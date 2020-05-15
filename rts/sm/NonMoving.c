@@ -586,15 +586,9 @@ static struct NonmovingSegment *nonmovingAllocSegment(uint32_t node)
     return ret;
 }
 
-static inline unsigned long log2_floor(unsigned long x)
-{
-    return sizeof(unsigned long)*8 - 1 - __builtin_clzl(x);
-}
-
 static inline unsigned long log2_ceil(unsigned long x)
 {
-    unsigned long log = log2_floor(x);
-    return (x - (1 << log)) ? log + 1 : log;
+    return (sizeof(unsigned long)*8) - __builtin_clzl(x-1);
 }
 
 // Advance a segment's next_free pointer. Returns true if segment if full.
