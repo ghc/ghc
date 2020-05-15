@@ -7,9 +7,9 @@ module GHC.Unit.State (
         module GHC.Unit.Info,
 
         -- * Reading the package config, and processing cmdline args
-        PackageState(..),
+        UnitState(..),
         UnitDatabase (..),
-        emptyPackageState,
+        emptyUnitState,
         initUnits,
         readUnitDatabases,
         readUnitDatabase,
@@ -314,7 +314,7 @@ instance Monoid UnitVisibility where
 type ModuleNameProvidersMap =
     Map ModuleName (Map Module ModuleOrigin)
 
-data PackageState = PackageState {
+data UnitState = UnitState {
   -- | A mapping of 'Unit' to 'UnitInfo'.  This list is adjusted
   -- so that only valid units are here.  'UnitInfo' reflects
   -- what was stored *on disk*, except for the 'trusted' flag, which
@@ -370,8 +370,8 @@ data PackageState = PackageState {
   allowVirtualUnits :: !Bool
   }
 
-emptyPackageState :: PackageState
-emptyPackageState = PackageState {
+emptyUnitState :: UnitState
+emptyUnitState = UnitState {
     unitInfoMap = Map.empty,
     preloadClosure = emptyUniqSet,
     packageNameMap = Map.empty,
@@ -393,10 +393,10 @@ data UnitDatabase unit = UnitDatabase
 type UnitInfoMap = Map UnitId UnitInfo
 
 -- | Find the unit we know about with the given unit, if any
-lookupUnit :: PackageState -> Unit -> Maybe UnitInfo
+lookupUnit :: UnitState -> Unit -> Maybe UnitInfo
 lookupUnit pkgs = lookupUnit' (allowVirtualUnits pkgs) (unitInfoMap pkgs) (preloadClosure pkgs)
 
--- | A more specialized interface, which doesn't require a 'PackageState' (so it
+-- | A more specialized interface, which doesn't require a 'UnitState' (so it
 -- can be used while we're initializing 'DynFlags')
 --
 -- Parameters:
@@ -422,7 +422,7 @@ lookupUnit' allowOnTheFlyInst pkg_map closure u = case u of
          Map.lookup (virtualUnitId i) pkg_map
 
 -- | Find the unit we know about with the given unit id, if any
-lookupUnitId :: PackageState -> UnitId -> Maybe UnitInfo
+lookupUnitId :: UnitState -> UnitId -> Maybe UnitInfo
 lookupUnitId state uid = lookupUnitId' (unitInfoMap state) uid
 
 -- | Find the unit we know about with the given unit id, if any
@@ -431,13 +431,13 @@ lookupUnitId' db uid = Map.lookup uid db
 
 
 -- | Looks up the given unit in the package state, panicing if it is not found
-unsafeLookupUnit :: HasDebugCallStack => PackageState -> Unit -> UnitInfo
+unsafeLookupUnit :: HasDebugCallStack => UnitState -> Unit -> UnitInfo
 unsafeLookupUnit state u = case lookupUnit state u of
    Just info -> info
    Nothing   -> pprPanic "unsafeLookupUnit" (ppr u)
 
 -- | Looks up the given unit id in the package state, panicing if it is not found
-unsafeLookupUnitId :: HasDebugCallStack => PackageState -> UnitId -> UnitInfo
+unsafeLookupUnitId :: HasDebugCallStack => UnitState -> UnitId -> UnitInfo
 unsafeLookupUnitId state uid = case lookupUnitId state uid of
    Just info -> info
    Nothing   -> pprPanic "unsafeLookupUnitId" (ppr uid)
@@ -445,11 +445,11 @@ unsafeLookupUnitId state uid = case lookupUnitId state uid of
 
 -- | Find the package we know about with the given package name (e.g. @foo@), if any
 -- (NB: there might be a locally defined unit name which overrides this)
-lookupPackageName :: PackageState -> PackageName -> Maybe IndefUnitId
+lookupPackageName :: UnitState -> PackageName -> Maybe IndefUnitId
 lookupPackageName pkgstate n = Map.lookup n (packageNameMap pkgstate)
 
 -- | Search for packages with a given package ID (e.g. \"foo-0.1\")
-searchPackageId :: PackageState -> PackageId -> [UnitInfo]
+searchPackageId :: UnitState -> PackageId -> [UnitInfo]
 searchPackageId pkgstate pid = filter ((pid ==) . unitPackageId)
                                (listUnitInfo pkgstate)
 
@@ -478,7 +478,7 @@ mkUnitInfoMap infos = foldl' add Map.empty infos
 -- this function, although all packages in this map are "visible", this
 -- does not imply that the exposed-modules of the package are available
 -- (they may have been thinned or renamed).
-listUnitInfo :: PackageState -> [UnitInfo]
+listUnitInfo :: UnitState -> [UnitInfo]
 listUnitInfo state = Map.elems (unitInfoMap state)
 
 -- ----------------------------------------------------------------------------
@@ -513,7 +513,7 @@ initUnits dflags = withTiming dflags
          | otherwise                           = read_pkg_dbs
 
   (pkg_state, preload, insts)
-        <- mkPackageState dflags pkg_dbs []
+        <- mkUnitState dflags pkg_dbs []
   return (dflags{ unitDatabases = Just read_pkg_dbs,
                   unitState = pkg_state,
                   homeUnitInstantiations = insts },
@@ -1340,17 +1340,17 @@ validateDatabase dflags pkg_map1 =
 -- When all the command-line options are in, we can process our package
 -- settings and populate the package state.
 
-mkPackageState
+mkUnitState
     :: DynFlags
     -- initial databases, in the order they were specified on
     -- the command line (later databases shadow earlier ones)
     -> [UnitDatabase UnitId]
     -> [UnitId]              -- preloaded packages
-    -> IO (PackageState,
+    -> IO (UnitState,
            [UnitId],         -- new packages to preload
            [(ModuleName, Module)])
 
-mkPackageState dflags dbs preload0 = do
+mkUnitState dflags dbs preload0 = do
 {-
    Plan.
 
@@ -1580,8 +1580,8 @@ mkPackageState dflags dbs preload0 = do
     FormatText
     (pprModuleMap mod_map)
 
-  -- Force pstate to avoid leaking the dflags passed to mkPackageState
-  let !pstate = PackageState
+  -- Force pstate to avoid leaking the dflags passed to mkUnitState
+  let !pstate = UnitState
          { preloadUnits                 = dep_preload
          , explicitUnits                = explicit_pkgs
          , unitInfoMap                  = pkg_db
@@ -1870,7 +1870,7 @@ getUnitFrameworks dflags pkgs = do
 
 -- | Takes a 'ModuleName', and if the module is in any package returns
 -- list of modules which take that name.
-lookupModuleInAllPackages :: PackageState
+lookupModuleInAllPackages :: UnitState
                           -> ModuleName
                           -> [(Module, UnitInfo)]
 lookupModuleInAllPackages pkgs m
@@ -1900,21 +1900,21 @@ data LookupResult =
 data ModuleSuggestion = SuggestVisible ModuleName Module ModuleOrigin
                       | SuggestHidden ModuleName Module ModuleOrigin
 
-lookupModuleWithSuggestions :: PackageState
+lookupModuleWithSuggestions :: UnitState
                             -> ModuleName
                             -> Maybe FastString
                             -> LookupResult
 lookupModuleWithSuggestions pkgs
   = lookupModuleWithSuggestions' pkgs (moduleNameProvidersMap pkgs)
 
-lookupPluginModuleWithSuggestions :: PackageState
+lookupPluginModuleWithSuggestions :: UnitState
                                   -> ModuleName
                                   -> Maybe FastString
                                   -> LookupResult
 lookupPluginModuleWithSuggestions pkgs
   = lookupModuleWithSuggestions' pkgs (pluginModuleNameProvidersMap pkgs)
 
-lookupModuleWithSuggestions' :: PackageState
+lookupModuleWithSuggestions' :: UnitState
                             -> ModuleNameProvidersMap
                             -> ModuleName
                             -> Maybe FastString
@@ -2075,7 +2075,7 @@ missingDependencyMsg (Just parent)
 -- these details in the IndefUnitId itself because we don't want to query
 -- DynFlags each time we pretty-print the IndefUnitId
 --
-mkIndefUnitId :: PackageState -> FastString -> IndefUnitId
+mkIndefUnitId :: UnitState -> FastString -> IndefUnitId
 mkIndefUnitId pkgstate raw =
     let uid = UnitId raw
     in case lookupUnitId pkgstate uid of
@@ -2083,11 +2083,11 @@ mkIndefUnitId pkgstate raw =
          Just c  -> Indefinite uid $ Just $ mkUnitPprInfo c
 
 -- | Update component ID details from the database
-updateIndefUnitId :: PackageState -> IndefUnitId -> IndefUnitId
+updateIndefUnitId :: UnitState -> IndefUnitId -> IndefUnitId
 updateIndefUnitId pkgstate uid = mkIndefUnitId pkgstate (unitIdFS (indefUnit uid))
 
 
-displayUnitId :: PackageState -> UnitId -> Maybe String
+displayUnitId :: UnitState -> UnitId -> Maybe String
 displayUnitId pkgstate uid =
     fmap unitPackageIdString (lookupUnitId pkgstate uid)
 
@@ -2095,10 +2095,10 @@ displayUnitId pkgstate uid =
 -- Displaying packages
 
 -- | Show (very verbose) package info
-pprPackages :: PackageState -> SDoc
+pprPackages :: UnitState -> SDoc
 pprPackages = pprPackagesWith pprUnitInfo
 
-pprPackagesWith :: (UnitInfo -> SDoc) -> PackageState -> SDoc
+pprPackagesWith :: (UnitInfo -> SDoc) -> UnitState -> SDoc
 pprPackagesWith pprIPI pkgstate =
     vcat (intersperse (text "---") (map pprIPI (listUnitInfo pkgstate)))
 
@@ -2106,7 +2106,7 @@ pprPackagesWith pprIPI pkgstate =
 --
 -- The idea is to only print package id, and any information that might
 -- be different from the package databases (exposure, trust)
-pprPackagesSimple :: PackageState -> SDoc
+pprPackagesSimple :: UnitState -> SDoc
 pprPackagesSimple = pprPackagesWith pprIPI
     where pprIPI ipi = let i = unitIdFS (unitId ipi)
                            e = if unitIsExposed ipi then text "E" else text " "
@@ -2132,7 +2132,7 @@ fsPackageName info = fs
 
 -- | Given a fully instantiated 'InstantiatedUnit', improve it into a
 -- 'RealUnit' if we can find it in the package database.
-improveUnit :: PackageState -> Unit -> Unit
+improveUnit :: UnitState -> Unit -> Unit
 improveUnit state u = improveUnit' (unitInfoMap state) (preloadClosure state) u
 
 -- | Given a fully instantiated 'InstantiatedUnit', improve it into a
@@ -2158,7 +2158,7 @@ improveUnit' pkg_map closure uid =
 -- references a matching installed unit.
 --
 -- See Note [VirtUnit to RealUnit improvement]
-instUnitToUnit :: PackageState -> InstantiatedUnit -> Unit
+instUnitToUnit :: UnitState -> InstantiatedUnit -> Unit
 instUnitToUnit state iuid =
     -- NB: suppose that we want to compare the instantiated
     -- unit p[H=impl:H] against p+abcd (where p+abcd
@@ -2177,14 +2177,14 @@ type ShHoleSubst = ModuleNameEnv Module
 -- directly on a 'nameModule', see Note [Representation of module/name variable].
 -- @p[A=<A>]:B@ maps to @p[A=q():A]:B@ with @A=q():A@;
 -- similarly, @<A>@ maps to @q():A@.
-renameHoleModule :: PackageState -> ShHoleSubst -> Module -> Module
+renameHoleModule :: UnitState -> ShHoleSubst -> Module -> Module
 renameHoleModule state = renameHoleModule' (unitInfoMap state) (preloadClosure state)
 
 -- | Substitutes holes in a 'Unit', suitable for renaming when
 -- an include occurs; see Note [Representation of module/name variable].
 --
 -- @p[A=<A>]@ maps to @p[A=<B>]@ with @A=<B>@.
-renameHoleUnit :: PackageState -> ShHoleSubst -> Unit -> Unit
+renameHoleUnit :: UnitState -> ShHoleSubst -> Unit -> Unit
 renameHoleUnit state = renameHoleUnit' (unitInfoMap state) (preloadClosure state)
 
 -- | Like 'renameHoleModule', but requires only 'ClosureUnitInfoMap'
@@ -2220,7 +2220,7 @@ renameHoleUnit' pkg_map closure env uid =
 
 -- | Injects an 'InstantiatedModule' to 'Module' (see also
 -- 'instUnitToUnit'.
-instModuleToModule :: PackageState -> InstantiatedModule -> Module
+instModuleToModule :: UnitState -> InstantiatedModule -> Module
 instModuleToModule pkgstate (Module iuid mod_name) =
     mkModule (instUnitToUnit pkgstate iuid) mod_name
 
