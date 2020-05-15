@@ -247,7 +247,7 @@ import GHC.Unit.Module
 import {-# SOURCE #-} GHC.Driver.Plugins
 import {-# SOURCE #-} GHC.Driver.Hooks
 import {-# SOURCE #-} GHC.Builtin.Names ( mAIN )
-import {-# SOURCE #-} GHC.Unit.State (PackageState, emptyPackageState, UnitDatabase, updateIndefUnitId)
+import {-# SOURCE #-} GHC.Unit.State (UnitState, emptyUnitState, UnitDatabase, updateIndefUnitId)
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Flags
 import GHC.Driver.Ways
@@ -636,7 +636,7 @@ data DynFlags = DynFlags {
         -- `initUnits` is called again, it doesn't reload the databases from
         -- disk.
 
-  unitState             :: PackageState,
+  unitState             :: UnitState,
         -- ^ Consolidated unit database built by 'initUnits' from the unit
         -- databases in 'unitDatabases' and flags ('-ignore-package', etc.).
         --
@@ -1370,7 +1370,7 @@ defaultDynFlags mySettings llvmConfig =
         trustFlags              = [],
         packageEnv              = Nothing,
         unitDatabases           = Nothing,
-        unitState               = emptyPackageState,
+        unitState               = emptyUnitState,
         ways                    = defaultWays mySettings,
         buildTag                = waysTag (defaultWays mySettings),
         splitInfo               = Nothing,
