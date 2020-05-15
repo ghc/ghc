@@ -608,6 +608,8 @@ cvtConstr (ForallC tvs ctxt con)
       where
         all_tvs = tvs' ++ ex_tvs
 
+    add_forall _    _    (XConDecl nec) = noExtCon nec
+
 cvtConstr (GadtC [] _strtys _ty)
   = failWith (text "GadtC must have at least one constructor name")
 

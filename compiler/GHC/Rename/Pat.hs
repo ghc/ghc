@@ -412,7 +412,7 @@ rnPatAndThen mk (SigPat x pat sig)
        ; return (SigPat x pat' sig' ) }
   where
     rnHsPatSigTypeAndThen :: HsPatSigType GhcPs -> CpsRn (HsPatSigType GhcRn)
-    rnHsPatSigTypeAndThen sig = CpsRn (rnHsPatSigType AlwaysBind PatCtx sig)
+    rnHsPatSigTypeAndThen sig = CpsRn (rnHsPatSigType AlwaysBind PatCtx Nothing sig)
 
 rnPatAndThen mk (LitPat x lit)
   | HsString src s <- lit

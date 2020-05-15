@@ -163,7 +163,8 @@ rn_hs_sig_wc_type :: HsSigWcTypeScoping -> HsDocContext -> Maybe SDoc
                       -> RnM (a, FreeVars))
                   -> RnM (a, FreeVars)
 rn_hs_sig_wc_type scoping ctxt inf_err hs_ty thing_inside
-  = do { free_vars <- extractFilteredRdrTyVarsDups hs_ty
+  = do { check_inferred_vars ctxt inf_err hs_ty
+       ; free_vars <- extractFilteredRdrTyVarsDups hs_ty
        ; (nwc_rdrs', tv_rdrs) <- partition_nwcs free_vars
        ; let nwc_rdrs = nubL nwc_rdrs'
              implicit_bndrs = case scoping of
