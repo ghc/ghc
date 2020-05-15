@@ -512,10 +512,14 @@ initUnits dflags = withTiming dflags
          | gopt Opt_DistrustAllPackages dflags = map distrust_all read_pkg_dbs
          | otherwise                           = read_pkg_dbs
 
-  (pkg_state, preload, insts)
-        <- mkUnitState dflags pkg_dbs []
-  return (dflags{ unitDatabases = Just read_pkg_dbs,
-                  unitState = pkg_state,
+  (state, preload, insts) <- mkUnitState dflags pkg_dbs []
+
+  dumpIfSet_dyn (dflags { pprCols = 200 }) Opt_D_dump_mod_map "Mod Map"
+    FormatText
+    (pprModuleMap (moduleNameProvidersMap state))
+
+  return (dflags{ unitDatabases          = Just read_pkg_dbs,
+                  unitState              = state,
                   homeUnitInstantiations = insts },
           preload)
   where
@@ -1579,10 +1583,6 @@ mkUnitState dflags dbs preload0 = do
   let mod_map1 = mkModuleNameProvidersMap dflags pkg_db emptyUniqSet vis_map
       mod_map2 = mkUnusableModuleNameProvidersMap unusable
       mod_map = Map.union mod_map1 mod_map2
-
-  dumpIfSet_dyn (dflags { pprCols = 200 }) Opt_D_dump_mod_map "Mod Map"
-    FormatText
-    (pprModuleMap mod_map)
 
   -- Force pstate to avoid leaking the dflags passed to mkUnitState
   let !pstate = UnitState
