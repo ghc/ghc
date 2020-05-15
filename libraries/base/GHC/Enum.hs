@@ -139,17 +139,34 @@ class  Enum a   where
     --     * @enumFromThenTo 6 8 2 :: [Int] = []@
     enumFromThenTo      :: a -> a -> a -> [a]
 
-    succ                   = toEnum . (+ 1)  . fromEnum
-    pred                   = toEnum . (subtract 1) . fromEnum
-    enumFrom x             = map toEnum [fromEnum x ..]
-    enumFromThen x y       = map toEnum [fromEnum x, fromEnum y ..]
-    enumFromTo x y         = map toEnum [fromEnum x .. fromEnum y]
+    succ = toEnum . (+ 1) . fromEnum
+
+    pred = toEnum . (subtract 1) . fromEnum
+
+    -- See Note [Stable Unfolding for list producers]
+    {-# INLINABLE enumFrom #-}
+    enumFrom x = map toEnum [fromEnum x ..]
+
+    -- See Note [Stable Unfolding for list producers]
+    {-# INLINABLE enumFromThen #-}
+    enumFromThen x y = map toEnum [fromEnum x, fromEnum y ..]
+
+    -- See Note [Stable Unfolding for list producers]
+    {-# INLINABLE enumFromTo #-}
+    enumFromTo x y = map toEnum [fromEnum x .. fromEnum y]
+
+    -- See Note [Stable Unfolding for list producers]
+    {-# INLINABLE enumFromThenTo #-}
     enumFromThenTo x1 x2 y = map toEnum [fromEnum x1, fromEnum x2 .. fromEnum y]
 
+-- See Note [Stable Unfolding for list producers]
+{-# INLINABLE boundedEnumFrom #-}
 -- Default methods for bounded enumerations
 boundedEnumFrom :: (Enum a, Bounded a) => a -> [a]
 boundedEnumFrom n = map toEnum [fromEnum n .. fromEnum (maxBound `asTypeOf` n)]
 
+-- See Note [Stable Unfolding for list producers]
+{-# INLINABLE boundedEnumFromThen #-}
 boundedEnumFromThen :: (Enum a, Bounded a) => a -> a -> [a]
 boundedEnumFromThen n1 n2
   | i_n2 >= i_n1  = map toEnum [i_n1, i_n2 .. fromEnum (maxBound `asTypeOf` n1)]
@@ -157,6 +174,14 @@ boundedEnumFromThen n1 n2
   where
     i_n1 = fromEnum n1
     i_n2 = fromEnum n2
+
+{-
+Note [Stable Unfolding for list producers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The INLINABLE/INLINE pragmas ensure that we export stable (unoptimised)
+unfoldings in the interface file so we can do list fusion at usage sites.
+-}
 
 ------------------------------------------------------------------------
 -- Helper functions
