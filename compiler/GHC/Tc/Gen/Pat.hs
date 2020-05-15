@@ -358,7 +358,35 @@ tc_pat penv (ParPat x pat) pat_ty thing_inside
 
 tc_pat penv (BangPat x pat) pat_ty thing_inside
   = do  { (pat', res) <- tc_lpat pat pat_ty penv thing_inside
+        ; should_warn <- shouldWarn pat -- 370gg#17340
+        ; when should_warn warnRedundantBangPats
         ; return (BangPat x pat', res) }
+        where
+        warnRedundantBangPats :: TcM ()
+        warnRedundantBangPats =
+          whenWOptM Opt_WarnRedundantBangPatterns
+                    (addWarnTc (Reason Opt_WarnRedundantBangPatterns)
+                               (text "Bang pattern is redundant"))
+
+        shouldWarn :: LPat GhcRn -> TcM Bool
+        shouldWarn (unLoc -> pat) = case pat of
+            ConPat _ (unLoc -> con_name) _ ->
+              do { con_like <- tcLookupConLike con_name
+                 ; case con_like of
+                     -- Only warn if DataCon is not a newtype!
+                     RealDataCon dataCon -> do
+                       let isNewType = isNewTyCon (dataConTyCon dataCon)
+                       return (not isNewType)
+                     -- Always neglect to warn for PatSyns (for now)
+                     PatSynCon _ -> return False }
+            ParPat _ p      -> shouldWarn p
+            AsPat _ _ p     -> shouldWarn p
+            SigPat _ p _    -> shouldWarn p
+            ViewPat _ _ p   -> shouldWarn p
+            WildPat _       -> return True
+            ListPat _ _     -> return True
+            TuplePat _ _ _  -> return True
+            _otherwise      -> return False
 
 tc_pat penv (LazyPat x pat) pat_ty thing_inside
   = do  { (pat', (res, pat_ct))

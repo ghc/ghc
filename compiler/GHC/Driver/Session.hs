@@ -3446,6 +3446,7 @@ wWarningFlagsDeps = [
   flagSpec "unused-top-binds"            Opt_WarnUnusedTopBinds,
   flagSpec "unused-type-patterns"        Opt_WarnUnusedTypePatterns,
   flagSpec "unused-record-wildcards"     Opt_WarnUnusedRecordWildcards,
+  flagSpec "redundant-bang-patterns"     Opt_WarnRedundantBangPatterns,
   flagSpec "redundant-record-wildcards"  Opt_WarnRedundantRecordWildcards,
   flagSpec "warnings-deprecations"       Opt_WarnWarningsDeprecations,
   flagSpec "wrong-do-bind"               Opt_WarnWrongDoBind,
@@ -4217,6 +4218,7 @@ minusWallOpts
         Opt_WarnUntickedPromotedConstructors,
         Opt_WarnMissingPatternSynonymSignatures,
         Opt_WarnUnusedRecordWildcards,
+        Opt_WarnRedundantBangPatterns,
         Opt_WarnRedundantRecordWildcards,
         Opt_WarnStarIsType
       ]
