@@ -333,8 +333,10 @@ data UnitState = UnitState {
   -- users refer to packages in Backpack includes.
   packageNameMap            :: Map PackageName IndefUnitId,
 
-  -- | A mapping from wired in names to the original names from the
-  -- package database.
+  -- | A mapping from database unit keys to wired in unit ids.
+  wireMap :: Map UnitId UnitId,
+
+  -- | A mapping from wired in unit ids to unit keys from the database.
   unwireMap :: Map UnitId UnitId,
 
   -- | The packages we're going to link in eagerly.  This list
@@ -375,6 +377,7 @@ emptyUnitState = UnitState {
     unitInfoMap = Map.empty,
     preloadClosure = emptyUniqSet,
     packageNameMap = Map.empty,
+    wireMap   = Map.empty,
     unwireMap = Map.empty,
     preloadUnits = [],
     explicitUnits = [],
@@ -512,15 +515,21 @@ initUnits dflags = withTiming dflags
          | gopt Opt_DistrustAllPackages dflags = map distrust_all read_pkg_dbs
          | otherwise                           = read_pkg_dbs
 
-  (state, preload, insts) <- mkUnitState dflags pkg_dbs []
+  (state, preload) <- mkUnitState dflags pkg_dbs []
 
   dumpIfSet_dyn (dflags { pprCols = 200 }) Opt_D_dump_mod_map "Mod Map"
     FormatText
     (pprModuleMap (moduleNameProvidersMap state))
 
+  -- Some wired units can be used to instantiate the home unit. We need to
+  -- replace their unit key by their wired unit id.
+  let wiringMap    = wireMap state
+      unwiredInsts = homeUnitInstantiations dflags
+      wiredInsts   = map (fmap (upd_wired_in_mod wiringMap)) unwiredInsts
+
   return (dflags{ unitDatabases          = Just read_pkg_dbs,
                   unitState              = state,
-                  homeUnitInstantiations = insts },
+                  homeUnitInstantiations = wiredInsts },
           preload)
   where
     forcePkgDb (dflags, _) = unitInfoMap (unitState dflags) `seq` ()
@@ -1355,8 +1364,7 @@ mkUnitState
     -> [UnitDatabase UnitId]
     -> [UnitId]              -- preloaded packages
     -> IO (UnitState,
-           [UnitId],         -- new packages to preload
-           [(ModuleName, Module)])
+           [UnitId])         -- new packages to preload
 
 mkUnitState dflags dbs preload0 = do
 {-
@@ -1593,6 +1601,7 @@ mkUnitState dflags dbs preload0 = do
          , moduleNameProvidersMap       = mod_map
          , pluginModuleNameProvidersMap = mkModuleNameProvidersMap dflags pkg_db emptyUniqSet plugin_vis_map
          , packageNameMap               = pkgname_map
+         , wireMap                      = wired_map
          , unwireMap                    = Map.fromList [ (v,k) | (k,v) <- Map.toList wired_map ]
          , requirementContext           = req_ctx
 
@@ -1601,8 +1610,7 @@ mkUnitState dflags dbs preload0 = do
            -- instantiated on-the-fly (see Note [About units] in GHC.Unit)
          , allowVirtualUnits            = homeUnitIsIndefinite dflags
          }
-  let new_insts = map (fmap (upd_wired_in_mod wired_map)) (homeUnitInstantiations dflags)
-  return (pstate, new_dep_preload, new_insts)
+  return (pstate, new_dep_preload)
 
 -- | Given a wired-in 'Unit', "unwire" it into the 'Unit'
 -- that it was recorded as in the package database.
