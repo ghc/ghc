@@ -1160,7 +1160,7 @@ hscCheckSafe' m l = do
                 where
                     inferredImportWarn = unitBag
                         $ makeIntoWarning (Reason Opt_WarnInferredSafeImports)
-                        $ mkErrMsg dflags l (pkgQual dflags)
+                        $ mkWarnMsg dflags l (pkgQual dflags)
                         $ sep
                             [ text "Importing Safe-Inferred module "
                                 <> ppr (moduleName m)
