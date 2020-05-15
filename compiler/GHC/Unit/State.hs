@@ -502,8 +502,8 @@ listUnitInfo state = Map.elems (unitInfoMap state)
 initUnits :: DynFlags -> IO (DynFlags, [UnitId])
 initUnits dflags = do
 
-  let forcePkgDb (state, _, _) = unitInfoMap state `seq` ()
-  (state,preload,raw_dbs) <- withTiming dflags
+  let forcePkgDb (state, _) = unitInfoMap state `seq` ()
+  (state,raw_dbs) <- withTiming dflags
                                 (text "initializing package database")
                                 forcePkgDb $ do
 
@@ -521,9 +521,9 @@ initUnits dflags = do
            = raw_dbs
 
     -- create the UnitState
-    (state,preload) <- mkUnitState dflags dbs []
+    state <- mkUnitState dflags dbs
 
-    return (state, preload, raw_dbs)
+    return (state, raw_dbs)
 
   dumpIfSet_dyn (dflags { pprCols = 200 }) Opt_D_dump_mod_map "Mod Map"
     FormatText
@@ -538,7 +538,7 @@ initUnits dflags = do
   return (dflags{ unitDatabases          = Just raw_dbs,
                   unitState              = state,
                   homeUnitInstantiations = wiredInsts },
-          preload)
+          (preloadUnits state))
 
 -- -----------------------------------------------------------------------------
 -- Reading the unit database(s)
@@ -1368,11 +1368,8 @@ mkUnitState
     -- initial databases, in the order they were specified on
     -- the command line (later databases shadow earlier ones)
     -> [UnitDatabase UnitId]
-    -> [UnitId]              -- preloaded packages
-    -> IO (UnitState,
-           [UnitId])         -- new packages to preload
-
-mkUnitState dflags dbs preload0 = do
+    -> IO UnitState
+mkUnitState dflags dbs = do
 {-
    Plan.
 
@@ -1592,7 +1589,6 @@ mkUnitState dflags dbs preload0 = do
 
   -- Close the preload packages with their dependencies
   dep_preload <- closeDeps dflags pkg_db (zip (map toUnitId preload3) (repeat Nothing))
-  let new_dep_preload = filter (`notElem` preload0) dep_preload
 
   let mod_map1 = mkModuleNameProvidersMap dflags pkg_db emptyUniqSet vis_map
       mod_map2 = mkUnusableModuleNameProvidersMap unusable
@@ -1616,7 +1612,7 @@ mkUnitState dflags dbs preload0 = do
            -- instantiated on-the-fly (see Note [About units] in GHC.Unit)
          , allowVirtualUnits            = homeUnitIsIndefinite dflags
          }
-  return (pstate, new_dep_preload)
+  return pstate
 
 -- | Given a wired-in 'Unit', "unwire" it into the 'Unit'
 -- that it was recorded as in the package database.
