@@ -123,20 +123,9 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
     -- (This magic number does not change when we change
     --  GHC interface file format)
     magic <- get bh
-    wantedGot "Magic" (binaryInterfaceMagic platform) magic ppr
+    wantedGot "Magic" (binaryInterfaceMagic platform) magic (ppr . unFixedLength)
     errorOnMismatch "magic number mismatch: old/corrupt interface file?"
-        (binaryInterfaceMagic platform) magic
-
-    -- Note [dummy iface field]
-    -- read a dummy 32/64 bit value.  This field used to hold the
-    -- dictionary pointer in old interface file formats, but now
-    -- the dictionary pointer is after the version (where it
-    -- should be).  Also, the serialisation of value of type "Bin
-    -- a" used to depend on the word size of the machine, now they
-    -- are always 32 bits.
-    case platformWordSize platform of
-      PW4 -> do _ <- Binary.get bh :: IO Word32; return ()
-      PW8 -> do _ <- Binary.get bh :: IO Word64; return ()
+        (unFixedLength $ binaryInterfaceMagic platform) (unFixedLength magic)
 
     -- Check the interface file version and ways.
     check_ver  <- get bh
@@ -197,13 +186,6 @@ writeBinIface dflags hi_path mod_iface = do
     bh <- openBinMem initBinMemSize
     let platform = targetPlatform dflags
     put_ bh (binaryInterfaceMagic platform)
-
-   -- dummy 32/64-bit field before the version/way for
-   -- compatibility with older interface file formats.
-   -- See Note [dummy iface field] above.
-    case platformWordSize platform of
-      PW4 -> Binary.put_ bh (0 :: Word32)
-      PW8 -> Binary.put_ bh (0 :: Word64)
 
     -- The version and way descriptor go next
     put_ bh (show hiVersion)
@@ -290,10 +272,10 @@ putWithUserData log_action bh payload = do
 initBinMemSize :: Int
 initBinMemSize = 1024 * 1024
 
-binaryInterfaceMagic :: Platform -> Word32
+binaryInterfaceMagic :: Platform -> FixedLengthEncoding Word32
 binaryInterfaceMagic platform
- | target32Bit platform = 0x1face
- | otherwise            = 0x1face64
+ | target32Bit platform = FixedLengthEncoding 0x1face
+ | otherwise            = FixedLengthEncoding 0x1face64
 
 
 -- -----------------------------------------------------------------------------
