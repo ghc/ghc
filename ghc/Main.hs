@@ -49,7 +49,7 @@ import GHC.Platform.Host
 import GHC.Settings.Config
 import GHC.Settings.Constants
 import GHC.Driver.Types
-import GHC.Unit.State ( pprPackages, pprPackagesSimple )
+import GHC.Unit.State ( pprUnits, pprUnitsSimple )
 import GHC.Driver.Phases
 import GHC.Types.Basic     ( failed )
 import GHC.Driver.Session hiding (WarnReason(..))
@@ -251,8 +251,8 @@ main' postLoadMode dflags0 args flagWarnings = do
 
         ---------------- Display configuration -----------
   case verbosity dflags6 of
-    v | v == 4 -> liftIO $ dumpPackagesSimple dflags6
-      | v >= 5 -> liftIO $ dumpPackages dflags6
+    v | v == 4 -> liftIO $ dumpUnitsSimple dflags6
+      | v >= 5 -> liftIO $ dumpUnits dflags6
       | otherwise -> return ()
 
   liftIO $ initUniqSupply (initialUnique dflags6) (uniqueIncrement dflags6)
@@ -272,7 +272,7 @@ main' postLoadMode dflags0 args flagWarnings = do
        DoEval exprs           -> ghciUI hsc_env dflags6 srcs $ Just $
                                    reverse exprs
        DoAbiHash              -> abiHash (map fst srcs)
-       ShowPackages           -> liftIO $ showPackages dflags6
+       ShowPackages           -> liftIO $ showUnits dflags6
        DoFrontend f           -> doFrontend f srcs
        DoBackpack             -> doBackpack (map fst srcs)
 
@@ -493,12 +493,12 @@ data PostLoadMode
   | DoFrontend ModuleName   -- ghc --frontend Plugin.Module
 
 doMkDependHSMode, doMakeMode, doInteractiveMode,
-  doAbiHashMode, showPackagesMode :: Mode
+  doAbiHashMode, showUnitsMode :: Mode
 doMkDependHSMode = mkPostLoadMode DoMkDependHS
 doMakeMode = mkPostLoadMode DoMake
 doInteractiveMode = mkPostLoadMode DoInteractive
 doAbiHashMode = mkPostLoadMode DoAbiHash
-showPackagesMode = mkPostLoadMode ShowPackages
+showUnitsMode = mkPostLoadMode ShowPackages
 
 showInterfaceMode :: FilePath -> Mode
 showInterfaceMode fp = mkPostLoadMode (ShowInterface fp)
@@ -604,7 +604,7 @@ mode_flags =
   , defFlag "-show-options"         (PassFlag (setMode showOptionsMode))
   , defFlag "-supported-languages"  (PassFlag (setMode showSupportedExtensionsMode))
   , defFlag "-supported-extensions" (PassFlag (setMode showSupportedExtensionsMode))
-  , defFlag "-show-packages"        (PassFlag (setMode showPackagesMode))
+  , defFlag "-show-packages"        (PassFlag (setMode showUnitsMode))
   ] ++
   [ defFlag k'                      (PassFlag (setMode (printSetting k)))
   | k <- ["Project version",
@@ -864,10 +864,10 @@ dumpFastStringStats dflags = do
   where
    x `pcntOf` y = int ((x * 100) `quot` y) Outputable.<> char '%'
 
-showPackages, dumpPackages, dumpPackagesSimple :: DynFlags -> IO ()
-showPackages       dflags = putStrLn (showSDoc dflags (pprPackages (unitState dflags)))
-dumpPackages       dflags = putMsg dflags (pprPackages (unitState dflags))
-dumpPackagesSimple dflags = putMsg dflags (pprPackagesSimple (unitState dflags))
+showUnits, dumpUnits, dumpUnitsSimple :: DynFlags -> IO ()
+showUnits       dflags = putStrLn (showSDoc dflags (pprUnits (unitState dflags)))
+dumpUnits       dflags = putMsg dflags (pprUnits (unitState dflags))
+dumpUnitsSimple dflags = putMsg dflags (pprUnitsSimple (unitState dflags))
 
 -- -----------------------------------------------------------------------------
 -- Frontend plugin support
