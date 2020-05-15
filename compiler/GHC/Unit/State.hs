@@ -500,39 +500,45 @@ listUnitInfo state = Map.elems (unitInfoMap state)
 -- 'unitState' in 'DynFlags' and return a list of packages to
 -- link in.
 initUnits :: DynFlags -> IO (DynFlags, [UnitId])
-initUnits dflags = withTiming dflags
-                                  (text "initializing package database")
-                                  forcePkgDb $ do
-  read_pkg_dbs <-
-    case unitDatabases dflags of
-        Nothing  -> readUnitDatabases dflags
-        Just dbs -> return dbs
+initUnits dflags = do
 
-  let
-      distrust_all db = db { unitDatabaseUnits = distrustAllUnits (unitDatabaseUnits db) }
+  let forcePkgDb (state, _, _) = unitInfoMap state `seq` ()
+  (state,preload,raw_dbs) <- withTiming dflags
+                                (text "initializing package database")
+                                forcePkgDb $ do
 
-      pkg_dbs
-         | gopt Opt_DistrustAllPackages dflags = map distrust_all read_pkg_dbs
-         | otherwise                           = read_pkg_dbs
+    -- read the databases if they have not been already read
+    raw_dbs <- case unitDatabases dflags of
+          Nothing  -> readUnitDatabases dflags
+          Just dbs -> return dbs
 
-  (state, preload) <- mkUnitState dflags pkg_dbs []
+    -- distrust all units if the flag is set
+    let distrust_all db = db { unitDatabaseUnits = distrustAllUnits (unitDatabaseUnits db) }
+        dbs
+           | gopt Opt_DistrustAllPackages dflags
+           = map distrust_all raw_dbs
+           | otherwise
+           = raw_dbs
+
+    -- create the UnitState
+    (state,preload) <- mkUnitState dflags dbs []
+
+    return (state, preload, raw_dbs)
 
   dumpIfSet_dyn (dflags { pprCols = 200 }) Opt_D_dump_mod_map "Mod Map"
     FormatText
     (pprModuleMap (moduleNameProvidersMap state))
 
   -- Some wired units can be used to instantiate the home unit. We need to
-  -- replace their unit key by their wired unit id.
+  -- replace their unit keys by their wired unit ids.
   let wiringMap    = wireMap state
       unwiredInsts = homeUnitInstantiations dflags
       wiredInsts   = map (fmap (upd_wired_in_mod wiringMap)) unwiredInsts
 
-  return (dflags{ unitDatabases          = Just read_pkg_dbs,
+  return (dflags{ unitDatabases          = Just raw_dbs,
                   unitState              = state,
                   homeUnitInstantiations = wiredInsts },
           preload)
-  where
-    forcePkgDb (dflags, _) = unitInfoMap (unitState dflags) `seq` ()
 
 -- -----------------------------------------------------------------------------
 -- Reading the unit database(s)
