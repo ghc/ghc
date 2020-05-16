@@ -1,9 +1,12 @@
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 module T17340 where
+
+import GHC.Exts
 
 data A = A { a :: () }
 data B = B
@@ -25,9 +28,6 @@ sigPat (!B :: B) = ()
 viewPat :: B -> ()
 viewPat (id -> !B) = ()
 
-wildPat :: A -> ()
-wildPat !A{..} = ()
-
 listPat :: [Int] -> ()
 listPat ![] = ()
 listPat _ = ()
@@ -39,6 +39,17 @@ list2Pat _ = ()
 tuplePat :: (B,B) -> ()
 tuplePat !(_, _) = ()
 
+casePat :: B -> ()
+casePat b = case b of !B -> ()
+
+nPat :: Int -> ()
+nPat !1 = ()
+nPat _ = ()
+
+-- no warning expected
+unboxedPat :: Int# -> Int
+unboxedPat !x = I# x
+
 -- no warning expected
 newtyPat :: C -> ()
 newtyPat !(C _) = ()
@@ -46,3 +57,12 @@ newtyPat !(C _) = ()
 -- no warning expected
 patSyn :: B -> ()
 patSyn !P = ()
+
+-- no warning expected
+wildPat :: B -> ()
+wildPat !_ = ()
+
+-- no warning expected
+-- TODO: only for top-level bindings!
+letPat :: ()
+letPat = let !() = undefined in ()

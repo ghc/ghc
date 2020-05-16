@@ -357,36 +357,54 @@ tc_pat penv (ParPat x pat) pat_ty thing_inside
         ; return (ParPat x pat', res) }
 
 tc_pat penv (BangPat x pat) pat_ty thing_inside
-  = do  { (pat', res) <- tc_lpat pat pat_ty penv thing_inside
-        ; should_warn <- shouldWarn pat -- 370gg#17340
-        ; when should_warn warnRedundantBangPats
+  = do  { whenM (bang_is_redundant pat) warn_redundant_bang_pats
+        ; (pat', res) <- tc_lpat pat pat_ty penv thing_inside
         ; return (BangPat x pat', res) }
         where
-        warnRedundantBangPats :: TcM ()
-        warnRedundantBangPats =
+        warn_redundant_bang_pats :: TcM ()
+        warn_redundant_bang_pats =
           whenWOptM Opt_WarnRedundantBangPatterns
                     (addWarnTc (Reason Opt_WarnRedundantBangPatterns)
-                               (text "Bang pattern is redundant"))
+                                (text "Bang pattern is redundant"))
 
-        shouldWarn :: LPat GhcRn -> TcM Bool
-        shouldWarn (unLoc -> pat) = case pat of
-            ConPat _ (unLoc -> con_name) _ ->
-              do { con_like <- tcLookupConLike con_name
-                 ; case con_like of
-                     -- Only warn if DataCon is not a newtype!
-                     RealDataCon dataCon -> do
-                       let isNewType = isNewTyCon (dataConTyCon dataCon)
-                       return (not isNewType)
-                     -- Always neglect to warn for PatSyns (for now)
-                     PatSynCon _ -> return False }
-            ParPat _ p      -> shouldWarn p
-            AsPat _ _ p     -> shouldWarn p
-            SigPat _ p _    -> shouldWarn p
-            ViewPat _ _ p   -> shouldWarn p
-            WildPat _       -> return True
-            ListPat _ _     -> return True
-            TuplePat _ _ _  -> return True
-            _otherwise      -> return False
+        bang_is_redundant :: LPat GhcRn -> TcM Bool
+        bang_is_redundant lpat
+          -- Do not warn if bang is part of "bang-pattern binding"
+          -- Although, how do we check if this is "top level"? Hmm...
+          | PE{pe_ctxt=LetPat{}} <- penv
+          = return False
+          | otherwise = should_warn lpat
+          where
+            should_warn :: LPat GhcRn -> TcM Bool
+            should_warn (L _ pat) = case pat of
+              ConPat _ (L _ con_name) _ ->
+                do { con_like <- tcLookupConLike con_name
+                   ; case con_like of
+                       -- Only warn if DataCon is not a newtype!
+                       RealDataCon dataCon -> do
+                         let isNewType = isNewTyCon (dataConTyCon dataCon)
+                         return (not isNewType)
+                       -- Always neglect to warn for PatSyns (for now)
+                       PatSynCon _ -> return False }
+              ListPat _ _     ->
+                -- do not bother if RebindableSyntax is ON
+                -- TODO: add test case
+                do { rebindableIsOn <- xoptM LangExt.RebindableSyntax
+                   ; return (if rebindableIsOn then False else True)}
+              ParPat _ p      -> should_warn p
+              AsPat _ _ p     -> should_warn p
+              SigPat _ p _    -> should_warn p
+              ViewPat _ _ p   -> should_warn p
+              TuplePat _ _ _  -> return True
+              LitPat _ _      -> return True
+              BangPat _ _     -> return True
+              WildPat _       -> return False
+              VarPat _ _      -> return False
+              LazyPat _ _     -> return False
+              SumPat _ _ _ _  -> return False
+              SplicePat _ _   -> return False
+              NPat _ _ _ _    -> return False
+              NPlusKPat _ _ _ _ _ _ -> return False
 
 tc_pat penv (LazyPat x pat) pat_ty thing_inside
   = do  { (pat', (res, pat_ct))
