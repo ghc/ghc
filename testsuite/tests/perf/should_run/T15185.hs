@@ -18,7 +18,7 @@ main = do
   _ <- evaluate (fact @Int16 50)
   _ <- evaluate (fact @Int8 50)
   _ <- evaluate (fact @Word 50)
-  _ <- evaluate (fact @Word64 50) -- doesn't fuse yet
+  _ <- evaluate (fact @Word64 50)
   _ <- evaluate (fact @Word32 50)
   _ <- evaluate (fact @Word16 50)
   _ <- evaluate (fact @Word8 50)
