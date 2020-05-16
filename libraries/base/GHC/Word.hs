@@ -892,10 +892,47 @@ instance Enum Word64 where
         | x <= fromIntegral (maxBound::Int)
                         = I# (word2Int# x#)
         | otherwise     = fromEnumError "Word64" x
-    enumFrom            = integralEnumFrom
-    enumFromThen        = integralEnumFromThen
-    enumFromTo          = integralEnumFromTo
-    enumFromThenTo      = integralEnumFromThenTo
+
+#if WORD_SIZE_IN_BITS < 64
+    {-# INLINABLE enumFrom #-}
+    enumFrom = integralEnumFrom
+
+    {-# INLINABLE enumFromThen #-}
+    enumFromThen = integralEnumFromThen
+
+    {-# INLINABLE enumFromTo #-}
+    enumFromTo = integralEnumFromTo
+
+    {-# INLINABLE enumFromThenTo #-}
+    enumFromThenTo = integralEnumFromThenTo
+#else
+    {-# INLINABLE enumFrom #-}
+    enumFrom w
+        = map wordToWord64
+        $ enumFrom (word64ToWord w)
+
+    {-# INLINABLE enumFromThen #-}
+    enumFromThen w s
+        = map wordToWord64
+        $ enumFromThen (word64ToWord w) (word64ToWord s)
+
+    {-# INLINABLE enumFromTo #-}
+    enumFromTo w1 w2
+        = map wordToWord64
+        $ enumFromTo (word64ToWord w1) (word64ToWord w2)
+
+    {-# INLINABLE enumFromThenTo #-}
+    enumFromThenTo w1 s w2
+        = map wordToWord64
+        $ enumFromThenTo (word64ToWord w1) (word64ToWord s) (word64ToWord w2)
+
+word64ToWord :: Word64 -> Word
+word64ToWord (W64# w#) = (W# w#)
+
+wordToWord64 :: Word -> Word64
+wordToWord64 (W# w#) = (W64# w#)
+#endif
+
 
 -- | @since 2.01
 instance Integral Word64 where
