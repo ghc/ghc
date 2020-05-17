@@ -171,7 +171,8 @@ pprSigmaType = pprIfaceSigmaType ShowForAllWhen . tidyToIfaceType
 pprForAll :: [TyCoVarBinder] -> SDoc
 pprForAll tvs = pprIfaceForAll (map toIfaceForAllBndr tvs)
 
--- | Print a user-level forall; see Note [When to print foralls] in this module.
+-- | Print a user-level forall; see @Note [When to print foralls]@ in
+-- "GHC.Iface.Type".
 pprUserForAll :: [TyCoVarBinder] -> SDoc
 pprUserForAll = pprUserIfaceForAll . map toIfaceForAllBndr
 
@@ -253,24 +254,6 @@ debug_ppr_ty prec ty@(ForAllTy {})
              = ([], ty)
 
 {-
-Note [When to print foralls]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Mostly we want to print top-level foralls when (and only when) the user specifies
--fprint-explicit-foralls.  But when kind polymorphism is at work, that suppresses
-too much information; see #9018.
-
-So I'm trying out this rule: print explicit foralls if
-  a) User specifies -fprint-explicit-foralls, or
-  b) Any of the quantified type variables has a kind
-     that mentions a kind variable
-
-This catches common situations, such as a type siguature
-     f :: m a
-which means
-      f :: forall k. forall (m :: k->*) (a :: k). m a
-We really want to see both the "forall k" and the kind signatures
-on m and a.  The latter comes from pprTCvBndr.
-
 Note [Infix type variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 With TypeOperators you can say
