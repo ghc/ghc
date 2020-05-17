@@ -38,17 +38,18 @@ diffAst diffType (Node info1 span1 xs1) (Node info2 span2 xs2) =
     spanDiff
       | span1 /= span2 = [hsep ["Spans", ppr span1, "and", ppr span2, "differ"]]
       | otherwise = []
-    infoDiff'
-      = (diffList eqDiff `on` (S.toAscList . nodeAnnotations)) info1 info2
-     ++ (diffList diffType `on` nodeType) info1 info2
-     ++ (diffIdents `on` nodeIdentifiers) info1 info2
-    infoDiff = case infoDiff' of
+    infoDiff' i1 i2
+      = (diffList eqDiff `on` (S.toAscList . nodeAnnotations)) i1 i2
+     ++ (diffList diffType `on` nodeType) i1 i2
+     ++ (diffIdents `on` nodeIdentifiers) i1 i2
+    sinfoDiff = diffList (\(k1,a) (k2,b) -> eqDiff k1 k2 ++ infoDiff' a b) `on` (M.toList . getSourcedNodeInfo)
+    infoDiff = case sinfoDiff info1 info2 of
       [] -> []
-      xs -> xs ++ [vcat ["In Node:",ppr (nodeIdentifiers info1,span1)
-                           , "and", ppr (nodeIdentifiers info2,span2)
+      xs -> xs ++ [vcat ["In Node:",ppr (sourcedNodeIdents info1,span1)
+                           , "and", ppr (sourcedNodeIdents info2,span2)
                         , "While comparing"
-                        , ppr (normalizeIdents $ nodeIdentifiers info1), "and"
-                        , ppr (normalizeIdents $ nodeIdentifiers info2)
+                        , ppr (normalizeIdents $ sourcedNodeIdents info1), "and"
+                        , ppr (normalizeIdents $ sourcedNodeIdents info2)
                         ]
                   ]
 
