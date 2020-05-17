@@ -54,6 +54,6 @@ main = do
   let hf = hie_file_result hfr
   forM_ [p1,p2,p3,p4] $ \point -> do
     putStr $ "At " ++ show point ++ ", got type: "
-    let types = nodeType $ nodeInfo $ selectPoint' hf point
+    let types = concatMap nodeType $ getSourcedNodeInfo $ sourcedNodeInfo $ selectPoint' hf point
     forM_ types $ \typ -> do
       putStrLn (renderHieType df $ recoverFullType typ (hie_types hf))
