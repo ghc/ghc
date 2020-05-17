@@ -260,9 +260,6 @@ data GenClosure b
         , link        :: !b -- ^ next weak pointer for the capability, can be NULL.
         }
 
-  -- TODO: There are many more fields in a TSO closure which
-  -- are not yet implemented
-
   -- | StgTSO
   | TSOClosure
       { info :: !StgInfoTable
@@ -274,8 +271,14 @@ data GenClosure b
       , blocked_exceptions :: !b
       , bq :: !b
       -- values
+      , what_next :: Word16
+      , why_blocked :: Word16
+      , flags :: Word32
       , threadId :: Word64
+      , saved_errno :: Word32
+      , dirty:: Word32
       , alloc_limit :: Int64
+      , tot_stack_size :: Word32
       }
 
   | StackClosure

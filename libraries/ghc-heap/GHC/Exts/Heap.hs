@@ -58,7 +58,7 @@ import GHC.Exts.Heap.InfoTableProf
 import GHC.Exts.Heap.InfoTable
 #endif
 import GHC.Exts.Heap.Utils
-import GHC.Exts.Heap.FFIClosures
+import qualified GHC.Exts.Heap.FFIClosures as FFIClosures
 
 import Control.Monad
 import Data.Bits
@@ -297,8 +297,7 @@ getClosureX get_closure_raw x = do
             allocaArray (length wds) (\ptr -> do
                 pokeArray ptr wds
 
-                threadId' <- peekStgThreadID ptr
-                alloc_limit' <- peekAllocLimit ptr
+                fields <- FFIClosures.peekTSOFields ptr
 
                 pure $ TSOClosure
                     { info = itbl
@@ -308,8 +307,14 @@ getClosureX get_closure_raw x = do
                     , trec = (pts !! 3)
                     , blocked_exceptions = (pts !! 4)
                     , bq = (pts !! 5)
-                    , threadId = threadId'
-                    , alloc_limit = alloc_limit'
+                    , what_next = FFIClosures.what_next fields
+                    , why_blocked = FFIClosures.why_blocked fields
+                    , flags = FFIClosures.flags fields
+                    , threadId = FFIClosures.threadId fields
+                    , saved_errno = FFIClosures.saved_errno fields
+                    , dirty = FFIClosures.dirty fields
+                    , alloc_limit = FFIClosures.alloc_limit fields
+                    , tot_stack_size = FFIClosures.tot_stack_size fields
                     }
                 )
         STACK -> do
