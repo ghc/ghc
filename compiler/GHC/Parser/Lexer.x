@@ -798,12 +798,12 @@ data Token
   | ITdupipvarid   FastString   -- GHC extension: implicit param: ?x
   | ITlabelvarid   FastString   -- Overloaded label: #x
 
-  | ITchar     SourceText Char       -- Note [Literal source text] in BasicTypes
+  | ITchar     SourceText {-# UNPACK #-} !Char -- Note [Literal source text] in BasicTypes
   | ITstring   SourceText FastString -- Note [Literal source text] in BasicTypes
   | ITinteger  IntegralLit           -- Note [Literal source text] in BasicTypes
   | ITrational FractionalLit
 
-  | ITprimchar   SourceText Char     -- Note [Literal source text] in BasicTypes
+  | ITprimchar   SourceText {-# UNPACK #-} !Char -- Note [Literal source text] in BasicTypes
   | ITprimstring SourceText ByteString -- Note [Literal source text] @BasicTypes
   | ITprimint    SourceText Integer  -- Note [Literal source text] in BasicTypes
   | ITprimword   SourceText Integer  -- Note [Literal source text] in BasicTypes

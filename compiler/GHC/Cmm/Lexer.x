@@ -125,7 +125,7 @@ $white_no_nl+           ;
 
 {
 data CmmToken
-  = CmmT_SpecChar  Char
+  = CmmT_SpecChar  {-# UNPACK #-} !Char
   | CmmT_DotDot
   | CmmT_DoubleColon
   | CmmT_Shr

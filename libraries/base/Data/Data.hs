@@ -554,7 +554,7 @@ data DataRep = AlgRep [Constr]
 data ConstrRep = AlgConstr    ConIndex
                | IntConstr    Integer
                | FloatConstr  Rational
-               | CharConstr   Char
+               | CharConstr   {-# UNPACK #-} !Char
 
                deriving ( Eq   -- ^ @since 4.0.0.0
                         , Show -- ^ @since 4.0.0.0

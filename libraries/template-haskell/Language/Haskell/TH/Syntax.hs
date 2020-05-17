@@ -1842,7 +1842,7 @@ reassociate the tree as necessary.
 --
 -----------------------------------------------------
 
-data Lit = CharL Char
+data Lit = CharL {-# UNPACK #-} !Char
          | StringL String
          | IntegerL Integer     -- ^ Used for overloaded and non-overloaded
                                 -- literals. We don't have a good way to
@@ -1855,7 +1855,7 @@ data Lit = CharL Char
          | DoublePrimL Rational
          | StringPrimL [Word8]  -- ^ A primitive C-style string, type 'Addr#'
          | BytesPrimL Bytes     -- ^ Some raw bytes, type 'Addr#':
-         | CharPrimL Char
+         | CharPrimL {-# UNPACK #-} !Char
     deriving( Show, Eq, Ord, Data, Generic )
 
     -- We could add Int, Float, Double etc, as we do in HsLit,

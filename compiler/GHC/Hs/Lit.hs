@@ -47,9 +47,9 @@ import Data.Data hiding ( Fixity )
 -- Note [Trees that grow] in GHC.Hs.Extension for the Xxxxx fields in the following
 -- | Haskell Literal
 data HsLit x
-  = HsChar (XHsChar x) {- SourceText -} Char
+  = HsChar (XHsChar x) {- SourceText -} {-# UNPACK #-} !Char
       -- ^ Character
-  | HsCharPrim (XHsCharPrim x) {- SourceText -} Char
+  | HsCharPrim (XHsCharPrim x) {- SourceText -} {-# UNPACK #-} !Char
       -- ^ Unboxed character
   | HsString (XHsString x) {- SourceText -} FastString
       -- ^ String

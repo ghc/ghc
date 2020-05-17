@@ -105,8 +105,9 @@ import Numeric ( fromRat )
 -- * The NULL pointer
 --
 data Literal
-  = LitChar    Char             -- ^ @Char#@ - at least 31 bits. Create with
-                                -- 'mkLitChar'
+  = LitChar {-# UNPACK #-} !Char
+                               -- ^ @Char#@ - at least 31 bits. Create with
+                               -- 'mkLitChar'
 
   | LitNumber !LitNumType !Integer Type
                                 -- ^ Any numeric literal that can be
