@@ -189,7 +189,7 @@ class IsList l where
   --   'fromList'. If the given number does not equal to the input list's length 
   --   the behaviour of 'fromListN' is not specified.
   --
-  --   prop> fromListN (length xs) == fromList xs
+  --   prop> fromListN (length xs) xs == fromList xs
   fromListN :: Int -> [Item l] -> l
   fromListN _ = fromList
 
