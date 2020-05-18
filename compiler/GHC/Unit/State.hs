@@ -1588,7 +1588,8 @@ mkUnitState dflags dbs = do
                         $ (basicLinkedUnits ++ preload2)
 
   -- Close the preload packages with their dependencies
-  dep_preload <- closeDeps dflags pkg_db (zip (map toUnitId preload3) (repeat Nothing))
+  let dep_preload_err = closeUnitDeps pkg_db (zip (map toUnitId preload3) (repeat Nothing))
+  dep_preload <- throwErr dflags dep_preload_err
 
   let mod_map1 = mkModuleNameProvidersMap dflags pkg_db emptyUniqSet vis_map
       mod_map2 = mkUnusableModuleNameProvidersMap unusable
@@ -2006,43 +2007,38 @@ listVisibleModuleNames state =
 -- instantiate the current unit, and for every unit explicitly passed in the
 -- given list of UnitId.
 getPreloadUnitsAnd :: DynFlags -> [UnitId] -> IO [UnitInfo]
-getPreloadUnitsAnd dflags pkgids0 =
+getPreloadUnitsAnd dflags ids0 =
   let
-      pkgids  = pkgids0 ++
-                  -- An indefinite package will have insts to HOLE,
-                  -- which is not a real package. Don't look it up.
-                  -- Fixes #14525
-                  if homeUnitIsIndefinite dflags
-                    then []
-                    else map (toUnitId . moduleUnit . snd)
-                             (homeUnitInstantiations dflags)
+      ids  = ids0 ++
+              -- An indefinite package will have insts to HOLE,
+              -- which is not a real package. Don't look it up.
+              -- Fixes #14525
+              if homeUnitIsIndefinite dflags
+                then []
+                else map (toUnitId . moduleUnit . snd)
+                         (homeUnitInstantiations dflags)
       state   = unitState dflags
       pkg_map = unitInfoMap state
       preload = preloadUnits state
-      parents = zip pkgids (repeat Nothing)
   in do
-  all_pkgs <- throwErr dflags (foldM (add_unit pkg_map) preload parents)
+  all_pkgs <- throwErr dflags (closeUnitDeps' pkg_map preload (ids `zip` repeat Nothing))
   return (map (unsafeLookupUnitId state) all_pkgs)
 
--- Takes a list of packages, and returns the list with dependencies included,
--- in reverse dependency order (a package appears before those it depends on).
-closeDeps :: DynFlags
-          -> UnitInfoMap
-          -> [(UnitId, Maybe UnitId)]
-          -> IO [UnitId]
-closeDeps dflags pkg_map ps
-    = throwErr dflags (closeDepsErr pkg_map ps)
-
 throwErr :: DynFlags -> MaybeErr MsgDoc a -> IO a
-throwErr dflags m
-              = case m of
-                Failed e    -> throwGhcExceptionIO (CmdLineError (showSDoc dflags e))
-                Succeeded r -> return r
+throwErr dflags m = case m of
+   Failed e    -> throwGhcExceptionIO (CmdLineError (showSDoc dflags e))
+   Succeeded r -> return r
 
-closeDepsErr :: UnitInfoMap
-             -> [(UnitId,Maybe UnitId)]
-             -> MaybeErr MsgDoc [UnitId]
-closeDepsErr pkg_map ps = foldM (add_unit pkg_map) [] ps
+-- | Takes a list of UnitIds (and their "parent" dependency, used for error
+-- messages), and returns the list with dependencies included, in reverse
+-- dependency order (a units appears before those it depends on).
+closeUnitDeps :: UnitInfoMap -> [(UnitId,Maybe UnitId)] -> MaybeErr MsgDoc [UnitId]
+closeUnitDeps pkg_map ps = closeUnitDeps' pkg_map [] ps
+
+-- | Similar to closeUnitDeps but takes a list of already loaded units as an
+-- additional argument.
+closeUnitDeps' :: UnitInfoMap -> [UnitId] -> [(UnitId,Maybe UnitId)] -> MaybeErr MsgDoc [UnitId]
+closeUnitDeps' pkg_map current_ids ps = foldM (add_unit pkg_map) current_ids ps
 
 -- | Add a UnitId and those it depends on (recursively) to the given list of
 -- UnitIds if they are not already in it. Return a list in reverse dependency
