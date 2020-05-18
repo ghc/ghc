@@ -57,7 +57,6 @@ fun2
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$trModule4 :: GHC.Prim.Addr#
 [GblId,
- Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 T7360.$trModule4 = "main"#
@@ -65,14 +64,6 @@ T7360.$trModule4 = "main"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$trModule3 :: GHC.Types.TrName
 [GblId,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
- Cpr=# 1(-),
->>>>>>> 6bb3d74323... Nested CPR
-=======
- Cpr=#c1(#),
->>>>>>> 7dc0a59c86... A slew of testsuite changes
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T7360.$trModule3 = GHC.Types.TrNameS T7360.$trModule4
@@ -80,7 +71,6 @@ T7360.$trModule3 = GHC.Types.TrNameS T7360.$trModule4
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$trModule2 :: GHC.Prim.Addr#
 [GblId,
- Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 T7360.$trModule2 = "T7360"#
@@ -88,14 +78,6 @@ T7360.$trModule2 = "T7360"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$trModule1 :: GHC.Types.TrName
 [GblId,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
- Cpr=# 1(-),
->>>>>>> 6bb3d74323... Nested CPR
-=======
- Cpr=#c1(#),
->>>>>>> 7dc0a59c86... A slew of testsuite changes
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T7360.$trModule1 = GHC.Types.TrNameS T7360.$trModule2
@@ -103,14 +85,6 @@ T7360.$trModule1 = GHC.Types.TrNameS T7360.$trModule2
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T7360.$trModule :: GHC.Types.Module
 [GblId,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
- Cpr=#1(#, #) 1(1(-), 1(-)),
->>>>>>> 6bb3d74323... Nested CPR
-=======
- Cpr=#c1(#c1(#), #c1(#)),
->>>>>>> 7dc0a59c86... A slew of testsuite changes
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
 T7360.$trModule
@@ -128,7 +102,6 @@ $krep
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$tcFoo2 :: GHC.Prim.Addr#
 [GblId,
- Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 T7360.$tcFoo2 = "Foo"#
@@ -136,14 +109,6 @@ T7360.$tcFoo2 = "Foo"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$tcFoo1 :: GHC.Types.TrName
 [GblId,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
- Cpr=# 1(-),
->>>>>>> 6bb3d74323... Nested CPR
-=======
- Cpr=#c1(#),
->>>>>>> 7dc0a59c86... A slew of testsuite changes
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T7360.$tcFoo1 = GHC.Types.TrNameS T7360.$tcFoo2
@@ -151,15 +116,6 @@ T7360.$tcFoo1 = GHC.Types.TrNameS T7360.$tcFoo2
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T7360.$tcFoo :: GHC.Types.TyCon
 [GblId,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
- Cpr=#1(*, *, #1(#, #), #, *, #) 1(-, -, 1(1(-), 1(-)), 1(-), -,
-                                   5(-)),
->>>>>>> 6bb3d74323... Nested CPR
-=======
- Cpr=#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #, #c5(*)),
->>>>>>> 7dc0a59c86... A slew of testsuite changes
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
 T7360.$tcFoo
@@ -183,7 +139,6 @@ T7360.$tc'Foo4
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo6 :: GHC.Prim.Addr#
 [GblId,
- Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 T7360.$tc'Foo6 = "'Foo1"#
@@ -191,14 +146,6 @@ T7360.$tc'Foo6 = "'Foo1"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo5 :: GHC.Types.TrName
 [GblId,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
- Cpr=# 1(-),
->>>>>>> 6bb3d74323... Nested CPR
-=======
- Cpr=#c1(#),
->>>>>>> 7dc0a59c86... A slew of testsuite changes
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T7360.$tc'Foo5 = GHC.Types.TrNameS T7360.$tc'Foo6
@@ -206,21 +153,6 @@ T7360.$tc'Foo5 = GHC.Types.TrNameS T7360.$tc'Foo6
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo1 :: GHC.Types.TyCon
 [GblId,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
- Cpr=#1(*, *, #1(#, #), #, *,
-        #1(#1(*, *, #1(#, #), #, *, #), *)) 1(-, -, 1(1(-), 1(-)), 1(-), -,
-                                              1(1(-, -, 1(1(-), 1(-)), 1(-), -, 5(-)), -)),
->>>>>>> 6bb3d74323... Nested CPR
-=======
- Cpr=#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #,
-<<<<<<< HEAD
-         #c1(#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #, #c5(*)), *)),
->>>>>>> 7dc0a59c86... A slew of testsuite changes
-=======
-         #c1(#c1(#, #, #c1(#, #), #c1(#), #, #c5(*)), *)),
->>>>>>> 73a270b912... Accept testuite output
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
 T7360.$tc'Foo1
@@ -235,7 +167,6 @@ T7360.$tc'Foo1
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo8 :: GHC.Prim.Addr#
 [GblId,
- Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 T7360.$tc'Foo8 = "'Foo2"#
@@ -243,14 +174,6 @@ T7360.$tc'Foo8 = "'Foo2"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo7 :: GHC.Types.TrName
 [GblId,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
- Cpr=# 1(-),
->>>>>>> 6bb3d74323... Nested CPR
-=======
- Cpr=#c1(#),
->>>>>>> 7dc0a59c86... A slew of testsuite changes
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T7360.$tc'Foo7 = GHC.Types.TrNameS T7360.$tc'Foo8
@@ -258,21 +181,6 @@ T7360.$tc'Foo7 = GHC.Types.TrNameS T7360.$tc'Foo8
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo2 :: GHC.Types.TyCon
 [GblId,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
- Cpr=#1(*, *, #1(#, #), #, *,
-        #1(#1(*, *, #1(#, #), #, *, #), *)) 1(-, -, 1(1(-), 1(-)), 1(-), -,
-                                              1(1(-, -, 1(1(-), 1(-)), 1(-), -, 5(-)), -)),
->>>>>>> 6bb3d74323... Nested CPR
-=======
- Cpr=#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #,
-<<<<<<< HEAD
-         #c1(#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #, #c5(*)), *)),
->>>>>>> 7dc0a59c86... A slew of testsuite changes
-=======
-         #c1(#c1(#, #, #c1(#, #), #c1(#), #, #c5(*)), *)),
->>>>>>> 73a270b912... Accept testuite output
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
 T7360.$tc'Foo2
@@ -295,7 +203,6 @@ T7360.$tc'Foo9 = GHC.Types.KindRepFun $krep T7360.$tc'Foo4
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo11 :: GHC.Prim.Addr#
 [GblId,
- Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 T7360.$tc'Foo11 = "'Foo3"#
@@ -303,14 +210,6 @@ T7360.$tc'Foo11 = "'Foo3"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo10 :: GHC.Types.TrName
 [GblId,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
- Cpr=# 1(-),
->>>>>>> 6bb3d74323... Nested CPR
-=======
- Cpr=#c1(#),
->>>>>>> 7dc0a59c86... A slew of testsuite changes
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T7360.$tc'Foo10 = GHC.Types.TrNameS T7360.$tc'Foo11
@@ -318,25 +217,6 @@ T7360.$tc'Foo10 = GHC.Types.TrNameS T7360.$tc'Foo11
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo3 :: GHC.Types.TyCon
 [GblId,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
- Cpr=#1(*, *, #1(#, #), #, *,
-        #4(#1(#1(*, *, #1(#, #), #, *, #), *),
-           #1(#1(*, *, #1(#, #), #, *, #), *))) 1(-, -, 1(1(-), 1(-)), 1(-),
-                                                  -,
-                                                  4(1(1(-, -, 1(1(-), 1(-)), 1(-), -, 5(-)), -),
-                                                    1(1(-, -, 1(1(-), 1(-)), 1(-), -, 5(-)), -))),
->>>>>>> 6bb3d74323... Nested CPR
-=======
- Cpr=#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #,
-<<<<<<< HEAD
-         #c4(#c1(#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #, #c5(*)), *),
-             #c1(#c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #, #c5(*)), *))),
->>>>>>> 7dc0a59c86... A slew of testsuite changes
-=======
-         #c4(#c1(#c1(#, #, #, #, #, #), *), #c1(#c1(#, #, #, #, #, #), *))),
->>>>>>> 73a270b912... Accept testuite output
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
 T7360.$tc'Foo3

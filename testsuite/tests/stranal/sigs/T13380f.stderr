@@ -11,13 +11,13 @@ T13380f.unsafeCall: <L,U>
 
 
 ==================== Cpr signatures ====================
-T13380f.$trModule:
-T13380f.f:
-T13380f.g:
-T13380f.h:
-T13380f.interruptibleCall:
-T13380f.safeCall:
-T13380f.unsafeCall:
+T13380f.$trModule: *
+T13380f.f: *c1(*, #c1(#))
+T13380f.g: *c1(*, #c1(#))
+T13380f.h: *c1(*, #c1(#))
+T13380f.interruptibleCall: *c1(*, *)
+T13380f.safeCall: *c1(*, *)
+T13380f.unsafeCall: *c1(*, *)
 
 
 

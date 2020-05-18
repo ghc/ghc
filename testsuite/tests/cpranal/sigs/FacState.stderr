@@ -1,6 +1,6 @@
 
 ==================== Cpr signatures ====================
-FacState.$trModule: #c1(#c1(#), #c1(#))
+FacState.$trModule: *
 FacState.fac: *c1(*, #c1(#))
 
 
