@@ -2002,8 +2002,9 @@ listVisibleModuleNames dflags =
     map fst (filter visible (Map.toList (moduleNameProvidersMap (unitState dflags))))
   where visible (_, ms) = any originVisible (Map.elems ms)
 
--- | Find all the 'UnitInfo' in both the preload packages from 'DynFlags' and corresponding to the list of
--- 'UnitInfo's
+-- | Lookup 'UnitInfo' for every preload unit, for every unit used to
+-- instantiate the current unit, and for every unit explicitly passed in the
+-- given list of UnitId.
 getPreloadUnitsAnd :: DynFlags -> [UnitId] -> IO [UnitInfo]
 getPreloadUnitsAnd dflags pkgids0 =
   let
@@ -2018,9 +2019,9 @@ getPreloadUnitsAnd dflags pkgids0 =
       state   = unitState dflags
       pkg_map = unitInfoMap state
       preload = preloadUnits state
-      pairs = zip pkgids (repeat Nothing)
+      parents = zip pkgids (repeat Nothing)
   in do
-  all_pkgs <- throwErr dflags (foldM (add_package dflags pkg_map) preload pairs)
+  all_pkgs <- throwErr dflags (foldM (add_package dflags pkg_map) preload parents)
   return (map (unsafeLookupUnitId state) all_pkgs)
 
 -- Takes a list of packages, and returns the list with dependencies included,
