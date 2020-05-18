@@ -119,9 +119,9 @@ cprAnalTopBind :: AnalEnv
                -> CoreBind
                -> (AnalEnv, CoreBind)
 cprAnalTopBind env (NonRec id rhs)
-  = (extendAnalEnv env id' (idCprInfo id'), NonRec id' rhs')
+  = (env', NonRec id' rhs')
   where
-    (id', rhs') = cprAnalBind TopLevel env [] id rhs
+    (id', rhs', env') = cprAnalBind TopLevel env noWidening [] id rhs
 
 cprAnalTopBind env (Rec pairs)
   = (env', Rec pairs')
@@ -213,9 +213,8 @@ cprAnal' env args (Case scrut case_bndr ty alts)
 cprAnal' env args (Let (NonRec id rhs) body)
   = (body_ty, Let (NonRec id' rhs') body')
   where
-    (id', rhs')      = cprAnalBind NotTopLevel env args id rhs
-    env'             = extendAnalEnv env id' (idCprInfo id')
-    (body_ty, body') = cprAnal env' args body
+    (id', rhs', env') = cprAnalBind NotTopLevel env noWidening args id rhs
+    (body_ty, body')  = cprAnal env' args body
 
 cprAnal' env args (Let (Rec pairs) body)
   = body_ty `seq` (body_ty, Let (Rec pairs') body')
@@ -252,12 +251,13 @@ cprTransform
   -> Id              -- ^ The function
   -> CprType         -- ^ The demand type of the function
 cprTransform env args id
-  = -- pprTrace "cprTransform" (vcat [ppr id, ppr sig])
+  = pprTrace "cprTransform" (vcat [ppr id, ppr sig])
     sig
   where
     sig
       -- See Note [CPR for expandable unfoldings]
       | Just rhs <- cprExpandUnfolding_maybe id
+      , pprTrace "expandable unfolding" (ppr id $$ ppr rhs) True
       = fst $ cprAnal env args rhs
       -- Data constructor
       | Just con <- isDataConWorkId_maybe id
@@ -275,56 +275,26 @@ cprTransform env args id
 -- * Bindings
 --
 
--- Recursive bindings
-cprFix
-  :: TopLevelFlag
-  -> AnalEnv                    -- Does not include bindings for this binding
-  -> [CprType]
-  -> [(Id,CoreExpr)]
-  -> (AnalEnv, [(Id,CoreExpr)]) -- Binders annotated with stricness info
-cprFix top_lvl env str orig_pairs
-  = loop 1 initial_pairs
-  where
-    init_sig id = mkCprSig (idArity id) divergeCpr
-    -- See Note [Initialising strictness] in GHC.Core.Opt.DmdAnal
-    initial_pairs | ae_virgin env = [(setIdCprInfo id (init_sig id), rhs) | (id, rhs) <- orig_pairs ]
-                  | otherwise     = orig_pairs
+--
+-- ** Widening
+--
 
-    -- The fixed-point varies the idCprInfo field of the binders, and terminates if that
-    -- annotation does not change any more.
-    loop :: Int -> [(Id,CoreExpr)] -> (AnalEnv, [(Id,CoreExpr)])
-    loop n pairs
-      | found_fixpoint = (final_anal_env, pairs')
-      | otherwise      = -- pprTrace "cprFix:loop" (ppr n <+> ppr (map fst pairs)) $
-                         loop (n+1) pairs'
-      where
-        found_fixpoint    = selector pairs' == selector pairs
-        selector          = map (idCprInfo . fst)
-        first_round       = n == 1
-        pairs'            = step first_round pairs
-        final_anal_env    = extendAnalEnvs env (map fst pairs')
+type Widening = CprSig -> CprSig
 
-    step :: Bool -> [(Id, CoreExpr)] -> [(Id, CoreExpr)]
-    step first_round pairs = pairs'
-      where
-        -- In all but the first iteration, delete the virgin flag
-        start_env | first_round = env
-                  | otherwise   = nonVirgin env
+noWidening :: Widening
+noWidening = id
 
-        start = extendAnalEnvs start_env (map fst pairs)
-
-        (_, pairs') = mapAccumL my_downRhs start pairs
-
-        my_downRhs env (id,rhs)
-          = (env', (id2, rhs'))
-          where
-            (id1, rhs') = cprAnalBind top_lvl env str id rhs
-            -- See Note [Ensuring termination of fixed-point iteration]
-            id2         = setIdCprInfo id1 $ pruneSig mAX_DEPTH $ markDiverging $ idCprInfo id1
-            env'        = extendAnalEnv env id2 (idCprInfo id2)
+-- | A widening operator on 'CprSig' to ensure termination of fixed-point
+-- iteration. See Note [Ensuring termination of fixed-point iteration]
+depthWidening :: Widening
+depthWidening = pruneSig mAX_DEPTH . markDiverging
 
 mAX_DEPTH :: Int
 mAX_DEPTH = 4
+
+pruneSig :: Int -> CprSig -> CprSig
+pruneSig d (CprSig cpr_ty)
+  = CprSig $ cpr_ty { ct_cpr = pruneDeepCpr d (ct_cpr cpr_ty) }
 
 -- TODO: We need the lubCpr with the initial CPR because
 --       of functions like iterate, which we would CPR
@@ -333,35 +303,22 @@ mAX_DEPTH = 4
 markDiverging :: CprSig -> CprSig
 markDiverging (CprSig cpr_ty) = CprSig $ cpr_ty { ct_cpr = ct_cpr cpr_ty `lubCpr` divergeCpr }
 
--- | A widening operator on 'CprSig' to ensure termination of fixed-point
--- iteration. See Note [Ensuring termination of fixed-point iteration]
-pruneSig :: Int -> CprSig -> CprSig
-pruneSig d (CprSig cpr_ty)
-  = CprSig $ cpr_ty { ct_cpr = pruneDeepCpr d (ct_cpr cpr_ty) }
-
-unboxingStrategy :: AnalEnv -> UnboxingStrategy
-unboxingStrategy env ty dmd
-  = prj <$> wantToUnbox (ae_fam_envs env) has_inlineable_prag ty dmd
-  where
-    prj (dmds, DataConAppContext { dcac_dc = dc, dcac_arg_tys = tys_w_str })
-      = (dc, map fst tys_w_str, dmds)
-    -- Rather than maintaining in AnalEnv whether we are in an INLINEABLE
-    -- function, we just assume that we aren't. That flag is only relevant
-    -- to Note [Do not unpack class dictionaries], the few unboxing
-    -- opportunities on dicts it prohibits are probably irrelevant to CPR.
-    has_inlineable_prag = False
+--
+-- ** Analysing a binding (one-round, the non-recursive case)
+--
 
 -- | Process the RHS of the binding for a sensible arity, add the CPR signature
 -- to the Id, and augment the environment with the signature as well.
 cprAnalBind
   :: TopLevelFlag
   -> AnalEnv
+  -> Widening -- ^ We want to specify 'depthWidening' in fixed-point iteration
   -> [CprType]
   -> Id
   -> CoreExpr
-  -> (Id, CoreExpr)
-cprAnalBind top_lvl env args id rhs
-  = (id', rhs')
+  -> (Id, CoreExpr, AnalEnv)
+cprAnalBind top_lvl env widening args id rhs
+  = (id', rhs', env')
   where
     arg_tys             = fst (splitFunNewTys (idType id))
     -- We compute the Termination and CPR transformer based on the strictness
@@ -392,11 +349,11 @@ cprAnalBind top_lvl env args id rhs
       | otherwise   = rhs_ty
 
     -- See Note [Arity trimming for CPR signatures]
-    -- We prune so that we discard too deep info on e.g. TyCon bindings
     dflags          = ae_dflags env
-    sig             = pruneSig mAX_DEPTH $ mkCprSigForArity dflags (idArity id) rhs_ty'
-    id'             = -- pprTrace "cprAnalBind" (ppr id $$ ppr sig) $
+    sig             = widening $ mkCprSigForArity dflags (idArity id) rhs_ty'
+    id'             = pprTrace "cprAnalBind" (ppr id $$ ppr sig) $
                       setIdCprInfo id sig
+    env'            = extendAnalEnv env id' sig
 
     -- See Note [CPR for thunks]
     stays_thunk = is_thunk && not_strict
@@ -409,12 +366,74 @@ cprAnalBind top_lvl env args id rhs
     -- See Note [CPR for expandable unfoldings]
     will_expand = isJust (cprExpandUnfolding_maybe id)
 
+unboxingStrategy :: AnalEnv -> UnboxingStrategy
+unboxingStrategy env ty dmd
+  = prj <$> wantToUnbox (ae_fam_envs env) has_inlineable_prag ty dmd
+  where
+    prj (dmds, DataConAppContext { dcac_dc = dc, dcac_arg_tys = tys_w_str })
+      = (dc, map fst tys_w_str, dmds)
+    -- Rather than maintaining in AnalEnv whether we are in an INLINEABLE
+    -- function, we just assume that we aren't. That flag is only relevant
+    -- to Note [Do not unpack class dictionaries], the few unboxing
+    -- opportunities on dicts it prohibits are probably irrelevant to CPR.
+    has_inlineable_prag = False
+
 cprExpandUnfolding_maybe :: Id -> Maybe CoreExpr
 cprExpandUnfolding_maybe id = do
   guard (idArity id == 0)
   -- There are only phase 0 Simplifier runs after CPR analysis
   guard (isActiveIn 0 (idInlineActivation id))
   expandUnfolding_maybe (idUnfolding id)
+
+--
+-- ** Analysing recursive bindings
+--
+
+-- | Fixed-point iteration
+cprFix
+  :: TopLevelFlag
+  -> AnalEnv                    -- Does not include bindings for this binding
+  -> [CprType]
+  -> [(Id,CoreExpr)]
+  -> (AnalEnv, [(Id,CoreExpr)]) -- Binders annotated with stricness info
+cprFix top_lvl env args orig_pairs
+  = loop 1 initial_pairs
+  where
+    init_sig id = mkCprSig (idArity id) divergeCpr
+    -- See Note [Initialising strictness] in GHC.Core.Opt.DmdAnal
+    initial_pairs | ae_virgin env = [(setIdCprInfo id (init_sig id), rhs) | (id, rhs) <- orig_pairs ]
+                  | otherwise     = orig_pairs
+
+    -- The fixed-point varies the idCprInfo field of the binders, and terminates if that
+    -- annotation does not change any more.
+    loop :: Int -> [(Id,CoreExpr)] -> (AnalEnv, [(Id,CoreExpr)])
+    loop n pairs
+      | found_fixpoint = (final_anal_env, pairs')
+      | otherwise      = -- pprTrace "cprFix:loop" (ppr n <+> ppr (map fst pairs)) $
+                         loop (n+1) pairs'
+      where
+        found_fixpoint    = selector pairs' == selector pairs
+        selector          = map (idCprInfo . fst)
+        first_round       = n == 1
+        pairs'            = step first_round pairs
+        final_anal_env    = extendAnalEnvs env (map fst pairs')
+
+    step :: Bool -> [(Id, CoreExpr)] -> [(Id, CoreExpr)]
+    step first_round pairs = pairs'
+      where
+        -- In all but the first iteration, delete the virgin flag
+        start_env | first_round = env
+                  | otherwise   = nonVirgin env
+
+        start = extendAnalEnvs start_env (map fst pairs)
+
+        (_, pairs') = mapAccumL anal_bind start pairs
+
+        anal_bind env (id,rhs)
+          = (env', (id', rhs'))
+          where
+            -- See Note [Ensuring termination of fixed-point iteration]
+            (id', rhs', env') = cprAnalBind top_lvl env depthWidening args id rhs
 
 {- Note [Arity trimming for CPR signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -502,7 +521,8 @@ nonVirgin env = env { ae_virgin = False }
 extendEnvForDataAlt :: AnalEnv -> Id -> CprType -> DataCon -> [Var] -> AnalEnv
 -- See Note [CPR in a DataAlt case alternative]
 extendEnvForDataAlt env case_bndr case_bndr_ty dc bndrs
-  = extendAnalEnv env' case_bndr (CprSig case_bndr_ty')
+  = pprTrace "extendOuter" (ppr case_bndr $$ ppr case_bndr_ty') $
+    extendAnalEnv env' case_bndr (pprTrace "extend" (ppr case_bndr $$ ppr case_bndr_ty') $ CprSig case_bndr_ty')
   where
     tycon          = dataConTyCon dc
     is_product     = isJust (isDataProductTyCon_maybe tycon)
