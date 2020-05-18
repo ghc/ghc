@@ -196,7 +196,7 @@ cprAnal' env args (Lam var body)
     (arg_ty, body_args)
       | ty:args' <- args = (ty, args')      -- We know things about the argument, for example from a StrictSig or an incoming argument. NB: This can never be an anonymous (non-let-bound) lambda! The simplifier would have eliminated the necessary (App (Lam{} |> co) _) construct.
       | otherwise        = (topCprType, []) -- An anonymous lambda or no info on its argument
-    env'                 = extendAnalEnv env var (CprSig arg_ty) -- TODO: I think we also need to store assumed argument strictness (which would be all lazy here) in the env
+    env'                 = extendSigEnv env var (CprSig arg_ty) -- TODO: I think we also need to store assumed argument strictness (which would be all lazy here) in the env
     (body_ty, body')     = cprAnal env' body_args body
     lam_ty               = abstractCprTy body_ty
 
@@ -238,7 +238,7 @@ cprAnalAlt env args case_bndr case_bndr_ty (con@(DataAlt dc),bndrs,rhs)
 cprAnalAlt env args case_bndr case_bndr_ty (con,bndrs,rhs)
   = (rhs_ty, (con, bndrs, rhs'))
   where
-    env' = extendAnalEnv env case_bndr (CprSig case_bndr_ty)
+    env' = extendSigEnv env case_bndr (CprSig case_bndr_ty)
     (rhs_ty, rhs') = cprAnal env' args rhs
 
 --
@@ -251,13 +251,15 @@ cprTransform
   -> Id              -- ^ The function
   -> CprType         -- ^ The demand type of the function
 cprTransform env args id
-  = pprTrace "cprTransform" (vcat [ppr id, ppr sig])
+  = -- pprTrace "cprTransform" (vcat [ppr id, ppr sig])
     sig
   where
     sig
+      -- Local let-bound
+      | Just sig <- lookupSigEnv env id
+      = cprTransformSig (idStrictness id) sig args
       -- See Note [CPR for expandable unfoldings]
       | Just rhs <- cprExpandUnfolding_maybe id
-      , pprTrace "expandable unfolding" (ppr id $$ ppr rhs) True
       = fst $ cprAnal env args rhs
       -- Data constructor
       | Just con <- isDataConWorkId_maybe id
@@ -265,9 +267,6 @@ cprTransform env args id
       -- Imported function or data con worker
       | isGlobalId id
       = cprTransformSig (idStrictness id) (idCprInfo id) args
-      -- Local let-bound
-      | Just sig <- lookupSigEnv env id
-      = cprTransformSig (idStrictness id) sig args
       | otherwise
       = topCprType
 
@@ -318,6 +317,10 @@ cprAnalBind
   -> CoreExpr
   -> (Id, CoreExpr, AnalEnv)
 cprAnalBind top_lvl env widening args id rhs
+  -- See Note [CPR for expandable unfoldings]
+  | isJust (cprExpandUnfolding_maybe id)
+  = (id, rhs, env)
+  | otherwise
   = (id', rhs', env')
   where
     arg_tys             = fst (splitFunNewTys (idType id))
@@ -344,16 +347,13 @@ cprAnalBind top_lvl env widening args id rhs
       | stays_thunk = trimCprTy rhs_ty
       -- See Note [CPR for sum types]
       | returns_sum = trimCprTy rhs_ty
-      -- See Note [CPR for expandable unfoldings]
-      | will_expand = topCprType
       | otherwise   = rhs_ty
 
     -- See Note [Arity trimming for CPR signatures]
     dflags          = ae_dflags env
     sig             = widening $ mkCprSigForArity dflags (idArity id) rhs_ty'
-    id'             = pprTrace "cprAnalBind" (ppr id $$ ppr sig) $
-                      setIdCprInfo id sig
-    env'            = extendAnalEnv env id' sig
+    (id', env')     = -- pprTrace "cprAnalBind" (ppr id $$ ppr sig) $
+                      (setIdCprInfo id sig, extendSigEnv env id sig)
 
     -- See Note [CPR for thunks]
     stays_thunk = is_thunk && not_strict
@@ -363,8 +363,6 @@ cprAnalBind top_lvl env widening args id rhs
     (_, ret_ty) = splitPiTys (idType id)
     not_a_prod  = isNothing (deepSplitProductType_maybe (ae_fam_envs env) ret_ty)
     returns_sum = not (isTopLevel top_lvl) && not_a_prod
-    -- See Note [CPR for expandable unfoldings]
-    will_expand = isJust (cprExpandUnfolding_maybe id)
 
 unboxingStrategy :: AnalEnv -> UnboxingStrategy
 unboxingStrategy env ty dmd
@@ -399,7 +397,9 @@ cprFix
 cprFix top_lvl env args orig_pairs
   = loop 1 initial_pairs
   where
-    init_sig id = mkCprSig (idArity id) divergeCpr
+    init_sig id
+      | isJust (cprExpandUnfolding_maybe id) = topCprSig
+      | otherwise                            = mkCprSig (idArity id) divergeCpr
     -- See Note [Initialising strictness] in GHC.Core.Opt.DmdAnal
     initial_pairs | ae_virgin env = [(setIdCprInfo id (init_sig id), rhs) | (id, rhs) <- orig_pairs ]
                   | otherwise     = orig_pairs
@@ -416,7 +416,7 @@ cprFix top_lvl env args orig_pairs
         selector          = map (idCprInfo . fst)
         first_round       = n == 1
         pairs'            = step first_round pairs
-        final_anal_env    = extendAnalEnvs env (map fst pairs')
+        final_anal_env    = extendSigEnvs env (map fst pairs')
 
     step :: Bool -> [(Id, CoreExpr)] -> [(Id, CoreExpr)]
     step first_round pairs = pairs'
@@ -425,7 +425,7 @@ cprFix top_lvl env args orig_pairs
         start_env | first_round = env
                   | otherwise   = nonVirgin env
 
-        start = extendAnalEnvs start_env (map fst pairs)
+        start = extendSigEnvs start_env (map fst pairs)
 
         (_, pairs') = mapAccumL anal_bind start pairs
 
@@ -497,17 +497,17 @@ emptyAnalEnv dflags fam_envs
   , ae_fam_envs = fam_envs
   }
 
-extendAnalEnv :: AnalEnv -> Id -> CprSig -> AnalEnv
-extendAnalEnv env id sig
+extendSigEnv :: AnalEnv -> Id -> CprSig -> AnalEnv
+extendSigEnv env id sig
   = env { ae_sigs = extendVarEnv (ae_sigs env) id sig }
 
-extendAnalEnvList :: AnalEnv -> [(Id, CprSig)] -> AnalEnv
-extendAnalEnvList env ids_cprs
+extendSigEnvList :: AnalEnv -> [(Id, CprSig)] -> AnalEnv
+extendSigEnvList env ids_cprs
   = env { ae_sigs = extendVarEnvList (ae_sigs env) ids_cprs }
 
 -- | Extend an environment with the CPR signatures attached to the id
-extendAnalEnvs :: AnalEnv -> [Id] -> AnalEnv
-extendAnalEnvs env ids
+extendSigEnvs :: AnalEnv -> [Id] -> AnalEnv
+extendSigEnvs env ids
   = env { ae_sigs = sigs' }
   where
     sigs' = extendVarEnvList (ae_sigs env) [ (id, idCprInfo id) | id <- ids ]
@@ -521,8 +521,7 @@ nonVirgin env = env { ae_virgin = False }
 extendEnvForDataAlt :: AnalEnv -> Id -> CprType -> DataCon -> [Var] -> AnalEnv
 -- See Note [CPR in a DataAlt case alternative]
 extendEnvForDataAlt env case_bndr case_bndr_ty dc bndrs
-  = pprTrace "extendOuter" (ppr case_bndr $$ ppr case_bndr_ty') $
-    extendAnalEnv env' case_bndr (pprTrace "extend" (ppr case_bndr $$ ppr case_bndr_ty') $ CprSig case_bndr_ty')
+  = extendSigEnv env' case_bndr (CprSig case_bndr_ty')
   where
     tycon          = dataConTyCon dc
     is_product     = isJust (isDataProductTyCon_maybe tycon)
@@ -537,7 +536,7 @@ extendEnvForDataAlt env case_bndr case_bndr_ty dc bndrs
       | Just fields <- splitConCprTy dc case_bndr_ty'
       , let ids     = filter isId bndrs
       , let cpr_tys = map (CprSig . CprType 0) fields
-      = extendAnalEnvList env (zipEqual "extendEnvForDataAlt" ids cpr_tys)
+      = extendSigEnvList env (zipEqual "extendEnvForDataAlt" ids cpr_tys)
       | otherwise
       = env
 
@@ -765,6 +764,14 @@ instead we keep on cprAnal'ing through *expandable* unfoldings for these arity
 In practice, GHC generates a lot of (nested) TyCon and KindRep bindings, one
 for each data declaration. It's wasteful to attach CPR signatures to each of
 them (and intractable in case of Nested CPR).
+
+Also we don't need to analyse RHSs of expandable bindings: The CPR signature of
+the binding is never consulted and there may not be let or case expressions
+nested inside its RHS. In which case we also don't record a signature in the
+local AnalEnv. Doing so would override looking into the unfolding. Why not give
+the expandable case in cprTransform a higher priority then? Because then *all*
+case binders would get the CPR property, regardless of -fcase-binder-cpr-depth,
+because case binders have expandable unfoldings.
 
 Tracked by #18154.
 

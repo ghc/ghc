@@ -318,7 +318,7 @@ conCprType con_tag args = CprType 0 (conCpr con_tag cprs)
 
 markOptimisticConCprType :: DataCon -> CprType -> CprType
 markOptimisticConCprType dc _ty@(CprType n cpr)
-  = pprTraceWith "markOptimisticConCpr" (\ty' -> ppr _ty $$ ppr ty') $
+  = -- pprTraceWith "markOptimisticConCpr" (\ty' -> ppr _ty $$ ppr ty') $
     ASSERT2( n == 0, ppr _ty ) CprType 0 (optimisticConCpr con_tag fields)
   where
     con_tag   = dataConTag dc
@@ -366,7 +366,7 @@ trimCprTy (CprType arty cpr) = CprType arty (trimCpr cpr)
 
 zonkOptimisticCprTy :: Int -> CprType -> CprType
 zonkOptimisticCprTy max_depth _ty@(CprType arty cpr)
-  = pprTraceWith "zonkOptimisticCprTy" (\ty' -> ppr max_depth <+> ppr _ty <+> ppr ty') $
+  = -- pprTraceWith "zonkOptimisticCprTy" (\ty' -> ppr max_depth <+> ppr _ty <+> ppr ty') $
     CprType arty (zonk max_depth cpr)
   where
     -- | The Int is the amount of "fuel" left; when it reaches 0, we no longer
