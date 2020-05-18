@@ -195,7 +195,7 @@ withBkpSession cid insts deps session_type do_this = do
         -- Synthesized the flags
         packageFlags = packageFlags dflags ++ map (\(uid0, rn) ->
           let state = unitState dflags
-              uid = unwireUnit dflags (improveUnit state $ renameHoleUnit state (listToUFM insts) uid0)
+              uid = unwireUnit state (improveUnit state $ renameHoleUnit state (listToUFM insts) uid0)
           in ExposePackage
             (showSDoc dflags
                 (text "-unit-id" <+> ppr uid <+> ppr rn))
@@ -306,6 +306,7 @@ buildUnit session cid insts lunit = do
                       $ home_mod_infos
             getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
             obj_files = concatMap getOfiles linkables
+            state     = unitState (hsc_dflags hsc_env)
 
         let compat_fs = unitIdFS (indefUnit cid)
             compat_pn = PackageName compat_fs
@@ -330,7 +331,7 @@ buildUnit session cid insts lunit = do
                         -- really used for anything, so we leave it
                         -- blank for now.
                         TcSession -> []
-                        _ -> map (toUnitId . unwireUnit dflags)
+                        _ -> map (toUnitId . unwireUnit state)
                                 $ deps ++ [ moduleUnit mod
                                           | (_, mod) <- insts
                                           , not (isHoleModule mod) ],
