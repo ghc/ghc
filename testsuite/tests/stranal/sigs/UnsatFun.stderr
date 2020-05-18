@@ -12,28 +12,7 @@ UnsatFun.h3: <C(S),1*C1(U)>
 
 
 ==================== Cpr signatures ====================
-<<<<<<< HEAD
-<<<<<<< HEAD
-UnsatFun.$trModule:
-UnsatFun.f: b
-UnsatFun.g:
-UnsatFun.g':
-UnsatFun.g3: m1
-UnsatFun.h:
-UnsatFun.h2:
-UnsatFun.h3: m1
-=======
-UnsatFun.$trModule: #1(#, #) 1(1(-), 1(-))
-UnsatFun.f: * b
-UnsatFun.g: * -
-UnsatFun.g': * -
-UnsatFun.g3: * 1(-)
-UnsatFun.h: * -
-UnsatFun.h2: * -
-UnsatFun.h3: * 1(-)
->>>>>>> 6bb3d74323... Nested CPR
-=======
-UnsatFun.$trModule: #c1(#c1(#), #c1(#))
+UnsatFun.$trModule: *
 UnsatFun.f: *b
 UnsatFun.g: *
 UnsatFun.g': *
@@ -41,7 +20,6 @@ UnsatFun.g3: *c1(#)
 UnsatFun.h: *
 UnsatFun.h2: *
 UnsatFun.h3: *c1(#)
->>>>>>> 7dc0a59c86... A slew of testsuite changes
 
 
 
