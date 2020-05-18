@@ -10,47 +10,23 @@ Noinline01.g :: GHC.Types.Bool
     \u [] Noinline01.f GHC.Types.False;
 
 Noinline01.$trModule4 :: GHC.Prim.Addr#
-[GblId, Cpr=#, Unf=OtherCon []] =
+[GblId, Unf=OtherCon []] =
     "main"#;
 
 Noinline01.$trModule3 :: GHC.Types.TrName
-<<<<<<< HEAD
-<<<<<<< HEAD
 [GblId, Unf=OtherCon []] =
-=======
-[GblId, Cpr=# 1(-), Unf=OtherCon []] =
->>>>>>> 6bb3d74323... Nested CPR
-=======
-[GblId, Cpr=#c1(#), Unf=OtherCon []] =
->>>>>>> 7dc0a59c86... A slew of testsuite changes
     CCS_DONT_CARE GHC.Types.TrNameS! [Noinline01.$trModule4];
 
 Noinline01.$trModule2 :: GHC.Prim.Addr#
-[GblId, Cpr=#, Unf=OtherCon []] =
+[GblId, Unf=OtherCon []] =
     "Noinline01"#;
 
 Noinline01.$trModule1 :: GHC.Types.TrName
-<<<<<<< HEAD
-<<<<<<< HEAD
 [GblId, Unf=OtherCon []] =
     CCS_DONT_CARE GHC.Types.TrNameS! [Noinline01.$trModule2];
 
 Noinline01.$trModule :: GHC.Types.Module
 [GblId, Unf=OtherCon []] =
-=======
-[GblId, Cpr=# 1(-), Unf=OtherCon []] =
-    CCS_DONT_CARE GHC.Types.TrNameS! [Noinline01.$trModule2];
-
-Noinline01.$trModule :: GHC.Types.Module
-[GblId, Cpr=#1(#, #) 1(1(-), 1(-)), Unf=OtherCon []] =
->>>>>>> 6bb3d74323... Nested CPR
-=======
-[GblId, Cpr=#c1(#), Unf=OtherCon []] =
-    CCS_DONT_CARE GHC.Types.TrNameS! [Noinline01.$trModule2];
-
-Noinline01.$trModule :: GHC.Types.Module
-[GblId, Cpr=#c1(#c1(#), #c1(#)), Unf=OtherCon []] =
->>>>>>> 7dc0a59c86... A slew of testsuite changes
     CCS_DONT_CARE GHC.Types.Module! [Noinline01.$trModule3
                                      Noinline01.$trModule1];
 
