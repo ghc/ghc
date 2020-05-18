@@ -368,16 +368,20 @@ instance  Enum Char  where
     toEnum   = chr
     fromEnum = ord
 
+    -- See Note [Stable Unfolding for list producers]
     {-# INLINE enumFrom #-}
     enumFrom (C# x) = eftChar (ord# x) 0x10FFFF#
         -- Blarg: technically I guess enumFrom isn't strict!
 
+    -- See Note [Stable Unfolding for list producers]
     {-# INLINE enumFromTo #-}
     enumFromTo (C# x) (C# y) = eftChar (ord# x) (ord# y)
 
+    -- See Note [Stable Unfolding for list producers]
     {-# INLINE enumFromThen #-}
     enumFromThen (C# x1) (C# x2) = efdChar (ord# x1) (ord# x2)
 
+    -- See Note [Stable Unfolding for list producers]
     {-# INLINE enumFromThenTo #-}
     enumFromThenTo (C# x1) (C# x2) (C# y) = efdtChar (ord# x1) (ord# x2) (ord# y)
 
@@ -497,17 +501,21 @@ instance  Enum Int  where
     toEnum   x = x
     fromEnum x = x
 
+    -- See Note [Stable Unfolding for list producers]
     {-# INLINE enumFrom #-}
     enumFrom (I# x) = eftInt x maxInt#
         where !(I# maxInt#) = maxInt
         -- Blarg: technically I guess enumFrom isn't strict!
 
+    -- See Note [Stable Unfolding for list producers]
     {-# INLINE enumFromTo #-}
     enumFromTo (I# x) (I# y) = eftInt x y
 
+    -- See Note [Stable Unfolding for list producers]
     {-# INLINE enumFromThen #-}
     enumFromThen (I# x1) (I# x2) = efdInt x1 x2
 
+    -- See Note [Stable Unfolding for list producers]
     {-# INLINE enumFromThenTo #-}
     enumFromThenTo (I# x1) (I# x2) (I# y) = efdtInt x1 x2 y
 
@@ -837,13 +845,20 @@ instance  Enum Integer  where
     toEnum (I# n)        = smallInteger n
     fromEnum n           = I# (integerToInt n)
 
+    -- See Note [Stable Unfolding for list producers]
     {-# INLINE enumFrom #-}
+    enumFrom x = enumDeltaInteger x 1
+
+    -- See Note [Stable Unfolding for list producers]
     {-# INLINE enumFromThen #-}
+    enumFromThen x y = enumDeltaInteger x (y-x)
+
+    -- See Note [Stable Unfolding for list producers]
     {-# INLINE enumFromTo #-}
+    enumFromTo x lim = enumDeltaToInteger x 1 lim
+
+    -- See Note [Stable Unfolding for list producers]
     {-# INLINE enumFromThenTo #-}
-    enumFrom x             = enumDeltaInteger   x 1
-    enumFromThen x y       = enumDeltaInteger   x (y-x)
-    enumFromTo x lim       = enumDeltaToInteger x 1     lim
     enumFromThenTo x y lim = enumDeltaToInteger x (y-x) lim
 
 -- See Note [How the Enum rules work]
@@ -952,6 +967,7 @@ instance Enum Natural where
     toEnum = intToNatural
 
 #if defined(MIN_VERSION_integer_gmp)
+    -- This is the integer-gmp special case. The general case is after the endif.
     fromEnum (NatS# w)
       | i >= 0    = i
       | otherwise = errorWithoutStackTrace "fromEnum: out of Int range"
@@ -961,11 +977,13 @@ instance Enum Natural where
     fromEnum n = fromEnum (naturalToInteger n)
 
     enumFrom x        = enumDeltaNatural      x (wordToNaturalBase 1##)
+
     enumFromThen x y
       | x <= y        = enumDeltaNatural      x (y-x)
       | otherwise     = enumNegDeltaToNatural x (x-y) (wordToNaturalBase 0##)
 
     enumFromTo x lim  = enumDeltaToNatural    x (wordToNaturalBase 1##) lim
+
     enumFromThenTo x y lim
       | x <= y        = enumDeltaToNatural    x (y-x) lim
       | otherwise     = enumNegDeltaToNatural x (x-y) lim
