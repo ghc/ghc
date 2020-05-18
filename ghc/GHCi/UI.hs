@@ -3516,7 +3516,7 @@ wrapIdentCompleterWithModifier modifChars fun = completeWordWithPrev Nothing wor
 -- | Return a list of visible module names for autocompletion.
 -- (NB: exposed != visible)
 allVisibleModules :: DynFlags -> [ModuleName]
-allVisibleModules dflags = listVisibleModuleNames dflags
+allVisibleModules dflags = listVisibleModuleNames (unitState dflags)
 
 completeExpression = completeQuotedWord (Just '\\') "\"" listFiles
                         completeIdentifier
