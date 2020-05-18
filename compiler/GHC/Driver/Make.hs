@@ -320,7 +320,7 @@ warnUnusedPackages = do
         requestedArgs = mapMaybe packageArg (packageFlags dflags)
 
         unusedArgs
-          = filter (\arg -> not $ any (matching dflags arg) loadedPackages)
+          = filter (\arg -> not $ any (matching state arg) loadedPackages)
                    requestedArgs
 
     let warn = makeIntoWarning
@@ -348,15 +348,15 @@ warnUnusedPackages = do
                 =  str == unitPackageIdString p
                 || str == unitPackageNameString p
 
-        matching :: DynFlags -> PackageArg -> UnitInfo -> Bool
+        matching :: UnitState -> PackageArg -> UnitInfo -> Bool
         matching _ (PackageArg str) p = matchingStr str p
-        matching dflags (UnitIdArg uid) p = uid == realUnit dflags p
+        matching state (UnitIdArg uid) p = uid == realUnit state p
 
         -- For wired-in packages, we have to unwire their id,
         -- otherwise they won't match package flags
-        realUnit :: DynFlags -> UnitInfo -> Unit
-        realUnit dflags
-          = unwireUnit dflags
+        realUnit :: UnitState -> UnitInfo -> Unit
+        realUnit state
+          = unwireUnit state
           . RealUnit
           . Definite
           . unitId

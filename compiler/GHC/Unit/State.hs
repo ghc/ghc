@@ -1616,9 +1616,9 @@ mkUnitState dflags dbs = do
 
 -- | Given a wired-in 'Unit', "unwire" it into the 'Unit'
 -- that it was recorded as in the package database.
-unwireUnit :: DynFlags -> Unit-> Unit
-unwireUnit dflags uid@(RealUnit (Definite def_uid)) =
-    maybe uid (RealUnit . Definite) (Map.lookup def_uid (unwireMap (unitState dflags)))
+unwireUnit :: UnitState -> Unit-> Unit
+unwireUnit state uid@(RealUnit (Definite def_uid)) =
+    maybe uid (RealUnit . Definite) (Map.lookup def_uid (unwireMap state))
 unwireUnit _ uid = uid
 
 -- -----------------------------------------------------------------------------
