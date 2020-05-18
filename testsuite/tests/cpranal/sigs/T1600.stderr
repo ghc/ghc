@@ -1,6 +1,6 @@
 
 ==================== Cpr signatures ====================
-Lib.$trModule: #c1(#c1(#), #c1(#))
+Lib.$trModule: *
 Lib.fac1: *c1(*, #c1(#))
 Lib.fac2: *c1(*, #c1(#))
 Lib.fac3: *c1(*, *c1(#))

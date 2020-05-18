@@ -57,7 +57,6 @@ fun2
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$trModule4 :: GHC.Prim.Addr#
 [GblId,
- Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 T7360.$trModule4 = "main"#
@@ -72,7 +71,6 @@ T7360.$trModule3 = GHC.Types.TrNameS T7360.$trModule4
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$trModule2 :: GHC.Prim.Addr#
 [GblId,
- Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 T7360.$trModule2 = "T7360"#
@@ -102,7 +100,6 @@ $krep
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$tcFoo2 :: GHC.Prim.Addr#
 [GblId,
- Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 T7360.$tcFoo2 = "Foo"#
@@ -138,7 +135,6 @@ T7360.$tc'Foo4
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo6 :: GHC.Prim.Addr#
 [GblId,
- Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 T7360.$tc'Foo6 = "'Foo1"#
@@ -167,7 +163,6 @@ T7360.$tc'Foo1
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo8 :: GHC.Prim.Addr#
 [GblId,
- Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 T7360.$tc'Foo8 = "'Foo2"#
@@ -200,7 +195,6 @@ T7360.$tc'Foo9 = GHC.Types.KindRepFun $krep T7360.$tc'Foo4
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo11 :: GHC.Prim.Addr#
 [GblId,
- Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 T7360.$tc'Foo11 = "'Foo3"#

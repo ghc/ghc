@@ -6,7 +6,6 @@ Result size of Tidy Core
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Roman.$trModule4 :: GHC.Prim.Addr#
 [GblId,
- Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 Roman.$trModule4 = "main"#
@@ -14,14 +13,6 @@ Roman.$trModule4 = "main"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Roman.$trModule3 :: GHC.Types.TrName
 [GblId,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
- Cpr=# 1(-),
->>>>>>> 6bb3d74323... Nested CPR
-=======
- Cpr=#c1(#),
->>>>>>> 7dc0a59c86... A slew of testsuite changes
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 Roman.$trModule3 = GHC.Types.TrNameS Roman.$trModule4
@@ -29,7 +20,6 @@ Roman.$trModule3 = GHC.Types.TrNameS Roman.$trModule4
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 Roman.$trModule2 :: GHC.Prim.Addr#
 [GblId,
- Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 Roman.$trModule2 = "Roman"#
@@ -37,14 +27,6 @@ Roman.$trModule2 = "Roman"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Roman.$trModule1 :: GHC.Types.TrName
 [GblId,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
- Cpr=# 1(-),
->>>>>>> 6bb3d74323... Nested CPR
-=======
- Cpr=#c1(#),
->>>>>>> 7dc0a59c86... A slew of testsuite changes
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 Roman.$trModule1 = GHC.Types.TrNameS Roman.$trModule2
@@ -52,14 +34,6 @@ Roman.$trModule1 = GHC.Types.TrNameS Roman.$trModule2
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 Roman.$trModule :: GHC.Types.Module
 [GblId,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
- Cpr=#1(#, #) 1(1(-), 1(-)),
->>>>>>> 6bb3d74323... Nested CPR
-=======
- Cpr=#c1(#c1(#), #c1(#)),
->>>>>>> 7dc0a59c86... A slew of testsuite changes
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 Roman.$trModule
@@ -156,14 +130,6 @@ Roman.foo_go
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 Roman.foo2 :: Int
 [GblId,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
- Cpr=# 1(-),
->>>>>>> 6bb3d74323... Nested CPR
-=======
- Cpr=#c1(#),
->>>>>>> 7dc0a59c86... A slew of testsuite changes
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 Roman.foo2 = GHC.Types.I# 6#
@@ -171,14 +137,6 @@ Roman.foo2 = GHC.Types.I# 6#
 -- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
 Roman.foo1 :: Maybe Int
 [GblId,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
- Cpr=#2(#) 2(1(-)),
->>>>>>> 6bb3d74323... Nested CPR
-=======
- Cpr=#c2(#c1(#)),
->>>>>>> 7dc0a59c86... A slew of testsuite changes
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 Roman.foo1 = GHC.Maybe.Just @Int Roman.foo2
