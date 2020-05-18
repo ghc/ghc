@@ -1226,9 +1226,9 @@ mkPrimOpId prim_op
     --      so that we give an `if ... then error "blah" else (1, 2)` the
     --      nested CPR property.
     -- In all other cases we simply assume `topCpr`.
-    cpr | primOpIsCheap prim_op     = whnfTermCpr
-        | isBottomingSig strict_sig = divergeCpr
-        | otherwise                 = topCpr
+    cpr | primOpIsCheap prim_op   = whnfTermCpr
+        | isDeadEndSig strict_sig = divergeCpr
+        | otherwise               = topCpr
 
     info = noCafIdInfo
            `setRuleInfo`           mkRuleInfo (maybeToList $ primOpRules name prim_op)
