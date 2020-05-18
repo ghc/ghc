@@ -339,7 +339,7 @@ def cleanup_and_exit(exitcode):
     exit(exitcode)
 
 def tabulate_metrics(metrics: List[PerfMetric]) -> None:
-    for metric in sorted(metrics, key=lambda m: (m.stat.test, m.stat.way)):
+    for metric in sorted(metrics, key=lambda m: (m.stat.test, m.stat.way, m.stat.metric)):
         print("{test:24}  {metric:40}  {value:15.3f}".format(
             test = "{}({})".format(metric.stat.test, metric.stat.way),
             metric = metric.stat.metric,
