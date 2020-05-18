@@ -1997,9 +1997,9 @@ lookupModuleWithSuggestions' pkgs mod_map m mb_pn
         (if originVisible origin then SuggestVisible else SuggestHidden)
             name mod origin
 
-listVisibleModuleNames :: DynFlags -> [ModuleName]
-listVisibleModuleNames dflags =
-    map fst (filter visible (Map.toList (moduleNameProvidersMap (unitState dflags))))
+listVisibleModuleNames :: UnitState -> [ModuleName]
+listVisibleModuleNames state =
+    map fst (filter visible (Map.toList (moduleNameProvidersMap state)))
   where visible (_, ms) = any originVisible (Map.elems ms)
 
 -- | Lookup 'UnitInfo' for every preload unit, for every unit used to
