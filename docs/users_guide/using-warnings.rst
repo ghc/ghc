@@ -1172,7 +1172,7 @@ of ``-W(no-)*``.
        single: orphan instances, warning
        single: orphan rules, warning
 
-    An instance is "orphan" if it appears in a module in which
+    An instance is an "orphan" if it appears in a module in which
     neither the class nor the type being instanced are declared in the
     same module.
     These flags allow selectively suppress a :ghc-flag:`-Worphans`
