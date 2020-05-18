@@ -2021,7 +2021,7 @@ getPreloadUnitsAnd dflags pkgids0 =
       preload = preloadUnits state
       parents = zip pkgids (repeat Nothing)
   in do
-  all_pkgs <- throwErr dflags (foldM (add_package pkg_map) preload parents)
+  all_pkgs <- throwErr dflags (foldM (add_unit pkg_map) preload parents)
   return (map (unsafeLookupUnitId state) all_pkgs)
 
 -- Takes a list of packages, and returns the list with dependencies included,
@@ -2042,34 +2042,35 @@ throwErr dflags m
 closeDepsErr :: UnitInfoMap
              -> [(UnitId,Maybe UnitId)]
              -> MaybeErr MsgDoc [UnitId]
-closeDepsErr pkg_map ps = foldM (add_package pkg_map) [] ps
+closeDepsErr pkg_map ps = foldM (add_unit pkg_map) [] ps
 
--- internal helper
-add_package :: UnitInfoMap
+-- | Add a UnitId and those it depends on (recursively) to the given list of
+-- UnitIds if they are not already in it. Return a list in reverse dependency
+-- order (a unit appears before those it depends on).
+--
+-- The UnitId is looked up in the given UnitInfoMap (to find its dependencies).
+-- It it's not found, the optional parent unit is used to return a more precise
+-- error message ("dependency of <PARENT>").
+add_unit :: UnitInfoMap
             -> [UnitId]
             -> (UnitId,Maybe UnitId)
             -> MaybeErr MsgDoc [UnitId]
-add_package pkg_map ps (p, mb_parent)
-  | p `elem` ps = return ps     -- Check if we've already added this package
-  | otherwise =
-      case lookupUnitId' pkg_map p of
-        Nothing -> Failed (missingPackageMsg p <>
-                           missingDependencyMsg mb_parent)
-        Just pkg -> do
-           -- Add the package's dependents also
-           ps' <- foldM add_unit_key ps (unitDepends pkg)
-           return (p : ps')
-          where
-            add_unit_key ps key
-              = add_package pkg_map ps (key, Just p)
-
-missingPackageMsg :: Outputable pkgid => pkgid -> SDoc
-missingPackageMsg p = text "unknown package:" <+> ppr p
-
-missingDependencyMsg :: Maybe UnitId -> SDoc
-missingDependencyMsg Nothing = Outputable.empty
-missingDependencyMsg (Just parent)
-  = space <> parens (text "dependency of" <+> ftext (unitIdFS parent))
+add_unit pkg_map ps (p, mb_parent)
+  | p `elem` ps = return ps     -- Check if we've already added this unit
+  | otherwise   = case lookupUnitId' pkg_map p of
+      Nothing -> Failed $
+                   (ftext (fsLit "unknown package:") <+> ppr p)
+                   <> case mb_parent of
+                         Nothing     -> Outputable.empty
+                         Just parent -> space <> parens (text "dependency of"
+                                                  <+> ftext (unitIdFS parent))
+      Just info -> do
+         -- Add the unit's dependents also
+         ps' <- foldM add_unit_key ps (unitDepends info)
+         return (p : ps')
+        where
+          add_unit_key ps key
+            = add_unit pkg_map ps (key, Just p)
 
 -- -----------------------------------------------------------------------------
 
