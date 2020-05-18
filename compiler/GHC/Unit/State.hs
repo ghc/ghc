@@ -2021,7 +2021,7 @@ getPreloadUnitsAnd dflags pkgids0 =
       preload = preloadUnits state
       parents = zip pkgids (repeat Nothing)
   in do
-  all_pkgs <- throwErr dflags (foldM (add_package dflags pkg_map) preload parents)
+  all_pkgs <- throwErr dflags (foldM (add_package pkg_map) preload parents)
   return (map (unsafeLookupUnitId state) all_pkgs)
 
 -- Takes a list of packages, and returns the list with dependencies included,
@@ -2031,7 +2031,7 @@ closeDeps :: DynFlags
           -> [(UnitId, Maybe UnitId)]
           -> IO [UnitId]
 closeDeps dflags pkg_map ps
-    = throwErr dflags (closeDepsErr dflags pkg_map ps)
+    = throwErr dflags (closeDepsErr pkg_map ps)
 
 throwErr :: DynFlags -> MaybeErr MsgDoc a -> IO a
 throwErr dflags m
@@ -2039,19 +2039,17 @@ throwErr dflags m
                 Failed e    -> throwGhcExceptionIO (CmdLineError (showSDoc dflags e))
                 Succeeded r -> return r
 
-closeDepsErr :: DynFlags
-             -> UnitInfoMap
+closeDepsErr :: UnitInfoMap
              -> [(UnitId,Maybe UnitId)]
              -> MaybeErr MsgDoc [UnitId]
-closeDepsErr dflags pkg_map ps = foldM (add_package dflags pkg_map) [] ps
+closeDepsErr pkg_map ps = foldM (add_package pkg_map) [] ps
 
 -- internal helper
-add_package :: DynFlags
-            -> UnitInfoMap
+add_package :: UnitInfoMap
             -> [UnitId]
             -> (UnitId,Maybe UnitId)
             -> MaybeErr MsgDoc [UnitId]
-add_package dflags pkg_map ps (p, mb_parent)
+add_package pkg_map ps (p, mb_parent)
   | p `elem` ps = return ps     -- Check if we've already added this package
   | otherwise =
       case lookupUnitId' pkg_map p of
@@ -2063,7 +2061,7 @@ add_package dflags pkg_map ps (p, mb_parent)
            return (p : ps')
           where
             add_unit_key ps key
-              = add_package dflags pkg_map ps (key, Just p)
+              = add_package pkg_map ps (key, Just p)
 
 missingPackageMsg :: Outputable pkgid => pkgid -> SDoc
 missingPackageMsg p = text "unknown package:" <+> ppr p
