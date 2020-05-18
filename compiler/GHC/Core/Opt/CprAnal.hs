@@ -122,8 +122,7 @@ cprAnalTopBind :: AnalEnv
 cprAnalTopBind env (NonRec id rhs)
   = (env', NonRec id' rhs')
   where
-    (id', rhs', env') = cprAnalBind TopLevel env [] id rhs
-
+    (id', rhs', env') = cprAnalBind TopLevel env noWidening [] id rhs
 
 cprAnalTopBind env (Rec pairs)
   = (env', Rec pairs')
@@ -215,7 +214,7 @@ cprAnal' env args (Case scrut case_bndr ty alts)
 cprAnal' env args (Let (NonRec id rhs) body)
   = (body_ty, Let (NonRec id' rhs') body')
   where
-    (id', rhs', env') = cprAnalBind NotTopLevel env args id rhs
+    (id', rhs', env') = cprAnalBind NotTopLevel env noWidening args id rhs
     (body_ty, body')  = cprAnal env' args body
 
 cprAnal' env args (Let (Rec pairs) body)
@@ -276,7 +275,130 @@ cprTransform env args id
 -- * Bindings
 --
 
--- Recursive bindings
+--
+-- ** Widening
+--
+
+type Widening = CprSig -> CprSig
+
+noWidening :: Widening
+noWidening = id
+
+-- | A widening operator on 'CprSig' to ensure termination of fixed-point
+-- iteration. See Note [Ensuring termination of fixed-point iteration]
+depthWidening :: Widening
+depthWidening = pruneSig mAX_DEPTH . markDiverging
+
+mAX_DEPTH :: Int
+mAX_DEPTH = 4
+
+pruneSig :: Int -> CprSig -> CprSig
+pruneSig d (CprSig cpr_ty)
+  = CprSig $ cpr_ty { ct_cpr = pruneDeepCpr d (ct_cpr cpr_ty) }
+
+-- TODO: We need the lubCpr with the initial CPR because
+--       of functions like iterate, which we would CPR
+--       multiple levels deep, thereby changing termination
+--       behavior.
+markDiverging :: CprSig -> CprSig
+markDiverging (CprSig cpr_ty) = CprSig $ cpr_ty { ct_cpr = ct_cpr cpr_ty `lubCpr` divergeCpr }
+
+--
+-- ** Analysing a binding (one-round, the non-recursive case)
+--
+
+-- | Process the RHS of the binding for a sensible arity, add the CPR signature
+-- to the Id, and augment the environment with the signature as well.
+cprAnalBind
+  :: TopLevelFlag
+  -> AnalEnv
+  -> Widening -- ^ We want to specify 'depthWidening' in fixed-point iteration
+  -> [CprType]
+  -> Id
+  -> CoreExpr
+  -> (Id, CoreExpr, AnalEnv)
+cprAnalBind top_lvl env widening args id rhs
+  -- See Note [CPR for data structures]
+  | isDataStructure id rhs
+  = (id,  rhs,  env) -- Data structure => no code => need to analyse rhs
+  | otherwise
+  = (id', rhs', env')
+  where
+    arg_tys             = fst (splitFunNewTys (idType id))
+    -- We compute the Termination and CPR transformer based on the strictness
+    -- signature. There is no point in pretending that an arg we are strict in
+    -- could lead to non-termination, as the signature then trivially
+    -- MightDiverge. Instead we assume that call sites make sure to force the
+    -- arguments appropriately and unleash the TerminationFlag there.
+    assumed_arg_cpr_tys = argCprTypesFromStrictSig (unboxingStrategy env)
+                                                   arg_tys
+                                                   (idStrictness id)
+
+    -- TODO: Not sure if that special handling of join points is really
+    -- necessary. It might even be harmful if the excess 'args' aren't unboxed
+    -- and we blindly assume that they have the CPR property! So we should
+    -- try out getting rid of this special case and 'args'.
+    (rhs_ty, rhs')
+      | isJoinId id = cprAnal env (assumed_arg_cpr_tys ++ args) rhs
+      | otherwise   = cprAnal env assumed_arg_cpr_tys rhs
+
+    -- possibly trim thunk CPR info
+    rhs_ty'
+      -- See Note [CPR for thunks]
+      | stays_thunk = trimCprTy rhs_ty
+      -- See Note [CPR for sum types]
+      | returns_sum = trimCprTy rhs_ty
+      | otherwise   = rhs_ty
+
+    -- See Note [Arity trimming for CPR signatures]
+    -- See Note [Ensuring termination of fixed-point iteration]
+    sig    = widening $ mkCprSigForArity (ae_dflags env) (idArity id) rhs_ty'
+    id'    = -- pprTrace "cprAnalBind" (ppr id $$ ppr sig) $
+             setIdCprInfo id sig
+    env'   = extendSigEnv env id sig
+
+    -- See Note [CPR for thunks]
+    stays_thunk = is_thunk && not_strict
+    is_thunk    = not (exprIsHNF rhs) && not (isJoinId id)
+    not_strict  = not (isStrictDmd (idDemandInfo id))
+    -- See Note [CPR for sum types]
+    (_, ret_ty) = splitPiTys (idType id)
+    not_a_prod  = isNothing (deepSplitProductType_maybe (ae_fam_envs env) ret_ty)
+    returns_sum = not (isTopLevel top_lvl) && not_a_prod
+
+isDataStructure :: Id -> CoreExpr -> Bool
+-- See Note [CPR for data structures]
+isDataStructure id rhs =
+  idArity id == 0 && exprIsHNF rhs
+
+-- | Returns an expandable unfolding
+-- (See Note [exprIsExpandable] in "GHC.Core.Utils") that has
+-- So effectively is a constructor application.
+cprDataStructureUnfolding_maybe :: Id -> Maybe CoreExpr
+cprDataStructureUnfolding_maybe id = do
+  -- There are only FinalPhase Simplifier runs after CPR analysis
+  guard (activeInFinalPhase (idInlineActivation id))
+  unf <- expandUnfolding_maybe (idUnfolding id)
+  guard (isDataStructure id unf)
+  return unf
+
+unboxingStrategy :: AnalEnv -> UnboxingStrategy
+unboxingStrategy env ty dmd
+  = prj <$> wantToUnbox (ae_fam_envs env) has_inlineable_prag ty dmd
+  where
+    prj (dmds, DataConAppContext { dcac_dc = dc, dcac_arg_tys = tys_w_str })
+      = (dc, map (scaledThing . fst) tys_w_str, dmds)
+    -- Rather than maintaining in AnalEnv whether we are in an INLINEABLE
+    -- function, we just assume that we aren't. That flag is only relevant
+    -- to Note [Do not unpack class dictionaries], the few unboxing
+    -- opportunities on dicts it prohibits are probably irrelevant to CPR.
+    has_inlineable_prag = False
+
+--
+-- ** Analysing recursive bindings
+--
+
+-- | Fixed-point iteration
 cprFix
   :: TopLevelFlag
   -> AnalEnv                    -- Does not include bindings for this binding
@@ -317,110 +439,7 @@ cprFix top_lvl orig_env str orig_pairs
       where
         go env (id, rhs) = (env', (id', rhs'))
           where
-            (id', rhs', env') = cprAnalBind top_lvl env str id rhs
-
-mAX_DEPTH :: Int
-mAX_DEPTH = 4
-
--- TODO: We need the lubCpr with the initial CPR because
---       of functions like iterate, which we would CPR
---       multiple levels deep, thereby changing termination
---       behavior.
-markDiverging :: CprSig -> CprSig
-markDiverging (CprSig cpr_ty) = CprSig $ cpr_ty { ct_cpr = ct_cpr cpr_ty `lubCpr` divergeCpr }
-
--- | A widening operator on 'CprSig' to ensure termination of fixed-point
--- iteration. See Note [Ensuring termination of fixed-point iteration]
-pruneSig :: Int -> CprSig -> CprSig
-pruneSig d (CprSig cpr_ty)
-  = CprSig $ cpr_ty { ct_cpr = pruneDeepCpr d (ct_cpr cpr_ty) }
-
-unboxingStrategy :: AnalEnv -> UnboxingStrategy
-unboxingStrategy env ty dmd
-  = prj <$> wantToUnbox (ae_fam_envs env) has_inlineable_prag ty dmd
-  where
-    prj (dmds, DataConAppContext { dcac_dc = dc, dcac_arg_tys = tys_w_str })
-      = (dc, map (scaledThing . fst) tys_w_str, dmds)
-    -- Rather than maintaining in AnalEnv whether we are in an INLINEABLE
-    -- function, we just assume that we aren't. That flag is only relevant
-    -- to Note [Do not unpack class dictionaries], the few unboxing
-    -- opportunities on dicts it prohibits are probably irrelevant to CPR.
-    has_inlineable_prag = False
-
--- | Process the RHS of the binding for a sensible arity, add the CPR signature
--- to the Id, and augment the environment with the signature as well.
-cprAnalBind
-  :: TopLevelFlag
-  -> AnalEnv
-  -> [CprType]
-  -> Id
-  -> CoreExpr
-  -> (Id, CoreExpr, AnalEnv)
-cprAnalBind top_lvl env args id rhs
-  -- See Note [CPR for data structures]
-  | isDataStructure id rhs
-  = (id,  rhs,  env) -- Data structure => no code => need to analyse rhs
-  | otherwise
-  = (id', rhs', env')
-  where
-    arg_tys             = fst (splitFunNewTys (idType id))
-    -- We compute the Termination and CPR transformer based on the strictness
-    -- signature. There is no point in pretending that an arg we are strict in
-    -- could lead to non-termination, as the signature then trivially
-    -- MightDiverge. Instead we assume that call sites make sure to force the
-    -- arguments appropriately and unleash the TerminationFlag there.
-    assumed_arg_cpr_tys = argCprTypesFromStrictSig (unboxingStrategy env)
-                                                   arg_tys
-                                                   (idStrictness id)
-
-    -- TODO: Not sure if that special handling of join points is really
-    -- necessary. It might even be harmful if the excess 'args' aren't unboxed
-    -- and we blindly assume that they have the CPR property! So we should
-    -- try out getting rid of this special case and 'args'.
-    (rhs_ty, rhs')
-      | isJoinId id = cprAnal env (assumed_arg_cpr_tys ++ args) rhs
-      | otherwise   = cprAnal env assumed_arg_cpr_tys rhs
-
-    -- possibly trim thunk CPR info
-    rhs_ty'
-      -- See Note [CPR for thunks]
-      | stays_thunk = trimCprTy rhs_ty
-      -- See Note [CPR for sum types]
-      | returns_sum = trimCprTy rhs_ty
-      | otherwise   = rhs_ty
-
-    -- See Note [Arity trimming for CPR signatures]
-    -- See Note [Ensuring termination of fixed-point iteration]
-    dflags = ae_dflags env
-    sig    = pruneSig mAX_DEPTH $ markDiverging $ mkCprSigForArity dflags (idArity id) rhs_ty'
-    id'    = -- pprTrace "cprAnalBind" (ppr id $$ ppr sig) $
-             setIdCprInfo id sig
-    env'   = extendSigEnv env id sig
-
-    -- See Note [CPR for thunks]
-    stays_thunk = is_thunk && not_strict
-    is_thunk    = not (exprIsHNF rhs) && not (isJoinId id)
-    not_strict  = not (isStrictDmd (idDemandInfo id))
-    -- See Note [CPR for sum types]
-    (_, ret_ty) = splitPiTys (idType id)
-    not_a_prod  = isNothing (deepSplitProductType_maybe (ae_fam_envs env) ret_ty)
-    returns_sum = not (isTopLevel top_lvl) && not_a_prod
-
-isDataStructure :: Id -> CoreExpr -> Bool
--- See Note [CPR for data structures]
-isDataStructure id rhs =
-  idArity id == 0 && exprIsHNF rhs
-
--- | Returns an expandable unfolding
--- (See Note [exprIsExpandable] in "GHC.Core.Utils") that has
--- So effectively is a constructor application.
-cprDataStructureUnfolding_maybe :: Id -> Maybe CoreExpr
-cprDataStructureUnfolding_maybe id = do
-  -- There are only FinalPhase Simplifier runs after CPR analysis
-  guard (activeInFinalPhase (idInlineActivation id))
-  unf <- expandUnfolding_maybe (idUnfolding id)
-  guard (isDataStructure id unf)
-  return unf
+            (id', rhs', env') = cprAnalBind top_lvl env depthWidening str id rhs
 
 {- Note [Arity trimming for CPR signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
