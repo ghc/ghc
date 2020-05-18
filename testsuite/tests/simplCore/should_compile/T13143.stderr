@@ -26,7 +26,6 @@ f = \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Prim.(##)
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T13143.$trModule4 :: GHC.Prim.Addr#
 [GblId,
- Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 T13143.$trModule4 = "main"#
@@ -42,7 +41,6 @@ T13143.$trModule3 = GHC.Types.TrNameS T13143.$trModule4
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T13143.$trModule2 :: GHC.Prim.Addr#
 [GblId,
- Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 T13143.$trModule2 = "T13143"#
