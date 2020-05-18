@@ -1181,7 +1181,7 @@ of ``-W(no-)*``.
     The flag may be specified multiple times.
     Use :ghc-flag:`-faccept-no-orphans` to reset the list.
 
-    The instances are still orphan. This flag only affects warning reporting.
+    The instances are still orphans. This flag only affects warning reporting.
 
 .. ghc-flag:: -Woverlapping-patterns
     :shortdesc: warn about overlapping patterns
