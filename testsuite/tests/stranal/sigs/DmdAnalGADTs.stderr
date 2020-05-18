@@ -14,63 +14,16 @@ DmdAnalGADTs.hasStrSig: <S,1*U(U)>
 
 
 ==================== Cpr signatures ====================
-<<<<<<< HEAD
-<<<<<<< HEAD
-DmdAnalGADTs.$tc'A:
-DmdAnalGADTs.$tc'B:
-DmdAnalGADTs.$tcD:
-DmdAnalGADTs.$trModule:
-DmdAnalGADTs.diverges: b
-DmdAnalGADTs.f:
-DmdAnalGADTs.f': m1
-DmdAnalGADTs.g:
-DmdAnalGADTs.hasCPR:
-DmdAnalGADTs.hasStrSig: m1
-=======
-DmdAnalGADTs.$tc'A: #1(*, *, #1(#, #), #, *,
-                       #1(#1(*, *, #1(#, #), #, *, #4(#, #)),
-                          #2(#1(#1(*, *, #1(#, #), #, *, #), *), *))) 1(-, -, 1(1(-), 1(-)),
-                                                                        1(-), -,
-                                                                        1(1(-, -, 1(1(-), 1(-)),
-                                                                            1(-), -, 4(5(-), 5(-))),
-                                                                          2(1(1(-, -, 1(1(-), 1(-)),
-                                                                                1(-), -, 5(-)),
-                                                                              -),
-                                                                            -)))
-DmdAnalGADTs.$tc'B: #1(*, *, #1(#, #), #, *,
-                       #1(#1(*, *, #1(#, #), #, *, #4(#, #)),
-                          #2(#4(#1(#1(*, *, #1(#, #), #, *, #), *),
-                                #1(#1(*, *, #1(#, #), #, *, #), *)),
-                             *))) 1(-, -, 1(1(-), 1(-)), 1(-), -,
-                                    1(1(-, -, 1(1(-), 1(-)), 1(-), -, 4(5(-), 5(-))),
-                                      2(4(1(1(-, -, 1(1(-), 1(-)), 1(-), -, 5(-)), -),
-                                          1(1(-, -, 1(1(-), 1(-)), 1(-), -, 5(-)), -)),
-                                        -)))
-DmdAnalGADTs.$tcD: #1(*, *, #1(#, #), #, *, #4(#, #)) 1(-, -,
-                                                        1(1(-), 1(-)), 1(-), -, 4(5(-), 5(-)))
-DmdAnalGADTs.$trModule: #1(#, #) 1(1(-), 1(-))
-DmdAnalGADTs.diverges: *(#..) b
-DmdAnalGADTs.f: * -
-DmdAnalGADTs.f': * 1(-)
-DmdAnalGADTs.g: * -
-DmdAnalGADTs.hasCPR: # 1(-)
-DmdAnalGADTs.hasStrSig: * -
->>>>>>> 6bb3d74323... Nested CPR
-=======
-DmdAnalGADTs.$tc'A: #c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #,
-                        #c1(#c1(#, #, #c1(#, #), #c1(#), #, #c4(#, #)), #c2(#c1(#, *), *)))
-DmdAnalGADTs.$tc'B: #c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #,
-                        #c1(#c1(#, #, #c1(#, #), #c1(#), #, #c4(#, #)), #c2(#c4(#, #), *)))
-DmdAnalGADTs.$tcD: #c1(#, #, #c1(#c1(#), #c1(#)), #c1(#), #,
-                       #c4(#c5(*), #c5(*)))
-DmdAnalGADTs.$trModule: #c1(#c1(#), #c1(#))
+DmdAnalGADTs.$tc'A: *
+DmdAnalGADTs.$tc'B: *
+DmdAnalGADTs.$tcD: *
+DmdAnalGADTs.$trModule: *
 DmdAnalGADTs.diverges: *b
 DmdAnalGADTs.f: *
 DmdAnalGADTs.f': #c1(#)
 DmdAnalGADTs.g: *
-DmdAnalGADTs.hasCPR: #c1(#)
-DmdAnalGADTs.hasStrSig: #
->>>>>>> 7dc0a59c86... A slew of testsuite changes
+DmdAnalGADTs.hasCPR: *
+DmdAnalGADTs.hasStrSig: #c1(#)
 
 
 
