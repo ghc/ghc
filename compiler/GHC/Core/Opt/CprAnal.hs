@@ -258,7 +258,7 @@ cprTransform env args id
     sig
       -- See Note [CPR for expandable unfoldings]
       | Just rhs <- cprExpandUnfolding_maybe id
-      = fst $ cprAnal env rhs
+      = fst $ cprAnal env args rhs
       -- Data constructor
       | Just con <- isDataConWorkId_maybe id
       = cprTransformDataConSig con args

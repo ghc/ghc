@@ -984,7 +984,7 @@ annotateBotStr id n_extra mb_str
       Nothing           -> id
       Just (arity, sig) -> id `setIdArity`      (arity + n_extra)
                               `setIdStrictness` (prependArgsStrictSig n_extra sig)
-                              `setIdStrictness` (increaseStrictSigArity n_extra sig)
+                              `setIdCprInfo`    mkCprSig (arity + n_extra) divergeCpr
 
 notWorthFloating :: CoreExpr -> [Var] -> Bool
 -- Returns True if the expression would be replaced by
