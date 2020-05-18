@@ -184,11 +184,12 @@ class IsList l where
   --   list of @Item l@
   fromList  :: [Item l] -> l
 
-  -- | The 'fromListN' function takes the input list's length as a hint. Its
-  --   behaviour should be equivalent to 'fromList'. The hint can be used to
-  --   construct the structure @l@ more efficiently compared to 'fromList'. If
-  --   the given hint does not equal to the input list's length the behaviour of
-  --   'fromListN' is not specified.
+  -- | The 'fromListN' function takes the input list's length and potentially
+  --   uses it to construct the structure @l@ more efficiently compared to 
+  --   'fromList'. If the given number does not equal to the input list's length 
+  --   the behaviour of 'fromListN' is not specified.
+  --
+  --   prop> fromListN (length xs) == fromList xs
   fromListN :: Int -> [Item l] -> l
   fromListN _ = fromList
 
