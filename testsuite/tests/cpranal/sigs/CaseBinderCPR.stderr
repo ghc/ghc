@@ -1,26 +1,7 @@
 
 ==================== Cpr signatures ====================
-<<<<<<< HEAD
-<<<<<<< HEAD
-CaseBinderCPR.$trModule:
-CaseBinderCPR.f_list_cmp: m1
-=======
-CaseBinderCPR.$trModule: #1(#, #) 1(1(-), 1(-))
-CaseBinderCPR.f_list_cmp: * 1(-)
->>>>>>> 6bb3d74323... Nested CPR
-
-
-
-==================== Strictness signatures ====================
-CaseBinderCPR.$trModule:
-CaseBinderCPR.f_list_cmp: <L,C(C1(U(1*U)))><S,1*U><S,1*U>
-=======
-CaseBinderCPR.$trModule: #c1(#c1(#), #c1(#))
+CaseBinderCPR.$trModule: *
 CaseBinderCPR.f_list_cmp: *c1(*)
-<<<<<<< HEAD
->>>>>>> 7dc0a59c86... A slew of testsuite changes
-=======
 CaseBinderCPR.g: *c1(#, #)
->>>>>>> 231205ea7d... Update CaseBinderCPR with a new function
 
 
