@@ -6,7 +6,6 @@ Result size of Tidy Core
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 ten :: Natural
 [GblId,
- Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
 ten = 10
@@ -14,7 +13,6 @@ ten = 10
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 M.$trModule4 :: GHC.Prim.Addr#
 [GblId,
- Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 M.$trModule4 = "main"#
@@ -22,14 +20,6 @@ M.$trModule4 = "main"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 M.$trModule3 :: GHC.Types.TrName
 [GblId,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
- Cpr=# 1(-),
->>>>>>> 6bb3d74323... Nested CPR
-=======
- Cpr=#c1(#),
->>>>>>> 7dc0a59c86... A slew of testsuite changes
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 M.$trModule3 = GHC.Types.TrNameS M.$trModule4
@@ -37,7 +27,6 @@ M.$trModule3 = GHC.Types.TrNameS M.$trModule4
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 M.$trModule2 :: GHC.Prim.Addr#
 [GblId,
- Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 M.$trModule2 = "M"#
@@ -45,14 +34,6 @@ M.$trModule2 = "M"#
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 M.$trModule1 :: GHC.Types.TrName
 [GblId,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
- Cpr=# 1(-),
->>>>>>> 6bb3d74323... Nested CPR
-=======
- Cpr=#c1(#),
->>>>>>> 7dc0a59c86... A slew of testsuite changes
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 M.$trModule1 = GHC.Types.TrNameS M.$trModule2
@@ -60,14 +41,6 @@ M.$trModule1 = GHC.Types.TrNameS M.$trModule2
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 M.$trModule :: GHC.Types.Module
 [GblId,
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
- Cpr=#1(#, #) 1(1(-), 1(-)),
->>>>>>> 6bb3d74323... Nested CPR
-=======
- Cpr=#c1(#c1(#), #c1(#)),
->>>>>>> 7dc0a59c86... A slew of testsuite changes
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
 M.$trModule = GHC.Types.Module M.$trModule3 M.$trModule1
@@ -98,7 +71,6 @@ minusOne
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 twoTimesTwo :: Natural
 [GblId,
- Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 0}]
 twoTimesTwo = 4
@@ -117,7 +89,6 @@ plusOne = \ (n :: Natural) -> plusNatural n M.minusOne1
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 one :: Natural
 [GblId,
- Cpr=#,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)}]

@@ -6,18 +6,8 @@ StrAnalExample.foo: <S,1*U>
 
 
 ==================== Cpr signatures ====================
-<<<<<<< HEAD
-<<<<<<< HEAD
-StrAnalExample.$trModule:
-StrAnalExample.foo:
-=======
-StrAnalExample.$trModule: #1(#, #) 1(1(-), 1(-))
-StrAnalExample.foo: * -
->>>>>>> 6bb3d74323... Nested CPR
-=======
-StrAnalExample.$trModule: #c1(#c1(#), #c1(#))
+StrAnalExample.$trModule: *
 StrAnalExample.foo: #
->>>>>>> 7dc0a59c86... A slew of testsuite changes
 
 
 
