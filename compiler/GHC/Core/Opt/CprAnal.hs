@@ -17,7 +17,7 @@ import GHC.Driver.Session
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Core
-import GHC.Core.Opt.Arity   ( splitFunNewTys )
+import GHC.Core.Opt.Arity ( splitFunNewTys )
 import GHC.Core.Seq
 import GHC.Utils.Outputable
 import GHC.Types.Var.Env
@@ -320,7 +320,7 @@ cprAnalBind
 cprAnalBind top_lvl env widening args id rhs
   -- See Note [CPR for data structures]
   | isDataStructure id rhs
-  = (id,  rhs,  env) -- Data structure => no code => need to analyse rhs
+  = (id,  rhs,  env) -- Data structure => no code => no need to analyse rhs
   | otherwise
   = (id', rhs', env')
   where
