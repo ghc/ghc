@@ -12,6 +12,7 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
+
 -- | Typechecking user-specified @MonoTypes@
 module GHC.Tc.Gen.HsType (
         -- Type signatures
@@ -169,7 +170,8 @@ funsSigCtxt []              = panic "funSigCtxt"
 
 addSigCtxt :: UserTypeCtxt -> LHsType GhcRn -> TcM a -> TcM a
 addSigCtxt ctxt hs_ty thing_inside
-  = setSrcSpan (getLoc hs_ty) $
+  = etaIOEnv $
+    setSrcSpan (getLoc hs_ty) $
     addErrCtxt (pprSigCtxt ctxt hs_ty) $
     thing_inside
 
@@ -1705,7 +1707,7 @@ addTypeCtxt :: LHsType GhcRn -> TcM a -> TcM a
         -- Omit invisible ones and ones user's won't grok
 addTypeCtxt (L _ (HsWildCardTy _)) thing = thing   -- "In the type '_'" just isn't helpful.
 addTypeCtxt (L _ ty) thing
-  = addErrCtxt doc thing
+  = etaIOEnv $ addErrCtxt doc thing
   where
     doc = text "In the type" <+> quotes (ppr ty)
 
@@ -2151,7 +2153,7 @@ kcCheckDeclHeader_sig kisig name flav
     --  * (Name, TcTyVar)  for  tcTyConScopedTyVars, if there's a user-written LHsTyVarBndr
     --
     zipped_to_tcb :: ZippedBinder -> TcM (TyConBinder, [(Name, TcTyVar)])
-    zipped_to_tcb zb = case zb of
+    zipped_to_tcb zb = etaIOEnv $ case zb of
 
       -- Inferred variable, no user-written binder.
       -- Example:   forall {k}.
@@ -2630,7 +2632,8 @@ bindImplicitTKBndrsX
    -> TcM ([TcTyVar], a)   -- Returned [TcTyVar] are in 1-1 correspondence
                            -- with the passed in [Name]
 bindImplicitTKBndrsX new_tv tv_names thing_inside
-  = do { tkvs <- mapM new_tv tv_names
+  = etaIOEnv
+  $ do { tkvs <- mapM new_tv tv_names
        ; traceTc "bindImplicitTKBndrs" (ppr tv_names $$ ppr tkvs)
        ; res <- tcExtendNameTyVarEnv (tv_names `zip` tkvs)
                 thing_inside
@@ -2759,7 +2762,8 @@ bindTyClTyVars :: Name
 -- in the "kind checking" and "type checking" pass,
 -- but not in the initial-kind run.
 bindTyClTyVars tycon_name thing_inside
-  = do { tycon <- tcLookupTcTyCon tycon_name
+  = etaIOEnv
+  $ do { tycon <- tcLookupTcTyCon tycon_name
        ; let scoped_prs = tcTyConScopedTyVars tycon
              res_kind   = tyConResKind tycon
              binders    = tyConBinders tycon
@@ -2775,8 +2779,8 @@ bindTyClTyVars tycon_name thing_inside
 ********************************************************************* -}
 
 zonkAndScopedSort :: [TcTyVar] -> TcM [TcTyVar]
-zonkAndScopedSort spec_tkvs
-  = do { spec_tkvs <- mapM zonkAndSkolemise spec_tkvs
+zonkAndScopedSort spec_tkvs = etaIOEnv $ do
+       { spec_tkvs <- mapM zonkAndSkolemise spec_tkvs
           -- Use zonkAndSkolemise because a skol_tv might be a TyVarTv
 
        -- Do a stable topological sort, following
@@ -2803,7 +2807,8 @@ kindGeneralizeSome :: (TcTyVar -> Bool)
                    -> TcType    -- ^ needn't be zonked
                    -> TcM [KindVar]
 kindGeneralizeSome should_gen kind_or_type
-  = do { traceTc "kindGeneralizeSome {" (ppr kind_or_type)
+  = etaIOEnv
+  $ do { traceTc "kindGeneralizeSome {" (ppr kind_or_type)
 
          -- use the "Kind" variant here, as any types we see
          -- here will already have all type variables quantified;
@@ -2835,7 +2840,8 @@ kindGeneralizeSome should_gen kind_or_type
 -- constraints on the type's metavariables will arise or be solved.
 kindGeneralizeAll :: TcType  -- needn't be zonked
                   -> TcM [KindVar]
-kindGeneralizeAll ty = do { traceTc "kindGeneralizeAll" empty
+kindGeneralizeAll ty = etaIOEnv $ do
+                          { traceTc "kindGeneralizeAll" empty
                           ; kindGeneralizeSome (const True) ty }
 
 -- | Specialized version of 'kindGeneralizeSome', but where no variables
@@ -2849,7 +2855,8 @@ kindGeneralizeAll ty = do { traceTc "kindGeneralizeAll" empty
 kindGeneralizeNone :: TcType  -- needn't be zonked
                    -> TcM ()
 kindGeneralizeNone ty
-  = do { traceTc "kindGeneralizeNone" empty
+  = etaIOEnv
+  $ do { traceTc "kindGeneralizeNone" empty
        ; kvs <- kindGeneralizeSome (const False) ty
        ; MASSERT( null kvs )
        }
@@ -2930,7 +2937,8 @@ etaExpandAlgTyCon :: [TyConBinder]
 -- Note [TyConBinders for the result kind signature of a data type]
 -- See Note [Datatype return kinds] in GHC.Tc.TyCl
 etaExpandAlgTyCon tc_bndrs kind
-  = do  { loc     <- getSrcSpanM
+  = etaIOEnv
+  $ do  { loc     <- getSrcSpanM
         ; uniqs   <- newUniqueSupply
         ; rdr_env <- getLocalRdrEnv
         ; let new_occs = [ occ
@@ -3000,7 +3008,7 @@ data DataSort
 --
 -- See also Note [Datatype return kinds] in GHC.Tc.TyCl
 checkDataKindSig :: DataSort -> Kind -> TcM ()
-checkDataKindSig data_sort kind = do
+checkDataKindSig data_sort kind = etaIOEnv $ do
   dflags <- getDynFlags
   checkTc (is_TYPE_or_Type dflags || is_kind_var) (err_msg dflags)
   where
@@ -3067,7 +3075,7 @@ checkDataKindSig data_sort kind = do
 -- | Checks that the result kind of a class is exactly `Constraint`, rejecting
 -- type synonyms and type families that reduce to `Constraint`. See #16826.
 checkClassKindSig :: Kind -> TcM ()
-checkClassKindSig kind = checkTc (tcIsConstraintKind kind) err_msg
+checkClassKindSig kind = etaIOEnv $ checkTc (tcIsConstraintKind kind) err_msg
   where
     err_msg :: SDoc
     err_msg =
@@ -3536,6 +3544,7 @@ funAppCtxt fun arg arg_no
 
 -- | Add a "In the data declaration for T" or some such.
 addTyConFlavCtxt :: Name -> TyConFlavour -> TcM a -> TcM a
-addTyConFlavCtxt name flav
-  = addErrCtxt $ hsep [ text "In the", ppr flav
-                      , text "declaration for", quotes (ppr name) ]
+addTyConFlavCtxt name flav thing
+  = etaIOEnv
+  $ addErrCtxt (hsep [ text "In the", ppr flav
+                      , text "declaration for", quotes (ppr name) ]) thing
