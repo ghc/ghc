@@ -16,6 +16,8 @@
 #include <sys/mman.h>
 #endif
 
+void printLoadedObjects(void);
+
 #include "BeginPrivate.h"
 
 typedef void SymbolAddr;
