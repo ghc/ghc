@@ -992,7 +992,7 @@ pprTrustFlag flag = case flag of
 type WiringMap = Map UnitId UnitId
 
 findWiredInUnits
-   :: DynFlags
+   :: (SDoc -> IO ())      -- debug trace
    -> UnitPrecedenceMap
    -> [UnitInfo]           -- database
    -> VisibilityMap             -- info on what packages are visible
@@ -1000,7 +1000,7 @@ findWiredInUnits
    -> IO ([UnitInfo],  -- package database updated for wired in
           WiringMap)   -- map from unit id to wired identity
 
-findWiredInUnits dflags prec_map pkgs vis_map = do
+findWiredInUnits printer prec_map pkgs vis_map = do
   -- Now we must find our wired-in packages, and rename them to
   -- their canonical names (eg. base-1.0 ==> base), as described
   -- in Note [Wired-in units] in GHC.Unit.Module
@@ -1042,14 +1042,14 @@ findWiredInUnits dflags prec_map pkgs vis_map = do
             many -> pick (head (sortByPreference prec_map many))
           where
                 notfound = do
-                          debugTraceMsg dflags 2 $
+                          printer $
                             text "wired-in package "
                                  <> ftext (unitIdFS wired_pkg)
                                  <> text " not found."
                           return Nothing
                 pick :: UnitInfo -> IO (Maybe (UnitId, UnitInfo))
                 pick pkg = do
-                        debugTraceMsg dflags 2 $
+                        printer $
                             text "wired-in package "
                                  <> ftext (unitIdFS wired_pkg)
                                  <> text " mapped to "
@@ -1072,7 +1072,7 @@ findWiredInUnits dflags prec_map pkgs vis_map = do
           where upd_pkg pkg
                   | Just wiredInUnitId <- Map.lookup (unitId pkg) wiredInMap
                   = pkg { unitId         = wiredInUnitId
-                        , unitInstanceOf = mkIndefUnitId (unitState dflags) (unitIdFS wiredInUnitId)
+                        , unitInstanceOf = fmap (const wiredInUnitId) (unitInstanceOf pkg)
                            -- every non instantiated unit is an instance of
                            -- itself (required by Backpack...)
                            --
@@ -1509,7 +1509,7 @@ mkUnitState dflags dbs = do
   -- it modifies the unit ids of wired in packages, but when we process
   -- package arguments we need to key against the old versions.
   --
-  (pkgs2, wired_map) <- findWiredInUnits dflags prec_map pkgs1 vis_map2
+  (pkgs2, wired_map) <- findWiredInUnits (debugTraceMsg dflags 2) prec_map pkgs1 vis_map2
   let pkg_db = mkUnitInfoMap pkgs2
 
   -- Update the visibility map, so we treat wired packages as visible.
