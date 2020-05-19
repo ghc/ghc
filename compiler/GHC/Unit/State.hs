@@ -78,6 +78,7 @@ where
 
 import GHC.Prelude
 
+import GHC.Platform
 import GHC.Unit.Database
 import GHC.Unit.Info
 import GHC.Unit.Types
@@ -306,6 +307,72 @@ instance Monoid UnitVisibility where
              }
     mappend = (Semigroup.<>)
 
+
+-- | Unit configuration
+data UnitConfig = UnitConfig
+   { unitConfigPlatformArchOs :: !PlatformMini  -- ^ Platform
+   , unitConfigWays           :: !(Set Way)     -- ^ Ways to use
+   , unitConfigProgramName    :: !String
+      -- ^ Name of the compiler (e.g. "GHC", "GHCJS"). Used to fetch environment
+      -- variables such as "GHC[JS]_PACKAGE_PATH".
+
+   , unitConfigGlobalDB :: !FilePath    -- ^ Path to global DB
+   , unitConfigGHCDir   :: !FilePath    -- ^ Main GHC dir: contains settings, etc.
+   , unitConfigDBName   :: !String      -- ^ User DB name (e.g. "package.conf.d")
+
+   , unitConfigAutoLink       :: ![UnitId] -- ^ Units to link automatically (e.g. base, rts)
+   , unitConfigDistrustAll    :: !Bool     -- ^ Distrust all units by default
+   , unitConfigHideAll        :: !Bool     -- ^ Hide all units by default
+   , unitConfigHideAllPlugins :: !Bool     -- ^ Hide all plugins units by default
+
+   , unitConfigAllowVirtualUnits :: !Bool
+      -- ^ Allow the use of virtual units instantiated on-the-fly (see Note
+      -- [About units] in GHC.Unit). This should only be used when we are
+      -- type-checking an indefinite unit (not producing any code).
+
+   -- command-line flags
+   , unitConfigFlagsDB      :: [PackageDBFlag]     -- ^ Unit databases flags
+   , unitConfigFlagsExposed :: [PackageFlag]       -- ^ Exposed units
+   , unitConfigFlagsIgnored :: [IgnorePackageFlag] -- ^ Ignored units
+   , unitConfigFlagsTrusted :: [TrustFlag]         -- ^ Trusted units
+   , unitConfigFlagsPlugins :: [PackageFlag]       -- ^ Plugins exposed units
+   }
+
+initUnitConfig :: DynFlags -> IO UnitConfig
+initUnitConfig dflags = do
+
+   let autoLink
+         | not (gopt Opt_AutoLinkPackages dflags) = []
+         -- By default we add base & rts to the preload units (when they are
+         -- found in the unit database) except when we are building them
+         | otherwise = filter (/= homeUnitId dflags) [baseUnitId, rtsUnitId]
+
+   pure $ UnitConfig
+      { unitConfigPlatformArchOs = platformMini (targetPlatform dflags)
+      , unitConfigProgramName    = programName dflags
+      , unitConfigWays           = ways dflags
+
+      , unitConfigGlobalDB       = globalPackageDatabasePath dflags
+      , unitConfigGHCDir         = topDir dflags
+      , unitConfigDBName         = "package.conf.d"
+
+      , unitConfigAutoLink       = autoLink
+      , unitConfigDistrustAll    = gopt Opt_DistrustAllPackages dflags
+      , unitConfigHideAll        = gopt Opt_HideAllPackages dflags
+      , unitConfigHideAllPlugins = gopt Opt_HideAllPluginPackages dflags
+
+        -- when the home unit is indefinite, it means we are type-checking it
+        -- only (not producing any code). Hence we can use virtual units
+        -- instantiated on-the-fly (see Note [About units] in GHC.Unit)
+      , unitConfigAllowVirtualUnits = homeUnitIsIndefinite dflags
+
+      , unitConfigFlagsDB      = packageDBFlags dflags
+      , unitConfigFlagsExposed = packageFlags dflags
+      , unitConfigFlagsIgnored = ignorePackageFlags dflags
+      , unitConfigFlagsTrusted = trustFlags dflags
+      , unitConfigFlagsPlugins = pluginPackageFlags dflags
+      }
+
 -- | Map from 'ModuleName' to a set of of module providers (i.e. a 'Module' and
 -- its 'ModuleOrigin').
 --
@@ -502,26 +569,32 @@ listUnitInfo state = Map.elems (unitInfoMap state)
 initUnits :: DynFlags -> IO (DynFlags, [UnitId])
 initUnits dflags = do
 
-  let forcePkgDb (state, _) = unitInfoMap state `seq` ()
+  let forceUnitInfoMap (state, _) = unitInfoMap state `seq` ()
   (state,raw_dbs) <- withTiming dflags
                                 (text "initializing package database")
-                                forcePkgDb $ do
+                                forceUnitInfoMap $ do
+
+    cfg <- initUnitConfig dflags
+
+    -- init SDocContext used to render exception messages
+    let ctx = initSDocContext dflags defaultUserStyle
+    let printer = debugTraceMsg dflags
 
     -- read the databases if they have not been already read
     raw_dbs <- case unitDatabases dflags of
-          Nothing  -> readUnitDatabases dflags
+          Nothing  -> readUnitDatabases printer cfg
           Just dbs -> return dbs
 
     -- distrust all units if the flag is set
     let distrust_all db = db { unitDatabaseUnits = distrustAllUnits (unitDatabaseUnits db) }
         dbs
-           | gopt Opt_DistrustAllPackages dflags
+           | unitConfigDistrustAll cfg
            = map distrust_all raw_dbs
            | otherwise
            = raw_dbs
 
     -- create the UnitState
-    state <- mkUnitState dflags dbs
+    state <- mkUnitState ctx (printer 2) cfg dbs
 
     return (state, raw_dbs)
 
@@ -543,18 +616,18 @@ initUnits dflags = do
 -- -----------------------------------------------------------------------------
 -- Reading the unit database(s)
 
-readUnitDatabases :: DynFlags -> IO [UnitDatabase UnitId]
-readUnitDatabases dflags = do
-  conf_refs <- getUnitDbRefs dflags
-  confs     <- liftM catMaybes $ mapM (resolveUnitDatabase dflags) conf_refs
-  mapM (readUnitDatabase dflags) confs
+readUnitDatabases :: (Int -> SDoc -> IO ()) -> UnitConfig -> IO [UnitDatabase UnitId]
+readUnitDatabases printer cfg = do
+  conf_refs <- getUnitDbRefs cfg
+  confs     <- liftM catMaybes $ mapM (resolveUnitDatabase cfg) conf_refs
+  mapM (readUnitDatabase printer cfg) confs
 
 
-getUnitDbRefs :: DynFlags -> IO [PkgDbRef]
-getUnitDbRefs dflags = do
+getUnitDbRefs :: UnitConfig -> IO [PkgDbRef]
+getUnitDbRefs cfg = do
   let system_conf_refs = [UserPkgDb, GlobalPkgDb]
 
-  e_pkg_path <- tryIO (getEnv $ map toUpper (programName dflags) ++ "_PACKAGE_PATH")
+  e_pkg_path <- tryIO (getEnv $ map toUpper (unitConfigProgramName cfg) ++ "_PACKAGE_PATH")
   let base_conf_refs = case e_pkg_path of
         Left _ -> system_conf_refs
         Right path
@@ -571,7 +644,7 @@ getUnitDbRefs dflags = do
   --  * We work with the package DB list in "left shadows right" order
   --  * and finally reverse it at the end, to get "right shadows left"
   --
-  return $ reverse (foldr doFlag base_conf_refs (packageDBFlags dflags))
+  return $ reverse (foldr doFlag base_conf_refs (unitConfigFlagsDB cfg))
  where
   doFlag (PackageDB p) dbs = p : dbs
   doFlag NoUserPackageDB dbs = filter isNotUser dbs
@@ -590,17 +663,17 @@ getUnitDbRefs dflags = do
 -- NB: This logic is reimplemented in Cabal, so if you change it,
 -- make sure you update Cabal. (Or, better yet, dump it in the
 -- compiler info so Cabal can use the info.)
-resolveUnitDatabase :: DynFlags -> PkgDbRef -> IO (Maybe FilePath)
-resolveUnitDatabase dflags GlobalPkgDb = return $ Just (globalPackageDatabasePath dflags)
-resolveUnitDatabase dflags UserPkgDb = runMaybeT $ do
-  dir <- versionedAppDir dflags
-  let pkgconf = dir </> "package.conf.d"
+resolveUnitDatabase :: UnitConfig -> PkgDbRef -> IO (Maybe FilePath)
+resolveUnitDatabase cfg GlobalPkgDb = return $ Just (unitConfigGlobalDB cfg)
+resolveUnitDatabase cfg UserPkgDb = runMaybeT $ do
+  dir <- versionedAppDir (unitConfigProgramName cfg) (unitConfigPlatformArchOs cfg)
+  let pkgconf = dir </> unitConfigDBName cfg
   exist <- tryMaybeT $ doesDirectoryExist pkgconf
   if exist then return pkgconf else mzero
 resolveUnitDatabase _ (PkgDbPath name) = return $ Just name
 
-readUnitDatabase :: DynFlags -> FilePath -> IO (UnitDatabase UnitId)
-readUnitDatabase dflags conf_file = do
+readUnitDatabase :: (Int -> SDoc -> IO ()) -> UnitConfig -> FilePath -> IO (UnitDatabase UnitId)
+readUnitDatabase printer cfg conf_file = do
   isdir <- doesDirectoryExist conf_file
 
   proto_pkg_configs <-
@@ -624,7 +697,7 @@ readUnitDatabase dflags conf_file = do
   let
       -- Fix #16360: remove trailing slash from conf_file before calculating pkgroot
       conf_file' = dropTrailingPathSeparator conf_file
-      top_dir = topDir dflags
+      top_dir = unitConfigGHCDir cfg
       pkgroot = takeDirectory conf_file'
       pkg_configs1 = map (mungeUnitInfo top_dir pkgroot . mapUnitInfo (\(UnitKey x) -> UnitId x) unitIdFS . mkUnitKeyInfo)
                          proto_pkg_configs
@@ -636,24 +709,23 @@ readUnitDatabase dflags conf_file = do
       cache_exists <- doesFileExist filename
       if cache_exists
         then do
-          debugTraceMsg dflags 2 $ text "Using binary package database:"
-                                    <+> text filename
+          printer 2 $ text "Using binary package database:" <+> text filename
           readPackageDbForGhc filename
         else do
           -- If there is no package.cache file, we check if the database is not
           -- empty by inspecting if the directory contains any .conf file. If it
           -- does, something is wrong and we fail. Otherwise we assume that the
           -- database is empty.
-          debugTraceMsg dflags 2 $ text "There is no package.cache in"
-                               <+> text conf_dir
-                                <> text ", checking if the database is empty"
+          printer 2 $ text "There is no package.cache in"
+                      <+> text conf_dir
+                       <> text ", checking if the database is empty"
           db_empty <- all (not . isSuffixOf ".conf")
                    <$> getDirectoryContents conf_dir
           if db_empty
             then do
-              debugTraceMsg dflags 3 $ text "There are no .conf files in"
-                                   <+> text conf_dir <> text ", treating"
-                                   <+> text "package database as empty"
+              printer 3 $ text "There are no .conf files in"
+                          <+> text conf_dir <> text ", treating"
+                          <+> text "package database as empty"
               return []
             else do
               throwGhcExceptionIO $ InstallationError $
@@ -676,7 +748,7 @@ readUnitDatabase dflags conf_file = do
           let conf_dir = conf_file <.> "d"
           direxists <- doesDirectoryExist conf_dir
           if direxists
-             then do debugTraceMsg dflags 2 (text "Ignoring old file-style db and trying:" <+> text conf_dir)
+             then do printer 2 (text "Ignoring old file-style db and trying:" <+> text conf_dir)
                      liftM Just (readDirStyleUnitInfo conf_dir)
              else return (Just []) -- ghc-pkg will create it when it's updated
         else return Nothing
@@ -705,25 +777,25 @@ mungeDynLibFields pkg =
 -- -trust and -distrust.
 
 applyTrustFlag
-   :: DynFlags
+   :: SDocContext
    -> UnitPrecedenceMap
    -> UnusableUnits
    -> [UnitInfo]
    -> TrustFlag
    -> IO [UnitInfo]
-applyTrustFlag dflags prec_map unusable pkgs flag =
+applyTrustFlag ctx prec_map unusable pkgs flag =
   case flag of
     -- we trust all matching packages. Maybe should only trust first one?
     -- and leave others the same or set them untrusted
     TrustPackage str ->
        case selectPackages prec_map (PackageArg str) pkgs unusable of
-         Left ps       -> trustFlagErr dflags flag ps
+         Left ps       -> trustFlagErr ctx flag ps
          Right (ps,qs) -> return (map trust ps ++ qs)
           where trust p = p {unitIsTrusted=True}
 
     DistrustPackage str ->
        case selectPackages prec_map (PackageArg str) pkgs unusable of
-         Left ps       -> trustFlagErr dflags flag ps
+         Left ps       -> trustFlagErr ctx flag ps
          Right (ps,qs) -> return (distrustAllUnits ps ++ qs)
 
 -- | A little utility to tell if the home unit is indefinite
@@ -737,7 +809,7 @@ homeUnitIsDefinite :: DynFlags -> Bool
 homeUnitIsDefinite dflags = unitIsDefinite (homeUnit dflags)
 
 applyPackageFlag
-   :: DynFlags
+   :: SDocContext
    -> UnitPrecedenceMap
    -> UnitInfoMap
    -> PreloadUnitClosure
@@ -749,11 +821,11 @@ applyPackageFlag
    -> PackageFlag               -- flag to apply
    -> IO VisibilityMap        -- Now exposed
 
-applyPackageFlag dflags prec_map pkg_map closure unusable no_hide_others pkgs vm flag =
+applyPackageFlag ctx prec_map pkg_map closure unusable no_hide_others pkgs vm flag =
   case flag of
     ExposePackage _ arg (ModRenaming b rns) ->
        case findPackages prec_map pkg_map closure arg pkgs unusable of
-         Left ps         -> packageFlagErr dflags flag ps
+         Left ps         -> packageFlagErr ctx flag ps
          Right (p:_) -> return vm'
           where
            n = fsPackageName p
@@ -817,7 +889,7 @@ applyPackageFlag dflags prec_map pkg_map closure unusable no_hide_others pkgs vm
 
     HidePackage str ->
        case findPackages prec_map pkg_map closure (PackageArg str) pkgs unusable of
-         Left ps  -> packageFlagErr dflags flag ps
+         Left ps  -> packageFlagErr ctx flag ps
          Right ps -> return vm'
           where vm' = foldl' (flip Map.delete) vm (map mkUnit ps)
 
@@ -946,26 +1018,26 @@ compareByPreference prec_map pkg pkg'
 comparing :: Ord a => (t -> a) -> t -> t -> Ordering
 comparing f a b = f a `compare` f b
 
-packageFlagErr :: DynFlags
+packageFlagErr :: SDocContext
                -> PackageFlag
                -> [(UnitInfo, UnusableUnitReason)]
                -> IO a
-packageFlagErr dflags flag reasons
-  = packageFlagErr' dflags (pprFlag flag) reasons
+packageFlagErr ctx flag reasons
+  = packageFlagErr' ctx (pprFlag flag) reasons
 
-trustFlagErr :: DynFlags
+trustFlagErr :: SDocContext
              -> TrustFlag
              -> [(UnitInfo, UnusableUnitReason)]
              -> IO a
-trustFlagErr dflags flag reasons
-  = packageFlagErr' dflags (pprTrustFlag flag) reasons
+trustFlagErr ctx flag reasons
+  = packageFlagErr' ctx (pprTrustFlag flag) reasons
 
-packageFlagErr' :: DynFlags
+packageFlagErr' :: SDocContext
                -> SDoc
                -> [(UnitInfo, UnusableUnitReason)]
                -> IO a
-packageFlagErr' dflags flag_doc reasons
-  = throwGhcExceptionIO (CmdLineError (showSDoc dflags $ err))
+packageFlagErr' ctx flag_doc reasons
+  = throwGhcExceptionIO (CmdLineError (renderWithStyle ctx $ err))
   where err = text "cannot satisfy " <> flag_doc <>
                 (if null reasons then Outputable.empty else text ": ") $$
               nest 4 (ppr_reasons $$
@@ -1313,12 +1385,12 @@ mergeDatabases printer = foldM merge (Map.empty, Map.empty) . zip [1..]
 -- 3. Apply ignore flags
 -- 4. Remove all packages which have deps with mismatching ABIs
 --
-validateDatabase :: DynFlags -> UnitInfoMap
+validateDatabase :: UnitConfig -> UnitInfoMap
                  -> (UnitInfoMap, UnusableUnits, [SCC UnitInfo])
-validateDatabase dflags pkg_map1 =
+validateDatabase cfg pkg_map1 =
     (pkg_map5, unusable, sccs)
   where
-    ignore_flags = reverse (ignorePackageFlags dflags)
+    ignore_flags = reverse (unitConfigFlagsIgnored cfg)
 
     -- Compute the reverse dependency index
     index = reverseDeps pkg_map1
@@ -1364,12 +1436,14 @@ validateDatabase dflags pkg_map1 =
 -- settings and populate the package state.
 
 mkUnitState
-    :: DynFlags
+    :: SDocContext      -- ^ SDocContext used to render exception messages
+    -> (SDoc -> IO ())
+    -> UnitConfig
     -- initial databases, in the order they were specified on
     -- the command line (later databases shadow earlier ones)
     -> [UnitDatabase UnitId]
     -> IO UnitState
-mkUnitState dflags dbs = do
+mkUnitState ctx printer cfg dbs = do
 {-
    Plan.
 
@@ -1423,12 +1497,10 @@ mkUnitState dflags dbs = do
           we build a mapping saying what every in scope module name points to.
 -}
 
-  let printer = debugTraceMsg dflags 2
-
   -- This, and the other reverse's that you will see, are due to the fact that
   -- packageFlags, pluginPackageFlags, etc. are all specified in *reverse* order
   -- than they are on the command line.
-  let other_flags = reverse (packageFlags dflags)
+  let other_flags = reverse (unitConfigFlagsExposed cfg)
   printer $
       text "package flags" <+> ppr other_flags
 
@@ -1437,15 +1509,15 @@ mkUnitState dflags dbs = do
 
   -- Now that we've merged everything together, prune out unusable
   -- packages.
-  let (pkg_map2, unusable, sccs) = validateDatabase dflags pkg_map1
+  let (pkg_map2, unusable, sccs) = validateDatabase cfg pkg_map1
 
   reportCycles   printer sccs
   reportUnusable printer unusable
 
   -- Apply trust flags (these flags apply regardless of whether
   -- or not packages are visible or not)
-  pkgs1 <- foldM (applyTrustFlag dflags prec_map unusable)
-                 (Map.elems pkg_map2) (reverse (trustFlags dflags))
+  pkgs1 <- foldM (applyTrustFlag ctx prec_map unusable)
+                 (Map.elems pkg_map2) (reverse (unitConfigFlagsTrusted cfg))
   let prelim_pkg_db = mkUnitInfoMap pkgs1
 
   --
@@ -1466,7 +1538,7 @@ mkUnitState dflags dbs = do
       -- most preferable *units* keyed by package name, which act as stand-ins in
       -- for "a package in a database". We use units here because we don't have
       -- "a package in a database" as a type currently.
-      mostPreferablePackageReps = if gopt Opt_HideAllPackages dflags
+      mostPreferablePackageReps = if unitConfigHideAll cfg
                     then emptyUDFM
                     else foldl' addIfMorePreferable emptyUDFM pkgs1
       -- When exposing units, we want to consider all of those in the most preferable
@@ -1502,8 +1574,8 @@ mkUnitState dflags dbs = do
   -- -hide-package).  This needs to know about the unusable packages, since if a
   -- user tries to enable an unusable package, we should let them know.
   --
-  vis_map2 <- foldM (applyPackageFlag dflags prec_map prelim_pkg_db emptyUniqSet unusable
-                        (gopt Opt_HideAllPackages dflags) pkgs1)
+  vis_map2 <- foldM (applyPackageFlag ctx prec_map prelim_pkg_db emptyUniqSet unusable
+                        (unitConfigHideAll cfg) pkgs1)
                             vis_map1 other_flags
 
   --
@@ -1517,9 +1589,9 @@ mkUnitState dflags dbs = do
   -- Update the visibility map, so we treat wired packages as visible.
   let vis_map = updateVisibilityMap wired_map vis_map2
 
-  let hide_plugin_pkgs = gopt Opt_HideAllPluginPackages dflags
+  let hide_plugin_pkgs = unitConfigHideAllPlugins cfg
   plugin_vis_map <-
-    case pluginPackageFlags dflags of
+    case unitConfigFlagsPlugins cfg of
         -- common case; try to share the old vis_map
         [] | not hide_plugin_pkgs -> return vis_map
            | otherwise -> return Map.empty
@@ -1530,10 +1602,10 @@ mkUnitState dflags dbs = do
                         -- won't work.
                         | otherwise = vis_map2
                 plugin_vis_map2
-                    <- foldM (applyPackageFlag dflags prec_map prelim_pkg_db emptyUniqSet unusable
-                                (gopt Opt_HideAllPluginPackages dflags) pkgs1)
+                    <- foldM (applyPackageFlag ctx prec_map prelim_pkg_db emptyUniqSet unusable
+                                hide_plugin_pkgs pkgs1)
                              plugin_vis_map1
-                             (reverse (pluginPackageFlags dflags))
+                             (reverse (unitConfigFlagsPlugins cfg))
                 -- Updating based on wired in packages is mostly
                 -- good hygiene, because it won't matter: no wired in
                 -- package has a compiler plugin.
@@ -1543,18 +1615,6 @@ mkUnitState dflags dbs = do
                 -- would happen?  I don't know!  But this doesn't seem
                 -- likely to actually happen.
                 return (updateVisibilityMap wired_map plugin_vis_map2)
-
-  --
-  -- Here we build up a set of the packages mentioned in -package
-  -- flags on the command line; these are called the "preload"
-  -- packages.  we link these packages in eagerly.  The preload set
-  -- should contain at least rts & base, which is why we pretend that
-  -- the command line contains -package rts & -package base.
-  --
-  -- NB: preload IS important even for type-checking, because we
-  -- need the correct include path to be set.
-  --
-  let preload1 = Map.keys (Map.filter uv_explicit vis_map)
 
   let pkgname_map = foldl' add Map.empty pkgs2
         where add pn_map p
@@ -1570,41 +1630,40 @@ mkUnitState dflags dbs = do
               $ Map.unionsWith Set.union (map uv_requirements (Map.elems vis_map))
 
 
-  let preload2 = preload1
+  --
+  -- Here we build up a set of the packages mentioned in -package
+  -- flags on the command line; these are called the "preload"
+  -- packages.  we link these packages in eagerly.  The preload set
+  -- should contain at least rts & base, which is why we pretend that
+  -- the command line contains -package rts & -package base.
+  --
+  -- NB: preload IS important even for type-checking, because we
+  -- need the correct include path to be set.
+  --
+  let preload1 = Map.keys (Map.filter uv_explicit vis_map)
 
-  let
-      -- add base & rts to the preload units
-      basicLinkedUnits
-       | gopt Opt_AutoLinkPackages dflags
-          = fmap (RealUnit . Definite) $
-            filter (flip Map.member pkg_db)
-                [baseUnitId, rtsUnitId]
-       | otherwise = []
-      -- but in any case remove the current unit from the set of
-      -- preloaded units so that base/rts does not end up in the
-      -- set up units package when we are just building it
-      -- (NB: since this is only relevant for base/rts it doesn't matter
-      -- that homeUnitInstantiations is not wired yet)
-      --
-      preload3 = ordNub $ filter (/= homeUnit dflags)
-                        $ (basicLinkedUnits ++ preload2)
+      -- add default preload units if they can be found in the db
+      basicLinkedUnits = fmap (RealUnit . Definite)
+                         $ filter (flip Map.member pkg_db)
+                         $ unitConfigAutoLink cfg
+      preload3 = ordNub $ (basicLinkedUnits ++ preload1)
 
   -- Close the preload packages with their dependencies
   let dep_preload_err = closeUnitDeps pkg_db (zip (map toUnitId preload3) (repeat Nothing))
-  dep_preload <- throwErr dflags dep_preload_err
+  dep_preload <- throwErr ctx dep_preload_err
 
-  let mod_map1 = mkModuleNameProvidersMap dflags pkg_db emptyUniqSet vis_map
+  let mod_map1 = mkModuleNameProvidersMap ctx cfg pkg_db emptyUniqSet vis_map
       mod_map2 = mkUnusableModuleNameProvidersMap unusable
       mod_map = Map.union mod_map1 mod_map2
 
-  -- Force pstate to avoid leaking the dflags passed to mkUnitState
-  let !pstate = UnitState
+  -- Force the result to avoid leaking input parameters
+  return $! UnitState
          { preloadUnits                 = dep_preload
          , explicitUnits                = explicit_pkgs
          , unitInfoMap                  = pkg_db
          , preloadClosure               = emptyUniqSet
          , moduleNameProvidersMap       = mod_map
-         , pluginModuleNameProvidersMap = mkModuleNameProvidersMap dflags pkg_db emptyUniqSet plugin_vis_map
+         , pluginModuleNameProvidersMap = mkModuleNameProvidersMap ctx cfg pkg_db emptyUniqSet plugin_vis_map
          , packageNameMap               = pkgname_map
          , wireMap                      = wired_map
          , unwireMap                    = Map.fromList [ (v,k) | (k,v) <- Map.toList wired_map ]
@@ -1613,9 +1672,8 @@ mkUnitState dflags dbs = do
            -- when the home unit is indefinite, it means we are type-checking it
            -- only (not producing any code). Hence we can use virtual units
            -- instantiated on-the-fly (see Note [About units] in GHC.Unit)
-         , allowVirtualUnits            = homeUnitIsIndefinite dflags
+         , allowVirtualUnits            = unitConfigAllowVirtualUnits cfg
          }
-  return pstate
 
 -- | Given a wired-in 'Unit', "unwire" it into the 'Unit'
 -- that it was recorded as in the package database.
@@ -1625,19 +1683,20 @@ unwireUnit state uid@(RealUnit (Definite def_uid)) =
 unwireUnit _ uid = uid
 
 -- -----------------------------------------------------------------------------
--- | Makes the mapping from module to package info
+-- | Makes the mapping from ModuleName to package info
 
 -- Slight irritation: we proceed by leafing through everything
 -- in the installed package database, which makes handling indefinite
 -- packages a bit bothersome.
 
 mkModuleNameProvidersMap
-  :: DynFlags
+  :: SDocContext     -- ^ SDocContext used to render exception messages
+  -> UnitConfig
   -> UnitInfoMap
   -> PreloadUnitClosure
   -> VisibilityMap
   -> ModuleNameProvidersMap
-mkModuleNameProvidersMap dflags pkg_map closure vis_map =
+mkModuleNameProvidersMap ctx cfg pkg_map closure vis_map =
     -- What should we fold on?  Both situations are awkward:
     --
     --    * Folding on the visibility map means that we won't create
@@ -1688,7 +1747,7 @@ mkModuleNameProvidersMap dflags pkg_map closure vis_map =
     rnBinding (orig, new) = (new, setOrigins origEntry fromFlag)
      where origEntry = case lookupUFM esmap orig of
             Just r -> r
-            Nothing -> throwGhcException (CmdLineError (showSDoc dflags
+            Nothing -> throwGhcException (CmdLineError (renderWithStyle ctx
                         (text "package flag: could not find module name" <+>
                             ppr orig <+> text "in package" <+> ppr pk)))
 
@@ -1710,7 +1769,7 @@ mkModuleNameProvidersMap dflags pkg_map closure vis_map =
     hiddens = [(m, mkModMap pk m ModHidden) | m <- hidden_mods]
 
     pk = mkUnit pkg
-    unit_lookup uid = lookupUnit' (homeUnitIsIndefinite dflags) pkg_map closure uid
+    unit_lookup uid = lookupUnit' (unitConfigAllowVirtualUnits cfg) pkg_map closure uid
                         `orElse` pprPanic "unit_lookup" (ppr uid)
 
     exposed_mods = unitExposedModules pkg
@@ -2022,13 +2081,14 @@ getPreloadUnitsAnd dflags ids0 =
       state   = unitState dflags
       pkg_map = unitInfoMap state
       preload = preloadUnits state
+      ctx     = initSDocContext dflags defaultUserStyle
   in do
-  all_pkgs <- throwErr dflags (closeUnitDeps' pkg_map preload (ids `zip` repeat Nothing))
+  all_pkgs <- throwErr ctx (closeUnitDeps' pkg_map preload (ids `zip` repeat Nothing))
   return (map (unsafeLookupUnitId state) all_pkgs)
 
-throwErr :: DynFlags -> MaybeErr MsgDoc a -> IO a
-throwErr dflags m = case m of
-   Failed e    -> throwGhcExceptionIO (CmdLineError (showSDoc dflags e))
+throwErr :: SDocContext -> MaybeErr MsgDoc a -> IO a
+throwErr ctx m = case m of
+   Failed e    -> throwGhcExceptionIO (CmdLineError (renderWithStyle ctx e))
    Succeeded r -> return r
 
 -- | Takes a list of UnitIds (and their "parent" dependency, used for error
