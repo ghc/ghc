@@ -33,6 +33,10 @@ module GHC.Rename.Env (
         lookupSyntax, lookupSyntaxExpr, lookupSyntaxName, lookupSyntaxNames,
         lookupIfThenElse,
 
+        -- QualifiedDo
+        lookupQualifiedDoExpr, lookupQualifiedDo,
+        lookupQualifiedDoName, lookupNameWithQualifier,
+
         -- Constructing usage information
         addUsedGRE, addUsedGREs, addUsedDataCons,
 
@@ -1720,6 +1724,49 @@ lookupSyntaxNames std_names
         else
           do { usr_names <- mapM (lookupOccRn . mkRdrUnqual . nameOccName) std_names
              ; return (map (HsVar noExtField . noLoc) usr_names, mkFVs usr_names) } }
+
+{-
+Note [QualifiedDo]
+~~~~~~~~~~~~~~~~~~
+QualifiedDo is implemented using the same placeholders for operation names in
+the AST that were devised for RebindableSyntax. Whenever the renamer checks
+which names to use for do syntax, it first checks if the do block is qualified
+(e.g. M.do { stmts }), in which case it searches for qualified names. If the
+qualified names are not in scope, an error is produced. If the do block is not
+qualified, the renamer does the usual search of the names which considers
+whether RebindableSyntax is enabled or not. Dealing with QualifiedDo is driven
+by the Opt_QualifiedDo dynamic flag.
+-}
+
+-- Lookup operations for a qualified do. If the context is not a qualified
+-- do, then use lookupSyntaxExpr. See Note [QualifiedDo].
+lookupQualifiedDoExpr :: HsStmtContext p -> Name -> RnM (HsExpr GhcRn, FreeVars)
+lookupQualifiedDoExpr ctxt std_name
+  = first nl_HsVar <$> lookupQualifiedDoName ctxt std_name
+
+-- Like lookupQualifiedDoExpr but for producing SyntaxExpr.
+-- See Note [QualifiedDo].
+lookupQualifiedDo
+  :: HsStmtContext p
+  -> Name
+  -> RnM (SyntaxExpr GhcRn, FreeVars)
+lookupQualifiedDo ctxt std_name
+  = first mkSyntaxExpr <$> lookupQualifiedDoExpr ctxt std_name
+
+lookupNameWithQualifier :: Name -> ModuleName -> RnM (Name, FreeVars)
+lookupNameWithQualifier std_name modName
+  = do { qname <- lookupOccRn (mkRdrQual modName (nameOccName std_name))
+       ; return (qname, unitFV qname) }
+
+-- See Note [QualifiedDo].
+lookupQualifiedDoName
+  :: HsStmtContext p
+  -> Name
+  -> RnM (Name, FreeVars)
+lookupQualifiedDoName ctxt std_name
+  = case qualifiedDoModuleName_maybe ctxt of
+      Nothing -> lookupSyntaxName std_name
+      Just modName -> lookupNameWithQualifier std_name modName
 
 -- Error messages
 

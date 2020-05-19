@@ -10,7 +10,7 @@ foo = barD
        barD = FunD ( mkName "bar" )
                    [ Clause manyArgs (NormalB barBody) [] ]
 
-       barBody = DoE [letxStmt, retxStmt]
+       barBody = DoE Nothing [letxStmt, retxStmt]
        letxStmt = LetS [ ValD (VarP xName) (NormalB $ LitE $ IntegerL 5) [] ]
        retxStmt = NoBindS $ AppE returnVarE xVarE
        xName = mkName "x"
