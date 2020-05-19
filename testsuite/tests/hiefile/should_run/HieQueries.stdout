@@ -11,7 +11,7 @@ At point (31,9), we found:
 |
 +- ┌
 |  │ $fC[] at HieQueries.hs:27:10-21, of type: forall a. C a => C [a]
-|  │     is an evidence variable bound by an instance
+|  │     is an evidence variable bound by an instance of class C
 |  │           with scope: ModuleScope
 |  │           
 |  │     Defined at HieQueries.hs:27:10
@@ -38,10 +38,8 @@ At point (37,9), we found:
 └
 |
 +- ┌
-|  │ $fShow[] at HieQueries.hs:(1,1)-(82,26), of type: forall a. Show a => Show [a]
-|  │     is an evidence variable bound by an instance
-|  │           with scope: ModuleScope
-|  │           
+|  │ $fShow[] at HieQueries.hs:37:1-22, of type: forall a. Show a => Show [a]
+|  │     is a usage of an external evidence variable
 |  │     Defined in `GHC.Show'
 |  └
 |
@@ -55,10 +53,8 @@ At point (37,9), we found:
    └
    |
    +- ┌
-   |  │ $fShow(,,) at HieQueries.hs:(1,1)-(82,26), of type: forall a b c. (Show a, Show b, Show c) => Show (a, b, c)
-   |  │     is an evidence variable bound by an instance
-   |  │           with scope: ModuleScope
-   |  │           
+   |  │ $fShow(,,) at HieQueries.hs:37:1-22, of type: forall a b c. (Show a, Show b, Show c) => Show (a, b, c)
+   |  │     is a usage of an external evidence variable
    |  │     Defined in `GHC.Show'
    |  └
    |
@@ -71,10 +67,8 @@ At point (37,9), we found:
    |  └
    |  |
    |  `- ┌
-   |     │ $fShowInteger at HieQueries.hs:(1,1)-(82,26), of type: Show Integer
-   |     │     is an evidence variable bound by an instance
-   |     │           with scope: ModuleScope
-   |     │           
+   |     │ $fShowInteger at HieQueries.hs:37:1-22, of type: Show Integer
+   |     │     is a usage of an external evidence variable
    |     │     Defined in `GHC.Show'
    |     └
    |
@@ -96,7 +90,7 @@ At point (37,9), we found:
       |
       `- ┌
          │ $fShowA at HieQueries.hs:42:21-24, of type: Show A
-         │     is an evidence variable bound by an instance
+         │     is an evidence variable bound by an instance of class Show
          │           with scope: ModuleScope
          │           
          │     Defined at HieQueries.hs:42:21
