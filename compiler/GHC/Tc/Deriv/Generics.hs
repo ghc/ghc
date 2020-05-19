@@ -372,11 +372,11 @@ tc_mkRepFamInsts :: GenericKind   -- Gen0 or Gen1
                  -> [Type]        -- The type(s) to which Generic(1) is applied
                                   -- in the generated instance
                  -> TcM FamInst   -- Generated representation0 coercion
-tc_mkRepFamInsts gk tycon inst_tys =
+tc_mkRepFamInsts gk tycon inst_tys = etaIOEnv $ do
        -- Consider the example input tycon `D`, where data D a b = D_ a
        -- Also consider `R:DInt`, where { data family D x y :: * -> *
        --                               ; data instance D Int a b = D_ a }
-  do { -- `rep` = GHC.Generics.Rep or GHC.Generics.Rep1 (type family)
+     { -- `rep` = GHC.Generics.Rep or GHC.Generics.Rep1 (type family)
        fam_tc <- case gk of
          Gen0 -> tcLookupTyCon repTyConName
          Gen1 -> tcLookupTyCon rep1TyConName

@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE MultiWayIf #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -130,18 +131,18 @@ matchGlobalInst :: DynFlags
                 -> Bool      -- True <=> caller is the short-cut solver
                              -- See Note [Shortcut solving: overlap]
                 -> Class -> [Type] -> TcM ClsInstResult
-matchGlobalInst dflags short_cut clas tys
+matchGlobalInst dflags short_cut clas tys = etaIOEnv $ if
   | cls_name == knownNatClassName
-  = matchKnownNat    dflags short_cut clas tys
+  -> matchKnownNat    dflags short_cut clas tys
   | cls_name == knownSymbolClassName
-  = matchKnownSymbol dflags short_cut clas tys
-  | isCTupleClass clas                = matchCTuple          clas tys
-  | cls_name == typeableClassName     = matchTypeable        clas tys
-  | clas `hasKey` heqTyConKey         = matchHeteroEquality       tys
-  | clas `hasKey` eqTyConKey          = matchHomoEquality         tys
-  | clas `hasKey` coercibleTyConKey   = matchCoercible            tys
-  | cls_name == hasFieldClassName     = matchHasField dflags short_cut clas tys
-  | otherwise                         = matchInstEnv dflags short_cut clas tys
+  -> matchKnownSymbol dflags short_cut clas tys
+  | isCTupleClass clas                -> matchCTuple          clas tys
+  | cls_name == typeableClassName     -> matchTypeable        clas tys
+  | clas `hasKey` heqTyConKey         -> matchHeteroEquality       tys
+  | clas `hasKey` eqTyConKey          -> matchHomoEquality         tys
+  | clas `hasKey` coercibleTyConKey   -> matchCoercible            tys
+  | cls_name == hasFieldClassName     -> matchHasField dflags short_cut clas tys
+  | otherwise                         -> matchInstEnv dflags short_cut clas tys
   where
     cls_name = className clas
 
@@ -154,8 +155,8 @@ matchGlobalInst dflags short_cut clas tys
 
 
 matchInstEnv :: DynFlags -> Bool -> Class -> [Type] -> TcM ClsInstResult
-matchInstEnv dflags short_cut_solver clas tys
-   = do { instEnvs <- tcGetInstEnvs
+matchInstEnv dflags short_cut_solver clas tys = etaIOEnv $ do
+        { instEnvs <- tcGetInstEnvs
         ; let safeOverlapCheck = safeHaskell dflags `elem` [Sf_Safe, Sf_Trustworthy]
               (matches, unify, unsafeOverlaps) = lookupInstEnv True instEnvs clas tys
               safeHaskFail = safeOverlapCheck && not (null unsafeOverlaps)
@@ -446,13 +447,13 @@ doFunTy clas ty arg_ty ret_ty
 -- 'onlyNamedBndrsApplied' has ensured that this application results in a type
 -- of monomorphic kind (e.g. all kind variables have been instantiated).
 doTyConApp :: Class -> Type -> TyCon -> [Kind] -> TcM ClsInstResult
-doTyConApp clas ty tc kind_args
+doTyConApp clas ty tc kind_args = etaIOEnv $ if
   | tyConIsTypeable tc
-  = return $ OneInst { cir_new_theta = (map (mk_typeable_pred clas) kind_args)
+  -> return $ OneInst { cir_new_theta = (map (mk_typeable_pred clas) kind_args)
                      , cir_mk_ev     = mk_ev
                      , cir_what      = BuiltinInstance }
   | otherwise
-  = return NoInstance
+  -> return NoInstance
   where
     mk_ev kinds = evTypeable ty $ EvTypeableTyCon tc (map EvExpr kinds)
 
