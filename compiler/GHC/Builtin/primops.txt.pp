@@ -2479,6 +2479,12 @@ primop  InterlockedExchangeAddr "interlockedExchangeAddr#" GenPrimOp
     with the Addr# given as second argument. Implies a read barrier.}
    with has_side_effects = True
 
+primop  InterlockedExchangeInt "interlockedExchangeInt#" GenPrimOp
+   Addr# -> Int# -> Int#
+   {The atomic exchange operation. Atomically exchanges the value at the address
+    with the given value. Returns the old value. Implies a read barrier.}
+   with has_side_effects = True
+
 ------------------------------------------------------------------------
 section "Mutable variables"
         {Operations on MutVar\#s.}

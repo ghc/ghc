@@ -859,6 +859,8 @@ emitPrimOp dflags = \case
 -- Atomic operations
   InterlockedExchangeAddr -> \[src, value] -> opAllDone $ \[res] ->
     emitPrimCall [res] (MO_Xchg (wordWidth platform)) [src, value]
+  InterlockedExchangeInt -> \[src, value] -> opAllDone $ \[res] ->
+    emitPrimCall [res] (MO_Xchg (wordWidth platform)) [src, value]
 
 -- SIMD primops
   (VecBroadcastOp vcat n w) -> \[e] -> opAllDone $ \[res] -> do

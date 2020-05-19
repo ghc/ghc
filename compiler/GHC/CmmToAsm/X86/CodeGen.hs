@@ -2518,7 +2518,9 @@ genCCall' _ is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] _ = d
   where
     format = intFormat width
 
-genCCall' config is32Bit (PrimTarget (MO_Xchg width)) [dst] [addr, value] _ = do
+genCCall' config is32Bit (PrimTarget (MO_Xchg width)) [dst] [addr, value] _
+  | (is32Bit && width == W64) = panic "gencCall: 64bit atomic exchange not supported on 32bit platforms"
+  | otherwise = do
     let dst_r = getRegisterReg platform (CmmLocal dst)
     Amode amode addr_code <- getSimpleAmode is32Bit addr
     (newval, newval_code) <- getSomeReg value
