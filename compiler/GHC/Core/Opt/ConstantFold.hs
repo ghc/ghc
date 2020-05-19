@@ -264,41 +264,41 @@ primOpRules nm = \case
 
    -- Relational operators
 
-   IntEqOp    -> mkRelOpRule nm (==) [ litEq True ]
-   IntNeOp    -> mkRelOpRule nm (/=) [ litEq False ]
-   CharEqOp   -> mkRelOpRule nm (==) [ litEq True ]
-   CharNeOp   -> mkRelOpRule nm (/=) [ litEq False ]
+   IntEqOp    -> mkRelOpRule nm Equals    [ litEq True ]
+   IntNeOp    -> mkRelOpRule nm NotEquals [ litEq False ]
+   CharEqOp   -> mkRelOpRule nm Equals    [ litEq True ]
+   CharNeOp   -> mkRelOpRule nm NotEquals [ litEq False ]
 
-   IntGtOp    -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
-   IntGeOp    -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
-   IntLeOp    -> mkRelOpRule nm (<=) [ boundsCmp Le ]
-   IntLtOp    -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+   IntGtOp    -> mkRelOpRule nm GreaterThan       [ boundsCmp Gt ]
+   IntGeOp    -> mkRelOpRule nm GreaterThanEquals [ boundsCmp Ge ]
+   IntLeOp    -> mkRelOpRule nm LessThanEquals    [ boundsCmp Le ]
+   IntLtOp    -> mkRelOpRule nm LessThan          [ boundsCmp Lt ]
 
-   CharGtOp   -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
-   CharGeOp   -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
-   CharLeOp   -> mkRelOpRule nm (<=) [ boundsCmp Le ]
-   CharLtOp   -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
+   CharGtOp   -> mkRelOpRule nm GreaterThan       [ boundsCmp Gt ]
+   CharGeOp   -> mkRelOpRule nm GreaterThanEquals [ boundsCmp Ge ]
+   CharLeOp   -> mkRelOpRule nm LessThanEquals    [ boundsCmp Le ]
+   CharLtOp   -> mkRelOpRule nm LessThan          [ boundsCmp Lt ]
 
-   FloatGtOp  -> mkFloatingRelOpRule nm (>)
-   FloatGeOp  -> mkFloatingRelOpRule nm (>=)
-   FloatLeOp  -> mkFloatingRelOpRule nm (<=)
-   FloatLtOp  -> mkFloatingRelOpRule nm (<)
-   FloatEqOp  -> mkFloatingRelOpRule nm (==)
-   FloatNeOp  -> mkFloatingRelOpRule nm (/=)
+   FloatGtOp  -> mkFloatingRelOpRule nm GreaterThan
+   FloatGeOp  -> mkFloatingRelOpRule nm GreaterThanEquals
+   FloatLeOp  -> mkFloatingRelOpRule nm LessThanEquals
+   FloatLtOp  -> mkFloatingRelOpRule nm LessThan
+   FloatEqOp  -> mkFloatingRelOpRule nm Equals
+   FloatNeOp  -> mkFloatingRelOpRule nm NotEquals
 
-   DoubleGtOp -> mkFloatingRelOpRule nm (>)
-   DoubleGeOp -> mkFloatingRelOpRule nm (>=)
-   DoubleLeOp -> mkFloatingRelOpRule nm (<=)
-   DoubleLtOp -> mkFloatingRelOpRule nm (<)
-   DoubleEqOp -> mkFloatingRelOpRule nm (==)
-   DoubleNeOp -> mkFloatingRelOpRule nm (/=)
+   DoubleGtOp -> mkFloatingRelOpRule nm GreaterThan
+   DoubleGeOp -> mkFloatingRelOpRule nm GreaterThanEquals
+   DoubleLeOp -> mkFloatingRelOpRule nm LessThanEquals
+   DoubleLtOp -> mkFloatingRelOpRule nm LessThan
+   DoubleEqOp -> mkFloatingRelOpRule nm Equals
+   DoubleNeOp -> mkFloatingRelOpRule nm NotEquals
 
-   WordGtOp   -> mkRelOpRule nm (>)  [ boundsCmp Gt ]
-   WordGeOp   -> mkRelOpRule nm (>=) [ boundsCmp Ge ]
-   WordLeOp   -> mkRelOpRule nm (<=) [ boundsCmp Le ]
-   WordLtOp   -> mkRelOpRule nm (<)  [ boundsCmp Lt ]
-   WordEqOp   -> mkRelOpRule nm (==) [ litEq True ]
-   WordNeOp   -> mkRelOpRule nm (/=) [ litEq False ]
+   WordGtOp   -> mkRelOpRule nm GreaterThan       [ boundsCmp Gt ]
+   WordGeOp   -> mkRelOpRule nm GreaterThanEquals [ boundsCmp Ge ]
+   WordLeOp   -> mkRelOpRule nm LessThanEquals    [ boundsCmp Le ]
+   WordLtOp   -> mkRelOpRule nm LessThan          [ boundsCmp Lt ]
+   WordEqOp   -> mkRelOpRule nm Equals            [ litEq True ]
+   WordNeOp   -> mkRelOpRule nm NotEquals         [ litEq False ]
 
    AddrAddOp  -> mkPrimOpRule nm 2 [ rightIdentityPlatform zeroi ]
 
@@ -319,8 +319,16 @@ primOpRules nm = \case
 mkPrimOpRule :: Name -> Int -> [RuleM CoreExpr] -> Maybe CoreRule
 mkPrimOpRule nm arity rules = Just $ mkBasicRule nm arity (msum rules)
 
-mkRelOpRule :: Name -> (forall a . Ord a => a -> a -> Bool)
-            -> [RuleM CoreExpr] -> Maybe CoreRule
+-- Relational operations
+data RelOp
+  = Equals 
+  | NotEquals
+  | LessThan
+  | LessThanEquals
+  | GreaterThan
+  | GreaterThanEquals
+
+mkRelOpRule :: Name -> RelOp -> [RuleM CoreExpr] -> Maybe CoreRule
 mkRelOpRule nm cmp extra
   = mkPrimOpRule nm 2 $
     binaryCmpLit cmp : equal_rule : extra
@@ -328,11 +336,17 @@ mkRelOpRule nm cmp extra
         -- x `cmp` x does not depend on x, so
         -- compute it for the arbitrary value 'True'
         -- and use that result
+    -- TODO: revisit this one more time.
     equal_rule = do { equalArgs
                     ; platform <- getPlatform
-                    ; return (if cmp True True
-                              then trueValInt  platform
-                              else falseValInt platform) }
+                    ; return $ case cmp of
+                        Equals -> trueValInt platform
+                        NotEquals -> falseValInt platform
+                        LessThan -> falseValInt platform
+                        LessThanEquals -> trueValInt platform
+                        GreaterThan -> falseValInt platform
+                        GreaterThanEquals -> trueValInt platform
+                     }
 
 {- Note [Rules for floating-point comparisons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -360,8 +374,7 @@ see Note [The litEq rule: converting equality to case].
 So we /refrain/ from using litEq for mkFloatingRelOpRule.
 -}
 
-mkFloatingRelOpRule :: Name -> (forall a . Ord a => a -> a -> Bool)
-                    -> Maybe CoreRule
+mkFloatingRelOpRule :: Name -> RelOp -> Maybe CoreRule
 -- See Note [Rules for floating-point comparisons]
 mkFloatingRelOpRule nm cmp
   = mkPrimOpRule nm 2 [binaryCmpLit cmp]
@@ -381,20 +394,43 @@ zerod = mkLitDouble 0.0
 oned  = mkLitDouble 1.0
 twod  = mkLitDouble 2.0
 
-cmpOp :: Platform -> (forall a . Ord a => a -> a -> Bool)
-      -> Literal -> Literal -> Maybe CoreExpr
+cmpOp :: Platform -> RelOp -> Literal -> Literal -> Maybe CoreExpr
 cmpOp platform cmp = go
   where
     done True  = Just $ trueValInt  platform
     done False = Just $ falseValInt platform
 
     -- These compares are at different types
-    go (LitChar i1)   (LitChar i2)   = done (i1 `cmp` i2)
-    go (LitFloat i1)  (LitFloat i2)  = done (i1 `cmp` i2)
-    go (LitDouble i1) (LitDouble i2) = done (i1 `cmp` i2)
+    go (LitChar i1)   (LitChar i2)   = case cmp of
+      Equals -> done (i1 == i2)
+      NotEquals -> done (i1 /= i2)
+      LessThan -> done (i1 < i2)
+      LessThanEquals -> done (i1 <= i2)
+      GreaterThan -> done (i1 >= i2)
+      GreaterThanEquals -> done (i1 >= i2)
+    go (LitFloat i1)  (LitFloat i2)  = case cmp of
+      Equals -> done (i1 == i2)
+      NotEquals -> done (i1 /= i2)
+      LessThan -> done (i1 < i2)
+      LessThanEquals -> done (i1 <= i2)
+      GreaterThan -> done (i1 >= i2)
+      GreaterThanEquals -> done (i1 >= i2)
+    go (LitDouble i1) (LitDouble i2) = case cmp of
+      Equals -> done (i1 == i2)
+      NotEquals -> done (i1 /= i2)
+      LessThan -> done (i1 < i2)
+      LessThanEquals -> done (i1 <= i2)
+      GreaterThan -> done (i1 >= i2)
+      GreaterThanEquals -> done (i1 >= i2)
     go (LitNumber nt1 i1 _) (LitNumber nt2 i2 _)
       | nt1 /= nt2 = Nothing
-      | otherwise  = done (i1 `cmp` i2)
+      | otherwise  = case cmp of
+          Equals -> done (i1 == i2)
+          NotEquals -> done (i1 /= i2)
+          LessThan -> done (i1 < i2)
+          LessThanEquals -> done (i1 <= i2)
+          GreaterThan -> done (i1 >= i2)
+          GreaterThanEquals -> done (i1 >= i2)
     go _               _               = Nothing
 
 --------------------------
@@ -862,7 +898,7 @@ binaryLit op = do
   [Lit l1, Lit l2] <- getArgs
   liftMaybe $ op env (convFloating env l1) (convFloating env l2)
 
-binaryCmpLit :: (forall a . Ord a => a -> a -> Bool) -> RuleM CoreExpr
+binaryCmpLit :: RelOp -> RuleM CoreExpr
 binaryCmpLit op = do
   platform <- getPlatform
   binaryLit (\_ -> cmpOp platform op)
