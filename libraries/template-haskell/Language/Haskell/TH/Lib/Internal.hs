@@ -312,11 +312,11 @@ letE ds e = do { ds2 <- sequenceA ds; e2 <- e; pure (LetE ds2 e2) }
 caseE :: Quote m => m Exp -> [m Match] -> m Exp
 caseE e ms = do { e1 <- e; ms1 <- sequenceA ms; pure (CaseE e1 ms1) }
 
-doE :: Quote m => [m Stmt] -> m Exp
-doE ss = do { ss1 <- sequenceA ss; pure (DoE ss1) }
+doE :: Quote m => Maybe ModName -> [m Stmt] -> m Exp
+doE m ss = do { ss1 <- sequenceA ss; pure (DoE m ss1) }
 
-mdoE :: Quote m => [m Stmt] -> m Exp
-mdoE ss = do { ss1 <- sequenceA ss; pure (MDoE ss1) }
+mdoE :: Quote m => Maybe ModName -> [m Stmt] -> m Exp
+mdoE m ss = do { ss1 <- sequenceA ss; pure (MDoE m ss1) }
 
 compE :: Quote m => [m Stmt] -> m Exp
 compE ss = do { ss1 <- sequenceA ss; pure (CompE ss1) }

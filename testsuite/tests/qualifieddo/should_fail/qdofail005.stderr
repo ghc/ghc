@@ -1,0 +1,5 @@
+
+qdofail005.hs:11:23:
+    Parse error in command:
+      Found a qualified P.do block in a command, but
+      qualified 'do' is not supported in commands.
