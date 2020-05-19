@@ -501,7 +501,7 @@ data EvVarSource
   | EvSigBind -- ^ bound by a type signature
   | EvWrapperBind -- ^ bound by a hswrapper
   | EvImplicitBind -- ^ bound by an implicit variable
-  | EvExternalBind -- ^ Bound by some instance
+  | EvInstBind Name -- ^ Bound by some instance of given class (type)
   | EvLetBind EvBindDeps -- ^ A direct let binding
   deriving (Eq,Ord)
 
@@ -510,7 +510,9 @@ instance Binary EvVarSource where
   put_ bh EvSigBind = putByte bh 1
   put_ bh EvWrapperBind = putByte bh 2
   put_ bh EvImplicitBind = putByte bh 3
-  put_ bh EvExternalBind = putByte bh 4
+  put_ bh (EvInstBind cls) = do
+    putByte bh 4
+    put_ bh cls
   put_ bh (EvLetBind deps) = do
     putByte bh 5
     put_ bh deps
@@ -522,7 +524,7 @@ instance Binary EvVarSource where
       1 -> pure EvSigBind
       2 -> pure EvWrapperBind
       3 -> pure EvImplicitBind
-      4 -> pure EvExternalBind
+      4 -> EvInstBind <$> get bh
       5 -> EvLetBind <$> get bh
       _ -> panic "Binary EvVarSource: invalid tag"
 
@@ -531,7 +533,7 @@ instance Outputable EvVarSource where
   ppr EvSigBind = text "bound by a type signature"
   ppr EvWrapperBind = text "bound by a HsWrapper"
   ppr EvImplicitBind = text "bound by an implicit variable binding"
-  ppr EvExternalBind = text "bound by an instance"
+  ppr (EvInstBind cls) = text "bound by an instance of class" <+> ppr cls
   ppr (EvLetBind deps) = text "bound by a let, depending on:" <+> ppr deps
 
 -- | Eq/Ord instances compare on the converted HieName,

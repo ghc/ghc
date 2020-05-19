@@ -101,7 +101,7 @@ data EvidenceInfo a
   { evidenceVar :: Name
   , evidenceSpan :: RealSrcSpan
   , evidenceType :: a
-  , evidenceDetails :: [(EvVarSource, Scope, Maybe Span)]
+  , evidenceDetails :: Maybe (EvVarSource, Scope, Maybe Span)
   } deriving (Eq,Ord,Functor)
 
 instance (Outputable a) => Outputable (EvidenceInfo a) where
@@ -110,9 +110,8 @@ instance (Outputable a) => Outputable (EvidenceInfo a) where
       pdets $$ (pprDefinedAt name)
     where
       pdets = case dets of
-        [] -> text "is a usage of an evidence variable"
-        xs -> text "is an" <+> (hsep $ punctuate (text "and/or") $
-          map (\(src,scp,spn) -> ppr (EvidenceVarBind src scp spn)) xs)
+        Nothing -> text "is a usage of an external evidence variable"
+        Just (src,scp,spn) -> text "is an" <+> ppr (EvidenceVarBind src scp spn)
 
 getEvidenceTreesAtPoint :: HieFile -> RefMap a -> (Int,Int) -> Tree.Forest (EvidenceInfo a)
 getEvidenceTreesAtPoint hf refmap point =
@@ -128,17 +127,26 @@ getEvidenceTree refmap var = go emptyNameSet var
       | var `elemNameSet` seen = Nothing
       | otherwise = do
           xs <- M.lookup (Right var) refmap
-          (sp,dets) <- find (any isEvidenceBind . identInfo . snd) xs
-          typ <- identType dets
-          let
-            (evdets,concat -> children) = unzip $ do
-              det <- S.toList $ identInfo dets
-              case det of
-                EvidenceVarBind src@(EvLetBind (getEvBindDeps -> xs)) scp spn ->
-                  pure ((src,scp,spn),mapMaybe (go $ extendNameSet seen var) xs)
-                EvidenceVarBind src scp spn -> pure ((src,scp,spn),[])
-                _ -> []
-          pure $ Tree.Node (EvidenceInfo var sp typ evdets) children
+          case find (any isEvidenceBind . identInfo . snd) xs of
+            Just (sp,dets) -> do
+              typ <- identType dets
+              (evdet,children) <- getFirst $ foldMap First $ do
+                 det <- S.toList $ identInfo dets
+                 case det of
+                   EvidenceVarBind src@(EvLetBind (getEvBindDeps -> xs)) scp spn ->
+                     pure $ Just ((src,scp,spn),mapMaybe (go $ extendNameSet seen var) xs)
+                   EvidenceVarBind src scp spn -> pure $ Just ((src,scp,spn),[])
+                   _ -> pure Nothing
+              pure $ Tree.Node (EvidenceInfo var sp typ (Just evdet)) children
+            -- It is externally bound
+            Nothing -> getFirst $ foldMap First $ do
+              (sp,dets) <- xs
+              if (any isEvidenceUse $ identInfo dets)
+                then do
+                  case identType dets of
+                    Nothing -> pure Nothing
+                    Just typ -> pure $ Just $ Tree.Node (EvidenceInfo var sp typ Nothing) []
+                else pure Nothing
 
 hieTypeToIface :: HieTypeFix -> IfaceType
 hieTypeToIface = foldType go
