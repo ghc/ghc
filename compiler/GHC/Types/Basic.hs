@@ -102,7 +102,7 @@ module GHC.Types.Basic (
         mkIntegralLit, mkFractionalLit,
         integralFractionalLit,
 
-        SourceText(..), pprWithSourceText,
+        SourceText(..), pprWithSourceText, extractSigDocText,
 
         IntWithInf, infinity, treatZeroAsInf, mkIntWithInf, intGtLimit,
 
@@ -1291,6 +1291,17 @@ instance Outputable SourceText where
 pprWithSourceText :: SourceText -> SDoc -> SDoc
 pprWithSourceText NoSourceText     d = d
 pprWithSourceText (SourceText src) _ = text src
+
+-- Helper function to remove a set of specified characters
+-- from a string. This is used in compiler/GHC/Hs/Binds.hs to
+-- clean up pragma strings (the SpecInstSig type)
+extractSigDocText :: [Char] -> [Char] -> [Char]
+extractSigDocText [] _ = ""
+extractSigDocText str elems = f str
+  where f (x:xs) | words (x:xs) == [] = " "
+                 | x `elem` elems  = f xs
+                 | xs == [] = [x]
+                 | otherwise = [x] ++ f xs
 
 {-
 ************************************************************************
