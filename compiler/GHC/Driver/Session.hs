@@ -1005,14 +1005,14 @@ tablesNextToCode = platformMisc_tablesNextToCode . platformMisc
 -- | The directory for this version of ghc in the user's app directory
 -- (typically something like @~/.ghc/x86_64-linux-7.6.3@)
 --
-versionedAppDir :: DynFlags -> MaybeT IO FilePath
-versionedAppDir dflags = do
+versionedAppDir :: String -> PlatformMini -> MaybeT IO FilePath
+versionedAppDir appname platform = do
   -- Make sure we handle the case the HOME isn't set (see #11678)
-  appdir <- tryMaybeT $ getAppUserDataDirectory (programName dflags)
-  return $ appdir </> versionedFilePath dflags
+  appdir <- tryMaybeT $ getAppUserDataDirectory appname
+  return $ appdir </> versionedFilePath platform
 
-versionedFilePath :: DynFlags -> FilePath
-versionedFilePath dflags = uniqueSubdir $ platformMini $ targetPlatform dflags
+versionedFilePath :: PlatformMini -> FilePath
+versionedFilePath platform = uniqueSubdir platform
 
 -- | The target code type of the compilation (if any).
 --
