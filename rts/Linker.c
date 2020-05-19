@@ -873,8 +873,9 @@ SymbolAddr* lookupSymbol_ (SymbolName* lbl)
  * Symbol name only used for diagnostics output.
  */
 SymbolAddr* loadSymbol(SymbolName *lbl, RtsSymbolInfo *pinfo) {
-    IF_DEBUG(linker, debugBelch("lookupSymbol: value of %s is %p\n", lbl,
-                                pinfo->value));
+    IF_DEBUG(linker, debugBelch("lookupSymbol: value of %s is %p, owned by %s\n", lbl,
+                                pinfo->value,
+                                pinfo->owner ? OC_INFORMATIVE_FILENAME(pinfo->owner) : "No owner, probably built-in."));
     ObjectCode* oc = pinfo->owner;
 
     /* Symbol can be found during linking, but hasn't been relocated. Do so now.
@@ -898,6 +899,27 @@ SymbolAddr* loadSymbol(SymbolName *lbl, RtsSymbolInfo *pinfo) {
     return pinfo->value;
 }
 
+void
+printLoadedObjects() {
+    ObjectCode* oc;
+    for (oc = objects; oc; oc = oc->next) {
+        if (oc->sections != NULL) {
+            int i;
+            printf("%s\n", OC_INFORMATIVE_FILENAME(oc));
+            for (i=0; i < oc->n_sections; i++) {
+                if(oc->sections[i].mapped_start != NULL || oc->sections[i].start != NULL) {
+                    printf("\tsec %2d[alloc: %d; kind: %d]: %p - %p; mmaped: %p - %p\n",
+                        i, oc->sections[i].alloc, oc->sections[i].kind,
+                        oc->sections[i].start,
+                        (void*)((uintptr_t)(oc->sections[i].start) + oc->sections[i].size),
+                        oc->sections[i].mapped_start,
+                        (void*)((uintptr_t)(oc->sections[i].mapped_start) + oc->sections[i].mapped_size));
+                }
+            }
+        }
+   }
+}
+
 SymbolAddr* lookupSymbol( SymbolName* lbl )
 {
     ACQUIRE_LOCK(&linker_mutex);
@@ -905,6 +927,7 @@ SymbolAddr* lookupSymbol( SymbolName* lbl )
     if (!r) {
         errorBelch("^^ Could not load '%s', dependency unresolved. "
                    "See top entry above.\n", lbl);
+        IF_DEBUG(linker, printLoadedObjects());
         fflush(stderr);
     }
     RELEASE_LOCK(&linker_mutex);
@@ -1720,6 +1743,9 @@ static HsInt resolveObjs_ (void)
         r = ocTryLoad(oc);
         if (!r)
         {
+            errorBelch("Could not load Object Code %s.\n", OC_INFORMATIVE_FILENAME(oc));
+            IF_DEBUG(linker, printLoadedObjects());
+            fflush(stderr);
             return r;
         }
     }
