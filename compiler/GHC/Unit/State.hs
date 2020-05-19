@@ -1169,20 +1169,20 @@ pprReason pref reason = case reason of
       pref <+> text "unusable due to shadowed dependencies:" $$
         nest 2 (hsep (map ppr deps))
 
-reportCycles :: DynFlags -> [SCC UnitInfo] -> IO ()
-reportCycles dflags sccs = mapM_ report sccs
+reportCycles :: (SDoc -> IO ()) -> [SCC UnitInfo] -> IO ()
+reportCycles printer sccs = mapM_ report sccs
   where
     report (AcyclicSCC _) = return ()
     report (CyclicSCC vs) =
-        debugTraceMsg dflags 2 $
+        printer $
           text "these packages are involved in a cycle:" $$
             nest 2 (hsep (map (ppr . unitId) vs))
 
-reportUnusable :: DynFlags -> UnusableUnits -> IO ()
-reportUnusable dflags pkgs = mapM_ report (Map.toList pkgs)
+reportUnusable :: (SDoc -> IO ()) -> UnusableUnits -> IO ()
+reportUnusable printer pkgs = mapM_ report (Map.toList pkgs)
   where
     report (ipid, (_, reason)) =
-       debugTraceMsg dflags 2 $
+       printer $
          pprReason
            (text "package" <+> ppr ipid <+> text "is") reason
 
@@ -1437,8 +1437,8 @@ mkUnitState dflags dbs = do
   -- packages.
   let (pkg_map2, unusable, sccs) = validateDatabase dflags pkg_map1
 
-  reportCycles dflags sccs
-  reportUnusable dflags unusable
+  reportCycles (debugTraceMsg dflags 2) sccs
+  reportUnusable (debugTraceMsg dflags 2) unusable
 
   -- Apply trust flags (these flags apply regardless of whether
   -- or not packages are visible or not)
