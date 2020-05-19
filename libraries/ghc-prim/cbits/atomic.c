@@ -10,6 +10,8 @@
 // according to the ABI and is not what GHC does when it generates
 // calls to these functions.
 
+//TODO: We now require gcc-5, so we should use __atomic__op variants.
+
 // FetchAddByteArrayOp_Int
 
 extern StgWord hs_atomic_add8(StgWord x, StgWord val);
@@ -320,11 +322,33 @@ hs_cmpxchg64(StgWord x, StgWord64 old, StgWord64 new)
 
 // Atomic exchange operations
 
-extern StgWord hs_xchg(StgPtr x, StgWord val);
+extern StgWord hs_xchg8(StgPtr x, StgWord val);
 StgWord
-hs_xchg(StgPtr x, StgWord val)
+hs_xchg8(StgPtr x, StgWord val)
 {
-  return __sync_lock_test_and_set((volatile StgPtr) x, val);
+  return (StgWord) __atomic_exchange_1((volatile StgPtr) x, val, __ATOMIC_ACQUIRE);
+}
+
+extern StgWord hs_xchg16(StgPtr x, StgWord val);
+StgWord
+hs_xchg16(StgPtr x, StgWord val)
+{
+  return (StgWord) __atomic_exchange_2(x, val, __ATOMIC_ACQUIRE);
+}
+
+extern StgWord hs_xchg32(StgPtr x, StgWord val);
+StgWord
+hs_xchg32(StgPtr x, StgWord val)
+{
+  return (StgWord) __atomic_exchange_4((volatile StgPtr) x, val, __ATOMIC_ACQUIRE);
+}
+
+//GCC provides this even on 32bit.
+extern StgWord hs_xchg64(StgPtr x, StgWord val);
+StgWord
+hs_xchg64(StgPtr x, StgWord val)
+{
+  return (StgWord) __atomic_exchange_8((volatile StgPtr) x, val, __ATOMIC_ACQUIRE);
 }
 
 // AtomicReadByteArrayOp_Int

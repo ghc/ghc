@@ -2518,10 +2518,11 @@ genCCall' _ is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] _ = d
   where
     format = intFormat width
 
-genCCall' config is32Bit (PrimTarget MO_Xchg) [dst] [addr, value] _ = do
+genCCall' config is32Bit (PrimTarget (MO_Xchg width)) [dst] [addr, value] _ = do
     let dst_r = getRegisterReg platform (CmmLocal dst)
     Amode amode addr_code <- getSimpleAmode is32Bit addr
     (newval, newval_code) <- getSomeReg value
+    -- Copy the value into the target register, perform the exchange.
     let code     = toOL
                    [ MOV format (OpReg newval) (OpReg dst_r)
                    , XCHG format (OpAddr amode) dst_r
@@ -2529,8 +2530,6 @@ genCCall' config is32Bit (PrimTarget MO_Xchg) [dst] [addr, value] _ = do
     return $ addr_code `appOL` newval_code `appOL` code
   where
     format = intFormat width
-    width | is32Bit   = W32
-          | otherwise = W64
     platform = ncgPlatform config
 
 genCCall' _ is32Bit target dest_regs args bid = do
@@ -3228,7 +3227,7 @@ outOfLineCmmOp bid mop res args
               MO_AtomicRead _  -> fsLit "atomicread"
               MO_AtomicWrite _ -> fsLit "atomicwrite"
               MO_Cmpxchg _     -> fsLit "cmpxchg"
-              MO_Xchg          -> fsLit "xchg"
+              MO_Xchg _        -> should_be_inline
 
               MO_UF_Conv _ -> unsupported
 
@@ -3248,6 +3247,11 @@ outOfLineCmmOp bid mop res args
               (MO_Prefetch_Data _ ) -> unsupported
         unsupported = panic ("outOfLineCmmOp: " ++ show mop
                           ++ " not supported here")
+        -- If we generate a call for the given primop
+        -- something went wrong.
+        should_be_inline = panic ("outOfLineCmmOp: " ++ show mop
+                          ++ " should be handled inline")
+
 
 -- -----------------------------------------------------------------------------
 -- Generating a table-branch
