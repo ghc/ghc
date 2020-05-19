@@ -65,7 +65,7 @@ import System.Directory (doesDirectoryExist, getTemporaryDirectory)
 
 import Text.ParserCombinators.ReadP (readP_to_S)
 import GHC hiding (verbosity)
-import Config
+import GHC.Settings.Config
 import GHC.Driver.Session hiding (projectVersion, verbosity)
 import GHC.Utils.Error
 import GHC.Unit
