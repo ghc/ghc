@@ -45,6 +45,15 @@ enableProcessJobs opts = opts
 enableProcessJobs opts = opts
 #endif
 
+#if !MIN_VERSION_base(4,15,0)
+-- TODO: This can be dropped with GHC 8.16
+hGetContents' :: Handle -> IO String
+hGetContents' hdl = do
+  output  <- hGetContents hdl
+  _ <- evaluate $ length output
+  return output
+#endif
+
 -- Similar to System.Process.readCreateProcessWithExitCode, but stderr is
 -- inherited from the parent process, and output to stderr is not captured.
 readCreateProcessWithExitCode'
@@ -55,13 +64,19 @@ readCreateProcessWithExitCode' proc = do
         createProcess $ enableProcessJobs $ proc{ std_out = CreatePipe }
 
     -- fork off a thread to start consuming the output
-    output  <- hGetContents outh
     outMVar <- newEmptyMVar
-    _ <- forkIO $ evaluate (length output) >> putMVar outMVar ()
+    let onError :: SomeException -> IO ()
+        onError exc = putMVar outMVar (Left exc)
+    _ <- forkIO $ handle onError $ do
+      output <- hGetContents' outh
+      putMVar outMVar $ Right output
 
     -- wait on the output
-    takeMVar outMVar
+    result <- takeMVar outMVar
     hClose outh
+    output <- case result of
+      Left exc -> throwIO exc
+      Right output -> return output
 
     -- wait on the process
     ex <- waitForProcess pid
