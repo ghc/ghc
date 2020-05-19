@@ -260,7 +260,9 @@ data GenClosure b
         , link        :: !b -- ^ next weak pointer for the capability, can be NULL.
         }
 
-  -- | StgTSO
+  -- | Representation of StgTSO: A Thread State Object.
+  -- The values for 'what_next', 'why_blocked' and 'flags' are defined in
+  -- @Constants.h@.
   | TSOClosure
       { info :: !StgInfoTable
       -- pointers
@@ -276,16 +278,16 @@ data GenClosure b
       , flags :: Word32
       , threadId :: Word64
       , saved_errno :: Word32
-      , dirty:: Word32
+      , dirty:: Word32 -- ^ non-zero => dirty
       , alloc_limit :: Int64
       , tot_stack_size :: Word32
       }
-
+  -- Representation of StgStack: The 'tsoStack' of a 'TSOClosure'.
   | StackClosure
      { info :: !StgInfoTable
-     , size :: !HalfWord
-     , dirty :: !HalfWord
-     , stackPointer :: !b
+     , size :: !HalfWord -- ^ stack size in *words*
+     , dirty :: !HalfWord -- ^ non-zero => dirty
+     , stackPointer :: !b -- ^ current stack pointer
      , stack :: [Word]
      }
 

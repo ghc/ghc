@@ -72,8 +72,16 @@ import Foreign
 #include "ghcconfig.h"
 
 class HasHeapRep (a :: TYPE rep) where
-    getClosureDataX :: (forall c . c -> IO (Ptr StgInfoTable, [Word], [b]))
-                      -> a -> IO (GenClosure b)
+
+    -- | Decode a closure to it's heap representation ('GenClosure').
+    -- Inside a GHC context 'b' is usually a 'GHC.Exts.Heap.Closures.Box'
+    -- containing a thunk or an evaluated heap object. Outside it can be a
+    -- 'Word' for "raw" usage of pointers.
+    getClosureDataX ::
+        (forall c . c -> IO (Ptr StgInfoTable, [Word], [b]))
+        -- ^ Helper function to get info table, memory and pointers of the closure
+        -> a -- ^ Closure to decode
+        -> IO (GenClosure b) -- Heap representation of the closure
 
 instance HasHeapRep (a :: TYPE 'LiftedRep) where
     getClosureDataX = getClosureX
@@ -115,7 +123,11 @@ amap' f (Array i0 i _ arr#) = map g [0 .. i - i0]
     where g (I# i#) = case indexArray# arr# i# of
                           (# e #) -> f e
 
-
+-- | Takes any value (closure) as parameter and returns a tuple of:
+-- * A 'Ptr' to the info table
+-- * The memory of the closure as @[Word]@
+-- * Pointers of the closure's @struct@ (in C code) in a @[Box]@.
+-- The pointers are collected in @Heap.c@.
 getClosureRaw :: a -> IO (Ptr StgInfoTable, [Word], [Box])
 getClosureRaw x = do
     case unpackClosure# x of
