@@ -281,7 +281,7 @@ genCall (PrimTarget (MO_Cmpxchg _width))
     retVar' <- doExprW targetTy $ ExtractV retVar 0
     statement $ Store retVar' dstVar
 
-genCall (PrimTarget MO_Xchg) [] [addr, val] = runStmtsDecls $ do
+genCall (PrimTarget (MO_Xchg _width)) [] [addr, val] = runStmtsDecls $ do
     addrVar <- exprToVarW addr
     valVar <- exprToVarW val
     let ptrTy = pLift $ getVarType valVar
@@ -864,7 +864,7 @@ cmmPrimOpFunctions mop = do
     MO_AtomicRMW _ _ -> unsupported
     MO_AtomicWrite _ -> unsupported
     MO_Cmpxchg _     -> unsupported
-    MO_Xchg          -> unsupported
+    MO_Xchg _        -> unsupported
 
 -- | Tail function calls
 genJump :: CmmExpr -> [GlobalReg] -> LlvmM StmtData

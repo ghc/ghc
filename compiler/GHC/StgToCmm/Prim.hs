@@ -856,6 +856,10 @@ emitPrimOp dflags = \case
   Word2DoubleOp -> \[w] -> opAllDone $ \[res] -> do
     emitPrimCall [res] (MO_UF_Conv W64) [w]
 
+-- Atomic operations
+  InterlockedExchangeAddr -> \[src, value] -> opAllDone $ \[res] ->
+    emitPrimCall [res] (MO_Xchg (wordWidth platform)) [src, value]
+
 -- SIMD primops
   (VecBroadcastOp vcat n w) -> \[e] -> opAllDone $ \[res] -> do
     checkVecCompatibility dflags vcat n w

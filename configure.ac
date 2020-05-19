@@ -730,6 +730,8 @@ dnl    unregisterised, Sparc, and PPC backends.
 FP_GCC_SUPPORTS__ATOMICS
 if test $CONF_GCC_SUPPORTS__ATOMICS = YES ; then
   AC_DEFINE([HAVE_C11_ATOMICS], [1], [Does GCC support __atomic primitives?])
+else
+  AC_MSG_ERROR([C compiler needs to support __atomic primitives.])
 fi
 
 FP_GCC_EXTRA_FLAGS
