@@ -26,9 +26,10 @@ import GHC.Types.Avail            ( Avails )
 import GHC.Data.Bag               ( Bag, bagToList )
 import GHC.Types.Basic
 import GHC.Data.BooleanFormula
-import GHC.Core.Class             ( FunDep )
+import GHC.Core.Class             ( FunDep, className, classSCSelIds )
 import GHC.Core.Utils             ( exprType )
 import GHC.Core.ConLike           ( conLikeName )
+import GHC.Core.TyCon             ( TyCon, tyConClass_maybe )
 import GHC.Core.FVs
 import GHC.HsToCore               ( deSugarExpr )
 import GHC.Types.FieldLabel
@@ -289,7 +290,8 @@ mkHieFileWithSource src_file src ms ts rs = do
   let tc_binds = tcg_binds ts
       top_ev_binds = tcg_ev_binds ts
       insts = tcg_insts ts
-  (asts', arr) <- getCompressedAsts tc_binds rs top_ev_binds insts
+      tcs = tcg_tcs ts
+  (asts', arr) <- getCompressedAsts tc_binds rs top_ev_binds insts tcs
   return $ HieFile
       { hie_hs_file = src_file
       , hie_module = ms_mod ms
@@ -300,22 +302,29 @@ mkHieFileWithSource src_file src ms ts rs = do
       , hie_hs_src = src
       }
 
-getCompressedAsts :: TypecheckedSource -> RenamedSource -> Bag EvBind -> [ClsInst]
+getCompressedAsts :: TypecheckedSource -> RenamedSource -> Bag EvBind -> [ClsInst] -> [TyCon]
   -> Hsc (HieASTs TypeIndex, A.Array TypeIndex HieTypeFlat)
-getCompressedAsts ts rs top_ev_binds insts = do
-  asts <- enrichHie ts rs top_ev_binds insts
+getCompressedAsts ts rs top_ev_binds insts tcs = do
+  asts <- enrichHie ts rs top_ev_binds insts tcs
   return $ compressTypes asts
 
-enrichHie :: TypecheckedSource -> RenamedSource -> Bag EvBind -> [ClsInst]
+enrichHie :: TypecheckedSource -> RenamedSource -> Bag EvBind -> [ClsInst] -> [TyCon]
   -> Hsc (HieASTs Type)
-enrichHie ts (hsGrp, imports, exports, _) ev_bs insts =
+enrichHie ts (hsGrp, imports, exports, _) ev_bs insts tcs =
   flip evalStateT initState $ flip runReaderT SourceInfo $ do
     tasts <- toHie $ fmap (BC RegularBind ModuleScope) ts
     rasts <- processGrp hsGrp
     imps <- toHie $ filter (not . ideclImplicit . unLoc) imports
     exps <- toHie $ fmap (map $ IEC Export . fst) exports
+    -- Add Instance bindings
     forM_ insts $ \i ->
-      addUnlocatedEvBind (is_dfun i) (EvidenceVarBind (EvInstBind (is_cls_nm i)) ModuleScope Nothing)
+      addUnlocatedEvBind (is_dfun i) (EvidenceVarBind (EvInstBind False (is_cls_nm i)) ModuleScope Nothing)
+    -- Add class parent bindings
+    forM_ tcs $ \tc ->
+      case tyConClass_maybe tc of
+        Nothing -> pure ()
+        Just c -> forM_ (classSCSelIds c) $ \v ->
+          addUnlocatedEvBind v (EvidenceVarBind (EvInstBind True (className c)) ModuleScope Nothing)
     let spanFile file children = case children of
           [] -> realSrcLocSpan (mkRealSrcLoc file 1 1)
           _ -> mkRealSrcSpan (realSrcSpanStart $ nodeSpan $ head children)
@@ -652,7 +661,7 @@ instance ToHie (EvBindContext (Located TcEvBinds)) where
           let evDeps = evVarsOfTermList $ eb_rhs evbind
               depNames = EvBindDeps $ map varName evDeps
           concatM $
-            [ toHie (C (EvidenceVarBind (EvLetBind depNames) sc sp)
+            [ toHie (C (EvidenceVarBind (EvLetBind depNames) (combineScopes sc (mkScope span)) sp)
                                         (L span $ eb_lhs evbind))
             , toHie $ map (C EvidenceVarUse . L span) $ evDeps
             ]
@@ -943,9 +952,10 @@ instance ( a ~ GhcPass p
               let ev_binds = cpt_binds ext
                   ev_vars = cpt_dicts ext
                   wrap = cpt_wrap ext
+                  evscope = mkScope ospan `combineScopes` scope `combineScopes` pscope
                 in concatM [ toHie $ EvBindContext scope rsp $ L ospan ev_binds
                            , toHie $ L ospan wrap
-                           , toHie $ map (C (EvidenceVarBind EvPatternBind scope rsp)
+                           , toHie $ map (C (EvidenceVarBind EvPatternBind evscope rsp)
                                          . L ospan) ev_vars
                            ]
             _ -> pure []

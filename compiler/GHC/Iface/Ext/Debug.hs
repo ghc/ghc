@@ -107,28 +107,23 @@ validAst (Node _ span children) = do
 -- | Look for any identifiers which occur outside of their supposed scopes.
 -- Returns a list of error messages.
 validateScopes :: Module -> M.Map FastString (HieAST a) -> [SDoc]
-validateScopes mod asts = validScopes ++ validEvLets
+validateScopes mod asts = validScopes ++ validEvs
   where
     refMap = generateReferencesMap asts
     -- We use a refmap for most of the computation
 
-    -- Check if everything on the RHS of an EvLet binding is also bound
-    -- somewhere in the AST
-    validEvLets = concatMap evVarInScope evletrhs
+    evs = M.keys
+      $ M.filter (any isEvidenceContext . concatMap (S.toList . identInfo . snd)) refMap
 
-    -- Check if a given evidence variable is bound
-    evVarInScope n = case M.lookup (Right n) refMap of
-          Nothing -> return $ hsep ["Local evidence variable:", ppr n
-            , "occuring in the rhs of a EvLet doesn't appear in the refmap"]
-          Just xs
-            | any (any isEvidenceBind) (map (identInfo . snd) xs) -> []
-            | otherwise -> return $ hsep ["Local evidence variable:"
-                , ppr n, "occuring in the rhs of a EvLet isn't bound in the refmap"]
-
-    -- All the evidence variables occuring on the RHS of an EvLet
-    evletrhs = S.fromList $ concatMap (evLets . identInfo . snd)
-                $ concat $ M.elems refMap
-    evLets = concatMap getEvidenceBindDeps
+    validEvs = do
+      i@(Right ev) <- evs
+      case M.lookup i refMap of
+        Nothing -> ["Impossible, ev"<+> ppr ev <+> "not found in refmap" ]
+        Just refs
+          | nameIsLocalOrFrom mod ev
+          , not (any isEvidenceBind . concatMap (S.toList . identInfo . snd) $ refs)
+          -> ["Evidence var" <+> ppr ev <+> "not bound in refmap"]
+          | otherwise -> []
 
     -- Check if all the names occur in their calculated scopes
     validScopes = M.foldrWithKey (\k a b -> valid k a ++ b) [] refMap
@@ -145,9 +140,9 @@ validateScopes mod asts = validScopes ++ validEvLets
           -- We validate scopes for names which are defined locally, and occur
           -- in this span, or are evidence variables
             = case scopes of
-              [] | any isEvidenceContext (identInfo dets)
-                   || (nameIsLocalOrFrom mod n
-                      && not (isDerivedOccName $ nameOccName n))
+              [] | nameIsLocalOrFrom mod n
+                  , (  not (isDerivedOccName $ nameOccName n)
+                    || any isEvidenceContext (identInfo dets))
                    -- If we don't get any scopes for a local name or
                    -- an evidence variable, then its an error.
                    -- We can ignore other kinds of derived names as
