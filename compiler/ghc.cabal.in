@@ -398,6 +398,7 @@ Library
         GHC.SysTools.Elf
         GHC.Iface.Tidy
         GHC.Parser.CharClass
+        GHC.Parser.Error
         GHC.Parser.Lexer
         GHC.Core.Coercion.Opt
         GHC.Parser

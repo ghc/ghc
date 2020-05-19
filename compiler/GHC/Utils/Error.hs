@@ -126,11 +126,15 @@ orValid _       v = v
 -- -----------------------------------------------------------------------------
 -- Basic error messages: just render a message with a source location.
 
-type Messages        = (WarningMessages, ErrorMessages)
-type WarningMessages = Bag WarnMsg
-type ErrorMessages   = Bag ErrMsg
+-- This module should be agnostic of the concrete error type
+-- and should only relly on the fact that we can render it
+-- to an ErrMsg.
 
-unionMessages :: Messages -> Messages -> Messages
+type Messages e      = (WarningMessages, ErrorMessages e)
+type WarningMessages = Bag WarnMsg
+type ErrorMessages e = Bag e
+
+unionMessages :: Messages e -> Messages e -> Messages e
 unionMessages (warns1, errs1) (warns2, errs2) =
   (warns1 `unionBags` warns2, errs1 `unionBags` errs2)
 
@@ -358,16 +362,16 @@ mkWarnMsg      dflags locn unqual msg       = mk_err_msg dflags SevWarning locn 
 mkPlainWarnMsg dflags locn        msg       = mk_err_msg dflags SevWarning locn alwaysQualify (ErrDoc [msg] [] [])
 
 ----------------
-emptyMessages :: Messages
+emptyMessages :: Messages e
 emptyMessages = (emptyBag, emptyBag)
 
-isEmptyMessages :: Messages -> Bool
+isEmptyMessages :: Messages e -> Bool
 isEmptyMessages (warns, errs) = isEmptyBag warns && isEmptyBag errs
 
-errorsFound :: DynFlags -> Messages -> Bool
+errorsFound :: DynFlags -> Messages e -> Bool
 errorsFound _dflags (_warns, errs) = not (isEmptyBag errs)
 
-warningsToMessages :: DynFlags -> WarningMessages -> Messages
+warningsToMessages :: DynFlags -> WarningMessages -> Messages ErrMsg
 warningsToMessages dflags =
   partitionBagWith $ \warn ->
     case isWarnMsgFatal dflags warn of
@@ -376,7 +380,7 @@ warningsToMessages dflags =
         Right warn{ errMsgSeverity = SevError
                   , errMsgReason = ErrReason err_reason }
 
-printBagOfErrors :: DynFlags -> Bag ErrMsg -> IO ()
+printBagOfErrors :: DynFlags -> ErrorMessages ErrMsg -> IO ()
 printBagOfErrors dflags bag_of_errors
   = sequence_ [ let style = mkErrStyle dflags unqual
                     ctx   = initSDocContext dflags style
