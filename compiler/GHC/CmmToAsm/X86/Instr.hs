@@ -462,6 +462,7 @@ x86_regUsageOfInstr platform instr
     usageMM :: Operand -> Operand -> RegUsage
     usageMM (OpReg src) (OpReg dst) = mkRU [src, dst] [src, dst]
     usageMM (OpReg src) (OpAddr ea) = mkRU (use_EA ea [src]) [src]
+    usageMM (OpAddr ea) (OpReg dst) = mkRU (use_EA ea [dst]) [dst]
     usageMM _ _                     = panic "X86.RegInfo.usageMM: no match"
 
     -- 3 operand form; first operand Read; second Modified; third Modified

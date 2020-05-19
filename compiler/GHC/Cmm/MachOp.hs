@@ -632,7 +632,9 @@ data CallishMachOp
   | MO_AtomicRead Width
   | MO_AtomicWrite Width
   | MO_Cmpxchg Width
-  | MO_Xchg
+  -- Should be an AtomicRMW variant eventually.
+  -- Has at least aquire semantics.
+  | MO_Xchg Width
   deriving (Eq, Show)
 
 -- | The operation to perform atomically.
