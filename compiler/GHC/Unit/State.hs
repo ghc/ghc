@@ -1273,15 +1273,15 @@ type UnitPrecedenceMap = Map UnitId Int
 -- packages with the same unit id in later databases override
 -- earlier ones.  This does NOT check if the resulting database
 -- makes sense (that's done by 'validateDatabase').
-mergeDatabases :: DynFlags -> [UnitDatabase UnitId]
+mergeDatabases :: (SDoc -> IO ()) -> [UnitDatabase UnitId]
                -> IO (UnitInfoMap, UnitPrecedenceMap)
-mergeDatabases dflags = foldM merge (Map.empty, Map.empty) . zip [1..]
+mergeDatabases printer = foldM merge (Map.empty, Map.empty) . zip [1..]
   where
     merge (pkg_map, prec_map) (i, UnitDatabase db_path db) = do
-      debugTraceMsg dflags 2 $
+      printer $
           text "loading package database" <+> text db_path
       forM_ (Set.toList override_set) $ \pkg ->
-          debugTraceMsg dflags 2 $
+          printer $
               text "package" <+> ppr pkg <+>
               text "overrides a previously defined package"
       return (pkg_map', prec_map')
@@ -1423,22 +1423,24 @@ mkUnitState dflags dbs = do
           we build a mapping saying what every in scope module name points to.
 -}
 
+  let printer = debugTraceMsg dflags 2
+
   -- This, and the other reverse's that you will see, are due to the fact that
   -- packageFlags, pluginPackageFlags, etc. are all specified in *reverse* order
   -- than they are on the command line.
   let other_flags = reverse (packageFlags dflags)
-  debugTraceMsg dflags 2 $
+  printer $
       text "package flags" <+> ppr other_flags
 
   -- Merge databases together, without checking validity
-  (pkg_map1, prec_map) <- mergeDatabases dflags dbs
+  (pkg_map1, prec_map) <- mergeDatabases printer dbs
 
   -- Now that we've merged everything together, prune out unusable
   -- packages.
   let (pkg_map2, unusable, sccs) = validateDatabase dflags pkg_map1
 
-  reportCycles (debugTraceMsg dflags 2) sccs
-  reportUnusable (debugTraceMsg dflags 2) unusable
+  reportCycles   printer sccs
+  reportUnusable printer unusable
 
   -- Apply trust flags (these flags apply regardless of whether
   -- or not packages are visible or not)
@@ -1509,7 +1511,7 @@ mkUnitState dflags dbs = do
   -- it modifies the unit ids of wired in packages, but when we process
   -- package arguments we need to key against the old versions.
   --
-  (pkgs2, wired_map) <- findWiredInUnits (debugTraceMsg dflags 2) prec_map pkgs1 vis_map2
+  (pkgs2, wired_map) <- findWiredInUnits printer prec_map pkgs1 vis_map2
   let pkg_db = mkUnitInfoMap pkgs2
 
   -- Update the visibility map, so we treat wired packages as visible.
