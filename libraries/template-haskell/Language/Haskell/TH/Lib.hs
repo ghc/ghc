@@ -156,12 +156,15 @@ import Language.Haskell.TH.Lib.Internal hiding
   , derivClause
   , standaloneDerivWithStrategyD
 
+  , doE
+  , mdoE
   , tupE
   , unboxedTupE
 
   , Role
   , InjectivityAnn
   )
+import qualified Language.Haskell.TH.Lib.Internal as Internal
 import Language.Haskell.TH.Syntax
 
 import Control.Applicative ( liftA2 )
@@ -336,3 +339,12 @@ tupE es = do { es1 <- sequenceA es; return (TupE $ map Just es1)}
 
 unboxedTupE :: Quote m => [m Exp] -> m Exp
 unboxedTupE es = do { es1 <- sequenceA es; return (UnboxedTupE $ map Just es1)}
+
+-------------------------------------------------------------------------------
+-- * Do expressions
+
+doE :: Quote m => [m Stmt] -> m Exp
+doE = Internal.doE Nothing
+
+mdoE :: Quote m => [m Stmt] -> m Exp
+mdoE = Internal.mdoE Nothing

@@ -3844,6 +3844,7 @@ xFlagsDeps = [
   flagSpec "QuantifiedConstraints"            LangExt.QuantifiedConstraints,
   flagSpec "PostfixOperators"                 LangExt.PostfixOperators,
   flagSpec "QuasiQuotes"                      LangExt.QuasiQuotes,
+  flagSpec "QualifiedDo"                      LangExt.QualifiedDo,
   flagSpec "Rank2Types"                       LangExt.RankNTypes,
   flagSpec "RankNTypes"                       LangExt.RankNTypes,
   flagSpec "RebindableSyntax"                 LangExt.RebindableSyntax,

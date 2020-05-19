@@ -772,11 +772,12 @@ addTickApplicativeArg isGuard (op, arg) =
       <*> addTickLPat pat
       <*> addTickLHsExpr expr
       <*> pure isBody
-  addTickArg (ApplicativeArgMany x stmts ret pat) =
+  addTickArg (ApplicativeArgMany x stmts ret pat ctxt) =
     (ApplicativeArgMany x)
       <$> addTickLStmts isGuard stmts
       <*> (unLoc <$> addTickLHsExpr (L hpcSrcSpan ret))
       <*> addTickLPat pat
+      <*> pure ctxt
 
 addTickStmtAndBinders :: Maybe (Bool -> BoxLabel) -> ParStmtBlock GhcTc GhcTc
                       -> TM (ParStmtBlock GhcTc GhcTc)

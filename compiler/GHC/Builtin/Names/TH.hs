@@ -30,6 +30,7 @@ templateHaskellNames = [
     returnQName, bindQName, sequenceQName, newNameName, liftName, liftTypedName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName, mkNameLName,
     mkNameSName,
+    mkModNameName,
     liftStringName,
     unTypeName,
     unTypeQName,
@@ -160,6 +161,7 @@ templateHaskellNames = [
     ruleBndrTyConName, tySynEqnTyConName,
     roleTyConName, tExpTyConName, injAnnTyConName, kindTyConName,
     overlapTyConName, derivClauseTyConName, derivStrategyTyConName,
+    modNameTyConName,
 
     -- Quasiquoting
     quoteDecName, quoteTypeName, quoteExpName, quotePatName]
@@ -191,7 +193,8 @@ quoteClassName = thCls (fsLit "Quote") quoteClassKey
 qTyConName, nameTyConName, fieldExpTyConName, patTyConName,
     fieldPatTyConName, expTyConName, decTyConName, typeTyConName,
     matchTyConName, clauseTyConName, funDepTyConName, predTyConName,
-    tExpTyConName, injAnnTyConName, overlapTyConName, decsTyConName :: Name
+    tExpTyConName, injAnnTyConName, overlapTyConName, decsTyConName,
+    modNameTyConName :: Name
 qTyConName             = thTc (fsLit "Q")              qTyConKey
 nameTyConName          = thTc (fsLit "Name")           nameTyConKey
 fieldExpTyConName      = thTc (fsLit "FieldExp")       fieldExpTyConKey
@@ -208,11 +211,12 @@ predTyConName          = thTc (fsLit "Pred")           predTyConKey
 tExpTyConName          = thTc (fsLit "TExp")           tExpTyConKey
 injAnnTyConName        = thTc (fsLit "InjectivityAnn") injAnnTyConKey
 overlapTyConName       = thTc (fsLit "Overlap")        overlapTyConKey
+modNameTyConName       = thTc (fsLit "ModName")        modNameTyConKey
 
 returnQName, bindQName, sequenceQName, newNameName, liftName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName,
     mkNameLName, mkNameSName, liftStringName, unTypeName, unTypeQName,
-    unsafeTExpCoerceName, liftTypedName :: Name
+    unsafeTExpCoerceName, liftTypedName, mkModNameName :: Name
 returnQName    = thFun (fsLit "returnQ")   returnQIdKey
 bindQName      = thFun (fsLit "bindQ")     bindQIdKey
 sequenceQName  = thFun (fsLit "sequenceQ") sequenceQIdKey
@@ -225,6 +229,7 @@ mkNameG_dName  = thFun (fsLit "mkNameG_d")  mkNameG_dIdKey
 mkNameG_tcName = thFun (fsLit "mkNameG_tc") mkNameG_tcIdKey
 mkNameLName    = thFun (fsLit "mkNameL")    mkNameLIdKey
 mkNameSName    = thFun (fsLit "mkNameS")    mkNameSIdKey
+mkModNameName  = thFun (fsLit "mkModName")  mkModNameIdKey
 unTypeName     = thFun (fsLit "unType")     unTypeIdKey
 unTypeQName    = thFun (fsLit "unTypeQ")    unTypeQIdKey
 unsafeTExpCoerceName = thFun (fsLit "unsafeTExpCoerce") unsafeTExpCoerceIdKey
@@ -648,8 +653,8 @@ expTyConKey, matchTyConKey, clauseTyConKey, qTyConKey, expQTyConKey,
     funDepTyConKey, predTyConKey,
     predQTyConKey, decsQTyConKey, ruleBndrTyConKey, tySynEqnTyConKey,
     roleTyConKey, tExpTyConKey, injAnnTyConKey, kindTyConKey,
-    overlapTyConKey, derivClauseTyConKey, derivStrategyTyConKey, decsTyConKey
-      :: Unique
+    overlapTyConKey, derivClauseTyConKey, derivStrategyTyConKey, decsTyConKey,
+    modNameTyConKey  :: Unique
 expTyConKey             = mkPreludeTyConUnique 200
 matchTyConKey           = mkPreludeTyConUnique 201
 clauseTyConKey          = mkPreludeTyConUnique 202
@@ -683,6 +688,7 @@ overlapTyConKey         = mkPreludeTyConUnique 233
 derivClauseTyConKey    = mkPreludeTyConUnique 234
 derivStrategyTyConKey  = mkPreludeTyConUnique 235
 decsTyConKey            = mkPreludeTyConUnique 236
+modNameTyConKey         = mkPreludeTyConUnique 238
 
 {- *********************************************************************
 *                                                                      *
@@ -736,7 +742,7 @@ incoherentDataConKey   = mkPreludeDataConUnique 212
 returnQIdKey, bindQIdKey, sequenceQIdKey, liftIdKey, newNameIdKey,
     mkNameIdKey, mkNameG_vIdKey, mkNameG_dIdKey, mkNameG_tcIdKey,
     mkNameLIdKey, mkNameSIdKey, unTypeIdKey, unTypeQIdKey,
-    unsafeTExpCoerceIdKey, liftTypedIdKey :: Unique
+    unsafeTExpCoerceIdKey, liftTypedIdKey, mkModNameIdKey :: Unique
 returnQIdKey        = mkPreludeMiscIdUnique 200
 bindQIdKey          = mkPreludeMiscIdUnique 201
 sequenceQIdKey      = mkPreludeMiscIdUnique 202
@@ -752,6 +758,7 @@ unTypeIdKey          = mkPreludeMiscIdUnique 211
 unTypeQIdKey         = mkPreludeMiscIdUnique 212
 unsafeTExpCoerceIdKey = mkPreludeMiscIdUnique 213
 liftTypedIdKey        = mkPreludeMiscIdUnique 214
+mkModNameIdKey        = mkPreludeMiscIdUnique 215
 
 
 -- data Lit = ...

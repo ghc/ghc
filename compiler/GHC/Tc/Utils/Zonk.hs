@@ -1227,15 +1227,15 @@ zonkStmt env _zBody (ApplicativeStmt body_ty args mb_join)
 
     get_pat :: (SyntaxExpr GhcTcId, ApplicativeArg GhcTcId) -> LPat GhcTcId
     get_pat (_, ApplicativeArgOne _ pat _ _) = pat
-    get_pat (_, ApplicativeArgMany _ _ _ pat) = pat
+    get_pat (_, ApplicativeArgMany _ _ _ pat _) = pat
 
     replace_pat :: LPat GhcTcId
                 -> (SyntaxExpr GhcTc, ApplicativeArg GhcTc)
                 -> (SyntaxExpr GhcTc, ApplicativeArg GhcTc)
     replace_pat pat (op, ApplicativeArgOne fail_op _ a isBody)
       = (op, ApplicativeArgOne fail_op pat a isBody)
-    replace_pat pat (op, ApplicativeArgMany x a b _)
-      = (op, ApplicativeArgMany x a b pat)
+    replace_pat pat (op, ApplicativeArgMany x a b _ c)
+      = (op, ApplicativeArgMany x a b pat c)
 
     zonk_args env args
       = do { (env1, new_args_rev) <- zonk_args_rev env (reverse args)
@@ -1260,10 +1260,10 @@ zonkStmt env _zBody (ApplicativeStmt body_ty args mb_join)
                  ; return fail'
                  }
            ; return (ApplicativeArgOne new_fail pat new_expr isBody) }
-    zonk_arg env (ApplicativeArgMany x stmts ret pat)
+    zonk_arg env (ApplicativeArgMany x stmts ret pat ctxt)
       = do { (env1, new_stmts) <- zonkStmts env zonkLExpr stmts
            ; new_ret           <- zonkExpr env1 ret
-           ; return (ApplicativeArgMany x new_stmts new_ret pat) }
+           ; return (ApplicativeArgMany x new_stmts new_ret pat ctxt) }
 
 -------------------------------------------------------------------------
 zonkRecFields :: ZonkEnv -> HsRecordBinds GhcTcId -> TcM (HsRecordBinds GhcTcId)

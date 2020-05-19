@@ -616,7 +616,7 @@ dsMcBindStmt :: LPat GhcTc
 dsMcBindStmt pat rhs' bind_op fail_op res1_ty stmts
   = do  { body     <- dsMcStmts stmts
         ; var      <- selectSimpleMatchVarL pat
-        ; match <- matchSinglePatVar var (StmtCtxt DoExpr) pat
+        ; match <- matchSinglePatVar var (StmtCtxt (DoExpr Nothing)) pat
                                   res1_ty (cantFailMatchResult body)
         ; match_code <- dsHandleMonadicFailure pat match fail_op
         ; dsSyntaxExpr bind_op [rhs', Lam var match_code] }

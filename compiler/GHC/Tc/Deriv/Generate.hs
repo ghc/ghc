@@ -983,7 +983,7 @@ gen_Read_binds get_fixity loc tycon
     read_nullary_cons
       = case nullary_cons of
             []    -> []
-            [con] -> [nlHsDo DoExpr (match_con con ++ [noLoc $ mkLastStmt (result_expr con [])])]
+            [con] -> [nlHsDo (DoExpr Nothing) (match_con con ++ [noLoc $ mkLastStmt (result_expr con [])])]
             _     -> [nlHsApp (nlHsVar choose_RDR)
                               (nlList (map mk_pair nullary_cons))]
         -- NB For operators the parens around (:=:) are matched by the
@@ -1057,7 +1057,7 @@ gen_Read_binds get_fixity loc tycon
     ------------------------------------------------------------------------
     mk_alt e1 e2       = genOpApp e1 alt_RDR e2                         -- e1 +++ e2
     mk_parser p ss b   = nlHsApps prec_RDR [nlHsIntLit p                -- prec p (do { ss ; b })
-                                           , nlHsDo DoExpr (ss ++ [noLoc $ mkLastStmt b])]
+                                           , nlHsDo (DoExpr Nothing) (ss ++ [noLoc $ mkLastStmt b])]
     con_app con as     = nlHsVarApps (getRdrName con) as                -- con as
     result_expr con as = nlHsApp (nlHsVar returnM_RDR) (con_app con as) -- return (con as)
 
