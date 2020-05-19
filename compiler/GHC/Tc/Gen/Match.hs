@@ -316,15 +316,15 @@ tcDoStmts ListComp (L l stmts) res_ty
                             (mkCheckExpType elt_ty)
         ; return $ mkHsWrapCo co (HsDo list_ty ListComp (L l stmts')) }
 
-tcDoStmts DoExpr (L l stmts) res_ty
-  = do  { stmts' <- tcStmts DoExpr tcDoStmt stmts res_ty
+tcDoStmts doExpr@(DoExpr _) (L l stmts) res_ty
+  = do  { stmts' <- tcStmts doExpr tcDoStmt stmts res_ty
         ; res_ty <- readExpType res_ty
-        ; return (HsDo res_ty DoExpr (L l stmts')) }
+        ; return (HsDo res_ty doExpr (L l stmts')) }
 
-tcDoStmts MDoExpr (L l stmts) res_ty
-  = do  { stmts' <- tcStmts MDoExpr tcDoStmt stmts res_ty
+tcDoStmts mDoExpr@(MDoExpr _) (L l stmts) res_ty
+  = do  { stmts' <- tcStmts mDoExpr tcDoStmt stmts res_ty
         ; res_ty <- readExpType res_ty
-        ; return (HsDo res_ty MDoExpr (L l stmts')) }
+        ; return (HsDo res_ty mDoExpr (L l stmts')) }
 
 tcDoStmts MonadComp (L l stmts) res_ty
   = do  { stmts' <- tcStmts MonadComp tcMcStmt stmts res_ty
@@ -1063,7 +1063,7 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
                       , .. }
                     ) }
 
-    goArg _body_ty (ApplicativeArgMany x stmts ret pat, pat_ty, exp_ty)
+    goArg _body_ty (ApplicativeArgMany x stmts ret pat ctxt, pat_ty, exp_ty)
       = do { (stmts', (ret',pat')) <-
                 tcStmtsAndThen ctxt tcDoStmt stmts (mkCheckExpType exp_ty) $
                 \res_ty  -> do
@@ -1072,7 +1072,7 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
                                  return ()
                   ; return (ret', pat')
                   }
-           ; return (ApplicativeArgMany x stmts' ret' pat') }
+           ; return (ApplicativeArgMany x stmts' ret' pat' ctxt) }
 
     get_arg_bndrs :: ApplicativeArg GhcTcId -> [Id]
     get_arg_bndrs (ApplicativeArgOne { app_arg_pattern = pat }) = collectPatBinders pat

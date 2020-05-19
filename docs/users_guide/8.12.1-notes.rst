@@ -145,6 +145,20 @@ Language
     data U a where
       MkU :: (Show a => U a)
 
+* A new language extension :extension:`QualifiedDo` is implemented, allowing
+  to qualify a do block to control which operations to use for desugaring do
+  syntax. ::
+
+    {-# LANGUAGE QualifiedDo #-}
+    import qualified SomeModule as M
+
+    f x = M.do           -- desugars to:
+      y <- M.return x    -- M.return x M.>>= \y ->
+      M.return y         -- M.return y M.>>
+      M.return y         -- M.return y
+
+  See :ref:`qualified-do-notation` for more details.
+
 Compiler
 ~~~~~~~~
 
