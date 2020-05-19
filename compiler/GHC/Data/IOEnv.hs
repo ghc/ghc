@@ -24,7 +24,7 @@ module GHC.Data.IOEnv (
         -- Getting at the environment
         getEnv, setEnv, updEnv,
 
-        runIOEnv, unsafeInterleaveM, uninterruptibleMaskM_,
+        runIOEnv, etaIOEnv, unsafeInterleaveM, uninterruptibleMaskM_,
         tryM, tryAllM, tryMostM, fixM,
 
         -- I/O operations
@@ -33,6 +33,7 @@ module GHC.Data.IOEnv (
   ) where
 
 import GHC.Prelude
+import GHC.Exts (oneShot)
 
 import GHC.Driver.Session
 import GHC.Utils.Exception
@@ -113,6 +114,11 @@ instance ContainsModule env => HasModule (IOEnv env) where
 runIOEnv :: env -> IOEnv env a -> IO a
 runIOEnv env (IOEnv m) = m env
 
+etaIOEnv :: IOEnv env a -> IOEnv env a
+{-# INLINE etaIOEnv #-}
+etaIOEnv = IOEnv . oneShot . unIOEnv
+   where
+      unIOEnv (IOEnv f) = f
 
 ---------------------------
 {-# NOINLINE fixM #-}

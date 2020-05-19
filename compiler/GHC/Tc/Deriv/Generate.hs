@@ -159,7 +159,7 @@ produced don't get through the typechecker.
 -}
 
 gen_Eq_binds :: SrcSpan -> TyCon -> TcM (LHsBinds GhcPs, BagDerivStuff)
-gen_Eq_binds loc tycon = do
+gen_Eq_binds loc tycon = etaIOEnv $ do
     dflags <- getDynFlags
     return (method_binds dflags, aux_binds)
   where
@@ -339,7 +339,7 @@ gtResult OrdGT      = true_Expr
 
 ------------
 gen_Ord_binds :: SrcSpan -> TyCon -> TcM (LHsBinds GhcPs, BagDerivStuff)
-gen_Ord_binds loc tycon = do
+gen_Ord_binds loc tycon = etaIOEnv $ do
     dflags <- getDynFlags
     return $ if null tycon_data_cons -- No data-cons => invoke bale-out case
       then ( unitBag $ mkFunBindEC 2 loc compare_RDR (const eqTag_Expr) []
@@ -584,7 +584,7 @@ For @enumFromTo@ and @enumFromThenTo@, we use the default methods.
 -}
 
 gen_Enum_binds :: SrcSpan -> TyCon -> TcM (LHsBinds GhcPs, BagDerivStuff)
-gen_Enum_binds loc tycon = do
+gen_Enum_binds loc tycon = etaIOEnv $ do
     dflags <- getDynFlags
     return (method_binds dflags, aux_binds)
   where
@@ -756,7 +756,7 @@ we follow the scheme given in Figure~19 of the Haskell~1.2 report
 
 gen_Ix_binds :: SrcSpan -> TyCon -> TcM (LHsBinds GhcPs, BagDerivStuff)
 
-gen_Ix_binds loc tycon = do
+gen_Ix_binds loc tycon = etaIOEnv $ do
     dflags <- getDynFlags
     return $ if isEnumerationTyCon tycon
       then (enum_ixes dflags, listToBag $ map DerivAuxBind
@@ -1311,8 +1311,8 @@ gen_Data_binds :: SrcSpan
                                         --  *representation* TyCon
                -> TcM (LHsBinds GhcPs,  -- The method bindings
                        BagDerivStuff)   -- Auxiliary bindings
-gen_Data_binds loc rep_tc
-  = do { dflags  <- getDynFlags
+gen_Data_binds loc rep_tc = etaIOEnv $ do
+       { dflags  <- getDynFlags
 
        -- Make unique names for the data type and constructor
        -- auxiliary bindings.  Start with the name of the TyCon/DataCon
@@ -1809,8 +1809,8 @@ gen_Newtype_binds :: SrcSpan
                   -> Type    -- the representation type
                   -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff)
 -- See Note [Newtype-deriving instances]
-gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
-  = do let ats = classATs cls
+gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty = etaIOEnv $ do
+       let ats = classATs cls
            (binds, sigs) = mapAndUnzip mk_bind_and_sig (classMethods cls)
        atf_insts <- ASSERT( all (not . isDataFamilyTyCon) ats )
                     mapM mk_atf_inst ats
