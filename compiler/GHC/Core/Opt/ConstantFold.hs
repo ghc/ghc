@@ -321,7 +321,7 @@ mkPrimOpRule nm arity rules = Just $ mkBasicRule nm arity (msum rules)
 
 -- Relational operations
 data RelOp
-  = Equals 
+  = Equals
   | NotEquals
   | LessThan
   | LessThanEquals
