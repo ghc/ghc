@@ -731,7 +731,7 @@ applyTrustFlag dflags prec_map unusable pkgs flag =
 homeUnitIsIndefinite :: DynFlags -> Bool
 homeUnitIsIndefinite dflags = not (homeUnitIsDefinite dflags)
 
--- | A little utility to tell if the home unit is indefinite
+-- | A little utility to tell if the home unit is definite
 -- (if it is, we should never use on-the-fly renaming.)
 homeUnitIsDefinite :: DynFlags -> Bool
 homeUnitIsDefinite dflags = unitIsDefinite (homeUnit dflags)
