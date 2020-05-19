@@ -857,9 +857,9 @@ emitPrimOp dflags = \case
     emitPrimCall [res] (MO_UF_Conv W64) [w]
 
 -- Atomic operations
-  InterlockedExchangeAddr -> \[src, value] -> opAllDone $ \[res] ->
+  InterlockedExchange_Addr -> \[src, value] -> opAllDone $ \[res] ->
     emitPrimCall [res] (MO_Xchg (wordWidth platform)) [src, value]
-  InterlockedExchangeInt -> \[src, value] -> opAllDone $ \[res] ->
+  InterlockedExchange_Int -> \[src, value] -> opAllDone $ \[res] ->
     emitPrimCall [res] (MO_Xchg (wordWidth platform)) [src, value]
 
 -- SIMD primops

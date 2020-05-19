@@ -1,5 +1,6 @@
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, RoleAnnotations #-}
+{-# LANGUAGE UnboxedTuples #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -169,9 +170,11 @@ castPtrToFunPtr (Ptr addr) = FunPtr addr
 -- Atomic operations for Ptr
 
 {-# INLINE exchangePtr #-}
-exchangePtr :: Ptr (Ptr a) -> Ptr b -> Ptr c
-exchangePtr (Ptr dst) (Ptr val)
-  = Ptr (interlockedExchangeAddr# dst val)
+exchangePtr :: Ptr (Ptr a) -> Ptr b -> IO (Ptr c)
+exchangePtr (Ptr dst) (Ptr val) =
+  IO $ \s ->
+      case (interlockedExchangeAddr# dst val s) of
+        (# s2, old_val #) -> (# s2, Ptr old_val #)
 
 ------------------------------------------------------------------------
 -- Show instances for Ptr and FunPtr
