@@ -205,3 +205,4 @@ test('T15892',
 test('T16617', normal, compile_and_run, [''])
 test('T16449_2', exit_code(0), compile_and_run, [''])
 test('T16846', [only_ways(['optasm']), exit_code(1)], compile_and_run, [''])
+test('cg_xchg001', normal, compile_and_run, [''])
