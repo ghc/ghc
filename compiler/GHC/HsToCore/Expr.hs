@@ -474,9 +474,9 @@ dsExpr (HsLet _ binds body) = do
 -- because the interpretation of `stmts' depends on what sort of thing it is.
 --
 dsExpr (HsDo res_ty ListComp (L _ stmts)) = dsListComp stmts res_ty
-dsExpr (HsDo _ DoExpr        (L _ stmts)) = dsDo stmts
-dsExpr (HsDo _ GhciStmtCtxt  (L _ stmts)) = dsDo stmts
-dsExpr (HsDo _ MDoExpr       (L _ stmts)) = dsDo stmts
+dsExpr (HsDo _ ctx@DoExpr{}      (L _ stmts)) = dsDo ctx stmts
+dsExpr (HsDo _ ctx@GhciStmtCtxt  (L _ stmts)) = dsDo ctx stmts
+dsExpr (HsDo _ ctx@MDoExpr{}     (L _ stmts)) = dsDo ctx stmts
 dsExpr (HsDo _ MonadComp     (L _ stmts)) = dsMonadComp stmts
 
 dsExpr (HsIf _ fun guard_expr then_expr else_expr)
@@ -968,8 +968,8 @@ handled in GHC.HsToCore.ListComp).  Basically does the translation given in the
 Haskell 98 report:
 -}
 
-dsDo :: [ExprLStmt GhcTc] -> DsM CoreExpr
-dsDo stmts
+dsDo :: HsStmtContext GhcRn -> [ExprLStmt GhcTc] -> DsM CoreExpr
+dsDo ctx stmts
   = goL stmts
   where
     goL [] = panic "dsDo"
@@ -993,7 +993,7 @@ dsDo stmts
       = do  { body     <- goL stmts
             ; rhs'     <- dsLExpr rhs
             ; var   <- selectSimpleMatchVarL (xbstc_boundResultMult xbs) pat
-            ; match <- matchSinglePatVar var (StmtCtxt DoExpr) pat
+            ; match <- matchSinglePatVar var (StmtCtxt ctx) pat
                          (xbstc_boundResultType xbs) (cantFailMatchResult body)
             ; match_code <- dsHandleMonadicFailure pat match (xbstc_failOp xbs)
             ; dsSyntaxExpr (xbstc_bindOp xbs) [rhs', Lam var match_code] }
@@ -1005,16 +1005,16 @@ dsDo stmts
 
                do_arg (ApplicativeArgOne fail_op pat expr _) =
                  ((pat, fail_op), dsLExpr expr)
-               do_arg (ApplicativeArgMany _ stmts ret pat) =
-                 ((pat, Nothing), dsDo (stmts ++ [noLoc $ mkLastStmt (noLoc ret)]))
+               do_arg (ApplicativeArgMany _ stmts ret pat _) =
+                 ((pat, Nothing), dsDo ctx (stmts ++ [noLoc $ mkLastStmt (noLoc ret)]))
 
            ; rhss' <- sequence rhss
 
-           ; body' <- dsLExpr $ noLoc $ HsDo body_ty DoExpr (noLoc stmts)
+           ; body' <- dsLExpr $ noLoc $ HsDo body_ty ctx (noLoc stmts)
 
            ; let match_args (pat, fail_op) (vs,body)
                    = do { var   <- selectSimpleMatchVarL Many pat
-                        ; match <- matchSinglePatVar var (StmtCtxt DoExpr) pat
+                        ; match <- matchSinglePatVar var (StmtCtxt ctx) pat
                                    body_ty (cantFailMatchResult body)
                         ; match_code <- dsHandleMonadicFailure pat match fail_op
                         ; return (var:vs, match_code)
@@ -1061,7 +1061,7 @@ dsDo stmts
                                , mg_origin = Generated })
         mfix_pat     = noLoc $ LazyPat noExtField $ mkBigLHsPatTupId rec_tup_pats
         body         = noLoc $ HsDo body_ty
-                                DoExpr (noLoc (rec_stmts ++ [ret_stmt]))
+                                ctx (noLoc (rec_stmts ++ [ret_stmt]))
         ret_app      = nlHsSyntaxApps return_op [mkBigLHsTupId rets]
         ret_stmt     = noLoc $ mkLastStmt ret_app
                      -- This LastStmt will be desugared with dsDo,
