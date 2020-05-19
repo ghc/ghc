@@ -43,6 +43,7 @@ data Extension
    | Arrows                   -- Arrow-notation syntax
    | TemplateHaskell
    | TemplateHaskellQuotes    -- subset of TH supported by stage1, no splice
+   | QualifiedDo
    | QuasiQuotes
    | ImplicitParams
    | ImplicitPrelude

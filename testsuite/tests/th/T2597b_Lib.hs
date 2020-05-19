@@ -6,4 +6,4 @@ import Language.Haskell.TH
 
 
 mkBug2 :: ExpQ
-mkBug2 = return $ DoE []
+mkBug2 = return $ DoE Nothing []
