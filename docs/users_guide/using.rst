@@ -1136,10 +1136,11 @@ Haddock
    single: haddock
 
 .. ghc-flag:: -haddock
-    :shortdesc: Make the parser more strict about Haddock comments.
+    :shortdesc: With this flag GHC will parse Haddock comments and include them
+      in the interface file it produces.
     :type: dynamic
     :reverse: -no-haddock
-    :category: misc
+    :category: haddock
 
     By default, GHC ignores Haddock comments (``-- | ...`` and ``-- ^ ...``)
     and does not check that they're associated with a valid term, such as a
