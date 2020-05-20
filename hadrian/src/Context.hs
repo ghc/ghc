@@ -61,9 +61,12 @@ libPath Context {..} = buildRoot <&> (-/- (stageString stage -/- "lib"))
 -- conventions (see 'cabalOsString' and 'cabalArchString').
 distDir :: Stage -> Action FilePath
 distDir st = do
+    let (os,arch) = case st of
+            Stage0 -> (HostOs , HostArch)
+            _      -> (TargetOs, TargetArch)
     version        <- ghcVersionStage st
-    hostOs         <- cabalOsString <$> setting BuildOs
-    hostArch       <- cabalArchString <$> setting BuildArch
+    hostOs         <- cabalOsString <$> setting os
+    hostArch       <- cabalArchString <$> setting arch
     return $ hostArch ++ "-" ++ hostOs ++ "-ghc-" ++ version
 
 pkgFileName :: Package -> String -> String -> Action FilePath
