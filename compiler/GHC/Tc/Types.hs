@@ -749,7 +749,8 @@ data TcLclEnv           -- Changes as we move inside an expression
   = TcLclEnv {
         tcl_loc        :: RealSrcSpan,     -- Source span
         tcl_ctxt       :: [ErrCtxt],       -- Error context, innermost on top
-        tcl_tclvl      :: TcLevel,         -- Birthplace for new unification variables
+        tcl_in_gen_code :: Bool,           -- See Note [Rebindable syntax and HsExpansion]
+        tcl_tclvl      :: TcLevel,
 
         tcl_th_ctxt    :: ThStage,         -- Template Haskell context
         tcl_th_bndrs   :: ThBindEnv,       -- and binder info

@@ -113,15 +113,22 @@ tcCheckExpr, tcCheckExprNC
 -- to do so himself.
 
 tcCheckExpr expr res_ty
-  = addExprErrCtxt (unLoc expr) $
-    tcCheckExprNC expr res_ty
+  = addExprCtxt expr $ tcCheckExprNC expr res_ty
 
 tcCheckExprNC (L loc expr) res_ty
-  = setSrcSpan loc $
+  = set_loc_and_ctxt loc expr $
     do { traceTc "tcCheckExprNC" (ppr res_ty)
        ; (wrap, expr') <- tcSkolemise GenSigCtxt res_ty $ \ _ res_ty ->
                           tcExpr expr (mkCheckExpType res_ty)
        ; return $ L loc (mkHsWrap wrap expr') }
+
+  where -- See Note [Rebindable syntax and HsExpansion), which describes
+        -- the logic behind this location/context tweaking.
+        set_loc_and_ctxt l e m = do
+          inGenCode <- inGeneratedCode
+          if inGenCode && not (isGeneratedSrcSpan l)
+            then setSrcSpan l $ addExprCtxt (L l e) m
+            else setSrcSpan l m
 
 ---------------
 tcInferSigma :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcSigmaType)
@@ -129,15 +136,15 @@ tcInferSigma :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcSigmaType)
 -- It goes against the principle of eager instantiation,
 -- so we expect very very few calls to this function
 -- Most clients will want tcInferRho
-tcInferSigma (L loc expr)
-  = addExprErrCtxt expr $ setSrcSpan loc $
+tcInferSigma le@(L loc expr)
+  = addExprCtxt le $ setSrcSpan loc $
     do { (fun, args, ty) <- tcInferApp expr
        ; return (L loc (applyHsArgs fun args), ty) }
 
 ---------------
 tcInferRho, tcInferRhoNC :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcRhoType)
 -- Infer a *rho*-type. The return type is always instantiated.
-tcInferRho le = addExprErrCtxt (unLoc le) (tcInferRhoNC le)
+tcInferRho le = addExprCtxt le (tcInferRhoNC le)
 
 tcInferRhoNC (L loc expr)
   = setSrcSpan loc $
@@ -162,7 +169,7 @@ tcLExpr, tcLExprNC
     -> TcM (LHsExpr GhcTc)
 
 tcLExpr expr res_ty
-  = addExprErrCtxt (unLoc expr) (tcLExprNC expr res_ty)
+  = setSrcSpan (getLoc expr) $ addExprCtxt expr (tcLExprNC expr res_ty)
 
 tcLExprNC (L loc expr) res_ty
   = setSrcSpan loc $
@@ -330,7 +337,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
   | (L loc (HsVar _ (L lv op_name))) <- op
   , op_name `hasKey` dollarIdKey        -- Note [Typing rule for ($)]
   = do { traceTc "Application rule" (ppr op)
-       ; (arg1', arg1_ty) <- addAppErrCtxt (unLoc op) (unLoc arg1) 1 $
+       ; (arg1', arg1_ty) <- addErrCtxt (funAppCtxt op arg1 1) $
                              tcInferRhoNC arg1
 
        ; let doc   = text "The first argument of ($) takes"
@@ -989,7 +996,7 @@ tcExpr e@(HsRnBracketOut _ brack ps) res_ty
 -- See Note [Rebindable syntax and HsExpansion].
 tcExpr (XExpr (HsExpanded a b)) t
   = fmap (XExpr . ExpansionExpr . HsExpanded a) $
-    tcExpr b t
+      setSrcSpan generatedSrcSpan (tcExpr b t)
 
 {-
 ************************************************************************
@@ -1224,15 +1231,8 @@ tcApp expr res_ty
          then tcTagToEnum expr fun args app_res_ty res_ty
          else -- The wildly common case
     do { let expr' = applyHsArgs fun args
-       ; maybeAddFunResCtxt fun app_res_ty res_ty $
+       ; addFunResCtxt True fun app_res_ty res_ty $
          tcWrapResult expr expr' app_res_ty res_ty } }
-
-  where
-    maybeAddFunResCtxt fun actual res
-      | Just l <- getFunLoc (snd $ collectHsArgs expr), l == noSrcSpan
-      = id
-      | otherwise
-      = addFunResCtxt True fun actual res
 
 ---------------------------
 tcInferApp :: HsExpr GhcRn
@@ -1302,7 +1302,7 @@ tcInferAppHead e
       ExprWithTySig _ e hs_ty -> add_ctxt $ tcExprWithSig e hs_ty
       _                       -> add_ctxt $ tcInfer (tcExpr e)
   where
-    add_ctxt thing = addExprErrCtxt e thing
+    add_ctxt thing = addErrCtxt (exprCtxt e) thing
 
 ----------------
 -- | Type-check the arguments to a function, possibly including visible type
@@ -1480,7 +1480,7 @@ tcArg :: HsExpr GhcRn                   -- The function (for error messages)
       -> Int                             -- # of argument
       -> TcM (LHsExpr GhcTc)           -- Resulting argument
 tcArg fun arg ty arg_no
-  = addAppErrCtxt fun (unLoc arg) arg_no $
+  = addErrCtxt (funAppCtxt fun arg arg_no) $
     do { traceTc "tcArg {" $
            vcat [ text "arg #" <> ppr arg_no <+> dcolon <+> ppr ty
                 , text "arg:" <+> ppr arg ]
@@ -2567,27 +2567,8 @@ fieldCtxt :: FieldLabelString -> SDoc
 fieldCtxt field_name
   = text "In the" <+> quotes (ppr field_name) <+> ptext (sLit "field of a record")
 
--- See Note [Rebindable syntax and HsExpansion].
-addAppErrCtxt
-  :: HsExpr GhcRn
-  -> HsExpr GhcRn
-  -> Int
-  -> TcM a
-  -> TcM a
-addAppErrCtxt fun arg arg_no =
-  addExprErrCtxt' arg (exprCtxt arg) (funAppCtxt fun arg arg_no)
-
--- See Note [Rebindable syntax and HsExpansion].
-addExprErrCtxt :: HsExpr GhcRn -> TcM a -> TcM a
-addExprErrCtxt e = addExprErrCtxt' e (exprCtxt e) (exprCtxt e)
-
-addExprErrCtxt' :: HsExpr GhcRn -> SDoc -> SDoc -> TcM a -> TcM a
-addExprErrCtxt' e expandedExprDoc otherDoc
-  = case e of
-      -- this is an expanded expression, we use the dedicated doc in the context
-      XExpr (HsExpanded{}) -> addErrCtxt expandedExprDoc
-      -- this is not an expanded expression, we just use the "standard" doc
-      _                    -> addErrCtxt otherDoc
+addExprCtxt :: LHsExpr GhcRn -> TcRn a -> TcRn a
+addExprCtxt e thing_inside = addErrCtxt (exprCtxt (unLoc e)) thing_inside
 
 exprCtxt :: HsExpr GhcRn -> SDoc
 exprCtxt expr = hang (text "In the expression:") 2 (ppr (stripParensHsExpr expr))

@@ -59,7 +59,7 @@ module GHC.Tc.Utils.Monad(
   addDependentFiles,
 
   -- * Error management
-  getSrcSpanM, setSrcSpan, addLocM,
+  getSrcSpanM, setSrcSpan, addLocM, inGeneratedCode,
   wrapLocM, wrapLocFstM, wrapLocSndM,wrapLocM_,
   getErrsVar, setErrsVar,
   addErr,
@@ -333,7 +333,9 @@ initTcWithGbl hsc_env gbl_env loc do_this
       ; errs_var     <- newIORef (emptyBag, emptyBag)
       ; let lcl_env = TcLclEnv {
                 tcl_errs       = errs_var,
-                tcl_loc        = loc,     -- Should be over-ridden very soon!
+                tcl_loc        = loc,
+                -- tcl_loc should be over-ridden very soon!
+                tcl_in_gen_code = False,
                 tcl_ctxt       = [],
                 tcl_rdr        = emptyLocalRdrEnv,
                 tcl_th_ctxt    = topStage,
@@ -825,11 +827,19 @@ getSrcSpanM :: TcRn SrcSpan
         -- Avoid clash with Name.getSrcLoc
 getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (tcl_loc env) Nothing) }
 
+-- See Note [Rebindable syntax and HsExpansion].
+inGeneratedCode :: TcRn Bool
+inGeneratedCode = tcl_in_gen_code <$> getLclEnv
+
 setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
-setSrcSpan (RealSrcSpan real_loc _) thing_inside
-    = updLclEnv (\env -> env { tcl_loc = real_loc }) thing_inside
--- Don't overwrite useful info with useless:
-setSrcSpan (UnhelpfulSpan _) thing_inside = thing_inside
+setSrcSpan (RealSrcSpan loc _) thing_inside =
+  updLclEnv (\env -> env { tcl_loc = loc, tcl_in_gen_code = False })
+            thing_inside
+setSrcSpan loc@(UnhelpfulSpan _) thing_inside
+  -- See Note [Rebindable syntax and HsExpansion].
+  | isGeneratedSrcSpan loc =
+      updLclEnv (\env -> env { tcl_in_gen_code = True }) thing_inside
+  | otherwise = thing_inside
 
 addLocM :: (a -> TcM b) -> Located a -> TcM b
 addLocM fn (L loc a) = setSrcSpan loc $ fn a
@@ -1009,7 +1019,11 @@ addErrCtxt msg = addErrCtxtM (\env -> return (env, msg))
 
 -- | Add a message to the error context. This message may do tidying.
 addErrCtxtM :: (TidyEnv -> TcM (TidyEnv, MsgDoc)) -> TcM a -> TcM a
-addErrCtxtM ctxt = updCtxt (\ ctxts -> (False, ctxt) : ctxts)
+addErrCtxtM ctxt m = do
+  shouldPushCtxt <- not <$> inGeneratedCode
+  if shouldPushCtxt
+    then updCtxt (\ ctxts -> (False, ctxt) : ctxts) m
+    else m
 
 -- | Add a fixed landmark message to the error context. A landmark
 -- message is always sure to be reported, even if there is a lot of
@@ -1021,7 +1035,11 @@ addLandmarkErrCtxt msg = addLandmarkErrCtxtM (\env -> return (env, msg))
 -- | Variant of 'addLandmarkErrCtxt' that allows for monadic operations
 -- and tidying.
 addLandmarkErrCtxtM :: (TidyEnv -> TcM (TidyEnv, MsgDoc)) -> TcM a -> TcM a
-addLandmarkErrCtxtM ctxt = updCtxt (\ctxts -> (True, ctxt) : ctxts)
+addLandmarkErrCtxtM ctxt m = do
+  shouldPushCtxt <- not <$> inGeneratedCode
+  if shouldPushCtxt
+    then updCtxt (\ctxts -> (True, ctxt) : ctxts) m
+    else m
 
 -- Helper function for the above
 updCtxt :: ([ErrCtxt] -> [ErrCtxt]) -> TcM a -> TcM a
@@ -1668,8 +1686,8 @@ emitNamedWildCardHoleConstraints wcs
        where
          real_span = case nameSrcSpan name of
                            RealSrcSpan span _ -> span
-                           UnhelpfulSpan str -> pprPanic "emitNamedWildCardHoleConstraints"
-                                                      (ppr name <+> quotes (ftext str))
+                           UnhelpfulSpan r    -> pprPanic "emitNamedWildCardHoleConstraints"
+                                                      (ppr name <+> quotes (pprUnhelpfulSpanReason r))
                -- Wildcards are defined locally, and so have RealSrcSpans
          ct_loc' = setCtLocSpan ct_loc real_span
 
