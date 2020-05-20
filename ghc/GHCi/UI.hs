@@ -58,7 +58,7 @@ import GHC.Driver.Types ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, 
 import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Unit.State   ( unitIsTrusted, unsafeLookupUnit, unsafeLookupUnitId,
-                          listVisibleModuleNames, pprFlag )
+                          listVisibleModuleNames, pprFlag, preloadUnits )
 import GHC.Iface.Syntax ( showToHeader )
 import GHC.Core.Ppr.TyThing
 import GHC.Builtin.Names
@@ -2934,7 +2934,7 @@ newDynFlags interactive_only minus_opts = do
 
       when (not interactive_only) $ do
         (dflags1, _, _) <- liftIO $ GHC.parseDynamicFlags dflags0 lopts
-        new_pkgs <- GHC.setProgramDynFlags dflags1
+        must_reload <- GHC.setProgramDynFlags dflags1
 
         -- if the package flags changed, reset the context and link
         -- the new packages.
@@ -2946,7 +2946,9 @@ newDynFlags interactive_only minus_opts = do
               "package flags have changed, resetting and loading new packages..."
           -- delete targets and all eventually defined breakpoints. (#1620)
           clearAllTargets
-          liftIO $ linkPackages hsc_env new_pkgs
+          when must_reload $ do
+            let units = preloadUnits (unitState dflags2)
+            liftIO $ linkPackages hsc_env units
           -- package flags changed, we can't re-use any of the old context
           setContextAfterLoad False []
           -- and copy the package state to the interactive DynFlags
