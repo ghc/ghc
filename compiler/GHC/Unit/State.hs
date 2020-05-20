@@ -576,18 +576,15 @@ initUnits :: DynFlags -> IO (DynFlags, [UnitId])
 initUnits dflags = do
 
   let forceUnitInfoMap (state, _) = unitInfoMap state `seq` ()
-  (state,dbs) <- withTiming dflags
-                                (text "initializing package database")
-                                forceUnitInfoMap $ do
+  let ctx     = initSDocContext dflags defaultUserStyle -- SDocContext used to render exception messages
+  let printer = debugTraceMsg dflags                    -- printer for trace messages
 
-    let ctx     = initSDocContext dflags defaultUserStyle -- SDocContext used to render exception messages
-    let printer = debugTraceMsg dflags                    -- printer for trace messages
-    let cfg     = initUnitConfig dflags                   -- unit configuration
-    mkUnitState ctx printer cfg
+  (state,dbs) <- withTiming dflags (text "initializing unit database")
+                   forceUnitInfoMap
+                   (mkUnitState ctx printer (initUnitConfig dflags))
 
-  dumpIfSet_dyn (dflags { pprCols = 200 }) Opt_D_dump_mod_map "Mod Map"
-    FormatText
-    (pprModuleMap (moduleNameProvidersMap state))
+  dumpIfSet_dyn (dflags { pprCols = 200 }) Opt_D_dump_mod_map "Module Map"
+    FormatText (pprModuleMap (moduleNameProvidersMap state))
 
   let dflags'  = dflags
                   { unitDatabases = Just dbs -- databases are cached and never read again
