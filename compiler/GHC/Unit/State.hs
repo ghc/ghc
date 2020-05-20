@@ -570,7 +570,7 @@ initUnits :: DynFlags -> IO (DynFlags, [UnitId])
 initUnits dflags = do
 
   let forceUnitInfoMap (state, _) = unitInfoMap state `seq` ()
-  (state,raw_dbs) <- withTiming dflags
+  (state,dbs) <- withTiming dflags
                                 (text "initializing package database")
                                 forceUnitInfoMap $ do
 
@@ -581,22 +581,14 @@ initUnits dflags = do
     let printer = debugTraceMsg dflags
 
     -- read the databases if they have not been already read
-    raw_dbs <- case unitDatabases dflags of
+    dbs <- case unitDatabases dflags of
           Nothing  -> readUnitDatabases printer cfg
           Just dbs -> return dbs
-
-    -- distrust all units if the flag is set
-    let distrust_all db = db { unitDatabaseUnits = distrustAllUnits (unitDatabaseUnits db) }
-        dbs
-           | unitConfigDistrustAll cfg
-           = map distrust_all raw_dbs
-           | otherwise
-           = raw_dbs
 
     -- create the UnitState
     state <- mkUnitState ctx (printer 2) cfg dbs
 
-    return (state, raw_dbs)
+    return (state, dbs)
 
   dumpIfSet_dyn (dflags { pprCols = 200 }) Opt_D_dump_mod_map "Mod Map"
     FormatText
@@ -608,7 +600,7 @@ initUnits dflags = do
       unwiredInsts = homeUnitInstantiations dflags
       wiredInsts   = map (fmap (upd_wired_in_mod wiringMap)) unwiredInsts
 
-  return (dflags{ unitDatabases          = Just raw_dbs,
+  return (dflags{ unitDatabases          = Just dbs,
                   unitState              = state,
                   homeUnitInstantiations = wiredInsts },
           (preloadUnits state))
@@ -1443,7 +1435,7 @@ mkUnitState
     -- the command line (later databases shadow earlier ones)
     -> [UnitDatabase UnitId]
     -> IO UnitState
-mkUnitState ctx printer cfg dbs = do
+mkUnitState ctx printer cfg raw_dbs = do
 {-
    Plan.
 
@@ -1496,6 +1488,13 @@ mkUnitState ctx printer cfg dbs = do
        d) finally, using the visibility map and the package database,
           we build a mapping saying what every in scope module name points to.
 -}
+
+
+  -- distrust all units if the flag is set
+  let distrust_all db = db { unitDatabaseUnits = distrustAllUnits (unitDatabaseUnits db) }
+      dbs | unitConfigDistrustAll cfg = map distrust_all raw_dbs
+          | otherwise                 = raw_dbs
+
 
   -- This, and the other reverse's that you will see, are due to the fact that
   -- packageFlags, pluginPackageFlags, etc. are all specified in *reverse* order
