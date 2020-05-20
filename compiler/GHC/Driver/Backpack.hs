@@ -203,8 +203,7 @@ withBkpSession cid insts deps session_type do_this = do
       } )) $ do
         dflags <- getSessionDynFlags
         -- pprTrace "flags" (ppr insts <> ppr deps) $ return ()
-        -- Calls initUnits
-        _ <- setSessionDynFlags dflags
+        setSessionDynFlags dflags -- calls initUnits
         do_this
 
 withBkpExeSession :: [(Unit, ModRenaming)] -> BkpM a -> BkpM a
@@ -392,8 +391,7 @@ addPackage pkg = do
                { unitDatabasePath  = "(in memory " ++ showSDoc dflags (ppr (unitId pkg)) ++ ")"
                , unitDatabaseUnits = [pkg]
                }
-         _ <- GHC.setSessionDynFlags (dflags { unitDatabases = Just (dbs ++ [newdb]) })
-         return ()
+         GHC.setSessionDynFlags (dflags { unitDatabases = Just (dbs ++ [newdb]) })
 
 compileInclude :: Int -> (Int, Unit) -> BkpM ()
 compileInclude n (i, uid) = do
