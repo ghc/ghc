@@ -410,6 +410,7 @@ pprUFMWithKeys ufm pp = pp (nonDetUFMToList ufm)
 
 -- | Determines the pluralisation suffix appropriate for the length of a set
 -- in the same way that plural from Outputable does for lists.
+{-# INLINE pluralUFM #-}
 pluralUFM :: String -> UniqFM a -> SDoc
 pluralUFM s ufm
   | sizeUFM ufm == 1 = text s
