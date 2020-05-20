@@ -183,7 +183,7 @@ showTerm term = do
                          showPpr dflags bname ++
                       ") :: Prelude.IO Prelude.String"
                dl   = hsc_dynLinker hsc_env
-           _ <- GHC.setSessionDynFlags dflags{log_action=noop_log}
+           GHC.setSessionDynFlags dflags{log_action=noop_log}
            txt_ <- withExtendedLinkEnv dl
                                        [(bname, fhv)]
                                        (GHC.compileExprRemote expr)
