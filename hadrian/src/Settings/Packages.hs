@@ -23,6 +23,10 @@ packageArgs = do
         -- See: https://gitlab.haskell.org/ghc/ghc/issues/16809.
         cross = flag CrossCompiling
 
+        -- Check if the bootstrap compiler has the same version as the one we
+        -- are building. This is used to build cross-compilers
+        bootCross = (==) <$> ghcVersionStage Stage0 <*> ghcVersionStage Stage1
+
     mconcat
         --------------------------------- base ---------------------------------
         [ package base ? mconcat
@@ -128,22 +132,37 @@ packageArgs = do
             input "**/cbits/atomic.c"  ? arg "-Wno-sync-nand" ]
 
         --------------------------------- ghci ---------------------------------
-        -- TODO: This should not be @not <$> flag CrossCompiling@. Instead we
-        -- should ensure that the bootstrap compiler has the same version as the
-        -- one we are building.
-
-        -- TODO: In that case we also do not need to build most of the Stage1
-        -- libraries, as we already know that the compiler comes with the most
-        -- recent versions.
-
-        -- TODO: The use case here is that we want to build @ghc-proxy@ for the
-        -- cross compiler. That one needs to be compiled by the bootstrap
-        -- compiler as it needs to run on the host. Hence @libiserv@ needs
-        -- @GHCi.TH@, @GHCi.Message@ and @GHCi.Run@ from @ghci@. And those are
-        -- behind the @-fghci@ flag.
         , package ghci ? mconcat
           [ notStage0 ? builder (Cabal Flags) ? arg "ghci"
-          , cross ? stage0 ? builder (Cabal Flags) ? arg "ghci" ]
+
+          -- The use case here is that we want to build @ghc-proxy@ for the
+          -- cross compiler. That one needs to be compiled by the bootstrap
+          -- compiler as it needs to run on the host. Hence @libiserv@ needs
+          -- @GHCi.TH@, @GHCi.Message@ and @GHCi.Run@ from @ghci@. And those are
+          -- behind the @-fghci@ flag.
+          --
+          -- But it may not build if we have made some changes to ghci's
+          -- dependencies (see #16051).
+          --
+          -- To fix this properly Hadrian would need to:
+          --   * first build a compiler for the build platform (stage1 is enough)
+          --   * use it as a bootstrap compiler to build the stage1 cross-compiler
+          --
+          -- The issue is that "configure" would have to be executed twice (for
+          -- the build platform and for the cross-platform) and Hadrian would
+          -- need to be fixed to support two different stage1 compilers.
+          --
+          -- The workaround we use is to check if the bootstrap compiler has
+          -- the same version as the one we are building. In this case we can
+          -- avoid the first step above and directly build with `-fghci`.
+          --
+          -- TODO: Note that in that case we also do not need to build most of
+          -- the Stage1 libraries, as we already know that the bootstrap
+          -- compiler comes with the same versions as the one we are building.
+          --
+          , cross ? stage0 ? bootCross ? builder (Cabal Flags) ? arg "ghci"
+
+          ]
 
         --------------------------------- iserv --------------------------------
         -- Add -Wl,--export-dynamic enables GHCi to load dynamic objects that
