@@ -1008,6 +1008,15 @@ data TickTransState = TT { tickBoxCount:: !Int
                          , ccIndices   :: !CostCentreState
                          }
 
+addMixEntry :: MixEntry_ -> TM Int
+addMixEntry ent = do
+  c <- tickBoxCount <$> getState
+  setState $ \st ->
+    st { tickBoxCount = c + 1
+       , mixEntries = ent : mixEntries st
+       }
+  return c
+
 data TickTransEnv = TTE { fileName     :: FastString
                         , density      :: TickDensity
                         , tte_dflags   :: DynFlags
@@ -1205,11 +1214,7 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path = do
   dflags <- getDynFlags
   env <- getEnv
   case tickishType env of
-    HpcTicks -> do
-      c <- liftM tickBoxCount getState
-      setState $ \st -> st { tickBoxCount = c + 1
-                           , mixEntries = me : mixEntries st }
-      return $ HpcTick (this_mod env) c
+    HpcTicks -> HpcTick (this_mod env) <$> addMixEntry me
 
     ProfNotes -> do
       let nm = mkFastString cc_name
@@ -1218,11 +1223,7 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path = do
           count = countEntries && gopt Opt_ProfCountEntries dflags
       return $ ProfNote cc count True{-scopes-}
 
-    Breakpoints -> do
-      c <- liftM tickBoxCount getState
-      setState $ \st -> st { tickBoxCount = c + 1
-                           , mixEntries = me:mixEntries st }
-      return $ Breakpoint c ids
+    Breakpoints -> Breakpoint <$> addMixEntry me <*> pure ids
 
     SourceNotes | RealSrcSpan pos' _ <- pos ->
       return $ SourceNote pos' cc_name
@@ -1243,22 +1244,15 @@ allocBinTickBox boxLabel pos m = do
 
 mkBinTickBoxHpc :: (Bool -> BoxLabel) -> SrcSpan -> LHsExpr GhcTc
                 -> TM (LHsExpr GhcTc)
-mkBinTickBoxHpc boxLabel pos e =
- TM $ \ env st ->
-  let meT = (pos,declPath env, [],boxLabel True)
-      meF = (pos,declPath env, [],boxLabel False)
-      meE = (pos,declPath env, [],ExpBox False)
-      c = tickBoxCount st
-      mes = mixEntries st
-  in
-     ( L pos $ HsTick noExtField (HpcTick (this_mod env) c)
-          $ L pos $ HsBinTick noExtField (c+1) (c+2) e
-   -- notice that F and T are reversed,
-   -- because we are building the list in
-   -- reverse...
-     , noFVs
-     , st {tickBoxCount=c+3 , mixEntries=meF:meT:meE:mes}
-     )
+mkBinTickBoxHpc boxLabel pos e = do
+  env <- getEnv
+  binTick <- HsBinTick noExtField
+    <$> addMixEntry (pos,declPath env, [],boxLabel True)
+    <*> addMixEntry (pos,declPath env, [],boxLabel False)
+    <*> pure e
+  tick <- HpcTick (this_mod env)
+    <$> addMixEntry (pos,declPath env, [],ExpBox False)
+  return $ L pos $ HsTick noExtField tick (L pos binTick)
 
 mkHpcPos :: SrcSpan -> HpcPos
 mkHpcPos pos@(RealSrcSpan s _)
