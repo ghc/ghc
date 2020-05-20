@@ -331,7 +331,7 @@ code (either C or assembly), or generating interface files.
 -- To display an 'SDoc', use 'printSDoc', 'printSDocLn', 'bufLeftRenderSDoc',
 -- or 'renderWithStyle'.  Avoid calling 'runSDoc' directly as it breaks the
 -- abstraction layer.
-newtype SDoc = SDoc { runSDoc :: SDocContext -> Doc }
+newtype SDoc = SDoc { runSDoc :: SDocContext -> (Doc, (Bool, Bool)) }
 
 data SDocContext = SDC
   { sdocStyle                       :: !PprStyle
@@ -385,7 +385,7 @@ withPprStyle sty d = SDoc $ \ctxt -> runSDoc d ctxt{sdocStyle=sty}
 
 pprDeeper :: SDoc -> SDoc
 pprDeeper d = SDoc $ \ctx -> case ctx of
-  SDC{sdocStyle=PprUser _ (PartWay 0) _} -> Pretty.text "..."
+  SDC{sdocStyle=PprUser _ (PartWay 0) _} -> (Pretty.text "...", (False, False))
   SDC{sdocStyle=PprUser q (PartWay n) c} ->
     runSDoc d ctx{sdocStyle = PprUser q (PartWay (n-1)) c}
   _ -> runSDoc d ctx
@@ -410,9 +410,10 @@ pprSetDepth :: Depth -> SDoc -> SDoc
 pprSetDepth depth doc = SDoc $ \ctx ->
     case ctx of
         SDC{sdocStyle=PprUser q _ c} ->
-            runSDoc doc ctx{sdocStyle = PprUser q depth c}
+            (runSDoc doc ctx{sdocStyle = PprUser q depth c}
+            , (False, False))
         _ ->
-            runSDoc doc ctx
+            (runSDoc doc ctx, (False, False))
 
 getPprStyle :: (PprStyle -> SDoc) -> SDoc
 getPprStyle df = SDoc $ \ctx -> runSDoc (df (sdocStyle ctx)) ctx
@@ -588,7 +589,7 @@ isEmpty :: SDocContext -> SDoc -> Bool
 isEmpty ctx sdoc = Pretty.isEmpty $ runSDoc sdoc (ctx {sdocStyle = PprDebug})
 
 docToSDoc :: Doc -> SDoc
-docToSDoc d = SDoc (\_ -> d)
+docToSDoc d = SDoc (\_ -> (d, (False, False))
 
 empty    :: SDoc
 char     :: Char       -> SDoc
@@ -630,15 +631,15 @@ doublePrec p n = text (showFFloat (Just p) n "")
 parens, braces, brackets, quotes, quote,
         doubleQuotes, angleBrackets :: SDoc -> SDoc
 
-parens d        = SDoc $ Pretty.parens . runSDoc d
-braces d        = SDoc $ Pretty.braces . runSDoc d
-brackets d      = SDoc $ Pretty.brackets . runSDoc d
-quote d         = SDoc $ Pretty.quote . runSDoc d
-doubleQuotes d  = SDoc $ Pretty.doubleQuotes . runSDoc d
+parens d        = SDoc $ (\(d', ms) -> (Pretty.parens d', ms)) . runSDoc d
+braces d        = SDoc $ (\(d', ms) -> (Pretty.braces d', ms)) . runSDoc d
+brackets d      = SDoc $ (\(d', ms) -> (Pretty.brackets d', ms)) . runSDoc d
+quote d         = SDoc $ (\(d', ms) -> (Pretty.quote d', ms)) . runSDoc d
+doubleQuotes d  = SDoc $ (\(d', ms) -> (Pretty.doubleQuotes d', ms)) . runSDoc d
 angleBrackets d = char '<' <> d <> char '>'
 
 cparen :: Bool -> SDoc -> SDoc
-cparen b d = SDoc $ Pretty.maybeParens b . runSDoc d
+cparen b d = SDoc $ (\(d', ms) -> (Pretty.maybeParens b d', ms)) . runSDoc d
 
 -- 'quotes' encloses something in single quotes...
 -- but it omits them if the thing begins or ends in a single quote
@@ -646,12 +647,12 @@ cparen b d = SDoc $ Pretty.maybeParens b . runSDoc d
 quotes d = sdocOption sdocCanUseUnicode $ \case
    True  -> char '‘' <> d <> char '’'
    False -> SDoc $ \sty ->
-      let pp_d = runSDoc d sty
+      let (pp_d, ms) = runSDoc d sty
           str  = show pp_d
       in case (str, lastMaybe str) of
-        (_, Just '\'') -> pp_d
-        ('\'' : _, _)       -> pp_d
-        _other              -> Pretty.quotes pp_d
+        (_, Just '\'') -> (pp_d, ms)
+        ('\'' : _, _)       -> (pp_d, ms)
+        _other              -> (Pretty.quotes pp_d, ms)
 
 semi, comma, colon, equals, space, dcolon, underscore, dot, vbar :: SDoc
 arrow, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt :: SDoc
@@ -670,7 +671,7 @@ semi       = docToSDoc $ Pretty.semi
 comma      = docToSDoc $ Pretty.comma
 colon      = docToSDoc $ Pretty.colon
 equals     = docToSDoc $ Pretty.equals
-space      = docToSDoc $ Pretty.space
+space      = SDoc $ \ctx -> (Pretty.empty, (True, True))
 underscore = char '_'
 dot        = char '.'
 vbar       = char '|'
@@ -715,13 +716,22 @@ nest :: Int -> SDoc -> SDoc
 -- ^ Join two 'SDoc' together vertically
 
 nest n d    = SDoc $ Pretty.nest n . runSDoc d
-(<+>) d1 d2 = SDoc $ \sty -> (Pretty.<+>) (runSDoc d1 sty) (runSDoc d2 sty)
+--(<+>) d1 d2 = SDoc $ \sty -> (Pretty.<+>) (runSDoc d1 sty) (runSDoc d2 sty)
+(<+>) d1 d2 = d1 <> space <> d2
 ($$) d1 d2  = SDoc $ \sty -> (Pretty.$$)  (runSDoc d1 sty) (runSDoc d2 sty)
 ($+$) d1 d2 = SDoc $ \sty -> (Pretty.$+$) (runSDoc d1 sty) (runSDoc d2 sty)
 
 -- | Join two 'SDoc' together horizontally without a gap
 instance Semigroup SDoc where
-  d1 <> d2 = SDoc $ \sty -> runSDoc d1 sty <> runSDoc d2 sty
+  d1 <> d2 = SDoc $ \sty ->
+    let
+      (s1, (lm1, rm1)) = runSDoc d1 sty
+      (s2, (lm2, rm2)) = runSDoc d2 sty
+      m = if rm1 || lm2 then Pretty.space else Pretty.empty
+    in (s1 <> m <> s2, (lm1, rm2))
+
+instance Monoid SDoc where
+  mempty = empty
 
 hcat :: [SDoc] -> SDoc
 -- ^ Concatenate 'SDoc' horizontally
@@ -1184,6 +1194,7 @@ speakNOf n d = speakN n <+> d <> char 's'               -- E.g. "three arguments
 -- > plural [] = char 's'
 -- > plural ["Hello"] = empty
 -- > plural ["Hello", "World"] = char 's'
+{-# INLINE plural #-}
 plural :: String -> [a] -> SDoc
 plural s [_] = text s  -- a bit frightening, but there you are
 plural s _   = text (s ++ "s")

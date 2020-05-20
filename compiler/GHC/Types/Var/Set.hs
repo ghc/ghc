@@ -196,6 +196,7 @@ seqVarSet s = sizeVarSet s `seq` ()
 
 -- | Determines the pluralisation suffix appropriate for the length of a set
 -- in the same way that plural from Outputable does for lists.
+{-# INLINE pluralVarSet #-}
 pluralVarSet :: String -> VarSet -> SDoc
 pluralVarSet s = pluralUFM s . getUniqSet
 
