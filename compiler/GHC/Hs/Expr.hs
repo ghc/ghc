@@ -670,12 +670,12 @@ type instance XPragE         (GhcPass _) = NoExtField
 type instance XXExpr         GhcPs       = NoExtCon
 
 -- See Note [Rebindable syntax and HsExpansion] below
-type instance XXExpr         GhcRn       = HsExpansion (LHsExpr GhcPs)
+type instance XXExpr         GhcRn       = HsExpansion (HsExpr GhcPs)
                                                        (HsExpr GhcRn)
 type instance XXExpr         GhcTc       = XXExprGhcTc
 
 data XXExprGhcTc = WrapExpr (HsWrap HsExpr)
-                 | ExpansionExpr (HsExpansion (LHsExpr GhcPs) (HsExpr GhcTc))
+                 | ExpansionExpr (HsExpansion (HsExpr GhcPs) (HsExpr GhcTc))
 
 
 {-
@@ -719,14 +719,20 @@ second field. The resulting renamed AST would look like:
 
     L locif (XExpr
       (HsExpanded
-        (L locif (HsIf (L loca 'a')
-                       (L loctrue ())
-                       (L locfalse True)
-                 )
+        (HsIf (L loca 'a')
+              (L loctrue ())
+              (L locfalse True)
         )
-        (((L ... (Var ifThenElse) `App` L loca 'a')
-                                  `App` L loctrue ())
-                                  `App` L locfalse True
+        (App (L generatedSrcSpan
+                (App (L generatedSrcSpan
+                        (App (L generatedSrcSpan (Var ifThenElse))
+                             (L loca 'a')
+                        )
+                     )
+                     (L loctrue ())
+                )
+             )
+             (L locfalse True)
         )
       )
     )
@@ -743,27 +749,17 @@ implementation of rebindable syntax. The key idea is to decorate
 some elements of the desugared expression so as to be able to
 give them a special treatment when typechecking the desugared
 expression, to print a different context line or skip one
-altogether:
+altogether.
 
-- Since the HsExpanded nodes store an 'HsExpr GhcRn' for the
-  desugared expression (with no location attached), and expression
-  contexts are only pushed by functions that take a located
-  expression, we cannot push the toplevel desugared expression,
-  by construction, since we call tcExpr on it.
-
-- Once we enter the desugared expression, we are typechecking
-  applications of 'ifThenElse', using tcApp/tcArgs/tcArg. In
-  order to avoid "in the Nth argument of ifThenElse", we decorate
-  all the subexpressions of the original 'if' in HsExpanded, so
-  that when they are processed by tcArg, we push a normal expression
-  context ("In the expression [...]") instead of the aforementioned
-  one.
-
-- We also decorate the HsVar of ifThenElse with a "fake" source span
-  (noSrcSpan) and give a special treatment to such functions calls
-  when typechecking the return type of the application, in order to
-  omit the "too few/many arguments" context line altogether, in
-  tcApp.
+Whenever we 'setSrcSpan' a 'generatedSrcSpan', we update a field in
+TcLclEnv called 'tcl_in_gen_code', setting it to True, which indicates that we
+entered generated code, i.e code fabricated by the compiler when rebinding some
+syntax. If someone tries to push some error context line while that field is set
+to True, the pushing won't actually happen and the context line is just dropped.
+Once we 'setSrcSpan' a real span (for an expression that was in the original
+source code), we set 'tcl_in_gen_code' back to False, indicating that we
+"emerged from the generated code tunnel", and that the expressions we will be
+processing are relevant to report in context lines again.
 
 -}
 
@@ -784,13 +780,13 @@ data HsExpansion a b
 --
 --   See Note [Rebindable Syntax and HsExpansion] above for more details.
 mkExpanded
-  :: (HsExpansion (Located a) b -> b) -- ^ XExpr, XCmd, ...
-  -> Located a                        -- ^ source expression ('GhcPs')
-  -> b                                -- ^ "desugared" expression
-                                      --   ('GhcRn')
-  -> Located b                        -- ^ suitably wrapped
-                                      --   'HsExpansion'
-mkExpanded xwrap a b = L (getLoc a) $ xwrap (HsExpanded a b)
+  :: (HsExpansion a b -> b) -- ^ XExpr, XCmd, ...
+  -> a                      -- ^ source expression ('GhcPs')
+  -> b                      -- ^ "desugared" expression
+                            --   ('GhcRn')
+  -> b                      -- ^ suitably wrapped
+                            --   'HsExpansion'
+mkExpanded xwrap a b = xwrap (HsExpanded a b)
 
 -- | Just print the original expression (the @a@).
 instance Outputable a => Outputable (HsExpansion a b) where
@@ -1227,8 +1223,8 @@ ppr_infix_expr (HsRecFld _ f)       = Just (pprInfixOcc f)
 ppr_infix_expr (HsUnboundVar _ occ) = Just (pprInfixOcc occ)
 ppr_infix_expr (XExpr x)            = case (ghcPass @p, x) of
   (GhcTc, WrapExpr (HsWrap _ e))          -> ppr_infix_expr e
-  (GhcTc, ExpansionExpr (HsExpanded a _)) -> ppr_infix_expr (unLoc a)
-  (GhcRn, HsExpanded a _)                 -> ppr_infix_expr (unLoc a)
+  (GhcTc, ExpansionExpr (HsExpanded a _)) -> ppr_infix_expr a
+  (GhcRn, HsExpanded a _)                 -> ppr_infix_expr a
   (GhcPs, _)                              -> Nothing
 ppr_infix_expr _ = Nothing
 
@@ -1332,9 +1328,9 @@ hsExprNeedsParens p = go
       | GhcTc <- ghcPass @p
       = case x of
           WrapExpr      (HsWrap _ e)     -> go e
-          ExpansionExpr (HsExpanded a _) -> hsExprNeedsParens p (unLoc a)
+          ExpansionExpr (HsExpanded a _) -> hsExprNeedsParens p a
       | GhcRn <- ghcPass @p
-      = case x of HsExpanded a _ -> hsExprNeedsParens p (unLoc a)
+      = case x of HsExpanded a _ -> hsExprNeedsParens p a
       | otherwise
       = True
 
@@ -1368,9 +1364,9 @@ isAtomicHsExpr (HsRecFld{})      = True
 isAtomicHsExpr (XExpr x)
   | GhcTc <- ghcPass @p          = case x of
       WrapExpr      (HsWrap _ e)     -> isAtomicHsExpr e
-      ExpansionExpr (HsExpanded a _) -> isAtomicHsExpr (unLoc a)
+      ExpansionExpr (HsExpanded a _) -> isAtomicHsExpr a
   | GhcRn <- ghcPass @p          = case x of
-      HsExpanded a _         -> isAtomicHsExpr (unLoc a)
+      HsExpanded a _         -> isAtomicHsExpr a
 isAtomicHsExpr _                 = False
 
 instance Outputable (HsPragE (GhcPass p)) where

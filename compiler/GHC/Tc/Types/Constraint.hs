@@ -1791,7 +1791,8 @@ ctLocTypeOrKind_maybe :: CtLoc -> Maybe TypeOrKind
 ctLocTypeOrKind_maybe = ctl_t_or_k
 
 setCtLocSpan :: CtLoc -> RealSrcSpan -> CtLoc
-setCtLocSpan ctl@(CtLoc { ctl_env = lcl }) loc = setCtLocEnv ctl (setLclEnvLoc lcl loc)
+setCtLocSpan ctl@(CtLoc { ctl_env = lcl }) loc
+  = setCtLocEnv ctl (setLclEnvLoc lcl loc)
 
 bumpCtLocDepth :: CtLoc -> CtLoc
 bumpCtLocDepth loc@(CtLoc { ctl_depth = d }) = loc { ctl_depth = bumpSubGoalDepth d }

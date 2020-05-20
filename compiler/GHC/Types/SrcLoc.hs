@@ -42,7 +42,7 @@ module GHC.Types.SrcLoc (
 
         -- ** Constructing SrcSpan
         mkGeneralSrcSpan, mkSrcSpan, mkRealSrcSpan,
-        noSrcSpan,
+        noSrcSpan, generatedSrcSpan, isGeneratedSrcSpan,
         wiredInSrcSpan,         -- Something wired into the compiler
         interactiveSrcSpan,
         srcLocSpan, realSrcLocSpan,
@@ -344,10 +344,14 @@ instance NFData SrcSpan where
   rnf x = x `seq` ()
 
 -- | Built-in "bad" 'SrcSpan's for common sources of location uncertainty
-noSrcSpan, wiredInSrcSpan, interactiveSrcSpan :: SrcSpan
+noSrcSpan, generatedSrcSpan, wiredInSrcSpan, interactiveSrcSpan :: SrcSpan
 noSrcSpan          = UnhelpfulSpan (fsLit "<no location info>")
 wiredInSrcSpan     = UnhelpfulSpan (fsLit "<wired into compiler>")
 interactiveSrcSpan = UnhelpfulSpan (fsLit "<interactive>")
+generatedSrcSpan   = UnhelpfulSpan (fsLit "<generated code>")
+
+isGeneratedSrcSpan :: SrcSpan -> Bool
+isGeneratedSrcSpan = (==generatedSrcSpan)
 
 -- | Create a "bad" 'SrcSpan' that has not location information
 mkGeneralSrcSpan :: FastString -> SrcSpan
