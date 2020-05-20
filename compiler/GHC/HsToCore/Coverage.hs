@@ -1003,7 +1003,7 @@ addTickArithSeqInfo (FromThenTo e1 e2 e3) =
                 (addTickLHsExpr e2)
                 (addTickLHsExpr e3)
 
-data TickTransState = TT { tickBoxCount:: Int
+data TickTransState = TT { tickBoxCount:: !Int
                          , mixEntries  :: [MixEntry_]
                          , ccIndices   :: CostCentreState
                          }
