@@ -79,6 +79,13 @@ Language
 
   This change prepares the way for Quick Look impredicativity.
 
+* GHC now allows users to manually define the specificity of type variable
+  binders. By marking a variable with braces ``{tyvar}`` or ``{tyvar :: kind}``,
+  it becomes inferred despite appearing in a type signature. This feature
+  effectively allows users to choose which variables can or can't be
+  instantiated through visible type application. More information can be found
+  here: :ref:`Manually-defining-inferred-variables`.
+  
 Compiler
 ~~~~~~~~
 
@@ -86,6 +93,9 @@ Compiler
 GHCi
 ~~~~
 
+- The ``:script`` command now allows for file names that contain spaces to
+  passed as arguments: either by enclosing the file names in double quotes or by
+  escaping spaces in file names with a backslash. (#18027)
 
 Runtime system
 ~~~~~~~~~~~~~~

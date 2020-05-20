@@ -1,0 +1,4 @@
+
+ExplicitSpecificity5.hs:7:1: error:
+    Inferred type variables are not allowed
+    In an instance declaration

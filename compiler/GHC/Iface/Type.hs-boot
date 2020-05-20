@@ -1,10 +1,12 @@
 module GHC.Iface.Type
-   ( IfaceType, IfaceTyCon, IfaceForAllBndr
+   ( IfaceType, IfaceTyCon, IfaceBndr
    , IfaceCoercion, IfaceTyLit, IfaceAppArgs
    )
 where
 
-import GHC.Types.Var (VarBndr, ArgFlag)
+-- Empty import to influence the compilation ordering.
+-- See note [Depend on GHC.Integer] in GHC.Base
+import GHC.Base ()
 
 data IfaceAppArgs
 
@@ -13,4 +15,3 @@ data IfaceTyCon
 data IfaceTyLit
 data IfaceCoercion
 data IfaceBndr
-type IfaceForAllBndr  = VarBndr IfaceBndr ArgFlag

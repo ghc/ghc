@@ -21,7 +21,7 @@ module GHC.Tc.Utils.TcType (
   -- Types
   TcType, TcSigmaType, TcRhoType, TcTauType, TcPredType, TcThetaType,
   TcTyVar, TcTyVarSet, TcDTyVarSet, TcTyCoVarSet, TcDTyCoVarSet,
-  TcKind, TcCoVar, TcTyCoVar, TcTyVarBinder, TcTyCon,
+  TcKind, TcCoVar, TcTyCoVar, TcTyVarBinder, TcInvisTVBinder, TcTyCon,
   KnotTied,
 
   ExpType(..), InferResult(..), ExpSigmaType, ExpRhoType, mkCheckExpType,
@@ -130,8 +130,9 @@ module GHC.Tc.Utils.TcType (
   Type, PredType, ThetaType, TyCoBinder,
   ArgFlag(..), AnonArgFlag(..), ForallVisFlag(..),
 
-  mkForAllTy, mkForAllTys, mkTyCoInvForAllTys, mkSpecForAllTys, mkTyCoInvForAllTy,
-  mkInvForAllTy, mkInvForAllTys,
+  mkForAllTy, mkForAllTys, mkInvisForAllTys, mkTyCoInvForAllTys,
+  mkSpecForAllTys, mkTyCoInvForAllTy,
+  mkInfForAllTy, mkInfForAllTys,
   mkVisFunTy, mkVisFunTys, mkInvisFunTy, mkInvisFunTys,
   mkTyConApp, mkAppTy, mkAppTys,
   mkTyConTy, mkTyVarTy, mkTyVarTys,
@@ -337,8 +338,9 @@ type TcTyCoVar = Var    -- Either a TcTyVar or a CoVar
         -- a cannot occur inside a MutTyVar in T; that is,
         -- T is "flattened" before quantifying over a
 
-type TcTyVarBinder   = TyVarBinder
-type TcTyCon         = TyCon   -- these can be the TcTyCon constructor
+type TcTyVarBinder     = TyVarBinder
+type TcInvisTVBinder   = InvisTVBinder
+type TcTyCon           = TyCon   -- these can be the TcTyCon constructor
 
 -- These types do not have boxy type variables in them
 type TcPredType     = PredType
@@ -1213,8 +1215,9 @@ tcSplitForAllTys ty
 -- @'sameVis' argf supplied_argf@ is 'True', where @argf@ is the visibility
 -- of the @ForAllTy@'s binder and @supplied_argf@ is the visibility provided
 -- as an argument to this function.
-tcSplitForAllTysSameVis :: ArgFlag -> Type -> ([TyVar], Type)
-tcSplitForAllTysSameVis supplied_argf ty = ASSERT( all isTyVar (fst sty) ) sty
+-- All split tyvars are annotated with their argf.
+tcSplitForAllTysSameVis :: ArgFlag -> Type -> ([TyVarBinder], Type)
+tcSplitForAllTysSameVis supplied_argf ty = ASSERT( all (isTyVar . binderVar) (fst sty) ) sty
   where sty = splitForAllTysSameVis supplied_argf ty
 
 -- | Like 'tcSplitForAllTys', but splits off only named binders.
