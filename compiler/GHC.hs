@@ -594,10 +594,10 @@ checkBrokenTablesNextToCode' dflags
 -- flags.  If you are not doing linking or doing static linking, you
 -- can ignore the list of packages returned.
 --
-setSessionDynFlags :: GhcMonad m => DynFlags -> m [UnitId]
+setSessionDynFlags :: GhcMonad m => DynFlags -> m ()
 setSessionDynFlags dflags = do
   dflags' <- checkNewDynFlags dflags
-  (dflags''', preload) <- liftIO $ initUnits dflags'
+  dflags''' <- liftIO $ initUnits dflags'
 
   -- Interpreter
   interp  <- if gopt Opt_ExternalInterpreter dflags
@@ -637,12 +637,14 @@ setSessionDynFlags dflags = do
                            -- already one set up
                          }
   invalidateModSummaryCache
-  return preload
 
 -- | Sets the program 'DynFlags'.  Note: this invalidates the internal
 -- cached module graph, causing more work to be done the next time
 -- 'load' is called.
-setProgramDynFlags :: GhcMonad m => DynFlags -> m [UnitId]
+--
+-- Returns a boolean indicating if preload units have changed and need to be
+-- reloaded.
+setProgramDynFlags :: GhcMonad m => DynFlags -> m Bool
 setProgramDynFlags dflags = setProgramDynFlags_ True dflags
 
 -- | Set the action taken when the compiler produces a message.  This
@@ -654,17 +656,17 @@ setLogAction action = do
   void $ setProgramDynFlags_ False $
     dflags' { log_action = action }
 
-setProgramDynFlags_ :: GhcMonad m => Bool -> DynFlags -> m [UnitId]
+setProgramDynFlags_ :: GhcMonad m => Bool -> DynFlags -> m Bool
 setProgramDynFlags_ invalidate_needed dflags = do
   dflags' <- checkNewDynFlags dflags
   dflags_prev <- getProgramDynFlags
-  (dflags'', preload) <-
-    if (packageFlagsChanged dflags_prev dflags')
-       then liftIO $ initUnits dflags'
-       else return (dflags', [])
+  let changed = packageFlagsChanged dflags_prev dflags'
+  dflags'' <- if changed
+               then liftIO $ initUnits dflags'
+               else return dflags'
   modifySession $ \h -> h{ hsc_dflags = dflags'' }
   when invalidate_needed $ invalidateModSummaryCache
-  return preload
+  return changed
 
 
 -- When changing the DynFlags, we want the changes to apply to future

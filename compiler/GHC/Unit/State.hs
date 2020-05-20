@@ -572,7 +572,7 @@ listUnitInfo state = Map.elems (unitInfoMap state)
 -- 'packageFlags' field of the 'DynFlags', and it will update the
 -- 'unitState' in 'DynFlags' and return a list of packages to
 -- link in.
-initUnits :: DynFlags -> IO (DynFlags, [UnitId])
+initUnits :: DynFlags -> IO DynFlags
 initUnits dflags = do
 
   let forceUnitInfoMap (state, _) = unitInfoMap state `seq` ()
@@ -592,7 +592,7 @@ initUnits dflags = do
                   }
       dflags'' = upd_wired_in_home_instantiations dflags'
 
-  return (dflags'', preloadUnits state)
+  return dflags''
 
 -- -----------------------------------------------------------------------------
 -- Reading the unit database(s)
