@@ -330,6 +330,11 @@ data UnitConfig = UnitConfig
       -- [About units] in GHC.Unit). This should only be used when we are
       -- type-checking an indefinite unit (not producing any code).
 
+   , unitConfigDBCache      :: Maybe [UnitDatabase UnitId]
+      -- ^ Cache of databases to use, in the order they were specified on the
+      -- command line (later databases shadow earlier ones).
+      -- If Nothing, databases will be found using `unitConfigFlagsDB`.
+
    -- command-line flags
    , unitConfigFlagsDB      :: [PackageDBFlag]     -- ^ Unit databases flags
    , unitConfigFlagsExposed :: [PackageFlag]       -- ^ Exposed units
@@ -338,16 +343,15 @@ data UnitConfig = UnitConfig
    , unitConfigFlagsPlugins :: [PackageFlag]       -- ^ Plugins exposed units
    }
 
-initUnitConfig :: DynFlags -> IO UnitConfig
-initUnitConfig dflags = do
-
+initUnitConfig :: DynFlags -> UnitConfig
+initUnitConfig dflags =
    let autoLink
          | not (gopt Opt_AutoLinkPackages dflags) = []
          -- By default we add base & rts to the preload units (when they are
          -- found in the unit database) except when we are building them
          | otherwise = filter (/= homeUnitId dflags) [baseUnitId, rtsUnitId]
 
-   pure $ UnitConfig
+   in UnitConfig
       { unitConfigPlatformArchOs = platformMini (targetPlatform dflags)
       , unitConfigProgramName    = programName dflags
       , unitConfigWays           = ways dflags
@@ -366,11 +370,13 @@ initUnitConfig dflags = do
         -- instantiated on-the-fly (see Note [About units] in GHC.Unit)
       , unitConfigAllowVirtualUnits = homeUnitIsIndefinite dflags
 
+      , unitConfigDBCache      = unitDatabases dflags
       , unitConfigFlagsDB      = packageDBFlags dflags
       , unitConfigFlagsExposed = packageFlags dflags
       , unitConfigFlagsIgnored = ignorePackageFlags dflags
       , unitConfigFlagsTrusted = trustFlags dflags
       , unitConfigFlagsPlugins = pluginPackageFlags dflags
+
       }
 
 -- | Map from 'ModuleName' to a set of of module providers (i.e. a 'Module' and
@@ -570,32 +576,18 @@ initUnits :: DynFlags -> IO (DynFlags, [UnitId])
 initUnits dflags = do
 
   let forceUnitInfoMap (state, _) = unitInfoMap state `seq` ()
-  (state,dbs) <- withTiming dflags
-                                (text "initializing package database")
-                                forceUnitInfoMap $ do
+  let ctx     = initSDocContext dflags defaultUserStyle -- SDocContext used to render exception messages
+  let printer = debugTraceMsg dflags                    -- printer for trace messages
 
-    cfg <- initUnitConfig dflags
+  (state,dbs) <- withTiming dflags (text "initializing unit database")
+                   forceUnitInfoMap
+                   (mkUnitState ctx printer (initUnitConfig dflags))
 
-    -- init SDocContext used to render exception messages
-    let ctx = initSDocContext dflags defaultUserStyle
-    let printer = debugTraceMsg dflags
-
-    -- read the databases if they have not been already read
-    dbs <- case unitDatabases dflags of
-          Nothing  -> readUnitDatabases printer cfg
-          Just dbs -> return dbs
-
-    -- create the UnitState
-    state <- mkUnitState ctx (printer 2) cfg dbs
-
-    return (state, dbs)
-
-  dumpIfSet_dyn (dflags { pprCols = 200 }) Opt_D_dump_mod_map "Mod Map"
-    FormatText
-    (pprModuleMap (moduleNameProvidersMap state))
+  dumpIfSet_dyn (dflags { pprCols = 200 }) Opt_D_dump_mod_map "Module Map"
+    FormatText (pprModuleMap (moduleNameProvidersMap state))
 
   let dflags'  = dflags
-                  { unitDatabases = Just dbs
+                  { unitDatabases = Just dbs -- databases are cached and never read again
                   , unitState     = state
                   }
       dflags'' = upd_wired_in_home_instantiations dflags'
@@ -1436,14 +1428,11 @@ validateDatabase cfg pkg_map1 =
 -- settings and populate the package state.
 
 mkUnitState
-    :: SDocContext      -- ^ SDocContext used to render exception messages
-    -> (SDoc -> IO ())
+    :: SDocContext            -- ^ SDocContext used to render exception messages
+    -> (Int -> SDoc -> IO ()) -- ^ Trace printer
     -> UnitConfig
-    -- initial databases, in the order they were specified on
-    -- the command line (later databases shadow earlier ones)
-    -> [UnitDatabase UnitId]
-    -> IO UnitState
-mkUnitState ctx printer cfg raw_dbs = do
+    -> IO (UnitState,[UnitDatabase UnitId])
+mkUnitState ctx printer cfg = do
 {-
    Plan.
 
@@ -1497,6 +1486,10 @@ mkUnitState ctx printer cfg raw_dbs = do
           we build a mapping saying what every in scope module name points to.
 -}
 
+  -- if databases have not been provided, read the database flags
+  raw_dbs <- case unitConfigDBCache cfg of
+               Nothing  -> readUnitDatabases printer cfg
+               Just dbs -> return dbs
 
   -- distrust all units if the flag is set
   let distrust_all db = db { unitDatabaseUnits = distrustAllUnits (unitDatabaseUnits db) }
@@ -1508,18 +1501,18 @@ mkUnitState ctx printer cfg raw_dbs = do
   -- packageFlags, pluginPackageFlags, etc. are all specified in *reverse* order
   -- than they are on the command line.
   let other_flags = reverse (unitConfigFlagsExposed cfg)
-  printer $
+  printer 2 $
       text "package flags" <+> ppr other_flags
 
   -- Merge databases together, without checking validity
-  (pkg_map1, prec_map) <- mergeDatabases printer dbs
+  (pkg_map1, prec_map) <- mergeDatabases (printer 2) dbs
 
   -- Now that we've merged everything together, prune out unusable
   -- packages.
   let (pkg_map2, unusable, sccs) = validateDatabase cfg pkg_map1
 
-  reportCycles   printer sccs
-  reportUnusable printer unusable
+  reportCycles   (printer 2) sccs
+  reportUnusable (printer 2) unusable
 
   -- Apply trust flags (these flags apply regardless of whether
   -- or not packages are visible or not)
@@ -1590,7 +1583,7 @@ mkUnitState ctx printer cfg raw_dbs = do
   -- it modifies the unit ids of wired in packages, but when we process
   -- package arguments we need to key against the old versions.
   --
-  (pkgs2, wired_map) <- findWiredInUnits printer prec_map pkgs1 vis_map2
+  (pkgs2, wired_map) <- findWiredInUnits (printer 2) prec_map pkgs1 vis_map2
   let pkg_db = mkUnitInfoMap pkgs2
 
   -- Update the visibility map, so we treat wired packages as visible.
@@ -1664,7 +1657,7 @@ mkUnitState ctx printer cfg raw_dbs = do
       mod_map = Map.union mod_map1 mod_map2
 
   -- Force the result to avoid leaking input parameters
-  return $! UnitState
+  let !state = UnitState
          { preloadUnits                 = dep_preload
          , explicitUnits                = explicit_pkgs
          , unitInfoMap                  = pkg_db
@@ -1675,12 +1668,10 @@ mkUnitState ctx printer cfg raw_dbs = do
          , wireMap                      = wired_map
          , unwireMap                    = Map.fromList [ (v,k) | (k,v) <- Map.toList wired_map ]
          , requirementContext           = req_ctx
-
-           -- when the home unit is indefinite, it means we are type-checking it
-           -- only (not producing any code). Hence we can use virtual units
-           -- instantiated on-the-fly (see Note [About units] in GHC.Unit)
          , allowVirtualUnits            = unitConfigAllowVirtualUnits cfg
          }
+
+  return (state, raw_dbs)
 
 -- | Given a wired-in 'Unit', "unwire" it into the 'Unit'
 -- that it was recorded as in the package database.
