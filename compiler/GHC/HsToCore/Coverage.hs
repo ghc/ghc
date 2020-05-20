@@ -117,7 +117,7 @@ addTicksToBinds hsc_env mod mod_loc exports tyCons binds
      dumpIfSet_dyn dflags Opt_D_dump_ticked "HPC" FormatHaskell
        (pprLHsBinds binds1)
 
-     return (binds1, HpcInfo tickCount hashNo, Just modBreaks)
+     return (binds1, HpcInfo tickCount hashNo, modBreaks)
 
   | otherwise = return (binds, emptyHpcInfo False, Nothing)
 
@@ -134,9 +134,9 @@ guessSourceFile binds orig_file =
         _ -> orig_file
 
 
-mkModBreaks :: HscEnv -> Module -> Int -> [MixEntry_] -> IO ModBreaks
+mkModBreaks :: HscEnv -> Module -> Int -> [MixEntry_] -> IO (Maybe ModBreaks)
 mkModBreaks hsc_env mod count entries
-  | HscInterpreted <- hscTarget (hsc_dflags hsc_env) = do
+  | breapointsEnabled (hsc_dflags hsc_env) = do
     breakArray <- GHCi.newBreakArray hsc_env (length entries)
     ccs <- mkCCSArray hsc_env mod count entries
     let
@@ -150,7 +150,7 @@ mkModBreaks hsc_env mod count entries
                        , modBreaks_decls = declsTicks
                        , modBreaks_ccs   = ccs
                        }
-  | otherwise = return emptyModBreaks
+  | otherwise = Nothing
 
 mkCCSArray
   :: HscEnv -> Module -> Int -> [MixEntry_]
@@ -1027,13 +1027,17 @@ data TickishType = ProfNotes | HpcTicks | Breakpoints | SourceNotes
 
 coveragePasses :: DynFlags -> [TickishType]
 coveragePasses dflags =
-    ifa (hscTarget dflags == HscInterpreted) Breakpoints $
+    ifa (breakpointsEnabled dflags)          Breakpoints $
     ifa (gopt Opt_Hpc dflags)                HpcTicks $
     ifa (gopt Opt_SccProfilingOn dflags &&
          profAuto dflags /= NoProfAuto)      ProfNotes $
     ifa (debugLevel dflags > 0)              SourceNotes []
   where ifa f x xs | f         = x:xs
                    | otherwise = xs
+
+-- | Should we produce 'Breakpoint' ticks?
+breakpointsEnabled :: DynFlags -> Bool
+breakpointsEnabled dflags = hscTarget dflags == HscInterpreted
 
 -- | Tickishs that only make sense when their source code location
 -- refers to the current file. This might not always be true due to
