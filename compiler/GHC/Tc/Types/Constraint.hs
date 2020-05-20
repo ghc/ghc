@@ -1785,13 +1785,16 @@ ctLocOrigin :: CtLoc -> CtOrigin
 ctLocOrigin = ctl_origin
 
 ctLocSpan :: CtLoc -> RealSrcSpan
-ctLocSpan (CtLoc { ctl_env = lcl}) = getLclEnvLoc lcl
+ctLocSpan (CtLoc { ctl_env = lcl}) = case getLclEnvLoc lcl of
+  RealSrcSpan s _ -> s
+  UnhelpfulSpan _ -> error "ctLocSpan: shouldn't get an UnhelpfulSpan" -- FIXME?
 
 ctLocTypeOrKind_maybe :: CtLoc -> Maybe TypeOrKind
 ctLocTypeOrKind_maybe = ctl_t_or_k
 
 setCtLocSpan :: CtLoc -> RealSrcSpan -> CtLoc
-setCtLocSpan ctl@(CtLoc { ctl_env = lcl }) loc = setCtLocEnv ctl (setLclEnvLoc lcl loc)
+setCtLocSpan ctl@(CtLoc { ctl_env = lcl }) loc
+  = setCtLocEnv ctl (setLclEnvLoc lcl (RealSrcSpan loc Nothing))
 
 bumpCtLocDepth :: CtLoc -> CtLoc
 bumpCtLocDepth loc@(CtLoc { ctl_depth = d }) = loc { ctl_depth = bumpSubGoalDepth d }

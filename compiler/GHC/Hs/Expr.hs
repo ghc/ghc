@@ -670,12 +670,12 @@ type instance XPragE         (GhcPass _) = NoExtField
 type instance XXExpr         GhcPs       = NoExtCon
 
 -- See Note [Rebindable syntax and HsExpansion] below
-type instance XXExpr         GhcRn       = HsExpansion (LHsExpr GhcPs)
+type instance XXExpr         GhcRn       = HsExpansion (HsExpr GhcPs)
                                                        (HsExpr GhcRn)
 type instance XXExpr         GhcTc       = XXExprGhcTc
 
 data XXExprGhcTc = WrapExpr (HsWrap HsExpr)
-                 | ExpansionExpr (HsExpansion (LHsExpr GhcPs) (HsExpr GhcTc))
+                 | ExpansionExpr (HsExpansion (HsExpr GhcPs) (HsExpr GhcTc))
 
 
 {-
@@ -784,13 +784,13 @@ data HsExpansion a b
 --
 --   See Note [Rebindable Syntax and HsExpansion] above for more details.
 mkExpanded
-  :: (HsExpansion (Located a) b -> b) -- ^ XExpr, XCmd, ...
-  -> Located a                        -- ^ source expression ('GhcPs')
-  -> b                                -- ^ "desugared" expression
-                                      --   ('GhcRn')
-  -> Located b                        -- ^ suitably wrapped
-                                      --   'HsExpansion'
-mkExpanded xwrap a b = L (getLoc a) $ xwrap (HsExpanded a b)
+  :: (HsExpansion a b -> b) -- ^ XExpr, XCmd, ...
+  -> a                      -- ^ source expression ('GhcPs')
+  -> b                      -- ^ "desugared" expression
+                            --   ('GhcRn')
+  -> b                      -- ^ suitably wrapped
+                            --   'HsExpansion'
+mkExpanded xwrap a b = xwrap (HsExpanded a b)
 
 -- | Just print the original expression (the @a@).
 instance Outputable a => Outputable (HsExpansion a b) where
@@ -1227,8 +1227,8 @@ ppr_infix_expr (HsRecFld _ f)       = Just (pprInfixOcc f)
 ppr_infix_expr (HsUnboundVar _ occ) = Just (pprInfixOcc occ)
 ppr_infix_expr (XExpr x)            = case (ghcPass @p, x) of
   (GhcTc, WrapExpr (HsWrap _ e))          -> ppr_infix_expr e
-  (GhcTc, ExpansionExpr (HsExpanded a _)) -> ppr_infix_expr (unLoc a)
-  (GhcRn, HsExpanded a _)                 -> ppr_infix_expr (unLoc a)
+  (GhcTc, ExpansionExpr (HsExpanded a _)) -> ppr_infix_expr a
+  (GhcRn, HsExpanded a _)                 -> ppr_infix_expr a
   (GhcPs, _)                              -> Nothing
 ppr_infix_expr _ = Nothing
 
@@ -1332,9 +1332,9 @@ hsExprNeedsParens p = go
       | GhcTc <- ghcPass @p
       = case x of
           WrapExpr      (HsWrap _ e)     -> go e
-          ExpansionExpr (HsExpanded a _) -> hsExprNeedsParens p (unLoc a)
+          ExpansionExpr (HsExpanded a _) -> hsExprNeedsParens p a
       | GhcRn <- ghcPass @p
-      = case x of HsExpanded a _ -> hsExprNeedsParens p (unLoc a)
+      = case x of HsExpanded a _ -> hsExprNeedsParens p a
       | otherwise
       = True
 
@@ -1368,9 +1368,9 @@ isAtomicHsExpr (HsRecFld{})      = True
 isAtomicHsExpr (XExpr x)
   | GhcTc <- ghcPass @p          = case x of
       WrapExpr      (HsWrap _ e)     -> isAtomicHsExpr e
-      ExpansionExpr (HsExpanded a _) -> isAtomicHsExpr (unLoc a)
+      ExpansionExpr (HsExpanded a _) -> isAtomicHsExpr a
   | GhcRn <- ghcPass @p          = case x of
-      HsExpanded a _         -> isAtomicHsExpr (unLoc a)
+      HsExpanded a _         -> isAtomicHsExpr a
 isAtomicHsExpr _                 = False
 
 instance Outputable (HsPragE (GhcPass p)) where

@@ -747,9 +747,10 @@ Why?  Because they are now Ids not TcIds.  This final GlobalEnv is
 data TcLclEnv           -- Changes as we move inside an expression
                         -- Discarded after typecheck/rename; not passed on to desugarer
   = TcLclEnv {
-        tcl_loc        :: RealSrcSpan,     -- Source span
+        tcl_loc        :: SrcSpan,         -- Source span
         tcl_ctxt       :: [ErrCtxt],       -- Error context, innermost on top
-        tcl_tclvl      :: TcLevel,         -- Birthplace for new unification variables
+        tcl_in_tunnel  :: Bool,            -- See Note [Rebindable syntax and HsExpansion]
+        tcl_tclvl      :: TcLevel,
 
         tcl_th_ctxt    :: ThStage,         -- Template Haskell context
         tcl_th_bndrs   :: ThBindEnv,       -- and binder info
@@ -788,10 +789,10 @@ setLclEnvTcLevel env lvl = env { tcl_tclvl = lvl }
 getLclEnvTcLevel :: TcLclEnv -> TcLevel
 getLclEnvTcLevel = tcl_tclvl
 
-setLclEnvLoc :: TcLclEnv -> RealSrcSpan -> TcLclEnv
+setLclEnvLoc :: TcLclEnv -> SrcSpan -> TcLclEnv
 setLclEnvLoc env loc = env { tcl_loc = loc }
 
-getLclEnvLoc :: TcLclEnv -> RealSrcSpan
+getLclEnvLoc :: TcLclEnv -> SrcSpan
 getLclEnvLoc = tcl_loc
 
 type ErrCtxt = (Bool, TidyEnv -> TcM (TidyEnv, MsgDoc))

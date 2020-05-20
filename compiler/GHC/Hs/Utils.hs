@@ -32,7 +32,8 @@ just attach noSrcSpan to everything.
 
 module GHC.Hs.Utils(
   -- * Terms
-  mkHsPar, mkHsApp, mkHsApps, mkHsAppType, mkHsAppTypes, mkHsCaseAlt,
+  mkHsPar, mkHsApp, mkHsAppWith, mkHsApps, mkHsAppsWith,
+  mkHsAppType, mkHsAppTypes, mkHsCaseAlt,
   mkSimpleMatch, unguardedGRHSs, unguardedRHS,
   mkMatchGroup, mkMatch, mkPrefixFunRhs, mkHsLam, mkHsIf,
   mkHsWrap, mkLHsWrap, mkHsWrapCo, mkHsWrapCoR, mkLHsWrapCo,
@@ -190,11 +191,25 @@ mkLocatedList [] = noLoc []
 mkLocatedList ms = L (combineLocs (head ms) (last ms)) ms
 
 mkHsApp :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
-mkHsApp e1 e2 = addCLoc e1 e2 (HsApp noExtField e1 e2)
+mkHsApp = mkHsAppWith addCLoc
+
+mkHsAppWith
+  :: (LHsExpr (GhcPass id) -> LHsExpr (GhcPass id) -> HsExpr (GhcPass id) -> LHsExpr (GhcPass id))
+  -> LHsExpr (GhcPass id)
+  -> LHsExpr (GhcPass id)
+  -> LHsExpr (GhcPass id)
+mkHsAppWith mkLocated e1 e2 = mkLocated e1 e2 (HsApp noExtField e1 e2)
 
 mkHsApps
   :: LHsExpr (GhcPass id) -> [LHsExpr (GhcPass id)] -> LHsExpr (GhcPass id)
-mkHsApps = foldl' mkHsApp
+mkHsApps = mkHsAppsWith addCLoc
+
+mkHsAppsWith
+ :: (LHsExpr (GhcPass id) -> LHsExpr (GhcPass id) -> HsExpr (GhcPass id) -> LHsExpr (GhcPass id))
+ -> LHsExpr (GhcPass id)
+ -> [LHsExpr (GhcPass id)]
+ -> LHsExpr (GhcPass id)
+mkHsAppsWith mkLocated = foldl' (mkHsAppWith mkLocated)
 
 mkHsAppType :: LHsExpr GhcRn -> LHsWcType GhcRn -> LHsExpr GhcRn
 mkHsAppType e t = addCLoc e t_body (HsAppType noExtField e paren_wct)
