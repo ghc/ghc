@@ -1005,7 +1005,7 @@ addTickArithSeqInfo (FromThenTo e1 e2 e3) =
 
 data TickTransState = TT { tickBoxCount:: !Int
                          , mixEntries  :: [MixEntry_]
-                         , ccIndices   :: CostCentreState
+                         , ccIndices   :: !CostCentreState
                          }
 
 data TickTransEnv = TTE { fileName     :: FastString
