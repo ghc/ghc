@@ -594,16 +594,13 @@ initUnits dflags = do
     FormatText
     (pprModuleMap (moduleNameProvidersMap state))
 
-  -- Some wired units can be used to instantiate the home unit. We need to
-  -- replace their unit keys by their wired unit ids.
-  let wiringMap    = wireMap state
-      unwiredInsts = homeUnitInstantiations dflags
-      wiredInsts   = map (fmap (upd_wired_in_mod wiringMap)) unwiredInsts
+  let dflags'  = dflags
+                  { unitDatabases = Just dbs
+                  , unitState     = state
+                  }
+      dflags'' = upd_wired_in_home_instantiations dflags'
 
-  return (dflags{ unitDatabases          = Just dbs,
-                  unitState              = state,
-                  homeUnitInstantiations = wiredInsts },
-          (preloadUnits state))
+  return (dflags'', preloadUnits state)
 
 -- -----------------------------------------------------------------------------
 -- Reading the unit database(s)
@@ -1160,6 +1157,17 @@ findWiredInUnits printer prec_map pkgs vis_map = do
 --
 -- For instance, base-4.9.0.0 will be rewritten to just base, to match
 -- what appears in GHC.Builtin.Names.
+
+-- | Some wired units can be used to instantiate the home unit. We need to
+-- replace their unit keys with their wired unit ids.
+upd_wired_in_home_instantiations :: DynFlags -> DynFlags
+upd_wired_in_home_instantiations dflags = dflags { homeUnitInstantiations = wiredInsts }
+   where
+      state        = unitState dflags
+      wiringMap    = wireMap state
+      unwiredInsts = homeUnitInstantiations dflags
+      wiredInsts   = map (fmap (upd_wired_in_mod wiringMap)) unwiredInsts
+
 
 upd_wired_in_mod :: WiringMap -> Module -> Module
 upd_wired_in_mod wiredInMap (Module uid m) = Module (upd_wired_in_uid wiredInMap uid) m
