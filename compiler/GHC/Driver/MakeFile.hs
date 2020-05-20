@@ -69,7 +69,7 @@ doMkDependHS srcs = do
                      hiSuf = "hi",
                      objectSuf = "o"
                  }
-    _ <- GHC.setSessionDynFlags dflags
+    GHC.setSessionDynFlags dflags
 
     when (null (depSuffixes dflags)) $ liftIO $
         throwGhcExceptionIO (ProgramError "You must specify at least one -dep-suffix")
