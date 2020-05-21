@@ -12,7 +12,7 @@ module GHC.Cmm (
      CmmBlock, RawCmmDecl,
      Section(..), SectionType(..),
      GenCmmStatics(..), type CmmStatics, type RawCmmStatics, CmmStatic(..),
-     isSecConstant,
+     SectionProtection(..), sectionProtection,
 
      -- ** Blocks containing lists
      GenBasicBlock(..), blockId,
@@ -185,17 +185,33 @@ data SectionType
   | OtherSection String
   deriving (Show)
 
--- | Should a data in this section be considered constant
-isSecConstant :: Section -> Bool
-isSecConstant (Section t _) = case t of
-    Text                    -> True
-    ReadOnlyData            -> True
-    RelocatableReadOnlyData -> True
-    ReadOnlyData16          -> True
-    CString                 -> True
-    Data                    -> False
-    UninitialisedData       -> False
-    (OtherSection _)        -> False
+data SectionProtection
+  = ReadWriteSection
+  | ReadOnlySection
+  | WriteProtectedSection -- See Note [Relocatable Read-Only Data]
+  deriving (Eq)
+
+-- | Should a data in this section be considered constant at runtime
+sectionProtection :: Section -> SectionProtection
+sectionProtection (Section t _) = case t of
+    Text                    -> ReadOnlySection
+    ReadOnlyData            -> ReadOnlySection
+    RelocatableReadOnlyData -> WriteProtectedSection
+    ReadOnlyData16          -> ReadOnlySection
+    CString                 -> ReadOnlySection
+    Data                    -> ReadWriteSection
+    UninitialisedData       -> ReadWriteSection
+    (OtherSection _)        -> ReadWriteSection
+
+{-
+Note [Relocatable Read-Only Data]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Relocatable data are only read-only after relocation at the start of the
+program. They should be writable from the source code until then. Failure to
+do so would end up in segfaults at execution when using linkers that do not
+enforce writability of those sections, such as the gold linker.
+-}
 
 data Section = Section SectionType CLabel
 

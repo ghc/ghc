@@ -47,7 +47,7 @@ module GHC.Core.TyCo.Rep (
         mkTyConTy, mkTyVarTy, mkTyVarTys,
         mkTyCoVarTy, mkTyCoVarTys,
         mkFunTy, mkVisFunTy, mkInvisFunTy, mkVisFunTys, mkInvisFunTys,
-        mkForAllTy, mkForAllTys,
+        mkForAllTy, mkForAllTys, mkInvisForAllTys,
         mkPiTy, mkPiTys,
 
         -- * Functions over binders
@@ -687,8 +687,10 @@ data TyCoBinder
 instance Outputable TyCoBinder where
   ppr (Anon af ty) = ppr af <+> ppr ty
   ppr (Named (Bndr v Required))  = ppr v
-  ppr (Named (Bndr v Specified)) = char '@' <> ppr v
-  ppr (Named (Bndr v Inferred))  = braces (ppr v)
+  -- See Note [Explicit Case Statement for Specificity]
+  ppr (Named (Bndr v (Invisible spec))) = case spec of
+    SpecifiedSpec -> char '@' <> ppr v
+    InferredSpec  -> braces (ppr v)
 
 
 -- | 'TyBinder' is like 'TyCoBinder', but there can only be 'TyVarBinder'
@@ -802,16 +804,22 @@ This table summarises the visibility rules:
      f3 :: forall a. a -> a; f3 x = x
   So f3 gets the type f3 :: forall a. a -> a, with 'a' Specified
 
+* Inferred.  Function defn, with signature (explicit forall), marked as inferred:
+     f4 :: forall {a}. a -> a; f4 x = x
+  So f4 gets the type f4 :: forall {a}. a -> a, with 'a' Inferred
+  It's Inferred because the user marked it as such, even though it does appear
+  in the user-written signature for f4
+
 * Inferred/Specified.  Function signature with inferred kind polymorphism.
-     f4 :: a b -> Int
-  So 'f4' gets the type f4 :: forall {k} (a:k->*) (b:k). a b -> Int
+     f5 :: a b -> Int
+  So 'f5' gets the type f5 :: forall {k} (a:k->*) (b:k). a b -> Int
   Here 'k' is Inferred (it's not mentioned in the type),
   but 'a' and 'b' are Specified.
 
 * Specified.  Function signature with explicit kind polymorphism
-     f5 :: a (b :: k) -> Int
+     f6 :: a (b :: k) -> Int
   This time 'k' is Specified, because it is mentioned explicitly,
-  so we get f5 :: forall (k:*) (a:k->*) (b:k). a b -> Int
+  so we get f6 :: forall (k:*) (a:k->*) (b:k). a b -> Int
 
 * Similarly pattern synonyms:
   Inferred - from inferred types (e.g. no pattern type signature)
@@ -994,6 +1002,10 @@ mkForAllTy tv vis ty = ForAllTy (Bndr tv vis) ty
 -- | Wraps foralls over the type using the provided 'TyCoVar's from left to right
 mkForAllTys :: [TyCoVarBinder] -> Type -> Type
 mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
+
+-- | Wraps foralls over the type using the provided 'InvisTVBinder's from left to right
+mkInvisForAllTys :: [InvisTVBinder] -> Type -> Type
+mkInvisForAllTys tyvars ty = foldr ForAllTy ty $ tyVarSpecToBinders tyvars
 
 mkPiTy:: TyCoBinder -> Type -> Type
 mkPiTy (Anon af ty1) ty2        = FunTy { ft_af = af, ft_arg = ty1, ft_res = ty2 }

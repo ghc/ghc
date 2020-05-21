@@ -745,7 +745,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
    = do { -- When quantifying, we want to preserve any order of variables as they
           -- appear in partial signatures. cf. decideQuantifiedTyVars
           let psig_tv_tys = [ mkTyVarTy tv | sig <- partial_sigs
-                                          , (_,tv) <- sig_inst_skols sig ]
+                                          , (_,Bndr tv _) <- sig_inst_skols sig ]
               psig_theta  = [ pred | sig <- partial_sigs
                                    , pred <- sig_inst_theta sig ]
 
@@ -1056,7 +1056,7 @@ decideMonoTyVars infer_mode name_taus psigs candidates
 
        -- If possible, we quantify over partial-sig qtvs, so they are
        -- not mono. Need to zonk them because they are meta-tyvar TyVarTvs
-       ; psig_qtvs <- mapM zonkTcTyVarToTyVar $
+       ; psig_qtvs <- mapM zonkTcTyVarToTyVar $ binderVars $
                       concatMap (map snd . sig_inst_skols) psigs
 
        ; psig_theta <- mapM TcM.zonkTcType $
@@ -1222,7 +1222,7 @@ decideQuantifiedTyVars name_taus psigs candidates
              -- See Note [Quantification and partial signatures]
              --     Wrinkles 2 and 3
        ; psig_tv_tys <- mapM TcM.zonkTcTyVar [ tv | sig <- psigs
-                                                  , (_,tv) <- sig_inst_skols sig ]
+                                                  , (_,Bndr tv _) <- sig_inst_skols sig ]
        ; psig_theta <- mapM TcM.zonkTcType [ pred | sig <- psigs
                                                   , pred <- sig_inst_theta sig ]
        ; tau_tys  <- mapM (TcM.zonkTcType . snd) name_taus

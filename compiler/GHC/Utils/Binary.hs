@@ -52,6 +52,9 @@ module GHC.Utils.Binary
    putSLEB128,
    getSLEB128,
 
+   -- * Fixed length encoding
+   FixedLengthEncoding(..),
+
    -- * Lazy Binary I/O
    lazyGet,
    lazyPut,
@@ -314,18 +317,18 @@ putWord8 h !w = putPrim h 1 (\op -> poke op w)
 getWord8 :: BinHandle -> IO Word8
 getWord8 h = getPrim h 1 peek
 
--- putWord16 :: BinHandle -> Word16 -> IO ()
--- putWord16 h w = putPrim h 2 (\op -> do
---   pokeElemOff op 0 (fromIntegral (w `shiftR` 8))
---   pokeElemOff op 1 (fromIntegral (w .&. 0xFF))
---   )
+putWord16 :: BinHandle -> Word16 -> IO ()
+putWord16 h w = putPrim h 2 (\op -> do
+  pokeElemOff op 0 (fromIntegral (w `shiftR` 8))
+  pokeElemOff op 1 (fromIntegral (w .&. 0xFF))
+  )
 
--- getWord16 :: BinHandle -> IO Word16
--- getWord16 h = getPrim h 2 (\op -> do
---   w0 <- fromIntegral <$> peekElemOff op 0
---   w1 <- fromIntegral <$> peekElemOff op 1
---   return $! w0 `shiftL` 8 .|. w1
---   )
+getWord16 :: BinHandle -> IO Word16
+getWord16 h = getPrim h 2 (\op -> do
+  w0 <- fromIntegral <$> peekElemOff op 0
+  w1 <- fromIntegral <$> peekElemOff op 1
+  return $! w0 `shiftL` 8 .|. w1
+  )
 
 putWord32 :: BinHandle -> Word32 -> IO ()
 putWord32 h w = putPrim h 4 (\op -> do
@@ -348,38 +351,38 @@ getWord32 h = getPrim h 4 (\op -> do
             w3
   )
 
--- putWord64 :: BinHandle -> Word64 -> IO ()
--- putWord64 h w = putPrim h 8 (\op -> do
---   pokeElemOff op 0 (fromIntegral (w `shiftR` 56))
---   pokeElemOff op 1 (fromIntegral ((w `shiftR` 48) .&. 0xFF))
---   pokeElemOff op 2 (fromIntegral ((w `shiftR` 40) .&. 0xFF))
---   pokeElemOff op 3 (fromIntegral ((w `shiftR` 32) .&. 0xFF))
---   pokeElemOff op 4 (fromIntegral ((w `shiftR` 24) .&. 0xFF))
---   pokeElemOff op 5 (fromIntegral ((w `shiftR` 16) .&. 0xFF))
---   pokeElemOff op 6 (fromIntegral ((w `shiftR` 8) .&. 0xFF))
---   pokeElemOff op 7 (fromIntegral (w .&. 0xFF))
---   )
+putWord64 :: BinHandle -> Word64 -> IO ()
+putWord64 h w = putPrim h 8 (\op -> do
+  pokeElemOff op 0 (fromIntegral (w `shiftR` 56))
+  pokeElemOff op 1 (fromIntegral ((w `shiftR` 48) .&. 0xFF))
+  pokeElemOff op 2 (fromIntegral ((w `shiftR` 40) .&. 0xFF))
+  pokeElemOff op 3 (fromIntegral ((w `shiftR` 32) .&. 0xFF))
+  pokeElemOff op 4 (fromIntegral ((w `shiftR` 24) .&. 0xFF))
+  pokeElemOff op 5 (fromIntegral ((w `shiftR` 16) .&. 0xFF))
+  pokeElemOff op 6 (fromIntegral ((w `shiftR` 8) .&. 0xFF))
+  pokeElemOff op 7 (fromIntegral (w .&. 0xFF))
+  )
 
--- getWord64 :: BinHandle -> IO Word64
--- getWord64 h = getPrim h 8 (\op -> do
---   w0 <- fromIntegral <$> peekElemOff op 0
---   w1 <- fromIntegral <$> peekElemOff op 1
---   w2 <- fromIntegral <$> peekElemOff op 2
---   w3 <- fromIntegral <$> peekElemOff op 3
---   w4 <- fromIntegral <$> peekElemOff op 4
---   w5 <- fromIntegral <$> peekElemOff op 5
---   w6 <- fromIntegral <$> peekElemOff op 6
---   w7 <- fromIntegral <$> peekElemOff op 7
+getWord64 :: BinHandle -> IO Word64
+getWord64 h = getPrim h 8 (\op -> do
+  w0 <- fromIntegral <$> peekElemOff op 0
+  w1 <- fromIntegral <$> peekElemOff op 1
+  w2 <- fromIntegral <$> peekElemOff op 2
+  w3 <- fromIntegral <$> peekElemOff op 3
+  w4 <- fromIntegral <$> peekElemOff op 4
+  w5 <- fromIntegral <$> peekElemOff op 5
+  w6 <- fromIntegral <$> peekElemOff op 6
+  w7 <- fromIntegral <$> peekElemOff op 7
 
---   return $! (w0 `shiftL` 56) .|.
---             (w1 `shiftL` 48) .|.
---             (w2 `shiftL` 40) .|.
---             (w3 `shiftL` 32) .|.
---             (w4 `shiftL` 24) .|.
---             (w5 `shiftL` 16) .|.
---             (w6 `shiftL` 8)  .|.
---             w7
---   )
+  return $! (w0 `shiftL` 56) .|.
+            (w1 `shiftL` 48) .|.
+            (w2 `shiftL` 40) .|.
+            (w3 `shiftL` 32) .|.
+            (w4 `shiftL` 24) .|.
+            (w5 `shiftL` 16) .|.
+            (w6 `shiftL` 8)  .|.
+            w7
+  )
 
 putByte :: BinHandle -> Word8 -> IO ()
 putByte bh !w = putWord8 bh w
@@ -511,6 +514,35 @@ getSLEB128 bh = do
                 else do
                     let !signed = testBit byte 6
                     return (val',shift',signed)
+
+-- -----------------------------------------------------------------------------
+-- Fixed length encoding instances
+
+-- Sometimes words are used to represent a certain bit pattern instead
+-- of a number. Using FixedLengthEncoding we will write the pattern as
+-- is to the interface file without the variable length encoding we usually
+-- apply.
+
+-- | Encode the argument in it's full length. This is different from many default
+-- binary instances which make no guarantee about the actual encoding and
+-- might do things use variable length encoding.
+newtype FixedLengthEncoding a = FixedLengthEncoding { unFixedLength :: a }
+
+instance Binary (FixedLengthEncoding Word8) where
+  put_ h (FixedLengthEncoding x) = putByte h x
+  get h = FixedLengthEncoding <$> getByte h
+
+instance Binary (FixedLengthEncoding Word16) where
+  put_ h (FixedLengthEncoding x) = putWord16 h x
+  get h = FixedLengthEncoding <$> getWord16 h
+
+instance Binary (FixedLengthEncoding Word32) where
+  put_ h (FixedLengthEncoding x) = putWord32 h x
+  get h = FixedLengthEncoding <$> getWord32 h
+
+instance Binary (FixedLengthEncoding Word64) where
+  put_ h (FixedLengthEncoding x) = putWord64 h x
+  get h = FixedLengthEncoding <$> getWord64 h
 
 -- -----------------------------------------------------------------------------
 -- Primitive Word writes

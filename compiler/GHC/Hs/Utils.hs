@@ -736,14 +736,23 @@ typeToLHsType ty
       foldl' (\f (arg, flag) ->
                let arg' = go arg in
                case flag of
-                 Inferred  -> f
-                 Specified -> f `nlHsAppKindTy` arg'
+                 -- See Note [Explicit Case Statement for Specificity]
+                 Invisible spec -> case spec of
+                   InferredSpec  -> f
+                   SpecifiedSpec -> f `nlHsAppKindTy` arg'
                  Required  -> f `nlHsAppTy`     arg')
              head (zip args arg_flags)
 
-    go_tv :: TyVar -> LHsTyVarBndr GhcPs
-    go_tv tv = noLoc $ KindedTyVar noExtField (noLoc (getRdrName tv))
-                                   (go (tyVarKind tv))
+    argf_to_spec :: ArgFlag -> Specificity
+    argf_to_spec Required      = SpecifiedSpec
+    -- see Note [Specificity in HsForAllTy] in GHC.Hs.Types
+    argf_to_spec (Invisible s) = s
+
+    go_tv :: TyVarBinder -> LHsTyVarBndr Specificity GhcPs
+    go_tv (Bndr tv argf) = noLoc $ KindedTyVar noExtField
+                                               (argf_to_spec argf)
+                                               (noLoc (getRdrName tv))
+                                               (go (tyVarKind tv))
 
 {-
 Note [Kind signatures in typeToLHsType]
