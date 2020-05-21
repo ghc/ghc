@@ -59,7 +59,7 @@ Library
     Default-Language: Haskell2010
     Exposed: False
 
-    Build-Depends: base       >= 4.11 && < 4.15,
+    Build-Depends: base       >= 4.11 && < 4.16,
                    deepseq    >= 1.4 && < 1.5,
                    directory  >= 1   && < 1.4,
                    process    >= 1   && < 1.7,
