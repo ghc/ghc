@@ -619,7 +619,7 @@ This is the only thing that isn't caught by the type-system.
 -}
 
 
-type Messager = HscEnv -> (Int,Int) -> RecompileRequired -> WorkGraphNode -> IO ()
+type Messager = HscEnv -> (Int,Int) -> RecompileRequired -> ModuleGraphNode -> IO ()
 
 -- | This function runs GHC's frontend with recompilation
 -- avoidance. Specifically, it checks if recompilation is needed,
@@ -642,8 +642,9 @@ hscIncrementalFrontend
     hsc_env <- getHscEnv
 
     let msg what = case mHscMessage of
-                   Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode mod_summary)
-                   Nothing -> return ()
+          -- Empty list because extra backpack deps is only needed for batch mode
+          Just hscMessage -> hscMessage hsc_env mod_index what (ModuleNode mod_summary [])
+          Nothing -> return ()
 
         skip iface = do
             liftIO $ msg UpToDate
@@ -899,7 +900,7 @@ batchMsg hsc_env mod_index recomp node = case node of
                 | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg "Skipping  " ""
                 | otherwise -> return ()
             RecompBecause reason -> showMsg "Instantiating " (" [" ++ reason ++ "]")
-    ModuleNode _ ->
+    ModuleNode _ _ ->
         case recomp of
             MustCompile -> showMsg "Compiling " ""
             UpToDate

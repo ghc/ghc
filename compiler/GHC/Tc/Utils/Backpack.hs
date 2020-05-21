@@ -10,6 +10,7 @@ module GHC.Tc.Utils.Backpack (
     findExtraSigImports,
     implicitRequirements',
     implicitRequirements,
+    implicitRequirementsShallow,
     checkUnit,
     tcRnCheckUnit,
     tcRnMergeSignatures,
@@ -238,7 +239,7 @@ check_inst sig_inst = do
 --      unit p where
 --          signature X
 --          signature Y
---              import Y
+--              import X
 --
 --      unit q where
 --          dependency p[X=\<A>,Y=\<B>]
@@ -275,7 +276,7 @@ findExtraSigImports hsc_env hsc_src modname = do
            | mod_name <- uniqDSetToList extra_requirements ]
 
 -- A version of 'implicitRequirements'' which is more friendly
--- for "GHC.Driver.Make" and "GHC.Tc.Module".
+-- for "GHC.Tc.Module".
 implicitRequirements :: HscEnv
                      -> [(Maybe FastString, Located ModuleName)]
                      -> IO [(Maybe FastString, Located ModuleName)]
@@ -298,6 +299,27 @@ implicitRequirements' hsc_env normal_imports
             Found _ mod | not (isHomeModule dflags mod) ->
                 return (uniqDSetToList (moduleFreeHoles mod))
             _ -> return []
+  where dflags = hsc_dflags hsc_env
+
+-- | Like @implicitRequirements'@, but returns either the module name, if it is
+-- a free hole, or the instantiated unit the imported module is from, so that
+-- that instantiated unit can be processed and via the batch mod graph (rather
+-- than a transitive closure done here) all the free holes are still reachable.
+implicitRequirementsShallow
+  :: HscEnv
+  -> [(Maybe FastString, Located ModuleName)]
+  -> IO [Either ModuleName InstantiatedUnit]
+implicitRequirementsShallow hsc_env normal_imports
+  = fmap concat $
+    forM normal_imports $ \(mb_pkg, L _ imp) -> do
+        found <- findImportedModule hsc_env imp mb_pkg
+        pure $ case found of
+            Found _ mod | not (isHomeModule dflags mod) ->
+                case moduleUnit mod of
+                    HoleUnit -> [Left $ moduleName mod]
+                    RealUnit _ -> []
+                    VirtUnit u -> [Right u]
+            _ -> []
   where dflags = hsc_dflags hsc_env
 
 -- | Given a 'Unit', make sure it is well typed.  This is because
