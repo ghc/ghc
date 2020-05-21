@@ -2187,7 +2187,7 @@ coercionLKind co
     go (TyConAppCo _ tc cos)    = mkTyConApp tc (map go cos)
     go (AppCo co1 co2)          = mkAppTy (go co1) (go co2)
     go (ForAllCo tv1 _ co1)     = mkTyCoInvForAllTy tv1 (go co1)
-    go (FunCo _ co1 co2)        = mkVisFunTy (go co1) (go co2)
+    go (FunCo _ co1 co2)        = mkFunctionType (go co1) (go co2)
     go (CoVarCo cv)             = coVarLType cv
     go (HoleCo h)               = coVarLType (coHoleCoVar h)
     go (UnivCo _ _ ty1 _)       = ty1
@@ -2244,7 +2244,7 @@ coercionRKind co
     go (AppCo co1 co2)          = mkAppTy (go co1) (go co2)
     go (CoVarCo cv)             = coVarRType cv
     go (HoleCo h)               = coVarRType (coHoleCoVar h)
-    go (FunCo _ co1 co2)        = mkVisFunTy (go co1) (go co2)
+    go (FunCo _ co1 co2)        = mkFunctionType (go co1) (go co2)
     go (UnivCo _ _ _ ty2)       = ty2
     go (SymCo co)               = coercionLKind co
     go (TransCo _ co2)          = go co2

@@ -51,7 +51,7 @@ module GHC.Core.Type (
         splitPiTy_maybe, splitPiTy, splitPiTys,
         mkTyConBindersPreferAnon,
         mkPiTy, mkPiTys,
-        mkLamType, mkLamTypes,
+        mkLamType, mkLamTypes, mkFunctionType,
         piResultTy, piResultTys,
         applyTysX, dropForAlls,
         mkFamilyTyConApp,
@@ -256,7 +256,7 @@ import {-# SOURCE #-} GHC.Core.Coercion
    , mkTyConAppCo, mkAppCo, mkCoVarCo, mkAxiomRuleCo
    , mkForAllCo, mkFunCo, mkAxiomInstCo, mkUnivCo
    , mkSymCo, mkTransCo, mkNthCo, mkLRCo, mkInstCo
-   , mkKindCo, mkSubCo, mkFunCo, mkAxiomInstCo
+   , mkKindCo, mkSubCo
    , decomposePiCos, coercionKind, coercionLKind
    , coercionRKind, coercionType
    , isReflexiveCo, seqCo )
@@ -1517,6 +1517,8 @@ mkLamType  :: Var -> Type -> Type
 mkLamTypes :: [Var] -> Type -> Type
 -- ^ 'mkLamType' for multiple type or value arguments
 
+mkLamTypes vs ty = foldr mkLamType ty vs
+
 mkLamType v body_ty
    | isTyVar v
    = ForAllTy (Bndr v Inferred) body_ty
@@ -1525,43 +1527,19 @@ mkLamType v body_ty
    , v `elemVarSet` tyCoVarsOfType body_ty
    = ForAllTy (Bndr v Required) body_ty
 
-   | isPredTy arg_ty  -- See Note [mkLamType: dictionary arguments]
-   = mkInvisFunTy arg_ty body_ty
+   | otherwise
+   = mkFunctionType (varType v) body_ty
+
+
+mkFunctionType :: Type -> Type -> Type
+-- This one works out the AnonArgFlag from the argument type
+-- See GHC.Types.Var Note [AnonArgFlag]
+mkFunctionType arg_ty res_ty
+   | isPredTy arg_ty -- See GHC.Types.Var Note [AnonArgFlag]
+   = mkInvisFunTy arg_ty res_ty
 
    | otherwise
-   = mkVisFunTy arg_ty body_ty
-   where
-     arg_ty = varType v
-
-mkLamTypes vs ty = foldr mkLamType ty vs
-
-{- Note [mkLamType: dictionary arguments]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we have (\ (d :: Ord a). blah), we want to give it type
-           (Ord a => blah_ty)
-with a fat arrow; that is, using mkInvisFunTy, not mkVisFunTy.
-
-Why? After all, we are in Core, where (=>) and (->) behave the same.
-Yes, but the /specialiser/ does treat dictionary arguments specially.
-Suppose we do w/w on 'foo' in module A, thus (#11272, #6056)
-   foo :: Ord a => Int -> blah
-   foo a d x = case x of I# x' -> $wfoo @a d x'
-
-   $wfoo :: Ord a => Int# -> blah
-
-Now in module B we see (foo @Int dOrdInt).  The specialiser will
-specialise this to $sfoo, where
-   $sfoo :: Int -> blah
-   $sfoo x = case x of I# x' -> $wfoo @Int dOrdInt x'
-
-Now we /must/ also specialise $wfoo!  But it wasn't user-written,
-and has a type built with mkLamTypes.
-
-Conclusion: the easiest thing is to make mkLamType build
-            (c => ty)
-when the argument is a predicate type.  See GHC.Core.TyCo.Rep
-Note [Types for coercions, predicates, and evidence]
--}
+   = mkVisFunTy arg_ty res_ty
 
 -- | Given a list of type-level vars and the free vars of a result kind,
 -- makes TyCoBinders, preferring anonymous binders
