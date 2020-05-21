@@ -319,3 +319,7 @@ test('T17810', normal, multimod_compile, ['T17810', '-fspecialise-aggressively -
 test('T18013', normal, multimod_compile, ['T18013', '-v0 -O'])
 test('T18098', normal, compile, ['-dcore-lint -O2'])
 test('T18120', normal, compile, ['-dcore-lint -O'])
+
+# Cast WW
+test('T17673', [ only_ways(['optasm']), grep_errmsg(r'^\w+\.\$wf') ], compile, ['-ddump-simpl -dsuppress-uniques -dppr-cols=9999'])
+test('T18078', [ only_ways(['optasm']), grep_errmsg(r'^\w+\.\$wf') ], compile, ['-ddump-simpl -dsuppress-uniques -dppr-cols=9999'])

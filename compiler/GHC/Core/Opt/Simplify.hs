@@ -43,12 +43,12 @@ import GHC.Types.Cpr    ( mkCprSig, botCpr )
 import GHC.Core.Ppr     ( pprCoreExpr )
 import GHC.Core.Unfold
 import GHC.Core.Utils
+import GHC.Core.Opt.Arity ( etaExpand )
 import GHC.Core.SimpleOpt ( pushCoTyArg, pushCoValArg
                           , joinPointBinding_maybe, joinPointBindings_maybe )
 import GHC.Core.FVs     ( mkRuleInfo )
 import GHC.Core.Rules   ( lookupRule, getRules )
-import GHC.Types.Basic  ( TopLevelFlag(..), isNotTopLevel, isTopLevel,
-                          RecFlag(..), Arity )
+import GHC.Types.Basic
 import GHC.Utils.Monad  ( mapAccumLM, liftIO )
 import GHC.Types.Var    ( isTyCoVar )
 import GHC.Data.Maybe   ( orElse )
@@ -315,8 +315,8 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
 
         -- ANF-ise a constructor or PAP rhs
         -- We get at most one float per argument here
-        ; (let_floats, body2) <- {-#SCC "prepareRhs" #-} prepareRhs (getMode env) top_lvl
-                                            (getOccFS bndr1) (idInfo bndr1) body1
+        ; (let_floats, bndr2, body2) <- {-#SCC "prepareBinding" #-}
+                                        prepareBinding env top_lvl bndr bndr1 body1
         ; let body_floats2 = body_floats1 `addLetFloats` let_floats
 
         ; (rhs_floats, rhs')
@@ -341,7 +341,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                         ; return (floats, rhs') }
 
         ; (bind_float, env2) <- completeBind (env `setInScopeFromF` rhs_floats)
-                                             top_lvl Nothing bndr bndr1 rhs'
+                                             top_lvl Nothing bndr bndr2 rhs'
         ; return (rhs_floats `addFloats` bind_float, env2) }
 
 --------------------------
@@ -393,16 +393,16 @@ completeNonRecX :: TopLevelFlag -> SimplEnv
 
 completeNonRecX top_lvl env is_strict old_bndr new_bndr new_rhs
   = ASSERT2( not (isJoinId new_bndr), ppr new_bndr )
-    do  { (prepd_floats, rhs1) <- prepareRhs (getMode env) top_lvl (getOccFS new_bndr)
-                                             (idInfo new_bndr) new_rhs
+    do  { (prepd_floats, new_bndr, new_rhs)
+              <- prepareBinding env top_lvl old_bndr new_bndr new_rhs
         ; let floats = emptyFloats env `addLetFloats` prepd_floats
         ; (rhs_floats, rhs2) <-
-                if doFloatFromRhs NotTopLevel NonRecursive is_strict floats rhs1
+                if doFloatFromRhs NotTopLevel NonRecursive is_strict floats new_rhs
                 then    -- Add the floats to the main env
                      do { tick LetFloatFromLet
-                        ; return (floats, rhs1) }
+                        ; return (floats, new_rhs) }
                 else    -- Do not float; wrap the floats around the RHS
-                     return (emptyFloats env, wrapFloats floats rhs1)
+                     return (emptyFloats env, wrapFloats floats new_rhs)
 
         ; (bind_float, env2) <- completeBind (env `setInScopeFromF` rhs_floats)
                                              NotTopLevel Nothing
@@ -412,12 +412,146 @@ completeNonRecX top_lvl env is_strict old_bndr new_bndr new_rhs
 
 {- *********************************************************************
 *                                                                      *
-           prepareRhs, makeTrivial
+           prepareBinding, prepareRhs, makeTrivial
 *                                                                      *
 ************************************************************************
 
-Note [prepareRhs]
-~~~~~~~~~~~~~~~~~
+Note [Cast worker/wrappers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we have a binding
+   x = e |> co
+we want to do something very similar to worker/wrapper:
+   $wx = e
+   x = $wx |> co
+
+So now x can be inlined freely.  There's a chance that e will be a
+constructor application or function, or something like that, so moving
+the coercion to the usage site may well cancel the coercions and lead
+to further optimisation.  Example:
+
+     data family T a :: *
+     data instance T Int = T Int
+
+     foo :: Int -> Int -> Int
+     foo m n = ...
+        where
+          t = T m
+          go 0 = 0
+          go n = case t of { T m -> go (n-m) }
+                -- This case should optimise
+
+We call this making a cast worker/wrapper, and it's done by prepareBinding.
+
+We need to be careful with inline/noinline pragmas:
+  rec { {-# NOINLINE f #-}
+        f = (...g...) |> co
+      ; g = ...f... }
+This is legitimate -- it tells GHC to use f as the loop breaker
+rather than g.  Now we do the cast thing, to get something like
+  rec { $wf = ...g...
+      ; f = $wf |> co
+      ; g = ...f... }
+Where should the NOINLINE pragma go?  If we leave it on f we'll get
+  rec { $wf = ...g...
+      ; {-# NOINLINE f #-}
+        f = $wf |> co
+      ; g = ...f... }
+and that is bad bad: the whole point is that we want to inline that
+cast!  We want to transfer the pagma to $wf:
+  rec { {-# NOINLINE $wf #-}
+        $wf = ...g...
+      ; f = $wf |> co
+      ; g = ...f... }
+It's exactly like worker/wrapper for strictness analysis:
+  f is the wrapper and must inline like crazy
+  $wf is the worker and must carry f's original pragma
+See Note [Worker-wrapper for NOINLINE functions] in
+GHC.Core.Opt.WorkWrap.
+
+See #17673, #18093, #18078.
+
+Note [Preserve strictness in cast w/w]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the Note [Cast worker/wrappers] transformation, keep the strictness info.
+Eg
+        f = e `cast` co    -- f has strictness SSL
+When we transform to
+        f' = e             -- f' also has strictness SSL
+        f = f' `cast` co   -- f still has strictness SSL
+
+Its not wrong to drop it on the floor, but better to keep it.
+
+Note [Cast w/w: unlifted]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+BUT don't do cast worker/wrapper if 'e' has an unlifted type.
+This *can* happen:
+
+     foo :: Int = (error (# Int,Int #) "urk")
+                  `cast` CoUnsafe (# Int,Int #) Int
+
+If do the makeTrivial thing to the error call, we'll get
+    foo = case error (# Int,Int #) "urk" of v -> v `cast` ...
+But 'v' isn't in scope!
+
+These strange casts can happen as a result of case-of-case
+        bar = case (case x of { T -> (# 2,3 #); F -> error "urk" }) of
+                (# p,q #) -> p+q
+
+NOTE: Nowadays we don't use casts for these error functions;
+instead, we use (case erorr ... of {}). So I'm not sure
+this Note makes much sense any more.
+-}
+
+prepareBinding :: SimplEnv -> TopLevelFlag
+               -> InId -> OutId -> OutExpr
+               -> SimplM (LetFloats, OutId, OutExpr)
+
+prepareBinding env top_lvl old_bndr bndr rhs
+  | Cast rhs1 co <- rhs
+    -- Try for cast worker/wrapper
+    -- See Note [Cast worker/wrappers]
+  , not (isStableUnfolding (realIdUnfolding old_bndr))
+        -- Don't make a cast w/w if the thing is going to be inlined anyway
+  , not (exprIsTrivial rhs1)
+        -- Nor if the RHS is trivial; then again it'll be inlined
+  , let ty1 = coercionLKind co
+  , not (isUnliftedType ty1)
+        -- Not if rhs has an unlifted type; see Note [Cast w/w: unlifted]
+  = do { (floats, new_id) <- makeTrivialBinding (getMode env) top_lvl
+                                   (getOccFS bndr) worker_info rhs1 ty1
+       ; let bndr' = bndr `setInlinePragma` mkCastWrapperInlinePrag (idInlinePragma bndr)
+       ; return (floats, bndr', Cast (Var new_id) co) }
+
+  | otherwise
+  = do { (floats, rhs') <- prepareRhs (getMode env) top_lvl (getOccFS bndr) rhs
+       ; return (floats, bndr, rhs') }
+ where
+   info = idInfo bndr
+   worker_info = vanillaIdInfo `setStrictnessInfo` strictnessInfo info
+                               `setCprInfo`        cprInfo info
+                               `setDemandInfo`     demandInfo info
+                               `setInlinePragInfo` inlinePragInfo info
+                               `setArityInfo`      arityInfo info
+          -- We do /not/ want to transfer OccInfo, Rules, Unfolding
+          -- Note [Preserve strictness in cast w/w]
+
+mkCastWrapperInlinePrag :: InlinePragma -> InlinePragma
+-- See Note [Cast wrappers]
+mkCastWrapperInlinePrag (InlinePragma { inl_act = act, inl_rule = rule_info })
+  = InlinePragma { inl_src    = SourceText "{-# INLINE"
+                 , inl_inline = NoUserInline -- See Note [Wrapper NoUserInline]
+                 , inl_sat    = Nothing      --     in GHC.Core.Opt.WorkWrap
+                 , inl_act    = wrap_act     -- See Note [Wrapper activation]
+                 , inl_rule   = rule_info }  --     in GHC.Core.Opt.WorkWrap
+                                -- RuleMatchInfo is (and must be) unaffected
+  where
+    -- See Note [Wrapper activation] in GHC.Core.Opt.WorkWrap
+    -- But simpler, because we don't need to disable during InitialPhase
+    wrap_act | isNeverActive act = activateDuringFinal
+             | otherwise         = act
+
+{- Note [prepareRhs]
+~~~~~~~~~~~~~~~~~~~~
 prepareRhs takes a putative RHS, checks whether it's a PAP or
 constructor application and, if so, converts it to ANF, so that the
 resulting thing can be inlined more easily.  Thus
@@ -435,26 +569,16 @@ That's what the 'go' loop in prepareRhs does
 -}
 
 prepareRhs :: SimplMode -> TopLevelFlag
-           -> FastString   -- Base for any new variables
-           -> IdInfo       -- IdInfo for the LHS of this binding
+           -> FastString    -- Base for any new variables
            -> OutExpr
            -> SimplM (LetFloats, OutExpr)
--- Transforms a RHS into a better RHS by adding floats
+-- Transforms a RHS into a better RHS by ANF'ing args
+-- for expandable RHSs: constructors and PAPs
 -- e.g        x = Just e
 -- becomes    a = e
 --            x = Just a
 -- See Note [prepareRhs]
-prepareRhs mode top_lvl occ info (Cast rhs co)  -- Note [Float coercions]
-  | let ty1 = coercionLKind co         -- Do *not* do this if rhs has an unlifted type
-  , not (isUnliftedType ty1)                 -- see Note [Float coercions (unlifted)]
-  = do  { (floats, rhs') <- makeTrivialWithInfo mode top_lvl occ sanitised_info rhs
-        ; return (floats, Cast rhs' co) }
-  where
-    sanitised_info = vanillaIdInfo `setStrictnessInfo` strictnessInfo info
-                                   `setCprInfo`        cprInfo info
-                                   `setDemandInfo`     demandInfo info
-
-prepareRhs mode top_lvl occ _ rhs0
+prepareRhs mode top_lvl occ rhs0
   = do  { (_is_exp, floats, rhs1) <- go 0 rhs0
         ; return (floats, rhs1) }
   where
@@ -498,61 +622,10 @@ prepareRhs mode top_lvl occ _ rhs0
     go _ other
         = return (False, emptyLetFloats, other)
 
-{-
-Note [Float coercions]
-~~~~~~~~~~~~~~~~~~~~~~
-When we find the binding
-        x = e `cast` co
-we'd like to transform it to
-        x' = e
-        x = x `cast` co         -- A trivial binding
-There's a chance that e will be a constructor application or function, or something
-like that, so moving the coercion to the usage site may well cancel the coercions
-and lead to further optimisation.  Example:
-
-     data family T a :: *
-     data instance T Int = T Int
-
-     foo :: Int -> Int -> Int
-     foo m n = ...
-        where
-          x = T m
-          go 0 = 0
-          go n = case x of { T m -> go (n-m) }
-                -- This case should optimise
-
-Note [Preserve strictness when floating coercions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In the Note [Float coercions] transformation, keep the strictness info.
-Eg
-        f = e `cast` co    -- f has strictness SSL
-When we transform to
-        f' = e             -- f' also has strictness SSL
-        f = f' `cast` co   -- f still has strictness SSL
-
-Its not wrong to drop it on the floor, but better to keep it.
-
-Note [Float coercions (unlifted)]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-BUT don't do [Float coercions] if 'e' has an unlifted type.
-This *can* happen:
-
-     foo :: Int = (error (# Int,Int #) "urk")
-                  `cast` CoUnsafe (# Int,Int #) Int
-
-If do the makeTrivial thing to the error call, we'll get
-    foo = case error (# Int,Int #) "urk" of v -> v `cast` ...
-But 'v' isn't in scope!
-
-These strange casts can happen as a result of case-of-case
-        bar = case (case x of { T -> (# 2,3 #); F -> error "urk" }) of
-                (# p,q #) -> p+q
--}
-
 makeTrivialArg :: SimplMode -> ArgSpec -> SimplM (LetFloats, ArgSpec)
-makeTrivialArg mode (ValArg e)
+makeTrivialArg mode arg@(ValArg { as_arg = e })
   = do { (floats, e') <- makeTrivial mode NotTopLevel (fsLit "arg") e
-       ; return (floats, ValArg e') }
+       ; return (floats, arg { as_arg = e' }) }
 makeTrivialArg _ arg
   = return (emptyLetFloats, arg)  -- CastBy, TyArg
 
@@ -561,29 +634,32 @@ makeTrivial :: SimplMode -> TopLevelFlag
             -> OutExpr     -- ^ This expression satisfies the let/app invariant
             -> SimplM (LetFloats, OutExpr)
 -- Binds the expression to a variable, if it's not trivial, returning the variable
-makeTrivial mode top_lvl context expr
- = makeTrivialWithInfo mode top_lvl context vanillaIdInfo expr
-
-makeTrivialWithInfo :: SimplMode -> TopLevelFlag
-                    -> FastString  -- ^ a "friendly name" to build the new binder from
-                    -> IdInfo
-                    -> OutExpr     -- ^ This expression satisfies the let/app invariant
-                    -> SimplM (LetFloats, OutExpr)
--- Propagate strictness and demand info to the new binder
--- Note [Preserve strictness when floating coercions]
--- Returned SimplEnv has same substitution as incoming one
-makeTrivialWithInfo mode top_lvl occ_fs info expr
+makeTrivial mode top_lvl occ_fs expr
   | exprIsTrivial expr                          -- Already trivial
   || not (bindingOk top_lvl expr expr_ty)       -- Cannot trivialise
                                                 --   See Note [Cannot trivialise]
   = return (emptyLetFloats, expr)
 
+  | Cast expr' co <- expr
+  = do { (floats, triv_expr) <- makeTrivial mode top_lvl occ_fs expr'
+       ; return (floats, Cast triv_expr co) }
+
   | otherwise
-  = do  { (floats, expr1) <- prepareRhs mode top_lvl occ_fs info expr
-        ; if   exprIsTrivial expr1  -- See Note [Trivial after prepareRhs]
-          then return (floats, expr1)
-          else do
-        { uniq <- getUniqueM
+  = do { (floats, new_id) <- makeTrivialBinding mode top_lvl occ_fs
+                                                vanillaIdInfo expr expr_ty
+       ; return (floats, Var new_id) }
+  where
+    expr_ty = exprType expr
+
+makeTrivialBinding :: SimplMode -> TopLevelFlag
+                   -> FastString  -- ^ a "friendly name" to build the new binder from
+                   -> IdInfo
+                   -> OutExpr     -- ^ This expression satisfies the let/app invariant
+                   -> OutType     -- Type of the expression
+                   -> SimplM (LetFloats, OutId)
+makeTrivialBinding mode top_lvl occ_fs info expr expr_ty
+  = do  { (floats, expr1) <- prepareRhs mode top_lvl occ_fs expr
+        ; uniq <- getUniqueM
         ; let name = mkSystemVarName uniq occ_fs
               var  = mkLocalIdWithInfo name expr_ty info
 
@@ -595,9 +671,7 @@ makeTrivialWithInfo mode top_lvl occ_fs info expr
         ; let final_id = addLetBndrInfo var arity is_bot unf
               bind     = NonRec final_id expr2
 
-        ; return ( floats `addLetFlts` unitLetFloat bind, Var final_id ) }}
-   where
-     expr_ty = exprType expr
+        ; return ( floats `addLetFlts` unitLetFloat bind, final_id ) }
 
 bindingOk :: TopLevelFlag -> CoreExpr -> Type -> Bool
 -- True iff we can have a binding of this expression at this level
@@ -606,15 +680,8 @@ bindingOk top_lvl expr expr_ty
   | isTopLevel top_lvl = exprIsTopLevelBindable expr expr_ty
   | otherwise          = True
 
-{- Note [Trivial after prepareRhs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we call makeTrival on (e |> co), the recursive use of prepareRhs
-may leave us with
-   { a1 = e }  and   (a1 |> co)
-Now the latter is trivial, so we don't want to let-bind it.
-
-Note [Cannot trivialise]
-~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Cannot trivialise]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider:
    f :: Int -> Addr#
 
@@ -696,7 +763,7 @@ completeBind env top_lvl mb_cont old_bndr new_bndr new_rhs
 
         -- Simplify the unfolding
       ; new_unfolding <- simplLetUnfolding env top_lvl mb_cont old_bndr
-                                           final_rhs (idType new_bndr) old_unf
+                          final_rhs (idType new_bndr) new_arity old_unf
 
       ; let final_bndr = addLetBndrInfo new_bndr new_arity is_bot new_unfolding
         -- See Note [In-scope set as a substitution]
@@ -928,6 +995,7 @@ simplExprF1 env (App fun arg) cont
                                 , sc_cont    = cont } }
       _       -> simplExprF env fun $
                  ApplyToVal { sc_arg = arg, sc_env = env
+                            , sc_hole_ty = substTy env (exprType fun)
                             , sc_dup = NoDup, sc_cont = cont }
 
 simplExprF1 env expr@(Lam {}) cont
@@ -1232,8 +1300,8 @@ rebuild env expr cont
       Select { sc_bndr = bndr, sc_alts = alts, sc_env = se, sc_cont = cont }
         -> rebuildCase (se `setInScopeFromE` env) expr bndr alts cont
 
-      StrictArg { sc_fun = fun, sc_cont = cont }
-        -> rebuildCall env (fun `addValArgTo` expr) cont
+      StrictArg { sc_fun = fun, sc_cont = cont, sc_fun_ty = fun_ty }
+        -> rebuildCall env (addValArgTo fun expr fun_ty ) cont
       StrictBind { sc_bndr = b, sc_bndrs = bs, sc_body = body
                  , sc_env = se, sc_cont = cont }
         -> do { (floats1, env') <- simplNonRecX (se `setInScopeFromE` env) b expr
@@ -1271,7 +1339,7 @@ In particular, we want to behave well on
 
 
  * (f |> co) @t1 @t2 ... @tn x1 .. xm
-   Here we wil use pushCoTyArg and pushCoValArg successively, which
+   Here we will use pushCoTyArg and pushCoValArg successively, which
    build up NthCo stacks.  Silly to do that if co is reflexive.
 
 However, we don't want to call isReflexiveCo too much, because it uses
@@ -1310,20 +1378,20 @@ simplCast env body co0 cont0
           where
             co' = mkTransCo co1 co2
 
-        addCoerce co cont@(ApplyToTy { sc_arg_ty = arg_ty, sc_cont = tail })
+        addCoerce co (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = tail })
           | Just (arg_ty', m_co') <- pushCoTyArg co arg_ty
-            -- N.B. As mentioned in Note [The hole type in ApplyToTy] this is
-            -- only needed by `sc_hole_ty` which is often not forced.
-            -- Consequently it is worthwhile using a lazy pattern match here to
-            -- avoid unnecessary coercionKind evaluations.
-          , let hole_ty = coercionLKind co
           = {-#SCC "addCoerce-pushCoTyArg" #-}
             do { tail' <- addCoerceM m_co' tail
-               ; return (cont { sc_arg_ty  = arg_ty'
-                              , sc_hole_ty = hole_ty  -- NB!  As the cast goes past, the
-                                                      -- type of the hole changes (#16312)
-                              , sc_cont    = tail' }) }
+               ; return (ApplyToTy { sc_arg_ty  = arg_ty'
+                                   , sc_cont    = tail'
+                                   , sc_hole_ty = coercionLKind co }) }
+                                        -- NB!  As the cast goes past, the
+                                        -- type of the hole changes (#16312)
 
+        -- (f |> co) e   ===>   (f (e |> co1)) |> co2
+        -- where   co :: (s1->s2) ~ (t1~t2)
+        --         co1 :: t1 ~ s1
+        --         co2 :: s2 ~ t2
         addCoerce co cont@(ApplyToVal { sc_arg = arg, sc_env = arg_se
                                       , sc_dup = dup, sc_cont = tail })
           | Just (co1, m_co2) <- pushCoValArg co
@@ -1347,7 +1415,8 @@ simplCast env body co0 cont0
                ; return (ApplyToVal { sc_arg  = mkCast arg' co1
                                     , sc_env  = arg_se'
                                     , sc_dup  = dup'
-                                    , sc_cont = tail' }) } }
+                                    , sc_cont = tail'
+                                    , sc_hole_ty = coercionLKind co }) } }
 
         addCoerce co cont
           | isReflexiveCo co = return cont  -- Having this at the end makes a huge
@@ -1426,7 +1495,7 @@ simplLamBndr env bndr
   | isId bndr && hasCoreUnfolding old_unf   -- Special case
   = do { (env1, bndr1) <- simplBinder env bndr
        ; unf'          <- simplStableUnfolding env1 NotTopLevel Nothing bndr
-                                               old_unf (idType bndr1)
+                                      (idType bndr1) (idArity bndr1) old_unf
        ; let bndr2 = bndr1 `setIdUnfolding` unf'
        ; return (modifyInScope env1 bndr2, bndr2) }
 
@@ -1874,22 +1943,24 @@ rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
 rebuildCall env info (CastIt co cont)
   = rebuildCall env (addCastTo info co) cont
 
-rebuildCall env info (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = cont })
-  = rebuildCall env (addTyArgTo info arg_ty) cont
+rebuildCall env info (ApplyToTy { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = cont })
+  = rebuildCall env (addTyArgTo info arg_ty hole_ty) cont
 
-rebuildCall env info@(ArgInfo { ai_encl = encl_rules, ai_type = fun_ty
+rebuildCall env info@(ArgInfo { ai_encl = encl_rules
                               , ai_strs = str:strs, ai_discs = disc:discs })
             (ApplyToVal { sc_arg = arg, sc_env = arg_se
-                        , sc_dup = dup_flag, sc_cont = cont })
+                        , sc_dup = dup_flag, sc_hole_ty = fun_ty
+                        , sc_cont = cont })
   | isSimplified dup_flag     -- See Note [Avoid redundant simplification]
-  = rebuildCall env (addValArgTo info' arg) cont
+  = rebuildCall env (addValArgTo info' arg fun_ty) cont
 
   | str         -- Strict argument
   , sm_case_case (getMode env)
   = -- pprTrace "Strict Arg" (ppr arg $$ ppr (seIdSubst env) $$ ppr (seInScope env)) $
     simplExprF (arg_se `setInScopeFromE` env) arg
                (StrictArg { sc_fun = info', sc_cci = cci_strict
-                          , sc_dup = Simplified, sc_cont = cont })
+                          , sc_dup = Simplified, sc_fun_ty = fun_ty
+                          , sc_cont = cont })
                 -- Note [Shadowing]
 
   | otherwise                           -- Lazy argument
@@ -1899,7 +1970,7 @@ rebuildCall env info@(ArgInfo { ai_encl = encl_rules, ai_type = fun_ty
         -- floating a demanded let.
   = do  { arg' <- simplExprC (arg_se `setInScopeFromE` env) arg
                              (mkLazyArgStop arg_ty cci_lazy)
-        ; rebuildCall env (addValArgTo info' arg') cont }
+        ; rebuildCall env (addValArgTo info' arg' fun_ty) cont }
   where
     info'  = info { ai_strs = strs, ai_discs = discs }
     arg_ty = funArgTy fun_ty
@@ -2107,9 +2178,11 @@ trySeqRules in_env scrut rhs cont
   where
     no_cast_scrut = drop_casts scrut
     scrut_ty  = exprType no_cast_scrut
-    seq_id_ty = idType seqId
-    res1_ty   = piResultTy seq_id_ty rhs_rep
-    res2_ty   = piResultTy res1_ty   scrut_ty
+    seq_id_ty = idType seqId                    -- forall r a (b::TYPE r). a -> b -> b
+    res1_ty   = piResultTy seq_id_ty rhs_rep    -- forall a (b::TYPE rhs_rep). a -> b -> b
+    res2_ty   = piResultTy res1_ty   scrut_ty   -- forall (b::TYPE rhs_rep). scrut_ty -> b -> b
+    res3_ty   = piResultTy res2_ty   rhs_ty     -- scrut_ty -> rhs_ty -> rhs_ty
+    res4_ty   = funResultTy res3_ty             -- rhs_ty -> rhs_ty
     rhs_ty    = substTy in_env (exprType rhs)
     rhs_rep   = getRuntimeRep rhs_ty
     out_args  = [ TyArg { as_arg_ty  = rhs_rep
@@ -2118,9 +2191,11 @@ trySeqRules in_env scrut rhs cont
                         , as_hole_ty = res1_ty }
                 , TyArg { as_arg_ty  = rhs_ty
                         , as_hole_ty = res2_ty }
-                , ValArg no_cast_scrut]
+                , ValArg { as_arg = no_cast_scrut
+                         , as_hole_ty = res3_ty } ]
     rule_cont = ApplyToVal { sc_dup = NoDup, sc_arg = rhs
-                           , sc_env = in_env, sc_cont = cont }
+                           , sc_env = in_env, sc_cont = cont
+                           , sc_hole_ty = res4_ty }
     -- Lazily evaluated, so we don't do most of this
 
     drop_casts (Cast e _) = drop_casts e
@@ -3110,7 +3185,8 @@ mkDupableCont env (StrictBind { sc_bndr = bndr, sc_bndrs = bndrs
                              , sc_dup  = OkToDup
                              , sc_cont = mkBoringStop res_ty } ) }
 
-mkDupableCont env (StrictArg { sc_fun = info, sc_cci = cci, sc_cont = cont })
+mkDupableCont env (StrictArg { sc_fun = info, sc_cci = cci
+                             , sc_cont = cont, sc_fun_ty = fun_ty })
         -- See Note [Duplicating StrictArg]
         -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
   = do { (floats1, cont') <- mkDupableCont env cont
@@ -3118,8 +3194,9 @@ mkDupableCont env (StrictArg { sc_fun = info, sc_cci = cci, sc_cont = cont })
                                            (ai_args info)
        ; return ( foldl' addLetFloats floats1 floats_s
                 , StrictArg { sc_fun = info { ai_args = args' }
-                            , sc_cci = cci
                             , sc_cont = cont'
+                            , sc_cci = cci
+                            , sc_fun_ty = fun_ty
                             , sc_dup = OkToDup} ) }
 
 mkDupableCont env (ApplyToTy { sc_cont = cont
@@ -3129,7 +3206,8 @@ mkDupableCont env (ApplyToTy { sc_cont = cont
                                     , sc_arg_ty = arg_ty, sc_hole_ty = hole_ty }) }
 
 mkDupableCont env (ApplyToVal { sc_arg = arg, sc_dup = dup
-                              , sc_env = se, sc_cont = cont })
+                              , sc_env = se, sc_cont = cont
+                              , sc_hole_ty = hole_ty })
   =     -- e.g.         [...hole...] (...arg...)
         --      ==>
         --              let a = ...arg...
@@ -3147,7 +3225,8 @@ mkDupableCont env (ApplyToVal { sc_arg = arg, sc_dup = dup
                                          -- arg'' in its in-scope set, even if makeTrivial
                                          -- has turned arg'' into a fresh variable
                                          -- See Note [StaticEnv invariant] in GHC.Core.Opt.Simplify.Utils
-                              , sc_dup = OkToDup, sc_cont = cont' }) }
+                              , sc_dup = OkToDup, sc_cont = cont'
+                              , sc_hole_ty = hole_ty }) }
 
 mkDupableCont env (Select { sc_bndr = case_bndr, sc_alts = alts
                           , sc_env = se, sc_cont = cont })
@@ -3491,11 +3570,11 @@ because we don't know its usage in each RHS separately
 simplLetUnfolding :: SimplEnv-> TopLevelFlag
                   -> MaybeJoinCont
                   -> InId
-                  -> OutExpr -> OutType
+                  -> OutExpr -> OutType -> Arity
                   -> Unfolding -> SimplM Unfolding
-simplLetUnfolding env top_lvl cont_mb id new_rhs rhs_ty unf
+simplLetUnfolding env top_lvl cont_mb id new_rhs rhs_ty arity unf
   | isStableUnfolding unf
-  = simplStableUnfolding env top_lvl cont_mb id unf rhs_ty
+  = simplStableUnfolding env top_lvl cont_mb id rhs_ty arity unf
   | isExitJoinId id
   = return noUnfolding -- See Note [Do not inline exit join points] in GHC.Core.Opt.Exitify
   | otherwise
@@ -3521,9 +3600,10 @@ mkLetUnfolding dflags top_lvl src id new_rhs
 simplStableUnfolding :: SimplEnv -> TopLevelFlag
                      -> MaybeJoinCont  -- Just k => a join point with continuation k
                      -> InId
-                     -> Unfolding -> OutType -> SimplM Unfolding
+                     -> OutType -> Arity -> Unfolding
+                     ->SimplM Unfolding
 -- Note [Setting the new unfolding]
-simplStableUnfolding env top_lvl mb_cont id unf rhs_ty
+simplStableUnfolding env top_lvl mb_cont id rhs_ty id_arity unf
   = case unf of
       NoUnfolding   -> return unf
       BootUnfolding -> return unf
@@ -3536,9 +3616,13 @@ simplStableUnfolding env top_lvl mb_cont id unf rhs_ty
 
       CoreUnfolding { uf_tmpl = expr, uf_src = src, uf_guidance = guide }
         | isStableSource src
-        -> do { expr' <- case mb_cont of -- See Note [Rules and unfolding for join points]
-                           Just cont -> simplJoinRhs unf_env id expr cont
-                           Nothing   -> simplExprC unf_env expr (mkBoringStop rhs_ty)
+        -> do { expr' <- case mb_cont of
+                           Just cont -> -- Binder is a join point
+                                        -- See Note [Rules and unfolding for join points]
+                                        simplJoinRhs unf_env id expr cont
+                           Nothing   -> -- Binder is not a join point
+                                        do { expr' <- simplExprC unf_env expr (mkBoringStop rhs_ty)
+                                           ; return (eta_expand expr') }
               ; case guide of
                   UnfWhen { ug_arity = arity
                           , ug_unsat_ok = sat_ok
@@ -3575,7 +3659,41 @@ simplStableUnfolding env top_lvl mb_cont id unf rhs_ty
     unf_env    = updMode (updModeForStableUnfoldings act) env
          -- See Note [Simplifying inside stable unfoldings] in GHC.Core.Opt.Simplify.Utils
 
-{-
+    -- See Note [Eta-expand stable unfoldings]
+    eta_expand expr
+      | not eta_on         = expr
+      | exprIsTrivial expr = expr
+      | otherwise          = etaExpand id_arity expr
+    eta_on = sm_eta_expand (getMode env)
+
+{- Note [Eta-expand stable unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For INLINE/INLINABLE things (which get stable unfoldings) there's a danger
+of getting
+   f :: Int -> Int -> Int -> Blah
+   [ Arity = 3                 -- Good arity
+   , Unf=Stable (\xy. blah)    -- Less good arity, only 2
+   f = \pqr. e
+
+This can happen because f's RHS is optimised more vigorously than
+its stable unfolding.  Now suppose we have a call
+   g = f x
+Because f has arity=3, g will have arity=2.  But if we inline f (using
+its stable unfolding) g's arity will reduce to 1, because <blah>
+hasn't been optimised yet.  This happened in the 'parsec' library,
+for Text.Pasec.Char.string.
+
+Generally, if we know that 'f' has arity N, it seems sensible to
+eta-expand the stable unfolding to arity N too. Simple and consistent.
+
+Wrinkles
+* Don't eta-expand a trivial expr, else each pass will eta-reduce it,
+  and then eta-expand again. See Note [Do not eta-expand trivial expressions]
+  in GHC.Core.Opt.Simplify.Utils.
+* Don't eta-expand join points; see Note [Do not eta-expand join points]
+  in GHC.Core.Opt.Simplify.Utils.  We uphold this because the join-point
+  case (mb_cont = Just _) doesn't use eta_expand.
+
 Note [Force bottoming field]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We need to force bottoming, or the new unfolding holds
