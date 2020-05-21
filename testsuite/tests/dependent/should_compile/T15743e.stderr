@@ -52,5 +52,5 @@ DATA CONSTRUCTORS
                 (d :: Proxy k5) (e :: Proxy k7).
          f c -> T k8 a b f c d e
 Dependent modules: []
-Dependent packages: [base-4.14.0.0, ghc-prim-0.6.1,
-                     integer-gmp-1.0.2.0]
+Dependent packages: [base-4.15.0.0, ghc-prim-0.6.1,
+                     integer-gmp-1.0.3.0]

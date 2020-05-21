@@ -72,7 +72,7 @@ library
 
     Build-Depends:
         array            == 0.5.*,
-        base             >= 4.8 && < 4.15,
+        base             >= 4.8 && < 4.16,
         binary           == 0.8.*,
         bytestring       == 0.10.*,
         containers       >= 0.5 && < 0.7,
