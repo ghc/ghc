@@ -1,4 +1,4 @@
 
-T16427.hs:5:26: error:
+T14320.hs:17:14: error:
     GADT constructor type signature cannot contain nested ‘forall’s or contexts
-    In the definition of data constructor ‘C’
+    In the definition of data constructor ‘TEBad’

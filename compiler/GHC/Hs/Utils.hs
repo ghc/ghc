@@ -1242,7 +1242,8 @@ hsTyClForeignBinders tycl_decls foreign_decls
     getSelectorNames (ns, fs) = map unLoc ns ++ map (extFieldOcc . unLoc) fs
 
 -------------------
-hsLTyClDeclBinders :: Located (TyClDecl (GhcPass p))
+hsLTyClDeclBinders :: IsPass p
+                   => Located (TyClDecl (GhcPass p))
                    -> ([Located (IdP (GhcPass p))], [LFieldOcc (GhcPass p)])
 -- ^ Returns all the /binding/ names of the decl.  The first one is
 -- guaranteed to be the name of the decl. The first component
@@ -1304,7 +1305,8 @@ getPatSynBinds binds
           , L _ (PatSynBind _ psb) <- bagToList lbinds ]
 
 -------------------
-hsLInstDeclBinders :: LInstDecl (GhcPass p)
+hsLInstDeclBinders :: IsPass p
+                   => LInstDecl (GhcPass p)
                    -> ([Located (IdP (GhcPass p))], [LFieldOcc (GhcPass p)])
 hsLInstDeclBinders (L _ (ClsInstD
                              { cid_inst = ClsInstDecl
@@ -1316,7 +1318,8 @@ hsLInstDeclBinders (L _ (TyFamInstD {})) = mempty
 
 -------------------
 -- | the 'SrcLoc' returned are for the whole declarations, not just the names
-hsDataFamInstBinders :: DataFamInstDecl (GhcPass p)
+hsDataFamInstBinders :: IsPass p
+                     => DataFamInstDecl (GhcPass p)
                      -> ([Located (IdP (GhcPass p))], [LFieldOcc (GhcPass p)])
 hsDataFamInstBinders (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
                        FamEqn { feqn_rhs = defn }}})
@@ -1325,7 +1328,8 @@ hsDataFamInstBinders (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
 
 -------------------
 -- | the 'SrcLoc' returned are for the whole declarations, not just the names
-hsDataDefnBinders :: HsDataDefn (GhcPass p)
+hsDataDefnBinders :: IsPass p
+                  => HsDataDefn (GhcPass p)
                   -> ([Located (IdP (GhcPass p))], [LFieldOcc (GhcPass p)])
 hsDataDefnBinders (HsDataDefn { dd_cons = cons })
   = hsConDeclsBinders cons
@@ -1335,7 +1339,8 @@ hsDataDefnBinders (HsDataDefn { dd_cons = cons })
 type Seen p = [LFieldOcc (GhcPass p)] -> [LFieldOcc (GhcPass p)]
                  -- Filters out ones that have already been seen
 
-hsConDeclsBinders :: [LConDecl (GhcPass p)]
+hsConDeclsBinders :: forall p. IsPass p
+                  => [LConDecl (GhcPass p)]
                   -> ([Located (IdP (GhcPass p))], [LFieldOcc (GhcPass p)])
    -- See hsLTyClDeclBinders for what this does
    -- The function is boringly complicated because of the records
@@ -1364,6 +1369,16 @@ hsConDeclsBinders cons
              where
                 (remSeen', flds) = get_flds remSeen args
                 (ns, fs) = go remSeen' rs
+
+           XConDecl x -> case ghcPass @p of
+             GhcPs |  ConDeclGADTPrefixPs { con_gp_names = names } <- x
+                   -> (map (L loc . unLoc) names ++ ns, fs)
+#if __GLASGOW_HASKELL__ < 811
+             GhcRn -> noExtCon x
+             GhcTc -> noExtCon x
+#endif
+             where
+               (ns, fs) = go remSeen rs
 
     get_flds :: Seen p -> HsConDeclDetails (GhcPass p)
              -> (Seen p, [LFieldOcc (GhcPass p)])
