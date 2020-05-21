@@ -8,5 +8,5 @@
 [3 of 3] Processing q
   [1 of 4] Compiling A[sig]           ( q/A.hsig, nothing )
   [2 of 4] Compiling B[sig]           ( q/B.hsig, nothing )
-  [3 of 4] Compiling M                ( q/M.hs, nothing )
-  [4 of 4] Instantiating p
+  [3 of 4] Instantiating p
+  [4 of 4] Compiling M                ( q/M.hs, nothing )

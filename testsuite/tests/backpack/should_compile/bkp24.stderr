@@ -10,8 +10,8 @@
   [1 of 1] Compiling B                ( b/B.hs, bkp24.out/b/B.o )
 [4 of 5] Processing q
   [1 of 3] Compiling B[sig]           ( q/B.hsig, nothing )
-  [2 of 3] Compiling Q                ( q/Q.hs, nothing )
-  [3 of 3] Instantiating p
+  [2 of 3] Instantiating p
+  [3 of 3] Compiling Q                ( q/Q.hs, nothing )
 [5 of 5] Processing r
   Instantiating r
   [1 of 2] Including q[B=b:B]
