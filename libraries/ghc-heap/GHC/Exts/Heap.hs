@@ -319,32 +319,35 @@ getClosureX get_closure_raw x = do
                     , trec = (pts !! 3)
                     , blocked_exceptions = (pts !! 4)
                     , bq = (pts !! 5)
-                    , what_next = FFIClosures.what_next fields
-                    , why_blocked = FFIClosures.why_blocked fields
-                    , flags = FFIClosures.flags fields
-                    , threadId = FFIClosures.threadId fields
-                    , saved_errno = FFIClosures.saved_errno fields
-                    , dirty = FFIClosures.dirty fields
-                    , alloc_limit = FFIClosures.alloc_limit fields
-                    , tot_stack_size = FFIClosures.tot_stack_size fields
+                    , what_next = FFIClosures.tso_what_next fields
+                    , why_blocked = FFIClosures.tso_why_blocked fields
+                    , flags = FFIClosures.tso_flags fields
+                    , threadId = FFIClosures.tso_threadId fields
+                    , saved_errno = FFIClosures.tso_saved_errno fields
+                    , tso_dirty = FFIClosures.tso_dirty fields
+                    , alloc_limit = FFIClosures.tso_alloc_limit fields
+                    , tot_stack_size = FFIClosures.tso_tot_stack_size fields
                     }
                 )
         STACK -> do
-            unless (length pts >= 1) $
-                fail $ "Expected at least 1 ptr argument to STACK, found "
+            unless (length pts == 1) $
+                fail $ "Expected 1 ptr argument to STACK, found "
                         ++ show (length pts)
-            let splitWord = rawWds !! 0
-            pure $ StackClosure itbl
-#if defined(WORDS_BIGENDIAN)
-                (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
-                (fromIntegral splitWord)
-#else
-                (fromIntegral splitWord)
-                (fromIntegral $ shiftR splitWord (wORD_SIZE_IN_BITS `div` 2))
-#endif
-                (pts !! 0)
-                []
 
+            allocaArray (length wds) (\ptr -> do
+                pokeArray ptr wds
+
+                fields <- FFIClosures.peekStackFields ptr
+
+                pure $ StackClosure
+                    { info = itbl
+                    , size = FFIClosures.stack_size fields
+                    , stack_dirty = FFIClosures.stack_dirty fields
+                    , stackPointer = (pts !! 0)
+                    , stack  = FFIClosures.stack fields
+                    , stack_marking = FFIClosures.stack_marking fields
+                    }
+                )
         _ ->
             pure $ UnsupportedClosure itbl
 

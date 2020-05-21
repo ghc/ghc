@@ -226,10 +226,9 @@ static StgWord collect_pointers(StgClosure *closure, StgWord size, StgClosure *p
 
             break;
         case STACK:
+            ASSERT((StgClosure *)((StgStack *)closure)->sp != NULL);
             ptrs[nptrs++] = (StgClosure *)((StgStack *)closure)->sp;
             break;
-
-
         case WEAK:
             ptrs[nptrs++] = (StgClosure *)((StgWeak *)closure)->cfinalizers;
             ptrs[nptrs++] = (StgClosure *)((StgWeak *)closure)->key;

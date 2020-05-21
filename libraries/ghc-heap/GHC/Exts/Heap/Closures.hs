@@ -278,15 +278,16 @@ data GenClosure b
       , flags :: Word32
       , threadId :: Word64
       , saved_errno :: Word32
-      , dirty:: Word32 -- ^ non-zero => dirty
+      , tso_dirty:: Word32 -- ^ non-zero => dirty
       , alloc_limit :: Int64
       , tot_stack_size :: Word32
       }
   -- Representation of StgStack: The 'tsoStack' of a 'TSOClosure'.
   | StackClosure
      { info :: !StgInfoTable
-     , size :: !HalfWord -- ^ stack size in *words*
-     , dirty :: !HalfWord -- ^ non-zero => dirty
+     , size :: !Word32 -- ^ stack size in *words*
+     , stack_dirty :: !Word8 -- ^ non-zero => dirty
+     , stack_marking :: Word8
      , stackPointer :: !b -- ^ current stack pointer
      , stack :: [Word]
      }

@@ -8,16 +8,16 @@ import Foreign
 -- TODO use sum type for what_next, why_blocked, flags?
 
 data TSOFields = TSOFields {
-    what_next :: Word16,
-    why_blocked :: Word16,
-    flags :: Word32,
+    tso_what_next :: Word16,
+    tso_why_blocked :: Word16,
+    tso_flags :: Word32,
 -- Unfortunately block_info is a union without clear discriminator.
 --    block_info :: TDB,
-    threadId :: Word64,
-    saved_errno :: Word32,
-    dirty:: Word32,
-    alloc_limit :: Int64,
-    tot_stack_size :: Word32
+    tso_threadId :: Word64,
+    tso_saved_errno :: Word32,
+    tso_dirty:: Word32,
+    tso_alloc_limit :: Int64,
+    tso_tot_stack_size :: Word32
 -- TODO StgTSOProfInfo prof is optionally included, but looks very interesting.
 }
 
@@ -34,12 +34,36 @@ peekTSOFields ptr = do
     tot_stack_size' <- (#peek struct StgTSO_, tot_stack_size) ptr
 
     return TSOFields {
-        what_next = what_next',
-        why_blocked = why_blocked',
-        flags = flags',
-        threadId = threadId',
-        saved_errno = saved_errno',
-        dirty= dirty',
-        alloc_limit = alloc_limit',
-        tot_stack_size = tot_stack_size'
+        tso_what_next = what_next',
+        tso_why_blocked = why_blocked',
+        tso_flags = flags',
+        tso_threadId = threadId',
+        tso_saved_errno = saved_errno',
+        tso_dirty= dirty',
+        tso_alloc_limit = alloc_limit',
+        tso_tot_stack_size = tot_stack_size'
+    }
+
+data StackFields = StackFields {
+    stack_size :: Word32,
+    stack_dirty :: Word8,
+    stack_marking :: Word8,
+    stack :: [Word]
+}
+
+-- | Get non-closure fields from @StgStack_@ (@TSO.h@)
+peekStackFields :: Ptr a -> IO StackFields
+peekStackFields ptr = do
+    stack_size' <- (#peek struct StgStack_, stack_size) ptr ::IO Word32
+    dirty' <- (#peek struct StgStack_, dirty) ptr
+    marking' <- (#peek struct StgStack_, marking) ptr
+
+    let stackPtr = (#ptr struct StgStack_, stack) ptr
+    stack' <- peekArray (fromIntegral stack_size') stackPtr
+
+    return StackFields {
+        stack_size = stack_size',
+        stack_dirty = dirty',
+        stack_marking = marking',
+        stack = stack'
     }
