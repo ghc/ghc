@@ -50,7 +50,6 @@ import GHC.Utils.Lexeme
 import GHC.Utils.Misc
 import GHC.Data.FastString
 import GHC.Utils.Outputable as Outputable
-import GHC.Utils.Monad ( foldrM )
 
 import qualified Data.ByteString as BS
 import Control.Monad( unless, ap )
@@ -595,6 +594,8 @@ cvtConstr (ForallC tvs ctxt con)
     add_cxt (L loc cxt1) (Just (L _ cxt2))
       = Just (L loc (cxt1 ++ cxt2))
 
+    add_forall :: [LHsTyVarBndr Hs.Specificity GhcPs] -> LHsContext GhcPs
+               -> ConDecl GhcPs -> ConDecl GhcPs
     add_forall tvs' cxt' con@(ConDeclGADT { con_qvars = qvars, con_mb_cxt = cxt })
       = con { con_forall = noLoc $ not (null all_tvs)
             , con_qvars  = all_tvs
@@ -609,7 +610,13 @@ cvtConstr (ForallC tvs ctxt con)
       where
         all_tvs = tvs' ++ ex_tvs
 
-    add_forall _    _    (XConDecl nec) = noExtCon nec
+    -- The GadtC and RecGadtC cases of cvtConstr will always return a
+    -- ConDeclGADT, not a ConDeclGADTPrefixPs, so this case is unreachable.
+    -- See Note [GADT abstract syntax] in GHC.Hs.Decls for more on the
+    -- distinction between ConDeclGADT and ConDeclGADTPrefixPs.
+    add_forall _ _ con@(XConDecl (ConDeclGADTPrefixPs {})) =
+      pprPanic "cvtConstr.add_forall: Unexpected ConDeclGADTPrefixPs"
+               (Outputable.ppr con)
 
 cvtConstr (GadtC [] _strtys _ty)
   = failWith (text "GadtC must have at least one constructor name")
@@ -617,9 +624,8 @@ cvtConstr (GadtC [] _strtys _ty)
 cvtConstr (GadtC c strtys ty)
   = do  { c'      <- mapM cNameL c
         ; args    <- mapM cvt_arg strtys
-        ; L _ ty' <- cvtType ty
-        ; c_ty    <- mk_arr_apps args ty'
-        ; returnL $ fst $ mkGadtDecl c' c_ty}
+        ; ty'     <- cvtType ty
+        ; returnL $ mk_gadt_decl c' (PrefixCon args) ty'}
 
 cvtConstr (RecGadtC [] _varstrtys _ty)
   = failWith (text "RecGadtC must have at least one constructor name")
@@ -628,9 +634,19 @@ cvtConstr (RecGadtC c varstrtys ty)
   = do  { c'       <- mapM cNameL c
         ; ty'      <- cvtType ty
         ; rec_flds <- mapM cvt_id_arg varstrtys
-        ; let rec_ty = noLoc (HsFunTy noExtField
-                                           (noLoc $ HsRecTy noExtField rec_flds) ty')
-        ; returnL $ fst $ mkGadtDecl c' rec_ty }
+        ; returnL $ mk_gadt_decl c' (RecCon $ noLoc rec_flds) ty' }
+
+mk_gadt_decl :: [Located RdrName] -> HsConDeclDetails GhcPs -> LHsType GhcPs
+             -> ConDecl GhcPs
+mk_gadt_decl names args res_ty
+  = ConDeclGADT { con_g_ext  = noExtField
+                , con_names  = names
+                , con_forall = noLoc False
+                , con_qvars  = []
+                , con_mb_cxt = Nothing
+                , con_args   = args
+                , con_res_ty = res_ty
+                , con_doc    = Nothing }
 
 cvtSrcUnpackedness :: TH.SourceUnpackedness -> SrcUnpackedness
 cvtSrcUnpackedness NoSourceUnpackedness = NoSrcUnpack
@@ -1646,13 +1662,6 @@ So scattered through Convert.hs are various points where parens are added.
 See (among other closed issued) https://gitlab.haskell.org/ghc/ghc/issues/14289
 -}
 -- ---------------------------------------------------------------------
-
--- | Constructs an arrow type with a specified return type
-mk_arr_apps :: [LHsType GhcPs] -> HsType GhcPs -> CvtM (LHsType GhcPs)
-mk_arr_apps tys return_ty = foldrM go return_ty tys >>= returnL
-    where go :: LHsType GhcPs -> HsType GhcPs -> CvtM (HsType GhcPs)
-          go arg ret_ty = do { ret_ty_l <- returnL ret_ty
-                             ; return (HsFunTy noExtField arg ret_ty_l) }
 
 split_ty_app :: TH.Type -> CvtM (TH.Type, [LHsTypeArg GhcPs])
 split_ty_app ty = go ty []

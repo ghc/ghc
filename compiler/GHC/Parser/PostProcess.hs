@@ -685,43 +685,35 @@ mkConDeclH98 name mb_forall mb_cxt args
                , con_args   = args
                , con_doc    = Nothing }
 
+-- | Construct a GADT-style data constructor from the constructor names and
+-- their type. This will return different AST forms for record syntax
+-- constructors and prefix constructors, as the latter must be handled
+-- specially in the renamer. See @Note [GADT abstract syntax]@ in
+-- "GHC.Hs.Decls" for the full story.
 mkGadtDecl :: [Located RdrName]
-           -> LHsType GhcPs     -- Always a HsForAllTy
-           -> (ConDecl GhcPs, [AddAnn])
+           -> LHsType GhcPs
+           -> ConDecl GhcPs
 mkGadtDecl names ty
-  = (ConDeclGADT { con_g_ext  = noExtField
-                 , con_names  = names
-                 , con_forall = L l $ isLHsForAllTy ty'
-                 , con_qvars  = tvs
-                 , con_mb_cxt = mcxt
-                 , con_args   = args
-                 , con_res_ty = res_ty
-                 , con_doc    = Nothing }
-    , anns1 ++ anns2)
+  | Just (mtvs, mcxt, args, res_ty) <- mb_record_gadt ty
+  = ConDeclGADT { con_g_ext  = noExtField
+                , con_names  = names
+                , con_forall = L (getLoc ty) $ isJust mtvs
+                , con_qvars  = fromMaybe [] mtvs
+                , con_mb_cxt = mcxt
+                , con_args   = args
+                , con_res_ty = res_ty
+                , con_doc    = Nothing }
+  | otherwise
+  = XConDecl $ ConDeclGADTPrefixPs { con_gp_names = names
+                                   , con_gp_ty    = mkLHsSigType ty
+                                   , con_gp_doc   = Nothing }
   where
-    (ty'@(L l _),anns1) = peel_parens ty []
-    (tvs, rho) = splitLHsForAllTyInvis ty'
-    (mcxt, tau, anns2) = split_rho rho []
-
-    split_rho (L _ (HsQualTy { hst_ctxt = cxt, hst_body = tau })) ann
-      = (Just cxt, tau, ann)
-    split_rho (L l (HsParTy _ ty)) ann
-      = split_rho ty (ann++mkParensApiAnn l)
-    split_rho tau                  ann
-      = (Nothing, tau, ann)
-
-    (args, res_ty) = split_tau tau
-
-    -- See Note [GADT abstract syntax] in GHC.Hs.Decls
-    split_tau (L _ (HsFunTy _ (L loc (HsRecTy _ rf)) res_ty))
-      = (RecCon (L loc rf), res_ty)
-    split_tau tau
-      = (PrefixCon [], tau)
-
-    peel_parens (L l (HsParTy _ ty)) ann = peel_parens ty
-                                                       (ann++mkParensApiAnn l)
-    peel_parens ty                   ann = (ty, ann)
-
+    mb_record_gadt ty
+      | (mtvs, mcxt, body_ty) <- splitLHsGADTPrefixTy ty
+      , L _ (HsFunTy _ (L loc (HsRecTy _ rf)) res_ty) <- body_ty
+      = Just (mtvs, mcxt, RecCon (L loc rf), res_ty)
+      | otherwise
+      = Nothing
 
 setRdrNameSpace :: RdrName -> NameSpace -> RdrName
 -- ^ This rather gruesome function is used mainly by the parser.

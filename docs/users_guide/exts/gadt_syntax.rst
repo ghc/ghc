@@ -103,6 +103,123 @@ implements this behaviour, odd though it is. But for GADT-style
 declarations, GHC's behaviour is much more useful, as well as much more
 intuitive.
 
+.. _formal-gadt-syntax:
+
+Formal syntax for GADTs
+~~~~~~~~~~~~~~~~~~~~~~~
+
+To make more precise what is and what is not permitted inside of a GADT-style
+constructor, we provide a BNF-style grammar for GADT below. Note that this
+grammar is subject to change in the future. ::
+
+  gadt_con ::= conids '::' opt_forall opt_ctxt gadt_body
+
+  conids ::= conid
+          |  conid ',' conids
+
+  opt_forall ::= <empty>
+              |  'forall' tv_bndrs '.'
+
+  tv_bndrs ::= <empty>
+            |  tv_bndr tv_bndrs
+
+  tv_bndr ::= tyvar
+           |  '(' tyvar '::' ctype ')'
+
+  opt_ctxt ::= <empty>
+            |  btype '=>'
+            |  '(' ctxt ')' '=>'
+
+  ctxt ::= ctype
+        |  ctype ',' ctxt
+
+  gadt_body ::= prefix_gadt_body
+             |  record_gadt_body
+
+  prefix_gadt_body ::= '(' prefix_gadt_body ')'
+                    |  return_type
+                    |  opt_unpack btype '->' prefix_gadt_body
+
+  record_gadt_body ::= '{' fieldtypes '}' '->' return_type
+
+  fieldtypes ::= <empty>
+              |  fieldnames '::' opt_unpack ctype
+              |  fieldnames '::' opt_unpack ctype ',' fieldtypes
+
+  fieldnames ::= fieldname
+              |  fieldname ',' fieldnames
+
+  opt_unpack ::= opt_bang
+              :  {-# UNPACK #-} opt_bang
+              |  {-# NOUNPACK #-} opt_bang
+
+  opt_bang ::= <empty>
+            |  '!'
+            |  '~'
+
+Where:
+
+- ``btype`` is a type that is not allowed to have an outermost
+  ``forall``/``=>`` unless it is surrounded by parentheses. For example,
+  ``forall a. a`` and ``Eq a => a`` are not legal ``btype``s, but
+  ``(forall a. a)`` and ``(Eq a => a)`` are legal.
+- ``ctype`` is a ``btype`` that has no restrictions on an outermost
+  ``forall``/``=>``, so ``forall a. a`` and ``Eq a => a`` are legal ``ctype``s.
+- ``return_type`` is a type that is not allowed to have ``forall``s, ``=>``s,
+  or ``->``s.
+
+This is a simplified grammar that does not fully delve into all of the
+implementation details of GHC's parser (such as the placement of Haddock
+comments), but it is sufficient to attain an understanding of what is
+syntactically allowed. Some further various observations about this grammar:
+
+- GADT constructor types are currently not permitted to have nested ``forall``s
+  or ``=>``s. (e.g., something like ``MkT :: Int -> forall a. a -> T`` would be
+  rejected.) As a result, ``gadt_sig`` puts all of its quantification and
+  constraints up front with ``opt_forall`` and ``opt_context``. Note that
+  higher-rank ``forall``s and ``=>``s are only permitted if they do not appear
+  directly to the right of a function arrow in a `prefix_gadt_body`. (e.g.,
+  something like ``MkS :: Int -> (forall a. a) -> S`` is allowed, since
+  parentheses separate the ``forall`` from the ``->``.)
+- Furthermore, GADT constructors do not permit outermost parentheses that
+  surround the ``opt_forall`` or ``opt_ctxt``, if at least one of them are
+  used. For example, ``MkU :: (forall a. a -> U)`` would be rejected, since
+  it would treat the ``forall`` as being nested.
+
+  Note that it is acceptable to use parentheses in a ``prefix_gadt_body``.
+  For instance, ``MkV1 :: forall a. (a) -> (V1)`` is acceptable, as is
+  ``MkV2 :: forall a. (a -> V2)``.
+- The function arrows in a ``prefix_gadt_body``, as well as the function
+  arrow in a ``record_gadt_body``, are required to be used infix. For
+  example, ``MkA :: (->) Int A`` would be rejected.
+- GHC uses the function arrows in a ``prefix_gadt_body`` and
+  ``prefix_gadt_body`` to syntactically demarcate the function and result
+  types. Note that GHC does not attempt to be clever about looking through
+  type synonyms here. If you attempt to do this, for instance: ::
+
+    type C = Int -> B
+
+    data B where
+      MkB :: C
+
+  Then GHC will interpret the return type of ``MkB`` to be ``C``, and since
+  GHC requires that the return type must be headed by ``B``, this will be
+  rejected. On the other hand, it is acceptable to use type synonyms within
+  the argument and result types themselves, so the following is permitted: ::
+
+    type B1 = Int
+    type B2 = B
+
+    data B where
+      MkB :: B1 -> B2
+- GHC will accept any combination of ``!``/``~`` and
+  ``{-# UNPACK #-}``/``{-# NOUNPACK #-}``, although GHC will ignore some
+  combinations. For example, GHC will produce a warning if you write
+  ``{-# UNPACK #-} ~Int`` and proceed as if you had written ``Int``.
+
+GADT syntax odds and ends
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
 The rest of this section gives further details about GADT-style data
 type declarations.
 
