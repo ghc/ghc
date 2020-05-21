@@ -196,10 +196,16 @@ Furthermore GHC lets you specify the way event log data (see :rts-flag:`-l
         Hands buffered event log data to your event log writer. Return true on success.
         Required for a custom :c:type:`EventLogWriter`.
 
+        Note that this function may be called by multiple threads
+        simultaneously.
+
     .. c:member:: void flushEventLog(void)
 
         Flush buffers (if any) of your custom :c:type:`EventLogWriter`. This can
         be ``NULL``.
+
+        Note that this function may be called by multiple threads
+        simultaneously.
 
     .. c:member:: void stopEventLogWriter(void)
 
