@@ -95,7 +95,28 @@ Language
   effectively allows users to choose which variables can or can't be
   instantiated through visible type application. More information can be found
   here: :ref:`Manually-defining-inferred-variables`.
-  
+
+* GADT constructor types now properly adhere to :ref:`forall-or-nothing`. As
+  a result, GHC will now reject some GADT constructors that previous versions
+  of GHC would accept, such as the following: ::
+
+    data T where
+      MkT1 :: (forall a. a -> b -> T)
+      MkT2 :: (forall a. a -> T)
+
+  ``MkT1`` and ``MkT2`` are rejected because the lack of an outermost
+  ``forall`` triggers implicit quantification, making the explicit ``forall``s
+  nested. Furthermore, GADT constructors do not permit the use of nested
+  ``forall``s, as explained in :ref:`formal-gadt-syntax`.
+
+  In addition to rejecting nested ``forall``s, GHC is now more stringent about
+  rejecting uses of nested *contexts* in GADT constructors. For example, the
+  following example, which previous versions of GHC would accept, is now
+  rejected:
+
+    data U a where
+      MkU :: (Show a => U a)
+
 Compiler
 ~~~~~~~~
 

@@ -59,12 +59,13 @@ import GHC.Types.Basic  ( pprRuleName, TypeOrKind(..) )
 import GHC.Data.FastString
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.Session
-import GHC.Utils.Misc   ( debugIsOn, lengthExceeds, partitionWith )
+import GHC.Utils.Misc   ( debugIsOn, lengthExceeds, notNull, partitionWith )
 import GHC.Driver.Types ( HscEnv, hsc_dflags )
 import GHC.Data.List.SetOps ( findDupsEq, removeDups, equivClasses )
 import GHC.Data.Graph.Directed ( SCC, flattenSCC, flattenSCCs, Node(..)
                                , stronglyConnCompFromEdgedVerticesUniq )
 import GHC.Types.Unique.Set
+import GHC.Types.Var ( Specificity )
 import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -2126,16 +2127,22 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
     do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt
         ; (new_args, fvs2)   <- rnConDeclDetails (unLoc (head new_names)) ctxt args
         ; (new_res_ty, fvs3) <- rnLHsType ctxt res_ty
+        ; (args', res_ty')   <-
+            case args of
+              InfixCon {}  -> pprPanic "rnConDecl" (ppr names)
+              RecCon {}    -> pure (new_args, new_res_ty)
+              PrefixCon as -> do
+                -- In the PrefixCon case, the parser puts the entire body of
+                -- the constructor type, including argument types, into res_ty.
+                -- We can properly determine what the argument types are after
+                -- renaming (see Note [GADT abstract syntax] in GHC.Hs.Decls),
+                -- so we do so by splitting new_res_ty below.
+                MASSERT( null as )
+                (arg_tys, final_res_ty) <-
+                  split_prefix_gadt_ty ctxt explicit_tkvs new_cxt new_res_ty
+                pure (PrefixCon arg_tys, final_res_ty)
 
         ; let all_fvs = fvs1 `plusFV` fvs2 `plusFV` fvs3
-              (args', res_ty')
-                  = case args of
-                      InfixCon {}  -> pprPanic "rnConDecl" (ppr names)
-                      RecCon {}    -> (new_args, new_res_ty)
-                      PrefixCon as | (arg_tys, final_res_ty) <- splitHsFunType new_res_ty
-                                   -> ASSERT( null as )
-                                      -- See Note [GADT abstract syntax] in GHC.Hs.Decls
-                                      (PrefixCon arg_tys, final_res_ty)
 
         ; traceRn "rnConDecl2" (ppr names $$ ppr implicit_tkvs $$ ppr explicit_tkvs)
         ; return (decl { con_g_ext = implicit_tkvs, con_names = new_names
@@ -2143,7 +2150,83 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
                        , con_args = args', con_res_ty = res_ty'
                        , con_doc = mb_doc' },
                   all_fvs) } }
+  where
+    -- Split the body of a prefix GADT constructor type into its argument
+    -- and result types. Furthermore, ensure that there are no nested `forall`s
+    -- or contexts, per
+    -- Note [No nested foralls or contexts in GADT constructors] in
+    -- GHC.Parser.PostProcess.
+    split_prefix_gadt_ty :: HsDocContext
+                         -> [LHsTyVarBndr Specificity GhcRn]
+                         -> Maybe (LHsContext GhcRn)
+                         -> LHsType GhcRn
+                         -> RnM ([LHsType GhcRn], LHsType GhcRn)
+    split_prefix_gadt_ty ctxt gadt_tvbs mb_gadt_cxt gadt_rho = do
+      -- Check for nested `forall`s or contexts
+      case gadt_res_ty of
+        L _ (HsForAllTy { hst_fvf = fvf })
+          |  ForallVis <- fvf
+          -> addErr $ withHsDocContext ctxt $ vcat
+             [ hang (text "Illegal visible, dependent quantification" <+>
+                     text "in the type of a term:")
+                  2 (ppr orig_gadt_ty)
+             , text "(GHC does not yet support this)" ]
+          |  ForallInvis <- fvf
+          -> nested_foralls_contexts_err
+        L _ (HsQualTy {})
+          -> nested_foralls_contexts_err
+        _ -> pure ()
 
+      pure (gadt_arg_tys, gadt_res_ty)
+      where
+        (gadt_arg_tys, gadt_res_ty) = splitLHsFunTys gadt_rho
+
+        -- If we are going to reject a GADT constructor type for having nested
+        -- `forall`s or contexts, then we can at least suggest an alternative
+        -- way to write the type without nesting. (#12087)
+        nested_foralls_contexts_err :: RnM ()
+        nested_foralls_contexts_err =
+          addErr $ withHsDocContext ctxt $
+          text "GADT constructor type signature cannot contain nested"
+          <+> quotes forAllLit <> text "s or contexts"
+          $+$ hang (text "Suggestion: instead use this type signature:")
+                 2 (pprWithCommas ppr names <+> dcolon <+> ppr suggested_gadt_ty)
+
+        -- To construct a type that GHC would accept (suggested_gadt_ty), we:
+        --
+        -- 1) Split apart the return type (which is headed by a forall or a
+        --    context) using splitNestedLHsSigmaTysInvis, collecting the type
+        --    variables and predicates we find, as well as the rho type
+        --    lurking underneath the nested foralls and contexts.
+        -- 2) Reassemble the type variables, predicates, and rho type into
+        --    prenex form.
+        (suggested_tvbs, suggested_theta, suggested_rho) =
+          splitNestedLHsSigmaTysInvis orig_gadt_ty
+        mb_suggested_theta | null (unLoc suggested_theta) = Nothing
+                           | otherwise                    = Just suggested_theta
+
+        orig_gadt_ty = mk_forall_ty explicit_forall gadt_tvbs $
+                       mk_qual_ty mb_gadt_cxt gadt_rho
+
+        suggested_gadt_ty =
+          mk_forall_ty (notNull suggested_tvbs) suggested_tvbs $
+          mk_qual_ty mb_suggested_theta suggested_rho
+
+        mk_forall_ty exp_forall tvbs tau
+          | exp_forall = noLoc $
+              HsForAllTy { hst_xforall = noExtField
+                         , hst_fvf     = ForallInvis
+                         , hst_bndrs   = tvbs
+                         , hst_body    = tau }
+          | otherwise  = tau
+
+        mk_qual_ty mb_ctxt rho =
+          case mb_ctxt of
+            Nothing   -> rho
+            Just ctxt -> noLoc $
+              HsQualTy { hst_xqual   = noExtField
+                       , hst_ctxt    = ctxt
+                       , hst_body    = rho }
 
 rnMbContext :: HsDocContext -> Maybe (LHsContext GhcPs)
             -> RnM (Maybe (LHsContext GhcRn), FreeVars)
