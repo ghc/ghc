@@ -22,7 +22,7 @@ module GHC.Tc.Types.Evidence (
   evBindMapToVarSet,
   varSetMinusEvBindMap,
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, mkGivenEvBind, mkWantedEvBind,
-  evBindVar, isCoEvBindsVar,
+  evBindVar, termEvidenceAllowed,
 
   -- * EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
@@ -453,9 +453,9 @@ evidence bindings are allowed.  Notebly ():
   - When unifying forall-types
 -}
 
-isCoEvBindsVar :: EvBindsVar -> Bool
-isCoEvBindsVar (CoEvBindsVar {}) = True
-isCoEvBindsVar (EvBindsVar {})   = False
+termEvidenceAllowed :: EvBindsVar -> Bool
+termEvidenceAllowed (CoEvBindsVar {}) = False
+termEvidenceAllowed (EvBindsVar {})   = True
 
 -----------------
 newtype EvBindMap

@@ -2421,14 +2421,24 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
     -- Identify which equalities are candidates for floating
     -- Float out alpha ~ ty, or ty ~ alpha which might be unified outside
     -- See Note [Which equalities to float]
-    is_float_eq_candidate ct
-      | pred <- ctPred ct
-      , EqPred NomEq ty1 ty2 <- classifyPredType pred
+    is_float_eq_candidate ct = float_help (classifyPredType (ctPred ct))
+
+    term_ev_allowed = termEvidenceAllowed ev_binds_var
+
+    float_help (EqPred {}) | not term_ev_allowed = True
+       -- If term evidence is not allowed, try floating any
+       -- equality (both NomEq and ReprEq) in the hope that it
+       -- may be soluble higher up, where term evidence is allowed
+       -- See #18213
+
+    float_help (EqPred NomEq ty1 ty2)
+      -- NomEq only; ReprEq doesn't cause unification
       = case (tcGetTyVar_maybe ty1, tcGetTyVar_maybe ty2) of
           (Just tv1, _) -> float_tv_eq_candidate tv1 ty2
           (_, Just tv2) -> float_tv_eq_candidate tv2 ty1
           _             -> False
-      | otherwise = False
+
+    float_help _ = False
 
     float_tv_eq_candidate tv1 ty2  -- See Note [Which equalities to float]
       =  isMetaTyVar tv1
