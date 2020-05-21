@@ -324,3 +324,7 @@ test('T18120', normal, compile, ['-dcore-lint -O'])
 # WW worker m1). Ideally, it would be one, but we fail to inline dead-ending
 # recursive groups due to Note [Bottoming floats].
 test('T18231', [ only_ways(['optasm']), grep_errmsg(r'^[\w\.]+ ::.*->.*') ], compile, ['-ddump-simpl -dsuppress-idinfo -dppr-cols=99999 -dsuppress-uniques'])
+
+# Cast WW
+test('T17673', [ only_ways(['optasm']), grep_errmsg(r'^\w+\.\$wf') ], compile, ['-ddump-simpl -dsuppress-uniques -dppr-cols=9999'])
+test('T18078', [ only_ways(['optasm']), grep_errmsg(r'^\w+\.\$wf') ], compile, ['-ddump-simpl -dsuppress-uniques -dppr-cols=9999'])
