@@ -685,30 +685,41 @@ mkConDeclH98 name mb_forall mb_cxt args
                , con_args   = args
                , con_doc    = Nothing }
 
+-- Construct a GADT-style data constructor from the constructor names and their
+-- type. Does not perform any validity checking, as that it done later in
+-- GHC.Rename.Module.rnConDecl.
 mkGadtDecl :: [Located RdrName]
            -> LHsType GhcPs     -- Always a HsForAllTy
-           -> (ConDecl GhcPs, [AddAnn])
+           -> ConDecl GhcPs
 mkGadtDecl names ty
-  = (ConDeclGADT { con_g_ext  = noExtField
-                 , con_names  = names
-                 , con_forall = L l $ isLHsForAllTy ty'
-                 , con_qvars  = tvs
-                 , con_mb_cxt = mcxt
-                 , con_args   = args
-                 , con_res_ty = res_ty
-                 , con_doc    = Nothing }
-    , anns1 ++ anns2)
+  = ConDeclGADT { con_g_ext  = noExtField
+                , con_names  = names
+                , con_forall = L (getLoc ty) $ isJust mtvs
+                , con_qvars  = fromMaybe [] mtvs
+                , con_mb_cxt = mcxt
+                , con_args   = args
+                , con_res_ty = res_ty
+                , con_doc    = Nothing }
   where
-    (ty'@(L l _),anns1) = peel_parens ty []
-    (tvs, rho) = splitLHsForAllTyInvis ty'
-    (mcxt, tau, anns2) = split_rho rho []
+    (mtvs, rho) = split_sigma ty
+    (mcxt, tau) = split_rho rho
 
-    split_rho (L _ (HsQualTy { hst_ctxt = cxt, hst_body = tau })) ann
-      = (Just cxt, tau, ann)
-    split_rho (L l (HsParTy _ ty)) ann
-      = split_rho ty (ann++mkParensApiAnn l)
-    split_rho tau                  ann
-      = (Nothing, tau, ann)
+    -- NB: We do not use splitLHsForAllTyInvis below, since that looks through
+    -- parentheses...
+    split_sigma (L _ (HsForAllTy { hst_fvf = ForallInvis, hst_bndrs = bndrs
+                                 , hst_body = rho }))
+      = (Just bndrs, rho)
+    split_sigma sigma
+      = (Nothing, sigma)
+
+    -- ...similarly, we do not use splitLHsQualTy below, since that also looks
+    -- through parentheses.
+    -- See Note [No nested foralls or contexts in GADT constructors] for why
+    -- this is important.
+    split_rho (L _ (HsQualTy { hst_ctxt = cxt, hst_body = tau }))
+      = (Just cxt, tau)
+    split_rho tau
+      = (Nothing, tau)
 
     (args, res_ty) = split_tau tau
 
@@ -718,10 +729,43 @@ mkGadtDecl names ty
     split_tau tau
       = (PrefixCon [], tau)
 
-    peel_parens (L l (HsParTy _ ty)) ann = peel_parens ty
-                                                       (ann++mkParensApiAnn l)
-    peel_parens ty                   ann = (ty, ann)
+{-
+Note [No nested foralls or contexts in GADT constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GADT constructors provide some freedom to change the order of foralls in their
+types (see Note [DataCon user type variable binders] in GHC.Core.DataCon), but
+this freedom is still limited. GADTs still require that all quantification
+occurs prenex. That is, any explicitly quantified type variables must occur at
+the front of the GADT type, followed by any contexts, followed by the body of
+the GADT type, in precisely that order. For instance:
 
+  data T where
+    MkT1 :: forall a b. (Eq a, Eq b) => a -> b -> T
+      -- OK
+    MkT2 :: forall a. Eq a => forall b. a -> b -> T
+      -- Rejected, `forall b` is nested
+    MkT3 :: forall a b. Eq a => Eq b => a -> b -> T
+      -- Rejected, `Eq b` is nested
+    MkT4 :: Int -> forall a. a -> T
+      -- Rejected, `forall a` is nested
+    MkT5 :: forall a. Int -> Eq a => a -> T
+      -- Rejected, `Eq a` is nested
+    MkT6 :: (forall a. a -> T)
+      -- Rejected, `forall a` is nested due to the surrounding parentheses
+    MkT7 :: (Eq a => a -> t)
+      -- Rejected, `Eq a` is nested due to the surrounding parentheses
+
+For the full details, see the "Formal syntax for GADTs" section of the GHC
+User's Guide.
+
+Because the presence of outermost parentheses can affect whether
+`forall`s/contexts are nested, the parser is careful not to remove parentheses
+when post-processing GADT constructors (in mkGadtDecl). Later, the renamer will
+check for nested `forall`s/contexts (in GHC.Rename.Module.rnConDecl) after
+it has determined what all of the argument types are.
+(See Note [GADT abstract syntax] in GHC.Hs.Decls for why this check must wait
+until the renamer.)
+-}
 
 setRdrNameSpace :: RdrName -> NameSpace -> RdrName
 -- ^ This rather gruesome function is used mainly by the parser.

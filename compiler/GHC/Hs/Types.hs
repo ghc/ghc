@@ -58,8 +58,9 @@ module GHC.Hs.Types (
         hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsExplicitLTyVarNames,
         splitLHsInstDeclTy, getLHsInstDeclHead, getLHsInstDeclClass_maybe,
         splitLHsPatSynTy,
-        splitLHsForAllTyInvis, splitLHsQualTy, splitLHsSigmaTyInvis,
-        splitHsFunType, hsTyGetAppHead_maybe,
+        splitLHsForAllTyInvis, splitLHsQualTy,
+        splitLHsSigmaTyInvis, splitNestedLHsSigmaTysInvis,
+        splitLHsFunTys, hsTyGetAppHead_maybe,
         mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
         ignoreParens, hsSigType, hsSigWcType, hsPatSigType,
         hsTyKindSig,
@@ -1242,18 +1243,44 @@ mkHsAppKindTy ext ty k
 -}
 
 ---------------------------------
--- splitHsFunType decomposes a type (t1 -> t2 ... -> tn)
--- Breaks up any parens in the result type:
---      splitHsFunType (a -> (b -> c)) = ([a,b], c)
-splitHsFunType :: LHsType GhcRn -> ([LHsType GhcRn], LHsType GhcRn)
-splitHsFunType (L _ (HsParTy _ ty))
-  = splitHsFunType ty
+-- | 'splitLHsFunTys' decomposes a type @t1 -> t2 ... -> tn@ into the argument
+-- and result types. For example:
+--
+-- @
+-- 'splitLHsFunTys' (a -> b -> c) = ([a,b], c)
+-- @
+--
+-- Note that this function looks through parentheses, so it will work on types
+-- such as @(a -> (b -> c))@. The downside to this is that it is not
+-- generally possible to take the returned types and reconstruct the original
+-- type (parentheses and all) from them.
+splitLHsFunTys :: LHsType GhcRn -> ([LHsType GhcRn], LHsType GhcRn)
+splitLHsFunTys (L _ (HsParTy _ ty))
+  = splitLHsFunTys ty
 
-splitHsFunType (L _ (HsFunTy _ x y))
-  | (args, res) <- splitHsFunType y
+splitLHsFunTys (L _ (HsFunTy _ x y))
+  | (args, res) <- splitLHsFunTys y
   = (x:args, res)
 
-splitHsFunType other = ([], other)
+splitLHsFunTys other = ([], other)
+
+-- | Returns 'Just (arg_ty, res_ty)@ if the supplied type is an 'HsFunTy',
+-- where @arg_ty@ and @res_ty@ are the decomposed argument and result types,
+-- respectively. Returns 'Nothing' otherwise. For example:
+--
+-- @
+-- 'splitLHsFunTy_maybe' (a -> b) = 'Just' (a, b)
+-- 'splitLHsFunTy_maybe' [a]      = 'Nothing'
+-- @
+--
+-- Note that this function looks through parentheses, so it will work on types
+-- such as @((a -> b))@. The downside to this is that it is not
+-- generally possible to take the returned types and reconstruct the original
+-- type (parentheses and all) from them.
+splitLHsFunTy_maybe :: LHsType pass -> Maybe (LHsType pass, LHsType pass)
+splitLHsFunTy_maybe (L _ (HsParTy _ ty))  = splitLHsFunTy_maybe ty
+splitLHsFunTy_maybe (L _ (HsFunTy _ x y)) = Just (x, y)
+splitLHsFunTy_maybe _                     = Nothing
 
 -- retrieve the name of the "head" of a nested type application
 -- somewhat like splitHsAppTys, but a little more thorough
@@ -1346,6 +1373,69 @@ splitLHsSigmaTyInvis ty
   | (tvs,  ty1) <- splitLHsForAllTyInvis ty
   , (ctxt, ty2) <- splitLHsQualTy ty1
   = (tvs, ctxt, ty2)
+
+-- | Decompose a type's @forall@s and contexts from its body, possibly looking
+-- underneath 'HsFunTy's in the process. For example:
+--
+-- @
+-- 'splitNestedLHsSigmaTysInvis' (forall a. a -> Show a => forall b. b -> a)
+--   = ([a, b], [Show a], [a -> b -> a])
+-- @
+--
+-- Note that this function looks through parentheses, so it will work on types
+-- such as @(forall a. <...>)@. The downside to this is that it is not
+-- generally possible to take the returned types and reconstruct the original
+-- type (parentheses and all) from them.
+splitNestedLHsSigmaTysInvis ::
+     LHsType (GhcPass p)
+  -> ( [LHsTyVarBndr Specificity (GhcPass p)]
+     , LHsContext (GhcPass p), LHsType (GhcPass p) )
+splitNestedLHsSigmaTysInvis ty
+    -- If there's a forall, split it apart and try splitting the rho type
+    -- underneath it.
+  | Just (arg_tys, tvs1, theta1, rho1) <- deepSplitLHsSigmaTyInvis_maybe ty
+  = let (tvs2, theta2, rho2) = splitNestedLHsSigmaTysInvis rho1
+    in ( tvs1 ++ tvs2
+       , append_lhs_contexts theta1 theta2
+       , foldr mk_lhs_fun_ty rho2 arg_tys )
+    -- If there's no forall, we're done.
+  | otherwise = ([], noLHsContext, ty)
+  where
+    append_lhs_contexts :: LHsContext (GhcPass p) -> LHsContext (GhcPass p)
+                        -> LHsContext (GhcPass p)
+    append_lhs_contexts (L _ ctxt1) (L _ ctxt2) = noLoc $ ctxt1 ++ ctxt2
+
+    mk_lhs_fun_ty :: LHsType (GhcPass p) -> LHsType (GhcPass p)
+                  -> LHsType (GhcPass p)
+    mk_lhs_fun_ty arg_ty res_ty = noLoc $ HsFunTy noExtField arg_ty res_ty
+
+-- | Helper function for 'deepSplitLHsSigmaTyInvis_maybe' that decomposes a
+-- function type's arguments, followed by any @forall@s and contexts that
+-- appear after the last function arrow. For example:
+--
+-- @
+-- 'deepSplitLHsSigmaTyInvis_maybe' (Int -> Char -> forall a. Show a => a -> b)
+--   = ([Int, Char], [a], [Show a], [a -> b])
+-- @
+--
+-- Note that this function looks through parentheses, so it will work on types
+-- such as @(forall a. <...>)@. The downside to this is that it is not
+-- generally possible to take the returned types and reconstruct the original
+-- type (parentheses and all) from them.
+deepSplitLHsSigmaTyInvis_maybe ::
+     LHsType pass
+  -> Maybe ( [LHsType pass], [LHsTyVarBndr Specificity pass]
+           , LHsContext pass, LHsType pass )
+deepSplitLHsSigmaTyInvis_maybe ty
+  | Just (arg_ty, res_ty)           <- splitLHsFunTy_maybe ty
+  , Just (arg_tys, tvs, theta, rho) <- deepSplitLHsSigmaTyInvis_maybe res_ty
+  = Just (arg_ty:arg_tys, tvs, theta, rho)
+
+  | (tvs, theta, rho) <- splitLHsSigmaTyInvis ty
+  , not (null tvs && null (unLoc theta))
+  = Just ([], tvs, theta, rho)
+
+  | otherwise = Nothing
 
 -- | Decompose a type of the form @forall <tvs>. body@ into its constituent
 -- parts. Only splits type variable binders that
