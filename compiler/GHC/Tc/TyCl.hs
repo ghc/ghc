@@ -3058,7 +3058,7 @@ dataDeclChecks tc_name new_or_data (L _ stupid_theta) cons
 
 
 -----------------------------------
-consUseGadtSyntax :: [LConDecl a] -> Bool
+consUseGadtSyntax :: [LConDecl GhcRn] -> Bool
 consUseGadtSyntax (L _ (ConDeclGADT {}) : _) = True
 consUseGadtSyntax _                          = False
                  -- All constructors have same shape
@@ -4705,49 +4705,11 @@ noClassTyVarErr clas fam_tc
 
 badDataConTyCon :: DataCon -> Type -> SDoc
 badDataConTyCon data_con res_ty_tmpl
-  | ASSERT( all isTyVar tvs )
-    tcIsForAllTy actual_res_ty
-  = nested_foralls_contexts_suggestion
-  | isJust (tcSplitPredFunTy_maybe actual_res_ty)
-  = nested_foralls_contexts_suggestion
-  | otherwise
   = hang (text "Data constructor" <+> quotes (ppr data_con) <+>
                 text "returns type" <+> quotes (ppr actual_res_ty))
        2 (text "instead of an instance of its parent type" <+> quotes (ppr res_ty_tmpl))
   where
     actual_res_ty = dataConOrigResTy data_con
-
-    -- This suggestion is useful for suggesting how to correct code like what
-    -- was reported in #12087:
-    --
-    --   data F a where
-    --     MkF :: Ord a => Eq a => a -> F a
-    --
-    -- Although nested foralls or contexts are allowed in function type
-    -- signatures, it is much more difficult to engineer GADT constructor type
-    -- signatures to allow something similar, so we error in the latter case.
-    -- Nevertheless, we can at least suggest how a user might reshuffle their
-    -- exotic GADT constructor type signature so that GHC will accept.
-    nested_foralls_contexts_suggestion =
-      text "GADT constructor type signature cannot contain nested"
-      <+> quotes forAllLit <> text "s or contexts"
-      $+$ hang (text "Suggestion: instead use this type signature:")
-             2 (ppr (dataConName data_con) <+> dcolon <+> ppr suggested_ty)
-
-    -- To construct a type that GHC would accept (suggested_ty), we
-    -- simply drag all the foralls and (=>) contexts to the front
-    -- of the type.
-    suggested_ty = mkSpecSigmaTy tvs theta rho
-    (tvs, theta, rho) = go (dataConUserType data_con)
-
-    go :: Type -> ([TyVar],ThetaType,Type)
-    -- The returned Type has no foralls or =>, even to the right of an (->)
-    go ty | null arg_tys = (tvs1, theta1, rho1)
-          | otherwise    = (tvs1 ++ tvs2, theta1 ++ theta2, mkVisFunTys arg_tys rho2)
-      where
-        (tvs1, theta1, rho1) = tcSplitNestedSigmaTys ty
-        (arg_tys, ty2)       = tcSplitFunTys rho1
-        (tvs2, theta2, rho2) = go ty2
 
 badGadtDecl :: Name -> SDoc
 badGadtDecl tc_name
