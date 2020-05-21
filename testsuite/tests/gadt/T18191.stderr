@@ -1,0 +1,16 @@
+
+T18191.hs:6:3: error:
+    GADT constructor type signature cannot contain nested ‘forall’s or contexts
+    Suggestion: instead use this type signature:
+      MkT :: forall a. a -> b -> T
+    In the definition of data constructor ‘MkT’
+
+T18191.hs:9:3: error:
+    GADT constructor type signature cannot contain nested ‘forall’s or contexts
+    Suggestion: instead use this type signature: MkS :: forall a. S a
+    In the definition of data constructor ‘MkS’
+
+T18191.hs:12:3: error:
+    GADT constructor type signature cannot contain nested ‘forall’s or contexts
+    Suggestion: instead use this type signature: MkU :: Show a => U a
+    In the definition of data constructor ‘MkU’

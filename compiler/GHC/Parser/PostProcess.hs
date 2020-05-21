@@ -663,30 +663,39 @@ mkConDeclH98 name mb_forall mb_cxt args
                , con_args   = args
                , con_doc    = Nothing }
 
+-- Construct a GADT-style data constructor from the constructor names and their
+-- type. Does not perform any validity checking, as that it done later in
+-- TODO RGS
 mkGadtDecl :: [Located RdrName]
            -> LHsType GhcPs     -- Always a HsForAllTy
-           -> (ConDecl GhcPs, [AddAnn])
+           -> ConDecl GhcPs
 mkGadtDecl names ty
-  = (ConDeclGADT { con_g_ext  = noExtField
-                 , con_names  = names
-                 , con_forall = L l $ isLHsForAllTy ty'
-                 , con_qvars  = mkHsQTvs tvs
-                 , con_mb_cxt = mcxt
-                 , con_args   = args
-                 , con_res_ty = res_ty
-                 , con_doc    = Nothing }
-    , anns1 ++ anns2)
+  = ConDeclGADT { con_g_ext  = noExtField
+                , con_names  = names
+                , con_forall = L (getLoc ty) $ isJust mtvs
+                , con_qvars  = mkHsQTvs $ fromMaybe [] mtvs
+                , con_mb_cxt = mcxt
+                , con_args   = args
+                , con_res_ty = res_ty
+                , con_doc    = Nothing }
   where
-    (ty'@(L l _),anns1) = peel_parens ty []
-    (tvs, rho) = splitLHsForAllTyInvis ty'
-    (mcxt, tau, anns2) = split_rho rho []
+    (mtvs, rho) = split_sigma ty
+    (mcxt, tau) = split_rho rho
 
-    split_rho (L _ (HsQualTy { hst_ctxt = cxt, hst_body = tau })) ann
-      = (Just cxt, tau, ann)
-    split_rho (L l (HsParTy _ ty)) ann
-      = split_rho ty (ann++mkParensApiAnn l)
-    split_rho tau                  ann
-      = (Nothing, tau, ann)
+    -- NB: We do not use splitLHsForAllTyInvis below, since that looks through
+    -- parentheses. TODO RGS...
+    split_sigma (L _ (HsForAllTy { hst_fvf = ForallInvis, hst_bndrs = bndrs
+                                 , hst_body = rho }))
+      = (Just bndrs, rho)
+    split_sigma sigma
+      = (Nothing, sigma)
+
+    -- ...similarly, we do not use splitLHsQualTy below, since that also looks
+    -- through parentheses. TODO RGS
+    split_rho (L _ (HsQualTy { hst_ctxt = cxt, hst_body = tau }))
+      = (Just cxt, tau)
+    split_rho tau
+      = (Nothing, tau)
 
     (args, res_ty) = split_tau tau
 
@@ -695,10 +704,6 @@ mkGadtDecl names ty
       = (RecCon (L loc rf), res_ty)
     split_tau tau
       = (PrefixCon [], tau)
-
-    peel_parens (L l (HsParTy _ ty)) ann = peel_parens ty
-                                                       (ann++mkParensApiAnn l)
-    peel_parens ty                   ann = (ty, ann)
 
 
 setRdrNameSpace :: RdrName -> NameSpace -> RdrName
