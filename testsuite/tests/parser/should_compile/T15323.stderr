@@ -8,7 +8,7 @@
     {ModuleName: T15323}))
   (Nothing)
   []
-  [({ T15323.hs:(5,1)-(6,56) }
+  [({ T15323.hs:(5,1)-(6,54) }
     (TyClD
      (NoExtField)
      (DataDecl
@@ -33,63 +33,67 @@
         [])
        (Nothing)
        (Nothing)
-       [({ T15323.hs:6:5-56 }
-         (ConDeclGADT
-          (NoExtField)
-          [({ T15323.hs:6:5-14 }
-            (Unqual
-             {OccName: TestParens}))]
-          ({ T15323.hs:6:21-55 }
-           (True))
-          [({ T15323.hs:6:28 }
-            (UserTyVar
-             (NoExtField)
-             (SpecifiedSpec)
-             ({ T15323.hs:6:28 }
-              (Unqual
-               {OccName: v}))))]
-          (Just
-           ({ T15323.hs:6:32-37 }
-            [({ T15323.hs:6:32-37 }
-              (HsParTy
-               (NoExtField)
-               ({ T15323.hs:6:33-36 }
-                (HsAppTy
-                 (NoExtField)
-                 ({ T15323.hs:6:33-34 }
-                  (HsTyVar
-                   (NoExtField)
-                   (NotPromoted)
-                   ({ T15323.hs:6:33-34 }
-                    (Unqual
-                     {OccName: Eq}))))
-                 ({ T15323.hs:6:36 }
-                  (HsTyVar
-                   (NoExtField)
-                   (NotPromoted)
-                   ({ T15323.hs:6:36 }
-                    (Unqual
-                     {OccName: v}))))))))]))
-          (PrefixCon
-           [])
-          ({ T15323.hs:6:42-55 }
-           (HsAppTy
+       [({ T15323.hs:6:5-54 }
+         (XConDecl
+          (ConDeclGADTPrefixPs
+           [({ T15323.hs:6:5-14 }
+             (Unqual
+              {OccName: TestParens}))]
+           (HsIB
             (NoExtField)
-            ({ T15323.hs:6:42-53 }
-             (HsTyVar
+            ({ T15323.hs:6:20-54 }
+             (HsForAllTy
               (NoExtField)
-              (NotPromoted)
-              ({ T15323.hs:6:42-53 }
-               (Unqual
-                {OccName: MaybeDefault}))))
-            ({ T15323.hs:6:55 }
-             (HsTyVar
-              (NoExtField)
-              (NotPromoted)
-              ({ T15323.hs:6:55 }
-               (Unqual
-                {OccName: v}))))))
-          (Nothing)))]
+              (ForallInvis)
+              [({ T15323.hs:6:27 }
+                (UserTyVar
+                 (NoExtField)
+                 (SpecifiedSpec)
+                 ({ T15323.hs:6:27 }
+                  (Unqual
+                   {OccName: v}))))]
+              ({ T15323.hs:6:31-54 }
+               (HsQualTy
+                (NoExtField)
+                ({ T15323.hs:6:31-36 }
+                 [({ T15323.hs:6:31-36 }
+                   (HsParTy
+                    (NoExtField)
+                    ({ T15323.hs:6:32-35 }
+                     (HsAppTy
+                      (NoExtField)
+                      ({ T15323.hs:6:32-33 }
+                       (HsTyVar
+                        (NoExtField)
+                        (NotPromoted)
+                        ({ T15323.hs:6:32-33 }
+                         (Unqual
+                          {OccName: Eq}))))
+                      ({ T15323.hs:6:35 }
+                       (HsTyVar
+                        (NoExtField)
+                        (NotPromoted)
+                        ({ T15323.hs:6:35 }
+                         (Unqual
+                          {OccName: v}))))))))])
+                ({ T15323.hs:6:41-54 }
+                 (HsAppTy
+                  (NoExtField)
+                  ({ T15323.hs:6:41-52 }
+                   (HsTyVar
+                    (NoExtField)
+                    (NotPromoted)
+                    ({ T15323.hs:6:41-52 }
+                     (Unqual
+                      {OccName: MaybeDefault}))))
+                  ({ T15323.hs:6:54 }
+                   (HsTyVar
+                    (NoExtField)
+                    (NotPromoted)
+                    ({ T15323.hs:6:54 }
+                     (Unqual
+                      {OccName: v})))))))))))
+           (Nothing))))]
        ({ <no location info> }
         [])))))]
   (Nothing)

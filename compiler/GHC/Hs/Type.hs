@@ -58,7 +58,8 @@ module GHC.Hs.Type (
         hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsExplicitLTyVarNames,
         splitLHsInstDeclTy, getLHsInstDeclHead, getLHsInstDeclClass_maybe,
         splitLHsPatSynTy,
-        splitLHsForAllTyInvis, splitLHsQualTy, splitLHsSigmaTyInvis,
+        splitLHsForAllTyInvis, splitLHsQualTy,
+        splitLHsSigmaTyInvis, splitLHsGADTPrefixTy,
         splitHsFunType, hsTyGetAppHead_maybe,
         mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
         ignoreParens, hsSigType, hsSigWcType, hsPatSigType,
@@ -1347,6 +1348,43 @@ splitLHsSigmaTyInvis ty
   | (tvs,  ty1) <- splitLHsForAllTyInvis ty
   , (ctxt, ty2) <- splitLHsQualTy ty1
   = (tvs, ctxt, ty2)
+
+-- | Decompose a prefix GADT type into its constituent parts.
+-- Returns @(mb_tvbs, mb_ctxt, body)@, where:
+--
+-- * @mb_tvbs@ are @Just@ the leading @forall@s, if they are provided.
+--   Otherwise, they are @Nothing@.
+--
+-- * @mb_ctxt@ is @Just@ the context, if it is provided.
+--   Otherwise, it is @Nothing@.
+--
+-- * @body@ is the body of the type after the optional @forall@s and context.
+--
+-- This function is careful not to look through parentheses.
+-- See @Note [GADT abstract syntax] (Wrinkle: No nested foralls or contexts)@
+-- "GHC.Hs.Decls" for why this is important.
+splitLHsGADTPrefixTy ::
+     LHsType pass
+  -> (Maybe [LHsTyVarBndr Specificity pass], Maybe (LHsContext pass), LHsType pass)
+splitLHsGADTPrefixTy ty
+  | (mb_tvbs, rho) <- split_forall ty
+  , (mb_ctxt, tau) <- split_ctxt rho
+  = (mb_tvbs, mb_ctxt, tau)
+  where
+    -- NB: We do not use splitLHsForAllTyInvis below, since that looks through
+    -- parentheses...
+    split_forall (L _ (HsForAllTy { hst_fvf = ForallInvis, hst_bndrs = bndrs
+                                  , hst_body = rho }))
+      = (Just bndrs, rho)
+    split_forall sigma
+      = (Nothing, sigma)
+
+    -- ...similarly, we do not use splitLHsQualTy below, since that also looks
+    -- through parentheses.
+    split_ctxt (L _ (HsQualTy { hst_ctxt = cxt, hst_body = tau }))
+      = (Just cxt, tau)
+    split_ctxt tau
+      = (Nothing, tau)
 
 -- | Decompose a type of the form @forall <tvs>. body@ into its constituent
 -- parts. Only splits type variable binders that
