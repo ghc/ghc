@@ -660,14 +660,18 @@ RtsPaused rts_pause (void)
     return paused;
 }
 
-void rts_unpause (RtsPaused  paused)
+// Counterpart of rts_pause: Continue from a pause.
+void rts_unpause (RtsPaused paused)
 {
     rts_paused = false;
     releaseAllCapabilities(n_capabilities, paused.capabilities, paused.pausing_task);
     freeTask(paused.pausing_task);
 }
 
-
+// Call cb for all StgTSOs. *user is a user defined payload to cb. It's not
+// used by the RTS.
+// rts_listThreads should only be called when the RTS is paused, i.e. rts_pause
+// was called before.
 void rts_listThreads(ListThreadsCb cb, void *user)
 {
     ASSERT(rts_paused);
@@ -691,6 +695,11 @@ static void list_roots_helper(void *user, StgClosure **p) {
     ctx->cb(ctx->user, *p);
 }
 
+// Call cb for all StgClosures reachable from threadStableNameTable and
+// threadStablePtrTable. *user is a user defined payload to cb. It's not
+// used by the RTS.
+// rts_listMiscRoots should only be called when the RTS is paused, i.e.
+// rts_pause was called before.
 void rts_listMiscRoots (ListRootsCb cb, void *user)
 {
     struct list_roots_ctx ctx;
@@ -713,7 +722,7 @@ RtsPaused rts_pause (void)
     return paused;
 }
 
-void rts_unpause (RtsPaused  paused STG_UNUSED)
+void rts_unpause (RtsPaused paused STG_UNUSED)
 {
     errorBelch("Warning: Unpausing the RTS is only possible for "
                "multithreaded RTS.");
