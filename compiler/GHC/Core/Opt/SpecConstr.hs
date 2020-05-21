@@ -1760,8 +1760,8 @@ Note [Transfer activation]
 In which phase should the specialise-constructor rules be active?
 Originally I made them always-active, but Manuel found that this
 defeated some clever user-written rules.  Then I made them active only
-in Phase 0; after all, currently, the specConstr transformation is
-only run after the simplifier has reached Phase 0, but that meant
+in FinalPhase; after all, currently, the specConstr transformation is
+only run after the simplifier has reached FinalPhase, but that meant
 that specialisations didn't fire inside wrappers; see test
 simplCore/should_compile/spec-inline.
 
