@@ -10,3 +10,9 @@ T13031:
 # take only one Int# argument
 T16029:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -fforce-recomp T16029.hs -dsuppress-uniques -ddump-simpl | grep '::.*Int'
+
+T18078:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -fforce-recomp T18078.hs -dsuppress-uniques -ddump-simpl | grep 'wf'
+
+T17673:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -fforce-recomp T17673.hs -dsuppress-uniques -ddump-simpl | grep 'wf'
