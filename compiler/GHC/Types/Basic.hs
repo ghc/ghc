@@ -83,6 +83,7 @@ module GHC.Types.Basic (
         Activation(..), isActive, isActiveIn, competesWith,
         isNeverActive, isAlwaysActive, isEarlyActive,
         activeAfterInitial, activeDuringFinal,
+        finalPhase, isFinalPhase,
 
         RuleMatchInfo(..), isConLike, isFunLike,
         InlineSpec(..), noUserInlineSpec,
@@ -1300,6 +1301,22 @@ pprWithSourceText (SourceText src) _ = text src
 ************************************************************************
 
 When a rule or inlining is active
+
+Note [Compiler phases]
+~~~~~~~~~~~~~~~~~~~~~~
+The CompilerPhase says which phase the simplifier is running in:
+
+* InitialPhase: before all user-visible phases
+
+* Phase 2,1,0: user-visible phases; the phase number
+  controls rule ordering an inlining.
+
+* Phase (-1) = finalPhase: used for all subsequent simplifier
+  runs. By delaying inlining of wrappers to phase (-1) we can
+  ensure that RULE have a good chance to fire. See
+  Note [Wrapper activation] in GHC.Core.Opt.WorkWrap
+
+The phase sequencing is done by GHC.Opt.Simplify.Driver
 -}
 
 -- | Phase Number
@@ -1317,12 +1334,21 @@ instance Outputable CompilerPhase where
 
 activeAfterInitial :: Activation
 -- Active in the first phase after the initial phase
--- Currently we have just phases [2,1,0]
+-- Currently we have just phases [2,1,0,-1]
+-- Where "-1" means GHC's internal simplification steps
+-- after all rules have run
 activeAfterInitial = ActiveAfter NoSourceText 2
 
 activeDuringFinal :: Activation
 -- Active in the final simplification phase (which is repeated)
-activeDuringFinal = ActiveAfter NoSourceText 0
+activeDuringFinal = ActiveAfter NoSourceText (-1)
+
+finalPhase :: CompilerPhase
+finalPhase = Phase (-1)
+
+isFinalPhase :: CompilerPhase -> Bool
+isFinalPhase (Phase (-1)) = True
+isFinalPhase _            = False
 
 -- See note [Pragma source text]
 data Activation = NeverActive
