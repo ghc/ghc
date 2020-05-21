@@ -28,6 +28,9 @@ static pid_t event_log_pid = -1;
 // File for logging events
 static FILE *event_log_file = NULL;
 
+// Protects event log file
+static Mutex event_log_mutex;
+
 static void initEventLogFileWriter(void);
 static bool writeEventLogFile(void *eventlog, size_t eventlog_size);
 static void flushEventLogFile(void);
@@ -89,6 +92,7 @@ initEventLogFileWriter(void)
     }
 
     stgFree(event_log_filename);
+    initMutex(&event_log_mutex);
 }
 
 static bool
@@ -97,15 +101,17 @@ writeEventLogFile(void *eventlog, size_t eventlog_size)
     unsigned char *begin = eventlog;
     size_t remain = eventlog_size;
 
+    ACQUIRE_MUTEX(&event_log_mutex);
     while (remain > 0) {
         size_t written = fwrite(begin, 1, remain, event_log_file);
         if (written == 0) {
+            RELEASE_MUTEX(&event_log_mutex);
             return false;
         }
         remain -= written;
         begin += written;
     }
-
+    RELEASE_MUTEX(&event_log_mutex);
     return true;
 }
 
