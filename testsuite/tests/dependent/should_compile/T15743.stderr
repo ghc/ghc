@@ -3,5 +3,5 @@ TYPE CONSTRUCTORS
     forall {k1} k2 (k3 :: k2). Proxy k3 -> k1 -> k2 -> *
     roles nominal nominal nominal phantom phantom phantom
 Dependent modules: []
-Dependent packages: [base-4.14.0.0, ghc-prim-0.6.1,
-                     integer-gmp-1.0.2.0]
+Dependent packages: [base-4.15.0.0, ghc-prim-0.6.1,
+                     integer-gmp-1.0.3.0]
