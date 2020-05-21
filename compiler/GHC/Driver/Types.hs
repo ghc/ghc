@@ -29,9 +29,10 @@ module GHC.Driver.Types (
         ModuleGraph, WorkGraphNode(..), emptyMG, mapMG,
         mkModuleGraph, mkModuleGraph', extendMG, extendMGInst, extendMG',
         filterToposortToModules,
-        mgModSummaries, mgModSummaries',
+        mgModSummaries, mgModSummaries', mgExtendedModSummaries,
         mgElemModule, mgLookupModule,
         needsTemplateHaskellOrQQ, mgBootModules,
+        ExtendedModSummary,
 
         -- * Hsc monad
         Hsc(..), runHsc, mkInteractiveHscEnv, runInteractiveHsc,
@@ -2842,13 +2843,18 @@ data WorkGraphNode
   -- for more explicit instantiations.
   = InstantiationNode InstantiatedUnit
   -- | There is a module summary node for each module, signature, and boot module being built.
-  | ModuleNode ModSummary
+  | ModuleNode
+      ModSummary
+      [InstantiatedUnit] -- ^ Extra backpack deps
+
+-- TODO use in ModuleNode and make real data type
+type ExtendedModSummary = (ModSummary, [InstantiatedUnit])
 
 -- TODO what do we want here?
 instance Outputable WorkGraphNode where
   ppr = \case
     InstantiationNode iuid -> ppr iuid
-    ModuleNode ms -> ppr ms
+    ModuleNode ms bds -> ppr ms <+> ppr bds
 
 -- TODO deprecate and remove this.
 type ModuleGraph = WorkGraph
@@ -2890,7 +2896,7 @@ mapMG :: (ModSummary -> ModSummary) -> ModuleGraph -> ModuleGraph
 mapMG f mg@ModuleGraph{..} = mg
   { mg_mss = flip fmap mg_mss $ \case
       InstantiationNode iuid -> InstantiationNode iuid
-      ModuleNode ms -> ModuleNode $ f ms
+      ModuleNode ms bds -> ModuleNode (f ms) bds
   , mg_non_boot = mapModuleEnv f mg_non_boot
   }
 
@@ -2898,7 +2904,10 @@ mgBootModules :: ModuleGraph -> ModuleSet
 mgBootModules ModuleGraph{..} = mg_boot
 
 mgModSummaries :: ModuleGraph -> [ModSummary]
-mgModSummaries mg = [ m | ModuleNode m <- mgModSummaries' mg ]
+mgModSummaries mg = [ m | ModuleNode m _ <- mgModSummaries' mg ]
+
+mgExtendedModSummaries :: ModuleGraph -> [ExtendedModSummary]
+mgExtendedModSummaries mg = [ (m, bds) | ModuleNode m bds <- mgModSummaries' mg ]
 
 mgModSummaries' :: ModuleGraph -> [WorkGraphNode]
 mgModSummaries' = mg_mss
@@ -2921,9 +2930,9 @@ isTemplateHaskellOrQQNonBoot ms =
 
 -- | Add a ModSummary to ModuleGraph. Assumes that the new ModSummary is
 -- not an element of the ModuleGraph.
-extendMG :: ModuleGraph -> ModSummary -> ModuleGraph
-extendMG ModuleGraph{..} ms = ModuleGraph
-  { mg_mss = ModuleNode ms : mg_mss
+extendMG :: ModuleGraph -> ModSummary -> [InstantiatedUnit] -> ModuleGraph
+extendMG ModuleGraph{..} ms bds = ModuleGraph
+  { mg_mss = ModuleNode ms bds : mg_mss
   , mg_non_boot = case isBootSummary ms of
       IsBoot -> mg_non_boot
       NotBoot -> extendModuleEnv mg_non_boot (ms_mod ms) ms
@@ -2941,10 +2950,10 @@ extendMGInst mg depUnitId = mg
 extendMG' :: ModuleGraph -> WorkGraphNode -> ModuleGraph
 extendMG' mg = \case
   InstantiationNode depUnitId -> extendMGInst mg depUnitId
-  ModuleNode ms -> extendMG mg ms
+  ModuleNode ms bds -> extendMG mg ms bds
 
-mkModuleGraph :: [ModSummary] -> ModuleGraph
-mkModuleGraph = foldr (flip extendMG) emptyMG
+mkModuleGraph :: [(ModSummary, [InstantiatedUnit])] -> ModuleGraph
+mkModuleGraph = foldr (\(ms, bds) mg -> extendMG mg ms bds) emptyMG
 
 mkModuleGraph' :: [WorkGraphNode] -> ModuleGraph
 mkModuleGraph' = foldr (flip extendMG') emptyMG
@@ -2960,7 +2969,7 @@ filterToposortToModules
   :: [SCC WorkGraphNode] -> [SCC ModSummary]
 filterToposortToModules = mapMaybe $ mapMaybeSCC $ \case
   InstantiationNode _ -> Nothing
-  ModuleNode node -> Just node
+  ModuleNode node _ -> Just node
 
 -- | A single node in a 'ModuleGraph'. The nodes of the module graph
 -- are one of:
@@ -3073,7 +3082,7 @@ instance Outputable ModSummary where
 showModMsg :: DynFlags -> Bool -> WorkGraphNode -> String
 showModMsg dflags _ (InstantiationNode indef_unit) = showSDoc dflags $
   ppr $ instUnitInstanceOf indef_unit
-showModMsg dflags recomp (ModuleNode mod_summary) = showSDoc dflags $
+showModMsg dflags recomp (ModuleNode mod_summary _) = showSDoc dflags $
   if gopt Opt_HideSourcePaths dflags
       then text mod_str
       else hsep $
