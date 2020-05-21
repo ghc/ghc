@@ -1,0 +1,5 @@
+T17673.$wfacIO [InlPrag=NOINLINE, Occ=LoopBreaker]
+T17673.$wfacIO
+          case T17673.$wfacIO (GHC.Prim.-# ww 1#) w of { (# ipv, ipv1 #) ->
+                 T17673.$wfacIO ww1 w1
+      case w of { GHC.Types.I# ww1 -> T17673.$wfacIO ww1 w1 }

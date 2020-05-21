@@ -1,0 +1,6 @@
+T18078.$wf [InlPrag=NOINLINE, Occ=LoopBreaker]
+T18078.$wf
+        __DEFAULT -> T18078.$wf (GHC.Prim.-# wild 1#);
+                 case T18078.$wf ww1 of ww2 [Occ=Once] { __DEFAULT ->
+      case T18078.$wf ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
+      case T18078.$wf (GHC.Prim.+# x1 1#) of ww { __DEFAULT ->

@@ -1340,8 +1340,7 @@ pushCoTyArg co ty
   | otherwise
   = Nothing
   where
-    tyL = coercionLKind co
-    tyR = coercionRKind co
+    Pair tyL tyR = coercionKind co
        -- co :: tyL ~ tyR
        -- tyL = forall (a1 :: k1). ty1
        -- tyR = forall (a2 :: k2). ty2
