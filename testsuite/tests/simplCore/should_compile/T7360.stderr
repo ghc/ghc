@@ -4,7 +4,7 @@ Result size of Tidy Core
   = {terms: 106, types: 47, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
-T7360.$WFoo3 [InlPrag=INLINE[0] CONLIKE] :: Int -> Foo
+T7360.$WFoo3 [InlPrag=INLINE[final] CONLIKE] :: Int -> Foo
 [GblId[DataConWrapper],
  Arity=1,
  Caf=NoCafRefs,

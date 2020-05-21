@@ -56,6 +56,9 @@ module GHC.Core.Utils (
         -- * Join points
         isJoinBind,
 
+        -- * unsafeEqualityProof
+        isUnsafeEqualityProof,
+
         -- * Dumping stuff
         dumpIdInfoOfProgram
     ) where
@@ -66,7 +69,7 @@ import GHC.Prelude
 import GHC.Platform
 
 import GHC.Core
-import GHC.Builtin.Names ( makeStaticName )
+import GHC.Builtin.Names ( makeStaticName, unsafeEqualityProofName )
 import GHC.Core.Ppr
 import GHC.Core.FVs( exprFreeVars )
 import GHC.Types.Var
@@ -2533,3 +2536,20 @@ dumpIdInfoOfProgram ppr_id_info binds = vcat (map printId ids)
   getIds (Rec bs)     = map fst bs
   printId id | isExportedId id = ppr id <> colon <+> (ppr_id_info (idInfo id))
              | otherwise       = empty
+
+
+{- *********************************************************************
+*                                                                      *
+             unsafeEqualityProof
+*                                                                      *
+********************************************************************* -}
+
+isUnsafeEqualityProof :: CoreExpr -> Bool
+-- See (U3) and (U4) in
+-- Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
+isUnsafeEqualityProof e
+  | Var v `App` Type _ `App` Type _ `App` Type _ <- e
+  = idName v == unsafeEqualityProofName
+  | otherwise
+  = False
+

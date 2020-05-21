@@ -465,10 +465,10 @@ instance Binary ArgFlag where
       _ -> return Inferred
 
 -- | The non-dependent version of 'ArgFlag'.
-
--- Appears here partly so that it's together with its friend ArgFlag,
--- but also because it is used in IfaceType, rather early in the
--- compilation chain
+-- See Note [AnonArgFlag]
+-- Appears here partly so that it's together with its friends ArgFlag
+-- and ForallVisFlag, but also because it is used in IfaceType, rather
+-- early in the compilation chain
 -- See Note [AnonArgFlag vs. ForallVisFlag]
 data AnonArgFlag
   = VisArg    -- ^ Used for @(->)@: an ordinary non-dependent arrow.
@@ -511,7 +511,60 @@ argToForallVisFlag Required  = ForallVis
 argToForallVisFlag Specified = ForallInvis
 argToForallVisFlag Inferred  = ForallInvis
 
-{-
+{- Note [AnonArgFlag]
+~~~~~~~~~~~~~~~~~~~~~
+AnonArgFlag is used principally in the FunTy constructor of Type.
+  FunTy VisArg   t1 t2   means   t1 -> t2
+  FunTy InvisArg t1 t2   means   t1 => t2
+
+However, the AnonArgFlag in a FunTy is just redundant, cached
+information.  In (FunTy { ft_af = af, ft_arg = t1, ft_res = t2 })
+  * if (isPredTy t1 = True)  then af = InvisArg
+  * if (isPredTy t1 = False) then af = VisArg
+where isPredTy is defined in GHC.Core.Type, and sees if t1's
+kind is Constraint.  See GHC.Core.TyCo.Rep
+Note [Types for coercions, predicates, and evidence]
+
+GHC.Core.Type.mkFunctionType :: Type -> Type -> Type
+uses isPredTy to decide the AnonArgFlag for the FunTy.
+
+The term (Lam b e), and coercion (FunCo co1 co2) don't carry
+AnonArgFlags; instead they use mkFunctionType when we want to
+get their types; see mkLamType and coercionLKind/RKind resp.
+This is just an engineering choice; we could cache here too
+if we wanted.
+
+Why bother with all this? After all, we are in Core, where (=>) and
+(->) behave the same.  We maintain this distinction throughout Core so
+that we can cheaply and conveniently determine
+* How to print a type
+* How to split up a type: tcSplitSigmaTy
+* How to specialise it (over type classes; GHC.Core.Opt.Specialise)
+
+For the specialisation point, consider
+(\ (d :: Ord a). blah).  We want to give it type
+           (Ord a => blah_ty)
+with a fat arrow; that is, using mkInvisFunTy, not mkVisFunTy.
+Why?  Because the /specialiser/ treats dictionary arguments specially.
+Suppose we do w/w on 'foo', thus (#11272, #6056)
+   foo :: Ord a => Int -> blah
+   foo a d x = case x of I# x' -> $wfoo @a d x'
+
+   $wfoo :: Ord a => Int# -> blah
+
+Now, at a call we see (foo @Int dOrdInt).  The specialiser will
+specialise this to $sfoo, where
+   $sfoo :: Int -> blah
+   $sfoo x = case x of I# x' -> $wfoo @Int dOrdInt x'
+
+Now we /must/ also specialise $wfoo!  But it wasn't user-written,
+and has a type built with mkLamTypes.
+
+Conclusion: the easiest thing is to make mkLamType build
+            (c => ty)
+when the argument is a predicate type.  See GHC.Core.TyCo.Rep
+Note [Types for coercions, predicates, and evidence]
+
 Note [AnonArgFlag vs. ForallVisFlag]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The AnonArgFlag and ForallVisFlag data types are quite similar at a first
@@ -522,15 +575,19 @@ glance:
 
 Both data types keep track of visibility of some sort. AnonArgFlag tracks
 whether a FunTy has a visible argument (->) or an invisible predicate argument
-(=>). ForallVisFlag tracks whether a `forall` quantifier is visible
-(forall a -> {...}) or invisible (forall a. {...}).
+(=>). ForallVisFlag tracks whether a `forall` quantifier in a user-specified
+HsType is
+   visible:   forall a -> {...}
+   invisible: forall a. {...}
+In fact the visible form can currently only appear in kinds.
 
-Given their similarities, it's tempting to want to combine these two data types
-into one, but they actually represent distinct concepts. AnonArgFlag reflects a
-property of *Core* types, whereas ForallVisFlag reflects a property of the GHC
-AST. In other words, AnonArgFlag is all about internals, whereas ForallVisFlag
-is all about surface syntax. Therefore, they are kept as separate data types.
--}
+Given their similarities, it's tempting to want to combine these two
+data types into one, but they actually represent distinct
+concepts. AnonArgFlag reflects a property of *Core* types, whereas
+ForallVisFlag reflects a property of the HsSyn source-code AST. In
+other words, AnonArgFlag is all about internals, whereas ForallVisFlag
+is all about surface syntax. Therefore, they are kept as separate data
+types.  -}
 
 {- *********************************************************************
 *                                                                      *
