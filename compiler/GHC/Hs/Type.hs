@@ -58,7 +58,8 @@ module GHC.Hs.Type (
         hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsExplicitLTyVarNames,
         splitLHsInstDeclTy, getLHsInstDeclHead, getLHsInstDeclClass_maybe,
         splitLHsPatSynTy,
-        splitLHsForAllTyInvis, splitLHsQualTy, splitLHsSigmaTyInvis,
+        splitLHsForAllTyInvis, splitLHsQualTy,
+        splitLHsSigmaTyInvis, splitLHsGADTPrefixTy,
         splitHsFunType, hsTyGetAppHead_maybe,
         mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
         ignoreParens, hsSigType, hsSigWcType, hsPatSigType,
@@ -1346,6 +1347,85 @@ splitLHsSigmaTyInvis ty
   | (tvs,  ty1) <- splitLHsForAllTyInvis ty
   , (ctxt, ty2) <- splitLHsQualTy ty1
   = (tvs, ctxt, ty2)
+
+-- | Decompose a prefix GADT type into its constituent parts.
+-- Returns @(mb_tvbs, mb_ctxt, body)@, where:
+--
+-- * @mb_tvbs@ are @Just@ the leading @forall@s, if they are provided.
+--   Otherwise, they are @Nothing@.
+--
+-- * @mb_ctxt@ is @Just@ the context, if it is provided.
+--   Otherwise, it is @Nothing@.
+--
+-- * @body@ is the body of the type after the optional @forall@s and context.
+--
+-- This function is careful not to look through parentheses.
+-- See @Note [No nested foralls or contexts in GADT constructors]@ for why this
+-- is important.
+splitLHsGADTPrefixTy ::
+     LHsType pass
+  -> (Maybe [LHsTyVarBndr Specificity pass], Maybe (LHsContext pass), LHsType pass)
+splitLHsGADTPrefixTy ty
+  | (mb_tvbs, rho) <- split_forall ty
+  , (mb_ctxt, tau) <- split_ctxt rho
+  = (mb_tvbs, mb_ctxt, tau)
+  where
+    -- NB: We do not use splitLHsForAllTyInvis below, since that looks through
+    -- parentheses...
+    split_forall (L _ (HsForAllTy { hst_fvf = ForallInvis, hst_bndrs = bndrs
+                                  , hst_body = rho }))
+      = (Just bndrs, rho)
+    split_forall sigma
+      = (Nothing, sigma)
+
+    -- ...similarly, we do not use splitLHsQualTy below, since that also looks
+    -- through parentheses.
+    split_ctxt (L _ (HsQualTy { hst_ctxt = cxt, hst_body = tau }))
+      = (Just cxt, tau)
+    split_ctxt tau
+      = (Nothing, tau)
+
+{-
+Note [No nested foralls or contexts in GADT constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GADT constructors provide some freedom to change the order of foralls in their
+types (see Note [DataCon user type variable binders] in GHC.Core.DataCon), but
+this freedom is still limited. GADTs still require that all quantification
+occurs "prenex". That is, any explicitly quantified type variables must occur
+at the front of the GADT type, followed by any contexts, followed by the body of
+the GADT type, in precisely that order. For instance:
+
+  data T where
+    MkT1 :: forall a b. (Eq a, Eq b) => a -> b -> T
+      -- OK
+    MkT2 :: forall a. Eq a => forall b. a -> b -> T
+      -- Rejected, `forall b` is nested
+    MkT3 :: forall a b. Eq a => Eq b => a -> b -> T
+      -- Rejected, `Eq b` is nested
+    MkT4 :: Int -> forall a. a -> T
+      -- Rejected, `forall a` is nested
+    MkT5 :: forall a. Int -> Eq a => a -> T
+      -- Rejected, `Eq a` is nested
+    MkT6 :: (forall a. a -> T)
+      -- Rejected, `forall a` is nested due to the surrounding parentheses
+    MkT7 :: (Eq a => a -> t)
+      -- Rejected, `Eq a` is nested due to the surrounding parentheses
+
+For the full details, see the "Formal syntax for GADTs" section of the GHC
+User's Guide. GHC enforces that GADT constructors do not have nested `forall`s
+or contexts in two parts:
+
+1. The splitLHsGADTPrefixTy function is careful not to remove parentheses
+   in a prefix GADT constructor's type, as these parentheses can be
+   syntactically significant. If the third result returned by
+   splitLHsGADTPrefixTy contains any `forall`s or contexts, then they are
+   nested.
+2. The renamer (in the ConDeclGADTPrefixPs case of GHC.Rename.Module.rnConDecl)
+   will check for nested `forall`s/contexts in the body of a prefix GADT type,
+   after it has determined what all of the argument types are.
+   (See Note [GADT abstract syntax] in GHC.Hs.Decls for why this check must wait
+   until the renamer.)
+-}
 
 -- | Decompose a type of the form @forall <tvs>. body@ into its constituent
 -- parts. Only splits type variable binders that

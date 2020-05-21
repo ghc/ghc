@@ -5,6 +5,7 @@
 
 {-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveFoldable,
              DeriveTraversable #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -70,7 +71,7 @@ module GHC.Hs.Decls (
   ForeignDecl(..), LForeignDecl, ForeignImport(..), ForeignExport(..),
   CImportSpec(..),
   -- ** Data-constructor declarations
-  ConDecl(..), LConDecl,
+  ConDecl(..), LConDecl, ConDeclGADTPrefixPs(..),
   HsConDeclDetails, hsConDeclArgTys, hsConDeclTheta,
   getConNames, getConArgs,
   -- ** Document comments
@@ -109,6 +110,7 @@ import GHC.Core.Coercion
 import GHC.Types.ForeignCall
 import GHC.Hs.Extension
 import GHC.Types.Name
+import GHC.Types.Name.Reader
 import GHC.Types.Name.Set
 
 -- others:
@@ -1422,54 +1424,92 @@ type instance XConDeclGADT GhcRn = [Name] -- Implicitly bound type variables
 type instance XConDeclGADT GhcTc = NoExtField
 
 type instance XConDeclH98  (GhcPass _) = NoExtField
-type instance XXConDecl    (GhcPass _) = NoExtCon
+
+type instance XXConDecl GhcPs = ConDeclGADTPrefixPs
+type instance XXConDecl GhcRn = NoExtCon
+type instance XXConDecl GhcTc = NoExtCon
+
+-- | Stores the types of prefix GADT constructors in the parser. This is used
+-- in lieu of ConDeclGADT, which requires knowing the specific argument and
+-- result types, as this is difficult to determine in general in the parser.
+-- See @Note [GADT abstract syntax]@.
+data ConDeclGADTPrefixPs = ConDeclGADTPrefixPs
+  { con_gp_names :: [Located RdrName]
+    -- ^ The GADT constructor declaration's names.
+  , con_gp_ty    :: LHsSigType GhcPs
+    -- ^ The type after the @::@.
+  , con_gp_doc   :: Maybe LHsDocString
+    -- ^ A possible Haddock comment.
+  }
 
 {- Note [GADT abstract syntax]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-There's a wrinkle in ConDeclGADT
+There are two broad ways to classify GADT constructors:
 
-* For record syntax, it's all uniform.  Given:
-      data T a where
-        K :: forall a. Ord a => { x :: [a], ... } -> T a
-    we make the a ConDeclGADT for K with
-       con_qvars  = {a}
-       con_mb_cxt = Just [Ord a]
-       con_args   = RecCon <the record fields>
-       con_res_ty = T a
+* Record-syntax constructors. For example:
 
-  We need the RecCon before the reanmer, so we can find the record field
-  binders in GHC.Hs.Utils.hsConDeclsBinders.
+    data T a where
+      K :: forall a. Ord a => { x :: [a], ... } -> T a
 
-* However for a GADT constr declaration which is not a record, it can
-  be hard parse until we know operator fixities. Consider for example
-     C :: a :*: b -> a :*: b -> a :+: b
-  Initially this type will parse as
-      a :*: (b -> (a :*: (b -> (a :+: b))))
-  so it's hard to split up the arguments until we've done the precedence
-  resolution (in the renamer).
+* Prefix constructors, which do not use record syntax. For example:
 
-  So:  - In the parser (GHC.Parser.PostProcess.mkGadtDecl), we put the whole constr
-         type into the res_ty for a ConDeclGADT for now, and use
-         PrefixCon []
-            con_args   = PrefixCon []
-            con_res_ty = a :*: (b -> (a :*: (b -> (a :+: b))))
+    data T a where
+      K :: forall a. Ord a => [a] -> ... -> T a
 
-       - In the renamer (GHC.Rename.Module.rnConDecl), we unravel it after
-         operator fixities are sorted. So we generate. So we end
-         up with
-            con_args   = PrefixCon [ a :*: b, a :*: b ]
-            con_res_ty = a :+: b
+Initially, both forms of GADT constructors are initially parsed as a single
+LHsType. However, GADTs have a certain structure, requiring distinct argument
+and result types, as well as imposing restrictions on where `forall`s and
+contexts can be (see Note [No nested foralls or contexts in GADT constructors]
+in GHC.Hs.Type). As a result, it is convenient to split up the LHsType into
+its individual components, which are stored in the ConDeclGADT constructor of
+ConDecl.
+
+Where should this splitting occur? For GADT constructors with record syntax,
+we split in the parser (in GHC.Parser.PostProcess.mkGadtDecl). We must do this
+splitting before the renamer, as we need the record field names for use in
+GHC.Hs.Utils.hsConDeclsBinders.
+
+For prefix GADT constructors, however, the situation is more complicated. It
+can be difficult to split a prefix GADT type until we know type operator
+fixities. Consider this, for example:
+
+  C :: a :*: b -> a :*: b -> a :+: b
+
+Initially, the type of C will parse as:
+
+  a :*: (b -> (a :*: (b -> (a :+: b))))
+
+So it's hard to split up the arguments until we've done the precedence
+resolution (in the renamer). (Unlike prefix GADT types, record GADT types
+do not have this problem because of their uniform syntax.)
+
+As a result, we deliberately avoid splitting prefix GADT types in the parser.
+Instead, we store the entire LHsType in ConDeclGADTPrefixPs, a GHC-specific
+extension constructor to ConDecl. Later, in the renamer
+(in GHC.Rename.Module.rnConDecl), we resolve the fixities of all type operators
+in the LHsType, which facilitates splitting it into argument and result types
+accurately. We finish renaming a ConDeclGADTPrefixPs by putting the split
+components into a ConDeclGADT. This is why ConDeclGADTPrefixPs has the suffix
+-Ps, as it is only used by the parser.
+
+Note that the existence of ConDeclGADTPrefixPs does not imply that ConDeclGADT
+goes completely unused by the parser. Other consumers of GHC's abstract syntax
+are still free to use ConDeclGADT. Indeed, both Haddock and Template Haskell
+construct values of type `ConDecl GhcPs` by way of ConDeclGADT, as neither of
+them have the same difficulties with operator precedence that GHC's parser
+does. As an example, see GHC.ThToHs.cvtConstr, which converts Template Haskell
+syntax into GHC syntax.
 -}
 
 -- | Haskell data Constructor Declaration Details
 type HsConDeclDetails pass
    = HsConDetails (LBangType pass) (Located [LConDeclField pass])
 
-getConNames :: ConDecl (GhcPass p) -> [Located (IdP (GhcPass p))]
+getConNames :: ConDecl GhcRn -> [Located Name]
 getConNames ConDeclH98  {con_name  = name}  = [name]
 getConNames ConDeclGADT {con_names = names} = names
 
-getConArgs :: ConDecl pass -> HsConDeclDetails pass
+getConArgs :: ConDecl GhcRn -> HsConDeclDetails GhcRn
 getConArgs d = con_args d
 
 hsConDeclArgTys :: HsConDeclDetails pass -> [LBangType pass]
@@ -1518,16 +1558,30 @@ instance Outputable NewOrData where
   ppr NewType  = text "newtype"
   ppr DataType = text "data"
 
-pp_condecls :: (OutputableBndrId p) => [LConDecl (GhcPass p)] -> SDoc
-pp_condecls cs@(L _ ConDeclGADT{} : _) -- In GADT syntax
+pp_condecls :: forall p. OutputableBndrId p => [LConDecl (GhcPass p)] -> SDoc
+pp_condecls cs
+  | gadt_syntax                  -- In GADT syntax
   = hang (text "where") 2 (vcat (map ppr cs))
-pp_condecls cs                    -- In H98 syntax
+  | otherwise                    -- In H98 syntax
   = equals <+> sep (punctuate (text " |") (map ppr cs))
+  where
+    gadt_syntax = case cs of
+      []                      -> False
+      (L _ ConDeclH98{}  : _) -> False
+      (L _ ConDeclGADT{} : _) -> True
+      (L _ (XConDecl x)  : _) ->
+        case ghcPass @p of
+          GhcPs |  ConDeclGADTPrefixPs{} <- x
+                -> True
+#if __GLASGOW_HASKELL__ < 811
+          GhcRn -> noExtCon x
+          GhcTc -> noExtCon x
+#endif
 
 instance (OutputableBndrId p) => Outputable (ConDecl (GhcPass p)) where
     ppr = pprConDecl
 
-pprConDecl :: (OutputableBndrId p) => ConDecl (GhcPass p) -> SDoc
+pprConDecl :: forall p. OutputableBndrId p => ConDecl (GhcPass p) -> SDoc
 pprConDecl (ConDeclH98 { con_name = L _ con
                        , con_ex_tvs = ex_tvs
                        , con_mb_cxt = mcxt
@@ -1557,6 +1611,16 @@ pprConDecl (ConDeclGADT { con_names = cons, con_qvars = qvars
 
     ppr_arrow_chain (a:as) = sep (a : map (arrow <+>) as)
     ppr_arrow_chain []     = empty
+
+pprConDecl (XConDecl x) =
+  case ghcPass @p of
+    GhcPs |  ConDeclGADTPrefixPs { con_gp_names = cons, con_gp_ty = ty
+                                 , con_gp_doc = doc } <- x
+          -> ppr_mbDoc doc <+> ppr_con_names cons <+> dcolon <+> ppr ty
+#if __GLASGOW_HASKELL__ < 811
+    GhcRn -> noExtCon x
+    GhcTc -> noExtCon x
+#endif
 
 ppr_con_names :: (OutputableBndr a) => [Located a] -> SDoc
 ppr_con_names = pprWithCommas (pprPrefixOcc . unLoc)
