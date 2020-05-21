@@ -1256,22 +1256,25 @@ instance Binary TupleSort where
 instance Binary Activation where
     put_ bh NeverActive = do
             putByte bh 0
-    put_ bh AlwaysActive = do
+    put_ bh FinalActive = do
             putByte bh 1
-    put_ bh (ActiveBefore src aa) = do
+    put_ bh AlwaysActive = do
             putByte bh 2
+    put_ bh (ActiveBefore src aa) = do
+            putByte bh 3
             put_ bh src
             put_ bh aa
     put_ bh (ActiveAfter src ab) = do
-            putByte bh 3
+            putByte bh 4
             put_ bh src
             put_ bh ab
     get bh = do
             h <- getByte bh
             case h of
               0 -> do return NeverActive
-              1 -> do return AlwaysActive
-              2 -> do src <- get bh
+              1 -> do return FinalActive
+              2 -> do return AlwaysActive
+              3 -> do src <- get bh
                       aa <- get bh
                       return (ActiveBefore src aa)
               _ -> do src <- get bh

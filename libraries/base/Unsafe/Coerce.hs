@@ -22,7 +22,6 @@ import GHC.Natural () -- See Note [Depend on GHC.Natural] in GHC.Base
 import GHC.Types
 
 {- Note [Implementing unsafeCoerce]
-
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The implementation of unsafeCoerce is surprisingly subtle.
 This Note describes the moving parts.  You will find more
@@ -126,8 +125,12 @@ several ways
      Flaoting the case is OK here, even though it broardens the
      scope, becuase we are done with simplification.
 
-(U4) GHC.CoreToStg.Prep.cpeExprIsTrivial anticipated the
+(U4) GHC.CoreToStg.Prep.cpeExprIsTrivial anticipates the
      upcoming discard of unsafeEqualityProof.
+
+(U4a) Ditto GHC.Core.Unfold.inlineBoringOk we want to treat
+      the RHS of unsafeCoerce as very small; see
+      Note [Inline unsafeCoerce] in that module.
 
 (U5) The definition of unsafeEqualityProof in Unsafe.Coerce
      looks very strange:
@@ -161,7 +164,7 @@ several ways
      to simplify the ase when the two tpyes are equal.
 
 (U8) The is a super-magic RULE in GHC.base
-         map cocerce = coerce
+         map coerce = coerce
      (see Note [Getting the map/coerce RULE to work] in CoreOpt)
      But it's all about turning coerce into a cast, and unsafeCoerce
      no longer does that.  So we need a separate map/unsafeCoerce

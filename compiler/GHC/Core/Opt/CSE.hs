@@ -404,7 +404,7 @@ delayInlining top_lvl bndr
        -- These rules are probably auto-generated specialisations,
        -- since Ids with manual rules usually have manually-inserted
        -- delayed inlining anyway
-  = bndr `setInlineActivation` activeAfterInitial
+  = bndr `setInlineActivation` activateAfterInitial
   | otherwise
   = bndr
 
