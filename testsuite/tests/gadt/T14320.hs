@@ -10,8 +10,8 @@ data Exp :: Type where
 newtype TypedExp :: Type -> Type where
   TEGood ::  forall a . (Exp -> (TypedExp a))
 
--- The only difference here is that the type is wrapped in parentheses,
--- but GHC 8.0.1 rejects this program
+-- The presence of outer parentheses makes the `forall` nested, and
+-- GADTs do not permit nested `forall`s.
 --
 newtype TypedExpToo :: Type -> Type where
   TEBad  :: (forall a . (Exp -> (TypedExpToo a)))

@@ -619,7 +619,7 @@ cvtConstr (GadtC c strtys ty)
         ; args    <- mapM cvt_arg strtys
         ; L _ ty' <- cvtType ty
         ; c_ty    <- mk_arr_apps args ty'
-        ; returnL $ fst $ mkGadtDecl c' c_ty}
+        ; returnL $ mkGadtDecl c' c_ty}
 
 cvtConstr (RecGadtC [] _varstrtys _ty)
   = failWith (text "RecGadtC must have at least one constructor name")
@@ -630,7 +630,7 @@ cvtConstr (RecGadtC c varstrtys ty)
         ; rec_flds <- mapM cvt_id_arg varstrtys
         ; let rec_ty = noLoc (HsFunTy noExtField
                                            (noLoc $ HsRecTy noExtField rec_flds) ty')
-        ; returnL $ fst $ mkGadtDecl c' rec_ty }
+        ; returnL $ mkGadtDecl c' rec_ty }
 
 cvtSrcUnpackedness :: TH.SourceUnpackedness -> SrcUnpackedness
 cvtSrcUnpackedness NoSourceUnpackedness = NoSrcUnpack
