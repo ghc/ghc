@@ -1,4 +1,4 @@
-T16029.$WMkT [InlPrag=INLINE[0] CONLIKE] :: Int -> Int -> T
+T16029.$WMkT [InlPrag=INLINE[final] CONLIKE] :: Int -> Int -> T
          Tmpl= \ (dt [Occ=Once!] :: Int) (dt [Occ=Once!] :: Int) ->
   = \ (dt [Occ=Once!] :: Int) (dt [Occ=Once!] :: Int) ->
   :: GHC.Prim.Int# -> GHC.Prim.Int#

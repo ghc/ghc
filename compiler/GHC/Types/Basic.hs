@@ -80,9 +80,9 @@ module GHC.Types.Basic (
 
         CompilerPhase(..), PhaseNum,
 
-        Activation(..), isActive, isActiveIn, competesWith,
-        isNeverActive, isAlwaysActive, isEarlyActive,
-        activeAfterInitial, activeDuringFinal,
+        Activation(..), isActive, competesWith,
+        isNeverActive, isAlwaysActive, activeInFinalPhase,
+        activateAfterInitial, activateDuringFinal,
 
         RuleMatchInfo(..), isConLike, isFunLike,
         InlineSpec(..), noUserInlineSpec,
@@ -1300,6 +1300,27 @@ pprWithSourceText (SourceText src) _ = text src
 ************************************************************************
 
 When a rule or inlining is active
+
+Note [Compiler phases]
+~~~~~~~~~~~~~~~~~~~~~~
+The CompilerPhase says which phase the simplifier is running in:
+
+* InitialPhase: before all user-visible phases
+
+* Phase 2,1,0: user-visible phases; the phase number
+  controls rule ordering an inlining.
+
+* FinalPhase: used for all subsequent simplifier
+  runs. By delaying inlining of wrappers to FinalPhase we can
+  ensure that RULE have a good chance to fire. See
+  Note [Wrapper activation] in GHC.Core.Opt.WorkWrap
+
+  NB: FinalPhase is run repeatedly, not just once.
+
+  NB: users don't have access to InitialPhase or FinalPhase.
+  They write {-# INLINE[n] f #-}, meaning (Phase n)
+
+The phase sequencing is done by GHC.Opt.Simplify.Driver
 -}
 
 -- | Phase Number
@@ -1308,37 +1329,109 @@ type PhaseNum = Int  -- Compilation phase
                      -- Zero is the last phase
 
 data CompilerPhase
-  = Phase PhaseNum
-  | InitialPhase    -- The first phase -- number = infinity!
+  = InitialPhase    -- The first phase -- number = infinity!
+  | Phase PhaseNum  -- User-specificable phases
+  | FinalPhase      -- The last phase  -- number = -infinity!
+  deriving Eq
 
 instance Outputable CompilerPhase where
    ppr (Phase n)    = int n
    ppr InitialPhase = text "InitialPhase"
-
-activeAfterInitial :: Activation
--- Active in the first phase after the initial phase
--- Currently we have just phases [2,1,0]
-activeAfterInitial = ActiveAfter NoSourceText 2
-
-activeDuringFinal :: Activation
--- Active in the final simplification phase (which is repeated)
-activeDuringFinal = ActiveAfter NoSourceText 0
+   ppr FinalPhase   = text "FinalPhase"
 
 -- See note [Pragma source text]
-data Activation = NeverActive
-                | AlwaysActive
-                | ActiveBefore SourceText PhaseNum
-                  -- Active only *strictly before* this phase
-                | ActiveAfter SourceText PhaseNum
-                  -- Active in this phase and later
-                deriving( Eq, Data )
-                  -- Eq used in comparing rules in GHC.Hs.Decls
+data Activation
+  = AlwaysActive
+  | ActiveBefore SourceText PhaseNum  -- Active only *strictly before* this phase
+  | ActiveAfter  SourceText PhaseNum  -- Active in this phase and later
+  | FinalActive                       -- Active in final phase only
+  | NeverActive
+  deriving( Eq, Data )
+    -- Eq used in comparing rules in GHC.Hs.Decls
 
--- | Rule Match Information
-data RuleMatchInfo = ConLike                    -- See Note [CONLIKE pragma]
-                   | FunLike
-                   deriving( Eq, Data, Show )
-        -- Show needed for GHC.Parser.Lexer
+activateAfterInitial :: Activation
+-- Active in the first phase after the initial phase
+-- Currently we have just phases [2,1,0,FinalPhase,FinalPhase,...]
+-- Where FinalPhase means GHC's internal simplification steps
+-- after all rules have run
+activateAfterInitial = ActiveAfter NoSourceText 2
+
+activateDuringFinal :: Activation
+-- Active in the final simplification phase (which is repeated)
+activateDuringFinal = FinalActive
+
+isActive :: CompilerPhase -> Activation -> Bool
+isActive InitialPhase act = activeInInitialPhase act
+isActive (Phase p)    act = activeInPhase p act
+isActive FinalPhase   act = activeInFinalPhase act
+
+activeInInitialPhase :: Activation -> Bool
+activeInInitialPhase AlwaysActive      = True
+activeInInitialPhase (ActiveBefore {}) = True
+activeInInitialPhase _                 = False
+
+activeInPhase :: PhaseNum -> Activation -> Bool
+activeInPhase _ AlwaysActive       = True
+activeInPhase _ NeverActive        = False
+activeInPhase _ FinalActive        = False
+activeInPhase p (ActiveAfter  _ n) = p <= n
+activeInPhase p (ActiveBefore _ n) = p >  n
+
+activeInFinalPhase :: Activation -> Bool
+activeInFinalPhase AlwaysActive     = True
+activeInFinalPhase FinalActive      = True
+activeInFinalPhase (ActiveAfter {}) = True
+activeInFinalPhase _                = False
+
+isNeverActive, isAlwaysActive :: Activation -> Bool
+isNeverActive NeverActive = True
+isNeverActive _           = False
+
+isAlwaysActive AlwaysActive = True
+isAlwaysActive _            = False
+
+competesWith :: Activation -> Activation -> Bool
+-- See Note [Activation competition]
+competesWith AlwaysActive      _                = True
+
+competesWith NeverActive       _                = False
+competesWith _                 NeverActive      = False
+
+competesWith FinalActive       FinalActive      = True
+competesWith FinalActive       _                = False
+
+competesWith (ActiveBefore {})  AlwaysActive      = True
+competesWith (ActiveBefore {})  FinalActive       = False
+competesWith (ActiveBefore {})  (ActiveBefore {}) = True
+competesWith (ActiveBefore _ a) (ActiveAfter _ b) = a < b
+
+competesWith (ActiveAfter {})  AlwaysActive      = False
+competesWith (ActiveAfter {})  FinalActive       = True
+competesWith (ActiveAfter {})  (ActiveBefore {}) = False
+competesWith (ActiveAfter _ a) (ActiveAfter _ b) = a >= b
+
+{- Note [Competing activations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Sometimes a RULE and an inlining may compete, or two RULES.
+See Note [Rules and inlining/other rules] in GHC.HsToCore.
+
+We say that act1 "competes with" act2 iff
+   act1 is active in the phase when act2 *becomes* active
+NB: remember that phases count *down*: 2, 1, 0!
+
+It's too conservative to ensure that the two are never simultaneously
+active.  For example, a rule might be always active, and an inlining
+might switch on in phase 2.  We could switch off the rule, but it does
+no harm.
+-}
+
+
+{- *********************************************************************
+*                                                                      *
+                 InlinePragma, InlineSpec, RuleMatchInfo
+*                                                                      *
+********************************************************************* -}
+
 
 data InlinePragma            -- Note [InlinePragma]
   = InlinePragma
@@ -1357,6 +1450,12 @@ data InlinePragma            -- Note [InlinePragma]
 
       , inl_rule   :: RuleMatchInfo  -- Should the function be treated like a constructor?
     } deriving( Eq, Data )
+
+-- | Rule Match Information
+data RuleMatchInfo = ConLike                    -- See Note [CONLIKE pragma]
+                   | FunLike
+                   deriving( Eq, Data, Show )
+        -- Show needed for GHC.Parser.Lexer
 
 -- | Inline Specification
 data InlineSpec   -- What the user's INLINE pragma looked like
@@ -1515,6 +1614,7 @@ instance Outputable Activation where
    ppr NeverActive        = brackets (text "~")
    ppr (ActiveBefore _ n) = brackets (char '~' <> int n)
    ppr (ActiveAfter  _ n) = brackets (int n)
+   ppr FinalActive        = text "[final]"
 
 instance Outputable RuleMatchInfo where
    ppr ConLike = text "CONLIKE"
@@ -1553,57 +1653,13 @@ pprInline' emptyInline (InlinePragma { inl_inline = inline, inl_act = activation
       pp_info | isFunLike info = empty
               | otherwise      = ppr info
 
-isActive :: CompilerPhase -> Activation -> Bool
-isActive InitialPhase AlwaysActive      = True
-isActive InitialPhase (ActiveBefore {}) = True
-isActive InitialPhase _                 = False
-isActive (Phase p)    act               = isActiveIn p act
 
-isActiveIn :: PhaseNum -> Activation -> Bool
-isActiveIn _ NeverActive        = False
-isActiveIn _ AlwaysActive       = True
-isActiveIn p (ActiveAfter _ n)  = p <= n
-isActiveIn p (ActiveBefore _ n) = p >  n
 
-competesWith :: Activation -> Activation -> Bool
--- See Note [Activation competition]
-competesWith NeverActive       _                = False
-competesWith _                 NeverActive      = False
-competesWith AlwaysActive      _                = True
-
-competesWith (ActiveBefore {})  AlwaysActive      = True
-competesWith (ActiveBefore {})  (ActiveBefore {}) = True
-competesWith (ActiveBefore _ a) (ActiveAfter _ b) = a < b
-
-competesWith (ActiveAfter {})  AlwaysActive      = False
-competesWith (ActiveAfter {})  (ActiveBefore {}) = False
-competesWith (ActiveAfter _ a) (ActiveAfter _ b) = a >= b
-
-{- Note [Competing activations]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Sometimes a RULE and an inlining may compete, or two RULES.
-See Note [Rules and inlining/other rules] in GHC.HsToCore.
-
-We say that act1 "competes with" act2 iff
-   act1 is active in the phase when act2 *becomes* active
-NB: remember that phases count *down*: 2, 1, 0!
-
-It's too conservative to ensure that the two are never simultaneously
-active.  For example, a rule might be always active, and an inlining
-might switch on in phase 2.  We could switch off the rule, but it does
-no harm.
--}
-
-isNeverActive, isAlwaysActive, isEarlyActive :: Activation -> Bool
-isNeverActive NeverActive = True
-isNeverActive _           = False
-
-isAlwaysActive AlwaysActive = True
-isAlwaysActive _            = False
-
-isEarlyActive AlwaysActive      = True
-isEarlyActive (ActiveBefore {}) = True
-isEarlyActive _                 = False
+{- *********************************************************************
+*                                                                      *
+                 Integer literals
+*                                                                      *
+********************************************************************* -}
 
 -- | Integral Literal
 --

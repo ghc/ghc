@@ -412,6 +412,8 @@ inlineBoringOk e
                         , exprIsTrivial a  = go (credit-1) f
     go credit (Tick _ e)                   = go credit e -- dubious
     go credit (Cast e _)                   = go credit e
+    go credit (Case scrut _ _ [(_,_,rhs)]) -- See Note [Inline unsafeCoerce]
+      | isUnsafeEqualityProof scrut        = go credit rhs
     go _      (Var {})                     = boringCxtOk
     go _      _                            = boringCxtNotOk
 
@@ -459,7 +461,21 @@ calcUnfoldingGuidance dflags is_top_bottoming expr
                        | otherwise             = (+)
              -- See Note [Function and non-function discounts]
 
-{-
+{- Note [Inline unsafeCoerce]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We really want to inline unsafeCoerce, even when applied to boring
+arguments.  It doesn't look as if its RHS is smaller than the call
+   unsafeCoerce x = case unsafeEqualityProof @a @b of UnsafeRefl -> x
+but that case is discarded -- see Note [Implementing unsafeCoerce]
+in base:Unsafe.Coerce.
+
+Moreover, if we /don't/ inline it, we may be left with
+          f (unsafeCoerce x)
+which will build a thunk -- bad, bad, bad.
+
+Conclusion: we really want inlineBoringOk to be True of the RHS of
+unsafeCoerce.  This is (U4a) in Note [Implementing unsafeCoerce].
+
 Note [Computing the size of an expression]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The basic idea of sizeExpr is obvious enough: count nodes.  But getting the

@@ -118,7 +118,9 @@ data SimplCont
         SimplCont
 
   | ApplyToVal         -- (ApplyToVal arg K)[e] = K[ e arg ]
-      { sc_dup  :: DupFlag      -- See Note [DupFlag invariants]
+      { sc_dup     :: DupFlag   -- See Note [DupFlag invariants]
+      , sc_hole_ty :: OutType   -- Type of the function, presumably (forall a. blah)
+                                -- See Note [The hole type in ApplyToTy/Val]
       , sc_arg  :: InExpr       -- The argument,
       , sc_env  :: StaticEnv    -- see Note [StaticEnv invariant]
       , sc_cont :: SimplCont }
@@ -126,7 +128,7 @@ data SimplCont
   | ApplyToTy          -- (ApplyToTy ty K)[e] = K[ e ty ]
       { sc_arg_ty  :: OutType     -- Argument type
       , sc_hole_ty :: OutType     -- Type of the function, presumably (forall a. blah)
-                                  -- See Note [The hole type in ApplyToTy]
+                                  -- See Note [The hole type in ApplyToTy/Val]
       , sc_cont    :: SimplCont }
 
   | Select             -- (Select alts K)[e] = K[ case e of alts ]
@@ -151,6 +153,9 @@ data SimplCont
       , sc_fun  :: ArgInfo     -- Specifies f, e1..en, Whether f has rules, etc
                                --     plus strictness flags for *further* args
       , sc_cci  :: CallCtxt    -- Whether *this* argument position is interesting
+      , sc_fun_ty :: OutType   -- Type of the function (f e1 .. en),
+                               -- presumably (arg_ty -> res_ty)
+                               -- where res_ty is expected by sc_cont
       , sc_cont :: SimplCont }
 
   | TickIt              -- (TickIt t K)[e] = K[ tick t e ]
@@ -254,8 +259,6 @@ data ArgInfo
         ai_fun   :: OutId,      -- The function
         ai_args  :: [ArgSpec],  -- ...applied to these args (which are in *reverse* order)
 
-        ai_type  :: OutType,    -- Type of (f a1 ... an)
-
         ai_rules :: FunRules,   -- Rules for this function
 
         ai_encl :: Bool,        -- Flag saying whether this function
@@ -271,37 +274,36 @@ data ArgInfo
     }
 
 data ArgSpec
-  = ValArg OutExpr                    -- Apply to this (coercion or value); c.f. ApplyToVal
+  = ValArg { as_arg :: OutExpr        -- Apply to this (coercion or value); c.f. ApplyToVal
+           , as_hole_ty :: OutType }  -- Type of the function (presumably t1 -> t2)
   | TyArg { as_arg_ty  :: OutType     -- Apply to this type; c.f. ApplyToTy
           , as_hole_ty :: OutType }   -- Type of the function (presumably forall a. blah)
   | CastBy OutCoercion                -- Cast by this; c.f. CastIt
 
 instance Outputable ArgSpec where
-  ppr (ValArg e)                 = text "ValArg" <+> ppr e
+  ppr (ValArg { as_arg = arg })  = text "ValArg" <+> ppr arg
   ppr (TyArg { as_arg_ty = ty }) = text "TyArg" <+> ppr ty
   ppr (CastBy c)                 = text "CastBy" <+> ppr c
 
-addValArgTo :: ArgInfo -> OutExpr -> ArgInfo
-addValArgTo ai arg = ai { ai_args = ValArg arg : ai_args ai
-                        , ai_type = applyTypeToArg (ai_type ai) arg
-                        , ai_rules = decRules (ai_rules ai) }
-
-addTyArgTo :: ArgInfo -> OutType -> ArgInfo
-addTyArgTo ai arg_ty = ai { ai_args = arg_spec : ai_args ai
-                          , ai_type = piResultTy poly_fun_ty arg_ty
-                          , ai_rules = decRules (ai_rules ai) }
+addValArgTo :: ArgInfo -> OutExpr -> OutType -> ArgInfo
+addValArgTo ai arg hole_ty = ai { ai_args = arg_spec : ai_args ai
+                                , ai_rules = decRules (ai_rules ai) }
   where
-    poly_fun_ty = ai_type ai
-    arg_spec    = TyArg { as_arg_ty = arg_ty, as_hole_ty = poly_fun_ty }
+    arg_spec = ValArg { as_arg = arg, as_hole_ty = hole_ty }
+
+addTyArgTo :: ArgInfo -> OutType -> OutType -> ArgInfo
+addTyArgTo ai arg_ty hole_ty = ai { ai_args = arg_spec : ai_args ai
+                                  , ai_rules = decRules (ai_rules ai) }
+  where
+    arg_spec = TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }
 
 addCastTo :: ArgInfo -> OutCoercion -> ArgInfo
-addCastTo ai co = ai { ai_args = CastBy co : ai_args ai
-                     , ai_type = coercionRKind co }
+addCastTo ai co = ai { ai_args = CastBy co : ai_args ai }
 
 argInfoAppArgs :: [ArgSpec] -> [OutExpr]
 argInfoAppArgs []                              = []
 argInfoAppArgs (CastBy {}                : _)  = []  -- Stop at a cast
-argInfoAppArgs (ValArg e                 : as) = e       : argInfoAppArgs as
+argInfoAppArgs (ValArg { as_arg = arg }  : as) = arg     : argInfoAppArgs as
 argInfoAppArgs (TyArg { as_arg_ty = ty } : as) = Type ty : argInfoAppArgs as
 
 pushSimplifiedArgs :: SimplEnv -> [ArgSpec] -> SimplCont -> SimplCont
@@ -310,7 +312,9 @@ pushSimplifiedArgs env  (arg : args) k
   = case arg of
       TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }
                -> ApplyToTy  { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = rest }
-      ValArg e -> ApplyToVal { sc_arg = e, sc_env = env, sc_dup = Simplified, sc_cont = rest }
+      ValArg { as_arg = arg, as_hole_ty = hole_ty }
+             -> ApplyToVal { sc_arg = arg, sc_env = env, sc_dup = Simplified
+                           , sc_hole_ty = hole_ty, sc_cont = rest }
       CastBy c -> CastIt c rest
   where
     rest = pushSimplifiedArgs env args k
@@ -323,7 +327,7 @@ argInfoExpr fun rev_args
   = go rev_args
   where
     go []                              = Var fun
-    go (ValArg a                 : as) = go as `App` a
+    go (ValArg { as_arg = arg }  : as) = go as `App` arg
     go (TyArg { as_arg_ty = ty } : as) = go as `App` Type ty
     go (CastBy co                : as) = mkCast (go as) co
 
@@ -409,11 +413,9 @@ contHoleType (TickIt _ k)                     = contHoleType k
 contHoleType (CastIt co _)                    = coercionLKind co
 contHoleType (StrictBind { sc_bndr = b, sc_dup = dup, sc_env = se })
   = perhapsSubstTy dup se (idType b)
-contHoleType (StrictArg { sc_fun = ai })      = funArgTy (ai_type ai)
-contHoleType (ApplyToTy  { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy]
-contHoleType (ApplyToVal { sc_arg = e, sc_env = se, sc_dup = dup, sc_cont = k })
-  = mkVisFunTy (perhapsSubstTy dup se (exprType e))
-               (contHoleType k)
+contHoleType (StrictArg  { sc_fun_ty = ty })  = funArgTy ty
+contHoleType (ApplyToTy  { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy/Val]
+contHoleType (ApplyToVal { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy/Val]
 contHoleType (Select { sc_dup = d, sc_bndr =  b, sc_env = se })
   = perhapsSubstTy d se (idType b)
 
@@ -458,13 +460,13 @@ mkArgInfo :: SimplEnv
 
 mkArgInfo env fun rules n_val_args call_cont
   | n_val_args < idArity fun            -- Note [Unsaturated functions]
-  = ArgInfo { ai_fun = fun, ai_args = [], ai_type = fun_ty
+  = ArgInfo { ai_fun = fun, ai_args = []
             , ai_rules = fun_rules
             , ai_encl = False
             , ai_strs = vanilla_stricts
             , ai_discs = vanilla_discounts }
   | otherwise
-  = ArgInfo { ai_fun = fun, ai_args = [], ai_type = fun_ty
+  = ArgInfo { ai_fun = fun, ai_args = []
             , ai_rules = fun_rules
             , ai_encl  = interestingArgContext rules call_cont
             , ai_strs  = arg_stricts
@@ -1091,7 +1093,7 @@ seems to be to do a callSiteInline based on the fact that there is
 something interesting about the call site (it's strict).  Hmm.  That
 seems a bit fragile.
 
-Conclusion: inline top level things gaily until Phase 0 (the last
+Conclusion: inline top level things gaily until FinalPhase (the last
 phase), at which point don't.
 
 Note [pre/postInlineUnconditionally in gentle mode]
@@ -1214,23 +1216,21 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
       -- not ticks.  Counting ticks cannot be duplicated, and non-counting
       -- ticks around a Lam will disappear anyway.
 
-    early_phase = case sm_phase mode of
-                    Phase 0 -> False
-                    _       -> True
--- If we don't have this early_phase test, consider
---      x = length [1,2,3]
--- The full laziness pass carefully floats all the cons cells to
--- top level, and preInlineUnconditionally floats them all back in.
--- Result is (a) static allocation replaced by dynamic allocation
---           (b) many simplifier iterations because this tickles
---               a related problem; only one inlining per pass
---
--- On the other hand, I have seen cases where top-level fusion is
--- lost if we don't inline top level thing (e.g. string constants)
--- Hence the test for phase zero (which is the phase for all the final
--- simplifications).  Until phase zero we take no special notice of
--- top level things, but then we become more leery about inlining
--- them.
+    early_phase = sm_phase mode /= FinalPhase
+    -- If we don't have this early_phase test, consider
+    --      x = length [1,2,3]
+    -- The full laziness pass carefully floats all the cons cells to
+    -- top level, and preInlineUnconditionally floats them all back in.
+    -- Result is (a) static allocation replaced by dynamic allocation
+    --           (b) many simplifier iterations because this tickles
+    --               a related problem; only one inlining per pass
+    --
+    -- On the other hand, I have seen cases where top-level fusion is
+    -- lost if we don't inline top level thing (e.g. string constants)
+    -- Hence the test for phase zero (which is the phase for all the final
+    -- simplifications).  Until phase zero we take no special notice of
+    -- top level things, but then we become more leery about inlining
+    -- them.
 
 {-
 ************************************************************************
@@ -1549,7 +1549,7 @@ tryEtaExpandRhs mode bndr rhs
          return (new_arity, is_bot, new_rhs) }
   where
     try_expand
-      | exprIsTrivial rhs
+      | exprIsTrivial rhs  -- See Note [Do not eta-expand trivial expressions]
       = return (exprArity rhs, False, rhs)
 
       | sm_eta_expand mode      -- Provided eta-expansion is on
@@ -1593,9 +1593,17 @@ because then 'genMap' will inline, and it really shouldn't: at least
 as far as the programmer is concerned, it's not applied to two
 arguments!
 
+Note [Do not eta-expand trivial expressions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Do not eta-expand a trivial RHS like
+  f = g
+If we eta expand do
+  f = \x. g x
+we'll just eta-reduce again, and so on; so the
+simplifier never terminates.
+
 Note [Do not eta-expand join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 Similarly to CPR (see Note [Don't w/w join points for CPR] in
 GHC.Core.Opt.WorkWrap), a join point stands well to gain from its outer binding's
 eta-expansion, and eta-expanding a join point is fraught with issues like how to

@@ -331,8 +331,8 @@ cprAnalBind top_lvl env id rhs
 cprExpandUnfolding_maybe :: Id -> Maybe CoreExpr
 cprExpandUnfolding_maybe id = do
   guard (idArity id == 0)
-  -- There are only phase 0 Simplifier runs after CPR analysis
-  guard (isActiveIn 0 (idInlineActivation id))
+  -- There are only FinalPhase Simplifier runs after CPR analysis
+  guard (activeInFinalPhase (idInlineActivation id))
   expandUnfolding_maybe (idUnfolding id)
 
 {- Note [Arity trimming for CPR signatures]
