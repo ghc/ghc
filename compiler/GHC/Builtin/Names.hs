@@ -472,7 +472,6 @@ basicKnownKeyNames
         , unsafeEqualityTyConName
         , unsafeReflDataConName
         , unsafeCoercePrimName
-        , unsafeCoerceName
     ]
 
 genericTyConNames :: [Name]
@@ -1331,12 +1330,11 @@ typeErrorShowTypeDataConName =
 
 -- Unsafe coercion proofs
 unsafeEqualityProofName, unsafeEqualityTyConName, unsafeCoercePrimName,
-  unsafeCoerceName, unsafeReflDataConName :: Name
+  unsafeReflDataConName :: Name
 unsafeEqualityProofName = varQual uNSAFE_COERCE (fsLit "unsafeEqualityProof") unsafeEqualityProofIdKey
 unsafeEqualityTyConName = tcQual uNSAFE_COERCE (fsLit "UnsafeEquality") unsafeEqualityTyConKey
 unsafeReflDataConName   = dcQual uNSAFE_COERCE (fsLit "UnsafeRefl")     unsafeReflDataConKey
 unsafeCoercePrimName    = varQual uNSAFE_COERCE (fsLit "unsafeCoerce#") unsafeCoercePrimIdKey
-unsafeCoerceName        = varQual uNSAFE_COERCE (fsLit "unsafeCoerce")  unsafeCoerceIdKey
 
 -- Dynamic
 toDynName :: Name
@@ -2410,10 +2408,9 @@ naturalSDataConKey      = mkPreludeMiscIdUnique 568
 wordToNaturalIdKey      = mkPreludeMiscIdUnique 569
 
 -- Unsafe coercion proofs
-unsafeEqualityProofIdKey, unsafeCoercePrimIdKey, unsafeCoerceIdKey :: Unique
+unsafeEqualityProofIdKey, unsafeCoercePrimIdKey :: Unique
 unsafeEqualityProofIdKey = mkPreludeMiscIdUnique 570
 unsafeCoercePrimIdKey    = mkPreludeMiscIdUnique 571
-unsafeCoerceIdKey        = mkPreludeMiscIdUnique 572
 
 {-
 ************************************************************************
