@@ -46,3 +46,8 @@ T17340.hs:43:23: warning: [-Wredundant-bang-patterns (in -Wall)]
     • In the pattern: !B
       In a case alternative: !B -> ()
       In the expression: case b of { !B -> () }
+
+T17340.hs:50:12: warning: [-Wredundant-bang-patterns (in -Wall)]
+    • Bang pattern is redundant
+    • In the pattern: !x
+      In an equation for ‘unboxedPat’: unboxedPat !x = I# x

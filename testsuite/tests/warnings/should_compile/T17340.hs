@@ -46,9 +46,12 @@ nPat :: Int -> ()
 nPat !1 = ()
 nPat _ = ()
 
--- no warning expected
 unboxedPat :: Int# -> Int
 unboxedPat !x = I# x
+
+-- no warning expected
+boxedPat :: Int -> Int
+boxedPat !x = x
 
 -- no warning expected
 newtyPat :: C -> ()

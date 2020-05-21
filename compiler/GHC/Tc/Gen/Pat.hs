@@ -391,6 +391,10 @@ tc_pat penv (BangPat x pat) pat_ty thing_inside
                 -- TODO: add test case
                 do { rebindableIsOn <- xoptM LangExt.RebindableSyntax
                    ; return (if rebindableIsOn then False else True)}
+              VarPat _ _      ->
+                -- do warn for unlifted types
+                do { pat_ty <- readExpType pat_ty
+                   ; return (isUnliftedType pat_ty)}
               ParPat _ p      -> should_warn p
               AsPat _ _ p     -> should_warn p
               SigPat _ p _    -> should_warn p
@@ -399,7 +403,6 @@ tc_pat penv (BangPat x pat) pat_ty thing_inside
               LitPat _ _      -> return True
               BangPat _ _     -> return True
               WildPat _       -> return False
-              VarPat _ _      -> return False
               LazyPat _ _     -> return False
               SumPat _ _ _ _  -> return False
               SplicePat _ _   -> return False
