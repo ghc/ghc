@@ -445,6 +445,7 @@ tcRnSrcDecls explicit_mod_hdr decls export_ies
         -- in the zonker which gives rise to the finalisers.
       ; (tcg_env_mf, _) <- setGblEnv (clearTcGblEnv tcg_env)
                                      run_th_modfinalizers
+
       ; finishTH
       ; traceTc "Tc11" empty
 
