@@ -331,7 +331,7 @@ runRnSplice flavour run_meta ppr_res splice
 
              -- Run the expression
        ; mod_finalizers_ref <- newTcRef []
-       ; result <- setStage (RunSplice mod_finalizers_ref) $
+       ; result <- setStage (RunSplice mod_finalizers_ref) . withProvenance TemplateHaskellCP $
                      run_meta zonked_q_expr
        ; mod_finalizers <- readTcRef mod_finalizers_ref
        ; traceSplice (SpliceInfo { spliceDescription = what
