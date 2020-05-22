@@ -613,6 +613,10 @@ getProfFlags = do
 
 getTraceFlags :: IO TraceFlags
 getTraceFlags = do
+#if defined(javascript_HOST_ARCH)
+  -- The JS backend does not currently have trace flags
+  pure (TraceFlags TraceNone False False False False False False False)
+#else
   let ptr = (#ptr RTS_FLAGS, TraceFlags) rtsFlagsPtr
   TraceFlags <$> (toEnum . fromIntegral
                    <$> (#{peek TRACE_FLAGS, tracing} ptr :: IO CInt))
@@ -630,6 +634,7 @@ getTraceFlags = do
                    (#{peek TRACE_FLAGS, sparks_full} ptr :: IO CBool))
              <*> (toBool <$>
                    (#{peek TRACE_FLAGS, user} ptr :: IO CBool))
+#endif
 
 getTickyFlags :: IO TickyFlags
 getTickyFlags = do
