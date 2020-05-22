@@ -287,7 +287,9 @@ data GenClosure b
      { info :: !StgInfoTable
      , size :: !Word32 -- ^ stack size in *words*
      , stack_dirty :: !Word8 -- ^ non-zero => dirty
+#if __GLASGOW_HASKELL__ >= 811
      , stack_marking :: Word8
+#endif
      , stackPointer :: !b -- ^ current stack pointer
      , stack :: [Word]
      }

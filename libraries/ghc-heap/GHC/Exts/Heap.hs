@@ -345,7 +345,9 @@ getClosureX get_closure_raw x = do
                     , stack_dirty = FFIClosures.stack_dirty fields
                     , stackPointer = (pts !! 0)
                     , stack  = FFIClosures.stack fields
+#if __GLASGOW_HASKELL__ >= 811
                     , stack_marking = FFIClosures.stack_marking fields
+#endif
                     }
                 )
         _ ->
