@@ -866,10 +866,22 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty type_arg_pats arg_pats t
   (nonInferredTyVarBinders, remaining_user_data_con_ty1) <- do
     -- split out pi telescope.
     let (bndrs, res_ty) = tcSplitPiTys $ remaining_user_data_con_ty0
+        exVars = mkVarSet (dataConExTyCoVars data_con)
     -- substitute both sides with fresh skolems
     lvl_succ <- pushTcLevel <$> getTcLevel
     (userTenv, nonInferredTyVarBinders) <- mapAccumLM
-      (rebuildTyCoBinderX $ \n k -> pure $ newSkolemTyVarLvlOverlappable lvl_succ True n k)
+      (\subst bndr ->
+        case bndr of
+          Named varbndr@(Bndr var _) -> (fmap . fmap) Named $
+            rebuildTyCoVarBinderX
+              (\n k ->
+                if var `elemVarSet` exVars
+                  then pure $ newSkolemTyVarLvlOverlappable lvl_succ True n k
+                  else newPatSigTyVar n k
+              )
+              subst varbndr
+          Anon flag ty -> pure (subst, Anon flag $ substTy subst ty)
+      )
       emptyTCvSubst
       bndrs
     pure (nonInferredTyVarBinders, substTy userTenv res_ty)
