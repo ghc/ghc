@@ -1,6 +1,6 @@
 f: 42
 CallStack (from -prof):
-  GHC.Internal.Debug.Trace.traceStack (libraries/ghc-internal/src/GHC/Internal/Debug/Trace.hs:234:1-10)
+  GHC.Internal.Debug.Trace.traceStack (libraries/ghc-internal/src/GHC/Internal/Debug/Trace.hs:240:1-10)
   Main.f (callstack002.hs:10:7-43)
   Main.map.go (callstack002.hs:15:21-23)
   Main.map.go (callstack002.hs:15:21-34)
@@ -9,7 +9,7 @@ CallStack (from -prof):
   Main.CAF (<entire-module>)
 f: 43
 CallStack (from -prof):
-  GHC.Internal.Debug.Trace.traceStack (libraries/ghc-internal/src/GHC/Internal/Debug/Trace.hs:234:1-10)
+  GHC.Internal.Debug.Trace.traceStack (libraries/ghc-internal/src/GHC/Internal/Debug/Trace.hs:240:1-10)
   Main.f (callstack002.hs:10:7-43)
   Main.map.go (callstack002.hs:15:21-23)
   Main.map.go (callstack002.hs:15:21-34)

@@ -37,6 +37,7 @@
       for libraries that define exception-handling combinators like `catch` and
       `onException`, such as `base`, or the `exceptions` package.
   * Move `Lift ByteArray` and `Lift Fixed` instances into `base` from `template-haskell`. See [CLC proposal #287](https://github.com/haskell/core-libraries-committee/issues/287).
+  * Make `Debug.Trace.{traceEventIO,traceMarkerIO}` faster when tracing is disabled. See [CLC proposal #291](https://github.com/haskell/core-libraries-committee/issues/291).
 
 ## 4.20.0.0 May 2024
   * Shipped with GHC 9.10.1

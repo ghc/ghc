@@ -1,4 +1,5 @@
 {-# LANGUAGE Unsafe #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE UnboxedTuples #-}
@@ -54,6 +55,11 @@ import GHC.Internal.Ptr
 import GHC.Internal.Show
 import GHC.Internal.Stack
 import GHC.Internal.Data.List (null, partition)
+import GHC.Internal.RTS.Flags.Test
+
+-- | 'userEventTracingEnabled' is True if event logging for user events (@+RTS -l@) is enabled.
+userEventTracingEnabled :: IO Bool
+userEventTracingEnabled = getUserEventTracingEnabled
 
 -- | The 'traceIO' function outputs the trace message from the IO monad.
 -- This sequences the output with respect to other IO actions.
@@ -239,8 +245,8 @@ traceStack str expr = unsafePerformIO $ do
 
 {-# NOINLINE traceEvent #-}
 -- | The 'traceEvent' function behaves like 'trace' with the difference that
--- the message is emitted to the eventlog, if eventlog profiling is available
--- and enabled at runtime.
+-- the message is emitted to the eventlog, if eventlog tracing is available
+-- and user event tracing is enabled at runtime.
 --
 -- It is suitable for use in pure code. In an IO context use 'traceEventIO'
 -- instead.
@@ -256,16 +262,19 @@ traceEvent msg expr = unsafeDupablePerformIO $ do
     return expr
 
 -- | The 'traceEventIO' function emits a message to the eventlog, if eventlog
--- profiling is available and enabled at runtime.
+-- tracing is available and user event tracing is enabled at runtime.
 --
 -- Compared to 'traceEvent', 'traceEventIO' sequences the event with respect to
 -- other IO actions.
 --
 -- @since base-4.5.0.0
 traceEventIO :: String -> IO ()
-traceEventIO msg =
-  Enc.withCString utf8 msg $ \(Ptr p) -> IO $ \s ->
-    case traceEvent# p s of s' -> (# s', () #)
+{-# INLINE traceEventIO #-}
+traceEventIO msg = do
+  enabled <- userEventTracingEnabled
+  when enabled $
+    Enc.withCString utf8 msg $ \(Ptr p) -> IO $ \s ->
+      case traceEvent# p s of s' -> (# s', () #)
 
 -- | Like 'traceEvent', but emits the result of calling a function on its
 -- argument.
@@ -276,7 +285,7 @@ traceEventWith f a = traceEvent (f a) a
 
 {-# NOINLINE traceMarker #-}
 -- | The 'traceMarker' function emits a marker to the eventlog, if eventlog
--- profiling is available and enabled at runtime. The @String@ is the name of
+-- tracing is available and enabled at runtime. The @String@ is the name of
 -- the marker. The name is just used in the profiling tools to help you keep
 -- clear which marker is which.
 --
@@ -294,16 +303,19 @@ traceMarker msg expr = unsafeDupablePerformIO $ do
     return expr
 
 -- | The 'traceMarkerIO' function emits a marker to the eventlog, if eventlog
--- profiling is available and enabled at runtime.
+-- tracing is available and user event tracing is enabled at runtime.
 --
 -- Compared to 'traceMarker', 'traceMarkerIO' sequences the event with respect to
 -- other IO actions.
 --
 -- @since base-4.7.0.0
 traceMarkerIO :: String -> IO ()
-traceMarkerIO msg =
-  Enc.withCString utf8 msg $ \(Ptr p) -> IO $ \s ->
-    case traceMarker# p s of s' -> (# s', () #)
+{-# INLINE traceMarkerIO #-}
+traceMarkerIO msg = do
+  enabled <- userEventTracingEnabled
+  when enabled $
+    Enc.withCString utf8 msg $ \(Ptr p) -> IO $ \s ->
+      case traceMarker# p s of s' -> (# s', () #)
 
 -- | Immediately flush the event log, if enabled.
 --
