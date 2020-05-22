@@ -36,6 +36,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
+import GHC.Core.FVs
 import GHC.Core.TyCo.Rep    -- needs to build types & coercions in a knot
 import GHC.Core.TyCo.Subst ( substTyCoVars )
 import GHC.Driver.Types
@@ -1054,15 +1055,30 @@ tcIfaceRules ignore_prags if_rules
   | otherwise    = mapM tcIfaceRule if_rules
 
 tcIfaceRule :: IfaceRule -> IfL CoreRule
-tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
+tcIfaceRule IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
                         ifRuleHead = fn, ifRuleArgs = args, ifRuleRhs = rhs,
-                        ifRuleAuto = auto, ifRuleOrph = orph })
+                        ifRuleAuto = auto, ifRuleOrph = orph }
   = do  { ~(bndrs', args', rhs') <-
                 -- Typecheck the payload lazily, in the hope it'll never be looked at
                 forkM (text "Rule" <+> pprRuleName name) $
                 bindIfaceBndrs bndrs                      $ \ bndrs' ->
-                do { args' <- mapM tcIfaceExpr args
-                   ; rhs'  <- tcIfaceExpr rhs
+                do { args'  <- mapM tcIfaceExpr args
+                   ; rhs'   <- tcIfaceExpr rhs
+                   ; dflags <- getDynFlags
+                   ; (_, lcl_env) <- getEnvs
+                   ; let in_scope :: [Var]
+                         in_scope = ((nonDetEltsUFM $ if_tv_env lcl_env) ++
+                                     (nonDetEltsUFM $ if_id_env lcl_env) ++
+                                     bndrs' ++
+                                     exprsFreeIdsList args')
+                   ; case lintExpr dflags in_scope rhs' of
+                      Nothing       -> return ()
+                      Just fail_msg -> do { mod <- getIfModule
+                                          ; pprPanic "Iface Lint failure"
+                                              (vcat [ text "In interface for" <+> ppr mod
+                                                    , hang doc 2 fail_msg
+                                                    , ppr name <+> equals <+> ppr rhs'
+                                                    , text "Iface expr =" <+> ppr rhs ]) }
                    ; return (bndrs', args', rhs') }
         ; let mb_tcs = map ifTopFreeName args
         ; this_mod <- getIfModule
@@ -1090,6 +1106,8 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
     ifTopFreeName (IfaceApp f _)                    = ifTopFreeName f
     ifTopFreeName (IfaceExt n)                      = Just n
     ifTopFreeName _                                 = Nothing
+
+    doc = text "Unfolding of" <+> ppr name
 
 {-
 ************************************************************************
