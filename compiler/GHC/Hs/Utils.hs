@@ -885,14 +885,14 @@ BUT we have a special case when abs_sig is true;
 -- | Should we treat this as an unlifted bind? This will be true for any
 -- bind that binds an unlifted variable, but we must be careful around
 -- AbsBinds. See Note [Unlifted id check in isUnliftedHsBind]. For usage
--- information, see Note [Strict binds check] is "GHC.HsToCore.Binds".
+-- information, see Note [Strict binds checks] is GHC.HsToCore.Binds.
 isUnliftedHsBind :: HsBind GhcTc -> Bool  -- works only over typechecked binds
 isUnliftedHsBind bind
   | AbsBinds { abs_exports = exports, abs_sig = has_sig } <- bind
   = if has_sig
     then any (is_unlifted_id . abe_poly) exports
     else any (is_unlifted_id . abe_mono) exports
-    -- If has_sig is True we wil never generate a binding for abe_mono,
+    -- If has_sig is True we will never generate a binding for abe_mono,
     -- so we don't need to worry about it being unlifted. The abe_poly
     -- binding might not be: e.g. forall a. Num a => (# a, a #)
 
