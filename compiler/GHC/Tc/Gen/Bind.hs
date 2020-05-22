@@ -608,11 +608,21 @@ tcPolyBinds sig_fn prag_fn rec_group rec_tc closed bind_list
     ; dflags   <- getDynFlags
     ; let plan = decideGeneralisationPlan dflags bind_list closed sig_fn
     ; traceTc "Generalisation plan" (ppr plan)
-    ; result@(_, poly_ids) <- case plan of
+    ; result@(bs, poly_ids) <- case plan of
          NoGen              -> tcPolyNoGen rec_tc prag_fn sig_fn bind_list
          InferGen mn        -> tcPolyInfer rec_tc prag_fn sig_fn mn bind_list
          CheckGen lbind sig -> tcPolyCheck prag_fn sig lbind
-
+    ; let warn_redundant_bang :: TcM ()
+                = whenWOptM Opt_WarnRedundantBangPatterns
+                            (addWarnTc (Reason Opt_WarnRedundantBangPatterns)
+                            (text "Bang pattern is redundant"))
+    ; let bang_is_redundant :: HsBind GhcTc -> Bool
+                -- It is important to have the "bang" check go first
+                -- to avoid checking top level binds.
+                -- see Note [Strict binds checks]
+                = \b -> isBangedHsBind b
+                      && isUnliftedHsBind b
+    ; mapBagM_ (\(L _ b) -> when (bang_is_redundant b) warn_redundant_bang) bs
     ; traceTc "} End of bindings for" (vcat [ ppr binder_names, ppr rec_group
                                             , vcat [ppr id <+> ppr (idType id) | id <- poly_ids]
                                           ])
