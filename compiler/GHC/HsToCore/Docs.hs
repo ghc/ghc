@@ -6,7 +6,7 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
-module GHC.HsToCore.Docs (extractDocs) where
+module GHC.HsToCore.Docs (extractDocs, unionArgMaps, extractTHDocs) where
 
 import GHC.Prelude
 import GHC.Data.Bag
@@ -35,20 +35,27 @@ extractDocs :: TcGblEnv
             -- 1. Module header
             -- 2. Docs on top level declarations
             -- 3. Docs on arguments
-extractDocs TcGblEnv { tcg_semantic_mod = mod
-                     , tcg_rn_decls = mb_rn_decls
-                     , tcg_insts = insts
-                     , tcg_fam_insts = fam_insts
-                     , tcg_doc_hdr = mb_doc_hdr
-                     } =
-    (unLoc <$> mb_doc_hdr, DeclDocMap doc_map, ArgDocMap arg_map)
+extractDocs gblEnv@TcGblEnv { tcg_semantic_mod = mod
+                            , tcg_rn_decls = mb_rn_decls
+                            , tcg_insts = insts
+                            , tcg_fam_insts = fam_insts
+                            , tcg_doc_hdr = mb_doc_hdr
+                            } =
+    ( doc_hdr
+    , DeclDocMap (th_doc_map <> th_inst_map <> doc_map)
+    , ArgDocMap (th_arg_map `unionArgMaps` arg_map)
+    )
   where
+    doc_hdr = th_doc_hdr <|> (unLoc <$> mb_doc_hdr)
+
     (doc_map, arg_map) = maybe (M.empty, M.empty)
                                (mkMaps local_insts)
                                mb_decls_with_docs
     mb_decls_with_docs = topDecls <$> mb_rn_decls
     local_insts = filter (nameIsLocalOrFrom mod)
                          $ map getName insts ++ map getName fam_insts
+
+    ExtractedTHDocs th_doc_hdr th_doc_map th_arg_map th_inst_map = extractTHDocs gblEnv
 
 -- | Create decl and arg doc-maps by looping through the declarations.
 -- For each declaration, find its names, its subordinates, and its doc strings.
@@ -353,3 +360,51 @@ mkDecls :: (struct -> [Located decl])
         -> struct
         -> [Located hsDecl]
 mkDecls field con = map (mapLoc con) . field
+
+-- | Extracts out individual maps of documentation added via Template Haskell's
+-- addDoc
+extractTHDocs :: TcGblEnv
+              -> ExtractedTHDocs
+extractTHDocs TcGblEnv {tcg_th_docs = tcg_th_docs} =
+    ExtractedTHDocs docHeader (searchDocs decl) (searchDocs args) (searchDocs insts)
+  where
+    docHeader :: Maybe HsDocString
+    docHeader
+      | FinishedDocs docs <- tcg_th_docs
+      , ((_, s):_) <- filter isModDoc docs = Just (mkHsDocString s)
+      | otherwise = Nothing
+
+    isModDoc (ModuleDoc, _) = True
+    isModDoc _ = False
+
+    searchDocs :: Monoid a => (a -> (DocLoc, String) -> a) -> a
+    searchDocs f
+      | CollectingDocs _ <- tcg_th_docs = mempty -- extractDocs might be called during splicing
+      | FinishedDocs docs <- tcg_th_docs = foldl' f mempty docs
+
+    decl acc ((DeclDoc name), s)     = M.insert name (mkHsDocString s) acc
+    decl acc _ = acc
+
+    insts acc ((InstanceDoc name), s) = M.insert name (mkHsDocString s) acc
+    insts acc _ = acc
+
+    args :: Map Name (Map Int HsDocString)
+         -> (DocLoc, String)
+         -> Map Name (Map Int HsDocString)
+    args acc ((ArgDoc name i), s) =
+       let ds = mkHsDocString s
+        in M.insertWith (\_ m -> M.insert i ds m) name (M.singleton i ds) acc
+    args acc _ = acc
+
+-- | Unions together two ArgMaps, such that two maps with values for the same
+-- key merge the inner map as well.
+-- Left biased so @unionArgMaps a b@ prefers @a@ over @b@.
+unionArgMaps :: Map Name (Map Int a)
+             -> Map Name (Map Int a)
+             -> Map Name (Map Int a)
+unionArgMaps a b = M.foldlWithKey go b a
+  where
+    go acc n newArgMap
+      | Just oldArgMap <- M.lookup n acc =
+          M.insert n (newArgMap `M.union` oldArgMap) acc
+      | otherwise = M.insert n newArgMap acc

@@ -445,6 +445,14 @@ tcRnSrcDecls explicit_mod_hdr decls export_ies
         -- in the zonker which gives rise to the finalisers.
       ; (tcg_env_mf, _) <- setGblEnv (clearTcGblEnv tcg_env)
                                      run_th_modfinalizers
+
+        -- Convert the CollectingDocs to FinishedDocs
+      ; th_docs <- fmap tcg_th_docs getGblEnv
+      ; collected_docs <-
+          case th_docs of
+            CollectingDocs ref -> readTcRef ref
+            FinishedDocs x -> return x
+
       ; finishTH
       ; traceTc "Tc11" empty
 
@@ -462,7 +470,8 @@ tcRnSrcDecls explicit_mod_hdr decls export_ies
                             tcg_ev_binds = ev_binds' `unionBags` ev_binds_mf ,
                             tcg_imp_specs = imp_specs' ++ imp_specs_mf ,
                             tcg_rules    = rules' ++ rules_mf ,
-                            tcg_fords    = fords' ++ fords_mf } } ;
+                            tcg_fords    = fords' ++ fords_mf ,
+                            tcg_th_docs  = FinishedDocs collected_docs } } ;
 
       ; setGlobalTypeEnv tcg_env' final_type_env
 
