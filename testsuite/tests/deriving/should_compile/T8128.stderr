@@ -1,0 +1,14 @@
+
+T8128.hs:9:1: warning: [-Winaccessible-code (in -Wdefault)]
+    • Couldn't match type ‘Int’ with ‘Bool’
+      Inaccessible code in
+        a pattern with constructor: MkT2 :: Bool -> T Bool,
+        in an equation for ‘showsPrec’
+    • In the pattern: MkT2 b1
+      In an equation for ‘showsPrec’:
+          showsPrec a (MkT2 b1)
+            = showParen (a >= 11) ((.) (showString "MkT2 ") (showsPrec 11 b1))
+      When typechecking the code for ‘showsPrec’
+        in a derived instance for ‘Show (T Int)’:
+        To see the code I am typechecking, use -ddump-deriv
+      In the instance declaration for ‘Show (T Int)’
