@@ -101,12 +101,12 @@ import Data.Array
 import qualified Data.ByteString.Char8 as BS
 import Data.Char
 import Data.Function
+import Data.IntMap (IntMap)
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
 import Data.List ( elemIndices, find, group, intercalate, intersperse,
                    isPrefixOf, isSuffixOf, nub, partition, sort, sortBy, (\\) )
 import qualified Data.Set as S
 import Data.Maybe
-import Data.Map (Map)
 import qualified Data.Map as M
 import qualified Data.IntMap.Strict as IntMap
 import Data.Time.LocalTime ( getZonedTime )
@@ -1786,7 +1786,7 @@ docCmd s  = do
   (liftIO . putStrLn . showSDocForUser dflags unqual) sdocs'
 
 -- TODO: also print arg docs.
-pprDocs :: (Maybe HsDocString, Map Int HsDocString) -> SDoc
+pprDocs :: (Maybe HsDocString, IntMap HsDocString) -> SDoc
 pprDocs (mb_decl_docs, _arg_docs) =
   maybe
     (text "<has no documentation>")
