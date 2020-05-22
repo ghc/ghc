@@ -38,7 +38,7 @@ import GHC.Utils.Outputable
 import GHC.Types.Unique
 import GHC.Types.Name
 import GHC.Utils.Misc
-import {-# SOURCE #-} GHC.Core.TyCo.Rep
+import GHC.Core.TyCo.Rep
 import {-# SOURCE #-} GHC.Core.ConLike
 
 import Data.Bits
