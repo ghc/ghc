@@ -1,0 +1,7 @@
+module header:
+  Nothing
+declaration docs:
+  f:
+    "The meaning of life"
+arg docs:
+extensible fields:
