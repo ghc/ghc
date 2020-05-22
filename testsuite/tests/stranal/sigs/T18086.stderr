@@ -1,0 +1,18 @@
+
+==================== Strictness signatures ====================
+T18086.$trModule:
+T18086.m: <L,U>x
+
+
+
+==================== Cpr signatures ====================
+T18086.$trModule:
+T18086.m: b
+
+
+
+==================== Strictness signatures ====================
+T18086.$trModule:
+T18086.m: <L,U>x
+
+
