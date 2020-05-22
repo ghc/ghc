@@ -198,6 +198,10 @@ Template Haskell
   splices do not lead directly to compile-time evaluation. (Merge request
   `!2288 <https://gitlab.haskell.org/ghc/ghc/-/merge_requests/2288>`_)
 
+ - There are now two new functions ``putDoc`` and ``getDoc``, which allow
+   Haddock documentation to be attached and read from module headers,
+   declarations, function arguments and instances.
+
 Arrow notation
 ~~~~~~~~~~~~~~
 
