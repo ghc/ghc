@@ -85,8 +85,8 @@ The server runs any finalizers that were added by addModuleFinalizer.
 
 Other Notes on TH / Remote GHCi
 
-  * Note [Remote GHCi] in compiler/ghci/GHCi.hs
-  * Note [External GHCi pointers] in compiler/ghci/GHCi.hs
+  * Note [Remote GHCi] in compiler/GHC/Runtime/Interpreter.hs
+  * Note [External GHCi pointers] in compiler/GHC/Runtime/Interpreter.hs
   * Note [TH recover with -fexternal-interpreter] in GHC.Tc.Gen.Splice
 -}
 
@@ -209,6 +209,8 @@ instance TH.Quasi GHCiQ where
     return ((), s { qsMap = M.insert (typeOf k) (toDyn k) (qsMap s) })
   qIsExtEnabled x = ghcCmd (IsExtEnabled x)
   qExtsEnabled = ghcCmd ExtsEnabled
+  qPutDoc l s = ghcCmd (PutDoc l s)
+  qGetDoc l = ghcCmd (GetDoc l)
 
 -- | The implementation of the 'StartTH' message: create
 -- a new IORef QState, and return a RemoteRef to it.
