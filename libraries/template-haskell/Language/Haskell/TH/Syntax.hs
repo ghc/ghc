@@ -123,6 +123,9 @@ class (MonadIO m, MonadFail m) => Quasi m where
   qIsExtEnabled :: Extension -> m Bool
   qExtsEnabled :: m [Extension]
 
+  qPutDoc :: DocLoc -> String -> m ()
+  qGetDoc :: DocLoc -> m (Maybe String)
+
 -----------------------------------------------------
 --      The IO instance of Quasi
 --
@@ -161,6 +164,8 @@ instance Quasi IO where
   qPutQ _               = badIO "putQ"
   qIsExtEnabled _       = badIO "isExtEnabled"
   qExtsEnabled          = badIO "extsEnabled"
+  qPutDoc _ _           = badIO "putDoc"
+  qGetDoc _             = badIO "getDoc"
 
 instance Quote IO where
   newName = newNameIO
@@ -745,6 +750,32 @@ isExtEnabled ext = Q (qIsExtEnabled ext)
 extsEnabled :: Q [Extension]
 extsEnabled = Q qExtsEnabled
 
+-- | Add Haddock documentation to the specified location. This will overwrite
+-- any documentation at the location if it already exists. This will reify the
+-- specified name, so it must be in scope when you call it. If you want to add
+-- documentation to something that you are currently splicing, you can use
+-- 'addModFinalizer' e.g.
+--
+-- > do
+-- >   let nm = mkName "x"
+-- >   addModFinalizer $ putDoc (DeclDoc nm) "Hello"
+-- >   [d| $(varP nm) = 42 |]
+--
+-- The helper functions 'withDecDoc' and 'withDecsDoc' will do this for you, as
+-- will the 'funD_doc' and other @_doc@ combinators.
+-- You most likely want to have the @-haddock@ flag turned on when using this.
+-- Adding documentation to anything outside of the current module will cause an
+-- error.
+putDoc :: DocLoc -> String -> Q ()
+putDoc t s = Q (qPutDoc t s)
+
+-- | Retreives the Haddock documentation at the specified location, if one
+-- exists.
+-- It can be used to read documentation on things defined outside of the current
+-- module, provided that those modules were compiled with the @-haddock@ flag.
+getDoc :: DocLoc -> Q (Maybe String)
+getDoc n = Q (qGetDoc n)
+
 instance MonadIO Q where
   liftIO = runIO
 
@@ -772,6 +803,8 @@ instance Quasi Q where
   qPutQ               = putQ
   qIsExtEnabled       = isExtEnabled
   qExtsEnabled        = extsEnabled
+  qPutDoc             = putDoc
+  qGetDoc             = getDoc
 
 
 ----------------------------------------------------
@@ -2624,6 +2657,17 @@ constructors):
   '[ Maybe, IO ]    PromotedConsT `AppT` Maybe `AppT`
                     (PromotedConsT  `AppT` IO `AppT` PromotedNilT)
 -}
+
+-- | A location at which to attach Haddock documentation.
+-- Note that adding documentation to a 'Name' defined oustide of the current
+-- module will cause an error.
+data DocLoc
+  = ModuleDoc         -- ^ At the current module's header.
+  | DeclDoc Name      -- ^ At a declaration, not necessarily top level.
+  | ArgDoc Name Int   -- ^ At a specific argument of a function, indexed by its
+                      -- position.
+  | InstDoc Type      -- ^ At a class or family instance.
+  deriving ( Show, Eq, Ord, Data, Generic )
 
 -----------------------------------------------------
 --              Internal helper functions

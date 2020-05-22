@@ -265,6 +265,8 @@ data THMessage a where
   AddForeignFilePath :: ForeignSrcLang -> FilePath -> THMessage (THResult ())
   IsExtEnabled :: Extension -> THMessage (THResult Bool)
   ExtsEnabled :: THMessage (THResult [Extension])
+  PutDoc :: TH.DocLoc -> String -> THMessage (THResult ())
+  GetDoc :: TH.DocLoc -> THMessage (THResult (Maybe String))
 
   StartRecover :: THMessage ()
   EndRecover :: Bool -> THMessage ()
@@ -305,6 +307,8 @@ getTHMessage = do
     20 -> THMsg <$> (AddForeignFilePath <$> get <*> get)
     21 -> THMsg <$> AddCorePlugin <$> get
     22 -> THMsg <$> ReifyType <$> get
+    23 -> THMsg <$> (PutDoc <$> get <*> get)
+    24 -> THMsg <$> GetDoc <$> get
     n -> error ("getTHMessage: unknown message " ++ show n)
 
 putTHMessage :: THMessage a -> Put
@@ -332,6 +336,8 @@ putTHMessage m = case m of
   AddForeignFilePath lang a   -> putWord8 20 >> put lang >> put a
   AddCorePlugin a             -> putWord8 21 >> put a
   ReifyType a                 -> putWord8 22 >> put a
+  PutDoc l s                  -> putWord8 23 >> put l >> put s
+  GetDoc l                    -> putWord8 24 >> put l
 
 
 data EvalOpts = EvalOpts

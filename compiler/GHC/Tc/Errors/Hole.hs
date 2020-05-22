@@ -419,7 +419,7 @@ addDocs :: [HoleFit] -> TcM [HoleFit]
 addDocs fits =
   do { showDocs <- goptM Opt_ShowDocsOfHoleFits
      ; if showDocs
-       then do { (_, DeclDocMap lclDocs, _) <- extractDocs <$> getGblEnv
+       then do { (_, DeclDocMap lclDocs, _) <- getGblEnv >>= extractDocs
                ; mapM (upd lclDocs) fits }
        else return fits }
   where

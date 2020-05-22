@@ -122,8 +122,8 @@ import Data.List ( elemIndices, find, group, intercalate, intersperse,
                    isPrefixOf, isSuffixOf, nub, partition, sort, sortBy, (\\) )
 import qualified Data.Set as S
 import Data.Maybe
-import Data.Map (Map)
 import qualified Data.Map as M
+import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Time.LocalTime ( getZonedTime )
 import Data.Time.Format ( formatTime, defaultTimeLocale )
@@ -1833,7 +1833,7 @@ data DocComponents =
   DocComponents
     { docs      :: Maybe HsDocString   -- ^ subject's haddocks
     , sigAndLoc :: Maybe SDoc          -- ^ type signature + category + location
-    , argDocs   :: Map Int HsDocString -- ^ haddocks for arguments
+    , argDocs   :: IntMap HsDocString -- ^ haddocks for arguments
     }
 
 buildDocComponents :: GHC.GhcMonad m => String -> Name -> m DocComponents

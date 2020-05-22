@@ -124,7 +124,11 @@ module Language.Haskell.TH.Lib (
     implicitParamBindD,
 
     -- ** Reify
-    thisModule
+    thisModule,
+
+    -- ** Documentation
+    withDecDoc, withDecsDoc, funD_doc, dataD_doc, newtypeD_doc, dataInstD_doc,
+    newtypeInstD_doc, patSynD_doc
 
    ) where
 

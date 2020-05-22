@@ -165,6 +165,19 @@ Runtime system
   is returned is controlled by the :rts-flag:`-Fd ⟨factor⟩`. Memory return
   is triggered by consecutive idle collections.
 
+Template Haskell
+~~~~~~~~~~~~~~~~
+
+- There are two new functions ``putDoc`` and ``getDoc``, which allow Haddock
+  documentation to be attached and read from module headers, declarations,
+  function arguments, class instances and family instances.
+  These functions are quite low level, so the ``withDecDoc`` function provides
+  a more ergonomic interface for this. Similarly ``funD_doc``, ``dataD_doc``
+  and friends provide an easy way to document functions and constructors
+  alongside their arguments simultaneously. ::
+
+    $(withDecsDoc "This does good things" [d| foo x = 42 |])
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
