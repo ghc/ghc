@@ -1890,7 +1890,12 @@ lintCoercion (CoVarCo cv)
   = do { subst <- getTCvSubst
        ; case lookupCoVar subst cv of
            Just linted_co -> return linted_co ;
-           Nothing -> -- lintCoBndr always extends the substitition
+           Nothing
+              | cv `isInScope` subst
+                   -> return (CoVarCo cv)
+              | otherwise
+                   ->
+                      -- lintCoBndr always extends the substitition
                       failWithL $
                       hang (text "The coercion variable" <+> pprBndr LetBind cv)
                          2 (text "is out of scope")
