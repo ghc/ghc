@@ -117,8 +117,8 @@ import Data.List ( elemIndices, find, group, intercalate, intersperse,
                    isPrefixOf, isSuffixOf, nub, partition, sort, sortBy, (\\) )
 import qualified Data.Set as S
 import Data.Maybe
-import Data.Map (Map)
 import qualified Data.Map as M
+import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 import Data.Time.LocalTime ( getZonedTime )
 import Data.Time.Format ( formatTime, defaultTimeLocale )
@@ -1814,7 +1814,7 @@ docCmd s  = do
   unit_state <- hsc_units <$> GHC.getSession
   (liftIO . putStrLn . showSDocForUser dflags unit_state unqual) sdocs'
 
-pprDocs :: [(Maybe HsDocString, Map Int HsDocString)] -> [SDoc]
+pprDocs :: [(Maybe HsDocString, IntMap HsDocString)] -> [SDoc]
 pprDocs docs
   | null nonEmptyDocs = pprDoc <$> take 1 docs
   -- elide <has no documentation> if there's at least one non-empty doc (#15784)
@@ -1825,7 +1825,7 @@ pprDocs docs
     nonEmptyDocs = filter (not . empty) docs
 
 -- TODO: also print arg docs.
-pprDoc :: (Maybe HsDocString, Map Int HsDocString) -> SDoc
+pprDoc :: (Maybe HsDocString, IntMap HsDocString) -> SDoc
 pprDoc (mb_decl_docs, _arg_docs) =
   maybe
     (text "<has no documentation>")

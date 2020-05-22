@@ -84,6 +84,18 @@ Runtime system
   Moreover, we now correctly account for the size of the array, meaning that
   space lost to fragmentation is no longer counted as live data.
 
+Template Haskell
+~~~~~~~~~~~~~~~~
+
+- There are two new functions ``putDoc`` and ``getDoc``, which allow Haddock
+  documentation to be attached and read from module headers, declarations,
+  function arguments, class instances and family instances.
+  These functions are quite low level, so the ``withDecDoc`` function provides
+  a more ergonomic interface for this. Similarly ``funD_doc``, ``dataD_doc``
+  and friends provide an easy way to document functions and constructors
+  alongside their arguments simultaneously. ::
+
+    $(withDecsDoc "This does good things" [d| foo x = 42 |])
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
