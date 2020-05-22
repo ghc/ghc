@@ -113,6 +113,9 @@ class (MonadIO m, MonadFail m) => Quasi m where
   qIsExtEnabled :: Extension -> m Bool
   qExtsEnabled :: m [Extension]
 
+  qAddDoc :: DocLoc -> String -> m ()
+  qGetDoc :: DocLoc -> m (Maybe String)
+
 -----------------------------------------------------
 --      The IO instance of Quasi
 --
@@ -151,6 +154,8 @@ instance Quasi IO where
   qPutQ _               = badIO "putQ"
   qIsExtEnabled _       = badIO "isExtEnabled"
   qExtsEnabled          = badIO "extsEnabled"
+  qAddDoc _ _           = badIO "addDoc"
+  qGetDoc _             = badIO "getDoc"
 
 instance Quote IO where
   newName = newNameIO
@@ -651,6 +656,16 @@ isExtEnabled ext = Q (qIsExtEnabled ext)
 extsEnabled :: Q [Extension]
 extsEnabled = Q qExtsEnabled
 
+-- | Adds Haddock documentation to the specified location. This will overwrite
+-- any existing at the location if it already exists.
+addDoc :: DocLoc -> String -> Q ()
+addDoc t s = Q (qAddDoc t s)
+
+-- | Retreives the Haddock documentation at the specified location, if one
+-- exists.
+getDoc :: DocLoc -> Q (Maybe String)
+getDoc n = Q (qGetDoc n)
+
 instance MonadIO Q where
   liftIO = runIO
 
@@ -678,6 +693,8 @@ instance Quasi Q where
   qPutQ               = putQ
   qIsExtEnabled       = isExtEnabled
   qExtsEnabled        = extsEnabled
+  qAddDoc             = addDoc
+  qGetDoc             = getDoc
 
 
 ----------------------------------------------------
@@ -2515,6 +2532,15 @@ constructors):
   '[ Maybe, IO ]    PromotedConsT `AppT` Maybe `AppT`
                     (PromotedConsT  `AppT` IO `AppT` PromotedNilT)
 -}
+
+-- | A location at which to attach Haddock documentation to.
+data DocLoc
+  = ModuleDoc         -- ^ At the current module's header.
+  | DeclDoc Name      -- ^ At a declaration, not necessarily top level.
+  | ArgDoc Name Int   -- ^ At a specific argument of a function, indexed by its
+                      -- position.
+  | InstDoc Name Type -- ^ At a class or family instance.
+  deriving ( Show, Eq, Ord, Data, Generic )
 
 -----------------------------------------------------
 --              Internal helper functions
