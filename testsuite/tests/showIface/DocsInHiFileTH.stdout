@@ -1,0 +1,118 @@
+module header:
+  Just "This is the new module header"
+declaration docs:
+  Tup2:
+    "Matches a tuple of (a, a)"
+  f:
+    "The meaning of life"
+  g:
+    "Some documentation"
+  qux:
+    "This is qux"
+  sin:
+    "15"
+  wd1:
+    "1"
+  wd17:
+    "17"
+  wd18:
+    "18"
+  wd2:
+    "2"
+  wd20:
+    "20"
+  wd8:
+    "8"
+  C:
+    "A new class"
+  Corge:
+    "This is a newtype record constructor"
+  runCorge:
+    "This is the newtype record constructor's argument"
+  E:
+    "A type family"
+  Foo:
+    "A new data type"
+  Foo:
+    "A new constructor"
+  Pretty:
+    "My cool class"
+  prettyPrint:
+    "Prettily prints the object"
+  Quux:
+    "This is Quux"
+  Quux1:
+    "This is Quux1"
+  Quux2:
+    "This is Quux2"
+  Quuz:
+    "This is a record constructor"
+  quuz1_a:
+    "This is the record constructor's argument"
+  WD10:
+    "10"
+  WD11Bool:
+    "This is a newtype instance constructor"
+  WD11Int:
+    "This is a data instance constructor"
+  WD12:
+    "12"
+  WD3:
+    "3"
+  WD4:
+    "4"
+  WD5:
+    "5"
+  WD6:
+    "6"
+  $fCTYPEFoo:
+    "7"
+  $fCTYPEInt:
+    "A new instance"
+  $fCTYPE[]:
+    "Another new instance"
+  $fDka:
+    "Another new instance"
+  $fF:
+    "14"
+  D:R:EBool:
+    "A type family instance"
+  D:R:WD11Bool0:
+    "This is a newtype instance"
+  D:R:WD11Foo0:
+    "11"
+  D:R:WD11Int0:
+    "This is a data instance"
+  D:R:WD13Foo:
+    "13"
+arg docs:
+  Tup2:
+    0:
+      "The thing to match twice"
+  h:
+    0:
+      "Your favourite number"
+    1:
+      "Your least favourite Boolean"
+    2:
+      "A return value"
+  qux:
+    0:
+      "Arg uno"
+    1:
+      "Arg dos"
+  Quux1:
+    0:
+      "I am an integer"
+  Quux2:
+    0:
+      "I am a string"
+    1:
+      "I am a bool"
+  WD11Bool:
+    0:
+      "This is a newtype instance constructor argument"
+  WD11Int:
+    0:
+      "This is a data instance constructor argument"
+extensible fields:
