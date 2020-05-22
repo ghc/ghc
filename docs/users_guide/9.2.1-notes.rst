@@ -1,0 +1,18 @@
+.. _release-9-2-1:
+
+Version 9.2.1
+==============
+
+Compiler
+~~~~~~~~
+
+- New '-Wredundant-bang-patterns' flag that enables checks for "dead" bangs.
+  For instance, given this program: ::
+
+      f :: Bool -> Bool
+      f True = False
+      f !x   = x
+
+  GHC would report that the bang on ``x`` is redundant and can be removed
+  since the argument was already forced in the first equation. For more
+  details see :ghc-flag:`-Wredundant-bang-patterns`

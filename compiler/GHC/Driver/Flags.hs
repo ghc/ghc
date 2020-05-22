@@ -442,6 +442,7 @@ data WarningFlag =
    | Opt_WarnUnusedTypePatterns
    | Opt_WarnUnusedForalls
    | Opt_WarnUnusedRecordWildcards
+   | Opt_WarnRedundantBangPatterns
    | Opt_WarnRedundantRecordWildcards
    | Opt_WarnWarningsDeprecations
    | Opt_WarnDeprecatedFlags
