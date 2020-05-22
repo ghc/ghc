@@ -10,6 +10,9 @@
     and `unTypeQ` are also generalised in terms of `Quote` rather than specific
     to `Q`.
 
+  * Add `addDoc` and `getDoc` which allow Haddock documentation to be attached
+    to module headers, declarations, function arguments and instances.
+
   * Fix Eq/Ord instances for `Bytes`: we were comparing pointers while we should
     compare the actual bytes (#16457).
 
