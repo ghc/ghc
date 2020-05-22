@@ -116,9 +116,9 @@ import GHC.Unit.Home.ModInfo
 import System.Directory
 import Data.Dynamic
 import Data.Either
+import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.List (find,intercalate)
-import Data.Map (Map)
 import qualified Data.Map as Map
 import Control.Monad
 import Control.Monad.Catch as MC
@@ -877,7 +877,7 @@ parseName str = withSession $ \hsc_env -> liftIO $
 
 getDocs :: GhcMonad m
         => Name
-        -> m (Either GetDocsFailure (Maybe HsDocString, Map Int HsDocString))
+        -> m (Either GetDocsFailure (Maybe HsDocString, IntMap HsDocString))
            -- TODO: What about docs for constructors etc.?
 getDocs name =
   withSession $ \hsc_env -> do
@@ -894,7 +894,7 @@ getDocs name =
              if isNothing mb_doc_hdr && Map.null dmap && Map.null amap
                then pure (Left (NoDocsInIface mod compiled))
                else pure (Right ( Map.lookup name dmap
-                                , Map.findWithDefault Map.empty name amap))
+                                , Map.findWithDefault mempty name amap))
   where
     compiled =
       -- TODO: Find a more direct indicator.
