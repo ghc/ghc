@@ -1,5 +1,13 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
+## 2.18.0.0
+  * Add `putDoc` and `getDoc` which allow Haddock documentation to be attached
+    to module headers, declarations, function arguments and instances, as well
+    as queried. These are quite low level operations, so for convenience there
+    are several combinators that can be used with `Dec`s directly, including
+    `withDecDoc`/`withDecsDoc` as well as `_doc` counterparts to many of the
+    `Dec` helper functions.
+
 ## 2.17.0.0
   * Typed Quotations now return a value of type `Code m a` (GHC Proposal #195).
     The main motiviation is to make writing instances easier and make it easier to
