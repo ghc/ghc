@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 module GHC.Exts.Heap.FFIClosures where
 
 #include "Rts.h"
@@ -47,7 +48,9 @@ peekTSOFields ptr = do
 data StackFields = StackFields {
     stack_size :: Word32,
     stack_dirty :: Word8,
+#if __GLASGOW_HASKELL__ >= 811
     stack_marking :: Word8,
+#endif
     stack :: [Word]
 }
 
@@ -56,7 +59,9 @@ peekStackFields :: Ptr a -> IO StackFields
 peekStackFields ptr = do
     stack_size' <- (#peek struct StgStack_, stack_size) ptr ::IO Word32
     dirty' <- (#peek struct StgStack_, dirty) ptr
+#if __GLASGOW_HASKELL__ >= 811
     marking' <- (#peek struct StgStack_, marking) ptr
+#endif
 
     let stackPtr = (#ptr struct StgStack_, stack) ptr
     stack' <- peekArray (fromIntegral stack_size') stackPtr
@@ -64,6 +69,8 @@ peekStackFields ptr = do
     return StackFields {
         stack_size = stack_size',
         stack_dirty = dirty',
+#if __GLASGOW_HASKELL__ >= 811
         stack_marking = marking',
+#endif
         stack = stack'
     }
