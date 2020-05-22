@@ -1,0 +1,6 @@
+
+T8392a.hs:10:1: warning: [-Winaccessible-code (in -Wdefault)]
+    Couldn't match type ‘Int’ with ‘Bool’
+    Inaccessible code in
+      the type signature for:
+        foo :: forall a. (Int ~ Bool) => a -> a

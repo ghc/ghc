@@ -1,0 +1,9 @@
+
+T12466.hs:9:10: warning: [-Winaccessible-code (in -Wdefault)]
+    • Couldn't match type ‘Char’ with ‘Int’
+      Inaccessible code in
+        a type expected by the context:
+          (Char ~ Int) => Int
+    • In the expression: T12466.$dmfoo @(Char)
+      In an equation for ‘foo’: foo = T12466.$dmfoo @(Char)
+      In the instance declaration for ‘Foo Char’
