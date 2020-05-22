@@ -1627,6 +1627,47 @@ of ``-W(no-)*``.
 
     would report that the ``P{..}`` match is unused.
 
+.. ghc-flag:: -Wredundant-bang-patterns
+    :shortdesc: Warn about redundant bang patterns.
+    :type: dynamic
+    :reverse: -Wno-redundant-bang-patterns
+    :category:
+
+    :since: 9.2.1
+
+    .. index::
+       single: redundant, warning, bang patterns
+
+    Report dead bang patterns, where dead bangs are bang patterns that under no
+    circumstances can force a thunk that wasn't already forced. Dead bangs are a
+    form of redundant bangs. The new check is performed in pattern-match coverage
+    checker along with other checks (namely, redundant and inaccessible RHSs).
+    Given ::
+
+
+        f :: Bool -> Int
+        f True = 1
+        f !x   = 2
+
+    The bang pattern on ``!x`` is dead. By the time the ``x`` in the second equation
+    is reached, ``x`` will already have been forced due to the first equation
+    (``f True = 1``). Moreover, there is no way to reach the second equation without
+    going through the first one.
+
+    Note that ``-Wredundant-bang-patterns`` will not warn about dead bangs that appear
+    on a redundant clause. That is because in that case, it is recommended to delete
+    the clause wholly, including its leading pattern match.
+
+    Dead bang patterns are redundant. But there are bang patterns which are
+    redundant that aren't dead, for example: ::
+
+
+        f !() = 0
+
+    the bang still forces the argument, before we attempt to match on ``()``. But it is
+    redundant with the forcing done by the ``()`` match. Currently such redundant bangs
+    are not considered dead, and ``-Wredundant-bang-patterns`` will not warn about them.
+
 .. ghc-flag:: -Wredundant-record-wildcards
     :shortdesc: Warn about record wildcard matches when the wildcard binds no patterns.
     :type: dynamic

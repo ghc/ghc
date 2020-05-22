@@ -124,6 +124,8 @@ test('T18478', collect_compiler_stats('bytes allocated',10), compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T18533', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17340', normal, compile,
+     ['-Wredundant-bang-patterns'])
 
 # Other tests
 test('pmc001', [], compile,
