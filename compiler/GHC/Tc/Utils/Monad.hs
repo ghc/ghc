@@ -237,6 +237,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         th_coreplugins_var <- newIORef [] ;
         th_state_var         <- newIORef Map.empty ;
         th_remote_state_var  <- newIORef Nothing ;
+        th_docs_var          <- newIORef [] ;
         let {
              dflags = hsc_dflags hsc_env ;
 
@@ -262,6 +263,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_th_coreplugins = th_coreplugins_var,
                 tcg_th_state         = th_state_var,
                 tcg_th_remote_state  = th_remote_state_var,
+                tcg_th_docs          = th_docs_var,
 
                 tcg_mod            = mod,
                 tcg_semantic_mod   =

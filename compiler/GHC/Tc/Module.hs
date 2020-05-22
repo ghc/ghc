@@ -253,6 +253,14 @@ tcRnModuleTcRnM hsc_env mod_sum
           tcg_env <- {-# SCC "tcRnImports" #-}
                      tcRnImports hsc_env all_imports
 
+       ;  -- Don't need to rename the Haddock documentation,
+          -- it's not parsed by GHC anymore.
+          -- Make sure to do this before 'tcRnSrcDecls', because we need the
+          -- module header when we're splicing TH, since it can be accessed via
+          -- 'getDoc'.
+          tcg_env <- return (tcg_env
+                              { tcg_doc_hdr = maybe_doc_hdr })
+
         ; -- If the whole module is warned about or deprecated
           -- (via mod_deprec) record that in tcg_warns. If we do thereby add
           -- a WarnAll, it will override any subsequent deprecations added to tcg_warns
@@ -284,12 +292,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                         -- because the latter might add new bindings for
                         -- boot_dfuns, which may be mentioned in imported
                         -- unfoldings.
-
-                        -- Don't need to rename the Haddock documentation,
-                        -- it's not parsed by GHC anymore.
-                        tcg_env <- return (tcg_env
-                                           { tcg_doc_hdr = maybe_doc_hdr })
-                      ; -- Report unused names
+                        -- Report unused names
                         -- Do this /after/ typeinference, so that when reporting
                         -- a function with no type signature we can give the
                         -- inferred type
@@ -445,6 +448,7 @@ tcRnSrcDecls explicit_mod_hdr decls export_ies
         -- in the zonker which gives rise to the finalisers.
       ; (tcg_env_mf, _) <- setGblEnv (clearTcGblEnv tcg_env)
                                      run_th_modfinalizers
+
       ; finishTH
       ; traceTc "Tc11" empty
 

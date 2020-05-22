@@ -1,0 +1,30 @@
+module header:
+  Just "This is the new module header"
+declaration docs:
+  f:
+    "The meaning of life"
+  g:
+    "Some documentation"
+  C:
+    "A new class"
+  E:
+    "A type family"
+  Foo:
+    "A new data type"
+  Foo:
+    "A new constructor"
+  $fCInt:
+    "A new instance"
+  $fDa:
+    "Another new instance"
+  D:R:EBool:
+    "A type family instance"
+arg docs:
+  h:
+    0:
+      "Your favourite number"
+    1:
+      "Your least favourite Boolean"
+    2:
+      "A return value"
+extensible fields:
