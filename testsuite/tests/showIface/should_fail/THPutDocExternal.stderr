@@ -1,0 +1,2 @@
+THPutDocExternal.hs:8:1:
+    Can't add documentation to THPutDocExternalA.f as it isn't inside the current module

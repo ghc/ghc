@@ -209,6 +209,8 @@ instance TH.Quasi GHCiQ where
     return ((), s { qsMap = M.insert (typeOf k) (toDyn k) (qsMap s) })
   qIsExtEnabled x = ghcCmd (IsExtEnabled x)
   qExtsEnabled = ghcCmd ExtsEnabled
+  qPutDoc l s = ghcCmd (PutDoc l s)
+  qGetDoc l = ghcCmd (GetDoc l)
 
 -- | The implementation of the 'StartTH' message: create
 -- a new IORef QState, and return a RemoteRef to it.
