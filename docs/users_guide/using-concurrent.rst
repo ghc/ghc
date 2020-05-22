@@ -16,7 +16,7 @@ Optionally, the program may be linked with the :ghc-flag:`-threaded` option (see
 :ref:`options-linker`. This provides two benefits:
 
 - It enables the :rts-flag:`-N ⟨x⟩` to be used, which allows threads to run in
-  parallelism on a multi-processor or multi-core machine. See :ref:`using-smp`.
+  parallel on a multi-processor or multi-core machine. See :ref:`using-smp`.
 
 - If a thread makes a foreign call (and the call is not marked
   ``unsafe``), then other Haskell threads in the program will continue
