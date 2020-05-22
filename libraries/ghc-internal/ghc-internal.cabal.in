@@ -253,6 +253,7 @@ Library
         GHC.Internal.Records
         GHC.Internal.ResponseFile
         GHC.Internal.RTS.Flags
+        GHC.Internal.RTS.Flags.Test
         GHC.Internal.ST
         GHC.Internal.Stack.CloneStack
         GHC.Internal.StaticPtr
