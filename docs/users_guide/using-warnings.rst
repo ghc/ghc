@@ -1627,6 +1627,28 @@ of ``-W(no-)*``.
 
     would report that the ``P{..}`` match is unused.
 
+.. ghc-flag:: -Wredundant-bang-patterns
+    :shortdesc: Warn about redundant bang patterns.
+    :type: dynamic
+    :reverse: -Wno-redundant-bang-patterns
+    :category:
+
+    :since: 8.12.1
+
+    .. index::
+       single: redundant, warning, bang patterns
+
+    Report all redundant bang patterns.
+    For instance: ::
+
+
+	f :: Bool -> Bool
+    f True = False
+    f !x   = x
+
+    would report that the bang on ``x`` match variable is redundant and can be removed
+    since the argument was already forced in the first equation.
+
 .. ghc-flag:: -Wredundant-record-wildcards
     :shortdesc: Warn about record wildcard matches when the wildcard binds no patterns.
     :type: dynamic
