@@ -1,0 +1,89 @@
+module header:
+  Just "This is the new module header"
+declaration docs:
+  f:
+    "The meaning of life"
+  g:
+    "Some documentation"
+  qux:
+    "This is qux"
+  wd1:
+    "1"
+  wd2:
+    "2"
+  wd8:
+    "8"
+  C:
+    "A new class"
+  E:
+    "A type family"
+  Foo:
+    "A new data type"
+  Foo:
+    "A new constructor"
+  Pretty:
+    "My cool class"
+  prettyPrint:
+    "Prettily prints the object"
+  Qax:
+    "This is a record type"
+  Qax1:
+    "This is a record constructor"
+  qax1_a:
+    "This is the record constructor's argument"
+  Quz:
+    "This is Quz"
+  Quz1:
+    "This is Quz1"
+  Quz2:
+    "This is Quz2"
+  WD10:
+    "10"
+  WD12:
+    "12"
+  WD3:
+    "3"
+  WD4:
+    "4"
+  WD5:
+    "5"
+  WD6:
+    "6"
+  $fCTYPEFoo:
+    "7"
+  $fCTYPEInt:
+    "A new instance"
+  $fCTYPE[]:
+    "Another new instance"
+  $fDka:
+    "Another new instance"
+  $fF:
+    "14"
+  D:R:EBool:
+    "A type family instance"
+  D:R:WD11Foo0:
+    "11"
+  D:R:WD13Foo:
+    "13"
+arg docs:
+  h:
+    0:
+      "Your favourite number"
+    1:
+      "Your least favourite Boolean"
+    2:
+      "A return value"
+  qux:
+    0:
+      "Arg uno"
+    1:
+      "Arg dos"
+  Quz1:
+    0:
+      "I am an integer"
+  Quz2:
+    0:
+      "I am a string"
+    1:
+      "I am a bool"
+extensible fields:
