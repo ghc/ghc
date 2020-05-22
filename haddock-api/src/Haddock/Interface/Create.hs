@@ -40,10 +40,13 @@ import Haddock.Options (Flag (..), modulePackageInfo)
 import Haddock.Types hiding (liftErrMsg)
 import Haddock.Utils (replace)
 
+import Control.Applicative ((<|>))
 import Control.Monad.Reader (MonadReader (..), ReaderT, asks, runReaderT)
 import Control.Monad.Writer.Strict hiding (tell)
 import Data.Bitraversable (bitraverse)
 import Data.List (find, foldl')
+import qualified Data.IntMap as IM
+import Data.IntMap (IntMap)
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe (catMaybes, fromJust, isJust, mapMaybe, maybeToList)
@@ -55,6 +58,7 @@ import GHC.Core.ConLike (ConLike (..))
 import GHC.Data.FastString (bytesFS, unpackFS)
 import GHC.Driver.Ppr (showSDoc)
 import GHC.HsToCore.Docs hiding (mkMaps)
+import GHC.IORef (readIORef)
 import GHC.Parser.Annotation (IsUnicodeSyntax (..))
 import GHC.Stack (HasCallStack)
 import GHC.Tc.Types hiding (IfM)
@@ -169,6 +173,7 @@ createInterface1 flags unit_state mod_sum tc_gbl_env ifaces inst_ifaces = do
       , tcg_rn_exports
       , tcg_rn_decls
 
+      , tcg_th_docs
       , tcg_doc_hdr
       } = tc_gbl_env
 
@@ -244,9 +249,13 @@ createInterface1 flags unit_state mod_sum tc_gbl_env ifaces inst_ifaces = do
   -- Infer module safety
   safety   <- liftIO (finalSafeMode ms_hspp_opts tc_gbl_env)
 
+  -- The docs added via Template Haskell's putDoc
+  thDocs@ExtractedTHDocs { ethd_mod_header = thMbDocStr } <-
+    liftIO $ extractTHDocs <$> readIORef tcg_th_docs
+
   -- Process the top-level module header documentation.
   (!info, header_doc) <- liftErrMsg $ processModuleHeader dflags pkg_name
-    tcg_rdr_env safety tcg_doc_hdr
+    tcg_rdr_env safety (thMbDocStr <|> (unLoc <$> tcg_doc_hdr))
 
   -- Warnings on declarations in this module
   decl_warnings <- liftErrMsg (mkWarningMap dflags tcg_warns tcg_rdr_env exported_names)
@@ -260,7 +269,7 @@ createInterface1 flags unit_state mod_sum tc_gbl_env ifaces inst_ifaces = do
     warnings = M.unions (decl_warnings : map ifaceWarningMap (M.elems ifaces))
 
   maps@(!docs, !arg_docs, !decl_map, _) <-
-    liftErrMsg (mkMaps dflags pkg_name tcg_rdr_env local_instances decls)
+    liftErrMsg (mkMaps dflags pkg_name tcg_rdr_env local_instances decls thDocs)
 
   export_items <- mkExportItems is_sig ifaces pkg_name tcg_mod tcg_semantic_mod
     warnings tcg_rdr_env exported_names (map fst decls) maps fixities
@@ -472,11 +481,14 @@ mkMaps :: DynFlags
        -> GlobalRdrEnv
        -> [Name]
        -> [(LHsDecl GhcRn, [HsDocString])]
+       -> ExtractedTHDocs -- ^ Template Haskell putDoc docs
        -> ErrMsgM Maps
-mkMaps dflags pkgName gre instances decls = do
+mkMaps dflags pkgName gre instances decls thDocs = do
   (a, b, c) <- unzip3 <$> traverse mappings decls
-  pure ( f' (map (nubByName fst) a)
-       , f  (filterMapping (not . M.null) b)
+  (th_a, th_b) <- thMappings
+  pure ( th_a `M.union` f' (map (nubByName fst) a)
+       , fmap intmap2mapint $
+           th_b `unionArgMaps` (f (filterMapping (not . IM.null) b))
        , f  (filterMapping (not . null) c)
        , instanceMap
        )
@@ -490,14 +502,37 @@ mkMaps dflags pkgName gre instances decls = do
     filterMapping :: (b -> Bool) ->  [[(a, b)]] -> [[(a, b)]]
     filterMapping p = map (filter (p . snd))
 
+    -- Convert IntMap -> IntMap
+    -- TODO: should ArgMap eventually be switched over to IntMap?
+    intmap2mapint = M.fromList . IM.toList
+
+    -- | Extract the mappings from template haskell.
+    -- No DeclMap/InstMap is needed since we already have access to the
+    -- doc strings
+    thMappings :: ErrMsgM (Map Name (MDoc Name), Map Name (IntMap (MDoc Name)))
+    thMappings = do
+      let ExtractedTHDocs
+            _
+            (DeclDocMap declDocs)
+            (ArgDocMap argDocs)
+            (DeclDocMap instDocs) = thDocs
+          ds2mdoc :: HsDocString -> ErrMsgM (MDoc Name)
+          ds2mdoc = processDocStringParas dflags pkgName gre
+
+      declDocs' <- mapM ds2mdoc declDocs
+      argDocs'  <- mapM (mapM ds2mdoc) argDocs
+      instDocs' <- mapM ds2mdoc instDocs
+      return (declDocs' <> instDocs', argDocs')
+
+
     mappings :: (LHsDecl GhcRn, [HsDocString])
              -> ErrMsgM ( [(Name, MDoc Name)]
-                        , [(Name, Map Int (MDoc Name))]
+                        , [(Name, IntMap (MDoc Name))]
                         , [(Name,  [LHsDecl GhcRn])]
                         )
     mappings (ldecl@(L (RealSrcSpan l _) decl), docStrs) = do
-      let declDoc :: [HsDocString] -> Map Int HsDocString
-                  -> ErrMsgM (Maybe (MDoc Name), Map Int (MDoc Name))
+      let declDoc :: [HsDocString] -> IntMap HsDocString
+                  -> ErrMsgM (Maybe (MDoc Name), IntMap (MDoc Name))
           declDoc strs m = do
             doc' <- processDocStrings dflags pkgName gre strs
             m'   <- traverse (processDocStringParas dflags pkgName gre) m
@@ -506,7 +541,7 @@ mkMaps dflags pkgName gre instances decls = do
       (doc, args) <- declDoc docStrs (declTypeDocs decl)
 
       let
-          subs :: [(Name, [HsDocString], Map Int HsDocString)]
+          subs :: [(Name, [HsDocString], IntMap HsDocString)]
           subs = subordinates instanceMap decl
 
       (subDocs, subArgs) <- unzip <$> traverse (\(_, strs, m) -> declDoc strs m) subs
@@ -1110,7 +1145,7 @@ extractPatternSyn nm t tvs cons =
           case con of
             ConDeclH98 { con_mb_cxt = Just cxt } -> noLoc (HsQualTy noExtField (Just cxt) typ)
             _ -> typ
-        typ'' = noLoc (HsQualTy noExtField Nothing typ')
+        typ'' = noLoc (HsQualTy noExtField (Just (noLoc [])) typ')
     in PatSynSig noExtField [noLoc nm] (mkEmptySigType typ'')
 
   longArrow :: [LHsType GhcRn] -> LHsType GhcRn -> LHsType GhcRn
