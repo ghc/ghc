@@ -47,11 +47,13 @@ module Debug.Trace (
 
 import System.IO.Unsafe
 
+import Control.Monad ((<$!>))
 import Foreign.C.String
 import GHC.Base
 import qualified GHC.Foreign
 import GHC.IO.Encoding
 import GHC.Ptr
+import GHC.RTS.Flags
 import GHC.Show
 import GHC.Stack
 import Data.List (null, partition)
@@ -73,6 +75,13 @@ import Data.List (null, partition)
 -- (that have no stderr) the output is directed to the Windows debug console.
 -- Some implementations of these functions may decorate the string that\'s
 -- output to indicate that you\'re tracing.
+
+-- | 'userTracingEnabled' is True if eventlogging (@+RTS -l@) is enabled.
+--
+-- It doesn't update if you modify the trace-flags after the first time you
+-- call it.
+userTracingEnabled :: Bool
+userTracingEnabled = unsafeDupablePerformIO $ user <$!> inline getTraceFlags
 
 -- | The 'traceIO' function outputs the trace message from the IO monad.
 -- This sequences the output with respect to other IO actions.
@@ -269,8 +278,10 @@ traceEvent msg expr = unsafeDupablePerformIO $ do
 -- @since 4.5.0.0
 traceEventIO :: String -> IO ()
 traceEventIO msg =
-  GHC.Foreign.withCString utf8 msg $ \(Ptr p) -> IO $ \s ->
-    case traceEvent# p s of s' -> (# s', () #)
+    when userTracingEnabled
+        (GHC.Foreign.withCString utf8 msg $ \(Ptr p) -> IO $ \s ->
+            case traceEvent# p s of s' -> (# s', () #))
+
 
 -- $markers
 --
@@ -319,8 +330,9 @@ traceMarker msg expr = unsafeDupablePerformIO $ do
 -- @since 4.7.0.0
 traceMarkerIO :: String -> IO ()
 traceMarkerIO msg =
-  GHC.Foreign.withCString utf8 msg $ \(Ptr p) -> IO $ \s ->
-    case traceMarker# p s of s' -> (# s', () #)
+    when userTracingEnabled
+        (GHC.Foreign.withCString utf8 msg $ \(Ptr p) -> IO $ \s ->
+            case traceMarker# p s of s' -> (# s', () #))
 
 -- | Immediately flush the event log, if enabled.
 --
