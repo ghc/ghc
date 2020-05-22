@@ -10,6 +10,7 @@ Pattern Matching Coverage Checking.
 {-# LANGUAGE ViewPatterns   #-}
 {-# LANGUAGE MultiWayIf     #-}
 {-# LANGUAGE LambdaCase     #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module GHC.HsToCore.PmCheck (
         -- Checking and printing
@@ -105,8 +106,12 @@ data PmGrd
     }
 
     -- | @PmBang x@ corresponds to a @seq x True@ guard.
+    -- If the extra SrcInfo is present, the bang guard came from a source
+    -- bang pattern, in which case we might want to report it as redundant,
+    -- see Note [Dead bang patterns].
   | PmBang {
-      pm_id          :: !Id
+      pm_id          :: !Id,
+      pm_loc         :: !(Maybe SrcInfo)
     }
 
     -- | @PmLet x expr@ corresponds to a @let x = expr@ guard. This actually
@@ -120,7 +125,7 @@ data PmGrd
 instance Outputable PmGrd where
   ppr (PmCon x alt _tvs _con_dicts con_args)
     = hsep [ppr alt, hsep (map ppr con_args), text "<-", ppr x]
-  ppr (PmBang x) = char '!' <> ppr x
+  ppr (PmBang x _loc) = char '!' <> ppr x
   ppr (PmLet x expr) = hsep [text "let", ppr x, text "=", ppr expr]
 
 type GrdVec = [PmGrd]
@@ -139,14 +144,15 @@ instance Monoid Precision where
   mempty = Precise
   mappend = (Semi.<>)
 
--- | Means by which we identify a RHS for later pretty-printing in a warning
--- message. 'SDoc' for the equation to show, 'Located' for the location.
-type RhsInfo = Located SDoc
+-- | Means by which we identify source location for later pretty-printing
+--  in a warning message. 'SDoc' for the equation to show, 'Located' for
+-- the location.
+type SrcInfo = Located SDoc
 
 -- | A representation of the desugaring to 'PmGrd's of all clauses of a
 -- function definition/pattern match/etc.
 data GrdTree
-  = Rhs !RhsInfo
+  = Rhs !SrcInfo
   | Guard !PmGrd !GrdTree
   -- ^ @Guard grd t@ will try to match @grd@ and on success continue to match
   -- @t@. Falls through if either match fails. Models left-to-right semantics
@@ -157,14 +163,48 @@ data GrdTree
   -- of pattern matching.
   -- @Sequence []@ always fails; it is useful for Note [Checking EmptyCase].
 
+{- Note [Dead bang patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+  f :: Bool -> Int
+  f True = 1
+  f !x   = 2
+
+Whenever we fall through to the second equation, we will already have evaluated
+the argument. Thus, the bang pattern serves no purpose and should be warned
+about. We call this kind of bang patterns "dead". Dead bangs are the ones
+that under no circumstances can force a thunk that wasn't already forced.
+Dead bangs are a form of redundant bangs; see below.
+
+We can detect dead bang patterns by checking whether @x ~ ⊥@ is satisfiable
+where the PmBang appears in 'checkGrdTree'. If not, then clearly the bang is
+dead. Such a dead bang is then indicated in the annotated pattern-match tree by
+a 'RedundantSrcBang' wrapping. In 'redundantAndInaccessibles', we collect
+all dead bangs to warn about.
+
+Note that we don't want to warn for a dead bang that appears on a redundant
+clause. That is because in that case, we recommend to delete the clause wholly,
+including its leading pattern match.
+
+Dead bang patterns are redundant. But there are bang patterns which are
+redundant that aren't dead, for example
+
+  f !() = 0
+
+the bang still forces the match variable, before we attempt to match on (). But
+it is redundant with the forcing done by the () match. We currently don't
+detect redundant bangs that aren't dead.
+-}
+
 -- | The digest of 'checkGrdTree', representing the annotated pattern-match
--- tree. 'redundantAndInaccessibleRhss' can figure out redundant and proper
--- inaccessible RHSs from this.
+-- tree. 'extractRedundancyInfo' can figure out redundant and proper
+-- inaccessible RHSs from this, as well as dead bangs.
 data AnnotatedTree
-  = AccessibleRhs !Deltas !RhsInfo
+  = AccessibleRhs !Deltas !SrcInfo
   -- ^ A RHS deemed accessible. The 'Deltas' is the (non-empty) set of covered
   -- values.
-  | InaccessibleRhs !RhsInfo
+  | InaccessibleRhs !SrcInfo
   -- ^ A RHS deemed inaccessible; it covers no value.
   | MayDiverge !AnnotatedTree
   -- ^ Asserts that the tree may force diverging values, so not all of its
@@ -173,13 +213,15 @@ data AnnotatedTree
   -- ^ @SequenceAnn inc ts@ mirrors @'Sequence' ts@ for preserving the
   -- skeleton of a 'GrdTree's @ts@. It also carries the set of incoming values
   -- @inc@.
+  | RedundantSrcBang !SrcInfo !AnnotatedTree
+  -- ^ For tracking redundant bangs. See Note [Dead bang patterns]
 
-pprRhsInfo :: RhsInfo -> SDoc
-pprRhsInfo (L (RealSrcSpan rss _) _) = ppr (srcSpanStartLine rss)
-pprRhsInfo (L s _)                   = ppr s
+pprSrcInfo :: SrcInfo -> SDoc
+pprSrcInfo (L (RealSrcSpan rss _) _) = ppr (srcSpanStartLine rss)
+pprSrcInfo (L s _)                   = ppr s
 
 instance Outputable GrdTree where
-  ppr (Rhs info)      = text "->" <+> pprRhsInfo info
+  ppr (Rhs info)      = text "->" <+> pprSrcInfo info
   -- Format guards as "| True <- x, let x = 42, !z"
   ppr g@Guard{} = fsep (prefix (map ppr grds)) <+> ppr t
     where
@@ -192,11 +234,12 @@ instance Outputable GrdTree where
   ppr (Sequence ts)   = braces (space <> fsep (punctuate semi (map ppr ts)) <> space)
 
 instance Outputable AnnotatedTree where
-  ppr (AccessibleRhs _delta info) = parens (ppr _delta) <+> pprRhsInfo info
-  ppr (InaccessibleRhs info) = text "inaccessible" <+> pprRhsInfo info
+  ppr (AccessibleRhs _delta info) = parens (ppr _delta) <+> pprSrcInfo info
+  ppr (InaccessibleRhs info) = text "inaccessible" <+> pprSrcInfo info
   ppr (MayDiverge t)         = text "div" <+> ppr t
   ppr (SequenceAnn _ [])       = text "<empty case>"
   ppr (SequenceAnn _ ts)       = braces (space <> fsep (punctuate semi (map ppr ts)) <> space)
+  ppr (RedundantSrcBang l t) = text "redundant bang" <+> pprSrcInfo l <+> ppr t
 
 -- | Lift 'addPmCts' over 'Deltas'.
 addPmCtsDeltas :: Deltas -> PmCts -> DsM Deltas
@@ -336,8 +379,9 @@ extractRhsDeltas = go_matches
     go_match :: Deltas -> AnnotatedTree -> (Deltas, NonEmpty Deltas)
     -- There is no -XEmptyCase at this level, only at the Matches level. So @ts@
     -- is non-empty!
-    go_match def (SequenceAnn pat ts) = (pat, foldMap1 (text "go_match: empty SequenceAnn") (go_grhss def) ts)
-    go_match def (MayDiverge t)       = go_match def t
+    go_match def (SequenceAnn pat ts)   = (pat, foldMap1 (text "go_match: empty SequenceAnn") (go_grhss def) ts)
+    go_match def (MayDiverge t)         = go_match def t
+    go_match def (RedundantSrcBang _ t) = go_match def t
     -- Even if there's only a single GRHS, we wrap it in a SequenceAnn for the
     -- Deltas covered by the pattern. So the remaining cases are impossible!
     go_match _   t                    = pprPanic "extractRhsDeltas.go_match" (text "Single GRHS must be wrapped in SequenceAnn. But got " $$ ppr t)
@@ -347,6 +391,7 @@ extractRhsDeltas = go_matches
     -- is non-empty!
     go_grhss def (SequenceAnn _ ts)       = foldMap1 (text "go_grhss: empty SequenceAnn") (go_grhss def) ts
     go_grhss def (MayDiverge t)           = go_grhss def t
+    go_grhss def (RedundantSrcBang _ t)   = go_grhss def t
     go_grhss _   (AccessibleRhs deltas _) = deltas :| []
     go_grhss def (InaccessibleRhs _)      = def    :| []
 
@@ -442,10 +487,11 @@ translatePat fam_insts x pat = case pat of
   VarPat _ y   -> pure (mkPmLetVar (unLoc y) x)
   ParPat _ p   -> translateLPat fam_insts x p
   LazyPat _ _  -> pure [] -- like a wildcard
-  BangPat _ p  ->
+  BangPat _ p@(L l p') ->
     -- Add the bang in front of the list, because it will happen before any
     -- nested stuff.
-    (PmBang x :) <$> translateLPat fam_insts x p
+    (PmBang x pm_loc :) <$> translateLPat fam_insts x p
+    where pm_loc = Just (L l (ppr p'))
 
   -- (x@pat)   ==>   Translate pat with x as match var and handle impedance
   --                 mismatch with incoming match var
@@ -629,7 +675,8 @@ translateConPatOut fam_insts x con univ_tys ex_tvs dicts = \case
 
       -- 2. bang strict fields
       let arg_is_banged = map isBanged $ conLikeImplBangs con
-          bang_grds     = map PmBang   $ filterByList arg_is_banged arg_ids
+          noSrcPmBang i = PmBang {pm_id = i, pm_loc = Nothing}
+          bang_grds     = map noSrcPmBang (filterByList arg_is_banged arg_ids)
 
       -- 3. guards from field selector patterns
       let arg_grds = concat arg_grdss
@@ -958,8 +1005,9 @@ mayDiverge a                = MayDiverge a
 --     'GrdTree'. Note that 'PmCon' guards are the only way in which values
 --     fall through from one 'Many' branch to the next.
 --   * An 'AnnotatedTree' that contains divergence and inaccessibility info
---     for all clauses. Will be fed to 'redundantAndInaccessibleRhss' for
---     presenting redundant and proper innaccessible RHSs to the user.
+--     for all clauses. Will be fed to 'extractRedundancyInfo' for
+--     presenting redundant and proper innaccessible RHSs, as well as dead
+--     bangs to the user.
 checkGrdTree' :: GrdTree -> Deltas -> DsM CheckResult
 -- RHS: Check that it covers something and wrap Inaccessible if not
 checkGrdTree' (Rhs sdoc) deltas = do
@@ -976,11 +1024,21 @@ checkGrdTree' (Guard (PmLet x e) tree) deltas = do
   deltas' <- addPmCtDeltas deltas (PmCoreCt x e)
   checkGrdTree' tree deltas'
 -- Bang x: Diverge on x ~ ⊥, refine with x /~ ⊥
-checkGrdTree' (Guard (PmBang x) tree) deltas = do
+checkGrdTree' (Guard (PmBang x src_bang_info) tree) deltas = do
   has_diverged <- addPmCtDeltas deltas (PmBotCt x) >>= isInhabited
   deltas' <- addPmCtDeltas deltas (PmNotBotCt x)
   res <- checkGrdTree' tree deltas'
-  pure res{ cr_clauses = applyWhen has_diverged mayDiverge (cr_clauses res) }
+  let clauses
+        | not has_diverged
+        , Just info <- src_bang_info
+        = RedundantSrcBang info (cr_clauses res)
+        | has_diverged
+        = mayDiverge (cr_clauses res)
+        | otherwise -- won't diverge and it wasn't a source bang
+        = cr_clauses res
+
+  pure res{ cr_clauses = clauses }
+
 -- Con: Diverge on x ~ ⊥, fall through on x /~ K and refine with x ~ K ys
 --      and type info
 checkGrdTree' (Guard (PmCon x con tvs dicts args) tree) deltas = do
@@ -1122,25 +1180,43 @@ needToRunPmCheck dflags origin
   | otherwise
   = notNull (filter (`wopt` dflags) allPmCheckWarnings)
 
-redundantAndInaccessibleRhss :: AnnotatedTree -> ([RhsInfo], [RhsInfo])
-redundantAndInaccessibleRhss tree = (fromOL ol_red, fromOL ol_inacc)
+-- | A type for organising information to be used in warnings.
+data RedundancyInfo
+  = RedundancyInfo
+  { redundant_rhss    :: ![SrcInfo]
+  , inaccessible_rhss :: ![SrcInfo]
+  , redundant_bangs   :: ![Located SDoc]
+  }
+
+extractRedundancyInfo :: AnnotatedTree -> RedundancyInfo
+extractRedundancyInfo tree =
+  RedundancyInfo { redundant_rhss    = fromOL ol_red
+                 , inaccessible_rhss = fromOL ol_inacc
+                 , redundant_bangs   = fromOL ol_bangs }
   where
-    (_ol_acc, ol_inacc, ol_red) = go tree
-    -- | Collects RHSs which are
-    --    1. accessible
-    --    2. proper inaccessible (so we can't delete them)
-    --    3. hypothetically redundant (so not only inaccessible RHS, but we can
+    (_ol_acc, ol_inacc, ol_red, ol_bangs) = go tree
+    -- | Collects
+    --    1. accessible RHSs
+    --    2. proper inaccessible RHSs (so we can't delete them)
+    --    3. hypothetically redundant RHSs (so not only inaccessible, but we can
     --       even safely delete the equation without altering semantics)
+    --    4. 'Dead' bangs from the source, collected to be warned about
     -- See Note [Determining inaccessible clauses]
-    go :: AnnotatedTree -> (OrdList RhsInfo, OrdList RhsInfo, OrdList RhsInfo)
-    go (AccessibleRhs _ info) = (unitOL info, nilOL, nilOL)
-    go (InaccessibleRhs info) = (nilOL,       nilOL, unitOL info) -- presumably redundant
+    -- See Note [Dead bang patterns]
+    go :: AnnotatedTree -> (OrdList SrcInfo, OrdList SrcInfo, OrdList SrcInfo, OrdList SrcInfo)
+    go (AccessibleRhs _ info) = (unitOL info, nilOL, nilOL      , nilOL)
+    go (InaccessibleRhs info) = (nilOL,       nilOL, unitOL info, nilOL) -- presumably redundant
     go (MayDiverge t)         = case go t of
       -- See Note [Determining inaccessible clauses]
-      (acc, inacc, red)
-        | isNilOL acc && isNilOL inacc -> (nilOL, red, nilOL)
+      (acc, inacc, red, bs)
+        | isNilOL acc && isNilOL inacc -> (nilOL, red, nilOL, bs)
       res                              -> res
     go (SequenceAnn _ ts)     = foldMap go ts
+    go (RedundantSrcBang l t) = case go t of
+      -- See Note [Dead bang patterns]
+      res@(acc, inacc, _, _)
+        | isNilOL acc, isNilOL inacc -> res
+        | otherwise                  -> (nilOL, nilOL, nilOL, unitOL l) Semi.<> res
 
 {- Note [Determining inaccessible clauses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1169,26 +1245,31 @@ inaccessible ones, we report the first clause as inaccessible.
 Clearly, it is enough if we say that we only degrade if *not all* of the child
 clauses are redundant. As long as there is at least one clause which we announce
 not to be redundant, the guard prefix responsible for the 'MayDiverge' will
-survive. Hence we check for that in 'redundantAndInaccessibleRhss'.
+survive. Hence we check for that in 'extractRedundancyInfo'.
 -}
 
 -- | Issue all the warnings (coverage, exhaustiveness, inaccessibility)
 dsPmWarn :: DynFlags -> DsMatchContext -> [Id] -> CheckResult -> DsM ()
 dsPmWarn dflags ctx@(DsMatchContext kind loc) vars result
-  = when (flag_i || flag_u) $ do
+  = when (flag_i || flag_u || flag_b) $ do
       unc_examples <- getNFirstUncovered vars (maxPatterns + 1) uncovered
-      let exists_r = flag_i && notNull redundant
-          exists_i = flag_i && notNull inaccessible
+      let exists_r = flag_i && notNull redundant_rhss
+          exists_i = flag_i && notNull inaccessible_rhss
           exists_u = flag_u && notNull unc_examples
+          exists_b = flag_b && notNull redundant_bangs
           approx   = precision == Approximate
 
       when (approx && (exists_u || exists_i)) $
         putSrcSpanDs loc (warnDs NoReason approx_msg)
 
-      when exists_r $ forM_ redundant $ \(L l q) -> do
+      when exists_b $ forM_ redundant_bangs $ \(L l q) -> do
+        putSrcSpanDs l (warnDs (Reason Opt_WarnRedundantBangPatterns)
+                               (pprEqn q "has redundant bang"))
+
+      when exists_r $ forM_ redundant_rhss $ \(L l q) -> do
         putSrcSpanDs l (warnDs (Reason Opt_WarnOverlappingPatterns)
                                (pprEqn q "is redundant"))
-      when exists_i $ forM_ inaccessible $ \(L l q) -> do
+      when exists_i $ forM_ inaccessible_rhss $ \(L l q) -> do
         putSrcSpanDs l (warnDs (Reason Opt_WarnOverlappingPatterns)
                                (pprEqn q "has inaccessible right hand side"))
 
@@ -1199,10 +1280,12 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) vars result
       { cr_clauses = clauses
       , cr_uncov   = uncovered
       , cr_approx  = precision } = result
-    (redundant, inaccessible) = redundantAndInaccessibleRhss clauses
+    RedundancyInfo{redundant_rhss, inaccessible_rhss, redundant_bangs}
+      = extractRedundancyInfo clauses
 
     flag_i = overlapping dflags kind
     flag_u = exhaustive dflags kind
+    flag_b = redundant_bang dflags
     flag_u_reason = maybe NoReason Reason (exhaustiveWarningFlag kind)
 
     maxPatterns = maxUncoveredPatterns dflags
@@ -1296,6 +1379,10 @@ overlapping dflags _      = wopt Opt_WarnOverlappingPatterns dflags
 -- | Check whether the exhaustiveness checker should run (exhaustiveness only)
 exhaustive :: DynFlags -> HsMatchContext id -> Bool
 exhaustive  dflags = maybe False (`wopt` dflags) . exhaustiveWarningFlag
+
+-- | Check whether unnecessary bangs should be warned about
+redundant_bang :: DynFlags -> Bool
+redundant_bang dflags = wopt Opt_WarnRedundantBangPatterns dflags
 
 -- | Denotes whether an exhaustiveness check is supported, and if so,
 -- via which 'WarningFlag' it's controlled.
