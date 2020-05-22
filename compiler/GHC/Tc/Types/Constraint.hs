@@ -1064,7 +1064,7 @@ Residual implication looks like
 
 We do /not/ want to set the implication status to IC_Insoluble,
 because that'll suppress reports of [W] C b (f b).  But we
-may not report the insoluble [G] f b ~# b either (see Note [Given errors]
+may not report the insoluble [G] f b ~# b either (see Note [Given warnings]
 in GHC.Tc.Errors), so we may fail to report anything at all!  Yikes.
 
 The same applies to Derived constraints that /arise from/ Givens.

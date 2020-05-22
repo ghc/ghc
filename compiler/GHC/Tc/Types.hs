@@ -755,7 +755,11 @@ data TcLclEnv           -- Changes as we move inside an expression
   = TcLclEnv {
         tcl_loc        :: RealSrcSpan,     -- Source span
         tcl_ctxt       :: [ErrCtxt],       -- Error context, innermost on top
-        tcl_in_gen_code :: Bool,           -- See Note [Rebindable syntax and HsExpansion]
+        tcl_in_gen_code :: Bool,           -- Are we in code that was generated for rebindable syntax?
+                                           -- See Note [Rebindable syntax and HsExpansion]
+        tcl_deriving :: Bool,              -- Are we in code that was generated for a deriving clause?
+                                           -- We can't reuse tcl_in_gen_code for this, because it is reset by setSrcSpan, and
+                                           -- many parts of the deriving mechanism set helpful SrcSpans.
         tcl_tclvl      :: TcLevel,
 
         tcl_th_ctxt    :: ThStage,         -- Template Haskell context

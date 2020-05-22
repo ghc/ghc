@@ -83,6 +83,7 @@ module GHC.Tc.Utils.Monad(
   -- * Context management for the type checker
   getErrCtxt, setErrCtxt, addErrCtxt, addErrCtxtM, addLandmarkErrCtxt,
   addLandmarkErrCtxtM, popErrCtxt, getCtLocM, setCtLocM,
+  setDeriving, inDeriving,
 
   -- * Error message generation (type checker)
   addErrTc,
@@ -346,6 +347,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_loc        = loc,
                 -- tcl_loc should be over-ridden very soon!
                 tcl_in_gen_code = False,
+                tcl_deriving   = False,
                 tcl_ctxt       = [],
                 tcl_rdr        = emptyLocalRdrEnv,
                 tcl_th_ctxt    = topStage,
@@ -1131,6 +1133,11 @@ setCtLocM (CtLoc { ctl_env = lcl }) thing_inside
                            , tcl_ctxt  = tcl_ctxt lcl })
               thing_inside
 
+setDeriving :: TcM a -> TcM a
+setDeriving = updLclEnv (\e -> e { tcl_deriving = True })
+
+inDeriving :: TcM Bool
+inDeriving = fmap tcl_deriving getLclEnv
 
 {- *********************************************************************
 *                                                                      *
