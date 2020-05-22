@@ -56,7 +56,7 @@ module GHC.Tc.Types(
         ThStage(..), SpliceType(..), PendingStuff(..),
         topStage, topAnnStage, topSpliceStage,
         ThLevel, impLevel, outerLevel, thLevel,
-        ForeignSrcLang(..),
+        ForeignSrcLang(..), THDocs, DocLoc(..),
 
         -- Arrows
         ArrowCtxt(..),
@@ -552,6 +552,9 @@ data TcGblEnv
         tcg_th_state :: TcRef (Map TypeRep Dynamic),
         tcg_th_remote_state :: TcRef (Maybe (ForeignRef (IORef QState))),
         -- ^ Template Haskell state
+
+        tcg_th_docs   :: TcRef THDocs,
+        -- ^ Docs added in Template Haskell via @putDoc@.
 
         tcg_ev_binds  :: Bag EvBind,        -- Top-level evidence bindings
 
@@ -1755,3 +1758,15 @@ lintGblEnv :: DynFlags -> TcGblEnv -> (Bag SDoc, Bag SDoc)
 lintGblEnv dflags tcg_env = lintAxioms dflags axioms
   where
     axioms = typeEnvCoAxioms (tcg_type_env tcg_env)
+
+-- | This is a mirror of Template Haskell's DocLoc, but the TH names are
+-- resolved to GHC names.
+data DocLoc = DeclDoc Name
+            | ArgDoc Name Int
+            | InstDoc Name
+            | ModuleDoc
+  deriving (Eq, Ord)
+
+-- | The current collection of docs that Template Haskell has built up via
+-- putDoc.
+type THDocs = Map DocLoc String
