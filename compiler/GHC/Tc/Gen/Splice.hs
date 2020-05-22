@@ -100,6 +100,7 @@ import GHC.Core.DataCon as DataCon
 import GHC.Tc.Types.Evidence
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.HsToCore.Docs
 import GHC.HsToCore.Expr
 import GHC.HsToCore.Monad
 import GHC.Serialized
@@ -1201,6 +1202,54 @@ instance TH.Quasi TcM where
   qExtsEnabled =
     EnumSet.toList . extensionFlags . hsc_dflags <$> getTopEnv
 
+  qAddDoc docArg s = do
+    CollectingDocs th_doc_var <- tcg_th_docs <$> getGblEnv
+    docArg' <- resolveDocName docArg
+    updTcRef th_doc_var ((docArg', s):)
+
+  qGetDoc (TH.DeclDoc n) = do
+    nm <- lookupThName n
+    (_, DeclDocMap declDocs, _) <- extractDocs <$> getGblEnv
+    return $ unpackHDS <$> Map.lookup nm declDocs
+
+  qGetDoc (TH.InstDoc n t) = do
+    nm <- findFirstInstName n t
+    (_, DeclDocMap declDocs, _) <- extractDocs <$> getGblEnv
+    return $ unpackHDS <$> Map.lookup nm declDocs
+
+  qGetDoc (TH.ArgDoc n i) = do
+    nm <- lookupThName n
+    (_, _, ArgDocMap argDocs) <- extractDocs <$> getGblEnv
+    let mDoc = Map.lookup nm argDocs >>= Map.lookup i
+    return (unpackHDS <$> mDoc)
+
+  qGetDoc TH.ModuleDoc = do
+    (moduleDoc, _, _) <- extractDocs <$> getGblEnv
+    return (fmap unpackHDS moduleDoc)
+
+
+resolveDocName :: TH.DocLoc -> TcM DocLoc
+resolveDocName (TH.DeclDoc n) = DeclDoc <$> lookupThName n
+resolveDocName (TH.ArgDoc n i) = ArgDoc <$> lookupThName n <*> pure i
+resolveDocName (TH.InstDoc n t) =
+  InstDoc <$> fmap getName (findFirstInstName n t)
+resolveDocName TH.ModuleDoc = pure ModuleDoc
+
+-- | Find the name of the first instance that matches
+findFirstInstName :: TH.Name -> TH.Type -> TcM Name
+findFirstInstName th_name th_type = do
+  insts <- reifyInstances' th_name [th_type]
+  case insts of   -- This expands any type synonyms
+    Left  (_, (inst:_)) -> return $ getName inst
+    Left  (_, [])       -> noMatches
+    Right (_, (inst:_)) -> return $ getName inst
+    Right (_, [])       -> noMatches
+  where
+    noMatches = failWithTc $
+      text "Couldn't find any instances of"
+        <+> quotes (text (TH.pprint th_name)) <+> text "for"
+        <+> quotes (text (TH.pprint th_type))
+
 -- | Adds a mod finalizer reference to the local environment.
 addModFinalizerRef :: ForeignRef (TH.Q ()) -> TcM ()
 addModFinalizerRef finRef = do
@@ -1415,6 +1464,15 @@ getAnnotationsByTypeRep th_name tyrep
 
 reifyInstances :: TH.Name -> [TH.Type] -> TcM [TH.Dec]
 reifyInstances th_nm th_tys
+  = do { insts <- reifyInstances' th_nm th_tys
+       ; case insts of
+           Left (cls, cls_insts) ->
+             reifyClassInstances cls cls_insts
+           Right (tc, fam_insts) ->
+             reifyFamilyInstances tc fam_insts }
+
+reifyInstances' :: TH.Name -> [TH.Type] -> TcM (Either (Class, [ClsInst]) (TyCon, [FamInst]))
+reifyInstances' th_nm th_tys
    = addErrCtxt (text "In the argument of reifyInstances:"
                  <+> ppr_th th_nm <+> sep (map ppr_th th_tys)) $
      do { loc <- getSrcSpanM
@@ -1442,19 +1500,19 @@ reifyInstances th_nm th_tys
                 -- In particular, the type might have kind
                 -- variables inside it (#7477)
 
-        ; traceTc "reifyInstances" (ppr ty $$ ppr (tcTypeKind ty))
+        ; traceTc "reifyInstances'" (ppr ty $$ ppr (tcTypeKind ty))
         ; case splitTyConApp_maybe ty of   -- This expands any type synonyms
             Just (tc, tys)                 -- See #7910
                | Just cls <- tyConClass_maybe tc
                -> do { inst_envs <- tcGetInstEnvs
                      ; let (matches, unifies, _) = lookupInstEnv False inst_envs cls tys
-                     ; traceTc "reifyInstances1" (ppr matches)
-                     ; reifyClassInstances cls (map fst matches ++ unifies) }
+                     ; traceTc "reifyInstances'1" (ppr matches)
+                     ; return $ Left (cls, map fst matches ++ unifies) }
                | isOpenFamilyTyCon tc
                -> do { inst_envs <- tcGetFamInstEnvs
                      ; let matches = lookupFamInstEnv inst_envs tc tys
-                     ; traceTc "reifyInstances2" (ppr matches)
-                     ; reifyFamilyInstances tc (map fim_instance matches) }
+                     ; traceTc "reifyInstances'2" (ppr matches)
+                     ; return $ Right (tc, map fim_instance matches) }
             _  -> bale_out (hang (text "reifyInstances:" <+> quotes (ppr ty))
                                2 (text "is not a class constraint or type family application")) }
   where

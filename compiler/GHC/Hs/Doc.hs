@@ -19,6 +19,8 @@ module GHC.Hs.Doc
 
   , ArgDocMap(..)
   , emptyArgDocMap
+
+  , ExtractedTHDocs(..)
   ) where
 
 #include "HsVersions.h"
@@ -150,3 +152,12 @@ instance Outputable ArgDocMap where
 
 emptyArgDocMap :: ArgDocMap
 emptyArgDocMap = ArgDocMap Map.empty
+
+-- | Maps of docs that were added via Template Haskell's addDoc
+data ExtractedTHDocs =
+  ExtractedTHDocs
+    { ethd_mod_header :: Maybe HsDocString
+    , ethd_decl_docs  :: Map Name HsDocString
+    , ethd_arg_docs   :: Map Name (Map Int HsDocString)
+    , ethd_inst_docs  :: Map Name HsDocString
+    }

@@ -56,7 +56,7 @@ module GHC.Tc.Types(
         ThStage(..), SpliceType(..), PendingStuff(..),
         topStage, topAnnStage, topSpliceStage,
         ThLevel, impLevel, outerLevel, thLevel,
-        ForeignSrcLang(..),
+        ForeignSrcLang(..), THDocs(..), DocLoc(..),
 
         -- Arrows
         ArrowCtxt(..),
@@ -547,6 +547,8 @@ data TcGblEnv
         tcg_th_state :: TcRef (Map TypeRep Dynamic),
         tcg_th_remote_state :: TcRef (Maybe (ForeignRef (IORef QState))),
         -- ^ Template Haskell state
+
+        tcg_th_docs   :: THDocs,
 
         tcg_ev_binds  :: Bag EvBind,        -- Top-level evidence bindings
 
@@ -1733,3 +1735,20 @@ lookupRoleAnnot = lookupNameEnv
 getRoleAnnots :: [Name] -> RoleAnnotEnv -> [LRoleAnnotDecl GhcRn]
 getRoleAnnots bndrs role_env
   = mapMaybe (lookupRoleAnnot role_env) bndrs
+
+-- | This is a mirror of Template Haskell's DocLoc, but the TH names are
+-- resolved to GHC names.
+data DocLoc = DeclDoc Name
+            | ArgDoc Name Int
+            | InstDoc Name
+            | ModuleDoc
+
+-- | The current collection of docs that Template Haskell has built up via
+-- addDoc.
+data THDocs =
+    CollectingDocs (IORef [(DocLoc, String)])
+    -- ^ Used during typechecking and splicing. Stores a map of things to
+    -- document, and the strings they should be documented with.
+  | FinishedDocs [(DocLoc, String)]
+    -- ^ At the end of typechecking the IORef in CollectingDocs is stored here
+    -- so it can be accessed by other pure functions.
