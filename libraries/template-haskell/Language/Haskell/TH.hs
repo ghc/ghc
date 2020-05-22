@@ -88,6 +88,9 @@ module Language.Haskell.TH(
         Syntax.Specificity(..),
         FamilyResultSig(..), Syntax.InjectivityAnn(..), PatSynType, BangType, VarBangType,
 
+    -- ** Documentation
+        putDoc, getDoc, DocLoc(..),
+
     -- * Library functions
     module Language.Haskell.TH.Lib,
 

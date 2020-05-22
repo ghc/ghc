@@ -103,6 +103,7 @@ import GHC.Core.DataCon as DataCon
 import GHC.Tc.Types.Evidence
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.HsToCore.Docs
 import GHC.HsToCore.Expr
 import GHC.HsToCore.Monad
 import GHC.Serialized
@@ -138,6 +139,7 @@ import Data.Binary.Get
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
 import Data.Dynamic  ( fromDynamic, toDyn )
+import qualified Data.IntMap as IntMap
 import qualified Data.Map as Map
 import Data.Typeable ( typeOf, Typeable, TypeRep, typeRep )
 import Data.Data (Data)
@@ -1204,6 +1206,102 @@ instance TH.Quasi TcM where
   qExtsEnabled =
     EnumSet.toList . extensionFlags . hsc_dflags <$> getTopEnv
 
+  qPutDoc docArg s = do
+    th_doc_var <- tcg_th_docs <$> getGblEnv
+    docArg' <- resolveDocName docArg
+    isLocal <- checkLocalName docArg'
+    unless isLocal $ failWithTc $ text
+      "Can't add documentation to" <+> pprLoc docArg <+>
+      text "as it isn't inside the current module"
+    updTcRef th_doc_var (Map.insert docArg' s)
+    where
+      resolveDocName (TH.DeclDoc n) = DeclDoc <$> lookupThName n
+      resolveDocName (TH.ArgDoc n i) = ArgDoc <$> lookupThName n <*> pure i
+      resolveDocName (TH.InstDoc n t) =
+        InstDoc <$> fmap getName (findFirstInstName n t)
+      resolveDocName TH.ModuleDoc = pure ModuleDoc
+
+      pprLoc (TH.DeclDoc n) = ppr_th n
+      pprLoc (TH.ArgDoc n _) = ppr_th n
+      pprLoc (TH.InstDoc n i) = text "the instance" <+>
+        ppr_th (TH.AppT (TH.ConT n) i)
+      pprLoc TH.ModuleDoc = text ""
+
+      -- It doesn't make sense to add documentation to something not inside
+      -- the current module. So check for it!
+      checkLocalName (DeclDoc n) = nameIsLocalOrFrom <$> getModule <*> pure n
+      checkLocalName (ArgDoc n _) = nameIsLocalOrFrom <$> getModule <*> pure n
+      checkLocalName (InstDoc n) = nameIsLocalOrFrom <$> getModule <*> pure n
+      checkLocalName ModuleDoc = pure True
+
+
+  qGetDoc (TH.DeclDoc n) = lookupThName n >>= lookupDeclDoc
+  qGetDoc (TH.InstDoc n t) = findFirstInstName n t >>= lookupDeclDoc
+  qGetDoc (TH.ArgDoc n i) = lookupThName n >>= lookupArgDoc i
+  qGetDoc TH.ModuleDoc = do
+    (moduleDoc, _, _) <- getGblEnv >>= extractDocs
+    return (fmap unpackHDS moduleDoc)
+
+-- | Looks up documentation for a declaration in first the current module,
+-- otherwise tries to find it in another module via 'hscGetModuleInterface'.
+lookupDeclDoc :: Name -> TcM (Maybe String)
+lookupDeclDoc nm = do
+  (_, DeclDocMap declDocs, _) <- getGblEnv >>= extractDocs
+  fam_insts <- tcg_fam_insts <$> getGblEnv
+  traceTc "lookupDeclDoc" (ppr nm <+> ppr declDocs <+> ppr fam_insts)
+  case Map.lookup nm declDocs of
+    Just doc -> pure $ Just (unpackHDS doc)
+    Nothing -> do
+      -- Wasn't in the current module. Try searching other external ones!
+      mIface <- getExternalModIface nm
+      case mIface of
+        Nothing -> pure Nothing
+        Just ModIface { mi_decl_docs = DeclDocMap dmap } ->
+          pure $ unpackHDS <$> Map.lookup nm dmap
+
+-- | Like 'lookupDeclDoc', looks up documentation for a function argument. If
+-- it can't find any documentation for a function in this module, it tries to
+-- find it in another module.
+lookupArgDoc :: Int -> Name -> TcM (Maybe String)
+lookupArgDoc i nm = do
+  (_, _, ArgDocMap argDocs) <- getGblEnv >>= extractDocs
+  case Map.lookup nm argDocs of
+    Just m -> pure $ unpackHDS <$> IntMap.lookup i m
+    Nothing -> do
+      mIface <- getExternalModIface nm
+      case mIface of
+        Nothing -> pure Nothing
+        Just ModIface { mi_arg_docs = ArgDocMap amap } ->
+          pure $ unpackHDS <$> (Map.lookup nm amap >>= IntMap.lookup i)
+
+-- | Returns the module a Name belongs to, if it is isn't local.
+getExternalModIface :: Name -> TcM (Maybe ModIface)
+getExternalModIface nm = do
+  isLocal <- nameIsLocalOrFrom <$> getModule <*> pure nm
+  if isLocal
+    then pure Nothing
+    else case nameModule_maybe nm of
+          Nothing -> pure Nothing
+          Just modNm -> do
+            hsc_env <- getTopEnv
+            iface <- liftIO $ hscGetModuleInterface hsc_env modNm
+            pure (Just iface)
+
+-- | Find the name of the first instance that matches
+findFirstInstName :: TH.Name -> TH.Type -> TcM Name
+findFirstInstName th_name th_type = do
+  insts <- reifyInstances' th_name [th_type]
+  case insts of   -- This expands any type synonyms
+    Left  (_, (inst:_)) -> return $ getName inst
+    Left  (_, [])       -> noMatches
+    Right (_, (inst:_)) -> return $ getName inst
+    Right (_, [])       -> noMatches
+  where
+    noMatches = failWithTc $
+      text "Couldn't find any instances of"
+        <+> ppr_th th_name <+> text "for" <+> ppr_th th_type
+        <+> text "to add documentation to"
+
 -- | Adds a mod finalizer reference to the local environment.
 addModFinalizerRef :: ForeignRef (TH.Q ()) -> TcM ()
 addModFinalizerRef finRef = do
@@ -1395,6 +1493,8 @@ handleTHMessage msg = case msg of
   AddForeignFilePath lang str -> wrapTHResult $ TH.qAddForeignFilePath lang str
   IsExtEnabled ext -> wrapTHResult $ TH.qIsExtEnabled ext
   ExtsEnabled -> wrapTHResult $ TH.qExtsEnabled
+  PutDoc l s -> wrapTHResult $ TH.qPutDoc l s
+  GetDoc l -> wrapTHResult $ TH.qGetDoc l
   FailIfErrs -> wrapTHResult failIfErrsM
   _ -> panic ("handleTHMessage: unexpected message " ++ show msg)
 
@@ -1418,6 +1518,19 @@ getAnnotationsByTypeRep th_name tyrep
 
 reifyInstances :: TH.Name -> [TH.Type] -> TcM [TH.Dec]
 reifyInstances th_nm th_tys
+  = do { insts <- reifyInstances' th_nm th_tys
+       ; case insts of
+           Left (cls, cls_insts) ->
+             reifyClassInstances cls cls_insts
+           Right (tc, fam_insts) ->
+             reifyFamilyInstances tc fam_insts }
+
+reifyInstances' :: TH.Name
+                -> [TH.Type]
+                -> TcM (Either (Class, [ClsInst]) (TyCon, [FamInst]))
+                -- ^ Returns 'Left' in the case that the instances were found to
+                -- be class instances, or 'Right' if they are family instances.
+reifyInstances' th_nm th_tys
    = addErrCtxt (text "In the argument of reifyInstances:"
                  <+> ppr_th th_nm <+> sep (map ppr_th th_tys)) $
      do { loc <- getSrcSpanM
@@ -1445,19 +1558,19 @@ reifyInstances th_nm th_tys
                 -- In particular, the type might have kind
                 -- variables inside it (#7477)
 
-        ; traceTc "reifyInstances" (ppr ty $$ ppr (tcTypeKind ty))
+        ; traceTc "reifyInstances'" (ppr ty $$ ppr (tcTypeKind ty))
         ; case splitTyConApp_maybe ty of   -- This expands any type synonyms
             Just (tc, tys)                 -- See #7910
                | Just cls <- tyConClass_maybe tc
                -> do { inst_envs <- tcGetInstEnvs
                      ; let (matches, unifies, _) = lookupInstEnv False inst_envs cls tys
-                     ; traceTc "reifyInstances1" (ppr matches)
-                     ; reifyClassInstances cls (map fst matches ++ unifies) }
+                     ; traceTc "reifyInstances'1" (ppr matches)
+                     ; return $ Left (cls, map fst matches ++ unifies) }
                | isOpenFamilyTyCon tc
                -> do { inst_envs <- tcGetFamInstEnvs
                      ; let matches = lookupFamInstEnv inst_envs tc tys
-                     ; traceTc "reifyInstances2" (ppr matches)
-                     ; reifyFamilyInstances tc (map fim_instance matches) }
+                     ; traceTc "reifyInstances'2" (ppr matches)
+                     ; return $ Right (tc, map fim_instance matches) }
             _  -> bale_out (hang (text "reifyInstances:" <+> quotes (ppr ty))
                                2 (text "is not a class constraint or type family application")) }
   where

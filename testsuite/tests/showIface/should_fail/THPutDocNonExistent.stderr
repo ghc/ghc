@@ -1,0 +1,2 @@
+THPutDocNonExistent.hs:10:2: error:
+    Couldn't find any instances of THPutDocNonExistent.A for THPutDocNonExistent.B to add documentation to
