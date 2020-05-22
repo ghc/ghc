@@ -1055,10 +1055,18 @@ Is this strict in 'y'? Often not! If @foo x s@ might throw a precise exception
 (ultimately via raiseIO#), then we must not force 'y', which may fail to
 terminate or throw an imprecise exception, until we have performed @foo x s@.
 
-So we have to 'Demand.deferAfterPreciseException' (which just 'lub's with
-'nopDmdType' to model the exceptional control flow) when @foo x s@
-may throw a precise exception. Motivated by T13380{d,e,f}.
+So we have to 'deferAfterPreciseException' (which 'lub's with 'exnDmdType' to
+model the exceptional control flow) when @foo x s@ may throw a precise
+exception. Motivated by T13380{d,e,f}.
 See Note [Which scrutinees may throw precise exceptions] in DmdAnal.
+
+We have to be careful not to discard dead-end Divergence from case
+alternatives, though (#18086):
+
+  m = putStrLn "foo" >> error "bar"
+
+'m' should still have 'exnDiv', which is why it is not sufficient to lub with
+'nopDmdType' (which has 'topDiv') in 'deferAfterPreciseException'.
 
 Historical Note: This used to be called the "IO hack". But that term is rather
 a bad fit because
@@ -1261,6 +1269,11 @@ isTopDmdType :: DmdType -> Bool
 isTopDmdType (DmdType env args div)
   = div == topDiv && null args && isEmptyVarEnv env
 
+-- | The demand type of an unspecified expression that is guaranteed to
+-- throw a (precise or imprecise) exception or diverge.
+exnDmdType :: DmdType
+exnDmdType = DmdType emptyDmdEnv [] exnDiv
+
 dmdTypeDepth :: DmdType -> Arity
 dmdTypeDepth (DmdType _ ds _) = length ds
 
@@ -1303,13 +1316,17 @@ splitDmdTy (DmdType fv (dmd:dmds) res_ty) = (dmd, DmdType fv dmds res_ty)
 splitDmdTy ty@(DmdType _ [] res_ty)       = (defaultArgDmd res_ty, ty)
 
 -- | When e is evaluated after executing an IO action that may throw a precise
--- exception, and d is e's demand, then what of this demand should we consider?
--- * We have to kill all strictness demands (i.e. lub with a lazy demand)
--- * We can keep usage information (i.e. lub with an absent demand)
--- * We have to kill definite divergence
+-- exception, we act as if there is an additional control flow path that is
+-- taken if e throws a precise exception. The demand type of this control flow
+-- path
+--   * is lazy and absent ('topDmd') in all free variables and arguments
+--   * has 'exnDiv' 'Divergence' result
+-- So we can simply take a variant of 'nopDmdType', 'exnDmdType'.
+-- Why not 'nopDmdType'? Because then the result of 'e' can never be 'exnDiv'!
+-- That means failure to drop dead-ends, see #18086.
 -- See Note [Precise exceptions and strictness analysis]
 deferAfterPreciseException :: DmdType -> DmdType
-deferAfterPreciseException d = lubDmdType d nopDmdType
+deferAfterPreciseException = lubDmdType exnDmdType
 
 strictenDmd :: Demand -> CleanDemand
 strictenDmd (JD { sd = s, ud = u})
