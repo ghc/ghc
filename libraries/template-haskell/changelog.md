@@ -16,6 +16,13 @@
     `flag` is either the `Specificity` of the type variable (`SpecifiedSpec` or
     `InferredSpec`) or `()`.
 
+  * Add `putDoc` and `getDoc` which allow Haddock documentation to be attached
+    to module headers, declarations, function arguments and instances, as well
+    as queried. These are quite low level operations, so for convenience there
+    are several combinators that can be used with `Dec`s directly, including
+    `withDecDoc`/`withDecsDoc` as well as `_doc` counterparts to many of the
+    `Dec` helper functions.
+
   * Fix Eq/Ord instances for `Bytes`: we were comparing pointers while we should
     compare the actual bytes (#16457).
 
