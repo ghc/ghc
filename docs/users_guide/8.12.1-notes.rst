@@ -261,6 +261,17 @@ Template Haskell
   splices do not lead directly to compile-time evaluation. (Merge request
   `!2288 <https://gitlab.haskell.org/ghc/ghc/-/merge_requests/2288>`_)
 
+- There are two new functions ``putDoc`` and ``getDoc``, which allow Haddock
+  documentation to be attached and read from module headers, declarations,
+  function arguments, class instances and family instances.
+  These functions are quite low level, so the ``withDecDoc`` function provides a
+  more ergonomic interface for this. Similarly ``funD_doc`` and ``dataD_doc``
+  provide an easy way to document functions and constructors alongside their
+  arguments simultaneously. ::
+
+    $(withDecsDoc "This does good things" [d| foo x = 42 |])
+
+
 Arrow notation
 ~~~~~~~~~~~~~~
 
