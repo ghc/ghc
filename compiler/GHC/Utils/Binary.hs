@@ -36,6 +36,7 @@ module GHC.Utils.Binary
    tellBin,
    castBin,
    withBinBuffer,
+   tellSize,
 
    writeBinMem,
    readBinMem,
@@ -170,6 +171,9 @@ withBinBuffer (BinMem _ ix_r _ arr_r) action = do
   withForeignPtr arr $ \ptr ->
     BS.unsafePackCStringLen (castPtr ptr, ix) >>= action
 
+-- | Get the size of the underlying buffer. When reading this corresponds to the file size.
+tellSize :: BinHandle -> IO Int
+tellSize (BinMem _ _ sz_r _) = readFastMutInt sz_r
 
 ---------------------------------------------------------------
 -- Bin

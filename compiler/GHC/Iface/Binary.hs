@@ -127,7 +127,7 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
     errorOnMismatch "magic number mismatch: old/corrupt interface file?"
         (unFixedLength $ binaryInterfaceMagic platform) (unFixedLength magic)
 
-    -- Check the interface file version and ways.
+    -- Check the interface file version, ways, and file size.
     check_ver  <- get bh
     let our_ver = show hiVersion
     wantedGot "Version" our_ver check_ver text
@@ -138,6 +138,11 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
     wantedGot "Way" way_descr check_way ppr
     when (checkHiWay == CheckHiWay) $
         errorOnMismatch "mismatched interface file ways" way_descr check_way
+
+    recorded_size <- unFixedLength <$> get bh :: IO Word32
+    actual_size <- fromIntegral <$> tellSize bh
+    wantedGot "Size" actual_size recorded_size ppr
+    errorOnMismatch "mismatched interface file size" recorded_size actual_size
 
     extFields_p <- get bh
 
@@ -192,6 +197,10 @@ writeBinIface dflags hi_path mod_iface = do
     let way_descr = getWayDescr dflags
     put_  bh way_descr
 
+    -- Mark this spot in the file, and put a placeholder for the size.
+    size_p <- tellBin bh
+    put_ bh size_p
+
     extFields_p_p <- tellBin bh
     put_ bh extFields_p_p
 
@@ -201,6 +210,11 @@ writeBinIface dflags hi_path mod_iface = do
     putAt bh extFields_p_p extFields_p
     seekBin bh extFields_p
     put_ bh (mi_ext_fields mod_iface)
+
+    -- Record the final size back at size_p and then return to the current pos.
+    ret_p <- tellBin bh
+    putAt bh size_p ret_p
+    seekBin bh ret_p
 
     -- And send the result to the file
     writeBinMem bh hi_path
