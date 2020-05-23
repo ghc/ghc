@@ -1642,19 +1642,14 @@ a polytype.  E.g.
                  @(T x      -> forall b. b -> b)
                 op
 
-The use of type applications is crucial here. If we had tried using only
-explicit type signatures, like so:
+The use of type applications is crucial here. We have to instantiate
+both type args of (coerce :: Coercible a b => a -> b) to polytypes,
+and we can only do that with VTA or Quick Look. Here VTA seems more
+appropriate for machine generated code: it's simple and robust.
 
-   instance C <rep-ty> => C (T x) where
-     op :: T x -> forall b. b -> b
-     op = coerce (op :: <rep-ty> -> forall b. b -> b)
-
-Then GHC will attempt to deeply skolemize the two type signatures, which will
-wreak havoc with the Coercible solver. Therefore, we instead use type
-applications, which do not deeply skolemize and thus avoid this issue.
-The downside is that we currently require -XImpredicativeTypes to permit this
-polymorphic type instantiation, so we have to switch that flag on locally in
-GHC.Tc.Deriv.genInst. See #8503 for more discussion.
+However, to allow VTA with polytypes we must switch on
+-XImpredicativeTypes locally in GHC.Tc.Deriv.genInst.
+See #8503 for more discussion.
 
 Note [Newtype-deriving trickiness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1758,9 +1753,8 @@ break this example (from the T15290d test case):
     c = coerce @(Int -> forall b. b -> Int)
                c
 
-That is because the instance signature deeply skolemizes the forall-bound
-`b`, which wreaks havoc with the `Coercible` solver. An additional visible type
-argument of @(Int -> forall b. b -> Age) is enough to prevent this.
+That is because we still need to instantiate the second argument of
+coerce with a polytype, and we can only do that with VTA or QuickLook.
 
 Be aware that the use of an instance signature doesn't /solve/ this
 problem; it just makes it less likely to occur. For example, if a class has

@@ -268,7 +268,7 @@ tcApp rn_expr exp_res_ty
 
        -- Wrap the result
        -- NB: app_res_ty may be a polytype, via zonkQuickLook
-       ; addFunResCtxt True tc_fun app_res_ty exp_res_ty $
+       ; addFunResCtxt tc_fun tc_args app_res_ty exp_res_ty $
          tcWrapResult rn_expr tc_expr app_res_ty exp_res_ty } }
 
 ----------------
@@ -994,7 +994,7 @@ tcCheckId :: Name -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcCheckId name res_ty
   = do { (expr, actual_res_ty) <- tcInferId name
        ; traceTc "tcCheckId" (vcat [ppr name, ppr actual_res_ty, ppr res_ty])
-       ; addFunResCtxt False expr actual_res_ty res_ty $
+       ; addFunResCtxt expr [] actual_res_ty res_ty $
          tcWrapResultO (OccurrenceOf name) (HsVar noExtField (noLoc name)) expr
                                            actual_res_ty res_ty }
 
@@ -1311,14 +1311,12 @@ tcTagToEnum expr fun args app_res_ty res_ty
 *                                                                      *
 ********************************************************************* -}
 
-addFunResCtxt :: Bool  -- There is at least one argument
-              -> HsExpr GhcTc -> TcType -> ExpRhoType
+addFunResCtxt :: HsExpr GhcTc -> [HsExprArg 'TcpTc]
+              -> TcType -> ExpRhoType
               -> TcM a -> TcM a
 -- When we have a mis-match in the return type of a function
 -- try to give a helpful message about too many/few arguments
---
--- Used for naked variables too; but with has_args = False
-addFunResCtxt has_args fun fun_res_ty env_ty
+addFunResCtxt fun args fun_res_ty env_ty
   = addLandmarkErrCtxtM (\env -> (env, ) <$> mk_msg)
       -- NB: use a landmark error context, so that an empty context
       -- doesn't suppress some more useful context
@@ -1350,7 +1348,7 @@ addFunResCtxt has_args fun fun_res_ty env_ty
                        = text "Probable cause:" <+> quotes (ppr fun)
                          <+> text "is applied to too few arguments"
 
-                       | has_args
+                       | not (null args)  -- Is applied to at least one arg
                        , not_fun res_fun
                        = text "Possible cause:" <+> quotes (ppr fun)
                          <+> text "is applied to too many arguments"
