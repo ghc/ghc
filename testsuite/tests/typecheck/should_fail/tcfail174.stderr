@@ -1,12 +1,4 @@
 
-tcfail174.hs:9:5: error:
-    • Couldn't match type: a0 -> a0
-                     with: forall a. a -> a
-      Expected: Capture (forall a. a -> a)
-        Actual: Capture (a0 -> a0)
-    • In the expression: Base id
-      In an equation for ‘g’: g = Base id
-
 tcfail174.hs:16:14: error:
     • Couldn't match type ‘a1’ with ‘a’
       Expected: Capture (forall x. x -> a)

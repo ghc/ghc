@@ -187,6 +187,9 @@ tcLExprNC (L loc expr) res_ty
 
 tcExpr :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 
+-- We use tcApp even for lone variables, to ensure that they
+-- can get an impredicative instatiation driven by res_ty
+-- (in checking mode)
 tcExpr e@(HsVar {})     res_ty = tcApp e res_ty
 tcExpr e@(HsApp {})     res_ty = tcApp e res_ty
 tcExpr e@(HsAppType {}) res_ty = tcApp e res_ty
