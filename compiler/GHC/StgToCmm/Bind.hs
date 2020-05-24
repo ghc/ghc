@@ -201,7 +201,7 @@ cgRhs :: Id
                )
 
 cgRhs id (StgRhsCon cc con args)
-  = withNewTickyCounterCon (idName id) $
+  = withNewTickyCounterCon (idName id) con $
     buildDynCon id True cc con (assertNonVoidStgArgs args)
       -- con args are always non-void,
       -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
