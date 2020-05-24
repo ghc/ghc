@@ -10,7 +10,7 @@ Dependent packages: [base-4.16.0.0, ghc-bignum-1.0, ghc-prim-0.7.0]
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 24, types: 61, coercions: 0, joins: 0/0}
+  = {terms: 18, types: 53, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 7, types: 8, coercions: 0, joins: 0/0}
 T18052a.$b:||: :: forall {a} {b}. a -> b -> (a, b)
