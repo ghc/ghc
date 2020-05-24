@@ -128,6 +128,7 @@ import GHC.Driver.Session
 -- Turgid imports for showTypeCategory
 import GHC.Builtin.Names
 import GHC.Tc.Utils.TcType
+import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Predicate
 
@@ -145,6 +146,7 @@ data TickyClosureType
     = TickyFun
         Bool -- True <-> single entry
     | TickyCon
+        DataCon -- the allocated constructor
     | TickyThunk
         Bool -- True <-> updateable
         Bool -- True <-> standard thunk (AP or selector), has no entry counter
@@ -188,13 +190,14 @@ withNewTickyCounterStdThunk isUpdatable name code = do
 
 withNewTickyCounterCon
   :: Name
+  -> DataCon
   -> FCode a
   -> FCode a
-withNewTickyCounterCon name code = do
+withNewTickyCounterCon name datacon code = do
     has_ctr <- thunkHasCounter False
     if not has_ctr
       then code
-      else withNewTickyCounter TickyCon name [] code
+      else withNewTickyCounter (TickyCon datacon) name [] code
 
 -- args does not include the void arguments
 withNewTickyCounter :: TickyClosureType -> Name -> [NonVoid Id] -> FCode a -> FCode a
@@ -222,7 +225,7 @@ emitTickyCounter cloType name args
                     ext = case cloType of
                               TickyFun single_entry -> parens $ hcat $ punctuate comma $
                                   [text "fun"] ++ [text "se"|single_entry]
-                              TickyCon -> parens (text "con")
+                              TickyCon datacon -> parens (text "con:" <+> ppr (dataConName datacon))
                               TickyThunk upd std -> parens $ hcat $ punctuate comma $
                                   [text "thk"] ++ [text "se"|not upd] ++ [text "std"|std]
                               TickyLNE | isInternalName name -> parens (text "LNE")
