@@ -573,11 +573,16 @@ plusForeignPtr (ForeignPtr addr c) (I# d) = ForeignPtr (plusAddr# addr d) c
 -- | Causes the finalizers associated with a foreign pointer to be run
 -- immediately. The foreign pointer must not be used again after this
 -- function is called.
+--
+-- Before 4.15.0.0, this threw an exception the foreign pointer was backed
+-- by 'PlainPtr'. Since 4.15.0.0, this returns unit when it encounters
+-- 'PlainPtr'. It also returns unit when it encounters 'FinalPtr',
+-- introduced in 4.15.0.0.
 finalizeForeignPtr :: ForeignPtr a -> IO ()
 finalizeForeignPtr (ForeignPtr _ c) = case c of
   PlainForeignPtr ref -> foreignPtrFinalizer ref
   MallocPtr _ ref -> foreignPtrFinalizer ref
-  _ -> errorWithoutStackTrace "finalizeForeignPtr PlainPtr"
+  _ -> return ()
 
 {- $commentary
 
