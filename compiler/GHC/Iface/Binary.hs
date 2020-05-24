@@ -139,6 +139,8 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
     when (checkHiWay == CheckHiWay) $
         errorOnMismatch "mismatched interface file ways" way_descr check_way
 
+    -- Compare the recorded size and compare it to the actual size.
+    -- If they do not match then the file is likely corrupt, so we'll stop here.
     recorded_size <- unFixedLength <$> get bh :: IO Word32
     actual_size <- fromIntegral <$> tellSize bh
     wantedGot "Size" actual_size recorded_size ppr
