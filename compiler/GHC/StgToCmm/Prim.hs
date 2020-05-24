@@ -39,7 +39,6 @@ import GHC.StgToCmm.Prof ( costCentreFrom )
 import GHC.Driver.Session
 import GHC.Platform
 import GHC.Types.Basic
-import GHC.Types.Id.Make ( realWorldPrimId )
 import GHC.Cmm.BlockId
 import GHC.Cmm.Graph
 import GHC.Stg.Syntax
@@ -86,12 +85,8 @@ cgOpApp (StgFCallOp fcall ty) stg_args res_ty
 
 cgOpApp (StgPrimOp KeepAliveOp) args _res_ty
   | [x, s, StgVarArg k] <- args = do
-      { emitComment $ fsLit "keepAlive#"
-      ; r <- cgExpr (StgApp k [s])
-      ; cmm_args <- getNonVoidArgAmodes [x, StgVarArg realWorldPrimId]
-      ; emitPrimCall [] MO_Touch cmm_args
-      ; return r
-      }
+    x' <- getNonVoidArgAmodes [x]
+    emitKeepAliveFrame (case x' of [y] -> y) $ cgExpr (StgApp k [s])
   | otherwise = pprPanic "ill-formed keepAlive#" (ppr args)
 
 cgOpApp (StgPrimOp primop) args res_ty = do
@@ -130,6 +125,20 @@ cgOpApp (StgPrimCallOp primcall) args _res_ty
   = do  { cmm_args <- getNonVoidArgAmodes args
         ; let fun = CmmLit (CmmLabel (mkPrimCallLabel primcall))
         ; emitCall (NativeNodeCall, NativeReturn) fun cmm_args }
+
+emitKeepAliveFrame :: CmmExpr -> FCode a -> FCode a
+emitKeepAliveFrame x body
+  = do
+        updfr <- getUpdFrameOff
+        dflags <- getDynFlags
+        let hdr = fixedHdrSize dflags
+            off_frame = updfr + hdr + sIZEOF_StgKeepAliveFrame_NoHdr dflags
+            frame = CmmStackSlot Old off_frame
+            off_closure = hdr + oFFSET_StgKeepAliveFrame_closure dflags
+
+        emitStore frame (mkLblExpr mkKeepAliveInfoLabel)
+        emitStore (cmmOffset (targetPlatform dflags) frame off_closure) x
+        withUpdFrameOff off_frame body
 
 -- | Interpret the argument as an unsigned value, assuming the value
 -- is given in two-complement form in the given width.

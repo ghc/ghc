@@ -195,6 +195,11 @@ typedef struct {
 } StgCatchFrame;
 
 typedef struct {
+    StgHeader  header;
+    StgClosure *closure;
+} StgKeepAliveFrame;
+
+typedef struct {
     const StgInfoTable* info;
     struct StgStack_ *next_chunk;
 } StgUnderflowFrame;

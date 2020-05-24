@@ -69,6 +69,17 @@ INFO_TABLE_RET (stg_restore_cccs_eval, RET_SMALL, W_ info_ptr, W_ cccs)
 }
 
 /* ----------------------------------------------------------------------------
+   keepAlive#
+   ------------------------------------------------------------------------- */
+
+INFO_TABLE_RET(stg_keepAlive_frame, RET_SMALL, W_ info_ptr)
+    /* explicit stack */
+{
+    Sp_adj(1);
+    jump %ENTRY_CODE(Sp(0)) [*]; // N.B. all registers live
+}
+
+/* ----------------------------------------------------------------------------
    Support for the bytecode interpreter.
    ------------------------------------------------------------------------- */
 
