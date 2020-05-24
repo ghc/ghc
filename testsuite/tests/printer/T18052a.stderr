@@ -11,7 +11,7 @@ Dependent packages: [base-4.14.0.0, ghc-prim-0.6.1,
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 18, types: 53, coercions: 0, joins: 0/0}
+  = {terms: 18, types: 46, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T18052a.$b:||: :: forall {a} {b}. a -> b -> (a, b)
@@ -23,7 +23,7 @@ T18052a.$b:||: = GHC.Tuple.(,)
 [GblId]
 (+++) = (++)
 
--- RHS size: {terms: 13, types: 20, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 13, types: 18, coercions: 0, joins: 0/0}
 T18052a.$m:||:
   :: forall {rep :: GHC.Types.RuntimeRep} {r :: TYPE rep} {a} {b}.
      (a, b) -> (a -> b -> r) -> (GHC.Prim.Void# -> r) -> r
