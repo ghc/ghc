@@ -564,11 +564,11 @@ $tab          { warnTab }
 --
 -- The precise rules are as follows:
 --
---  * Identifiers, literals, and opening brackets (, (#, [, [|, [||, [p|, [e|,
---    [t|, {, are considered "opening tokens". The function followedByOpeningToken
---    tests whether the next token is an opening token.
+--  * Identifiers, literals, and opening brackets (, (#, (|, [, [|, [||, [p|,
+--    [e|, [t|, {, ⟦, ⦇, are considered "opening tokens". The function
+--    followedByOpeningToken tests whether the next token is an opening token.
 --
---  * Identifiers, literals, and closing brackets ), #), ], |], },
+--  * Identifiers, literals, and closing brackets ), #), |), ], |], }, ⟧, ⦈,
 --    are considered "closing tokens". The function precededByClosingToken tests
 --    whether the previous token is a closing token.
 --
@@ -1068,6 +1068,8 @@ followedByOpeningToken _ _ _ (AI _ buf)
         ('\"', _) -> True
         ('\'', _) -> True
         ('_', _) -> True
+        ('⟦', _) -> True
+        ('⦇', _) -> True
         (c, _) -> isAlphaNum c
 
 -- See Note [Whitespace-sensitive operator parsing]
@@ -1080,6 +1082,8 @@ precededByClosingToken _ (AI _ buf) _ _ =
     '\"' -> True
     '\'' -> True
     '_' -> True
+    '⟧' -> True
+    '⦈' -> True
     c -> isAlphaNum c
 
 {-# INLINE nextCharIs #-}
