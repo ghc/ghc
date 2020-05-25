@@ -1,0 +1,83 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 35, types: 27, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+Lib.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+Lib.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+Lib.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Cpr=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+Lib.$trModule3 = GHC.Types.TrNameS Lib.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+Lib.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+Lib.$trModule2 = "Lib"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+Lib.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Cpr=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+Lib.$trModule1 = GHC.Types.TrNameS Lib.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+Lib.$trModule :: GHC.Types.Module
+[GblId,
+ Cpr=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+Lib.$trModule = GHC.Types.Module Lib.$trModule3 Lib.$trModule1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+Lib.$wfoo [InlPrag=NOINLINE]
+  :: GHC.Prim.Int# -> GHC.Prim.Int# -> GHC.Prim.Int#
+[GblId, Arity=2, Str=<L,U><L,U>, Unf=OtherCon []]
+Lib.$wfoo = (GHC.Prim.+#)
+
+-- RHS size: {terms: 18, types: 14, coercions: 0, joins: 0/0}
+foo [InlPrag=NOUSERINLINE[0]] :: (Int, Int) -> Int -> Int
+[GblId,
+ Arity=2,
+ Str=<S(SL),1*U(1*U(U),A)><S,1*U(U)>,
+ Cpr=m1,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (w_sHs [Occ=Once!] :: (Int, Int))
+                 (w1_sHt [Occ=Once!] :: Int) ->
+                 case w_sHs of { (ww1_sHw [Occ=Once!], _ [Occ=Dead]) ->
+                 case ww1_sHw of { GHC.Types.I# ww4_sHz [Occ=Once] ->
+                 case w1_sHt of { GHC.Types.I# ww6_sHF [Occ=Once] ->
+                 case Lib.$wfoo ww4_sHz ww6_sHF of ww7_sHJ [Occ=Once] { __DEFAULT ->
+                 GHC.Types.I# ww7_sHJ
+                 }
+                 }
+                 }
+                 }}]
+foo
+  = \ (w_sHs :: (Int, Int)) (w1_sHt :: Int) ->
+      case w_sHs of { (ww1_sHw, ww2_sHB) ->
+      case ww1_sHw of { GHC.Types.I# ww4_sHz ->
+      case w1_sHt of { GHC.Types.I# ww6_sHF ->
+      case Lib.$wfoo ww4_sHz ww6_sHF of ww7_sHJ { __DEFAULT ->
+      GHC.Types.I# ww7_sHJ
+      }
+      }
+      }
+      }
+
+
+

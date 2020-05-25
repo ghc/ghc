@@ -162,7 +162,7 @@ mkWwBodies dflags fam_envs rhs_fvs fun_id demands cpr_info
               wrapper_body = wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var
               worker_body = mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args
 
-        ; if isWorkerSmallEnough dflags work_args
+        ; if isWorkerSmallEnough dflags (length demands) work_args
              && not (too_many_args_for_join_point wrap_args)
              && ((useful1 && not only_one_void_argument) || useful2)
           then return (Just (worker_args_dmds, length work_call_args,
@@ -203,10 +203,13 @@ mkWwBodies dflags fam_envs rhs_fvs fun_id demands cpr_info
       = False
 
 -- See Note [Limit w/w arity]
-isWorkerSmallEnough :: DynFlags -> [Var] -> Bool
-isWorkerSmallEnough dflags vars = count isId vars <= maxWorkerArgs dflags
+isWorkerSmallEnough :: DynFlags -> Int -> [Var] -> Bool
+isWorkerSmallEnough dflags old_n_args vars
+  = count isId vars <= max old_n_args (maxWorkerArgs dflags)
     -- We count only Free variables (isId) to skip Type, Kind
     -- variables which have no runtime representation.
+    -- Also if the function took 82 arguments before (old_n_args), it's fine if
+    -- it takes <= 82 arguments afterwards.
 
 {-
 Note [Always do CPR w/w]
@@ -227,7 +230,8 @@ Guard against high worker arity as it generates a lot of stack traffic.
 A simplified example is #11565#comment:6
 
 Current strategy is very simple: don't perform w/w transformation at all
-if the result produces a wrapper with arity higher than -fmax-worker-args=.
+if the result produces a wrapper with arity higher than -fmax-worker-args
+and the number arguments before w/w.
 
 It is a bit all or nothing, consider
 
