@@ -1,67 +1,36 @@
 
 T17340.hs:17:8: warning: [-Wredundant-bang-patterns (in -Wall)]
-    • Bang pattern is redundant
-    • In the pattern: !B
-      In an equation for ‘conPat’: conPat !B = ()
+    Bang pattern is redundant
 
 T17340.hs:20:8: warning: [-Wredundant-bang-patterns (in -Wall)]
-    • Bang pattern is redundant
-    • In the pattern: !(A _)
-      In an equation for ‘parPat’: parPat !(A _) = ()
+    Bang pattern is redundant
 
 T17340.hs:23:7: warning: [-Wredundant-bang-patterns (in -Wall)]
-    • Bang pattern is redundant
-    • In the pattern: !a@(A _)
-      In an equation for ‘asPat’: asPat !a@(A _) = ()
+    Bang pattern is redundant
 
 T17340.hs:26:9: warning: [-Wredundant-bang-patterns (in -Wall)]
-    • Bang pattern is redundant
-    • In the pattern: !B
-      In the pattern: !B :: B
-      In an equation for ‘sigPat’: sigPat (!B :: B) = ()
+    Bang pattern is redundant
 
 T17340.hs:29:22: warning: [-Wredundant-bang-patterns (in -Wall)]
-    • Bang pattern is redundant
-    • In the pattern: !B
-      In the pattern: id -> !B
-      In an equation for ‘insideViewPat’: insideViewPat (id -> !B) = ()
+    Bang pattern is redundant
 
 T17340.hs:32:9: warning: [-Wredundant-bang-patterns (in -Wall)]
-    • Bang pattern is redundant
-    • In the pattern: ![]
-      In an equation for ‘listPat’: listPat ![] = ()
+    Bang pattern is redundant
 
 T17340.hs:36:10: warning: [-Wredundant-bang-patterns (in -Wall)]
-    • Bang pattern is redundant
-    • In the pattern: !(_ : _)
-      In an equation for ‘list2Pat’: list2Pat !(_ : _) = ()
+    Bang pattern is redundant
 
 T17340.hs:40:10: warning: [-Wredundant-bang-patterns (in -Wall)]
-    • Bang pattern is redundant
-    • In the pattern: !(_, _)
-      In an equation for ‘tuplePat’: tuplePat !(_, _) = ()
+    Bang pattern is redundant
 
 T17340.hs:43:23: warning: [-Wredundant-bang-patterns (in -Wall)]
-    • Bang pattern is redundant
-    • In the pattern: !B
-      In a case alternative: !B -> ()
-      In the expression: case b of { !B -> () }
+    Bang pattern is redundant
+
+T17340.hs:46:6: warning: [-Wredundant-bang-patterns (in -Wall)]
+    Bang pattern is redundant
 
 T17340.hs:50:12: warning: [-Wredundant-bang-patterns (in -Wall)]
-    • Bang pattern is redundant
-    • In the pattern: !x
-      In an equation for ‘unboxedPat’: unboxedPat !x = I# x
+    Bang pattern is redundant
 
-T17340.hs:55:7: warning: [-Wredundant-bang-patterns (in -Wall)]
-    • Bang pattern is redundant
-    • In the expression:
-        let
-          x :: Int#
-          !x = undefined
-        in ()
-      In an equation for ‘unliftedBind’:
-          unliftedBind
-            = let
-                x :: Int#
-                !x = undefined
-              in ()
+T17340.hs:54:3: warning: [-Wredundant-bang-patterns (in -Wall)]
+    Bang pattern is redundant
