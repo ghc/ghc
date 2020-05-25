@@ -171,7 +171,7 @@ cpsTop dflags proc =
         -- label to put on info tables for basic blocks that are not
         -- the entry point.
         splitting_proc_points = hscTarget dflags /= HscAsm
-                             || not (tablesNextToCode dflags)
+                             || not (platformTablesNextToCode platform)
                              || -- Note [inconsistent-pic-reg]
                                 usingInconsistentPicReg
         usingInconsistentPicReg
