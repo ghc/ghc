@@ -762,8 +762,7 @@ emitProcWithConvention conv mb_info lbl args blocks
 emitProc :: Maybe CmmInfoTable -> CLabel -> [GlobalReg] -> CmmAGraphScoped
          -> Int -> Bool -> FCode ()
 emitProc mb_info lbl live blocks offset do_layout
-  = do  { platform <- getPlatform
-        ; l <- newBlockId
+  = do  { l <- newBlockId
         ; let
               blks :: CmmGraph
               blks = labelAGraph l blocks
@@ -772,7 +771,6 @@ emitProc mb_info lbl live blocks offset do_layout
                     | otherwise            = mapEmpty
 
               sinfo = StackInfo { arg_space = offset
-                                , updfr_space = Just (initUpdFrameOff platform)
                                 , do_layout = do_layout }
 
               tinfo = TopInfo { info_tbls = infos

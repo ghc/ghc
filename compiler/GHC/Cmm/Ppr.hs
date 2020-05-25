@@ -103,9 +103,8 @@ instance Outputable CmmGraph where
 -- Outputting types Cmm contains
 
 pprStackInfo :: CmmStackInfo -> SDoc
-pprStackInfo (StackInfo {arg_space=arg_space, updfr_space=updfr_space}) =
-  text "arg_space: " <> ppr arg_space <+>
-  text "updfr_space: " <> ppr updfr_space
+pprStackInfo (StackInfo {arg_space=arg_space}) =
+  text "arg_space: " <> ppr arg_space
 
 pprTopInfo :: CmmTopInfo -> SDoc
 pprTopInfo (TopInfo {info_tbls=info_tbl, stack_info=stack_info}) =
