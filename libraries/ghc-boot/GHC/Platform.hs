@@ -64,6 +64,10 @@ data Platform = Platform
    , platformHasSubsectionsViaSymbols :: !Bool
    , platformIsCrossCompiling         :: !Bool
    , platformLeadingUnderscore        :: !Bool             -- ^ Symbols need underscore prefix
+   , platformTablesNextToCode         :: !Bool
+      -- ^ Determines whether we will be compiling info tables that reside just
+      --   before the entry code, or with an indirection to the entry code. See
+      --   TABLES_NEXT_TO_CODE in includes/rts/storage/InfoTables.h.
    }
    deriving (Read, Show, Eq)
 
@@ -294,10 +298,6 @@ data PlatformMisc = PlatformMisc
   , platformMisc_ghcWithNativeCodeGen :: Bool
   , platformMisc_ghcWithSMP           :: Bool
   , platformMisc_ghcRTSWays           :: String
-  -- | Determines whether we will be compiling info tables that reside just
-  --   before the entry code, or with an indirection to the entry code. See
-  --   TABLES_NEXT_TO_CODE in includes/rts/storage/InfoTables.h.
-  , platformMisc_tablesNextToCode     :: Bool
   , platformMisc_libFFI               :: Bool
   , platformMisc_ghcThreaded          :: Bool
   , platformMisc_ghcDebugged          :: Bool

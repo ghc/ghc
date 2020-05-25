@@ -43,6 +43,7 @@ getTargetPlatform settingsFile mySettings = do
   targetHasIdentDirective <- getBooleanSetting "target has .ident directive"
   targetHasSubsectionsViaSymbols <- getBooleanSetting "target has subsections via symbols"
   crossCompiling <- getBooleanSetting "cross compiling"
+  tablesNextToCode <- getBooleanSetting "Tables next to code"
 
   pure $ Platform
     { platformMini = PlatformMini
@@ -57,6 +58,7 @@ getTargetPlatform settingsFile mySettings = do
     , platformHasSubsectionsViaSymbols = targetHasSubsectionsViaSymbols
     , platformIsCrossCompiling = crossCompiling
     , platformLeadingUnderscore = targetLeadingUnderscore
+    , platformTablesNextToCode  = tablesNextToCode
     }
 
 -----------------------------------------------------------------------------

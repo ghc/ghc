@@ -124,7 +124,7 @@ mkInfoTable dflags proc@(CmmProc infos entry_lbl live blocks)
   -- in the non-tables-next-to-code case, procs can have at most a
   -- single info table associated with the entry label of the proc.
   --
-  | not (tablesNextToCode dflags)
+  | not (platformTablesNextToCode (targetPlatform dflags))
   = case topInfoTable proc of   --  must be at most one
       -- no info table
       Nothing ->
@@ -134,8 +134,8 @@ mkInfoTable dflags proc@(CmmProc infos entry_lbl live blocks)
         (top_decls, (std_info, extra_bits)) <-
              mkInfoTableContents dflags info Nothing
         let
-          rel_std_info   = map (makeRelativeRefTo dflags info_lbl) std_info
-          rel_extra_bits = map (makeRelativeRefTo dflags info_lbl) extra_bits
+          rel_std_info   = map (makeRelativeRefTo platform info_lbl) std_info
+          rel_extra_bits = map (makeRelativeRefTo platform info_lbl) extra_bits
         --
         -- Separately emit info table (with the function entry
         -- point as first entry) and the entry code
@@ -159,13 +159,14 @@ mkInfoTable dflags proc@(CmmProc infos entry_lbl live blocks)
             [CmmProc (mapFromList raw_infos) entry_lbl live blocks])
 
   where
+   platform = targetPlatform dflags
    do_one_info (lbl,itbl) = do
      (top_decls, (std_info, extra_bits)) <-
          mkInfoTableContents dflags itbl Nothing
      let
         info_lbl = cit_lbl itbl
-        rel_std_info   = map (makeRelativeRefTo dflags info_lbl) std_info
-        rel_extra_bits = map (makeRelativeRefTo dflags info_lbl) extra_bits
+        rel_std_info   = map (makeRelativeRefTo platform info_lbl) std_info
+        rel_extra_bits = map (makeRelativeRefTo platform info_lbl) extra_bits
      --
      return (top_decls, (lbl, CmmStaticsRaw info_lbl $ map CmmStaticLit $
                               reverse rel_extra_bits ++ rel_std_info))
@@ -195,7 +196,7 @@ mkInfoTableContents dflags
 
   | StackRep frame <- smrep
   = do { (prof_lits, prof_data) <- mkProfLits platform prof
-       ; let (srt_label, srt_bitmap) = mkSRTLit dflags info_lbl srt
+       ; let (srt_label, srt_bitmap) = mkSRTLit platform info_lbl srt
        ; (liveness_lit, liveness_data) <- mkLivenessBits dflags frame
        ; let
              std_info = mkStdInfoTable dflags prof_lits rts_tag srt_bitmap liveness_lit
@@ -208,7 +209,7 @@ mkInfoTableContents dflags
   | HeapRep _ ptrs nonptrs closure_type <- smrep
   = do { let layout  = packIntsCLit platform ptrs nonptrs
        ; (prof_lits, prof_data) <- mkProfLits platform prof
-       ; let (srt_label, srt_bitmap) = mkSRTLit dflags info_lbl srt
+       ; let (srt_label, srt_bitmap) = mkSRTLit platform info_lbl srt
        ; (mb_srt_field, mb_layout, extra_bits, ct_data)
                                 <- mk_pieces closure_type srt_label
        ; let std_info = mkStdInfoTable dflags prof_lits
@@ -246,7 +247,7 @@ mkInfoTableContents dflags
            ; let fun_type | null liveness_data = aRG_GEN
                           | otherwise          = aRG_GEN_BIG
                  extra_bits = [ packIntsCLit platform fun_type arity ]
-                           ++ (if inlineSRT dflags then [] else [ srt_lit ])
+                           ++ (if inlineSRT platform then [] else [ srt_lit ])
                            ++ [ liveness_lit, slow_entry ]
            ; return (Nothing, Nothing, extra_bits, liveness_data) }
       where
@@ -265,25 +266,25 @@ packIntsCLit platform a b = packHalfWordsCLit platform
                            (toStgHalfWord platform (fromIntegral b))
 
 
-mkSRTLit :: DynFlags
+mkSRTLit :: Platform
          -> CLabel
          -> Maybe CLabel
          -> ([CmmLit],    -- srt_label, if any
              CmmLit)      -- srt_bitmap
-mkSRTLit dflags info_lbl (Just lbl)
-  | inlineSRT dflags
-  = ([], CmmLabelDiffOff lbl info_lbl 0 (halfWordWidth (targetPlatform dflags)))
-mkSRTLit dflags _ Nothing    = ([], CmmInt 0 (halfWordWidth (targetPlatform dflags)))
-mkSRTLit dflags _ (Just lbl) = ([CmmLabel lbl], CmmInt 1 (halfWordWidth (targetPlatform dflags)))
+mkSRTLit platform info_lbl (Just lbl)
+  | inlineSRT platform
+  = ([], CmmLabelDiffOff lbl info_lbl 0 (halfWordWidth platform))
+mkSRTLit platform _ Nothing    = ([], CmmInt 0 (halfWordWidth platform))
+mkSRTLit platform _ (Just lbl) = ([CmmLabel lbl], CmmInt 1 (halfWordWidth platform))
 
 
 -- | Is the SRT offset field inline in the info table on this platform?
 --
 -- See the section "Referring to an SRT from the info table" in
 -- Note [SRTs] in GHC.Cmm.Info.Build
-inlineSRT :: DynFlags -> Bool
-inlineSRT dflags = platformArch (targetPlatform dflags) == ArchX86_64
-  && tablesNextToCode dflags
+inlineSRT :: Platform -> Bool
+inlineSRT platform = platformArch platform == ArchX86_64
+  && platformTablesNextToCode platform
 
 -------------------------------------------------------------------------
 --
@@ -311,16 +312,14 @@ inlineSRT dflags = platformArch (targetPlatform dflags) == ArchX86_64
 -- Note that this is done even when the -fPIC flag is not specified,
 -- as we want to keep binary compatibility between PIC and non-PIC.
 
-makeRelativeRefTo :: DynFlags -> CLabel -> CmmLit -> CmmLit
-
-makeRelativeRefTo dflags info_lbl (CmmLabel lbl)
-  | tablesNextToCode dflags
-  = CmmLabelDiffOff lbl info_lbl 0 (wordWidth (targetPlatform dflags))
-makeRelativeRefTo dflags info_lbl (CmmLabelOff lbl off)
-  | tablesNextToCode dflags
-  = CmmLabelDiffOff lbl info_lbl off (wordWidth (targetPlatform dflags))
-makeRelativeRefTo _ _ lit = lit
-
+makeRelativeRefTo :: Platform -> CLabel -> CmmLit -> CmmLit
+makeRelativeRefTo platform info_lbl lit
+  = if platformTablesNextToCode platform
+      then case lit of
+         CmmLabel lbl        -> CmmLabelDiffOff lbl info_lbl 0   (wordWidth platform)
+         CmmLabelOff lbl off -> CmmLabelDiffOff lbl info_lbl off (wordWidth platform)
+         _                   -> lit
+      else lit
 
 -------------------------------------------------------------------------
 --
@@ -457,12 +456,13 @@ closureInfoPtr :: DynFlags -> CmmExpr -> CmmExpr
 closureInfoPtr dflags e =
     CmmLoad (wordAligned dflags e) (bWord (targetPlatform dflags))
 
-entryCode :: DynFlags -> CmmExpr -> CmmExpr
--- Takes an info pointer (the first word of a closure)
--- and returns its entry code
-entryCode dflags e
- | tablesNextToCode dflags = e
- | otherwise               = CmmLoad e (bWord (targetPlatform dflags))
+-- | Takes an info pointer (the first word of a closure) and returns its entry
+-- code
+entryCode :: Platform -> CmmExpr -> CmmExpr
+entryCode platform e =
+ if platformTablesNextToCode platform
+      then e
+      else CmmLoad e (bWord platform)
 
 getConstrTag :: DynFlags -> CmmExpr -> CmmExpr
 -- Takes a closure pointer, and return the *zero-indexed*
@@ -489,8 +489,8 @@ infoTable :: DynFlags -> CmmExpr -> CmmExpr
 -- and returns a pointer to the first word of the standard-form
 -- info table, excluding the entry-code word (if present)
 infoTable dflags info_ptr
-  | tablesNextToCode dflags = cmmOffsetB platform info_ptr (- stdInfoTableSizeB dflags)
-  | otherwise               = cmmOffsetW platform info_ptr 1 -- Past the entry code pointer
+  | platformTablesNextToCode platform = cmmOffsetB platform info_ptr (- stdInfoTableSizeB dflags)
+  | otherwise                         = cmmOffsetW platform info_ptr 1 -- Past the entry code pointer
   where platform = targetPlatform dflags
 
 infoTableConstrTag :: DynFlags -> CmmExpr -> CmmExpr
@@ -527,7 +527,7 @@ funInfoTable :: DynFlags -> CmmExpr -> CmmExpr
 -- and returns a pointer to the first word of the StgFunInfoExtra struct
 -- in the info table.
 funInfoTable dflags info_ptr
-  | tablesNextToCode dflags
+  | platformTablesNextToCode platform
   = cmmOffsetB platform info_ptr (- stdInfoTableSizeB dflags - sIZEOF_StgFunInfoExtraRev dflags)
   | otherwise
   = cmmOffsetW platform info_ptr (1 + stdInfoTableSizeW dflags)
@@ -543,12 +543,13 @@ funInfoArity dflags iptr
    platform = targetPlatform dflags
    fun_info = funInfoTable dflags iptr
    rep = cmmBits (widthFromBytes rep_bytes)
+   tablesNextToCode = platformTablesNextToCode platform
 
    (rep_bytes, offset)
-    | tablesNextToCode dflags = ( pc_REP_StgFunInfoExtraRev_arity pc
-                                , oFFSET_StgFunInfoExtraRev_arity dflags )
-    | otherwise               = ( pc_REP_StgFunInfoExtraFwd_arity pc
-                                , oFFSET_StgFunInfoExtraFwd_arity dflags )
+    | tablesNextToCode = ( pc_REP_StgFunInfoExtraRev_arity pc
+                         , oFFSET_StgFunInfoExtraRev_arity dflags )
+    | otherwise        = ( pc_REP_StgFunInfoExtraFwd_arity pc
+                         , oFFSET_StgFunInfoExtraFwd_arity dflags )
 
    pc = platformConstants dflags
 

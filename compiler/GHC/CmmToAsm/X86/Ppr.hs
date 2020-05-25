@@ -183,8 +183,8 @@ pprGloblDecl lbl
   | not (externallyVisibleCLabel lbl) = empty
   | otherwise = text ".globl " <> ppr lbl
 
-pprLabelType' :: DynFlags -> CLabel -> SDoc
-pprLabelType' dflags lbl =
+pprLabelType' :: Platform -> CLabel -> SDoc
+pprLabelType' platform lbl =
   if isCFunctionLabel lbl || functionOkInfoTable then
     text "@function"
   else
@@ -237,16 +237,14 @@ pprLabelType' dflags lbl =
     every code-like thing to give the needed information for to the tools
     but mess up with the relocation. https://phabricator.haskell.org/D4730
     -}
-    functionOkInfoTable = tablesNextToCode dflags &&
+    functionOkInfoTable = platformTablesNextToCode platform &&
       isInfoTableLabel lbl && not (isConInfoTableLabel lbl)
 
 
 pprTypeDecl :: Platform -> CLabel -> SDoc
 pprTypeDecl platform lbl
     = if osElfTarget (platformOS platform) && externallyVisibleCLabel lbl
-      then
-        sdocWithDynFlags $ \df ->
-          text ".type " <> ppr lbl <> ptext (sLit  ", ") <> pprLabelType' df lbl
+      then text ".type " <> ppr lbl <> ptext (sLit  ", ") <> pprLabelType' platform lbl
       else empty
 
 pprLabel :: Platform -> CLabel -> SDoc

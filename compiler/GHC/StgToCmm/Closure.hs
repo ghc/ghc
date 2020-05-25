@@ -65,6 +65,7 @@ module GHC.StgToCmm.Closure (
 #include "HsVersions.h"
 
 import GHC.Prelude
+import GHC.Platform
 
 import GHC.Stg.Syntax
 import GHC.Runtime.Heap.Layout
@@ -511,7 +512,7 @@ getCallMethod dflags name id (LFReEntrant _ arity _ _) n_args _v_args _cg_loc
      -- See Note [Evaluating functions with profiling] in rts/Apply.cmm
   = ASSERT( arity /= 0 ) ReturnIt
   | n_args < arity = SlowCall        -- Not enough args
-  | otherwise      = DirectEntry (enterIdLabel dflags name (idCafInfo id)) arity
+  | otherwise      = DirectEntry (enterIdLabel (targetPlatform dflags) name (idCafInfo id)) arity
 
 getCallMethod _ _name _ LFUnlifted n_args _v_args _cg_loc _self_loop_info
   = ASSERT( n_args == 0 ) ReturnIt
@@ -781,10 +782,10 @@ staticClosureLabel = toClosureLbl .  closureInfoLabel
 closureSlowEntryLabel :: ClosureInfo -> CLabel
 closureSlowEntryLabel = toSlowEntryLbl . closureInfoLabel
 
-closureLocalEntryLabel :: DynFlags -> ClosureInfo -> CLabel
-closureLocalEntryLabel dflags
-  | tablesNextToCode dflags = toInfoLbl  . closureInfoLabel
-  | otherwise               = toEntryLbl . closureInfoLabel
+closureLocalEntryLabel :: Platform -> ClosureInfo -> CLabel
+closureLocalEntryLabel platform
+  | platformTablesNextToCode platform = toInfoLbl  . closureInfoLabel
+  | otherwise                         = toEntryLbl . closureInfoLabel
 
 mkClosureInfoTableLabel :: DynFlags -> Id -> LambdaFormInfo -> CLabel
 mkClosureInfoTableLabel dflags id lf_info
@@ -821,22 +822,26 @@ thunkEntryLabel dflags _thunk_id _ (ApThunk arity) upd_flag
 thunkEntryLabel dflags _thunk_id _ (SelectorThunk offset) upd_flag
   = enterSelectorLabel dflags upd_flag offset
 thunkEntryLabel dflags thunk_id c _ _
-  = enterIdLabel dflags thunk_id c
+  = enterIdLabel (targetPlatform dflags) thunk_id c
 
 enterApLabel :: DynFlags -> Bool -> Arity -> CLabel
 enterApLabel dflags is_updatable arity
-  | tablesNextToCode dflags = mkApInfoTableLabel dflags is_updatable arity
-  | otherwise               = mkApEntryLabel     dflags is_updatable arity
+  | platformTablesNextToCode platform = mkApInfoTableLabel dflags is_updatable arity
+  | otherwise                         = mkApEntryLabel     dflags is_updatable arity
+  where
+   platform = targetPlatform dflags
 
 enterSelectorLabel :: DynFlags -> Bool -> WordOff -> CLabel
 enterSelectorLabel dflags upd_flag offset
-  | tablesNextToCode dflags = mkSelectorInfoLabel  dflags upd_flag offset
-  | otherwise               = mkSelectorEntryLabel dflags upd_flag offset
+  | platformTablesNextToCode platform = mkSelectorInfoLabel  dflags upd_flag offset
+  | otherwise                         = mkSelectorEntryLabel dflags upd_flag offset
+  where
+   platform = targetPlatform dflags
 
-enterIdLabel :: DynFlags -> Name -> CafInfo -> CLabel
-enterIdLabel dflags id c
-  | tablesNextToCode dflags = mkInfoTableLabel id c
-  | otherwise               = mkEntryLabel id c
+enterIdLabel :: Platform -> Name -> CafInfo -> CLabel
+enterIdLabel platform id c
+  | platformTablesNextToCode platform = mkInfoTableLabel id c
+  | otherwise                         = mkEntryLabel id c
 
 
 --------------------------------------

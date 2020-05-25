@@ -78,7 +78,6 @@ initSettings top_dir = do
       getBooleanSetting key = either pgmError pure $
         getBooleanSetting0 settingsFile mySettings key
   targetPlatformString <- getSetting "target platform string"
-  tablesNextToCode <- getBooleanSetting "Tables next to code"
   myExtraGccViaCFlags <- getSetting "GCC extra via C opts"
   -- On Windows, mingw is distributed with GHC,
   -- so we look in TopDir/../mingw/bin,
@@ -220,7 +219,6 @@ initSettings top_dir = do
       , platformMisc_ghcWithNativeCodeGen = ghcWithNativeCodeGen
       , platformMisc_ghcWithSMP = ghcWithSMP
       , platformMisc_ghcRTSWays = ghcRTSWays
-      , platformMisc_tablesNextToCode = tablesNextToCode
       , platformMisc_libFFI = useLibFFI
       , platformMisc_ghcThreaded = ghcThreaded
       , platformMisc_ghcDebugged = ghcDebugged
