@@ -1,0 +1,22 @@
+:set -fobject-code
+:load A
+import Control.Concurrent
+import Control.Monad
+:{
+_ <- forkIO $ do
+       forM_ [0..3] (\i -> print (f (a * i)) >> threadDelay 1000000)
+       putStrLn "===== THREAD DONE ====="
+:}
+:l []
+System.Mem.performGC
+threadDelay 1000000
+System.Mem.performGC
+threadDelay 1000000
+System.Mem.performGC
+threadDelay 1000000
+System.Mem.performGC
+threadDelay 1000000
+System.Mem.performGC
+threadDelay 1000000
+System.Mem.performGC
+threadDelay 1000000
