@@ -691,7 +691,7 @@ mkGadtDecl :: [Located RdrName]
 mkGadtDecl names ty
   = (ConDeclGADT { con_g_ext  = noExtField
                  , con_names  = names
-                 , con_forall = L l $ isLHsForAllTy ty'
+                 , con_forall = lhas_forall
                  , con_qvars  = tvs
                  , con_mb_cxt = mcxt
                  , con_args   = args
@@ -699,9 +699,15 @@ mkGadtDecl names ty
                  , con_doc    = Nothing }
     , anns1 ++ anns2)
   where
-    (ty'@(L l _),anns1) = peel_parens ty []
-    (tvs, rho) = splitLHsForAllTyInvis ty'
+    (ty'@(L ty'_loc _),anns1) = peel_parens ty []
+    (L tvs_loc tvs, rho) = splitLHsForAllTyInvis ty'
     (mcxt, tau, anns2) = split_rho rho []
+
+    -- If there is an explicit `forall`, use the `forall`'s SrcSpan.
+    -- Otherwise, fall back to the outermost SrcSpan, which is the next-best
+    -- thing.
+    lhas_forall | isLHsForAllTy ty' = L tvs_loc True
+                | otherwise         = L ty'_loc False
 
     split_rho (L _ (HsQualTy { hst_ctxt = cxt, hst_body = tau })) ann
       = (Just cxt, tau, ann)

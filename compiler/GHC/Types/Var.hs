@@ -65,11 +65,10 @@ module GHC.Types.Var (
         -- * ArgFlags
         ArgFlag(Invisible,Required,Specified,Inferred),
         isVisibleArgFlag, isInvisibleArgFlag, sameVis,
-        AnonArgFlag(..), ForallVisFlag(..), argToForallVisFlag,
-        Specificity(..),
+        AnonArgFlag(..), Specificity(..),
 
         -- * TyVar's
-        VarBndr(..), TyCoVarBinder, TyVarBinder, InvisTVBinder,
+        VarBndr(..), TyCoVarBinder, TyVarBinder, InvisTVBinder, ReqTVBinder,
         binderVar, binderVars, binderArgFlag, binderType,
         mkTyCoVarBinder, mkTyCoVarBinders,
         mkTyVarBinder, mkTyVarBinders,
@@ -405,7 +404,6 @@ data ArgFlag = Invisible Specificity
   -- (<) on ArgFlag means "is less visible than"
 
 -- | Whether an 'Invisible' argument may appear in source Haskell.
--- see Note [Specificity in HsForAllTy] in GHC.Hs.Type
 data Specificity = InferredSpec
                    -- ^ the argument may not appear in source Haskell, it is
                    -- only inferred.
@@ -469,7 +467,6 @@ instance Binary ArgFlag where
 -- Appears here partly so that it's together with its friend ArgFlag,
 -- but also because it is used in IfaceType, rather early in the
 -- compilation chain
--- See Note [AnonArgFlag vs. ForallVisFlag]
 data AnonArgFlag
   = VisArg    -- ^ Used for @(->)@: an ordinary non-dependent arrow.
               --   The argument is visible in source code.
@@ -491,47 +488,6 @@ instance Binary AnonArgFlag where
       0 -> return VisArg
       _ -> return InvisArg
 
--- | Is a @forall@ invisible (e.g., @forall a b. {...}@, with a dot) or visible
--- (e.g., @forall a b -> {...}@, with an arrow)?
-
--- See Note [AnonArgFlag vs. ForallVisFlag]
-data ForallVisFlag
-  = ForallVis   -- ^ A visible @forall@ (with an arrow)
-  | ForallInvis -- ^ An invisible @forall@ (with a dot)
-  deriving (Eq, Ord, Data)
-
-instance Outputable ForallVisFlag where
-  ppr f = text $ case f of
-                   ForallVis   -> "ForallVis"
-                   ForallInvis -> "ForallInvis"
-
--- | Convert an 'ArgFlag' to its corresponding 'ForallVisFlag'.
-argToForallVisFlag :: ArgFlag -> ForallVisFlag
-argToForallVisFlag Required  = ForallVis
-argToForallVisFlag Specified = ForallInvis
-argToForallVisFlag Inferred  = ForallInvis
-
-{-
-Note [AnonArgFlag vs. ForallVisFlag]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The AnonArgFlag and ForallVisFlag data types are quite similar at a first
-glance:
-
-  data AnonArgFlag   = VisArg    | InvisArg
-  data ForallVisFlag = ForallVis | ForallInvis
-
-Both data types keep track of visibility of some sort. AnonArgFlag tracks
-whether a FunTy has a visible argument (->) or an invisible predicate argument
-(=>). ForallVisFlag tracks whether a `forall` quantifier is visible
-(forall a -> {...}) or invisible (forall a. {...}).
-
-Given their similarities, it's tempting to want to combine these two data types
-into one, but they actually represent distinct concepts. AnonArgFlag reflects a
-property of *Core* types, whereas ForallVisFlag reflects a property of the GHC
-AST. In other words, AnonArgFlag is all about internals, whereas ForallVisFlag
-is all about surface syntax. Therefore, they are kept as separate data types.
--}
-
 {- *********************************************************************
 *                                                                      *
 *                   VarBndr, TyCoVarBinder
@@ -541,13 +497,16 @@ is all about surface syntax. Therefore, they are kept as separate data types.
 -- Variable Binder
 --
 -- VarBndr is polymorphic in both var and visibility fields.
--- Currently there are six different uses of 'VarBndr':
+-- Currently there are nine different uses of 'VarBndr':
 --   * Var.TyVarBinder   = VarBndr TyVar ArgFlag
 --   * Var.TyCoVarBinder = VarBndr TyCoVar ArgFlag
+--   * Var.InvisTVBinder = VarBndr TyVar Specificity
+--   * Var.ReqTVBinder   = VarBndr TyVar ()
 --   * TyCon.TyConBinder     = VarBndr TyVar TyConBndrVis
 --   * TyCon.TyConTyCoBinder = VarBndr TyCoVar TyConBndrVis
---   * IfaceType.IfaceForAllBndr  = VarBndr IfaceBndr ArgFlag
---   * IfaceType.IfaceTyConBinder = VarBndr IfaceBndr TyConBndrVis
+--   * IfaceType.IfaceForAllBndr     = VarBndr IfaceBndr ArgFlag
+--   * IfaceType.IfaceTyConBinder    = VarBndr IfaceBndr TyConBndrVis
+--   * IfaceType.IfaceForAllSpecBndr = VarBndr IfaceBndr Specificity
 data VarBndr var argf = Bndr var argf
   deriving( Data )
 
@@ -561,6 +520,7 @@ data VarBndr var argf = Bndr var argf
 type TyCoVarBinder     = VarBndr TyCoVar ArgFlag
 type TyVarBinder       = VarBndr TyVar ArgFlag
 type InvisTVBinder     = VarBndr TyVar Specificity
+type ReqTVBinder       = VarBndr TyVar ()
 
 tyVarSpecToBinders :: [VarBndr a Specificity] -> [VarBndr a ArgFlag]
 tyVarSpecToBinders = map tyVarSpecToBinder

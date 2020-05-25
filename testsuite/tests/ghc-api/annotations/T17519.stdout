@@ -16,8 +16,8 @@
 ((Test17519.hs:5:1-36,AnnSemi), [Test17519.hs:7:1]),
 ((Test17519.hs:5:1-36,AnnType), [Test17519.hs:5:1-4]),
 ((Test17519.hs:5:1-36,AnnWhere), [Test17519.hs:5:38-42]),
-((Test17519.hs:5:23-36,AnnForallU), [Test17519.hs:5:23]),
-((Test17519.hs:5:23-36,AnnRarrowU), [Test17519.hs:5:27]),
+((Test17519.hs:5:23-27,AnnForallU), [Test17519.hs:5:23]),
+((Test17519.hs:5:23-27,AnnRarrowU), [Test17519.hs:5:27]),
 ((Test17519.hs:5:29,AnnRarrowU), [Test17519.hs:5:31]),
 ((Test17519.hs:5:29-36,AnnRarrowU), [Test17519.hs:5:31]),
 ((Test17519.hs:6:3-18,AnnEqual), [Test17519.hs:6:11])
