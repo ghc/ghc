@@ -366,60 +366,8 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
         ; return (ParPat x pat', res) }
 
   BangPat x pat -> do
-        { whenM (bang_is_redundant pat) warn_redundant_bang_pats
-        ; (pat', res) <- tc_lpat pat_ty penv pat thing_inside
+        { (pat', res) <- tc_lpat pat_ty penv pat thing_inside
         ; return (BangPat x pat', res) }
-        where
-        warn_redundant_bang_pats :: TcM ()
-        warn_redundant_bang_pats =
-          whenWOptM Opt_WarnRedundantBangPatterns
-                    (addWarnTc (Reason Opt_WarnRedundantBangPatterns)
-                                (text "Bang pattern is redundant"))
-
-        bang_is_redundant :: LPat GhcRn -> TcM Bool
-        bang_is_redundant lpat
-          -- Do not warn if bang is part of "bang-pattern binding"
-          -- Although, how do we check if this is "top level"? Hmm...
-          | PE{pe_ctxt=LetPat{}} <- penv
-          = return False
-          | otherwise = should_warn lpat
-          where
-            should_warn :: LPat GhcRn -> TcM Bool
-            should_warn (L _ pat) = case pat of
-              ConPat _ (L _ con_name) pats ->
-                do { con_like <- tcLookupConLike con_name
-                   ; case con_like of
-                       -- Only warn if DataCon is not a newtype!
-                       RealDataCon dataCon
-                         | isNewTyCon (dataConTyCon dataCon)
-                         , [pat] <- hsConPatArgs pats
-                         -> should_warn pat -- Treat !(N p) like !p
-                         | otherwise
-                         -> return True     -- Warn about !(K x y z)
-                       -- Always neglect to warn for PatSyns (for now)
-                       PatSynCon _ -> return False }
-              ListPat _ _     ->
-                -- do not bother if RebindableSyntax is ON
-                -- TODO: add test case
-                do { rebindableIsOn <- xoptM LangExt.RebindableSyntax
-                   ; return (if rebindableIsOn then False else True)}
-              VarPat _ _      ->
-                -- do warn for unlifted types
-                do { pat_ty <- readExpType pat_ty
-                   ; return (isUnliftedType pat_ty)}
-              ParPat _ p      -> should_warn p
-              AsPat _ _ p     -> should_warn p
-              SigPat _ p _    -> should_warn p
-              TuplePat _ _ _  -> return True
-              LitPat _ _      -> return True
-              BangPat _ _     -> return True
-              ViewPat _ _ _   -> return False
-              WildPat _       -> return False
-              LazyPat _ _     -> return False
-              SumPat _ _ _ _  -> return False
-              SplicePat _ _   -> return False
-              NPat _ _ _ _    -> return False
-              NPlusKPat _ _ _ _ _ _ -> return False
 
   LazyPat x pat -> do
         { mult_wrap <- checkManyPattern pat_ty
