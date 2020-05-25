@@ -201,9 +201,6 @@ typedef struct _ObjectCode {
     /* non-zero if the object file was mmap'd, otherwise malloc'd */
     int        imageMapped;
 
-    /* flag used when deciding whether to unload an object file */
-    int        referenced;
-
     /* record by how much image has been deliberately misaligned
        after allocation, so that we can use realloc */
     int        misalignment;
@@ -215,8 +212,30 @@ typedef struct _ObjectCode {
     int n_segments;
     Segment *segments;
 
-    /* Allow a chain of these things */
-    struct _ObjectCode * next;
+    //
+    // Garbage collection fields
+    //
+
+    // Next object in `objects` list
+    struct _ObjectCode *next;
+
+    // Previous object in `objects` list
+    struct _ObjectCode *prev;
+
+    // Next object in `loaded_objects` list
+    struct _ObjectCode *next_loaded_object;
+
+    // Mark bit
+    uint8_t mark;
+
+    // Set of dependencies of the object file. Keys are `ObjectCode*`s for
+    // dependencies, values are NULL. Traverse dependencies using
+    // `iterHashTable`.
+    HashTable *dependencies; // key = ObjectCode*, value = NULL
+
+    //
+    // End of garbage collection fields
+    //
 
     /* SANITY CHECK ONLY: a list of the only memory regions which may
        safely be prodded during relocation.  Any attempt to prod
@@ -259,12 +278,8 @@ typedef struct _ObjectCode {
       (OC)->fileName                            \
     )
 
-extern ObjectCode *objects;
-extern ObjectCode *unloaded_objects;
-
 #if defined(THREADED_RTS)
 extern Mutex linker_mutex;
-extern Mutex linker_unloaded_mutex;
 #endif
 
 /* Type of the initializer */
@@ -315,8 +330,9 @@ int ghciInsertSymbolTable(
     HsBool weak,
     ObjectCode *owner);
 
-/* lock-free version of lookupSymbol */
-SymbolAddr* lookupSymbol_ (SymbolName* lbl);
+/* Lock-free version of lookupSymbol. When 'dependent' is not NULL, adds it as a
+ * dependent to the owner of the symbol. */
+SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent);
 
 extern StrHashTable *symhash;
 

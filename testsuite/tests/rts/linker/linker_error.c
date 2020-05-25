@@ -57,7 +57,10 @@ int main (int argc, char *argv[])
         r = resolveObjs();
         if (!r) {
             debugBelch("resolveObjs failed\n");
+            // Mark the object as unloadable:
             unloadObj(obj);
+            // Actually unload it:
+            performMajorGC();
             continue;
         }
         errorBelch("loading succeeded");
