@@ -722,8 +722,7 @@ tcStandaloneDerivInstType ctxt
                   HsIB { hsib_ext = vars
                        , hsib_body
                            = L (getLoc deriv_ty_body) $
-                             HsForAllTy { hst_fvf = ForallInvis
-                                        , hst_bndrs = tvs
+                             HsForAllTy { hst_tele = mkHsForAllInvisTele tvs
                                         , hst_xforall = noExtField
                                         , hst_body  = rho }}
        let (tvs, _theta, cls, inst_tys) = tcSplitDFunTy dfun_ty

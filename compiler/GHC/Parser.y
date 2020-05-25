@@ -1890,9 +1890,16 @@ unpackedness :: { Located ([AddAnn], SourceText, SrcUnpackedness) }
         : '{-# UNPACK' '#-}'   { sLL $1 $> ([mo $1, mc $2], getUNPACK_PRAGs $1, SrcUnpack) }
         | '{-# NOUNPACK' '#-}' { sLL $1 $> ([mo $1, mc $2], getNOUNPACK_PRAGs $1, SrcNoUnpack) }
 
-forall_vis_flag :: { (AddAnn, ForallVisFlag) }
-        : '.'  { (mj AnnDot $1,    ForallInvis) }
-        | '->' { (mu AnnRarrow $1, ForallVis)   }
+forall_telescope :: { Located ([AddAnn], HsForAllTelescope GhcPs) }
+        : 'forall' tv_bndrs '.'  {% do { hintExplicitForall $1
+                                       ; pure $ sLL $1 $>
+                                           ( [mu AnnForall $1, mu AnnDot $3]
+                                           , mkHsForAllInvisTele $2 ) }}
+        | 'forall' tv_bndrs '->' {% do { hintExplicitForall $1
+                                       ; req_tvbs <- fromSpecTyVarBndrs $2
+                                       ; pure $ sLL $1 $> $
+                                           ( [mu AnnForall $1, mu AnnRarrow $3]
+                                           , mkHsForAllVisTele req_tvbs ) }}
 
 -- A ktype/ktypedoc is a ctype/ctypedoc, possibly with a kind annotation
 ktype :: { LHsType GhcPs }
@@ -1907,15 +1914,12 @@ ktypedoc :: { LHsType GhcPs }
 
 -- A ctype is a for-all type
 ctype   :: { LHsType GhcPs }
-        : 'forall' tv_bndrs forall_vis_flag ctype
-                                        {% let (fv_ann, fv_flag) = $3 in
-                                           hintExplicitForall $1 *>
-                                           ams (sLL $1 $> $
-                                                HsForAllTy { hst_fvf = fv_flag
-                                                           , hst_bndrs = $2
-                                                           , hst_xforall = noExtField
-                                                           , hst_body = $4 })
-                                               [mu AnnForall $1,fv_ann] }
+        : forall_telescope ctype      {% let (forall_anns, forall_tele) = unLoc $1 in
+                                         ams (sLL $1 $> $
+                                              HsForAllTy { hst_tele = forall_tele
+                                                         , hst_xforall = noExtField
+                                                         , hst_body = $2 })
+                                             forall_anns }
         | context '=>' ctype          {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
                                          >> return (sLL $1 $> $
                                             HsQualTy { hst_ctxt = $1
@@ -1937,15 +1941,12 @@ ctype   :: { LHsType GhcPs }
 -- to 'field' or to 'Int'. So we must use `ctype` to describe the type.
 
 ctypedoc :: { LHsType GhcPs }
-        : 'forall' tv_bndrs forall_vis_flag ctypedoc
-                                         {% let (fv_ann, fv_flag) = $3 in
-                                            hintExplicitForall $1 *>
-                                            ams (sLL $1 $> $
-                                                 HsForAllTy { hst_fvf = fv_flag
-                                                            , hst_bndrs = $2
-                                                            , hst_xforall = noExtField
-                                                            , hst_body = $4 })
-                                                [mu AnnForall $1,fv_ann] }
+        : forall_telescope ctypedoc   {% let (forall_anns, forall_tele) = unLoc $1 in
+                                         ams (sLL $1 $> $
+                                              HsForAllTy { hst_tele = forall_tele
+                                                         , hst_xforall = noExtField
+                                                         , hst_body = $2 })
+                                             forall_anns }
         | context '=>' ctypedoc       {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
                                          >> return (sLL $1 $> $
                                             HsQualTy { hst_ctxt = $1

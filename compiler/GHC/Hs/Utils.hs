@@ -694,11 +694,17 @@ typeToLHsType ty
                                       , hst_body = go tau })
 
     go ty@(ForAllTy (Bndr _ argf) _)
-      | (tvs, tau) <- tcSplitForAllTysSameVis argf ty
-      = noLoc (HsForAllTy { hst_fvf = argToForallVisFlag argf
-                          , hst_bndrs = map go_tv tvs
+      = noLoc (HsForAllTy { hst_tele = tele
                           , hst_xforall = noExtField
                           , hst_body = go tau })
+      where
+        (tele, tau)
+          | isVisibleArgFlag argf
+          = let (req_tvbs, tau') = tcSplitForAllTysReq ty in
+            (mkHsForAllVisTele (map go_tv req_tvbs), tau')
+          | otherwise
+          = let (inv_tvbs, tau') = tcSplitForAllTysInvis ty in
+            (mkHsForAllInvisTele (map go_tv inv_tvbs), tau')
     go (TyVarTy tv)         = nlHsTyVar (getRdrName tv)
     go (LitTy (NumTyLit n))
       = noLoc $ HsTyLit noExtField (HsNumTy NoSourceText n)
@@ -723,7 +729,7 @@ typeToLHsType ty
         args :: [Type]
         (head, args) = splitAppTys ty
     go (CastTy ty _)        = go ty
-    go (CoercionTy co)      = pprPanic "toLHsSigWcType" (ppr co)
+    go (CoercionTy co)      = pprPanic "typeToLHsType" (ppr co)
 
          -- Source-language types have _invisible_ kind arguments,
          -- so we must remove them here (#8563)
@@ -743,14 +749,9 @@ typeToLHsType ty
                  Required  -> f `nlHsAppTy`     arg')
              head (zip args arg_flags)
 
-    argf_to_spec :: ArgFlag -> Specificity
-    argf_to_spec Required      = SpecifiedSpec
-    -- see Note [Specificity in HsForAllTy] in GHC.Hs.Type
-    argf_to_spec (Invisible s) = s
-
-    go_tv :: TyVarBinder -> LHsTyVarBndr Specificity GhcPs
-    go_tv (Bndr tv argf) = noLoc $ KindedTyVar noExtField
-                                               (argf_to_spec argf)
+    go_tv :: VarBndr TyVar flag -> LHsTyVarBndr flag GhcPs
+    go_tv (Bndr tv flag) = noLoc $ KindedTyVar noExtField
+                                               flag
                                                (noLoc (getRdrName tv))
                                                (go (tyVarKind tv))
 
