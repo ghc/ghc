@@ -307,7 +307,7 @@ mkRhsClosure    dflags bndr _cc
   , all (isGcPtrRep . idPrimRep . fromNonVoid) fvs
   , isUpdatable upd_flag
   , n_fvs <= mAX_SPEC_AP_SIZE dflags
-  , not (gopt Opt_SccProfilingOn dflags)
+  , not (sccProfilingEnabled dflags)
                          -- not when profiling: we don't want to
                          -- lose information about this particular
                          -- thunk (e.g. its type) (#949)
@@ -626,7 +626,7 @@ emitBlackHoleCode node = do
   -- Note the eager-blackholing check is here rather than in blackHoleOnEntry,
   -- because emitBlackHoleCode is called from GHC.Cmm.Parser.
 
-  let  eager_blackholing =  not (gopt Opt_SccProfilingOn dflags)
+  let  eager_blackholing =  not (sccProfilingEnabled dflags)
                          && gopt Opt_EagerBlackHoling dflags
              -- Profiling needs slop filling (to support LDV
              -- profiling), so currently eager blackholing doesn't
@@ -655,7 +655,7 @@ setupUpdate closure_info node body
           dflags <- getDynFlags
           let
               bh = blackHoleOnEntry closure_info &&
-                   not (gopt Opt_SccProfilingOn dflags) &&
+                   not (sccProfilingEnabled dflags) &&
                    gopt Opt_EagerBlackHoling dflags
 
               lbl | bh        = mkBHUpdInfoLabel
