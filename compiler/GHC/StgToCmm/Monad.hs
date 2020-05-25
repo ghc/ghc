@@ -772,7 +772,6 @@ emitProc mb_info lbl live blocks offset do_layout
                     | otherwise            = mapEmpty
 
               sinfo = StackInfo { arg_space = offset
-                                , updfr_space = Just (initUpdFrameOff platform)
                                 , do_layout = do_layout }
 
               tinfo = TopInfo { info_tbls = infos
