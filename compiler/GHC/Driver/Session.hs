@@ -132,7 +132,6 @@ module GHC.Driver.Session (
         sGhcWithNativeCodeGen,
         sGhcWithSMP,
         sGhcRTSWays,
-        sTablesNextToCode,
         sLibFFI,
         sGhcThreaded,
         sGhcDebugged,
@@ -151,7 +150,6 @@ module GHC.Driver.Session (
         opt_L, opt_P, opt_F, opt_c, opt_cxx, opt_a, opt_l, opt_i,
         opt_P_signature,
         opt_windres, opt_lo, opt_lc, opt_lcc,
-        tablesNextToCode,
 
         -- ** Manipulating DynFlags
         addPluginModuleName,
@@ -992,9 +990,6 @@ opt_lc                :: DynFlags -> [String]
 opt_lc dflags= toolSettings_opt_lc $ toolSettings dflags
 opt_i                 :: DynFlags -> [String]
 opt_i dflags= toolSettings_opt_i $ toolSettings dflags
-
-tablesNextToCode :: DynFlags -> Bool
-tablesNextToCode = platformMisc_tablesNextToCode . platformMisc
 
 -- | The directory for this version of ghc in the user's app directory
 -- (typically something like @~/.ghc/x86_64-linux-7.6.3@)

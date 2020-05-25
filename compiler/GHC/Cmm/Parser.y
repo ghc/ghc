@@ -909,17 +909,18 @@ exprOp name args_code = do
 
 exprMacros :: DynFlags -> UniqFM ([CmmExpr] -> CmmExpr)
 exprMacros dflags = listToUFM [
-  ( fsLit "ENTRY_CODE",   \ [x] -> entryCode dflags x ),
+  ( fsLit "ENTRY_CODE",   \ [x] -> entryCode platform x ),
   ( fsLit "INFO_PTR",     \ [x] -> closureInfoPtr dflags x ),
   ( fsLit "STD_INFO",     \ [x] -> infoTable dflags x ),
   ( fsLit "FUN_INFO",     \ [x] -> funInfoTable dflags x ),
-  ( fsLit "GET_ENTRY",    \ [x] -> entryCode dflags (closureInfoPtr dflags x) ),
+  ( fsLit "GET_ENTRY",    \ [x] -> entryCode platform (closureInfoPtr dflags x) ),
   ( fsLit "GET_STD_INFO", \ [x] -> infoTable dflags (closureInfoPtr dflags x) ),
   ( fsLit "GET_FUN_INFO", \ [x] -> funInfoTable dflags (closureInfoPtr dflags x) ),
   ( fsLit "INFO_TYPE",    \ [x] -> infoTableClosureType dflags x ),
   ( fsLit "INFO_PTRS",    \ [x] -> infoTablePtrs dflags x ),
   ( fsLit "INFO_NPTRS",   \ [x] -> infoTableNonPtrs dflags x )
   ]
+  where platform = targetPlatform dflags
 
 -- we understand a subset of C-- primitives:
 machOps = listToUFM $
@@ -1213,7 +1214,7 @@ doReturn exprs_code = do
 mkReturnSimple  :: DynFlags -> [CmmActual] -> UpdFrameOffset -> CmmAGraph
 mkReturnSimple dflags actuals updfr_off =
   mkReturn dflags e actuals updfr_off
-  where e = entryCode dflags (CmmLoad (CmmStackSlot Old updfr_off)
+  where e = entryCode platform (CmmLoad (CmmStackSlot Old updfr_off)
                              (gcWord platform))
         platform = targetPlatform dflags
 
