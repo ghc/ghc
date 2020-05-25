@@ -319,3 +319,8 @@ test('T17810', normal, multimod_compile, ['T17810', '-fspecialise-aggressively -
 test('T18013', normal, multimod_compile, ['T18013', '-v0 -O'])
 test('T18098', normal, compile, ['-dcore-lint -O2'])
 test('T18120', normal, compile, ['-dcore-lint -O'])
+
+# Verify that there are only two top-level functions (the rec group of m's cast
+# WW worker m1). Ideally, it would be one, but we fail to inline dead-ending
+# recursive groups due to Note [Bottoming floats].
+test('T18231', [ only_ways(['optasm']), grep_errmsg(r'^[\w\.]+ ::.*->.*') ], compile, ['-ddump-simpl -dsuppress-idinfo -dppr-cols=99999 -dsuppress-uniques'])

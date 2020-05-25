@@ -952,6 +952,9 @@ Tiresomely, though, the simplifier has an invariant that the manifest
 arity of the RHS should be the same as the arity; but we can't call
 etaExpand during GHC.Core.Opt.SetLevels because it works over a decorated form of
 CoreExpr.  So we do the eta expansion later, in GHC.Core.Opt.FloatOut.
+But we should only eta-expand if the RHS doesn't already have the right
+exprArity, otherwise we get unnecessary top-level bindings if the RHS was
+trivial after the next run of the Simplifier.
 
 Note [Case MFEs]
 ~~~~~~~~~~~~~~~~

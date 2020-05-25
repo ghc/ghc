@@ -15,7 +15,7 @@ import GHC.Prelude
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Make
-import GHC.Core.Opt.Arity    ( etaExpand )
+import GHC.Core.Opt.Arity ( exprArity, etaExpand )
 import GHC.Core.Opt.Monad ( FloatOutSwitches(..) )
 
 import GHC.Driver.Session
@@ -221,8 +221,9 @@ floatBind (NonRec (TB var _) rhs)
 
         -- A tiresome hack:
         -- see Note [Bottoming floats: eta expansion] in GHC.Core.Opt.SetLevels
-    let rhs'' | isDeadEndId var   = etaExpand (idArity var) rhs'
-              | otherwise         = rhs'
+    let rhs'' | isDeadEndId var
+              , exprArity rhs' < idArity var = etaExpand (idArity var) rhs'
+              | otherwise                    = rhs'
 
     in (fs, rhs_floats, [NonRec var rhs'']) }
 
