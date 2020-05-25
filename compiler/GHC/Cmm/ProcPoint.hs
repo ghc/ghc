@@ -315,10 +315,12 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
                   -- when jumping to a PP that has an info table, if
                   -- tablesNextToCode is off we must jump to the entry
                   -- label instead.
+                  platform         = targetPlatform dflags
+                  tablesNextToCode = platformTablesNextToCode platform
                   jump_label (Just info_lbl) _
-                             | tablesNextToCode dflags = info_lbl
-                             | otherwise               = toEntryLbl info_lbl
-                  jump_label Nothing         block_lbl = block_lbl
+                             | tablesNextToCode = info_lbl
+                             | otherwise        = toEntryLbl info_lbl
+                  jump_label Nothing  block_lbl = block_lbl
 
                   add_if_pp id rst = case mapLookup id procLabels of
                                        Just (lbl, mb_info_lbl) -> (id, jump_label mb_info_lbl lbl) : rst

@@ -86,7 +86,7 @@ emitReturn results
            Return ->
              do { adjustHpBackwards
                 ; let e = CmmLoad (CmmStackSlot Old updfr_off) (gcWord platform)
-                ; emit (mkReturn dflags (entryCode dflags e) results updfr_off)
+                ; emit (mkReturn dflags (entryCode platform e) results updfr_off)
                 }
            AssignTo regs adjust ->
              do { when adjust adjustHpBackwards
@@ -222,7 +222,7 @@ slowCall fun stg_args
 
              fast_code <- getCode $
                 emitCall (NativeNodeCall, NativeReturn)
-                  (entryCode dflags fun_iptr)
+                  (entryCode platform fun_iptr)
                   (nonVArgs ((P,Just funv):argsreps))
 
              slow_lbl <- newBlockId

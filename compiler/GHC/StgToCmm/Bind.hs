@@ -552,7 +552,7 @@ mkSlowEntryCode bndr cl_info arg_regs -- function closure is already in `Node'
        platform <- getPlatform
        let node = idToReg platform (NonVoid bndr)
            slow_lbl = closureSlowEntryLabel  cl_info
-           fast_lbl = closureLocalEntryLabel dflags cl_info
+           fast_lbl = closureLocalEntryLabel platform cl_info
            -- mkDirectJump does not clobber `Node' containing function closure
            jump = mkJump dflags NativeNodeCall
                                 (mkLblExpr fast_lbl)
@@ -727,7 +727,7 @@ link_caf node = do
 
   -- see Note [atomic CAF entry] in rts/sm/Storage.c
   ; updfr  <- getUpdFrameOff
-  ; let target = entryCode dflags (closureInfoPtr dflags (CmmReg (CmmLocal node)))
+  ; let target = entryCode platform (closureInfoPtr dflags (CmmReg (CmmLocal node)))
   ; emit =<< mkCmmIfThen
       (cmmEqWord platform (CmmReg (CmmLocal bh)) (zeroExpr platform))
         -- re-enter the CAF
