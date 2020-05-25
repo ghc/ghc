@@ -11,6 +11,7 @@ module GHC.ByteCode.InfoTable ( mkITbls ) where
 
 import GHC.Prelude
 
+import GHC.Platform
 import GHC.ByteCode.Types
 import GHC.Runtime.Interpreter
 import GHC.Driver.Session
@@ -71,7 +72,8 @@ make_constr_itbls hsc_env cons =
 
          descr = dataConIdentity dcon
 
-         tables_next_to_code = tablesNextToCode dflags
+         platform = targetPlatform dflags
+         tables_next_to_code = platformTablesNextToCode platform
 
      r <- iservCmd hsc_env (MkConInfoTable tables_next_to_code ptrs' nptrs_really
                               conNo (tagForCon dflags dcon) descr)
