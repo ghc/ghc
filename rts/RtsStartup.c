@@ -575,8 +575,6 @@ hs_exit_(bool wait_foreign)
    if (is_io_mng_native_p())
       hs_restoreConsoleCP();
 #endif
-    /* free hash table storage */
-    exitHashTable();
 
     // Finally, free all our storage.  However, we only free the heap
     // memory if we have waited for foreign calls to complete;
