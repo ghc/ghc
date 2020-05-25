@@ -185,6 +185,7 @@
 #include "RtsUtils.h"
 #include "RtsSymbolInfo.h"
 #include "GetEnv.h"
+#include "CheckUnload.h"
 #include "linker/PEi386.h"
 #include "linker/PEi386Types.h"
 #include "LinkerInternals.h"
@@ -1885,7 +1886,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
          } else {
             copyName ( getSymShortName (info, sym), oc, symbol,
                        sizeof(symbol)-1 );
-            S = (size_t) lookupSymbol_( (char*)symbol );
+            S = (size_t) lookupDependentSymbol( (char*)symbol, oc );
             if ((void*)S == NULL) {
                 errorBelch(" | %" PATH_FMT ": unknown symbol `%s'", oc->fileName, symbol);
                 releaseOcInfo (oc);
