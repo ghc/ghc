@@ -1474,19 +1474,19 @@ cvtTypeKind ty_str ty
                    ; cxt' <- cvtContext funPrec cxt
                    ; ty'  <- cvtType ty
                    ; loc <- getL
-                   ; let hs_ty  = mkHsForAllTy loc ForallInvis tvs' rho_ty
+                   ; let tele   = mkHsForAllInvisTele tvs'
+                         hs_ty  = mkHsForAllTy loc tele rho_ty
                          rho_ty = mkHsQualTy cxt loc cxt' ty'
 
                    ; return hs_ty }
 
            ForallVisT tvs ty
              | null tys'
-             -> do { let tvs_spec = map (TH.SpecifiedSpec <$) tvs
-                   -- see Note [Specificity in HsForAllTy] in GHC.Hs.Type
-                   ; tvs_spec' <- cvtTvs tvs_spec
-                   ; ty'       <- cvtType ty
-                   ; loc       <- getL
-                   ; pure $ mkHsForAllTy loc ForallVis tvs_spec' ty' }
+             -> do { tvs' <- cvtTvs tvs
+                   ; ty'  <- cvtType ty
+                   ; loc  <- getL
+                   ; let tele = mkHsForAllVisTele tvs'
+                   ; pure $ mkHsForAllTy loc tele ty' }
 
            SigT ty ki
              -> do { ty' <- cvtType ty
@@ -1726,8 +1726,7 @@ cvtPatSynSigTy (ForallT univs reqs (ForallT exis provs ty))
                                ; univs' <- cvtTvs univs
                                ; ty'    <- cvtType (ForallT exis provs ty)
                                ; let forTy = HsForAllTy
-                                              { hst_fvf = ForallInvis
-                                              , hst_bndrs = univs'
+                                              { hst_tele = mkHsForAllInvisTele univs'
                                               , hst_xforall = noExtField
                                               , hst_body = L l cxtTy }
                                      cxtTy = HsQualTy { hst_ctxt = L l []
@@ -1779,21 +1778,21 @@ unboxedSumChecks alt arity
 mkHsForAllTy :: SrcSpan
              -- ^ The location of the returned 'LHsType' if it needs an
              --   explicit forall
-             -> ForallVisFlag
-             -- ^ Whether this is @forall@ is visible (e.g., @forall a ->@)
-             --   or invisible (e.g., @forall a.@)
-             -> [LHsTyVarBndr Hs.Specificity GhcPs]
+             -> HsForAllTelescope GhcPs
              -- ^ The converted type variable binders
              -> LHsType GhcPs
              -- ^ The converted rho type
              -> LHsType GhcPs
              -- ^ The complete type, quantified with a forall if necessary
-mkHsForAllTy loc fvf tvs rho_ty
-  | null tvs  = rho_ty
-  | otherwise = L loc $ HsForAllTy { hst_fvf = fvf
-                                   , hst_bndrs = tvs
+mkHsForAllTy loc tele rho_ty
+  | no_tvs    = rho_ty
+  | otherwise = L loc $ HsForAllTy { hst_tele = tele
                                    , hst_xforall = noExtField
                                    , hst_body = rho_ty }
+  where
+    no_tvs = case tele of
+      HsForAllVis   { hsf_vis_bndrs   = bndrs } -> null bndrs
+      HsForAllInvis { hsf_invis_bndrs = bndrs } -> null bndrs
 
 -- | If passed an empty 'TH.Cxt', this simply returns the third argument
 -- (an 'LHsType'). Otherwise, return an 'HsQualTy' using the provided

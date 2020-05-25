@@ -23,6 +23,7 @@ module GHC.Rename.HsType (
         checkPrecMatch, checkSectionPrec,
 
         -- Binding related stuff
+        bindHsForAllTelescope,
         bindLHsTyVarBndr, bindLHsTyVarBndrs, rnImplicitBndrs,
         bindSigTyVarsFV, bindHsQTyVars, bindLRdrNames,
         extractHsTyRdrTyVars, extractHsTyRdrTyVarsKindVars,
@@ -203,12 +204,11 @@ rnWcBody ctxt nwc_rdrs hs_ty
 
     rn_ty :: RnTyKiEnv -> HsType GhcPs -> RnM (HsType GhcRn, FreeVars)
     -- A lot of faff just to allow the extra-constraints wildcard to appear
-    rn_ty env hs_ty@(HsForAllTy { hst_fvf = fvf, hst_bndrs = tvs
-                                , hst_body = hs_body })
-      = bindLHsTyVarBndrs (rtke_ctxt env) (Just $ inTypeDoc hs_ty) Nothing tvs $ \ tvs' ->
+    rn_ty env hs_ty@(HsForAllTy { hst_tele = tele, hst_body = hs_body })
+      = bindHsForAllTelescope (rtke_ctxt env) (Just $ inTypeDoc hs_ty) tele $ \ tele' ->
         do { (hs_body', fvs) <- rn_lty env hs_body
-           ; return (HsForAllTy { hst_fvf = fvf, hst_xforall = noExtField
-                                , hst_bndrs = tvs', hst_body = hs_body' }
+           ; return (HsForAllTy { hst_xforall = noExtField
+                                , hst_tele = tele', hst_body = hs_body' }
                     , fvs) }
 
     rn_ty env (HsQualTy { hst_ctxt = L cx hs_ctxt
@@ -401,9 +401,10 @@ check_inferred_vars ctxt (Just msg) ty =
   where
     forallty_bndrs :: LHsType GhcPs -> [HsTyVarBndr Specificity GhcPs]
     forallty_bndrs (L _ ty) = case ty of
-      HsParTy _ ty'                  -> forallty_bndrs ty'
-      HsForAllTy { hst_bndrs = tvs } -> map unLoc tvs
-      _                              -> []
+      HsParTy _ ty' -> forallty_bndrs ty'
+      HsForAllTy { hst_tele = HsForAllInvis { hsf_invis_bndrs = tvs }}
+                    -> map unLoc tvs
+      _             -> []
 
 {- ******************************************************
 *                                                       *
@@ -531,14 +532,13 @@ rnLHsTyKi env (L loc ty)
 
 rnHsTyKi :: RnTyKiEnv -> HsType GhcPs -> RnM (HsType GhcRn, FreeVars)
 
-rnHsTyKi env ty@(HsForAllTy { hst_fvf = fvf, hst_bndrs = tyvars
-                            , hst_body = tau })
+rnHsTyKi env ty@(HsForAllTy { hst_tele = tele, hst_body = tau })
   = do { checkPolyKinds env ty
-       ; bindLHsTyVarBndrs (rtke_ctxt env) (Just $ inTypeDoc ty)
-                           Nothing tyvars $ \ tyvars' ->
+       ; bindHsForAllTelescope (rtke_ctxt env) (Just $ inTypeDoc ty)
+                               tele $ \ tele' ->
     do { (tau',  fvs) <- rnLHsTyKi env tau
-       ; return ( HsForAllTy { hst_fvf = fvf, hst_xforall = noExtField
-                             , hst_bndrs = tyvars' , hst_body =  tau' }
+       ; return ( HsForAllTy { hst_xforall = noExtField
+                             , hst_tele = tele' , hst_body =  tau' }
                 , fvs) } }
 
 rnHsTyKi env ty@(HsQualTy { hst_ctxt = lctxt, hst_body = tau })
@@ -991,6 +991,21 @@ So tvs is {k,a} and kvs is {k}.
 
 NB: we do this only at the binding site of 'tvs'.
 -}
+
+bindHsForAllTelescope :: HsDocContext
+                      -> Maybe SDoc -- Just d => check for unused tvs
+                                    --   d is a phrase like "in the type ..."
+                      -> HsForAllTelescope GhcPs
+                      -> (HsForAllTelescope GhcRn -> RnM (a, FreeVars))
+                      -> RnM (a, FreeVars)
+bindHsForAllTelescope doc mb_in_doc tele thing_inside =
+  case tele of
+    HsForAllVis { hsf_vis_bndrs = bndrs } ->
+      bindLHsTyVarBndrs doc mb_in_doc Nothing bndrs $ \bndrs' ->
+        thing_inside $ mkHsForAllVisTele bndrs'
+    HsForAllInvis { hsf_invis_bndrs = bndrs } ->
+      bindLHsTyVarBndrs doc mb_in_doc Nothing bndrs $ \bndrs' ->
+        thing_inside $ mkHsForAllInvisTele bndrs'
 
 bindLHsTyVarBndrs :: (OutputableBndrFlag flag)
                   => HsDocContext
@@ -1773,8 +1788,8 @@ extract_lty (L _ ty) acc
       HsStarTy _ _                -> acc
       HsKindSig _ ty ki           -> extract_lty ty $
                                      extract_lty ki acc
-      HsForAllTy { hst_bndrs = tvs, hst_body = ty }
-                                  -> extract_hs_tv_bndrs tvs acc $
+      HsForAllTy { hst_tele = tele, hst_body = ty }
+                                  -> extract_hs_for_all_telescope tele acc $
                                      extract_lty ty []
       HsQualTy { hst_ctxt = ctxt, hst_body = ty }
                                   -> extract_lctxt ctxt $
@@ -1782,6 +1797,17 @@ extract_lty (L _ ty) acc
       XHsType {}                  -> acc
       -- We deal with these separately in rnLHsTypeWithWildCards
       HsWildCardTy {}             -> acc
+
+extract_hs_for_all_telescope :: HsForAllTelescope GhcPs
+                             -> FreeKiTyVarsWithDups -- Accumulator
+                             -> FreeKiTyVarsWithDups -- Free in body
+                             -> FreeKiTyVarsWithDups
+extract_hs_for_all_telescope tele acc_vars body_fvs =
+  case tele of
+    HsForAllVis { hsf_vis_bndrs = bndrs } ->
+      extract_hs_tv_bndrs bndrs acc_vars body_fvs
+    HsForAllInvis { hsf_invis_bndrs = bndrs } ->
+      extract_hs_tv_bndrs bndrs acc_vars body_fvs
 
 extractHsTvBndrs :: [LHsTyVarBndr flag GhcPs]
                  -> FreeKiTyVarsWithDups           -- Free in body
