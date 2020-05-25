@@ -1153,10 +1153,7 @@ unload_wkr hsc_env keep_linkables pls@PersistentLinkerState{..}  = do
         -- dynamic linker.  Doing so introduces extra complexity for
         -- not much benefit.
 
-      -- Code unloading currently disabled due to instability.
-      -- See #16841.
-      -- id False, so that the pattern-match checker doesn't complain
-      | id False -- otherwise
+      | otherwise
       = mapM_ (unloadObj hsc_env) [f | DotO f <- linkableUnlinked lnk]
                 -- The components of a BCO linkable may contain
                 -- dot-o files.  Which is very confusing.
@@ -1164,7 +1161,6 @@ unload_wkr hsc_env keep_linkables pls@PersistentLinkerState{..}  = do
                 -- But the BCO parts can be unlinked just by
                 -- letting go of them (plus of course depopulating
                 -- the symbol table which is done in the main body)
-      | otherwise = return () -- see #16841
 
 {- **********************************************************************
 
