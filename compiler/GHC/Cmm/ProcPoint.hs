@@ -356,7 +356,6 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
                  g' = replacePPIds g
                  live = ppLiveness (g_entry g')
                  stack_info = StackInfo { arg_space = 0
-                                        , updfr_space =  Nothing
                                         , do_layout = True }
                                -- cannot use panic, this is printed by -ddump-cmm
 
