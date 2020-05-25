@@ -21,8 +21,8 @@ module GHC.Tc.Utils.TcType (
   -- Types
   TcType, TcSigmaType, TcRhoType, TcTauType, TcPredType, TcThetaType,
   TcTyVar, TcTyVarSet, TcDTyVarSet, TcTyCoVarSet, TcDTyCoVarSet,
-  TcKind, TcCoVar, TcTyCoVar, TcTyVarBinder, TcInvisTVBinder, TcTyCon,
-  KnotTied,
+  TcKind, TcCoVar, TcTyCoVar, TcTyVarBinder, TcInvisTVBinder, TcReqTVBinder,
+  TcTyCon, KnotTied,
 
   ExpType(..), InferResult(..), ExpSigmaType, ExpRhoType, mkCheckExpType,
 
@@ -57,7 +57,8 @@ module GHC.Tc.Utils.TcType (
   -- These are important because they do not look through newtypes
   getTyVar,
   tcSplitForAllTy_maybe,
-  tcSplitForAllTys, tcSplitForAllTysSameVis,
+  tcSplitForAllTys, tcSplitSomeForAllTys,
+  tcSplitForAllTysReq, tcSplitForAllTysInvis,
   tcSplitPiTys, tcSplitPiTy_maybe, tcSplitForAllVarBndrs,
   tcSplitPhiTy, tcSplitPredFunTy_maybe,
   tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy, tcFunResultTyN,
@@ -128,7 +129,7 @@ module GHC.Tc.Utils.TcType (
   --------------------------------
   -- Reexported from Type
   Type, PredType, ThetaType, TyCoBinder,
-  ArgFlag(..), AnonArgFlag(..), ForallVisFlag(..),
+  ArgFlag(..), AnonArgFlag(..),
 
   mkForAllTy, mkForAllTys, mkInvisForAllTys, mkTyCoInvForAllTys,
   mkSpecForAllTys, mkTyCoInvForAllTy,
@@ -340,6 +341,7 @@ type TcTyCoVar = Var    -- Either a TcTyVar or a CoVar
 
 type TcTyVarBinder     = TyVarBinder
 type TcInvisTVBinder   = InvisTVBinder
+type TcReqTVBinder     = ReqTVBinder
 type TcTyCon           = TyCon   -- these can be the TcTyCon constructor
 
 -- These types do not have boxy type variables in them
@@ -1212,14 +1214,25 @@ tcSplitForAllTys ty
   = ASSERT( all isTyVar (fst sty) ) sty
   where sty = splitForAllTys ty
 
--- | Like 'tcSplitForAllTys', but only splits a 'ForAllTy' if
--- @'sameVis' argf supplied_argf@ is 'True', where @argf@ is the visibility
--- of the @ForAllTy@'s binder and @supplied_argf@ is the visibility provided
--- as an argument to this function.
--- All split tyvars are annotated with their argf.
-tcSplitForAllTysSameVis :: ArgFlag -> Type -> ([TyVarBinder], Type)
-tcSplitForAllTysSameVis supplied_argf ty = ASSERT( all (isTyVar . binderVar) (fst sty) ) sty
-  where sty = splitForAllTysSameVis supplied_argf ty
+-- | Like 'tcSplitForAllTys', but only splits a 'ForAllTy' if @argf_pred argf@
+-- is 'True', where @argf@ is the visibility of the @ForAllTy@'s binder and
+-- @argf_pred@ is a predicate over visibilities provided as an argument to this
+-- function. All split tyvars are annotated with their @argf@.
+tcSplitSomeForAllTys :: (ArgFlag -> Bool) -> Type -> ([TyCoVarBinder], Type)
+tcSplitSomeForAllTys argf_pred ty = ASSERT( all (isTyVar . binderVar) (fst sty) ) sty
+  where sty = splitSomeForAllTys argf_pred ty
+
+-- | Like 'tcSplitForAllTys', but only splits 'ForAllTy's with 'Required' type
+-- variable binders. All split tyvars are annotated with '()'.
+tcSplitForAllTysReq :: Type -> ([TcReqTVBinder], Type)
+tcSplitForAllTysReq ty = ASSERT( all (isTyVar . binderVar) (fst sty) ) sty
+  where sty = splitForAllTysReq ty
+
+-- | Like 'tcSplitForAllTys', but only splits 'ForAllTy's with 'Invisible' type
+-- variable binders. All split tyvars are annotated with their 'Specificity'.
+tcSplitForAllTysInvis :: Type -> ([TcInvisTVBinder], Type)
+tcSplitForAllTysInvis ty = ASSERT( all (isTyVar . binderVar) (fst sty) ) sty
+  where sty = splitForAllTysInvis ty
 
 -- | Like 'tcSplitForAllTys', but splits off only named binders.
 tcSplitForAllVarBndrs :: Type -> ([TyVarBinder], Type)

@@ -716,6 +716,12 @@ type family XXType           x
 
 -- ---------------------------------------------------------------------
 
+type family XHsForAllVis        x
+type family XHsForAllInvis      x
+type family XXHsForAllTelescope x
+
+-- ---------------------------------------------------------------------
+
 type family XUserTyVar   x
 type family XKindedTyVar x
 type family XXTyVarBndr  x

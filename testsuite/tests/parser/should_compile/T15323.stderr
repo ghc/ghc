@@ -44,14 +44,15 @@
             ({ T15323.hs:6:20-54 }
              (HsForAllTy
               (NoExtField)
-              (ForallInvis)
-              [({ T15323.hs:6:27 }
-                (UserTyVar
-                 (NoExtField)
-                 (SpecifiedSpec)
-                 ({ T15323.hs:6:27 }
-                  (Unqual
-                   {OccName: v}))))]
+              (HsForAllInvis
+               (NoExtField)
+               [({ T15323.hs:6:27 }
+                 (UserTyVar
+                  (NoExtField)
+                  (SpecifiedSpec)
+                  ({ T15323.hs:6:27 }
+                   (Unqual
+                    {OccName: v}))))])
               ({ T15323.hs:6:31-54 }
                (HsQualTy
                 (NoExtField)

@@ -279,8 +279,8 @@ no_anon_wc lty = go lty
       HsRecTy _ flds                 -> gos $ map (cd_fld_type . unLoc) flds
       HsExplicitListTy _ _ tys       -> gos tys
       HsExplicitTupleTy _ tys        -> gos tys
-      HsForAllTy { hst_bndrs = bndrs
-                 , hst_body = ty } -> no_anon_wc_bndrs bndrs
+      HsForAllTy { hst_tele = tele
+                 , hst_body = ty } -> no_anon_wc_tele tele
                                         && go ty
       HsQualTy { hst_ctxt = L _ ctxt
                , hst_body = ty }  -> gos ctxt && go ty
@@ -293,8 +293,10 @@ no_anon_wc lty = go lty
 
     gos = all go
 
-no_anon_wc_bndrs :: [LHsTyVarBndr flag GhcRn] -> Bool
-no_anon_wc_bndrs ltvs = all (go . unLoc) ltvs
+no_anon_wc_tele :: HsForAllTelescope GhcRn -> Bool
+no_anon_wc_tele tele = case tele of
+  HsForAllVis   { hsf_vis_bndrs   = ltvs } -> all (go . unLoc) ltvs
+  HsForAllInvis { hsf_invis_bndrs = ltvs } -> all (go . unLoc) ltvs
   where
     go (UserTyVar _ _ _)      = True
     go (KindedTyVar _ _ _ ki) = no_anon_wc ki

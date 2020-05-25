@@ -368,13 +368,14 @@
                    ({ DumpRenamedAst.hs:19:11-33 }
                     (HsForAllTy
                      (NoExtField)
-                     (ForallInvis)
-                     [({ DumpRenamedAst.hs:19:18-19 }
-                       (UserTyVar
-                        (NoExtField)
-                        (SpecifiedSpec)
-                        ({ DumpRenamedAst.hs:19:18-19 }
-                         {Name: xx})))]
+                     (HsForAllInvis
+                      (NoExtField)
+                      [({ DumpRenamedAst.hs:19:18-19 }
+                        (UserTyVar
+                         (NoExtField)
+                         (SpecifiedSpec)
+                         ({ DumpRenamedAst.hs:19:18-19 }
+                          {Name: xx})))])
                      ({ DumpRenamedAst.hs:19:22-33 }
                       (HsFunTy
                        (NoExtField)
