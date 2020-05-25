@@ -33,8 +33,11 @@ int keyCountHashTable (HashTable *table);
 int keysHashTable(HashTable *table, StgWord keys[], int szKeys);
 
 typedef void (*MapHashFn)(void *data, StgWord key, const void *value);
+// Return true -> continue; false -> stop
+typedef bool (*IterHashFn)(void *data, StgWord key, const void *value);
 
 void mapHashTable(HashTable *table, void *data, MapHashFn fn);
+void iterHashTable(HashTable *table, void *data, IterHashFn);
 
 /* Hash table access where the keys are C strings (the strings are
  * assumed to be allocated by the caller, and mustn't be deallocated
@@ -62,6 +65,32 @@ int hashStr(const HashTable *table, StgWord key);
  */
 void freeHashTable ( HashTable *table, void (*freeDataFun)(void *) );
 
-void exitHashTable ( void );
+INLINE_HEADER void freeStrHashTable ( HashTable *table, void (*freeDataFun)(void *) )
+{
+    freeHashTable((HashTable*)table, freeDataFun);
+}
+
+/*
+ * Hash set API
+ *
+ * A hash set is bascially a hash table where values are NULL.
+ */
+
+typedef struct hashtable HashSet;
+
+INLINE_HEADER HashSet *allocHashSet ( void )
+{
+    return (HashSet*)allocHashTable();
+}
+
+INLINE_HEADER void freeHashSet ( HashSet *set )
+{
+    freeHashTable((HashTable*)set, NULL);
+}
+
+INLINE_HEADER void insertHashSet ( HashSet *set, StgWord key )
+{
+    insertHashTable((HashTable*)set, key, NULL);
+}
 
 #include "EndPrivate.h"

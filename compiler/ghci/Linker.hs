@@ -1134,14 +1134,15 @@ unload_wkr hsc_env keep_linkables pls@PersistentLinkerState{..}  = do
   where
     unloadObjs :: Linkable -> IO ()
     unloadObjs lnk
+        -- The RTS's PEi386 linker currently doesn't support unloading.
+      | isWindowsHost = return ()
+
       | dynamicGhc = return ()
         -- We don't do any cleanup when linking objects with the
         -- dynamic linker.  Doing so introduces extra complexity for
         -- not much benefit.
 
-      -- Code unloading currently disabled due to instability.
-      -- See #16841.
-      | False -- otherwise
+      | otherwise
       = mapM_ (unloadObj hsc_env) [f | DotO f <- linkableUnlinked lnk]
                 -- The components of a BCO linkable may contain
                 -- dot-o files.  Which is very confusing.
@@ -1149,7 +1150,6 @@ unload_wkr hsc_env keep_linkables pls@PersistentLinkerState{..}  = do
                 -- But the BCO parts can be unlinked just by
                 -- letting go of them (plus of course depopulating
                 -- the symbol table which is done in the main body)
-      | otherwise = return () -- see #16841
 
 {- **********************************************************************
 
