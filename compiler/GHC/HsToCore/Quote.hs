@@ -1265,7 +1265,7 @@ repLTy ty = repTy (unLoc ty)
 -- Desugar a type headed by an invisible forall (e.g., @forall a. a@) or
 -- a context (e.g., @Show a => a@) into a ForallT from L.H.TH.Syntax.
 -- In other words, the argument to this function is always an
--- @HsForAllTy ForallInvis@ or @HsQualTy@.
+-- @HsForAllTy HsForAllInvis{}@ or @HsQualTy@.
 -- Types headed by visible foralls (which are desugared to ForallVisT) are
 -- handled separately in repTy.
 repForallT :: HsType GhcRn -> MetaM (Core (M TH.Type))
@@ -1278,14 +1278,13 @@ repForallT ty
       }
 
 repTy :: HsType GhcRn -> MetaM (Core (M TH.Type))
-repTy ty@(HsForAllTy { hst_fvf = fvf, hst_bndrs = tvs, hst_body = body }) =
-  case fvf of
-    ForallInvis -> repForallT ty
-    ForallVis   -> let tvs' = map ((<$>) (setHsTyVarBndrFlag ())) tvs
-                       -- see Note [Specificity in HsForAllTy] in GHC.Hs.Type
-                   in addHsTyVarBinds tvs' $ \bndrs ->
-                   do body1 <- repLTy body
-                      repTForallVis bndrs body1
+repTy ty@(HsForAllTy { hst_tele = tele, hst_body = body }) =
+  case tele of
+    HsForAllInvis{} -> repForallT ty
+    HsForAllVis { hsf_vis_bndrs = tvs } ->
+      addHsTyVarBinds tvs $ \bndrs ->
+      do body1 <- repLTy body
+         repTForallVis bndrs body1
 repTy ty@(HsQualTy {}) = repForallT ty
 
 repTy (HsTyVar _ _ (L _ n))
