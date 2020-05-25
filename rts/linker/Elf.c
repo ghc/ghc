@@ -1075,7 +1075,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
            if (ELF_ST_BIND(symbol->elf_sym->st_info) == STB_LOCAL || strncmp(symbol->name, "_GLOBAL_OFFSET_TABLE_", 21) == 0) {
                S = (Elf_Addr)symbol->addr;
            } else {
-               S_tmp = lookupSymbol_( symbol->name );
+               S_tmp = lookupDependentSymbol( symbol->name, oc );
                S = (Elf_Addr)S_tmp;
            }
            if (!S) {
@@ -1495,7 +1495,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
          } else {
             /* No, so look up the name in our global table. */
             symbol = strtab + sym.st_name;
-            S_tmp = lookupSymbol_( symbol );
+            S_tmp = lookupDependentSymbol( symbol, oc );
             S = (Elf_Addr)S_tmp;
          }
          if (!S) {
