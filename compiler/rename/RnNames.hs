@@ -635,9 +635,12 @@ extendGlobalRdrEnvRn avails new_fixities
       | otherwise
       = return (extendGlobalRdrEnv env gre)
       where
-        name = gre_name gre
-        occ  = nameOccName name
-        dups = filter isLocalGRE (lookupGlobalRdrEnv env occ)
+        occ  = greOccName gre
+        dups = filter isDupGRE (lookupGlobalRdrEnv env occ)
+        -- Duplicate GREs are those defined locally with the same OccName,
+        -- except cases where *both* GREs are DuplicateRecordFields (#17965).
+        isDupGRE gre' = isLocalGRE gre'
+                && not (isOverloadedRecFldGRE gre && isOverloadedRecFldGRE gre')
 
 
 {- *********************************************************************
@@ -1611,9 +1614,8 @@ printMinimalImports imports_w_usage
   = do { imports' <- getMinimalImports imports_w_usage
        ; this_mod <- getModule
        ; dflags   <- getDynFlags
-       ; liftIO $
-         do { h <- openFile (mkFilename dflags this_mod) WriteMode
-            ; printForUser dflags h neverQualify (vcat (map ppr imports')) }
+       ; liftIO $ withFile (mkFilename dflags this_mod) WriteMode $ \h ->
+          printForUser dflags h neverQualify (vcat (map ppr imports'))
               -- The neverQualify is important.  We are printing Names
               -- but they are in the context of an 'import' decl, and
               -- we never qualify things inside there
@@ -1769,14 +1771,13 @@ addDupDeclErr gres@(gre : _)
   = addErrAt (getSrcSpan (last sorted_names)) $
     -- Report the error at the later location
     vcat [text "Multiple declarations of" <+>
-             quotes (ppr (nameOccName name)),
+             quotes (ppr (greOccName gre)),
              -- NB. print the OccName, not the Name, because the
              -- latter might not be in scope in the RdrEnv and so will
              -- be printed qualified.
           text "Declared at:" <+>
                    vcat (map (ppr . nameSrcLoc) sorted_names)]
   where
-    name = gre_name gre
     sorted_names = sortWith nameSrcLoc (map gre_name gres)
 
 

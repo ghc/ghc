@@ -21,11 +21,13 @@
 #include "Printer.h"
 #include "Schedule.h"
 #include "Weak.h"
+#include "Stats.h"
 #include "STM.h"
 #include "MarkWeak.h"
 #include "sm/Storage.h"
 #include "CNF.h"
 
+static bool check_in_nonmoving_heap(StgClosure *p);
 static void mark_closure (MarkQueue *queue, const StgClosure *p, StgClosure **origin);
 static void mark_tso (MarkQueue *queue, StgTSO *tso);
 static void mark_stack (MarkQueue *queue, StgStack *stack);
@@ -316,6 +318,7 @@ void nonmovingBeginFlush(Task *task)
     debugTrace(DEBUG_nonmoving_gc, "Starting update remembered set flush...");
     traceConcSyncBegin();
     upd_rem_set_flush_count = 0;
+    stat_startNonmovingGcSync();
     stopAllCapabilitiesWith(NULL, task, SYNC_FLUSH_UPD_REM_SET);
 
     // XXX: We may have been given a capability via releaseCapability (i.e. a
@@ -407,6 +410,7 @@ void nonmovingFinishFlush(Task *task)
 
     debugTrace(DEBUG_nonmoving_gc, "Finished update remembered set flush...");
     traceConcSyncEnd();
+    stat_endNonmovingGcSync();
     releaseAllCapabilities(n_capabilities, NULL, task);
 }
 #endif
@@ -447,10 +451,17 @@ push (MarkQueue *q, const MarkQueueEnt *ent)
 void
 markQueuePushClosureGC (MarkQueue *q, StgClosure *p)
 {
+    if (!check_in_nonmoving_heap(p)) {
+        return;
+    }
+
     /* We should not make it here if we are doing a deadlock detect GC.
      * See Note [Deadlock detection under nonmoving collector].
+     * This is actually no longer true due to call in nonmovingScavengeOne
+     * introduced due to Note [Dirty flags in the non-moving collector]
+     * (see NonMoving.c).
      */
-    ASSERT(!deadlock_detect_gc);
+    //ASSERT(!deadlock_detect_gc);
 
     // Are we at the end of the block?
     if (q->top->head == MARK_QUEUE_BLOCK_ENTRIES) {

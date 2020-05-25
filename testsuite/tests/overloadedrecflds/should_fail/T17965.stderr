@@ -1,0 +1,5 @@
+
+T17965.hs:4:17: error:
+    Multiple declarations of ‘f’
+    Declared at: T17965.hs:3:29
+                 T17965.hs:4:17
