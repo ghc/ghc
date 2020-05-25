@@ -381,7 +381,7 @@ nodeMustPointToIt dflags (LFThunk top no_fvs updatable NonStandardThunk _)
   =  not no_fvs            -- Self parameter
   || isNotTopLevel top     -- Note [GC recovery]
   || updatable             -- Need to push update frame
-  || gopt Opt_SccProfilingOn dflags
+  || sccProfilingEnabled dflags
           -- For the non-updatable (single-entry case):
           --
           -- True if has fvs (in which case we need access to them, and we
@@ -508,7 +508,7 @@ getCallMethod dflags _ id _ n_args v_args _cg_loc
 getCallMethod dflags name id (LFReEntrant _ arity _ _) n_args _v_args _cg_loc
               _self_loop_info
   | n_args == 0 -- No args at all
-  && not (gopt Opt_SccProfilingOn dflags)
+  && not (sccProfilingEnabled dflags)
      -- See Note [Evaluating functions with profiling] in rts/Apply.cmm
   = ASSERT( arity /= 0 ) ReturnIt
   | n_args < arity = SlowCall        -- Not enough args
@@ -859,7 +859,7 @@ enterIdLabel platform id c
 
 mkProfilingInfo :: DynFlags -> Id -> String -> ProfilingInfo
 mkProfilingInfo dflags id val_descr
-  | not (gopt Opt_SccProfilingOn dflags) = NoProfilingInfo
+  | not (sccProfilingEnabled dflags) = NoProfilingInfo
   | otherwise = ProfilingInfo ty_descr_w8 (BS8.pack val_descr)
   where
     ty_descr_w8  = BS8.pack (getTyDescription (idType id))
@@ -906,8 +906,8 @@ mkDataConInfoTable dflags data_con is_static ptr_wds nonptr_wds
                   -- We keep the *zero-indexed* tag in the srt_len field
                   -- of the info table of a data constructor.
 
-   prof | not (gopt Opt_SccProfilingOn dflags) = NoProfilingInfo
-        | otherwise                            = ProfilingInfo ty_descr val_descr
+   prof | not (sccProfilingEnabled dflags) = NoProfilingInfo
+        | otherwise                        = ProfilingInfo ty_descr val_descr
 
    ty_descr  = BS8.pack $ occNameString $ getOccName $ dataConTyCon data_con
    val_descr = BS8.pack $ occNameString $ getOccName data_con

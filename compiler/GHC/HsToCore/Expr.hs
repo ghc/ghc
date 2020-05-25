@@ -805,7 +805,7 @@ dsExpr (HsRecFld      {})  = panic "dsExpr:HsRecFld"
 ds_prag_expr :: HsPragE GhcTc -> LHsExpr GhcTc -> DsM CoreExpr
 ds_prag_expr (HsPragSCC _ _ cc) expr = do
     dflags <- getDynFlags
-    if gopt Opt_SccProfilingOn dflags
+    if sccProfilingEnabled dflags
       then do
         mod_name <- getModule
         count <- goptM Opt_ProfCountEntries
