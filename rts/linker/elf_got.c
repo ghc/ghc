@@ -88,7 +88,7 @@ fillGot(ObjectCode * oc) {
                 if(   STT_NOTYPE == ELF_ST_TYPE(symbol->elf_sym->st_info)
                    || STB_WEAK   == ELF_ST_BIND(symbol->elf_sym->st_info)) {
                     if(0x0 == symbol->addr) {
-                        symbol->addr = lookupSymbol_(symbol->name);
+                        symbol->addr = lookupDependentSymbol(symbol->name, oc);
                         if(0x0 == symbol->addr) {
                             if(0 == strncmp(symbol->name,"_GLOBAL_OFFSET_TABLE_",21)) {
                                 symbol->addr = oc->info->got_start;

@@ -297,6 +297,10 @@ GarbageCollect (uint32_t collect_gen,
           static_flag == STATIC_FLAG_A ? STATIC_FLAG_B : STATIC_FLAG_A;
   }
 
+  if (major_gc) {
+      prepareUnloadCheck();
+  }
+
 #if defined(THREADED_RTS)
   work_stealing = RtsFlags.ParFlags.parGcLoadBalancingEnabled &&
                   N >= RtsFlags.ParFlags.parGcLoadBalancingGen;
@@ -825,7 +829,7 @@ GarbageCollect (uint32_t collect_gen,
 
   // Must be after stablePtrUnlock(), because it might free stable ptrs.
   if (major_gc) {
-      checkUnload (gct->scavenged_static_objects);
+      checkUnload();
   }
 
 #if defined(PROFILING)
