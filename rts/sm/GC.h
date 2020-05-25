@@ -35,6 +35,7 @@ extern uint32_t N;
 extern bool major_gc;
 /* See Note [Deadlock detection under nonmoving collector]. */
 extern bool deadlock_detect_gc;
+extern bool unload_mark_needed;
 
 extern bdescr *mark_stack_bd;
 extern bdescr *mark_stack_top_bd;
