@@ -5,6 +5,7 @@
 #include "sm/OSMem.h"
 #include "RtsUtils.h"
 #include "LinkerInternals.h"
+#include "CheckUnload.h" // loaded_objects, insertOCSectionIndices
 #include "linker/M32Alloc.h"
 
 /* Platform specific headers */
@@ -241,7 +242,6 @@ lookupGNUArchiveIndex(int gnuFileIndexSize, char **fileName_,
 
 static HsInt loadArchive_ (pathchar *path)
 {
-    ObjectCode* oc = NULL;
     char *image = NULL;
     HsInt retcode = 0;
     int memberSize;
@@ -521,8 +521,8 @@ static HsInt loadArchive_ (pathchar *path)
             pathprintf(archiveMemberName, size, WSTR("%" PATH_FMT "(%.*s)"),
                        path, (int)thisFileNameSize, fileName);
 
-            oc = mkOc(path, image, memberSize, false, archiveMemberName
-                     , misalignment);
+            ObjectCode *oc = mkOc(path, image, memberSize, false, archiveMemberName,
+                                  misalignment);
 #if defined(OBJFORMAT_MACHO)
             ocInit_MachO( oc );
 #endif
@@ -537,8 +537,9 @@ static HsInt loadArchive_ (pathchar *path)
                 fclose(f);
                 return 0;
             } else {
-                oc->next = objects;
-                objects = oc;
+                insertOCSectionIndices(oc); // also adds the object to `objects` list
+                oc->next_loaded_object = loaded_objects;
+                loaded_objects = oc;
             }
         }
         else if (isGnuIndex) {
