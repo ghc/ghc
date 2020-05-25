@@ -1,6 +1,10 @@
 :set -fobject-code
 :load A
 import Control.Concurrent
-_ <- forkIO $ threadDelay 1000000 >> (print (map v1 value))
+_ <- forkIO $ threadDelay 500000 >> print (map v1 value)
 :l []
+System.Mem.performGC
+threadDelay 500000
+System.Mem.performGC
+threadDelay 500000
 System.Mem.performGC
