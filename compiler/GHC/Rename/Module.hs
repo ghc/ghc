@@ -2182,13 +2182,13 @@ rnConDecl (XConDecl (ConDeclGADTPrefixPs { con_gp_names = names, con_gp_ty = ty
          -- Note [GADT abstract syntax] (Wrinkle: No nested foralls or contexts)
          -- in GHC.Hs.Type.
        ; case res_ty of
-           L l (HsForAllTy { hst_fvf = fvf })
-             |  ForallVis <- fvf
+           L l (HsForAllTy { hst_tele = tele })
+             |  HsForAllVis{} <- tele
              -> setSrcSpan l $ addErr $ withHsDocContext ctxt $ vcat
                 [ text "Illegal visible, dependent quantification" <+>
                   text "in the type of a term"
                 , text "(GHC does not yet support this)" ]
-             |  ForallInvis <- fvf
+             |  HsForAllInvis{} <- tele
              -> nested_foralls_contexts_err l ctxt
            L l (HsQualTy {})
              -> nested_foralls_contexts_err l ctxt

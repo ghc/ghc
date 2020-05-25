@@ -2443,8 +2443,8 @@ getGhciStepIO = do
         ioM     = nlHsAppTy (nlHsTyVar ioTyConName) (nlHsTyVar a_tv)
 
         step_ty = noLoc $ HsForAllTy
-                     { hst_fvf = ForallInvis
-                     , hst_bndrs = [noLoc $ UserTyVar noExtField SpecifiedSpec (noLoc a_tv)]
+                     { hst_tele = mkHsForAllInvisTele
+                                  [noLoc $ UserTyVar noExtField SpecifiedSpec (noLoc a_tv)]
                      , hst_xforall = noExtField
                      , hst_body  = nlHsFunTy ghciM ioM }
 
