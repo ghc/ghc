@@ -518,6 +518,11 @@ loop:
   if (!HEAP_ALLOCED_GC(q)) {
       if (!major_gc) return;
 
+      // Note [Object unloading] in CheckUnload.c
+      if (RTS_UNLIKELY(unload_mark_needed)) {
+          markObjectCode(q);
+      }
+
       info = get_itbl(q);
       switch (info->type) {
 

@@ -100,6 +100,13 @@
  * See also: Note [STATIC_LINK fields] in Storage.h.
  */
 
+/* Hot GC globals
+ * ~~~~~~~~~~~~~~
+ * The globals below are quite hot during GC but read-only, initialized during
+ * the beginning of collection. It is important that they reside in the same
+ * cache-line to minimize unnecessary cache misses.
+ */
+
 /* N is the oldest generation being collected, where the generations
  * are numbered starting at 0.  A major GC (indicated by the major_gc
  * flag) is when we're collecting all generations.  We only attempt to
@@ -107,6 +114,7 @@
  */
 uint32_t N;
 bool major_gc;
+bool unload_mark_needed;
 
 /* Data used for allocation area sizing.
  */
@@ -271,6 +279,12 @@ GarbageCollect (uint32_t collect_gen,
       prev_static_flag = static_flag;
       static_flag =
           static_flag == STATIC_FLAG_A ? STATIC_FLAG_B : STATIC_FLAG_A;
+  }
+
+  if (major_gc) {
+      unload_mark_needed = prepareUnloadCheck();
+  } else {
+      unload_mark_needed = false;
   }
 
 #if defined(THREADED_RTS)
@@ -743,9 +757,14 @@ GarbageCollect (uint32_t collect_gen,
   // hs_free_stable_ptr(), both of which access the StablePtr table.
   stablePtrUnlock();
 
-  // Must be after stablePtrUnlock(), because it might free stable ptrs.
+  // Unload dynamically-loaded object code after a major GC.
+  // See Note [Object unloading] in CheckUnload.c for details.
+  //
+  // TODO: Similar to `nonmovingGcCafs` non-moving GC should have its own
+  // collector for these objects, but that's currently not implemented, so we
+  // simply don't unload object code when non-moving GC is enabled.
   if (major_gc) {
-      checkUnload (gct->scavenged_static_objects);
+      checkUnload();
   }
 
 #if defined(PROFILING)
