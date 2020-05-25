@@ -39,7 +39,7 @@
           [({ T15323.hs:6:5-14 }
             (Unqual
              {OccName: TestParens}))]
-          ({ T15323.hs:6:21-55 }
+          ({ T15323.hs:6:21-30 }
            (True))
           [({ T15323.hs:6:28 }
             (UserTyVar

@@ -34,7 +34,7 @@ module GHC.Core.TyCo.Rep (
         KindOrType, Kind,
         KnotTied,
         PredType, ThetaType,      -- Synonyms
-        ArgFlag(..), AnonArgFlag(..), ForallVisFlag(..),
+        ArgFlag(..), AnonArgFlag(..),
 
         -- * Coercions
         Coercion(..),

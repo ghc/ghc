@@ -279,8 +279,8 @@ no_anon_wc lty = go lty
       HsRecTy _ flds                 -> gos $ map (cd_fld_type . unLoc) flds
       HsExplicitListTy _ _ tys       -> gos tys
       HsExplicitTupleTy _ tys        -> gos tys
-      HsForAllTy { hst_bndrs = bndrs
-                 , hst_body = ty } -> no_anon_wc_bndrs bndrs
+      HsForAllTy { hst_tele = tele
+                 , hst_body = ty } -> no_anon_wc_tele tele
                                         && go ty
       HsQualTy { hst_ctxt = L _ ctxt
                , hst_body = ty }  -> gos ctxt && go ty
@@ -293,8 +293,10 @@ no_anon_wc lty = go lty
 
     gos = all go
 
-no_anon_wc_bndrs :: [LHsTyVarBndr flag GhcRn] -> Bool
-no_anon_wc_bndrs ltvs = all (go . unLoc) ltvs
+no_anon_wc_tele :: LHsForAllTelescope GhcRn -> Bool
+no_anon_wc_tele (L _ tele) = case tele of
+  HsForAllVis   { hsf_vis_bndrs   = ltvs } -> all (go . unLoc) ltvs
+  HsForAllInvis { hsf_invis_bndrs = ltvs } -> all (go . unLoc) ltvs
   where
     go (UserTyVar _ _ _)      = True
     go (KindedTyVar _ _ _ ki) = no_anon_wc ki
@@ -374,8 +376,8 @@ tcPatSynSig :: Name -> LHsSigType GhcRn -> TcM TcPatSynInfo
 tcPatSynSig name sig_ty
   | HsIB { hsib_ext = implicit_hs_tvs
          , hsib_body = hs_ty }  <- sig_ty
-  , (univ_hs_tvbndrs, hs_req,  hs_ty1)     <- splitLHsSigmaTyInvis hs_ty
-  , (ex_hs_tvbndrs,   hs_prov, hs_body_ty) <- splitLHsSigmaTyInvis hs_ty1
+  , (L _ univ_hs_tvbndrs, hs_req,  hs_ty1)     <- splitLHsSigmaTyInvis hs_ty
+  , (L _ ex_hs_tvbndrs,   hs_prov, hs_body_ty) <- splitLHsSigmaTyInvis hs_ty1
   = do {  traceTc "tcPatSynSig 1" (ppr sig_ty)
        ; (implicit_tvs, (univ_tvbndrs, (ex_tvbndrs, (req, prov, body_ty))))
            <- pushTcLevelM_   $

@@ -548,14 +548,8 @@ tcInstTypeBndrs :: ([VarBndr TyVar Specificity] -> TcM (TCvSubst, [VarBndr TcTyV
                 -> TcM ([(Name, VarBndr TcTyVar Specificity)], TcThetaType, TcType) -- ^ Result
                      -- (type vars, preds (incl equalities), rho)
 tcInstTypeBndrs inst_tyvars id =
-  let (tyvars, rho) = splitForAllVarBndrs (idType id)
-      tyvars'       = map argf_to_spec tyvars
-  in tc_inst_internal inst_tyvars tyvars' rho
-  where
-    argf_to_spec :: VarBndr TyCoVar ArgFlag -> VarBndr TyCoVar Specificity
-    argf_to_spec (Bndr tv Required)      = Bndr tv SpecifiedSpec
-    -- see Note [Specificity in HsForAllTy] in GHC.Hs.Type
-    argf_to_spec (Bndr tv (Invisible s)) = Bndr tv s
+  let (tyvars, rho) = splitForAllTysInvis (idType id)
+  in tc_inst_internal inst_tyvars tyvars rho
 
 tcSkolDFunType :: DFunId -> TcM ([TcTyVar], TcThetaType, TcType)
 -- Instantiate a type signature with skolem constants.
