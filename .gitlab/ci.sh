@@ -2,6 +2,8 @@
 # shellcheck disable=SC2230
 
 # This is the primary driver of the GitLab CI infrastructure.
+# Run `ci.sh usage` for usage information.
+
 
 set -e -o pipefail
 
@@ -59,6 +61,55 @@ function run() {
 }
 
 TOP="$(pwd)"
+
+function usage() {
+  cat <<EOF
+$0 - GHC continuous integration driver
+
+Modes:
+
+  usage         Show this usage message.
+  setup         Prepare environment for a build.
+  configure     Run ./configure.
+  build_make    Build GHC via the make build system
+  build_hadrian Build GHC via the Hadrian build system
+  test_make     Test GHC via the make build system
+  test_hadrian  Test GHC via the Hadrian build system
+  clean         Clean the tree
+  shell         Run an interactive shell with a configured build environment.
+
+Environment variables:
+
+  MSYSTEM           (Windows-only) Which platform to build form (MINGW64 or MINGW32).
+
+Environment variables determining build configuration of Make system:
+
+  BUILD_FLAVOUR     Which flavour to build.
+  BUILD_SPHINX_HTML Whether to build Sphinx HTML documentation.
+  BUILD_SPHINX_PDF  Whether to build Sphinx PDF documentation.
+  INTEGER_LIBRARY   Which integer library to use (integer-simple or integer-gmp).
+  HADDOCK_HYPERLINKED_SOURCES
+                    Whether to build hyperlinked Haddock sources.
+  TEST_TYPE         Which test rule to run.
+
+Environment variables determining build configuration of Hadrian system:
+
+  FLAVOUR       Which build flavour to build.
+
+Environment variables determining bootstrap toolchain (Linux):
+
+  GHC           Path of GHC executable to use for bootstrapping.
+  CABAL         Path of cabal-install executable to use for bootstrapping.
+  ALEX          Path of alex executable to use for bootstrapping.
+  HAPPY         Path of alex executable to use for bootstrapping.
+
+Environment variables determining bootstrap toolchain (non-Linux):
+
+  GHC_VERSION   Which GHC version to fetch for bootstrapping.
+  CABAL_INSTALL_VERSION
+                Cabal-install version to fetch for bootstrapping.
+EOF
+}
 
 function mingw_init() {
   case "$MSYSTEM" in
@@ -438,6 +489,7 @@ esac
 set_toolchain_paths
 
 case $1 in
+  usage) usage ;;
   setup) setup && cleanup_submodules ;;
   configure) configure ;;
   build_make) build_make ;;
