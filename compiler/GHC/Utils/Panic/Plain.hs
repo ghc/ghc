@@ -117,6 +117,10 @@ panic    x = unsafeDupablePerformIO $ do
    if null stack
       then throwPlainGhcException (PlainPanic x)
       else throwPlainGhcException (PlainPanic (x ++ '\n' : renderStack stack))
+-- These are otherwise inlined and result in unnecessary code bloat.
+{-# NOINLINE panic #-}
+{-# NOINLINE sorry #-}
+{-# NOINLINE pgmError #-}
 
 sorry    x = throwPlainGhcException (PlainSorry x)
 pgmError x = throwPlainGhcException (PlainProgramError x)
