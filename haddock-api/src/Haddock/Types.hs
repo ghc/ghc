@@ -695,6 +695,10 @@ type instance XTyLit           DocNameI = NoExtField
 type instance XWildCardTy      DocNameI = NoExtField
 type instance XXType           DocNameI = NewHsTypeX
 
+type instance XHsForAllVis        DocNameI = NoExtField
+type instance XHsForAllInvis      DocNameI = NoExtField
+type instance XXHsForAllTelescope DocNameI = NoExtCon
+
 type instance XUserTyVar    DocNameI = NoExtField
 type instance XKindedTyVar  DocNameI = NoExtField
 type instance XXTyVarBndr   DocNameI = NoExtCon

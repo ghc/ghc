@@ -19,6 +19,8 @@ module Haddock.Convert (
   PrintRuntimeReps(..),
 ) where
 
+#include "HsVersions.h"
+
 import GHC.Data.Bag ( emptyBag )
 import GHC.Types.Basic ( TupleSort(..), SourceText(..), LexicalFixity(..)
                   , PromotionFlag(..), DefMethSpec(..) )
@@ -44,7 +46,9 @@ import GHC.Builtin.Types ( eqTyConName, listTyConName, liftedTypeKindTyConName
 import GHC.Builtin.Names ( hasKey, eqTyConKey, ipClassKey, tYPETyConKey
                  , liftedRepDataConKey )
 import GHC.Types.Unique ( getUnique )
-import GHC.Utils.Misc ( chkAppend,dropList, filterByList, filterOut )
+import GHC.Utils.Misc ( chkAppend, debugIsOn, dropList, equalLength
+                      , filterByList, filterOut )
+import GHC.Utils.Outputable ( assertPanic )
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.SrcLoc
@@ -53,7 +57,7 @@ import Haddock.Types
 import Haddock.Interface.Specialize
 import Haddock.GhcUtils                      ( orderedFVs, defaultRuntimeRepVars )
 
-import Data.Maybe                            ( catMaybes, maybeToList )
+import Data.Maybe                            ( catMaybes, mapMaybe, maybeToList )
 
 
 -- | Whether or not to default 'RuntimeRep' variables to 'LiftedRep'. Check
@@ -395,7 +399,7 @@ synifyDataCon use_gadt_syntax dc =
               ConDeclGADT { con_g_ext  = []
                           , con_names  = [name]
                           , con_forall = noLoc $ not $ null user_tvbndrs
-                          , con_qvars  = map synifyInvisTyVar user_tvbndrs
+                          , con_qvars  = map synifyTyVarBndr user_tvbndrs
                           , con_mb_cxt = ctx
                           , con_args   = hat
                           , con_res_ty = synifyType WithinType [] res_ty
@@ -404,7 +408,7 @@ synifyDataCon use_gadt_syntax dc =
               ConDeclH98 { con_ext    = noExtField
                          , con_name   = name
                          , con_forall = noLoc False
-                         , con_ex_tvs = map (synifyInvisTyVar . (mkTyCoVarBinder InferredSpec)) ex_tvs
+                         , con_ex_tvs = map (synifyTyVarBndr . (mkTyCoVarBinder InferredSpec)) ex_tvs
                          , con_mb_cxt = ctx
                          , con_args   = hat
                          , con_doc    = Nothing }
@@ -450,26 +454,24 @@ synifyTyVars ktvs = HsQTvs { hsq_ext = []
                            , hsq_explicit = map synifyTyVar ktvs }
 
 synifyTyVar :: TyVar -> LHsTyVarBndr () GhcRn
-synifyTyVar = synifyTyVar' emptyVarSet
+synifyTyVar = synify_ty_var emptyVarSet ()
 
-synifyInvisTyVar :: InvisTVBinder -> LHsTyVarBndr Specificity GhcRn
-synifyInvisTyVar = synifyInvisTyVar' emptyVarSet
+synifyTyVarBndr :: VarBndr TyVar flag -> LHsTyVarBndr flag GhcRn
+synifyTyVarBndr = synifyTyVarBndr' emptyVarSet
 
--- | Like 'synifyTyVar', but accepts a set of variables for which to omit kind
+synifyTyVarBndr' :: VarSet -> VarBndr TyVar flag -> LHsTyVarBndr flag GhcRn
+synifyTyVarBndr' no_kinds (Bndr tv spec) = synify_ty_var no_kinds spec tv
+
+-- | Like 'synifyTyVarBndr', but accepts a set of variables for which to omit kind
 -- signatures (even if they don't have the lifted type kind).
-synifyTyVar' :: VarSet -> TyVar -> LHsTyVarBndr () GhcRn
-synifyTyVar' no_kinds tv
+synify_ty_var :: VarSet -> flag -> TyVar -> LHsTyVarBndr flag GhcRn
+synify_ty_var no_kinds flag tv
   | isLiftedTypeKind kind || tv `elemVarSet` no_kinds
-  = noLoc (UserTyVar noExtField () (noLoc name))
-  | otherwise = noLoc (KindedTyVar noExtField () (noLoc name) (synifyKindSig kind))
+  = noLoc (UserTyVar noExtField flag (noLoc name))
+  | otherwise = noLoc (KindedTyVar noExtField flag (noLoc name) (synifyKindSig kind))
   where
     kind = tyVarKind tv
     name = getName tv
-
-synifyInvisTyVar' :: VarSet -> InvisTVBinder -> LHsTyVarBndr Specificity GhcRn
-synifyInvisTyVar' no_kinds (Bndr tv spec) = case (synifyTyVar' no_kinds tv) of
-  L l (UserTyVar   ne _ n)   -> L l (UserTyVar   ne spec n)
-  L l (KindedTyVar ne _ n k) -> L l (KindedTyVar ne spec n k)
 
 -- | Annotate (with HsKingSig) a type if the first parameter is True
 -- and if the type contains a free variable.
@@ -626,39 +628,56 @@ synifyType _ vs (AppTy t1 t2) = let
   s1 = synifyType WithinType vs t1
   s2 = synifyType WithinType vs t2
   in noLoc $ HsAppTy noExtField s1 s2
-synifyType s vs funty@(FunTy InvisArg _ _) = synifyForAllType s Inferred vs funty
+synifyType s vs funty@(FunTy InvisArg _ _) = synifySigmaType s vs funty
 synifyType _ vs       (FunTy VisArg t1 t2) = let
   s1 = synifyType WithinType vs t1
   s2 = synifyType WithinType vs t2
   in noLoc $ HsFunTy noExtField s1 s2
 synifyType s vs forallty@(ForAllTy (Bndr _ argf) _ty) =
-  synifyForAllType s argf vs forallty
+  case argf of
+    Required    -> synifyVisForAllType vs forallty
+    Invisible _ -> synifySigmaType s vs forallty
 
 synifyType _ _ (LitTy t) = noLoc $ HsTyLit noExtField $ synifyTyLit t
 synifyType s vs (CastTy t _) = synifyType s vs t
 synifyType _ _ (CoercionTy {}) = error "synifyType:Coercion"
 
--- | Process a 'Type' which starts with a forall or a constraint into
--- an 'HsType'
-synifyForAllType
+-- | Process a 'Type' which starts with a visible @forall@ into an 'HsType'
+synifyVisForAllType
+  :: [TyVar]          -- ^ free variables in the type to convert
+  -> Type             -- ^ the forall type to convert
+  -> LHsType GhcRn
+synifyVisForAllType vs ty =
+  let (tvs, rho) = tcSplitForAllTysReqPreserveSynonyms ty
+
+      sTvs = map synifyTyVarBndr tvs
+
+      -- Figure out what the type variable order would be inferred in the
+      -- absence of an explicit forall
+      tvs' = orderedFVs (mkVarSet vs) [rho]
+
+  in noLoc $ HsForAllTy { hst_tele = mkHsForAllVisTele sTvs
+                        , hst_xforall = noExtField
+                        , hst_body  = synifyType WithinType (tvs' ++ vs) rho }
+
+-- | Process a 'Type' which starts with an invisible @forall@ or a constraint
+-- into an 'HsType'
+synifySigmaType
   :: SynifyTypeState  -- ^ what to do with the 'forall'
-  -> ArgFlag          -- ^ the visibility of the @forall@
   -> [TyVar]          -- ^ free variables in the type to convert
   -> Type             -- ^ the forall type to convert
   -> LHsType GhcRn
-synifyForAllType s argf vs ty =
-  let (tvs, ctx, tau) = tcSplitSigmaTySameVisPreserveSynonyms argf ty
-      inv_tvs = map to_invis_bndr tvs
+synifySigmaType s vs ty =
+  let (tvs, ctx, tau) = tcSplitSigmaTyPreserveSynonyms ty
       sPhi = HsQualTy { hst_ctxt = synifyCtx ctx
                       , hst_xqual = noExtField
                       , hst_body = synifyType WithinType (tvs' ++ vs) tau }
 
-      sTy = HsForAllTy { hst_fvf = argToForallVisFlag argf
-                       , hst_bndrs = sTvs
+      sTy = HsForAllTy { hst_tele = mkHsForAllInvisTele sTvs
                        , hst_xforall = noExtField
                        , hst_body  = noLoc sPhi }
 
-      sTvs = map synifyInvisTyVar inv_tvs
+      sTvs = map synifyTyVarBndr tvs
 
       -- Figure out what the type variable order would be inferred in the
       -- absence of an explicit forall
@@ -672,12 +691,7 @@ synifyForAllType s argf vs ty =
       | not (null tvs) -> noLoc sTy
       | otherwise -> noLoc sPhi
 
-    ImplicitizeForAll -> implicitForAll [] vs inv_tvs ctx (synifyType WithinType) tau
-
-  where
-    to_invis_bndr :: TyVarBinder -> InvisTVBinder
-    to_invis_bndr (Bndr tv Required)         = Bndr tv SpecifiedSpec
-    to_invis_bndr (Bndr tv (Invisible spec)) = Bndr tv spec
+    ImplicitizeForAll -> implicitForAll [] vs tvs ctx (synifyType WithinType) tau
 
 -- | Put a forall in if there are any type variables which require
 -- explicit kind annotations or if the inferred type variable order
@@ -701,13 +715,12 @@ implicitForAll tycons vs tvs ctx synInner tau
        = HsQualTy { hst_ctxt = synifyCtx ctx
                   , hst_xqual = noExtField
                   , hst_body = synInner (tvs' ++ vs) tau }
-  sTy = HsForAllTy { hst_fvf = ForallInvis
-                   , hst_bndrs = sTvs
+  sTy = HsForAllTy { hst_tele = mkHsForAllInvisTele sTvs
                    , hst_xforall = noExtField
                    , hst_body = noLoc sPhi }
 
   no_kinds_needed = noKindTyVars tycons tau
-  sTvs = map (synifyInvisTyVar' no_kinds_needed) tvs
+  sTvs = map (synifyTyVarBndr' no_kinds_needed) tvs
 
   -- Figure out what the type variable order would be inferred in the
   -- absence of an explicit forall
@@ -850,22 +863,54 @@ See https://github.com/haskell/haddock/issues/879 for a bug where this
 invariant didn't hold.
 -}
 
--- | A version of 'TcType.tcSplitSigmaTySameVis' that preserves type synonyms.
+-- | A version of 'TcType.tcSplitSigmaTy' that:
+--
+-- 1. Preserves type synonyms.
+-- 2. Returns 'InvisTVBinder's instead of 'TyVar's.
 --
 -- See Note [Invariant: Never expand type synonyms]
-tcSplitSigmaTySameVisPreserveSynonyms :: ArgFlag -> Type -> ([TyVarBinder], ThetaType, Type)
-tcSplitSigmaTySameVisPreserveSynonyms argf ty =
-    case tcSplitForAllTysSameVisPreserveSynonyms argf ty of
+tcSplitSigmaTyPreserveSynonyms :: Type -> ([InvisTVBinder], ThetaType, Type)
+tcSplitSigmaTyPreserveSynonyms ty =
+    case tcSplitForAllTysInvisPreserveSynonyms ty of
       (tvs, rho) -> case tcSplitPhiTyPreserveSynonyms rho of
         (theta, tau) -> (tvs, theta, tau)
 
 -- | See Note [Invariant: Never expand type synonyms]
-tcSplitForAllTysSameVisPreserveSynonyms :: ArgFlag -> Type -> ([TyVarBinder], Type)
-tcSplitForAllTysSameVisPreserveSynonyms supplied_argf ty = split ty ty []
+tcSplitSomeForAllTysPreserveSynonyms ::
+  (ArgFlag -> Bool) -> Type -> ([TyCoVarBinder], Type)
+tcSplitSomeForAllTysPreserveSynonyms argf_pred ty = split ty ty []
   where
-    split _       (ForAllTy tvbndr@(Bndr _ argf) ty') tvs
-      | argf `sameVis` supplied_argf                = split ty' ty' (tvbndr:tvs)
-    split orig_ty _                             tvs = (reverse tvs, orig_ty)
+    split _ (ForAllTy tvb@(Bndr _ argf) ty') tvs
+      | argf_pred argf  = split ty' ty' (tvb:tvs)
+    split orig_ty _ tvs = (reverse tvs, orig_ty)
+
+-- | See Note [Invariant: Never expand type synonyms]
+tcSplitForAllTysReqPreserveSynonyms :: Type -> ([ReqTVBinder], Type)
+tcSplitForAllTysReqPreserveSynonyms ty =
+  let (all_bndrs, body) = tcSplitSomeForAllTysPreserveSynonyms isVisibleArgFlag ty
+      req_bndrs         = mapMaybe mk_req_bndr_maybe all_bndrs in
+  ASSERT( req_bndrs `equalLength` all_bndrs )
+  (req_bndrs, body)
+  where
+    mk_req_bndr_maybe :: TyCoVarBinder -> Maybe ReqTVBinder
+    mk_req_bndr_maybe (Bndr tv argf) = case argf of
+      Required    -> Just $ Bndr tv ()
+      Invisible _ -> Nothing
+
+-- | See Note [Invariant: Never expand type synonyms]
+tcSplitForAllTysInvisPreserveSynonyms :: Type -> ([InvisTVBinder], Type)
+tcSplitForAllTysInvisPreserveSynonyms ty =
+  let (all_bndrs, body) = tcSplitSomeForAllTysPreserveSynonyms isInvisibleArgFlag ty
+      inv_bndrs         = mapMaybe mk_inv_bndr_maybe all_bndrs in
+  ASSERT( inv_bndrs `equalLength` all_bndrs )
+  (inv_bndrs, body)
+  where
+    mk_inv_bndr_maybe :: TyCoVarBinder -> Maybe InvisTVBinder
+    mk_inv_bndr_maybe (Bndr tv argf) = case argf of
+      Invisible s -> Just $ Bndr tv s
+      Required    -> Nothing
+
+-- | See Note [Invariant: Never expand type synonyms]
 
 -- | See Note [Invariant: Never expand type synonyms]
 tcSplitPhiTyPreserveSynonyms :: Type -> (ThetaType, Type)

@@ -474,10 +474,9 @@ ppSubSigLike unicode typ argDocs subdocs leader = do_args 0 leader typ
     arg_doc n = rDoc . fmap _doc $ Map.lookup n argDocs
 
     do_args :: Int -> LaTeX -> HsType DocNameI -> [(LaTeX, LaTeX)]
-    do_args _n leader (HsForAllTy _ fvf tvs ltype)
+    do_args _n leader (HsForAllTy _ tele ltype)
       = [ ( decltt leader
-          , decltt (hsep (forallSymbol unicode : ppTyVars tvs ++
-                          [ppForAllSeparator unicode fvf]))
+          , decltt (ppHsForAllTelescope tele unicode)
               <+> ppLType unicode ltype
           ) ]
     do_args n leader (HsQualTy _ lctxt ltype)
@@ -506,17 +505,19 @@ ppSubSigLike unicode typ argDocs subdocs leader = do_args 0 leader typ
     gadtOpen = text "\\{"
 
 
-ppForAllSeparator :: Bool -> ForallVisFlag -> LaTeX
-ppForAllSeparator unicode fvf =
-  case fvf of
-    ForallVis   -> text "\\ " <> arrow unicode
-    ForallInvis -> dot
-
 ppTypeSig :: [Name] -> HsType DocNameI  -> Bool -> LaTeX
 ppTypeSig nms ty unicode =
   hsep (punctuate comma $ map ppSymName nms)
     <+> dcolon unicode
     <+> ppType unicode ty
+
+
+ppHsForAllTelescope :: HsForAllTelescope DocNameI -> Bool -> LaTeX
+ppHsForAllTelescope tele unicode = case tele of
+  HsForAllVis { hsf_vis_bndrs = bndrs } ->
+    hsep (forallSymbol unicode : ppTyVars bndrs) <> text "\\" <> arrow unicode
+  HsForAllInvis { hsf_invis_bndrs = bndrs } ->
+    hsep (forallSymbol unicode : ppTyVars bndrs) <> dot
 
 
 ppTyVars :: [LHsTyVarBndr flag DocNameI] -> [LaTeX]
@@ -1040,9 +1041,8 @@ ppr_mono_lty ty unicode = ppr_mono_ty (unLoc ty) unicode
 
 
 ppr_mono_ty :: HsType DocNameI -> Bool -> LaTeX
-ppr_mono_ty (HsForAllTy _ fvf tvs ty) unicode
-  = sep [ hsep (forallSymbol unicode : ppTyVars tvs) <>
-            ppForAllSeparator unicode fvf
+ppr_mono_ty (HsForAllTy _ tele ty) unicode
+  = sep [ ppHsForAllTelescope tele unicode
         , ppr_mono_lty ty unicode ]
 ppr_mono_ty (HsQualTy _ ctxt ty) unicode
   = sep [ ppLContext ctxt unicode

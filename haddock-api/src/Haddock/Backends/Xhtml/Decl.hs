@@ -151,10 +151,10 @@ ppSubSigLike unicode qual typ argDocs subdocs sep emptyCtxts = do_args 0 sep typ
     do_largs n leader (L _ t) = do_args n leader t
 
     do_args :: Int -> Html -> HsType DocNameI -> [SubDecl]
-    do_args n leader (HsForAllTy _ fvf tvs ltype)
+    do_args n leader (HsForAllTy _ tele ltype)
       = do_largs n leader' ltype
       where
-        leader' = leader <+> ppForAll tvs unicode qual fvf
+        leader' = leader <+> ppForAll tele unicode qual
 
     do_args n leader (HsQualTy _ lctxt ltype)
       | null (unLoc lctxt)
@@ -189,20 +189,22 @@ ppSubSigLike unicode qual typ argDocs subdocs sep emptyCtxts = do_args 0 sep typ
 
 
 
-ppForAll :: [LHsTyVarBndr flag DocNameI] -> Unicode -> Qualification -> ForallVisFlag
+ppForAll :: HsForAllTelescope DocNameI -> Unicode -> Qualification
          -> Html
-ppForAll tvs unicode qual fvf =
-  case [ppKTv n k | L _ (KindedTyVar _ _ (L _ n) k) <- tvs] of
-    [] -> noHtml
-    ts -> forallSymbol unicode <+> hsep ts +++ ppForAllSeparator unicode fvf
-  where ppKTv n k = parens $
-          ppTyName (getName n) <+> dcolon unicode <+> ppLKind unicode qual k
+ppForAll tele unicode qual = case tele of
+  HsForAllVis { hsf_vis_bndrs = bndrs } ->
+    pp_bndrs bndrs (spaceHtml +++ arrow unicode)
+  HsForAllInvis { hsf_invis_bndrs = bndrs } ->
+    pp_bndrs bndrs dot
+  where
+    pp_bndrs :: [LHsTyVarBndr flag DocNameI] -> Html -> Html
+    pp_bndrs tvs forall_separator =
+      case [pp_ktv n k | L _ (KindedTyVar _ _ (L _ n) k) <- tvs] of
+        [] -> noHtml
+        ts -> forallSymbol unicode <+> hsep ts +++ forall_separator
 
-ppForAllSeparator :: Unicode -> ForallVisFlag -> Html
-ppForAllSeparator unicode fvf =
-  case fvf of
-    ForallVis   -> spaceHtml +++ arrow unicode
-    ForallInvis -> dot
+    pp_ktv n k = parens $
+      ppTyName (getName n) <+> dcolon unicode <+> ppLKind unicode qual k
 
 ppFixities :: [(DocName, Fixity)] -> Qualification -> Html
 ppFixities [] _ = noHtml
@@ -1146,16 +1148,16 @@ patSigContext typ | hasNonEmptyContext typ && isFirstContextEmpty typ =  ShowEmp
     hasNonEmptyContext :: LHsType name -> Bool
     hasNonEmptyContext t =
       case unLoc t of
-        HsForAllTy _ _ _ s -> hasNonEmptyContext s
-        HsQualTy _ cxt s   -> if null (unLoc cxt) then hasNonEmptyContext s else True
-        HsFunTy _ _ s      -> hasNonEmptyContext s
+        HsForAllTy _ _ s -> hasNonEmptyContext s
+        HsQualTy _ cxt s -> if null (unLoc cxt) then hasNonEmptyContext s else True
+        HsFunTy _ _ s    -> hasNonEmptyContext s
         _ -> False
     isFirstContextEmpty :: LHsType name -> Bool
     isFirstContextEmpty t =
       case unLoc t of
-        HsForAllTy _ _ _ s -> isFirstContextEmpty s
-        HsQualTy _ cxt _   -> null (unLoc cxt)
-        HsFunTy _ _ s      -> isFirstContextEmpty s
+        HsForAllTy _ _ s -> isFirstContextEmpty s
+        HsQualTy _ cxt _ -> null (unLoc cxt)
+        HsFunTy _ _ s    -> isFirstContextEmpty s
         _ -> False
 
 
@@ -1165,19 +1167,21 @@ ppPatSigType :: Unicode -> Qualification -> LHsType DocNameI -> Html
 ppPatSigType unicode qual typ =
   let emptyCtxts = patSigContext typ in ppLType unicode qual emptyCtxts typ
 
-ppForAllPart :: RenderableBndrFlag flag =>
-  Unicode -> Qualification -> ForallVisFlag -> [LHsTyVarBndr flag DocNameI] -> Html
-ppForAllPart unicode qual fvf tvs =
-  hsep (forallSymbol unicode : ppTyVars unicode qual tvs) +++
-  ppForAllSeparator unicode fvf
+ppForAllPart :: Unicode -> Qualification -> HsForAllTelescope DocNameI -> Html
+ppForAllPart unicode qual tele = case tele of
+  HsForAllVis { hsf_vis_bndrs = bndrs } ->
+    hsep (forallSymbol unicode : ppTyVars unicode qual bndrs) +++
+    spaceHtml +++  arrow unicode
+  HsForAllInvis { hsf_invis_bndrs = bndrs } ->
+    hsep (forallSymbol unicode : ppTyVars unicode qual bndrs) +++ dot
 
 ppr_mono_lty :: LHsType DocNameI -> Unicode -> Qualification -> HideEmptyContexts -> Html
 ppr_mono_lty ty = ppr_mono_ty (unLoc ty)
 
 
 ppr_mono_ty :: HsType DocNameI -> Unicode -> Qualification -> HideEmptyContexts -> Html
-ppr_mono_ty (HsForAllTy _ fvf tvs ty) unicode qual emptyCtxts
-  = ppForAllPart unicode qual fvf tvs <+> ppr_mono_lty ty unicode qual emptyCtxts
+ppr_mono_ty (HsForAllTy _ tele ty) unicode qual emptyCtxts
+  = ppForAllPart unicode qual tele <+> ppr_mono_lty ty unicode qual emptyCtxts
 
 ppr_mono_ty (HsQualTy _ ctxt ty) unicode qual emptyCtxts
   = ppLContext ctxt unicode qual emptyCtxts <+> ppr_mono_lty ty unicode qual emptyCtxts

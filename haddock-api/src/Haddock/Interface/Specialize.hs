@@ -206,12 +206,16 @@ freeVariables =
     everythingWithState Set.empty Set.union query
   where
     query term ctx = case cast term :: Maybe (HsType GhcRn) of
-        Just (HsForAllTy _ _ bndrs _) ->
-            (Set.empty, Set.union ctx (bndrsNames bndrs))
+        Just (HsForAllTy _ tele _) ->
+            (Set.empty, Set.union ctx (teleNames tele))
         Just (HsTyVar _ _ (L _ name))
             | getName name `Set.member` ctx -> (Set.empty, ctx)
             | otherwise -> (Set.singleton $ getName name, ctx)
         _ -> (Set.empty, ctx)
+
+    teleNames (HsForAllVis   _ bndrs) = bndrsNames bndrs
+    teleNames (HsForAllInvis _ bndrs) = bndrsNames bndrs
+
     bndrsNames = Set.fromList . map (getName . tyVarName . unLoc)
 
 
@@ -244,9 +248,9 @@ data RenameEnv name = RenameEnv
 
 
 renameType :: HsType GhcRn -> Rename (IdP GhcRn) (HsType GhcRn)
-renameType (HsForAllTy x fvf bndrs lt) =
-    HsForAllTy x fvf
-        <$> mapM (located renameBinder) bndrs
+renameType (HsForAllTy x tele lt) =
+    HsForAllTy x
+        <$> renameForAllTelescope tele
         <*> renameLType lt
 renameType (HsQualTy x lctxt lt) =
     HsQualTy x
@@ -291,10 +295,20 @@ renameLTypes = mapM renameLType
 renameContext :: HsContext GhcRn -> Rename (IdP GhcRn) (HsContext GhcRn)
 renameContext = renameLTypes
 
+renameForAllTelescope :: HsForAllTelescope GhcRn
+                      -> Rename (IdP GhcRn) (HsForAllTelescope GhcRn)
+renameForAllTelescope (HsForAllVis x bndrs) =
+  HsForAllVis x <$> mapM renameLBinder bndrs
+renameForAllTelescope (HsForAllInvis x bndrs) =
+  HsForAllInvis x <$> mapM renameLBinder bndrs
+
 renameBinder :: HsTyVarBndr flag GhcRn -> Rename (IdP GhcRn) (HsTyVarBndr flag GhcRn)
 renameBinder (UserTyVar x fl lname) = UserTyVar x fl <$> located renameName lname
 renameBinder (KindedTyVar x fl lname lkind) =
   KindedTyVar x fl <$> located renameName lname <*> located renameType lkind
+
+renameLBinder :: LHsTyVarBndr flag GhcRn -> Rename (IdP GhcRn) (LHsTyVarBndr flag GhcRn)
+renameLBinder = located renameBinder
 
 -- | Core renaming logic.
 renameName :: (Eq name, SetName name) => name -> Rename name name

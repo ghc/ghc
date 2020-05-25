@@ -476,7 +476,7 @@ subordinates instMap decl = case decl of
         extract_deriv_ty (L l ty) =
           case ty of
             -- deriving (forall a. C a {- ^ Doc comment -})
-            HsForAllTy{ hst_fvf = ForallInvis
+            HsForAllTy{ hst_tele = HsForAllInvis{}
                       , hst_body = L _ (HsDocTy _ _ doc) }
                             -> Just (l, doc)
             -- deriving (C a {- ^ Doc comment -})

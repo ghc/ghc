@@ -138,9 +138,9 @@ addClassContext cls tvs0 (L pos (ClassOpSig _ _ lname ltype))
   = L pos (TypeSig noExtField lname (mkEmptySigWcType (go (hsSigType ltype))))
           -- The mkEmptySigWcType is suspicious
   where
-    go (L loc (HsForAllTy { hst_fvf = fvf, hst_bndrs = tvs, hst_body = ty }))
-       = L loc (HsForAllTy { hst_fvf = fvf, hst_xforall = noExtField
-                           , hst_bndrs = tvs, hst_body = go ty })
+    go (L loc (HsForAllTy { hst_tele = tele, hst_body = ty }))
+       = L loc (HsForAllTy { hst_xforall = noExtField
+                           , hst_tele = tele, hst_body = go ty })
     go (L loc (HsQualTy { hst_ctxt = ctxt, hst_body = ty }))
        = L loc (HsQualTy { hst_xqual = noExtField
                          , hst_ctxt = add_ctxt ctxt, hst_body = ty })
