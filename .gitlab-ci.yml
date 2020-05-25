@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: 6223fe0b5942f4fa35bdec92c74566cf195bfb42
+  DOCKER_REV: 35d6418c6ee0297352e6ea5f93a8ede0f2c2f931
 
   # Sequential version number capturing the versions of all tools fetched by
   # .gitlab/ci.sh.
@@ -647,6 +647,12 @@ nightly-x86_64-linux-deb10:
 release-x86_64-linux-deb10:
   <<: *release
   extends: .build-x86_64-linux-deb10
+
+nightly-x86_64-linux-deb10-cross-aarch64:
+  <<: *nightly
+  extends: .build-x86_64-linux-deb10
+  variables:
+    CROSS_TARGET: "aarch64-linux-gnu"
 
 #################################
 # x86_64-linux-deb8
