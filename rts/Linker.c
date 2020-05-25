@@ -826,15 +826,18 @@ HsInt insertSymbol(pathchar* obj_name, SymbolName* key, SymbolAddr* data)
  * lookup a symbol in the hash table
  */
 #if defined(OBJFORMAT_PEi386)
-SymbolAddr* lookupSymbol_ (SymbolName* lbl)
+SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent)
 {
+    (void)dependent; // TODO
+    ASSERT_LOCK_HELD(&linker_mutex);
     return lookupSymbol_PEi386(lbl);
 }
 
 #else
 
-SymbolAddr* lookupSymbol_ (SymbolName* lbl)
+SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent)
 {
+    ASSERT_LOCK_HELD(&linker_mutex);
     IF_DEBUG(linker, debugBelch("lookupSymbol: looking up %s\n", lbl));
 
     ASSERT(symhash != NULL);
@@ -859,10 +862,18 @@ SymbolAddr* lookupSymbol_ (SymbolName* lbl)
         return internal_dlsym(lbl + 1);
 
 #       else
-        ASSERT(2+2 == 5);
+        ASSERT(false);
         return NULL;
 #       endif
     } else {
+        if (dependent) {
+            // Add symbol's owner as a dependency to object code
+            ObjectCode *owner = pinfo->owner;
+            if (owner) {
+                // TODO: what does it mean for a symbol to not have an owner?
+                insertHashTable(owner->dependents, (W_)dependent, NULL);
+            }
+        }
         return loadSymbol(lbl, pinfo);
     }
 }
@@ -923,7 +934,9 @@ printLoadedObjects() {
 SymbolAddr* lookupSymbol( SymbolName* lbl )
 {
     ACQUIRE_LOCK(&linker_mutex);
-    SymbolAddr* r = lookupSymbol_(lbl);
+    // NULL for "don't add dependent". When adding a dependency we call
+    // lookupDependentSymbol directly.
+    SymbolAddr* r = lookupDependentSymbol(lbl, NULL);
     if (!r) {
         errorBelch("^^ Could not load '%s', dependency unresolved. "
                    "See top entry above.\n", lbl);
@@ -1238,9 +1251,6 @@ void freeObjectCode (ObjectCode *oc)
                            oc->sections[i].mapped_size);
                     break;
                 case SECTION_M32:
-                    IF_DEBUG(zero_on_gc,
-                        memset(oc->sections[i].start,
-                            0x00, oc->sections[i].size));
                     // Freed by m32_allocator_free
                     break;
 #endif
@@ -1293,6 +1303,8 @@ void freeObjectCode (ObjectCode *oc)
 
     stgFree(oc->fileName);
     stgFree(oc->archiveMemberName);
+
+    freeHashTable(oc->dependents, NULL);
 
     stgFree(oc);
 }
@@ -1374,6 +1386,8 @@ mkOc( pathchar *path, char *image, int imageSize,
    oc->rw_m32 = m32_allocator_new(false);
    oc->rx_m32 = m32_allocator_new(true);
 #endif
+
+   oc->dependents = allocHashTable();
 
    IF_DEBUG(linker, debugBelch("mkOc: done\n"));
    return oc;
