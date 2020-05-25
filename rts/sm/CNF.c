@@ -253,7 +253,7 @@ compactAllocateBlockInternal(Capability            *cap,
     return self;
 }
 
-static inline StgCompactNFDataBlock *
+StgCompactNFDataBlock *
 compactGetFirstBlock(StgCompactNFData *str)
 {
     return (StgCompactNFDataBlock*) ((W_)str - sizeof(StgCompactNFDataBlock));
