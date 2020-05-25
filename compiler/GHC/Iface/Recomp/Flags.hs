@@ -55,7 +55,7 @@ fingerprintDynFlags dflags@DynFlags{..} this_mod nameio =
         paths = [ hcSuf ]
 
         -- -fprof-auto etc.
-        prof = if gopt Opt_SccProfilingOn dflags then fromEnum profAuto else 0
+        prof = if sccProfilingEnabled dflags then fromEnum profAuto else 0
 
         -- Ticky
         ticky =

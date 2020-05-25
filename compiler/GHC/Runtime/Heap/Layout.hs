@@ -282,8 +282,8 @@ fixedHdrSizeW dflags = sTD_HDR_SIZE dflags + profHdrSize dflags
 -- (StgProfHeader in includes\/rts\/storage\/Closures.h)
 profHdrSize  :: DynFlags -> WordOff
 profHdrSize dflags
- | gopt Opt_SccProfilingOn dflags = pROF_HDR_SIZE dflags
- | otherwise                      = 0
+ | sccProfilingEnabled dflags = pROF_HDR_SIZE dflags
+ | otherwise                  = 0
 
 -- | The garbage collector requires that every closure is at least as
 --   big as this.

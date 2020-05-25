@@ -1168,7 +1168,7 @@ reserveStackFrame psize preg body = do
   withUpdFrameOff frame body
 
 profilingInfo dflags desc_str ty_str
-  = if not (gopt Opt_SccProfilingOn dflags)
+  = if not (sccProfilingEnabled dflags)
     then NoProfilingInfo
     else ProfilingInfo (BS8.pack desc_str) (BS8.pack ty_str)
 

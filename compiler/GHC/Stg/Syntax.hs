@@ -805,7 +805,7 @@ pprStgRhs :: OutputablePass pass => GenStgRhs pass -> SDoc
 
 pprStgRhs (StgRhsClosure ext cc upd_flag args body)
   = sdocWithDynFlags $ \dflags ->
-    hang (hsep [if gopt Opt_SccProfilingOn dflags then ppr cc else empty,
+    hang (hsep [if sccProfilingEnabled dflags then ppr cc else empty,
                 ppUnlessOption sdocSuppressStgExts (ppr ext),
                 char '\\' <> ppr upd_flag, brackets (interppSP args)])
          4 (ppr body)

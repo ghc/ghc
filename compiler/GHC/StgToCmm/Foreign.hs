@@ -306,7 +306,7 @@ saveThreadState dflags = do
             spExpr,
     close_nursery,
     -- and save the current cost centre stack in the TSO when profiling:
-    if gopt Opt_SccProfilingOn dflags then
+    if sccProfilingEnabled dflags then
         mkStore (cmmOffset platform (CmmReg (CmmLocal tso)) (tso_CCCS dflags)) cccsExpr
       else mkNop
     ]
@@ -421,7 +421,7 @@ loadThreadState dflags = do
     mkAssign hpAllocReg (zeroExpr platform),
     open_nursery,
     -- and load the current cost centre stack from the TSO when profiling:
-    if gopt Opt_SccProfilingOn dflags
+    if sccProfilingEnabled dflags
        then storeCurCCS
               (CmmLoad (cmmOffset platform (CmmReg (CmmLocal tso))
                  (tso_CCCS dflags)) (ccsType platform))
