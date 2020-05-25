@@ -61,7 +61,6 @@ module GHC.Settings
   , sGhcWithNativeCodeGen
   , sGhcWithSMP
   , sGhcRTSWays
-  , sTablesNextToCode
   , sLibFFI
   , sGhcThreaded
   , sGhcDebugged
@@ -274,8 +273,6 @@ sGhcWithSMP :: Settings -> Bool
 sGhcWithSMP = platformMisc_ghcWithSMP . sPlatformMisc
 sGhcRTSWays :: Settings -> String
 sGhcRTSWays = platformMisc_ghcRTSWays . sPlatformMisc
-sTablesNextToCode :: Settings -> Bool
-sTablesNextToCode = platformMisc_tablesNextToCode . sPlatformMisc
 sLibFFI :: Settings -> Bool
 sLibFFI = platformMisc_libFFI . sPlatformMisc
 sGhcThreaded :: Settings -> Bool
