@@ -251,7 +251,6 @@ data GeneralFlag
    | Opt_PIE                         -- ^ @-fPIE@
    | Opt_PICExecutable               -- ^ @-pie@
    | Opt_ExternalDynamicRefs
-   | Opt_SccProfilingOn
    | Opt_Ticky
    | Opt_Ticky_Allocd
    | Opt_Ticky_LNE
