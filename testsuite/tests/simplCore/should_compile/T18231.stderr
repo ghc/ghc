@@ -1,0 +1,40 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 30, types: 22, coercions: 5, joins: 0/0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18231.$trModule4 :: GHC.Prim.Addr#
+T18231.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18231.$trModule3 :: GHC.Types.TrName
+T18231.$trModule3 = GHC.Types.TrNameS T18231.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18231.$trModule2 :: GHC.Prim.Addr#
+T18231.$trModule2 = "T18231"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18231.$trModule1 :: GHC.Types.TrName
+T18231.$trModule1 = GHC.Types.TrNameS T18231.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T18231.$trModule :: GHC.Types.Module
+T18231.$trModule = GHC.Types.Module T18231.$trModule3 T18231.$trModule1
+
+Rec {
+-- RHS size: {terms: 6, types: 1, coercions: 0, joins: 0/0}
+lvl :: GHC.Prim.Int# -> Data.Functor.Identity.Identity ((), Int)
+lvl = \ (x :: GHC.Prim.Int#) -> T18231.m1 (GHC.Types.I# (GHC.Prim.+# x 1#))
+
+-- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
+T18231.m1 :: Int -> Data.Functor.Identity.Identity ((), Int)
+T18231.m1 = \ (s1 :: Int) -> case s1 of { GHC.Types.I# x -> lvl x }
+end Rec }
+
+-- RHS size: {terms: 1, types: 0, coercions: 5, joins: 0/0}
+m :: State Int ()
+m = T18231.m1 `cast` (Sym (Control.Monad.Trans.State.Strict.N:StateT[0] <Int>_N <Data.Functor.Identity.Identity>_R <()>_N) :: (Int -> Data.Functor.Identity.Identity ((), Int)) ~R# StateT Int Data.Functor.Identity.Identity ())
+
+
+
