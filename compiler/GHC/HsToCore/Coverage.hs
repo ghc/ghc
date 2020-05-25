@@ -78,8 +78,7 @@ addTicksToBinds
 addTicksToBinds hsc_env mod mod_loc exports tyCons binds
   | let dflags = hsc_dflags hsc_env
         passes = coveragePasses dflags, not (null passes),
-    Just orig_file <- ml_hs_file mod_loc,
-    not ("boot" `isSuffixOf` orig_file) = do
+    Just orig_file <- ml_hs_file mod_loc = do
 
      let  orig_file2 = guessSourceFile binds orig_file
 
@@ -118,7 +117,7 @@ addTicksToBinds hsc_env mod mod_loc exports tyCons binds
      dumpIfSet_dyn dflags Opt_D_dump_ticked "HPC" FormatHaskell
        (pprLHsBinds binds1)
 
-     return (binds1, HpcInfo tickCount hashNo, Just modBreaks)
+     return (binds1, HpcInfo tickCount hashNo, modBreaks)
 
   | otherwise = return (binds, emptyHpcInfo False, Nothing)
 
@@ -135,23 +134,23 @@ guessSourceFile binds orig_file =
         _ -> orig_file
 
 
-mkModBreaks :: HscEnv -> Module -> Int -> [MixEntry_] -> IO ModBreaks
+mkModBreaks :: HscEnv -> Module -> Int -> [MixEntry_] -> IO (Maybe ModBreaks)
 mkModBreaks hsc_env mod count entries
-  | HscInterpreted <- hscTarget (hsc_dflags hsc_env) = do
+  | breakpointsEnabled (hsc_dflags hsc_env) = do
     breakArray <- GHCi.newBreakArray hsc_env (length entries)
     ccs <- mkCCSArray hsc_env mod count entries
     let
            locsTicks  = listArray (0,count-1) [ span  | (span,_,_,_)  <- entries ]
            varsTicks  = listArray (0,count-1) [ vars  | (_,_,vars,_)  <- entries ]
            declsTicks = listArray (0,count-1) [ decls | (_,decls,_,_) <- entries ]
-    return emptyModBreaks
+    return $ Just $ emptyModBreaks
                        { modBreaks_flags = breakArray
                        , modBreaks_locs  = locsTicks
                        , modBreaks_vars  = varsTicks
                        , modBreaks_decls = declsTicks
                        , modBreaks_ccs   = ccs
                        }
-  | otherwise = return emptyModBreaks
+  | otherwise = return Nothing
 
 mkCCSArray
   :: HscEnv -> Module -> Int -> [MixEntry_]
@@ -1004,10 +1003,19 @@ addTickArithSeqInfo (FromThenTo e1 e2 e3) =
                 (addTickLHsExpr e2)
                 (addTickLHsExpr e3)
 
-data TickTransState = TT { tickBoxCount:: Int
+data TickTransState = TT { tickBoxCount:: !Int
                          , mixEntries  :: [MixEntry_]
-                         , ccIndices   :: CostCentreState
+                         , ccIndices   :: !CostCentreState
                          }
+
+addMixEntry :: MixEntry_ -> TM Int
+addMixEntry ent = do
+  c <- tickBoxCount <$> getState
+  setState $ \st ->
+    st { tickBoxCount = c + 1
+       , mixEntries = ent : mixEntries st
+       }
+  return c
 
 data TickTransEnv = TTE { fileName     :: FastString
                         , density      :: TickDensity
@@ -1028,13 +1036,17 @@ data TickishType = ProfNotes | HpcTicks | Breakpoints | SourceNotes
 
 coveragePasses :: DynFlags -> [TickishType]
 coveragePasses dflags =
-    ifa (hscTarget dflags == HscInterpreted) Breakpoints $
+    ifa (breakpointsEnabled dflags)          Breakpoints $
     ifa (gopt Opt_Hpc dflags)                HpcTicks $
     ifa (gopt Opt_SccProfilingOn dflags &&
          profAuto dflags /= NoProfAuto)      ProfNotes $
     ifa (debugLevel dflags > 0)              SourceNotes []
   where ifa f x xs | f         = x:xs
                    | otherwise = xs
+
+-- | Should we produce 'Breakpoint' ticks?
+breakpointsEnabled :: DynFlags -> Bool
+breakpointsEnabled dflags = hscTarget dflags == HscInterpreted
 
 -- | Tickishs that only make sense when their source code location
 -- refers to the current file. This might not always be true due to
@@ -1202,11 +1214,7 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path = do
   dflags <- getDynFlags
   env <- getEnv
   case tickishType env of
-    HpcTicks -> do
-      c <- liftM tickBoxCount getState
-      setState $ \st -> st { tickBoxCount = c + 1
-                           , mixEntries = me : mixEntries st }
-      return $ HpcTick (this_mod env) c
+    HpcTicks -> HpcTick (this_mod env) <$> addMixEntry me
 
     ProfNotes -> do
       let nm = mkFastString cc_name
@@ -1215,11 +1223,7 @@ mkTickish boxLabel countEntries topOnly pos fvs decl_path = do
           count = countEntries && gopt Opt_ProfCountEntries dflags
       return $ ProfNote cc count True{-scopes-}
 
-    Breakpoints -> do
-      c <- liftM tickBoxCount getState
-      setState $ \st -> st { tickBoxCount = c + 1
-                           , mixEntries = me:mixEntries st }
-      return $ Breakpoint c ids
+    Breakpoints -> Breakpoint <$> addMixEntry me <*> pure ids
 
     SourceNotes | RealSrcSpan pos' _ <- pos ->
       return $ SourceNote pos' cc_name
@@ -1240,22 +1244,15 @@ allocBinTickBox boxLabel pos m = do
 
 mkBinTickBoxHpc :: (Bool -> BoxLabel) -> SrcSpan -> LHsExpr GhcTc
                 -> TM (LHsExpr GhcTc)
-mkBinTickBoxHpc boxLabel pos e =
- TM $ \ env st ->
-  let meT = (pos,declPath env, [],boxLabel True)
-      meF = (pos,declPath env, [],boxLabel False)
-      meE = (pos,declPath env, [],ExpBox False)
-      c = tickBoxCount st
-      mes = mixEntries st
-  in
-     ( L pos $ HsTick noExtField (HpcTick (this_mod env) c)
-          $ L pos $ HsBinTick noExtField (c+1) (c+2) e
-   -- notice that F and T are reversed,
-   -- because we are building the list in
-   -- reverse...
-     , noFVs
-     , st {tickBoxCount=c+3 , mixEntries=meF:meT:meE:mes}
-     )
+mkBinTickBoxHpc boxLabel pos e = do
+  env <- getEnv
+  binTick <- HsBinTick noExtField
+    <$> addMixEntry (pos,declPath env, [],boxLabel True)
+    <*> addMixEntry (pos,declPath env, [],boxLabel False)
+    <*> pure e
+  tick <- HpcTick (this_mod env)
+    <$> addMixEntry (pos,declPath env, [],ExpBox False)
+  return $ L pos $ HsTick noExtField tick (L pos binTick)
 
 mkHpcPos :: SrcSpan -> HpcPos
 mkHpcPos pos@(RealSrcSpan s _)
