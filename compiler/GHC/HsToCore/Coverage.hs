@@ -1039,7 +1039,7 @@ coveragePasses :: DynFlags -> [TickishType]
 coveragePasses dflags =
     ifa (breakpointsEnabled dflags)          Breakpoints $
     ifa (gopt Opt_Hpc dflags)                HpcTicks $
-    ifa (gopt Opt_SccProfilingOn dflags &&
+    ifa (sccProfilingEnabled dflags &&
          profAuto dflags /= NoProfAuto)      ProfNotes $
     ifa (debugLevel dflags > 0)              SourceNotes []
   where ifa f x xs | f         = x:xs

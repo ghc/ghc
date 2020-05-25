@@ -275,11 +275,9 @@ outputForeignStubs_help fname doc_str header footer
 -- module;
 
 -- | Generate code to initialise cost centres
-profilingInitCode :: DynFlags -> Module -> CollectedCCs -> SDoc
-profilingInitCode dflags this_mod (local_CCs, singleton_CCSs)
- = if not (gopt Opt_SccProfilingOn dflags)
-   then empty
-   else vcat
+profilingInitCode :: Module -> CollectedCCs -> SDoc
+profilingInitCode this_mod (local_CCs, singleton_CCSs)
+ = vcat
     $  map emit_cc_decl local_CCs
     ++ map emit_ccs_decl singleton_CCSs
     ++ [emit_cc_list local_CCs]

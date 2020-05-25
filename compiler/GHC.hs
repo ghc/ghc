@@ -605,10 +605,12 @@ setSessionDynFlags dflags = do
     then do
          let
            prog = pgm_i dflags ++ flavour
+           profiled = ways dflags `hasWay` WayProf
+           dynamic  = ways dflags `hasWay` WayDyn
            flavour
-             | WayProf `S.member` ways dflags = "-prof"
-             | WayDyn `S.member` ways dflags  = "-dyn"
-             | otherwise                      = ""
+             | profiled  = "-prof" -- FIXME: can't we have both?
+             | dynamic   = "-dyn"
+             | otherwise = ""
            msg = text "Starting " <> text prog
          tr <- if verbosity dflags >= 3
                 then return (logInfo dflags $ withPprStyle defaultDumpStyle msg)
@@ -617,8 +619,8 @@ setSessionDynFlags dflags = do
           conf = IServConfig
             { iservConfProgram  = prog
             , iservConfOpts     = getOpts dflags opt_i
-            , iservConfProfiled = gopt Opt_SccProfilingOn dflags
-            , iservConfDynamic  = WayDyn `S.member` ways dflags
+            , iservConfProfiled = profiled
+            , iservConfDynamic  = dynamic
             , iservConfHook     = createIservProcessHook (hooks dflags)
             , iservConfTrace    = tr
             }

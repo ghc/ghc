@@ -405,7 +405,7 @@ mkStdInfoTable dflags (type_descr, closure_descr) cl_type srt layout_lit
  where
     platform = targetPlatform dflags
     prof_info
-        | gopt Opt_SccProfilingOn dflags = [type_descr, closure_descr]
+        | sccProfilingEnabled dflags = [type_descr, closure_descr]
         | otherwise = []
 
     tag = CmmInt (fromIntegral cl_type) (halfWordWidth platform)
@@ -565,7 +565,7 @@ stdInfoTableSizeW :: DynFlags -> WordOff
 -- It must vary in sync with mkStdInfoTable
 stdInfoTableSizeW dflags
   = fixedInfoTableSizeW
-  + if gopt Opt_SccProfilingOn dflags
+  + if sccProfilingEnabled dflags
        then profInfoTableSizeW
        else 0
 
