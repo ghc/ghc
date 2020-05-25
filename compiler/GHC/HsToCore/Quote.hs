@@ -355,7 +355,7 @@ get_scoped_tvs (L _ signature)
       --    here 'k' scopes too
       | HsIB { hsib_ext = implicit_vars
              , hsib_body = hs_ty } <- sig
-      , (explicit_vars, _) <- splitLHsForAllTyInvis hs_ty
+      , (L _ explicit_vars, _) <- splitLHsForAllTyInvis hs_ty
       = implicit_vars ++ hsLTyVarNames explicit_vars
 
 {- Notes
@@ -997,7 +997,7 @@ rep_ty_sig :: Name -> SrcSpan -> LHsSigType GhcRn -> Located Name
 -- and Note [Don't quantify implicit type variables in quotes]
 rep_ty_sig mk_sig loc sig_ty nm
   | HsIB { hsib_body = hs_ty } <- sig_ty
-  , (explicit_tvs, ctxt, ty) <- splitLHsSigmaTyInvis hs_ty
+  , (L _ explicit_tvs, ctxt, ty) <- splitLHsSigmaTyInvis hs_ty
   = do { nm1 <- lookupLOcc nm
        ; let rep_in_scope_tv tv = do { name <- lookupBinder (hsLTyVarName tv)
                                      ; repTyVarBndrWithKind tv name }
@@ -1025,7 +1025,7 @@ rep_patsyn_ty_sig :: SrcSpan -> LHsSigType GhcRn -> Located Name
 -- and Note [Don't quantify implicit type variables in quotes]
 rep_patsyn_ty_sig loc sig_ty nm
   | HsIB { hsib_body = hs_ty } <- sig_ty
-  , (univs, reqs, exis, provs, ty) <- splitLHsPatSynTy hs_ty
+  , (L _ univs, reqs, L _ exis, provs, ty) <- splitLHsPatSynTy hs_ty
   = do { nm1 <- lookupLOcc nm
        ; let rep_in_scope_tv tv = do { name <- lookupBinder (hsLTyVarName tv)
                                      ; repTyVarBndrWithKind tv name }
@@ -1240,7 +1240,7 @@ repContext ctxt = do preds <- repListM typeTyConName repLTy ctxt
 repHsSigType :: LHsSigType GhcRn -> MetaM (Core (M TH.Type))
 repHsSigType (HsIB { hsib_ext = implicit_tvs
                    , hsib_body = body })
-  | (explicit_tvs, ctxt, ty) <- splitLHsSigmaTyInvis body
+  | (L _ explicit_tvs, ctxt, ty) <- splitLHsSigmaTyInvis body
   = addSimpleTyVarBinds implicit_tvs $
       -- See Note [Don't quantify implicit type variables in quotes]
     addHsTyVarBinds explicit_tvs $ \ th_explicit_tvs ->
@@ -1265,12 +1265,12 @@ repLTy ty = repTy (unLoc ty)
 -- Desugar a type headed by an invisible forall (e.g., @forall a. a@) or
 -- a context (e.g., @Show a => a@) into a ForallT from L.H.TH.Syntax.
 -- In other words, the argument to this function is always an
--- @HsForAllTy ForallInvis@ or @HsQualTy@.
+-- @HsForAllTy HsForAllInvis{}@ or @HsQualTy@.
 -- Types headed by visible foralls (which are desugared to ForallVisT) are
 -- handled separately in repTy.
 repForallT :: HsType GhcRn -> MetaM (Core (M TH.Type))
 repForallT ty
- | (tvs, ctxt, tau) <- splitLHsSigmaTyInvis (noLoc ty)
+ | (L _ tvs, ctxt, tau) <- splitLHsSigmaTyInvis (noLoc ty)
  = addHsTyVarBinds tvs $ \bndrs ->
    do { ctxt1  <- repLContext ctxt
       ; tau1   <- repLTy tau
@@ -1278,14 +1278,13 @@ repForallT ty
       }
 
 repTy :: HsType GhcRn -> MetaM (Core (M TH.Type))
-repTy ty@(HsForAllTy { hst_fvf = fvf, hst_bndrs = tvs, hst_body = body }) =
-  case fvf of
-    ForallInvis -> repForallT ty
-    ForallVis   -> let tvs' = map ((<$>) (setHsTyVarBndrFlag ())) tvs
-                       -- see Note [Specificity in HsForAllTy] in GHC.Hs.Type
-                   in addHsTyVarBinds tvs' $ \bndrs ->
-                   do body1 <- repLTy body
-                      repTForallVis bndrs body1
+repTy ty@(HsForAllTy { hst_tele = L _ tele, hst_body = body }) =
+  case tele of
+    HsForAllInvis{} -> repForallT ty
+    HsForAllVis { hsf_vis_bndrs = tvs } ->
+      addHsTyVarBinds tvs $ \bndrs ->
+      do body1 <- repLTy body
+         repTForallVis bndrs body1
 repTy ty@(HsQualTy {}) = repForallT ty
 
 repTy (HsTyVar _ _ (L _ n))

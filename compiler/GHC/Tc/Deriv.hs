@@ -715,15 +715,15 @@ tcStandaloneDerivInstType
 tcStandaloneDerivInstType ctxt
     (HsWC { hswc_body = deriv_ty@(HsIB { hsib_ext = vars
                                        , hsib_body   = deriv_ty_body })})
-  | (tvs, theta, rho) <- splitLHsSigmaTyInvis deriv_ty_body
+  | (L tvs_loc tvs, theta, rho) <- splitLHsSigmaTyInvis deriv_ty_body
   , L _ [wc_pred] <- theta
   , L wc_span (HsWildCardTy _) <- ignoreParens wc_pred
   = do dfun_ty <- tcHsClsInstType ctxt $
                   HsIB { hsib_ext = vars
                        , hsib_body
                            = L (getLoc deriv_ty_body) $
-                             HsForAllTy { hst_fvf = ForallInvis
-                                        , hst_bndrs = tvs
+                             HsForAllTy { hst_tele = L tvs_loc $
+                                            mkHsForAllInvisTele tvs
                                         , hst_xforall = noExtField
                                         , hst_body  = rho }}
        let (tvs, _theta, cls, inst_tys) = tcSplitDFunTy dfun_ty

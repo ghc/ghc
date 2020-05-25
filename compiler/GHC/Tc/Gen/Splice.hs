@@ -2123,19 +2123,19 @@ reifyType ty@(CoercionTy {})= noTH (sLit "coercions in types") (ppr ty)
 
 reify_for_all :: TyCoRep.ArgFlag -> TyCoRep.Type -> TcM TH.Type
 -- Arg of reify_for_all is always ForAllTy or a predicate FunTy
-reify_for_all argf ty = do
-  tvbndrs' <- reifyTyVarBndrs tvbndrs
-  case argToForallVisFlag argf of
-    ForallVis   -> do phi' <- reifyType phi
-                      let tvs = map (() <$) tvbndrs'
-                      -- see Note [Specificity in HsForAllTy] in GHC.Hs.Type
-                      pure $ TH.ForallVisT tvs phi'
-    ForallInvis -> do let (cxt, tau) = tcSplitPhiTy phi
-                      cxt' <- reifyCxt cxt
-                      tau' <- reifyType tau
-                      pure $ TH.ForallT tvbndrs' cxt' tau'
-  where
-    (tvbndrs, phi) = tcSplitForAllTysSameVis argf ty
+reify_for_all argf ty
+  | isVisibleArgFlag argf
+  = do let (req_bndrs, phi) = tcSplitForAllTysReq ty
+       tvbndrs' <- reifyTyVarBndrs req_bndrs
+       phi' <- reifyType phi
+       pure $ TH.ForallVisT tvbndrs' phi'
+  | otherwise
+  = do let (inv_bndrs, phi) = tcSplitForAllTysInvis ty
+       tvbndrs' <- reifyTyVarBndrs inv_bndrs
+       let (cxt, tau) = tcSplitPhiTy phi
+       cxt' <- reifyCxt cxt
+       tau' <- reifyType tau
+       pure $ TH.ForallT tvbndrs' cxt' tau'
 
 reifyTyLit :: TyCoRep.TyLit -> TcM TH.TyLit
 reifyTyLit (NumTyLit n) = return (TH.NumTyLit n)
@@ -2176,10 +2176,6 @@ instance ReifyFlag () () where
 instance ReifyFlag Specificity TH.Specificity where
     reifyFlag SpecifiedSpec = TH.SpecifiedSpec
     reifyFlag InferredSpec  = TH.InferredSpec
-
-instance ReifyFlag ArgFlag TH.Specificity where
-    reifyFlag Required      = TH.SpecifiedSpec
-    reifyFlag (Invisible s) = reifyFlag s
 
 reifyTyVars :: [TyVar] -> TcM [TH.TyVarBndr ()]
 reifyTyVars = reifyTyVarBndrs . map mk_bndr
