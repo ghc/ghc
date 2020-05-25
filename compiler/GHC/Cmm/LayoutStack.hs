@@ -357,10 +357,9 @@ isGcJump _something_else = False
 
 -- This doesn't seem right somehow.  We need to find out whether this
 -- proc will push some update frame material at some point, so that we
--- can avoid using that area of the stack for spilling.  The
--- updfr_space field of the CmmProc *should* tell us, but it doesn't
--- (I think maybe it gets filled in later when we do proc-point
--- splitting).
+-- can avoid using that area of the stack for spilling. Ideally we would
+-- capture this information in the CmmProc (e.g. in CmmStackInfo; see #18232
+-- for details on one ill-fated attempt at this).
 --
 -- So we'll just take the max of all the cml_ret_offs.  This could be
 -- unnecessarily pessimistic, but probably not in the code we
