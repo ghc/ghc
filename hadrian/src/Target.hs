@@ -20,7 +20,9 @@ type Target = H.Target Context Builder
 -- 'True' only if the argument needs to be tracked.
 trackArgument :: Target -> String -> Bool
 trackArgument target arg = case builder target of
-    (Make _) -> not $ threadArg arg
-    _        -> True
+    Make _    -> not $ threadArg arg
+    Ghc _ _   -> not $ verbosityArg arg
+    _         -> True
   where
     threadArg s = dropWhileEnd isDigit s `elem` ["-j", "MAKEFLAGS=-j", "THREADS="]
+    verbosityArg s = dropWhileEnd isDigit s == "-v"
