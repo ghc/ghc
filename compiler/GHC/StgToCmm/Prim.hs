@@ -300,8 +300,8 @@ emitPrimOp dflags = \case
   GetCCSOfOp -> \[arg] -> opAllDone $ \[res] -> do
     let
       val
-       | gopt Opt_SccProfilingOn dflags = costCentreFrom dflags (cmmUntag dflags arg)
-       | otherwise                      = CmmLit (zeroCLit platform)
+       | sccProfilingEnabled dflags = costCentreFrom dflags (cmmUntag dflags arg)
+       | otherwise                  = CmmLit (zeroCLit platform)
     emitAssign (CmmLocal res) val
 
   GetCurrentCCSOp -> \[_] -> opAllDone $ \[res] -> do
