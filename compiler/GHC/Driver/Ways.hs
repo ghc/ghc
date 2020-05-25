@@ -20,6 +20,7 @@
 -- this compilation.
 module GHC.Driver.Ways
    ( Way(..)
+   , hasWay
    , allowed_combination
    , wayGeneralFlags
    , wayUnsetGeneralFlags
@@ -60,12 +61,15 @@ data Way
   | WayDyn           -- ^ Dynamic linking
   deriving (Eq, Ord, Show)
 
+-- | Test if a ways is enabled
+hasWay :: Set Way -> Way -> Bool
+hasWay ws w = Set.member w ws
 
 -- | Check if a combination of ways is allowed
 allowed_combination :: Set Way -> Bool
 allowed_combination ways = not disallowed
   where
-   disallowed = or [ Set.member ways x && Set.member ways y
+   disallowed = or [ hasWay ways x && hasWay ways y
                    | (x,y) <- couples
                    ]
    -- List of disallowed couples of ways
@@ -121,7 +125,7 @@ wayGeneralFlags _ WayDyn      = [Opt_PIC, Opt_ExternalDynamicRefs]
     -- .so before loading the .so using the system linker.  Since only
     -- PIC objects can be linked into a .so, we have to compile even
     -- modules of the main program with -fPIC when using -dynamic.
-wayGeneralFlags _ WayProf     = [Opt_SccProfilingOn]
+wayGeneralFlags _ WayProf     = []
 wayGeneralFlags _ WayEventLog = []
 
 -- | Turn these flags off when enabling this way

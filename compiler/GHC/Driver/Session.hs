@@ -42,6 +42,7 @@ module GHC.Driver.Session (
         whenCannotGenerateDynamicToo,
         dynamicTooMkDynamicDynFlags,
         dynamicOutputFile,
+        sccProfilingEnabled,
         DynFlags(..),
         FlagSpec(..),
         HasDynFlags(..), ContainsDynFlags(..),
@@ -5093,6 +5094,10 @@ isBmi2Enabled dflags = case platformArch (targetPlatform dflags) of
     ArchX86_64 -> bmiVersion dflags >= Just BMI2
     ArchX86    -> bmiVersion dflags >= Just BMI2
     _          -> False
+
+-- | Indicate if cost-centre profiling is enabled
+sccProfilingEnabled :: DynFlags -> Bool
+sccProfilingEnabled dflags = ways dflags `hasWay` WayProf
 
 -- -----------------------------------------------------------------------------
 -- Linker/compiler information

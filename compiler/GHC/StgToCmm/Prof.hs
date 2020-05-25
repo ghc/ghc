@@ -76,15 +76,15 @@ costCentreFrom dflags cl = CmmLoad (cmmOffsetB platform cl (oFFSET_StgHeader_ccs
 -- | The profiling header words in a static closure
 staticProfHdr :: DynFlags -> CostCentreStack -> [CmmLit]
 staticProfHdr dflags ccs
-  | gopt Opt_SccProfilingOn dflags = [mkCCostCentreStack ccs, staticLdvInit platform]
-  | otherwise                      = []
+  | sccProfilingEnabled dflags = [mkCCostCentreStack ccs, staticLdvInit platform]
+  | otherwise                  = []
   where platform = targetPlatform dflags
 
 -- | Profiling header words in a dynamic closure
 dynProfHdr :: DynFlags -> CmmExpr -> [CmmExpr]
 dynProfHdr dflags ccs
-  | gopt Opt_SccProfilingOn dflags = [ccs, dynLdvInit dflags]
-  | otherwise                      = []
+  | sccProfilingEnabled dflags = [ccs, dynLdvInit dflags]
+  | otherwise                  = []
 
 -- | Initialise the profiling field of an update frame
 initUpdFrameProf :: CmmExpr -> FCode ()
@@ -130,7 +130,7 @@ saveCurrentCostCentre :: FCode (Maybe LocalReg)
 saveCurrentCostCentre
   = do dflags <- getDynFlags
        platform <- getPlatform
-       if not (gopt Opt_SccProfilingOn dflags)
+       if not (sccProfilingEnabled dflags)
            then return Nothing
            else do local_cc <- newTemp (ccType platform)
                    emitAssign (CmmLocal local_cc) cccsExpr
@@ -195,7 +195,7 @@ enterCostCentreFun ccs closure =
 ifProfiling :: FCode () -> FCode ()
 ifProfiling code
   = do dflags <- getDynFlags
-       if gopt Opt_SccProfilingOn dflags
+       if sccProfilingEnabled dflags
            then code
            else return ()
 
@@ -207,7 +207,7 @@ initCostCentres :: CollectedCCs -> FCode ()
 -- Emit the declarations
 initCostCentres (local_CCs, singleton_CCSs)
   = do dflags <- getDynFlags
-       when (gopt Opt_SccProfilingOn dflags) $
+       when (sccProfilingEnabled dflags) $
            do mapM_ emitCostCentreDecl local_CCs
               mapM_ emitCostCentreStackDecl singleton_CCSs
 
@@ -277,7 +277,7 @@ emitSetCCC :: CostCentre -> Bool -> Bool -> FCode ()
 emitSetCCC cc tick push
  = do dflags <- getDynFlags
       platform <- getPlatform
-      if not (gopt Opt_SccProfilingOn dflags)
+      if not (sccProfilingEnabled dflags)
           then return ()
           else do tmp <- newTemp (ccsType platform)
                   pushCostCentre tmp cccsExpr cc
