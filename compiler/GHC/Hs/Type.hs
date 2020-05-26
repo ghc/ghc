@@ -30,7 +30,7 @@ module GHC.Hs.Type (
         HsTyLit(..),
         HsIPName(..), hsIPNameFS,
         HsArg(..), numVisibleArgs,
-        LHsTypeArg,
+        LHsTypeArg, lhsTypeArgSrcSpan,
         OutputableBndrFlag,
 
         LBangType, BangType,
@@ -1288,6 +1288,13 @@ numVisibleArgs = count is_vis
 
 -- type level equivalent
 type LHsTypeArg p = HsArg (LHsType p) (LHsKind p)
+
+-- | Compute the 'SrcSpan' associated with an 'LHsTypeArg'.
+lhsTypeArgSrcSpan :: LHsTypeArg pass -> SrcSpan
+lhsTypeArgSrcSpan arg = case arg of
+  HsValArg  tm    -> getLoc tm
+  HsTypeArg at ty -> at `combineSrcSpans` getLoc ty
+  HsArgPar  sp    -> sp
 
 instance (Outputable tm, Outputable ty) => Outputable (HsArg tm ty) where
   ppr (HsValArg tm)    = ppr tm
