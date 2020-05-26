@@ -1576,7 +1576,7 @@ gen_Lift_binds loc tycon = (listToBag [lift_bind, liftTyped_bind], emptyBag)
   where
     lift_bind      = mkFunBindEC 1 loc lift_RDR (nlHsApp pure_Expr)
                                  (map (pats_etc mk_exp) data_cons)
-    liftTyped_bind = mkFunBindEC 1 loc liftTyped_RDR (nlHsApp pure_Expr)
+    liftTyped_bind = mkFunBindEC 1 loc liftTyped_RDR (nlHsApp codeCoerce_Expr . nlHsApp pure_Expr)
                                  (map (pats_etc mk_texp) data_cons)
 
     mk_exp = ExpBr noExtField
@@ -2352,7 +2352,7 @@ bs_RDRs         = [ mkVarUnqual (mkFastString ("b"++show i)) | i <- [(1::Int) ..
 cs_RDRs         = [ mkVarUnqual (mkFastString ("c"++show i)) | i <- [(1::Int) .. ] ]
 
 a_Expr, b_Expr, c_Expr, z_Expr, ltTag_Expr, eqTag_Expr, gtTag_Expr, false_Expr,
-    true_Expr, pure_Expr :: LHsExpr GhcPs
+    true_Expr, pure_Expr, codeCoerce_Expr :: LHsExpr GhcPs
 a_Expr          = nlHsVar a_RDR
 b_Expr          = nlHsVar b_RDR
 c_Expr          = nlHsVar c_RDR
@@ -2363,6 +2363,7 @@ gtTag_Expr      = nlHsVar gtTag_RDR
 false_Expr      = nlHsVar false_RDR
 true_Expr       = nlHsVar true_RDR
 pure_Expr       = nlHsVar pure_RDR
+codeCoerce_Expr = nlHsVar unsafeCodeCoerce_RDR
 
 a_Pat, b_Pat, c_Pat, d_Pat, k_Pat, z_Pat :: LPat GhcPs
 a_Pat           = nlVarPat a_RDR

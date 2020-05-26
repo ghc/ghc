@@ -22,11 +22,11 @@ dq = [| 5 |]
 top_level :: (C m, D m, Quote m) => m Exp
 top_level = [| $cq + $dq |]
 
-cqt :: (C m, Quote m) => m (TExp Int)
+cqt :: (C m, Quote m) => Code m Int
 cqt = [|| 5 ||]
 
-dqt :: (D m, Quote m) => m (TExp Int)
+dqt :: (D m, Quote m) => Code m Int
 dqt = [|| 5 ||]
 
-top_level_t :: (C m, D m, Quote m) => m (TExp Int)
+top_level_t :: (C m, D m, Quote m) => Code m Int
 top_level_t = [|| $$cqt + $$dqt ||]

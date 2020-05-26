@@ -31,6 +31,7 @@ type PatQ                = Q Pat
 type FieldPatQ           = Q FieldPat
 type ExpQ                = Q Exp
 type TExpQ a             = Q (TExp a)
+type CodeQ a             = Code Q a
 type DecQ                = Q Dec
 type DecsQ               = Q [Dec]
 type Decs                = [Dec] -- Defined as it is more convenient to wire-in

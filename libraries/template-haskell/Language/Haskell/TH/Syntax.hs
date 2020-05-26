@@ -343,6 +343,43 @@ be inferred (#8459).  Consider
 The splice will evaluate to (MkAge 3) and you can't add that to
 4::Int. So you can't coerce a (TExp Age) to a (TExp Int). -}
 
+-- Code constructor
+
+type role Code representational nominal   -- See Note [Role of TExp]
+newtype Code m (a :: TYPE (r :: RuntimeRep)) = Code
+  { examineCode :: m (TExp a) -- ^ Underlying untyped Template Haskell expression
+  }
+
+unsafeCodeCoerce :: forall (r :: RuntimeRep) (a :: TYPE r) m .
+                      Quote m => m Exp -> Code m a
+unsafeCodeCoerce m = Code (unsafeTExpCoerce m)
+
+liftCode :: m (TExp a) -> Code m a
+liftCode = Code
+
+unTypeCode :: forall (r :: RuntimeRep) (a :: TYPE r) m . Quote m
+           => Code m a -> m Exp
+unTypeCode = unTypeQ . examineCode
+
+hoistCode :: (forall x . m x -> n x) -> Code m a -> Code n a
+hoistCode f (Code a) = Code (f a)
+
+bindCode :: Monad m => m a -> (a -> Code m b) -> Code m b
+bindCode q k = liftCode (q >>= examineCode . k)
+
+bindCode_ :: Monad m => m a -> Code m b -> Code m b
+bindCode_ q c = liftCode ( q >> examineCode c)
+
+-- | A useful combinator for embedding monadic actions into 'Code'
+-- @
+-- myCode :: ... => Code m a
+-- myCode = joinCode $ do
+--   x <- someSideEffect
+--   return (makeCodeWith x)
+-- @
+joinCode :: Monad m => m (Code m a) -> Code m a
+joinCode = flip bindCode id
+
 ----------------------------------------------------
 -- Packaged versions for the programmer, hiding the Quasi-ness
 
@@ -727,107 +764,107 @@ class Lift (t :: TYPE r) where
   -- a splice.
   lift :: Quote m => t -> m Exp
   default lift :: (r ~ 'LiftedRep, Quote m) => t -> m Exp
-  lift = unTypeQ . liftTyped
+  lift = unTypeCode . liftTyped
 
   -- | Turn a value into a Template Haskell typed expression, suitable for use
   -- in a typed splice.
   --
   -- @since 2.16.0.0
-  liftTyped :: Quote m => t -> m (TExp t)
+  liftTyped :: Quote m => t -> Code m t
 
 
 -- If you add any instances here, consider updating test th/TH_Lift
 instance Lift Integer where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL x))
 
 instance Lift Int where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 -- | @since 2.16.0.0
 instance Lift Int# where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntPrimL (fromIntegral (I# x))))
 
 instance Lift Int8 where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Int16 where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Int32 where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Int64 where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 -- | @since 2.16.0.0
 instance Lift Word# where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (WordPrimL (fromIntegral (W# x))))
 
 instance Lift Word where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Word8 where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Word16 where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Word32 where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Word64 where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Lift Natural where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (IntegerL (fromIntegral x)))
 
 instance Integral a => Lift (Ratio a) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (RationalL (toRational x)))
 
 instance Lift Float where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (RationalL (toRational x)))
 
 -- | @since 2.16.0.0
 instance Lift Float# where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (FloatPrimL (toRational (F# x))))
 
 instance Lift Double where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (RationalL (toRational x)))
 
 -- | @since 2.16.0.0
 instance Lift Double# where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (DoublePrimL (toRational (D# x))))
 
 instance Lift Char where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (CharL x))
 
 -- | @since 2.16.0.0
 instance Lift Char# where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x = return (LitE (CharPrimL (C# x)))
 
 instance Lift Bool where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
 
   lift True  = return (ConE trueName)
   lift False = return (ConE falseName)
@@ -837,24 +874,24 @@ instance Lift Bool where
 --
 -- @since 2.16.0.0
 instance Lift Addr# where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x
     = return (LitE (StringPrimL (map (fromIntegral . ord) (unpackCString# x))))
 
 instance Lift a => Lift (Maybe a) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
 
   lift Nothing  = return (ConE nothingName)
   lift (Just x) = liftM (ConE justName `AppE`) (lift x)
 
 instance (Lift a, Lift b) => Lift (Either a b) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
 
   lift (Left x)  = liftM (ConE leftName  `AppE`) (lift x)
   lift (Right y) = liftM (ConE rightName `AppE`) (lift y)
 
 instance Lift a => Lift [a] where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift xs = do { xs' <- mapM lift xs; return (ListE xs') }
 
 liftString :: Quote m => String -> m Exp
@@ -863,7 +900,7 @@ liftString s = return (LitE (StringL s))
 
 -- | @since 2.15.0.0
 instance Lift a => Lift (NonEmpty a) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
 
   lift (x :| xs) = do
     x' <- lift x
@@ -872,77 +909,77 @@ instance Lift a => Lift (NonEmpty a) where
 
 -- | @since 2.15.0.0
 instance Lift Void where
-  liftTyped = pure . absurd
-  lift = pure . absurd
+  liftTyped = absurd
+  lift = absurd
 
 instance Lift () where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift () = return (ConE (tupleDataName 0))
 
 instance (Lift a, Lift b) => Lift (a, b) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (a, b)
     = liftM TupE $ sequence $ map (fmap Just) [lift a, lift b]
 
 instance (Lift a, Lift b, Lift c) => Lift (a, b, c) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (a, b, c)
     = liftM TupE $ sequence $ map (fmap Just) [lift a, lift b, lift c]
 
 instance (Lift a, Lift b, Lift c, Lift d) => Lift (a, b, c, d) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (a, b, c, d)
     = liftM TupE $ sequence $ map (fmap Just) [lift a, lift b, lift c, lift d]
 
 instance (Lift a, Lift b, Lift c, Lift d, Lift e)
       => Lift (a, b, c, d, e) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (a, b, c, d, e)
     = liftM TupE $ sequence $ map (fmap Just) [ lift a, lift b
                                               , lift c, lift d, lift e ]
 
 instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f)
       => Lift (a, b, c, d, e, f) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (a, b, c, d, e, f)
     = liftM TupE $ sequence $ map (fmap Just) [ lift a, lift b, lift c
                                               , lift d, lift e, lift f ]
 
 instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
       => Lift (a, b, c, d, e, f, g) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (a, b, c, d, e, f, g)
     = liftM TupE $ sequence $ map (fmap Just) [ lift a, lift b, lift c
                                               , lift d, lift e, lift f, lift g ]
 
 -- | @since 2.16.0.0
 instance Lift (# #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (# #) = return (ConE (unboxedTupleTypeName 0))
 
 -- | @since 2.16.0.0
 instance (Lift a) => Lift (# a #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (# a #)
     = liftM UnboxedTupE $ sequence $ map (fmap Just) [lift a]
 
 -- | @since 2.16.0.0
 instance (Lift a, Lift b) => Lift (# a, b #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (# a, b #)
     = liftM UnboxedTupE $ sequence $ map (fmap Just) [lift a, lift b]
 
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c)
       => Lift (# a, b, c #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (# a, b, c #)
     = liftM UnboxedTupE $ sequence $ map (fmap Just) [lift a, lift b, lift c]
 
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c, Lift d)
       => Lift (# a, b, c, d #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (# a, b, c, d #)
     = liftM UnboxedTupE $ sequence $ map (fmap Just) [ lift a, lift b
                                                      , lift c, lift d ]
@@ -950,7 +987,7 @@ instance (Lift a, Lift b, Lift c, Lift d)
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c, Lift d, Lift e)
       => Lift (# a, b, c, d, e #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (# a, b, c, d, e #)
     = liftM UnboxedTupE $ sequence $ map (fmap Just) [ lift a, lift b
                                                      , lift c, lift d, lift e ]
@@ -958,7 +995,7 @@ instance (Lift a, Lift b, Lift c, Lift d, Lift e)
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f)
       => Lift (# a, b, c, d, e, f #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (# a, b, c, d, e, f #)
     = liftM UnboxedTupE $ sequence $ map (fmap Just) [ lift a, lift b, lift c
                                                      , lift d, lift e, lift f ]
@@ -966,7 +1003,7 @@ instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f)
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
       => Lift (# a, b, c, d, e, f, g #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift (# a, b, c, d, e, f, g #)
     = liftM UnboxedTupE $ sequence $ map (fmap Just) [ lift a, lift b, lift c
                                                      , lift d, lift e, lift f
@@ -974,7 +1011,7 @@ instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
 
 -- | @since 2.16.0.0
 instance (Lift a, Lift b) => Lift (# a | b #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x
     = case x of
         (# y | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 2
@@ -983,7 +1020,7 @@ instance (Lift a, Lift b) => Lift (# a | b #) where
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c)
       => Lift (# a | b | c #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x
     = case x of
         (# y | | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 3
@@ -993,7 +1030,7 @@ instance (Lift a, Lift b, Lift c)
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c, Lift d)
       => Lift (# a | b | c | d #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x
     = case x of
         (# y | | | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 4
@@ -1004,7 +1041,7 @@ instance (Lift a, Lift b, Lift c, Lift d)
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c, Lift d, Lift e)
       => Lift (# a | b | c | d | e #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x
     = case x of
         (# y | | | | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 5
@@ -1016,7 +1053,7 @@ instance (Lift a, Lift b, Lift c, Lift d, Lift e)
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f)
       => Lift (# a | b | c | d | e | f #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x
     = case x of
         (# y | | | | | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 6
@@ -1029,7 +1066,7 @@ instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f)
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
       => Lift (# a | b | c | d | e | f | g #) where
-  liftTyped x = unsafeTExpCoerce (lift x)
+  liftTyped x = unsafeCodeCoerce (lift x)
   lift x
     = case x of
         (# y | | | | | | #) -> UnboxedSumE <$> lift y <*> pure 1 <*> pure 7
