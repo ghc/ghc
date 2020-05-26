@@ -31,7 +31,7 @@ System FC, as implemented in GHC\footnote{This
 document was originally prepared by Richard Eisenberg (\texttt{eir@cis.upenn.edu}),
 but it should be maintained by anyone who edits the functions or data structures
 mentioned in this file. Please feel free to contact Richard for more information.}\\
-\Large 26 January, 2018
+\Large 26 May, 2020
 \end{center}
 
 \section{Introduction}
@@ -72,8 +72,8 @@ Literals do not play a major role, so we leave them abstract:
 
 \gram{\ottlit}
 
-We also leave abstract the function \coderef{basicTypes/Literal.hs}{literalType}
-and the judgment \coderef{coreSyn/CoreLint.hs}{lintTyLit} (written $[[G |-tylit lit : k]]$).
+We also leave abstract the function \coderef{GHC/Types/Literal.hs}{literalType}
+and the judgment \coderef{GHC/Core/Lint.hs}{lintTyLit} (written $[[G |-tylit lit : k]]$).
 
 \subsection{Variables}
 \enlargethispage{10pt} % without this first line of "z" definition is placed on
@@ -351,13 +351,13 @@ fresh in the context. In the implementation, of course, some work is done
 to guarantee this freshness. In particular, adding a new type variable to
 the context sometimes requires creating a new, fresh variable name and then
 applying a substitution. We elide these details in this formalism, but
-see \coderef{types/Type.hs}{substTyVarBndr} for details.
+see \coderef{GHC/Core/Type.hs}{substTyVarBndr} for details.
 
 \section{Typing judgments}
 
 The following functions are used from GHC. Their names are descriptive, and they
-are not formalized here: \coderef{types/TyCon.hs}{tyConKind},
-\coderef{types/TyCon.hs}{tyConArity}, \coderef{basicTypes/DataCon.hs}{dataConTyCon}, \coderef{types/TyCon.hs}{isNewTyCon}, \coderef{basicTypes/DataCon.hs}{dataConRepType}.
+are not formalized here: \coderef{GHC/Core/TyCon.hs}{tyConKind},
+\coderef{GHC/Core/TyCon.hs}{tyConArity}, \coderef{GHC/Core/DataCon.hs}{dataConTyCon}, \coderef{GHC/Core/TyCon.hs}{isNewTyCon}, \coderef{GHC/Core/DataCon.hs}{dataConRepType}.
 
 \subsection{Program consistency}
 
@@ -367,7 +367,7 @@ and then check each binding.
 
 \ottdefnlintCoreBindings{}
 
-Here is the definition of $[[vars_of]]$, taken from \coderef{coreSyn/CoreSyn.hs}{bindersOf}:
+Here is the definition of $[[vars_of]]$, taken from \coderef{GHC/Core.hs}{bindersOf}:
 
 \[
 \begin{array}{ll}
@@ -413,11 +413,11 @@ to check each substituted type $[[s'i]]$ in a context containing all the types
 that come before it in the list of bindings. The $[[G'i]]$ are contexts
 containing the names and kinds of all type variables (and term variables,
 for that matter) up to the $i$th binding. This logic is extracted from
-\coderef{coreSyn/CoreLint.hs}{lintAndScopeIds}.
+\coderef{GHC/Core/Lint.hs}{lintAndScopeIds}.
 
 \item The GHC source code checks all arguments in an application expression
-all at once using \coderef{coreSyn/CoreSyn.hs}{collectArgs}
-and \coderef{coreSyn/CoreLint.hs}{lintCoreArgs}. The operation
+all at once using \coderef{GHC/Core.hs}{collectArgs}
+and \coderef{GHC/Core/Lint.hs}{lintCoreArgs}. The operation
 has been unfolded for presentation here.
 
 \item If a $[[tick]]$ contains breakpoints, the GHC source performs additional
@@ -481,7 +481,7 @@ We believe both technical approaches are equivalent in what coercions they accep
 \label{sec:name_consistency}
 
 There are three very similar checks for names, two performed as part of
-\coderef{coreSyn/CoreLint.hs}{lintSingleBinding}:
+\coderef{GHC/Core/Lint.hs}{lintSingleBinding}:
 
 \ottdefnlintSingleBindingXXlintBinder{}
 
@@ -565,12 +565,12 @@ The judgment $[[apart]]$ checks to see whether two lists of types are surely
 apart. $[[apart( </ ti // i />, </ si // i /> )]]$, where $[[ </ ti // i />
 ]]$ is a list of types and $[[ </ si // i /> ]]$ is a list of type
 \emph{patterns} (as in a type family equation), first flattens the $[[ </ ti
-    // i /> ]]$ using \coderef{types/FamInstEnv.hs}{flattenTys} and then checks to
-see if \coderef{types/Unify.hs}{tcUnifyTysFG} returns \texttt{SurelyApart}.
+    // i /> ]]$ using \coderef{GHC/Core/FamInstEnv.hs}{flattenTys} and then checks to
+see if \coderef{GHC/Core/Unify.hs}{tcUnifyTysFG} returns \texttt{SurelyApart}.
 Flattening takes all type family applications and replaces them with fresh variables,
 taking care to map identical type family applications to the same fresh variable.
 
-The algorithm $[[unify]]$ is implemented in \coderef{types/Unify.hs}{tcUnifyTys}.
+The algorithm $[[unify]]$ is implemented in \coderef{GHC/Core/Unify.hs}{tcUnifyTys}.
 It performs a standard unification, returning a substitution upon success.
 
 \section{Operational semantics}
@@ -579,7 +579,7 @@ It performs a standard unification, returning a substitution upon success.
 GHC does not implement an operational semantics in any concrete form. Most
 of the rules below are implied by algorithms in, for example, the simplifier
 and optimizer. Yet, there is no one place in GHC that states these rules,
-analogously to \texttt{CoreLint.hs}.
+analogously to \texttt{GHC/Core/Lint.hs}.
 Nevertheless, these rules are included in this document to help the reader
 understand System FC.
 
@@ -607,17 +607,17 @@ to the constructor. The terms are the regular term arguments stored in an
 algebraic datatype. Coercions (say, in a GADT) are considered term arguments.
 \item The rule \ottdrulename{S\_CasePush} is the most complex rule.
 \begin{itemize}
-\item The logic in this rule is implemented in \coderef{coreSyn/CoreSubst.hs}{exprIsConApp\_maybe}.
-\item The $[[coercionKind]]$ function (\coderef{types/Coercion.hs}{coercionKind})
+\item The logic in this rule is implemented in \coderef{GHC/Core/Subst.hs}{exprIsConApp\_maybe}.
+\item The $[[coercionKind]]$ function (\coderef{GHC/Core/Coercion.hs}{coercionKind})
 extracts the two types (and their kinds) from
 a coercion. It does not require a typing context, as it does not \emph{check} the
 coercion, just extracts its types.
-\item The $[[dataConRepType]]$ function (\coderef{basicTypes/DataCon.hs}{dataConRepType}) extracts the full type of a data constructor. Following the notation for
+\item The $[[dataConRepType]]$ function (\coderef{GHC/Core/DataCon.hs}{dataConRepType}) extracts the full type of a data constructor. Following the notation for
 constructor expressions, the parameters to the constructor are broken into three
 groups: universally quantified types, existentially quantified types, and terms.
 \item The substitutions in the last premise to the rule are unusual: they replace
 \emph{type} variables with \emph{coercions}. This substitution is called lifting
-and is implemented in \coderef{types/Coercion.hs}{liftCoSubst}. The notation is
+and is implemented in \coderef{GHC/Core/Coercion.hs}{liftCoSubst}. The notation is
 essentially a pun on the fact that types and coercions have such similar structure.
 This operation is quite non-trivial. Please see \emph{System FC with Explicit
 Kind Equality} for details.
