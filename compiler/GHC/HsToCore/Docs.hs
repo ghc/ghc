@@ -99,10 +99,12 @@ mkMaps instances decls =
     names :: RealSrcSpan -> HsDecl GhcRn -> [Name]
     names l (InstD _ d) = maybeToList $ -- See Note [1].
       case d of
-              TyFamInstD _ _ -> M.lookup l instanceMap
-                -- The CoAx's loc is the whole line, but only
-                -- for TFs
-              _ -> lookupSrcSpan (getInstLoc d) instanceMap
+        -- The CoAx's loc is the whole line, but only for TFs. The workaround is
+        -- to dig into the family instance declaration and get the identifier
+        -- with the right location.
+        TyFamInstD _ (TyFamInstDecl d') ->
+          lookupSrcSpan (getLoc (feqn_tycon (hsib_body d'))) instanceMap
+        _ -> lookupSrcSpan (getInstLoc d) instanceMap
 
     names l (DerivD {}) = maybeToList (M.lookup l instanceMap) -- See Note [1].
     names _ decl = getMainDeclBinder decl
