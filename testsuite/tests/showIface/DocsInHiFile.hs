@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 {-| `elem`, 'print',
 `Unknown',
 '<>', ':=:', 'Bool'
@@ -35,3 +36,8 @@ class P f where
 -- | Another datatype...
 data D'
 -- ^ ...with two docstrings.
+
+-- | A type family
+type family F a
+-- | A type family instance
+type instance F Int = Bool

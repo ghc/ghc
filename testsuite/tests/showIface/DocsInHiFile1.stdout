@@ -22,6 +22,10 @@ declaration docs:
     " Another datatype...
 
  ...with two docstrings."
+  D:R:FInt:
+    " A type family instance"
+  F:
+    " A type family"
 arg docs:
   add:
     0:
