@@ -73,6 +73,7 @@ import GHC.Builtin.Utils
 import GHC.Types.Name.Reader
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Gen.Expr
+import GHC.Tc.Gen.App( tcInferSigmaTy )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Gen.Export
 import GHC.Tc.Types.Evidence
@@ -98,6 +99,7 @@ import GHC.Tc.TyCl.Instance
 import GHC.IfaceToCore
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
+import GHC.Tc.Utils.Instantiate (tcGetInsts, topInstantiate)
 import GHC.Tc.Solver
 import GHC.Tc.TyCl
 import GHC.Tc.Instance.Typeable ( mkTypeableBinds )
@@ -134,7 +136,6 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Data.Bag
-import GHC.Tc.Utils.Instantiate (tcGetInsts)
 import qualified GHC.LanguageExtensions as LangExt
 import Data.Data ( Data )
 import GHC.Hs.Dump
@@ -2490,14 +2491,16 @@ tcRnExpr hsc_env mode rdr_expr
 
         -- Now typecheck the expression, and generalise its type
         -- it might have a rank-2 type (e.g. :t runST)
-    uniq <- newUnique ;
-    let { fresh_it  = itName uniq (getLoc rdr_expr) } ;
-    ((tclvl, (_tc_expr, res_ty)), lie)
+    ((tclvl, res_ty), lie)
           <- captureTopConstraints $
              pushTcLevelM          $
-             tc_infer rn_expr ;
+             tcInferSigmaTy rn_expr ;
+
+    res_ty <- instantiate (lexprCtOrigin rn_expr) res_ty ;
 
     -- Generalise
+    uniq <- newUnique ;
+    let { fresh_it = itName uniq (getLoc rdr_expr) } ;
     (qtvs, dicts, _, residual, _)
          <- simplifyInfer tclvl infer_mode
                           []    {- No sig vars -}
@@ -2521,9 +2524,10 @@ tcRnExpr hsc_env mode rdr_expr
     return (snd (normaliseType fam_envs Nominal ty))
     }
   where
-    tc_infer expr | inst      = tcInferRho expr
-                  | otherwise = tcInferSigma expr
-                  -- tcInferSigma: see Note [Implementing :type]
+    instantiate orig res_ty
+      | not inst  = return res_ty
+      | otherwise = do { (_,rho) <- topInstantiate orig res_ty
+                       ; return rho }
 
     -- See Note [TcRnExprMode]
     (inst, infer_mode, perhaps_disable_default_warnings) = case mode of

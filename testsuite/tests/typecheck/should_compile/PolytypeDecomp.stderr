@@ -1,0 +1,20 @@
+
+PolytypeDecomp.hs:30:17: error:
+    • Couldn't match type ‘a0’ with ‘[forall a. Maybe a]’
+      Expected: Id a0
+        Actual: [forall a. Maybe a]
+      Cannot instantiate unification variable ‘a0’
+      with a type involving polytypes: [forall a. Maybe a]
+    • In the expression: x
+      In the first argument of ‘myLength’, namely ‘[x, f]’
+      In the expression: myLength [x, f]
+
+PolytypeDecomp.hs:30:19: error:
+    • Couldn't match type ‘a0’ with ‘[forall a. F [a]]’
+      Expected: Id a0
+        Actual: [forall a. F [a]]
+      Cannot instantiate unification variable ‘a0’
+      with a type involving polytypes: [forall a. F [a]]
+    • In the expression: f
+      In the first argument of ‘myLength’, namely ‘[x, f]’
+      In the expression: myLength [x, f]

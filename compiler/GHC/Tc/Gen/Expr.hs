@@ -348,10 +348,14 @@ rule just for saturated applications of ($).
   * Use arg2_ty to typecheck arg2
 -}
 
+tcExpr expr@(OpApp {}) res_ty
+  = tcApp expr res_ty
+{-
 tcExpr expr@(OpApp fix arg1 op arg2) res_ty
   | (L loc (HsVar _ (L lv op_name))) <- op
   , op_name `hasKey` dollarIdKey        -- Note [Typing rule for ($)]
-  = do { traceTc "Application rule" (ppr op)
+  = do {
+         traceTc "Application rule" (ppr op)
        ; (arg1', arg1_ty) <- addErrCtxt (funAppCtxt op arg1 1) $
                              tcInferRhoNC arg1
 
@@ -422,6 +426,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
   where
     fn_orig = exprCtOrigin nl_op
     nl_op   = unLoc op
+-}
 
 -- Right sections, equivalent to \ x -> x `op` expr, or
 --      \ x -> op x expr
