@@ -13,12 +13,12 @@ main = do
   mapM_ (\q -> runQ q >>= ppr_and_show)
         [first_of_2, second_of_2, empty_2, full_2, third_of_3]
 
-  mapM_ (\q -> runQ (fmap unType q) >>= ppr_and_show)
+  mapM_ (\q -> (runQ (unTypeCode q)) >>= ppr_and_show)
         [first_of_2_T, second_of_2_T]
 
-  runQ (fmap unType empty_2_T) >>= ppr_and_show
-  runQ (fmap unType full_2_T) >>= ppr_and_show
-  runQ (fmap unType third_of_3_T) >>= ppr_and_show
+  runQ (unTypeCode empty_2_T) >>= ppr_and_show
+  runQ (unTypeCode full_2_T) >>= ppr_and_show
+  runQ (unTypeCode third_of_3_T) >>= ppr_and_show
 
   print $ "(909,) applied to 'c' should be (909, 'c') ===> "
             ++ (show $ (909, 'c') == ($first_of_2 'c'))

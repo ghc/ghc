@@ -29,8 +29,8 @@ main = print (f 1 "", g 'a' 2, h True 3)
                 )
              , xg :: Char
              )
-    h xh y = ( $$(do printTypeOf("xh")
-                     [|| y :: Int ||]
+    h xh y = ( $$(liftCode $ do printTypeOf("xh")
+                                examineCode [|| y :: Int ||]
                  )
              , xh :: Bool
              )
