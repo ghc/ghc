@@ -12,7 +12,7 @@
 defns
 CoreLint :: '' ::=
 
-defn |- prog program ::  :: lintCoreBindings :: 'Prog_' {{ com Program typing, \coderef{coreSyn/CoreLint.hs}{lintCoreBindings} }}
+defn |- prog program ::  :: lintCoreBindings :: 'Prog_' {{ com Program typing, \coderef{GHC/Core/Lint.hs}{lintCoreBindings} }}
   {{ tex \labeledjudge{prog} [[program]] }}
 by
 
@@ -22,7 +22,7 @@ no_duplicates </ bindingi // i />
 --------------------- :: CoreBindings
 |-prog </ bindingi // i />
 
-defn G |- bind binding ::  :: lint_bind :: 'Binding_' {{ com Binding typing, \coderef{coreSyn/CoreLint.hs}{lint\_bind} }}
+defn G |- bind binding ::  :: lint_bind :: 'Binding_' {{ com Binding typing, \coderef{GHC/Core/Lint.hs}{lint\_bind} }}
   {{ tex [[G]] \labeledjudge{bind} [[binding]] }}
 by
 
@@ -34,7 +34,7 @@ G |-bind n = e
 ---------------------- :: Rec
 G |-bind rec </ ni = ei // i />
 
-defn G  |- sbind n <- e ::  :: lintSingleBinding :: 'SBinding_' {{ com Single binding typing, \coderef{coreSyn/CoreLint.hs}{lintSingleBinding} }}
+defn G  |- sbind n <- e ::  :: lintSingleBinding :: 'SBinding_' {{ com Single binding typing, \coderef{GHC/Core/Lint.hs}{lintSingleBinding} }}
   {{ tex [[G]] \labeledjudge{sbind} [[n]] [[<-]] [[e]] }}
 by
 
@@ -45,7 +45,7 @@ G |-name z_t ok
 ----------------- :: SingleBinding
 G |-sbind z_t <- e
 
-defn G ; D |-sjbind l vars <- e : t ::  :: lintSingleBinding_joins :: 'SJBinding_' {{ com Single join binding typing, \coderef{coreSyn/CoreLint.hs}{lintSingleBinding} }}
+defn G ; D |-sjbind l vars <- e : t ::  :: lintSingleBinding_joins :: 'SJBinding_' {{ com Single join binding typing, \coderef{GHC/Core/Lint.hs}{lintSingleBinding} }}
   {{ tex [[G]];[[D]] \labeledjudge{sjbind} [[l]] \, [[vars]] [[<-]] [[e]] : [[t]] }}
 by
 
@@ -60,7 +60,7 @@ split_I s = </ sj // j /> t
 G; D |-sjbind p/I_s </ nj // j /> <- e : t
 
 defn G ; D  |- tm e : t ::  :: lintCoreExpr :: 'Tm_'
-  {{ com Expression typing, \coderef{coreSyn/CoreLint.hs}{lintCoreExpr} }}
+  {{ com Expression typing, \coderef{GHC/Core/Lint.hs}{lintCoreExpr} }}
   {{ tex [[G]]; [[D]] \labeledjudge{tm} [[e]] : [[t]] }}
 by
 
@@ -171,7 +171,7 @@ G |-co g : t1 k1~Rep k2 t2
 G; D |-tm g : (~Rep#) k1 k2 t1 t2
 
 defn G  |- name n ok ::  :: lintSingleBinding_lintBinder :: 'Name_'
-  {{ com Name consistency check, \coderef{coreSyn/CoreLint.hs}{lintSingleBinding\#lintBinder} }}
+  {{ com Name consistency check, \coderef{GHC/Core/Lint.hs}{lintSingleBinding\#lintBinder} }}
   {{ tex [[G]] \labeledjudge{n} [[n]] [[ok]] }}
 by
 
@@ -184,7 +184,7 @@ G |-name x_t ok
 G |-name alpha_k ok
 
 defn G |- label l ok ::  :: lintSingleBinding_lintBinder_join :: 'Label_'
-  {{ com Label consistency check, \coderef{coreSyn/CoreLint.hs}{lintSingleBinding\#lintBinder} }}
+  {{ com Label consistency check, \coderef{GHC/Core/Lint.hs}{lintSingleBinding\#lintBinder} }}
   {{ tex [[G]] \labeledjudge{label} [[l]] [[ok]] }}
 by
 
@@ -197,7 +197,7 @@ k' = * \/ k' = #
 G |-label p / I _ t ok
 
 defn G |- bnd n ok ::  :: lintBinder :: 'Binding_'
-  {{ com Binding consistency, \coderef{coreSyn/CoreLint.hs}{lintBinder} }}
+  {{ com Binding consistency, \coderef{GHC/Core/Lint.hs}{lintBinder} }}
   {{ tex [[G]] \labeledjudge{bnd} [[n]] [[ok]] }}
 by
 
@@ -211,7 +211,7 @@ G |-ki k ok
 G |-bnd alpha_k ok
 
 defn G  |- co g : t1 k1 ~ R k2 t2 ::  :: lintCoercion :: 'Co_'
-  {{ com Coercion typing, \coderef{coreSyn/CoreLint.hs}{lintCoercion} }}
+  {{ com Coercion typing, \coderef{GHC/Core/Lint.hs}{lintCoercion} }}
   {{ tex [[G]] \labeledjudge{co} [[g]] : [[t1]] \mathop{ {}^{[[k1]]} {\sim}_{[[R]]}^{[[k2]]} } [[t2]] }}
 by
 
@@ -375,7 +375,7 @@ G |-ty t'2 : k0'
 G |-co mu </ ti // i /> $ </ gj // j /> : t'1 k0 ~R' k0' t'2
 
 defn G |- axk [ namesroles |-> gs ] ~> ( subst1 , subst2 ) ::  :: check_ki :: 'AxiomKind_'
-  {{ com Axiom argument kinding, \coderef{coreSyn/CoreLint.hs}{lintCoercion\#check\_ki} }}
+  {{ com Axiom argument kinding, \coderef{GHC/Core/Lint.hs}{lintCoercion\#check\_ki} }}
   {{ tex [[G]] \labeledjudge{axk} [ [[namesroles]] [[|->]] [[gs]] ] [[~>]] ([[subst1]], [[subst2]]) }}
 by
 
@@ -451,7 +451,7 @@ O |- t |> g : R
 O |- g : Ph
 
 defn R1 <= R2 ::  :: ltRole :: 'Rlt_'
-  {{ com Sub-role relation, \coderef{types/Coercion.hs}{ltRole} }}
+  {{ com Sub-role relation, \coderef{GHC/Core/Coercion.hs}{ltRole} }}
   {{ tex [[R1]] \leq [[R2]] }}
 by
 
@@ -465,7 +465,7 @@ R <= Ph
 R <= R
 
 defn G |- ki k ok ::  :: lintKind :: 'K_'
-  {{ com Kind validity, \coderef{coreSyn/CoreLint.hs}{lintKind} }}
+  {{ com Kind validity, \coderef{GHC/Core/Lint.hs}{lintKind} }}
   {{ tex [[G]] \labeledjudge{k} [[k]] [[ok]] }}
 by
 
@@ -478,7 +478,7 @@ G |-ty k : #
 G |-ki k ok
 
 defn G |- ty t : k ::  :: lintType :: 'Ty_'
-  {{ com Kinding, \coderef{coreSyn/CoreLint.hs}{lintType} }}
+  {{ com Kinding, \coderef{GHC/Core/Lint.hs}{lintType} }}
   {{ tex [[G]] \labeledjudge{ty} [[t]] : [[k]] }}
 by
 
@@ -535,7 +535,7 @@ G |-co g : t1 k1 ~Rep k2 t2
 G |-ty g : (~Rep#) k1 k2 t1 t2
 
 defn G |- subst n |-> t ok ::  :: lintTyKind :: 'Subst_'
-  {{ com Substitution consistency, \coderef{coreSyn/CoreLint.hs}{lintTyKind} }}
+  {{ com Substitution consistency, \coderef{GHC/Core/Lint.hs}{lintTyKind} }}
   {{ tex [[G]] \labeledjudge{subst} [[n]] [[|->]] [[t]] [[ok]] }}
 by
 
@@ -544,7 +544,7 @@ G |-ty t : k
 G |-subst z_k |-> t ok
 
 defn G ; D ; s |- altern alt : t ::  :: lintCoreAlt :: 'Alt_'
-  {{ com Case alternative consistency, \coderef{coreSyn/CoreLint.hs}{lintCoreAlt} }}
+  {{ com Case alternative consistency, \coderef{GHC/Core/Lint.hs}{lintCoreAlt} }}
   {{ tex [[G]];[[D]];[[s]] \labeledjudge{alt} [[alt]] : [[t]] }}
 by
 
@@ -569,7 +569,7 @@ G'; D |-tm e : t
 G; D; T </ sj // j /> |-altern K </ ni // i /> -> e : t
 
 defn t' = t { </ si // , // i /> } ::  :: applyTys :: 'ApplyTys_'
-  {{ com Telescope substitution, \coderef{types/Type.hs}{applyTys} }}
+  {{ com Telescope substitution, \coderef{GHC/Core/Type.hs}{applyTys} }}
 by
 
 --------------------- :: Empty
@@ -581,7 +581,7 @@ t'' = t'[n |-> s]
 t'' = (forall n. t) { s, </ si // i /> }
 
 defn G |- altbnd vars : t1 ~> t2 ::  :: lintAltBinders :: 'AltBinders_'
-  {{ com Case alternative binding consistency, \coderef{coreSyn/CoreLint.hs}{lintAltBinders} }}
+  {{ com Case alternative binding consistency, \coderef{GHC/Core/Lint.hs}{lintAltBinders} }}
   {{ tex [[G]] \labeledjudge{altbnd} [[vars]] : [[t1]] [[~>]] [[t2]] }}
 by
 
@@ -602,7 +602,7 @@ G |-altbnd </ ni // i /> : t2 ~> s
 G |-altbnd x_t1, </ ni // i /> : (t1 -> t2) ~> s
 
 defn G |- arrow k1 -> k2 : k ::  :: lintArrow :: 'Arrow_'
-  {{ com Arrow kinding, \coderef{coreSyn/CoreLint.hs}{lintArrow} }}
+  {{ com Arrow kinding, \coderef{GHC/Core/Lint.hs}{lintArrow} }}
   {{ tex [[G]] \labeledjudge{\rightarrow} [[k1]] [[->]] [[k2]] : [[k]] }}
 by
 
@@ -612,7 +612,7 @@ k2 = TYPE s
 G |-arrow k1 -> k2 : *
 
 defn G |- app kinded_types : k1 ~> k2 ::  :: lint_app :: 'App_'
-  {{ com Type application kinding, \coderef{coreSyn/CoreLint.hs}{lint\_app} }}
+  {{ com Type application kinding, \coderef{GHC/Core/Lint.hs}{lint\_app} }}
   {{ tex [[G]] \labeledjudge{app} [[kinded_types]] : [[k1]] [[~>]] [[k2]] }}
 by
 
@@ -628,7 +628,7 @@ G |-app </ (ti : ki) // i /> : k2[z_k1 |-> t] ~> k'
 G |-app (t : k1), </ (ti : ki) // i /> : (forall z_k1. k2) ~> k'
 
 defn no_conflict ( C , </ sj // j /> , ind1 , ind2 ) ::  :: check_no_conflict :: 'NoConflict_'
-  {{ com \parbox{5in}{Branched axiom conflict checking, \coderef{types/OptCoercion.hs}{checkAxInstCo} \\ and \coderef{types/FamInstEnv.hs}{compatibleBranches} } }}
+  {{ com \parbox{5in}{Branched axiom conflict checking, \coderef{GHC/Core/Coercion/Opt.hs}{checkAxInstCo} \\ and \coderef{GHC/Core/FamInstEnv.hs}{compatibleBranches} } }}
 by
 
 ------------------------------------------------ :: NoBranch
