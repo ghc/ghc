@@ -138,22 +138,31 @@ mapAndUnzip5M :: Monad m => (a -> m (b,c,d,e,f)) -> [a] -> m ([b],[c],[d],[e],[f
 -- See Note [Inline @mapAndUnzipNM@ functions] above.
 mapAndUnzip5M f xs =  unzip5 <$> traverse f xs
 
+-- TODO: mapAccumLM is used in many places. Surely most of
+-- these don't actually want to be lazy. We should add a strict
+-- variant and use it where appropriate.
+
 -- | Monadic version of mapAccumL
 mapAccumLM :: Monad m
             => (acc -> x -> m (acc, y)) -- ^ combining function
             -> acc                      -- ^ initial state
             -> [x]                      -- ^ inputs
             -> m (acc, [y])             -- ^ final state, outputs
-mapAccumLM _ s []     = return (s, [])
-mapAccumLM f s (x:xs) = do
-    (s1, x')  <- f s x
-    (s2, xs') <- mapAccumLM f s1 xs
-    return    (s2, x' : xs')
+mapAccumLM f s xs =
+  go s xs
+  where
+    go s (x:xs) = do
+      (s1, x')  <- f s x
+      (s2, xs') <- go s1 xs
+      return    (s2, x' : xs')
+    go s [] = return (s, [])
 
 -- | Monadic version of mapSnd
 mapSndM :: Monad m => (b -> m c) -> [(a,b)] -> m [(a,c)]
-mapSndM _ []         = return []
-mapSndM f ((a,b):xs) = do { c <- f b; rs <- mapSndM f xs; return ((a,c):rs) }
+mapSndM f xs = go xs
+  where
+    go []         = return []
+    go ((a,b):xs) = do { c <- f b; rs <- go xs; return ((a,c):rs) }
 
 -- | Monadic version of concatMap
 concatMapM :: Monad m => (a -> m [b]) -> [a] -> m [b]
@@ -176,15 +185,19 @@ fmapEitherM _ fr (Right b) = fr b >>= (return . Right)
 
 -- | Monadic version of 'any', aborts the computation at the first @True@ value
 anyM :: Monad m => (a -> m Bool) -> [a] -> m Bool
-anyM _ []     = return False
-anyM f (x:xs) = do b <- f x
+anyM f xs = go xs
+  where
+    go [] = return False
+    go (x:xs) = do b <- f x
                    if b then return True
-                        else anyM f xs
+                        else go xs
 
 -- | Monad version of 'all', aborts the computation at the first @False@ value
 allM :: Monad m => (a -> m Bool) -> [a] -> m Bool
-allM _ []     = return True
-allM f (b:bs) = (f b) >>= (\bv -> if bv then allM f bs else return False)
+allM f bs = go bs
+  where
+    go []     = return True
+    go (b:bs) = (f b) >>= (\bv -> if bv then go bs else return False)
 
 -- | Monadic version of or
 orM :: Monad m => m Bool -> m Bool -> m Bool
