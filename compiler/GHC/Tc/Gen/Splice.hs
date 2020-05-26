@@ -196,7 +196,7 @@ tcTypedBracket rn_expr brack@(TExpBr _ expr) res_ty
        ; let rep = getRuntimeRep expr_ty
        ; meta_ty <- tcTExpTy m_var expr_ty
        ; ps' <- readMutVar ps_ref
-       ; texpco <- tcLookupId unsafeTExpCoerceName
+       ; texpco <- tcLookupId unsafeCodeCoerceName
        ; tcWrapResultO (Shouldn'tHappenOrigin "TExpBr")
                        rn_expr
                        (unLoc (mkHsApp (mkLHsWrap (applyQuoteWrapper wrapper)
@@ -302,9 +302,9 @@ tcPendingSplice m_var (PendingRnSplice flavour splice_name expr)
 tcTExpTy :: TcType -> TcType -> TcM TcType
 tcTExpTy m_ty exp_ty
   = do { unless (isTauTy exp_ty) $ addErr (err_msg exp_ty)
-       ; texp <- tcLookupTyCon tExpTyConName
+       ; codeCon <- tcLookupTyCon codeTyConName
        ; let rep = getRuntimeRep exp_ty
-       ; return (mkAppTy m_ty (mkTyConApp texp [rep, exp_ty])) }
+       ; return (mkTyConApp codeCon [rep, m_ty, exp_ty]) }
   where
     err_msg ty
       = vcat [ text "Illegal polytype:" <+> ppr ty
@@ -619,10 +619,10 @@ tcNestedSplice pop_stage (TcPending ps_var lie_var q@(QuoteWrapper _ m_var)) spl
        ; expr' <- setStage pop_stage $
                   setConstraintVar lie_var $
                   tcLExpr expr (mkCheckExpType meta_exp_ty)
-       ; untypeq <- tcLookupId unTypeQName
+       ; untypeCode <- tcLookupId unTypeCodeName
        ; let expr'' = mkHsApp
                         (mkLHsWrap (applyQuoteWrapper q)
-                          (nlHsTyApp untypeq [rep, res_ty])) expr'
+                          (nlHsTyApp untypeCode [rep, res_ty])) expr'
        ; ps <- readMutVar ps_var
        ; writeMutVar ps_var (PendingTcSplice splice_name expr'' : ps)
 

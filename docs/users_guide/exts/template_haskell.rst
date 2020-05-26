@@ -133,15 +133,15 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
    is an arbitrary expression.
 
    A top-level typed expression splice can occur in place of an expression; the
-   spliced expression must have type ``Q (TExp a)``
+   spliced expression must have type ``Code Q a``
 
 -  A *typed* expression quotation is written as ``[|| ... ||]``, or
    ``[e|| ... ||]``, where the "..." is an expression; if the "..."
    expression has type ``a``, then the quotation has type
-   ``Quote m => m (TExp a)``.
+   ``Quote m => Code m a``.
 
-   Values of type ``TExp a`` may be converted to values of type ``Exp``
-   using the function ``unType :: TExp a -> Exp``.
+   It is possible to extract a value of type ``m Exp`` from ``Code m a``
+   using the ``unTypeCode :: Code m a -> m Exp`` function.
 
 -  A quasi-quotation can appear in a pattern, type, expression, or
    declaration context and is also written in Oxford brackets:
@@ -202,7 +202,7 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
 
        class Lift t where
            lift :: Quote m => t -> m Exp
-           liftTyped :: Quote m => t -> m (TExp t)
+           liftTyped :: Quote m => t -> Code m t
 
    In general, if GHC sees an expression within Oxford brackets (e.g., ``[|
    foo bar |]``, then GHC looks up each name within the brackets. If a name

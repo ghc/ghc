@@ -4,8 +4,8 @@ import Language.Haskell.TH
 
 data A a = A
 
-x :: Q (TExp (A a))
+x :: Code Q (A a)
 x = [|| A ||]
 
-y :: Q (TExp (A Int))
+y :: Code Q (A Int)
 y = x

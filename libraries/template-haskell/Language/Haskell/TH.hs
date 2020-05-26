@@ -50,6 +50,8 @@ module Language.Haskell.TH(
 
         -- * Typed expressions
         TExp, unType,
+        Code(..), unTypeCode, unsafeCodeCoerce, hoistCode, bindCode,
+        bindCode_, joinCode, liftCode,
 
         -- * Names
         Name, NameSpace,        -- Abstract
