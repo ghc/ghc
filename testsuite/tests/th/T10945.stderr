@@ -1,9 +1,9 @@
 
 T10945.hs:7:4: error:
     • Couldn't match type: [Dec]
-                     with: TExp DecsQ
-      Expected: Q (TExp DecsQ)
-        Actual: Q [Dec]
+                     with: Q [Dec]
+      Expected: Code Q DecsQ
+        Actual: Code Q [Dec]
     • In the expression:
         return
           [SigD
