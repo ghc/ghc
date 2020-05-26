@@ -13,7 +13,7 @@ bug-reports:          https://github.com/haskell/haddock/issues
 copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
-tested-with:          GHC==8.10.*, GHC==8.8.1, GHC==8.6.5
+tested-with:          GHC==8.12.*, GHC==8.10.*, GHC==8.8.1
 
 extra-source-files:
   CHANGES.md
@@ -43,7 +43,7 @@ library
   default-language: Haskell2010
 
   -- this package typically supports only single major versions
-  build-depends: base            ^>= 4.13.0
+  build-depends: base            ^>= 4.15.0
                , Cabal           ^>= 2.4.0
                , ghc             ^>= 8.11
                , ghc-paths       ^>= 0.1.0.9
