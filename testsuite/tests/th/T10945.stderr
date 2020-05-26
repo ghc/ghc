@@ -1,8 +1,8 @@
 
 T10945.hs:7:4: error:
-    • Couldn't match type ‘[Dec]’ with ‘TExp DecsQ’
-      Expected type: Q (TExp DecsQ)
-        Actual type: Q [Dec]
+    • Couldn't match type ‘[Dec]’ with ‘Q [Dec]’
+      Expected type: Code Q DecsQ
+        Actual type: Code Q [Dec]
     • In the expression:
         return
           [SigD

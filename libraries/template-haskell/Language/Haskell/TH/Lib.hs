@@ -18,7 +18,7 @@ module Language.Haskell.TH.Lib (
 
     -- * Library functions
     -- ** Abbreviations
-        InfoQ, ExpQ, TExpQ, DecQ, DecsQ, ConQ, TypeQ, KindQ,
+        InfoQ, ExpQ, TExpQ, CodeQ, DecQ, DecsQ, ConQ, TypeQ, KindQ,
         TyLitQ, CxtQ, PredQ, DerivClauseQ, MatchQ, ClauseQ, BodyQ, GuardQ,
         StmtQ, RangeQ, SourceStrictnessQ, SourceUnpackednessQ, BangQ,
         BangTypeQ, VarBangTypeQ, StrictTypeQ, VarStrictTypeQ, FieldExpQ, PatQ,

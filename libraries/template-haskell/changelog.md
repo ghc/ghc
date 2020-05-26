@@ -1,6 +1,9 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
 ## 2.17.0.0
+  * Typed Quotations now return a value of type `Code m a` (GHC Proposal #195).
+    The main motiviation is to make writing instances easier and make it easier to
+    store `Code` values in type-indexed maps.
 
   * Implement Overloaded Quotations (GHC Proposal #246). This patch modifies a
     few fundamental things in the API. All the library combinators are generalised
@@ -9,7 +12,7 @@
     written in terms of `Q` are now disallowed. The types of `unsafeTExpCoerce`
     and `unTypeQ` are also generalised in terms of `Quote` rather than specific
     to `Q`.
-    
+
   * Implement Explicit specificity in type variable binders (GHC Proposal #99).
     In `Language.Haskell.TH.Syntax`, `TyVarBndr` is now annotated with a `flag`,
     denoting the additional argument to its constructors `PlainTV` and `KindedTV`.
