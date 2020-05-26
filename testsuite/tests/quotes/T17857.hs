@@ -7,4 +7,4 @@ import Language.Haskell.TH.Syntax
 data T = MkT deriving Data
 instance Lift T where
   lift = liftData
-  liftTyped = unsafeTExpCoerce . lift
+  liftTyped = unsafeCodeCoerce . lift
