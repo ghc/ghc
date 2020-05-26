@@ -1,8 +1,8 @@
 
 T8577.hs:9:11: error:
     • Couldn't match type ‘Int’ with ‘Bool’
-      Expected: Q (TExp (A Bool))
-        Actual: Q (TExp (A Int))
+      Expected: Code Q (A Bool)
+        Actual: Code Q (A Int)
     • In the expression: y
       In the Template Haskell splice $$(y)
       In the expression: $$(y)
