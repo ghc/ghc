@@ -1,4 +1,4 @@
 
-T11203.hs:7:24: error:
+T11203.hs:7:1: error:
     • Different names for the same type variable: ‘k1’ and ‘k2’
     • In the data declaration for ‘Q’

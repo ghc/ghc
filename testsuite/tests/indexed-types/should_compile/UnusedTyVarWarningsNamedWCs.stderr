@@ -1,12 +1,12 @@
 
-UnusedTyVarWarningsNamedWCs.hs:8:7: warning: [-Wunused-type-patterns]
+UnusedTyVarWarningsNamedWCs.hs:8:3: warning: [-Wunused-type-patterns]
     Defined but not used on the right hand side: type variable ‘b’
 
-UnusedTyVarWarningsNamedWCs.hs:11:20: warning: [-Wunused-type-patterns]
+UnusedTyVarWarningsNamedWCs.hs:11:15: warning: [-Wunused-type-patterns]
     Defined but not used on the right hand side: type variable ‘b’
 
-UnusedTyVarWarningsNamedWCs.hs:27:5: warning: [-Wunused-type-patterns]
+UnusedTyVarWarningsNamedWCs.hs:27:3: warning: [-Wunused-type-patterns]
     Defined but not used on the right hand side: type variable ‘a’
 
-UnusedTyVarWarningsNamedWCs.hs:33:19: warning: [-Wunused-type-patterns]
+UnusedTyVarWarningsNamedWCs.hs:33:15: warning: [-Wunused-type-patterns]
     Defined but not used on the right hand side: type variable ‘b’

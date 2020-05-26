@@ -1,8 +1,8 @@
 
-T16356_Compile2.hs:10:12: warning: [-Wunused-type-patterns]
+T16356_Compile2.hs:10:8: warning: [-Wunused-type-patterns]
     Defined but not used on the right hand side: type variable ‘j’
 
-T16356_Compile2.hs:10:17: warning: [-Wunused-type-patterns]
+T16356_Compile2.hs:10:8: warning: [-Wunused-type-patterns]
     Defined but not used on the right hand side: type variable ‘a’
 
 T16356_Compile2.hs:13:15: warning: [-Wunused-type-patterns]

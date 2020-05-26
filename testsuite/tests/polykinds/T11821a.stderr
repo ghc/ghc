@@ -1,4 +1,4 @@
 
-T11821a.hs:4:31: error:
+T11821a.hs:4:1: error:
     • Different names for the same type variable: ‘k1’ and ‘k2’
     • In the type declaration for ‘SameKind’
