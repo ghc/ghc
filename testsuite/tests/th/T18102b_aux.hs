@@ -7,5 +7,5 @@ import Language.Haskell.TH.Syntax
 ifThenElse :: Bool -> Int -> Int -> Int
 ifThenElse _ a b = a+b
 
-intQuote :: Q (TExp Int)
+intQuote :: CodeQ Int
 intQuote = [|| if True then 10 else 15 ||]
