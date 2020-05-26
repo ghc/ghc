@@ -664,7 +664,7 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
 
 rnFamInstEqn :: HsDocContext
              -> AssocTyFamInfo
-             -> [Located RdrName]
+             -> FreeKiTyVars
              -- ^ Kind variables from the equation's RHS to be implicitly bound
              -- if no explicit forall.
              -> FamInstEqn GhcPs rhs
@@ -681,9 +681,10 @@ rnFamInstEqn doc atfi rhs_kvars
                         AssocTyFamDeflt cls  -> Just cls
                         AssocTyFamInst cls _ -> Just cls
        ; tycon'   <- lookupFamInstName mb_cls tycon
-       ; let pat_kity_vars_with_dups = extractHsTyArgRdrKiTyVarsDup pats
-             -- Use the "...Dups" form because it's needed
-             -- below to report unused binder on the LHS
+       ; let pat_kity_vars_with_dups = extractHsTyArgRdrKiTyVars pats
+             -- It is crucial that extractHsTyArgRdrKiTyVars return
+             -- duplicate occurrences, since they're needed below to help
+             -- determine unused binders on the LHS.
 
        ; let bndrs = fromMaybe [] mb_bndrs
 
@@ -713,48 +714,42 @@ rnFamInstEqn doc atfi rhs_kvars
            -- No need to filter out explicit binders (the 'mb_bndrs = Just
            -- explicit_bndrs' case) because there must be none if we're going
            -- to implicitly bind anything, per the previous comment.
-           nubL $ pat_kity_vars_with_dups ++ rhs_kvars
-       ; all_imp_var_names <- mapM (newTyVarNameRn mb_cls) all_imp_vars
+           pat_kity_vars_with_dups ++ rhs_kvars
 
-             -- All the free vars of the family patterns
-             -- with a sensible binding location
-       ; ((bndrs', pats', payload'), fvs)
-              <- bindLocalNamesFV all_imp_var_names $
-                 bindLHsTyVarBndrs doc (Just $ inHsDocContext doc)
-                                   Nothing bndrs $ \bndrs' ->
-                 -- Note: If we pass mb_cls instead of Nothing here,
-                 --  bindLHsTyVarBndrs will use class variables for any names
-                 --  the user meant to bring in scope here. This is an explicit
-                 --  forall, so we want fresh names, not class variables.
-                 --  Thus: always pass Nothing
-                 do { (pats', pat_fvs) <- rnLHsTypeArgs (FamPatCtx tycon) pats
-                    ; (payload', rhs_fvs) <- rn_payload doc payload
+       ; rnImplicitBndrs mb_cls all_imp_vars $ \all_imp_var_names ->
+         bindLHsTyVarBndrs doc (Just $ inHsDocContext doc)
+                           Nothing bndrs $ \bndrs' ->
+         -- Note: If we pass mb_cls instead of Nothing here,
+         --  bindLHsTyVarBndrs will use class variables for any names
+         --  the user meant to bring in scope here. This is an explicit
+         --  forall, so we want fresh names, not class variables.
+         --  Thus: always pass Nothing
+    do { (pats', pat_fvs) <- rnLHsTypeArgs (FamPatCtx tycon) pats
+       ; (payload', rhs_fvs) <- rn_payload doc payload
 
-                       -- Report unused binders on the LHS
-                       -- See Note [Unused type variables in family instances]
-                    ; let groups :: [NonEmpty (Located RdrName)]
-                          groups = equivClasses cmpLocated $
-                                   pat_kity_vars_with_dups
-                    ; nms_dups <- mapM (lookupOccRn . unLoc) $
-                                     [ tv | (tv :| (_:_)) <- groups ]
-                          -- Add to the used variables
-                          --  a) any variables that appear *more than once* on the LHS
-                          --     e.g.   F a Int a = Bool
-                          --  b) for associated instances, the variables
-                          --     of the instance decl.  See
-                          --     Note [Unused type variables in family instances]
-                    ; let nms_used = extendNameSetList rhs_fvs $
-                                        inst_tvs ++ nms_dups
-                          inst_tvs = case atfi of
-                                       NonAssocTyFamEqn          -> []
-                                       AssocTyFamDeflt _         -> []
-                                       AssocTyFamInst _ inst_tvs -> inst_tvs
-                          all_nms = all_imp_var_names ++ hsLTyVarNames bndrs'
-                    ; warnUnusedTypePatterns all_nms nms_used
+          -- Report unused binders on the LHS
+          -- See Note [Unused type variables in family instances]
+       ; let groups :: [NonEmpty (Located RdrName)]
+             groups = equivClasses cmpLocated $
+                      pat_kity_vars_with_dups
+       ; nms_dups <- mapM (lookupOccRn . unLoc) $
+                        [ tv | (tv :| (_:_)) <- groups ]
+             -- Add to the used variables
+             --  a) any variables that appear *more than once* on the LHS
+             --     e.g.   F a Int a = Bool
+             --  b) for associated instances, the variables
+             --     of the instance decl.  See
+             --     Note [Unused type variables in family instances]
+       ; let nms_used = extendNameSetList rhs_fvs $
+                           inst_tvs ++ nms_dups
+             inst_tvs = case atfi of
+                          NonAssocTyFamEqn          -> []
+                          AssocTyFamDeflt _         -> []
+                          AssocTyFamInst _ inst_tvs -> inst_tvs
+             all_nms = all_imp_var_names ++ hsLTyVarNames bndrs'
+       ; warnUnusedTypePatterns all_nms nms_used
 
-                    ; return ((bndrs', pats', payload'), rhs_fvs `plusFV` pat_fvs) }
-
-       ; let all_fvs  = fvs `addOneFV` unLoc tycon'
+       ; let all_fvs = (rhs_fvs `plusFV` pat_fvs) `addOneFV` unLoc tycon'
             -- type instance => use, hence addOneFV
 
        ; return (HsIB { hsib_ext = all_imp_var_names -- Note [Wildcards in family instances]
@@ -765,7 +760,7 @@ rnFamInstEqn doc atfi rhs_kvars
                                    , feqn_pats   = pats'
                                    , feqn_fixity = fixity
                                    , feqn_rhs    = payload' } },
-                 all_fvs) }
+                 all_fvs) } }
 
 rnTyFamInstDecl :: AssocTyFamInfo
                 -> TyFamInstDecl GhcPs
@@ -2116,12 +2111,12 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
           -- See #14808.
         ; implicit_bndrs <- forAllOrNothing explicit_forall
             $ extractHsTvBndrs explicit_tkvs
-            $ extractHsTysRdrTyVarsDups (theta ++ arg_tys ++ [res_ty])
+            $ extractHsTysRdrTyVars (theta ++ arg_tys ++ [res_ty])
 
         ; let ctxt    = ConDeclCtx new_names
               mb_ctxt = Just (inHsDocContext ctxt)
 
-        ; rnImplicitBndrs implicit_bndrs $ \ implicit_tkvs ->
+        ; rnImplicitBndrs Nothing implicit_bndrs $ \ implicit_tkvs ->
           bindLHsTyVarBndrs ctxt mb_ctxt Nothing explicit_tkvs $ \ explicit_tkvs ->
     do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt
         ; (new_args, fvs2)   <- rnConDeclDetails (unLoc (head new_names)) ctxt args
