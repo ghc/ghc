@@ -86,8 +86,13 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
 pprSizeDecl :: Platform -> CLabel -> SDoc
 pprSizeDecl platform lbl
  = if osElfTarget (platformOS platform)
-   then text "\t.size" <+> ppr lbl <> text ", .-" <> ppr lbl
+   then text "\t.size" <+> prettyLbl <> text ", .-" <> codeLbl
    else empty
+  where
+    prettyLbl = ppr lbl
+    codeLbl
+      | platformArch platform == ArchPPC_64 ELF_V1 = char '.' <> prettyLbl
+      | otherwise                                  = prettyLbl
 
 pprFunctionDescriptor :: CLabel -> SDoc
 pprFunctionDescriptor lab = pprGloblDecl lab
