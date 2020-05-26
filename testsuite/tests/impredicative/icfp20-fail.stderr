@@ -1,0 +1,42 @@
+
+icfp20-fail.hs:20:10: error:
+    • Couldn't match type: forall a. a -> a
+                     with: b -> b
+      Expected: SId -> b -> b
+        Actual: SId -> SId
+    • In the expression: id
+      In an equation for ‘auto'1’: auto'1 = id
+    • Relevant bindings include
+        auto'1 :: SId -> b -> b (bound at icfp20-fail.hs:20:1)
+
+icfp20-fail.hs:23:9: error:
+    • Couldn't match expected type ‘a0’
+                  with actual type ‘SId -> b0 -> b0’
+      Cannot instantiate unification variable ‘a0’
+      with a type involving polytypes: SId -> b0 -> b0
+    • In the first argument of ‘id’, namely ‘auto'2’
+      In the expression: id auto'2
+      In an equation for ‘a6’: a6 = id auto'2
+    • Relevant bindings include a6 :: a0 (bound at icfp20-fail.hs:23:1)
+
+icfp20-fail.hs:26:16: error:
+    • Couldn't match type ‘SId’ with ‘b -> b’
+      Expected: (b -> b) -> b -> b
+        Actual: SId -> b -> b
+    • In the second argument of ‘choose’, namely ‘auto'2’
+      In the expression: choose id auto'2
+      In an equation for ‘a8’: a8 = choose id auto'2
+    • Relevant bindings include
+        a8 :: (b -> b) -> b -> b (bound at icfp20-fail.hs:26:1)
+
+icfp20-fail.hs:30:12: error:
+    • Couldn't match type: forall s. ST s a
+                     with: ST s0 a
+      Expected: ST s0 a -> a
+        Actual: (forall s. ST s a) -> a
+    • In the first argument of ‘id’, namely ‘runST’
+      In the expression: id runST x
+      In an equation for ‘st2’: st2 x = id runST x
+    • Relevant bindings include
+        x :: forall s. ST s a (bound at icfp20-fail.hs:30:5)
+        st2 :: (forall s. ST s a) -> a (bound at icfp20-fail.hs:30:1)

@@ -8,6 +8,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Bug (await, bug) where
 
@@ -21,8 +22,6 @@ data Attempt α = Success α
 fromAttempt ∷ Attempt α → IO α
 fromAttempt (Success a) = return a
 fromAttempt (Failure e) = throwIO e
-
-data Inject f α = ∀ β . Inject (f β) (α → β)
 
 class Completable f where
   complete ∷ f α → α → IO Bool
@@ -84,29 +83,34 @@ instance (Typeable n, Exception e) ⇒ Exception (NthException n e)
 
 instance WaitOp (WaitOps rs) where
   type WaitOpResult (WaitOps rs) = HElemOf rs
-  registerWaitOp ops ev = do
-    let inj n (Success r) = Success (HNth n r)
-        inj n (Failure e) = Failure (NthException n e)
-        register ∷ ∀ n . HDropClass n rs
-                 ⇒ Bool → Peano n → WaitOps (HDrop n rs) → IO Bool
-        register first n (WaitOp op) = do
-          t ← try $ registerWaitOp op (Inject ev $ inj n)
-          r ← case t of
-            Right r → return r
-            Left e  → complete ev $ inj n $ Failure (e ∷ SomeException)
-          return $ r || not first
-        register first n (op :? ops') = do
-          t ← try $ registerWaitOp op (Inject ev $ inj n)
-          case t of
-            Right True → case waitOpsNonEmpty ops' of
-              HNonEmptyInst → case hTailDropComm ∷ HTailDropComm n rs of
-                HTailDropComm → register False (PSucc n) ops'
-            Right False → return $ not first
-            Left e → do
-              c ← complete ev $ inj n $ Failure (e ∷ SomeException)
-              return $ c || not first
-    case waitOpsNonEmpty ops of
-      HNonEmptyInst → register True PZero ops
+
+inj :: Peano n -> Attempt (HNth n l) -> Attempt (HElemOf l)
+inj = error "urk"
+
+rwo :: forall rs f. f (Attempt (WaitOpResult (WaitOps rs))) → IO Bool
+rwo ev = do
+    let register ∷ ∀ n . Peano n → WaitOps (HDrop n rs) → IO Bool
+        register n (WaitOp (op :: op_ty)) =
+          ((($) -- (px -> qx) -> px -> qx   px=a_a2iT   qx=b_a2iU
+                (Inject @f  ev)   -- Instantiate at ax=a2iW bx=a2iX;
+                                  --    (ax -> bx) -> Inject f ax
+                                  -- ql with arg or Inject:   f bx ~ f (Attempt (WaitOpReslt (WaitOps rs)))
+                                  --       bx := Attempt (WaitOpResult (WaitOps rs) = Attempt (HElemOf rs)
+                   -- px := (ax -> bx)
+                   -- qx := Inject f ax
+                (inj @n n)        -- instantiate lx=l_a2iZ;
+                                  --    Attempt (HNth n lx) -> Attempt (HElemOf lx)
+                   -- res_ty px = (ax->bx) ~ Attempt (HNth n lx) -> Attempt (HElemOf lx)
+                   -- ax := Attempt (HNth n lx)
+                   -- bx := Attempt (HElemOf lx)
+           ) :: Inject f (Attempt (WaitOpResult op_ty)))
+                   -- Result ql: Attempt (WaitOpResult op_ty) ~ ax = Attempt (HNth n lx)
+           `seq` return True
+    return True
+
+
+data Inject f a where
+  Inject ::  ∀f a b . (f b) -> (a → b) -> Inject f a
 
 bug ∷ IO Int
 bug = do

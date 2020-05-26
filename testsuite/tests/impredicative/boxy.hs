@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XImpredicativeTypes -fno-warn-deprecated-flags -XScopedTypeVariables #-}
+{-# LANGUAGE ImpredicativeTypes, ScopedTypeVariables, TypeApplications #-}
 
 module ShouldCompile where
 
@@ -17,7 +17,6 @@ sing x = [x]
 id1 :: forall a. a -> a
 id1 = id
 
-{-
 ids :: [forall a. a -> a]
 ids = [id1,id1]
 
@@ -29,7 +28,6 @@ t2 = sing id
 
 t3 :: forall a. a -> a
 t3 = head ids
--}
 
 {--------------- Examples from QMLF paper -------------------}
 
@@ -45,13 +43,11 @@ qH choose id = choose id
 choose :: forall a. a -> a -> a
 choose x y = x
 
-{-
 impred1 :: (Bool, Char)
-impred1 = qF $ choose  --- impredicative instantiation for $
+impred1 = ($) qF choose  --- impredicative instantiation for $
 
 impred2 :: (forall a. a -> a -> a) -> (Bool, Char)
 impred2 = id qF
--}
 
 {------ Examples for Garrique/Remy paper -------}
 
@@ -68,33 +64,6 @@ gr1 = self1 id
 gr2 = self2 id
 
 gr3 = (\(u :: (forall a. a -> a) -> (forall a. a -> a)) -> u id) self1
-
-{------------ Church numerals ----------}
-
-type Church = forall a. a -> (a -> a) -> a
-
-z :: Church
-z = \z -> \f -> z
-
-s :: Church -> Church
-s = \n -> \z -> \f -> f (n z f)
-
-fold :: Church -> a -> (a -> a) -> a
-fold n f z = n f z
-
-{-
-mul :: Church -> Church -> Church
-mul m n = \f -> \a -> m (n f) a
-
-exp :: Church -> Church -> Church
-exp m n = n (mul m) (s z)
-
-idC :: Church -> Church
-idC x = fold x s z
-
-inc :: Church -> Church
-inc x = fold x s (s z)
--}
 
 {------- fix for higher rank types ---------}
 

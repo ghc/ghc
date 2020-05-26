@@ -1222,7 +1222,7 @@ tcSplitForAllTysSameVis supplied_argf ty
   where
     sty = splitSomeForAllTys (`sameVis` supplied_argf) ty
 
-tcSplitSomeForAllTys :: (ArgFlag -> Bool) -> Type -> ([TyVar], Type)
+tcSplitSomeForAllTys :: (ArgFlag -> Bool) -> Type -> ([TyVarBinder], Type)
 tcSplitSomeForAllTys argf_pred ty = splitSomeForAllTys argf_pred ty
 
 -- | Like 'tcSplitForAllTys', but splits off only named binders.
