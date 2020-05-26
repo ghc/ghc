@@ -10,7 +10,7 @@
 --
 -- Avoid using them as much as possible
 module GHC.Data.List.SetOps (
-        unionLists, minusList, deleteBys,
+        unionLists, minusList,
 
         -- Association lists
         Assoc, assoc, assocMaybe, assocUsing, assocDefault, assocDefaultUsing,
@@ -38,11 +38,6 @@ import qualified Data.Set as S
 getNth :: Outputable a => [a] -> Int -> a
 getNth xs n = ASSERT2( xs `lengthExceeds` n, ppr n $$ ppr xs )
              xs !! n
-
-deleteBys :: (a -> a -> Bool) -> [a] -> [a] -> [a]
--- (deleteBys eq xs ys) returns xs-ys, using the given equality function
--- Just like 'Data.List.delete' but with an equality function
-deleteBys eq xs ys = foldl' (flip (L.deleteBy eq)) xs ys
 
 {-
 ************************************************************************

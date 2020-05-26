@@ -1431,7 +1431,7 @@ reifyInstances th_nm th_tys
                              -- must error before proceeding to typecheck the
                              -- renamed type, as that will result in GHC
                              -- internal errors (#13837).
-               bindLRdrNames tv_rdrs $ \ tv_names ->
+               rnImplicitBndrs Nothing tv_rdrs $ \ tv_names ->
                do { (rn_ty, fvs) <- rnLHsType doc rdr_ty
                   ; return ((tv_names, rn_ty), fvs) }
         ; (_tvs, ty)
