@@ -1,4 +1,4 @@
--- WARNING: template-haskell.cabal is automatically generated from template-haskell.cabal.in by
+ WARNING: template-haskell.cabal is automatically generated from template-haskell.cabal.in by
 -- ../../configure.  Make sure you are editing template-haskell.cabal.in, not
 -- template-haskell.cabal.
 
@@ -48,7 +48,7 @@ Library
         Language.Haskell.TH.Quote
         Language.Haskell.TH.Syntax
         Language.Haskell.TH.LanguageExtensions
-
+        Language.Haskell.TH.CodeDo
         Language.Haskell.TH.Lib.Internal
 
     other-modules:
