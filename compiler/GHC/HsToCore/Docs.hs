@@ -97,13 +97,7 @@ mkMaps instances decls =
     instanceMap = M.fromList [(l, n) | n <- instances, RealSrcSpan l _ <- [getSrcSpan n] ]
 
     names :: RealSrcSpan -> HsDecl GhcRn -> [Name]
-    names l (InstD _ d) = maybeToList $ -- See Note [1].
-      case d of
-              TyFamInstD _ _ -> M.lookup l instanceMap
-                -- The CoAx's loc is the whole line, but only
-                -- for TFs
-              _ -> lookupSrcSpan (getInstLoc d) instanceMap
-
+    names _ (InstD _ d) = maybeToList $ lookupSrcSpan (getInstLoc d) instanceMap
     names l (DerivD {}) = maybeToList (M.lookup l instanceMap) -- See Note [1].
     names _ decl = getMainDeclBinder decl
 
@@ -145,14 +139,16 @@ sigNameNoLoc _                             = []
 getInstLoc :: InstDecl (GhcPass p) -> SrcSpan
 getInstLoc = \case
   ClsInstD _ (ClsInstDecl { cid_poly_ty = ty }) -> getLoc (hsSigType ty)
+  -- The Names of data and type family instances have their SrcSpan's attached
+  -- to the *type constructor*. For example, the Name "D:R:Foo:Int" would have
+  -- its SrcSpan attached here:
+  --   type family Foo a
+  --   type instance Foo Int = Bool
+  --                 ^^^
   DataFamInstD _ (DataFamInstDecl
     { dfid_eqn = HsIB { hsib_body = FamEqn { feqn_tycon = L l _ }}}) -> l
   TyFamInstD _ (TyFamInstDecl
-    -- Since CoAxioms' Names refer to the whole line for type family instances
-    -- in particular, we need to dig a bit deeper to pull out the entire
-    -- equation. This does not happen for data family instances, for some
-    -- reason.
-    { tfid_eqn = HsIB { hsib_body = FamEqn { feqn_rhs = L l _ }}}) -> l
+    { tfid_eqn = HsIB { hsib_body = FamEqn { feqn_tycon = L l _ }}}) -> l
 
 -- | Get all subordinate declarations inside a declaration, and their docs.
 -- A subordinate declaration is something like the associate type or data
