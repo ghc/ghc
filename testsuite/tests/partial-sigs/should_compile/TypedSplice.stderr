@@ -5,7 +5,7 @@ TypedSplice.hs:9:22: warning: [-Wpartial-type-signatures (in -Wdefault)]
       In an expression type signature: _ -> _b
       In the Template Haskell quotation [|| not :: _ -> _b ||]
     • Relevant bindings include
-        metaExp :: Q (TExp (Bool -> Bool)) (bound at TypedSplice.hs:9:1)
+        metaExp :: Code Q (Bool -> Bool) (bound at TypedSplice.hs:9:1)
 
 TypedSplice.hs:9:27: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_b’ standing for ‘Bool’
@@ -13,4 +13,4 @@ TypedSplice.hs:9:27: warning: [-Wpartial-type-signatures (in -Wdefault)]
       In the Template Haskell quotation [|| not :: _ -> _b ||]
       In the expression: [|| not :: _ -> _b ||]
     • Relevant bindings include
-        metaExp :: Q (TExp (Bool -> Bool)) (bound at TypedSplice.hs:9:1)
+        metaExp :: Code Q (Bool -> Bool) (bound at TypedSplice.hs:9:1)

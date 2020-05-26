@@ -46,7 +46,9 @@ Derived class instances:
   instance Language.Haskell.TH.Syntax.Lift
              (DrvEmptyData.Void a) where
     Language.Haskell.TH.Syntax.lift z = GHC.Base.pure (case z of)
-    Language.Haskell.TH.Syntax.liftTyped z = GHC.Base.pure (case z of)
+    Language.Haskell.TH.Syntax.liftTyped z
+      = Language.Haskell.TH.Syntax.unsafeCodeCoerce
+          (GHC.Base.pure (case z of))
   
   $tVoid :: Data.Data.DataType
   $tVoid = Data.Data.mkDataType "Void" []

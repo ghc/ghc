@@ -16,7 +16,7 @@ import Data.Functor.Identity
 
 type LetT m a = WriterT [Locus] m a
 
-type Code m a = m (TExp a)
+type MCode m a = m (TExp a)
 
 type LetCode m a = LetT m (TExp a)
 
@@ -29,7 +29,7 @@ instance (Monoid w, Quote m) => Quote (StateT w m) where
   newName x = W.lift (newName x)
 
 
-locus :: (Locus -> LetCode m a) -> Code m a
+locus :: (Locus -> LetCode m a) -> MCode m a
 locus = undefined
 
 newTypedName :: Quote m => m (TExp a)
@@ -38,15 +38,15 @@ newTypedName = do
   return (TExp (VarE n))
 
 
-gen :: Quote m => Locus -> (Code Identity (a -> b) -> LetCode m a -> LetCode m b) -> LetCode m (a -> b)
+gen :: Quote m => Locus -> (MCode Identity (a -> b) -> LetCode m a -> LetCode m b) -> LetCode m (a -> b)
 gen l f = do
   n <- newTypedName
-  [|| \a -> $$(f (Identity n) [|| a ||]) ||]
+  examineCode [|| \a -> $$(liftCode $ f (Identity n) (examineCode [|| a ||])) ||]
 
 
 mrfix :: forall a b m r . (Monad m, Ord a, Quote m)
-      => (forall m . (a -> Code m (b -> r)) -> (a -> Code m b -> Code m r))
-      -> (a -> Code m (b -> r))
+      => (forall m . (a -> MCode m (b -> r)) -> (a -> MCode m b -> MCode m r))
+      -> (a -> MCode m (b -> r))
 mrfix f x =
   flip evalStateT Map.empty $
     locus $ \locus -> do

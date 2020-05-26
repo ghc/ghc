@@ -32,9 +32,8 @@ templateHaskellNames = [
     mkNameSName,
     mkModNameName,
     liftStringName,
-    unTypeName,
-    unTypeQName,
-    unsafeTExpCoerceName,
+    unTypeName, unTypeCodeName,
+    unsafeCodeCoerceName,
 
     -- Lit
     charLName, stringLName, integerLName, intPrimLName, wordPrimLName,
@@ -135,8 +134,6 @@ templateHaskellNames = [
     -- DerivStrategy
     stockStrategyName, anyclassStrategyName,
     newtypeStrategyName, viaStrategyName,
-    -- TExp
-    tExpDataConName,
     -- RuleBndr
     ruleVarName, typedRuleVarName,
     -- FunDep
@@ -159,7 +156,7 @@ templateHaskellNames = [
     typeTyConName, tyVarBndrUnitTyConName, tyVarBndrSpecTyConName, clauseTyConName,
     patQTyConName, funDepTyConName, decsQTyConName,
     ruleBndrTyConName, tySynEqnTyConName,
-    roleTyConName, tExpTyConName, injAnnTyConName, kindTyConName,
+    roleTyConName, codeTyConName, injAnnTyConName, kindTyConName,
     overlapTyConName, derivClauseTyConName, derivStrategyTyConName,
     modNameTyConName,
 
@@ -193,7 +190,7 @@ quoteClassName = thCls (fsLit "Quote") quoteClassKey
 qTyConName, nameTyConName, fieldExpTyConName, patTyConName,
     fieldPatTyConName, expTyConName, decTyConName, typeTyConName,
     matchTyConName, clauseTyConName, funDepTyConName, predTyConName,
-    tExpTyConName, injAnnTyConName, overlapTyConName, decsTyConName,
+    codeTyConName, injAnnTyConName, overlapTyConName, decsTyConName,
     modNameTyConName :: Name
 qTyConName             = thTc (fsLit "Q")              qTyConKey
 nameTyConName          = thTc (fsLit "Name")           nameTyConKey
@@ -208,15 +205,15 @@ matchTyConName         = thTc (fsLit "Match")          matchTyConKey
 clauseTyConName        = thTc (fsLit "Clause")         clauseTyConKey
 funDepTyConName        = thTc (fsLit "FunDep")         funDepTyConKey
 predTyConName          = thTc (fsLit "Pred")           predTyConKey
-tExpTyConName          = thTc (fsLit "TExp")           tExpTyConKey
+codeTyConName          = thTc (fsLit "Code")           codeTyConKey
 injAnnTyConName        = thTc (fsLit "InjectivityAnn") injAnnTyConKey
 overlapTyConName       = thTc (fsLit "Overlap")        overlapTyConKey
 modNameTyConName       = thTc (fsLit "ModName")        modNameTyConKey
 
 returnQName, bindQName, sequenceQName, newNameName, liftName,
     mkNameName, mkNameG_vName, mkNameG_dName, mkNameG_tcName,
-    mkNameLName, mkNameSName, liftStringName, unTypeName, unTypeQName,
-    unsafeTExpCoerceName, liftTypedName, mkModNameName :: Name
+    mkNameLName, mkNameSName, liftStringName, unTypeName, unTypeCodeName,
+    unsafeCodeCoerceName, liftTypedName, mkModNameName :: Name
 returnQName    = thFun (fsLit "returnQ")   returnQIdKey
 bindQName      = thFun (fsLit "bindQ")     bindQIdKey
 sequenceQName  = thFun (fsLit "sequenceQ") sequenceQIdKey
@@ -231,8 +228,8 @@ mkNameLName    = thFun (fsLit "mkNameL")    mkNameLIdKey
 mkNameSName    = thFun (fsLit "mkNameS")    mkNameSIdKey
 mkModNameName  = thFun (fsLit "mkModName")  mkModNameIdKey
 unTypeName     = thFun (fsLit "unType")     unTypeIdKey
-unTypeQName    = thFun (fsLit "unTypeQ")    unTypeQIdKey
-unsafeTExpCoerceName = thFun (fsLit "unsafeTExpCoerce") unsafeTExpCoerceIdKey
+unTypeCodeName    = thFun (fsLit "unTypeCode") unTypeCodeIdKey
+unsafeCodeCoerceName = thFun (fsLit "unsafeCodeCoerce") unsafeCodeCoerceIdKey
 liftTypedName = thFun (fsLit "liftTyped") liftTypedIdKey
 
 
@@ -525,10 +522,6 @@ unsafeName     = libFun (fsLit "unsafe") unsafeIdKey
 safeName       = libFun (fsLit "safe") safeIdKey
 interruptibleName = libFun (fsLit "interruptible") interruptibleIdKey
 
--- newtype TExp a = ...
-tExpDataConName :: Name
-tExpDataConName = thCon (fsLit "TExp") tExpDataConKey
-
 -- data RuleBndr = ...
 ruleVarName, typedRuleVarName :: Name
 ruleVarName      = libFun (fsLit ("ruleVar"))      ruleVarIdKey
@@ -653,7 +646,7 @@ expTyConKey, matchTyConKey, clauseTyConKey, qTyConKey, expQTyConKey,
     fieldExpTyConKey, fieldPatTyConKey, nameTyConKey, patQTyConKey,
     funDepTyConKey, predTyConKey,
     predQTyConKey, decsQTyConKey, ruleBndrTyConKey, tySynEqnTyConKey,
-    roleTyConKey, tExpTyConKey, injAnnTyConKey, kindTyConKey,
+    roleTyConKey, codeTyConKey, injAnnTyConKey, kindTyConKey,
     overlapTyConKey, derivClauseTyConKey, derivStrategyTyConKey, decsTyConKey,
     modNameTyConKey  :: Unique
 expTyConKey             = mkPreludeTyConUnique 200
@@ -667,7 +660,7 @@ conTyConKey             = mkPreludeTyConUnique 210
 typeQTyConKey           = mkPreludeTyConUnique 211
 typeTyConKey            = mkPreludeTyConUnique 212
 decTyConKey             = mkPreludeTyConUnique 213
-bangTypeTyConKey       = mkPreludeTyConUnique 214
+bangTypeTyConKey        = mkPreludeTyConUnique 214
 varBangTypeTyConKey     = mkPreludeTyConUnique 215
 fieldExpTyConKey        = mkPreludeTyConUnique 216
 fieldPatTyConKey        = mkPreludeTyConUnique 217
@@ -677,19 +670,19 @@ funDepTyConKey          = mkPreludeTyConUnique 222
 predTyConKey            = mkPreludeTyConUnique 223
 predQTyConKey           = mkPreludeTyConUnique 224
 tyVarBndrUnitTyConKey   = mkPreludeTyConUnique 225
-tyVarBndrSpecTyConKey   = mkPreludeTyConUnique 237
 decsQTyConKey           = mkPreludeTyConUnique 226
-ruleBndrTyConKey       = mkPreludeTyConUnique 227
+ruleBndrTyConKey        = mkPreludeTyConUnique 227
 tySynEqnTyConKey        = mkPreludeTyConUnique 228
 roleTyConKey            = mkPreludeTyConUnique 229
-tExpTyConKey            = mkPreludeTyConUnique 230
 injAnnTyConKey          = mkPreludeTyConUnique 231
-kindTyConKey           = mkPreludeTyConUnique 232
+kindTyConKey            = mkPreludeTyConUnique 232
 overlapTyConKey         = mkPreludeTyConUnique 233
-derivClauseTyConKey    = mkPreludeTyConUnique 234
-derivStrategyTyConKey  = mkPreludeTyConUnique 235
+derivClauseTyConKey     = mkPreludeTyConUnique 234
+derivStrategyTyConKey   = mkPreludeTyConUnique 235
 decsTyConKey            = mkPreludeTyConUnique 236
-modNameTyConKey         = mkPreludeTyConUnique 238
+tyVarBndrSpecTyConKey   = mkPreludeTyConUnique 237
+codeTyConKey            = mkPreludeTyConUnique 238
+modNameTyConKey         = mkPreludeTyConUnique 239
 
 {- *********************************************************************
 *                                                                      *
@@ -717,10 +710,6 @@ allPhasesDataConKey   = mkPreludeDataConUnique 205
 fromPhaseDataConKey   = mkPreludeDataConUnique 206
 beforePhaseDataConKey = mkPreludeDataConUnique 207
 
--- newtype TExp a = ...
-tExpDataConKey :: Unique
-tExpDataConKey = mkPreludeDataConUnique 208
-
 -- data Overlap = ..
 overlappableDataConKey,
   overlappingDataConKey,
@@ -742,8 +731,8 @@ incoherentDataConKey   = mkPreludeDataConUnique 212
 
 returnQIdKey, bindQIdKey, sequenceQIdKey, liftIdKey, newNameIdKey,
     mkNameIdKey, mkNameG_vIdKey, mkNameG_dIdKey, mkNameG_tcIdKey,
-    mkNameLIdKey, mkNameSIdKey, unTypeIdKey, unTypeQIdKey,
-    unsafeTExpCoerceIdKey, liftTypedIdKey, mkModNameIdKey :: Unique
+    mkNameLIdKey, mkNameSIdKey, unTypeIdKey, unTypeCodeIdKey,
+    unsafeCodeCoerceIdKey, liftTypedIdKey, mkModNameIdKey :: Unique
 returnQIdKey        = mkPreludeMiscIdUnique 200
 bindQIdKey          = mkPreludeMiscIdUnique 201
 sequenceQIdKey      = mkPreludeMiscIdUnique 202
@@ -756,10 +745,10 @@ mkNameG_tcIdKey      = mkPreludeMiscIdUnique 208
 mkNameLIdKey         = mkPreludeMiscIdUnique 209
 mkNameSIdKey         = mkPreludeMiscIdUnique 210
 unTypeIdKey          = mkPreludeMiscIdUnique 211
-unTypeQIdKey         = mkPreludeMiscIdUnique 212
-unsafeTExpCoerceIdKey = mkPreludeMiscIdUnique 213
+unTypeCodeIdKey      = mkPreludeMiscIdUnique 212
 liftTypedIdKey        = mkPreludeMiscIdUnique 214
 mkModNameIdKey        = mkPreludeMiscIdUnique 215
+unsafeCodeCoerceIdKey = mkPreludeMiscIdUnique 216
 
 
 -- data Lit = ...
@@ -1105,9 +1094,10 @@ inferredSpecKey  = mkPreludeMiscIdUnique 499
 ************************************************************************
 -}
 
-lift_RDR, liftTyped_RDR, mkNameG_dRDR, mkNameG_vRDR :: RdrName
+lift_RDR, liftTyped_RDR, mkNameG_dRDR, mkNameG_vRDR, unsafeCodeCoerce_RDR :: RdrName
 lift_RDR     = nameRdrName liftName
 liftTyped_RDR = nameRdrName liftTypedName
+unsafeCodeCoerce_RDR = nameRdrName unsafeCodeCoerceName
 mkNameG_dRDR = nameRdrName mkNameG_dName
 mkNameG_vRDR = nameRdrName mkNameG_vName
 
