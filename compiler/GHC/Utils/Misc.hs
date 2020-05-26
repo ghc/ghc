@@ -1440,13 +1440,6 @@ mulHi a b = fromIntegral (r `shiftR` 32)
    where r :: Int64
          r = fromIntegral a * fromIntegral b
 
--- | A call stack constraint, but only when 'isDebugOn'.
-#if defined(DEBUG)
-type HasDebugCallStack = HasCallStack
-#else
-type HasDebugCallStack = (() :: Constraint)
-#endif
-
 data OverridingBool
   = Auto
   | Always
