@@ -17,7 +17,6 @@ module GHC.Iface.Binary (
         getSymtabName,
         getDictFastString,
         CheckHiWay(..),
-        TraceBinIFaceReading(..),
         getWithUserData,
         putWithUserData,
 
@@ -42,14 +41,12 @@ import GHC.Iface.Env
 import GHC.Driver.Types
 import GHC.Unit
 import GHC.Types.Name
-import GHC.Driver.Session
 import GHC.Driver.Ways
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Utils.Panic
 import GHC.Utils.Binary as Binary
 import GHC.Types.SrcLoc
-import GHC.Utils.Error
 import GHC.Data.FastMutInt
 import GHC.Types.Unique
 import GHC.Utils.Outputable
@@ -80,35 +77,19 @@ import qualified Control.Monad.Trans.State.Strict as State
 data CheckHiWay = CheckHiWay | IgnoreHiWay
     deriving Eq
 
-data TraceBinIFaceReading = TraceBinIFaceReading | QuietBinIFaceReading
-    deriving Eq
-
 -- | Read an interface file
-readBinIface :: CheckHiWay -> TraceBinIFaceReading -> FilePath
+readBinIface :: Platform -> Set Way -> (SDoc -> IO()) -> CheckHiWay -> FilePath
              -> TcRnIf a b ModIface
-readBinIface checkHiWay traceBinIFaceReading hi_path = do
+readBinIface platform ways printer checkHiWay hi_path = do
     ncu <- mkNameCacheUpdater
-    dflags <- getDynFlags
-    liftIO $ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu
+    liftIO $ readBinIface_ platform ways printer checkHiWay hi_path ncu
 
 -- | Read an interface file in 'IO'.
-readBinIface_ :: DynFlags -> CheckHiWay -> TraceBinIFaceReading -> FilePath
+readBinIface_ :: Platform -> Set Way -> (SDoc -> IO ()) -> CheckHiWay -> FilePath
               -> NameCacheUpdater
               -> IO ModIface
-readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
-    let platform = targetPlatform dflags
-
-        printer :: SDoc -> IO ()
-        printer = case traceBinIFaceReading of
-                      TraceBinIFaceReading -> \sd ->
-                          putLogMsg dflags
-                                    NoReason
-                                    SevOutput
-                                    noSrcSpan
-                                    $ withPprStyle defaultDumpStyle sd
-                      QuietBinIFaceReading -> \_ -> return ()
-
-        wantedGot :: String -> a -> a -> (a -> SDoc) -> IO ()
+readBinIface_ platform ways printer checkHiWay hi_path ncu = do
+    let wantedGot :: String -> a -> a -> (a -> SDoc) -> IO ()
         wantedGot what wanted got ppr' =
             printer (text what <> text ": " <>
                      vcat [text "Wanted " <> ppr' wanted <> text ",",
@@ -138,7 +119,7 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
     errorOnMismatch "mismatched interface file versions" our_ver check_ver
 
     check_way <- get bh
-    let way_descr = getWayDescr platform (targetWays dflags)
+    let way_descr = getWayDescr platform ways
     wantedGot "Way" way_descr check_way ppr
     when (checkHiWay == CheckHiWay) $
         errorOnMismatch "mismatched interface file ways" way_descr check_way
@@ -185,21 +166,20 @@ getWithUserData ncu bh = do
     get bh
 
 -- | Write an interface file
-writeBinIface :: DynFlags -> FilePath -> ModIface -> IO ()
-writeBinIface dflags hi_path mod_iface = do
+writeBinIface :: Platform -> Set Way -> (SDoc -> IO ()) -> FilePath -> ModIface -> IO ()
+writeBinIface platform ways tracer hi_path mod_iface = do
     bh <- openBinMem initBinMemSize
-    let platform = targetPlatform dflags
     put_ bh (binaryInterfaceMagic platform)
 
     -- The version and way descriptor go next
     put_ bh (show hiVersion)
-    let way_descr = getWayDescr platform (targetWays dflags)
+    let way_descr = getWayDescr platform ways
     put_  bh way_descr
 
     extFields_p_p <- tellBin bh
     put_ bh extFields_p_p
 
-    putWithUserData (debugTraceMsg dflags 3) bh mod_iface
+    putWithUserData tracer bh mod_iface
 
     extFields_p <- tellBin bh
     putAt bh extFields_p_p extFields_p
