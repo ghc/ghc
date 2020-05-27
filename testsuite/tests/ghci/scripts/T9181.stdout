@@ -1,9 +1,16 @@
 type GHC.TypeLits.AppendSymbol :: GHC.Types.Symbol
                                   -> GHC.Types.Symbol -> GHC.Types.Symbol
 type family GHC.TypeLits.AppendSymbol a b
+type GHC.TypeLits.CharToNat :: Char -> GHC.Types.Nat
+type family GHC.TypeLits.CharToNat a
+type GHC.TypeLits.CmpChar :: Char -> Char -> Ordering
+type family GHC.TypeLits.CmpChar a b
 type GHC.TypeLits.CmpSymbol :: GHC.Types.Symbol
                                -> GHC.Types.Symbol -> Ordering
 type family GHC.TypeLits.CmpSymbol a b
+type GHC.TypeLits.ConsSymbol :: Char
+                                -> GHC.Types.Symbol -> GHC.Types.Symbol
+type family GHC.TypeLits.ConsSymbol a b
 type GHC.TypeLits.ErrorMessage :: *
 data GHC.TypeLits.ErrorMessage
   = GHC.TypeLits.Text GHC.Types.Symbol
@@ -14,25 +21,116 @@ data GHC.TypeLits.ErrorMessage
   | GHC.TypeLits.ErrorMessage
     GHC.TypeLits.:$$:
     GHC.TypeLits.ErrorMessage
+type GHC.TypeLits.GeneralCharCategory :: Char
+                                         -> GHC.Unicode.GeneralCategory
+type family GHC.TypeLits.GeneralCharCategory a
+type GHC.TypeLits.IsAlpha :: Char -> Bool
+type family GHC.TypeLits.IsAlpha a
+type GHC.TypeLits.IsAlphaNum :: Char -> Bool
+type family GHC.TypeLits.IsAlphaNum a
+type GHC.TypeLits.IsAscii :: Char -> Bool
+type GHC.TypeLits.IsAscii c = GHC.TypeLits.LeqChar c '\DEL' :: Bool
+type GHC.TypeLits.IsAsciiLower :: Char -> Bool
+type GHC.TypeLits.IsAsciiLower c =
+  GHC.TypeLits.LeqChar 'a' c
+  Data.Type.Bool.&& GHC.TypeLits.LeqChar c 'z'
+  :: Bool
+type GHC.TypeLits.IsAsciiUpper :: Char -> Bool
+type GHC.TypeLits.IsAsciiUpper c =
+  GHC.TypeLits.LeqChar 'A' c
+  Data.Type.Bool.&& GHC.TypeLits.LeqChar c 'Z'
+  :: Bool
+type GHC.TypeLits.IsControl :: Char -> Bool
+type family GHC.TypeLits.IsControl a
+type GHC.TypeLits.IsDigit :: Char -> Bool
+type family GHC.TypeLits.IsDigit a
+type GHC.TypeLits.IsHexDigit :: Char -> Bool
+type family GHC.TypeLits.IsHexDigit a
+type GHC.TypeLits.IsLatin1 :: Char -> Bool
+type GHC.TypeLits.IsLatin1 c =
+  GHC.TypeLits.LeqChar c '\255' :: Bool
+type GHC.TypeLits.IsLetter :: Char -> Bool
+type family GHC.TypeLits.IsLetter a
+type GHC.TypeLits.IsLower :: Char -> Bool
+type family GHC.TypeLits.IsLower a
+type GHC.TypeLits.IsMark :: Char -> Bool
+type GHC.TypeLits.IsMark a =
+  GHC.TypeLits.IsMarkCategory (GHC.TypeLits.GeneralCharCategory a)
+  :: Bool
+type GHC.TypeLits.IsNumber :: Char -> Bool
+type GHC.TypeLits.IsNumber a =
+  GHC.TypeLits.IsNumberCategory (GHC.TypeLits.GeneralCharCategory a)
+  :: Bool
+type GHC.TypeLits.IsOctDigit :: Char -> Bool
+type family GHC.TypeLits.IsOctDigit a
+type GHC.TypeLits.IsPrint :: Char -> Bool
+type family GHC.TypeLits.IsPrint a
+type GHC.TypeLits.IsPunctuation :: Char -> Bool
+type GHC.TypeLits.IsPunctuation a =
+  GHC.TypeLits.IsPunctuationCategory
+    (GHC.TypeLits.GeneralCharCategory a)
+  :: Bool
+type GHC.TypeLits.IsSeparator :: Char -> Bool
+type GHC.TypeLits.IsSeparator a =
+  GHC.TypeLits.IsSeparatorCategory
+    (GHC.TypeLits.GeneralCharCategory a)
+  :: Bool
+type GHC.TypeLits.IsSpace :: Char -> Bool
+type family GHC.TypeLits.IsSpace a
+type GHC.TypeLits.IsSymbol :: Char -> Bool
+type GHC.TypeLits.IsSymbol a =
+  GHC.TypeLits.IsSymbolCategory (GHC.TypeLits.GeneralCharCategory a)
+  :: Bool
+type GHC.TypeLits.IsUpper :: Char -> Bool
+type family GHC.TypeLits.IsUpper a
+type GHC.TypeLits.KnownChar :: Char -> Constraint
+class GHC.TypeLits.KnownChar n where
+  GHC.TypeLits.charSing :: GHC.TypeLits.SChar n
+  {-# MINIMAL charSing #-}
 type GHC.TypeLits.KnownSymbol :: GHC.Types.Symbol -> Constraint
 class GHC.TypeLits.KnownSymbol n where
   GHC.TypeLits.symbolSing :: GHC.TypeLits.SSymbol n
   {-# MINIMAL symbolSing #-}
+type GHC.TypeLits.LeqChar :: Char -> Char -> Bool
+type family GHC.TypeLits.LeqChar a b
+type GHC.TypeLits.NatToChar :: GHC.Types.Nat -> Char
+type family GHC.TypeLits.NatToChar a
+type GHC.TypeLits.SomeChar :: *
+data GHC.TypeLits.SomeChar
+  = forall (n :: Char).
+    GHC.TypeLits.KnownChar n =>
+    GHC.TypeLits.SomeChar (Data.Proxy.Proxy n)
 type GHC.TypeLits.SomeSymbol :: *
 data GHC.TypeLits.SomeSymbol
   = forall (n :: GHC.Types.Symbol).
     GHC.TypeLits.KnownSymbol n =>
     GHC.TypeLits.SomeSymbol (Data.Proxy.Proxy n)
+type GHC.TypeLits.ToLower :: Char -> Char
+type family GHC.TypeLits.ToLower a
+type GHC.TypeLits.ToTitle :: Char -> Char
+type family GHC.TypeLits.ToTitle a
+type GHC.TypeLits.ToUpper :: Char -> Char
+type family GHC.TypeLits.ToUpper a
 type GHC.TypeLits.TypeError :: forall b.
                                GHC.TypeLits.ErrorMessage -> b
 type family GHC.TypeLits.TypeError a where
+type GHC.TypeLits.UnconsSymbol :: GHC.Types.Symbol
+                                  -> Maybe (Char, GHC.Types.Symbol)
+type family GHC.TypeLits.UnconsSymbol a
+GHC.TypeLits.charVal :: GHC.TypeLits.KnownChar n => proxy n -> Char
+GHC.TypeLits.charVal' ::
+  GHC.TypeLits.KnownChar n => GHC.Prim.Proxy# n -> Char
 GHC.TypeLits.natVal ::
   GHC.TypeNats.KnownNat n => proxy n -> Integer
 GHC.TypeLits.natVal' ::
   GHC.TypeNats.KnownNat n => GHC.Prim.Proxy# n -> Integer
+GHC.TypeLits.sameChar ::
+  (GHC.TypeLits.KnownChar a, GHC.TypeLits.KnownChar b) =>
+  proxy1 a -> proxy2 b -> Maybe (a Data.Type.Equality.:~: b)
 GHC.TypeLits.sameSymbol ::
   (GHC.TypeLits.KnownSymbol a, GHC.TypeLits.KnownSymbol b) =>
   proxy1 a -> proxy2 b -> Maybe (a Data.Type.Equality.:~: b)
+GHC.TypeLits.someCharVal :: Char -> GHC.TypeLits.SomeChar
 GHC.TypeLits.someNatVal :: Integer -> Maybe GHC.TypeNats.SomeNat
 GHC.TypeLits.someSymbolVal :: String -> GHC.TypeLits.SomeSymbol
 GHC.TypeLits.symbolVal ::
