@@ -187,7 +187,7 @@ mkIfaceForAllTvBndr :: ArgFlag -> IfaceTvBndr -> IfaceForAllBndr
 mkIfaceForAllTvBndr vis var = Bndr (IfaceTvBndr var) vis
 
 -- | Build the 'tyConKind' from the binders and the result kind.
--- Keep in sync with 'mkTyConKind' in types/TyCon.
+-- Keep in sync with 'mkTyConKind' in GHC/Core/TyCon.
 mkIfaceTyConKind :: [IfaceTyConBinder] -> IfaceKind -> IfaceKind
 mkIfaceTyConKind bndrs res_kind = foldr mk res_kind bndrs
   where
