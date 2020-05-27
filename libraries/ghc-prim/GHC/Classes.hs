@@ -487,7 +487,7 @@ deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
                    Eq t2, Eq u2, Eq v2, Eq w2, Eq x2, Eq y2, Eq z2, Eq a3,
                    Eq b3, Eq c3, Eq d3, Eq e3, Eq f3)
                => Eq (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s,
-                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2, 
+                      t, u, v, w, x, y, z, a2, b2, c2, d2, e2, f2, g2, h2, i2,
                       j2, k2, l2, m2, n2, o2, p2, q2, r2, s2, t2, u2, v2, w2,
                       x2, y2, z2, a3, b3, c3, d3, e3, f3)
 deriving instance (Eq a, Eq b, Eq c, Eq d, Eq e, Eq f, Eq g, Eq h, Eq i, Eq j,
