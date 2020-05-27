@@ -9,6 +9,9 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
+#if MIN_VERSION_base(4,16,0)
+#define HAS_TYPELITCHAR
+#endif
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
 
@@ -960,11 +963,17 @@ instance Binary KindRep where
 instance Binary TypeLitSort where
     put_ bh TypeLitSymbol = putByte bh 0
     put_ bh TypeLitNat = putByte bh 1
+#if defined(HAS_TYPELITCHAR)
+    put_ bh TypeLitChar = putByte bh 2
+#endif
     get bh = do
         tag <- getByte bh
         case tag of
           0 -> pure TypeLitSymbol
           1 -> pure TypeLitNat
+#if defined(HAS_TYPELITCHAR)
+          2 -> pure TypeLitChar
+#endif
           _ -> fail "Binary.putTypeLitSort: invalid tag"
 
 putTypeRep :: BinHandle -> TypeRep a -> IO ()
