@@ -251,6 +251,7 @@ instance Outputable Type where
 data TyLit
   = NumTyLit Integer
   | StrTyLit FastString
+  | CharTyLit Char
   deriving (Eq, Ord, Data.Data)
 
 instance Outputable TyLit where
