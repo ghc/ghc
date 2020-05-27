@@ -920,6 +920,7 @@ type instance XXType         (GhcPass _) = NewHsTypeX
 data HsTyLit
   = HsNumTy SourceText Integer
   | HsStrTy SourceText FastString
+  | HsCharTy SourceText Char
     deriving Data
 
 oneDataConHsTy :: HsType GhcRn
@@ -1965,8 +1966,9 @@ ppr_fun_ty mult ty1 ty2
 
 --------------------------
 ppr_tylit :: HsTyLit -> SDoc
-ppr_tylit (HsNumTy _ i) = integer i
-ppr_tylit (HsStrTy _ s) = text (show s)
+ppr_tylit (HsNumTy _ i)  = integer i
+ppr_tylit (HsStrTy _ s)  = text (show s)
+ppr_tylit (HsCharTy _ c) = text (show c)
 
 
 -- | @'hsTypeNeedsParens' p t@ returns 'True' if the type @t@ needs parentheses
