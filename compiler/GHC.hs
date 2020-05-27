@@ -544,10 +544,10 @@ checkBrokenTablesNextToCode dflags
 
 checkBrokenTablesNextToCode' :: MonadIO m => DynFlags -> m Bool
 checkBrokenTablesNextToCode' dflags
-  | not (isARM arch)                 = return False
-  | WayDyn `S.notMember` ways dflags = return False
-  | not tablesNextToCode             = return False
-  | otherwise                        = do
+  | not (isARM arch)                       = return False
+  | WayDyn `S.notMember` targetWays dflags = return False
+  | not tablesNextToCode                   = return False
+  | otherwise                              = do
     linkerInfo <- liftIO $ getLinkerInfo dflags
     case linkerInfo of
       GnuLD _  -> return True
@@ -606,8 +606,8 @@ setSessionDynFlags dflags = do
     then do
          let
            prog = pgm_i dflags ++ flavour
-           profiled = ways dflags `hasWay` WayProf
-           dynamic  = ways dflags `hasWay` WayDyn
+           profiled = targetWays dflags `hasWay` WayProf
+           dynamic  = targetWays dflags `hasWay` WayDyn
            flavour
              | profiled  = "-prof" -- FIXME: can't we have both?
              | dynamic   = "-dyn"
