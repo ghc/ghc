@@ -178,7 +178,7 @@ lint-release-changelogs:
 # Validation via Pipelines (hadrian)
 ############################################################
 
-.validate-hadrian:
+.build-hadrian:
   variables:
     FLAVOUR: "validate"
   script:
@@ -198,11 +198,40 @@ lint-release-changelogs:
       - ghc.tar.xz
       - junit.xml
 
-.validate-linux-hadrian:
-  extends: .validate-hadrian
+.build-linux-hadrian:
+  extends: .build-hadrian
+  before_script:
+    # workaround for docker permissions
+    - sudo chown ghc:ghc -R .
+    - git submodule sync --recursive
+    - git submodule update --init --recursive
+    - git checkout .gitmodules
+    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
+  after_script:
+    - .gitlab/ci.sh clean
+
+.build-x86_64-linux-deb9-hadrian:
+  extends: .build-linux-hadrian
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  tags:
+    - x86_64-linux
+
+validate-x86_64-linux-deb9-hadrian:
+  extends: .build-x86_64-linux-deb9-hadrian
+  stage: build
   variables:
     TEST_ENV: "x86_64-linux-deb9-hadrian"
+
+validate-x86_64-linux-deb9-unreg-hadrian:
+  extends: .build-x86_64-linux-deb9-hadrian
+  stage: full-build
+  variables:
+    CONFIGURE_ARGS: --enable-unregisterised
+    TEST_ENV: "x86_64-linux-deb9-unreg-hadrian"
+
+.build-x86_64-linux-deb10-hadrian:
+  extends: .build-hadrian
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
   before_script:
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
@@ -215,16 +244,10 @@ lint-release-changelogs:
   tags:
     - x86_64-linux
 
-validate-x86_64-linux-deb9-hadrian:
-  extends: .validate-linux-hadrian
-  stage: build
 
-validate-x86_64-linux-deb9-unreg-hadrian:
-  extends: .validate-linux-hadrian
-  stage: full-build
-  variables:
-    CONFIGURE_ARGS: --enable-unregisterised
-    TEST_ENV: "x86_64-linux-deb9-unreg-hadrian"
+############################################################
+# GHC-in-GHCi (Hadrian)
+############################################################
 
 hadrian-ghc-in-ghci:
   stage: quick-build
@@ -327,7 +350,7 @@ release-x86_64-freebsd:
   stage: full-build
 
 .build-x86_64-freebsd-hadrian:
-  extends: .validate-hadrian
+  extends: .build-hadrian
   stage: full-build
   tags:
     - x86_64-freebsd
@@ -678,7 +701,7 @@ release-x86_64-linux-deb8:
 #################################
 
 .build-x86_64-linux-alpine-hadrian:
-  extends: .validate-linux-hadrian
+  extends: .build-linux-hadrian
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine:$DOCKER_REV"
   # There are currently a few failing tests
