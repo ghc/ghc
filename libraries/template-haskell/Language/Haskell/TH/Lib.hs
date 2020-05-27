@@ -61,7 +61,7 @@ module Language.Haskell.TH.Lib (
         sigT, litT, wildCardT, promotedT, promotedTupleT, promotedNilT,
         promotedConsT, implicitParamT,
     -- **** Type literals
-    numTyLit, strTyLit,
+    numTyLit, strTyLit, charTyLit,
     -- **** Strictness
     noSourceUnpackedness, sourceNoUnpack, sourceUnpack,
     noSourceStrictness, sourceLazy, sourceStrict,
