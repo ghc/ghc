@@ -1,6 +1,6 @@
 [submodule "libraries/binary"]
 	path = libraries/binary
-	url = https://gitlab.haskell.org/ghc/packages/binary.git
+	url = https://gitlab.haskell.org/Haskell-mouse/binary.git
 	ignore = untracked
 [submodule "libraries/bytestring"]
 	path = libraries/bytestring
@@ -89,9 +89,9 @@
 	ignore = untracked
 [submodule "utils/haddock"]
 	path = utils/haddock
-	url = https://gitlab.haskell.org/ghc/haddock.git
+	url = https://gitlab.haskell.org/Haskell-mouse/haddock.git
 	ignore = untracked
-	branch = ghc-head
+	branch = ghc-type-level-chars
 [submodule "nofib"]
 	path = nofib
 	url = https://gitlab.haskell.org/ghc/nofib.git

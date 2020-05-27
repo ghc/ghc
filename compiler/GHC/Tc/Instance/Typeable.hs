@@ -369,6 +369,7 @@ data TypeableStuff
             , kindRepTYPEDataCon     :: DataCon
             , kindRepTypeLitSDataCon :: DataCon
             , typeLitSymbolDataCon   :: DataCon
+            , typeLitCharDataCon     :: DataCon
             , typeLitNatDataCon      :: DataCon
             }
 
@@ -386,6 +387,7 @@ collect_stuff = do
     kindRepTypeLitSDataCon <- tcLookupDataCon kindRepTypeLitSDataConName
     typeLitSymbolDataCon   <- tcLookupDataCon typeLitSymbolDataConName
     typeLitNatDataCon      <- tcLookupDataCon typeLitNatDataConName
+    typeLitCharDataCon     <- tcLookupDataCon typeLitCharDataConName
     trNameLit              <- mkTrNameLit
     return Stuff {..}
 
@@ -608,6 +610,11 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep
       = return $ nlHsDataCon kindRepTypeLitSDataCon
                  `nlHsApp` nlHsDataCon typeLitSymbolDataCon
                  `nlHsApp` nlHsLit (mkHsStringPrimLit $ mkFastString $ show s)
+
+    new_kind_rep (LitTy (CharTyLit c))
+      = return $ nlHsDataCon kindRepTypeLitSDataCon
+                 `nlHsApp` nlHsDataCon typeLitCharDataCon
+                 `nlHsApp` nlHsLit (mkHsStringPrimLit $ mkFastString $ show c)
 
     -- See Note [Typeable instances for casted types]
     new_kind_rep (CastTy ty co)
