@@ -256,14 +256,14 @@ linkDynLib dflags0 o_files dep_packages
                (mkHomeUnitFromFlags dflags)
                dep_packages
 
-    let pkg_lib_paths = collectLibraryPaths (ways dflags) pkgs
+    let pkg_lib_paths = collectLibraryPaths (targetWays dflags) pkgs
     let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
         get_pkg_lib_path_opts l
          | ( osElfTarget (platformOS (targetPlatform dflags)) ||
              osMachOTarget (platformOS (targetPlatform dflags)) ) &&
            dynLibLoader dflags == SystemDependent &&
            -- Only if we want dynamic libraries
-           WayDyn `Set.member` ways dflags &&
+           WayDyn `Set.member` targetWays dflags &&
            -- Only use RPath if we explicitly asked for it
            gopt Opt_RPath dflags
             = ["-L" ++ l, "-Xlinker", "-rpath", "-Xlinker", l]
