@@ -71,6 +71,7 @@ module GHC.Data.FastString
 
         -- ** Deconstruction
         unpackFS,           -- :: FastString -> String
+        unconsFS,           -- :: FastString -> Maybe (Char, FastString)
 
         -- ** Encoding
         zEncodeFS,
@@ -605,6 +606,12 @@ headFS fs = head $ unpackFS fs
 
 consFS :: Char -> FastString -> FastString
 consFS c fs = mkFastString (c : unpackFS fs)
+
+unconsFS :: FastString -> Maybe (Char, FastString)
+unconsFS fs =
+  case unpackFS fs of
+    []          -> Nothing
+    (chr : str) -> Just (chr, mkFastString str)
 
 uniqueOfFS :: FastString -> Int
 uniqueOfFS fs = uniq fs

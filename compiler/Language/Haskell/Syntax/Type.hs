@@ -910,6 +910,7 @@ type HsCoreTy = Type
 data HsTyLit
   = HsNumTy SourceText Integer
   | HsStrTy SourceText FastString
+  | HsCharTy SourceText Char
     deriving Data
 
 -- | Denotes the type of arrows in the surface language
@@ -1302,3 +1303,4 @@ instance Outputable HsTyLit where
 ppr_tylit :: HsTyLit -> SDoc
 ppr_tylit (HsNumTy source i) = pprWithSourceText source (integer i)
 ppr_tylit (HsStrTy source s) = pprWithSourceText source (text (show s))
+ppr_tylit (HsCharTy source c) = pprWithSourceText source (text (show c))

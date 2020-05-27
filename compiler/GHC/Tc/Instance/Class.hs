@@ -39,7 +39,7 @@ import GHC.Types.Id
 import GHC.Core.Predicate
 import GHC.Core.InstEnv
 import GHC.Core.Type
-import GHC.Core.Make ( mkStringExprFS, mkNaturalExpr )
+import GHC.Core.Make ( mkCharExpr, mkStringExprFS, mkNaturalExpr )
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Core.Class
@@ -141,6 +141,8 @@ matchGlobalInst dflags short_cut clas tys
   = matchKnownNat    dflags short_cut clas tys
   | cls_name == knownSymbolClassName
   = matchKnownSymbol dflags short_cut clas tys
+  | cls_name == knownCharClassName
+  = matchKnownChar dflags short_cut clas tys
   | isCTupleClass clas                = matchCTuple          clas tys
   | cls_name == typeableClassName     = matchTypeable        clas tys
   | clas `hasKey` heqTyConKey         = matchHeteroEquality       tys
@@ -377,6 +379,16 @@ matchKnownSymbol df sc clas tys = matchInstEnv df sc clas tys
  -- See Note [Fabricating Evidence for Literals in Backpack] for why
  -- this lookup into the instance environment is required.
 
+matchKnownChar :: DynFlags
+                 -> Bool      -- True <=> caller is the short-cut solver
+                              -- See Note [Shortcut solving: overlap]
+                 -> Class -> [Type] -> TcM ClsInstResult
+matchKnownChar _ _ clas [ty]  -- clas = KnownChar
+  | Just s <- isCharLitTy ty = makeLitDict clas ty (mkCharExpr s)
+matchKnownChar df sc clas tys = matchInstEnv df sc clas tys
+ -- See Note [Fabricating Evidence for Literals in Backpack] for why
+ -- this lookup into the instance environment is required.
+
 makeLitDict :: Class -> Type -> EvExpr -> TcM ClsInstResult
 -- makeLitDict adds a coercion that will convert the literal into a dictionary
 -- of the appropriate type.  See Note [KnownNat & KnownSymbol and EvLit]
@@ -424,6 +436,7 @@ matchTypeable clas [k,t]  -- clas = Typeable
   -- Now cases that do work
   | k `eqType` naturalTy                   = doTyLit knownNatClassName         t
   | k `eqType` typeSymbolKind              = doTyLit knownSymbolClassName      t
+  | k `eqType` charTy                      = doTyLit knownCharClassName        t
   | tcIsConstraintKind t                   = doTyConApp clas t constraintKindTyCon []
   | Just (mult,arg,ret) <- splitFunTy_maybe t   = doFunTy    clas t mult arg ret
   | Just (tc, ks) <- splitTyConApp_maybe t -- See Note [Typeable (T a b c)]
