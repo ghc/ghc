@@ -369,7 +369,7 @@ initUnitConfig dflags =
    in UnitConfig
       { unitConfigPlatformArchOS = platformArchOS (targetPlatform dflags)
       , unitConfigProgramName    = programName dflags
-      , unitConfigWays           = ways dflags
+      , unitConfigWays           = targetWays dflags
       , unitConfigAllowVirtual   = allow_virtual_units
 
       , unitConfigGlobalDB       = globalPackageDatabasePath dflags
@@ -1830,7 +1830,7 @@ collectArchives dflags pc =
   filterM doesFileExist [ searchPath </> ("lib" ++ lib ++ ".a")
                         | searchPath <- searchPaths
                         , lib <- libs ]
-  where searchPaths = ordNub . filter notNull . libraryDirsForWay (ways dflags) $ pc
+  where searchPaths = ordNub . filter notNull . libraryDirsForWay (targetWays dflags) $ pc
         libs        = packageHsLibs dflags pc ++ unitExtDepLibsSys pc
 
 getLibs :: DynFlags -> [UnitId] -> IO [(String,String)]
@@ -1841,14 +1841,14 @@ getLibs dflags pkgs = do
             (mkHomeUnitFromFlags dflags)
             pkgs
   fmap concat . forM ps $ \p -> do
-    let candidates = [ (l </> f, f) | l <- collectLibraryPaths (ways dflags) [p]
+    let candidates = [ (l </> f, f) | l <- collectLibraryPaths (targetWays dflags) [p]
                                     , f <- (\n -> "lib" ++ n ++ ".a") <$> packageHsLibs dflags p ]
     filterM (doesFileExist . fst) candidates
 
 packageHsLibs :: DynFlags -> UnitInfo -> [String]
 packageHsLibs dflags p = map (mkDynName . addSuffix) (unitLibraries p)
   where
-        ways0 = ways dflags
+        ways0 = targetWays dflags
 
         ways1 = Set.filter (/= WayDyn) ways0
         -- the name of a shared library is libHSfoo-ghc<version>.so
@@ -1864,7 +1864,7 @@ packageHsLibs dflags p = map (mkDynName . addSuffix) (unitLibraries p)
         rts_tag = waysTag ways2
 
         mkDynName x
-         | WayDyn `Set.notMember` ways dflags = x
+         | WayDyn `Set.notMember` targetWays dflags = x
          | "HS" `isPrefixOf` x                =
               x ++ '-':programName dflags ++ projectVersion dflags
            -- For non-Haskell libraries, we use the name "Cfoo". The .a
