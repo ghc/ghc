@@ -8,6 +8,7 @@ import GHC.Types.Name (Name)
 
 listTyCon :: TyCon
 typeNatKind, typeSymbolKind :: Type
+charTy :: Type
 mkBoxedTupleTy :: [Type] -> Type
 
 coercibleTyCon, heqTyCon :: TyCon

@@ -715,6 +715,8 @@ typeToLHsType ty
       = noLoc $ HsTyLit noExtField (HsNumTy NoSourceText n)
     go (LitTy (StrTyLit s))
       = noLoc $ HsTyLit noExtField (HsStrTy NoSourceText s)
+    go (LitTy (CharTyLit c))
+      = noLoc $ HsTyLit noExtField (HsCharTy NoSourceText c)
     go ty@(TyConApp tc args)
       | tyConAppNeedsKindSig True tc (length args)
         -- We must produce an explicit kind signature here to make certain
