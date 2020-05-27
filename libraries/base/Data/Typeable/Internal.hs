@@ -79,7 +79,7 @@ module Data.Typeable.Internal (
     -- | These are for internal use only
     mkTrType, mkTrCon, mkTrApp, mkTrAppChecked, mkTrFun,
     mkTyCon, mkTyCon#,
-    typeSymbolTypeRep, typeNatTypeRep,
+    typeSymbolTypeRep, typeNatTypeRep, typeCharTypeRep
   ) where
 
 import GHC.Prim ( FUN )
@@ -90,7 +90,7 @@ import Data.Type.Equality
 import GHC.List ( splitAt, foldl', elem )
 import GHC.Word
 import GHC.Show
-import GHC.TypeLits ( KnownSymbol, symbolVal', AppendSymbol )
+import GHC.TypeLits ( KnownChar, charVal', KnownSymbol, symbolVal', AppendSymbol )
 import GHC.TypeNats ( KnownNat, Nat, natVal' )
 import Unsafe.Coerce ( unsafeCoerce )
 
@@ -986,17 +986,26 @@ typeNatTypeRep = typeLitTypeRep (show (natVal' (proxy# @a))) tcNat
 typeSymbolTypeRep :: forall a. KnownSymbol a => TypeRep a
 typeSymbolTypeRep = typeLitTypeRep (show (symbolVal' (proxy# @a))) tcSymbol
 
+-- | Used to make `'Typeable' instance for things of kind Char
+typeCharTypeRep :: forall a. KnownChar a => TypeRep a
+typeCharTypeRep = typeLitTypeRep (show (charVal' (proxy# @a))) tcChar
+
 mkTypeLitFromString :: TypeLitSort -> String -> SomeTypeRep
 mkTypeLitFromString TypeLitSymbol s =
     SomeTypeRep $ (typeLitTypeRep s tcSymbol :: TypeRep Symbol)
 mkTypeLitFromString TypeLitNat s =
     SomeTypeRep $ (typeLitTypeRep s tcSymbol :: TypeRep Nat)
+mkTypeLitFromString TypeLitChar s =
+    SomeTypeRep $ (typeLitTypeRep s tcSymbol :: TypeRep Char)
 
 tcSymbol :: TyCon
 tcSymbol = typeRepTyCon (typeRep @Symbol)
 
 tcNat :: TyCon
 tcNat = typeRepTyCon (typeRep @Nat)
+
+tcChar :: TyCon
+tcChar = typeRepTyCon (typeRep @Char)
 
 -- | An internal function, to make representations for type literals.
 typeLitTypeRep :: forall k (a :: k). (Typeable k) =>
