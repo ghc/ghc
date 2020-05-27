@@ -1,5 +1,8 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveFunctor      #-}
+{-# LANGUAGE DeriveFoldable     #-}
+{-# LANGUAGE DeriveTraversable  #-}
 {-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE EmptyDataDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -261,7 +264,8 @@ comment loc cs = ApiAnn loc NoApiAnns cs
 
 type LocatedA = GenLocated SrcSpanAnn
 
-data SrcSpanAnn = SrcSpanAnn { ann :: ApiAnn, locA :: SrcSpan }
+type SrcSpanAnn = SrcSpanAnn' ApiAnn
+data SrcSpanAnn' a = SrcSpanAnn { ann :: a, locA :: SrcSpan }
         deriving (Data, Eq)
 
 instance Outputable SrcSpanAnn where
@@ -288,6 +292,87 @@ addCLocA a b c = L (noAnnSrcSpan $ combineSrcSpans (locA $ getLoc a) (getLoc b))
 
 addCLocAA :: LocatedA a -> LocatedA b -> c -> LocatedA c
 addCLocAA a b c = L (noAnnSrcSpan $ combineSrcSpans (locA $ getLoc a) (locA $ getLoc b)) c
+
+-- ---------------------------------------------------------------------
+-- Annotations for names
+-- ---------------------------------------------------------------------
+-- We initially wrapped all names in Located as a hook for the
+-- annotations. Now we can do it directly
+
+type SrcSpanAnnName = SrcSpanAnn' ApiAnn
+
+data NameAnn = NameAnn {
+  nann_adornment :: NameAdornment,
+  nann_open      :: RealSrcSpan,
+  nann_name      :: RealSrcSpan,
+  bann_close     :: RealSrcSpan
+  } deriving (Data)
+
+data NameAdornment
+  = NameParens
+  | NameParensHash
+  | NameBackquotes
+  | NameSquare
+  | NameRArrow
+  deriving (Eq, Ord, Data)
+-- Annotations that can occur for a RdrName
+--
+--  AnnVal - when RdrName has adornments
+--    AnnOpenP, AnnCloseP for '(' ')'
+--    AnnBackquote '`' x 2
+--    AnnOpenPH, AnnClosePH for '(#', '#)'
+--    AnnOpenS, AnnCloseS for '[' ']'
+-- AnnRarrow, AnnRarrowU for '->' or unicode version
+--   with
+--    AnnOpenP, AnnCloseP for '(' ')'
+
+noAnnName :: SrcSpanAnnName
+noAnnName = noSrcSpanA
+
+data ApiAnnName a = N SrcSpanAnnName a
+        deriving (Eq, Data, Functor, Foldable, Traversable)
+
+unApiName :: ApiAnnName a -> a
+unApiName (N _ a) = a
+
+noApiName :: a -> ApiAnnName a
+noApiName a = N noAnnName a
+
+reAnnN :: [AddApiAnn] -> ApiAnnComments -> Located a -> ApiAnnName a
+reAnnN anns cs (L l a) = N (SrcSpanAnn (ApiAnn (realSrcSpan l) anns cs) l) a
+
+getLocN :: ApiAnnName a -> SrcSpan
+getLocN (N (SrcSpanAnn _ l) _) = l
+
+getNA :: ApiAnnName a -> SrcSpanAnnName
+getNA (N a _) = a
+
+reLocN :: ApiAnnName a -> Located a
+reLocN (N (SrcSpanAnn _ l) a) = L l a
+
+-- |Helper function (temporary) during transition of names
+l2n :: LocatedA a -> ApiAnnName a
+l2n (L la a) = N la a
+
+n2l :: ApiAnnName a -> LocatedA a
+n2l (N la a) = L la a
+
+la2na :: SrcSpanAnn -> SrcSpanAnnName
+la2na = id
+
+mapLocN :: (a -> b) -> ApiAnnName a -> ApiAnnName b
+mapLocN f (N l a) = N l (f a)
+
+-- | Tests whether the two located things are equal
+eqApiAnnNamed :: Eq a => ApiAnnName a -> ApiAnnName a -> Bool
+eqApiAnnNamed a b = unApiName a == unApiName b
+
+-- | Tests the ordering of the two located things
+cmpApiAnnNamed :: Ord a => ApiAnnName a -> ApiAnnName a -> Ordering
+cmpApiAnnNamed a b = unApiName a `compare` unApiName b
+
+instance (Outputable e) => Outputable (ApiAnnName e) where
+  ppr (N _ e) = ppr e
 
 -- ---------------------------------------------------------------------
 -- Managing annotations for lists

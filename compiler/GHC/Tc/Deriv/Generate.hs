@@ -535,7 +535,7 @@ nlConWildPat :: DataCon -> LPat GhcPs
 -- The pattern (K {})
 nlConWildPat con = noLocA $ ConPat
   { pat_con_ext = noAnn
-  , pat_con = noLocA $ getRdrName con
+  , pat_con = noApiName $ getRdrName con
   , pat_args = RecCon $ HsRecFields
       { rec_flds = []
       , rec_dotdot = Nothing }
@@ -782,7 +782,7 @@ gen_Ix_binds loc tycon = do
 
     enum_index dflags
       = mkSimpleGeneratedFunBind loc unsafeIndex_RDR
-                [noLocA (AsPat noAnn (noLocA c_RDR)
+                [noLocA (AsPat noAnn (noApiName c_RDR)
                            (nlTuplePat [a_Pat, nlWildPat] Boxed)),
                                 d_Pat] (
            untag_Expr dflags tycon [(a_RDR, ah_RDR)] (
@@ -1350,7 +1350,7 @@ gen_data dflags data_type_name constr_names loc rep_tc
     genDataTyCon :: DerivStuff
     genDataTyCon        --  $dT
       = DerivHsBind (mkHsVarBind loc data_type_name rhs,
-                     L loc (TypeSig noAnn [L (noAnnSrcSpan loc) data_type_name] sig_ty))
+                     L loc (TypeSig noAnn [N (noAnnSrcSpan loc) data_type_name] sig_ty))
 
     sig_ty = mkLHsSigWcType (nlHsTyVar dataType_RDR)
     ctx    = initDefaultSDocContext dflags
@@ -1361,7 +1361,7 @@ gen_data dflags data_type_name constr_names loc rep_tc
     genDataDataCon :: DataCon -> RdrName -> DerivStuff
     genDataDataCon dc constr_name       --  $cT1 etc
       = DerivHsBind (mkHsVarBind loc constr_name rhs,
-                     L loc (TypeSig noAnn [L (noAnnSrcSpan loc) constr_name] sig_ty))
+                     L loc (TypeSig noAnn [N (noAnnSrcSpan loc) constr_name] sig_ty))
       where
         sig_ty   = mkLHsSigWcType (nlHsTyVar constr_RDR)
         rhs      = nlHsApps mkConstr_RDR constr_args
@@ -1860,7 +1860,7 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
         (_, _, to_tau)   = tcSplitSigmaTy to_ty
 
         meth_RDR = getRdrName meth_id
-        loc_meth_RDR = L (noAnnSrcSpan loc) meth_RDR
+        loc_meth_RDR = N (noAnnSrcSpan loc) meth_RDR
 
         rhs_expr = nlHsVar (getRdrName coerceId)
                                       `nlHsAppType`     from_tau
@@ -1877,7 +1877,7 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
 
     mk_atf_inst :: TyCon -> TcM FamInst
     mk_atf_inst fam_tc = do
-        rep_tc_name <- newFamInstTyConName (L (noAnnSrcSpan loc) (tyConName fam_tc))
+        rep_tc_name <- newFamInstTyConName (N (noAnnSrcSpan loc) (tyConName fam_tc))
                                            rep_lhs_tys
         let axiom = mkSingleCoAxiom Nominal rep_tc_name rep_tvs' [] rep_cvs'
                                     fam_tc rep_lhs_tys rep_rhs_ty
@@ -1962,7 +1962,7 @@ genAuxBindSpec :: DynFlags -> SrcSpan -> AuxBindSpec
                   -> (LHsBind GhcPs, LSig GhcPs)
 genAuxBindSpec dflags loc (DerivCon2Tag tycon)
   = (mkFunBindSE 0 loc rdr_name eqns,
-     L loc (TypeSig noAnn [L (noAnnSrcSpan loc) rdr_name] sig_ty))
+     L loc (TypeSig noAnn [N (noAnnSrcSpan loc) rdr_name] sig_ty))
   where
     rdr_name = con2tag_RDR dflags tycon
 
@@ -1988,7 +1988,7 @@ genAuxBindSpec dflags loc (DerivTag2Con tycon)
   = (mkFunBindSE 0 loc rdr_name
         [([nlConVarPat intDataCon_RDR [a_RDR]],
            nlHsApp (nlHsVar tagToEnum_RDR) a_Expr)],
-     L loc (TypeSig noAnn [L (noAnnSrcSpan loc) rdr_name] sig_ty))
+     L loc (TypeSig noAnn [N (noAnnSrcSpan loc) rdr_name] sig_ty))
   where
     sig_ty = mkLHsSigWcType $ L (noAnnSrcSpan loc) $
              XHsType $ NHsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
@@ -1998,7 +1998,7 @@ genAuxBindSpec dflags loc (DerivTag2Con tycon)
 
 genAuxBindSpec dflags loc (DerivMaxTag tycon)
   = (mkHsVarBind loc rdr_name rhs,
-     L loc (TypeSig noAnn [L (noAnnSrcSpan loc) rdr_name] sig_ty))
+     L loc (TypeSig noAnn [N (noAnnSrcSpan loc) rdr_name] sig_ty))
   where
     rdr_name = maxtag_RDR dflags tycon
     sig_ty = mkLHsSigWcType (L (noAnnSrcSpan loc) (XHsType (NHsCoreTy intTy)))
@@ -2055,16 +2055,16 @@ mkFunBindSE :: Arity -> SrcSpan -> RdrName
              -> [([LPat GhcPs], LHsExpr GhcPs)]
              -> LHsBind GhcPs
 mkFunBindSE arity loc fun pats_and_exprs
-  = mkRdrFunBindSE arity (L (noAnnSrcSpan loc) fun) matches
+  = mkRdrFunBindSE arity (N (noAnnSrcSpan loc) fun) matches
   where
-    matches = [mkMatch (mkPrefixFunRhs (L (noAnnSrcSpan loc) fun))
+    matches = [mkMatch (mkPrefixFunRhs (N (noAnnSrcSpan loc) fun))
                                (map (parenthesizePat appPrec) p) e
                                (noLoc emptyLocalBinds)
               | (p,e) <-pats_and_exprs]
 
-mkRdrFunBind :: LocatedA RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
+mkRdrFunBind :: ApiAnnName RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
              -> LHsBind GhcPs
-mkRdrFunBind fun@(L loc _fun_rdr) matches
+mkRdrFunBind fun@(N loc _fun_rdr) matches
   = L loc (mkFunBind Generated fun matches)
 
 -- | Make a function binding. If no equations are given, produce a function
@@ -2076,9 +2076,9 @@ mkFunBindEC :: Arity -> SrcSpan -> RdrName
             -> [([LPat GhcPs], LHsExpr GhcPs)]
             -> LHsBind GhcPs
 mkFunBindEC arity loc fun catch_all pats_and_exprs
-  = mkRdrFunBindEC arity catch_all (L (noAnnSrcSpan loc) fun) matches
+  = mkRdrFunBindEC arity catch_all (N (noAnnSrcSpan loc) fun) matches
   where
-    matches = [ mkMatch (mkPrefixFunRhs (L (noAnnSrcSpan loc) fun))
+    matches = [ mkMatch (mkPrefixFunRhs (N (noAnnSrcSpan loc) fun))
                                 (map (parenthesizePat appPrec) p) e
                                 (noLoc emptyLocalBinds)
               | (p,e) <- pats_and_exprs ]
@@ -2089,10 +2089,10 @@ mkFunBindEC arity loc fun catch_all pats_and_exprs
 -- the right-hand side.
 mkRdrFunBindEC :: Arity
                -> (LHsExpr GhcPs -> LHsExpr GhcPs)
-               -> LocatedA RdrName
+               -> ApiAnnName RdrName
                -> [LMatch GhcPs (LHsExpr GhcPs)]
                -> LHsBind GhcPs
-mkRdrFunBindEC arity catch_all fun@(L loc _fun_rdr) matches
+mkRdrFunBindEC arity catch_all fun@(N loc _fun_rdr) matches
   = L loc (mkFunBind Generated fun matches')
  where
    -- Catch-all eqn looks like
@@ -2114,9 +2114,9 @@ mkRdrFunBindEC arity catch_all fun@(L loc _fun_rdr) matches
 -- | Produces a function binding. When there are no equations, it generates
 -- a binding with the given arity that produces an error based on the name of
 -- the type of the last argument.
-mkRdrFunBindSE :: Arity -> LocatedA RdrName ->
+mkRdrFunBindSE :: Arity -> ApiAnnName RdrName ->
                     [LMatch GhcPs (LHsExpr GhcPs)] -> LHsBind GhcPs
-mkRdrFunBindSE arity fun@(L loc fun_rdr) matches
+mkRdrFunBindSE arity fun@(N loc fun_rdr) matches
   = L loc (mkFunBind Generated fun matches')
  where
    -- Catch-all eqn looks like

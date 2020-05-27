@@ -224,6 +224,7 @@ data AnnKeywordId
     | AnnCloseQ  -- ^ '|]'
     | AnnCloseQU -- ^ '|]', unicode variant
     | AnnCloseP -- ^ ')'
+    | AnnClosePH -- ^ '\#)'
     | AnnCloseS -- ^ ']'
     | AnnColon
     | AnnComma -- ^ as a list separator
@@ -265,7 +266,7 @@ data AnnKeywordId
     | AnnNewtype
     | AnnName -- ^ where a name loses its location in the AST, this carries it
     | AnnOf
-    | AnnOpen    -- ^ '(\#' or '{-\# LANGUAGE' etc
+    | AnnOpen    -- ^ '{-\# LANGUAGE' etc
     | AnnOpenB   -- ^ '(|'
     | AnnOpenBU  -- ^ '(|', unicode variant
     | AnnOpenC   -- ^ '{'
@@ -274,6 +275,7 @@ data AnnKeywordId
     | AnnOpenEQU -- ^ '[|', unicode variant
     | AnnOpenP   -- ^ '('
     | AnnOpenS   -- ^ '['
+    | AnnOpenPH  -- ^ '(\#'
     | AnnDollar          -- ^ prefix '$'   -- TemplateHaskell
     | AnnDollarDollar    -- ^ prefix '$$'  -- TemplateHaskell
     | AnnPackageName

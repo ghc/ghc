@@ -239,7 +239,7 @@ tcCompleteSigs sigs =
               AcceptAny -> failWithTc ambiguousError
               Fixed _ tc  -> return $ mkMatch cls tc
 
-          check_complete_match :: LocatedA Name -> TcM CompleteMatch -- AZ Temp
+          check_complete_match :: ApiAnnName Name -> TcM CompleteMatch -- AZ Temp
           check_complete_match tc_name = do
             ty_con <- tcLookupLocatedTyCon tc_name
             (_, cls) <- checkCLTypes (Fixed Nothing ty_con)
@@ -263,10 +263,10 @@ tcCompleteSigs sigs =
 
 
       -- See note [Typechecking Complete Matches]
-      checkCLType :: (CompleteSigType, [ConLike]) -> LocatedA Name
+      checkCLType :: (CompleteSigType, [ConLike]) -> ApiAnnName Name
                   -> TcM (CompleteSigType, [ConLike])
       checkCLType (cst, cs) n = do
-        cl <- addLocMA tcLookupConLike n
+        cl <- addLocMN tcLookupConLike n
         let   (_,_,_,_,_,_, res_ty) = conLikeFullSig cl
               res_ty_con = fst <$> splitTyConApp_maybe res_ty
         case (cst, res_ty_con) of
@@ -311,7 +311,7 @@ tcHsBootSigs binds sigs
   where
     tc_boot_sig (TypeSig _ lnames hs_ty) = mapM f lnames
       where
-        f (L _ name)
+        f (N _ name)
           = do { sigma_ty <- tcHsSigWcType (FunSigCtxt name False) hs_ty
                ; return (mkVanillaGlobal name sigma_ty) }
         -- Notice that we make GlobalIds, not LocalIds
@@ -526,7 +526,7 @@ tc_single :: forall thing.
           -> LHsBind GhcRn -> IsGroupClosed -> TcM thing
           -> TcM (LHsBinds GhcTcId, thing)
 tc_single _top_lvl sig_fn _prag_fn
-          (L _ (PatSynBind _ psb@PSB{ psb_id = L _ name }))
+          (L _ (PatSynBind _ psb@PSB{ psb_id = N _ name }))
           _ thing_inside
   = do { (aux_binds, tcg_env) <- tcPatSynDecl psb (sig_fn name)
        ; thing <- setGblEnv tcg_env thing_inside
@@ -687,7 +687,7 @@ tcPolyCheck prag_fn
             (CompleteSig { sig_bndr  = poly_id
                          , sig_ctxt  = ctxt
                          , sig_loc   = sig_loc })
-            (L loc (FunBind { fun_id = (L nm_loc name)
+            (L loc (FunBind { fun_id = (N nm_loc name)
                             , fun_matches = matches }))
   = setSrcSpan sig_loc $
     do { traceTc "tcPolyCheck" (ppr poly_id $$ ppr sig_loc)
@@ -705,7 +705,7 @@ tcPolyCheck prag_fn
                tcExtendBinderStack [TcIdBndr mono_id NotTopLevel]  $
                tcExtendNameTyVarEnv tv_prs $
                setSrcSpanA loc             $
-               tcMatchesFun (L nm_loc mono_name) matches (mkCheckExpType tau)
+               tcMatchesFun (N nm_loc mono_name) matches (mkCheckExpType tau)
 
        ; let prag_sigs = lookupPragEnv prag_fn name
        ; spec_prags <- tcSpecPrags poly_id prag_sigs
@@ -713,7 +713,7 @@ tcPolyCheck prag_fn
 
        ; mod <- getModule
        ; tick <- funBindTicks (locA nm_loc) mono_id mod prag_sigs
-       ; let bind' = FunBind { fun_id      = L nm_loc mono_id
+       ; let bind' = FunBind { fun_id      = N nm_loc mono_id
                              , fun_matches = matches'
                              , fun_ext     = co_fn
                              , fun_tick    = tick }
@@ -1253,7 +1253,7 @@ tcMonoBinds :: RecFlag  -- Whether the binding is recursive for typechecking pur
             -> [LHsBind GhcRn]
             -> TcM (LHsBinds GhcTcId, [MonoBindInfo])
 tcMonoBinds is_rec sig_fn no_gen
-           [ L b_loc (FunBind { fun_id = L nm_loc name
+           [ L b_loc (FunBind { fun_id = N nm_loc name
                               , fun_matches = matches })]
                              -- Single function binding,
   | NonRecursive <- is_rec   -- ...binder isn't mentioned in RHS
@@ -1272,11 +1272,11 @@ tcMonoBinds is_rec sig_fn no_gen
                   -- We extend the error context even for a non-recursive
                   -- function so that in type error messages we show the
                   -- type of the thing whose rhs we are type checking
-               tcMatchesFun (L nm_loc name) matches exp_ty
+               tcMatchesFun (N nm_loc name) matches exp_ty
 
         ; mono_id <- newLetBndr no_gen name rhs_ty
         ; return (unitBag $ L b_loc $
-                     FunBind { fun_id = L nm_loc mono_id,
+                     FunBind { fun_id = N nm_loc mono_id,
                                fun_matches = matches',
                                fun_ext = co_fn, fun_tick = [] },
                   [MBI { mbi_poly_name = name
@@ -1333,7 +1333,7 @@ tcLhs :: TcSigFun -> LetBndrSpec -> HsBind GhcRn -> TcM TcMonoBind
 -- CheckGen is used only for functions with a complete type signature,
 --          and tcPolyCheck doesn't use tcMonoBinds at all
 
-tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name
+tcLhs sig_fn no_gen (FunBind { fun_id = N nm_loc name
                              , fun_matches = matches })
   | Just (TcIdSig sig) <- sig_fn name
   = -- There is a type signature.
@@ -1421,9 +1421,9 @@ tcRhs (TcFunBind info@(MBI { mbi_sig = mb_sig, mbi_mono_id = mono_id })
   = tcExtendIdBinderStackForRhs [info]  $
     tcExtendTyVarEnvForRhs mb_sig       $
     do  { traceTc "tcRhs: fun bind" (ppr mono_id $$ ppr (idType mono_id))
-        ; (co_fn, matches') <- tcMatchesFun (L (noAnnSrcSpan loc) (idName mono_id))
+        ; (co_fn, matches') <- tcMatchesFun (N (noAnnSrcSpan loc) (idName mono_id))
                                  matches (mkCheckExpType $ idType mono_id)
-        ; return ( FunBind { fun_id = L (noAnnSrcSpan loc) mono_id
+        ; return ( FunBind { fun_id = N (noAnnSrcSpan loc) mono_id
                            , fun_matches = matches'
                            , fun_ext = co_fn
                            , fun_tick = [] } ) }
@@ -1651,7 +1651,7 @@ decideGeneralisationPlan dflags lbinds closed sig_fn
     -- except a single function binding with a signature
     one_funbind_with_sig
       | [lbind@(L _ (FunBind { fun_id = v }))] <- lbinds
-      , Just (TcIdSig sig) <- sig_fn (unLoc v)
+      , Just (TcIdSig sig) <- sig_fn (unApiName v)
       = Just (lbind, sig)
       | otherwise
       = Nothing
@@ -1660,7 +1660,7 @@ decideGeneralisationPlan dflags lbinds closed sig_fn
     restricted (PatBind {})                              = True
     restricted (VarBind { var_id = v })                  = no_sig v
     restricted (FunBind { fun_id = v, fun_matches = m }) = restricted_match m
-                                                           && no_sig (unLoc v)
+                                                           && no_sig (unApiName v)
     restricted b = pprPanic "isRestrictedGroup/unrestricted" (ppr b)
 
     restricted_match mg = matchGroupArity mg == 0
@@ -1679,7 +1679,7 @@ isClosedBndrGroup type_env binds
     fv_env = mkNameEnv $ concatMap (bindFvs . unLoc) binds
 
     bindFvs :: HsBindLR GhcRn GhcRn -> [(Name, NameSet)]
-    bindFvs (FunBind { fun_id = L _ f
+    bindFvs (FunBind { fun_id = N _ f
                      , fun_ext = fvs })
        = let open_fvs = get_open_fvs fvs
          in [(f, open_fvs)]

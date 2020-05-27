@@ -532,6 +532,9 @@ mkLScope = mkScope . getLoc
 mkLScopeA :: LocatedA a -> Scope
 mkLScopeA = mkScope . locA . getLoc
 
+mkLScopeN :: ApiAnnName a -> Scope
+mkLScopeN = mkScope . getLocN
+
 combineScopes :: Scope -> Scope -> Scope
 combineScopes ModuleScope _ = ModuleScope
 combineScopes _ ModuleScope = ModuleScope

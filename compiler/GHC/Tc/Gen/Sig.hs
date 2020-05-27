@@ -194,13 +194,13 @@ tcTySig (L _ (IdSig _ id))
 tcTySig (L loc (TypeSig _ names sig_ty))
   = setSrcSpan loc $
     do { sigs <- sequence [ tcUserTypeSig loc sig_ty (Just name)
-                          | L _ name <- names ]
+                          | N _ name <- names ]
        ; return (map TcIdSig sigs) }
 
 tcTySig (L loc (PatSynSig _ names sig_ty))
   = setSrcSpan loc $
     do { tpsigs <- sequence [ tcPatSynSig name sig_ty
-                            | L _ name <- names ]
+                            | N _ name <- names ]
        ; return (map TcPatSynSig tpsigs) }
 
 tcTySig _ = return []
@@ -553,11 +553,11 @@ mkPragEnv sigs binds
     prs = mapMaybe get_sig sigs
 
     get_sig :: LSig GhcRn -> Maybe (Name, LSig GhcRn)
-    get_sig (L l (SpecSig x lnm@(L _ nm) ty inl))
+    get_sig (L l (SpecSig x lnm@(N _ nm) ty inl))
       = Just (nm, L l $ SpecSig   x lnm ty (add_arity nm inl))
-    get_sig (L l (InlineSig x lnm@(L _ nm) inl))
+    get_sig (L l (InlineSig x lnm@(N _ nm) inl))
       = Just (nm, L l $ InlineSig x lnm    (add_arity nm inl))
-    get_sig (L l (SCCFunSig x st lnm@(L _ nm) str))
+    get_sig (L l (SCCFunSig x st lnm@(N _ nm) str))
       = Just (nm, L l $ SCCFunSig x st lnm str)
     get_sig _ = Nothing
 
@@ -578,7 +578,7 @@ mkPragEnv sigs binds
 
 lhsBindArity :: LHsBind GhcRn -> NameEnv Arity -> NameEnv Arity
 lhsBindArity (L _ (FunBind { fun_id = id, fun_matches = ms })) env
-  = extendNameEnv env (unLoc id) (matchGroupArity ms)
+  = extendNameEnv env (unApiName id) (matchGroupArity ms)
 lhsBindArity _ env = env        -- PatBind/VarBind
 
 
@@ -797,7 +797,7 @@ tcImpPrags prags
          else do
             { pss <- mapAndRecoverM (wrapLocM tcImpSpec)
                      [L loc (name,prag)
-                             | (L loc prag@(SpecSig _ (L _ name) _ _)) <- prags
+                             | (L loc prag@(SpecSig _ (N _ name) _ _)) <- prags
                              , not (nameIsLocalOrFrom this_mod name) ]
             ; return $ concatMap (\(L l ps) -> map (L l) ps) pss } }
   where

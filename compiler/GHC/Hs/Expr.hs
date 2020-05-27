@@ -179,7 +179,7 @@ mkSyntaxExpr = SyntaxExprRn
 -- | Make a 'SyntaxExpr' from a 'Name' (the "rn" is because this is used in the
 -- renamer).
 mkRnSyntaxExpr :: Name -> SyntaxExprRn
-mkRnSyntaxExpr name = SyntaxExprRn $ HsVar noExtField $ noLocA name
+mkRnSyntaxExpr name = SyntaxExprRn $ HsVar noExtField $ noApiName name
 
 instance Outputable SyntaxExprRn where
   ppr (SyntaxExprRn expr) = ppr expr
@@ -241,7 +241,7 @@ is Less Cool because
 -- | A Haskell expression.
 data HsExpr p
   = HsVar     (XVar p)
-              (LocatedA (IdP p)) -- ^ Variable
+              (ApiAnnName (IdP p)) -- ^ Variable
 
                              -- See Note [Located RdrNames]
 
@@ -441,7 +441,7 @@ data HsExpr p
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | RecordCon
       { rcon_ext      :: XRecordCon p
-      , rcon_con_name :: LocatedA (IdP p)   -- The constructor name;
+      , rcon_con_name :: ApiAnnName (IdP p) -- The constructor name;
                                             --  not used after type checking
       , rcon_flds     :: HsRecordBinds p }  -- The fields
 
@@ -955,7 +955,7 @@ ppr_lexpr e = ppr_expr (unLoc e)
 
 ppr_expr :: forall p. (OutputableBndrId p)
          => HsExpr (GhcPass p) -> SDoc
-ppr_expr (HsVar _ (L _ v))  = pprPrefixOcc v
+ppr_expr (HsVar _ (N _ v))  = pprPrefixOcc v
 ppr_expr (HsUnboundVar _ uv)= pprPrefixOcc uv
 ppr_expr (HsConLikeOut _ c) = pprPrefixOcc c
 ppr_expr (HsIPVar _ v)      = ppr v
@@ -1129,7 +1129,7 @@ ppr_expr (XExpr x) = case ghcPass @p of
                                                       else pprExpr e)
 
 ppr_infix_expr :: forall p. (OutputableBndrId p) => HsExpr (GhcPass p) -> Maybe SDoc
-ppr_infix_expr (HsVar _ (L _ v))    = Just (pprInfixOcc v)
+ppr_infix_expr (HsVar _ (N _ v))    = Just (pprInfixOcc v)
 ppr_infix_expr (HsConLikeOut _ c)   = Just (pprInfixOcc (conLikeName c))
 ppr_infix_expr (HsRecFld _ f)       = Just (pprInfixOcc f)
 ppr_infix_expr (HsUnboundVar _ occ) = Just (pprInfixOcc occ)
@@ -1548,10 +1548,10 @@ ppr_cmd (HsCmdArrApp _ arrow arg HsHigherOrderApp True)
 ppr_cmd (HsCmdArrApp _ arrow arg HsHigherOrderApp False)
   = hsep [ppr_lexpr arg, arrowtt, ppr_lexpr arrow]
 
-ppr_cmd (HsCmdArrForm _ (L _ (HsVar _ (L _ v))) _ (Just _) [arg1, arg2])
+ppr_cmd (HsCmdArrForm _ (L _ (HsVar _ (N _ v))) _ (Just _) [arg1, arg2])
   = hang (pprCmdArg (unLoc arg1)) 4 (sep [ pprInfixOcc v
                                          , pprCmdArg (unLoc arg2)])
-ppr_cmd (HsCmdArrForm _ (L _ (HsVar _ (L _ v))) Infix _    [arg1, arg2])
+ppr_cmd (HsCmdArrForm _ (L _ (HsVar _ (N _ v))) Infix _    [arg1, arg2])
   = hang (pprCmdArg (unLoc arg1)) 4 (sep [ pprInfixOcc v
                                          , pprCmdArg (unLoc arg2)])
 ppr_cmd (HsCmdArrForm _ (L _ (HsConLikeOut _ c)) _ (Just _) [arg1, arg2])
@@ -1783,7 +1783,7 @@ pprMatch (Match { m_pats = pats, m_ctxt = ctxt, m_grhss = grhss })
   where
     (herald, other_pats)
         = case ctxt of
-            FunRhs {mc_fun=L _ fun, mc_fixity=fixity, mc_strictness=strictness}
+            FunRhs {mc_fun=N _ fun, mc_fixity=fixity, mc_strictness=strictness}
                 | SrcStrict <- strictness
                 -> ASSERT(null pats)     -- A strict variable binding
                    (char '!'<>pprPrefixOcc fun, pats)
@@ -2777,7 +2777,7 @@ pp_dotdot = text " .. "
 -- Context of a pattern match. This is more subtle than it would seem. See Note
 -- [Varieties of pattern matches].
 data HsMatchContext id -- Not an extensible tag
-  = FunRhs { mc_fun        :: LocatedA id   -- ^ function binder of @f@
+  = FunRhs { mc_fun        :: ApiAnnName id   -- ^ function binder of @f@
            , mc_fixity     :: LexicalFixity -- ^ fixing of @f@
            , mc_strictness :: SrcStrictness -- ^ was @f@ banged?
                                             -- See Note [FunBind vs PatBind]
@@ -2892,7 +2892,7 @@ pprMatchContext ctxt
 
 pprMatchContextNoun :: Outputable id
                     => HsMatchContext id -> SDoc
-pprMatchContextNoun (FunRhs {mc_fun=L _ fun})
+pprMatchContextNoun (FunRhs {mc_fun=N _ fun})
                                     = text "equation for"
                                       <+> quotes (ppr fun)
 pprMatchContextNoun CaseAlt         = text "case alternative"
@@ -2948,7 +2948,7 @@ instance Outputable id => Outputable (HsStmtContext id) where
 -- Used to generate the string for a *runtime* error message
 matchContextErrString :: Outputable id
                       => HsMatchContext id -> SDoc
-matchContextErrString (FunRhs{mc_fun=L _ fun})   = text "function" <+> ppr fun
+matchContextErrString (FunRhs{mc_fun=N _ fun})   = text "function" <+> ppr fun
 matchContextErrString CaseAlt                    = text "case"
 matchContextErrString IfAlt                      = text "multi-way if"
 matchContextErrString PatBindRhs                 = text "pattern binding"

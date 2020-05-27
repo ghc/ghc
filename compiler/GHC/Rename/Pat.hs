@@ -139,11 +139,11 @@ wrapSrcSpanCps fn (L loc a)
                  unCpsRn (fn a) $ \v ->
                  k (L loc v))
 
-lookupConCps :: LocatedA RdrName -> CpsRn (LocatedA Name)
+lookupConCps :: ApiAnnName RdrName -> CpsRn (ApiAnnName Name)
 lookupConCps con_rdr
-  = CpsRn (\k -> do { con_name <- lookupLocatedOccRn con_rdr
+  = CpsRn (\k -> do { con_name <- lookupLocatedOccRnN con_rdr
                     ; (r, fvs) <- k con_name
-                    ; return (r, addOneFV fvs (unLoc con_name)) })
+                    ; return (r, addOneFV fvs (unApiName con_name)) })
     -- We add the constructor name to the free vars
     -- See Note [Patterns are uses]
 
@@ -218,12 +218,12 @@ matchNameMaker ctxt = LamMk report_unused
                       ThPatQuote            -> False
                       _                     -> True
 
-newPatLName :: NameMaker -> LocatedA RdrName -> CpsRn (LocatedA Name)
-newPatLName name_maker rdr_name@(L loc _)
+newPatLName :: NameMaker -> ApiAnnName RdrName -> CpsRn (ApiAnnName Name)
+newPatLName name_maker rdr_name@(N loc _)
   = do { name <- newPatName name_maker rdr_name
-       ; return (L loc name) }
+       ; return (N loc name) }
 
-newPatName :: NameMaker -> LocatedA RdrName -> CpsRn Name
+newPatName :: NameMaker -> ApiAnnName RdrName -> CpsRn Name
 newPatName (LamMk report_unused) rdr_name
   = CpsRn (\ thing_inside ->
         do { name <- newLocalBndrRn rdr_name
@@ -342,7 +342,7 @@ rnPat :: HsMatchContext Name -- for error messages
 rnPat ctxt pat thing_inside
   = rnPats ctxt [pat] (\pats' -> let [pat'] = pats' in thing_inside pat')
 
-applyNameMaker :: NameMaker -> LocatedA RdrName -> RnM (LocatedA Name)
+applyNameMaker :: NameMaker -> ApiAnnName RdrName -> RnM (ApiAnnName Name)
 applyNameMaker mk rdr = do { (n, _fvs) <- runCps (newPatLName mk rdr)
                            ; return n }
 
@@ -390,10 +390,10 @@ rnPatAndThen mk (LazyPat _ pat) = do { pat' <- rnLPatAndThen mk pat
                                      ; return (LazyPat noExtField pat') }
 rnPatAndThen mk (BangPat _ pat) = do { pat' <- rnLPatAndThen mk pat
                                      ; return (BangPat noExtField pat') }
-rnPatAndThen mk (VarPat x (L l rdr))
+rnPatAndThen mk (VarPat x (N l rdr))
     = do { loc <- liftCps getSrcSpanM
-         ; name <- newPatName mk (L (noAnnSrcSpan loc) rdr)
-         ; return (VarPat x (L l name)) }
+         ; name <- newPatName mk (N (noAnnSrcSpan loc) rdr)
+         ; return (VarPat x (N l name)) }
      -- we need to bind pattern variables for view pattern expressions
      -- (e.g. in the pattern (x, x -> y) x needs to be bound in the rhs of the tuple)
 
@@ -441,7 +441,7 @@ rnPatAndThen _ (NPat x (L l lit) mb_neg _eq)
        ; return (NPat x (L l lit') mb_neg' eq') }
 
 rnPatAndThen mk (NPlusKPat _ rdr (L l lit) _ _ _ )
-  = do { new_name <- newPatName mk rdr
+  = do { new_name <- newPatName mk (l2n rdr)
        ; (lit', _) <- liftCpsFV $ rnOverLit lit -- See Note [Negative zero]
                                                 -- We skip negateName as
                                                 -- negative zero doesn't make
@@ -471,7 +471,7 @@ rnPatAndThen mk p@(ViewPat _ expr pat)
 rnPatAndThen mk (ConPat _ con args)
    -- rnConPatAndThen takes care of reconstructing the pattern
    -- The pattern for the empty list needs to be replaced by an empty explicit list pattern when overloaded lists is turned on.
-  = case unLoc con == nameRdrName (dataConName nilDataCon) of
+  = case unApiName con == nameRdrName (dataConName nilDataCon) of
       True    -> do { ol_flag <- liftCps $ xoptM LangExt.OverloadedLists
                     ; if ol_flag then rnPatAndThen mk (ListPat noAnn [])
                                  else rnConPatAndThen mk con args}
@@ -507,7 +507,7 @@ rnPatAndThen mk (SplicePat _ splice)
 
 --------------------
 rnConPatAndThen :: NameMaker
-                -> LocatedA RdrName    -- the constructor
+                -> ApiAnnName RdrName    -- the constructor
                 -> HsConPatDetails GhcPs
                 -> CpsRn (Pat GhcRn)
 
@@ -525,7 +525,7 @@ rnConPatAndThen mk con (InfixCon pat1 pat2)
   = do  { con' <- lookupConCps con
         ; pat1' <- rnLPatAndThen mk pat1
         ; pat2' <- rnLPatAndThen mk pat2
-        ; fixity <- liftCps $ lookupFixityRn (unLoc con')
+        ; fixity <- liftCps $ lookupFixityRn (unApiName con')
         ; liftCps $ mkConOpPatRn con' fixity pat1' pat2' }
 
 rnConPatAndThen mk con (RecCon rpats)
@@ -546,10 +546,10 @@ checkUnusedRecordWildcardCps loc dotdot_names =
                     return (r, fvs) )
 --------------------
 rnHsRecPatsAndThen :: NameMaker
-                   -> LocatedA Name      -- Constructor
+                   -> ApiAnnName Name      -- Constructor
                    -> HsRecFields GhcPs (LPat GhcPs)
                    -> CpsRn (HsRecFields GhcRn (LPat GhcRn))
-rnHsRecPatsAndThen mk (L _ con)
+rnHsRecPatsAndThen mk (N _ con)
      hs_rec_fields@(HsRecFields { rec_dotdot = dd })
   = do { flds <- liftCpsFV $ rnHsRecFields (HsRecFieldPat con) mkVarPat
                                             hs_rec_fields
@@ -558,7 +558,7 @@ rnHsRecPatsAndThen mk (L _ con)
        ; return (HsRecFields { rec_flds = flds', rec_dotdot = dd }) }
   where
     mkVarPat :: SrcSpan -> IdP GhcPs -> Pat GhcPs -- AZ temp
-    mkVarPat l n = VarPat noExtField (L (noAnnSrcSpan l) n)
+    mkVarPat l n = VarPat noExtField (N (noAnnSrcSpan l) n)
     -- rn_field :: (LHsRecField GhcPs (LPat GhcPs), Int) -> CpsRn (LHsRecField GhcRn (LPat GhcRn)) -- AZ
     rn_field (L l fld, n') =
       do { arg' <- rnLPatAndThen (nested_mk dd mk n') (hsRecFieldArg fld)
@@ -632,7 +632,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
     rn_fld pun_ok parent (L l
                            (HsRecField
                               { hsRecFieldLbl =
-                                  (L loc (FieldOcc _ (L ll lbl)))
+                                  (L loc (FieldOcc _ (N ll lbl)))
                               , hsRecFieldArg = arg
                               , hsRecPun      = pun }))
       = do { sel <- setSrcSpan loc $ lookupRecFieldOcc parent lbl
@@ -645,7 +645,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                      else return arg
            ; return (L l (HsRecField
                              { hsRecFieldAnn = noAnn
-                             , hsRecFieldLbl = (L loc (FieldOcc sel (L ll lbl)))
+                             , hsRecFieldLbl = (L loc (FieldOcc sel (N ll lbl)))
                              , hsRecFieldArg = arg'
                              , hsRecPun      = pun })) }
 
@@ -691,7 +691,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
            ; return [ L loc' (HsRecField
                         { hsRecFieldAnn = noAnn
                         , hsRecFieldLbl
-                           = L loc (FieldOcc sel (L loc' arg_rdr))
+                           = L loc (FieldOcc sel (N loc' arg_rdr))
                         , hsRecFieldArg = L loc' (mk_arg loc arg_rdr)
                         , hsRecPun      = False })
                     | fl <- dot_dot_fields
@@ -759,7 +759,7 @@ rnHsRecUpdFields flds
                                -- Discard any module qualifier (#11662)
                              ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
                              ; return (L (noAnnSrcSpan loc) (HsVar noExtField
-                                              (L (noAnnSrcSpan loc) arg_rdr))) }
+                                              (N (noAnnSrcSpan loc) arg_rdr))) }
                      else return arg
            ; (arg'', fvs) <- rnLExpr arg'
 
@@ -769,11 +769,11 @@ rnHsRecUpdFields flds
                           Right _       -> fvs
                  lbl' = case sel of
                           Left sel_name -> L loc (Unambiguous sel_name
-                                                  (L (noAnnSrcSpan loc) lbl))
+                                                  (N (noAnnSrcSpan loc) lbl))
                           Right [sel_name] -> L loc (Unambiguous sel_name
-                                                     (L (noAnnSrcSpan loc) lbl))
+                                                     (N (noAnnSrcSpan loc) lbl))
                           Right _ -> L loc (Ambiguous   noExtField
-                                            (L (noAnnSrcSpan loc) lbl))
+                                            (N (noAnnSrcSpan loc) lbl))
 
            ; return (L l (HsRecField { hsRecFieldAnn = noAnn
                                      , hsRecFieldLbl = lbl'
@@ -793,7 +793,7 @@ getFieldIds flds = map (unLoc . hsRecFieldSel . unLoc) flds
 
 getFieldLbls :: [LHsRecField id arg] -> [RdrName]
 getFieldLbls flds
-  = map (unLoc . rdrNameFieldOcc . unLoc . hsRecFieldLbl . unLoc) flds
+  = map (unApiName . rdrNameFieldOcc . unLoc . hsRecFieldLbl . unLoc) flds
 
 getFieldUpdLbls :: [LHsRecUpdField GhcPs] -> [RdrName]
 getFieldUpdLbls flds = map (rdrNameAmbiguousFieldOcc . unLoc . hsRecFieldLbl . unLoc) flds

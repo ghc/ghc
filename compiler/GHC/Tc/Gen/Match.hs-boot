@@ -4,13 +4,13 @@ import GHC.Tc.Types.Evidence  ( HsWrapper )
 import GHC.Types.Name   ( Name )
 import GHC.Tc.Utils.TcType( ExpSigmaType, TcRhoType )
 import GHC.Tc.Types     ( TcM )
-import GHC.Hs.Extension ( GhcRn, GhcTcId, LocatedA )
+import GHC.Hs.Extension ( GhcRn, GhcTcId, ApiAnnName )
 
 tcGRHSsPat    :: GRHSs GhcRn (LHsExpr GhcRn)
               -> TcRhoType
               -> TcM (GRHSs GhcTcId (LHsExpr GhcTcId))
 
-tcMatchesFun :: LocatedA Name
+tcMatchesFun :: ApiAnnName Name
              -> MatchGroup GhcRn (LHsExpr GhcRn)
              -> ExpSigmaType
              -> TcM (HsWrapper, MatchGroup GhcTcId (LHsExpr GhcTcId))

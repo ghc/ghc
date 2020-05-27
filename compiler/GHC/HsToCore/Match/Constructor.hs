@@ -180,7 +180,7 @@ matchOneConLike vars ty (eqn1 :| eqns)   -- All eqns for a single constructor
                               alt_wrapper = wrapper1,
                               alt_result = foldr1 combineMatchResults match_results } }
   where
-    ConPat { pat_con = L _ con1
+    ConPat { pat_con = N _ con1
            , pat_args = args1
            , pat_con_ext = ConPatTc
              { cpt_arg_tys = arg_tys

@@ -93,7 +93,7 @@ data Pat p
 
        -- AZ:TODO above comment needs to be updated
   | VarPat      (XVarPat p)
-                (LocatedA (IdP p))  -- ^ Variable Pattern
+                (ApiAnnName (IdP p))  -- ^ Variable Pattern
 
                              -- See Note [Located RdrNames] in GHC.Hs.Expr
   | LazyPat     (XLazyPat p)
@@ -103,7 +103,7 @@ data Pat p
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | AsPat       (XAsPat p)
-                (LocatedA (IdP p)) (LPat p)   -- ^ As pattern
+                (ApiAnnName (IdP p)) (LPat p)   -- ^ As pattern
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt'
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
@@ -176,7 +176,7 @@ data Pat p
         ------------ Constructor patterns ---------------
   | ConPat {
         pat_con_ext :: XConPat p,
-        pat_con     :: LocatedA (ConLikeP p),
+        pat_con     :: ApiAnnName (ConLikeP p),
         pat_args    :: HsConPatDetails p
     }
     -- ^ Constructor Pattern
@@ -560,11 +560,11 @@ pprParendPat p pat = sdocOption sdocPrintTypecheckerElaboration $ \ print_tc_ela
       -- is the pattern inside that matters.  Sigh.
 
 pprPat :: forall p. (OutputableBndrId p) => Pat (GhcPass p) -> SDoc
-pprPat (VarPat _ lvar)          = pprPatBndr (unLoc lvar)
+pprPat (VarPat _ lvar)          = pprPatBndr (unApiName lvar)
 pprPat (WildPat _)              = char '_'
 pprPat (LazyPat _ pat)          = char '~' <> pprParendLPat appPrec pat
 pprPat (BangPat _ pat)          = char '!' <> pprParendLPat appPrec pat
-pprPat (AsPat _ name pat)       = hcat [pprPrefixOcc (unLoc name), char '@',
+pprPat (AsPat _ name pat)       = hcat [pprPrefixOcc (unApiName name), char '@',
                                         pprParendLPat appPrec pat]
 pprPat (ViewPat _ expr pat)     = hcat [pprLExpr expr, text " -> ", ppr pat]
 pprPat (ParPat _ pat)           = parens (ppr pat)
@@ -594,10 +594,10 @@ pprPat (ConPat { pat_con = con
                }
        )
   = case ghcPass @p of
-      GhcPs -> pprUserCon (unLoc con) details
-      GhcRn -> pprUserCon (unLoc con) details
+      GhcPs -> pprUserCon (unApiName con) details
+      GhcRn -> pprUserCon (unApiName con) details
       GhcTc -> sdocOption sdocPrintTypecheckerElaboration $ \case
-        False -> pprUserCon (unLoc con) details
+        False -> pprUserCon (unApiName con) details
         True  ->
           -- Tiresome; in TcBinds.tcRhs we print out a typechecked Pat in an
           -- error message, and we want to make sure it prints nicely
@@ -660,7 +660,7 @@ mkPrefixConPat :: DataCon ->
                   [LPat GhcTc] -> [Type] -> LPat GhcTc
 -- Make a vanilla Prefix constructor pattern
 mkPrefixConPat dc pats tys
-  = noLocA $ ConPat { pat_con = noLocA (RealDataCon dc)
+  = noLocA $ ConPat { pat_con = noApiName (RealDataCon dc)
                     , pat_args = PrefixCon pats
                     , pat_con_ext = ConPatTc
                       { cpt_tvs = []
@@ -782,8 +782,8 @@ isIrrefutableHsPat
        GhcPs -> False -- Conservative
        GhcRn -> False -- Conservative
        GhcTc -> case con of
-         L _ (PatSynCon _pat)  -> False -- Conservative
-         L _ (RealDataCon con) ->
+         N _ (PatSynCon _pat)  -> False -- Conservative
+         N _ (RealDataCon con) ->
            isJust (tyConSingleDataCon_maybe (dataConTyCon con))
            -- NB: tyConSingleDataCon_maybe, *not* isProductTyCon, because
            -- the latter is false of existentials. See #4439
@@ -817,7 +817,7 @@ isSimplePat p = case unLoc p of
   SigPat _ x _ -> isSimplePat x
   LazyPat _ x -> isSimplePat x
   BangPat _ x -> isSimplePat x
-  VarPat _ x -> Just (unLoc x)
+  VarPat _ x -> Just (unApiName x)
   _ -> Nothing
 
 

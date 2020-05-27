@@ -183,9 +183,9 @@ instance OutputableBndrId p
 -- primarily for accurate pretty printing of ParsedSource, and API Annotation
 -- placement.
 data IEWrappedName name
-  = IEName    (LocatedA name)  -- ^ no extra
-  | IEPattern (LocatedA name)  -- ^ pattern X
-  | IEType    (LocatedA name)  -- ^ type (:+:)
+  = IEName    (ApiAnnName name)  -- ^ no extra
+  | IEPattern (ApiAnnName name)  -- ^ pattern X
+  | IEType    (ApiAnnName name)  -- ^ type (:+:)
   deriving (Eq,Data)
 
 -- | Located name with possible adornment
@@ -312,25 +312,25 @@ ieNames (IEGroup          {})     = []
 ieNames (IEDoc            {})     = []
 ieNames (IEDocNamed       {})     = []
 
-ieWrappedLName :: IEWrappedName name -> LocatedA name
+ieWrappedLName :: IEWrappedName name -> ApiAnnName name
 ieWrappedLName (IEName    ln) = ln
 ieWrappedLName (IEPattern ln) = ln
 ieWrappedLName (IEType    ln) = ln
 
 ieWrappedName :: IEWrappedName name -> name
-ieWrappedName = unLoc . ieWrappedLName
+ieWrappedName = unApiName . ieWrappedLName
 
 
 lieWrappedName :: LIEWrappedName name -> name
 lieWrappedName (L _ n) = ieWrappedName n
 
-ieLWrappedName :: LIEWrappedName name -> LocatedA name
+ieLWrappedName :: LIEWrappedName name -> ApiAnnName name
 ieLWrappedName (L _ n) = ieWrappedLName n
 
 replaceWrappedName :: IEWrappedName name1 -> name2 -> IEWrappedName name2
-replaceWrappedName (IEName    (L l _)) n = IEName    (L l n)
-replaceWrappedName (IEPattern (L l _)) n = IEPattern (L l n)
-replaceWrappedName (IEType    (L l _)) n = IEType    (L l n)
+replaceWrappedName (IEName    (N l _)) n = IEName    (N l n)
+replaceWrappedName (IEPattern (N l _)) n = IEPattern (N l n)
+replaceWrappedName (IEType    (N l _)) n = IEType    (N l n)
 
 replaceLWrappedName :: LIEWrappedName name1 -> name2 -> LIEWrappedName name2
 replaceLWrappedName (L l n) n' = L l (replaceWrappedName n n')
@@ -366,9 +366,9 @@ instance (OutputableBndr name) => OutputableBndr (IEWrappedName name) where
   pprInfixOcc  w = pprInfixOcc  (ieWrappedName w)
 
 instance (OutputableBndr name) => Outputable (IEWrappedName name) where
-  ppr (IEName    n) = pprPrefixOcc (unLoc n)
-  ppr (IEPattern n) = text "pattern" <+> pprPrefixOcc (unLoc n)
-  ppr (IEType    n) = text "type"    <+> pprPrefixOcc (unLoc n)
+  ppr (IEName    n) = pprPrefixOcc (unApiName n)
+  ppr (IEPattern n) = text "pattern" <+> pprPrefixOcc (unApiName n)
+  ppr (IEType    n) = text "type"    <+> pprPrefixOcc (unApiName n)
 
 pprImpExp :: (HasOccName name, OutputableBndr name) => name -> SDoc
 pprImpExp name = type_pref <+> pprPrefixOcc name
