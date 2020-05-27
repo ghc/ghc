@@ -1171,6 +1171,7 @@ getDFunTyKey t@(CoercionTy _)        = pprPanic "getDFunTyKey" (ppr t)
 getDFunTyLitKey :: TyLit -> OccName
 getDFunTyLitKey (NumTyLit n) = mkOccName Name.varName (show n)
 getDFunTyLitKey (StrTyLit n) = mkOccName Name.varName (show n)  -- hm
+getDFunTyLitKey (CharTyLit n) = mkOccName Name.varName (show n)
 
 {- *********************************************************************
 *                                                                      *
