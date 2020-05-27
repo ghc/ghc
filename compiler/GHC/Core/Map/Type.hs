@@ -307,6 +307,7 @@ filterT f (TM { tm_var  = tvar, tm_app = tapp, tm_tycon = ttycon
 ------------------------
 data TyLitMap a = TLM { tlm_number :: Map.Map Integer a
                       , tlm_string :: UniqFM  FastString a
+                      , tlm_char   :: Map.Map Char a
                       }
 
 instance TrieMap TyLitMap where
@@ -319,31 +320,34 @@ instance TrieMap TyLitMap where
    filterTM = filterTyLit
 
 emptyTyLitMap :: TyLitMap a
-emptyTyLitMap = TLM { tlm_number = Map.empty, tlm_string = emptyUFM }
+emptyTyLitMap = TLM { tlm_number = Map.empty, tlm_string = emptyUFM, tlm_char = Map.empty }
 
 mapTyLit :: (a->b) -> TyLitMap a -> TyLitMap b
-mapTyLit f (TLM { tlm_number = tn, tlm_string = ts })
-  = TLM { tlm_number = Map.map f tn, tlm_string = mapUFM f ts }
+mapTyLit f (TLM { tlm_number = tn, tlm_string = ts, tlm_char = tc })
+  = TLM { tlm_number = Map.map f tn, tlm_string = mapUFM f ts, tlm_char = Map.map f tc }
 
 lkTyLit :: TyLit -> TyLitMap a -> Maybe a
 lkTyLit l =
   case l of
     NumTyLit n -> tlm_number >.> Map.lookup n
     StrTyLit n -> tlm_string >.> (`lookupUFM` n)
+    CharTyLit n -> tlm_char >.> Map.lookup n
 
 xtTyLit :: TyLit -> XT a -> TyLitMap a -> TyLitMap a
 xtTyLit l f m =
   case l of
-    NumTyLit n -> m { tlm_number = Map.alter f n (tlm_number m) }
-    StrTyLit n -> m { tlm_string = alterUFM  f (tlm_string m) n }
+    NumTyLit n ->  m { tlm_number = Map.alter f n (tlm_number m) }
+    StrTyLit n ->  m { tlm_string = alterUFM  f (tlm_string m) n }
+    CharTyLit n -> m { tlm_char = Map.alter f n (tlm_char m) }
 
 foldTyLit :: (a -> b -> b) -> TyLitMap a -> b -> b
 foldTyLit l m = flip (foldUFM l) (tlm_string m)
-              . flip (Map.foldr l)   (tlm_number m)
+              . flip (Map.foldr l) (tlm_number m)
+              . flip (Map.foldr l) (tlm_char m)
 
 filterTyLit :: (a -> Bool) -> TyLitMap a -> TyLitMap a
-filterTyLit f (TLM { tlm_number = tn, tlm_string = ts })
-  = TLM { tlm_number = Map.filter f tn, tlm_string = filterUFM f ts }
+filterTyLit f (TLM { tlm_number = tn, tlm_string = ts, tlm_char = tc })
+  = TLM { tlm_number = Map.filter f tn, tlm_string = filterUFM f ts, tlm_char = Map.filter f tc }
 
 -------------------------------------------------
 -- | @TypeMap a@ is a map from 'Type' to @a@.  If you are a client, this

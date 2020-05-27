@@ -2167,6 +2167,8 @@ atype :: { LHsType GhcPs }
                                                  [mos $1,mcs $5] }
         | INTEGER              { sLL $1 $> $ HsTyLit noExtField $ HsNumTy (getINTEGERs $1)
                                                            (il_value (getINTEGER $1)) }
+        | CHAR                 { sLL $1 $> $ HsTyLit noExtField $ HsCharTy (getCHARs $1)
+                                                                        (getCHAR $1) }
         | STRING               { sLL $1 $> $ HsTyLit noExtField $ HsStrTy (getSTRINGs $1)
                                                                      (getSTRING  $1) }
         | '_'                  { sL1 $1 $ mkAnonWildCardTy }

@@ -1729,6 +1729,7 @@ split_ty_app ty = go ty []
 cvtTyLit :: TH.TyLit -> HsTyLit
 cvtTyLit (TH.NumTyLit i) = HsNumTy NoSourceText i
 cvtTyLit (TH.StrTyLit s) = HsStrTy NoSourceText (fsLit s)
+cvtTyLit (TH.CharTyLit c) = HsCharTy NoSourceText c
 
 {- | @cvtOpAppT x op y@ converts @op@ and @y@ and produces the operator
 application @x `op` y@. The produced tree of infix types will be right-biased,
