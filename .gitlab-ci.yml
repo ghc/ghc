@@ -257,6 +257,20 @@ validate-x86_64-linux-deb9-unreg-hadrian:
     CONFIGURE_ARGS: --enable-unregisterised
     TEST_ENV: "x86_64-linux-deb9-unreg-hadrian"
 
+nightly-x86_64-linux-deb10-hadrian-cross-aarch64:
+  <<: *nightly
+  extends: .validate-linux-hadrian
+  stage: full-build
+  variables:
+    CONFIGURE_ARGS: --with-intree-gmp
+    CROSS_TARGET: "aarch64-linux-gnu"
+
+
+
+############################################################
+# GHC-in-GHCi (Hadrian)
+############################################################
+
 hadrian-ghc-in-ghci:
   stage: quick-build
   needs: [lint-linters, lint-submods]
