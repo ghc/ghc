@@ -1,6 +1,6 @@
 [submodule "libraries/binary"]
 	path = libraries/binary
-	url = https://gitlab.haskell.org/ghc/packages/binary.git
+	url = https://gitlab.haskell.org/Haskell-mouse/binary.git
 	ignore = untracked
 [submodule "libraries/bytestring"]
 	path = libraries/bytestring
@@ -44,7 +44,7 @@
 	ignore = untracked
 [submodule "libraries/array"]
 	path = libraries/array
-	url = https://gitlab.haskell.org/ghc/packages/array.git
+	url = https://gitlab.haskell.org/Haskell-mouse/array.git
 	ignore = untracked
 [submodule "libraries/deepseq"]
 	path = libraries/deepseq
@@ -89,16 +89,16 @@
 	ignore = untracked
 [submodule "utils/haddock"]
 	path = utils/haddock
-	url = https://gitlab.haskell.org/ghc/haddock.git
+	url = https://gitlab.haskell.org/Haskell-mouse/haddock.git
 	ignore = untracked
-	branch = ghc-head
+	branch = ghc-type-level-chars
 [submodule "nofib"]
 	path = nofib
 	url = https://gitlab.haskell.org/ghc/nofib.git
 	ignore = untracked
 [submodule "utils/hsc2hs"]
 	path = utils/hsc2hs
-	url = https://gitlab.haskell.org/ghc/hsc2hs.git
+	url = https://gitlab.haskell.org/Haskell-mouse/hsc2hs.git
 	ignore = untracked
 [submodule "libffi-tarballs"]
 	path = libffi-tarballs
