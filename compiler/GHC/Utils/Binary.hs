@@ -8,6 +8,9 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 {-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
+#if MIN_VERSION_base(4,16,0)
+#define HAS_TYPELITCHAR
+#endif
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
 

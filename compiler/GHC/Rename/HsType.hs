@@ -690,6 +690,7 @@ rnHsTyKi env tyLit@(HsTyLit _ t)
   where
     negLit (HsStrTy _ _) = False
     negLit (HsNumTy _ i) = i < 0
+    negLit (HsCharTy _ _) = False
     negLitErr = text "Illegal literal in type (type literals must not be negative):" <+> ppr tyLit
 
 rnHsTyKi env (HsAppTy _ ty1 ty2)

@@ -869,6 +869,7 @@ split t = go t []
 pprTyLit :: TyLit -> Doc
 pprTyLit (NumTyLit n) = integer n
 pprTyLit (StrTyLit s) = text (show s)
+pprTyLit (CharTyLit c) = text (show c)
 
 instance Ppr TyLit where
   ppr = pprTyLit

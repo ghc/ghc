@@ -3,11 +3,11 @@
 Type-Level Literals
 ===================
 
-GHC supports numeric and string literals at the type level, giving
+GHC supports numeric, string, and character literals at the type level, giving
 convenient access to a large number of predefined type-level constants.
-Numeric literals are of kind ``Natural``, while string literals are of kind
-``Symbol``. This feature is enabled by the :extension:`DataKinds` language
-extension.
+Numeric literals are of kind ``Natural``, string literals are of kind ``Symbol``,
+and character literals are of kind ``Char``.
+This feature is enabled by the :extension:`DataKinds` language extension.
 
 The kinds of the literals and all other low-level operations for this
 feature are defined in modules ``GHC.TypeLits`` and ``GHC.TypeNats``.
@@ -127,5 +127,3 @@ the type level:
 
     GHC.TypeLits> natVal (lg (Proxy :: Proxy 2) (Proxy :: Proxy 8))
     3
-
-
