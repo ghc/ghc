@@ -1347,6 +1347,7 @@ tcIfaceCtxt sts = mapM tcIfaceType sts
 tcIfaceTyLit :: IfaceTyLit -> IfL TyLit
 tcIfaceTyLit (IfaceNumTyLit n) = return (NumTyLit n)
 tcIfaceTyLit (IfaceStrTyLit n) = return (StrTyLit n)
+tcIfaceTyLit (IfaceCharTyLit n) = return (CharTyLit n)
 
 {-
 %************************************************************************

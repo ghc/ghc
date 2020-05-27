@@ -68,13 +68,14 @@ module GHC.Builtin.Types (
         maybeTyCon, maybeTyConName,
         nothingDataCon, nothingDataConName, promotedNothingDataCon,
         justDataCon, justDataConName, promotedJustDataCon,
+        mkPromotedMaybeTy, mkMaybeTy, isPromotedMaybeTy,
 
         -- * Tuples
         mkTupleTy, mkTupleTy1, mkBoxedTupleTy, mkTupleStr,
         tupleTyCon, tupleDataCon, tupleTyConName, tupleDataConName,
         promotedTupleDataCon,
         unitTyCon, unitDataCon, unitDataConId, unitTy, unitTyConKey,
-        pairTyCon,
+        pairTyCon, mkPromotedPairTy, isPromotedPairType,
         unboxedUnitTy,
         unboxedUnitTyCon, unboxedUnitDataCon,
         unboxedTupleKind, unboxedSumKind,
@@ -1005,6 +1006,16 @@ tupleDataCon Unboxed i = snd (unboxedTupleArr ! i)
 tupleDataConName :: Boxity -> Arity -> Name
 tupleDataConName sort i = dataConName (tupleDataCon sort i)
 
+mkPromotedPairTy :: Kind -> Kind -> Type -> Type -> Type
+mkPromotedPairTy k1 k2 t1 t2 = mkTyConApp (promotedTupleDataCon Boxed 2) [k1,k2,t1,t2]
+
+isPromotedPairType :: Type -> Maybe (Type, Type)
+isPromotedPairType t
+  | Just (tc, [_,_,x,y]) <- splitTyConApp_maybe t
+  , tc == promotedTupleDataCon Boxed 2
+  = Just (x, y)
+  | otherwise = Nothing
+
 boxedTupleArr, unboxedTupleArr :: Array Int (TyCon,DataCon)
 boxedTupleArr   = listArray (0,mAX_TUPLE_SIZE) [mk_tuple Boxed   i | i <- [0..mAX_TUPLE_SIZE]]
 unboxedTupleArr = listArray (0,mAX_TUPLE_SIZE) [mk_tuple Unboxed i | i <- [0..mAX_TUPLE_SIZE]]
@@ -1790,6 +1801,20 @@ nothingDataCon = pcDataCon nothingDataConName alpha_tyvar [] maybeTyCon
 
 justDataCon :: DataCon
 justDataCon = pcDataCon justDataConName alpha_tyvar [alphaTy] maybeTyCon
+
+mkPromotedMaybeTy :: Kind -> Maybe Type -> Type
+mkPromotedMaybeTy k (Just x) = mkTyConApp promotedJustDataCon [k,x]
+mkPromotedMaybeTy k Nothing  = mkTyConApp promotedNothingDataCon [k]
+
+mkMaybeTy :: Type -> Kind
+mkMaybeTy t = mkTyConApp maybeTyCon [t]
+
+isPromotedMaybeTy :: Type -> Maybe (Maybe Type)
+isPromotedMaybeTy t
+  | Just (tc,[_,x]) <- splitTyConApp_maybe t, tc == promotedJustDataCon = return $ Just x
+  | Just (tc,[_])   <- splitTyConApp_maybe t, tc == promotedNothingDataCon = return $ Nothing
+  | otherwise = Nothing
+
 
 {-
 ** *********************************************************************
