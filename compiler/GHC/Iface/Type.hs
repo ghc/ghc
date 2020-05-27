@@ -190,6 +190,7 @@ type IfaceContext = [IfacePredType]
 data IfaceTyLit
   = IfaceNumTyLit Integer
   | IfaceStrTyLit FastString
+  | IfaceCharTyLit Char
   deriving (Eq)
 
 type IfaceTyConBinder    = VarBndr IfaceBndr TyConBndrVis
@@ -1619,6 +1620,7 @@ pprTuple ctxt_prec sort promoted args =
 pprIfaceTyLit :: IfaceTyLit -> SDoc
 pprIfaceTyLit (IfaceNumTyLit n) = integer n
 pprIfaceTyLit (IfaceStrTyLit n) = text (show n)
+pprIfaceTyLit (IfaceCharTyLit c) = text (show c)
 
 pprIfaceCoercion, pprParendIfaceCoercion :: IfaceCoercion -> SDoc
 pprIfaceCoercion = ppr_co topPrec
@@ -1763,8 +1765,9 @@ instance Outputable IfaceTyLit where
   ppr = pprIfaceTyLit
 
 instance Binary IfaceTyLit where
-  put_ bh (IfaceNumTyLit n)  = putByte bh 1 >> put_ bh n
-  put_ bh (IfaceStrTyLit n)  = putByte bh 2 >> put_ bh n
+  put_ bh (IfaceNumTyLit n)   = putByte bh 1 >> put_ bh n
+  put_ bh (IfaceStrTyLit n)   = putByte bh 2 >> put_ bh n
+  put_ bh (IfaceCharTyLit n)  = putByte bh 3 >> put_ bh n
 
   get bh =
     do tag <- getByte bh
@@ -1773,6 +1776,8 @@ instance Binary IfaceTyLit where
                  ; return (IfaceNumTyLit n) }
          2 -> do { n <- get bh
                  ; return (IfaceStrTyLit n) }
+         3 -> do { n <- get bh
+                 ; return (IfaceCharTyLit n) }
          _ -> panic ("get IfaceTyLit " ++ show tag)
 
 instance Binary IfaceAppArgs where
@@ -2105,6 +2110,7 @@ instance NFData IfaceTyLit where
   rnf = \case
     IfaceNumTyLit f1 -> rnf f1
     IfaceStrTyLit f1 -> rnf f1
+    IfaceCharTyLit f1 -> rnf f1
 
 instance NFData IfaceCoercion where
   rnf = \case
