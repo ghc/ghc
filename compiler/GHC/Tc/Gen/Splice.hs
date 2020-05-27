@@ -2163,6 +2163,7 @@ reify_for_all argf ty
 reifyTyLit :: TyCoRep.TyLit -> TcM TH.TyLit
 reifyTyLit (NumTyLit n) = return (TH.NumTyLit n)
 reifyTyLit (StrTyLit s) = return (TH.StrTyLit (unpackFS s))
+reifyTyLit (CharTyLit c) = return (TH.CharTyLit c)
 
 reifyTypes :: [Type] -> TcM [TH.Type]
 reifyTypes = mapM reifyType
