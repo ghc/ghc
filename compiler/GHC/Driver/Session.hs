@@ -64,7 +64,7 @@ module GHC.Driver.Session (
         optimisationFlags,
         setFlagsFromEnvFile,
 
-        addWay', updateWays,
+        addWay',
 
         homeUnit, mkHomeModule, isHomeModule,
 
@@ -526,7 +526,6 @@ data DynFlags = DynFlags {
 
   -- ways
   ways                  :: Set Way,     -- ^ Way flags from the command line
-  buildTag              :: String,      -- ^ The global \"way\" (e.g. \"p\" for prof)
 
   -- For object splitting
   splitInfo             :: Maybe (String,Int),
@@ -1208,9 +1207,8 @@ dynamicTooMkDynamicDynFlags dflags0
                         hiSuf = dynHiSuf dflags1,
                         objectSuf = dynObjectSuf dflags1
                     }
-          dflags3 = updateWays dflags2
-          dflags4 = gopt_unset dflags3 Opt_BuildDynamicToo
-      in dflags4
+          dflags3 = gopt_unset dflags2 Opt_BuildDynamicToo
+      in dflags3
 
 -- | Compute the path of the dynamic object corresponding to an object file.
 dynamicOutputFile :: DynFlags -> FilePath -> FilePath
@@ -1367,7 +1365,6 @@ defaultDynFlags mySettings llvmConfig =
         unitDatabases           = Nothing,
         unitState               = emptyUnitState,
         ways                    = defaultWays mySettings,
-        buildTag                = waysTag (defaultWays mySettings),
         splitInfo               = Nothing,
 
         ghcNameVersion = sGhcNameVersion mySettings,
@@ -2127,46 +2124,39 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
 
   -- check for disabled flags in safe haskell
   let (dflags2, sh_warns) = safeFlagCheck cmdline dflags1
-      dflags3 = updateWays dflags2
-      theWays = ways dflags3
+      theWays = ways dflags2
 
   unless (allowed_combination theWays) $ liftIO $
       throwGhcExceptionIO (CmdLineError ("combination not supported: " ++
                                intercalate "/" (map wayDesc (Set.toAscList theWays))))
 
   let chooseOutput
-        | isJust (outputFile dflags3)          -- Only iff user specified -o ...
-        , not (isJust (dynOutputFile dflags3)) -- but not -dyno
-        = return $ dflags3 { dynOutputFile = Just $ dynamicOutputFile dflags3 outFile }
+        | isJust (outputFile dflags2)          -- Only iff user specified -o ...
+        , not (isJust (dynOutputFile dflags2)) -- but not -dyno
+        = return $ dflags2 { dynOutputFile = Just $ dynamicOutputFile dflags2 outFile }
         | otherwise
-        = return dflags3
+        = return dflags2
         where
-          outFile = fromJust $ outputFile dflags3
-  dflags4 <- ifGeneratingDynamicToo dflags3 chooseOutput (return dflags3)
+          outFile = fromJust $ outputFile dflags2
+  dflags3 <- ifGeneratingDynamicToo dflags2 chooseOutput (return dflags2)
 
-  let (dflags5, consistency_warnings) = makeDynFlagsConsistent dflags4
+  let (dflags4, consistency_warnings) = makeDynFlagsConsistent dflags3
 
   -- Set timer stats & heap size
-  when (enableTimeStats dflags5) $ liftIO enableTimingStats
-  case (ghcHeapSize dflags5) of
+  when (enableTimeStats dflags4) $ liftIO enableTimingStats
+  case (ghcHeapSize dflags4) of
     Just x -> liftIO (setHeapSize x)
     _      -> return ()
 
-  liftIO $ setUnsafeGlobalDynFlags dflags5
+  liftIO $ setUnsafeGlobalDynFlags dflags4
 
   let warns' = map (Warn Cmd.NoReason) (consistency_warnings ++ sh_warns)
 
-  return (dflags5, leftover, warns' ++ warns)
+  return (dflags4, leftover, warns' ++ warns)
 
 -- | Write an error or warning to the 'LogOutput'.
 putLogMsg :: DynFlags -> WarnReason -> Severity -> SrcSpan -> MsgDoc -> IO ()
 putLogMsg dflags = log_action dflags dflags
-
-updateWays :: DynFlags -> DynFlags
-updateWays dflags
-    = dflags {
-        buildTag = waysTag (Set.filter (not . wayRTSOnly) (ways dflags))
-      }
 
 -- | Check (and potentially disable) any extensions that aren't allowed
 -- in safe mode.

@@ -42,6 +42,7 @@ import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Builtin.Names ( gHC_PRIM )
 import GHC.Driver.Session
+import GHC.Driver.Ways
 import GHC.Utils.Outputable as Outputable
 import GHC.Data.Maybe    ( expectJust )
 
@@ -368,7 +369,7 @@ findPackageModule_ hsc_env mod pkg_conf =
 
   let
      dflags = hsc_dflags hsc_env
-     tag = buildTag dflags
+     tag = waysBuildTag (ways dflags)
 
            -- hi-suffix for packages depends on the build tag.
      package_hisuf | null tag  = "hi"
@@ -700,7 +701,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
 
             _ -> panic "cantFindErr"
 
-    build_tag = buildTag dflags
+    build_tag = waysBuildTag (ways dflags)
 
     not_found_in_package pkg files
        | build_tag /= ""
@@ -809,7 +810,7 @@ cantFindInstalledErr cannot_find _ dflags mod_name find_result
 
             _ -> panic "cantFindInstalledErr"
 
-    build_tag = buildTag dflags
+    build_tag = waysBuildTag (ways dflags)
     pkgstate = unitState dflags
 
     looks_like_srcpkgid :: UnitId -> SDoc

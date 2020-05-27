@@ -20,7 +20,6 @@ import GHC.Prelude
 import qualified GHC
 import GHC.Driver.Monad
 import GHC.Driver.Session
-import GHC.Driver.Ways
 import GHC.Utils.Misc
 import GHC.Driver.Types
 import qualified GHC.SysTools as SysTools
@@ -65,7 +64,6 @@ doMkDependHS srcs = do
     -- be specified.
     let dflags = dflags0 {
                      ways = Set.empty,
-                     buildTag = waysTag Set.empty,
                      hiSuf = "hi",
                      objectSuf = "o"
                  }
