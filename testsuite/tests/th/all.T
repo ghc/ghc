@@ -345,6 +345,7 @@ test('T10819', [], multimod_compile,
      ['T10819.hs', '-v0 ' + config.ghc_th_way_flags])
 test('T10820', normal, compile_and_run, ['-v0'])
 test('T11341', normal, compile, ['-v0 -dsuppress-uniques'])
+test('T11342b', normal, compile, ['-v0'])
 test('T11345', normal, compile_and_run, ['-v0 -dsuppress-uniques'])
 test('TH_finalizer', normal, compile, ['-v0'])
 test('TH_finalizer2',
