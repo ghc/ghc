@@ -15,8 +15,8 @@
 {-|
 GHC's @DataKinds@ language extension lifts data constructors, natural
 numbers, and strings to the type level. This module provides the
-primitives needed for working with type-level numbers (the 'Nat' kind)
-and strings (the 'Symbol') kind. It also defines the 'TypeError' type
+primitives needed for working with type-level numbers (the 'Nat' kind),
+strings (the 'Symbol' kind), and characters (the 'Char' kind). It also defines the 'TypeError' type
 family, a feature that makes use of type-level strings to support user
 defined type errors.
 
@@ -36,16 +36,18 @@ module GHC.TypeLits
     -- * Linking type and value level
   , N.KnownNat, natVal, natVal'
   , KnownSymbol, symbolVal, symbolVal'
-  , N.SomeNat(..), SomeSymbol(..)
-  , someNatVal, someSymbolVal
-  , N.sameNat, sameSymbol
+  , KnownChar, charVal, charVal'
+  , N.SomeNat(..), SomeSymbol(..), SomeChar(..)
+  , someNatVal, someSymbolVal, someCharVal
+  , N.sameNat, sameSymbol, sameChar
 
 
     -- * Functions on type literals
   , type (N.<=), type (N.<=?), type (N.+), type (N.*), type (N.^), type (N.-)
   , type N.Div, type N.Mod, type N.Log2
   , AppendSymbol
-  , N.CmpNat, CmpSymbol
+  , N.CmpNat, CmpSymbol, CmpChar
+  , ConsSymbol, UnconsSymbol
 
   -- * User-defined type errors
   , TypeError
@@ -54,7 +56,7 @@ module GHC.TypeLits
   ) where
 
 import GHC.Base(Eq(..), Ord(..), Ordering(..), String, otherwise)
-import GHC.Types(Symbol)
+import GHC.Types(Symbol, Char)
 import GHC.Num(Integer, fromInteger)
 import GHC.Show(Show(..))
 import GHC.Read(Read(..))
@@ -100,6 +102,21 @@ symbolVal' _ = case symbolSing :: SSymbol n of
 data SomeSymbol = forall n. KnownSymbol n => SomeSymbol (Proxy n)
                   -- ^ @since 4.7.0.0
 
+
+class KnownChar (n :: Char) where
+-- | @since 4.16.0.0
+  charSing :: SChar n
+
+charVal :: forall n proxy. KnownChar n => proxy n -> Char
+charVal _ = case charSing :: SChar n of
+                 SChar x -> x
+
+charVal' :: forall n. KnownChar n => Proxy# n -> Char
+charVal' _ = case charSing :: SChar n of
+                SChar x -> x
+
+data SomeChar = forall n. KnownChar n => SomeChar (Proxy n)
+
 -- | Convert an integer into an unknown type-level natural.
 --
 -- @since 4.7.0.0
@@ -132,6 +149,26 @@ instance Show SomeSymbol where
 -- | @since 4.7.0.0
 instance Read SomeSymbol where
   readsPrec p xs = [ (someSymbolVal a, ys) | (a,ys) <- readsPrec p xs ]
+
+
+-- | Convert a character into an unknown type-level char.
+--
+-- | @since 4.16.0.0
+someCharVal :: Char -> SomeChar
+someCharVal n   = withSChar SomeChar (SChar n) Proxy
+{-# NOINLINE someCharVal #-}
+
+instance Eq SomeChar where
+  SomeChar x == SomeChar y = charVal x == charVal y
+
+instance Ord SomeChar where
+  compare (SomeChar x) (SomeChar y) = compare (charVal x) (charVal y)
+
+instance Show SomeChar where
+  showsPrec p (SomeChar x) = showsPrec p (charVal x)
+
+instance Read SomeChar where
+  readsPrec p xs = [ (someCharVal a, ys) | (a,ys) <- readsPrec p xs ]
 
 --------------------------------------------------------------------------------
 
@@ -193,6 +230,25 @@ infixl 6 :<>:
 type family TypeError (a :: ErrorMessage) :: b where
 
 
+-- Char-related type families
+
+-- | Comparison of type-level characters.
+--
+-- @since 4.16.0.0
+type family CmpChar (a :: Char) (b :: Char) :: Ordering
+
+-- | Extending a type-level symbol with a type-level character
+--
+-- @since 4.16.0.0
+
+type family ConsSymbol (a :: Char) (b :: Symbol) :: Symbol
+
+-- | This type family yields type-level `Just` storing the first character
+-- of a symbol and its tail if it is defined and `Nothing` otherwise.
+--
+-- @since 4.16.0.0
+type family UnconsSymbol (a :: Symbol) :: Maybe (Char, Symbol)
+
 --------------------------------------------------------------------------------
 
 -- | We either get evidence that this function was instantiated with the
@@ -205,6 +261,17 @@ sameSymbol x y
   | symbolVal x == symbolVal y  = Just (unsafeCoerce Refl)
   | otherwise                   = Nothing
 
+
+-- | We either get evidence that this function was instantiated with the
+-- same type-level characters, or 'Nothing'.
+--
+-- @since 4.16.0.0
+sameChar :: (KnownChar a, KnownChar b) =>
+              proxy1 a -> proxy2 b -> Maybe (a :~: b)
+sameChar x y
+  | charVal x == charVal y  = Just (unsafeCoerce Refl)
+  | otherwise                = Nothing
+
 --------------------------------------------------------------------------------
 -- PRIVATE:
 
@@ -216,3 +283,12 @@ data WrapS a b = WrapS (KnownSymbol a => Proxy a -> b)
 withSSymbol :: (KnownSymbol a => Proxy a -> b)
             -> SSymbol a      -> Proxy a -> b
 withSSymbol f x y = magicDict (WrapS f) x y
+
+newtype SChar (s :: Char) = SChar Char
+
+data WrapC a b = WrapC (KnownChar a => Proxy a -> b)
+
+-- See Note [q] in "basicType/MkId.hs"
+withSChar :: (KnownChar a => Proxy a -> b)
+            -> SChar a      -> Proxy a -> b
+withSChar f x y = magicDict (WrapC f) x y
