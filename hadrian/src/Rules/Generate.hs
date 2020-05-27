@@ -59,12 +59,11 @@ compilerDependencies = do
             , notStage0 ? isGmp ? return [gmpPath -/- "include/ghc-gmp.h"]
             , notStage0 ? return ((rtsPath -/-) <$> libffiHeaderFiles)
             , return $ fmap (ghcPath -/-)
-                  [ "primop-can-fail.hs-incl"
-                  , "primop-code-size.hs-incl"
+                  [ "primop-code-size.hs-incl"
                   , "primop-commutable.hs-incl"
                   , "primop-data-decl.hs-incl"
+                  , "primop-effect.hs-incl"
                   , "primop-fixity.hs-incl"
-                  , "primop-has-side-effects.hs-incl"
                   , "primop-list.hs-incl"
                   , "primop-out-of-line.hs-incl"
                   , "primop-primop-info.hs-incl"
