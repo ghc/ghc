@@ -357,7 +357,7 @@ cprAnalBind top_lvl env widening args id rhs
 
     -- See Note [CPR for thunks]
     stays_thunk = is_thunk && not_strict
-    is_thunk    = not (exprIsHNF rhs) && not (isJoinId id)
+    is_thunk    = idArity == 0 && not (isJoinId id)
     not_strict  = not (isStrictDmd (idDemandInfo id))
     -- See Note [CPR for sum types]
     (_, ret_ty) = splitPiTys (idType id)
