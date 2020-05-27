@@ -98,7 +98,10 @@ def symlinks_work() -> bool:
             except OSError as e:
                 print('Saw {} during symlink test; assuming symlinks do not work.'.format(e))
             finally:
-                os.unlink('__symlink-test')
+                try:
+                    os.unlink('__symlink-test')
+                except:
+                    pass
 
         return works
     else:
