@@ -190,13 +190,20 @@ instance Outputable Type where
 data TyLit
   = NumTyLit Integer
   | StrTyLit FastString
+  | CharTyLit Char
   deriving (Eq, Data.Data)
 
 instance Ord TyLit where
-   compare (NumTyLit _) (StrTyLit _) = LT
-   compare (StrTyLit _) (NumTyLit _) = GT
-   compare (NumTyLit x) (NumTyLit y) = compare x y
-   compare (StrTyLit x) (StrTyLit y) = uniqCompareFS x y
+   compare (NumTyLit _) (StrTyLit _)   = LT
+   compare (NumTyLit _) (CharTyLit _)   = GT
+   compare (NumTyLit x) (NumTyLit y)   = compare x y
+   compare (StrTyLit _) (NumTyLit _)   = GT
+   compare (StrTyLit _) (CharTyLit _)   = GT
+   compare (StrTyLit x) (StrTyLit y)   = uniqCompareFS x y
+   compare (CharTyLit _) (NumTyLit _)   = LT
+   compare (CharTyLit _) (StrTyLit _)   = LT
+   compare (CharTyLit x) (CharTyLit y) = compare x y
+
 
 instance Outputable TyLit where
    ppr = pprTyLit
