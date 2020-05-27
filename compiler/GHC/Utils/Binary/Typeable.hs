@@ -177,11 +177,17 @@ instance Binary KindRep where
 instance Binary TypeLitSort where
     put_ bh TypeLitSymbol = putByte bh 0
     put_ bh TypeLitNat = putByte bh 1
+#if defined(HAS_TYPELITCHAR)
+    put_ bh TypeLitChar = putByte bh 2
+#endif
     get bh = do
         tag <- getByte bh
         case tag of
           0 -> pure TypeLitSymbol
           1 -> pure TypeLitNat
+#if defined(HAS_TYPELITCHAR)
+          2 -> pure TypeLitChar
+#endif
           _ -> fail "Binary.putTypeLitSort: invalid tag"
 
 putTypeRep :: BinHandle -> TypeRep a -> IO ()
@@ -212,4 +218,3 @@ instance Binary Serialized where
         the_type <- get bh
         bytes <- get bh
         return (Serialized the_type bytes)
-
