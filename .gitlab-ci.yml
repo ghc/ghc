@@ -649,7 +649,8 @@ release-x86_64-linux-deb10:
   extends: .build-x86_64-linux-deb10
 
 nightly-x86_64-linux-deb10-cross-aarch64:
-  <<: *nightly
+  #<<: *nightly
+  stage: build
   extends: .build-x86_64-linux-deb10
   variables:
     CROSS_TARGET: "aarch64-linux-gnu"
