@@ -43,6 +43,7 @@ import GHC.Driver.Types
 import GHC.Unit
 import GHC.Types.Name
 import GHC.Driver.Session
+import GHC.Driver.Ways
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Utils.Panic
@@ -58,6 +59,7 @@ import GHC.Data.FastString
 import GHC.Settings.Constants
 import GHC.Utils.Misc
 
+import Data.Set (Set)
 import Data.Array
 import Data.Array.ST
 import Data.Array.Unsafe
@@ -136,7 +138,7 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
     errorOnMismatch "mismatched interface file versions" our_ver check_ver
 
     check_way <- get bh
-    let way_descr = getWayDescr dflags
+    let way_descr = getWayDescr platform (ways dflags)
     wantedGot "Way" way_descr check_way ppr
     when (checkHiWay == CheckHiWay) $
         errorOnMismatch "mismatched interface file ways" way_descr check_way
@@ -191,7 +193,7 @@ writeBinIface dflags hi_path mod_iface = do
 
     -- The version and way descriptor go next
     put_ bh (show hiVersion)
-    let way_descr = getWayDescr dflags
+    let way_descr = getWayDescr platform (ways dflags)
     put_  bh way_descr
 
     extFields_p_p <- tellBin bh
@@ -428,10 +430,10 @@ data BinDictionary = BinDictionary {
                                 -- indexed by FastString
   }
 
-getWayDescr :: DynFlags -> String
-getWayDescr dflags
-  | platformUnregisterised (targetPlatform dflags) = 'u':tag
-  | otherwise                                      =     tag
-  where tag = buildTag dflags
+getWayDescr :: Platform -> Set Way -> String
+getWayDescr platform ws
+  | platformUnregisterised platform = 'u':tag
+  | otherwise                       =     tag
+  where tag = waysBuildTag ws
         -- if this is an unregisterised build, make sure our interfaces
         -- can't be used by a registerised build.
