@@ -34,6 +34,9 @@
 
   * The argument to `TExpQ` can now be levity polymorphic.
 
+  * Add support for the Char Kind (#11342): we extend the `TyLit` data type with
+    the constructor `CharTyLit` reflecting type-level characters.
+
 ## 2.16.0.0 *TBA*
 
   * Add support for tuple sections. (#15843) The type signatures of `TupE` and
