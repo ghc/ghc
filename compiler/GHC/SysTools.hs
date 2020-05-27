@@ -239,10 +239,9 @@ linkDynLib dflags0 o_files dep_packages
         dflags1 = if platformMisc_ghcThreaded $ platformMisc dflags0
           then addWay' WayThreaded dflags0
           else                     dflags0
-        dflags2 = if platformMisc_ghcDebugged $ platformMisc dflags1
+        dflags = if platformMisc_ghcDebugged $ platformMisc dflags1
           then addWay' WayDebug dflags1
           else                  dflags1
-        dflags = updateWays dflags2
 
         verbFlags = getVerbFlags dflags
         o_file = outputFile dflags
