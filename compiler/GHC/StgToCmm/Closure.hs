@@ -889,6 +889,7 @@ getTyLitDescription l =
   case l of
     NumTyLit n -> show n
     StrTyLit n -> show n
+    CharTyLit n -> show n
 
 --------------------------------------
 --   CmmInfoTable-related things
