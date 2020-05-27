@@ -57,6 +57,39 @@ module GHC.Builtin.Types (
         -- * Word8
         word8TyCon, word8DataCon, word8TyConName, word8Ty,
 
+        -- * GeneralCategory
+        generalCategoryTy, generalCategoryTyCon, genCatUppercaseDataCon, genCatLowercaseDataCon,
+        genCatTitlecaseDataCon, genCatModifierDataCon, genCatOtherLetterDataCon,
+        genCatNonSpacingDataCon, genCatSpacingCombiningMarkDataCon,
+        genCatEnclosingDataCon, genCatDecimalDataCon, genCatLetterNumberDataCon,
+        genCatOtherNumberDataCon, genCatConnectorDataCon, genCatDashDataCon,
+        genCatOpenPunctuationDataCon, genCatClosePunctuationDataCon, genCatInitialQuoteDataCon,
+        genCatFinalQuoteDataCon, genCatOtherPunctuationDataCon, genCatMathSymbolDataCon,
+        genCatCurrencySymbolDataCon, genCatModifierSymbolDataCon, genCatOtherSymbolDataCon,
+        genCatSpaceDataCon, genCatLineSeparatorDataCon, genCatParagraphSeparatorDataCon,
+        genCatControlDataCon, genCatFormatDataCon, genCatSurrogateDataCon,
+        genCatPrivateUseDataCon, genCatNotAssignedDataCon, genCatUppercaseDataConId,
+        genCatLowercaseDataConId, genCatTitlecaseDataConId,
+        genCatModifierDataConId, genCatOtherLetterDataConId, genCatNonSpacingDataConId,
+        genCatSpacingCombiningMarkDataConId, genCatEnclosingDataConId,
+        genCatDecimalDataConId, genCatLetterNumberDataConId, genCatOtherNumberDataConId,
+        genCatConnectorDataConId, genCatDashDataConId, genCatOpenPunctuationDataConId,
+        genCatClosePunctuationDataConId, genCatInitialQuoteDataConId, genCatFinalQuoteDataConId,
+        genCatOtherPunctuationDataConId, genCatMathSymbolDataConId, genCatCurrencySymbolDataConId,
+        genCatModifierSymbolDataConId, genCatOtherSymbolDataConId, genCatSpaceDataConId,
+        genCatLineSeparatorDataConId, genCatParagraphSeparatorDataConId, genCatControlDataConId,
+        genCatFormatDataConId, genCatSurrogateDataConId, genCatPrivateUseDataConId, genCatNotAssignedDataConId,
+        promotedUppercaseLetterDataCon, promotedLowercaseLetterDataCon, promotedTitlecaseLetterDataCon,
+        promotedModifierLetterDataCon, promotedOtherLetterDataCon, promotedNonSpacingMarkDataCon,
+        promotedSpacingCombiningMarkDataCon, promotedEnclosingMarkDataCon, promotedDecimalNumberDataCon,
+        promotedLetterNumberDataCon, promotedOtherNumberDataCon, promotedConnectorPunctuationDataCon,
+        promotedDashPunctuationDataCon, promotedOpenPunctuationDataCon, promotedClosePunctuationDataCon,
+        promotedInitialQuoteDataCon, promotedFinalQuoteDataCon, promotedOtherPunctuationDataCon,
+        promotedMathSymbolDataCon, promotedCurrencySymbolDataCon, promotedModifierSymbolDataCon,
+        promotedOtherSymbolDataCon, promotedSpaceDataCon, promotedLineSeparatorDataCon,
+        promotedParagraphSeparatorDataCon, promotedControlDataCon, promotedFormatDataCon,
+        promotedSurrogateDataCon, promotedPrivateUseDataCon, promotedNotAssignedDataCon,
+
         -- * List
         listTyCon, listTyCon_RDR, listTyConName, listTyConKey,
         nilDataCon, nilDataConName, nilDataConKey,
@@ -253,6 +286,7 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because they
                 , listTyCon
                 , orderingTyCon
                 , maybeTyCon
+                , generalCategoryTyCon
                 , heqTyCon
                 , eqTyCon
                 , coercibleTyCon
@@ -1659,6 +1693,129 @@ ordLTDataConId = dataConWorkId ordLTDataCon
 ordEQDataConId = dataConWorkId ordEQDataCon
 ordGTDataConId = dataConWorkId ordGTDataCon
 
+generalCategoryTy :: Type
+generalCategoryTy = mkTyConTy generalCategoryTyCon
+
+generalCategoryTyCon :: TyCon
+generalCategoryTyCon = pcTyCon generalCategoryTyConName Nothing
+                        [] constructorsList
+  where
+  constructorsList =
+    [ genCatUppercaseDataCon
+    , genCatLowercaseDataCon
+    , genCatTitlecaseDataCon
+    , genCatModifierDataCon
+    , genCatOtherLetterDataCon
+    , genCatNonSpacingDataCon
+    , genCatSpacingCombiningMarkDataCon
+    , genCatEnclosingDataCon
+    , genCatDecimalDataCon
+    , genCatLetterNumberDataCon
+    , genCatOtherNumberDataCon
+    , genCatConnectorDataCon
+    , genCatDashDataCon
+    , genCatOpenPunctuationDataCon
+    , genCatClosePunctuationDataCon
+    , genCatInitialQuoteDataCon
+    , genCatFinalQuoteDataCon
+    , genCatOtherPunctuationDataCon
+    , genCatMathSymbolDataCon
+    , genCatCurrencySymbolDataCon
+    , genCatModifierSymbolDataCon
+    , genCatOtherSymbolDataCon
+    , genCatSpaceDataCon
+    , genCatLineSeparatorDataCon
+    , genCatParagraphSeparatorDataCon
+    , genCatControlDataCon
+    , genCatFormatDataCon
+    , genCatSurrogateDataCon
+    , genCatPrivateUseDataCon
+    , genCatNotAssignedDataCon
+    ]
+
+genCatUppercaseDataCon, genCatLowercaseDataCon, genCatTitlecaseDataCon,
+    genCatModifierDataCon, genCatOtherLetterDataCon, genCatNonSpacingDataCon,
+    genCatSpacingCombiningMarkDataCon, genCatEnclosingDataCon,
+    genCatDecimalDataCon, genCatLetterNumberDataCon, genCatOtherNumberDataCon,
+    genCatConnectorDataCon, genCatDashDataCon, genCatOpenPunctuationDataCon,
+    genCatClosePunctuationDataCon, genCatInitialQuoteDataCon, genCatFinalQuoteDataCon,
+    genCatOtherPunctuationDataCon, genCatMathSymbolDataCon, genCatCurrencySymbolDataCon,
+    genCatModifierSymbolDataCon, genCatOtherSymbolDataCon, genCatSpaceDataCon,
+    genCatLineSeparatorDataCon, genCatParagraphSeparatorDataCon, genCatControlDataCon,
+    genCatFormatDataCon, genCatSurrogateDataCon, genCatPrivateUseDataCon, genCatNotAssignedDataCon :: DataCon
+genCatUppercaseDataCon            = pcDataCon genCatUppercaseDataConName [] [] generalCategoryTyCon
+genCatLowercaseDataCon            = pcDataCon genCatLowercaseDataConName [] [] generalCategoryTyCon
+genCatTitlecaseDataCon            = pcDataCon genCatTitlecaseDataConName [] [] generalCategoryTyCon
+genCatModifierDataCon             = pcDataCon genCatModifierDataConName  [] [] generalCategoryTyCon
+genCatOtherLetterDataCon          = pcDataCon genCatOtherLetterDataConName [] [] generalCategoryTyCon
+genCatNonSpacingDataCon           = pcDataCon genCatNonSpacingDataConName [] [] generalCategoryTyCon
+genCatSpacingCombiningMarkDataCon = pcDataCon genCatSpacingCombiningMarkDataConName [] [] generalCategoryTyCon
+genCatEnclosingDataCon            = pcDataCon genCatEnclosingDataConName [] [] generalCategoryTyCon
+genCatDecimalDataCon              = pcDataCon genCatDecimalDataConName [] [] generalCategoryTyCon
+genCatLetterNumberDataCon         = pcDataCon genCatLetterNumberDataConName [] [] generalCategoryTyCon
+genCatOtherNumberDataCon          = pcDataCon genCatOtherNumberDataConName [] [] generalCategoryTyCon
+genCatConnectorDataCon            = pcDataCon genCatConnectorDataConName [] [] generalCategoryTyCon
+genCatDashDataCon                 = pcDataCon genCatDashDataConName [] [] generalCategoryTyCon
+genCatOpenPunctuationDataCon      = pcDataCon genCatOpenPunctuationDataConName [] [] generalCategoryTyCon
+genCatClosePunctuationDataCon     = pcDataCon genCatClosePunctuationDataConName [] [] generalCategoryTyCon
+genCatInitialQuoteDataCon         = pcDataCon genCatInitialQuoteDataConName [] [] generalCategoryTyCon
+genCatFinalQuoteDataCon           = pcDataCon genCatFinalQuoteDataConName [] [] generalCategoryTyCon
+genCatOtherPunctuationDataCon     = pcDataCon genCatOtherPunctuationDataConName [] [] generalCategoryTyCon
+genCatMathSymbolDataCon           = pcDataCon genCatMathSymbolDataConName [] [] generalCategoryTyCon
+genCatCurrencySymbolDataCon       = pcDataCon genCatCurrencySymbolDataConName [] [] generalCategoryTyCon
+genCatModifierSymbolDataCon       = pcDataCon genCatModifierSymbolDataConName [] [] generalCategoryTyCon
+genCatOtherSymbolDataCon          = pcDataCon genCatOtherSymbolDataConName [] [] generalCategoryTyCon
+genCatSpaceDataCon                = pcDataCon genCatSpaceDataConName [] [] generalCategoryTyCon
+genCatLineSeparatorDataCon        = pcDataCon genCatLineSeparatorDataConName [] [] generalCategoryTyCon
+genCatParagraphSeparatorDataCon   = pcDataCon genCatParagraphSeparatorDataConName [] [] generalCategoryTyCon
+genCatControlDataCon              = pcDataCon genCatControlDataConName [] [] generalCategoryTyCon
+genCatFormatDataCon               = pcDataCon genCatFormatDataConName [] [] generalCategoryTyCon
+genCatSurrogateDataCon            = pcDataCon genCatSurrogateDataConName [] [] generalCategoryTyCon
+genCatPrivateUseDataCon           = pcDataCon genCatPrivateUseDataConName [] [] generalCategoryTyCon
+genCatNotAssignedDataCon          = pcDataCon genCatNotAssignedDataConName [] [] generalCategoryTyCon
+
+genCatUppercaseDataConId, genCatLowercaseDataConId, genCatTitlecaseDataConId,
+    genCatModifierDataConId, genCatOtherLetterDataConId, genCatNonSpacingDataConId,
+    genCatSpacingCombiningMarkDataConId, genCatEnclosingDataConId,
+    genCatDecimalDataConId, genCatLetterNumberDataConId, genCatOtherNumberDataConId,
+    genCatConnectorDataConId, genCatDashDataConId, genCatOpenPunctuationDataConId,
+    genCatClosePunctuationDataConId, genCatInitialQuoteDataConId, genCatFinalQuoteDataConId,
+    genCatOtherPunctuationDataConId, genCatMathSymbolDataConId, genCatCurrencySymbolDataConId,
+    genCatModifierSymbolDataConId, genCatOtherSymbolDataConId, genCatSpaceDataConId,
+    genCatLineSeparatorDataConId, genCatParagraphSeparatorDataConId, genCatControlDataConId,
+    genCatFormatDataConId, genCatSurrogateDataConId, genCatPrivateUseDataConId, genCatNotAssignedDataConId :: Id
+genCatUppercaseDataConId            = dataConWorkId genCatUppercaseDataCon
+genCatLowercaseDataConId            = dataConWorkId genCatLowercaseDataCon
+genCatTitlecaseDataConId            = dataConWorkId genCatTitlecaseDataCon
+genCatModifierDataConId             = dataConWorkId genCatModifierDataCon
+genCatOtherLetterDataConId          = dataConWorkId genCatOtherLetterDataCon
+genCatNonSpacingDataConId           = dataConWorkId genCatNonSpacingDataCon
+genCatSpacingCombiningMarkDataConId = dataConWorkId genCatSpacingCombiningMarkDataCon
+genCatEnclosingDataConId            = dataConWorkId genCatEnclosingDataCon
+genCatDecimalDataConId              = dataConWorkId genCatDecimalDataCon
+genCatLetterNumberDataConId         = dataConWorkId genCatLetterNumberDataCon
+genCatOtherNumberDataConId          = dataConWorkId genCatOtherNumberDataCon
+genCatConnectorDataConId            = dataConWorkId genCatConnectorDataCon
+genCatDashDataConId                 = dataConWorkId genCatDashDataCon
+genCatOpenPunctuationDataConId      = dataConWorkId genCatOpenPunctuationDataCon
+genCatClosePunctuationDataConId     = dataConWorkId genCatClosePunctuationDataCon
+genCatInitialQuoteDataConId         = dataConWorkId genCatInitialQuoteDataCon
+genCatFinalQuoteDataConId           = dataConWorkId genCatFinalQuoteDataCon
+genCatOtherPunctuationDataConId     = dataConWorkId genCatOtherPunctuationDataCon
+genCatMathSymbolDataConId           = dataConWorkId genCatMathSymbolDataCon
+genCatCurrencySymbolDataConId       = dataConWorkId genCatCurrencySymbolDataCon
+genCatModifierSymbolDataConId       = dataConWorkId genCatModifierSymbolDataCon
+genCatOtherSymbolDataConId          = dataConWorkId genCatOtherSymbolDataCon
+genCatSpaceDataConId                = dataConWorkId genCatSpaceDataCon
+genCatLineSeparatorDataConId        = dataConWorkId genCatLineSeparatorDataCon
+genCatParagraphSeparatorDataConId   = dataConWorkId genCatParagraphSeparatorDataCon
+genCatControlDataConId              = dataConWorkId genCatControlDataCon
+genCatFormatDataConId               = dataConWorkId genCatFormatDataCon
+genCatSurrogateDataConId            = dataConWorkId genCatSurrogateDataCon
+genCatPrivateUseDataConId           = dataConWorkId genCatPrivateUseDataCon
+genCatNotAssignedDataConId          = dataConWorkId genCatNotAssignedDataCon
+
+
 {-
 ************************************************************************
 *                                                                      *
@@ -1811,6 +1968,69 @@ promotedGTDataCon     = promoteDataCon ordGTDataCon
 promotedConsDataCon, promotedNilDataCon :: TyCon
 promotedConsDataCon   = promoteDataCon consDataCon
 promotedNilDataCon    = promoteDataCon nilDataCon
+
+-- Promoted general category
+promotedUppercaseLetterDataCon
+  , promotedLowercaseLetterDataCon
+  , promotedTitlecaseLetterDataCon
+  , promotedModifierLetterDataCon
+  , promotedOtherLetterDataCon
+  , promotedNonSpacingMarkDataCon
+  , promotedSpacingCombiningMarkDataCon
+  , promotedEnclosingMarkDataCon
+  , promotedDecimalNumberDataCon
+  , promotedLetterNumberDataCon
+  , promotedOtherNumberDataCon
+  , promotedConnectorPunctuationDataCon
+  , promotedDashPunctuationDataCon
+  , promotedOpenPunctuationDataCon
+  , promotedClosePunctuationDataCon
+  , promotedInitialQuoteDataCon
+  , promotedFinalQuoteDataCon
+  , promotedOtherPunctuationDataCon
+  , promotedMathSymbolDataCon
+  , promotedCurrencySymbolDataCon
+  , promotedModifierSymbolDataCon
+  , promotedOtherSymbolDataCon
+  , promotedSpaceDataCon
+  , promotedLineSeparatorDataCon
+  , promotedParagraphSeparatorDataCon
+  , promotedControlDataCon
+  , promotedFormatDataCon
+  , promotedSurrogateDataCon
+  , promotedPrivateUseDataCon
+  , promotedNotAssignedDataCon
+  :: TyCon
+promotedUppercaseLetterDataCon      = promoteDataCon genCatUppercaseDataCon
+promotedLowercaseLetterDataCon      = promoteDataCon genCatLowercaseDataCon
+promotedTitlecaseLetterDataCon      = promoteDataCon genCatTitlecaseDataCon
+promotedModifierLetterDataCon       = promoteDataCon genCatModifierDataCon
+promotedOtherLetterDataCon          = promoteDataCon genCatOtherLetterDataCon
+promotedNonSpacingMarkDataCon       = promoteDataCon genCatNonSpacingDataCon
+promotedSpacingCombiningMarkDataCon = promoteDataCon genCatSpacingCombiningMarkDataCon
+promotedEnclosingMarkDataCon        = promoteDataCon genCatEnclosingDataCon
+promotedDecimalNumberDataCon        = promoteDataCon genCatDecimalDataCon
+promotedLetterNumberDataCon         = promoteDataCon genCatLetterNumberDataCon
+promotedOtherNumberDataCon          = promoteDataCon genCatOtherNumberDataCon
+promotedConnectorPunctuationDataCon = promoteDataCon genCatConnectorDataCon
+promotedDashPunctuationDataCon      = promoteDataCon genCatDashDataCon
+promotedOpenPunctuationDataCon      = promoteDataCon genCatOpenPunctuationDataCon
+promotedClosePunctuationDataCon     = promoteDataCon genCatClosePunctuationDataCon
+promotedInitialQuoteDataCon         = promoteDataCon genCatInitialQuoteDataCon
+promotedFinalQuoteDataCon           = promoteDataCon genCatFinalQuoteDataCon
+promotedOtherPunctuationDataCon     = promoteDataCon genCatOtherPunctuationDataCon
+promotedMathSymbolDataCon           = promoteDataCon genCatMathSymbolDataCon
+promotedCurrencySymbolDataCon       = promoteDataCon genCatCurrencySymbolDataCon
+promotedModifierSymbolDataCon       = promoteDataCon genCatModifierSymbolDataCon
+promotedOtherSymbolDataCon          = promoteDataCon genCatOtherSymbolDataCon
+promotedSpaceDataCon                = promoteDataCon genCatSpaceDataCon
+promotedLineSeparatorDataCon        = promoteDataCon genCatLineSeparatorDataCon
+promotedParagraphSeparatorDataCon   = promoteDataCon genCatParagraphSeparatorDataCon
+promotedControlDataCon              = promoteDataCon genCatControlDataCon
+promotedFormatDataCon               = promoteDataCon genCatFormatDataCon
+promotedSurrogateDataCon            = promoteDataCon genCatSurrogateDataCon
+promotedPrivateUseDataCon           = promoteDataCon genCatPrivateUseDataCon
+promotedNotAssignedDataCon          = promoteDataCon genCatNotAssignedDataCon
 
 -- | Make a *promoted* list.
 mkPromotedListTy :: Kind   -- ^ of the elements of the list
