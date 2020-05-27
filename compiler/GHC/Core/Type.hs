@@ -63,6 +63,7 @@ module GHC.Core.Type (
 
         mkNumLitTy, isNumLitTy,
         mkStrLitTy, isStrLitTy,
+        mkCharLitTy, isCharLitTy,
         isLitTy,
 
         isPredTy,
@@ -257,7 +258,7 @@ import GHC.Types.Unique.Set
 import GHC.Core.TyCon
 import GHC.Builtin.Types.Prim
 import {-# SOURCE #-} GHC.Builtin.Types
-                                 ( listTyCon, typeNatKind
+                                 ( charTy, listTyCon, typeNatKind
                                  , typeSymbolKind, liftedTypeKind
                                  , constraintKind
                                  , unrestrictedFunTyCon
@@ -1004,6 +1005,15 @@ isStrLitTy :: Type -> Maybe FastString
 isStrLitTy ty
   | LitTy (StrTyLit s) <- coreFullView ty = Just s
   | otherwise                             = Nothing
+
+mkCharLitTy :: Char -> Type
+mkCharLitTy c = LitTy (CharTyLit c)
+
+-- | This is a char literal. We also look through type synonyms.
+isCharLitTy :: Type -> Maybe Char
+isCharLitTy ty | Just ty1 <- coreView ty = isCharLitTy ty1
+isCharLitTy (LitTy (CharTyLit s)) = Just s
+isCharLitTy _                     = Nothing
 
 -- | Is this a type literal (symbol or numeric).
 isLitTy :: Type -> Maybe TyLit
@@ -2595,6 +2605,7 @@ tcReturnsConstraintKind _                       = False
 typeLiteralKind :: TyLit -> Kind
 typeLiteralKind (NumTyLit {}) = typeNatKind
 typeLiteralKind (StrTyLit {}) = typeSymbolKind
+typeLiteralKind (CharTyLit {}) = charTy
 
 -- | Returns True if a type is levity polymorphic. Should be the same
 -- as (isKindLevPoly . typeKind) but much faster.
