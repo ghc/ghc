@@ -17,8 +17,8 @@
 
 GHC's @DataKinds@ language extension lifts data constructors, natural
 numbers, and strings to the type level. This module provides the
-primitives needed for working with type-level numbers (the 'Nat' kind)
-and strings (the 'Symbol') kind. It also defines the 'TypeError' type
+primitives needed for working with type-level numbers (the 'Nat' kind),
+strings (the 'Symbol' kind), and characters (the 'Char' kind). It also defines the 'TypeError' type
 family, a feature that makes use of type-level strings to support user
 defined type errors.
 
@@ -38,16 +38,28 @@ module GHC.TypeLits
     -- * Linking type and value level
   , N.KnownNat, natVal, natVal'
   , KnownSymbol, symbolVal, symbolVal'
-  , N.SomeNat(..), SomeSymbol(..)
-  , someNatVal, someSymbolVal
-  , N.sameNat, sameSymbol
+  , KnownChar, charVal, charVal'
+  , N.SomeNat(..), SomeSymbol(..), SomeChar(..)
+  , someNatVal, someSymbolVal, someCharVal
+  , N.sameNat, sameSymbol, sameChar
 
 
     -- * Functions on type literals
   , type (N.<=), type (N.<=?), type (N.+), type (N.*), type (N.^), type (N.-)
   , type N.Div, type N.Mod, type N.Log2
   , AppendSymbol
-  , N.CmpNat, CmpSymbol
+  , N.CmpNat, CmpSymbol, CmpChar, LeqChar
+  , GeneralCharCategory
+  , IsControl, IsSpace, IsLower
+  , IsUpper, IsAlpha, IsAlphaNum
+  , IsPrint, IsDigit, IsOctDigit
+  , IsHexDigit, IsLetter, IsMark
+  , IsNumber, IsPunctuation, IsSymbol
+  , IsSeparator, IsAscii, IsLatin1
+  , IsAsciiUpper, IsAsciiLower
+  , ToUpper, ToLower, ToTitle
+  , CharToNat, NatToChar, ConsSymbol
+  , UnconsSymbol
 
   -- * User-defined type errors
   , TypeError
@@ -56,7 +68,7 @@ module GHC.TypeLits
   ) where
 
 import GHC.Base(Eq(..), Ord(..), Ordering(..), otherwise)
-import GHC.Types( Nat, Symbol )
+import GHC.Types(Bool(..), Nat, Symbol, Char)
 import GHC.Num(Integer, fromInteger)
 import GHC.Base(String)
 import GHC.Show(Show(..))
@@ -65,9 +77,11 @@ import GHC.Real(toInteger)
 import GHC.Prim(magicDict, Proxy#)
 import Data.Maybe(Maybe(..))
 import Data.Proxy (Proxy(..))
+import Data.Type.Bool(type (&&))
 import Data.Type.Equality((:~:)(Refl))
 import Unsafe.Coerce(unsafeCoerce)
 
+import Data.Char (GeneralCategory (..))
 import GHC.TypeNats (KnownNat)
 import qualified GHC.TypeNats as N
 
@@ -103,6 +117,20 @@ symbolVal' _ = case symbolSing :: SSymbol n of
 data SomeSymbol = forall n. KnownSymbol n => SomeSymbol (Proxy n)
                   -- ^ @since 4.7.0.0
 
+
+class KnownChar (n :: Char) where
+  charSing :: SChar n
+
+charVal :: forall n proxy. KnownChar n => proxy n -> Char
+charVal _ = case charSing :: SChar n of
+                 SChar x -> x
+
+charVal' :: forall n. KnownChar n => Proxy# n -> Char
+charVal' _ = case charSing :: SChar n of
+                SChar x -> x
+
+data SomeChar = forall n. KnownChar n => SomeChar (Proxy n)
+
 -- | Convert an integer into an unknown type-level natural.
 --
 -- @since 4.7.0.0
@@ -135,6 +163,25 @@ instance Show SomeSymbol where
 -- | @since 4.7.0.0
 instance Read SomeSymbol where
   readsPrec p xs = [ (someSymbolVal a, ys) | (a,ys) <- readsPrec p xs ]
+
+
+-- | Convert a character into an unknown type-level char.
+--
+someCharVal :: Char -> SomeChar
+someCharVal n   = withSChar SomeChar (SChar n) Proxy
+{-# NOINLINE someCharVal #-}
+
+instance Eq SomeChar where
+  SomeChar x == SomeChar y = charVal x == charVal y
+
+instance Ord SomeChar where
+  compare (SomeChar x) (SomeChar y) = compare (charVal x) (charVal y)
+
+instance Show SomeChar where
+  showsPrec p (SomeChar x) = showsPrec p (charVal x)
+
+instance Read SomeChar where
+  readsPrec p xs = [ (someCharVal a, ys) | (a,ys) <- readsPrec p xs ]
 
 --------------------------------------------------------------------------------
 
@@ -196,10 +243,146 @@ infixl 6 :<>:
 type family TypeError (a :: ErrorMessage) :: b where
 
 
+-- Char-related type families
+
+-- | Comparison of type-level characters, as a type family.
+type family CmpChar (a :: Char) (b :: Char) :: Ordering
+
+-- | Boolean comparison of type-level characters
+type family LeqChar (a :: Char) (b :: Char) :: Bool
+
+-- | Extending a type-level symbol with a type-level character
+type family ConsSymbol (a :: Char) (b :: Symbol) :: Symbol
+
+-- | This type family yields type-level `Just` storing the first character
+-- of a symbol and its tail if it is defined and `Nothing` otherwise.
+type family UnconsSymbol (a :: Symbol) :: Maybe (Char, Symbol)
+
+-- | A type-level analogue of the function `toUpper` from 'Data.Char'.
+type family ToUpper (a :: Char) :: Char
+
+-- | A type-level analogue of the function `toLower` from 'Data.Char'.
+type family ToLower (a :: Char) :: Char
+
+-- | A type-level analogue of the function `toTitle` from 'Data.Char'.
+type family ToTitle (a :: Char) :: Char
+
+-- | These type families are type-level analogues of the functions `ord` and `chr` from Data.Char respectively.
+type family CharToNat (a :: Char) :: Nat
+
+type family NatToChar (a :: Nat) :: Char
+
+-- | A type-level analogue of the function `generalCategory` from
+type family GeneralCharCategory (a :: Char) :: GeneralCategory
+
+
+--------------------------------------------------------------------------------
+
+-- | Char-related built-in unary predicates
+
+-- | A type-level analogue of the `isAlpha` function from 'Data.Char'.
+type family IsAlpha (a :: Char) :: Bool
+
+-- | A type-level analogue of the `isAlphaNum` function from 'Data.Char'.
+type family IsAlphaNum (a :: Char) :: Bool
+
+-- | A type-level analogue of the `isControl` function from 'Data.Char'.
+type family IsControl (a :: Char) :: Bool
+
+-- | A type-level analogue of the `isPrint` function from 'Data.Char'.
+type family IsPrint (a :: Char) :: Bool
+
+-- | A type-level analogue of the `isUpper` function from 'Data.Char'.
+type family IsUpper (a :: Char) :: Bool
+
+-- | A type-level analogue of the `isUpper` function from 'Data.Char'.
+type family IsLower (a :: Char) :: Bool
+
+-- | A type-level analogue of the `isSpace` function from 'Data.Char'.
+type family IsSpace (a :: Char) :: Bool
+
+-- | A type-level analogue of the `isDigit` function from 'Data.Char'.
+type family IsDigit (a :: Char) :: Bool
+
+-- | A type-level analogue of the `isOctDigit` function from 'Data.Char'.
+type family IsOctDigit (a :: Char) :: Bool
+
+-- | A type-level analogue of the `isHexDigit` function from 'Data.Char'.
+type family IsHexDigit (a :: Char) :: Bool
+
+-- | A type-level analogue of the `isLetter` function from 'Data.Char'.
+type family IsLetter (a :: Char) :: Bool
+
+-- | A type-level analogue of the `isMark` function from 'Data.Char'.
+type IsMark a = IsMarkCategory (GeneralCharCategory a)
+
+type family IsMarkCategory (c :: GeneralCategory) :: Bool where
+  IsMarkCategory 'NonSpacingMark       = 'True
+  IsMarkCategory 'SpacingCombiningMark = 'True
+  IsMarkCategory 'EnclosingMark        = 'True
+  IsMarkCategory _                     = 'False
+
+-- | A type-level analogue of the `isNumber` function from 'Data.Char'.
+type IsNumber a = IsNumberCategory (GeneralCharCategory a)
+
+type family IsNumberCategory c where
+  IsNumberCategory 'DecimalNumber = 'True
+  IsNumberCategory 'LetterNumber  = 'True
+  IsNumberCategory 'OtherNumber   = 'True
+  IsNumberCategory _              = 'False
+
+-- | A type-level analogue of the `isPunctuation` function from 'Data.Char'.
+type IsPunctuation a = IsPunctuationCategory (GeneralCharCategory a)
+
+type family IsPunctuationCategory c where
+  IsPunctuationCategory 'ConnectorPunctuation = 'True
+  IsPunctuationCategory 'DashPunctuation      = 'True
+  IsPunctuationCategory 'OpenPunctuation      = 'True
+  IsPunctuationCategory 'ClosePunctuation     = 'True
+  IsPunctuationCategory 'InitialQuote         = 'True
+  IsPunctuationCategory 'FinalQuote           = 'True
+  IsPunctuationCategory 'OtherPunctuation     = 'True
+  IsPunctuationCategory _                     = 'False
+
+-- | A type-level analogue of the `isSymbol` function from 'Data.Char'.
+type IsSymbol a = IsSymbolCategory (GeneralCharCategory a)
+
+type family IsSymbolCategory c where
+  IsSymbolCategory 'MathSymbol     = 'True
+  IsSymbolCategory 'CurrencySymbol = 'True
+  IsSymbolCategory 'ModifierSymbol = 'True
+  IsSymbolCategory 'OtherSymbol    = 'True
+  IsSymbolCategory _               = 'False
+
+-- | A type-level analogue of the `isSeparator` function from 'Data.Char'.
+type IsSeparator a = IsSeparatorCategory (GeneralCharCategory a)
+
+type family IsSeparatorCategory c where
+  IsSeparatorCategory 'Space              = 'True
+  IsSeparatorCategory 'LineSeparator      = 'True
+  IsSeparatorCategory 'ParagraphSeparator = 'True
+  IsSeparatorCategory _                   = 'False
+
+--------------------------------------------------------------------------------
+
+-- | Type-level char subranges
+
+-- | A type-level analogue of the `isAscii` function from 'Data.Char'
+type IsAscii c = LeqChar c '\127'
+
+-- | A type-level analogue of the `isLatin1` function from 'Data.Char'
+type IsLatin1 c = LeqChar c '\xff'
+
+-- | A type-level analogue of the `isAsciiUpper` function from 'Data.Char'
+type IsAsciiUpper c = LeqChar 'A' c && LeqChar c 'Z'
+
+-- | A type-level analogue of the `isAsciiLower` function from 'Data.Char'
+type IsAsciiLower c = LeqChar 'a' c && LeqChar c 'z'
+
 --------------------------------------------------------------------------------
 
 -- | We either get evidence that this function was instantiated with the
--- same type-level symbols, or 'Nothing'.
+-- same type-level symbols (or characters), or 'Nothing'.
 --
 -- @since 4.7.0.0
 sameSymbol :: (KnownSymbol a, KnownSymbol b) =>
@@ -207,6 +390,12 @@ sameSymbol :: (KnownSymbol a, KnownSymbol b) =>
 sameSymbol x y
   | symbolVal x == symbolVal y  = Just (unsafeCoerce Refl)
   | otherwise                   = Nothing
+
+sameChar :: (KnownChar a, KnownChar b) =>
+              proxy1 a -> proxy2 b -> Maybe (a :~: b)
+sameChar x y
+  | charVal x == charVal y  = Just (unsafeCoerce Refl)
+  | otherwise                = Nothing
 
 --------------------------------------------------------------------------------
 -- PRIVATE:
@@ -219,3 +408,12 @@ data WrapS a b = WrapS (KnownSymbol a => Proxy a -> b)
 withSSymbol :: (KnownSymbol a => Proxy a -> b)
             -> SSymbol a      -> Proxy a -> b
 withSSymbol f x y = magicDict (WrapS f) x y
+
+newtype SChar (s :: Char) = SChar Char
+
+data WrapC a b = WrapC (KnownChar a => Proxy a -> b)
+
+-- See Note [q] in "basicType/MkId.hs"
+withSChar :: (KnownChar a => Proxy a -> b)
+            -> SChar a      -> Proxy a -> b
+withSChar f x y = magicDict (WrapC f) x y
