@@ -43,7 +43,7 @@ class TestConfig:
         self.summary_file = ''
 
         # Path to Ghostscript
-        self.gs = ''
+        self.gs = None # type: Optional[Path]
 
         # Run tests requiring Haddock
         self.haddock = False

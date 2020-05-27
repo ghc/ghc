@@ -131,3 +131,16 @@ class Watcher(object):
         if self.pool <= 0:
             self.evt.set()
         self.sync_lock.release()
+
+def memoize(f):
+    """
+    A decorator to memoize a nullary function.
+    """
+    def cached():
+        if cached._cache is None:
+            cached._cache = f()
+
+        return cached._cache
+
+    cached._cache = None
+    return cached
