@@ -1,9 +1,14 @@
 type GHC.TypeLits.AppendSymbol :: GHC.Types.Symbol
                                   -> GHC.Types.Symbol -> GHC.Types.Symbol
 type family GHC.TypeLits.AppendSymbol a b
+type GHC.TypeLits.CmpChar :: Char -> Char -> Ordering
+type family GHC.TypeLits.CmpChar a b
 type GHC.TypeLits.CmpSymbol :: GHC.Types.Symbol
                                -> GHC.Types.Symbol -> Ordering
 type family GHC.TypeLits.CmpSymbol a b
+type GHC.TypeLits.ConsSymbol :: Char
+                                -> GHC.Types.Symbol -> GHC.Types.Symbol
+type family GHC.TypeLits.ConsSymbol a b
 type GHC.TypeLits.ErrorMessage :: *
 data GHC.TypeLits.ErrorMessage
   = GHC.TypeLits.Text GHC.Types.Symbol
@@ -14,10 +19,19 @@ data GHC.TypeLits.ErrorMessage
   | GHC.TypeLits.ErrorMessage
     GHC.TypeLits.:$$:
     GHC.TypeLits.ErrorMessage
+type GHC.TypeLits.KnownChar :: Char -> Constraint
+class GHC.TypeLits.KnownChar n where
+  GHC.TypeLits.charSing :: GHC.TypeLits.SChar n
+  {-# MINIMAL charSing #-}
 type GHC.TypeLits.KnownSymbol :: GHC.Types.Symbol -> Constraint
 class GHC.TypeLits.KnownSymbol n where
   GHC.TypeLits.symbolSing :: GHC.TypeLits.SSymbol n
   {-# MINIMAL symbolSing #-}
+type GHC.TypeLits.SomeChar :: *
+data GHC.TypeLits.SomeChar
+  = forall (n :: Char).
+    GHC.TypeLits.KnownChar n =>
+    GHC.TypeLits.SomeChar (Data.Proxy.Proxy n)
 type GHC.TypeLits.SomeSymbol :: *
 data GHC.TypeLits.SomeSymbol
   = forall (n :: GHC.Types.Symbol).
@@ -26,13 +40,23 @@ data GHC.TypeLits.SomeSymbol
 type GHC.TypeLits.TypeError :: forall b.
                                GHC.TypeLits.ErrorMessage -> b
 type family GHC.TypeLits.TypeError a where
+type GHC.TypeLits.UnconsSymbol :: GHC.Types.Symbol
+                                  -> Maybe (Char, GHC.Types.Symbol)
+type family GHC.TypeLits.UnconsSymbol a
+GHC.TypeLits.charVal :: GHC.TypeLits.KnownChar n => proxy n -> Char
+GHC.TypeLits.charVal' ::
+  GHC.TypeLits.KnownChar n => GHC.Prim.Proxy# n -> Char
 GHC.TypeLits.natVal ::
   GHC.TypeNats.KnownNat n => proxy n -> Integer
 GHC.TypeLits.natVal' ::
   GHC.TypeNats.KnownNat n => GHC.Prim.Proxy# n -> Integer
+GHC.TypeLits.sameChar ::
+  (GHC.TypeLits.KnownChar a, GHC.TypeLits.KnownChar b) =>
+  proxy1 a -> proxy2 b -> Maybe (a Data.Type.Equality.:~: b)
 GHC.TypeLits.sameSymbol ::
   (GHC.TypeLits.KnownSymbol a, GHC.TypeLits.KnownSymbol b) =>
   proxy1 a -> proxy2 b -> Maybe (a Data.Type.Equality.:~: b)
+GHC.TypeLits.someCharVal :: Char -> GHC.TypeLits.SomeChar
 GHC.TypeLits.someNatVal :: Integer -> Maybe GHC.TypeNats.SomeNat
 GHC.TypeLits.someSymbolVal :: String -> GHC.TypeLits.SomeSymbol
 GHC.TypeLits.symbolVal ::
