@@ -83,7 +83,6 @@ module GHC.Types.Basic (
         Activation(..), isActive, competesWith,
         isNeverActive, isAlwaysActive, activeInFinalPhase,
         activateAfterInitial, activateDuringFinal,
-        finalPhase, isFinalPhase,
 
         RuleMatchInfo(..), isConLike, isFunLike,
         InlineSpec(..), noUserInlineSpec,
@@ -1332,7 +1331,8 @@ type PhaseNum = Int  -- Compilation phase
 data CompilerPhase
   = InitialPhase    -- The first phase -- number = infinity!
   | Phase PhaseNum  -- User-specificable phases
-  | FinalPhase
+  | FinalPhase      -- The last phase  -- number = -infinity!
+  deriving Eq
 
 instance Outputable CompilerPhase where
    ppr (Phase n)    = int n
@@ -1359,13 +1359,6 @@ activateAfterInitial = ActiveAfter NoSourceText 2
 activateDuringFinal :: Activation
 -- Active in the final simplification phase (which is repeated)
 activateDuringFinal = FinalActive
-
-finalPhase :: CompilerPhase
-finalPhase = FinalPhase
-
-isFinalPhase :: CompilerPhase -> Bool
-isFinalPhase FinalPhase = True
-isFinalPhase _          = False
 
 isActive :: CompilerPhase -> Activation -> Bool
 isActive InitialPhase act = activeInInitialPhase act

@@ -435,9 +435,9 @@ Conclusion:
     phase 0, the last user-visible phase.  That means that all
     rules will have had a chance to fire.
 
-    What phase is after phase 0?  Answer: finalPhase, phase (-1).
-    That's the reason finalPhase exists. NB: user's can't write
-    INLINE[-1] f; it's syntactically illegal.
+    What phase is after phase 0?  Answer: FinalPhase, that's the reason it
+    exists. NB: Similar to InitialPhase, users can't write INLINE[Final] f;
+    it's syntactically illegal.
 
   - Otherwise inline wrapper in phase 2.  That allows the
     'gentle' simplification pass to apply specialisation rules

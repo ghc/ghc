@@ -165,7 +165,7 @@ getCoreToDo dflags
 
     -- Run GHC's internal simplification phase, after all rules have run.
     -- See Note [Compiler phases] in GHC.Types.Basic
-    simplify name = simpl_phase finalPhase name max_iter
+    simplify name = simpl_phase FinalPhase name max_iter
 
     -- initial simplify: mk specialiser happy: minimum effort please
     simpl_gently = CoreDoSimplify max_iter
@@ -205,7 +205,7 @@ getCoreToDo dflags
      if opt_level == 0 then
        [ static_ptrs_float_outwards,
          CoreDoSimplify max_iter
-             (base_mode { sm_phase = finalPhase
+             (base_mode { sm_phase = FinalPhase
                         , sm_names = ["Non-opt simplification"] })
        ]
 
@@ -306,7 +306,7 @@ getCoreToDo dflags
 
         runWhen do_float_in CoreDoFloatInwards,
 
-        maybe_rule_check finalPhase,
+        maybe_rule_check FinalPhase,
 
                 -- Case-liberation for -O2.  This should be after
                 -- strictness analysis and the simplification which follows it.
@@ -319,7 +319,7 @@ getCoreToDo dflags
 
         runWhen spec_constr CoreDoSpecConstr,
 
-        maybe_rule_check finalPhase,
+        maybe_rule_check FinalPhase,
 
         runWhen late_specialise
           (CoreDoPasses [ CoreDoSpecialising
@@ -345,7 +345,7 @@ getCoreToDo dflags
         -- can become /exponentially/ more expensive. See #11731, #12996.
         runWhen (strictness || late_dmd_anal) CoreDoDemand,
 
-        maybe_rule_check finalPhase
+        maybe_rule_check FinalPhase
      ]
 
     -- Remove 'CoreDoNothing' and flatten 'CoreDoPasses' for clarity.

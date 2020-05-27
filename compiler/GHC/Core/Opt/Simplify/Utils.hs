@@ -1093,7 +1093,7 @@ seems to be to do a callSiteInline based on the fact that there is
 something interesting about the call site (it's strict).  Hmm.  That
 seems a bit fragile.
 
-Conclusion: inline top level things gaily until finalPhase (the last
+Conclusion: inline top level things gaily until FinalPhase (the last
 phase), at which point don't.
 
 Note [pre/postInlineUnconditionally in gentle mode]
@@ -1216,7 +1216,7 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
       -- not ticks.  Counting ticks cannot be duplicated, and non-counting
       -- ticks around a Lam will disappear anyway.
 
-    early_phase = not (isFinalPhase (sm_phase mode))
+    early_phase = sm_phase mode /= FinalPhase
     -- If we don't have this early_phase test, consider
     --      x = length [1,2,3]
     -- The full laziness pass carefully floats all the cons cells to
