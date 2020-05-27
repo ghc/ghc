@@ -25,7 +25,7 @@ import GHC.Types.Basic
 import GHC.Core.DataCon
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Core.Utils   ( exprIsHNF, dumpIdInfoOfProgram )
+import GHC.Core.Utils   ( dumpIdInfoOfProgram )
 import GHC.Core.TyCon
 import GHC.Core.Type
 import GHC.Core.Multiplicity
@@ -358,7 +358,7 @@ cprAnalBind top_lvl env widening args id rhs
 
     -- See Note [CPR for thunks]
     stays_thunk = is_thunk && not_strict
-    is_thunk    = not (exprIsHNF rhs) && not (isJoinId id)
+    is_thunk    = idArity id == 0 && not (isJoinId id)
     not_strict  = not (isStrictDmd (idDemandInfo id))
     -- See Note [CPR for sum types]
     (_, ret_ty) = splitPiTys (idType id)
