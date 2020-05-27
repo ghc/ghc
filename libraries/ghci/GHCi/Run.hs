@@ -6,7 +6,7 @@
 -- Execute GHCi messages.
 --
 -- For details on Remote GHCi, see Note [Remote GHCi] in
--- compiler/ghci/GHCi.hs.
+-- compiler/GHC/Runtime/Interpreter.hs.
 --
 module GHCi.Run
   ( run, redirectInterrupts
