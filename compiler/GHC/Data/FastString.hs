@@ -71,6 +71,7 @@ module GHC.Data.FastString
 
         -- ** Deconstruction
         unpackFS,           -- :: FastString -> String
+        unconsFS,           -- :: FastString -> Maybe (Char, FastString)
 
         -- ** Encoding
         zEncodeFS,
@@ -81,6 +82,7 @@ module GHC.Data.FastString
         nullFS,
         appendFS,
         headFS,
+        tailFS,
         concatFS,
         consFS,
         nilFS,
@@ -603,8 +605,18 @@ headFS fs
   | SBS.null $ fs_sbs fs = panic "headFS: Empty FastString"
 headFS fs = head $ unpackFS fs
 
+tailFS :: FastString -> FastString
+tailFS fs
+  | SBS.null $ fs_sbs fs = panic "tailFS: Empty FastString"
+tailFS fs = fsLit . tail . unpackFS $ fs
+
 consFS :: Char -> FastString -> FastString
 consFS c fs = mkFastString (c : unpackFS fs)
+
+unconsFS :: FastString -> Maybe (Char, FastString)
+unconsFS fs
+  | SBS.null $ fs_sbs fs = Nothing
+  | otherwise            = Just (headFS fs, tailFS fs)
 
 uniqueOfFS :: FastString -> Int
 uniqueOfFS fs = uniq fs

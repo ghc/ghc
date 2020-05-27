@@ -1767,6 +1767,7 @@ lintTyLit (NumTyLit n)
   | otherwise = failWithL msg
     where msg = text "Negative type literal:" <+> integer n
 lintTyLit (StrTyLit _) = return ()
+lintTyLit (CharTyLit _) = return ()
 
 lint_app :: SDoc -> LintedKind -> [LintedType] -> LintM ()
 -- (lint_app d fun_kind arg_tys)

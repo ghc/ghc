@@ -832,6 +832,9 @@ numTyLit n = if n >= 0 then pure (NumTyLit n)
 strTyLit :: Quote m => String -> m TyLit
 strTyLit s = pure (StrTyLit s)
 
+charTyLit :: Quote m => Char -> m TyLit
+charTyLit c = pure (CharTyLit c)
+
 -------------------------------------------------------------------------------
 -- *   Kind
 
