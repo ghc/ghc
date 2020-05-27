@@ -155,7 +155,7 @@ mkNoteObjsToLinkIntoBinary dflags dep_packages = do
 
       -- ALL generated assembly must have this section to disable
       -- executable stacks.  See also
-      -- compiler/nativeGen/AsmCodeGen.hs for another instance
+      -- compiler/GHC/CmmToAsm.hs for another instance
       -- where we need to do this.
       if platformHasGnuNonexecStack platform
         then text ".section .note.GNU-stack,\"\","
