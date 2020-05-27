@@ -247,12 +247,13 @@ basicKnownKeyNames
         typeLitSortTyConName,
         typeLitSymbolDataConName,
         typeLitNatDataConName,
+        typeLitCharDataConName,
         typeRepIdName,
         mkTrTypeName,
         mkTrConName,
         mkTrAppName,
         mkTrFunName,
-        typeSymbolTypeRepName, typeNatTypeRepName,
+        typeSymbolTypeRepName, typeNatTypeRepName, typeCharTypeRepName,
         trGhcPrimModuleName,
 
         -- KindReps for common cases
@@ -404,7 +405,7 @@ basicKnownKeyNames
         randomClassName, randomGenClassName, monadPlusClassName,
 
         -- Type-level naturals
-        knownNatClassName, knownSymbolClassName,
+        knownNatClassName, knownSymbolClassName, knownCharClassName,
 
         -- Overloaded labels
         isLabelClassName,
@@ -1305,10 +1306,12 @@ kindRepTypeLitDDataConName = dcQual gHC_TYPES     (fsLit "KindRepTypeLitD") kind
 typeLitSortTyConName
   , typeLitSymbolDataConName
   , typeLitNatDataConName
+  , typeLitCharDataConName
   :: Name
 typeLitSortTyConName     = tcQual gHC_TYPES       (fsLit "TypeLitSort")    typeLitSortTyConKey
 typeLitSymbolDataConName = dcQual gHC_TYPES       (fsLit "TypeLitSymbol")  typeLitSymbolDataConKey
 typeLitNatDataConName    = dcQual gHC_TYPES       (fsLit "TypeLitNat")     typeLitNatDataConKey
+typeLitCharDataConName   = dcQual gHC_TYPES       (fsLit "TypeLitChar")    typeLitCharDataConKey
 
 -- Class Typeable, and functions for constructing `Typeable` dictionaries
 typeableClassName
@@ -1322,6 +1325,7 @@ typeableClassName
   , typeRepIdName
   , typeNatTypeRepName
   , typeSymbolTypeRepName
+  , typeCharTypeRepName
   , trGhcPrimModuleName
   :: Name
 typeableClassName     = clsQual tYPEABLE_INTERNAL (fsLit "Typeable")       typeableClassKey
@@ -1335,6 +1339,7 @@ mkTrAppName           = varQual tYPEABLE_INTERNAL (fsLit "mkTrApp")        mkTrA
 mkTrFunName           = varQual tYPEABLE_INTERNAL (fsLit "mkTrFun")        mkTrFunKey
 typeNatTypeRepName    = varQual tYPEABLE_INTERNAL (fsLit "typeNatTypeRep") typeNatTypeRepKey
 typeSymbolTypeRepName = varQual tYPEABLE_INTERNAL (fsLit "typeSymbolTypeRep") typeSymbolTypeRepKey
+typeCharTypeRepName   = varQual tYPEABLE_INTERNAL (fsLit "typeCharTypeRep") typeCharTypeRepKey
 -- this is the Typeable 'Module' for GHC.Prim (which has no code, so we place in GHC.Types)
 -- See Note [Grand plan for Typeable] in GHC.Tc.Instance.Typeable.
 trGhcPrimModuleName   = varQual gHC_TYPES         (fsLit "tr$ModuleGHCPrim")  trGhcPrimModuleKey
@@ -1517,6 +1522,8 @@ knownNatClassName :: Name
 knownNatClassName     = clsQual gHC_TYPENATS (fsLit "KnownNat") knownNatClassNameKey
 knownSymbolClassName :: Name
 knownSymbolClassName  = clsQual gHC_TYPELITS (fsLit "KnownSymbol") knownSymbolClassNameKey
+knownCharClassName :: Name
+knownCharClassName  = clsQual gHC_TYPELITS (fsLit "KnownChar") knownCharClassNameKey
 
 -- Overloaded labels
 isLabelClassName :: Name
@@ -1673,23 +1680,26 @@ knownNatClassNameKey = mkPreludeClassUnique 42
 knownSymbolClassNameKey :: Unique
 knownSymbolClassNameKey = mkPreludeClassUnique 43
 
+knownCharClassNameKey :: Unique
+knownCharClassNameKey = mkPreludeClassUnique 44
+
 ghciIoClassKey :: Unique
-ghciIoClassKey = mkPreludeClassUnique 44
+ghciIoClassKey = mkPreludeClassUnique 45
 
 isLabelClassNameKey :: Unique
-isLabelClassNameKey = mkPreludeClassUnique 45
+isLabelClassNameKey = mkPreludeClassUnique 46
 
 semigroupClassKey, monoidClassKey :: Unique
-semigroupClassKey = mkPreludeClassUnique 46
-monoidClassKey    = mkPreludeClassUnique 47
+semigroupClassKey = mkPreludeClassUnique 47
+monoidClassKey    = mkPreludeClassUnique 48
 
 -- Implicit Parameters
 ipClassKey :: Unique
-ipClassKey = mkPreludeClassUnique 48
+ipClassKey = mkPreludeClassUnique 49
 
 -- Overloaded record fields
 hasFieldClassNameKey :: Unique
-hasFieldClassNameKey = mkPreludeClassUnique 49
+hasFieldClassNameKey = mkPreludeClassUnique 50
 
 
 ---------------- Template Haskell -------------------
@@ -1873,81 +1883,88 @@ uIntTyConKey    = mkPreludeTyConUnique 162
 uWordTyConKey   = mkPreludeTyConUnique 163
 
 -- Type-level naturals
-typeSymbolKindConNameKey,
+typeSymbolKindConNameKey, typeCharKindConNameKey,
   typeNatAddTyFamNameKey, typeNatMulTyFamNameKey, typeNatExpTyFamNameKey,
   typeNatLeqTyFamNameKey, typeNatSubTyFamNameKey
-  , typeSymbolCmpTyFamNameKey, typeNatCmpTyFamNameKey
+  , typeSymbolCmpTyFamNameKey, typeNatCmpTyFamNameKey, typeCharCmpTyFamNameKey
+  , typeLeqCharTyFamNameKey
   , typeNatDivTyFamNameKey
   , typeNatModTyFamNameKey
   , typeNatLogTyFamNameKey
+  , typeConsSymbolTyFamNameKey, typeUnconsSymbolTyFamNameKey
   :: Unique
 typeSymbolKindConNameKey  = mkPreludeTyConUnique 165
-typeNatAddTyFamNameKey    = mkPreludeTyConUnique 166
-typeNatMulTyFamNameKey    = mkPreludeTyConUnique 167
-typeNatExpTyFamNameKey    = mkPreludeTyConUnique 168
-typeNatLeqTyFamNameKey    = mkPreludeTyConUnique 169
-typeNatSubTyFamNameKey    = mkPreludeTyConUnique 170
-typeSymbolCmpTyFamNameKey = mkPreludeTyConUnique 171
-typeNatCmpTyFamNameKey    = mkPreludeTyConUnique 172
-typeNatDivTyFamNameKey  = mkPreludeTyConUnique 173
-typeNatModTyFamNameKey  = mkPreludeTyConUnique 174
-typeNatLogTyFamNameKey  = mkPreludeTyConUnique 175
+typeCharKindConNameKey    = mkPreludeTyConUnique 166
+typeNatAddTyFamNameKey    = mkPreludeTyConUnique 167
+typeNatMulTyFamNameKey    = mkPreludeTyConUnique 168
+typeNatExpTyFamNameKey    = mkPreludeTyConUnique 169
+typeNatLeqTyFamNameKey    = mkPreludeTyConUnique 170
+typeNatSubTyFamNameKey    = mkPreludeTyConUnique 171
+typeSymbolCmpTyFamNameKey = mkPreludeTyConUnique 172
+typeNatCmpTyFamNameKey    = mkPreludeTyConUnique 173
+typeCharCmpTyFamNameKey   = mkPreludeTyConUnique 174
+typeLeqCharTyFamNameKey   = mkPreludeTyConUnique 175
+typeNatDivTyFamNameKey  = mkPreludeTyConUnique 176
+typeNatModTyFamNameKey  = mkPreludeTyConUnique 177
+typeNatLogTyFamNameKey  = mkPreludeTyConUnique 178
+typeConsSymbolTyFamNameKey = mkPreludeTyConUnique 179
+typeUnconsSymbolTyFamNameKey = mkPreludeTyConUnique 180
 
 -- Custom user type-errors
 errorMessageTypeErrorFamKey :: Unique
-errorMessageTypeErrorFamKey =  mkPreludeTyConUnique 176
+errorMessageTypeErrorFamKey =  mkPreludeTyConUnique 181
 
 
 
 ntTyConKey:: Unique
-ntTyConKey = mkPreludeTyConUnique 177
+ntTyConKey = mkPreludeTyConUnique 182
 coercibleTyConKey :: Unique
-coercibleTyConKey = mkPreludeTyConUnique 178
+coercibleTyConKey = mkPreludeTyConUnique 183
 
 proxyPrimTyConKey :: Unique
-proxyPrimTyConKey = mkPreludeTyConUnique 179
+proxyPrimTyConKey = mkPreludeTyConUnique 184
 
 specTyConKey :: Unique
-specTyConKey = mkPreludeTyConUnique 180
+specTyConKey = mkPreludeTyConUnique 185
 
 anyTyConKey :: Unique
-anyTyConKey = mkPreludeTyConUnique 181
+anyTyConKey = mkPreludeTyConUnique 186
 
-smallArrayPrimTyConKey        = mkPreludeTyConUnique  182
-smallMutableArrayPrimTyConKey = mkPreludeTyConUnique  183
+smallArrayPrimTyConKey        = mkPreludeTyConUnique  187
+smallMutableArrayPrimTyConKey = mkPreludeTyConUnique  188
 
 staticPtrTyConKey  :: Unique
-staticPtrTyConKey  = mkPreludeTyConUnique 184
+staticPtrTyConKey  = mkPreludeTyConUnique 189
 
 staticPtrInfoTyConKey :: Unique
-staticPtrInfoTyConKey = mkPreludeTyConUnique 185
+staticPtrInfoTyConKey = mkPreludeTyConUnique 190
 
 callStackTyConKey :: Unique
-callStackTyConKey = mkPreludeTyConUnique 186
+callStackTyConKey = mkPreludeTyConUnique 191
 
 -- Typeables
 typeRepTyConKey, someTypeRepTyConKey, someTypeRepDataConKey :: Unique
-typeRepTyConKey       = mkPreludeTyConUnique 187
-someTypeRepTyConKey   = mkPreludeTyConUnique 188
-someTypeRepDataConKey = mkPreludeTyConUnique 189
+typeRepTyConKey       = mkPreludeTyConUnique 192
+someTypeRepTyConKey   = mkPreludeTyConUnique 193
+someTypeRepDataConKey = mkPreludeTyConUnique 194
 
 
 typeSymbolAppendFamNameKey :: Unique
-typeSymbolAppendFamNameKey = mkPreludeTyConUnique 190
+typeSymbolAppendFamNameKey = mkPreludeTyConUnique 195
 
 -- Unsafe equality
 unsafeEqualityTyConKey :: Unique
-unsafeEqualityTyConKey = mkPreludeTyConUnique 191
+unsafeEqualityTyConKey = mkPreludeTyConUnique 196
 
 -- Linear types
 multiplicityTyConKey :: Unique
-multiplicityTyConKey = mkPreludeTyConUnique 192
+multiplicityTyConKey = mkPreludeTyConUnique 197
 
 unrestrictedFunTyConKey :: Unique
-unrestrictedFunTyConKey = mkPreludeTyConUnique 193
+unrestrictedFunTyConKey = mkPreludeTyConUnique 198
 
 multMulTyConKey :: Unique
-multMulTyConKey = mkPreludeTyConUnique 194
+multMulTyConKey = mkPreludeTyConUnique 199
 
 ---------------- Template Haskell -------------------
 --      GHC.Builtin.Names.TH: USES TyConUniques 200-299
@@ -2112,19 +2129,20 @@ kindRepTYPEDataConKey     = mkPreludeDataConUnique 109
 kindRepTypeLitSDataConKey = mkPreludeDataConUnique 110
 kindRepTypeLitDDataConKey = mkPreludeDataConUnique 111
 
-typeLitSymbolDataConKey, typeLitNatDataConKey :: Unique
+typeLitSymbolDataConKey, typeLitNatDataConKey, typeLitCharDataConKey :: Unique
 typeLitSymbolDataConKey   = mkPreludeDataConUnique 112
 typeLitNatDataConKey      = mkPreludeDataConUnique 113
+typeLitCharDataConKey     = mkPreludeDataConUnique 114
 
 -- Unsafe equality
 unsafeReflDataConKey :: Unique
-unsafeReflDataConKey      = mkPreludeDataConUnique 114
+unsafeReflDataConKey      = mkPreludeDataConUnique 115
 
 -- Multiplicity
 
 oneDataConKey, manyDataConKey :: Unique
-oneDataConKey = mkPreludeDataConUnique 115
-manyDataConKey = mkPreludeDataConUnique 116
+oneDataConKey = mkPreludeDataConUnique 116
+manyDataConKey = mkPreludeDataConUnique 117
 
 -- ghc-bignum
 integerISDataConKey, integerINDataConKey, integerIPDataConKey,
@@ -2351,6 +2369,7 @@ mkTyConKey
   , mkTrFunKey
   , typeNatTypeRepKey
   , typeSymbolTypeRepKey
+  , typeCharTypeRepKey
   , typeRepIdKey
   :: Unique
 mkTyConKey            = mkPreludeMiscIdUnique 503
@@ -2359,8 +2378,9 @@ mkTrConKey            = mkPreludeMiscIdUnique 505
 mkTrAppKey            = mkPreludeMiscIdUnique 506
 typeNatTypeRepKey     = mkPreludeMiscIdUnique 507
 typeSymbolTypeRepKey  = mkPreludeMiscIdUnique 508
-typeRepIdKey          = mkPreludeMiscIdUnique 509
-mkTrFunKey            = mkPreludeMiscIdUnique 510
+typeCharTypeRepKey    = mkPreludeMiscIdUnique 509
+typeRepIdKey          = mkPreludeMiscIdUnique 510
+mkTrFunKey            = mkPreludeMiscIdUnique 511
 
 -- Representations for primitive types
 trTYPEKey
@@ -2368,10 +2388,10 @@ trTYPEKey
   , trRuntimeRepKey
   , tr'PtrRepLiftedKey
   :: Unique
-trTYPEKey              = mkPreludeMiscIdUnique 511
-trTYPE'PtrRepLiftedKey = mkPreludeMiscIdUnique 512
-trRuntimeRepKey        = mkPreludeMiscIdUnique 513
-tr'PtrRepLiftedKey     = mkPreludeMiscIdUnique 514
+trTYPEKey              = mkPreludeMiscIdUnique 512
+trTYPE'PtrRepLiftedKey = mkPreludeMiscIdUnique 513
+trRuntimeRepKey        = mkPreludeMiscIdUnique 514
+tr'PtrRepLiftedKey     = mkPreludeMiscIdUnique 515
 
 -- KindReps for common cases
 starKindRepKey, starArrStarKindRepKey, starArrStarArrStarKindRepKey :: Unique

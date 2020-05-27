@@ -2562,6 +2562,8 @@ data InjectivityAnn = InjectivityAnn Name [Name]
 
 data TyLit = NumTyLit Integer             -- ^ @2@
            | StrTyLit String              -- ^ @\"Hello\"@
+           | CharTyLit Char               -- ^ @\'C\'@
+           -- | @since 4.16.0.0
   deriving ( Show, Eq, Ord, Data, Generic )
 
 -- | Role annotations
