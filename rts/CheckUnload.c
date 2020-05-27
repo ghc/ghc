@@ -57,6 +57,8 @@
 // on.
 //
 
+static uint8_t object_code_mark_bit = 0;
+
 typedef struct {
     W_ start;
     W_ end;
@@ -64,18 +66,45 @@ typedef struct {
 } OCSectionIndex;
 
 typedef struct {
+    int capacity; // Doubled on resize
     int n_sections;
+    bool sorted; // Invalidated on insertion. Sorted in checkUnload.
     OCSectionIndex *indices;
 } OCSectionIndices;
 
-static OCSectionIndices *createOCSectionIndices(int n_sections)
+ObjectCode *objects = NULL; // Not static, used in Linker.c
+static ObjectCode *old_objects = NULL;
+static OCSectionIndices *global_s_indices = NULL; // TODO: Maybe use this directly below instead of passing as parameter?
+
+static OCSectionIndices *createOCSectionIndices(void)
 {
-    OCSectionIndices *s_indices;
-    s_indices = stgMallocBytes(sizeof(OCSectionIndices), "OCSectionIndices");
-    s_indices->n_sections = n_sections;
-    s_indices->indices = stgMallocBytes(n_sections*sizeof(OCSectionIndex),
+    // TODO (osa): Maybe initialize as empty (without allocation) and allocate
+    // on first insertion?
+    OCSectionIndices *s_indices = stgMallocBytes(sizeof(OCSectionIndices), "OCSectionIndices");
+    int capacity = 1024;
+    s_indices->capacity = capacity;
+    s_indices->n_sections = 0;
+    s_indices->sorted = true;
+    s_indices->indices = stgMallocBytes(capacity * sizeof(OCSectionIndex),
         "OCSectionIndices::indices");
     return s_indices;
+}
+
+static void freeOCSectionIndices(OCSectionIndices *s_indices)
+{
+    free(s_indices->indices);
+    free(s_indices);
+}
+
+void initUnloadCheck()
+{
+    global_s_indices = createOCSectionIndices();
+}
+
+void exitUnloadCheck()
+{
+    freeOCSectionIndices(global_s_indices);
+    global_s_indices = NULL;
 }
 
 static int cmpSectionIndex(const void* indexa, const void *indexb)
@@ -90,41 +119,84 @@ static int cmpSectionIndex(const void* indexa, const void *indexb)
     return 0;
 }
 
-static OCSectionIndices* buildOCSectionIndices(ObjectCode *ocs)
+static void reserveOCSectionIndices(OCSectionIndices *s_indices, int len)
 {
-    int cnt_sections = 0;
-    ObjectCode *oc;
-    for (oc = ocs; oc; oc = oc->next) {
-        cnt_sections += oc->n_sections;
+    int current_capacity = s_indices->capacity;
+    int current_len = s_indices->n_sections;
+    if (current_capacity - current_len >= len) {
+        return;
     }
-    OCSectionIndices* s_indices = createOCSectionIndices(cnt_sections);
-    int s_i = 0, i;
-    for (oc = ocs; oc; oc = oc->next) {
-        for (i = 0; i < oc->n_sections; i++) {
-            if (oc->sections[i].kind != SECTIONKIND_OTHER) {
-                s_indices->indices[s_i].start = (W_)oc->sections[i].start;
-                s_indices->indices[s_i].end = (W_)oc->sections[i].start
-                    + oc->sections[i].size;
-                s_indices->indices[s_i].oc = oc;
-                s_i++;
-            }
+
+    // Round up to nearest power of 2
+    int new_capacity = (int)pow(2, ceil(log2(current_len + len)));
+
+    OCSectionIndex *old_indices = s_indices->indices;
+    OCSectionIndex *new_indices = stgMallocBytes(new_capacity * sizeof(OCSectionIndex),
+        "reserveOCSectionIndices");
+
+    for (int i = 0; i < current_len; ++i) {
+        new_indices[i] = old_indices[i];
+    }
+
+    s_indices->capacity = new_capacity;
+    s_indices->indices = new_indices;
+
+    free(old_indices);
+}
+
+// Insert object section indices of a single ObjectCode. Invalidates 'sorted'
+// state.
+void insertOCSectionIndices(ObjectCode *oc)
+{
+    reserveOCSectionIndices(global_s_indices, oc->n_sections);
+    global_s_indices->sorted = false;
+
+    int s_i = global_s_indices->n_sections;
+    for (int i = 0; i < oc->n_sections; i++) {
+        if (oc->sections[i].kind != SECTIONKIND_OTHER) {
+            global_s_indices->indices[s_i].start = (W_)oc->sections[i].start;
+            global_s_indices->indices[s_i].end = (W_)oc->sections[i].start
+                + oc->sections[i].size;
+            global_s_indices->indices[s_i].oc = oc;
+            s_i++;
         }
     }
-    s_indices->n_sections = s_i;
+
+    global_s_indices->n_sections = s_i;
+
+    // Add object to 'objects' list
+    if (objects != NULL) {
+        objects->prev = oc;
+    }
+    oc->next = objects;
+    objects = oc;
+}
+
+/* TODO
+static void removeOCSectionIndices(OCSectionIndices *s_indices, ObjectCode *oc)
+{
+    (void)s_indices;
+    (void)oc;
+    // TODO
+}
+*/
+
+static void sortOCSectionIndices(OCSectionIndices *s_indices) {
+    if (s_indices->sorted) {
+        return;
+    }
+
     qsort(s_indices->indices,
         s_indices->n_sections,
         sizeof(OCSectionIndex),
         cmpSectionIndex);
-    return s_indices;
-}
 
-static void freeOCSectionIndices(OCSectionIndices *section_indices)
-{
-    free(section_indices->indices);
-    free(section_indices);
+    s_indices->sorted = true;
 }
 
 static ObjectCode *findOC(OCSectionIndices *s_indices, const void *addr) {
+    ASSERT(s_indices->sorted);
+
     W_ w_addr = (W_)addr;
     if (s_indices->n_sections <= 0) return NULL;
     if (w_addr < s_indices->indices[0].start) return NULL;
@@ -146,27 +218,58 @@ static ObjectCode *findOC(OCSectionIndices *s_indices, const void *addr) {
     return NULL;
 }
 
-static void checkAddress (HashTable *addrs, const void *addr,
-        OCSectionIndices *s_indices)
-{
-    if (!lookupHashTable(addrs, (W_)addr)) {
-        insertHashTable(addrs, (W_)addr, addr);
+static bool markObjectLive(void *data STG_UNUSED, StgWord key, const void *value STG_UNUSED) {
+    ObjectCode *oc = (ObjectCode*)key;
+    if (oc->mark == object_code_mark_bit) {
+        return true; // for hash table iteration
+    }
 
-        ObjectCode *oc = findOC(s_indices, addr);
-        if (oc != NULL) {
-            oc->referenced = 1;
-            return;
-        }
+    oc->mark = object_code_mark_bit;
+    // Remove from 'old_objects' list
+    if (oc->prev != NULL) {
+        // TODO(osa): Maybe 'prev' should be a pointer to the referencing
+        // field?
+        oc->prev->next = oc->next;
+    } else {
+        old_objects = oc->next;
+    }
+    if (oc->next != NULL) {
+        oc->next->prev = oc->prev;
+    }
+
+    // Add it to 'objects' list
+    oc->prev = NULL;
+    oc->next = objects;
+    if (objects != NULL) {
+        objects->prev = oc;
+    }
+    objects = oc;
+
+    // Mark its dependencies
+    iterHashTable(oc->dependencies, NULL, markObjectLive);
+
+    return true; // for hash table iteration
+}
+
+static void checkAddress (const void *addr, OCSectionIndices *s_indices)
+{
+    if (HEAP_ALLOCED(addr)) {
+        return;
+    }
+
+    ObjectCode *oc = findOC(s_indices, addr);
+    if (oc != NULL) {
+        // Mark the object code and its dependencies
+        markObjectLive(NULL, (W_)oc, NULL);
     }
 }
 
 static StgPtr
-search_small_bitmap (HashTable *addrs, StgPtr p, StgWord size, StgWord bitmap,
-        OCSectionIndices *s_indices)
+search_small_bitmap (StgPtr p, StgWord size, StgWord bitmap, OCSectionIndices *s_indices)
 {
     while (size > 0) {
         if ((bitmap & 1) == 0) {
-            checkAddress(addrs, (void*)*p, s_indices);
+            checkAddress((void*)*p, s_indices);
         }
         p++;
         bitmap = bitmap >> 1;
@@ -175,28 +278,22 @@ search_small_bitmap (HashTable *addrs, StgPtr p, StgWord size, StgWord bitmap,
     return p;
 }
 
-typedef struct {
-    HashTable *addrs;
-    OCSectionIndices *s_indices;
-} SearchArgs;
-
 static void
-search_payload_loc(StgClosure **p, void *args_)
+search_payload_loc(StgClosure **p, void *s_indices_)
 {
-    SearchArgs *args = (SearchArgs*)args_;
-    checkAddress(args->addrs, *p, args->s_indices);
+    OCSectionIndices *s_indices = (OCSectionIndices*)s_indices_;
+    checkAddress(*p, s_indices);
 }
 
 static void
-search_large_bitmap (HashTable *addrs, StgPtr p, StgLargeBitmap *large_bitmap, StgWord size,
+search_large_bitmap (StgPtr p, StgLargeBitmap *large_bitmap, StgWord size,
         OCSectionIndices *s_indices)
 {
-    SearchArgs args = { .addrs = addrs, .s_indices = s_indices };
-    walk_large_bitmap(search_payload_loc, (StgClosure**)p, large_bitmap, size, &args);
+    walk_large_bitmap(search_payload_loc, (StgClosure**)p, large_bitmap, size, (void*)s_indices);
 }
 
 static void
-search_PAP_payload (HashTable *addrs, StgClosure *fun, StgClosure **payload, StgWord size,
+search_PAP_payload (StgClosure *fun, StgClosure **payload, StgWord size,
         OCSectionIndices *s_indices)
 {
     const StgFunInfoTable *fun_info = get_fun_itbl(UNTAG_CONST_CLOSURE(fun));
@@ -208,21 +305,21 @@ search_PAP_payload (HashTable *addrs, StgClosure *fun, StgClosure **payload, Stg
         bitmap = BITMAP_BITS(fun_info->f.b.bitmap);
         goto small_bitmap;
     case ARG_GEN_BIG:
-        search_large_bitmap(addrs, p, GET_FUN_LARGE_BITMAP(fun_info), size, s_indices);
+        search_large_bitmap(p, GET_FUN_LARGE_BITMAP(fun_info), size, s_indices);
         break;
     case ARG_BCO:
-        search_large_bitmap(addrs, (StgPtr)payload, BCO_BITMAP(fun), size, s_indices);
+        search_large_bitmap((StgPtr)payload, BCO_BITMAP(fun), size, s_indices);
         break;
     default:
         bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
     small_bitmap:
-        search_small_bitmap(addrs, p, size, bitmap, s_indices);
+        search_small_bitmap(p, size, bitmap, s_indices);
         break;
     }
 }
 
 static StgPtr
-search_arg_block (HashTable *addrs, const StgFunInfoTable *fun_info, StgClosure **args,
+search_arg_block (const StgFunInfoTable *fun_info, StgClosure **args,
         OCSectionIndices *s_indices)
 {
     StgWord bitmap;
@@ -236,20 +333,20 @@ search_arg_block (HashTable *addrs, const StgFunInfoTable *fun_info, StgClosure 
         goto small_bitmap;
     case ARG_GEN_BIG:
         size = GET_FUN_LARGE_BITMAP(fun_info)->size;
-        search_large_bitmap(addrs, p, GET_FUN_LARGE_BITMAP(fun_info), size, s_indices);
+        search_large_bitmap(p, GET_FUN_LARGE_BITMAP(fun_info), size, s_indices);
         p += size;
         break;
     default:
         bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
         size = BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]);
     small_bitmap:
-        p = search_small_bitmap(addrs, p, size, bitmap, s_indices);
+        p = search_small_bitmap(p, size, bitmap, s_indices);
         break;
     }
     return p;
 }
 
-static void searchStackChunk (HashTable *addrs, StgPtr p, StgPtr stack_end,
+static void searchStackChunk (StgPtr p, StgPtr stack_end,
         OCSectionIndices *s_indices)
 {
     StgWord bitmap;
@@ -263,7 +360,7 @@ static void searchStackChunk (HashTable *addrs, StgPtr p, StgPtr stack_end,
         case UPDATE_FRAME:
         {
             StgUpdateFrame *frame = (StgUpdateFrame *)p;
-            checkAddress(addrs, frame->updatee, s_indices);
+            checkAddress(frame->updatee, s_indices);
             p += sizeofW(StgUpdateFrame);
             continue;
         }
@@ -280,18 +377,18 @@ static void searchStackChunk (HashTable *addrs, StgPtr p, StgPtr stack_end,
             bitmap = BITMAP_BITS(info->i.layout.bitmap);
             size   = BITMAP_SIZE(info->i.layout.bitmap);
             p++;
-            p = search_small_bitmap(addrs, p, size, bitmap, s_indices);
+            p = search_small_bitmap(p, size, bitmap, s_indices);
             continue;
         }
 
         case RET_BCO:
         {
             p++;
-            checkAddress(addrs, (void*)*p, s_indices);
+            checkAddress((void*)*p, s_indices);
             StgBCO *bco = (StgBCO *)*p;
             p++;
             StgWord size = BCO_BITMAP_SIZE(bco);
-            search_large_bitmap(addrs, p, BCO_BITMAP(bco), size, s_indices);
+            search_large_bitmap(p, BCO_BITMAP(bco), size, s_indices);
             p += size;
             continue;
         }
@@ -301,7 +398,7 @@ static void searchStackChunk (HashTable *addrs, StgPtr p, StgPtr stack_end,
         {
             StgWord size = GET_LARGE_BITMAP(&info->i)->size;
             p++;
-            search_large_bitmap(addrs, p, GET_LARGE_BITMAP(&info->i), size, s_indices);
+            search_large_bitmap(p, GET_LARGE_BITMAP(&info->i), size, s_indices);
             p += size;
             continue;
         }
@@ -309,9 +406,9 @@ static void searchStackChunk (HashTable *addrs, StgPtr p, StgPtr stack_end,
         case RET_FUN:
         {
             StgRetFun *ret_fun = (StgRetFun *)p;
-            checkAddress(addrs, ret_fun->fun, s_indices);
+            checkAddress(ret_fun->fun, s_indices);
             const StgFunInfoTable *fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
-            p = search_arg_block(addrs, fun_info, ret_fun->payload, s_indices);
+            p = search_arg_block(fun_info, ret_fun->payload, s_indices);
             continue;
         }
 
@@ -321,8 +418,7 @@ static void searchStackChunk (HashTable *addrs, StgPtr p, StgPtr stack_end,
     }
 }
 
-static void searchHeapBlock (HashTable *addrs, StgPtr p, StgPtr end,
-        OCSectionIndices *s_indices)
+static void searchHeapBlock (StgPtr p, StgPtr end, OCSectionIndices *s_indices)
 {
     while (p < end) {
         StgClosure *c = (StgClosure*)p;
@@ -332,7 +428,7 @@ static void searchHeapBlock (HashTable *addrs, StgPtr p, StgPtr end,
         // NOTE: This call could be omitted for info tables that we know
         // can't be created by GHCi, e.g. MUT_VARs, ARR_WORDs etc. I'm not
         // sure if it's worth optimizing this.
-        checkAddress(addrs, info, s_indices);
+        checkAddress(info, s_indices);
 
         // NOTE: No need to check SRTs below because we can't refer to a
         // dynamically loaded object from SRTs.
@@ -364,7 +460,7 @@ static void searchHeapBlock (HashTable *addrs, StgPtr p, StgPtr end,
         case BLOCKING_QUEUE:
         {
             for (W_ i = 0; i < info->layout.payload.ptrs; ++i) {
-                checkAddress(addrs, c->payload[i], s_indices);
+                checkAddress(c->payload[i], s_indices);
             }
             size = closure_sizeW(c);
             break;
@@ -381,7 +477,7 @@ static void searchHeapBlock (HashTable *addrs, StgPtr p, StgPtr end,
         {
             StgThunk *thunk = (StgThunk*)c;
             for (W_ i = 0; i < info->layout.payload.ptrs; ++i) {
-                checkAddress(addrs, thunk->payload[i], s_indices);
+                checkAddress(thunk->payload[i], s_indices);
             }
             size = closure_sizeW(c);
             break;
@@ -400,7 +496,7 @@ static void searchHeapBlock (HashTable *addrs, StgPtr p, StgPtr end,
         {
             StgMutArrPtrs *a = (StgMutArrPtrs*)c;
             for (W_ i = 0; i < a->ptrs; ++i) {
-                checkAddress(addrs, a->payload[i], s_indices);
+                checkAddress(a->payload[i], s_indices);
             }
             size = mut_arr_ptrs_sizeW(a);
             break;
@@ -413,7 +509,7 @@ static void searchHeapBlock (HashTable *addrs, StgPtr p, StgPtr end,
         {
             StgSmallMutArrPtrs *a = (StgSmallMutArrPtrs*)c;
             for (W_ i = 0; i < a->ptrs; ++i) {
-                checkAddress(addrs, a->payload[i], s_indices);
+                checkAddress(a->payload[i], s_indices);
             }
             size = small_mut_arr_ptrs_sizeW(a);
             break;
@@ -424,15 +520,15 @@ static void searchHeapBlock (HashTable *addrs, StgPtr p, StgPtr end,
             StgTSO *tso = (StgTSO*)c;
 
             if (tso->bound != NULL) {
-                checkAddress(addrs, tso->bound->tso, s_indices);
+                checkAddress(tso->bound->tso, s_indices);
             }
 
-            checkAddress(addrs, tso->blocked_exceptions, s_indices);
-            checkAddress(addrs, tso->bq, s_indices);
-            checkAddress(addrs, tso->trec, s_indices);
-            checkAddress(addrs, tso->stackobj, s_indices);
-            checkAddress(addrs, tso->_link, s_indices);
-            checkAddress(addrs, tso->block_info.closure, s_indices);
+            checkAddress(tso->blocked_exceptions, s_indices);
+            checkAddress(tso->bq, s_indices);
+            checkAddress(tso->trec, s_indices);
+            checkAddress(tso->stackobj, s_indices);
+            checkAddress(tso->_link, s_indices);
+            checkAddress(tso->block_info.closure, s_indices);
 
             size = sizeofW(StgTSO);
             break;
@@ -441,7 +537,7 @@ static void searchHeapBlock (HashTable *addrs, StgPtr p, StgPtr end,
         case STACK:
         {
             StgStack *stack = (StgStack*)c;
-            searchStackChunk(addrs, stack->sp, stack->stack + stack->stack_size, s_indices);
+            searchStackChunk(stack->sp, stack->stack + stack->stack_size, s_indices);
             size = stack_sizeW(stack);
             break;
         }
@@ -449,10 +545,10 @@ static void searchHeapBlock (HashTable *addrs, StgPtr p, StgPtr end,
         case WEAK:
         {
             StgWeak *w = (StgWeak*)c;
-            checkAddress(addrs, w->value, s_indices);
-            checkAddress(addrs, w->key, s_indices);
-            checkAddress(addrs, w->finalizer, s_indices);
-            checkAddress(addrs, w->cfinalizers, s_indices);
+            checkAddress(w->value, s_indices);
+            checkAddress(w->key, s_indices);
+            checkAddress(w->finalizer, s_indices);
+            checkAddress(w->cfinalizers, s_indices);
             size = closure_sizeW(c);
             break;
         }
@@ -460,8 +556,8 @@ static void searchHeapBlock (HashTable *addrs, StgPtr p, StgPtr end,
         case AP_STACK:
         {
             StgAP_STACK *ap = (StgAP_STACK*)c;
-            checkAddress(addrs, ap->fun, s_indices);
-            searchStackChunk(addrs, (StgPtr)ap->payload, (StgPtr)ap->payload + ap->size, s_indices);
+            checkAddress(ap->fun, s_indices);
+            searchStackChunk((StgPtr)ap->payload, (StgPtr)ap->payload + ap->size, s_indices);
             size = ap_stack_sizeW(ap);
             break;
         }
@@ -469,8 +565,8 @@ static void searchHeapBlock (HashTable *addrs, StgPtr p, StgPtr end,
         case PAP:
         {
             StgPAP *pap = (StgPAP*)c;
-            checkAddress(addrs, pap->fun, s_indices);
-            search_PAP_payload(addrs, pap->fun, pap->payload, pap->n_args, s_indices);
+            checkAddress(pap->fun, s_indices);
+            search_PAP_payload(pap->fun, pap->payload, pap->n_args, s_indices);
             size = closure_sizeW(c);
             break;
         }
@@ -478,8 +574,8 @@ static void searchHeapBlock (HashTable *addrs, StgPtr p, StgPtr end,
         case AP:
         {
             StgAP *ap = (StgAP*)c;
-            checkAddress(addrs, ap->fun, s_indices);
-            search_PAP_payload(addrs, ap->fun, ap->payload, ap->n_args, s_indices);
+            checkAddress(ap->fun, s_indices);
+            search_PAP_payload(ap->fun, ap->payload, ap->n_args, s_indices);
             size = closure_sizeW(c);
             break;
         }
@@ -488,7 +584,7 @@ static void searchHeapBlock (HashTable *addrs, StgPtr p, StgPtr end,
         case IND_STATIC: // TODO: skip this?
         case BLACKHOLE:
         {
-            checkAddress(addrs, ((StgInd*)c)->indirectee, s_indices);
+            checkAddress(((StgInd*)c)->indirectee, s_indices);
             size = closure_sizeW(c);
             break;
         }
@@ -497,11 +593,11 @@ static void searchHeapBlock (HashTable *addrs, StgPtr p, StgPtr end,
         {
             StgTRecChunk *tc = ((StgTRecChunk *) p);
             TRecEntry *e = &(tc -> entries[0]);
-            checkAddress(addrs, tc->prev_chunk, s_indices);
+            checkAddress(tc->prev_chunk, s_indices);
             for (W_ i = 0; i < tc -> next_entry_idx; i ++, e++) {
-                checkAddress(addrs, e->tvar, s_indices);
-                checkAddress(addrs, e->expected_value, s_indices);
-                checkAddress(addrs, e->new_value, s_indices);
+                checkAddress(e->tvar, s_indices);
+                checkAddress(e->expected_value, s_indices);
+                checkAddress(e->new_value, s_indices);
             }
             size = sizeofW(StgTRecChunk);
             break;
@@ -513,7 +609,7 @@ static void searchHeapBlock (HashTable *addrs, StgPtr p, StgPtr end,
             for (StgCompactNFDataBlock *block = compactGetFirstBlock(str); block; block = block->next) {
                 bdescr *bd = Bdescr((P_)block);
                 StgPtr start = bd->start + sizeofW(StgCompactNFDataBlock);
-                searchHeapBlock(addrs, start, bd->free, s_indices);
+                searchHeapBlock(start, bd->free, s_indices);
             }
             size = sizeofW(StgCompactNFData);
             break;
@@ -527,8 +623,7 @@ static void searchHeapBlock (HashTable *addrs, StgPtr p, StgPtr end,
     }
 }
 
-static void searchHeapBlocks (HashTable *addrs, bdescr *bd,
-        OCSectionIndices *s_indices)
+static void searchHeapBlocks (bdescr *bd, OCSectionIndices *s_indices)
 {
     for (; bd != NULL; bd = bd->link) {
 
@@ -538,7 +633,7 @@ static void searchHeapBlocks (HashTable *addrs, bdescr *bd,
             continue;
         }
 
-        searchHeapBlock(addrs, bd->start, bd->free, s_indices);
+        searchHeapBlock(bd->start, bd->free, s_indices);
     }
 }
 
@@ -547,47 +642,17 @@ static void searchHeapBlocks (HashTable *addrs, bdescr *bd,
 // Do not unload the object if the CCS tree refers to a CCS or CC which
 // originates in the object.
 //
-static void searchCostCentres (HashTable *addrs, CostCentreStack *ccs,
-        OCSectionIndices* s_indices)
+static void searchCostCentres (CostCentreStack *ccs, OCSectionIndices* s_indices)
 {
-    checkAddress(addrs, ccs, s_indices);
-    checkAddress(addrs, ccs->cc, s_indices);
+    checkAddress(ccs, s_indices);
+    checkAddress(ccs->cc, s_indices);
     for (IndexTable *i = ccs->indexTable; i != NULL; i = i->next) {
         if (!i->back_edge) {
-            searchCostCentres(addrs, i->ccs, s_indices);
+            searchCostCentres(i->ccs, s_indices);
         }
     }
 }
 #endif
-
-static bool
-check_dependent_referenced(void *data, StgWord key, const void *value STG_UNUSED)
-{
-    ObjectCode *oc = (ObjectCode*)key;
-    bool *any_referenced = (bool*)data;
-
-    if (oc->referenced) {
-        *any_referenced = true;
-        // Stop
-        return false;
-    } else {
-        // Continue
-        return true;
-    }
-}
-
-static bool
-oc_referenced(ObjectCode *oc)
-{
-    if (oc->referenced) {
-        return true;
-    }
-
-    bool any_referenced = false;
-    iterHashTable(oc->dependents, &any_referenced, check_dependent_referenced);
-
-    return any_referenced;
-}
 
 //
 // Check whether we can unload any object code.  This is called at the
@@ -600,84 +665,81 @@ oc_referenced(ObjectCode *oc)
 //
 void checkUnload (StgClosure *static_objects)
 {
-  if (unloaded_objects == NULL) return;
+    OCSectionIndices *s_indices = global_s_indices;
+    sortOCSectionIndices(s_indices);
 
-  ACQUIRE_LOCK(&linker_unloaded_mutex);
+    object_code_mark_bit = ~object_code_mark_bit;
 
-  OCSectionIndices *s_indices = buildOCSectionIndices(unloaded_objects);
-  // Mark every unloadable object as unreferenced initially
-  for (ObjectCode *oc = unloaded_objects; oc; oc = oc->next) {
-      IF_DEBUG(linker, debugBelch("Checking whether to unload %" PATH_FMT "\n",
-                                  oc->fileName));
-      oc->referenced = false;
-  }
+    // TODO (osa): Do we need to take linker_mutex here? I think not -- unloadObj
+    // no longer uses linker state (it was using unloaded_objects before)
 
-  HashTable *addrs = allocHashTable();
+    StgClosure *link = NULL;
+    for (StgClosure *p = static_objects; p != END_OF_STATIC_OBJECT_LIST; p = link) {
+        p = UNTAG_STATIC_LIST_PTR(p);
+        checkAddress(p, s_indices);
+        const StgInfoTable *info = get_itbl(p);
+        checkAddress(info, s_indices);
+        link = *STATIC_LINK(info, p);
+    }
 
-  StgClosure *link = NULL;
-  for (StgClosure *p = static_objects; p != END_OF_STATIC_OBJECT_LIST; p = link) {
-      p = UNTAG_STATIC_LIST_PTR(p);
-      checkAddress(addrs, p, s_indices);
-      const StgInfoTable *info = get_itbl(p);
-      checkAddress(addrs, info, s_indices);
-      link = *STATIC_LINK(info, p);
-  }
+    // CAFs on revertible_caf_list are not on static_objects
+    for (StgClosure *p = (StgClosure*)revertible_caf_list;
+            p != END_OF_CAF_LIST;
+            p = ((StgIndStatic *)p)->static_link) {
+        p = UNTAG_STATIC_LIST_PTR(p);
+        checkAddress(p, s_indices);
+    }
 
-  // CAFs on revertible_caf_list are not on static_objects
-  for (StgClosure *p = (StgClosure*)revertible_caf_list;
-       p != END_OF_CAF_LIST;
-       p = ((StgIndStatic *)p)->static_link) {
-      p = UNTAG_STATIC_LIST_PTR(p);
-      checkAddress(addrs, p, s_indices);
-  }
+    for (uint32_t g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        searchHeapBlocks(generations[g].blocks, s_indices);
+        searchHeapBlocks(generations[g].large_objects, s_indices);
 
-  for (uint32_t g = 0; g < RtsFlags.GcFlags.generations; g++) {
-      searchHeapBlocks(addrs, generations[g].blocks, s_indices);
-      searchHeapBlocks(addrs, generations[g].large_objects, s_indices);
-
-      for (uint32_t n = 0; n < n_capabilities; n++) {
-          gen_workspace *ws = &gc_threads[n]->gens[g];
-          searchHeapBlocks(addrs, ws->todo_bd, s_indices);
-          searchHeapBlocks(addrs, ws->part_list, s_indices);
-          searchHeapBlocks(addrs, ws->scavd_list, s_indices);
-      }
-  }
+        for (uint32_t n = 0; n < n_capabilities; n++) {
+            gen_workspace *ws = &gc_threads[n]->gens[g];
+            searchHeapBlocks(ws->todo_bd, s_indices);
+            searchHeapBlocks(ws->part_list, s_indices);
+            searchHeapBlocks(ws->scavd_list, s_indices);
+        }
+    }
 
 #if defined(PROFILING)
-  /* Traverse the cost centre tree, calling checkAddress on each CCS/CC */
-  searchCostCentres(addrs, CCS_MAIN, s_indices);
+    /* Traverse the cost centre tree, calling checkAddress on each CCS/CC */
+    searchCostCentres(CCS_MAIN, s_indices);
 
-  /* Also check each cost centre in the CC_LIST */
-  for (CostCentre *cc = CC_LIST; cc != NULL; cc = cc->link) {
-      checkAddress(addrs, cc, s_indices);
-  }
+    /* Also check each cost centre in the CC_LIST */
+    for (CostCentre *cc = CC_LIST; cc != NULL; cc = cc->link) {
+        checkAddress(cc, s_indices);
+    }
 #endif /* PROFILING */
 
-  freeOCSectionIndices(s_indices);
-  // Look through the unloadable objects, and any object that is still
-  // marked as unreferenced can be physically unloaded, because we
-  // have no references to it.
-  ObjectCode *prev = NULL;
-  ObjectCode *next = NULL;
-  for (ObjectCode *oc = unloaded_objects; oc; oc = next) {
-      next = oc->next;
-      if (oc_referenced(oc) == false) {
-          if (prev == NULL) {
-              unloaded_objects = oc->next;
-          } else {
-              prev->next = oc->next;
-          }
-          IF_DEBUG(linker, debugBelch("Unloading object file %" PATH_FMT "\n",
-                                      oc->fileName));
-          freeObjectCode(oc);
-      } else {
-          IF_DEBUG(linker, debugBelch("Object file still in use: %"
-                                      PATH_FMT "\n", oc->fileName));
-          prev = oc;
-      }
-  }
 
-  freeHashTable(addrs, NULL);
+/*
 
-  RELEASE_LOCK(&linker_unloaded_mutex);
+    TODO: Free stuff in old_objects
+    // Look through the unloadable objects, and any object that is still
+    // marked as unreferenced can be physically unloaded, because we
+    // have no references to it.
+    ObjectCode *prev = NULL;
+    ObjectCode *next = NULL;
+    for (ObjectCode *oc = unloaded_objects; oc; oc = next) {
+        next = oc->next;
+        if (oc_referenced(oc) == false) {
+            if (prev == NULL) {
+                unloaded_objects = oc->next;
+            } else {
+                prev->next = oc->next;
+            }
+            IF_DEBUG(linker, debugBelch("Unloading object file %" PATH_FMT "\n",
+                        oc->fileName));
+            freeObjectCode(oc);
+        } else {
+            IF_DEBUG(linker, debugBelch("Object file still in use: %"
+                        PATH_FMT "\n", oc->fileName));
+            prev = oc;
+        }
+    }
+*/
+
+
+    RELEASE_LOCK(&linker_unloaded_mutex);
 }

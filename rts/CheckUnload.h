@@ -12,6 +12,16 @@
 
 #include "BeginPrivate.h"
 
-void checkUnload (StgClosure *static_objects);
+#include "LinkerInternals.h"
+
+// Current loaded objects
+extern ObjectCode *objects;
+
+void initUnloadCheck(void);
+void exitUnloadCheck(void);
+void checkUnload(StgClosure *static_objects);
+
+// Call on loaded object codes
+void insertOCSectionIndices(ObjectCode *oc);
 
 #include "EndPrivate.h"

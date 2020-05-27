@@ -31,6 +31,7 @@
 #include "linker/CacheFlush.h"
 #include "linker/SymbolExtras.h"
 #include "PathUtils.h"
+#include "CheckUnload.h" // createOCSectionIndices
 
 #if !defined(mingw32_HOST_OS)
 #include "posix/Signals.h"
@@ -160,23 +161,9 @@
  */
 StrHashTable *symhash;
 
-/* List of currently loaded objects */
-ObjectCode *objects = NULL;     /* initially empty */
-
-/* List of objects that have been unloaded via unloadObj(), but are waiting
-   to be actually freed via checkUnload() */
-ObjectCode *unloaded_objects = NULL; /* initially empty */
-
 #if defined(THREADED_RTS)
-/* This protects all the Linker's global state except unloaded_objects */
+/* This protects all the Linker's global state */
 Mutex linker_mutex;
-/*
- * This protects unloaded_objects.  We have a separate mutex for this, because
- * the GC needs to access unloaded_objects in checkUnload, while the linker only
- * needs to access unloaded_objects in unloadObj(), so this allows most linker
- * operations proceed concurrently with the GC.
- */
-Mutex linker_unloaded_mutex;
 #endif
 
 /* Generic wrapper function to try and Resolve and RunInit oc files */
@@ -434,8 +421,7 @@ initLinker_ (int retain_cafs)
         linker_init_done = 1;
     }
 
-    objects = NULL;
-    unloaded_objects = NULL;
+    initUnloadCheck();
 
 #if defined(THREADED_RTS)
     initMutex(&linker_mutex);
@@ -525,6 +511,7 @@ exitLinker( void ) {
 #endif
    if (linker_init_done == 1) {
        freeStrHashTable(symhash, free);
+       exitUnloadCheck();
    }
 #if defined(THREADED_RTS)
    closeMutex(&linker_mutex);
@@ -867,11 +854,11 @@ SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent)
 #       endif
     } else {
         if (dependent) {
-            // Add symbol's owner as a dependency to object code
+            // Add dependent as symbol's owner's dependency
             ObjectCode *owner = pinfo->owner;
             if (owner) {
                 // TODO: what does it mean for a symbol to not have an owner?
-                insertHashTable(owner->dependents, (W_)dependent, NULL);
+                insertHashTable(dependent->dependencies, (W_)owner, NULL);
             }
         }
         return loadSymbol(lbl, pinfo);
@@ -1164,6 +1151,8 @@ static void removeOcSymbols (ObjectCode *oc)
  * Release StablePtrs and free oc->stable_ptrs.
  * This operation is idempotent.
  */
+// TODO(osa): Need to call this when unloading in CheckUnload.c
+/*
 static void freeOcStablePtrs (ObjectCode *oc)
 {
     // Release any StablePtrs that were created when this
@@ -1177,6 +1166,7 @@ static void freeOcStablePtrs (ObjectCode *oc)
     }
     oc->stable_ptrs = NULL;
 }
+*/
 
 static void
 freePreloadObjectFile (ObjectCode *oc)
@@ -1281,7 +1271,7 @@ void freeObjectCode (ObjectCode *oc)
     stgFree(oc->fileName);
     stgFree(oc->archiveMemberName);
 
-    freeHashTable(oc->dependents, NULL);
+    freeHashTable(oc->dependencies, NULL);
 
     stgFree(oc);
 }
@@ -1364,7 +1354,7 @@ mkOc( pathchar *path, char *image, int imageSize,
    oc->rx_m32 = m32_allocator_new(true);
 #endif
 
-   oc->dependents = allocHashTable();
+   oc->dependencies = allocHashTable();
 
    IF_DEBUG(linker, debugBelch("mkOc: done\n"));
    return oc;
@@ -1378,8 +1368,7 @@ mkOc( pathchar *path, char *image, int imageSize,
 HsInt
 isAlreadyLoaded( pathchar *path )
 {
-    ObjectCode *o;
-    for (o = objects; o; o = o->next) {
+    for (ObjectCode *o = objects; o; o = o->next) {
        if (0 == pathcmp(o->fileName, path)) {
            return 1; /* already loaded */
        }
@@ -1539,8 +1528,8 @@ static HsInt loadObj_ (pathchar *path)
        return 0;
    }
 
-   oc->next = objects;
-   objects = oc;
+   insertOCSectionIndices(oc);
+
    return 1;
 }
 
@@ -1725,13 +1714,10 @@ int ocTryLoad (ObjectCode* oc) {
  */
 static HsInt resolveObjs_ (void)
 {
-    ObjectCode *oc;
-    int r;
-
     IF_DEBUG(linker, debugBelch("resolveObjs: start\n"));
 
-    for (oc = objects; oc; oc = oc->next) {
-        r = ocTryLoad(oc);
+    for (ObjectCode *oc = objects; oc; oc = oc->next) {
+        int r = ocTryLoad(oc);
         if (!r)
         {
             return r;
@@ -1760,6 +1746,9 @@ HsInt resolveObjs (void)
  */
 static HsInt unloadObj_ (pathchar *path, bool just_purge)
 {
+    (void)path;
+    (void)just_purge;
+/*
     ObjectCode *oc, *prev, *next;
     HsBool unloadedAnyObj = HS_BOOL_FALSE;
 
@@ -1796,8 +1785,8 @@ static HsInt unloadObj_ (pathchar *path, bool just_purge)
                 prev = oc;
             }
 
-            /* This could be a member of an archive so continue
-             * unloading other members. */
+            // This could be a member of an archive so continue
+            // unloading other members.
             unloadedAnyObj = HS_BOOL_TRUE;
         } else {
             prev = oc;
@@ -1811,6 +1800,8 @@ static HsInt unloadObj_ (pathchar *path, bool just_purge)
         errorBelch("unloadObj: can't find `%" PATH_FMT "' to unload", path);
         return 0;
     }
+*/
+    return 1; // TODO(osa): Not sure about the return value
 }
 
 HsInt unloadObj (pathchar *path)
@@ -1831,17 +1822,18 @@ HsInt purgeObj (pathchar *path)
 
 static OStatus getObjectLoadStatus_ (pathchar *path)
 {
-    ObjectCode *o;
-    for (o = objects; o; o = o->next) {
+    for (ObjectCode *o = objects; o; o = o->next) {
        if (0 == pathcmp(o->fileName, path)) {
            return o->status;
        }
     }
-    for (o = unloaded_objects; o; o = o->next) {
+/*  TODO (osa):  Make sure this is right
+    for (ObjectCode *o = unloaded_objects; o; o = o->next) {
        if (0 == pathcmp(o->fileName, path)) {
            return o->status;
        }
     }
+*/
     return OBJECT_NOT_LOADED;
 }
 
