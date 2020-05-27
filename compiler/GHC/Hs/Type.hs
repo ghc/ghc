@@ -595,12 +595,12 @@ data HsTyVarBndr flag pass
   = UserTyVar        -- no explicit kinding
          (XUserTyVar pass)
          flag
-         (LocatedA (IdP pass))
+         (ApiAnnName (IdP pass))
         -- See Note [Located RdrNames] in GHC.Hs.Expr
   | KindedTyVar
          (XKindedTyVar pass)
          flag
-         (LocatedA (IdP pass))
+         (ApiAnnName (IdP pass))
          (LHsKind pass)  -- The user-supplied kind signature
         -- ^
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
@@ -638,8 +638,8 @@ hsTvbAllKinded :: LHsQTyVars pass -> Bool
 hsTvbAllKinded = all (isHsKindedTyVar . unLoc) . hsQTvExplicit
 
 instance NamedThing (HsTyVarBndr flag GhcRn) where
-  getName (UserTyVar _ _ v) = unLoc v
-  getName (KindedTyVar _ _ v _) = unLoc v
+  getName (UserTyVar _ _ v) = unApiName v
+  getName (KindedTyVar _ _ v _) = unApiName v
 
 {- Note [Specificity in HsForAllTy]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -677,9 +677,9 @@ data HsType pass
       , hst_body  :: LHsType pass }
 
   | HsTyVar  (XTyVar pass)
-              PromotionFlag    -- Whether explicitly promoted,
-                               -- for the pretty printer
-             (LocatedA (IdP pass))
+             PromotionFlag    -- Whether explicitly promoted,
+                              -- for the pretty printer
+             (ApiAnnName (IdP pass))
                   -- Type variable, type constructor, or data constructor
                   -- see Note [Promotions (HsTyVar)]
                   -- See Note [Located RdrNames] in GHC.Hs.Expr
@@ -728,7 +728,7 @@ data HsType pass
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsOpTy              (XOpTy pass)
-                        (LHsType pass) (LocatedA (IdP pass)) (LHsType pass)
+                        (LHsType pass) (ApiAnnName (IdP pass)) (LHsType pass)
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
@@ -1157,8 +1157,8 @@ Bottom line: nip problems in the bud by matching on ForallInvis from the start.
 
 ---------------------
 hsTyVarName :: HsTyVarBndr flag (GhcPass p) -> IdP (GhcPass p)
-hsTyVarName (UserTyVar _ _ (L _ n))     = n
-hsTyVarName (KindedTyVar _ _ (L _ n) _) = n
+hsTyVarName (UserTyVar _ _ (N _ n))     = n
+hsTyVarName (KindedTyVar _ _ (N _ n) _) = n
 
 hsLTyVarName :: LHsTyVarBndr flag (GhcPass p) -> IdP (GhcPass p)
 hsLTyVarName = hsTyVarName . unLoc
@@ -1176,10 +1176,10 @@ hsAllLTyVarNames (HsQTvs { hsq_ext = kvs
                          , hsq_explicit = tvs })
   = kvs ++ hsLTyVarNames tvs
 
-hsLTyVarLocName :: LHsTyVarBndr flag (GhcPass p) -> LocatedA (IdP (GhcPass p))
-hsLTyVarLocName (L l a) = L (noAnnSrcSpan l) (hsTyVarName a)
+hsLTyVarLocName :: LHsTyVarBndr flag (GhcPass p) -> ApiAnnName (IdP (GhcPass p))
+hsLTyVarLocName (L l a) = N (noAnnSrcSpan l) (hsTyVarName a)
 
-hsLTyVarLocNames :: LHsQTyVars (GhcPass p) -> [LocatedA (IdP (GhcPass p))]
+hsLTyVarLocNames :: LHsQTyVars (GhcPass p) -> [ApiAnnName (IdP (GhcPass p))]
 hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvExplicit qtvs)
 
 -- | Get the kind signature of a type, ignoring parentheses:
@@ -1220,7 +1220,7 @@ isLHsForAllTy _                     = False
 mkAnonWildCardTy :: HsType GhcPs
 mkAnonWildCardTy = HsWildCardTy noExtField
 
-mkHsOpTy :: LHsType (GhcPass p) -> LocatedA (IdP (GhcPass p))
+mkHsOpTy :: LHsType (GhcPass p) -> ApiAnnName (IdP (GhcPass p))
          -> LHsType (GhcPass p) -> HsType (GhcPass p)
 mkHsOpTy ty1 op ty2 = HsOpTy noAnn ty1 op ty2
 
@@ -1264,13 +1264,13 @@ splitHsFunType other = ([], other)
 -- used to examine the result of a GADT-like datacon, so it doesn't handle
 -- *all* cases (like lists, tuples, (~), etc.)
 hsTyGetAppHead_maybe :: LHsType (GhcPass p)
-                     -> Maybe (LocatedA (IdP (GhcPass p)))
+                     -> Maybe (ApiAnnName (IdP (GhcPass p)))
 hsTyGetAppHead_maybe = go
   where
     go (L _ (HsTyVar _ _ ln))          = Just ln
     go (L _ (HsAppTy _ l _))           = go l
     go (L _ (HsAppKindTy _ t _))       = go t
-    go (L _ (HsOpTy _ _ (L loc n) _))  = Just (L loc n)
+    go (L _ (HsOpTy _ _ ln _))         = Just ln
     go (L _ (HsParTy _ t))             = go t
     go (L _ (HsKindSig _ t _))         = go t
     go _                               = Nothing
@@ -1407,7 +1407,7 @@ getLHsInstDeclHead inst_ty
   = body_ty
 
 getLHsInstDeclClass_maybe :: LHsSigType (GhcPass p)
-                          -> Maybe (LocatedA (IdP (GhcPass p)))
+                          -> Maybe (ApiAnnName (IdP (GhcPass p)))
 -- Works on (HsSigType RdrName)
 getLHsInstDeclClass_maybe inst_ty
   = do { let head_ty = getLHsInstDeclHead inst_ty
@@ -1431,7 +1431,7 @@ type LFieldOcc pass = Located (FieldOcc pass)
 -- both the 'RdrName' the user originally wrote, and after the
 -- renamer, the selector function.
 data FieldOcc pass = FieldOcc { extFieldOcc     :: XCFieldOcc pass
-                              , rdrNameFieldOcc :: LocatedA RdrName
+                              , rdrNameFieldOcc :: ApiAnnName RdrName
                                  -- ^ See Note [Located RdrNames] in GHC.Hs.Expr
                               }
 
@@ -1448,7 +1448,7 @@ type instance XXFieldOcc (GhcPass _) = NoExtCon
 instance Outputable (FieldOcc pass) where
   ppr = ppr . rdrNameFieldOcc
 
-mkFieldOcc :: LocatedA RdrName -> FieldOcc GhcPs
+mkFieldOcc :: ApiAnnName RdrName -> FieldOcc GhcPs
 mkFieldOcc rdr = FieldOcc noExtField rdr
 
 
@@ -1465,8 +1465,8 @@ mkFieldOcc rdr = FieldOcc noExtField rdr
 -- Note [Disambiguating record fields] in GHC.Tc.Gen.Expr.
 -- See Note [Located RdrNames] in GHC.Hs.Expr
 data AmbiguousFieldOcc pass
-  = Unambiguous (XUnambiguous pass) (LocatedA RdrName)
-  | Ambiguous   (XAmbiguous pass)   (LocatedA RdrName)
+  = Unambiguous (XUnambiguous pass) (ApiAnnName RdrName)
+  | Ambiguous   (XAmbiguous pass)   (ApiAnnName RdrName)
   | XAmbiguousFieldOcc !(XXAmbiguousFieldOcc pass)
 
 type instance XUnambiguous GhcPs = NoExtField
@@ -1486,12 +1486,12 @@ instance OutputableBndr (AmbiguousFieldOcc (GhcPass p)) where
   pprInfixOcc  = pprInfixOcc . rdrNameAmbiguousFieldOcc
   pprPrefixOcc = pprPrefixOcc . rdrNameAmbiguousFieldOcc
 
-mkAmbiguousFieldOcc :: LocatedA RdrName -> AmbiguousFieldOcc GhcPs
+mkAmbiguousFieldOcc :: ApiAnnName RdrName -> AmbiguousFieldOcc GhcPs
 mkAmbiguousFieldOcc rdr = Unambiguous noExtField rdr
 
 rdrNameAmbiguousFieldOcc :: AmbiguousFieldOcc (GhcPass p) -> RdrName
-rdrNameAmbiguousFieldOcc (Unambiguous _ (L _ rdr)) = rdr
-rdrNameAmbiguousFieldOcc (Ambiguous   _ (L _ rdr)) = rdr
+rdrNameAmbiguousFieldOcc (Unambiguous _ (N _ rdr)) = rdr
+rdrNameAmbiguousFieldOcc (Ambiguous   _ (N _ rdr)) = rdr
 
 selectorAmbiguousFieldOcc :: AmbiguousFieldOcc GhcTc -> Id
 selectorAmbiguousFieldOcc (Unambiguous sel _) = sel
@@ -1661,7 +1661,7 @@ ppr_mono_ty (HsQualTy { hst_ctxt = ctxt, hst_body = ty })
 
 ppr_mono_ty (HsBangTy _ b ty)   = ppr b <> ppr_mono_lty ty
 ppr_mono_ty (HsRecTy _ flds)      = pprConDeclFields flds
-ppr_mono_ty (HsTyVar _ prom (L _ name))
+ppr_mono_ty (HsTyVar _ prom (N _ name))
   | isPromoted prom = quote (pprPrefixOcc name)
   | otherwise       = pprPrefixOcc name
 ppr_mono_ty (HsFunTy _ ty1 ty2)   = ppr_fun_ty ty1 ty2
@@ -1702,7 +1702,7 @@ ppr_mono_ty (HsAppTy _ fun_ty arg_ty)
   = hsep [ppr_mono_lty fun_ty, ppr_mono_lty arg_ty]
 ppr_mono_ty (HsAppKindTy _ ty k)
   = ppr_mono_lty ty <+> char '@' <> ppr_mono_lty k
-ppr_mono_ty (HsOpTy _ ty1 (L _ op) ty2)
+ppr_mono_ty (HsOpTy _ ty1 (N _ op) ty2)
   = sep [ ppr_mono_lty ty1
         , sep [pprInfixOcc op, ppr_mono_lty ty2 ] ]
 

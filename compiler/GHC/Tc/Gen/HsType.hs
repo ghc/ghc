@@ -161,10 +161,10 @@ checking until step (3).
 ************************************************************************
 -}
 
-funsSigCtxt :: [LocatedA Name] -> UserTypeCtxt
+funsSigCtxt :: [ApiAnnName Name] -> UserTypeCtxt
 -- Returns FunSigCtxt, with no redundant-context-reporting,
 -- form a list of located names
-funsSigCtxt (L _ name1 : _) = FunSigCtxt name1 False
+funsSigCtxt (N _ name1 : _) = FunSigCtxt name1 False
 funsSigCtxt []              = panic "funSigCtxt"
 
 addSigCtxt :: UserTypeCtxt -> LHsType GhcRn -> TcM a -> TcM a
@@ -193,7 +193,7 @@ tcHsSigWcType :: UserTypeCtxt -> LHsSigWcType GhcRn -> TcM Type
 -- already checked this, so we can simply ignore it.
 tcHsSigWcType ctxt sig_ty = tcHsSigType ctxt (dropWildCards sig_ty)
 
-kcClassSigType :: SkolemInfo -> [LocatedA Name] -> LHsSigType GhcRn -> TcM ()
+kcClassSigType :: SkolemInfo -> [ApiAnnName Name] -> LHsSigType GhcRn -> TcM ()
 -- This is a special form of tcClassSigType that is used during the
 -- kind-checking phase to infer the kind of class variables. Cf. tc_hs_sig_type.
 -- Importantly, this does *not* kind-generalize. Consider
@@ -218,7 +218,7 @@ kcClassSigType skol_info names (HsIB { hsib_ext  = sig_vars
        ; emitResidualTvConstraint skol_info Nothing spec_tkvs
                                   tc_lvl wanted }
 
-tcClassSigType :: SkolemInfo -> [LocatedA Name] -> LHsSigType GhcRn -> TcM Type
+tcClassSigType :: SkolemInfo -> [ApiAnnName Name] -> LHsSigType GhcRn -> TcM Type
 -- Does not do validity checking
 tcClassSigType skol_info names sig_ty
   = addSigCtxt (funsSigCtxt names) (hsSigType sig_ty) $
@@ -263,7 +263,7 @@ tcHsSigType ctxt sig_ty
 -- Does validity checking and zonking.
 tcStandaloneKindSig :: LStandaloneKindSig GhcRn -> TcM (Name, Kind)
 tcStandaloneKindSig (L _ kisig) = case kisig of
-  StandaloneKindSig _ (L _ name) ksig ->
+  StandaloneKindSig _ (N _ name) ksig ->
     let ctxt = StandaloneKindSigCtxt name in
     addSigCtxt ctxt (hsSigType ksig) $
     do { kind <- tcTopLHsType kindLevelMode ksig (expectedKindInCtxt ctxt)
@@ -713,7 +713,7 @@ tc_hs_type _ ty@(HsSpliceTy {}) _exp_kind
 tc_hs_type mode (HsFunTy _ ty1 ty2) exp_kind
   = tc_fun_type mode ty1 ty2 exp_kind
 
-tc_hs_type mode (HsOpTy _ ty1 (L _ op) ty2) exp_kind
+tc_hs_type mode (HsOpTy _ ty1 (N _ op) ty2) exp_kind
   | op `hasKey` funTyConKey
   = tc_fun_type mode ty1 ty2 exp_kind
 
@@ -1102,7 +1102,7 @@ splitHsAppTys hs_ty
     is_app :: HsType GhcRn -> Bool
     is_app (HsAppKindTy {})        = True
     is_app (HsAppTy {})            = True
-    is_app (HsOpTy _ _ (L _ op) _) = not (op `hasKey` funTyConKey)
+    is_app (HsOpTy _ _ (N _ op) _) = not (op `hasKey` funTyConKey)
       -- I'm not sure why this funTyConKey test is necessary
       -- Can it even happen?  Perhaps for   t1 `(->)` t2
       -- but then maybe it's ok to treat that like a normal
@@ -1118,7 +1118,7 @@ splitHsAppTys hs_ty
     go (L _  (HsAppTy _ f a))      as = go f (HsValArg a : as)
     go (L _  (HsAppKindTy l ty k)) as = go ty (HsTypeArg l k : as)
     go (L sp (HsParTy _ f))        as = go f (HsArgPar (locA sp) : as)
-    go (L _  (HsOpTy _ l op@(L sp _) r)) as
+    go (L _  (HsOpTy _ l op@(N sp _) r)) as
       = ( L sp (HsTyVar noAnn NotPromoted op)
         , HsValArg l : HsValArg r : as )
     go f as = (f, as)
@@ -1129,7 +1129,7 @@ tcInferAppHead :: TcTyMode -> LHsType GhcRn -> TcM (TcType, TcKind)
 -- application. In particular, for a HsTyVar (which includes type
 -- constructors, it does not zoom off into tcInferApps and family
 -- saturation
-tcInferAppHead mode (L _ (HsTyVar _ _ (L _ tv)))
+tcInferAppHead mode (L _ (HsTyVar _ _ (N _ tv)))
   = tcTyVar mode tv
 tcInferAppHead mode ty
   = tc_infer_lhs_type mode ty
@@ -2248,7 +2248,7 @@ kcCheckDeclHeader_sig kisig name flav
       case unLoc b of
         UserTyVar _ _ _ -> return ()
         KindedTyVar _ _ v v_hs_ki -> do
-          v_ki <- tcLHsKindSig (TyVarBndrKindCtxt (unLoc v)) v_hs_ki
+          v_ki <- tcLHsKindSig (TyVarBndrKindCtxt (unApiName v)) v_hs_ki
           discardResult $ -- See Note [discardResult in kcCheckDeclHeader_sig]
             unifyKind (Just (HsTyVar noAnn NotPromoted v))
                       (tyBinderType tb)
@@ -2761,10 +2761,10 @@ bindExplicitTKBndrsX tc_tv hs_tvs thing_inside
 -----------------
 tcHsTyVarBndr :: (Name -> Kind -> TcM TyVar)
               -> HsTyVarBndr flag GhcRn -> TcM TcTyVar
-tcHsTyVarBndr new_tv (UserTyVar _ _ (L _ tv_nm))
+tcHsTyVarBndr new_tv (UserTyVar _ _ (N _ tv_nm))
   = do { kind <- newMetaKindVar
        ; new_tv tv_nm kind }
-tcHsTyVarBndr new_tv (KindedTyVar _ _ (L _ tv_nm) lhs_kind)
+tcHsTyVarBndr new_tv (KindedTyVar _ _ (N _ tv_nm) lhs_kind)
   = do { kind <- tcLHsKindSig (TyVarBndrKindCtxt tv_nm) lhs_kind
        ; new_tv tv_nm kind }
 
@@ -2775,14 +2775,14 @@ tcHsQTyVarBndr :: ContextKind
 -- Just like tcHsTyVarBndr, but also
 --   - uses the in-scope TyVar from class, if it exists
 --   - takes a ContextKind to use for the no-sig case
-tcHsQTyVarBndr ctxt_kind new_tv (UserTyVar _ _ (L _ tv_nm))
+tcHsQTyVarBndr ctxt_kind new_tv (UserTyVar _ _ (N _ tv_nm))
   = do { mb_tv <- tcLookupLcl_maybe tv_nm
        ; case mb_tv of
            Just (ATyVar _ tv) -> return tv
            _ -> do { kind <- newExpectedKind ctxt_kind
                    ; new_tv tv_nm kind } }
 
-tcHsQTyVarBndr _ new_tv (KindedTyVar _ _ (L _ tv_nm) lhs_kind)
+tcHsQTyVarBndr _ new_tv (KindedTyVar _ _ (N _ tv_nm) lhs_kind)
   = do { kind <- tcLHsKindSig (TyVarBndrKindCtxt tv_nm) lhs_kind
        ; mb_tv <- tcLookupLcl_maybe tv_nm
        ; case mb_tv of
@@ -2796,7 +2796,7 @@ tcHsQTyVarBndr _ new_tv (KindedTyVar _ _ (L _ tv_nm) lhs_kind)
 
            _ -> new_tv tv_nm kind }
   where
-    hs_tv = HsTyVar noAnn NotPromoted (noLocA tv_nm)
+    hs_tv = HsTyVar noAnn NotPromoted (noApiName tv_nm)
             -- Used for error messages only
 
 --------------------------------------

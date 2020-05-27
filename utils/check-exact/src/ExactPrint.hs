@@ -14,6 +14,7 @@ module ExactPrint
     ExactPrint(..)
   , exactPrint
   -- , exactPrintWithOptions
+  , showGhc
   ) where
 
 import GHC hiding (getAndRemoveAnnotation)
@@ -268,8 +269,8 @@ class ExactPrint a where
 -- ---------------------------------------------------------------------
 
 instance (ExactPrint a) => ExactPrint (Located a) where
-  exact (L _ a) = exact a
   getApiAnnotation (L _ a) = getApiAnnotation a
+  exact (L _ a) = exact a
 
 -- ---------------------------------------------------------------------
 
@@ -277,6 +278,7 @@ instance (ExactPrint a) => ExactPrint (Located a) where
 --   exact (L l n) = withPpr n
 
 instance ExactPrint RdrName where
+  getApiAnnotation _ = NoEntryVal
   exact = withPpr
 
 -- ---------------------------------------------------------------------
@@ -322,6 +324,22 @@ printStringAtSs anchor (RealSrcSpan ss _) str = do
   debugM $ "printStringAtSs: (dp,p) = " ++ show (dp,p)
   printStringAtLsDelta [] dp str
 
+-- ---------------------------------------------------------------------
+
+printStringAtKw :: ApiAnn -> AnnKeywordId -> String -> EPP ()
+printStringAtKw ApiAnnNotUsed _ str = printString True str
+printStringAtKw (ApiAnn anchor anns _cs) kw str = do
+  case find (\(AddApiAnn k _) -> k == kw) anns of
+    Nothing -> printString True str
+    Just (AddApiAnn _ ss) -> do
+      dp <- nextDP ss
+      p <- getPos
+      debugM $ "printStringAtKw: (dp,p) = " ++ show (dp,p)
+      printStringAtLsDelta [] dp str
+
+-- ---------------------------------------------------------------------
+
+mark :: ApiAnn -> AnnKeywordId -> EPP ()
 mark ApiAnnNotUsed _ = return ()
 mark (ApiAnn anchor anns _cs) kw = do
   case find (\(AddApiAnn k _) -> k == kw) anns of
@@ -337,6 +355,13 @@ mark (ApiAnn anchor anns _cs) kw = do
 markLocatedA :: (ExactPrint a) => LocatedA a -> EPP ()
 markLocatedA (L (SrcSpanAnn ann l) a) = do
   debugM $ "markLocatedA:ann=" ++ showGhc ann
+  exact a
+
+-- ---------------------------------------------------------------------
+
+markLocatedN :: (ExactPrint a) => ApiAnnName a -> EPP ()
+markLocatedN (N (SrcSpanAnn ann l) a) = do
+  debugM $ "markLocatedN:ann=" ++ showGhc ann
   exact a
 
 -- ---------------------------------------------------------------------
@@ -500,7 +525,7 @@ instance ExactPrint (Match GhcPs (LHsExpr GhcPs)) where
     case mctxt of
       FunRhs fun fix str -> do
         debugM $ "exact Match FunRhs:" ++ showGhc fun
-        markLocatedA fun
+        markLocatedN fun
       _ -> withPpr mctxt
 
     case grhs of
@@ -650,9 +675,14 @@ instance ExactPrint (HsExpr GhcPs) where
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint (LocatedA RdrName) where
-  getApiAnnotation (L (SrcSpanAnn ann _) _) = fromAnn ann
-  exact = withPpr -- AZ TODO
+instance ExactPrint (ApiAnnName RdrName) where
+  getApiAnnotation (N (SrcSpanAnn ann _) _) = fromAnn ann
+  exact (N (SrcSpanAnn ann _) a) = do
+    mark ann AnnOpenP
+    mark ann AnnBackquote
+    printStringAtKw ann AnnVal (showGhc a)
+    mark ann AnnBackquote
+    mark ann AnnCloseP
 
 -- ---------------------------------------------------------------------
 

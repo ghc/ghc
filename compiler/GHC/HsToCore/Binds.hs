@@ -145,7 +145,7 @@ dsHsBind dflags (VarBind { var_id = var
                           else []
         ; return (force_var, [core_bind]) }
 
-dsHsBind dflags b@(FunBind { fun_id = L loc fun
+dsHsBind dflags b@(FunBind { fun_id = N loc fun
                            , fun_matches = matches
                            , fun_ext = co_fn
                            , fun_tick = tick })
@@ -158,7 +158,7 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
                           --            predicate of the coverage checker
                           -- See Note [Type and Term Equality Propagation] in PmCheck
                           matchWrapper
-                           (mkPrefixFunRhs (L loc (idName fun)))
+                           (mkPrefixFunRhs (N loc (idName fun)))
                            Nothing matches
         ; core_wrap <- dsHsWrapper co_fn
         ; let body' = mkOptTickBox tick body

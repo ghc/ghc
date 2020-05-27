@@ -87,12 +87,12 @@ so it must be prepared to use tcSkolemise to skolemise it.
 See Note [sig_tau may be polymorphic] in GHC.Tc.Gen.Pat.
 -}
 
-tcMatchesFun :: LocatedA Name
+tcMatchesFun :: ApiAnnName Name
              -> MatchGroup GhcRn (LHsExpr GhcRn)
              -> ExpSigmaType    -- Expected type of function
              -> TcM (HsWrapper, MatchGroup GhcTcId (LHsExpr GhcTcId))
                                 -- Returns type of body
-tcMatchesFun fn@(L _ fun_name) matches exp_ty
+tcMatchesFun fn@(N _ fun_name) matches exp_ty
   = do  {  -- Check that they all have the same no of arguments
            -- Location is in the monad, set the caller so that
            -- any inter-equation error messages get some vaguely

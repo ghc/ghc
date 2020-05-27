@@ -473,7 +473,7 @@ lexprCtOrigin :: LHsExpr GhcRn -> CtOrigin
 lexprCtOrigin (L _ e) = exprCtOrigin e
 
 exprCtOrigin :: HsExpr GhcRn -> CtOrigin
-exprCtOrigin (HsVar _ (L _ name)) = OccurrenceOf name
+exprCtOrigin (HsVar _ (N _ name)) = OccurrenceOf name
 exprCtOrigin (HsUnboundVar _ uv)  = UnboundOccurrenceOf uv
 exprCtOrigin (HsConLikeOut {})    = panic "exprCtOrigin HsConLikeOut"
 exprCtOrigin (HsRecFld _ f)       = OccurrenceOfRecSel (rdrNameAmbiguousFieldOcc f)
@@ -600,7 +600,7 @@ pprCtOrigin (Shouldn'tHappenOrigin note)
                     , text "https://gitlab.haskell.org/ghc/ghc/wikis/report-a-bug >>"
                     ]
 
-pprCtOrigin (ProvCtxtOrigin PSB{ psb_id = (L _ name) })
+pprCtOrigin (ProvCtxtOrigin PSB{ psb_id = (N _ name) })
   = hang (ctoHerald <+> text "the \"provided\" constraints claimed by")
        2 (text "the signature of" <+> quotes (ppr name))
 

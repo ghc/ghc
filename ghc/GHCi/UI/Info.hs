@@ -327,7 +327,7 @@ processAllTypeCheckedModule tcm = do
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LHsBind's
     getTypeLHsBind :: LHsBind GhcTc -> m (Maybe (Maybe Id,SrcSpan,Type))
     getTypeLHsBind (L _spn FunBind{fun_id = pid,fun_matches = MG _ _ _})
-        = pure $ Just (Just (unLoc pid),locA $ getLoc pid,varType (unLoc pid))
+        = pure $ Just (Just (unApiName pid), getLocN pid,varType (unApiName pid))
     getTypeLHsBind _ = pure Nothing
 
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LHsExpr's
@@ -338,7 +338,7 @@ processAllTypeCheckedModule tcm = do
         return $ fmap (\expr -> (mid, getLocA e, GHC.Core.Utils.exprType expr)) mbe
       where
         mid :: Maybe Id
-        mid | HsVar _ (L _ i) <- unwrapVar (unLoc e) = Just i
+        mid | HsVar _ (N _ i) <- unwrapVar (unLoc e) = Just i
             | otherwise                              = Nothing
 
         unwrapVar (XExpr (HsWrap _ var)) = var
@@ -349,7 +349,7 @@ processAllTypeCheckedModule tcm = do
     getTypeLPat (L spn pat) =
         pure (Just (getMaybeId pat,locA spn,hsPatType pat))
       where
-        getMaybeId (VarPat _ (L _ vid)) = Just vid
+        getMaybeId (VarPat _ (N _ vid)) = Just vid
         getMaybeId _                        = Nothing
 
     -- | Get ALL source spans in the source.

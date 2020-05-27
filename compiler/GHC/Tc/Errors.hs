@@ -43,6 +43,7 @@ import GHC.Core.DataCon
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.EvTerm
 import GHC.Hs.Binds ( PatSynBind(..) )
+import GHC.Hs.Extension ( ApiAnnName(..) )
 import GHC.Types.Name
 import GHC.Types.Name.Reader ( lookupGRE_Name, GlobalRdrEnv, mkRdrUnqual )
 import GHC.Builtin.Names ( typeableClassName )
@@ -2524,7 +2525,7 @@ ctxtFixes has_ambig_tvs pred implics
 
 discardProvCtxtGivens :: CtOrigin -> [UserGiven] -> [UserGiven]
 discardProvCtxtGivens orig givens  -- See Note [discardProvCtxtGivens]
-  | ProvCtxtOrigin (PSB {psb_id = L _ name}) <- orig
+  | ProvCtxtOrigin (PSB {psb_id = N _ name}) <- orig
   = filterOut (discard name) givens
   | otherwise
   = givens
