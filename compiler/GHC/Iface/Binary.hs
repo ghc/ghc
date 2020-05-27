@@ -138,7 +138,7 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
     errorOnMismatch "mismatched interface file versions" our_ver check_ver
 
     check_way <- get bh
-    let way_descr = getWayDescr platform (ways dflags)
+    let way_descr = getWayDescr platform (targetWays dflags)
     wantedGot "Way" way_descr check_way ppr
     when (checkHiWay == CheckHiWay) $
         errorOnMismatch "mismatched interface file ways" way_descr check_way
@@ -193,7 +193,7 @@ writeBinIface dflags hi_path mod_iface = do
 
     -- The version and way descriptor go next
     put_ bh (show hiVersion)
-    let way_descr = getWayDescr platform (ways dflags)
+    let way_descr = getWayDescr platform (targetWays dflags)
     put_  bh way_descr
 
     extFields_p_p <- tellBin bh

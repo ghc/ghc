@@ -254,7 +254,7 @@ linkDynLib dflags0 o_files dep_packages
          | ( osElfTarget (platformOS (targetPlatform dflags)) ||
              osMachOTarget (platformOS (targetPlatform dflags)) ) &&
            dynLibLoader dflags == SystemDependent &&
-           WayDyn `Set.member` ways dflags
+           WayDyn `Set.member` targetWays dflags
             = ["-L" ++ l, "-Xlinker", "-rpath", "-Xlinker", l]
               -- See Note [-Xlinker -rpath vs -Wl,-rpath]
          | otherwise = ["-L" ++ l]

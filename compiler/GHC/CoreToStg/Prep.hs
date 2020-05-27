@@ -182,7 +182,7 @@ corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
     initialCorePrepEnv <- mkInitialCorePrepEnv hsc_env
 
     let cost_centres
-          | WayProf `S.member` ways dflags
+          | WayProf `S.member` targetWays dflags
           = collectCostCentres this_mod binds
           | otherwise
           = S.empty

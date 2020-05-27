@@ -450,11 +450,13 @@ data DynFlags = DynFlags {
   -- formerly Settings
   ghcNameVersion    :: {-# UNPACK #-} !GhcNameVersion,
   fileSettings      :: {-# UNPACK #-} !FileSettings,
-  targetPlatform    :: Platform,       -- Filled in by SysTools
   toolSettings      :: {-# UNPACK #-} !ToolSettings,
   platformMisc      :: {-# UNPACK #-} !PlatformMisc,
   platformConstants :: PlatformConstants,
   rawSettings       :: [(String, String)],
+
+  targetPlatform    :: Platform,    -- ^ Target platform
+  targetWays        :: Set Way,     -- ^ Target ways (dynamic, profiled, debug, etc.)
 
   llvmConfig            :: LlvmConfig,
     -- ^ N.B. It's important that this field is lazy since we load the LLVM
@@ -524,9 +526,6 @@ data DynFlags = DynFlags {
   homeUnitId            :: UnitId,                 -- ^ Target home unit-id
   homeUnitInstanceOfId  :: Maybe IndefUnitId,      -- ^ Unit-id to instantiate
   homeUnitInstantiations:: [(ModuleName, Module)], -- ^ How to instantiate `homeUnitInstanceOfId` unit
-
-  -- ways
-  ways                  :: Set Way,     -- ^ Way flags from the command line
 
   -- For object splitting
   splitInfo             :: Maybe (String,Int),
@@ -957,28 +956,28 @@ pgm_i dflags = toolSettings_pgm_i $ toolSettings dflags
 opt_L                 :: DynFlags -> [String]
 opt_L dflags = toolSettings_opt_L $ toolSettings dflags
 opt_P                 :: DynFlags -> [String]
-opt_P dflags = concatMap (wayOptP (targetPlatform dflags)) (ways dflags)
+opt_P dflags = concatMap (wayOptP (targetPlatform dflags)) (targetWays dflags)
             ++ toolSettings_opt_P (toolSettings dflags)
 
 -- This function packages everything that's needed to fingerprint opt_P
 -- flags. See Note [Repeated -optP hashing].
 opt_P_signature       :: DynFlags -> ([String], Fingerprint)
 opt_P_signature dflags =
-  ( concatMap (wayOptP (targetPlatform dflags)) (ways dflags)
+  ( concatMap (wayOptP (targetPlatform dflags)) (targetWays dflags)
   , toolSettings_opt_P_fingerprint $ toolSettings dflags
   )
 
 opt_F                 :: DynFlags -> [String]
 opt_F dflags= toolSettings_opt_F $ toolSettings dflags
 opt_c                 :: DynFlags -> [String]
-opt_c dflags = concatMap (wayOptc (targetPlatform dflags)) (ways dflags)
+opt_c dflags = concatMap (wayOptc (targetPlatform dflags)) (targetWays dflags)
             ++ toolSettings_opt_c (toolSettings dflags)
 opt_cxx               :: DynFlags -> [String]
 opt_cxx dflags= toolSettings_opt_cxx $ toolSettings dflags
 opt_a                 :: DynFlags -> [String]
 opt_a dflags= toolSettings_opt_a $ toolSettings dflags
 opt_l                 :: DynFlags -> [String]
-opt_l dflags = concatMap (wayOptl (targetPlatform dflags)) (ways dflags)
+opt_l dflags = concatMap (wayOptl (targetPlatform dflags)) (targetWays dflags)
             ++ toolSettings_opt_l (toolSettings dflags)
 opt_windres           :: DynFlags -> [String]
 opt_windres dflags= toolSettings_opt_windres $ toolSettings dflags
@@ -1365,16 +1364,16 @@ defaultDynFlags mySettings llvmConfig =
         packageEnv              = Nothing,
         unitDatabases           = Nothing,
         unitState               = emptyUnitState,
-        ways                    = defaultWays mySettings,
         splitInfo               = Nothing,
 
         ghcNameVersion = sGhcNameVersion mySettings,
         fileSettings = sFileSettings mySettings,
         toolSettings = sToolSettings mySettings,
-        targetPlatform = sTargetPlatform mySettings,
         platformMisc = sPlatformMisc mySettings,
         platformConstants = sPlatformConstants mySettings,
         rawSettings = sRawSettings mySettings,
+        targetPlatform = sTargetPlatform mySettings,
+        targetWays     = defaultWays mySettings,
 
         -- See Note [LLVM configuration].
         llvmConfig              = llvmConfig,
@@ -2125,7 +2124,7 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
 
   -- check for disabled flags in safe haskell
   let (dflags2, sh_warns) = safeFlagCheck cmdline dflags1
-      theWays = ways dflags2
+      theWays = targetWays dflags2
 
   unless (allowed_combination theWays) $ liftIO $
       throwGhcExceptionIO (CmdLineError ("combination not supported: " ++
@@ -4367,7 +4366,7 @@ addWay w = upd (addWay' w)
 
 addWay' :: Way -> DynFlags -> DynFlags
 addWay' w dflags0 = let platform = targetPlatform dflags0
-                        dflags1 = dflags0 { ways = Set.insert w (ways dflags0) }
+                        dflags1 = dflags0 { targetWays = Set.insert w (targetWays dflags0) }
                         dflags2 = foldr setGeneralFlag' dflags1
                                         (wayGeneralFlags platform w)
                         dflags3 = foldr unSetGeneralFlag' dflags2
@@ -4375,7 +4374,7 @@ addWay' w dflags0 = let platform = targetPlatform dflags0
                     in dflags3
 
 removeWayDyn :: DynP ()
-removeWayDyn = upd (\dfs -> dfs { ways = Set.filter (WayDyn /=) (ways dfs) })
+removeWayDyn = upd (\dfs -> dfs { targetWays = Set.filter (WayDyn /=) (targetWays dfs) })
 
 --------------------------
 setGeneralFlag, unSetGeneralFlag :: GeneralFlag -> DynP ()
@@ -4798,7 +4797,7 @@ picCCOpts dflags = pieOpts ++ picOpts
       -- correctly.  They need to reference data in the Haskell
       -- objects, but can't without -fPIC.  See
       -- https://gitlab.haskell.org/ghc/ghc/wikis/commentary/position-independent-code
-       | gopt Opt_PIC dflags || WayDyn `Set.member` ways dflags ->
+       | gopt Opt_PIC dflags || WayDyn `Set.member` targetWays dflags ->
           ["-fPIC", "-U__PIC__", "-D__PIC__"]
       -- gcc may be configured to have PIC on by default, let's be
       -- explicit here, see #15847
@@ -4981,8 +4980,8 @@ makeDynFlagsConsistent dflags
  , not (gopt Opt_ExternalInterpreter dflags)
  , hostIsProfiled
  , isObjectTarget (hscTarget dflags)
- , WayProf `Set.notMember` ways dflags
-    = loop dflags{ways = Set.insert WayProf (ways dflags)}
+ , WayProf `Set.notMember` targetWays dflags
+    = loop dflags{targetWays = Set.insert WayProf (targetWays dflags)}
          "Enabling -prof, because -fobject-code is enabled and GHCi is profiled"
 
  | otherwise = (dflags, [])
@@ -5096,7 +5095,7 @@ isBmi2Enabled dflags = case platformArch (targetPlatform dflags) of
 
 -- | Indicate if cost-centre profiling is enabled
 sccProfilingEnabled :: DynFlags -> Bool
-sccProfilingEnabled dflags = ways dflags `hasWay` WayProf
+sccProfilingEnabled dflags = targetWays dflags `hasWay` WayProf
 
 -- -----------------------------------------------------------------------------
 -- Linker/compiler information
