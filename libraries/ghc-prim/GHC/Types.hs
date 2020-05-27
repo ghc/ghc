@@ -518,6 +518,7 @@ data KindRep = KindRepTyConApp TyCon [KindRep]
 
 data TypeLitSort = TypeLitSymbol
                  | TypeLitNat
+                 | TypeLitChar
 
 -- Show instance for TyCon found in GHC.Show
 data TyCon = TyCon WORD64_TY WORD64_TY   -- Fingerprint
