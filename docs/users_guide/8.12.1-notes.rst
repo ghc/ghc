@@ -17,7 +17,7 @@ Highlights
     digit improvements in runtime for inner loops.
 
     In the mean this improved runtime by about 0.8%. For details
-    see ticket #17823.
+    see ticket :ghc-ticket:`17823`.
 
 Full details
 ------------
@@ -95,7 +95,7 @@ Language
   effectively allows users to choose which variables can or can't be
   instantiated through visible type application. More information can be found
   here: :ref:`Manually-defining-inferred-variables`.
-  
+
 Compiler
 ~~~~~~~~
 
@@ -105,10 +105,14 @@ GHCi
 
 - The ``:script`` command now allows for file names that contain spaces to
   passed as arguments: either by enclosing the file names in double quotes or by
-  escaping spaces in file names with a backslash. (#18027)
+  escaping spaces in file names with a backslash. (:ghc-ticket:`18027`)
 
 Runtime system
 ~~~~~~~~~~~~~~
+
+- :rts-flag:`-N` without a count now tries to respect the number of processors
+  in the process's affinity mask, making GHC's behavior more predictable in
+  containerized settings (:ghc-ticket:`14781`).
 
 Template Haskell
 ~~~~~~~~~~~~~~~~

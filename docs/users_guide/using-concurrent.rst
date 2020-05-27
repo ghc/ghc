@@ -111,6 +111,7 @@ There are two ways to run a program on multiple processors: call
 use the RTS :rts-flag:`-N ⟨x⟩` options.
 
 .. rts-flag:: -N ⟨x⟩
+              -N
               -maxN ⟨x⟩
 
     Use ⟨x⟩ simultaneous threads when running the program.
