@@ -954,7 +954,6 @@ dynLoadObjs hsc_env pls@PersistentLinkerState{..} objs = do
                       -- the vanilla dynamic libraries, so we set the
                       -- ways / build tag to be just WayDyn.
                       ways = Set.singleton WayDyn,
-                      buildTag = waysTag (Set.singleton WayDyn),
                       outputFile = Just soFile
                   }
     -- link all "loaded packages" so symbols in those can be resolved
