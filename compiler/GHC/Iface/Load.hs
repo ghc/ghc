@@ -982,7 +982,10 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
 writeIface :: DynFlags -> FilePath -> ModIface -> IO ()
 writeIface dflags hi_file_path new_iface
     = do createDirectoryIfMissing True (takeDirectory hi_file_path)
-         writeBinIface dflags hi_file_path new_iface
+         let platform = targetPlatform dflags
+             ways     = targetWays dflags
+             tracer   = debugTraceMsg dflags 3
+         writeBinIface platform ways tracer hi_file_path new_iface
 
 -- @readIface@ tries just the one file.
 readIface :: Module -> FilePath
@@ -991,8 +994,12 @@ readIface :: Module -> FilePath
         -- Succeeded iface <=> successfully found and parsed
 
 readIface wanted_mod file_path
-  = do  { res <- tryMostM $
-                 readBinIface CheckHiWay QuietBinIFaceReading file_path
+  = do  { res <- tryMostM $ do
+                  dflags <- getDynFlags
+                  let ways      = targetWays dflags
+                      platform  = targetPlatform dflags
+                      printer _ = pure ()
+                  readBinIface platform ways printer CheckHiWay file_path
         ; case res of
             Right iface
                 -- NB: This check is NOT just a sanity check, it is
@@ -1111,12 +1118,16 @@ For some background on this choice see trac #15269.
 -- | Read binary interface, and print it out
 showIface :: HscEnv -> FilePath -> IO ()
 showIface hsc_env filename = do
+   let dflags    = hsc_dflags hsc_env
+       ways      = targetWays dflags
+       platform  = targetPlatform dflags
+       printer s = putLogMsg dflags NoReason SevOutput noSrcSpan
+                     $ withPprStyle defaultDumpStyle s
    -- skip the hi way check; we don't want to worry about profiled vs.
    -- non-profiled interfaces, for example.
    iface <- initTcRnIf 's' hsc_env () () $
-       readBinIface IgnoreHiWay TraceBinIFaceReading filename
-   let dflags = hsc_dflags hsc_env
-       -- See Note [Name qualification with --show-iface]
+       readBinIface platform ways printer IgnoreHiWay filename
+   let -- See Note [Name qualification with --show-iface]
        qualifyImportedNames mod _
            | mod == mi_module iface = NameUnqual
            | otherwise              = NameNotInScope1
