@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: 35d6418c6ee0297352e6ea5f93a8ede0f2c2f931
+  DOCKER_REV: ba119705df5222fe74208a85019cb980e2c4318f
 
   # Sequential version number capturing the versions of all tools fetched by
   # .gitlab/ci.sh.
