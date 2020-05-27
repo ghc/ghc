@@ -1418,6 +1418,9 @@ repTyLit (HsNumTy _ i) = rep2 numTyLitName [mkIntegerExpr i]
 repTyLit (HsStrTy _ s) = do { s' <- mkStringExprFS s
                             ; rep2 strTyLitName [s']
                             }
+repTyLit (HsCharTy _ c) = do { c' <- return (mkCharExpr c)
+                             ; rep2 charTyLitName [c']
+                             }
 
 -- | Represent a type wrapped in a Maybe
 repMaybeLTy :: Maybe (LHsKind GhcRn)
