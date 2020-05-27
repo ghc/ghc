@@ -279,8 +279,8 @@ compileOne' m_tc_result mHscMessage
        input_fnpp  = ms_hspp_file summary
        mod_graph   = hsc_mod_graph hsc_env0
        needsLinker = needsTemplateHaskellOrQQ mod_graph
-       isDynWay    = any (== WayDyn) (ways dflags0)
-       isProfWay   = any (== WayProf) (ways dflags0)
+       isDynWay    = targetWays dflags0 `hasWay` WayDyn
+       isProfWay   = targetWays dflags0 `hasWay` WayProf
        internalInterpreter = not (gopt Opt_ExternalInterpreter dflags0)
 
        src_flavour = ms_hsc_src summary
@@ -529,7 +529,7 @@ linkingNeeded dflags staticLink linkables pkg_deps = do
 
 findHSLib :: DynFlags -> [String] -> String -> IO (Maybe FilePath)
 findHSLib dflags dirs lib = do
-  let batch_lib_file = if WayDyn `notElem` ways dflags
+  let batch_lib_file = if not (targetWays dflags `hasWay` WayDyn)
                       then "lib" ++ lib <.> "a"
                       else mkSOName (targetPlatform dflags) lib
   found <- filterM doesFileExist (map (</> batch_lib_file) dirs)
@@ -888,10 +888,10 @@ llvmOptions dflags =
         Just (LlvmTarget _ mcpu mattr) = lookup target (llvmTargets $ llvmConfig dflags)
 
         -- Relocation models
-        rmodel | gopt Opt_PIC dflags        = "pic"
-               | positionIndependent dflags = "pic"
-               | WayDyn `elem` ways dflags  = "dynamic-no-pic"
-               | otherwise                  = "static"
+        rmodel | gopt Opt_PIC dflags              = "pic"
+               | positionIndependent dflags       = "pic"
+               | WayDyn `elem` targetWays dflags  = "dynamic-no-pic"
+               | otherwise                        = "static"
 
         align :: Int
         align = case platformArch (targetPlatform dflags) of
@@ -1673,7 +1673,7 @@ linkBinary' staticLink dflags o_files dep_units = do
         get_pkg_lib_path_opts l
          | osElfTarget (platformOS platform) &&
            dynLibLoader dflags == SystemDependent &&
-           WayDyn `elem` ways dflags
+           WayDyn `elem` targetWays dflags
             = let libpath = if gopt Opt_RelativeDynlibPaths dflags
                             then "$ORIGIN" </>
                                  (l `makeRelativeTo` full_output_fn)
@@ -1694,7 +1694,7 @@ linkBinary' staticLink dflags o_files dep_units = do
               in ["-L" ++ l] ++ rpathlink ++ rpath
          | osMachOTarget (platformOS platform) &&
            dynLibLoader dflags == SystemDependent &&
-           WayDyn `elem` ways dflags &&
+           WayDyn `elem` targetWays dflags &&
            gopt Opt_RPath dflags
             = let libpath = if gopt Opt_RelativeDynlibPaths dflags
                             then "@loader_path" </>
