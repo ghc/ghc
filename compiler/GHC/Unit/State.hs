@@ -1785,7 +1785,7 @@ getLibs dflags pkgs = do
 packageHsLibs :: DynFlags -> UnitInfo -> [String]
 packageHsLibs dflags p = map (mkDynName . addSuffix) (unitLibraries p)
   where
-        ways0 = ways dflags
+        ways0 = targetWays dflags
 
         ways1 = Set.filter (/= WayDyn) ways0
         -- the name of a shared library is libHSfoo-ghc<version>.so
@@ -1801,7 +1801,7 @@ packageHsLibs dflags p = map (mkDynName . addSuffix) (unitLibraries p)
         rts_tag = waysTag ways2
 
         mkDynName x
-         | WayDyn `Set.notMember` ways dflags = x
+         | WayDyn `Set.notMember` targetWays dflags = x
          | "HS" `isPrefixOf` x                =
               x ++ '-':programName dflags ++ projectVersion dflags
            -- For non-Haskell libraries, we use the name "Cfoo". The .a
@@ -1833,7 +1833,7 @@ packageHsLibs dflags p = map (mkDynName . addSuffix) (unitLibraries p)
 -- | Either the 'unitLibraryDirs' or 'unitLibraryDynDirs' as appropriate for the way.
 libraryDirsForWay :: DynFlags -> UnitInfo -> [String]
 libraryDirsForWay dflags
-  | WayDyn `elem` ways dflags = unitLibraryDynDirs
+  | WayDyn `elem` targetWays dflags = unitLibraryDynDirs
   | otherwise                 = unitLibraryDirs
 
 -- | Find all the C-compiler options in these and the preload packages
