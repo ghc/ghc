@@ -340,32 +340,32 @@ data PrimOpEffect
   -- See Note [Precise vs imprecise exceptions] in GHC.Types.Demand.
   deriving (Eq, Ord)
 
--- | Can we discard a call to the primop, i.e. @case a `op` b of _ -> rhs@?
--- This is a question that i.e. the Simplifier asks before dropping the @case@.
--- See Note [Transformations affected by can_fail and has_side_effects].
-isDiscardablePrimOpEffect :: PrimOpEffect -> Bool
-isDiscardablePrimOpEffect eff = eff <= ThrowsImprecise
-
--- | Can we duplicate a call to the primop?
--- This is a question that i.e. the Simplifier asks when inlining definitions
--- involving primops with multiple syntactic occurrences.
--- See Note [Transformations affected by can_fail and has_side_effects].
-isDupablePrimOpEffect :: PrimOpEffect -> Bool
--- isDupablePrimOpEffect eff = True -- #3207, see the Note
-isDupablePrimOpEffect eff = eff <= ThrowsImprecise
-
--- | Can we perform other actions first before entering the primop?
--- This is the question that i.e. @FloatIn@ asks.
--- See Note [Transformations affected by can_fail and has_side_effects].
-isDeferrablePrimOpEffect :: PrimOpEffect -> Bool
-isDeferrablePrimOpEffect eff = eff <= WriteEffect
-
--- | Can we speculatively execute this primop, before performing other actions
--- that should come first according to evaluation strategy?
--- This is the question that i.e. @FloatOut@ (of a @case@) asks.
--- See Note [Transformations affected by can_fail and has_side_effects].
-isSpeculatablePrimOpEffect :: PrimOpEffect -> Bool
-isSpeculatablePrimOpEffect eff = eff <= NoEffect
+-- -- | Can we discard a call to the primop, i.e. @case a `op` b of _ -> rhs@?
+-- -- This is a question that i.e. the Simplifier asks before dropping the @case@.
+-- -- See Note [Transformations affected by can_fail and has_side_effects].
+-- isDiscardablePrimOpEffect :: PrimOpEffect -> Bool
+-- isDiscardablePrimOpEffect eff = eff <= ThrowsImprecise
+--
+-- -- | Can we duplicate a call to the primop?
+-- -- This is a question that i.e. the Simplifier asks when inlining definitions
+-- -- involving primops with multiple syntactic occurrences.
+-- -- See Note [Transformations affected by can_fail and has_side_effects].
+-- isDupablePrimOpEffect :: PrimOpEffect -> Bool
+-- -- isDupablePrimOpEffect eff = True -- #3207, see the Note
+-- isDupablePrimOpEffect eff = eff <= ThrowsImprecise
+--
+-- -- | Can we perform other actions first before entering the primop?
+-- -- This is the question that i.e. @FloatIn@ asks.
+-- -- See Note [Transformations affected by can_fail and has_side_effects].
+-- isDeferrablePrimOpEffect :: PrimOpEffect -> Bool
+-- isDeferrablePrimOpEffect eff = eff <= WriteEffect
+--
+-- -- | Can we speculatively execute this primop, before performing other actions
+-- -- that should come first according to evaluation strategy?
+-- -- This is the question that i.e. @FloatOut@ (of a @case@) asks.
+-- -- See Note [Transformations affected by can_fail and has_side_effects].
+-- isSpeculatablePrimOpEffect :: PrimOpEffect -> Bool
+-- isSpeculatablePrimOpEffect eff = eff <= NoEffect
 
 {- Note [Classification by PrimOpEffect]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -523,13 +523,11 @@ Two main predicates on primpops test these flags:
 primOpEffect :: PrimOp -> PrimOpEffect
 #include "primop-effect.hs-incl"
 
-primOpOkForSideEffects :: PrimOp -> Bool
--- This is exactly @isDupablePrimOpEffect (primOpEffect op)@
-primOpOkForSideEffects op = primOpEffect op < WriteEffect
+primOpHasSideEffects :: PrimOp -> Bool
+primOpHasSideEffects op = primOpEffect op >= WriteEffect
 
 primOpCanFail :: PrimOp -> Bool
--- This is exactly @isSpeculatablePrimOpEffect (primOpEffect op)@
-primOpCanFail op = primOpEffect op < ThrowsImprecise
+primOpCanFail op = primOpEffect op >= ThrowsImprecise
 
 primOpOkForSpeculation :: PrimOp -> Bool
   -- See Note [PrimOp can_fail and has_side_effects]

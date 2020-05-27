@@ -193,11 +193,10 @@ main = getArgs >>= \args ->
 known_args :: [String]
 known_args
    = [ "--data-decl",
-       "--has-side-effects",
+       "--effect",
        "--out-of-line",
        "--commutable",
        "--code-size",
-       "--can-fail",
        "--strictness",
        "--fixity",
        "--primop-primop-info",
@@ -774,7 +773,6 @@ gen_switch_from_attribs attrib_name fn_name (Info defaults entries)
          getAltRhs (OptionString _ s) = s
          getAltRhs (OptionVector _) = "True"
          getAltRhs (OptionFixity mf) = show mf
-         getAltRhs (OptionEffect eff) = show eff
 
          mkAlt po
             = case lookup_attrib attrib_name (opts po) of

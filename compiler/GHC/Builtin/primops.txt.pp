@@ -67,7 +67,7 @@
 -- #).
 
 defaults
-   effect         = NoEffect -- See Note [Classification by PrimOpEffect] in PrimOp.hs
+   effect         = { NoEffect } -- See Note [Classification by PrimOpEffect] in PrimOp.hs
    out_of_line    = False   -- See Note [When do out-of-line primops go in primops.txt.pp]
    commutable     = False
    code_size      = { primOpCodeSizeDefault }
@@ -99,7 +99,7 @@ defaults
 --   - No polymorphism in type
 --   - `strictness = <default>`
 --   - `can_fail   = False`
---   - `effect     = WriteEffect`
+--   - `effect     = { WriteEffect }`
 --
 -- https://gitlab.haskell.org/ghc/ghc/issues/16929 tracks this issue,
 -- and has a table of which external-only primops are blocked by which
@@ -253,15 +253,15 @@ primop Int8MulOp "timesInt8#" Dyadic Int8# -> Int8# -> Int8#
 
 primop Int8QuotOp "quotInt8#" Dyadic Int8# -> Int8# -> Int8#
   with
-    effect = ThrowsImprecise
+    effect = { ThrowsImprecise }
 
 primop Int8RemOp "remInt8#" Dyadic Int8# -> Int8# -> Int8#
   with
-    effect = ThrowsImprecise
+    effect = { ThrowsImprecise }
 
 primop Int8QuotRemOp "quotRemInt8#" GenPrimOp Int8# -> Int8# -> (# Int8#, Int8# #)
   with
-    effect = ThrowsImprecise
+    effect = { ThrowsImprecise }
 
 primop Int8EqOp "eqInt8#" Compare Int8# -> Int8# -> Int#
 primop Int8GeOp "geInt8#" Compare Int8# -> Int8# -> Int#
@@ -294,15 +294,15 @@ primop Word8MulOp "timesWord8#" Dyadic Word8# -> Word8# -> Word8#
 
 primop Word8QuotOp "quotWord8#" Dyadic Word8# -> Word8# -> Word8#
   with
-    effect = ThrowsImprecise
+    effect = { ThrowsImprecise }
 
 primop Word8RemOp "remWord8#" Dyadic Word8# -> Word8# -> Word8#
   with
-    effect = ThrowsImprecise
+    effect = { ThrowsImprecise }
 
 primop Word8QuotRemOp "quotRemWord8#" GenPrimOp Word8# -> Word8# -> (# Word8#, Word8# #)
   with
-    effect = ThrowsImprecise
+    effect = { ThrowsImprecise }
 
 primop Word8EqOp "eqWord8#" Compare Word8# -> Word8# -> Int#
 primop Word8GeOp "geWord8#" Compare Word8# -> Word8# -> Int#
@@ -335,15 +335,15 @@ primop Int16MulOp "timesInt16#" Dyadic Int16# -> Int16# -> Int16#
 
 primop Int16QuotOp "quotInt16#" Dyadic Int16# -> Int16# -> Int16#
   with
-    effect = ThrowsImprecise
+    effect = { ThrowsImprecise }
 
 primop Int16RemOp "remInt16#" Dyadic Int16# -> Int16# -> Int16#
   with
-    effect = ThrowsImprecise
+    effect = { ThrowsImprecise }
 
 primop Int16QuotRemOp "quotRemInt16#" GenPrimOp Int16# -> Int16# -> (# Int16#, Int16# #)
   with
-    effect = ThrowsImprecise
+    effect = { ThrowsImprecise }
 
 primop Int16EqOp "eqInt16#" Compare Int16# -> Int16# -> Int#
 primop Int16GeOp "geInt16#" Compare Int16# -> Int16# -> Int#
@@ -376,15 +376,15 @@ primop Word16MulOp "timesWord16#" Dyadic Word16# -> Word16# -> Word16#
 
 primop Word16QuotOp "quotWord16#" Dyadic Word16# -> Word16# -> Word16#
   with
-    effect = ThrowsImprecise
+    effect = { ThrowsImprecise }
 
 primop Word16RemOp "remWord16#" Dyadic Word16# -> Word16# -> Word16#
   with
-    effect = ThrowsImprecise
+    effect = { ThrowsImprecise }
 
 primop Word16QuotRemOp "quotRemWord16#" GenPrimOp Word16# -> Word16# -> (# Word16#, Word16# #)
   with
-    effect = ThrowsImprecise
+    effect = { ThrowsImprecise }
 
 primop Word16EqOp "eqWord16#" Compare Word16# -> Word16# -> Int#
 primop Word16GeOp "geWord16#" Compare Word16# -> Word16# -> Int#
@@ -471,19 +471,19 @@ primop   IntQuotOp    "quotInt#"    Dyadic
    {Rounds towards zero. The behavior is undefined if the second argument is
     zero.
    }
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop   IntRemOp    "remInt#"    Dyadic
    Int# -> Int# -> Int#
    {Satisfies \texttt{(quotInt\# x y) *\# y +\# (remInt\# x y) == x}. The
     behavior is undefined if the second argument is zero.
    }
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop   IntQuotRemOp "quotRemInt#"    GenPrimOp
    Int# -> Int# -> (# Int#, Int# #)
    {Rounds towards zero.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop   AndIOp   "andI#"   Dyadic    Int# -> Int# -> Int#
    {Bitwise "and".}
@@ -608,20 +608,20 @@ primop   WordMul2Op  "timesWord2#"   GenPrimOp
    with commutable = True
 
 primop   WordQuotOp   "quotWord#"   Dyadic   Word# -> Word# -> Word#
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop   WordRemOp   "remWord#"   Dyadic   Word# -> Word# -> Word#
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop   WordQuotRemOp "quotRemWord#" GenPrimOp
    Word# -> Word# -> (# Word#, Word# #)
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop   WordQuotRem2Op "quotRemWord2#" GenPrimOp
    Word# -> Word# -> Word# -> (# Word#, Word# #)
          { Takes high word of dividend, then low word of dividend, then divisor.
            Requires that high word < divisor.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop   AndOp   "and#"   Dyadic   Word# -> Word# -> Word#
    with commutable = True
@@ -782,7 +782,7 @@ primop   DoubleMulOp   "*##"   Dyadic
 
 primop   DoubleDivOp   "/##"   Dyadic
    Double# -> Double# -> Double#
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
         fixity = infixl 7
 
 primop   DoubleNegOp   "negateDouble#"  Monadic   Double# -> Double#
@@ -810,13 +810,13 @@ primop   DoubleLogOp   "logDouble#"      Monadic
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
-   effect = ThrowsImprecise
+   effect = { ThrowsImprecise }
 
 primop   DoubleLog1POp   "log1pDouble#"      Monadic
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
-   effect = ThrowsImprecise
+   effect = { ThrowsImprecise }
 
 primop   DoubleSqrtOp   "sqrtDouble#"      Monadic
    Double# -> Double#
@@ -842,13 +842,13 @@ primop   DoubleAsinOp   "asinDouble#"      Monadic
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
-   effect = ThrowsImprecise
+   effect = { ThrowsImprecise }
 
 primop   DoubleAcosOp   "acosDouble#"      Monadic
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
-   effect = ThrowsImprecise
+   effect = { ThrowsImprecise }
 
 primop   DoubleAtanOp   "atanDouble#"      Monadic
    Double# -> Double#
@@ -937,7 +937,7 @@ primop   FloatMulOp   "timesFloat#"      Dyadic
 
 primop   FloatDivOp   "divideFloat#"      Dyadic
    Float# -> Float# -> Float#
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop   FloatNegOp   "negateFloat#"      Monadic    Float# -> Float#
 
@@ -962,13 +962,13 @@ primop   FloatLogOp   "logFloat#"      Monadic
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
-   effect = ThrowsImprecise
+   effect = { ThrowsImprecise }
 
 primop   FloatLog1POp  "log1pFloat#"     Monadic
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
-   effect = ThrowsImprecise
+   effect = { ThrowsImprecise }
 
 primop   FloatSqrtOp   "sqrtFloat#"      Monadic
    Float# -> Float#
@@ -994,13 +994,13 @@ primop   FloatAsinOp   "asinFloat#"      Monadic
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
-   effect = ThrowsImprecise
+   effect = { ThrowsImprecise }
 
 primop   FloatAcosOp   "acosFloat#"      Monadic
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
-   effect = ThrowsImprecise
+   effect = { ThrowsImprecise }
 
 primop   FloatAtanOp   "atanFloat#"      Monadic
    Float# -> Float#
@@ -1066,8 +1066,8 @@ primop  NewArrayOp "newArray#" GenPrimOp
     with each element containing the specified initial value.}
    with
    out_of_line = True
-   -- effect = NoEffect -- #3207
-   effect = WriteEffect
+   -- effect = { NoEffect } -- #3207
+   effect = { WriteEffect }
 
 primop  SameMutableArrayOp "sameMutableArray#" GenPrimOp
    MutableArray# s a -> MutableArray# s a -> Int#
@@ -1076,14 +1076,14 @@ primop  ReadArrayOp "readArray#" GenPrimOp
    MutableArray# s a -> Int# -> State# s -> (# State# s, a #)
    {Read from specified index of mutable array. Result is not yet evaluated.}
    with
-   -- effect = ThrowsImprecise -- #3207
-   effect = WriteEffect
+   -- effect = { ThrowsImprecise } -- #3207
+   effect = { WriteEffect }
 
 primop  WriteArrayOp "writeArray#" GenPrimOp
    MutableArray# s a -> Int# -> a -> State# s -> State# s
    {Write to specified index of mutable array.}
    with
-   effect    = WriteEffect
+   effect    = { WriteEffect }
    code_size = 2 -- card update too
 
 primop  SizeofArrayOp "sizeofArray#" GenPrimOp
@@ -1104,20 +1104,20 @@ primop  IndexArrayOp "indexArray#" GenPrimOp
     heap. Avoiding these thunks, in turn, reduces references to the
     argument array, allowing it to be garbage collected more promptly.}
    with
-   effect = ThrowsImprecise
+   effect = { ThrowsImprecise }
 
 primop  UnsafeFreezeArrayOp "unsafeFreezeArray#" GenPrimOp
    MutableArray# s a -> State# s -> (# State# s, Array# a #)
    {Make a mutable array immutable, without copying.}
    with
-   effect = WriteEffect
+   effect = { WriteEffect }
 
 primop  UnsafeThawArrayOp  "unsafeThawArray#" GenPrimOp
    Array# a -> State# s -> (# State# s, MutableArray# s a #)
    {Make an immutable array mutable, without copying.}
    with
    out_of_line = True
-   effect = WriteEffect
+   effect = { WriteEffect }
 
 primop  CopyArrayOp "copyArray#" GenPrimOp
   Array# a -> Int# -> MutableArray# s a -> Int# -> Int# -> State# s -> State# s
@@ -1130,7 +1130,7 @@ primop  CopyArrayOp "copyArray#" GenPrimOp
    either.}
   with
   out_of_line = True
-  effect      = WriteEffect
+  effect      = { WriteEffect }
 
 primop  CopyMutableArrayOp "copyMutableArray#" GenPrimOp
   MutableArray# s a -> Int# -> MutableArray# s a -> Int# -> Int# -> State# s -> State# s
@@ -1143,7 +1143,7 @@ primop  CopyMutableArrayOp "copyMutableArray#" GenPrimOp
    destination regions may overlap.}
   with
   out_of_line = True
-  effect      = WriteEffect
+  effect      = { WriteEffect }
 
 primop  CloneArrayOp "cloneArray#" GenPrimOp
   Array# a -> Int# -> Int# -> Array# a
@@ -1153,7 +1153,7 @@ primop  CloneArrayOp "cloneArray#" GenPrimOp
    range, but this is not checked.}
   with
   out_of_line = True
-  effect      = WriteEffect
+  effect      = { WriteEffect }
 
 primop  CloneMutableArrayOp "cloneMutableArray#" GenPrimOp
   MutableArray# s a -> Int# -> Int# -> State# s -> (# State# s, MutableArray# s a #)
@@ -1163,7 +1163,7 @@ primop  CloneMutableArrayOp "cloneMutableArray#" GenPrimOp
    range, but this is not checked.}
   with
   out_of_line = True
-  effect      = WriteEffect
+  effect      = { WriteEffect }
 
 primop  FreezeArrayOp "freezeArray#" GenPrimOp
   MutableArray# s a -> Int# -> Int# -> State# s -> (# State# s, Array# a #)
@@ -1173,8 +1173,8 @@ primop  FreezeArrayOp "freezeArray#" GenPrimOp
    range, but this is not checked.}
   with
   out_of_line = True
-  -- effect      = ThrowsImprecise -- #3207
-  effect      = WriteEffect
+  -- effect      = { ThrowsImprecise } -- #3207
+  effect      = { WriteEffect }
 
 primop  ThawArrayOp "thawArray#" GenPrimOp
   Array# a -> Int# -> Int# -> State# s -> (# State# s, MutableArray# s a #)
@@ -1184,8 +1184,8 @@ primop  ThawArrayOp "thawArray#" GenPrimOp
    range, but this is not checked.}
   with
   out_of_line = True
-  -- effect      = ThrowsImprecise -- #3207
-  effect      = WriteEffect
+  -- effect      = { ThrowsImprecise } -- #3207
+  effect      = { WriteEffect }
 
 primop CasArrayOp  "casArray#" GenPrimOp
    MutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, a #)
@@ -1203,7 +1203,7 @@ primop CasArrayOp  "casArray#" GenPrimOp
    }
    with
    out_of_line = True
-   effect      = WriteEffect
+   effect      = { WriteEffect }
 
 
 ------------------------------------------------------------------------
@@ -1240,8 +1240,8 @@ primop  NewSmallArrayOp "newSmallArray#" GenPrimOp
     with each element containing the specified initial value.}
    with
    out_of_line = True
-   -- effect      = NoEffect -- #3207
-   effect      = WriteEffect
+   -- effect      = { NoEffect } -- #3207
+   effect      = { WriteEffect }
 
 primop  SameSmallMutableArrayOp "sameSmallMutableArray#" GenPrimOp
    SmallMutableArray# s a -> SmallMutableArray# s a -> Int#
@@ -1252,20 +1252,20 @@ primop  ShrinkSmallMutableArrayOp_Char "shrinkSmallMutableArray#" GenPrimOp
     the specified state thread. The new size argument must be less than or
     equal to the current size as reported by {\tt getSizeofSmallMutableArray\#}.}
    with out_of_line = True
-        effect      = WriteEffect
+        effect      = { WriteEffect }
 
 primop  ReadSmallArrayOp "readSmallArray#" GenPrimOp
    SmallMutableArray# s a -> Int# -> State# s -> (# State# s, a #)
    {Read from specified index of mutable array. Result is not yet evaluated.}
    with
-   -- effect = ThrowsImprecise -- #3207
-   effect = WriteEffect
+   -- effect = { ThrowsImprecise } -- #3207
+   effect = { WriteEffect }
 
 primop  WriteSmallArrayOp "writeSmallArray#" GenPrimOp
    SmallMutableArray# s a -> Int# -> a -> State# s -> State# s
    {Write to specified index of mutable array.}
    with
-   effect = WriteEffect
+   effect = { WriteEffect }
 
 primop  SizeofSmallArrayOp "sizeofSmallArray#" GenPrimOp
    SmallArray# a -> Int#
@@ -1287,20 +1287,20 @@ primop  IndexSmallArrayOp "indexSmallArray#" GenPrimOp
    {Read from specified index of immutable array. Result is packaged into
     an unboxed singleton; the result itself is not yet evaluated.}
    with
-   effect = ThrowsImprecise
+   effect = { ThrowsImprecise }
 
 primop  UnsafeFreezeSmallArrayOp "unsafeFreezeSmallArray#" GenPrimOp
    SmallMutableArray# s a -> State# s -> (# State# s, SmallArray# a #)
    {Make a mutable array immutable, without copying.}
    with
-   effect = WriteEffect
+   effect = { WriteEffect }
 
 primop  UnsafeThawSmallArrayOp  "unsafeThawSmallArray#" GenPrimOp
    SmallArray# a -> State# s -> (# State# s, SmallMutableArray# s a #)
    {Make an immutable array mutable, without copying.}
    with
    out_of_line = True
-   effect      = WriteEffect
+   effect      = { WriteEffect }
 
 -- The code_size is only correct for the case when the copy family of
 -- primops aren't inlined. It would be nice to keep track of both.
@@ -1316,7 +1316,7 @@ primop  CopySmallArrayOp "copySmallArray#" GenPrimOp
    either.}
   with
   out_of_line = True
-  effect      = WriteEffect
+  effect      = { WriteEffect }
 
 primop  CopySmallMutableArrayOp "copySmallMutableArray#" GenPrimOp
   SmallMutableArray# s a -> Int# -> SmallMutableArray# s a -> Int# -> Int# -> State# s -> State# s
@@ -1330,7 +1330,7 @@ primop  CopySmallMutableArrayOp "copySmallMutableArray#" GenPrimOp
    array is provided as both the source and the destination. }
   with
   out_of_line = True
-  effect      = WriteEffect
+  effect      = { WriteEffect }
 
 primop  CloneSmallArrayOp "cloneSmallArray#" GenPrimOp
   SmallArray# a -> Int# -> Int# -> SmallArray# a
@@ -1340,7 +1340,7 @@ primop  CloneSmallArrayOp "cloneSmallArray#" GenPrimOp
    range, but this is not checked.}
   with
   out_of_line = True
-  effect      = ThrowsImprecise
+  effect      = { ThrowsImprecise }
 
 primop  CloneSmallMutableArrayOp "cloneSmallMutableArray#" GenPrimOp
   SmallMutableArray# s a -> Int# -> Int# -> State# s -> (# State# s, SmallMutableArray# s a #)
@@ -1350,8 +1350,8 @@ primop  CloneSmallMutableArrayOp "cloneSmallMutableArray#" GenPrimOp
    range, but this is not checked.}
   with
   out_of_line = True
-  -- effect      = ThrowsImprecise -- #3207
-  effect      = WriteEffect
+  -- effect      = { ThrowsImprecise } -- #3207
+  effect      = { WriteEffect }
 
 primop  FreezeSmallArrayOp "freezeSmallArray#" GenPrimOp
   SmallMutableArray# s a -> Int# -> Int# -> State# s -> (# State# s, SmallArray# a #)
@@ -1361,8 +1361,8 @@ primop  FreezeSmallArrayOp "freezeSmallArray#" GenPrimOp
    range, but this is not checked.}
   with
   out_of_line = True
-  -- effect      = ThrowsImprecise -- #3207
-  effect      = WriteEffect
+  -- effect      = { ThrowsImprecise } -- #3207
+  effect      = { WriteEffect }
 
 primop  ThawSmallArrayOp "thawSmallArray#" GenPrimOp
   SmallArray# a -> Int# -> Int# -> State# s -> (# State# s, SmallMutableArray# s a #)
@@ -1372,8 +1372,8 @@ primop  ThawSmallArrayOp "thawSmallArray#" GenPrimOp
    range, but this is not checked.}
   with
   out_of_line = True
-  -- effect      = ThrowsImprecise -- #3207
-  effect      = WriteEffect
+  -- effect      = { ThrowsImprecise } -- #3207
+  effect      = { WriteEffect }
 
 primop CasSmallArrayOp  "casSmallArray#" GenPrimOp
    SmallMutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, a #)
@@ -1381,7 +1381,7 @@ primop CasSmallArrayOp  "casSmallArray#" GenPrimOp
     See the documentation of {\tt casArray\#}.}
    with
    out_of_line = True
-   effect      = WriteEffect
+   effect      = { WriteEffect }
 
 ------------------------------------------------------------------------
 section "Byte Arrays"
@@ -1408,21 +1408,21 @@ primop  NewByteArrayOp_Char "newByteArray#" GenPrimOp
     the specified state thread.}
    with out_of_line = True
         -- effect      = NoEffec --#3207
-        effect      = WriteEffect
+        effect      = { WriteEffect }
 
 primop  NewPinnedByteArrayOp_Char "newPinnedByteArray#" GenPrimOp
    Int# -> State# s -> (# State# s, MutableByteArray# s #)
    {Create a mutable byte array that the GC guarantees not to move.}
    with out_of_line = True
         -- effect      = NoEffec --#3207
-        effect      = WriteEffect
+        effect      = { WriteEffect }
 
 primop  NewAlignedPinnedByteArrayOp_Char "newAlignedPinnedByteArray#" GenPrimOp
    Int# -> Int# -> State# s -> (# State# s, MutableByteArray# s #)
    {Create a mutable byte array, aligned by the specified amount, that the GC guarantees not to move.}
    with out_of_line = True
         -- effect      = NoEffec --#3207
-        effect      = WriteEffect
+        effect      = { WriteEffect }
 
 primop  MutableByteArrayIsPinnedOp "isMutableByteArrayPinned#" GenPrimOp
    MutableByteArray# s -> Int#
@@ -1448,7 +1448,7 @@ primop  ShrinkMutableByteArrayOp_Char "shrinkMutableByteArray#" GenPrimOp
     the specified state thread. The new size argument must be less than or
     equal to the current size as reported by {\tt getSizeofMutableByteArray\#}.}
    with out_of_line = True
-        effect      = WriteEffect
+        effect      = { WriteEffect }
 
 primop  ResizeMutableByteArrayOp_Char "resizeMutableByteArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s,MutableByteArray# s #)
@@ -1464,13 +1464,13 @@ primop  ResizeMutableByteArrayOp_Char "resizeMutableByteArray#" GenPrimOp
     to allow garbage collection of the original {\tt MutableByteArray\#} in
     case a new {\tt MutableByteArray\#} had to be allocated.}
    with out_of_line = True
-        effect      = WriteEffect
+        effect      = { WriteEffect }
 
 primop  UnsafeFreezeByteArrayOp "unsafeFreezeByteArray#" GenPrimOp
    MutableByteArray# s -> State# s -> (# State# s, ByteArray# #)
    {Make a mutable byte array immutable, without copying.}
    with
-   effect = WriteEffect
+   effect = { WriteEffect }
 
 primop  SizeofByteArrayOp "sizeofByteArray#" GenPrimOp
    ByteArray# -> Int#
@@ -1490,452 +1490,421 @@ primop  GetSizeofMutableByteArrayOp "getSizeofMutableByteArray#" GenPrimOp
 primop IndexByteArrayOp_Char "indexCharArray#" GenPrimOp
    ByteArray# -> Int# -> Char#
    {Read 8-bit character; offset in bytes.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_WideChar "indexWideCharArray#" GenPrimOp
    ByteArray# -> Int# -> Char#
    {Read 31-bit character; offset in 4-byte words.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Int "indexIntArray#" GenPrimOp
    ByteArray# -> Int# -> Int#
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Word "indexWordArray#" GenPrimOp
    ByteArray# -> Int# -> Word#
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Addr "indexAddrArray#" GenPrimOp
    ByteArray# -> Int# -> Addr#
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Float "indexFloatArray#" GenPrimOp
    ByteArray# -> Int# -> Float#
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Double "indexDoubleArray#" GenPrimOp
    ByteArray# -> Int# -> Double#
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_StablePtr "indexStablePtrArray#" GenPrimOp
    ByteArray# -> Int# -> StablePtr# a
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Int8 "indexInt8Array#" GenPrimOp
    ByteArray# -> Int# -> Int#
    {Read 8-bit integer; offset in bytes.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Int16 "indexInt16Array#" GenPrimOp
    ByteArray# -> Int# -> Int#
    {Read 16-bit integer; offset in 16-bit words.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Int32 "indexInt32Array#" GenPrimOp
    ByteArray# -> Int# -> INT32
    {Read 32-bit integer; offset in 32-bit words.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Int64 "indexInt64Array#" GenPrimOp
    ByteArray# -> Int# -> INT64
    {Read 64-bit integer; offset in 64-bit words.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Word8 "indexWord8Array#" GenPrimOp
    ByteArray# -> Int# -> Word#
    {Read 8-bit word; offset in bytes.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Word16 "indexWord16Array#" GenPrimOp
    ByteArray# -> Int# -> Word#
    {Read 16-bit word; offset in 16-bit words.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Word32 "indexWord32Array#" GenPrimOp
    ByteArray# -> Int# -> WORD32
    {Read 32-bit word; offset in 32-bit words.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Word64 "indexWord64Array#" GenPrimOp
    ByteArray# -> Int# -> WORD64
    {Read 64-bit word; offset in 64-bit words.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Word8AsChar "indexWord8ArrayAsChar#" GenPrimOp
    ByteArray# -> Int# -> Char#
    {Read 8-bit character; offset in bytes.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Word8AsWideChar "indexWord8ArrayAsWideChar#" GenPrimOp
    ByteArray# -> Int# -> Char#
    {Read 31-bit character; offset in bytes.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Word8AsAddr "indexWord8ArrayAsAddr#" GenPrimOp
    ByteArray# -> Int# -> Addr#
    {Read address; offset in bytes.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Word8AsFloat "indexWord8ArrayAsFloat#" GenPrimOp
    ByteArray# -> Int# -> Float#
    {Read float; offset in bytes.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Word8AsDouble "indexWord8ArrayAsDouble#" GenPrimOp
    ByteArray# -> Int# -> Double#
    {Read double; offset in bytes.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Word8AsStablePtr "indexWord8ArrayAsStablePtr#" GenPrimOp
    ByteArray# -> Int# -> StablePtr# a
    {Read stable pointer; offset in bytes.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Word8AsInt16 "indexWord8ArrayAsInt16#" GenPrimOp
    ByteArray# -> Int# -> Int#
    {Read 16-bit int; offset in bytes.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Word8AsInt32 "indexWord8ArrayAsInt32#" GenPrimOp
    ByteArray# -> Int# -> INT32
    {Read 32-bit int; offset in bytes.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Word8AsInt64 "indexWord8ArrayAsInt64#" GenPrimOp
    ByteArray# -> Int# -> INT64
    {Read 64-bit int; offset in bytes.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Word8AsInt "indexWord8ArrayAsInt#" GenPrimOp
    ByteArray# -> Int# -> Int#
    {Read int; offset in bytes.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Word8AsWord16 "indexWord8ArrayAsWord16#" GenPrimOp
    ByteArray# -> Int# -> Word#
    {Read 16-bit word; offset in bytes.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Word8AsWord32 "indexWord8ArrayAsWord32#" GenPrimOp
    ByteArray# -> Int# -> WORD32
    {Read 32-bit word; offset in bytes.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Word8AsWord64 "indexWord8ArrayAsWord64#" GenPrimOp
    ByteArray# -> Int# -> WORD64
    {Read 64-bit word; offset in bytes.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexByteArrayOp_Word8AsWord "indexWord8ArrayAsWord#" GenPrimOp
    ByteArray# -> Int# -> Word#
    {Read word; offset in bytes.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop  ReadByteArrayOp_Char "readCharArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Char# #)
    {Read 8-bit character; offset in bytes.}
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_WideChar "readWideCharArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Char# #)
    {Read 31-bit character; offset in 4-byte words.}
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Int "readIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
    {Read integer; offset in machine words.}
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Word "readWordArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
    {Read word; offset in machine words.}
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Addr "readAddrArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Addr# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Float "readFloatArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Float# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Double "readDoubleArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Double# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_StablePtr "readStablePtrArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, StablePtr# a #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Int8 "readInt8Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Int16 "readInt16Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Int32 "readInt32Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, INT32 #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Int64 "readInt64Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, INT64 #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Word8 "readWord8Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Word16 "readWord16Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Word32 "readWord32Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD32 #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Word64 "readWord64Array#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD64 #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Word8AsChar "readWord8ArrayAsChar#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Char# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Word8AsWideChar "readWord8ArrayAsWideChar#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Char# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Word8AsAddr "readWord8ArrayAsAddr#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Addr# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Word8AsFloat "readWord8ArrayAsFloat#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Float# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Word8AsDouble "readWord8ArrayAsDouble#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Double# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Word8AsStablePtr "readWord8ArrayAsStablePtr#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, StablePtr# a #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Word8AsInt16 "readWord8ArrayAsInt16#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Word8AsInt32 "readWord8ArrayAsInt32#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, INT32 #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Word8AsInt64 "readWord8ArrayAsInt64#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, INT64 #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Word8AsInt "readWord8ArrayAsInt#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Word8AsWord16 "readWord8ArrayAsWord16#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Word8AsWord32 "readWord8ArrayAsWord32#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD32 #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Word8AsWord64 "readWord8ArrayAsWord64#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, WORD64 #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadByteArrayOp_Word8AsWord "readWord8ArrayAsWord#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Word# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Char "writeCharArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Char# -> State# s -> State# s
    {Write 8-bit character; offset in bytes.}
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_WideChar "writeWideCharArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Char# -> State# s -> State# s
    {Write 31-bit character; offset in 4-byte words.}
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Int "writeIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Word "writeWordArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Addr "writeAddrArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Addr# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Float "writeFloatArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Float# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Double "writeDoubleArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Double# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_StablePtr "writeStablePtrArray#" GenPrimOp
    MutableByteArray# s -> Int# -> StablePtr# a -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Int8 "writeInt8Array#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Int16 "writeInt16Array#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Int32 "writeInt32Array#" GenPrimOp
    MutableByteArray# s -> Int# -> INT32 -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Int64 "writeInt64Array#" GenPrimOp
    MutableByteArray# s -> Int# -> INT64 -> State# s -> State# s
-   with effect = ThrowsImprecise
-        effect           = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Word8 "writeWord8Array#" GenPrimOp
    MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Word16 "writeWord16Array#" GenPrimOp
    MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Word32 "writeWord32Array#" GenPrimOp
    MutableByteArray# s -> Int# -> WORD32 -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Word64 "writeWord64Array#" GenPrimOp
    MutableByteArray# s -> Int# -> WORD64 -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Word8AsChar "writeWord8ArrayAsChar#" GenPrimOp
    MutableByteArray# s -> Int# -> Char# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Word8AsWideChar "writeWord8ArrayAsWideChar#" GenPrimOp
    MutableByteArray# s -> Int# -> Char# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Word8AsAddr "writeWord8ArrayAsAddr#" GenPrimOp
    MutableByteArray# s -> Int# -> Addr# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Word8AsFloat "writeWord8ArrayAsFloat#" GenPrimOp
    MutableByteArray# s -> Int# -> Float# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Word8AsDouble "writeWord8ArrayAsDouble#" GenPrimOp
    MutableByteArray# s -> Int# -> Double# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Word8AsStablePtr "writeWord8ArrayAsStablePtr#" GenPrimOp
    MutableByteArray# s -> Int# -> StablePtr# a -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Word8AsInt16 "writeWord8ArrayAsInt16#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Word8AsInt32 "writeWord8ArrayAsInt32#" GenPrimOp
    MutableByteArray# s -> Int# -> INT32 -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Word8AsInt64 "writeWord8ArrayAsInt64#" GenPrimOp
    MutableByteArray# s -> Int# -> INT64 -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Word8AsInt "writeWord8ArrayAsInt#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Word8AsWord16 "writeWord8ArrayAsWord16#" GenPrimOp
    MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Word8AsWord32 "writeWord8ArrayAsWord32#" GenPrimOp
    MutableByteArray# s -> Int# -> WORD32 -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Word8AsWord64 "writeWord8ArrayAsWord64#" GenPrimOp
    MutableByteArray# s -> Int# -> WORD64 -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  WriteByteArrayOp_Word8AsWord "writeWord8ArrayAsWord#" GenPrimOp
    MutableByteArray# s -> Int# -> Word# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop  CompareByteArraysOp "compareByteArrays#" GenPrimOp
    ByteArray# -> Int# -> ByteArray# -> Int# -> Int# -> Int#
@@ -1949,7 +1918,7 @@ primop  CompareByteArraysOp "compareByteArrays#" GenPrimOp
     respectively, to be byte-wise lexicographically less than, to
     match, or be greater than the second range.}
    with
-   effect = ThrowsImprecise
+   effect = { ThrowsImprecise }
 
 primop  CopyByteArrayOp "copyByteArray#" GenPrimOp
   ByteArray# -> Int# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
@@ -1961,8 +1930,8 @@ primop  CopyByteArrayOp "copyByteArray#" GenPrimOp
    not be the same array in different states, but this is not checked
    either.}
   with
-  -- effect    = ThrowsImprecise -- #3207
-  effect    = WriteEffect
+  -- effect    = { ThrowsImprecise } -- #3207
+  effect    = { WriteEffect }
   code_size = { primOpCodeSizeForeignCall + 4}
 
 primop  CopyMutableByteArrayOp "copyMutableByteArray#" GenPrimOp
@@ -1972,8 +1941,8 @@ primop  CopyMutableByteArrayOp "copyMutableByteArray#" GenPrimOp
    allowed to overlap, although this is only possible when the same array is provided
    as both the source and the destination.}
   with
-  -- effect    = ThrowsImprecise -- #3207
-  effect    = WriteEffect
+  -- effect    = { ThrowsImprecise } -- #3207
+  effect    = { WriteEffect }
   code_size = { primOpCodeSizeForeignCall + 4 }
 
 primop  CopyByteArrayToAddrOp "copyByteArrayToAddr#" GenPrimOp
@@ -1984,8 +1953,8 @@ primop  CopyByteArrayToAddrOp "copyByteArrayToAddr#" GenPrimOp
    ByteArray\# (e.g. if the ByteArray\# were pinned), but this is not checked
    either.}
   with
-  -- effect    = ThrowsImprecise -- #3207
-  effect    = WriteEffect
+  -- effect    = { ThrowsImprecise } -- #3207
+  effect    = { WriteEffect }
   code_size = { primOpCodeSizeForeignCall + 4}
 
 primop  CopyMutableByteArrayToAddrOp "copyMutableByteArrayToAddr#" GenPrimOp
@@ -1996,8 +1965,8 @@ primop  CopyMutableByteArrayToAddrOp "copyMutableByteArrayToAddr#" GenPrimOp
    point into the MutableByteArray\# (e.g. if the MutableByteArray\# were
    pinned), but this is not checked either.}
   with
-  -- effect    = ThrowsImprecise -- #3207
-  effect    = WriteEffect
+  -- effect    = { ThrowsImprecise } -- #3207
+  effect    = { WriteEffect }
   code_size = { primOpCodeSizeForeignCall + 4}
 
 primop  CopyAddrToByteArrayOp "copyAddrToByteArray#" GenPrimOp
@@ -2008,8 +1977,8 @@ primop  CopyAddrToByteArrayOp "copyAddrToByteArray#" GenPrimOp
    point into the MutableByteArray\# (e.g. if the MutableByteArray\# were pinned),
    but this is not checked either.}
   with
-  -- effect    = ThrowsImprecise -- #3207
-  effect    = WriteEffect
+  -- effect    = { ThrowsImprecise } -- #3207
+  effect    = { WriteEffect }
   code_size = { primOpCodeSizeForeignCall + 4}
 
 primop  SetByteArrayOp "setByteArray#" GenPrimOp
@@ -2017,8 +1986,8 @@ primop  SetByteArrayOp "setByteArray#" GenPrimOp
   {{\tt setByteArray# ba off len c} sets the byte range {\tt [off, off+len]} of
    the {\tt MutableByteArray#} to the byte {\tt c}.}
   with
-  -- effect    = ThrowsImprecise -- #3207
-  effect    = WriteEffect
+  -- effect    = { ThrowsImprecise } -- #3207
+  effect    = { WriteEffect }
   code_size = { primOpCodeSizeForeignCall + 4 }
 
 -- Atomic operations
@@ -2027,15 +1996,15 @@ primop  AtomicReadByteArrayOp_Int "atomicReadIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, Int# #)
    {Given an array and an offset in machine words, read an element. The
     index is assumed to be in bounds. Implies a full memory barrier.}
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  AtomicWriteByteArrayOp_Int "atomicWriteIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
    {Given an array and an offset in machine words, write an element. The
     index is assumed to be in bounds. Implies a full memory barrier.}
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop CasByteArrayOp_Int "casIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> Int# -> State# s -> (# State# s, Int# #)
@@ -2044,56 +2013,56 @@ primop CasByteArrayOp_Int "casIntArray#" GenPrimOp
     value if the current value matches the provided old value. Returns
     the value of the element before the operation. Implies a full memory
     barrier.}
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop FetchAddByteArrayOp_Int "fetchAddIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
    {Given an array, and offset in machine words, and a value to add,
     atomically add the value to the element. Returns the value of the
     element before the operation. Implies a full memory barrier.}
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop FetchSubByteArrayOp_Int "fetchSubIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
    {Given an array, and offset in machine words, and a value to subtract,
     atomically subtract the value to the element. Returns the value of
     the element before the operation. Implies a full memory barrier.}
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop FetchAndByteArrayOp_Int "fetchAndIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
    {Given an array, and offset in machine words, and a value to AND,
     atomically AND the value to the element. Returns the value of the
     element before the operation. Implies a full memory barrier.}
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop FetchNandByteArrayOp_Int "fetchNandIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
    {Given an array, and offset in machine words, and a value to NAND,
     atomically NAND the value to the element. Returns the value of the
     element before the operation. Implies a full memory barrier.}
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop FetchOrByteArrayOp_Int "fetchOrIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
    {Given an array, and offset in machine words, and a value to OR,
     atomically OR the value to the element. Returns the value of the
     element before the operation. Implies a full memory barrier.}
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop FetchXorByteArrayOp_Int "fetchXorIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
    {Given an array, and offset in machine words, and a value to XOR,
     atomically XOR the value to the element. Returns the value of the
     element before the operation. Implies a full memory barrier.}
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 
 ------------------------------------------------------------------------
@@ -2116,8 +2085,8 @@ primop  NewArrayArrayOp "newArrayArray#" GenPrimOp
     newly created array.}
    with
    out_of_line = True
-   -- effect      = NoEffect -- #3207
-   effect      = WriteEffect
+   -- effect      = { NoEffect } -- #3207
+   effect      = { WriteEffect }
 
 primop  SameMutableArrayArrayOp "sameMutableArrayArray#" GenPrimOp
    MutableArrayArray# s -> MutableArrayArray# s -> Int#
@@ -2126,7 +2095,7 @@ primop  UnsafeFreezeArrayArrayOp "unsafeFreezeArrayArray#" GenPrimOp
    MutableArrayArray# s -> State# s -> (# State# s, ArrayArray# #)
    {Make a mutable array of arrays immutable, without copying.}
    with
-   effect = WriteEffect
+   effect = { WriteEffect }
 
 primop  SizeofArrayArrayOp "sizeofArrayArray#" GenPrimOp
    ArrayArray# -> Int#
@@ -2138,51 +2107,51 @@ primop  SizeofMutableArrayArrayOp "sizeofMutableArrayArray#" GenPrimOp
 
 primop IndexArrayArrayOp_ByteArray "indexByteArrayArray#" GenPrimOp
    ArrayArray# -> Int# -> ByteArray#
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexArrayArrayOp_ArrayArray "indexArrayArrayArray#" GenPrimOp
    ArrayArray# -> Int# -> ArrayArray#
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop  ReadArrayArrayOp_ByteArray "readByteArrayArray#" GenPrimOp
    MutableArrayArray# s -> Int# -> State# s -> (# State# s, ByteArray# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadArrayArrayOp_MutableByteArray "readMutableByteArrayArray#" GenPrimOp
    MutableArrayArray# s -> Int# -> State# s -> (# State# s, MutableByteArray# s #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadArrayArrayOp_ArrayArray "readArrayArrayArray#" GenPrimOp
    MutableArrayArray# s -> Int# -> State# s -> (# State# s, ArrayArray# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  ReadArrayArrayOp_MutableArrayArray "readMutableArrayArrayArray#" GenPrimOp
    MutableArrayArray# s -> Int# -> State# s -> (# State# s, MutableArrayArray# s #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  WriteArrayArrayOp_ByteArray "writeByteArrayArray#" GenPrimOp
    MutableArrayArray# s -> Int# -> ByteArray# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  WriteArrayArrayOp_MutableByteArray "writeMutableByteArrayArray#" GenPrimOp
    MutableArrayArray# s -> Int# -> MutableByteArray# s -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  WriteArrayArrayOp_ArrayArray "writeArrayArrayArray#" GenPrimOp
    MutableArrayArray# s -> Int# -> ArrayArray# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  WriteArrayArrayOp_MutableArrayArray "writeMutableArrayArrayArray#" GenPrimOp
    MutableArrayArray# s -> Int# -> MutableArrayArray# s -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  CopyArrayArrayOp "copyArrayArray#" GenPrimOp
   ArrayArray# -> Int# -> MutableArrayArray# s -> Int# -> Int# -> State# s -> State# s
@@ -2191,8 +2160,8 @@ primop  CopyArrayArrayOp "copyArrayArray#" GenPrimOp
    The two arrays must not be the same array in different states, but this is not checked either.}
   with
   out_of_line = True
-  -- effect      = ThrowsImprecise -- #3207
-  effect      = WriteEffect
+  -- effect      = { ThrowsImprecise } -- #3207
+  effect      = { WriteEffect }
 
 primop  CopyMutableArrayArrayOp "copyMutableArrayArray#" GenPrimOp
   MutableArrayArray# s -> Int# -> MutableArrayArray# s -> Int# -> Int# -> State# s -> State# s
@@ -2204,8 +2173,8 @@ primop  CopyMutableArrayArrayOp "copyMutableArrayArray#" GenPrimOp
    }
   with
   out_of_line = True
-  -- effect      = ThrowsImprecise -- #3207
-  effect      = WriteEffect
+  -- effect      = { ThrowsImprecise } -- #3207
+  effect      = { WriteEffect }
 
 ------------------------------------------------------------------------
 section "Addr#"
@@ -2244,230 +2213,230 @@ primop   AddrLeOp  "leAddr#"   Compare   Addr# -> Addr# -> Int#
 primop IndexOffAddrOp_Char "indexCharOffAddr#" GenPrimOp
    Addr# -> Int# -> Char#
    {Reads 8-bit character; offset in bytes.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexOffAddrOp_WideChar "indexWideCharOffAddr#" GenPrimOp
    Addr# -> Int# -> Char#
    {Reads 31-bit character; offset in 4-byte words.}
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexOffAddrOp_Int "indexIntOffAddr#" GenPrimOp
    Addr# -> Int# -> Int#
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexOffAddrOp_Word "indexWordOffAddr#" GenPrimOp
    Addr# -> Int# -> Word#
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexOffAddrOp_Addr "indexAddrOffAddr#" GenPrimOp
    Addr# -> Int# -> Addr#
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexOffAddrOp_Float "indexFloatOffAddr#" GenPrimOp
    Addr# -> Int# -> Float#
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexOffAddrOp_Double "indexDoubleOffAddr#" GenPrimOp
    Addr# -> Int# -> Double#
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexOffAddrOp_StablePtr "indexStablePtrOffAddr#" GenPrimOp
    Addr# -> Int# -> StablePtr# a
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexOffAddrOp_Int8 "indexInt8OffAddr#" GenPrimOp
    Addr# -> Int# -> Int#
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexOffAddrOp_Int16 "indexInt16OffAddr#" GenPrimOp
    Addr# -> Int# -> Int#
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexOffAddrOp_Int32 "indexInt32OffAddr#" GenPrimOp
    Addr# -> Int# -> INT32
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexOffAddrOp_Int64 "indexInt64OffAddr#" GenPrimOp
    Addr# -> Int# -> INT64
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexOffAddrOp_Word8 "indexWord8OffAddr#" GenPrimOp
    Addr# -> Int# -> Word#
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexOffAddrOp_Word16 "indexWord16OffAddr#" GenPrimOp
    Addr# -> Int# -> Word#
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexOffAddrOp_Word32 "indexWord32OffAddr#" GenPrimOp
    Addr# -> Int# -> WORD32
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop IndexOffAddrOp_Word64 "indexWord64OffAddr#" GenPrimOp
    Addr# -> Int# -> WORD64
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 primop ReadOffAddrOp_Char "readCharOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Char# #)
    {Reads 8-bit character; offset in bytes.}
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop ReadOffAddrOp_WideChar "readWideCharOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Char# #)
    {Reads 31-bit character; offset in 4-byte words.}
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop ReadOffAddrOp_Int "readIntOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Int# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop ReadOffAddrOp_Word "readWordOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Word# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop ReadOffAddrOp_Addr "readAddrOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Addr# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop ReadOffAddrOp_Float "readFloatOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Float# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop ReadOffAddrOp_Double "readDoubleOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Double# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop ReadOffAddrOp_StablePtr "readStablePtrOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, StablePtr# a #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop ReadOffAddrOp_Int8 "readInt8OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Int# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop ReadOffAddrOp_Int16 "readInt16OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Int# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop ReadOffAddrOp_Int32 "readInt32OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, INT32 #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop ReadOffAddrOp_Int64 "readInt64OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, INT64 #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop ReadOffAddrOp_Word8 "readWord8OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Word# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop ReadOffAddrOp_Word16 "readWord16OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, Word# #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop ReadOffAddrOp_Word32 "readWord32OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, WORD32 #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop ReadOffAddrOp_Word64 "readWord64OffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, WORD64 #)
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  WriteOffAddrOp_Char "writeCharOffAddr#" GenPrimOp
    Addr# -> Int# -> Char# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  WriteOffAddrOp_WideChar "writeWideCharOffAddr#" GenPrimOp
    Addr# -> Int# -> Char# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  WriteOffAddrOp_Int "writeIntOffAddr#" GenPrimOp
    Addr# -> Int# -> Int# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  WriteOffAddrOp_Word "writeWordOffAddr#" GenPrimOp
    Addr# -> Int# -> Word# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  WriteOffAddrOp_Addr "writeAddrOffAddr#" GenPrimOp
    Addr# -> Int# -> Addr# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  WriteOffAddrOp_Float "writeFloatOffAddr#" GenPrimOp
    Addr# -> Int# -> Float# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  WriteOffAddrOp_Double "writeDoubleOffAddr#" GenPrimOp
    Addr# -> Int# -> Double# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  WriteOffAddrOp_StablePtr "writeStablePtrOffAddr#" GenPrimOp
    Addr# -> Int# -> StablePtr# a -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  WriteOffAddrOp_Int8 "writeInt8OffAddr#" GenPrimOp
    Addr# -> Int# -> Int# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  WriteOffAddrOp_Int16 "writeInt16OffAddr#" GenPrimOp
    Addr# -> Int# -> Int# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  WriteOffAddrOp_Int32 "writeInt32OffAddr#" GenPrimOp
    Addr# -> Int# -> INT32 -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  WriteOffAddrOp_Int64 "writeInt64OffAddr#" GenPrimOp
    Addr# -> Int# -> INT64 -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  WriteOffAddrOp_Word8 "writeWord8OffAddr#" GenPrimOp
    Addr# -> Int# -> Word# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  WriteOffAddrOp_Word16 "writeWord16OffAddr#" GenPrimOp
    Addr# -> Int# -> Word# -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  WriteOffAddrOp_Word32 "writeWord32OffAddr#" GenPrimOp
    Addr# -> Int# -> WORD32 -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 primop  WriteOffAddrOp_Word64 "writeWord64OffAddr#" GenPrimOp
    Addr# -> Int# -> WORD64 -> State# s -> State# s
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
 
 ------------------------------------------------------------------------
 section "Mutable variables"
@@ -2482,21 +2451,21 @@ primop  NewMutVarOp "newMutVar#" GenPrimOp
    {Create {\tt MutVar\#} with specified initial value in specified state thread.}
    with
    out_of_line = True
-   -- effect      = NoEffect -- #3207
-   effect      = WriteEffect
+   -- effect      = { NoEffect } -- #3207
+   effect      = { WriteEffect }
 
 primop  ReadMutVarOp "readMutVar#" GenPrimOp
    MutVar# s a -> State# s -> (# State# s, a #)
    {Read contents of {\tt MutVar\#}. Result is not yet evaluated.}
    with
-   -- effect = NoEffect -- #3207
-   effect = WriteEffect
+   -- effect = { NoEffect } -- #3207
+   effect = { WriteEffect }
 
 primop  WriteMutVarOp "writeMutVar#"  GenPrimOp
    MutVar# s a -> a -> State# s -> State# s
    {Write contents of {\tt MutVar\#}.}
    with
-   effect    = WriteEffect
+   effect    = { WriteEffect }
    code_size = { primOpCodeSizeForeignCall } -- for the write barrier
 
 primop  SameMutVarOp "sameMutVar#" GenPrimOp
@@ -2525,7 +2494,7 @@ primop  AtomicModifyMutVar2Op "atomicModifyMutVar2#" GenPrimOp
      but we don't know about pairs here. }
    with
    out_of_line = True
-   effect      = WriteEffect
+   effect      = { WriteEffect }
 
 primop  AtomicModifyMutVar_Op "atomicModifyMutVar_#" GenPrimOp
    MutVar# s a -> (a -> a) -> State# s -> (# State# s, a, a #)
@@ -2534,13 +2503,13 @@ primop  AtomicModifyMutVar_Op "atomicModifyMutVar_#" GenPrimOp
      previous contents. }
    with
    out_of_line = True
-   effect      = WriteEffect
+   effect      = { WriteEffect }
 
 primop  CasMutVarOp "casMutVar#" GenPrimOp
   MutVar# s a -> a -> a -> State# s -> (# State# s, Int#, a #)
    with
    out_of_line = True
-   effect      = WriteEffect
+   effect      = { WriteEffect }
 
 ------------------------------------------------------------------------
 section "Exceptions"
@@ -2570,7 +2539,7 @@ primop  CatchOp "catch#" GenPrimOp
                                                  , topDmd] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
-   effect      = WriteEffect
+   effect      = { WriteEffect }
 
 primop  RaiseOp "raise#" GenPrimOp
    b -> o
@@ -2585,7 +2554,7 @@ primop  RaiseOp "raise#" GenPrimOp
    -- See Note [PrimOp can_fail and has_side_effects] in PrimOp.hs.
    strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botDiv }
    out_of_line = True
-   effect      = ThrowsImprecise
+   effect      = { ThrowsImprecise }
 
 -- Note [Arithmetic exception primops]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2608,7 +2577,7 @@ primop  RaiseDivZeroOp "raiseDivZero#" GenPrimOp
    with
    strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botDiv }
    out_of_line = True
-   effect      = ThrowsImprecise
+   effect      = { ThrowsImprecise }
 
 primop  RaiseUnderflowOp "raiseUnderflow#" GenPrimOp
    Void# -> o
@@ -2618,7 +2587,7 @@ primop  RaiseUnderflowOp "raiseUnderflow#" GenPrimOp
    with
    strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botDiv }
    out_of_line = True
-   effect      = ThrowsImprecise
+   effect      = { ThrowsImprecise }
 
 primop  RaiseOverflowOp "raiseOverflow#" GenPrimOp
    Void# -> o
@@ -2628,7 +2597,7 @@ primop  RaiseOverflowOp "raiseOverflow#" GenPrimOp
    with
    strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botDiv }
    out_of_line = True
-   effect      = ThrowsImprecise
+   effect      = { ThrowsImprecise }
 
 -- See Note [Precise vs. imprecise exceptions] in GHC.Types.Demand.
 -- This is the only way to throw a precise exception, hence a primop separate
@@ -2640,7 +2609,7 @@ primop  RaiseIOOp "raiseIO#" GenPrimOp
    -- for why this is the *only* primop that has 'exnDiv'
    strictness  = { \ _arity -> mkClosedStrictSig [topDmd, topDmd] exnDiv }
    out_of_line = True
-   effect      = ThrowsPrecise
+   effect      = { ThrowsPrecise }
 
 primop  MaskAsyncExceptionsOp "maskAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
@@ -2649,7 +2618,7 @@ primop  MaskAsyncExceptionsOp "maskAsyncExceptions#" GenPrimOp
    strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
-   effect      = WriteEffect
+   effect      = { WriteEffect }
 
 primop  MaskUninterruptibleOp "maskUninterruptible#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
@@ -2657,7 +2626,7 @@ primop  MaskUninterruptibleOp "maskUninterruptible#" GenPrimOp
    with
    strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topDiv }
    out_of_line = True
-   effect      = WriteEffect
+   effect      = { WriteEffect }
 
 primop  UnmaskAsyncExceptionsOp "unmaskAsyncExceptions#" GenPrimOp
         (State# RealWorld -> (# State# RealWorld, a #))
@@ -2666,13 +2635,13 @@ primop  UnmaskAsyncExceptionsOp "unmaskAsyncExceptions#" GenPrimOp
    strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
-   effect      = WriteEffect
+   effect      = { WriteEffect }
 
 primop  MaskStatus "getMaskingState#" GenPrimOp
         State# RealWorld -> (# State# RealWorld, Int# #)
    with
    out_of_line = True
-   effect      = WriteEffect
+   effect      = { WriteEffect }
 
 ------------------------------------------------------------------------
 section "STM-accessible Mutable Variables"
@@ -2687,7 +2656,7 @@ primop  AtomicallyOp "atomically#" GenPrimOp
    strictness  = { \ _arity -> mkClosedStrictSig [strictApply1Dmd,topDmd] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
-   effect      = WriteEffect
+   effect      = { WriteEffect }
 
 -- NB: retry#'s strictness information specifies it to diverge.
 -- This lets the compiler perform some extra simplifications, since retry#
@@ -2704,7 +2673,7 @@ primop  RetryOp "retry#" GenPrimOp
    with
    strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botDiv }
    out_of_line = True
-   effect      = WriteEffect
+   effect      = { WriteEffect }
 
 primop  CatchRetryOp "catchRetry#" GenPrimOp
       (State# RealWorld -> (# State# RealWorld, a #) )
@@ -2716,7 +2685,7 @@ primop  CatchRetryOp "catchRetry#" GenPrimOp
                                                  , topDmd ] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
-   effect      = WriteEffect
+   effect      = { WriteEffect }
 
 primop  CatchSTMOp "catchSTM#" GenPrimOp
       (State# RealWorld -> (# State# RealWorld, a #) )
@@ -2728,7 +2697,7 @@ primop  CatchSTMOp "catchSTM#" GenPrimOp
                                                  , topDmd ] topDiv }
                  -- See Note [Strictness for mask/unmask/catch]
    out_of_line = True
-   effect      = WriteEffect
+   effect      = { WriteEffect }
 
 primop  NewTVarOp "newTVar#" GenPrimOp
        a
@@ -2736,8 +2705,8 @@ primop  NewTVarOp "newTVar#" GenPrimOp
    {Create a new {\tt TVar\#} holding a specified initial value.}
    with
    out_of_line = True
-   -- effect      = NoEffect -- #3207
-   effect      = WriteEffect
+   -- effect      = { NoEffect } -- #3207
+   effect      = { WriteEffect }
 
 primop  ReadTVarOp "readTVar#" GenPrimOp
        TVar# s a
@@ -2745,8 +2714,8 @@ primop  ReadTVarOp "readTVar#" GenPrimOp
    {Read contents of {\tt TVar\#}.  Result is not yet evaluated.}
    with
    out_of_line = True
-   -- effect      = NoEffect -- #3207
-   effect      = WriteEffect
+   -- effect      = { NoEffect } -- #3207
+   effect      = { WriteEffect }
 
 primop ReadTVarIOOp "readTVarIO#" GenPrimOp
        TVar# s a
@@ -2754,8 +2723,8 @@ primop ReadTVarIOOp "readTVarIO#" GenPrimOp
    {Read contents of {\tt TVar\#} outside an STM transaction}
    with
    out_of_line = True
-   -- effect      = NoEffect -- #3207
-   effect      = WriteEffect
+   -- effect      = { NoEffect } -- #3207
+   effect      = { WriteEffect }
 
 primop  WriteTVarOp "writeTVar#" GenPrimOp
        TVar# s a
@@ -2764,7 +2733,7 @@ primop  WriteTVarOp "writeTVar#" GenPrimOp
    {Write contents of {\tt TVar\#}.}
    with
    out_of_line      = True
-   effect           = WriteEffect
+   effect           = { WriteEffect }
 
 primop  SameTVarOp "sameTVar#" GenPrimOp
    TVar# s a -> TVar# s a -> Int#
@@ -2785,8 +2754,8 @@ primop  NewMVarOp "newMVar#"  GenPrimOp
    {Create new {\tt MVar\#}; initially empty.}
    with
    out_of_line = True
-   -- effect      = NoEffect -- #3207
-   effect      = WriteEffect
+   -- effect      = { NoEffect } -- #3207
+   effect      = { WriteEffect }
 
 primop  TakeMVarOp "takeMVar#" GenPrimOp
    MVar# s a -> State# s -> (# State# s, a #)
@@ -2794,7 +2763,7 @@ primop  TakeMVarOp "takeMVar#" GenPrimOp
    Then remove and return its contents, and set it empty.}
    with
    out_of_line = True
-   effect      = WriteEffect -- because it may block!
+   effect      = { WriteEffect } -- because it may block!
 
 primop  TryTakeMVarOp "tryTakeMVar#" GenPrimOp
    MVar# s a -> State# s -> (# State# s, Int#, a #)
@@ -2802,7 +2771,7 @@ primop  TryTakeMVarOp "tryTakeMVar#" GenPrimOp
    Otherwise, return with integer 1 and contents of {\tt MVar\#}, and set {\tt MVar\#} empty.}
    with
    out_of_line = True
-   effect      = WriteEffect
+   effect      = { WriteEffect }
 
 primop  PutMVarOp "putMVar#" GenPrimOp
    MVar# s a -> a -> State# s -> State# s
@@ -2810,7 +2779,7 @@ primop  PutMVarOp "putMVar#" GenPrimOp
    Then store value arg as its new contents.}
    with
    out_of_line = True
-   effect      = WriteEffect
+   effect      = { WriteEffect }
 
 primop  TryPutMVarOp "tryPutMVar#" GenPrimOp
    MVar# s a -> a -> State# s -> (# State# s, Int# #)
@@ -2818,7 +2787,7 @@ primop  TryPutMVarOp "tryPutMVar#" GenPrimOp
     Otherwise, store value arg as {\tt MVar\#}'s new contents, and return with integer 1.}
    with
    out_of_line = True
-   effect      = WriteEffect
+   effect      = { WriteEffect }
 
 primop  ReadMVarOp "readMVar#" GenPrimOp
    MVar# s a -> State# s -> (# State# s, a #)
@@ -2827,7 +2796,7 @@ primop  ReadMVarOp "readMVar#" GenPrimOp
    of intervention from other threads.}
    with
    out_of_line = True
-   effect      = WriteEffect -- because it may block!
+   effect      = { WriteEffect } -- because it may block!
 
 primop  TryReadMVarOp "tryReadMVar#" GenPrimOp
    MVar# s a -> State# s -> (# State# s, Int#, a #)
@@ -2835,7 +2804,7 @@ primop  TryReadMVarOp "tryReadMVar#" GenPrimOp
    Otherwise, return with integer 1 and contents of {\tt MVar\#}.}
    with
    out_of_line      = True
-   effect           = WriteEffect
+   effect           = { WriteEffect }
 
 primop  SameMVarOp "sameMVar#" GenPrimOp
    MVar# s a -> MVar# s a -> Int#
@@ -2845,8 +2814,8 @@ primop  IsEmptyMVarOp "isEmptyMVar#" GenPrimOp
    {Return 1 if {\tt MVar\#} is empty; 0 otherwise.}
    with
    out_of_line = True
-   -- effect      = NoEffect -- #3207
-   effect      = WriteEffect
+   -- effect      = { NoEffect } -- #3207
+   effect      = { WriteEffect }
 
 ------------------------------------------------------------------------
 section "Delay/wait operations"
@@ -2856,21 +2825,21 @@ primop  DelayOp "delay#" GenPrimOp
    Int# -> State# s -> State# s
    {Sleep specified number of microseconds.}
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  WaitReadOp "waitRead#" GenPrimOp
    Int# -> State# s -> State# s
    {Block until input is available on specified file descriptor.}
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  WaitWriteOp "waitWrite#" GenPrimOp
    Int# -> State# s -> State# s
    {Block until output is possible on specified file descriptor.}
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 ------------------------------------------------------------------------
@@ -2897,58 +2866,58 @@ primtype ThreadId#
 primop  ForkOp "fork#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  ForkOnOp "forkOn#" GenPrimOp
    Int# -> a -> State# RealWorld -> (# State# RealWorld, ThreadId# #)
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  KillThreadOp "killThread#"  GenPrimOp
    ThreadId# -> a -> State# RealWorld -> State# RealWorld
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  YieldOp "yield#" GenPrimOp
    State# RealWorld -> State# RealWorld
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  MyThreadIdOp "myThreadId#" GenPrimOp
    State# RealWorld -> (# State# RealWorld, ThreadId# #)
    with
-   -- effect = NoEffect -- #3207
-   effect = WriteEffect
+   -- effect = { NoEffect } -- #3207
+   effect = { WriteEffect }
 
 primop LabelThreadOp "labelThread#" GenPrimOp
    ThreadId# -> Addr# -> State# RealWorld -> State# RealWorld
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  IsCurrentThreadBoundOp "isCurrentThreadBound#" GenPrimOp
    State# RealWorld -> (# State# RealWorld, Int# #)
    with
    out_of_line = True
-   -- effect       = NoEffect -- #3207
-   effect      = WriteEffect
+   -- effect       = { NoEffect } -- #3207
+   effect      = { WriteEffect }
 
 primop  NoDuplicateOp "noDuplicate#" GenPrimOp
    State# s -> State# s
    with
    out_of_line = True
-   effect      = WriteEffect -- See Note [Classification by PrimOpEffect] in PrimOp
+   effect      = { WriteEffect } -- See Note [Classification by PrimOpEffect] in PrimOp
 
 primop  ThreadStatusOp "threadStatus#" GenPrimOp
    ThreadId# -> State# RealWorld -> (# State# RealWorld, Int#, Int#, Int# #)
    with
    out_of_line = True
-   -- effect       = NoEffect -- #3207
-   effect      = WriteEffect
+   -- effect       = { NoEffect } -- #3207
+   effect      = { WriteEffect }
 
 ------------------------------------------------------------------------
 section "Weak pointers"
@@ -2967,13 +2936,13 @@ primop  MkWeakOp "mkWeak#" GenPrimOp
      the type of {\tt k} must be represented by a pointer (i.e. of kind {\tt
      TYPE 'LiftedRep} or {\tt TYPE 'UnliftedRep}). }
    with
-   effect      = WriteEffect -- better be safe
+   effect      = { WriteEffect } -- better be safe
    out_of_line = True
 
 primop  MkWeakNoFinalizerOp "mkWeakNoFinalizer#" GenPrimOp
    o -> b -> State# RealWorld -> (# State# RealWorld, Weak# b #)
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  AddCFinalizerToWeakOp "addCFinalizerToWeak#" GenPrimOp
@@ -2986,13 +2955,13 @@ primop  AddCFinalizerToWeakOp "addCFinalizerToWeak#" GenPrimOp
      {\tt eptr} and {\tt ptr}. {\tt addCFinalizerToWeak#} returns
      1 on success, or 0 if {\tt w} is already dead. }
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  DeRefWeakOp "deRefWeak#" GenPrimOp
    Weak# a -> State# RealWorld -> (# State# RealWorld, Int#, a #)
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  FinalizeWeakOp "finalizeWeak#" GenPrimOp
@@ -3004,14 +2973,14 @@ primop  FinalizeWeakOp "finalizeWeak#" GenPrimOp
      action. An {\tt Int#} of {\tt 1} indicates that the finalizer is valid. The
      return value {\tt b} from the finalizer should be ignored. }
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop TouchOp "touch#" GenPrimOp
    o -> State# RealWorld -> State# RealWorld
    with
    code_size = { 0 }
-   effect    = WriteEffect
+   effect    = { WriteEffect }
 
 ------------------------------------------------------------------------
 section "Stable pointers and names"
@@ -3024,24 +2993,24 @@ primtype StableName# a
 primop  MakeStablePtrOp "makeStablePtr#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, StablePtr# a #)
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  DeRefStablePtrOp "deRefStablePtr#" GenPrimOp
    StablePtr# a -> State# RealWorld -> (# State# RealWorld, a #)
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  EqStablePtrOp "eqStablePtr#" GenPrimOp
    StablePtr# a -> StablePtr# a -> Int#
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
 
 primop  MakeStableNameOp "makeStableName#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, StableName# a #)
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  EqStableNameOp "eqStableName#" GenPrimOp
@@ -3076,8 +3045,8 @@ primop  CompactNewOp "compactNew#" GenPrimOp
      The capacity is rounded up to a multiple of the allocator block size
      and is capped to one mega block. }
    with
-   -- effect      = NoEffect -- #3207
-   effect      = WriteEffect
+   -- effect      = { NoEffect } -- #3207
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  CompactResizeOp "compactResize#" GenPrimOp
@@ -3087,23 +3056,23 @@ primop  CompactResizeOp "compactResize#" GenPrimOp
      determines the capacity of each compact block in the CNF. It
      does not retroactively affect existing compact blocks in the CNF. }
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  CompactContainsOp "compactContains#" GenPrimOp
    Compact# -> a -> State# RealWorld -> (# State# RealWorld, Int# #)
    { Returns 1\# if the object is contained in the CNF, 0\# otherwise. }
    with
-   -- effect      = NoEffect -- #3207
-   effect      = WriteEffect
+   -- effect      = { NoEffect } -- #3207
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  CompactContainsAnyOp "compactContainsAny#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, Int# #)
    { Returns 1\# if the object is in any CNF at all, 0\# otherwise. }
    with
-   -- effect      = NoEffect -- #3207
-   effect      = WriteEffect
+   -- effect      = { NoEffect } -- #3207
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  CompactGetFirstBlockOp "compactGetFirstBlock#" GenPrimOp
@@ -3111,8 +3080,8 @@ primop  CompactGetFirstBlockOp "compactGetFirstBlock#" GenPrimOp
    { Returns the address and the utilized size (in bytes) of the
      first compact block of a CNF.}
    with
-   -- effect      = NoEffect -- #3207
-   effect      = WriteEffect
+   -- effect      = { NoEffect } -- #3207
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  CompactGetNextBlockOp "compactGetNextBlock#" GenPrimOp
@@ -3121,8 +3090,8 @@ primop  CompactGetNextBlockOp "compactGetNextBlock#" GenPrimOp
      next compact block and its utilized size, or {\tt nullAddr\#} if the
      argument was the last compact block in the CNF. }
    with
-   -- effect      = NoEffect -- #3207
-   effect      = WriteEffect
+   -- effect      = { NoEffect } -- #3207
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  CompactAllocateBlockOp "compactAllocateBlock#" GenPrimOp
@@ -3137,7 +3106,7 @@ primop  CompactAllocateBlockOp "compactAllocateBlock#" GenPrimOp
      so that the address does not escape or memory will be leaked.
    }
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  CompactFixupPointersOp "compactFixupPointers#" GenPrimOp
@@ -3150,7 +3119,7 @@ primop  CompactFixupPointersOp "compactFixupPointers#" GenPrimOp
      a serialized CNF. It returns the new CNF and the new adjusted
      root address. }
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop CompactAdd "compactAdd#" GenPrimOp
@@ -3163,7 +3132,7 @@ primop CompactAdd "compactAdd#" GenPrimOp
      enforce any mutual exclusion; the caller is expected to
      arrange this. }
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop CompactAddWithSharing "compactAddWithSharing#" GenPrimOp
@@ -3171,7 +3140,7 @@ primop CompactAddWithSharing "compactAddWithSharing#" GenPrimOp
    { Like {\texttt compactAdd\#}, but retains sharing and cycles
    during compaction. }
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop CompactSize "compactSize#" GenPrimOp
@@ -3179,8 +3148,8 @@ primop CompactSize "compactSize#" GenPrimOp
    { Return the total capacity (in bytes) of all the compact blocks
      in the CNF. }
    with
-   -- effect      = NoEffect -- #3207
-   effect      = WriteEffect
+   -- effect      = { NoEffect } -- #3207
+   effect      = { WriteEffect }
    out_of_line = True
 
 ------------------------------------------------------------------------
@@ -3192,7 +3161,7 @@ primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
    a -> a -> Int#
    { Returns {\texttt 1\#} if the given pointers are equal and {\texttt 0\#} otherwise. }
    with
-   effect = ThrowsImprecise -- See Note [reallyUnsafePtrEquality#]
+   effect = { ThrowsImprecise } -- See Note [reallyUnsafePtrEquality#]
 
 
 -- Note [reallyUnsafePtrEquality#]
@@ -3233,14 +3202,14 @@ primop  ParOp "par#" GenPrimOp
    with
       -- Note that Par is lazy to avoid that the sparked thing
       -- gets evaluated strictly, which it should *not* be
-   effect    = WriteEffect
+   effect    = { WriteEffect }
    code_size = { primOpCodeSizeForeignCall }
    deprecated_msg = { Use 'spark#' instead }
 
 primop SparkOp "spark#" GenPrimOp
    a -> State# s -> (# State# s, a #)
    with
-   effect    = WriteEffect
+   effect    = { WriteEffect }
    code_size = { primOpCodeSizeForeignCall }
 
 primop SeqOp "seq#" GenPrimOp
@@ -3250,16 +3219,16 @@ primop SeqOp "seq#" GenPrimOp
 primop GetSparkOp "getSpark#" GenPrimOp
    State# s -> (# State# s, Int#, a #)
    with
-   -- effect      = NoEffect -- #3207
-   effect      = WriteEffect
+   -- effect      = { NoEffect } -- #3207
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop NumSparks "numSparks#" GenPrimOp
    State# s -> (# State# s, Int# #)
    { Returns the number of sparks in the local spark pool. }
    with
-   -- effect      = NoEffect -- #3207
-   effect      = WriteEffect
+   -- effect      = { NoEffect } -- #3207
+   effect      = { WriteEffect }
    out_of_line = True
 
 ------------------------------------------------------------------------
@@ -3324,7 +3293,7 @@ primop  NewBCOOp "newBCO#" GenPrimOp
      encoded in {\tt instrs}, and a static reference table usage bitmap given by
      {\tt bitmap}. }
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  UnpackClosureOp "unpackClosure#" GenPrimOp
@@ -3441,7 +3410,7 @@ pseudoop   "unsafeCoerce#"
         to, use {\tt Any}, which is not an algebraic data type.
 
         }
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
 
 -- NB. It is tempting to think that casting a value to a type that it doesn't have is safe
 -- as long as you don't "do anything" with the value in its cast form, such as seq on it.  This
@@ -3458,7 +3427,7 @@ primop  TraceEventOp "traceEvent#" GenPrimOp
      argument.  The event will be emitted either to the {\tt .eventlog} file,
      or to stderr, depending on the runtime RTS flags. }
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  TraceEventBinaryOp "traceBinaryEvent#" GenPrimOp
@@ -3468,7 +3437,7 @@ primop  TraceEventBinaryOp "traceBinaryEvent#" GenPrimOp
      the the given length passed as the second argument. The event will be
      emitted to the {\tt .eventlog} file. }
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  TraceMarkerOp "traceMarker#" GenPrimOp
@@ -3478,14 +3447,14 @@ primop  TraceMarkerOp "traceMarker#" GenPrimOp
      argument.  The event will be emitted either to the {\tt .eventlog} file,
      or to stderr, depending on the runtime RTS flags. }
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 primop  SetThreadAllocationCounter "setThreadAllocationCounter#" GenPrimOp
    INT64 -> State# RealWorld -> State# RealWorld
    { Sets the allocation counter for the current thread to the given value. }
    with
-   effect      = WriteEffect
+   effect      = { WriteEffect }
    out_of_line = True
 
 ------------------------------------------------------------------------
@@ -3569,7 +3538,7 @@ primop VecUnpackOp "unpack#" GenPrimOp
 primop VecInsertOp "insert#" GenPrimOp
    VECTOR -> SCALAR -> Int# -> VECTOR
    { Insert a scalar at the given position in a vector. }
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
         llvm_only = True
         vector = ALL_VECTOR_TYPES
 
@@ -3596,21 +3565,21 @@ primop VecMulOp "times#" Dyadic
 primop VecDivOp "divide#" Dyadic
    VECTOR -> VECTOR -> VECTOR
    { Divide two vectors element-wise. }
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
         llvm_only = True
         vector = FLOAT_VECTOR_TYPES
 
 primop VecQuotOp "quot#" Dyadic
    VECTOR -> VECTOR -> VECTOR
    { Rounds towards zero element-wise. }
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
         llvm_only = True
         vector = INT_VECTOR_TYPES
 
 primop VecRemOp "rem#" Dyadic
    VECTOR -> VECTOR -> VECTOR
    { Satisfies \texttt{(quot\# x y) times\# y plus\# (rem\# x y) == x}. }
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
         llvm_only = True
         vector = INT_VECTOR_TYPES
 
@@ -3623,44 +3592,44 @@ primop VecNegOp "negate#" Monadic
 primop VecIndexByteArrayOp "indexArray#" GenPrimOp
    ByteArray# -> Int# -> VECTOR
    { Read a vector from specified index of immutable array. }
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
         llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecReadByteArrayOp "readArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, VECTOR #)
    { Read a vector from specified index of mutable array. }
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
         llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecWriteByteArrayOp "writeArray#" GenPrimOp
    MutableByteArray# s -> Int# -> VECTOR -> State# s -> State# s
    { Write a vector to specified index of mutable array. }
-   with effect = WriteEffect
+   with effect = { WriteEffect }
         llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecIndexOffAddrOp "indexOffAddr#" GenPrimOp
    Addr# -> Int# -> VECTOR
    { Reads vector; offset in bytes. }
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
         llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecReadOffAddrOp "readOffAddr#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, VECTOR #)
    { Reads vector; offset in bytes. }
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
         llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecWriteOffAddrOp "writeOffAddr#" GenPrimOp
    Addr# -> Int# -> VECTOR -> State# s -> State# s
    { Write vector; offset in bytes. }
-   with effect = WriteEffect
+   with effect = { WriteEffect }
         llvm_only = True
         vector = ALL_VECTOR_TYPES
 
@@ -3668,44 +3637,44 @@ primop VecWriteOffAddrOp "writeOffAddr#" GenPrimOp
 primop VecIndexScalarByteArrayOp "indexArrayAs#" GenPrimOp
    ByteArray# -> Int# -> VECTOR
    { Read a vector from specified index of immutable array of scalars; offset is in scalar elements. }
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
         llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecReadScalarByteArrayOp "readArrayAs#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> (# State# s, VECTOR #)
    { Read a vector from specified index of mutable array of scalars; offset is in scalar elements. }
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
         llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecWriteScalarByteArrayOp "writeArrayAs#" GenPrimOp
    MutableByteArray# s -> Int# -> VECTOR -> State# s -> State# s
    { Write a vector to specified index of mutable array of scalars; offset is in scalar elements. }
-   with effect = WriteEffect
+   with effect = { WriteEffect }
         llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecIndexScalarOffAddrOp "indexOffAddrAs#" GenPrimOp
    Addr# -> Int# -> VECTOR
    { Reads vector; offset in scalar elements. }
-   with effect = ThrowsImprecise
+   with effect = { ThrowsImprecise }
         llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecReadScalarOffAddrOp "readOffAddrAs#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, VECTOR #)
    { Reads vector; offset in scalar elements. }
-   with -- effect = ThrowsImprecise -- #3207
-        effect = WriteEffect
+   with -- effect = { ThrowsImprecise } -- #3207
+        effect = { WriteEffect }
         llvm_only = True
         vector = ALL_VECTOR_TYPES
 
 primop VecWriteScalarOffAddrOp "writeOffAddrAs#" GenPrimOp
    Addr# -> Int# -> VECTOR -> State# s -> State# s
    { Write vector; offset in scalar elements. }
-   with effect = WriteEffect
+   with effect = { WriteEffect }
         llvm_only = True
         vector = ALL_VECTOR_TYPES
 
@@ -3754,7 +3723,7 @@ section "Prefetch"
   It is important to note that while the prefetch operations will never change the
   answer to a pure computation, They CAN change the memory locations resident
   in a CPU cache and that may change the performance and timing characteristics
-  of an application. The prefetch operations are marked effect = WriteEffect
+  of an application. The prefetch operations are marked effect = { WriteEffect }
   to reflect that these operations have side effects with respect to the runtime
   performance characteristics of the resulting code. Additionally, if the prefetchValue
   operations did not have this attribute, GHC does a float out transformation that
@@ -3771,77 +3740,72 @@ section "Prefetch"
 ---
 primop PrefetchByteArrayOp3 "prefetchByteArray3#" GenPrimOp
   ByteArray# -> Int# ->  State# s -> State# s
-  with effect = WriteEffect
+  with effect = { WriteEffect }
 
 primop PrefetchMutableByteArrayOp3 "prefetchMutableByteArray3#" GenPrimOp
   MutableByteArray# s -> Int# -> State# s -> State# s
-  with effect = WriteEffect
+  with effect = { WriteEffect }
 
 primop PrefetchAddrOp3 "prefetchAddr3#" GenPrimOp
   Addr# -> Int# -> State# s -> State# s
-  with effect = WriteEffect
+  with effect = { WriteEffect }
 
 primop PrefetchValueOp3 "prefetchValue3#" GenPrimOp
    a -> State# s -> State# s
    with strictness  = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] topDiv }
-        effect = WriteEffect
+        effect = { WriteEffect }
 ----
 
 primop PrefetchByteArrayOp2 "prefetchByteArray2#" GenPrimOp
   ByteArray# -> Int# ->  State# s -> State# s
-  with effect = WriteEffect
+  with effect = { WriteEffect }
 
 primop PrefetchMutableByteArrayOp2 "prefetchMutableByteArray2#" GenPrimOp
   MutableByteArray# s -> Int# -> State# s -> State# s
-  with effect = WriteEffect
+  with effect = { WriteEffect }
 
 primop PrefetchAddrOp2 "prefetchAddr2#" GenPrimOp
   Addr# -> Int# ->  State# s -> State# s
-  with effect = WriteEffect
+  with effect = { WriteEffect }
 
 primop PrefetchValueOp2 "prefetchValue2#" GenPrimOp
    a ->  State# s -> State# s
    with strictness  = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] topDiv }
-        effect = WriteEffect
+        effect = { WriteEffect }
 ----
 
 primop PrefetchByteArrayOp1 "prefetchByteArray1#" GenPrimOp
    ByteArray# -> Int# -> State# s -> State# s
-   with effect = WriteEffect
+   with effect = { WriteEffect }
 
 primop PrefetchMutableByteArrayOp1 "prefetchMutableByteArray1#" GenPrimOp
   MutableByteArray# s -> Int# -> State# s -> State# s
-  with effect = WriteEffect
+  with effect = { WriteEffect }
 
 primop PrefetchAddrOp1 "prefetchAddr1#" GenPrimOp
   Addr# -> Int# -> State# s -> State# s
-  with effect = WriteEffect
+  with effect = { WriteEffect }
 
 primop PrefetchValueOp1 "prefetchValue1#" GenPrimOp
    a -> State# s -> State# s
    with strictness = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] topDiv }
-        effect     = WriteEffect
+        effect     = { WriteEffect }
 ----
 
 primop PrefetchByteArrayOp0 "prefetchByteArray0#" GenPrimOp
   ByteArray# -> Int# ->  State# s -> State# s
-  with effect = WriteEffect
+  with effect = { WriteEffect }
 
 primop PrefetchMutableByteArrayOp0 "prefetchMutableByteArray0#" GenPrimOp
   MutableByteArray# s -> Int# -> State# s -> State# s
-  with effect = WriteEffect
+  with effect = { WriteEffect }
 
 primop PrefetchAddrOp0 "prefetchAddr0#" GenPrimOp
   Addr# -> Int# -> State# s -> State# s
-  with effect = WriteEffect
+  with effect = { WriteEffect }
 
 primop PrefetchValueOp0 "prefetchValue0#" GenPrimOp
    a -> State# s -> State# s
    with strictness = { \ _arity -> mkClosedStrictSig [botDmd, topDmd] topDiv }
-        effect     = WriteEffect
-
-------------------------------------------------------------------------
----                                                                  ---
-------------------------------------------------------------------------
 
 thats_all_folks
