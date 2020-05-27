@@ -319,7 +319,7 @@ mechanism to define mconcat and the Applicative and Monad instances for lists.
 We mark them INLINE because the inliner is not generally too keen to inline
 build forms such as the ones these desugar to without our insistence.  Defining
 these using list comprehensions instead of foldr has an additional potential
-benefit, as described in compiler/deSugar/DsListComp.hs: if optimizations
+benefit, as described in compiler/GHC/HsToCore/ListComp.hs: if optimizations
 needed to make foldr/build forms efficient are turned off, we'll get reasonably
 efficient translations anyway.
 -}
