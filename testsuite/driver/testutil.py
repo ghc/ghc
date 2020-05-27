@@ -55,7 +55,7 @@ def getStdout(cmd_and_args: List[str]):
     if r != 0:
         raise Exception("Command failed: " + str(cmd_and_args))
     if stderr:
-        raise Exception("stderr from command: %s\nOutput:\n%s\n" % (cmd_and_args, stderr))
+        raise Exception("stderr from command: %s\nOutput:\n%s\n" % (cmd_and_args, stderr.decode('utf-8')))
     return stdout.decode('utf-8')
 
 def lndir(srcdir: Path, dstdir: Path):
