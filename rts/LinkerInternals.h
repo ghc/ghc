@@ -188,11 +188,6 @@ typedef struct _ObjectCode {
     Symbol_t *symbols;
     int    n_symbols;
 
-    /* Set of ObjectCode* (HashTable with NULL values) that depends on this
-     * ObjectCode. When unloading this object code we check whether these are
-     * unreferenced. If not then we can't unload it. */
-    HashTable *dependents;
-
     /* ptr to mem containing the object file image */
     char*      image;
 
@@ -203,9 +198,6 @@ typedef struct _ObjectCode {
 
     /* non-zero if the object file was mmap'd, otherwise malloc'd */
     int        imageMapped;
-
-    /* flag used when deciding whether to unload an object file */
-    int        referenced;
 
     /* record by how much image has been deliberately misaligned
        after allocation, so that we can use realloc */
@@ -218,8 +210,11 @@ typedef struct _ObjectCode {
     int n_segments;
     Segment *segments;
 
-    /* Allow a chain of these things */
-    struct _ObjectCode * next;
+    // Garbage-collection fields. TODO(osa): Document these.
+    struct _ObjectCode *next;
+    struct _ObjectCode *prev;
+    uint8_t mark;
+    HashTable *dependencies; // key = ObjectCode*, value = NULL
 
     /* SANITY CHECK ONLY: a list of the only memory regions which may
        safely be prodded during relocation.  Any attempt to prod
@@ -261,9 +256,6 @@ typedef struct _ObjectCode {
       (OC)->archiveMemberName :                 \
       (OC)->fileName                            \
     )
-
-extern ObjectCode *objects;
-extern ObjectCode *unloaded_objects;
 
 #if defined(THREADED_RTS)
 extern Mutex linker_mutex;
