@@ -54,7 +54,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Multiplicity
-import GHC.Builtin.Types ( typeNatKind, typeSymbolKind )
+import GHC.Builtin.Types ( typeNatKind, typeSymbolKind, charTy )
 import GHC.Types.Id
 import GHC.Types.Id.Make(proxyHashId)
 import GHC.Types.Name
@@ -1309,6 +1309,7 @@ ds_ev_typeable ty (EvTypeableTyLit ev)
     -- of    typeSymbolTypeRep :: KnownSymbol a => Proxy# a -> TypeRep a
     tr_fun | ty_kind `eqType` typeNatKind    = typeNatTypeRepName
            | ty_kind `eqType` typeSymbolKind = typeSymbolTypeRepName
+           | ty_kind `eqType` charTy         = typeCharTypeRepName
            | otherwise = panic "dsEvTypeable: unknown type lit kind"
 
 ds_ev_typeable ty ev
