@@ -4,7 +4,7 @@
 -- The Remote GHCi server.
 --
 -- For details on Remote GHCi, see Note [Remote GHCi] in
--- compiler/ghci/GHCi.hs.
+-- compiler/GHC/Runtime/Interpreter.hs.
 --
 module Main (main) where
 

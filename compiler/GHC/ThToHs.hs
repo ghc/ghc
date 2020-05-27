@@ -2041,7 +2041,7 @@ specially in `GHC.HsToCore.Quote`, `GHC.ThToHs`, and
               (where ty is the AST representation of t1 -> t2 -> ... -> tn -> t)
 
    (b) When converting pattern synonyms from TH.Dec to HsSyn in
-       `hsSyn/Convert.hs`, we convert their TH type signatures back to an
+       `GHC/ThToHs.hs`, we convert their TH type signatures back to an
        appropriate Haskell pattern synonym type of the form
 
          forall univs. reqs => forall exis. provs => t1 -> t2 -> ... -> tn -> t

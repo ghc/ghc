@@ -542,7 +542,7 @@ toBlockListEntryFirst g
 -- have both true and false successors. Block ordering can make a big difference
 -- in performance in the LLVM backend. Note that we rely crucially on the order
 -- of successors returned for CmmCondBranch by the NonLocal instance for CmmNode
--- defined in cmm/CmmNode.hs. -GBM
+-- defined in GHC/Cmm/Node.hs. -GBM
 toBlockListEntryFirstFalseFallthrough :: CmmGraph -> [CmmBlock]
 toBlockListEntryFirstFalseFallthrough g
   | mapNull m  = []

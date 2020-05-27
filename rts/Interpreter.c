@@ -290,7 +290,7 @@ static StgWord app_ptrs_itbl[] = {
 };
 
 HsStablePtr rts_breakpoint_io_action; // points to the IO action which is executed on a breakpoint
-                                      // it is set in main/GHC.hs:runStmt
+                                      // it is set in compiler/GHC.hs:runStmt
 
 Capability *
 interpretBCO (Capability* cap)

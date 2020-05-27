@@ -102,8 +102,8 @@ $(eval $(call compilerConfig,1))
 $(eval $(call compilerConfig,2))
 
 # ----------------------------------------------------------------------------
-#		Generate supporting stuff for prelude/PrimOp.hs
-#		from prelude/primops.txt
+#		Generate supporting stuff for GHC/Builtin/PrimOps.hs
+#		from GHC/Builtin/primops.txt
 
 PRIMOP_BITS_NAMES = primop-data-decl.hs-incl        \
                     primop-tag.hs-incl              \

@@ -1276,7 +1276,7 @@ for all other cases, apart from EmptyCase). This gave rise to #10746. Instead,
 we do the following:
 
 1. We normalise the outermost type family redex, data family redex or newtype,
-   using pmTopNormaliseType (in types/FamInstEnv.hs). This computes 3
+   using pmTopNormaliseType (in GHC/Core/FamInstEnv.hs). This computes 3
    things:
    (a) A normalised type src_ty, which is equal to the type of the scrutinee in
        source Haskell (does not normalise newtypes or data families)
@@ -1291,7 +1291,7 @@ we do the following:
        newtype rewrite performed in (b).
 
    For an example see also Note [Type normalisation]
-   in types/FamInstEnv.hs.
+   in GHC/Core/FamInstEnv.hs.
 
 2. Function Check.checkEmptyCase' performs the check:
    - If core_ty is not an algebraic type, then we cannot check for

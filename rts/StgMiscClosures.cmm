@@ -504,7 +504,7 @@ CLOSURE(stg_NO_TREC_closure,stg_NO_TREC);
 /* ----------------------------------------------------------------------------
    SRTs
 
-   See Note [SRTs] in compiler/cmm/CmmBuildInfoTable.hs
+   See Note [SRTs] in compiler/GHC/Cmm/Info/Build.hs
    ------------------------------------------------------------------------- */
 
 INFO_TABLE_CONSTR(stg_SRT_1, 1, 0, 0, CONSTR_1_0, "SRT_1", "SRT_1")

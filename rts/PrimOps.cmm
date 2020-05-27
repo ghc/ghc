@@ -13,7 +13,7 @@
  *
  * Entry convention: the entry convention for a primop is the
  * NativeNodeCall convention, and the return convention is
- * NativeReturn.  (see compiler/cmm/CmmCallConv.hs)
+ * NativeReturn.  (see compiler/GHC/Cmm/CallConv.hs)
  *
  * This file is written in a subset of C--, extended with various
  * features specific to GHC.  It is compiled by GHC directly.  For the

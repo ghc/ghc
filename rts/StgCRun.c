@@ -151,7 +151,7 @@ STG_NO_OPTIMIZE StgWord8 *win32AllocStack(void)
  * procedure entry and calls, which led to bugs (see #4211 and #5250).
  *
  * To change this convention you need to change the code here, and in
- * compiler/nativeGen/X86/CodeGen.hs::GenCCall, and maybe the adjustor
+ * compiler/GHC/CmmToAsm/X86/CodeGen.hs::GenCCall, and maybe the adjustor
  * code for thunks in rts/AdjustorAsm.s, rts/Adjustor.c.
  *
  * A quick way to see if this is wrong is to compile this code:
@@ -395,7 +395,7 @@ StgRunIsImplementedInAssembler(void)
 #if defined(mingw32_HOST_OS)
         /*
          * Additional callee saved registers on Win64. This must match
-         * callClobberedRegisters in compiler/nativeGen/X86/Regs.hs as
+         * callClobberedRegisters in compiler/GHC/CmmToAsm/X86/Regs.hs as
          * both represent the Win64 calling convention.
          */
         "movq %%rdi,48(%%rax)\n\t"

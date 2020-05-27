@@ -341,7 +341,7 @@ the stack. See Note [Overlapping global registers] for implications.
    The Sun SPARC register mapping
 
    !! IMPORTANT: if you change this register mapping you must also update
-                 compiler/nativeGen/SPARC/Regs.hs. That file handles the
+                 compiler/GHC/CmmToAsm/SPARC/Regs.hs. That file handles the
                  mapping for the NCG. This one only affects via-c code.
 
    The SPARC register (window) story: Remember, within the Haskell

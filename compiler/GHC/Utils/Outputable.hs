@@ -1005,7 +1005,7 @@ pprHsBytes bs = let escaped = concatMap escape $ BS.unpack bs
                         else '\\' : show w
 
 -- Postfix modifiers for unboxed literals.
--- See Note [Printing of literals in Core] in `basicTypes/Literal.hs`.
+-- See Note [Printing of literals in Core] in `GHC/Types/Literal.hs`.
 primCharSuffix, primFloatSuffix, primIntSuffix :: SDoc
 primDoubleSuffix, primWordSuffix, primInt64Suffix, primWord64Suffix :: SDoc
 primCharSuffix   = char '#'

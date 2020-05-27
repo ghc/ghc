@@ -241,7 +241,7 @@ emitRtsCallGen res lbl args safe
 -- here, as we don't have liveness information.  And really, we
 -- shouldn't be doing the workaround at this point in the pipeline, see
 -- Note [Register parameter passing] and the ToDo on CmmCall in
--- cmm/CmmNode.hs.  Right now the workaround is to avoid inlining across
+-- GHC/Cmm/Node.hs.  Right now the workaround is to avoid inlining across
 -- unsafe foreign calls in rewriteAssignments, but this is strictly
 -- temporary.
 callerSaveVolatileRegs :: DynFlags -> (CmmAGraph, CmmAGraph)

@@ -200,7 +200,7 @@ call and just recurse directly in to the subexpressions.
 
 -}
 
--- These synonyms match those defined in main/GHC.hs
+-- These synonyms match those defined in compiler/GHC.hs
 type RenamedSource     = ( HsGroup GhcRn, [LImportDecl GhcRn]
                          , Maybe [(LIE GhcRn, Avails)]
                          , Maybe LHsDocString )

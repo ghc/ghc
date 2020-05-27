@@ -2256,7 +2256,7 @@ data Foreign = ImportF Callconv Safety String Name Type
              | ExportF Callconv        String Name Type
          deriving( Show, Eq, Ord, Data, Generic )
 
--- keep Callconv in sync with module ForeignCall in ghc/compiler/prelude/ForeignCall.hs
+-- keep Callconv in sync with module ForeignCall in ghc/compiler/GHC/Types/ForeignCall.hs
 data Callconv = CCall | StdCall | CApi | Prim | JavaScript
           deriving( Show, Eq, Ord, Data, Generic )
 

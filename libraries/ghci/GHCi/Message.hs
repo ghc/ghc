@@ -6,7 +6,7 @@
 -- Remote GHCi message types and serialization.
 --
 -- For details on Remote GHCi, see Note [Remote GHCi] in
--- compiler/ghci/GHCi.hs.
+-- compiler/GHC/Runtime/Interpreter.hs.
 --
 module GHCi.Message
   ( Message(..), Msg(..)
@@ -83,7 +83,7 @@ data Message a where
   -- | Create a set of BCO objects, and return HValueRefs to them
   -- Note: Each ByteString contains a Binary-encoded [ResolvedBCO], not
   -- a ResolvedBCO. The list is to allow us to serialise the ResolvedBCOs
-  -- in parallel. See @createBCOs@ in compiler/ghci/GHCi.hsc.
+  -- in parallel. See @createBCOs@ in compiler/GHC/Runtime/Interpreter.hs.
   CreateBCOs :: [LB.ByteString] -> Message [HValueRef]
 
   -- | Release 'HValueRef's
