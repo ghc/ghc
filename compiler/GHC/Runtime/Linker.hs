@@ -594,7 +594,7 @@ checkNonStdWay hsc_env srcspan
 
   | otherwise = return (Just (hostWayTag ++ "o"))
   where
-    targetFullWays = Set.filter (not . wayRTSOnly) (ways (hsc_dflags hsc_env))
+    targetFullWays = Set.filter (not . wayRTSOnly) (targetWays (hsc_dflags hsc_env))
     hostWayTag = case waysTag hostFullWays of
                   "" -> ""
                   tag -> tag ++ "_"
@@ -613,8 +613,8 @@ failNonStd dflags srcspan = dieWith dflags srcspan $
   text "      with" <+> compWay <+>
      text "using -osuf to set a different object file suffix."
     where compWay
-            | WayDyn `elem` ways dflags = text "-dynamic"
-            | WayProf `elem` ways dflags = text "-prof"
+            | WayDyn `elem` targetWays dflags = text "-dynamic"
+            | WayProf `elem` targetWays dflags = text "-prof"
             | otherwise = text "normal"
           ghciWay
             | hostIsDynamic = text "with -dynamic"
@@ -948,12 +948,12 @@ dynLoadObjs hsc_env pls@PersistentLinkerState{..} objs = do
                       --
                       -- When running TH for a non-dynamic way, we still
                       -- need to make -l flags to link against the dynamic
-                      -- libraries, so we need to add WayDyn to ways.
+                      -- libraries, so we need to add WayDyn to targetWays.
                       --
                       -- Even if we're e.g. profiling, we still want
                       -- the vanilla dynamic libraries, so we set the
-                      -- ways / build tag to be just WayDyn.
-                      ways = Set.singleton WayDyn,
+                      -- targetWays to be just WayDyn.
+                      targetWays = Set.singleton WayDyn,
                       outputFile = Just soFile
                   }
     -- link all "loaded packages" so symbols in those can be resolved

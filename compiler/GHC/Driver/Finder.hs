@@ -369,7 +369,7 @@ findPackageModule_ hsc_env mod pkg_conf =
 
   let
      dflags = hsc_dflags hsc_env
-     tag = waysBuildTag (ways dflags)
+     tag = waysBuildTag (targetWays dflags)
 
            -- hi-suffix for packages depends on the build tag.
      package_hisuf | null tag  = "hi"
@@ -701,7 +701,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
 
             _ -> panic "cantFindErr"
 
-    build_tag = waysBuildTag (ways dflags)
+    build_tag = waysBuildTag (targetWays dflags)
 
     not_found_in_package pkg files
        | build_tag /= ""
@@ -810,7 +810,7 @@ cantFindInstalledErr cannot_find _ dflags mod_name find_result
 
             _ -> panic "cantFindInstalledErr"
 
-    build_tag = waysBuildTag (ways dflags)
+    build_tag = waysBuildTag (targetWays dflags)
     pkgstate = unitState dflags
 
     looks_like_srcpkgid :: UnitId -> SDoc
