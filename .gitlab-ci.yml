@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: 6223fe0b5942f4fa35bdec92c74566cf195bfb42
+  DOCKER_REV: ba119705df5222fe74208a85019cb980e2c4318f
 
   # Sequential version number capturing the versions of all tools fetched by
   # .gitlab/ci.sh.
@@ -240,6 +240,13 @@ validate-x86_64-linux-deb9-unreg-hadrian:
     - .gitlab/ci.sh clean
   tags:
     - x86_64-linux
+
+nightly-x86_64-linux-deb10-hadrian-cross-aarch64:
+  #<<: *nightly
+  stage: build
+  extends: .build-x86_64-linux-deb10-hadrian
+  variables:
+    CROSS_TARGET: "aarch64-linux-gnu"
 
 
 ############################################################
