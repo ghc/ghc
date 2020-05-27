@@ -108,11 +108,10 @@ $(eval $(call compilerConfig,2))
 PRIMOP_BITS_NAMES = primop-data-decl.hs-incl        \
                     primop-tag.hs-incl              \
                     primop-list.hs-incl             \
-                    primop-has-side-effects.hs-incl \
+                    primop-effect.hs-incl \
                     primop-out-of-line.hs-incl      \
                     primop-commutable.hs-incl       \
                     primop-code-size.hs-incl        \
-                    primop-can-fail.hs-incl         \
                     primop-strictness.hs-incl       \
                     primop-fixity.hs-incl           \
                     primop-primop-info.hs-incl      \
@@ -143,16 +142,14 @@ compiler/stage$1/build/primop-tag.hs-incl: compiler/stage$1/build/primops.txt $$
 	"$$(genprimopcode_INPLACE)" --primop-tag         < $$< > $$@
 compiler/stage$1/build/primop-list.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --primop-list        < $$< > $$@
-compiler/stage$1/build/primop-has-side-effects.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
-	"$$(genprimopcode_INPLACE)" --has-side-effects   < $$< > $$@
+compiler/stage$1/build/primop-effect.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
+	"$$(genprimopcode_INPLACE)" --effect   < $$< > $$@
 compiler/stage$1/build/primop-out-of-line.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --out-of-line        < $$< > $$@
 compiler/stage$1/build/primop-commutable.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --commutable         < $$< > $$@
 compiler/stage$1/build/primop-code-size.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --code-size          < $$< > $$@
-compiler/stage$1/build/primop-can-fail.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
-	"$$(genprimopcode_INPLACE)" --can-fail           < $$< > $$@
 compiler/stage$1/build/primop-strictness.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)
 	"$$(genprimopcode_INPLACE)" --strictness         < $$< > $$@
 compiler/stage$1/build/primop-fixity.hs-incl: compiler/stage$1/build/primops.txt $$$$(genprimopcode_INPLACE)

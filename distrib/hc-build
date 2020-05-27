@@ -73,11 +73,10 @@ HappyCmd="$PWD/distrib/fake-happy" ./configure --with-ghc="$PWD/compiler/ghc-inp
 PRIMOP_BITS="primop-data-decl.hs-incl \
 	      primop-tag.hs-incl  \
 	      primop-list.hs-incl  \
-	      primop-has-side-effects.hs-incl  \
+	      primop-effect.hs-incl  \
 	      primop-out-of-line.hs-incl  \
 	      primop-commutable.hs-incl  \
 	      primop-needs-wrapper.hs-incl  \
-	      primop-can-fail.hs-incl  \
 	      primop-strictness.hs-incl  \
 	      primop-usage.hs-incl  \
 	      primop-primop-info.hs-incl"

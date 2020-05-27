@@ -124,10 +124,10 @@ main = getArgs >>= \args ->
                       "--data-decl"
                          -> putStr (gen_data_decl p_o_specs)
 
-                      "--has-side-effects"
+                      "--effect"
                          -> putStr (gen_switch_from_attribs
-                                       "has_side_effects"
-                                       "primOpHasSideEffects" p_o_specs)
+                                       "effect"
+                                       "primOpEffect" p_o_specs)
 
                       "--out-of-line"
                          -> putStr (gen_switch_from_attribs
@@ -143,11 +143,6 @@ main = getArgs >>= \args ->
                          -> putStr (gen_switch_from_attribs
                                        "code_size"
                                        "primOpCodeSize" p_o_specs)
-
-                      "--can-fail"
-                         -> putStr (gen_switch_from_attribs
-                                       "can_fail"
-                                       "primOpCanFail" p_o_specs)
 
                       "--strictness"
                          -> putStr (gen_switch_from_attribs
@@ -779,6 +774,7 @@ gen_switch_from_attribs attrib_name fn_name (Info defaults entries)
          getAltRhs (OptionString _ s) = s
          getAltRhs (OptionVector _) = "True"
          getAltRhs (OptionFixity mf) = show mf
+         getAltRhs (OptionEffect eff) = show eff
 
          mkAlt po
             = case lookup_attrib attrib_name (opts po) of

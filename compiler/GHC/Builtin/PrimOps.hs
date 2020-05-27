@@ -328,9 +328,16 @@ primOpOutOfLine :: PrimOp -> Bool
 -- them.
 data PrimOpEffect
   = NoEffect
+  -- ^ Triggers no side-effects.
   | ThrowsImprecise
+  -- ^ May throw an /imprecise/ exception.
+  -- See Note [Precise vs imprecise exceptions] in GHC.Types.Demand.
   | WriteEffect
+  -- ^ May perform a write effect, such as writing out to a file or a mutable
+  -- ref cell. (Or any of the weaker effects.)
   | ThrowsPrecise
+  -- ^ May throw a /precise/ exception. (Or any of the weaker effects.)
+  -- See Note [Precise vs imprecise exceptions] in GHC.Types.Demand.
   deriving (Eq, Ord)
 
 -- | Can we discard a call to the primop, i.e. @case a `op` b of _ -> rhs@?
@@ -513,11 +520,16 @@ Two main predicates on primpops test these flags:
     has_side_effects things (very very very) not-cheap!
 -}
 
-primOpHasSideEffects :: PrimOp -> Bool
-#include "primop-has-side-effects.hs-incl"
+primOpEffect :: PrimOp -> PrimOpEffect
+#include "primop-effect.hs-incl"
+
+primOpOkForSideEffects :: PrimOp -> Bool
+-- This is exactly @isDupablePrimOpEffect (primOpEffect op)@
+primOpOkForSideEffects op = primOpEffect op < WriteEffect
 
 primOpCanFail :: PrimOp -> Bool
-#include "primop-can-fail.hs-incl"
+-- This is exactly @isSpeculatablePrimOpEffect (primOpEffect op)@
+primOpCanFail op = primOpEffect op < ThrowsImprecise
 
 primOpOkForSpeculation :: PrimOp -> Bool
   -- See Note [PrimOp can_fail and has_side_effects]
