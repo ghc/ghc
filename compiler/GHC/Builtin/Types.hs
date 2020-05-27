@@ -68,13 +68,14 @@ module GHC.Builtin.Types (
         maybeTyCon, maybeTyConName,
         nothingDataCon, nothingDataConName, promotedNothingDataCon,
         justDataCon, justDataConName, promotedJustDataCon,
+        maybeType, maybeKind, isMaybeType,
 
         -- * Tuples
         mkTupleTy, mkTupleTy1, mkBoxedTupleTy, mkTupleStr,
         tupleTyCon, tupleDataCon, tupleTyConName, tupleDataConName,
         promotedTupleDataCon,
         unitTyCon, unitDataCon, unitDataConId, unitTy, unitTyConKey,
-        pairTyCon,
+        pairTyCon, pair, isTupleType,
         unboxedUnitTy,
         unboxedUnitTyCon, unboxedUnitDataCon,
         unboxedTupleKind, unboxedSumKind,
@@ -1005,6 +1006,14 @@ tupleDataCon Unboxed i = snd (unboxedTupleArr ! i)
 tupleDataConName :: Boxity -> Arity -> Name
 tupleDataConName sort i = dataConName (tupleDataCon sort i)
 
+pair :: Kind -> Kind -> Type -> Type -> Type
+pair u x y z = mkTyConApp (promotedTupleDataCon Boxed 2) [u,x,y,z]
+
+isTupleType :: Type -> Maybe (Type, Type)
+isTupleType tc
+  | Just (tc1, [x,y]) <- splitTyConApp_maybe tc, tc1 == (promotedTupleDataCon Boxed 2) = Just (x, y)
+  | otherwise = Nothing
+
 boxedTupleArr, unboxedTupleArr :: Array Int (TyCon,DataCon)
 boxedTupleArr   = listArray (0,mAX_TUPLE_SIZE) [mk_tuple Boxed   i | i <- [0..mAX_TUPLE_SIZE]]
 unboxedTupleArr = listArray (0,mAX_TUPLE_SIZE) [mk_tuple Unboxed i | i <- [0..mAX_TUPLE_SIZE]]
@@ -1790,6 +1799,20 @@ nothingDataCon = pcDataCon nothingDataConName alpha_tyvar [] maybeTyCon
 
 justDataCon :: DataCon
 justDataCon = pcDataCon justDataConName alpha_tyvar [alphaTy] maybeTyCon
+
+maybeType :: Kind -> Maybe Type -> Type
+maybeType k (Just x) = mkTyConApp promotedJustDataCon [k,x]
+maybeType k (Nothing) = mkTyConApp promotedNothingDataCon [k]
+
+maybeKind :: Type -> Kind
+maybeKind t = mkTyConApp maybeTyCon [t]
+
+isMaybeType :: Type -> Maybe (Maybe Type)
+isMaybeType tc
+  | Just (tc1,[t]) <- splitTyConApp_maybe tc, tc1 == promotedJustDataCon = return $ Just t
+  | Just (tc1,[]) <- splitTyConApp_maybe tc, tc1 == promotedNothingDataCon = return $ Nothing
+  | otherwise = Nothing
+
 
 {-
 ** *********************************************************************

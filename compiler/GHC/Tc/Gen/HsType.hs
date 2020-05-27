@@ -1193,6 +1193,9 @@ tc_hs_type _ rn_ty@(HsTyLit _ (HsNumTy _ n)) exp_kind
 tc_hs_type _ rn_ty@(HsTyLit _ (HsStrTy _ s)) exp_kind
   = do { checkWiredInTyCon typeSymbolKindCon
        ; checkExpectedKind rn_ty (mkStrLitTy s) typeSymbolKind exp_kind }
+tc_hs_type _ rn_ty@(HsTyLit _ (HsCharTy _ c)) exp_kind
+  = do { checkWiredInTyCon charTyCon
+       ; checkExpectedKind rn_ty (mkCharLitTy c) charTy exp_kind }
 
 --------- Wildcards
 

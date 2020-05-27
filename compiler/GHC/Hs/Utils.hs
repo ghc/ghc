@@ -60,6 +60,7 @@ module GHC.Hs.Utils(
 
   -- * Literals
   mkHsIntegral, mkHsFractional, mkHsIsString, mkHsString, mkHsStringPrimLit,
+  mkHsCharPrimLit,
 
   -- * Patterns
   mkNPat, mkNPlusKPat, nlVarPat, nlLitPat, nlConVarPat, nlConVarPatName, nlConPat,
@@ -407,6 +408,9 @@ mkHsString s = HsString NoSourceText (mkFastString s)
 
 mkHsStringPrimLit :: FastString -> HsLit (GhcPass p)
 mkHsStringPrimLit fs = HsStringPrim NoSourceText (bytesFS fs)
+
+mkHsCharPrimLit :: Char -> HsLit (GhcPass p)
+mkHsCharPrimLit c = HsChar NoSourceText c
 
 
 {-
