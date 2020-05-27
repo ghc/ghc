@@ -536,8 +536,10 @@ static HsInt loadArchive_ (pathchar *path)
                 fclose(f);
                 return 0;
             } else {
+                /* TODO(osa): Update this code
                 oc->next = objects;
                 objects = oc;
+                */
             }
         }
         else if (isGnuIndex) {
