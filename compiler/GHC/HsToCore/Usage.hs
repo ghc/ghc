@@ -174,7 +174,7 @@ mkPluginUsage hsc_env pluginModule
     -- The plugin is from an external package:
     -- search for the library files containing the plugin.
       let searchPaths = collectLibraryPaths dflags [pkg]
-          useDyn = WayDyn `elem` ways dflags
+          useDyn = WayDyn `elem` targetWays dflags
           suffix = if useDyn then soExt platform else "a"
           libLocs = [ searchPath </> "lib" ++ libLoc <.> suffix
                     | searchPath <- searchPaths

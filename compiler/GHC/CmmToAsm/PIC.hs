@@ -662,7 +662,7 @@ pprImportedSymbol dflags config importedLbl = case (arch,os) of
    --    section.
    --    The "official" GOT mechanism (label@got) isn't intended to be used
    --    in position dependent code, so we have to create our own "fake GOT"
-   --    when not Opt_PIC && WayDyn `elem` ways dflags.
+   --    when not Opt_PIC && WayDyn `elem` targetWays dflags.
    --
    -- 2) PowerPC Linux is just plain broken.
    --    While it's theoretically possible to use GOT offsets larger
