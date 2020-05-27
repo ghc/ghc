@@ -40,9 +40,9 @@ Hadrian build system
   build_hadrian Build GHC via the Hadrian build system
   test_hadrian  Test GHC via the Hadrian build system
 
-
 Environment variables affecting both build systems:
 
+  CROSS_TARGET      Triple of cross-compilation target.
   VERBOSE           Set to non-empty for verbose build output
   MSYSTEM           (Windows-only) Which platform to build form (MINGW64 or MINGW32).
 
@@ -111,11 +111,11 @@ function setup_locale() {
 function mingw_init() {
   case "$MSYSTEM" in
     MINGW32)
-      triple="i386-unknown-mingw32"
+      target_triple="i386-unknown-mingw32"
       boot_triple="i386-unknown-mingw32" # triple of bootstrap GHC
       ;;
     MINGW64)
-      triple="x86_64-unknown-mingw32"
+      target_triple="x86_64-unknown-mingw32"
       boot_triple="x86_64-unknown-mingw32" # triple of bootstrap GHC
       ;;
     *)
@@ -378,8 +378,8 @@ function configure() {
   end_section "booting"
 
   local target_args=""
-  if [[ -n "$triple" ]]; then
-    target_args="--target=$triple"
+  if [[ -n "$target_triple" ]]; then
+    target_args="--target=$target_triple"
   fi
 
   start_section "configuring"
@@ -430,6 +430,11 @@ function determine_metric_baseline() {
 }
 
 function test_make() {
+  if [ -n "$CROSS_TARGET" ]; then
+    info "Can't test cross-compiled build."
+    return
+  fi
+
   run "$MAKE" test_bindist TEST_PREP=YES
   run "$MAKE" V=0 test \
     THREADS="$cores" \
@@ -450,6 +455,11 @@ function build_hadrian() {
 }
 
 function test_hadrian() {
+  if [ -n "$CROSS_TARGET" ]; then
+    info "Can't test cross-compiled build."
+    return
+  fi
+
   cd _build/bindist/ghc-*/
   run ./configure --prefix="$TOP"/_build/install
   run "$MAKE" install
@@ -536,6 +546,11 @@ case "$(uname)" in
   Linux) ;;
   *) fail "uname $(uname) is not supported" ;;
 esac
+
+if [ -n "$CROSS_TARGET" ]; then
+  info "Cross-compiling for $CROSS_TARGET..."
+  target_triple="$CROSS_TARGET"
+fi
 
 set_toolchain_paths
 
