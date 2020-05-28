@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -43,6 +44,7 @@ module GHC.CmmToLlvm.Base (
 
 import GHC.Prelude
 import GHC.Utils.Panic
+import GHC.Exts (oneShot)
 
 import GHC.Llvm
 import GHC.CmmToLlvm.Regs
@@ -64,6 +66,7 @@ import GHC.Types.Unique.Supply
 import GHC.Utils.Error
 import qualified GHC.Data.Stream as Stream
 
+import Data.Bifunctor
 import Data.Maybe (fromJust)
 import Control.Monad (ap)
 import Data.Char (isDigit)
@@ -318,8 +321,19 @@ data LlvmEnv = LlvmEnv
 type LlvmEnvMap = UniqFM Unique LlvmType
 
 -- | The Llvm monad. Wraps @LlvmEnv@ state as well as the @IO@ monad
-newtype LlvmM a = LlvmM { runLlvmM :: LlvmEnv -> IO (a, LlvmEnv) }
-    deriving (Functor)
+newtype LlvmM a = LlvmM' (LlvmEnv -> IO (a, LlvmEnv))
+
+runLlvmM :: LlvmM a -> LlvmEnv -> IO (a, LlvmEnv)
+runLlvmM (LlvmM f) = f
+
+{-# COMPLETE LlvmM #-}
+pattern LlvmM :: (LlvmEnv -> IO (a,LlvmEnv)) -> LlvmM a
+pattern LlvmM f <- LlvmM' f
+   where
+      LlvmM f = LlvmM' (oneShot f)
+
+instance Functor LlvmM where
+   fmap f (LlvmM g) = LlvmM (\env -> first f <$> g env)
 
 instance Applicative LlvmM where
     pure x = LlvmM $ \env -> return (x, env)

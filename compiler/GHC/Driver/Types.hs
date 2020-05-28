@@ -7,11 +7,10 @@
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE PatternSynonyms      #-}
 
 {-
 (c) The University of Glasgow, 2006
-
-\section[GHC.Driver.Types]{Types for the per-module compiler}
 -}
 
 -- | Types for the per-module compiler
@@ -28,7 +27,7 @@ module GHC.Driver.Types (
         needsTemplateHaskellOrQQ, mgBootModules,
 
         -- * Hsc monad
-        Hsc(..), runHsc, mkInteractiveHscEnv, runInteractiveHsc,
+        Hsc(..), pattern Hsc, runHsc, mkInteractiveHscEnv, runInteractiveHsc,
 
         -- * Information about modules
         ModDetails(..), emptyModDetails,
@@ -158,6 +157,7 @@ module GHC.Driver.Types (
 #include "HsVersions.h"
 
 import GHC.Prelude
+import GHC.Exts (oneShot)
 
 import GHC.Driver.Ppr
 import GHC.Driver.CmdLine
@@ -229,6 +229,7 @@ import Data.IORef
 import Data.Map         ( Map )
 import qualified Data.Map as Map
 import Data.Time
+import Data.Bifunctor
 import GHC.Utils.Exception
 import System.FilePath
 import Control.DeepSeq
@@ -276,8 +277,16 @@ data HscStatus
 -- -----------------------------------------------------------------------------
 -- The Hsc monad: Passing an environment and warning state
 
-newtype Hsc a = Hsc (HscEnv -> WarningMessages -> IO (a, WarningMessages))
-    deriving (Functor)
+newtype Hsc a = Hsc' (HscEnv -> WarningMessages -> IO (a, WarningMessages))
+
+{-# COMPLETE Hsc #-}
+pattern Hsc :: (HscEnv -> WarningMessages -> IO (a,WarningMessages)) -> Hsc a
+pattern Hsc f <- Hsc' f
+   where
+      Hsc f = Hsc' (oneShot f)
+
+instance Functor Hsc where
+   fmap f (Hsc g) = Hsc (\env msg -> first f <$> g env msg)
 
 instance Applicative Hsc where
     pure a = Hsc $ \_ w -> return (a, w)
