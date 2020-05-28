@@ -30,6 +30,7 @@ module GHC.RTS.Flags
   , getGCFlags
   , getConcFlags
   , getMiscFlags
+  , getIoManagerFlag
   , getDebugFlags
   , getCCFlags
   , getProfFlags
@@ -477,6 +478,7 @@ getConcFlags = do
   ConcFlags <$> #{peek CONCURRENT_FLAGS, ctxtSwitchTime} ptr
             <*> #{peek CONCURRENT_FLAGS, ctxtSwitchTicks} ptr
 
+{-# INLINEABLE getMiscFlags #-}
 getMiscFlags :: IO MiscFlags
 getMiscFlags = do
   let ptr = (#ptr RTS_FLAGS, MiscFlags) rtsFlagsPtr
@@ -502,6 +504,36 @@ getMiscFlags = do
                  <$> (#{peek MISC_FLAGS, ioManager} ptr :: IO Word32))
             <*> (fromIntegral
                  <$> (#{peek MISC_FLAGS, numIoWorkerThreads} ptr :: IO Word32))
+
+{- Note [The need for getIoManagerFlag]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   GHC supports both the new WINIO manager
+   as well as the old MIO one. In order to
+   decide which code path to take we often
+   have to inspect what the user selected at
+   RTS startup.
+
+   We could use getMiscFlags but then we end up with core containing
+   reads for all MiscFlags. These won't be eliminated at the core level
+   even if it's obvious we will only look at the ioManager part of the
+   ADT.
+
+   We could add a INLINE pragma, but that just means whatever we inline
+   into is likely to be inlined. So rather than adding a dozen pragmas
+   we expose a lean way to query this particular flag. It's not satisfying
+   but it works well enough and allows these checks to be inlined nicely.
+
+-}
+
+{-# INLINE getIoManagerFlag #-}
+-- | Needed to optimize support for different IO Managers on Windows.
+-- See Note [The need for getIoManagerFlag]
+getIoManagerFlag :: IO IoSubSystem
+getIoManagerFlag = do
+      let ptr = (#ptr RTS_FLAGS, MiscFlags) rtsFlagsPtr
+      mgrFlag <- (#{peek MISC_FLAGS, ioManager} ptr :: IO Word32)
+      (toEnum . fromIntegral)
 
 getDebugFlags :: IO DebugFlags
 getDebugFlags = do
