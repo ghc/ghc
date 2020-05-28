@@ -2,6 +2,7 @@ module Rules.BinaryDist where
 
 import Hadrian.Haskell.Cabal
 
+import CommandLine
 import Context
 import Expression
 import Oracles.Setting
@@ -98,6 +99,18 @@ other, the install script:
 bindistRules :: Rules ()
 bindistRules = do
     root <- buildRootRules
+    phony "install" $ do
+        need ["binary-dist-dir"]
+        version        <- setting ProjectVersion
+        targetPlatform <- setting TargetPlatformFull
+        let ghcVersionPretty = "ghc-" ++ version ++ "-" ++ targetPlatform
+            bindistFilesDir  = root -/- "bindist" -/- ghcVersionPretty
+            prefixErr = "You must specify a path with --prefix when using the"
+                     ++ " 'install' rule"
+        installPrefix <- fromMaybe (error prefixErr) <$> cmdPrefix
+        runBuilder (Configure bindistFilesDir) ["--prefix="++installPrefix] [] []
+        runBuilder (Make bindistFilesDir) ["install"] [] []
+
     phony "binary-dist-dir" $ do
         -- We 'need' all binaries and libraries
         targets <- mapM pkgTarget =<< stagePackages Stage1
