@@ -258,6 +258,19 @@ $ ./configure [--prefix=PATH] && make install
 
 workflow, for now.
 
+### Building and installing GHC
+
+You can get Hadrian to build _and_ install a binary distribution in one go
+with the following command:
+
+``` sh
+$ build install --prefix=/some/absolute/path
+```
+
+This builds everything that would be shipped in a bindist, without creating
+the archive, and just runs `./configure --prefix=PATH` and `make install`
+to get GHC installed installed at `/some/absolute/path`.
+
 #### Building Stage3
 
 It is possible to define a build flavour that builds a Stage3 compiler, which is
