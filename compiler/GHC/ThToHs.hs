@@ -15,6 +15,7 @@ This module converts Template Haskell syntax into Hs syntax
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -29,6 +30,7 @@ module GHC.ThToHs
 where
 
 import GHC.Prelude
+import GHC.Exts (oneShot)
 
 import GHC.Hs as Hs
 import GHC.Builtin.Names
@@ -82,11 +84,17 @@ convertToHsType origin loc t
   = initCvt origin loc $ wrapMsg "type" t $ cvtType t
 
 -------------------------------------------------------------------
-newtype CvtM a = CvtM { unCvtM :: Origin -> SrcSpan -> Either MsgDoc (SrcSpan, a) }
+newtype CvtM a = CvtMNoEta { unCvtM :: Origin -> SrcSpan -> Either MsgDoc (SrcSpan, a) }
     deriving (Functor)
         -- Push down the Origin (that is configurable by
         -- -fenable-th-splice-warnings) and source location;
         -- Can fail, with a single error message
+
+{-# COMPLETE CvtM #-}
+pattern CvtM :: (Origin -> SrcSpan -> Either MsgDoc (SrcSpan, a)) -> CvtM a
+pattern CvtM f <- CvtMNoEta f
+   where
+      CvtM f = CvtMNoEta (oneShot f)
 
 -- NB: If the conversion succeeds with (Right x), there should
 --     be no exception values hiding in x

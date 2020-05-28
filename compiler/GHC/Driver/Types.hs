@@ -14,6 +14,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 -- | Types for the per-module compiler
 module GHC.Driver.Types (
@@ -29,7 +30,7 @@ module GHC.Driver.Types (
         needsTemplateHaskellOrQQ, mgBootModules,
 
         -- * Hsc monad
-        Hsc(..), runHsc, mkInteractiveHscEnv, runInteractiveHsc,
+        Hsc(..), pattern Hsc, runHsc, mkInteractiveHscEnv, runInteractiveHsc,
 
         -- * Information about modules
         ModDetails(..), emptyModDetails,
@@ -160,6 +161,7 @@ module GHC.Driver.Types (
 #include "HsVersions.h"
 
 import GHC.Prelude
+import GHC.Exts (oneShot)
 
 import GHC.ByteCode.Types
 import GHC.Runtime.Eval.Types ( Resume )
@@ -273,8 +275,14 @@ data HscStatus
 -- -----------------------------------------------------------------------------
 -- The Hsc monad: Passing an environment and warning state
 
-newtype Hsc a = Hsc (HscEnv -> WarningMessages -> IO (a, WarningMessages))
+newtype Hsc a = HscNoEta (HscEnv -> WarningMessages -> IO (a, WarningMessages))
     deriving (Functor)
+
+{-# COMPLETE Hsc #-}
+pattern Hsc :: (HscEnv -> WarningMessages -> IO (a,WarningMessages)) -> Hsc a
+pattern Hsc f <- HscNoEta f
+   where
+      Hsc f = HscNoEta (oneShot f)
 
 instance Applicative Hsc where
     pure a = Hsc $ \_ w -> return (a, w)

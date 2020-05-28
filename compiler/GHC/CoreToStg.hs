@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, DeriveFunctor #-}
+{-# LANGUAGE CPP, DeriveFunctor, PatternSynonyms #-}
 
 --
 -- (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
@@ -16,6 +16,7 @@ module GHC.CoreToStg ( coreToStg ) where
 #include "HsVersions.h"
 
 import GHC.Prelude
+import GHC.Exts (oneShot)
 
 import GHC.Core
 import GHC.Core.Utils   ( exprType, findDefault, isJoinBind
@@ -821,12 +822,19 @@ isPAP env _               = False
 -- ("core-to-STG monad") monad to help.  All the stuff here is only passed
 -- *down*.
 
-newtype CtsM a = CtsM
+newtype CtsM a = CtsMNoEta
     { unCtsM :: DynFlags -- Needed for checking for bad coercions in coreToStgArgs
              -> IdEnv HowBound
              -> a
     }
     deriving (Functor)
+
+
+{-# COMPLETE CtsM #-}
+pattern CtsM :: (DynFlags -> IdEnv HowBound -> a) -> CtsM a
+pattern CtsM f <- CtsMNoEta f
+   where
+      CtsM f = CtsMNoEta (oneShot f)
 
 data HowBound
   = ImportBound         -- Used only as a response to lookupBinding; never

@@ -1,4 +1,6 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 {-
 (c) The University of Glasgow 2006-2012
@@ -17,7 +19,7 @@ module GHC.Utils.Outputable (
 
         -- * Pretty printing combinators
         SDoc, runSDoc, initSDocContext,
-        docToSDoc,
+        docToSDoc, multiShotSDoc,
         interppSP, interpp'SP,
         pprQuotedList, pprWithCommas, quotedListWithOr, quotedListWithNor,
         pprWithBars,
@@ -93,6 +95,11 @@ module GHC.Utils.Outputable (
     ) where
 
 import GHC.Prelude
+#if !MIN_VERSION_base(4,14,0)
+import GHC.Exts (oneShot)
+#else
+import GHC.Exts (oneShot,multiShot)
+#endif
 
 import {-# SOURCE #-}   GHC.Driver.Session
                            ( DynFlags, hasPprDebug, hasNoDebugOutput
@@ -136,6 +143,20 @@ import GHC.Show         ( showMultiLineString )
 import GHC.Stack        ( callStack, prettyCallStack )
 import Control.Monad.IO.Class
 import GHC.Utils.Exception
+
+#if !MIN_VERSION_base(4,14,0)
+-- | Cancel away a oneShot but don't inhibit arity analysis from finding
+-- one-shot lambdas (see #18238)
+--
+-- It's duplicated from ghc-prim:GHC.Magic (reexported by base:GHC.Exts) until
+-- we bootstrap with a sufficiently recent compiler providing it.
+multiShot :: (a -> b) -> a -> b
+{-# INLINE multiShot #-}
+multiShot = \f x -> f (opaque x)
+  where
+    opaque x = x
+    {-# INLINE[0] opaque #-}
+#endif
 
 {-
 ************************************************************************
@@ -319,7 +340,21 @@ code (either C or assembly), or generating interface files.
 -- To display an 'SDoc', use 'printSDoc', 'printSDocLn', 'bufLeftRenderSDoc',
 -- or 'renderWithStyle'.  Avoid calling 'runSDoc' directly as it breaks the
 -- abstraction layer.
-newtype SDoc = SDoc { runSDoc :: SDocContext -> Doc }
+newtype SDoc = SDocNoEta { runSDoc :: SDocContext -> Doc }
+
+{-# COMPLETE SDoc #-}
+pattern SDoc :: (SDocContext -> Doc) -> SDoc
+pattern SDoc f <- SDocNoEta f
+   where
+      SDoc f = SDocNoEta (oneShot f)
+
+-- | Don't eta-expand the given SDoc.
+--
+-- It is sometimes necessary. See #18202 for an example.
+multiShotSDoc :: SDoc -> SDoc
+multiShotSDoc = \(SDoc m) -> SDoc (multiShot m)
+{-# INLINE multiShotSDoc #-}
+
 
 data SDocContext = SDC
   { sdocStyle                       :: !PprStyle

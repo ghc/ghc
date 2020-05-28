@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -47,6 +48,7 @@ where
 #include "HsVersions.h"
 
 import GHC.Prelude
+import GHC.Exts (oneShot)
 
 import GHC.Platform
 import GHC.Platform.Reg
@@ -121,8 +123,15 @@ data NatM_State
 
 type DwarfFiles = UniqFM (FastString, Int)
 
-newtype NatM result = NatM (NatM_State -> (result, NatM_State))
+newtype NatM result = NatMNoEta (NatM_State -> (result, NatM_State))
     deriving (Functor)
+
+{-# COMPLETE NatM #-}
+pattern NatM :: (NatM_State -> (result, NatM_State)) -> NatM result
+pattern NatM f <- NatMNoEta f
+   where
+      NatM f = NatMNoEta (oneShot f)
+
 
 unNat :: NatM a -> NatM_State -> (a, NatM_State)
 unNat (NatM a) = a

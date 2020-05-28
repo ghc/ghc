@@ -31,6 +31,7 @@ module GHC.CmmToAsm (
 #include "HsVersions.h"
 
 import GHC.Prelude
+import GHC.Exts (oneShot)
 
 import qualified GHC.CmmToAsm.X86.CodeGen as X86.CodeGen
 import qualified GHC.CmmToAsm.X86.Regs    as X86.Regs
@@ -1085,8 +1086,15 @@ pattern OptMResult x y = (# x, y #)
 data OptMResult a = OptMResult !a ![CLabel] deriving (Functor)
 #endif
 
-newtype CmmOptM a = CmmOptM (NCGConfig -> Module -> [CLabel] -> OptMResult a)
+newtype CmmOptM a = CmmOptMNoEta (NCGConfig -> Module -> [CLabel] -> OptMResult a)
     deriving (Functor)
+
+{-# COMPLETE CmmOptM #-}
+pattern CmmOptM :: (NCGConfig -> Module -> [CLabel] -> OptMResult a) -> CmmOptM a
+pattern CmmOptM f <- CmmOptMNoEta f
+   where
+      CmmOptM f = CmmOptMNoEta (oneShot f)
+
 
 instance Applicative CmmOptM where
     pure x = CmmOptM $ \_ _ imports -> OptMResult x imports
