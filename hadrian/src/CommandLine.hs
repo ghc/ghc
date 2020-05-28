@@ -1,7 +1,8 @@
 module CommandLine (
     optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, lookupFreeze2,
     cmdIntegerSimple, cmdProgressInfo, cmdConfigure, cmdCompleteSetting,
-    cmdDocsArgs, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs
+    cmdDocsArgs, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs,
+    cmdPrefix
     ) where
 
 import Data.Either
@@ -30,6 +31,7 @@ data CommandLineArgs = CommandLineArgs
     , buildRoot      :: BuildRoot
     , testArgs       :: TestArgs
     , docTargets     :: DocTargets
+    , prefix         :: Maybe FilePath
     , completeStg    :: Maybe String }
     deriving (Eq, Show)
 
@@ -45,6 +47,7 @@ defaultCommandLineArgs = CommandLineArgs
     , buildRoot      = BuildRoot "_build"
     , testArgs       = defaultTestArgs
     , docTargets     = Set.fromList [minBound..maxBound]
+    , prefix         = Nothing
     , completeStg    = Nothing }
 
 -- | These arguments are used by the `test` target.
@@ -207,6 +210,9 @@ readBrokenTests way =
             let newTests = words tests ++ brokenTests (testArgs flags)
             in flags { testArgs = (testArgs flags) {brokenTests = newTests} }
 
+readPrefix :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
+readPrefix ms = Right $ \flags -> flags { prefix = ms }
+
 readCompleteStg :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readCompleteStg ms = Right $ \flags -> flags { completeStg = ms }
 
@@ -281,6 +287,8 @@ optDescrs =
     , Option [] ["broken-test"] (OptArg readBrokenTests "TEST_NAME")
       "consider these tests to be broken"
     , Option ['a'] ["test-accept"] (NoArg readTestAccept) "Accept new output of tests"
+    , Option [] ["prefix"] (OptArg readPrefix "PATH")
+        "Destination path for the bindist 'install' rule"
     , Option [] ["complete-setting"] (OptArg readCompleteStg "SETTING")
         "Setting key to autocomplete, for the 'autocomplete' target."
     ]
@@ -331,6 +339,9 @@ cmdConfigure = configure <$> cmdLineArgs
 
 cmdFlavour :: Action (Maybe String)
 cmdFlavour = flavour <$> cmdLineArgs
+
+cmdPrefix :: Action (Maybe String)
+cmdPrefix = prefix <$> cmdLineArgs
 
 cmdCompleteSetting :: Action (Maybe String)
 cmdCompleteSetting = completeStg <$> cmdLineArgs
