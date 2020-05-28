@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 {-
 (c) The University of Glasgow 2006-2012
@@ -93,6 +94,7 @@ module GHC.Utils.Outputable (
     ) where
 
 import GHC.Prelude
+import GHC.Exts (oneShot)
 
 import {-# SOURCE #-}   GHC.Driver.Session
                            ( DynFlags, hasPprDebug, hasNoDebugOutput
@@ -320,7 +322,14 @@ code (either C or assembly), or generating interface files.
 -- To display an 'SDoc', use 'printSDoc', 'printSDocLn', 'bufLeftRenderSDoc',
 -- or 'renderWithStyle'.  Avoid calling 'runSDoc' directly as it breaks the
 -- abstraction layer.
-newtype SDoc = SDoc { runSDoc :: SDocContext -> Doc }
+newtype SDoc = SDocNoEta { runSDoc :: SDocContext -> Doc }
+
+{-# COMPLETE SDoc #-}
+pattern SDoc :: (SDocContext -> Doc) -> SDoc
+pattern SDoc f <- SDocNoEta f
+   where
+      SDoc f = SDocNoEta (oneShot f)
+
 
 data SDocContext = SDC
   { sdocStyle                       :: !PprStyle
