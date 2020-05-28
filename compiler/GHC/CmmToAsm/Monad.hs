@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -46,6 +47,7 @@ where
 #include "HsVersions.h"
 
 import GHC.Prelude
+import GHC.Exts (oneShot)
 
 import GHC.Platform
 import GHC.Platform.Reg
@@ -66,6 +68,7 @@ import GHC.Types.Unique         ( Unique )
 import GHC.Unit.Module
 
 import Control.Monad    ( ap )
+import Data.Bifunctor
 
 import GHC.Utils.Outputable (SDoc, ppr)
 import GHC.Utils.Panic      (pprPanic)
@@ -119,8 +122,16 @@ data NatM_State
 
 type DwarfFiles = UniqFM FastString (FastString, Int)
 
-newtype NatM result = NatM (NatM_State -> (result, NatM_State))
-    deriving (Functor)
+newtype NatM result = NatM' (NatM_State -> (result, NatM_State))
+
+{-# COMPLETE NatM #-}
+pattern NatM :: (NatM_State -> (result, NatM_State)) -> NatM result
+pattern NatM f <- NatM' f
+   where
+      NatM f = NatM' (oneShot f)
+
+instance Functor NatM where
+   fmap f (NatM g) = NatM (first f . g)
 
 unNat :: NatM a -> NatM_State -> (a, NatM_State)
 unNat (NatM a) = a

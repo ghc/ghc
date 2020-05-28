@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -5,6 +6,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 {-
 (c) The University of Glasgow 2006-2012
@@ -91,6 +93,7 @@ module GHC.Utils.Outputable (
     ) where
 
 import GHC.Prelude
+import GHC.Exts (oneShot)
 
 import {-# SOURCE #-}   GHC.Unit.Types ( Unit, Module, moduleName )
 import {-# SOURCE #-}   GHC.Unit.Module.Name( ModuleName )
@@ -126,7 +129,6 @@ import qualified Data.List.NonEmpty as NEL
 import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
 import GHC.Utils.Exception
-import GHC.Exts (oneShot)
 
 {-
 ************************************************************************

@@ -7,6 +7,7 @@
 {-# LANGUAGE ScopedTypeVariables     #-}
 {-# LANGUAGE TypeFamilies            #-}
 {-# LANGUAGE ViewPatterns            #-}
+{-# LANGUAGE PatternSynonyms         #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
@@ -16,9 +17,9 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
 
-This module converts Template Haskell syntax into Hs syntax
 -}
 
+-- | This module converts Template Haskell syntax into Hs syntax
 module GHC.ThToHs
    ( convertToHsExpr
    , convertToPat
@@ -29,6 +30,7 @@ module GHC.ThToHs
 where
 
 import GHC.Prelude
+import GHC.Exts (oneShot)
 
 import GHC.Hs as Hs
 import GHC.Builtin.Names
@@ -55,6 +57,7 @@ import GHC.Utils.Panic
 import qualified Data.ByteString as BS
 import Control.Monad( unless, ap )
 
+import Data.Bifunctor
 import Data.Maybe( catMaybes, isNothing )
 import Language.Haskell.TH as TH hiding (sigP)
 import Language.Haskell.TH.Syntax as TH
@@ -83,11 +86,23 @@ convertToHsType origin loc t
   = initCvt origin loc $ wrapMsg "type" t $ cvtType t
 
 -------------------------------------------------------------------
-newtype CvtM a = CvtM { unCvtM :: Origin -> SrcSpan -> Either MsgDoc (SrcSpan, a) }
-    deriving (Functor)
+newtype CvtM a = CvtM' (Origin -> SrcSpan -> Either MsgDoc (SrcSpan, a))
         -- Push down the Origin (that is configurable by
         -- -fenable-th-splice-warnings) and source location;
         -- Can fail, with a single error message
+
+{-# COMPLETE CvtM #-}
+pattern CvtM :: (Origin -> SrcSpan -> Either MsgDoc (SrcSpan, a)) -> CvtM a
+pattern CvtM f <- CvtM' f
+   where
+      CvtM f = CvtM' (oneShot f)
+
+unCvtM :: CvtM a -> Origin -> SrcSpan -> Either MsgDoc (SrcSpan, a)
+unCvtM (CvtM f) = f
+
+
+instance Functor CvtM where
+   fmap f (CvtM g) = CvtM (\origin srcspan -> second f <$> g origin srcspan)
 
 -- NB: If the conversion succeeds with (Right x), there should
 --     be no exception values hiding in x

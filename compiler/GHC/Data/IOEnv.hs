@@ -57,8 +57,7 @@ import GHC.Exts( oneShot )
 
 
 newtype IOEnv env a = IOEnv' (env -> IO a)
-  deriving (Functor)
-  deriving (MonadThrow, MonadCatch, MonadMask, MonadIO) via (ReaderT env IO)
+  deriving (MonadThrow, MonadCatch, MonadMask) via (ReaderT env IO)
 
 -- See Note [The one-shot state monad trick] in GHC.Utils.Monad
 pattern IOEnv :: forall env a. (env -> IO a) -> IOEnv env a
@@ -67,6 +66,12 @@ pattern IOEnv m <- IOEnv' m
     IOEnv m = IOEnv' (oneShot m)
 
 {-# COMPLETE IOEnv #-}
+
+instance Functor (IOEnv env) where
+   fmap f (IOEnv g) = IOEnv (\env -> f <$> g env)
+
+instance MonadIO (IOEnv env) where
+   liftIO f = IOEnv (\_env -> f)
 
 unIOEnv :: IOEnv env a -> (env -> IO a)
 unIOEnv (IOEnv m) = m
