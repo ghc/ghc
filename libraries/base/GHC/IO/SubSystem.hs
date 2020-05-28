@@ -18,11 +18,10 @@
 -----------------------------------------------------------------------------
 
 module GHC.IO.SubSystem (
-  setIoSubSystem,
-  getIoSubSystem,
   withIoSubSystem,
   withIoSubSystem',
   whenIoSubSystem,
+  ioSubSystem,
   IoSubSystem(..),
   conditional,
   (<!>),
@@ -32,21 +31,20 @@ module GHC.IO.SubSystem (
 import GHC.Base
 
 import GHC.IO.Unsafe
-import GHC.IORef
 import GHC.RTS.Flags
 
 infixl 7 <!>
 
 -- | Conditionally execute an action depending on the configured I/O subsystem.
--- If POSIX then execute first action, if Windows then execute second.
--- On POSIX systems but NATIVE and POSIX will execute the first action.
+-- On POSIX systems always execute the first action.
+-- On windows execute the second action if WINIO as active, otherwise fall back to
+-- the first action.
 conditional :: a -> a -> a
 #if defined(mingw32_HOST_OS)
-conditional posix windows = withIoSubSystem' sub
-  where
-    sub = \s -> case s of
-                  IoPOSIX -> posix
-                  IoNative -> windows
+conditional posix windows =
+  case ioSubSystem of
+    IoPOSIX -> posix
+    IoNative -> windows
 #else
 conditional posix _       = posix
 #endif
@@ -59,30 +57,21 @@ conditional posix _       = posix
 isWindowsNativeIO :: Bool
 isWindowsNativeIO = False <!> True
 
-ioSubSystem :: IORef IoSubSystem
-ioSubSystem = unsafePerformIO sub
-  where
-    sub = do misc <- getMiscFlags
-             newIORef (ioManager misc)
-
-setIoSubSystem :: IoSubSystem -> IO ()
-setIoSubSystem = writeIORef ioSubSystem
-
-getIoSubSystem :: IO IoSubSystem
-getIoSubSystem = readIORef ioSubSystem
+ioSubSystem :: IoSubSystem
+#if defined(mingw32_HOST_OS)
+{-# NOINLINE ioSubSystem #-}
+ioSubSystem = unsafeDupablePerformIO getIoManagerFlag
+#else
+ioSubSystem = IoPOSIX
+#endif
 
 withIoSubSystem :: (IoSubSystem -> IO a) -> IO a
-withIoSubSystem f = do sub <- getIoSubSystem
-                       f sub
+withIoSubSystem f = f ioSubSystem
 
 withIoSubSystem' :: (IoSubSystem -> a) -> a
-withIoSubSystem' f = unsafePerformIO inner
-  where inner = do sub <- getIoSubSystem
-                   return (f sub)
+withIoSubSystem' f = f ioSubSystem
 
 whenIoSubSystem :: IoSubSystem -> IO () -> IO ()
-whenIoSubSystem m f = do sub <- getIoSubSystem
+whenIoSubSystem m f = do let sub = ioSubSystem
                          when (sub == m) f
-
-
 
