@@ -264,7 +264,7 @@ lookupTopBndrRn_maybe :: RdrName -> RnM (Maybe Name)
 -- source files, so we don't need to do so here.
 
 lookupTopBndrRn_maybe rdr_name =
-  lookupExactOrOrig rdr_name Just $
+  lookupExactOrOrig_maybe rdr_name id $
     do  {  -- Check for operators in type or class declarations
            -- See Note [Type and class operator definitions]
           let occ = rdrNameOcc rdr_name
@@ -430,13 +430,22 @@ lookupConstructorFields con_name
 
 -- In CPS style as `RnM r` is monadic
 lookupExactOrOrig :: RdrName -> (Name -> r) -> RnM r -> RnM r
-lookupExactOrOrig rdr_name res k
-  | Just n <- isExact_maybe rdr_name   -- This happens in derived code
-  = res <$> lookupExactOcc n
-  | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
-  = res <$> lookupOrig rdr_mod rdr_occ
-  | otherwise = k
+lookupExactOrOrig = lookupExactOrOrig_base lookupExactOcc id id
 
+-- Variant of 'lookupExactOrOrig' that never fails
+lookupExactOrOrig_maybe :: RdrName -> (Maybe Name -> r) -> RnM r -> RnM r
+lookupExactOrOrig_maybe
+  = lookupExactOrOrig_base lookupExactOcc_either rightToMaybe Just
+
+lookupExactOrOrig_base :: (Name -> RnM a) -> (a -> b) -> (Name -> b)
+                       -> RdrName -> (b -> r)
+                       -> RnM r -> RnM r
+lookupExactOrOrig_base lookupExact exact_f orig_f rdr_name res k
+  | Just n <- isExact_maybe rdr_name   -- This happens in derived code
+  = res . exact_f <$> lookupExact n
+  | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
+  = res . orig_f <$> lookupOrig rdr_mod rdr_occ
+  | otherwise = k
 
 
 -----------------------------------------------
@@ -1039,7 +1048,7 @@ lookupGlobalOccRn_maybe :: RdrName -> RnM (Maybe Name)
 -- No filter function; does not report an error on failure
 -- Uses addUsedRdrName to record use and deprecations
 lookupGlobalOccRn_maybe rdr_name =
-  lookupExactOrOrig rdr_name Just $
+  lookupExactOrOrig_maybe rdr_name id $
     runMaybeT . msum . map MaybeT $
       [ fmap gre_name <$> lookupGreRn_maybe rdr_name
       , listToMaybe <$> lookupQualifiedNameGHCi rdr_name ]
@@ -1086,7 +1095,7 @@ lookupInfoOccRn rdr_name =
 lookupGlobalOccRn_overloaded :: Bool -> RdrName
                              -> RnM (Maybe (Either Name [Name]))
 lookupGlobalOccRn_overloaded overload_ok rdr_name =
-  lookupExactOrOrig rdr_name (Just . Left) $
+  lookupExactOrOrig_maybe rdr_name (fmap Left) $
      do  { res <- lookupGreRn_helper rdr_name
          ; case res of
                 GreNotFound  -> return Nothing
