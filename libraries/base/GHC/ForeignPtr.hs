@@ -590,7 +590,8 @@ plusForeignPtr (ForeignPtr addr c) (I# d) = ForeignPtr (plusAddr# addr d) c
 -- in a @FinalPtr@-backed foreign pointer. This resulted in
 -- @Data.ByteString.Unsafe.unsafeFinalize@ behaving nondeterministically
 -- depending on optimization level and caused failures in the test
--- suite for @bytestring@.
+-- suite for @bytestring@. The bytestring test suite failure was reported in
+-- <https://github.com/haskell/bytestring/issues/228 bytestring issue 228>.
 finalizeForeignPtr :: ForeignPtr a -> IO ()
 finalizeForeignPtr (ForeignPtr _ c) = case c of
   PlainForeignPtr ref -> foreignPtrFinalizer ref
