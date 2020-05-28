@@ -305,6 +305,6 @@ INFO_TABLE(stg_MK_STRING, 0, 1, THUNK_STATIC, "stg_MK_STRING", "stg_MK_STRING")
         Sp_adj(-2);
         Sp(1) = node;
         Sp(0) = stg_bh_upd_frame_info;
-        jump ghczmprim_GHCziCString_unpackCStringzh_info(StgThunk_payload(node,0));
+        jump stg_ap_n_fast(ghczmprim_GHCziCString_unpackCStringzh_info, StgThunk_payload(node, 0));
     }
 }
