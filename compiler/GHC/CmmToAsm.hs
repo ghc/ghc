@@ -83,6 +83,7 @@ where
 #include "HsVersions.h"
 
 import GHC.Prelude
+import GHC.Exts (oneShot)
 
 import qualified GHC.CmmToAsm.X86   as X86
 import qualified GHC.CmmToAsm.PPC   as PPC
@@ -987,8 +988,18 @@ pattern OptMResult x y = (# x, y #)
 data OptMResult a = OptMResult !a ![CLabel] deriving (Functor)
 #endif
 
-newtype CmmOptM a = CmmOptM (NCGConfig -> Module -> [CLabel] -> OptMResult a)
-    deriving (Functor)
+newtype CmmOptM a = CmmOptM' (NCGConfig -> Module -> [CLabel] -> OptMResult a)
+
+{-# COMPLETE CmmOptM #-}
+pattern CmmOptM :: (NCGConfig -> Module -> [CLabel] -> OptMResult a) -> CmmOptM a
+pattern CmmOptM f <- CmmOptM' f
+   where
+      CmmOptM f = CmmOptM' (oneShot f)
+
+instance Functor CmmOptM where
+   fmap f (CmmOptM g) = CmmOptM $ \cfg mod lbls ->
+      case g cfg mod lbls of
+         OptMResult a b -> OptMResult (f a) b
 
 instance Applicative CmmOptM where
     pure x = CmmOptM $ \_ _ imports -> OptMResult x imports

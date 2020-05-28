@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -5,6 +6,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 {-
 (c) The University of Glasgow 2006-2012
@@ -91,6 +93,11 @@ module GHC.Utils.Outputable (
     ) where
 
 import GHC.Prelude
+#if !MIN_VERSION_base(4,14,0)
+import GHC.Exts (oneShot)
+#else
+import GHC.Exts (oneShot,multiShot)
+#endif
 
 import {-# SOURCE #-}   GHC.Unit.Types ( Unit, Module, moduleName )
 import {-# SOURCE #-}   GHC.Unit.Module.Name( ModuleName )
@@ -127,6 +134,20 @@ import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
 import GHC.Utils.Exception
 import GHC.Exts (oneShot)
+
+#if !MIN_VERSION_base(4,14,0)
+-- | Cancel away a oneShot but don't inhibit arity analysis from finding
+-- one-shot lambdas (see #18238)
+--
+-- It's duplicated from ghc-prim:GHC.Magic (reexported by base:GHC.Exts) until
+-- we bootstrap with a sufficiently recent compiler providing it.
+multiShot :: (a -> b) -> a -> b
+{-# INLINE multiShot #-}
+multiShot = \f x -> f (opaque x)
+  where
+    opaque x = x
+    {-# INLINE[0] opaque #-}
+#endif
 
 {-
 ************************************************************************
