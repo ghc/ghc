@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -42,6 +43,7 @@ module GHC.CmmToLlvm.Base (
 #include "ghcautoconf.h"
 
 import GHC.Prelude
+import GHC.Exts (oneShot)
 
 import GHC.Llvm
 import GHC.CmmToLlvm.Regs
@@ -328,8 +330,16 @@ data LlvmEnv = LlvmEnv
 type LlvmEnvMap = UniqFM LlvmType
 
 -- | The Llvm monad. Wraps @LlvmEnv@ state as well as the @IO@ monad
-newtype LlvmM a = LlvmM { runLlvmM :: LlvmEnv -> IO (a, LlvmEnv) }
+newtype LlvmM a = LlvmMNoEta { runLlvmM :: LlvmEnv -> IO (a, LlvmEnv) }
     deriving (Functor)
+
+
+{-# COMPLETE LlvmM #-}
+pattern LlvmM :: (LlvmEnv -> IO (a,LlvmEnv)) -> LlvmM a
+pattern LlvmM f <- LlvmMNoEta f
+   where
+      LlvmM f = LlvmMNoEta (oneShot f)
+
 
 instance Applicative LlvmM where
     pure x = LlvmM $ \env -> return (x, env)
