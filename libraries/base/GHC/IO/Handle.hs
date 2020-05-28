@@ -451,8 +451,7 @@ hTell handle =
     wantSeekableHandle "hGetPosn" handle $ \ handle_@Handle__{..} -> do
 
       -- TODO: Guard these on Windows
-      sub <- getIoSubSystem
-      posn <- if sub == IoNative
+      posn <- if ioSubSystem == IoNative
                          then (fromIntegral . bufOffset) `fmap` readIORef haByteBuffer
                          else IODevice.tell haDevice
 
