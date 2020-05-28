@@ -1069,6 +1069,15 @@ primop  NewArrayOp "newArray#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
+primop  DoubletonArrayOp "doubletonArray#" GenPrimOp
+   Int# -> a -> a -> State# s -> (# State# s, MutableArray# s a #) -- TODO: don't want mutable array here
+   {Create a new mutable array with the specified number of elements,
+    in the specified state thread,
+    with each element containing the specified initial value.}
+   with
+   out_of_line = True
+   has_side_effects = True
+
 primop  SameMutableArrayOp "sameMutableArray#" GenPrimOp
    MutableArray# s a -> MutableArray# s a -> Int#
 

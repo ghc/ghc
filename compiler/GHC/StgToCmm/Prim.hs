@@ -186,6 +186,20 @@ emitPrimOp dflags = \case
         (fromInteger n) init
     _ -> PrimopCmmEmit_External
 
+  DoubletonArrayOp -> \case
+    [elem0, elem1] -> opAllDone $ \[res]
+      -> let n = 2 in doDoubletonArrayOp
+          res
+          (arrPtrsRep dflags n)
+          mkMAP_DIRTY_infoLabel
+          [ (mkIntExpr platform n,
+            fixedHdrSize dflags + oFFSET_StgMutArrPtrs_ptrs dflags)
+          , (mkIntExpr platform (nonHdrSizeW (arrPtrsRep dflags 2)),
+            fixedHdrSize dflags + oFFSET_StgMutArrPtrs_size dflags)
+          ]
+          elem0
+          elem1
+
   CopyArrayOp -> \case
     [src, src_off, dst, dst_off, (CmmLit (CmmInt n _))] ->
       opAllDone $ \ [] -> doCopyArrayOp src src_off dst dst_off (fromInteger n)
@@ -2556,6 +2570,36 @@ doNewArrayOp res_r rep info payload n init = do
     let mkOff off = cmmOffsetW platform (CmmReg arr) (hdrSizeW dflags rep + off)
         initialization = [ mkStore (mkOff off) init | off <- [0.. n - 1] ]
     emit (catAGraphs initialization)
+
+    emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
+
+-- | Allocate a new array of size 2. TODO: this makes a mutable array, but we
+-- want an immutable one.
+doDoubletonArrayOp ::
+     CmmFormal             -- ^ return register
+  -> SMRep                 -- ^ representation of the array
+  -> CLabel                -- ^ info pointer
+  -> [(CmmExpr, ByteOff)]  -- ^ header payload
+  -> CmmExpr               -- ^ elem 0
+  -> CmmExpr               -- ^ elem 1
+  -> FCode ()
+doDoubletonArrayOp res_r rep info payload elem0 elem1 = do
+    dflags <- getDynFlags
+    platform <- getPlatform
+
+    let info_ptr = mkLblExpr info
+
+    tickyAllocPrim (mkIntExpr platform (hdrSize dflags rep))
+        (mkIntExpr platform (nonHdrSize platform rep))
+        (zeroExpr platform)
+
+    base <- allocHeapClosure rep info_ptr cccsExpr payload
+
+    arr <- CmmLocal <$> newTemp (bWord platform)
+    emit $ mkAssign arr base
+
+    let mkOff off = cmmOffsetW platform (CmmReg arr) (hdrSizeW dflags rep + off)
+    emit (catAGraphs [mkStore (mkOff 0) elem0, mkStore (mkOff 1) elem1])
 
     emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
 
