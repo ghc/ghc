@@ -93,7 +93,9 @@ doMkDependHS srcs = do
     -- and complaining about cycles
     hsc_env <- getSession
     root <- liftIO getCurrentDirectory
-    mapM_ (liftIO . processDeps dflags hsc_env excl_mods root (mkd_tmp_hdl files)) sorted
+
+    mapM_ (liftIO . processDeps dflags hsc_env (mgBootModules module_graph)
+                                excl_mods root (mkd_tmp_hdl files)) sorted
 
     -- If -ddump-mod-cycles, show cycles in the module graph
     liftIO $ dumpModCycles dflags module_graph
@@ -178,10 +180,11 @@ beginMkDependHS dflags = do
 
 processDeps :: DynFlags
             -> HscEnv
-            -> [ModuleName]
-            -> FilePath
-            -> Handle           -- Write dependencies to here
-            -> SCC ModSummary
+            -> ModuleSet        -- ^ modules with hs-boot files
+            -> [ModuleName]     -- ^ modules to exclude
+            -> FilePath         -- ^ root directory
+            -> Handle           -- ^ Write dependencies to here
+            -> SCC ModSummary   -- ^ a SCC of dependent modules
             -> IO ()
 -- Write suitable dependencies to handle
 -- Always:
@@ -198,11 +201,11 @@ processDeps :: DynFlags
 --
 -- For {-# SOURCE #-} imports the "hi" will be "hi-boot".
 
-processDeps dflags _ _ _ _ (CyclicSCC nodes)
+processDeps dflags _ _ _ _ _ (CyclicSCC nodes)
   =     -- There shouldn't be any cycles; report them
     throwGhcExceptionIO (ProgramError (showSDoc dflags $ GHC.cyclicModuleErr nodes))
 
-processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC node)
+processDeps dflags hsc_env boot_mods excl_mods root hdl (AcyclicSCC node)
   = do  { let extra_suffixes = depSuffixes dflags
               include_pkg_deps = depIncludePkgDeps dflags
               src_file  = msHsFilePath node
@@ -249,8 +252,40 @@ processDeps dflags hsc_env excl_mods root hdl (AcyclicSCC node)
 
         ; do_imps True  (ms_srcimps node)
         ; do_imps False (ms_imps node)
-        }
 
+
+                -- For each module with a hs-boot file, emit a
+                -- dependency from the object to the hi-boot file.
+                -- See Note [Ensure hs-boot files are built before
+                -- source files].
+        ; case (ms_hsc_src, has_boot_file node) of
+            (HsSrcFile, Just hs_boot_loc) ->
+              writeDependency root hdl obj_files (ml_hi_file hs_boot_loc)
+            _ -> return ()
+        }
+  where
+    has_boot_file :: ModSummary -> Maybe ModLocation
+    has_boot_file ms
+      | ms_mod ms `elemModuleSet` boot_mods
+      = Just $ addBootSuffixLocn (ms_location ms)
+      | otherwise
+      = Nothing
+
+-- Note [Ensure hs-boot files are built before source files]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- In general we need to take care to ensure that `.hs-boot` files
+-- are built before their associated `.hs` files. The reason is that
+-- the existence of a .hi-boot file will affect the code generated
+-- during the compilation of the .hs file. If the .hi-boot file is *not*
+-- built prior to the .hs file then you can end up with situations like
+-- #14481, where the logic which makes DFun decls work in boot files
+-- fails to fire (see Note [DFun impedance matching] and Note [DFun
+-- knot-tying] in GHC.Tc.Module.
+--
+-- Consequently, we inject "artificial" dependencies from objects to
+-- the hi-boot files of any modules which produced the object. This avoids
+-- #14481 and #14482.
+--
 
 findDependency  :: HscEnv
                 -> SrcSpan
