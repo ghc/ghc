@@ -110,7 +110,6 @@ cgTopRhsClosure dflags rec id ccs upd_flag args body =
          arg' <- getArgAmode (NonVoid arg)
          case arg' of
            CmmLit lit -> do
-             let payload = [lit]
              let info = CmmInfoTable
                    { cit_lbl = mkRtsMkStringLabel
                    , cit_rep = HeapRep True 0 1 Thunk
@@ -118,7 +117,17 @@ cgTopRhsClosure dflags rec id ccs upd_flag args body =
                    , cit_srt = Nothing
                    , cit_clo = Nothing
                    }
-             emitDecl (CmmData (Section Data closure_label) (CmmStatics closure_label info ccs payload))
+             emitDecl $ CmmData (Section Data closure_label) $
+                 -- CmmStatics closure_label info ccs payload
+                 let platform = targetPlatform dflags
+                     layout =
+                       [ CmmLabel (cit_lbl info) -- info ptr
+                       , mkIntCLit platform 0 -- padding for indirectee after update
+                       , mkIntCLit platform 0 -- static link
+                       , mkIntCLit platform 0 -- saved info
+                       , lit -- the payload! TODO FIXME HACK: we have to put it here as we don't support payload in top-level closures!!!!!
+                       ]
+                  in CmmStaticsRaw closure_label (map CmmStaticLit layout)
 
            _ -> panic "cgTopRhsClosure.gen_code"
 
