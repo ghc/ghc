@@ -682,7 +682,6 @@ pprImportedSymbol dflags config importedLbl = case (arch,os) of
         -> case dynamicLinkerLabelInfo importedLbl of
             Just (SymbolPtr, lbl)
               -> vcat [
-                   text ".section \".toc\", \"aw\"",
                    text ".LC_" <> pprCLabel dflags lbl <> char ':',
                    text "\t.quad" <+> pprCLabel dflags lbl ]
             _ -> empty
@@ -845,4 +844,3 @@ initializePicBase_x86 ArchX86 OSDarwin picReg
 
 initializePicBase_x86 _ _ _ _
         = panic "initializePicBase_x86: not needed"
-
