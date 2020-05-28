@@ -622,12 +622,7 @@ tc_sub_type unify inst_orig ctxt ty_actual ty_expected
 
        ; return (sk_wrap <.> inner_wrap) }
   where
-    possibly_poly ty
-      | isForAllTy ty                        = True
-      | Just (_, res) <- splitFunTy_maybe ty = possibly_poly res
-      | otherwise                            = False
-      -- NB *not* tcSplitFunTy, because here we want
-      -- to decompose type-class arguments too
+    possibly_poly ty = not (isRhoTy ty)
 
     definitely_poly ty
       | (tvs, theta, tau) <- tcSplitSigmaTy ty
@@ -679,9 +674,6 @@ So roughly:
  * and the ty_actual has no top-level polymorphism (but looking deeply)
 then we can revert to simple equality.  But we need to be careful.
 These examples are all fine:
-
- * (Char -> forall a. a->a) <= (forall a. Char -> a -> a)
-      Polymorphism is buried in ty_actual
 
  * (Char->Char) <= (forall a. Char -> Char)
       ty_expected isn't really polymorphic
