@@ -572,26 +572,8 @@ plusForeignPtr (ForeignPtr addr c) (I# d) = ForeignPtr (plusAddr# addr d) c
 
 -- | Causes the finalizers associated with a foreign pointer to be run
 -- immediately. The foreign pointer must not be used again after this
--- function is called.
---
--- Before 4.15.0.0, this threw an exception when the foreign pointer was backed
--- by 'PlainPtr'. Since 4.15.0.0, this returns unit when it encounters
--- 'PlainPtr'. It also returns unit when it encounters 'FinalPtr',
--- introduced in 4.15.0.0.
--- 
--- ==== __Explanation__
---
--- Why was the change in behavior needed? After
--- <https://github.com/haskell/bytestring/pull/191 bytestring PR 191>
--- and <https://gitlab.haskell.org/ghc/ghc/-/merge_requests/2165 GHC MR 2165>,
--- which were written in tandem, it became possible for rewrite rules in
--- @bytestring@ to transform an expression that would have resulted in a
--- @PlainForeignPtr@-backed foreign pointer into an expression that results
--- in a @FinalPtr@-backed foreign pointer. This resulted in
--- @Data.ByteString.Unsafe.unsafeFinalize@ behaving nondeterministically
--- depending on optimization level and caused failures in the test
--- suite for @bytestring@. The bytestring test suite failure was reported in
--- <https://github.com/haskell/bytestring/issues/228 bytestring issue 228>.
+-- function is called. If the foreign pointer does not support finalizers,
+-- this is a no-op.
 finalizeForeignPtr :: ForeignPtr a -> IO ()
 finalizeForeignPtr (ForeignPtr _ c) = case c of
   PlainForeignPtr ref -> foreignPtrFinalizer ref

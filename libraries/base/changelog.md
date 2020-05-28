@@ -19,9 +19,6 @@
 
   * Add `singleton` function for `Data.List.NonEmpty`.
 
-  * Allow `finalizeForeignPtr` to be called on foreign pointers that do not
-    accept finalizers. Previously, this function errored out in this situation.
-
   * Add `Generic` instances to `Fingerprint`, `GiveGCStats`, `GCFlags`,
     `ConcFlags`, `DebugFlags`, `CCFlags`, `DoHeapProfile`, `ProfFlags`,
     `DoTrace`, `TraceFlags`, `TickyFlags`, `ParFlags`, `RTSFlags`, `RTSStats`,
