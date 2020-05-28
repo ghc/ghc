@@ -5,6 +5,13 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
+-- This module contains exclusively Data instances, which are going to be slow
+-- no matter what we do. Furthermore, they are incredibly slow to compile with
+-- optimisation (see #9557). Consequently we compile this with -O0.
+-- See #18254.
+{-# OPTIONS_GHC -O0 #-}
+
 module GHC.Hs.Instances where
 
 -- This module defines the Data instances for the hsSyn AST.
