@@ -14,6 +14,7 @@ module GHC.Rename.Unbound
    , unboundName
    , unboundNameX
    , notInScopeErr
+   , exactNameErr
    )
 where
 
@@ -80,8 +81,10 @@ unboundNameX where_look rdr_name extra
 
 notInScopeErr :: RdrName -> SDoc
 notInScopeErr rdr_name
-  = hang (text "Not in scope:")
-       2 (what <+> quotes (ppr rdr_name))
+  = case isExact_maybe rdr_name of
+      Just name -> exactNameErr name
+      Nothing -> hang (text "Not in scope:")
+                  2 (what <+> quotes (ppr rdr_name))
   where
     what = pprNonVarNameSpace (occNameSpace (rdrNameOcc rdr_name))
 
@@ -385,3 +388,10 @@ there are 2 cases, where we hide the last "no module is imported" line:
        and we have to check the current module in the last added entry of
        the HomePackageTable. (See test T15611b)
 -}
+
+exactNameErr :: Name -> SDoc
+exactNameErr name =
+  hang (text "The exact Name" <+> quotes (ppr name) <+> ptext (sLit "is not in scope"))
+    2 (vcat [ text "Probable cause: you used a unique Template Haskell name (NameU), "
+            , text "perhaps via newName, but did not bind it"
+            , text "If that's it, then -ddump-splices might be useful" ])

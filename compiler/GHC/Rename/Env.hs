@@ -237,16 +237,6 @@ terribly efficient, but there seems to be no better way.
 -- Can be made to not be exposed
 -- Only used unwrapped in rnAnnProvenance
 lookupTopBndrRn :: RdrName -> RnM Name
-lookupTopBndrRn n = do nopt <- lookupTopBndrRn_maybe n
-                       case nopt of
-                         Just n' -> return n'
-                         Nothing -> do traceRn "lookupTopBndrRn fail" (ppr n)
-                                       unboundName WL_LocalTop n
-
-lookupLocatedTopBndrRn :: Located RdrName -> RnM (Located Name)
-lookupLocatedTopBndrRn = wrapLocM lookupTopBndrRn
-
-lookupTopBndrRn_maybe :: RdrName -> RnM (Maybe Name)
 -- Look up a top-level source-code binder.   We may be looking up an unqualified 'f',
 -- and there may be several imported 'f's too, which must not confuse us.
 -- For example, this is OK:
@@ -262,9 +252,8 @@ lookupTopBndrRn_maybe :: RdrName -> RnM (Maybe Name)
 -- but there can be if we have read in an external-Core file.
 -- The Haskell parser checks for the illegal qualified name in Haskell
 -- source files, so we don't need to do so here.
-
-lookupTopBndrRn_maybe rdr_name =
-  lookupExactOrOrig rdr_name Just $
+lookupTopBndrRn rdr_name =
+  lookupExactOrOrig rdr_name id $
     do  {  -- Check for operators in type or class declarations
            -- See Note [Type and class operator definitions]
           let occ = rdrNameOcc rdr_name
@@ -274,9 +263,14 @@ lookupTopBndrRn_maybe rdr_name =
 
         ; env <- getGlobalRdrEnv
         ; case filter isLocalGRE (lookupGRE_RdrName rdr_name env) of
-            [gre] -> return (Just (gre_name gre))
-            _     -> return Nothing  -- Ambiguous (can't happen) or unbound
+            [gre] -> return (gre_name gre)
+            _     -> do -- Ambiguous (can't happen) or unbound
+                        traceRn "lookupTopBndrRN fail" (ppr rdr_name)
+                        unboundName WL_LocalTop rdr_name
     }
+
+lookupLocatedTopBndrRn :: Located RdrName -> RnM (Located Name)
+lookupLocatedTopBndrRn = wrapLocM lookupTopBndrRn
 
 -----------------------------------------------
 -- | Lookup an @Exact@ @RdrName@. See Note [Looking up Exact RdrNames].
@@ -333,16 +327,11 @@ lookupExactOcc_either name
                             ; th_topnames <- readTcRef th_topnames_var
                             ; if name `elemNameSet` th_topnames
                               then return (Right name)
-                              else return (Left exact_nm_err)
+                              else return (Left (exactNameErr name))
                             }
                        }
            gres -> return (Left (sameNameErr gres))   -- Ugh!  See Note [Template Haskell ambiguity]
        }
-  where
-    exact_nm_err = hang (text "The exact Name" <+> quotes (ppr name) <+> ptext (sLit "is not in scope"))
-                      2 (vcat [ text "Probable cause: you used a unique Template Haskell name (NameU), "
-                              , text "perhaps via newName, but did not bind it"
-                              , text "If that's it, then -ddump-splices might be useful" ])
 
 sameNameErr :: [GlobalRdrElt] -> MsgDoc
 sameNameErr [] = panic "addSameNameErr: empty list"
@@ -429,13 +418,46 @@ lookupConstructorFields con_name
 
 
 -- In CPS style as `RnM r` is monadic
+-- Fails if the name is an Exact or Orig and it can't find the name
+-- Otherwise if it is not an Exact or Orig, returns k
 lookupExactOrOrig :: RdrName -> (Name -> r) -> RnM r -> RnM r
 lookupExactOrOrig rdr_name res k
+  = do { men <- lookupExactOrOrig_base rdr_name
+       ; case men of
+          FoundExactOrOrig n -> return (res n)
+          ExactOrOrigError e ->
+            do { addErr e
+               ; return (res (mkUnboundNameRdr rdr_name)) }
+          NotExactOrOrig     -> k }
+
+-- Variant of 'lookupExactOrOrig' that never fails
+-- Calls k if the name is neither an Exact nor Orig
+lookupExactOrOrig_maybe :: RdrName -> (Maybe Name -> r) -> RnM r -> RnM r
+lookupExactOrOrig_maybe rdr_name res k
+  = do { men <- lookupExactOrOrig_base rdr_name
+       ; case men of
+           FoundExactOrOrig n -> return (res (Just n))
+           ExactOrOrigError _ -> return (res Nothing)
+           NotExactOrOrig      -> k }
+
+data ExactOrOrigResult = FoundExactOrOrig Name -- ^ Found an Exact Or Orig Name
+                       | ExactOrOrigError MsgDoc -- ^ The RdrName was an Exact
+                                                 -- or Orig, but there was an
+                                                 -- error looking up the Name
+                       | NotExactOrOrig -- ^ The RdrName is neither an Exact nor
+                                        -- Orig
+
+-- Does the actual looking up an Exact or Orig name, see 'ExactOrOrigResult'
+lookupExactOrOrig_base :: RdrName -> RnM ExactOrOrigResult
+lookupExactOrOrig_base rdr_name
   | Just n <- isExact_maybe rdr_name   -- This happens in derived code
-  = res <$> lookupExactOcc n
+  = cvtEither <$> lookupExactOcc_either n
   | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
-  = res <$> lookupOrig rdr_mod rdr_occ
-  | otherwise = k
+  = FoundExactOrOrig <$> lookupOrig rdr_mod rdr_occ
+  | otherwise = return NotExactOrOrig
+  where
+    cvtEither (Left e)  = ExactOrOrigError e
+    cvtEither (Right n) = FoundExactOrOrig n
 
 
 
@@ -920,7 +942,7 @@ lookupLocalOccRn rdr_name
            Just name -> return name
            Nothing   -> unboundName WL_LocalOnly rdr_name }
 
--- lookupPromotedOccRn looks up an optionally promoted RdrName.
+-- lookupTypeOccRn looks up an optionally promoted RdrName.
 lookupTypeOccRn :: RdrName -> RnM Name
 -- see Note [Demotion]
 lookupTypeOccRn rdr_name
@@ -1034,29 +1056,35 @@ lookupOccRn_overloaded overload_ok
 
 lookupGlobalOccRn_maybe :: RdrName -> RnM (Maybe Name)
 -- Looks up a RdrName occurrence in the top-level
---   environment, including using lookupQualifiedNameGHCi
---   for the GHCi case
+-- environment, including using lookupQualifiedNameGHCi
+-- for the GHCi case, but first tries to find an Exact or Orig name.
 -- No filter function; does not report an error on failure
 -- Uses addUsedRdrName to record use and deprecations
 lookupGlobalOccRn_maybe rdr_name =
-  lookupExactOrOrig rdr_name Just $
-    runMaybeT . msum . map MaybeT $
-      [ fmap gre_name <$> lookupGreRn_maybe rdr_name
-      , listToMaybe <$> lookupQualifiedNameGHCi rdr_name ]
-                      -- This test is not expensive,
-                      -- and only happens for failed lookups
+  lookupExactOrOrig_maybe rdr_name id (lookupGlobalAndGhci rdr_name)
 
 lookupGlobalOccRn :: RdrName -> RnM Name
 -- lookupGlobalOccRn is like lookupOccRn, except that it looks in the global
 -- environment.  Adds an error message if the RdrName is not in scope.
 -- You usually want to use "lookupOccRn" which also looks in the local
 -- environment.
-lookupGlobalOccRn rdr_name
-  = do { mb_name <- lookupGlobalOccRn_maybe rdr_name
-       ; case mb_name of
-           Just n  -> return n
-           Nothing -> do { traceRn "lookupGlobalOccRn" (ppr rdr_name)
-                         ; unboundName WL_Global rdr_name } }
+lookupGlobalOccRn rdr_name =
+  lookupExactOrOrig rdr_name id $ do
+    mn <- lookupGlobalAndGhci rdr_name
+    case mn of
+      Just n -> return n
+      Nothing -> do { traceRn "lookupGlobalOccRn" (ppr rdr_name)
+                    ; unboundName WL_Global rdr_name }
+
+-- Looks up a RdrName occurence in the GlobalRdrEnv and with
+-- lookupQualifiedNameGHCi. Does not try to find an Exact or Orig name first.
+lookupGlobalAndGhci :: RdrName -> RnM (Maybe Name)
+lookupGlobalAndGhci rdr_name =
+  runMaybeT . msum . map MaybeT $
+    [ fmap gre_name <$> lookupGreRn_maybe rdr_name
+    , listToMaybe <$> lookupQualifiedNameGHCi rdr_name ]
+                      -- This test is not expensive,
+                      -- and only happens for failed lookups
 
 lookupInfoOccRn :: RdrName -> RnM [Name]
 -- lookupInfoOccRn is intended for use in GHCi's ":info" command
@@ -1086,7 +1114,7 @@ lookupInfoOccRn rdr_name =
 lookupGlobalOccRn_overloaded :: Bool -> RdrName
                              -> RnM (Maybe (Either Name [Name]))
 lookupGlobalOccRn_overloaded overload_ok rdr_name =
-  lookupExactOrOrig rdr_name (Just . Left) $
+  lookupExactOrOrig_maybe rdr_name (fmap Left) $
      do  { res <- lookupGreRn_helper rdr_name
          ; case res of
                 GreNotFound  -> return Nothing
