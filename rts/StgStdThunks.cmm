@@ -299,13 +299,12 @@ INFO_TABLE(stg_MK_STRING, 0, 1, THUNK_STATIC, "stg_MK_STRING", "stg_MK_STRING")
     (newCAF_ret) = ccall newCAF(BaseReg "ptr", node "ptr");
 
     if (newCAF_ret == 0) {
-        LDV_ENTER(node);
+        jump node();
     } else {
         // TODO: Stack checks?
         Sp_adj(-2);
         Sp(1) = node;
         Sp(0) = stg_bh_upd_frame_info;
         jump ghczmprim_GHCziCString_unpackCStringzh_info(StgThunk_payload(node,0));
-
     }
 }
