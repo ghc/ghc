@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE PatternSynonyms #-}
 --
 -- (c) The University of Glasgow 2002-2006
 --
@@ -33,6 +34,7 @@ module GHC.Data.IOEnv (
   ) where
 
 import GHC.Prelude
+import GHC.Exts (oneShot)
 
 import GHC.Driver.Session
 import GHC.Utils.Exception
@@ -54,9 +56,15 @@ import Control.Applicative (Alternative(..))
 ----------------------------------------------------------------------
 
 
-newtype IOEnv env a = IOEnv (env -> IO a)
+newtype IOEnv env a = IOEnvNoEta (env -> IO a)
   deriving (Functor)
   deriving (MonadThrow, MonadCatch, MonadMask, MonadIO) via (ReaderT env IO)
+
+{-# COMPLETE IOEnv #-}
+pattern IOEnv :: (env -> IO a) -> IOEnv env a
+pattern IOEnv f <- IOEnvNoEta f
+   where
+      IOEnv f = IOEnvNoEta (oneShot f)
 
 unIOEnv :: IOEnv env a -> (env -> IO a)
 unIOEnv (IOEnv m) = m
