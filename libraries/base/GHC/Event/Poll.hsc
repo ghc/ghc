@@ -51,7 +51,7 @@ data Poll = Poll {
     }
 
 new :: IO E.Backend
-new = E.backend poll modifyFd modifyFdOnce (\_ -> return ()) `liftM`
+new = E.backend poll modifyFd modifyFdOnce (\_ _ _ -> Nothing) (\_ -> return ()) `liftM`
       liftM2 Poll (newMVar =<< A.empty) A.empty
 
 modifyFd :: Poll -> Fd -> E.Event -> E.Event -> IO Bool
@@ -78,7 +78,7 @@ reworkFd p (PollFd fd npevt opevt) = do
 
 poll :: Poll
      -> Maybe E.Timeout
-     -> (Fd -> E.Event -> IO ())
+     -> (E.IOResult -> IO ())
      -> IO Int
 poll p mtout f = do
   let a = pollFd p
@@ -95,7 +95,7 @@ poll p mtout f = do
     A.loop a 0 $ \i e -> do
       let r = pfdRevents e
       if r /= 0
-        then do f (pfdFd e) (toEvent r)
+        then do f (E.IOResult_Event (pfdFd e) (toEvent r))
                 let i' = i + 1
                 return (i', i' == n)
         else return (i, True)

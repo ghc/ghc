@@ -293,12 +293,12 @@ step mgr@EventManager{..} = do
   state `seq` return state
   where
     waitForIO = do
-      n1 <- I.poll emBackend Nothing (onFdEvent mgr)
+      n1 <- I.poll emBackend Nothing (onIOResult mgr)
       when (n1 <= 0) $ do
         yield
-        n2 <- I.poll emBackend Nothing (onFdEvent mgr)
+        n2 <- I.poll emBackend Nothing (onIOResult mgr)
         when (n2 <= 0) $ do
-          _ <- I.poll emBackend (Just Forever) (onFdEvent mgr)
+          _ <- I.poll emBackend (Just Forever) (onIOResult mgr)
           return ()
 
 ------------------------------------------------------------------------
@@ -443,6 +443,11 @@ closeFd_ mgr tbl fd = do
 
 ------------------------------------------------------------------------
 -- Utilities
+
+-- | Call the callbacks corresponding ot the given IOResult.
+onIOResult :: EventManager -> I.IOResult -> IO ()
+onIOResult em ioResult = case ioResult of
+  I.IOResult_Event fd events -> onFdEvent em fd events
 
 -- | Call the callbacks corresponding to the given file descriptor.
 onFdEvent :: EventManager -> Fd -> Event -> IO ()

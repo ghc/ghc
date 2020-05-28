@@ -71,7 +71,13 @@ new :: IO E.Backend
 new = do
   epfd <- epollCreate
   evts <- A.new 64
-  let !be = E.backend poll modifyFd modifyFdOnce delete (EPoll epfd evts)
+  let !be = E.backend
+                poll
+                modifyFd
+                modifyFdOnce
+                (\_ _ _ -> Nothing)
+                delete
+                (EPoll epfd evts)
   return be
 
 delete :: EPoll -> IO ()
@@ -109,7 +115,7 @@ modifyFdOnce ep fd evt =
 -- events that are ready.
 poll :: EPoll                     -- ^ state
      -> Maybe Timeout             -- ^ timeout in milliseconds
-     -> (Fd -> E.Event -> IO ())  -- ^ I/O callback
+     -> (E.IOResult -> IO ())     -- ^ I/O callback
      -> IO Int
 poll ep mtimeout f = do
   let events = epollEvents ep
@@ -122,7 +128,7 @@ poll ep mtimeout f = do
     Nothing      -> epollWaitNonBlock fd es cap
 
   when (n > 0) $ do
-    A.forM_ events $ \e -> f (eventFd e) (toEvent (eventTypes e))
+    A.forM_ events $ \e -> f (E.IOResult_Event (eventFd e) (toEvent (eventTypes e)))
     cap <- A.capacity events
     when (cap == n) $ A.ensureCapacity events (2 * cap)
   return n

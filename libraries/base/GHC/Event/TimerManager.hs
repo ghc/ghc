@@ -50,9 +50,8 @@ import GHC.Num (Num(..))
 import GHC.Real (quot, fromIntegral)
 import GHC.Show (Show(..))
 import GHC.Event.Control
-import GHC.Event.Internal (Backend, Event, evtRead, Timeout(..))
+import GHC.Event.Internal (Backend, evtRead, Timeout(..))
 import GHC.Event.Unique (Unique, UniqueSource, newSource, newUnique)
-import System.Posix.Types (Fd)
 
 import qualified GHC.Event.Internal as I
 import qualified GHC.Event.PSQ as Q
@@ -99,13 +98,15 @@ data TimerManager = TimerManager
 ------------------------------------------------------------------------
 -- Creation
 
-handleControlEvent :: TimerManager -> Fd -> Event -> IO ()
-handleControlEvent mgr fd _evt = do
+handleControlEvent :: TimerManager -> I.IOResult -> IO ()
+handleControlEvent mgr (I.IOResult_Event fd _evt) = do
   msg <- readControlMessage (emControl mgr) fd
   case msg of
     CMsgWakeup      -> return ()
     CMsgDie         -> writeIORef (emState mgr) Finished
     CMsgSignal fp s -> runHandlers fp s
+-- TimerManager should only use the event api of the backend to wait on timers.
+-- handleControlEvent _ _ = errorWithoutStackTrace "unexpected non-event IO result"
 
 newDefaultBackend :: IO Backend
 #if defined(HAVE_POLL)
