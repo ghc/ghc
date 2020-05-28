@@ -24,7 +24,15 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Magic ( inline, noinline, lazy, oneShot, runRW# ) where
+module GHC.Magic
+   ( inline
+   , noinline
+   , lazy
+   , oneShot
+   , multiShot
+   , runRW#
+   )
+where
 
 --------------------------------------------------
 --        See Note [magicIds] in GHC.Types.Id.Make
@@ -112,14 +120,25 @@ oneShot f = f
 -- Implementation note: This is wired in in GHC.Types.Id.Make, so the code here is
 -- mostly there to have a place for the documentation.
 
+
+
+-- | Cancel away a oneShot but don't inhibit arity analysis from finding
+-- one-shot lambdas (see #18238)
+multiShot :: (a -> b) -> a -> b
+{-# INLINE multiShot #-}
+multiShot = \f x -> f (opaque x)
+  where
+    opaque x = x
+    {-# INLINE[0] opaque #-}
+
+
 -- | Apply a function to a @'State#' 'RealWorld'@ token. When manually applying
 -- a function to `realWorld#`, it is necessary to use @NOINLINE@ to prevent
 -- semantically undesirable floating. `runRW#` is inlined, but only very late
 -- in compilation after all floating is complete.
-
+--
 -- 'runRW#' is representation polymorphic: the result may have a lifted or
 -- unlifted type.
-
 runRW# :: forall (r :: RuntimeRep) (o :: TYPE r).
           (State# RealWorld -> o) -> o
 -- See Note [runRW magic] in CorePrep
