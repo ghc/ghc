@@ -182,8 +182,8 @@ rdrNameSpace = occNameSpace . rdrNameOcc
 demoteRdrName :: RdrName -> Maybe RdrName
 demoteRdrName (Unqual occ) = fmap Unqual (demoteOccName occ)
 demoteRdrName (Qual m occ) = fmap (Qual m) (demoteOccName occ)
-demoteRdrName (Orig _ _) = panic "demoteRdrName"
-demoteRdrName (Exact _) = panic "demoteRdrName"
+demoteRdrName (Orig _ _) = Nothing
+demoteRdrName (Exact _) = Nothing
 
         -- These two are the basic constructors
 mkRdrUnqual :: OccName -> RdrName
