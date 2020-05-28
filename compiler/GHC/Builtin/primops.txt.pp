@@ -2935,6 +2935,18 @@ primop  MyThreadIdOp "myThreadId#" GenPrimOp
    with
    has_side_effects = True
 
+primop SetAdamTraceIdOp "setAdamTraceId#" GenPrimOp
+   ByteArray# -> State# s -> State# s
+   with
+   has_side_effects = True
+   out_of_line      = True
+
+primop GetAdamTraceIdOp "getAdamTraceId#" GenPrimOp
+   State# s -> (# State# s, ByteArray# #)
+   with
+   has_side_effects = True
+   out_of_line      = True
+
 primop LabelThreadOp "labelThread#" GenPrimOp
    ThreadId# -> Addr# -> State# RealWorld -> State# RealWorld
    with

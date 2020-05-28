@@ -681,6 +681,8 @@
       SymI_HasProto(stg_makeStablePtrzh)                                \
       SymI_HasProto(stg_mkApUpd0zh)                                     \
       SymI_HasProto(stg_labelThreadzh)                                  \
+      SymI_HasProto(stg_setAdamTraceIdzh)                               \
+      SymI_HasProto(stg_getAdamTraceIdzh)                               \
       SymI_HasProto(stg_newArrayzh)                                     \
       SymI_HasProto(stg_copyArrayzh)                                    \
       SymI_HasProto(stg_copyMutableArrayzh)                             \

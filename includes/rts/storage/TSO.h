@@ -182,6 +182,17 @@ typedef struct StgTSO_ {
 #if defined(mingw32_HOST_OS)
     StgWord32 saved_winerror;
 #endif
+    /** For automatic trace id propagation (OpenTelemetry) across threads
+     *  and futher to external processes. GHC Eventlog allows to persist trace id
+     *  at runtime and reconstruct it only at parsing logs.
+
+     *  setAdamTraceId trId
+     *  forkIO $ forkIO $ forkIO $ doHttpCall (TraceHeader <$> getAdamTraceId)
+     *   or
+     *  setAdamTraceId trId
+     *  forkIO $ $forkIO $ forkIO $ runProcess $ (EnvVariable TraceId) <$> getAdamTraceId
+     */
+    StgClosure* trace_id;
 
 } *StgTSOPtr; // StgTSO defined in rts/Types.h
 

@@ -123,7 +123,9 @@ scavengeTSO (StgTSO *tso)
     evacuate((StgClosure **)&tso->trec);
 
     evacuate((StgClosure **)&tso->stackobj);
-
+    if (tso->trace_id) {
+        evacuate((StgClosure **)&tso->trace_id);
+    }
     evacuate((StgClosure **)&tso->_link);
     if (   tso->why_blocked == BlockedOnMVar
         || tso->why_blocked == BlockedOnMVarRead

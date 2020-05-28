@@ -443,6 +443,7 @@ wanteds os = concat
           ,closureField  C    "StgTSO"      "what_next"
           ,closureField  C    "StgTSO"      "why_blocked"
           ,closureField  C    "StgTSO"      "block_info"
+          ,closureField  C    "StgTSO"      "trace_id"
           ,closureField  C    "StgTSO"      "blocked_exceptions"
           ,closureField  C    "StgTSO"      "id"
           ,closureField  C    "StgTSO"      "cap"
@@ -969,4 +970,3 @@ execute verbose prog args
       ec <- rawSystem prog args
       unless (ec == ExitSuccess) $
           die ("Executing " ++ show prog ++ " failed")
-

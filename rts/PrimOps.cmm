@@ -1042,6 +1042,19 @@ stg_yieldzh ()
     jump stg_yield_noregs();
 }
 
+stg_setAdamTraceIdzh ( gcptr src )
+{
+    ccall c_setAdamTraceId(CurrentTSO, src);
+    return ();
+}
+
+stg_getAdamTraceIdzh ( /* no args */ )
+{
+    gcptr ret;
+    (ret) = ccall c_getAdamTraceId(CurrentTSO);
+    return (ret);
+}
+
 stg_labelThreadzh ( gcptr threadid, W_ addr )
 {
 #if defined(DEBUG) || defined(TRACING) || defined(DTRACE)

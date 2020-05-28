@@ -112,6 +112,7 @@ createThread(Capability *cap, W_ size)
     ASSIGN_Int64((W_*)&(tso->alloc_limit), 0);
 
     tso->trec = NO_TREC;
+    tso->trace_id = 0;
 
 #if defined(PROFILING)
     tso->prof.cccs = CCS_MAIN;
@@ -132,11 +133,36 @@ createThread(Capability *cap, W_ size)
     g0->threads = tso;
     RELEASE_LOCK(&sched_mutex);
 
+    if (cap->r.rCurrentTSO) {
+        tso->trace_id = cap->r.rCurrentTSO->trace_id;
+    }
+
     // ToDo: report the stack size in the event?
     traceEventCreateThread(cap, tso);
 
     return tso;
 }
+
+void c_setAdamTraceId(StgTSO* tso USED_IF_THREADS, StgClosure* trId) {
+    tso->trace_id = trId;
+    write_barrier();
+    dirty_TSO(tso->cap, tso);
+}
+
+#define SIZEOF_W  sizeof(void*)
+#define ROUNDUP_BYTES_TO_WDS(n) (((n) + SIZEOF_W - 1) / SIZEOF_W)
+#define SIZEOF_StgArrBytes sizeof(StgArrBytes)
+
+StgClosure* c_getAdamTraceId(StgTSO* tso USED_IF_THREADS) {
+    if (tso->trace_id) {
+        return tso->trace_id;
+    }
+    StgArrBytes* trace_id = (StgArrBytes*)allocate(tso->cap, ROUNDUP_BYTES_TO_WDS(SIZEOF_StgArrBytes));
+    SET_HDR(trace_id, &stg_ARR_WORDS_info, CCS_SYSTEM);
+    trace_id->bytes = 0;
+    return trace_id;
+}
+
 
 /* ---------------------------------------------------------------------------
  * Equality on Thread ids.
@@ -901,7 +927,6 @@ printThreadBlockage(StgTSO *tso)
          tso->why_blocked, (long)tso->id, tso);
   }
 }
-
 
 void
 printThreadStatus(StgTSO *t)

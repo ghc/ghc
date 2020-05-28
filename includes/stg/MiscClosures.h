@@ -449,6 +449,8 @@ RTS_FUN_DECL(stg_maskUninterruptiblezh);
 RTS_FUN_DECL(stg_unmaskAsyncExceptionszh);
 RTS_FUN_DECL(stg_myThreadIdzh);
 RTS_FUN_DECL(stg_labelThreadzh);
+RTS_FUN_DECL(stg_setAdamTraceIdzh);
+RTS_FUN_DECL(stg_getAdamTraceIdzh);
 RTS_FUN_DECL(stg_isCurrentThreadBoundzh);
 RTS_FUN_DECL(stg_threadStatuszh);
 

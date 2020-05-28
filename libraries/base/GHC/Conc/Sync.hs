@@ -33,7 +33,7 @@
 -- #not-home
 module GHC.Conc.Sync
         ( ThreadId(..)
-
+        , AdamTraceId(..)
         -- * Forking and suchlike
         , forkIO
         , forkIOWithUnmask
@@ -46,6 +46,8 @@ module GHC.Conc.Sync
         , numSparks
         , childHandler
         , myThreadId
+        , setAdamTraceId
+        , getAdamTraceId
         , killThread
         , throwTo
         , par
@@ -116,6 +118,7 @@ import GHC.Real         ( fromIntegral )
 import GHC.Show         ( Show(..), showParen, showString )
 import GHC.Stable       ( StablePtr(..) )
 import GHC.Weak
+import GHC.Word
 
 import Unsafe.Coerce    ( unsafeCoerce# )
 
@@ -150,6 +153,8 @@ instance Show ThreadId where
    showsPrec d t = showParen (d >= 11) $
         showString "ThreadId " .
         showsPrec d (getThreadId (id2TSO t))
+
+data AdamTraceId = AdamTraceId ByteArray#
 
 foreign import ccall unsafe "rts_getThreadId" getThreadId :: ThreadId# -> CInt
 
@@ -470,6 +475,17 @@ myThreadId :: IO ThreadId
 myThreadId = IO $ \s ->
    case (myThreadId# s) of (# s1, tid #) -> (# s1, ThreadId tid #)
 
+
+-- | Returns the value associated with origin thread (GHC only).
+getAdamTraceId :: IO AdamTraceId
+getAdamTraceId = IO $ \s ->
+   case (getAdamTraceId# s) of (# s1, trId #) -> (# s1, AdamTraceId trId #)
+
+-- | Associates value with current thread which is transfered
+-- to all child threads (GHC only).
+setAdamTraceId :: AdamTraceId -> IO ()
+setAdamTraceId (AdamTraceId trId) = IO $ \s ->
+   case (setAdamTraceId# trId s) of s1 -> (# s1, () #)
 
 -- | The 'yield' action allows (forces, in a co-operative multitasking
 -- implementation) a context-switch to any other currently runnable

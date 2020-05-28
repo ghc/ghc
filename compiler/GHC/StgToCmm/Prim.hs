@@ -1485,6 +1485,8 @@ emitPrimOp dflags = \case
   KillThreadOp -> alwaysExternal
   YieldOp -> alwaysExternal
   LabelThreadOp -> alwaysExternal
+  GetAdamTraceIdOp -> alwaysExternal
+  SetAdamTraceIdOp -> alwaysExternal
   IsCurrentThreadBoundOp -> alwaysExternal
   NoDuplicateOp -> alwaysExternal
   ThreadStatusOp -> alwaysExternal
