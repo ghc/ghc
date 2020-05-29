@@ -3,7 +3,7 @@ T15073.hs:8:12: error:
     • Illegal unboxed tuple type as function argument: (# Foo a #)
       Perhaps you intended to use UnboxedTuples
     • In the type signature:
-        p :: Foo a -> Unit# @'GHC.Types.LiftedRep (Foo a)
+        p :: Foo a -> Solo# @'GHC.Types.LiftedRep (Foo a)
       When typechecking the code for ‘p’
         in a derived instance for ‘P (Foo a)’:
         To see the code I am typechecking, use -ddump-deriv

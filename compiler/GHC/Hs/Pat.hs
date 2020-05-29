@@ -570,7 +570,7 @@ pprPat (SigPat _ pat ty)        = ppr pat <+> dcolon <+> ppr_ty
 pprPat (ListPat _ pats)         = brackets (interpp'SP pats)
 pprPat (TuplePat _ pats bx)
     -- Special-case unary boxed tuples so that they are pretty-printed as
-    -- `Unit x`, not `(x)`
+    -- `Solo x`, not `(x)`
   | [pat] <- pats
   , Boxed <- bx
   = hcat [text (mkTupleStr Boxed 1), pprParendLPat appPrec pat]
