@@ -118,7 +118,6 @@ import GHC.Real         ( fromIntegral )
 import GHC.Show         ( Show(..), showParen, showString )
 import GHC.Stable       ( StablePtr(..) )
 import GHC.Weak
-import GHC.Word
 
 import Unsafe.Coerce    ( unsafeCoerce# )
 
