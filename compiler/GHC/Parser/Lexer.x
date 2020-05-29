@@ -119,7 +119,7 @@ import GHC.Parser.Annotation
 -- -----------------------------------------------------------------------------
 -- Alex "Character set macros"
 
--- NB: The logic behind these definitions is also reflected in GHC/Utils/Lexeme.hs
+-- NB: The logic behind these definitions is also reflected in "GHC.Utils.Lexeme"
 -- Any changes here should likely be reflected there.
 $unispace    = \x05 -- Trick Alex into handling Unicode. See [Unicode in Alex].
 $nl          = [\n\r\f]
@@ -2261,7 +2261,7 @@ adjustChar c = fromIntegral $ ord adj_c
           -- with the actual character value hidden in the state.
           | otherwise =
                 -- NB: The logic behind these definitions is also reflected
-                -- in GHC/Utils/Lexeme.hs
+                -- in "GHC.Utils.Lexeme"
                 -- Any changes here should likely be reflected there.
 
                 case generalCategory c of
