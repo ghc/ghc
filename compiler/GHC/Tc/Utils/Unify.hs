@@ -14,7 +14,7 @@
 module GHC.Tc.Utils.Unify (
   -- Full-blown subsumption
   tcWrapResult, tcWrapResultO, tcWrapResultMono,
-  tcSkolemise, tcSkolemiseScoped, tcSkolemiseET,
+  tcSkolemise, tcSkolemiseScoped, tcSkolemiseAlways, tcSkolemiseET,
   tcSubType, tcSubTypeSigma, tcSubTypePat,
   checkConstraints, checkTvConstraints,
   buildImplicationFor, buildTvImplication, emitResidualTvConstraint,
@@ -960,7 +960,7 @@ tcSkolemiseScoped is very similar, but differs in two ways:
   See Note [When to build an implication] below.
 -}
 
-tcSkolemise, tcSkolemiseScoped
+tcSkolemise, tcSkolemiseScoped, tcSkolemiseAlways
     :: UserTypeCtxt -> TcSigmaType
     -> (TcType -> TcM result)
     -> TcM (HsWrapper, result)
@@ -983,6 +983,9 @@ tcSkolemise ctxt expected_ty thing_inside
   = do { res <- thing_inside expected_ty
        ; return (idHsWrapper, res) }
   | otherwise
+  = tcSkolemiseAlways ctxt expected_ty thing_inside
+
+tcSkolemiseAlways ctxt expected_ty thing_inside
   = do  { (wrap, tv_prs, given, rho_ty) <- topSkolemise expected_ty
 
         ; let skol_tvs  = map snd tv_prs
@@ -1156,7 +1159,7 @@ take care:
       [W] C Int b2    -- from g_blan
   and fundpes can yield [D] b1 ~ b2, even though the two functions have
   literally nothing to do with each other.  #14185 is an example.
-  Building an implication keeps them separage.
+  Building an implication keeps them separate.
 -}
 
 {-
