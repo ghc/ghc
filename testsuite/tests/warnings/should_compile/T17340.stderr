@@ -26,11 +26,11 @@ T17340.hs:40:10: warning: [-Wredundant-bang-patterns (in -Wall)]
 T17340.hs:43:23: warning: [-Wredundant-bang-patterns (in -Wall)]
     Bang pattern is redundant
 
-T17340.hs:46:6: warning: [-Wredundant-bang-patterns (in -Wall)]
-    Bang pattern is redundant
-
 T17340.hs:50:12: warning: [-Wredundant-bang-patterns (in -Wall)]
     Bang pattern is redundant
 
 T17340.hs:54:3: warning: [-Wredundant-bang-patterns (in -Wall)]
+    Bang pattern is redundant
+
+T17340.hs:58:9: warning: [-Wredundant-bang-patterns (in -Wall)]
     Bang pattern is redundant
