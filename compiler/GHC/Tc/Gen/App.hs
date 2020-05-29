@@ -593,11 +593,13 @@ tcInstFun impred_on inst_final rn_fun fun_sigma rn_args
            ; go delta' acc' so_far fun_ty' args }
 
     go1 delta acc so_far fun_ty
-        (eva@(EValArg { eva_arg = arg, eva_gd = guarded })  : rest_args)
+        (eva@(EValArg { eva_arg = ValArg arg, eva_gd = guarded })  : rest_args)
       = do { (wrap, arg_ty, res_ty) <- matchActualFunTy herald
                                          (Just rn_fun) (n_val_args, so_far) fun_ty
-          ; (delta', val_arg) <- quickLookArg impred_on guarded delta arg arg_ty
-          ; let acc' = eva { eva_arg = val_arg, eva_ty = arg_ty }
+          ; (delta', arg') <- if impred_on
+                              then quickLookArg guarded delta arg arg_ty
+                              else return (delta, ValArg arg)
+          ; let acc' = eva { eva_arg = arg', eva_ty = arg_ty }
                        : addArgWrap wrap acc
           ; go delta' acc' (arg_ty:so_far) res_ty rest_args }
 
@@ -798,20 +800,32 @@ isGuardedTy ty
 type Delta = TcTyVarSet   -- Set of instantiation variables
 
 ----------------
-quickLookArg :: Bool -> Bool -> Delta -> EValArg 'TcpRn -> TcSigmaType
+quickLookArg :: Bool -> Delta -> LHsExpr GhcRn -> TcSigmaType
              -> TcM (Delta, EValArg 'TcpInst)
 -- Special behaviour only for (f e1 .. en)
--- Even narrower than tcInferAppHead!  But plenty for now.
 --
 -- The returned Delta is a superset of the one passed in
 -- with added instantiation variables from
 --   (a) the call itself
 --   (b) the arguments of the call
-quickLookArg impred_on guarded delta (ValArg larg@(L loc arg)) arg_ty
-  | not impred_on        = return no_ql_result
+quickLookArg  guarded delta arg arg_ty
   | isEmptyVarSet delta  = return no_ql_result
   | not (isRhoTy arg_ty) = return no_ql_result
+  | Just kappa <- tcGetTyVar_maybe arg_ty
+  , kappa `elemVarSet` delta
+  = do { info <- readMetaTyVar kappa
+       ; case info of
+            Indirect arg_ty' -> quickLookArg  guarded delta arg arg_ty'
+            Flexi            -> quickLookArg1 guarded delta arg arg_ty }
   | otherwise
+  = quickLookArg1 guarded delta arg arg_ty
+  where
+    no_ql_result = (delta, ValArg arg)
+
+
+quickLookArg1 :: Bool -> Delta -> LHsExpr GhcRn -> TcSigmaType
+              -> TcM (Delta, EValArg 'TcpInst)
+quickLookArg1 guarded delta larg@(L loc arg) arg_ty
   = setSrcSpan loc $
     do { let (rn_fun,rn_args,rebuild) = splitHsApps arg
        ; mb_fun_ty <- tcInferAppHead_maybe rn_fun rn_args
