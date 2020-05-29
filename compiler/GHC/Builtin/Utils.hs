@@ -127,7 +127,7 @@ knownKeyNames
     all_names =
       -- We exclude most tuples from this list—see
       -- Note [Infinite families of known-key names] in GHC.Builtin.Names.
-      -- We make an exception for Unit (i.e., the boxed 1-tuple), since it does
+      -- We make an exception for Solo (i.e., the boxed 1-tuple), since it does
       -- not use special syntax like other tuples.
       -- See Note [One-tuples] (Wrinkle: Make boxed one-tuple names have known keys)
       -- in GHC.Builtin.Types.
