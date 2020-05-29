@@ -344,12 +344,12 @@ We could do one of two things:
     mkCoreTup [e1] = e1
 
 * Build a one-tuple (see Note [One-tuples] in GHC.Builtin.Types)
-    mkCoreTup1 [e1] = Unit e1
+    mkCoreTup1 [e1] = Solo e1
   We use a suffix "1" to indicate this.
 
 Usually we want the former, but occasionally the latter.
 
-NB: The logic in tupleDataCon knows about () and Unit and (,), etc.
+NB: The logic in tupleDataCon knows about () and Solo and (,), etc.
 
 Note [Don't flatten tuples from HsSyn]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

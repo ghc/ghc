@@ -1,7 +1,7 @@
 
 TH_1tuple.hs:11:6: error:
-    • Expecting one more argument to ‘Unit’
-      Expected a type, but ‘Unit’ has kind ‘* -> *’
-    • In an expression type signature: Unit
-      In the expression: 1 :: Unit
-      In an equation for ‘y’: y = (1 :: Unit)
+    • Expecting one more argument to ‘Solo’
+      Expected a type, but ‘Solo’ has kind ‘* -> *’
+    • In an expression type signature: Solo
+      In the expression: 1 :: Solo
+      In an equation for ‘y’: y = (1 :: Solo)

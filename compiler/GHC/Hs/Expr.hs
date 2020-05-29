@@ -983,7 +983,7 @@ ppr_expr (SectionR _ op expr)
 
 ppr_expr (ExplicitTuple _ exprs boxity)
     -- Special-case unary boxed tuples so that they are pretty-printed as
-    -- `Unit x`, not `(x)`
+    -- `Solo x`, not `(x)`
   | [L _ (Present _ expr)] <- exprs
   , Boxed <- boxity
   = hsep [text (mkTupleStr Boxed 1), ppr expr]

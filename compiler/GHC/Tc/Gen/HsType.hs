@@ -1051,28 +1051,28 @@ GHC provides unary tuples and unboxed tuples (see Note [One-tuples] in
 GHC.Builtin.Types) but does *not* provide unary constraint tuples. Why? First,
 recall the definition of a unary tuple data type:
 
-  data Unit a = Unit a
+  data Solo a = Solo a
 
-Note that `Unit a` is *not* the same thing as `a`, since Unit is boxed and
-lazy. Therefore, the presence of `Unit` matters semantically. On the other
+Note that `Solo a` is *not* the same thing as `a`, since Solo is boxed and
+lazy. Therefore, the presence of `Solo` matters semantically. On the other
 hand, suppose we had a unary constraint tuple:
 
-  class a => Unit% a
+  class a => Solo% a
 
-This compiles down a newtype (i.e., a cast) in Core, so `Unit% a` is
+This compiles down a newtype (i.e., a cast) in Core, so `Solo% a` is
 semantically equivalent to `a`. Therefore, a 1-tuple constraint would have
 no user-visible impact, nor would it allow you to express anything that
 you couldn't otherwise.
 
-We could simply add Unit% for consistency with tuples (Unit) and unboxed
-tuples (Unit#), but that would require even more magic to wire in another
+We could simply add Solo% for consistency with tuples (Solo) and unboxed
+tuples (Solo#), but that would require even more magic to wire in another
 magical class, so we opt not to do so. We must be careful, however, since
 one can try to sneak in uses of unary constraint tuples through Template
 Haskell, such as in this program (from #17511):
 
   f :: $(pure (ForallT [] [TupleT 1 `AppT` (ConT ''Show `AppT` ConT ''Int)]
                        (ConT ''String)))
-  -- f :: Unit% (Show Int) => String
+  -- f :: Solo% (Show Int) => String
   f = "abc"
 
 This use of `TupleT 1` will produce an HsBoxedOrConstraintTuple of arity 1,
@@ -1081,7 +1081,7 @@ it as thought it were a constraint tuple, which can potentially lead to
 trouble if one attempts to look up the name of a constraint tuple of arity
 1 (as it won't exist). To avoid this trouble, we simply take any unary
 constraint tuples discovered when typechecking and drop them—i.e., treat
-"Unit% a" as though the user had written "a". This is always safe to do
+"Solo% a" as though the user had written "a". This is always safe to do
 since the two constraints should be semantically equivalent.
 -}
 

@@ -1,39 +1,39 @@
 
 T17380.hs:9:7: error:
-    • Couldn't match expected type ‘Unit (Maybe String)’
+    • Couldn't match expected type ‘Solo (Maybe String)’
                   with actual type ‘Maybe [Char]’
     • In the expression: Just "wat"
       In an equation for ‘foo’: foo = Just "wat"
 
 T17380.hs:12:8: error:
     • Couldn't match expected type ‘Maybe String’
-                  with actual type ‘Unit (Maybe [Char])’
-    • In the expression: Unit Just "wat"
-      In an equation for ‘bar’: bar = (Unit Just "wat")
+                  with actual type ‘Solo (Maybe [Char])’
+    • In the expression: Solo Just "wat"
+      In an equation for ‘bar’: bar = (Solo Just "wat")
 
 T17380.hs:15:6: error:
-    • Couldn't match expected type ‘Unit (Maybe String)’
+    • Couldn't match expected type ‘Solo (Maybe String)’
                   with actual type ‘Maybe [Char]’
     • In the pattern: Just "wat"
       In an equation for ‘baz’: baz (Just "wat") = Just "frerf"
 
 T17380.hs:18:7: error:
     • Couldn't match expected type ‘Maybe String’
-                  with actual type ‘Unit (Maybe [Char])’
-    • In the pattern: Unit(Just "wat")
-      In an equation for ‘quux’: quux (Unit(Just "wat")) = Just "frerf"
+                  with actual type ‘Solo (Maybe [Char])’
+    • In the pattern: Solo(Just "wat")
+      In an equation for ‘quux’: quux (Solo(Just "wat")) = Just "frerf"
 
 T17380.hs:21:8: error:
-    • Couldn't match type ‘Maybe String’ with ‘'Unit (Maybe String)’
-      Expected type: Proxy ('Unit (Maybe String))
+    • Couldn't match type ‘Maybe String’ with ‘'Solo (Maybe String)’
+      Expected type: Proxy ('Solo (Maybe String))
         Actual type: Proxy (Maybe String)
     • In the expression: Proxy :: Proxy (Maybe String)
       In an equation for ‘quuz’: quuz = Proxy :: Proxy (Maybe String)
 
 T17380.hs:24:8: error:
-    • Couldn't match type ‘'Unit (Maybe String)’ with ‘Maybe String’
+    • Couldn't match type ‘'Solo (Maybe String)’ with ‘Maybe String’
       Expected type: Proxy (Maybe String)
-        Actual type: Proxy ('Unit (Maybe String))
-    • In the expression: Proxy :: Proxy ('Unit Maybe String)
+        Actual type: Proxy ('Solo (Maybe String))
+    • In the expression: Proxy :: Proxy ('Solo Maybe String)
       In an equation for ‘fred’:
-          fred = Proxy :: Proxy ('Unit Maybe String)
+          fred = Proxy :: Proxy ('Solo Maybe String)
