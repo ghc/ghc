@@ -166,7 +166,7 @@ Other Notes on Remote GHCi
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
   * This wiki page has an implementation overview:
     https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/external-interpreter
-  * Note [External GHCi pointers] in compiler/GHC/Runtime/Interpreter.hs
+  * Note [External GHCi pointers] in "GHC.Runtime.Interpreter"
   * Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs
 -}
 

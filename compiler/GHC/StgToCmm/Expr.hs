@@ -902,7 +902,7 @@ cgIdApp fun_id args = do
 --
 -- Self-recursive tail calls can be optimized into a local jump in the same
 -- way as let-no-escape bindings (see Note [What is a non-escaping let] in
--- GHC/CoreToStg.hs). Consider this:
+-- "GHC.CoreToStg"). Consider this:
 --
 -- foo.info:
 --     a = R1  // calling convention

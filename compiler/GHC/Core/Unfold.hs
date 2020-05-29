@@ -991,7 +991,7 @@ binary sizes shrink significantly either.
 
 Note [Discounts and thresholds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Constants for discounts and thesholds are defined in GHC/Driver/Session,
+Constants for discounts and thesholds are defined in "GHC.Driver.Session",
 all of form ufXxxx.   They are:
 
 ufCreationThreshold

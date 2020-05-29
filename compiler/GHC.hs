@@ -1346,7 +1346,7 @@ getNameToInstancesIndex visible_mods mods_to_load = do
 
 -- -----------------------------------------------------------------------------
 
-{- ToDo: Move the primary logic here to compiler/GHC/Unit/State.hs
+{- ToDo: Move the primary logic here to "GHC.Unit.State"
 -- | Return all /external/ modules available in the package database.
 -- Modules from the current session (i.e., from the 'HomePackageTable') are
 -- not included.  This includes module names which are reexported by packages.

@@ -674,7 +674,7 @@ in this case by a little known `optimization' that was disabled in
 an instance declaration.  In this case, it silently inserts the `C
 [a]', and everything happens to work out.
 
-(See `GHC/Types/Id/Make:mkDictFunId' for the code in question.  Search for
+(See `GHC.Types.Id.Make.mkDictFunId' for the code in question.  Search for
 `Mark Jones', although Mark claims no credit for the `optimization' in
 question, and would rather it stopped being called the `Mark Jones
 optimization' ;-)

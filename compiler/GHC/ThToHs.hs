@@ -2032,7 +2032,7 @@ with the following parts:
 Due to the two forall quantifiers and constraint contexts (either of
 which might be empty), pattern synonym type signatures are treated
 specially in `GHC.HsToCore.Quote`, `GHC.ThToHs`, and
-`typecheck/GHC.Tc.Gen.Splice.hs`:
+`GHC.Tc.Gen.Splice`:
 
    (a) When desugaring a pattern synonym from HsSyn to TH.Dec in
        `GHC.HsToCore.Quote`, we represent its *full* type signature in TH, i.e.:
@@ -2041,7 +2041,7 @@ specially in `GHC.HsToCore.Quote`, `GHC.ThToHs`, and
               (where ty is the AST representation of t1 -> t2 -> ... -> tn -> t)
 
    (b) When converting pattern synonyms from TH.Dec to HsSyn in
-       `GHC/ThToHs.hs`, we convert their TH type signatures back to an
+       `GHC.ThToHs`, we convert their TH type signatures back to an
        appropriate Haskell pattern synonym type of the form
 
          forall univs. reqs => forall exis. provs => t1 -> t2 -> ... -> tn -> t
@@ -2049,7 +2049,7 @@ specially in `GHC.HsToCore.Quote`, `GHC.ThToHs`, and
        where initial empty `univs` type variables or an empty `reqs`
        constraint context are represented *explicitly* as `() =>`.
 
-   (c) When reifying a pattern synonym in `typecheck/GHC.Tc.Gen.Splice.hs`, we always
+   (c) When reifying a pattern synonym in `GHC.Tc.Gen.Splice`, we always
        return its *full* type, i.e.:
 
            ForallT univs reqs (ForallT exis provs ty)

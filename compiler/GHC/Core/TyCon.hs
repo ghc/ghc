@@ -1372,7 +1372,7 @@ although it's probably true that we could merge some of these.
 
 Roughly in order of "includes more information":
 
- - A Width (GHC/Cmm/Type) is simply a binary value with the specified
+ - A Width ("GHC.Cmm.Type") is simply a binary value with the specified
    number of bits.  It may represent a signed or unsigned integer, a
    floating-point value, or an address.
 

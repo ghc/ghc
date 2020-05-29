@@ -1552,7 +1552,7 @@ match_inline (Type _ : e : _)
 match_inline _ = Nothing
 
 
--- See Note [magicDictId magic] in `GHC/Types/Id/Make.hs`
+-- See Note [magicDictId magic] in "GHC.Types.Id.Make"
 -- for a description of what is going on here.
 match_magicDict :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
 match_magicDict [Type _, Var wrap `App` Type a `App` Type _ `App` f, x, y ]
