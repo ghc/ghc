@@ -1109,7 +1109,7 @@ forall a. [a] -&gt; [a] -&gt; [a]
       ><span id=""
       ><span class="annot"
 	><span class="annottext"
-	  >plugh :: Either a a -&gt; Either b b -&gt; Either (a -&gt; b) (b -&gt; a)
+	  >plugh :: forall a b. Either a a -&gt; Either b b -&gt; Either (a -&gt; b) (b -&gt; a)
 </span
 	  ><a href="#"
 	  ><span class="hs-identifier hs-var hs-var hs-var hs-var"

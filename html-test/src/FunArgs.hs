@@ -22,7 +22,7 @@ h :: forall a b c
   -> b -- ^ Second argument
   -> c -- ^ Third argument
   -> forall d. d -- ^ Result
-h = undefined
+h _ _ _ = undefined
 
 
 i :: forall a (b :: ()) d. (d ~ '())

@@ -132,7 +132,7 @@
       ><span id="num"
       ><span class="annot"
 	><span class="annottext"
-	  >num :: a
+	  >num :: forall a. Num a =&gt; a
 </span
 	  ><a href="Literals.html#num"
 	  ><span class="hs-identifier hs-var hs-var"
@@ -285,7 +285,7 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
       ><span id="frac"
       ><span class="annot"
 	><span class="annottext"
-	  >frac :: a
+	  >frac :: forall a. Fractional a =&gt; a
 </span
 	  ><a href="Literals.html#frac"
 	  ><span class="hs-identifier hs-var hs-var"
@@ -360,7 +360,7 @@ forall a. Num a =&gt; a -&gt; a -&gt; a
       ><span id="list"
       ><span class="annot"
 	><span class="annottext"
-	  >list :: [[[[a]]]]
+	  >list :: forall a. [[[[a]]]]
 </span
 	  ><a href="Literals.html#list"
 	  ><span class="hs-identifier hs-var hs-var"
