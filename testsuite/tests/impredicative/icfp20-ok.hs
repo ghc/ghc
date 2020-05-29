@@ -69,3 +69,6 @@ d4 = runST $ argST
 
 st1 :: forall a. (forall s. ST s a) -> a
 st1 x = id (runST @a) x
+
+-- Not in the paper's table
+c10 = head ids True
