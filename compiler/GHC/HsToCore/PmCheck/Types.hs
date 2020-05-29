@@ -271,7 +271,7 @@ The impact of this treatment of overloaded literals is the following:
   * We have instant equality check for overloaded literals (we do not rely on
     the term oracle which is rather expensive, both in terms of performance and
     memory). This significantly improves the performance of functions `covered`
-    `uncovered` and `divergent` in GHC/HsToCore/PmCheck.hs and effectively addresses
+    `uncovered` and `divergent` in "GHC.HsToCore.PmCheck" and effectively addresses
     #11161.
 
   * The warnings issued are simpler.
