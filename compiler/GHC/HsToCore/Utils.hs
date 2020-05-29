@@ -567,10 +567,10 @@ There are two cases.
    * The pattern binds exactly one variable
         let !(Just (Just x) = e in body
      ==>
-       let { t = case e of Just (Just v) -> Unit v
-           ; v = case t of Unit v -> v }
+       let { t = case e of Just (Just v) -> Solo v
+           ; v = case t of Solo v -> v }
        in t `seq` body
-    The 'Unit' is a one-tuple; see Note [One-tuples] in GHC.Builtin.Types
+    The 'Solo' is a one-tuple; see Note [One-tuples] in GHC.Builtin.Types
     Note that forcing 't' makes the pattern match happen,
     but does not force 'v'.
 
@@ -584,8 +584,8 @@ There are two cases.
 ------ Examples ----------
   *   !(_, (_, a)) = e
     ==>
-      t = case e of (_, (_, a)) -> Unit a
-      a = case t of Unit a -> a
+      t = case e of (_, (_, a)) -> Solo a
+      a = case t of Solo a -> a
 
     Note that
      - Forcing 't' will force the pattern to match fully;
@@ -595,8 +595,8 @@ There are two cases.
 
   *   !(Just x) = e
     ==>
-      t = case e of Just x -> Unit x
-      x = case t of Unit x -> x
+      t = case e of Just x -> Solo x
+      x = case t of Solo x -> x
 
     Again, forcing 't' will fail if 'e' yields Nothing.
 
@@ -607,12 +607,12 @@ work out well:
 
     let Just (Just v) = e in body
   ==>
-    let t = case e of Just (Just v) -> Unit v
-        v = case t of Unit v -> v
+    let t = case e of Just (Just v) -> Solo v
+        v = case t of Solo v -> v
     in body
   ==>
-    let v = case (case e of Just (Just v) -> Unit v) of
-              Unit v -> v
+    let v = case (case e of Just (Just v) -> Solo v) of
+              Solo v -> v
     in body
   ==>
     let v = case e of Just (Just v) -> v
