@@ -72,6 +72,7 @@ include-dirs:           TOP"/rts/dist/build"
                         TOP"/includes/dist-derivedconstants/header"
                         FFI_INCLUDE_DIR
                         LIBDW_INCLUDE_DIR
+                        LIBSYSTEMPTAP_INCLUDE_DIR
                         TOP"/includes/dist-install/build"
 #endif
 

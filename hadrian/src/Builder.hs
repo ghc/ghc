@@ -3,6 +3,7 @@ module Builder (
     -- * Data types
     ArMode (..), CcMode (..), ConfigurationInfo (..), GhcMode (..),
     GhcPkgMode (..), HaddockMode (..), SphinxMode (..), TarMode (..),
+    DtraceMode (..),
     Builder (..),
 
     -- * Builder properties
@@ -102,6 +103,15 @@ instance Binary   HaddockMode
 instance Hashable HaddockMode
 instance NFData   HaddockMode
 
+-- | The Dtrace compiler is user in two different modes:
+-- * Generate a header file
+-- * Generate a stub object
+data DtraceMode = DtraceHeader | DtraceStub deriving (Eq, Generic, Show)
+
+instance Binary   DtraceMode
+instance Hashable DtraceMode
+instance NFData   DtraceMode
+
 -- | A 'Builder' is a (usually external) command invoked in a separate process
 -- via 'cmd'. Here are some examples:
 -- * 'Alex' is a lexical analyser generator that builds @Lexer.hs@ from @Lexer.x@.
@@ -117,6 +127,7 @@ data Builder = Alex
              | Cc CcMode Stage
              | Configure FilePath
              | DeriveConstants
+             | Dtrace DtraceMode
              | GenApply
              | GenPrimopCode
              | Ghc GhcMode Stage
@@ -288,6 +299,13 @@ instance H.Builder Builder where
                     unit $ cmd' [Cwd output] [path]        buildArgs
 
                 Tar _ -> cmd' buildOptions echo [path] buildArgs
+
+                Dtrace mode -> do
+                    let modeFlag = case mode of
+                            DtraceHeader -> "-h"
+                            DtraceStub -> "-G"
+                    cmd' echo [path] buildArgs modeFlag [ "-o", output ] [ "-s", input ]
+
                 _  -> cmd' echo [path] buildArgs
 
 -- TODO: Some builders are required only on certain platforms. For example,
@@ -312,6 +330,7 @@ systemBuilderPath builder = case builder of
     Configure _     -> return "configure"
     Ghc _  Stage0   -> fromKey "system-ghc"
     GhcPkg _ Stage0 -> fromKey "system-ghc-pkg"
+    Dtrace _        -> fromKey "dtrace"
     Happy           -> fromKey "happy"
     HsCpp           -> fromKey "hs-cpp"
     Ld _            -> fromKey "ld"

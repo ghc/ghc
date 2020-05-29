@@ -115,8 +115,8 @@
      `symhash`, where possible duplicates are handled via the semantics
      described in `ghciInsertSymbolTable`.
 
-     This phase will produce ObjectCode with status `OBJECT_LOADED` or `OBJECT_NEEDED`
-     depending on whether they are an archive member or not.
+     This phase will produce ObjectCode with status `OBJECT_LOADED` if it is
+     an archive member or `OBJECT_NEEDED` if not.
 
    * During initialization we load ObjectCode, perform relocations, execute
      static constructors etc. This phase may trigger other ObjectCodes to
