@@ -366,15 +366,20 @@ $tab          { warnTab }
 -- "special" symbols
 
 <0> {
-  "[|"        / { ifExtension ThQuotesBit } { token (ITopenExpQuote NoE NormalSyntax) }
-  "[||"       / { ifExtension ThQuotesBit } { token (ITopenTExpQuote NoE) }
+
+  -- Don't check ThQuotesBit here as the renamer can produce a better
+  -- error message than the lexer (see the thQuotesEnabled check in rnBracket).
+  "[|"  { token (ITopenExpQuote NoE NormalSyntax) }
+  "[||" { token (ITopenTExpQuote NoE) }
+  "|]"  { token (ITcloseQuote NormalSyntax) }
+  "||]" { token ITcloseTExpQuote }
+
+  -- Check ThQuotesBit here as to not steal syntax.
   "[e|"       / { ifExtension ThQuotesBit } { token (ITopenExpQuote HasE NormalSyntax) }
   "[e||"      / { ifExtension ThQuotesBit } { token (ITopenTExpQuote HasE) }
   "[p|"       / { ifExtension ThQuotesBit } { token ITopenPatQuote }
   "[d|"       / { ifExtension ThQuotesBit } { layout_token ITopenDecQuote }
   "[t|"       / { ifExtension ThQuotesBit } { token ITopenTypQuote }
-  "|]"        / { ifExtension ThQuotesBit } { token (ITcloseQuote NormalSyntax) }
-  "||]"       / { ifExtension ThQuotesBit } { token ITcloseTExpQuote }
 
   "[" @varid "|"  / { ifExtension QqBit }   { lex_quasiquote_tok }
 
