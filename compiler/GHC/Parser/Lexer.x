@@ -1449,7 +1449,7 @@ qconsym buf len = ITqconsym $! splitQualName buf len False
 -- See Note [Whitespace-sensitive operator parsing]
 varsym_prefix :: Action
 varsym_prefix = sym $ \exts s ->
-  if | TypeApplicationsBit `xtest` exts, s == fsLit "@"
+  if | s == fsLit "@"  -- regardless of TypeApplications for better error messages
      -> return ITtypeApp
      | ThQuotesBit `xtest` exts, s == fsLit "$"
      -> return ITdollar
@@ -2461,7 +2461,6 @@ data ExtBits
   | BinaryLiteralsBit
   | NegativeLiteralsBit
   | HexFloatLiteralsBit
-  | TypeApplicationsBit
   | StaticPointersBit
   | NumericUnderscoresBit
   | StarIsTypeBit
@@ -2548,7 +2547,6 @@ mkParserFlags' warningFlags extensionFlags thisPackage
       .|. NegativeLiteralsBit         `xoptBit` LangExt.NegativeLiterals
       .|. HexFloatLiteralsBit         `xoptBit` LangExt.HexFloatLiterals
       .|. PatternSynonymsBit          `xoptBit` LangExt.PatternSynonyms
-      .|. TypeApplicationsBit         `xoptBit` LangExt.TypeApplications
       .|. StaticPointersBit           `xoptBit` LangExt.StaticPointers
       .|. NumericUnderscoresBit       `xoptBit` LangExt.NumericUnderscores
       .|. StarIsTypeBit               `xoptBit` LangExt.StarIsType
