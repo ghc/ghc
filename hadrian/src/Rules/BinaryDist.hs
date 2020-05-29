@@ -5,6 +5,7 @@ import Hadrian.Haskell.Cabal
 import Context
 import Expression
 import Oracles.Setting
+import Oracles.Flag
 import Packages
 import Settings
 import Settings.Program (programContext)
@@ -101,8 +102,9 @@ bindistRules = do
     phony "binary-dist-dir" $ do
         -- We 'need' all binaries and libraries
         targets <- mapM pkgTarget =<< stagePackages Stage1
+        cross <- flag CrossCompiling
         need targets
-        needIservBins
+        unless cross $ needIservBins
 
         version        <- setting ProjectVersion
         targetPlatform <- setting TargetPlatformFull
@@ -121,7 +123,7 @@ bindistRules = do
         copyDirectory (ghcBuildDir -/- "bin") bindistFilesDir
         copyDirectory (ghcBuildDir -/- "lib") bindistFilesDir
         copyDirectory (rtsIncludeDir)         bindistFilesDir
-        need ["docs"]
+        unless cross $ need ["docs"]
         -- TODO: we should only embed the docs that have been generated
         -- depending on the current settings (flavours' "ghcDocs" field and
         -- "--docs=.." command-line flag)
@@ -138,9 +140,10 @@ bindistRules = do
 
         -- We copy the binary (<build root>/stage1/bin/haddock[.exe]) to
         -- the bindist's bindir (<build root>/bindist/ghc-.../bin/).
-        haddockPath <- programPath (vanillaContext Stage1 haddock)
-        copyFile haddockPath
-                 (bindistFilesDir -/- "bin" -/- takeFileName haddockPath)
+        unless cross $ do
+          haddockPath <- programPath (vanillaContext Stage1 haddock)
+          copyFile haddockPath
+                   (bindistFilesDir -/- "bin" -/- takeFileName haddockPath)
 
         -- We then 'need' all the files necessary to configure and install
         -- (as in, './configure [...] && make install') this build on some
