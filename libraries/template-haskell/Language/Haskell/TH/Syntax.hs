@@ -1587,7 +1587,7 @@ mk_tup_name n space boxed
     withParens thing
       | boxed     = "("  ++ thing ++ ")"
       | otherwise = "(#" ++ thing ++ "#)"
-    tup_occ | n == 1    = if boxed then "Unit" else "Unit#"
+    tup_occ | n == 1    = if boxed then "Solo" else "Solo#"
             | otherwise = withParens (replicate n_commas ',')
     n_commas = n - 1
     tup_mod  = mkModName "GHC.Tuple"
