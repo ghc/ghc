@@ -54,6 +54,9 @@ unliftedBind =
   let x :: Int#
       !x = undefined in ()
 
+wildPat :: Int# -> ()
+wildPat !_ = ()
+
 -- no warning expected
 liftedBind:: ()
 liftedBind =
@@ -61,21 +64,29 @@ liftedBind =
       !x = undefined in ()
 
 -- no warning expected
-boxedPat :: Int -> Int
-boxedPat !x = x
+boxedPatNoWarn :: Int -> Int
+boxedPatNoWarn !x = x
 
 -- no warning expected
-newtyPat :: C -> ()
-newtyPat !(C _) = ()
+newtyPatNoWarn :: C -> ()
+newtyPatNoWarn !(C _) = ()
 
 -- no warning expected
-patSyn :: B -> ()
-patSyn !P = ()
+patSynNoWarn :: B -> ()
+patSynNoWarn !P = ()
 
 -- no warning expected
-wildPat :: B -> ()
-wildPat !_ = ()
+wildPatNoWarn :: B -> ()
+wildPatNoWarn !_ = ()
 
 -- no warning expected
-viewPat :: B -> ()
-viewPat !(id -> B) = ()
+viewPatNoWarn :: B -> ()
+viewPatNoWarn !(id -> B) = ()
+
+-- todo:
+-- unlifted tuples
+-- list with rebindable syntax
+-- SumPat
+-- more top-level banged binds
+-- more numeric patterns
+-- more view patterns

@@ -5,7 +5,6 @@
 -}
 
 {-# LANGUAGE CPP, TupleSections #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -536,14 +535,15 @@ zonkMonoBinds env binds = mapBagM (zonk_lbind env) binds
 zonk_lbind :: ZonkEnv -> LHsBind GhcTcId -> TcM (LHsBind GhcTc)
 zonk_lbind env bind =
   do { bind' <- wrapLocM (zonk_bind env) bind
-     ; let warn_redundant_bang :: TcM ()
-             = whenWOptM Opt_WarnRedundantBangPatterns
-                        (addWarnTc (Reason Opt_WarnRedundantBangPatterns)
-                        (text "Bang pattern is redundant"))
-     ; let bang_is_redundant :: HsBind GhcTcId -> Bool
-             = \b -> isBangedHsBind b && isUnliftedHsBind b
-     ; when (bang_is_redundant (unLoc bind')) warn_redundant_bang
+     ; let b = unLoc bind'
+     -- TODO: fix this and remove isUnliftedHsBind
+     ; when (isBangedHsBind b && isUnliftedHsBind b) warn_redundant_bang
      ; return bind'}
+       where
+       warn_redundant_bang
+         = whenWOptM Opt_WarnRedundantBangPatterns
+                     (addWarnTc (Reason Opt_WarnRedundantBangPatterns)
+                     (text "Bang pattern is redundant"))
 
 zonk_bind :: ZonkEnv -> HsBind GhcTcId -> TcM (HsBind GhcTc)
 zonk_bind env bind@(PatBind { pat_lhs = pat, pat_rhs = grhss
@@ -1344,11 +1344,10 @@ zonk_pat env (BangPat x pat)
         ; whenM (should_warn pat') warn_redundant_bang_pats
         ; return (env',  BangPat x pat') }
         where
-        warn_redundant_bang_pats :: TcM ()
-        warn_redundant_bang_pats =
-          whenWOptM Opt_WarnRedundantBangPatterns
-                    (addWarnTc (Reason Opt_WarnRedundantBangPatterns)
-                               (text "Bang pattern is redundant"))
+        warn_redundant_bang_pats
+          = whenWOptM Opt_WarnRedundantBangPatterns
+                      (addWarnTc (Reason Opt_WarnRedundantBangPatterns)
+                                 (text "Bang pattern is redundant"))
 
         should_warn :: LPat GhcTc -> TcM Bool
         should_warn (L _ pat) = case pat of
@@ -1371,17 +1370,17 @@ zonk_pat env (BangPat x pat)
           VarPat _ (L _ var) ->
             -- do warn for unlifted types
             return (isUnliftedType (idType var))
+          WildPat ty      -> return (isUnliftedType ty)
           ParPat _ p      -> should_warn p
           AsPat _ _ p     -> should_warn p
           SigPat _ p _    -> should_warn p
           TuplePat _ _ _  -> return True
           LitPat _ _      -> return True
           BangPat _ _     -> return True
-          NPat _ _ _ _    -> return True
+          SumPat _ _ _ _  -> return True
+          NPat _ _ _ _    -> return False
           ViewPat _ _ _   -> return False
-          WildPat _       -> return False
           LazyPat _ _     -> return False
-          SumPat _ _ _ _  -> return False
           SplicePat _ _   -> return False
           NPlusKPat _ _ _ _ _ _ -> return False
           _otherwise            -> panic "warn_redundant_bang_pats"
