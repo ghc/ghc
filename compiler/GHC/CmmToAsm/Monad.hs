@@ -149,7 +149,6 @@ mkNatM_State us delta dflags this_mod
 initConfig :: DynFlags -> NCGConfig
 initConfig dflags = NCGConfig
    { ncgPlatform              = targetPlatform dflags
-   , ncgUnitId                = homeUnit dflags
    , ncgProcAlignment         = cmmProcAlignment dflags
    , ncgDebugLevel            = debugLevel dflags
    , ncgExternalDynamicRefs   = gopt Opt_ExternalDynamicRefs dflags

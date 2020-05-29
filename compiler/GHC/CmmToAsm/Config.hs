@@ -9,12 +9,10 @@ where
 import GHC.Prelude
 import GHC.Platform
 import GHC.Cmm.Type (Width(..))
-import GHC.Unit.Module
 
 -- | Native code generator configuration
 data NCGConfig = NCGConfig
    { ncgPlatform              :: !Platform        -- ^ Target platform
-   , ncgUnitId                :: Unit             -- ^ Target unit ID
    , ncgProcAlignment         :: !(Maybe Int)     -- ^ Mandatory proc alignment
    , ncgDebugLevel            :: !Int             -- ^ Debug level
    , ncgExternalDynamicRefs   :: !Bool            -- ^ Generate code to link against dynamic libraries
