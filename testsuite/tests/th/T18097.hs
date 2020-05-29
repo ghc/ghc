@@ -4,11 +4,11 @@ module T18097 where
 import Language.Haskell.TH
 import GHC.Tuple
 
-f = case $( tupE [ [| "ok" |] ] ) of Unit x -> putStrLn x
-g = case Unit "ok" of $( tupP [ [p| x |] ] ) -> putStrLn x
+f = case $( tupE [ [| "ok" |] ] ) of Solo x -> putStrLn x
+g = case Solo "ok" of $( tupP [ [p| x |] ] ) -> putStrLn x
 
 h :: $( tupleT 1 ) String
-h = Unit "ok"
+h = Solo "ok"
 
-i :: Unit String
+i :: Solo String
 i = $( tupE [ [| "ok" |] ] )

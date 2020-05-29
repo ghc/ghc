@@ -1,4 +1,4 @@
-## 0.6.2 (edit as necessary)
+## 0.7.0 (edit as necessary)
 
 - Shipped with GHC 8.12.1
 
@@ -16,6 +16,8 @@
 
   If the folding function is known this allows for unboxing of the
   Char argument resulting in much faster code.
+
+- Renamed the singleton tuple `GHC.Tuple.Unit` to `GHC.Tuple.Solo`.
 
 ## 0.6.1 (edit as necessary)
 
