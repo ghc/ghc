@@ -76,13 +76,20 @@ Lexical syntax
    See `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
    for the precise rules.
 
--  As-patterns must not be surrounded by whitespace::
+-  As-patterns must not be surrounded by whitespace on either side::
 
      f p@(x, y, z) = ...    -- accepted by both GHC and the Haskell Report
-     f p @ (x, y, z) = ...  -- accepted by the Haskell Report but not GHC
 
-   When surrounded by whitespace, ``(@)`` is treated by GHC as a regular infix
-   operator.
+     -- accepted by the Haskell Report but not GHC:
+     f p @ (x, y, z) = ...
+     f p @(x, y, z) = ...
+     f p@ (x, y, z) = ...
+
+   When surrounded by whitespace on both sides, ``(@)`` is treated by GHC as a
+   regular infix operator.
+
+   When preceded but not followed by whitespace, ``(@)`` is treated as a
+   visible type application.
 
    See `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
    for the precise rules.

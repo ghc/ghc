@@ -2738,11 +2738,9 @@ fexp    :: { ECP }
                                           mkHsAppPV (comb2 $1 $>) $1 $2 }
 
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
-        | fexp PREFIX_AT atype       {% runECP_P $1 >>= \ $1 ->
-                                        runPV (checkExpBlockArguments $1) >>= \_ ->
-                                        fmap ecpFromExp $
-                                        ams (sLL $1 $> $ HsAppType noExtField $1 (mkHsWildCardBndrs $3))
-                                            [mj AnnAt $2] }
+        | fexp PREFIX_AT atype       { ECP $
+                                        runECP_PV $1 >>= \ $1 ->
+                                        amms (mkHsAppTypePV (comb2 $1 $>) $1 $3) [mj AnnAt $2] }
 
         | 'static' aexp              {% runECP_P $2 >>= \ $2 ->
                                         fmap ecpFromExp $
