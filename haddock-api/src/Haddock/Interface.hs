@@ -152,62 +152,63 @@ processModule verbosity modsum flags modMap instIfaceMap = do
   out verbosity verbose $ "Checking module " ++ moduleString (ms_mod modsum) ++ "..."
   tm <- {-# SCC "parse/typecheck/load" #-} loadModule =<< typecheckModule =<< parseModule modsum
 
-  if not $ isBootSummary modsum then do
-    out verbosity verbose "Creating interface..."
-    (interface, msgs) <- {-# SCC createIterface #-}
-                        withTimingD "createInterface" (const ()) $ do
-                          runWriterGhc $ createInterface tm flags modMap instIfaceMap
+  case isBootSummary modsum of
+    IsBoot ->
+      return Nothing
+    NotBoot -> do
+      out verbosity verbose "Creating interface..."
+      (interface, msgs) <- {-# SCC createIterface #-}
+                          withTimingD "createInterface" (const ()) $ do
+                            runWriterGhc $ createInterface tm flags modMap instIfaceMap
 
-    -- We need to keep track of which modules were somehow in scope so that when
-    -- Haddock later looks for instances, it also looks in these modules too.
-    --
-    -- See https://github.com/haskell/haddock/issues/469.
-    hsc_env <- getSession
-    let new_rdr_env = tcg_rdr_env . fst . GHC.tm_internals_ $ tm
-        this_pkg = thisPackage (hsc_dflags hsc_env)
-        !mods = mkModuleSet [ nameModule name
-                            | gre <- globalRdrEnvElts new_rdr_env
-                            , let name = gre_name gre
-                            , nameIsFromExternalPackage this_pkg name
-                            , isTcOcc (nameOccName name)   -- Types and classes only
-                            , unQualOK gre ]               -- In scope unqualified
+      -- We need to keep track of which modules were somehow in scope so that when
+      -- Haddock later looks for instances, it also looks in these modules too.
+      --
+      -- See https://github.com/haskell/haddock/issues/469.
+      hsc_env <- getSession
+      let new_rdr_env = tcg_rdr_env . fst . GHC.tm_internals_ $ tm
+          this_pkg = thisPackage (hsc_dflags hsc_env)
+          !mods = mkModuleSet [ nameModule name
+                              | gre <- globalRdrEnvElts new_rdr_env
+                              , let name = gre_name gre
+                              , nameIsFromExternalPackage this_pkg name
+                              , isTcOcc (nameOccName name)   -- Types and classes only
+                              , unQualOK gre ]               -- In scope unqualified
 
-    liftIO $ mapM_ putStrLn (nub msgs)
-    dflags <- getDynFlags
-    let (haddockable, haddocked) = ifaceHaddockCoverage interface
-        percentage = round (fromIntegral haddocked * 100 / fromIntegral haddockable :: Double) :: Int
-        modString = moduleString (ifaceMod interface)
-        coverageMsg = printf " %3d%% (%3d /%3d) in '%s'" percentage haddocked haddockable modString
-        header = case ifaceDoc interface of
-          Documentation Nothing _ -> False
-          _ -> True
-        undocumentedExports = [ formatName s n | ExportDecl { expItemDecl = L s n
-                                                            , expItemMbDoc = (Documentation Nothing _, _)
-                                                            } <- ifaceExportItems interface ]
-          where
-            formatName :: SrcSpan -> HsDecl GhcRn -> String
-            formatName loc n = p (getMainDeclBinder n) ++ case loc of
-              RealSrcSpan rss _ -> " (" ++ unpackFS (srcSpanFile rss) ++ ":" ++ show (srcSpanStartLine rss) ++ ")"
-              _ -> ""
+      liftIO $ mapM_ putStrLn (nub msgs)
+      dflags <- getDynFlags
+      let (haddockable, haddocked) = ifaceHaddockCoverage interface
+          percentage = round (fromIntegral haddocked * 100 / fromIntegral haddockable :: Double) :: Int
+          modString = moduleString (ifaceMod interface)
+          coverageMsg = printf " %3d%% (%3d /%3d) in '%s'" percentage haddocked haddockable modString
+          header = case ifaceDoc interface of
+            Documentation Nothing _ -> False
+            _ -> True
+          undocumentedExports = [ formatName s n | ExportDecl { expItemDecl = L s n
+                                                              , expItemMbDoc = (Documentation Nothing _, _)
+                                                              } <- ifaceExportItems interface ]
+            where
+              formatName :: SrcSpan -> HsDecl GhcRn -> String
+              formatName loc n = p (getMainDeclBinder n) ++ case loc of
+                RealSrcSpan rss _ -> " (" ++ unpackFS (srcSpanFile rss) ++ ":" ++ show (srcSpanStartLine rss) ++ ")"
+                _ -> ""
 
-            p [] = ""
-            p (x:_) = let n = pretty dflags x
-                          ms = modString ++ "."
-                      in if ms `isPrefixOf` n
-                         then drop (length ms) n
-                         else n
+              p [] = ""
+              p (x:_) = let n = pretty dflags x
+                            ms = modString ++ "."
+                        in if ms `isPrefixOf` n
+                           then drop (length ms) n
+                           else n
 
-    when (OptHide `notElem` ifaceOptions interface) $ do
-      out verbosity normal coverageMsg
-      when (Flag_NoPrintMissingDocs `notElem` flags
-            && not (null undocumentedExports && header)) $ do
-        out verbosity normal "  Missing documentation for:"
-        unless header $ out verbosity normal "    Module header"
-        mapM_ (out verbosity normal . ("    " ++)) undocumentedExports
-    interface' <- liftIO $ evaluate interface
-    return (Just (interface', mods))
-  else
-    return Nothing
+      when (OptHide `notElem` ifaceOptions interface) $ do
+        out verbosity normal coverageMsg
+        when (Flag_NoPrintMissingDocs `notElem` flags
+              && not (null undocumentedExports && header)) $ do
+          out verbosity normal "  Missing documentation for:"
+          unless header $ out verbosity normal "    Module header"
+          mapM_ (out verbosity normal . ("    " ++)) undocumentedExports
+      interface' <- liftIO $ evaluate interface
+      return (Just (interface', mods))
 
 
 --------------------------------------------------------------------------------
