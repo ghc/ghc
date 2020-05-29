@@ -155,8 +155,7 @@ data TcPass = TcpRn     -- Arguments decomposed
 data HsExprArg (p :: TcPass)
   = EValArg  { eva_loc :: SrcSpan        -- Of the function
              , eva_arg :: EValArg p
-             , eva_ty  :: !(XEType p)
-             , eva_gd  :: Bool }
+             , eva_ty  :: !(XEType p) }
 
   | ETypeArg SrcSpan        -- Of the function
              (LHsWcType GhcRn)
@@ -180,7 +179,7 @@ data EValArg (p :: TcPass) where
 
 mkEValArg :: SrcSpan -> LHsExpr GhcRn -> HsExprArg 'TcpRn
 mkEValArg l e = EValArg { eva_loc = l, eva_arg = ValArg e
-                        , eva_ty = noExtField, eva_gd = False }
+                        , eva_ty = noExtField }
 
 type family XPass p where
   XPass 'TcpRn   = 'Renamed
@@ -196,9 +195,8 @@ type family XEWrap p where
   XEWrap _      = HsWrapper
 
 instance OutputableBndrId (XPass p) => Outputable (HsExprArg p) where
-  ppr (EValArg { eva_arg = arg, eva_gd = gd })
-    = text "EValArg" <> if gd then text "(gd)" else text "(un-gd)"
-                     <+> ppr arg
+  ppr (EValArg { eva_arg = arg })
+    = text "EValArg" <+> ppr arg
   ppr (EPrag _ p)          = text "EPrag" <+> ppr p
   ppr (ETypeArg _ hs_ty _) = char '@' <> ppr hs_ty
   ppr (EPar _)             = text "EPar"
@@ -315,8 +313,7 @@ tcInferSigmaTy (L loc rn_expr)
   = setSrcSpan loc $
     do { impred <- xoptM LangExt.ImpredicativeTypes
        ; (tc_fun, fun_sigma) <- tcInferAppHead rn_fun rn_args
-       ; let rn_args' = maybeAddGuardFlags impred fun_sigma rn_args
-       ; (_delta, inst_args, app_res_sigma) <- tcInstFun impred False rn_fun fun_sigma rn_args'
+       ; (_delta, inst_args, app_res_sigma) <- tcInstFun impred False rn_fun fun_sigma rn_args
        ; _tc_args <- tcValArgs impred tc_fun inst_args
        ; return app_res_sigma }
 
@@ -328,8 +325,7 @@ tcApp rn_expr exp_res_ty
        ; (tc_fun, fun_sigma) <- tcInferAppHead rn_fun rn_args
 
        -- Instantiate
-       ; let rn_args' = maybeAddGuardFlags impred fun_sigma rn_args
-       ; (delta, inst_args, app_res_rho) <- tcInstFun impred True rn_fun fun_sigma rn_args'
+       ; (delta, inst_args, app_res_rho) <- tcInstFun impred True rn_fun fun_sigma rn_args
 
        -- Quick look at result
        ; when (impred && not (isEmptyVarSet delta)) $
@@ -593,11 +589,11 @@ tcInstFun impred_on inst_final rn_fun fun_sigma rn_args
            ; go delta' acc' so_far fun_ty' args }
 
     go1 delta acc so_far fun_ty
-        (eva@(EValArg { eva_arg = ValArg arg, eva_gd = guarded })  : rest_args)
+        (eva@(EValArg { eva_arg = ValArg arg })  : rest_args)
       = do { (wrap, arg_ty, res_ty) <- matchActualFunTy herald
                                          (Just rn_fun) (n_val_args, so_far) fun_ty
           ; (delta', arg') <- if impred_on
-                              then quickLookArg guarded delta arg arg_ty
+                              then quickLookArg delta arg arg_ty
                               else return (delta, ValArg arg)
           ; let acc' = eva { eva_arg = arg', eva_ty = arg_ty }
                        : addArgWrap wrap acc
@@ -734,61 +730,41 @@ and we had the visible type application
 *                                                                      *
 ********************************************************************* -}
 
-maybeAddGuardFlags :: Bool -> TcSigmaType -> [HsExprArg 'TcpRn]
-                   -> [HsExprArg 'TcpRn]
-maybeAddGuardFlags impred fun_ty args
-  | impred    = snd (addGuardFlags fun_ty args)
-  | otherwise = args  -- No Quick Look, no need to add guardedness
-
-addGuardFlags :: TcSigmaType -> [HsExprArg 'TcpRn]
-              -> (Bool, [HsExprArg 'TcpRn])
-              -- True <=> there are no free quantified variables
-              --          in the result of the call
-addGuardFlags fun_ty args
-  = go emptyVarSet [] fun_ty args
+findNoKappa :: TcSigmaType -> [HsExprArg 'TcpRn] -> Bool
+   -- True <=> there are no free quantified variables
+   --          in the result of the call
+findNoKappa fun_ty args
+  = go emptyVarSet fun_ty args
   where
     need_instantiation []               = True
     need_instantiation (EValArg {} : _) = True
     need_instantiation _                = False
 
-    go bvs acc fun_ty args
+    go bvs fun_ty args
       | need_instantiation args
       , (tvs, theta, rho) <- tcSplitSigmaTy fun_ty
       , not (null tvs && null theta)
-      = go (bvs `extendVarSetList` tvs) acc rho args
+      = go (bvs `extendVarSetList` tvs) rho args
 
-    go bvs acc fun_ty []
-      = ( tyCoVarsOfType fun_ty `disjointVarSet` bvs
-        , reverse acc)
+    go bvs fun_ty [] =  tyCoVarsOfType fun_ty `disjointVarSet` bvs
 
-    go bvs acc fun_ty (arg@(EPar {})  : args) = go bvs (arg : acc) fun_ty args
-    go bvs acc fun_ty (arg@(EPrag {}) : args) = go bvs (arg : acc) fun_ty args
+    go bvs fun_ty (EPar {}  : args) = go bvs fun_ty args
+    go bvs fun_ty (EPrag {} : args) = go bvs fun_ty args
 
-    go bvs acc fun_ty args@(arg@(ETypeArg {}) : rest_args)
+    go bvs fun_ty args@(ETypeArg {} : rest_args)
       | (tvbs,  body1) <- tcSplitSomeForAllTys (== Inferred) fun_ty
       , (theta, body2) <- tcSplitPhiTy body1
       , not (null tvbs && null theta)
-      = go (bvs `extendVarSetList` binderVars tvbs) acc body2 args
+      = go (bvs `extendVarSetList` binderVars tvbs) body2 args
       | Just (_tv, res_ty) <- tcSplitForAllTy_maybe fun_ty
-      = go bvs (arg:acc) res_ty rest_args
+      = go bvs res_ty rest_args
 
-    go bvs acc fun_ty (arg@(EValArg {}) : rest_args)
-      | Just (arg_ty, res_ty) <- tcSplitFunTy_maybe fun_ty
-      = go bvs (arg { eva_gd = isGuardedTy arg_ty } : acc)
-           res_ty rest_args
+    go bvs fun_ty (EValArg {} : rest_args)
+      | Just (_, res_ty) <- tcSplitFunTy_maybe fun_ty
+      = go bvs res_ty rest_args
 
-    go _ acc _ args = bale_out acc args
+    go _ _ _ = False
 
-    bale_out acc [] = (False, reverse acc)
-    bale_out acc (arg@(EValArg {}) : args)
-      = bale_out (arg { eva_gd = False } : acc) args
-    bale_out acc (arg:args) = bale_out (arg:acc) args
-
-isGuardedTy :: TcType -> Bool
-isGuardedTy ty
-  | Just (tc,_) <- tcSplitTyConApp_maybe ty = isGenerativeTyCon tc Nominal
-  | Just {} <- tcSplitAppTy_maybe ty        = True
-  | otherwise                               = False
 
 
 {- *********************************************************************
@@ -800,7 +776,7 @@ isGuardedTy ty
 type Delta = TcTyVarSet   -- Set of instantiation variables
 
 ----------------
-quickLookArg :: Bool -> Delta -> LHsExpr GhcRn -> TcSigmaType
+quickLookArg :: Delta -> LHsExpr GhcRn -> TcSigmaType
              -> TcM (Delta, EValArg 'TcpInst)
 -- Special behaviour only for (f e1 .. en)
 --
@@ -808,20 +784,33 @@ quickLookArg :: Bool -> Delta -> LHsExpr GhcRn -> TcSigmaType
 -- with added instantiation variables from
 --   (a) the call itself
 --   (b) the arguments of the call
-quickLookArg  guarded delta arg arg_ty
+quickLookArg delta arg arg_ty
   | isEmptyVarSet delta  = return no_ql_result
-  | not (isRhoTy arg_ty) = return no_ql_result
-  | Just kappa <- tcGetTyVar_maybe arg_ty
-  , kappa `elemVarSet` delta
-  = do { info <- readMetaTyVar kappa
-       ; case info of
-            Indirect arg_ty' -> quickLookArg  guarded delta arg arg_ty'
-            Flexi            -> quickLookArg1 guarded delta arg arg_ty }
-  | otherwise
-  = quickLookArg1 guarded delta arg arg_ty
+  | otherwise            = go arg_ty
   where
     no_ql_result = (delta, ValArg arg)
+    guarded      = isGuardedTy arg_ty
+      -- NB: guardedness is computed based on the original,
+      -- unzonked arg_ty, so we deliberately do not exploit
+      -- guardedness that emerges a result of QL on earlier args
 
+    go arg_ty | not (isRhoTy arg_ty)
+              = return no_ql_result
+
+              | Just kappa <- tcGetTyVar_maybe arg_ty
+              , kappa `elemVarSet` delta
+              = do { info <- readMetaTyVar kappa
+                   ; case info of
+                       Indirect arg_ty' -> go arg_ty'
+                       Flexi            -> quickLookArg1 guarded delta arg arg_ty }
+              | otherwise
+              = quickLookArg1 guarded delta arg arg_ty
+
+isGuardedTy :: TcType -> Bool
+isGuardedTy ty
+  | Just (tc,_) <- tcSplitTyConApp_maybe ty = isGenerativeTyCon tc Nominal
+  | Just {} <- tcSplitAppTy_maybe ty        = True
+  | otherwise                               = False
 
 quickLookArg1 :: Bool -> Delta -> LHsExpr GhcRn -> TcSigmaType
               -> TcM (Delta, EValArg 'TcpInst)
@@ -839,7 +828,7 @@ quickLookArg1 guarded delta larg@(L loc arg) arg_ty
                           return no_ql_result ;
            Just (fun', fun_sigma) ->
 
-    do { let (no_free_kappas, rn_args') = addGuardFlags fun_sigma rn_args
+    do { let no_free_kappas = findNoKappa fun_sigma rn_args
        ; traceTc "quickLookArg 2" $
          vcat [ text "no_free_kappas:" <+> ppr no_free_kappas
               , text "guarded:" <+> ppr guarded ]
@@ -847,7 +836,7 @@ quickLookArg1 guarded delta larg@(L loc arg) arg_ty
          then return no_ql_result
          else
     do { (delta_app, inst_args, app_res_rho)
-             <- tcInstFun True True rn_fun fun_sigma rn_args'
+             <- tcInstFun True True rn_fun fun_sigma rn_args
        ; traceTc "quickLookArg" $
          vcat [ text "arg:" <+> ppr arg
               , text "delta:" <+> ppr delta
