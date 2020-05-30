@@ -156,7 +156,7 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
                           -- oracle.
                           -- addTyCsDs: Add type evidence to the refinement type
                           --            predicate of the coverage checker
-                          -- See Note [Type and Term Equality Propagation] in PmCheck
+                          -- See Note [Type and Term Equality Propagation] in "GHC.HsToCore.PmCheck"
                           matchWrapper
                            (mkPrefixFunRhs (L loc (idName fun)))
                            Nothing matches
@@ -293,7 +293,7 @@ dsAbsBinds dflags tyvars dicts exports
        ; let mk_bind (ABE { abe_wrap = wrap
                           , abe_poly = global
                           , abe_mono = local, abe_prags = spec_prags })
-                          -- See Note [AbsBinds wrappers] in HsBinds
+                          -- See Note [AbsBinds wrappers] in "GHC.Hs.Binds"
                 = do { tup_id  <- newSysLocalDs tup_ty
                      ; core_wrap <- dsHsWrapper wrap
                      ; let rhs = core_wrap $ mkLams tyvars $ mkLams dicts $
@@ -957,7 +957,7 @@ Consider
 After type checking the LHS becomes (foo alpha (C alpha)), where alpha
 is an unbound meta-tyvar.  The zonker in GHC.Tc.Utils.Zonk is careful not to
 turn the free alpha into Any (as it usually does).  Instead it turns it
-into a TyVar 'a'.  See Note [Zonking the LHS of a RULE] in Ghc.Tc.Syntax.
+into a TyVar 'a'.  See Note [Zonking the LHS of a RULE] in "GHC.Tc.Utils.Zonk".
 
 Now we must quantify over that 'a'.  It's /really/ inconvenient to do that
 in the zonker, because the HsExpr data type is very large.  But it's /easy/

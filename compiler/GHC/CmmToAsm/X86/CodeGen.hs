@@ -222,7 +222,7 @@ basicBlockCodeGen block = do
   return (BasicBlock id top : other_blocks, statics)
 
 -- | Convert 'DELTA' instructions into 'UNWIND' instructions to capture changes
--- in the @sp@ register. See Note [What is this unwinding business?] in Debug
+-- in the @sp@ register. See Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock"
 -- for details.
 addSpUnwindings :: Instr -> NatM (OrdList Instr)
 addSpUnwindings instr@(DELTA d) = do

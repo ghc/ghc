@@ -359,7 +359,7 @@ data IfaceUnfolding
 
   | IfCompulsory IfaceExpr      -- default methods and unsafeCoerce#
                                 -- for more about unsafeCoerce#, see
-                                -- Note [Wiring in unsafeCoerce#] in Desugar
+                                -- Note [Wiring in unsafeCoerce#] in "GHC.HsToCore"
 
   | IfInlineRule Arity          -- INLINE pragmas
                  Bool           -- OK to inline even if *un*-saturated

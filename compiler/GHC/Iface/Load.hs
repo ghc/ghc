@@ -558,7 +558,7 @@ we get "duplicate instance" warnings when we compile the "real"
 instance in M itself.  Hence the strange business of just updateing
 the eps_PTE.
 
-This really happens in practice.  The module HsExpr.hs gets
+This really happens in practice.  The module "GHC.Hs.Expr" gets
 "duplicate instance" errors if this hack is not present.
 
 This is a mess.

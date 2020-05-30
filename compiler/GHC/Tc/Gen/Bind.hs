@@ -476,7 +476,7 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
         -- strongly-connected-component analysis, this time omitting
         -- any references to variables with type signatures.
         -- (This used to be optional, but isn't now.)
-        -- See Note [Polymorphic recursion] in HsBinds.
+        -- See Note [Polymorphic recursion] in "GHC.Hs.Binds".
     do  { traceTc "tc_group rec" (pprLHsBinds binds)
         ; whenIsJust mbFirstPatSyn $ \lpat_syn ->
             recursivePatSynErr (getLoc lpat_syn) binds
@@ -544,7 +544,7 @@ tc_single top_lvl sig_fn prag_fn lbind closed thing_inside
 type BKey = Int -- Just number off the bindings
 
 mkEdges :: TcSigFun -> LHsBinds GhcRn -> [Node BKey (LHsBind GhcRn)]
--- See Note [Polymorphic recursion] in HsBinds.
+-- See Note [Polymorphic recursion] in "GHC.Hs.Binds".
 mkEdges sig_fn binds
   = [ DigraphNode bind key [key | n <- nonDetEltsUniqSet (bind_fvs (unLoc bind)),
                          Just key <- [lookupNameEnv key_map n], no_sig n ]

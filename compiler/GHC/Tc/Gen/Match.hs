@@ -941,7 +941,7 @@ tcDoStmt _ stmt _ _
 -- The idea behind issuing MonadFail warnings is that we add them whenever a
 -- failable pattern is encountered. However, instead of throwing a type error
 -- when the constraint cannot be satisfied, we only issue a warning in
--- GHC.Tc.Errors.hs.
+-- "GHC.Tc.Errors".
 
 tcMonadFailOp :: CtOrigin
               -> LPat GhcTcId

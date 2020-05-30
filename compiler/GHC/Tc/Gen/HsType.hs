@@ -897,7 +897,7 @@ This table summarises this relation:
 --------------------------------------------------------------------------
 
 For more information regarding the interpretation of the resulting ArgFlag, see
-Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in TyCoRep.
+Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in "GHC.Core.TyCo.Rep".
 -}
 
 ------------------------------------------

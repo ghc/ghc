@@ -2154,7 +2154,7 @@ data MetaTyVarUpdateResult a
   = MTVU_OK a
   | MTVU_Bad          -- Forall, predicate, or type family
   | MTVU_HoleBlocker  -- Blocking coercion hole
-        -- See Note [Equalities with incompatible kinds] in TcCanonical
+        -- See Note [Equalities with incompatible kinds] in "GHC.Tc.Solver.Canonical"
   | MTVU_Occurs
     deriving (Functor)
 
@@ -2200,7 +2200,7 @@ metaTyVarUpdateOK :: DynFlags
 --       (b) that ty does not have any foralls
 --           (in the impredicative case), or type functions
 --       (c) that ty does not have any blocking coercion holes
---           See Note [Equalities with incompatible kinds] in TcCanonical
+--           See Note [Equalities with incompatible kinds] in "GHC.Tc.Solver.Canonical"
 --
 -- We have two possible outcomes:
 -- (1) Return the type to update the type variable with,
@@ -2286,7 +2286,7 @@ preCheck dflags ty_fam_ok tv ty
      -- inferred
     fast_check_co co | not (gopt Opt_DeferTypeErrors dflags)
                      , badCoercionHoleCo co            = MTVU_HoleBlocker
-        -- Wrinkle (4b) in TcCanonical Note [Equalities with incompatible kinds]
+        -- Wrinkle (4b) in "GHC.Tc.Solver.Canonical" Note [Equalities with incompatible kinds]
 
                      | tv `elemVarSet` tyCoVarsOfCo co = MTVU_Occurs
                      | otherwise                       = ok

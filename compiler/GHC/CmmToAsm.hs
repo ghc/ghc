@@ -289,7 +289,7 @@ data NativeGenAcc statics instr
         , ngs_dwarfFiles  :: !DwarfFiles
         , ngs_unwinds     :: !(LabelMap [UnwindPoint])
              -- ^ see Note [Unwinding information in the NCG]
-             -- and Note [What is this unwinding business?] in Debug.
+             -- and Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock".
         }
 
 {-
@@ -314,7 +314,7 @@ field of NativeGenAcc. This is a label map which contains an entry for each
 procedure, containing a list of unwinding points (e.g. a label and an associated
 unwinding table).
 
-See also Note [What is this unwinding business?] in Debug.
+See also Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock".
 -}
 
 nativeCodeGen' :: (Outputable statics, Outputable instr,Outputable jumpDest,
@@ -432,7 +432,7 @@ cmmNativeGenStream dflags this_mod modLoc ncgImpl h us cmm_stream ngs
                                                dbgMap us cmms ngs 0
 
               -- Link native code information into debug blocks
-              -- See Note [What is this unwinding business?] in Debug.
+              -- See Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock".
               let !ldbgs = cmmDebugLink (ngs_labels ngs') (ngs_unwinds ngs') ndbgs
               unless (null ldbgs) $
                 dumpIfSet_dyn dflags Opt_D_dump_debug "Debug Infos" FormatText

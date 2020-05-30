@@ -2110,15 +2110,15 @@ argToPat env in_scope val_env (Tick _ arg) arg_occ
 
 argToPat env in_scope val_env (Let _ arg) arg_occ
   = argToPat env in_scope val_env arg arg_occ
-        -- See Note [Matching lets] in Rule.hs
+        -- See Note [Matching lets] in "GHC.Core.Rules"
         -- Look through let expressions
         -- e.g.         f (let v = rhs in (v,w))
         -- Here we can specialise for f (v,w)
         -- because the rule-matcher will look through the let.
 
-{- Disabled; see Note [Matching cases] in Rule.hs
+{- Disabled; see Note [Matching cases] in "GHC.Core.Rules"
 argToPat env in_scope val_env (Case scrut _ _ [(_, _, rhs)]) arg_occ
-  | exprOkForSpeculation scrut  -- See Note [Matching cases] in Rule.hhs
+  | exprOkForSpeculation scrut  -- See Note [Matching cases] in "GHC.Core.Rules"
   = argToPat env in_scope val_env rhs arg_occ
 -}
 

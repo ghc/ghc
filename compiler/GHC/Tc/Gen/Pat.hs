@@ -631,7 +631,7 @@ AST is used for the subtraction operation.
         ; let minus'' = case minus' of
                           NoSyntaxExprTc -> pprPanic "tc_pat NoSyntaxExprTc" (ppr minus')
                                    -- this should be statically avoidable
-                                   -- Case (3) from Note [NoSyntaxExpr] in Hs.Expr
+                                   -- Case (3) from Note [NoSyntaxExpr] in "GHC.Hs.Expr"
                           SyntaxExprTc { syn_expr = minus'_expr
                                        , syn_arg_wraps = minus'_arg_wraps
                                        , syn_res_wrap = minus'_res_wrap }

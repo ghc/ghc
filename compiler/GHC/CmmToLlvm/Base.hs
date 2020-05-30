@@ -568,7 +568,7 @@ generateExternDecls = do
 -- | Here we take a global variable definition, rename it with a
 -- @$def@ suffix, and generate the appropriate alias.
 aliasify :: LMGlobal -> LlvmM [LMGlobal]
--- See note [emit-time elimination of static indirections] in CLabel.
+-- See note [emit-time elimination of static indirections] in "GHC.Cmm.CLabel".
 -- Here we obtain the indirectee's precise type and introduce
 -- fresh aliases to both the precise typed label (lbl$def) and the i8*
 -- typed (regular) label of it with the matching new names.

@@ -2330,7 +2330,7 @@ tidySkolemInfo _   info                   = info
 tidySigSkol :: TidyEnv -> UserTypeCtxt
             -> TcType -> [(Name,TcTyVar)] -> SkolemInfo
 -- We need to take special care when tidying SigSkol
--- See Note [SigSkol SkolemInfo] in Origin
+-- See Note [SigSkol SkolemInfo] in "GHC.Tc.Types.Origin"
 tidySigSkol env cx ty tv_prs
   = SigSkol cx (tidy_ty env ty) tv_prs'
   where

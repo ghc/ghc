@@ -597,7 +597,7 @@ monad and the particular mapper in use.
 Even specialising to the monad alone made a 20% allocation difference
 in perf/compiler/T5030.
 
-See Note [Specialising foldType] in TyCoRep for more details of this
+See Note [Specialising foldType] in "GHC.Core.TyCo.Rep" for more details of this
 idiom.
 -}
 
@@ -2367,7 +2367,7 @@ nonDetCmpTypesX _   _         []        = GT
 -- | Compare two 'TyCon's. NB: This should /never/ see 'Constraint' (as
 -- recognized by Kind.isConstraintKindCon) which is considered a synonym for
 -- 'Type' in Core.
--- See Note [Kind Constraint and kind Type] in Kind.
+-- See Note [Kind Constraint and kind Type] in "GHC.Core.Type".
 -- See Note [nonDetCmpType nondeterminism]
 nonDetCmpTc :: TyCon -> TyCon -> Ordering
 nonDetCmpTc tc1 tc2

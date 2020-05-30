@@ -289,7 +289,7 @@ Note [Suppressing uniques in OccNames]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This is a hack to de-wobblify the OccNames that contain uniques from
 Template Haskell that have been turned into a string in the OccName.
-See Note [Unique OccNames from Template Haskell] in Convert.hs
+See Note [Unique OccNames from Template Haskell] in "GHC.ThToHs"
 
 ************************************************************************
 *                                                                      *

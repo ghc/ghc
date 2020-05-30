@@ -446,8 +446,8 @@ A TcRhoType has no foralls or contexts at the top, or to the right of an arrow
 
 TyVarDetails gives extra info about type variables, used during type
 checking.  It's attached to mutable type variables only.
-It's knot-tied back to Var.hs.  There is no reason in principle
-why Var.hs shouldn't actually have the definition, but it "belongs" here.
+It's knot-tied back to "GHC.Types.Var".  There is no reason in principle
+why "GHC.Types.Var" shouldn't actually have the definition, but it "belongs" here.
 
 Note [Signature skolems]
 ~~~~~~~~~~~~~~~~~~~~~~~~

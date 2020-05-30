@@ -116,7 +116,7 @@ import Data.Data
 *                                                                      *
 ************************************************************************
 -- These synonyms are here and not in Id because otherwise we need a very
--- large number of SOURCE imports of Id.hs :-(
+-- large number of SOURCE imports of "GHC.Types.Id" :-(
 -}
 
 -- | Identifier
@@ -702,7 +702,7 @@ idDetails (Id { id_details = details }) = details
 idDetails other                         = pprPanic "idDetails" (ppr other)
 
 -- The next three have a 'Var' suffix even though they always build
--- Ids, because Id.hs uses 'mkGlobalId' etc with different types
+-- Ids, because "GHC.Types.Id" uses 'mkGlobalId' etc with different types
 mkGlobalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalVar details name ty info
   = mk_id name ty GlobalId details info
