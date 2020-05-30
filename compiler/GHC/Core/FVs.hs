@@ -482,7 +482,7 @@ idRuleRhsVars is_active id
     get_fvs (Rule { ru_fn = fn, ru_bndrs = bndrs
                   , ru_rhs = rhs, ru_act = act })
       | is_active act
-            -- See Note [Finding rule RHS free vars] in OccAnal.hs
+            -- See Note [Finding rule RHS free vars] in "GHC.Core.Opt.OccurAnal"
       = delOneFromUniqSet_Directly fvs (getUnique fn)
             -- Note [Rule free var hack]
       where

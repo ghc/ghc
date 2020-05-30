@@ -1259,7 +1259,7 @@ cvtLit (BytesPrimL (Bytes fptr off sz)) = do
 cvtLit _ = panic "Convert.cvtLit: Unexpected literal"
         -- cvtLit should not be called on IntegerL, RationalL
         -- That precondition is established right here in
-        -- Convert.hs, hence panic
+        -- "GHC.ThToHs", hence panic
 
 quotedSourceText :: String -> SourceText
 quotedSourceText s = SourceText $ "\"" ++ s ++ "\""
@@ -1657,7 +1657,7 @@ This Convert module then converts the TH AST back to hsSyn AST.
 In order to pretty-print this hsSyn AST, parens need to be adde back at certain
 points so that the code is readable with its original meaning.
 
-So scattered through Convert.hs are various points where parens are added.
+So scattered through "GHC.ThToHs" are various points where parens are added.
 
 See (among other closed issued) https://gitlab.haskell.org/ghc/ghc/issues/14289
 -}

@@ -373,7 +373,7 @@ data AnalEnv
   -- ^ Current approximation of signatures for local ids
   , ae_virgin :: Bool
   -- ^ True only on every first iteration in a fixed-point
-  -- iteration. See Note [Initialising strictness] in "DmdAnal"
+  -- iteration. See Note [Initialising strictness] in "GHC.Core.Opt.DmdAnal"
   , ae_fam_envs :: FamInstEnvs
   -- ^ Needed when expanding type families and synonyms of product types.
   }

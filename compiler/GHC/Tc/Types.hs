@@ -317,7 +317,7 @@ data DsLclEnv = DsLclEnv {
         dsl_meta    :: DsMetaEnv,        -- Template Haskell bindings
         dsl_loc     :: RealSrcSpan,      -- To put in pattern-matching error msgs
 
-        -- See Note [Note [Type and Term Equality Propagation] in Check.hs
+        -- See Note [Note [Type and Term Equality Propagation] in "GHC.HsToCore.PmCheck"
         -- The set of reaching values Deltas is augmented as we walk inwards,
         -- refined through each pattern match in turn
         dsl_deltas  :: Deltas
@@ -1167,7 +1167,7 @@ For (static e) to be valid, we need for every 'x' free in 'e',
 that x's binding is floatable to the top level.  Specifically:
    * x's RhsNames must be empty
    * x's type has no free variables
-See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.hs.
+See Note [Grand plan for static forms] in "GHC.Iface.Tidy.StaticPtrTable".
 This test is made in GHC.Tc.Gen.Expr.checkClosedInStaticForm.
 Actually knowing x's RhsNames (rather than just its emptiness
 or otherwise) is just so we can produce better error messages

@@ -293,7 +293,7 @@ mkHsComp ctxt stmts expr = mkHsDo ctxt (stmts ++ [last_stmt])
 -- restricted to GhcPs because other phases might need a SyntaxExpr
 mkHsIf :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs -> HsExpr GhcPs
 mkHsIf c a b = HsIf True {- this might use rebindable syntax -} noSyntaxExpr c a b
-  -- see Note [Rebindable if] in Hs.Expr
+  -- see Note [Rebindable if] in "GHC.Hs.Expr"
 
 -- restricted to GhcPs because other phases might need a SyntaxExpr
 mkHsCmdIf :: LHsExpr GhcPs -> LHsCmd GhcPs -> LHsCmd GhcPs -> HsCmd GhcPs
@@ -506,7 +506,7 @@ nlHsPar e              = noLoc (HsPar noExtField e)
 
 -- nlHsIf should generate if-expressions which are NOT subject to
 -- RebindableSyntax, so the first field of HsIf is False. (#12080)
--- See Note [Rebindable if] in Hs.Expr
+-- See Note [Rebindable if] in "GHC.Hs.Expr"
 nlHsIf :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
 nlHsIf cond true false = noLoc (HsIf False noSyntaxExpr cond true false)
 

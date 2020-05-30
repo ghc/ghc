@@ -1455,7 +1455,7 @@ maybe_is_tagToEnum_call app
            , isDataTyCon tyc
            = map (getName . dataConWorkId) (tyConDataCons tyc)
            -- NOTE: use the worker name, not the source name of
-           -- the DataCon.  See DataCon.hs for details.
+           -- the DataCon.  See "GHC.Core.DataCon" for details.
            | otherwise
            = pprPanic "maybe_is_tagToEnum_call.extract_constr_Ids" (ppr ty)
 

@@ -870,7 +870,7 @@ mkClosureInfoTableLabel id lf_info
        -- Make the _info pointer for the implicit datacon worker
        -- binding local. The reason we can do this is that importing
        -- code always either uses the _closure or _con_info. By the
-       -- invariants in CorePrep anything else gets eta expanded.
+       -- invariants in "GHC.CoreToStg.Prep" anything else gets eta expanded.
 
 
 thunkEntryLabel :: DynFlags -> Name -> CafInfo -> StandardFormInfo -> Bool -> CLabel

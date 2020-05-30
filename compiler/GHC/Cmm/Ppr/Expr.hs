@@ -253,7 +253,7 @@ pprArea :: Area -> SDoc
 pprArea Old        = text "old"
 pprArea (Young id) = hcat [ text "young<", ppr id, text ">" ]
 
--- needs to be kept in syn with CmmExpr.hs.GlobalReg
+-- needs to be kept in syn with 'GHC.Cmm.Expr.GlobalReg'
 --
 pprGlobalReg :: GlobalReg -> SDoc
 pprGlobalReg gr

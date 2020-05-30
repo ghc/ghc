@@ -1058,7 +1058,7 @@ terminate or throw an imprecise exception, until we have performed @foo x s@.
 So we have to 'deferAfterPreciseException' (which 'lub's with 'exnDmdType' to
 model the exceptional control flow) when @foo x s@ may throw a precise
 exception. Motivated by T13380{d,e,f}.
-See Note [Which scrutinees may throw precise exceptions] in DmdAnal.
+See Note [Which scrutinees may throw precise exceptions] in "GHC.Core.Opt.DmdAnal".
 
 We have to be careful not to discard dead-end Divergence from case
 alternatives, though (#18086):
@@ -1864,7 +1864,7 @@ where f has usage signature
 Then argsOneShots returns a [[OneShotInfo]] of
     [[OneShot,NoOneShotInfo,OneShot],  [OneShot]]
 The occurrence analyser propagates this one-shot infor to the
-binders \pqr and \xyz; see Note [Use one-shot information] in OccurAnal.
+binders \pqr and \xyz; see Note [Use one-shot information] in "GHC.Core.Opt.OccurAnal".
 -}
 
 -- | Returns true if an application to n args would diverge or throw an

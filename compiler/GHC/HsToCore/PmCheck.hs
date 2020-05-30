@@ -510,7 +510,7 @@ translatePat fam_insts x pat = case pat of
     translateConPatOut fam_insts x con arg_tys ex_tvs dicts ps
 
   NPat ty (L _ olit) mb_neg _ -> do
-    -- See Note [Literal short cut] in GHC.HsToCore.Match.Literal.hs
+    -- See Note [Literal short cut] in "GHC.HsToCore.Match.Literal"
     -- We inline the Literal short cut for @ty@ here, because @ty@ is more
     -- precise than the field of OverLitTc, which is all that dsOverLit (which
     -- normally does the literal short cut) can look at. Also @ty@ matches the
@@ -919,7 +919,7 @@ throttle limit old@(MkDeltas old_ds) new@(MkDeltas new_ds)
   | otherwise                                 = (Precise,     new)
 
 -- | Matching on a newtype doesn't force anything.
--- See Note [Divergence of Newtype matches] in Oracle.
+-- See Note [Divergence of Newtype matches] in "GHC.HsToCore.PmCheck.Oracle".
 conMatchForces :: PmAltCon -> Bool
 conMatchForces (PmAltConLike (RealDataCon dc))
   | isNewTyCon (dataConTyCon dc) = False

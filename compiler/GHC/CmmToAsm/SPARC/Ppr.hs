@@ -103,7 +103,7 @@ pprBasicBlock platform info_env (BasicBlock blockid instrs)
 
 
 pprDatas :: Platform -> RawCmmStatics -> SDoc
--- See note [emit-time elimination of static indirections] in CLabel.
+-- See note [emit-time elimination of static indirections] in "GHC.Cmm.CLabel".
 pprDatas _platform (CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l

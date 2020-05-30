@@ -167,8 +167,8 @@ data Ct
        --   * (TyEq:TV) If rhs (perhaps under the cast) is also a tv, then it is oriented
        --     to give best chance of
        --     unification happening; eg if rhs is touchable then lhs is too
-       --     See TcCanonical Note [Canonical orientation for tyvar/tyvar equality constraints]
-       --   * (TyEq:H) The RHS has no blocking coercion holes. See TcCanonical
+       --     See "GHC.Tc.Solver.Canonical" Note [Canonical orientation for tyvar/tyvar equality constraints]
+       --   * (TyEq:H) The RHS has no blocking coercion holes. See "GHC.Tc.Solver.Canonical"
        --     Note [Equalities with incompatible kinds], wrinkle (2)
       cc_ev     :: CtEvidence, -- See Note [Ct/evidence invariant]
       cc_tyvar  :: TcTyVar,
@@ -267,7 +267,7 @@ data CtIrredStatus
   = InsolubleCIS   -- this constraint will never be solved
   | BlockedCIS     -- this constraint is blocked on a coercion hole
                    -- The hole will appear in the ctEvPred of the constraint with this status
-                   -- See Note [Equalities with incompatible kinds] in TcCanonical
+                   -- See Note [Equalities with incompatible kinds] in "GHC.Tc.Solver.Canonical"
                    -- Wrinkle (4a)
   | OtherCIS
 

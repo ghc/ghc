@@ -1478,7 +1478,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                 (spec_inl_prag, spec_unf)
                   | not is_local && isStrongLoopBreaker (idOccInfo fn)
                   = (neverInlinePragma, noUnfolding)
-                        -- See Note [Specialising imported functions] in OccurAnal
+                        -- See Note [Specialising imported functions] in "GHC.Core.Opt.OccurAnal"
 
                   | InlinePragma { inl_inline = Inlinable } <- inl_prag
                   = (inl_prag { inl_inline = NoUserInline }, noUnfolding)

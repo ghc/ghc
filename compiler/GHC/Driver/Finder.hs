@@ -349,7 +349,7 @@ findPackageModule hsc_env mod = do
 -- | Look up the interface file associated with module @mod@.  This function
 -- requires a few invariants to be upheld: (1) the 'Module' in question must
 -- be the module identifier of the *original* implementation of a module,
--- not a reexport (this invariant is upheld by @Packages.hs@) and (2)
+-- not a reexport (this invariant is upheld by "GHC.Unit.State") and (2)
 -- the 'UnitInfo' must be consistent with the unit id in the 'Module'.
 -- The redundancy is to avoid an extra lookup in the package state
 -- for the appropriate config.

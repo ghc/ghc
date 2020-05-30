@@ -225,7 +225,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
         id_dmds                  = addCaseBndrDmd case_bndr_dmd dmds
         fam_envs                 = ae_fam_envs env
         alt_ty3
-          -- See Note [Precise exceptions and strictness analysis] in Demand
+          -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
           | exprMayThrowPreciseException fam_envs scrut
           = deferAfterPreciseException alt_ty2
           | otherwise
@@ -259,7 +259,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty alts)
                                --     when there really are no alternatives
         fam_envs             = ae_fam_envs env
         alt_ty2
-          -- See Note [Precise exceptions and strictness analysis] in Demand
+          -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
           | exprMayThrowPreciseException fam_envs scrut
           = deferAfterPreciseException alt_ty
           | otherwise

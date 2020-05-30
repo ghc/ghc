@@ -1047,8 +1047,8 @@ Note [Floating applications to coercions]
 We don’t float out variables applied only to type arguments, since the
 extra binding would be pointless: type arguments are completely erased.
 But *coercion* arguments aren’t (see Note [Coercion tokens] in
-CoreToStg.hs and Note [Count coercion arguments in boring contexts] in
-CoreUnfold.hs), so we still want to float out variables applied only to
+"GHC.CoreToStg" and Note [Count coercion arguments in boring contexts] in
+"GHC.Core.Unfold"), so we still want to float out variables applied only to
 coercion arguments.
 
 Note [Escaping a value lambda]

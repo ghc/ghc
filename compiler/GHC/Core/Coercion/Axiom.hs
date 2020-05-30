@@ -448,7 +448,7 @@ See also:
 * Note [Newtype eta] in GHC.Core.TyCon.  This is notionally separate
   and deals with the axiom connecting a newtype with its representation
   type; but it too is eta-reduced.
-* Note [Implementing eta reduction for data families] in TcInstDcls. This
+* Note [Implementing eta reduction for data families] in "GHC.Tc.TyCl.Instance". This
   describes the implementation details of this eta reduction happen.
 -}
 

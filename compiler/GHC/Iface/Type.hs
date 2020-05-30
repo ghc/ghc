@@ -129,8 +129,8 @@ ifaceBndrType (IfaceTvBndr (_, t)) = t
 
 type IfaceLamBndr = (IfaceBndr, IfaceOneShot)
 
-data IfaceOneShot    -- See Note [Preserve OneShotInfo] in CoreTicy
-  = IfaceNoOneShot   -- and Note [The oneShot function] in GHC.Types.Id.Make
+data IfaceOneShot    -- See Note [Preserve OneShotInfo] in "GHC.Core.Tidy"
+  = IfaceNoOneShot   -- and Note [The oneShot function] in "GHC.Types.Id.Make"
   | IfaceOneShot
 
 
@@ -1273,7 +1273,7 @@ pprSpaceIfPromotedTyCon (IfaceTyConApp tyCon _)
 pprSpaceIfPromotedTyCon _
   = id
 
--- See equivalent function in GHC.Core.TyCo.Rep.hs
+-- See equivalent function in "GHC.Core.TyCo.Rep"
 pprIfaceTyList :: PprPrec -> IfaceType -> IfaceType -> SDoc
 -- Given a type-level list (t1 ': t2), see if we can print
 -- it in list notation [t1, ...].

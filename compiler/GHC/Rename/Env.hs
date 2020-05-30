@@ -167,7 +167,7 @@ newTopSrcBinder (L loc rdr_name)
          ; unless (this_mod == nameModule name)
                   (addErrAt loc (badOrigBinding rdr_name))
          ; return name }
-    else   -- See Note [Binders in Template Haskell] in Convert.hs
+    else   -- See Note [Binders in Template Haskell] in "GHC.ThToHs"
       do { this_mod <- getModule
          ; externaliseName this_mod name }
 

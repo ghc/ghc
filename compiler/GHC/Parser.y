@@ -3853,7 +3853,7 @@ getPRIMSTRINGs  (L _ (ITprimstring src _)) = src
 getPRIMINTEGERs (L _ (ITprimint    src _)) = src
 getPRIMWORDs    (L _ (ITprimword   src _)) = src
 
--- See Note [Pragma source text] in BasicTypes for the following
+-- See Note [Pragma source text] in "GHC.Types.Basic" for the following
 getINLINE_PRAGs       (L _ (ITinline_prag       src _ _)) = src
 getSPEC_PRAGs         (L _ (ITspec_prag         src))     = src
 getSPEC_INLINE_PRAGs  (L _ (ITspec_inline_prag  src _))   = src

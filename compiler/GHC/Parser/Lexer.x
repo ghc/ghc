@@ -724,7 +724,7 @@ data Token
   | ITdependency
   | ITrequires
 
-  -- Pragmas, see  note [Pragma source text] in BasicTypes
+  -- Pragmas, see  note [Pragma source text] in "GHC.Types.Basic"
   | ITinline_prag       SourceText InlineSpec RuleMatchInfo
   | ITspec_prag         SourceText                -- SPECIALISE
   | ITspec_inline_prag  SourceText Bool    -- SPECIALISE INLINE (or NOINLINE)
@@ -803,15 +803,15 @@ data Token
   | ITdupipvarid   FastString   -- GHC extension: implicit param: ?x
   | ITlabelvarid   FastString   -- Overloaded label: #x
 
-  | ITchar     SourceText Char       -- Note [Literal source text] in BasicTypes
-  | ITstring   SourceText FastString -- Note [Literal source text] in BasicTypes
-  | ITinteger  IntegralLit           -- Note [Literal source text] in BasicTypes
+  | ITchar     SourceText Char       -- Note [Literal source text] in "GHC.Types.Basic"
+  | ITstring   SourceText FastString -- Note [Literal source text] in "GHC.Types.Basic"
+  | ITinteger  IntegralLit           -- Note [Literal source text] in "GHC.Types.Basic"
   | ITrational FractionalLit
 
-  | ITprimchar   SourceText Char     -- Note [Literal source text] in BasicTypes
-  | ITprimstring SourceText ByteString -- Note [Literal source text] @BasicTypes
-  | ITprimint    SourceText Integer  -- Note [Literal source text] in BasicTypes
-  | ITprimword   SourceText Integer  -- Note [Literal source text] in BasicTypes
+  | ITprimchar   SourceText Char     -- Note [Literal source text] in "GHC.Types.Basic"
+  | ITprimstring SourceText ByteString -- Note [Literal source text] in "GHC.Types.Basic"
+  | ITprimint    SourceText Integer  -- Note [Literal source text] in "GHC.Types.Basic"
+  | ITprimword   SourceText Integer  -- Note [Literal source text] in "GHC.Types.Basic"
   | ITprimfloat  FractionalLit
   | ITprimdouble FractionalLit
 

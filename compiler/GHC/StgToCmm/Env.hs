@@ -136,7 +136,7 @@ getCgIdInfo id
               let ext_lbl
                       | isUnliftedType (idType id) =
                           -- An unlifted external Id must refer to a top-level
-                          -- string literal. See Note [Bytes label] in CLabel.
+                          -- string literal. See Note [Bytes label] in "GHC.Cmm.CLabel".
                           ASSERT( idType id `eqType` addrPrimTy )
                           mkBytesLabel name
                       | otherwise = mkClosureLabel name $ idCafInfo id

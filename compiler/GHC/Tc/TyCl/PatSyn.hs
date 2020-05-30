@@ -408,7 +408,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        ; let skol_info = SigSkol (PatSynCtxt name) pat_ty []
                          -- The type here is a bit bogus, but we do not print
                          -- the type for PatSynCtxt, so it doesn't matter
-                         -- See Note [Skolem info for pattern synonyms] in Origin
+                         -- See Note [Skolem info for pattern synonyms] in "GHC.Tc.Types.Origin"
        ; (implics, ev_binds) <- buildImplicationFor tclvl skol_info univ_tvs req_dicts wanted
 
        -- Solve the constraints now, because we are about to make a PatSyn,

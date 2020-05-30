@@ -126,7 +126,7 @@ import GHC.Tc.Errors.Hole.FitTypes
 
 import qualified Language.Haskell.TH as TH
 
-{- This instance is defined outside GHC.Core.Opt.Monad.hs so that
+{- This instance is defined outside GHC.Core.Opt.Monad so that
    GHC.Core.Opt.Monad does not depend on GHC.Tc.Utils.Env -}
 instance MonadThings CoreM where
     lookupThing name = do { hsc_env <- getHscEnv

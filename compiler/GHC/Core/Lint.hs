@@ -163,7 +163,7 @@ Note [Linting type lets]
 In the desugarer, it's very very convenient to be able to say (in effect)
         let a = Type Bool in
         let x::a = True in <body>
-That is, use a type let.   See Note [Type let] in CoreSyn.
+That is, use a type let.   See Note [Type let] in "GHC.Core".
 One place it is used is in mkWwArgs; see Note [Join points and beta-redexes]
 in GHC.Core.Opt.WorkWrap.Utils.  (Maybe there are other "clients" of this feature; I'm not sure).
 
@@ -468,7 +468,7 @@ lintCoreBindings dflags pass local_in_scope binds
     all_pairs = flattenBinds binds
      -- Put all the top-level binders in scope at the start
      -- This is because rewrite rules can bring something
-     -- into use 'unexpectedly'; see Note [Glomming] in OccurAnal
+     -- into use 'unexpectedly'; see Note [Glomming] in "GHC.Core.Opt.OccurAnal"
     binders = map fst all_pairs
 
     flags = defaultLintFlags
@@ -1834,7 +1834,7 @@ conceivably we could allow it. But we can always eta-expand such an
 "undersaturated" rule (see 'GHC.Core.Opt.Arity.etaExpandToJoinPointRule'), and in fact
 the simplifier would have to in order to deal with the RHS. So we take a
 conservative view and don't allow undersaturated rules for join points. See
-Note [Rules and join points] in OccurAnal for further discussion.
+Note [Rules and join points] in "GHC.Core.Opt.OccurAnal" for further discussion.
 -}
 
 {-

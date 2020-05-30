@@ -528,7 +528,7 @@ data RuleInfo
         DVarSet         -- Locally-defined free vars of *both* LHS and RHS
                         -- of rules.  I don't think it needs to include the
                         -- ru_fn though.
-                        -- Note [Rule dependency info] in OccurAnal
+                        -- Note [Rule dependency info] in "GHC.Core.Opt.OccurAnal"
 
 -- | Assume that no specializations exist: always safe
 emptyRuleInfo :: RuleInfo

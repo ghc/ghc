@@ -836,8 +836,8 @@ newRecordSelector overload_ok (dc:_) (L loc (FieldOcc _ (L _ fld)))
               -- of an already renamer-resolved field and its use
               -- sites. This is needed to correctly support record
               -- selectors in Template Haskell. See Note [Binders in
-              -- Template Haskell] in Convert.hs and Note [Looking up
-              -- Exact RdrNames] in GHC.Rename.Env.
+              -- Template Haskell] in "GHC.ThToHs" and Note [Looking up
+              -- Exact RdrNames] in "GHC.Rename.Env".
           | otherwise   = mkRdrUnqual (flSelector qualFieldLbl)
 
 {-
