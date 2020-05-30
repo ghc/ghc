@@ -519,16 +519,22 @@ cmpStringPrefix ptr1 ptr2 len =
  do r <- memcmp ptr1 ptr2 len
     return (r == 0)
 
-
 hashStr  :: Ptr Word8 -> Int -> Int
  -- use the Addr to produce a hash value between 0 & m (inclusive)
 hashStr (Ptr a#) (I# len#) = loop 0# 0#
-   where
-    loop h n | isTrue# (n ==# len#) = I# h
-             | otherwise  = loop h2 (n +# 1#)
-          where
-            !c = ord# (indexCharOffAddr# a# n)
-            !h2 = (h *# 16777619#) `xorI#` c
+  where
+    loop h n =
+      if isTrue# (n ==# len#) then
+        I# h
+      else
+        let
+          -- DO NOT move this let binding! indexCharOffAddr# reads from the
+          -- pointer so we need to evaluate this based on the length check
+          -- above. Not doing this right caused #17909.
+          !c = ord# (indexCharOffAddr# a# n)
+          !h2 = (h *# 16777619#) `xorI#` c
+        in
+          loop h2 (n +# 1#)
 
 -- -----------------------------------------------------------------------------
 -- Operations
