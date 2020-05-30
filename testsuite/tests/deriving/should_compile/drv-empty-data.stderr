@@ -46,7 +46,9 @@ Derived class instances:
   instance Language.Haskell.TH.Syntax.Lift
              (DrvEmptyData.Void a) where
     Language.Haskell.TH.Syntax.lift z = GHC.Base.pure (case z of)
-    Language.Haskell.TH.Syntax.liftTyped z = GHC.Base.pure (case z of)
+    Language.Haskell.TH.Syntax.liftTyped z
+      = Language.Haskell.TH.Syntax.unsafeCodeCoerce
+          (GHC.Base.pure (case z of))
   
   DrvEmptyData.$tVoid :: Data.Data.DataType
   DrvEmptyData.$tVoid = Data.Data.mkDataType "Void" []
@@ -64,130 +66,137 @@ Derived type family instances:
 
 
 ==================== Filling in method body ====================
-GHC.Read.Read [DrvEmptyData.Void a[ssk:2]]
+GHC.Read.Read [DrvEmptyData.Void a[ssk:1]]
   GHC.Read.readsPrec = GHC.Read.$dmreadsPrec
-                         @(DrvEmptyData.Void a[ssk:2])
+                         @(DrvEmptyData.Void a[ssk:1])
 
 
 
 ==================== Filling in method body ====================
-GHC.Show.Show [DrvEmptyData.Void a[ssk:2]]
-  GHC.Show.show = GHC.Show.$dmshow @(DrvEmptyData.Void a[ssk:2])
+GHC.Show.Show [DrvEmptyData.Void a[ssk:1]]
+  GHC.Show.show = GHC.Show.$dmshow @(DrvEmptyData.Void a[ssk:1])
 
 
 
 ==================== Filling in method body ====================
-GHC.Show.Show [DrvEmptyData.Void a[ssk:2]]
+GHC.Show.Show [DrvEmptyData.Void a[ssk:1]]
   GHC.Show.showList = GHC.Show.$dmshowList
-                        @(DrvEmptyData.Void a[ssk:2])
+                        @(DrvEmptyData.Void a[ssk:1])
 
 
 
 ==================== Filling in method body ====================
-GHC.Classes.Ord [DrvEmptyData.Void a[ssk:2]]
-  GHC.Classes.< = GHC.Classes.$dm< @(DrvEmptyData.Void a[ssk:2])
+GHC.Classes.Ord [DrvEmptyData.Void a[ssk:1]]
+  GHC.Classes.< = GHC.Classes.$dm< @(DrvEmptyData.Void a[ssk:1])
 
 
 
 ==================== Filling in method body ====================
-GHC.Classes.Ord [DrvEmptyData.Void a[ssk:2]]
-  GHC.Classes.<= = GHC.Classes.$dm<= @(DrvEmptyData.Void a[ssk:2])
+GHC.Classes.Ord [DrvEmptyData.Void a[ssk:1]]
+  GHC.Classes.<= = GHC.Classes.$dm<= @(DrvEmptyData.Void a[ssk:1])
 
 
 
 ==================== Filling in method body ====================
-GHC.Classes.Ord [DrvEmptyData.Void a[ssk:2]]
-  GHC.Classes.> = GHC.Classes.$dm> @(DrvEmptyData.Void a[ssk:2])
+GHC.Classes.Ord [DrvEmptyData.Void a[ssk:1]]
+  GHC.Classes.> = GHC.Classes.$dm> @(DrvEmptyData.Void a[ssk:1])
 
 
 
 ==================== Filling in method body ====================
-GHC.Classes.Ord [DrvEmptyData.Void a[ssk:2]]
-  GHC.Classes.>= = GHC.Classes.$dm>= @(DrvEmptyData.Void a[ssk:2])
+GHC.Classes.Ord [DrvEmptyData.Void a[ssk:1]]
+  GHC.Classes.>= = GHC.Classes.$dm>= @(DrvEmptyData.Void a[ssk:1])
 
 
 
 ==================== Filling in method body ====================
-GHC.Classes.Ord [DrvEmptyData.Void a[ssk:2]]
-  GHC.Classes.max = GHC.Classes.$dmmax @(DrvEmptyData.Void a[ssk:2])
+GHC.Classes.Ord [DrvEmptyData.Void a[ssk:1]]
+  GHC.Classes.max = GHC.Classes.$dmmax @(DrvEmptyData.Void a[ssk:1])
 
 
 
 ==================== Filling in method body ====================
-GHC.Classes.Ord [DrvEmptyData.Void a[ssk:2]]
-  GHC.Classes.min = GHC.Classes.$dmmin @(DrvEmptyData.Void a[ssk:2])
+GHC.Classes.Ord [DrvEmptyData.Void a[ssk:1]]
+  GHC.Classes.min = GHC.Classes.$dmmin @(DrvEmptyData.Void a[ssk:1])
 
 
 
 ==================== Filling in method body ====================
-GHC.Classes.Eq [DrvEmptyData.Void a[ssk:2]]
-  GHC.Classes./= = GHC.Classes.$dm/= @(DrvEmptyData.Void a[ssk:2])
+GHC.Classes.Eq [DrvEmptyData.Void a[ssk:1]]
+  GHC.Classes./= = GHC.Classes.$dm/= @(DrvEmptyData.Void a[ssk:1])
 
 
 
 ==================== Filling in method body ====================
-Data.Data.Data [DrvEmptyData.Void a[ssk:2]]
+Data.Data.Data [DrvEmptyData.Void a[ssk:1]]
   Data.Data.dataCast2 = Data.Data.$dmdataCast2
-                          @(DrvEmptyData.Void a[ssk:2])
+                          @(DrvEmptyData.Void a[ssk:1])
 
 
 
 ==================== Filling in method body ====================
-Data.Data.Data [DrvEmptyData.Void a[ssk:2]]
-  Data.Data.gmapT = Data.Data.$dmgmapT @(DrvEmptyData.Void a[ssk:2])
+Data.Data.Data [DrvEmptyData.Void a[ssk:1]]
+  Data.Data.gmapT = Data.Data.$dmgmapT @(DrvEmptyData.Void a[ssk:1])
 
 
 
 ==================== Filling in method body ====================
-Data.Data.Data [DrvEmptyData.Void a[ssk:2]]
+Data.Data.Data [DrvEmptyData.Void a[ssk:1]]
   Data.Data.gmapQl = Data.Data.$dmgmapQl
-                       @(DrvEmptyData.Void a[ssk:2])
+                       @(DrvEmptyData.Void a[ssk:1])
 
 
 
 ==================== Filling in method body ====================
-Data.Data.Data [DrvEmptyData.Void a[ssk:2]]
+Data.Data.Data [DrvEmptyData.Void a[ssk:1]]
   Data.Data.gmapQr = Data.Data.$dmgmapQr
-                       @(DrvEmptyData.Void a[ssk:2])
+                       @(DrvEmptyData.Void a[ssk:1])
 
 
 
 ==================== Filling in method body ====================
-Data.Data.Data [DrvEmptyData.Void a[ssk:2]]
-  Data.Data.gmapQ = Data.Data.$dmgmapQ @(DrvEmptyData.Void a[ssk:2])
+Data.Data.Data [DrvEmptyData.Void a[ssk:1]]
+  Data.Data.gmapQ = Data.Data.$dmgmapQ @(DrvEmptyData.Void a[ssk:1])
 
 
 
 ==================== Filling in method body ====================
-Data.Data.Data [DrvEmptyData.Void a[ssk:2]]
+Data.Data.Data [DrvEmptyData.Void a[ssk:1]]
   Data.Data.gmapQi = Data.Data.$dmgmapQi
-                       @(DrvEmptyData.Void a[ssk:2])
+                       @(DrvEmptyData.Void a[ssk:1])
 
 
 
 ==================== Filling in method body ====================
-Data.Data.Data [DrvEmptyData.Void a[ssk:2]]
-  Data.Data.gmapM = Data.Data.$dmgmapM @(DrvEmptyData.Void a[ssk:2])
+Data.Data.Data [DrvEmptyData.Void a[ssk:1]]
+  Data.Data.gmapM = Data.Data.$dmgmapM @(DrvEmptyData.Void a[ssk:1])
 
 
 
 ==================== Filling in method body ====================
-Data.Data.Data [DrvEmptyData.Void a[ssk:2]]
+Data.Data.Data [DrvEmptyData.Void a[ssk:1]]
   Data.Data.gmapMp = Data.Data.$dmgmapMp
-                       @(DrvEmptyData.Void a[ssk:2])
+                       @(DrvEmptyData.Void a[ssk:1])
 
 
 
 ==================== Filling in method body ====================
-Data.Data.Data [DrvEmptyData.Void a[ssk:2]]
+Data.Data.Data [DrvEmptyData.Void a[ssk:1]]
   Data.Data.gmapMo = Data.Data.$dmgmapMo
-                       @(DrvEmptyData.Void a[ssk:2])
+                       @(DrvEmptyData.Void a[ssk:1])
 
 
 
 ==================== Filling in method body ====================
 Data.Foldable.Foldable [DrvEmptyData.Void]
   Data.Foldable.fold = Data.Foldable.$dmfold @(DrvEmptyData.Void)
+
+
+
+==================== Filling in method body ====================
+Data.Foldable.Foldable [DrvEmptyData.Void]
+  Data.Foldable.foldMap' = Data.Foldable.$dmfoldMap'
+                             @(DrvEmptyData.Void)
 
 
 

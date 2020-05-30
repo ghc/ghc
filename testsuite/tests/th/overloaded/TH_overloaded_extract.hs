@@ -19,5 +19,5 @@ main = do
   print $ runIdentity [d| data Foo = Foo |]
   print $ runIdentity [p| () |]
   print $ runIdentity [t| [Int] |]
-  print $ unType $ runIdentity [|| (+1) ||]
+  print $ runIdentity $ unTypeCode [|| (+1) ||]
 
