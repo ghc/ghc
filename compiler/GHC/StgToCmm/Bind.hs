@@ -82,7 +82,7 @@ cgTopRhsClosure dflags rec id ccs upd_flag args body =
   -- shortcutting the whole process, and generating a lot less code
   -- (#7308). Eventually the IND_STATIC closure will be eliminated
   -- by assembly '.equiv' directives, where possible (#15155).
-  -- See note [emit-time elimination of static indirections] in CLabel.
+  -- See note [emit-time elimination of static indirections] in "GHC.Cmm.CLabel".
   --
   -- Note: we omit the optimisation when this binding is part of a
   -- recursive group, because the optimisation would inhibit the black
@@ -206,7 +206,7 @@ cgRhs id (StgRhsCon cc con args)
       -- con args are always non-void,
       -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
 
-{- See Note [GC recovery] in compiler/GHC.StgToCmm/Closure.hs -}
+{- See Note [GC recovery] in "GHC.StgToCmm.Closure" -}
 cgRhs id (StgRhsClosure fvs cc upd_flag args body)
   = do dflags <- getDynFlags
        mkRhsClosure dflags id cc (nonVoidIds (dVarSetElems fvs)) upd_flag args body

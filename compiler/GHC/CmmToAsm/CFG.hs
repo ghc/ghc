@@ -251,7 +251,7 @@ filterEdges f cfg =
 See Note [What is shortcutting] in the control flow optimization
 code (GHC.Cmm.ContFlowOpt) for a slightly more in depth explanation on shortcutting.
 
-In the native backend we shortcut jumps at the assembly level. (AsmCodeGen.hs)
+In the native backend we shortcut jumps at the assembly level. ("GHC.CmmToAsm")
 This means we remove blocks containing only one jump from the code
 and instead redirecting all jumps targeting this block to the deleted
 blocks jump target.

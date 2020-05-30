@@ -1538,7 +1538,7 @@ data UnfoldingSource
 
   | InlineCompulsory   -- Something that *has* no binding, so you *must* inline it
                        -- Only a few primop-like things have this property
-                       -- (see MkId.hs, calls to mkCompulsoryUnfolding).
+                       -- (see "GHC.Types.Id.Make", calls to mkCompulsoryUnfolding).
                        -- Inline absolutely always, however boring the context.
 
 

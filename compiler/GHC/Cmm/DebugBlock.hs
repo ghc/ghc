@@ -395,7 +395,7 @@ The flow of unwinding information through the compiler is a bit convoluted:
    (by the Dwarf module) and emitted in the final object.
 
 See also:
-  Note [Unwinding information in the NCG] in AsmCodeGen,
+  Note [Unwinding information in the NCG] in "GHC.CmmToAsm",
   Note [Unwind pseudo-instruction in Cmm],
   Note [Debugging DWARF unwinding info].
 
@@ -460,7 +460,7 @@ symbols for gdb if you obtain it through a package manager.
 
 Keep in mind that the current release of GDB has an instruction pointer handling
 heuristic that works well for C-like languages, but doesn't always work for
-Haskell. See Note [Info Offset] in Dwarf.Types for more details.
+Haskell. See Note [Info Offset] in "GHC.CmmToAsm.Dwarf.Types" for more details.
 
 Note [Unwind pseudo-instruction in Cmm]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1018,7 +1018,7 @@ rep_ty_sig mk_sig loc sig_ty nm
 rep_patsyn_ty_sig :: SrcSpan -> LHsSigType GhcRn -> Located Name
                   -> MetaM (SrcSpan, Core (M TH.Dec))
 -- represents a pattern synonym type signature;
--- see Note [Pattern synonym type signatures and Template Haskell] in Convert
+-- see Note [Pattern synonym type signatures and Template Haskell] in "GHC.ThToHs"
 --
 -- Don't create the implicit and explicit variables when desugaring signatures,
 -- see Note [Scoped type variables in class and instance declarations]

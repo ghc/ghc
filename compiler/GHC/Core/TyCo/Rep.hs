@@ -107,7 +107,7 @@ Despite the fact that DataCon has to be imported via a hi-boot route,
 this module seems the right place for TyThing, because it's needed for
 funTyCon and all the types in GHC.Builtin.Types.Prim.
 
-It is also SOURCE-imported into Name.hs
+It is also SOURCE-imported into "GHC.Types.Name"
 
 
 Note [ATyCon for classes]

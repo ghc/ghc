@@ -1822,7 +1822,7 @@ kickOutAfterUnification new_tv
        ; setInertCans ics2
        ; return n_kicked }
 
--- See Wrinkle (2b) in Note [Equalities with incompatible kinds] in TcCanonical
+-- See Wrinkle (2b) in Note [Equalities with incompatible kinds] in "GHC.Tc.Solver.Canonical"
 kickOutAfterFillingCoercionHole :: CoercionHole -> TcS ()
 kickOutAfterFillingCoercionHole hole
   = do { ics <- getInertCans
@@ -3232,7 +3232,7 @@ newFlattenSkolem flav loc tc xis
       | otherwise  -- Generate a [WD] for both Wanted and Derived
                    -- See Note [No Derived CFunEqCans]
       = do { fmv <- wrapTcS (TcM.newFmvTyVar fam_ty)
-              -- See (2a) in TcCanonical
+              -- See (2a) in "GHC.Tc.Solver.Canonical"
               -- Note [Equalities with incompatible kinds]
            ; (ev, hole_co) <- newWantedEq_SI NoBlockSubst WDeriv loc Nominal
                                              fam_ty (mkTyVarTy fmv)
