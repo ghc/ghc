@@ -165,7 +165,9 @@ static bool scheduleHandleThreadFinished( Capability *cap, Task *task,
                                           StgTSO *t );
 static bool scheduleNeedHeapProfile(bool ready_to_gc);
 static void scheduleDoGC( Capability **pcap, Task *task,
-                          bool force_major, bool deadlock_detect );
+                          bool force_major,
+                          bool deadlock_detect,
+                          bool force_nonconcurrent );
 
 static void deleteThread (StgTSO *tso);
 static void deleteAllThreads (void);
@@ -265,7 +267,7 @@ schedule (Capability *initialCapability, Task *task)
     case SCHED_INTERRUPTING:
         debugTrace(DEBUG_sched, "SCHED_INTERRUPTING");
         /* scheduleDoGC() deletes all the threads */
-        scheduleDoGC(&cap,task,true,false);
+        scheduleDoGC(&cap, task, true, false, false);
 
         // after scheduleDoGC(), we must be shutting down.  Either some
         // other Capability did the final GC, or we did it above,
@@ -562,7 +564,7 @@ run_thread:
     }
 
     if (ready_to_gc || scheduleNeedHeapProfile(ready_to_gc)) {
-      scheduleDoGC(&cap,task,false,false);
+      scheduleDoGC(&cap, task, false, false, false);
     }
   } /* end of while() */
 }
@@ -936,7 +938,10 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
         // they are unreachable and will therefore be sent an
         // exception.  Any threads thus released will be immediately
         // runnable.
-        scheduleDoGC (pcap, task, true/*force major GC*/, true/*deadlock detection*/);
+        scheduleDoGC (pcap, task,
+                      true/*force major GC*/,
+                      true/*deadlock detection*/,
+                      false/*force_nonconcurrent*/);
         cap = *pcap;
         // when force_major == true. scheduleDoGC sets
         // recent_activity to ACTIVITY_DONE_GC and turns off the timer
@@ -1557,7 +1562,7 @@ void releaseAllCapabilities(uint32_t n, Capability *keep_cap, Task *task)
 // behind deadlock_detect argument.
 static void
 scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
-              bool force_major, bool deadlock_detect)
+              bool force_major, bool deadlock_detect, bool force_nonconcurrent)
 {
     Capability *cap = *pcap;
     bool heap_census;
@@ -2775,7 +2780,7 @@ void markScheduler (evac_fn evac USED_IF_NOT_THREADS,
    -------------------------------------------------------------------------- */
 
 static void
-performGC_(bool force_major)
+performGC_(bool force_major, bool force_nonconcurrent)
 {
     Task *task;
     Capability *cap = NULL;
@@ -2788,7 +2793,7 @@ performGC_(bool force_major)
     // TODO: do we need to traceTask*() here?
 
     waitForCapability(&cap,task);
-    scheduleDoGC(&cap,task,force_major,false);
+    scheduleDoGC(&cap, task, force_major, false, force_nonconcurrent);
     releaseCapability(cap);
     boundTaskExiting(task);
 }
@@ -2796,13 +2801,19 @@ performGC_(bool force_major)
 void
 performGC(void)
 {
-    performGC_(false);
+    performGC_(false, false);
 }
 
 void
 performMajorGC(void)
 {
-    performGC_(true);
+    performGC_(true, false);
+}
+
+void
+performBlockingMajorGC(void)
+{
+    performGC_(true, true);
 }
 
 /* ---------------------------------------------------------------------------

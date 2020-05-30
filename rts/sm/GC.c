@@ -196,6 +196,7 @@ void
 GarbageCollect (uint32_t collect_gen,
                 const bool do_heap_census,
                 const bool deadlock_detect,
+                const bool force_nonconcurrent,
                 uint32_t gc_type USED_IF_THREADS,
                 Capability *cap,
                 bool idle_cap[])
@@ -779,7 +780,7 @@ GarbageCollect (uint32_t collect_gen,
       // upd_rem_set
       nonmovingAddUpdRemSetBlocks(&gct->cap->upd_rem_set.queue);
 #endif
-      nonmovingCollect(&dead_weak_ptr_list, &resurrected_threads);
+      nonmovingCollect(&dead_weak_ptr_list, &resurrected_threads, force_nonconcurrent);
       ACQUIRE_SM_LOCK;
   }
 

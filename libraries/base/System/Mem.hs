@@ -3,7 +3,7 @@
 -- Module      :  System.Mem
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  provisional
 -- Portability :  portable
@@ -19,6 +19,7 @@ module System.Mem
        (
        -- * Garbage collection
          performGC
+       , performBlockingMajorGC
        , performMajorGC
        , performMinorGC
 
@@ -34,6 +35,12 @@ import GHC.Conc.Sync
 -- | Triggers an immediate major garbage collection.
 performGC :: IO ()
 performGC = performMajorGC
+
+-- | Triggers an immediate major garbage collection, ensuring that collection
+-- finishes before returning.
+--
+-- @since 4.15.0.0
+foreign import ccall "performBlockingMajorGC" performBlockingMajorGC :: IO ()
 
 -- | Triggers an immediate major garbage collection.
 --

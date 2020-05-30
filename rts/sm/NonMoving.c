@@ -900,7 +900,9 @@ static void nonmovingMarkWeakPtrList(MarkQueue *mark_queue, StgWeak *dead_weak_p
     }
 }
 
-void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
+void nonmovingCollect(StgWeak **dead_weaks,
+                      StgTSO **resurrected_threads,
+                      bool force_nonmoving)
 {
 #if defined(THREADED_RTS)
     // We can't start a new collection until the old one has finished
@@ -979,7 +981,7 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
     // again for the sync if we let it go, because it'll immediately start doing
     // a major GC, because that's what we do when exiting scheduler (see
     // exitScheduler()).
-    if (sched_state == SCHED_RUNNING) {
+    if (sched_state == SCHED_RUNNING && !force_nonconcurrent) {
         concurrent_coll_running = true;
         nonmoving_write_barrier_enabled = true;
         debugTrace(DEBUG_nonmoving_gc, "Starting concurrent mark thread");
