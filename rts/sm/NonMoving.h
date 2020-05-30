@@ -126,7 +126,8 @@ void nonmovingExit(void);
 //   directly, but in a pause.
 //
 void nonmovingCollect(StgWeak **dead_weaks,
-                       StgTSO **resurrected_threads);
+                      StgTSO **resurrected_threads,
+                      bool force_nonmoving);
 
 void *nonmovingAllocate(Capability *cap, StgWord sz);
 void nonmovingAddCapabilities(uint32_t new_n_caps);

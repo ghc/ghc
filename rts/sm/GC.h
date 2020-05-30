@@ -20,6 +20,7 @@
 void GarbageCollect (uint32_t collect_gen,
                      bool do_heap_census,
                      bool deadlock_detect,
+                     bool force_nonconcurrent,
                      uint32_t gc_type,
                      Capability *cap,
                      bool idle_cap[]);
