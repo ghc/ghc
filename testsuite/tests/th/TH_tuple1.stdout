@@ -1,10 +1,10 @@
 SigE (AppE (AppE (ConE GHC.Tuple.(,)) (LitE (IntegerL 1))) (LitE (IntegerL 2))) (AppT (AppT (ConT GHC.Tuple.(,)) (ConT GHC.Integer.Type.Integer)) (ConT GHC.Integer.Type.Integer))
 GHC.Tuple.(,) 1 2 :: GHC.Tuple.(,) GHC.Integer.Type.Integer
                                    GHC.Integer.Type.Integer
-SigE (AppE (ConE GHC.Tuple.Unit) (LitE (IntegerL 1))) (AppT (ConT GHC.Tuple.Unit) (ConT GHC.Integer.Type.Integer))
-GHC.Tuple.Unit 1 :: GHC.Tuple.Unit GHC.Integer.Type.Integer
+SigE (AppE (ConE GHC.Tuple.Solo) (LitE (IntegerL 1))) (AppT (ConT GHC.Tuple.Solo) (ConT GHC.Integer.Type.Integer))
+GHC.Tuple.Solo 1 :: GHC.Tuple.Solo GHC.Integer.Type.Integer
 SigE (AppE (AppE (ConE GHC.Tuple.(#,#)) (LitE (IntegerL 1))) (LitE (IntegerL 2))) (AppT (AppT (ConT GHC.Tuple.(#,#)) (ConT GHC.Integer.Type.Integer)) (ConT GHC.Integer.Type.Integer))
 GHC.Tuple.(#,#) 1 2 :: GHC.Tuple.(#,#) GHC.Integer.Type.Integer
                                        GHC.Integer.Type.Integer
-SigE (AppE (ConE GHC.Tuple.Unit#) (LitE (IntegerL 1))) (AppT (ConT GHC.Tuple.Unit#) (ConT GHC.Integer.Type.Integer))
-GHC.Tuple.Unit# 1 :: GHC.Tuple.Unit# GHC.Integer.Type.Integer
+SigE (AppE (ConE GHC.Tuple.Solo#) (LitE (IntegerL 1))) (AppT (ConT GHC.Tuple.Solo#) (ConT GHC.Integer.Type.Integer))
+GHC.Tuple.Solo# 1 :: GHC.Tuple.Solo# GHC.Integer.Type.Integer
