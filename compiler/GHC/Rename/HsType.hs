@@ -277,7 +277,7 @@ extraConstraintWildCardsAllowed env
       TypeSigCtx {}       -> True
       ExprWithTySigCtx {} -> True
       DerivDeclCtx {}     -> True
-      StandaloneKindSigCtx {} -> False  -- See Note [Wildcards in standalone kind signatures] in GHC/Hs/Decls
+      StandaloneKindSigCtx {} -> False  -- See Note [Wildcards in standalone kind signatures] in "GHC.Hs.Decls"
       _                   -> False
 
 -- | When the NamedWildCards extension is enabled, partition_nwcs
@@ -812,7 +812,7 @@ wildCardsAllowed env
        FamPatCtx {}        -> True   -- Not named wildcards though
        GHCiCtx {}          -> True
        HsTypeCtx {}        -> True
-       StandaloneKindSigCtx {} -> False  -- See Note [Wildcards in standalone kind signatures] in GHC/Hs/Decls
+       StandaloneKindSigCtx {} -> False  -- See Note [Wildcards in standalone kind signatures] in "GHC.Hs.Decls"
        _                   -> False
 
 

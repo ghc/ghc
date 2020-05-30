@@ -647,7 +647,7 @@ mkCoAxBranch :: [TyVar] -- original, possibly stale, tyvars
              -> SrcSpan
              -> CoAxBranch
 mkCoAxBranch tvs eta_tvs cvs ax_tc lhs rhs roles loc
-  = -- See Note [CoAxioms are homogeneous] in Core.Coercion.Axiom
+  = -- See Note [CoAxioms are homogeneous] in "GHC.Core.Coercion.Axiom"
     ASSERT( typeKind (mkTyConApp ax_tc lhs) `eqType` typeKind rhs )
     CoAxBranch { cab_tvs     = tvs'
                , cab_eta_tvs = eta_tvs'

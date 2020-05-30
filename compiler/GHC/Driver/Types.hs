@@ -3163,7 +3163,7 @@ data HsParsedModule = HsParsedModule {
 *                                                                      *
 ************************************************************************
 
-This stuff is in here, rather than (say) in Linker.hs, because the Linker.hs
+This stuff is in here, rather than (say) in "GHC.Runtime.Linker", because the "GHC.Runtime.Linker"
 stuff is the *dynamic* linker, and isn't present in a stage-1 compiler
 -}
 

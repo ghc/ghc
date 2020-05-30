@@ -57,7 +57,7 @@ import GHC.Exts
 --
 -- We assume we can ignore overflow when parsing a multibyte character here.
 -- To make this safe, we add extra sentinel bytes to unparsed UTF-8 sequences
--- before decoding them (see StringBuffer.hs).
+-- before decoding them (see "GHC.Data.StringBuffer").
 
 {-# INLINE utf8DecodeChar# #-}
 utf8DecodeChar# :: Addr# -> (# Char#, Int# #)

@@ -93,7 +93,7 @@ The fix is
 to let bind the algebraic case scrutinees (done, I think) and
 the case alternatives (except the ones with an
 unboxed type)(not done, I think). This is best done in the
-GHC.Core.Opt.SetLevels.hs module, which tags things with their level numbers.
+GHC.Core.Opt.SetLevels module, which tags things with their level numbers.
 \item
 do the full laziness pass (floating lets outwards).
 \item

@@ -571,7 +571,7 @@ Oh: two other reasons for injecting them late:
 There is one sort of implicit binding that is injected still later,
 namely those for data constructor workers. Reason (I think): it's
 really just a code generation trick.... binding itself makes no sense.
-See Note [Data constructor workers] in CorePrep.
+See Note [Data constructor workers] in "GHC.CoreToStg.Prep".
 -}
 
 getImplicitBinds :: TyCon -> [CoreBind]

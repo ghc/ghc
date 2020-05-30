@@ -475,7 +475,7 @@ instance Outputable a => Outputable (SharedDIdEnv a) where
 -- entries are possibly shared when we figure out that two variables must be
 -- equal, thus represent the same set of values.
 --
--- See Note [TmState invariants] in Oracle.
+-- See Note [TmState invariants] in "GHC.HsToCore.PmCheck.Oracle".
 data TmState
   = TmSt
   { ts_facts :: !(SharedDIdEnv VarInfo)
@@ -492,7 +492,7 @@ data TmState
 -- Also caches the type ('vi_ty'), the 'PossibleMatches' of a COMPLETE set
 -- ('vi_cache').
 --
--- Subject to Note [The Pos/Neg invariant] in PmOracle.
+-- Subject to Note [The Pos/Neg invariant] in "GHC.HsToCore.PmCheck.Oracle".
 data VarInfo
   = VI
   { vi_ty  :: !Type
