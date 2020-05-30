@@ -1500,7 +1500,6 @@ module:
    instance* or at least one *orphan rule*.
 
 -  An instance declaration in a module ``M`` is an *orphan instance* if
-   orphan instance
 
    -  The class of the instance declaration is not declared in ``M``, and
 
