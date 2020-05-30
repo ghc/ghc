@@ -70,7 +70,7 @@ data CmmNode e x where
     -- up one frame. Having unwind information for @Sp@ will allow the
     -- debugger to "walk" the stack.
     --
-    -- See Note [What is this unwinding business?] in Debug
+    -- See Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock"
   CmmUnwind :: [(GlobalReg, Maybe CmmExpr)] -> CmmNode O O
 
   CmmAssign :: !CmmReg -> !CmmExpr -> CmmNode O O

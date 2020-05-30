@@ -474,7 +474,7 @@ dsExpr (HsIf _ fun guard_expr then_expr else_expr)
   = do { pred <- dsLExpr guard_expr
        ; b1 <- dsLExpr then_expr
        ; b2 <- dsLExpr else_expr
-       ; case fun of  -- See Note [Rebindable if] in Hs.Expr
+       ; case fun of  -- See Note [Rebindable if] in "GHC.Hs.Expr"
            (SyntaxExprTc {}) -> dsSyntaxExpr fun [pred, b1, b2]
            NoSyntaxExprTc    -> return $ mkIfThenElse pred b1 b2 }
 

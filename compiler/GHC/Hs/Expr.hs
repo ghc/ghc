@@ -139,7 +139,7 @@ type family SyntaxExprGhc (p :: Pass) = (r :: Data.Kind.Type) | r -> p where
 -- | The function to use in rebindable syntax. See Note [NoSyntaxExpr].
 data SyntaxExprRn = SyntaxExprRn (HsExpr GhcRn)
     -- Why is the payload not just a Name?
-    -- See Note [Monad fail : Rebindable syntax, overloaded strings] in RnExpr
+    -- See Note [Monad fail : Rebindable syntax, overloaded strings] in "GHC.Rename.Expr"
                   | NoSyntaxExprRn
 
 -- | An expression with wrappers, used for rebindable syntax
@@ -170,7 +170,7 @@ noSyntaxExpr = case ghcPass @p of
 
 -- | Make a 'SyntaxExpr GhcRn' from an expression
 -- Used only in getMonadFailOp.
--- See Note [Monad fail : Rebindable syntax, overloaded strings] in RnExpr
+-- See Note [Monad fail : Rebindable syntax, overloaded strings] in "GHC.Rename.Expr"
 mkSyntaxExpr :: HsExpr GhcRn -> SyntaxExprRn
 mkSyntaxExpr = SyntaxExprRn
 

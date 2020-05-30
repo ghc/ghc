@@ -571,7 +571,7 @@ treat coercions the same way.
 However, this isn’t a good idea: unlike type arguments, which have
 no runtime representation, coercion arguments *do* have a runtime
 representation (albeit the zero-width VoidRep, see Note [Coercion tokens]
-in CoreToStg.hs). This caused trouble in #17787 for DataCon wrappers for
+in "GHC.CoreToStg"). This caused trouble in #17787 for DataCon wrappers for
 nullary GADT constructors: the wrappers would be inlined and each use of
 the constructor would lead to a separate allocation instead of just
 sharing the wrapper closure.

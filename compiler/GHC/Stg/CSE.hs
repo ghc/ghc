@@ -235,7 +235,7 @@ substVar env id = fromMaybe id $ lookupVarEnv (ce_subst env) id
 
 -- This is much simpler than the equivalent code in GHC.Core.Subst:
 --  * We do not substitute type variables, and
---  * There is nothing relevant in IdInfo at this stage
+--  * There is nothing relevant in GHC.Types.Id.Info at this stage
 --    that needs substitutions.
 -- Therefore, no special treatment for a recursive group is required.
 

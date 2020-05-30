@@ -588,7 +588,7 @@ pprPat (ConPat { pat_con = con
       GhcTc -> sdocOption sdocPrintTypecheckerElaboration $ \case
         False -> pprUserCon (unLoc con) details
         True  ->
-          -- Tiresome; in TcBinds.tcRhs we print out a typechecked Pat in an
+          -- Tiresome; in 'GHC.Tc.Gen.Bind.tcRhs' we print out a typechecked Pat in an
           -- error message, and we want to make sure it prints nicely
           ppr con
             <> braces (sep [ hsep (map pprPatBndr (tvs ++ dicts))

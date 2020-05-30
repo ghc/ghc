@@ -2602,7 +2602,7 @@ primop  RaiseOp "raise#" GenPrimOp
    -- Hence, it has 'botDiv', not 'exnDiv'.
    -- For the same reasons, 'raise#' is marked as "can_fail" (which 'raiseIO#'
    -- is not), but not as "has_side_effects" (which 'raiseIO#' is).
-   -- See Note [PrimOp can_fail and has_side_effects] in PrimOp.hs.
+   -- See Note [PrimOp can_fail and has_side_effects] in "GHC.Builtin.PrimOps".
    strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botDiv }
    out_of_line = True
    can_fail = True
@@ -2653,7 +2653,7 @@ primop  RaiseOverflowOp "raiseOverflow#" GenPrimOp
 primop  RaiseIOOp "raiseIO#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, b #)
    with
-   -- See Note [Precise exceptions and strictness analysis] in Demand.hs
+   -- See Note [Precise exceptions and strictness analysis] in "GHC.Types.Demand"
    -- for why this is the *only* primop that has 'exnDiv'
    strictness  = { \ _arity -> mkClosedStrictSig [topDmd, topDmd] exnDiv }
    out_of_line = True

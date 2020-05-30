@@ -71,7 +71,7 @@ cgTopRhsCon dflags id con args
     -- For External bindings we must keep the binding,
     -- since importing modules will refer to it by name;
     -- but for Internal ones we can drop it altogether
-    -- See Note [About the NameSorts] in Name.hs for Internal/External
+    -- See Note [About the NameSorts] in "GHC.Types.Name" for Internal/External
     (static_info, static_code)
 
   -- Otherwise generate a closure for the constructor.

@@ -173,7 +173,7 @@ simplTopBinds env0 binds0
                 -- so that if a rewrite rule has unexpectedly brought
                 -- anything into scope, then we don't get a complaint about that.
                 -- It's rather as if the top-level binders were imported.
-                -- See note [Glomming] in OccurAnal.
+                -- See note [Glomming] in "GHC.Core.Opt.OccurAnal".
         ; env1 <- {-#SCC "simplTopBinds-simplRecBndrs" #-} simplRecBndrs env0 (bindersOfBinds binds0)
         ; (floats, env2) <- {-#SCC "simplTopBinds-simpl_binds" #-} simpl_binds env1 binds0
         ; freeTick SimplifierDone
@@ -480,7 +480,7 @@ prepareRhs mode top_lvl occ _ rhs0
           is_exp = isExpandableApp fun n_val_args   -- The fun a constructor or PAP
                         -- See Note [CONLIKE pragma] in GHC.Types.Basic
                         -- The definition of is_exp should match that in
-                        -- OccurAnal.occAnalApp
+                        -- 'GHC.Core.Opt.OccurAnal.occAnalApp'
 
     go n_val_args (Tick t rhs)
         -- We want to be able to float bindings past this
@@ -2616,7 +2616,7 @@ inlined.
 Historical note: we use to do the "case binder swap" in the Simplifier
 so there were additional complications if the scrutinee was a variable.
 Now the binder-swap stuff is done in the occurrence analyser; see
-OccurAnal Note [Binder swap].
+"GHC.Core.Opt.OccurAnal" Note [Binder swap].
 
 Note [knownCon occ info]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2897,8 +2897,8 @@ Note [Add unfolding for scrutinee]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In general it's unlikely that a variable scrutinee will appear
 in the case alternatives   case x of { ...x unlikely to appear... }
-because the binder-swap in OccAnal has got rid of all such occurrences
-See Note [Binder swap] in OccAnal.
+because the binder-swap in OccurAnal has got rid of all such occurrences
+See Note [Binder swap] in "GHC.Core.Opt.OccurAnal".
 
 BUT it is still VERY IMPORTANT to add a suitable unfolding for a
 variable scrutinee, in simplAlt.  Here's why
@@ -3637,7 +3637,7 @@ substitute the RULES and add them back onto the binders; this is done
 cases where he really, really wanted a RULE for a recursive function
 to apply in that function's own right-hand side.
 
-See Note [Forming Rec groups] in OccurAnal
+See Note [Forming Rec groups] in "GHC.Core.Opt.OccurAnal"
 -}
 
 addBndrRules :: SimplEnv -> InBndr -> OutBndr

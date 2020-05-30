@@ -246,7 +246,7 @@ procToFrame initUws blk
         -- | If the current procedure has an info table, then we also say that
         -- its first block has one to ensure that it gets the necessary -1
         -- offset applied to its start address.
-        -- See Note [Info Offset] in Dwarf.Types.
+        -- See Note [Info Offset] in "GHC.CmmToAsm.Dwarf.Types".
         setHasInfo :: [(DebugBlock, [UnwindPoint])]
                    -> [(DebugBlock, [UnwindPoint])]
         setHasInfo [] = []

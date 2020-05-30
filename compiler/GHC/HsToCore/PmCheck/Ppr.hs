@@ -92,7 +92,7 @@ Unhandled constraints that refer to HsExpr are typically ignored by the solver
 (it does not even substitute in HsExpr so they are even printed as wildcards).
 Additionally, the oracle returns a substitution if it succeeds so we apply this
 substitution to the vectors before printing them out (see function `pprOne' in
-Check.hs) to be more precise.
+"GHC.HsToCore.PmCheck") to be more precise.
 -}
 
 -- | Extract and assigns pretty names to constraint variables with refutable
