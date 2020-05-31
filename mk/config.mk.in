@@ -839,6 +839,7 @@ BUILD_SPHINX_HTML        = @BUILD_SPHINX_HTML@
 BUILD_SPHINX_PDF         = @BUILD_SPHINX_PDF@
 SPHINXOPTS               = -D latex_paper_size=letter
 XELATEX                  = @XELATEX@
+MAKEINDEX                = @MAKEINDEX@
 
 #-----------------------------------------------------------------------------
 # 		FPtools support software
