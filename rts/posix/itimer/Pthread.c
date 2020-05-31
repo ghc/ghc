@@ -96,6 +96,24 @@ static Condition start_cond;
 static Mutex mutex;
 static OSThreadId thread;
 
+/* -----------------------------------------------------------------------------
+   Sleep for the given period of time.
+   -------------------------------------------------------------------------- */
+
+/* Returns -1 on failure but handles EINTR internally.
+ * N.B. usleep has been removed from POSIX 2008 */
+static int rtsSleep(Time t)
+{
+    struct timespec req;
+    req.tv_sec = TimeToSeconds(t);
+    req.tv_nsec = TimeToNS(t - req.tv_sec * TIME_RESOLUTION);
+    int ret;
+    do {
+        ret = nanosleep(&req, &req);
+    } while (ret == -1 && errno == EINTR);
+    return ret;
+}
+
 static void *itimer_thread_func(void *_handle_tick)
 {
     TickProc handle_tick = _handle_tick;
