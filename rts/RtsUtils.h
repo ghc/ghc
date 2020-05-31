@@ -33,7 +33,6 @@ void stgFree(void* p);
  * Misc other utilities
  * -------------------------------------------------------------------------- */
 
-int rtsSleep(Time t);
 char *time_str(void);
 char *showStgWord64(StgWord64, char *, bool);
 
