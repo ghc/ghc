@@ -33,10 +33,14 @@ import System.Process
 import GHC.SysTools.FileCleanup
 
 -- | Enable process jobs support on Windows if it can be expected to work (e.g.
--- @process >= 1.6.8.0@).
+-- @process >= 1.6.9.0@).
 enableProcessJobs :: CreateProcess -> CreateProcess
 #if defined(MIN_VERSION_process)
+#if MIN_VERSION_process(1,6,9)
 enableProcessJobs opts = opts { use_process_jobs = True }
+#else
+enableProcessJobs opts = opts
+#endif
 #else
 enableProcessJobs opts = opts
 #endif
@@ -48,7 +52,7 @@ readCreateProcessWithExitCode'
     -> IO (ExitCode, String)    -- ^ stdout
 readCreateProcessWithExitCode' proc = do
     (_, Just outh, _, pid) <-
-        createProcess proc{ std_out = CreatePipe }
+        createProcess $ enableProcessJobs $ proc{ std_out = CreatePipe }
 
     -- fork off a thread to start consuming the output
     output  <- hGetContents outh
@@ -77,7 +81,7 @@ readProcessEnvWithExitCode
     -> IO (ExitCode, String, String) -- ^ (exit_code, stdout, stderr)
 readProcessEnvWithExitCode prog args env_update = do
     current_env <- getEnvironment
-    readCreateProcessWithExitCode (enableProcessJobs $ proc prog args) {
+    readCreateProcessWithExitCode (proc prog args) {
         env = Just (replaceVar env_update current_env) } ""
 
 -- Don't let gcc localize version info string, #8825
