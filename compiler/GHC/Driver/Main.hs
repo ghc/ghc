@@ -1160,7 +1160,7 @@ hscCheckSafe' m l = do
                 where
                     inferredImportWarn = unitBag
                         $ makeIntoWarning (Reason Opt_WarnInferredSafeImports)
-                        $ mkErrMsg dflags l (pkgQual dflags)
+                        $ mkWarnMsg dflags l (pkgQual dflags)
                         $ sep
                             [ text "Importing Safe-Inferred module "
                                 <> ppr (moduleName m)
@@ -1434,7 +1434,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
 
             ------------------  Code output -----------------------
             rawcmms0 <- {-# SCC "cmmToRawCmm" #-}
-                      lookupHook cmmToRawCmmHook
+                      lookupHook (\x -> cmmToRawCmmHook x)
                         (\dflg _ -> cmmToRawCmm dflg) dflags dflags (Just this_mod) cmms
 
             let dump a = do
@@ -1506,7 +1506,7 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
         unless (null cmmgroup) $
           dumpIfSet_dyn dflags Opt_D_dump_cmm "Output Cmm"
             FormatCMM (ppr cmmgroup)
-        rawCmms <- lookupHook cmmToRawCmmHook
+        rawCmms <- lookupHook (\x -> cmmToRawCmmHook x)
                      (\dflgs _ -> cmmToRawCmm dflgs) dflags dflags Nothing (Stream.yield cmmgroup)
         _ <- codeOutput dflags cmm_mod output_filename no_loc NoStubs [] []
              rawCmms

@@ -1,0 +1,4 @@
+
+T18251b.hs:3:11: error:
+    Found a binding for the ‘@’ operator in a pattern position.
+    Perhaps you meant an as-pattern, which must not be surrounded by whitespace

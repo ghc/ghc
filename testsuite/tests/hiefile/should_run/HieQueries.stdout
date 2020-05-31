@@ -19,7 +19,7 @@ At point (31,9), we found:
 |
 `- ┌
    │ $dC at HieQueries.hs:31:1-13, of type: C a
-   │     is an evidence variable bound by a type signature
+   │     is an evidence variable bound by a HsWrapper
    │           with scope: LocalScope HieQueries.hs:31:1-13
    │           bound at: HieQueries.hs:31:1-13
    │     Defined at <no location info>
@@ -74,7 +74,7 @@ At point (37,9), we found:
    |
    +- ┌
    |  │ $dShow at HieQueries.hs:37:1-22, of type: Show x
-   |  │     is an evidence variable bound by a type signature
+   |  │     is an evidence variable bound by a HsWrapper
    |  │           with scope: LocalScope HieQueries.hs:37:1-22
    |  │           bound at: HieQueries.hs:37:1-22
    |  │     Defined at <no location info>

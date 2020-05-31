@@ -184,6 +184,9 @@ void _assertFail(const char *filename, unsigned int linenum)
 /* Global constraints */
 #include "rts/Constants.h"
 
+/* Runtime flags */
+#include "rts/Flags.h"
+
 /* Profiling information */
 #include "rts/prof/CCS.h"
 #include "rts/prof/LDV.h"
@@ -214,7 +217,6 @@ void _assertFail(const char *filename, unsigned int linenum)
 #include "rts/Signals.h"
 #include "rts/BlockSignals.h"
 #include "rts/Hpc.h"
-#include "rts/Flags.h"
 #include "rts/Adjustor.h"
 #include "rts/FileLock.h"
 #include "rts/GetTime.h"

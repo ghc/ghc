@@ -1,2 +1,2 @@
-$sfoo :: (?b::Bool) => [Char] -> [Char]
+$sfoo :: (?b::Bool) => String -> [Char]
 $sfoo

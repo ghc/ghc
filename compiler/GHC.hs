@@ -936,7 +936,7 @@ getModSummary mod = do
    mg <- liftM hsc_mod_graph getSession
    let mods_by_name = [ ms | ms <- mgModSummaries mg
                       , ms_mod_name ms == mod
-                      , not (isBootSummary ms) ]
+                      , isBootSummary ms == NotBoot ]
    case mods_by_name of
      [] -> do dflags <- getDynFlags
               liftIO $ throwIO $ mkApiErr dflags (text "Module not part of module graph")
@@ -1346,7 +1346,7 @@ getNameToInstancesIndex visible_mods mods_to_load = do
 
 -- -----------------------------------------------------------------------------
 
-{- ToDo: Move the primary logic here to compiler/main/Packages.hs
+{- ToDo: Move the primary logic here to "GHC.Unit.State"
 -- | Return all /external/ modules available in the package database.
 -- Modules from the current session (i.e., from the 'HomePackageTable') are
 -- not included.  This includes module names which are reexported by packages.

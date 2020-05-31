@@ -36,6 +36,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.Coercion.Axiom
+import GHC.Core.FVs
 import GHC.Core.TyCo.Rep    -- needs to build types & coercions in a knot
 import GHC.Core.TyCo.Subst ( substTyCoVars )
 import GHC.Driver.Types
@@ -353,7 +354,7 @@ mergeIfaceDecls = plusOccEnv_C mergeIfaceDecl
 typecheckIfacesForMerging :: Module -> [ModIface] -> IORef TypeEnv -> IfM lcl (TypeEnv, [ModDetails])
 typecheckIfacesForMerging mod ifaces tc_env_var =
   -- cannot be boot (False)
-  initIfaceLcl mod (text "typecheckIfacesForMerging") False $ do
+  initIfaceLcl mod (text "typecheckIfacesForMerging") NotBoot $ do
     ignore_prags <- goptM Opt_IgnoreInterfacePragmas
     -- Build the initial environment
     -- NB: Don't include dfuns here, because we don't want to
@@ -505,7 +506,7 @@ tcHiBootIface hsc_src mod
                 -- it's been compiled once, and we don't need to check the boot iface
           then do { hpt <- getHpt
                  ; case lookupHpt hpt (moduleName mod) of
-                      Just info | mi_boot (hm_iface info)
+                      Just info | mi_boot (hm_iface info) == IsBoot
                                 -> mkSelfBootInfo (hm_iface info) (hm_details info)
                       _ -> return NoSelfBoot }
           else do
@@ -516,7 +517,7 @@ tcHiBootIface hsc_src mod
         -- that an hi-boot is necessary due to a circular import.
         { read_result <- findAndReadIface
                                 need (fst (getModuleInstantiation mod)) mod
-                                True    -- Hi-boot file
+                                IsBoot  -- Hi-boot file
 
         ; case read_result of {
             Succeeded (iface, _path) -> do { tc_iface <- initIfaceTcRn $ typecheckIface iface
@@ -532,14 +533,15 @@ tcHiBootIface hsc_src mod
         -- disappeared.
     do  { eps <- getEps
         ; case lookupUFM (eps_is_boot eps) (moduleName mod) of
-            Nothing -> return NoSelfBoot -- The typical case
-
-            Just (_, False) -> failWithTc moduleLoop
-                -- Someone below us imported us!
-                -- This is a loop with no hi-boot in the way
-
-            Just (_mod, True) -> failWithTc (elaborate err)
-                -- The hi-boot file has mysteriously disappeared.
+            -- The typical case
+            Nothing -> return NoSelfBoot
+            -- error cases
+            Just (GWIB { gwib_isBoot = is_boot }) -> case is_boot of
+              IsBoot -> failWithTc (elaborate err)
+              -- The hi-boot file has mysteriously disappeared.
+              NotBoot -> failWithTc moduleLoop
+              -- Someone below us imported us!
+              -- This is a loop with no hi-boot in the way
     }}}}
   where
     need = text "Need the hi-boot interface for" <+> ppr mod
@@ -1061,8 +1063,24 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
                 -- Typecheck the payload lazily, in the hope it'll never be looked at
                 forkM (text "Rule" <+> pprRuleName name) $
                 bindIfaceBndrs bndrs                      $ \ bndrs' ->
-                do { args' <- mapM tcIfaceExpr args
-                   ; rhs'  <- tcIfaceExpr rhs
+                do { args'  <- mapM tcIfaceExpr args
+                   ; rhs'   <- tcIfaceExpr rhs
+                   ; whenGOptM Opt_DoCoreLinting $ do
+                      { dflags <- getDynFlags
+                      ; (_, lcl_env) <- getEnvs
+                      ; let in_scope :: [Var]
+                            in_scope = ((nonDetEltsUFM $ if_tv_env lcl_env) ++
+                                        (nonDetEltsUFM $ if_id_env lcl_env) ++
+                                        bndrs' ++
+                                        exprsFreeIdsList args')
+                      ; case lintExpr dflags in_scope rhs' of
+                          Nothing       -> return ()
+                          Just fail_msg -> do { mod <- getIfModule
+                                              ; pprPanic "Iface Lint failure"
+                                                  (vcat [ text "In interface for" <+> ppr mod
+                                                        , hang doc 2 fail_msg
+                                                        , ppr name <+> equals <+> ppr rhs'
+                                                        , text "Iface expr =" <+> ppr rhs ]) } }
                    ; return (bndrs', args', rhs') }
         ; let mb_tcs = map ifTopFreeName args
         ; this_mod <- getIfModule
@@ -1090,6 +1108,8 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
     ifTopFreeName (IfaceApp f _)                    = ifTopFreeName f
     ifTopFreeName (IfaceExt n)                      = Just n
     ifTopFreeName _                                 = Nothing
+
+    doc = text "Unfolding of" <+> ppr name
 
 {-
 ************************************************************************
@@ -1461,8 +1481,9 @@ tcIdInfo ignore_prags toplvl name ty info = do
     lcl_env <- getLclEnv
     -- Set the CgInfo to something sensible but uninformative before
     -- we start; default assumption is that it has CAFs
-    let init_info | if_boot lcl_env = vanillaIdInfo `setUnfoldingInfo` BootUnfolding
-                  | otherwise       = vanillaIdInfo
+    let init_info = if if_boot lcl_env == IsBoot
+                      then vanillaIdInfo `setUnfoldingInfo` BootUnfolding
+                      else vanillaIdInfo
 
     let needed = needed_prags info
     foldlM tcPrag init_info needed
