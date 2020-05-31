@@ -34,6 +34,9 @@ module GHC.IO.Windows.Handle
    -- * Utility functions
    convertHandle,
    toHANDLE,
+   fromHANDLE,
+   handleToMode,
+   optimizeFileAccess,
 
    -- * Standard Handles
    stdin,
@@ -48,9 +51,10 @@ module GHC.IO.Windows.Handle
 
 #include <windows.h>
 #include <ntstatus.h>
+#include <winnt.h>
 ##include "windows_cconv.h"
 
-import Data.Bits ((.|.), shiftL)
+import Data.Bits ((.|.), (.&.), shiftL)
 import Data.Word (Word8, Word16, Word64)
 import Data.Functor ((<$>))
 import Data.Typeable
@@ -430,6 +434,8 @@ hwndRead hwnd ptr offset bytes
       | err == #{const ERROR_SUCCESS}      = Mgr.ioSuccess $ fromIntegral dwBytes
       | err == #{const ERROR_HANDLE_EOF}   = Mgr.ioSuccess 0
       | err == #{const STATUS_END_OF_FILE} = Mgr.ioSuccess 0
+      | err == #{const ERROR_BROKEN_PIPE}  = Mgr.ioSuccess 0
+      | err == #{const STATUS_PIPE_BROKEN} = Mgr.ioSuccess 0
       | err == #{const ERROR_MORE_DATA}    = Mgr.ioSuccess $ fromIntegral dwBytes
       | otherwise                          = Mgr.ioFailed err
 
@@ -455,6 +461,8 @@ hwndReadNonBlocking hwnd ptr offset bytes
       | err == #{const ERROR_SUCCESS}      = Mgr.ioSuccess $ fromIntegral dwBytes
       | err == #{const ERROR_HANDLE_EOF}   = Mgr.ioSuccess 0
       | err == #{const STATUS_END_OF_FILE} = Mgr.ioSuccess 0
+      | err == #{const ERROR_BROKEN_PIPE}  = Mgr.ioSuccess 0
+      | err == #{const STATUS_PIPE_BROKEN} = Mgr.ioSuccess 0
       | otherwise                          = Mgr.ioFailed err
 
 hwndWrite :: Io NativeHandle -> Ptr Word8 -> Word64 -> Int -> IO ()
@@ -583,7 +591,7 @@ consoleRead hwnd ptr _offset bytes
               else do w_first <- peekElemOff w_ptr 0
                       case () of
                         -- Handle Ctrl+Z which is the actual EOL sequence on
-                        -- windows, but also hanlde Ctrl+D which is what the
+                        -- windows, but also handle Ctrl+D which is what the
                         -- ASCII standard defines as EOL.
                         _ | w_first == fromIntegral acCtrlD -> return 0
                           | w_first == fromIntegral acCtrlZ -> return 0
@@ -937,6 +945,22 @@ optimizeFileAccess handle =
       c_SetFileCompletionNotificationModes handle
           (    #{const FILE_SKIP_COMPLETION_PORT_ON_SUCCESS}
             .|. #{const FILE_SKIP_SET_EVENT_ON_HANDLE})
+
+-- Reconstruct an I/O mode from an open HANDLE
+handleToMode :: HANDLE -> IO IOMode
+handleToMode hwnd = do
+  mask <- c_get_handle_access_mask hwnd
+  let flag = flagOn mask
+  case () of
+    () | flag (#{const FILE_APPEND_DATA})                        -> return AppendMode
+       | flag (#{const GENERIC_WRITE} .|. #{const GENERIC_READ}) -> return ReadWriteMode
+       | flag (#{const GENERIC_READ})                            -> return ReadMode
+       | flag (#{const GENERIC_WRITE})                           -> return WriteMode
+       | otherwise -> error "unknown access mask in handleToMode."
+    where flagOn mask v = (v .&. mask) == v
+
+foreign import ccall unsafe "__get_handle_access_mask"
+  c_get_handle_access_mask :: HANDLE -> IO DWORD
 
 release :: RawHandle a => a -> IO ()
 release h = if isLockable h
