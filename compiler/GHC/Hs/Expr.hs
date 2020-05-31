@@ -2479,7 +2479,7 @@ data DelayedSplice =
     TcLclEnv          -- The local environment to run the splice in
     (LHsExpr GhcRn)   -- The original renamed expression
     TcType            -- The result type of running the splice, unzonked
-    (LHsExpr GhcTcId) -- The typechecked expression to run and splice in the result
+    (LHsExpr GhcTc)   -- The typechecked expression to run and splice in the result
 
 -- A Data instance which ignores the argument of 'DelayedSplice'.
 instance Data DelayedSplice where

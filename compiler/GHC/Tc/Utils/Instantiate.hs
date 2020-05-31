@@ -90,7 +90,7 @@ newMethodFromName
   :: CtOrigin              -- ^ why do we need this?
   -> Name                  -- ^ name of the method
   -> [TcRhoType]           -- ^ types with which to instantiate the class
-  -> TcM (HsExpr GhcTcId)
+  -> TcM (HsExpr GhcTc)
 -- ^ Used when 'Name' is the wired-in name for a wired-in class method,
 -- so the caller knows its type for sure, which should be of form
 --
@@ -464,7 +464,7 @@ cases (the rest are caught in lookupInst).
 
 newOverloadedLit :: HsOverLit GhcRn
                  -> ExpRhoType
-                 -> TcM (HsOverLit GhcTcId)
+                 -> TcM (HsOverLit GhcTc)
 newOverloadedLit
   lit@(OverLit { ol_val = val, ol_ext = rebindable }) res_ty
   | not rebindable
@@ -493,7 +493,7 @@ newOverloadedLit
 newNonTrivialOverloadedLit :: CtOrigin
                            -> HsOverLit GhcRn
                            -> ExpRhoType
-                           -> TcM (HsOverLit GhcTcId)
+                           -> TcM (HsOverLit GhcTc)
 newNonTrivialOverloadedLit orig
   lit@(OverLit { ol_val = val, ol_witness = HsVar _ (L _ meth_name)
                , ol_ext = rebindable }) res_ty
@@ -557,7 +557,7 @@ just use the expression inline.
 tcSyntaxName :: CtOrigin
              -> TcType                 -- ^ Type to instantiate it at
              -> (Name, HsExpr GhcRn)   -- ^ (Standard name, user name)
-             -> TcM (Name, HsExpr GhcTcId)
+             -> TcM (Name, HsExpr GhcTc)
                                        -- ^ (Standard name, suitable expression)
 -- USED ONLY FOR CmdTop (sigh) ***
 -- See Note [CmdSyntaxTable] in GHC.Hs.Expr

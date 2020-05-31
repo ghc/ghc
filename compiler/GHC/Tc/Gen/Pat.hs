@@ -80,7 +80,7 @@ tcLetPat :: (Name -> Maybe TcId)
          -> LetBndrSpec
          -> LPat GhcRn -> Scaled ExpSigmaType
          -> TcM a
-         -> TcM (LPat GhcTcId, a)
+         -> TcM (LPat GhcTc, a)
 tcLetPat sig_fn no_gen pat pat_ty thing_inside
   = do { bind_lvl <- getTcLevel
        ; let ctxt = LetPat { pc_lvl    = bind_lvl
@@ -97,7 +97,7 @@ tcPats :: HsMatchContext GhcRn
        -> [LPat GhcRn]            -- Patterns,
        -> [Scaled ExpSigmaType]         --   and their types
        -> TcM a                  --   and the checker for the body
-       -> TcM ([LPat GhcTcId], a)
+       -> TcM ([LPat GhcTc], a)
 
 -- This is the externally-callable wrapper function
 -- Typecheck the patterns, extend the environment to bind the variables,
@@ -117,7 +117,7 @@ tcPats ctxt pats pat_tys thing_inside
 
 tcInferPat :: HsMatchContext GhcRn -> LPat GhcRn
            -> TcM a
-           -> TcM ((LPat GhcTcId, a), TcSigmaType)
+           -> TcM ((LPat GhcTc, a), TcSigmaType)
 tcInferPat ctxt pat thing_inside
   = tcInfer $ \ exp_ty ->
     tc_lpat (unrestricted exp_ty) penv pat thing_inside
@@ -127,7 +127,7 @@ tcInferPat ctxt pat thing_inside
 tcCheckPat :: HsMatchContext GhcRn
            -> LPat GhcRn -> Scaled TcSigmaType
            -> TcM a                     -- Checker for body
-           -> TcM (LPat GhcTcId, a)
+           -> TcM (LPat GhcTc, a)
 tcCheckPat ctxt = tcCheckPat_O ctxt PatOrigin
 
 -- | A variant of 'tcPat' that takes a custom origin
@@ -135,7 +135,7 @@ tcCheckPat_O :: HsMatchContext GhcRn
              -> CtOrigin              -- ^ origin to use if the type needs inst'ing
              -> LPat GhcRn -> Scaled TcSigmaType
              -> TcM a                 -- Checker for body
-             -> TcM (LPat GhcTcId, a)
+             -> TcM (LPat GhcTc, a)
 tcCheckPat_O ctxt orig pat (Scaled pat_mult pat_ty) thing_inside
   = tc_lpat (Scaled pat_mult (mkCheckExpType pat_ty)) penv pat thing_inside
   where
@@ -326,7 +326,7 @@ tcMultiple tc_pat penv args thing_inside
 
 --------------------
 tc_lpat :: Scaled ExpSigmaType
-        -> Checker (LPat GhcRn) (LPat GhcTcId)
+        -> Checker (LPat GhcRn) (LPat GhcTc)
 tc_lpat pat_ty penv (L span pat) thing_inside
   = setSrcSpan span $
     do  { (pat', res) <- maybeWrapPatCtxt pat (tc_pat pat_ty penv pat)
@@ -334,7 +334,7 @@ tc_lpat pat_ty penv (L span pat) thing_inside
         ; return (L span pat', res) }
 
 tc_lpats :: [Scaled ExpSigmaType]
-         -> Checker [LPat GhcRn] [LPat GhcTcId]
+         -> Checker [LPat GhcRn] [LPat GhcTc]
 tc_lpats tys penv pats
   = ASSERT2( equalLength pats tys, ppr pats $$ ppr tys )
     tcMultiple (\ penv' (p,t) -> tc_lpat t penv' p)
@@ -348,7 +348,7 @@ checkManyPattern pat_ty = tcSubMult NonLinearPatternOrigin Many (scaledMult pat_
 
 tc_pat  :: Scaled ExpSigmaType
         -- ^ Fully refined result type
-        -> Checker (Pat GhcRn) (Pat GhcTcId)
+        -> Checker (Pat GhcRn) (Pat GhcTc)
         -- ^ Translated pattern
 
 tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
@@ -849,7 +849,7 @@ to express the local scope of GADT refinements.
 tcConPat :: PatEnv -> Located Name
          -> Scaled ExpSigmaType    -- Type of the pattern
          -> HsConPatDetails GhcRn -> TcM a
-         -> TcM (Pat GhcTcId, a)
+         -> TcM (Pat GhcTc, a)
 tcConPat penv con_lname@(L _ con_name) pat_ty arg_pats thing_inside
   = do  { con_like <- tcLookupConLike con_name
         ; case con_like of
@@ -862,7 +862,7 @@ tcConPat penv con_lname@(L _ con_name) pat_ty arg_pats thing_inside
 tcDataConPat :: PatEnv -> Located Name -> DataCon
              -> Scaled ExpSigmaType        -- Type of the pattern
              -> HsConPatDetails GhcRn -> TcM a
-             -> TcM (Pat GhcTcId, a)
+             -> TcM (Pat GhcTc, a)
 tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
              arg_pats thing_inside
   = do  { let tycon = dataConTyCon data_con
@@ -967,7 +967,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
 tcPatSynPat :: PatEnv -> Located Name -> PatSyn
             -> Scaled ExpSigmaType         -- Type of the pattern
             -> HsConPatDetails GhcRn -> TcM a
-            -> TcM (Pat GhcTcId, a)
+            -> TcM (Pat GhcTc, a)
 tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
   = do  { let (univ_tvs, req_theta, ex_tvs, prov_theta, arg_tys, ty) = patSynSig pat_syn
 
@@ -1143,7 +1143,7 @@ tcConArgs con_like arg_tys penv con_args thing_inside = case con_args of
         ; return (RecCon (HsRecFields rpats' dd), res) }
     where
       tc_field :: Checker (LHsRecField GhcRn (LPat GhcRn))
-                          (LHsRecField GhcTcId (LPat GhcTcId))
+                          (LHsRecField GhcTc (LPat GhcTc))
       tc_field penv
                (L l (HsRecField (L loc (FieldOcc sel (L lr rdr))) pat pun))
                thing_inside
