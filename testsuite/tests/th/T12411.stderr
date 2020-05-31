@@ -1,8 +1,6 @@
 
-T12411.hs:4:6: error:
-    Variable not in scope:
-      (@)
-        :: (a1 -> f0 a1) -> t0 -> Language.Haskell.TH.Lib.Internal.DecsQ
+T12411.hs:4:1: error:
+    Illegal visible type application ‘@Q’
+      Perhaps you intended to use TypeApplications
 
-T12411.hs:4:7: error:
-    Data constructor not in scope: Q :: [a0] -> t0
+T12411.hs:4:7: error: Not in scope: type constructor or class ‘Q’

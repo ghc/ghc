@@ -126,10 +126,11 @@ def get_perf_stats(commit: Union[GitRef, GitHash]=GitRef('HEAD'),
     except subprocess.CalledProcessError:
         return []
 
-    log = log.strip('\n').split('\n')
-    log = list(filter(None, log))
-    log = [parse_perf_stat(stat_str) for stat_str in log]
-    return log
+    return \
+        [ parse_perf_stat(stat_str)
+          for stat_str in log.strip('\n').split('\n')
+          if stat_str != ''
+        ]
 
 # Check if a str is in a 40 character git commit hash.
 _commit_hash_re = re.compile('[0-9a-f]' * 40)
