@@ -482,6 +482,7 @@ data CbResult a
   | CbError a            -- ^ I/O request abort, return failure immediately
   | CbNone Bool          -- ^ The caller did not do any checking, the I/O
                          --   manager will perform additional checks.
+    deriving Show
 
 -- | Called when the completion is delivered.
 type CompletionCallback a = ErrCode   -- ^ 0 indicates success
@@ -495,12 +496,20 @@ associateHandle' hwnd
   = do mngr <- getSystemManager
        associateHandle mngr hwnd
 
+-- | A handle value representing an invalid handle.
+invalidHandle :: HANDLE
+invalidHandle = intPtrToPtr (#{const INVALID_HANDLE_VALUE})
+
 -- | Associate a 'HANDLE' with the I/O manager's completion port.  This must be
 -- done before using the handle with 'withOverlapped'.
 associateHandle :: Manager -> HANDLE -> IO ()
 associateHandle Manager{..} h =
-    -- Use as completion key the file handle itself, so we can track completion
-    FFI.associateHandleWithIOCP mgrIOCP h (fromIntegral $ ptrToWordPtr h)
+    -- Don't try to if the handle is invalid.  This can happen with i.e a closed
+    -- std handle.
+    when (h /= invalidHandle) $
+      -- Use as completion key the file handle itself, so we can track
+      -- completion
+      FFI.associateHandleWithIOCP mgrIOCP h (fromIntegral $ ptrToWordPtr h)
 
 -- | Start an overlapped I/O operation, and wait for its completion.  If
 -- 'withOverlapped' is interrupted by an asynchronous exception, the operation
@@ -543,7 +552,6 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
         --       time.  This would allow us to scale better.
         cdData <- new (CompletionData h completionCB')
         let ptr_lpol = hs_lpol `plusPtr` cdOffset
-        poke ptr_lpol cdData
         let lpol = castPtr hs_lpol
         debugIO $ "hs_lpol:" ++ show hs_lpol
                 ++ " cdData:" ++ show cdData
@@ -562,25 +570,27 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
           -- synchronously we've requested to not have the completion queued.
           let result' =
                 case result of
-                  CbNone ret | success == #{const STATUS_SUCCESS}      -> CbDone Nothing
-                             | success == #{const STATUS_END_OF_FILE}  -> CbDone Nothing
-                             | success == #{const STATUS_PENDING}      -> CbPending
+                  CbNone ret | success == #{const STATUS_SUCCESS}          -> CbDone Nothing
+                             | success == #{const STATUS_END_OF_FILE}      -> CbDone Nothing
+                             | success == #{const STATUS_PENDING}          -> CbPending
                              -- Buffer was too small.. not sure what to do, so I'll just
                              -- complete the read request
-                             | err     == #{const ERROR_MORE_DATA}     -> CbDone Nothing
-                             | err     == #{const ERROR_SUCCESS}       -> CbDone Nothing
-                             | err     == #{const ERROR_IO_PENDING}    -> CbPending
-                             | err     == #{const ERROR_IO_INCOMPLETE} -> CbIncomplete
-                             | err     == #{const ERROR_HANDLE_EOF}    -> CbDone Nothing
-                             | not ret                                 -> CbError err
-                             | otherwise                               -> CbPending
-                  _                                                    -> result
+                             | err     == #{const ERROR_MORE_DATA}         -> CbDone Nothing
+                             | err     == #{const ERROR_SUCCESS}           -> CbDone Nothing
+                             | err     == #{const ERROR_IO_PENDING}        -> CbPending
+                             | err     == #{const ERROR_IO_INCOMPLETE}     -> CbIncomplete
+                             | err     == #{const ERROR_HANDLE_EOF}        -> CbDone Nothing
+                             | err     == #{const ERROR_BROKEN_PIPE}       -> CbDone Nothing
+                             | err     == #{const ERROR_OPERATION_ABORTED} -> CbDone Nothing
+                             | not ret                                     -> CbError err
+                             | otherwise                                   -> CbPending
+                  _                                                        -> result
           case result' of
             CbNone    _ -> error "shouldn't happen."
             CbIncomplete -> do
                debugIO $ "handling incomplete request synchronously " ++ show (h, lpol)
                res <- spinWaitComplete h lpol
-               debugIO $ "done blocking request " ++ show (h, lpol)
+               debugIO $ "done blocking request 2: " ++ show (h, lpol) ++ " - " ++ show res
                return res
             CbPending   -> do
               -- Before we enqueue check to see if operation finished in the
@@ -599,6 +609,8 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                                || status == #{const STATUS_END_OF_FILE}
                                || lasterr == #{const ERROR_HANDLE_EOF}
                                || lasterr == #{const ERROR_SUCCESS}
+                               || lasterr == #{const ERROR_BROKEN_PIPE}
+                               || lasterr == #{const ERROR_OPERATION_ABORTED}
               -- This status indicates that the request hasn't finished early,
               -- but it will finish shortly.  The I/O manager will not be
               -- enqueuing this either.  Also needs to be handled inline.
@@ -608,15 +620,22 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
               case (finished, done_early, will_finish_sync) of
                 -- Still pending
                 (Nothing, False, False) -> do
+                    -- Since FILE_SKIP_COMPLETION_PORT_ON_SUCCESS can't be
+                    -- relied on for non-file handles we need a way to prevent
+                    -- us from handling a request inline and handle a completion
+                    -- event handled without a queued I/O operation.  We can do
+                    -- this by deferring the setting data pointer until we know
+                    -- the request will be handled async.
+                    poke ptr_lpol cdData
                     reqs <- addRequest
                     debugIO $ "+1.. " ++ show reqs ++ " requests queued. | " ++ show lpol
-                    wakeupIOManager
+                    --wakeupIOManager
                     return result'
                 -- In progress, we will wait for completion.
                 (Nothing, False, True) -> do
                   debugIO $ "handling incomplete request synchronously " ++ show (h, lpol)
                   res <- spinWaitComplete h lpol
-                  debugIO $ "done blocking request " ++ show (h, lpol)
+                  debugIO $ "done blocking request 1: " ++ show (h, lpol) ++ " - " ++ show res
                   return res
                 _                -> do
                   debugIO "request handled immediately (o/b), not queued."
@@ -668,6 +687,7 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                         then return rdata
                         -- Make sure it's safe to free the OVERLAPPED buffer
                         else FFI.getOverlappedResult h lpol False
+            debugIO $ dbg $ ":: done bytes: " ++ show bytes
             case bytes of
               Just res ->  completionCB 0 res -- free hs_lpol >> completionCB 0 res
               Nothing  -> do err <- FFI.overlappedIOStatus lpol
@@ -676,6 +696,7 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                              -- of re-interpret here. But for now, don't care.
                              let err' = fromIntegral err
                              -- free hs_lpol
+                             debugIO $ dbg $ ":: done callback: " ++ show err' ++ " - " ++ show numBytes
                              completionCB err' (fromIntegral numBytes)
           CbError err  -> do
             free cdData
@@ -700,6 +721,13 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                   return $ CbDone res
                         | otherwise ->
                   do m <- newEmptyIOPort
+                     lasterr <- fmap fromIntegral getLastError :: IO Int
+                     let done =
+                            lasterr == #{const ERROR_HANDLE_EOF}
+                            || lasterr == #{const ERROR_SUCCESS}
+                            || lasterr == #{const ERROR_BROKEN_PIPE}
+                            || lasterr == #{const ERROR_OPERATION_ABORTED}
+                     debugIO $ ":: loop - " ++ show lasterr ++ " :" ++ show done
                      -- We will complete quite soon, in the threaded RTS we
                      -- probably don't really want to wait for it while we could
                      -- have done something else.  In particular this is because
@@ -718,7 +746,9 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                        reg <- registerTimeout mgr usecs $
                                 writeIOPort m () >> return ()
                        readIOPort m `onException` unregisterTimeout mgr reg
-                     spinWaitComplete fhndl lpol
+                     if done
+                        then return $ CbDone Nothing
+                        else spinWaitComplete fhndl lpol
                 Just _ -> do
                    when (not threadedIOMgr) completeSynchronousRequest
                    return $ CbDone res
@@ -814,7 +844,7 @@ unregisterTimeout mgr (TK key) = do
 editTimeouts :: Manager -> TimeoutEdit -> IO ()
 editTimeouts mgr g = do
   atomicModifyIORef' (mgrTimeouts mgr) $ \tq -> (g tq, ())
-  wakeupIOManager
+  interruptSystemManager
 
 ------------------------------------------------------------------------
 -- I/O manager loop
@@ -977,11 +1007,12 @@ processCompletion Manager{..} n delay = do
                     ++ " cdData: " ++ show cdDataCheck
                     ++ " at idx " ++ show idx
           let oldDataPtr = exchangePtr ptr_lpol nullReq
-          when (oldDataPtr /= nullReq) $
-            do payload <- peek oldDataPtr
-               debugIO $ "exchanged: " ++ show oldDataPtr
+          debugIO $ ":: oldDataPtr " ++ show oldDataPtr
+          when (oldDataPtr /= nullPtr && oldDataPtr /= nullReq) $
+            do debugIO $ "exchanged: " ++ show oldDataPtr
+               payload <- peek oldDataPtr
                let !(CompletionData _hwnd cb) = payload
-               -- free oldDataPtr
+               free oldDataPtr
                reqs <- removeRequest
                debugIO $ "-1.. " ++ show reqs ++ " requests queued."
                status <- FFI.overlappedIOStatus (lpOverlapped oe)
@@ -989,7 +1020,7 @@ processCompletion Manager{..} n delay = do
                -- of re-interpret here. But for now, don't care.
                let status' = fromIntegral status
                cb status' (dwNumberOfBytesTransferred oe)
-               -- free hs_lpol
+               free hs_lpol
 
       -- clear the array so we don't erroneously interpret the output, in
       -- certain circumstances like lockFileEx the code could return 1 entry
