@@ -178,6 +178,9 @@ hsImplicitBodyI (HsIB { hsib_body = body }) = body
 hsSigTypeI :: LHsSigType DocNameI -> LHsType DocNameI
 hsSigTypeI = hsImplicitBodyI
 
+getConArgsI :: ConDecl DocNameI -> HsConDeclDetails DocNameI
+getConArgsI d = con_args d
+
 getGADTConType :: ConDecl DocNameI -> LHsType DocNameI
 -- The full type of a GADT data constructor We really only get this in
 -- order to pretty-print it, and currently only in Haddock's code.  So
@@ -233,7 +236,7 @@ tcdNameI = unLoc . tyClDeclLNameI
 
 -- -------------------------------------
 
-getGADTConTypeG :: ConDecl (GhcPass p) -> LHsType (GhcPass p)
+getGADTConTypeG :: ConDecl GhcRn -> LHsType GhcRn
 -- The full type of a GADT data constructor We really only get this in
 -- order to pretty-print it, and currently only in Haddock's code.  So
 -- we are cavalier about locations and extensions, hence the

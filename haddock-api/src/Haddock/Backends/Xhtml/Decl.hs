@@ -934,7 +934,7 @@ ppSideBySideConstr subdocs fixities unicode pkg qual (L _ con)
                               , fixity
                               ]
 
-    fieldPart = case (con, getConArgs con) of
+    fieldPart = case (con, getConArgsI con) of
         -- Record style GADTs
         (ConDeclGADT{}, RecCon _)            -> [ doConstrArgsWithDocs [] ]
 

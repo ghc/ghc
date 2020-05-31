@@ -795,7 +795,7 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
                             , ppLType unicode (getGADTConType con)
                             ]
 
-    fieldPart = case (con, getConArgs con) of
+    fieldPart = case (con, getConArgsI con) of
         -- Record style GADTs
         (ConDeclGADT{}, RecCon _)            -> doConstrArgsWithDocs []
 
