@@ -880,6 +880,7 @@ fi
 
 dnl ** check for xelatex
 AC_PATH_PROG(XELATEX,xelatex)
+AC_PATH_PROG(MAKEINDEX,makeindex)
 
 dnl ** check for makeinfo
 AC_PATH_PROG(MAKEINFO,makeinfo)
@@ -1379,7 +1380,7 @@ dnl --------------------------------------------------------------
 if test -n "$SPHINXBUILD"; then
     BUILD_MAN=YES
     BUILD_SPHINX_HTML=YES
-    if test -n "$XELATEX"; then
+    if test -n "$XELATEX" -a -n "$MAKEINDEX"; then
         BUILD_SPHINX_PDF=YES
     else
         BUILD_SPHINX_PDF=NO
