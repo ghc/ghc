@@ -510,22 +510,22 @@ expected_ty.
 -----------------
 -- tcWrapResult needs both un-type-checked (for origins and error messages)
 -- and type-checked (for wrapping) expressions
-tcWrapResult :: HsExpr GhcRn -> HsExpr GhcTcId -> TcSigmaType -> ExpRhoType
-             -> TcM (HsExpr GhcTcId)
+tcWrapResult :: HsExpr GhcRn -> HsExpr GhcTc -> TcSigmaType -> ExpRhoType
+             -> TcM (HsExpr GhcTc)
 tcWrapResult rn_expr = tcWrapResultO (exprCtOrigin rn_expr) rn_expr
 
-tcWrapResultO :: CtOrigin -> HsExpr GhcRn -> HsExpr GhcTcId -> TcSigmaType -> ExpRhoType
-               -> TcM (HsExpr GhcTcId)
+tcWrapResultO :: CtOrigin -> HsExpr GhcRn -> HsExpr GhcTc -> TcSigmaType -> ExpRhoType
+               -> TcM (HsExpr GhcTc)
 tcWrapResultO orig rn_expr expr actual_ty res_ty
   = do { traceTc "tcWrapResult" (vcat [ text "Actual:  " <+> ppr actual_ty
                                       , text "Expected:" <+> ppr res_ty ])
        ; wrap <- tcSubTypeNC orig GenSigCtxt (Just rn_expr) actual_ty res_ty
        ; return (mkHsWrap wrap expr) }
 
-tcWrapResultMono :: HsExpr GhcRn -> HsExpr GhcTcId
+tcWrapResultMono :: HsExpr GhcRn -> HsExpr GhcTc
                  -> TcRhoType   -- Actual -- a rho-type not a sigma-type
                  -> ExpRhoType  -- Expected
-                 -> TcM (HsExpr GhcTcId)
+                 -> TcM (HsExpr GhcTc)
 -- A version of tcWrapResult to use when the actual type is a
 -- rho-type, so nothing to instantiate; just go straight to unify.
 -- It means we don't need to pass in a CtOrigin

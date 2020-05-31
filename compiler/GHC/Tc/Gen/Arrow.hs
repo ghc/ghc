@@ -85,7 +85,7 @@ Note that
 
 tcProc :: LPat GhcRn -> LHsCmdTop GhcRn         -- proc pat -> expr
        -> ExpRhoType                            -- Expected type of whole proc expression
-       -> TcM (LPat GhcTc, LHsCmdTop GhcTcId, TcCoercion)
+       -> TcM (LPat GhcTc, LHsCmdTop GhcTc, TcCoercion)
 
 tcProc pat cmd exp_ty
   = newArrowScope $
@@ -123,7 +123,7 @@ mkCmdArrTy env t1 t2 = mkAppTys (cmd_arr env) [t1, t2]
 tcCmdTop :: CmdEnv
          -> LHsCmdTop GhcRn
          -> CmdType
-         -> TcM (LHsCmdTop GhcTcId)
+         -> TcM (LHsCmdTop GhcTc)
 
 tcCmdTop env (L loc (HsCmdTop names cmd)) cmd_ty@(cmd_stk, res_ty)
   = setSrcSpan loc $
@@ -132,14 +132,14 @@ tcCmdTop env (L loc (HsCmdTop names cmd)) cmd_ty@(cmd_stk, res_ty)
         ; return (L loc $ HsCmdTop (CmdTopTc cmd_stk res_ty names') cmd') }
 
 ----------------------------------------
-tcCmd  :: CmdEnv -> LHsCmd GhcRn -> CmdType -> TcM (LHsCmd GhcTcId)
+tcCmd  :: CmdEnv -> LHsCmd GhcRn -> CmdType -> TcM (LHsCmd GhcTc)
         -- The main recursive function
 tcCmd env (L loc cmd) res_ty
   = setSrcSpan loc $ do
         { cmd' <- tc_cmd env cmd res_ty
         ; return (L loc cmd') }
 
-tc_cmd :: CmdEnv -> HsCmd GhcRn  -> CmdType -> TcM (HsCmd GhcTcId)
+tc_cmd :: CmdEnv -> HsCmd GhcRn  -> CmdType -> TcM (HsCmd GhcTc)
 tc_cmd env (HsCmdPar x cmd) res_ty
   = do  { cmd' <- tcCmd env cmd res_ty
         ; return (HsCmdPar x cmd') }
@@ -316,7 +316,7 @@ tc_cmd env cmd@(HsCmdArrForm x expr f fixity cmd_args) (cmd_stk, res_ty)
         ; return (HsCmdArrForm x expr' f fixity cmd_args') }
 
   where
-    tc_cmd_arg :: LHsCmdTop GhcRn -> TcM (LHsCmdTop GhcTcId, TcType)
+    tc_cmd_arg :: LHsCmdTop GhcRn -> TcM (LHsCmdTop GhcTc, TcType)
     tc_cmd_arg cmd
        = do { arr_ty <- newFlexiTyVarTy arrowTyConKind
             ; stk_ty <- newFlexiTyVarTy liftedTypeKind
@@ -339,7 +339,7 @@ tcCmdMatches :: CmdEnv
              -> TcType                           -- ^ type of the scrutinee
              -> MatchGroup GhcRn (LHsCmd GhcRn)  -- ^ case alternatives
              -> CmdType
-             -> TcM (MatchGroup GhcTcId (LHsCmd GhcTcId))
+             -> TcM (MatchGroup GhcTc (LHsCmd GhcTc))
 tcCmdMatches env scrut_ty matches (stk, res_ty)
   = tcMatchesCase match_ctxt (unrestricted scrut_ty) matches (mkCheckExpType res_ty)
   where
@@ -423,7 +423,7 @@ tcArrDoStmt env ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
 tcArrDoStmt _ _ stmt _ _
   = pprPanic "tcArrDoStmt: unexpected Stmt" (ppr stmt)
 
-tc_arr_rhs :: CmdEnv -> LHsCmd GhcRn -> TcM (LHsCmd GhcTcId, TcType)
+tc_arr_rhs :: CmdEnv -> LHsCmd GhcRn -> TcM (LHsCmd GhcTc, TcType)
 tc_arr_rhs env rhs = do { ty <- newFlexiTyVarTy liftedTypeKind
                         ; rhs' <- tcCmd env rhs (unitTy, ty)
                         ; return (rhs', ty) }
