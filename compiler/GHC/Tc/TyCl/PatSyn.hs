@@ -427,7 +427,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                           (args', (map scaledThing arg_tys))
                           pat_ty rec_fields }
   where
-    tc_arg :: TCvSubst -> Name -> Type -> TcM (LHsExpr GhcTcId)
+    tc_arg :: TCvSubst -> Name -> Type -> TcM (LHsExpr GhcTc)
     tc_arg subst arg_name arg_ty
       = do {   -- Look up the variable actually bound by lpat
                -- and check that it has the expected type
@@ -597,8 +597,7 @@ tc_patsyn_finish :: Located Name      -- ^ PatSyn Name
                  -> LPat GhcTc        -- ^ Pattern of the PatSyn
                  -> ([TcInvisTVBinder], [PredType], TcEvBinds, [EvVar])
                  -> ([TcInvisTVBinder], [TcType], [PredType], [EvTerm])
-                 -> ([LHsExpr GhcTcId], [TcType])   -- ^ Pattern arguments and
-                                                    -- types
+                 -> ([LHsExpr GhcTc], [TcType])  -- ^ Pattern arguments and types
                  -> TcType            -- ^ Pattern type
                  -> [Name]            -- ^ Selector names
                  -- ^ Whether fields, empty if not record PatSyn
@@ -683,7 +682,7 @@ tcPatSynMatcher :: Located Name
                 -> LPat GhcTc
                 -> ([TcTyVar], ThetaType, TcEvBinds, [EvVar])
                 -> ([TcTyVar], [TcType], ThetaType, [EvTerm])
-                -> ([LHsExpr GhcTcId], [TcType])
+                -> ([LHsExpr GhcTc], [TcType])
                 -> TcType
                 -> TcM ((Id, Bool), LHsBinds GhcTc)
 -- See Note [Matchers and builders for pattern synonyms] in GHC.Core.PatSyn
@@ -885,7 +884,7 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
                              pprMatches other_mg
 
-tcPatSynBuilderOcc :: PatSyn -> TcM (HsExpr GhcTcId, TcSigmaType)
+tcPatSynBuilderOcc :: PatSyn -> TcM (HsExpr GhcTc, TcSigmaType)
 -- monadic only for failure
 tcPatSynBuilderOcc ps
   | Just (builder_id, add_void_arg) <- builder

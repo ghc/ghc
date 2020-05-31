@@ -5,28 +5,28 @@ import GHC.Tc.Utils.TcType ( TcRhoType, TcSigmaType, SyntaxOpType, ExpType, ExpR
 import GHC.Tc.Types        ( TcM )
 import GHC.Tc.Types.Origin ( CtOrigin )
 import GHC.Core.Type ( Mult )
-import GHC.Hs.Extension    ( GhcRn, GhcTcId )
+import GHC.Hs.Extension    ( GhcRn, GhcTc )
 
 tcCheckPolyExpr ::
           LHsExpr GhcRn
        -> TcSigmaType
-       -> TcM (LHsExpr GhcTcId)
+       -> TcM (LHsExpr GhcTc)
 
 tcMonoExpr, tcMonoExprNC ::
           LHsExpr GhcRn
        -> ExpRhoType
-       -> TcM (LHsExpr GhcTcId)
+       -> TcM (LHsExpr GhcTc)
 tcCheckMonoExpr, tcCheckMonoExprNC ::
           LHsExpr GhcRn
        -> TcRhoType
-       -> TcM (LHsExpr GhcTcId)
+       -> TcM (LHsExpr GhcTc)
 
-tcExpr :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTcId)
+tcExpr :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 
-tcInferSigma :: LHsExpr GhcRn -> TcM (LHsExpr GhcTcId, TcSigmaType)
+tcInferSigma :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcSigmaType)
 
 tcInferRho, tcInferRhoNC ::
-          LHsExpr GhcRn -> TcM (LHsExpr GhcTcId, TcRhoType)
+          LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcRhoType)
 
 tcSyntaxOp :: CtOrigin
            -> SyntaxExprRn
@@ -43,4 +43,4 @@ tcSyntaxOpGen :: CtOrigin
               -> TcM (a, SyntaxExprTc)
 
 
-tcCheckId :: Name -> ExpRhoType -> TcM (HsExpr GhcTcId)
+tcCheckId :: Name -> ExpRhoType -> TcM (HsExpr GhcTc)

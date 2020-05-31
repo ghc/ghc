@@ -348,12 +348,12 @@ checkMissingAmpersand dflags arg_tys res_ty
 -}
 
 tcForeignExports :: [LForeignDecl GhcRn]
-             -> TcM (LHsBinds GhcTcId, [LForeignDecl GhcTcId], Bag GlobalRdrElt)
+             -> TcM (LHsBinds GhcTc, [LForeignDecl GhcTc], Bag GlobalRdrElt)
 tcForeignExports decls =
   getHooked tcForeignExportsHook tcForeignExports' >>= ($ decls)
 
 tcForeignExports' :: [LForeignDecl GhcRn]
-             -> TcM (LHsBinds GhcTcId, [LForeignDecl GhcTcId], Bag GlobalRdrElt)
+             -> TcM (LHsBinds GhcTc, [LForeignDecl GhcTc], Bag GlobalRdrElt)
 -- For the (Bag GlobalRdrElt) result,
 -- see Note [Newtype constructor usage in foreign declarations]
 tcForeignExports' decls

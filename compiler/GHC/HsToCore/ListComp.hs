@@ -647,7 +647,7 @@ dsInnerMonadComp stmts bndrs ret_op
 --       , fmap (selN2 :: (t1, t2) -> t2) ys )
 
 mkMcUnzipM :: TransForm
-           -> HsExpr GhcTcId    -- fmap
+           -> HsExpr GhcTc      -- fmap
            -> Id                -- Of type n (a,b,c)
            -> [Type]            -- [a,b,c]   (not levity-polymorphic)
            -> DsM CoreExpr      -- Of type (n a, n b, n c)
