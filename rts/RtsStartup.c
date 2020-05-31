@@ -70,7 +70,7 @@ static void flushStdHandles(void);
 
 /* -----------------------------------------------------------------------------
    Initialise floating point unit on x86 (currently disabled; See Note
-   [x86 Floating point precision] in compiler/nativeGen/X86/Instr.hs)
+   [x86 Floating point precision] in compiler/GHC/CmmToAsm/X86/Instr.hs)
    -------------------------------------------------------------------------- */
 
 #define X86_INIT_FPU 0

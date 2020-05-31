@@ -85,8 +85,8 @@ The server runs any finalizers that were added by addModuleFinalizer.
 
 Other Notes on TH / Remote GHCi
 
-  * Note [Remote GHCi] in compiler/ghci/GHCi.hs
-  * Note [External GHCi pointers] in compiler/ghci/GHCi.hs
+  * Note [Remote GHCi] in compiler/GHC/Runtime/Interpreter.hs
+  * Note [External GHCi pointers] in compiler/GHC/Runtime/Interpreter.hs
   * Note [TH recover with -fexternal-interpreter] in GHC.Tc.Gen.Splice
 -}
 

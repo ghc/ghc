@@ -1,0 +1,5 @@
+
+T18251e.hs:3:5: error:
+    • Syntax error on [| id |]
+      Perhaps you intended to use TemplateHaskell or TemplateHaskellQuotes
+    • In the Template Haskell quotation [| id |]
