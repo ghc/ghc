@@ -467,7 +467,7 @@ lintCoreBindings dflags pass local_in_scope binds
   where
     all_pairs = flattenBinds binds
      -- Put all the top-level binders in scope at the start
-     -- This is because transformation rules can bring something
+     -- This is because rewrite rules can bring something
      -- into use 'unexpectedly'; see Note [Glomming] in OccurAnal
     binders = map fst all_pairs
 

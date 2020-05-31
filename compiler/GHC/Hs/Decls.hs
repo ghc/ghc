@@ -2184,7 +2184,7 @@ instance Outputable ForeignExport where
 {-
 ************************************************************************
 *                                                                      *
-\subsection{Transformation rules}
+\subsection{Rewrite rules}
 *                                                                      *
 ************************************************************************
 -}

@@ -354,7 +354,7 @@ to the binders in the top-level bindings
 
 Reason
   - It makes the rules easier to look up
-  - It means that transformation rules and specialisations for
+  - It means that rewrite rules and specialisations for
     locally defined Ids are handled uniformly
   - It keeps alive things that are referred to only from a rule
     (the occurrence analyser knows about rules attached to Ids)
@@ -368,7 +368,7 @@ Reason
 
 ************************************************************************
 *                                                                      *
-*              Desugaring transformation rules
+*              Desugaring rewrite rules
 *                                                                      *
 ************************************************************************
 -}

@@ -2488,7 +2488,7 @@ lookupFixity env n = case lookupNameEnv env n of
 -- * An instance declaration in a module other than the definition
 --   module for one of the type constructors or classes in the instance head
 --
--- * A transformation rule in a module other than the one defining
+-- * A rewrite rule in a module other than the one defining
 --   the function in the head of the rule
 --
 type WhetherHasOrphans   = Bool

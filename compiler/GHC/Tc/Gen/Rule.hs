@@ -7,7 +7,7 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 
--- | Typechecking transformation rules
+-- | Typechecking rewrite rules
 module GHC.Tc.Gen.Rule ( tcRules ) where
 
 import GHC.Prelude
@@ -239,7 +239,7 @@ tcRuleTmBndrs (L _ (RuleBndrSig _ (L _ name) rn_ty) : rule_bndrs)
         ; return (map snd tvs ++ tyvars, id : tmvars) }
 
 ruleCtxt :: FastString -> SDoc
-ruleCtxt name = text "When checking the transformation rule" <+>
+ruleCtxt name = text "When checking the rewrite rule" <+>
                 doubleQuotes (ftext name)
 
 
