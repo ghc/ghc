@@ -55,7 +55,7 @@ def getStdout(cmd_and_args: List[str]):
     if r != 0:
         raise Exception("Command failed: " + str(cmd_and_args))
     if stderr:
-        raise Exception("stderr from command: %s\nOutput:\n%s\n" % (cmd_and_args, stderr))
+        raise Exception("stderr from command: %s\nOutput:\n%s\n" % (cmd_and_args, stderr.decode('utf-8')))
     return stdout.decode('utf-8')
 
 def lndir(srcdir: Path, dstdir: Path):
@@ -98,7 +98,10 @@ def symlinks_work() -> bool:
             except OSError as e:
                 print('Saw {} during symlink test; assuming symlinks do not work.'.format(e))
             finally:
-                os.unlink('__symlink-test')
+                try:
+                    os.unlink('__symlink-test')
+                except:
+                    pass
 
         return works
     else:
@@ -128,3 +131,16 @@ class Watcher(object):
         if self.pool <= 0:
             self.evt.set()
         self.sync_lock.release()
+
+def memoize(f):
+    """
+    A decorator to memoize a nullary function.
+    """
+    def cached():
+        if cached._cache is None:
+            cached._cache = f()
+
+        return cached._cache
+
+    cached._cache = None
+    return cached

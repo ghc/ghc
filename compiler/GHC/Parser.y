@@ -51,7 +51,7 @@ import qualified Prelude
 import GHC.Hs
 
 import GHC.Driver.Phases  ( HscSource(..) )
-import GHC.Driver.Types   ( IsBootInterface, WarningTxt(..) )
+import GHC.Driver.Types   ( IsBootInterface(..), WarningTxt(..) )
 import GHC.Driver.Session
 import GHC.Driver.Backpack.Syntax
 import GHC.Unit.Info
@@ -722,8 +722,8 @@ unitdecl :: { LHsUnitDecl PackageName }
              -- XXX not accurate
              { sL1 $2 $ DeclD
                  (case snd $3 of
-                   False -> HsSrcFile
-                   True  -> HsBootFile)
+                   NotBoot -> HsSrcFile
+                   IsBoot  -> HsBootFile)
                  $4
                  (Just $ sL1 $2 (HsModule (Just $4) $6 (fst $ snd $8) (snd $ snd $8) $5 $1)) }
         | maybedocheader 'signature' modid maybemodwarning maybeexports 'where' body
@@ -735,8 +735,8 @@ unitdecl :: { LHsUnitDecl PackageName }
         -- will prevent us from parsing both forms.
         | maybedocheader 'module' maybe_src modid
              { sL1 $2 $ DeclD (case snd $3 of
-                   False -> HsSrcFile
-                   True  -> HsBootFile) $4 Nothing }
+                   NotBoot -> HsSrcFile
+                   IsBoot  -> HsBootFile) $4 Nothing }
         | maybedocheader 'signature' modid
              { sL1 $2 $ DeclD HsigFile $3 Nothing }
         | 'dependency' unitid mayberns
@@ -985,8 +985,8 @@ importdecl :: { LImportDecl GhcPs }
 
 maybe_src :: { (([AddAnn],SourceText),IsBootInterface) }
         : '{-# SOURCE' '#-}'        { (([mo $1,mc $2],getSOURCE_PRAGs $1)
-                                      , True) }
-        | {- empty -}               { (([],NoSourceText),False) }
+                                      , IsBoot) }
+        | {- empty -}               { (([],NoSourceText),NotBoot) }
 
 maybe_safe :: { ([AddAnn],Bool) }
         : 'safe'                                { ([mj AnnSafe $1],True) }
