@@ -17,6 +17,8 @@
 #include <windows.h>
 #include <io.h>
 #include <objbase.h>
+#include <ntstatus.h>
+#include <winternl.h>
 #include "fs.h"
 
 /* This is the error table that defines the mapping between OS error
@@ -208,6 +210,31 @@ bool __createUUIDTempFileErrNo (wchar_t* pathName, wchar_t* prefix,
 fail:
   maperrno();
   return false;
+}
+
+
+/* Seems to be part of the Windows SDK so provide an inline definition for
+   use and rename it so it doesn't conflict for people who do have the SDK.  */
+
+typedef struct _MY_PUBLIC_OBJECT_BASIC_INFORMATION {
+  ULONG Attributes;
+  ACCESS_MASK GrantedAccess;
+  ULONG HandleCount;
+  ULONG PointerCount;
+  ULONG Reserved[10];
+ } MY_PUBLIC_OBJECT_BASIC_INFORMATION, *PMY_PUBLIC_OBJECT_BASIC_INFORMATION;
+
+ACCESS_MASK __get_handle_access_mask (HANDLE handle)
+{
+  MY_PUBLIC_OBJECT_BASIC_INFORMATION obi;
+  if (STATUS_SUCCESS != NtQueryObject(handle, ObjectBasicInformation, &obi,
+                                      sizeof(obi), NULL))
+  {
+    return obi.GrantedAccess;
+  }
+
+  maperrno();
+  return 0;
 }
 
 bool getTempFileNameErrorNo (wchar_t* pathName, wchar_t* prefix,
