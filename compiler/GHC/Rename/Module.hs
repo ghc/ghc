@@ -1068,7 +1068,7 @@ bindRuleTyVars _ _ thing_inside = thing_inside Nothing
 {-
 Note [Rule LHS validity checking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Check the shape of a transformation rule LHS.  Currently we only allow
+Check the shape of a rewrite rule LHS.  Currently we only allow
 LHSs of the form @(f e1 .. en)@, where @f@ is not one of the
 @forall@'d variables.
 

@@ -1,4 +1,4 @@
 
 ExplicitForAllRules1.hs:49:31: warning: [-Wunused-foralls (in -Wextra)]
     Unused quantified type variable ‘b’
-    In the transformation rule example7
+    In the rewrite rule "example7"

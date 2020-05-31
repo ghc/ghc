@@ -9,7 +9,7 @@ T5853.hs:15:52: error:
         bound by the RULE "map/map" at T5853.hs:15:2-57
       NB: ‘Subst’ is a non-injective type family
     • In the expression: (f . g) <$> xs
-      When checking the transformation rule "map/map"
+      When checking the rewrite rule "map/map"
     • Relevant bindings include
         f :: Elem fa -> b (bound at T5853.hs:15:19)
         g :: a -> Elem fa (bound at T5853.hs:15:21)
