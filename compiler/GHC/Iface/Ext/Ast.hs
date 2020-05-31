@@ -54,6 +54,7 @@ import GHC.Types.Var              ( Id, Var, EvId, setVarName, varName, varType,
 import GHC.Types.Var.Env
 import GHC.Types.Unique
 import GHC.Iface.Make             ( mkIfaceExports )
+import GHC.Utils.Panic
 import GHC.Data.Maybe
 import GHC.Data.FastString
 
@@ -485,7 +486,7 @@ tvScopes
   :: TyVarScope
   -> Scope
   -> [LHsTyVarBndr flag (GhcPass a)]
-  -> [TVScoped (LHsTyVarBndr flag (GHcPass a))]
+  -> [TVScoped (LHsTyVarBndr flag (GhcPass a))]
 tvScopes tvScope rhsScope xs =
   map (\(RS sc a)-> TVS tvScope sc a) $ listScopes rhsScope xs
 
@@ -677,7 +678,7 @@ instance ToHie (Located HsWrapper) where
           concatMapM (toHie . C EvidenceVarUse . L osp) $ evVarsOfTermList a
         _               -> pure []
 
-instance HiePass p => HasType (LHsBind (GhcPass p)) where
+instance HiePass p => HasType (Located (HsBind (GhcPass p))) where
   getTypeNode (L spn bind) =
     case hiePass @p of
       HieRn -> makeNode bind spn
@@ -1162,7 +1163,7 @@ instance HiePass p => ToHie (Located (HsExpr (GhcPass p))) where
            ]
         | otherwise -> []
 
-instance HiePass p => ToHie (Located (LHsTupArg (GhcPass p))) where
+instance HiePass p => ToHie (Located (HsTupArg (GhcPass p))) where
   toHie (L span arg) = concatM $ makeNode arg span : case arg of
     Present _ expr ->
       [ toHie expr
@@ -1223,7 +1224,7 @@ instance HiePass p => ToHie (RScoped (Located (HsLocalBinds (GhcPass p)))) where
                       valBinds
         ]
 
-instance HiePass p => ToHie (RScoped (LIPBind (GhcPass p))) where
+instance HiePass p => ToHie (RScoped (Located (IPBind (GhcPass p)))) where
   toHie (RS scope (L sp bind)) = concatM $ makeNode bind sp : case bind of
     IPBind _ (Left _) expr -> [toHie expr]
     IPBind _ (Right v) expr ->
@@ -1706,7 +1707,7 @@ instance (ToHie tm, ToHie ty) => ToHie (HsArg tm ty) where
   toHie (HsTypeArg _ ty) = toHie ty
   toHie (HsArgPar sp) = locOnly sp
 
-instance Data flag => ToHie (TVScoped (LHsTyVarBndr flag GhcRn)) where
+instance Data flag => ToHie (TVScoped (Located (HsTyVarBndr flag GhcRn))) where
   toHie (TVS tsc sc (L span bndr)) = concatM $ makeNode bndr span : case bndr of
       UserTyVar _ _ var ->
         [ toHie $ C (TyVarBind sc tsc) var
