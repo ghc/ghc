@@ -290,6 +290,13 @@ buildSphinxPdf path = do
             need (map (rstFilesDir -/-) rstFiles)
             build $ target docContext (Sphinx LatexMode) [pathPath path] [dir]
             checkSphinxWarnings dir
+
+            -- LaTeX "fixed point"
+            build $ target docContext Xelatex [path <.> "tex"] [dir]
+            build $ target docContext Xelatex [path <.> "tex"] [dir]
+            build $ target docContext Xelatex [path <.> "tex"] [dir]
+            build $ target docContext Makeindex [path <.> "idx"] [dir]
+            build $ target docContext Xelatex [path <.> "tex"] [dir]
             build $ target docContext Xelatex [path <.> "tex"] [dir]
             copyFileUntracked (dir -/- path <.> "pdf") file
 

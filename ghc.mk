@@ -185,6 +185,11 @@ $(error BUILD_SPHINX_PDF=YES, but `xelatex` was not found. \
   Install `xelatex`, then rerun `./configure`. \
   See https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation)
 endif
+ifeq "$(MAKEINDEX)" ""
+$(error BUILD_SPHINX_PDF=YES, but `makeindex` was not found. \
+  Install `xelatex`, then rerun `./configure`. \
+  See https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation)
+endif
 endif
 
 ifeq "$(HSCOLOUR_SRCS)" "YES"
