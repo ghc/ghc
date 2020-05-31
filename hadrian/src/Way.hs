@@ -27,7 +27,7 @@ dynamic = wayFromUnits [Dynamic]
 profilingDynamic :: Way
 profilingDynamic = wayFromUnits [Profiling, Dynamic]
 
--- RTS only ways below. See compiler/main/DynFlags.hs.
+-- RTS only ways below. See compiler/GHC/Driver/Session.hs.
 -- | Build RTS with event logging.
 logging :: Way
 logging = wayFromUnits [Logging]

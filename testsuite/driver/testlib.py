@@ -22,7 +22,7 @@ from testglobals import config, ghc_env, default_testopts, brokens, t, \
                         TestRun, TestResult, TestOptions, PerfMetric
 from testutil import strip_quotes, lndir, link_or_copy_file, passed, \
                      failBecause, testing_metrics, \
-                     PassFail
+                     PassFail, memoize
 from term_color import Color, colored
 import testutil
 from cpu_features import have_cpu_feature
@@ -1895,7 +1895,7 @@ def check_hp_ok(name: TestName) -> bool:
 
     if hp2psResult == 0:
         if actual_ps_path.exists():
-            if gs_working:
+            if does_ghostscript_work():
                 gsResult = runCmd(genGSCmd(actual_ps_path))
                 if (gsResult == 0):
                     return True
@@ -2335,31 +2335,38 @@ def runCmd(cmd: str,
 
 # -----------------------------------------------------------------------------
 # checking if ghostscript is available for checking the output of hp2ps
-
 def genGSCmd(psfile: Path) -> str:
     return '{{gs}} -dNODISPLAY -dBATCH -dQUIET -dNOPAUSE "{0}"'.format(psfile)
 
-def gsNotWorking() -> None:
-    global gs_working
-    print("GhostScript not available for hp2ps tests")
+@memoize
+def does_ghostscript_work() -> bool:
+    """
+    Detect whether Ghostscript is functional.
+    """
+    def gsNotWorking(reason: str) -> None:
+        print("GhostScript not available for hp2ps tests:", reason)
 
-global gs_working
-gs_working = False
-if config.have_profiling:
-  if config.gs != '':
-    resultGood = runCmd(genGSCmd(config.top + '/config/good.ps'));
-    if resultGood == 0:
-        resultBad = runCmd(genGSCmd(config.top + '/config/bad.ps') +
-                                   ' >/dev/null 2>&1')
-        if resultBad != 0:
-            print("GhostScript available for hp2ps tests")
-            gs_working = True
-        else:
-            gsNotWorking();
-    else:
-        gsNotWorking();
-  else:
-    gsNotWorking();
+    if config.gs is None:
+        return False
+
+    try:
+        if runCmd(genGSCmd(config.top / 'config' / 'good.ps')) != 0:
+            gsNotWorking("gs can't process good input")
+            return False
+    except Exception as e:
+        gsNotWorking('error invoking gs on bad input: %s' % e)
+        return False
+
+    try:
+        cmd = genGSCmd(config.top / 'config' / 'bad.ps') + ' >/dev/null 2>&1'
+        if runCmd(cmd) == 0:
+            gsNotWorking('gs accepts bad input')
+            return False
+    except Exception as e:
+        gsNotWorking('error invoking gs on bad input: %s' % e)
+        return False
+
+    return True
 
 def add_suffix( name: Union[str, Path], suffix: str ) -> Path:
     if suffix == '':
