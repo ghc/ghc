@@ -170,7 +170,7 @@ simplTopBinds :: SimplEnv -> [InBind] -> SimplM (SimplFloats, SimplEnv)
 -- See Note [The big picture]
 simplTopBinds env0 binds0
   = do  {       -- Put all the top-level binders into scope at the start
-                -- so that if a transformation rule has unexpectedly brought
+                -- so that if a rewrite rule has unexpectedly brought
                 -- anything into scope, then we don't get a complaint about that.
                 -- It's rather as if the top-level binders were imported.
                 -- See note [Glomming] in OccurAnal.
