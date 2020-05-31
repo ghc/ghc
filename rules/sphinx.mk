@@ -66,7 +66,7 @@ $1/$2.pdf: $1/conf.py $$($1_RST_SOURCES)
 	cd $1/build-pdf/$2 ; $(XELATEX) -halt-on-error $2.tex 2>/dev/null >/dev/null || true
 	cd $1/build-pdf/$2 ; $(XELATEX) -halt-on-error $2.tex 2>/dev/null >/dev/null || true
 	cd $1/build-pdf/$2 ; $(XELATEX) -halt-on-error $2.tex 2>/dev/null >/dev/null || true
-	cd $1/build-pdf/$2 ; makeindex $2.idx
+	cd $1/build-pdf/$2 ; $(MAKEINDEX) $2.idx
 	cd $1/build-pdf/$2 ; $(XELATEX) -halt-on-error $2.tex 2>/dev/null >/dev/null || true
 	cd $1/build-pdf/$2 ; $(XELATEX) -halt-on-error $2.tex
 	cp $1/build-pdf/$2/$2.pdf $1/$2.pdf
