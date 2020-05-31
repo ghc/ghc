@@ -2337,6 +2337,7 @@ def runCmd(cmd: str,
 def genGSCmd(psfile: Path) -> str:
     return '{{gs}} -dNODISPLAY -dBATCH -dQUIET -dNOPAUSE "{0}"'.format(psfile)
 
+<<<<<<< HEAD
 @memoize
 def does_ghostscript_work() -> bool:
     """
@@ -2366,6 +2367,35 @@ def does_ghostscript_work() -> bool:
         return False
 
     return True
+=======
+def gsNotWorking() -> None:
+    global gs_working
+    print("GhostScript not available for hp2ps tests")
+
+global gs_working
+gs_working = False
+if config.have_profiling:
+  if config.gs != '':
+    try:
+        resultGood = runCmd(genGSCmd(config.top + '/config/good.ps'));
+    except:
+        resultGood = 1;
+    if resultGood == 0:
+        try:
+            resultBad = runCmd(genGSCmd(config.top + '/config/bad.ps') +
+                                   ' >/dev/null 2>&1')
+        except:
+            resultBad = 0;
+        if resultBad != 0:
+            print("GhostScript available for hp2ps tests")
+            gs_working = True
+        else:
+            gsNotWorking();
+    else:
+        gsNotWorking();
+  else:
+    gsNotWorking();
+>>>>>>> b395c7d162... WINIO: Various fixes
 
 def add_suffix( name: Union[str, Path], suffix: str ) -> Path:
     if suffix == '':
