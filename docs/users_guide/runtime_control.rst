@@ -373,10 +373,19 @@ collection. Hopefully, you won't need any of these in normal operation,
 but there are several things that can be tweaked for maximum
 performance.
 
+.. rts-flag:: --copying-gc
+    :default: on
+    :since: 8.10.2
+    :reverse: --nonmoving-gc
+
+    Uses the generational copying garbage collector for all generations.
+    This is the default.
+
 .. rts-flag:: --nonmoving-gc
 
     :default: off
     :since: 8.10.1
+    :reverse: --copying-gc
 
     .. index::
        single: concurrent mark and sweep
