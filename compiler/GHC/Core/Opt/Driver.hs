@@ -18,7 +18,7 @@ import GHC.Driver.Types
 import GHC.Core.Opt.CSE  ( cseProgram )
 import GHC.Core.Rules   ( mkRuleBase, unionRuleBase,
                           extendRuleBaseList, ruleCheckProgram, addRuleInfo,
-                          getRules )
+                          getRules, initRuleOpts )
 import GHC.Core.Ppr     ( pprCoreBindings, pprCoreExpr )
 import GHC.Core.Opt.OccurAnal ( occurAnalysePgm, occurAnalyseExpr )
 import GHC.Types.Id.Info
@@ -497,9 +497,10 @@ ruleCheckPass current_phase pat guts =
     ; vis_orphs <- getVisibleOrphanMods
     ; let rule_fn fn = getRules (RuleEnv rb vis_orphs) fn
                         ++ (mg_rules guts)
+    ; let ropts = initRuleOpts dflags
     ; liftIO $ putLogMsg dflags NoReason Err.SevDump noSrcSpan
                    $ withPprStyle defaultDumpStyle
-                   (ruleCheckProgram current_phase pat
+                   (ruleCheckProgram ropts current_phase pat
                       rule_fn (mg_binds guts))
     ; return guts }
 
