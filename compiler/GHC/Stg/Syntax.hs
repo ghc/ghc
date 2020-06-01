@@ -691,7 +691,7 @@ instance OutputablePass pass => Outputable (GenStgExpr pass) where
     ppr = pprStgExpr
 
 instance OutputablePass pass => Outputable (GenStgRhs pass) where
-    ppr rhs = pprStgRhs rhs
+    ppr rhs = sdocWithDynFlags $ \dflags -> pprStgRhs (sccProfilingEnabled dflags) rhs
 
 pprStgArg :: StgArg -> SDoc
 pprStgArg (StgVarArg var) = ppr var
@@ -801,15 +801,14 @@ instance Outputable AltType where
   ppr (AlgAlt tc)     = text "Alg"    <+> ppr tc
   ppr (PrimAlt tc)    = text "Prim"   <+> ppr tc
 
-pprStgRhs :: OutputablePass pass => GenStgRhs pass -> SDoc
+pprStgRhs :: OutputablePass pass => Bool -> GenStgRhs pass -> SDoc
 
-pprStgRhs (StgRhsClosure ext cc upd_flag args body)
-  = sdocWithDynFlags $ \dflags ->
-    hang (hsep [if sccProfilingEnabled dflags then ppr cc else empty,
+pprStgRhs scc_enabled (StgRhsClosure ext cc upd_flag args body)
+  = hang (hsep [if scc_enabled then ppr cc else empty,
                 ppUnlessOption sdocSuppressStgExts (ppr ext),
                 char '\\' <> ppr upd_flag, brackets (interppSP args)])
          4 (ppr body)
 
-pprStgRhs (StgRhsCon cc con args)
+pprStgRhs _ (StgRhsCon cc con args)
   = hcat [ ppr cc,
            space, ppr con, text "! ", brackets (interppSP args)]
