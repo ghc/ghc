@@ -56,7 +56,11 @@ module GHC.Stg.Syntax (
         stgCaseBndrInScope,
         bindersOf, bindersOfTop, bindersOfTopBinds,
 
-        pprStgBinding, pprGenStgTopBindings, pprStgTopBindings
+        -- ppr
+        StgPprOpts(..), initStgPprOpts, panicStgPprOpts,
+        pprStgArg, pprStgExpr, pprStgRhs, pprStgBinding,
+        pprGenStgTopBinding, pprStgTopBinding,
+        pprGenStgTopBindings, pprStgTopBindings
     ) where
 
 #include "HsVersions.h"
@@ -643,79 +647,73 @@ type OutputablePass pass =
   , OutputableBndr (BinderP pass)
   )
 
+-- | STG pretty-printing options
+data StgPprOpts = StgPprOpts
+   { stgSccEnabled :: !Bool -- ^ Enable cost-centres
+   }
+
+-- | Initialize STG pretty-printing options from DynFlags
+initStgPprOpts :: DynFlags -> StgPprOpts
+initStgPprOpts dflags = StgPprOpts
+   { stgSccEnabled = sccProfilingEnabled dflags
+   }
+
+-- | STG pretty-printing options used for panic messages
+panicStgPprOpts :: StgPprOpts
+panicStgPprOpts = StgPprOpts
+   { stgSccEnabled = True
+   }
+
 pprGenStgTopBinding
-  :: OutputablePass pass => GenStgTopBinding pass -> SDoc
-pprGenStgTopBinding (StgTopStringLit bndr str)
-  = hang (hsep [pprBndr LetBind bndr, equals])
-        4 (pprHsBytes str <> semi)
-pprGenStgTopBinding (StgTopLifted bind)
-  = pprGenStgBinding bind
+  :: OutputablePass pass => StgPprOpts -> GenStgTopBinding pass -> SDoc
+pprGenStgTopBinding opts b = case b of
+   StgTopStringLit bndr str -> hang (hsep [pprBndr LetBind bndr, equals]) 4 (pprHsBytes str <> semi)
+   StgTopLifted bind        -> pprGenStgBinding opts bind
 
-pprGenStgBinding
-  :: OutputablePass pass => GenStgBinding pass -> SDoc
+pprGenStgBinding :: OutputablePass pass => StgPprOpts -> GenStgBinding pass -> SDoc
+pprGenStgBinding opts b = case b of
+   StgNonRec bndr rhs -> hang (hsep [pprBndr LetBind bndr, equals]) 4 (pprStgRhs opts rhs <> semi)
+   StgRec pairs       -> vcat [ text "Rec {"
+                              , vcat (intersperse blankLine (map ppr_bind pairs))
+                              , text "end Rec }" ]
+                         where
+                           ppr_bind (bndr, expr)
+                             = hang (hsep [pprBndr LetBind bndr, equals])
+                                    4 (pprStgRhs opts expr <> semi)
 
-pprGenStgBinding (StgNonRec bndr rhs)
-  = hang (hsep [pprBndr LetBind bndr, equals])
-        4 (ppr rhs <> semi)
+pprGenStgTopBindings :: (OutputablePass pass) => StgPprOpts -> [GenStgTopBinding pass] -> SDoc
+pprGenStgTopBindings opts binds
+  = vcat $ intersperse blankLine (map (pprGenStgTopBinding opts) binds)
 
-pprGenStgBinding (StgRec pairs)
-  = vcat [ text "Rec {"
-         , vcat (intersperse blankLine (map ppr_bind pairs))
-         , text "end Rec }" ]
-  where
-    ppr_bind (bndr, expr)
-      = hang (hsep [pprBndr LetBind bndr, equals])
-             4 (ppr expr <> semi)
-
-pprGenStgTopBindings
-  :: (OutputablePass pass) => [GenStgTopBinding pass] -> SDoc
-pprGenStgTopBindings binds
-  = vcat $ intersperse blankLine (map pprGenStgTopBinding binds)
-
-pprStgBinding :: StgBinding -> SDoc
+pprStgBinding :: StgPprOpts -> StgBinding -> SDoc
 pprStgBinding = pprGenStgBinding
 
-pprStgTopBindings :: [StgTopBinding] -> SDoc
+pprStgTopBinding :: StgPprOpts -> StgTopBinding -> SDoc
+pprStgTopBinding = pprGenStgTopBinding
+
+pprStgTopBindings :: StgPprOpts -> [StgTopBinding] -> SDoc
 pprStgTopBindings = pprGenStgTopBindings
 
 instance Outputable StgArg where
-    ppr = pprStgArg
-
-instance OutputablePass pass => Outputable (GenStgTopBinding pass) where
-    ppr = pprGenStgTopBinding
-
-instance OutputablePass pass => Outputable (GenStgBinding pass) where
-    ppr = pprGenStgBinding
-
-instance OutputablePass pass => Outputable (GenStgExpr pass) where
-    ppr = pprStgExpr
-
-instance OutputablePass pass => Outputable (GenStgRhs pass) where
-    ppr rhs = pprStgRhs rhs
+  ppr = pprStgArg
 
 pprStgArg :: StgArg -> SDoc
 pprStgArg (StgVarArg var) = ppr var
 pprStgArg (StgLitArg con) = ppr con
 
-pprStgExpr :: OutputablePass pass => GenStgExpr pass -> SDoc
--- special case
-pprStgExpr (StgLit lit)     = ppr lit
-
--- general case
-pprStgExpr (StgApp func args)
-  = hang (ppr func) 4 (sep (map (ppr) args))
-
-pprStgExpr (StgConApp con args _)
-  = hsep [ ppr con, brackets (interppSP args) ]
-
-pprStgExpr (StgOpApp op args _)
-  = hsep [ pprStgOp op, brackets (interppSP args)]
-
-pprStgExpr (StgLam bndrs body)
-  = sep [ char '\\' <+> ppr_list (map (pprBndr LambdaBind) (toList bndrs))
-            <+> text "->",
-         pprStgExpr body ]
-  where ppr_list = brackets . fsep . punctuate comma
+pprStgExpr :: OutputablePass pass => StgPprOpts -> GenStgExpr pass -> SDoc
+pprStgExpr opts e = case e of
+                           -- special case
+   StgLit lit           -> ppr lit
+                           -- general case
+   StgApp func args     -> hang (ppr func) 4 (interppSP args)
+   StgConApp con args _ -> hsep [ ppr con, brackets (interppSP args) ]
+   StgOpApp op args _   -> hsep [ pprStgOp op, brackets (interppSP args)]
+   StgLam bndrs body    -> let ppr_list = brackets . fsep . punctuate comma
+                           in sep [ char '\\' <+> ppr_list (map (pprBndr LambdaBind) (toList bndrs))
+                                      <+> text "->"
+                                  , pprStgExpr opts body
+                                  ]
 
 -- special case: let v = <very specific thing>
 --               in
@@ -726,9 +724,9 @@ pprStgExpr (StgLam bndrs body)
 -- Very special!  Suspicious! (SLPJ)
 
 {-
-pprStgExpr (StgLet srt (StgNonRec bndr (StgRhsClosure cc bi free_vars upd_flag args rhs))
+   StgLet srt (StgNonRec bndr (StgRhsClosure cc bi free_vars upd_flag args rhs))
                         expr@(StgLet _ _))
-  = ($$)
+   -> ($$)
       (hang (hcat [text "let { ", ppr bndr, ptext (sLit " = "),
                           ppr cc,
                           pp_binder_info bi,
@@ -739,53 +737,60 @@ pprStgExpr (StgLet srt (StgNonRec bndr (StgRhsClosure cc bi free_vars upd_flag a
       (ppr expr)
 -}
 
--- special case: let ... in let ...
-
-pprStgExpr (StgLet ext bind expr@StgLet{})
-  = ($$)
+   -- special case: let ... in let ...
+   StgLet ext bind expr@StgLet{} -> ($$)
       (sep [hang (text "let" <+> ppr ext <+> text "{")
-                2 (hsep [pprGenStgBinding bind, text "} in"])])
-      (ppr expr)
+                2 (hsep [pprGenStgBinding opts bind, text "} in"])])
+      (pprStgExpr opts expr)
 
--- general case
-pprStgExpr (StgLet ext bind expr)
-  = sep [hang (text "let" <+> ppr ext <+> text "{") 2 (pprGenStgBinding bind),
-           hang (text "} in ") 2 (ppr expr)]
+   -- general case
+   StgLet ext bind expr
+      -> sep [ hang (text "let" <+> ppr ext <+> text "{")
+                    2 (pprGenStgBinding opts bind)
+             , hang (text "} in ") 2 (pprStgExpr opts expr)
+             ]
 
-pprStgExpr (StgLetNoEscape ext bind expr)
-  = sep [hang (text "let-no-escape" <+> ppr ext <+> text "{")
-                2 (pprGenStgBinding bind),
-           hang (text "} in ")
-                2 (ppr expr)]
+   StgLetNoEscape ext bind expr
+      -> sep [ hang (text "let-no-escape" <+> ppr ext <+> text "{")
+                    2 (pprGenStgBinding opts bind)
+             , hang (text "} in ") 2 (pprStgExpr opts expr)
+             ]
 
-pprStgExpr (StgTick tickish expr)
-  = sdocOption sdocSuppressTicks $ \case
-      True  -> pprStgExpr expr
-      False -> sep [ ppr tickish, pprStgExpr expr ]
+   StgTick tickish expr -> sdocOption sdocSuppressTicks $ \case
+      True  -> pprStgExpr opts expr
+      False -> sep [ ppr tickish, pprStgExpr opts expr ]
+
+   -- Don't indent for a single case alternative.
+   StgCase expr bndr alt_type [alt]
+      -> sep [ sep [ text "case"
+                   , nest 4 (hsep [ pprStgExpr opts expr
+                                  , whenPprDebug (dcolon <+> ppr alt_type)
+                                  ])
+                   , text "of"
+                   , pprBndr CaseBind bndr
+                   , char '{'
+                   ]
+             , pprStgAlt opts False alt
+             , char '}'
+             ]
+
+   StgCase expr bndr alt_type alts
+      -> sep [ sep [ text "case"
+                   , nest 4 (hsep [ pprStgExpr opts expr
+                                  , whenPprDebug (dcolon <+> ppr alt_type)
+                                  ])
+                   , text "of"
+                   , pprBndr CaseBind bndr, char '{'
+                   ]
+             , nest 2 (vcat (map (pprStgAlt opts True) alts))
+             , char '}'
+             ]
 
 
--- Don't indent for a single case alternative.
-pprStgExpr (StgCase expr bndr alt_type [alt])
-  = sep [sep [text "case",
-           nest 4 (hsep [pprStgExpr expr,
-             whenPprDebug (dcolon <+> ppr alt_type)]),
-           text "of", pprBndr CaseBind bndr, char '{'],
-           pprStgAlt False alt,
-           char '}']
-
-pprStgExpr (StgCase expr bndr alt_type alts)
-  = sep [sep [text "case",
-           nest 4 (hsep [pprStgExpr expr,
-             whenPprDebug (dcolon <+> ppr alt_type)]),
-           text "of", pprBndr CaseBind bndr, char '{'],
-           nest 2 (vcat (map (pprStgAlt True) alts)),
-           char '}']
-
-
-pprStgAlt :: OutputablePass pass => Bool -> GenStgAlt pass -> SDoc
-pprStgAlt indent (con, params, expr)
-  | indent    = hang altPattern 4 (ppr expr <> semi)
-  | otherwise = sep [altPattern, ppr expr <> semi]
+pprStgAlt :: OutputablePass pass => StgPprOpts -> Bool -> GenStgAlt pass -> SDoc
+pprStgAlt opts indent (con, params, expr)
+  | indent    = hang altPattern 4 (pprStgExpr opts expr <> semi)
+  | otherwise = sep [altPattern, pprStgExpr opts expr <> semi]
     where
       altPattern = (hsep [ppr con, sep (map (pprBndr CasePatBind) params), text "->"])
 
@@ -801,15 +806,14 @@ instance Outputable AltType where
   ppr (AlgAlt tc)     = text "Alg"    <+> ppr tc
   ppr (PrimAlt tc)    = text "Prim"   <+> ppr tc
 
-pprStgRhs :: OutputablePass pass => GenStgRhs pass -> SDoc
+pprStgRhs :: OutputablePass pass => StgPprOpts -> GenStgRhs pass -> SDoc
+pprStgRhs opts rhs = case rhs of
+   StgRhsClosure ext cc upd_flag args body
+      -> hang (hsep [ if stgSccEnabled opts then ppr cc else empty
+                    , ppUnlessOption sdocSuppressStgExts (ppr ext)
+                    , char '\\' <> ppr upd_flag, brackets (interppSP args)
+                    ])
+              4 (pprStgExpr opts body)
 
-pprStgRhs (StgRhsClosure ext cc upd_flag args body)
-  = sdocWithDynFlags $ \dflags ->
-    hang (hsep [if sccProfilingEnabled dflags then ppr cc else empty,
-                ppUnlessOption sdocSuppressStgExts (ppr ext),
-                char '\\' <> ppr upd_flag, brackets (interppSP args)])
-         4 (ppr body)
-
-pprStgRhs (StgRhsCon cc con args)
-  = hcat [ ppr cc,
-           space, ppr con, text "! ", brackets (interppSP args)]
+   StgRhsCon cc con args
+      -> hcat [ ppr cc, space, ppr con, text "! ", brackets (sep (map pprStgArg args))]

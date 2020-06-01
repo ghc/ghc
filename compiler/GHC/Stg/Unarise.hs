@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-2012
 
@@ -315,7 +317,7 @@ unariseExpr rho e@(StgApp f args)
     f' = case lookupVarEnv rho f of
            Just (UnaryVal (StgVarArg f')) -> f'
            Nothing -> f
-           err -> pprPanic "unariseExpr - app2" (ppr e $$ ppr err)
+           err -> pprPanic "unariseExpr - app2" (pprStgExpr panicStgPprOpts e $$ ppr err)
                -- Can't happen because 'args' is non-empty, and
                -- a tuple or sum cannot be applied to anything
 
@@ -334,7 +336,7 @@ unariseExpr rho (StgOpApp op args ty)
   = return (StgOpApp op (unariseFunArgs rho args) ty)
 
 unariseExpr _ e@StgLam{}
-  = pprPanic "unariseExpr: found lambda" (ppr e)
+  = pprPanic "unariseExpr: found lambda" (pprStgExpr panicStgPprOpts e)
 
 unariseExpr rho (StgCase scrut bndr alt_ty alts)
   -- tuple/sum binders in the scrutinee can always be eliminated
@@ -412,7 +414,7 @@ elimCase rho args bndr (MultiValAlt _) alts
 
 elimCase _ args bndr alt_ty alts
   = pprPanic "elimCase - unhandled case"
-      (ppr args <+> ppr bndr <+> ppr alt_ty $$ ppr alts)
+      (ppr args <+> ppr bndr <+> ppr alt_ty $$ pprPanicAlts alts)
 
 --------------------------------------------------------------------------------
 
@@ -433,7 +435,7 @@ unariseAlts rho (MultiValAlt n) bndr [(DataAlt _, ys, e)]
 
 unariseAlts _ (MultiValAlt _) bndr alts
   | isUnboxedTupleBndr bndr
-  = pprPanic "unariseExpr: strange multi val alts" (ppr alts)
+  = pprPanic "unariseExpr: strange multi val alts" (pprPanicAlts alts)
 
 -- In this case we don't need to scrutinize the tag bit
 unariseAlts rho (MultiValAlt _) bndr [(DEFAULT, _, rhs)]
@@ -484,7 +486,7 @@ unariseSumAlt rho args (DataAlt sumCon, bs, e)
        return ( LitAlt (LitNumber LitNumInt (fromIntegral (dataConTag sumCon))), [], e' )
 
 unariseSumAlt _ scrt alt
-  = pprPanic "unariseSumAlt" (ppr scrt $$ ppr alt)
+  = pprPanic "unariseSumAlt" (ppr scrt $$ pprPanicAlt alt)
 
 --------------------------------------------------------------------------------
 
@@ -776,4 +778,10 @@ mkDefaultLitAlt :: [StgAlt] -> [StgAlt]
 mkDefaultLitAlt [] = pprPanic "elimUbxSumExpr.mkDefaultAlt" (text "Empty alts")
 mkDefaultLitAlt alts@((DEFAULT, _, _) : _) = alts
 mkDefaultLitAlt ((LitAlt{}, [], rhs) : alts) = (DEFAULT, [], rhs) : alts
-mkDefaultLitAlt alts = pprPanic "mkDefaultLitAlt" (text "Not a lit alt:" <+> ppr alts)
+mkDefaultLitAlt alts = pprPanic "mkDefaultLitAlt" (text "Not a lit alt:" <+> pprPanicAlts alts)
+
+pprPanicAlts :: (Outputable a, Outputable b, OutputablePass pass) => [(a,b,GenStgExpr pass)] -> SDoc
+pprPanicAlts alts = ppr (map pprPanicAlt alts)
+
+pprPanicAlt :: (Outputable a, Outputable b, OutputablePass pass) => (a,b,GenStgExpr pass) -> SDoc
+pprPanicAlt (c,b,e) = ppr (c,b,pprStgExpr panicStgPprOpts e)

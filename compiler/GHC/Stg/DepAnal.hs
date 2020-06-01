@@ -14,6 +14,7 @@ import GHC.Types.Var.Set
 import GHC.Unit.Module (Module)
 
 import Data.Graph (SCC (..))
+import Data.Bifunctor (first)
 
 --------------------------------------------------------------------------------
 -- * Dependency analysis
@@ -90,7 +91,7 @@ annTopBindingsDeps this_mod bs = zip bs (map top_bind bs)
     expr bounds (StgOpApp _ as _) =
       args bounds as
     expr _ lam@StgLam{} =
-      pprPanic "annTopBindingsDeps" (text "Found lambda:" $$ ppr lam)
+      pprPanic "annTopBindingsDeps" (text "Found lambda:" $$ pprStgExpr panicStgPprOpts lam)
     expr bounds (StgCase scrut scrut_bndr _ as) =
       expr bounds scrut `unionVarSet`
         alts (extendVarSet bounds scrut_bndr) as
@@ -141,4 +142,6 @@ depSort = concatMap get_binds . depAnal defs uses
     get_binds (AcyclicSCC bind) =
       [bind]
     get_binds (CyclicSCC binds) =
-      pprPanic "depSortStgBinds" (text "Found cyclic SCC:" $$ ppr binds)
+      pprPanic "depSortStgBinds"
+               (text "Found cyclic SCC:"
+               $$ ppr (map (first (pprStgTopBinding panicStgPprOpts)) binds))
