@@ -341,7 +341,7 @@ getClosureX get_closure_raw x = do
 
                 pure $ StackClosure
                     { info = itbl
-                    , size = FFIClosures.stack_size fields
+                    , stack_size = FFIClosures.stack_size fields
                     , stack_dirty = FFIClosures.stack_dirty fields
                     , stackPointer = (pts !! 0)
                     , stack  = FFIClosures.stack fields
