@@ -36,3 +36,9 @@ test('closure_size_noopt',
      ],
      compile_and_run, [''])
 
+test('tso_and_stack_closures',
+     [extra_files(['create_tso.c','create_tso.h']),
+      ignore_stdout,
+      ignore_stderr
+     ],
+     multi_compile_and_run, ['tso_and_stack_closures', [('create_tso.c','')], ''])
