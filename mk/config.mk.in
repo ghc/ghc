@@ -912,6 +912,6 @@ endif
 # Note [Disable -O2 in unregisterised mode]
 # Disable -O2 optimization in unregisterised mode. Otherwise amount
 # of generated C code # makes things very slow to compile (~5 minutes
-# on core-i7 for 'compiler/hsSyn/HsExpr.hs') and sometimes not compile
-# at all: powerpc64 overflows TOC section on 'compiler/hsSyn/HsExpr.hs'
-#         ia64 overflows short data section on 'compiler/main/DynFlags.hs'
+# on core-i7 for 'compiler/GHC/Hs/Expr.hs') and sometimes not compile
+# at all: powerpc64 overflows TOC section on 'compiler/GHC/Hs/Expr.hs'
+#         ia64 overflows short data section on 'compiler/GHC/Driver/Session.hs'

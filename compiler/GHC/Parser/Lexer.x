@@ -119,7 +119,7 @@ import GHC.Parser.Annotation
 -- -----------------------------------------------------------------------------
 -- Alex "Character set macros"
 
--- NB: The logic behind these definitions is also reflected in basicTypes/Lexeme.hs
+-- NB: The logic behind these definitions is also reflected in "GHC.Utils.Lexeme"
 -- Any changes here should likely be reflected there.
 $unispace    = \x05 -- Trick Alex into handling Unicode. See [Unicode in Alex].
 $nl          = [\n\r\f]
@@ -366,15 +366,20 @@ $tab          { warnTab }
 -- "special" symbols
 
 <0> {
-  "[|"        / { ifExtension ThQuotesBit } { token (ITopenExpQuote NoE NormalSyntax) }
-  "[||"       / { ifExtension ThQuotesBit } { token (ITopenTExpQuote NoE) }
+
+  -- Don't check ThQuotesBit here as the renamer can produce a better
+  -- error message than the lexer (see the thQuotesEnabled check in rnBracket).
+  "[|"  { token (ITopenExpQuote NoE NormalSyntax) }
+  "[||" { token (ITopenTExpQuote NoE) }
+  "|]"  { token (ITcloseQuote NormalSyntax) }
+  "||]" { token ITcloseTExpQuote }
+
+  -- Check ThQuotesBit here as to not steal syntax.
   "[e|"       / { ifExtension ThQuotesBit } { token (ITopenExpQuote HasE NormalSyntax) }
   "[e||"      / { ifExtension ThQuotesBit } { token (ITopenTExpQuote HasE) }
   "[p|"       / { ifExtension ThQuotesBit } { token ITopenPatQuote }
   "[d|"       / { ifExtension ThQuotesBit } { layout_token ITopenDecQuote }
   "[t|"       / { ifExtension ThQuotesBit } { token ITopenTypQuote }
-  "|]"        / { ifExtension ThQuotesBit } { token (ITcloseQuote NormalSyntax) }
-  "||]"       / { ifExtension ThQuotesBit } { token ITcloseTExpQuote }
 
   "[" @varid "|"  / { ifExtension QqBit }   { lex_quasiquote_tok }
 
@@ -1449,7 +1454,7 @@ qconsym buf len = ITqconsym $! splitQualName buf len False
 -- See Note [Whitespace-sensitive operator parsing]
 varsym_prefix :: Action
 varsym_prefix = sym $ \exts s ->
-  if | TypeApplicationsBit `xtest` exts, s == fsLit "@"
+  if | s == fsLit "@"  -- regardless of TypeApplications for better error messages
      -> return ITtypeApp
      | ThQuotesBit `xtest` exts, s == fsLit "$"
      -> return ITdollar
@@ -2261,7 +2266,7 @@ adjustChar c = fromIntegral $ ord adj_c
           -- with the actual character value hidden in the state.
           | otherwise =
                 -- NB: The logic behind these definitions is also reflected
-                -- in basicTypes/Lexeme.hs
+                -- in "GHC.Utils.Lexeme"
                 -- Any changes here should likely be reflected there.
 
                 case generalCategory c of
@@ -2461,7 +2466,6 @@ data ExtBits
   | BinaryLiteralsBit
   | NegativeLiteralsBit
   | HexFloatLiteralsBit
-  | TypeApplicationsBit
   | StaticPointersBit
   | NumericUnderscoresBit
   | StarIsTypeBit
@@ -2548,7 +2552,6 @@ mkParserFlags' warningFlags extensionFlags thisPackage
       .|. NegativeLiteralsBit         `xoptBit` LangExt.NegativeLiterals
       .|. HexFloatLiteralsBit         `xoptBit` LangExt.HexFloatLiterals
       .|. PatternSynonymsBit          `xoptBit` LangExt.PatternSynonyms
-      .|. TypeApplicationsBit         `xoptBit` LangExt.TypeApplications
       .|. StaticPointersBit           `xoptBit` LangExt.StaticPointers
       .|. NumericUnderscoresBit       `xoptBit` LangExt.NumericUnderscores
       .|. StarIsTypeBit               `xoptBit` LangExt.StarIsType
