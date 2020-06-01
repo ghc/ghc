@@ -121,6 +121,7 @@ data GeneralFlag
    | Opt_D_faststring_stats
    | Opt_D_dump_minimal_imports
    | Opt_DoCoreLinting
+   | Opt_DoLinearCoreLinting
    | Opt_DoStgLinting
    | Opt_DoCmmLinting
    | Opt_DoAsmLinting

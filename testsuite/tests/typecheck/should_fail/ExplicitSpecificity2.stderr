@@ -1,6 +1,6 @@
 
 ExplicitSpecificity2.hs:11:15: error:
-    • Cannot apply expression of type ‘Proxy (*) -> T (*)’
+    • Cannot apply expression of type ‘Proxy (*) # n0 -> T (*)’
       to a visible type argument ‘Int’
     • In the expression: C @Type @Int Proxy
       In an equation for ‘x’: x = C @Type @Int Proxy

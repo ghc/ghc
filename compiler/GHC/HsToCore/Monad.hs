@@ -79,6 +79,7 @@ import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 import GHC.Core.Type
+import GHC.Core.Multiplicity
 import GHC.Types.Unique.Supply
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -356,7 +357,7 @@ still reporting nice error messages.
 -}
 
 -- Make a new Id with the same print name, but different type, and new unique
-newUniqueId :: Id -> Type -> DsM Id
+newUniqueId :: Id -> Mult -> Type -> DsM Id
 newUniqueId id = mk_local (occNameFS (nameOccName (idName id)))
 
 duplicateLocalDs :: Id -> DsM Id
@@ -366,9 +367,9 @@ duplicateLocalDs old_local
 
 newPredVarDs :: PredType -> DsM Var
 newPredVarDs
- = mkSysLocalOrCoVarM (fsLit "ds")  -- like newSysLocalDs, but we allow covars
+ = mkSysLocalOrCoVarM (fsLit "ds") Many  -- like newSysLocalDs, but we allow covars
 
-newSysLocalDsNoLP, newSysLocalDs, newFailLocalDs :: Type -> DsM Id
+newSysLocalDsNoLP, newSysLocalDs, newFailLocalDs :: Mult -> Type -> DsM Id
 newSysLocalDsNoLP  = mk_local (fsLit "ds")
 
 -- this variant should be used when the caller can be sure that the variable type
@@ -379,15 +380,15 @@ newFailLocalDs = mkSysLocalM (fsLit "fail")
   -- the fail variable is used only in a situation where we can tell that
   -- levity-polymorphism is impossible.
 
-newSysLocalsDsNoLP, newSysLocalsDs :: [Type] -> DsM [Id]
-newSysLocalsDsNoLP = mapM newSysLocalDsNoLP
-newSysLocalsDs = mapM newSysLocalDs
+newSysLocalsDsNoLP, newSysLocalsDs :: [Scaled Type] -> DsM [Id]
+newSysLocalsDsNoLP = mapM (\(Scaled w t) -> newSysLocalDsNoLP w t)
+newSysLocalsDs = mapM (\(Scaled w t) -> newSysLocalDs w t)
 
-mk_local :: FastString -> Type -> DsM Id
-mk_local fs ty = do { dsNoLevPoly ty (text "When trying to create a variable of type:" <+>
-                                      ppr ty)  -- could improve the msg with another
-                                               -- parameter indicating context
-                    ; mkSysLocalOrCoVarM fs ty }
+mk_local :: FastString -> Mult -> Type -> DsM Id
+mk_local fs w ty = do { dsNoLevPoly ty (text "When trying to create a variable of type:" <+>
+                                        ppr ty)  -- could improve the msg with another
+                                                 -- parameter indicating context
+                      ; mkSysLocalOrCoVarM fs w ty }
 
 {-
 We can also reach out and either set/grab location information from
@@ -561,7 +562,7 @@ discardWarningsDs thing_inside
 -- | Fail with an error message if the type is levity polymorphic.
 dsNoLevPoly :: Type -> SDoc -> DsM ()
 -- See Note [Levity polymorphism checking]
-dsNoLevPoly ty doc = checkForLevPolyX errDs doc ty
+dsNoLevPoly ty doc = checkForLevPolyX failWithDs doc ty
 
 -- | Check an expression for levity polymorphism, failing if it is
 -- levity polymorphic.
