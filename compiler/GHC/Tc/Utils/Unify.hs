@@ -84,7 +84,7 @@ import Control.Arrow ( second )
 --   returning an uninstantiated sigma-type
 matchActualFunTy
   :: SDoc -- See Note [Herald for matchExpectedFunTys]
-  -> Maybe (HsExpr GhcRn)   -- The thing with type TcSigmaType
+  -> Maybe SDoc             -- The thing with type TcSigmaType
   -> (Arity, [TcSigmaType]) -- Total number of value args in the call, and
                             -- types of values args to which function has
                             --   been applied already (reversed)
@@ -186,7 +186,7 @@ Ugh!
 -- for example in function application
 matchActualFunTysRho :: SDoc   -- See Note [Herald for matchExpectedFunTys]
                      -> CtOrigin
-                     -> Maybe (HsExpr GhcRn)   -- the thing with type TcSigmaType
+                     -> Maybe SDoc  -- the thing with type TcSigmaType
                      -> Arity
                      -> TcSigmaType
                      -> TcM (HsWrapper, [TcSigmaType], TcRhoType)
@@ -521,7 +521,7 @@ tcWrapResultO :: CtOrigin -> HsExpr GhcRn -> HsExpr GhcTcId -> TcSigmaType -> Ex
 tcWrapResultO orig rn_expr expr actual_ty res_ty
   = do { traceTc "tcWrapResult" (vcat [ text "Actual:  " <+> ppr actual_ty
                                       , text "Expected:" <+> ppr res_ty ])
-       ; wrap <- tcSubTypeNC orig GenSigCtxt (Just rn_expr) actual_ty res_ty
+       ; wrap <- tcSubTypeNC orig GenSigCtxt (Just (ppr rn_expr)) actual_ty res_ty
        ; return (mkHsWrap wrap expr) }
 
 tcWrapResultMono :: HsExpr GhcRn -> HsExpr GhcTcId
@@ -535,7 +535,7 @@ tcWrapResultMono rn_expr expr act_ty res_ty
   = ASSERT2( isRhoTy act_ty, ppr act_ty $$ ppr rn_expr )
     do { co <- case res_ty of
                   Infer inf_res -> fillInferResult act_ty inf_res
-                  Check exp_ty  -> unifyType (Just rn_expr) act_ty exp_ty
+                  Check exp_ty  -> unifyType (Just (ppr rn_expr)) act_ty exp_ty
        ; return (mkHsWrapCo co expr) }
 
 ------------------------
@@ -567,7 +567,7 @@ tcSubType orig ctxt ty_actual ty_expected
 
 tcSubTypeNC :: CtOrigin       -- Used when instantiating
             -> UserTypeCtxt   -- Used when skolemising
-            -> Maybe (HsExpr GhcRn)   -- The expression that has type 'actual' (if known)
+            -> Maybe SDoc     -- The expression that has type 'actual' (if known)
             -> TcSigmaType            -- Actual type
             -> ExpRhoType             -- Expected type
             -> TcM HsWrapper
@@ -1173,8 +1173,9 @@ The exported functions are all defined as versions of some
 non-exported generic functions.
 -}
 
-unifyType :: Maybe (HsExpr GhcRn)   -- ^ If present, has type 'ty1'
-          -> TcTauType -> TcTauType -> TcM TcCoercionN
+unifyType :: Maybe SDoc  -- ^ If present, the thing that has type ty1
+          -> TcTauType -> TcTauType    -- ty1, ty2
+          -> TcM TcCoercionN           -- :: ty1 ~# ty2
 -- Actual and expected types
 -- Returns a coercion : ty1 ~ ty2
 unifyType thing ty1 ty2
@@ -1197,13 +1198,13 @@ unifyTypeET ty1 ty2
                           , uo_visible  = True }
 
 
-unifyKind :: Maybe (HsType GhcRn) -> TcKind -> TcKind -> TcM CoercionN
-unifyKind thing ty1 ty2
+unifyKind :: Maybe SDoc -> TcKind -> TcKind -> TcM CoercionN
+unifyKind mb_thing ty1 ty2
   = uType KindLevel origin ty1 ty2
   where
     origin = TypeEqOrigin { uo_actual   = ty1
                           , uo_expected = ty2
-                          , uo_thing    = ppr <$> thing
+                          , uo_thing    = mb_thing
                           , uo_visible  = True }
 
 

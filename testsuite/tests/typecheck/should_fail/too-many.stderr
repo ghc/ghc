@@ -1,0 +1,16 @@
+
+too-many.hs:9:11: error:
+    • Couldn't match type ‘Bool’ with ‘Int -> Bool’
+      Expected: Int -> Int -> Bool
+        Actual: Int -> Bool
+    • Possible cause: ‘f1’ is applied to too many arguments
+      In the first argument of ‘foo’, namely ‘(f1 2 3)’
+      In the expression: foo (f1 2 3)
+      In an equation for ‘g1’: g1 = foo (f1 2 3)
+
+too-many.hs:16:11: error:
+    • Couldn't match expected type ‘Int -> Int -> Bool’
+                  with actual type ‘Bool’
+    • In the first argument of ‘foo’, namely ‘(f2 2)’
+      In the expression: foo (f2 2)
+      In an equation for ‘g2’: g2 = foo (f2 2)

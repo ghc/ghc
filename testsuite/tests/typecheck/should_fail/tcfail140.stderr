@@ -9,7 +9,7 @@ tcfail140.hs:10:7: error:
 
 tcfail140.hs:12:10: error:
     • Couldn't match expected type ‘t1 -> t’ with actual type ‘Int’
-    • The operator ‘f’ takes two value arguments,
+    • The function ‘f’ is applied to two value arguments,
         but its type ‘Int -> Int’ has only one
       In the expression: 3 `f` 4
       In an equation for ‘rot’: rot xs = 3 `f` 4
@@ -19,7 +19,7 @@ tcfail140.hs:12:10: error:
 tcfail140.hs:14:15: error:
     • Couldn't match expected type ‘a -> b’ with actual type ‘Int’
     • The operator ‘f’ takes two value arguments,
-      but its type ‘Int -> Int’ has only one
+        but its type ‘Int -> Int’ has only one
       In the first argument of ‘map’, namely ‘(3 `f`)’
       In the expression: map (3 `f`) xs
     • Relevant bindings include

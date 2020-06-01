@@ -8,7 +8,7 @@ PluralS.hs:15:17: warning: [-Wtype-defaults (in -Wall)]
 
 PluralS.hs:17:24: warning: [-Wtype-defaults (in -Wall)]
     • Defaulting the following constraints to type ‘Integer’
-        (Show a0) arising from a use of ‘show’ at PluralS.hs:17:24-31
+        (Show a0) arising from a use of ‘show’ at PluralS.hs:17:24-27
         (Num a0) arising from the literal ‘123’ at PluralS.hs:17:29-31
     • In the expression: show 123
       In an equation for ‘defaultingNumAndShow’:

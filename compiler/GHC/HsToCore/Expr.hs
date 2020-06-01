@@ -260,8 +260,8 @@ dsLExprNoLP (L loc e)
 dsExpr :: HsExpr GhcTc -> DsM CoreExpr
 dsExpr (HsPar _ e)            = dsLExpr e
 dsExpr (ExprWithTySig _ e _)  = dsLExpr e
-dsExpr (HsVar _ (L _ var))    = dsHsVar var
-dsExpr (HsUnboundVar {})      = panic "dsExpr: HsUnboundVar" -- Typechecker eliminates them
+dsExpr (HsVar _ (L _ id))     = dsHsVar id
+dsExpr (HsUnboundVar id _)    = dsHsVar id
 dsExpr (HsConLikeOut _ con)   = dsConLike con
 dsExpr (HsIPVar {})           = panic "dsExpr: HsIPVar"
 dsExpr (HsOverLabel{})        = panic "dsExpr: HsOverLabel"
