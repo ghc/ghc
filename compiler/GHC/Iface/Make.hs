@@ -38,6 +38,7 @@ import GHC.Core.Coercion.Axiom
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.Type
+import GHC.Core.Multiplicity
 import GHC.Tc.Utils.TcType
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
@@ -210,7 +211,7 @@ mkIface_ hsc_env
   = do
     let semantic_mod = canonicalizeHomeModule (hsc_dflags hsc_env) (moduleName this_mod)
         entities = typeEnvElts type_env
-        decls  = [ tyThingToIfaceDecl entity
+        decls  = [ tyThingToIfaceDecl (hsc_dflags hsc_env) entity
                  | entity <- entities,
                    let name = getName entity,
                    not (isImplicitTyThing entity),
@@ -371,12 +372,12 @@ Names too: see Note [Binders in Template Haskell] in Convert, and
 ************************************************************************
 -}
 
-tyThingToIfaceDecl :: TyThing -> IfaceDecl
-tyThingToIfaceDecl (AnId id)      = idToIfaceDecl id
-tyThingToIfaceDecl (ATyCon tycon) = snd (tyConToIfaceDecl emptyTidyEnv tycon)
-tyThingToIfaceDecl (ACoAxiom ax)  = coAxiomToIfaceDecl ax
-tyThingToIfaceDecl (AConLike cl)  = case cl of
-    RealDataCon dc -> dataConToIfaceDecl dc -- for ppr purposes only
+tyThingToIfaceDecl :: DynFlags -> TyThing -> IfaceDecl
+tyThingToIfaceDecl _ (AnId id)      = idToIfaceDecl id
+tyThingToIfaceDecl _ (ATyCon tycon) = snd (tyConToIfaceDecl emptyTidyEnv tycon)
+tyThingToIfaceDecl _ (ACoAxiom ax)  = coAxiomToIfaceDecl ax
+tyThingToIfaceDecl dflags (AConLike cl)  = case cl of
+    RealDataCon dc -> dataConToIfaceDecl dflags dc -- for ppr purposes only
     PatSynCon ps   -> patSynToIfaceDecl ps
 
 --------------------------
@@ -392,10 +393,10 @@ idToIfaceDecl id
               ifIdInfo    = toIfaceIdInfo (idInfo id) }
 
 --------------------------
-dataConToIfaceDecl :: DataCon -> IfaceDecl
-dataConToIfaceDecl dataCon
+dataConToIfaceDecl :: DynFlags -> DataCon -> IfaceDecl
+dataConToIfaceDecl dflags dataCon
   = IfaceId { ifName      = getName dataCon,
-              ifType      = toIfaceType (dataConUserType dataCon),
+              ifType      = toIfaceType (dataConDisplayType dflags dataCon),
               ifIdDetails = IfVanillaId,
               ifIdInfo    = [] }
 
@@ -542,7 +543,9 @@ tyConToIfaceDecl env tycon
                     ifConUserTvBinders = map toIfaceForAllBndr user_bndrs',
                     ifConEqSpec  = map (to_eq_spec . eqSpecPair) eq_spec,
                     ifConCtxt    = tidyToIfaceContext con_env2 theta,
-                    ifConArgTys  = map (tidyToIfaceType con_env2) arg_tys,
+                    ifConArgTys  =
+                      map (\(Scaled w t) -> (tidyToIfaceType con_env2 w
+                                          , (tidyToIfaceType con_env2 t))) arg_tys,
                     ifConFields  = dataConFieldLabels data_con,
                     ifConStricts = map (toIfaceBang con_env2)
                                        (dataConImplBangs data_con),

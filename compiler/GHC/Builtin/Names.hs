@@ -1899,6 +1899,15 @@ typeSymbolAppendFamNameKey = mkPreludeTyConUnique 190
 unsafeEqualityTyConKey :: Unique
 unsafeEqualityTyConKey = mkPreludeTyConUnique 191
 
+-- Linear types
+multiplicityTyConKey :: Unique
+multiplicityTyConKey = mkPreludeTyConUnique 192
+
+unrestrictedFunTyConKey :: Unique
+unrestrictedFunTyConKey = mkPreludeTyConUnique 193
+
+multMulTyConKey :: Unique
+multMulTyConKey = mkPreludeTyConUnique 194
 
 ---------------- Template Haskell -------------------
 --      GHC.Builtin.Names.TH: USES TyConUniques 200-299
@@ -2072,6 +2081,12 @@ typeLitNatDataConKey      = mkPreludeDataConUnique 113
 -- Unsafe equality
 unsafeReflDataConKey :: Unique
 unsafeReflDataConKey      = mkPreludeDataConUnique 114
+
+-- Multiplicity
+
+oneDataConKey, manyDataConKey :: Unique
+oneDataConKey = mkPreludeDataConUnique 115
+manyDataConKey = mkPreludeDataConUnique 116
 
 ---------------- Template Haskell -------------------
 --      GHC.Builtin.Names.TH: USES DataUniques 200-250

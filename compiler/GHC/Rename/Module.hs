@@ -2116,7 +2116,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
           -- See #14808.
         ; implicit_bndrs <- forAllOrNothing explicit_forall
             $ extractHsTvBndrs explicit_tkvs
-            $ extractHsTysRdrTyVarsDups (theta ++ arg_tys ++ [res_ty])
+            $ extractHsTysRdrTyVarsDups (theta ++ map hsScaledThing arg_tys ++ [res_ty])
 
         ; let ctxt    = ConDeclCtx new_names
               mb_ctxt = Just (inHsDocContext ctxt)
@@ -2126,16 +2126,19 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
     do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt
         ; (new_args, fvs2)   <- rnConDeclDetails (unLoc (head new_names)) ctxt args
         ; (new_res_ty, fvs3) <- rnLHsType ctxt res_ty
+        ; linearTypes <- xopt LangExt.LinearTypes <$> getDynFlags
 
         ; let all_fvs = fvs1 `plusFV` fvs2 `plusFV` fvs3
               (args', res_ty')
                   = case args of
                       InfixCon {}  -> pprPanic "rnConDecl" (ppr names)
                       RecCon {}    -> (new_args, new_res_ty)
-                      PrefixCon as | (arg_tys, final_res_ty) <- splitHsFunType new_res_ty
-                                   -> ASSERT( null as )
+                      PrefixCon as -> let (arg_tys, final_res_ty) = splitHsFunType new_res_ty
+                                          arg_tys' | linearTypes = arg_tys
+                                                   | otherwise   = map (hsLinear . hsScaledThing) arg_tys
+                                      in  ASSERT( null as )
                                       -- See Note [GADT abstract syntax] in GHC.Hs.Decls
-                                      (PrefixCon arg_tys, final_res_ty)
+                                         (PrefixCon arg_tys', final_res_ty)
 
         ; traceRn "rnConDecl2" (ppr names $$ ppr implicit_tkvs $$ ppr explicit_tkvs)
         ; return (decl { con_g_ext = implicit_tkvs, con_names = new_names
@@ -2154,16 +2157,16 @@ rnMbContext doc (Just cxt) = do { (ctx',fvs) <- rnContext doc cxt
 rnConDeclDetails
    :: Name
    -> HsDocContext
-   -> HsConDetails (LHsType GhcPs) (Located [LConDeclField GhcPs])
-   -> RnM (HsConDetails (LHsType GhcRn) (Located [LConDeclField GhcRn]),
+   -> HsConDetails (HsScaled GhcPs (LHsType GhcPs)) (Located [LConDeclField GhcPs])
+   -> RnM ((HsConDetails (HsScaled GhcRn (LHsType GhcRn))) (Located [LConDeclField GhcRn]),
            FreeVars)
 rnConDeclDetails _ doc (PrefixCon tys)
-  = do { (new_tys, fvs) <- rnLHsTypes doc tys
+  = do { (new_tys, fvs) <- mapFvRn (rnScaledLHsType doc) tys
        ; return (PrefixCon new_tys, fvs) }
 
 rnConDeclDetails _ doc (InfixCon ty1 ty2)
-  = do { (new_ty1, fvs1) <- rnLHsType doc ty1
-       ; (new_ty2, fvs2) <- rnLHsType doc ty2
+  = do { (new_ty1, fvs1) <- rnScaledLHsType doc ty1
+       ; (new_ty2, fvs2) <- rnScaledLHsType doc ty2
        ; return (InfixCon new_ty1 new_ty2, fvs1 `plusFV` fvs2) }
 
 rnConDeclDetails con doc (RecCon (L l fields))

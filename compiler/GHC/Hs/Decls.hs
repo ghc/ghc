@@ -1463,19 +1463,26 @@ There's a wrinkle in ConDeclGADT
 
 -- | Haskell data Constructor Declaration Details
 type HsConDeclDetails pass
-   = HsConDetails (LBangType pass) (Located [LConDeclField pass])
+   = HsConDetails (HsScaled pass (LBangType pass)) (Located [LConDeclField pass])
 
 getConNames :: ConDecl (GhcPass p) -> [Located (IdP (GhcPass p))]
 getConNames ConDeclH98  {con_name  = name}  = [name]
 getConNames ConDeclGADT {con_names = names} = names
 
+
 getConArgs :: ConDecl pass -> HsConDeclDetails pass
 getConArgs d = con_args d
 
-hsConDeclArgTys :: HsConDeclDetails pass -> [LBangType pass]
+hsConDeclArgTys :: HsConDeclDetails pass -> [HsScaled pass (LBangType pass)]
 hsConDeclArgTys (PrefixCon tys)    = tys
 hsConDeclArgTys (InfixCon ty1 ty2) = [ty1,ty2]
-hsConDeclArgTys (RecCon flds)      = map (cd_fld_type . unLoc) (unLoc flds)
+hsConDeclArgTys (RecCon flds)      = map (hsLinear . cd_fld_type . unLoc) (unLoc flds)
+  -- Remark: with the record syntax, constructors have all their argument
+  -- linear, despite the fact that projections do not make sense on linear
+  -- constructors. The design here is that the record projection themselves are
+  -- typed to take an unrestricted argument (that is the record itself is
+  -- unrestricted). By the transfer property, projections are then correct in
+  -- that all the non-projected fields have multiplicity Many, and can be dropped.
 
 hsConDeclTheta :: Maybe (LHsContext pass) -> [LHsType pass]
 hsConDeclTheta Nothing            = []
@@ -1535,9 +1542,13 @@ pprConDecl (ConDeclH98 { con_name = L _ con
                        , con_doc = doc })
   = sep [ppr_mbDoc doc, pprHsForAll ForallInvis ex_tvs cxt, ppr_details args]
   where
-    ppr_details (InfixCon t1 t2) = hsep [ppr t1, pprInfixOcc con, ppr t2]
+    -- In ppr_details: let's not print the multiplicities (they are always 1, by
+    -- definition) as they do not appear in an actual declaration.
+    ppr_details (InfixCon t1 t2) = hsep [ppr (hsScaledThing t1),
+                                         pprInfixOcc con,
+                                         ppr (hsScaledThing t2)]
     ppr_details (PrefixCon tys)  = hsep (pprPrefixOcc con
-                                   : map (pprHsType . unLoc) tys)
+                                   : map (pprHsType . unLoc . hsScaledThing) tys)
     ppr_details (RecCon fields)  = pprPrefixOcc con
                                  <+> pprConDeclFields (unLoc fields)
     cxt = fromMaybe noLHsContext mcxt

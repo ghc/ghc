@@ -46,6 +46,7 @@ import GHC.Core.DataCon ( dataConTagZ, dataConTyCon, dataConWrapId, dataConWorkI
 import GHC.Core.Utils  ( cheapEqExpr, cheapEqExpr', exprIsHNF, exprType
                        , stripTicksTop, stripTicksTopT, mkTicks )
 import GHC.Core.Unfold ( exprIsConApp_maybe )
+import GHC.Core.Multiplicity
 import GHC.Core.Type
 import GHC.Types.Name.Occurrence ( occNameFS )
 import GHC.Builtin.Names
@@ -546,7 +547,7 @@ litEq is_eq = msum
   where
     do_lit_eq platform lit expr = do
       guard (not (litIsLifted lit))
-      return (mkWildCase expr (literalType lit) intPrimTy
+      return (mkWildCase expr (unrestricted $ literalType lit) intPrimTy
                     [(DEFAULT,    [], val_if_neq),
                      (LitAlt lit, [], val_if_eq)])
       where
@@ -1532,10 +1533,10 @@ match_inline _ = Nothing
 -- for a description of what is going on here.
 match_magicDict :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
 match_magicDict [Type _, Var wrap `App` Type a `App` Type _ `App` f, x, y ]
-  | Just (fieldTy, _)   <- splitFunTy_maybe $ dropForAlls $ idType wrap
-  , Just (dictTy, _)    <- splitFunTy_maybe fieldTy
-  , Just dictTc         <- tyConAppTyCon_maybe dictTy
-  , Just (_,_,co)       <- unwrapNewTyCon_maybe dictTc
+  | Just (_, fieldTy, _)  <- splitFunTy_maybe $ dropForAlls $ idType wrap
+  , Just (_, dictTy, _)   <- splitFunTy_maybe fieldTy
+  , Just dictTc           <- tyConAppTyCon_maybe dictTy
+  , Just (_,_,co)         <- unwrapNewTyCon_maybe dictTc
   = Just
   $ f `App` Cast x (mkSymCo (mkUnbranchedAxInstCo Representational co [a] []))
       `App` y
@@ -1555,7 +1556,7 @@ match_WordToInteger :: RuleFun
 match_WordToInteger _ id_unf id [xl]
   | Just (LitNumber LitNumWord x _) <- exprIsLiteral_maybe id_unf xl
   = case splitFunTy_maybe (idType id) of
-    Just (_, integerTy) ->
+    Just (_, _, integerTy) ->
         Just (Lit (mkLitInteger x integerTy))
     _ ->
         panic "match_WordToInteger: Id has the wrong type"
@@ -1565,7 +1566,7 @@ match_Int64ToInteger :: RuleFun
 match_Int64ToInteger _ id_unf id [xl]
   | Just (LitNumber LitNumInt64 x _) <- exprIsLiteral_maybe id_unf xl
   = case splitFunTy_maybe (idType id) of
-    Just (_, integerTy) ->
+    Just (_, _, integerTy) ->
         Just (Lit (mkLitInteger x integerTy))
     _ ->
         panic "match_Int64ToInteger: Id has the wrong type"
@@ -1575,7 +1576,7 @@ match_Word64ToInteger :: RuleFun
 match_Word64ToInteger _ id_unf id [xl]
   | Just (LitNumber LitNumWord64 x _) <- exprIsLiteral_maybe id_unf xl
   = case splitFunTy_maybe (idType id) of
-    Just (_, integerTy) ->
+    Just (_, _, integerTy) ->
         Just (Lit (mkLitInteger x integerTy))
     _ ->
         panic "match_Word64ToInteger: Id has the wrong type"
@@ -1585,7 +1586,7 @@ match_NaturalToInteger :: RuleFun
 match_NaturalToInteger _ id_unf id [xl]
   | Just (LitNumber LitNumNatural x _) <- exprIsLiteral_maybe id_unf xl
   = case splitFunTy_maybe (idType id) of
-    Just (_, naturalTy) ->
+    Just (_, _, naturalTy) ->
         Just (Lit (LitNumber LitNumInteger x naturalTy))
     _ ->
         panic "match_NaturalToInteger: Id has the wrong type"
@@ -1596,7 +1597,7 @@ match_NaturalFromInteger _ id_unf id [xl]
   | Just (LitNumber LitNumInteger x _) <- exprIsLiteral_maybe id_unf xl
   , x >= 0
   = case splitFunTy_maybe (idType id) of
-    Just (_, naturalTy) ->
+    Just (_, _, naturalTy) ->
         Just (Lit (LitNumber LitNumNatural x naturalTy))
     _ ->
         panic "match_NaturalFromInteger: Id has the wrong type"
@@ -1606,7 +1607,7 @@ match_WordToNatural :: RuleFun
 match_WordToNatural _ id_unf id [xl]
   | Just (LitNumber LitNumWord x _) <- exprIsLiteral_maybe id_unf xl
   = case splitFunTy_maybe (idType id) of
-    Just (_, naturalTy) ->
+    Just (_, _, naturalTy) ->
         Just (Lit (LitNumber LitNumNatural x naturalTy))
     _ ->
         panic "match_WordToNatural: Id has the wrong type"
@@ -1641,7 +1642,7 @@ match_bitInteger env id_unf fn [arg]
     -- would be a bad idea (#14959)
   , let x_int = fromIntegral x :: Int
   = case splitFunTy_maybe (idType fn) of
-    Just (_, integerTy)
+    Just (_, _, integerTy)
       -> Just (Lit (LitNumber LitNumInteger (bit x_int) integerTy))
     _ -> panic "match_IntToInteger_unop: Id has the wrong type"
 
@@ -1667,7 +1668,7 @@ match_IntToInteger_unop :: (Integer -> Integer) -> RuleFun
 match_IntToInteger_unop unop _ id_unf fn [xl]
   | Just (LitNumber LitNumInt x _) <- exprIsLiteral_maybe id_unf xl
   = case splitFunTy_maybe (idType fn) of
-    Just (_, integerTy) ->
+    Just (_, _, integerTy) ->
         Just (Lit (LitNumber LitNumInteger (unop x) integerTy))
     _ ->
         panic "match_IntToInteger_unop: Id has the wrong type"
@@ -1778,7 +1779,7 @@ match_decodeDouble :: RuleFun
 match_decodeDouble env id_unf fn [xl]
   | Just (LitDouble x) <- exprIsLiteral_maybe id_unf xl
   = case splitFunTy_maybe (idType fn) of
-    Just (_, res)
+    Just (_, _, res)
       | Just [_lev1, _lev2, integerTy, intHashTy] <- tyConAppArgs_maybe res
       -> case decodeFloat (fromRational x :: Double) of
            (y, z) ->
