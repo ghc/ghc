@@ -874,7 +874,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
                                                   lhs_kind
                   ; let lhs_applied_ty = lhs_ty `mkTcAppTys` lhs_extra_args
                         hs_lhs         = nlHsTyConApp fixity (getName fam_tc) hs_pats
-                  ; _ <- unifyKind (Just (unLoc hs_lhs)) lhs_applied_kind res_kind
+                  ; _ <- unifyKind (Just (ppr hs_lhs)) lhs_applied_kind res_kind
                     -- Check that the result kind of the TyCon applied to its args
                     -- is compatible with the explicit signature (or Type, if there
                     -- is none)

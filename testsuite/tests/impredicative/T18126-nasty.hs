@@ -9,6 +9,8 @@ module Bug where
 -- (which here is switched on by ($))
 -- beecause of a very subtle issue where we instantiate an
 -- instantiation variable with (F alpha), where F is a type function
+--
+-- It's a stripped-dwn version of T5490
 
 register :: forall rs op_ty.
            (HDrop rs ~ HSingle (WaitOpResult op_ty))

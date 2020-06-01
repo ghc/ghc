@@ -39,6 +39,7 @@ import GHC.Hs.Binds
 -- others:
 import GHC.Tc.Types.Evidence
 import GHC.Core
+import GHC.Types.Id( Id )
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Basic
@@ -591,7 +592,6 @@ deriving instance (Data (hs_syn GhcTc), Typeable hs_syn) => Data (HsWrap hs_syn)
 -- ---------------------------------------------------------------------
 
 type instance XVar           (GhcPass _) = NoExtField
-type instance XUnboundVar    (GhcPass _) = NoExtField
 type instance XConLikeOut    (GhcPass _) = NoExtField
 type instance XRecFld        (GhcPass _) = NoExtField
 type instance XOverLabel     (GhcPass _) = NoExtField
@@ -601,6 +601,10 @@ type instance XLitE          (GhcPass _) = NoExtField
 type instance XLam           (GhcPass _) = NoExtField
 type instance XLamCase       (GhcPass _) = NoExtField
 type instance XApp           (GhcPass _) = NoExtField
+
+type instance XUnboundVar    GhcPs = NoExtField
+type instance XUnboundVar    GhcRn = NoExtField
+type instance XUnboundVar    GhcTc = Id
 
 type instance XAppTypeE      GhcPs = NoExtField
 type instance XAppTypeE      GhcRn = NoExtField
@@ -1236,7 +1240,6 @@ isAtomicHsExpr (HsOverLit {})    = True
 isAtomicHsExpr (HsIPVar {})      = True
 isAtomicHsExpr (HsOverLabel {})  = True
 isAtomicHsExpr (HsUnboundVar {}) = True
-isAtomicHsExpr (HsPar _ e)       = isAtomicHsExpr (unLoc e)
 isAtomicHsExpr (HsRecFld{})      = True
 isAtomicHsExpr (XExpr x)
   | GhcTc <- ghcPass @p

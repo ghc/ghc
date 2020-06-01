@@ -915,8 +915,8 @@ zonkExpr env (XExpr (HsWrap co_fn expr))
        new_expr <- zonkExpr env1 expr
        return (XExpr (HsWrap new_co_fn new_expr))
 
-zonkExpr _ e@(HsUnboundVar {})
-  = return e
+zonkExpr env (HsUnboundVar v occ)
+  = return (HsUnboundVar (zonkIdOcc env v) occ)
 
 zonkExpr _ expr = pprPanic "zonkExpr" (ppr expr)
 

@@ -2408,7 +2408,7 @@ kcCheckDeclHeader_sig kisig name flav
         KindedTyVar _ _ v v_hs_ki -> do
           v_ki <- tcLHsKindSig (TyVarBndrKindCtxt (unLoc v)) v_hs_ki
           discardResult $ -- See Note [discardResult in kcCheckDeclHeader_sig]
-            unifyKind (Just (HsTyVar noExtField NotPromoted v))
+            unifyKind (Just (ppr v))
                       (tyBinderType tb)
                       v_ki
 
@@ -2954,7 +2954,7 @@ tcHsQTyVarBndr _ new_tv (KindedTyVar _ _ (L _ tv_nm) lhs_kind)
        ; mb_tv <- tcLookupLcl_maybe tv_nm
        ; case mb_tv of
            Just (ATyVar _ tv)
-             -> do { discardResult $ unifyKind (Just hs_tv)
+             -> do { discardResult $ unifyKind (Just (ppr tv_nm))
                                         kind (tyVarKind tv)
                        -- This unify rejects:
                        --    class C (m :: * -> *) where
@@ -2962,9 +2962,6 @@ tcHsQTyVarBndr _ new_tv (KindedTyVar _ _ (L _ tv_nm) lhs_kind)
                    ; return tv }
 
            _ -> new_tv tv_nm kind }
-  where
-    hs_tv = HsTyVar noExtField NotPromoted (noLoc tv_nm)
-            -- Used for error messages only
 
 --------------------------------------
 -- Binding type/class variables in the

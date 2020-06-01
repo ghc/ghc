@@ -169,8 +169,10 @@ data HsExprArg (p :: TcPass)
   | EWrap    !(XEWrap p)     -- Wrapper, after instantiation
 
 data EValArg (p :: TcPass) where
-  ValArg   :: LHsExpr (GhcPass (XPass p)) -> EValArg p
-  ValArgQL :: { va_loc  :: SrcSpan
+  ValArg   :: LHsExpr (GhcPass (XPass p))
+           -> EValArg p
+  ValArgQL :: { va_expr :: LHsExpr GhcRn        -- Original expression
+                                                -- For location and error msgs
               , va_fun  :: HsExpr GhcTc         -- Function, typechecked
               , va_args :: [HsExprArg 'TcpInst] -- Args, instantiated
               , va_ty   :: TcRhoType            -- Result type
@@ -180,6 +182,10 @@ data EValArg (p :: TcPass) where
 mkEValArg :: SrcSpan -> LHsExpr GhcRn -> HsExprArg 'TcpRn
 mkEValArg l e = EValArg { eva_loc = l, eva_arg = ValArg e
                         , eva_ty = noExtField }
+
+eValArgExpr :: EValArg 'TcpInst -> LHsExpr GhcRn
+eValArgExpr (ValArg e)                 = e
+eValArgExpr (ValArgQL { va_expr = e }) = e
 
 type family XPass p where
   XPass 'TcpRn   = 'Renamed
@@ -281,7 +287,11 @@ isHsValArg _              = False
 countLeadingValArgs :: [HsExprArg id] -> Int
 countLeadingValArgs (EValArg {} : args) = 1 + countLeadingValArgs args
 countLeadingValArgs (EPar {} : args)    = countLeadingValArgs args
-countLeadingValArgs _                     = 0
+countLeadingValArgs _                   = 0
+
+isValArg :: HsExprArg id -> Bool
+isValArg (EValArg {}) = True
+isValArg _            = False
 
 isArgPar :: HsExprArg id -> Bool
 isArgPar (EPar {}) = True
@@ -320,11 +330,10 @@ tcInferSigmaTy (L loc rn_expr)
 tcApp :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcApp rn_expr exp_res_ty
   | (rn_fun, rn_args, rebuild) <- splitHsApps rn_expr
-  = do { impred <- impred_call rn_fun
-
-       ; (tc_fun, fun_sigma) <- tcInferAppHead rn_fun rn_args
+  = do { (tc_fun, fun_sigma) <- tcInferAppHead rn_fun rn_args
 
        -- Instantiate
+       ; impred <- xoptM LangExt.ImpredicativeTypes
        ; (delta, inst_args, app_res_rho) <- tcInstFun impred True rn_fun fun_sigma rn_args
 
        -- Quick look at result
@@ -358,14 +367,6 @@ tcApp rn_expr exp_res_ty
        -- NB: app_res_ty may be a polytype, via zonkQuickLook
        ; addFunResCtxt tc_fun tc_args app_res_rho exp_res_ty $
          tcWrapResult rn_expr tc_expr app_res_rho exp_res_ty } }
-  where
-    impred_call :: HsExpr GhcRn -> TcM Bool
-    -- Return True if this call can be instantiated impredicatively
-    impred_call rn_fun
-      | (HsVar _ (L _ f)) <- rn_fun, f `hasKey` dollarIdKey
-      = return True  -- GHC's special case for ($)
-      | otherwise
-      = xoptM LangExt.ImpredicativeTypes
 
 ----------------
 tcInferAppHead :: HsExpr GhcRn
@@ -402,11 +403,10 @@ tcInferAppHead_maybe fun args
       HsVar _ (L _ nm)          -> Just <$> tcInferId nm
       HsRecFld _ f              -> Just <$> go_rec_fld f
       ExprWithTySig _ e hs_ty
-        | isCompleteHsSig hs_ty -> add_ctxt (Just <$> tcExprWithSig e hs_ty)
+        | isCompleteHsSig hs_ty -> addErrCtxt (exprCtxt fun) $
+                                   Just <$> tcExprWithSig e hs_ty
       _                         -> return Nothing
   where
-    add_ctxt thing = addErrCtxt (exprCtxt fun) thing
-
     -- Disgusting special case for ambiguous record selectors
     go_rec_fld (Ambiguous _ lbl)
       | arg1 : _ <- filterOut isArgPar args -- A value arg is first
@@ -444,8 +444,12 @@ tcValArgs quick_look fun args
                                      else return arg_ty
 
              -- Now check the argument
-           ; arg' <- addErrCtxt (funAppCtxt fun arg n) $
-                     tcEValArg arg arg_ty
+           ; arg' <- addErrCtxt (funAppCtxt fun (eValArgExpr arg) n) $
+                     do { traceTc "tcEValArg" $
+                          vcat [ ppr n <+> text "of" <+> ppr fun
+                               , text "arg type:" <+> ppr arg_ty
+                               , text "arg:" <+> ppr arg ]
+                        ; tcEValArg arg arg_ty }
 
            ; return (n+1, eva { eva_arg = ValArg arg', eva_ty = arg_ty }) }
 
@@ -454,9 +458,10 @@ tcEValArg :: EValArg 'TcpInst -> TcSigmaType -> TcM (LHsExpr GhcTc)
 tcEValArg (ValArg arg) exp_arg_sigma
   = tcCheckPolyExprNC arg exp_arg_sigma
 
-tcEValArg (ValArgQL { va_loc = loc, va_fun = fun, va_args = args
+tcEValArg (ValArgQL { va_expr = L loc _, va_fun = fun, va_args = args
                     , va_ty = app_res_rho, va_rebuild = rebuild }) exp_arg_sigma
-  = do { traceTc "tcEValArg {" (vcat [ ppr fun <+> ppr args ])
+  = setSrcSpan loc $
+    do { traceTc "tcEValArg {" (vcat [ ppr fun <+> ppr args ])
        ; tc_args <- tcValArgs True fun args
        ; co <- unifyType Nothing app_res_rho exp_arg_sigma
        ; traceTc "tcEValArg }" empty
@@ -469,7 +474,7 @@ tcValArg :: HsExpr GhcRn          -- The function (for error messages)
          -> TcM (LHsExpr GhcTc)   -- Resulting argument
 tcValArg fun arg arg_ty arg_no
    = addErrCtxt (funAppCtxt fun arg arg_no) $
-     do { traceTc "tcArg" $
+     do { traceTc "tcValArg" $
           vcat [ ppr arg_no <+> text "of" <+> ppr fun
                , text "arg type:" <+> ppr arg_ty
                , text "arg:" <+> ppr arg ]
@@ -490,12 +495,14 @@ tcInstFun :: Bool   -- True <=> ImpredicativeTypes is on; do quick-look
                  , [HsExprArg 'TcpInst]
                  , TcSigmaType )
 tcInstFun impred_on inst_final rn_fun fun_sigma rn_args
-  = setSrcSpanFromArgs rn_args $
-       -- Setting the location is important for the class constraints
-       -- that may be emitted from instantiating fun_sigma
-    do { traceTc "tcInstFun" (ppr rn_fun $$ ppr rn_args)
+  = do { traceTc "tcInstFun" (ppr rn_fun $$ ppr rn_args)
        ; go emptyVarSet [] [] fun_sigma rn_args }
   where
+    do_ql = impred_on || is_dollar rn_fun
+            -- GHC's special case for ($)
+    is_dollar (HsVar _ (L _ f)) =  f `hasKey` dollarIdKey
+    is_dollar _                 = False
+
     fun_orig = exprCtOrigin rn_fun
     herald = sep [ text "The function" <+> quotes (ppr rn_fun)
                  , text "is applied to"]
@@ -537,7 +544,10 @@ tcInstFun impred_on inst_final rn_fun fun_sigma rn_args
       | need_instantiation args
       , (tvs, theta, body) <- tcSplitSigmaTy fun_ty
       , not (null tvs && null theta)
-      = do { (inst_tvs, wrap, fun_rho) <- instantiateSigma fun_orig tvs theta body
+      = do { (inst_tvs, wrap, fun_rho) <- setSrcSpanFromArgs rn_args $
+                                          instantiateSigma fun_orig tvs theta body
+                 -- Setting the location is important for the class constraints
+                 -- that may be emitted from instantiating fun_sigma
            ; go (delta `extendVarSetList` inst_tvs)
                 (addArgWrap wrap acc) so_far fun_rho args }
 
@@ -590,9 +600,9 @@ tcInstFun impred_on inst_final rn_fun fun_sigma rn_args
 
     go1 delta acc so_far fun_ty
         (eva@(EValArg { eva_arg = ValArg arg })  : rest_args)
-      = do { (wrap, arg_ty, res_ty) <- matchActualFunTy herald
-                                         (Just rn_fun) (n_val_args, so_far) fun_ty
-          ; (delta', arg') <- if impred_on
+      = do { (wrap, arg_ty, res_ty) <- matchActualFunTy herald (Just (ppr rn_fun))
+                                                        (n_val_args, so_far) fun_ty
+          ; (delta', arg') <- if do_ql
                               then quickLookArg delta arg arg_ty
                               else return (delta, ValArg arg)
           ; let acc' = eva { eva_arg = arg', eva_ty = arg_ty }
@@ -835,8 +845,10 @@ quickLookArg1 guarded delta larg@(L loc arg) arg_ty
        ; if not (guarded || no_free_kappas)
          then return no_ql_result
          else
-    do { (delta_app, inst_args, app_res_rho)
-             <- tcInstFun True True rn_fun fun_sigma rn_args
+    do { impred_on <- xoptM LangExt.ImpredicativeTypes
+         -- If the parent call is (e1 $ e2) then -XImpredicativeTypes might not be on
+       ; (delta_app, inst_args, app_res_rho)
+             <- tcInstFun impred_on True rn_fun fun_sigma rn_args
        ; traceTc "quickLookArg" $
          vcat [ text "arg:" <+> ppr arg
               , text "delta:" <+> ppr delta
@@ -849,7 +861,7 @@ quickLookArg1 guarded delta larg@(L loc arg) arg_ty
        ; let delta' = delta `unionVarSet` delta_app
        ; qlUnify delta' arg_ty app_res_rho
 
-       ; let ql_arg = ValArgQL { va_loc = loc, va_fun = fun'
+       ; let ql_arg = ValArgQL { va_expr = larg, va_fun = fun'
                                , va_args = inst_args
                                , va_ty = app_res_rho
                                , va_rebuild = rebuild }
@@ -941,12 +953,9 @@ qlUnify delta ty1 ty2
       | kappa `elemVarSet` ty2_tvs
       = return ()   -- Occurs-check
 
---      | not (isAlmostFunctionFree ty2)
---      = return ()   -- Sigh.  See Note [Quick Look at type families]
-
       | otherwise
       = do { -- Unify the kinds; see Note [Kinds in QL unify]
-             co <- unifyType Nothing ty2_kind kappa_kind
+           ; co <- unifyKind (Just (ppr ty2)) ty2_kind kappa_kind
 
            ; traceTc "qlUnify:update" $
              vcat [ hang (ppr kappa <+> dcolon <+> ppr kappa_kind)
@@ -957,7 +966,6 @@ qlUnify delta ty1 ty2
         ty2_tvs    = tyCoVarsOfType ty2
         ty2_kind   = typeKind ty2
         kappa_kind = tyVarKind kappa
-
 
 {- Note [Quick Look and type families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1531,7 +1539,8 @@ addFunResCtxt fun args fun_res_ty env_ty
                        = text "Probable cause:" <+> quotes (ppr fun)
                          <+> text "is applied to too few arguments"
 
-                       | not (null args)  -- Is applied to at least one arg
+                       -- n_fun < n_env
+                       | (n_fun + count isValArg args) >= n_env
                        , not_fun res_fun
                        = text "Possible cause:" <+> quotes (ppr fun)
                          <+> text "is applied to too many arguments"
@@ -1604,7 +1613,9 @@ tcExprPrag (HsPragTick x1 src info srcInfo) = HsPragTick x1 src info srcInfo
 ********************************************************************* -}
 
 addExprCtxt :: LHsExpr GhcRn -> TcRn a -> TcRn a
-addExprCtxt e thing_inside = addErrCtxt (exprCtxt (unLoc e)) thing_inside
+addExprCtxt (L _ e) thing_inside
+   | isAtomicHsExpr e = thing_inside
+   | otherwise        = addErrCtxt (exprCtxt e) thing_inside
 
 exprCtxt :: HsExpr GhcRn -> SDoc
 exprCtxt expr = hang (text "In the expression:") 2 (ppr (stripParensHsExpr expr))

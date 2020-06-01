@@ -345,7 +345,7 @@ tcExpr expr@(SectionR x op arg2) res_ty
   = do { (op', op_ty) <- tcInferRhoNC op
        ; (wrap_fun, [arg1_ty, arg2_ty], op_res_ty)
                   <- matchActualFunTysRho (mk_op_msg op) fn_orig
-                                          (Just (unLoc op)) 2 op_ty
+                                          (Just (ppr op)) 2 op_ty
        ; arg2' <- tcValArg (unLoc op) arg2 arg2_ty 2
        ; let expr'      = SectionR x (mkLHsWrap wrap_fun op') arg2'
              act_res_ty = mkVisFunTy arg1_ty op_res_ty
@@ -365,7 +365,7 @@ tcExpr expr@(SectionL x arg1 op) res_ty
 
        ; (wrap_fn, (arg1_ty:arg_tys), op_res_ty)
            <- matchActualFunTysRho (mk_op_msg op) fn_orig
-                                   (Just (unLoc op)) n_reqd_args op_ty
+                                   (Just (ppr op)) n_reqd_args op_ty
        ; arg1' <- tcValArg (unLoc op) arg1 arg1_ty 1
        ; let expr'      = SectionL x arg1' (mkLHsWrap wrap_fn op')
              act_res_ty = mkVisFunTys arg_tys op_res_ty
@@ -853,7 +853,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
               scrut_ty      = TcType.substTy scrut_subst  con1_res_ty
               con1_arg_tys' = map (TcType.substTy result_subst) con1_arg_tys
 
-        ; co_scrut <- unifyType (Just (unLoc record_expr)) record_rho scrut_ty
+        ; co_scrut <- unifyType (Just (ppr record_expr)) record_rho scrut_ty
                 -- NB: normal unification is OK here (as opposed to subsumption),
                 -- because for this to work out, both record_rho and scrut_ty have
                 -- to be normal datatypes -- no contravariant stuff can go on
@@ -953,17 +953,14 @@ tcUnboundId :: HsExpr GhcRn -> OccName -> ExpRhoType -> TcM (HsExpr GhcTc)
 --
 -- Some of these started life as a true expression hole "_".
 -- Others might simply be variables that accidentally have no binding site
---
--- We turn all of them into HsVar, since HsUnboundVar can't contain an
--- Id; and indeed the evidence for the ExprHole does bind it, so it's
--- not unbound any more!
 tcUnboundId rn_expr occ res_ty
  = do { ty <- newOpenFlexiTyVarTy  -- Allow Int# etc (#12531)
       ; name <- newSysName occ
       ; let ev = mkLocalId name ty
       ; emitNewExprHole occ ev ty
-      ; tcWrapResultO (UnboundOccurrenceOf occ) rn_expr
-          (HsVar noExtField (noLoc ev)) ty res_ty }
+      ; let expr' = HsUnboundVar ev occ
+            orig  = UnboundOccurrenceOf occ
+      ; tcWrapResultO orig rn_expr expr' ty res_ty }
 
 
 {- *********************************************************************
