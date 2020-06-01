@@ -285,7 +285,7 @@ data GenClosure b
   -- Representation of StgStack: The 'tsoStack' of a 'TSOClosure'.
   | StackClosure
      { info :: !StgInfoTable
-     , size :: !Word32 -- ^ stack size in *words*
+     , stack_size :: !Word32 -- ^ stack size in *words*
      , stack_dirty :: !Word8 -- ^ non-zero => dirty
 #if __GLASGOW_HASKELL__ >= 811
      , stack_marking :: Word8
