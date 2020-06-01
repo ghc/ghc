@@ -387,24 +387,17 @@ void registerAlertableWait (bool has_timeout, DWORD mssec, uint64_t num_req, boo
    finished overlapped entried belonging to the completed I/O requests.  The
    number of read entries will be returned in NUM.
 
-   We clear the outstanding request flag to prevent two threads from handling
-   the same payload early on.  Failing this the final safe guard is in
-   processCompletions.  */
+   NOTE: This function isn't thread safe, but is intended to be called only
+         when requested by the I/O manager via notifyScheduler.  In
+         that context it is thread safe as we're guaranteeing that the I/O
+         manager is blocked waiting for the read to happen followed by a
+         registerAlertableWait call.  */
 OVERLAPPED_ENTRY* getOverlappedEntries (uint32_t *num)
 {
-  AcquireSRWLockExclusive (&lock);
-
-  if (outstanding_service_requests)
-    *num = num_last_completed;
-  else
-    *num = 0;
-
-  outstanding_service_requests = false;
-
-  ReleaseSRWLockExclusive (&lock);
-
+  *num = num_last_completed;
   return entries;
 }
+
 
 /* Called by the scheduler when we have ran out of work to do and we have at
    least one thread blocked on an I/O Port.  When WAIT then if this function
@@ -550,6 +543,7 @@ static DWORD WINAPI runner (LPVOID lpParam STG_UNUSED)
     }
     return 0;
 }
+
 
 
 
