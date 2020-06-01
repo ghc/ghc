@@ -314,7 +314,7 @@ data UnhelpfulSpanReason
   | UnhelpfulWiredIn
   | UnhelpfulInteractive
   | UnhelpfulGenerated
-  | UnhelpfulOther !FastString
+  | UnhelpfulOther {-# UNPACK #-} !FastString
   deriving (Eq, Show)
 
 {- Note [Why Maybe BufPos]

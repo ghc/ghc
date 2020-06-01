@@ -168,8 +168,16 @@ tcLExpr, tcLExprNC
                          -- Definitely no foralls at the top
     -> TcM (LHsExpr GhcTc)
 
-tcLExpr expr res_ty
-  = setSrcSpan (getLoc expr) $ addExprCtxt expr (tcLExprNC expr res_ty)
+tcLExpr e@(L loc expr) res_ty
+  -- We duplicate tcLExprNC so as to avoid setting the
+  -- source span twice.
+  -- It is however necessary to set the span before adding
+  -- the context, as depending on loc's value, we might
+  -- actually not add the context at all. See
+  -- Note [Rebindable syntax and HsExpansion] for details.
+  = setSrcSpan loc $ addExprCtxt e $
+    do { expr' <- tcExpr expr res_ty
+       ; return (L loc expr') }
 
 tcLExprNC (L loc expr) res_ty
   = setSrcSpan loc $
