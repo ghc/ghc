@@ -50,7 +50,7 @@ import GHC.Core.Opt.Arity ( etaExpand )
 import GHC.Core.SimpleOpt ( pushCoTyArg, pushCoValArg
                           , joinPointBinding_maybe, joinPointBindings_maybe )
 import GHC.Core.FVs     ( mkRuleInfo )
-import GHC.Core.Rules   ( lookupRule, getRules )
+import GHC.Core.Rules   ( lookupRule, getRules, initRuleOpts )
 import GHC.Types.Basic
 import GHC.Utils.Monad  ( mapAccumLM, liftIO )
 import GHC.Types.Var    ( isTyCoVar )
@@ -2182,7 +2182,7 @@ tryRules env rules fn args call_cont
       ; return (Just (val_arg, Select dup new_bndr new_alts se cont)) }
 -}
 
-  | Just (rule, rule_rhs) <- lookupRule dflags (getUnfoldingInRuleMatch env)
+  | Just (rule, rule_rhs) <- lookupRule ropts (getUnfoldingInRuleMatch env)
                                         (activeRule (getMode env)) fn
                                         (argInfoAppArgs args) rules
   -- Fire a rule for the function
@@ -2205,6 +2205,7 @@ tryRules env rules fn args call_cont
        ; return Nothing }
 
   where
+    ropts      = initRuleOpts dflags
     dflags     = seDynFlags env
     zapped_env = zapSubstEnv env  -- See Note [zapSubstEnv]
 
