@@ -798,7 +798,7 @@ checkWellStaged pp_thing bind_lvl use_lvl
   = return ()                   -- E.g.  \x -> [| $(f x) |]
 
   | bind_lvl == outerLevel      -- GHC restriction on top level splices
-  = stageRestrictionError pp_thing
+  = return () --stageRestrictionError pp_thing
 
   | otherwise                   -- Badly staged
   = failWithTc $                -- E.g.  \x -> $(f x)

@@ -9,6 +9,7 @@ The Desugarer: turning HsSyn into Core.
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.HsToCore (
@@ -25,7 +26,7 @@ import GHC.Driver.Session
 import GHC.Driver.Types
 import GHC.Hs
 import GHC.Tc.Types
-import GHC.Tc.Utils.Monad  ( finalSafeMode, fixSafeInstances )
+import GHC.Tc.Utils.Monad  ( finalSafeMode, fixSafeInstances, getGblEnv )
 import GHC.Tc.Module ( runTcInteractive )
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -34,7 +35,7 @@ import GHC.Core.Type
 import GHC.Core.TyCon     ( tyConDataCons )
 import GHC.Types.Avail
 import GHC.Core
-import GHC.Core.FVs       ( exprsSomeFreeVarsList )
+import GHC.Core.FVs       ( exprsSomeFreeVarsList, exprFreeVarsList )
 import GHC.Core.SimpleOpt ( simpleOptPgm, simpleOptExpr )
 import GHC.Core.Utils
 import GHC.Core.Unfold
@@ -66,11 +67,16 @@ import Util
 import MonadUtils
 import OrdList
 import GHC.HsToCore.Docs
+import GHC.Types.Unique.Set
 
 import Data.List
 import Data.IORef
 import Control.Monad( when )
 import GHC.Driver.Plugins ( LoadedPlugin(..) )
+
+import Digraph
+import Data.Maybe
+import {-# SOURCE #-} GHC.Tc.Gen.Splice
 
 {-
 ************************************************************************
@@ -138,17 +144,21 @@ deSugar hsc_env
                           ; (spec_prs, spec_rules) <- dsImpSpecs imp_specs
                           ; (ds_fords, foreign_prs) <- dsForeigns fords
                           ; ds_rules <- mapMaybeM dsRule rules
+                          ; ds_top_splices <- (liftIO . readIORef) =<< (ds_splices <$> getGblEnv)
+                          ; let all_prs = foreign_prs `appOL` core_prs `appOL` spec_prs
+                          ; runTopSplices (combineEvBinds ds_ev_binds (fromOL all_prs)) ds_top_splices
+                          ; core_prs_no_splices <- liftIO $ mapM (\(i, e) -> (i,) <$> readExprHoles e) core_prs
                           ; let hpc_init
                                   | gopt Opt_Hpc dflags = hpcInitCode mod ds_hpc_info
                                   | otherwise = empty
                           ; return ( ds_ev_binds
-                                   , foreign_prs `appOL` core_prs `appOL` spec_prs
+                                   , foreign_prs `appOL` core_prs_no_splices `appOL` spec_prs
                                    , spec_rules ++ ds_rules
                                    , ds_fords `appendStubC` hpc_init) }
 
         ; case mb_res of {
            Nothing -> return (msgs, Nothing) ;
-           Just (ds_ev_binds, all_prs, all_rules, ds_fords) ->
+           Just (ds_ev_binds,  all_prs, all_rules, ds_fords) ->
 
      do {       -- Add export flags to bindings
           keep_alive <- readIORef keep_var
@@ -157,6 +167,7 @@ deSugar hsc_env
                                                  rules_for_locals (fromOL all_prs)
 
               final_pgm = combineEvBinds ds_ev_binds final_prs
+
         -- Notice that we put the whole lot in a big Rec, even the foreign binds
         -- When compiling PrelFloat, which defines data Float = F# Float#
         -- we want F# to be in scope in the foreign marshalling code!
@@ -248,6 +259,58 @@ combineEvBinds (NonRec b r : bs) val_prs
   | otherwise = NonRec b r : combineEvBinds bs val_prs
 combineEvBinds (Rec prs : bs) val_prs
   = combineEvBinds bs (prs ++ val_prs)
+
+
+data SpliceNodeType = SpliceNode (CoreExpr, CExprHole Id) | DefnNode (Var, CoreExpr)
+
+instance Outputable SpliceNodeType where
+  ppr (SpliceNode e) = text "SpliceNode:" <+> ppr (fst e)
+  ppr (DefnNode e) = text "DefnNode:" <+> ppr e
+
+-- 1. Get the pending top-splices from the program
+-- 2. Perform dependency analysis with top-splices and expressions
+-- 3. Compile any expressions needed to ByteCode before running the splices with that
+-- infromation in the environment.
+runTopSplices :: [CoreBind] -> [(CoreExpr, CExprHole Id)] -> DsM [CoreBind]
+runTopSplices cbs splices = do
+  pprTraceM "Splices" (ppr (map fst splices))
+  -- Build dependency graph
+  let g = graphFromEdgedVerticesUniq (map mkSpliceNode splices ++ concatMap mkBindNodes cbs )
+  -- Find the order to deal with splices
+  let sps = mapMaybe (isSpliceNode . node_payload) (topologicalSortG g)
+  pprTraceM "Ordered Splices" (ppr (map fst sps))
+  -- Now deal with each of the splices in turn, by first compiling the dependencies to bytecode
+  -- and then running the splice
+  -- For now share now work
+  mapM_ (doOneSplice g) sps
+  liftIO $ mapM readExprHolesBind cbs
+  where
+    mkSpliceNode sp@(e, h) = DigraphNode (SpliceNode sp) (exprHoleFV h) (exprFreeVarsList e)
+
+    mkBindNodes (NonRec b e) = [mkExprNode (b, e)]
+    mkBindNodes (Rec bs) = map mkExprNode bs
+
+    mkExprNode e@(bndr, ce)  = DigraphNode (DefnNode e) bndr (exprFreeVarsList ce)
+
+    isSpliceNode (SpliceNode sp) = Just sp
+    isSpliceNode _ = Nothing
+
+    doOneSplice :: Graph (Node Id SpliceNodeType) -> (CoreExpr, CExprHole Id) -> DsM ()
+    doOneSplice g sp = do
+      let rs = reachableG g (mkSpliceNode sp)
+          sorted_g = topologicalSortG (graphFromEdgedVerticesUniq rs)
+      pprTraceM "rs" (ppr rs)
+      pprTraceM "sorted_g" (ppr sorted_g)
+      mapM_ (doOne . node_payload) (reverse sorted_g)
+      where
+        doOne (SpliceNode (ce, h)) =
+          runTopSpliceDs [] ce h
+        doOne (DefnNode (v, ce)) = compileDefnDS v ce
+
+
+
+
+
 
 {-
 Note [Top-level evidence]

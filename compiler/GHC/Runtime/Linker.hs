@@ -529,8 +529,8 @@ preloadLib hsc_env lib_paths framework_paths pls lib_spec = do
 -- Raises an IO exception ('ProgramError') if it can't find a compiled
 -- version of the dependents to link.
 --
-linkExpr :: HscEnv -> SrcSpan -> UnlinkedBCO -> IO ForeignHValue
-linkExpr hsc_env span root_ul_bco
+linkExpr :: Maybe Module -> HscEnv -> SrcSpan -> UnlinkedBCO -> IO ForeignHValue
+linkExpr my_mod hsc_env span root_ul_bco
   = do {
      -- Initialise the linker (if it's not been done already)
    ; initDynLinker hsc_env
@@ -540,7 +540,7 @@ linkExpr hsc_env span root_ul_bco
 
      -- Take lock for the actual work.
    ; modifyPLS dl $ \pls0 -> do {
-
+   ; pprTraceM "link deps" (ppr needed_mods)
      -- Link the packages and modules required
    ; (pls, ok) <- linkDependencies hsc_env pls0 span needed_mods
    ; if failed ok then
@@ -552,7 +552,7 @@ linkExpr hsc_env span root_ul_bco
          ce = closure_env pls
 
      -- Link the necessary packages and linkables
-
+   ; pprTraceM "ce" (ppr (map fst (nameEnvElts ce)))
    ; let nobreakarray = error "no break array"
          bco_ix = mkNameEnv [(unlinkedBCOName root_ul_bco, 0)]
    ; resolved <- linkBCO hsc_env ie ce bco_ix nobreakarray root_ul_bco
@@ -562,11 +562,13 @@ linkExpr hsc_env span root_ul_bco
    }}}
    where
      free_names = uniqDSetToList (bcoFreeNames root_ul_bco)
-
+     isCurrentModule :: Module -> Bool
+     isCurrentModule m = maybe False (== m) my_mod
      needed_mods :: [Module]
      needed_mods = [ nameModule n | n <- free_names,
                      isExternalName n,      -- Names from other modules
-                     not (isWiredInName n)  -- Exclude wired-in names
+                     not (isWiredInName n),  -- Exclude wired-in names
+                     not (isCurrentModule (nameModule n))
                    ]                        -- (see note below)
         -- Exclude wired-in names because we may not have read
         -- their interface files, so getLinkDeps will fail

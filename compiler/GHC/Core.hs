@@ -6,6 +6,7 @@
 {-# LANGUAGE CPP, DeriveDataTypeable, FlexibleContexts #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -18,7 +19,7 @@ module GHC.Core (
         TaggedExpr, TaggedAlt, TaggedBind, TaggedArg, TaggedBndr(..), deTagExpr,
 
         -- * ExprHole
-        CExprHole(..), newExprHole, fillExprHole, readExprHole, exprHoleFV,
+        CExprHole(..), newExprHole, fillExprHole, readExprHole, exprHoleFV, readExprHoles, readExprHolesBind,
 
         -- * In/Out type synonyms
         InId, InBind, InExpr, InAlt, InArg, InType, InKind,
@@ -279,8 +280,10 @@ data CExprHole b = CExprHole b (IORef (Maybe (Expr b)))
 exprHoleFV :: CExprHole b -> b
 exprHoleFV (CExprHole b _) = b
 
-fillExprHole :: MonadIO m => CExprHole b -> Expr b -> m ()
-fillExprHole (CExprHole _v hole) e =  liftIO (writeIORef hole (Just e))
+fillExprHole :: (Outputable (Expr b), MonadIO m) => CExprHole b -> Expr b -> m ()
+fillExprHole (CExprHole _v hole) e = do
+  pprTraceM "FILLING" (ppr e)
+  liftIO (writeIORef hole (Just e))
 
 readExprHole :: (Outputable b, MonadIO m) => CExprHole b -> m (Expr b)
 readExprHole (CExprHole v hole) = do
@@ -295,6 +298,24 @@ newExprHole b =
 
 -- TODO: Provide implementation like CoercionHole
 instance Typeable b => Data (CExprHole b) where
+
+-- | Replace EHoles with the values they are filled with
+readExprHoles :: Outputable b => Expr b -> IO (Expr b)
+readExprHoles (App e1 e2) = App <$> readExprHoles e1 <*> readExprHoles e2
+readExprHoles (Lam b e) = Lam b <$> readExprHoles e
+readExprHoles (Let b e) = Let <$> readExprHolesBind b <*> readExprHoles e
+readExprHoles (Case b w t as) = Case <$> readExprHoles b <*> pure w <*> pure t <*> mapM readExprHolesAlts as
+readExprHoles (Cast e co) = Cast <$> readExprHoles e <*> pure co
+readExprHoles (Tick tid e) = Tick tid <$> readExprHoles e
+readExprHoles (EHole h) = readExprHole h
+readExprHoles e = pure e
+
+readExprHolesBind :: Outputable b => Bind b -> IO (Bind b)
+readExprHolesBind (NonRec b e) = NonRec b <$> readExprHoles e
+readExprHolesBind (Rec bs) = Rec <$> (mapM (\(b, e) -> (b,) <$> readExprHoles e) bs)
+
+readExprHolesAlts :: Outputable b => Alt b -> IO (Alt b)
+readExprHolesAlts (c, as, e) = (c, as,) <$> readExprHoles e
 
 -- | Type synonym for expressions that occur in function argument positions.
 -- Only 'Arg' should contain a 'Type' at top level, general 'Expr' should not

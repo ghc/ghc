@@ -1666,7 +1666,7 @@ hscParsedStmt hsc_env stmt = runInteractiveHsc hsc_env $ do
   -- for linking, else we try to link 'main' and can't find it.
   -- Whereas the linker already knows to ignore 'interactive'
   let src_span = srcLocSpan interactiveSrcLoc
-  hval <- liftIO $ hscCompileCoreExpr hsc_env src_span ds_expr
+  hval <- liftIO $ hscCompileCoreExpr hsc_env Nothing src_span ds_expr
 
   return $ Just (ids, hval, fix_env)
 
@@ -1885,12 +1885,12 @@ hscParseThingWithLocation source linenumber parser str
 %*                                                                      *
 %********************************************************************* -}
 
-hscCompileCoreExpr :: HscEnv -> SrcSpan -> CoreExpr -> IO ForeignHValue
+hscCompileCoreExpr :: HscEnv -> Maybe Module ->  SrcSpan -> CoreExpr -> IO ForeignHValue
 hscCompileCoreExpr hsc_env =
   lookupHook hscCompileCoreExprHook hscCompileCoreExpr' (hsc_dflags hsc_env) hsc_env
 
-hscCompileCoreExpr' :: HscEnv -> SrcSpan -> CoreExpr -> IO ForeignHValue
-hscCompileCoreExpr' hsc_env srcspan ds_expr
+hscCompileCoreExpr' :: HscEnv -> Maybe Module -> SrcSpan -> CoreExpr -> IO ForeignHValue
+hscCompileCoreExpr' hsc_env my_mod srcspan ds_expr
     = do { let dflags = hsc_dflags hsc_env
 
            {- Simplify it -}
@@ -1902,18 +1902,21 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
            {- Prepare for codegen -}
          ; prepd_expr <- corePrepExpr dflags hsc_env tidy_expr
 
-         --; pprTraceM "hscCompileExpr" (ppr ds_expr $$ ppr simpl_expr)
+         ; pprTraceM "hscCompileExpr" (ppr ds_expr $$ ppr simpl_expr)
          -- I have no idea how these ever worked, top-level splices have always contained
          -- the same free type variables that these link checks complain about.
 --         ; lintInteractiveExpr "hscCompileExpr-s" hsc_env simpl_expr
 --         ; lintInteractiveExpr "hscCompileExpr-p" hsc_env prepd_expr
 
            {- Convert to BCOs -}
+         ; pprTraceM "hscCompileExpr" (ppr ds_expr $$ ppr simpl_expr)
          ; bcos <- coreExprToBCOs hsc_env
                      (icInteractiveModule (hsc_IC hsc_env)) prepd_expr
 
            {- link it -}
-         ; hval <- linkExpr hsc_env srcspan bcos
+         ; pprTraceM "hscCompileExpr" (ppr ds_expr $$ ppr simpl_expr)
+         ; hval <- linkExpr my_mod hsc_env srcspan bcos
+         ; pprTraceM "linked" (ppr ds_expr)
 
          ; return hval }
 

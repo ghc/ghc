@@ -97,7 +97,7 @@ data Hooks = Hooks
             -> TcM (LHsBinds GhcTcId, [LForeignDecl GhcTcId], Bag GlobalRdrElt))
   , hscFrontendHook        :: Maybe (ModSummary -> Hsc FrontendResult)
   , hscCompileCoreExprHook ::
-               Maybe (HscEnv -> SrcSpan -> CoreExpr -> IO ForeignHValue)
+               Maybe (HscEnv -> Maybe Module -> SrcSpan -> CoreExpr -> IO ForeignHValue)
   , ghcPrimIfaceHook       :: Maybe ModIface
   , runPhaseHook           :: Maybe (PhasePlus -> FilePath -> DynFlags
                                          -> CompPipeline (PhasePlus, FilePath))

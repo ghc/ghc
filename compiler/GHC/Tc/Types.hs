@@ -317,6 +317,7 @@ data DsGblEnv
            -- Additional complete pattern matches
         , ds_cc_st   :: IORef CostCentreState
            -- Tracking indices for cost centre annotations
+        , ds_splices :: IORef [(CoreExpr, CExprHole Id)]
         }
 
 instance ContainsModule DsGblEnv where

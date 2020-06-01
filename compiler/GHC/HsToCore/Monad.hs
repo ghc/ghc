@@ -52,7 +52,9 @@ module GHC.HsToCore.Monad (
         dsNoLevPoly, dsNoLevPolyExpr, dsWhenNoErrs,
 
         -- Trace injection
-        pprRuntimeTrace
+        pprRuntimeTrace,
+
+        addPendingSpliceDS
     ) where
 
 import GhcPrelude
@@ -197,6 +199,7 @@ mkDsEnvsFromTcGbl :: MonadIO m
                   -> m (DsGblEnv, DsLclEnv)
 mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
   = do { cc_st_var   <- liftIO $ newIORef newCostCentreState
+       ; splices_var <- liftIO $ newIORef []
        ; let dflags   = hsc_dflags hsc_env
              this_mod = tcg_mod tcg_env
              type_env = tcg_type_env tcg_env
@@ -205,7 +208,7 @@ mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
              complete_matches = hptCompleteSigs hsc_env
                                 ++ tcg_complete_matches tcg_env
        ; return $ mkDsEnvs dflags this_mod rdr_env type_env fam_inst_env
-                           msg_var cc_st_var complete_matches
+                           msg_var cc_st_var complete_matches splices_var
        }
 
 runDs :: HscEnv -> (DsGblEnv, DsLclEnv) -> DsM a -> IO (Messages, Maybe a)
@@ -226,6 +229,7 @@ initDsWithModGuts :: HscEnv -> ModGuts -> DsM a -> IO (Messages, Maybe a)
 initDsWithModGuts hsc_env guts thing_inside
   = do { cc_st_var   <- newIORef newCostCentreState
        ; msg_var <- newIORef emptyMessages
+       ; splices_var <- newIORef []
        ; let dflags   = hsc_dflags hsc_env
              type_env = typeEnvFromEntities ids (mg_tcs guts) (mg_fam_insts guts)
              rdr_env  = mg_rdr_env guts
@@ -240,7 +244,7 @@ initDsWithModGuts hsc_env guts thing_inside
 
              envs  = mkDsEnvs dflags this_mod rdr_env type_env
                               fam_inst_env msg_var cc_st_var
-                              complete_matches
+                              complete_matches splices_var
        ; runDs hsc_env envs thing_inside
        }
 
@@ -269,9 +273,10 @@ initTcDsForSolver thing_inside
 
 mkDsEnvs :: DynFlags -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
          -> IORef Messages -> IORef CostCentreState -> [CompleteMatch]
+         -> IORef [(CoreExpr, CExprHole Id)]
          -> (DsGblEnv, DsLclEnv)
 mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var cc_st_var
-         complete_matches
+         complete_matches splices_var
   = let if_genv = IfGblEnv { if_doc       = text "mkDsEnvs",
                              if_rec_types = Just (mod, return type_env) }
         if_lenv = mkIfLclEnv mod (text "GHC error in desugarer lookup in" <+> ppr mod)
@@ -285,6 +290,7 @@ mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var cc_st_var
                            , ds_msgs    = msg_var
                            , ds_complete_matches = completeMatchMap
                            , ds_cc_st   = cc_st_var
+                           , ds_splices = splices_var
                            }
         lcl_env = DsLclEnv { dsl_meta    = emptyNameEnv
                            , dsl_loc     = real_span
@@ -293,6 +299,15 @@ mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var cc_st_var
                            , dsl_bind_var  = mkNilExpr (mkBoxedTupleTy [intTy, intTy])
                            }
     in (gbl_env, lcl_env)
+
+
+addPendingSpliceDS :: (Type, CoreExpr) -> DsM CoreExpr
+addPendingSpliceDS (t, ce) = do
+  sp_id <- newSysLocalDs t
+  e_hole <- newExprHole sp_id
+  ds_var <- ds_splices <$> getGblEnv
+  liftIO $ modifyIORef ds_var $ \dps -> ((ce, e_hole) : dps)
+  return (EHole e_hole)
 
 
 {-

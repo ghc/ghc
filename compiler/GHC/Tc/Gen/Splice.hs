@@ -29,7 +29,7 @@ module GHC.Tc.Gen.Splice(
      runMetaE, runMetaP, runMetaT, runMetaD, runQuasi,
      tcTopSpliceExpr, lookupThName_maybe,
      defaultRunMeta, runMeta', runRemoteModFinalizers,
-     finishTH, runTopSplice, runMetaCore, runMetaCoreT
+     finishTH, runTopSplice, runMetaCore, runMetaCoreT, compileDefnDS
       ) where
 
 #include "HsVersions.h"
@@ -143,6 +143,7 @@ import Data.Data (Data)
 import Data.Proxy    ( Proxy (..) )
 
 import GHC.Core
+import GHC.Runtime.Linker
 
 {-
 ************************************************************************
@@ -994,9 +995,10 @@ runMeta' show_code ppr_hs run_and_convert desugar expr
         ; (loc, ds_expr) <- desugar expr
         -- Compile and link it; might fail if linking fails
         ; src_span <- getSrcSpanM
+        ; mod <- getModule
         ; traceTc "About to run (desugared)" (ppr ds_expr)
         ; either_hval <- tryM $ liftIO $
-                         GHC.Driver.Main.hscCompileCoreExpr hsc_env src_span ds_expr
+                         GHC.Driver.Main.hscCompileCoreExpr hsc_env (Just mod) src_span ds_expr
         ; pprTraceM "Run desugared" (ppr ds_expr)
         ; case either_hval of {
             Left exn   -> fail_with_exn "compile and link" exn ;
@@ -1036,16 +1038,28 @@ runMeta' show_code ppr_hs run_and_convert desugar expr
                         if show_code then text "Code:" <+> ppr expr else empty]
         failWithTc msg
 
+compileDefnDS :: Id -> CoreExpr -> DsM ()
+compileDefnDS v ce = do
+  hsc_env <- getTopEnv
+  mod <- getModule
+  either_hval <- tryM $ liftIO $ hscCompileCoreExpr hsc_env (Just mod) noSrcSpan ce
+  case either_hval of
+    Left exn   -> fail_with_exn_ds ce "compile and link" exn
+    Right hval -> liftIO $ do
+      let dl = hsc_dynLinker hsc_env
+      extendLinkEnv dl [((idName v), hval)]
+
 ---------------
 runMetaDS :: (SrcSpan -> ForeignHValue -> DsM (Either MsgDoc hs_syn))        -- How to run x
          -> CoreExpr
          -> DsM hs_syn           -- Of type t
 runMetaDS run_and_convert ds_expr
   = do  { hsc_env <- getTopEnv
+        ; mod <- getModule
         ; either_hval <- tryM $ liftIO $
-                         hscCompileCoreExpr hsc_env noSrcSpan ds_expr
+                         hscCompileCoreExpr hsc_env (Just mod) noSrcSpan ds_expr
         ; case either_hval of {
-            Left exn   -> fail_with_exn "compile and link" exn ;
+            Left exn   -> fail_with_exn_ds ds_expr "compile and link" exn ;
             Right hval -> do
 
         {       -- Coerce it to Q t, and run it
@@ -1069,17 +1083,17 @@ runMetaDS run_and_convert ds_expr
             Right v -> return v
             Left se -> case fromException se of
                          Just IOEnvFailure -> failM -- Error already in Tc monad
-                         _ -> fail_with_exn "run" se -- Exception
+                         _ -> fail_with_exn_ds ds_expr "run" se -- Exception
         }}}
   where
     -- see Note [Concealed TH exceptions]
-    fail_with_exn :: Exception e => String -> e -> DsM a
-    fail_with_exn phase exn = do
-        exn_msg <- liftIO $ Panic.safeShowException exn
-        let msg = vcat [text "Exception when trying to" <+> text phase <+> text "compile-time code:",
-                        nest 2 (text exn_msg),
-                        text "Code:" <+> ppr ds_expr]
-        failWithDs msg
+fail_with_exn_ds :: Exception e => CoreExpr -> String -> e -> DsM a
+fail_with_exn_ds ds_expr phase exn = do
+    exn_msg <- liftIO $ Panic.safeShowException exn
+    let msg = vcat [text "Exception when trying to" <+> text phase <+> text "compile-time code:",
+                    nest 2 (text exn_msg),
+                    text "Code:" <+> ppr ds_expr]
+    failWithDs msg
 
 {-
 Note [Running typed splices in the zonker]

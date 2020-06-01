@@ -11,6 +11,7 @@ import GHC.Tc.Types( TcM , DsM, SpliceType )
 import GHC.Tc.Utils.TcType   ( ExpRhoType )
 import GHC.Types.Annotations ( Annotation, CoreAnnTarget )
 import GHC.Hs.Extension      ( GhcTcId, GhcRn, GhcPs, GhcTc )
+import GHC.Types.Id
 
 import GHC.Hs     ( HsSplice, HsBracket, HsExpr, LHsExpr, LHsType, LPat,
                     LHsDecl, ThModFinalizers )
@@ -43,6 +44,8 @@ runMetaD :: LHsExpr GhcTcId -> TcM [LHsDecl GhcPs]
 
 runMetaCore :: CoreExpr
         -> DsM TH.TExpU
+
+compileDefnDS :: Id -> CoreExpr -> DsM ()
 
 lookupThName_maybe :: TH.Name -> TcM (Maybe Name)
 runQuasi :: TH.Q a -> TcM a

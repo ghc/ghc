@@ -19,6 +19,7 @@ module GHC.HsToCore.Expr
    , dsHandleMonadicFailure
    , dsSplicedD
    , dsSplicedT
+   , runTopSpliceDs
    )
 where
 
@@ -753,10 +754,9 @@ dsExpr (HsTcUntypedBracketOut _ w x ps) = GHC.HsToCore.Quote.dsBracket w x ps
 dsExpr (HsTcZonkedBracketOut _ (rty, ty) (w, ex, pss) x ps ev_zs zs) = do
 --  exp <- GHC.HsToCore.Quote.dsBracket (Just w) ex pss
   GHC.HsToCore.DsMetaTc.dsBracketTc (rty, ty) Nothing w x ps ev_zs zs
-dsExpr (HsSpliceE _ (XSplice (HsSplicedT (DelayedSplice _ _ _t e)))) = do
+dsExpr (HsSpliceE _ (XSplice (HsSplicedT (DelayedSplice _ _ t e)))) = do
   e' <- dsLExpr e
-  res <- runMetaCore e'
-  dsSplicedD (Just $ ppr e) res
+  addPendingSpliceDS (t, e')
 dsExpr (HsSpliceE _ (HsSplicedD tu))
   = dsSplicedD Nothing tu
 dsExpr (HsSpliceE {}) =
@@ -875,6 +875,12 @@ loadCoreExpr before zs menv subst (THRep s) = do --pprTrace "LOADING" (ppr (map 
   forM_ before $ \bdoc -> traceSplice bdoc (ppr res)
   return res
 
+
+runTopSpliceDs :: [()] -> CoreExpr -> CExprHole Id -> DsM ()
+runTopSpliceDs local_deps splice_expr hole = do
+  splice_res <- runMetaCore splice_expr
+  final_e <- dsSplicedD (Just $ ppr splice_expr) splice_res
+  fillExprHole hole final_e
 
 traceSplice :: SDoc -> SDoc -> DsM ()
 traceSplice before after = do
