@@ -23,7 +23,7 @@ module GHC.Core.Rules (
         -- * Misc. CoreRule helpers
         rulesOfBinds, getRules, pprRulesForUser,
 
-        lookupRule, mkRule, roughTopNames
+        lookupRule, mkRule, roughTopNames, initRuleOpts
     ) where
 
 #include "HsVersions.h"
@@ -375,14 +375,14 @@ pprRuleBase rules = pprUFM rules $ \rss ->
 -- supplied rules to this instance of an application in a given
 -- context, returning the rule applied and the resulting expression if
 -- successful.
-lookupRule :: DynFlags -> InScopeEnv
+lookupRule :: RuleOpts -> InScopeEnv
            -> (Activation -> Bool)      -- When rule is active
            -> Id -> [CoreExpr]
            -> [CoreRule] -> Maybe (CoreRule, CoreExpr)
 
 -- See Note [Extra args in rule matching]
 -- See comments on matchRule
-lookupRule dflags in_scope is_active fn args rules
+lookupRule opts in_scope is_active fn args rules
   = -- pprTrace "matchRules" (ppr fn <+> ppr args $$ ppr rules ) $
     case go [] rules of
         []     -> Nothing
@@ -399,7 +399,7 @@ lookupRule dflags in_scope is_active fn args rules
     go :: [(CoreRule,CoreExpr)] -> [CoreRule] -> [(CoreRule,CoreExpr)]
     go ms [] = ms
     go ms (r:rs)
-      | Just e <- matchRule dflags in_scope is_active fn args' rough_args r
+      | Just e <- matchRule opts in_scope is_active fn args' rough_args r
       = go ((r,mkTicks ticks e):ms) rs
       | otherwise
       = -- pprTrace "match failed" (ppr r $$ ppr args $$
@@ -478,7 +478,7 @@ to lookupRule are the result of a lazy substitution
 -}
 
 ------------------------------------
-matchRule :: DynFlags -> InScopeEnv -> (Activation -> Bool)
+matchRule :: RuleOpts -> InScopeEnv -> (Activation -> Bool)
           -> Id -> [CoreExpr] -> [Maybe Name]
           -> CoreRule -> Maybe CoreExpr
 
@@ -504,15 +504,10 @@ matchRule :: DynFlags -> InScopeEnv -> (Activation -> Bool)
 -- Any 'surplus' arguments in the input are simply put on the end
 -- of the output.
 
-matchRule dflags rule_env _is_active fn args _rough_args
+matchRule opts rule_env _is_active fn args _rough_args
           (BuiltinRule { ru_try = match_fn })
 -- Built-in rules can't be switched off, it seems
-  = let env = RuleOpts
-               { roPlatform = targetPlatform dflags
-               , roNumConstantFolding = gopt Opt_NumConstantFolding dflags
-               , roExcessRationalPrecision = gopt Opt_ExcessPrecision dflags
-               }
-    in case match_fn env rule_env fn args of
+  = case match_fn opts rule_env fn args of
         Nothing   -> Nothing
         Just expr -> Just expr
 
@@ -522,6 +517,16 @@ matchRule _ in_scope is_active _ args rough_args
   | not (is_active act)               = Nothing
   | ruleCantMatch tpl_tops rough_args = Nothing
   | otherwise = matchN in_scope rule_name tpl_vars tpl_args args rhs
+
+
+-- | Initialize RuleOpts from DynFlags
+initRuleOpts :: DynFlags -> RuleOpts
+initRuleOpts dflags = RuleOpts
+  { roPlatform = targetPlatform dflags
+  , roNumConstantFolding = gopt Opt_NumConstantFolding dflags
+  , roExcessRationalPrecision = gopt Opt_ExcessPrecision dflags
+  }
+
 
 ---------------------------------------
 matchN  :: InScopeEnv
@@ -1155,12 +1160,13 @@ is so important.
 
 -- | Report partial matches for rules beginning with the specified
 -- string for the purposes of error reporting
-ruleCheckProgram :: CompilerPhase               -- ^ Rule activation test
+ruleCheckProgram :: RuleOpts                    -- ^ Rule options
+                 -> CompilerPhase               -- ^ Rule activation test
                  -> String                      -- ^ Rule pattern
                  -> (Id -> [CoreRule])          -- ^ Rules for an Id
                  -> CoreProgram                 -- ^ Bindings to check in
                  -> SDoc                        -- ^ Resulting check message
-ruleCheckProgram phase rule_pat rules binds
+ruleCheckProgram ropts phase rule_pat rules binds
   | isEmptyBag results
   = text "Rule check results: no rule application sites"
   | otherwise
@@ -1173,7 +1179,9 @@ ruleCheckProgram phase rule_pat rules binds
                        , rc_id_unf    = idUnfolding     -- Not quite right
                                                         -- Should use activeUnfolding
                        , rc_pattern   = rule_pat
-                       , rc_rules = rules }
+                       , rc_rules     = rules
+                       , rc_ropts     = ropts
+                       }
     results = unionManyBags (map (ruleCheckBind env) binds)
     line = text (replicate 20 '-')
 
@@ -1181,7 +1189,8 @@ data RuleCheckEnv = RuleCheckEnv {
     rc_is_active :: Activation -> Bool,
     rc_id_unf  :: IdUnfoldingFun,
     rc_pattern :: String,
-    rc_rules :: Id -> [CoreRule]
+    rc_rules :: Id -> [CoreRule],
+    rc_ropts :: RuleOpts
 }
 
 ruleCheckBind :: RuleCheckEnv -> CoreBind -> Bag SDoc
@@ -1228,16 +1237,15 @@ ruleAppCheck_help env fn args rules
     i_args = args `zip` [1::Int ..]
     rough_args = map roughTopName args
 
-    check_rule rule = sdocWithDynFlags $ \dflags ->
-                      rule_herald rule <> colon <+> rule_info dflags rule
+    check_rule rule = rule_herald rule <> colon <+> rule_info (rc_ropts env) rule
 
     rule_herald (BuiltinRule { ru_name = name })
         = text "Builtin rule" <+> doubleQuotes (ftext name)
     rule_herald (Rule { ru_name = name })
         = text "Rule" <+> doubleQuotes (ftext name)
 
-    rule_info dflags rule
-        | Just _ <- matchRule dflags (emptyInScopeSet, rc_id_unf env)
+    rule_info opts rule
+        | Just _ <- matchRule opts (emptyInScopeSet, rc_id_unf env)
                               noBlackList fn args rough_args rule
         = text "matches (which is very peculiar!)"
 
