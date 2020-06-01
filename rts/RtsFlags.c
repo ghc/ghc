@@ -292,6 +292,12 @@ usage_text[] = {
 "  -?       Prints this message and exits; the program is not executed",
 "  --info   Print information about the RTS used by this program",
 "",
+"  --nonmoving-gc",
+"            Selects the non-moving mark-and-sweep garbage collector to",
+"            manage the oldest generation.",
+"  --copying-gc",
+"            Selects the copying garbage collector to manage all generations.",
+"",
 "  -K<size>  Sets the maximum stack size (default: 80% of the heap)",
 "            Egs: -K32k -K512k -K8M",
 "  -ki<size> Sets the initial thread stack size (default 1k)  Egs: -ki4k -ki2m",
@@ -938,6 +944,11 @@ error = true;
                       OPTION_SAFE;
                       printRtsInfo(rtsConfig);
                       stg_exit(0);
+                  }
+                  else if (strequal("copying-gc",
+                               &rts_argv[arg][2])) {
+                      OPTION_SAFE;
+                      RtsFlags.GcFlags.useNonmoving = false;
                   }
                   else if (strequal("nonmoving-gc",
                                &rts_argv[arg][2])) {
