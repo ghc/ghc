@@ -321,7 +321,7 @@ badBootDeclErr = text "Illegal declarations in an hs-boot file"
 
 ------------------------
 tcLocalBinds :: HsLocalBinds GhcRn -> TcM thing
-             -> TcM (HsLocalBinds GhcTcId, thing)
+             -> TcM (HsLocalBinds GhcTc, thing)
 
 tcLocalBinds (EmptyLocalBinds x) thing_inside
   = do  { thing <- thing_inside
@@ -382,7 +382,7 @@ untouchable-range idea.
 tcValBinds :: TopLevelFlag
            -> [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn]
            -> TcM thing
-           -> TcM ([(RecFlag, LHsBinds GhcTcId)], thing)
+           -> TcM ([(RecFlag, LHsBinds GhcTc)], thing)
 
 tcValBinds top_lvl binds sigs thing_inside
   = do  {   -- Typecheck the signatures
@@ -412,7 +412,7 @@ tcValBinds top_lvl binds sigs thing_inside
 ------------------------
 tcBindGroups :: TopLevelFlag -> TcSigFun -> TcPragEnv
              -> [(RecFlag, LHsBinds GhcRn)] -> TcM thing
-             -> TcM ([(RecFlag, LHsBinds GhcTcId)], thing)
+             -> TcM ([(RecFlag, LHsBinds GhcTc)], thing)
 -- Typecheck a whole lot of value bindings,
 -- one strongly-connected component at a time
 -- Here a "strongly connected component" has the straightforward
@@ -453,7 +453,7 @@ tcBindGroups top_lvl sig_fn prag_fn (group : groups) thing_inside
 tc_group :: forall thing.
             TopLevelFlag -> TcSigFun -> TcPragEnv
          -> (RecFlag, LHsBinds GhcRn) -> IsGroupClosed -> TcM thing
-         -> TcM ([(RecFlag, LHsBinds GhcTcId)], thing)
+         -> TcM ([(RecFlag, LHsBinds GhcTc)], thing)
 
 -- Typecheck one strongly-connected component of the original program.
 -- We get a list of groups back, because there may
@@ -491,7 +491,7 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
     sccs :: [SCC (LHsBind GhcRn)]
     sccs = stronglyConnCompFromEdgedVerticesUniq (mkEdges sig_fn binds)
 
-    go :: [SCC (LHsBind GhcRn)] -> TcM (LHsBinds GhcTcId, thing)
+    go :: [SCC (LHsBind GhcRn)] -> TcM (LHsBinds GhcTc, thing)
     go (scc:sccs) = do  { (binds1, ids1) <- tc_scc scc
                         ; (binds2, thing) <- tcExtendLetEnv top_lvl sig_fn
                                                             closed ids1 $
@@ -523,7 +523,7 @@ recursivePatSynErr loc binds
 tc_single :: forall thing.
             TopLevelFlag -> TcSigFun -> TcPragEnv
           -> LHsBind GhcRn -> IsGroupClosed -> TcM thing
-          -> TcM (LHsBinds GhcTcId, thing)
+          -> TcM (LHsBinds GhcTc, thing)
 tc_single _top_lvl sig_fn _prag_fn
           (L _ (PatSynBind _ psb@PSB{ psb_id = L _ name }))
           _ thing_inside
@@ -574,7 +574,7 @@ tcPolyBinds :: TcSigFun -> TcPragEnv
                                -- dependencies based on type signatures
             -> IsGroupClosed   -- Whether the group is closed
             -> [LHsBind GhcRn]  -- None are PatSynBind
-            -> TcM (LHsBinds GhcTcId, [TcId])
+            -> TcM (LHsBinds GhcTc, [TcId])
 
 -- Typechecks a single bunch of values bindings all together,
 -- and generalises them.  The bunch may be only part of a recursive
@@ -618,7 +618,7 @@ tcPolyBinds sig_fn prag_fn rec_group rec_tc closed bind_list
 -- If typechecking the binds fails, then return with each
 -- signature-less binder given type (forall a.a), to minimise
 -- subsequent error messages
-recoveryCode :: [Name] -> TcSigFun -> TcM (LHsBinds GhcTcId, [Id])
+recoveryCode :: [Name] -> TcSigFun -> TcM (LHsBinds GhcTc, [Id])
 recoveryCode binder_names sig_fn
   = do  { traceTc "tcBindsWithSigs: error recovery" (ppr binder_names)
         ; let poly_ids = map mk_dummy binder_names
@@ -651,7 +651,7 @@ tcPolyNoGen     -- No generalisation whatsoever
                    -- dependencies based on type signatures
   -> TcPragEnv -> TcSigFun
   -> [LHsBind GhcRn]
-  -> TcM (LHsBinds GhcTcId, [TcId])
+  -> TcM (LHsBinds GhcTc, [TcId])
 
 tcPolyNoGen rec_tc prag_fn tc_sig_fn bind_list
   = do { (binds', mono_infos) <- tcMonoBinds rec_tc tc_sig_fn
@@ -678,7 +678,7 @@ tcPolyNoGen rec_tc prag_fn tc_sig_fn bind_list
 tcPolyCheck :: TcPragEnv
             -> TcIdSigInfo     -- Must be a complete signature
             -> LHsBind GhcRn   -- Must be a FunBind
-            -> TcM (LHsBinds GhcTcId, [TcId])
+            -> TcM (LHsBinds GhcTc, [TcId])
 -- There is just one binding,
 --   it is a FunBind
 --   it has a complete type signature,
@@ -782,7 +782,7 @@ tcPolyInfer
   -> TcPragEnv -> TcSigFun
   -> Bool         -- True <=> apply the monomorphism restriction
   -> [LHsBind GhcRn]
-  -> TcM (LHsBinds GhcTcId, [TcId])
+  -> TcM (LHsBinds GhcTc, [TcId])
 tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
   = do { (tclvl, wanted, (binds', mono_infos))
              <- pushLevelAndCaptureConstraints  $
@@ -1250,7 +1250,7 @@ tcMonoBinds :: RecFlag  -- Whether the binding is recursive for typechecking pur
                         --      we are not rescued by a type signature
             -> TcSigFun -> LetBndrSpec
             -> [LHsBind GhcRn]
-            -> TcM (LHsBinds GhcTcId, [MonoBindInfo])
+            -> TcM (LHsBinds GhcTc, [MonoBindInfo])
 tcMonoBinds is_rec sig_fn no_gen
            [ L b_loc (FunBind { fun_id = L nm_loc name
                               , fun_matches = matches })]
@@ -1323,7 +1323,7 @@ tcMonoBinds _ sig_fn no_gen binds
 
 data TcMonoBind         -- Half completed; LHS done, RHS not done
   = TcFunBind  MonoBindInfo  SrcSpan (MatchGroup GhcRn (LHsExpr GhcRn))
-  | TcPatBind [MonoBindInfo] (LPat GhcTcId) (GRHSs GhcRn (LHsExpr GhcRn))
+  | TcPatBind [MonoBindInfo] (LPat GhcTc) (GRHSs GhcRn (LHsExpr GhcRn))
               TcSigmaType
 
 tcLhs :: TcSigFun -> LetBndrSpec -> HsBind GhcRn -> TcM TcMonoBind
@@ -1414,7 +1414,7 @@ newSigLetBndr no_gen name (TISI { sig_inst_tau = tau })
   = newLetBndr no_gen name tau
 
 -------------------
-tcRhs :: TcMonoBind -> TcM (HsBind GhcTcId)
+tcRhs :: TcMonoBind -> TcM (HsBind GhcTc)
 tcRhs (TcFunBind info@(MBI { mbi_sig = mb_sig, mbi_mono_id = mono_id })
                  loc matches)
   = tcExtendIdBinderStackForRhs [info]  $
