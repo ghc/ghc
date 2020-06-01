@@ -70,7 +70,7 @@ lintStgTopBindings :: forall a . (OutputablePass a, BinderP a ~ Id)
 
 lintStgTopBindings dflags this_mod unarised whodunnit binds
   = {-# SCC "StgLint" #-}
-    case initL this_mod unarised top_level_binds (lint_binds binds) of
+    case initL this_mod unarised opts top_level_binds (lint_binds binds) of
       Nothing  ->
         return ()
       Just msg -> do
@@ -80,10 +80,11 @@ lintStgTopBindings dflags this_mod unarised whodunnit binds
                         text whodunnit <+> text "***",
                   msg,
                   text "*** Offending Program ***",
-                  pprGenStgTopBindings binds,
+                  pprGenStgTopBindings opts binds,
                   text "*** End of Offense ***"])
         Err.ghcExit dflags 1
   where
+    opts = initStgPprOpts dflags
     -- Bring all top-level binds into scope because CoreToStg does not generate
     -- bindings in dependency order (so we may see a use before its definition).
     top_level_binds = mkVarSet (bindersOfTopBinds binds)
@@ -129,9 +130,10 @@ lint_binds_help top_lvl (binder, rhs)
   = addLoc (RhsOf binder) $ do
         when (isTopLevel top_lvl) (checkNoCurrentCCS rhs)
         lintStgRhs rhs
+        opts <- getStgPprOpts
         -- Check binder doesn't have unlifted type or it's a join point
         checkL (isJoinId binder || not (isUnliftedType (idType binder)))
-               (mkUnliftedTyMsg binder rhs)
+               (mkUnliftedTyMsg opts binder rhs)
 
 -- | Top-level bindings can't inherit the cost centre stack from their
 -- (static) allocation site.
@@ -139,14 +141,17 @@ checkNoCurrentCCS
     :: (OutputablePass a, BinderP a ~ Id)
     => GenStgRhs a
     -> LintM ()
-checkNoCurrentCCS rhs@(StgRhsClosure _ ccs _ _ _)
-  | isCurrentCCS ccs
-  = addErrL (text "Top-level StgRhsClosure with CurrentCCS" $$ ppr rhs)
-checkNoCurrentCCS rhs@(StgRhsCon ccs _ _)
-  | isCurrentCCS ccs
-  = addErrL (text "Top-level StgRhsCon with CurrentCCS" $$ ppr rhs)
-checkNoCurrentCCS _
-  = return ()
+checkNoCurrentCCS rhs = do
+   opts <- getStgPprOpts
+   let rhs' = pprStgRhs opts rhs
+   case rhs of
+      StgRhsClosure _ ccs _ _ _
+         | isCurrentCCS ccs
+         -> addErrL (text "Top-level StgRhsClosure with CurrentCCS" $$ rhs')
+      StgRhsCon ccs _ _
+         | isCurrentCCS ccs
+         -> addErrL (text "Top-level StgRhsCon with CurrentCCS" $$ rhs')
+      _ -> return ()
 
 lintStgRhs :: (OutputablePass a, BinderP a ~ Id) => GenStgRhs a -> LintM ()
 
@@ -159,9 +164,10 @@ lintStgRhs (StgRhsClosure _ _ _ binders expr)
         lintStgExpr expr
 
 lintStgRhs rhs@(StgRhsCon _ con args) = do
-    when (isUnboxedTupleCon con || isUnboxedSumCon con) $
+    when (isUnboxedTupleCon con || isUnboxedSumCon con) $ do
+      opts <- getStgPprOpts
       addErrL (text "StgRhsCon is an unboxed tuple or sum application" $$
-               ppr rhs)
+               pprStgRhs opts rhs)
     mapM_ lintStgArg args
     mapM_ checkPostUnariseConArg args
 
@@ -176,17 +182,19 @@ lintStgExpr (StgApp fun args) = do
 lintStgExpr app@(StgConApp con args _arg_tys) = do
     -- unboxed sums should vanish during unarise
     lf <- getLintFlags
-    when (lf_unarised lf && isUnboxedSumCon con) $
+    when (lf_unarised lf && isUnboxedSumCon con) $ do
+      opts <- getStgPprOpts
       addErrL (text "Unboxed sum after unarise:" $$
-               ppr app)
+               pprStgExpr opts app)
     mapM_ lintStgArg args
     mapM_ checkPostUnariseConArg args
 
 lintStgExpr (StgOpApp _ args _) =
     mapM_ lintStgArg args
 
-lintStgExpr lam@(StgLam _ _) =
-    addErrL (text "Unexpected StgLam" <+> ppr lam)
+lintStgExpr lam@(StgLam _ _) = do
+    opts <- getStgPprOpts
+    addErrL (text "Unexpected StgLam" <+> pprStgExpr opts lam)
 
 lintStgExpr (StgLet _ binds body) = do
     binders <- lintStgBinds NotTopLevel binds
@@ -235,6 +243,7 @@ The Lint monad
 newtype LintM a = LintM
     { unLintM :: Module
               -> LintFlags
+              -> StgPprOpts        -- Pretty-printing options
               -> [LintLocInfo]     -- Locations
               -> IdSet             -- Local vars in scope
               -> Bag MsgDoc        -- Error messages so far
@@ -268,16 +277,16 @@ pp_binders bs
     pp_binder b
       = hsep [ppr b, dcolon, ppr (idType b)]
 
-initL :: Module -> Bool -> IdSet -> LintM a -> Maybe MsgDoc
-initL this_mod unarised locals (LintM m) = do
-  let (_, errs) = m this_mod (LintFlags unarised) [] locals emptyBag
+initL :: Module -> Bool -> StgPprOpts -> IdSet -> LintM a -> Maybe MsgDoc
+initL this_mod unarised opts locals (LintM m) = do
+  let (_, errs) = m this_mod (LintFlags unarised) opts [] locals emptyBag
   if isEmptyBag errs then
       Nothing
   else
       Just (vcat (punctuate blankLine (bagToList errs)))
 
 instance Applicative LintM where
-      pure a = LintM $ \_mod _lf _loc _scope errs -> (a, errs)
+      pure a = LintM $ \_mod _lf _opts _loc _scope errs -> (a, errs)
       (<*>) = ap
       (*>)  = thenL_
 
@@ -286,14 +295,14 @@ instance Monad LintM where
     (>>)  = (*>)
 
 thenL :: LintM a -> (a -> LintM b) -> LintM b
-thenL m k = LintM $ \mod lf loc scope errs
-  -> case unLintM m mod lf loc scope errs of
-      (r, errs') -> unLintM (k r) mod lf loc scope errs'
+thenL m k = LintM $ \mod lf opts loc scope errs
+  -> case unLintM m mod lf opts loc scope errs of
+      (r, errs') -> unLintM (k r) mod lf opts loc scope errs'
 
 thenL_ :: LintM a -> LintM b -> LintM b
-thenL_ m k = LintM $ \mod lf loc scope errs
-  -> case unLintM m mod lf loc scope errs of
-      (_, errs') -> unLintM k mod lf loc scope errs'
+thenL_ m k = LintM $ \mod lf opts loc scope errs
+  -> case unLintM m mod lf opts loc scope errs of
+      (_, errs') -> unLintM k mod lf opts loc scope errs'
 
 checkL :: Bool -> MsgDoc -> LintM ()
 checkL True  _   = return ()
@@ -338,7 +347,7 @@ checkPostUnariseId id =
       is_sum <|> is_tuple <|> is_void
 
 addErrL :: MsgDoc -> LintM ()
-addErrL msg = LintM $ \_mod _lf loc _scope errs -> ((), addErr errs msg loc)
+addErrL msg = LintM $ \_mod _lf _opts loc _scope errs -> ((), addErr errs msg loc)
 
 addErr :: Bag MsgDoc -> MsgDoc -> [LintLocInfo] -> Bag MsgDoc
 addErr errs_so_far msg locs
@@ -349,29 +358,32 @@ addErr errs_so_far msg locs
     mk_msg []      = msg
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
-addLoc extra_loc m = LintM $ \mod lf loc scope errs
-   -> unLintM m mod lf (extra_loc:loc) scope errs
+addLoc extra_loc m = LintM $ \mod lf opts loc scope errs
+   -> unLintM m mod lf opts (extra_loc:loc) scope errs
 
 addInScopeVars :: [Id] -> LintM a -> LintM a
-addInScopeVars ids m = LintM $ \mod lf loc scope errs
+addInScopeVars ids m = LintM $ \mod lf opts loc scope errs
  -> let
         new_set = mkVarSet ids
-    in unLintM m mod lf loc (scope `unionVarSet` new_set) errs
+    in unLintM m mod lf opts loc (scope `unionVarSet` new_set) errs
 
 getLintFlags :: LintM LintFlags
-getLintFlags = LintM $ \_mod lf _loc _scope errs -> (lf, errs)
+getLintFlags = LintM $ \_mod lf _opts _loc _scope errs -> (lf, errs)
+
+getStgPprOpts :: LintM StgPprOpts
+getStgPprOpts = LintM $ \_mod _lf opts _loc _scope errs -> (opts, errs)
 
 checkInScope :: Id -> LintM ()
-checkInScope id = LintM $ \mod _lf loc scope errs
+checkInScope id = LintM $ \mod _lf _opts loc scope errs
  -> if nameIsLocalOrFrom mod (idName id) && not (id `elemVarSet` scope) then
         ((), addErr errs (hsep [ppr id, dcolon, ppr (idType id),
                                 text "is out of scope"]) loc)
     else
         ((), errs)
 
-mkUnliftedTyMsg :: OutputablePass a => Id -> GenStgRhs a -> SDoc
-mkUnliftedTyMsg binder rhs
+mkUnliftedTyMsg :: OutputablePass a => StgPprOpts -> Id -> GenStgRhs a -> SDoc
+mkUnliftedTyMsg opts binder rhs
   = (text "Let(rec) binder" <+> quotes (ppr binder) <+>
      text "has unlifted type" <+> quotes (ppr (idType binder)))
     $$
-    (text "RHS:" <+> ppr rhs)
+    (text "RHS:" <+> pprStgRhs opts rhs)
