@@ -412,12 +412,12 @@ data UnitState = UnitState {
   -- | A mapping from wired in unit ids to unit keys from the database.
   unwireMap :: Map UnitId UnitId,
 
-  -- | The packages we're going to link in eagerly.  This list
-  -- should be in reverse dependency order; that is, a package
-  -- is always mentioned before the packages it depends on.
+  -- | The units we're going to link in eagerly.  This list
+  -- should be in reverse dependency order; that is, a unit
+  -- is always mentioned before the units it depends on.
   preloadUnits      :: [UnitId],
 
-  -- | Packages which we explicitly depend on (from a command line flag).
+  -- | Units which we explicitly depend on (from a command line flag).
   -- We'll use this to generate version macros.
   explicitUnits      :: [Unit],
 
@@ -506,25 +506,25 @@ lookupUnitId' :: UnitInfoMap -> UnitId -> Maybe UnitInfo
 lookupUnitId' db uid = Map.lookup uid db
 
 
--- | Looks up the given unit in the package state, panicing if it is not found
+-- | Looks up the given unit in the unit state, panicing if it is not found
 unsafeLookupUnit :: HasDebugCallStack => UnitState -> Unit -> UnitInfo
 unsafeLookupUnit state u = case lookupUnit state u of
    Just info -> info
    Nothing   -> pprPanic "unsafeLookupUnit" (ppr u)
 
--- | Looks up the given unit id in the package state, panicing if it is not found
+-- | Looks up the given unit id in the unit state, panicing if it is not found
 unsafeLookupUnitId :: HasDebugCallStack => UnitState -> UnitId -> UnitInfo
 unsafeLookupUnitId state uid = case lookupUnitId state uid of
    Just info -> info
    Nothing   -> pprPanic "unsafeLookupUnitId" (ppr uid)
 
 
--- | Find the package we know about with the given package name (e.g. @foo@), if any
+-- | Find the unit we know about with the given package name (e.g. @foo@), if any
 -- (NB: there might be a locally defined unit name which overrides this)
 lookupPackageName :: UnitState -> PackageName -> Maybe IndefUnitId
 lookupPackageName pkgstate n = Map.lookup n (packageNameMap pkgstate)
 
--- | Search for packages with a given package ID (e.g. \"foo-0.1\")
+-- | Search for units with a given package ID (e.g. \"foo-0.1\")
 searchPackageId :: UnitState -> PackageId -> [UnitInfo]
 searchPackageId pkgstate pid = filter ((pid ==) . unitPackageId)
                                (listUnitInfo pkgstate)
@@ -550,28 +550,23 @@ mkUnitInfoMap infos = foldl' add Map.empty infos
       | otherwise
       = Map.insert (unitId p) p pkg_map
 
--- | Get a list of entries from the package database.  NB: be careful with
--- this function, although all packages in this map are "visible", this
--- does not imply that the exposed-modules of the package are available
+-- | Get a list of entries from the unit database.  NB: be careful with
+-- this function, although all units in this map are "visible", this
+-- does not imply that the exposed-modules of the unit are available
 -- (they may have been thinned or renamed).
 listUnitInfo :: UnitState -> [UnitInfo]
 listUnitInfo state = Map.elems (unitInfoMap state)
 
 -- ----------------------------------------------------------------------------
--- Loading the package db files and building up the package state
+-- Loading the unit db files and building up the unit state
 
--- | Read the package database files, and sets up various internal tables of
--- package information, according to the package-related flags on the
+-- | Read the unit database files, and sets up various internal tables of
+-- unit information, according to the unit-related flags on the
 -- command-line (@-package@, @-hide-package@ etc.)
---
--- Returns a list of packages to link in if we're doing dynamic linking.
--- This list contains the packages that the user explicitly mentioned with
--- @-package@ flags.
 --
 -- 'initUnits' can be called again subsequently after updating the
 -- 'packageFlags' field of the 'DynFlags', and it will update the
--- 'unitState' in 'DynFlags' and return a list of packages to
--- link in.
+-- 'unitState' in 'DynFlags'.
 initUnits :: DynFlags -> IO DynFlags
 initUnits dflags = do
 
@@ -754,7 +749,7 @@ mungeDynLibFields pkg =
     }
 
 -- -----------------------------------------------------------------------------
--- Modify our copy of the package database based on trust flags,
+-- Modify our copy of the unit database based on trust flags,
 -- -trust and -distrust.
 
 applyTrustFlag
@@ -957,8 +952,8 @@ sortByPreference prec_map = sortBy (flip (compareByPreference prec_map))
 --      came in the latest package database.
 --
 -- Pursuant to #12518, we could change this policy to, for example, remove
--- the version preference, meaning that we would always prefer the packages
--- in later package database.
+-- the version preference, meaning that we would always prefer the units
+-- in later unit database.
 --
 -- Instead, we use that preference based policy only when one of the packages
 -- is integer-gmp and the other is integer-simple.
@@ -983,7 +978,7 @@ compareByPreference prec_map pkg pkg'
         GT -> GT
         EQ | Just prec  <- Map.lookup (unitId pkg)  prec_map
            , Just prec' <- Map.lookup (unitId pkg') prec_map
-           -- Prefer the package from the later DB flag (i.e., higher
+           -- Prefer the unit from the later DB flag (i.e., higher
            -- precedence)
            -> compare prec prec'
            | otherwise
@@ -1048,13 +1043,13 @@ findWiredInUnits
    :: (SDoc -> IO ())      -- debug trace
    -> UnitPrecedenceMap
    -> [UnitInfo]           -- database
-   -> VisibilityMap             -- info on what packages are visible
+   -> VisibilityMap             -- info on what units are visible
                                 -- for wired in selection
-   -> IO ([UnitInfo],  -- package database updated for wired in
+   -> IO ([UnitInfo],  -- unit database updated for wired in
           WiringMap)   -- map from unit id to wired identity
 
 findWiredInUnits printer prec_map pkgs vis_map = do
-  -- Now we must find our wired-in packages, and rename them to
+  -- Now we must find our wired-in units, and rename them to
   -- their canonical names (eg. base-1.0 ==> base), as described
   -- in Note [Wired-in units] in GHC.Unit.Module
   let
@@ -1188,22 +1183,22 @@ updateVisibilityMap wiredInMap vis_map = foldl' f vis_map (Map.toList wiredInMap
 
 -- ----------------------------------------------------------------------------
 
--- | The reason why a package is unusable.
+-- | The reason why a unit is unusable.
 data UnusableUnitReason
   = -- | We ignored it explicitly using @-ignore-package@.
     IgnoredWithFlag
-    -- | This package transitively depends on a package that was never present
+    -- | This unit transitively depends on a unit that was never present
     -- in any of the provided databases.
   | BrokenDependencies   [UnitId]
-    -- | This package transitively depends on a package involved in a cycle.
+    -- | This unit transitively depends on a unit involved in a cycle.
     -- Note that the list of 'UnitId' reports the direct dependencies
-    -- of this package that (transitively) depended on the cycle, and not
+    -- of this unit that (transitively) depended on the cycle, and not
     -- the actual cycle itself (which we report separately at high verbosity.)
   | CyclicDependencies   [UnitId]
-    -- | This package transitively depends on a package which was ignored.
+    -- | This unit transitively depends on a unit which was ignored.
   | IgnoredDependencies  [UnitId]
-    -- | This package transitively depends on a package which was
-    -- shadowed by an ABI-incompatible package.
+    -- | This unit transitively depends on a unit which was
+    -- shadowed by an ABI-incompatible unit.
   | ShadowedDependencies [UnitId]
 
 instance Outputable UnusableUnitReason where
@@ -1259,7 +1254,7 @@ reportUnusable printer pkgs = mapM_ report (Map.toList pkgs)
 -- the 'UnitId's which have a dependency on it.
 type RevIndex = Map UnitId [UnitId]
 
--- | Compute the reverse dependency index of a package database.
+-- | Compute the reverse dependency index of a unit database.
 reverseDeps :: UnitInfoMap -> RevIndex
 reverseDeps db = Map.foldl' go Map.empty db
   where
@@ -1268,7 +1263,7 @@ reverseDeps db = Map.foldl' go Map.empty db
 
 -- | Given a list of 'UnitId's to remove, a database,
 -- and a reverse dependency index (as computed by 'reverseDeps'),
--- remove those packages, plus any packages which depend on them.
+-- remove those units, plus any units which depend on them.
 -- Returns the pruned database, as well as a list of 'UnitInfo's
 -- that was removed.
 removeUnits :: [UnitId] -> RevIndex
@@ -1285,17 +1280,16 @@ removeUnits uids index m = go uids (m,[])
         | otherwise
         = go uids (m,pkgs)
 
--- | Given a 'UnitInfo' from some 'UnitInfoMap',
--- return all entries in 'depends' which correspond to packages
--- that do not exist in the index.
+-- | Given a 'UnitInfo' from some 'UnitInfoMap', return all entries in 'depends'
+-- which correspond to units that do not exist in the index.
 depsNotAvailable :: UnitInfoMap
                  -> UnitInfo
                  -> [UnitId]
 depsNotAvailable pkg_map pkg = filter (not . (`Map.member` pkg_map)) (unitDepends pkg)
 
--- | Given a 'UnitInfo' from some 'UnitInfoMap'
--- return all entries in 'unitAbiDepends' which correspond to packages
--- that do not exist, OR have mismatching ABIs.
+-- | Given a 'UnitInfo' from some 'UnitInfoMap' return all entries in
+-- 'unitAbiDepends' which correspond to units that do not exist, OR have
+-- mismatching ABIs.
 depsAbiMismatch :: UnitInfoMap
                 -> UnitInfo
                 -> [UnitId]
@@ -1308,7 +1302,7 @@ depsAbiMismatch pkg_map pkg = map fst . filter (not . abiMatch) $ unitAbiDepends
         = False
 
 -- -----------------------------------------------------------------------------
--- Ignore packages
+-- Ignore units
 
 ignoreUnits :: [IgnorePackageFlag] -> [UnitInfo] -> UnusableUnits
 ignoreUnits flags pkgs = Map.fromList (concatMap doit flags)
@@ -1317,7 +1311,7 @@ ignoreUnits flags pkgs = Map.fromList (concatMap doit flags)
      case partition (matchingStr str) pkgs of
          (ps, _) -> [ (unitId p, (p, IgnoredWithFlag))
                     | p <- ps ]
-        -- missing package is not an error for -ignore-package,
+        -- missing unit is not an error for -ignore-package,
         -- because a common usage is to -ignore-package P as
         -- a preventative measure just in case P exists.
 
@@ -1326,15 +1320,15 @@ ignoreUnits flags pkgs = Map.fromList (concatMap doit flags)
 -- Merging databases
 --
 
--- | For each package, a mapping from uid -> i indicates that this
--- package was brought into GHC by the ith @-package-db@ flag on
+-- | For each unit, a mapping from uid -> i indicates that this
+-- unit was brought into GHC by the ith @-package-db@ flag on
 -- the command line.  We use this mapping to make sure we prefer
--- packages that were defined later on the command line, if there
+-- units that were defined later on the command line, if there
 -- is an ambiguity.
 type UnitPrecedenceMap = Map UnitId Int
 
 -- | Given a list of databases, merge them together, where
--- packages with the same unit id in later databases override
+-- units with the same unit id in later databases override
 -- earlier ones.  This does NOT check if the resulting database
 -- makes sense (that's done by 'validateDatabase').
 mergeDatabases :: (SDoc -> IO ()) -> [UnitDatabase UnitId]
@@ -1368,14 +1362,14 @@ mergeDatabases printer = foldM merge (Map.empty, Map.empty) . zip [1..]
       prec_map' :: UnitPrecedenceMap
       prec_map' = Map.union (Map.map (const i) db_map) prec_map
 
--- | Validates a database, removing unusable packages from it
--- (this includes removing packages that the user has explicitly
+-- | Validates a database, removing unusable units from it
+-- (this includes removing units that the user has explicitly
 -- ignored.)  Our general strategy:
 --
--- 1. Remove all broken packages (dangling dependencies)
--- 2. Remove all packages that are cyclic
+-- 1. Remove all broken units (dangling dependencies)
+-- 2. Remove all units that are cyclic
 -- 3. Apply ignore flags
--- 4. Remove all packages which have deps with mismatching ABIs
+-- 4. Remove all units which have deps with mismatching ABIs
 --
 validateDatabase :: UnitConfig -> UnitInfoMap
                  -> (UnitInfoMap, UnusableUnits, [SCC UnitInfo])
@@ -1392,13 +1386,13 @@ validateDatabase cfg pkg_map1 =
       Map.fromList [ (unitId pkg, (pkg, mk_err (dep_matcher m pkg)))
                    | pkg <- uids ]
 
-    -- Find broken packages
+    -- Find broken units
     directly_broken = filter (not . null . depsNotAvailable pkg_map1)
                              (Map.elems pkg_map1)
     (pkg_map2, broken) = removeUnits (map unitId directly_broken) index pkg_map1
     unusable_broken = mk_unusable BrokenDependencies depsNotAvailable pkg_map2 broken
 
-    -- Find recursive packages
+    -- Find recursive units
     sccs = stronglyConnComp [ (pkg, unitId pkg, unitDepends pkg)
                             | pkg <- Map.elems pkg_map2 ]
     getCyclicSCC (CyclicSCC vs) = map unitId vs
@@ -1411,7 +1405,7 @@ validateDatabase cfg pkg_map1 =
     (pkg_map4, ignored) = removeUnits (Map.keys directly_ignored) index pkg_map3
     unusable_ignored = mk_unusable IgnoredDependencies depsNotAvailable pkg_map4 ignored
 
-    -- Knock out packages whose dependencies don't agree with ABI
+    -- Knock out units whose dependencies don't agree with ABI
     -- (i.e., got invalidated due to shadowing)
     directly_shadowed = filter (not . null . depsAbiMismatch pkg_map4)
                                (Map.elems pkg_map4)
@@ -1424,8 +1418,8 @@ validateDatabase cfg pkg_map1 =
                                 `Map.union` unusable_shadowed
 
 -- -----------------------------------------------------------------------------
--- When all the command-line options are in, we can process our package
--- settings and populate the package state.
+-- When all the command-line options are in, we can process our unit
+-- settings and populate the unit state.
 
 mkUnitState
     :: SDocContext            -- ^ SDocContext used to render exception messages
