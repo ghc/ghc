@@ -138,11 +138,12 @@ import GHC.Prelude
 import GHC.Platform
 
 import {-# SOURCE #-} GHC.Core.TyCo.Rep
-   ( Kind, Type, PredType, mkForAllTy, mkFunTy )
+   ( Kind, Type, PredType, mkForAllTy, mkFunTyMany )
 import {-# SOURCE #-} GHC.Core.TyCo.Ppr
    ( pprType )
 import {-# SOURCE #-} GHC.Builtin.Types
    ( runtimeRepTyCon, constraintKind
+   , multiplicityTyCon
    , vecCountTyCon, vecElemTyCon, liftedTypeKind )
 import {-# SOURCE #-} GHC.Core.DataCon
    ( DataCon, dataConExTyCoVars, dataConFieldLabels
@@ -489,7 +490,7 @@ mkTyConKind :: [TyConBinder] -> Kind -> Kind
 mkTyConKind bndrs res_kind = foldr mk res_kind bndrs
   where
     mk :: TyConBinder -> Kind -> Kind
-    mk (Bndr tv (AnonTCB af))   k = mkFunTy af (varType tv) k
+    mk (Bndr tv (AnonTCB af))   k = mkFunTyMany af (varType tv) k
     mk (Bndr tv (NamedTCB vis)) k = mkForAllTy tv vis k
 
 tyConInvisTVBinders :: [TyConBinder]   -- From the TyCon
@@ -1871,6 +1872,7 @@ isVanillaAlgTyCon (AlgTyCon { algTcParent = VanillaAlgTyCon _ }) = True
 isVanillaAlgTyCon _                                              = False
 
 -- | Returns @True@ for the 'TyCon' of the 'Constraint' kind.
+{-# INLINE isConstraintKindCon #-} -- See Note [Inlining coreView] in GHC.Core.Type
 isConstraintKindCon :: TyCon -> Bool
 -- NB: We intentionally match on AlgTyCon, because 'constraintKindTyCon' is
 -- always an AlgTyCon (see 'pcTyCon' in TysWiredIn) and the record selector
@@ -2031,6 +2033,7 @@ arguments are simply value arguments, and should not get in the way.
 
 
 -- | Is this a 'TyCon' representing a regular H98 type synonym (@type@)?
+{-# INLINE isTypeSynonymTyCon #-}  -- See Note [Inlining coreView] in GHC.Core.Type
 isTypeSynonymTyCon :: TyCon -> Bool
 isTypeSynonymTyCon (SynonymTyCon {}) = True
 isTypeSynonymTyCon _                 = False
@@ -2213,6 +2216,7 @@ kindTyConKeys :: UniqSet Unique
 kindTyConKeys = unionManyUniqSets
   ( mkUniqSet [ liftedTypeKindTyConKey, constraintKindTyConKey, tYPETyConKey ]
   : map (mkUniqSet . tycon_with_datacons) [ runtimeRepTyCon
+                                          , multiplicityTyCon
                                           , vecCountTyCon, vecElemTyCon ] )
   where
     tycon_with_datacons tc = getUnique tc : map getUnique (tyConDataCons tc)
@@ -2306,8 +2310,8 @@ expandSynTyCon_maybe tc tys
         GT -> Just (tvs `zip` tys, rhs, drop arity tys)
         EQ -> Just (tvs `zip` tys, rhs, [])
         LT -> Nothing
-   | otherwise
-   = Nothing
+  | otherwise
+  = Nothing
 
 ----------------
 
@@ -2410,7 +2414,7 @@ tyConRoles :: TyCon -> [Role]
 -- See also Note [TyCon Role signatures]
 tyConRoles tc
   = case tc of
-    { FunTyCon {}                         -> [Nominal, Nominal, Representational, Representational]
+    { FunTyCon {}                         -> [Nominal, Nominal, Nominal, Representational, Representational]
     ; AlgTyCon { tcRoles = roles }        -> roles
     ; SynonymTyCon { tcRoles = roles }    -> roles
     ; FamilyTyCon {}                      -> const_role Nominal

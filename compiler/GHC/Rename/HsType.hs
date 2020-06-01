@@ -18,6 +18,8 @@ module GHC.Rename.HsType (
         rnConDeclFields,
         rnLTyVar,
 
+        rnScaledLHsType,
+
         -- Precence related stuff
         mkOpAppRn, mkNegAppRn, mkOpFormRn, mkConOpPatRn,
         checkPrecMatch, checkSectionPrec,
@@ -484,6 +486,14 @@ rnLHsType ctxt ty = rnLHsTyKi (mkTyKiEnv ctxt TypeLevel RnTypeBody) ty
 rnLHsTypes :: HsDocContext -> [LHsType GhcPs] -> RnM ([LHsType GhcRn], FreeVars)
 rnLHsTypes doc tys = mapFvRn (rnLHsType doc) tys
 
+rnScaledLHsType :: HsDocContext -> HsScaled GhcPs (LHsType GhcPs)
+                                  -> RnM (HsScaled GhcRn (LHsType GhcRn), FreeVars)
+rnScaledLHsType doc (HsScaled w ty) = do
+  (w' , fvs_w) <- rnHsArrow (mkTyKiEnv doc TypeLevel RnTypeBody) w
+  (ty', fvs) <- rnLHsType doc ty
+  return (HsScaled w' ty', fvs `plusFV` fvs_w)
+
+
 rnHsType  :: HsDocContext -> HsType GhcPs -> RnM (HsType GhcRn, FreeVars)
 rnHsType ctxt ty = rnHsTyKi (mkTyKiEnv ctxt TypeLevel RnTypeBody) ty
 
@@ -591,7 +601,7 @@ rnHsTyKi env ty@(HsRecTy _ flds)
                                    2 (ppr ty))
            ; return [] }
 
-rnHsTyKi env (HsFunTy _ ty1 ty2)
+rnHsTyKi env (HsFunTy _ mult ty1 ty2)
   = do { (ty1', fvs1) <- rnLHsTyKi env ty1
         -- Might find a for-all as the arg of a function type
        ; (ty2', fvs2) <- rnLHsTyKi env ty2
@@ -599,8 +609,11 @@ rnHsTyKi env (HsFunTy _ ty1 ty2)
         -- when we find return :: forall m. Monad m -> forall a. a -> m a
 
         -- Check for fixity rearrangements
-       ; res_ty <- mkHsOpTyRn (HsFunTy noExtField) funTyConName funTyFixity ty1' ty2'
-       ; return (res_ty, fvs1 `plusFV` fvs2) }
+       ; (mult', w_fvs) <- rnHsArrow env mult
+       ; res_ty <- mkHsOpTyRn (hs_fun_ty mult') funTyConName funTyFixity ty1' ty2'
+       ; return (res_ty, fvs1 `plusFV` fvs2 `plusFV` w_fvs) }
+  where
+    hs_fun_ty w a b = HsFunTy noExtField w a b
 
 rnHsTyKi env listTy@(HsListTy _ ty)
   = do { data_kinds <- xoptM LangExt.DataKinds
@@ -695,6 +708,12 @@ rnHsTyKi env ty@(HsExplicitTupleTy _ tys)
 rnHsTyKi env (HsWildCardTy _)
   = do { checkAnonWildCard env
        ; return (HsWildCardTy noExtField, emptyFVs) }
+
+rnHsArrow :: RnTyKiEnv -> HsArrow GhcPs -> RnM (HsArrow GhcRn, FreeVars)
+rnHsArrow _env HsUnrestrictedArrow = return (HsUnrestrictedArrow, emptyFVs)
+rnHsArrow _env HsLinearArrow = return (HsLinearArrow, emptyFVs)
+rnHsArrow env (HsExplicitMult p)
+  = (\(mult, fvs) -> (HsExplicitMult mult, fvs)) <$> rnLHsTyKi env p
 
 --------------
 rnTyVar :: RnTyKiEnv -> RdrName -> RnM Name
@@ -1126,9 +1145,11 @@ mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsOpTy noExtField ty21 op2 ty22))
                       (\t1 t2 -> HsOpTy noExtField t1 op2 t2)
                       (unLoc op2) fix2 ty21 ty22 loc2 }
 
-mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsFunTy _ ty21 ty22))
+mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsFunTy _ mult ty21 ty22))
   = mk_hs_op_ty mk1 pp_op1 fix1 ty1
-                (HsFunTy noExtField) funTyConName funTyFixity ty21 ty22 loc2
+                hs_fun_ty funTyConName funTyFixity ty21 ty22 loc2
+  where
+    hs_fun_ty a b = HsFunTy noExtField mult a b
 
 mkHsOpTyRn mk1 _ _ ty1 ty2              -- Default case, no rearrangment
   = return (mk1 ty1 ty2)
@@ -1758,8 +1779,9 @@ extract_lty (L _ ty) acc
       HsListTy _ ty               -> extract_lty ty acc
       HsTupleTy _ _ tys           -> extract_ltys tys acc
       HsSumTy _ tys               -> extract_ltys tys acc
-      HsFunTy _ ty1 ty2           -> extract_lty ty1 $
-                                     extract_lty ty2 acc
+      HsFunTy _ w ty1 ty2         -> extract_lty ty1 $
+                                     extract_lty ty2 $
+                                     extract_hs_arrow w acc
       HsIParamTy _ _ ty           -> extract_lty ty acc
       HsOpTy _ ty1 tv ty2         -> extract_tv tv $
                                      extract_lty ty1 $
@@ -1782,6 +1804,11 @@ extract_lty (L _ ty) acc
       XHsType {}                  -> acc
       -- We deal with these separately in rnLHsTypeWithWildCards
       HsWildCardTy {}             -> acc
+
+extract_hs_arrow :: HsArrow GhcPs -> FreeKiTyVarsWithDups ->
+                   FreeKiTyVarsWithDups
+extract_hs_arrow (HsExplicitMult p) acc = extract_lty p acc
+extract_hs_arrow _ acc = acc
 
 extractHsTvBndrs :: [LHsTyVarBndr flag GhcPs]
                  -> FreeKiTyVarsWithDups           -- Free in body
