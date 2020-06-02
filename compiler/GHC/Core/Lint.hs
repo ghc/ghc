@@ -731,8 +731,6 @@ lintJoinLams join_arity enforce rhs
   where
     go 0 expr            = lintCoreExpr expr
     go n (Lam var body)  = lintLambda var $ go (n-1) body
-      -- N.B. join points can be cast. e.g. we consider ((\x -> ...) `cast` ...)
-      -- to be a join point at join arity 1.
     go n expr | Just bndr <- enforce -- Join point with too few RHS lambdas
               = failWithL $ mkBadJoinArityMsg bndr join_arity n rhs
               | otherwise -- Future join point, not yet eta-expanded
@@ -781,36 +779,26 @@ hurts us here.
 
 Note [Linting of runRW#]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-runRW# has some very peculiar behavior (see Note [runRW magic] in
-GHC.CoreToStg.Prep) which CoreLint must accommodate.
+runRW# has some very special behavior (see Note [runRW magic] in
+GHC.CoreToStg.Prep) which CoreLint must accommodate, by allowing
+join points in its argument.  For example, this is fine:
 
-As described in Note [Casts and lambdas] in
-GHC.Core.Opt.Simplify.Utils, the simplifier pushes casts out of
-lambdas. Concretely, the simplifier will transform
+    join j x = ...
+    in runRW#  (\s. case v of
+                       A -> j 3
+                       B -> j 4)
 
-    runRW# @r @ty (\s -> expr `cast` co)
+Usually those calls to the join point 'j' would not be valid tail calls,
+because they occur in a function argument.  But in the case of runRW#
+they are fine, because runRW# (\s.e) behaves operationally just like e.
+(runRW# is ultimately inlined in GHC.CoreToStg.Prep.)
 
-into
-
-    runRW# @r @ty ((\s -> expr) `cast` co)
-
-Consequently we need to handle the case that the continuation is a
-cast of a lambda. See Note [Casts and lambdas] in
-GHC.Core.Opt.Simplify.Utils.
-
-In the event that the continuation is headed by a lambda (which
-will bind the State# token) we can safely allow calls to join
-points since CorePrep is going to apply the continuation to
-RealWorld.
-
-In the case that the continuation is not a lambda we lint the
-continuation disallowing join points, to rule out things like,
+In the case that the continuation is /not/ a lambda we simply disable this
+special behaviour.  For example, this is /not/ fine:
 
     join j = ...
-    in runRW# @r @ty (
-         let x = jump j
-         in x
-       )
+    in runRW# @r @ty (jump j)
+
 
 
 ************************************************************************
@@ -931,10 +919,6 @@ lintCoreExpr e@(App _ _)
        ; (fun_ty2, ue2) <- lintCoreArg fun_pair1      arg_ty2
          -- See Note [Linting of runRW#]
        ; let lintRunRWCont :: CoreArg -> LintM (LintedType, UsageEnv)
-             lintRunRWCont (Cast expr co) = do
-                (ty, ue) <- lintRunRWCont expr
-                new_ty <- lintCastExpr expr ty co
-                return (new_ty, ue)
              lintRunRWCont expr@(Lam _ _) = do
                 lintJoinLams 1 (Just fun) expr
              lintRunRWCont other = markAllJoinsBad $ lintCoreExpr other
@@ -942,10 +926,6 @@ lintCoreExpr e@(App _ _)
        ; (arg3_ty, ue3) <- lintRunRWCont arg3
        ; app_ty <- lintValApp arg3 fun_ty2 arg3_ty ue2 ue3
        ; lintCoreArgs app_ty rest }
-
-  | Var fun <- fun
-  , fun `hasKey` runRWKey
-  = failWithL (text "Invalid runRW# application")
 
   | otherwise
   = do { pair <- lintCoreFun fun (length args)

@@ -1972,8 +1972,10 @@ rebuildCall env info (ApplyToTy { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_c
   = rebuildCall env (addTyArgTo info arg_ty hole_ty) cont
 
 ---------- The runRW# rule. Do this after absorbing all arguments ------
+-- See Note [Simplification of runRW#] in GHC.CoreToSTG.Prep.
+--
 -- runRW# :: forall (r :: RuntimeRep) (o :: TYPE r). (State# RealWorld -> o) -> o
--- K[ runRW# rr ty body ]  -->  runRW rr' ty' (\s. K[ body s ])
+-- K[ runRW# rr ty body ]   -->   runRW rr' ty' (\s. K[ body s ])
 rebuildCall env (ArgInfo { ai_fun = fun_id, ai_args = rev_args })
             (ApplyToVal { sc_arg = arg, sc_env = arg_se
                         , sc_cont = cont, sc_hole_ty = fun_ty })
