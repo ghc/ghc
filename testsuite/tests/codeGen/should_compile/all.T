@@ -87,3 +87,4 @@ test('T14373d', [],
 
 test('T17648', normal, makefile_test, [])
 test('T17904', normal, compile, ['-O'])
+test('T18291', normal, compile, ['-O0'])
