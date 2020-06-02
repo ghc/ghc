@@ -17,7 +17,7 @@
 extern bool startupAsyncWinIO(void);
 extern void shutdownAsyncWinIO(bool wait_threads);
 extern void awaitAsyncRequests(bool wait);
-extern void registerNewIOCPHandle (HANDLE port);
+extern void registerIOCPHandle (HANDLE port);
 extern void registerAlertableWait (bool has_timeout, DWORD mssec, uint64_t num_req, bool service_pending);
 
 extern OVERLAPPED_ENTRY* getOverlappedEntries (uint32_t *num);
