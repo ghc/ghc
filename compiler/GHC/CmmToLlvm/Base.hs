@@ -42,11 +42,13 @@ module GHC.CmmToLlvm.Base (
 #include "ghcautoconf.h"
 
 import GHC.Prelude
+import GHC.Utils.Panic
 
 import GHC.Llvm
 import GHC.CmmToLlvm.Regs
 
 import GHC.Cmm.CLabel
+import GHC.Cmm.Ppr.Expr ()
 import GHC.Platform.Regs ( activeStgRegs )
 import GHC.Driver.Session
 import GHC.Data.FastString
@@ -65,7 +67,7 @@ import qualified GHC.Data.Stream as Stream
 import Data.Maybe (fromJust)
 import Control.Monad (ap)
 import Data.Char (isDigit)
-import Data.List (sort, groupBy, intercalate)
+import Data.List (sort, groupBy, intercalate, nub)
 import qualified Data.List.NonEmpty as NE
 
 -- ----------------------------------------------------------------------------
@@ -240,7 +242,12 @@ padLiveArgs plat live =
 getFPRPadding :: (Int -> GlobalReg) -> LiveGlobalRegs -> [(Bool, GlobalReg)]
 getFPRPadding paddingCtor live = padding
     where
-        fprRegNums = sort $ map fprRegNum live
+        -- we need to `nub` the live registers because with handwritten Cmm code
+        -- (such as in the RTS), we may end up having several STG registers
+        -- mapped to the same real register that are live at the same time. E.g.
+        -- in #17920 we saved both Fn and Dn registers which are mapped to the
+        -- same XMMn registers.
+        fprRegNums = nub $ sort $ map fprRegNum live
         (_, padding) = foldl assignSlots (1, []) $ fprRegNums
 
         assignSlots (i, acc) regNum
@@ -251,7 +258,13 @@ getFPRPadding paddingCtor live = padding
                   acc' = genPad i numNeeded ++ acc
                 in
                   (regNum+1, acc')
-            | otherwise = error "padLiveArgs -- i > regNum ??"
+            | otherwise = panicDoc "getFPRPadding" $ sep
+                              [ text "live: " <> ppr live
+                              , text "nums:" <> ppr fprRegNums
+                              , text "i:" <> ppr i
+                              , text "acc:" <> ppr acc
+                              , text "regNum:" <> ppr regNum
+                              ]
 
         genPad start n =
             take n $ flip map (iterate (+1) start) (\i ->
