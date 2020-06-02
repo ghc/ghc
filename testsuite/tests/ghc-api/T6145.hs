@@ -6,6 +6,7 @@ module Main where
 
 import System.IO
 import GHC
+import GHC.Driver.Types
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Data.Bag (filterBag,isEmptyBag)
@@ -21,7 +22,8 @@ main = do
                         dflags <- getSessionDynFlags
                         setSessionDynFlags dflags
                         let mn =mkModuleName "Test"
-                        addTarget Target { targetId = TargetModule mn, targetAllowObjCode = True, targetContents = Nothing }
+                        unitId <- hsc_currentPackage <$> getSession
+                        addTarget Target { targetId = TargetModule mn, targetPackage = unitId, targetAllowObjCode = True, targetContents = Nothing }
                         load LoadAllTargets
                         modSum <- getModSummary mn
                         p <- parseModule modSum
