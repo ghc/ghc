@@ -1,4 +1,3 @@
-
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -137,7 +136,7 @@ withBkpSession :: IndefUnitId
                -> BkpM a        -- actual action to run
                -> BkpM a
 withBkpSession cid insts deps session_type do_this = do
-    dflags0 <- getSessionDynFlags
+    dflags0 <- getDynFlags
     let cid_fs = unitIdFS (indefUnit cid)
         is_primary = False
         uid_str = unpackFS (mkInstantiatedUnitHash cid insts)
@@ -171,7 +170,10 @@ withBkpSession cid insts deps session_type do_this = do
               CompSession -> generalFlags dflags0
               ExeSession -> generalFlags dflags0
           , homeUnitInstantiations = insts
-          , homeUnitInstanceOfId = Just cid
+                                   -- if we don't have any instantiation, don't
+                                   -- fill `homeUnitInstanceOfId` as it makes no
+                                   -- sense (we're not instantiating anything)
+          , homeUnitInstanceOfId = if null insts then Nothing else Just cid
           , homeUnitId = newUnitId cid $ case session_type of
               TcSession -> Nothing
               -- No hash passed if no instances
@@ -188,9 +190,10 @@ withBkpSession cid insts deps session_type do_this = do
           -- Clear the import path so we don't accidentally grab anything
           , importPaths = []
           -- Synthesized the flags
-          , packageFlags = packageFlags dflags ++ map (\(uid0, rn) ->
-          let state = unitState dflags
-              uid = unwireUnit state (improveUnit state $ renameHoleUnit state (listToUFM insts) uid0)            in ExposePackage
+          , packageFlags = packageFlags dflags0 ++ map (\(uid0, rn) ->
+          let state = unitState dflags0
+              uid = unwireUnit state (improveUnit state $ renameHoleUnit state (listToUFM insts) uid0)
+          in ExposePackage
               (showSDoc dflags0
                   (text "-unit-id" <+> ppr uid <+> ppr rn))
               (UnitIdArg uid) rn) deps
@@ -198,11 +201,11 @@ withBkpSession cid insts deps session_type do_this = do
         iUnitId = homeUnitId dflags
 
     withTempSession (\hsc_env ->
-        hsc_env { hsc_internalUnitEnv = Map.singleton iUnitId
+        singleton_hsc_unitEnv hsc_env iUnitId
             (InternalUnitEnv
                 { internalUnitEnv_dflags = dflags
                 , internalUnitEnv_homePackageTable = emptyHomePackageTable
-                })}) $ do
+                })) $ do
         dflags <- getSessionDynFlags
         -- pprTrace "flags" (ppr insts <> ppr deps) $ return ()
         setSessionDynFlags dflags -- calls initUnits
