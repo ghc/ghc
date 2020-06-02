@@ -31,14 +31,14 @@ INFO_TABLE_RET (stg_stack_underflow_frame, UNDERFLOW_FRAME,
     W_ new_tso;
     W_ ret_off;
 
-    SAVE_STGREGS
+    SAVE_REGS();
 
     SAVE_THREAD_STATE();
     (ret_off) = foreign "C" threadStackUnderflow(MyCapability() "ptr",
                                                  CurrentTSO);
     LOAD_THREAD_STATE();
 
-    RESTORE_STGREGS
+    RESTORE_REGS();
 
     jump %ENTRY_CODE(Sp(ret_off)) [*]; // NB. all registers live!
 }

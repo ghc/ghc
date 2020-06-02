@@ -23,6 +23,7 @@ module GHC.StgToCmm.Utils (
         tagToClosure, mkTaggedObjectLoad,
 
         callerSaves, callerSaveVolatileRegs, get_GlobalReg_addr,
+        callerSaveGlobalReg, callerRestoreGlobalReg,
 
         cmmAndWord, cmmOrWord, cmmNegate, cmmEqWord, cmmNeWord,
         cmmUGtWord, cmmSubWord, cmmMulWord, cmmAddWord, cmmUShrWord,
@@ -249,8 +250,8 @@ callerSaveVolatileRegs dflags = (caller_save, caller_load)
   where
     platform = targetPlatform dflags
 
-    caller_save = catAGraphs (map callerSaveGlobalReg    regs_to_save)
-    caller_load = catAGraphs (map callerRestoreGlobalReg regs_to_save)
+    caller_save = catAGraphs (map (callerSaveGlobalReg    dflags) regs_to_save)
+    caller_load = catAGraphs (map (callerRestoreGlobalReg dflags) regs_to_save)
 
     system_regs = [ Sp,SpLim,Hp,HpLim,CCCS,CurrentTSO,CurrentNursery
                     {- ,SparkHd,SparkTl,SparkBase,SparkLim -}
@@ -258,12 +259,14 @@ callerSaveVolatileRegs dflags = (caller_save, caller_load)
 
     regs_to_save = filter (callerSaves platform) system_regs
 
-    callerSaveGlobalReg reg
-        = mkStore (get_GlobalReg_addr dflags reg) (CmmReg (CmmGlobal reg))
+callerSaveGlobalReg :: DynFlags -> GlobalReg -> CmmAGraph
+callerSaveGlobalReg dflags reg
+    = mkStore (get_GlobalReg_addr dflags reg) (CmmReg (CmmGlobal reg))
 
-    callerRestoreGlobalReg reg
-        = mkAssign (CmmGlobal reg)
-                   (CmmLoad (get_GlobalReg_addr dflags reg) (globalRegType platform reg))
+callerRestoreGlobalReg :: DynFlags -> GlobalReg -> CmmAGraph
+callerRestoreGlobalReg dflags reg
+    = mkAssign (CmmGlobal reg)
+               (CmmLoad (get_GlobalReg_addr dflags reg) (globalRegType (targetPlatform dflags) reg))
 
 
 -------------------------------------------------------------------------
