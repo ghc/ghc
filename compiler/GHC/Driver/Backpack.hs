@@ -195,14 +195,19 @@ withBkpSession cid insts deps session_type do_this = do
               (UnitIdArg uid) rn) deps
           }
         iUnitId = thisUnitId dflags
-    modifySession $ \hsc_env ->
+    -- modifySession $ \hsc_env ->
+    --     singleton_hsc_unitEnv hsc_env iUnitId
+    --         (InternalUnitEnv
+    --             { internalUnitEnv_dflags = dflags
+    --             , internalUnitEnv_homePackageTable = emptyHomePackageTable
+    --             })
+
+    withTempSession (\hsc_env ->
         singleton_hsc_unitEnv hsc_env iUnitId
             (InternalUnitEnv
                 { internalUnitEnv_dflags = dflags
                 , internalUnitEnv_homePackageTable = emptyHomePackageTable
-                })
-
-    withTempSession (\hsc_env -> hsc_env { hsc_currentPackage = iUnitId }) $ do
+                })) $ do
         dflags <- getSessionDynFlags
         -- pprTrace "flags" (ppr insts <> ppr deps) $ return ()
         -- Calls initPackages
