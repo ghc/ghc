@@ -91,6 +91,7 @@ test('T17648', normal, makefile_test, [])
 test('T17904', normal, compile, ['-O'])
 test('T18227A', normal, compile, [''])
 test('T18227B', normal, compile, [''])
+test('T18291', normal, compile, ['-O0'])
 test('T15570',
    when(unregisterised(), skip),
    compile, ['-Wno-overflowed-literals'])
