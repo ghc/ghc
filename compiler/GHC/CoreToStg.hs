@@ -435,7 +435,10 @@ coreToStgExpr e0@(Case scrut bndr _ alts) = do
     let stg = StgCase scrut2 bndr (mkStgAltType bndr alts) alts2
     -- See (U2) in Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
     case scrut2 of
-      StgApp id [] | idName id == unsafeEqualityProofName ->
+      StgApp id [] | idName id == unsafeEqualityProofName
+                   , isDeadBinder bndr ->
+        -- We can only discard the case if the case-binder is dead
+        -- It usually is, but see #18227
         case alts2 of
           [(_, [_co], rhs)] ->
             return rhs
