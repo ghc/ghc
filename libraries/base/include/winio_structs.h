@@ -18,10 +18,10 @@
 /* Completion data structure.  Must be kept in sync with that in
    GHC.Event.Windows or horrible things happen.  */
 typedef struct _CompletionData {
-  /* The Handle to object for which the I/O operation in progress.  */
+  /* The Handle to the object for which the I/O operation is in progress.  */
   HWND cdHandle;
   /* Handle to the callback routine to call to notify that an operation has
-     finished.  This value is opaque as it's not a point that is accessible
+     finished.  This value is opaque as it shouldn't be accessible
      outside the Haskell world.  */
   uintptr_t cdCallback;
 } CompletionData, *LPCompletionData;
@@ -38,4 +38,5 @@ typedef struct _HASKELL_OVERLAPPED {
      order to correctly handle multiple threads using it.  */
   LPCompletionData hoData ALIGNMENT;
 } HASKELL_OVERLAPPED;
+
 

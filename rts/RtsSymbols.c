@@ -344,7 +344,7 @@
    SymI_HasProto(unblockUserSignals)
 #else
 #define RTS_USER_SIGNALS_SYMBOLS             \
-   SymI_HasProto(registerNewIOCPHandle)      \
+   SymI_HasProto(registerIOCPHandle)      \
    SymI_HasProto(getOverlappedEntries)       \
    SymI_HasProto(completeSynchronousRequest) \
    SymI_HasProto(registerAlertableWait)      \
