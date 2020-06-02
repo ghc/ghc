@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, GADTs #-}
+{-# LANGUAGE CPP, GADTs, MultiWayIf #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 -- ----------------------------------------------------------------------------
@@ -38,6 +38,7 @@ import GHC.Utils.Misc
 
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
+import Control.Monad
 
 import qualified Data.Semigroup as Semigroup
 import Data.List ( nub )
@@ -1848,7 +1849,7 @@ funPrologue live cmmBlocks = do
       isLive r     = r `elem` alwaysLive || r `elem` live
 
   platform <- getPlatform
-  stmtss <- flip mapM assignedRegs $ \reg ->
+  stmtss <- forM assignedRegs $ \reg ->
     case reg of
       CmmLocal (LocalReg un _) -> do
         let (newv, stmts) = allocReg reg
@@ -1875,9 +1876,7 @@ funEpilogue :: LiveGlobalRegs -> LlvmM ([LlvmVar], LlvmStatements)
 funEpilogue live = do
     platform <- getPlatform
 
-    -- the bool indicates whether the register is padding.
-    let alwaysNeeded = map (\r -> (False, r)) alwaysLive
-        livePadded = alwaysNeeded ++ padLiveArgs platform live
+    let paddingRegs = padLiveArgs platform live
 
     -- Set to value or "undef" depending on whether the register is
     -- actually live
@@ -1887,14 +1886,25 @@ funEpilogue live = do
         loadUndef r = do
           let ty = (pLower . getVarType $ lmGlobalRegVar platform r)
           return (Just $ LMLitVar $ LMUndefLit ty, nilOL)
-    platform <- getPlatform
+
+    -- Note that floating-point registers in `activeStgRegs` must be sorted
+    -- according to the calling convention.
+    --  E.g. for X86:
+    --     GOOD: F1,D1,XMM1,F2,D2,XMM2,...
+    --     BAD : F1,F2,F3,D1,D2,D3,XMM1,XMM2,XMM3,...
+    --  As Fn, Dn and XMMn use the same register (XMMn) to be passed, we don't
+    --  want to pass F2 before D1 for example, otherwise we could get F2 -> XMM1
+    --  and D1 -> XMM2.
     let allRegs = activeStgRegs platform
-    loads <- flip mapM allRegs $ \r -> case () of
-      _ | (False, r) `elem` livePadded
-                             -> loadExpr r   -- if r is not padding, load it
-        | not (isFPR r) || (True, r) `elem` livePadded
-                             -> loadUndef r
-        | otherwise          -> return (Nothing, nilOL)
+    loads <- forM allRegs $ \r -> if
+      -- load live registers
+      | r `elem` alwaysLive  -> loadExpr r
+      | r `elem` live        -> loadExpr r
+      -- load all non Floating-Point Registers
+      | not (isFPR r)        -> loadUndef r
+      -- load padding Floating-Point Registers
+      | r `elem` paddingRegs -> loadUndef r
+      | otherwise            -> return (Nothing, nilOL)
 
     let (vars, stmts) = unzip loads
     return (catMaybes vars, concatOL stmts)
