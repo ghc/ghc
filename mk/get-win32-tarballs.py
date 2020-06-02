@@ -5,6 +5,7 @@ from pathlib import Path
 import urllib.request
 import subprocess
 import argparse
+import sys
 from sys import stderr
 
 TARBALL_VERSION = '0.2'
@@ -39,7 +40,8 @@ def fetch_arch(arch: str):
 
 def verify(arch: str):
     if not Path(DEST / arch / "SHA256SUMS").is_file():
-        raise IOError("SHA256SUMS doesn't exist; have you fetched?")
+        print("SHA256SUMS doesn't exist; have you fetched?", file=stderr)
+        sys.exit(2)
 
     cmd = ['sha256sum', '--quiet', '--check', '--ignore-missing', 'SHA256SUMS']
     subprocess.check_call(cmd, cwd=DEST / arch)
