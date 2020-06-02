@@ -64,6 +64,7 @@ test7918 = do
 
   let target = Target {
                    targetId           = TargetFile "T7918B.hs" Nothing
+                 , targetPackage      = homeUnitId dynFlags
                  , targetAllowObjCode = True
                  , targetContents     = Nothing
                  }
