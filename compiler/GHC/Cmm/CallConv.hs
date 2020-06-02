@@ -206,9 +206,13 @@ realArgRegsCover dflags
     | passFloatArgsInXmm (targetPlatform dflags)
     = map ($VGcPtr) (realVanillaRegs dflags) ++
       realLongRegs dflags ++
-      map XmmReg (realXmmRegNos dflags)
-    | otherwise                 = map ($VGcPtr) (realVanillaRegs dflags) ++
-                                  realFloatRegs dflags ++
-                                  realDoubleRegs dflags ++
-                                  realLongRegs dflags ++
-                                  map XmmReg (realXmmRegNos dflags)
+      realDoubleRegs dflags -- we only need to save the low Double part of XMM registers.
+                            -- Moreover, the NCG can't load/store full XMM
+                            -- registers for now...
+
+    | otherwise
+    = map ($VGcPtr) (realVanillaRegs dflags) ++
+      realFloatRegs dflags ++
+      realDoubleRegs dflags ++
+      realLongRegs dflags
+      -- we don't save XMM registers if they are not used for parameter passing
