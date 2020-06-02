@@ -748,7 +748,57 @@
    loaded any live STG registers into variables for us, but in
    hand-written low-level Cmm code where we don't know which registers
    are live, we might have to save them all.
+
+   On x86-64, we map Fn and Dn registers to XMMn registers. Hence we don't have
+   to save them twice.
+
    -------------------------------------------------------------------------- */
+#if defined(x86_64_HOST_ARCH)
+
+#define SAVE_STGREGS                            \
+    W_ r1, r2, r3,  r4,  r5,  r6,  r7,  r8;     \
+    D_ d1, d2, d3, d4, d5, d6;                  \
+    L_ l1;                                      \
+                                                \
+    r1 = R1;                                    \
+    r2 = R2;                                    \
+    r3 = R3;                                    \
+    r4 = R4;                                    \
+    r5 = R5;                                    \
+    r6 = R6;                                    \
+    r7 = R7;                                    \
+    r8 = R8;                                    \
+                                                \
+    d1 = D1;                                    \
+    d2 = D2;                                    \
+    d3 = D3;                                    \
+    d4 = D4;                                    \
+    d5 = D5;                                    \
+    d6 = D6;                                    \
+                                                \
+    l1 = L1;
+
+
+#define RESTORE_STGREGS                         \
+    R1 = r1;                                    \
+    R2 = r2;                                    \
+    R3 = r3;                                    \
+    R4 = r4;                                    \
+    R5 = r5;                                    \
+    R6 = r6;                                    \
+    R7 = r7;                                    \
+    R8 = r8;                                    \
+                                                \
+    D1 = d1;                                    \
+    D2 = d2;                                    \
+    D3 = d3;                                    \
+    D4 = d4;                                    \
+    D5 = d5;                                    \
+    D6 = d6;                                    \
+                                                \
+    L1 = l1;
+
+#else // !defined(x86_64_HOST_ARCH)
 
 #define SAVE_STGREGS                            \
     W_ r1, r2, r3,  r4,  r5,  r6,  r7,  r8;     \
@@ -807,6 +857,8 @@
     D6 = d6;                                    \
                                                 \
     L1 = l1;
+
+#endif
 
 /* -----------------------------------------------------------------------------
    Misc junk
