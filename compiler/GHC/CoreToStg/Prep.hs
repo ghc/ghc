@@ -798,10 +798,6 @@ cpeApp top_env expr
             _          -> cpe_app env arg (CpeApp (Var realWorldPrimId) : rest) (n-1)
              -- TODO: What about casts?
 
-    cpe_app _env (Var f) args n
-        | f `hasKey` runRWKey
-        = pprPanic "cpe_app(runRW#)" (ppr args $$ ppr n)
-
     cpe_app env (Var v) args depth
       = do { v1 <- fiddleCCall v
            ; let e2 = lookupCorePrepEnv env v1
@@ -923,18 +919,33 @@ optimization (right before lowering to STG, in CorePrep), we can ensure that
 no further floating will occur. This allows us to safely inline things like
 @runST@, which are otherwise needlessly expensive (see #10678 and #5916).
 
-'runRW' is defined (for historical reasons) in GHC.Magic, with a NOINLINE
-pragma.  It is levity-polymorphic.
+'runRW' has a variety of quirks:
+
+ * 'runRW' is known-key with a NOINLINE definition (for historical reasons) in
+   GHC.Magic. However, its correctness needs no special treatment in GHC except
+   the special late inlining here in CorePrep and GHC.CoreToByteCode.
+
+ * It is levity-polymorphic:
 
     runRW# :: forall (r1 :: RuntimeRep). (o :: TYPE r)
            => (State# RealWorld -> (# State# RealWorld, o #))
-                              -> (# State# RealWorld, o #)
+           -> (# State# RealWorld, o #)
 
-It's correctness needs no special treatment in GHC except this special inlining
-here in CorePrep (and in GHC.CoreToByteCode).
+ * It has some special simplification logic to allow unboxing of results when
+   runRW# appears in a strict context. See Note [Simplification of runRW#]
+   below.
 
-However, there are a variety of optimisation opportunities that the simplifier
-takes advantage of. See Note [Simplification of runRW#].
+ * Since its body is inlined, we allow runRW#'s argument to be a join point.
+   That is, the following is allowed:
+
+    join j = \s -> ...
+    in runRW# @_ @_ j
+
+   The Core Linter knows about this. See Note [Linting of runRW#] in
+   GHC.Core.Lint for details.
+
+   The occurrence analyser and SetLevels also know about this, as described in
+   Note [Simplification of runRW#].
 
 
 Note [Simplification of runRW#]
@@ -950,7 +961,7 @@ contexts into runRW's continuation. That is, it transforms
 
     K[ runRW# @r @ty cont ]
               ~>
-    runRW# @r @ty K[cont]
+    runRW# @r @ty (\s -> K[cont s])
 
 This has a few interesting implications. Consider, for instance, this program:
 
@@ -973,10 +984,17 @@ completely fine. Both occurrence analysis and Core Lint have special treatment
 for runRW# applications. See Note [Linting of runRW#] for details on the latter.
 
 Moreover, it's helpful to ensure that runRW's continuation isn't floated out
-(since doing so would then require a call, whereas we would otherwise end up
-with straight-line). Consequently, GHC.Core.Opt.SetLevels.lvlApp has special
-treatment for runRW# applications, ensure the arguments are not floated if
-MFEs.
+For instance, if we have
+
+    runRW# (\s -> do_something)
+
+where do_something contains only top-level free variables, we may be tempted to
+float the argument to the top-level. However, we must resist this urge as since
+doing so would then require that runRW# lower to a call, whereas we would
+otherwise end up with straight-line code. Consequently,
+GHC.Core.Opt.SetLevels.lvlApp has special treatment for runRW# applications,
+ensure the arguments are not floated as MFEs.
+
 
 Other considered designs
 ------------------------
