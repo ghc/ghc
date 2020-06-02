@@ -31,7 +31,7 @@ main = defaultErrorHandler defaultFatalMessager defaultFlushOut
     liftIO $ putStrLn "Setting Target"
     setTargets $ pure @[] $ Target
       { targetId = TargetModule mod_nm
-      , targetPackage = thisPackage dflags
+      , targetPackage = thisUnitId dflags
       , targetAllowObjCode = True
       , targetContents = Nothing
       }
