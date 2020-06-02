@@ -106,6 +106,11 @@ several ways
     unsafeEqualityProof to f.  As (U5) says, it is implemented as
     UnsafeRefl so all is good.
 
+    NB: Don't discard the case if the case-binder is used
+           case unsafeEqualityProof of wild_xx { UnsafeRefl ->
+           ...wild_xx...
+        That rarely happens, but see #18227.
+
 (U3) In GHC.CoreToStg.Prep.cpeRhsE, if we see
        let x = case unsafeEqualityProof ... of
                  UnsafeRefl -> K e
