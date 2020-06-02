@@ -165,8 +165,8 @@ Build system
 Bootstrapping requirements
 --------------------------
 
-Starting with 8.12.1 GHC requires a C compiler which supports
-__atomic_op_n builtins. This raises the requirement for GCC to 4.7.
+- GHC now requires a C compiler which supports
+  ``__atomic_op_n`` builtins. This raises the requirement for GCC to 4.7.
 
 Included libraries
 ------------------
