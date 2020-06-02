@@ -19,7 +19,8 @@
 module GHC.Driver.Types (
         -- * compilation state
         HscEnv(..), hscEPS, hsc_HPT, hsc_dflags, set_hsc_dflags, set_hsc_HPT, modify_hsc_dflags,
-        InternalUnitEnv(..), modify_hsc_HPT,
+        InternalUnitEnv(..), modify_hsc_HPT, singleton_hsc_unitEnv, insert_hsc_unitEnv,
+        pprInternalUnitMap,
         FinderCache, FindResult(..), InstalledFindResult(..),
         Target(..), TargetId(..), InputFileBuffer, pprTarget, pprTargetId,
         HscStatus(..),
@@ -293,11 +294,30 @@ instance MonadIO Hsc where
 instance HasDynFlags Hsc where
     getDynFlags = Hsc $ \e w -> return (hsc_dflags e, w)
 
+assertHscEnv :: HasCallStack => HscEnv -> HscEnv
+assertHscEnv e =
+  ASSERT2(Map.size (hsc_internalUnitEnv e) == 1, errMsg) e
+  where
+    errMsg = text "assertHscEnv" <+> ppr (hsc_currentPackage e) $$ nest 2 (ppr (pprInternalUnitMap e))
+
+pprInternalUnitMap :: HscEnv -> SDoc
+pprInternalUnitMap env = text "pprInternalUnitMap:" <+> text "(package: " <>  ppr (hsc_currentPackage env) <> text ")"
+  $$ nest 2 (vcat (map (\(k, v) -> pprInternalUnitEnv k v) $ Map.assocs $ hsc_internalUnitEnv env))
+
+pprInternalUnitEnv :: UnitId -> InternalUnitEnv -> SDoc
+pprInternalUnitEnv uid InternalUnitEnv {..} = ppr uid <+> text "->" <+> pprHPT internalUnitEnv_homePackageTable
+
 hsc_currentInternalUnitEnv :: HscEnv -> InternalUnitEnv
-hsc_currentInternalUnitEnv e = case Map.lookup (hsc_currentPackage e) (hsc_internalUnitEnv e) of
+hsc_currentInternalUnitEnv e = case Map.lookup (hsc_currentPackage e) (hsc_internalUnitEnv $ assertHscEnv e) of
     Just unitEnv -> unitEnv
     Nothing -> pprPanic "packageNotFound" $
       ppr $ hsc_currentPackage e
+
+singleton_hsc_unitEnv :: HscEnv -> UnitId -> InternalUnitEnv -> HscEnv
+singleton_hsc_unitEnv e unitId unitEnv = assertHscEnv $ e
+  { hsc_internalUnitEnv = Map.singleton unitId unitEnv
+  , hsc_currentPackage = unitId
+  }
 
 hsc_dflags :: HscEnv -> DynFlags
 hsc_dflags = internalUnitEnv_dflags . hsc_currentInternalUnitEnv
@@ -306,7 +326,7 @@ set_hsc_dflags :: HscEnv -> DynFlags -> HscEnv
 set_hsc_dflags e dflags = modify_hsc_dflags e $ const dflags
 
 modify_hsc_dflags :: HscEnv -> (DynFlags -> DynFlags) -> HscEnv
-modify_hsc_dflags e f = e
+modify_hsc_dflags e f = assertHscEnv $ e
   { hsc_internalUnitEnv = Map.adjust update (hsc_currentPackage e) $ hsc_internalUnitEnv e
   }
   where
@@ -319,11 +339,16 @@ set_hsc_HPT :: HscEnv -> HomePackageTable -> HscEnv
 set_hsc_HPT e hpt = modify_hsc_HPT e $ const hpt
 
 modify_hsc_HPT :: HscEnv -> (HomePackageTable -> HomePackageTable) -> HscEnv
-modify_hsc_HPT e f = e
+modify_hsc_HPT e f = assertHscEnv $ e
   { hsc_internalUnitEnv = Map.adjust update (hsc_currentPackage e) $ hsc_internalUnitEnv e
   }
   where
     update unitEnv = unitEnv { internalUnitEnv_homePackageTable = f $ internalUnitEnv_homePackageTable unitEnv }
+
+insert_hsc_unitEnv :: HscEnv -> UnitId -> InternalUnitEnv -> HscEnv
+insert_hsc_unitEnv e unitId unitEnv = assertHscEnv $ e
+  { hsc_internalUnitEnv = Map.insert unitId unitEnv $ hsc_internalUnitEnv e
+  }
 
 runHsc :: HscEnv -> Hsc a -> IO a
 runHsc hsc_env (Hsc hsc) = do
@@ -332,9 +357,7 @@ runHsc hsc_env (Hsc hsc) = do
     return a
 
 mkInteractiveHscEnv :: HscEnv -> HscEnv
-mkInteractiveHscEnv hsc_env = hsc_env
-    { hsc_internalUnitEnv = Map.insert interactiveUnitId interactiveInternalUnitEnv $ hsc_internalUnitEnv hsc_env
-    }
+mkInteractiveHscEnv hsc_env = singleton_hsc_unitEnv hsc_env interactiveUnitId interactiveInternalUnitEnv
   where
     interactiveInternalUnitEnv = InternalUnitEnv
         { internalUnitEnv_dflags = ic_dflags (hsc_IC hsc_env)
