@@ -723,18 +723,6 @@ instance Outputable ArgInfo where
   ppr (CpeCast co) = text "cast" <+> ppr co
   ppr (CpeTick tick) = text "tick" <+> ppr tick
 
-{-
- Note [runRW arg]
-~~~~~~~~~~~~~~~~~~~
-If we got, say
-   runRW# (case bot of {})
-which happened in #11291, we do /not/ want to turn it into
-   (case bot of {}) realWorldPrimId#
-because that gives a panic in CoreToStg.myCollectArgs, which expects
-only variables in function position.  But if we are sure to make
-runRW# strict (which we do in GHC.Types.Id.Make), this can't happen
--}
-
 cpeApp :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 -- May return a CpeRhs because of saturating primops
 cpeApp top_env expr
@@ -799,10 +787,6 @@ cpeApp top_env expr
             Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body rest (n-2)
             _          -> cpe_app env arg (CpeApp (Var realWorldPrimId) : rest) (n-1)
              -- TODO: What about casts?
-
-    cpe_app _env (Var f) args n
-        | f `hasKey` runRWKey
-        = pprPanic "cpe_app(runRW#)" (ppr args $$ ppr n)
 
     cpe_app env (Var v) args depth
       = do { v1 <- fiddleCCall v
@@ -925,34 +909,96 @@ optimization (right before lowering to STG, in CorePrep), we can ensure that
 no further floating will occur. This allows us to safely inline things like
 @runST@, which are otherwise needlessly expensive (see #10678 and #5916).
 
-'runRW' is defined (for historical reasons) in GHC.Magic, with a NOINLINE
-pragma.  It is levity-polymorphic.
+'runRW' has a variety of quirks:
+
+ * 'runRW' is known-key with a NOINLINE definition in
+   GHC.Magic. This definition is used in cases where runRW is curried.
+
+ * In addition to its normal Haskell definition in GHC.Magic, we give it
+   a special late inlining here in CorePrep and GHC.CoreToByteCode, avoiding
+   the incorrect sharing due to float-out noted above.
+
+ * It is levity-polymorphic:
 
     runRW# :: forall (r1 :: RuntimeRep). (o :: TYPE r)
            => (State# RealWorld -> (# State# RealWorld, o #))
-                              -> (# State# RealWorld, o #)
+           -> (# State# RealWorld, o #)
 
-It's correctness needs no special treatment in GHC except this special inlining
-here in CorePrep (and in GHC.CoreToByteCode).
+ * It has some special simplification logic to allow unboxing of results when
+   runRW# appears in a strict context. See Note [Simplification of runRW#]
+   below.
 
-However, there are a variety of optimisation opportunities that the simplifier
-takes advantage of. See Note [Simplification of runRW#].
+ * Since its body is inlined, we allow runRW#'s argument to contain jumps to
+   join points. That is, the following is allowed:
+
+    join j x = ...
+    in runRW# @_ @_ (\s -> ... jump j 42 ...)
+
+   The Core Linter knows about this. See Note [Linting of runRW#] in
+   GHC.Core.Lint for details.
+
+   The occurrence analyser and SetLevels also know about this, as described in
+   Note [Simplification of runRW#].
+
+Other relevant Notes:
+
+ * Note [Simplification of runRW#] below, describing a transformation of runRW
+   applications in strict contexts performed by the simplifier.
+ * Note [Linting of runRW#] in GHC.Core.Lint
+ * Note [runRW arg] below, describing a non-obvious case where the
+   late-inlining could go wrong.
+
+
+ Note [runRW arg]
+~~~~~~~~~~~~~~~~~~~
+Consider the Core program (from #11291),
+
+   runRW# (case bot of {})
+
+The late inlining logic in cpe_app would transform this into:
+
+   (case bot of {}) realWorldPrimId#
+
+Which would rise to a panic in CoreToStg.myCollectArgs, which expects only
+variables in function position.
+
+However, as runRW#'s strictness signature captures the fact that it will call
+its argument this can't happen: the simplifier will transform the bottoming
+application into simply (case bot of {}).
+
+Note that this reasoning does *not* apply to non-bottoming continuations like:
+
+    hello :: Bool -> Int
+    hello n =
+      runRW# (
+          case n of
+            True -> \s -> 23
+            _    -> \s -> 10)
+
+Why? The difference is that (case bot of {}) is considered by okCpeArg to be
+trivial, consequently cpeArg (which the catch-all case of cpe_app calls on both
+the function and the arguments) will forgo binding it to a variable. By
+contrast, in the non-bottoming case of `hello` above  the function will be
+deemed non-trivial and consequently will be case-bound.
 
 
 Note [Simplification of runRW#]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the program,
 
-    case runRW# (\s -> let n = I# 42# in n) of
+    case runRW# (\s -> I# 42#) of
       I# n# -> f n#
 
 There is no reason why we should allocate an I# constructor given that we
-immediately destructure it. To avoid this the simplifier will push strict
-contexts into runRW's continuation. That is, it transforms
+immediately destructure it.
+
+To avoid this the simplifier has a special transformation rule, specific to
+runRW#, that pushes a strict context into runRW#'s continuation.  See the
+`runRW#` guard in `GHC.Core.Opt.Simplify.rebuildCall`.  That is, it transforms
 
     K[ runRW# @r @ty cont ]
               ~>
-    runRW# @r @ty K[cont]
+    runRW# @r @ty (\s -> K[cont s])
 
 This has a few interesting implications. Consider, for instance, this program:
 
@@ -971,14 +1017,28 @@ Performing the transform described above would result in:
 If runRW# were a "normal" function this call to join point j would not be
 allowed in its continuation argument. However, since runRW# is inlined (as
 described in Note [runRW magic] above), such join point occurences are
-completely fine. Both occurrence analysis and Core Lint have special treatment
-for runRW# applications. See Note [Linting of runRW#] for details on the latter.
+completely fine. Both occurrence analysis (see the runRW guard in occAnalApp)
+and Core Lint (see the App case of lintCoreExpr) have special treatment for
+runRW# applications. See Note [Linting of runRW#] for details on the latter.
 
 Moreover, it's helpful to ensure that runRW's continuation isn't floated out
-(since doing so would then require a call, whereas we would otherwise end up
-with straight-line). Consequently, GHC.Core.Opt.SetLevels.lvlApp has special
-treatment for runRW# applications, ensure the arguments are not floated if
+For instance, if we have
+
+    runRW# (\s -> do_something)
+
+where do_something contains only top-level free variables, we may be tempted to
+float the argument to the top-level. However, we must resist this urge as since
+doing so would then require that runRW# produce an allocation and call, e.g.:
+
+    let lvl = \s -> do_somethign
+    in
+    ....(runRW# lvl)....
+
+whereas without floating the inlining of the definition of runRW would result
+in straight-line code. Consequently, GHC.Core.Opt.SetLevels.lvlApp has special
+treatment for runRW# applications, ensure the arguments are not floated as
 MFEs.
+
 
 Other considered designs
 ------------------------
