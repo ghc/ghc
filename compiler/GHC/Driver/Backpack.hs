@@ -1,4 +1,3 @@
-
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -137,7 +136,7 @@ withBkpSession :: IndefUnitId
                -> BkpM a        -- actual action to run
                -> BkpM a
 withBkpSession cid insts deps session_type do_this = do
-    dflags0 <- getSessionDynFlags
+    dflags0 <- getDynFlags
     let cid_fs = unitIdFS (indefUnit cid)
         is_primary = False
         uid_str = unpackFS (mkInstantiatedUnitHash cid insts)
@@ -196,14 +195,19 @@ withBkpSession cid insts deps session_type do_this = do
               (UnitIdArg uid) rn) deps
           }
         iUnitId = thisUnitId dflags
-    modifySession $ \hsc_env -> hsc_env
-      { hsc_internalUnitEnv = hsc_internalUnitEnv hsc_env `mappend` Map.singleton iUnitId
-        (InternalUnitEnv
-          { internalUnitEnv_dflags = dflags
-          , internalUnitEnv_homePackageTable = emptyHomePackageTable
-          })
-      }
-    withTempSession (\hsc_env -> hsc_env { hsc_currentPackage = iUnitId }) $ do
+    -- modifySession $ \hsc_env ->
+    --     singleton_hsc_unitEnv hsc_env iUnitId
+    --         (InternalUnitEnv
+    --             { internalUnitEnv_dflags = dflags
+    --             , internalUnitEnv_homePackageTable = emptyHomePackageTable
+    --             })
+
+    withTempSession (\hsc_env ->
+        singleton_hsc_unitEnv hsc_env iUnitId
+            (InternalUnitEnv
+                { internalUnitEnv_dflags = dflags
+                , internalUnitEnv_homePackageTable = emptyHomePackageTable
+                })) $ do
         dflags <- getSessionDynFlags
         -- pprTrace "flags" (ppr insts <> ppr deps) $ return ()
         -- Calls initPackages
