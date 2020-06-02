@@ -52,8 +52,6 @@ INLINE_HEADER const StgInfoTable *GET_INFO(StgClosure *c) {
     return c->header.info;
 }
 
-#define GET_ENTRY(c)  (ENTRY_CODE(GET_INFO(c)))
-
 #if defined(TABLES_NEXT_TO_CODE)
 EXTERN_INLINE StgInfoTable *INFO_PTR_TO_STRUCT(const StgInfoTable *info);
 EXTERN_INLINE StgInfoTable *INFO_PTR_TO_STRUCT(const StgInfoTable *info) {return (StgInfoTable *)info - 1;}
