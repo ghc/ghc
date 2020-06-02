@@ -842,10 +842,6 @@ cpeApp top_env expr
             _          -> cpe_app env arg (CpeApp (Var realWorldPrimId) : rest) (n-1)
              -- TODO: What about casts?
 
-    cpe_app _env (Var f) args n
-        | f `hasKey` runRWKey
-        = pprPanic "cpe_app(runRW#)" (ppr args $$ ppr n)
-
     cpe_app env (Var v) args depth
       = do { v1 <- fiddleCCall v
            ; let e2 = lookupCorePrepEnv env v1
@@ -1018,9 +1014,9 @@ for runRW# applications. See Note [Linting of runRW#] for details on the latter.
 
 Moreover, it's helpful to ensure that runRW's continuation isn't floated out
 (since doing so would then require a call, whereas we would otherwise end up
-with straight-line). Consequently, GHC.Core.Opt.SetLevels.lvlApp has special
-treatment for runRW# applications, ensure the arguments are not floated if
-MFEs.
+with straight-line code). Consequently, GHC.Core.Opt.SetLevels.lvlApp has
+special treatment for runRW# applications, ensure the arguments are not floated
+as MFEs.
 
 Other considered designs
 ------------------------
