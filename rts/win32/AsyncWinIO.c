@@ -240,7 +240,7 @@ bool startupAsyncWinIO(void)
   entries = calloc (sizeof (OVERLAPPED_ENTRY), num_callbacks);
 
   /* Start the I/O manager before creating the worker thread to prevent a busy
-     wait or spin-lock, this will call registerNewIOCPHandle allowing us to
+     wait or spin-lock, this will call registerIOCPHandle allowing us to
      skip the initial un-alertable wait.  */
   ioManagerStart ();
 
@@ -288,7 +288,7 @@ void shutdownAsyncWinIO(bool wait_threads)
 
 /* Register the I/O completetion port handle PORT that the I/O manager will be
    monitoring.  All handles are expected to be associated with this handle.  */
-void registerNewIOCPHandle (HANDLE port)
+void registerIOCPHandle (HANDLE port)
 {
   AcquireSRWLockExclusive (&wio_runner_lock);
 
