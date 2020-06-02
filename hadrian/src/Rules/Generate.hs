@@ -185,6 +185,9 @@ generateRules = do
         -- TODO: simplify, get rid of fake rts context
         for_ (fst <$> deriveConstantsPairs) $ \constantsFile ->
             prefix -/- constantsFile %> \file -> do
+                -- N.B. deriveConstants needs to compile programs which #include
+                -- PosixSource.h, which #include's ghcplatform.h. Fixes #18290.
+                need [prefix -/- "ghcplatform.h"]
                 withTempDir $ \dir -> build $
                     target (rtsContext stage) DeriveConstants [] [file, dir]
   where
