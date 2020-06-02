@@ -4,12 +4,14 @@ module Main where
 
 import System.Environment
 import GHC
+import GHC.Driver.Types
 
 main :: IO ()
 main = do
     flags <- getArgs
     runGhc' flags $ do
-      setTargets [Target (TargetFile "T10052-input.hs" Nothing) True Nothing]
+      unitId <- hsc_currentPackage <$> getSession
+      setTargets [Target (TargetFile "T10052-input.hs" Nothing) unitId True Nothing]
       _success <- load LoadAllTargets
       return ()
 
