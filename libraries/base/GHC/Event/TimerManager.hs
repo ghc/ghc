@@ -106,7 +106,7 @@ handleControlEvent mgr (I.IOResult_Event fd _evt) = do
     CMsgDie         -> writeIORef (emState mgr) Finished
     CMsgSignal fp s -> runHandlers fp s
 -- TimerManager should only use the event api of the backend to wait on timers.
--- handleControlEvent _ _ = errorWithoutStackTrace "unexpected non-event IO result"
+handleControlEvent _ _ = errorWithoutStackTrace "unexpected non-event IO result"
 
 newDefaultBackend :: IO Backend
 #if defined(HAVE_POLL)

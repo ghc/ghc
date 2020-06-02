@@ -6,9 +6,10 @@ module GHC.Event.Internal
     -- * Event back end
       Backend
     , backend
-    , IOOperation
+    , IOOperation(..)
     , IOResult(..)
     , delete
+    , doIOOperation
     , poll
     , modifyFd
     , modifyFdOnce
@@ -41,19 +42,16 @@ import GHC.Num (Num(..))
 import GHC.Show (Show(..))
 import Data.Semigroup.Internal (stimesMonoid)
 
-
-data IOOperation -- TODO add actions
-    -- IOOperation_Read IOOperationID ...
+data IOOperation
+    = IOOperation_Read
     -- IOOperation_Write IOOperationID ...
     -- ...
 
 data IOResult
-    -- | An event has occurred for a file handle. See IOOperation_SetFdEvents and
+    -- | An event has occurred for a file handle.
     = IOResult_Event Fd Event
-    -- IOResult_Read IOOperationID ...
-    -- IOResult_Write IOOperationID ...
-    -- ...
-
+    -- | An IOOperation has completed.
+    | IOResult_IOComplete Unique
 
 -- | An I\/O event.
 newtype Event = Event Int
@@ -242,6 +240,9 @@ modifyFd (Backend bState _ bModifyFd _ _ _) = bModifyFd bState
 modifyFdOnce :: Backend -> Fd -> Event -> IO Bool
 modifyFdOnce (Backend bState _ _ bModifyFdOnce _ _) = bModifyFdOnce bState
 {-# INLINE modifyFdOnce #-}
+
+doIOOperation :: Backend -> Unique -> IOOperation -> Maybe (IO Bool)
+doIOOperation (Backend bState _ _ _ bDoIOOperation _) = bDoIOOperation bState
 
 delete :: Backend -> IO ()
 delete (Backend bState _ _ _ _ bDelete) = bDelete bState

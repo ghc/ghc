@@ -45,6 +45,7 @@ module GHC.Event.Manager
     , Event
     , evtRead
     , evtWrite
+    , EventCallback
     , IOCallback
     , FdKey(keyFd)
     , FdData
@@ -81,7 +82,7 @@ import GHC.Event.Control
 import GHC.Event.IntTable (IntTable)
 import GHC.Event.Internal (Backend, Event, evtClose, evtRead, evtWrite,
                            Lifetime(..), EventLifetime, Timeout(..))
-import GHC.Event.Unique (Unique, UniqueSource, newSource, newUnique)
+import GHC.Event.Unique (Unique, UniqueSource, asInt, newSource, newUnique)
 import System.Posix.Types (Fd)
 
 import qualified GHC.Event.IntTable as IT
@@ -103,7 +104,7 @@ import qualified GHC.Event.Poll   as Poll
 data FdData = FdData {
       fdKey       :: {-# UNPACK #-} !FdKey
     , fdEvents    :: {-# UNPACK #-} !EventLifetime
-    , _fdCallback :: !IOCallback
+    , _fdCallback :: !EventCallback
     }
 
 -- | A file descriptor registration cookie.
@@ -115,7 +116,10 @@ data FdKey = FdKey {
                )
 
 -- | Callback invoked on I/O events.
-type IOCallback = FdKey -> Event -> IO ()
+type EventCallback = FdKey -> Event -> IO ()
+
+-- | Callback invoked on completion of I/O operations.
+type IOCallback = IO ()
 
 data State = Created
            | Running
@@ -130,6 +134,22 @@ data State = Created
 data EventManager = EventManager
     { emBackend      :: !Backend
     , emFds          :: {-# UNPACK #-} !(Array Int (MVar (IntTable [FdData])))
+        -- ^ The FdData for events. Array index is the Fd hash. IntTable index
+        -- is the Fd. To get all FdDatas for an Fd:
+        --
+        --     lookup (fromIntegral fd) (emFds ! hashFd someFd)
+        --
+        -- The reason for the Array is to reduce contention between threads. See
+        -- "stripping" from the ??????? paper.
+    , emOps          :: {-# UNPACK #-} !(Array Int (MVar (IntTable IOCallback)))
+        -- ^ The callbackd for IO operations. Array index is the operation's
+        -- Unique hash. IntTable index is the operations Unique. To get the call
+        -- back for an operation:
+        --
+        --     lookup (asInt opUnique) (emOps ! hashUnique opUnique)
+        --
+        -- The reason for the Array is to reduce contention between threads. See
+        -- "stripping" from the ??????? paper.
     , emState        :: {-# UNPACK #-} !(IORef State)
     , emUniqueSource :: {-# UNPACK #-} !UniqueSource
     , emControl      :: {-# UNPACK #-} !Control
@@ -141,12 +161,24 @@ callbackArraySize :: Int
 callbackArraySize = 32
 
 hashFd :: Fd -> Int
-hashFd fd = fromIntegral fd .&. (callbackArraySize - 1)
+hashFd fd = hashInt (fromIntegral fd)
 {-# INLINE hashFd #-}
+
+hashUnique :: Unique -> Int
+hashUnique u = hashInt (asInt u)
+{-# INLINE hashUnique #-}
+
+hashInt :: Int -> Int
+hashInt int = int .&. (callbackArraySize - 1)
+{-# INLINE hashInt #-}
 
 callbackTableVar :: EventManager -> Fd -> MVar (IntTable [FdData])
 callbackTableVar mgr fd = emFds mgr ! hashFd fd
 {-# INLINE callbackTableVar #-}
+
+opCallbackTableVar :: EventManager -> Unique -> MVar (IntTable IOCallback)
+opCallbackTableVar mgr unique = emOps mgr ! hashUnique unique
+{-# INLINE opCallbackTableVar #-}
 
 haveOneShot :: Bool
 {-# INLINE haveOneShot #-}
@@ -184,8 +216,11 @@ new = newWith =<< newDefaultBackend
 -- | Create a new 'EventManager' with the given polling backend.
 newWith :: Backend -> IO EventManager
 newWith be = do
+  let intTableInitSize = 8
   iofds <- fmap (listArray (0, callbackArraySize-1)) $
-           replicateM callbackArraySize (newMVar =<< IT.new 8)
+           replicateM callbackArraySize (newMVar =<< IT.new intTableInitSize)
+  ioops <- fmap (listArray (0, callbackArraySize-1)) $
+           replicateM callbackArraySize (newMVar =<< IT.new intTableInitSize)
   ctrl <- newControl False
   state <- newIORef Created
   us <- newSource
@@ -197,6 +232,7 @@ newWith be = do
   lockVar <- newMVar ()
   let mgr = EventManager { emBackend = be
                          , emFds = iofds
+                         , emOps = ioops
                          , emState = state
                          , emUniqueSource = us
                          , emControl = ctrl
@@ -312,7 +348,7 @@ step mgr@EventManager{..} = do
 -- platform's @select@ or @epoll@ system call, which tend to vary in
 -- what sort of fds are permitted. For instance, waiting on regular files
 -- is not allowed on many platforms.
-registerFd_ :: EventManager -> IOCallback -> Fd -> Event -> Lifetime
+registerFd_ :: EventManager -> EventCallback -> Fd -> Event -> Lifetime
             -> IO (FdKey, Bool)
 registerFd_ mgr@(EventManager{..}) cb fd evs lt = do
   u <- newUnique emUniqueSource
@@ -356,12 +392,61 @@ registerFd_ mgr@(EventManager{..}) cb fd evs lt = do
 -- on the file descriptor @fd@ for lifetime @lt@. @cb@ is called for
 -- each event that occurs.  Returns a cookie that can be handed to
 -- 'unregisterFd'.
-registerFd :: EventManager -> IOCallback -> Fd -> Event -> Lifetime -> IO FdKey
+registerFd :: EventManager -> EventCallback -> Fd -> Event -> Lifetime -> IO FdKey
 registerFd mgr cb fd evs lt = do
   (r, wake) <- registerFd_ mgr cb fd evs lt
   when wake $ wakeManager mgr
   return r
 {-# INLINE registerFd #-}
+
+-- | @registerOp mgr cb op@ registers the IO operation @op@. This returns
+-- immediately and the operation is done asynchronously. @cb@ is called when the
+-- operation completes.
+--
+-- TODO
+--  * what if the operation fails?
+--  * Should we support cancellation (return some cookie as `registerFd` does)?
+registerOp :: EventManager -> IOCallback -> I.IOOperation -> IO ()
+registerOp mgr@(EventManager{..}) cb op = do
+  -- registerFd_ mgr cb fd evs lt
+  u <- newUnique emUniqueSource
+  ok <- withMVar (opCallbackTableVar mgr u) $ \tbl -> do
+
+    ok <- case I.doIOOperation emBackend u op of
+      Nothing -> defaultRegisterOp_ mgr cb op u tbl
+      Just register -> register
+
+    if ok
+      then do
+        _nothing <- IT.insertWith
+          (error "Impossible! IO Operation Unique already exists")
+          (asInt u) cb tbl
+        return True
+      else return False
+
+  if ok
+    -- We've added an operation and need to wake the manager to check if the
+    -- operation is completed
+    then wakeManager mgr
+    -- Adding the operation failed. As with `registerFd`, we immediately call
+    -- the callback.
+    else cb
+  return ()
+{-# INLINE registerOp #-}
+
+-- | Provides a default implementation for registering an operation implemented
+-- in terms of Events. It is assumed that the caller has obtained the
+-- `opCallbackTableVar` MVar.
+defaultRegisterOp_
+  :: EventManager
+  -> IOCallback
+  -> I.IOOperation
+  -> Unique
+  -> IntTable IOCallback
+  -> IO Bool
+defaultRegisterOp_ mgr@(EventManager{..}) cb op u tbl = case op of
+  IOOperation_Read -> _
+{-# INLINE defaultRegisterOp_ #-}
 
 -- | Wake up the event manager.
 wakeManager :: EventManager -> IO ()
@@ -448,6 +533,12 @@ closeFd_ mgr tbl fd = do
 onIOResult :: EventManager -> I.IOResult -> IO ()
 onIOResult em ioResult = case ioResult of
   I.IOResult_Event fd events -> onFdEvent em fd events
+  I.IOResult_IOComplete unique -> do
+    withMVar (opCallbackTableVar em unique) $ \tbl -> do
+      callbackMay <- IT.delete (asInt unique) tbl
+      case callbackMay of
+        Nothing -> return ()
+        Just callback -> callback
 
 -- | Call the callbacks corresponding to the given file descriptor.
 onFdEvent :: EventManager -> Fd -> Event -> IO ()
