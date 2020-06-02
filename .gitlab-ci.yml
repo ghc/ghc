@@ -477,7 +477,7 @@ nightly-aarch64-linux-deb9:
 
 .build-armv7-linux-deb9:
   extends: .validate-linux
-  stage: full-build
+  stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/armv7-linux-deb9:$DOCKER_REV"
   variables:
     TEST_ENV: "armv7-linux-deb9"
