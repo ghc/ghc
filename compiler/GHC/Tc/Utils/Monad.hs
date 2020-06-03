@@ -1830,7 +1830,7 @@ setLocalRdrEnv rdr_env thing_inside
 ************************************************************************
 -}
 
-mkIfLclEnv :: Module -> SDoc -> Bool -> IfLclEnv
+mkIfLclEnv :: Module -> SDoc -> IsBootInterface -> IfLclEnv
 mkIfLclEnv mod loc boot
                    = IfLclEnv { if_mod     = mod,
                                 if_loc     = loc,
@@ -1887,14 +1887,14 @@ initIfaceCheck doc hsc_env do_this
                     }
       initTcRnIf 'i' hsc_env gbl_env () do_this
 
-initIfaceLcl :: Module -> SDoc -> Bool -> IfL a -> IfM lcl a
+initIfaceLcl :: Module -> SDoc -> IsBootInterface -> IfL a -> IfM lcl a
 initIfaceLcl mod loc_doc hi_boot_file thing_inside
   = setLclEnv (mkIfLclEnv mod loc_doc hi_boot_file) thing_inside
 
 -- | Initialize interface typechecking, but with a 'NameShape'
 -- to apply when typechecking top-level 'OccName's (see
 -- 'lookupIfaceTop')
-initIfaceLclWithSubst :: Module -> SDoc -> Bool -> NameShape -> IfL a -> IfM lcl a
+initIfaceLclWithSubst :: Module -> SDoc -> IsBootInterface -> NameShape -> IfL a -> IfM lcl a
 initIfaceLclWithSubst mod loc_doc hi_boot_file nsubst thing_inside
   = setLclEnv ((mkIfLclEnv mod loc_doc hi_boot_file) { if_nsubst = Just nsubst }) thing_inside
 
