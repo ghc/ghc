@@ -259,7 +259,6 @@ typedef struct _ObjectCode {
 
 #if defined(THREADED_RTS)
 extern Mutex linker_mutex;
-extern Mutex linker_unloaded_mutex;
 #endif
 
 /* Type of the initializer */
