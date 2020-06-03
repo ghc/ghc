@@ -69,6 +69,9 @@ typedef struct {
     int capacity; // Doubled on resize
     int n_sections;
     bool sorted; // Invalidated on insertion. Sorted in checkUnload.
+    bool unloaded; // Whether we removed anything from the table in
+                   // removeOCSectionIndices. If this is set we "compact" the
+                   // table (remove unused entries) in `sortOCSectionIndices.
     OCSectionIndex *indices;
 } OCSectionIndices;
 
@@ -85,6 +88,7 @@ static OCSectionIndices *createOCSectionIndices(void)
     s_indices->capacity = capacity;
     s_indices->n_sections = 0;
     s_indices->sorted = true;
+    s_indices->unloaded = false;
     s_indices->indices = stgMallocBytes(capacity * sizeof(OCSectionIndex),
         "OCSectionIndices::indices");
     return s_indices;
@@ -172,14 +176,25 @@ void insertOCSectionIndices(ObjectCode *oc)
     objects = oc;
 }
 
-/* TODO
+static int findSectionIdx(OCSectionIndices *s_indices, const void *addr);
+
 static void removeOCSectionIndices(OCSectionIndices *s_indices, ObjectCode *oc)
 {
-    (void)s_indices;
-    (void)oc;
-    // TODO
+    // To avoid quadratic behavior in checkUnload we set `oc` fields of indices
+    // of unloaded objects NULL here. Removing unused entries is done in
+    // `sortOCSectionIndices`.
+
+    s_indices->unloaded = true;
+
+    for (int i = 0; i < oc->n_sections; i++) {
+        if (oc->sections[i].kind != SECTIONKIND_OTHER) {
+            int section_idx = findSectionIdx(s_indices, oc->sections[i].start);
+            if (section_idx != -1) {
+                s_indices->indices[section_idx].oc = NULL;
+            }
+        }
+    }
 }
-*/
 
 static void sortOCSectionIndices(OCSectionIndices *s_indices) {
     if (s_indices->sorted) {
@@ -194,12 +209,38 @@ static void sortOCSectionIndices(OCSectionIndices *s_indices) {
     s_indices->sorted = true;
 }
 
-static ObjectCode *findOC(OCSectionIndices *s_indices, const void *addr) {
+static void removeRemovedOCSections(OCSectionIndices *s_indices) {
+    if (!s_indices->unloaded) {
+        return;
+    }
+
+    int next_free_idx = 0;
+    for (int i = 0; i < s_indices->n_sections; ++i) {
+        if (s_indices->indices[i].oc == NULL) {
+            // free entry, skip
+        } else if (i == next_free_idx) {
+            ++next_free_idx;
+        } else {
+            s_indices->indices[next_free_idx] = s_indices->indices[i];
+            ++next_free_idx;
+        }
+    }
+
+    s_indices->n_sections = next_free_idx;
+    s_indices->unloaded = true;
+}
+
+// Returns -1 if not found
+static int findSectionIdx(OCSectionIndices *s_indices, const void *addr) {
     ASSERT(s_indices->sorted);
 
     W_ w_addr = (W_)addr;
-    if (s_indices->n_sections <= 0) return NULL;
-    if (w_addr < s_indices->indices[0].start) return NULL;
+    if (s_indices->n_sections <= 0) {
+        return -1;
+    }
+    if (w_addr < s_indices->indices[0].start) {
+        return -1;
+    }
 
     int left = 0, right = s_indices->n_sections;
     while (left + 1 < right) {
@@ -213,9 +254,19 @@ static ObjectCode *findOC(OCSectionIndices *s_indices, const void *addr) {
     }
     ASSERT(w_addr >= s_indices->indices[left].start);
     if (w_addr < s_indices->indices[left].end) {
-        return s_indices->indices[left].oc;
+        return left;
     }
-    return NULL;
+    return -1;
+}
+
+static ObjectCode *findOC(OCSectionIndices *s_indices, const void *addr) {
+    int oc_idx = findSectionIdx(s_indices, addr);
+
+    if (oc_idx == -1) {
+        return NULL;
+    }
+
+    return s_indices->indices[oc_idx].oc;
 }
 
 static bool markObjectLive(void *data STG_UNUSED, StgWord key, const void *value STG_UNUSED) {
@@ -228,7 +279,7 @@ static bool markObjectLive(void *data STG_UNUSED, StgWord key, const void *value
     // Remove from 'old_objects' list
     if (oc->prev != NULL) {
         // TODO(osa): Maybe 'prev' should be a pointer to the referencing
-        // field?
+        // *field* ? (instead of referencing *object*)
         oc->prev->next = oc->next;
     } else {
         old_objects = oc->next;
@@ -665,7 +716,12 @@ static void searchCostCentres (CostCentreStack *ccs, OCSectionIndices* s_indices
 //
 void checkUnload (StgClosure *static_objects)
 {
+    if (global_s_indices == NULL) {
+        return;
+    }
+
     OCSectionIndices *s_indices = global_s_indices;
+    removeRemovedOCSections(s_indices);
     sortOCSectionIndices(s_indices);
 
     object_code_mark_bit = ~object_code_mark_bit;
@@ -712,34 +768,12 @@ void checkUnload (StgClosure *static_objects)
     }
 #endif /* PROFILING */
 
-
-/*
-
-    TODO: Free stuff in old_objects
-    // Look through the unloadable objects, and any object that is still
-    // marked as unreferenced can be physically unloaded, because we
-    // have no references to it.
-    ObjectCode *prev = NULL;
+    // Free unmarked objects
     ObjectCode *next = NULL;
-    for (ObjectCode *oc = unloaded_objects; oc; oc = next) {
+    for (ObjectCode *oc = old_objects; oc != NULL; oc = next) {
         next = oc->next;
-        if (oc_referenced(oc) == false) {
-            if (prev == NULL) {
-                unloaded_objects = oc->next;
-            } else {
-                prev->next = oc->next;
-            }
-            IF_DEBUG(linker, debugBelch("Unloading object file %" PATH_FMT "\n",
-                        oc->fileName));
-            freeObjectCode(oc);
-        } else {
-            IF_DEBUG(linker, debugBelch("Object file still in use: %"
-                        PATH_FMT "\n", oc->fileName));
-            prev = oc;
-        }
+
+        removeOCSectionIndices(s_indices, oc);
+        freeObjectCode(oc);
     }
-*/
-
-
-    RELEASE_LOCK(&linker_unloaded_mutex);
 }
