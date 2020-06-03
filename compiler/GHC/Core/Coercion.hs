@@ -2834,7 +2834,7 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
        -> [Role]      -- Roles at which to flatten these ...
        -> [(Type, Coercion)]  -- flattened arguments, with their flattening coercions
        -> ([Type], [Coercion], CoercionN)
-    go acc_xis acc_cos lc binders inner_ki _ []
+    go acc_xis acc_cos !lc binders inner_ki _ []
       = (reverse acc_xis, reverse acc_cos, kind_co)
       where
         final_kind = mkPiTys binders inner_ki
