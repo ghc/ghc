@@ -6,8 +6,11 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-module GHC.CmmToAsm.PPC.Ppr (pprNatCmmDecl) where
+module GHC.CmmToAsm.PPC.Ppr
+   ( pprNatCmmDecl
+   , pprInstr
+   )
+where
 
 import GHC.Prelude
 
@@ -15,12 +18,13 @@ import GHC.CmmToAsm.PPC.Regs
 import GHC.CmmToAsm.PPC.Instr
 import GHC.CmmToAsm.PPC.Cond
 import GHC.CmmToAsm.Ppr
-import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Format
 import GHC.Platform.Reg
 import GHC.Platform.Reg.Class
 import GHC.CmmToAsm.Reg.Target
 import GHC.CmmToAsm.Config
+import GHC.CmmToAsm.Types
+import GHC.CmmToAsm.Utils
 
 import GHC.Cmm hiding (topInfoTable)
 import GHC.Cmm.Dataflow.Collections
@@ -34,7 +38,6 @@ import GHC.Types.Unique ( pprUniqueAlways, getUnique )
 import GHC.Platform
 import GHC.Data.FastString
 import GHC.Utils.Outputable
-import GHC.Driver.Session (targetPlatform)
 
 import Data.Word
 import Data.Int
@@ -183,11 +186,6 @@ pprLabel platform lbl =
 
 -- -----------------------------------------------------------------------------
 -- pprInstr: print an 'Instr'
-
-instance Outputable Instr where
-    ppr instr = sdocWithDynFlags $ \dflags ->
-                  pprInstr (targetPlatform dflags) instr
-
 
 pprReg :: Reg -> SDoc
 

@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, CPP #-}
+{-# LANGUAGE BangPatterns, CPP, DeriveFunctor #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -23,15 +23,17 @@ import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Reg.Graph.Spill
 import GHC.CmmToAsm.Reg.Graph.SpillCost
 import GHC.CmmToAsm.Reg.Graph.TrivColorable
-import GHC.CmmToAsm.Instr
-import GHC.Platform.Reg.Class
-import GHC.Platform.Reg
 import GHC.CmmToAsm.Reg.Target
-import GHC.Platform
+import GHC.CmmToAsm.Instr
+import GHC.CmmToAsm.Types
 
-import GHC.Utils.Outputable
+import GHC.Platform
+import GHC.Platform.Reg
+import GHC.Platform.Reg.Class
+
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
+import GHC.Utils.Outputable
 import GHC.Utils.Monad.State
 
 -- | Holds interesting statistics from the register allocator.
@@ -108,6 +110,7 @@ data RegAllocStats statics instr
           -- | Target platform
         , raPlatform    :: !Platform
         }
+        deriving (Functor)
 
 
 instance (Outputable statics, Outputable instr)
