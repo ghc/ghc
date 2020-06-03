@@ -22,6 +22,7 @@ import GHC.Driver.Ppr     (pprTrace)
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Monad
 import GHC.CmmToAsm.CFG
+import GHC.CmmToAsm.Types
 
 import GHC.Cmm.BlockId
 import GHC.Cmm
@@ -668,7 +669,7 @@ buildChains edges blocks
 
 -- | Place basic blocks based on the given CFG.
 -- See Note [Chain based CFG serialization]
-sequenceChain :: forall a i. (Instruction i, Outputable i)
+sequenceChain :: forall a i. Instruction i
               => LabelMap a -- ^ Keys indicate an info table on the block.
               -> CFG -- ^ Control flow graph and some meta data.
               -> [GenBasicBlock i] -- ^ List of basic blocks to be placed.
@@ -815,7 +816,7 @@ dropJumps info ((BasicBlock lbl ins):todo)
 -- fallthroughs.
 
 sequenceTop
-    :: (Instruction instr, Outputable instr)
+    :: Instruction instr
     => DynFlags -- Determine which layout algo to use
     -> NcgImpl statics instr jumpDest
     -> Maybe CFG -- ^ CFG if we have one.
