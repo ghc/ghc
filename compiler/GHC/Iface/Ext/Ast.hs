@@ -1726,7 +1726,6 @@ instance ToHie (TScoped (LHsQTyVars GhcRn)) where
       varLoc = loc vars
       bindings = map (C $ TyVarBind (mkScope varLoc) sc) implicits
 
--- instance ToHie (LHsContext GhcRn) where
 instance ToHie (Located [Located (HsType GhcRn)]) where
   toHie (L span tys) = concatM $
       [ locOnly span
