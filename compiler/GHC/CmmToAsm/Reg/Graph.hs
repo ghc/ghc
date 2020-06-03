@@ -17,6 +17,7 @@ import GHC.CmmToAsm.Reg.Graph.TrivColorable
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Reg.Target
 import GHC.CmmToAsm.Config
+import GHC.CmmToAsm.Types
 import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
 
@@ -45,7 +46,7 @@ maxSpinCount    = 10
 
 -- | The top level of the graph coloring register allocator.
 regAlloc
-        :: (Outputable statics, Outputable instr, Instruction instr)
+        :: (Outputable statics, Instruction instr)
         => NCGConfig
         -> UniqFM RegClass (UniqSet RealReg)     -- ^ registers we can use for allocation
         -> UniqSet Int                  -- ^ set of available spill slots.
@@ -90,7 +91,6 @@ regAlloc config regsFree slotsFree slotsCount code cfg
 regAlloc_spin
         :: forall instr statics.
            (Instruction instr,
-            Outputable instr,
             Outputable statics)
         => NCGConfig
         -> Int  -- ^ Number of solver iterations we've already performed.
@@ -388,7 +388,7 @@ graphAddCoalesce (r1, r2) graph
 
 -- | Patch registers in code using the reg -> reg mapping in this graph.
 patchRegsFromGraph
-        :: (Outputable statics, Outputable instr, Instruction instr)
+        :: (Outputable statics, Instruction instr)
         => Platform -> Color.Graph VirtualReg RegClass RealReg
         -> LiveCmmDecl statics instr -> LiveCmmDecl statics instr
 
@@ -413,7 +413,7 @@ patchRegsFromGraph platform graph code
                 = pprPanic "patchRegsFromGraph: register mapping failed."
                         (  text "There is no node in the graph for register "
                                 <> ppr reg
-                        $$ ppr code
+                        $$ pprLiveCmmDecl platform code
                         $$ Color.dotGraph
                                 (\_ -> text "white")
                                 (trivColorable platform

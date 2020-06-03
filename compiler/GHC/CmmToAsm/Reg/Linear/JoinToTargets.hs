@@ -18,6 +18,8 @@ import GHC.CmmToAsm.Reg.Linear.FreeRegs
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Config
+import GHC.CmmToAsm.Types
+
 import GHC.Platform.Reg
 
 import GHC.Cmm.BlockId
@@ -33,7 +35,7 @@ import GHC.Types.Unique.Set
 --      vregs are in the correct regs for its destination.
 --
 joinToTargets
-        :: (FR freeRegs, Instruction instr, Outputable instr)
+        :: (FR freeRegs, Instruction instr)
         => BlockMap RegSet              -- ^ maps the unique of the blockid to the set of vregs
                                         --      that are known to be live on the entry to each block.
 
@@ -57,7 +59,7 @@ joinToTargets block_live id instr
 
 -----
 joinToTargets'
-        :: (FR freeRegs, Instruction instr, Outputable instr)
+        :: (FR freeRegs, Instruction instr)
         => BlockMap RegSet              -- ^ maps the unique of the blockid to the set of vregs
                                         --      that are known to be live on the entry to each block.
 
@@ -111,7 +113,7 @@ joinToTargets' block_live new_blocks block_id instr (dest:dests)
 
 
 -- this is the first time we jumped to this block.
-joinToTargets_first :: (FR freeRegs, Instruction instr, Outputable instr)
+joinToTargets_first :: (FR freeRegs, Instruction instr)
                     => BlockMap RegSet
                     -> [NatBasicBlock instr]
                     -> BlockId
@@ -140,7 +142,7 @@ joinToTargets_first block_live new_blocks block_id instr dest dests
 
 
 -- we've jumped to this block before
-joinToTargets_again :: (Instruction instr, FR freeRegs, Outputable instr)
+joinToTargets_again :: (Instruction instr, FR freeRegs)
                     => BlockMap RegSet
                     -> [NatBasicBlock instr]
                     -> BlockId
