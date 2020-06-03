@@ -587,18 +587,23 @@ Library
             GHC.Platform.Reg.Class
             GHC.CmmToAsm.PIC
             GHC.CmmToAsm.CPrim
+            GHC.CmmToAsm.Types
+            GHC.CmmToAsm.Utils
+            GHC.CmmToAsm.X86
             GHC.CmmToAsm.X86.Regs
             GHC.CmmToAsm.X86.RegInfo
             GHC.CmmToAsm.X86.Instr
             GHC.CmmToAsm.X86.Cond
             GHC.CmmToAsm.X86.Ppr
             GHC.CmmToAsm.X86.CodeGen
+            GHC.CmmToAsm.PPC
             GHC.CmmToAsm.PPC.Regs
             GHC.CmmToAsm.PPC.RegInfo
             GHC.CmmToAsm.PPC.Instr
             GHC.CmmToAsm.PPC.Cond
             GHC.CmmToAsm.PPC.Ppr
             GHC.CmmToAsm.PPC.CodeGen
+            GHC.CmmToAsm.SPARC
             GHC.CmmToAsm.SPARC.Base
             GHC.CmmToAsm.SPARC.Regs
             GHC.CmmToAsm.SPARC.Imm
