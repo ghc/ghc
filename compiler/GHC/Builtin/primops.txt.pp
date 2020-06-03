@@ -139,7 +139,7 @@
 defaults
    has_side_effects = False
    out_of_line      = False   -- See Note [When do out-of-line primops go in primops.txt.pp]
-   can_fail         = False   -- See Note [PrimOp can_fail and has_side_effects] in PrimOp
+   can_fail         = False   -- See Note [PrimOp can_fail and has_side_effects] in GHC.Builtin.PrimOps
    commutable       = False
    code_size        = { primOpCodeSizeDefault }
    strictness       = { \ arity -> mkClosedDmdSig (replicate arity topDmd) topDiv }
@@ -180,7 +180,7 @@ defaults
 -- that were formally in here, until they can be given a better home.
 -- Likewise, their underlying C-- implementation need not live in the
 -- RTS either. Best case (in my view), both the C-- and `foreign import
--- prim` can be moved to a small library tailured to the features being
+-- prim` can be moved to a small library tailored to the features being
 -- implemented and dependencies of those features.
 
 -- Currently, documentation is produced using latex, so contents of
@@ -190,9 +190,9 @@ defaults
 -- Note [Levity and representation polymorphic primops]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- In the types of primops in this module,
--- 
+--
 -- * The names `a,b,c,s` stand for type variables of kind Type
--- 
+--
 -- * The names `v` and `w` stand for levity-polymorphic
 --   type variables.
 --   For example:
@@ -207,7 +207,7 @@ defaults
 --     - `v` and `w` end up written as `a` and `b` (respectively) in types,
 --       which means that one shouldn't write a primop type involving both
 --       `a` and `v`, nor `b` and `w`.
--- 
+--
 -- * The names `o` and `p` stand for representation-polymorphic
 --   type variables, similarly to `v` and `w` above. For example:
 --      op :: o -> p -> Int
@@ -3260,29 +3260,29 @@ primop  ReallyUnsafePtrEqualityOp "reallyUnsafePtrEquality#" GenPrimOp
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- The primop `reallyUnsafePtrEquality#` does a direct pointer
 -- equality between two (boxed) values.  Several things to note:
--- 
+--
 -- * It is levity-polymorphic. It works for TYPE (BoxedRep Lifted) and
 --   TYPE (BoxedRep Unlifted). But not TYPE IntRep, for example.
 --   This levity-polymorphism comes from the use of the type variables
 --   "v" and "w". See Note [Levity and representation polymorphic primops]
--- 
+--
 -- * It does not evaluate its arguments. The user of the primop is responsible
 --   for doing so.
--- 
+--
 -- * It is hetero-typed; you can compare pointers of different types.
 --   This is used in various packages such as containers & unordered-containers.
--- 
+--
 -- * It is obviously very dangerous, because
 --      let x = f y in reallyUnsafePtrEquality# x x
 --   will probably return True, whereas
 --      reallyUnsafePtrEquality# (f y) (f y)
 --   will probably return False. ("probably", because it's affected
 --   by CSE and inlining).
--- 
+--
 -- * reallyUnsafePtrEquality# can't fail, but it is marked as such
 --   to prevent it from floating out.
 --   See Note [reallyUnsafePtrEquality# can_fail]
--- 
+--
 -- The library GHC.Exts provides several less Wild-West functions
 -- for use in specific cases, namely:
 --
