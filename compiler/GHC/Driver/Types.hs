@@ -114,7 +114,7 @@ module GHC.Driver.Types (
         MonadThings(..),
 
         -- * Information on imports and exports
-        WhetherHasOrphans, IsBootInterface, Usage(..),
+        WhetherHasOrphans, IsBootInterface(..), Usage(..),
         Dependencies(..), noDependencies,
         updNameCache,
         IfaceExport,
@@ -745,12 +745,12 @@ hptInstances hsc_env want_this_module
     in (concat insts, concat famInsts)
 
 -- | Get rules from modules "below" this one (in the dependency sense)
-hptRules :: HscEnv -> [(ModuleName, IsBootInterface)] -> [CoreRule]
+hptRules :: HscEnv -> [ModuleNameWithIsBoot] -> [CoreRule]
 hptRules = hptSomeThingsBelowUs (md_rules . hm_details) False
 
 
 -- | Get annotations from modules "below" this one (in the dependency sense)
-hptAnns :: HscEnv -> Maybe [(ModuleName, IsBootInterface)] -> [Annotation]
+hptAnns :: HscEnv -> Maybe [ModuleNameWithIsBoot] -> [Annotation]
 hptAnns hsc_env (Just deps) = hptSomeThingsBelowUs (md_anns . hm_details) False hsc_env deps
 hptAnns hsc_env Nothing = hptAllThings (md_anns . hm_details) hsc_env
 
@@ -759,7 +759,7 @@ hptAllThings extract hsc_env = concatMap extract (eltsHpt (hsc_HPT hsc_env))
 
 -- | Get things from modules "below" this one (in the dependency sense)
 -- C.f Inst.hptInstances
-hptSomeThingsBelowUs :: (HomeModInfo -> [a]) -> Bool -> HscEnv -> [(ModuleName, IsBootInterface)] -> [a]
+hptSomeThingsBelowUs :: (HomeModInfo -> [a]) -> Bool -> HscEnv -> [ModuleNameWithIsBoot] -> [a]
 hptSomeThingsBelowUs extract include_hi_boot hsc_env deps
   | isOneShot (ghcMode (hsc_dflags hsc_env)) = []
 
@@ -768,8 +768,8 @@ hptSomeThingsBelowUs extract include_hi_boot hsc_env deps
     in
     [ thing
     |   -- Find each non-hi-boot module below me
-      (mod, is_boot_mod) <- deps
-    , include_hi_boot || not is_boot_mod
+      GWIB { gwib_mod = mod, gwib_isBoot = is_boot } <- deps
+    , include_hi_boot || (is_boot == NotBoot)
 
         -- unsavoury: when compiling the base package with --make, we
         -- sometimes try to look up RULES etc for GHC.Prim. GHC.Prim won't
@@ -1114,8 +1114,10 @@ data ModIface_ (phase :: ModIfacePhase)
 
 -- | Old-style accessor for whether or not the ModIface came from an hs-boot
 -- file.
-mi_boot :: ModIface -> Bool
-mi_boot iface = mi_hsc_src iface == HsBootFile
+mi_boot :: ModIface -> IsBootInterface
+mi_boot iface = if mi_hsc_src iface == HsBootFile
+    then IsBoot
+    else NotBoot
 
 -- | Lookups up a (possibly cached) fixity from a 'ModIface'. If one cannot be
 -- found, 'defaultFixity' is returned instead.
@@ -1141,7 +1143,7 @@ mi_free_holes iface =
         -> renameFreeHoles (mkUniqDSet cands) (instUnitInsts (moduleUnit indef))
     _   -> emptyUniqDSet
   where
-    cands = map fst (dep_mods (mi_deps iface))
+    cands = map gwib_mod $ dep_mods $ mi_deps iface
 
 -- | Given a set of free holes, and a unit identifier, rename
 -- the free holes according to the instantiation of the unit
@@ -2494,9 +2496,6 @@ type WhetherHasOrphans   = Bool
 -- | Does this module define family instances?
 type WhetherHasFamInst = Bool
 
--- | Did this module originate from a *-boot file?
-type IsBootInterface = Bool
-
 -- | Dependency information about ALL modules and packages below this one
 -- in the import hierarchy.
 --
@@ -2504,7 +2503,7 @@ type IsBootInterface = Bool
 --
 -- Invariant: none of the lists contain duplicates.
 data Dependencies
-  = Deps { dep_mods   :: [(ModuleName, IsBootInterface)]
+  = Deps { dep_mods   :: [ModuleNameWithIsBoot]
                         -- ^ All home-package modules transitively below this one
                         -- I.e. modules that this one imports, or that are in the
                         --      dep_mods of those directly-imported modules
@@ -2694,7 +2693,7 @@ type PackageCompleteMatchMap = CompleteMatchMap
 -- their interface files
 data ExternalPackageState
   = EPS {
-        eps_is_boot :: !(ModuleNameEnv (ModuleName, IsBootInterface)),
+        eps_is_boot :: !(ModuleNameEnv ModuleNameWithIsBoot),
                 -- ^ In OneShot mode (only), home-package modules
                 -- accumulate in the external package state, and are
                 -- sucked in lazily.  For these home-pkg modules
@@ -2872,19 +2871,19 @@ isTemplateHaskellOrQQNonBoot :: ModSummary -> Bool
 isTemplateHaskellOrQQNonBoot ms =
   (xopt LangExt.TemplateHaskell (ms_hspp_opts ms)
     || xopt LangExt.QuasiQuotes (ms_hspp_opts ms)) &&
-  not (isBootSummary ms)
+  (isBootSummary ms == NotBoot)
 
 -- | Add a ModSummary to ModuleGraph. Assumes that the new ModSummary is
 -- not an element of the ModuleGraph.
 extendMG :: ModuleGraph -> ModSummary -> ModuleGraph
 extendMG ModuleGraph{..} ms = ModuleGraph
   { mg_mss = ms:mg_mss
-  , mg_non_boot = if isBootSummary ms
-      then mg_non_boot
-      else extendModuleEnv mg_non_boot (ms_mod ms) ms
-  , mg_boot = if isBootSummary ms
-      then extendModuleSet mg_boot (ms_mod ms)
-      else mg_boot
+  , mg_non_boot = case isBootSummary ms of
+      IsBoot -> mg_non_boot
+      NotBoot -> extendModuleEnv mg_non_boot (ms_mod ms) ms
+  , mg_boot = case isBootSummary ms of
+      NotBoot -> mg_boot
+      IsBoot -> extendModuleSet mg_boot (ms_mod ms)
   , mg_needs_th_or_qq = mg_needs_th_or_qq || isTemplateHaskellOrQQNonBoot ms
   }
 
@@ -2985,8 +2984,8 @@ msDynObjFilePath :: ModSummary -> DynFlags -> FilePath
 msDynObjFilePath ms dflags = dynamicOutputFile dflags (msObjFilePath ms)
 
 -- | Did this 'ModSummary' originate from a hs-boot file?
-isBootSummary :: ModSummary -> Bool
-isBootSummary ms = ms_hsc_src ms == HsBootFile
+isBootSummary :: ModSummary -> IsBootInterface
+isBootSummary ms = if ms_hsc_src ms == HsBootFile then IsBoot else NotBoot
 
 instance Outputable ModSummary where
    ppr ms
