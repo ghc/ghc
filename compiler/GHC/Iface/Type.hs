@@ -187,7 +187,7 @@ mkIfaceForAllTvBndr :: ArgFlag -> IfaceTvBndr -> IfaceForAllBndr
 mkIfaceForAllTvBndr vis var = Bndr (IfaceTvBndr var) vis
 
 -- | Build the 'tyConKind' from the binders and the result kind.
--- Keep in sync with 'mkTyConKind' in types/TyCon.
+-- Keep in sync with 'mkTyConKind' in "GHC.Core.TyCon".
 mkIfaceTyConKind :: [IfaceTyConBinder] -> IfaceKind -> IfaceKind
 mkIfaceTyConKind bndrs res_kind = foldr mk res_kind bndrs
   where
@@ -1524,7 +1524,7 @@ pprTuple ctxt_prec sort promoted args =
     ppr_tuple_app :: [IfaceType] -> SDoc -> SDoc
     ppr_tuple_app args_wo_runtime_reps ppr_args_w_parens
         -- Special-case unary boxed tuples so that they are pretty-printed as
-        -- `Unit x`, not `(x)`
+        -- `Solo x`, not `(x)`
       | [_] <- args_wo_runtime_reps
       , BoxedTuple <- sort
       = let unit_tc_info = IfaceTyConInfo promoted IfaceNormalTyCon
