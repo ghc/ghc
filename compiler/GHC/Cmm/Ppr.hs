@@ -265,7 +265,7 @@ pprNode platform node = pp_node <+> pp_debug
 
       CmmCall tgt k regs out res updfr_off ->
           hcat [ text "call", space
-               , pprFun tgt, parens (interpp'SP regs), space
+               , pprFun tgt, parens (interpp'SP (regSetToList regs)), space
                , returns <+>
                  text "args: " <> ppr out <> comma <+>
                  text "res: " <> ppr res <> comma <+>

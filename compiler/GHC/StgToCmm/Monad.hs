@@ -741,7 +741,7 @@ emitProcWithStackFrame
 
 emitProcWithStackFrame _conv mb_info lbl _stk_args [] blocks False
   = do  { platform <- getPlatform
-        ; emitProc mb_info lbl [] blocks (widthInBytes (wordWidth platform)) False
+        ; emitProc mb_info lbl emptyRegSet blocks (widthInBytes (wordWidth platform)) False
         }
 emitProcWithStackFrame conv mb_info lbl stk_args args (graph, tscope) True
         -- do layout
@@ -759,7 +759,7 @@ emitProcWithConvention :: Convention -> Maybe CmmInfoTable -> CLabel
 emitProcWithConvention conv mb_info lbl args blocks
   = emitProcWithStackFrame conv mb_info lbl [] args blocks True
 
-emitProc :: Maybe CmmInfoTable -> CLabel -> [GlobalReg] -> CmmAGraphScoped
+emitProc :: Maybe CmmInfoTable -> CLabel -> GlobalRegSet -> CmmAGraphScoped
          -> Int -> Bool -> FCode ()
 emitProc mb_info lbl live blocks offset do_layout
   = do  { l <- newBlockId

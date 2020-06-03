@@ -262,8 +262,7 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
                      graph' = mapInsert bid b graph
 
      let liveness = cmmGlobalLiveness dflags g
-     let ppLiveness pp = filter isArgReg $
-                         regSetToList $
+     let ppLiveness pp = filterRegSet isArgReg $
                          expectJust "ppLiveness" $ mapLookup pp liveness
 
      graphEnv <- return $ foldlGraphBlocks add_block mapEmpty g

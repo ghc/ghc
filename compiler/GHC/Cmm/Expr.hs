@@ -23,7 +23,7 @@ module GHC.Cmm.Expr
     , RegSet, LocalRegSet, GlobalRegSet
     , emptyRegSet, elemRegSet, extendRegSet, deleteFromRegSet, mkRegSet
     , plusRegSet, minusRegSet, timesRegSet, sizeRegSet, nullRegSet
-    , regSetToList
+    , filterRegSet, regSetToList
 
     , Area(..)
     , module GHC.Cmm.MachOp
@@ -317,6 +317,7 @@ mkRegSet                :: Ord r => [r] -> RegSet r
 minusRegSet, plusRegSet, timesRegSet :: Ord r => RegSet r -> RegSet r -> RegSet r
 sizeRegSet              :: RegSet r -> Int
 regSetToList            :: RegSet r -> [r]
+filterRegSet            :: (r -> Bool) -> RegSet r -> RegSet r
 
 emptyRegSet      = Set.empty
 nullRegSet       = Set.null
@@ -329,6 +330,7 @@ plusRegSet       = Set.union
 timesRegSet      = Set.intersection
 sizeRegSet       = Set.size
 regSetToList     = Set.toList
+filterRegSet     = Set.filter
 
 class Ord r => UserOfRegs r a where
   foldRegsUsed :: DynFlags -> (b -> r -> b) -> b -> a -> b
