@@ -9,22 +9,31 @@
 -----------------------------------------------------------------------------
 #include "HsVersions.h"
 
-module GHC.CmmToAsm.SPARC.Instr (
-        RI(..),
-        riZero,
-
-        fpRelEA,
-        moveSp,
-
-        isUnconditionalJump,
-
-        Instr(..),
-        maxSpillSlots
-)
-
+module GHC.CmmToAsm.SPARC.Instr
+   ( Instr(..)
+   , RI(..)
+   , riZero
+   , fpRelEA
+   , moveSp
+   , isUnconditionalJump
+   , maxSpillSlots
+   , patchRegsOfInstr
+   , patchJumpInstr
+   , mkRegRegMoveInstr
+   , mkLoadInstr
+   , mkSpillInstr
+   , mkJumpInstr
+   , takeDeltaInstr
+   , isMetaInstr
+   , isJumpishInstr
+   , jumpDestsOfInstr
+   , takeRegRegMoveInstr
+   , regUsageOfInstr
+   )
 where
 
 import GHC.Prelude
+import GHC.Platform
 
 import GHC.CmmToAsm.SPARC.Stack
 import GHC.CmmToAsm.SPARC.Imm
@@ -33,19 +42,19 @@ import GHC.CmmToAsm.SPARC.Cond
 import GHC.CmmToAsm.SPARC.Regs
 import GHC.CmmToAsm.SPARC.Base
 import GHC.CmmToAsm.Reg.Target
-import GHC.CmmToAsm.Instr
-import GHC.Platform.Reg.Class
-import GHC.Platform.Reg
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Config
+import GHC.CmmToAsm.Instr (RegUsage(..), noUsage)
+
+import GHC.Platform.Reg.Class
+import GHC.Platform.Reg
+import GHC.Platform.Regs
 
 import GHC.Cmm.CLabel
-import GHC.Platform.Regs
 import GHC.Cmm.BlockId
 import GHC.Cmm
 import GHC.Data.FastString
 import GHC.Utils.Panic
-import GHC.Platform
 
 
 -- | Register or immediate
@@ -86,24 +95,6 @@ isUnconditionalJump ii
         BI ALWAYS _ _   -> True
         BF ALWAYS _ _   -> True
         _               -> False
-
-
--- | instance for sparc instruction set
-instance Instruction Instr where
-        regUsageOfInstr         = sparc_regUsageOfInstr
-        patchRegsOfInstr        = sparc_patchRegsOfInstr
-        isJumpishInstr          = sparc_isJumpishInstr
-        jumpDestsOfInstr        = sparc_jumpDestsOfInstr
-        patchJumpInstr          = sparc_patchJumpInstr
-        mkSpillInstr            = sparc_mkSpillInstr
-        mkLoadInstr             = sparc_mkLoadInstr
-        takeDeltaInstr          = sparc_takeDeltaInstr
-        isMetaInstr             = sparc_isMetaInstr
-        mkRegRegMoveInstr       = sparc_mkRegRegMoveInstr
-        takeRegRegMoveInstr     = sparc_takeRegRegMoveInstr
-        mkJumpInstr             = sparc_mkJumpInstr
-        mkStackAllocInstr       = panic "no sparc_mkStackAllocInstr"
-        mkStackDeallocInstr     = panic "no sparc_mkStackDeallocInstr"
 
 
 -- | SPARC instruction set.
@@ -218,8 +209,8 @@ data Instr
 --      consequences of control flow transfers, as far as register
 --      allocation goes, are taken care of by the register allocator.
 --
-sparc_regUsageOfInstr :: Platform -> Instr -> RegUsage
-sparc_regUsageOfInstr platform instr
+regUsageOfInstr :: Platform -> Instr -> RegUsage
+regUsageOfInstr platform instr
  = case instr of
     LD    _ addr reg            -> usage (regAddr addr,         [reg])
     ST    _ reg addr            -> usage (reg : regAddr addr,   [])
@@ -285,8 +276,8 @@ interesting platform reg
 
 
 -- | Apply a given mapping to tall the register references in this instruction.
-sparc_patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
-sparc_patchRegsOfInstr instr env = case instr of
+patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
+patchRegsOfInstr instr env = case instr of
     LD    fmt addr reg          -> LD fmt (fixAddr addr) (env reg)
     ST    fmt reg addr          -> ST fmt (env reg) (fixAddr addr)
 
@@ -337,8 +328,8 @@ sparc_patchRegsOfInstr instr env = case instr of
 
 
 --------------------------------------------------------------------------------
-sparc_isJumpishInstr :: Instr -> Bool
-sparc_isJumpishInstr instr
+isJumpishInstr :: Instr -> Bool
+isJumpishInstr instr
  = case instr of
         BI{}            -> True
         BF{}            -> True
@@ -347,8 +338,8 @@ sparc_isJumpishInstr instr
         CALL{}          -> True
         _               -> False
 
-sparc_jumpDestsOfInstr :: Instr -> [BlockId]
-sparc_jumpDestsOfInstr insn
+jumpDestsOfInstr :: Instr -> [BlockId]
+jumpDestsOfInstr insn
   = case insn of
         BI   _ _ id     -> [id]
         BF   _ _ id     -> [id]
@@ -356,8 +347,8 @@ sparc_jumpDestsOfInstr insn
         _               -> []
 
 
-sparc_patchJumpInstr :: Instr -> (BlockId -> BlockId) -> Instr
-sparc_patchJumpInstr insn patchF
+patchJumpInstr :: Instr -> (BlockId -> BlockId) -> Instr
+patchJumpInstr insn patchF
   = case insn of
         BI cc annul id  -> BI cc annul (patchF id)
         BF cc annul id  -> BF cc annul (patchF id)
@@ -368,14 +359,14 @@ sparc_patchJumpInstr insn patchF
 --------------------------------------------------------------------------------
 -- | Make a spill instruction.
 --      On SPARC we spill below frame pointer leaving 2 words/spill
-sparc_mkSpillInstr
+mkSpillInstr
     :: NCGConfig
     -> Reg      -- ^ register to spill
     -> Int      -- ^ current stack delta
     -> Int      -- ^ spill slot to use
     -> Instr
 
-sparc_mkSpillInstr config reg _ slot
+mkSpillInstr config reg _ slot
  = let  platform = ncgPlatform config
         off      = spillSlotToOffset config slot
         off_w    = 1 + (off `div` 4)
@@ -388,14 +379,14 @@ sparc_mkSpillInstr config reg _ slot
 
 
 -- | Make a spill reload instruction.
-sparc_mkLoadInstr
+mkLoadInstr
     :: NCGConfig
     -> Reg      -- ^ register to load into
     -> Int      -- ^ current stack delta
     -> Int      -- ^ spill slot to use
     -> Instr
 
-sparc_mkLoadInstr config reg _ slot
+mkLoadInstr config reg _ slot
   = let platform = ncgPlatform config
         off      = spillSlotToOffset config slot
         off_w    = 1 + (off `div` 4)
@@ -409,21 +400,21 @@ sparc_mkLoadInstr config reg _ slot
 
 --------------------------------------------------------------------------------
 -- | See if this instruction is telling us the current C stack delta
-sparc_takeDeltaInstr
+takeDeltaInstr
         :: Instr
         -> Maybe Int
 
-sparc_takeDeltaInstr instr
+takeDeltaInstr instr
  = case instr of
         DELTA i         -> Just i
         _               -> Nothing
 
 
-sparc_isMetaInstr
+isMetaInstr
         :: Instr
         -> Bool
 
-sparc_isMetaInstr instr
+isMetaInstr instr
  = case instr of
         COMMENT{}       -> True
         LDATA{}         -> True
@@ -437,13 +428,13 @@ sparc_isMetaInstr instr
 --      floating point and integer regs. If we need to do that then we
 --      have to go via memory.
 --
-sparc_mkRegRegMoveInstr
+mkRegRegMoveInstr
     :: Platform
     -> Reg
     -> Reg
     -> Instr
 
-sparc_mkRegRegMoveInstr platform src dst
+mkRegRegMoveInstr platform src dst
         | srcClass      <- targetClassOfReg platform src
         , dstClass      <- targetClassOfReg platform dst
         , srcClass == dstClass
@@ -460,8 +451,8 @@ sparc_mkRegRegMoveInstr platform src dst
 --      The register allocator attempts to eliminate reg->reg moves whenever it can,
 --      by assigning the src and dest temporaries to the same real register.
 --
-sparc_takeRegRegMoveInstr :: Instr -> Maybe (Reg,Reg)
-sparc_takeRegRegMoveInstr instr
+takeRegRegMoveInstr :: Instr -> Maybe (Reg,Reg)
+takeRegRegMoveInstr instr
  = case instr of
         ADD False False src (RIReg src2) dst
          | g0 == src2           -> Just (src, dst)
@@ -472,10 +463,10 @@ sparc_takeRegRegMoveInstr instr
 
 
 -- | Make an unconditional branch instruction.
-sparc_mkJumpInstr
+mkJumpInstr
         :: BlockId
         -> [Instr]
 
-sparc_mkJumpInstr id
+mkJumpInstr id
  =       [BI ALWAYS False id
         , NOP]                  -- fill the branch delay slot.

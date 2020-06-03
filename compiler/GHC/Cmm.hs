@@ -3,6 +3,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ExplicitNamespaces #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module GHC.Cmm (
      -- * Cmm top-level datatypes
@@ -95,6 +96,8 @@ data GenCmmDecl d h g
   | CmmData     -- Static data
         Section
         d
+
+  deriving (Functor)
 
 type CmmDecl     = GenCmmDecl CmmStatics    CmmTopInfo CmmGraph
 type CmmDeclSRTs = GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph
@@ -246,14 +249,19 @@ type RawCmmStatics = GenCmmStatics 'True
 -- These are used by the LLVM and NCG backends, when populating Cmm
 -- with lists of instructions.
 
-data GenBasicBlock i = BasicBlock BlockId [i]
+data GenBasicBlock i
+   = BasicBlock BlockId [i]
+   deriving (Functor)
+
 
 -- | The branch block id is that of the first block in
 -- the branch, which is that branch's entry point
 blockId :: GenBasicBlock i -> BlockId
 blockId (BasicBlock blk_id _ ) = blk_id
 
-newtype ListGraph i = ListGraph [GenBasicBlock i]
+newtype ListGraph i
+   = ListGraph [GenBasicBlock i]
+   deriving (Functor)
 
 instance Outputable instr => Outputable (ListGraph instr) where
     ppr (ListGraph blocks) = vcat (map ppr blocks)

@@ -46,11 +46,11 @@ import GHC.CmmToAsm.X86.RegInfo
 
 import GHC.Platform.Regs
 import GHC.CmmToAsm.CPrim
+import GHC.CmmToAsm.Types
 import GHC.Cmm.DebugBlock
    ( DebugBlock(..), UnwindPoint(..), UnwindTable
    , UnwindExpr(UwReg), toUnwindExpr
    )
-import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.PIC
 import GHC.CmmToAsm.Monad
    ( NatM, getNewRegNat, getNewLabelNat, setDeltaNat

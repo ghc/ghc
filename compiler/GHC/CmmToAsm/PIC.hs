@@ -54,10 +54,10 @@ import qualified GHC.CmmToAsm.PPC.Regs  as PPC
 import qualified GHC.CmmToAsm.X86.Instr as X86
 
 import GHC.Platform
-import GHC.CmmToAsm.Instr
 import GHC.Platform.Reg
 import GHC.CmmToAsm.Monad
 import GHC.CmmToAsm.Config
+import GHC.CmmToAsm.Types
 
 
 import GHC.Cmm.Dataflow.Collections

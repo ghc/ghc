@@ -1,28 +1,18 @@
 
-module GHC.CmmToAsm.Instr (
-        RegUsage(..),
-        noUsage,
-        GenBasicBlock(..), blockId,
-        ListGraph(..),
-        NatCmm,
-        NatCmmDecl,
-        NatBasicBlock,
-        topInfoTable,
-        entryBlocks,
-        Instruction(..)
-)
-
+module GHC.CmmToAsm.Instr
+   ( Instruction(..)
+   , RegUsage(..)
+   , noUsage
+   )
 where
 
 import GHC.Prelude
 
 import GHC.Platform
 import GHC.Platform.Reg
+import GHC.Utils.Outputable (SDoc)
 
 import GHC.Cmm.BlockId
-import GHC.Cmm.Dataflow.Collections
-import GHC.Cmm.Dataflow.Label
-import GHC.Cmm hiding (topInfoTable)
 
 import GHC.CmmToAsm.Config
 
@@ -46,51 +36,11 @@ data RegUsage
 noUsage :: RegUsage
 noUsage  = RU [] []
 
--- Our flavours of the Cmm types
--- Type synonyms for Cmm populated with native code
-type NatCmm instr
-        = GenCmmGroup
-                RawCmmStatics
-                (LabelMap RawCmmStatics)
-                (ListGraph instr)
-
-type NatCmmDecl statics instr
-        = GenCmmDecl
-                statics
-                (LabelMap RawCmmStatics)
-                (ListGraph instr)
-
-
-type NatBasicBlock instr
-        = GenBasicBlock instr
-
-
--- | Returns the info table associated with the CmmDecl's entry point,
--- if any.
-topInfoTable :: GenCmmDecl a (LabelMap i) (ListGraph b) -> Maybe i
-topInfoTable (CmmProc infos _ _ (ListGraph (b:_)))
-  = mapLookup (blockId b) infos
-topInfoTable _
-  = Nothing
-
--- | Return the list of BlockIds in a CmmDecl that are entry points
--- for this proc (i.e. they may be jumped to from outside this proc).
-entryBlocks :: GenCmmDecl a (LabelMap i) (ListGraph b) -> [BlockId]
-entryBlocks (CmmProc info _ _ (ListGraph code)) = entries
-  where
-        infos = mapKeys info
-        entries = case code of
-                    [] -> infos
-                    BasicBlock entry _ : _ -- first block is the entry point
-                       | entry `elem` infos -> infos
-                       | otherwise          -> entry : infos
-entryBlocks _ = []
-
 -- | Common things that we can do with instructions, on all architectures.
 --      These are used by the shared parts of the native code generator,
 --      specifically the register allocators.
 --
-class   Instruction instr where
+class Instruction instr where
 
         -- | Get the registers that are being used by this instruction.
         --      regUsage doesn't need to do any trickery for jumps and such.
@@ -204,3 +154,6 @@ class   Instruction instr where
                 :: Platform
                 -> Int
                 -> [instr]
+
+        -- | Pretty-print an instruction
+        pprInstr :: Platform -> instr -> SDoc

@@ -2,7 +2,6 @@
 --
 -- (c) The University of Glasgow 1993-2004
 --
--- This is the top-level module in the native code generator.
 --
 -- -----------------------------------------------------------------------------
 
@@ -15,40 +14,74 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
-module GHC.CmmToAsm (
-                    -- * Module entry point
-                    nativeCodeGen
+-- | Native code generator
+--
+-- The native-code generator has machine-independent and
+-- machine-dependent modules.
+--
+-- This module ("GHC.CmmToAsm") is the top-level machine-independent
+-- module.  Before entering machine-dependent land, we do some
+-- machine-independent optimisations (defined below) on the
+-- 'CmmStmts's.
+--
+-- We convert to the machine-specific 'Instr' datatype with
+-- 'cmmCodeGen', assuming an infinite supply of registers.  We then use
+-- a machine-independent register allocator ('regAlloc') to rejoin
+-- reality.  Obviously, 'regAlloc' has machine-specific helper
+-- functions (see about "RegAllocInfo" below).
+--
+-- Finally, we order the basic blocks of the function so as to minimise
+-- the number of jumps between blocks, by utilising fallthrough wherever
+-- possible.
+--
+-- The machine-dependent bits break down as follows:
+--
+--   * ["MachRegs"]  Everything about the target platform's machine
+--     registers (and immediate operands, and addresses, which tend to
+--     intermingle/interact with registers).
+--
+--   * ["MachInstrs"]  Includes the 'Instr' datatype (possibly should
+--     have a module of its own), plus a miscellany of other things
+--     (e.g., 'targetDoubleSize', 'smStablePtrTable', ...)
+--
+--   * ["MachCodeGen"]  is where 'Cmm' stuff turns into
+--     machine instructions.
+--
+--   * ["PprMach"] 'pprInstr' turns an 'Instr' into text (well, really
+--     a 'SDoc').
+--
+--   * ["RegAllocInfo"] In the register allocator, we manipulate
+--     'MRegsState's, which are 'BitSet's, one bit per machine register.
+--     When we want to say something about a specific machine register
+--     (e.g., ``it gets clobbered by this instruction''), we set/unset
+--     its bit.  Obviously, we do this 'BitSet' thing for efficiency
+--     reasons.
+--
+--     The 'RegAllocInfo' module collects together the machine-specific
+--     info needed to do register allocation.
+--
+--    * ["RegisterAlloc"] The (machine-independent) register allocator.
+-- -}
+--
+module GHC.CmmToAsm
+   ( nativeCodeGen
 
-                    -- * Test-only exports: see trac #12744
-                    -- used by testGraphNoSpills, which needs to access
-                    -- the register allocator intermediate data structures
-                    -- cmmNativeGen emits
-                  , cmmNativeGen
-                  , NcgImpl(..)
-                  , x86NcgImpl
-                  ) where
+   -- * Test-only exports: see trac #12744
+   -- used by testGraphNoSpills, which needs to access
+   -- the register allocator intermediate data structures
+   -- cmmNativeGen emits
+   , cmmNativeGen
+   , NcgImpl(..)
+   )
+where
 
 #include "HsVersions.h"
 
 import GHC.Prelude
 
-import qualified GHC.CmmToAsm.X86.CodeGen as X86.CodeGen
-import qualified GHC.CmmToAsm.X86.Regs    as X86.Regs
-import qualified GHC.CmmToAsm.X86.Instr   as X86.Instr
-import qualified GHC.CmmToAsm.X86.Ppr     as X86.Ppr
-
-import qualified GHC.CmmToAsm.SPARC.CodeGen as SPARC.CodeGen
-import qualified GHC.CmmToAsm.SPARC.Regs    as SPARC.Regs
-import qualified GHC.CmmToAsm.SPARC.Instr   as SPARC.Instr
-import qualified GHC.CmmToAsm.SPARC.Ppr     as SPARC.Ppr
-import qualified GHC.CmmToAsm.SPARC.ShortcutJump   as SPARC.ShortcutJump
-import qualified GHC.CmmToAsm.SPARC.CodeGen.Expand as SPARC.CodeGen.Expand
-
-import qualified GHC.CmmToAsm.PPC.CodeGen as PPC.CodeGen
-import qualified GHC.CmmToAsm.PPC.Regs    as PPC.Regs
-import qualified GHC.CmmToAsm.PPC.RegInfo as PPC.RegInfo
-import qualified GHC.CmmToAsm.PPC.Instr   as PPC.Instr
-import qualified GHC.CmmToAsm.PPC.Ppr     as PPC.Ppr
+import qualified GHC.CmmToAsm.X86   as X86
+import qualified GHC.CmmToAsm.PPC   as PPC
+import qualified GHC.CmmToAsm.SPARC as SPARC
 
 import GHC.CmmToAsm.Reg.Liveness
 import qualified GHC.CmmToAsm.Reg.Linear                as Linear
@@ -71,6 +104,7 @@ import GHC.CmmToAsm.Monad
 import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.Dwarf
 import GHC.CmmToAsm.Config
+import GHC.CmmToAsm.Types
 import GHC.Cmm.DebugBlock
 
 import GHC.Cmm.BlockId
@@ -90,7 +124,6 @@ import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Utils.Misc
 
-import GHC.Types.Basic       ( Alignment )
 import qualified GHC.Utils.Ppr as Pretty
 import GHC.Utils.BufHandle
 import GHC.Utils.Outputable as Outputable
@@ -102,63 +135,12 @@ import GHC.Unit
 import GHC.Data.Stream (Stream)
 import qualified GHC.Data.Stream as Stream
 
--- DEBUGGING ONLY
---import GHC.Data.OrdList
-
 import Data.List
 import Data.Maybe
 import Data.Ord         ( comparing )
 import Control.Exception
 import Control.Monad
 import System.IO
-
-{-
-The native-code generator has machine-independent and
-machine-dependent modules.
-
-This module ("AsmCodeGen") is the top-level machine-independent
-module.  Before entering machine-dependent land, we do some
-machine-independent optimisations (defined below) on the
-'CmmStmts's.
-
-We convert to the machine-specific 'Instr' datatype with
-'cmmCodeGen', assuming an infinite supply of registers.  We then use
-a machine-independent register allocator ('regAlloc') to rejoin
-reality.  Obviously, 'regAlloc' has machine-specific helper
-functions (see about "RegAllocInfo" below).
-
-Finally, we order the basic blocks of the function so as to minimise
-the number of jumps between blocks, by utilising fallthrough wherever
-possible.
-
-The machine-dependent bits break down as follows:
-
-  * ["MachRegs"]  Everything about the target platform's machine
-    registers (and immediate operands, and addresses, which tend to
-    intermingle/interact with registers).
-
-  * ["MachInstrs"]  Includes the 'Instr' datatype (possibly should
-    have a module of its own), plus a miscellany of other things
-    (e.g., 'targetDoubleSize', 'smStablePtrTable', ...)
-
-  * ["MachCodeGen"]  is where 'Cmm' stuff turns into
-    machine instructions.
-
-  * ["PprMach"] 'pprInstr' turns an 'Instr' into text (well, really
-    a 'SDoc').
-
-  * ["RegAllocInfo"] In the register allocator, we manipulate
-    'MRegsState's, which are 'BitSet's, one bit per machine register.
-    When we want to say something about a specific machine register
-    (e.g., ``it gets clobbered by this instruction''), we set/unset
-    its bit.  Obviously, we do this 'BitSet' thing for efficiency
-    reasons.
-
-    The 'RegAllocInfo' module collects together the machine-specific
-    info needed to do register allocation.
-
-   * ["RegisterAlloc"] The (machine-independent) register allocator.
--}
 
 --------------------
 nativeCodeGen :: forall a . DynFlags -> Module -> ModLocation -> Handle -> UniqSupply
@@ -167,113 +149,24 @@ nativeCodeGen :: forall a . DynFlags -> Module -> ModLocation -> Handle -> UniqS
 nativeCodeGen dflags this_mod modLoc h us cmms
  = let config   = initConfig dflags
        platform = ncgPlatform config
-       nCG' :: ( Outputable statics, Outputable instr
-               , Outputable jumpDest, Instruction instr)
+       nCG' :: ( Outputable statics, Outputable jumpDest, Instruction instr)
             => NcgImpl statics instr jumpDest -> IO a
        nCG' ncgImpl = nativeCodeGen' dflags this_mod modLoc ncgImpl h us cmms
    in case platformArch platform of
-      ArchX86       -> nCG' (x86NcgImpl    config)
-      ArchX86_64    -> nCG' (x86_64NcgImpl config)
-      ArchPPC       -> nCG' (ppcNcgImpl    config)
-      ArchS390X     -> panic "nativeCodeGen: No NCG for S390X"
-      ArchSPARC     -> nCG' (sparcNcgImpl  config)
+      ArchX86       -> nCG' (X86.ncgX86     config)
+      ArchX86_64    -> nCG' (X86.ncgX86_64  config)
+      ArchPPC       -> nCG' (PPC.ncgPPC     config)
+      ArchPPC_64 _  -> nCG' (PPC.ncgPPC     config)
+      ArchSPARC     -> nCG' (SPARC.ncgSPARC config)
       ArchSPARC64   -> panic "nativeCodeGen: No NCG for SPARC64"
+      ArchS390X     -> panic "nativeCodeGen: No NCG for S390X"
       ArchARM {}    -> panic "nativeCodeGen: No NCG for ARM"
       ArchARM64     -> panic "nativeCodeGen: No NCG for ARM64"
-      ArchPPC_64 _  -> nCG' (ppcNcgImpl    config)
       ArchAlpha     -> panic "nativeCodeGen: No NCG for Alpha"
       ArchMipseb    -> panic "nativeCodeGen: No NCG for mipseb"
       ArchMipsel    -> panic "nativeCodeGen: No NCG for mipsel"
       ArchUnknown   -> panic "nativeCodeGen: No NCG for unknown arch"
       ArchJavaScript-> panic "nativeCodeGen: No NCG for JavaScript"
-
-x86NcgImpl :: NCGConfig -> NcgImpl (Alignment, RawCmmStatics)
-                                  X86.Instr.Instr X86.Instr.JumpDest
-x86NcgImpl config
- = (x86_64NcgImpl config)
-
-x86_64NcgImpl :: NCGConfig -> NcgImpl (Alignment, RawCmmStatics)
-                                  X86.Instr.Instr X86.Instr.JumpDest
-x86_64NcgImpl config
- = NcgImpl {
-        ncgConfig                 = config
-       ,cmmTopCodeGen             = X86.CodeGen.cmmTopCodeGen
-       ,generateJumpTableForInstr = X86.CodeGen.generateJumpTableForInstr config
-       ,getJumpDestBlockId        = X86.Instr.getJumpDestBlockId
-       ,canShortcut               = X86.Instr.canShortcut
-       ,shortcutStatics           = X86.Instr.shortcutStatics
-       ,shortcutJump              = X86.Instr.shortcutJump
-       ,pprNatCmmDecl             = X86.Ppr.pprNatCmmDecl config
-       ,maxSpillSlots             = X86.Instr.maxSpillSlots config
-       ,allocatableRegs           = X86.Regs.allocatableRegs platform
-       ,ncgAllocMoreStack         = X86.Instr.allocMoreStack platform
-       ,ncgExpandTop              = id
-       ,ncgMakeFarBranches        = const id
-       ,extractUnwindPoints       = X86.CodeGen.extractUnwindPoints
-       ,invertCondBranches        = X86.CodeGen.invertCondBranches
-   }
-    where
-      platform = ncgPlatform config
-
-ppcNcgImpl :: NCGConfig -> NcgImpl RawCmmStatics PPC.Instr.Instr PPC.RegInfo.JumpDest
-ppcNcgImpl config
- = NcgImpl {
-        ncgConfig                 = config
-       ,cmmTopCodeGen             = PPC.CodeGen.cmmTopCodeGen
-       ,generateJumpTableForInstr = PPC.CodeGen.generateJumpTableForInstr config
-       ,getJumpDestBlockId        = PPC.RegInfo.getJumpDestBlockId
-       ,canShortcut               = PPC.RegInfo.canShortcut
-       ,shortcutStatics           = PPC.RegInfo.shortcutStatics
-       ,shortcutJump              = PPC.RegInfo.shortcutJump
-       ,pprNatCmmDecl             = PPC.Ppr.pprNatCmmDecl config
-       ,maxSpillSlots             = PPC.Instr.maxSpillSlots config
-       ,allocatableRegs           = PPC.Regs.allocatableRegs platform
-       ,ncgAllocMoreStack         = PPC.Instr.allocMoreStack platform
-       ,ncgExpandTop              = id
-       ,ncgMakeFarBranches        = PPC.Instr.makeFarBranches
-       ,extractUnwindPoints       = const []
-       ,invertCondBranches        = \_ _ -> id
-   }
-    where
-      platform = ncgPlatform config
-
-sparcNcgImpl :: NCGConfig -> NcgImpl RawCmmStatics SPARC.Instr.Instr SPARC.ShortcutJump.JumpDest
-sparcNcgImpl config
- = NcgImpl {
-        ncgConfig                 = config
-       ,cmmTopCodeGen             = SPARC.CodeGen.cmmTopCodeGen
-       ,generateJumpTableForInstr = SPARC.CodeGen.generateJumpTableForInstr platform
-       ,getJumpDestBlockId        = SPARC.ShortcutJump.getJumpDestBlockId
-       ,canShortcut               = SPARC.ShortcutJump.canShortcut
-       ,shortcutStatics           = SPARC.ShortcutJump.shortcutStatics
-       ,shortcutJump              = SPARC.ShortcutJump.shortcutJump
-       ,pprNatCmmDecl             = SPARC.Ppr.pprNatCmmDecl config
-       ,maxSpillSlots             = SPARC.Instr.maxSpillSlots config
-       ,allocatableRegs           = SPARC.Regs.allocatableRegs
-       ,ncgAllocMoreStack         = noAllocMoreStack
-       ,ncgExpandTop              = map SPARC.CodeGen.Expand.expandTop
-       ,ncgMakeFarBranches        = const id
-       ,extractUnwindPoints       = const []
-       ,invertCondBranches        = \_ _ -> id
-   }
-    where
-      platform = ncgPlatform config
-
---
--- Allocating more stack space for spilling is currently only
--- supported for the linear register allocator on x86/x86_64, the rest
--- default to the panic below.  To support allocating extra stack on
--- more platforms provide a definition of ncgAllocMoreStack.
---
-noAllocMoreStack :: Int -> NatCmmDecl statics instr
-                 -> UniqSM (NatCmmDecl statics instr, [(BlockId,BlockId)])
-noAllocMoreStack amount _
-  = panic $   "Register allocator: out of stack slots (need " ++ show amount ++ ")\n"
-        ++  "   If you are trying to compile SHA1.hs from the crypto library then this\n"
-        ++  "   is a known limitation in the linear allocator.\n"
-        ++  "\n"
-        ++  "   Try enabling the graph colouring allocator with -fregs-graph instead."
-        ++  "   You can still file a bug report if you like.\n"
 
 
 -- | Data accumulated during code generation. Mostly about statistics,
@@ -320,8 +213,7 @@ unwinding table).
 See also Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock".
 -}
 
-nativeCodeGen' :: (Outputable statics, Outputable instr,Outputable jumpDest,
-                   Instruction instr)
+nativeCodeGen' :: (Outputable statics, Outputable jumpDest, Instruction instr)
                => DynFlags
                -> Module -> ModLocation
                -> NcgImpl statics instr jumpDest
@@ -397,8 +289,7 @@ finishNativeGen dflags modLoc bufh@(BufHandle _ _ h) us ngs
                    (dumpOptionsFromFlag Opt_D_dump_asm_stats) "NCG stats"
                    FormatText
 
-cmmNativeGenStream :: (Outputable statics, Outputable instr
-                      ,Outputable jumpDest, Instruction instr)
+cmmNativeGenStream :: (Outputable statics, Outputable jumpDest, Instruction instr)
               => DynFlags
               -> Module -> ModLocation
               -> NcgImpl statics instr jumpDest
@@ -453,8 +344,7 @@ cmmNativeGenStream dflags this_mod modLoc ncgImpl h us cmm_stream ngs
 -- | Do native code generation on all these cmms.
 --
 cmmNativeGens :: forall statics instr jumpDest.
-                 (Outputable statics, Outputable instr
-                 ,Outputable jumpDest, Instruction instr)
+                 (Outputable statics, Outputable jumpDest, Instruction instr)
               => DynFlags
               -> Module -> ModLocation
               -> NcgImpl statics instr jumpDest
@@ -530,8 +420,7 @@ emitNativeCode dflags h sdoc = do
 --      Dumping the output of each stage along the way.
 --      Global conflict graph and NGC stats
 cmmNativeGen
-    :: forall statics instr jumpDest. (Instruction instr,
-        Outputable statics, Outputable instr, Outputable jumpDest)
+    :: forall statics instr jumpDest. (Instruction instr, Outputable statics, Outputable jumpDest)
     => DynFlags
     -> Module -> ModLocation
     -> NcgImpl statics instr jumpDest
@@ -602,7 +491,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
         dumpIfSet_dyn dflags
                 Opt_D_dump_asm_liveness "Liveness annotations added"
                 FormatCMM
-                (vcat $ map ppr withLiveness)
+                (vcat $ map (pprLiveCmmDecl platform) withLiveness)
 
         -- allocate registers
         (alloced, usAlloc, ppr_raStatsColor, ppr_raStatsLinear, raStats, stack_updt_blks) <-
@@ -650,7 +539,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                         (vcat   $ map (\(stage, stats)
                                         -> text "# --------------------------"
                                         $$ text "#  cmm " <> int count <> text " Stage " <> int stage
-                                        $$ ppr stats)
+                                        $$ ppr (fmap (pprInstr platform) stats))
                                 $ zip [0..] regAllocStats)
 
                 let mPprStats =

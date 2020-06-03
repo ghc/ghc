@@ -10,7 +10,7 @@ import GHC.Prelude
 
 import GHC.CmmToAsm.SPARC.Instr
 import GHC.CmmToAsm.SPARC.Ppr        () -- For Outputable instances
-import GHC.CmmToAsm.Instr
+import GHC.CmmToAsm.Types
 
 import GHC.Cmm
 

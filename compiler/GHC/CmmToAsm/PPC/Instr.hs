@@ -12,23 +12,37 @@
 
 #include "HsVersions.h"
 
-module GHC.CmmToAsm.PPC.Instr (
-    archWordFormat,
-    RI(..),
-    Instr(..),
-    stackFrameHeaderSize,
-    maxSpillSlots,
-    allocMoreStack,
-    makeFarBranches
-)
-
+module GHC.CmmToAsm.PPC.Instr
+   ( Instr(..)
+   , RI(..)
+   , archWordFormat
+   , stackFrameHeaderSize
+   , maxSpillSlots
+   , allocMoreStack
+   , makeFarBranches
+   , mkJumpInstr
+   , mkLoadInstr
+   , mkSpillInstr
+   , patchJumpInstr
+   , patchRegsOfInstr
+   , jumpDestsOfInstr
+   , takeRegRegMoveInstr
+   , takeDeltaInstr
+   , mkRegRegMoveInstr
+   , mkStackAllocInstr
+   , mkStackDeallocInstr
+   , regUsageOfInstr
+   , isJumpishInstr
+   , isMetaInstr
+   )
 where
 
 import GHC.Prelude
 
 import GHC.CmmToAsm.PPC.Regs
 import GHC.CmmToAsm.PPC.Cond
-import GHC.CmmToAsm.Instr
+import GHC.CmmToAsm.Types
+import GHC.CmmToAsm.Instr (RegUsage(..), noUsage)
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Reg.Target
 import GHC.CmmToAsm.Config
@@ -60,34 +74,16 @@ archWordFormat is32Bit
  | otherwise = II64
 
 
--- | Instruction instance for powerpc
-instance Instruction Instr where
-        regUsageOfInstr         = ppc_regUsageOfInstr
-        patchRegsOfInstr        = ppc_patchRegsOfInstr
-        isJumpishInstr          = ppc_isJumpishInstr
-        jumpDestsOfInstr        = ppc_jumpDestsOfInstr
-        patchJumpInstr          = ppc_patchJumpInstr
-        mkSpillInstr            = ppc_mkSpillInstr
-        mkLoadInstr             = ppc_mkLoadInstr
-        takeDeltaInstr          = ppc_takeDeltaInstr
-        isMetaInstr             = ppc_isMetaInstr
-        mkRegRegMoveInstr _     = ppc_mkRegRegMoveInstr
-        takeRegRegMoveInstr     = ppc_takeRegRegMoveInstr
-        mkJumpInstr             = ppc_mkJumpInstr
-        mkStackAllocInstr       = ppc_mkStackAllocInstr
-        mkStackDeallocInstr     = ppc_mkStackDeallocInstr
+mkStackAllocInstr :: Platform -> Int -> [Instr]
+mkStackAllocInstr platform amount
+  = mkStackAllocInstr' platform (-amount)
 
+mkStackDeallocInstr :: Platform -> Int -> [Instr]
+mkStackDeallocInstr platform amount
+  = mkStackAllocInstr' platform amount
 
-ppc_mkStackAllocInstr :: Platform -> Int -> [Instr]
-ppc_mkStackAllocInstr platform amount
-  = ppc_mkStackAllocInstr' platform (-amount)
-
-ppc_mkStackDeallocInstr :: Platform -> Int -> [Instr]
-ppc_mkStackDeallocInstr platform amount
-  = ppc_mkStackAllocInstr' platform amount
-
-ppc_mkStackAllocInstr' :: Platform -> Int -> [Instr]
-ppc_mkStackAllocInstr' platform amount
+mkStackAllocInstr' :: Platform -> Int -> [Instr]
+mkStackAllocInstr' platform amount
   | fits16Bits amount
   = [ LD fmt r0 (AddrRegImm sp zero)
     , STU fmt r0 (AddrRegImm sp immAmount)
@@ -313,8 +309,8 @@ data Instr
 -- The consequences of control flow transfers, as far as register
 -- allocation goes, are taken care of by the register allocator.
 --
-ppc_regUsageOfInstr :: Platform -> Instr -> RegUsage
-ppc_regUsageOfInstr platform instr
+regUsageOfInstr :: Platform -> Instr -> RegUsage
+regUsageOfInstr platform instr
  = case instr of
     LD      _ reg addr       -> usage (regAddr addr, [reg])
     LDFAR   _ reg addr       -> usage (regAddr addr, [reg])
@@ -406,8 +402,8 @@ interesting _        (RegReal (RealRegPair{}))
 
 -- | Apply a given mapping to all the register references in this
 -- instruction.
-ppc_patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
-ppc_patchRegsOfInstr instr env
+patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
+patchRegsOfInstr instr env
  = case instr of
     LD      fmt reg addr    -> LD fmt (env reg) (fixAddr addr)
     LDFAR   fmt reg addr    -> LDFAR fmt (env reg) (fixAddr addr)
@@ -497,8 +493,8 @@ ppc_patchRegsOfInstr instr env
 -- | Checks whether this instruction is a jump/branch instruction.
 -- One that can change the flow of control in a way that the
 -- register allocator needs to worry about.
-ppc_isJumpishInstr :: Instr -> Bool
-ppc_isJumpishInstr instr
+isJumpishInstr :: Instr -> Bool
+isJumpishInstr instr
  = case instr of
     BCC{}       -> True
     BCCFAR{}    -> True
@@ -512,8 +508,8 @@ ppc_isJumpishInstr instr
 -- | Checks whether this instruction is a jump/branch instruction.
 -- One that can change the flow of control in a way that the
 -- register allocator needs to worry about.
-ppc_jumpDestsOfInstr :: Instr -> [BlockId]
-ppc_jumpDestsOfInstr insn
+jumpDestsOfInstr :: Instr -> [BlockId]
+jumpDestsOfInstr insn
   = case insn of
         BCC _ id _       -> [id]
         BCCFAR _ id _    -> [id]
@@ -524,8 +520,8 @@ ppc_jumpDestsOfInstr insn
 -- | Change the destination of this jump instruction.
 -- Used in the linear allocator when adding fixup blocks for join
 -- points.
-ppc_patchJumpInstr :: Instr -> (BlockId -> BlockId) -> Instr
-ppc_patchJumpInstr insn patchF
+patchJumpInstr :: Instr -> (BlockId -> BlockId) -> Instr
+patchJumpInstr insn patchF
   = case insn of
         BCC cc id p     -> BCC cc (patchF id) p
         BCCFAR cc id p  -> BCCFAR cc (patchF id) p
@@ -536,14 +532,14 @@ ppc_patchJumpInstr insn patchF
 -- -----------------------------------------------------------------------------
 
 -- | An instruction to spill a register into a spill slot.
-ppc_mkSpillInstr
+mkSpillInstr
    :: NCGConfig
    -> Reg       -- register to spill
    -> Int       -- current stack delta
    -> Int       -- spill slot to use
    -> Instr
 
-ppc_mkSpillInstr config reg delta slot
+mkSpillInstr config reg delta slot
   = let platform = ncgPlatform config
         off      = spillSlotToOffset platform slot
         arch     = platformArch platform
@@ -561,14 +557,14 @@ ppc_mkSpillInstr config reg delta slot
     in instr fmt reg (AddrRegImm sp (ImmInt (off-delta)))
 
 
-ppc_mkLoadInstr
+mkLoadInstr
    :: NCGConfig
    -> Reg       -- register to load
    -> Int       -- current stack delta
    -> Int       -- spill slot to use
    -> Instr
 
-ppc_mkLoadInstr config reg delta slot
+mkLoadInstr config reg delta slot
   = let platform = ncgPlatform config
         off      = spillSlotToOffset platform slot
         arch     = platformArch platform
@@ -629,21 +625,21 @@ spillSlotToOffset platform slot
 
 --------------------------------------------------------------------------------
 -- | See if this instruction is telling us the current C stack delta
-ppc_takeDeltaInstr
+takeDeltaInstr
     :: Instr
     -> Maybe Int
 
-ppc_takeDeltaInstr instr
+takeDeltaInstr instr
  = case instr of
      DELTA i  -> Just i
      _        -> Nothing
 
 
-ppc_isMetaInstr
+isMetaInstr
     :: Instr
     -> Bool
 
-ppc_isMetaInstr instr
+isMetaInstr instr
  = case instr of
     COMMENT{}   -> True
     LOCATION{}  -> True
@@ -655,29 +651,29 @@ ppc_isMetaInstr instr
 
 -- | Copy the value in a register to another one.
 -- Must work for all register classes.
-ppc_mkRegRegMoveInstr
+mkRegRegMoveInstr
     :: Reg
     -> Reg
     -> Instr
 
-ppc_mkRegRegMoveInstr src dst
+mkRegRegMoveInstr src dst
     = MR dst src
 
 
 -- | Make an unconditional jump instruction.
-ppc_mkJumpInstr
+mkJumpInstr
     :: BlockId
     -> [Instr]
 
-ppc_mkJumpInstr id
+mkJumpInstr id
     = [BCC ALWAYS id Nothing]
 
 
 -- | Take the source and destination from this reg -> reg move instruction
 -- or Nothing if it's not one
-ppc_takeRegRegMoveInstr :: Instr -> Maybe (Reg,Reg)
-ppc_takeRegRegMoveInstr (MR dst src) = Just (src,dst)
-ppc_takeRegRegMoveInstr _  = Nothing
+takeRegRegMoveInstr :: Instr -> Maybe (Reg,Reg)
+takeRegRegMoveInstr (MR dst src) = Just (src,dst)
+takeRegRegMoveInstr _  = Nothing
 
 -- -----------------------------------------------------------------------------
 -- Making far branches

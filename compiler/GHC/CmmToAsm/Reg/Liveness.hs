@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -26,6 +27,7 @@ module GHC.CmmToAsm.Reg.Liveness (
 
         mapBlockTop,    mapBlockTopM,   mapSCCM,
         mapGenBlockTop, mapGenBlockTopM,
+        mapLiveCmmDecl, pprLiveCmmDecl,
         stripLive,
         stripLiveBlock,
         slurpConflicts,
@@ -43,6 +45,8 @@ import GHC.Platform.Reg
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.Config
+import GHC.CmmToAsm.Types
+import GHC.CmmToAsm.Utils
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
@@ -106,6 +110,8 @@ data InstrSR instr
         -- | reload this reg from a stack slot
         | RELOAD Int Reg
 
+        deriving (Functor)
+
 instance Instruction instr => Instruction (InstrSR instr) where
         regUsageOfInstr platform i
          = case i of
@@ -163,10 +169,13 @@ instance Instruction instr => Instruction (InstrSR instr) where
         mkStackDeallocInstr platform amount =
              Instr <$> mkStackDeallocInstr platform amount
 
+        pprInstr platform i = ppr (fmap (pprInstr platform) i)
+
 
 -- | An instruction with liveness information.
 data LiveInstr instr
         = LiveInstr (InstrSR instr) (Maybe Liveness)
+        deriving (Functor)
 
 -- | Liveness information.
 --   The regs which die are ones which are no longer live in the *next* instruction
@@ -494,7 +503,7 @@ slurpReloadCoalesce live
 
 -- | Strip away liveness information, yielding NatCmmDecl
 stripLive
-        :: (Outputable statics, Outputable instr, Instruction instr)
+        :: (Outputable statics, Instruction instr)
         => NCGConfig
         -> LiveCmmDecl statics instr
         -> NatCmmDecl statics instr
@@ -502,7 +511,7 @@ stripLive
 stripLive config live
         = stripCmm live
 
- where  stripCmm :: (Outputable statics, Outputable instr, Instruction instr)
+ where  stripCmm :: (Outputable statics, Instruction instr)
                  => LiveCmmDecl statics instr -> NatCmmDecl statics instr
         stripCmm (CmmData sec ds)       = CmmData sec ds
         stripCmm (CmmProc (LiveInfo info (first_id:_) _ _) label live sccs)
@@ -519,7 +528,21 @@ stripLive config live
 
         -- If the proc has blocks but we don't know what the first one was, then we're dead.
         stripCmm proc
-                 = pprPanic "RegAlloc.Liveness.stripLive: no first_id on proc" (ppr proc)
+                 = pprPanic "RegAlloc.Liveness.stripLive: no first_id on proc" (pprLiveCmmDecl (ncgPlatform config) proc)
+
+
+-- | Pretty-print a `LiveCmmDecl`
+pprLiveCmmDecl :: (Outputable statics, Instruction instr) => Platform -> LiveCmmDecl statics instr -> SDoc
+pprLiveCmmDecl platform d = ppr (mapLiveCmmDecl (pprInstr platform) d)
+
+
+-- | Map over instruction type in `LiveCmmDecl`
+mapLiveCmmDecl
+   :: Outputable statics
+   => (instr -> b)
+   -> LiveCmmDecl statics instr
+   -> LiveCmmDecl statics b
+mapLiveCmmDecl f proc = fmap (fmap (fmap (fmap (fmap f)))) proc
 
 -- | Strip away liveness information from a basic block,
 --   and make real spill instructions out of SPILL, RELOAD pseudos along the way.
@@ -653,15 +676,16 @@ patchRegsLiveInstr patchF li
 -- | Convert a NatCmmDecl to a LiveCmmDecl, with liveness information
 
 cmmTopLiveness
-        :: (Outputable instr, Instruction instr)
-        => Maybe CFG -> Platform
+        :: Instruction instr
+        => Maybe CFG
+        -> Platform
         -> NatCmmDecl statics instr
         -> UniqSM (LiveCmmDecl statics instr)
 cmmTopLiveness cfg platform cmm
         = regLiveness platform $ natCmmTopToLive cfg cmm
 
 natCmmTopToLive
-        :: (Instruction instr, Outputable instr)
+        :: Instruction instr
         => Maybe CFG -> NatCmmDecl statics instr
         -> LiveCmmDecl statics instr
 
@@ -747,7 +771,7 @@ sccBlocks blocks entries mcfg = map (fmap node_payload) sccs
 --
 
 regLiveness
-        :: (Outputable instr, Instruction instr)
+        :: Instruction instr
         => Platform
         -> LiveCmmDecl statics instr
         -> UniqSM (LiveCmmDecl statics instr)
@@ -830,7 +854,7 @@ reverseBlocksInTops top
 --  want for the next pass.
 --
 computeLiveness
-        :: (Outputable instr, Instruction instr)
+        :: Instruction instr
         => Platform
         -> [SCC (LiveBasicBlock instr)]
         -> ([SCC (LiveBasicBlock instr)],       -- instructions annotated with list of registers
@@ -841,10 +865,11 @@ computeLiveness
 computeLiveness platform sccs
  = case checkIsReverseDependent sccs of
         Nothing         -> livenessSCCs platform mapEmpty [] sccs
-        Just bad        -> pprPanic "RegAlloc.Liveness.computeLiveness"
+        Just bad        -> let sccs' = fmap (fmap (fmap (fmap (pprInstr platform)))) sccs
+                           in pprPanic "RegAlloc.Liveness.computeLiveness"
                                 (vcat   [ text "SCCs aren't in reverse dependent order"
                                         , text "bad blockId" <+> ppr bad
-                                        , ppr sccs])
+                                        , ppr sccs'])
 
 livenessSCCs
        :: Instruction instr

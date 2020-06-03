@@ -8,7 +8,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 module GHC.CmmToAsm.X86.Ppr (
         pprNatCmmDecl,
         pprData,
@@ -24,25 +23,27 @@ where
 
 import GHC.Prelude
 
+import GHC.Platform
+import GHC.Platform.Reg
+
 import GHC.CmmToAsm.X86.Regs
 import GHC.CmmToAsm.X86.Instr
 import GHC.CmmToAsm.X86.Cond
-import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Format
-import GHC.Platform.Reg
+import GHC.CmmToAsm.Types
+import GHC.CmmToAsm.Utils
 import GHC.CmmToAsm.Ppr
 
-
+import GHC.Cmm              hiding (topInfoTable)
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
-import GHC.Types.Basic (Alignment, mkAlignment, alignmentBytes)
-import GHC.Driver.Session
-import GHC.Cmm              hiding (topInfoTable)
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
+
+import GHC.Types.Basic (Alignment, mkAlignment, alignmentBytes)
 import GHC.Types.Unique ( pprUniqueAlways )
-import GHC.Platform
+
 import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -269,11 +270,6 @@ pprAlign platform alignment
         log2 4 = 2
         log2 8 = 3
         log2 n = 1 + log2 (n `quot` 2)
-
-instance Outputable Instr where
-    ppr instr = sdocWithDynFlags $ \dflags ->
-                  pprInstr (targetPlatform dflags) instr
-
 
 pprReg :: Platform -> Format -> Reg -> SDoc
 pprReg platform f r

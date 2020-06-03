@@ -9,7 +9,6 @@
 -----------------------------------------------------------------------------
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-
 module GHC.CmmToAsm.SPARC.Ppr (
         pprNatCmmDecl,
         pprBasicBlock,
@@ -32,11 +31,12 @@ import GHC.CmmToAsm.SPARC.Cond
 import GHC.CmmToAsm.SPARC.Imm
 import GHC.CmmToAsm.SPARC.AddrMode
 import GHC.CmmToAsm.SPARC.Base
-import GHC.CmmToAsm.Instr
 import GHC.Platform.Reg
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Ppr
 import GHC.CmmToAsm.Config
+import GHC.CmmToAsm.Types
+import GHC.CmmToAsm.Utils
 
 import GHC.Cmm hiding (topInfoTable)
 import GHC.Cmm.Ppr() -- For Outputable instances

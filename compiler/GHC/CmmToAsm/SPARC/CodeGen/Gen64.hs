@@ -16,9 +16,7 @@ import GHC.CmmToAsm.SPARC.Regs
 import GHC.CmmToAsm.SPARC.AddrMode
 import GHC.CmmToAsm.SPARC.Imm
 import GHC.CmmToAsm.SPARC.Instr
--- GHC.CmmToAsm.SPARC.Ppr()
 import GHC.CmmToAsm.Monad
-import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Format
 import GHC.Platform.Reg
 

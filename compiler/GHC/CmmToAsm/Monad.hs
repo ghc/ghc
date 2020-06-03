@@ -53,6 +53,7 @@ import GHC.Platform.Reg
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Reg.Target
 import GHC.CmmToAsm.Config
+import GHC.CmmToAsm.Types
 
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
@@ -68,10 +69,8 @@ import GHC.Unit.Module
 
 import Control.Monad    ( ap )
 
-import GHC.CmmToAsm.Instr
 import GHC.Utils.Outputable (SDoc, ppr)
 import GHC.Utils.Panic      (pprPanic)
-import GHC.Cmm (RawCmmDecl, RawCmmStatics)
 import GHC.CmmToAsm.CFG
 
 data NcgImpl statics instr jumpDest = NcgImpl {

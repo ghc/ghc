@@ -9,10 +9,31 @@
 -----------------------------------------------------------------------------
 
 module GHC.CmmToAsm.X86.Instr
-   ( Instr(..), Operand(..), PrefetchVariant(..), JumpDest(..)
-   , getJumpDestBlockId, canShortcut, shortcutStatics
-   , shortcutJump, allocMoreStack
-   , maxSpillSlots, archWordFormat
+   ( Instr(..)
+   , Operand(..)
+   , PrefetchVariant(..)
+   , JumpDest(..)
+   , getJumpDestBlockId
+   , canShortcut
+   , shortcutStatics
+   , shortcutJump
+   , allocMoreStack
+   , maxSpillSlots
+   , archWordFormat
+   , takeRegRegMoveInstr
+   , regUsageOfInstr
+   , takeDeltaInstr
+   , mkLoadInstr
+   , mkJumpInstr
+   , mkStackAllocInstr
+   , mkStackDeallocInstr
+   , mkSpillInstr
+   , mkRegRegMoveInstr
+   , jumpDestsOfInstr
+   , patchRegsOfInstr
+   , patchJumpInstr
+   , isMetaInstr
+   , isJumpishInstr
    )
 where
 
@@ -22,8 +43,10 @@ import GHC.Prelude
 
 import GHC.CmmToAsm.X86.Cond
 import GHC.CmmToAsm.X86.Regs
-import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Format
+import GHC.CmmToAsm.Types
+import GHC.CmmToAsm.Utils
+import GHC.CmmToAsm.Instr (RegUsage(..), noUsage)
 import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
 import GHC.CmmToAsm.Reg.Target
@@ -39,11 +62,11 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
 
-import GHC.Types.Basic (Alignment)
 import GHC.Cmm.CLabel
 import GHC.Types.Unique.Set
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
+import GHC.Types.Basic (Alignment)
 import GHC.Cmm.DebugBlock (UnwindTable)
 
 import Control.Monad
@@ -55,24 +78,6 @@ archWordFormat :: Bool -> Format
 archWordFormat is32Bit
  | is32Bit   = II32
  | otherwise = II64
-
--- | Instruction instance for x86 instruction set.
-instance Instruction Instr where
-        regUsageOfInstr         = x86_regUsageOfInstr
-        patchRegsOfInstr        = x86_patchRegsOfInstr
-        isJumpishInstr          = x86_isJumpishInstr
-        jumpDestsOfInstr        = x86_jumpDestsOfInstr
-        patchJumpInstr          = x86_patchJumpInstr
-        mkSpillInstr            = x86_mkSpillInstr
-        mkLoadInstr             = x86_mkLoadInstr
-        takeDeltaInstr          = x86_takeDeltaInstr
-        isMetaInstr             = x86_isMetaInstr
-        mkRegRegMoveInstr       = x86_mkRegRegMoveInstr
-        takeRegRegMoveInstr     = x86_takeRegRegMoveInstr
-        mkJumpInstr             = x86_mkJumpInstr
-        mkStackAllocInstr       = x86_mkStackAllocInstr
-        mkStackDeallocInstr     = x86_mkStackDeallocInstr
-
 
 -- -----------------------------------------------------------------------------
 -- Intel x86 instructions
@@ -345,8 +350,8 @@ data Operand
 
 -- | Returns which registers are read and written as a (read, written)
 -- pair.
-x86_regUsageOfInstr :: Platform -> Instr -> RegUsage
-x86_regUsageOfInstr platform instr
+regUsageOfInstr :: Platform -> Instr -> RegUsage
+regUsageOfInstr platform instr
  = case instr of
     MOV    _ src dst    -> usageRW src dst
     CMOV _ _ src dst    -> mkRU (use_R src [dst]) [dst]
@@ -430,7 +435,7 @@ x86_regUsageOfInstr platform instr
 
     -- note: might be a better way to do this
     PREFETCH _  _ src -> mkRU (use_R src []) []
-    LOCK i              -> x86_regUsageOfInstr platform i
+    LOCK i              -> regUsageOfInstr platform i
     XADD _ src dst      -> usageMM src dst
     CMPXCHG _ src dst   -> usageRMM src dst (OpReg eax)
     XCHG _ src dst      -> usageMM src (OpReg dst)
@@ -514,8 +519,8 @@ interesting _        (RegReal (RealRegPair{}))   = panic "X86.interesting: no re
 
 -- | Applies the supplied function to all registers in instructions.
 -- Typically used to change virtual registers to real registers.
-x86_patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
-x86_patchRegsOfInstr instr env
+patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
+patchRegsOfInstr instr env
  = case instr of
     MOV  fmt src dst     -> patch2 (MOV  fmt) src dst
     CMOV cc fmt src dst  -> CMOV cc fmt (patchOp src) (env dst)
@@ -590,7 +595,7 @@ x86_patchRegsOfInstr instr env
 
     PREFETCH lvl format src -> PREFETCH lvl format (patchOp src)
 
-    LOCK i               -> LOCK (x86_patchRegsOfInstr i env)
+    LOCK i               -> LOCK (patchRegsOfInstr i env)
     XADD fmt src dst     -> patch2 (XADD fmt) src dst
     CMPXCHG fmt src dst  -> patch2 (CMPXCHG fmt) src dst
     XCHG fmt src dst     -> XCHG fmt (patchOp src) (env dst)
@@ -621,10 +626,10 @@ x86_patchRegsOfInstr instr env
 
 
 --------------------------------------------------------------------------------
-x86_isJumpishInstr
+isJumpishInstr
         :: Instr -> Bool
 
-x86_isJumpishInstr instr
+isJumpishInstr instr
  = case instr of
         JMP{}           -> True
         JXX{}           -> True
@@ -634,21 +639,21 @@ x86_isJumpishInstr instr
         _               -> False
 
 
-x86_jumpDestsOfInstr
+jumpDestsOfInstr
         :: Instr
         -> [BlockId]
 
-x86_jumpDestsOfInstr insn
+jumpDestsOfInstr insn
   = case insn of
         JXX _ id        -> [id]
         JMP_TBL _ ids _ _ -> [id | Just (DestBlockId id) <- ids]
         _               -> []
 
 
-x86_patchJumpInstr
+patchJumpInstr
         :: Instr -> (BlockId -> BlockId) -> Instr
 
-x86_patchJumpInstr insn patchF
+patchJumpInstr insn patchF
   = case insn of
         JXX cc id       -> JXX cc (patchF id)
         JMP_TBL op ids section lbl
@@ -664,14 +669,14 @@ x86_patchJumpInstr insn patchF
 
 -- -----------------------------------------------------------------------------
 -- | Make a spill instruction.
-x86_mkSpillInstr
+mkSpillInstr
     :: NCGConfig
     -> Reg      -- register to spill
     -> Int      -- current stack delta
     -> Int      -- spill slot to use
     -> Instr
 
-x86_mkSpillInstr config reg delta slot
+mkSpillInstr config reg delta slot
   = let off     = spillSlotToOffset platform slot - delta
     in
     case targetClassOfReg platform reg of
@@ -683,21 +688,21 @@ x86_mkSpillInstr config reg delta slot
           is32Bit = target32Bit platform
 
 -- | Make a spill reload instruction.
-x86_mkLoadInstr
+mkLoadInstr
     :: NCGConfig
     -> Reg      -- register to load
     -> Int      -- current stack delta
     -> Int      -- spill slot to use
     -> Instr
 
-x86_mkLoadInstr config reg delta slot
+mkLoadInstr config reg delta slot
   = let off     = spillSlotToOffset platform slot - delta
     in
         case targetClassOfReg platform reg of
               RcInteger -> MOV (archWordFormat is32Bit)
                                (OpAddr (spRel platform off)) (OpReg reg)
               RcDouble  -> MOV FF64 (OpAddr (spRel platform off)) (OpReg reg)
-              _           -> panic "X86.x86_mkLoadInstr"
+              _           -> panic "X86.mkLoadInstr"
     where platform = ncgPlatform config
           is32Bit = target32Bit platform
 
@@ -725,21 +730,21 @@ spillSlotToOffset platform slot
 --------------------------------------------------------------------------------
 
 -- | See if this instruction is telling us the current C stack delta
-x86_takeDeltaInstr
+takeDeltaInstr
         :: Instr
         -> Maybe Int
 
-x86_takeDeltaInstr instr
+takeDeltaInstr instr
  = case instr of
         DELTA i         -> Just i
         _               -> Nothing
 
 
-x86_isMetaInstr
+isMetaInstr
         :: Instr
         -> Bool
 
-x86_isMetaInstr instr
+isMetaInstr instr
  = case instr of
         COMMENT{}       -> True
         LOCATION{}      -> True
@@ -757,18 +762,18 @@ x86_isMetaInstr instr
 --      floating point and integer regs. If we need to do that then we
 --      have to go via memory.
 --
-x86_mkRegRegMoveInstr
+mkRegRegMoveInstr
     :: Platform
     -> Reg
     -> Reg
     -> Instr
 
-x86_mkRegRegMoveInstr platform src dst
+mkRegRegMoveInstr platform src dst
  = case targetClassOfReg platform src of
         RcInteger -> case platformArch platform of
                      ArchX86    -> MOV II32 (OpReg src) (OpReg dst)
                      ArchX86_64 -> MOV II64 (OpReg src) (OpReg dst)
-                     _          -> panic "x86_mkRegRegMoveInstr: Bad arch"
+                     _          -> panic "X86.mkRegRegMoveInstr: Bad arch"
         RcDouble    ->  MOV FF64 (OpReg src) (OpReg dst)
         -- this code is the lie we tell ourselves because both float and double
         -- use the same register class.on x86_64 and x86 32bit with SSE2,
@@ -779,22 +784,22 @@ x86_mkRegRegMoveInstr platform src dst
 --      The register allocator attempts to eliminate reg->reg moves whenever it can,
 --      by assigning the src and dest temporaries to the same real register.
 --
-x86_takeRegRegMoveInstr
+takeRegRegMoveInstr
         :: Instr
         -> Maybe (Reg,Reg)
 
-x86_takeRegRegMoveInstr (MOV _ (OpReg r1) (OpReg r2))
+takeRegRegMoveInstr (MOV _ (OpReg r1) (OpReg r2))
         = Just (r1,r2)
 
-x86_takeRegRegMoveInstr _  = Nothing
+takeRegRegMoveInstr _  = Nothing
 
 
 -- | Make an unconditional branch instruction.
-x86_mkJumpInstr
+mkJumpInstr
         :: BlockId
         -> [Instr]
 
-x86_mkJumpInstr id
+mkJumpInstr id
         = [JXX ALWAYS id]
 
 -- Note [Windows stack layout]
@@ -837,11 +842,11 @@ needs_probe_call platform amount
                     _          -> False
      _         -> False
 
-x86_mkStackAllocInstr
+mkStackAllocInstr
         :: Platform
         -> Int
         -> [Instr]
-x86_mkStackAllocInstr platform amount
+mkStackAllocInstr platform amount
   = case platformOS platform of
       OSMinGW32 ->
         -- These will clobber AX but this should be ok because
@@ -880,22 +885,22 @@ x86_mkStackAllocInstr platform amount
                            [ SUB II64 (OpImm (ImmInt amount)) (OpReg rsp)
                            , TEST II64 (OpReg rsp) (OpReg rsp)
                            ]
-            _ -> panic "x86_mkStackAllocInstr"
+            _ -> panic "X86.mkStackAllocInstr"
       _       ->
         case platformArch platform of
           ArchX86    -> [ SUB II32 (OpImm (ImmInt amount)) (OpReg esp) ]
           ArchX86_64 -> [ SUB II64 (OpImm (ImmInt amount)) (OpReg rsp) ]
-          _ -> panic "x86_mkStackAllocInstr"
+          _ -> panic "X86.mkStackAllocInstr"
 
-x86_mkStackDeallocInstr
+mkStackDeallocInstr
         :: Platform
         -> Int
         -> [Instr]
-x86_mkStackDeallocInstr platform amount
+mkStackDeallocInstr platform amount
   = case platformArch platform of
       ArchX86    -> [ADD II32 (OpImm (ImmInt amount)) (OpReg esp)]
       ArchX86_64 -> [ADD II64 (OpImm (ImmInt amount)) (OpReg rsp)]
-      _ -> panic "x86_mkStackDeallocInstr"
+      _ -> panic "X86.mkStackDeallocInstr"
 
 
 --
@@ -976,7 +981,7 @@ allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
       insert_dealloc insn r = case insn of
          JMP _ _     -> dealloc ++ (insn : r)
          JXX_GBL _ _ -> panic "insert_dealloc: cannot handle JXX_GBL"
-         _other      -> x86_patchJumpInstr insn retarget : r
+         _other      -> patchJumpInstr insn retarget : r
            where retarget b = fromMaybe b (mapLookup b new_blockmap)
 
       new_code = concatMap insert_stack_insns code
