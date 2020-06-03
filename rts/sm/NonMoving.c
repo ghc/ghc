@@ -981,7 +981,7 @@ void nonmovingCollect(StgWeak **dead_weaks,
     // again for the sync if we let it go, because it'll immediately start doing
     // a major GC, because that's what we do when exiting scheduler (see
     // exitScheduler()).
-    if (sched_state == SCHED_RUNNING && !force_nonconcurrent) {
+    if (sched_state == SCHED_RUNNING && !force_nonmoving) {
         concurrent_coll_running = true;
         nonmoving_write_barrier_enabled = true;
         debugTrace(DEBUG_nonmoving_gc, "Starting concurrent mark thread");

@@ -1011,7 +1011,7 @@ scheduleProcessInbox (Capability **pcap USED_IF_THREADS)
     while (!emptyInbox(cap)) {
         // Executing messages might use heap, so we should check for GC.
         if (doYouWantToGC(cap)) {
-            scheduleDoGC(pcap, cap->running_task, false, false);
+            scheduleDoGC(pcap, cap->running_task, false, false, false);
             cap = *pcap;
         }
 
