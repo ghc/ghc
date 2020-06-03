@@ -15,6 +15,7 @@ module GHC.Cmm.CLabel (
         NeedExternDecl (..),
         ForeignLabelSource(..),
         pprDebugCLabel,
+        pprNcgCLabel,
 
         mkClosureLabel,
         mkSRTLabel,
@@ -1219,7 +1220,7 @@ pprCLabel dflags lbl =
      platform = targetPlatform dflags
      useNCG   = platformMisc_ghcWithNativeCodeGen (platformMisc dflags)
     in if useNCG
-         then pprNcgLbl platform lbl
+         then pprNcgCLabel platform lbl
          else case lbl of
             LocalBlockLabel u
                -> tempLabelPrefixOrUnderscore platform <> pprUniqueAlways u
@@ -1230,8 +1231,8 @@ pprCLabel dflags lbl =
 
             lbl -> pprCLbl platform lbl
 
-pprNcgLbl :: Platform -> CLabel -> SDoc
-pprNcgLbl platform lbl = getPprStyle $ \sty -> case lbl of
+pprNcgCLabel :: Platform -> CLabel -> SDoc
+pprNcgCLabel platform lbl = getPprStyle $ \sty -> case lbl of
    LocalBlockLabel u
       -> tempLabelPrefixOrUnderscore platform <> pprUniqueAlways u
 
@@ -1242,7 +1243,7 @@ pprNcgLbl platform lbl = getPprStyle $ \sty -> case lbl of
       -> ptext (asmTempLabelPrefix platform)
          <> case l of AsmTempLabel u    -> pprUniqueAlways u
                       LocalBlockLabel u -> pprUniqueAlways u
-                      _other            -> pprNcgLbl platform l
+                      _other            -> pprNcgCLabel platform l
          <> ftext suf
 
    DynamicLinkerLabel info lbl
@@ -1259,7 +1260,7 @@ pprNcgLbl platform lbl = getPprStyle $ \sty -> case lbl of
          optional `_` (underscore) because this is how you mark non-temp symbols
          on some platforms (Darwin)
       -}
-      maybe_underscore $ text "dsp_" <> pprNcgLbl platform lbl <> text "_dsp"
+      maybe_underscore $ text "dsp_" <> pprNcgCLabel platform lbl <> text "_dsp"
 
    StringLitLabel u
       -> pprUniqueAlways u <> ptext (sLit "_str")
@@ -1438,7 +1439,7 @@ pprDynamicLinkerAsmLabel platform dllInfo lbl =
 
       _ -> panic "pprDynamicLinkerAsmLabel"
   where
-    ppLbl = pprNcgLbl platform lbl
+    ppLbl = pprNcgCLabel platform lbl
     elfLabel
       | platformArch platform == ArchPPC
       = case dllInfo of
