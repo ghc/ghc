@@ -183,22 +183,20 @@ emitPrimOp dflags = \case
         , (mkIntExpr platform (nonHdrSizeW (arrPtrsRep dflags (fromInteger n))),
            fixedHdrSize dflags + oFFSET_StgMutArrPtrs_size dflags)
         ]
-        (fromInteger n) init
+        (replicate (fromIntegral n) init)
     _ -> PrimopCmmEmit_External
 
-  DoubletonArrayOp -> \case
-    [elem0, elem1] -> opAllDone $ \[res]
-      -> let n = 2 in doDoubletonArrayOp
+  ArrayOf2Op -> \elems -> opAllDone $ \[res] ->
+    let n = length elems
+      in doNewArrayOp
           res
-          (arrPtrsRep dflags n)
-          mkMAP_DIRTY_infoLabel
-          [ (mkIntExpr platform n,
-            fixedHdrSize dflags + oFFSET_StgMutArrPtrs_ptrs dflags)
-          , (mkIntExpr platform (nonHdrSizeW (arrPtrsRep dflags 2)),
-            fixedHdrSize dflags + oFFSET_StgMutArrPtrs_size dflags)
-          ]
-          elem0
-          elem1
+          (arrPtrsRep dflags (fromIntegral n))
+          mkMAP_FROZEN_DIRTY_infoLabel
+          [ ( mkIntExpr platform n
+            , fixedHdrSize dflags + oFFSET_StgMutArrPtrs_ptrs dflags )
+          , ( mkIntExpr platform (nonHdrSizeW (arrPtrsRep dflags (fromIntegral n)))
+            , fixedHdrSize dflags + oFFSET_StgMutArrPtrs_size dflags ) ]
+          elems
 
   CopyArrayOp -> \case
     [src, src_off, dst, dst_off, (CmmLit (CmmInt n _))] ->
@@ -252,8 +250,18 @@ emitPrimOp dflags = \case
         [ (mkIntExpr platform (fromInteger n),
            fixedHdrSize dflags + oFFSET_StgSmallMutArrPtrs_ptrs dflags)
         ]
-        (fromInteger n) init
+        (replicate (fromIntegral n) init)
     _ -> PrimopCmmEmit_External
+
+  SmallArrayOf2Op -> \elems -> opAllDone $ \[res] ->
+    let n = length elems
+      in doNewArrayOp
+          res
+          (smallArrPtrsRep (fromIntegral n))
+          mkSMAP_FROZEN_DIRTY_infoLabel
+          [ ( mkIntExpr platform n
+            , fixedHdrSize dflags + oFFSET_StgSmallMutArrPtrs_ptrs dflags ) ]
+          elems
 
   CopySmallArrayOp -> \case
     [src, src_off, dst, dst_off, (CmmLit (CmmInt n _))] ->
@@ -2544,14 +2552,14 @@ doSetByteArrayOp ba off len c = do
 -- Allocating arrays
 
 -- | Allocate a new array.
-doNewArrayOp :: CmmFormal             -- ^ return register
-             -> SMRep                 -- ^ representation of the array
-             -> CLabel                -- ^ info pointer
-             -> [(CmmExpr, ByteOff)]  -- ^ header payload
-             -> WordOff               -- ^ array size
-             -> CmmExpr               -- ^ initial element
-             -> FCode ()
-doNewArrayOp res_r rep info payload n init = do
+doNewArrayOp ::
+     CmmFormal             -- ^ return register
+  -> SMRep                 -- ^ representation of the array
+  -> CLabel                -- ^ info pointer
+  -> [(CmmExpr, ByteOff)]  -- ^ header payload
+  -> [CmmExpr]             -- ^ initial elements
+  -> FCode ()
+doNewArrayOp res_r rep info payload inits = do
     dflags <- getDynFlags
     platform <- getPlatform
 
@@ -2568,38 +2576,8 @@ doNewArrayOp res_r rep info payload n init = do
 
     -- Initialise all elements of the array
     let mkOff off = cmmOffsetW platform (CmmReg arr) (hdrSizeW dflags rep + off)
-        initialization = [ mkStore (mkOff off) init | off <- [0.. n - 1] ]
+        initialization = [ mkStore (mkOff off) init | (init, off) <- zip inits [0..] ]
     emit (catAGraphs initialization)
-
-    emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
-
--- | Allocate a new array of size 2. TODO: this makes a mutable array, but we
--- want an immutable one.
-doDoubletonArrayOp ::
-     CmmFormal             -- ^ return register
-  -> SMRep                 -- ^ representation of the array
-  -> CLabel                -- ^ info pointer
-  -> [(CmmExpr, ByteOff)]  -- ^ header payload
-  -> CmmExpr               -- ^ elem 0
-  -> CmmExpr               -- ^ elem 1
-  -> FCode ()
-doDoubletonArrayOp res_r rep info payload elem0 elem1 = do
-    dflags <- getDynFlags
-    platform <- getPlatform
-
-    let info_ptr = mkLblExpr info
-
-    tickyAllocPrim (mkIntExpr platform (hdrSize dflags rep))
-        (mkIntExpr platform (nonHdrSize platform rep))
-        (zeroExpr platform)
-
-    base <- allocHeapClosure rep info_ptr cccsExpr payload
-
-    arr <- CmmLocal <$> newTemp (bWord platform)
-    emit $ mkAssign arr base
-
-    let mkOff off = cmmOffsetW platform (CmmReg arr) (hdrSizeW dflags rep + off)
-    emit (catAGraphs [mkStore (mkOff 0) elem0, mkStore (mkOff 1) elem1])
 
     emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
 

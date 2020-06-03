@@ -69,7 +69,7 @@
 defaults
    has_side_effects = False
    out_of_line      = False   -- See Note [When do out-of-line primops go in primops.txt.pp]
-   can_fail         = False   -- See Note [PrimOp can_fail and has_side_effects] in PrimOp
+   can_fail         = False   -- See Note [PrimOp can_fail and has_side_effects] in GHC.Builtin.PrimOps
    commutable       = False
    code_size        = { primOpCodeSizeDefault }
    strictness       = { \ arity -> mkClosedStrictSig (replicate arity topDmd) topDiv }
@@ -111,7 +111,7 @@ defaults
 -- that were formally in here, until they can be given a better home.
 -- Likewise, their underlying C-- implementation need not live in the
 -- RTS either. Best case (in my view), both the C-- and `foreign import
--- prim` can be moved to a small library tailured to the features being
+-- prim` can be moved to a small library tailored to the features being
 -- implemented and dependencies of those features.
 
 -- Currently, documentation is produced using latex, so contents of
@@ -1069,13 +1069,11 @@ primop  NewArrayOp "newArray#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
-primop  DoubletonArrayOp "doubletonArray#" GenPrimOp
-   Int# -> a -> a -> State# s -> (# State# s, MutableArray# s a #) -- TODO: don't want mutable array here
-   {Create a new mutable array with the specified number of elements,
-    in the specified state thread,
-    with each element containing the specified initial value.}
+primop ArrayOf2Op "arrayOf2#" GenPrimOp
+   a -> a -> Array# a
+   {Create a new immutable array with two elements.}
    with
-   out_of_line = True
+   out_of_line      = True
    has_side_effects = True
 
 primop  SameMutableArrayOp "sameMutableArray#" GenPrimOp
@@ -1254,6 +1252,13 @@ primop  NewSmallArrayOp "newSmallArray#" GenPrimOp
     with each element containing the specified initial value.}
    with
    out_of_line = True
+   has_side_effects = True
+
+primop SmallArrayOf2Op "smallArrayOf2#" GenPrimOp
+   a -> a -> SmallArray# a
+   {Create a new immutable array with two elements.}
+   with
+   out_of_line      = True
    has_side_effects = True
 
 primop  SameSmallMutableArrayOp "sameSmallMutableArray#" GenPrimOp
@@ -2611,7 +2616,7 @@ primop  RaiseOp "raise#" GenPrimOp
    -- Hence, it has 'botDiv', not 'exnDiv'.
    -- For the same reasons, 'raise#' is marked as "can_fail" (which 'raiseIO#'
    -- is not), but not as "has_side_effects" (which 'raiseIO#' is).
-   -- See Note [PrimOp can_fail and has_side_effects] in PrimOp.hs.
+   -- See Note [PrimOp can_fail and has_side_effects] in GHC.Builtin.PrimOps
    strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botDiv }
    out_of_line = True
    can_fail = True
