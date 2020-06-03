@@ -850,6 +850,24 @@ tcConPat penv con_lname@(L _ con_name) pat_ty type_arg_pats arg_pats thing_insid
                                              pat_ty arg_pats thing_inside
         }
 
+-- | Type used in the implementation of tcDataConPat to collect up a type substitution
+-- (from the renamer's variables to the newly constructed ones) as well as lists of
+-- the freshly-constructed universal and existential variables.
+-- These lists are for the auxiliary purpose of filling out the cpt_arg_tys and
+-- cpt_tvs fields of the ConPatTc structure we're ultimately constructing.
+data TelescopeState = TelState
+  { telState_subst :: TCvSubst
+  , telState_forall :: [TyVar] -> [TyVar]
+  , telState_exists :: [TyVar] -> [TyVar]
+  }
+
+emptyTelState :: TelescopeState
+emptyTelState = TelState
+  { telState_subst = emptyTCvSubst
+  , telState_forall = id
+  , telState_exists = id
+  }
+
 tcDataConPat :: PatEnv
              -> Located Name
              -> DataCon
@@ -863,30 +881,55 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty type_arg_pats arg_pats t
   (nonUserVarWrapper, remaining_user_data_con_ty0) <-
     topInstantiateInferred PatOrigin $ dataConUserType data_con
 
-  (nonInferredTyVarBinders, remaining_user_data_con_ty1) <- do
-    -- split out pi telescope.
-    let (bndrs, res_ty) = tcSplitPiTys $ remaining_user_data_con_ty0
+  (nonInferredTyVarBinders, remaining_user_data_con_ty1, telState) <- do
+    let -- Split out the Pi telescope for the user-provided type of the data
+        -- constructor, getting a collection of binders (both foralls and
+        -- ordinary arguments to the data constructor), along with the result
+        -- type.
+        (bndrs, res_ty) = tcSplitPiTys $ remaining_user_data_con_ty0
+        -- We'll need to know which of these binders are binding existentials
+        -- and a list of existentials is already provided in the DataCon, so
+        -- we extract it and turn it into a VarSet.
         exVars = mkVarSet (dataConExTyCoVars data_con)
-    -- substitute both sides with fresh skolems
+
+    -- Get the new level at which we'll be creating existential variables.
     lvl_succ <- pushTcLevel <$> getTcLevel
-    (userTenv, nonInferredTyVarBinders) <- mapAccumLM
-      (\subst bndr ->
+
+    -- We iterate over the binders, creating either new skolems or new metavariables
+    -- (of the sort provided by newPatSigTyVar) depending on whether they were
+    -- existential or not. While doing so, we collect up an environment
+    (telState, nonInferredTyVarBinders) <- mapAccumLM
+      (\telState bndr ->
         case bndr of
-          Named varbndr@(Bndr var _) -> (fmap . fmap) Named $
-            rebuildTyCoVarBinderX
+          Named varbndr@(Bndr var _) -> do
+            let isExistential = var `elemVarSet` exVars
+            (subst', varbndr'@(Bndr var' _)) <- rebuildTyCoVarBinderX
               (\n k ->
-                if var `elemVarSet` exVars
+                if isExistential
                   then pure $ newSkolemTyVarLvlOverlappable lvl_succ True n k
                   else newPatSigTyVar n k
               )
-              subst varbndr
-          Anon flag ty -> pure (subst, Anon flag $ substTy subst ty)
+              (telState_subst telState) varbndr
+            let telState' = if isExistential
+                  then telState
+                        { telState_subst = subst'
+                        , telState_exists = telState_exists telState . (var':)
+                        }
+                  else telState
+                        { telState_subst = subst'
+                        , telState_forall = telState_forall telState . (var':)
+                        }
+            return (telState', Named varbndr')
+          Anon flag ty ->
+            pure (telState, Anon flag $ substTy (telState_subst telState) ty)
       )
-      emptyTCvSubst
+      emptyTelState
       bndrs
-    pure (nonInferredTyVarBinders, substTy userTenv res_ty)
+    pure (nonInferredTyVarBinders, substTy (telState_subst telState) res_ty, telState)
 
   let (theta, data_con_subst_user_ret_ty)   = tcSplitPhiTy remaining_user_data_con_ty1
+
+  wrap <- tc_sub_type penv pat_ty data_con_subst_user_ret_ty
 
   let -- zip through invisible argument patterns, extending the name environment
       -- with variables bound by each one in turn.
@@ -974,10 +1017,10 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty type_arg_pats arg_pats t
               -- should require the GADT language flag.
               -- Re TypeFamilies see also #7156
 
+  {- patTyTyIsDataConSubstUserRetTy <- newEvVar (mkPrimEqPred pat_ty_ty data_con_subst_user_ret_ty) -}
   given <- do
     pat_ty_ty <- expTypeToType pat_ty
-    let returnEqWithTheta =
-          mkPrimEqPred pat_ty_ty data_con_subst_user_ret_ty : theta
+    let returnEqWithTheta = theta
     mapM newEvVar returnEqWithTheta
 
   (ev_binds, (bodyWrap, (arg_pats', res))) <- do
@@ -999,20 +1042,25 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty type_arg_pats arg_pats t
         tcConArgs (RealDataCon data_con) vis_arg_tys penv arg_pats thing_inside
       pure (nonUserVarWrapper <.> mconcat wrappers, res)
 
+  traceTc "tcConPat: arg_pats' = " (ppr arg_pats')
+  traceTc "tcConPat: type_arg_pats = " (ppr type_arg_pats)
+  traceTc "tcConPat: cpt_arg_tys = " (ppr (mkTyVarTys (telState_forall telState [])))
+  traceTc "tcConPat: cpt_tvs = " (ppr (telState_exists telState []))
+  traceTc "tcConPat: given = " (ppr given)
   let res_pat = ConPat
         { pat_con = L con_span (RealDataCon data_con)
         , pat_args = arg_pats'
         , pat_ty_args = type_arg_pats
         , pat_con_ext = ConPatTc
-            { cpt_arg_tys = error "ctxt_res_tys"
-            , cpt_tvs   = error "ex_tvs'"
+            { cpt_arg_tys = mkTyVarTys (telState_forall telState [])
+            , cpt_tvs   = telState_exists telState []
             , cpt_dicts = given
             , cpt_binds = ev_binds
             , cpt_wrap  = idHsWrapper
             }
         }
   pat_ty_ty <- readExpType pat_ty
-  return (mkHsWrapPat bodyWrap res_pat pat_ty_ty, res)
+  return (mkHsWrapPat (wrap <.> bodyWrap) res_pat pat_ty_ty, res)
 
 tcPatSynPat :: PatEnv -> Located Name -> PatSyn
             -> ExpSigmaType                -- Type of the pattern
