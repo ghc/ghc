@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, GADTs #-}
+{-# LANGUAGE CPP, GADTs, MultiWayIf #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 -- ----------------------------------------------------------------------------
@@ -1862,8 +1862,7 @@ funEpilogue live = do
     platform <- getPlatform
 
     -- the bool indicates whether the register is padding.
-    let alwaysNeeded = map (\r -> (False, r)) (regSetToList alwaysLive)
-        livePadded = alwaysNeeded ++ padLiveArgs platform live
+    let paddingRegs = padLiveArgs platform live
 
     -- Set to value or "undef" depending on whether the register is
     -- actually live
@@ -1873,14 +1872,16 @@ funEpilogue live = do
         loadUndef r = do
           let ty = (pLower . getVarType $ lmGlobalRegVar platform r)
           return (Just $ LMLitVar $ LMUndefLit ty, nilOL)
-    platform <- getDynFlag targetPlatform
     let allRegs = activeStgRegs platform
-    loads <- flip mapM allRegs $ \r -> case () of
-      _ | (False, r) `elem` livePadded
-                             -> loadExpr r   -- if r is not padding, load it
-        | not (isFPR r) || (True, r) `elem` livePadded
-                             -> loadUndef r
-        | otherwise          -> return (Nothing, nilOL)
+    loads <- flip mapM allRegs $ \r -> if
+      -- load live registers
+      | r `elemRegSet` alwaysLive -> loadExpr r
+      | r `elemRegSet` live       -> loadExpr r
+      -- load all non Floating-Point Registers
+      | not (isFPR r)             -> loadUndef r
+      -- load padding Floating-Point Registers
+      | r `elem` paddingRegs      -> loadUndef r
+      | otherwise                 -> return (Nothing, nilOL)
 
     let (vars, stmts) = unzip loads
     return (catMaybes vars, concatOL stmts)

@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE BangPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -67,7 +68,8 @@ import qualified GHC.Data.Stream as Stream
 import Data.Maybe (fromJust)
 import Control.Monad (ap)
 import Data.Char (isDigit)
-import Data.List (sort, groupBy, intercalate, nub)
+import Data.Ord (comparing)
+import Data.List (groupBy, intercalate, maximumBy)
 import qualified Data.List.NonEmpty as NE
 
 -- ----------------------------------------------------------------------------
@@ -160,8 +162,10 @@ llvmFunArgs :: Platform -> LiveGlobalRegs -> [LlvmVar]
 llvmFunArgs platform live =
     map (lmGlobalRegArg platform) (filter isPassed allRegs)
     where allRegs = activeStgRegs platform
-          paddedLive = map (\(_,r) -> r) $ padLiveArgs platform live
-          isLive r = r `elemRegSet` alwaysLive || r `elem` paddedLive
+          paddingRegs = padLiveArgs platform live
+          isLive r = r `elemRegSet` alwaysLive
+                     || r `elemRegSet` live
+                     || r `elemRegSet` paddingRegs
           isPassed r = not (isFPR r) || isLive r
 
 
@@ -173,102 +177,63 @@ isFPR (YmmReg _)    = True
 isFPR (ZmmReg _)    = True
 isFPR _             = False
 
-sameFPRClass :: GlobalReg -> GlobalReg -> Bool
-sameFPRClass (FloatReg _)  (FloatReg _) = True
-sameFPRClass (DoubleReg _) (DoubleReg _) = True
-sameFPRClass (XmmReg _)    (XmmReg _) = True
-sameFPRClass (YmmReg _)    (YmmReg _) = True
-sameFPRClass (ZmmReg _)    (ZmmReg _) = True
-sameFPRClass _             _          = False
-
-normalizeFPRNum :: GlobalReg -> GlobalReg
-normalizeFPRNum (FloatReg _)  = FloatReg 1
-normalizeFPRNum (DoubleReg _) = DoubleReg 1
-normalizeFPRNum (XmmReg _)    = XmmReg 1
-normalizeFPRNum (YmmReg _)    = YmmReg 1
-normalizeFPRNum (ZmmReg _)    = ZmmReg 1
-normalizeFPRNum _ = error "normalizeFPRNum expected only FPR regs"
-
-getFPRCtor :: GlobalReg -> Int -> GlobalReg
-getFPRCtor (FloatReg _)  = FloatReg
-getFPRCtor (DoubleReg _) = DoubleReg
-getFPRCtor (XmmReg _)    = XmmReg
-getFPRCtor (YmmReg _)    = YmmReg
-getFPRCtor (ZmmReg _)    = ZmmReg
-getFPRCtor _ = error "getFPRCtor expected only FPR regs"
-
-fprRegNum :: GlobalReg -> Int
-fprRegNum (FloatReg i)  = i
-fprRegNum (DoubleReg i) = i
-fprRegNum (XmmReg i)    = i
-fprRegNum (YmmReg i)    = i
-fprRegNum (ZmmReg i)    = i
-fprRegNum _ = error "fprRegNum expected only FPR regs"
-
--- | Input: dynflags, and the list of live registers
+-- | Return a list of "padding" registers for LLVM function calls.
 --
--- Output: An augmented list of live registers, where padding was
--- added to the list of registers to ensure the calling convention is
--- correctly used by LLVM.
---
--- Each global reg in the returned list is tagged with a bool, which
--- indicates whether the global reg was added as padding, or was an original
--- live register.
---
--- That is, True => padding, False => a real, live global register.
---
--- Also, the returned list is not sorted in any particular order.
---
-padLiveArgs :: Platform -> LiveGlobalRegs -> [(Bool, GlobalReg)]
+-- When we generate LLVM function signatures, we can't just make any register
+-- alive on function entry. Instead, we need to insert fake arguments of the
+-- same register class until we are sure that one of them is mapped to the
+-- register we want alive. E.g. to ensure that F5 is alive, we may need to
+-- insert fake arguments mapped to F1, F2, F3 and F4.
+padLiveArgs :: Platform -> LiveGlobalRegs -> LiveGlobalRegs
 padLiveArgs plat live =
       if platformUnregisterised plat
-        then taggedLive -- not using GHC's register convention for platform.
-        else padding ++ taggedLive
+        then emptyRegSet -- not using GHC's register convention for platform.
+        else mkRegSet padded
   where
-    taggedLive = map (\x -> (False, x)) (regSetToList live)
+    ----------------------------------
+    -- handle floating-point registers (FPR)
 
-    fprLive = filter isFPR (regSetToList live)
-    padding = concatMap calcPad $ groupBy sharesClass fprLive
+    fprLive = filterRegSet isFPR live  -- real live FPR registers
+
+    -- we group live registers sharing the same classes, i.e. that use the same
+    -- set of real registers to be passed. E.g. FloatReg, DoubleReg and XmmReg
+    -- all use the same real regs on X86-64 (XMM registers).
+    classes = groupBy sharesClass (regSetToList fprLive)
 
     sharesClass :: GlobalReg -> GlobalReg -> Bool
-    sharesClass a b = sameFPRClass a b || overlappingClass
-      where
-        overlappingClass = regsOverlap plat (norm a) (norm b)
-        norm = CmmGlobal . normalizeFPRNum
+    sharesClass a b =
+      let !na = norm a
+          !nb = norm b
+      in na == nb                   -- same Cmm register class
+         || regsOverlap plat na nb  -- mapped to overlapping registers
 
-    calcPad :: [GlobalReg] -> [(Bool, GlobalReg)]
-    calcPad rs = getFPRPadding (getFPRCtor $ head rs) (mkRegSet rs)
+    norm x = CmmGlobal ((fpr_ctor x) 1)
 
-getFPRPadding :: (Int -> GlobalReg) -> LiveGlobalRegs -> [(Bool, GlobalReg)]
-getFPRPadding paddingCtor live = padding
-    where
-        -- we need to `nub` the live registers because with handwritten Cmm code
-        -- (such as in the RTS), we may end up having several STG registers
-        -- mapped to the same real register that are live at the same time. E.g.
-        -- in #17920 we saved both Fn and Dn registers which are mapped to the
-        -- same XMMn registers.
-        fprRegNums = nub $ sort $ map fprRegNum (regSetToList live)
-        (_, padding) = foldl assignSlots (1, []) $ fprRegNums
+    -- we find the register with the highest number for each class, and we add
+    -- all the registers below it that are missing for padding.
+    padded = [ ctor i
+             | c <- classes
+             , let maxr = maximumBy (comparing fpr_num) c
+             , let ctor = fpr_ctor maxr
+             , i <- [1..fpr_num maxr - 1]
+             , i `notElem` map (fpr_num) c
+             ]
 
-        assignSlots (i, acc) regNum
-            | i == regNum = -- don't need padding here
-                  (i+1, acc)
-            | i < regNum = let -- add padding for slots i .. regNum-1
-                  numNeeded = regNum-i
-                  acc' = genPad i numNeeded ++ acc
-                in
-                  (regNum+1, acc')
-            | otherwise = panicDoc "getFPRPadding" $ sep
-                              [ text "live: " <> ppr live
-                              , text "nums:" <> ppr fprRegNums
-                              , text "i:" <> ppr i
-                              , text "acc:" <> ppr acc
-                              , text "regNum:" <> ppr regNum
-                              ]
+    fpr_ctor :: GlobalReg -> Int -> GlobalReg
+    fpr_ctor (FloatReg _)  = FloatReg
+    fpr_ctor (DoubleReg _) = DoubleReg
+    fpr_ctor (XmmReg _)    = XmmReg
+    fpr_ctor (YmmReg _)    = YmmReg
+    fpr_ctor (ZmmReg _)    = ZmmReg
+    fpr_ctor _ = error "fpr_ctor expected only FPR regs"
 
-        genPad start n =
-            take n $ flip map (iterate (+1) start) (\i ->
-                (True, paddingCtor i))
+    fpr_num :: GlobalReg -> Int
+    fpr_num (FloatReg i)  = i
+    fpr_num (DoubleReg i) = i
+    fpr_num (XmmReg i)    = i
+    fpr_num (YmmReg i)    = i
+    fpr_num (ZmmReg i)    = i
+    fpr_num _ = error "fpr_num expected only FPR regs"
 
 
 -- | Llvm standard fun attributes
