@@ -479,6 +479,8 @@ nightly-aarch64-linux-deb9:
   extends: .validate-linux
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/armv7-linux-deb9:$DOCKER_REV"
+  # Due to linker issues
+  allow_failure: true
   variables:
     TEST_ENV: "armv7-linux-deb9"
     BIN_DIST_PREP_TAR_COMP: "ghc-armv7-linux-deb9.tar.xz"
@@ -660,6 +662,7 @@ release-x86_64-linux-deb10:
   extends: .validate-linux
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb8:$DOCKER_REV"
+  # Due to #18298.
   allow_failure: true
   variables:
     TEST_ENV: "x86_64-linux-deb8"
