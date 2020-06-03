@@ -34,7 +34,7 @@ import GHC.CmmToAsm.SPARC.Imm
 import GHC.CmmToAsm.SPARC.AddrMode
 import GHC.CmmToAsm.SPARC.Regs
 import GHC.CmmToAsm.SPARC.Stack
-import GHC.CmmToAsm.Instr
+import GHC.CmmToAsm.Types
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Monad   ( NatM, getNewRegNat, getNewLabelNat, getPlatform, getConfig )
 import GHC.CmmToAsm.Config

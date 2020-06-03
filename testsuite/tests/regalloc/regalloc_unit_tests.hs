@@ -23,6 +23,7 @@ module Main where
 import qualified GHC.CmmToAsm.Reg.Graph.Stats as Color
 import qualified GHC.CmmToAsm.Reg.Linear.Base as Linear
 import qualified GHC.CmmToAsm.X86.Instr as X86.Instr
+import qualified GHC.CmmToAsm.X86 as X86
 import GHC.Driver.Main
 import GHC.StgToCmm.CgUtils
 import GHC.CmmToAsm
@@ -175,7 +176,7 @@ runTests dflags us = testGraphNoSpills dflags noSpillsCmmFile us >>= \res ->
 testGraphNoSpills :: DynFlags -> FilePath -> UniqSupply -> IO Bool
 testGraphNoSpills dflags' path us = do
         colorStats <- fst . concatTupledMaybes <$>
-                        compileCmmForRegAllocStats dflags path x86NcgImpl us
+                        compileCmmForRegAllocStats dflags path X86.ncgX86 us
 
         assertIO "testGraphNoSpills: color stats should not be empty"
                         $ not (null colorStats)

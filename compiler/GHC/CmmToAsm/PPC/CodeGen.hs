@@ -30,6 +30,7 @@ import GHC.CmmToAsm.PPC.Instr
 import GHC.CmmToAsm.PPC.Cond
 import GHC.CmmToAsm.PPC.Regs
 import GHC.CmmToAsm.CPrim
+import GHC.CmmToAsm.Types
 import GHC.Cmm.DebugBlock
    ( DebugBlock(..) )
 import GHC.CmmToAsm.Monad
@@ -38,7 +39,6 @@ import GHC.CmmToAsm.Monad
    , getPicBaseMaybeNat, getPlatform, getConfig
    , getDebugBlock, getFileId
    )
-import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.PIC
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Config

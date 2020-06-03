@@ -122,6 +122,7 @@ import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Reg.Utils
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Config
+import GHC.CmmToAsm.Types
 import GHC.Platform.Reg
 
 import GHC.Cmm.BlockId
@@ -146,7 +147,7 @@ import Control.Applicative
 
 -- Allocate registers
 regAlloc
-        :: (Outputable instr, Instruction instr)
+        :: Instruction instr
         => NCGConfig
         -> LiveCmmDecl statics instr
         -> UniqSM ( NatCmmDecl statics instr
@@ -203,7 +204,7 @@ regAlloc _ (CmmProc _ _ _ _)
 --   an entry in the block map or it is the first block.
 --
 linearRegAlloc
-        :: (Outputable instr, Instruction instr)
+        :: Instruction instr
         => NCGConfig
         -> [BlockId] -- ^ entry points
         -> BlockMap RegSet
@@ -235,7 +236,7 @@ linearRegAlloc config entry_ids block_live sccs
 -- | Constraints on the instruction instances used by the
 -- linear allocator.
 type OutputableRegConstraint freeRegs instr =
-        (FR freeRegs, Outputable freeRegs, Outputable instr, Instruction instr)
+        (FR freeRegs, Outputable freeRegs, Instruction instr)
 
 linearRegAlloc'
         :: OutputableRegConstraint freeRegs instr
@@ -467,7 +468,10 @@ raInsn block_live new_instrs id (LiveInstr (Instr instr) (Just live))
                         -- See Note [Unique Determinism and code generation]
 
 raInsn _ _ _ instr
-        = pprPanic "raInsn" (text "no match for:" <> ppr instr)
+        = do
+            platform <- getPlatform
+            let instr' = fmap (pprInstr platform) instr
+            pprPanic "raInsn" (text "no match for:" <> ppr instr')
 
 -- ToDo: what can we do about
 --
@@ -763,7 +767,7 @@ data SpillLoc = ReadMem StackSlot  -- reading from register only in memory
 --   the list of free registers and free stack slots.
 
 allocateRegsAndSpill
-        :: forall freeRegs instr. (FR freeRegs, Outputable instr, Instruction instr)
+        :: forall freeRegs instr. (FR freeRegs, Instruction instr)
         => Bool                 -- True <=> reading (load up spilled regs)
         -> [VirtualReg]         -- don't push these out
         -> [instr]              -- spill insns
@@ -829,7 +833,7 @@ findPrefRealReg vreg = do
 
 -- reading is redundant with reason, but we keep it around because it's
 -- convenient and it maintains the recursive structure of the allocator. -- EZY
-allocRegsAndSpill_spill :: (FR freeRegs, Instruction instr, Outputable instr)
+allocRegsAndSpill_spill :: (FR freeRegs, Instruction instr)
                         => Bool
                         -> [VirtualReg]
                         -> [instr]
