@@ -13,10 +13,11 @@ import GHC.CmmToAsm.SPARC.Instr
 import GHC.CmmToAsm.SPARC.Imm
 import GHC.CmmToAsm.SPARC.AddrMode
 import GHC.CmmToAsm.SPARC.Regs
-import GHC.CmmToAsm.Instr
-import GHC.Platform.Reg
 import GHC.CmmToAsm.Format
+import GHC.CmmToAsm.Types
 import GHC.Cmm
+
+import GHC.Platform.Reg
 
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
