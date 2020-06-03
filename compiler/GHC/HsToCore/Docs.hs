@@ -123,8 +123,7 @@ getMainDeclBinder (ForD _ (ForeignExport _ _ _ _)) = []
 getMainDeclBinder _ = []
 
 
-sigNameNoLoc :: ( XRec pass (IdP pass) ~ Located (IdP pass)
-                ) => Sig pass -> [IdP pass]
+sigNameNoLoc :: CollectPass pass => Sig pass -> [IdP pass]
 sigNameNoLoc (TypeSig    _   ns _)         = map unLoc ns
 sigNameNoLoc (ClassOpSig _ _ ns _)         = map unLoc ns
 sigNameNoLoc (PatSynSig  _   ns _)         = map unLoc ns
