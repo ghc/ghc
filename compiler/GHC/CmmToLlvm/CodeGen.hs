@@ -858,7 +858,7 @@ cmmPrimOpFunctions mop = do
     MO_Cmpxchg _     -> unsupported
 
 -- | Tail function calls
-genJump :: CmmExpr -> [GlobalReg] -> LlvmM StmtData
+genJump :: CmmExpr -> LiveGlobalRegs -> LlvmM StmtData
 
 -- Call to known function
 genJump (CmmLit (CmmLabel lbl)) live = do
@@ -1831,7 +1831,7 @@ funPrologue live cmmBlocks = do
       getAssignedRegs _                  = []
       getRegsBlock (_, body, _)          = concatMap getAssignedRegs $ blockToList body
       assignedRegs = nub $ concatMap (getRegsBlock . blockSplit) cmmBlocks
-      isLive r     = r `elem` alwaysLive || r `elem` live
+      isLive r     = r `elemRegSet` alwaysLive || r `elemRegSet` live
 
   platform <- getPlatform
   stmtss <- flip mapM assignedRegs $ \reg ->
@@ -1862,7 +1862,7 @@ funEpilogue live = do
     platform <- getPlatform
 
     -- the bool indicates whether the register is padding.
-    let alwaysNeeded = map (\r -> (False, r)) alwaysLive
+    let alwaysNeeded = map (\r -> (False, r)) (regSetToList alwaysLive)
         livePadded = alwaysNeeded ++ padLiveArgs platform live
 
     -- Set to value or "undef" depending on whether the register is

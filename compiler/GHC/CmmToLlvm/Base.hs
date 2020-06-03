@@ -78,7 +78,7 @@ type LlvmCmmDecl = GenCmmDecl [LlvmData] (Maybe RawCmmStatics) (ListGraph LlvmSt
 type LlvmBasicBlock = GenBasicBlock LlvmStatement
 
 -- | Global registers live on proc entry
-type LiveGlobalRegs = [GlobalReg]
+type LiveGlobalRegs = GlobalRegSet
 
 -- | Unresolved code.
 -- Of the form: (data label, data type, unresolved data)
@@ -161,7 +161,7 @@ llvmFunArgs platform live =
     map (lmGlobalRegArg platform) (filter isPassed allRegs)
     where allRegs = activeStgRegs platform
           paddedLive = map (\(_,r) -> r) $ padLiveArgs platform live
-          isLive r = r `elem` alwaysLive || r `elem` paddedLive
+          isLive r = r `elemRegSet` alwaysLive || r `elem` paddedLive
           isPassed r = not (isFPR r) || isLive r
 
 
@@ -225,9 +225,9 @@ padLiveArgs plat live =
         then taggedLive -- not using GHC's register convention for platform.
         else padding ++ taggedLive
   where
-    taggedLive = map (\x -> (False, x)) live
+    taggedLive = map (\x -> (False, x)) (regSetToList live)
 
-    fprLive = filter isFPR live
+    fprLive = filter isFPR (regSetToList live)
     padding = concatMap calcPad $ groupBy sharesClass fprLive
 
     sharesClass :: GlobalReg -> GlobalReg -> Bool
@@ -237,7 +237,7 @@ padLiveArgs plat live =
         norm = CmmGlobal . normalizeFPRNum
 
     calcPad :: [GlobalReg] -> [(Bool, GlobalReg)]
-    calcPad rs = getFPRPadding (getFPRCtor $ head rs) rs
+    calcPad rs = getFPRPadding (getFPRCtor $ head rs) (mkRegSet rs)
 
 getFPRPadding :: (Int -> GlobalReg) -> LiveGlobalRegs -> [(Bool, GlobalReg)]
 getFPRPadding paddingCtor live = padding
@@ -247,7 +247,7 @@ getFPRPadding paddingCtor live = padding
         -- mapped to the same real register that are live at the same time. E.g.
         -- in #17920 we saved both Fn and Dn registers which are mapped to the
         -- same XMMn registers.
-        fprRegNums = nub $ sort $ map fprRegNum live
+        fprRegNums = nub $ sort $ map fprRegNum (regSetToList live)
         (_, padding) = foldl assignSlots (1, []) $ fprRegNums
 
         assignSlots (i, acc) regNum

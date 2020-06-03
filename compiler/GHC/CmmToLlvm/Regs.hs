@@ -93,8 +93,8 @@ lmGlobalReg platform suf reg
         zmmGlobal    name = LMNLocalVar (fsLit name) (LMVector 16 (LMInt 32))
 
 -- | A list of STG Registers that should always be considered alive
-alwaysLive :: [GlobalReg]
-alwaysLive = [BaseReg, Sp, Hp, SpLim, HpLim, node]
+alwaysLive :: GlobalRegSet
+alwaysLive = mkRegSet [BaseReg, Sp, Hp, SpLim, HpLim, node]
 
 -- | STG Type Based Alias Analysis hierarchy
 stgTBAA :: [(Unique, LMString, Maybe Unique)]
