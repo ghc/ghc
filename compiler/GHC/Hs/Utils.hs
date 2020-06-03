@@ -1469,8 +1469,6 @@ lPatImplicits = hs_lpat
 
     hs_pat (SigPat _ pat _)     = hs_lpat pat
 
-    -- TODO (Cale): Determine what lPatImplicits is computing, and whether it's
-    -- correct to ignore type arguments.
     hs_pat (ConPat {pat_con=con, pat_args=ps}) = details con ps
 
     hs_pat _ = []
