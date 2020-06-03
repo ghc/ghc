@@ -1220,7 +1220,7 @@ doRawJump expr_code vols = do
   dflags <- getDynFlags
   expr <- expr_code
   updfr_off <- getUpdFrameOff
-  emit (mkRawJump dflags expr updfr_off vols)
+  emit (mkRawJump dflags expr updfr_off (mkRegSet vols))
 
 doJumpWithStack :: CmmParse CmmExpr -> [CmmParse CmmExpr]
                 -> [CmmParse CmmExpr] -> CmmParse ()

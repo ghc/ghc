@@ -121,7 +121,7 @@ data CmmNode e x where
           -- occur in CmmExprs, namely as (CmmLit (CmmBlock b)) or
           -- (CmmStackSlot (Young b) _).
 
-      cml_args_regs :: [GlobalReg],
+      cml_args_regs :: GlobalRegSet,
           -- The argument GlobalRegs (Rx, Fx, Dx, Lx) that are passed
           -- to the call.  This is essential information for the
           -- native code generator's register allocator; without
@@ -339,7 +339,7 @@ instance UserOfRegs GlobalReg (CmmNode e x) where
     CmmUnsafeForeignCall t _ args -> fold f (fold f z t) args
     CmmCondBranch expr _ _ _ -> fold f z expr
     CmmSwitch expr _ -> fold f z expr
-    CmmCall {cml_target=tgt, cml_args_regs=args} -> fold f (fold f z args) tgt
+    CmmCall {cml_target=tgt, cml_args_regs=args} -> fold f (fold f z (regSetToList args)) tgt
     CmmForeignCall {tgt=tgt, args=args} -> fold f (fold f z tgt) args
     _ -> z
     where fold :: forall a b.  UserOfRegs GlobalReg a
