@@ -1323,8 +1323,8 @@ linkPackage hsc_env pkg
         all_paths_env <- addEnvPaths "LD_LIBRARY_PATH" all_paths
         pathCache <- mapM (addLibrarySearchPath hsc_env) all_paths_env
 
-        maybePutStr dflags
-            ("Loading package " ++ unitPackageIdString pkg ++ " ... ")
+        maybePutSDoc dflags
+            (text "Loading unit " <> pprUnitInfoForUser pkg <> text " ... ")
 
         -- See comments with partOfGHCi
 #if defined(CAN_LOAD_DLL)
@@ -1354,9 +1354,9 @@ linkPackage hsc_env pkg
 
         if succeeded ok
            then maybePutStrLn dflags "done."
-           else let errmsg = "unable to load package `"
-                             ++ unitPackageIdString pkg ++ "'"
-                 in throwGhcExceptionIO (InstallationError errmsg)
+           else let errmsg = text "unable to load unit `"
+                             <> pprUnitInfoForUser pkg <> text "'"
+                 in throwGhcExceptionIO (InstallationError (showSDoc dflags errmsg))
 
 {-
 Note [Crash early load_dyn and locateLib]
@@ -1731,14 +1731,17 @@ loadFramework hsc_env extraPaths rootname
 
   ********************************************************************* -}
 
-maybePutStr :: DynFlags -> String -> IO ()
-maybePutStr dflags s
+maybePutSDoc :: DynFlags -> SDoc -> IO ()
+maybePutSDoc dflags s
     = when (verbosity dflags > 1) $
           putLogMsg dflags
               NoReason
               SevInteractive
               noSrcSpan
-              $ withPprStyle defaultUserStyle (text s)
+              $ withPprStyle defaultUserStyle s
+
+maybePutStr :: DynFlags -> String -> IO ()
+maybePutStr dflags s = maybePutSDoc dflags (text s)
 
 maybePutStrLn :: DynFlags -> String -> IO ()
 maybePutStrLn dflags s = maybePutStr dflags (s ++ "\n")
