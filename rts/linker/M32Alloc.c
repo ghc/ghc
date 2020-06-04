@@ -256,7 +256,7 @@ m32_alloc_page(void)
     m32_free_page_pool_size --;
     return page;
   } else {
-    struct m32_page_t *page = mmapForLinker(getPageSize(),MAP_ANONYMOUS,-1,0);
+    struct m32_page_t *page = mmapForLinker(getPageSize(), PROT_READ | PROT_WRITE, MAP_ANONYMOUS, -1, 0);
     if (page > (struct m32_page_t *) 0xffffffff) {
       barf("m32_alloc_page: failed to get allocation in lower 32-bits");
     }
@@ -280,7 +280,7 @@ m32_allocator_new(bool executable)
   // Preallocate the initial M32_MAX_PAGES to ensure that they don't
   // fragment the memory.
   size_t pgsz = getPageSize();
-  char* bigchunk = mmapForLinker(pgsz * M32_MAX_PAGES, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANONYMOUS,-1,0);
+  char* bigchunk = mmapForLinker(pgsz * M32_MAX_PAGES, PROT_READ | PROT_WRITE, MAP_ANONYMOUS,-1,0);
   if (bigchunk == NULL)
       barf("m32_allocator_init: Failed to map");
 
@@ -396,7 +396,7 @@ m32_alloc(struct m32_allocator_t *alloc, size_t size, size_t alignment)
    if (m32_is_large_object(size,alignment)) {
       // large object
       size_t alsize = ROUND_UP(sizeof(struct m32_page_t), alignment);
-      struct m32_page_t *page = mmapForLinker(alsize+size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANONYMOUS,-1,0);
+      struct m32_page_t *page = mmapForLinker(alsize+size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS,-1,0);
       page->filled_page.size = alsize + size;
       m32_allocator_push_filled_list(&alloc->unprotected_list, (struct m32_page_t *) page);
       return (char*) page + alsize;

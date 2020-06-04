@@ -79,7 +79,7 @@ int ocAllocateExtras(ObjectCode* oc, int count, int first, int bssSize)
       size_t n = roundUpToPage(oc->fileSize);
       bssSize = roundUpToAlign(bssSize, 8);
       size_t allocated_size = n + bssSize + extras_size;
-      void *new = mmapForLinker(allocated_size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANONYMOUS, -1, 0);
+      void *new = mmapForLinker(allocated_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS, -1, 0);
       if (new) {
           memcpy(new, oc->image, oc->fileSize);
           if (oc->imageMapped) {

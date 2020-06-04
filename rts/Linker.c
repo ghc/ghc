@@ -1009,6 +1009,23 @@ resolveSymbolAddr (pathchar* buffer, int size,
 
 #if RTS_LINKER_USE_MMAP
 
+/* -----------------------------------------------------------------------------
+   Occationally we depend on mmap'd region being close to already mmap'd regions.
+
+   Our static in-memory linker may be restricted by the architectures relocation
+   range. E.g. aarch64 has a +-4GB range for PIC code, thus we'd preferrably
+   get memory for the linker close to existing mappings.  mmap on it's own is
+   free to return any memory location, independent of what the preferred
+   location argument indicates.
+
+   For example mmap (via qemu) might give you addresses all over the available
+   memory range if the requested location is already occupied.
+
+   mmap_next will do a linear search from the start page upwards to find a
+   suitable location that is as close as possible to the locations (proivded
+   via the first argument).
+   -------------------------------------------------------------------------- */
+
 void*
 mmap_next(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
   if(addr == NULL) return mmap(addr, length, prot, flags, fd, offset);
@@ -1046,12 +1063,6 @@ mmapForLinker (size_t bytes, uint32_t prot, uint32_t flags, int fd, int offset)
 mmap_again:
 #endif
 
-    size_t mmap_counter = MMAP_MAX_RETRY;
-mmap_again:
-   if (0 == --mmap_counter) {
-       sysErrorBelch("mmap, small memory model: failed to allocate within 2GB after %d retries.\n", MMAP_MAX_RETRY);
-       stg_exit(EXIT_FAILURE);
-   }
    if (mmap_32bit_base != 0) {
        map_addr = mmap_32bit_base;
    }
@@ -1063,8 +1074,7 @@ mmap_again:
             debugBelch("mmapForLinker: \tflags      %#0x\n",
                        MAP_PRIVATE | tryMap32Bit | fixed | flags));
 
-   result = mmap_next(map_addr, size,
-                      prot,
+   result = mmap_next(map_addr, size, prot,
                       MAP_PRIVATE|tryMap32Bit|fixed|flags, fd, offset);
 
    if (result == MAP_FAILED) {

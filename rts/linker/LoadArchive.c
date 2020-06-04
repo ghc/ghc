@@ -488,7 +488,7 @@ static HsInt loadArchive_ (pathchar *path)
 
 #if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
             if (RTS_LINKER_USE_MMAP)
-                image = mmapForLinker(memberSize, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANONYMOUS, -1, 0);
+                image = mmapForLinker(memberSize, PROT_READ | PROT_WRITE, MAP_ANONYMOUS, -1, 0);
             else {
                 /* See loadObj() */
                 misalignment = machoGetMisalignment(f);
@@ -546,7 +546,7 @@ while reading filename from `%" PATH_FMT "'", path);
             }
             DEBUG_LOG("Found GNU-variant file index\n");
 #if RTS_LINKER_USE_MMAP
-            gnuFileIndex = mmapForLinker(memberSize + 1, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANONYMOUS, -1, 0);
+            gnuFileIndex = mmapForLinker(memberSize + 1, PROT_READ | PROT_WRITE, MAP_ANONYMOUS, -1, 0);
 #else
             gnuFileIndex = stgMallocBytes(memberSize + 1, "loadArchive(image)");
 #endif
