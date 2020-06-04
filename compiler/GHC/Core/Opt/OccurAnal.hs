@@ -1568,16 +1568,17 @@ occAnalRhs :: OccEnv -> Maybe JoinArity
            -> CoreExpr   -- RHS
            -> (UsageDetails, CoreExpr)
 occAnalRhs env mb_join_arity rhs
-  = (rhs_usage, rhs')
+  = case occAnalLamOrRhs env bndrs body of { (body_usage, bndrs', body') ->
+    let rhs' = mkLams (markJoinOneShots mb_join_arity bndrs') body'
+               -- For a /non-recursive/ join point we can mark all
+               -- its join-lambda as one-shot; and it's a good idea to do so
+
+        -- Final adjustment
+        rhs_usage = adjustRhsUsage mb_join_arity NonRecursive bndrs' body_usage
+
+    in (rhs_usage, rhs') }
   where
     (bndrs, body) = collectBinders rhs
-    (body_usage, bndrs', body') = occAnalLamOrRhs env bndrs body
-    rhs' = mkLams (markJoinOneShots mb_join_arity bndrs') body'
-           -- For a /non-recursive/ join point we can mark all
-           -- its join-lambda as one-shot; and it's a good idea to do so
-
-    -- Final adjustment
-    rhs_usage = adjustRhsUsage mb_join_arity NonRecursive bndrs' body_usage
 
 occAnalUnfolding :: OccEnv
                  -> Maybe JoinArity   -- See Note [Join points and unfoldings/rules]
@@ -1885,12 +1886,18 @@ occAnalApp :: OccEnv
 occAnalApp env (Var fun, args, ticks)
   -- Account for join arity of runRW# continuation
   -- See Note [Simplification of runRW#]
+  --
+  -- NB: Do not be tempted to make the next (Var fun, args, tick)
+  --     equation into an 'otherwise' clause for this equation
+  --     The former has a bang-pattern to occ-anal the args, and
+  --     we don't want to occ-anal them twice in the runRW# case!
+  --     This caused #18296
   | fun `hasKey` runRWKey
   , [t1, t2, arg]  <- args
   , let (usage, arg') = occAnalRhs env (Just 1) arg
   = (usage, mkTicks ticks $ mkApps (Var fun) [t1, t2, arg'])
 
-  | otherwise
+occAnalApp env (Var fun, args, ticks)
   = (all_uds, mkTicks ticks $ mkApps fun' args')
   where
     (fun', fun_id') = lookupVarEnv (occ_bs_env env) fun
