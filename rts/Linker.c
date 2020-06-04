@@ -221,7 +221,6 @@ int ocTryLoad( ObjectCode* oc );
  * We pick a default address based on the OS, but also make this
  * configurable via an RTS flag (+RTS -xm)
  */
-#define MMAP_MAX_RETRY 100
 
 #if (defined(aarch64_TARGET_ARCH) || defined(aarch64_HOST_ARCH))
 // Try to use stg_upd_frame_info as the base. We need to be within +-4GB of that
@@ -1038,6 +1037,8 @@ mmap_next(void *addr, size_t length, int prot, int flags, int fd, off_t offset) 
     if(mem == NULL) return mem;
     if(mem == target) return mem;
     munmap(mem, length);
+    IF_DEBUG(linker && (i % 1024 == 0),
+      debugBelch("mmap_next failed to find suitable space in %p - %p\n", addr, target));
   }
   return NULL;
 }
