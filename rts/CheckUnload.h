@@ -14,8 +14,11 @@
 
 #include "LinkerInternals.h"
 
-// Current loaded objects
+// Currently live objects
 extern ObjectCode *objects;
+
+// Root set for object collection
+extern ObjectCode *loaded_objects;
 
 // Mark bit for live objects
 extern uint8_t object_code_mark_bit;

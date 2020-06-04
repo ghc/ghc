@@ -1153,7 +1153,7 @@ void mmapForLinkerMarkExecutable(void *start, size_t len)
  * Remove symbols from the symbol table, and free oc->symbols.
  * This operation is idempotent.
  */
-static void removeOcSymbols (ObjectCode *oc)
+void removeOcSymbols (ObjectCode *oc)
 {
     if (oc->symbols == NULL) return;
 
@@ -1173,9 +1173,7 @@ static void removeOcSymbols (ObjectCode *oc)
  * Release StablePtrs and free oc->stable_ptrs.
  * This operation is idempotent.
  */
-// TODO(osa): Need to call this when unloading in CheckUnload.c
-/*
-static void freeOcStablePtrs (ObjectCode *oc)
+void freeOcStablePtrs (ObjectCode *oc)
 {
     // Release any StablePtrs that were created when this
     // object module was initialized.
@@ -1188,7 +1186,6 @@ static void freeOcStablePtrs (ObjectCode *oc)
     }
     oc->stable_ptrs = NULL;
 }
-*/
 
 static void
 freePreloadObjectFile (ObjectCode *oc)
@@ -1371,6 +1368,7 @@ mkOc( pathchar *path, char *image, int imageSize,
    /* chain it onto the list of objects */
    oc->next              = NULL;
    oc->prev              = NULL;
+   oc->next_loaded_object = NULL;
    oc->mark              = object_code_mark_bit;
    oc->dependencies      = allocHashTable();
 
@@ -1526,21 +1524,16 @@ preloadObjectFile (pathchar *path)
  */
 static HsInt loadObj_ (pathchar *path)
 {
-   ObjectCode* oc;
-   IF_DEBUG(linker, debugBelch("loadObj: %" PATH_FMT "\n", path));
-
-   /* debugBelch("loadObj %s\n", path ); */
-
-   /* Check that we haven't already loaded this object.
-      Ignore requests to load multiple times */
+   // Check that we haven't already loaded this object.
+   // Ignore requests to load multiple times
 
    if (isAlreadyLoaded(path)) {
        IF_DEBUG(linker,
                 debugBelch("ignoring repeated load of %" PATH_FMT "\n", path));
-       return 1; /* success */
+       return 1; // success
    }
 
-   oc = preloadObjectFile(path);
+   ObjectCode *oc = preloadObjectFile(path);
    if (oc == NULL) return 0;
 
    if (! loadOc(oc)) {
@@ -1553,6 +1546,8 @@ static HsInt loadObj_ (pathchar *path)
 
    insertOCSectionIndices(oc);
 
+   oc->next_loaded_object = loaded_objects;
+   loaded_objects = oc;
    return 1;
 }
 
@@ -1772,48 +1767,23 @@ HsInt resolveObjs (void)
  */
 static HsInt unloadObj_ (pathchar *path, bool just_purge)
 {
-    (void)path;
-    (void)just_purge;
-/*
-    ObjectCode *oc, *prev, *next;
-    HsBool unloadedAnyObj = HS_BOOL_FALSE;
+    (void)just_purge; // TODO (osa): Not sure what this is for
 
     ASSERT(symhash != NULL);
     ASSERT(objects != NULL);
 
     IF_DEBUG(linker, debugBelch("unloadObj: %" PATH_FMT "\n", path));
 
-    prev = NULL;
-    for (oc = objects; oc; oc = next) {
-        next = oc->next; // oc might be freed
-
-        if (!pathcmp(oc->fileName,path)) {
-
-            // these are both idempotent, so in just_purge mode we can
-            // later call unloadObj() to really unload the object.
-            removeOcSymbols(oc);
-            freeOcStablePtrs(oc);
-
-            if (!just_purge) {
-                if (prev == NULL) {
-                    objects = oc->next;
-                } else {
-                    prev->next = oc->next;
-                }
-                ACQUIRE_LOCK(&linker_unloaded_mutex);
-                oc->next = unloaded_objects;
-                unloaded_objects = oc;
-                oc->status = OBJECT_UNLOADED;
-                RELEASE_LOCK(&linker_unloaded_mutex);
-                // We do not own oc any more; it can be released at any time by
-                // the GC in checkUnload().
+    bool unloadedAnyObj = false;
+    ObjectCode *prev = NULL;
+    for (ObjectCode *oc = loaded_objects; oc; oc = oc->next_loaded_object) {
+        if (pathcmp(oc->fileName,path) == 0) {
+            if (prev == NULL) {
+                loaded_objects = oc->next_loaded_object;
             } else {
-                prev = oc;
+                prev->next = oc->next_loaded_object;
             }
-
-            // This could be a member of an archive so continue
-            // unloading other members.
-            unloadedAnyObj = HS_BOOL_TRUE;
+            unloadedAnyObj = true;
         } else {
             prev = oc;
         }
@@ -1821,13 +1791,10 @@ static HsInt unloadObj_ (pathchar *path, bool just_purge)
 
     if (unloadedAnyObj) {
         return 1;
-    }
-    else {
+    } else {
         errorBelch("unloadObj: can't find `%" PATH_FMT "' to unload", path);
         return 0;
     }
-*/
-    return 1; // TODO(osa): Not sure about the return value
 }
 
 HsInt unloadObj (pathchar *path)
