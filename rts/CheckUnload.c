@@ -725,6 +725,8 @@ void checkUnload (StgClosure *static_objects)
     sortOCSectionIndices(s_indices);
 
     object_code_mark_bit = ~object_code_mark_bit;
+    old_objects = objects;
+    objects = NULL;
 
     // TODO (osa): Do we need to take linker_mutex here? I think not -- unloadObj
     // no longer uses linker state (it was using unloaded_objects before)
