@@ -17,6 +17,9 @@
 // Current loaded objects
 extern ObjectCode *objects;
 
+// Mark bit for live objects
+extern uint8_t object_code_mark_bit;
+
 void initUnloadCheck(void);
 void exitUnloadCheck(void);
 void checkUnload(StgClosure *static_objects);
