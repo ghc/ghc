@@ -1347,13 +1347,14 @@ mkOc( pathchar *path, char *image, int imageSize,
 
    /* chain it onto the list of objects */
    oc->next              = NULL;
+   oc->prev              = NULL;
+   oc->mark              = object_code_mark_bit;
+   oc->dependencies      = allocHashTable();
 
 #if RTS_LINKER_USE_MMAP
    oc->rw_m32 = m32_allocator_new(false);
    oc->rx_m32 = m32_allocator_new(true);
 #endif
-
-   oc->dependencies = allocHashTable();
 
    IF_DEBUG(linker, debugBelch("mkOc: done\n"));
    return oc;
