@@ -168,8 +168,9 @@ mkUnit p
    | otherwise          = RealUnit (Definite (unitId p))
 
 -- | Create a UnitPprInfo from a UnitInfo
-mkUnitPprInfo :: GenUnitInfo u -> UnitPprInfo
-mkUnitPprInfo i = UnitPprInfo
+mkUnitPprInfo :: (u -> FastString) -> GenUnitInfo u -> UnitPprInfo
+mkUnitPprInfo ufs i = UnitPprInfo
+   (ufs (unitId i))
    (unitPackageNameString i)
    (unitPackageVersion i)
    ((unpackFS . unPackageName) <$> unitComponentName i)
