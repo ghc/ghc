@@ -77,6 +77,7 @@ typedef struct {
 
 ObjectCode *objects = NULL; // Not static, used in Linker.c
 static ObjectCode *old_objects = NULL;
+ObjectCode *loaded_objects; // Not static, used in Linker.c
 static OCSectionIndices *global_s_indices = NULL; // TODO: Maybe use this directly below instead of passing as parameter?
 
 static OCSectionIndices *createOCSectionIndices(void)
@@ -728,6 +729,11 @@ void checkUnload (StgClosure *static_objects)
     old_objects = objects;
     objects = NULL;
 
+
+    // Mark roots
+    for (ObjectCode *oc = loaded_objects; oc != NULL; oc = oc->next_loaded_object) {
+        markObjectLive(NULL, (W_)oc, NULL);
+    }
     // TODO (osa): Do we need to take linker_mutex here? I think not -- unloadObj
     // no longer uses linker state (it was using unloaded_objects before)
 
@@ -775,6 +781,8 @@ void checkUnload (StgClosure *static_objects)
     for (ObjectCode *oc = old_objects; oc != NULL; oc = next) {
         next = oc->next;
 
+        removeOcSymbols(oc);
+        freeOcStablePtrs(oc);
         removeOCSectionIndices(s_indices, oc);
         freeObjectCode(oc);
     }
