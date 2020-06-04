@@ -637,7 +637,7 @@ mapObjectFileSection (int fd, Elf_Word offset, Elf_Word size,
 
     pageOffset = roundDownToPage(offset);
     pageSize = roundUpToPage(offset-pageOffset+size);
-    p = mmapForLinker(pageSize, PROT_READ | PROT_WRITE | PROT_EXEC, 0, fd, pageOffset);
+    p = mmapForLinker(pageSize, PROT_READ | PROT_WRITE, 0, fd, pageOffset);
     if (p == NULL) return NULL;
     *mapped_size = pageSize;
     *mapped_offset = pageOffset;
@@ -709,7 +709,7 @@ ocGetNames_ELF ( ObjectCode* oc )
                * address might be out of range for sections that are mmaped.
                */
               alloc = SECTION_MMAP;
-              start = mmapForLinker(size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANONYMOUS, -1, 0);
+              start = mmapForLinker(size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS, -1, 0);
               mapped_start = start;
               mapped_offset = 0;
               mapped_size = roundUpToPage(size);
@@ -751,10 +751,7 @@ ocGetNames_ELF ( ObjectCode* oc )
           unsigned nstubs = numberOfStubsForSection(oc, i);
           unsigned stub_space = STUB_SIZE * nstubs;
 
-          void * mem = mmapForLinker(size+stub_space,
-                            PROT_READ | PROT_WRITE | PROT_EXEC,
-                            MAP_ANON | MAP_PRIVATE,
-                            -1, 0);
+          void * mem = mmapForLinker(size+stub_space, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0);
 
           if( mem == MAP_FAILED ) {
               barf("failed to mmap allocated memory to load section %d. "
