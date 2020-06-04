@@ -1644,6 +1644,7 @@ to_ie_post_rn_var (L l n)
 to_ie_post_rn :: (HasOccName name) => Located name -> LIEWrappedName name
 to_ie_post_rn (L l n)
   | isTcOcc occ && isSymOcc occ = L l (IEType (L l n))
+  | isDataOcc occ               = L l (IEPattern (L l n))
   | otherwise                   = L l (IEName (L l n))
   where occ = occName n
 
