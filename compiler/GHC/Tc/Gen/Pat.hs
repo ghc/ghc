@@ -44,8 +44,7 @@ import GHC.Types.Name.Reader
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity( arityErr )
-import GHC.Core.TyCo.Ppr ( pprTyVars )
-import GHC.Core.TyCo.Rep ( Type(..), TyBinder(..), TyCoBinder(..) )
+import GHC.Core.TyCo.Rep ( Type(..), TyBinder, TyCoBinder(..) )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Gen.HsType
@@ -53,7 +52,6 @@ import GHC.Builtin.Types
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Origin
 import GHC.Core.TyCon
-import GHC.Core.Coercion ( mkPrimEqPred )
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Core.ConLike
@@ -67,36 +65,8 @@ import GHC.Utils.Outputable as Outputable
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.List.SetOps ( getNth )
 
-import Control.Monad
 import Control.Arrow  ( second )
 import Control.Monad  ( when )
-import Data.Data (showConstr, toConstr, gmapQ, Data(..), Typeable, cast)
-
--- | Generic show: an alternative to \"deriving Show\"
-gshow :: Data a => a -> String
-gshow x = gshows x ""
-
--- | Generic shows
-gshows :: Data a => a -> ShowS
-
--- This is a prefix-show using surrounding "(" and ")",
--- where we recurse into subterms with gmapQ.
-gshows = ( \t ->
-                showChar '('
-              . (showString . showConstr . toConstr $ t)
-              . (foldr (.) id . gmapQ ((showChar ' ' .) . gshows) $ t)
-              . showChar ')'
-         ) `extQ` (shows :: String -> ShowS)
-
-extQ :: ( Typeable a
-        , Typeable b
-        )
-     => (a -> q)
-     -> (b -> q)
-     -> a
-     -> q
-extQ f g a = maybe (f a) g (cast a)
-
 
 {-
 ************************************************************************
@@ -1017,11 +987,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty type_arg_pats arg_pats t
               -- should require the GADT language flag.
               -- Re TypeFamilies see also #7156
 
-  {- patTyTyIsDataConSubstUserRetTy <- newEvVar (mkPrimEqPred pat_ty_ty data_con_subst_user_ret_ty) -}
-  given <- do
-    pat_ty_ty <- expTypeToType pat_ty
-    let returnEqWithTheta = theta
-    mapM newEvVar returnEqWithTheta
+  given <- mapM newEvVar theta
 
   (ev_binds, (bodyWrap, (arg_pats', res))) <- do
     let skol_info = PatSkol (RealDataCon data_con) mc
