@@ -1085,7 +1085,6 @@ mmap_again:
        map_addr = mmap_32bit_base;
    }
 
-   const int prot = PROT_READ | PROT_WRITE;
    IF_DEBUG(linker,
             debugBelch("mmapForLinker: \tprotection %#0x\n", prot));
    IF_DEBUG(linker,
