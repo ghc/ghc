@@ -23,8 +23,8 @@ module GHC.Rename.HsType (
         checkPrecMatch, checkSectionPrec,
 
         -- Binding related stuff
-        bindLHsTyVarBndr, bindLHsTyVarBndrs, rnImplicitBndrs,
-        bindSigTyVarsFV, bindHsQTyVars, bindLRdrNames,
+        bindLHsTyVarBndr, bindLHsTyVarBndrs, WarnUnusedForalls(..),
+        rnImplicitBndrs, bindSigTyVarsFV, bindHsQTyVars, bindLRdrNames,
         extractHsTyRdrTyVars, extractHsTyRdrTyVarsKindVars,
         extractHsTysRdrTyVarsDups,
         extractRdrKindSigVars, extractDataDefnKindVars,
@@ -41,9 +41,10 @@ import GHC.Driver.Session
 import GHC.Hs
 import GHC.Rename.Doc    ( rnLHsDoc, rnMbLHsDoc )
 import GHC.Rename.Env
-import GHC.Rename.Utils  ( HsDocContext(..), withHsDocContext, mapFvRn
-                         , pprHsDocContext, bindLocalNamesFV, typeAppErr
-                         , newLocalBndrRn, checkDupRdrNames, checkShadowedRdrNames )
+import GHC.Rename.Utils  ( HsDocContext(..), inHsDocContext, withHsDocContext
+                         , mapFvRn, pprHsDocContext, bindLocalNamesFV
+                         , typeAppErr, newLocalBndrRn, checkDupRdrNames
+                         , checkShadowedRdrNames )
 import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
                          , lookupTyFixityRn )
 import GHC.Tc.Utils.Monad
@@ -203,9 +204,10 @@ rnWcBody ctxt nwc_rdrs hs_ty
 
     rn_ty :: RnTyKiEnv -> HsType GhcPs -> RnM (HsType GhcRn, FreeVars)
     -- A lot of faff just to allow the extra-constraints wildcard to appear
-    rn_ty env hs_ty@(HsForAllTy { hst_fvf = fvf, hst_bndrs = tvs
-                                , hst_body = hs_body })
-      = bindLHsTyVarBndrs (rtke_ctxt env) (Just $ inTypeDoc hs_ty) Nothing tvs $ \ tvs' ->
+    rn_ty env (HsForAllTy { hst_fvf = fvf, hst_bndrs = tvs
+                          , hst_body = hs_body })
+      = bindLHsTyVarBndrs (rtke_ctxt env) WarnUnusedForalls
+                          Nothing tvs $ \ tvs' ->
         do { (hs_body', fvs) <- rn_lty env hs_body
            ; return (HsForAllTy { hst_fvf = fvf, hst_xforall = noExtField
                                 , hst_bndrs = tvs', hst_body = hs_body' }
@@ -534,7 +536,7 @@ rnHsTyKi :: RnTyKiEnv -> HsType GhcPs -> RnM (HsType GhcRn, FreeVars)
 rnHsTyKi env ty@(HsForAllTy { hst_fvf = fvf, hst_bndrs = tyvars
                             , hst_body = tau })
   = do { checkPolyKinds env ty
-       ; bindLHsTyVarBndrs (rtke_ctxt env) (Just $ inTypeDoc ty)
+       ; bindLHsTyVarBndrs (rtke_ctxt env) WarnUnusedForalls
                            Nothing tyvars $ \ tyvars' ->
     do { (tau',  fvs) <- rnLHsTyKi env tau
        ; return ( HsForAllTy { hst_fvf = fvf, hst_xforall = noExtField
@@ -845,11 +847,9 @@ bindLRdrNames rdrs thing_inside
 ---------------
 bindHsQTyVars :: forall a b.
                  HsDocContext
-              -> Maybe SDoc         -- Just d => check for unused tvs
-                                    --   d is a phrase like "in the type ..."
               -> Maybe a            -- Just _  => an associated type decl
               -> [Located RdrName]  -- Kind variables from scope, no dups
-              -> (LHsQTyVars GhcPs)
+              -> LHsQTyVars GhcPs
               -> (LHsQTyVars GhcRn -> Bool -> RnM (b, FreeVars))
                   -- The Bool is True <=> all kind variables used in the
                   -- kind signature are bound on the left.  Reason:
@@ -863,7 +863,7 @@ bindHsQTyVars :: forall a b.
 --     and  (ii) mentioned in the kinds of hsq_bndrs
 -- (b) Bring type variables into scope
 --
-bindHsQTyVars doc mb_in_doc mb_assoc body_kv_occs hsq_bndrs thing_inside
+bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
   = do { let hs_tv_bndrs = hsQTvExplicit hsq_bndrs
              bndr_kv_occs = extractHsTyVarBndrsKVs hs_tv_bndrs
 
@@ -888,7 +888,10 @@ bindHsQTyVars doc mb_in_doc mb_assoc body_kv_occs hsq_bndrs thing_inside
        ; implicit_kv_nms <- mapM (newTyVarNameRn mb_assoc) implicit_kvs
 
        ; bindLocalNamesFV implicit_kv_nms                     $
-         bindLHsTyVarBndrs doc mb_in_doc mb_assoc hs_tv_bndrs $ \ rn_bndrs ->
+         bindLHsTyVarBndrs doc NoWarnUnusedForalls mb_assoc hs_tv_bndrs $ \ rn_bndrs ->
+           -- This is the only call site for bindLHsTyVarBndrs where we pass
+           -- NoWarnUnusedForalls, which suppresses -Wunused-foralls warnings.
+           -- See Note [Suppress -Wunused-foralls when binding LHsQTyVars].
     do { traceRn "bindHsQTyVars" (ppr hsq_bndrs $$ ppr implicit_kv_nms $$ ppr rn_bndrs)
        ; thing_inside (HsQTvs { hsq_ext = implicit_kv_nms
                               , hsq_explicit  = rn_bndrs })
@@ -990,17 +993,50 @@ variable in (a :: k), later in the binding. (This mistake lead to #14710.)
 So tvs is {k,a} and kvs is {k}.
 
 NB: we do this only at the binding site of 'tvs'.
+
+Note [Suppress -Wunused-foralls when binding LHsQTyVars]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The WarnUnusedForalls flag controls whether bindLHsTyVarBndrs should warn about
+explicit type variable binders that go unused (e.g., the `a` in
+`forall a. Int`). We almost always want to warn about these, since unused type
+variables can usually be deleted without any repercussions. There is one
+exception to this rule, however: binding LHsQTyVars. Consider this example:
+
+  data Proxy a = Proxy
+
+The `a` in `Proxy a` is bound by an LHsQTyVars, and the code which brings it
+into scope, bindHsQTyVars, will invoke bindLHsTyVarBndrs in turn. As such, it
+has a choice to make about whether to emit -Wunused-foralls warnings or not.
+If it /did/ emit warnings, then the `a` would be flagged as unused. However,
+this is not what we want! Removing the `a` in `Proxy a` would change its kind
+entirely, which is a huge price to pay for fixing a warning.
+
+Unlike other forms of type variable binders, dropping "unused" variables in
+an LHsQTyVars can be semantically significant. As a result, we suppress
+-Wunused-foralls warnings in exactly one place: in bindHsQTyVars.
 -}
+
+-- | Should GHC warn if a quantified type variable goes unused? Usually, the
+-- answer is \"yes\", but in the particular case of binding 'LHsQTyVars', we
+-- avoid emitting warnings.
+-- See @Note [Suppress -Wunused-foralls when binding LHsQTyVars]@.
+data WarnUnusedForalls
+  = WarnUnusedForalls
+  | NoWarnUnusedForalls
+
+instance Outputable WarnUnusedForalls where
+  ppr wuf = text $ case wuf of
+    WarnUnusedForalls   -> "WarnUnusedForalls"
+    NoWarnUnusedForalls -> "NoWarnUnusedForalls"
 
 bindLHsTyVarBndrs :: (OutputableBndrFlag flag)
                   => HsDocContext
-                  -> Maybe SDoc            -- Just d => check for unused tvs
-                                           --   d is a phrase like "in the type ..."
+                  -> WarnUnusedForalls
                   -> Maybe a               -- Just _  => an associated type decl
                   -> [LHsTyVarBndr flag GhcPs]  -- User-written tyvars
                   -> ([LHsTyVarBndr flag GhcRn] -> RnM (b, FreeVars))
                   -> RnM (b, FreeVars)
-bindLHsTyVarBndrs doc mb_in_doc mb_assoc tv_bndrs thing_inside
+bindLHsTyVarBndrs doc wuf mb_assoc tv_bndrs thing_inside
   = do { when (isNothing mb_assoc) (checkShadowedRdrNames tv_names_w_loc)
        ; checkDupRdrNames tv_names_w_loc
        ; go tv_bndrs thing_inside }
@@ -1014,9 +1050,9 @@ bindLHsTyVarBndrs doc mb_in_doc mb_assoc tv_bndrs thing_inside
                                 ; warn_unused b' fvs
                                 ; return (res, fvs) }
 
-    warn_unused tv_bndr fvs = case mb_in_doc of
-      Just in_doc -> warnUnusedForAll in_doc tv_bndr fvs
-      Nothing     -> return ()
+    warn_unused tv_bndr fvs = case wuf of
+      WarnUnusedForalls   -> warnUnusedForAll doc tv_bndr fvs
+      NoWarnUnusedForalls -> return ()
 
 bindLHsTyVarBndr :: HsDocContext
                  -> Maybe a   -- associated class
@@ -1456,16 +1492,14 @@ dataKindsErr env thing
     pp_what | isRnKindLevel env = text "kind"
             | otherwise          = text "type"
 
-inTypeDoc :: HsType GhcPs -> SDoc
-inTypeDoc ty = text "In the type" <+> quotes (ppr ty)
-
-warnUnusedForAll :: (OutputableBndrFlag flag) => SDoc -> LHsTyVarBndr flag GhcRn -> FreeVars -> TcM ()
-warnUnusedForAll in_doc (L loc tv) used_names
+warnUnusedForAll :: OutputableBndrFlag flag
+                 => HsDocContext -> LHsTyVarBndr flag GhcRn -> FreeVars -> TcM ()
+warnUnusedForAll doc (L loc tv) used_names
   = whenWOptM Opt_WarnUnusedForalls $
     unless (hsTyVarName tv `elemNameSet` used_names) $
     addWarnAt (Reason Opt_WarnUnusedForalls) loc $
     vcat [ text "Unused quantified type variable" <+> quotes (ppr tv)
-         , in_doc ]
+         , inHsDocContext doc ]
 
 opTyErr :: Outputable a => RdrName -> a -> SDoc
 opTyErr op overall_ty
