@@ -524,7 +524,6 @@ static void searchHeapBlock (StgPtr p, StgPtr end, OCSectionIndices *s_indices)
         case THUNK_2_0:
         case THUNK_1_1:
         case THUNK_0_2:
-        case THUNK_SELECTOR:
         case THUNK_STATIC: // TODO: skip this?
         {
             StgThunk *thunk = (StgThunk*)c;
@@ -532,6 +531,14 @@ static void searchHeapBlock (StgPtr p, StgPtr end, OCSectionIndices *s_indices)
                 checkAddress(thunk->payload[i], s_indices);
             }
             size = closure_sizeW(c);
+            break;
+        }
+
+        case THUNK_SELECTOR:
+        {
+            StgSelector *s = (StgSelector *)c;
+            checkAddress(s->selectee, s_indices);
+            size = THUNK_SELECTOR_sizeW();
             break;
         }
 
