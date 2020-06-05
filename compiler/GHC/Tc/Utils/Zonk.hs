@@ -67,7 +67,6 @@ import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Core.ConLike
 import GHC.Core.DataCon
-import GHC.Driver.Session
 import GHC.Driver.Types
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -79,7 +78,6 @@ import GHC.Data.Maybe
 import GHC.Types.SrcLoc
 import GHC.Data.Bag
 import GHC.Utils.Outputable
-import qualified GHC.LanguageExtensions as LangExt
 import GHC.Utils.Misc
 import GHC.Types.Unique.FM
 import GHC.Core
@@ -533,17 +531,7 @@ zonkMonoBinds :: ZonkEnv -> LHsBinds GhcTcId -> TcM (LHsBinds GhcTc)
 zonkMonoBinds env binds = mapBagM (zonk_lbind env) binds
 
 zonk_lbind :: ZonkEnv -> LHsBind GhcTcId -> TcM (LHsBind GhcTc)
-zonk_lbind env bind =
-  do { bind' <- wrapLocM (zonk_bind env) bind
-     ; let b = unLoc bind'
-     -- TODO: fix this and remove isUnliftedHsBind
-     ; when (isBangedHsBind b && isUnliftedHsBind b) warn_redundant_bang
-     ; return bind'}
-       where
-       warn_redundant_bang
-         = whenWOptM Opt_WarnRedundantBangPatterns
-                     (addWarnTc (Reason Opt_WarnRedundantBangPatterns)
-                     (text "Bang pattern is redundant"))
+zonk_lbind env = wrapLocM (zonk_bind env)
 
 zonk_bind :: ZonkEnv -> HsBind GhcTcId -> TcM (HsBind GhcTc)
 zonk_bind env bind@(PatBind { pat_lhs = pat, pat_rhs = grhss
@@ -1341,49 +1329,7 @@ zonk_pat env (LazyPat x pat)
 
 zonk_pat env (BangPat x pat)
   = do  { (env', pat') <- zonkPat env pat
-        ; whenM (should_warn pat') warn_redundant_bang_pats
         ; return (env',  BangPat x pat') }
-        where
-        warn_redundant_bang_pats
-          = whenWOptM Opt_WarnRedundantBangPatterns
-                      (addWarnTc (Reason Opt_WarnRedundantBangPatterns)
-                                 (text "Bang pattern is redundant"))
-
-        should_warn :: LPat GhcTc -> TcM Bool
-        should_warn (L _ pat) = case pat of
-          ConPat { pat_con = (L _ con)
-                 , pat_con_ext = ConPatTc { cpt_arg_tys = tys }
-                 , pat_args = pat_args } ->
-            do  { let pat_ty = conLikeResTy con tys
-                ; case con of
-                    RealDataCon _
-                      | isNewTyCon (tcTyConAppTyCon pat_ty)
-                      , [pat] <- hsConPatArgs pat_args
-                      -> should_warn pat -- Treat !(N p) like !p
-                      | otherwise
-                      -> return True     -- Warn about !(K x y z)
-                    PatSynCon _ -> return False }
-          ListPat _ _     ->
-            -- do not bother if RebindableSyntax is ON
-            do  { rebindableIsOn <- xoptM LangExt.RebindableSyntax
-                ; return (if rebindableIsOn then False else True)}
-          VarPat _ (L _ var) ->
-            -- do warn for unlifted types
-            return (isUnliftedType (idType var))
-          WildPat ty      -> return (isUnliftedType ty)
-          ParPat _ p      -> should_warn p
-          AsPat _ _ p     -> should_warn p
-          SigPat _ p _    -> should_warn p
-          TuplePat _ _ _  -> return True
-          LitPat _ _      -> return True
-          BangPat _ _     -> return True
-          SumPat _ _ _ _  -> return True
-          NPat _ _ _ _    -> return False
-          ViewPat _ _ _   -> return False
-          LazyPat _ _     -> return False
-          SplicePat _ _   -> return False
-          NPlusKPat _ _ _ _ _ _ -> return False
-          _otherwise            -> panic "warn_redundant_bang_pats"
 
 zonk_pat env (AsPat x (L loc v) pat)
   = do  { v' <- zonkIdBndr env v
