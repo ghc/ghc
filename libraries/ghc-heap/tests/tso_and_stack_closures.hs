@@ -1,4 +1,4 @@
-{-# LANGUAGE ForeignFunctionInterface, MagicHash, CPP #-}
+{-# LANGUAGE ForeignFunctionInterface, MagicHash, CPP, BangPatterns #-}
 
 import Foreign
 import Foreign.C.Types
@@ -20,17 +20,47 @@ data FoolStgTSO
 
 main :: IO ()
 main = do
-    ptr <- c_create_tso
-    let wPtr = unpackWord# ptr
-    tso <- getClosureData ((unsafeCoerce# wPtr) :: FoolStgTSO)
-
+    tso <- createTSOClosure
     assertEqual (what_next tso) ThreadRunGHC
     assertEqual (why_blocked tso) NotBlocked
     assertEqual (saved_errno tso) 0
 
--- todo (sven): assert more?
-
     print $ "tso : "++ show tso
+
+    -- The newly created TSO should be on the end of the run queue.
+    let !_linkBox = _link tso
+    _linkClosure <- getBoxedClosureData _linkBox
+    assertEqual (name _linkClosure) "END_TSO_QUEUE"
+
+    let !global_linkBox = global_link tso
+    globalLinkClosure <- getBoxedClosureData global_linkBox
+    assertEqual (getClosureType globalLinkClosure) TSO
+
+    let !stackBox = tsoStack tso
+    stackClosure <- getBoxedClosureData stackBox
+    assertEqual (getClosureType stackClosure) STACK
+
+    let !stackPointerBox = stackPointer stackClosure
+    stackPointerClosure <- getBoxedClosureData stackPointerBox
+    assertEqual (getClosureType stackPointerClosure) RET_SMALL
+
+    let !trecBox = trec tso
+    trecClosure <- getBoxedClosureData trecBox
+    assertEqual (name trecClosure) "NO_TREC"
+
+    let !blockedExceptionsBox = blocked_exceptions tso
+    blockedExceptionsClosure <- getBoxedClosureData blockedExceptionsBox
+    assertEqual (name blockedExceptionsClosure) "END_TSO_QUEUE"
+
+    let !bqBox = bq tso
+    bqClosure <- getBoxedClosureData bqBox
+    assertEqual (name bqClosure) "END_TSO_QUEUE"
+
+createTSOClosure :: IO (GenClosure Box)
+createTSOClosure = do
+    ptr <- c_create_tso
+    let wPtr = unpackWord# ptr
+    getClosureData ((unsafeCoerce# wPtr) :: FoolStgTSO)
 
 unpackWord# :: Word -> Word#
 unpackWord# (W# w#) = w#
@@ -39,3 +69,6 @@ assertEqual :: (Show a, Eq a) => a -> a -> IO ()
 assertEqual a b
   | a /= b = error (show a ++ " /= " ++ show b)
   | otherwise = return ()
+
+getClosureType :: GenClosure b -> ClosureType
+getClosureType = tipe . info
