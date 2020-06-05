@@ -18,6 +18,9 @@ foreign import ccall unsafe "create_tso.h create_tso"
 -- (which is a primop that expects a pointer to a closure).
 data FoolStgTSO
 
+-- We can make some assumptions about the - otherwise dynamic - properties of
+-- StgTSO and StgStack, because a new, non-running TSO is created with
+-- create_tso() (create_tso.c).create_tso
 main :: IO ()
 main = do
     tso <- createTSOClosure
