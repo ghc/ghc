@@ -90,3 +90,13 @@ viewPatNoWarn !(id -> B) = ()
 -- more top-level banged binds
 -- more numeric patterns
 -- more view patterns
+
+-- f :: Bool -> Bool
+-- f True = False
+-- f !x   = x
+
+-- f (a,b) True = e1
+-- f !x False = e2    -- Redundant bang
+
+-- data T = MkT !Int
+-- f (MkT !x) = ...   -- Redundant bang
