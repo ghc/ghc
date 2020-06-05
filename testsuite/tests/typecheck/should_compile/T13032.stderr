@@ -16,7 +16,7 @@ f = \ (@a) (@b) _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] ->
 T13032.$trModule :: GHC.Types.Module
 [LclIdX,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 80 30}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 80 10}]
 T13032.$trModule
   = GHC.Types.Module
       (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "T13032"#)
