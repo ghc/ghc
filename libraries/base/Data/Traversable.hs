@@ -88,6 +88,32 @@ class (Functor t, Foldable t) => Traversable t where
     -- | Map each element of a structure to an action, evaluate these actions
     -- from left to right, and collect the results. For a version that ignores
     -- the results see 'Data.Foldable.traverse_'.
+    --
+    -- ==== __Examples__
+    --
+    -- Basic usage:
+    --
+    -- In the first two examples we show each evaluated action mapping to the
+    -- output structure.
+    --
+    -- >>> traverse Just [1,2,3,4]
+    -- Just [1,2,3,4]
+    --
+    -- >>> traverse id [Right 1, Right 2, Right 3, Right 4]
+    -- Right [1,2,3,4]
+    --
+    -- In the next examples, we show that 'Nothing' and 'Left' values short
+    -- circuit the created structure.
+    --
+    -- >>> traverse (const Nothing) [1,2,3,4]
+    -- Nothing
+    --
+    -- >>> traverse (\x -> if odd x then Just x else Nothing)  [1,2,3,4]
+    -- Nothing
+    --
+    -- >>> traverse id [Right 1, Right 2, Right 3, Right 4, Left 0]
+    -- Left 0
+    --
     traverse :: Applicative f => (a -> f b) -> t a -> f (t b)
     {-# INLINE traverse #-}  -- See Note [Inline default methods]
     traverse f = sequenceA . fmap f
@@ -95,6 +121,30 @@ class (Functor t, Foldable t) => Traversable t where
     -- | Evaluate each action in the structure from left to right, and
     -- collect the results. For a version that ignores the results
     -- see 'Data.Foldable.sequenceA_'.
+    --
+    -- ==== __Examples__
+    --
+    -- Basic usage:
+    --
+    -- For the first two examples we show sequenceA fully evaluating a
+    -- a structure and collecting the results.
+    --
+    -- >>> sequenceA [Just 1, Just 2, Just 3]
+    -- Just [1,2,3]
+    --
+    -- >>> sequenceA [Right 1, Right 2, Right 3]
+    -- Right [1,2,3]
+    --
+    -- The next two example show 'Nothing' and 'Just' will short circuit
+    -- the resulting structure if present in the input. For more context,
+    -- check the 'Traversable' instances for 'Either' and 'Maybe'.
+    --
+    -- >>> sequenceA [Just 1, Just 2, Just 3, Nothing]
+    -- Nothing
+    --
+    -- >>> sequenceA [Right 1, Right 2, Right 3, Left 4]
+    -- Left 4
+    --
     sequenceA :: Applicative f => t (f a) -> f (t a)
     {-# INLINE sequenceA #-}  -- See Note [Inline default methods]
     sequenceA = traverse id
@@ -102,6 +152,19 @@ class (Functor t, Foldable t) => Traversable t where
     -- | Map each element of a structure to a monadic action, evaluate
     -- these actions from left to right, and collect the results. For
     -- a version that ignores the results see 'Data.Foldable.mapM_'.
+    --
+    -- ==== __Examples__
+    --
+    -- 'mapM' is 'traverse' for 'Monad', and the following example shows
+    -- how 'mapM' can apply an 'IO' action to a 'List' to produce a
+    -- structured result.
+    --
+    -- Basic usage:
+    --
+    -- >>> import System.IO
+    -- >>> mapM (openTempFile ".") ["t1", "t2"]
+    -- [("./t169980-3",{handle: ./t169980-3}),("./t269980-4",{handle: ./t269980-4})]
+    --
     mapM :: Monad m => (a -> m b) -> t a -> m (t b)
     {-# INLINE mapM #-}  -- See Note [Inline default methods]
     mapM = traverse
@@ -109,6 +172,29 @@ class (Functor t, Foldable t) => Traversable t where
     -- | Evaluate each monadic action in the structure from left to
     -- right, and collect the results. For a version that ignores the
     -- results see 'Data.Foldable.sequence_'.
+    --
+    -- ==== __Examples__
+    --
+    -- Basic usage:
+    --
+    -- The first two examples are instances where the input and
+    -- and output of 'sequence' are isomorphic.
+    --
+    -- >>> sequence $ Right [1,2,3,4]
+    -- [Right 1,Right 2,Right 3,Right 4]
+    --
+    -- >>> sequence $ [Right 1,Right 2,Right 3,Right 4]
+    -- Right [1,2,3,4]
+    --
+    -- The following examples demonstrate short circuit behavior
+    -- for 'sequence'.
+    --
+    -- >>> sequence $ Left [1,2,3,4]
+    -- Left [1,2,3,4]
+    --
+    -- >>> sequence $ [Left 0, Right 1,Right 2,Right 3,Right 4]
+    -- Left 0
+    --
     sequence :: Monad m => t (m a) -> m (t a)
     {-# INLINE sequence #-}  -- See Note [Inline default methods]
     sequence = sequenceA
@@ -311,6 +397,17 @@ forM = flip mapM
 -- and 'Data.Foldable.foldl'; it applies a function to each element of a structure,
 -- passing an accumulating parameter from left to right, and returning
 -- a final value of this accumulator together with the new structure.
+--
+-- ==== __Examples__
+--
+-- Basic usage:
+--
+-- >>> mapAccumL (\a b -> (a + b, a)) 0 [1..10]
+-- (55,[0,1,3,6,10,15,21,28,36,45])
+--
+-- >>> mapAccumL (\a b -> (a <> show b, a)) "0" [1..5]
+-- ("012345",["0","01","012","0123","01234"])
+--
 mapAccumL :: Traversable t => (a -> b -> (a, c)) -> a -> t b -> (a, t c)
 mapAccumL f s t = runStateL (traverse (StateL . flip f) t) s
 
@@ -318,6 +415,17 @@ mapAccumL f s t = runStateL (traverse (StateL . flip f) t) s
 -- and 'Data.Foldable.foldr'; it applies a function to each element of a structure,
 -- passing an accumulating parameter from right to left, and returning
 -- a final value of this accumulator together with the new structure.
+--
+-- ==== __Examples__
+--
+-- Basic usage:
+--
+-- >>> mapAccumR (\a b -> (a + b, a)) 0 [1..10]
+-- (55,[54,52,49,45,40,34,27,19,10,0])
+--
+-- >>> mapAccumR (\a b -> (a <> show b, a)) "0" [1..5]
+-- ("054321",["05432","0543","054","05","0"])
+--
 mapAccumR :: Traversable t => (a -> b -> (a, c)) -> a -> t b -> (a, t c)
 mapAccumR f s t = runStateR (traverse (StateR . flip f) t) s
 
