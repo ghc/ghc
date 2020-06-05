@@ -1,4 +1,4 @@
 
-T2636.hs:1:8: error:
-    Could not find module ‘MissingModule’
+T11596.hs:1:8:
+    Could not find module ‘T11596S’
     Use -v (or `:set -v` in ghci) to see a list of the files searched for.

@@ -2517,10 +2517,15 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                         -- Home package
                          Just <$> just_found location mod
 
+             err@(NotFound {})
+                | ghcLink dflags == LinkInMemory ->
+                        -- For GHCi return the error message (#11596)
+                   return $ Just $ Left $ unitBag $
+                      noModError dflags loc wanted_mod err
              _ -> return Nothing
                         -- Not found
                         -- (If it is TRULY not found at all, we'll
-                        -- error when we actually try to compile)
+                        -- error when we actually try to compile) (#11256)
 
     just_found location mod = do
                 -- Adjust location to point to the hs-boot source file,
