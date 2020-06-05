@@ -79,9 +79,11 @@ class HasHeapRep (a :: TYPE rep) where
     -- 'Word' for "raw" usage of pointers.
     getClosureDataX ::
         (forall c . c -> IO (Ptr StgInfoTable, [Word], [b]))
-        -- ^ Helper function to get info table, memory and pointers of the closure
+        -- ^ Helper function to get info table, memory and pointers of the
+        -- closure. The order of @[b]@ is significant and determined by
+        -- @collect_pointers()@ in @rts/Heap.c@.
         -> a -- ^ Closure to decode
-        -> IO (GenClosure b) -- Heap representation of the closure
+        -> IO (GenClosure b) -- ^ Heap representation of the closure
 
 instance HasHeapRep (a :: TYPE 'LiftedRep) where
     getClosureDataX = getClosureX
@@ -150,12 +152,26 @@ getClosureData :: forall rep (a :: TYPE rep) . HasHeapRep a => a -> IO Closure
 getClosureData = getClosureDataX getClosureRaw
 
 
--- | This function returns a parsed heap representation of the argument _at
--- this moment_, even if it is unevaluated or an indirection or other exotic
--- stuff.  Beware when passing something to this function, the same caveats as
--- for 'asBox' apply.
-getClosureX :: forall a b . (a -> IO (Ptr StgInfoTable, [Word], [b]))
-            -> a -> IO (GenClosure b)
+-- | This function returns a parsed heap representation ('GenClosure') of the
+-- closure _at this moment_, even if it is unevaluated or an indirection or
+-- other exotic stuff. Beware when passing something to this function, the same
+-- caveats as for 'asBox' apply.
+--
+-- Inside a GHC context 'b' is usually a 'GHC.Exts.Heap.Closures.Box'
+-- containing a thunk or an evaluated heap object. Outside it can be a
+-- 'Word' for "raw" usage of pointers.
+--
+-- 'get_closure_raw' should provide low level details of the closure's heap
+-- respresentation. The order of @[b]@ is significant and determined by
+-- @collect_pointers()@ in @rts/Heap.c@.
+--
+-- For most use cases 'getClosureData' is an easier to use alternative.
+getClosureX :: forall a b .
+            (a -> IO (Ptr StgInfoTable, [Word], [b]))
+            -- ^ Helper function to get info table, memory and pointers of the
+            -- closure
+            -> a -- ^ Closure to decode
+            -> IO (GenClosure b) -- ^ Heap representation of the closure
 getClosureX get_closure_raw x = do
     (iptr, wds, pts) <- get_closure_raw x
     itbl <- peekItbl iptr
