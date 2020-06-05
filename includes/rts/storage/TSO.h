@@ -107,22 +107,6 @@ typedef struct StgTSO_ {
      */
     struct StgStack_       *stackobj;
 
-    struct InCall_ *bound;
-    struct Capability_ *cap;
-
-    struct StgTRecHeader_ *trec; /* STM transaction record */
-
-    /*
-     * A list of threads blocked on this TSO waiting to throw exceptions.
-     */
-    struct MessageThrowTo_ *blocked_exceptions;
-
-    /*
-     * A list of StgBlockingQueue objects, representing threads
-     * blocked on thunks that are under evaluation by this thread.
-     */
-    struct StgBlockingQueue_ *bq;
-
     /*
      * The tso->dirty flag indicates that this TSO's stack should be
      * scanned during garbage collection.  It also indicates that this
@@ -144,6 +128,21 @@ typedef struct StgTSO_ {
     StgThreadID             id;
     StgWord32               saved_errno;
     StgWord32               dirty;          /* non-zero => dirty */
+    struct InCall_*         bound;
+    struct Capability_*     cap;
+
+    struct StgTRecHeader_ * trec;       /* STM transaction record */
+
+    /*
+     * A list of threads blocked on this TSO waiting to throw exceptions.
+    */
+    struct MessageThrowTo_ * blocked_exceptions;
+
+    /*
+     * A list of StgBlockingQueue objects, representing threads
+     * blocked on thunks that are under evaluation by this thread.
+    */
+    struct StgBlockingQueue_ *bq;
 
     /*
      * The allocation limit for this thread, which is updated as the
