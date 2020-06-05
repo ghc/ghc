@@ -533,7 +533,7 @@ getIoManagerFlag :: IO IoSubSystem
 getIoManagerFlag = do
       let ptr = (#ptr RTS_FLAGS, MiscFlags) rtsFlagsPtr
       mgrFlag <- (#{peek MISC_FLAGS, ioManager} ptr :: IO Word32)
-      (toEnum . fromIntegral)
+      return $ (toEnum . fromIntegral) mgrFlag
 
 getDebugFlags :: IO DebugFlags
 getDebugFlags = do
