@@ -1,0 +1,26 @@
+#include "Cmm.h"
+
+section "rodata" { msg : bits8[] "Test\n"; }
+section "data" { faketso : bits8[1000]; }
+
+main {
+   jump stg_foo [];
+}
+
+stg_foo {
+  
+   BaseReg = faketso;
+
+   SAVE_REGS();
+
+   foreign "C" printf(msg "ptr");
+
+   RESTORE_REGS();
+
+   jump stg_myExit [*]; // all registers live
+}
+
+stg_myExit {
+   foreign "C" exit(0);
+}
+
