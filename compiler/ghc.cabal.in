@@ -16,6 +16,12 @@ Description:
     include loading Haskell code dynamically in a GHCi-like manner.
     For this reason, a lot of GHC's functionality is made available
     through this package.
+    .
+    See GHC's wiki for more information:
+    .
+      * <https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/compiler>
+    .
+      * <https://gitlab.haskell.org/ghc/ghc/-/wikis/Make-GHC-codebase-more-modular>
 Category: Development
 Build-Type: Simple
 Cabal-Version: >=1.10
