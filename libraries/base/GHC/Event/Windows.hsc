@@ -1077,7 +1077,7 @@ processRemoteCompletion = do
     _ <- peekArray n entries
     mngr <- getSystemManager
     let arr = mgrOverlappedEntries mngr
-    A.unsafeSet arr entries n
+    A.unsafeCopyFromBuffer arr entries n
 
     -- Process timeouts
     delay <- runExpiredTimeouts mngr :: IO (Maybe Seconds)
