@@ -1,24 +1,27 @@
 
 T6069.hs:13:15: error:
-    • Couldn't match type ‘ST s0 Int’ with ‘forall s. ST s a0’
-      Expected type: ST s0 Int -> a0
-        Actual type: (forall s. ST s a0) -> a0
+    • Couldn't match type: forall s. ST s b0
+                     with: ST s0 Int
+      Expected: ST s0 Int -> b0
+        Actual: (forall s. ST s b0) -> b0
     • In the second argument of ‘(.)’, namely ‘runST’
       In the expression: print . runST
       In the expression: (print . runST) fourty_two
 
 T6069.hs:14:15: error:
-    • Couldn't match type ‘ST s1 Int’ with ‘forall s. ST s a1’
-      Expected type: ST s1 Int -> a1
-        Actual type: (forall s. ST s a1) -> a1
+    • Couldn't match type: forall s. ST s b1
+                     with: ST s1 Int
+      Expected: ST s1 Int -> b1
+        Actual: (forall s. ST s b1) -> b1
     • In the second argument of ‘(.)’, namely ‘runST’
       In the first argument of ‘($)’, namely ‘(print . runST)’
       In the expression: (print . runST) $ fourty_two
 
 T6069.hs:15:16: error:
-    • Couldn't match type ‘ST s2 Int’ with ‘forall s. ST s a2’
-      Expected type: ST s2 Int -> a2
-        Actual type: (forall s. ST s a2) -> a2
+    • Couldn't match type: forall s. ST s b2
+                     with: ST s2 Int
+      Expected: ST s2 Int -> b2
+        Actual: (forall s. ST s b2) -> b2
     • In the second argument of ‘(.)’, namely ‘runST’
       In the first argument of ‘($)’, namely ‘(print . runST)’
       In the expression: (print . runST) $

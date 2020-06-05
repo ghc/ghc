@@ -1,7 +1,8 @@
+
 ExpandSynsFail4.hs:11:22: error:
-    Couldn't match type ‘Bool’ with ‘Int’
-    Expected type: T Int
-      Actual type: T Bool
-    In the first argument of ‘f’, namely ‘(undefined :: T Bool)’
-    In the second argument of ‘($)’, namely ‘f (undefined :: T Bool)’
-    In the expression: putStrLn $ f (undefined :: T Bool)
+    • Couldn't match type ‘Bool’ with ‘Int’
+      Expected: T Int
+        Actual: T Bool
+    • In the first argument of ‘f’, namely ‘(undefined :: T Bool)’
+      In the second argument of ‘($)’, namely ‘f (undefined :: T Bool)’
+      In the expression: putStrLn $ f (undefined :: T Bool)
