@@ -55,6 +55,11 @@ Flag integer-gmp
     Manual: True
     Default: False
 
+Flag dynamic-system-linker
+    Description: The system can load dynamic code. This is not the case for musl.
+    Default: True
+    Manual: False
+
 Library
     Default-Language: Haskell2010
     Exposed: False
@@ -107,6 +112,10 @@ Library
     if flag(integer-simple)
         CPP-Options: -DINTEGER_SIMPLE
         build-depends: integer-simple >= 0.1.1.1
+
+    -- if no dynamic system linker is available, don't try DLLs.
+    if flag(dynamic-system-linker)
+        CPP-Options: -DCAN_LOAD_DLL
 
     Other-Extensions:
         BangPatterns
