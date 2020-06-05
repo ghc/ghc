@@ -195,7 +195,7 @@ test('T8101b', normal, multimod_compile,
 test('T10600', normal, compile_fail, ['-fno-code'])
 
 # Should not panic when compiling cmm file together with -outputdir.
-test('T9050', cmm_src, compile, ['-outputdir=.'])
+test('T9050', cmm_src, compile, ['-outputdir=. -no-hs-main'])
 
 test('write_interface_oneshot', [extra_files(['A011.hs'])], makefile_test, [])
 
