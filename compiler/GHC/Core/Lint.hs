@@ -722,7 +722,7 @@ lintRhs _bndr rhs = fmap lf_check_static_ptrs getLintFlags >>= go
     go _ = markAllJoinsBad $ lintCoreExpr rhs
 
 -- | Lint the RHS of a join point with expected join arity of @n@ (see Note
--- [Join points] in GHC.Core).
+-- [Join points] in "GHC.Core").
 lintJoinLams :: JoinArity -> Maybe Id -> CoreExpr -> LintM (LintedType, UsageEnv)
 lintJoinLams join_arity enforce rhs
   = go join_arity rhs

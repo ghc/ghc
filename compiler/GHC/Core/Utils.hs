@@ -1551,7 +1551,7 @@ it's applied only to dictionaries.
 --    exprIsHNF            implies exprOkForSpeculation
 --    exprOkForSpeculation implies exprOkForSideEffects
 --
--- See Note [PrimOp can_fail and has_side_effects] in GHC.Builtin.PrimOps
+-- See Note [PrimOp can_fail and has_side_effects] in "GHC.Builtin.PrimOps"
 -- and Note [Transformations affected by can_fail and has_side_effects]
 --
 -- As an example of the considerations in this test, consider:
@@ -1958,7 +1958,7 @@ exprIsTopLevelBindable :: CoreExpr -> Type -> Bool
 -- See Note [Core top-level string literals]
 -- Precondition: exprType expr = ty
 -- Top-level literal strings can't even be wrapped in ticks
---   see Note [Core top-level string literals] in GHC.Core
+--   see Note [Core top-level string literals] in "GHC.Core"
 exprIsTopLevelBindable expr ty
   = not (mightBeUnliftedType ty)
     -- Note that 'expr' may be levity polymorphic here consequently we must use

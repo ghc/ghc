@@ -202,7 +202,7 @@ roughTopNames :: [CoreExpr] -> [Maybe Name]
 -- Such names are either:
 --
 -- 1. The function finally being applied to in an application chain
---    (if that name is a GlobalId: see "Var#globalvslocal"), or
+--    (if that name is a GlobalId: see "GHC.Types.Var#globalvslocal"), or
 --
 -- 2. The 'TyCon' if the expression is a 'Type'
 --
