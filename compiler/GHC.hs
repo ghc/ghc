@@ -1010,7 +1010,7 @@ desugarModule tcm = do
 --
 -- A module must be loaded before dependent modules can be typechecked.  This
 -- always includes generating a 'ModIface' and, depending on the
--- 'DynFlags.hscTarget', may also include code generation.
+-- @DynFlags@\'s 'GHC.Driver.Session.hscTarget', may also include code generation.
 --
 -- This function will always cause recompilation and will always overwrite
 -- previous compilation results (potentially files on disk).
@@ -1145,7 +1145,7 @@ compileCore simplify fn = do
 getModuleGraph :: GhcMonad m => m ModuleGraph -- ToDo: DiGraph ModSummary
 getModuleGraph = liftM hsc_mod_graph getSession
 
--- | Return @True@ <==> module is loaded.
+-- | Return @True@ \<==> module is loaded.
 isLoaded :: GhcMonad m => ModuleName -> m Bool
 isLoaded m = withSession $ \hsc_env ->
   return $! isJust (lookupHpt (hsc_HPT hsc_env) m)

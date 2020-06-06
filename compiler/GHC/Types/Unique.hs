@@ -67,7 +67,7 @@ module GHC.Types.Unique (
         dataConWorkerUnique, dataConTyRepNameUnique,
 
         -- ** Local uniques
-        -- | These are exposed exclusively for use by 'VarEnv.uniqAway', which
+        -- | These are exposed exclusively for use by 'GHC.Types.Var.Env.uniqAway', which
         -- has rather peculiar needs. See Note [Local uniques].
         mkLocalUnique, minLocalUnique, maxLocalUnique
     ) where
@@ -178,7 +178,7 @@ unpkUnique (MkUnique u)
 -- | The interface file symbol-table encoding assumes that known-key uniques fit
 -- in 30-bits; verify this.
 --
--- See Note [Symbol table representation of names] in GHC.Iface.Binary for details.
+-- See Note [Symbol table representation of names] in "GHC.Iface.Binary" for details.
 isValidKnownKeyUnique :: Unique -> Bool
 isValidKnownKeyUnique u =
     case unpkUnique u of

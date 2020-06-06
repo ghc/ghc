@@ -162,7 +162,7 @@ import GHC.CmmToAsm.Config
 
   - By the C-- AST to identify labels
 
-  - By the unregisterised C code generator ("PprC") for naming functions (hence
+  - By the unregisterised C code generator (\"PprC\") for naming functions (hence
     the name 'CLabel')
 
   - By the native and LLVM code generators to identify labels

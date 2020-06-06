@@ -156,7 +156,7 @@ instance Outputable FloatLang where
     where
       (rec, pairs) = decomposeStgBinding bind
 
--- | Flattens an expression in @['FloatLang']@ into an STG program, see #floats.
+-- | Flattens an expression in @['FloatLang']@ into an STG program, see "GHC.Stg.Lift.Monad#floats".
 -- Important pre-conditions: The nesting of opening 'StartBindinGroup's and
 -- closing 'EndBindinGroup's is balanced. Also, it is crucial that every binding
 -- group has at least one recursive binding inside. Otherwise there's no point
@@ -232,16 +232,16 @@ runLiftM dflags us (LiftM m) = collectFloats (fromOL floats)
 addTopStringLit :: OutId -> ByteString -> LiftM ()
 addTopStringLit id = LiftM . RWS.tell . unitOL . PlainTopBinding . StgTopStringLit id
 
--- | Starts a recursive binding group. See #floats# and 'collectFloats'.
+-- | Starts a recursive binding group. See "GHC.Stg.Lift.Monad#floats" and 'collectFloats'.
 startBindingGroup :: LiftM ()
 startBindingGroup = LiftM $ RWS.tell $ unitOL $ StartBindingGroup
 
--- | Ends a recursive binding group. See #floats# and 'collectFloats'.
+-- | Ends a recursive binding group. See "GHC.Stg.Lift.Monad#floats" and 'collectFloats'.
 endBindingGroup :: LiftM ()
 endBindingGroup = LiftM $ RWS.tell $ unitOL $ EndBindingGroup
 
 -- | Lifts a binding to top-level. Depending on whether it's declared inside
--- a recursive RHS (see #floats# and 'collectFloats'), this might be added to
+-- a recursive RHS (see "GHC.Stg.Lift.Monad#floats" and 'collectFloats'), this might be added to
 -- an existing recursive top-level binding group.
 addLiftedBinding :: OutStgBinding -> LiftM ()
 addLiftedBinding = LiftM . RWS.tell . unitOL . LiftedBinding
@@ -289,7 +289,7 @@ withLiftedBndrs :: Traversable f => DIdSet -> f Id -> (f Id -> LiftM a) -> LiftM
 withLiftedBndrs abs_ids = runContT . traverse (ContT . withLiftedBndr abs_ids)
 
 -- | Substitutes a binder /occurrence/, which was brought in scope earlier by
--- 'withSubstBndr'\/'withLiftedBndr'.
+-- 'withSubstBndr' \/ 'withLiftedBndr'.
 substOcc :: Id -> LiftM Id
 substOcc id = LiftM (RWS.asks (lookupIdSubst id . e_subst))
 
