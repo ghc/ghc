@@ -34,7 +34,7 @@ import Data.Word        ( Word8 )
 
 
 -- | Represents an annotation after it has been sufficiently desugared from
--- it's initial form of 'HsDecls.AnnDecl'
+-- it's initial form of 'GHC.Hs.Decls.AnnDecl'
 data Annotation = Annotation {
         ann_target :: CoreAnnTarget,    -- ^ The target of the annotation
         ann_value  :: AnnPayload
