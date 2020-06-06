@@ -76,8 +76,8 @@ data HsModule
         --  - @Just [...]@: as you would expect...
         --
         --
-        --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen'
-        --                                   ,'ApiAnnotation.AnnClose'
+        --  - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnOpen'
+        --                                   ,'GHC.Parser.Annotation.AnnClose'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
       hsmodImports :: [LImportDecl GhcPs],
@@ -89,25 +89,25 @@ data HsModule
       hsmodDeprecMessage :: Maybe (Located WarningTxt),
         -- ^ reason\/explanation for warning/deprecation of this module
         --
-        --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen'
-        --                                   ,'ApiAnnotation.AnnClose'
+        --  - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnOpen'
+        --                                   ,'GHC.Parser.Annotation.AnnClose'
         --
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
       hsmodHaddockModHeader :: Maybe LHsDocString
         -- ^ Haddock module info and description, unparsed
         --
-        --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen'
-        --                                   ,'ApiAnnotation.AnnClose'
+        --  - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnOpen'
+        --                                   ,'GHC.Parser.Annotation.AnnClose'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
    }
-     -- ^ 'ApiAnnotation.AnnKeywordId's
+     -- ^ 'GHC.Parser.Annotation.AnnKeywordId's
      --
-     --  - 'ApiAnnotation.AnnModule','ApiAnnotation.AnnWhere'
+     --  - 'GHC.Parser.Annotation.AnnModule','GHC.Parser.Annotation.AnnWhere'
      --
-     --  - 'ApiAnnotation.AnnOpen','ApiAnnotation.AnnSemi',
-     --    'ApiAnnotation.AnnClose' for explicit braces and semi around
+     --  - 'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnSemi',
+     --    'GHC.Parser.Annotation.AnnClose' for explicit braces and semi around
      --    hsmodImports,hsmodDecls if this style is used.
 
      -- For details on above see note [Api annotations] in GHC.Parser.Annotation
