@@ -1119,7 +1119,7 @@ splitHsAppTys hs_ty
     go (L _  (HsAppKindTy l ty k)) as = go ty (HsTypeArg l k : as)
     go (L sp (HsParTy _ f))        as = go f (HsArgPar (locA sp) : as)
     go (L _  (HsOpTy _ l op@(N sp _) r)) as
-      = ( L sp (HsTyVar noAnn NotPromoted op)
+      = ( L (na2la sp) (HsTyVar noAnn NotPromoted op)
         , HsValArg l : HsValArg r : as )
     go f as = (f, as)
 

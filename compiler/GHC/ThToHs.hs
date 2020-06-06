@@ -128,7 +128,8 @@ setL loc = CvtM (\_ _ -> Right (loc, ()))
 returnL :: a -> CvtM (Located a)
 returnL x = CvtM (\_ loc -> Right (loc, L loc x))
 
-returnLA :: a -> CvtM (LocatedA a)
+-- returnLA :: a -> CvtM (LocatedA a)
+returnLA :: e -> CvtM (GenLocated (SrcSpanAnn' (ApiAnn' ann)) e)
 returnLA x = CvtM (\_ loc -> Right (loc, L (noAnnSrcSpan loc) x))
 
 returnJustLA :: a -> CvtM (Maybe (LocatedA a))
@@ -162,7 +163,7 @@ wrapL (CvtM m) = CvtM $ \origin loc -> case m origin loc of
 wrapLN :: CvtM a -> CvtM (ApiAnnName a)
 wrapLN (CvtM m) = CvtM $ \origin loc -> case m origin loc of
   Left err -> Left err
-  Right (loc', v) -> Right (loc', N (noAnnSrcSpan loc) v)
+  Right (loc', v) -> Right (loc', N (noAnnApiName loc) v)
 
 wrapLA :: CvtM a -> CvtM (LocatedA a)
 wrapLA (CvtM m) = CvtM $ \origin loc -> case m origin loc of
@@ -672,7 +673,7 @@ cvt_arg (Bang su ss, ty)
 
 cvt_id_arg :: (TH.Name, TH.Bang, TH.Type) -> CvtM (LConDeclField GhcPs)
 cvt_id_arg (i, str, ty)
-  = do  { L li i' <- vNameL i
+  = do  { N li i' <- vNameN i
         ; ty' <- cvt_arg (str,ty)
         ; return $ noLocA (ConDeclField
                           { cd_fld_ext = noAnn
@@ -1341,7 +1342,7 @@ cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p
 
 cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (LHsRecField GhcPs (LPat GhcPs))
 cvtPatFld (s,p)
-  = do  { L ls s' <- vNameL s
+  = do  { N ls s' <- vNameN s
         ; p' <- cvtPat p
         ; return (noLocA $ HsRecField { hsRecFieldAnn = noAnn
                                       , hsRecFieldLbl
@@ -1752,7 +1753,7 @@ cvtPatSynSigTy (ForallT univs reqs (ForallT exis provs ty))
   | null univs, null reqs = do { l'   <- getL
                                ; let l = noAnnSrcSpan l'
                                ; ty' <- cvtType (ForallT exis provs ty)
-                               ; return $ L l (HsQualTy { hst_ctxt = L l []
+                               ; return $ L l (HsQualTy { hst_ctxt = L (noAnnSrcSpan l') []
                                                         , hst_xqual = noAnn
                                                         , hst_body = ty' }) }
   | null reqs             = do { l'      <- getL
@@ -1763,11 +1764,11 @@ cvtPatSynSigTy (ForallT univs reqs (ForallT exis provs ty))
                                               { hst_fvf = ForallInvis
                                               , hst_bndrs = univs'
                                               , hst_xforall = noAnn
-                                              , hst_body = L l cxtTy }
+                                              , hst_body = L (noAnnSrcSpan l') cxtTy }
                                      cxtTy = HsQualTy { hst_ctxt = L l []
                                                       , hst_xqual = noAnn
                                                       , hst_body = ty' }
-                               ; return $ L l forTy }
+                               ; return $ L (noAnnSrcSpan l') forTy }
   | otherwise             = cvtType (ForallT univs reqs (ForallT exis provs ty))
 cvtPatSynSigTy ty         = cvtType ty
 

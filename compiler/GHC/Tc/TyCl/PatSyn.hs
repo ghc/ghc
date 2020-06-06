@@ -576,7 +576,7 @@ collectPatSynArgInfo details =
 
 addPatSynCtxt :: ApiAnnName Name -> TcM a -> TcM a
 addPatSynCtxt (N loc name) thing_inside
-  = setSrcSpanA loc $
+  = setSrcSpanN loc $
     addErrCtxt (text "In the declaration for pattern synonym"
                 <+> quotes (ppr name)) $
     thing_inside
@@ -866,7 +866,7 @@ tcPatSynBuilderBind (PSB { psb_id = N loc name
     mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)
     mk_mg body = mkMatchGroup Generated [builder_match]
           where
-            builder_args  = [L loc (VarPat noExtField (N loc n))
+            builder_args  = [L (na2la loc) (VarPat noExtField (N loc n))
                             | N loc n <- args]
             builder_match = mkMatch (mkPrefixFunRhs (N loc name))
                                     builder_args body
@@ -928,7 +928,7 @@ tcPatToExpr name args pat = go pat
                     -> Either MsgDoc (HsExpr GhcRn)
     mkPrefixConExpr lcon@(N loc _) pats
       = do { exprs <- mapM go pats
-           ; return (foldl' (\x y -> HsApp noComments (L loc x) y)
+           ; return (foldl' (\x y -> HsApp noComments (L (na2la loc) x) y)
                             (HsVar noExtField lcon) exprs) }
 
     mkRecordConExpr :: ApiAnnName Name -> HsRecFields GhcRn (LPat GhcRn)

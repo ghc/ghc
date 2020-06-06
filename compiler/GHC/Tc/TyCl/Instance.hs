@@ -576,7 +576,7 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
 
          -- (1) do the work of verifying the synonym group
        ; co_ax_branch <- tcTyFamInstEqn fam_tc mb_clsinfo
-                                        (L (getNA fam_lname) eqn)
+                                        (L (na2la $ getNA fam_lname) eqn)
 
 
          -- (2) check for validity
@@ -1730,7 +1730,7 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
                                             mkMethIds clas tyvars dfun_ev_vars
                                                       inst_tys sel_id
 
-       ; let lm_bind = meth_bind { fun_id = N (noAnnSrcSpan bndr_loc)
+       ; let lm_bind = meth_bind { fun_id = N (noAnnApiName bndr_loc)
                                                         (idName local_meth_id) }
                        -- Substitute the local_meth_name for the binder
                        -- NB: the binding is always a FunBind

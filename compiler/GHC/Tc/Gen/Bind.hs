@@ -1421,9 +1421,9 @@ tcRhs (TcFunBind info@(MBI { mbi_sig = mb_sig, mbi_mono_id = mono_id })
   = tcExtendIdBinderStackForRhs [info]  $
     tcExtendTyVarEnvForRhs mb_sig       $
     do  { traceTc "tcRhs: fun bind" (ppr mono_id $$ ppr (idType mono_id))
-        ; (co_fn, matches') <- tcMatchesFun (N (noAnnSrcSpan loc) (idName mono_id))
+        ; (co_fn, matches') <- tcMatchesFun (N (noAnnApiName loc) (idName mono_id))
                                  matches (mkCheckExpType $ idType mono_id)
-        ; return ( FunBind { fun_id = N (noAnnSrcSpan loc) mono_id
+        ; return ( FunBind { fun_id = N (noAnnApiName loc) mono_id
                            , fun_matches = matches'
                            , fun_ext = co_fn
                            , fun_tick = [] } ) }

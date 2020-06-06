@@ -227,7 +227,7 @@ tcExpr e@(HsOverLabel _ mb_fromLabel l) res_ty
                          ; loc <- getSrcSpanM
                          ; var <- emitWantedEvVar origin pred
                          ; tcWrapResult e
-                                       (fromDict pred (HsVar noExtField (N (noAnnSrcSpan loc) var)))
+                                       (fromDict pred (HsVar noExtField (N (noAnnApiName loc) var)))
                                         alpha res_ty } }
   where
   -- Coerces a dictionary for `IsLabel "x" t` into `t`,
@@ -239,7 +239,7 @@ tcExpr e@(HsOverLabel _ mb_fromLabel l) res_ty
   applyFromLabel :: SrcSpanAnn -> IdP GhcRn -> HsExpr GhcRn -- AZ Temp
   applyFromLabel loc fromLabel =
     HsAppType NoExtField
-         (L loc (HsVar noExtField (N loc fromLabel)))
+         (L loc (HsVar noExtField (N (la2na loc) fromLabel)))
          (mkEmptyWildCardBndrs (L loc (HsTyLit noExtField (HsStrTy NoSourceText l))))
 
 tcExpr (HsLam _ match) res_ty
@@ -2361,7 +2361,7 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
            ; let L loc af = hsRecFieldLbl upd
                  lbl      = rdrNameAmbiguousFieldOcc af
            ; return $ L l upd { hsRecFieldLbl
-                          = L loc (Unambiguous i (N (noAnnSrcSpan loc) lbl)) } }
+                          = L loc (Unambiguous i (N (noAnnApiName loc) lbl)) } }
 
 
 -- Extract the outermost TyCon of a type, if there is one; for
@@ -2461,7 +2461,7 @@ tcRecordUpd con_like arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
                                  , hsRecFieldArg = rhs }))
       = do { let lbl = rdrNameAmbiguousFieldOcc af
                  sel_id = selectorAmbiguousFieldOcc af
-                 f = L loc (FieldOcc (idName sel_id) (N (noAnnSrcSpan loc) lbl))
+                 f = L loc (FieldOcc (idName sel_id) (N (noAnnApiName loc) lbl))
            ; mb <- tcRecordField con_like flds_w_tys f rhs
            ; case mb of
                Nothing         -> return Nothing
@@ -2470,7 +2470,7 @@ tcRecordUpd con_like arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
                          (L l (fld { hsRecFieldLbl
                                       = L loc (Unambiguous
                                                (extFieldOcc (unLoc f'))
-                                               (N (noAnnSrcSpan loc) lbl))
+                                               (N (noAnnApiName loc) lbl))
                                    , hsRecFieldArg = rhs' }))) }
 
 tcRecordField :: ConLike -> Assoc Name Type

@@ -920,8 +920,8 @@ isInfixFunBind _ = False
 mkSimpleGeneratedFunBind :: SrcSpan -> RdrName -> [LPat GhcPs]
                 -> LHsExpr GhcPs -> LHsBind GhcPs
 mkSimpleGeneratedFunBind loc fun pats expr
-  = L (noAnnSrcSpan loc) $ mkFunBind Generated (N (noAnnSrcSpan loc) fun)
-              [mkMatch (mkPrefixFunRhs (N (noAnnSrcSpan loc) fun)) pats expr
+  = L (noAnnSrcSpan loc) $ mkFunBind Generated (N (noAnnApiName loc) fun)
+              [mkMatch (mkPrefixFunRhs (N (noAnnApiName loc) fun)) pats expr
                        (noLoc emptyLocalBinds)]
 
 -- | Make a prefix, non-strict function 'HsMatchContext'
@@ -1299,7 +1299,7 @@ hsLTyClDeclBinders (L loc (DataDecl    { tcdLName = (N _ name)
 hsForeignDeclsBinders :: [LForeignDecl pass] -> [ApiAnnName (IdP pass)]
 -- ^ See Note [SrcSpan for binders]
 hsForeignDeclsBinders foreign_decls
-  = [ N (noAnnSrcSpan decl_loc) n
+  = [ N (noAnnApiName decl_loc) n
     | L decl_loc (ForeignImport { fd_name = N _ n })
         <- foreign_decls]
 

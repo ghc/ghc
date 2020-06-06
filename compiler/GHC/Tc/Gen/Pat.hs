@@ -381,7 +381,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
         ; return (WildPat pat_ty, res) }
 
   AsPat x (N nm_loc name) pat -> do
-        { (wrap, bndr_id) <- setSrcSpanA nm_loc (tcPatBndr penv name pat_ty)
+        { (wrap, bndr_id) <- setSrcSpanN nm_loc (tcPatBndr penv name pat_ty)
         ; (pat', res) <- tcExtendIdEnv1 name bndr_id $
                          tc_lpat (mkCheckExpType $ idType bndr_id)
                                  penv pat thing_inside
@@ -836,7 +836,7 @@ tcDataConPat penv (N con_span con_name) data_con pat_ty
         ; pat_ty <- readExpType pat_ty
 
           -- Add the stupid theta
-        ; setSrcSpanA con_span $ addDataConStupidTheta data_con ctxt_res_tys
+        ; setSrcSpanN con_span $ addDataConStupidTheta data_con ctxt_res_tys
 
         ; let all_arg_tys = eqSpecPreds eq_spec ++ theta ++ arg_tys
         ; checkExistentials ex_tvs all_arg_tys penv

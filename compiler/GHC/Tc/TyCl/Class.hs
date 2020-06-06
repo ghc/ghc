@@ -276,7 +276,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
 
              local_dm_ty = instantiateMethod clas global_dm_id (mkTyVarTys tyvars)
 
-             lm_bind     = dm_bind { fun_id = N bind_loc local_dm_name }
+             lm_bind     = dm_bind { fun_id = N (la2na bind_loc) local_dm_name }
                              -- Substitute the local_meth_name for the binder
                              -- NB: the binding is always a FunBind
 
@@ -521,7 +521,7 @@ tcATDefault loc inst_subst defined_ats (ATI fam_tc defs)
              (tv', cv') = partition isTyVar tcv'
              tvs'     = scopedSort tv'
              cvs'     = scopedSort cv'
-       ; rep_tc_name <- newFamInstTyConName (N (noAnnSrcSpan loc) (tyConName fam_tc)) pat_tys'
+       ; rep_tc_name <- newFamInstTyConName (N (noAnnApiName loc) (tyConName fam_tc)) pat_tys'
        ; let axiom = mkSingleCoAxiom Nominal rep_tc_name tvs' [] cvs'
                                      fam_tc pat_tys' rhs'
            -- NB: no validity check. We check validity of default instances

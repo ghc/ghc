@@ -2206,7 +2206,7 @@ extendPatSynEnv val_decls local_fix_env thing = do {
       | (L bind_loc (PatSynBind _ (PSB { psb_id = N _ n
                                        , psb_args = RecCon as }))) <- bind
       = do
-          bnd_name <- newTopSrcBinder (N bind_loc n)
+          bnd_name <- newTopSrcBinder (N (la2na bind_loc) n)
           let rnames = map recordPatSynSelectorId as
               mkFieldOcc :: ApiAnnName RdrName -> LFieldOcc GhcPs
               mkFieldOcc (N l name) = L (locA l) (FieldOcc noExtField (N l name))
@@ -2215,7 +2215,7 @@ extendPatSynEnv val_decls local_fix_env thing = do {
           return ((bnd_name, flds): names)
       | L bind_loc (PatSynBind _ (PSB { psb_id = N _ n})) <- bind
       = do
-        bnd_name <- newTopSrcBinder (N bind_loc n)
+        bnd_name <- newTopSrcBinder (N (la2na bind_loc) n)
         return ((bnd_name, []): names)
       | otherwise
       = return names

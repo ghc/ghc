@@ -1785,7 +1785,7 @@ check_main dflags tcg_env explicit_mod_hdr export_ies
         ; (ev_binds, main_expr)
                <- checkConstraints skol_info [] [] $
                   addErrCtxt mainCtxt    $
-                  tcLExpr (L loc' (HsVar noExtField (N loc' main_name)))
+                  tcLExpr (L loc' (HsVar noExtField (N (noAnnApiName loc) main_name)))
                           (mkCheckExpType io_ty)
 
                 -- See Note [Root-main Id]
@@ -2175,13 +2175,14 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
                -- Don't try to typecheck if the renamer fails!
         ; ghciStep <- getGhciStepIO
         ; uniq <- newUnique
+        ; let loc' = noAnnApiName $ locA loc
         ; interPrintName <- getInteractivePrintName
         ; let fresh_it  = itName uniq (locA loc)
-              matches   = [mkMatch (mkPrefixFunRhs (N loc fresh_it)) [] rn_expr
+              matches   = [mkMatch (mkPrefixFunRhs (N loc' fresh_it)) [] rn_expr
                                    (noLoc emptyLocalBinds)]
               -- [it = expr]
               the_bind  = L loc $ (mkTopFunBind FromSource
-                                     (N loc fresh_it) matches)
+                                     (N loc' fresh_it) matches)
                                          { fun_ext = fvs }
               -- Care here!  In GHCi the expression might have
               -- free variables, and they in turn may have free type variables
@@ -2198,7 +2199,7 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
                                           { xbsrn_bindOp = mkRnSyntaxExpr bindIOName
                                           , xbsrn_failOp = Nothing
                                           })
-                                       (L loc (VarPat noExtField (N loc fresh_it)))
+                                       (L loc (VarPat noExtField (N loc' fresh_it)))
                                        (nlHsApp ghciStep rn_expr)
 
               -- [; print it]
@@ -2736,7 +2737,7 @@ tcRnLookupRdrName :: HscEnv -> ApiAnnName RdrName
 -- ^ Find all the Names that this RdrName could mean, in GHCi
 tcRnLookupRdrName hsc_env (N loc rdr_name)
   = runTcInteractive hsc_env $
-    setSrcSpanA loc          $
+    setSrcSpanN loc          $
     do {   -- If the identifier is a constructor (begins with an
            -- upper-case letter), then we need to consider both
            -- constructor and type class identifiers.

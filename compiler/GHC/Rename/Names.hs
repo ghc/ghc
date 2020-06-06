@@ -719,7 +719,7 @@ getLocalNonValBinders fixity_env
 
     -- In a hs-boot file, the value binders come from the
     --  *signatures*, and there should be no foreign binders
-    hs_boot_sig_bndrs = [ N (noAnnSrcSpan decl_loc) (unApiName n)
+    hs_boot_sig_bndrs = [ N (noAnnApiName decl_loc) (unApiName n)
                         | L decl_loc (TypeSig _ ns _) <- val_sigs, n <- ns]
 
       -- the SrcSpan attached to the input should be the span of the

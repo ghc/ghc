@@ -8,9 +8,9 @@ module GHC.Hs.Exact
 -- Module to provide "exact" printing of a GhcPs syntax fragment.
 -- This will be the the home of the functionality currently in ghc-exactprint.
 
-import GHC.Hs.Extension
-import GHC.Types.Name.Reader
-import GHC.Types.SrcLoc
+-- import GHC.Hs.Extension
+-- import GHC.Types.Name.Reader
+-- import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 
 -- ---------------------------------------------------------------------

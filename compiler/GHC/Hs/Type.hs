@@ -293,7 +293,7 @@ quantified in left-to-right order in kind signatures is nice since:
 -}
 
 -- | Located Haskell Context
-type LHsContext pass = LocatedA (HsContext pass)
+type LHsContext pass = LocatedC (HsContext pass)
       -- ^ 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnUnit'
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
@@ -851,11 +851,11 @@ type instance XQualTy          (GhcPass _) = ApiAnn
 type instance XTyVar           (GhcPass _) = ApiAnn
 type instance XAppTy           (GhcPass _) = NoExtField
 type instance XFunTy           (GhcPass _) = ApiAnn
-type instance XListTy          (GhcPass _) = ApiAnn
-type instance XTupleTy         (GhcPass _) = ApiAnn
-type instance XSumTy           (GhcPass _) = ApiAnn
+type instance XListTy          (GhcPass _) = ApiAnn' AnnParen
+type instance XTupleTy         (GhcPass _) = ApiAnn' AnnParen
+type instance XSumTy           (GhcPass _) = ApiAnn' AnnParen
 type instance XOpTy            (GhcPass _) = ApiAnn
-type instance XParTy           (GhcPass _) = ApiAnn
+type instance XParTy           (GhcPass _) = ApiAnn' AnnParen
 type instance XIParamTy        (GhcPass _) = ApiAnn
 type instance XStarTy          (GhcPass _) = NoExtField
 type instance XKindSig         (GhcPass _) = ApiAnn
@@ -1177,7 +1177,7 @@ hsAllLTyVarNames (HsQTvs { hsq_ext = kvs
   = kvs ++ hsLTyVarNames tvs
 
 hsLTyVarLocName :: LHsTyVarBndr flag (GhcPass p) -> ApiAnnName (IdP (GhcPass p))
-hsLTyVarLocName (L l a) = N (noAnnSrcSpan l) (hsTyVarName a)
+hsLTyVarLocName (L l a) = N (noAnnApiName l) (hsTyVarName a)
 
 hsLTyVarLocNames :: LHsQTyVars (GhcPass p) -> [ApiAnnName (IdP (GhcPass p))]
 hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvExplicit qtvs)

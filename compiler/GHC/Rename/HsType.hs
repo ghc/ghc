@@ -382,7 +382,7 @@ rnImplicitBndrs implicit_vs_with_dups
          vcat [ ppr implicit_vs_with_dups, ppr implicit_vs ]
 
        ; loc <- getSrcSpanM
-       ; vars <- mapM (newLocalBndrRn . N (noAnnSrcSpan loc) . unApiName) implicit_vs
+       ; vars <- mapM (newLocalBndrRn . N (noAnnApiName loc) . unApiName) implicit_vs
 
        ; bindLocalNamesFV vars $
          thing_inside vars }

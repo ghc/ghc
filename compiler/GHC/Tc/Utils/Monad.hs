@@ -887,7 +887,7 @@ wrapLocMA fn (L loc a) = setSrcSpanA loc $ do { b <- fn a
                                               ; return (L loc b) }
 
 wrapLocMN :: (a -> TcM b) -> ApiAnnName a -> TcM (ApiAnnName b)
-wrapLocMN fn (N loc a) = setSrcSpanA loc $ do { b <- fn a
+wrapLocMN fn (N loc a) = setSrcSpanN loc $ do { b <- fn a
                                               ; return (N loc b) }
 
 wrapLocFstM :: (a -> TcM (b,c)) -> Located a -> TcM (Located b, c)

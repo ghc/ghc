@@ -41,7 +41,7 @@ import GHC.Types.Var
 import GHC.Utils.Binary
 import GHC.Utils.Outputable hiding ((<>))
 import GHC.Types.SrcLoc
-import GHC.Parser.Lexer (AddApiAnn)
+import GHC.Parser.Lexer (AddApiAnn(..))
 import GHC.Parser.Annotation
 
 import Data.Kind
@@ -263,35 +263,98 @@ comment :: RealSrcSpan -> ApiAnnComments -> ApiAnnCO
 comment loc cs = ApiAnn loc NoApiAnns cs
 
 type LocatedA = GenLocated SrcSpanAnn
+type LocatedL = GenLocated SrcSpanAnnL
+type LocatedC = GenLocated SrcSpanAnnC
 
-type SrcSpanAnn = SrcSpanAnn' ApiAnn
+type LocatedAn an = GenLocated (SrcSpanAnn' (ApiAnn' an))
+
+-- type SrcSpanAnn = SrcSpanAnn' ApiAnn
+type SrcSpanAnn  = SrcSpanAnn' (ApiAnn' AnnListItem)
+type SrcSpanAnnL = SrcSpanAnn' (ApiAnn' AnnList)
+type SrcSpanAnnC = SrcSpanAnn' (ApiAnn' AnnContext)
+
 data SrcSpanAnn' a = SrcSpanAnn { ann :: a, locA :: SrcSpan }
         deriving (Data, Eq)
 
-instance Outputable SrcSpanAnn where
+instance (Outputable a) => Outputable (SrcSpanAnn' a) where
   ppr (SrcSpanAnn a l) = text "SrcSpanAnn" <+> ppr a <+> ppr l
 
-sortLocatedA :: [LocatedA a] -> [LocatedA a]
+instance Outputable AnnListItem where
+  ppr (AnnListItem ts) = text "AnnListItem" <+> ppr ts
+
+instance Outputable AnnList where
+  ppr (AnnList o c r) = text "AnnList" <+> ppr o <+> ppr c <+> ppr r
+
+-- sortLocatedA :: [LocatedA a] -> [LocatedA a]
+sortLocatedA :: [GenLocated (SrcSpanAnn' a) e] -> [GenLocated (SrcSpanAnn' a) e]
 sortLocatedA = sortBy (leftmost_smallest `on` getLocA)
 
-mapLocA :: (a -> b) -> Located a -> LocatedA b
+-- mapLocA :: (a -> b) -> Located a -> LocatedA b
+mapLocA :: (t -> e) -> GenLocated SrcSpan t -> GenLocated (SrcSpanAnn' (ApiAnn' ann)) e
 mapLocA f (L l a) = L (noAnnSrcSpan l) (f a)
 
 -- AZ:TODO: move this somewhere sane
 
-combineLocsA :: LocatedA a -> LocatedA b -> SrcSpanAnn
+-- combineLocsA :: LocatedA a -> LocatedA b -> SrcSpanAnn
+combineLocsA :: Semigroup a => GenLocated (SrcSpanAnn' a) e1 -> GenLocated (SrcSpanAnn' a) e2 -> SrcSpanAnn' a
 combineLocsA (L a _) (L b _) = combineSrcSpansA a b
 
-combineSrcSpansA :: SrcSpanAnn -> SrcSpanAnn -> SrcSpanAnn
+-- combineSrcSpansA :: SrcSpanAnn -> SrcSpanAnn -> SrcSpanAnn
+combineSrcSpansA :: Semigroup a => SrcSpanAnn' a -> SrcSpanAnn' a -> SrcSpanAnn' a
 combineSrcSpansA (SrcSpanAnn aa la) (SrcSpanAnn ab lb)
   = SrcSpanAnn (aa <> ab) (combineSrcSpans la lb)
 
 -- | Combine locations from two 'Located' things and add them to a third thing
-addCLocA :: LocatedA a -> Located b -> c -> LocatedA c
+-- addCLocA :: LocatedA a -> Located b -> c -> LocatedA c
+addCLocA :: GenLocated (SrcSpanAnn' a) e1 -> GenLocated SrcSpan e2 -> e3 -> GenLocated (SrcSpanAnn' (ApiAnn' ann)) e3
 addCLocA a b c = L (noAnnSrcSpan $ combineSrcSpans (locA $ getLoc a) (getLoc b)) c
 
-addCLocAA :: LocatedA a -> LocatedA b -> c -> LocatedA c
+-- addCLocAA :: LocatedA a -> LocatedA b -> c -> LocatedA c
+addCLocAA :: GenLocated (SrcSpanAnn' a1) e1 -> GenLocated (SrcSpanAnn' a2) e2 -> e3 -> GenLocated (SrcSpanAnn' (ApiAnn' ann)) e3
 addCLocAA a b c = L (noAnnSrcSpan $ combineSrcSpans (locA $ getLoc a) (locA $ getLoc b)) c
+
+-- ---------------------------------------------------------------------
+-- Annotations for lists of items
+-- ---------------------------------------------------------------------
+
+data AnnListItem
+  = AnnListItem {
+      lann_trailing  :: [AddApiAnn]
+      }
+  deriving (Data, Eq)
+
+-- ---------------------------------------------------------------------
+-- Managing annotations for lists
+-- ---------------------------------------------------------------------
+
+data AnnList
+  = AnnList {
+      al_open      :: AddApiAnn,
+      al_close     :: AddApiAnn,
+      al_rest      :: [AddApiAnn]
+      } deriving (Data)
+
+-- ---------------------------------------------------------------------
+
+data AnnParen
+  = AnnParen {
+      ap_adornment :: ParenType,
+      ap_open      :: RealSrcSpan,
+      ap_close     :: RealSrcSpan
+      } deriving (Data)
+
+data ParenType
+  = AnnParens
+  | AnnParensHash
+  | AnnParensSquare
+  deriving (Eq, Ord, Data)
+
+data AnnContext
+  = AnnContext {
+      ac_darrow    :: Maybe (IsUnicodeSyntax, RealSrcSpan),
+      ac_open      :: [RealSrcSpan],
+      ac_close     :: [RealSrcSpan]
+      } deriving (Data)
 
 -- ---------------------------------------------------------------------
 -- Annotations for names
@@ -299,23 +362,43 @@ addCLocAA a b c = L (noAnnSrcSpan $ combineSrcSpans (locA $ getLoc a) (locA $ ge
 -- We initially wrapped all names in Located as a hook for the
 -- annotations. Now we can do it directly
 
--- type SrcSpanAnnName = SrcSpanAnn' (ApiAnn' NameAnn)
-type SrcSpanAnnName = SrcSpanAnn' ApiAnn
--- type NameA = ApiAnn' NameAnn
+type SrcSpanAnnName = SrcSpanAnn' (ApiAnn' NameAnn)
 
-data NameAnn = NameAnn {
-  nann_adornment :: NameAdornment,
-  nann_open      :: RealSrcSpan,
-  nann_name      :: RealSrcSpan,
-  bann_close     :: RealSrcSpan
-  } deriving (Data, Eq)
+data NameAnn
+  = NameAnn {
+      nann_adornment :: NameAdornment,
+      nann_open      :: RealSrcSpan,
+      nann_name      :: RealSrcSpan,
+      nann_close     :: RealSrcSpan,
+      nann_trailing  :: [AddApiAnn]
+      }
+  | NameAnnCommas {
+      nann_adornment :: NameAdornment,
+      nann_open      :: RealSrcSpan,
+      nann_commas    :: [RealSrcSpan],
+      nann_close     :: RealSrcSpan,
+      nann_trailing  :: [AddApiAnn]
+      }
+  | NameAnnOnly {
+      nann_adornment :: NameAdornment,
+      nann_open      :: RealSrcSpan,
+      nann_close     :: RealSrcSpan,
+      nann_trailing  :: [AddApiAnn]
+      }
+  | NameAnnRArrow {
+      nann_name      :: RealSrcSpan,
+      nann_trailing  :: [AddApiAnn]
+      }
+  | NameAnnTrailing {
+      nann_trailing  :: [AddApiAnn]
+      }
+  deriving (Data, Eq)
 
 data NameAdornment
   = NameParens
   | NameParensHash
   | NameBackquotes
   | NameSquare
-  | NameRArrow
   deriving (Eq, Ord, Data)
 -- Annotations that can occur for a RdrName
 --
@@ -328,10 +411,19 @@ data NameAdornment
 --   with
 --    AnnOpenP, AnnCloseP for '(' ')'
 
-noAnnName :: SrcSpanAnnName
-noAnnName = noSrcSpanA
--- noAnnName = SrcSpanAnn ApiAnnNotUsed noSrcSpan
+addTrailingComma :: SrcSpan -> ApiAnn' NameAnn -> RealSrcSpan -> ApiAnn' NameAnn
+addTrailingComma s ApiAnnNotUsed l = ApiAnn (realSrcSpan s) (NameAnnTrailing [AddApiAnn AnnComma l]) []
+addTrailingComma _ n l = n { anns = addTrailingComma' (anns n) l }
 
+addTrailingComma' :: NameAnn -> RealSrcSpan -> NameAnn
+addTrailingComma' n l = n { nann_trailing = AddApiAnn AnnComma l : nann_trailing n }
+
+
+noAnnName :: SrcSpanAnnName
+-- noAnnName = noSrcSpanA
+noAnnName = SrcSpanAnn ApiAnnNotUsed noSrcSpan
+
+-- AZ: this can go back to being a GenLocated thing
 data ApiAnnName a = N SrcSpanAnnName a
         deriving (Eq, Data, Functor, Foldable, Traversable)
 
@@ -340,9 +432,6 @@ unApiName (N _ a) = a
 
 noApiName :: a -> ApiAnnName a
 noApiName a = N noAnnName a
-
-reAnnN :: [AddApiAnn] -> ApiAnnComments -> Located a -> ApiAnnName a
-reAnnN anns cs (L l a) = N (SrcSpanAnn (ApiAnn (realSrcSpan l) anns cs) l) a
 
 getLocN :: ApiAnnName a -> SrcSpan
 getLocN (N (SrcSpanAnn _ l) _) = l
@@ -353,15 +442,33 @@ getNA (N a _) = a
 reLocN :: ApiAnnName a -> Located a
 reLocN (N (SrcSpanAnn _ l) a) = L l a
 
+noAnnApiName :: SrcSpan -> SrcSpanAnnName
+noAnnApiName l = SrcSpanAnn ApiAnnNotUsed l
+
 -- |Helper function (temporary) during transition of names
-l2n :: LocatedA a -> ApiAnnName a
-l2n (L la a) = N la a
+--  Discards any annotations
+-- l2n :: LocatedA a -> ApiAnnName a
+l2n :: GenLocated (SrcSpanAnn' a1) a2 -> ApiAnnName a2
+l2n (L la a) = N (noAnnApiName (locA la)) a
 
 n2l :: ApiAnnName a -> LocatedA a
-n2l (N la a) = L la a
+n2l (N la a) = L (na2la la) a
 
-la2na :: SrcSpanAnn -> SrcSpanAnnName
-la2na = id
+-- |Helper function (temporary) during transition of names
+--  Discards any annotations
+-- la2na :: SrcSpanAnn -> SrcSpanAnnName
+la2na :: SrcSpanAnn' a -> SrcSpanAnnName
+la2na l = noAnnApiName (locA l)
+
+-- l2l :: SrcSpanAnn' a -> SrcSpanAnn' b
+l2l :: SrcSpanAnn' a -> SrcSpanAnn' (ApiAnn' ann)
+l2l l = noAnnSrcSpan (locA l)
+
+-- |Helper function (temporary) during transition of names
+--  Discards any annotations
+-- na2la :: SrcSpanAnnName -> SrcSpanAnn
+na2la :: SrcSpanAnn' a -> SrcSpanAnn' (ApiAnn' ann)
+na2la l = noAnnSrcSpan (locA l)
 
 mapLocN :: (a -> b) -> ApiAnnName a -> ApiAnnName b
 mapLocN f (N l a) = N l (f a)
@@ -378,45 +485,45 @@ instance (Outputable e) => Outputable (ApiAnnName e) where
   ppr (N _ e) = ppr e
 
 -- ---------------------------------------------------------------------
--- Managing annotations for lists
--- ---------------------------------------------------------------------
-
-data AnnList
-  = AnnList {
-      alOpenLoc      :: SrcSpan,
-      alOpenKeyword  :: AnnKeywordId,
-      alCloseLoc     :: SrcSpan,
-      alCloseKeyword :: AnnKeywordId
-      } deriving (Data)
-
--- ---------------------------------------------------------------------
 
 realSrcSpan :: SrcSpan -> RealSrcSpan
 realSrcSpan (RealSrcSpan s _) = s
 realSrcSpan _ = panic "expecting RealSrcSpan"
 
 reAnn :: [AddApiAnn] -> ApiAnnComments -> Located a -> LocatedA a
-reAnn anns cs (L l a) = L (SrcSpanAnn (ApiAnn (realSrcSpan l) anns cs) l) a
+reAnn anns cs (L l a) = L (SrcSpanAnn (ApiAnn (realSrcSpan l) (AnnListItem anns) cs) l) a
 
-noLocA :: a -> LocatedA a
+reAnnC :: AnnContext -> ApiAnnComments -> Located a -> LocatedC a
+reAnnC anns cs (L l a) = L (SrcSpanAnn (ApiAnn (realSrcSpan l) anns cs) l) a
+
+-- reAnnL :: AnnList -> ApiAnnComments -> Located a -> LocatedL a
+reAnnL :: ann -> ApiAnnComments -> Located e -> GenLocated (SrcSpanAnn' (ApiAnn' ann)) e
+reAnnL anns cs (L l a) = L (SrcSpanAnn (ApiAnn (realSrcSpan l) anns cs) l) a
+
+-- noLocA :: a -> GenLocated (SrcSpanAnn' (ApiAnn' an)) a
+noLocA :: a -> LocatedAn an a
 noLocA = L (SrcSpanAnn ApiAnnNotUsed noSrcSpan)
 
-getLocA :: LocatedA a -> SrcSpan
+getLocA :: GenLocated (SrcSpanAnn' a) e -> SrcSpan
 getLocA (L (SrcSpanAnn _ l) _) = l
 
 getLocAnn :: Located a  -> SrcSpanAnn
 getLocAnn (L l _) = SrcSpanAnn ApiAnnNotUsed l
 
-noAnnSrcSpan :: SrcSpan -> SrcSpanAnn
+-- noAnnSrcSpan :: SrcSpan -> SrcSpanAnn
+noAnnSrcSpan :: SrcSpan -> SrcSpanAnn' (ApiAnn' ann)
 noAnnSrcSpan l = SrcSpanAnn ApiAnnNotUsed l
 
-noSrcSpanA :: SrcSpanAnn
+-- noSrcSpanA :: SrcSpanAnn
+noSrcSpanA :: SrcSpanAnn' (ApiAnn' ann)
 noSrcSpanA = noAnnSrcSpan noSrcSpan
 
-reLoc :: LocatedA a -> Located a
+-- reLoc :: LocatedA a -> Located a
+reLoc :: GenLocated (SrcSpanAnn' a) e -> Located e
 reLoc (L (SrcSpanAnn _ l) a) = L l a
 
-reLocA :: Located a -> LocatedA a
+-- reLocA :: Located a -> LocatedA a
+reLocA :: GenLocated SrcSpan e -> GenLocated (SrcSpanAnn' (ApiAnn' ann)) e
 reLocA (L l a) = (L (SrcSpanAnn ApiAnnNotUsed l) a)
 
 noAnn :: ApiAnn' a
@@ -429,6 +536,10 @@ addAnns (ApiAnn l as1 cs) as2 cs2 = ApiAnn l (as1 ++ as2) (cs ++ cs2)
 addAnns ApiAnnNotUsed [] [] = ApiAnnNotUsed
 addAnns ApiAnnNotUsed as cs = ApiAnn placeholderRealSpan as cs
 
+addAnnsA :: ApiAnn' AnnListItem -> [AddApiAnn] -> ApiAnnComments -> ApiAnn' AnnListItem
+addAnnsA (ApiAnn l as1 cs) as2 cs2 = ApiAnn l (AnnListItem (lann_trailing as1 ++ as2)) (cs ++ cs2)
+addAnnsA ApiAnnNotUsed [] [] = ApiAnnNotUsed
+addAnnsA ApiAnnNotUsed as cs = ApiAnn placeholderRealSpan (AnnListItem as) cs
 
 -- TODO:AZ combining anchor locations needs to be done properly.  Or
 -- this function discarded.
@@ -440,6 +551,8 @@ instance (Semigroup a) => Semigroup (ApiAnn' a) where
 instance (Monoid a) => Monoid (ApiAnn' a) where
   mempty = ApiAnnNotUsed
 
+instance Semigroup AnnListItem where
+  (AnnListItem l1) <> (AnnListItem l2) = AnnListItem (l1 <> l2)
 
 instance (Outputable a) => Outputable (ApiAnn' a) where
   ppr (ApiAnn l a c)  = text "ApiAnn" <+> ppr l <+> ppr a <+> ppr c

@@ -676,6 +676,8 @@ evVarsOfTermList (EvFun{}) = []
 instance ToHie (EvBindContext (LocatedA TcEvBinds)) where
   toHie (EvBindContext sc sp (L span (EvBinds bs)))
     = toHie (EvBindContext sc sp (L (locA span) (EvBinds bs)))
+  toHie (EvBindContext sc sp (L span (TcEvBinds bs)))
+    = toHie (EvBindContext sc sp (L (locA span) (TcEvBinds bs)))
 
 instance ToHie (EvBindContext (Located TcEvBinds)) where
   toHie (EvBindContext sc sp (L span (EvBinds bs)))

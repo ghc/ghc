@@ -102,7 +102,7 @@ finishHsVar (L l name)
  = do { this_mod <- getModule
       ; when (nameIsLocalOrFrom this_mod name) $
         checkThLocalName name
-      ; return (HsVar noExtField (N l name), unitFV name) }
+      ; return (HsVar noExtField (N (la2na l) name), unitFV name) }
 
 rnUnboundVar :: RdrName -> RnM (HsExpr GhcRn, FreeVars)
 rnUnboundVar v
@@ -130,7 +130,7 @@ rnExpr (HsVar _ (N l v))
               -> rnExpr (ExplicitList noAnn Nothing [])
 
               | otherwise
-              -> finishHsVar (L l name) ;
+              -> finishHsVar (L (na2la l) name) ;
             Just (Right [s]) ->
               return ( HsRecFld noExtField (Unambiguous s (N l v) ), unitFV s) ;
            Just (Right fs@(_:_:_)) ->
@@ -306,7 +306,7 @@ rnExpr (RecordCon { rcon_con_name = con_id
                 , fvs `plusFV` plusFVs fvss `addOneFV` con_name) }
   where
     mk_hs_var :: SrcSpan -> IdP GhcPs -> HsExpr GhcPs -- AZ
-    mk_hs_var l n = HsVar noExtField (N (noAnnSrcSpan l) n)
+    mk_hs_var l n = HsVar noExtField (N (noAnnApiName l) n)
     rn_field :: GenLocated l (HsRecField' id (LHsExpr GhcPs))
                       -> RnM
                            (GenLocated l (HsRecField' id (LHsExpr GhcRn)), FreeVars) -- AZ

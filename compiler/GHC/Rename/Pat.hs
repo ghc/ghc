@@ -392,7 +392,7 @@ rnPatAndThen mk (BangPat _ pat) = do { pat' <- rnLPatAndThen mk pat
                                      ; return (BangPat noExtField pat') }
 rnPatAndThen mk (VarPat x (N l rdr))
     = do { loc <- liftCps getSrcSpanM
-         ; name <- newPatName mk (N (noAnnSrcSpan loc) rdr)
+         ; name <- newPatName mk (N (noAnnApiName loc) rdr)
          ; return (VarPat x (N l name)) }
      -- we need to bind pattern variables for view pattern expressions
      -- (e.g. in the pattern (x, x -> y) x needs to be bound in the rhs of the tuple)
@@ -558,7 +558,7 @@ rnHsRecPatsAndThen mk (N _ con)
        ; return (HsRecFields { rec_flds = flds', rec_dotdot = dd }) }
   where
     mkVarPat :: SrcSpan -> IdP GhcPs -> Pat GhcPs -- AZ temp
-    mkVarPat l n = VarPat noExtField (N (noAnnSrcSpan l) n)
+    mkVarPat l n = VarPat noExtField (N (noAnnApiName l) n)
     -- rn_field :: (LHsRecField GhcPs (LPat GhcPs), Int) -> CpsRn (LHsRecField GhcRn (LPat GhcRn)) -- AZ
     rn_field (L l fld, n') =
       do { arg' <- rnLPatAndThen (nested_mk dd mk n') (hsRecFieldArg fld)
@@ -691,7 +691,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
            ; return [ L loc' (HsRecField
                         { hsRecFieldAnn = noAnn
                         , hsRecFieldLbl
-                           = L loc (FieldOcc sel (N loc' arg_rdr))
+                           = L loc (FieldOcc sel (N (noAnnApiName loc) arg_rdr))
                         , hsRecFieldArg = L loc' (mk_arg loc arg_rdr)
                         , hsRecPun      = False })
                     | fl <- dot_dot_fields
@@ -759,7 +759,7 @@ rnHsRecUpdFields flds
                                -- Discard any module qualifier (#11662)
                              ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
                              ; return (L (noAnnSrcSpan loc) (HsVar noExtField
-                                              (N (noAnnSrcSpan loc) arg_rdr))) }
+                                              (N (noAnnApiName loc) arg_rdr))) }
                      else return arg
            ; (arg'', fvs) <- rnLExpr arg'
 
@@ -769,11 +769,11 @@ rnHsRecUpdFields flds
                           Right _       -> fvs
                  lbl' = case sel of
                           Left sel_name -> L loc (Unambiguous sel_name
-                                                  (N (noAnnSrcSpan loc) lbl))
+                                                  (N (noAnnApiName loc) lbl))
                           Right [sel_name] -> L loc (Unambiguous sel_name
-                                                     (N (noAnnSrcSpan loc) lbl))
+                                                     (N (noAnnApiName loc) lbl))
                           Right _ -> L loc (Ambiguous   noExtField
-                                            (N (noAnnSrcSpan loc) lbl))
+                                            (N (noAnnApiName loc) lbl))
 
            ; return (L l (HsRecField { hsRecFieldAnn = noAnn
                                      , hsRecFieldLbl = lbl'

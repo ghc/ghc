@@ -208,7 +208,7 @@ newTopSrcBinder (N loc rdr_name)
                 ; return (mkInternalName uniq (rdrNameOcc rdr_name) (locA loc)) }
           else
              do { this_mod <- getModule
-                ; traceRn "newTopSrcBinder" (ppr this_mod $$ ppr rdr_name $$ ppr loc)
+                ; traceRn "newTopSrcBinder" (ppr this_mod $$ ppr rdr_name $$ ppr (locA loc))
                 ; newGlobalBinder this_mod (rdrNameOcc rdr_name) (locA loc) }
         }
 

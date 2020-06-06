@@ -87,7 +87,7 @@ data HsModule
         -- downstream.
       hsmodDecls :: [LHsDecl GhcPs],
         -- ^ Type, class, value, and interface signature decls
-      hsmodDeprecMessage :: Maybe (LocatedA WarningTxt),
+      hsmodDeprecMessage :: Maybe (LocatedL WarningTxt),
         -- ^ reason\/explanation for warning/deprecation of this module
         --
         --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen'

@@ -1003,7 +1003,7 @@ checkTyClHdr is_cls ty
     go lp (HsParTy _ (L l (HsStarTy _ isUni))) acc ann fix
       = do { warnStarBndr (locA l)
            ; let name = mkOccName tcClsName (starSym isUni)
-           ; return (N l (Unqual name), acc, fix
+           ; return (N (la2na l) (Unqual name), acc, fix
                     , (ann ++ mkParensApiAnn lp)) }
 
     go _ (HsTyVar _ _ ltc@(N _ tc)) acc ann fix
@@ -1014,7 +1014,7 @@ checkTyClHdr is_cls ty
     go _ (HsAppTy _ t1 t2) acc ann fix = goL t1 (HsValArg t2:acc) ann fix
     go _ (HsAppKindTy l ty ki) acc ann fix = goL ty (HsTypeArg l ki:acc) ann fix
     go l (HsTupleTy _ HsBoxedOrConstraintTuple ts) [] ann fix
-      = return (N (noAnnSrcSpan l) (nameRdrName tup_name)
+      = return (N (noAnnApiName l) (nameRdrName tup_name)
                , map HsValArg ts, fix, ann)
       where
         arity = length ts
@@ -1073,21 +1073,30 @@ checkCmdBlockArguments :: LHsCmd GhcPs -> PV ()
 -- @
 checkContext :: LHsType GhcPs -> P (LHsContext GhcPs)
 checkContext orig_t@(L (SrcSpanAnn an l) _orig_t) = do
-  check an orig_t
+  check ([],[],[]) orig_t
  where
-  check :: ApiAnn -> LHsType GhcPs -> P (LHsContext GhcPs)
-  check anns (L _l (HsTupleTy ann' HsBoxedOrConstraintTuple ts))
+  check :: ([RealSrcSpan],[RealSrcSpan],[RealLocated AnnotationComment]) -> LHsType GhcPs -> P (LHsContext GhcPs)
+  check (oparens,cparens,cs) (L _l (HsTupleTy ann' HsBoxedOrConstraintTuple ts))
     -- (Eq a, Ord b) shows up as a tuple type. Only boxed tuples can
     -- be used as context constraints.
-    = return (L (SrcSpanAnn (anns `mappend` ann') l) ts)           -- Ditto ()
+    -- Ditto ()
+    = do
+        let (op,cp,cs') = case ann' of
+              ApiAnnNotUsed -> ([],[],[])
+              ApiAnn _ (AnnParen _ o c) cs -> ([o],[c],cs)
+        return (L (SrcSpanAnn (ApiAnn (realSrcSpan l) (AnnContext Nothing (op++oparens) (cp++cparens)) (cs++cs')) l) ts)
 
-  check anns (L _lp1 (HsParTy ann' ty))
+  check (opi,cpi,csi) (L _lp1 (HsParTy ann' ty))
                                   -- to be sure HsParTy doesn't get into the way
-       = check (anns `mappend` ann') ty
+    = do
+        let (op,cp,cs') = case ann' of
+                    ApiAnnNotUsed -> ([],[],[])
+                    ApiAnn _ (AnnParen _ open close ) cs -> ([open],[close],cs)
+        check (op++opi,cp++cpi,cs'++csi) ty
 
   -- no need for anns, returning original
-  check anns t = checkNoDocs msg t
-                 *> return (L (SrcSpanAnn anns l) [orig_t])
+  check (opi,cpi,csi) t = checkNoDocs msg t
+                 *> return (L (SrcSpanAnn (ApiAnn (realSrcSpan l) (AnnContext Nothing opi cpi) csi) l) [orig_t])
 
   msg = text "data constructor context"
 
@@ -1149,7 +1158,7 @@ checkPat :: SrcSpan -> LocatedA (PatBuilder GhcPs) -> [LPat GhcPs]
 checkPat loc (L l e@(PatBuilderVar (N _ c))) args
   | isRdrDataCon c = return . L (noAnnSrcSpan loc) $ ConPat
       { pat_con_ext = noAnn -- AZ: where should this come from?
-      , pat_con = N l c
+      , pat_con = N (la2na l) c
       , pat_args = PrefixCon args
       }
   | not (null args) && patIsRec c =
@@ -1198,7 +1207,7 @@ checkAPat loc e0 = do
          r <- checkLPat r
          return $ ConPat
            { pat_con_ext = anns
-           , pat_con = N cl c
+           , pat_con = N (la2na cl) c
            , pat_args = InfixCon l r
            }
 
@@ -1396,7 +1405,7 @@ isFunLhs e = go e [] []
                                       = go e es (ann ++ mkParensApiAnn (locA l))
    go (L loc (PatBuilderOpApp l (L loc' op) r (ApiAnn loca anns cs))) es ann
         | not (isRdrDataCon op)         -- We have found the function!
-        = return (Just (N loc' op, Infix, (l:r:es), (anns ++ ann)))
+        = return (Just (N (la2na loc') op, Infix, (l:r:es), (anns ++ ann)))
         | otherwise                     -- Infix data con; keep going
         = do { mb_l <- go l es ann
              ; case mb_l of
@@ -1746,7 +1755,7 @@ mergeDataCon all_xs =
            ; return (pure [], (data_con, RecCon (L (locA l) fields), mDoc)) }
     goFirst [L l (TyElOpd (HsTupleTy _ HsBoxedOrConstraintTuple ts))]
       = return ( pure []
-               , ( N l (getRdrName (tupleDataCon Boxed (length ts)))
+               , ( N (la2na l) (getRdrName (tupleDataCon Boxed (length ts)))
                  , PrefixCon ts
                  , mTrailingDoc ) )
     goFirst ((L l (TyElOpd t)):xs)
@@ -1869,20 +1878,20 @@ ecpFromCmd a = ECP (ecpFromCmd' a)
 -- | Disambiguate infix operators.
 -- See Note [Ambiguous syntactic categories]
 class DisambInfixOp b where
-  mkHsVarOpPV :: ApiAnnName RdrName -> PV (LocatedA b)
-  mkHsConOpPV :: ApiAnnName RdrName -> PV (LocatedA b)
+  mkHsVarOpPV :: ApiAnnName RdrName -> PV (ApiAnnName b)
+  mkHsConOpPV :: ApiAnnName RdrName -> PV (ApiAnnName b)
   mkHsInfixHolePV :: SrcSpan -> [AddApiAnn] -> PV (Located b)
 
 instance DisambInfixOp (HsExpr GhcPs) where
-  mkHsVarOpPV v = return $ L (getNA v) (HsVar noExtField v)
-  mkHsConOpPV v = return $ L (getNA v) (HsVar noExtField v)
+  mkHsVarOpPV v = return $ N (getNA v) (HsVar noExtField v)
+  mkHsConOpPV v = return $ N (getNA v) (HsVar noExtField v)
   mkHsInfixHolePV l ann = do
     cs <- addAnnsAt l []
     return $ L l (hsHoleExpr (ApiAnn (realSrcSpan l) ann cs))
 
 instance DisambInfixOp RdrName where
-  mkHsConOpPV (N l v) = return $ L l v
-  mkHsVarOpPV (N l v) = return $ L l v
+  mkHsConOpPV (N l v) = return $ N l v
+  mkHsVarOpPV (N l v) = return $ N l v
   mkHsInfixHolePV l _ =
     addFatalError l $ text "Invalid infix hole, expected an infix operator"
 
@@ -1909,7 +1918,7 @@ class b ~ (Body b) GhcPs => DisambECP b where
   superInfixOp
     :: (DisambInfixOp (InfixOp b) => PV (LocatedA b )) -> PV (LocatedA b)
   -- | Disambiguate "f # x" (infix operator)
-  mkHsOpAppPV :: SrcSpanAnn -> LocatedA b -> LocatedA (InfixOp b) -> LocatedA b
+  mkHsOpAppPV :: SrcSpanAnn -> LocatedA b -> ApiAnnName (InfixOp b) -> LocatedA b
               -> ApiAnn -> PV (LocatedA b)
   -- | Disambiguate "case ... of ..."
   mkHsCasePV :: SrcSpan -> LHsExpr GhcPs -> MatchGroup GhcPs (LocatedA b)
@@ -2042,7 +2051,7 @@ instance DisambECP (HsCmd GhcPs) where
   superInfixOp m = m
   mkHsOpAppPV l c1 op c2 anns = do
     let cmdArg c = L (getLocA c) $ HsCmdTop noExtField c
-    return $ L l $ HsCmdArrForm anns op Infix Nothing [cmdArg c1, cmdArg c2]
+    return $ L l $ HsCmdArrForm anns (n2l op) Infix Nothing [cmdArg c1, cmdArg c2]
   mkHsCasePV l c mg anns = do
     cs <- addAnnsAt l []
     return $ L (noAnnSrcSpan l) (HsCmdCase (ApiAnn (realSrcSpan l) anns cs) c mg)
@@ -2112,7 +2121,7 @@ instance DisambECP (HsExpr GhcPs) where
   type InfixOp (HsExpr GhcPs) = HsExpr GhcPs
   superInfixOp m = m
   mkHsOpAppPV l e1 op e2 anns = do
-    return $ L l $ OpApp anns e1 op e2
+    return $ L l $ OpApp anns e1 (n2l op) e2
   mkHsCasePV l e mg anns = do
     cs <- addAnnsAt l []
     return $ L (noAnnSrcSpan l) (HsCase (ApiAnn (realSrcSpan l) anns cs) e mg)
@@ -2138,7 +2147,7 @@ instance DisambECP (HsExpr GhcPs) where
   mkHsParPV l e ann = do
     cs <- addAnnsAt l []
     return $ L (noAnnSrcSpan l) (HsPar (ApiAnn (realSrcSpan l) ann cs) e)
-  mkHsVarPV v@(N l _) = return $ L l (HsVar noExtField v)
+  mkHsVarPV v@(N l _) = return $ L (na2la l) (HsVar noExtField v)
   mkHsLitPV (L l a) = do
     cs <- addAnnsAt l []
     return $ L l (HsLit (comment (realSrcSpan l) cs) a)
@@ -2227,7 +2236,7 @@ instance DisambECP (PatBuilder GhcPs) where
     = addFatalError l $ text "(let ... in ...)-syntax in pattern"
   type InfixOp (PatBuilder GhcPs) = RdrName
   superInfixOp m = m
-  mkHsOpAppPV l p1 op p2 anns = return $ L l $ PatBuilderOpApp p1 op p2 anns
+  mkHsOpAppPV l p1 op p2 anns = return $ L l $ PatBuilderOpApp p1 (n2l op) p2 anns
   mkHsCasePV l _ _ _
     = addFatalError l $ text "(case ... of ...)-syntax in pattern"
   mkHsLamCasePV l _ _ = addFatalError l $ text "(\\case ...)-syntax in pattern"
@@ -2240,7 +2249,7 @@ instance DisambECP (PatBuilder GhcPs) where
     = addFatalError l $ text "(if ... then ... else ...)-syntax in pattern"
   mkHsDoPV l _ _ = addFatalError l $ text "do-notation in pattern"
   mkHsParPV l p _ = return $ L (noAnnSrcSpan l) (PatBuilderPar p)
-  mkHsVarPV v@(N l _) = return $ L l (PatBuilderVar v)
+  mkHsVarPV v@(N l _) = return $ L (na2la l) (PatBuilderVar v)
   mkHsLitPV lit@(L l a) = do
     checkUnboxedStringLitPat lit
     return $ L l (PatBuilderPat (LitPat noExtField a))
@@ -2942,7 +2951,7 @@ data ImpExpSubSpec = ImpExpAbs
                    | ImpExpAllWith [Located ImpExpQcSpec]
 
 data ImpExpQcSpec = ImpExpQcName (ApiAnnName RdrName)
-                  | ImpExpQcType (ApiAnnName RdrName)
+                  | ImpExpQcType RealSrcSpan (ApiAnnName RdrName)
                   | ImpExpQcWildcard
 
 mkModuleImpExp :: [AddApiAnn] -> Located ImpExpQcSpec -> ImpExpSubSpec -> P (IE GhcPs)
@@ -2985,12 +2994,12 @@ mkModuleImpExp anns (L l specname) subs = do
                    else empty)
         else return $ ieNameFromSpec specname
 
-    ieNameVal (ImpExpQcName ln)  = unApiName ln
-    ieNameVal (ImpExpQcType ln)  = unApiName ln
-    ieNameVal (ImpExpQcWildcard) = panic "ieNameVal got wildcard"
+    ieNameVal (ImpExpQcName ln)   = unApiName ln
+    ieNameVal (ImpExpQcType _ ln) = unApiName ln
+    ieNameVal (ImpExpQcWildcard)  = panic "ieNameVal got wildcard"
 
-    ieNameFromSpec (ImpExpQcName ln)  = IEName ln
-    ieNameFromSpec (ImpExpQcType ln)  = IEType ln
+    ieNameFromSpec (ImpExpQcName   ln) = IEName ln
+    ieNameFromSpec (ImpExpQcType _ ln) = IEType ln
     ieNameFromSpec (ImpExpQcWildcard) = panic "ieName got wildcard"
 
     wrapped = map (mapLoc ieNameFromSpec)
