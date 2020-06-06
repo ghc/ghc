@@ -4,7 +4,7 @@
 -- Specialised deterministic sets, for things with @Uniques@
 --
 -- Based on 'UniqDFM's (as you would expect).
--- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for explanation why we need it.
+-- See Note [Deterministic UniqFM] in "GHC.Types.Unique.DFM" for explanation why we need it.
 --
 -- Basically, the things need to be in class 'Uniquable'.
 
