@@ -211,12 +211,12 @@ data HsBindLR idL idR
     -- 'MatchContext'. See Note [FunBind vs PatBind] for
     -- details about the relationship between FunBind and PatBind.
     --
-    --  'ApiAnnotation.AnnKeywordId's
+    --  'GHC.Parser.Annotation.AnnKeywordId's
     --
-    --  - 'ApiAnnotation.AnnFunId', attached to each element of fun_matches
+    --  - 'GHC.Parser.Annotation.AnnFunId', attached to each element of fun_matches
     --
-    --  - 'ApiAnnotation.AnnEqual','ApiAnnotation.AnnWhere',
-    --    'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
+    --  - 'GHC.Parser.Annotation.AnnEqual','GHC.Parser.Annotation.AnnWhere',
+    --    'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnClose',
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
     FunBind {
@@ -255,9 +255,9 @@ data HsBindLR idL idR
   -- relationship between FunBind and PatBind.
 
   --
-  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnBang',
-  --       'ApiAnnotation.AnnEqual','ApiAnnotation.AnnWhere',
-  --       'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
+  --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnBang',
+  --       'GHC.Parser.Annotation.AnnEqual','GHC.Parser.Annotation.AnnWhere',
+  --       'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnClose',
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | PatBind {
@@ -291,7 +291,7 @@ data HsBindLR idL idR
         abs_exports :: [ABExport idL],
 
         -- | Evidence bindings
-        -- Why a list? See GHC.Tc.TyCl.Instance
+        -- Why a list? See "GHC.Tc.TyCl.Instance"
         -- Note [Typechecking plan for instance declarations]
         abs_ev_binds :: [TcEvBinds],
 
@@ -305,10 +305,10 @@ data HsBindLR idL idR
   | PatSynBind
         (XPatSynBind idL idR)
         (PatSynBind idL idR)
-        -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnPattern',
-        --          'ApiAnnotation.AnnLarrow','ApiAnnotation.AnnEqual',
-        --          'ApiAnnotation.AnnWhere'
-        --          'ApiAnnotation.AnnOpen' @'{'@,'ApiAnnotation.AnnClose' @'}'@
+        -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnPattern',
+        --          'GHC.Parser.Annotation.AnnLarrow','GHC.Parser.Annotation.AnnEqual',
+        --          'GHC.Parser.Annotation.AnnWhere'
+        --          'GHC.Parser.Annotation.AnnOpen' @'{'@,'GHC.Parser.Annotation.AnnClose' @'}'@
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
@@ -360,10 +360,10 @@ type instance XABE       (GhcPass p) = NoExtField
 type instance XXABExport (GhcPass p) = NoExtCon
 
 
--- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnPattern',
---             'ApiAnnotation.AnnEqual','ApiAnnotation.AnnLarrow'
---             'ApiAnnotation.AnnWhere','ApiAnnotation.AnnOpen' @'{'@,
---             'ApiAnnotation.AnnClose' @'}'@,
+-- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnPattern',
+--             'GHC.Parser.Annotation.AnnEqual','GHC.Parser.Annotation.AnnLarrow',
+--             'GHC.Parser.Annotation.AnnWhere','GHC.Parser.Annotation.AnnOpen' @'{'@,
+--             'GHC.Parser.Annotation.AnnClose' @'}'@,
 
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
@@ -823,7 +823,7 @@ isEmptyIPBindsTc (IPBinds ds is) = null is && isEmptyTcEvBinds ds
 
 -- | Located Implicit Parameter Binding
 type LIPBind id = Located (IPBind id)
--- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi' when in a
+-- ^ May have 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnSemi' when in a
 --   list
 
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
@@ -835,7 +835,7 @@ type LIPBind id = Located (IPBind id)
 -- (Right d), where "d" is the name of the dictionary holding the
 -- evidence for the implicit parameter.
 --
--- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnEqual'
+-- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnEqual'
 
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 data IPBind id
@@ -889,8 +889,8 @@ data Sig pass
       -- signature that brought them into scope, in this third field to be
       -- more specific.
       --
-      --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon',
-      --          'ApiAnnotation.AnnComma'
+      --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDcolon',
+      --          'GHC.Parser.Annotation.AnnComma'
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
     TypeSig
@@ -902,9 +902,9 @@ data Sig pass
       --
       -- > pattern Single :: () => (Show a) => a -> [a]
       --
-      --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnPattern',
-      --           'ApiAnnotation.AnnDcolon','ApiAnnotation.AnnForall'
-      --           'ApiAnnotation.AnnDot','ApiAnnotation.AnnDarrow'
+      --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnPattern',
+      --           'GHC.Parser.Annotation.AnnDcolon','GHC.Parser.Annotation.AnnForall'
+      --           'GHC.Parser.Annotation.AnnDot','GHC.Parser.Annotation.AnnDarrow'
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | PatSynSig (XPatSynSig pass) [Located (IdP pass)] (LHsSigType pass)
@@ -918,8 +918,8 @@ data Sig pass
       --          default op :: Eq a => a -> a   -- Generic default
       -- No wildcards allowed here
       --
-      --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDefault',
-      --           'ApiAnnotation.AnnDcolon'
+      --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDefault',
+      --           'GHC.Parser.Annotation.AnnDcolon'
   | ClassOpSig (XClassOpSig pass) Bool [Located (IdP pass)] (LHsSigType pass)
 
         -- | A type signature in generated code, notably the code
@@ -934,8 +934,8 @@ data Sig pass
         -- >     infixl 8 ***
         --
         --
-        --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnInfix',
-        --           'ApiAnnotation.AnnVal'
+        --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnInfix',
+        --           'GHC.Parser.Annotation.AnnVal'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | FixSig (XFixSig pass) (FixitySig pass)
@@ -944,11 +944,11 @@ data Sig pass
         --
         -- > {#- INLINE f #-}
         --
-        --  - 'ApiAnnotation.AnnKeywordId' :
-        --       'ApiAnnotation.AnnOpen' @'{-\# INLINE'@ and @'['@,
-        --       'ApiAnnotation.AnnClose','ApiAnnotation.AnnOpen',
-        --       'ApiAnnotation.AnnVal','ApiAnnotation.AnnTilde',
-        --       'ApiAnnotation.AnnClose'
+        --  - 'GHC.Parser.Annotation.AnnKeywordId' :
+        --       'GHC.Parser.Annotation.AnnOpen' @'{-\# INLINE'@ and @'['@,
+        --       'GHC.Parser.Annotation.AnnClose','GHC.Parser.Annotation.AnnOpen',
+        --       'GHC.Parser.Annotation.AnnVal','GHC.Parser.Annotation.AnnTilde',
+        --       'GHC.Parser.Annotation.AnnClose'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | InlineSig   (XInlineSig pass)
@@ -959,12 +959,12 @@ data Sig pass
         --
         -- > {-# SPECIALISE f :: Int -> Int #-}
         --
-        --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
-        --      'ApiAnnotation.AnnOpen' @'{-\# SPECIALISE'@ and @'['@,
-        --      'ApiAnnotation.AnnTilde',
-        --      'ApiAnnotation.AnnVal',
-        --      'ApiAnnotation.AnnClose' @']'@ and @'\#-}'@,
-        --      'ApiAnnotation.AnnDcolon'
+        --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
+        --      'GHC.Parser.Annotation.AnnOpen' @'{-\# SPECIALISE'@ and @'['@,
+        --      'GHC.Parser.Annotation.AnnTilde',
+        --      'GHC.Parser.Annotation.AnnVal',
+        --      'GHC.Parser.Annotation.AnnClose' @']'@ and @'\#-}'@,
+        --      'GHC.Parser.Annotation.AnnDcolon'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | SpecSig     (XSpecSig pass)
@@ -981,8 +981,8 @@ data Sig pass
         -- (Class tys); should be a specialisation of the
         -- current instance declaration
         --
-        --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
-        --      'ApiAnnotation.AnnInstance','ApiAnnotation.AnnClose'
+        --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
+        --      'GHC.Parser.Annotation.AnnInstance','GHC.Parser.Annotation.AnnClose'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | SpecInstSig (XSpecInstSig pass) SourceText (LHsSigType pass)
@@ -992,9 +992,9 @@ data Sig pass
         --
         -- > {-# MINIMAL a | (b, c | (d | e)) #-}
         --
-        --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
-        --      'ApiAnnotation.AnnVbar','ApiAnnotation.AnnComma',
-        --      'ApiAnnotation.AnnClose'
+        --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
+        --      'GHC.Parser.Annotation.AnnVbar','GHC.Parser.Annotation.AnnComma',
+        --      'GHC.Parser.Annotation.AnnClose'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | MinimalSig (XMinimalSig pass)

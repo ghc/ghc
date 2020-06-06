@@ -234,11 +234,11 @@ instance Outputable Header where
 
 -- | A C type, used in CAPI FFI calls
 --
---  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{-\# CTYPE'@,
---        'ApiAnnotation.AnnHeader','ApiAnnotation.AnnVal',
---        'ApiAnnotation.AnnClose' @'\#-}'@,
+--  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'{-\# CTYPE'@,
+--        'GHC.Parser.Annotation.AnnHeader','GHC.Parser.Annotation.AnnVal',
+--        'GHC.Parser.Annotation.AnnClose' @'\#-}'@,
 
--- For details on above see note [Api annotations] in GHC.Parser.Annotation
+-- For details on above see note [Api annotations] in "GHC.Parser.Annotation"
 data CType = CType SourceText -- Note [Pragma source text] in GHC.Types.Basic
                    (Maybe Header) -- header to include for this type
                    (SourceText,FastString) -- the type itself

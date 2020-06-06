@@ -73,7 +73,7 @@ import qualified Language.Haskell.TH as TH (Q)
 
 -- | Located Haskell Expression
 type LHsExpr p = Located (HsExpr p)
-  -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma' when
+  -- ^ May have 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnComma' when
   --   in a list
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
@@ -279,16 +279,16 @@ data HsExpr p
               (MatchGroup p (LHsExpr p))
                        -- ^ Lambda abstraction. Currently always a single match
        --
-       -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLam',
-       --       'ApiAnnotation.AnnRarrow',
+       -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
+       --       'GHC.Parser.Annotation.AnnRarrow',
 
        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsLamCase (XLamCase p) (MatchGroup p (LHsExpr p)) -- ^ Lambda-case
        --
-       -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLam',
-       --           'ApiAnnotation.AnnCase','ApiAnnotation.AnnOpen',
-       --           'ApiAnnotation.AnnClose'
+       -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
+       --           'GHC.Parser.Annotation.AnnCase','GHC.Parser.Annotation.AnnOpen',
+       --           'GHC.Parser.Annotation.AnnClose'
 
        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
@@ -301,7 +301,7 @@ data HsExpr p
        -- Explicit type argument; e.g  f @Int x y
        -- NB: Has wildcards, but no implicit quantification
        --
-       -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt',
+       -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnAt',
 
   -- | Operator applications:
   -- NB Bracketed ops such as (+) come out as Vars.
@@ -317,15 +317,15 @@ data HsExpr p
   -- | Negation operator. Contains the negated expression and the name
   -- of 'negate'
   --
-  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnMinus'
+  --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnMinus'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | NegApp      (XNegApp p)
                 (LHsExpr p)
                 (SyntaxExpr p)
 
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
-  --             'ApiAnnotation.AnnClose' @')'@
+  -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'('@,
+  --             'GHC.Parser.Annotation.AnnClose' @')'@
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | HsPar       (XPar p)
@@ -340,8 +340,8 @@ data HsExpr p
 
   -- | Used for explicit tuples and sections thereof
   --
-  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
-  --         'ApiAnnotation.AnnClose'
+  --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
+  --         'GHC.Parser.Annotation.AnnClose'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   -- Note [ExplicitTuple]
@@ -352,10 +352,10 @@ data HsExpr p
 
   -- | Used for unboxed sum types
   --
-  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'(#'@,
-  --          'ApiAnnotation.AnnVbar', 'ApiAnnotation.AnnClose' @'#)'@,
+  --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'(#'@,
+  --          'GHC.Parser.Annotation.AnnVbar', 'GHC.Parser.Annotation.AnnClose' @'#)'@,
   --
-  --  There will be multiple 'ApiAnnotation.AnnVbar', (1 - alternative) before
+  --  There will be multiple 'GHC.Parser.Annotation.AnnVbar', (1 - alternative) before
   --  the expression, (arity - alternative) after it
   | ExplicitSum
           (XExplicitSum p)
@@ -363,19 +363,19 @@ data HsExpr p
           Arity  --  Sum arity
           (LHsExpr p)
 
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnCase',
-  --       'ApiAnnotation.AnnOf','ApiAnnotation.AnnOpen' @'{'@,
-  --       'ApiAnnotation.AnnClose' @'}'@
+  -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnCase',
+  --       'GHC.Parser.Annotation.AnnOf','GHC.Parser.Annotation.AnnOpen' @'{'@,
+  --       'GHC.Parser.Annotation.AnnClose' @'}'@
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | HsCase      (XCase p)
                 (LHsExpr p)
                 (MatchGroup p (LHsExpr p))
 
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnIf',
-  --       'ApiAnnotation.AnnSemi',
-  --       'ApiAnnotation.AnnThen','ApiAnnotation.AnnSemi',
-  --       'ApiAnnotation.AnnElse',
+  -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnIf',
+  --       'GHC.Parser.Annotation.AnnSemi',
+  --       'GHC.Parser.Annotation.AnnThen','GHC.Parser.Annotation.AnnSemi',
+  --       'GHC.Parser.Annotation.AnnElse',
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | HsIf        (XIf p)        -- GhcPs: this is a Bool; False <=> do not use
@@ -389,27 +389,27 @@ data HsExpr p
 
   -- | Multi-way if
   --
-  -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnIf'
-  --       'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
+  -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnIf'
+  --       'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnClose',
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | HsMultiIf   (XMultiIf p) [LGRHS p (LHsExpr p)]
 
   -- | let(rec)
   --
-  -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLet',
-  --       'ApiAnnotation.AnnOpen' @'{'@,
-  --       'ApiAnnotation.AnnClose' @'}'@,'ApiAnnotation.AnnIn'
+  -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLet',
+  --       'GHC.Parser.Annotation.AnnOpen' @'{'@,
+  --       'GHC.Parser.Annotation.AnnClose' @'}'@,'GHC.Parser.Annotation.AnnIn'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | HsLet       (XLet p)
                 (LHsLocalBinds p)
                 (LHsExpr  p)
 
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDo',
-  --             'ApiAnnotation.AnnOpen', 'ApiAnnotation.AnnSemi',
-  --             'ApiAnnotation.AnnVbar',
-  --             'ApiAnnotation.AnnClose'
+  -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDo',
+  --             'GHC.Parser.Annotation.AnnOpen', 'GHC.Parser.Annotation.AnnSemi',
+  --             'GHC.Parser.Annotation.AnnVbar',
+  --             'GHC.Parser.Annotation.AnnClose'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | HsDo        (XDo p)                  -- Type of the whole expression
@@ -420,8 +420,8 @@ data HsExpr p
 
   -- | Syntactic list: [a,b,c,...]
   --
-  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'['@,
-  --              'ApiAnnotation.AnnClose' @']'@
+  --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'['@,
+  --              'GHC.Parser.Annotation.AnnClose' @']'@
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   -- See Note [Empty lists]
@@ -433,8 +433,8 @@ data HsExpr p
 
   -- | Record construction
   --
-  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{'@,
-  --         'ApiAnnotation.AnnDotdot','ApiAnnotation.AnnClose' @'}'@
+  --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'{'@,
+  --         'GHC.Parser.Annotation.AnnDotdot','GHC.Parser.Annotation.AnnClose' @'}'@
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | RecordCon
@@ -445,8 +445,8 @@ data HsExpr p
 
   -- | Record update
   --
-  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{'@,
-  --         'ApiAnnotation.AnnDotdot','ApiAnnotation.AnnClose' @'}'@
+  --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'{'@,
+  --         'GHC.Parser.Annotation.AnnDotdot','GHC.Parser.Annotation.AnnClose' @'}'@
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | RecordUpd
@@ -459,7 +459,7 @@ data HsExpr p
 
   -- | Expression with an explicit type signature. @e :: type@
   --
-  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
+  --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDcolon'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | ExprWithTySig
@@ -470,9 +470,9 @@ data HsExpr p
 
   -- | Arithmetic sequence
   --
-  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'['@,
-  --              'ApiAnnotation.AnnComma','ApiAnnotation.AnnDotdot',
-  --              'ApiAnnotation.AnnClose' @']'@
+  --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'['@,
+  --              'GHC.Parser.Annotation.AnnComma','GHC.Parser.Annotation.AnnDotdot',
+  --              'GHC.Parser.Annotation.AnnClose' @']'@
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | ArithSeq
@@ -486,9 +486,9 @@ data HsExpr p
   -----------------------------------------------------------
   -- MetaHaskell Extensions
 
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
-  --         'ApiAnnotation.AnnOpenE','ApiAnnotation.AnnOpenEQ',
-  --         'ApiAnnotation.AnnClose','ApiAnnotation.AnnCloseQ'
+  -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
+  --         'GHC.Parser.Annotation.AnnOpenE','GHC.Parser.Annotation.AnnOpenEQ',
+  --         'GHC.Parser.Annotation.AnnClose','GHC.Parser.Annotation.AnnCloseQ'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | HsBracket    (XBracket p) (HsBracket p)
@@ -509,8 +509,8 @@ data HsExpr p
       [PendingTcSplice]    -- _typechecked_ splices to be
                            -- pasted back in by the desugarer
 
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
-  --         'ApiAnnotation.AnnClose'
+  -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
+  --         'GHC.Parser.Annotation.AnnClose'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | HsSpliceE  (XSpliceE p) (HsSplice p)
@@ -520,8 +520,8 @@ data HsExpr p
 
   -- | @proc@ notation for Arrows
   --
-  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnProc',
-  --          'ApiAnnotation.AnnRarrow'
+  --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnProc',
+  --          'GHC.Parser.Annotation.AnnRarrow'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | HsProc      (XProc p)
@@ -531,7 +531,7 @@ data HsExpr p
 
   ---------------------------------------
   -- static pointers extension
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnStatic',
+  -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnStatic',
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | HsStatic (XStatic p) -- Free variables of the body
@@ -580,8 +580,8 @@ data RecordUpdTc = RecordUpdTc
 
 -- | HsWrap appears only in typechecker output
 -- Invariant: The contained Expr is *NOT* itself an HsWrap.
--- See Note [Detecting forced eta expansion] in GHC.HsToCore.Expr.
--- This invariant is maintained by GHC.Hs.Utils.mkHsWrap.
+-- See Note [Detecting forced eta expansion] in "GHC.HsToCore.Expr".
+-- This invariant is maintained by 'GHC.Hs.Utils.mkHsWrap'.
 -- hs_syn is something like HsExpr or HsCmd
 data HsWrap hs_syn = HsWrap HsWrapper      -- the wrapper
                             (hs_syn GhcTc) -- the thing that is wrapped
@@ -683,22 +683,22 @@ data HsPragE p
                 SourceText            -- Note [Pragma source text] in GHC.Types.Basic
                 StringLiteral         -- "set cost centre" SCC pragma
 
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{-\# CORE'@,
-  --             'ApiAnnotation.AnnVal', 'ApiAnnotation.AnnClose' @'\#-}'@
+  -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'{-\# CORE'@,
+  --             'GHC.Parser.Annotation.AnnVal', 'GHC.Parser.Annotation.AnnClose' @'\#-}'@
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | HsPragCore  (XCoreAnn p)
                 SourceText            -- Note [Pragma source text] in GHC.Types.Basic
                 StringLiteral         -- hdaume: core annotation
 
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
-  --       'ApiAnnotation.AnnOpen' @'{-\# GENERATED'@,
-  --       'ApiAnnotation.AnnVal','ApiAnnotation.AnnVal',
-  --       'ApiAnnotation.AnnColon','ApiAnnotation.AnnVal',
-  --       'ApiAnnotation.AnnMinus',
-  --       'ApiAnnotation.AnnVal','ApiAnnotation.AnnColon',
-  --       'ApiAnnotation.AnnVal',
-  --       'ApiAnnotation.AnnClose' @'\#-}'@
+  -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
+  --       'GHC.Parser.Annotation.AnnOpen' @'{-\# GENERATED'@,
+  --       'GHC.Parser.Annotation.AnnVal','GHC.Parser.Annotation.AnnVal',
+  --       'GHC.Parser.Annotation.AnnColon','GHC.Parser.Annotation.AnnVal',
+  --       'GHC.Parser.Annotation.AnnMinus',
+  --       'GHC.Parser.Annotation.AnnVal','GHC.Parser.Annotation.AnnColon',
+  --       'GHC.Parser.Annotation.AnnVal',
+  --       'GHC.Parser.Annotation.AnnClose' @'\#-}'@
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | HsPragTick                        -- A pragma introduced tick
@@ -724,7 +724,7 @@ type instance XXPragE        (GhcPass _) = NoExtCon
 -- @ExplicitTuple [Missing ty1, Present a, Missing ty3]@
 -- Which in turn stands for @(\x:ty1 \y:ty2. (x,a,y))@
 type LHsTupArg id = Located (HsTupArg id)
--- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma'
+-- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnComma'
 
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
@@ -1275,9 +1275,9 @@ type LHsCmd id = Located (HsCmd id)
 
 -- | Haskell Command (e.g. a "statement" in an Arrow proc block)
 data HsCmd id
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.Annlarrowtail',
-  --          'ApiAnnotation.Annrarrowtail','ApiAnnotation.AnnLarrowtail',
-  --          'ApiAnnotation.AnnRarrowtail'
+  -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.Annlarrowtail',
+  --          'GHC.Parser.Annotation.Annrarrowtail','GHC.Parser.Annotation.AnnLarrowtail',
+  --          'GHC.Parser.Annotation.AnnRarrowtail'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   = HsCmdArrApp          -- Arrow tail, or arrow application (f -< arg)
@@ -1289,8 +1289,8 @@ data HsCmd id
         Bool             -- True => right-to-left (f -< arg)
                          -- False => left-to-right (arg >- f)
 
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpenB' @'(|'@,
-  --         'ApiAnnotation.AnnCloseB' @'|)'@
+  -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpenB' @'(|'@,
+  --         'GHC.Parser.Annotation.AnnCloseB' @'|)'@
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | HsCmdArrForm         -- Command formation,  (| e cmd1 .. cmdn |)
@@ -1310,32 +1310,32 @@ data HsCmd id
 
   | HsCmdLam    (XCmdLam id)
                 (MatchGroup id (LHsCmd id))     -- kappa
-       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLam',
-       --       'ApiAnnotation.AnnRarrow',
+       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
+       --       'GHC.Parser.Annotation.AnnRarrow',
 
        -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsCmdPar    (XCmdPar id)
                 (LHsCmd id)                     -- parenthesised command
-    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
-    --             'ApiAnnotation.AnnClose' @')'@
+    -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'('@,
+    --             'GHC.Parser.Annotation.AnnClose' @')'@
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsCmdCase   (XCmdCase id)
                 (LHsExpr id)
                 (MatchGroup id (LHsCmd id))     -- bodies are HsCmd's
-    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnCase',
-    --       'ApiAnnotation.AnnOf','ApiAnnotation.AnnOpen' @'{'@,
-    --       'ApiAnnotation.AnnClose' @'}'@
+    -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnCase',
+    --       'GHC.Parser.Annotation.AnnOf','GHC.Parser.Annotation.AnnOpen' @'{'@,
+    --       'GHC.Parser.Annotation.AnnClose' @'}'@
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsCmdLamCase (XCmdLamCase id)
                  (MatchGroup id (LHsCmd id))    -- bodies are HsCmd's
-    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLam',
-    --       'ApiAnnotation.AnnCase','ApiAnnotation.AnnOpen' @'{'@,
-    --       'ApiAnnotation.AnnClose' @'}'@
+    -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLam',
+    --       'GHC.Parser.Annotation.AnnCase','GHC.Parser.Annotation.AnnOpen' @'{'@,
+    --       'GHC.Parser.Annotation.AnnClose' @'}'@
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
@@ -1344,28 +1344,28 @@ data HsCmd id
                 (LHsExpr id)            -- predicate
                 (LHsCmd id)             -- then part
                 (LHsCmd id)             -- else part
-    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnIf',
-    --       'ApiAnnotation.AnnSemi',
-    --       'ApiAnnotation.AnnThen','ApiAnnotation.AnnSemi',
-    --       'ApiAnnotation.AnnElse',
+    -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnIf',
+    --       'GHC.Parser.Annotation.AnnSemi',
+    --       'GHC.Parser.Annotation.AnnThen','GHC.Parser.Annotation.AnnSemi',
+    --       'GHC.Parser.Annotation.AnnElse',
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsCmdLet    (XCmdLet id)
                 (LHsLocalBinds id)      -- let(rec)
                 (LHsCmd  id)
-    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLet',
-    --       'ApiAnnotation.AnnOpen' @'{'@,
-    --       'ApiAnnotation.AnnClose' @'}'@,'ApiAnnotation.AnnIn'
+    -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLet',
+    --       'GHC.Parser.Annotation.AnnOpen' @'{'@,
+    --       'GHC.Parser.Annotation.AnnClose' @'}'@,'GHC.Parser.Annotation.AnnIn'
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsCmdDo     (XCmdDo id)                     -- Type of the whole expression
                 (Located [CmdLStmt id])
-    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDo',
-    --             'ApiAnnotation.AnnOpen', 'ApiAnnotation.AnnSemi',
-    --             'ApiAnnotation.AnnVbar',
-    --             'ApiAnnotation.AnnClose'
+    -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDo',
+    --             'GHC.Parser.Annotation.AnnOpen', 'GHC.Parser.Annotation.AnnSemi',
+    --             'GHC.Parser.Annotation.AnnVbar',
+    --             'GHC.Parser.Annotation.AnnClose'
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
@@ -1585,7 +1585,7 @@ type instance XXMatchGroup (GhcPass _) b = NoExtCon
 
 -- | Located Match
 type LMatch id body = Located (Match id body)
--- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi' when in a
+-- ^ May have 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnSemi' when in a
 --   list
 
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
@@ -1675,10 +1675,10 @@ hsLMatchPats (L _ (Match { m_pats = pats })) = pats
 --
 -- GRHSs are used both for pattern bindings and for Matches
 --
---  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnVbar',
---        'ApiAnnotation.AnnEqual','ApiAnnotation.AnnWhere',
---        'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose'
---        'ApiAnnotation.AnnRarrow','ApiAnnotation.AnnSemi'
+--  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnVbar',
+--        'GHC.Parser.Annotation.AnnEqual','GHC.Parser.Annotation.AnnWhere',
+--        'GHC.Parser.Annotation.AnnOpen','GHC.Parser.Annotation.AnnClose'
+--        'GHC.Parser.Annotation.AnnRarrow','GHC.Parser.Annotation.AnnSemi'
 
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 data GRHSs p body
@@ -1825,10 +1825,10 @@ type GhciStmt   id = Stmt  id (LHsExpr id)
 -- The SyntaxExprs in here are used *only* for do-notation and monad
 -- comprehensions, which have rebindable syntax. Otherwise they are unused.
 -- | API Annotations when in qualifier lists or guards
---  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnVbar',
---         'ApiAnnotation.AnnComma','ApiAnnotation.AnnThen',
---         'ApiAnnotation.AnnBy','ApiAnnotation.AnnBy',
---         'ApiAnnotation.AnnGroup','ApiAnnotation.AnnUsing'
+--  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnVbar',
+--         'GHC.Parser.Annotation.AnnComma','GHC.Parser.Annotation.AnnThen',
+--         'GHC.Parser.Annotation.AnnBy','GHC.Parser.Annotation.AnnBy',
+--         'GHC.Parser.Annotation.AnnGroup','GHC.Parser.Annotation.AnnUsing'
 
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 data StmtLR idL idR body -- body should always be (LHs**** idR)
@@ -1846,7 +1846,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
             -- For ListComp we use the baked-in 'return'
             -- For DoExpr, MDoExpr, we don't apply a 'return' at all
             -- See Note [Monad Comprehensions]
-            -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLarrow'
+            -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLarrow'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | BindStmt (XBindStmt idL idR body)
@@ -1863,7 +1863,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
   -- appropriate applicative expression by the desugarer, but it is intended
   -- to be invisible in error messages.
   --
-  -- For full details, see Note [ApplicativeDo] in GHC.Rename.Expr
+  -- For full details, see Note [ApplicativeDo] in "GHC.Rename.Expr"
   --
   | ApplicativeStmt
              (XApplicativeStmt idL idR body) -- Post typecheck, Type of the body
@@ -1879,8 +1879,8 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
              (SyntaxExpr idR)  -- The `guard` operator; used only in MonadComp
                                -- See notes [Monad Comprehensions]
 
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnLet'
-  --          'ApiAnnotation.AnnOpen' @'{'@,'ApiAnnotation.AnnClose' @'}'@,
+  -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLet'
+  --          'GHC.Parser.Annotation.AnnOpen' @'{'@,'GHC.Parser.Annotation.AnnClose' @'}'@,
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | LetStmt  (XLetStmt idL idR body) (LHsLocalBindsLR idL idR)
@@ -1918,7 +1918,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
     }                                 -- See Note [Monad Comprehensions]
 
   -- Recursive statement (see Note [How RecStmt works] below)
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRec'
+  -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnRec'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | RecStmt
