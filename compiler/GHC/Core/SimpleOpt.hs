@@ -1060,7 +1060,7 @@ data ConCont = CC [CoreExpr] Coercion
 -- [exprIsConApp_maybe on data constructors with wrappers]. Data constructor wrappers
 -- are unfolded late, but we really want to trigger case-of-known-constructor as
 -- early as possible. See also Note [Activation for data constructor wrappers]
--- in GHC.Types.Id.Make.
+-- in "GHC.Types.Id.Make".
 --
 -- We also return the incoming InScopeSet, augmented with
 -- the binders from any [FloatBind] that we return

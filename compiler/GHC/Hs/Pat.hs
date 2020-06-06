@@ -82,7 +82,7 @@ type LPat p = XRec p Pat
 
 -- | Pattern
 --
--- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnBang'
+-- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnBang'
 
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 data Pat p
@@ -98,26 +98,26 @@ data Pat p
                              -- See Note [Located RdrNames] in GHC.Hs.Expr
   | LazyPat     (XLazyPat p)
                 (LPat p)                -- ^ Lazy Pattern
-    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnTilde'
+    -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnTilde'
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | AsPat       (XAsPat p)
                 (Located (IdP p)) (LPat p)    -- ^ As pattern
-    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt'
+    -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnAt'
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | ParPat      (XParPat p)
                 (LPat p)                -- ^ Parenthesised pattern
                                         -- See Note [Parens in HsSyn] in GHC.Hs.Expr
-    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
-    --                                    'ApiAnnotation.AnnClose' @')'@
+    -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'('@,
+    --                                    'GHC.Parser.Annotation.AnnClose' @')'@
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | BangPat     (XBangPat p)
                 (LPat p)                -- ^ Bang pattern
-    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnBang'
+    -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnBang'
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
@@ -130,8 +130,8 @@ data Pat p
 
     -- ^ Syntactic List
     --
-    -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'['@,
-    --                                    'ApiAnnotation.AnnClose' @']'@
+    -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'['@,
+    --                                    'GHC.Parser.Annotation.AnnClose' @']'@
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
@@ -157,9 +157,9 @@ data Pat p
         --           will be wrapped in CoPats, no?)
     -- ^ Tuple sub-patterns
     --
-    -- - 'ApiAnnotation.AnnKeywordId' :
-    --            'ApiAnnotation.AnnOpen' @'('@ or @'(#'@,
-    --            'ApiAnnotation.AnnClose' @')'@ or  @'#)'@
+    -- - 'GHC.Parser.Annotation.AnnKeywordId' :
+    --            'GHC.Parser.Annotation.AnnOpen' @'('@ or @'(#'@,
+    --            'GHC.Parser.Annotation.AnnClose' @')'@ or  @'#)'@
 
   | SumPat      (XSumPat p)        -- after typechecker, types of the alternative
                 (LPat p)           -- Sum sub-pattern
@@ -167,9 +167,9 @@ data Pat p
                 Arity              -- Arity (INVARIANT: ≥ 2)
     -- ^ Anonymous sum pattern
     --
-    -- - 'ApiAnnotation.AnnKeywordId' :
-    --            'ApiAnnotation.AnnOpen' @'(#'@,
-    --            'ApiAnnotation.AnnClose' @'#)'@
+    -- - 'GHC.Parser.Annotation.AnnKeywordId' :
+    --            'GHC.Parser.Annotation.AnnOpen' @'(#'@,
+    --            'GHC.Parser.Annotation.AnnClose' @'#)'@
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
@@ -182,7 +182,7 @@ data Pat p
     -- ^ Constructor Pattern
 
         ------------ View patterns ---------------
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow'
+  -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnRarrow'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | ViewPat       (XViewPat p)     -- The overall type of the pattern
@@ -193,8 +193,8 @@ data Pat p
     -- ^ View Pattern
 
         ------------ Pattern splices ---------------
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'$('@
-  --        'ApiAnnotation.AnnClose' @')'@
+  -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'$('@
+  --        'GHC.Parser.Annotation.AnnClose' @')'@
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | SplicePat       (XSplicePat p)
@@ -220,7 +220,7 @@ data Pat p
 
   -- ^ Natural Pattern
   --
-  -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnVal' @'+'@
+  -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnVal' @'+'@
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | NPlusKPat       (XNPlusKPat p)           -- Type of overall pattern
@@ -235,7 +235,7 @@ data Pat p
   -- ^ n+k pattern
 
         ------------ Pattern type signatures ---------------
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
+  -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDcolon'
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | SigPat          (XSigPat p)             -- After typechecker: Type
@@ -416,7 +416,7 @@ type HsRecUpdField p     = HsRecField' (AmbiguousFieldOcc p) (LHsExpr p)
 
 -- | Haskell Record Field
 --
--- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnEqual',
+-- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnEqual',
 --
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 data HsRecField' id arg = HsRecField {

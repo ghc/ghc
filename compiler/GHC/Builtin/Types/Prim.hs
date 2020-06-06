@@ -9,7 +9,7 @@ Wired-in knowledge about primitive types
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- | This module defines TyCons that can't be expressed in Haskell.
---   They are all, therefore, wired-in TyCons.  C.f module GHC.Builtin.Types
+--   They are all, therefore, wired-in TyCons.  C.f module "GHC.Builtin.Types"
 module GHC.Builtin.Types.Prim(
         mkPrimTyConName, -- For implicit parameters in GHC.Builtin.Types only
 
@@ -138,7 +138,7 @@ import Data.Char
 primTyCons :: [TyCon]
 primTyCons = unexposedPrimTyCons ++ exposedPrimTyCons
 
--- | Primitive 'TyCon's that are defined in "GHC.Prim" but not exposed.
+-- | Primitive 'TyCon's that are defined in GHC.Prim but not exposed.
 -- It's important to keep these separate as we don't want users to be able to
 -- write them (see #15209) or see them in GHCi's @:browse@ output
 -- (see #12023).
@@ -149,7 +149,7 @@ unexposedPrimTyCons
     , eqPhantPrimTyCon
     ]
 
--- | Primitive 'TyCon's that are defined in, and exported from, "GHC.Prim".
+-- | Primitive 'TyCon's that are defined in, and exported from, GHC.Prim.
 exposedPrimTyCons :: [TyCon]
 exposedPrimTyCons
   = [ addrPrimTyCon

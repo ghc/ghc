@@ -152,7 +152,7 @@ instance Outputable LeftOrRight where
 -- "real work". So:
 --  fib 100     has arity 0
 --  \x -> fib x has arity 1
--- See also Note [Definition of arity] in GHC.Core.Opt.Arity
+-- See also Note [Definition of arity] in "GHC.Core.Opt.Arity"
 type Arity = Int
 
 -- | Representation Arity
@@ -661,14 +661,14 @@ instance Outputable Origin where
 -- instance. See Note [Safe Haskell isSafeOverlap] (in "GHC.Core.InstEnv") for a
 -- explanation of the `isSafeOverlap` field.
 --
--- - 'ApiAnnotation.AnnKeywordId' :
---      'ApiAnnotation.AnnOpen' @'\{-\# OVERLAPPABLE'@ or
+-- - 'GHC.Parser.Annotation.AnnKeywordId' :
+--      'GHC.Parser.Annotation.AnnOpen' @'\{-\# OVERLAPPABLE'@ or
 --                              @'\{-\# OVERLAPPING'@ or
 --                              @'\{-\# OVERLAPS'@ or
 --                              @'\{-\# INCOHERENT'@,
---      'ApiAnnotation.AnnClose' @`\#-\}`@,
+--      'GHC.Parser.Annotation.AnnClose' @`\#-\}`@,
 
--- For details on above see note [Api annotations] in GHC.Parser.Annotation
+-- For details on above see note [Api annotations] in "GHC.Parser.Annotation"
 data OverlapFlag = OverlapFlag
   { overlapMode   :: OverlapMode
   , isSafeOverlap :: Bool
@@ -752,7 +752,7 @@ data OverlapMode  -- See Note [Rules for instance lookup] in GHC.Core.InstEnv
     -- instance                   Foo [a]
     -- Without the Incoherent flag, we'd complain that
     -- instantiating 'b' would change which instance
-    -- was chosen. See also note [Incoherent instances] in GHC.Core.InstEnv
+    -- was chosen. See also note [Incoherent instances] in "GHC.Core.InstEnv"
 
   deriving (Eq, Data)
 

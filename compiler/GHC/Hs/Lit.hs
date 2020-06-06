@@ -57,7 +57,7 @@ data HsLit x
       -- ^ Packed bytes
   | HsInt (XHsInt x)  IntegralLit
       -- ^ Genuinely an Int; arises from
-      -- @GHC.Tc.Deriv.Generate@, and from TRANSLATION
+      -- "GHC.Tc.Deriv.Generate", and from TRANSLATION
   | HsIntPrim (XHsIntPrim x) {- SourceText -} Integer
       -- ^ literal @Int#@
   | HsWordPrim (XHsWordPrim x) {- SourceText -} Integer

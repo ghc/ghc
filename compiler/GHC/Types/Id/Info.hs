@@ -176,7 +176,7 @@ data IdDetails
                -- This only covers /un-lifted/ coercions, of type
                -- (t1 ~# t2) or (t1 ~R# t2), not their lifted variants
   | JoinId JoinArity           -- ^ An 'Id' for a join point taking n arguments
-       -- Note [Join points] in GHC.Core
+       -- Note [Join points] in "GHC.Core"
 
 -- | Recursive Selector Parent
 data RecSelParent = RecSelData TyCon | RecSelPatSyn PatSyn deriving Eq
@@ -352,7 +352,7 @@ levityInfo = bitfieldGetLevityInfo . bitfield
 oneShotInfo :: IdInfo -> OneShotInfo
 oneShotInfo = bitfieldGetOneShotInfo . bitfield
 
--- | 'Id' arity, as computed by 'GHC.Core.Opt.Arity'. Specifies how many arguments
+-- | 'Id' arity, as computed by "GHC.Core.Opt.Arity". Specifies how many arguments
 -- this 'Id' has to be applied to before it doesn any meaningful work.
 arityInfo :: IdInfo -> ArityInfo
 arityInfo = bitfieldGetArityInfo . bitfield

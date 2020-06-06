@@ -14,18 +14,19 @@
 -- #name_types#
 -- GHC uses several kinds of name internally:
 --
--- * 'OccName.OccName': see "OccName#name_types"
+-- * 'GHC.Types.Name.Occurrence.OccName': see "GHC.Types.Name.Occurrence#name_types"
 --
--- * 'RdrName.RdrName': see "RdrName#name_types"
+-- * 'GHC.Types.Name.Reader.RdrName': see "GHC.Types.Name.Reader#name_types"
 --
--- *  'Name.Name' is the type of names that have had their scoping and binding resolved. They
---   have an 'OccName.OccName' but also a 'Unique.Unique' that disambiguates Names that have
---   the same 'OccName.OccName' and indeed is used for all 'Name.Name' comparison. Names
---   also contain information about where they originated from, see "Name#name_sorts"
+-- * 'GHC.Types.Name.Name' is the type of names that have had their scoping and
+--   binding resolved. They have an 'OccName' but also a 'GHC.Types.Unique.Unique'
+--   that disambiguates Names that have the same 'OccName' and indeed is used for all
+--   'Name' comparison. Names also contain information about where they originated
+--   from, see "GHC.Types.Name#name_sorts"
 --
--- * 'Id.Id': see "Id#name_types"
+-- * 'GHC.Types.Id.Id': see "GHC.Types.Id#name_types"
 --
--- * 'Var.Var': see "Var#name_types"
+-- * 'GHC.Types.Var.Var': see "GHC.Types.Var#name_types"
 --
 -- #name_sorts#
 -- Names are one of:
@@ -306,7 +307,7 @@ nameIsLocalOrFrom :: Module -> Name -> Bool
 -- each give rise to a fresh module (Ghci1, Ghci2, etc), but they all come
 -- from the magic 'interactive' package; and all the details are kept in the
 -- TcLclEnv, TcGblEnv, NOT in the HPT or EPT.
--- See Note [The interactive package] in GHC.Driver.Types
+-- See Note [The interactive package] in "GHC.Driver.Types"
 
 nameIsLocalOrFrom from name
   | Just mod <- nameModule_maybe name = from == mod || isInteractiveModule mod

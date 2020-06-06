@@ -62,7 +62,7 @@ import GHC.Utils.Outputable (SDoc)
 -- | A non-deterministic Variable Set
 --
 -- A non-deterministic set of variables.
--- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for explanation why it's not
+-- See Note [Deterministic UniqFM] in "GHC.Types.Unique.DFM" for explanation why it's not
 -- deterministic and why it matters. Use DVarSet if the set eventually
 -- gets converted into a list or folded over in a way where the order
 -- changes the generated code, for example when abstracting variables.

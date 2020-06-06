@@ -588,7 +588,7 @@ mkUbxSum dc ty_args args0
 --    * Literals: 0 or 0.0
 --    * Pointers: `ghc-prim:GHC.Prim.Panic.absentSumFieldError`
 --
--- See Note [aBSENT_SUM_FIELD_ERROR_ID] in GHC.Core.Make
+-- See Note [aBSENT_SUM_FIELD_ERROR_ID] in "GHC.Core.Make"
 --
 ubxSumRubbishArg :: SlotTy -> StgArg
 ubxSumRubbishArg PtrSlot    = StgVarArg aBSENT_SUM_FIELD_ERROR_ID

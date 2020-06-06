@@ -11,19 +11,19 @@
 -- #name_types#
 -- GHC uses several kinds of name internally:
 --
--- * 'OccName.OccName': see "OccName#name_types"
+-- * 'GHC.Types.Name.Occurrence.OccName': see "GHC.Types.Name.Occurrence#name_types"
 --
--- * 'RdrName.RdrName': see "RdrName#name_types"
+-- * 'GHC.Types.Name.Reader.RdrName': see "GHC.Types.Name.Reader#name_types"
 --
--- * 'Name.Name': see "Name#name_types"
+-- * 'GHC.Types.Name.Name': see "GHC.Types.Name#name_types"
 --
--- * 'Id.Id' represents names that not only have a 'Name.Name' but also a
---   'GHC.Core.TyCo.Rep.Type' and some additional details (a 'IdInfo.IdInfo' and
---   one of 'Var.LocalIdDetails' or 'IdInfo.GlobalIdDetails') that are added,
---   modified and inspected by various compiler passes. These 'Var.Var' names
---   may either be global or local, see "Var#globalvslocal"
+-- * 'GHC.Types.Id.Id' represents names that not only have a 'GHC.Types.Name.Name' but also a
+--   'GHC.Core.TyCo.Rep.Type' and some additional details (a 'GHC.Types.Id.Info.IdInfo' and
+--   one of LocalIdDetails or GlobalIdDetails) that are added,
+--   modified and inspected by various compiler passes. These 'GHC.Types.Var.Var' names
+--   may either be global or local, see "GHC.Types.Var#globalvslocal"
 --
--- * 'Var.Var': see "Var#name_types"
+-- * 'GHC.Types.Var.Var': see "GHC.Types.Var#name_types"
 
 module GHC.Types.Id (
         -- * The main types
@@ -276,7 +276,7 @@ substitution (which changes the free type variables) is more common.
 Anyway, we removed it in March 2008.
 -}
 
--- | For an explanation of global vs. local 'Id's, see "Var#globalvslocal"
+-- | For an explanation of global vs. local 'Id's, see "GHC.Types.Var.Var#globalvslocal"
 mkGlobalId :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalId = Var.mkGlobalVar
 
@@ -289,7 +289,7 @@ mkVanillaGlobalWithInfo :: Name -> Type -> IdInfo -> Id
 mkVanillaGlobalWithInfo = mkGlobalId VanillaId
 
 
--- | For an explanation of global vs. local 'Id's, see "Var#globalvslocal"
+-- | For an explanation of global vs. local 'Id's, see "GHC.Types.Var#globalvslocal"
 mkLocalId :: HasDebugCallStack => Name -> Mult -> Type -> Id
 mkLocalId name w ty = ASSERT( not (isCoVarType ty) )
                       mkLocalIdWithInfo name w ty vanillaIdInfo
@@ -347,7 +347,7 @@ mkSysLocalOrCoVarM :: MonadUnique m => FastString -> Mult -> Type -> m Id
 mkSysLocalOrCoVarM fs w ty
   = getUniqueM >>= (\uniq -> return (mkSysLocalOrCoVar fs uniq w ty))
 
--- | Create a user local 'Id'. These are local 'Id's (see "Var#globalvslocal") with a name and location that the user might recognize
+-- | Create a user local 'Id'. These are local 'Id's (see "GHC.Types.Var#globalvslocal") with a name and location that the user might recognize
 mkUserLocal :: OccName -> Unique -> Mult -> Type -> SrcSpan -> Id
 mkUserLocal occ uniq w ty loc = ASSERT( not (isCoVarType ty) )
                                 mkLocalId (mkInternalName uniq occ loc) w ty
@@ -659,7 +659,7 @@ idFunRepArity :: Id -> RepArity
 idFunRepArity x = countFunRepArgs (idArity x) (idType x)
 
 -- | Returns true if an application to n args diverges or throws an exception
--- See Note [Dead ends] in GHC.Types.Demand.
+-- See Note [Dead ends] in "GHC.Types.Demand".
 isDeadEndId :: Var -> Bool
 isDeadEndId v
   | isId v    = isDeadEndSig (idStrictness v)
@@ -810,7 +810,7 @@ idOneShotInfo :: Id -> OneShotInfo
 idOneShotInfo id = oneShotInfo (idInfo id)
 
 -- | Like 'idOneShotInfo', but taking the Horrible State Hack in to account
--- See Note [The state-transformer hack] in GHC.Core.Opt.Arity
+-- See Note [The state-transformer hack] in "GHC.Core.Opt.Arity"
 idStateHackOneShotInfo :: Id -> OneShotInfo
 idStateHackOneShotInfo id
     | isStateHackType (idType id) = stateHackOneShot
@@ -820,7 +820,7 @@ idStateHackOneShotInfo id
 -- This one is the "business end", called externally.
 -- It works on type variables as well as Ids, returning True
 -- Its main purpose is to encapsulate the Horrible State Hack
--- See Note [The state-transformer hack] in GHC.Core.Opt.Arity
+-- See Note [The state-transformer hack] in "GHC.Core.Opt.Arity"
 isOneShotBndr :: Var -> Bool
 isOneShotBndr var
   | isTyVar var                              = True

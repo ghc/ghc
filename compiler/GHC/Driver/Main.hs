@@ -7,7 +7,7 @@
 --
 -- This module implements compilation of a Haskell source. It is
 -- /not/ concerned with preprocessing of source files; this is handled
--- in GHC.Driver.Pipeline
+-- in "GHC.Driver.Pipeline"
 --
 -- There are various entry points depending on what mode we're in:
 -- "batch" mode (@--make@), "one-shot" mode (@-c@, @-S@ etc.), and
@@ -997,10 +997,10 @@ hscCheckSafeImports tcg_env = do
 --
 -- The code for this is quite tricky as the whole algorithm is done in a few
 -- distinct phases in different parts of the code base. See
--- GHC.Rename.Names.rnImportDecl for where package trust dependencies for a
+-- 'GHC.Rename.Names.rnImportDecl' for where package trust dependencies for a
 -- module are collected and unioned.  Specifically see the Note [Tracking Trust
--- Transitively] in GHC.Rename.Names and the Note [Trust Own Package] in
--- GHC.Rename.Names.
+-- Transitively] in "GHC.Rename.Names" and the Note [Trust Own Package] in
+-- "GHC.Rename.Names".
 checkSafeImports :: TcGblEnv -> Hsc TcGblEnv
 checkSafeImports tcg_env
     = do
@@ -1768,7 +1768,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
     return (new_tythings, new_ictxt)
 
 -- | Load the given static-pointer table entries into the interpreter.
--- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
+-- See Note [Grand plan for static forms] in "GHC.Iface.Tidy.StaticPtrTable".
 hscAddSptEntries :: HscEnv -> [SptEntry] -> IO ()
 hscAddSptEntries hsc_env entries = do
     let add_spt_entry :: SptEntry -> IO ()

@@ -481,7 +481,7 @@ data TypeMapX a
     -- Note that there is no tyconapp case; see Note [Equality on AppTys] in GHC.Core.Type
 
 -- | Squeeze out any synonyms, and change TyConApps to nested AppTys. Why the
--- last one? See Note [Equality on AppTys] in GHC.Core.Type
+-- last one? See Note [Equality on AppTys] in "GHC.Core.Type"
 --
 -- Note, however, that we keep Constraint and Type apart here, despite the fact
 -- that they are both synonyms of TYPE 'LiftedRep (see #11715).

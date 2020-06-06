@@ -1452,7 +1452,7 @@ data ModGuts
                                          -- ^ Family instances declared in this module
         mg_patsyns   :: ![PatSyn],       -- ^ Pattern synonyms declared in this module
         mg_rules     :: ![CoreRule],     -- ^ Before the core pipeline starts, contains
-                                         -- See Note [Overall plumbing for rules] in GHC.Core.Rules
+                                         -- See Note [Overall plumbing for rules] in "GHC.Core.Rules"
         mg_binds     :: !CoreProgram,    -- ^ Bindings for this module
         mg_foreign   :: !ForeignStubs,   -- ^ Foreign exports declared in this module
         mg_foreign_files :: ![(ForeignSrcLang, FilePath)],
@@ -1479,7 +1479,7 @@ data ModGuts
         mg_trust_pkg    :: Bool,                -- ^ Do we need to trust our
                                                 -- own package for Safe Haskell?
                                                 -- See Note [Trust Own Package]
-                                                -- in GHC.Rename.Names
+                                                -- in "GHC.Rename.Names"
 
         mg_doc_hdr       :: !(Maybe HsDocString), -- ^ Module header.
         mg_decl_docs     :: !DeclDocMap,     -- ^ Docs on declarations.
@@ -1526,7 +1526,7 @@ data CgGuts
         cg_spt_entries :: [SptEntry]
                 -- ^ Static pointer table entries for static forms defined in
                 -- the module.
-                -- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable
+                -- See Note [Grand plan for static forms] in "GHC.Iface.Tidy.StaticPtrTable"
     }
 
 -----------------------------------
@@ -2087,9 +2087,9 @@ Examples:
 -- scope, just for a start!
 
 -- N.B. the set of TyThings returned here *must* match the set of
--- names returned by GHC.Iface.Load.ifaceDeclImplicitBndrs, in the sense that
+-- names returned by 'GHC.Iface.Load.ifaceDeclImplicitBndrs', in the sense that
 -- TyThing.getOccName should define a bijection between the two lists.
--- This invariant is used in GHC.Iface.Load.loadDecl (see note [Tricky iface loop])
+-- This invariant is used in 'GHC.Iface.Load.loadDecl' (see note [Tricky iface loop])
 -- The order of the list does not matter.
 implicitTyThings :: TyThing -> [TyThing]
 implicitTyThings (AnId _)       = []
@@ -2821,7 +2821,7 @@ soExt platform
 -- module.
 --
 -- The graph is not necessarily stored in topologically-sorted order.  Use
--- 'GHC.topSortModuleGraph' and 'Digraph.flattenSCC' to achieve this.
+-- 'GHC.topSortModuleGraph' and 'GHC.Data.Graph.Directed.flattenSCC' to achieve this.
 data ModuleGraph = ModuleGraph
   { mg_mss :: [ModSummary]
   , mg_non_boot :: ModuleEnv ModSummary

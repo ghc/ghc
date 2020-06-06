@@ -145,7 +145,7 @@ data RealSrcLoc
 --
 -- Unlike 'RealSrcLoc', it is not affected by #line and {-# LINE ... #-}
 -- pragmas. In particular, notice how 'setSrcLoc' and 'resetAlrLastLoc' in
--- GHC.Parser.Lexer update 'PsLoc' preserving 'BufPos'.
+-- "GHC.Parser.Lexer" update 'PsLoc' preserving 'BufPos'.
 --
 -- The parser guarantees that 'BufPos' are monotonic. See #17632.
 newtype BufPos = BufPos { bufPos :: Int }
