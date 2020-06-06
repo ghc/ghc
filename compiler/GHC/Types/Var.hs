@@ -13,20 +13,20 @@
 -- #name_types#
 -- GHC uses several kinds of name internally:
 --
--- * 'OccName.OccName': see "OccName#name_types"
+-- * 'GHC.Types.Name.Occurrence.OccName': see "GHC.Types.Name.Occurrence#name_types"
 --
--- * 'RdrName.RdrName': see "RdrName#name_types"
+-- * 'GHC.Types.Name.Reader.RdrName': see "GHC.Types.Name.Reader#name_types"
 --
--- * 'Name.Name': see "Name#name_types"
+-- * 'GHC.Types.Name.Name': see "GHC.Types.Name#name_types"
 --
--- * 'Id.Id': see "Id#name_types"
+-- * 'GHC.Types.Id.Id': see "GHC.Types.Id#name_types"
 --
--- * 'Var.Var' is a synonym for the 'Id.Id' type but it may additionally
+-- * 'GHC.Types.Var.Var' is a synonym for the 'GHC.Types.Id.Id' type but it may additionally
 --   potentially contain type variables, which have a 'GHC.Core.TyCo.Rep.Kind'
 --   rather than a 'GHC.Core.TyCo.Rep.Type' and only contain some extra
 --   details during typechecking.
 --
---   These 'Var.Var' names may either be global or local, see "Var#globalvslocal"
+--   These 'Var' names may either be global or local, see "GHC.Types.Var#globalvslocal"
 --
 -- #globalvslocal#
 -- Global 'Id's and 'Var's are those that are imported or correspond
@@ -398,14 +398,14 @@ updateVarTypeM f id = do { ty' <- f (varType id)
 -- Is something required to appear in source Haskell ('Required'),
 -- permitted by request ('Specified') (visible type application), or
 -- prohibited entirely from appearing in source Haskell ('Inferred')?
--- See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in GHC.Core.TyCo.Rep
+-- See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in "GHC.Core.TyCo.Rep"
 data ArgFlag = Invisible Specificity
              | Required
   deriving (Eq, Ord, Data)
   -- (<) on ArgFlag means "is less visible than"
 
 -- | Whether an 'Invisible' argument may appear in source Haskell.
--- see Note [Specificity in HsForAllTy] in GHC.Hs.Type
+-- see Note [Specificity in HsForAllTy] in "GHC.Hs.Type"
 data Specificity = InferredSpec
                    -- ^ the argument may not appear in source Haskell, it is
                    -- only inferred.
@@ -613,7 +613,7 @@ data VarBndr var argf = Bndr var argf
 --
 -- A 'TyCoVarBinder' is the binder of a ForAllTy
 -- It's convenient to define this synonym here rather its natural
--- home in GHC.Core.TyCo.Rep, because it's used in GHC.Core.DataCon.hs-boot
+-- home in "GHC.Core.TyCo.Rep", because it's used in GHC.Core.DataCon.hs-boot
 --
 -- A 'TyVarBinder' is a binder with only TyVar
 type TyCoVarBinder     = VarBndr TyCoVar ArgFlag
