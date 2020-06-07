@@ -250,10 +250,10 @@ redirectInterrupts target wait = do
 
 measureAlloc :: IO (EvalResult a) -> IO (EvalStatus a)
 measureAlloc io = do
-  setAllocationCounter maxBound
+  setAllocationCounter 0                                 -- #16012
   a <- io
   ctr <- getAllocationCounter
-  let allocs = fromIntegral (maxBound::Int64) - fromIntegral ctr
+  let allocs = negate $ fromIntegral ctr
   return (EvalComplete allocs a)
 
 -- Exceptions can't be marshaled because they're dynamically typed, so
