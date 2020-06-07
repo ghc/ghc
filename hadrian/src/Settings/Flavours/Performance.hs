@@ -1,4 +1,4 @@
-module Settings.Flavours.Performance (performanceFlavour) where
+module Settings.Flavours.Performance (performanceFlavour, performanceArgs) where
 
 import Expression
 import Flavour

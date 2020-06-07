@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: 6223fe0b5942f4fa35bdec92c74566cf195bfb42
+  DOCKER_REV: 2e59067d7371d19c7c829e803ecfe4c07aa76245
 
   # Sequential version number capturing the versions of all tools fetched by
   # .gitlab/ci.sh.
@@ -708,7 +708,9 @@ release-x86_64-linux-deb8:
   # There are currently a few failing tests
   allow_failure: true
   variables:
+    INTEGER_LIBRARY: integer-simple
     TEST_ENV: "x86_64-linux-alpine"
+    FLAVOUR: "static"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-alpine-linux.tar.xz"
     # Can't use ld.gold due to #13958.
     CONFIGURE_ARGS: "--disable-ld-override"
@@ -724,10 +726,14 @@ release-x86_64-linux-deb8:
 
 release-x86_64-linux-alpine:
   <<: *release
+  variables:
+    FLAVOUR: "static"
   extends: .build-x86_64-linux-alpine-hadrian
 
 nightly-x86_64-linux-alpine:
   <<: *nightly
+  variables:
+    FLAVOUR: "static"
   extends: .build-x86_64-linux-alpine-hadrian
 
 #################################
