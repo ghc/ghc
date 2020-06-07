@@ -368,7 +368,7 @@ as for :ref:`data-instance-declarations`.
 
 Also in the same way as :ref:`data-instance-declarations`, when
 :extension:`ExplicitForAll` is enabled, type and kind variables can be
-explicilty bound in a type instance declaration.
+explicitly bound in a type instance declaration.
 
 Type family instance declarations are only legitimate when an
 appropriate family declaration is in scope - just like class instances
