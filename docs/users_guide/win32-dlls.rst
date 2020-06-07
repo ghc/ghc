@@ -132,7 +132,7 @@ your paths:
   - replace ``\`` with ``\\``
   - expand relative paths to absolute paths
 
-If you want to opt out of all preprocessing just expliticly use namespaces in
+If you want to opt out of all preprocessing just explicitly use namespaces in
 your paths. Due to this change, if you need to open raw devices (e.g. COM ports)
 you need to use the device namespace explicitly. (e.g. ``\\.\COM1``). GHC and
 Haskell programs in general no longer support opening devices in the legacy

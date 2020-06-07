@@ -157,7 +157,7 @@ the left hand side can be explicitly bound. For example: ::
     data instance forall a (b :: Proxy a). F (Proxy b) = FProxy Bool
 
 When an explicit ``forall`` is present, *all* type and kind variables mentioned
-which are not already in scope must be bound by the ``forall``:
+which are not already in scope must be bound by the ``forall``: ::
 
     data instance forall   (a :: k). F a = FOtherwise  -- rejected: k not in scope
     data instance forall k (a :: k). F a = FOtherwise  -- accepted
@@ -368,7 +368,7 @@ as for :ref:`data-instance-declarations`.
 
 Also in the same way as :ref:`data-instance-declarations`, when
 :extension:`ExplicitForAll` is enabled, type and kind variables can be
-explicilty bound in a type instance declaration.
+explicitly bound in a type instance declaration.
 
 Type family instance declarations are only legitimate when an
 appropriate family declaration is in scope - just like class instances
@@ -550,7 +550,7 @@ Decidability of type synonym instances
     Relax restrictions on the decidability of type synonym family instances.
 
 In order to guarantee that type inference in the presence of type
-families decidable, we need to place a number of additional restrictions
+families is decidable, we need to place a number of additional restrictions
 on the formation of type instance declarations (c.f., Definition 5
 (Relaxed Conditions) of “\ `Type Checking with Open Type
 Functions <http://www.cse.unsw.edu.au/~chak/papers/SPCS08.html>`__\ ”).
@@ -661,7 +661,7 @@ keyword in the family instance: ::
 
 The data or type family instance for an associated type must follow
 the rule that the type indexes corresponding to class parameters must have
-precisely the same as type given in the instance head. For example: ::
+precisely the same {- TODO: same what? -} as type given in the instance head. For example: ::
 
     class Collects ce where
       type Elem ce :: Type
@@ -786,49 +786,49 @@ Here are some examples:
 
         type F3 a
         type F3 [b] = b              -- BAD; only type variables allowed on the
-                                             LHS, and the argument to F3 is
-                                             instantiated to [b], which is not
-                                             a bare type variable
+                                     --      LHS, and the argument to F3 is
+                                     --      instantiated to [b], which is not
+                                     --      a bare type variable
 
         type F4 x y
         type F4 x x = x              -- BAD; the type variable x is repeated on
-                                             the LHS
+                                     --      the LHS
 
         type F5 a
         type F5 b = a                -- BAD; 'a' is not in scope  in the RHS
 
         type F6 a :: [k]
         type F6 a = ('[] :: [x])     -- OK; the kind variable x is implicitly
-                                            bound by an invisible kind pattern
-                                            on the LHS
+                                     --     bound by an invisible kind pattern
+                                     --     on the LHS
 
         type F7 a
         type F7 a =
           Proxy ('[] :: [x])         -- BAD; the kind variable x is not bound,
-                                             even by an invisible kind pattern
+                                     --      even by an invisible kind pattern
 
         type F8 (x :: a) :: [a]
         type F8 x = ('[] :: [a])     -- OK; the kind variable a is implicitly
-                                            bound by the kind signature of the
-                                            LHS type pattern
+                                     --     bound by the kind signature of the
+                                     --     LHS type pattern
 
         type F9 (a :: k)
         type F9 a = Maybe a          -- BAD; the kind variable k is
-                                             instantiated to Type, which is not
-                                             a bare kind variable
+                                     --      instantiated to Type, which is not
+                                     --      a bare kind variable
 
         type F10 (a :: j) (b :: k)
         type F10 (a :: z) (b :: z)
           = Proxy a                  -- BAD; the kind variable z is repeated,
-                                     -- as both j and k are instantiated to z
+                                     --      as both j and k are instantiated to z
 
         type F11 a b
         type forall a b. F11 a b = a -- OK; LHS type variables can be
-                                        explicitly bound with 'forall'
+                                     --     explicitly bound with 'forall'
 
         type F12 (a :: k)
         type F12 @k a = Proxy a      -- OK; visible kind application syntax is
-                                            permitted in default declarations
+                                     --     permitted in default declarations
 
 .. _scoping-class-params:
 
@@ -900,7 +900,7 @@ Import and export
 -----------------
 
 The rules for export lists (Haskell Report `Section
-5.2 <http://www.haskell.org/onlinereport/modules.html#sect5.2>`__) needs
+5.2 <http://www.haskell.org/onlinereport/modules.html#sect5.2>`__) need
 adjustment for type families:
 
 -  The form ``T(..)``, where ``T`` is a data family, names the family

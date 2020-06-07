@@ -9,7 +9,7 @@ Nullary type classes
 
     :since: 7.8.1
 
-    Allows the use definition of type classes with no parameters. This extension
+    Allow use and definition of type classes with no parameters. This extension
     has been replaced by :extension:`MultiParamTypeClasses`.
 
 

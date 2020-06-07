@@ -6,7 +6,7 @@ Instance declarations and resolution
 
 An instance declaration has the form ::
 
-      instance ( assertion1, ..., assertionn) => class type1 ... typem where ...
+      instance (assertion1, ..., assertionn) => class type1 ... typem where ...
 
 The part before the "``=>``" is the *context*, while the part after the
 "``=>``" is the *head* of the instance declaration.
@@ -74,7 +74,7 @@ GHC relaxes this rule in two ways:
    writing the RHS of the type synonym definition. For example: ::
 
          type Point a = (a,a)
-         instance C (Point a)   where ...
+         instance C (Point a) where ...
 
    is legal. The instance declaration is equivalent to ::
 
@@ -382,7 +382,7 @@ like this:
    target constraint is a substitution instance of :math:`I`. These instance
    declarations are the *candidates*.
 
--  If no candidates remain, the search failes
+-  If no candidates remain, the search fails
 
 -  Eliminate any candidate :math:`IX` for which there is another candidate
    :math:`IY` such that both of the following hold:
@@ -450,7 +450,7 @@ former is a substitution instance of the latter. For example (D) is
 "more specific" than (C) because you can get from (C) to (D) by
 substituting ``a := Int``.
 
-The final bullet (about unifiying instances)
+The final bullet (about unifying instances)
 makes GHC conservative about committing to an
 overlapping instance. For example: ::
 
