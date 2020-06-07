@@ -1,0 +1,2 @@
+n <- System.Mem.getAllocationCounter
+(n < 0 && n >= -160000)
