@@ -40,7 +40,7 @@ Language
 
 * Record field selectors are now given type signatures that preserve the
   user-written order of quantified type variables. Moreover, field selector
-  type signatures no longer make inferred type variables avaiable for explicit
+  type signatures no longer make inferred type variables available for explicit
   type application. See :ref:`field-selectors-and-type-applications` for more
   details.
 
@@ -103,7 +103,7 @@ Language
   <https://gitlab.haskell.org/ghc/ghc/issues/18126>`_.
 
 * GHC now implements simplified subsumption, as described in `GHC Proposal #287 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0287-simplify-subsumption.rst>`__.
-  This change simplifies the type system, and prevents the possiblity of GHC
+  This change simplifies the type system, and prevents the possibility of GHC
   silently changing the semantics of user programs, but it does mean that some libraries
   may need eta-expansion to typecheck.  More info here: :ref:`simple-subsumption`.
 

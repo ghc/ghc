@@ -936,7 +936,7 @@ at error generation.
     hfPlugin :: [CommandLineOption] -> Maybe HoleFitPlugin
 
 
-Where ``fromPureHFPlugin :: HoleFitPlugin -> HoleFitPluginR`` is a convencience
+Where ``fromPureHFPlugin :: HoleFitPlugin -> HoleFitPluginR`` is a convenience
 function provided in the ``TcHoleErrors`` module, for defining plugins that do
 not require internal state.
 
