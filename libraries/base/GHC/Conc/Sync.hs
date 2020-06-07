@@ -173,11 +173,12 @@ instance Ord ThreadId where
     _  -> GT
 
 -- | Every thread has an allocation counter that tracks how much
--- memory has been allocated by the thread.  The counter is
--- initialized to zero, and 'setAllocationCounter' sets the current
--- value.  The allocation counter counts *down*, so in the absence of
--- a call to 'setAllocationCounter' its value is the negation of the
--- number of bytes of memory allocated by the thread.
+-- memory has been allocated by the thread. The counter might be
+-- initialized with an arbitrary value >= 0 by GHC.
+-- 'setAllocationCounter' sets the current value.
+-- The allocation counter counts *down*.
+-- If initialized to zero a call to 'setAllocationCounter' reports
+-- the negation of the number of bytes of memory allocated by the thread.
 --
 -- There are two things that you can do with this counter:
 --
@@ -186,7 +187,9 @@ instance Ord ThreadId where
 --
 -- * Use it as a resource limit.  See 'enableAllocationLimit'.
 --
--- Allocation accounting is accurate only to about 4Kbytes.
+-- Allocation accounting is accurate only to about 4Kbytes. Without
+-- initialization results are only meaningful if compared to the results
+-- of other invocations on the same thread.
 --
 -- @since 4.8.0.0
 setAllocationCounter :: Int64 -> IO ()
