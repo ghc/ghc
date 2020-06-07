@@ -31,7 +31,7 @@ import GHC.Rename.HsType
 import GHC.Rename.Bind
 import GHC.Rename.Env
 import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, bindLocalNames
-                        , checkDupRdrNames, inHsDocContext, bindLocalNamesFV
+                        , checkDupRdrNames, bindLocalNamesFV
                         , checkShadowedRdrNames, warnUnusedTypePatterns
                         , extendTyVarEnvFVRn, newLocalBndrsRn
                         , withHsDocContext )
@@ -720,7 +720,7 @@ rnFamInstEqn doc atfi rhs_kvars
              -- with a sensible binding location
        ; ((bndrs', pats', payload'), fvs)
               <- bindLocalNamesFV all_imp_var_names $
-                 bindLHsTyVarBndrs doc (Just $ inHsDocContext doc)
+                 bindLHsTyVarBndrs doc WarnUnusedForalls
                                    Nothing bndrs $ \bndrs' ->
                  -- Note: If we pass mb_cls instead of Nothing here,
                  --  bindLHsTyVarBndrs will use class variables for any names
@@ -1017,7 +1017,7 @@ rnHsRuleDecl (HsRule { rd_name = rule_name
        ; checkShadowedRdrNames rdr_names_w_loc
        ; names <- newLocalBndrsRn rdr_names_w_loc
        ; let doc = RuleCtx (snd $ unLoc rule_name)
-       ; bindRuleTyVars doc in_rule tyvs $ \ tyvs' ->
+       ; bindRuleTyVars doc tyvs $ \ tyvs' ->
          bindRuleTmVars doc tyvs' tmvs names $ \ tmvs' ->
     do { (lhs', fv_lhs') <- rnLExpr lhs
        ; (rhs', fv_rhs') <- rnLExpr rhs
@@ -1033,7 +1033,6 @@ rnHsRuleDecl (HsRule { rd_name = rule_name
     get_var :: RuleBndr GhcPs -> Located RdrName
     get_var (RuleBndrSig _ v _) = v
     get_var (RuleBndr _ v)      = v
-    in_rule = text "in the rule" <+> pprFullRuleName rule_name
 
 bindRuleTmVars :: HsDocContext -> Maybe ty_bndrs
                -> [LRuleBndr GhcPs] -> [Name]
@@ -1059,17 +1058,17 @@ bindRuleTmVars doc tyvs vars names thing_inside
     bind_free_tvs = case tyvs of Nothing -> AlwaysBind
                                  Just _  -> NeverBind
 
-bindRuleTyVars :: HsDocContext -> SDoc -> Maybe [LHsTyVarBndr () GhcPs]
+bindRuleTyVars :: HsDocContext -> Maybe [LHsTyVarBndr () GhcPs]
                -> (Maybe [LHsTyVarBndr () GhcRn]  -> RnM (b, FreeVars))
                -> RnM (b, FreeVars)
-bindRuleTyVars doc in_doc (Just bndrs) thing_inside
-  = bindLHsTyVarBndrs doc (Just in_doc) Nothing bndrs (thing_inside . Just)
-bindRuleTyVars _ _ _ thing_inside = thing_inside Nothing
+bindRuleTyVars doc (Just bndrs) thing_inside
+  = bindLHsTyVarBndrs doc WarnUnusedForalls Nothing bndrs (thing_inside . Just)
+bindRuleTyVars _ _ thing_inside = thing_inside Nothing
 
 {-
 Note [Rule LHS validity checking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Check the shape of a transformation rule LHS.  Currently we only allow
+Check the shape of a rewrite rule LHS.  Currently we only allow
 LHSs of the form @(f e1 .. en)@, where @f@ is not one of the
 @forall@'d variables.
 
@@ -1581,7 +1580,7 @@ rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars,
        ; let kvs = extractHsTyRdrTyVarsKindVars rhs
              doc = TySynCtx tycon
        ; traceRn "rntycl-ty" (ppr tycon <+> ppr kvs)
-       ; bindHsQTyVars doc Nothing Nothing kvs tyvars $ \ tyvars' _ ->
+       ; bindHsQTyVars doc Nothing kvs tyvars $ \ tyvars' _ ->
     do { (rhs', fvs) <- rnTySyn doc rhs
        ; return (SynDecl { tcdLName = tycon', tcdTyVars = tyvars'
                          , tcdFixity = fixity
@@ -1597,7 +1596,7 @@ rnTyClDecl (DataDecl
        ; let kvs = extractDataDefnKindVars defn
              doc = TyDataCtx tycon
        ; traceRn "rntycl-data" (ppr tycon <+> ppr kvs)
-       ; bindHsQTyVars doc Nothing Nothing kvs tyvars $ \ tyvars' no_rhs_kvs ->
+       ; bindHsQTyVars doc Nothing kvs tyvars $ \ tyvars' no_rhs_kvs ->
     do { (defn', fvs) <- rnDataDefn doc defn
        ; cusk <- data_decl_has_cusk tyvars' new_or_data no_rhs_kvs kind_sig
        ; let rn_info = DataDeclRn { tcdDataCusk = cusk
@@ -1621,7 +1620,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
 
         -- Tyvars scope over superclass context and method signatures
         ; ((tyvars', context', fds', ats'), stuff_fvs)
-            <- bindHsQTyVars cls_doc Nothing Nothing kvs tyvars $ \ tyvars' _ -> do
+            <- bindHsQTyVars cls_doc Nothing kvs tyvars $ \ tyvars' _ -> do
                   -- Checks for distinct tyvars
              { (context', cxt_fvs) <- rnContext cls_doc context
              ; fds'  <- rnFds fds
@@ -1878,7 +1877,7 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
                              , fdInjectivityAnn = injectivity })
   = do { tycon' <- lookupLocatedTopBndrRn tycon
        ; ((tyvars', res_sig', injectivity'), fv1) <-
-            bindHsQTyVars doc Nothing mb_cls kvs tyvars $ \ tyvars' _ ->
+            bindHsQTyVars doc mb_cls kvs tyvars $ \ tyvars' _ ->
             do { let rn_sig = rnFamResultSig doc
                ; (res_sig', fv_kind) <- wrapLocFstM rn_sig res_sig
                ; injectivity' <- traverse (rnInjectivityAnn tyvars' res_sig')
@@ -2080,7 +2079,7 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
         -- scoping we get.  So no implicit binders at the existential forall
 
         ; let ctxt = ConDeclCtx [new_name]
-        ; bindLHsTyVarBndrs ctxt (Just (inHsDocContext ctxt))
+        ; bindLHsTyVarBndrs ctxt WarnUnusedForalls
                             Nothing ex_tvs $ \ new_ex_tvs ->
     do  { (new_context, fvs1) <- rnMbContext ctxt mcxt
         ; (new_args,    fvs2) <- rnConDeclDetails (unLoc new_name) ctxt args
@@ -2118,11 +2117,11 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
             $ extractHsTvBndrs explicit_tkvs
             $ extractHsTysRdrTyVarsDups (theta ++ arg_tys ++ [res_ty])
 
-        ; let ctxt    = ConDeclCtx new_names
-              mb_ctxt = Just (inHsDocContext ctxt)
+        ; let ctxt = ConDeclCtx new_names
 
         ; rnImplicitBndrs implicit_bndrs $ \ implicit_tkvs ->
-          bindLHsTyVarBndrs ctxt mb_ctxt Nothing explicit_tkvs $ \ explicit_tkvs ->
+          bindLHsTyVarBndrs ctxt WarnUnusedForalls
+                            Nothing explicit_tkvs $ \ explicit_tkvs ->
     do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt
         ; (new_args, fvs2)   <- rnConDeclDetails (unLoc (head new_names)) ctxt args
         ; (new_res_ty, fvs3) <- rnLHsType ctxt res_ty
