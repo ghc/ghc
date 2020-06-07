@@ -732,7 +732,7 @@ release-x86_64-linux-deb8:
 # x86_64-linux-alpine
 #################################
 
-.build-x86_64-linux-alpine-hadrian:
+build-x86_64-linux-alpine-hadrian:
   extends: .validate-linux-hadrian
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_12:$DOCKER_REV"
@@ -740,6 +740,7 @@ release-x86_64-linux-deb8:
   allow_failure: true
   variables:
     TEST_ENV: "x86_64-linux-alpine"
+    FLAVOUR: "static"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-alpine-linux.tar.xz"
     # Can't use ld.gold due to #13958.
     CONFIGURE_ARGS: "--disable-ld-override"
@@ -755,11 +756,15 @@ release-x86_64-linux-deb8:
 
 release-x86_64-linux-alpine:
   <<: *release
-  extends: .build-x86_64-linux-alpine-hadrian
+  variables:
+    FLAVOUR: "static"
+  extends: build-x86_64-linux-alpine-hadrian
 
 nightly-x86_64-linux-alpine:
   <<: *nightly
-  extends: .build-x86_64-linux-alpine-hadrian
+  variables:
+    FLAVOUR: "static"
+  extends: build-x86_64-linux-alpine-hadrian
 
 #################################
 # x86_64-linux-centos7
