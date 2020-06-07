@@ -7,7 +7,7 @@ import {-# SOURCE #-} Settings.Default
 -- Please update doc/flavours.md when changing this file.
 staticFlavour :: Flavour
 staticFlavour = defaultFlavour
-    { name = "broken_static"
+    { name = "static"
     , args = defaultBuilderArgs <> performanceArgs <> defaultPackageArgs }
 
 performanceArgs :: Args
