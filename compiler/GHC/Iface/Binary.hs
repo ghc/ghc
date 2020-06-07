@@ -13,6 +13,7 @@ module GHC.Iface.Binary (
         -- * Public API for interface file serialisation
         writeBinIface,
         readBinIface,
+        readBinIface_,
         getSymtabName,
         getDictFastString,
         CheckHiWay(..),
@@ -88,6 +89,7 @@ readBinIface checkHiWay traceBinIFaceReading hi_path = do
     dflags <- getDynFlags
     liftIO $ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu
 
+-- | Read an interface file in 'IO'.
 readBinIface_ :: DynFlags -> CheckHiWay -> TraceBinIFaceReading -> FilePath
               -> NameCacheUpdater
               -> IO ModIface
