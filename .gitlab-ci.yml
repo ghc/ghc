@@ -738,7 +738,9 @@ release-x86_64-linux-deb8:
   # There are currently a few failing tests
   allow_failure: true
   variables:
+    INTEGER_LIBRARY: integer-simple
     TEST_ENV: "x86_64-linux-alpine"
+    FLAVOUR: "static"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-alpine-linux.tar.xz"
     # Can't use ld.gold due to #13958.
     CONFIGURE_ARGS: "--disable-ld-override"
@@ -754,10 +756,14 @@ release-x86_64-linux-deb8:
 
 release-x86_64-linux-alpine:
   <<: *release
+  variables:
+    FLAVOUR: "static"
   extends: .build-x86_64-linux-alpine-hadrian
 
 nightly-x86_64-linux-alpine:
   <<: *nightly
+  variables:
+    FLAVOUR: "static"
   extends: .build-x86_64-linux-alpine-hadrian
 
 #################################
