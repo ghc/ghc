@@ -187,10 +187,10 @@ For example: ::
   f4 :: (Int -> forall a. (Eq a, Show a) => a -> a) -> Bool
   g4 ::  Int -> forall x. (Show x, Eq x) => x -> x) -> Bool
 
-Then the application ``f3 g3a`` is well-typed, becuase ``g3a`` has a type that matches the type
+Then the application ``f3 g3a`` is well-typed, because ``g3a`` has a type that matches the type
 expected by ``f3``.  But ``f3 g3b`` is not well typed, because the foralls are in different places.
 Nor is ``f3 g3c``, where the foralls are in the same place but the variables are in a different order.
-Similarly ``f4 g4`` is not well typed, becuase the constraints appear in a different order.
+Similarly ``f4 g4`` is not well typed, because the constraints appear in a different order.
 
 These examples can be made to typecheck by eta-expansion. For example ``f3 (\x -> g3b x)``
 is well typed, and similarly ``f3 (\x -> g3c x)`` and ``f4 (\x -> g4 x)``.

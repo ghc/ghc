@@ -13,7 +13,7 @@ Record wildcards
     Allow the use of wildcards in record construction and pattern matching.
 
 Record wildcards are enabled by the language extension :extension:`RecordWildCards`. This
-exension implies :extension:`DisambiguateRecordFields`.
+extension implies :extension:`DisambiguateRecordFields`.
 
 For records with many fields, it can be tiresome to write out each field
 individually in a record pattern, as in ::

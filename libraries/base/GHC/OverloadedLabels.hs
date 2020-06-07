@@ -17,7 +17,7 @@
 -- Stability   :  internal
 -- Portability :  non-portable (GHC extensions)
 --
--- This module defines the 'IsLabel' class is used by the
+-- This module defines the 'IsLabel' class used by the
 -- @OverloadedLabels@ extension.  See the
 -- <https://gitlab.haskell.org/ghc/ghc/wikis/records/overloaded-record-fields/overloaded-labels wiki page>
 -- for more details.
