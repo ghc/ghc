@@ -609,7 +609,7 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
             CbNone    _ -> error "withOverlappedEx: CbNone shouldn't happen."
             CbIncomplete -> do
                debugIO $ "handling incomplete request synchronously " ++ show (h, lpol)
-               res <- spinWaitComplete h lpol
+               res <- waitForCompletion h lpol
                debugIO $ "done blocking request 2: " ++ show (h, lpol) ++ " - " ++ show res
                return res
             CbPending   -> do
@@ -652,7 +652,7 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                 -- In progress, we will wait for completion.
                 (Nothing, False, True) -> do
                   debugIO $ "handling incomplete request synchronously " ++ show (h, lpol)
-                  res <- spinWaitComplete h lpol
+                  res <- waitForCompletion h lpol
                   debugIO $ "done blocking request 1: " ++ show (h, lpol) ++ " - " ++ show res
                   return res
                 _                -> do
@@ -728,53 +728,56 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
             free hs_lpol
             error "unexpected case in `startCBResult'"
       where dbgMsg s = s ++ " (" ++ show h ++ ":" ++ show offset ++ ")"
-            spinWaitComplete :: HANDLE -> Ptr FFI.OVERLAPPED -> IO (CbResult Int)
-            spinWaitComplete fhndl lpol = do
+            -- Wait for .25ms (threaded) and 1ms (non-threaded)
+            -- Yields in the threaded case allowing other work.
+            -- Blocks all haskell execution in the non-threaded case.
+            -- We might want to reconsider the non-threaded handling
+            -- at some point.
+            doShortWait :: IO ()
+            doShortWait
+                | threadedIOMgr = do
+                    -- Uses an inline definition of threadDelay to prevent an import
+                    -- cycle.
+                    let usecs = 250 -- 0.25ms
+                    m <- newEmptyIOPort
+                    reg <- registerTimeout mgr usecs $
+                                writeIOPort m () >> return ()
+                    readIOPort m `onException` unregisterTimeout mgr reg
+                | otherwise = sleepBlock 1 -- 1 ms
+            waitForCompletion :: HANDLE -> Ptr FFI.OVERLAPPED -> IO (CbResult Int)
+            waitForCompletion fhndl lpol = do
               -- Wait for the request to finish as it was running before and
               -- The I/O manager won't enqueue it due to our optimizations to
               -- prevent context switches in such cases.
               res <- FFI.getOverlappedResult fhndl lpol False
               status <- FFI.overlappedIOStatus lpol
               case res of
-                -- Uses an inline definition of threadDelay to prevent an import
-                -- cycle.
-                Nothing | status == #{const STATUS_END_OF_FILE} -> do
-                  when (not threadedIOMgr) completeSynchronousRequest
-                  return $ CbDone res
+                Nothing | status == #{const STATUS_END_OF_FILE}
+                        -> do
+                              when (not threadedIOMgr) completeSynchronousRequest
+                              return $ CbDone res
                         | otherwise ->
-                  do m <- newEmptyIOPort
-                     lasterr <- getLastError
+                  do lasterr <- getLastError
                      let done = errorIsCompleted lasterr
                      -- debugIO $ ":: loop - " ++ show lasterr ++ " :" ++ show done
                      -- We will complete quite soon, in the threaded RTS we
                      -- probably don't really want to wait for it while we could
                      -- have done something else.  In particular this is because
-                     -- of sockets which make take slightly longer.  However for
-                     -- the non-threaded RTS, using the timer manage is a waste
-                     -- since there's only one capability anyway.
+                     -- of sockets which make take slightly longer.
                      -- There's a trade-off.  Using the timer would allow it do
                      -- to continue running other Haskell threads, but also
-                     -- means it may take longer to complete the wait.  For now
-                     -- I'll not use it and enter a busy wait and see if there
-                     -- are any complaints.
-                     -- OTOH any of the two should be a massive improvement over
-                     -- The old I/O Manager.
-                     case (done, threadedIOMgr) of
-                       (False, True) -> do
-                         let usecs = 250 -- 0.25ms
-                         reg <- registerTimeout mgr usecs $
-                                  writeIOPort m () >> return ()
-                         readIOPort m `onException` unregisterTimeout mgr reg
-                       (False, False) -> sleepBlock 250
-                       _              -> return ()
+                     -- means it may take longer to complete the wait.
+                     unless done doShortWait
                      if done
                         then do when (not threadedIOMgr)
                                   completeSynchronousRequest
                                 return $ CbDone Nothing
-                        else spinWaitComplete fhndl lpol
+                        else waitForCompletion fhndl lpol
                 Just _ -> do
                    when (not threadedIOMgr) completeSynchronousRequest
                    return $ CbDone res
+            unless :: Bool -> IO () -> IO ()
+            unless p a = if p then a else return ()
 
 -- Safe version of function
 withOverlapped :: String
@@ -1185,6 +1188,7 @@ foreign import ccall unsafe "sendIOManagerEvent" -- in the RTS (ThrIOManager.c)
 
 foreign import ccall unsafe "rtsSupportsBoundThreads" threadedIOMgr :: Bool
 
+-- | Sleep for n ms
 foreign import stdcall unsafe "Sleep" sleepBlock :: Int -> IO ()
 
 -- ---------------------------------------------------------------------------
@@ -1236,7 +1240,6 @@ unregisterHandle (Manager{..}) key@HandleKey{..} = do
             new_lst = EventData evs updated
         _ <- IT.updateWith (\_ -> return new_lst) hwnd' evts
         return ()
-
 
 -- ---------------------------------------------------------------------------
 -- debugging
