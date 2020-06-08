@@ -109,6 +109,7 @@ import GHC.Types.Basic ( InlineSpec(..), RuleMatchInfo(..))
 import GHC.Hs.Doc
 
 import GHC.Parser.CharClass
+import GHC.Parser.Error
 
 import GHC.Parser.Annotation
 import GHC.Driver.Flags

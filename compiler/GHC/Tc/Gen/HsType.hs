@@ -1062,11 +1062,11 @@ tc_hs_type mode forall@(HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
 
        -- Do not kind-generalise here!  See Note [Kind generalisation]
 
-       ; let skol_info = ForAllSkol (ppr forall) $ sep $ case tele of
+       ; let skol_info = ForAllSkol forall $ sep $ case tele of
                            HsForAllVis { hsf_vis_bndrs = hs_tvs } ->
-                             map ppr hs_tvs
+                             hs_tvs
                            HsForAllInvis { hsf_invis_bndrs = hs_tvs } ->
-                             map ppr hs_tvs
+                             hs_tvs
              skol_tvs  = binderVars tv_bndrs
 
        ; implic <- buildTvImplication skol_info skol_tvs tclvl wanted

@@ -49,6 +49,11 @@ module GHC.Tc.Types(
         SelfBootInfo(..),
         pprTcTyThingCategory, pprPECategory, CompleteMatch, CompleteMatches,
 
+        -- Desugaring types
+        DsM, DsLclEnv(..), DsGblEnv(..), DsError,
+        DsMetaEnv, DsMetaVal(..), CompleteMatchMap,
+        mkCompleteMatchMap, extendCompleteMatchMap,
+
         -- Template Haskell
         ThStage(..), SpliceType(..), PendingStuff(..),
         topStage, topAnnStage, topSpliceStage,
@@ -109,6 +114,10 @@ import GHC.Core.FamInstEnv
 import GHC.Types.Id         ( idType, idName )
 import GHC.Types.FieldLabel ( FieldLabel )
 import GHC.Types.Fixity.Env
+import GHC.Tc.Errors.Types
+import GHC.Tc.Utils.TcType
+import GHC.Tc.Types.Constraint
+import GHC.Tc.Types.Origin
 import GHC.Types.Annotations
 import GHC.Types.CompleteMatch
 import GHC.Types.Name.Reader
@@ -303,6 +312,7 @@ data IfLclEnv
 {-
 ************************************************************************
 *                                                                      *
+type DsError = TcRnError
                 Global typechecker environment
 *                                                                      *
 ************************************************************************
@@ -748,7 +758,7 @@ data TcLclEnv           -- Changes as we move inside an expression
                                       -- and for tidying types
 
         tcl_lie  :: TcRef WantedConstraints,    -- Place to accumulate type constraints
-        tcl_errs :: TcRef Messages              -- Place to accumulate errors
+        tcl_errs :: TcRef (Messages TcRnError)     -- Place to accumulate errors
     }
 
 setLclEnvTcLevel :: TcLclEnv -> TcLevel -> TcLclEnv

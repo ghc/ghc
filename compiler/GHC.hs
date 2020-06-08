@@ -1435,7 +1435,7 @@ getNameToInstancesIndex :: GhcMonad m
                      -- if it is visible from at least one module in the list.
   -> Maybe [Module]  -- ^ modules to load. If this is not specified, we load
                      -- modules for everything that is in scope unqualified.
-  -> m (Messages, Maybe (NameEnv ([ClsInst], [FamInst])))
+  -> m (Messages TcRnError, Maybe (NameEnv ([ClsInst], [FamInst])))
 getNameToInstancesIndex visible_mods mods_to_load = do
   hsc_env <- getSession
   liftIO $ runTcInteractive hsc_env $
@@ -1541,6 +1541,8 @@ getTokenStream mod = do
   case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts    -> return ts
     PFailed pst -> throwErrors (fmap pprError (getErrorMessages pst))
+        do dflags <- getDynFlags
+           throwErrors $ mapBag (fmap GhcErrorPs) (getErrorMessages pst dflags)
 
 -- | Give even more information on the source than 'getTokenStream'
 -- This function allows reconstructing the source completely with
@@ -1551,7 +1553,9 @@ getRichTokenStream mod = do
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts    -> return $ addSourceToTokens startLoc source ts
-    PFailed pst -> throwErrors (fmap pprError (getErrorMessages pst))
+    PFailed pst ->
+        do dflags <- getDynFlags
+           throwErrors $ mapBag (fmap GhcErrorPs) (getErrorMessages pst dflags)
 
 -- | Given a source location and a StringBuffer corresponding to this
 -- location, return a rich token stream with the source associated to the
@@ -1715,7 +1719,7 @@ lookupName name =
 parser :: String         -- ^ Haskell module source text (full Unicode is supported)
        -> DynFlags       -- ^ the flags
        -> FilePath       -- ^ the filename (for source locations)
-       -> (WarningMessages, Either ErrorMessages (Located HsModule))
+       -> (WarningMessages, Either (ErrorMessages PsError) (Located HsModule))
 
 parser str dflags filename =
    let

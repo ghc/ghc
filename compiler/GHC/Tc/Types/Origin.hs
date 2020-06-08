@@ -28,6 +28,8 @@ import GHC.Tc.Utils.TcType
 
 import GHC.Hs
 
+import GHC.Types.Id
+import GHC.Types.Var (Specificity)
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.TyCon
@@ -184,8 +186,10 @@ data SkolemInfo
                  -- hence, we have less info
 
   | ForAllSkol  -- Bound by a user-written "forall".
-       SDoc        -- Shows the entire forall type
-       SDoc        -- Shows just the binders, used when reporting a bad telescope
+       (HsType GhcRn)
+       -- Shows the entire forall type
+       [LHsTyVarBndr Specificity GhcRn]
+       -- Shows just the binders, used when reporting a bad telescope
                    -- See Note [Checking telescopes] in GHC.Tc.Types.Constraint
 
   | DerivSkol Type      -- Bound by a 'deriving' clause;
@@ -244,7 +248,7 @@ pprSkolInfo :: SkolemInfo -> SDoc
 -- Complete the sentence "is a rigid type variable bound by..."
 pprSkolInfo (SigSkol cx ty _) = pprSigSkolInfo cx ty
 pprSkolInfo (SigTypeSkol cx)  = pprUserTypeCtxt cx
-pprSkolInfo (ForAllSkol pt _) = quotes pt
+pprSkolInfo (ForAllSkol pt _) = quotes (ppr pt)
 pprSkolInfo (IPSkol ips)      = text "the implicit-parameter binding" <> plural ips <+> text "for"
                                  <+> pprWithCommas ppr ips
 pprSkolInfo (DerivSkol pred)  = text "the deriving clause for" <+> quotes (ppr pred)

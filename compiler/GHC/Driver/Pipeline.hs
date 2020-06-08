@@ -130,7 +130,7 @@ preprocess :: HscEnv
            -> Maybe InputFileBuffer
            -- ^ optional buffer to use instead of reading the input file
            -> Maybe Phase -- ^ starting phase
-           -> IO (Either ErrorMessages (DynFlags, FilePath))
+           -> IO (Either (ErrorMessages GhcError) (DynFlags, FilePath))
 preprocess hsc_env input_fn mb_input_buf mb_phase =
   handleSourceError (\err -> return (Left (srcErrorMessages err))) $
   MC.handle handler $
@@ -149,7 +149,8 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
   where
     srcspan = srcLocSpan $ mkSrcLoc (mkFastString input_fn) 1 1
     handler (ProgramError msg) = return $ Left $ unitBag $
-        mkPlainErrMsg (hsc_dflags hsc_env) srcspan $ text msg
+      fmap ghcErrorRawErrDoc $ mkPlainErrMsg (hsc_dflags hsc_env) srcspan $
+        text msg
     handler ex = throwGhcExceptionIO ex
 
 -- ---------------------------------------------------------------------------
@@ -1152,7 +1153,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
                 popts = initParserOpts dflags
             eimps <- getImports popts imp_prelude buf input_fn (basename <.> suff)
             case eimps of
-              Left errs -> throwErrors (fmap pprError errs)
+              Left errs -> throwErrors (mapBag (fmap GhcErrorPs) errs)
               Right (src_imps,imps,L _ mod_name) -> return
                   (Just buf, mod_name, imps, src_imps)
 

@@ -25,6 +25,9 @@ module GHC.Driver.Monad (
 
 import GHC.Prelude
 
+import GHC.Data.Bag (mapBag)
+import GHC.Utils.Monad
+import GHC.Driver.Types
 import GHC.Driver.Session
 import GHC.Driver.Env
 
@@ -181,7 +184,8 @@ instance ExceptionMonad m => GhcMonad (GhcT m) where
 printException :: GhcMonad m => SourceError -> m ()
 printException err = do
   dflags <- getSessionDynFlags
-  liftIO $ printBagOfErrors dflags (srcErrorMessages err)
+  liftIO $ printBagOfErrors dflags $
+    mapBag (fmap (renderError dflags)) (srcErrorMessages err)
 
 -- | A function called to log warnings and errors.
 type WarnErrLogger = forall m. GhcMonad m => Maybe SourceError -> m ()
