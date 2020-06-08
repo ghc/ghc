@@ -788,8 +788,6 @@ void checkUnload (StgClosure *static_objects)
     for (ObjectCode *oc = old_objects; oc != NULL; oc = next) {
         next = oc->next;
 
-        removeOcSymbols(oc);
-
         removeOCSectionIndices(s_indices, oc);
         freeObjectCode(oc);
     }
