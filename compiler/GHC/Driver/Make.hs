@@ -2436,7 +2436,7 @@ checkSummaryTimestamp
     -> IO (Either e ModSummary)
 checkSummaryTimestamp
   hsc_env dflags obj_allowed is_boot new_summary
-  old_summary location package src_timestamp
+  old_summary location _package src_timestamp
   | ms_hs_date old_summary == src_timestamp &&
       not (gopt Opt_ForceRecomp (hsc_dflags hsc_env)) = do
            -- update the object-file timestamp
