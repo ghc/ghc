@@ -580,14 +580,6 @@ class Functor f => Applicative f where
     -- A few functors support an implementation of '<*>' that is more
     -- efficient than the default one.
     --
-    -- Using @ApplicativeDo@: \'@fs '<*>' as@\' can be understood as
-    -- the @do@ expression
-    --
-    -- @
-    -- do f <- fs
-    --    a <- as
-    --    pure (f a)
-    -- @
     (<*>) :: f (a -> b) -> f a -> f b
     (<*>) = liftA2 id
 
@@ -601,14 +593,6 @@ class Functor f => Applicative f where
     -- This became a typeclass method in 4.10.0.0. Prior to that, it was
     -- a function defined in terms of '<*>' and 'fmap'.
     --
-    -- Using @ApplicativeDo@: \'@'liftA2' f as bs@\' can be understood
-    -- as the @do@ expression
-    --
-    -- @
-    -- do a <- as
-    --    b <- bs
-    --    pure (f a b)
-    -- @
 
     liftA2 :: (a -> b -> c) -> f a -> f b -> f c
     liftA2 f x = (<*>) (fmap f x)
@@ -634,27 +618,11 @@ class Functor f => Applicative f where
 
     -- | Sequence actions, discarding the value of the second argument.
     --
-    -- Using @ApplicativeDo@: \'@as '<*' bs@\' can be understood as
-    -- the @do@ expression
-    --
-    -- @
-    -- do a <- as
-    --    bs
-    --    pure a
-    -- @
     (<*) :: f a -> f b -> f a
     (<*) = liftA2 const
 
 -- | A variant of '<*>' with the arguments reversed.
 --
--- Using @ApplicativeDo@: \'@as '<**>' fs@\' can be understood as the
--- @do@ expression
---
--- @
--- do a <- as
---    f <- fs
---    pure (f a)
--- @
 (<**>) :: Applicative f => f a -> f (a -> b) -> f b
 (<**>) = liftA2 (\a f -> f a)
 -- Don't use $ here, see the note at the top of the page
@@ -662,16 +630,6 @@ class Functor f => Applicative f where
 -- | Lift a function to actions.
 -- This function may be used as a value for `fmap` in a `Functor` instance.
 --
--- Using @ApplicativeDo@: \'@'liftA' f as@\' can be understood as the
--- @do@ expression
---
---
--- @
--- do a <- as
---    pure (f a)
--- @
---
--- with an inferred @Functor@ constraint, weaker than @Applicative@.
 liftA :: Applicative f => (a -> b) -> f a -> f b
 liftA f a = pure f <*> a
 -- Caution: since this may be used for `fmap`, we can't use the obvious
@@ -679,15 +637,6 @@ liftA f a = pure f <*> a
 
 -- | Lift a ternary function to actions.
 --
--- Using @ApplicativeDo@: \'@'liftA3' f as bs cs@\' can be understood
--- as the @do@ expression
---
--- @
--- do a <- as
---    b <- bs
---    c <- cs
---    pure (f a b c)
--- @
 liftA3 :: Applicative f => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
 liftA3 f a b c = liftA2 f a b <*> c
 
