@@ -291,9 +291,6 @@ void exitLinker( void );
 void freeObjectCode (ObjectCode *oc);
 SymbolAddr* loadSymbol(SymbolName *lbl, RtsSymbolInfo *pinfo);
 
-void removeOcSymbols (ObjectCode *oc);
-void freeOcStablePtrs (ObjectCode *oc);
-
 void *mmapForLinker (size_t bytes, uint32_t flags, int fd, int offset);
 void mmapForLinkerMarkExecutable (void *start, size_t len);
 

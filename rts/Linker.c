@@ -1784,6 +1784,7 @@ static HsInt unloadObj_ (pathchar *path, bool just_purge)
             unloadedAnyObj = true;
 
             if (!just_purge) {
+                // Remove object code from root set
                 if (prev == NULL) {
                     loaded_objects = oc->next_loaded_object;
                 } else {
