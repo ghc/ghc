@@ -1000,7 +1000,10 @@ mkErrorMsgFromCt ctxt ct report
 mkErrorReport :: ReportErrCtxt -> TcLclEnv -> Report -> TcM ErrMsg
 mkErrorReport ctxt tcl_env (Report important relevant_bindings valid_subs)
   = do { context <- mkErrInfo (cec_tidy ctxt) (tcl_ctxt tcl_env)
-       ; mkErrDocAt (RealSrcSpan (tcl_loc tcl_env) Nothing)
+         -- We know there is at least one real span in tcl_loc
+         -- because we only ever push on top of the stack that
+         -- always starts with one real span.
+       ; mkErrDocAt (RealSrcSpan (getLclEnvLoc tcl_env) Nothing)
             (errDoc important [context] (relevant_bindings ++ valid_subs))
        }
 
@@ -1118,7 +1121,10 @@ mkHoleError tidy_simples ctxt ct@(CHoleCan { cc_occ = occ, cc_hole = hole_sort }
        ; imp_info <- getImports
        ; curr_mod <- getModule
        ; hpt <- getHpt
-       ; mkErrDocAt (RealSrcSpan (tcl_loc lcl_env) Nothing) $
+         -- We know there is at least one real span in tcl_loc
+         -- because we only ever push on top of the stack that
+         -- always starts with one real span.
+       ; mkErrDocAt (RealSrcSpan (getLclEnvLoc lcl_env) Nothing) $
                     errDoc [out_of_scope_msg] []
                            [unknownNameSuggestions dflags hpt curr_mod rdr_env
                             (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ)] }
@@ -1231,7 +1237,7 @@ givenConstraintsMsg ctxt =
         constraints =
           do { implic@Implic{ ic_given = given } <- cec_encl ctxt
              ; constraint <- given
-             ; return (varType constraint, tcl_loc (ic_env implic)) }
+             ; return (varType constraint, getLclEnvLoc (ic_env implic)) }
 
         pprConstraint (constraint, loc) =
           ppr constraint <+> nest 2 (parens (text "from" <+> ppr loc))

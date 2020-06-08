@@ -747,9 +747,8 @@ Why?  Because they are now Ids not TcIds.  This final GlobalEnv is
 data TcLclEnv           -- Changes as we move inside an expression
                         -- Discarded after typecheck/rename; not passed on to desugarer
   = TcLclEnv {
-        tcl_loc        :: RealSrcSpan,     -- Source span
+        tcl_loc        :: [SrcSpan],       -- Source span stack
         tcl_ctxt       :: [ErrCtxt],       -- Error context, innermost on top
-        tcl_in_gen_code :: Bool,           -- See Note [Rebindable syntax and HsExpansion]
         tcl_tclvl      :: TcLevel,
 
         tcl_th_ctxt    :: ThStage,         -- Template Haskell context
@@ -790,12 +789,21 @@ getLclEnvTcLevel :: TcLclEnv -> TcLevel
 getLclEnvTcLevel = tcl_tclvl
 
 setLclEnvLoc :: TcLclEnv -> RealSrcSpan -> TcLclEnv
-setLclEnvLoc env loc = env { tcl_loc = loc }
+setLclEnvLoc env loc = env { tcl_loc = RealSrcSpan loc Nothing : tcl_loc env }
 
+-- We critically rely on the fact that we always push
+-- a real span when constructing the initial TcLclEnv, and
+-- that we then always augment the stack, with real and fake
+-- locations.
 getLclEnvLoc :: TcLclEnv -> RealSrcSpan
-getLclEnvLoc = tcl_loc
+getLclEnvLoc env = first_real_span (tcl_loc env)
 
-type ErrCtxt = (Bool, TidyEnv -> TcM (TidyEnv, MsgDoc))
+  where first_real_span [] = error
+          "getLclEnvLoc: real source span invariant violated"
+        first_real_span (RealSrcSpan r _ :  _) = r
+        first_real_span (_               : ss) = first_real_span ss
+
+type ErrCtxt = (Bool, TidyEnv -> TcM (TidyEnv, MsgDoc), SrcSpan)
         -- Monadic so that we have a chance
         -- to deal with bound type variables just before error
         -- message construction

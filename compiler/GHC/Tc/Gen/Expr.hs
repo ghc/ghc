@@ -113,7 +113,8 @@ tcCheckExpr, tcCheckExprNC
 -- to do so himself.
 
 tcCheckExpr expr res_ty
-  = addExprCtxt expr $ tcCheckExprNC expr res_ty
+  = addExprCtxt expr $
+    tcCheckExprNC expr res_ty
 
 tcCheckExprNC (L loc expr) res_ty
   = set_loc_and_ctxt loc expr $
@@ -122,11 +123,9 @@ tcCheckExprNC (L loc expr) res_ty
                           tcExpr expr (mkCheckExpType res_ty)
        ; return $ L loc (mkHsWrap wrap expr') }
 
-  where -- See Note [Rebindable syntax and HsExpansion), which describes
-        -- the logic behind this location/context tweaking.
-        set_loc_and_ctxt l e m = do
-          inGenCode <- inGeneratedCode
-          if inGenCode && not (isGeneratedSrcSpan l)
+  where set_loc_and_ctxt l e m = do
+          span <- getSrcSpanM
+          if isGeneratedSrcSpan span && not (isGeneratedSrcSpan l)
             then setSrcSpan l $ addExprCtxt (L l e) m
             else setSrcSpan l m
 

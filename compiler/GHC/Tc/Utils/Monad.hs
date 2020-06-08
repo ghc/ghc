@@ -59,7 +59,7 @@ module GHC.Tc.Utils.Monad(
   addDependentFiles,
 
   -- * Error management
-  getSrcSpanM, setSrcSpan, addLocM, inGeneratedCode,
+  getSrcSpanM, setSrcSpan, addLocM,
   wrapLocM, wrapLocFstM, wrapLocSndM,wrapLocM_,
   getErrsVar, setErrsVar,
   addErr,
@@ -333,9 +333,13 @@ initTcWithGbl hsc_env gbl_env loc do_this
       ; errs_var     <- newIORef (emptyBag, emptyBag)
       ; let lcl_env = TcLclEnv {
                 tcl_errs       = errs_var,
-                tcl_loc        = loc,
-                -- tcl_loc should be over-ridden very soon!
-                tcl_in_gen_code = False,
+                tcl_loc        = [RealSrcSpan loc Nothing],
+                  -- This guarantees the invariant that we can always find a
+                  -- real source span in the stack, hopefully never having to
+                  -- search that far down so as to reach the beginning.
+                  -- But tcl_loc should be over-ridden very soon, with real or
+                  -- "fake" source spans pushed on top of this location, as we
+                  -- traverse ASTs.
                 tcl_ctxt       = [],
                 tcl_rdr        = emptyLocalRdrEnv,
                 tcl_th_ctxt    = topStage,
@@ -825,21 +829,13 @@ addDependentFiles fs = do
 
 getSrcSpanM :: TcRn SrcSpan
         -- Avoid clash with Name.getSrcLoc
-getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (tcl_loc env) Nothing) }
-
--- See Note [Rebindable syntax and HsExpansion].
-inGeneratedCode :: TcRn Bool
-inGeneratedCode = tcl_in_gen_code <$> getLclEnv
+getSrcSpanM = do { env <- getLclEnv; return (head $ tcl_loc env) }
+ -- we critically rely on the TcLclEnv being created with at least one spa
 
 setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
-setSrcSpan (RealSrcSpan loc _) thing_inside =
-  updLclEnv (\env -> env { tcl_loc = loc, tcl_in_gen_code = False })
+setSrcSpan loc thing_inside =
+  updLclEnv (\env -> env { tcl_loc = loc : tcl_loc env })
             thing_inside
-setSrcSpan loc@(UnhelpfulSpan _) thing_inside
-  -- See Note [Rebindable syntax and HsExpansion].
-  | isGeneratedSrcSpan loc =
-      updLclEnv (\env -> env { tcl_in_gen_code = True }) thing_inside
-  | otherwise = thing_inside
 
 addLocM :: (a -> TcM b) -> Located a -> TcM b
 addLocM fn (L loc a) = setSrcSpan loc $ fn a
@@ -1019,11 +1015,8 @@ addErrCtxt msg = addErrCtxtM (\env -> return (env, msg))
 
 -- | Add a message to the error context. This message may do tidying.
 addErrCtxtM :: (TidyEnv -> TcM (TidyEnv, MsgDoc)) -> TcM a -> TcM a
-addErrCtxtM ctxt m = do
-  shouldPushCtxt <- not <$> inGeneratedCode
-  if shouldPushCtxt
-    then updCtxt (\ ctxts -> (False, ctxt) : ctxts) m
-    else m
+addErrCtxtM ctxt = updLclEnv $ \env ->
+  env { tcl_ctxt = (False, ctxt, head (tcl_loc env)) : tcl_ctxt env}
 
 -- | Add a fixed landmark message to the error context. A landmark
 -- message is always sure to be reported, even if there is a lot of
@@ -1034,12 +1027,10 @@ addLandmarkErrCtxt msg = addLandmarkErrCtxtM (\env -> return (env, msg))
 
 -- | Variant of 'addLandmarkErrCtxt' that allows for monadic operations
 -- and tidying.
+{-# INLINE addLandmarkErrCtxtM #-}
 addLandmarkErrCtxtM :: (TidyEnv -> TcM (TidyEnv, MsgDoc)) -> TcM a -> TcM a
-addLandmarkErrCtxtM ctxt m = do
-  shouldPushCtxt <- not <$> inGeneratedCode
-  if shouldPushCtxt
-    then updCtxt (\ctxts -> (True, ctxt) : ctxts) m
-    else m
+addLandmarkErrCtxtM ctxt = updLclEnv $ \env ->
+  env { tcl_ctxt = (True, ctxt, head (tcl_loc env)) : tcl_ctxt env }
 
 -- Helper function for the above
 updCtxt :: ([ErrCtxt] -> [ErrCtxt]) -> TcM a -> TcM a
@@ -1437,8 +1428,9 @@ mkErrInfo env ctxts
  where
    go :: Bool -> Int -> TidyEnv -> [ErrCtxt] -> TcM SDoc
    go _ _ _   [] = return empty
-   go dbg n env ((is_landmark, ctxt) : ctxts)
-     | is_landmark || n < mAX_CONTEXTS -- Too verbose || dbg
+   go dbg n env ((is_landmark, ctxt, span) : ctxts)
+     | (is_landmark || n < mAX_CONTEXTS) && not (isGeneratedSrcSpan span)
+     -- Too verbose || dbg
      = do { (env', msg) <- ctxt env
           ; let n' = if is_landmark then n else n+1
           ; rest <- go dbg n' env' ctxts
