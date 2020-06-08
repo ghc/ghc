@@ -115,7 +115,6 @@ import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 import GHC.Runtime.Heap.Layout
 
-import GHC.Unit
 import GHC.Types.Name
 import GHC.Types.Id
 import GHC.Types.Basic
@@ -356,7 +355,7 @@ registerTickyCtr ctr_lbl = do
         , mkStore (CmmLit (cmmLabelOffB ctr_lbl
                                 (oFFSET_StgEntCounter_registeredp dflags)))
                    (mkIntExpr platform 1) ]
-    ticky_entry_ctrs = mkLblExpr (mkCmmDataLabel rtsUnitId (fsLit "ticky_entry_ctrs"))
+    ticky_entry_ctrs = mkLblExpr (mkRtsCmmDataLabel (fsLit "ticky_entry_ctrs"))
   emit =<< mkCmmIfThen test (catAGraphs register_stmts)
 
 tickyReturnOldCon, tickyReturnNewCon :: RepArity -> FCode ()
@@ -498,12 +497,12 @@ tickyAllocHeap genuine hp
                      bytes,
             -- Bump the global allocation total ALLOC_HEAP_tot
             addToMemLbl (bWord platform)
-                        (mkCmmDataLabel rtsUnitId (fsLit "ALLOC_HEAP_tot"))
+                        (mkRtsCmmDataLabel (fsLit "ALLOC_HEAP_tot"))
                         bytes,
             -- Bump the global allocation counter ALLOC_HEAP_ctr
             if not genuine then mkNop
             else addToMemLbl (bWord platform)
-                             (mkCmmDataLabel rtsUnitId (fsLit "ALLOC_HEAP_ctr"))
+                             (mkRtsCmmDataLabel (fsLit "ALLOC_HEAP_ctr"))
                              1
             ]}
 
@@ -567,13 +566,13 @@ ifTickyDynThunk :: FCode () -> FCode ()
 ifTickyDynThunk code = tickyDynThunkIsOn >>= \b -> when b code
 
 bumpTickyCounter :: FastString -> FCode ()
-bumpTickyCounter lbl = bumpTickyLbl (mkCmmDataLabel rtsUnitId lbl)
+bumpTickyCounter lbl = bumpTickyLbl (mkRtsCmmDataLabel lbl)
 
 bumpTickyCounterBy :: FastString -> Int -> FCode ()
-bumpTickyCounterBy lbl = bumpTickyLblBy (mkCmmDataLabel rtsUnitId lbl)
+bumpTickyCounterBy lbl = bumpTickyLblBy (mkRtsCmmDataLabel lbl)
 
 bumpTickyCounterByE :: FastString -> CmmExpr -> FCode ()
-bumpTickyCounterByE lbl = bumpTickyLblByE (mkCmmDataLabel rtsUnitId lbl)
+bumpTickyCounterByE lbl = bumpTickyLblByE (mkRtsCmmDataLabel lbl)
 
 bumpTickyEntryCount :: CLabel -> FCode ()
 bumpTickyEntryCount lbl = do
@@ -615,7 +614,7 @@ bumpHistogram lbl n = do
     emit (addToMem (bWord platform)
            (cmmIndexExpr platform
                 (wordWidth platform)
-                (CmmLit (CmmLabel (mkCmmDataLabel rtsUnitId lbl)))
+                (CmmLit (CmmLabel (mkRtsCmmDataLabel lbl)))
                 (CmmLit (CmmInt (fromIntegral offset) (wordWidth platform))))
            1)
 
