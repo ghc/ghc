@@ -1430,8 +1430,8 @@ pushCoercionIntoLambda
 pushCoercionIntoLambda in_scope x e co
     | ASSERT(not (isTyVar x) && not (isCoVar x)) True
     , Pair s1s2 t1t2 <- coercionKind co
-    , Just (_s1,_s2) <- splitFunTy_maybe s1s2
-    , Just (Scaled w1 t1,_t2) <- splitFunTy_maybe t1t2
+    , Just (_, _s1,_s2) <- splitFunTy_maybe s1s2
+    , Just (w1, t1,_t2) <- splitFunTy_maybe t1t2
     , (co_mult, co1, co2) <- decomposeFunCo Representational co
     , isReflexiveCo co_mult
       -- We can't push the coercion in the case where co_mult isn't

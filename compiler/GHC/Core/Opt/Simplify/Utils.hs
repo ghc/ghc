@@ -544,7 +544,7 @@ mkArgInfo env fun rules n_val_args call_cont
 
     add_type_str _ [] = []
     add_type_str fun_ty all_strs@(str:strs)
-      | Just (Scaled _ arg_ty, fun_ty') <- splitFunTy_maybe fun_ty        -- Add strict-type info
+      | Just (_, arg_ty, fun_ty') <- splitFunTy_maybe fun_ty        -- Add strict-type info
       = (str || Just False == isLiftedType_maybe arg_ty)
         : add_type_str fun_ty' strs
           -- If the type is levity-polymorphic, we can't know whether it's

@@ -199,7 +199,6 @@ import GHC.Core.TyCo.Subst ( mkTvSubst, substTyWithCoVars )
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr
 import GHC.Core.Class
-import GHC.Core.Multiplicity
 import GHC.Types.Var
 import GHC.Types.ForeignCall
 import GHC.Types.Var.Set
@@ -867,7 +866,7 @@ anyRewritableTyVar ignore_cos role pred ty
     go rl bvs (TyConApp tc tys)  = go_tc rl bvs tc tys
     go rl bvs (AppTy fun arg)    = go rl bvs fun || go NomEq bvs arg
     go rl bvs (FunTy _ w arg res)  = go NomEq bvs arg_rep || go NomEq bvs res_rep ||
-                                     go rl bvs arg || go rl bvs res || go rl bvs w
+                                     go rl bvs arg || go rl bvs res || go NomEq bvs w
       where arg_rep = getRuntimeRep arg -- forgetting these causes #17024
             res_rep = getRuntimeRep res
     go rl bvs (ForAllTy tv ty)   = go rl (bvs `extendVarSet` binderVar tv) ty

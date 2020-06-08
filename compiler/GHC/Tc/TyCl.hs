@@ -823,9 +823,9 @@ swizzleTcTyConBndrs tc_infos
     swizzle_var :: Var -> Var
     swizzle_var v
       | Just nm <- lookupVarEnv swizzle_env v
-      = updateVarTypeAndMult swizzle_ty (v `setVarName` nm)
+      = updateVarType swizzle_ty (v `setVarName` nm)
       | otherwise
-      = updateVarTypeAndMult swizzle_ty v
+      = updateVarType swizzle_ty v
 
     (map_type, _, _, _) = mapTyCo swizzleMapper
     swizzle_ty ty = runIdentity (map_type ty)
@@ -4562,7 +4562,7 @@ checkValidRoles tc
       >> check_ty_roles env Nominal ty2
 
     check_ty_roles env role (FunTy _ w ty1 ty2)
-      =  check_ty_roles env role w
+      =  check_ty_roles env Nominal w
       >> check_ty_roles env role ty1
       >> check_ty_roles env role ty2
 

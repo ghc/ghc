@@ -402,7 +402,7 @@ zonkEvBndr :: ZonkEnv -> EvVar -> TcM EvVar
 -- Works for dictionaries and coercions
 -- Does not extend the ZonkEnv
 zonkEvBndr env var
-  = updateVarTypeAndMultM ({-# SCC "zonkEvBndr_zonkTcTypeToType" #-} zonkTcTypeToTypeX env) var
+  = updateIdTypeAndMultM ({-# SCC "zonkEvBndr_zonkTcTypeToType" #-} zonkTcTypeToTypeX env) var
 
 {-
 zonkEvVarOcc :: ZonkEnv -> EvVar -> TcM EvTerm
@@ -583,7 +583,7 @@ zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
       , (L loc bind@(FunBind { fun_id      = (L mloc mono_id)
                              , fun_matches = ms
                              , fun_ext     = co_fn })) <- lbind
-      = do { new_mono_id <- updateVarTypeAndMultM (zonkTcTypeToTypeX env) mono_id
+      = do { new_mono_id <- updateIdTypeAndMultM (zonkTcTypeToTypeX env) mono_id
                             -- Specifically /not/ zonkIdBndr; we do not
                             -- want to complain about a levity-polymorphic binder
            ; (env', new_co_fn) <- zonkCoFn env co_fn

@@ -49,14 +49,14 @@ module GHC.Types.Id (
 
         -- ** Modifying an Id
         setIdName, setIdUnique, GHC.Types.Id.setIdType, setIdMult,
-        updateIdTypeAndMult, updateIdTypeAndMultM,
+        updateIdTypeButNotMult, updateIdTypeAndMult, updateIdTypeAndMultM,
         setIdExported, setIdNotExported,
         globaliseId, localiseId,
         setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
         zapLamIdInfo, zapIdDemandInfo, zapIdUsageInfo, zapIdUsageEnvInfo,
         zapIdUsedOnceInfo, zapIdTailCallInfo,
         zapFragileIdInfo, zapIdStrictness, zapStableUnfolding,
-        transferPolyIdInfo, scaleIdBy,
+        transferPolyIdInfo, scaleIdBy, scaleVarBy,
 
         -- ** Predicates on Ids
         isImplicitId, isDeadBinder,
@@ -134,7 +134,8 @@ import GHC.Types.Var( Id, CoVar, JoinId,
             InId,  InVar,
             OutId, OutVar,
             idInfo, idDetails, setIdDetails, globaliseId,
-            isId, isLocalId, isGlobalId, isExportedId )
+            isId, isLocalId, isGlobalId, isExportedId,
+            setIdMult, updateIdTypeAndMult, updateIdTypeButNotMult, updateIdTypeAndMultM)
 import qualified GHC.Types.Var as Var
 
 import GHC.Core.Type
@@ -200,10 +201,14 @@ idScaledType :: Id -> Scaled Type
 idScaledType id = Scaled (idMult id) (idType id)
 
 scaleIdBy :: Mult -> Id -> Id
-scaleIdBy = Var.scaleVarBy
+scaleIdBy m id = setIdMult id (m `mkMultMul` idMult id)
 
-setIdMult :: Id -> Mult -> Id
-setIdMult = Var.setVarMult
+-- | Like 'scaleIdBy', but skips non-Ids. Useful for scaling
+-- a mixed list of ids and tyvars.
+scaleVarBy :: Mult -> Var -> Var
+scaleVarBy m id
+  | isId id   = scaleIdBy m id
+  | otherwise = id
 
 setIdName :: Id -> Name -> Id
 setIdName = Var.setVarName
@@ -215,12 +220,6 @@ setIdUnique = Var.setVarUnique
 -- reduce space usage
 setIdType :: Id -> Type -> Id
 setIdType id ty = seqType ty `seq` Var.setVarType id ty
-
-updateIdTypeAndMult :: (Type -> Type) -> Id -> Id
-updateIdTypeAndMult = Var.updateVarTypeAndMult
-
-updateIdTypeAndMultM :: Monad m => (Type -> m Type) -> Id -> m Id
-updateIdTypeAndMultM = Var.updateVarTypeAndMultM
 
 setIdExported :: Id -> Id
 setIdExported = Var.setIdExported
