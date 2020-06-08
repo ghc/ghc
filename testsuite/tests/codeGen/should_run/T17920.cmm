@@ -4,7 +4,7 @@ section "rodata" { msg : bits8[] "Test\n"; }
 section "data" { faketso : bits8[1000]; }
 
 stg_myExit {
-   foreign "C" exit(0);
+   foreign "C" stg_exit(0);
 }
 
 stg_foo {
@@ -20,6 +20,9 @@ stg_foo {
    jump stg_myExit [*]; // all registers live
 }
 
-main {
+INFO_TABLE_CONSTR(ZCMain_main,0,0,0,CONSTR_NOCAF,"MAIN","MAIN")
+{
    jump stg_foo [];
 }
+
+CLOSURE(ZCMain_main_closure,ZCMain_main);

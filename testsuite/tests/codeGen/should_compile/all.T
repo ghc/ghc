@@ -19,15 +19,15 @@ test('massive_array',
      [ when(arch('i386'), omit_ways(llvm_ways)) ],
      compile, ['-fPIC'])
 test('T7237', normal, compile, [''])
-test('T7574', [cmm_src, omit_ways(llvm_ways)], compile, [''])
+test('T7574', [cmm_src, omit_ways(llvm_ways)], compile, ['-no-hs-main'])
 test('T8205', normal, compile, ['-O0'])
 test('T9155', normal, compile, ['-O2'])
 test('T9303', normal, compile, ['-O2'])
-test('T9329', [when(unregisterised(), expect_broken(15467)), cmm_src], compile, [''])
+test('T9329', [when(unregisterised(), expect_broken(15467)), cmm_src], compile, ['-no-hs-main'])
 
 test('debug', normal, makefile_test, [])
 test('T9964', normal, compile, ['-O'])
-test('T10518', [cmm_src], compile, [''])
+test('T10518', [cmm_src], compile, ['-no-hs-main'])
 test('T10667', normal, compile, ['-g'])
 test('T12115', normal, compile, [''])
 test('T12355', normal, compile, [''])
