@@ -24,6 +24,7 @@ import qualified GHC.CmmToAsm.Reg.Graph.Stats as Color
 import qualified GHC.CmmToAsm.Reg.Linear.Base as Linear
 import qualified GHC.CmmToAsm.X86.Instr as X86.Instr
 import qualified GHC.CmmToAsm.X86 as X86
+import GHC.Data.Bag (mapBag)
 import GHC.Driver.Main
 import GHC.StgToCmm.CgUtils
 import GHC.CmmToAsm
@@ -115,7 +116,7 @@ compileCmmForRegAllocStats dflags' cmmFile ncgImplF us = do
         errorMsgs   = fmap pprError errors
 
     -- print parser errors or warnings
-    mapM_ (printBagOfErrors dflags) [warningMsgs, errorMsgs]
+    mapM_ (printBagOfErrors dflags) [warningMsgs, mapBag (fmap renderError) errorMsgs]
 
     let initTopSRT = emptySRT thisMod
     cmmGroup <- fmap snd $ cmmPipeline hscEnv initTopSRT $ fromJust parsedCmm

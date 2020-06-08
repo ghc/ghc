@@ -1,4 +1,7 @@
+{-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module GHC.Types.Error
    ( Messages
@@ -9,24 +12,57 @@ module GHC.Types.Error
    , ErrDoc (..)
    , MsgDoc
    , Severity (..)
+   , RenderableDiagnostic (..)
+   , showErrMsg
+   -- * Manipulating 'ErrorMessages' and 'WarningMessages'
+   , mapMessages
+   , bimapMessages
    , unionMessages
+   , consError
+   , snocError
+   , consWarning
    , errDoc
    , mapErrDoc
    , pprMessageBag
+   -- * Constructing individual errors
+   , mkErrMsg
+   , mkPlainErrMsg
+   , mkErr
+   , mkLongErrMsg
+   , mkWarnMsg
+   , mkPlainWarnMsg
+   , mkLongWarnMsg
+   -- * Constructing bags of errors and messages
+   , mkWarningMessages
+   , mkErrorMessages
    , mkLocMessage
    , mkLocMessageAnn
+   -- * Accessors
+   , getErrorMessages
+   , getWarningMessages
    , getSeverityColour
    , getCaretDiagnostic
+
+   -- * Promoting and demoting a single warning/error
    , makeIntoWarning
+   , makeIntoError
+
+   -- * Promoting and demoting a warnings/errors
+   , promoteWarningsToErrors
+   , demoteErrorsToWarnings
    )
 where
+
+import Data.Coerce (coerce)
+import Data.Monoid
 
 import GHC.Prelude
 
 import GHC.Driver.Flags
 
 import GHC.Data.Bag
-import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Outputable as Outputable hiding ((<>))
+import qualified GHC.Utils.Outputable as Outputable
 import qualified GHC.Utils.Ppr.Colour as Col
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Data.FastString (unpackFS)
@@ -35,23 +71,46 @@ import GHC.Utils.Json
 
 import System.IO.Error  ( catchIOError )
 
-type Messages        = (WarningMessages, ErrorMessages)
-type WarningMessages = Bag WarnMsg
-type ErrorMessages   = Bag ErrMsg
-type MsgDoc          = SDoc
-type WarnMsg         = ErrMsg
+type Messages         w e = (WarningMessages w, ErrorMessages e)
+newtype WarningMessages w = WarningMessages { getWarningMessages :: Bag (ErrMsg w) }
+newtype ErrorMessages   e = ErrorMessages   { getErrorMessages   :: Bag (ErrMsg e) }
+type MsgDoc               = SDoc
+type WarnMsg              = ErrMsg ErrDoc
 
+instance Functor WarningMessages where
+  fmap f (WarningMessages xs) = WarningMessages (mapBag (fmap f) xs)
 
-data ErrMsg = ErrMsg
+instance Semigroup (WarningMessages w) where
+  (WarningMessages a) <> (WarningMessages b) = WarningMessages $ a `unionBags` b
+
+instance Monoid (WarningMessages w) where
+  mempty  = WarningMessages emptyBag
+  mappend = (<>)
+
+instance Functor ErrorMessages where
+  fmap f (ErrorMessages xs) = ErrorMessages (mapBag (fmap f) xs)
+
+instance Semigroup (ErrorMessages w) where
+  (ErrorMessages a) <> (ErrorMessages b) = ErrorMessages $ a `unionBags` b
+
+instance Monoid (ErrorMessages w) where
+  mempty  = ErrorMessages emptyBag
+  mappend = (<>)
+
+-- | A class for types (typically errors and warnings) which can be \"rendered\" into a opaque 'ErrDoc'.
+class RenderableDiagnostic a where
+  renderDiagnostic :: a -> ErrDoc
+
+-- | The main 'GHC' error type, parameterised over the /domain-specific/ error /or/ warning 'a'.
+-- There is deliberately no 'Show' instance for an 'ErrMsg', see Note [Showing ErrMsg].
+data ErrMsg a = ErrMsg
    { errMsgSpan        :: SrcSpan
       -- ^ The SrcSpan is used for sorting errors into line-number order
    , errMsgContext     :: PrintUnqualified
-   , errMsgDoc         :: ErrDoc
-   , errMsgShortString :: String
-      -- ^ This has the same text as errDocImportant . errMsgDoc.
+   , errMsgDiagnostic  :: a
    , errMsgSeverity    :: Severity
    , errMsgReason      :: WarnReason
-   }
+   } deriving Functor
 
 -- | Categorise error msgs by their importance.  This is so each section can
 -- be rendered visually distinct.  See Note [Error report] for where these come
@@ -65,9 +124,36 @@ data ErrDoc = ErrDoc {
         errDocSupplementary :: [MsgDoc]
         }
 
-unionMessages :: Messages -> Messages -> Messages
-unionMessages (warns1, errs1) (warns2, errs2) =
-  (warns1 `unionBags` warns2, errs1 `unionBags` errs2)
+instance RenderableDiagnostic ErrDoc where
+  renderDiagnostic = id
+
+mkWarningMessages :: Bag (ErrMsg w) -> WarningMessages w
+mkWarningMessages = WarningMessages
+
+mkErrorMessages :: Bag (ErrMsg e) -> ErrorMessages e
+mkErrorMessages = ErrorMessages
+
+mapMessages :: (e -> e') -> Messages w e -> Messages w e'
+mapMessages f (ws, es) = bimapMessages id f (ws, es)
+
+bimapMessages :: (w -> w') -> (e -> e') -> Messages w e -> Messages w' e'
+bimapMessages f g (ws, es) = (fmap f ws, fmap g es)
+
+unionMessages :: Messages w e -> Messages w e -> Messages w e
+unionMessages (coerce -> warns1, coerce -> errs1) (coerce -> warns2, coerce -> errs2) =
+  (WarningMessages $ warns1 `unionBags` warns2, ErrorMessages $ errs1 `unionBags` errs2)
+
+-- | Prepend an error at the beginning of the 'ErrorMessages'.
+consError :: ErrMsg e -> ErrorMessages e -> ErrorMessages e
+consError e (ErrorMessages errs) = ErrorMessages (e `consBag` errs)
+
+-- | Prepend a warning at the beginning of the 'WarningMessages'.
+consWarning :: ErrMsg e -> WarningMessages e -> WarningMessages e
+consWarning w (WarningMessages warns) = WarningMessages (w `consBag` warns)
+
+-- | Append an error at the end of the 'ErrorMessages'.
+snocError :: ErrorMessages e -> ErrMsg e -> ErrorMessages e
+snocError (ErrorMessages errs) e = ErrorMessages (errs `snocBag` e)
 
 errDoc :: [MsgDoc] -> [MsgDoc] -> [MsgDoc] -> ErrDoc
 errDoc = ErrDoc
@@ -101,8 +187,27 @@ data Severity
 instance ToJson Severity where
   json s = JSString (show s)
 
-instance Show ErrMsg where
-    show em = errMsgShortString em
+-- NOTE [Showing ErrMsg]
+-- Showing an 'ErrMsg' via its 'Show' instance is something that doesn't make much sense.
+-- To begin with, we can't write a meaningful 'Show' instance such that 'read . show === id', but
+-- /properly/ showing an 'ErrMsg' is done via the 'RenderableError' machinery and all the pretty-printing,
+-- so having a 'Show' instance feels like duplicating efforts.
+-- Furthermore, the 'errMsgShortString' function was added to an 'ErrMsg' with the sole purpose of
+-- writing the instance below:
+--
+-- instance Show (ErrMsg e) where
+--   show em = errMsgShortString em
+--
+-- However, errMsgShortString required 'DynFlags' to be passed as input for rendering correctly the 'SDoc'
+-- making things even more coupled.
+-- For all these reasons we remove the 'Show' instance for 'ErrMsg' and we offer a top-level function for
+-- convenience, i.e. 'showErrMsg'.
+
+-- | Shows an 'ErrMsg'. See NOTE [Showing ErrMsg]. Use this function only for debugging and testing
+-- purposes.
+showErrMsg :: RenderableDiagnostic a => ErrMsg a -> String
+showErrMsg err =
+  renderWithContext defaultSDocContext (vcat (errDocImportant $ renderDiagnostic $ errMsgDiagnostic err))
 
 pprMessageBag :: Bag MsgDoc -> SDoc
 pprMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))
@@ -132,12 +237,12 @@ mkLocMessageAnn ann severity locn msg
           -- Add optional information
           optAnn = case ann of
             Nothing -> text ""
-            Just i  -> text " [" <> coloured sevColour (text i) <> text "]"
+            Just i  -> text " [" Outputable.<> coloured sevColour (text i) Outputable.<> text "]"
 
           -- Add prefixes, like    Foo.hs:34: warning:
           --                           <the warning message>
-          header = locn' <> colon <+>
-                   coloured sevColour sevText <> optAnn
+          header = locn' Outputable.<> colon <+>
+                   coloured sevColour sevText Outputable.<> optAnn
 
       in coloured (Col.sMessage col_scheme)
                   (hang (coloured (Col.sHeader col_scheme) header) 4
@@ -195,13 +300,13 @@ getCaretDiagnostic severity (RealSrcSpan span _) =
       let sevColour = getSeverityColour severity col_scheme
           marginColour = Col.sMargin col_scheme
       in
-      coloured marginColour (text marginSpace) <>
-      text ("\n") <>
-      coloured marginColour (text marginRow) <>
-      text (" " ++ srcLinePre) <>
-      coloured sevColour (text srcLineSpan) <>
-      text (srcLinePost ++ "\n") <>
-      coloured marginColour (text marginSpace) <>
+      coloured marginColour (text marginSpace) Outputable.<>
+      text ("\n") Outputable.<>
+      coloured marginColour (text marginRow) Outputable.<>
+      text (" " ++ srcLinePre) Outputable.<>
+      coloured sevColour (text srcLineSpan) Outputable.<>
+      text (srcLinePost ++ "\n") Outputable.<>
+      coloured marginColour (text marginSpace) Outputable.<>
       coloured sevColour (text (" " ++ caretLine))
 
       where
@@ -233,8 +338,52 @@ getCaretDiagnostic severity (RealSrcSpan span _) =
                       | otherwise = ""
         caretLine = replicate start ' ' ++ replicate width '^' ++ caretEllipsis
 
-makeIntoWarning :: WarnReason -> ErrMsg -> ErrMsg
+makeIntoWarning :: WarnReason -> ErrMsg e -> ErrMsg e
 makeIntoWarning reason err = err
     { errMsgSeverity = SevWarning
     , errMsgReason = reason }
 
+makeIntoError :: WarnReason -> ErrMsg e -> ErrMsg e
+makeIntoError reason err = err
+    { errMsgSeverity = SevError
+    , errMsgReason = reason }
+
+-- | \"Promotes\" plain 'WarningMessages' into 'ErrorMessages', by applying the input
+-- function. The typical case when you want to do that is when \"-Werror\" is enabled,
+-- and therefore warnings need to be treated as errors.
+promoteWarningsToErrors :: (w -> e) -> WarningMessages w -> ErrorMessages e
+promoteWarningsToErrors toError (WarningMessages warns) = ErrorMessages (mapBag (fmap toError) warns)
+
+demoteErrorsToWarnings :: (e -> w) -> ErrorMessages e -> WarningMessages w
+demoteErrorsToWarnings toWarning (ErrorMessages errs) = WarningMessages (mapBag (fmap toWarning) errs)
+
+--
+-- Creating ErrMsg(s)
+--
+
+mk_err_msg
+  :: RenderableDiagnostic e
+  => Severity -> SrcSpan -> PrintUnqualified -> e -> ErrMsg e
+mk_err_msg sev locn print_unqual err
+ = ErrMsg { errMsgSpan = locn
+          , errMsgContext = print_unqual
+          , errMsgDiagnostic = err
+          , errMsgSeverity = sev
+          , errMsgReason = NoReason }
+
+mkErr :: RenderableDiagnostic e => SrcSpan -> PrintUnqualified -> e -> ErrMsg e
+mkErr = mk_err_msg SevError
+
+mkLongErrMsg, mkLongWarnMsg   :: SrcSpan -> PrintUnqualified -> MsgDoc -> MsgDoc -> ErrMsg ErrDoc
+-- ^ A long (multi-line) error message
+mkErrMsg, mkWarnMsg           :: SrcSpan -> PrintUnqualified -> MsgDoc            -> ErrMsg ErrDoc
+-- ^ A short (one-line) error message
+mkPlainErrMsg, mkPlainWarnMsg :: SrcSpan ->                     MsgDoc            -> ErrMsg ErrDoc
+-- ^ Variant that doesn't care about qualified/unqualified names
+
+mkLongErrMsg   locn unqual msg extra = mk_err_msg SevError   locn unqual        (ErrDoc [msg] [] [extra])
+mkErrMsg       locn unqual msg       = mk_err_msg SevError   locn unqual        (ErrDoc [msg] [] [])
+mkPlainErrMsg  locn        msg       = mk_err_msg SevError   locn alwaysQualify (ErrDoc [msg] [] [])
+mkLongWarnMsg  locn unqual msg extra = mk_err_msg SevWarning locn unqual        (ErrDoc [msg] [] [extra])
+mkWarnMsg      locn unqual msg       = mk_err_msg SevWarning locn unqual        (ErrDoc [msg] [] [])
+mkPlainWarnMsg locn        msg       = mk_err_msg SevWarning locn alwaysQualify (ErrDoc [msg] [] [])

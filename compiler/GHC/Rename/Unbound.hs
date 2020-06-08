@@ -23,6 +23,13 @@ import GHC.Prelude
 import GHC.Driver.Session
 import GHC.Driver.Ppr
 
+import GHC.Tc.Errors.Types ( OutOfScopeSuggestions(..)
+                           , NameSuggestions(..)
+                           , ImportSuggestion(..)
+                           , ExtensionSuggestion(..)
+                           , TcRnError(..)
+                           , noOutOfScopeSuggestions
+                           )
 import GHC.Tc.Utils.Monad
 import GHC.Builtin.Names ( mkUnboundName, isUnboundName, getUnique)
 import GHC.Utils.Outputable as Outputable
@@ -72,9 +79,10 @@ unboundNameX :: WhereLooking -> RdrName -> SDoc -> RnM Name
 unboundNameX where_look rdr_name extra
   = do  { dflags <- getDynFlags
         ; let show_helpful_errors = gopt Opt_HelpfulErrors dflags
-              err = notInScopeErr rdr_name $$ extra
+        ; loc <- getSrcSpanM
         ; if not show_helpful_errors
-          then addErr err
+          then addTcRnErr loc
+                 (TcRnOutOfScope rdr_name noOutOfScopeSuggestions extra)
           else do { local_env  <- getLocalRdrEnv
                   ; global_env <- getGlobalRdrEnv
                   ; impInfo <- getImports
@@ -83,7 +91,7 @@ unboundNameX where_look rdr_name extra
                   ; let suggestions = unknownNameSuggestions_ where_look
                           dflags hpt currmod global_env local_env impInfo
                           rdr_name
-                  ; addErr (err $$ suggestions) }
+                  ; addTcRnErr loc (TcRnOutOfScope rdr_name suggestions extra) }
         ; return (mkUnboundNameRdr rdr_name) }
 
 notInScopeErr :: RdrName -> SDoc
@@ -104,31 +112,30 @@ type HowInScope = Either SrcSpan ImpDeclSpec
 unknownNameSuggestions :: DynFlags
                        -> HomePackageTable -> Module
                        -> GlobalRdrEnv -> LocalRdrEnv -> ImportAvails
-                       -> RdrName -> SDoc
+                       -> RdrName -> OutOfScopeSuggestions
 unknownNameSuggestions = unknownNameSuggestions_ WL_Any
 
 unknownNameSuggestions_ :: WhereLooking -> DynFlags
                        -> HomePackageTable -> Module
                        -> GlobalRdrEnv -> LocalRdrEnv -> ImportAvails
-                       -> RdrName -> SDoc
+                       -> RdrName -> OutOfScopeSuggestions
 unknownNameSuggestions_ where_look dflags hpt curr_mod global_env local_env
                           imports tried_rdr_name =
-    similarNameSuggestions where_look dflags global_env local_env tried_rdr_name $$
-    importSuggestions where_look global_env hpt
-                      curr_mod imports tried_rdr_name $$
-    extensionSuggestions tried_rdr_name
+  OutOfScopeSuggestions
+    (similarNameSuggestions where_look dflags global_env local_env tried_rdr_name)
+    (importSuggestions where_look global_env hpt
+                      curr_mod imports tried_rdr_name)
+    (extensionSuggestions tried_rdr_name)
 
 
 similarNameSuggestions :: WhereLooking -> DynFlags
                         -> GlobalRdrEnv -> LocalRdrEnv
-                        -> RdrName -> SDoc
+                        -> RdrName -> Maybe NameSuggestions
 similarNameSuggestions where_look dflags global_env
                         local_env tried_rdr_name
   = case suggest of
-      []  -> Outputable.empty
-      [p] -> perhaps <+> pp_item p
-      ps  -> sep [ perhaps <+> text "one of these:"
-                 , nest 2 (pprWithCommas pp_item ps) ]
+      []  -> Nothing
+      ps -> Just $ NameSuggestions ps
   where
     all_possibilities :: [(String, (RdrName, HowInScope))]
     all_possibilities
@@ -137,20 +144,6 @@ similarNameSuggestions where_look dflags global_env
        ++ [ (showPpr dflags r, rp) | (r, rp) <- global_possibilities global_env ]
 
     suggest = fuzzyLookup (showPpr dflags tried_rdr_name) all_possibilities
-    perhaps = text "Perhaps you meant"
-
-    pp_item :: (RdrName, HowInScope) -> SDoc
-    pp_item (rdr, Left loc) = pp_ns rdr <+> quotes (ppr rdr) <+> loc' -- Locally defined
-        where loc' = case loc of
-                     UnhelpfulSpan l -> parens (ppr l)
-                     RealSrcSpan l _ -> parens (text "line" <+> int (srcSpanStartLine l))
-    pp_item (rdr, Right is) = pp_ns rdr <+> quotes (ppr rdr) <+>   -- Imported
-                              parens (text "imported from" <+> ppr (is_mod is))
-
-    pp_ns :: RdrName -> SDoc
-    pp_ns rdr | ns /= tried_ns = pprNameSpace ns
-              | otherwise      = Outputable.empty
-      where ns = rdrNameSpace rdr
 
     tried_occ     = rdrNameOcc tried_rdr_name
     tried_is_sym  = isSymOcc tried_occ
@@ -228,80 +221,35 @@ similarNameSuggestions where_look dflags global_env
 importSuggestions :: WhereLooking
                   -> GlobalRdrEnv
                   -> HomePackageTable -> Module
-                  -> ImportAvails -> RdrName -> SDoc
+                  -> ImportAvails -> RdrName -> Maybe ImportSuggestion
 importSuggestions where_look global_env hpt currMod imports rdr_name
-  | WL_LocalOnly <- where_look                 = Outputable.empty
-  | not (isQual rdr_name || isUnqual rdr_name) = Outputable.empty
+  | WL_LocalOnly <- where_look                 = Nothing
+  | not (isQual rdr_name || isUnqual rdr_name) = Nothing
   | null interesting_imports
   , Just name <- mod_name
   , show_not_imported_line name
-  = hsep
-      [ text "No module named"
-      , quotes (ppr name)
-      , text "is imported."
-      ]
+  = Just (SuggestNoModuleImported name)
   | is_qualified
   , null helpful_imports
   , [(mod,_)] <- interesting_imports
-  = hsep
-      [ text "Module"
-      , quotes (ppr mod)
-      , text "does not export"
-      , quotes (ppr occ_name) <> dot
-      ]
+  = Just (SuggestModulesDoNotExport [mod] occ_name)
   | is_qualified
   , null helpful_imports
   , not (null interesting_imports)
   , mods <- map fst interesting_imports
-  = hsep
-      [ text "Neither"
-      , quotedListWithNor (map ppr mods)
-      , text "exports"
-      , quotes (ppr occ_name) <> dot
-      ]
+  = Just (SuggestModulesDoNotExport mods occ_name)
   | [(mod,imv)] <- helpful_imports_non_hiding
-  = fsep
-      [ text "Perhaps you want to add"
-      , quotes (ppr occ_name)
-      , text "to the import list"
-      , text "in the import of"
-      , quotes (ppr mod)
-      , parens (ppr (imv_span imv)) <> dot
-      ]
+  = Just (SuggestAddNameToImportLists occ_name [(mod, imv_span imv)])
   | not (null helpful_imports_non_hiding)
-  = fsep
-      [ text "Perhaps you want to add"
-      , quotes (ppr occ_name)
-      , text "to one of these import lists:"
-      ]
-    $$
-    nest 2 (vcat
-        [ quotes (ppr mod) <+> parens (ppr (imv_span imv))
-        | (mod,imv) <- helpful_imports_non_hiding
-        ])
+  = Just $ SuggestAddNameToImportLists occ_name
+      (map (\(m, imv) -> (m, imv_span imv)) helpful_imports_non_hiding)
   | [(mod,imv)] <- helpful_imports_hiding
-  = fsep
-      [ text "Perhaps you want to remove"
-      , quotes (ppr occ_name)
-      , text "from the explicit hiding list"
-      , text "in the import of"
-      , quotes (ppr mod)
-      , parens (ppr (imv_span imv)) <> dot
-      ]
+  = Just (SuggestRemoveNameFromHidingLists occ_name [(mod, imv_span imv)])
   | not (null helpful_imports_hiding)
-  = fsep
-      [ text "Perhaps you want to remove"
-      , quotes (ppr occ_name)
-      , text "from the hiding clauses"
-      , text "in one of these imports:"
-      ]
-    $$
-    nest 2 (vcat
-        [ quotes (ppr mod) <+> parens (ppr (imv_span imv))
-        | (mod,imv) <- helpful_imports_hiding
-        ])
+  = Just $ SuggestRemoveNameFromHidingLists occ_name
+      (map (\(m, imv) -> (m, imv_span imv)) helpful_imports_hiding)
   | otherwise
-  = Outputable.empty
+  = Nothing
  where
   is_qualified = isQual rdr_name
   (mod_name, occ_name) = case rdr_name of
@@ -357,12 +305,12 @@ importSuggestions where_look global_env hpt currMod imports rdr_name
                      , (mod, _) <- qualsInScope gre
                      ]
 
-extensionSuggestions :: RdrName -> SDoc
+extensionSuggestions :: RdrName -> Maybe ExtensionSuggestion
 extensionSuggestions rdrName
   | rdrName == mkUnqual varName (fsLit "mdo") ||
     rdrName == mkUnqual varName (fsLit "rec")
-      = text "Perhaps you meant to use RecursiveDo"
-  | otherwise = Outputable.empty
+      = Just SuggestRecursiveDo
+  | otherwise = Nothing
 
 qualsInScope :: GlobalRdrElt -> [(ModuleName, HowInScope)]
 -- Ones for which the qualified version is in scope
