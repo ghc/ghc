@@ -33,6 +33,7 @@ import GHC.Types.Name
 import GHC.Utils.Outputable
 import GHC.Types.Unique
 import GHC.Utils.Misc
+import GHC.Core.Multiplicity
 import GHC.Types.Basic
 import GHC.Types.Var
 import GHC.Types.FieldLabel
@@ -421,13 +422,13 @@ patSynExTyVars ps = binderVars (psExTyVars ps)
 patSynExTyVarBinders :: PatSyn -> [InvisTVBinder]
 patSynExTyVarBinders = psExTyVars
 
-patSynSigBndr :: PatSyn -> ([InvisTVBinder], ThetaType, [InvisTVBinder], ThetaType, [Type], Type)
+patSynSigBndr :: PatSyn -> ([InvisTVBinder], ThetaType, [InvisTVBinder], ThetaType, [Scaled Type], Type)
 patSynSigBndr (MkPatSyn { psUnivTyVars = univ_tvs, psExTyVars = ex_tvs
-                    , psProvTheta = prov, psReqTheta = req
-                    , psArgs = arg_tys, psResultTy = res_ty })
-  = (univ_tvs, req, ex_tvs, prov, arg_tys, res_ty)
+                        , psProvTheta = prov, psReqTheta = req
+                        , psArgs = arg_tys, psResultTy = res_ty })
+  = (univ_tvs, req, ex_tvs, prov, map unrestricted arg_tys, res_ty)
 
-patSynSig :: PatSyn -> ([TyVar], ThetaType, [TyVar], ThetaType, [Type], Type)
+patSynSig :: PatSyn -> ([TyVar], ThetaType, [TyVar], ThetaType, [Scaled Type], Type)
 patSynSig ps = let (u_tvs, req, e_tvs, prov, arg_tys, res_ty) = patSynSigBndr ps
                in (binderVars u_tvs, req, binderVars e_tvs, prov, arg_tys, res_ty)
 
@@ -484,6 +485,6 @@ pprPatSynType (MkPatSyn { psUnivTyVars = univ_tvs,  psReqTheta  = req_theta
         , pprType sigma_ty ]
   where
     sigma_ty = mkInvisForAllTys ex_tvs $
-               mkInvisFunTys prov_theta $
-               mkVisFunTys orig_args orig_res_ty
+               mkInvisFunTysMany prov_theta $
+               mkVisFunTysMany orig_args orig_res_ty
     insert_empty_ctxt = null req_theta && not (null prov_theta && null ex_tvs)

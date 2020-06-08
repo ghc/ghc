@@ -521,6 +521,8 @@ Library
         GHC.Core.FamInstEnv
         GHC.Tc.Instance.FunDeps
         GHC.Core.InstEnv
+        GHC.Core.Multiplicity
+        GHC.Core.UsageEnv
         GHC.Core.TyCon
         GHC.Core.Coercion.Axiom
         GHC.Core.Type

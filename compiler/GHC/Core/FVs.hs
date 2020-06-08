@@ -76,6 +76,8 @@ import GHC.Core.TyCo.FVs
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.FamInstEnv
+import GHC.Core.Multiplicity
+import GHC.Builtin.Types( unrestrictedFunTyConName )
 import GHC.Builtin.Types.Prim( funTyConName )
 import GHC.Data.Maybe( orElse )
 import GHC.Utils.Misc
@@ -350,11 +352,17 @@ orphNamesOfType ty | Just ty' <- coreView ty = orphNamesOfType ty'
                 -- Look through type synonyms (#4912)
 orphNamesOfType (TyVarTy _)          = emptyNameSet
 orphNamesOfType (LitTy {})           = emptyNameSet
-orphNamesOfType (TyConApp tycon tys) = orphNamesOfTyCon tycon
+orphNamesOfType (TyConApp tycon tys) = func
+                                       `unionNameSet` orphNamesOfTyCon tycon
                                        `unionNameSet` orphNamesOfTypes tys
+        where func = case tys of
+                       arg:_ | tycon == funTyCon -> orph_names_of_fun_ty_con arg
+                       _ -> emptyNameSet
 orphNamesOfType (ForAllTy bndr res)  = orphNamesOfType (binderType bndr)
                                        `unionNameSet` orphNamesOfType res
-orphNamesOfType (FunTy _ arg res)    = unitNameSet funTyConName    -- NB!  See #8535
+orphNamesOfType (FunTy _ w arg res)  =  orph_names_of_fun_ty_con w
+                                       `unionNameSet` unitNameSet funTyConName
+                                       `unionNameSet` orphNamesOfType w
                                        `unionNameSet` orphNamesOfType arg
                                        `unionNameSet` orphNamesOfType res
 orphNamesOfType (AppTy fun arg)      = orphNamesOfType fun `unionNameSet` orphNamesOfType arg
@@ -378,7 +386,7 @@ orphNamesOfCo (TyConAppCo _ tc cos) = unitNameSet (getName tc) `unionNameSet` or
 orphNamesOfCo (AppCo co1 co2)       = orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
 orphNamesOfCo (ForAllCo _ kind_co co)
   = orphNamesOfCo kind_co `unionNameSet` orphNamesOfCo co
-orphNamesOfCo (FunCo _ co1 co2)     = orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
+orphNamesOfCo (FunCo _ co_mult co1 co2) = orphNamesOfCo co_mult `unionNameSet` orphNamesOfCo co1 `unionNameSet` orphNamesOfCo co2
 orphNamesOfCo (CoVarCo _)           = emptyNameSet
 orphNamesOfCo (AxiomInstCo con _ cos) = orphNamesOfCoCon con `unionNameSet` orphNamesOfCos cos
 orphNamesOfCo (UnivCo p _ t1 t2)    = orphNamesOfProv p `unionNameSet` orphNamesOfType t1 `unionNameSet` orphNamesOfType t2
@@ -427,6 +435,12 @@ orphNamesOfCoAxBranch (CoAxBranch { cab_lhs = lhs, cab_rhs = rhs })
 -- Used in the implementation of ":info" in GHCi.
 orphNamesOfFamInst :: FamInst -> NameSet
 orphNamesOfFamInst fam_inst = orphNamesOfAxiom (famInstAxiom fam_inst)
+
+-- Detect FUN 'Many as an application of (->), so that :i (->) works as expected
+-- (see #8535) Issue #16475 describes a more robust solution
+orph_names_of_fun_ty_con :: Mult -> NameSet
+orph_names_of_fun_ty_con Many = unitNameSet unrestrictedFunTyConName
+orph_names_of_fun_ty_con _ = emptyNameSet
 
 {-
 ************************************************************************
@@ -716,9 +730,10 @@ freeVars = go
   where
     go :: CoreExpr -> CoreExprWithFVs
     go (Var v)
-      | isLocalVar v = (aFreeVar v `unionFVs` ty_fvs, AnnVar v)
+      | isLocalVar v = (aFreeVar v `unionFVs` ty_fvs `unionFVs` mult_vars, AnnVar v)
       | otherwise    = (emptyDVarSet,                 AnnVar v)
       where
+        mult_vars = tyCoVarsOfTypeDSet (varMult v)
         ty_fvs = dVarTypeTyCoVars v
                  -- See Note [The FVAnn invariant]
 

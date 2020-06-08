@@ -48,7 +48,7 @@ The previous patch, to fix polymorphic floatout demand signatures, is
 essential to make this work well!
 -}
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, PatternSynonyms #-}
 module GHC.Core.Opt.StaticArgs ( doStaticArgs ) where
 
 import GHC.Prelude
@@ -56,6 +56,7 @@ import GHC.Prelude
 import GHC.Types.Var
 import GHC.Core
 import GHC.Core.Utils
+import GHC.Core.Multiplicity ( pattern Many )
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Types.Id
@@ -420,12 +421,13 @@ saTransform binder arg_staticness rhs_binders rhs_body
           shadow_rhs = mkLams shadow_lam_bndrs local_body
             -- nonrec_rhs = \alpha' beta' c n xs -> sat_worker xs
 
-          rec_body_bndr = mkSysLocal (fsLit "sat_worker") uniq (exprType rec_body)
+          rec_body_bndr = mkSysLocal (fsLit "sat_worker") uniq Many (exprType rec_body)
             -- rec_body_bndr = sat_worker
 
             -- See Note [Shadow binding]; make a SysLocal
           shadow_bndr = mkSysLocal (occNameFS (getOccName binder))
                                    (idUnique binder)
+                                   Many
                                    (exprType shadow_rhs)
 
 isStaticValue :: Staticness App -> Bool

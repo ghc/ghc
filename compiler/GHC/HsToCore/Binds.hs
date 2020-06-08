@@ -53,6 +53,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
 import GHC.Core.Coercion
+import GHC.Core.Multiplicity
 import GHC.Builtin.Types ( typeNatKind, typeSymbolKind )
 import GHC.Types.Id
 import GHC.Types.Id.Make(proxyHashId)
@@ -176,7 +177,7 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
                 = []
         ; --pprTrace "dsHsBind" (vcat [ ppr fun <+> ppr (idInlinePragma fun)
           --                          , ppr (mg_alts matches)
-          --                          , ppr args, ppr core_binds]) $
+          --                          , ppr args, ppr core_binds, ppr body']) $
           return (force_var, [core_binds]) }
 
 dsHsBind dflags (PatBind { pat_lhs = pat, pat_rhs = grhss
@@ -288,7 +289,7 @@ dsAbsBinds dflags tyvars dicts exports
                             mkLet core_bind $
                             tup_expr
 
-       ; poly_tup_id <- newSysLocalDs (exprType poly_tup_rhs)
+       ; poly_tup_id <- newSysLocalDs Many (exprType poly_tup_rhs)
 
         -- Find corresponding global or make up a new one: sometimes
         -- we need to make new export to desugar strict binds, see
@@ -299,7 +300,7 @@ dsAbsBinds dflags tyvars dicts exports
                           , abe_poly = global
                           , abe_mono = local, abe_prags = spec_prags })
                           -- See Note [AbsBinds wrappers] in HsBinds
-                = do { tup_id  <- newSysLocalDs tup_ty
+                = do { tup_id  <- newSysLocalDs Many tup_ty
                      ; core_wrap <- dsHsWrapper wrap
                      ; let rhs = core_wrap $ mkLams tyvars $ mkLams dicts $
                                  mkTupleSelector all_locals local tup_id $
@@ -357,7 +358,7 @@ dsAbsBinds dflags tyvars dicts exports
             ([],[]) lcls
 
     mk_export local =
-      do global <- newSysLocalDs
+      do global <- newSysLocalDs Many
                      (exprType (mkLams tyvars (mkLams dicts (Var local))))
          return (ABE { abe_ext   = noExtField
                      , abe_poly  = global
@@ -703,7 +704,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
        { this_mod <- getModule
        ; let fn_unf    = realIdUnfolding poly_id
              spec_unf  = specUnfolding dflags spec_bndrs core_app rule_lhs_args fn_unf
-             spec_id   = mkLocalId spec_name spec_ty
+             spec_id   = mkLocalId spec_name Many spec_ty -- Specialised binding is toplevel, hence Many.
                             `setInlinePragma` inl_prag
                             `setIdUnfolding`  spec_unf
 
@@ -876,7 +877,7 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs
      = scopedSort unbound_tvs ++ unbound_dicts
      where
        unbound_tvs   = [ v | v <- unbound_vars, isTyVar v ]
-       unbound_dicts = [ mkLocalId (localiseName (idName d)) (idType d)
+       unbound_dicts = [ mkLocalId (localiseName (idName d)) Many (idType d)
                        | d <- unbound_vars, isDictId d ]
        unbound_vars  = [ v | v <- exprsFreeVarsList args
                            , not (v `elemVarSet` orig_bndr_set)
@@ -1126,8 +1127,8 @@ dsHsWrapper (WpCompose c1 c2) = do { w1 <- dsHsWrapper c1
                                    ; return (w1 . w2) }
  -- See comments on WpFun in GHC.Tc.Types.Evidence for an explanation of what
  -- the specification of this clause is
-dsHsWrapper (WpFun c1 c2 t1 doc)
-                              = do { x  <- newSysLocalDsNoLP t1
+dsHsWrapper (WpFun c1 c2 (Scaled w t1) doc)
+                              = do { x <- newSysLocalDsNoLP w t1
                                    ; w1 <- dsHsWrapper c1
                                    ; w2 <- dsHsWrapper c2
                                    ; let app f a = mkCoreAppDs (text "dsHsWrapper") f a
@@ -1140,7 +1141,9 @@ dsHsWrapper (WpCast co)       = ASSERT(coercionRole co == Representational)
                                 return $ \e -> mkCastDs e co
 dsHsWrapper (WpEvApp tm)      = do { core_tm <- dsEvTerm tm
                                    ; return (\e -> App e core_tm) }
-
+dsHsWrapper (WpMultCoercion co) = do { when (not (isReflexiveCo co)) $
+                                         errDs (text "Multiplicity coercions are currently not supported")
+                                     ; return $ \e -> e }
 --------------------------------------
 dsTcEvBinds_s :: [TcEvBinds] -> DsM [CoreBind]
 dsTcEvBinds_s []       = return []
@@ -1264,24 +1267,26 @@ ds_ev_typeable ty (EvTypeableTyApp ev1 ev2)
        ; mkTrApp <- dsLookupGlobalId mkTrAppName
                     -- mkTrApp :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
                     --            TypeRep a -> TypeRep b -> TypeRep (a b)
-       ; let (k1, k2) = splitFunTy (typeKind t1)
+       ; let (Scaled _ k1, k2) = splitFunTy (typeKind t1)  -- drop the multiplicity,
+                                                           -- since it's a kind
        ; let expr =  mkApps (mkTyApps (Var mkTrApp) [ k1, k2, t1, t2 ])
                             [ e1, e2 ]
        -- ; pprRuntimeTrace "Trace mkTrApp" (ppr expr) expr
        ; return expr
        }
 
-ds_ev_typeable ty (EvTypeableTrFun ev1 ev2)
-  | Just (t1,t2) <- splitFunTy_maybe ty
+ds_ev_typeable ty (EvTypeableTrFun evm ev1 ev2)
+  | Just (Scaled m t1,t2) <- splitFunTy_maybe ty
   = do { e1 <- getRep ev1 t1
        ; e2 <- getRep ev2 t2
+       ; em <- getRep evm m
        ; mkTrFun <- dsLookupGlobalId mkTrFunName
-                    -- mkTrFun :: forall r1 r2 (a :: TYPE r1) (b :: TYPE r2).
-                    --            TypeRep a -> TypeRep b -> TypeRep (a -> b)
+                    -- mkTrFun :: forall (m :: Multiplicity) r1 r2 (a :: TYPE r1) (b :: TYPE r2).
+                    --            TypeRep m -> TypeRep a -> TypeRep b -> TypeRep (a # m -> b)
        ; let r1 = getRuntimeRep t1
              r2 = getRuntimeRep t2
-       ; return $ mkApps (mkTyApps (Var mkTrFun) [r1, r2, t1, t2])
-                         [ e1, e2 ]
+       ; return $ mkApps (mkTyApps (Var mkTrFun) [m, r1, r2, t1, t2])
+                         [ em, e1, e2 ]
        }
 
 ds_ev_typeable ty (EvTypeableTyLit ev)

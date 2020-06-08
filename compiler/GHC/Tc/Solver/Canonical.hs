@@ -25,6 +25,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.EvTerm
 import GHC.Core.Class
 import GHC.Core.TyCon
+import GHC.Core.Multiplicity
 import GHC.Core.TyCo.Rep   -- cleverly decomposes types, good for completeness checking
 import GHC.Core.Coercion
 import GHC.Core
@@ -551,7 +552,7 @@ mk_strict_superclasses rec_clss (CtGiven { ctev_evar = evar, ctev_loc = loc })
         (sc_theta, sc_inner_pred) = splitFunTys sc_rho
 
         all_tvs       = tvs `chkAppend` sc_tvs
-        all_theta     = theta `chkAppend` sc_theta
+        all_theta     = theta `chkAppend` (map scaledThing sc_theta)
         swizzled_pred = mkInfSigmaTy all_tvs all_theta sc_inner_pred
 
         -- evar :: forall tvs. theta => cls tys
@@ -1007,16 +1008,16 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
 -- Decompose FunTy: (s -> t) and (c => t)
 -- NB: don't decompose (Int -> blah) ~ (Show a => blah)
 can_eq_nc' _flat _rdr_env _envs ev eq_rel
-           (FunTy { ft_af = af1, ft_arg = ty1a, ft_res = ty1b }) _
-           (FunTy { ft_af = af2, ft_arg = ty2a, ft_res = ty2b }) _
+           (FunTy { ft_mult = am1, ft_af = af1, ft_arg = ty1a, ft_res = ty1b }) _
+           (FunTy { ft_mult = am2, ft_af = af2, ft_arg = ty2a, ft_res = ty2b }) _
   | af1 == af2   -- Don't decompose (Int -> blah) ~ (Show a => blah)
   , Just ty1a_rep <- getRuntimeRep_maybe ty1a  -- getRutimeRep_maybe:
   , Just ty1b_rep <- getRuntimeRep_maybe ty1b  -- see Note [Decomposing FunTy]
   , Just ty2a_rep <- getRuntimeRep_maybe ty2a
   , Just ty2b_rep <- getRuntimeRep_maybe ty2b
   = canDecomposableTyConAppOK ev eq_rel funTyCon
-                              [ty1a_rep, ty1b_rep, ty1a, ty1b]
-                              [ty2a_rep, ty2b_rep, ty2a, ty2b]
+                              [am1, ty1a_rep, ty1b_rep, ty1a, ty1b]
+                              [am2, ty2a_rep, ty2b_rep, ty2a, ty2b]
 
 -- Decompose type constructor applications
 -- NB: e have expanded type synonyms already
@@ -1177,11 +1178,12 @@ zonk_eq_types = go
     -- RuntimeReps of the argument and result types. This can be observed in
     -- testcase tc269.
     go ty1 ty2
-      | Just (arg1, res1) <- split1
-      , Just (arg2, res2) <- split2
+      | Just (Scaled w1 arg1, res1) <- split1
+      , Just (Scaled w2 arg2, res2) <- split2
+      , eqType w1 w2
       = do { res_a <- go arg1 arg2
            ; res_b <- go res1 res2
-           ; return $ combine_rev mkVisFunTy res_b res_a
+           ; return $ combine_rev (mkVisFunTy w1) res_b res_a
            }
       | isJust split1 || isJust split2
       = bale_out ty1 ty2
@@ -2469,10 +2471,11 @@ unifyWanted loc role orig_ty1 orig_ty2
     go ty1 ty2 | Just ty1' <- tcView ty1 = go ty1' ty2
     go ty1 ty2 | Just ty2' <- tcView ty2 = go ty1 ty2'
 
-    go (FunTy _ s1 t1) (FunTy _ s2 t2)
+    go (FunTy _ w1 s1 t1) (FunTy _ w2 s2 t2)
       = do { co_s <- unifyWanted loc role s1 s2
            ; co_t <- unifyWanted loc role t1 t2
-           ; return (mkFunCo role co_s co_t) }
+           ; co_w <- unifyWanted loc Nominal w1 w2
+           ; return (mkFunCo role co_w co_s co_t) }
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       | tc1 == tc2, tys1 `equalLength` tys2
       , isInjectiveTyCon tc1 role -- don't look under newtypes at Rep equality
@@ -2520,9 +2523,10 @@ unify_derived loc role    orig_ty1 orig_ty2
     go ty1 ty2 | Just ty1' <- tcView ty1 = go ty1' ty2
     go ty1 ty2 | Just ty2' <- tcView ty2 = go ty1 ty2'
 
-    go (FunTy _ s1 t1) (FunTy _ s2 t2)
+    go (FunTy _ w1 s1 t1) (FunTy _ w2 s2 t2)
       = do { unify_derived loc role s1 s2
-           ; unify_derived loc role t1 t2 }
+           ; unify_derived loc role t1 t2
+           ; unify_derived loc role w1 w2 }
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       | tc1 == tc2, tys1 `equalLength` tys2
       , isInjectiveTyCon tc1 role

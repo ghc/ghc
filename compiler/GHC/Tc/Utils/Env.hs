@@ -34,6 +34,7 @@ module GHC.Tc.Utils.Env(
         tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2,
         tcExtendBinderStack, tcExtendLocalTypeEnv,
         isTypeClosedLetBndr,
+        tcCheckUsage,
 
         tcLookup, tcLookupLocated, tcLookupLocalIds,
         tcLookupId, tcLookupIdMaybe, tcLookupTyVar,
@@ -78,6 +79,10 @@ import GHC.Iface.Env
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
+import GHC.Core.UsageEnv
+import GHC.Tc.Types.Evidence (HsWrapper, idHsWrapper)
+import {-# SOURCE #-} GHC.Tc.Utils.Unify ( tcSubMult )
+import GHC.Tc.Types.Origin ( CtOrigin(UsageEnvironmentOf) )
 import GHC.Iface.Load
 import GHC.Builtin.Names
 import GHC.Builtin.Types
@@ -108,6 +113,7 @@ import GHC.Data.Bag
 import GHC.Data.List.SetOps
 import GHC.Utils.Error
 import GHC.Data.Maybe( MaybeErr(..), orElse )
+import GHC.Core.Multiplicity
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Utils.Misc ( HasDebugCallStack )
 
@@ -620,6 +626,28 @@ tc_extend_local_env top_lvl extra_env thing_inside
 tcExtendLocalTypeEnv :: TcLclEnv -> [(Name, TcTyThing)] -> TcLclEnv
 tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things
   = lcl_env { tcl_env = extendNameEnvList lcl_type_env tc_ty_things }
+
+-- | @tcCheckUsage name mult thing_inside@ runs @thing_inside@, checks that the
+-- usage of @name@ is a submultiplicity of @mult@, and removes @name@ from the
+-- usage environment. See also Note [tcSubMult's wrapper] in TcUnify.
+tcCheckUsage :: Name -> Mult -> TcM a -> TcM (a, HsWrapper)
+tcCheckUsage name id_mult thing_inside
+  = do { (local_usage, result) <- tcCollectingUsage thing_inside
+       ; wrapper <- check_then_add_usage local_usage
+       ; return (result, wrapper) }
+    where
+    check_then_add_usage :: UsageEnv -> TcM HsWrapper
+    -- Checks that the usage of the newly introduced binder is compatible with
+    -- its multiplicity, and combines the usage of non-new binders to |uenv|
+    check_then_add_usage uenv
+      = do { let actual_u = lookupUE uenv name
+           ; traceTc "check_then_add_usage" (ppr id_mult $$ ppr actual_u)
+           ; wrapper <- case actual_u of
+               Bottom -> return idHsWrapper
+               Zero     -> tcSubMult (UsageEnvironmentOf name) Many id_mult
+               MUsage m -> tcSubMult (UsageEnvironmentOf name) m id_mult
+           ; tcEmitBindingUsage (deleteUE uenv name)
+           ; return wrapper }
 
 {- *********************************************************************
 *                                                                      *

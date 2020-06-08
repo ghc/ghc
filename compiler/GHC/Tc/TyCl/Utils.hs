@@ -36,6 +36,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Bind( tcValBinds )
 import GHC.Core.TyCo.Rep( Type(..), Coercion(..), MCoercion(..), UnivCoProvenance(..) )
+import GHC.Core.Multiplicity
 import GHC.Tc.Utils.TcType
 import GHC.Core.Predicate
 import GHC.Builtin.Types( unitTy )
@@ -90,7 +91,7 @@ synonymTyConsOfType ty
      go (LitTy _)         = emptyNameEnv
      go (TyVarTy _)       = emptyNameEnv
      go (AppTy a b)       = go a `plusNameEnv` go b
-     go (FunTy _ a b)     = go a `plusNameEnv` go b
+     go (FunTy _ w a b)   = go w `plusNameEnv` go a `plusNameEnv` go b
      go (ForAllTy _ ty)   = go ty
      go (CastTy ty co)    = go ty `plusNameEnv` go_co co
      go (CoercionTy co)   = go_co co
@@ -124,7 +125,7 @@ synonymTyConsOfType ty
      go_co (TyConAppCo _ tc cs)   = go_tc tc `plusNameEnv` go_co_s cs
      go_co (AppCo co co')         = go_co co `plusNameEnv` go_co co'
      go_co (ForAllCo _ co co')    = go_co co `plusNameEnv` go_co co'
-     go_co (FunCo _ co co')       = go_co co `plusNameEnv` go_co co'
+     go_co (FunCo _ co_mult co co') = go_co co_mult `plusNameEnv` go_co co `plusNameEnv` go_co co'
      go_co (CoVarCo _)            = emptyNameEnv
      go_co (HoleCo {})            = emptyNameEnv
      go_co (AxiomInstCo _ _ cs)   = go_co_s cs
@@ -579,7 +580,7 @@ irDataCon datacon
   = setRoleInferenceVars univ_tvs $
     irExTyVars ex_tvs $ \ ex_var_set ->
     mapM_ (irType ex_var_set)
-          (map tyVarKind ex_tvs ++ eqSpecPreds eq_spec ++ theta ++ arg_tys)
+          (map tyVarKind ex_tvs ++ eqSpecPreds eq_spec ++ theta ++ (map scaledThing arg_tys))
       -- See Note [Role-checking data constructor arguments]
   where
     (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty)
@@ -599,7 +600,7 @@ irType = go
                                           lcls' = extendVarSet lcls tv
                                     ; markNominal lcls (tyVarKind tv)
                                     ; go lcls' ty }
-    go lcls (FunTy _ arg res)  = go lcls arg >> go lcls res
+    go lcls (FunTy _ w arg res)  = go lcls w >> go lcls arg >> go lcls res
     go _    (LitTy {})         = return ()
       -- See Note [Coercions in role inference]
     go lcls (CastTy ty _)      = go lcls ty
@@ -635,7 +636,7 @@ markNominal lcls ty = let nvars = fvVarList (FV.delFVs lcls $ get_ty_vars ty) in
     get_ty_vars :: Type -> FV
     get_ty_vars (TyVarTy tv)      = unitFV tv
     get_ty_vars (AppTy t1 t2)     = get_ty_vars t1 `unionFV` get_ty_vars t2
-    get_ty_vars (FunTy _ t1 t2)   = get_ty_vars t1 `unionFV` get_ty_vars t2
+    get_ty_vars (FunTy _ w t1 t2) = get_ty_vars w `unionFV` get_ty_vars t1 `unionFV` get_ty_vars t2
     get_ty_vars (TyConApp _ tys)  = mapUnionFV get_ty_vars tys
     get_ty_vars (ForAllTy tvb ty) = tyCoFVsBndr tvb (get_ty_vars ty)
     get_ty_vars (LitTy {})        = emptyFV
@@ -881,7 +882,10 @@ mkOneRecordSelector all_cons idDetails fl
                           mkPhiTy (conLikeStupidTheta con1) $   -- Urgh!
                           -- req_theta is empty for normal DataCon
                           mkPhiTy req_theta                 $
-                          mkVisFunTy data_ty                $
+                          mkVisFunTyMany data_ty            $
+                            -- Record selectors are always typed with Many. We
+                            -- could improve on it in the case where all the
+                            -- fields in all the constructor have multiplicity Many.
                           field_ty
 
     -- Make the binding: sel (C2 { fld = x }) = x
