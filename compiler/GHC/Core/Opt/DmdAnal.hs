@@ -62,9 +62,10 @@ dmdAnalTopBind :: AnalEnv
                -> CoreBind
                -> (AnalEnv, CoreBind)
 dmdAnalTopBind env (NonRec id rhs)
-  = (extendAnalEnv TopLevel env id' (idStrictness id'), NonRec id' rhs')
+  = ( extendAnalEnv TopLevel env id sig
+    , NonRec (setIdStrictness id sig) rhs')
   where
-    ( _, id', rhs') = dmdAnalRhsLetDown Nothing env cleanEvalDmd id rhs
+    ( _, sig, rhs') = dmdAnalRhsLetDown Nothing env cleanEvalDmd id rhs
 
 dmdAnalTopBind env (Rec pairs)
   = (env', Rec pairs')
@@ -216,10 +217,8 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
   -- Only one alternative with a product constructor
   | let tycon = dataConTyCon dc
   , isJust (isDataProductTyCon_maybe tycon)
-  , Just rec_tc' <- checkRecTc (ae_rec_tc env) tycon
   = let
-        env_alt                  = env { ae_rec_tc = rec_tc' }
-        (rhs_ty, rhs')           = dmdAnal env_alt dmd rhs
+        (rhs_ty, rhs')           = dmdAnal env dmd rhs
         (alt_ty1, dmds)          = findBndrsDmds env rhs_ty bndrs
         (alt_ty2, case_bndr_dmd) = findBndrDmd env False alt_ty1 case_bndr
         id_dmds                  = addCaseBndrDmd case_bndr_dmd dmds
@@ -299,8 +298,9 @@ dmdAnal' env dmd (Let (NonRec id rhs) body)
 dmdAnal' env dmd (Let (NonRec id rhs) body)
   = (body_ty2, Let (NonRec id2 rhs') body')
   where
-    (lazy_fv, id1, rhs') = dmdAnalRhsLetDown Nothing env dmd id rhs
-    env1                 = extendAnalEnv NotTopLevel env id1 (idStrictness id1)
+    (lazy_fv, sig, rhs') = dmdAnalRhsLetDown Nothing env dmd id rhs
+    id1                  = setIdStrictness id sig
+    env1                 = extendAnalEnv NotTopLevel env id sig
     (body_ty, body')     = dmdAnal env1 dmd body
     (body_ty1, id2)      = annotateBndr env body_ty id1
     body_ty2             = addLazyFVs body_ty1 lazy_fv -- see Note [Lazy and unleashable free variables]
@@ -546,7 +546,10 @@ dmdFix top_lvl env let_dmd orig_pairs
     -- The fixed-point varies the idStrictness field of the binders, and terminates if that
     -- annotation does not change any more.
     loop :: Int -> [(Id,CoreExpr)] -> (AnalEnv, DmdEnv, [(Id,CoreExpr)])
-    loop n pairs
+    loop n pairs = pprTrace "dmdFix" (ppr n <+> vcat [ ppr id <+> ppr (idStrictness id) | (id,_)<- pairs]) $
+                   loop' n pairs
+
+    loop' n pairs
       | found_fixpoint = (final_anal_env, lazy_fv, pairs')
       | n == 10        = abort
       | otherwise      = loop (n+1) pairs'
@@ -573,10 +576,10 @@ dmdFix top_lvl env let_dmd orig_pairs
         my_downRhs (env, lazy_fv) (id,rhs)
           = ((env', lazy_fv'), (id', rhs'))
           where
-            (lazy_fv1, id', rhs') = dmdAnalRhsLetDown (Just bndrs) env let_dmd id rhs
+            (lazy_fv1, sig, rhs') = dmdAnalRhsLetDown (Just bndrs) env let_dmd id rhs
             lazy_fv'              = plusVarEnv_C bothDmd lazy_fv lazy_fv1
-            env'                  = extendAnalEnv top_lvl env id (idStrictness id')
-
+            env'                  = extendAnalEnv top_lvl env id sig
+            id'                   = setIdStrictness id sig
 
     zapIdStrictness :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
     zapIdStrictness pairs = [(setIdStrictness id nopSig, rhs) | (id, rhs) <- pairs ]
@@ -615,30 +618,26 @@ dmdAnalRhsLetDown
   :: Maybe [Id]   -- Just bs <=> recursive, Nothing <=> non-recursive
   -> AnalEnv -> CleanDemand
   -> Id -> CoreExpr
-  -> (DmdEnv, Id, CoreExpr)
+  -> (DmdEnv, StrictSig, CoreExpr)
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
+-- See Note [NOINLINE and strictness]
 dmdAnalRhsLetDown rec_flag env let_dmd id rhs
-  = (lazy_fv, id', rhs')
+  = (lazy_fv, sig, rhs')
   where
-    rhs_arity      = idArity id
-    rhs_dmd
-      -- See Note [Demand analysis for join points]
-      -- See Note [Invariants on join points] invariant 2b, in GHC.Core
-      --     rhs_arity matches the join arity of the join point
-      | isJoinId id
-      = mkCallDmds rhs_arity let_dmd
-      | otherwise
-      -- NB: rhs_arity
-      -- See Note [Demand signatures are computed for a threshold demand based on idArity]
-      = mkRhsDmd env rhs_arity rhs
-    (DmdType rhs_fv rhs_dmds rhs_div, rhs')
-                   = dmdAnal env rhs_dmd rhs
-    sig            = mkStrictSigForArity rhs_arity (DmdType sig_fv rhs_dmds rhs_div)
-    id'            = -- pprTrace "dmdAnalRhsLetDown" (ppr id <+> ppr sig) $
-                     setIdStrictness id sig
-        -- See Note [NOINLINE and strictness]
+    rhs_arity = idArity id
+    rhs_dmd -- See Note [Demand analysis for join points]
+            -- See Note [Invariants on join points] invariant 2b, in GHC.Core
+            --     rhs_arity matches the join arity of the join point
+            | isJoinId id
+            = mkCallDmds rhs_arity let_dmd
+            | otherwise
+            -- NB: rhs_arity
+            -- See Note [Demand signatures are computed for a threshold demand based on idArity]
+            = mkRhsDmd env rhs_arity rhs
 
+    (DmdType rhs_fv rhs_dmds rhs_div, rhs') = dmdAnal env rhs_dmd rhs
+    sig = mkStrictSigForArity rhs_arity (DmdType sig_fv rhs_dmds rhs_div)
 
     -- See Note [Aggregated demand for cardinality]
     rhs_fv1 = case rec_flag of
@@ -1133,7 +1132,6 @@ data AnalEnv
        , ae_sigs   :: SigEnv
        , ae_virgin :: Bool    -- True on first iteration only
                               -- See Note [Initialising strictness]
-       , ae_rec_tc :: RecTcChecker
        , ae_fam_envs :: FamInstEnvs
  }
 
@@ -1157,7 +1155,6 @@ emptyAnalEnv dflags fam_envs
     = AE { ae_dflags = dflags
          , ae_sigs = emptySigEnv
          , ae_virgin = True
-         , ae_rec_tc = initRecTc
          , ae_fam_envs = fam_envs
          }
 

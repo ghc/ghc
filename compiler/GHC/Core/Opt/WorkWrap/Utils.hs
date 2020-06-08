@@ -1000,21 +1000,27 @@ findTypeShape :: FamInstEnvs -> Type -> TypeShape
 -- The data type TypeShape is defined in GHC.Types.Demand
 -- See Note [Trimming a demand to a type] in GHC.Types.Demand
 findTypeShape fam_envs ty
-  | Just (tc, tc_args)  <- splitTyConApp_maybe ty
-  , Just con <- isDataProductTyCon_maybe tc
-  = TsProd (map (findTypeShape fam_envs) $ dataConInstArgTys con tc_args)
+  = go (setRecTcMaxBound 2 initRecTc) ty
+  where
+    go rec_tc ty
+       | Just (_, res) <- splitFunTy_maybe ty
+       = TsFun (go rec_tc res)
 
-  | Just (_, res) <- splitFunTy_maybe ty
-  = TsFun (findTypeShape fam_envs res)
+       | Just (tc, tc_args)  <- splitTyConApp_maybe ty
+       , Just con <- isDataProductTyCon_maybe tc
+       , Just rec_tc <- if isTupleTyCon tc
+                        then Just rec_tc
+                        else checkRecTc rec_tc tc
+       = TsProd (map (go rec_tc) (dataConInstArgTys con tc_args))
 
-  | Just (_, ty') <- splitForAllTy_maybe ty
-  = findTypeShape fam_envs ty'
+       | Just (_, ty') <- splitForAllTy_maybe ty
+       = go rec_tc ty'
 
-  | Just (_, ty') <- topNormaliseType_maybe fam_envs ty
-  = findTypeShape fam_envs ty'
+       | Just (_, ty') <- topNormaliseType_maybe fam_envs ty
+       = go rec_tc ty'
 
-  | otherwise
-  = TsUnk
+       | otherwise
+       = TsUnk
 
 {-
 ************************************************************************
