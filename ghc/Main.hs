@@ -29,6 +29,7 @@ import GHC.Driver.Pipeline  ( oneShot, compileFile )
 import GHC.Driver.MakeFile  ( doMkDependHS )
 import GHC.Driver.Backpack  ( doBackpack )
 import GHC.Driver.Plugins
+import GHC.Driver.Errors    ( handleFlagWarnings )
 
 import GHC.Platform
 import GHC.Platform.Ways

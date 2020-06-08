@@ -29,30 +29,31 @@ import GHC.Platform
 
 import GHC.Driver.Session
 import GHC.Driver.Config
+import GHC.Driver.Errors.Types
 
-import GHC.Parser.Errors.Ppr
-import GHC.Parser.Errors
+import GHC.Parser.Errors    as Parser
 import GHC.Parser           ( parseHeader )
-import GHC.Parser.Lexer
+import GHC.Parser.Lexer     hiding ( getErrorMessages )
+import qualified GHC.Parser.Lexer as Lexer
 
 import GHC.Hs
 import GHC.Unit.Module
 import GHC.Builtin.Names
 
+import GHC.Types.Error ( mkErrorMessages )
 import GHC.Types.SrcLoc
 import GHC.Types.SourceError
 import GHC.Types.SourceText
 
 import GHC.Utils.Error
 import GHC.Utils.Misc
-import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Monad
 import GHC.Utils.Exception as Exception
 
 import GHC.Data.StringBuffer
 import GHC.Data.Maybe
-import GHC.Data.Bag         ( Bag, emptyBag, listToBag, unitBag, isEmptyBag )
+import GHC.Data.Bag         ( listToBag, unitBag )
 import GHC.Data.FastString
 
 import Control.Monad
@@ -73,7 +74,7 @@ getImports :: ParserOpts   -- ^ Parser options
            -> FilePath     -- ^ The original source filename (used for locations
                            --   in the function result)
            -> IO (Either
-               (Bag Error)
+               (ErrorMessages Parser.Error)
                ([(Maybe FastString, Located ModuleName)],
                 [(Maybe FastString, Located ModuleName)],
                 Located ModuleName))
@@ -84,13 +85,14 @@ getImports popts implicit_prelude buf filename source_filename = do
   case unP parseHeader (initParserState popts buf loc) of
     PFailed pst ->
         -- assuming we're not logging warnings here as per below
-      return $ Left $ getErrorMessages pst
+      return $ Left $ Lexer.getErrorMessages pst
     POk pst rdr_module -> fmap Right $ do
-      let (_warns, errs) = getMessages pst
+      let msgs@(_warns, errs) = Lexer.getMessages pst
       -- don't log warnings: they'll be reported when we parse the file
       -- for real.  See #2500.
-      if not (isEmptyBag errs)
-        then throwIO $ mkSrcErr (fmap pprError errs)
+      -- logWarnings warns
+      if errorsFound msgs
+        then throwIO $ mkSrcErr (GhcErrorPs <$> errs)
         else
           let   hsmod = unLoc rdr_module
                 mb_mod = hsmodName hsmod
@@ -255,7 +257,7 @@ getOptions' dflags toks
               | IToptions_prag str <- unLoc open
               , ITclose_prag       <- unLoc close
               = case toArgs str of
-                  Left _err -> optionsParseError str dflags $   -- #15053
+                  Left _err -> optionsParseError str $   -- #15053
                                  combineSrcSpans (getLoc open) (getLoc close)
                   Right args -> map (L (getLoc open)) args ++ parseToks xs
           parseToks (open:close:xs)
@@ -280,10 +282,10 @@ getOptions' dflags toks
                 case rest of
                   (L _loc ITcomma):more -> parseLanguage more
                   (L _loc ITclose_prag):more -> parseToks more
-                  (L loc _):_ -> languagePragParseError dflags loc
+                  (L loc _):_ -> languagePragParseError loc
                   [] -> panic "getOptions'.parseLanguage(1) went past eof token"
           parseLanguage (tok:_)
-              = languagePragParseError dflags (getLoc tok)
+              = languagePragParseError (getLoc tok)
           parseLanguage []
               = panic "getOptions'.parseLanguage(2) went past eof token"
 
@@ -304,14 +306,11 @@ getOptions' dflags toks
 --
 -- Throws a 'SourceError' if the input list is non-empty claiming that the
 -- input flags are unknown.
-checkProcessArgsResult :: MonadIO m => DynFlags -> [Located String] -> m ()
-checkProcessArgsResult dflags flags
+checkProcessArgsResult :: MonadIO m => [Located String] -> m ()
+checkProcessArgsResult flags
   = when (notNull flags) $
-      liftIO $ throwIO $ mkSrcErr $ listToBag $ map mkMsg flags
-    where mkMsg (L loc flag)
-              = mkPlainErrMsg dflags loc $
-                  (text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+>
-                   text flag)
+      liftIO $ throwIO $ mkSrcErr $ fmap GhcErrorPs $ mkErrorMessages (listToBag $ map mkMsg flags)
+    where mkMsg (L loc flag) = mkParserErr loc (ErrUnknownOptionsFlag flag)
 
 -----------------------------------------------------------------------------
 
@@ -326,44 +325,32 @@ checkExtension dflags (L l ext)
     ext' = unpackFS ext
     supported = supportedLanguagesAndExtensions $ platformArchOS $ targetPlatform dflags
 
-languagePragParseError :: DynFlags -> SrcSpan -> a
-languagePragParseError dflags loc =
-    throwErr dflags loc $
-       vcat [ text "Cannot parse LANGUAGE pragma"
-            , text "Expecting comma-separated list of language options,"
-            , text "each starting with a capital letter"
-            , nest 2 (text "E.g. {-# LANGUAGE TemplateHaskell, GADTs #-}") ]
+languagePragParseError :: SrcSpan -> a
+languagePragParseError loc =
+  throwPsError $ mkParserErr loc ErrLanguagePragmaParseError
 
 unsupportedExtnError :: DynFlags -> SrcSpan -> String -> a
 unsupportedExtnError dflags loc unsup =
-    throwErr dflags loc $
-        text "Unsupported extension: " <> text unsup $$
-        if null suggestions then Outputable.empty else text "Perhaps you meant" <+> quotedListWithOr (map text suggestions)
+    throwPsError $ mkParserErr loc (ErrUnsupportedExtension unsup suggestions)
   where
      supported = supportedLanguagesAndExtensions $ platformArchOS $ targetPlatform dflags
      suggestions = fuzzyMatch unsup supported
 
 
-optionsErrorMsgs :: DynFlags -> [String] -> [Located String] -> FilePath -> Messages
-optionsErrorMsgs dflags unhandled_flags flags_lines _filename
-  = (emptyBag, listToBag (map mkMsg unhandled_flags_lines))
+optionsErrorMsgs :: [String] -> [Located String] -> FilePath -> Messages Parser.Warning Parser.Error
+optionsErrorMsgs unhandled_flags flags_lines _filename
+  = (mempty, mkErrorMessages $ listToBag (map mkMsg unhandled_flags_lines))
   where unhandled_flags_lines :: [Located String]
         unhandled_flags_lines = [ L l f
                                 | f <- unhandled_flags
                                 , L l f' <- flags_lines
                                 , f == f' ]
-        mkMsg (L flagSpan flag) =
-            GHC.Utils.Error.mkPlainErrMsg dflags flagSpan $
-                    text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+> text flag
+        mkMsg (L flagSpan flag) = mkParserErr flagSpan (ErrUnknownOptionsFlag flag)
 
-optionsParseError :: String -> DynFlags -> SrcSpan -> a     -- #15053
-optionsParseError str dflags loc =
-  throwErr dflags loc $
-      vcat [ text "Error while parsing OPTIONS_GHC pragma."
-           , text "Expecting whitespace-separated list of GHC options."
-           , text "  E.g. {-# OPTIONS_GHC -Wall -O2 #-}"
-           , text ("Input was: " ++ show str) ]
+optionsParseError :: String -> SrcSpan -> a     -- #15053
+optionsParseError str loc =
+  throwPsError $ mkParserErr loc (ErrOptionsGhcParseError str)
 
-throwErr :: DynFlags -> SrcSpan -> SDoc -> a                -- #15053
-throwErr dflags loc doc =
-  throw $ mkSrcErr $ unitBag $ mkPlainErrMsg dflags loc doc
+throwPsError :: ErrMsg Parser.Error -> a        -- #15053
+throwPsError =
+  throw . mkSrcErr . mkErrorMessages . unitBag . fmap GhcErrorPs

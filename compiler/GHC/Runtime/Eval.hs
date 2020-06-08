@@ -68,6 +68,7 @@ import GHC.ByteCode.Types
 import GHC.Linker.Types
 import GHC.Linker.Loader as Loader
 
+import GHC.Driver.Errors.Types
 import GHC.Hs
 
 import GHC.Core.Predicate
@@ -1064,7 +1065,7 @@ typeKind normalise str = withSession $ \hsc_env ->
 getInstancesForType :: GhcMonad m => Type -> m [ClsInst]
 getInstancesForType ty = withSession $ \hsc_env ->
   liftIO $ runInteractiveHsc hsc_env $
-    ioMsgMaybe $ runTcInteractive hsc_env $ do
+    ioMsgMaybe . wrappingErrors GhcErrorTcRn $ runTcInteractive hsc_env $ do
       -- Bring class and instances from unqualified modules into scope, this fixes #16793.
       loadUnqualIfaces hsc_env (hsc_IC hsc_env)
       matches <- findMatchingInstances ty
@@ -1077,7 +1078,8 @@ parseInstanceHead str = withSession $ \hsc_env0 -> do
   (ty, _) <- liftIO $ runInteractiveHsc hsc_env0 $ do
     hsc_env <- getHscEnv
     ty <- hscParseType str
-    ioMsgMaybe $ tcRnType hsc_env SkolemiseFlexi True ty
+    ioMsgMaybe . wrappingErrors GhcErrorTcRn $
+      tcRnType hsc_env SkolemiseFlexi True ty
 
   return ty
 
