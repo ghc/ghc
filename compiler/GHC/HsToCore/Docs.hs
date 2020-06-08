@@ -328,10 +328,7 @@ filterDecls = filter (isHandled . unLoc . fst)
 
 
 -- | Go through all class declarations and filter their sub-declarations
-filterClasses :: ( LHsDecl p ~ Located (HsDecl p)
-                 , LSig p ~ Located (Sig p)
-                 ) =>
-                 [(LHsDecl p, doc)] -> [(LHsDecl p, doc)]
+filterClasses :: [(LHsDecl (GhcPass p), doc)] -> [(LHsDecl (GhcPass p), doc)]
 filterClasses = map (first (mapLoc filterClass))
   where
     filterClass (TyClD x c@(ClassDecl {})) =

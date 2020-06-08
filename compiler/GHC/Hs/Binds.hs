@@ -1081,25 +1081,25 @@ isDefaultMethod :: TcSpecPrags -> Bool
 isDefaultMethod IsDefaultMethod = True
 isDefaultMethod (SpecPrags {})  = False
 
-isFixityLSig :: XRec pass (Sig pass) ~ Located (Sig pass) => LSig pass -> Bool
+isFixityLSig :: Located (Sig pass) -> Bool
 isFixityLSig (L _ (FixSig {})) = True
 isFixityLSig _                 = False
 
-isTypeLSig :: XRec pass (Sig pass) ~ Located (Sig pass) => LSig pass -> Bool  -- Type signatures
+isTypeLSig :: Located (Sig pass) -> Bool  -- Type signatures
 isTypeLSig (L _(TypeSig {}))    = True
 isTypeLSig (L _(ClassOpSig {})) = True
 isTypeLSig (L _(IdSig {}))      = True
 isTypeLSig _                    = False
 
-isSpecLSig :: XRec pass (Sig pass) ~ Located (Sig pass) => LSig pass -> Bool
+isSpecLSig :: Located (Sig pass) -> Bool
 isSpecLSig (L _(SpecSig {})) = True
 isSpecLSig _                 = False
 
-isSpecInstLSig :: XRec pass (Sig pass) ~ Located (Sig pass) => LSig pass -> Bool
+isSpecInstLSig :: Located (Sig pass) -> Bool
 isSpecInstLSig (L _ (SpecInstSig {})) = True
 isSpecInstLSig _                      = False
 
-isPragLSig :: XRec pass (Sig pass) ~ Located (Sig pass) => LSig pass -> Bool
+isPragLSig :: Located (Sig pass) -> Bool
 -- Identifies pragmas
 isPragLSig (L _ (SpecSig {}))   = True
 isPragLSig (L _ (InlineSig {})) = True
@@ -1107,20 +1107,20 @@ isPragLSig (L _ (SCCFunSig {})) = True
 isPragLSig (L _ (CompleteMatchSig {})) = True
 isPragLSig _                    = False
 
-isInlineLSig :: XRec pass (Sig pass) ~ Located (Sig pass) => LSig pass -> Bool
+isInlineLSig :: Located (Sig pass) -> Bool
 -- Identifies inline pragmas
 isInlineLSig (L _ (InlineSig {})) = True
 isInlineLSig _                    = False
 
-isMinimalLSig :: XRec pass (Sig pass) ~ Located (Sig pass) => LSig pass -> Bool
+isMinimalLSig :: Located (Sig pass) -> Bool
 isMinimalLSig (L _ (MinimalSig {})) = True
 isMinimalLSig _                     = False
 
-isSCCFunSig :: XRec pass (Sig pass) ~ Located (Sig pass) => LSig pass -> Bool
+isSCCFunSig :: Located (Sig pass) -> Bool
 isSCCFunSig (L _ (SCCFunSig {})) = True
 isSCCFunSig _                    = False
 
-isCompleteMatchSig :: XRec pass (Sig pass) ~ Located (Sig pass) => LSig pass -> Bool
+isCompleteMatchSig :: Located (Sig pass) -> Bool
 isCompleteMatchSig (L _ (CompleteMatchSig {} )) = True
 isCompleteMatchSig _                            = False
 
