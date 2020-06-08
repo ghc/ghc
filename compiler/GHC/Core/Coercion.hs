@@ -149,7 +149,6 @@ import GHC.Builtin.Types.Prim
 import GHC.Data.List.SetOps
 import GHC.Data.Maybe
 import GHC.Types.Unique.FM
-import GHC.Core.Multiplicity
 
 import Control.Monad (foldM, zipWithM)
 import Data.Function ( on )
@@ -397,8 +396,8 @@ decomposePiCos orig_co (Pair orig_k1 orig_k2) orig_args
         in
         go (arg_co : acc_arg_cos) (subst1', t1) res_co (subst2', t2) tys
 
-      | Just (_s1, t1) <- splitFunTy_maybe k1
-      , Just (_s2, t2) <- splitFunTy_maybe k2
+      | Just (_w1, _s1, t1) <- splitFunTy_maybe k1
+      , Just (_w1, _s2, t2) <- splitFunTy_maybe k2
         -- know     co :: (s1 -> t1) ~ (s2 -> t2)
         --    function :: s1 -> t1
         --          ty :: s2

@@ -29,7 +29,6 @@ import GHC.Platform
 import GHC.Types.Name
 import GHC.Types.Id.Make
 import GHC.Types.Id
-import GHC.Types.Var ( updateVarTypeButNotMult )
 import GHC.Types.ForeignCall
 import GHC.Driver.Types
 import GHC.Core.Utils
@@ -38,7 +37,6 @@ import GHC.Core.Ppr
 import GHC.Types.Literal
 import GHC.Builtin.PrimOps
 import GHC.Core.FVs
-import GHC.Core.Multiplicity ( pattern Many )
 import GHC.Core.Type
 import GHC.Types.RepType
 import GHC.Core.DataCon
@@ -710,7 +708,7 @@ protectNNLJoinPointBind x rhs@(fvs, _)
 protectNNLJoinPointId :: Id -> Id
 protectNNLJoinPointId x
   = ASSERT( isNNLJoinPoint x )
-    updateVarTypeButNotMult (voidPrimTy `mkVisFunTyMany`) x
+    updateIdTypeButNotMult (voidPrimTy `mkVisFunTyMany`) x
 
 {-
    Ticked Expressions

@@ -968,8 +968,16 @@ simplExprF1 env (App fun arg) cont
                                 , sc_hole_ty = hole'
                                 , sc_cont    = cont } }
       _       ->
+          -- crucially, these are /lazy/ bindings. They will
+          -- be forced only if we need to run contHoleType.
+          -- When these are forced, we might get quadratic behavior;
+          -- this quadratic blowup could be avoided by drilling down
+          -- to the function and getting its multiplicities all at once
+          -- (instead of one-at-a-time). But in practice, we have not
+          -- observed the quadratic behavior, so this extra entanglement
+          -- seems not worthwhile.
         let fun_ty = exprType fun
-            (Scaled m _, _) = splitFunTy fun_ty
+            (m, _, _) = splitFunTy fun_ty
         in
                 simplExprF env fun $
                  ApplyToVal { sc_arg = arg, sc_env = env
@@ -1080,7 +1088,7 @@ simplJoinRhs env bndr expr cont
   | Just arity <- isJoinId_maybe bndr
   =  do { let (join_bndrs, join_body) = collectNBinders arity expr
               mult = contHoleScaling cont
-        ; (env', join_bndrs') <- simplLamBndrs env (map (scaleIdBy mult) join_bndrs)
+        ; (env', join_bndrs') <- simplLamBndrs env (map (scaleVarBy mult) join_bndrs)
         ; join_body' <- simplExprC env' join_body cont
         ; return $ mkLams join_bndrs' join_body' }
 
@@ -2587,7 +2595,7 @@ rebuildCase env scrut case_bndr alts cont
     -- they are aliases anyway.
     scale_float (GHC.Core.Make.FloatCase scrut case_bndr con vars) =
       let
-        scale_id id = scaleIdBy holeScaling id
+        scale_id id = scaleVarBy holeScaling id
       in
       GHC.Core.Make.FloatCase scrut (scale_id case_bndr) con (map scale_id vars)
     scale_float f = f

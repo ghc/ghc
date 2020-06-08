@@ -46,19 +46,18 @@ module GHC.Types.Var (
         -- ** Taking 'Var's apart
         varName, varUnique, varType,
         varMult, varMultMaybe,
-        varScaledType,
 
         -- ** Modifying 'Var's
         setVarName, setVarUnique, setVarType,
-        scaleVarBy, setVarMult,
-        updateVarTypeButNotMult,
-        updateVarTypeAndMult, updateVarTypeAndMultM,
+        updateVarType, updateVarTypeM,
 
         -- ** Constructing, taking apart, modifying 'Id's
         mkGlobalVar, mkLocalVar, mkExportedLocalVar, mkCoVar,
         idInfo, idDetails,
         lazySetIdInfo, setIdDetails, globaliseId,
-        setIdExported, setIdNotExported,
+        setIdExported, setIdNotExported, setIdMult,
+        updateIdTypeButNotMult,
+        updateIdTypeAndMult, updateIdTypeAndMultM,
 
         -- ** Predicates
         isId, isTyVar, isTcTyVar,
@@ -98,13 +97,12 @@ module GHC.Types.Var (
 
 import GHC.Prelude
 
-import {-# SOURCE #-}   GHC.Core.TyCo.Rep( Type, Kind )
+import {-# SOURCE #-}   GHC.Core.TyCo.Rep( Type, Kind, Mult )
 import {-# SOURCE #-}   GHC.Core.TyCo.Ppr( pprKind )
 import {-# SOURCE #-}   GHC.Tc.Utils.TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTv )
 import {-# SOURCE #-}   GHC.Types.Id.Info( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
                                            vanillaIdInfo, pprIdDetails )
-import GHC.Core.Multiplicity
-
+import {-# SOURCE #-}   GHC.Builtin.Types ( manyDataConTy )
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Unique ( Uniquable, Unique, getKey, getUnique
                         , mkUniqueGrimily, nonDetCmpUnique )
@@ -386,6 +384,10 @@ instance HasOccName Var where
 varUnique :: Var -> Unique
 varUnique var = mkUniqueGrimily (realUnique var)
 
+varMultMaybe :: Id -> Maybe Mult
+varMultMaybe (Id { varMult = mult }) = Just mult
+varMultMaybe _ = Nothing
+
 setVarUnique :: Var -> Unique -> Var
 setVarUnique var uniq
   = var { realUnique = getKey uniq,
@@ -396,42 +398,39 @@ setVarName var new_name
   = var { realUnique = getKey (getUnique new_name),
           varName = new_name }
 
-setVarType :: Id -> Type -> Id
+setVarType :: Var -> Type -> Var
 setVarType id ty = id { varType = ty }
 
-updateVarTypeButNotMult :: (Type -> Type) -> Id -> Id
-updateVarTypeButNotMult f id = id { varType = f (varType id) }
+-- | Update a 'Var's type. Does not update the /multiplicity/
+-- stored in an 'Id', if any. Because of the possibility for
+-- abuse, ASSERTs that there is no multiplicity to update.
+updateVarType :: (Type -> Type) -> Var -> Var
+updateVarType upd var
+  | debugIsOn
+  = case var of
+      Id { id_details = details } -> ASSERT( isCoVarDetails details )
+                                     result
+      _ -> result
+  | otherwise
+  = result
+  where
+    result = var { varType = upd (varType var) }
 
-updateVarTypeAndMult :: (Type -> Type) -> Id -> Id
-updateVarTypeAndMult f id = let id' = id { varType = f (varType id) }
-                            in case varMultMaybe id' of
-                                      Just w -> setVarMult id' (f w)
-                                      Nothing -> id'
-
-updateVarTypeAndMultM :: Monad m => (Type -> m Type) -> Id -> m Id
-updateVarTypeAndMultM f id = do { ty' <- f (varType id)
-                                ; let id' = setVarType id ty'
-                                ; case varMultMaybe id of
-                                    Just w -> do w' <- f w
-                                                 return $ setVarMult id' w'
-                                    Nothing -> return id'
-                                }
-
-varMultMaybe :: Id -> Maybe Mult
-varMultMaybe (Id { varMult = mult }) = Just mult
-varMultMaybe _ = Nothing
-
-varScaledType :: Id -> Scaled Kind
-varScaledType var = Scaled (varMult var) (varType var)
-
-scaleVarBy :: Mult -> Id -> Id
-scaleVarBy m id@(Id { varMult = w }) =
-  id { varMult = m `mkMultMul` w }
-scaleVarBy _ id = id
-
-setVarMult :: Id -> Mult -> Id
-setVarMult id r | isId id = id { varMult = r }
-                | otherwise = pprPanic "setVarMult" (ppr id <+> ppr r)
+-- | Update a 'Var's type monadically. Does not update the /multiplicity/
+-- stored in an 'Id', if any. Because of the possibility for
+-- abuse, ASSERTs that there is no multiplicity to update.
+updateVarTypeM :: Monad m => (Type -> m Type) -> Var -> m Var
+updateVarTypeM upd var
+  | debugIsOn
+  = case var of
+      Id { id_details = details } -> ASSERT( isCoVarDetails details )
+                                     result
+      _ -> result
+  | otherwise
+  = result
+  where
+    result = do { ty' <- upd (varType var)
+                ; return (var { varType = ty' }) }
 
 {- *********************************************************************
 *                                                                      *
@@ -752,7 +751,7 @@ idDetails other                         = pprPanic "idDetails" (ppr other)
 -- Ids, because Id.hs uses 'mkGlobalId' etc with different types
 mkGlobalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalVar details name ty info
-  = mk_id name Many ty GlobalId details info
+  = mk_id name manyDataConTy ty GlobalId details info
   -- There is no support for linear global variables yet. They would require
   -- being checked at link-time, which can be useful, but is not a priority.
 
@@ -762,12 +761,12 @@ mkLocalVar details name w ty info
 
 mkCoVar :: Name -> Type -> CoVar
 -- Coercion variables have no IdInfo
-mkCoVar name ty = mk_id name Many ty (LocalId NotExported) coVarDetails vanillaIdInfo
+mkCoVar name ty = mk_id name manyDataConTy ty (LocalId NotExported) coVarDetails vanillaIdInfo
 
 -- | Exported 'Var's will not be removed as dead code
 mkExportedLocalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkExportedLocalVar details name ty info
-  = mk_id name Many ty (LocalId Exported) details info
+  = mk_id name manyDataConTy ty (LocalId Exported) details info
   -- There is no support for exporting linear variables. See also [mkGlobalVar]
 
 mk_id :: Name -> Mult -> Type -> IdScope -> IdDetails -> IdInfo -> Id
@@ -802,6 +801,30 @@ setIdNotExported :: Id -> Id
 -- ^ We can only do this to LocalIds
 setIdNotExported id = ASSERT( isLocalId id )
                       id { idScope = LocalId NotExported }
+
+-----------------------
+updateIdTypeButNotMult :: (Type -> Type) -> Id -> Id
+updateIdTypeButNotMult f id = id { varType = f (varType id) }
+
+
+updateIdTypeAndMult :: (Type -> Type) -> Id -> Id
+updateIdTypeAndMult f id@(Id { varType = ty
+                             , varMult = mult })
+  = id { varType = f ty
+       , varMult = f mult }
+updateIdTypeAndMult _ other = pprPanic "updateIdTypeAndMult" (ppr other)
+
+updateIdTypeAndMultM :: Monad m => (Type -> m Type) -> Id -> m Id
+updateIdTypeAndMultM f id@(Id { varType = ty
+                              , varMult = mult })
+  = do { ty' <- f ty
+       ; mult' <- f mult
+       ; return (id { varType = ty', varMult = mult' }) }
+updateIdTypeAndMultM _ other = pprPanic "updateIdTypeAndMultM" (ppr other)
+
+setIdMult :: Id -> Mult -> Id
+setIdMult id r | isId id = id { varMult = r }
+               | otherwise = pprPanic "setIdMult" (ppr id <+> ppr r)
 
 {-
 ************************************************************************

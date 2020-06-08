@@ -76,7 +76,6 @@ import GHC.Data.FastString
 import GHC.Types.Basic hiding ( SuccessFlag(..) )
 import GHC.Data.List.SetOps
 import GHC.Fingerprint
-import GHC.Core.Multiplicity
 import qualified GHC.Data.BooleanFormula as BF
 
 import Control.Monad
