@@ -23,6 +23,7 @@ just attach noSrcSpan to everything.
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE DataKinds #-}
@@ -120,6 +121,7 @@ import GHC.Types.Var
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon
 import GHC.Core.Type ( appTyArgFlags, splitAppTys, tyConArgFlags, tyConAppNeedsKindSig )
+import GHC.Core.Multiplicity ( pattern One, pattern Many )
 import GHC.Builtin.Types ( unitTy )
 import GHC.Tc.Utils.TcType
 import GHC.Core.DataCon
@@ -330,7 +332,10 @@ mkBodyStmt body
   = BodyStmt noExtField body noSyntaxExpr noSyntaxExpr
 mkPsBindStmt pat body = BindStmt noExtField pat body
 mkRnBindStmt pat body = BindStmt (XBindStmtRn { xbsrn_bindOp = noSyntaxExpr, xbsrn_failOp = Nothing }) pat body
-mkTcBindStmt pat body = BindStmt (XBindStmtTc { xbstc_bindOp = noSyntaxExpr, xbstc_boundResultType =unitTy, xbstc_failOp = Nothing }) pat body
+mkTcBindStmt pat body = BindStmt (XBindStmtTc { xbstc_bindOp = noSyntaxExpr,
+                                                xbstc_boundResultType = unitTy,
+                                                xbstc_boundResultMult = Many,
+                                                xbstc_failOp = Nothing }) pat body
   -- don't use placeHolderTypeTc above, because that panics during zonking
 
 emptyRecStmt' :: forall idL idR body. IsPass idR
@@ -516,12 +521,12 @@ nlList exprs          = noLoc (ExplicitList noExtField Nothing exprs)
 
 nlHsAppTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsTyVar :: IdP (GhcPass p)                            -> LHsType (GhcPass p)
-nlHsFunTy :: LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
+nlHsFunTy :: HsArrow (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p)
 nlHsParTy :: LHsType (GhcPass p)                        -> LHsType (GhcPass p)
 
 nlHsAppTy f t = noLoc (HsAppTy noExtField f (parenthesizeHsType appPrec t))
 nlHsTyVar x   = noLoc (HsTyVar noExtField NotPromoted (noLoc x))
-nlHsFunTy a b = noLoc (HsFunTy noExtField (parenthesizeHsType funPrec a) b)
+nlHsFunTy mult a b = noLoc (HsFunTy noExtField mult (parenthesizeHsType funPrec a) b)
 nlHsParTy t   = noLoc (HsParTy noExtField t)
 
 nlHsTyConApp :: LexicalFixity -> IdP (GhcPass p)
@@ -685,9 +690,9 @@ typeToLHsType ty
   = go ty
   where
     go :: Type -> LHsType GhcPs
-    go ty@(FunTy { ft_af = af, ft_arg = arg, ft_res = res })
+    go ty@(FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res })
       = case af of
-          VisArg   -> nlHsFunTy (go arg) (go res)
+          VisArg   -> nlHsFunTy (multToHsArrow mult) (go arg) (go res)
           InvisArg | (theta, tau) <- tcSplitPhiTy ty
                    -> noLoc (HsQualTy { hst_ctxt = noLoc (map go theta)
                                       , hst_xqual = noExtField
@@ -753,6 +758,16 @@ typeToLHsType ty
                                                (argf_to_spec argf)
                                                (noLoc (getRdrName tv))
                                                (go (tyVarKind tv))
+
+-- | This is used to transform an arrow from Core's Type to surface
+-- syntax. There is a choice between being very explicit here, or trying to
+-- refold arrows into shorthands as much as possible. We choose to do the
+-- latter, for it should be more readable. It also helps printing Haskell'98
+-- code into Haskell'98 syntax.
+multToHsArrow :: Mult -> HsArrow GhcPs
+multToHsArrow One = HsLinearArrow
+multToHsArrow Many = HsUnrestrictedArrow
+multToHsArrow ty = HsExplicitMult (typeToLHsType ty)
 
 {-
 Note [Kind signatures in typeToLHsType]

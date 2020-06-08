@@ -53,6 +53,7 @@ import GHC.Core    ( isOrphan )
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Utils.TcMType
 import GHC.Core.Type
+import GHC.Core.Multiplicity
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr ( debugPprType )
 import GHC.Tc.Utils.TcType
@@ -393,7 +394,7 @@ tcInstInvisibleTyBinder subst (Named (Bndr tv _))
        ; return (subst', mkTyVarTy tv') }
 
 tcInstInvisibleTyBinder subst (Anon af ty)
-  | Just (mk, k1, k2) <- get_eq_tys_maybe (substTy subst ty)
+  | Just (mk, k1, k2) <- get_eq_tys_maybe (substTy subst (scaledThing ty))
     -- Equality is the *only* constraint currently handled in types.
     -- See Note [Constraints in kinds] in GHC.Core.TyCo.Rep
   = ASSERT( af == InvisArg )
@@ -500,7 +501,7 @@ newNonTrivialOverloadedLit orig
         ; let lit_ty = hsLitType hs_lit
         ; (_, fi') <- tcSyntaxOp orig (mkRnSyntaxExpr meth_name)
                                       [synKnownType lit_ty] res_ty $
-                      \_ -> return ()
+                      \_ _ -> return ()
         ; let L _ witness = nlHsSyntaxApps fi' [nlHsLit hs_lit]
         ; res_ty <- readExpType res_ty
         ; return (lit { ol_witness = witness

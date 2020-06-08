@@ -16,8 +16,15 @@ GHC.Hs.Type: Abstract syntax: user-defined types
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module GHC.Hs.Type (
+        Mult, HsScaled(..),
+        hsMult, hsScaledThing,
+        HsArrow(..), arrowToHsType,
+        hsLinear, hsUnrestricted, isUnrestricted,
+
         HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,
         HsTyVarBndr(..), LHsTyVarBndr, ForallVisFlag(..),
         LHsQTyVars(..),
@@ -85,7 +92,7 @@ import GHC.Types.Name( Name, NamedThing(getName) )
 import GHC.Types.Name.Reader ( RdrName )
 import GHC.Core.DataCon( HsSrcBang(..), HsImplBang(..),
                          SrcStrictness(..), SrcUnpackedness(..) )
-import GHC.Builtin.Types( mkTupleStr )
+import GHC.Builtin.Types( manyDataConName, oneDataConName, mkTupleStr )
 import GHC.Core.Type
 import GHC.Hs.Doc
 import GHC.Types.Basic
@@ -700,6 +707,7 @@ data HsType pass
                         (LHsKind pass)
 
   | HsFunTy             (XFunTy pass)
+                        (HsArrow pass)
                         (LHsType pass)   -- function type
                         (LHsType pass)
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow',
@@ -893,6 +901,62 @@ data HsTyLit
   = HsNumTy SourceText Integer
   | HsStrTy SourceText FastString
     deriving Data
+
+oneDataConHsTy :: HsType GhcRn
+oneDataConHsTy = HsTyVar noExtField NotPromoted (noLoc oneDataConName)
+
+manyDataConHsTy :: HsType GhcRn
+manyDataConHsTy = HsTyVar noExtField NotPromoted (noLoc manyDataConName)
+
+isUnrestricted :: HsArrow GhcRn -> Bool
+isUnrestricted (arrowToHsType -> L _ (HsTyVar _ _ (L _ n))) = n == manyDataConName
+isUnrestricted _ = False
+
+-- | Denotes the type of arrows in the surface language
+data HsArrow pass
+  = HsUnrestrictedArrow
+    -- ^ a -> b
+  | HsLinearArrow
+    -- ^ a #-> b
+  | HsExplicitMult (LHsType pass)
+    -- ^ a # m -> b (very much including `a # Many -> b`! This is how the
+    -- programmer wrote it). It is stored as an `HsType` so as to preserve the
+    -- syntax as written in the program.
+
+-- | Convert an arrow into its corresponding multiplicity. In essence this
+-- erases the information of whether the programmer wrote an explicit
+-- multiplicity or a shorthand.
+arrowToHsType :: HsArrow GhcRn -> LHsType GhcRn
+arrowToHsType HsUnrestrictedArrow = noLoc manyDataConHsTy
+arrowToHsType HsLinearArrow = noLoc oneDataConHsTy
+arrowToHsType (HsExplicitMult p) = p
+
+-- | This is used in the syntax. In constructor declaration. It must keep the
+-- arrow representation.
+data HsScaled pass a = HsScaled (HsArrow pass) a
+
+hsMult :: HsScaled pass a -> HsArrow pass
+hsMult (HsScaled m _) = m
+
+hsScaledThing :: HsScaled pass a -> a
+hsScaledThing (HsScaled _ t) = t
+
+-- | When creating syntax we use the shorthands. It's better for printing, also,
+-- the shorthands work trivially at each pass.
+hsUnrestricted, hsLinear :: a -> HsScaled pass a
+hsUnrestricted = HsScaled HsUnrestrictedArrow
+hsLinear = HsScaled HsLinearArrow
+
+instance Outputable a => Outputable (HsScaled pass a) where
+   ppr (HsScaled _cnt t) = -- ppr cnt <> ppr t
+                          ppr t
+
+instance
+      (OutputableBndrId pass) =>
+      Outputable (HsArrow (GhcPass pass)) where
+  ppr HsUnrestrictedArrow = parens arrow
+  ppr HsLinearArrow = parens lollipop
+  ppr (HsExplicitMult p) = parens (mulArrow (ppr p))
 
 
 {-
@@ -1246,13 +1310,13 @@ mkHsAppKindTy ext ty k
 -- splitHsFunType decomposes a type (t1 -> t2 ... -> tn)
 -- Breaks up any parens in the result type:
 --      splitHsFunType (a -> (b -> c)) = ([a,b], c)
-splitHsFunType :: LHsType GhcRn -> ([LHsType GhcRn], LHsType GhcRn)
+splitHsFunType :: LHsType GhcRn -> ([HsScaled GhcRn (LHsType GhcRn)], LHsType GhcRn)
 splitHsFunType (L _ (HsParTy _ ty))
   = splitHsFunType ty
 
-splitHsFunType (L _ (HsFunTy _ x y))
+splitHsFunType (L _ (HsFunTy _ mult x y))
   | (args, res) <- splitHsFunType y
-  = (x:args, res)
+  = (HsScaled mult x:args, res)
 
 splitHsFunType other = ([], other)
 
@@ -1661,7 +1725,7 @@ ppr_mono_ty (HsRecTy _ flds)      = pprConDeclFields flds
 ppr_mono_ty (HsTyVar _ prom (L _ name))
   | isPromoted prom = quote (pprPrefixOcc name)
   | otherwise       = pprPrefixOcc name
-ppr_mono_ty (HsFunTy _ ty1 ty2)   = ppr_fun_ty ty1 ty2
+ppr_mono_ty (HsFunTy _ mult ty1 ty2)   = ppr_fun_ty mult ty1 ty2
 ppr_mono_ty (HsTupleTy _ con tys)
     -- Special-case unary boxed tuples so that they are pretty-printed as
     -- `Solo x`, not `(x)`
@@ -1719,12 +1783,16 @@ ppr_mono_ty (XHsType t) = ppr t
 
 --------------------------
 ppr_fun_ty :: (OutputableBndrId p)
-           => LHsType (GhcPass p) -> LHsType (GhcPass p) -> SDoc
-ppr_fun_ty ty1 ty2
+           => HsArrow (GhcPass p) -> LHsType (GhcPass p) -> LHsType (GhcPass p) -> SDoc
+ppr_fun_ty mult ty1 ty2
   = let p1 = ppr_mono_lty ty1
         p2 = ppr_mono_lty ty2
+        arr = case mult of
+          HsLinearArrow -> lollipop
+          HsUnrestrictedArrow -> arrow
+          HsExplicitMult p -> mulArrow (ppr p)
     in
-    sep [p1, arrow <+> p2]
+    sep [p1, arr <+> p2]
 
 --------------------------
 ppr_tylit :: HsTyLit -> SDoc
@@ -1783,7 +1851,7 @@ lhsTypeHasLeadingPromotionQuote ty
     go (HsBangTy{})          = False
     go (HsRecTy{})           = False
     go (HsTyVar _ p _)       = isPromoted p
-    go (HsFunTy _ arg _)     = goL arg
+    go (HsFunTy _ _ arg _)   = goL arg
     go (HsListTy{})          = False
     go (HsTupleTy{})         = False
     go (HsSumTy{})           = False

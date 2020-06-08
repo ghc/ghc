@@ -25,10 +25,7 @@ module GHC.Core.TyCo.Rep (
         TyThing(..), tyThingCategory, pprTyThingCategory, pprShortTyThing,
 
         -- * Types
-        Type( TyVarTy, AppTy, TyConApp, ForAllTy
-            , LitTy, CastTy, CoercionTy
-            , FunTy, ft_arg, ft_res, ft_af
-            ),  -- Export the type synonym FunTy too
+        Type(..),
 
         TyLit(..),
         KindOrType, Kind,
@@ -46,9 +43,14 @@ module GHC.Core.TyCo.Rep (
         -- * Functions over types
         mkTyConTy, mkTyVarTy, mkTyVarTys,
         mkTyCoVarTy, mkTyCoVarTys,
-        mkFunTy, mkVisFunTy, mkInvisFunTy, mkVisFunTys, mkInvisFunTys,
+        mkFunTy, mkVisFunTy, mkInvisFunTy, mkVisFunTys,
         mkForAllTy, mkForAllTys, mkInvisForAllTys,
         mkPiTy, mkPiTys,
+        mkFunTyMany,
+        mkScaledFunTy,
+        mkVisFunTyMany, mkVisFunTysMany,
+        mkInvisFunTyMany, mkInvisFunTysMany,
+        mkTyConApp,
 
         -- * Functions over binders
         TyCoBinder(..), TyCoVarBinder, TyBinder,
@@ -65,7 +67,10 @@ module GHC.Core.TyCo.Rep (
         TyCoFolder(..), foldTyCo,
 
         -- * Sizes
-        typeSize, coercionSize, provSize
+        typeSize, coercionSize, provSize,
+
+        -- * Multiplicities
+        Scaled(..), scaledMult, scaledThing, mapScaledType, Mult
     ) where
 
 #include "HsVersions.h"
@@ -87,7 +92,10 @@ import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
 -- others
+import GHC.Builtin.Names ( liftedTypeKindTyConKey, manyDataConKey )
+import {-# SOURCE #-} GHC.Builtin.Types ( liftedTypeKindTyCon, manyDataConTy )
 import GHC.Types.Basic ( LeftOrRight(..), pickLR )
+import GHC.Types.Unique ( hasKey )
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Utils.Misc
@@ -210,9 +218,10 @@ data Type
              -- be mentioned in the Type. See
              -- Note [Unused coercion variable in ForAllTy]
 
-  | FunTy      -- ^ t1 -> t2   Very common, so an important special case
+  | FunTy      -- ^ FUN m t1 t2   Very common, so an important special case
                 -- See Note [Function types]
-     { ft_af  :: AnonArgFlag  -- Is this (->) or (=>)?
+     { ft_af  :: AnonArgFlag    -- Is this (->) or (=>)?
+     , ft_mult :: Mult          -- Multiplicity
      , ft_arg :: Type           -- Argument type
      , ft_res :: Type }         -- Result type
 
@@ -680,8 +689,8 @@ type KnotTied ty = ty
 -- not. See Note [TyCoBinders]
 data TyCoBinder
   = Named TyCoVarBinder    -- A type-lambda binder
-  | Anon AnonArgFlag Type  -- A term-lambda binder. Type here can be CoercionTy.
-                           -- Visibility is determined by the AnonArgFlag
+  | Anon AnonArgFlag (Scaled Type)  -- A term-lambda binder. Type here can be CoercionTy.
+                                    -- Visibility is determined by the AnonArgFlag
   deriving Data.Data
 
 instance Outputable TyCoBinder where
@@ -980,19 +989,41 @@ mkTyCoVarTy v
 mkTyCoVarTys :: [TyCoVar] -> [Type]
 mkTyCoVarTys = map mkTyCoVarTy
 
-infixr 3 `mkFunTy`, `mkVisFunTy`, `mkInvisFunTy`      -- Associates to the right
+infixr 3 `mkFunTy`, `mkVisFunTy`, `mkInvisFunTy`, `mkVisFunTyMany`,
+         `mkInvisFunTyMany`      -- Associates to the right
 
-mkFunTy :: AnonArgFlag -> Type -> Type -> Type
-mkFunTy af arg res = FunTy { ft_af = af, ft_arg = arg, ft_res = res }
+mkFunTy :: AnonArgFlag -> Mult -> Type -> Type -> Type
+mkFunTy af mult arg res = FunTy { ft_af = af
+                                , ft_mult = mult
+                                , ft_arg = arg
+                                , ft_res = res }
 
-mkVisFunTy, mkInvisFunTy :: Type -> Type -> Type
+mkScaledFunTy :: AnonArgFlag -> Scaled Type -> Type -> Type
+mkScaledFunTy af (Scaled mult arg) res = mkFunTy af mult arg res
+
+mkVisFunTy, mkInvisFunTy :: Mult -> Type -> Type -> Type
 mkVisFunTy   = mkFunTy VisArg
 mkInvisFunTy = mkFunTy InvisArg
 
+mkFunTyMany :: AnonArgFlag -> Type -> Type -> Type
+mkFunTyMany af = mkFunTy af manyDataConTy
+
+-- | Special, common, case: Arrow type with mult Many
+mkVisFunTyMany :: Type -> Type -> Type
+mkVisFunTyMany = mkVisFunTy manyDataConTy
+
+mkInvisFunTyMany :: Type -> Type -> Type
+mkInvisFunTyMany = mkInvisFunTy manyDataConTy
+
 -- | Make nested arrow types
-mkVisFunTys, mkInvisFunTys :: [Type] -> Type -> Type
-mkVisFunTys   tys ty = foldr mkVisFunTy   ty tys
-mkInvisFunTys tys ty = foldr mkInvisFunTy ty tys
+mkVisFunTys :: [Scaled Type] -> Type -> Type
+mkVisFunTys tys ty = foldr (mkScaledFunTy VisArg) ty tys
+
+mkVisFunTysMany :: [Type] -> Type -> Type
+mkVisFunTysMany tys ty = foldr mkVisFunTyMany ty tys
+
+mkInvisFunTysMany :: [Type] -> Type -> Type
+mkInvisFunTysMany tys ty = foldr mkInvisFunTyMany ty tys
 
 -- | Like 'mkTyCoForAllTy', but does not check the occurrence of the binder
 -- See Note [Unused coercion variable in ForAllTy]
@@ -1007,8 +1038,8 @@ mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
 mkInvisForAllTys :: [InvisTVBinder] -> Type -> Type
 mkInvisForAllTys tyvars ty = foldr ForAllTy ty $ tyVarSpecToBinders tyvars
 
-mkPiTy:: TyCoBinder -> Type -> Type
-mkPiTy (Anon af ty1) ty2        = FunTy { ft_af = af, ft_arg = ty1, ft_res = ty2 }
+mkPiTy :: TyCoBinder -> Type -> Type
+mkPiTy (Anon af ty1) ty2        = mkScaledFunTy af ty1 ty2
 mkPiTy (Named (Bndr tv vis)) ty = mkForAllTy tv vis ty
 
 mkPiTys :: [TyCoBinder] -> Type -> Type
@@ -1017,6 +1048,58 @@ mkPiTys tbs ty = foldr mkPiTy ty tbs
 -- | Create the plain type constructor type which has been applied to no type arguments at all.
 mkTyConTy :: TyCon -> Type
 mkTyConTy tycon = TyConApp tycon []
+
+-- | A key function: builds a 'TyConApp' or 'FunTy' as appropriate to
+-- its arguments.  Applies its arguments to the constructor from left to right.
+mkTyConApp :: TyCon -> [Type] -> Type
+mkTyConApp tycon tys
+  | isFunTyCon tycon
+  , [w, _rep1,_rep2,ty1,ty2] <- tys
+  -- The FunTyCon (->) is always a visible one
+  = FunTy { ft_af = VisArg, ft_mult = w, ft_arg = ty1, ft_res = ty2 }
+
+  -- Note [mkTyConApp and Type]
+  | tycon `hasKey` liftedTypeKindTyConKey
+  = ASSERT2( null tys, ppr tycon $$ ppr tys )
+    liftedTypeKindTyConApp
+  | tycon `hasKey` manyDataConKey
+  -- There are a lot of occurrences of 'Many' so it's a small optimisation to
+  -- avoid reboxing every time `mkTyConApp` is called.
+  = ASSERT2( null tys, ppr tycon $$ ppr tys )
+    manyDataConTy
+  | otherwise
+  = TyConApp tycon tys
+
+-- This is a single, global definition of the type `Type`
+-- Defined here so it is only allocated once.
+-- See Note [mkTyConApp and Type]
+liftedTypeKindTyConApp :: Type
+liftedTypeKindTyConApp = TyConApp liftedTypeKindTyCon []
+
+{-
+Note [mkTyConApp and Type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Whilst benchmarking it was observed in #17292 that GHC allocated a lot
+of `TyConApp` constructors. Upon further inspection a large number of these
+TyConApp constructors were all duplicates of `Type` applied to no arguments.
+
+```
+(From a sample of 100000 TyConApp closures)
+0x45f3523    - 28732 - `Type`
+0x420b840702 - 9629  - generic type constructors
+0x42055b7e46 - 9596
+0x420559b582 - 9511
+0x420bb15a1e - 9509
+0x420b86c6ba - 9501
+0x42055bac1e - 9496
+0x45e68fd    - 538 - `TYPE ...`
+```
+
+Therefore in `mkTyConApp` we have a special case for `Type` to ensure that
+only one `TyConApp 'Type []` closure is allocated during the course of
+compilation. In order to avoid a potentially expensive series of checks in
+`mkTyConApp` only this egregious case is special cased at the moment.
+-}
 
 {-
 %************************************************************************
@@ -1079,8 +1162,8 @@ data Coercion
   | ForAllCo TyCoVar KindCoercion Coercion
          -- ForAllCo :: _ -> N -> e -> e
 
-  | FunCo Role Coercion Coercion         -- lift FunTy
-         -- FunCo :: "e" -> e -> e -> e
+  | FunCo Role CoercionN Coercion Coercion         -- lift FunTy
+         -- FunCo :: "e" -> N -> e -> e -> e
          -- Note: why doesn't FunCo have a AnonArgFlag, like FunTy?
          -- Because the AnonArgFlag has no impact on Core; it is only
          -- there to guide implicit instantiation of Haskell source
@@ -1825,7 +1908,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_ty _   (LitTy {})        = mempty
     go_ty env (CastTy ty co)    = go_ty env ty `mappend` go_co env co
     go_ty env (CoercionTy co)   = go_co env co
-    go_ty env (FunTy _ arg res) = go_ty env arg `mappend` go_ty env res
+    go_ty env (FunTy _ w arg res) = go_ty env w `mappend` go_ty env arg `mappend` go_ty env res
     go_ty env (TyConApp _ tys)  = go_tys env tys
     go_ty env (ForAllTy (Bndr tv vis) inner)
       = let !env' = tycobinder env tv vis  -- Avoid building a thunk here
@@ -1845,7 +1928,9 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_co env (GRefl _ ty (MCo co))   = go_ty env ty `mappend` go_co env co
     go_co env (TyConAppCo _ _ args)   = go_cos env args
     go_co env (AppCo c1 c2)           = go_co env c1 `mappend` go_co env c2
-    go_co env (FunCo _ c1 c2)         = go_co env c1 `mappend` go_co env c2
+    go_co env (FunCo _ cw c1 c2)      = go_co env cw `mappend`
+                                        go_co env c1 `mappend`
+                                        go_co env c2
     go_co env (CoVarCo cv)            = covar env cv
     go_co env (AxiomInstCo _ _ args)  = go_cos env args
     go_co env (HoleCo hole)           = cohole env hole
@@ -1892,7 +1977,7 @@ typeSize :: Type -> Int
 typeSize (LitTy {})                 = 1
 typeSize (TyVarTy {})               = 1
 typeSize (AppTy t1 t2)              = typeSize t1 + typeSize t2
-typeSize (FunTy _ t1 t2)            = typeSize t1 + typeSize t2
+typeSize (FunTy _ _ t1 t2)          = typeSize t1 + typeSize t2
 typeSize (ForAllTy (Bndr tv _) t)   = typeSize (varType tv) + typeSize t
 typeSize (TyConApp _ ts)            = 1 + sum (map typeSize ts)
 typeSize (CastTy ty co)             = typeSize ty + coercionSize co
@@ -1905,7 +1990,8 @@ coercionSize (GRefl _ ty (MCo co)) = 1 + typeSize ty + coercionSize co
 coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (AppCo co arg)      = coercionSize co + coercionSize arg
 coercionSize (ForAllCo _ h co)   = 1 + coercionSize co + coercionSize h
-coercionSize (FunCo _ co1 co2)   = 1 + coercionSize co1 + coercionSize co2
+coercionSize (FunCo _ w co1 co2) = 1 + coercionSize co1 + coercionSize co2
+                                                        + coercionSize w
 coercionSize (CoVarCo _)         = 1
 coercionSize (HoleCo _)          = 1
 coercionSize (AxiomInstCo _ _ args) = 1 + sum (map coercionSize args)
@@ -1923,3 +2009,50 @@ provSize :: UnivCoProvenance -> Int
 provSize (PhantomProv co)    = 1 + coercionSize co
 provSize (ProofIrrelProv co) = 1 + coercionSize co
 provSize (PluginProv _)      = 1
+
+{-
+************************************************************************
+*                                                                      *
+                    Multiplicities
+*                                                                      *
+************************************************************************
+
+These definitions are here to avoid module loops, and to keep
+GHC.Core.Multiplicity above this module.
+
+-}
+
+-- | A shorthand for data with an attached 'Mult' element (the multiplicity).
+data Scaled a = Scaled Mult a
+  deriving (Data.Data)
+
+instance (Outputable a) => Outputable (Scaled a) where
+   ppr (Scaled _cnt t) = ppr t
+     -- Do not print the multiplicity here because it tends to be too verbose
+
+scaledMult :: Scaled a -> Mult
+scaledMult (Scaled m _) = m
+
+scaledThing :: Scaled a -> a
+scaledThing (Scaled _ t) = t
+
+-- | Apply a function to both the Mult and the Type in a 'Scaled Type'
+mapScaledType :: (Type -> Type) -> Scaled Type -> Scaled Type
+mapScaledType f (Scaled m t) = Scaled (f m) (f t)
+
+{- |
+Mult is a type alias for Type.
+
+Mult must contain Type because multiplicity variables are mere type variables
+(of kind Multiplicity) in Haskell. So the simplest implementation is to make
+Mult be Type.
+
+Multiplicities can be formed with:
+- One: GHC.Types.One (= oneDataCon)
+- Many: GHC.Types.Many (= manyDataCon)
+- Multiplication: GHC.Types.MultMul (= multMulTyCon)
+
+So that Mult feels a bit more structured, we provide pattern synonyms and smart
+constructors for these.
+-}
+type Mult = Type

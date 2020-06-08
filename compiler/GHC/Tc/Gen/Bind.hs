@@ -41,6 +41,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Gen.Pat
 import GHC.Tc.Utils.TcMType
+import GHC.Core.Multiplicity
 import GHC.Core.FamInstEnv( normaliseType )
 import GHC.Tc.Instance.Family( tcGetFamInstEnvs )
 import GHC.Core.TyCon
@@ -398,6 +399,9 @@ tcValBinds top_lvl binds sigs thing_inside
         -- Do not extend the TcBinderStack; instead
         --   we extend it on a per-rhs basis in tcExtendForRhs
         --   See Note [Relevant bindings and the binder stack]
+        --
+        -- For the moment, let bindings and top-level bindings introduce
+        -- only unrestricted variables.
         ; tcExtendSigIds top_lvl poly_ids $
      do { (binds', (extra_binds', thing))
               <- tcBindGroups top_lvl sig_fn prag_fn binds $
@@ -497,9 +501,10 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
 
     go :: [SCC (LHsBind GhcRn)] -> TcM (LHsBinds GhcTcId, thing)
     go (scc:sccs) = do  { (binds1, ids1) <- tc_scc scc
-                        ; (binds2, thing) <- tcExtendLetEnv top_lvl sig_fn
-                                                            closed ids1 $
-                                             go sccs
+                         -- recursive bindings must be unrestricted
+                         -- (the ids added to the environment here are the name of the recursive definitions).
+                        ; (binds2, thing) <- tcExtendLetEnv top_lvl sig_fn closed ids1
+                                                            (go sccs)
                         ; return (binds1 `unionBags` binds2, thing) }
     go []         = do  { thing <- thing_inside; return (emptyBag, thing) }
 
@@ -541,6 +546,8 @@ tc_single top_lvl sig_fn prag_fn lbind closed thing_inside
                                       NonRecursive NonRecursive
                                       closed
                                       [lbind]
+         -- since we are defining a non-recursive binding, it is not necessary here
+         -- to define an unrestricted binding. But we do so until toplevel linear bindings are supported.
        ; thing <- tcExtendLetEnv top_lvl sig_fn closed ids thing_inside
        ; return (binds1, thing) }
 
@@ -633,7 +640,7 @@ recoveryCode binder_names sig_fn
       , Just poly_id <- completeSigPolyId_maybe sig
       = poly_id
       | otherwise
-      = mkLocalId name forall_a_a
+      = mkLocalId name Many forall_a_a
 
 forall_a_a :: TcType
 -- At one point I had (forall r (a :: TYPE r). a), but of course
@@ -703,7 +710,7 @@ tcPolyCheck prag_fn
                 -- NB: tcSkolemise makes fresh type variables
                 -- See Note [Instantiate sig with fresh variables]
 
-                let mono_id = mkLocalId mono_name rho_ty in
+                let mono_id = mkLocalId mono_name (varMult poly_id) rho_ty in
                 tcExtendBinderStack [TcIdBndr mono_id NotTopLevel] $
                 -- Why mono_id in the BinderStack?
                 --    See Note [Relevant bindings and the binder stack]
@@ -719,7 +726,7 @@ tcPolyCheck prag_fn
        -- We re-use mono-name, but we could equally well use a fresh one
 
        ; let prag_sigs = lookupPragEnv prag_fn name
-             poly_id2  = mkLocalId mono_name (idType poly_id)
+             poly_id2  = mkLocalId mono_name (idMult poly_id) (idType poly_id)
        ; spec_prags <- tcSpecPrags    poly_id prag_sigs
        ; poly_id    <- addInlinePrags poly_id prag_sigs
 
@@ -933,7 +940,7 @@ mkInferredPolyId insoluble qtvs inferred_theta poly_name mb_sig_inst mono_ty
          -- do this check; otherwise (#14000) we may report an ambiguity
          -- error for a rather bogus type.
 
-       ; return (mkLocalId poly_name inferred_poly_ty) }
+       ; return (mkLocalId poly_name Many inferred_poly_ty) }
 
 
 chooseInferredQuantifiers :: TcThetaType   -- inferred
@@ -1288,7 +1295,7 @@ tcMonoBinds is_rec sig_fn no_gen
                   -- type of the thing whose rhs we are type checking
                tcMatchesFun (L nm_loc name) matches exp_ty
 
-        ; mono_id <- newLetBndr no_gen name rhs_ty
+        ; mono_id <- newLetBndr no_gen name Many rhs_ty
         ; return (unitBag $ L b_loc $
                      FunBind { fun_id = L nm_loc mono_id,
                                fun_matches = matches',
@@ -1361,7 +1368,10 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name
 
   | otherwise  -- No type signature
   = do { mono_ty <- newOpenFlexiTyVarTy
-       ; mono_id <- newLetBndr no_gen name mono_ty
+       ; mono_id <- newLetBndr no_gen name Many mono_ty
+          -- This ^ generates a binder with Many multiplicity because all
+          -- let/where-binders are unrestricted. When we introduce linear let
+          -- binders, we will need to retrieve the multiplicity information.
        ; let mono_info = MBI { mbi_poly_name = name
                              , mbi_sig       = Nothing
                              , mbi_mono_id   = mono_id }
@@ -1379,7 +1389,10 @@ tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
         ; ((pat', nosig_mbis), pat_ty)
             <- addErrCtxt (patMonoBindsCtxt pat grhss) $
                tcInfer $ \ exp_ty ->
-               tcLetPat inst_sig_fun no_gen pat exp_ty $
+               tcLetPat inst_sig_fun no_gen pat (unrestricted exp_ty) $
+                 -- The above inferred type get an unrestricted multiplicity. It may be
+                 -- worth it to try and find a finer-grained multiplicity here
+                 -- if examples warrant it.
                mapM lookup_info nosig_names
 
         ; let mbis = sig_mbis ++ nosig_mbis
@@ -1426,7 +1439,10 @@ newSigLetBndr (LetGblBndr prags) name (TISI { sig_inst_sig = id_sig })
   | CompleteSig { sig_bndr = poly_id } <- id_sig
   = addInlinePrags poly_id (lookupPragEnv prags name)
 newSigLetBndr no_gen name (TISI { sig_inst_tau = tau })
-  = newLetBndr no_gen name tau
+  = newLetBndr no_gen name Many tau
+    -- Binders with a signature are currently always of multiplicity
+    -- Many. Because they come either from toplevel, let, or where
+    -- declarations. Which are all unrestricted currently.
 
 -------------------
 tcRhs :: TcMonoBind -> TcM (HsBind GhcTcId)
@@ -1450,6 +1466,12 @@ tcRhs (TcPatBind infos pat' grhss pat_ty)
     tcExtendIdBinderStackForRhs infos        $
     do  { traceTc "tcRhs: pat bind" (ppr pat' $$ ppr pat_ty)
         ; grhss' <- addErrCtxt (patMonoBindsCtxt pat' grhss) $
+                    tcScalingUsage Many $
+                    -- Like in tcMatchesFun, this scaling happens because all
+                    -- let bindings are unrestricted. A difference, here, is
+                    -- that when this is not the case, any more, we will have to
+                    -- make sure that the pattern is strict, otherwise this will
+                    -- be desugar to incorrect code.
                     tcGRHSsPat grhss pat_ty
         ; return ( PatBind { pat_lhs = pat', pat_rhs = grhss'
                            , pat_ext = NPatBindTc emptyNameSet pat_ty

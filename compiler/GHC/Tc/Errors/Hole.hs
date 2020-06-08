@@ -462,7 +462,7 @@ pprHoleFit (HFDC sWrp sWrpVars sTy sProv sMs) (HoleFit {..}) =
            -- into [m, a]
            unwrapTypeVars :: Type -> [TyCoVarBinder]
            unwrapTypeVars t = vars ++ case splitFunTy_maybe unforalled of
-                               Just (_, unfunned) -> unwrapTypeVars unfunned
+                               Just (_, _, unfunned) -> unwrapTypeVars unfunned
                                _ -> []
              where (vars, unforalled) = splitForAllVarBndrs t
        holeVs = sep $ map (parens . (text "_" <+> dcolon <+>) . ppr) hfMatches
@@ -620,7 +620,7 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
       where newTyVars = replicateM refLvl $ setLvl <$>
                             (newOpenTypeKind >>= newFlexiTyVar)
             setLvl = flip setMetaTyVarTcLevel hole_lvl
-            wrapWithVars vars = mkVisFunTys (map mkTyVarTy vars) hole_ty
+            wrapWithVars vars = mkVisFunTysMany (map mkTyVarTy vars) hole_ty
 
     sortFits :: SortingAlg    -- How we should sort the hole fits
              -> [HoleFit]     -- The subs to sort

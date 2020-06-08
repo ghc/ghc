@@ -570,7 +570,7 @@ tyCoFVsOfType (TyVarTy v)        f bound_vars (acc_list, acc_set)
 tyCoFVsOfType (TyConApp _ tys)   f bound_vars acc = tyCoFVsOfTypes tys f bound_vars acc
 tyCoFVsOfType (LitTy {})         f bound_vars acc = emptyFV f bound_vars acc
 tyCoFVsOfType (AppTy fun arg)    f bound_vars acc = (tyCoFVsOfType fun `unionFV` tyCoFVsOfType arg) f bound_vars acc
-tyCoFVsOfType (FunTy _ arg res)  f bound_vars acc = (tyCoFVsOfType arg `unionFV` tyCoFVsOfType res) f bound_vars acc
+tyCoFVsOfType (FunTy _ w arg res)  f bound_vars acc = (tyCoFVsOfType w `unionFV` tyCoFVsOfType arg `unionFV` tyCoFVsOfType res) f bound_vars acc
 tyCoFVsOfType (ForAllTy bndr ty) f bound_vars acc = tyCoFVsBndr bndr (tyCoFVsOfType ty)  f bound_vars acc
 tyCoFVsOfType (CastTy ty co)     f bound_vars acc = (tyCoFVsOfType ty `unionFV` tyCoFVsOfCo co) f bound_vars acc
 tyCoFVsOfType (CoercionTy co)    f bound_vars acc = tyCoFVsOfCo co f bound_vars acc
@@ -617,8 +617,8 @@ tyCoFVsOfCo (AppCo co arg) fv_cand in_scope acc
   = (tyCoFVsOfCo co `unionFV` tyCoFVsOfCo arg) fv_cand in_scope acc
 tyCoFVsOfCo (ForAllCo tv kind_co co) fv_cand in_scope acc
   = (tyCoFVsVarBndr tv (tyCoFVsOfCo co) `unionFV` tyCoFVsOfCo kind_co) fv_cand in_scope acc
-tyCoFVsOfCo (FunCo _ co1 co2)    fv_cand in_scope acc
-  = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfCo co2) fv_cand in_scope acc
+tyCoFVsOfCo (FunCo _ w co1 co2)    fv_cand in_scope acc
+  = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfCo co2 `unionFV` tyCoFVsOfCo w) fv_cand in_scope acc
 tyCoFVsOfCo (CoVarCo v) fv_cand in_scope acc
   = tyCoFVsOfCoVar v fv_cand in_scope acc
 tyCoFVsOfCo (HoleCo h) fv_cand in_scope acc
@@ -672,8 +672,9 @@ almost_devoid_co_var_of_co (AppCo co arg) cv
 almost_devoid_co_var_of_co (ForAllCo v kind_co co) cv
   = almost_devoid_co_var_of_co kind_co cv
   && (v == cv || almost_devoid_co_var_of_co co cv)
-almost_devoid_co_var_of_co (FunCo _ co1 co2) cv
-  = almost_devoid_co_var_of_co co1 cv
+almost_devoid_co_var_of_co (FunCo _ w co1 co2) cv
+  = almost_devoid_co_var_of_co w cv
+  && almost_devoid_co_var_of_co co1 cv
   && almost_devoid_co_var_of_co co2 cv
 almost_devoid_co_var_of_co (CoVarCo v) cv = v /= cv
 almost_devoid_co_var_of_co (HoleCo h)  cv = (coHoleCoVar h) /= cv
@@ -723,8 +724,9 @@ almost_devoid_co_var_of_type (LitTy {}) _ = True
 almost_devoid_co_var_of_type (AppTy fun arg) cv
   = almost_devoid_co_var_of_type fun cv
   && almost_devoid_co_var_of_type arg cv
-almost_devoid_co_var_of_type (FunTy _ arg res) cv
-  = almost_devoid_co_var_of_type arg cv
+almost_devoid_co_var_of_type (FunTy _ w arg res) cv
+  = almost_devoid_co_var_of_type w cv
+  && almost_devoid_co_var_of_type arg cv
   && almost_devoid_co_var_of_type res cv
 almost_devoid_co_var_of_type (ForAllTy (Bndr v _) ty) cv
   = almost_devoid_co_var_of_type (varType v) cv
@@ -779,12 +781,12 @@ injectiveVarsOfType :: Bool   -- ^ Should we look under injective type families?
                     -> Type -> FV
 injectiveVarsOfType look_under_tfs = go
   where
-    go ty                 | Just ty' <- coreView ty
-                          = go ty'
-    go (TyVarTy v)        = unitFV v `unionFV` go (tyVarKind v)
-    go (AppTy f a)        = go f `unionFV` go a
-    go (FunTy _ ty1 ty2)  = go ty1 `unionFV` go ty2
-    go (TyConApp tc tys)  =
+    go ty                  | Just ty' <- coreView ty
+                           = go ty'
+    go (TyVarTy v)         = unitFV v `unionFV` go (tyVarKind v)
+    go (AppTy f a)         = go f `unionFV` go a
+    go (FunTy _ w ty1 ty2) = go w `unionFV` go ty1 `unionFV` go ty2
+    go (TyConApp tc tys)   =
       case tyConInjectivityInfo tc of
         Injective inj
           |  look_under_tfs || not (isTypeFamilyTyCon tc)
@@ -837,7 +839,7 @@ invisibleVarsOfType = go
                           = go ty'
     go (TyVarTy v)        = go (tyVarKind v)
     go (AppTy f a)        = go f `unionFV` go a
-    go (FunTy _ ty1 ty2)  = go ty1 `unionFV` go ty2
+    go (FunTy _ w ty1 ty2) = go w `unionFV` go ty1 `unionFV` go ty2
     go (TyConApp tc tys)  = tyCoFVsOfTypes invisibles `unionFV`
                             invisibleVarsOfTypes visibles
       where (invisibles, visibles) = partitionInvisibleTypes tc tys

@@ -115,7 +115,7 @@ import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Parser.Lexer
 import GHC.Utils.Lexeme ( isLexCon )
-import GHC.Core.Type    ( TyThing(..), funTyCon, Specificity(..) )
+import GHC.Core.Type    ( TyThing(..), unrestrictedFunTyCon, Specificity(..) )
 import GHC.Builtin.Types( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
                           listTyConName, listTyConKey, eqTyCon_RDR,
@@ -713,7 +713,7 @@ mkGadtDecl names ty
     (args, res_ty) = split_tau tau
 
     -- See Note [GADT abstract syntax] in GHC.Hs.Decls
-    split_tau (L _ (HsFunTy _ (L loc (HsRecTy _ rf)) res_ty))
+    split_tau (L _ (HsFunTy _ _w (L loc (HsRecTy _ rf)) res_ty))
       = (RecCon (L loc rf), res_ty)
     split_tau tau
       = (PrefixCon [], tau)
@@ -721,7 +721,6 @@ mkGadtDecl names ty
     peel_parens (L l (HsParTy _ ty)) ann = peel_parens ty
                                                        (ann++mkParensApiAnn l)
     peel_parens ty                   ann = (ty, ann)
-
 
 setRdrNameSpace :: RdrName -> NameSpace -> RdrName
 -- ^ This rather gruesome function is used mainly by the parser.
@@ -1658,7 +1657,7 @@ mergeDataCon all_xs =
     goFirst [L l (TyElOpd (HsTupleTy _ HsBoxedOrConstraintTuple ts))]
       = return ( pure ()
                , ( L l (getRdrName (tupleDataCon Boxed (length ts)))
-                 , PrefixCon ts
+                 , PrefixCon (map hsLinear ts)
                  , mTrailingDoc ) )
     goFirst ((L l (TyElOpd t)):xs)
       | (_, t', addAnns, xs') <- pBangTy (L l t) xs
@@ -1670,7 +1669,7 @@ mergeDataCon all_xs =
 
     go addAnns mLastDoc ts [ L l (TyElOpd (HsTyVar _ _ (L _ tc))) ]
       = do { data_con <- tyConToDataCon l tc
-           ; return (addAnns, (data_con, PrefixCon ts, mkConDoc mLastDoc)) }
+           ; return (addAnns, (data_con, PrefixCon (map hsLinear ts), mkConDoc mLastDoc)) }
     go addAnns mLastDoc ts ((L l (TyElDocPrev doc)):xs) =
       go addAnns (mLastDoc `mplus` Just (L l doc)) ts xs
     go addAnns mLastDoc ts ((L l (TyElOpd t)):xs)
@@ -1705,7 +1704,7 @@ mergeDataCon all_xs =
          ; let rhs = mkLHsDocTyMaybe rhs_t trailingFieldDoc
                lhs = mkLHsDocTyMaybe lhs_t mLhsDoc
                addAnns = lhs_addAnns >> rhs_addAnns
-         ; return (addAnns, (op, InfixCon lhs rhs, mkConDoc mOpDoc)) }
+         ; return (addAnns, (op, InfixCon (hsLinear lhs) (hsLinear rhs), mkConDoc mOpDoc)) }
       where
         malformedErr =
           ( foldr combineSrcSpans noSrcSpan (map getLoc all_xs')
@@ -2573,8 +2572,9 @@ checkPrecP (L l (_,i)) (L _ ol)
  | all specialOp ol = pure ()
  | otherwise = addFatalError l (text ("Precedence out of range: " ++ show i))
   where
+    -- If you change this, consider updating Note [Fixity of (->)] in GHC/Types.hs
     specialOp op = unLoc op `elem` [ eqTyCon_RDR
-                                   , getRdrName funTyCon ]
+                                   , getRdrName unrestrictedFunTyCon ]
 
 mkRecConstrOrUpdate
         :: LHsExpr GhcPs

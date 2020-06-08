@@ -571,7 +571,7 @@ cvtConstr :: TH.Con -> CvtM (LConDecl GhcPs)
 cvtConstr (NormalC c strtys)
   = do  { c'   <- cNameL c
         ; tys' <- mapM cvt_arg strtys
-        ; returnL $ mkConDeclH98 c' Nothing Nothing (PrefixCon tys') }
+        ; returnL $ mkConDeclH98 c' Nothing Nothing (PrefixCon (map hsLinear tys')) }
 
 cvtConstr (RecC c varstrtys)
   = do  { c'    <- cNameL c
@@ -583,7 +583,8 @@ cvtConstr (InfixC st1 c st2)
   = do  { c'   <- cNameL c
         ; st1' <- cvt_arg st1
         ; st2' <- cvt_arg st2
-        ; returnL $ mkConDeclH98 c' Nothing Nothing (InfixCon st1' st2') }
+        ; returnL $ mkConDeclH98 c' Nothing Nothing (InfixCon (hsLinear st1')
+                                                              (hsLinear st2')) }
 
 cvtConstr (ForallC tvs ctxt con)
   = do  { tvs'      <- cvtTvs tvs
@@ -629,7 +630,7 @@ cvtConstr (RecGadtC c varstrtys ty)
         ; ty'      <- cvtType ty
         ; rec_flds <- mapM cvt_id_arg varstrtys
         ; let rec_ty = noLoc (HsFunTy noExtField
-                                           (noLoc $ HsRecTy noExtField rec_flds) ty')
+                                           HsUnrestrictedArrow (noLoc $ HsRecTy noExtField rec_flds) ty')
         ; returnL $ fst $ mkGadtDecl c' rec_ty }
 
 cvtSrcUnpackedness :: TH.SourceUnpackedness -> SrcUnpackedness
@@ -1448,7 +1449,23 @@ cvtTypeKind ty_str ty
                           _            -> return $
                                           parenthesizeHsType sigPrec x'
                  let y'' = parenthesizeHsType sigPrec y'
-                 returnL (HsFunTy noExtField x'' y'')
+                 returnL (HsFunTy noExtField HsUnrestrictedArrow x'' y'')
+             | otherwise
+             -> mk_apps
+                (HsTyVar noExtField NotPromoted (noLoc (getRdrName unrestrictedFunTyCon)))
+                tys'
+           MulArrowT
+             | Just normals <- m_normals
+             , [w',x',y'] <- normals -> do
+                 x'' <- case unLoc x' of
+                          HsFunTy{}    -> returnL (HsParTy noExtField x')
+                          HsForAllTy{} -> returnL (HsParTy noExtField x') -- #14646
+                          HsQualTy{}   -> returnL (HsParTy noExtField x') -- #15324
+                          _            -> return $
+                                          parenthesizeHsType sigPrec x'
+                 let y'' = parenthesizeHsType sigPrec y'
+                     w'' = hsTypeToArrow w'
+                 returnL (HsFunTy noExtField w'' x'' y'')
              | otherwise
              -> mk_apps
                 (HsTyVar noExtField NotPromoted (noLoc (getRdrName funTyCon)))
@@ -1581,6 +1598,13 @@ cvtTypeKind ty_str ty
            _ -> failWith (ptext (sLit ("Malformed " ++ ty_str)) <+> text (show ty))
     }
 
+hsTypeToArrow :: LHsType GhcPs -> HsArrow GhcPs
+hsTypeToArrow w = case unLoc w of
+                     HsTyVar _ _ (L _ (isExact_maybe -> Just n))
+                        | n == oneDataConName -> HsLinearArrow
+                        | n == manyDataConName -> HsUnrestrictedArrow
+                     _ -> HsExplicitMult w
+
 -- ConT/InfixT can contain both data constructor (i.e., promoted) names and
 -- other (i.e, unpromoted) names, as opposed to PromotedT, which can only
 -- contain data constructor names. See #15572/#17394. We use this function to
@@ -1652,7 +1676,7 @@ mk_arr_apps :: [LHsType GhcPs] -> HsType GhcPs -> CvtM (LHsType GhcPs)
 mk_arr_apps tys return_ty = foldrM go return_ty tys >>= returnL
     where go :: LHsType GhcPs -> HsType GhcPs -> CvtM (HsType GhcPs)
           go arg ret_ty = do { ret_ty_l <- returnL ret_ty
-                             ; return (HsFunTy noExtField arg ret_ty_l) }
+                             ; return (HsFunTy noExtField HsUnrestrictedArrow arg ret_ty_l) }
 
 split_ty_app :: TH.Type -> CvtM (TH.Type, [LHsTypeArg GhcPs])
 split_ty_app ty = go ty []
