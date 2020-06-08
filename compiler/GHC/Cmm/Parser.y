@@ -399,7 +399,7 @@ cmmdata :: { CmmParse () }
 data_label :: { CmmParse CLabel }
     : NAME ':'
                 {% liftP . withHomeUnitId $ \pkg ->
-                   return (mkCmmDataLabel pkg $1) }
+                   return (mkCmmDataLabel pkg (NeedExternDecl False) $1) }
 
 statics :: { [CmmParse [CmmStatic]] }
         : {- empty -}                   { [] }
@@ -1176,7 +1176,7 @@ staticClosure :: UnitId -> FastString -> FastString -> [CmmLit] -> CmmParse ()
 staticClosure pkg cl_label info payload
   = do dflags <- getDynFlags
        let lits = mkStaticClosure dflags (mkCmmInfoLabel pkg info) dontCareCCS payload [] [] []
-       code $ emitDataLits (mkCmmDataLabel pkg cl_label) lits
+       code $ emitDataLits (mkCmmDataLabel pkg (NeedExternDecl True) cl_label) lits
 
 foreignCall
         :: String
