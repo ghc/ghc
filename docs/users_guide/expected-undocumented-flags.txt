@@ -101,7 +101,6 @@
 -fimplicit-params
 -fimplicit-prelude
 -firrefutable-tuples
--fkeep-cafs
 -fkill-absence
 -fkill-one-shot
 -fmax-errors

@@ -1174,7 +1174,7 @@ for example).
     Also, you may need to use the :ghc-flag:`-rdynamic` flag to ensure that
     that symbols are not dropped from your PIE objects.
 
-.. ghc-flag:: -keep-cafs
+.. ghc-flag:: -fkeep-cafs
     :shortdesc: Do not garbage-collect CAFs (top-level expressions) at runtime
     :type: dynamic
     :category: linking
