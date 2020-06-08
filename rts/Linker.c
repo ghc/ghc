@@ -1783,6 +1783,7 @@ static HsInt unloadObj_ (pathchar *path, bool just_purge)
             } else {
                 prev->next_loaded_object = oc->next_loaded_object;
             }
+            freeOcStablePtrs(oc);
             unloadedAnyObj = true;
         } else {
             prev = oc;

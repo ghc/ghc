@@ -789,7 +789,7 @@ void checkUnload (StgClosure *static_objects)
         next = oc->next;
 
         removeOcSymbols(oc);
-        freeOcStablePtrs(oc);
+
         removeOCSectionIndices(s_indices, oc);
         freeObjectCode(oc);
     }
