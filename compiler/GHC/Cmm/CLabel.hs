@@ -187,6 +187,7 @@ data CLabel
   -- | A label from a .cmm file that is not associated with a .hs level Id.
   | CmmLabel
         Unit                    -- what package the label belongs to.
+        Bool                    -- does the label need an "extern .." declaration
         FastString              -- identifier giving the prefix of the label
         CmmLabelInfo            -- encodes the suffix of the label
 
@@ -285,10 +286,11 @@ instance Ord CLabel where
     compare a1 a2 `thenCmp`
     compare b1 b2 `thenCmp`
     compare c1 c2
-  compare (CmmLabel a1 b1 c1) (CmmLabel a2 b2 c2) =
+  compare (CmmLabel a1 b1 c1 d1) (CmmLabel a2 b2 c2 d2) =
     compare a1 a2 `thenCmp`
     compare b1 b2 `thenCmp`
-    compare c1 c2
+    compare c1 c2 `thenCmp`
+    compare d1 d2
   compare (RtsLabel a1) (RtsLabel a2) = compare a1 a2
   compare (LocalBlockLabel u1) (LocalBlockLabel u2) = nonDetCmpUnique u1 u2
   compare (ForeignLabel a1 b1 c1 d1) (ForeignLabel a2 b2 c2 d2) =
@@ -380,7 +382,7 @@ pprDebugCLabel lbl
  = case lbl of
         IdLabel _ _ info-> ppr lbl <> (parens $ text "IdLabel"
                                        <> whenPprDebug (text ":" <> text (show info)))
-        CmmLabel pkg _name _info
+        CmmLabel pkg _ext _name _info
          -> ppr lbl <> (parens $ text "CmmLabel" <+> ppr pkg)
 
         RtsLabel{}      -> ppr lbl <> (parens $ text "RtsLabel")
@@ -510,24 +512,24 @@ mkDirty_MUT_VAR_Label,
     mkSMAP_DIRTY_infoLabel, mkBadAlignmentLabel :: CLabel
 mkDirty_MUT_VAR_Label           = mkForeignLabel (fsLit "dirty_MUT_VAR") Nothing ForeignLabelInExternalPackage IsFunction
 mkNonmovingWriteBarrierEnabledLabel
-                                = CmmLabel rtsUnitId (fsLit "nonmoving_write_barrier_enabled") CmmData
-mkUpdInfoLabel                  = CmmLabel rtsUnitId (fsLit "stg_upd_frame")         CmmInfo
-mkBHUpdInfoLabel                = CmmLabel rtsUnitId (fsLit "stg_bh_upd_frame" )     CmmInfo
-mkIndStaticInfoLabel            = CmmLabel rtsUnitId (fsLit "stg_IND_STATIC")        CmmInfo
-mkMainCapabilityLabel           = CmmLabel rtsUnitId (fsLit "MainCapability")        CmmData
-mkMAP_FROZEN_CLEAN_infoLabel    = CmmLabel rtsUnitId (fsLit "stg_MUT_ARR_PTRS_FROZEN_CLEAN") CmmInfo
-mkMAP_FROZEN_DIRTY_infoLabel    = CmmLabel rtsUnitId (fsLit "stg_MUT_ARR_PTRS_FROZEN_DIRTY") CmmInfo
-mkMAP_DIRTY_infoLabel           = CmmLabel rtsUnitId (fsLit "stg_MUT_ARR_PTRS_DIRTY") CmmInfo
-mkTopTickyCtrLabel              = CmmLabel rtsUnitId (fsLit "top_ct")                CmmData
-mkCAFBlackHoleInfoTableLabel    = CmmLabel rtsUnitId (fsLit "stg_CAF_BLACKHOLE")     CmmInfo
-mkArrWords_infoLabel            = CmmLabel rtsUnitId (fsLit "stg_ARR_WORDS")         CmmInfo
-mkSMAP_FROZEN_CLEAN_infoLabel   = CmmLabel rtsUnitId (fsLit "stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN") CmmInfo
-mkSMAP_FROZEN_DIRTY_infoLabel   = CmmLabel rtsUnitId (fsLit "stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY") CmmInfo
-mkSMAP_DIRTY_infoLabel          = CmmLabel rtsUnitId (fsLit "stg_SMALL_MUT_ARR_PTRS_DIRTY") CmmInfo
-mkBadAlignmentLabel             = CmmLabel rtsUnitId (fsLit "stg_badAlignment")      CmmEntry
+                                = CmmLabel rtsUnitId True (fsLit "nonmoving_write_barrier_enabled") CmmData
+mkUpdInfoLabel                  = CmmLabel rtsUnitId True (fsLit "stg_upd_frame")         CmmInfo
+mkBHUpdInfoLabel                = CmmLabel rtsUnitId True (fsLit "stg_bh_upd_frame" )     CmmInfo
+mkIndStaticInfoLabel            = CmmLabel rtsUnitId True (fsLit "stg_IND_STATIC")        CmmInfo
+mkMainCapabilityLabel           = CmmLabel rtsUnitId True (fsLit "MainCapability")        CmmData
+mkMAP_FROZEN_CLEAN_infoLabel    = CmmLabel rtsUnitId True (fsLit "stg_MUT_ARR_PTRS_FROZEN_CLEAN") CmmInfo
+mkMAP_FROZEN_DIRTY_infoLabel    = CmmLabel rtsUnitId True (fsLit "stg_MUT_ARR_PTRS_FROZEN_DIRTY") CmmInfo
+mkMAP_DIRTY_infoLabel           = CmmLabel rtsUnitId True (fsLit "stg_MUT_ARR_PTRS_DIRTY") CmmInfo
+mkTopTickyCtrLabel              = CmmLabel rtsUnitId True (fsLit "top_ct")                CmmData
+mkCAFBlackHoleInfoTableLabel    = CmmLabel rtsUnitId True (fsLit "stg_CAF_BLACKHOLE")     CmmInfo
+mkArrWords_infoLabel            = CmmLabel rtsUnitId True (fsLit "stg_ARR_WORDS")         CmmInfo
+mkSMAP_FROZEN_CLEAN_infoLabel   = CmmLabel rtsUnitId True (fsLit "stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN") CmmInfo
+mkSMAP_FROZEN_DIRTY_infoLabel   = CmmLabel rtsUnitId True (fsLit "stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY") CmmInfo
+mkSMAP_DIRTY_infoLabel          = CmmLabel rtsUnitId True (fsLit "stg_SMALL_MUT_ARR_PTRS_DIRTY") CmmInfo
+mkBadAlignmentLabel             = CmmLabel rtsUnitId True (fsLit "stg_badAlignment")      CmmEntry
 
 mkSRTInfoLabel :: Int -> CLabel
-mkSRTInfoLabel n = CmmLabel rtsUnitId lbl CmmInfo
+mkSRTInfoLabel n = CmmLabel rtsUnitId True lbl CmmInfo
  where
    lbl =
      case n of
@@ -551,16 +553,18 @@ mkSRTInfoLabel n = CmmLabel rtsUnitId lbl CmmInfo
 
 -----
 mkCmmInfoLabel,   mkCmmEntryLabel, mkCmmRetInfoLabel, mkCmmRetLabel,
-  mkCmmCodeLabel, mkCmmDataLabel,  mkCmmClosureLabel
+  mkCmmCodeLabel, mkCmmClosureLabel
         :: Unit -> FastString -> CLabel
 
-mkCmmInfoLabel      pkg str     = CmmLabel pkg str CmmInfo
-mkCmmEntryLabel     pkg str     = CmmLabel pkg str CmmEntry
-mkCmmRetInfoLabel   pkg str     = CmmLabel pkg str CmmRetInfo
-mkCmmRetLabel       pkg str     = CmmLabel pkg str CmmRet
-mkCmmCodeLabel      pkg str     = CmmLabel pkg str CmmCode
-mkCmmDataLabel      pkg str     = CmmLabel pkg str CmmData
-mkCmmClosureLabel   pkg str     = CmmLabel pkg str CmmClosure
+mkCmmDataLabel :: Unit -> Bool -> FastString -> CLabel
+
+mkCmmInfoLabel       pkg str     = CmmLabel pkg True str CmmInfo
+mkCmmEntryLabel      pkg str     = CmmLabel pkg True str CmmEntry
+mkCmmRetInfoLabel    pkg str     = CmmLabel pkg True str CmmRetInfo
+mkCmmRetLabel        pkg str     = CmmLabel pkg True str CmmRet
+mkCmmCodeLabel       pkg str     = CmmLabel pkg True str CmmCode
+mkCmmClosureLabel    pkg str     = CmmLabel pkg True str CmmClosure
+mkCmmDataLabel       pkg ext str = CmmLabel pkg ext  str CmmData
 
 mkLocalBlockLabel :: Unique -> CLabel
 mkLocalBlockLabel u = LocalBlockLabel u
@@ -583,7 +587,7 @@ mkApEntryLabel       upd off    = RtsLabel (RtsApEntry           upd off)
 -- A call to some primitive hand written Cmm code
 mkPrimCallLabel :: PrimCall -> CLabel
 mkPrimCallLabel (PrimCall str pkg)
-        = CmmLabel pkg str CmmPrimCall
+        = CmmLabel pkg True str CmmPrimCall
 
 
 -- Constructing ForeignLabels
@@ -621,7 +625,7 @@ isStaticClosureLabel :: CLabel -> Bool
 -- Closure defined in haskell (.hs)
 isStaticClosureLabel (IdLabel _ _ Closure) = True
 -- Closure defined in cmm
-isStaticClosureLabel (CmmLabel _ _ CmmClosure) = True
+isStaticClosureLabel (CmmLabel _ _ _ CmmClosure) = True
 isStaticClosureLabel _lbl = False
 
 -- | Whether label is a .rodata label
@@ -633,7 +637,7 @@ isSomeRODataLabel (IdLabel _ _ InfoTable) = True
 isSomeRODataLabel (IdLabel _ _ LocalInfoTable) = True
 isSomeRODataLabel (IdLabel _ _ BlockInfoTable) = True
 -- info table defined in cmm (.cmm)
-isSomeRODataLabel (CmmLabel _ _ CmmInfo) = True
+isSomeRODataLabel (CmmLabel _ _ _ CmmInfo) = True
 isSomeRODataLabel _lbl = False
 
 -- | Whether label is points to some kind of info table
@@ -715,7 +719,7 @@ mkAsmTempDieLabel l = mkAsmTempDerivedLabel l (fsLit "_die")
 
 toClosureLbl :: CLabel -> CLabel
 toClosureLbl (IdLabel n c _) = IdLabel n c Closure
-toClosureLbl (CmmLabel m str _) = CmmLabel m str CmmClosure
+toClosureLbl (CmmLabel m ext str _) = CmmLabel m ext str CmmClosure
 toClosureLbl l = pprPanic "toClosureLbl" (ppr l)
 
 toSlowEntryLbl :: CLabel -> CLabel
@@ -730,16 +734,16 @@ toEntryLbl (IdLabel n c ConInfoTable)    = IdLabel n c ConEntry
 toEntryLbl (IdLabel n _ BlockInfoTable)  = mkLocalBlockLabel (nameUnique n)
                               -- See Note [Proc-point local block entry-point].
 toEntryLbl (IdLabel n c _)               = IdLabel n c Entry
-toEntryLbl (CmmLabel m str CmmInfo)      = CmmLabel m str CmmEntry
-toEntryLbl (CmmLabel m str CmmRetInfo)   = CmmLabel m str CmmRet
+toEntryLbl (CmmLabel m ext str CmmInfo)    = CmmLabel m ext str CmmEntry
+toEntryLbl (CmmLabel m ext str CmmRetInfo) = CmmLabel m ext str CmmRet
 toEntryLbl l = pprPanic "toEntryLbl" (ppr l)
 
 toInfoLbl :: CLabel -> CLabel
 toInfoLbl (IdLabel n c LocalEntry)     = IdLabel n c LocalInfoTable
 toInfoLbl (IdLabel n c ConEntry)       = IdLabel n c ConInfoTable
 toInfoLbl (IdLabel n c _)              = IdLabel n c InfoTable
-toInfoLbl (CmmLabel m str CmmEntry)    = CmmLabel m str CmmInfo
-toInfoLbl (CmmLabel m str CmmRet)      = CmmLabel m str CmmRetInfo
+toInfoLbl (CmmLabel m ext str CmmEntry)= CmmLabel m ext str CmmInfo
+toInfoLbl (CmmLabel m ext str CmmRet)  = CmmLabel m ext str CmmRetInfo
 toInfoLbl l = pprPanic "CLabel.toInfoLbl" (ppr l)
 
 hasHaskellName :: CLabel -> Maybe Name
@@ -791,10 +795,13 @@ needsCDecl (AsmTempLabel _)             = False
 needsCDecl (AsmTempDerivedLabel _ _)    = False
 needsCDecl (RtsLabel _)                 = False
 
-needsCDecl (CmmLabel pkgId _ _)
+needsCDecl (CmmLabel pkgId external _ _)
+        -- local labels mustn't have it
+        | not external                  = False
+
         -- Prototypes for labels defined in the runtime system are imported
         --      into HC files via includes/Stg.h.
-        | pkgId == rtsUnitId         = False
+        | pkgId == rtsUnitId            = False
 
         -- For other labels we inline one into the HC file directly.
         | otherwise                     = True
@@ -919,7 +926,7 @@ externallyVisibleCLabel (AsmTempLabel _)        = False
 externallyVisibleCLabel (AsmTempDerivedLabel _ _)= False
 externallyVisibleCLabel (RtsLabel _)            = True
 externallyVisibleCLabel (LocalBlockLabel _)     = False
-externallyVisibleCLabel (CmmLabel _ _ _)        = True
+externallyVisibleCLabel (CmmLabel _ _ _ _)      = True
 externallyVisibleCLabel (ForeignLabel{})        = True
 externallyVisibleCLabel (IdLabel name _ info)   = isExternalName name && externallyVisibleIdLabel info
 externallyVisibleCLabel (CC_Label _)            = True
@@ -962,14 +969,14 @@ isGcPtrLabel lbl = case labelType lbl of
 --    whether it be code, data, or static GC object.
 labelType :: CLabel -> CLabelType
 labelType (IdLabel _ _ info)                    = idInfoLabelType info
-labelType (CmmLabel _ _ CmmData)                = DataLabel
-labelType (CmmLabel _ _ CmmClosure)             = GcPtrLabel
-labelType (CmmLabel _ _ CmmCode)                = CodeLabel
-labelType (CmmLabel _ _ CmmInfo)                = DataLabel
-labelType (CmmLabel _ _ CmmEntry)               = CodeLabel
-labelType (CmmLabel _ _ CmmPrimCall)            = CodeLabel
-labelType (CmmLabel _ _ CmmRetInfo)             = DataLabel
-labelType (CmmLabel _ _ CmmRet)                 = CodeLabel
+labelType (CmmLabel _ _ _ CmmData)              = DataLabel
+labelType (CmmLabel _ _ _ CmmClosure)           = GcPtrLabel
+labelType (CmmLabel _ _ _ CmmCode)              = CodeLabel
+labelType (CmmLabel _ _ _ CmmInfo)              = DataLabel
+labelType (CmmLabel _ _ _ CmmEntry)             = CodeLabel
+labelType (CmmLabel _ _ _ CmmPrimCall)          = CodeLabel
+labelType (CmmLabel _ _ _ CmmRetInfo)           = DataLabel
+labelType (CmmLabel _ _ _ CmmRet)               = CodeLabel
 labelType (RtsLabel (RtsSelectorInfoTable _ _)) = DataLabel
 labelType (RtsLabel (RtsApInfoTable _ _))       = DataLabel
 labelType (RtsLabel (RtsApFast _))              = CodeLabel
@@ -1039,7 +1046,7 @@ labelDynamic config this_mod lbl =
 
    -- When compiling in the "dyn" way, each package is to be linked into
    -- its own shared library.
-   CmmLabel pkg _ _
+   CmmLabel pkg _ _ _
     | os == OSMinGW32 -> externalDynamicRefs && (this_pkg /= pkg)
     | otherwise       -> externalDynamicRefs
 
@@ -1238,9 +1245,9 @@ pprCLbl dflags = \case
                            -- until that gets resolved we'll just force them to start
                            -- with a letter so the label will be legal assembly code.
 
-   (CmmLabel _ str CmmCode)     -> ftext str
-   (CmmLabel _ str CmmData)     -> ftext str
-   (CmmLabel _ str CmmPrimCall) -> ftext str
+   (CmmLabel _ _ str CmmCode)     -> ftext str
+   (CmmLabel _ _ str CmmData)     -> ftext str
+   (CmmLabel _ _ str CmmPrimCall) -> ftext str
 
    (LocalBlockLabel u) -> tempLabelPrefixOrUnderscore <> text "blk_" <> pprUniqueAlways u
 
@@ -1278,11 +1285,11 @@ pprCLbl dflags = \case
                         else (sLit "_noupd_entry"))
         ]
 
-   (CmmLabel _ fs CmmInfo)    -> ftext fs <> text "_info"
-   (CmmLabel _ fs CmmEntry)   -> ftext fs <> text "_entry"
-   (CmmLabel _ fs CmmRetInfo) -> ftext fs <> text "_info"
-   (CmmLabel _ fs CmmRet)     -> ftext fs <> text "_ret"
-   (CmmLabel _ fs CmmClosure) -> ftext fs <> text "_closure"
+   (CmmLabel _ _ fs CmmInfo)    -> ftext fs <> text "_info"
+   (CmmLabel _ _ fs CmmEntry)   -> ftext fs <> text "_entry"
+   (CmmLabel _ _ fs CmmRetInfo) -> ftext fs <> text "_info"
+   (CmmLabel _ _ fs CmmRet)     -> ftext fs <> text "_ret"
+   (CmmLabel _ _ fs CmmClosure) -> ftext fs <> text "_closure"
 
    (RtsLabel (RtsPrimOp primop)) -> text "stg_" <> ppr primop
    (RtsLabel (RtsSlowFastTickyCtr pat)) ->
