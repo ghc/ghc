@@ -113,7 +113,7 @@ tcCheckPolyExprNC expr res_ty = tcPolyExprNC expr (mkCheckExpType res_ty)
 -- These versions take an ExpType
 tcPolyExpr, tcPolyExprNC
   :: LHsExpr GhcRn -> ExpSigmaType
-  -> TcM (LHsExpr GhcTcId)
+  -> TcM (LHsExpr GhcTc)
 
 tcPolyExpr expr res_ty
   = addExprCtxt expr $
@@ -143,7 +143,7 @@ tcCheckMonoExpr, tcCheckMonoExprNC
     :: LHsExpr GhcRn     -- Expression to type check
     -> TcRhoType         -- Expected type
                          -- Definitely no foralls at the top
-    -> TcM (LHsExpr GhcTcId)
+    -> TcM (LHsExpr GhcTc)
 tcCheckMonoExpr   expr res_ty = tcMonoExpr   expr (mkCheckExpType res_ty)
 tcCheckMonoExprNC expr res_ty = tcMonoExprNC expr (mkCheckExpType res_ty)
 
@@ -151,7 +151,7 @@ tcMonoExpr, tcMonoExprNC
     :: LHsExpr GhcRn     -- Expression to type check
     -> ExpRhoType        -- Expected type
                          -- Definitely no foralls at the top
-    -> TcM (LHsExpr GhcTcId)
+    -> TcM (LHsExpr GhcTc)
 
 tcMonoExpr expr res_ty
   = addExprCtxt expr $

@@ -225,7 +225,6 @@ data Pass = Parsed | Renamed | Typechecked
 type GhcPs   = GhcPass 'Parsed      -- Old 'RdrName' type param
 type GhcRn   = GhcPass 'Renamed     -- Old 'Name' type param
 type GhcTc   = GhcPass 'Typechecked -- Old 'Id' type para,
-type GhcTcId = GhcTc                -- Old 'TcId' type param
 
 -- | Allows us to check what phase we're in at GHC's runtime.
 -- For example, this class allows us to write
