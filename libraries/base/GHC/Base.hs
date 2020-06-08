@@ -486,30 +486,26 @@ the first law, so you need only check that the former condition holds.
 -}
 
 class  Functor f  where
-    -- | Using @ApplicativeDo@: \'@'fmap' f as@\' can be understood as
+    -- | Assuming that the 'Functor' is also a 'Monad', @('fmap' f as)@ can be understood as
     -- the @do@ expression
     --
     -- @
     -- do a <- as
     --    pure (f a)
     -- @
-    --
-    -- with an inferred @Functor@ constraint.
     fmap        :: (a -> b) -> f a -> f b
 
     -- | Replace all locations in the input with the same value.
     -- The default definition is @'fmap' . 'const'@, but this may be
     -- overridden with a more efficient version.
     --
-    -- Using @ApplicativeDo@: \'@a '<$' bs@\' can be understood as the
+    -- Assuming that the 'Functor' is also a 'Monad', @(a '<$' bs)@ can be understood as the
     -- @do@ expression
     --
     -- @
     -- do bs
     --    pure a
     -- @
-    --
-    -- with an inferred @Functor@ constraint.
     (<$)        :: a -> f b -> f a
     (<$)        =  fmap . const
 
@@ -622,21 +618,11 @@ class Functor f => Applicative f where
 
     -- | Sequence actions, discarding the value of the first argument.
     --
-    -- \'@as '*>' bs@\' can be understood as the @do@ expression
+    -- @(as '*>' bs)@ can be understood as the @do@ expression
     --
     -- @
     -- do as
     --    bs
-    -- @
-    --
-    -- This is a tad complicated for our @ApplicativeDo@ extension
-    -- which will give it a @Monad@ constraint. For an @Applicative@
-    -- constraint we write it of the form
-    --
-    -- @
-    -- do _ <- as
-    --    b <- bs
-    --    pure b
     -- @
     (*>) :: f a -> f b -> f b
     a1 *> a2 = (id <$ a1) <*> a2
