@@ -432,13 +432,14 @@ hwndRead hwnd ptr offset bytes
       return $ Mgr.CbNone ret
 
     completionCB err dwBytes
-      | err == #{const ERROR_SUCCESS}      = Mgr.ioSuccess $ fromIntegral dwBytes
-      | err == #{const ERROR_HANDLE_EOF}   = Mgr.ioSuccess 0
-      | err == #{const STATUS_END_OF_FILE} = Mgr.ioSuccess 0
-      | err == #{const ERROR_BROKEN_PIPE}  = Mgr.ioSuccess 0
-      | err == #{const STATUS_PIPE_BROKEN} = Mgr.ioSuccess 0
-      | err == #{const ERROR_MORE_DATA}    = Mgr.ioSuccess $ fromIntegral dwBytes
-      | otherwise                          = Mgr.ioFailed err
+      | err == #{const ERROR_SUCCESS}       = Mgr.ioSuccess $ fromIntegral dwBytes
+      | err == #{const ERROR_HANDLE_EOF}    = Mgr.ioSuccess 0
+      | err == #{const STATUS_END_OF_FILE}  = Mgr.ioSuccess 0
+      | err == #{const ERROR_BROKEN_PIPE}   = Mgr.ioSuccess 0
+      | err == #{const STATUS_PIPE_BROKEN}  = Mgr.ioSuccess 0
+      | err == #{const ERROR_NO_MORE_ITEMS} = Mgr.ioSuccess 0
+      | err == #{const ERROR_MORE_DATA}     = Mgr.ioSuccess $ fromIntegral dwBytes
+      | otherwise                           = Mgr.ioFailed err
 
 -- In WinIO we'll never block in the FFI call, so this call is equivalent to
 -- hwndRead,  Though we may revisit this when implementing sockets and pipes.
@@ -459,12 +460,14 @@ hwndReadNonBlocking hwnd ptr offset bytes
       return $ Mgr.CbNone ret
 
     completionCB err dwBytes
-      | err == #{const ERROR_SUCCESS}      = Mgr.ioSuccess $ fromIntegral dwBytes
-      | err == #{const ERROR_HANDLE_EOF}   = Mgr.ioSuccess 0
-      | err == #{const STATUS_END_OF_FILE} = Mgr.ioSuccess 0
-      | err == #{const ERROR_BROKEN_PIPE}  = Mgr.ioSuccess 0
-      | err == #{const STATUS_PIPE_BROKEN} = Mgr.ioSuccess 0
-      | otherwise                          = Mgr.ioFailed err
+      | err == #{const ERROR_SUCCESS}       = Mgr.ioSuccess $ fromIntegral dwBytes
+      | err == #{const ERROR_HANDLE_EOF}    = Mgr.ioSuccess 0
+      | err == #{const STATUS_END_OF_FILE}  = Mgr.ioSuccess 0
+      | err == #{const ERROR_BROKEN_PIPE}   = Mgr.ioSuccess 0
+      | err == #{const STATUS_PIPE_BROKEN}  = Mgr.ioSuccess 0
+      | err == #{const ERROR_NO_MORE_ITEMS} = Mgr.ioSuccess 0
+      | err == #{const ERROR_MORE_DATA}     = Mgr.ioSuccess $ fromIntegral dwBytes
+      | otherwise                           = Mgr.ioFailed err
 
 hwndWrite :: Io NativeHandle -> Ptr Word8 -> Word64 -> Int -> IO ()
 hwndWrite hwnd ptr offset bytes
