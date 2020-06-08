@@ -386,8 +386,8 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 -- >>> traverse nameAndLineCount ["/etc/passwd","/etc/hosts"]
 -- [("/etc/passwd",56),("/etc/hosts",32)]
 --
--- The specialisation of 'traverse' to the case when 'f' is a monad is called
--- 'mapM'.  The two are otherwise generally identical:
+-- The specialisation of 'traverse' to the case when __@f@__ is a monad is
+-- called 'mapM'.  The two are otherwise generally identical:
 --
 -- > traverse :: (Applicative f, Traversable t) => (a -> f b) -> t a -> f (t b)
 -- > mapM     :: (Monad       m, Traversable t) => (a -> m b) -> t a -> m (t b)
@@ -509,8 +509,8 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 -- > sequenceA = traverse id
 -- > sequence  = mapM id
 --
--- When the monad __@m@__ is 'IO', applying 'sequence' to a list of IO actions,
--- performs each in turn, returning a list of the results:
+-- When the monad __@m@__ is 'System.IO.IO', applying 'sequence' to a list of
+-- IO actions, performs each in turn, returning a list of the results:
 --
 -- > sequence [putStr "Hello ", putStrLn "World!"]
 -- >     = (\a b -> [a,b]) <$> putStr "Hello " <*> putStrLn "World!"
