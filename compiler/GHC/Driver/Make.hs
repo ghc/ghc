@@ -2402,7 +2402,7 @@ summariseFile hsc_env old_summaries src_fn package mb_phase obj_allowed maybe_bu
 
         -- Tell the Finder cache where it is, so that subsequent calls
         -- to findModule will find it, even if it's not on any search path
-        mod <- liftIO $ addHomeModuleToFinder hsc_env pi_mod_name location package
+        mod <- liftIO $ addHomeModuleToFinder hsc_env pi_mod_name location -- package
 
         liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
             { nms_src_fn = src_fn
@@ -2432,7 +2432,7 @@ checkSummaryTimestamp
     -> IO (Either e ModSummary)
 checkSummaryTimestamp
   hsc_env dflags obj_allowed is_boot new_summary
-  old_summary location package src_timestamp
+  old_summary location _package src_timestamp
   | ms_hs_date old_summary == src_timestamp &&
       not (gopt Opt_ForceRecomp (hsc_dflags hsc_env)) = do
            -- update the object-file timestamp
@@ -2448,7 +2448,7 @@ checkSummaryTimestamp
            -- needed when we're called from sumariseModule but it shouldn't
            -- hurt.
            _ <- addHomeModuleToFinder hsc_env
-                  (moduleName (ms_mod old_summary)) location package
+                  (moduleName (ms_mod old_summary)) location -- package
 
            hi_timestamp <- maybeGetIfaceDate dflags location
            hie_timestamp <- modificationTimeIfExists (ml_hie_file location)
