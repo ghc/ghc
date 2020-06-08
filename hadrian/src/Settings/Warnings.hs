@@ -11,7 +11,9 @@ defaultGhcWarningsArgs :: Args
 defaultGhcWarningsArgs = mconcat
     [ notStage0 ? arg "-Wnoncanonical-monad-instances"
     , notM (flag CcLlvmBackend) ? arg "-optc-Wno-error=inline"
-    , flag CcLlvmBackend ? arg "-optc-Wno-unknown-pragmas" ]
+    , flag CcLlvmBackend ? arg "-optc-Wno-unknown-pragmas"
+    , arg "-optP-Wno-nonportable-include-path" -- #17798
+    ]
 
 -- | Package-specific warnings-related arguments, mostly suppressing various warnings.
 ghcWarningsArgs :: Args

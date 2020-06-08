@@ -153,6 +153,7 @@ findHsDependencies = builder (Ghc FindHsDependencies) ? do
             , ghcVersion > [8,9,0] ? arg "-include-cpp-deps"
 
             , commonGhcArgs
+            , defaultGhcWarningsArgs
             , arg "-include-pkg-deps"
             , arg "-dep-makefile", arg =<< getOutput
             , pure $ concat [ ["-dep-suffix", wayPrefix w] | w <- ways ]
