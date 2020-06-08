@@ -432,7 +432,7 @@ rnCmdArgs (arg:args)
 rnCmdTop :: LHsCmdTop GhcPs -> RnM (LHsCmdTop GhcRn, FreeVars)
 rnCmdTop = wrapLocFstM rnCmdTop'
  where
-  rnCmdTop' (XCmdTop a) = noExtCon a
+  rnCmdTop' :: HsCmdTop GhcPs -> RnM (HsCmdTop GhcRn, FreeVars)
   rnCmdTop' (HsCmdTop _ cmd)
    = do { (cmd', fvCmd) <- rnLCmd cmd
         ; let cmd_names = [arrAName, composeAName, firstAName] ++

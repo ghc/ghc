@@ -101,7 +101,7 @@ dsIPBinds (IPBinds ev_binds ip_binds) body
                 -- dependency order; hence Rec
         ; foldrM ds_ip_bind inner ip_binds }
   where
-    ds_ip_bind (L _ (XIPBind a)) _body = noExtCon a
+    ds_ip_bind :: LIPBind GhcTc -> CoreExpr -> DsM CoreExpr
     ds_ip_bind (L _ (IPBind _ ~(Right n) e)) body
       = do e' <- dsLExpr e
            return (Let (NonRec n e') body)
