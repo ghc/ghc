@@ -2097,7 +2097,7 @@ data PState = PState {
         options    :: ParserFlags,
         -- This needs to take DynFlags as an argument until
         -- we have a fix for #10143
-        messages   :: DynFlags -> Messages,
+        messages   :: DynFlags -> Messages ErrDoc,
         tab_first  :: Maybe RealSrcSpan, -- pos of first tab warning in the file
         tab_count  :: !Int,              -- number of tab warnings in the file
         last_tk    :: Maybe Token,
@@ -2657,8 +2657,8 @@ class Monad m => MonadP m where
 appendError
   :: SrcSpan
   -> SDoc
-  -> (DynFlags -> Messages)
-  -> (DynFlags -> Messages)
+  -> (DynFlags -> Messages ErrDoc)
+  -> (DynFlags -> Messages ErrDoc)
 appendError srcspan msg m =
   \d ->
     let (ws, es) = m d
@@ -2671,8 +2671,8 @@ appendWarning
   -> WarningFlag
   -> SrcSpan
   -> SDoc
-  -> (DynFlags -> Messages)
-  -> (DynFlags -> Messages)
+  -> (DynFlags -> Messages ErrDoc)
+  -> (DynFlags -> Messages ErrDoc)
 appendWarning o option srcspan warning m =
   \d ->
     let (ws, es) = m d
@@ -2710,7 +2710,7 @@ addTabWarning srcspan
                 else s
        in POk s' ()
 
-mkTabWarning :: PState -> DynFlags -> Maybe ErrMsg
+mkTabWarning :: PState -> DynFlags -> Maybe (ErrMsg ErrDoc)
 mkTabWarning PState{tab_first=tf, tab_count=tc} d =
   let middle = if tc == 1
         then text ""
@@ -2724,13 +2724,13 @@ mkTabWarning PState{tab_first=tf, tab_count=tc} d =
 
 -- | Get a bag of the errors that have been accumulated so far.
 --   Does not take -Werror into account.
-getErrorMessages :: PState -> DynFlags -> ErrorMessages
+getErrorMessages :: PState -> DynFlags -> ErrorMessages ErrDoc
 getErrorMessages PState{messages=m} d =
   let (_, es) = m d in es
 
 -- | Get the warnings and errors accumulated so far.
 --   Does not take -Werror into account.
-getMessages :: PState -> DynFlags -> Messages
+getMessages :: PState -> DynFlags -> Messages ErrDoc
 getMessages p@PState{messages=m} d =
   let (ws, es) = m d
       tabwarning = mkTabWarning p d

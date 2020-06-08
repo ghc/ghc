@@ -1310,7 +1310,7 @@ getNameToInstancesIndex :: GhcMonad m
                      -- if it is visible from at least one module in the list.
   -> Maybe [Module]  -- ^ modules to load. If this is not specified, we load
                      -- modules for everything that is in scope unqualified.
-  -> m (Messages, Maybe (NameEnv ([ClsInst], [FamInst])))
+  -> m (Messages ErrDoc, Maybe (NameEnv ([ClsInst], [FamInst])))
 getNameToInstancesIndex visible_mods mods_to_load = do
   hsc_env <- getSession
   liftIO $ runTcInteractive hsc_env $
@@ -1596,7 +1596,7 @@ lookupName name =
 parser :: String         -- ^ Haskell module source text (full Unicode is supported)
        -> DynFlags       -- ^ the flags
        -> FilePath       -- ^ the filename (for source locations)
-       -> (WarningMessages, Either ErrorMessages (Located HsModule))
+       -> (WarningMessages, Either (ErrorMessages ErrDoc) (Located HsModule))
 
 parser str dflags filename =
    let

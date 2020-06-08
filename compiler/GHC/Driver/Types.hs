@@ -313,19 +313,19 @@ runInteractiveHsc hsc_env = runHsc (mkInteractiveHscEnv hsc_env)
 -- When the compiler (GHC.Driver.Main) discovers errors, it throws an
 -- exception in the IO monad.
 
-mkSrcErr :: ErrorMessages -> SourceError
+mkSrcErr :: ErrorMessages ErrDoc -> SourceError
 mkSrcErr = SourceError
 
-srcErrorMessages :: SourceError -> ErrorMessages
+srcErrorMessages :: SourceError -> ErrorMessages ErrDoc
 srcErrorMessages (SourceError msgs) = msgs
 
 mkApiErr :: DynFlags -> SDoc -> GhcApiError
 mkApiErr dflags msg = GhcApiError (showSDoc dflags msg)
 
-throwErrors :: MonadIO io => ErrorMessages -> io a
+throwErrors :: MonadIO io => ErrorMessages ErrDoc -> io a
 throwErrors = liftIO . throwIO . mkSrcErr
 
-throwOneError :: MonadIO io => ErrMsg -> io a
+throwOneError :: MonadIO io => ErrMsg ErrDoc -> io a
 throwOneError = throwErrors . unitBag
 
 -- | A source error is an error that is caused by one or more errors in the
@@ -344,7 +344,7 @@ throwOneError = throwErrors . unitBag
 --
 -- See 'printExceptionAndWarnings' for more information on what to take care
 -- of when writing a custom error handler.
-newtype SourceError = SourceError ErrorMessages
+newtype SourceError = SourceError (ErrorMessages ErrDoc)
 
 instance Show SourceError where
   show (SourceError msgs) = unlines . map show . bagToList $ msgs

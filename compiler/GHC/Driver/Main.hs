@@ -233,14 +233,14 @@ handleWarnings = do
 
 -- | log warning in the monad, and if there are errors then
 -- throw a SourceError exception.
-logWarningsReportErrors :: Messages -> Hsc ()
+logWarningsReportErrors :: Messages ErrDoc -> Hsc ()
 logWarningsReportErrors (warns,errs) = do
     logWarnings warns
     when (not $ isEmptyBag errs) $ throwErrors errs
 
 -- | Log warnings and throw errors, assuming the messages
 -- contain at least one error (e.g. coming from PFailed)
-handleWarningsThrowErrors :: Messages -> Hsc a
+handleWarningsThrowErrors :: Messages ErrDoc -> Hsc a
 handleWarningsThrowErrors (warns, errs) = do
     logWarnings warns
     dflags <- getDynFlags
@@ -264,7 +264,7 @@ handleWarningsThrowErrors (warns, errs) = do
 --  2. If there are no error messages, but the second result indicates failure
 --     there should be warnings in the first result. That is, if the action
 --     failed, it must have been due to the warnings (i.e., @-Werror@).
-ioMsgMaybe :: IO (Messages, Maybe a) -> Hsc a
+ioMsgMaybe :: IO (Messages ErrDoc, Maybe a) -> Hsc a
 ioMsgMaybe ioA = do
     ((warns,errs), mb_r) <- liftIO ioA
     logWarnings warns
@@ -274,7 +274,7 @@ ioMsgMaybe ioA = do
 
 -- | like ioMsgMaybe, except that we ignore error messages and return
 -- 'Nothing' instead.
-ioMsgMaybe' :: IO (Messages, Maybe a) -> Hsc (Maybe a)
+ioMsgMaybe' :: IO (Messages ErrDoc, Maybe a) -> Hsc (Maybe a)
 ioMsgMaybe' ioA = do
     ((warns,_errs), mb_r) <- liftIO $ ioA
     logWarnings warns
@@ -981,7 +981,7 @@ hscCheckSafeImports tcg_env = do
 
     warns dflags rules = listToBag $ map (warnRules dflags) rules
 
-    warnRules :: DynFlags -> GenLocated SrcSpan (RuleDecl GhcTc) -> ErrMsg
+    warnRules :: DynFlags -> GenLocated SrcSpan (RuleDecl GhcTc) -> ErrMsg ErrDoc
     warnRules dflags (L loc (HsRule { rd_name = n })) =
         mkPlainWarnMsg dflags loc $
             text "Rule \"" <> ftext (snd $ unLoc n) <> text "\" ignored" $+$

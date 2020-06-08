@@ -64,7 +64,7 @@ getImports :: DynFlags
            -> FilePath     -- ^ The original source filename (used for locations
                            --   in the function result)
            -> IO (Either
-               ErrorMessages
+               (ErrorMessages ErrDoc)
                ([(Maybe FastString, Located ModuleName)],
                 [(Maybe FastString, Located ModuleName)],
                 Located ModuleName))
@@ -336,7 +336,7 @@ unsupportedExtnError dflags loc unsup =
      suggestions = fuzzyMatch unsup supported
 
 
-optionsErrorMsgs :: DynFlags -> [String] -> [Located String] -> FilePath -> Messages
+optionsErrorMsgs :: DynFlags -> [String] -> [Located String] -> FilePath -> (Messages ErrDoc)
 optionsErrorMsgs dflags unhandled_flags flags_lines _filename
   = (emptyBag, listToBag (map mkMsg unhandled_flags_lines))
   where unhandled_flags_lines :: [Located String]
