@@ -2750,6 +2750,9 @@ data RecTcChecker = RC !Int (NameEnv Int)
   -- The upper bound, and the number of times
   -- we have encountered each TyCon
 
+instance Outputable RecTcChecker where
+  ppr (RC n env) = braces (text "RC" <+> ppr n <+> ppr env)
+
 -- | Initialise a 'RecTcChecker' with 'defaultRecTcMaxBound'.
 initRecTc :: RecTcChecker
 initRecTc = RC defaultRecTcMaxBound emptyNameEnv
