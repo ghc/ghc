@@ -183,15 +183,22 @@ bool __createUUIDTempFileErrNo (wchar_t* pathName, wchar_t* prefix,
       if (UuidToStringW ((UUID*)&guid, &guidStr) != S_OK)
         goto fail;
 
-      wchar_t* devName = FS(create_device_name) ((wchar_t*)pathName);
+      /* We can't create a device path here since this path escapes the compiler
+         so instead return a normal path and have openFile deal with it.  */
+      wchar_t* devName = malloc (sizeof (wchar_t) * wcslen (pathName));
+      wcscpy (devName, pathName);
       int len = wcslen (devName) + wcslen (suffix) + wcslen (prefix)
               + wcslen (guidStr) + 3;
       *tempFileName = malloc (len * sizeof (wchar_t));
       if (*tempFileName == NULL)
         goto fail;
 
-      if (-1 == swprintf_s (*tempFileName, len, L"%ls\\%ls-%ls%ls",
-                            devName, prefix, guidStr, suffix))
+      /* Only add a slash if path didn't already end in one, otherwise we create
+         an invalid path.  */
+      bool slashed = devName[strlen(devName)-1] == '\\';
+      wchar_t* sep = slashed ? L"" : L"\\";
+      if (-1 == swprintf_s (*tempFileName, len, L"%ls%ls%ls-%ls%ls",
+                            devName, sep, prefix, guidStr, suffix))
         goto fail;
 
       free (devName);
