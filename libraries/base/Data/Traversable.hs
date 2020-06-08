@@ -719,24 +719,20 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 --  * In the 'Foldable' instance, 'Data.Foldable.foldMap' should be
 --    equivalent to traversal with a constant applicative functor
 --    ('foldMapDefault').
---
--- References:
--- [1] The Essence of the Iterator Pattern, Jeremy Gibbons and Bruno C. d. S. Oliveira
---
 
 ------------------
 
 -- $also
 --
+--  * [1] \"The Essence of the Iterator Pattern\",
+--    by Jeremy Gibbons and Bruno Oliveira,
+--    in /Mathematically-Structured Functional Programming/, 2006, online at
+--    <http://web.comlab.ox.ac.uk/oucl/work/jeremy.gibbons/publications/#iterator>.
+--
 --  * \"Applicative Programming with Effects\",
 --    by Conor McBride and Ross Paterson,
 --    /Journal of Functional Programming/ 18:1 (2008) 1-13, online at
 --    <http://www.soi.city.ac.uk/~ross/papers/Applicative.html>.
---
---  * \"The Essence of the Iterator Pattern\",
---    by Jeremy Gibbons and Bruno Oliveira,
---    in /Mathematically-Structured Functional Programming/, 2006, online at
---    <http://web.comlab.ox.ac.uk/oucl/work/jeremy.gibbons/publications/#iterator>.
 --
 --  * \"An Investigation of the Laws of Traversals\",
 --    by Mauro Jaskelioff and Ondrej Rypacek,
