@@ -563,16 +563,17 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
           -- non-overlapping handle or was completed immediately.
           -- e.g. stdio redirection or data in cache, FAST I/O.
           success <- FFI.overlappedIOStatus lpol
-          err     <- fmap fromIntegral getLastError
+          err     <- getLastError
           -- Determine if the caller has done any checking.  If not then check
           -- to see if the request was completed synchronously.  We have to
           -- in order to prevent deadlocks since if it has completed
           -- synchronously we've requested to not have the completion queued.
           let result' =
                 case result of
-                  CbNone ret | success == #{const STATUS_SUCCESS}          -> CbDone Nothing
+                  CbNone ret -- Start by checking some flags which indicates we
+                             -- are done.
+                             | success == #{const STATUS_SUCCESS}          -> CbDone Nothing
                              | success == #{const STATUS_END_OF_FILE}      -> CbDone Nothing
-                             | success == #{const STATUS_PENDING}          -> CbPending
                              -- Buffer was too small.. not sure what to do, so I'll just
                              -- complete the read request
                              | err     == #{const ERROR_MORE_DATA}         -> CbDone Nothing
@@ -581,8 +582,17 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                              | err     == #{const ERROR_IO_INCOMPLETE}     -> CbIncomplete
                              | err     == #{const ERROR_HANDLE_EOF}        -> CbDone Nothing
                              | err     == #{const ERROR_BROKEN_PIPE}       -> CbDone Nothing
+                             | err     == #{const ERROR_NO_MORE_ITEMS}     -> CbDone Nothing
                              | err     == #{const ERROR_OPERATION_ABORTED} -> CbDone Nothing
-                             | not ret                                     -> CbError err
+                             -- This is currently mapping all non-complete requests we don't know
+                             -- about as an error. I wonder if this isn't too strict..
+                             | not ret                                     -> CbError $ fromIntegral err
+                             -- We check success codes after checking error as
+                             -- errors are much more indicative
+                             | success == #{const STATUS_PENDING}          -> CbPending
+                             -- If not just assume we can complete.  If we can't this will
+                             -- hang because we don't know how to properly deal with it.
+                             -- I don't know what the best default here is...
                              | otherwise                                   -> CbPending
                   _                                                        -> result
           case result' of
@@ -602,7 +612,7 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
               debugIO $ "== " ++ show (finished)
               status <- FFI.overlappedIOStatus lpol
               debugIO $ "== >< " ++ show (status)
-              lasterr <- fmap fromIntegral getLastError :: IO Int
+              lasterr <- getLastError
               -- This status indicated that we have finished early and so we
               -- won't have a request enqueued.  Handle it inline.
               let done_early = status == #{const STATUS_SUCCESS}
@@ -610,6 +620,7 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                                || lasterr == #{const ERROR_HANDLE_EOF}
                                || lasterr == #{const ERROR_SUCCESS}
                                || lasterr == #{const ERROR_BROKEN_PIPE}
+                               || lasterr == #{const ERROR_NO_MORE_ITEMS}
                                || lasterr == #{const ERROR_OPERATION_ABORTED}
               -- This status indicates that the request hasn't finished early,
               -- but it will finish shortly.  The I/O manager will not be
@@ -681,7 +692,7 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
         case execute of
           CbPending    -> runner
           CbDone rdata -> do
-            -- free cdData
+            free cdData
             debugIO $ dbg $ ":: done " ++ show lpol ++ " - " ++ show rdata
             bytes <- if isJust rdata
                         then return rdata
@@ -689,13 +700,13 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                         else FFI.getOverlappedResult h lpol False
             debugIO $ dbg $ ":: done bytes: " ++ show bytes
             case bytes of
-              Just res ->  completionCB 0 res -- free hs_lpol >> completionCB 0 res
+              Just res ->  free hs_lpol >> completionCB 0 res
               Nothing  -> do err <- FFI.overlappedIOStatus lpol
                              numBytes <- FFI.overlappedIONumBytes lpol
                              -- TODO: Remap between STATUS_ and ERROR_ instead
                              -- of re-interpret here. But for now, don't care.
                              let err' = fromIntegral err
-                             -- free hs_lpol
+                             free hs_lpol
                              debugIO $ dbg $ ":: done callback: " ++ show err' ++ " - " ++ show numBytes
                              completionCB err' (fromIntegral numBytes)
           CbError err  -> do
@@ -721,13 +732,14 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                   return $ CbDone res
                         | otherwise ->
                   do m <- newEmptyIOPort
-                     lasterr <- fmap fromIntegral getLastError :: IO Int
+                     lasterr <- getLastError
                      let done =
                             lasterr == #{const ERROR_HANDLE_EOF}
                             || lasterr == #{const ERROR_SUCCESS}
                             || lasterr == #{const ERROR_BROKEN_PIPE}
+                            || lasterr == #{const ERROR_NO_MORE_ITEMS}
                             || lasterr == #{const ERROR_OPERATION_ABORTED}
-                     debugIO $ ":: loop - " ++ show lasterr ++ " :" ++ show done
+                     -- debugIO $ ":: loop - " ++ show lasterr ++ " :" ++ show done
                      -- We will complete quite soon, in the threaded RTS we
                      -- probably don't really want to wait for it while we could
                      -- have done something else.  In particular this is because
@@ -741,13 +753,18 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                      -- are any complaints.
                      -- OTOH any of the two should be a massive improvement over
                      -- The old I/O Manager.
-                     when threadedIOMgr $ do
-                       let usecs = 100 -- 0.1ms
-                       reg <- registerTimeout mgr usecs $
-                                writeIOPort m () >> return ()
-                       readIOPort m `onException` unregisterTimeout mgr reg
+                     case (done, threadedIOMgr) of
+                       (False, True) -> do
+                         let usecs = 250 -- 0.25ms
+                         reg <- registerTimeout mgr usecs $
+                                  writeIOPort m () >> return ()
+                         readIOPort m `onException` unregisterTimeout mgr reg
+                       (False, False) -> sleepBlock 250
+                       _              -> return ()
                      if done
-                        then return $ CbDone Nothing
+                        then do when (not threadedIOMgr)
+                                  completeSynchronousRequest
+                                return $ CbDone Nothing
                         else spinWaitComplete fhndl lpol
                 Just _ -> do
                    when (not threadedIOMgr) completeSynchronousRequest
@@ -1159,6 +1176,7 @@ foreign import ccall unsafe "sendIOManagerEvent" -- in the RTS (ThrIOManager.c)
 
 foreign import ccall unsafe "rtsSupportsBoundThreads" threadedIOMgr :: Bool
 
+foreign import stdcall unsafe "Sleep" sleepBlock :: Int -> IO ()
 
 -- ---------------------------------------------------------------------------
 -- I/O manager event notifications
