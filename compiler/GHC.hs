@@ -300,6 +300,8 @@ import GHC.Platform.Ways
 
 import GHC.Driver.Phases   ( Phase(..), isHaskellSrcFilename
                            , isSourceFilename, startPhase )
+import GHC.Driver.Errors       ( handleFlagWarnings, printOrThrowWarnings )
+import GHC.Driver.Errors.Types ( GhcError(..), GhcWarning(..) )
 import GHC.Driver.Env
 import GHC.Driver.CmdLine
 import GHC.Driver.Session hiding (WarnReason(..))
@@ -323,7 +325,7 @@ import GHCi.RemoteTypes
 import qualified GHC.Parser as Parser
 import GHC.Parser.Lexer
 import GHC.Parser.Annotation
-import GHC.Parser.Errors.Ppr
+import GHC.Parser.Errors    as Parser
 
 import GHC.Iface.Load        ( loadSysInterface )
 import GHC.Hs
@@ -340,6 +342,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Module
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Family
+import GHC.Tc.Errors.Types ( TcRnError(..), TcRnWarning )
 
 import GHC.SysTools.FileCleanup
 import GHC.SysTools
@@ -380,6 +383,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Ppr
 import GHC.Types.TypeEnv
 import GHC.Types.SourceFile
+import GHC.Types.Error ( mkWarningMessages )
 
 import GHC.Unit
 import GHC.Unit.External
@@ -855,9 +859,10 @@ checkNewInteractiveDynFlags dflags0 = do
   -- We currently don't support use of StaticPointers in expressions entered on
   -- the REPL. See #12356.
   if xopt LangExt.StaticPointers dflags0
-  then do liftIO $ printOrThrowWarnings dflags0 $ listToBag
-            [mkPlainWarnMsg dflags0 interactiveSrcSpan
-             $ text "StaticPointers is not supported in GHCi interactive expressions."]
+  then do liftIO $ printOrThrowWarnings dflags0 $
+            fmap GhcWarningRaw . mkWarningMessages $ listToBag
+              [mkPlainWarnMsg interactiveSrcSpan
+               $ text "StaticPointers is not supported in GHCi interactive expressions."]
           return $ xopt_unset dflags0 LangExt.StaticPointers
   else return dflags0
 
@@ -1435,7 +1440,7 @@ getNameToInstancesIndex :: GhcMonad m
                      -- if it is visible from at least one module in the list.
   -> Maybe [Module]  -- ^ modules to load. If this is not specified, we load
                      -- modules for everything that is in scope unqualified.
-  -> m (Messages, Maybe (NameEnv ([ClsInst], [FamInst])))
+  -> m (Messages TcRnWarning TcRnError, Maybe (NameEnv ([ClsInst], [FamInst])))
 getNameToInstancesIndex visible_mods mods_to_load = do
   hsc_env <- getSession
   liftIO $ runTcInteractive hsc_env $
@@ -1540,7 +1545,7 @@ getTokenStream mod = do
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts    -> return ts
-    PFailed pst -> throwErrors (fmap pprError (getErrorMessages pst))
+    PFailed pst -> throwErrors (GhcErrorPs <$> getErrorMessages pst)
 
 -- | Give even more information on the source than 'getTokenStream'
 -- This function allows reconstructing the source completely with
@@ -1551,7 +1556,7 @@ getRichTokenStream mod = do
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts    -> return $ addSourceToTokens startLoc source ts
-    PFailed pst -> throwErrors (fmap pprError (getErrorMessages pst))
+    PFailed pst -> throwErrors (GhcErrorPs <$> getErrorMessages pst)
 
 -- | Given a source location and a StringBuffer corresponding to this
 -- location, return a rich token stream with the source associated to the
@@ -1715,7 +1720,7 @@ lookupName name =
 parser :: String         -- ^ Haskell module source text (full Unicode is supported)
        -> DynFlags       -- ^ the flags
        -> FilePath       -- ^ the filename (for source locations)
-       -> (WarningMessages, Either ErrorMessages (Located HsModule))
+       -> (WarningMessages Parser.Warning, Either (ErrorMessages Parser.Error) (Located HsModule))
 
 parser str dflags filename =
    let
@@ -1726,11 +1731,11 @@ parser str dflags filename =
 
      PFailed pst ->
          let (warns,errs) = getMessages pst in
-         (fmap pprWarning warns, Left (fmap pprError errs))
+         (warns, Left errs)
 
      POk pst rdr_module ->
          let (warns,_) = getMessages pst in
-         (fmap pprWarning warns, Right rdr_module)
+         (warns, Right rdr_module)
 
 -- -----------------------------------------------------------------------------
 -- | Find the package environment (if one exists)

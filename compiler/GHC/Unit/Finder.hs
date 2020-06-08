@@ -38,7 +38,7 @@ module GHC.Unit.Finder (
 
 import GHC.Prelude
 
-import GHC.Driver.Env
+import GHC.Driver.Env.Types ( HscEnv(..) )
 import GHC.Driver.Session
 
 import GHC.Platform.Ways

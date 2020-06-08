@@ -33,6 +33,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Data.Bag
 import GHC.Types.SrcLoc
+import GHC.Types.Error ( ErrDoc(..), RenderableDiagnostic(..) )
 import GHC.Utils.Json
 
 import Data.Function
@@ -96,6 +97,9 @@ data WarnReason
 
 instance Outputable WarnReason where
   ppr = text . show
+
+instance RenderableDiagnostic Warn where
+  renderDiagnostic (Warn _ (L _ warn)) = ErrDoc [text warn] [] []
 
 instance ToJson WarnReason where
   json NoReason = JSNull

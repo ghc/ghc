@@ -51,6 +51,7 @@ import GHC.Driver.Main
 import GHC.Driver.Env hiding ( Hsc )
 import GHC.Driver.Pipeline.Monad
 import GHC.Driver.Config
+import GHC.Driver.Errors (GhcError(..), ghcErrorRawErrDoc, handleFlagWarnings)
 import GHC.Driver.Phases
 import GHC.Driver.Session
 import GHC.Driver.Backend
@@ -61,7 +62,6 @@ import GHC.Platform.Ways
 import GHC.Platform.ArchOS
 
 import GHC.Parser.Header
-import GHC.Parser.Errors.Ppr
 
 import GHC.SysTools
 import GHC.SysTools.ExtraObj
@@ -89,6 +89,7 @@ import GHC.Iface.Make          ( mkFullIface )
 import GHC.Iface.UpdateIdInfos ( updateModDetailsIdInfos )
 
 import GHC.Types.Basic       ( SuccessFlag(..) )
+import GHC.Types.Error       ( mkErrorMessages )
 import GHC.Types.Target
 import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
@@ -130,7 +131,7 @@ preprocess :: HscEnv
            -> Maybe InputFileBuffer
            -- ^ optional buffer to use instead of reading the input file
            -> Maybe Phase -- ^ starting phase
-           -> IO (Either ErrorMessages (DynFlags, FilePath))
+           -> IO (Either (ErrorMessages GhcError) (DynFlags, FilePath))
 preprocess hsc_env input_fn mb_input_buf mb_phase =
   handleSourceError (\err -> return (Left (srcErrorMessages err))) $
   MC.handle handler $
@@ -148,8 +149,9 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
   return (dflags, fp)
   where
     srcspan = srcLocSpan $ mkSrcLoc (mkFastString input_fn) 1 1
-    handler (ProgramError msg) = return $ Left $ unitBag $
-        mkPlainErrMsg (hsc_dflags hsc_env) srcspan $ text msg
+    handler (ProgramError msg) = return $ Left $ mkErrorMessages $ unitBag $
+      fmap ghcErrorRawErrDoc $ mkPlainErrMsg srcspan $
+        text msg
     handler ex = throwGhcExceptionIO ex
 
 -- ---------------------------------------------------------------------------
@@ -1066,7 +1068,7 @@ runPhase (RealPhase (Cpp sf)) input_fn dflags0
        (dflags1, unhandled_flags, warns)
            <- liftIO $ parseDynamicFilePragma dflags0 src_opts
        setDynFlags dflags1
-       liftIO $ checkProcessArgsResult dflags1 unhandled_flags
+       liftIO $ checkProcessArgsResult unhandled_flags
 
        if not (xopt LangExt.Cpp dflags1) then do
            -- we have to be careful to emit warnings only once.
@@ -1085,7 +1087,7 @@ runPhase (RealPhase (Cpp sf)) input_fn dflags0
             src_opts <- liftIO $ getOptionsFromFile dflags0 output_fn
             (dflags2, unhandled_flags, warns)
                 <- liftIO $ parseDynamicFilePragma dflags0 src_opts
-            liftIO $ checkProcessArgsResult dflags2 unhandled_flags
+            liftIO $ checkProcessArgsResult unhandled_flags
             unless (gopt Opt_Pp dflags2) $
                 liftIO $ handleFlagWarnings dflags2 warns
             -- the HsPp pass below will emit warnings
@@ -1118,7 +1120,7 @@ runPhase (RealPhase (HsPp sf)) input_fn dflags
         (dflags1, unhandled_flags, warns)
             <- liftIO $ parseDynamicFilePragma dflags src_opts
         setDynFlags dflags1
-        liftIO $ checkProcessArgsResult dflags1 unhandled_flags
+        liftIO $ checkProcessArgsResult unhandled_flags
         liftIO $ handleFlagWarnings dflags1 warns
 
         return (RealPhase (Hsc sf), output_fn)
@@ -1152,7 +1154,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
                 popts = initParserOpts dflags
             eimps <- getImports popts imp_prelude buf input_fn (basename <.> suff)
             case eimps of
-              Left errs -> throwErrors (fmap pprError errs)
+              Left errs -> throwErrors (GhcErrorPs <$> errs)
               Right (src_imps,imps,L _ mod_name) -> return
                   (Just buf, mod_name, imps, src_imps)
 
