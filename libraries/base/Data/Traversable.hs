@@ -64,7 +64,7 @@ module Data.Traversable (
 import Control.Applicative ( Const(..), ZipList(..) )
 import Data.Coerce
 import Data.Either ( Either(..) )
-import Data.Foldable ( Foldable )
+import Data.Foldable
 import Data.Functor
 import Data.Functor.Identity ( Identity(..) )
 import Data.Functor.Utils ( StateL(..), StateR(..) )
