@@ -18,24 +18,6 @@
 --
 -- Class of data structures that can be traversed from left to right,
 -- performing an action on each element.
---
--- See also
---
---  * \"Applicative Programming with Effects\",
---    by Conor McBride and Ross Paterson,
---    /Journal of Functional Programming/ 18:1 (2008) 1-13, online at
---    <http://www.soi.city.ac.uk/~ross/papers/Applicative.html>.
---
---  * \"The Essence of the Iterator Pattern\",
---    by Jeremy Gibbons and Bruno Oliveira,
---    in /Mathematically-Structured Functional Programming/, 2006, online at
---    <http://web.comlab.ox.ac.uk/oucl/work/jeremy.gibbons/publications/#iterator>.
---
---  * \"An Investigation of the Laws of Traversals\",
---    by Mauro Jaskelioff and Ondrej Rypacek,
---    in /Mathematically-Structured Functional Programming/, 2012, online at
---    <http://arxiv.org/pdf/1202.2919>.
---
 -----------------------------------------------------------------------------
 
 module Data.Traversable (
@@ -72,6 +54,9 @@ module Data.Traversable (
     -- * Laws
     --
     -- $laws
+
+    -- * See also
+    -- $also
     ) where
 
 -- It is convenient to use 'Const' here but this means we must
@@ -737,3 +722,23 @@ foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
 --
 -- References:
 -- [1] The Essence of the Iterator Pattern, Jeremy Gibbons and Bruno C. d. S. Oliveira
+--
+
+------------------
+
+-- $also
+--
+--  * \"Applicative Programming with Effects\",
+--    by Conor McBride and Ross Paterson,
+--    /Journal of Functional Programming/ 18:1 (2008) 1-13, online at
+--    <http://www.soi.city.ac.uk/~ross/papers/Applicative.html>.
+--
+--  * \"The Essence of the Iterator Pattern\",
+--    by Jeremy Gibbons and Bruno Oliveira,
+--    in /Mathematically-Structured Functional Programming/, 2006, online at
+--    <http://web.comlab.ox.ac.uk/oucl/work/jeremy.gibbons/publications/#iterator>.
+--
+--  * \"An Investigation of the Laws of Traversals\",
+--    by Mauro Jaskelioff and Ondrej Rypacek,
+--    in /Mathematically-Structured Functional Programming/, 2012, online at
+--    <http://arxiv.org/pdf/1202.2919>.
