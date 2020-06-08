@@ -45,6 +45,7 @@ import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSub
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
 import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
 import GHC.Core.TyCon ( tyConArity )
+import GHC.Core.Multiplicity
 import GHC.Builtin.Types
 import GHC.Builtin.Names
 import GHC.Types.Basic
@@ -377,7 +378,7 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
                  top_level
   | Type ty <- in_rhs        -- let a::* = TYPE ty in <body>
   , let out_ty = substTy (soe_subst rhs_env) ty
-  = ASSERT( isTyVar in_bndr )
+  = ASSERT2( isTyVar in_bndr, ppr in_bndr $$ ppr in_rhs )
     (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
 
   | Coercion co <- in_rhs
@@ -435,7 +436,7 @@ simple_out_bind :: TopLevelFlag
                 -> (SimpleOptEnv, Maybe (OutVar, OutExpr))
 simple_out_bind top_level env@(SOE { soe_subst = subst }) (in_bndr, out_rhs)
   | Type out_ty <- out_rhs
-  = ASSERT( isTyVar in_bndr )
+  = ASSERT2( isTyVar in_bndr, ppr in_bndr $$ ppr out_ty $$ ppr out_rhs )
     (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
 
   | Coercion out_co <- out_rhs
@@ -588,7 +589,7 @@ subst_opt_id_bndr env@(SOE { soe_subst = subst, soe_inl = inl }) old_id
     Subst in_scope id_subst tv_subst cv_subst = subst
 
     id1    = uniqAway in_scope old_id
-    id2    = setIdType id1 (substTy subst (idType old_id))
+    id2    = updateIdTypeAndMult (substTy subst) id1
     new_id = zapFragileIdInfo id2
              -- Zaps rules, unfolding, and fragile OccInfo
              -- The unfolding and rules will get added back later, by add_info
@@ -1400,7 +1401,14 @@ pushCoValArg co
   = Just (mkRepReflCo arg, MRefl)
 
   | isFunTy tyL
-  , (co1, co2) <- decomposeFunCo Representational co
+  , (co_mult, co1, co2) <- decomposeFunCo Representational co
+  , isReflexiveCo co_mult
+    -- We can't push the coercion in the case where co_mult isn't reflexivity:
+    -- it could be an unsafe axiom, and losing this information could yield
+    -- ill-typed terms. For instance (fun x ::(1) Int -> (fun _ -> () |> co) x)
+    -- with co :: (Int -> ()) ~ (Int #-> ()), would reduce to (fun x ::(1) Int
+    -- -> (fun _ ::(Many) Int -> ()) x) which is ill-typed
+
               -- If   co  :: (tyL1 -> tyL2) ~ (tyR1 -> tyR2)
               -- then co1 :: tyL1 ~ tyR1
               --      co2 :: tyL2 ~ tyR2
@@ -1423,11 +1431,15 @@ pushCoercionIntoLambda in_scope x e co
     | ASSERT(not (isTyVar x) && not (isCoVar x)) True
     , Pair s1s2 t1t2 <- coercionKind co
     , Just (_s1,_s2) <- splitFunTy_maybe s1s2
-    , Just (t1,_t2) <- splitFunTy_maybe t1t2
-    = let (co1, co2) = decomposeFunCo Representational co
+    , Just (Scaled w1 t1,_t2) <- splitFunTy_maybe t1t2
+    , (co_mult, co1, co2) <- decomposeFunCo Representational co
+    , isReflexiveCo co_mult
+      -- We can't push the coercion in the case where co_mult isn't
+      -- reflexivity. See pushCoValArg for more details.
+    = let
           -- Should we optimize the coercions here?
           -- Otherwise they might not match too well
-          x' = x `setIdType` t1
+          x' = x `setIdType` t1 `setIdMult` w1
           in_scope' = in_scope `extendInScopeSet` x'
           subst = extendIdSubst (mkEmptySubst in_scope')
                                 x
@@ -1479,14 +1491,15 @@ pushCoDataCon dc dc_args co
                               (map exprToType ex_args)
 
           -- Cast the value arguments (which include dictionaries)
-        new_val_args = zipWith cast_arg arg_tys val_args
+        new_val_args = zipWith cast_arg (map scaledThing arg_tys) val_args
         cast_arg arg_ty arg = mkCast arg (psi_subst arg_ty)
 
         to_ex_args = map Type to_ex_arg_tys
 
         dump_doc = vcat [ppr dc,      ppr dc_univ_tyvars, ppr dc_ex_tcvars,
                          ppr arg_tys, ppr dc_args,
-                         ppr ex_args, ppr val_args, ppr co, ppr from_ty, ppr to_ty, ppr to_tc ]
+                         ppr ex_args, ppr val_args, ppr co, ppr from_ty, ppr to_ty, ppr to_tc
+                         , ppr $ mkTyConApp to_tc (map exprToType $ takeList dc_univ_tyvars dc_args) ]
     in
     ASSERT2( eqType from_ty (mkTyConApp to_tc (map exprToType $ takeList dc_univ_tyvars dc_args)), dump_doc )
     ASSERT2( equalLength val_args arg_tys, dump_doc )
@@ -1546,7 +1559,8 @@ collectBindersPushingCo e
       | isId b
       , let Pair tyL tyR = coercionKind co
       , ASSERT( isFunTy tyL) isFunTy tyR
-      , (co_arg, co_res) <- decomposeFunCo Representational co
+      , (co_mult, co_arg, co_res) <- decomposeFunCo Representational co
+      , isReflCo co_mult -- See Note [collectBindersPushingCo]
       , isReflCo co_arg  -- See Note [collectBindersPushingCo]
       = go_c (b:bs) e co_res
 
@@ -1557,7 +1571,7 @@ collectBindersPushingCo e
 Note [collectBindersPushingCo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We just look for coercions of form
-   <type> -> blah
+   <type> # w -> blah
 (and similarly for foralls) to keep this function simple.  We could do
 more elaborate stuff, but it'd involve substitution etc.
 

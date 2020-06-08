@@ -43,6 +43,7 @@ import GHC.HsToCore.Monad
 import GHC.HsToCore.Expr
 import GHC.HsToCore.Binds
 import GHC.HsToCore.Foreign.Decl
+import GHC.Core.Multiplicity
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim
 import GHC.Core.Coercion
@@ -691,11 +692,11 @@ mkUnsafeCoercePrimPair _old_id old_expr
                           , openAlphaTyVar, openBetaTyVar
                           , x ] $
                    mkSingleAltCase scrut1
-                                   (mkWildValBinder scrut1_ty)
+                                   (mkWildValBinder Many scrut1_ty)
                                    (DataAlt unsafe_refl_data_con)
                                    [rr_cv] $
                    mkSingleAltCase scrut2
-                                   (mkWildValBinder scrut2_ty)
+                                   (mkWildValBinder Many scrut2_ty)
                                    (DataAlt unsafe_refl_data_con)
                                    [ab_cv] $
                    Var x `mkCast` x_co
@@ -736,7 +737,7 @@ mkUnsafeCoercePrimPair _old_id old_expr
 
              ty = mkSpecForAllTys [ runtimeRep1TyVar, runtimeRep2TyVar
                                   , openAlphaTyVar, openBetaTyVar ] $
-                  mkVisFunTy openAlphaTy openBetaTy
+                  mkVisFunTyMany openAlphaTy openBetaTy
 
              id   = mkExportedVanillaId unsafeCoercePrimName ty `setIdInfo` info
        ; return (id, old_expr) }

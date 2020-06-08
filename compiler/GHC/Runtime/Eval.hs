@@ -63,6 +63,7 @@ import GHC.Iface.Env       ( newInteractiveBinder )
 import GHC.Core.FamInstEnv ( FamInst )
 import GHC.Core.FVs        ( orphNamesOfFamInst )
 import GHC.Core.TyCon
+import GHC.Core.Multiplicity ( irrelevantMult )
 import GHC.Core.Type       hiding( typeKind )
 import qualified GHC.Core.Type as Type
 import GHC.Types.RepType
@@ -1102,7 +1103,7 @@ findMatchingInstances ty = do
   try_cls ies cls
     | Just (arg_kind, res_kind) <- splitFunTy_maybe (tyConKind $ classTyCon cls)
     , tcIsConstraintKind res_kind
-    , Type.typeKind ty `eqType` arg_kind
+    , Type.typeKind ty `eqType` irrelevantMult arg_kind
     , (matches, _, _) <- lookupInstEnv True ies cls [ty]
     = matches
     | otherwise

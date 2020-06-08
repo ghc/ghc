@@ -22,6 +22,7 @@ Types
     type_applications
     rank_polymorphism
     impredicative_types
+    linear_types
     type_errors
     defer_type_errors
     roles

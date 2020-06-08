@@ -31,15 +31,17 @@ import GHC.Types.Basic
 import GHC.Data.BooleanFormula
 import GHC.Core.Class             ( FunDep, className, classSCSelIds )
 import GHC.Core.Utils             ( exprType )
-import GHC.Core.ConLike           ( conLikeName )
+import GHC.Core.ConLike           ( conLikeName, ConLike(RealDataCon) )
 import GHC.Core.TyCon             ( TyCon, tyConClass_maybe )
 import GHC.Core.FVs
+import GHC.Core.DataCon           ( dataConNonlinearType )
 import GHC.HsToCore               ( deSugarExpr )
 import GHC.Types.FieldLabel
 import GHC.Hs
 import GHC.Driver.Types
 import GHC.Unit.Module            ( ModuleName, ml_hs_file )
 import GHC.Utils.Monad            ( concatMapM, liftIO )
+import GHC.Types.Id               ( isDataConId_maybe )
 import GHC.Types.Name             ( Name, nameSrcSpan, setNameLoc, nameUnique )
 import GHC.Types.Name.Env         ( NameEnv, emptyNameEnv, extendNameEnv, lookupNameEnv )
 import GHC.Types.SrcLoc
@@ -606,11 +608,14 @@ instance ToHie (Context (Located Var)) where
           let name = case lookupNameEnv m (varName name') of
                 Just var -> var
                 Nothing-> name'
+              ty = case isDataConId_maybe name' of
+                      Nothing -> varType name'
+                      Just dc -> dataConNonlinearType dc
           pure
             [Node
               (mkSourcedNodeInfo org $ NodeInfo S.empty [] $
                 M.singleton (Right $ varName name)
-                            (IdentifierDetails (Just $ varType name')
+                            (IdentifierDetails (Just ty)
                                                (S.singleton context)))
               span
               []]
@@ -646,7 +651,7 @@ evVarsOfTermList (EvTypeable _ ev)  =
   case ev of
     EvTypeableTyCon _ e   -> concatMap evVarsOfTermList e
     EvTypeableTyApp e1 e2 -> concatMap evVarsOfTermList [e1,e2]
-    EvTypeableTrFun e1 e2 -> concatMap evVarsOfTermList [e1,e2]
+    EvTypeableTrFun e1 e2 e3 -> concatMap evVarsOfTermList [e1,e2,e3]
     EvTypeableTyLit e     -> evVarsOfTermList e
 evVarsOfTermList (EvFun{}) = []
 
@@ -717,6 +722,8 @@ instance HiePass p => HasType (LHsExpr (GhcPass p)) where
         let tyOpt = case e' of
               HsLit _ l -> Just (hsLitType l)
               HsOverLit _ o -> Just (overLitType o)
+
+              HsConLikeOut _ (RealDataCon con) -> Just (dataConNonlinearType con)
 
               HsLam     _ (MG { mg_ext = groupTy }) -> Just (matchGroupType groupTy)
               HsLamCase _ (MG { mg_ext = groupTy }) -> Just (matchGroupType groupTy)
@@ -1514,6 +1521,9 @@ instance ToHie (Located (DerivStrategy GhcRn)) where
 instance ToHie (Located OverlapMode) where
   toHie (L span _) = locOnly span
 
+instance ToHie a => ToHie (HsScaled GhcRn a) where
+  toHie (HsScaled w t) = concatM [toHie (arrowToHsType w), toHie t]
+
 instance ToHie (LConDecl GhcRn) where
   toHie (L span decl) = concatM $ makeNode decl span : case decl of
       ConDeclGADT { con_names = names, con_qvars = exp_vars, con_g_ext = imp_vars
@@ -1543,9 +1553,11 @@ instance ToHie (LConDecl GhcRn) where
           rhsScope = combineScopes ctxScope argsScope
           ctxScope = maybe NoScope mkLScope ctx
           argsScope = condecl_scope dets
-    where condecl_scope args = case args of
-            PrefixCon xs -> foldr combineScopes NoScope $ map mkLScope xs
-            InfixCon a b -> combineScopes (mkLScope a) (mkLScope b)
+    where condecl_scope :: HsConDeclDetails p -> Scope
+          condecl_scope args = case args of
+            PrefixCon xs -> foldr combineScopes NoScope $ map (mkLScope . hsScaledThing) xs
+            InfixCon a b -> combineScopes (mkLScope (hsScaledThing a))
+                                          (mkLScope (hsScaledThing b))
             RecCon x -> mkLScope x
 
 instance ToHie (Located [LConDeclField GhcRn]) where
@@ -1652,8 +1664,9 @@ instance ToHie (TScoped (LHsType GhcRn)) where
         [ toHie ty
         , toHie $ TS (ResolvedScopes []) ki
         ]
-      HsFunTy _ a b ->
-        [ toHie a
+      HsFunTy _ w a b ->
+        [ toHie (arrowToHsType w)
+        , toHie a
         , toHie b
         ]
       HsListTy _ a ->

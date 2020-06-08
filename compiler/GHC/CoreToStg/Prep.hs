@@ -33,6 +33,7 @@ import GHC.Core.Lint    ( endPassIO )
 import GHC.Core
 import GHC.Core.Make hiding( FloatBind(..) )   -- We use our own FloatBind here
 import GHC.Core.Type
+import GHC.Core.Multiplicity
 import GHC.Types.Literal
 import GHC.Core.Coercion
 import GHC.Tc.Utils.Env
@@ -920,7 +921,7 @@ cpeApp top_env expr
               case splitFunTy_maybe fun_ty of
                 Just as -> as
                 Nothing -> pprPanic "cpeBody" (ppr fun_ty $$ ppr expr)
-        (fs, arg') <- cpeArg top_env ss1 arg arg_ty
+        (fs, arg') <- cpeArg top_env ss1 arg (scaledThing arg_ty)
         rebuild_app as (App fun' arg') res_ty (fs `appendFloats` floats) ss_rest
       CpeCast co ->
         let ty2 = coercionRKind co
@@ -1261,7 +1262,7 @@ tryEtaReducePrep bndrs expr@(App _ _)
     ok _    _         = False
 
     -- We can't eta reduce something which must be saturated.
-    ok_to_eta_reduce (Var f) = not (hasNoBinding f)
+    ok_to_eta_reduce (Var f) = not (hasNoBinding f) && not (isLinearType (idType f))
     ok_to_eta_reduce _       = False -- Safe. ToDo: generalise
 
 
@@ -1696,7 +1697,7 @@ newVar :: Type -> UniqSM Id
 newVar ty
  = seqType ty `seq` do
      uniq <- getUniqueM
-     return (mkSysLocalOrCoVar (fsLit "sat") uniq ty)
+     return (mkSysLocalOrCoVar (fsLit "sat") uniq Many ty)
 
 
 ------------------------------------------------------------------------------

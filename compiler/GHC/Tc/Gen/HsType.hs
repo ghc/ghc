@@ -57,6 +57,9 @@ module GHC.Tc.Gen.HsType (
         tcLHsKindSig, checkDataKindSig, DataSort(..),
         checkClassKindSig,
 
+        -- Multiplicity
+        tcMult,
+
         -- Pattern type signatures
         tcHsPatSigType,
 
@@ -85,6 +88,7 @@ import GHC.Core.TyCo.Ppr
 import GHC.Tc.Errors      ( reportAllUnsolved )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Instantiate ( tcInstInvisibleTyBinders, tcInstInvisibleTyBinder )
+import GHC.Core.Multiplicity
 import GHC.Core.Type
 import GHC.Builtin.Types.Prim
 import GHC.Types.Name.Reader( lookupLocalRdrOcc )
@@ -469,7 +473,7 @@ tcHsDeriv hs_ty
        ; let (tvs, pred)    = splitForAllTys ty
              (kind_args, _) = splitFunTys (tcTypeKind pred)
        ; case getClassPredTys_maybe pred of
-           Just (cls, tys) -> return (tvs, cls, tys, kind_args)
+           Just (cls, tys) -> return (tvs, cls, tys, map scaledThing kind_args)
            Nothing -> failWithTc (text "Illegal deriving item" <+> quotes (ppr hs_ty)) }
 
 -- | Typecheck a deriving strategy. For most deriving strategies, this is a
@@ -684,6 +688,9 @@ concern things that the renamer can't handle.
 
 -}
 
+tcMult :: HsArrow GhcRn -> TcM Mult
+tcMult hc = tc_mult (mkMode TypeLevel) hc
+
 -- | Info about the context in which we're checking a type. Currently,
 -- differentiates only between types and kinds, but this will likely
 -- grow, at least to include the distinction between patterns and
@@ -888,12 +895,15 @@ tc_hs_type _ ty@(HsSpliceTy {}) _exp_kind
   = failWithTc (text "Unexpected type splice:" <+> ppr ty)
 
 ---------- Functions and applications
-tc_hs_type mode (HsFunTy _ ty1 ty2) exp_kind
-  = tc_fun_type mode ty1 ty2 exp_kind
+tc_hs_type mode ty@(HsFunTy _ mult ty1 ty2) exp_kind
+  | mode_tyki mode == KindLevel && not (isUnrestricted mult)
+    = failWithTc (text "Linear arrows disallowed in kinds:" <+> ppr ty)
+  | otherwise
+    = tc_fun_type mode mult ty1 ty2 exp_kind
 
 tc_hs_type mode (HsOpTy _ ty1 (L _ op) ty2) exp_kind
   | op `hasKey` funTyConKey
-  = tc_fun_type mode ty1 ty2 exp_kind
+  = tc_fun_type mode HsUnrestrictedArrow ty1 ty2 exp_kind
 
 --------- Foralls
 tc_hs_type mode forall@(HsForAllTy { hst_fvf = fvf, hst_bndrs = hs_tvs
@@ -1089,20 +1099,25 @@ Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in TyCoRep.
 -}
 
 ------------------------------------------
-tc_fun_type :: TcTyMode -> LHsType GhcRn -> LHsType GhcRn -> TcKind
+tc_mult :: TcTyMode -> HsArrow GhcRn -> TcM Mult
+tc_mult mode ty = tc_lhs_type mode (arrowToHsType ty) multiplicityTy
+------------------------------------------
+tc_fun_type :: TcTyMode -> HsArrow GhcRn -> LHsType GhcRn -> LHsType GhcRn -> TcKind
             -> TcM TcType
-tc_fun_type mode ty1 ty2 exp_kind = case mode_tyki mode of
+tc_fun_type mode mult ty1 ty2 exp_kind = case mode_tyki mode of
   TypeLevel ->
     do { arg_k <- newOpenTypeKind
        ; res_k <- newOpenTypeKind
        ; ty1' <- tc_lhs_type mode ty1 arg_k
        ; ty2' <- tc_lhs_type mode ty2 res_k
-       ; checkExpectedKind (HsFunTy noExtField ty1 ty2) (mkVisFunTy ty1' ty2')
+       ; mult' <- tc_mult mode mult
+       ; checkExpectedKind (HsFunTy noExtField mult ty1 ty2) (mkVisFunTy mult' ty1' ty2')
                            liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
     do { ty1' <- tc_lhs_type mode ty1 liftedTypeKind
        ; ty2' <- tc_lhs_type mode ty2 liftedTypeKind
-       ; checkExpectedKind (HsFunTy noExtField ty1 ty2) (mkVisFunTy ty1' ty2')
+       ; mult' <- tc_mult mode mult
+       ; checkExpectedKind (HsFunTy noExtField mult ty1 ty2) (mkVisFunTy mult' ty1' ty2')
                            liftedTypeKind exp_kind }
 
 {- Note [Skolem escape and forall-types]
@@ -2133,7 +2148,7 @@ kcCheckDeclHeader_cusk name flav
                               ++ mkNamedTyConBinders Specified specified
                               ++ map (mkRequiredTyConBinder mentioned_kv_set) tc_tvs
 
-             all_tv_prs = mkTyVarNamePairs (scoped_kvs ++ tc_tvs)
+             all_tv_prs =  mkTyVarNamePairs (scoped_kvs ++ tc_tvs)
              tycon = mkTcTyCon name final_tc_binders res_kind all_tv_prs
                                True -- it is generalised
                                flav
@@ -2368,7 +2383,7 @@ kcCheckDeclHeader_sig kisig name flav
       -- Example:   (a~b) =>
       ZippedBinder (Anon InvisArg bndr_ki) Nothing -> do
         name <- newSysName (mkTyVarOccFS (fsLit "ev"))
-        let tv = mkTyVar name bndr_ki
+        let tv = mkTyVar name (scaledThing bndr_ki)
         return (mkAnonTyConBinder InvisArg tv, [])
 
       -- Non-dependent visible argument with a user-written binder.
@@ -2376,7 +2391,7 @@ kcCheckDeclHeader_sig kisig name flav
       ZippedBinder (Anon VisArg bndr_ki) (Just b) ->
         return $
           let v_name = getName b
-              tv = mkTyVar v_name bndr_ki
+              tv = mkTyVar v_name (scaledThing bndr_ki)
               tcb = mkAnonTyConBinder VisArg tv
           in (tcb, [(v_name, tv)])
 
@@ -3171,7 +3186,7 @@ etaExpandAlgTyCon tc_bndrs kind
           Just (Anon af arg, kind')
             -> go loc occs' uniqs' subst' (tcb : acc) kind'
             where
-              arg'   = substTy subst arg
+              arg'   = substTy subst (scaledThing arg)
               tv     = mkTyVar (mkInternalName uniq occ loc) arg'
               subst' = extendTCvInScope subst tv
               tcb    = Bndr tv (AnonTCB af)

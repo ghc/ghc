@@ -50,7 +50,7 @@ import GHC.Core.Predicate
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
-import GHC.Builtin.Types ( liftedRepTy )
+import GHC.Builtin.Types ( liftedRepTy, manyDataConTy )
 import GHC.Core.Unify    ( tcMatchTyKi )
 import GHC.Utils.Misc
 import GHC.Types.Var
@@ -2222,6 +2222,13 @@ defaultTyVarTcS the_tv
     -- and Note [Inferring kinds for type declarations] in GHC.Tc.TyCl
   = do { traceTcS "defaultTyVarTcS RuntimeRep" (ppr the_tv)
        ; unifyTyVar the_tv liftedRepTy
+       ; return True }
+  | isMultiplicityVar the_tv
+  , not (isTyVarTyVar the_tv)  -- TyVarTvs should only be unified with a tyvar
+                             -- never with a type; c.f. TcMType.defaultTyVar
+                             -- See Note [Kind generalisation and SigTvs]
+  = do { traceTcS "defaultTyVarTcS Multiplicity" (ppr the_tv)
+       ; unifyTyVar the_tv manyDataConTy
        ; return True }
   | otherwise
   = return False  -- the common case

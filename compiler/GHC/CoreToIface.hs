@@ -61,6 +61,7 @@ import GHC.Builtin.Names
 import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Core.Type
+import GHC.Core.Multiplicity
 import GHC.Core.PatSyn
 import GHC.Utils.Outputable
 import GHC.Data.FastString
@@ -118,7 +119,8 @@ toIfaceIdBndr :: Id -> IfaceIdBndr
 toIfaceIdBndr = toIfaceIdBndrX emptyVarSet
 
 toIfaceIdBndrX :: VarSet -> CoVar -> IfaceIdBndr
-toIfaceIdBndrX fr covar = ( occNameFS (getOccName covar)
+toIfaceIdBndrX fr covar = ( toIfaceType (idMult covar)
+                          , occNameFS (getOccName covar)
                           , toIfaceTypeX fr (varType covar)
                           )
 
@@ -170,8 +172,8 @@ toIfaceTypeX fr ty@(AppTy {})  =
 toIfaceTypeX _  (LitTy n)      = IfaceLitTy (toIfaceTyLit n)
 toIfaceTypeX fr (ForAllTy b t) = IfaceForAllTy (toIfaceForAllBndrX fr b)
                                                (toIfaceTypeX (fr `delVarSet` binderVar b) t)
-toIfaceTypeX fr (FunTy { ft_arg = t1, ft_res = t2, ft_af = af })
-  = IfaceFunTy af (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
+toIfaceTypeX fr (FunTy { ft_arg = t1, ft_mult = w, ft_res = t2, ft_af = af })
+  = IfaceFunTy af (toIfaceTypeX fr w) (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
 toIfaceTypeX fr (CastTy ty co)  = IfaceCastTy (toIfaceTypeX fr ty) (toIfaceCoercionX fr co)
 toIfaceTypeX fr (CoercionTy co) = IfaceCoercionTy (toIfaceCoercionX fr co)
 
@@ -290,9 +292,10 @@ toIfaceCoercionX fr co
                                           (toIfaceTypeX fr t2)
     go (TyConAppCo r tc cos)
       | tc `hasKey` funTyConKey
-      , [_,_,_,_] <- cos         = pprPanic "toIfaceCoercion" (ppr co)
-      | otherwise                = IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
-    go (FunCo r co1 co2)   = IfaceFunCo r (go co1) (go co2)
+      , [_,_,_,_, _] <- cos         = pprPanic "toIfaceCoercion" empty
+      | otherwise                =
+        IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
+    go (FunCo r w co1 co2)   = IfaceFunCo r (go w) (go co1) (go co2)
 
     go (ForAllCo tv k co) = IfaceForAllCo (toIfaceBndr tv)
                                           (toIfaceCoercionX fr' k)
@@ -388,7 +391,7 @@ patSynToIfaceDecl ps
                 , ifPatExBndrs    = map toIfaceForAllBndr ex_bndrs'
                 , ifPatProvCtxt   = tidyToIfaceContext env2 prov_theta
                 , ifPatReqCtxt    = tidyToIfaceContext env2 req_theta
-                , ifPatArgs       = map (tidyToIfaceType env2) args
+                , ifPatArgs       = map (tidyToIfaceType env2 . scaledThing) args
                 , ifPatTy         = tidyToIfaceType env2 rhs_ty
                 , ifFieldLabels   = (patSynFieldLabels ps)
                 }

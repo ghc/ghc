@@ -1,0 +1,11 @@
+steps:
+  - label: Build and test
+    agents:
+      queue: ghc
+    command: |
+      echo "BuildFlavour = validate" > mk/build.mk
+      cat mk/build.mk.sample >> mk/build.mk
+      nix-shell --pure --run "./boot && configure_ghc && make -j9"
+      mkdir -p test-results
+      nix-shell --pure --run "THREADS=9 TEST_ENV=x86_64-linux make test"
+    timeout: 200

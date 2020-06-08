@@ -5,8 +5,8 @@ GhcStage2HcOpts    = -O -dcore-lint -dno-debug-output
 GhcLibHcOpts       = -O -dcore-lint -dno-debug-output
 BUILD_PROF_LIBS    = NO
 SplitSections      = NO
-HADDOCK_DOCS       = YES
-BUILD_SPHINX_HTML ?= YES
+HADDOCK_DOCS       = NO
+BUILD_SPHINX_HTML ?= NO
 BUILD_SPHINX_PDF  ?= NO
 
 ifeq "$(ValidateHpc)" "YES"
@@ -24,8 +24,6 @@ endif
 ifneq "$(ValidateSpeed)" "FAST"
 BUILD_EXTRA_PKGS   = YES
 endif
-
-WERROR             = -Werror
 
 # Reduce optimisation when building Cabal; this makes a significant difference
 # in overall build time. See #16817.

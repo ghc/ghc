@@ -40,6 +40,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
+import GHC.Core.Multiplicity
 import GHC.Utils.Misc
 import GHC.Types.Var
 import GHC.Types.Var.Set
@@ -557,7 +558,7 @@ deepSubtypesContaining tv
 foldDataConArgs :: FFoldType a -> DataCon -> [a]
 -- Fold over the arguments of the datacon
 foldDataConArgs ft con
-  = map foldArg (dataConOrigArgTys con)
+  = map foldArg (map scaledThing $ dataConOrigArgTys con)
   where
     foldArg
       = case getTyVar_maybe (last (tyConAppArgs (dataConOrigResTy con))) of

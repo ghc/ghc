@@ -36,7 +36,7 @@ module GHC.Tc.Utils.Zonk (
         zonkTyVarBinders, zonkTyVarBindersX, zonkTyVarBinderX,
         zonkTyBndrs, zonkTyBndrsX,
         zonkTcTypeToType,  zonkTcTypeToTypeX,
-        zonkTcTypesToTypes, zonkTcTypesToTypesX,
+        zonkTcTypesToTypes, zonkTcTypesToTypesX, zonkScaledTcTypesToTypesX,
         zonkTyVarOcc,
         zonkCoToCo,
         zonkEvBinds, zonkTcEvBinds,
@@ -80,6 +80,7 @@ import GHC.Data.Bag
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Types.Unique.FM
+import GHC.Core.Multiplicity
 import GHC.Core
 
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (runTopSplice)
@@ -372,11 +373,11 @@ zonkIdOccs env ids = map (zonkIdOcc env) ids
 -- to its final form.  The TyVarEnv give
 zonkIdBndr :: ZonkEnv -> TcId -> TcM Id
 zonkIdBndr env v
-  = do ty' <- zonkTcTypeToTypeX env (idType v)
+  = do Scaled w' ty' <- zonkScaledTcTypeToTypeX env (idScaledType v)
        ensureNotLevPoly ty'
          (text "In the type of binder" <+> quotes (ppr v))
 
-       return (modifyIdInfo (`setLevityInfoWithType` ty') (setIdType v ty'))
+       return (modifyIdInfo (`setLevityInfoWithType` ty') (setIdMult (setIdType v ty') w'))
 
 zonkIdBndrs :: ZonkEnv -> [TcId] -> TcM [Id]
 zonkIdBndrs env ids = mapM (zonkIdBndr env) ids
@@ -401,11 +402,7 @@ zonkEvBndr :: ZonkEnv -> EvVar -> TcM EvVar
 -- Works for dictionaries and coercions
 -- Does not extend the ZonkEnv
 zonkEvBndr env var
-  = do { let var_ty = varType var
-       ; ty <-
-           {-# SCC "zonkEvBndr_zonkTcTypeToType" #-}
-           zonkTcTypeToTypeX env var_ty
-       ; return (setVarType var ty) }
+  = updateVarTypeAndMultM ({-# SCC "zonkEvBndr_zonkTcTypeToType" #-} zonkTcTypeToTypeX env) var
 
 {-
 zonkEvVarOcc :: ZonkEnv -> EvVar -> TcM EvTerm
@@ -583,10 +580,10 @@ zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
   where
     zonk_val_bind env lbind
       | has_sig
-      , (L loc bind@(FunBind { fun_id      = L mloc mono_id
+      , (L loc bind@(FunBind { fun_id      = (L mloc mono_id)
                              , fun_matches = ms
                              , fun_ext     = co_fn })) <- lbind
-      = do { new_mono_id <- updateVarTypeM (zonkTcTypeToTypeX env) mono_id
+      = do { new_mono_id <- updateVarTypeAndMultM (zonkTcTypeToTypeX env) mono_id
                             -- Specifically /not/ zonkIdBndr; we do not
                             -- want to complain about a levity-polymorphic binder
            ; (env', new_co_fn) <- zonkCoFn env co_fn
@@ -674,7 +671,7 @@ zonkMatchGroup env zBody (MG { mg_alts = L l ms
                              , mg_ext = MatchGroupTc arg_tys res_ty
                              , mg_origin = origin })
   = do  { ms' <- mapM (zonkMatch env zBody) ms
-        ; arg_tys' <- zonkTcTypesToTypesX env arg_tys
+        ; arg_tys' <- zonkScaledTcTypesToTypesX env arg_tys
         ; res_ty'  <- zonkTcTypeToTypeX env res_ty
         ; return (MG { mg_alts = L l ms'
                      , mg_ext = MatchGroupTc arg_tys' res_ty'
@@ -1043,7 +1040,7 @@ zonkCoFn env (WpCompose c1 c2) = do { (env1, c1') <- zonkCoFn env c1
                                     ; return (env2, WpCompose c1' c2') }
 zonkCoFn env (WpFun c1 c2 t1 d) = do { (env1, c1') <- zonkCoFn env c1
                                      ; (env2, c2') <- zonkCoFn env1 c2
-                                     ; t1'         <- zonkTcTypeToTypeX env2 t1
+                                     ; t1'         <- zonkScaledTcTypeToTypeX env2 t1
                                      ; return (env2, WpFun c1' c2' t1' d) }
 zonkCoFn env (WpCast co) = do { co' <- zonkCoToCo env co
                               ; return (env, WpCast co') }
@@ -1058,6 +1055,8 @@ zonkCoFn env (WpTyApp ty)   = do { ty' <- zonkTcTypeToTypeX env ty
                                  ; return (env, WpTyApp ty') }
 zonkCoFn env (WpLet bs)     = do { (env1, bs') <- zonkTcEvBinds env bs
                                  ; return (env1, WpLet bs') }
+zonkCoFn env (WpMultCoercion co) = do { co' <- zonkCoToCo env co
+                                      ; return (env, WpMultCoercion co') }
 
 -------------------------------------------------------------------------
 zonkOverLit :: ZonkEnv -> HsOverLit GhcTcId -> TcM (HsOverLit GhcTc)
@@ -1199,6 +1198,7 @@ zonkStmt env _ (LetStmt x (L l binds))
 
 zonkStmt env zBody (BindStmt xbs pat body)
   = do  { (env1, new_bind) <- zonkSyntaxExpr env (xbstc_bindOp xbs)
+        ; new_w <- zonkTcTypeToTypeX env1 (xbstc_boundResultMult xbs)
         ; new_bind_ty <- zonkTcTypeToTypeX env1 (xbstc_boundResultType xbs)
         ; new_body <- zBody env1 body
         ; (env2, new_pat) <- zonkPat env1 pat
@@ -1209,6 +1209,7 @@ zonkStmt env zBody (BindStmt xbs pat body)
                  , BindStmt (XBindStmtTc
                               { xbstc_bindOp = new_bind
                               , xbstc_boundResultType = new_bind_ty
+                              , xbstc_boundResultMult = new_w
                               , xbstc_failOp = new_fail
                               })
                             new_pat new_body) }
@@ -1617,10 +1618,11 @@ zonkEvTypeable env (EvTypeableTyApp t1 t2)
   = do { t1' <- zonkEvTerm env t1
        ; t2' <- zonkEvTerm env t2
        ; return (EvTypeableTyApp t1' t2') }
-zonkEvTypeable env (EvTypeableTrFun t1 t2)
-  = do { t1' <- zonkEvTerm env t1
+zonkEvTypeable env (EvTypeableTrFun tm t1 t2)
+  = do { tm' <- zonkEvTerm env tm
+       ; t1' <- zonkEvTerm env t1
        ; t2' <- zonkEvTerm env t2
-       ; return (EvTypeableTrFun t1' t2') }
+       ; return (EvTypeableTrFun tm' t1' t2') }
 zonkEvTypeable env (EvTypeableTyLit t1)
   = do { t1' <- zonkEvTerm env t1
        ; return (EvTypeableTyLit t1') }
@@ -1805,6 +1807,9 @@ commitFlexi flexi tv zonked_kind
         | isRuntimeRepTy zonked_kind
         -> do { traceTc "Defaulting flexi tyvar to LiftedRep:" (pprTyVar tv)
               ; return liftedRepTy }
+        | isMultiplicityTy zonked_kind
+        -> do { traceTc "Defaulting flexi tyvar to Many:" (pprTyVar tv)
+              ; return manyDataConTy }
         | otherwise
         -> do { traceTc "Defaulting flexi tyvar to Any:" (pprTyVar tv)
               ; return (anyTypeOfKind zonked_kind) }
@@ -1871,11 +1876,19 @@ zonkTcTypeToType ty = initZonkEnv $ \ ze -> zonkTcTypeToTypeX ze ty
 zonkTcTypesToTypes :: [TcType] -> TcM [Type]
 zonkTcTypesToTypes tys = initZonkEnv $ \ ze -> zonkTcTypesToTypesX ze tys
 
+zonkScaledTcTypeToTypeX :: ZonkEnv -> Scaled TcType -> TcM (Scaled TcType)
+zonkScaledTcTypeToTypeX env (Scaled m ty) = Scaled <$> zonkTcTypeToTypeX env m
+                                                   <*> zonkTcTypeToTypeX env ty
+
 zonkTcTypeToTypeX   :: ZonkEnv -> TcType   -> TcM Type
 zonkTcTypesToTypesX :: ZonkEnv -> [TcType] -> TcM [Type]
 zonkCoToCo          :: ZonkEnv -> Coercion -> TcM Coercion
 (zonkTcTypeToTypeX, zonkTcTypesToTypesX, zonkCoToCo, _)
   = mapTyCoX zonk_tycomapper
+
+zonkScaledTcTypesToTypesX :: ZonkEnv -> [Scaled TcType] -> TcM [Scaled Type]
+zonkScaledTcTypesToTypesX env scaled_tys =
+   mapM (zonkScaledTcTypeToTypeX env) scaled_tys
 
 zonkTcMethInfoToMethInfoX :: ZonkEnv -> TcMethInfo -> TcM MethInfo
 zonkTcMethInfoToMethInfoX ze (name, ty, gdm_spec)

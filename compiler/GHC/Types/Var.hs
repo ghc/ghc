@@ -45,10 +45,14 @@ module GHC.Types.Var (
 
         -- ** Taking 'Var's apart
         varName, varUnique, varType,
+        varMult, varMultMaybe,
+        varScaledType,
 
         -- ** Modifying 'Var's
-        setVarName, setVarUnique, setVarType, updateVarType,
-        updateVarTypeM,
+        setVarName, setVarUnique, setVarType,
+        scaleVarBy, setVarMult,
+        updateVarTypeButNotMult,
+        updateVarTypeAndMult, updateVarTypeAndMultM,
 
         -- ** Constructing, taking apart, modifying 'Id's
         mkGlobalVar, mkLocalVar, mkExportedLocalVar, mkCoVar,
@@ -99,6 +103,7 @@ import {-# SOURCE #-}   GHC.Core.TyCo.Ppr( pprKind )
 import {-# SOURCE #-}   GHC.Tc.Utils.TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTv )
 import {-# SOURCE #-}   GHC.Types.Id.Info( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
                                            vanillaIdInfo, pprIdDetails )
+import GHC.Core.Multiplicity
 
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Unique ( Uniquable, Unique, getKey, getUnique
@@ -249,6 +254,7 @@ data Var
         varName    :: !Name,
         realUnique :: {-# UNPACK #-} !Int,
         varType    :: Type,
+        varMult    :: Mult,             -- See Note [Multiplicity of let binders]
         idScope    :: IdScope,
         id_details :: IdDetails,        -- Stable, doesn't change
         id_info    :: IdInfo }          -- Unstable, updated by simplifier
@@ -299,6 +305,18 @@ A LocalId is
   * always treated as a candidate by the free-variable finder
 
 After CoreTidy, top-level LocalIds are turned into GlobalIds
+
+Note [Multiplicity of let binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In Core, let-binders' multiplicity is always completely determined by syntax:
+a recursive let will always have multiplicity Many (it's a prerequisite for
+being recursive), and non-recursive let doesn't have a conventional multiplicity,
+instead they act, for the purpose of multiplicity, as an alias for their
+right-hand side.
+
+Therefore, the `varMult` field of identifier is only used by binders in lambda
+and case expressions. In a let expression the `varMult` field holds an
+arbitrary value which will (and must!) be ignored.
 -}
 
 instance Outputable Var where
@@ -322,7 +340,8 @@ instance Outputable Var where
                   _  -> empty
             in if
                |  debug && (not supp_var_kinds)
-                 -> parens (ppr (varName var) <+> ppr_var <+>
+                 -> parens (ppr (varName var) <+> ppr (varMultMaybe var)
+                                              <+> ppr_var <+>
                           dcolon <+> pprKind (tyVarKind var))
                |  otherwise
                  -> ppr (varName var) <> ppr_var
@@ -380,12 +399,39 @@ setVarName var new_name
 setVarType :: Id -> Type -> Id
 setVarType id ty = id { varType = ty }
 
-updateVarType :: (Type -> Type) -> Id -> Id
-updateVarType f id = id { varType = f (varType id) }
+updateVarTypeButNotMult :: (Type -> Type) -> Id -> Id
+updateVarTypeButNotMult f id = id { varType = f (varType id) }
 
-updateVarTypeM :: Monad m => (Type -> m Type) -> Id -> m Id
-updateVarTypeM f id = do { ty' <- f (varType id)
-                         ; return (id { varType = ty' }) }
+updateVarTypeAndMult :: (Type -> Type) -> Id -> Id
+updateVarTypeAndMult f id = let id' = id { varType = f (varType id) }
+                            in case varMultMaybe id' of
+                                      Just w -> setVarMult id' (f w)
+                                      Nothing -> id'
+
+updateVarTypeAndMultM :: Monad m => (Type -> m Type) -> Id -> m Id
+updateVarTypeAndMultM f id = do { ty' <- f (varType id)
+                                ; let id' = setVarType id ty'
+                                ; case varMultMaybe id of
+                                    Just w -> do w' <- f w
+                                                 return $ setVarMult id' w'
+                                    Nothing -> return id'
+                                }
+
+varMultMaybe :: Id -> Maybe Mult
+varMultMaybe (Id { varMult = mult }) = Just mult
+varMultMaybe _ = Nothing
+
+varScaledType :: Id -> Scaled Kind
+varScaledType var = Scaled (varMult var) (varType var)
+
+scaleVarBy :: Mult -> Id -> Id
+scaleVarBy m id@(Id { varMult = w }) =
+  id { varMult = m `mkMultMul` w }
+scaleVarBy _ id = id
+
+setVarMult :: Id -> Mult -> Id
+setVarMult id r | isId id = id { varMult = r }
+                | otherwise = pprPanic "setVarMult" (ppr id <+> ppr r)
 
 {- *********************************************************************
 *                                                                      *
@@ -706,25 +752,29 @@ idDetails other                         = pprPanic "idDetails" (ppr other)
 -- Ids, because Id.hs uses 'mkGlobalId' etc with different types
 mkGlobalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalVar details name ty info
-  = mk_id name ty GlobalId details info
+  = mk_id name Many ty GlobalId details info
+  -- There is no support for linear global variables yet. They would require
+  -- being checked at link-time, which can be useful, but is not a priority.
 
-mkLocalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
-mkLocalVar details name ty info
-  = mk_id name ty (LocalId NotExported) details  info
+mkLocalVar :: IdDetails -> Name -> Mult -> Type -> IdInfo -> Id
+mkLocalVar details name w ty info
+  = mk_id name w ty (LocalId NotExported) details  info
 
 mkCoVar :: Name -> Type -> CoVar
 -- Coercion variables have no IdInfo
-mkCoVar name ty = mk_id name ty (LocalId NotExported) coVarDetails vanillaIdInfo
+mkCoVar name ty = mk_id name Many ty (LocalId NotExported) coVarDetails vanillaIdInfo
 
 -- | Exported 'Var's will not be removed as dead code
 mkExportedLocalVar :: IdDetails -> Name -> Type -> IdInfo -> Id
 mkExportedLocalVar details name ty info
-  = mk_id name ty (LocalId Exported) details info
+  = mk_id name Many ty (LocalId Exported) details info
+  -- There is no support for exporting linear variables. See also [mkGlobalVar]
 
-mk_id :: Name -> Type -> IdScope -> IdDetails -> IdInfo -> Id
-mk_id name ty scope details info
+mk_id :: Name -> Mult -> Type -> IdScope -> IdDetails -> IdInfo -> Id
+mk_id name w ty scope details info
   = Id { varName    = name,
          realUnique = getKey (nameUnique name),
+         varMult    = w,
          varType    = ty,
          idScope    = scope,
          id_details = details,

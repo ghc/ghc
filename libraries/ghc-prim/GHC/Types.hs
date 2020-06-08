@@ -1,6 +1,7 @@
 {-# LANGUAGE MagicHash, NoImplicitPrelude, TypeFamilies, UnboxedTuples,
              MultiParamTypeClasses, RoleAnnotations, CPP, TypeOperators,
-             PolyKinds #-}
+             PolyKinds, NegativeLiterals, DataKinds #-}
+-- NegativeLiterals: see Note [Fixity of (->)]
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Types
@@ -40,12 +41,39 @@ module GHC.Types (
 
         -- * Runtime type representation
         Module(..), TrName(..), TyCon(..), TypeLitSort(..),
-        KindRep(..), KindBndr
+        KindRep(..), KindBndr,
+
+        -- * Multiplicity Types
+        Multiplicity(..), MultMul
     ) where
 
 import GHC.Prim
 
 infixr 5 :
+
+
+{- *********************************************************************
+*                                                                      *
+                  Functions
+*                                                                      *
+********************************************************************* -}
+
+infixr -1 ->
+{-
+Note [Fixity of (->)]
+~~~~~~~~~~~~~~~~~~~~~
+This declaration is important for :info (->) command (issue #10145)
+1) The parser parses -> as if it had lower fixity than 0,
+   so we conventionally use -1 (issue #15235).
+2) Fixities outside the 0-9 range are exceptionally allowed
+   for (->) (see checkPrecP in RdrHsSyn)
+3) The negative fixity -1 must be parsed as a single token,
+   hence this module requires NegativeLiterals.
+-}
+
+-- | The regular function type
+type (->) = FUN 'Many
+-- See Note [Linear Types] in Multiplicity
 
 {- *********************************************************************
 *                                                                      *
@@ -58,6 +86,14 @@ data Constraint
 
 -- | The kind of types with lifted values. For example @Int :: Type@.
 type Type = TYPE 'LiftedRep
+
+data Multiplicity = Many | One
+
+type family MultMul (a :: Multiplicity) (b :: Multiplicity) :: Multiplicity where
+  MultMul 'One x = x
+  MultMul x 'One = x
+  MultMul 'Many x = 'Many
+  MultMul x 'Many = 'Many
 
 {- *********************************************************************
 *                                                                      *
@@ -185,13 +221,6 @@ or the 'Prelude.>>' and 'Prelude.>>=' operations from the 'Prelude.Monad'
 class.
 -}
 newtype IO a = IO (State# RealWorld -> (# State# RealWorld, a #))
-type role IO representational
-
-{- The 'type role' role annotation for IO is redundant but is included
-because this role is significant in the normalisation of FFI
-types. Specifically, if this role were to become nominal (which would
-be very strange, indeed!), changes elsewhere in GHC would be
-necessary. See [FFI type roles] in GHC.Tc.Gen.Foreign.  -}
 
 
 {- *********************************************************************

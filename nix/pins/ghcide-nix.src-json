@@ -1,0 +1,8 @@
+{
+  "url": "https://github.com/cachix/ghcide-nix",
+  "rev": "c940edd61eedba6750671fc142c9422cced73528",
+  "date": "2020-02-06T05:36:05+01:00",
+  "sha256": "01f2x5sgncd468h99w3mpkkb1203akachm12czmiwbvgishf7dwp",
+  "fetchSubmodules": false
+}
+

@@ -4,7 +4,7 @@
 
 -}
 
-{-# LANGUAGE CPP, TupleSections, MultiWayIf #-}
+{-# LANGUAGE CPP, TupleSections, MultiWayIf, PatternSynonyms #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -26,6 +26,7 @@ module GHC.Tc.Utils.TcMType (
   cloneMetaTyVar,
   newFmvTyVar, newFskTyVar,
 
+  newMultiplicityVar,
   readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
   newTauTvDetailsAtLevel, newMetaDetails, newMetaTyVarName,
   isFilledMetaTyVar_maybe, isFilledMetaTyVar, isUnfilledMetaTyVar,
@@ -126,6 +127,7 @@ import GHC.Data.FastString
 import GHC.Data.Bag
 import GHC.Data.Pair
 import GHC.Types.Unique.Set
+import GHC.Core.Multiplicity
 import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Types.Basic ( TypeOrKind(..) )
@@ -173,7 +175,7 @@ newEvVars theta = mapM newEvVar theta
 newEvVar :: TcPredType -> TcRnIf gbl lcl EvVar
 -- Creates new *rigid* variables for predicates
 newEvVar ty = do { name <- newSysName (predTypeOccName ty)
-                 ; return (mkLocalIdOrCoVar name ty) }
+                 ; return (mkLocalIdOrCoVar name Many ty) }
 
 newWanted :: CtOrigin -> Maybe TypeOrKind -> PredType -> TcM CtEvidence
 -- Deals with both equality and non-equality predicates
@@ -286,7 +288,7 @@ emitNewExprHole occ ev_id ty
 newDict :: Class -> [TcType] -> TcM DictId
 newDict cls tys
   = do { name <- newSysName (mkDictOcc (getOccName cls))
-       ; return (mkLocalId name (mkClassPred cls tys)) }
+       ; return (mkLocalId name Many (mkClassPred cls tys)) }
 
 predTypeOccName :: PredType -> OccName
 predTypeOccName ty = case classifyPredType ty of
@@ -931,6 +933,7 @@ writeMetaTyVarRef tyvar ref ty
        -- Check for level OK
        -- See Note [Level check when unifying]
        ; MASSERT2( level_check_ok, level_check_msg )
+       -- another level check problem, see #97
 
        -- Check Kinds ok
        ; MASSERT2( kind_check_ok, kind_msg )
@@ -987,6 +990,9 @@ coercion variables, except for the special case of the promoted Eq#. But,
 that can't ever appear in user code, so we're safe!
 -}
 
+
+newMultiplicityVar :: TcM TcType
+newMultiplicityVar = newFlexiTyVarTy multiplicityTy
 
 newFlexiTyVar :: Kind -> TcM TcTyVar
 newFlexiTyVar kind = newAnonMetaTyVar TauTv kind
@@ -1326,9 +1332,9 @@ collect_cand_qtvs orig_ty is_dep bound dvs ty
     -----------------
     go :: CandidatesQTvs -> TcType -> TcM CandidatesQTvs
     -- Uses accumulating-parameter style
-    go dv (AppTy t1 t2)     = foldlM go dv [t1, t2]
-    go dv (TyConApp _ tys)  = foldlM go dv tys
-    go dv (FunTy _ arg res) = foldlM go dv [arg, res]
+    go dv (AppTy t1 t2)    = foldlM go dv [t1, t2]
+    go dv (TyConApp _ tys) = foldlM go dv tys
+    go dv (FunTy _ w arg res) = foldlM go dv [w, arg, res]
     go dv (LitTy {})        = return dv
     go dv (CastTy ty co)    = do dv1 <- go dv ty
                                  collect_cand_qtvs_co orig_ty bound dv1 co
@@ -1399,7 +1405,7 @@ collect_cand_qtvs_co orig_ty bound = go_co
                                         go_mco dv1 mco
     go_co dv (TyConAppCo _ _ cos)  = foldlM go_co dv cos
     go_co dv (AppCo co1 co2)       = foldlM go_co dv [co1, co2]
-    go_co dv (FunCo _ co1 co2)     = foldlM go_co dv [co1, co2]
+    go_co dv (FunCo _ w co1 co2)   = foldlM go_co dv [w, co1, co2]
     go_co dv (AxiomInstCo _ _ cos) = foldlM go_co dv cos
     go_co dv (AxiomRuleCo _ cos)   = foldlM go_co dv cos
     go_co dv (UnivCo prov _ t1 t2) = do dv1 <- go_prov dv prov
@@ -1731,6 +1737,10 @@ defaultTyVar default_kind tv
   = do { traceTc "Defaulting a RuntimeRep var to LiftedRep" (ppr tv)
        ; writeMetaTyVar tv liftedRepTy
        ; return True }
+  | isMultiplicityVar tv
+  = do { traceTc "Defaulting a Multiplicty var to Many" (ppr tv)
+       ; writeMetaTyVar tv manyDataConTy
+       ; return True }
 
   | default_kind            -- -XNoPolyKinds and this is a kind var
   = default_kind_var tv     -- so default it to * if possible
@@ -2036,8 +2046,7 @@ zonkImplication implic@(Implic { ic_skols  = skols
                         , ic_info   = info' }) }
 
 zonkEvVar :: EvVar -> TcM EvVar
-zonkEvVar var = do { ty' <- zonkTcType (varType var)
-                   ; return (setVarType var ty') }
+zonkEvVar var = updateVarTypeAndMultM zonkTcType var
 
 
 zonkWC :: WantedConstraints -> TcM WantedConstraints
@@ -2224,9 +2233,7 @@ zonkInvisTVBinder (Bndr tv spec) = do { tv' <- zonkTcTyVarToTyVar tv
 
 -- zonkId is used *during* typechecking just to zonk the Id's type
 zonkId :: TcId -> TcM TcId
-zonkId id
-  = do { ty' <- zonkTcType (idType id)
-       ; return (Id.setIdType id ty') }
+zonkId id = Id.updateIdTypeAndMultM zonkTcType id
 
 zonkCoVar :: CoVar -> TcM CoVar
 zonkCoVar = zonkId
@@ -2314,7 +2321,7 @@ tidyHole env h@(Hole { hole_ty = ty }) = h { hole_ty = tidyType env ty }
 
 ----------------
 tidyEvVar :: TidyEnv -> EvVar -> EvVar
-tidyEvVar env var = setVarType var (tidyType env (varType var))
+tidyEvVar env var = updateVarTypeAndMult (tidyType env) var
 
 ----------------
 tidySkolemInfo :: TidyEnv -> SkolemInfo -> SkolemInfo
@@ -2339,8 +2346,10 @@ tidySigSkol env cx ty tv_prs
       where
         (env', tv') = tidy_tv_bndr env tv
 
-    tidy_ty env ty@(FunTy InvisArg arg res) -- Look under  c => t
-      = ty { ft_arg = tidyType env arg, ft_res = tidy_ty env res }
+    tidy_ty env ty@(FunTy InvisArg w arg res) -- Look under  c => t
+      = ty { ft_mult = tidy_ty env w,
+             ft_arg = tidyType env arg,
+             ft_res = tidy_ty env res }
 
     tidy_ty env ty = tidyType env ty
 

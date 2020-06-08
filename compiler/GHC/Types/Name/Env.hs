@@ -20,7 +20,7 @@ module GHC.Types.Name.Env (
         extendNameEnv_C, extendNameEnv_Acc, extendNameEnv,
         extendNameEnvList, extendNameEnvList_C,
         filterNameEnv, anyNameEnv,
-        plusNameEnv, plusNameEnv_C, alterNameEnv,
+        plusNameEnv, plusNameEnv_C, plusNameEnv_CD, plusNameEnv_CD2, alterNameEnv,
         lookupNameEnv, lookupNameEnv_NF, delFromNameEnv, delListFromNameEnv,
         elemNameEnv, mapNameEnv, disjointNameEnv,
 
@@ -106,6 +106,8 @@ extendNameEnv_Acc  :: (a->b->b) -> (a->b) -> NameEnv b -> Name -> a -> NameEnv b
 extendNameEnv      :: NameEnv a -> Name -> a -> NameEnv a
 plusNameEnv        :: NameEnv a -> NameEnv a -> NameEnv a
 plusNameEnv_C      :: (a->a->a) -> NameEnv a -> NameEnv a -> NameEnv a
+plusNameEnv_CD     :: (a->a->a) -> NameEnv a -> a -> NameEnv a -> a -> NameEnv a
+plusNameEnv_CD2    :: (Maybe a->Maybe a->a) -> NameEnv a -> NameEnv a -> NameEnv a
 extendNameEnvList  :: NameEnv a -> [(Name,a)] -> NameEnv a
 extendNameEnvList_C :: (a->a->a) -> NameEnv a -> [(Name,a)] -> NameEnv a
 delFromNameEnv     :: NameEnv a -> Name -> NameEnv a
@@ -132,6 +134,8 @@ mkNameEnvWith f       = mkNameEnv . map (\a -> (f a, a))
 elemNameEnv x y          = elemUFM x y
 plusNameEnv x y          = plusUFM x y
 plusNameEnv_C f x y      = plusUFM_C f x y
+plusNameEnv_CD f x d y b = plusUFM_CD f x d y b
+plusNameEnv_CD2 f x y    = plusUFM_CD2 f x y
 extendNameEnv_C f x y z  = addToUFM_C f x y z
 mapNameEnv f x           = mapUFM f x
 extendNameEnv_Acc x y z a b  = addToUFM_Acc x y z a b
