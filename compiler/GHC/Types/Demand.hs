@@ -71,6 +71,7 @@ import GHC.Data.Maybe   ( orElse )
 import GHC.Core.Type    ( Type )
 import GHC.Core.TyCon   ( isNewTyCon, isClassTyCon )
 import GHC.Core.DataCon ( splitDataProductType_maybe )
+import GHC.Core.Multiplicity    ( scaledThing )
 
 {-
 ************************************************************************
@@ -1957,7 +1958,7 @@ strictifyDictDmd ty dmd = case getUseDmd dmd of
              -- smells like reboxing; results in CBV boxed
              --
              -- TODO revisit this if we ever do boxity analysis
-           | otherwise -> case mkProdDmd $ zipWith strictifyDictDmd inst_con_arg_tys dmds of
+           | otherwise -> case mkProdDmd $ zipWith strictifyDictDmd (map scaledThing inst_con_arg_tys) dmds of
                JD {sd = s,ud = a} -> JD (Str s) (Use n a)
              -- TODO could optimize with an aborting variant of zipWith since
              -- the superclass dicts are always a prefix

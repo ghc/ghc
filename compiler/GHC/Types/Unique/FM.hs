@@ -49,6 +49,7 @@ module GHC.Types.Unique.FM (
         plusUFM,
         plusUFM_C,
         plusUFM_CD,
+        plusUFM_CD2,
         plusMaybeUFM_C,
         plusUFMList,
         minusUFM,
@@ -202,17 +203,36 @@ plusUFM_C f (UFM x) (UFM y) = UFM (M.unionWith f x y)
 --    == {A: f 1 42, B: f 2 3, C: f 23 4 }
 -- @
 plusUFM_CD
-  :: (elt -> elt -> elt)
-  -> UniqFM elt  -- map X
-  -> elt         -- default for X
-  -> UniqFM elt  -- map Y
-  -> elt         -- default for Y
-  -> UniqFM elt
+  :: (elta -> eltb -> eltc)
+  -> UniqFM elta  -- map X
+  -> elta         -- default for X
+  -> UniqFM eltb  -- map Y
+  -> eltb         -- default for Y
+  -> UniqFM eltc
 plusUFM_CD f (UFM xm) dx (UFM ym) dy
   = UFM $ M.mergeWithKey
       (\_ x y -> Just (x `f` y))
       (M.map (\x -> x `f` dy))
       (M.map (\y -> dx `f` y))
+      xm ym
+
+-- | `plusUFM_CD2 f m1 m2` merges the maps using `f` as the combining
+-- function. Unlike `plusUFM_CD`, a missing value is not defaulted: it is
+-- instead passed as `Nothing` to `f`. `f` can never have both its arguments
+-- be `Nothing`.
+--
+-- `plusUFM_CD2 f m1 m2` is the same as `plusUFM_CD f (mapUFM Just m1) Nothing
+-- (mapUFM Just m2) Nothing`.
+plusUFM_CD2
+  :: (Maybe elta -> Maybe eltb -> eltc)
+  -> UniqFM elta  -- map X
+  -> UniqFM eltb  -- map Y
+  -> UniqFM eltc
+plusUFM_CD2 f (UFM xm) (UFM ym)
+  = UFM $ M.mergeWithKey
+      (\_ x y -> Just (Just x `f` Just y))
+      (M.map (\x -> Just x `f` Nothing))
+      (M.map (\y -> Nothing `f` Just y))
       xm ym
 
 plusMaybeUFM_C :: (elt -> elt -> Maybe elt)

@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP, TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE DataKinds #-}
@@ -52,6 +53,7 @@ import GHC.Types.Name.Env
 import GHC.Tc.Utils.TcType
 import GHC.Core.TyCon
 import GHC.Builtin.Types
+import GHC.Core.Multiplicity ( pattern Many )
 import GHC.Core
 import GHC.Core.Make
 import GHC.Core.Utils
@@ -112,8 +114,8 @@ mkMetaWrappers q@(QuoteWrapper quote_var_raw m_var) = do
           -- the expected type
           tyvars = dataConUserTyVarBinders (classDataCon cls)
           expected_ty = mkInvisForAllTys tyvars $
-                          mkInvisFunTy (mkClassPred cls (mkTyVarTys (binderVars tyvars)))
-                                       (mkClassPred monad_cls (mkTyVarTys (binderVars tyvars)))
+                          mkInvisFunTyMany (mkClassPred cls (mkTyVarTys (binderVars tyvars)))
+                                           (mkClassPred monad_cls (mkTyVarTys (binderVars tyvars)))
 
       MASSERT2( idType monad_sel `eqType` expected_ty, ppr monad_sel $$ ppr expected_ty)
 
@@ -1289,9 +1291,10 @@ repTy ty@(HsForAllTy { hst_fvf = fvf, hst_bndrs = tvs, hst_body = body }) =
 repTy ty@(HsQualTy {}) = repForallT ty
 
 repTy (HsTyVar _ _ (L _ n))
-  | isLiftedTypeKindTyConName n       = repTStar
-  | n `hasKey` constraintKindTyConKey = repTConstraint
-  | n `hasKey` funTyConKey            = repArrowTyCon
+  | isLiftedTypeKindTyConName n        = repTStar
+  | n `hasKey` constraintKindTyConKey  = repTConstraint
+  | n `hasKey` unrestrictedFunTyConKey = repArrowTyCon
+  | n `hasKey` funTyConKey             = repMulArrowTyCon
   | isTvOcc occ   = do tv1 <- lookupOcc n
                        repTvar tv1
   | isDataOcc occ = do tc1 <- lookupOcc n
@@ -1310,11 +1313,16 @@ repTy (HsAppKindTy _ ty ki) = do
                                 ty1 <- repLTy ty
                                 ki1 <- repLTy ki
                                 repTappKind ty1 ki1
-repTy (HsFunTy _ f a)       = do
+repTy (HsFunTy _ w f a) | isUnrestricted w = do
                                 f1   <- repLTy f
                                 a1   <- repLTy a
                                 tcon <- repArrowTyCon
                                 repTapps tcon [f1, a1]
+repTy (HsFunTy _ w f a) = do w1   <- repLTy (arrowToHsType w)
+                             f1   <- repLTy f
+                             a1   <- repLTy a
+                             tcon <- repMulArrowTyCon
+                             repTapps tcon [w1, f1, a1]
 repTy (HsListTy _ t)        = do
                                 t1   <- repLTy t
                                 tcon <- repListTyCon
@@ -2011,7 +2019,7 @@ mkGenSyms :: [Name] -> MetaM [GenSymBind]
 --
 -- Nevertheless, it's monadic because we have to generate nameTy
 mkGenSyms ns = do { var_ty <- lookupType nameTyConName
-                  ; return [(nm, mkLocalId (localiseName nm) var_ty) | nm <- ns] }
+                  ; return [(nm, mkLocalId (localiseName nm) Many var_ty) | nm <- ns] }
 
 
 addBinds :: [GenSymBind] -> MetaM a -> MetaM a
@@ -2562,11 +2570,11 @@ repConstr :: HsConDeclDetails GhcRn
           -> [Core TH.Name]
           -> MetaM (Core (M TH.Con))
 repConstr (PrefixCon ps) Nothing [con]
-    = do arg_tys  <- repListM bangTypeTyConName repBangTy ps
+    = do arg_tys  <- repListM bangTypeTyConName repBangTy (map hsScaledThing ps)
          rep2 normalCName [unC con, unC arg_tys]
 
 repConstr (PrefixCon ps) (Just res_ty) cons
-    = do arg_tys     <- repListM bangTypeTyConName repBangTy ps
+    = do arg_tys     <- repListM bangTypeTyConName repBangTy (map hsScaledThing ps)
          res_ty' <- repLTy res_ty
          rep2 gadtCName [ unC (nonEmptyCoreList cons), unC arg_tys, unC res_ty']
 
@@ -2589,8 +2597,8 @@ repConstr (RecCon ips) resTy cons
                           ; rep2 varBangTypeName [v,ty] }
 
 repConstr (InfixCon st1 st2) Nothing [con]
-    = do arg1 <- repBangTy st1
-         arg2 <- repBangTy st2
+    = do arg1 <- repBangTy (hsScaledThing st1)
+         arg2 <- repBangTy (hsScaledThing st2)
          rep2 infixCName [unC arg1, unC con, unC arg2]
 
 repConstr (InfixCon {}) (Just _) _ =
@@ -2677,6 +2685,9 @@ repUnboxedSumTyCon arity = do platform <- getPlatform
 
 repArrowTyCon :: MetaM (Core (M TH.Type))
 repArrowTyCon = rep2 arrowTName []
+
+repMulArrowTyCon :: MetaM (Core (M TH.Type))
+repMulArrowTyCon = rep2 mulArrowTName []
 
 repListTyCon :: MetaM (Core (M TH.Type))
 repListTyCon = rep2 listTName []
