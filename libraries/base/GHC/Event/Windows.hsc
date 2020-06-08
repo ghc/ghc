@@ -627,11 +627,7 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
               -- won't have a request enqueued.  Handle it inline.
               let done_early = status == #{const STATUS_SUCCESS}
                                || status == #{const STATUS_END_OF_FILE}
-                               || lasterr == #{const ERROR_HANDLE_EOF}
-                               || lasterr == #{const ERROR_SUCCESS}
-                               || lasterr == #{const ERROR_BROKEN_PIPE}
-                               || lasterr == #{const ERROR_NO_MORE_ITEMS}
-                               || lasterr == #{const ERROR_OPERATION_ABORTED}
+                               || errorIsCompleted lasterr
               -- This status indicates that the request hasn't finished early,
               -- but it will finish shortly.  The I/O manager will not be
               -- enqueuing this either.  Also needs to be handled inline.
@@ -748,12 +744,7 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                         | otherwise ->
                   do m <- newEmptyIOPort
                      lasterr <- getLastError
-                     let done =
-                            lasterr == #{const ERROR_HANDLE_EOF}
-                            || lasterr == #{const ERROR_SUCCESS}
-                            || lasterr == #{const ERROR_BROKEN_PIPE}
-                            || lasterr == #{const ERROR_NO_MORE_ITEMS}
-                            || lasterr == #{const ERROR_OPERATION_ABORTED}
+                     let done = errorIsCompleted lasterr
                      -- debugIO $ ":: loop - " ++ show lasterr ++ " :" ++ show done
                      -- We will complete quite soon, in the threaded RTS we
                      -- probably don't really want to wait for it while we could
@@ -796,6 +787,17 @@ withOverlapped :: String
 withOverlapped fname h offset startCB completionCB = do
   mngr <- getSystemManager
   withOverlappedEx mngr fname h offset startCB completionCB
+
+------------------------------------------------------------------------
+-- Helper to check if an error code implies an operation has completed.
+
+errorIsCompleted :: ErrCode -> Bool
+errorIsCompleted lasterr =
+       lasterr == #{const ERROR_HANDLE_EOF}
+    || lasterr == #{const ERROR_SUCCESS}
+    || lasterr == #{const ERROR_BROKEN_PIPE}
+    || lasterr == #{const ERROR_NO_MORE_ITEMS}
+    || lasterr == #{const ERROR_OPERATION_ABORTED}
 
 ------------------------------------------------------------------------
 -- I/O Utilities
