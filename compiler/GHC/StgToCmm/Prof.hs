@@ -364,7 +364,7 @@ ldvEnter cl_ptr = do
 
 loadEra :: DynFlags -> CmmExpr
 loadEra dflags = CmmMachOp (MO_UU_Conv (cIntWidth dflags) (wordWidth platform))
-    [CmmLoad (mkLblExpr (mkCmmDataLabel rtsUnitId (fsLit "era")))
+    [CmmLoad (mkLblExpr (mkCmmDataLabel rtsUnitId True (fsLit "era")))
              (cInt dflags)]
     where platform = targetPlatform dflags
 
