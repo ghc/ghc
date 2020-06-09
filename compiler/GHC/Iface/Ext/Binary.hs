@@ -59,7 +59,7 @@ data HieDictionary = HieDictionary
 initBinMemSize :: Int
 initBinMemSize = 1024*1024
 
--- | The header for HIE files - Capital ASCII letters "HIE".
+-- | The header for HIE files - Capital ASCII letters \"HIE\".
 hieMagic :: [Word8]
 hieMagic = [72,73,69]
 
