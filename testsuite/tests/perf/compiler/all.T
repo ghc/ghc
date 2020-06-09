@@ -234,9 +234,14 @@ test('T12707',
      compile,
      [''])
 
+# This test is meant to test regressions involving the
+# pattern match checker. Any regression there will show
+# up massively, but otherwise it hardly allocates. So we
+# are slightly more generous with the allocation threshold
+# to avoid spurious errors.
 test('T12150',
      [ only_ways(['optasm']),
-       collect_compiler_stats('bytes allocated', 1)
+       collect_compiler_stats('bytes allocated', 2)
      ],
     compile,
      [''])
