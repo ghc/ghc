@@ -3,7 +3,7 @@
 -- (c) 2014 I/O Tweag
 --
 -- Each module that uses 'static' keyword declares an initialization function of
--- the form hs_spt_init_<module>() which is emitted into the _stub.c file and
+-- the form hs_spt_init_\<module>() which is emitted into the _stub.c file and
 -- annotated with __attribute__((constructor)) so that it gets executed at
 -- startup time.
 --
@@ -28,7 +28,7 @@
 --
 -- The linker must find the definitions matching the @extern StgPtr <name>@
 -- declarations. For this to work, the identifiers of static pointers need to be
--- exported. This is done in GHC.Core.Opt.SetLevels.newLvlVar.
+-- exported. This is done in 'GHC.Core.Opt.SetLevels.newLvlVar'.
 --
 -- There is also a finalization function for the time when the module is
 -- unloaded.

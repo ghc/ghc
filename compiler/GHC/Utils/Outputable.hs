@@ -958,7 +958,7 @@ instance Outputable Extension where
 -- | 'BindingSite' is used to tell the thing that prints binder what
 -- language construct is binding the identifier.  This can be used
 -- to decide how much info to print.
--- Also see Note [Binding-site specific printing] in GHC.Core.Ppr
+-- Also see Note [Binding-site specific printing] in "GHC.Core.Ppr"
 data BindingSite
     = LambdaBind  -- ^ The x in   (\x. e)
     | CaseBind    -- ^ The x in   case scrut of x { (y,z) -> ... }
