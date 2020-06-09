@@ -343,7 +343,7 @@ import GHC.Types.Annotations
 import GHC.Unit.Module
 import GHC.Utils.Panic
 import GHC.Platform
-import GHC.Data.Bag        ( listToBag )
+import GHC.Data.Bag        ( mapBag, listToBag )
 import GHC.Utils.Error
 import GHC.Utils.Monad
 import GHC.Utils.Misc
@@ -1417,7 +1417,7 @@ getTokenStream mod = do
     POk _ ts  -> return ts
     PFailed pst ->
         do dflags <- getDynFlags
-           throwErrors (getErrorMessages pst dflags)
+           throwErrors $ mapBag (fmap psErrorDoc) (getErrorMessages pst dflags)
 
 -- | Give even more information on the source than 'getTokenStream'
 -- This function allows reconstructing the source completely with
@@ -1430,7 +1430,7 @@ getRichTokenStream mod = do
     POk _ ts -> return $ addSourceToTokens startLoc source ts
     PFailed pst ->
         do dflags <- getDynFlags
-           throwErrors (getErrorMessages pst dflags)
+           throwErrors $ mapBag (fmap psErrorDoc) (getErrorMessages pst dflags)
 
 -- | Given a source location and a StringBuffer corresponding to this
 -- location, return a rich token stream with the source associated to the
@@ -1596,7 +1596,7 @@ lookupName name =
 parser :: String         -- ^ Haskell module source text (full Unicode is supported)
        -> DynFlags       -- ^ the flags
        -> FilePath       -- ^ the filename (for source locations)
-       -> (WarningMessages, Either (ErrorMessages ErrDoc) (Located HsModule))
+       -> (WarningMessages, Either (ErrorMessages PsError) (Located HsModule))
 
 parser str dflags filename =
    let

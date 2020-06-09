@@ -1414,7 +1414,7 @@ initEnv dflags = listToUFM [
   ]
   where platform = targetPlatform dflags
 
-parseCmmFile :: DynFlags -> FilePath -> IO (Messages ErrDoc, Maybe CmmGroup)
+parseCmmFile :: DynFlags -> FilePath -> IO (Messages PsError, Maybe CmmGroup)
 parseCmmFile dflags filename = withTiming dflags (text "ParseCmm"<+>brackets (text filename)) (\_ -> ()) $ do
   buf <- hGetStringBuffer filename
   let

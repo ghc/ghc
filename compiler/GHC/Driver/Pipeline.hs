@@ -43,6 +43,7 @@ import GHC.Driver.Pipeline.Monad
 import GHC.Unit.State
 import GHC.Driver.Ways
 import GHC.Parser.Header
+import GHC.Parser.Lexer (psErrorDoc)
 import GHC.Driver.Phases
 import GHC.SysTools
 import GHC.SysTools.ExtraObj
@@ -68,7 +69,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.SysTools.FileCleanup
 import GHC.SysTools.Ar
 import GHC.Settings
-import GHC.Data.Bag             ( unitBag )
+import GHC.Data.Bag             ( mapBag, unitBag )
 import GHC.Data.FastString      ( mkFastString )
 import GHC.Iface.Make           ( mkFullIface )
 import GHC.Iface.UpdateCafInfos ( updateModDetailsCafInfos )
@@ -1062,7 +1063,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
             buf <- hGetStringBuffer input_fn
             eimps <- getImports dflags buf input_fn (basename <.> suff)
             case eimps of
-              Left errs -> throwErrors errs
+              Left errs -> throwErrors (mapBag (fmap psErrorDoc) errs)
               Right (src_imps,imps,L _ mod_name) -> return
                   (Just buf, mod_name, imps, src_imps)
 

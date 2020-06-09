@@ -41,7 +41,7 @@ import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Data.Maybe
-import GHC.Data.Bag         ( emptyBag, listToBag, unitBag )
+import GHC.Data.Bag         ( emptyBag, listToBag, mapBag, unitBag )
 import GHC.Utils.Monad
 import GHC.Utils.Exception as Exception
 import GHC.Types.Basic
@@ -64,7 +64,7 @@ getImports :: DynFlags
            -> FilePath     -- ^ The original source filename (used for locations
                            --   in the function result)
            -> IO (Either
-               (ErrorMessages ErrDoc)
+               (ErrorMessages PsError)
                ([(Maybe FastString, Located ModuleName)],
                 [(Maybe FastString, Located ModuleName)],
                 Located ModuleName))
@@ -83,7 +83,7 @@ getImports dflags buf filename source_filename = do
           ms = (emptyBag, errs)
       -- logWarnings warns
       if errorsFound dflags ms
-        then throwIO $ mkSrcErr errs
+        then throwIO $ mkSrcErr (mapBag (fmap psErrorDoc) errs)
         else
           let   hsmod = unLoc rdr_module
                 mb_mod = hsmodName hsmod
@@ -336,9 +336,9 @@ unsupportedExtnError dflags loc unsup =
      suggestions = fuzzyMatch unsup supported
 
 
-optionsErrorMsgs :: DynFlags -> [String] -> [Located String] -> FilePath -> (Messages ErrDoc)
+optionsErrorMsgs :: DynFlags -> [String] -> [Located String] -> FilePath -> Messages PsError
 optionsErrorMsgs dflags unhandled_flags flags_lines _filename
-  = (emptyBag, listToBag (map mkMsg unhandled_flags_lines))
+  = (emptyBag, listToBag (map (fmap PsErrorDoc . mkMsg) unhandled_flags_lines))
   where unhandled_flags_lines :: [Located String]
         unhandled_flags_lines = [ L l f
                                 | f <- unhandled_flags

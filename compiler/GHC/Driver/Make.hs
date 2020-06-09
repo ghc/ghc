@@ -44,13 +44,14 @@ import GHC.Utils.Error
 import GHC.Driver.Finder
 import GHC.Driver.Monad
 import GHC.Parser.Header
+import GHC.Parser.Lexer    ( psErrorDoc )
 import GHC.Driver.Types
 import GHC.Unit.Module
 import GHC.IfaceToCore     ( typecheckIface )
 import GHC.Tc.Utils.Monad  ( initIfaceCheck )
 import GHC.Driver.Main
 
-import GHC.Data.Bag        ( unitBag, listToBag, unionManyBags, isEmptyBag )
+import GHC.Data.Bag        ( mapBag, unitBag, listToBag, unionManyBags, isEmptyBag )
 import GHC.Types.Basic
 import GHC.Data.Graph.Directed
 import GHC.Utils.Exception ( tryIO )
@@ -84,7 +85,7 @@ import Control.Concurrent.MVar
 import Control.Concurrent.QSem
 import Control.Exception
 import Control.Monad
-import Control.Monad.Trans.Except ( ExceptT(..), runExceptT, throwE )
+import Control.Monad.Trans.Except ( ExceptT(..), withExceptT, runExceptT, throwE )
 import qualified Control.Monad.Catch as MC
 import Data.IORef
 import Data.List
@@ -2670,7 +2671,8 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
       <- ExceptT $ preprocess hsc_env src_fn (fst <$> maybe_buf) mb_phase
   pi_hspp_buf <- liftIO $ hGetStringBuffer pi_hspp_fn
   (pi_srcimps, pi_theimps, L pi_mod_name_loc pi_mod_name)
-      <- ExceptT $ getImports pi_local_dflags pi_hspp_buf pi_hspp_fn src_fn
+      <- withExceptT (mapBag (fmap psErrorDoc)) . ExceptT $
+           getImports pi_local_dflags pi_hspp_buf pi_hspp_fn src_fn
   return PreprocessedImports {..}
 
 

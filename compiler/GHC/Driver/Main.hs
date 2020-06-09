@@ -352,7 +352,8 @@ hscParse' mod_summary
 
     case unP parseMod (mkPState dflags buf loc) of
         PFailed pst ->
-            handleWarningsThrowErrors (getMessages pst dflags)
+            handleWarningsThrowErrors $
+                mapMessages psErrorDoc (getMessages pst dflags)
         POk pst rdr_module -> do
             let (warns, errs) = getMessages pst dflags
             logWarnings warns
@@ -362,7 +363,8 @@ hscParse' mod_summary
                         FormatHaskell (showAstData NoBlankSrcSpan rdr_module)
             liftIO $ dumpIfSet_dyn dflags Opt_D_source_stats "Source Statistics"
                         FormatText (ppSourceStats False rdr_module)
-            when (not $ isEmptyBag errs) $ throwErrors errs
+            when (not $ isEmptyBag errs) $
+                throwErrors (mapBag (fmap psErrorDoc) errs)
 
             -- To get the list of extra source files, we take the list
             -- that the parser gave us,
@@ -1486,7 +1488,8 @@ hscInteractive hsc_env cgguts location = do
 hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> IO ()
 hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
     let dflags = hsc_dflags hsc_env
-    cmm <- ioMsgMaybe $ parseCmmFile dflags filename
+    cmm <- ioMsgMaybe . fmap (\(m, r) -> (mapMessages psErrorDoc m, r)) $
+        parseCmmFile dflags filename
     liftIO $ do
         dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose_by_proc "Parsed Cmm" FormatCMM (ppr cmm)
         let -- Make up a module name to give the NCG. We can't pass bottom here
@@ -1863,10 +1866,12 @@ hscParseThingWithLocation source linenumber parser str
 
     case unP parser (mkPState dflags buf loc) of
         PFailed pst -> do
-            handleWarningsThrowErrors (getMessages pst dflags)
+            handleWarningsThrowErrors $
+              mapMessages psErrorDoc (getMessages pst dflags)
 
         POk pst thing -> do
-            logWarningsReportErrors (getMessages pst dflags)
+            logWarningsReportErrors $
+              mapMessages psErrorDoc (getMessages pst dflags)
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser"
                         FormatHaskell (ppr thing)
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed_ast "Parser AST"

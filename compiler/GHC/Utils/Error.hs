@@ -6,6 +6,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE LambdaCase #-}
@@ -20,7 +21,7 @@ module GHC.Utils.Error (
         ErrDoc, errDoc, errDocImportant, errDocContext, errDocSupplementary,
         WarnMsg, MsgDoc,
         Messages, ErrorMessages, WarningMessages,
-        unionMessages,
+        mapMessages, unionMessages,
         errMsgSpan, errMsgContext,
         errorsFound, isEmptyMessages,
         isWarnMsgFatal,
@@ -130,6 +131,9 @@ type Messages e      = (WarningMessages, ErrorMessages e)
 type WarningMessages = Bag WarnMsg
 type ErrorMessages e = Bag (ErrMsg e)
 
+mapMessages :: (e -> e') -> Messages e -> Messages e'
+mapMessages f (ws, es) = (ws, mapBag (fmap f) es)
+
 unionMessages :: Messages e -> Messages e -> Messages e
 unionMessages (warns1, errs1) (warns2, errs2) =
   (warns1 `unionBags` warns2, errs1 `unionBags` errs2)
@@ -142,9 +146,8 @@ data ErrMsg e = ErrMsg {
         errMsgShortString :: String,
         errMsgSeverity    :: Severity,
         errMsgReason      :: WarnReason
-        }
+        } deriving Functor
         -- The SrcSpan is used for sorting errors into line-number order
-
 
 -- | Categorise error msgs by their importance.  This is so each section can
 -- be rendered visually distinct.  See Note [Error report] for where these come

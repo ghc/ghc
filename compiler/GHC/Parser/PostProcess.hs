@@ -133,7 +133,7 @@ import GHC.Utils.Misc
 import GHC.Parser.Annotation
 import Data.List
 import GHC.Driver.Session ( WarningFlag(..), DynFlags )
-import GHC.Utils.Error ( Messages, ErrDoc )
+import GHC.Utils.Error ( Messages )
 
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
@@ -2915,7 +2915,7 @@ data PV_Context =
 
 data PV_Accum =
   PV_Accum
-    { pv_messages :: DynFlags -> Messages ErrDoc
+    { pv_messages :: DynFlags -> Messages PsError
     , pv_annotations :: [(ApiAnnKey,[RealSrcSpan])]
     , pv_comment_q :: [RealLocated AnnotationComment]
     , pv_annotations_comments :: [(RealSrcSpan,[RealLocated AnnotationComment])]

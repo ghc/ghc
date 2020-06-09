@@ -51,6 +51,7 @@
 module GHC.Parser.Lexer (
    Token(..), lexer, lexerDbg, pragState, mkPState, mkPStatePure, PState(..),
    P(..), ParseResult(..), mkParserFlags, mkParserFlags', ParserFlags(..),
+   PsError(..), psErrorDoc,
    appendWarning,
    appendError,
    allocateComments,
@@ -2092,12 +2093,18 @@ data ParserFlags = ParserFlags {
   , pExtsBitmap     :: !ExtsBitmap -- ^ bitmap of permitted extensions
   }
 
+-- | Dedicated error type for the parser
+data PsError = PsErrorDoc ErrDoc
+
+psErrorDoc :: PsError -> ErrDoc
+psErrorDoc (PsErrorDoc d) = d
+
 data PState = PState {
         buffer     :: StringBuffer,
         options    :: ParserFlags,
         -- This needs to take DynFlags as an argument until
         -- we have a fix for #10143
-        messages   :: DynFlags -> Messages ErrDoc,
+        messages   :: DynFlags -> Messages PsError,
         tab_first  :: Maybe RealSrcSpan, -- pos of first tab warning in the file
         tab_count  :: !Int,              -- number of tab warnings in the file
         last_tk    :: Maybe Token,
@@ -2657,12 +2664,12 @@ class Monad m => MonadP m where
 appendError
   :: SrcSpan
   -> SDoc
-  -> (DynFlags -> Messages ErrDoc)
-  -> (DynFlags -> Messages ErrDoc)
+  -> (DynFlags -> Messages PsError)
+  -> (DynFlags -> Messages PsError)
 appendError srcspan msg m =
   \d ->
     let (ws, es) = m d
-        errormsg = mkErrMsg d srcspan alwaysQualify msg
+        errormsg = fmap PsErrorDoc (mkErrMsg d srcspan alwaysQualify msg)
         es' = es `snocBag` errormsg
     in (ws, es')
 
@@ -2671,8 +2678,8 @@ appendWarning
   -> WarningFlag
   -> SrcSpan
   -> SDoc
-  -> (DynFlags -> Messages ErrDoc)
-  -> (DynFlags -> Messages ErrDoc)
+  -> (DynFlags -> Messages PsError)
+  -> (DynFlags -> Messages PsError)
 appendWarning o option srcspan warning m =
   \d ->
     let (ws, es) = m d
@@ -2724,13 +2731,13 @@ mkTabWarning PState{tab_first=tf, tab_count=tc} d =
 
 -- | Get a bag of the errors that have been accumulated so far.
 --   Does not take -Werror into account.
-getErrorMessages :: PState -> DynFlags -> ErrorMessages ErrDoc
+getErrorMessages :: PState -> DynFlags -> ErrorMessages PsError
 getErrorMessages PState{messages=m} d =
   let (_, es) = m d in es
 
 -- | Get the warnings and errors accumulated so far.
 --   Does not take -Werror into account.
-getMessages :: PState -> DynFlags -> Messages ErrDoc
+getMessages :: PState -> DynFlags -> Messages PsError
 getMessages p@PState{messages=m} d =
   let (ws, es) = m d
       tabwarning = mkTabWarning p d
