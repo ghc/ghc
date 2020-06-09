@@ -282,6 +282,7 @@ render dflags flags sinceQual qual ifaces installedIfaces extSrcMap = do
     opt_latex_style      = optLaTeXStyle     flags
     opt_source_css       = optSourceCssFile  flags
     opt_mathjax          = optMathjax        flags
+    pkgs                 = unitState dflags
     dflags'
       | unicode          = gopt_set dflags Opt_PrintUnicodeSyntax
       | otherwise        = dflags
@@ -340,7 +341,7 @@ render dflags flags sinceQual qual ifaces installedIfaces extSrcMap = do
     -- records the *wired in* identity base.  So untranslate it
     -- so that we can service the request.
     unwire :: Module -> Module
-    unwire m = m { moduleUnit = unwireUnit dflags (moduleUnit m) }
+    unwire m = m { moduleUnit = unwireUnit (unitState dflags) (moduleUnit m) }
 
   reexportedIfaces <- concat `fmap` (for (reexportFlags flags) $ \mod_str -> do
     let warn = hPutStrLn stderr . ("Warning: " ++)
@@ -371,7 +372,7 @@ render dflags flags sinceQual qual ifaces installedIfaces extSrcMap = do
   when (Flag_GenContents `elem` flags) $ do
     withTiming dflags' "ppHtmlContents" (const ()) $ do
       _ <- {-# SCC ppHtmlContents #-}
-           ppHtmlContents dflags' odir title pkgStr
+           ppHtmlContents pkgs odir title pkgStr
                      themes opt_mathjax opt_index_url sourceUrls' opt_wiki_urls
                      allVisibleIfaces True prologue pretty
                      sincePkg (makeContentsQual qual)
@@ -381,7 +382,7 @@ render dflags flags sinceQual qual ifaces installedIfaces extSrcMap = do
   when (Flag_Html `elem` flags) $ do
     withTiming dflags' "ppHtml" (const ()) $ do
       _ <- {-# SCC ppHtml #-}
-           ppHtml dflags' title pkgStr visibleIfaces reexportedIfaces odir
+           ppHtml pkgs title pkgStr visibleIfaces reexportedIfaces odir
                   prologue
                   themes opt_mathjax sourceUrls' opt_wiki_urls
                   opt_contents_url opt_index_url unicode sincePkg qual

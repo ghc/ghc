@@ -167,7 +167,7 @@ processModule verbosity modsum flags modMap instIfaceMap = do
       -- See https://github.com/haskell/haddock/issues/469.
       hsc_env <- getSession
       let new_rdr_env = tcg_rdr_env . fst . GHC.tm_internals_ $ tm
-          this_pkg = thisPackage (hsc_dflags hsc_env)
+          this_pkg = homeUnit (hsc_dflags hsc_env)
           !mods = mkModuleSet [ nameModule name
                               | gre <- globalRdrEnvElts new_rdr_env
                               , let name = gre_name gre

@@ -48,7 +48,7 @@ import GHC.Driver.Types
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
-import GHC.Unit.State   ( lookupModuleInAllPackages, PackageName(..) )
+import GHC.Unit.State
 import GHC.Data.Bag
 import GHC.Types.Name.Reader
 import GHC.Tc.Types
@@ -159,7 +159,7 @@ createInterface tm flags modMap instIfaceMap = do
       !prunedExportItems = seqList prunedExportItems' `seq` prunedExportItems'
 
   let !aliases =
-        mkAliasMap dflags $ tm_renamed_source tm
+        mkAliasMap (unitState dflags) $ tm_renamed_source tm
 
   modWarn <- liftErrMsg (moduleWarning dflags gre warnings)
 
@@ -197,8 +197,8 @@ createInterface tm flags modMap instIfaceMap = do
 -- create a mapping from the module identity of M, to an alias N
 -- (if there are multiple aliases, we pick the last one.)  This
 -- will go in 'ifaceModuleAliases'.
-mkAliasMap :: DynFlags -> Maybe RenamedSource -> M.Map Module ModuleName
-mkAliasMap dflags mRenamedSource =
+mkAliasMap :: UnitState -> Maybe RenamedSource -> M.Map Module ModuleName
+mkAliasMap state mRenamedSource =
   case mRenamedSource of
     Nothing -> M.empty
     Just (_,impDecls,_,_) ->
@@ -206,7 +206,7 @@ mkAliasMap dflags mRenamedSource =
       mapMaybe (\(SrcLoc.L _ impDecl) -> do
         SrcLoc.L _ alias <- ideclAs impDecl
         return $
-          (lookupModuleDyn dflags
+          (lookupModuleDyn state
              -- TODO: This is supremely dodgy, because in general the
              -- UnitId isn't going to look anything like the package
              -- qualifier (even with old versions of GHC, the
@@ -265,13 +265,13 @@ unrestrictedModuleImports idecls =
 -- Similar to GHC.lookupModule
 -- ezyang: Not really...
 lookupModuleDyn ::
-  DynFlags -> Maybe Unit -> ModuleName -> Module
+  UnitState -> Maybe Unit -> ModuleName -> Module
 lookupModuleDyn _ (Just pkgId) mdlName =
   Module.mkModule pkgId mdlName
-lookupModuleDyn dflags Nothing mdlName =
-  case lookupModuleInAllPackages dflags mdlName of
+lookupModuleDyn state Nothing mdlName =
+  case lookupModuleInAllUnits state mdlName of
     (m,_):_ -> m
-    [] -> Module.mkModule Module.mainUnitId mdlName
+    [] -> Module.mkModule Module.mainUnit mdlName
 
 
 -------------------------------------------------------------------------------
@@ -835,7 +835,7 @@ availExportItem is_sig modMap thisMod semMod warnings exportedNames
                     Nothing -> return ([], (noDocForDecl, availNoDocs avail))
                     -- TODO: If we try harder, we might be able to find
                     -- a Haddock!  Look in the Haddocks for each thing in
-                    -- requirementContext (pkgState)
+                    -- requirementContext (unitState)
                     Just decl -> return ([decl], (noDocForDecl, availNoDocs avail))
               | otherwise ->
                 return ([], (noDocForDecl, availNoDocs avail))
@@ -966,8 +966,7 @@ moduleExport thisMod dflags ifaceMap instIfaceMap expMod =
                     "documentation for exported module: " ++ pretty dflags expMod]
             return []
   where
-    m = mkModule unitId expMod -- Identity module!
-    unitId = moduleUnit thisMod
+    m = mkModule (moduleUnit thisMod) expMod -- Identity module!
 
 -- Note [1]:
 ------------
