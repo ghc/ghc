@@ -170,14 +170,14 @@ noExtCon x = case x of {}
 -- to add 'SrcLoc' info via 'Located'. Other passes than 'GhcPass' not
 -- interested in location information can define this as
 -- @type instance XRec NoLocated a = a@.
-type family XRec p :: Type -> Type
-type instance XRec (GhcPass p) = Located
+type family XRec p a = r | r -> a
+type instance XRec (GhcPass p) a = Located a
 
 class Unwrap p where
-  unwrap :: f p -> XRec p a -> a
+  unwrap :: XRec p a -> a
 
 instance Unwrap (GhcPass p) where
-  unwrap _ = unLoc
+  unwrap = unLoc
 
 {-
 Note [NoExtCon and strict fields]

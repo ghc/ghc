@@ -30,7 +30,6 @@ import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe
 import Data.Semigroup
-import Data.Proxy
 
 -- | Extract docs from renamer output.
 extractDocs :: TcGblEnv
@@ -128,12 +127,12 @@ getMainDeclBinder _ = []
 
 
 sigNameNoLoc :: forall pass. CollectPass pass => Sig pass -> [IdP pass]
-sigNameNoLoc (TypeSig    _   ns _)         = map (unwrap (Proxy @pass)) ns
-sigNameNoLoc (ClassOpSig _ _ ns _)         = map (unwrap (Proxy @pass)) ns
-sigNameNoLoc (PatSynSig  _   ns _)         = map (unwrap (Proxy @pass)) ns
-sigNameNoLoc (SpecSig    _   n _ _)        = [unwrap (Proxy @pass) n]
-sigNameNoLoc (InlineSig  _   n _)          = [unwrap (Proxy @pass) n]
-sigNameNoLoc (FixSig _ (FixitySig _ ns _)) = map (unwrap (Proxy @pass)) ns
+sigNameNoLoc (TypeSig    _   ns _)         = map (unwrap @pass) ns
+sigNameNoLoc (ClassOpSig _ _ ns _)         = map (unwrap @pass) ns
+sigNameNoLoc (PatSynSig  _   ns _)         = map (unwrap @pass) ns
+sigNameNoLoc (SpecSig    _   n _ _)        = [unwrap @pass n]
+sigNameNoLoc (InlineSig  _   n _)          = [unwrap @pass n]
+sigNameNoLoc (FixSig _ (FixitySig _ ns _)) = map (unwrap @pass) ns
 sigNameNoLoc _                             = []
 
 -- Extract the source location where an instance is defined. This is used
