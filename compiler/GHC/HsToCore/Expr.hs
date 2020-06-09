@@ -434,7 +434,6 @@ dsExpr (ExplicitTuple _ tup_args boxity)
                     -- lambdas, just arguments.
                = do { core_expr <- dsLExprNoLP expr
                     ; return (lam_vars, core_expr : args) }
-             go (_, _) (L _ (XTupArg a)) = noExtCon a
 
        ; dsWhenNoErrs (foldM go ([], []) (reverse tup_args))
                 -- The reverse is because foldM goes left-to-right

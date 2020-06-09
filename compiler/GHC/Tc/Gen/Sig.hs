@@ -298,7 +298,6 @@ no_anon_wc_bndrs ltvs = all (go . unLoc) ltvs
   where
     go (UserTyVar _ _ _)      = True
     go (KindedTyVar _ _ _ ki) = no_anon_wc ki
-    go (XTyVarBndr a)       = noExtCon a
 
 {- Note [Fail eagerly on bad signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

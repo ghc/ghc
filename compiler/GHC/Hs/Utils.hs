@@ -1085,7 +1085,7 @@ collect_bind :: forall p idR. CollectPass p
              -> [IdP p]
              -> [IdP p]
 collect_bind _ (PatBind { pat_lhs = p })           acc = collect_lpat p acc
-collect_bind _ (FunBind { fun_id = f })            acc = unwrapXIdP (Proxy @p) f : acc
+collect_bind _ (FunBind { fun_id = f })            acc = unwrap (Proxy @p) f : acc
 collect_bind _ (VarBind { var_id = f })            acc = f : acc
 collect_bind _ (AbsBinds { abs_exports = dbinds }) acc = map abe_poly dbinds ++ acc
         -- I don't think we want the binders from the abe_binds
@@ -1093,7 +1093,7 @@ collect_bind _ (AbsBinds { abs_exports = dbinds }) acc = map abe_poly dbinds ++ 
         -- binding (hence see AbsBinds) is in zonking in GHC.Tc.Utils.Zonk
 collect_bind omitPatSyn (PatSynBind _ (PSB { psb_id = ps })) acc
   | omitPatSyn                  = acc
-  | otherwise                   = unwrapXIdP (Proxy @p) ps : acc
+  | otherwise                   = unwrap (Proxy @p) ps : acc
 collect_bind _ (PatSynBind _ (XPatSynBind _)) acc = acc
 collect_bind _ (XHsBindsLR _) acc = acc
 
@@ -1154,18 +1154,18 @@ collectPatsBinders pats = foldr collect_lpat [] pats
 -------------
 collect_lpat :: forall pass. (CollectPass pass)
              => LPat pass -> [IdP pass] -> [IdP pass]
-collect_lpat p bndrs = collect_pat (unLoc p) bndrs
+collect_lpat p bndrs = collect_pat (unwrap (Proxy @pass) p) bndrs
 
 collect_pat :: forall p. CollectPass p
             => Pat p
             -> [IdP p]
             -> [IdP p]
 collect_pat pat bndrs = case pat of
-  (VarPat _ var)          -> unwrapXIdP (Proxy @p) var : bndrs
+  (VarPat _ var)          -> unwrap (Proxy @p) var : bndrs
   (WildPat _)             -> bndrs
   (LazyPat _ pat)         -> collect_lpat pat bndrs
   (BangPat _ pat)         -> collect_lpat pat bndrs
-  (AsPat _ a pat)         -> unwrapXIdP (Proxy @p) a : collect_lpat pat bndrs
+  (AsPat _ a pat)         -> unwrap (Proxy @p) a : collect_lpat pat bndrs
   (ViewPat _ _ pat)       -> collect_lpat pat bndrs
   (ParPat _ pat)          -> collect_lpat pat bndrs
   (ListPat _ pats)        -> foldr collect_lpat bndrs pats
@@ -1175,7 +1175,7 @@ collect_pat pat bndrs = case pat of
   -- See Note [Dictionary binders in ConPatOut]
   (LitPat _ _)            -> bndrs
   (NPat {})               -> bndrs
-  (NPlusKPat _ n _ _ _ _) -> unwrapXIdP (Proxy @p) n : bndrs
+  (NPlusKPat _ n _ _ _ _) -> unwrap (Proxy @p) n : bndrs
   (SigPat _ pat _)        -> collect_lpat pat bndrs
   (SplicePat _ (HsSpliced _ _ (HsSplicedPat pat)))
                           -> collect_pat pat bndrs
@@ -1188,10 +1188,8 @@ collect_pat pat bndrs = case pat of
 --
 -- In particular, Haddock already makes use of this, with an instance for its 'DocNameI' pass so that
 -- it can reuse the code in GHC for collecting binders.
-class ( XRec p (Pat p) ~ Located (Pat p)
-      ) => CollectPass p where
+class Unwrap p => CollectPass p where
   collectXXPat :: Proxy p -> XXPat p -> [IdP p] -> [IdP p]
-  unwrapXIdP  :: Proxy p -> XRec p (IdP p) -> IdP p
 
 instance IsPass p => CollectPass (GhcPass p) where
   collectXXPat _ ext =
@@ -1199,7 +1197,6 @@ instance IsPass p => CollectPass (GhcPass p) where
       GhcTc -> let CoPat _ pat _ = ext in collect_pat pat
       GhcRn -> noExtCon ext
       GhcPs -> noExtCon ext
-  unwrapXIdP _ lid = unLoc lid
 
 {-
 Note [Dictionary binders in ConPatOut] See also same Note in GHC.HsToCore.Arrows
@@ -1288,7 +1285,7 @@ hsLTyClDeclBinders (L loc (DataDecl    { tcdLName = (L _ name)
 hsForeignDeclsBinders :: forall pass. CollectPass pass => [Located (ForeignDecl pass)] -> [Located (IdP pass)]
 -- ^ See Note [SrcSpan for binders]
 hsForeignDeclsBinders foreign_decls
-  = [ L decl_loc (unwrapXIdP (Proxy @pass) n)
+  = [ L decl_loc (unwrap (Proxy @pass) n)
     | L decl_loc (ForeignImport { fd_name = n })
         <- foreign_decls]
 
@@ -1304,7 +1301,7 @@ hsPatSynSelectors (XValBindsLR (NValBinds binds _))
 addPatSynSelector :: forall p. CollectPass p => Located (HsBind p) -> [IdP p] -> [IdP p]
 addPatSynSelector bind sels
   | PatSynBind _ (PSB { psb_args = RecCon as }) <- unLoc bind
-  = map (unwrapXIdP (Proxy @p) . recordPatSynSelectorId) as ++ sels
+  = map (unwrap (Proxy @p) . recordPatSynSelectorId) as ++ sels
   | otherwise = sels
 
 getPatSynBinds :: LHsBind id ~ Located (HsBind id)
@@ -1442,7 +1439,6 @@ lStmtsImplicits = hs_lstmts
     hs_stmt (ApplicativeStmt _ args _) = concatMap do_arg args
       where do_arg (_, ApplicativeArgOne { app_arg_pattern = pat }) = lPatImplicits pat
             do_arg (_, ApplicativeArgMany { app_stmts = stmts })    = hs_lstmts stmts
-            do_arg (_, XApplicativeArg {})                          = []
     hs_stmt (LetStmt _ binds)     = hs_local_binds (unLoc binds)
     hs_stmt (BodyStmt {})         = []
     hs_stmt (LastStmt {})         = []

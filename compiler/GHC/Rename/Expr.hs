@@ -289,7 +289,6 @@ rnExpr (ExplicitTuple x tup_args boxity)
                                       ; return (L l (Present x e'), fvs) }
     rnTupArg (L l (Missing _)) = return (L l (Missing noExtField)
                                         , emptyFVs)
-    rnTupArg (L _ (XTupArg a)) = noExtCon a
 
 rnExpr (ExplicitSum x alt arity expr)
   = do { (expr', fvs) <- rnLExpr expr

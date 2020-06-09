@@ -32,7 +32,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Var
 import GHC.Utils.Outputable
-import GHC.Types.SrcLoc (Located)
+import GHC.Types.SrcLoc (Located, unLoc)
 
 import Data.Kind
 
@@ -170,8 +170,14 @@ noExtCon x = case x of {}
 -- to add 'SrcLoc' info via 'Located'. Other passes than 'GhcPass' not
 -- interested in location information can define this as
 -- @type instance XRec NoLocated a = a@.
-type family XRec p a
-type instance XRec (GhcPass p) a = Located a
+type family XRec p :: Type -> Type
+type instance XRec (GhcPass p) = Located
+
+class Unwrap p where
+  unwrap :: f p -> XRec p a -> a
+
+instance Unwrap (GhcPass p) where
+  unwrap _ = unLoc
 
 {-
 Note [NoExtCon and strict fields]

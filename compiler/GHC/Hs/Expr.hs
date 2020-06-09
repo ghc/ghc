@@ -992,7 +992,6 @@ ppr_expr (ExplicitTuple _ exprs boxity)
     ppr_tup_args []               = []
     ppr_tup_args (Present _ e : es) = (ppr_lexpr e <> punc es) : ppr_tup_args es
     ppr_tup_args (Missing _   : es) = punc es : ppr_tup_args es
-    ppr_tup_args (XTupArg {}  : es) = punc es : ppr_tup_args es
 
     punc (Present {} : _) = comma <> space
     punc (Missing {} : _) = comma
