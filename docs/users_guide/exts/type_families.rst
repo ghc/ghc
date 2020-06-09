@@ -660,8 +660,8 @@ keyword in the family instance: ::
       ...
 
 The data or type family instance for an associated type must follow
-the rule that the type indexes corresponding to class parameters must have
-precisely the same {- TODO: same what? -} as type given in the instance head. For example: ::
+the rule that the type indexes corresponding to class parameters must be
+precisely the same as types given in the instance head. For example: ::
 
     class Collects ce where
       type Elem ce :: Type
