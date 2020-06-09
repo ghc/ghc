@@ -1779,6 +1779,8 @@ static HsInt unloadObj_ (pathchar *path, bool just_purge)
     ObjectCode *prev = NULL;
     for (ObjectCode *oc = loaded_objects; oc; oc = oc->next_loaded_object) {
         if (pathcmp(oc->fileName,path) == 0) {
+            oc->status = OBJECT_UNLOADED;
+
             // These are both idempotent, so in just_purge mode we can later
             // call unloadObj() to really unload the object.
             removeOcSymbols(oc);
