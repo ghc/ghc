@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -508,6 +509,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
 
                       -- Check for missing associated types and build them
                       -- from their defaults (if available)
+                    ; let !atItems = classATItems clas -- make sure this always gets forced or extra allocation will happen
                     ; tf_insts2 <- mapM (tcATDefault loc mini_subst defined_ats)
                       -- Don't default type family instances, but rather omit,
                       -- in hsig/hs-boot. There's no way to opt out of this,
@@ -519,7 +521,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
                       -- defaults also don't sneak into `hsig/hs-boot`, either.
                       -- Dependent Haskell could make them provide equalities,
                       -- and thus influence interfaces, for example.
-                                        (if is_boot then [] else classATItems clas)
+                                        (if is_boot then [] else atItems)
 
                     ; return (df_stuff, tf_insts1 ++ concat tf_insts2) }
 
