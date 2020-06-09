@@ -183,8 +183,20 @@ emitPrimOp dflags = \case
         , (mkIntExpr platform (nonHdrSizeW (arrPtrsRep dflags (fromInteger n))),
            fixedHdrSize dflags + oFFSET_StgMutArrPtrs_size dflags)
         ]
-        (fromInteger n) init
+        (replicate (fromIntegral n) init)
     _ -> PrimopCmmEmit_External
+
+  ArrayOf2Op -> \elems -> opAllDone $ \[res] ->
+    let n = length elems
+      in doNewArrayOp
+          res
+          (arrPtrsRep dflags (fromIntegral n))
+          mkMAP_FROZEN_DIRTY_infoLabel
+          [ ( mkIntExpr platform n
+            , fixedHdrSize dflags + oFFSET_StgMutArrPtrs_ptrs dflags )
+          , ( mkIntExpr platform (nonHdrSizeW (arrPtrsRep dflags (fromIntegral n)))
+            , fixedHdrSize dflags + oFFSET_StgMutArrPtrs_size dflags ) ]
+          elems
 
   CopyArrayOp -> \case
     [src, src_off, dst, dst_off, (CmmLit (CmmInt n _))] ->
@@ -238,8 +250,18 @@ emitPrimOp dflags = \case
         [ (mkIntExpr platform (fromInteger n),
            fixedHdrSize dflags + oFFSET_StgSmallMutArrPtrs_ptrs dflags)
         ]
-        (fromInteger n) init
+        (replicate (fromIntegral n) init)
     _ -> PrimopCmmEmit_External
+
+  SmallArrayOf2Op -> \elems -> opAllDone $ \[res] ->
+    let n = length elems
+      in doNewArrayOp
+          res
+          (smallArrPtrsRep (fromIntegral n))
+          mkSMAP_FROZEN_DIRTY_infoLabel
+          [ ( mkIntExpr platform n
+            , fixedHdrSize dflags + oFFSET_StgSmallMutArrPtrs_ptrs dflags ) ]
+          elems
 
   CopySmallArrayOp -> \case
     [src, src_off, dst, dst_off, (CmmLit (CmmInt n _))] ->
@@ -2530,14 +2552,14 @@ doSetByteArrayOp ba off len c = do
 -- Allocating arrays
 
 -- | Allocate a new array.
-doNewArrayOp :: CmmFormal             -- ^ return register
-             -> SMRep                 -- ^ representation of the array
-             -> CLabel                -- ^ info pointer
-             -> [(CmmExpr, ByteOff)]  -- ^ header payload
-             -> WordOff               -- ^ array size
-             -> CmmExpr               -- ^ initial element
-             -> FCode ()
-doNewArrayOp res_r rep info payload n init = do
+doNewArrayOp ::
+     CmmFormal             -- ^ return register
+  -> SMRep                 -- ^ representation of the array
+  -> CLabel                -- ^ info pointer
+  -> [(CmmExpr, ByteOff)]  -- ^ header payload
+  -> [CmmExpr]             -- ^ initial elements
+  -> FCode ()
+doNewArrayOp res_r rep info payload inits = do
     dflags <- getDynFlags
     platform <- getPlatform
 
@@ -2554,7 +2576,7 @@ doNewArrayOp res_r rep info payload n init = do
 
     -- Initialise all elements of the array
     let mkOff off = cmmOffsetW platform (CmmReg arr) (hdrSizeW dflags rep + off)
-        initialization = [ mkStore (mkOff off) init | off <- [0.. n - 1] ]
+        initialization = [ mkStore (mkOff off) init | (init, off) <- zip inits [0..] ]
     emit (catAGraphs initialization)
 
     emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
