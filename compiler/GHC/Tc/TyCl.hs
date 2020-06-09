@@ -4781,7 +4781,7 @@ wrongKindOfFamily family
 
 -- | Produce an error for oversaturated type family equations with too many
 -- required arguments.
--- See Note [Oversaturated type family equations] in GHC.Tc.Validity.
+-- See Note [Oversaturated type family equations] in "GHC.Tc.Validity".
 wrongNumberOfParmsErr :: Arity -> SDoc
 wrongNumberOfParmsErr max_args
   = text "Number of parameters must match family declaration; expected"
