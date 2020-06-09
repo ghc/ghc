@@ -31,6 +31,7 @@ import Control.Monad hiding (mapM)
 import Data.List
 import qualified Data.Map as Map hiding ( Map )
 import Prelude hiding (mapM)
+import GHC.HsToCore.Docs
 
 renameInterface :: DynFlags -> LinkEnv -> Bool -> Interface -> ErrMsgM Interface
 renameInterface dflags renamingEnv warnings iface =

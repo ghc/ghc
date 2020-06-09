@@ -44,6 +44,7 @@ import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Builtin.Types.Prim( funTyConName )
 import GHC.Types.Var hiding (varName)
+import GHC.HsToCore.Docs
 
 type ExportedNames = Set.Set Name
 type Modules = Set.Set Module

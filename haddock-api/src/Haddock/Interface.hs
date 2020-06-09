@@ -61,6 +61,7 @@ import GHC.Types.Name (nameIsFromExternalPackage, nameOccName)
 import GHC.Types.Name.Occurrence (isTcOcc)
 import GHC.Types.Name.Reader (unQualOK, gre_name, globalRdrEnvElts)
 import GHC.Utils.Error (withTimingD)
+import GHC.HsToCore.Docs
 
 #if defined(mingw32_HOST_OS)
 import System.IO

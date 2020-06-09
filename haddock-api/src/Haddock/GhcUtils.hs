@@ -56,32 +56,6 @@ moduleString = moduleNameString . moduleName
 isNameSym :: Name -> Bool
 isNameSym = isSymOcc . nameOccName
 
-getMainDeclBinder :: (CollectPass (GhcPass p)) => HsDecl (GhcPass p) -> [IdP (GhcPass p)]
-getMainDeclBinder (TyClD _ d) = [tcdName d]
-getMainDeclBinder (ValD _ d) =
-  case collectHsBindBinders d of
-    []       -> []
-    (name:_) -> [name]
-getMainDeclBinder (SigD _ d) = sigNameNoLoc d
-getMainDeclBinder (ForD _ (ForeignImport _ name _ _)) = [unLoc name]
-getMainDeclBinder (ForD _ (ForeignExport _ _ _ _)) = []
-getMainDeclBinder _ = []
-
--- Extract the source location where an instance is defined. This is used
--- to correlate InstDecls with their Instance/CoAxiom Names, via the
--- instanceMap.
-getInstLoc :: InstDecl (GhcPass p) -> SrcSpan
-getInstLoc (ClsInstD _ (ClsInstDecl { cid_poly_ty = ty })) = getLoc (hsSigType ty)
-getInstLoc (DataFamInstD _ (DataFamInstDecl
-  { dfid_eqn = HsIB { hsib_body = FamEqn { feqn_tycon = L l _ }}})) = l
-getInstLoc (TyFamInstD _ (TyFamInstDecl
-  -- Since CoAxioms' Names refer to the whole line for type family instances
-  -- in particular, we need to dig a bit deeper to pull out the entire
-  -- equation. This does not happen for data family instances, for some reason.
-  { tfid_eqn = HsIB { hsib_body = FamEqn { feqn_rhs = L l _ }}})) = l
-
-
-
 -- Useful when there is a signature with multiple names, e.g.
 --   foo, bar :: Types..
 -- but only one of the names is exported and we have to change the
@@ -139,23 +113,8 @@ isClassD :: HsDecl a -> Bool
 isClassD (TyClD _ d) = isClassDecl d
 isClassD _ = False
 
-isValD :: HsDecl a -> Bool
-isValD (ValD _ _) = True
-isValD _ = False
-
 pretty :: Outputable a => DynFlags -> a -> String
 pretty = showPpr
-
-nubByName :: (a -> Name) -> [a] -> [a]
-nubByName f ns = go emptyNameSet ns
-  where
-    go !_ [] = []
-    go !s (x:xs)
-      | y `elemNameSet` s = go s xs
-      | otherwise         = let !s' = extendNameSet s y
-                            in x : go s' xs
-      where
-        y = f x
 
 -- ---------------------------------------------------------------------
 
