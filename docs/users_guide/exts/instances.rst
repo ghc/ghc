@@ -99,6 +99,77 @@ GHC relaxes this rule in two ways:
 However, the instance declaration must still conform to the rules for
 instance termination: see :ref:`instance-termination`.
 
+.. _formal-instance-syntax:
+
+Formal syntax for instance declaration types
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The top of an instance declaration only permits very specific forms of types.
+To make more precise what forms of types are or are not permitted, we provide a
+BNF-style grammar for the tops of instance declarations below: ::
+
+  inst_top ::= 'instance' opt_forall opt_ctxt inst_head opt_where
+
+  opt_forall ::= <empty>
+              |  'forall' tv_bndrs '.'
+
+  tv_bndrs ::= <empty>
+            |  tv_bndr tv_bndrs
+
+  tv_bndr ::= tyvar
+           |  '(' tyvar '::' ctype ')'
+
+  opt_ctxt ::= <empty>
+            |  btype '=>'
+            |  '(' ctxt ')' '=>'
+
+  ctxt ::= ctype
+        |  ctype ',' ctxt
+
+  inst_head ::= '(' inst_head ')'
+             |  prefix_cls_tycon arg_types
+             |  arg_type infix_cls_tycon arg_type
+             |  '(' arg_type infix_cls_tycon arg_type ')' arg_types
+
+  arg_type ::= <empty>
+            |  arg_type arg_types
+
+  opt_where ::= <empty>
+             |  'where'
+
+Where:
+
+- ``btype`` is a type that is not allowed to have an outermost
+  ``forall``/``=>`` unless it is surrounded by parentheses. For example,
+  ``forall a. a`` and ``Eq a => a`` are not legal ``btype``s, but
+  ``(forall a. a)`` and ``(Eq a => a)`` are legal.
+- ``ctype`` is a ``btype`` that has no restrictions on an outermost
+  ``forall``/``=>``, so ``forall a. a`` and ``Eq a => a`` are legal ``ctype``s.
+- ``arg_type`` is a type that is not allowed to have ``forall``s or ``=>``s
+- ``prefix_cls_tycon`` is a class type constructor written prefix (e.g.,
+  ``Show`` or ``(&&&)``), while ``infix_cls_tycon`` is a class type constructor
+  written infix (e.g., ```Show``` or ``&&&``).
+
+This is a simplified grammar that does not fully delve into all of the
+implementation details of GHC's parser (such as the placement of Haddock
+comments), but it is sufficient to attain an understanding of what is
+syntactically allowed. Some further various observations about this grammar:
+
+- Instance declarations are not allowed to be declared with nested ``forall``s
+  or ``=>``s. For example, this would be rejected: ::
+
+    instance forall a. forall b. C (Either a b) where ...
+
+  As a result, ``inst_top`` puts all of its quantification and constraints up
+  front with ``opt_forall`` and ``opt_context``.
+- Furthermore, instance declarations types do not permit outermost parentheses
+  that surround the ``opt_forall`` or ``opt_ctxt``, if at least one of them are
+  used. For example, ``instance (forall a. C a)`` would be rejected, since GHC
+  would treat the ``forall`` as being nested.
+
+  Note that it is acceptable to use parentheses in a ``inst_head``. For
+  instance, ``instance (C a)`` is accepted, as is ``instance forall a. (C a)``.
+
 .. _instance-rules:
 
 Relaxed rules for instance contexts
