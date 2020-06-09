@@ -16,11 +16,11 @@ Lexically scoped type variables
 
 .. tip::
 
-    ``ScopedTypeVariables`` breaks GHC's usual rule that explicit ``forall`` is optional and doesn't affect semantics.
+    :extension:`ScopedTypeVariables` breaks GHC's usual rule that explicit ``forall`` is optional and doesn't affect semantics.
     For the :ref:`decl-type-sigs` (or :ref:`exp-type-sigs`) examples in this section,
     the explicit ``forall`` is required.
     (If omitted, usually the program will not compile; in a few cases it will compile but the functions get a different signature.)
-    To trigger those forms of ``ScopedTypeVariables``, the ``forall`` must appear against the top-level signature (or outer expression)
+    To trigger those forms of :extension:`ScopedTypeVariables`, the ``forall`` must appear against the top-level signature (or outer expression)
     but *not* against nested signatures referring to the same type variables.
 
     Explicit ``forall`` is not always required -- see :ref:`pattern signature equivalent <pattern-equiv-form>` for the example in this section, or :ref:`pattern-type-sigs`.
@@ -261,11 +261,12 @@ the pattern, rather than the pattern binding the variable.
 Class and instance declarations
 -------------------------------
 
-The type variables in the head of a ``class`` or ``instance``
-declaration scope over the methods defined in the ``where`` part. You do
-not even need an explicit ``forall`` (although you are allowed an explicit
-``forall`` in an ``instance`` declaration; see :ref:`explicit-foralls`).
-For example: ::
+:extension:`ScopedTypeVariables` allow the type variables bound by the top of a
+``class`` or ``instance`` declaration to scope over the methods defined in the
+``where`` part. Unlike :ref`decl-type-sigs`, type variables from class and
+instance declarations can be lexically scoped without an explicit ``forall``
+(although you are allowed an explicit ``forall`` in an ``instance``
+declaration; see :ref:`explicit-foralls`). For example: ::
 
       class C a where
         op :: [a] -> a
@@ -278,4 +279,36 @@ For example: ::
       instance C b => C [b] where
         op xs = reverse (head (xs :: [[b]]))
 
+      -- Alternatively, one could write the instance above as:
+      instance forall b. C b => C [b] where
+        op xs = reverse (head (xs :: [[b]]))
 
+While :extension:`ScopedTypeVariables` is required for type variables from the
+top of a class or instance declaration to scope over the /bodies/ of the
+methods, it is not required for the type variables to scope over the /type
+signatures/ of the methods. For example, the following will be accepted without
+explicitly enabling :extension:`ScopedTypeVariables`: ::
+
+      class D a where
+        m :: [a] -> a
+
+      instance D [a] where
+        m :: [a] -> [a]
+        m = reverse
+
+Note that writing ``m :: [a] -> [a]`` requires the use of the
+:extension:`InstanceSigs` extension.
+
+Similarly, :extension:`ScopedTypeVariables` is not required for type variables
+from the top of the class or instance declaration to scope over associated type
+families, which only requires the :extension:`TypeFamilies` extension. For
+instance, the following will be accepted without explicitly enabling
+:extension:`ScopedTypeVariables`: ::
+
+      class E a where
+        type T a
+
+      instance E [a] where
+        type T [a] = a
+
+See :ref:`scoping-class-params` for further information.

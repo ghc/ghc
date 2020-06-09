@@ -37,6 +37,6 @@ data X1 a
 data X2 a
 data X3 a
 
-deriving via (forall a. T a) instance           Z a (X1 b)
-deriving via           (T a) instance forall b. Z a (X2 b)
-deriving via (forall a. T a) instance forall b. Z a (X3 b)
+deriving via forall a. T a instance           Z a (X1 b)
+deriving via           T a instance forall b. Z a (X2 b)
+deriving via forall a. T a instance forall b. Z a (X3 b)
