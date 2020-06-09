@@ -111,11 +111,21 @@ putBinLine bh xs = do
   mapM_ (putByte bh) $ BS.unpack xs
   putByte bh 10 -- newline char
 
--- | Write a `HieFile` to the given `FilePath`, with a proper header and
--- symbol tables for `Name`s and `FastString`s
+
 writeHieFile :: FilePath -> HieFile -> IO ()
 writeHieFile hie_file_path hiefile = do
   bh0 <- openBinMem initBinMemSize
+
+  writeHie bh0 hiefile
+
+  -- and send the result to the file
+  createDirectoryIfMissing True (takeDirectory hie_file_path)
+  writeBinMem bh0 hie_file_path
+
+-- | Write a `HieFile` to the given `FilePath`, with a proper header and
+-- symbol tables for `Name`s and `FastString`s
+writeHie :: BinHandle -> HieFile -> IO ()
+writeHie bh0 hiefile = do
 
   -- Write the header: hieHeader followed by the
   -- hieVersion and the GHC version used to generate this file
@@ -171,10 +181,6 @@ writeHieFile hie_file_path hiefile = do
   dict_map  <- readIORef dict_map_ref
   putDictionary bh dict_next dict_map
 
-  -- and send the result to the file
-  createDirectoryIfMissing True (takeDirectory hie_file_path)
-  writeBinMem bh hie_file_path
-  return ()
 
 data HieFileResult
   = HieFileResult

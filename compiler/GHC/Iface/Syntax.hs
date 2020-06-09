@@ -404,7 +404,7 @@ data IfaceModGuts = IfaceModGuts {
     img_fam_insts :: ![IfaceFamInst],
     img_patsyns   :: ![IfaceDecl],
     img_rules     :: ![IfaceRule],
-    img_binds     :: ![IfaceBinding],
+    img_binds     :: ![(Bool, IfaceBinding)],
     img_foreign   :: !ForeignStubs,
     img_foreign_files :: ![(ForeignSrcLang, FilePath)],
     img_warns     :: !Warnings,
@@ -1329,9 +1329,9 @@ pprParendIfaceExpr = pprIfaceExpr parens
 -- an atomic value (e.g. function args)
 pprIfaceExpr :: (SDoc -> SDoc) -> IfaceExpr -> SDoc
 
-pprIfaceExpr _       (IfaceLcl v)       = ppr v
-pprIfaceExpr _       (IfaceExt v)       = ppr v
-pprIfaceExpr _       (IfaceLit l)       = ppr l
+pprIfaceExpr _       (IfaceLcl v)       = sep [ text "IfaceLcl", parens (ppr v) ]
+pprIfaceExpr _       (IfaceExt v)       = sep [ text "IfaceExt", parens (ppr v) ]
+pprIfaceExpr _       (IfaceLit l)       = sep [ text "IfaceLit", parens (ppr l) ]
 pprIfaceExpr _       (IfaceFCall cc ty) = braces (ppr cc <+> ppr ty)
 pprIfaceExpr _       (IfaceType ty)     = char '@' <> pprParendIfaceType ty
 pprIfaceExpr _       (IfaceCo co)       = text "@~" <> pprParendIfaceCoercion co

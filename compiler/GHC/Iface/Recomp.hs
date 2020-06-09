@@ -155,6 +155,22 @@ check_old_iface hsc_env mod_summary src_modified maybe_iface
                      return Nothing
                  Succeeded iface -> do
                      traceIf (text "Read the interface file" <+> text iface_path)
+
+                     -- liftIO $ putStrLn $ showSDoc dflags (ppr (mgModSummaries $ hsc_mod_graph hsc_env))
+
+                     -- liftIO $ do
+                     --    core <- initIfaceLoad hsc_env $ do
+                     --      liftIO $ putStrLn $ showSDoc dflags (ppr mod_summary)
+                     --      liftIO $ putStrLn "Interface"
+                     --      initIfaceLcl (ms_mod mod_summary) (text "CORE") False $ do
+                     --        liftIO $ putStrLn "init"
+                     --        loadCore iface
+
+                     --    putStrLn $ "Loaded core:"
+                     --    case core of
+                     --      Just c -> print $ showSDoc dflags (ppr (mg_binds c))
+                     --      Nothing -> putStrLn "No core field"
+
                      return $ Just iface
 
         src_changed

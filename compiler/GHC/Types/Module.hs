@@ -164,7 +164,7 @@ import Control.DeepSeq
 import Data.Coerce
 import Data.Data
 import Data.Function
-import Data.Map (Map)
+import Data.Map (Map, toList)
 import Data.Set (Set)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -1172,6 +1172,9 @@ wiredInUnitIds = [ primUnitId,
 
 -- | A map keyed off of 'Module's
 newtype ModuleEnv elt = ModuleEnv (Map NDModule elt)
+
+instance Outputable elt => Outputable (ModuleEnv elt) where
+  ppr (ModuleEnv m) = vcat $ map (\(NDModule md, elt) -> sep [ppr (moduleName md), ppr elt]) $ toList m
 
 {-
 Note [ModuleEnv performance and determinism]

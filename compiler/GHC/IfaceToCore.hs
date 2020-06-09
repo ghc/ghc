@@ -21,6 +21,8 @@ module GHC.IfaceToCore (
         tcIfaceExpr,    -- Desired by HERMIT (#7683)
         tcIfaceGlobal,
         tcIfaceModGuts,
+
+        tcIfaceType, tcJoinInfo, tcIfaceTyCon, tcIfaceRule
  ) where
 
 #include "HsVersions.h"
@@ -81,6 +83,8 @@ import qualified BooleanFormula as BF
 import Control.Monad
 import qualified Data.Map as Map
 
+import Data.IORef
+import GHC.Types.Name.Cache
 {-
 This module takes
 
@@ -1846,32 +1850,65 @@ bindIfaceTyConBinderX bind_tv (Bndr tv vis) thing_inside
 ************************************************************************
 -}
 
-tcIfaceBinding :: IfaceBinding -> IfL (Bind Id)
-tcIfaceBinding (IfaceNonRec (IfLetBndr fs ty info ji) rhs)
-  = do  { name    <- newIfaceName (mkVarOccFS fs)
-        ; ty'     <- tcIfaceType ty
-        ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
-                              NotTopLevel name ty' info
-        ; let id = mkLocalIdWithInfo name ty' id_info
-                     `asJoinId_maybe` tcJoinInfo ji
-        ; rhs' <- tcIfaceExpr rhs
-        ; return (NonRec id rhs') }
+tcIfaceBinding :: Module -> SrcSpan -> (Bool, IfaceBinding) -> IfL (Maybe (Bind Id))
+tcIfaceBinding mod loc ibind = do
+  bind <- tryAllM $ tcIfaceBinding' mod loc ibind
+  case bind of
+    Left _ -> return Nothing
+    Right b -> do
+        let (NonRec n _) = b
+        liftIO $ putStrLn (nameStableString $ idName n)
+        return $ Just b
 
-tcIfaceBinding (IfaceRec pairs)
-  = do { ids <- mapM tc_rec_bndr (map fst pairs)
-       ; extendIfaceIdEnv ids $ do
-       { pairs' <- zipWithM tc_pair pairs ids
-       ; return (Rec pairs') } }
- where
-   tc_rec_bndr (IfLetBndr fs ty _ ji)
-     = do { name <- newIfaceName (mkVarOccFS fs)
-          ; ty'  <- tcIfaceType ty
-          ; return (mkLocalId name ty' `asJoinId_maybe` tcJoinInfo ji) }
-   tc_pair (IfLetBndr _ _ info _, rhs) id
-     = do { rhs' <- tcIfaceExpr rhs
-          ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
-                                NotTopLevel (idName id) (idType id) info
-          ; return (setIdInfo id id_info, rhs') }
+tcIfaceBinding' :: Module -> SrcSpan -> (Bool, IfaceBinding) -> IfL (Bind Id)
+tcIfaceBinding' _   _    (_p, (IfaceRec _)) = panic "tcIfaceBinding: expected NonRec at top level"
+tcIfaceBinding' mod loc b@(p, IfaceNonRec (IfLetBndr fs ty info ji) rhs) = do
+  name <- lookupIfaceTop (mkVarOccFS fs)
+
+
+  -- name    <- newGlobalBinder mod (mkVarOccFS fs) loc
+
+  ty'     <- tcIfaceType ty
+  -- id_info <- tcIdInfo False TopLevel name ty' info
+  let id = mkExportedVanillaId name ty'
+             `asJoinId_maybe` tcJoinInfo ji
+
+
+  liftIO $ putStrLn "-----------------------------"
+  liftIO $ print (nameStableString name, isInternalName name, isExternalName name, isSystemName name, isWiredInName name)
+  liftIO $ putStrLn "------------"
+  dflags <- getDynFlags
+  -- Env env _ _ _ <- getEnv
+  -- liftIO $ do
+  --   nc <- readIORef $ hsc_NC env
+  --   putStrLn $ showSDoc dflags (ppr $ nsNames nc)
+  --   return ()
+
+
+  liftIO $ putStrLn $ showSDoc dflags (ppr rhs)
+  rhs' <- tcIfaceExpr rhs
+  liftIO $ putStrLn "------------"
+  liftIO $ putStrLn $ showSDoc dflags (ppr rhs')
+  -- liftIO $ putStrLn "------------"
+  -- liftIO $ print (b == toIfaceBinding (NonRec id rhs'))
+  liftIO $ putStrLn "-----------------------------"
+  return (NonRec id rhs')
+
+-- tcIfaceBinding' (IfaceRec pairs)
+--   = do { ids <- mapM tc_rec_bndr (map fst pairs)
+--        ; extendIfaceIdEnv ids $ do
+--        { pairs' <- zipWithM tc_pair pairs ids
+--        ; return (Rec pairs') } }
+--  where
+--    tc_rec_bndr (IfLetBndr fs ty _ ji)
+--      = do { name <- newIfaceName (mkVarOccFS fs)
+--           ; ty'  <- tcIfaceType ty
+--           ; return (mkLocalId name ty' `asJoinId_maybe` tcJoinInfo ji) }
+--    tc_pair (IfLetBndr _ _ info _, rhs) id
+--      = do { rhs' <- tcIfaceExpr rhs
+--           ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
+--                                 NotTopLevel (idName id) (idType id) info
+--           ; return (setIdInfo id id_info, rhs') }
 
 tcIfaceModGuts :: IfaceModGuts -> IfL ModGuts
 tcIfaceModGuts (IfaceModGuts f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18
@@ -1881,7 +1918,7 @@ tcIfaceModGuts (IfaceModGuts f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 
   f12' <- mapM tcIfaceFamInst f12
   f13' <- mapM tcIfacePatSyn f13
   f14' <- mapM tcIfaceRule f14
-  f15' <- mapM tcIfaceBinding f15
+  f15' <- catMaybes <$> mapM (tcIfaceBinding f1 f3) f15
   f23' <- extendInstEnvList emptyInstEnv <$> mapM tcIfaceInst f23
   f24' <- extendFamInstEnvList emptyFamInstEnv <$> mapM tcIfaceFamInst f24
 
