@@ -730,7 +730,7 @@ to a UserTypeCtxt of GenSigCtxt.  Why?
 %********************************************************************* -}
 
 -- | Infer a type using a fresh ExpType
--- See also Note [ExpType] in GHC.Tc.Utils.TcMType
+-- See also Note [ExpType] in "GHC.Tc.Utils.TcMType"
 tcInfer :: (ExpSigmaType -> TcM a) -> TcM (a, TcSigmaType)
 tcInfer tc_check
   = do { res_ty <- newInferExpType

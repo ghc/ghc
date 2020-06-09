@@ -831,11 +831,11 @@ the let binding.
 -- | How should we choose which constraints to quantify over?
 data InferMode = ApplyMR          -- ^ Apply the monomorphism restriction,
                                   -- never quantifying over any constraints
-               | EagerDefaulting  -- ^ See Note [TcRnExprMode] in GHC.Tc.Module,
+               | EagerDefaulting  -- ^ See Note [TcRnExprMode] in "GHC.Tc.Module",
                                   -- the :type +d case; this mode refuses
                                   -- to quantify over any defaultable constraint
                | NoRestrictions   -- ^ Quantify over any constraint that
-                                  -- satisfies TcType.pickQuantifiablePreds
+                                  -- satisfies 'GHC.Tc.Utils.TcType.pickQuantifiablePreds'
 
 instance Outputable InferMode where
   ppr ApplyMR         = text "ApplyMR"

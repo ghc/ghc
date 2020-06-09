@@ -348,8 +348,8 @@ parseError s0 = case breakColon s0 of
 -- taking care to ignore colons in Windows drive letters (as noted in #17786).
 -- For instance,
 --
--- * @"hi.c: ABCD"@ is mapped to @Just ("hi.c", "ABCD")@
--- * @"C:\hi.c: ABCD"@ is mapped to @Just ("C:\hi.c", "ABCD")@
+-- * @"hi.c: ABCD"@ is mapped to @Just ("hi.c", \"ABCD\")@
+-- * @"C:\\hi.c: ABCD"@ is mapped to @Just ("C:\\hi.c", \"ABCD\")@
 breakColon :: String -> Maybe (String, String)
 breakColon = go []
   where

@@ -112,11 +112,11 @@ import qualified Data.Set as Set
 -- The package state is computed by 'initPackages', and kept in DynFlags.
 -- It is influenced by various package flags:
 --
---   * @-package <pkg>@ and @-package-id <pkg>@ cause @<pkg>@ to become exposed.
+--   * @-package \<pkg>@ and @-package-id \<pkg>@ cause @\<pkg>@ to become exposed.
 --     If @-hide-all-packages@ was not specified, these commands also cause
 --      all other packages with the same name to become hidden.
 --
---   * @-hide-package <pkg>@ causes @<pkg>@ to become hidden.
+--   * @-hide-package \<pkg>@ causes @\<pkg>@ to become hidden.
 --
 --   * (there are a few more flags, check below for their semantics)
 --
@@ -353,9 +353,9 @@ data PackageState = PackageState {
 
   -- | A map saying, for each requirement, what interfaces must be merged
   -- together when we use them.  For example, if our dependencies
-  -- are @p[A=<A>]@ and @q[A=<A>,B=r[C=<A>]:B]@, then the interfaces
-  -- to merge for A are @p[A=<A>]:A@, @q[A=<A>,B=r[C=<A>]:B]:A@
-  -- and @r[C=<A>]:C@.
+  -- are @p[A=\<A>]@ and @q[A=\<A>,B=r[C=\<A>]:B]@, then the interfaces
+  -- to merge for A are @p[A=\<A>]:A@, @q[A=\<A>,B=r[C=\<A>]:B]:A@
+  -- and @r[C=\<A>]:C@.
   --
   -- There's an entry in this map for each hole in our home library.
   requirementContext :: Map ModuleName [InstantiatedModule]
