@@ -20,6 +20,7 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module GHC.Hs.Binds where
 
@@ -1081,47 +1082,47 @@ isDefaultMethod :: TcSpecPrags -> Bool
 isDefaultMethod IsDefaultMethod = True
 isDefaultMethod (SpecPrags {})  = False
 
-isFixityLSig :: Located (Sig pass) -> Bool
-isFixityLSig (L _ (FixSig {})) = True
+isFixityLSig :: forall p. UnXRec p => LSig p -> Bool
+isFixityLSig (unXRec @p -> FixSig {}) = True
 isFixityLSig _                 = False
 
-isTypeLSig :: Located (Sig pass) -> Bool  -- Type signatures
-isTypeLSig (L _(TypeSig {}))    = True
-isTypeLSig (L _(ClassOpSig {})) = True
-isTypeLSig (L _(IdSig {}))      = True
+isTypeLSig :: forall p. UnXRec p => LSig p -> Bool  -- Type signatures
+isTypeLSig (unXRec @p -> TypeSig {})    = True
+isTypeLSig (unXRec @p -> ClassOpSig {}) = True
+isTypeLSig (unXRec @p -> IdSig {})      = True
 isTypeLSig _                    = False
 
-isSpecLSig :: Located (Sig pass) -> Bool
-isSpecLSig (L _(SpecSig {})) = True
+isSpecLSig :: forall p. UnXRec p => LSig p -> Bool
+isSpecLSig (unXRec @p -> SpecSig {}) = True
 isSpecLSig _                 = False
 
-isSpecInstLSig :: Located (Sig pass) -> Bool
-isSpecInstLSig (L _ (SpecInstSig {})) = True
+isSpecInstLSig :: forall p. UnXRec p => LSig p -> Bool
+isSpecInstLSig (unXRec @p -> SpecInstSig {}) = True
 isSpecInstLSig _                      = False
 
-isPragLSig :: Located (Sig pass) -> Bool
+isPragLSig :: forall p. UnXRec p => LSig p -> Bool
 -- Identifies pragmas
-isPragLSig (L _ (SpecSig {}))   = True
-isPragLSig (L _ (InlineSig {})) = True
-isPragLSig (L _ (SCCFunSig {})) = True
-isPragLSig (L _ (CompleteMatchSig {})) = True
+isPragLSig (unXRec @p -> SpecSig {})   = True
+isPragLSig (unXRec @p -> InlineSig {}) = True
+isPragLSig (unXRec @p -> SCCFunSig {}) = True
+isPragLSig (unXRec @p -> CompleteMatchSig {}) = True
 isPragLSig _                    = False
 
-isInlineLSig :: Located (Sig pass) -> Bool
+isInlineLSig :: forall p. UnXRec p => LSig p -> Bool
 -- Identifies inline pragmas
-isInlineLSig (L _ (InlineSig {})) = True
+isInlineLSig (unXRec @p -> InlineSig {}) = True
 isInlineLSig _                    = False
 
-isMinimalLSig :: Located (Sig pass) -> Bool
-isMinimalLSig (L _ (MinimalSig {})) = True
-isMinimalLSig _                     = False
+isMinimalLSig :: forall p. UnXRec p => LSig p -> Bool
+isMinimalLSig (unXRec @p -> MinimalSig {}) = True
+isMinimalLSig _                               = False
 
-isSCCFunSig :: Located (Sig pass) -> Bool
-isSCCFunSig (L _ (SCCFunSig {})) = True
+isSCCFunSig :: forall p. UnXRec p => LSig p -> Bool
+isSCCFunSig (unXRec @p -> SCCFunSig {}) = True
 isSCCFunSig _                    = False
 
-isCompleteMatchSig :: Located (Sig pass) -> Bool
-isCompleteMatchSig (L _ (CompleteMatchSig {} )) = True
+isCompleteMatchSig :: forall p. UnXRec p => LSig p -> Bool
+isCompleteMatchSig (unXRec @p -> CompleteMatchSig {} ) = True
 isCompleteMatchSig _                            = False
 
 hsSigDoc :: Sig name -> SDoc

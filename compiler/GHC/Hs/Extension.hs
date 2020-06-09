@@ -173,11 +173,17 @@ noExtCon x = case x of {}
 type family XRec p a = r | r -> a
 type instance XRec (GhcPass p) a = Located a
 
-class Unwrap p where
-  unwrap :: XRec p a -> a
+class UnXRec p where
+  unXRec :: XRec p a -> a
 
-instance Unwrap (GhcPass p) where
-  unwrap = unLoc
+instance UnXRec (GhcPass p) where
+  unXRec = unLoc
+
+class MapXRec p where
+  mapXRec :: (a -> b) -> XRec p a -> XRec p b
+
+instance MapXRec (GhcPass p) where
+  mapXRec = fmap
 
 {-
 Note [NoExtCon and strict fields]

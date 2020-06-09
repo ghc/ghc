@@ -890,9 +890,9 @@ mkPatSynBind name details lpat dir = PatSynBind noExtField psb
 
 -- |If any of the matches in the 'FunBind' are infix, the 'FunBind' is
 -- considered infix.
-isInfixFunBind :: HsBindLR id1 (GhcPass id2) -> Bool
+isInfixFunBind :: forall id1 id2. UnXRec id2 => HsBindLR id1 id2 -> Bool
 isInfixFunBind (FunBind { fun_matches = MG _ matches _ })
-  = any (isInfixMatch . unLoc) (unLoc matches)
+  = any (isInfixMatch . unXRec @id2) (unXRec @id2 matches)
 isInfixFunBind _ = False
 
 
@@ -1040,18 +1040,16 @@ collectHsBindBinders :: CollectPass p
 -- ^ Collect both 'Id's and pattern-synonym binders
 collectHsBindBinders b = collect_bind False b []
 
-collectHsBindsBinders :: ( CollectPass p
-                         , LHsBindLR p idR ~ Located (HsBindLR p idR)
-                         )
+collectHsBindsBinders :: CollectPass p
                       => LHsBindsLR p idR
                       -> [IdP p]
 collectHsBindsBinders binds = collect_binds False binds []
 
-collectHsBindListBinders :: CollectPass p
-                         => [Located (HsBindLR p idR)]
+collectHsBindListBinders :: forall p idR. CollectPass p
+                         => [LHsBindLR p idR]
                          -> [IdP p]
 -- ^ Same as 'collectHsBindsBinders', but works over a list of bindings
-collectHsBindListBinders = foldr (collect_bind False . unLoc) []
+collectHsBindListBinders = foldr (collect_bind False . unXRec @p) []
 
 collect_hs_val_binders :: CollectPass (GhcPass idL)
                        => Bool
@@ -1061,23 +1059,19 @@ collect_hs_val_binders ps (ValBinds _ binds _) = collect_binds ps binds []
 collect_hs_val_binders ps (XValBindsLR (NValBinds binds _))
   = collect_out_binds ps binds
 
-collect_out_binds :: ( CollectPass p
-                     , LHsBind p ~ Located (HsBind p)
-                     )
+collect_out_binds :: forall p. CollectPass p
                   => Bool
                   -> [(RecFlag, LHsBinds p)]
                   -> [IdP p]
 collect_out_binds ps = foldr (collect_binds ps . snd) []
 
-collect_binds :: ( CollectPass p
-                 , LHsBindLR p idR ~ Located (HsBindLR p idR)
-                 )
+collect_binds :: forall p idR. CollectPass p
               => Bool
               -> LHsBindsLR p idR
               -> [IdP p]
               -> [IdP p]
 -- ^ Collect 'Id's, or 'Id's + pattern synonyms, depending on boolean flag
-collect_binds ps binds acc = foldr (collect_bind ps . unLoc) acc binds
+collect_binds ps binds acc = foldr (collect_bind ps . unXRec @p) acc binds
 
 collect_bind :: forall p idR. CollectPass p
              => Bool
@@ -1085,7 +1079,7 @@ collect_bind :: forall p idR. CollectPass p
              -> [IdP p]
              -> [IdP p]
 collect_bind _ (PatBind { pat_lhs = p })           acc = collect_lpat p acc
-collect_bind _ (FunBind { fun_id = f })            acc = unwrap @p f : acc
+collect_bind _ (FunBind { fun_id = f })            acc = unXRec @p f : acc
 collect_bind _ (VarBind { var_id = f })            acc = f : acc
 collect_bind _ (AbsBinds { abs_exports = dbinds }) acc = map abe_poly dbinds ++ acc
         -- I don't think we want the binders from the abe_binds
@@ -1093,17 +1087,14 @@ collect_bind _ (AbsBinds { abs_exports = dbinds }) acc = map abe_poly dbinds ++ 
         -- binding (hence see AbsBinds) is in zonking in GHC.Tc.Utils.Zonk
 collect_bind omitPatSyn (PatSynBind _ (PSB { psb_id = ps })) acc
   | omitPatSyn                  = acc
-  | otherwise                   = unwrap @p ps : acc
+  | otherwise                   = unXRec @p ps : acc
 collect_bind _ (PatSynBind _ (XPatSynBind _)) acc = acc
 collect_bind _ (XHsBindsLR _) acc = acc
 
-collectMethodBinders :: ( CollectPass idL
-                        , LHsBindLR idL idR ~ Located (HsBindLR idL idR)
-                        )
-                        => LHsBindsLR idL idR -> [XRec idL (IdP idL)]
+collectMethodBinders :: forall idL idR. UnXRec idL => LHsBindsLR idL idR -> [XRec idL (IdP idL)]
 -- ^ Used exclusively for the bindings of an instance decl which are all
 -- 'FunBinds'
-collectMethodBinders binds = foldr (get . unLoc) [] binds
+collectMethodBinders binds = foldr (get . unXRec @idL) [] binds
   where
     get (FunBind { fun_id = f }) fs = f : fs
     get _                        fs = fs
@@ -1154,18 +1145,18 @@ collectPatsBinders pats = foldr collect_lpat [] pats
 -------------
 collect_lpat :: forall pass. (CollectPass pass)
              => LPat pass -> [IdP pass] -> [IdP pass]
-collect_lpat p bndrs = collect_pat (unwrap @pass p) bndrs
+collect_lpat p bndrs = collect_pat (unXRec @pass p) bndrs
 
 collect_pat :: forall p. CollectPass p
             => Pat p
             -> [IdP p]
             -> [IdP p]
 collect_pat pat bndrs = case pat of
-  (VarPat _ var)          -> unwrap @p var : bndrs
+  (VarPat _ var)          -> unXRec @p var : bndrs
   (WildPat _)             -> bndrs
   (LazyPat _ pat)         -> collect_lpat pat bndrs
   (BangPat _ pat)         -> collect_lpat pat bndrs
-  (AsPat _ a pat)         -> unwrap @p a : collect_lpat pat bndrs
+  (AsPat _ a pat)         -> unXRec @p a : collect_lpat pat bndrs
   (ViewPat _ _ pat)       -> collect_lpat pat bndrs
   (ParPat _ pat)          -> collect_lpat pat bndrs
   (ListPat _ pats)        -> foldr collect_lpat bndrs pats
@@ -1175,7 +1166,7 @@ collect_pat pat bndrs = case pat of
   -- See Note [Dictionary binders in ConPatOut]
   (LitPat _ _)            -> bndrs
   (NPat {})               -> bndrs
-  (NPlusKPat _ n _ _ _ _) -> unwrap @p n : bndrs
+  (NPlusKPat _ n _ _ _ _) -> unXRec @p n : bndrs
   (SigPat _ pat _)        -> collect_lpat pat bndrs
   (SplicePat _ (HsSpliced _ _ (HsSplicedPat pat)))
                           -> collect_pat pat bndrs
@@ -1188,7 +1179,7 @@ collect_pat pat bndrs = case pat of
 --
 -- In particular, Haddock already makes use of this, with an instance for its 'DocNameI' pass so that
 -- it can reuse the code in GHC for collecting binders.
-class Unwrap p => CollectPass p where
+class UnXRec p => CollectPass p where
   collectXXPat :: Proxy p -> XXPat p -> [IdP p] -> [IdP p]
 
 instance IsPass p => CollectPass (GhcPass p) where
@@ -1282,11 +1273,11 @@ hsLTyClDeclBinders (L loc (DataDecl    { tcdLName = (L _ name)
 
 
 -------------------
-hsForeignDeclsBinders :: forall pass. CollectPass pass => [Located (ForeignDecl pass)] -> [Located (IdP pass)]
+hsForeignDeclsBinders :: forall pass. (UnXRec pass, MapXRec pass) => [LForeignDecl pass] -> [XRec pass (IdP pass)]
 -- ^ See Note [SrcSpan for binders]
 hsForeignDeclsBinders foreign_decls
-  = [ L decl_loc (unwrap @pass n)
-    | L decl_loc (ForeignImport { fd_name = n })
+  = [ mapXRec @pass (const $ unXRec @pass n) fi
+    | fi@(unXRec @pass -> ForeignImport { fd_name = n })
         <- foreign_decls]
 
 
@@ -1298,17 +1289,17 @@ hsPatSynSelectors (ValBinds _ _ _) = panic "hsPatSynSelectors"
 hsPatSynSelectors (XValBindsLR (NValBinds binds _))
   = foldr addPatSynSelector [] . unionManyBags $ map snd binds
 
-addPatSynSelector :: forall p. CollectPass p => Located (HsBind p) -> [IdP p] -> [IdP p]
+addPatSynSelector :: forall p. UnXRec p => LHsBind p -> [IdP p] -> [IdP p]
 addPatSynSelector bind sels
-  | PatSynBind _ (PSB { psb_args = RecCon as }) <- unLoc bind
-  = map (unwrap @p . recordPatSynSelectorId) as ++ sels
+  | PatSynBind _ (PSB { psb_args = RecCon as }) <- unXRec @p bind
+  = map (unXRec @p . recordPatSynSelectorId) as ++ sels
   | otherwise = sels
 
-getPatSynBinds :: LHsBind id ~ Located (HsBind id)
+getPatSynBinds :: forall id. UnXRec id
                => [(RecFlag, LHsBinds id)] -> [PatSynBind id id]
 getPatSynBinds binds
   = [ psb | (_, lbinds) <- binds
-          , L _ (PatSynBind _ psb) <- bagToList lbinds ]
+          , (unXRec @id -> (PatSynBind _ psb)) <- bagToList lbinds ]
 
 -------------------
 hsLInstDeclBinders :: LInstDecl (GhcPass p)
