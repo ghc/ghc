@@ -1,5 +1,5 @@
 
-T16326_Fail8.hs:7:10: error:
+T18271.hs:7:19: error:
     Illegal visible, dependent quantification in the type of a term
     (GHC does not yet support this)
-    In an instance declaration
+    In a deriving declaration

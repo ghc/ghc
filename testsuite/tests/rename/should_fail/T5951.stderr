@@ -1,6 +1,4 @@
 
-T5951.hs:8:8: error:
-    Illegal class instance: ‘A => B => C’
-      Class instances must be of the form
-        context => C ty_1 ... ty_n
-      where ‘C’ is a class
+T5951.hs:9:8: error:
+    Instance head cannot contain nested ‘forall’s or contexts
+    In an instance declaration

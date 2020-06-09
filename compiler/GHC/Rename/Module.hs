@@ -65,6 +65,7 @@ import GHC.Data.List.SetOps ( findDupsEq, removeDups, equivClasses )
 import GHC.Data.Graph.Directed ( SCC, flattenSCC, flattenSCCs, Node(..)
                                , stronglyConnCompFromEdgedVerticesUniq )
 import GHC.Types.Unique.Set
+import GHC.Data.Maybe ( whenIsJust )
 import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -601,27 +602,43 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
                            , cid_sigs = uprags, cid_tyfam_insts = ats
                            , cid_overlap_mode = oflag
                            , cid_datafam_insts = adts })
-  = do { (inst_ty', inst_fvs)
-           <- rnHsSigType (GenericCtx $ text "an instance declaration") TypeLevel inf_err inst_ty
+  = do { (inst_ty', inst_fvs) <- rnHsSigType ctxt TypeLevel inf_err inst_ty
        ; let (ktv_names, _, head_ty') = splitLHsInstDeclTy inst_ty'
-       ; cls <-
-           case hsTyGetAppHead_maybe head_ty' of
-             Just (L _ cls) -> pure cls
-             Nothing -> do
-               -- The instance is malformed. We'd still like
-               -- to make *some* progress (rather than failing outright), so
-               -- we report an error and continue for as long as we can.
-               -- Importantly, this error should be thrown before we reach the
-               -- typechecker, lest we encounter different errors that are
-               -- hopelessly confusing (such as the one in #16114).
-               addErrAt (getLoc (hsSigType inst_ty)) $
-                 hang (text "Illegal class instance:" <+> quotes (ppr inst_ty))
-                    2 (vcat [ text "Class instances must be of the form"
-                            , nest 2 $ text "context => C ty_1 ... ty_n"
-                            , text "where" <+> quotes (char 'C')
-                              <+> text "is a class"
-                            ])
-               pure $ mkUnboundName (mkTcOccFS (fsLit "<class>"))
+             -- Check if there are any nested `forall`s or contexts, which are
+             -- illegal in the type of an instance declaration (see
+             -- Note [No nested foralls or contexts in instance types] in
+             -- GHC.Hs.Type)...
+             mb_nested_msg = no_nested_foralls_contexts_err
+                               (text "Instance head") head_ty'
+             -- ...then check if the instance head is actually headed by a
+             -- class type constructor...
+             eith_cls = case hsTyGetAppHead_maybe head_ty' of
+               Just (L _ cls) -> Right cls
+               Nothing        -> Left
+                 ( getLoc head_ty'
+                 , hang (text "Illegal head of an instance declaration:"
+                           <+> quotes (ppr head_ty'))
+                      2 (vcat [ text "Instance heads must be of the form"
+                              , nest 2 $ text "C ty_1 ... ty_n"
+                              , text "where" <+> quotes (char 'C')
+                                <+> text "is a class"
+                              ])
+                 )
+         -- ...finally, attempt to retrieve the class type constructor, failing
+         -- with an error message if there isn't one. To avoid excessive
+         -- amounts of error messages, we will only report one of the errors
+         -- from mb_nested_msg or eith_cls at a time.
+       ; cls <- case maybe eith_cls Left mb_nested_msg of
+           Right cls         -> pure cls
+           Left (l, err_msg) -> do
+             -- The instance is malformed. We'd still like
+             -- to make *some* progress (rather than failing outright), so
+             -- we report an error and continue for as long as we can.
+             -- Importantly, this error should be thrown before we reach the
+             -- typechecker, lest we encounter different errors that are
+             -- hopelessly confusing (such as the one in #16114).
+             addErrAt l $ withHsDocContext ctxt err_msg
+             pure $ mkUnboundName (mkTcOccFS (fsLit "<class>"))
 
           -- Rename the bindings
           -- The typechecker (not the renamer) checks that all
@@ -660,6 +677,7 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
              --     strange, but should not matter (and it would be more work
              --     to remove the context).
   where
+    ctxt    = GenericCtx $ text "an instance declaration"
     inf_err = Just (text "Inferred type variables are not allowed")
 
 rnFamInstEqn :: HsDocContext
@@ -993,11 +1011,19 @@ rnSrcDerivDecl (DerivDecl _ ty mds overlap)
   = do { standalone_deriv_ok <- xoptM LangExt.StandaloneDeriving
        ; unless standalone_deriv_ok (addErr standaloneDerivErr)
        ; (mds', ty', fvs)
-           <- rnLDerivStrategy DerivDeclCtx mds $
-              rnHsSigWcType DerivDeclCtx inf_err ty
+           <- rnLDerivStrategy ctxt mds $ rnHsSigWcType ctxt inf_err ty
+         -- Check if there are any nested `forall`s or contexts, which are
+         -- illegal in the type of an instance declaration (see
+         -- Note [No nested foralls or contexts in instance types] in
+         -- GHC.Hs.Type).
+       ; whenIsJust (no_nested_foralls_contexts_err
+                       (text "Standalone-derived instance head")
+                       (getLHsInstDeclHead $ dropWildCards ty')) $ \(l, err_msg) ->
+           addErrAt l $ withHsDocContext ctxt err_msg
        ; warnNoDerivStrat mds' loc
        ; return (DerivDecl noExtField ty' mds' overlap, fvs) }
   where
+    ctxt    = DerivDeclCtx
     inf_err = Just (text "Inferred type variables are not allowed")
     loc = getLoc $ hsib_body $ hswc_body ty
 
@@ -1805,14 +1831,26 @@ rnLHsDerivingClause doc
                               , deriv_clause_strategy = dcs
                               , deriv_clause_tys = L loc' dct }))
   = do { (dcs', dct', fvs)
-           <- rnLDerivStrategy doc dcs $ mapFvRn (rnHsSigType doc TypeLevel inf_err) dct
+           <- rnLDerivStrategy doc dcs $ mapFvRn rn_clause_pred dct
        ; warnNoDerivStrat dcs' loc
        ; pure ( L loc (HsDerivingClause { deriv_clause_ext = noExtField
                                         , deriv_clause_strategy = dcs'
                                         , deriv_clause_tys = L loc' dct' })
               , fvs ) }
   where
-    inf_err = Just (text "Inferred type variables are not allowed")
+    rn_clause_pred :: LHsSigType GhcPs -> RnM (LHsSigType GhcRn, FreeVars)
+    rn_clause_pred pred_ty = do
+      let inf_err = Just (text "Inferred type variables are not allowed")
+      ret@(pred_ty', _) <- rnHsSigType doc TypeLevel inf_err pred_ty
+      -- Check if there are any nested `forall`s, which are illegal in a
+      -- `deriving` clause.
+      -- See Note [No nested foralls or contexts in instance types]
+      -- (Wrinkle: Derived instances) in GHC.Hs.Type.
+      whenIsJust (no_nested_foralls_contexts_err
+                    (text "Derived class type")
+                    (getLHsInstDeclHead pred_ty')) $ \(l, err_msg) ->
+            addErrAt l $ withHsDocContext doc err_msg
+      pure ret
 
 rnLDerivStrategy :: forall a.
                     HsDocContext
@@ -1848,9 +1886,17 @@ rnLDerivStrategy doc mds thing_inside
           do (via_ty', fvs1) <- rnHsSigType doc TypeLevel inf_err via_ty
              let HsIB { hsib_ext  = via_imp_tvs
                       , hsib_body = via_body } = via_ty'
-                 (via_exp_tv_bndrs, _, _) = splitLHsSigmaTyInvis via_body
-                 via_exp_tvs = hsLTyVarNames via_exp_tv_bndrs
+                 (via_exp_tv_bndrs, via_rho) = splitLHsForAllTyInvis_KP via_body
+                 via_exp_tvs = maybe [] hsLTyVarNames via_exp_tv_bndrs
                  via_tvs = via_imp_tvs ++ via_exp_tvs
+             -- Check if there are any nested `forall`s, which are illegal in a
+             -- `via` type.
+             -- See Note [No nested foralls or contexts in instance types]
+             -- (Wrinkle: Derived instances) in GHC.Hs.Type.
+             whenIsJust (no_nested_foralls_contexts_err
+                           (quotes (text "via") <+> text "type")
+                           via_rho) $ \(l, err_msg) ->
+               addErrAt l $ withHsDocContext doc err_msg
              (thing, fvs2) <- extendTyVarEnvFVRn via_tvs thing_inside
              pure (ViaStrategy via_ty', thing, fvs1 `plusFV` fvs2)
 
@@ -2184,18 +2230,10 @@ rnConDecl (XConDecl (ConDeclGADTPrefixPs { con_gp_names = names, con_gp_ty = ty
          -- Ensure that there are no nested `forall`s or contexts, per
          -- Note [GADT abstract syntax] (Wrinkle: No nested foralls or contexts)
          -- in GHC.Hs.Type.
-       ; case res_ty of
-           L l (HsForAllTy { hst_tele = tele })
-             |  HsForAllVis{} <- tele
-             -> setSrcSpan l $ addErr $ withHsDocContext ctxt $ vcat
-                [ text "Illegal visible, dependent quantification" <+>
-                  text "in the type of a term"
-                , text "(GHC does not yet support this)" ]
-             |  HsForAllInvis{} <- tele
-             -> nested_foralls_contexts_err l ctxt
-           L l (HsQualTy {})
-             -> nested_foralls_contexts_err l ctxt
-           _ -> pure ()
+       ; whenIsJust (no_nested_foralls_contexts_err
+                       (text "GADT constructor type signature")
+                       res_ty) $ \(l, err_msg) ->
+           addErrAt l $ withHsDocContext ctxt err_msg
 
        ; traceRn "rnConDecl (ConDeclGADTPrefixPs)"
            (ppr names $$ ppr implicit_tkvs $$ ppr explicit_tkvs)
@@ -2204,12 +2242,6 @@ rnConDecl (XConDecl (ConDeclGADTPrefixPs { con_gp_names = names, con_gp_ty = ty
                            , con_mb_cxt = mb_cxt, con_args = arg_details
                            , con_res_ty = res_ty, con_doc = mb_doc' },
                fvs) }
-  where
-    nested_foralls_contexts_err :: SrcSpan -> HsDocContext -> RnM ()
-    nested_foralls_contexts_err l ctxt =
-      setSrcSpan l $ addErr $ withHsDocContext ctxt $
-      text "GADT constructor type signature cannot contain nested"
-      <+> quotes forAllLit <> text "s or contexts"
 
 rnMbContext :: HsDocContext -> Maybe (LHsContext GhcPs)
             -> RnM (Maybe (LHsContext GhcRn), FreeVars)
@@ -2238,6 +2270,41 @@ rnConDeclDetails con doc (RecCon (L l fields))
                 -- No need to check for duplicate fields
                 -- since that is done by GHC.Rename.Names.extendGlobalRdrEnvRn
         ; return (RecCon (L l new_fields), fvs) }
+
+-- | Examines a non-outermost type for @forall@s or contexts, which are assumed
+-- to be nested. Returns @'Just' err_msg@ if such a @forall@ or context is
+-- found, and returns @Nothing@ otherwise.
+--
+-- This is currently used in two places:
+--
+-- * In GADT constructor types (in 'rnConDecl').
+--   See @Note [GADT abstract syntax] (Wrinkle: No nested foralls or contexts)@
+--   in "GHC.Hs.Type".
+--
+-- * In instance declaration types (in 'rnClsIntDecl' and 'rnSrcDerivDecl').
+--   See @Note [No nested foralls or contexts in instance types]@ in
+--   "GHC.Hs.Type".
+no_nested_foralls_contexts_err :: SDoc -> LHsType GhcRn -> Maybe (SrcSpan, SDoc)
+no_nested_foralls_contexts_err what lty =
+  case ignoreParens lty of
+    L l (HsForAllTy { hst_tele = tele })
+      |  HsForAllVis{} <- tele
+         -- The only two places where this function is called correspond to
+         -- types of terms, so we give a slightly more descriptive error
+         -- message in the event that they contain visible dependent
+         -- quantification (currently only allowed in kinds).
+      -> Just (l, vcat [ text "Illegal visible, dependent quantification" <+>
+                         text "in the type of a term"
+                       , text "(GHC does not yet support this)" ])
+      |  HsForAllInvis{} <- tele
+      -> Just (l, nested_foralls_contexts_err)
+    L l (HsQualTy {})
+      -> Just (l, nested_foralls_contexts_err)
+    _ -> Nothing
+  where
+    nested_foralls_contexts_err =
+      what <+> text "cannot contain nested"
+      <+> quotes forAllLit <> text "s or contexts"
 
 -------------------------------------------------
 

@@ -14,4 +14,4 @@ newtype F1 = F1 Int
   deriving Eq via Char
 
 newtype F2 a = MkF2 a
-  deriving (C a) via (forall a. a)
+  deriving (C a) via forall a. a

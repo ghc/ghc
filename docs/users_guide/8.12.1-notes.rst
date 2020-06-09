@@ -145,6 +145,22 @@ Language
     data U a where
       MkU :: (Show a => U a)
 
+* GHC more strictly enforces the rule that the type in the top of an instance
+  declaration is not permitted to contain nested ``forall``s or contexts, as
+  documented in :ref:`formal-instance-syntax`. For example, the following
+  examples, which previous versions of GHC would accept, are now rejected:
+
+    instance (forall a. C a) where ...
+    instance (Show a => C a) where ...
+
+  In addition, GHC now enforces the rule that the types in ``deriving`` clauses
+  and ``via`` types (for instances derived with :extension:`DerivingVia`)
+  cannot contain nested ``forall``s or contexts. For example, the following
+  examples, which previous versions of GHC would accept, are now rejected: ::
+
+    data T = MkT deriving (C1, (forall x. C2 x))
+    deriving via (forall x. V x) instance C (S x)
+
 Compiler
 ~~~~~~~~
 
