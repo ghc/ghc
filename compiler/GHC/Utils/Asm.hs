@@ -1,7 +1,7 @@
 -- | Various utilities used in generating assembler.
 --
 -- These are used not only by the native code generator, but also by the
--- GHC.Driver.Pipeline
+-- "GHC.Driver.Pipeline"
 module GHC.Utils.Asm
     ( sectionType
     ) where

@@ -43,7 +43,7 @@ import GHC.Unit.Ppr
 --    * UnitId: identifier used to generate code (cf 'UnitInfo')
 --
 -- These two identifiers are different for wired-in packages. See Note [About
--- Units] in GHC.Unit
+-- Units] in "GHC.Unit"
 type GenUnitInfo unit = GenericUnitInfo (Indefinite unit) PackageId PackageName unit ModuleName (GenModule (GenUnit unit))
 
 -- | A unit key in the database

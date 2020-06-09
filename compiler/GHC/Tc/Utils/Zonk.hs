@@ -29,7 +29,7 @@ module GHC.Tc.Utils.Zonk (
 
         -- * Zonking
         -- | For a description of "zonking", see Note [What is zonking?]
-        -- in GHC.Tc.Utils.TcMType
+        -- in "GHC.Tc.Utils.TcMType"
         zonkTopDecls, zonkTopExpr, zonkTopLExpr,
         zonkTopBndrs,
         ZonkEnv, ZonkFlexi(..), emptyZonkEnv, mkEmptyZonkEnv, initZonkEnv,
@@ -203,7 +203,7 @@ the environment manipulation is tiresome.
 -- Confused by zonking? See Note [What is zonking?] in GHC.Tc.Utils.TcMType.
 
 -- | See Note [The ZonkEnv]
--- Confused by zonking? See Note [What is zonking?] in GHC.Tc.Utils.TcMType.
+-- Confused by zonking? See Note [What is zonking?] in "GHC.Tc.Utils.TcMType".
 data ZonkEnv  -- See Note [The ZonkEnv]
   = ZonkEnv { ze_flexi  :: ZonkFlexi
             , ze_tv_env :: TyCoVarEnv TyCoVar

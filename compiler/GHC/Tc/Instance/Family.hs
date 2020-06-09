@@ -736,7 +736,7 @@ checkForInjectivityConflicts instEnvs famInst
 -- this is possible and False if adding this equation would violate injectivity
 -- annotation. This looks only at the one equation; it does not look for
 -- interaction between equations. Use checkForInjectivityConflicts for that.
--- Does checks (2)-(4) of Note [Verifying injectivity annotation] in GHC.Core.FamInstEnv.
+-- Does checks (2)-(4) of Note [Verifying injectivity annotation] in "GHC.Core.FamInstEnv".
 checkInjectiveEquation :: FamInst -> TcM ()
 checkInjectiveEquation famInst
     | isTypeFamilyTyCon tycon

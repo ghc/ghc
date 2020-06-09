@@ -1026,7 +1026,7 @@ instance Outputable EvTypeable where
 -- expect the 'Type' to have the form `IP sym ty` or `IsLabel sym ty`,
 -- and return a 'Coercion' `co :: IP sym ty ~ ty` or
 -- `co :: IsLabel sym ty ~ Proxy# sym -> ty`.  See also
--- Note [Type-checking overloaded labels] in GHC.Tc.Gen.Expr.
+-- Note [Type-checking overloaded labels] in "GHC.Tc.Gen.Expr".
 unwrapIP :: Type -> CoercionR
 unwrapIP ty =
   case unwrapNewTyCon_maybe tc of

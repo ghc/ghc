@@ -660,12 +660,12 @@ computeInterface doc_str hi_boot_file mod0 = do
 -- | Compute the signatures which must be compiled in order to
 -- load the interface for a 'Module'.  The output of this function
 -- is always a subset of 'moduleFreeHoles'; it is more precise
--- because in signature @p[A=<A>,B=<B>]:B@, although the free holes
+-- because in signature @p[A=\<A>,B=\<B>]:B@, although the free holes
 -- are A and B, B might not depend on A at all!
 --
 -- If this is invoked on a signature, this does NOT include the
 -- signature itself; e.g. precise free module holes of
--- @p[A=<A>,B=<B>]:B@ never includes B.
+-- @p[A=\<A>,B=\<B>]:B@ never includes B.
 moduleFreeHolesPrecise
     :: SDoc -> Module
     -> TcRnIf gbl lcl (MaybeErr MsgDoc (UniqDSet ModuleName))

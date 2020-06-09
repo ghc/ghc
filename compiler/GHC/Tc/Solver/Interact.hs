@@ -2488,7 +2488,7 @@ matchClassInst dflags inerts clas tys loc
 -- | If a class is "naturally coherent", then we needn't worry at all, in any
 -- way, about overlapping/incoherent instances. Just solve the thing!
 -- See Note [Naturally coherent classes]
--- See also Note [The equality class story] in GHC.Builtin.Types.Prim.
+-- See also Note [The equality class story] in "GHC.Builtin.Types.Prim".
 naturallyCoherentClass :: Class -> Bool
 naturallyCoherentClass cls
   = isCTupleClass cls

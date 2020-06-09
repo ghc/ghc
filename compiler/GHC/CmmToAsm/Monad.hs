@@ -97,7 +97,7 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     -- and Note [Unwinding information in the NCG] in this module.
     invertCondBranches        :: Maybe CFG -> LabelMap RawCmmStatics -> [NatBasicBlock instr]
                               -> [NatBasicBlock instr]
-    -- ^ Turn the sequence of `jcc l1; jmp l2` into `jncc l2; <block_l1>`
+    -- ^ Turn the sequence of @jcc l1; jmp l2@ into @jncc l2; \<block_l1>@
     -- when possible.
     }
 

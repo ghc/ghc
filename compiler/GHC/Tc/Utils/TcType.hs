@@ -7,7 +7,7 @@
 {-# LANGUAGE CPP, ScopedTypeVariables, MultiWayIf, FlexibleContexts #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
--- | Types used in the typechecker}
+-- | Types used in the typechecker
 --
 -- This module provides the Type interface for front-end parts of the
 -- compiler.  These parts
@@ -366,7 +366,7 @@ type TcDTyCoVarSet  = DTyCoVarSet
 ********************************************************************* -}
 
 -- | An expected type to check against during type-checking.
--- See Note [ExpType] in GHC.Tc.Utils.TcMType, where you'll also find manipulators.
+-- See Note [ExpType] in "GHC.Tc.Utils.TcMType", where you'll also find manipulators.
 data ExpType = Check TcType
              | Infer !InferResult
 
@@ -417,7 +417,7 @@ mkCheckExpType = Check
 -- You'll also get three multiplicities back: one for each function arrow. See
 -- also Note [Linear types] in Multiplicity.
 --
--- This is defined here to avoid defining it in GHC.Tc.Gen.Expr boot file.
+-- This is defined here to avoid defining it in "GHC.Tc.Gen.Expr" boot file.
 data SyntaxOpType
   = SynAny     -- ^ Any type
   | SynRho     -- ^ A rho type, skolemised or instantiated as appropriate
@@ -757,8 +757,8 @@ promoteSkolemsX tclvl = mapAccumL (promoteSkolemX tclvl)
 --
 -- This is important for its use in deciding termination of type
 -- instances (see #11581).  E.g.
---    type instance G [Int] = ...(F Int <big type>)...
--- we don't need to take <big type> into account when asking if
+--    type instance G [Int] = ...(F Int \<big type>)...
+-- we don't need to take \<big type> into account when asking if
 -- the calls on the RHS are smaller than the LHS
 tcTyFamInsts :: Type -> [(TyCon, [Type])]
 tcTyFamInsts = map (\(_,b,c) -> (b,c)) . tcTyFamInstsAndVis
@@ -1846,7 +1846,7 @@ isImprovementPred ty
 --      a ~R ...(N a)...  -- Not definitely insoluble
 --                        -- Perhaps newtype N a = MkN Int
 -- See Note [Occurs check error] in
--- GHC.Tc.Solver.Canonical for the motivation for this function.
+-- "GHC.Tc.Solver.Canonical" for the motivation for this function.
 isInsolubleOccursCheck :: EqRel -> TcTyVar -> TcType -> Bool
 isInsolubleOccursCheck eq_rel tv ty
   = go ty
@@ -2104,7 +2104,7 @@ isRigidTy ty
 
 
 -- | Is this type *almost function-free*? See Note [Almost function-free]
--- in GHC.Tc.Types
+-- in "GHC.Tc.Types"
 isAlmostFunctionFree :: TcType -> Bool
 isAlmostFunctionFree ty | Just ty' <- tcView ty = isAlmostFunctionFree ty'
 isAlmostFunctionFree (TyVarTy {})    = True

@@ -982,7 +982,7 @@ storing required arguments along with the PmAltConLike in 'vi_neg'.
 
 -- | Guess the universal argument types of a ConLike from an instantiation of
 -- its result type. Rather easy for DataCons, but not so much for PatSynCons.
--- See Note [Pattern synonym result type] in GHC.Core.PatSyn.
+-- See Note [Pattern synonym result type] in "GHC.Core.PatSyn".
 guessConLikeUnivTyArgsFromResTy :: FamInstEnvs -> Type -> ConLike -> Maybe [Type]
 guessConLikeUnivTyArgsFromResTy env res_ty (RealDataCon _) = do
   (tc, tc_args) <- splitTyConApp_maybe res_ty

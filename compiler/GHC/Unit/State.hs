@@ -124,11 +124,11 @@ import qualified Data.Set as Set
 -- The unit state is computed by 'initUnits', and kept in DynFlags.
 -- It is influenced by various command-line flags:
 --
---   * @-package <pkg>@ and @-package-id <pkg>@ cause @<pkg>@ to become exposed.
+--   * @-package \<pkg>@ and @-package-id \<pkg>@ cause @\<pkg>@ to become exposed.
 --     If @-hide-all-packages@ was not specified, these commands also cause
 --      all other packages with the same name to become hidden.
 --
---   * @-hide-package <pkg>@ causes @<pkg>@ to become hidden.
+--   * @-hide-package \<pkg>@ causes @\<pkg>@ to become hidden.
 --
 --   * (there are a few more flags, check below for their semantics)
 --
@@ -431,9 +431,9 @@ data UnitState = UnitState {
 
   -- | A map saying, for each requirement, what interfaces must be merged
   -- together when we use them.  For example, if our dependencies
-  -- are @p[A=<A>]@ and @q[A=<A>,B=r[C=<A>]:B]@, then the interfaces
-  -- to merge for A are @p[A=<A>]:A@, @q[A=<A>,B=r[C=<A>]:B]:A@
-  -- and @r[C=<A>]:C@.
+  -- are @p[A=\<A>]@ and @q[A=\<A>,B=r[C=\<A>]:B]@, then the interfaces
+  -- to merge for A are @p[A=\<A>]:A@, @q[A=\<A>,B=r[C=\<A>]:B]:A@
+  -- and @r[C=\<A>]:C@.
   --
   -- There's an entry in this map for each hole in our home library.
   requirementContext :: Map ModuleName [InstantiatedModule],
@@ -2215,20 +2215,20 @@ type ShHoleSubst = ModuleNameEnv Module
 
 -- | Substitutes holes in a 'Module'.  NOT suitable for being called
 -- directly on a 'nameModule', see Note [Representation of module/name variable].
--- @p[A=<A>]:B@ maps to @p[A=q():A]:B@ with @A=q():A@;
--- similarly, @<A>@ maps to @q():A@.
+-- @p[A=\<A>]:B@ maps to @p[A=q():A]:B@ with @A=q():A@;
+-- similarly, @\<A>@ maps to @q():A@.
 renameHoleModule :: UnitState -> ShHoleSubst -> Module -> Module
 renameHoleModule state = renameHoleModule' (unitInfoMap state) (preloadClosure state)
 
 -- | Substitutes holes in a 'Unit', suitable for renaming when
 -- an include occurs; see Note [Representation of module/name variable].
 --
--- @p[A=<A>]@ maps to @p[A=<B>]@ with @A=<B>@.
+-- @p[A=\<A>]@ maps to @p[A=\<B>]@ with @A=\<B>@.
 renameHoleUnit :: UnitState -> ShHoleSubst -> Unit -> Unit
 renameHoleUnit state = renameHoleUnit' (unitInfoMap state) (preloadClosure state)
 
 -- | Like 'renameHoleModule', but requires only 'ClosureUnitInfoMap'
--- so it can be used by "Packages".
+-- so it can be used by "GHC.Unit.State".
 renameHoleModule' :: UnitInfoMap -> PreloadUnitClosure -> ShHoleSubst -> Module -> Module
 renameHoleModule' pkg_map closure env m
   | not (isHoleModule m) =
@@ -2239,7 +2239,7 @@ renameHoleModule' pkg_map closure env m
   | otherwise = m
 
 -- | Like 'renameHoleUnit, but requires only 'ClosureUnitInfoMap'
--- so it can be used by "Packages".
+-- so it can be used by "GHC.Unit.State".
 renameHoleUnit' :: UnitInfoMap -> PreloadUnitClosure -> ShHoleSubst -> Unit -> Unit
 renameHoleUnit' pkg_map closure env uid =
     case uid of

@@ -1,13 +1,13 @@
 {-# LANGUAGE CPP, ScopedTypeVariables, LambdaCase #-}
 
 -- | Defines a simple exception type and utilities to throw it. The
--- 'PlainGhcException' type is a subset of the 'Panic.GhcException'
+-- 'PlainGhcException' type is a subset of the 'GHC.Utils.Panic.GhcException'
 -- type.  It omits the exception constructors that involve
--- pretty-printing via 'Outputable.SDoc'.
+-- pretty-printing via 'GHC.Utils.Outputable.SDoc'.
 --
 -- There are two reasons for this:
 --
--- 1. To avoid import cycles / use of boot files. "Outputable" has
+-- 1. To avoid import cycles / use of boot files. "GHC.Utils.Outputable" has
 -- many transitive dependencies. To throw exceptions from these
 -- modules, the functions here can be used without introducing import
 -- cycles.
@@ -34,14 +34,14 @@ import GHC.Prelude
 import System.Environment
 import System.IO.Unsafe
 
--- | This type is very similar to 'Panic.GhcException', but it omits
+-- | This type is very similar to 'GHC.Utils.Panic.GhcException', but it omits
 -- the constructors that involve pretty-printing via
--- 'Outputable.SDoc'.  Due to the implementation of 'fromException'
--- for 'Panic.GhcException', this type can be caught as a
--- 'Panic.GhcException'.
+-- 'GHC.Utils.Outputable.SDoc'.  Due to the implementation of 'fromException'
+-- for 'GHC.Utils.Panic.GhcException', this type can be caught as a
+-- 'GHC.Utils.Panic.GhcException'.
 --
 -- Note that this should only be used for throwing exceptions, not for
--- catching, as 'Panic.GhcException' will not be converted to this
+-- catching, as 'GHC.Utils.Panic.GhcException' will not be converted to this
 -- type when catching.
 data PlainGhcException
   -- | Some other fatal signal (SIGHUP,SIGTERM)

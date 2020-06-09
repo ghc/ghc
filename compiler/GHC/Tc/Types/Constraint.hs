@@ -484,12 +484,12 @@ tyCoVarsOfCt :: Ct -> TcTyCoVarSet
 tyCoVarsOfCt = fvVarSet . tyCoFVsOfCt
 
 -- | Returns free variables of constraints as a deterministically ordered.
--- list. See Note [Deterministic FV] in GHC.Utils.FV.
+-- list. See Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoVarsOfCtList :: Ct -> [TcTyCoVar]
 tyCoVarsOfCtList = fvVarList . tyCoFVsOfCt
 
 -- | Returns free variables of constraints as a composable FV computation.
--- See Note [Deterministic FV] in GHC.Utils.FV.
+-- See Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoFVsOfCt :: Ct -> FV
 tyCoFVsOfCt ct = tyCoFVsOfType (ctPred ct)
   -- This must consult only the ctPred, so that it gets *tidied* fvs if the
@@ -497,34 +497,34 @@ tyCoFVsOfCt ct = tyCoFVsOfType (ctPred ct)
   -- fields of the Ct, only the predicate in the CtEvidence.
 
 -- | Returns free variables of a bag of constraints as a non-deterministic
--- set. See Note [Deterministic FV] in GHC.Utils.FV.
+-- set. See Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoVarsOfCts :: Cts -> TcTyCoVarSet
 tyCoVarsOfCts = fvVarSet . tyCoFVsOfCts
 
 -- | Returns free variables of a bag of constraints as a deterministically
--- ordered list. See Note [Deterministic FV] in GHC.Utils.FV.
+-- ordered list. See Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoVarsOfCtsList :: Cts -> [TcTyCoVar]
 tyCoVarsOfCtsList = fvVarList . tyCoFVsOfCts
 
 -- | Returns free variables of a bag of constraints as a composable FV
--- computation. See Note [Deterministic FV] in GHC.Utils.FV.
+-- computation. See Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoFVsOfCts :: Cts -> FV
 tyCoFVsOfCts = foldr (unionFV . tyCoFVsOfCt) emptyFV
 
 -- | Returns free variables of WantedConstraints as a non-deterministic
--- set. See Note [Deterministic FV] in GHC.Utils.FV.
+-- set. See Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoVarsOfWC :: WantedConstraints -> TyCoVarSet
 -- Only called on *zonked* things, hence no need to worry about flatten-skolems
 tyCoVarsOfWC = fvVarSet . tyCoFVsOfWC
 
 -- | Returns free variables of WantedConstraints as a deterministically
--- ordered list. See Note [Deterministic FV] in GHC.Utils.FV.
+-- ordered list. See Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoVarsOfWCList :: WantedConstraints -> [TyCoVar]
 -- Only called on *zonked* things, hence no need to worry about flatten-skolems
 tyCoVarsOfWCList = fvVarList . tyCoFVsOfWC
 
 -- | Returns free variables of WantedConstraints as a composable FV
--- computation. See Note [Deterministic FV] in GHC.Utils.FV.
+-- computation. See Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoFVsOfWC :: WantedConstraints -> FV
 -- Only called on *zonked* things, hence no need to worry about flatten-skolems
 tyCoFVsOfWC (WC { wc_simple = simple, wc_impl = implic, wc_holes = holes })
@@ -533,7 +533,7 @@ tyCoFVsOfWC (WC { wc_simple = simple, wc_impl = implic, wc_holes = holes })
     tyCoFVsOfBag tyCoFVsOfHole holes
 
 -- | Returns free variables of Implication as a composable FV computation.
--- See Note [Deterministic FV] in GHC.Utils.FV.
+-- See Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoFVsOfImplic :: Implication -> FV
 -- Only called on *zonked* things, hence no need to worry about flatten-skolems
 tyCoFVsOfImplic (Implic { ic_skols = skols
@@ -1380,7 +1380,7 @@ data TcEvDest
 
   | HoleDest  CoercionHole  -- ^ fill in this hole with the evidence
               -- HoleDest is always used for type-equalities
-              -- See Note [Coercion holes] in GHC.Core.TyCo.Rep
+              -- See Note [Coercion holes] in "GHC.Core.TyCo.Rep"
 
 data CtEvidence
   = CtGiven    -- Truly given, not depending on subgoals
@@ -1539,7 +1539,7 @@ ctEvFlavour (CtDerived {})                  = Derived
 
 -- | Whether or not one 'Ct' can rewrite another is determined by its
 -- flavour and its equality relation. See also
--- Note [Flavours with roles] in GHC.Tc.Solver.Monad
+-- Note [Flavours with roles] in "GHC.Tc.Solver.Monad"
 type CtFlavourRole = (CtFlavour, EqRel)
 
 -- | Extract the flavour, role, and boxity from a 'CtEvidence'

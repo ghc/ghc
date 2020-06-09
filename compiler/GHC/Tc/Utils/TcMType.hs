@@ -304,7 +304,7 @@ predTypeOccName ty = case classifyPredType ty of
 --
 -- This is monadic to look up the 'TcLclEnv', which is used to initialize
 -- 'ic_env', and to set the -Winaccessible-code flag. See
--- Note [Avoid -Winaccessible-code when deriving] in GHC.Tc.TyCl.Instance.
+-- Note [Avoid -Winaccessible-code when deriving] in "GHC.Tc.TyCl.Instance".
 newImplication :: TcM Implication
 newImplication
   = do env <- getLclEnv
@@ -609,12 +609,12 @@ tcInstSkolTyVarsAt lvl overlappable subst tvs
 freshenTyVarBndrs :: [TyVar] -> TcM (TCvSubst, [TyVar])
 -- ^ Give fresh uniques to a bunch of TyVars, but they stay
 --   as TyVars, rather than becoming TcTyVars
--- Used in GHC.Tc.Instance.Family.newFamInst, and Inst.newClsInst
+-- Used in 'GHC.Tc.Instance.Family.newFamInst', and 'GHC.Tc.Utils.Instantiate.newClsInst'
 freshenTyVarBndrs = freshenTyCoVars mkTyVar
 
 freshenCoVarBndrsX :: TCvSubst -> [CoVar] -> TcM (TCvSubst, [CoVar])
 -- ^ Give fresh uniques to a bunch of CoVars
--- Used in GHC.Tc.Instance.Family.newFamInst
+-- Used in "GHC.Tc.Instance.Family.newFamInst"
 freshenCoVarBndrsX subst = freshenTyCoVarsX mkCoVar subst
 
 ------------------

@@ -31,7 +31,7 @@ import GHC.HsToCore.PmCheck.Oracle
 -- | Pretty-print the guts of an uncovered value vector abstraction, i.e., its
 -- components and refutable shapes associated to any mentioned variables.
 --
--- Example for @([Just p, q], [p :-> [3,4], q :-> [0,5]]):
+-- Example for @([Just p, q], [p :-> [3,4], q :-> [0,5]])@:
 --
 -- @
 -- (Just p) q

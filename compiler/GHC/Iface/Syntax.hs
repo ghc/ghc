@@ -199,7 +199,7 @@ data IfaceFamTyConFlav
   | IfaceClosedSynFamilyTyCon (Maybe (IfExtName, [IfaceAxBranch]))
     -- ^ Name of associated axiom and branches for pretty printing purposes,
     -- or 'Nothing' for an empty closed family without an axiom
-    -- See Note [Pretty printing via Iface syntax] in GHC.Core.Ppr.TyThing
+    -- See Note [Pretty printing via Iface syntax] in "GHC.Core.Ppr.TyThing"
   | IfaceAbstractClosedSynFamilyTyCon
   | IfaceBuiltInSynFamTyCon -- for pretty printing purposes only
 
@@ -720,7 +720,7 @@ data ShowHowMuch
   | ShowSome [OccName] AltPpr
   -- ^ Show only some sub-components. Specifically,
   --
-  -- [@[]@] Print all sub-components.
+  -- [@\[\]@] Print all sub-components.
   -- [@(n:ns)@] Print sub-component @n@ with @ShowSub = ns@;
   -- elide other sub-components to @...@
   -- May 14: the list is max 1 element long at the moment

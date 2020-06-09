@@ -112,7 +112,7 @@ data EquationInfo
               -- ^ The patterns for an equation
               --
               -- NB: We have /already/ applied 'decideBangHood' to
-              -- these patterns.  See Note [decideBangHood] in GHC.HsToCore.Utils
+              -- these patterns.  See Note [decideBangHood] in "GHC.HsToCore.Utils"
 
             , eqn_orig :: Origin
               -- ^ Was this equation present in the user source?

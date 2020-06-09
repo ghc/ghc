@@ -560,7 +560,7 @@ tcSyntaxName :: CtOrigin
              -> TcM (Name, HsExpr GhcTc)
                                        -- ^ (Standard name, suitable expression)
 -- USED ONLY FOR CmdTop (sigh) ***
--- See Note [CmdSyntaxTable] in GHC.Hs.Expr
+-- See Note [CmdSyntaxTable] in "GHC.Hs.Expr"
 
 tcSyntaxName orig ty (std_nm, HsVar _ (L _ user_nm))
   | std_nm == user_nm

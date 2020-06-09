@@ -56,12 +56,12 @@ import System.Mem.Weak  ( deRefWeak )
 --   error messages all take the form:
 --
 --  @
---      <location>: <error>
+--      \<location>: \<error>
 --  @
 --
 --   If the location is on the command line, or in GHC itself, then
---   <location>="ghc".  All of the error types below correspond to
---   a <location> of "ghc", except for ProgramError (where the string is
+--   \<location>="ghc".  All of the error types below correspond to
+--   a \<location> of "ghc", except for ProgramError (where the string is
 --  assumed to contain a location already, so we don't print one).
 
 data GhcException
@@ -128,7 +128,7 @@ safeShowException e = do
 
 -- | Append a description of the given exception to this string.
 --
--- Note that this uses 'DynFlags.unsafeGlobalDynFlags', which may have some
+-- Note that this uses 'GHC.Driver.Session.unsafeGlobalDynFlags', which may have some
 -- uninitialized fields if invoked before 'GHC.initGhcMonad' has been called.
 -- If the error message to be printed includes a pretty-printer document
 -- which forces one of these fields this call may bottom.

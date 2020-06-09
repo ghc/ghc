@@ -45,7 +45,7 @@ data CondCode
         = CondCode Bool Cond InstrBlock
 
 
--- | a.k.a "Register64"
+-- | a.k.a \"Register64\"
 --      Reg is the lower 32-bit temporary which contains the result.
 --      Use getHiVRegFromLo to find the other VRegUnique.
 --

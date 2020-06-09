@@ -256,7 +256,7 @@ requirementMerges pkgstate mod_name =
 --              import A
 --
 --      unit q where
---          dependency p[A=<A>,B=<B>]
+--          dependency p[A=\<A>,B=\<B>]
 --          signature A
 --          signature B
 --

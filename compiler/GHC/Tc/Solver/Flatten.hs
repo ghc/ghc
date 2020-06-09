@@ -767,7 +767,7 @@ when trying to find derived equalities arising from injectivity.
 -- If (xi, co) <- flatten mode ev ty, then co :: xi ~r ty
 -- where r is the role in @ev@. If @mode@ is 'FM_FlattenAll',
 -- then 'xi' is almost function-free (Note [Almost function-free]
--- in GHC.Tc.Types).
+-- in "GHC.Tc.Types").
 flatten :: FlattenMode -> CtEvidence -> TcType
         -> TcS (Xi, TcCoercion)
 flatten mode ev ty
