@@ -67,7 +67,7 @@ module GHC.Hs.Type (
         hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsExplicitLTyVarNames,
         splitLHsInstDeclTy, getLHsInstDeclHead, getLHsInstDeclClass_maybe,
         splitLHsPatSynTy,
-        splitLHsForAllTyInvis, splitLHsQualTy,
+        splitLHsForAllTyInvis, splitLHsForAllTyInvis_KP, splitLHsQualTy,
         splitLHsSigmaTyInvis, splitLHsGADTPrefixTy,
         splitHsFunType, hsTyGetAppHead_maybe,
         mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
@@ -102,10 +102,10 @@ import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Data.FastString
-import GHC.Data.Maybe( isJust )
 import GHC.Utils.Misc ( count )
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
+import Data.Maybe
 
 {-
 ************************************************************************
@@ -1338,10 +1338,10 @@ splitHsFunType (L _ (HsFunTy _ mult x y))
 
 splitHsFunType other = ([], other)
 
--- retrieve the name of the "head" of a nested type application
--- somewhat like splitHsAppTys, but a little more thorough
--- used to examine the result of a GADT-like datacon, so it doesn't handle
--- *all* cases (like lists, tuples, (~), etc.)
+-- | Retrieve the name of the \"head\" of a nested type application.
+-- This is somewhat like @GHC.Tc.Gen.HsType.splitHsAppTys@, but a little more
+-- thorough. The purpose of this function is to examine instance heads, so it
+-- doesn't handle *all* cases (like lists, tuples, @(~)@, etc.).
 hsTyGetAppHead_maybe :: LHsType (GhcPass p)
                      -> Maybe (Located (IdP (GhcPass p)))
 hsTyGetAppHead_maybe = go
@@ -1437,6 +1437,26 @@ splitLHsSigmaTyInvis ty
   , (ctxt, ty2) <- splitLHsQualTy ty1
   = (tvs, ctxt, ty2)
 
+-- | Decompose a sigma type (of the form @forall <tvs>. context => body@)
+-- into its constituent parts.
+-- Only splits type variable binders that were
+-- quantified invisibly (e.g., @forall a.@, with a dot).
+--
+-- This function is used to split apart certain types, such as instance
+-- declaration types, which disallow visible @forall@s. For instance, if GHC
+-- split apart the @forall@ in @instance forall a -> Show (Blah a)@, then that
+-- declaration would mistakenly be accepted!
+--
+-- Unlike 'splitLHsSigmaTyInvis', this function does not look through
+-- parentheses, hence the suffix @_KP@ (short for \"Keep Parentheses\").
+splitLHsSigmaTyInvis_KP ::
+     LHsType pass
+  -> (Maybe [LHsTyVarBndr Specificity pass], Maybe (LHsContext pass), LHsType pass)
+splitLHsSigmaTyInvis_KP ty
+  | (mb_tvbs, ty1) <- splitLHsForAllTyInvis_KP ty
+  , (mb_ctxt, ty2) <- splitLHsQualTy_KP ty1
+  = (mb_tvbs, mb_ctxt, ty2)
+
 -- | Decompose a prefix GADT type into its constituent parts.
 -- Returns @(mb_tvbs, mb_ctxt, body)@, where:
 --
@@ -1454,26 +1474,7 @@ splitLHsSigmaTyInvis ty
 splitLHsGADTPrefixTy ::
      LHsType pass
   -> (Maybe [LHsTyVarBndr Specificity pass], Maybe (LHsContext pass), LHsType pass)
-splitLHsGADTPrefixTy ty
-  | (mb_tvbs, rho) <- split_forall ty
-  , (mb_ctxt, tau) <- split_ctxt rho
-  = (mb_tvbs, mb_ctxt, tau)
-  where
-    -- NB: We do not use splitLHsForAllTyInvis below, since that looks through
-    -- parentheses...
-    split_forall (L _ (HsForAllTy { hst_tele =
-                                      HsForAllInvis { hsf_invis_bndrs = bndrs }
-                                  , hst_body = rho }))
-      = (Just bndrs, rho)
-    split_forall sigma
-      = (Nothing, sigma)
-
-    -- ...similarly, we do not use splitLHsQualTy below, since that also looks
-    -- through parentheses.
-    split_ctxt (L _ (HsQualTy { hst_ctxt = cxt, hst_body = tau }))
-      = (Just cxt, tau)
-    split_ctxt tau
-      = (Nothing, tau)
+splitLHsGADTPrefixTy = splitLHsSigmaTyInvis_KP
 
 -- | Decompose a type of the form @forall <tvs>. body@ into its constituent
 -- parts. Only splits type variable binders that
@@ -1488,14 +1489,33 @@ splitLHsGADTPrefixTy ty
 -- such as @(forall a. <...>)@. The downside to this is that it is not
 -- generally possible to take the returned types and reconstruct the original
 -- type (parentheses and all) from them.
-splitLHsForAllTyInvis :: LHsType pass -> ([LHsTyVarBndr Specificity pass], LHsType pass)
-splitLHsForAllTyInvis lty@(L _ ty) =
+-- Unlike 'splitLHsSigmaTyInvis', this function does not look through
+-- parentheses, hence the suffix @_KP@ (short for \"Keep Parentheses\").
+splitLHsForAllTyInvis ::
+  LHsType pass -> ([LHsTyVarBndr Specificity pass], LHsType pass)
+splitLHsForAllTyInvis ty
+  | (mb_tvbs, body) <- splitLHsForAllTyInvis_KP (ignoreParens ty)
+  = (fromMaybe [] mb_tvbs, body)
+
+-- | Decompose a type of the form @forall <tvs>. body@ into its constituent
+-- parts. Only splits type variable binders that
+-- were quantified invisibly (e.g., @forall a.@, with a dot).
+--
+-- This function is used to split apart certain types, such as instance
+-- declaration types, which disallow visible @forall@s. For instance, if GHC
+-- split apart the @forall@ in @instance forall a -> Show (Blah a)@, then that
+-- declaration would mistakenly be accepted!
+--
+-- Unlike 'splitLHsForAllTyInvis', this function does not look through
+-- parentheses, hence the suffix @_KP@ (short for \"Keep Parentheses\").
+splitLHsForAllTyInvis_KP ::
+  LHsType pass -> (Maybe [LHsTyVarBndr Specificity pass], LHsType pass)
+splitLHsForAllTyInvis_KP lty@(L _ ty) =
   case ty of
-    HsParTy _ ty' -> splitLHsForAllTyInvis ty'
-    HsForAllTy { hst_tele = HsForAllInvis { hsf_invis_bndrs = tvs' }
-               , hst_body = body' }
-      -> (tvs', body')
-    _ -> ([], lty)
+    HsForAllTy { hst_tele = HsForAllInvis { hsf_invis_bndrs = tvs }
+               , hst_body = body }
+      -> (Just tvs, body)
+    _ -> (Nothing, lty)
 
 -- | Decompose a type of the form @context => body@ into its constituent parts.
 --
@@ -1504,39 +1524,140 @@ splitLHsForAllTyInvis lty@(L _ ty) =
 -- generally possible to take the returned types and reconstruct the original
 -- type (parentheses and all) from them.
 splitLHsQualTy :: LHsType pass -> (LHsContext pass, LHsType pass)
-splitLHsQualTy (L _ (HsParTy _ ty)) = splitLHsQualTy ty
-splitLHsQualTy (L _ (HsQualTy { hst_ctxt = ctxt, hst_body = body })) = (ctxt,     body)
-splitLHsQualTy body              = (noLHsContext, body)
+splitLHsQualTy ty
+  | (mb_ctxt, body) <- splitLHsQualTy_KP (ignoreParens ty)
+  = (fromMaybe noLHsContext mb_ctxt, body)
+
+-- | Decompose a type of the form @context => body@ into its constituent parts.
+--
+-- Unlike 'splitLHsQualTy', this function does not look through
+-- parentheses, hence the suffix @_KP@ (short for \"Keep Parentheses\").
+splitLHsQualTy_KP :: LHsType pass -> (Maybe (LHsContext pass), LHsType pass)
+splitLHsQualTy_KP (L _ (HsQualTy { hst_ctxt = ctxt, hst_body = body }))
+                       = (Just ctxt, body)
+splitLHsQualTy_KP body = (Nothing, body)
 
 -- | Decompose a type class instance type (of the form
 -- @forall <tvs>. context => instance_head@) into its constituent parts.
+-- Note that the @[Name]@s returned correspond to either:
 --
--- Note that this function looks through parentheses, so it will work on types
--- such as @(forall <tvs>. <...>)@. The downside to this is that it is not
--- generally possible to take the returned types and reconstruct the original
--- type (parentheses and all) from them.
+-- * The implicitly bound type variables (if the type lacks an outermost
+--   @forall@), or
+--
+-- * The explicitly bound type variables (if the type has an outermost
+--   @forall@).
+--
+-- This function is careful not to look through parentheses.
+-- See @Note [No nested foralls or contexts in instance types]@
+-- for why this is important.
 splitLHsInstDeclTy :: LHsSigType GhcRn
                    -> ([Name], LHsContext GhcRn, LHsType GhcRn)
--- Split up an instance decl type, returning the pieces
 splitLHsInstDeclTy (HsIB { hsib_ext = itkvs
                          , hsib_body = inst_ty })
-  | (tvs, cxt, body_ty) <- splitLHsSigmaTyInvis inst_ty
-  = (itkvs ++ hsLTyVarNames tvs, cxt, body_ty)
-         -- Return implicitly bound type and kind vars
-         -- For an instance decl, all of them are in scope
+  | (mb_tvs, mb_cxt, body_ty) <- splitLHsSigmaTyInvis_KP inst_ty
+  = (itkvs ++ maybe [] hsLTyVarNames mb_tvs, fromMaybe noLHsContext mb_cxt, body_ty)
+    -- Because of the forall-or-nothing rule (see Note [forall-or-nothing rule]
+    -- in GHC.Rename.HsType), at least one of itkvs (the implicitly bound type
+    -- variables) or mb_tvs (the explicitly bound type variables) will be
+    -- empty. Still, if ScopedTypeVariables is enabled, we must bring one or
+    -- the other into scope over the bodies of the instance methods, so we
+    -- simply combine them into a single list.
 
+-- | Decompose a type class instance type (of the form
+-- @forall <tvs>. context => instance_head@) into the @instance_head@.
 getLHsInstDeclHead :: LHsSigType (GhcPass p) -> LHsType (GhcPass p)
-getLHsInstDeclHead inst_ty
-  | (_tvs, _cxt, body_ty) <- splitLHsSigmaTyInvis (hsSigType inst_ty)
+getLHsInstDeclHead (HsIB { hsib_body = inst_ty })
+  | (_mb_tvs, _mb_cxt, body_ty) <- splitLHsSigmaTyInvis_KP inst_ty
   = body_ty
 
+-- | Decompose a type class instance type (of the form
+-- @forall <tvs>. context => instance_head@) into the @instance_head@ and
+-- retrieve the underlying class type constructor (if it exists).
 getLHsInstDeclClass_maybe :: LHsSigType (GhcPass p)
                           -> Maybe (Located (IdP (GhcPass p)))
--- Works on (HsSigType RdrName)
+-- Works on (LHsSigType GhcPs)
 getLHsInstDeclClass_maybe inst_ty
   = do { let head_ty = getLHsInstDeclHead inst_ty
        ; cls <- hsTyGetAppHead_maybe head_ty
        ; return cls }
+
+{-
+Note [No nested foralls or contexts in instance types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The type at the top of an instance declaration is one of the few places in GHC
+where nested `forall`s or contexts are not permitted, even with RankNTypes
+enabled. For example, the following will be rejected:
+
+  instance forall a. forall b. Show (Either a b) where ...
+  instance Eq a => Eq b => Show (Either a b) where ...
+  instance (forall a. Show (Maybe a)) where ...
+  instance (Eq a => Show (Maybe a)) where ...
+
+This restriction is partly motivated by an unusual quirk of instance
+declarations. Namely, if ScopedTypeVariables is enabled, then the type
+variables from the top of an instance will scope over the bodies of the
+instance methods, /even if the type variables are implicitly quantified/.
+For example, GHC will accept the following:
+
+  instance Monoid a => Monoid (Identity a) where
+    mempty = Identity (mempty @a)
+
+Moreover, the type in the top of an instance declaration must obey the
+forall-or-nothing rule (see Note [forall-or-nothing rule] in
+GHC.Rename.HsType). If instance types allowed nested `forall`s, this could
+result in some strange interactions. For example, consider the following:
+
+  class C a where
+    m :: Proxy a
+  instance (forall a. C (Either a b)) where
+    m = Proxy @(Either a b)
+
+Somewhat surprisingly, old versions of GHC would accept the instance above.
+Even though the `forall` only quantifies `a`, the outermost parentheses mean
+that the `forall` is nested, and per the forall-or-nothing rule, this means
+that implicit quantification would occur. Therefore, the `a` is explicitly
+bound and the `b` is implicitly bound. Moreover, ScopedTypeVariables would
+bring /both/ sorts of type variables into scope over the body of `m`.
+How utterly confusing!
+
+To avoid this sort of confusion, we simply disallow nested `forall`s in
+instance types, which makes things like the instance above become illegal.
+For the sake of consistency, we also disallow nested contexts, even though they
+don't have the same strange interaction with ScopedTypeVariables.
+
+-----
+-- Wrinkle: Derived instances
+-----
+
+`deriving` clauses and standalone `deriving` declarations also permit bringing
+type variables into scope, either through explicit or implicit quantification.
+Unlike in the tops of instance declarations, however, one does not need to
+enable ScopedTypeVariables for this to take effect.
+
+Just as GHC forbids nested `forall`s in the top of instance declarations, it
+also forbids them in types involved with `deriving`:
+
+1. In the `via` types in DerivingVia. For example, this is rejected:
+
+     deriving via (forall x. V x) instance C (S x)
+
+   Just like the types in instance declarations, `via` types can also bring
+   both implicitly and explicitly bound type variables into scope. As a result,
+   we adopt the same no-nested-`forall`s rule in `via` types to avoid confusing
+   behavior like in the example below:
+
+     deriving via (forall x. T x y) instance W x y (Foo a b)
+     -- Both x and y are brought into scope???
+2. In the classes in `deriving` clauses. For example, this is rejected:
+
+     data T = MkT deriving (C1, (forall x. C2 x y))
+
+   This is because the generated instance would look like:
+
+     instance forall x y. C2 x y T where ...
+
+   So really, the same concerns as instance declarations apply here as well.
+-}
 
 {-
 ************************************************************************
