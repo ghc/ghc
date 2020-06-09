@@ -12,4 +12,4 @@ newtype Foo2 a b = Foo2 (a -> b)
   deriving Category
     via fooo
 
-data Foo3 deriving Eq via (forall a. a)
+data Foo3 deriving Eq via forall a. a

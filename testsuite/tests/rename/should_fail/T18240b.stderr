@@ -1,0 +1,24 @@
+
+T18240b.hs:17:15: error:
+    ‘via’ type cannot contain nested ‘forall’s or contexts
+    In a deriving declaration
+
+T18240b.hs:18:24: error:
+    ‘via’ type cannot contain nested ‘forall’s or contexts
+    In a deriving declaration
+
+T18240b.hs:19:25: error:
+    ‘via’ type cannot contain nested ‘forall’s or contexts
+    In a deriving declaration
+
+T18240b.hs:26:24: error:
+    Derived class type cannot contain nested ‘forall’s or contexts
+    In the data type declaration for ‘Bar’
+
+T18240b.hs:27:33: error:
+    Derived class type cannot contain nested ‘forall’s or contexts
+    In the data type declaration for ‘Bar’
+
+T18240b.hs:28:34: error:
+    Derived class type cannot contain nested ‘forall’s or contexts
+    In the data type declaration for ‘Bar’
