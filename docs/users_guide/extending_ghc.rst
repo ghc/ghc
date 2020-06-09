@@ -937,7 +937,7 @@ at error generation.
 
 
 Where ``fromPureHFPlugin :: HoleFitPlugin -> HoleFitPluginR`` is a convenience
-function provided in the ``TcHoleErrors`` module, for defining plugins that do
+function provided in the ``GHC.Tc.Errors.Hole`` module, for defining plugins that do
 not require internal state.
 
 
@@ -986,7 +986,7 @@ spent on searching for valid hole fits, after which new searches are aborted.
 
     import GHC.Plugins hiding ((<>))
 
-    import TcHoleErrors
+    import GHC.Tc.Errors.Hole
 
     import Data.List (stripPrefix, sortOn)
 
