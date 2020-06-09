@@ -6,6 +6,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS -ddump-simpl -ddump-cmm -ddump-to-file -fforce-recomp #-}
 
 -------------------------------------------------------------------------------
 -- |
@@ -936,7 +937,8 @@ fromTimeout (Just sec) | sec > 120  = 120000
 -- to block, shutdown or suspend than that request is honored at the end of the
 -- loop.
 --
--- This function can be safely executed multiple times in parallel
+-- This function can be safely executed multiple times in parallel and is only
+-- used by the threaded manager.
 step :: Bool -> Manager -> IO (Bool, Maybe Seconds)
 step maxDelay mgr@Manager{..} = do
     -- Determine how long to wait the next time we block in an alertable state.
@@ -949,9 +951,8 @@ step maxDelay mgr@Manager{..} = do
         then debugIO $ "I/O manager waiting: delay=" ++ show delay
         else debugIO $ "I/O manager pausing: maxDelay=" ++ show maxDelay
 
-    -- If threaded this call informs the threadpool that a thread is now
-    -- entering a kernel mode wait and this is free to be used.  If non-threaded
-    -- then this is a no-op.
+    -- Inform the threadpool that a thread is now
+    -- entering a kernel mode wait and thus is ready for new work.
     notifyWaiting mgrThreadPool
 
     -- To quote Matt Godbolts:
@@ -1006,10 +1007,10 @@ step maxDelay mgr@Manager{..} = do
     processCompletion mgr n delay
 
 -- | Process the results at the end of an evaluation loop.  This function will
--- read all the completions, wake up all the Haskell threads, clean up the book
--- keeping of the I/O manager and return whether there are outstanding work to
--- be done and how long it expects to have to wait till it can take action
--- again.
+-- read all the completions, unblock up all the Haskell threads, clean up the book
+-- keeping of the I/O manager.
+-- It returns whether there is outstanding work (request or timer) to be
+-- done and how long it expects to have to wait till it can take action again.
 --
 -- Note that this method can do less work than there are entries in the
 -- completion table.  This is because some completion entries may have been
@@ -1029,10 +1030,10 @@ processCompletion :: Manager -> Int -> Maybe Seconds -> IO (Bool, Maybe Seconds)
 processCompletion Manager{..} n delay = do
     -- If some completions are done, we need to process them and call their
     -- callbacks.  We then remove the callbacks from the bookkeeping and resize
-    -- the index if required.
+    -- the array if required.
     when (n > 0) $ do
       forM_ [0..(n-1)] $ \idx -> do
-        oe <- A.unsafeRead mgrOverlappedEntries idx
+        oe <- A.unsafeRead mgrOverlappedEntries idx :: IO OVERLAPPED_ENTRY
         let lpol     = lpOverlapped oe
         when (lpol /= nullPtr) $ do
           let hs_lpol  = castPtr lpol :: Ptr FFI.HASKELL_OVERLAPPED
@@ -1080,7 +1081,8 @@ processCompletion Manager{..} n delay = do
     return (more || (isJust delay && threadedIOMgr), delay)
 
 -- | Entry point for the non-threaded I/O manager to be able to process
--- completed completions.  It is mostly a wrapper around processCompletion.
+-- completed completions.  It is mostly a wrapper around processCompletion
+-- and invoked by the C thread via the scheduler.
 processRemoteCompletion :: IO ()
 processRemoteCompletion = do
 #if defined(DEBUG) || defined(DEBUG_TRACE)
@@ -1267,10 +1269,10 @@ debugIO s
 debugIO _ = return ()
 #endif
 
-dbxIO :: String -> IO ()
-dbxIO s = do tid <- myThreadId
-             let pref = if threadedIOMgr then "\t" else ""
-             _   <- withCStringLen (pref ++ "winio: " ++ s ++ " (" ++
-                                   showThreadId tid ++ ")\n") $
-                   \(p, len) -> c_write 2 (castPtr p) (fromIntegral len)
-             return ()
+-- dbxIO :: String -> IO ()
+-- dbxIO s = do tid <- myThreadId
+--              let pref = if threadedIOMgr then "\t" else ""
+--              _   <- withCStringLen (pref ++ "winio: " ++ s ++ " (" ++
+--                                    showThreadId tid ++ ")\n") $
+--                    \(p, len) -> c_write 2 (castPtr p) (fromIntegral len)
+--              return ()
