@@ -1,6 +1,5 @@
 
 T16326_Fail8.hs:7:10: error:
-    Illegal class instance: ‘forall a -> C (Blah a)’
-      Class instances must be of the form
-        context => C ty_1 ... ty_n
-      where ‘C’ is a class
+    Illegal visible, dependent quantification in the type of a term
+    (GHC does not yet support this)
+    In an instance declaration

@@ -1,0 +1,40 @@
+
+T18240.hs:11:10: error:
+    Illegal head of an instance declaration: ‘(forall a. C [a])’
+      Instance heads must be of the form
+        C ty_1 ... ty_n
+      where ‘C’ is a class
+    In an instance declaration
+
+T18240.hs:12:15: error: Not in scope: type variable ‘a’
+
+T18240.hs:14:10: error:
+    Illegal head of an instance declaration: ‘(Eq a => C [a])’
+      Instance heads must be of the form
+        C ty_1 ... ty_n
+      where ‘C’ is a class
+    In an instance declaration
+
+T18240.hs:17:10: error:
+    Illegal head of an instance declaration: ‘(forall a.
+                                               C (Either a b))’
+      Instance heads must be of the form
+        C ty_1 ... ty_n
+      where ‘C’ is a class
+    In an instance declaration
+
+T18240.hs:18:22: error: Not in scope: type variable ‘a’
+
+T18240.hs:22:10: error:
+    Illegal head of an instance declaration: ‘42’
+      Instance heads must be of the form
+        C ty_1 ... ty_n
+      where ‘C’ is a class
+    In an instance declaration
+
+T18240.hs:23:10: error:
+    Illegal head of an instance declaration: ‘Int -> Int’
+      Instance heads must be of the form
+        C ty_1 ... ty_n
+      where ‘C’ is a class
+    In an instance declaration
