@@ -13,7 +13,7 @@
 
 -- | Generating derived instance declarations
 --
--- This module is nominally ``subordinate'' to @GHC.Tc.Deriv@, which is the
+-- This module is nominally ``subordinate'' to "GHC.Tc.Deriv", which is the
 -- ``official'' interface to deriving-related things.
 --
 -- This is where we do all the grimy bindings' generation.

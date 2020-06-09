@@ -147,7 +147,7 @@ There are many wrinkles:
 -- entry-point of this module and is invoked by the typechecker driver in
 -- 'tcRnSrcDecls'.
 --
--- See Note [Grand plan for Typeable] in GHC.Tc.Instance.Typeable.
+-- See Note [Grand plan for Typeable] in "GHC.Tc.Instance.Typeable".
 mkTypeableBinds :: TcM TcGblEnv
 mkTypeableBinds
   = do { dflags <- getDynFlags
@@ -346,7 +346,7 @@ mkPrimTypeableTodos
 -- The majority of the types we need here are contained in 'primTyCons'.
 -- However, not all of them: in particular unboxed tuples are absent since we
 -- don't want to include them in the original name cache. See
--- Note [Built-in syntax and the OrigNameCache] in GHC.Iface.Env for more.
+-- Note [Built-in syntax and the OrigNameCache] in "GHC.Iface.Env" for more.
 ghcPrimTypeableTyCons :: [TyCon]
 ghcPrimTypeableTyCons = concat
     [ [ runtimeRepTyCon, vecCountTyCon, vecElemTyCon, funTyCon ]

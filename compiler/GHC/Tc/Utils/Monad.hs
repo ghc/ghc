@@ -1480,7 +1480,7 @@ newTcEvBinds = do { binds_ref <- newTcRef emptyEvBindMap
                                        , ebv_uniq = uniq }) }
 
 -- | Creates an EvBindsVar incapable of holding any bindings. It still
--- tracks covar usages (see comments on ebv_tcvs in GHC.Tc.Types.Evidence), thus
+-- tracks covar usages (see comments on ebv_tcvs in "GHC.Tc.Types.Evidence"), thus
 -- must be made monadically
 newNoTcEvBinds :: TcM EvBindsVar
 newNoTcEvBinds
