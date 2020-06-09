@@ -1,5 +1,8 @@
 -- | Extract docs from the renamer output so they can be be serialized.
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -27,6 +30,7 @@ import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe
 import Data.Semigroup
+import Data.Proxy
 
 -- | Extract docs from renamer output.
 extractDocs :: TcGblEnv
@@ -123,13 +127,13 @@ getMainDeclBinder (ForD _ (ForeignExport _ _ _ _)) = []
 getMainDeclBinder _ = []
 
 
-sigNameNoLoc :: CollectPass pass => Sig pass -> [IdP pass]
-sigNameNoLoc (TypeSig    _   ns _)         = map unLoc ns
-sigNameNoLoc (ClassOpSig _ _ ns _)         = map unLoc ns
-sigNameNoLoc (PatSynSig  _   ns _)         = map unLoc ns
-sigNameNoLoc (SpecSig    _   n _ _)        = [unLoc n]
-sigNameNoLoc (InlineSig  _   n _)          = [unLoc n]
-sigNameNoLoc (FixSig _ (FixitySig _ ns _)) = map unLoc ns
+sigNameNoLoc :: forall pass. CollectPass pass => Sig pass -> [IdP pass]
+sigNameNoLoc (TypeSig    _   ns _)         = map (unwrapXIdP (Proxy @pass)) ns
+sigNameNoLoc (ClassOpSig _ _ ns _)         = map (unwrapXIdP (Proxy @pass)) ns
+sigNameNoLoc (PatSynSig  _   ns _)         = map (unwrapXIdP (Proxy @pass)) ns
+sigNameNoLoc (SpecSig    _   n _ _)        = [unwrapXIdP (Proxy @pass) n]
+sigNameNoLoc (InlineSig  _   n _)          = [unwrapXIdP (Proxy @pass) n]
+sigNameNoLoc (FixSig _ (FixitySig _ ns _)) = map (unwrapXIdP (Proxy @pass)) ns
 sigNameNoLoc _                             = []
 
 -- Extract the source location where an instance is defined. This is used
