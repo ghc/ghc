@@ -25,7 +25,15 @@ extern uint8_t object_code_mark_bit;
 
 void initUnloadCheck(void);
 void exitUnloadCheck(void);
-void checkUnload(StgClosure *static_objects);
+
+// Call before major GC to prepare section index table for marking
+void prepareUnloadCheck(void);
+
+// Mark object code of a static closure address as 'live'
+void markObjectCode(const void *addr);
+
+// Call after major GC to unload unused and unmarked object codes
+void checkUnload(void);
 
 // Call on loaded object codes
 void insertOCSectionIndices(ObjectCode *oc);
