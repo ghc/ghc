@@ -8,80 +8,80 @@ module T17340 where
 
 import GHC.Exts
 
-data A = A { a :: () }
-data B = B
-newtype C = C Int
-pattern P = B
+-- data A = A { a :: () }
+-- data B = B
+-- newtype C = C Int
+-- pattern P = B
 
-conPat :: B -> ()
-conPat !B = ()
+-- conPat :: B -> ()
+-- conPat !B = ()
 
-parPat :: A -> ()
-parPat !(A _) = ()
+-- parPat :: A -> ()
+-- parPat !(A _) = ()
 
-asPat :: A -> ()
-asPat !a@(A _) = ()
+-- asPat :: A -> ()
+-- asPat !a@(A _) = ()
 
-sigPat :: B -> ()
-sigPat (!B :: B) = ()
+-- sigPat :: B -> ()
+-- sigPat (!B :: B) = ()
 
-insideViewPat :: B -> ()
-insideViewPat (id -> !B) = ()
+-- insideViewPat :: B -> ()
+-- insideViewPat (id -> !B) = ()
 
-listPat :: [Int] -> ()
-listPat ![] = ()
-listPat _ = ()
+-- listPat :: [Int] -> ()
+-- listPat ![] = ()
+-- listPat _ = ()
 
-list2Pat :: [Int] -> ()
-list2Pat !(_:_) = ()
-list2Pat _ = ()
+-- list2Pat :: [Int] -> ()
+-- list2Pat !(_:_) = ()
+-- list2Pat _ = ()
 
-tuplePat :: (B,B) -> ()
-tuplePat !(_, _) = ()
+-- tuplePat :: (B,B) -> ()
+-- tuplePat !(_, _) = ()
 
-casePat :: B -> ()
-casePat b = case b of !B -> ()
+-- casePat :: B -> ()
+-- casePat b = case b of !B -> ()
 
-nPat :: Int -> ()
-nPat !1 = ()
-nPat _ = ()
+-- nPat :: Int -> ()
+-- nPat !1 = ()
+-- nPat _ = ()
 
-unboxedPat :: Int# -> Int
-unboxedPat !x = I# x
+-- unboxedPat :: Int# -> Int
+-- unboxedPat !x = I# x
 
-unliftedBind :: ()
-unliftedBind =
-  let x :: Int#
-      !x = undefined in ()
+-- unliftedBind :: ()
+-- unliftedBind =
+--   let x :: Int#
+--       !x = undefined in ()
 
-wildPat :: Int# -> ()
-wildPat !_ = ()
+-- wildPat :: Int# -> ()
+-- wildPat !_ = ()
 
--- no warning expected
-liftedBind:: ()
-liftedBind =
-  let x :: Int
-      !x = undefined in ()
+-- -- no warning expected
+-- liftedBind:: ()
+-- liftedBind =
+--   let x :: Int
+--       !x = undefined in ()
 
--- no warning expected
-boxedPatNoWarn :: Int -> Int
-boxedPatNoWarn !x = x
+-- -- no warning expected
+-- boxedPatNoWarn :: Int -> Int
+-- boxedPatNoWarn !x = x
 
--- no warning expected
-newtyPatNoWarn :: C -> ()
-newtyPatNoWarn !(C _) = ()
+-- -- no warning expected
+-- newtyPatNoWarn :: C -> ()
+-- newtyPatNoWarn !(C _) = ()
 
--- no warning expected
-patSynNoWarn :: B -> ()
-patSynNoWarn !P = ()
+-- -- no warning expected
+-- patSynNoWarn :: B -> ()
+-- patSynNoWarn !P = ()
 
--- no warning expected
-wildPatNoWarn :: B -> ()
-wildPatNoWarn !_ = ()
+-- -- no warning expected
+-- wildPatNoWarn :: B -> ()
+-- wildPatNoWarn !_ = ()
 
--- no warning expected
-viewPatNoWarn :: B -> ()
-viewPatNoWarn !(id -> B) = ()
+-- -- no warning expected
+-- viewPatNoWarn :: B -> ()
+-- viewPatNoWarn !(id -> B) = ()
 
 -- todo:
 -- unlifted tuples
@@ -91,12 +91,17 @@ viewPatNoWarn !(id -> B) = ()
 -- more numeric patterns
 -- more view patterns
 
--- f :: Bool -> Bool
--- f True = False
--- f !x   = x
+f_nowarn :: Bool -> Bool
+f_nowarn !x   = x
 
--- f (a,b) True = e1
--- f !x False = e2    -- Redundant bang
+f :: Bool -> Bool
+f True = False
+f !x   = x
 
--- data T = MkT !Int
--- f (MkT !x) = ...   -- Redundant bang
+g :: (Int, Int) -> Bool -> ()
+g (a,b) True = ()
+g !x False = ()
+
+data T = MkT !Int
+h :: T -> ()
+h (MkT !x) = ()
