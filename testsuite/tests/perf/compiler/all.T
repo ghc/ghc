@@ -358,3 +358,9 @@ test('T16190',
       ['T16190.hs', '-v0'])
 
 test('T16473', normal, makefile_test, ['T16473'])
+
+test ('T18304',
+      [ collect_compiler_stats('bytes allocated',2)
+      ],
+      compile,
+      ['-v0 -O'])
