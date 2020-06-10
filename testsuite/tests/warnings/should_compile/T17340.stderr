@@ -1,36 +1,8 @@
 
-T17340.hs:17:8: warning: [-Wredundant-bang-patterns (in -Wall)]
-    Bang pattern is redundant
+T17340.hs:99:4: warning: [-Wredundant-bang-patterns (in -Wall)]
+    Pattern match has redundant bang
+    In an equation for ‘f’: f x = ...
 
-T17340.hs:20:8: warning: [-Wredundant-bang-patterns (in -Wall)]
-    Bang pattern is redundant
-
-T17340.hs:23:7: warning: [-Wredundant-bang-patterns (in -Wall)]
-    Bang pattern is redundant
-
-T17340.hs:26:9: warning: [-Wredundant-bang-patterns (in -Wall)]
-    Bang pattern is redundant
-
-T17340.hs:29:22: warning: [-Wredundant-bang-patterns (in -Wall)]
-    Bang pattern is redundant
-
-T17340.hs:32:9: warning: [-Wredundant-bang-patterns (in -Wall)]
-    Bang pattern is redundant
-
-T17340.hs:36:10: warning: [-Wredundant-bang-patterns (in -Wall)]
-    Bang pattern is redundant
-
-T17340.hs:40:10: warning: [-Wredundant-bang-patterns (in -Wall)]
-    Bang pattern is redundant
-
-T17340.hs:43:23: warning: [-Wredundant-bang-patterns (in -Wall)]
-    Bang pattern is redundant
-
-T17340.hs:50:12: warning: [-Wredundant-bang-patterns (in -Wall)]
-    Bang pattern is redundant
-
-T17340.hs:54:3: warning: [-Wredundant-bang-patterns (in -Wall)]
-    Bang pattern is redundant
-
-T17340.hs:58:9: warning: [-Wredundant-bang-patterns (in -Wall)]
-    Bang pattern is redundant
+T17340.hs:103:4: warning: [-Wredundant-bang-patterns (in -Wall)]
+    Pattern match has redundant bang
+    In an equation for ‘g’: g x = ...
