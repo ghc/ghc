@@ -440,7 +440,10 @@ fixIO k = do
     putMVar m result
     return result
 
--- NOTE: we do our own explicit black holing here, because GHC's lazy
+-- Note [Blackholing in fixIO]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- We do our own explicit black holing here, because GHC's lazy
 -- blackholing isn't enough.  In an infinite loop, GHC may run the IO
 -- computation a few times before it notices the loop, which is wrong.
 --

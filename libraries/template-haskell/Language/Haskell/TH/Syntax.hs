@@ -31,9 +31,14 @@ module Language.Haskell.TH.Syntax
 import Data.Data hiding (Fixity(..))
 import Data.IORef
 import System.IO.Unsafe ( unsafePerformIO )
+import GHC.IO.Unsafe    ( unsafeDupableInterleaveIO )
 import Control.Monad (liftM)
 import Control.Monad.IO.Class (MonadIO (..))
+import Control.Monad.Fix (MonadFix (..))
 import Control.Applicative (liftA2)
+import Control.Exception (BlockedIndefinitelyOnMVar (..), catch, throwIO)
+import Control.Exception.Base (FixIOException (..))
+import Control.Concurrent.MVar (newEmptyMVar, readMVar, putMVar)
 import System.IO        ( hPutStrLn, stderr )
 import Data.Char        ( isAlpha, isAlphaNum, isUpper, ord )
 import Data.Int
@@ -214,6 +219,23 @@ instance Semigroup a => Semigroup (Q a) where
 -- | @since 2.17.0.0
 instance Monoid a => Monoid (Q a) where
   mempty = pure mempty
+
+-- | If the function passed to 'mfix' inspects its argument,
+-- the resulting action will throw a 'FixIOException'.
+--
+-- @since 2.17.0.0
+instance MonadFix Q where
+  -- We use the same blackholing approach as in fixIO.
+  -- See Note [Blackholing in fixIO] in System.IO in base.
+  mfix k = do
+    m <- runIO newEmptyMVar
+    ans <- runIO (unsafeDupableInterleaveIO
+             (readMVar m `catch` \BlockedIndefinitelyOnMVar ->
+                                    throwIO FixIOException))
+    result <- k ans
+    runIO (putMVar m result)
+    return result
+
 
 -----------------------------------------------------
 --
