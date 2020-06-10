@@ -38,7 +38,7 @@ module GHC.Conc.IO
         , threadWaitWrite
         , threadWaitReadSTM
         , threadWaitWriteSTM
-        , closeWith
+        , closeFdWith
 
 #if defined(mingw32_HOST_OS)
         , asyncRead
@@ -58,6 +58,7 @@ import Foreign
 import GHC.Base
 import GHC.Conc.Sync as Sync
 import GHC.Real ( fromIntegral )
+import System.Posix.Types
 
 #if defined(mingw32_HOST_OS)
 import qualified GHC.Conc.Windows as Windows
@@ -68,8 +69,6 @@ import GHC.Conc.Windows (asyncRead, asyncWrite, asyncDoProc, asyncReadBA,
 #else
 import qualified GHC.Event.Thread as Event
 #endif
-import GHC.IO.Types (BHandle)
-import qualified GHC.IO.Types as Types
 
 ensureIOManagerIsRunning :: IO ()
 #if !defined(mingw32_HOST_OS)
@@ -97,56 +96,50 @@ ioManagerCapabilitiesChanged = return ()
 #endif
 
 -- | Block the current thread until data is available to read on the
--- given handle or file descriptor (GHC only).
+-- given file descriptor (GHC only).
 --
--- This will throw an 'Prelude.IOError' if the handle or file descriptor was closed
--- while this thread was blocked.  To safely close a handle or file descriptor
+-- This will throw an 'Prelude.IOError' if the file descriptor was closed
+-- while this thread was blocked.  To safely close a file descriptor
 -- that has been used with 'threadWaitRead', use 'closeFdWith'.
-{-# SPECIALIZE threadWaitRead :: Types.IntPtr -> IO () #-}
-{-# SPECIALIZE threadWaitRead :: Types.Fd -> IO () #-}
-threadWaitRead :: BHandle a => a -> IO ()
-threadWaitRead bh
+threadWaitRead :: Fd -> IO ()
+threadWaitRead fd
 #if !defined(mingw32_HOST_OS)
-  | threaded  = Event.threadWaitRead (toFD bh)
+  | threaded  = Event.threadWaitRead fd
 #endif
   | otherwise = IO $ \s ->
-        case fromIntegral bh of { I# bh# ->
-        case waitRead# bh# s of { s' -> (# s', () #)
+        case fromIntegral fd of { I# fd# ->
+        case waitRead# fd# s of { s' -> (# s', () #)
         }}
 
 -- | Block the current thread until data can be written to the
--- given handle or file descriptor (GHC only).
+-- given file descriptor (GHC only).
 --
--- This will throw an 'Prelude.IOError' if the handle or file descriptor was closed
--- while this thread was blocked.  To safely close a handle or file descriptor
+-- This will throw an 'Prelude.IOError' if the file descriptor was closed
+-- while this thread was blocked.  To safely close a file descriptor
 -- that has been used with 'threadWaitWrite', use 'closeFdWith'.
-{-# SPECIALIZE threadWaitWrite :: Types.IntPtr -> IO () #-}
-{-# SPECIALIZE threadWaitWrite :: Types.Fd -> IO () #-}
-threadWaitWrite :: BHandle a => a -> IO ()
-threadWaitWrite bh
+threadWaitWrite :: Fd -> IO ()
+threadWaitWrite fd
 #if !defined(mingw32_HOST_OS)
-  | threaded  = Event.threadWaitWrite (toFD bh)
+  | threaded  = Event.threadWaitWrite fd
 #endif
   | otherwise = IO $ \s ->
-        case fromIntegral bh of { I# bh# ->
-        case waitWrite# bh# s of { s' -> (# s', () #)
+        case fromIntegral fd of { I# fd# ->
+        case waitWrite# fd# s of { s' -> (# s', () #)
         }}
 
 -- | Returns an STM action that can be used to wait for data
--- to read from a handle or file descriptor. The second returned value
+-- to read from a file descriptor. The second returned value
 -- is an IO action that can be used to deregister interest
--- in the handle or file descriptor.
-{-# SPECIALIZE threadWaitReadSTM :: Types.IntPtr -> IO (Sync.STM (), IO ()) #-}
-{-# SPECIALIZE threadWaitReadSTM :: Types.Fd -> IO (Sync.STM (), IO ()) #-}
-threadWaitReadSTM :: BHandle a => a -> IO (Sync.STM (), IO ())
-threadWaitReadSTM bh
+-- in the file descriptor.
+threadWaitReadSTM :: Fd -> IO (Sync.STM (), IO ())
+threadWaitReadSTM fd
 #if !defined(mingw32_HOST_OS)
-  | threaded  = Event.threadWaitReadSTM (toFD bh)
+  | threaded  = Event.threadWaitReadSTM fd
 #endif
   | otherwise = do
       m <- Sync.newTVarIO False
       t <- Sync.forkIO $ do
-        threadWaitRead bh
+        threadWaitRead fd
         Sync.atomically $ Sync.writeTVar m True
       let waitAction = do b <- Sync.readTVar m
                           if b then return () else retry
@@ -154,44 +147,40 @@ threadWaitReadSTM bh
       return (waitAction, killAction)
 
 -- | Returns an STM action that can be used to wait until data
--- can be written to a handle or file descriptor. The second returned value
+-- can be written to a file descriptor. The second returned value
 -- is an IO action that can be used to deregister interest
--- in the handle or file descriptor.
-{-# SPECIALIZE threadWaitWriteSTM :: Types.IntPtr -> IO (Sync.STM (), IO ()) #-}
-{-# SPECIALIZE threadWaitWriteSTM :: Types.Fd -> IO (Sync.STM (), IO ()) #-}
-threadWaitWriteSTM :: BHandle a => a -> IO (Sync.STM (), IO ())
-threadWaitWriteSTM bh
+-- in the file descriptor.
+threadWaitWriteSTM :: Fd -> IO (Sync.STM (), IO ())
+threadWaitWriteSTM fd
 #if !defined(mingw32_HOST_OS)
-  | threaded  = Event.threadWaitWriteSTM (toFD bh)
+  | threaded  = Event.threadWaitWriteSTM fd
 #endif
   | otherwise = do
       m <- Sync.newTVarIO False
       t <- Sync.forkIO $ do
-        threadWaitWrite bh
+        threadWaitWrite fd
         Sync.atomically $ Sync.writeTVar m True
       let waitAction = do b <- Sync.readTVar m
                           if b then return () else retry
       let killAction = Sync.killThread t
       return (waitAction, killAction)
 
--- | Close a handle or file descriptor in a concurrency-safe way (GHC only).  If
+-- | Close a file descriptor in a concurrency-safe way (GHC only).  If
 -- you are using 'threadWaitRead' or 'threadWaitWrite' to perform
 -- blocking I\/O, you /must/ use this function to close file
 -- descriptors, or blocked threads may not be woken.
 --
--- Any threads that are blocked on the handle or file descriptor via
+-- Any threads that are blocked on the file descriptor via
 -- 'threadWaitRead' or 'threadWaitWrite' will be unblocked by having
 -- IO exceptions thrown.
-{-# SPECIALIZE closeWith :: (Types.IntPtr ->IO ()) -> Types.IntPtr -> IO () #-}
-{-# SPECIALIZE closeWith :: (Types.Fd ->IO ()) -> Types.Fd -> IO () #-}
-closeWith :: BHandle a => (a -> IO ()) -- ^ Low-level action that performs the real close.
-          -> a            -- ^ handle or file descriptor to close.
-          -> IO ()
-closeWith close bh
+closeFdWith :: (Fd -> IO ()) -- ^ Low-level action that performs the real close.
+            -> Fd            -- ^ File descriptor to close.
+            -> IO ()
+closeFdWith close fd
 #if !defined(mingw32_HOST_OS)
-  | threaded  = Event.closeFdWith close (toFD bh)
+  | threaded  = Event.closeFdWith close fd
 #endif
-  | otherwise = close bh
+  | otherwise = close fd
 
 -- | Suspends the current thread for a given number of microseconds
 -- (GHC only).
