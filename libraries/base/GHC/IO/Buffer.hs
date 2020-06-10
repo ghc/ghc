@@ -64,10 +64,6 @@ module GHC.IO.Buffer (
     charSize,
  ) where
 
-#if defined(CHARBUF_UTF16)
-import Data.Word (Word64)
-#endif
-
 import GHC.Base
 -- import GHC.IO
 import GHC.Num
@@ -268,6 +264,9 @@ bufferOffset Buffer{ bufOffset=off } = off
 bufferAdjustOffset :: Word64 -> Buffer e -> Buffer e
 bufferAdjustOffset offs buf = buf{ bufOffset=offs }
 
+-- The adjustment to the offset can be 32bit int on 32 platforms.
+-- This is fine, we only use this after reading into/writing from
+-- the buffer so we will never overflow here.
 bufferAddOffset :: Int -> Buffer e -> Buffer e
 bufferAddOffset offs buf@Buffer{ bufOffset=w } =
   buf{ bufOffset=w+(fromIntegral offs) }
