@@ -46,7 +46,7 @@ import GHC.Core.TyCon
 import GHC.Types.Var (EvVar)
 import GHC.Core.Coercion
 import GHC.Tc.Types.Evidence (HsWrapper(..), isIdHsWrapper)
-import GHC.Tc.Utils.TcType (evVarPred, tcTyConAppTyCon)
+import GHC.Tc.Utils.TcType (evVarPred)
 import {-# SOURCE #-} GHC.HsToCore.Expr (dsExpr, dsLExpr, dsSyntaxExpr)
 import {-# SOURCE #-} GHC.HsToCore.Binds (dsHsWrapper)
 import GHC.HsToCore.Utils (selectMatchVar)
@@ -103,9 +103,10 @@ data PmGrd
     }
 
     -- | @PmBang x@ corresponds to a @seq x True@ guard.
+    -- Track extra location info to report redundant bangs.
   | PmBang {
       pm_id          :: !Id,
-      pm_loc         :: !(Maybe (Located SDoc))
+      pm_loc         :: !(Maybe SrcInfo)
     }
 
     -- | @PmLet x expr@ corresponds to a @let x = expr@ guard. This actually
@@ -138,14 +139,15 @@ instance Monoid Precision where
   mempty = Precise
   mappend = (Semi.<>)
 
--- | Means by which we identify a RHS for later pretty-printing in a warning
--- message. 'SDoc' for the equation to show, 'Located' for the location.
-type RhsInfo = Located SDoc
+-- | Means by which we identify source location for later pretty-printing
+--  in a warning message. 'SDoc' for the equation to show, 'Located' for
+-- the location.
+type SrcInfo = Located SDoc
 
 -- | A representation of the desugaring to 'PmGrd's of all clauses of a
 -- function definition/pattern match/etc.
 data GrdTree
-  = Rhs !RhsInfo
+  = Rhs !SrcInfo
   | Guard !PmGrd !GrdTree
   -- ^ @Guard grd t@ will try to match @grd@ and on success continue to match
   -- @t@. Falls through if either match fails. Models left-to-right semantics
@@ -162,10 +164,10 @@ data GrdTree
 -- tree. 'redundantAndInaccessibleRhss' can figure out redundant and proper
 -- inaccessible RHSs from this.
 data AnnotatedTree
-  = AccessibleRhs !Deltas !RhsInfo
+  = AccessibleRhs !Deltas !SrcInfo
   -- ^ A RHS deemed accessible. The 'Deltas' is the (non-empty) set of covered
   -- values.
-  | InaccessibleRhs !RhsInfo
+  | InaccessibleRhs !SrcInfo
   -- ^ A RHS deemed inaccessible; it covers no value.
   | MayDiverge !AnnotatedTree
   -- ^ Asserts that the tree may force diverging values, so not all of its
@@ -174,15 +176,15 @@ data AnnotatedTree
   -- ^ Mirrors 'Sequence' for preserving the skeleton of a 'GrdTree's.
   | EmptyAnn
   -- ^ Mirrors 'Empty' for preserving the skeleton of a 'GrdTree's.
-  | RedundantSrcBang !(Maybe (Located SDoc)) !AnnotatedTree
+  | RedundantSrcBang !SrcInfo !AnnotatedTree
   -- ^ ...
 
-pprRhsInfo :: RhsInfo -> SDoc
-pprRhsInfo (L (RealSrcSpan rss _) _) = ppr (srcSpanStartLine rss)
-pprRhsInfo (L s _)                   = ppr s
+pprSrcInfo :: SrcInfo -> SDoc
+pprSrcInfo (L (RealSrcSpan rss _) _) = ppr (srcSpanStartLine rss)
+pprSrcInfo (L s _)                   = ppr s
 
 instance Outputable GrdTree where
-  ppr (Rhs info)      = text "->" <+> pprRhsInfo info
+  ppr (Rhs info)      = text "->" <+> pprSrcInfo info
   -- Format guards as "| True <- x, let x = 42, !z"
   ppr g@Guard{} = fsep (prefix (map ppr grds)) <+> ppr t
     where
@@ -199,17 +201,15 @@ instance Outputable GrdTree where
   ppr Empty          = text "<empty case>"
 
 instance Outputable AnnotatedTree where
-  ppr (AccessibleRhs _ info) = pprRhsInfo info
-  ppr (InaccessibleRhs info) = text "inaccessible" <+> pprRhsInfo info
+  ppr (AccessibleRhs _ info) = pprSrcInfo info
+  ppr (InaccessibleRhs info) = text "inaccessible" <+> pprSrcInfo info
   ppr (MayDiverge t)         = text "div" <+> ppr t
     -- Format nested Sequences in blocks "{ grds1; grds2; ... }"
   ppr t@SequenceAnn{}        = braces (space <> fsep (punctuate semi (collect_seqs t)) <> space)
     where
       collect_seqs (SequenceAnn l r) = collect_seqs l ++ collect_seqs r
       collect_seqs t                 = [ppr t]
-  ppr (RedundantSrcBang l t) = text "redundant bang" <+> p_doc <+> ppr t
-    where p_doc | Just (L _ p) <- l = p
-                | Nothing      <- l = empty
+  ppr (RedundantSrcBang l t) = text "redundant bang" <+> pprSrcInfo l <+> ppr t
   ppr EmptyAnn               = text "<empty case>"
 
 -- | Lift 'addPmCts' over 'Deltas'.
@@ -437,14 +437,11 @@ translatePat fam_insts x pat = case pat of
   VarPat _ y   -> pure (mkPmLetVar (unLoc y) x)
   ParPat _ p   -> translateLPat fam_insts x p
   LazyPat _ _  -> pure [] -- like a wildcard
-  BangPat _ p  -> do
+  BangPat _ p  ->
     -- Add the bang in front of the list, because it will happen before any
     -- nested stuff.
-    pat_is_reduntant <- should_warn p
-    let pm_loc | pat_is_reduntant
-               , L l p' <- p      = Just (L l (ppr p'))
-               | otherwise        = Nothing
     (PmBang x pm_loc :) <$> translateLPat fam_insts x p
+    where pm_loc | L l p' <- p = Just (L l (ppr p'))
 
   -- (x@pat)   ==>   Translate pat with x as match var and handle impedance
   --                 mismatch with incoming match var
@@ -561,42 +558,6 @@ translatePat fam_insts x pat = case pat of
   -- Not supposed to happen
   SplicePat {} -> panic "Check.translatePat: SplicePat"
 
-should_warn :: LPat GhcTc -> DsM Bool
-should_warn (L _ pat) = case pat of
-  ConPat { pat_con = (L _ con)
-         , pat_con_ext = ConPatTc { cpt_arg_tys = tys }
-         , pat_args = pat_args } ->
-     do  { let pat_ty = conLikeResTy con tys
-         ; case con of
-            RealDataCon _
-              | isNewTyCon (tcTyConAppTyCon pat_ty)
-              , [pat] <- hsConPatArgs pat_args
-              -> should_warn pat -- Treat !(N p) like !p
-              | otherwise
-              -> return True     -- Warn about !(K x y z)
-            PatSynCon _ -> return False }
-  ListPat _ _     ->
-    -- do not bother if RebindableSyntax is ON
-    do  { rebindableIsOn <- xoptM LangExt.RebindableSyntax
-        ; return (if rebindableIsOn then False else True)}
-  VarPat _ (L _ var) ->
-    -- do warn for unlifted types
-    return (isUnliftedType (idType var))
-  WildPat ty      -> return (isUnliftedType ty)
-  ParPat _ p      -> should_warn p
-  AsPat _ _ p     -> should_warn p
-  SigPat _ p _    -> should_warn p
-  TuplePat _ _ _  -> return True
-  LitPat _ _      -> return True
-  BangPat _ _     -> return True
-  SumPat _ _ _ _  -> return True
-  NPat _ _ _ _    -> return False
-  ViewPat _ _ _   -> return False
-  LazyPat _ _     -> return False
-  SplicePat _ _   -> return False
-  NPlusKPat _ _ _ _ _ _ -> return False
-  _otherwise            -> panic "warn_redundant_bang_pats"
-
 -- | 'translatePat', but also select and return a new match var.
 translatePatV :: FamInstEnvs -> Pat GhcTc -> DsM (Id, GrdVec)
 translatePatV fam_insts pat = do
@@ -664,7 +625,8 @@ translateConPatOut fam_insts x con univ_tys ex_tvs dicts = \case
 
       -- 2. bang strict fields
       let arg_is_banged = map isBanged $ conLikeImplBangs con
-          bang_grds     = map (`PmBang` Nothing) $ filterByList arg_is_banged arg_ids
+          noSrcPmBang i = PmBang {pm_id = i, pm_loc = Nothing}
+          bang_grds     = map noSrcPmBang (filterByList arg_is_banged arg_ids)
 
       -- 3. guards from field selector patterns
       let arg_grds = concat arg_grdss
@@ -1006,10 +968,13 @@ checkGrdTree' (Guard (PmBang x pos) tree) deltas = do
   has_diverged <- addPmCtDeltas deltas (PmBotCt x) >>= isInhabited
   deltas' <- addPmCtDeltas deltas (PmNotBotCt x)
   res <- checkGrdTree' tree deltas'
-  let clauses =
-        if has_diverged
-        then mayDiverge (cr_clauses res)
-        else RedundantSrcBang pos (cr_clauses res)
+  let clauses
+        | not (has_diverged)
+        -- bang is coming from the source
+        , Just info <- pos
+        = RedundantSrcBang info (cr_clauses res)
+        | otherwise
+        = mayDiverge (cr_clauses res)
   pure res{ cr_clauses = clauses }
 
 -- Con: Diverge on x ~ ⊥, fall through on x /~ K and refine with x ~ K ys
@@ -1150,7 +1115,7 @@ needToRunPmCheck dflags origin
   | otherwise
   = notNull (filter (`wopt` dflags) allPmCheckWarnings)
 
-redundantAndInaccessibleRhss :: AnnotatedTree -> ([RhsInfo], [RhsInfo], [Located SDoc])
+redundantAndInaccessibleRhss :: AnnotatedTree -> ([SrcInfo], [SrcInfo], [Located SDoc])
 redundantAndInaccessibleRhss tree = (fromOL ol_red, fromOL ol_inacc, fromOL ol_bangs)
   where
     (_ol_acc, ol_inacc, ol_red, ol_bangs) = go tree
@@ -1161,7 +1126,7 @@ redundantAndInaccessibleRhss tree = (fromOL ol_red, fromOL ol_inacc, fromOL ol_b
     --       even safely delete the equation without altering semantics)
     --    4. TODO: extend comment about redundant bangs
     -- See Note [Determining inaccessible clauses]
-    go :: AnnotatedTree -> (OrdList RhsInfo, OrdList RhsInfo, OrdList RhsInfo, OrdList RhsInfo)
+    go :: AnnotatedTree -> (OrdList SrcInfo, OrdList SrcInfo, OrdList SrcInfo, OrdList SrcInfo)
     go (AccessibleRhs _ info) = (unitOL info, nilOL, nilOL      , nilOL)
     go (InaccessibleRhs info) = (nilOL,       nilOL, unitOL info, nilOL) -- presumably redundant
     go (MayDiverge t)         = case go t of
@@ -1170,9 +1135,13 @@ redundantAndInaccessibleRhss tree = (fromOL ol_red, fromOL ol_inacc, fromOL ol_b
         | isNilOL acc && isNilOL inacc -> (nilOL, red, nilOL, bs)
       res                              -> res
     go (SequenceAnn l r)      = go l Semi.<> go r
-    go (RedundantSrcBang l t)
-      | Just loc <- l         = (nilOL, nilOL, nilOL, unitOL loc)
-      | otherwise             = go t
+    go (RedundantSrcBang l t) = case go t of
+      -- See Note [Warning about redundant bangs]
+      -- .. which is to be written
+      (acc, inacc, red, bs)
+        | (isNilOL acc || isNilOL inacc)
+        && (not (isNilOL red)) -> (acc, inacc, red, bs)
+      res                      -> (nilOL, nilOL, nilOL, unitOL l) Semi.<> res
     go EmptyAnn               = (nilOL, nilOL, nilOL, nilOL)
 
 {- Note [Determining inaccessible clauses]
