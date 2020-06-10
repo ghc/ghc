@@ -180,10 +180,10 @@ saner code ibuf obuf = do
    else return (why,            bufL ibuf' - bufL ibuf, ibuf', obuf')
 
 byteView :: Buffer CWchar -> Buffer Word8
-byteView (Buffer {..}) = Buffer { bufState = bufState, bufRaw = castForeignPtr bufRaw, bufSize = bufSize * 2, bufOffset = 0, bufL = bufL * 2, bufR = bufR * 2 }
+byteView (Buffer {..}) = Buffer { bufState = bufState, bufRaw = castForeignPtr bufRaw, bufSize = bufSize * 2, bufOffset = bufOffset, bufL = bufL * 2, bufR = bufR * 2 }
 
 cwcharView :: Buffer Word8 -> Buffer CWchar
-cwcharView (Buffer {..}) = Buffer { bufState = bufState, bufRaw = castForeignPtr bufRaw, bufSize = half bufSize, bufOffset = 0, bufL = half bufL, bufR = half bufR }
+cwcharView (Buffer {..}) = Buffer { bufState = bufState, bufRaw = castForeignPtr bufRaw, bufSize = half bufSize, bufOffset = bufOffset, bufL = half bufL, bufR = half bufR }
   where half x = case x `divMod` 2 of (y, 0) -> y
                                       _      -> errorWithoutStackTrace "cwcharView: utf16_(encode|decode) (wrote out|consumed) non multiple-of-2 number of bytes"
 
