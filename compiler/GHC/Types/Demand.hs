@@ -46,7 +46,7 @@ module GHC.Types.Demand (
         splitProdDmd_maybe, peelCallDmd, peelManyCalls, mkCallDmd, mkCallDmds,
         mkWorkerDemand, dmdTransformSig, dmdTransformDataConSig,
         dmdTransformDictSelSig, argOneShots, argsOneShots, saturatedByOneShots,
-        TypeShape(..), peelTsFuns, trimToType,
+        TypeShape(..), trimToType,
 
         useCount, isUsedOnce, reuseEnv,
         zapUsageDemand, zapUsageEnvSig,
@@ -809,24 +809,34 @@ data StrictPair a b = !a :*: !b
 strictPairToTuple :: StrictPair a b -> (a, b)
 strictPairToTuple (x :*: y) = (x, y)
 
-data TypeShape = TsFun TypeShape
-               | TsProd [TypeShape]
-               | TsUnk
+splitProdDmd_maybe :: Demand -> Maybe [Demand]
+-- Split a product into its components, iff there is any
+-- useful information to be extracted thereby
+-- The demand is not necessarily strict!
+splitProdDmd_maybe (JD { sd = s, ud = u })
+  = case (s,u) of
+      (Str (SProd sx), Use _ u) | Just ux <- splitUseProdDmd (length sx) u
+                                -> Just (mkJointDmds sx ux)
+      (Str s, Use _ (UProd ux)) | Just sx <- splitStrProdDmd (length ux) s
+                                -> Just (mkJointDmds sx ux)
+      (Lazy,  Use _ (UProd ux)) -> Just (mkJointDmds (replicate (length ux) Lazy) ux)
+      _ -> Nothing
 
-instance Outputable TypeShape where
-  ppr TsUnk        = text "TsUnk"
-  ppr (TsFun ts)   = text "TsFun" <> parens (ppr ts)
-  ppr (TsProd tss) = parens (hsep $ punctuate comma $ map ppr tss)
+{- *********************************************************************
+*                                                                      *
+               TypeShape and demand trimming
+*                                                                      *
+********************************************************************* -}
 
--- | @peelTsFuns n ts@ tries to peel off @n@ 'TsFun' constructors from @ts@ and
--- returns 'Just' the wrapped 'TypeShape' on success, and 'Nothing' otherwise.
-peelTsFuns :: Arity -> TypeShape -> Maybe TypeShape
-peelTsFuns 0 ts         = Just ts
-peelTsFuns n (TsFun ts) = peelTsFuns (n-1) ts
-peelTsFuns _ _          = Nothing
+
+data TypeShape -- See Note [Trimming a demand to a type]
+               --     in GHC.Core.Opt.DmdAnal
+  = TsFun TypeShape
+  | TsProd [TypeShape]
+  | TsUnk
 
 trimToType :: Demand -> TypeShape -> Demand
--- See Note [Trimming a demand to a type]
+-- See Note [Trimming a demand to a type] in GHC.Core.Opt.DmdAnal
 trimToType (JD { sd = ms, ud = mu }) ts
   = JD (go_ms ms ts) (go_mu mu ts)
   where
@@ -852,72 +862,18 @@ trimToType (JD { sd = ms, ud = mu }) ts
       | equalLength mus tss      = UProd (zipWith go_mu mus tss)
     go_u _           _           = Used
 
-{-
-Note [Trimming a demand to a type]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this:
-
-  f :: a -> Bool
-  f x = case ... of
-          A g1 -> case (x |> g1) of (p,q) -> ...
-          B    -> error "urk"
-
-where A,B are the constructors of a GADT.  We'll get a U(U,U) demand
-on x from the A branch, but that's a stupid demand for x itself, which
-has type 'a'. Indeed we get ASSERTs going off (notably in
-splitUseProdDmd, #8569).
-
-Bottom line: we really don't want to have a binder whose demand is more
-deeply-nested than its type.  There are various ways to tackle this.
-When processing (x |> g1), we could "trim" the incoming demand U(U,U)
-to match x's type.  But I'm currently doing so just at the moment when
-we pin a demand on a binder, in GHC.Core.Opt.DmdAnal.findBndrDmd.
+instance Outputable TypeShape where
+  ppr TsUnk        = text "TsUnk"
+  ppr (TsFun ts)   = text "TsFun" <> parens (ppr ts)
+  ppr (TsProd tss) = parens (hsep $ punctuate comma $ map ppr tss)
 
 
-Note [Threshold demands]
-~~~~~~~~~~~~~~~~~~~~~~~~
-Threshold usage demand is generated to figure out if
-cardinality-instrumented demands of a binding's free variables should
-be unleashed. See also [Aggregated demand for cardinality].
 
-Note [Replicating polymorphic demands]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Some demands can be considered as polymorphic. Generally, it is
-applicable to such beasts as tops, bottoms as well as Head-Used and
-Head-stricts demands. For instance,
-
-S ~ S(L, ..., L)
-
-Also, when top or bottom is occurred as a result demand, it in fact
-can be expanded to saturate a callee's arity.
--}
-
-splitProdDmd_maybe :: Demand -> Maybe [Demand]
--- Split a product into its components, iff there is any
--- useful information to be extracted thereby
--- The demand is not necessarily strict!
-splitProdDmd_maybe (JD { sd = s, ud = u })
-  = case (s,u) of
-      (Str (SProd sx), Use _ u) | Just ux <- splitUseProdDmd (length sx) u
-                                -> Just (mkJointDmds sx ux)
-      (Str s, Use _ (UProd ux)) | Just sx <- splitStrProdDmd (length ux) s
-                                -> Just (mkJointDmds sx ux)
-      (Lazy,  Use _ (UProd ux)) -> Just (mkJointDmds (replicate (length ux) Lazy) ux)
-      _ -> Nothing
-
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
                    Termination
 *                                                                      *
-************************************************************************
-
-Divergence:     Dunno
-               /
-          Diverges
-
-In a fixpoint iteration, start from Diverges
--}
+********************************************************************* -}
 
 -- | Divergence lattice. Models a subset lattice of the following exhaustive
 -- set of divergence results:
