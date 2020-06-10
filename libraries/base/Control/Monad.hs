@@ -274,7 +274,12 @@ Core: https://gitlab.haskell.org/ghc/ghc/issues/11795#note_118976
 -}
 
 -- | @'replicateM' n act@ performs the action @n@ times gathering the results.
--- Note the @Applicative@ constraint.
+--
+-- ==== __Examples__
+-- >>> result <- replicateM 5 getChar
+-- result :: [Char]
+-- >>> result
+-- "abcde"
 replicateM        :: (Applicative m) => Int -> m a -> m [a]
 {-# INLINABLE replicateM #-}
 {-# SPECIALISE replicateM :: Int -> IO a -> IO [a] #-}
