@@ -364,6 +364,7 @@ test('T11629', normal, compile, ['-v0'])
 test('T8761', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T12045TH1', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T12045TH2', normal, compile, ['-v0'])
+test('T12073', normal, compile_and_run, [''])
 test('T12130', [], multimod_compile,
      ['T12130', '-v0 ' + config.ghc_th_way_flags])
 test('T12387', normal, compile_fail, ['-v0'])
