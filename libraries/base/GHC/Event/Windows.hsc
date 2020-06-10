@@ -5,6 +5,8 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS -ddump-simpl -ddump-cmm -ddump-to-file -fforce-recomp #-}
 
 -------------------------------------------------------------------------------
 -- |
@@ -254,7 +256,11 @@ import {-# SOURCE #-} Debug.Trace (traceEventIO)
 --
 
 -- ---------------------------------------------------------------------------
--- I/O manager resume/suspend code
+-- I/O manager global thread
+
+-- When running GHCi we still want to ensure we still only have one
+-- io manager thread, even if base is loaded twice. See the docs for
+-- sharedCAF for how this is done.
 
 {-# NOINLINE ioManagerThread #-}
 ioManagerThread :: MVar (Maybe ThreadId)
@@ -268,8 +274,8 @@ foreign import ccall unsafe "getOrSetGHCConcWindowsIOManagerThreadStore"
 -- ---------------------------------------------------------------------------
 -- Non-threaded I/O manager callback hooks. See `ASyncWinIO.c`
 
-foreign import ccall safe "registerNewIOCPHandle"
-  registerNewIOCPHandle :: FFI.IOCP -> IO ()
+foreign import ccall safe "registerIOCPHandle"
+  registerIOCPHandle :: FFI.IOCP -> IO ()
 
 foreign import ccall safe "registerAlertableWait"
 -- (bool has_timeout, DWORD mssec, uint64_t num_req, bool pending_service);
@@ -295,10 +301,13 @@ foreign import ccall "wrapper"
 foreign import ccall "dynamic"
   mkIOCallback :: FunPtr IOCallback -> IOCallback
 
--- | Structure that the I/O managed uses to to associate callbacks with
--- it's additional payload such as it's OVERLAPPED structure and Win32 handle
--- etc.  Must be kept in sync with that in `winio_structs.h` or horrible things
+-- | Structure that the I/O manager uses to associate callbacks with
+-- additional payload such as their OVERLAPPED structure and Win32 handle
+-- etc.  *Must* be kept in sync with that in `winio_structs.h` or horrible things
 -- happen.
+--
+-- We keep the handle around for the benefit of ghc-external libraries making
+-- use of the manager.
 data CompletionData = CompletionData { cdHandle   :: !HANDLE
                                      , cdCallback :: !IOCallback
                                      }
@@ -308,15 +317,15 @@ instance Storable CompletionData where
     alignment _ = #{alignment CompletionData}
 
     peek ptr = do
-      cdHandle   <- #{peek CompletionData, cdHandle} ptr
       cdCallback <- mkIOCallback `fmap` #{peek CompletionData, cdCallback} ptr
+      cdHandle   <- #{peek CompletionData, cdHandle} ptr
       let !cd = CompletionData{..}
       return cd
 
     poke ptr CompletionData{..} = do
-      #{poke CompletionData, cdHandle} ptr cdHandle
       cb <- wrapIOCallback cdCallback
       #{poke CompletionData, cdCallback} ptr cb
+      #{poke CompletionData, cdHandle} ptr cdHandle
 
 -- | Pointer offset in bytes to the location of hoData in HASKELL_OVERLAPPPED
 cdOffset :: Int
@@ -370,7 +379,7 @@ newManager = do
     debugIO "Starting io-manager..."
     mgrIOCP         <- FFI.newIOCP
     when (not threadedIOMgr) $
-      registerNewIOCPHandle mgrIOCP
+      registerIOCPHandle mgrIOCP
     debugIO $ "iocp: " ++ show mgrIOCP
     mgrClock             <- getClock
     mgrUniqueSource      <- newSource
@@ -388,6 +397,8 @@ newManager = do
 -- until they are instructed to die.
 -- For the non-threaded runtime we have a single worker thread in
 -- the C runtime which we force to wake up instead.
+--
+-- TODO: Threadpools are not yet implemented.
 startIOManagerThread :: IO () -> IO ()
 startIOManagerThread loop
   | not threadedIOMgr
@@ -476,7 +487,7 @@ type StartIOCallback a = StartCallback (CbResult a)
 -- an I/O Completion call could be in.
 data CbResult a
   = CbDone (Maybe DWORD) -- ^ Request was handled immediately, no queue.
-  | CbPending            -- ^ Queued and handled by I/O manager
+  | CbPending            -- ^ Queued and to be handled by I/O manager
   | CbIncomplete         -- ^ I/O request is incomplete but not enqueued, handle
                          --   it synchronously.
   | CbError a            -- ^ I/O request abort, return failure immediately
@@ -518,9 +529,10 @@ associateHandle Manager{..} h =
 -- 'withOverlapped' waits for a completion to arrive before returning or
 -- throwing an exception.  This means you can use functions like
 -- 'Foreign.Marshal.Alloc.alloca' to allocate buffers for the operation.
-withOverlappedEx :: Manager
+withOverlappedEx :: forall a.
+                    Manager
                  -> String -- ^ Handle name
-                 -> HANDLE
+                 -> HANDLE -- ^ Windows handle associated with the operation.
                  -> Word64 -- ^ Value to use for the @OVERLAPPED@
                            --   structure's Offset/OffsetHigh members.
                  -> StartIOCallback Int
@@ -528,10 +540,9 @@ withOverlappedEx :: Manager
                  -> IO (IOResult a)
 withOverlappedEx mgr fname h offset startCB completionCB = do
     signal <- newEmptyIOPort :: IO (IOPort (IOResult a))
-    let dbg s = s ++ " (" ++ show h ++ ":" ++ show offset ++ ")"
-    let signalReturn a = failIfFalse_ (dbg "signalReturn") $
+    let signalReturn a = failIfFalse_ (dbgMsg "signalReturn") $
                             writeIOPort signal (IOSuccess a)
-        signalThrow ex = failIfFalse_ (dbg "signalThrow") $
+        signalThrow ex = failIfFalse_ (dbgMsg "signalThrow") $
                             writeIOPort signal (IOFailed ex)
     mask_ $ do
         let completionCB' e b = completionCB e b >>= \result ->
@@ -550,14 +561,14 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
         --
         -- Todo: Use a memory pool for this so we don't have to hit malloc every
         --       time.  This would allow us to scale better.
-        cdData <- new (CompletionData h completionCB')
+        cdData <- new (CompletionData h completionCB') :: IO (Ptr CompletionData)
         let ptr_lpol = hs_lpol `plusPtr` cdOffset
         let lpol = castPtr hs_lpol
         debugIO $ "hs_lpol:" ++ show hs_lpol
                 ++ " cdData:" ++ show cdData
                 ++ " ptr_lpol:" ++ show ptr_lpol
 
-        execute <- startCB lpol `onException`
+        startCBResult <- startCB lpol `onException`
                         (CbError `fmap` Win32.getLastError) >>= \result -> do
           -- Check to see if the operation was completed on a
           -- non-overlapping handle or was completed immediately.
@@ -596,14 +607,14 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                              | otherwise                                   -> CbPending
                   _                                                        -> result
           case result' of
-            CbNone    _ -> error "shouldn't happen."
+            CbNone    _ -> error "withOverlappedEx: CbNone shouldn't happen."
             CbIncomplete -> do
                debugIO $ "handling incomplete request synchronously " ++ show (h, lpol)
-               res <- spinWaitComplete h lpol
+               res <- waitForCompletion h lpol
                debugIO $ "done blocking request 2: " ++ show (h, lpol) ++ " - " ++ show res
                return res
             CbPending   -> do
-              -- Before we enqueue check to see if operation finished in the
+              -- Before we enqueue check see if operation finished in the
               -- mean time, since caller may not have done this.
               -- Normally we'd have to clear lpol with 0 before this call,
               -- however the statuses we're interested in would not get to here
@@ -617,11 +628,7 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
               -- won't have a request enqueued.  Handle it inline.
               let done_early = status == #{const STATUS_SUCCESS}
                                || status == #{const STATUS_END_OF_FILE}
-                               || lasterr == #{const ERROR_HANDLE_EOF}
-                               || lasterr == #{const ERROR_SUCCESS}
-                               || lasterr == #{const ERROR_BROKEN_PIPE}
-                               || lasterr == #{const ERROR_NO_MORE_ITEMS}
-                               || lasterr == #{const ERROR_OPERATION_ABORTED}
+                               || errorIsCompleted lasterr
               -- This status indicates that the request hasn't finished early,
               -- but it will finish shortly.  The I/O manager will not be
               -- enqueuing this either.  Also needs to be handled inline.
@@ -640,12 +647,13 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                     poke ptr_lpol cdData
                     reqs <- addRequest
                     debugIO $ "+1.. " ++ show reqs ++ " requests queued. | " ++ show lpol
-                    --wakeupIOManager
+                    -- If we should add back support to suspend the IO Manager thread
+                    -- then we will need to make sure it's running at this point.
                     return result'
                 -- In progress, we will wait for completion.
                 (Nothing, False, True) -> do
                   debugIO $ "handling incomplete request synchronously " ++ show (h, lpol)
-                  res <- spinWaitComplete h lpol
+                  res <- waitForCompletion h lpol
                   debugIO $ "done blocking request 1: " ++ show (h, lpol) ++ " - " ++ show res
                   return res
                 _                -> do
@@ -655,6 +663,8 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
             CbDone  _   -> do
               debugIO "request handled immediately (o), not queued." >> return result'
 
+        -- If an exception was received while waiting for IO to complete
+        -- we try to cancel the request here.
         let cancel e = do
                         debugIO $ "## Exception occurred. Cancelling request... "
                         debugIO $ show (e :: SomeException)
@@ -680,34 +690,34 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                              delay <- runExpiredTimeouts mgr
                              registerAlertableWait delay num_remaining True
                         return $ IOFailed Nothing
-        let runner = do debugIO $ (dbg ":: waiting ") ++ " | "  ++ show lpol
+        let runner = do debugIO $ (dbgMsg ":: waiting ") ++ " | "  ++ show lpol
                         res <- readIOPort signal `catch` cancel
-                        debugIO $ dbg ":: signaled "
+                        debugIO $ dbgMsg ":: signaled "
                         case res of
                           IOFailed err -> FFI.throwWinErr fname (maybe 0 fromIntegral err)
                           _            -> return res
 
         -- Sometimes we shouldn't bother with the I/O manager as the call has
         -- failed or is done.
-        case execute of
+        case startCBResult of
           CbPending    -> runner
           CbDone rdata -> do
             free cdData
-            debugIO $ dbg $ ":: done " ++ show lpol ++ " - " ++ show rdata
+            debugIO $ dbgMsg $ ":: done " ++ show lpol ++ " - " ++ show rdata
             bytes <- if isJust rdata
                         then return rdata
                         -- Make sure it's safe to free the OVERLAPPED buffer
                         else FFI.getOverlappedResult h lpol False
-            debugIO $ dbg $ ":: done bytes: " ++ show bytes
+            debugIO $ dbgMsg $ ":: done bytes: " ++ show bytes
             case bytes of
-              Just res ->  free hs_lpol >> completionCB 0 res
+              Just res -> free hs_lpol >> completionCB 0 res
               Nothing  -> do err <- FFI.overlappedIOStatus lpol
                              numBytes <- FFI.overlappedIONumBytes lpol
                              -- TODO: Remap between STATUS_ and ERROR_ instead
                              -- of re-interpret here. But for now, don't care.
                              let err' = fromIntegral err
                              free hs_lpol
-                             debugIO $ dbg $ ":: done callback: " ++ show err' ++ " - " ++ show numBytes
+                             debugIO $ dbgMsg $ ":: done callback: " ++ show err' ++ " - " ++ show numBytes
                              completionCB err' (fromIntegral numBytes)
           CbError err  -> do
             free cdData
@@ -717,58 +727,58 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
           _            -> do
             free cdData
             free hs_lpol
-            error "unexpected case in `execute'"
-      where spinWaitComplete fhndl lpol = do
+            error "unexpected case in `startCBResult'"
+      where dbgMsg s = s ++ " (" ++ show h ++ ":" ++ show offset ++ ")"
+            -- Wait for .25ms (threaded) and 1ms (non-threaded)
+            -- Yields in the threaded case allowing other work.
+            -- Blocks all haskell execution in the non-threaded case.
+            -- We might want to reconsider the non-threaded handling
+            -- at some point.
+            doShortWait :: IO ()
+            doShortWait
+                | threadedIOMgr = do
+                    -- Uses an inline definition of threadDelay to prevent an import
+                    -- cycle.
+                    let usecs = 250 -- 0.25ms
+                    m <- newEmptyIOPort
+                    reg <- registerTimeout mgr usecs $
+                                writeIOPort m () >> return ()
+                    readIOPort m `onException` unregisterTimeout mgr reg
+                | otherwise = sleepBlock 1 -- 1 ms
+            waitForCompletion :: HANDLE -> Ptr FFI.OVERLAPPED -> IO (CbResult Int)
+            waitForCompletion fhndl lpol = do
               -- Wait for the request to finish as it was running before and
               -- The I/O manager won't enqueue it due to our optimizations to
               -- prevent context switches in such cases.
               res <- FFI.getOverlappedResult fhndl lpol False
               status <- FFI.overlappedIOStatus lpol
               case res of
-                -- Uses an inline definition of threadDelay to prevent an import
-                -- cycle.
-                Nothing | status == #{const STATUS_END_OF_FILE} -> do
-                  when (not threadedIOMgr) completeSynchronousRequest
-                  return $ CbDone res
+                Nothing | status == #{const STATUS_END_OF_FILE}
+                        -> do
+                              when (not threadedIOMgr) completeSynchronousRequest
+                              return $ CbDone res
                         | otherwise ->
-                  do m <- newEmptyIOPort
-                     lasterr <- getLastError
-                     let done =
-                            lasterr == #{const ERROR_HANDLE_EOF}
-                            || lasterr == #{const ERROR_SUCCESS}
-                            || lasterr == #{const ERROR_BROKEN_PIPE}
-                            || lasterr == #{const ERROR_NO_MORE_ITEMS}
-                            || lasterr == #{const ERROR_OPERATION_ABORTED}
+                  do lasterr <- getLastError
+                     let done = errorIsCompleted lasterr
                      -- debugIO $ ":: loop - " ++ show lasterr ++ " :" ++ show done
                      -- We will complete quite soon, in the threaded RTS we
                      -- probably don't really want to wait for it while we could
                      -- have done something else.  In particular this is because
-                     -- of sockets which make take slightly longer.  However for
-                     -- the non-threaded RTS, using the timer manage is a waste
-                     -- since there's only one capability anyway.
+                     -- of sockets which make take slightly longer.
                      -- There's a trade-off.  Using the timer would allow it do
                      -- to continue running other Haskell threads, but also
-                     -- means it may take longer to complete the wait.  For now
-                     -- I'll not use it and enter a busy wait and see if there
-                     -- are any complaints.
-                     -- OTOH any of the two should be a massive improvement over
-                     -- The old I/O Manager.
-                     case (done, threadedIOMgr) of
-                       (False, True) -> do
-                         let usecs = 250 -- 0.25ms
-                         reg <- registerTimeout mgr usecs $
-                                  writeIOPort m () >> return ()
-                         readIOPort m `onException` unregisterTimeout mgr reg
-                       (False, False) -> sleepBlock 250
-                       _              -> return ()
+                     -- means it may take longer to complete the wait.
+                     unless done doShortWait
                      if done
                         then do when (not threadedIOMgr)
                                   completeSynchronousRequest
                                 return $ CbDone Nothing
-                        else spinWaitComplete fhndl lpol
+                        else waitForCompletion fhndl lpol
                 Just _ -> do
                    when (not threadedIOMgr) completeSynchronousRequest
                    return $ CbDone res
+            unless :: Bool -> IO () -> IO ()
+            unless p a = if p then a else return ()
 
 -- Safe version of function
 withOverlapped :: String
@@ -781,6 +791,17 @@ withOverlapped :: String
 withOverlapped fname h offset startCB completionCB = do
   mngr <- getSystemManager
   withOverlappedEx mngr fname h offset startCB completionCB
+
+------------------------------------------------------------------------
+-- Helper to check if an error code implies an operation has completed.
+
+errorIsCompleted :: ErrCode -> Bool
+errorIsCompleted lasterr =
+       lasterr == #{const ERROR_HANDLE_EOF}
+    || lasterr == #{const ERROR_SUCCESS}
+    || lasterr == #{const ERROR_BROKEN_PIPE}
+    || lasterr == #{const ERROR_NO_MORE_ITEMS}
+    || lasterr == #{const ERROR_OPERATION_ABORTED}
 
 ------------------------------------------------------------------------
 -- I/O Utilities
@@ -916,7 +937,8 @@ fromTimeout (Just sec) | sec > 120  = 120000
 -- to block, shutdown or suspend than that request is honored at the end of the
 -- loop.
 --
--- This function can be safely executed multiple times in parallel
+-- This function can be safely executed multiple times in parallel and is only
+-- used by the threaded manager.
 step :: Bool -> Manager -> IO (Bool, Maybe Seconds)
 step maxDelay mgr@Manager{..} = do
     -- Determine how long to wait the next time we block in an alertable state.
@@ -929,9 +951,8 @@ step maxDelay mgr@Manager{..} = do
         then debugIO $ "I/O manager waiting: delay=" ++ show delay
         else debugIO $ "I/O manager pausing: maxDelay=" ++ show maxDelay
 
-    -- If threaded this call informs the threadpool that a thread is now
-    -- entering a kernel mode wait and this is free to be used.  If non-threaded
-    -- then this is a no-op.
+    -- Inform the threadpool that a thread is now
+    -- entering a kernel mode wait and thus is ready for new work.
     notifyWaiting mgrThreadPool
 
     -- To quote Matt Godbolts:
@@ -986,10 +1007,10 @@ step maxDelay mgr@Manager{..} = do
     processCompletion mgr n delay
 
 -- | Process the results at the end of an evaluation loop.  This function will
--- read all the completions, wake up all the Haskell threads, clean up the book
--- keeping of the I/O manager and return whether there are outstanding work to
--- be done and how long it expects to have to wait till it can take action
--- again.
+-- read all the completions, unblock up all the Haskell threads, clean up the book
+-- keeping of the I/O manager.
+-- It returns whether there is outstanding work (request or timer) to be
+-- done and how long it expects to have to wait till it can take action again.
 --
 -- Note that this method can do less work than there are entries in the
 -- completion table.  This is because some completion entries may have been
@@ -1009,10 +1030,10 @@ processCompletion :: Manager -> Int -> Maybe Seconds -> IO (Bool, Maybe Seconds)
 processCompletion Manager{..} n delay = do
     -- If some completions are done, we need to process them and call their
     -- callbacks.  We then remove the callbacks from the bookkeeping and resize
-    -- the index if required.
+    -- the array if required.
     when (n > 0) $ do
       forM_ [0..(n-1)] $ \idx -> do
-        oe <- A.unsafeRead mgrOverlappedEntries idx
+        oe <- A.unsafeRead mgrOverlappedEntries idx :: IO OVERLAPPED_ENTRY
         let lpol     = lpOverlapped oe
         when (lpol /= nullPtr) $ do
           let hs_lpol  = castPtr lpol :: Ptr FFI.HASKELL_OVERLAPPED
@@ -1028,7 +1049,7 @@ processCompletion Manager{..} n delay = do
           when (oldDataPtr /= nullPtr && oldDataPtr /= nullReq) $
             do debugIO $ "exchanged: " ++ show oldDataPtr
                payload <- peek oldDataPtr
-               let !(CompletionData _hwnd cb) = payload
+               let !cb = cdCallback payload
                free oldDataPtr
                reqs <- removeRequest
                debugIO $ "-1.. " ++ show reqs ++ " requests queued."
@@ -1060,7 +1081,8 @@ processCompletion Manager{..} n delay = do
     return (more || (isJust delay && threadedIOMgr), delay)
 
 -- | Entry point for the non-threaded I/O manager to be able to process
--- completed completions.  It is mostly a wrapper around processCompletion.
+-- completed completions.  It is mostly a wrapper around processCompletion
+-- and invoked by the C thread via the scheduler.
 processRemoteCompletion :: IO ()
 processRemoteCompletion = do
 #if defined(DEBUG) || defined(DEBUG_TRACE)
@@ -1077,7 +1099,7 @@ processRemoteCompletion = do
     _ <- peekArray n entries
     mngr <- getSystemManager
     let arr = mgrOverlappedEntries mngr
-    A.unsafeSet arr entries n
+    A.unsafeCopyFromBuffer arr entries n
 
     -- Process timeouts
     delay <- runExpiredTimeouts mngr :: IO (Maybe Seconds)
@@ -1089,19 +1111,10 @@ processRemoteCompletion = do
 
     -- Update and potentially wake up IO Manager
     -- This call will unblock the non-threaded I/O manager.  After this it is no
-    -- longer safe to use `entries` nor `completed`.
+    -- longer safe to use `entries` nor `completed` as they can now be modified
+    -- by the C thread.
     registerAlertableWait delay num_left False
 
-    debugIO "WinIOBlocked"
-    -- We may have been woken up due to a timer timeout.  So check for any
-    -- expired timeouts. If we have processed any completions only check
-    -- timeouts, if we have been woken up only to process timeouts then check if
-    -- we have to change the wait interval.
-    --
-    -- When not the threaded runtime we would not have reset the timer events
-    -- below.  Because of this when the request is done we have an additional
-    -- `step` here to reset the wait timers so the I/O manager doesn't keep
-    -- polling at the temporary high frequency we entered.
     debugIO "processRemoteCompletion :: done ()"
     return ()
 
@@ -1123,7 +1136,7 @@ io_mngr_loop _event mgr = go False
     where
       go maxDelay =
           do debugIO "io_mngr_loop:WinIORunning"
-             traceEventIO "io_mngr_loop:WinIORunning"
+             -- Step will process IO events, or block if none are outstanding.
              (more, delay) <- step maxDelay mgr
              let !use_max_delay = not (isJust delay || more)
              debugIO "I/O manager stepping."
@@ -1133,7 +1146,7 @@ io_mngr_loop _event mgr = go False
                  _ | event_id == io_MANAGER_WAKEUP -> return False
                  _ | event_id == io_MANAGER_DIE    -> return True
                  0 -> return False -- spurious wakeup
-                 _ -> do traceEventIO $ "handling console event: " ++ show (event_id `shiftR` 1)
+                 _ -> do debugIO $ "handling console event: " ++ show (event_id `shiftR` 1)
                          start_console_handler (event_id `shiftR` 1)
                          return False
 
@@ -1156,6 +1169,7 @@ io_MANAGER_DIE    = #{const IO_MANAGER_DIE}
 wakeupIOManager :: IO ()
 wakeupIOManager
   = do mngr <- getSystemManager
+       -- We don't care about the event handle here, only that it exists.
        _event <- c_getIOManagerEvent
        debugIO "waking up I/O manager."
        startIOManagerThread (io_mngr_loop (error "IOManagerEvent used") mngr)
@@ -1176,6 +1190,7 @@ foreign import ccall unsafe "sendIOManagerEvent" -- in the RTS (ThrIOManager.c)
 
 foreign import ccall unsafe "rtsSupportsBoundThreads" threadedIOMgr :: Bool
 
+-- | Sleep for n ms
 foreign import stdcall unsafe "Sleep" sleepBlock :: Int -> IO ()
 
 -- ---------------------------------------------------------------------------
@@ -1228,7 +1243,6 @@ unregisterHandle (Manager{..}) key@HandleKey{..} = do
         _ <- IT.updateWith (\_ -> return new_lst) hwnd' evts
         return ()
 
-
 -- ---------------------------------------------------------------------------
 -- debugging
 
@@ -1255,10 +1269,10 @@ debugIO s
 debugIO _ = return ()
 #endif
 
-dbxIO :: String -> IO ()
-dbxIO s = do tid <- myThreadId
-             let pref = if threadedIOMgr then "\t" else ""
-             _   <- withCStringLen (pref ++ "winio: " ++ s ++ " (" ++
-                                   showThreadId tid ++ ")\n") $
-                   \(p, len) -> c_write 2 (castPtr p) (fromIntegral len)
-             return ()
+-- dbxIO :: String -> IO ()
+-- dbxIO s = do tid <- myThreadId
+--              let pref = if threadedIOMgr then "\t" else ""
+--              _   <- withCStringLen (pref ++ "winio: " ++ s ++ " (" ++
+--                                    showThreadId tid ++ ")\n") $
+--                    \(p, len) -> c_write 2 (castPtr p) (fromIntegral len)
+--              return ()
