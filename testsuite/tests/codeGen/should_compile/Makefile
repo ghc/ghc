@@ -64,10 +64,10 @@ T17648:
 	#  NoCafRefs) to the interface files.
 	'$(TEST_HC)' $(TEST_HC_OPTS) -dno-typeable-binds -O T17648.hs -v0
 	'$(TEST_HC)' --show-iface T17648.hi | tr -d '\n\r' | \
-		grep -F 'f :: T GHC.Types.Int -> ()  [HasNoCafRefs, Arity' >/dev/null
+		grep -F 'f :: T GHC.Types.Int -> ()  [HasNoCafRefs, LambdaFormInfo' >/dev/null
 
 	# Second compilation with -fcatch-bottoms, f should be CAFFY
 	'$(TEST_HC)' $(TEST_HC_OPTS) -dno-typeable-binds -O \
 		-fcatch-bottoms T17648.hs -v0 -fforce-recomp
 	'$(TEST_HC)' --show-iface T17648.hi | tr -d '\n\r' | \
-		grep -F 'f :: T GHC.Types.Int -> ()  [Arity: 1, Strictness' >/dev/null
+		grep -F 'f :: T GHC.Types.Int -> ()  [LambdaFormInfo' >/dev/null

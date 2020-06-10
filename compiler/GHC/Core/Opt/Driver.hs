@@ -37,7 +37,7 @@ import GHC.Core.Opt.FloatOut ( floatOutwards )
 import GHC.Core.FamInstEnv
 import GHC.Types.Id
 import GHC.Utils.Error  ( withTiming, withTimingD, DumpFormat (..) )
-import GHC.Types.Basic  ( CompilerPhase(..), isDefaultInlinePragma, defaultInlinePragma )
+import GHC.Types.Basic
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Core.Opt.LiberateCase ( liberateCase )
@@ -141,8 +141,10 @@ getCoreToDo dflags
 
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
 
-    maybe_strictness_before phase
-      = runWhen (phase `elem` strictnessBefore dflags) CoreDoDemand
+    maybe_strictness_before (Phase phase)
+      | phase `elem` strictnessBefore dflags = CoreDoDemand
+    maybe_strictness_before _
+      = CoreDoNothing
 
     base_mode = SimplMode { sm_phase      = panic "base_mode"
                           , sm_names      = []
@@ -152,20 +154,20 @@ getCoreToDo dflags
                           , sm_inline     = True
                           , sm_case_case  = True }
 
-    simpl_phase phase names iter
+    simpl_phase phase name iter
       = CoreDoPasses
       $   [ maybe_strictness_before phase
           , CoreDoSimplify iter
-                (base_mode { sm_phase = Phase phase
-                           , sm_names = names })
+                (base_mode { sm_phase = phase
+                           , sm_names = [name] })
 
-          , maybe_rule_check (Phase phase) ]
+          , maybe_rule_check phase ]
 
-    simpl_phases = CoreDoPasses [ simpl_phase phase ["main"] max_iter
-                                | phase <- [phases, phases-1 .. 1] ]
+    -- Run GHC's internal simplification phase, after all rules have run.
+    -- See Note [Compiler phases] in GHC.Types.Basic
+    simplify name = simpl_phase FinalPhase name max_iter
 
-
-        -- initial simplify: mk specialiser happy: minimum effort please
+    -- initial simplify: mk specialiser happy: minimum effort please
     simpl_gently = CoreDoSimplify max_iter
                        (base_mode { sm_phase = InitialPhase
                                   , sm_names = ["Gentle"]
@@ -182,7 +184,7 @@ getCoreToDo dflags
 
     demand_analyser = (CoreDoPasses (
                            dmd_cpr_ww ++
-                           [simpl_phase 0 ["post-worker-wrapper"] max_iter]
+                           [simplify "post-worker-wrapper"]
                            ))
 
     -- Static forms are moved to the top level with the FloatOut pass.
@@ -203,7 +205,7 @@ getCoreToDo dflags
      if opt_level == 0 then
        [ static_ptrs_float_outwards,
          CoreDoSimplify max_iter
-             (base_mode { sm_phase = Phase 0
+             (base_mode { sm_phase = FinalPhase
                         , sm_names = ["Non-opt simplification"] })
        ]
 
@@ -251,8 +253,10 @@ getCoreToDo dflags
            -- GHC.Iface.Tidy.StaticPtrTable.
            static_ptrs_float_outwards,
 
-        simpl_phases,
-
+        -- Run the simplier phases 2,1,0 to allow rewrite rules to fire
+        CoreDoPasses [ simpl_phase (Phase phase) "main" max_iter
+                     | phase <- [phases, phases-1 .. 1] ],
+        simpl_phase (Phase 0) "main" (max max_iter 3),
                 -- Phase 0: allow all Ids to be inlined now
                 -- This gets foldr inlined before strictness analysis
 
@@ -263,7 +267,6 @@ getCoreToDo dflags
                 -- ==>  let k = BIG in letrec go = \xs -> ...(k x).... in go xs
                 -- ==>  let k = BIG in letrec go = \xs -> ...(BIG x).... in go xs
                 -- Don't stop now!
-        simpl_phase 0 ["main"] (max max_iter 3),
 
         runWhen do_float_in CoreDoFloatInwards,
             -- Run float-inwards immediately before the strictness analyser
@@ -274,9 +277,10 @@ getCoreToDo dflags
 
         runWhen call_arity $ CoreDoPasses
             [ CoreDoCallArity
-            , simpl_phase 0 ["post-call-arity"] max_iter
+            , simplify "post-call-arity"
             ],
 
+        -- Strictness analysis
         runWhen strictness demand_analyser,
 
         runWhen exitification CoreDoExitify,
@@ -302,24 +306,24 @@ getCoreToDo dflags
 
         runWhen do_float_in CoreDoFloatInwards,
 
-        maybe_rule_check (Phase 0),
+        maybe_rule_check FinalPhase,
 
                 -- Case-liberation for -O2.  This should be after
                 -- strictness analysis and the simplification which follows it.
         runWhen liberate_case (CoreDoPasses [
             CoreLiberateCase,
-            simpl_phase 0 ["post-liberate-case"] max_iter
+            simplify "post-liberate-case"
             ]),         -- Run the simplifier after LiberateCase to vastly
                         -- reduce the possibility of shadowing
                         -- Reason: see Note [Shadowing] in GHC.Core.Opt.SpecConstr
 
         runWhen spec_constr CoreDoSpecConstr,
 
-        maybe_rule_check (Phase 0),
+        maybe_rule_check FinalPhase,
 
         runWhen late_specialise
           (CoreDoPasses [ CoreDoSpecialising
-                        , simpl_phase 0 ["post-late-spec"] max_iter]),
+                        , simplify "post-late-spec"]),
 
         -- LiberateCase can yield new CSE opportunities because it peels
         -- off one layer of a recursive function (concretely, I saw this
@@ -328,11 +332,10 @@ getCoreToDo dflags
         runWhen ((liberate_case || spec_constr) && cse) CoreCSE,
 
         -- Final clean-up simplification:
-        simpl_phase 0 ["final"] max_iter,
+        simplify "final",
 
         runWhen late_dmd_anal $ CoreDoPasses (
-            dmd_cpr_ww ++
-            [simpl_phase 0 ["post-late-ww"] max_iter]
+            dmd_cpr_ww ++ [simplify "post-late-ww"]
           ),
 
         -- Final run of the demand_analyser, ensures that one-shot thunks are
@@ -342,7 +345,7 @@ getCoreToDo dflags
         -- can become /exponentially/ more expensive. See #11731, #12996.
         runWhen (strictness || late_dmd_anal) CoreDoDemand,
 
-        maybe_rule_check (Phase 0)
+        maybe_rule_check FinalPhase
      ]
 
     -- Remove 'CoreDoNothing' and flatten 'CoreDoPasses' for clarity.
