@@ -62,9 +62,10 @@ dmdAnalTopBind :: AnalEnv
                -> CoreBind
                -> (AnalEnv, CoreBind)
 dmdAnalTopBind env (NonRec id rhs)
-  = (extendAnalEnv TopLevel env id' (idStrictness id'), NonRec id' rhs')
+  = ( extendAnalEnv TopLevel env id sig
+    , NonRec (setIdStrictness id sig) rhs')
   where
-    ( _, id', rhs') = dmdAnalRhsLetDown Nothing env cleanEvalDmd id rhs
+    ( _, sig, rhs') = dmdAnalRhsLetDown Nothing env cleanEvalDmd id rhs
 
 dmdAnalTopBind env (Rec pairs)
   = (env', Rec pairs')
@@ -216,10 +217,8 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
   -- Only one alternative with a product constructor
   | let tycon = dataConTyCon dc
   , isJust (isDataProductTyCon_maybe tycon)
-  , Just rec_tc' <- checkRecTc (ae_rec_tc env) tycon
   = let
-        env_alt                  = env { ae_rec_tc = rec_tc' }
-        (rhs_ty, rhs')           = dmdAnal env_alt dmd rhs
+        (rhs_ty, rhs')           = dmdAnal env dmd rhs
         (alt_ty1, dmds)          = findBndrsDmds env rhs_ty bndrs
         (alt_ty2, case_bndr_dmd) = findBndrDmd env False alt_ty1 case_bndr
         id_dmds                  = addCaseBndrDmd case_bndr_dmd dmds
@@ -299,8 +298,9 @@ dmdAnal' env dmd (Let (NonRec id rhs) body)
 dmdAnal' env dmd (Let (NonRec id rhs) body)
   = (body_ty2, Let (NonRec id2 rhs') body')
   where
-    (lazy_fv, id1, rhs') = dmdAnalRhsLetDown Nothing env dmd id rhs
-    env1                 = extendAnalEnv NotTopLevel env id1 (idStrictness id1)
+    (lazy_fv, sig, rhs') = dmdAnalRhsLetDown Nothing env dmd id rhs
+    id1                  = setIdStrictness id sig
+    env1                 = extendAnalEnv NotTopLevel env id sig
     (body_ty, body')     = dmdAnal env1 dmd body
     (body_ty1, id2)      = annotateBndr env body_ty id1
     body_ty2             = addLazyFVs body_ty1 lazy_fv -- see Note [Lazy and unleashable free variables]
@@ -509,95 +509,11 @@ dmdTransform env var dmd
   = -- pprTrace "dmdTransform:other" (vcat [ppr var, ppr sig, ppr dmd, ppr res]) $
     unitDmdType (unitVarEnv var (mkOnceUsedDmd dmd))
 
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-\subsection{Bindings}
+                      Binding right-hand sides
 *                                                                      *
-************************************************************************
--}
-
--- Recursive bindings
-dmdFix :: TopLevelFlag
-       -> AnalEnv                            -- Does not include bindings for this binding
-       -> CleanDemand
-       -> [(Id,CoreExpr)]
-       -> (AnalEnv, DmdEnv, [(Id,CoreExpr)]) -- Binders annotated with strictness info
-
-dmdFix top_lvl env let_dmd orig_pairs
-  = loop 1 initial_pairs
-  where
-    bndrs = map fst orig_pairs
-
-    -- See Note [Initialising strictness]
-    initial_pairs | ae_virgin env = [(setIdStrictness id botSig, rhs) | (id, rhs) <- orig_pairs ]
-                  | otherwise     = orig_pairs
-
-    -- If fixed-point iteration does not yield a result we use this instead
-    -- See Note [Safe abortion in the fixed-point iteration]
-    abort :: (AnalEnv, DmdEnv, [(Id,CoreExpr)])
-    abort = (env, lazy_fv', zapped_pairs)
-      where (lazy_fv, pairs') = step True (zapIdStrictness orig_pairs)
-            -- Note [Lazy and unleashable free variables]
-            non_lazy_fvs = plusVarEnvList $ map (strictSigDmdEnv . idStrictness . fst) pairs'
-            lazy_fv'     = lazy_fv `plusVarEnv` mapVarEnv (const topDmd) non_lazy_fvs
-            zapped_pairs = zapIdStrictness pairs'
-
-    -- The fixed-point varies the idStrictness field of the binders, and terminates if that
-    -- annotation does not change any more.
-    loop :: Int -> [(Id,CoreExpr)] -> (AnalEnv, DmdEnv, [(Id,CoreExpr)])
-    loop n pairs
-      | found_fixpoint = (final_anal_env, lazy_fv, pairs')
-      | n == 10        = abort
-      | otherwise      = loop (n+1) pairs'
-      where
-        found_fixpoint    = map (idStrictness . fst) pairs' == map (idStrictness . fst) pairs
-        first_round       = n == 1
-        (lazy_fv, pairs') = step first_round pairs
-        final_anal_env    = extendAnalEnvs top_lvl env (map fst pairs')
-
-    step :: Bool -> [(Id, CoreExpr)] -> (DmdEnv, [(Id, CoreExpr)])
-    step first_round pairs = (lazy_fv, pairs')
-      where
-        -- In all but the first iteration, delete the virgin flag
-        start_env | first_round = env
-                  | otherwise   = nonVirgin env
-
-        start = (extendAnalEnvs top_lvl start_env (map fst pairs), emptyDmdEnv)
-
-        ((_,lazy_fv), pairs') = mapAccumL my_downRhs start pairs
-                -- mapAccumL: Use the new signature to do the next pair
-                -- The occurrence analyser has arranged them in a good order
-                -- so this can significantly reduce the number of iterations needed
-
-        my_downRhs (env, lazy_fv) (id,rhs)
-          = ((env', lazy_fv'), (id', rhs'))
-          where
-            (lazy_fv1, id', rhs') = dmdAnalRhsLetDown (Just bndrs) env let_dmd id rhs
-            lazy_fv'              = plusVarEnv_C bothDmd lazy_fv lazy_fv1
-            env'                  = extendAnalEnv top_lvl env id (idStrictness id')
-
-
-    zapIdStrictness :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
-    zapIdStrictness pairs = [(setIdStrictness id nopSig, rhs) | (id, rhs) <- pairs ]
-
-{-
-Note [Safe abortion in the fixed-point iteration]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Fixed-point iteration may fail to terminate. But we cannot simply give up and
-return the environment and code unchanged! We still need to do one additional
-round, for two reasons:
-
- * To get information on used free variables (both lazy and strict!)
-   (see Note [Lazy and unleashable free variables])
- * To ensure that all expressions have been traversed at least once, and any left-over
-   strictness annotations have been updated.
-
-This final iteration does not add the variables to the strictness signature
-environment, which effectively assigns them 'nopSig' (see "getStrictness")
-
--}
+********************************************************************* -}
 
 -- Let bindings can be processed in two ways:
 -- Down (RHS before body) or Up (body before RHS).
@@ -615,30 +531,26 @@ dmdAnalRhsLetDown
   :: Maybe [Id]   -- Just bs <=> recursive, Nothing <=> non-recursive
   -> AnalEnv -> CleanDemand
   -> Id -> CoreExpr
-  -> (DmdEnv, Id, CoreExpr)
+  -> (DmdEnv, StrictSig, CoreExpr)
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
+-- See Note [NOINLINE and strictness]
 dmdAnalRhsLetDown rec_flag env let_dmd id rhs
-  = (lazy_fv, id', rhs')
+  = (lazy_fv, sig, rhs')
   where
-    rhs_arity      = idArity id
-    rhs_dmd
-      -- See Note [Demand analysis for join points]
-      -- See Note [Invariants on join points] invariant 2b, in GHC.Core
-      --     rhs_arity matches the join arity of the join point
-      | isJoinId id
-      = mkCallDmds rhs_arity let_dmd
-      | otherwise
-      -- NB: rhs_arity
-      -- See Note [Demand signatures are computed for a threshold demand based on idArity]
-      = mkRhsDmd env rhs_arity rhs
-    (DmdType rhs_fv rhs_dmds rhs_div, rhs')
-                   = dmdAnal env rhs_dmd rhs
-    sig            = mkStrictSigForArity rhs_arity (DmdType sig_fv rhs_dmds rhs_div)
-    id'            = -- pprTrace "dmdAnalRhsLetDown" (ppr id <+> ppr sig) $
-                     setIdStrictness id sig
-        -- See Note [NOINLINE and strictness]
+    rhs_arity = idArity id
+    rhs_dmd -- See Note [Demand analysis for join points]
+            -- See Note [Invariants on join points] invariant 2b, in GHC.Core
+            --     rhs_arity matches the join arity of the join point
+            | isJoinId id
+            = mkCallDmds rhs_arity let_dmd
+            | otherwise
+            -- NB: rhs_arity
+            -- See Note [Demand signatures are computed for a threshold demand based on idArity]
+            = mkRhsDmd env rhs_arity rhs
 
+    (DmdType rhs_fv rhs_dmds rhs_div, rhs') = dmdAnal env rhs_dmd rhs
+    sig = mkStrictSigForArity rhs_arity (DmdType sig_fv rhs_dmds rhs_div)
 
     -- See Note [Aggregated demand for cardinality]
     rhs_fv1 = case rec_flag of
@@ -912,13 +824,151 @@ That motivated using a demand of C(C(C(S(L,L)))) for the RHS, where
 behaviour -- see #17932.   Happily it turns out now to be entirely
 unnecessary: we get good results with C(C(C(S))).   So I simply
 deleted the special case.
-
-************************************************************************
-*                                                                      *
-\subsection{Strictness signatures and types}
-*                                                                      *
-************************************************************************
 -}
+
+{- *********************************************************************
+*                                                                      *
+                      Fixpoints
+*                                                                      *
+********************************************************************* -}
+
+-- Recursive bindings
+dmdFix :: TopLevelFlag
+       -> AnalEnv                            -- Does not include bindings for this binding
+       -> CleanDemand
+       -> [(Id,CoreExpr)]
+       -> (AnalEnv, DmdEnv, [(Id,CoreExpr)]) -- Binders annotated with strictness info
+
+dmdFix top_lvl env let_dmd orig_pairs
+  = loop 1 initial_pairs
+  where
+    bndrs = map fst orig_pairs
+
+    -- See Note [Initialising strictness]
+    initial_pairs | ae_virgin env = [(setIdStrictness id botSig, rhs) | (id, rhs) <- orig_pairs ]
+                  | otherwise     = orig_pairs
+
+    -- If fixed-point iteration does not yield a result we use this instead
+    -- See Note [Safe abortion in the fixed-point iteration]
+    abort :: (AnalEnv, DmdEnv, [(Id,CoreExpr)])
+    abort = (env, lazy_fv', zapped_pairs)
+      where (lazy_fv, pairs') = step True (zapIdStrictness orig_pairs)
+            -- Note [Lazy and unleashable free variables]
+            non_lazy_fvs = plusVarEnvList $ map (strictSigDmdEnv . idStrictness . fst) pairs'
+            lazy_fv'     = lazy_fv `plusVarEnv` mapVarEnv (const topDmd) non_lazy_fvs
+            zapped_pairs = zapIdStrictness pairs'
+
+    -- The fixed-point varies the idStrictness field of the binders, and terminates if that
+    -- annotation does not change any more.
+    loop :: Int -> [(Id,CoreExpr)] -> (AnalEnv, DmdEnv, [(Id,CoreExpr)])
+    loop n pairs = -- pprTrace "dmdFix" (ppr n <+> vcat [ ppr id <+> ppr (idStrictness id)
+                   --                                     | (id,_)<- pairs]) $
+                   loop' n pairs
+
+    loop' n pairs
+      | found_fixpoint = (final_anal_env, lazy_fv, pairs')
+      | n == 10        = abort
+      | otherwise      = loop (n+1) pairs'
+      where
+        found_fixpoint    = map (idStrictness . fst) pairs' == map (idStrictness . fst) pairs
+        first_round       = n == 1
+        (lazy_fv, pairs') = step first_round pairs
+        final_anal_env    = extendAnalEnvs top_lvl env (map fst pairs')
+
+    step :: Bool -> [(Id, CoreExpr)] -> (DmdEnv, [(Id, CoreExpr)])
+    step first_round pairs = (lazy_fv, pairs')
+      where
+        -- In all but the first iteration, delete the virgin flag
+        start_env | first_round = env
+                  | otherwise   = nonVirgin env
+
+        start = (extendAnalEnvs top_lvl start_env (map fst pairs), emptyDmdEnv)
+
+        ((_,lazy_fv), pairs') = mapAccumL my_downRhs start pairs
+                -- mapAccumL: Use the new signature to do the next pair
+                -- The occurrence analyser has arranged them in a good order
+                -- so this can significantly reduce the number of iterations needed
+
+        my_downRhs (env, lazy_fv) (id,rhs)
+          = ((env', lazy_fv'), (id', rhs'))
+          where
+            (lazy_fv1, sig, rhs') = dmdAnalRhsLetDown (Just bndrs) env let_dmd id rhs
+            lazy_fv'              = plusVarEnv_C bothDmd lazy_fv lazy_fv1
+            env'                  = extendAnalEnv top_lvl env id sig
+            id'                   = setIdStrictness id sig
+
+    zapIdStrictness :: [(Id, CoreExpr)] -> [(Id, CoreExpr)]
+    zapIdStrictness pairs = [(setIdStrictness id nopSig, rhs) | (id, rhs) <- pairs ]
+
+{- Note [Safe abortion in the fixed-point iteration]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Fixed-point iteration may fail to terminate. But we cannot simply give up and
+return the environment and code unchanged! We still need to do one additional
+round, for two reasons:
+
+ * To get information on used free variables (both lazy and strict!)
+   (see Note [Lazy and unleashable free variables])
+ * To ensure that all expressions have been traversed at least once, and any left-over
+   strictness annotations have been updated.
+
+This final iteration does not add the variables to the strictness signature
+environment, which effectively assigns them 'nopSig' (see "getStrictness")
+
+Note [Trimming a demand to a type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There are two reasons we sometimes trim a demand to match a type.
+  1. GADTs
+  2. Recursive products and widening
+
+More on both below.  But the botttom line is: we really don't want to
+have a binder whose demand is more deeply-nested than its type
+"allows". So in findBndrDmd we call trimToType and findTypeShape to
+trim the demand on the binder to a form that matches the type
+
+Now to the reasons. For (1) consider
+  f :: a -> Bool
+  f x = case ... of
+          A g1 -> case (x |> g1) of (p,q) -> ...
+          B    -> error "urk"
+
+where A,B are the constructors of a GADT.  We'll get a U(U,U) demand
+on x from the A branch, but that's a stupid demand for x itself, which
+has type 'a'. Indeed we get ASSERTs going off (notably in
+splitUseProdDmd, #8569).
+
+For (2) consider
+  data T = MkT Int T    -- A recursive product
+  f :: Int -> T -> Int
+  f 0 _         = 0
+  f _ (MkT n t) = f n t
+
+Here f is lazy in T, but its *usage* is infinite: U(U,U(U,U(U, ...))).
+Notice that this happens becuase T is a product type, and is recrusive.
+If we are not careful, we'll fail to iterate to a fixpoint in dmdFix,
+and bale out entirely, which is inefficient and over-conservative.
+
+Worse, as we discovered in #18304, the size of the usages we compute
+can grow /exponentially/, so even 10 iterations costs far too much.
+Especially since we then discard the result.
+
+To avoid this we use the same findTypeShape function as for (1), but
+arrange that it trims the demand if it encounters the same type constructor
+twice (or three times, etc).  We use our standard RecTcChecker mechanism
+for this -- see GHC.Core.Opt.WorkWrap.Utils.findTypeShape.
+
+This is usually call "widening".  We could do it just in dmdFix, but
+since are doing this findTypeShape business /anyway/ because of (1),
+and it has all the right information to hand, it's extremely
+convenient to do it there.
+
+-}
+
+{- *********************************************************************
+*                                                                      *
+                 Strictness signatures and types
+*                                                                      *
+********************************************************************* -}
 
 unitDmdType :: DmdEnv -> DmdType
 unitDmdType dmd_env = DmdType dmd_env [] topDiv
@@ -1133,7 +1183,6 @@ data AnalEnv
        , ae_sigs   :: SigEnv
        , ae_virgin :: Bool    -- True on first iteration only
                               -- See Note [Initialising strictness]
-       , ae_rec_tc :: RecTcChecker
        , ae_fam_envs :: FamInstEnvs
  }
 
@@ -1157,7 +1206,6 @@ emptyAnalEnv dflags fam_envs
     = AE { ae_dflags = dflags
          , ae_sigs = emptySigEnv
          , ae_virgin = True
-         , ae_rec_tc = initRecTc
          , ae_fam_envs = fam_envs
          }
 
@@ -1199,7 +1247,7 @@ findBndrsDmds env dmd_ty bndrs
       | otherwise = go dmd_ty bs
 
 findBndrDmd :: AnalEnv -> Bool -> DmdType -> Id -> (DmdType, Demand)
--- See Note [Trimming a demand to a type] in GHC.Types.Demand
+-- See Note [Trimming a demand to a type]
 findBndrDmd env arg_of_dfun dmd_ty id
   = (dmd_ty', dmd')
   where
