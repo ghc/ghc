@@ -191,13 +191,22 @@ foreign import WINDOWS_CCONV "WideCharToMultiByte"
 -- TODO: GHC is internally UTF-32 which means we have re-encode for
 --       Windows which is annoying. Switch to UTF-16 on IoNative
 --       being default.
-withUTF16ToGhcInternal :: Ptr Word8 -> Int
-                       -> (CInt -> Ptr Word16 -> IO CInt) -> IO Int
+
+-- | Decode a UTF16 buffer into the given buffer in the current code page.
+-- The source UTF16 buffer is filled by the function given as argument.
+withUTF16ToGhcInternal :: Ptr Word8 -- Buffer to store the encoded string in.
+                       -> Int       -- Length of the buffer
+                       -- Function to fill source buffer.
+                       ->  ( CInt       -- Size of available buffer in bytes
+                          -> Ptr Word16 -- Temporary source buffer.
+                          -> IO CInt    -- Actual length of buffer content.
+                           )
+                       -> IO Int    -- Returns number of bytes stored in buffer.
 withUTF16ToGhcInternal ptr len fn
  = do cp <- getCurrentCodePage
       -- Annoyingly the IO system is very UTF-32 oriented and asks for bytes
       -- as buffer reads.  Problem is we don't know how many bytes we'll end up
-      -- having as UTF-32 MultiByte encoded UTF-16. So be conservative.  We
+      -- having as UTF-32 MultiByte encoded UTF-16. So be conservative.  We assume
       -- that a single byte may expand to atmost 1 Word16.  So assume that each
       -- byte does and divide the requested number of bytes by two since each
       -- Word16 encoded wchar may expand to only two Word8 sequences.
@@ -206,6 +215,7 @@ withUTF16ToGhcInternal ptr len fn
         w_len <- fn (fromIntegral reqBytes) w_ptr
         if w_len == 0
            then return 0 else do
+                -- Get required length of encoding
                 mbchars' <- failIfZero "withUTF16ToGhcInternal" $
                               wideCharToMultiByte' cp 0 w_ptr
                                                   (fromIntegral w_len) nullPtr
