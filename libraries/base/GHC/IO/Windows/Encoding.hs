@@ -48,51 +48,40 @@ import GHC.Real
 encodeMultiByte :: CodePage -> String -> String
 encodeMultiByte cp = unsafeLocalState . encodeMultiByteIO cp
 
+{-# INLINE encodeMultiByteIO' #-}
+-- | String must not be zero length.
+encodeMultiByteIO' :: CodePage -> String -> ((LPCSTR, CInt) -> IO a) -> IO a
+encodeMultiByteIO' cp wstr transformer =
+  withCWStringLen wstr $ \(cwstr,len) -> do
+    mbchars' <- failIfZero "WideCharToMultiByte" $ wideCharToMultiByte
+                cp
+                0
+                cwstr
+                (fromIntegral len)
+                nullPtr 0
+                nullPtr nullPtr
+    -- mbchar' is the length of buffer required
+    allocaArray (fromIntegral mbchars') $ \mbstr -> do
+      mbchars <- failIfZero "WideCharToMultiByte" $ wideCharToMultiByte
+                 cp
+                 0
+                 cwstr
+                 (fromIntegral len)
+                 mbstr mbchars'
+                 nullPtr nullPtr
+      transformer (mbstr,fromIntegral mbchars)
+
+-- converts [Char] to UTF-16
 encodeMultiByteIO :: CodePage -> String -> IO String
 encodeMultiByteIO _ "" = return ""
-  -- WideCharToMultiByte doesn't handle empty strings
-encodeMultiByteIO cp wstr =
-  withCWStringLen wstr $ \(cwstr,len) -> do
-    mbchars' <- failIfZero "WideCharToMultiByte" $ wideCharToMultiByte
-                cp
-                0
-                cwstr
-                (fromIntegral len)
-                nullPtr 0
-                nullPtr nullPtr
-    -- mbchar' is the length of buffer required
-    allocaArray (fromIntegral mbchars') $ \mbstr -> do
-      mbchars <- failIfZero "WideCharToMultiByte" $ wideCharToMultiByte
-                 cp
-                 0
-                 cwstr
-                 (fromIntegral len)
-                 mbstr mbchars'
-                 nullPtr nullPtr
-      peekCAStringLen (mbstr,fromIntegral mbchars)  -- converts [Char] to UTF-16
+encodeMultiByteIO cp s = encodeMultiByteIO' cp s toString
+  where toString (s,l) = peekCAStringLen (s,fromIntegral l)
 
+-- converts [Char] to UTF-16
 encodeMultiByteRawIO :: CodePage -> String -> IO (LPCSTR, CInt)
 encodeMultiByteRawIO _ "" = return (nullPtr, 0)
-  -- WideCharToMultiByte doesn't handle empty strings
-encodeMultiByteRawIO cp wstr =
-  withCWStringLen wstr $ \(cwstr,len) -> do
-    mbchars' <- failIfZero "WideCharToMultiByte" $ wideCharToMultiByte
-                cp
-                0
-                cwstr
-                (fromIntegral len)
-                nullPtr 0
-                nullPtr nullPtr
-    -- mbchar' is the length of buffer required
-    allocaArray (fromIntegral mbchars') $ \mbstr -> do
-      mbchars <- failIfZero "WideCharToMultiByte" $ wideCharToMultiByte
-                 cp
-                 0
-                 cwstr
-                 (fromIntegral len)
-                 mbstr mbchars'
-                 nullPtr nullPtr
-      return (mbstr,fromIntegral mbchars)  -- converts [Char] to UTF-16
+encodeMultiByteRawIO cp s = encodeMultiByteIO' cp s toSizedCString
+  where toSizedCString (s,l) = return (s, fromIntegral l)
 
 foreign import WINDOWS_CCONV "WideCharToMultiByte"
   wideCharToMultiByte
