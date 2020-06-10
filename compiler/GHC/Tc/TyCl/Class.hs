@@ -149,16 +149,16 @@ tcClassSigs clas sigs def_methods
        ; traceTc "tcClassSigs 2" (ppr clas)
        ; return op_info }
   where
-    vanilla_sigs :: [Located ([ApiAnnName Name], LHsSigType GhcRn)] -- AZ temp
+    vanilla_sigs :: [Located ([LocatedN Name], LHsSigType GhcRn)] -- AZ temp
     vanilla_sigs = [L loc (nm,ty) | L loc (ClassOpSig _ False nm ty) <- sigs]
-    gen_sigs :: [Located ([ApiAnnName Name], LHsSigType GhcRn)] -- AZ temp
+    gen_sigs :: [Located ([LocatedN Name], LHsSigType GhcRn)] -- AZ temp
     gen_sigs     = [L loc (nm,ty) | L loc (ClassOpSig _ True  nm ty) <- sigs]
     dm_bind_names :: [Name] -- These ones have a value binding in the class decl
-    dm_bind_names = [op | L _ (FunBind {fun_id = N _ op}) <- bagToList def_methods]
+    dm_bind_names = [op | L _ (FunBind {fun_id = L _ op}) <- bagToList def_methods]
 
     skol_info = TyConSkol ClassFlavour clas
 
-    tc_sig :: NameEnv (SrcSpan, Type) -> ([ApiAnnName Name], LHsSigType GhcRn)
+    tc_sig :: NameEnv (SrcSpan, Type) -> ([LocatedN Name], LHsSigType GhcRn)
            -> TcM [TcMethInfo]
     tc_sig gen_dm_env (op_names, op_hs_ty)
       = do { traceTc "ClsSig 1" (ppr op_names)
@@ -166,18 +166,18 @@ tcClassSigs clas sigs def_methods
                    -- Class tyvars already in scope
 
            ; traceTc "ClsSig 2" (ppr op_names)
-           ; return [ (op_name, op_ty, f op_name) | N _ op_name <- op_names ] }
+           ; return [ (op_name, op_ty, f op_name) | L _ op_name <- op_names ] }
            where
              f nm | Just lty <- lookupNameEnv gen_dm_env nm = Just (GenericDM lty)
                   | nm `elem` dm_bind_names                 = Just VanillaDM
                   | otherwise                               = Nothing
 
-    tc_gen_sig :: ([ApiAnnName Name], LHsSigType GhcRn)
+    tc_gen_sig :: ([LocatedN Name], LHsSigType GhcRn)
                       -> IOEnv (Env TcGblEnv TcLclEnv) [(Name, (SrcSpan, Type))] -- AZ temp
     tc_gen_sig (op_names, gen_hs_ty)
       = do { gen_op_ty <- tcClassSigType skol_info op_names gen_hs_ty
            ; return [ (op_name, (locA loc, gen_op_ty))
-                                                 | N loc op_name <- op_names ] }
+                                                 | L loc op_name <- op_names ] }
 
 {-
 ************************************************************************
@@ -193,7 +193,7 @@ tcClassDecl2 :: LTyClDecl GhcRn          -- The class declaration
 tcClassDecl2 (L _ (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
                                 tcdMeths = default_binds}))
   = recoverM (return emptyLHsBinds) $
-    setSrcSpan (getLocN class_name) $
+    setSrcSpan (getLocA class_name) $
     do  { clas <- tcLookupLocatedClass (n2l class_name)
 
         -- We make a separate binding for each default method.
@@ -276,7 +276,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
 
              local_dm_ty = instantiateMethod clas global_dm_id (mkTyVarTys tyvars)
 
-             lm_bind     = dm_bind { fun_id = N (la2na bind_loc) local_dm_name }
+             lm_bind     = dm_bind { fun_id = L (la2na bind_loc) local_dm_name }
                              -- Substitute the local_meth_name for the binder
                              -- NB: the binding is always a FunBind
 
@@ -372,7 +372,7 @@ mkHsSigFun sigs = lookupNameEnv env
   where
     env = mkHsSigEnv get_classop_sig sigs
 
-    get_classop_sig :: LSig GhcRn -> Maybe ([ApiAnnName Name], LHsSigType GhcRn)
+    get_classop_sig :: LSig GhcRn -> Maybe ([LocatedN Name], LHsSigType GhcRn)
     get_classop_sig  (L _ (ClassOpSig _ _ ns hs_ty)) = Just (ns, hs_ty)
     get_classop_sig  _                               = Nothing
 
@@ -389,7 +389,7 @@ findMethodBind sel_name binds prag_fn
   where
     prags    = lookupPragEnv prag_fn sel_name
 
-    f bind@(L _ (FunBind { fun_id = N bndr_loc op_name }))
+    f bind@(L _ (FunBind { fun_id = L bndr_loc op_name }))
       | op_name == sel_name
              = Just (bind, locA bndr_loc, prags)
     f _other = Nothing
@@ -399,7 +399,7 @@ findMinimalDef :: [LSig GhcRn] -> Maybe ClassMinimalDef
 findMinimalDef = firstJusts . map toMinimalDef
   where
     toMinimalDef :: LSig GhcRn -> Maybe ClassMinimalDef
-    toMinimalDef (L _ (MinimalSig _ _ (L _ bf))) = Just (fmap unApiName bf)
+    toMinimalDef (L _ (MinimalSig _ _ (L _ bf))) = Just (fmap unLoc bf)
     toMinimalDef _                               = Nothing
 
 {-
@@ -521,7 +521,7 @@ tcATDefault loc inst_subst defined_ats (ATI fam_tc defs)
              (tv', cv') = partition isTyVar tcv'
              tvs'     = scopedSort tv'
              cvs'     = scopedSort cv'
-       ; rep_tc_name <- newFamInstTyConName (N (noAnnApiName loc) (tyConName fam_tc)) pat_tys'
+       ; rep_tc_name <- newFamInstTyConName (L (noAnnSrcSpan loc) (tyConName fam_tc)) pat_tys'
        ; let axiom = mkSingleCoAxiom Nominal rep_tc_name tvs' [] cvs'
                                      fam_tc pat_tys' rhs'
            -- NB: no validity check. We check validity of default instances

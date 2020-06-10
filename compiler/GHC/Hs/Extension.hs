@@ -265,6 +265,7 @@ comment loc cs = ApiAnn loc NoApiAnns cs
 type LocatedA = GenLocated SrcSpanAnn
 type LocatedL = GenLocated SrcSpanAnnL
 type LocatedC = GenLocated SrcSpanAnnC
+type LocatedN = GenLocated SrcSpanAnnName
 
 type LocatedAn an = GenLocated (SrcSpanAnn' (ApiAnn' an))
 
@@ -282,9 +283,26 @@ instance (Outputable a) => Outputable (SrcSpanAnn' a) where
 instance Outputable AnnListItem where
   ppr (AnnListItem ts) = text "AnnListItem" <+> ppr ts
 
+instance Outputable NameAdornment where
+  ppr NameParens     = text "NameParens"
+  ppr NameParensHash = text "NameParensHash"
+  ppr NameBackquotes = text "NameBackquotes"
+  ppr NameSquare     = text "NameSquare"
+
+instance Outputable NameAnn where
+  ppr (NameAnn a o n c t)
+    = text "NameAnn" <+> ppr a <+> ppr o <+> ppr n <+> ppr c <+> ppr t
+  ppr (NameAnnCommas a o n c t)
+    = text "NameAnnCommas" <+> ppr a <+> ppr o <+> ppr n <+> ppr c <+> ppr t
+  ppr (NameAnnOnly a o c t)
+    = text "NameAnnOnly" <+> ppr a <+> ppr o <+> ppr c <+> ppr t
+  ppr (NameAnnRArrow n t)
+    = text "NameAnnRArrow" <+> ppr n <+> ppr t
+  ppr (NameAnnTrailing t)
+    = text "NameAnnTrailing" <+> ppr t
+
 instance Outputable AnnList where
   ppr (AnnList o c r) = text "AnnList" <+> ppr o <+> ppr c <+> ppr r
-
 -- sortLocatedA :: [LocatedA a] -> [LocatedA a]
 sortLocatedA :: [GenLocated (SrcSpanAnn' a) e] -> [GenLocated (SrcSpanAnn' a) e]
 sortLocatedA = sortBy (leftmost_smallest `on` getLocA)
@@ -419,46 +437,19 @@ addTrailingComma' :: NameAnn -> RealSrcSpan -> NameAnn
 addTrailingComma' n l = n { nann_trailing = AddApiAnn AnnComma l : nann_trailing n }
 
 
-noAnnName :: SrcSpanAnnName
--- noAnnName = noSrcSpanA
-noAnnName = SrcSpanAnn ApiAnnNotUsed noSrcSpan
-
--- AZ: this can go back to being a GenLocated thing
-data ApiAnnName a = N SrcSpanAnnName a
-        deriving (Eq, Data, Functor, Foldable, Traversable)
-
-unApiName :: ApiAnnName a -> a
-unApiName (N _ a) = a
-
-noApiName :: a -> ApiAnnName a
-noApiName a = N noAnnName a
-
-getLocN :: ApiAnnName a -> SrcSpan
-getLocN (N (SrcSpanAnn _ l) _) = l
-
-getNA :: ApiAnnName a -> SrcSpanAnnName
-getNA (N a _) = a
-
-reLocN :: ApiAnnName a -> Located a
-reLocN (N (SrcSpanAnn _ l) a) = L l a
-
-noAnnApiName :: SrcSpan -> SrcSpanAnnName
-noAnnApiName l = SrcSpanAnn ApiAnnNotUsed l
-
 -- |Helper function (temporary) during transition of names
 --  Discards any annotations
--- l2n :: LocatedA a -> ApiAnnName a
-l2n :: GenLocated (SrcSpanAnn' a1) a2 -> ApiAnnName a2
-l2n (L la a) = N (noAnnApiName (locA la)) a
+l2n :: GenLocated (SrcSpanAnn' a1) a2 -> LocatedN a2
+l2n (L la a) = L (noAnnSrcSpan (locA la)) a
 
-n2l :: ApiAnnName a -> LocatedA a
-n2l (N la a) = L (na2la la) a
+n2l :: LocatedN a -> LocatedA a
+n2l (L la a) = L (na2la la) a
 
 -- |Helper function (temporary) during transition of names
 --  Discards any annotations
 -- la2na :: SrcSpanAnn -> SrcSpanAnnName
 la2na :: SrcSpanAnn' a -> SrcSpanAnnName
-la2na l = noAnnApiName (locA l)
+la2na l = noAnnSrcSpan (locA l)
 
 -- l2l :: SrcSpanAnn' a -> SrcSpanAnn' b
 l2l :: SrcSpanAnn' a -> SrcSpanAnn' (ApiAnn' ann)
@@ -469,20 +460,6 @@ l2l l = noAnnSrcSpan (locA l)
 -- na2la :: SrcSpanAnnName -> SrcSpanAnn
 na2la :: SrcSpanAnn' a -> SrcSpanAnn' (ApiAnn' ann)
 na2la l = noAnnSrcSpan (locA l)
-
-mapLocN :: (a -> b) -> ApiAnnName a -> ApiAnnName b
-mapLocN f (N l a) = N l (f a)
-
--- | Tests whether the two located things are equal
-eqApiAnnNamed :: Eq a => ApiAnnName a -> ApiAnnName a -> Bool
-eqApiAnnNamed a b = unApiName a == unApiName b
-
--- | Tests the ordering of the two located things
-cmpApiAnnNamed :: Ord a => ApiAnnName a -> ApiAnnName a -> Ordering
-cmpApiAnnNamed a b = unApiName a `compare` unApiName b
-
-instance (Outputable e) => Outputable (ApiAnnName e) where
-  ppr (N _ e) = ppr e
 
 -- ---------------------------------------------------------------------
 
@@ -525,6 +502,12 @@ reLoc (L (SrcSpanAnn _ l) a) = L l a
 -- reLocA :: Located a -> LocatedA a
 reLocA :: GenLocated SrcSpan e -> GenLocated (SrcSpanAnn' (ApiAnn' ann)) e
 reLocA (L l a) = (L (SrcSpanAnn ApiAnnNotUsed l) a)
+
+reLocL :: LocatedN e -> LocatedA e
+reLocL (L l a) = (L (na2la l) a)
+
+reLocN :: LocatedN a -> Located a
+reLocN (L (SrcSpanAnn _ l) a) = L l a
 
 noAnn :: ApiAnn' a
 noAnn = ApiAnnNotUsed

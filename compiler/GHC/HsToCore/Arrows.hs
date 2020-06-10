@@ -1244,11 +1244,11 @@ collectl :: LPat GhcTc -> [Id] -> [Id]
 collectl (L _ pat) bndrs
   = go pat
   where
-    go (VarPat _ (N _ var))       = var : bndrs
+    go (VarPat _ (L _ var))       = var : bndrs
     go (WildPat _)                = bndrs
     go (LazyPat _ pat)            = collectl pat bndrs
     go (BangPat _ pat)            = collectl pat bndrs
-    go (AsPat _ (N _ a) pat)      = a : collectl pat bndrs
+    go (AsPat _ (L _ a) pat)      = a : collectl pat bndrs
     go (ParPat _ pat)             = collectl pat bndrs
 
     go (ListPat _ pats)           = foldr collectl bndrs pats

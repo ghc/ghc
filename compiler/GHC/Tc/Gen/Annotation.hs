@@ -61,8 +61,8 @@ tcAnnotation (L loc ann@(HsAnnotation _ _ provenance expr)) = do
 
 annProvenanceToTarget :: Module -> AnnProvenance Name
                       -> AnnTarget Name
-annProvenanceToTarget _   (ValueAnnProvenance (N _ name)) = NamedTarget name
-annProvenanceToTarget _   (TypeAnnProvenance (N _ name))  = NamedTarget name
+annProvenanceToTarget _   (ValueAnnProvenance (L _ name)) = NamedTarget name
+annProvenanceToTarget _   (TypeAnnProvenance (L _ name))  = NamedTarget name
 annProvenanceToTarget mod ModuleAnnProvenance             = ModuleTarget mod
 
 annCtxt :: (OutputableBndrId p) => AnnDecl (GhcPass p) -> SDoc

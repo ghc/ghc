@@ -861,7 +861,7 @@ mkOneRecordSelector all_cons idDetails fl
   where
     loc      = getSrcSpan sel_name
     loc'     = noAnnSrcSpan loc
-    loc''    = noAnnApiName loc
+    loc''    = noAnnSrcSpan loc
     lbl      = flLabel fl
     sel_name = flSelector fl
 
@@ -896,18 +896,18 @@ mkOneRecordSelector all_cons idDetails fl
              | otherwise =  map mk_match cons_w_field ++ deflt
     mk_match con = mkSimpleMatch (mkPrefixFunRhs sel_lname)
                                  [L loc' (mk_sel_pat con)]
-                                 (L loc' (HsVar noExtField (N loc'' field_var)))
-    mk_sel_pat con = ConPat NoExtField (N loc'' (getName con)) (RecCon rec_fields)
+                                 (L loc' (HsVar noExtField (L loc'' field_var)))
+    mk_sel_pat con = ConPat NoExtField (L loc'' (getName con)) (RecCon rec_fields)
     rec_fields = HsRecFields { rec_flds = [rec_field], rec_dotdot = Nothing }
     rec_field  = noLocA (HsRecField
                         { hsRecFieldAnn = noAnn
                         , hsRecFieldLbl
                            = L loc (FieldOcc sel_name
-                                     (N loc'' $ mkVarUnqual lbl))
+                                     (L loc'' $ mkVarUnqual lbl))
                         , hsRecFieldArg
-                           = L loc' (VarPat noExtField (N loc'' field_var))
+                           = L loc' (VarPat noExtField (L loc'' field_var))
                         , hsRecPun = False })
-    sel_lname = N loc'' sel_name
+    sel_lname = L loc'' sel_name
     field_var = mkInternalName (mkBuiltinUnique 1) (getOccName sel_name) loc
 
     -- Add catch-all default case unless the case is exhaustive
@@ -917,7 +917,7 @@ mkOneRecordSelector all_cons idDetails fl
           | otherwise = [mkSimpleMatch CaseAlt
                             [L loc' (WildPat noExtField)]
                             (mkHsApp (L loc' (HsVar noExtField
-                                         (N loc'' (getName rEC_SEL_ERROR_ID))))
+                                         (L loc'' (getName rEC_SEL_ERROR_ID))))
                                      (L loc' (HsLit noComments msg_lit)))]
 
         -- Do not add a default case unless there are unmatched

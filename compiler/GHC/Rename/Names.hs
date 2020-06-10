@@ -714,17 +714,17 @@ getLocalNonValBinders fixity_env
   where
     ValBinds _ _val_binds val_sigs = binds
 
-    for_hs_bndrs :: [ApiAnnName RdrName]
+    for_hs_bndrs :: [LocatedN RdrName]
     for_hs_bndrs = hsForeignDeclsBinders foreign_decls
 
     -- In a hs-boot file, the value binders come from the
     --  *signatures*, and there should be no foreign binders
-    hs_boot_sig_bndrs = [ N (noAnnApiName decl_loc) (unApiName n)
+    hs_boot_sig_bndrs = [ L (noAnnSrcSpan decl_loc) (unLoc n)
                         | L decl_loc (TypeSig _ ns _) <- val_sigs, n <- ns]
 
       -- the SrcSpan attached to the input should be the span of the
       -- declaration, not just the name
-    new_simple :: ApiAnnName RdrName -> RnM AvailInfo
+    new_simple :: LocatedN RdrName -> RnM AvailInfo
     new_simple rdr_name = do{ nm <- newTopSrcBinder rdr_name
                             ; return (avail nm) }
 
@@ -747,7 +747,7 @@ getLocalNonValBinders fixity_env
                -> [(Name, [FieldLabel])]
     mk_fld_env d names flds = concatMap find_con_flds (dd_cons d)
       where
-        find_con_flds (L _ (ConDeclH98 { con_name = N _ rdr
+        find_con_flds (L _ (ConDeclH98 { con_name = L _ rdr
                                        , con_args = RecCon cdflds }))
             = [( find_con_name rdr
                , concatMap find_con_decl_flds (unLoc cdflds) )]
@@ -755,7 +755,7 @@ getLocalNonValBinders fixity_env
                                         , con_args = RecCon flds }))
             = [ ( find_con_name rdr
                  , concatMap find_con_decl_flds (unLoc flds))
-              | N _ rdr <- rdrs ]
+              | L _ rdr <- rdrs ]
 
         find_con_flds _ = []
 
@@ -765,7 +765,7 @@ getLocalNonValBinders fixity_env
         find_con_decl_flds (L _ x)
           = map find_con_decl_fld (cd_fld_names x)
 
-        find_con_decl_fld  (L _ (FieldOcc _ (N _ rdr)))
+        find_con_decl_fld  (L _ (FieldOcc _ (L _ rdr)))
           = expectJust "getLocalNonValBinders/find_con_decl_fld" $
               find (\ fl -> flLabel fl == lbl) flds
           where lbl = occNameFS (rdrNameOcc rdr)
@@ -793,7 +793,7 @@ getLocalNonValBinders fixity_env
            -- be Nothing.
            mb_cls_nm <- runMaybeT $ do
              -- See (1) above
-             N loc cls_rdr <- MaybeT $ pure $ getLHsInstDeclClass_maybe inst_ty
+             L loc cls_rdr <- MaybeT $ pure $ getLHsInstDeclClass_maybe inst_ty
              -- See (2) above
              MaybeT $ setSrcSpan (locA loc) $ lookupGlobalOccRn_maybe cls_rdr
            -- Assuming the previous step succeeded, process any associated data
@@ -813,7 +813,7 @@ getLocalNonValBinders fixity_env
              ; let (bndrs, flds) = hsDataFamInstBinders dfid
              ; sub_names <- mapM (newTopSrcBinder . l2n) bndrs
              ; flds' <- mapM (newRecordSelector overload_ok sub_names) flds
-             ; let avail    = AvailTC (unApiName main_name) sub_names flds'
+             ; let avail    = AvailTC (unLoc main_name) sub_names flds'
                                   -- main_name is not bound here!
                    fld_env  = mk_fld_env (feqn_rhs ti_decl) sub_names flds'
              ; return (avail, fld_env) }
@@ -824,8 +824,8 @@ getLocalNonValBinders fixity_env
 
 newRecordSelector :: Bool -> [Name] -> LFieldOcc GhcPs -> RnM FieldLabel
 newRecordSelector _ [] _ = error "newRecordSelector: datatype has no constructors!"
-newRecordSelector overload_ok (dc:_) (L _ (FieldOcc _ (N loc fld)))
-  = do { selName <- newTopSrcBinder $ N loc $ field
+newRecordSelector overload_ok (dc:_) (L _ (FieldOcc _ (L loc fld)))
+  = do { selName <- newTopSrcBinder $ L loc $ field
        ; return $ qualFieldLbl { flSelector = selName } }
   where
     fieldOccName = occNameFS $ rdrNameOcc fld
@@ -1645,14 +1645,14 @@ printMinimalImports imports_w_usage
 
 to_ie_post_rn_var :: (HasOccName name) => LocatedA name -> LIEWrappedName name
 to_ie_post_rn_var (L l n)
-  | isDataOcc $ occName n = L (locA l) (IEPattern (N (la2na l) n))
-  | otherwise             = L (locA l) (IEName    (N (la2na l) n))
+  | isDataOcc $ occName n = L (locA l) (IEPattern (L (la2na l) n))
+  | otherwise             = L (locA l) (IEName    (L (la2na l) n))
 
 
 to_ie_post_rn :: (HasOccName name) => LocatedA name -> LIEWrappedName name
 to_ie_post_rn (L l n)
-  | isTcOcc occ && isSymOcc occ = L (locA l) (IEType (N (la2na l) n))
-  | otherwise                   = L (locA l) (IEName (N (la2na l) n))
+  | isTcOcc occ && isSymOcc occ = L (locA l) (IEType (L (la2na l) n))
+  | otherwise                   = L (locA l) (IEName (L (la2na l) n))
   where occ = occName n
 
 {-
@@ -1776,7 +1776,7 @@ dodgyMsgInsert :: forall p . IdP (GhcPass p) -> IE (GhcPass p)
 dodgyMsgInsert tc = IEThingAll noAnn ii
   where
     ii :: LIEWrappedName (IdP (GhcPass p))
-    ii = noLoc (IEName $ noApiName tc)
+    ii = noLoc (IEName $ noLocA tc)
 
 
 addDupDeclErr :: [GlobalRdrElt] -> TcRn ()

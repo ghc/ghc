@@ -82,12 +82,12 @@ is used in error messages.  It checks that all the equations have the
 same number of arguments before using @tcMatches@ to do the work.
 -}
 
-tcMatchesFun :: ApiAnnName Name
+tcMatchesFun :: LocatedN Name
              -> MatchGroup GhcRn (LHsExpr GhcRn)
              -> ExpRhoType    -- Expected type of function
              -> TcM (HsWrapper, MatchGroup GhcTcId (LHsExpr GhcTcId))
                                 -- Returns type of body
-tcMatchesFun fn@(N _ fun_name) matches exp_ty
+tcMatchesFun fn@(L _ fun_name) matches exp_ty
   = do  {  -- Check that they all have the same no of arguments
            -- Location is in the monad, set the caller so that
            -- any inter-equation error messages get some vaguely

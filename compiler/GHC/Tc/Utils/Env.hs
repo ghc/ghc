@@ -295,7 +295,7 @@ tcLookupLocatedGlobalId = addLocMA tcLookupId
 tcLookupLocatedClass :: LocatedA Name -> TcM Class
 tcLookupLocatedClass = addLocMA tcLookupClass
 
-tcLookupLocatedTyCon :: ApiAnnName Name -> TcM TyCon
+tcLookupLocatedTyCon :: LocatedN Name -> TcM TyCon
 tcLookupLocatedTyCon = addLocMN tcLookupTyCon
 
 -- Find the instance that exactly matches a type class application.  The class arguments must be precisely
@@ -690,14 +690,14 @@ tcAddDataFamConPlaceholders inst_decls thing_inside
     get_fi_cons :: DataFamInstDecl GhcRn -> [Name]
     get_fi_cons (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
                   FamEqn { feqn_rhs = HsDataDefn { dd_cons = cons } }}})
-      = map unApiName $ concatMap (getConNames . unLoc) cons
+      = map unLoc $ concatMap (getConNames . unLoc) cons
 
 
 tcAddPatSynPlaceholders :: [PatSynBind GhcRn GhcRn] -> TcM a -> TcM a
 -- See Note [Don't promote pattern synonyms]
 tcAddPatSynPlaceholders pat_syns thing_inside
   = tcExtendKindEnvList [ (name, APromotionErr PatSynPE)
-                        | PSB{ psb_id = N _ name } <- pat_syns ]
+                        | PSB{ psb_id = L _ name } <- pat_syns ]
        thing_inside
 
 getTypeSigNames :: [LSig GhcRn] -> NameSet
@@ -708,8 +708,8 @@ getTypeSigNames sigs
     get_type_sig :: LSig GhcRn -> NameSet -> NameSet
     get_type_sig sig ns =
       case sig of
-        L _ (TypeSig _ names _) -> extendNameSetList ns (map unApiName names)
-        L _ (PatSynSig _ names _) -> extendNameSetList ns (map unApiName names)
+        L _ (TypeSig _ names _) -> extendNameSetList ns (map unLoc names)
+        L _ (PatSynSig _ names _) -> extendNameSetList ns (map unLoc names)
         _ -> ns
 
 
@@ -981,11 +981,11 @@ newDFunName clas tys loc
         ; dfun_occ <- chooseUniqueOccTc (mkDFunOcc info_string is_boot)
         ; newGlobalBinder mod dfun_occ loc }
 
-newFamInstTyConName :: ApiAnnName Name -> [Type] -> TcM Name
-newFamInstTyConName (N loc name) tys = mk_fam_inst_name id (locA loc) name [tys]
+newFamInstTyConName :: LocatedN Name -> [Type] -> TcM Name
+newFamInstTyConName (L loc name) tys = mk_fam_inst_name id (locA loc) name [tys]
 
-newFamInstAxiomName :: ApiAnnName Name -> [[Type]] -> TcM Name
-newFamInstAxiomName (N loc name) branches
+newFamInstAxiomName :: LocatedN Name -> [[Type]] -> TcM Name
+newFamInstAxiomName (L loc name) branches
   = mk_fam_inst_name mkInstTyCoOcc (locA loc) name branches
 
 mk_fam_inst_name :: (OccName -> OccName) -> SrcSpan -> Name -> [[Type]] -> TcM Name

@@ -1778,11 +1778,12 @@ check_main dflags tcg_env explicit_mod_hdr export_ies
         { traceTc "checkMain found" (ppr main_mod <+> ppr main_fn)
         ; let loc       = srcLocSpan (getSrcLoc main_name)
         ; let loc'      = noAnnSrcSpan loc
+        ; let loc''     = noAnnSrcSpan loc
         ; ioTyCon <- tcLookupTyCon ioTyConName
         ; res_ty <- newFlexiTyVarTy liftedTypeKind
         ; let io_ty = mkTyConApp ioTyCon [res_ty]
               skol_info = SigSkol (FunSigCtxt main_name False) io_ty []
-              main_expr_rn = L loc (HsVar noExtField (L loc main_name))
+              main_expr_rn = L loc' (HsVar noExtField (L loc'' main_name))
         ; (ev_binds, main_expr)
                <- checkConstraints skol_info [] [] $
                   addErrCtxt mainCtxt    $
@@ -2175,14 +2176,14 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
                -- Don't try to typecheck if the renamer fails!
         ; ghciStep <- getGhciStepIO
         ; uniq <- newUnique
-        ; let loc' = noAnnApiName $ locA loc
+        ; let loc' = noAnnSrcSpan $ locA loc
         ; interPrintName <- getInteractivePrintName
         ; let fresh_it  = itName uniq (locA loc)
-              matches   = [mkMatch (mkPrefixFunRhs (N loc' fresh_it)) [] rn_expr
+              matches   = [mkMatch (mkPrefixFunRhs (L loc' fresh_it)) [] rn_expr
                                    (noLoc emptyLocalBinds)]
               -- [it = expr]
               the_bind  = L loc $ (mkTopFunBind FromSource
-                                     (N loc' fresh_it) matches)
+                                     (L loc' fresh_it) matches)
                                          { fun_ext = fvs }
               -- Care here!  In GHCi the expression might have
               -- free variables, and they in turn may have free type variables
@@ -2199,7 +2200,7 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
                                           { xbsrn_bindOp = mkRnSyntaxExpr bindIOName
                                           , xbsrn_failOp = Nothing
                                           })
-                                       (L loc (VarPat noExtField (N loc' fresh_it)))
+                                       (L loc (VarPat noExtField (L loc' fresh_it)))
                                        (nlHsApp ghciStep rn_expr)
 
               -- [; print it]
@@ -2733,10 +2734,10 @@ getModuleInterface hsc_env mod
   = runTcInteractive hsc_env $
     loadModuleInterface (text "getModuleInterface") mod
 
-tcRnLookupRdrName :: HscEnv -> ApiAnnName RdrName
+tcRnLookupRdrName :: HscEnv -> LocatedN RdrName
                   -> IO (Messages, Maybe [Name])
 -- ^ Find all the Names that this RdrName could mean, in GHCi
-tcRnLookupRdrName hsc_env (N loc rdr_name)
+tcRnLookupRdrName hsc_env (L loc rdr_name)
   = runTcInteractive hsc_env $
     setSrcSpanN loc          $
     do {   -- If the identifier is a constructor (begins with an

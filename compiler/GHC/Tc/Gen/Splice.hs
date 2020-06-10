@@ -764,7 +764,7 @@ runAnnotation target expr = do
               ; let loc' = noAnnSrcSpan loc
               ; let specialised_to_annotation_wrapper_expr
                       = L loc' (mkHsWrap wrapper
-                                 (HsVar noExtField (N (noAnnApiName loc) to_annotation_wrapper_id)))
+                                 (HsVar noExtField (L (noAnnSrcSpan loc) to_annotation_wrapper_id)))
               ; return (L loc' (HsApp noComments
                                 specialised_to_annotation_wrapper_expr expr'))
                                 })
@@ -1147,7 +1147,7 @@ instance TH.Quasi TcM where
         = return ()
       checkTopDecl (AnnD _ _)
         = return ()
-      checkTopDecl (ForD _ (ForeignImport { fd_name = N _ name }))
+      checkTopDecl (ForD _ (ForeignImport { fd_name = L _ name }))
         = bindName name
       checkTopDecl _
         = addErr $ text "Only function, value, annotation, and foreign import declarations may be added with addTopDecl"

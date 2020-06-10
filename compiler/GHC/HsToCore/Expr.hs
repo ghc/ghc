@@ -197,13 +197,13 @@ dsUnliftedBind (AbsBinds { abs_tvs = [], abs_ev_vars = []
        ; ds_binds <- dsTcEvBinds_s ev_binds
        ; return (mkCoreLets ds_binds body2) }
 
-dsUnliftedBind (FunBind { fun_id = N l fun
+dsUnliftedBind (FunBind { fun_id = L l fun
                         , fun_matches = matches
                         , fun_ext = co_fn
                         , fun_tick = tick }) body
                -- Can't be a bang pattern (that looks like a PatBind)
                -- so must be simply unboxed
-  = do { (args, rhs) <- matchWrapper (mkPrefixFunRhs (N l $ idName fun))
+  = do { (args, rhs) <- matchWrapper (mkPrefixFunRhs (L l $ idName fun))
                                      Nothing matches
        ; MASSERT( null args ) -- Functions aren't lifted
        ; MASSERT( isIdHsWrapper co_fn )
@@ -260,7 +260,7 @@ dsLExprNoLP (L loc e)
 dsExpr :: HsExpr GhcTc -> DsM CoreExpr
 dsExpr (HsPar _ e)            = dsLExpr e
 dsExpr (ExprWithTySig _ e _)  = dsLExpr e
-dsExpr (HsVar _ (N _ var))    = dsHsVar var
+dsExpr (HsVar _ (L _ var))    = dsHsVar var
 dsExpr (HsUnboundVar {})      = panic "dsExpr: HsUnboundVar" -- Typechecker eliminates them
 dsExpr (HsConLikeOut _ con)   = dsConLike con
 dsExpr (HsIPVar {})           = panic "dsExpr: HsIPVar"
@@ -276,7 +276,7 @@ dsExpr (HsOverLit _ lit)
 
 dsExpr hswrap@(XExpr (HsWrap co_fn e))
   = do { e' <- case e of
-                 HsVar _ (N _ var) -> return $ varToCoreExpr var
+                 HsVar _ (L _ var) -> return $ varToCoreExpr var
                  HsConLikeOut _ (RealDataCon dc) -> return $ varToCoreExpr (dataConWrapId dc)
                  XExpr (HsWrap _ _) -> pprPanic "dsExpr: HsWrap inside HsWrap" (ppr hswrap)
                  HsPar _ _ -> pprPanic "dsExpr: HsPar inside HsWrap" (ppr hswrap)
@@ -737,7 +737,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
 
                  req_wrap = dict_req_wrap <.> mkWpTyApps in_inst_tys
 
-                 pat = noLocA $ ConPat { pat_con = noApiName con
+                 pat = noLocA $ ConPat { pat_con = noLocA con
                                        , pat_args = PrefixCon $ map nlVarPat arg_ids
                                        , pat_con_ext = ConPatTc
                                          { cpt_tvs = ex_tvs
@@ -1205,7 +1205,7 @@ So, either way, we're good to reject.
 checkForcedEtaExpansion :: HsExpr GhcTc -> SDoc -> Type -> DsM ()
 checkForcedEtaExpansion expr expr_doc ty
   | Just var <- case expr of
-                  HsVar _ (N _ var)               -> Just var
+                  HsVar _ (L _ var)               -> Just var
                   HsConLikeOut _ (RealDataCon dc) -> Just (dataConWrapId dc)
                   _                               -> Nothing
   , let bad_tys = badUseOfLevPolyPrimop var ty

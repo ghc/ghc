@@ -87,7 +87,7 @@ tcPatSynDecl psb mb_sig
 recoverPSB :: PatSynBind GhcRn GhcRn
            -> TcM (LHsBinds GhcTc, TcGblEnv)
 -- See Note [Pattern synonym error recovery]
-recoverPSB (PSB { psb_id = N _ name
+recoverPSB (PSB { psb_id = L _ name
                 , psb_args = details })
  = do { matcher_name <- newImplicitBinder name mkMatcherOcc
       ; let placeholder = AConLike $ PatSynCon $
@@ -139,7 +139,7 @@ pattern.) But it'll do for now.
 
 tcInferPatSynDecl :: PatSynBind GhcRn GhcRn
                   -> TcM (LHsBinds GhcTc, TcGblEnv)
-tcInferPatSynDecl (PSB { psb_id = lname@(N _ name), psb_args = details
+tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
                        , psb_def = lpat, psb_dir = dir })
   = addPatSynCtxt lname $
     do { traceTc "tcInferPatSynDecl {" $ ppr name
@@ -343,7 +343,7 @@ is not very helpful, but at least we don't get a Lint error.
 tcCheckPatSynDecl :: PatSynBind GhcRn GhcRn
                   -> TcPatSynInfo
                   -> TcM (LHsBinds GhcTc, TcGblEnv)
-tcCheckPatSynDecl psb@PSB{ psb_id = lname@(N _ name), psb_args = details
+tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                          , psb_def = lpat, psb_dir = dir }
                   TPSI{ patsig_implicit_bndrs = implicit_bndrs
                       , patsig_univ_bndrs = explicit_univ_bndrs, patsig_prov = prov_theta
@@ -557,25 +557,25 @@ a pattern synonym.  What about the /building/ side?
   a bad idea.
 -}
 
-collectPatSynArgInfo :: HsPatSynDetails (ApiAnnName Name)
+collectPatSynArgInfo :: HsPatSynDetails (LocatedN Name)
                      -> ([Name], [Name], Bool)
 collectPatSynArgInfo details =
   case details of
-    PrefixCon names      -> (map unApiName names, [], False)
-    InfixCon name1 name2 -> (map unApiName [name1, name2], [], True)
+    PrefixCon names      -> (map unLoc names, [], False)
+    InfixCon name1 name2 -> (map unLoc [name1, name2], [], True)
     RecCon names         -> (vars, sels, False)
                          where
                             (vars, sels) = unzip (map splitRecordPatSyn names)
   where
-    splitRecordPatSyn :: RecordPatSynField (ApiAnnName Name)
+    splitRecordPatSyn :: RecordPatSynField (LocatedN Name)
                       -> (Name, Name)
     splitRecordPatSyn (RecordPatSynField
-                       { recordPatSynPatVar     = N _ patVar
-                       , recordPatSynSelectorId = N _ selId })
+                       { recordPatSynPatVar     = L _ patVar
+                       , recordPatSynSelectorId = L _ selId })
       = (patVar, selId)
 
-addPatSynCtxt :: ApiAnnName Name -> TcM a -> TcM a
-addPatSynCtxt (N loc name) thing_inside
+addPatSynCtxt :: LocatedN Name -> TcM a -> TcM a
+addPatSynCtxt (L loc name) thing_inside
   = setSrcSpanN loc $
     addErrCtxt (text "In the declaration for pattern synonym"
                 <+> quotes (ppr name)) $
@@ -590,7 +590,7 @@ wrongNumberOfParmsErr name decl_arity missing
 
 -------------------------
 -- Shared by both tcInferPatSyn and tcCheckPatSyn
-tc_patsyn_finish :: ApiAnnName Name   -- ^ PatSyn Name
+tc_patsyn_finish :: LocatedN Name   -- ^ PatSyn Name
                  -> HsPatSynDir GhcRn -- ^ PatSyn type (Uni/Bidir/ExplicitBidir)
                  -> Bool              -- ^ Whether infix
                  -> LPat GhcTc        -- ^ Pattern of the PatSyn
@@ -625,7 +625,7 @@ tc_patsyn_finish lname dir is_infix lpat'
              pat_ty     = tidyType  env2 pat_ty'
 
        ; traceTc "tc_patsyn_finish {" $
-           ppr (unApiName lname) $$ ppr (unLoc lpat') $$
+           ppr (unLoc lname) $$ ppr (unLoc lpat') $$
            ppr (univ_tvs, req_theta, req_ev_binds, req_dicts) $$
            ppr (ex_tvs, prov_theta, prov_dicts) $$
            ppr args $$
@@ -653,7 +653,7 @@ tc_patsyn_finish lname dir is_infix lpat'
 
 
        -- Make the PatSyn itself
-       ; let patSyn = mkPatSyn (unApiName lname) is_infix
+       ; let patSyn = mkPatSyn (unLoc lname) is_infix
                         (univ_tvs, req_theta)
                         (ex_tvs, prov_theta)
                         arg_tys
@@ -678,7 +678,7 @@ tc_patsyn_finish lname dir is_infix lpat'
 ************************************************************************
 -}
 
-tcPatSynMatcher :: ApiAnnName Name
+tcPatSynMatcher :: LocatedN Name
                 -> LPat GhcTc
                 -> ([TcTyVar], ThetaType, TcEvBinds, [EvVar])
                 -> ([TcTyVar], [TcType], ThetaType, [EvTerm])
@@ -686,7 +686,7 @@ tcPatSynMatcher :: ApiAnnName Name
                 -> TcType
                 -> TcM ((Id, Bool), LHsBinds GhcTc)
 -- See Note [Matchers and builders for pattern synonyms] in GHC.Core.PatSyn
-tcPatSynMatcher (N loc name) lpat
+tcPatSynMatcher (L loc name) lpat
                 (univ_tvs, req_theta, req_ev_binds, req_dicts)
                 (ex_tvs, ex_tys, prov_theta, prov_dicts)
                 (args, arg_tys) pat_ty
@@ -741,7 +741,7 @@ tcPatSynMatcher (N loc name) lpat
                        , mg_ext = MatchGroupTc [pat_ty, cont_ty, fail_ty] res_ty
                        , mg_origin = Generated
                        }
-             match = mkMatch (mkPrefixFunRhs (N loc name)) []
+             match = mkMatch (mkPrefixFunRhs (L loc name)) []
                              (mkHsLams (rr_tv:res_tv:univ_tvs)
                                        req_dicts body')
                              (noLoc (EmptyLocalBinds noExtField))
@@ -751,7 +751,7 @@ tcPatSynMatcher (N loc name) lpat
                     , mg_origin = Generated
                     }
 
-       ; let bind = FunBind{ fun_id = N loc matcher_id
+       ; let bind = FunBind{ fun_id = L loc matcher_id
                            , fun_matches = mg
                            , fun_ext = idHsWrapper
                            , fun_tick = [] }
@@ -782,12 +782,12 @@ isUnidirectional ExplicitBidirectional{} = False
 ************************************************************************
 -}
 
-mkPatSynBuilderId :: HsPatSynDir a -> ApiAnnName Name
+mkPatSynBuilderId :: HsPatSynDir a -> LocatedN Name
                   -> [InvisTVBinder] -> ThetaType
                   -> [InvisTVBinder] -> ThetaType
                   -> [Type] -> Type
                   -> TcM (Maybe (Id, Bool))
-mkPatSynBuilderId dir (N _ name)
+mkPatSynBuilderId dir (L _ name)
                   univ_bndrs req_theta ex_bndrs prov_theta
                   arg_tys pat_ty
   | isUnidirectional dir
@@ -813,7 +813,7 @@ mkPatSynBuilderId dir (N _ name)
 tcPatSynBuilderBind :: PatSynBind GhcRn GhcRn
                     -> TcM (LHsBinds GhcTc)
 -- See Note [Matchers and builders for pattern synonyms] in GHC.Core.PatSyn
-tcPatSynBuilderBind (PSB { psb_id = N loc name
+tcPatSynBuilderBind (PSB { psb_id = L loc name
                          , psb_def = lpat
                          , psb_dir = dir
                          , psb_args = details })
@@ -840,7 +840,7 @@ tcPatSynBuilderBind (PSB { psb_id = N loc name
          let match_group' | need_dummy_arg = add_dummy_arg match_group
                           | otherwise      = match_group
 
-             bind = FunBind { fun_id      = N loc (idName builder_id)
+             bind = FunBind { fun_id      = L loc (idName builder_id)
                             , fun_matches = match_group'
                             , fun_ext     = emptyNameSet
                             , fun_tick    = [] }
@@ -866,9 +866,9 @@ tcPatSynBuilderBind (PSB { psb_id = N loc name
     mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)
     mk_mg body = mkMatchGroup Generated [builder_match]
           where
-            builder_args  = [L (na2la loc) (VarPat noExtField (N loc n))
-                            | N loc n <- args]
-            builder_match = mkMatch (mkPrefixFunRhs (N loc name))
+            builder_args  = [L (na2la loc) (VarPat noExtField (L loc n))
+                            | L loc n <- args]
+            builder_match = mkMatch (mkPrefixFunRhs (L loc name))
                                     builder_args body
                                     (noLoc (EmptyLocalBinds noExtField))
 
@@ -909,7 +909,7 @@ add_void need_dummy_arg ty
   | need_dummy_arg = mkVisFunTy voidPrimTy ty
   | otherwise      = ty
 
-tcPatToExpr :: Name -> [ApiAnnName Name] -> LPat GhcRn
+tcPatToExpr :: Name -> [LocatedN Name] -> LPat GhcRn
             -> Either MsgDoc (LHsExpr GhcRn)
 -- Given a /pattern/, return an /expression/ that builds a value
 -- that matches the pattern.  E.g. if the pattern is (Just [x]),
@@ -921,17 +921,17 @@ tcPatToExpr :: Name -> [ApiAnnName Name] -> LPat GhcRn
 -- See Note [Builder for a bidirectional pattern synonym]
 tcPatToExpr name args pat = go pat
   where
-    lhsVars = mkNameSet (map unApiName args)
+    lhsVars = mkNameSet (map unLoc args)
 
     -- Make a prefix con for prefix and infix patterns for simplicity
-    mkPrefixConExpr :: ApiAnnName Name -> [LPat GhcRn]
+    mkPrefixConExpr :: LocatedN Name -> [LPat GhcRn]
                     -> Either MsgDoc (HsExpr GhcRn)
-    mkPrefixConExpr lcon@(N loc _) pats
+    mkPrefixConExpr lcon@(L loc _) pats
       = do { exprs <- mapM go pats
            ; return (foldl' (\x y -> HsApp noComments (L (na2la loc) x) y)
                             (HsVar noExtField lcon) exprs) }
 
-    mkRecordConExpr :: ApiAnnName Name -> HsRecFields GhcRn (LPat GhcRn)
+    mkRecordConExpr :: LocatedN Name -> HsRecFields GhcRn (LPat GhcRn)
                     -> Either MsgDoc (HsExpr GhcRn)
     mkRecordConExpr con fields
       = do { exprFields <- mapM go fields
@@ -950,9 +950,9 @@ tcPatToExpr name args pat = go pat
     go1 (SigPat _ pat _) = go1 (unLoc pat)
         -- See Note [Type signatures and the builder expression]
 
-    go1 (VarPat _ (N l var))
+    go1 (VarPat _ (L l var))
         | var `elemNameSet` lhsVars
-        = return $ HsVar noExtField (N l var)
+        = return $ HsVar noExtField (L l var)
         | otherwise
         = Left (quotes (ppr var) <+> text "is not bound by the LHS of the pattern synonym")
     go1 (ParPat _ pat)          = fmap (HsPar noAnn) $ go pat

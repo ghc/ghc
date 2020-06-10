@@ -102,7 +102,7 @@ finishHsVar (L l name)
  = do { this_mod <- getModule
       ; when (nameIsLocalOrFrom this_mod name) $
         checkThLocalName name
-      ; return (HsVar noExtField (N (la2na l) name), unitFV name) }
+      ; return (HsVar noExtField (L (la2na l) name), unitFV name) }
 
 rnUnboundVar :: RdrName -> RnM (HsExpr GhcRn, FreeVars)
 rnUnboundVar v
@@ -114,9 +114,9 @@ rnUnboundVar v
 
         else -- Fail immediately (qualified name)
              do { n <- reportUnboundName v
-                ; return (HsVar noExtField (noApiName n), emptyFVs) } }
+                ; return (HsVar noExtField (noLocA n), emptyFVs) } }
 
-rnExpr (HsVar _ (N l v))
+rnExpr (HsVar _ (L l v))
   = do { opt_DuplicateRecordFields <- xoptM LangExt.DuplicateRecordFields
        ; mb_name <- lookupOccRn_overloaded opt_DuplicateRecordFields v
        ; dflags <- getDynFlags
@@ -132,9 +132,9 @@ rnExpr (HsVar _ (N l v))
               | otherwise
               -> finishHsVar (L (na2la l) name) ;
             Just (Right [s]) ->
-              return ( HsRecFld noExtField (Unambiguous s (N l v) ), unitFV s) ;
+              return ( HsRecFld noExtField (Unambiguous s (L l v) ), unitFV s) ;
            Just (Right fs@(_:_:_)) ->
-              return ( HsRecFld noExtField (Ambiguous noExtField (N l v))
+              return ( HsRecFld noExtField (Ambiguous noExtField (L l v))
                      , mkFVs fs);
            Just (Right [])         -> panic "runExpr/HsVar" } }
 
@@ -194,7 +194,7 @@ rnExpr (OpApp _ e1 op e2)
         -- more, so I've removed the test.  Adding HsPars in GHC.Tc.Deriv.Generate
         -- should prevent bad things happening.
         ; fixity <- case op' of
-              L _ (HsVar _ (N _ n)) -> lookupFixityRn n
+              L _ (HsVar _ (L _ n)) -> lookupFixityRn n
               L _ (HsRecFld _ f)    -> lookupFieldFixityRn f
               _ -> return (Fixity NoSourceText minPrecedence InfixL)
                    -- c.f. lookupFixity for unbound
@@ -297,7 +297,7 @@ rnExpr (ExplicitSum _ alt arity expr)
 
 rnExpr (RecordCon { rcon_con_name = con_id
                   , rcon_flds = rec_binds@(HsRecFields { rec_dotdot = dd }) })
-  = do { con_lname@(N _ con_name) <- lookupLocatedOccRnN con_id
+  = do { con_lname@(L _ con_name) <- lookupLocatedOccRnN con_id
        ; (flds, fvs)   <- rnHsRecFields (HsRecFieldCon con_name) mk_hs_var rec_binds
        ; (flds', fvss) <- mapAndUnzipM rn_field flds
        ; let rec_binds' = HsRecFields { rec_flds = flds', rec_dotdot = dd }
@@ -306,7 +306,7 @@ rnExpr (RecordCon { rcon_con_name = con_id
                 , fvs `plusFV` plusFVs fvss `addOneFV` con_name) }
   where
     mk_hs_var :: SrcSpan -> IdP GhcPs -> HsExpr GhcPs -- AZ
-    mk_hs_var l n = HsVar noExtField (N (noAnnApiName l) n)
+    mk_hs_var l n = HsVar noExtField (L (noAnnSrcSpan l) n)
     rn_field :: GenLocated l (HsRecField' id (LHsExpr GhcPs))
                       -> RnM
                            (GenLocated l (HsRecField' id (LHsExpr GhcRn)), FreeVars) -- AZ
@@ -470,7 +470,7 @@ rnCmd (HsCmdArrApp _ arrow arg ho rtl)
 -- infix form
 rnCmd (HsCmdArrForm _ op _ (Just _) [arg1, arg2])
   = do { (op',fv_op) <- escapeArrowScope (rnLExpr op)
-       ; let L _ (HsVar _ (N _ op_name)) = op'
+       ; let L _ (HsVar _ (L _ op_name)) = op'
        ; (arg1',fv_arg1) <- rnCmdTop arg1
        ; (arg2',fv_arg2) <- rnCmdTop arg2
         -- Deal with fixity
@@ -977,12 +977,12 @@ lookupStmtNamePoly ctxt name
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if rebindable_on
          then do { fm <- lookupOccRn (nameRdrName name)
-                 ; return (HsVar noExtField (noApiName fm), unitFV fm) }
+                 ; return (HsVar noExtField (noLocA fm), unitFV fm) }
          else not_rebindable }
   | otherwise
   = not_rebindable
   where
-    not_rebindable = return (HsVar noExtField (noApiName name), emptyFVs)
+    not_rebindable = return (HsVar noExtField (noLocA name), emptyFVs)
 
 -- | Is this a context where we respect RebindableSyntax?
 -- but ListComp are never rebindable
@@ -1972,7 +1972,7 @@ isReturnApp monad_names (L _ e) = case e of
  where
   is_var f (L _ (HsPar _ e)) = is_var f e
   is_var f (L _ (HsAppType _ e _)) = is_var f e
-  is_var f (L _ (HsVar _ (N _ r))) = f r
+  is_var f (L _ (HsVar _ (L _ r))) = f r
        -- TODO: I don't know how to get this right for rebindable syntax
   is_var _ _ = False
 
@@ -2199,7 +2199,7 @@ getMonadFailOp
               nlHsApp (noLocA failExpr)
                       (nlHsApp (noLocA $ fromStringExpr) arg_syn_expr)
         let failAfterFromStringExpr :: HsExpr GhcRn =
-              unLoc $ mkHsLam [noLocA $ VarPat noExtField $ noApiName arg_name] body
+              unLoc $ mkHsLam [noLocA $ VarPat noExtField $ noLocA arg_name] body
         let failAfterFromStringSynExpr :: SyntaxExpr GhcRn =
               mkSyntaxExpr failAfterFromStringExpr
         return (failAfterFromStringSynExpr, failFvs `plusFV` fromStringFvs)

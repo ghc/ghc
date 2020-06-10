@@ -359,7 +359,7 @@ markLocatedA (L (SrcSpanAnn ann l) a) = do
 
 -- ---------------------------------------------------------------------
 
-markLocatedN :: (ExactPrint a) => ApiAnnName a -> EPP ()
+markLocatedN :: (ExactPrint a) => LocatedN a -> EPP ()
 markLocatedN (N (SrcSpanAnn ann l) a) = do
   debugM $ "markLocatedN:ann=" ++ showGhc ann
   exact a
@@ -675,7 +675,7 @@ instance ExactPrint (HsExpr GhcPs) where
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint (ApiAnnName RdrName) where
+instance ExactPrint (LocatedN RdrName) where
   getApiAnnotation (N (SrcSpanAnn ann _) _) = fromAnn ann
   exact (N (SrcSpanAnn ann _) a) = do
     mark ann AnnOpenP

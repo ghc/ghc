@@ -548,8 +548,8 @@ instance HasLoc (Located a) where
 instance HasLoc (LocatedA a) where
   loc (L la _) = locA la
 
-instance HasLoc (ApiAnnName a) where
-  loc (N la _) = locA la
+instance HasLoc (LocatedN a) where
+  loc (L la _) = locA la
 
 instance HasLoc a => HasLoc [a] where
   loc [] = noSrcSpan
@@ -577,13 +577,13 @@ original datacon name
 See also Note [Data Constructor Naming]
 -}
 class HasRealDataConName p where
-  getRealDataCon :: XRecordCon p -> ApiAnnName (IdP p) -> ApiAnnName (IdP p)
+  getRealDataCon :: XRecordCon p -> LocatedN (IdP p) -> LocatedN (IdP p)
 
 instance HasRealDataConName GhcRn where
   getRealDataCon _ n = n
 instance HasRealDataConName GhcTc where
-  getRealDataCon RecordConTc{rcon_con_like = con} (N sp var) =
-    N sp (setVarName var (conLikeName con))
+  getRealDataCon RecordConTc{rcon_con_like = con} (L sp var) =
+    L sp (setVarName var (conLikeName con))
 
 -- | The main worker class
 -- See Note [Updating HieAst for changes in the GHC AST] for more information
@@ -612,8 +612,8 @@ instance ToHie (IEContext (Located ModuleName)) where
           idents = M.singleton (Left mname) details
   toHie _ = pure []
 
-instance ToHie (Context (Located a)) => ToHie (Context (ApiAnnName a)) where
-  toHie (C c (N l a)) = toHie (C c (L (locA l) a))
+instance ToHie (Context (Located a)) => ToHie (Context (LocatedN a)) where
+  toHie (C c (L l a)) = toHie (C c (L (locA l) a))
 
 instance ToHie (Context (Located a)) => ToHie (Context (LocatedA a)) where
   toHie (C c (L l a)) = toHie (C c (L (locA l) a))
@@ -716,7 +716,7 @@ instance HiePass p => HasType (LHsBind (GhcPass p)) where
     case hiePass @p of
       HieRn -> makeNode bind (locA spn)
       HieTc ->  case bind of
-        FunBind{fun_id = name} -> makeTypeNode bind (locA spn) (varType $ unApiName name)
+        FunBind{fun_id = name} -> makeTypeNode bind (locA spn) (varType $ unLoc name)
         _ -> makeNode bind (locA spn)
 
 instance HiePass p => HasType (LocatedA (Pat (GhcPass p))) where
@@ -1067,7 +1067,7 @@ instance ( ToHie (LocatedA body)
 
 instance HiePass p => ToHie (LHsExpr (GhcPass p)) where
   toHie e@(L mspan oexpr) = concatM $ getTypeNode e : case oexpr of
-      HsVar _ (N _ var) ->
+      HsVar _ (L _ var) ->
         [ toHie $ C Use (L mspan var)
              -- Patch up var location since typechecker removes it
         ]
@@ -1580,11 +1580,11 @@ instance ToHie (LConDecl GhcRn) where
     where condecl_scope args = case args of
             PrefixCon xs -> foldr combineScopes NoScope $ map mkLScopeA xs
             InfixCon a b -> combineScopes (mkLScopeA a) (mkLScopeA b)
-            RecCon x -> mkLScope x
+            RecCon x -> mkLScopeA x
 
-instance ToHie (Located [LConDeclField GhcRn]) where
+instance ToHie (LocatedA [LConDeclField GhcRn]) where
   toHie (L span decls) = concatM $
-    [ locOnly span
+    [ locOnly (locA span)
     , toHie decls
     ]
 
@@ -1623,17 +1623,17 @@ instance HiePass p => ToHie (SigContext (LSig (GhcPass p))) where
       HieRn -> concatM $ makeNode sig sp : case sig of
         TypeSig _ names typ ->
           [ toHie $ map (C TyDecl) names
-          , toHie $ TS (UnresolvedScope (map unApiName names) Nothing) typ
+          , toHie $ TS (UnresolvedScope (map unLoc names) Nothing) typ
           ]
         PatSynSig _ names typ ->
           [ toHie $ map (C TyDecl) names
-          , toHie $ TS (UnresolvedScope (map unApiName names) Nothing) typ
+          , toHie $ TS (UnresolvedScope (map unLoc names) Nothing) typ
           ]
         ClassOpSig _ _ names typ ->
           [ case styp of
               ClassSig -> toHie $ map (C $ ClassTyDecl $ getRealSpan sp) names
               _  -> toHie $ map (C $ TyDecl) names
-          , toHie $ TS (UnresolvedScope (map unApiName names) msp) typ
+          , toHie $ TS (UnresolvedScope (map unLoc names) msp) typ
           ]
         IdSig _ _ -> []
         FixSig _ fsig ->
@@ -1811,7 +1811,7 @@ instance ToHie PendingRnSplice where
 instance ToHie PendingTcSplice where
   toHie _ = pure []
 
-instance ToHie (LBooleanFormula (ApiAnnName Name)) where
+instance ToHie (LBooleanFormula (LocatedN Name)) where
   toHie (L span form) = concatM $ makeNode form (locA span) : case form of
       Var a ->
         [ toHie $ C Use a

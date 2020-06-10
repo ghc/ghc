@@ -494,7 +494,7 @@ rnBind _ bind@(PatBind { pat_lhs = pat
 rnBind sig_fn bind@(FunBind { fun_id = name
                             , fun_matches = matches })
        -- invariant: no free vars here when it's a FunBind
-  = do  { let plain_name = unApiName name
+  = do  { let plain_name = unLoc name
 
         ; (matches', rhs_fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
                                 -- bindSigTyVars tests for LangExt.ScopedTyVars
@@ -605,7 +605,7 @@ mkScopedTvFn sigs = \n -> lookupNameEnv env n `orElse` []
   where
     env = mkHsSigEnv get_scoped_tvs sigs
 
-    get_scoped_tvs :: LSig GhcRn -> Maybe ([ApiAnnName Name], [Name])
+    get_scoped_tvs :: LSig GhcRn -> Maybe ([LocatedN Name], [Name])
     -- Returns (binders, scoped tvs for those binders)
     get_scoped_tvs (L _ (ClassOpSig _ _ names sig_ty))
       = Just (names, hsScopedTvs sig_ty)
@@ -629,7 +629,7 @@ makeMiniFixityEnv decls = foldlM add_one_sig emptyFsEnv decls
    add_one_sig :: MiniFixityEnv -> LFixitySig GhcPs -> RnM MiniFixityEnv
    add_one_sig env (L loc (FixitySig _ names fixity)) =
      foldlM add_one env [ (loc,locA name_loc,name,fixity)
-                        | N name_loc name <- names ]
+                        | L name_loc name <- names ]
 
    add_one :: FastStringEnv (Located e)
                       -> (SrcSpan, SrcSpan, RdrName, e)
@@ -666,7 +666,7 @@ dupFixityDecl loc rdr_name
 rnPatSynBind :: (Name -> [Name])           -- Signature tyvar function
              -> PatSynBind GhcRn GhcPs
              -> RnM (PatSynBind GhcRn GhcRn, [Name], Uses)
-rnPatSynBind sig_fn bind@(PSB { psb_id = N l name
+rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
                               , psb_args = details
                               , psb_def = pat
                               , psb_dir = dir })
@@ -685,14 +685,14 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = N l name
                    do { checkDupRdrNamesN vars
                       ; names <- mapM lookupPatSynBndr vars
                       ; return ( (pat', PrefixCon names)
-                               , mkFVs (map unApiName names)) }
+                               , mkFVs (map unLoc names)) }
                InfixCon var1 var2 ->
                    do { checkDupRdrNames [var1, var2]
                       ; name1 <- lookupPatSynBndr var1
                       ; name2 <- lookupPatSynBndr var2
                       -- ; checkPrecMatch -- TODO
                       ; return ( (pat', InfixCon name1 name2)
-                               , mkFVs (map unApiName [name1, name2])) }
+                               , mkFVs (map unLoc [name1, name2])) }
                RecCon vars ->
                    do { checkDupRdrNames (map recordPatSynSelectorId vars)
                       ; let rnRecordPatSynField
@@ -704,14 +704,14 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = N l name
                                                                 , recordPatSynPatVar = hidden' } }
                       ; names <- mapM rnRecordPatSynField  vars
                       ; return ( (pat', RecCon names)
-                               , mkFVs (map (unApiName . recordPatSynPatVar) names)) }
+                               , mkFVs (map (unLoc . recordPatSynPatVar) names)) }
 
         ; (dir', fvs2) <- case dir of
             Unidirectional -> return (Unidirectional, emptyFVs)
             ImplicitBidirectional -> return (ImplicitBidirectional, emptyFVs)
             ExplicitBidirectional mg ->
                 do { (mg', fvs) <- bindSigTyVarsFV scoped_tvs $
-                                   rnMatchGroup (mkPrefixFunRhs (N l name))
+                                   rnMatchGroup (mkPrefixFunRhs (L l name))
                                                 rnLExpr mg
                    ; return (ExplicitBidirectional mg', fvs) }
 
@@ -728,7 +728,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = N l name
                           , psb_ext = fvs' }
               selector_names = case details' of
                                  RecCon names ->
-                                  map (unApiName . recordPatSynSelectorId) names
+                                  map (unLoc . recordPatSynSelectorId) names
                                  _ -> []
 
         ; fvs' `seq` -- See Note [Free-variable space leak]
@@ -737,7 +737,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = N l name
       }
   where
     -- See Note [Renaming pattern synonym variables]
-    lookupPatSynBndr :: ApiAnnName RdrName -> TcM (ApiAnnName Name) -- AZ
+    lookupPatSynBndr :: LocatedN RdrName -> TcM (LocatedN Name) -- AZ
     lookupPatSynBndr = wrapLocMN lookupLocalOccRn
 
     patternSynonymErr :: SDoc
@@ -1032,7 +1032,7 @@ renameSig _ctxt sig@(CompleteMatchSig _ s (L l bf) mty)
        new_mty  <- traverse lookupLocatedOccRnN mty
 
        this_mod <- fmap tcg_mod getGblEnv
-       unless (any (nameIsLocalOrFrom this_mod . unApiName) new_bf) $ do
+       unless (any (nameIsLocalOrFrom this_mod . unLoc) new_bf) $ do
          -- Why 'any'? See Note [Orphan COMPLETE pragmas]
          addErrCtxt (text "In" <+> ppr sig) $ failWithTc orphanError
 
@@ -1066,7 +1066,7 @@ For now we simply disallow orphan COMPLETE pragmas, as the added
 complexity of supporting them properly doesn't seem worthwhile.
 -}
 
-ppr_sig_bndrs :: [ApiAnnName RdrName] -> SDoc
+ppr_sig_bndrs :: [LocatedN RdrName] -> SDoc
 ppr_sig_bndrs bs = quotes (pprWithCommas ppr bs)
 
 okHsSig :: HsSigCtxt -> LSig (GhcPass a) -> Bool
@@ -1111,7 +1111,7 @@ okHsSig ctxt (L _ sig)
      (CompleteMatchSig {}, _)              -> False
 
 -------------------
-findDupSigs :: [LSig GhcPs] -> [NonEmpty (ApiAnnName RdrName, Sig GhcPs)]
+findDupSigs :: [LSig GhcPs] -> [NonEmpty (LocatedN RdrName, Sig GhcPs)]
 -- Check for duplicates on RdrName version,
 -- because renamed version has unboundName for
 -- not-in-scope binders, which gives bogus dup-sig errors
@@ -1123,7 +1123,7 @@ findDupSigs :: [LSig GhcPs] -> [NonEmpty (ApiAnnName RdrName, Sig GhcPs)]
 findDupSigs sigs
   = findDupsEq matching_sig (concatMap (expand_sig . unLoc) sigs)
   where
-    expand_sig :: Sig GhcPs -> [(ApiAnnName RdrName, Sig GhcPs)] -- AZ
+    expand_sig :: Sig GhcPs -> [(LocatedN RdrName, Sig GhcPs)] -- AZ
     expand_sig sig@(FixSig _ (FixitySig _ ns _)) = zip ns (repeat sig)
     expand_sig sig@(InlineSig _ n _)             = [(n,sig)]
     expand_sig sig@(TypeSig _ ns _)              = [(n,sig) | n <- ns]
@@ -1132,8 +1132,8 @@ findDupSigs sigs
     expand_sig sig@(SCCFunSig _ _ n _)           = [(n,sig)]
     expand_sig _ = []
 
-    matching_sig :: (ApiAnnName RdrName, Sig GhcPs) -> (ApiAnnName RdrName, Sig GhcPs) -> Bool --AZ
-    matching_sig (N _ n1,sig1) (N _ n2,sig2)       = n1 == n2 && mtch sig1 sig2
+    matching_sig :: (LocatedN RdrName, Sig GhcPs) -> (LocatedN RdrName, Sig GhcPs) -> Bool --AZ
+    matching_sig (L _ n1,sig1) (L _ n2,sig2)       = n1 == n2 && mtch sig1 sig2
     mtch (FixSig {})           (FixSig {})         = True
     mtch (InlineSig {})        (InlineSig {})      = True
     mtch (TypeSig {})          (TypeSig {})        = True
@@ -1182,8 +1182,8 @@ rnMatch' ctxt rnBody (Match { m_ctxt = mf, m_pats = pats, m_grhss = grhss })
         ; rnPats ctxt pats      $ \ pats' -> do
         { (grhss', grhss_fvs) <- rnGRHSs ctxt rnBody grhss
         ; let mf' = case (ctxt, mf) of
-                      (FunRhs { mc_fun = N _ funid }, FunRhs { mc_fun = N lf _ })
-                                            -> mf { mc_fun = N lf funid }
+                      (FunRhs { mc_fun = L _ funid }, FunRhs { mc_fun = L lf _ })
+                                            -> mf { mc_fun = L lf funid }
                       _                     -> ctxt
         ; return (Match { m_ext = noAnn, m_ctxt = mf', m_pats = pats'
                         , m_grhss = grhss'}, grhss_fvs ) }}
@@ -1264,13 +1264,13 @@ rnSrcFixityDecl sig_ctxt = rn_decl
       = do names <- concatMapM lookup_one fnames
            return (FixitySig noExtField names fixity)
 
-    lookup_one :: ApiAnnName RdrName -> RnM [ApiAnnName Name]
-    lookup_one (N name_loc rdr_name)
+    lookup_one :: LocatedN RdrName -> RnM [LocatedN Name]
+    lookup_one (L name_loc rdr_name)
       = setSrcSpanN name_loc $
                     -- This lookup will fail if the name is not defined in the
                     -- same binding group as this fixity declaration.
         do names <- lookupLocalTcNames sig_ctxt what rdr_name
-           return [ N name_loc name | (_, name) <- names ]
+           return [ L name_loc name | (_, name) <- names ]
     what = text "fixity signature"
 
 {-
@@ -1281,13 +1281,13 @@ rnSrcFixityDecl sig_ctxt = rn_decl
 ************************************************************************
 -}
 
-dupSigDeclErr :: NonEmpty (ApiAnnName RdrName, Sig GhcPs) -> RnM ()
-dupSigDeclErr pairs@((N loc name, sig) :| _)
+dupSigDeclErr :: NonEmpty (LocatedN RdrName, Sig GhcPs) -> RnM ()
+dupSigDeclErr pairs@((L loc name, sig) :| _)
   = addErrAt (locA loc) $
     vcat [ text "Duplicate" <+> what_it_is
            <> text "s for" <+> quotes (ppr name)
          , text "at" <+> vcat (map ppr $ sortBy SrcLoc.leftmost_smallest
-                                       $ map (getLocN . fst)
+                                       $ map (getLocA . fst)
                                        $ toList pairs)
          ]
   where

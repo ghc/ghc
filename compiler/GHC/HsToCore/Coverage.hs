@@ -284,7 +284,7 @@ addTickLHsBind (L pos bind@(AbsBinds { abs_binds   = binds,
                       | ABE{ abe_poly = pid, abe_mono = mid } <- abs_exports
                       , isInlinePragma (idInlinePragma pid) ] }
 
-addTickLHsBind (L pos (funBind@(FunBind { fun_id = N _ id }))) = do
+addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id }))) = do
   let name = getOccString id
   decl_path <- getPathEntry
   density <- getDensity
@@ -506,7 +506,7 @@ addBinTickLHsExpr boxLabel (L pos e0)
 -- in the addTickLHsExpr family of functions.)
 
 addTickHsExpr :: HsExpr GhcTc -> TM (HsExpr GhcTc)
-addTickHsExpr e@(HsVar _ (N _ id)) = do freeVar id; return e
+addTickHsExpr e@(HsVar _ (L _ id)) = do freeVar id; return e
 addTickHsExpr (HsUnboundVar {})    = panic "addTickHsExpr.HsUnboundVar"
 addTickHsExpr e@(HsConLikeOut _ con)
   | Just id <- conLikeWrapId_maybe con = do freeVar id; return e

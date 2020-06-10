@@ -120,17 +120,17 @@ getMainDeclBinder (ValD _ d) =
     []       -> []
     (name:_) -> [name]
 getMainDeclBinder (SigD _ d) = sigNameNoLoc d
-getMainDeclBinder (ForD _ (ForeignImport _ name _ _)) = [unApiName name]
+getMainDeclBinder (ForD _ (ForeignImport _ name _ _)) = [unLoc name]
 getMainDeclBinder (ForD _ (ForeignExport _ _ _ _)) = []
 getMainDeclBinder _ = []
 
 sigNameNoLoc :: Sig pass -> [IdP pass]
-sigNameNoLoc (TypeSig    _   ns _)         = map unApiName ns
-sigNameNoLoc (ClassOpSig _ _ ns _)         = map unApiName ns
-sigNameNoLoc (PatSynSig  _   ns _)         = map unApiName ns
-sigNameNoLoc (SpecSig    _   n _ _)        = [unApiName n]
-sigNameNoLoc (InlineSig  _   n _)          = [unApiName n]
-sigNameNoLoc (FixSig _ (FixitySig _ ns _)) = map unApiName ns
+sigNameNoLoc (TypeSig    _   ns _)         = map unLoc ns
+sigNameNoLoc (ClassOpSig _ _ ns _)         = map unLoc ns
+sigNameNoLoc (PatSynSig  _   ns _)         = map unLoc ns
+sigNameNoLoc (SpecSig    _   n _ _)        = [unLoc n]
+sigNameNoLoc (InlineSig  _   n _)          = [unLoc n]
+sigNameNoLoc (FixSig _ (FixitySig _ ns _)) = map unLoc ns
 sigNameNoLoc _                             = []
 
 -- Extract the source location where an instance is defined. This is used
@@ -146,9 +146,9 @@ getInstLoc = \case
   --   type instance Foo Int = Bool
   --                 ^^^
   DataFamInstD _ (DataFamInstDecl
-    { dfid_eqn = HsIB { hsib_body = FamEqn { feqn_tycon = N l _ }}}) -> locA l
+    { dfid_eqn = HsIB { hsib_body = FamEqn { feqn_tycon = L l _ }}}) -> locA l
   TyFamInstD _ (TyFamInstDecl
-    { tfid_eqn = HsIB { hsib_body = FamEqn { feqn_tycon = N l _ }}}) -> locA l
+    { tfid_eqn = HsIB { hsib_body = FamEqn { feqn_tycon = L l _ }}}) -> locA l
 
 -- | Get all subordinate declarations inside a declaration, and their docs.
 -- A subordinate declaration is something like the associate type or data
@@ -159,7 +159,7 @@ subordinates :: Map RealSrcSpan Name
 subordinates instMap decl = case decl of
   InstD _ (ClsInstD _ d) -> do
     DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
-      FamEqn { feqn_tycon = N l _
+      FamEqn { feqn_tycon = L l _
              , feqn_rhs   = defn }}} <- unLoc <$> cid_datafam_insts d
     [ (n, [], M.empty)
                       | Just n <- [lookupSrcSpan (locA l) instMap] ] ++ dataSubs defn
@@ -179,7 +179,7 @@ subordinates instMap decl = case decl of
     dataSubs dd = constrs ++ fields ++ derivs
       where
         cons = map unLoc $ (dd_cons dd)
-        constrs = [ ( unApiName cname
+        constrs = [ ( unLoc cname
                     , maybeToList $ fmap unLoc $ con_doc c
                     , conArgDocs c)
                   | c <- cons, cname <- getConNames c ]
