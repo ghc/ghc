@@ -483,26 +483,41 @@ the first law, so you need only check that the former condition holds.
 -}
 
 class  Functor f  where
-    -- | Assuming that the 'Functor' is also a 'Monad', @('fmap' f as)@ can be understood as
-    -- the @do@ expression
+    -- 'fmap' is used to apply a function of type '(a -> b)' on a functor 'f a', to produce a functor 'f b'.
+    -- ==== __Examples__
     --
-    -- @
-    -- do a <- as
-    --    pure (f a)
-    -- @
+    -- Convert from a @'Data.Maybe.Maybe' 'Data.Int.Int'@ to a @'Data.Maybe.Maybe'
+    -- 'Data.String.String'@ using 'Prelude.show':
+    --
+    -- >>> fmap show Nothing
+    -- Nothing
+    -- >>> fmap show Just 3
+    -- Just "3"
+    --
+    -- Convert from an @'Data.Either.Either' 'Data.Int.Int' 'Data.Int.Int'@ to an
+    -- @'Data.Either.Either' 'Data.Int.Int'@ 'Data.String.String' using 'Prelude.show':
+    --
+    -- >>> fmap show (Left 17)
+    -- Left 17
+    -- >>> fmap show (Right 17)
+    -- Right "17"
+    --
+    -- Double each element of a list:
+    --
+    -- >>> fmap (*2) [1,2,3]
+    -- [2,4,6]
+    --
+    -- Apply 'Prelude.even' to the second element of a pair:
+    --
+    -- >>> fmap even (2,2)
+    -- (2,True)
+    --
     fmap        :: (a -> b) -> f a -> f b
 
     -- | Replace all locations in the input with the same value.
     -- The default definition is @'fmap' . 'const'@, but this may be
     -- overridden with a more efficient version.
     --
-    -- Assuming that the 'Functor' is also a 'Monad', @(a '<$' bs)@ can be understood as the
-    -- @do@ expression
-    --
-    -- @
-    -- do bs
-    --    pure a
-    -- @
     (<$)        :: a -> f b -> f a
     (<$)        =  fmap . const
 
