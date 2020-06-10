@@ -123,6 +123,7 @@ data Plugin = Plugin {
     -- the loading of the plugin interface. Tools that rely on information from
     -- modules other than the currently compiled one should implement this
     -- function.
+  , interfaceWriteAction :: [CommandLineOption] -> HscEnv -> ModDetails -> ModGuts -> PartialModIface -> IO PartialModIface
   }
 
 -- Note [Source plugins]
@@ -215,6 +216,7 @@ defaultPlugin = Plugin {
       , typeCheckResultAction = \_ _ -> return
       , spliceRunAction       = \_ -> return
       , interfaceLoadAction   = \_ -> return
+      , interfaceWriteAction  = \_ _ _ _ -> return
     }
 
 

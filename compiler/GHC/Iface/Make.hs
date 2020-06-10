@@ -67,7 +67,7 @@ import Data.Function
 import Data.List ( findIndex, mapAccumL, sortBy )
 import Data.Ord
 import Data.IORef
-import GHC.Driver.Plugins (LoadedPlugin(..))
+import GHC.Driver.Plugins
 
 import Control.Monad
 
@@ -99,30 +99,31 @@ mkPartialIface hsc_env mod_details
               , mg_decl_docs    = decl_docs
               , mg_arg_docs     = arg_docs
               }
-  | gopt Opt_WriteCoreField dflags = do
-    fields <- writeFieldWith "ghc/core" write (mi_ext_fields iface)
-    forM_ (mg_binds guts) go
-    return iface{mi_ext_fields = fields}
-  | otherwise = return iface
+  = withPlugins dflags (\p opts -> interfaceWriteAction p opts hsc_env mod_details guts) iface
+  -- | gopt Opt_WriteCoreField dflags = do
+  --   fields <- writeFieldWith "ghc/core" write (mi_ext_fields iface)
+  --   forM_ (mg_binds guts) go
+  --   return iface{mi_ext_fields = fields}
+  -- | otherwise = return iface
   where
     dflags = hsc_dflags hsc_env
-    write bh = putWithUserData (const $ return ()) bh (toIfaceModGuts guts)
+    -- write bh = putWithUserData (const $ return ()) bh (toIfaceModGuts guts)
     iface = mkIface_ hsc_env this_mod hsc_src used_th deps rdr_env fix_env warns hpc_info self_trust
              safe_mode usages doc_hdr decl_docs arg_docs mod_details
 
-    go (NonRec iden rhs) = go2 iden rhs
-    go (Rec    binds ) = print (length binds) >> mapM_ (uncurry go2) binds
-    go2 iden rhs = do
-      let n = idName iden
-      putStrLn "------------------------------------"
-      putStrLn (nameStableString n)
-      putStrLn $ showSDoc dflags (ppr n)
-      print (isInternalName n, isExternalName n, isSystemName n, isWiredInName n)
-      putStrLn "-------"
-      putStrLn $ showSDoc dflags (ppr rhs)
-      putStrLn "-------"
-      putStrLn (showSDoc dflags (ppr (toIfaceExpr rhs)))
-      putStrLn "------------------------------------"
+    -- go (NonRec iden rhs) = go2 iden rhs
+    -- go (Rec    binds ) = print (length binds) >> mapM_ (uncurry go2) binds
+    -- go2 iden rhs = do
+    --   let n = idName iden
+    --   putStrLn "------------------------------------"
+    --   putStrLn (nameStableString n)
+    --   putStrLn $ showSDoc dflags (ppr n)
+    --   print (isInternalName n, isExternalName n, isSystemName n, isWiredInName n)
+    --   putStrLn "-------"
+    --   putStrLn $ showSDoc dflags (ppr rhs)
+    --   putStrLn "-------"
+    --   putStrLn (showSDoc dflags (ppr (toIfaceExpr rhs)))
+    --   putStrLn "------------------------------------"
 
 
 -- | Fully instantiate a interface
