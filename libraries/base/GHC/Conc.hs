@@ -59,7 +59,7 @@ module GHC.Conc
         , threadWaitWrite
         , threadWaitReadSTM
         , threadWaitWriteSTM
-        , closeWith
+        , closeFdWith
 
         -- * Allocation counter and limit
         , setAllocationCounter
