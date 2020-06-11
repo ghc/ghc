@@ -19,6 +19,19 @@ Highlights
     In the mean this improved runtime by about 0.8%. For details
     see ticket :ghc-ticket:`17823`.
 
+* Pattern-Match Coverage Checking
+
+  - The revamp of the pattern-match coverage checker that started in 8.10 concludes with this release and implements the 
+    novel `*Lower Your Guards* <https://www.microsoft.com/en-us/research/uploads/prod/2020/03/lyg.pdf>`_ algorithm.
+  - Compared to 8.10, end users might notice improvements to "long-distance information": :: haskell
+
+      :linenos:   
+      f True = 1
+      f x    = ... case x of { False -> 2; True -> 3 } ...
+
+    GHC is now able to detect the case alt returning 3 as redundant.
+  - Some more performance improvements in edge cases.
+
 Full details
 ------------
 
