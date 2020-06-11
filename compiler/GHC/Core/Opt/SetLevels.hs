@@ -658,8 +658,8 @@ lvlMFE env strict_ctxt e@(_, AnnCase {})
 lvlMFE env strict_ctxt ann_expr
   |  floatTopLvlOnly env && not (isTopLvl dest_lvl)
          -- Only floating to the top level is allowed.
-  || anyDVarSet isJoinId fvs   -- If there is a free join, don't float
-                               -- See Note [Free join points]
+  || hasFreeJoin env fvs   -- If there is a free join, don't float
+                           -- See Note [Free join points]
   || isExprLevPoly expr
          -- We can't let-bind levity polymorphic expressions
          -- See Note [Levity polymorphism invariants] in GHC.Core
@@ -754,6 +754,14 @@ lvlMFE env strict_ctxt ann_expr
     saves_alloc =  isTopLvl dest_lvl
                 && floatConsts env
                 && (not strict_ctxt || is_bot || exprIsHNF expr)
+
+hasFreeJoin :: LevelEnv -> DVarSet -> Bool
+-- Has a free join point which is not being floated to top level.
+-- (In the latter case it won't be a join point any more.)
+-- Not treating top-level ones specially had a massive effect
+-- on nofib/minimax/Prog.prog
+hasFreeJoin env fvs
+  = not (maxFvLevel isJoinId env fvs == tOP_LEVEL)
 
 isBottomThunk :: Maybe (Arity, s) -> Bool
 -- See Note [Bottoming floats] (2)
