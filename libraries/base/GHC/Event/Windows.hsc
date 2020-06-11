@@ -53,6 +53,7 @@ module GHC.Event.Windows (
     withException,
     ioSuccess,
     ioFailed,
+    ioFailedAny,
     getLastError,
 
     -- * I/O Result type
@@ -826,6 +827,11 @@ ioSuccess = return . IOSuccess
 -- | Signal that the I/O action has failed with the given reason.
 ioFailed :: Integral a => a -> IO (IOResult a)
 ioFailed = return . IOFailed . Just . fromIntegral
+
+-- | Signal that the I/O action has failed with the given reason.
+-- Polymorphic in successful result type.
+ioFailedAny :: Integral a => a -> IO (IOResult b)
+ioFailedAny = return . IOFailed . Just . fromIntegral
 
 ------------------------------------------------------------------------
 -- Timeouts
