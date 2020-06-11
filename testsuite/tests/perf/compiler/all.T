@@ -352,7 +352,7 @@ test ('WWRec',
 test('T16190',
       [ req_th,
         unless(have_ncg(), skip), # T16190 tests a NCG feature
-        collect_compiler_stats()
+        collect_compiler_stats('bytes allocated',20)
       ],
       multimod_compile,
       ['T16190.hs', '-v0'])
