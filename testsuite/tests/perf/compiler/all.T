@@ -350,7 +350,7 @@ test ('WWRec',
       ['-v0 -O'])
 
 test('T16190',
-      [req_th, collect_compiler_stats()],
+      [req_th, collect_compiler_stats('bytes allocated',20)],
       multimod_compile,
       ['T16190.hs', '-v0'])
 
