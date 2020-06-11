@@ -533,15 +533,36 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
                 SDoc,           -- C type
                 Type,           -- Haskell type
                 CmmType)]       -- the CmmType
-  arg_info  = [ let stg_type = showStgType ty in
-                (arg_cname n stg_type,
+  arg_info  = [ let stg_type = showStgType ty
+                    cmm_type = typeCmmType platform (getPrimTyOf ty)
+                    stack_type
+                      = if int_promote (typeTyCon ty)
+                        then text "HsWord"
+                        else stg_type
+                in
+                (arg_cname n stg_type stack_type,
                  stg_type,
                  ty,
-                 typeCmmType platform (getPrimTyOf ty))
+                 cmm_type)
               | (ty,n) <- zip arg_htys [1::Int ..] ]
 
-  arg_cname n stg_ty
-        | libffi    = char '*' <> parens (stg_ty <> char '*') <>
+  int_promote ty_con
+    | ty_con `hasKey` int8TyConKey = True
+    | ty_con `hasKey` int16TyConKey = True
+    | ty_con `hasKey` int32TyConKey
+    , platformWordSizeInBytes platform > 4
+    = True
+    | ty_con `hasKey` word8TyConKey = True
+    | ty_con `hasKey` word16TyConKey = True
+    | ty_con `hasKey` word32TyConKey
+    , platformWordSizeInBytes platform > 4
+    = True
+    | otherwise = False
+
+
+  arg_cname n stg_ty stack_ty
+        | libffi    = parens (stg_ty) <> char '*' <>
+                      parens (stack_ty <> char '*') <>
                       text "args" <> brackets (int (n-1))
         | otherwise = text ('a':show n)
 
