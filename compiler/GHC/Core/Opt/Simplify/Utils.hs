@@ -1200,9 +1200,9 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
     extend_subst_with inl_rhs = extendIdSubst env bndr (mkContEx rhs_env inl_rhs)
 
     one_occ IAmDead = True -- Happens in ((\x.1) v)
-    one_occ OneOcc{ occ_one_br = InOneBranch
+    one_occ OneOcc{ occ_n_br   = 1
                   , occ_in_lam = NotInsideLam }   = isNotTopLevel top_lvl || early_phase
-    one_occ OneOcc{ occ_one_br = InOneBranch
+    one_occ OneOcc{ occ_n_br   = 1
                   , occ_in_lam = IsInsideLam
                   , occ_int_cxt = IsInteresting } = canInlineInLam rhs
     one_occ _                                     = False
@@ -1328,12 +1328,17 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs
         --         False -> case x of ...
         -- This is very important in practice; e.g. wheel-seive1 doubles
         -- in allocation if you miss this out
-      OneOcc { occ_in_lam = in_lam, occ_int_cxt = int_cxt }
-               -- OneOcc => no code-duplication issue
-        ->     smallEnoughToInline dflags unfolding     -- Small enough to dup
+
+      OneOcc { occ_in_lam = in_lam, occ_int_cxt = int_cxt, occ_n_br = n_br }
+        ->  -- See Note [Suppress exponential blowup]
+            n_br < (case int_cxt of
+                        IsInteresting  -> 16
+                        NotInteresting -> 4)
+
+           && smallEnoughToInline dflags unfolding     -- Small enough to dup
                         -- ToDo: consider discount on smallEnoughToInline if int_cxt is true
                         --
-                        -- NB: Do NOT inline arbitrarily big things, even if one_br is True
+                        -- NB: Do NOT inline arbitrarily big things, even if occ_n_br=1
                         -- Reason: doing so risks exponential behaviour.  We simplify a big
                         --         expression, inline it, and simplify it again.  But if the
                         --         very same thing happens in the big expression, we get
@@ -1380,7 +1385,35 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs
     active    = isActive (sm_phase (getMode env)) (idInlineActivation bndr)
         -- See Note [pre/postInlineUnconditionally in gentle mode]
 
-{-
+{- Note [Suppress exponential blowup]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In #13253, and a raft of related tickets, we got an exponential blowup
+in code size from postInlineUnconditionally.  The trouble comes when
+we have
+  let j1a = case f y     of { True -> p;   False -> q }
+      j1b = case f y     of { True -> q;   False -> p }
+      j2a = case f (y+1) of { True -> j1a; False -> j1b }
+      j2b = case f (y+1) of { True -> j1b; False -> j1a }
+      ...
+  in case f (y+10) of { True -> j10a; False -> j10b }
+
+when there are many branches. In pass 1, postInlineUnconditionally
+inlines j10a and j10b (they are both small).  Now we have two calls
+to j9a and two to j9b.  In pass 2, postInlineUnconditionally inlines
+all four of these calls, leaving four calls to j8a and j8b. Etc.
+Yikes!  This is exponential!
+
+Moreover, this structure can and does arise easily, as the
+tickets show: it's just a sequence of diamond control flow blocks.
+
+Solution: stop doing postInlineUnconditionally for some fixed,
+smallish number of branches, say 4.
+
+This still leaves the nasty possiblity that /ordinary/ inlining (not
+postInlineUnconditionally) might inline these join points, each of
+which is individually quiet small.  I'm still not sure what to do
+about this (see #15488).  But let's kill off one problem anyway.
+
 Note [Top level and postInlineUnconditionally]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We don't do postInlineUnconditionally for top-level things (even for
