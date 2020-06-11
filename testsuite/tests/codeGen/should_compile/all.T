@@ -6,6 +6,7 @@ test('cg005', only_ways(['optasm']), compile, [''])
 test('cg006', normal, compile, [''])
 test('cg007', normal, compile, [''])
 test('cg008', normal, compile, [''])
+test('cg009', normal, compile, [''])
 
 test('T1916', normal, compile, [''])
 test('T2388', normal, compile, [''])
