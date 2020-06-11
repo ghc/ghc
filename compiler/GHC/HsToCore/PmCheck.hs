@@ -964,17 +964,20 @@ checkGrdTree' (Guard (PmLet x e) tree) deltas = do
   deltas' <- addPmCtDeltas deltas (PmCoreCt x e)
   checkGrdTree' tree deltas'
 -- Bang x: Diverge on x ~ ⊥, refine with x /~ ⊥
-checkGrdTree' (Guard (PmBang x pos) tree) deltas = do
+checkGrdTree' (Guard (PmBang x src_bang_info) tree) deltas = do
   has_diverged <- addPmCtDeltas deltas (PmBotCt x) >>= isInhabited
   deltas' <- addPmCtDeltas deltas (PmNotBotCt x)
   res <- checkGrdTree' tree deltas'
   let clauses
-        | not (has_diverged)
+        | not has_diverged
         -- bang is coming from the source
-        , Just info <- pos
+        , Just info <- src_bang_info
         = RedundantSrcBang info (cr_clauses res)
-        | otherwise
+        | has_diverged
         = mayDiverge (cr_clauses res)
+        | otherwise
+        = cr_clauses res
+
   pure res{ cr_clauses = clauses }
 
 -- Con: Diverge on x ~ ⊥, fall through on x /~ K and refine with x ~ K ys
@@ -1138,10 +1141,9 @@ redundantAndInaccessibleRhss tree = (fromOL ol_red, fromOL ol_inacc, fromOL ol_b
     go (RedundantSrcBang l t) = case go t of
       -- See Note [Warning about redundant bangs]
       -- .. which is to be written
-      (acc, inacc, red, bs)
-        | (isNilOL acc || isNilOL inacc)
-        && (not (isNilOL red)) -> (acc, inacc, red, bs)
-      res                      -> (nilOL, nilOL, nilOL, unitOL l) Semi.<> res
+      res@(acc, inacc, _, _)
+        | isNilOL acc, isNilOL inacc -> res
+        | otherwise                  -> (nilOL, nilOL, nilOL, unitOL l) Semi.<> res
     go EmptyAnn               = (nilOL, nilOL, nilOL, nilOL)
 
 {- Note [Determining inaccessible clauses]
