@@ -450,7 +450,7 @@ hwndReadNonBlocking :: Io NativeHandle -> Ptr Word8 -> Word64 -> Int
 hwndReadNonBlocking hwnd ptr offset bytes
   = do val <- withOverlapped "hwndReadNonBlocking" (toHANDLE hwnd) offset
                               (startCB ptr) completionCB
-       return $ Just $ fromIntegral $ ioValue val
+       return $ ioValue val
   where
     startCB inputBuf lpOverlapped = do
       debugIO ":: hwndReadNonBlocking"
@@ -460,14 +460,14 @@ hwndReadNonBlocking hwnd ptr offset bytes
       return $ Mgr.CbNone ret
 
     completionCB err dwBytes
-      | err == #{const ERROR_SUCCESS}       = Mgr.ioSuccess $ fromIntegral dwBytes
-      | err == #{const ERROR_HANDLE_EOF}    = Mgr.ioSuccess 0
-      | err == #{const STATUS_END_OF_FILE}  = Mgr.ioSuccess 0
-      | err == #{const ERROR_BROKEN_PIPE}   = Mgr.ioSuccess 0
-      | err == #{const STATUS_PIPE_BROKEN}  = Mgr.ioSuccess 0
-      | err == #{const ERROR_NO_MORE_ITEMS} = Mgr.ioSuccess 0
-      | err == #{const ERROR_MORE_DATA}     = Mgr.ioSuccess $ fromIntegral dwBytes
-      | otherwise                           = Mgr.ioFailed err
+      | err == #{const ERROR_SUCCESS}       = Mgr.ioSuccess $ Just $! fromIntegral dwBytes
+      | err == #{const ERROR_HANDLE_EOF}    = Mgr.ioSuccess Nothing
+      | err == #{const STATUS_END_OF_FILE}  = Mgr.ioSuccess Nothing
+      | err == #{const ERROR_BROKEN_PIPE}   = Mgr.ioSuccess Nothing
+      | err == #{const STATUS_PIPE_BROKEN}  = Mgr.ioSuccess Nothing
+      | err == #{const ERROR_NO_MORE_ITEMS} = Mgr.ioSuccess Nothing
+      | err == #{const ERROR_MORE_DATA}     = Mgr.ioSuccess $ Just $! fromIntegral dwBytes
+      | otherwise                           = Mgr.ioFailedAny err
 
 hwndWrite :: Io NativeHandle -> Ptr Word8 -> Word64 -> Int -> IO ()
 hwndWrite hwnd ptr offset bytes
