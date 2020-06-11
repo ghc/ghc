@@ -61,9 +61,9 @@ foo [InlPrag=NOUSERINLINE[2]] :: Int -> Int
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (w [Occ=Once!] :: Int) ->
-                 case w of { GHC.Types.I# ww1 [Occ=Once] ->
-                 case T4930.$wfoo ww1 of ww2 [Occ=Once] { __DEFAULT ->
+         Tmpl= \ (w [Occ=Once1!] :: Int) ->
+                 case w of { GHC.Types.I# ww1 [Occ=Once1] ->
+                 case T4930.$wfoo ww1 of ww2 [Occ=Once1] { __DEFAULT ->
                  GHC.Types.I# ww2
                  }
                  }}]

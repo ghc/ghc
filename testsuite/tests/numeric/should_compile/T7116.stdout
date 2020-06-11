@@ -48,7 +48,7 @@ dr :: Double -> Double
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (x [Occ=Once!] :: Double) ->
+         Tmpl= \ (x [Occ=Once1!] :: Double) ->
                  case x of { GHC.Types.D# x1 ->
                  GHC.Types.D# (GHC.Prim.+## x1 x1)
                  }}]
@@ -65,7 +65,7 @@ dl :: Double -> Double
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (x [Occ=Once!] :: Double) ->
+         Tmpl= \ (x [Occ=Once1!] :: Double) ->
                  case x of { GHC.Types.D# y -> GHC.Types.D# (GHC.Prim.+## y y) }}]
 dl = dr
 
@@ -78,7 +78,7 @@ fr :: Float -> Float
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (x [Occ=Once!] :: Float) ->
+         Tmpl= \ (x [Occ=Once1!] :: Float) ->
                  case x of { GHC.Types.F# x1 ->
                  GHC.Types.F# (GHC.Prim.plusFloat# x1 x1)
                  }}]
@@ -97,7 +97,7 @@ fl :: Float -> Float
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (x [Occ=Once!] :: Float) ->
+         Tmpl= \ (x [Occ=Once1!] :: Float) ->
                  case x of { GHC.Types.F# y ->
                  GHC.Types.F# (GHC.Prim.plusFloat# y y)
                  }}]

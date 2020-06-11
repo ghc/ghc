@@ -118,8 +118,9 @@ Roman.foo_go [InlPrag=NOUSERINLINE[2]]
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (w [Occ=Once] :: Maybe Int) (w1 [Occ=Once] :: Maybe Int) ->
-                 case Roman.$wgo w w1 of ww [Occ=Once] { __DEFAULT ->
+         Tmpl= \ (w [Occ=Once1] :: Maybe Int)
+                 (w1 [Occ=Once1] :: Maybe Int) ->
+                 case Roman.$wgo w w1 of ww [Occ=Once1] { __DEFAULT ->
                  GHC.Types.I# ww
                  }}]
 Roman.foo_go
@@ -149,8 +150,8 @@ foo :: Int -> Int
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (n [Occ=Once!] :: Int) ->
-                 case n of n1 [Occ=Once] { GHC.Types.I# _ [Occ=Dead] ->
+         Tmpl= \ (n [Occ=Once1!] :: Int) ->
+                 case n of n1 [Occ=Once1] { GHC.Types.I# _ [Occ=Dead] ->
                  Roman.foo_go (GHC.Maybe.Just @Int n1) Roman.foo1
                  }}]
 foo
