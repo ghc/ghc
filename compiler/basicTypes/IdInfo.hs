@@ -54,8 +54,8 @@ module IdInfo (
         isDeadOcc, isStrongLoopBreaker, isWeakLoopBreaker,
         occInfo, setOccInfo,
 
-        InsideLam, OneBranch,
-        insideLam, notInsideLam, oneBranch, notOneBranch,
+        InsideLam, BranchCount,
+        insideLam, notInsideLam, oneBranch,
 
         TailCallInfo(..),
         tailCallInfo, isAlwaysTailCalled,
