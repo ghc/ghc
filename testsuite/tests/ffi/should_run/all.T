@@ -194,6 +194,8 @@ test('T12134', [omit_ways(['ghci'])], compile_and_run, ['T12134_c.c'])
 
 test('T12614', [omit_ways(['ghci'])], compile_and_run, ['T12614_c.c'])
 
+test('T15933', extra_files(['T15933_c.c', 'T15933.h']), makefile_test, ['T15933'])
+
 test('T16650a', [omit_ways(['ghci'])], compile_and_run, ['T16650a_c.c'])
 
 test('T16650b', [omit_ways(['ghci'])], compile_and_run, ['T16650b_c.c'])
