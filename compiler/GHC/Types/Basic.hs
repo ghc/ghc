@@ -68,7 +68,7 @@ module GHC.Types.Basic (
         isNoOccInfo, strongLoopBreaker, weakLoopBreaker,
 
         InsideLam(..),
-        OneBranch(..),
+        BranchCount, oneBranch,
         InterestingCxt(..),
         TailCallInfo(..), tailCallInfo, zapOccTailCallInfo,
         isAlwaysTailCalled,
@@ -978,7 +978,7 @@ data OccInfo
                         -- lambda and case-bound variables.
 
   | OneOcc          { occ_in_lam  :: !InsideLam
-                    , occ_one_br  :: !OneBranch
+                    , occ_n_br    :: {-# UNPACK #-} !BranchCount
                     , occ_int_cxt :: !InterestingCxt
                     , occ_tail    :: !TailCallInfo }
                         -- ^ Occurs exactly once (per branch), not inside a rule
@@ -991,6 +991,11 @@ data OccInfo
   deriving (Eq)
 
 type RulesOnly = Bool
+
+type BranchCount = Int -- For OneOcc, says how many syntactic occurrences there are
+
+oneBranch :: BranchCount
+oneBranch = 1
 
 {-
 Note [LoopBreaker OccInfo]
@@ -1058,14 +1063,6 @@ instance Monoid InsideLam where
   mappend = (Semi.<>)
 
 -----------------
-data OneBranch
-  = InOneBranch
-    -- ^ One syntactic occurrence: Occurs in only one case branch
-    -- so no code-duplication issue to worry about
-  | MultipleBranches
-  deriving (Eq)
-
------------------
 data TailCallInfo = AlwaysTailCalled JoinArity -- See Note [TailCallInfo]
                   | NoTailCallInfo
   deriving (Eq)
@@ -1124,12 +1121,10 @@ instance Outputable OccInfo where
           pp_ro | rule_only = char '!'
                 | otherwise = empty
   ppr (OneOcc inside_lam one_branch int_cxt tail_info)
-        = text "Once" <> pp_lam inside_lam <> pp_br one_branch <> pp_args int_cxt <> pp_tail
+        = text "Once" <> pp_lam inside_lam <> ppr one_branch <> pp_args int_cxt <> pp_tail
         where
           pp_lam IsInsideLam     = char 'L'
           pp_lam NotInsideLam    = empty
-          pp_br MultipleBranches = char '*'
-          pp_br InOneBranch      = empty
           pp_args IsInteresting  = char '!'
           pp_args NotInteresting = empty
           pp_tail                = pprShortTailCallInfo tail_info
@@ -1156,7 +1151,7 @@ AlwaysTailCalled.
 
 Note that there is a 'TailCallInfo' on a 'ManyOccs' value. One might expect that
 being tail-called would mean that the variable could only appear once per branch
-(thus getting a `OneOcc { occ_one_br = True }` occurrence info), but a join
+(thus getting a `OneOcc { }` occurrence info), but a join
 point can also be invoked from other join points, not just from case branches:
 
   let j1 x = ...
@@ -1167,7 +1162,7 @@ point can also be invoked from other join points, not just from case branches:
        C -> j2 q
 
 Here both 'j1' and 'j2' will get marked AlwaysTailCalled, but j1 will get
-ManyOccs and j2 will get `OneOcc { occ_one_br = True }`.
+ManyOccs and j2 will get `OneOcc { occ_n_br = 2 }`.
 
 ************************************************************************
 *                                                                      *
