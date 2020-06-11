@@ -58,7 +58,7 @@ module GHC.Types.Id.Info (
         isDeadOcc, isStrongLoopBreaker, isWeakLoopBreaker,
         occInfo, setOccInfo,
 
-        InsideLam(..), OneBranch(..),
+        InsideLam(..), BranchCount,
 
         TailCallInfo(..),
         tailCallInfo, isAlwaysTailCalled,

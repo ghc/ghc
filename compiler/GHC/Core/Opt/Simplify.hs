@@ -664,13 +664,6 @@ prepareRhs mode top_lvl occ rhs0
     go _ other
         = return (False, emptyLetFloats, other)
 
-makeTrivialArg :: SimplMode -> ArgSpec -> SimplM (LetFloats, ArgSpec)
-makeTrivialArg mode arg@(ValArg { as_arg = e })
-  = do { (floats, e') <- makeTrivial mode NotTopLevel (fsLit "arg") e
-       ; return (floats, arg { as_arg = e' }) }
-makeTrivialArg _ arg
-  = return (emptyLetFloats, arg)  -- CastBy, TyArg
-
 makeTrivial :: SimplMode -> TopLevelFlag
             -> FastString  -- ^ A "friendly name" to build the new binder from
             -> OutExpr     -- ^ This expression satisfies the let/app invariant
@@ -3325,9 +3318,11 @@ mkDupableCont env (TickIt t cont)
 
 mkDupableCont env (StrictBind { sc_bndr = bndr, sc_bndrs = bndrs
                               , sc_body = body, sc_env = se, sc_cont = cont})
-  -- See Note [Duplicating StrictBind]
+-- See Note [Duplicating StrictBind]
+-- K[ let x = <> in b ]  -->   join j x = K[ b ]
+--                             j <>
   = do { let sb_env = se `setInScopeFromE` env
-       ; (sb_env1, bndr') <- simplBinder sb_env bndr
+       ; (sb_env1, bndr')      <- simplBinder sb_env bndr
        ; (floats1, join_inner) <- simplLam sb_env1 bndrs body cont
           -- No need to use mkDupableCont before simplLam; we
           -- use cont once here, and then share the result if necessary
@@ -3335,37 +3330,21 @@ mkDupableCont env (StrictBind { sc_bndr = bndr, sc_bndrs = bndrs
        ; let join_body = wrapFloats floats1 join_inner
              res_ty    = contResultType cont
 
-       ; (floats2, body2)
-            <- if exprIsDupable (targetPlatform (seDynFlags env)) join_body
-               then return (emptyFloats env, join_body)
-               else do { join_bndr <- newJoinId [bndr'] res_ty
-                       ; let join_call = App (Var join_bndr) (Var bndr')
-                             join_rhs  = Lam (setOneShotLambda bndr') join_body
-                             join_bind = NonRec join_bndr join_rhs
-                             floats    = emptyFloats env `extendFloats` join_bind
-                       ; return (floats, join_call) }
-       ; return ( floats2
-                , StrictBind { sc_bndr = bndr', sc_bndrs = []
-                             , sc_body = body2
-                             , sc_env  = zapSubstEnv se `setInScopeFromF` floats2
-                                         -- See Note [StaticEnv invariant] in GHC.Core.Opt.Simplify.Utils
-                             , sc_dup  = OkToDup
-                             , sc_cont = mkBoringStop res_ty } ) }
+       ; mkDupableStrictBind env RhsCtxt bndr' join_body res_ty }
 
-mkDupableCont env (StrictArg { sc_fun = info, sc_cci = cci
-                             , sc_cont = cont, sc_fun_ty = fun_ty, sc_mult = m })
-        -- See Note [Duplicating StrictArg]
-        -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
-  = do { (floats1, cont') <- mkDupableCont env cont
-       ; (floats_s, args') <- mapAndUnzipM (makeTrivialArg (getMode env))
-                                           (ai_args info)
-       ; return ( foldl' addLetFloats floats1 floats_s
-                , StrictArg { sc_fun = info { ai_args = args' }
-                            , sc_cont = cont'
-                            , sc_cci = cci
-                            , sc_fun_ty = fun_ty
-                            , sc_mult = m
-                            , sc_dup = OkToDup} ) }
+mkDupableCont env (StrictArg { sc_fun = fun, sc_cci = cci
+                             , sc_cont = cont, sc_fun_ty = fun_ty
+                             , sc_mult = m })
+-- See Note [Duplicating StrictArg]
+-- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
+--   K[ f a b <> ]   -->   join j x = K[ f a b x ]
+--                         j <>
+  = do { let arg_ty = funArgTy fun_ty
+             rhs_ty = contResultType cont
+       ; arg_bndr <- newId (fsLit "arg") m arg_ty   -- ToDo: check this linearity argument
+       ; let env' = env `addNewInScopeIds` [arg_bndr]
+       ; (floats, join_rhs) <- rebuildCall env' (addValArgTo fun (m, Var arg_bndr) fun_ty) cont
+       ; mkDupableStrictBind env' cci arg_bndr (wrapFloats floats join_rhs) rhs_ty }
 
 mkDupableCont env (ApplyToTy { sc_cont = cont
                              , sc_arg_ty = arg_ty, sc_hole_ty = hole_ty })
@@ -3438,6 +3417,34 @@ mkDupableCont env (Select { sc_bndr = case_bndr, sc_alts = alts
                           , sc_env  = zapSubstEnv se `setInScopeFromF` all_floats
                                       -- See Note [StaticEnv invariant] in GHC.Core.Opt.Simplify.Utils
                           , sc_cont = mkBoringStop (contResultType cont) } ) }
+
+mkDupableStrictBind :: SimplEnv -> CallCtxt -> OutId -> OutExpr -> OutType
+                    -> SimplM (SimplFloats, SimplCont)
+mkDupableStrictBind env cci arg_bndr join_rhs res_ty
+  | exprIsDupable (targetPlatform (seDynFlags env)) join_rhs
+  = return (emptyFloats env
+           , StrictBind { sc_bndr = arg_bndr, sc_bndrs = []
+                        , sc_body = join_rhs
+                        , sc_env  = zapSubstEnv env
+                          -- See Note [StaticEnv invariant] in GHC.Core.Opt.Simplify.Utils
+                        , sc_dup  = OkToDup
+                        , sc_cont = mkBoringStop res_ty } )
+  | otherwise
+  = do { join_bndr <- newJoinId [arg_bndr] res_ty
+       ; let arg_info = ArgInfo { ai_fun   = join_bndr
+                                , ai_rules = Nothing, ai_args  = []
+                                , ai_encl  = False, ai_strs  = repeat False
+                                , ai_discs = repeat 0 }
+       ; return ( addJoinFloats (emptyFloats env) $
+                  unitJoinFloat                   $
+                  NonRec join_bndr                $
+                  Lam (setOneShotLambda arg_bndr) join_rhs
+                , StrictArg { sc_dup    = OkToDup
+                            , sc_fun    = arg_info
+                            , sc_fun_ty = idType join_bndr
+                            , sc_cont   = mkBoringStop res_ty
+                            , sc_mult   = Many   -- ToDo: check this!
+                            , sc_cci    = cci } ) }
 
 mkDupableAlt :: Platform -> OutId
              -> JoinFloats -> OutAlt
@@ -3612,56 +3619,75 @@ type variables as well as term variables.
 
 Note [Duplicating StrictArg]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We make a StrictArg duplicable simply by making all its
-stored-up arguments (in sc_fun) trivial, by let-binding
-them.  Thus:
-        f E [..hole..]
-        ==>     let a = E
-                in f a [..hole..]
-Now if the thing in the hole is a case expression (which is when
-we'll call mkDupableCont), we'll push the function call into the
-branches, which is what we want.  Now RULES for f may fire, and
-call-pattern specialisation.  Here's an example from #3116
+What code do we want for this?
+
+   f (case x1 of { T -> F; F -> T })
+     (case x2 of { T -> F; F -> T })
+     ...etc...
+
+when f is strict in all its arguments.  (It might, for example, be a
+strict data constructor whose wrapper has not yet been inlined.)
+
+Morally, we want to evaluate each argument in turn, and then call f.
+Eavluating each argument has a case-split, so we'll get a diamond
+pattern of join points, like this, assuming we evaluate the args
+left-to-right:
+
+  join {
+    j1 a1 = join {
+              j2 a2 = .....
+            } in case x2 of { T -> j2 F; j2 T }
+  } in case x1 of { T -> j1 F; F -> j1 T }
+
+So when we want to duplicate a StrictArg continuation, we
+want to use this transformation
+   K[ f a b <> ]   -->   join j x = K[ f a b x ]
+                         in j <>
+
+-- Downsides --
+
+This plan has some downsides, because now the call to 'f' can't
+"see" the actual argument 'x' which might be important for RULES
+or call-pattern specialisation. Here's an example from #3116
+
      go (n+1) (case l of
                  1  -> bs'
                  _  -> Chunk p fpc (o+1) (l-1) bs')
-If we can push the call for 'go' inside the case, we get
+
+If we pushed the entire call for 'go' inside the case, we get
 call-pattern specialisation for 'go', which is *crucial* for
 this program.
 
-Here is the (&&) example:
+Here is another example. With our current approach we see
         && E (case x of { T -> F; F -> T })
-  ==>   let a = E in
-        case x of { T -> && a F; F -> && a T }
-Much better!
-
-Notice that
-  * Arguments to f *after* the strict one are handled by
-    the ApplyToVal case of mkDupableCont.  Eg
-        f [..hole..] E
-
-  * We can only do the let-binding of E because the function
-    part of a StrictArg continuation is an explicit syntax
-    tree.  In earlier versions we represented it as a function
-    (CoreExpr -> CoreEpxr) which we couldn't take apart.
-
-Historical aide: previously we did this (where E is a
-big argument:
-        f E [..hole..]
-        ==>     let $j = \a -> f E a
-                in $j [..hole..]
-
-But this is terrible! Here's an example:
-        && E (case x of { T -> F; F -> T })
-Now, && is strict so we end up simplifying the case with
-an ArgOf continuation.  If we let-bind it, we get
-        let $j = \v -> && E v
-        in simplExpr (case x of { T -> F; F -> T })
-                     (ArgOf (\r -> $j r)
-And after simplifying more we get
+  ==>
         let $j = \v -> && E v
         in case x of { T -> $j F; F -> $j T }
-Which is a Very Bad Thing
+
+But we'd prefer to get
+        let a = E
+        in case x of { T -> && a F; F -> && a T }
+
+Pushing the whole call inwards in this way is precisely the change
+that was made in #3116, but /un-done/ by my fix to #13253.  Why?
+Because pushing the whole call inwards works very badly in some cases.
+
+   f (case x1 of { T->F; F->T }) (case x2..) ...
+
+==> GHC 8.10 duplicate StrictArg
+  (case x1 of { T -> f F, F -> f T })
+     (case x2 ...)
+     (case x3 ...)
+==> duplicate ApplyToVal
+  let a2 = case x2 of ...
+      a3 = case x3 of ...
+  in case x1 of { T -> f F a2 a3 ... ; F -> f T a2 a3 ... }
+
+Now there is an Awful Danger than we'll postInlineUnconditionally a2
+and a3, and repeat the whole exercise, leading to exponential code
+size.  Moreover, if we don't, those ai lets are really strict; so not
+or later they will be dealt with via Note [Duplicating StrictBind].
+StrictArg and StrictBind should be handled the same.
 
 
 Note [Duplicating StrictBind]
@@ -3671,9 +3697,10 @@ that for case expressions.  After all,
    let x* = e in b   is similar to    case e of x -> b
 
 So we potentially make a join-point for the body, thus:
-   let x = [] in b   ==>   join j x = b
-                           in let x = [] in j x
+   let x = <> in b   ==>   join j x = b
+                           in j <>
 
+Just like StrictArg in fact -- and indeed they share code.
 
 Note [Join point abstraction]  Historical note
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

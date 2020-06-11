@@ -832,7 +832,7 @@ occAnalNonRecBind env lvl imp_rule_edges bndr rhs body_usage
 
     certainly_inline -- See Note [Cascading inlines]
       = case occ of
-          OneOcc { occ_in_lam = NotInsideLam, occ_one_br = InOneBranch }
+          OneOcc { occ_in_lam = NotInsideLam, occ_n_br = 1 }
             -> active && not_stable
           _ -> False
 
@@ -2563,7 +2563,7 @@ mkOneOcc id int_cxt arity
   = emptyDetails
   where
     occ_info = OneOcc { occ_in_lam  = NotInsideLam
-                      , occ_one_br  = InOneBranch
+                      , occ_n_br    = oneBranch
                       , occ_int_cxt = int_cxt
                       , occ_tail    = AlwaysTailCalled arity }
 
@@ -2967,11 +2967,15 @@ addOccInfo a1 a2  = ASSERT( not (isDeadOcc a1 || isDeadOcc a2) )
 -- (orOccInfo orig new) is used
 -- when combining occurrence info from branches of a case
 
-orOccInfo (OneOcc { occ_in_lam = in_lam1, occ_int_cxt = int_cxt1
-                  , occ_tail   = tail1 })
-          (OneOcc { occ_in_lam = in_lam2, occ_int_cxt = int_cxt2
-                  , occ_tail   = tail2 })
-  = OneOcc { occ_one_br  = MultipleBranches -- because it occurs in both branches
+orOccInfo (OneOcc { occ_in_lam  = in_lam1
+                  , occ_n_br    = nbr1
+                  , occ_int_cxt = int_cxt1
+                  , occ_tail    = tail1 })
+          (OneOcc { occ_in_lam  = in_lam2
+                  , occ_n_br    = nbr2
+                  , occ_int_cxt = int_cxt2
+                  , occ_tail    = tail2 })
+  = OneOcc { occ_n_br    = nbr1 + nbr2
            , occ_in_lam  = in_lam1 `mappend` in_lam2
            , occ_int_cxt = int_cxt1 `mappend` int_cxt2
            , occ_tail    = tail1 `andTailCallInfo` tail2 }
