@@ -2866,7 +2866,7 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
          -- The bangs here have been observed to improve performance
          -- significantly in optimized builds.
          let kind_co = mkSymCo $
-               liftCoSubst Nominal lc (tyCoBinderType binder)
+                       liftCoSubst Nominal lc (tyCoBinderType binder)
              !casted_xi = xi `mkCastTy` kind_co
              casted_co =  mkCoherenceLeftCo role xi kind_co co
 
