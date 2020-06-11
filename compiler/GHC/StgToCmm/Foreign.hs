@@ -74,6 +74,7 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
               | otherwise            = Nothing
 
               -- ToDo: this might not be correct for 64-bit API
+              -- This is correct for the PowerPC ELF ABI version 1 and 2.
             arg_size (arg, _) = max (widthInBytes $ typeWidth $ cmmExprType platform arg)
                                      (platformWordSizeInBytes platform)
         ; cmm_args <- getFCallArgs stg_args typ
@@ -634,4 +635,3 @@ typeToStgFArgType typ
   -- a type in a foreign function signature with a representationally
   -- equivalent newtype.
   tycon = tyConAppTyCon (unwrapType typ)
-
