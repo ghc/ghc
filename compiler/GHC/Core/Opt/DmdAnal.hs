@@ -8,6 +8,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
 
 module GHC.Core.Opt.DmdAnal ( dmdAnalProgram ) where
 
@@ -51,7 +52,7 @@ import GHC.Types.Unique.Set
 dmdAnalProgram :: DynFlags -> FamInstEnvs -> CoreProgram -> IO CoreProgram
 dmdAnalProgram dflags fam_envs binds = do
   let env             = emptyAnalEnv dflags fam_envs
-  let binds_plus_dmds = snd $ mapAccumL dmdAnalTopBind env binds
+  let !binds_plus_dmds = snd $ mapAccumL dmdAnalTopBind env binds
   dumpIfSet_dyn dflags Opt_D_dump_str_signatures "Strictness signatures" FormatText $
     dumpIdInfoOfProgram (pprIfaceStrictSig . strictnessInfo) binds_plus_dmds
   -- See Note [Stamp out space leaks in demand analysis]
@@ -149,7 +150,9 @@ dmdAnal, dmdAnal' :: AnalEnv
 --    See Note [Ensure demand is strict]
 
 dmdAnal env d e = -- pprTrace "dmdAnal" (ppr d <+> ppr e) $
-                  dmdAnal' env d e
+                  -- See Note [Demand analysis on self recursive functions]
+                  -- for why we widen the incoming demand here.
+                  dmdAnal' env (widenDmd 5 d) e
 
 dmdAnal' _ _ (Lit lit)     = (nopDmdType, Lit lit)
 dmdAnal' _ _ (Type ty)     = (nopDmdType, Type ty) -- Doesn't happen, in fact
@@ -517,6 +520,83 @@ dmdTransform env var dmd
 ************************************************************************
 -}
 
+{- Note [Demand analysis on self recursive functions]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Given a data type like this:
+
+    T = C { ... , next :: T }
+
+and a function
+
+    f x = ..
+      .. -> f (next x)
+
+usage information would be unbounded in it's size.
+
+The reason is that we figure out f will use the next field of x.
+Giving us useage information of U<U>.
+Armed with this information we analyse `f (next x)` in the body again
+on the next iteration giving usage of U<U<U>>. We can repeat this
+for infinity and will never reach a fixpoint.
+
+We used to deal with this simply by limiting the number of iterations
+to 10 and giving up if we could not find a fix point in this time.
+
+While this works well for small recursive groups it doesn't work for
+large ones. This happened in #18304.
+
+The reason is simple. We analyse a recursive group of functions
+like below:
+
+f1 x = ...
+  -> f1 (next x)
+  -> f2 (next x)
+
+f2 x = ...
+  -> f1 (next x)
+  -> f2 (next x)
+  -> fn ...
+
+We analyse f1 under the default demand resulting in U<U>.
+We analyse f2 and see the call `f1 (next x)` in the body.
+Since `f1 x` has U<U> "f1 (next x)" in the body of f2 will
+result in U<U<U>> as usage demand of f2.
+
+For each additional function fn in the group of this pattern
+usage information will become nested deeper by one level.
+
+This means depth of usage information will grow linear in the
+number of functions in the recursive group. Being capped at
+iterations * n.
+
+This is still tractable, the issue in #18304 addone one more
+dimension to the problem by not having one, but two "next" fields.
+
+data T = C { ... , next1 :: T, next2 :: T}
+
+f1 x = ...
+  .. -> f1 (next1 x)
+  .. -> f1 (next2 x)
+  .. -> f2 (next1 x)
+  .. -> f2 (next2 x)
+
+Suddenly the size of usage information was growing exponentially
+in 2 ^ (n * iterations).
+
+This very quickly becomes untractable!
+
+This is a well known problem which is usually solved by adding a
+widening operator.
+
+For simplicity however we apply this operator to the incoming demand
+instead of the result. This has the same result of allowing us to reach
+a fixpoint but has two benefits:
+
+* There is only a single place where we need to care (in the argument of dmdAnal).
+* We can fully analyze functions taking apart deeply nested non-recursive types
+
+-}
 -- Recursive bindings
 dmdFix :: TopLevelFlag
        -> AnalEnv                            -- Does not include bindings for this binding
@@ -623,15 +703,16 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
   where
     rhs_arity      = idArity id
     rhs_dmd
-      -- See Note [Demand analysis for join points]
-      -- See Note [Invariants on join points] invariant 2b, in GHC.Core
-      --     rhs_arity matches the join arity of the join point
-      | isJoinId id
-      = mkCallDmds rhs_arity let_dmd
-      | otherwise
-      -- NB: rhs_arity
-      -- See Note [Demand signatures are computed for a threshold demand based on idArity]
-      = mkRhsDmd env rhs_arity rhs
+        -- See Note [Demand analysis for join points]
+        -- See Note [Invariants on join points] invariant 2b, in GHC.Core
+        --     rhs_arity matches the join arity of the join point
+        | isJoinId id
+        = mkCallDmds rhs_arity let_dmd
+        | otherwise
+        -- NB: rhs_arity
+        -- See Note [Demand signatures are computed for a threshold demand based on idArity]
+        = mkRhsDmd env rhs_arity rhs
+
     (DmdType rhs_fv rhs_dmds rhs_div, rhs')
                    = dmdAnal env rhs_dmd rhs
     sig            = mkStrictSigForArity rhs_arity (DmdType sig_fv rhs_dmds rhs_div)

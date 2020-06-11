@@ -5,6 +5,7 @@
 \section[Demand]{@Demand@: A decoupled implementation of a demand domain}
 -}
 
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP, FlexibleInstances, TypeSynonymInstances, RecordWildCards #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -51,7 +52,9 @@ module GHC.Types.Demand (
         useCount, isUsedOnce, reuseEnv,
         zapUsageDemand, zapUsageEnvSig,
         zapUsedOnceDemand, zapUsedOnceSig,
-        strictifyDictDmd, strictifyDmd
+        strictifyDictDmd, strictifyDmd,
+
+        widenDmd
 
      ) where
 
@@ -82,6 +85,12 @@ import GHC.Core.DataCon ( splitDataProductType_maybe )
 
 data JointDmd s u = JD { sd :: s, ud :: u }
   deriving ( Eq, Show )
+
+-- | Limit the depth of demands to the given nesting.
+-- Any sub-demand exceeding this depth will be given the top
+-- demand for the respective domain.
+widenDmd :: Int -> JointDmd StrDmd UseDmd -> JointDmd StrDmd UseDmd
+widenDmd n (JD s u) = JD (widenStrDmd n s) (widenUseDmd n u)
 
 getStrDmd :: JointDmd s u -> s
 getStrDmd = sd
@@ -205,6 +214,21 @@ data StrDmd
                          --                       including a type variable
 
   deriving ( Eq, Show )
+
+widenStrDmd :: Int -> StrDmd -> StrDmd
+widenStrDmd !n d =
+  case d of
+    HyperStr -> HyperStr
+    HeadStr -> HeadStr
+    SCall d -> SCall $! widenStrDmd n d
+    SProd args -> SProd $ map (widenStrArgDmd n) args
+
+widenStrArgDmd :: Int -> ArgStr -> ArgStr
+widenStrArgDmd 0 _ = Lazy
+widenStrArgDmd n d =
+  case d of
+    Lazy -> Lazy
+    Str d -> Str $! widenStrDmd (n-1) d
 
 -- | Strictness of a function argument.
 type ArgStr = Str StrDmd
@@ -330,14 +354,20 @@ splitStrProdDmd _ (SCall {}) = Nothing
          UHead
           |
   Count x -
-        |
-       Abs
+          |
+         Abs
 -}
 
 -- | Domain for genuine usage
 data UseDmd
-  = UCall Count UseDmd   -- ^ Call demand for absence.
+  = UCall Count UseDmd   -- ^ Call demand for absence analysis.
                          -- Used only for values of function type
+                         --
+                         -- The Count argument describes how often the
+                         -- value itself is used.
+                         -- The UseDmd describes how often we use the result
+                         -- of applying one argument to the value. This can
+                         -- and often is nested for multiple arguments.
 
   | UProd [ArgUse]       -- ^ Product.
                          -- Used only for values of product type
@@ -362,6 +392,18 @@ data UseDmd
   | Used                 -- ^ May be used and its sub-components may be used.
                          -- (top of the lattice)
   deriving ( Eq, Show )
+
+widenUseDmd :: Int -> UseDmd -> UseDmd
+widenUseDmd 0 _ = Used
+widenUseDmd _ UHead = UHead
+widenUseDmd _ Used = Used
+widenUseDmd n (UCall c d) = UCall c $! widenUseDmd n d
+widenUseDmd n (UProd args) = UProd $ map (widenUseArg n) args
+
+widenUseArg :: Int -> ArgUse -> ArgUse
+widenUseArg _ Abs = Abs
+widenUseArg n (Use c d) = Use c $! widenUseDmd (n-1) d
+
 
 -- Extended usage demand for absence and counting
 type ArgUse = Use UseDmd
