@@ -375,3 +375,24 @@ test ('T18282',
       ],
       compile,
       ['-v0 -O'])
+test ('T18140',
+      [ collect_compiler_stats('bytes allocated',2)
+      ],
+      compile,
+      ['-v0 -O'])
+test('T10421',
+    [ only_ways(['normal']),
+      collect_compiler_stats('bytes allocated', 1)
+    ],
+    multimod_compile,
+    ['T10421', '-v0 -O'])
+test ('T13253',
+      [ collect_compiler_stats('bytes allocated',2)
+      ],
+      compile,
+      ['-v0 -O'])
+test ('T13253-spj',
+      [ collect_compiler_stats('bytes allocated',2)
+      ],
+      compile,
+      ['-v0 -O'])
