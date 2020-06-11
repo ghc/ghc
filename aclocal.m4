@@ -447,25 +447,40 @@ AC_DEFUN([GET_ARM_ISA],
                      #endif]
                 )],
                 [AC_DEFINE(arm_HOST_ARCH_PRE_ARMv7, 1, [ARM pre v7])
-                 ARM_ISA=ARMv6
-                 AC_COMPILE_IFELSE([
-                        AC_LANG_PROGRAM(
-                                [],
-                                [#if defined(__VFP_FP__)
-                                     return 0;
-                                #else
-                                     no vfp
-                                #endif]
-                        )],
-                        [changequote(, )dnl
-                         ARM_ISA_EXT="[VFPv2]"
-                         changequote([, ])dnl
-                        ],
-                        [changequote(, )dnl
-                         ARM_ISA_EXT="[]"
-                         changequote([, ])dnl
-                        ]
-                )],
+                 if grep -q Raspbian /etc/issue && uname -m | grep -q armv7; then
+                   # Raspbian unfortunately makes some extremely questionable
+                   # packaging decisions, configuring gcc to compile for ARMv6
+                   # despite the fact that the RPi4 is ARMv8. As ARMv8 doesn't
+                   # support all instructions supported by ARMv6 this can
+                   # break. Work around this by checking uname to verify
+                   # that we aren't running on armv7.
+                   # See #17856.
+                   AC_MSG_NOTICE([Found compiler which claims to target ARMv6 running on ARMv7, assuming this is ARMv7 on Raspbian (see T17856)])
+                   ARM_ISA=ARMv7
+                   changequote(, )dnl
+                   ARM_ISA_EXT="[VFPv2]"
+                   changequote([, ])dnl
+                 else
+                   ARM_ISA=ARMv6
+                   AC_COMPILE_IFELSE([
+                          AC_LANG_PROGRAM(
+                                  [],
+                                  [#if defined(__VFP_FP__)
+                                       return 0;
+                                  #else
+                                       no vfp
+                                  #endif]
+                          )],
+                          [changequote(, )dnl
+                           ARM_ISA_EXT="[VFPv2]"
+                           changequote([, ])dnl
+                          ],
+                          [changequote(, )dnl
+                           ARM_ISA_EXT="[]"
+                           changequote([, ])dnl
+                          ]
+                  )
+                fi],
                 [changequote(, )dnl
                  ARM_ISA=ARMv7
                  ARM_ISA_EXT="[VFPv3,NEON]"
