@@ -13,11 +13,11 @@ T7360.$WFoo3 [InlPrag=INLINE[final] CONLIKE] :: Int #-> Foo
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (dt [Occ=Once!] :: Int) ->
-                 case dt of { GHC.Types.I# dt [Occ=Once] -> T7360.Foo3 dt }}]
+         Tmpl= \ (dt [Occ=Once1!] :: Int) ->
+                 case dt of { GHC.Types.I# dt [Occ=Once1] -> T7360.Foo3 dt }}]
 T7360.$WFoo3
-  = \ (dt [Occ=Once!] :: Int) ->
-      case dt of { GHC.Types.I# dt [Occ=Once] -> T7360.Foo3 dt }
+  = \ (dt [Occ=Once1!] :: Int) ->
+      case dt of { GHC.Types.I# dt [Occ=Once1] -> T7360.Foo3 dt }
 
 -- RHS size: {terms: 5, types: 2, coercions: 0, joins: 0/0}
 fun1 [InlPrag=NOINLINE] :: Foo -> ()
@@ -40,10 +40,10 @@ fun2 :: forall {a}. [a] -> ((), Int)
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (@a) (x [Occ=Once] :: [a]) ->
+         Tmpl= \ (@a) (x [Occ=Once1] :: [a]) ->
                  (T7360.fun4,
-                  case x of wild [Occ=Once] { __DEFAULT ->
-                  case GHC.List.$wlenAcc @a wild 0# of ww2 [Occ=Once] { __DEFAULT ->
+                  case x of wild [Occ=Once1] { __DEFAULT ->
+                  case GHC.List.$wlenAcc @a wild 0# of ww2 [Occ=Once1] { __DEFAULT ->
                   GHC.Types.I# ww2
                   }
                   })}]
