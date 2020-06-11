@@ -2024,6 +2024,7 @@ genCCall' config gcp target dest_regs args
                     MO_Ctz _     -> unsupported
                     MO_AtomicRMW {} -> unsupported
                     MO_Cmpxchg w -> (fsLit $ cmpxchgLabel w, False)
+                    MO_Xchg w    -> (fsLit $ xchgLabel w, False)
                     MO_AtomicRead _  -> unsupported
                     MO_AtomicWrite _ -> unsupported
 
