@@ -38,6 +38,9 @@ General bug fixes
 - Fix a bug where typechecker plugins could be run with an inconsistent
   typechecker environment (:ghc-ticket:`19191`).
 
+- Fix a simplifier bug which lead to an exponential blow up and excessive
+  memory usage in certain cases (:ghc-ticket:`18923`, :ghc-ticket:`18140`, :ghc-ticket:`10421`, :ghc-ticket:`18282`, :ghc-ticket:`13253`)
+
 Portability fixes
 -----------------
 

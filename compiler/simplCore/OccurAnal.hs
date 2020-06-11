@@ -1539,8 +1539,8 @@ occAnalNonRecRhs env bndr bndrs body
 
     certainly_inline -- See Note [Cascading inlines]
       = case occ of
-          OneOcc { occ_in_lam = in_lam, occ_one_br = one_br }
-            -> not in_lam && one_br && active && not_stable
+          OneOcc { occ_in_lam = in_lam, occ_n_br = n_br }
+            -> not in_lam && n_br == 1 && active && not_stable
           _ -> False
 
     is_join_point = isAlwaysTailCalled occ
@@ -2481,7 +2481,7 @@ mkOneOcc :: OccEnv -> Id -> InterestingCxt -> JoinArity -> UsageDetails
 mkOneOcc env id int_cxt arity
   | isLocalId id
   = singleton $ OneOcc { occ_in_lam  = False
-                       , occ_one_br  = True
+                       , occ_n_br  = 1
                        , occ_int_cxt = int_cxt
                        , occ_tail    = AlwaysTailCalled arity }
   | id `elemVarSet` occ_gbl_scrut env
@@ -2877,11 +2877,15 @@ addOccInfo a1 a2  = ASSERT( not (isDeadOcc a1 || isDeadOcc a2) )
 -- (orOccInfo orig new) is used
 -- when combining occurrence info from branches of a case
 
-orOccInfo (OneOcc { occ_in_lam = in_lam1, occ_int_cxt = int_cxt1
-                  , occ_tail   = tail1 })
-          (OneOcc { occ_in_lam = in_lam2, occ_int_cxt = int_cxt2
-                  , occ_tail   = tail2 })
-  = OneOcc { occ_one_br  = False -- False, because it occurs in both branches
+orOccInfo (OneOcc { occ_in_lam  = in_lam1
+                  , occ_n_br    = nbr1
+                  , occ_int_cxt = int_cxt1
+                  , occ_tail    = tail1 })
+          (OneOcc { occ_in_lam  = in_lam2
+                  , occ_n_br    = nbr2
+                  , occ_int_cxt = int_cxt2
+                  , occ_tail    = tail2 })
+  = OneOcc { occ_n_br  = nbr1 + nbr2
            , occ_in_lam  = in_lam1 || in_lam2
            , occ_int_cxt = int_cxt1 && int_cxt2
            , occ_tail    = tail1 `andTailCallInfo` tail2 }
