@@ -85,8 +85,8 @@ f [InlPrag=NOUSERINLINE[2]] :: Int -> (Int, Int) -> Bool
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (w [Occ=Once!] :: Int) (w1 [Occ=Once] :: (Int, Int)) ->
-                 case w of { I# ww1 [Occ=Once] -> T4908.$wf ww1 w1 }}]
+         Tmpl= \ (w [Occ=Once1!] :: Int) (w1 [Occ=Once1] :: (Int, Int)) ->
+                 case w of { I# ww1 [Occ=Once1] -> T4908.$wf ww1 w1 }}]
 f = \ (w :: Int) (w1 :: (Int, Int)) ->
       case w of { I# ww1 -> T4908.$wf ww1 w1 }
 

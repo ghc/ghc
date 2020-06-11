@@ -82,7 +82,7 @@ plusOne :: Natural -> Natural
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (n [Occ=Once] :: Natural) -> naturalAdd n M.minusOne1}]
+         Tmpl= \ (n [Occ=Once1] :: Natural) -> naturalAdd n M.minusOne1}]
 plusOne = \ (n :: Natural) -> naturalAdd n M.minusOne1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}

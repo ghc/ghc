@@ -94,11 +94,11 @@ g [InlPrag=NOUSERINLINE[2]] :: Bool -> Bool -> Int -> Int
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=3,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (w [Occ=Once] :: Bool)
-                 (w1 [Occ=Once] :: Bool)
-                 (w2 [Occ=Once!] :: Int) ->
-                 case w2 of { GHC.Types.I# ww1 [Occ=Once] ->
-                 case T13143.$wg w w1 ww1 of ww2 [Occ=Once] { __DEFAULT ->
+         Tmpl= \ (w [Occ=Once1] :: Bool)
+                 (w1 [Occ=Once1] :: Bool)
+                 (w2 [Occ=Once1!] :: Int) ->
+                 case w2 of { GHC.Types.I# ww1 [Occ=Once1] ->
+                 case T13143.$wg w w1 ww1 of ww2 [Occ=Once1] { __DEFAULT ->
                  GHC.Types.I# ww2
                  }
                  }}]
