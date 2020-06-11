@@ -186,6 +186,18 @@ emitPrimOp dflags = \case
         (replicate (fromIntegral n) init)
     _ -> PrimopCmmEmit_External
 
+  ArrayOf1Op -> \elems -> opAllDone $ \[res] ->
+    let n = length elems
+      in doNewArrayOp
+          res
+          (arrPtrsRep dflags (fromIntegral n))
+          mkMAP_FROZEN_DIRTY_infoLabel
+          [ ( mkIntExpr platform n
+            , fixedHdrSize dflags + oFFSET_StgMutArrPtrs_ptrs dflags )
+          , ( mkIntExpr platform (nonHdrSizeW (arrPtrsRep dflags (fromIntegral n)))
+            , fixedHdrSize dflags + oFFSET_StgMutArrPtrs_size dflags ) ]
+          elems
+
   ArrayOf2Op -> \elems -> opAllDone $ \[res] ->
     let n = length elems
       in doNewArrayOp
@@ -252,6 +264,16 @@ emitPrimOp dflags = \case
         ]
         (replicate (fromIntegral n) init)
     _ -> PrimopCmmEmit_External
+
+  SmallArrayOf1Op -> \elems -> opAllDone $ \[res] ->
+    let n = length elems
+      in doNewArrayOp
+          res
+          (smallArrPtrsRep (fromIntegral n))
+          mkSMAP_FROZEN_DIRTY_infoLabel
+          [ ( mkIntExpr platform n
+            , fixedHdrSize dflags + oFFSET_StgSmallMutArrPtrs_ptrs dflags ) ]
+          elems
 
   SmallArrayOf2Op -> \elems -> opAllDone $ \[res] ->
     let n = length elems

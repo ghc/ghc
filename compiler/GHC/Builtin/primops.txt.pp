@@ -1076,6 +1076,13 @@ primop ArrayOf2Op "arrayOf2#" GenPrimOp
    out_of_line      = True
    has_side_effects = True
 
+primop ArrayOf1Op "arrayOf1#" GenPrimOp
+   a -> Array# a
+   {Create a new immutable array with one element.}
+   with
+   out_of_line      = True
+   has_side_effects = True
+
 primop  SameMutableArrayOp "sameMutableArray#" GenPrimOp
    MutableArray# s a -> MutableArray# s a -> Int#
 
@@ -1252,6 +1259,13 @@ primop  NewSmallArrayOp "newSmallArray#" GenPrimOp
     with each element containing the specified initial value.}
    with
    out_of_line = True
+   has_side_effects = True
+
+primop SmallArrayOf1Op "smallArrayOf1#" GenPrimOp
+   a -> SmallArray# a
+   {Create a new immutable array with one element.}
+   with
+   out_of_line      = True
    has_side_effects = True
 
 primop SmallArrayOf2Op "smallArrayOf2#" GenPrimOp
