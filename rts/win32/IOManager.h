@@ -107,4 +107,3 @@ extern int AddProcRequest ( void*          proc,
 extern void abandonWorkRequest ( int reqID );
 
 extern void interruptIOManagerEvent ( void );
-
