@@ -54,8 +54,8 @@ module GHC.IO.Windows.Handle
 #include <winnt.h>
 ##include "windows_cconv.h"
 
+-- Can't avoid these semantics leaks, they are base constructs
 import Data.Bits ((.|.), (.&.), shiftL)
-import Data.Word (Word8, Word16, Word64)
 import Data.Functor ((<$>))
 import Data.Typeable
 
@@ -64,8 +64,9 @@ import GHC.Enum
 import GHC.Num
 import GHC.Real
 import GHC.List
+import GHC.Word (Word8, Word16, Word64)
 
-import GHC.IO
+import GHC.IO hiding (mask)
 import GHC.IO.Buffer
 import GHC.IO.BufferedIO
 import qualified GHC.IO.Device

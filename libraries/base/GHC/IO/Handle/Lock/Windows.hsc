@@ -30,10 +30,7 @@ import GHC.IO.FD
 import GHC.IO.Handle.FD
 import GHC.IO.Handle.Types (Handle)
 import GHC.IO.Handle.Lock.Common (LockMode(..))
-import GHC.IO.Handle.Windows (handleToHANDLE)
-import GHC.IO.Handle.Lock.Common (LockMode(..), FileLockingNotSupported(..))
 import GHC.IO.SubSystem
-import GHC.Ptr
 import GHC.Windows
 
 lockImpl :: Handle -> String -> LockMode -> Bool -> IO Bool
