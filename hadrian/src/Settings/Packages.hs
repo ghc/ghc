@@ -273,10 +273,6 @@ rtsPackageArgs = package rts ? do
     let ghcArgs = mconcat
           [ arg "-Irts"
           , arg $ "-I" ++ path
-          , flag WithLibdw ? if not (null libdwIncludeDir) then arg ("-I" ++ libdwIncludeDir) else mempty
-          , flag WithLibdw ? if not (null libdwLibraryDir) then arg ("-L" ++ libdwLibraryDir) else mempty
-          , flag WithLibnuma ? if not (null libnumaIncludeDir) then arg ("-I" ++ libnumaIncludeDir) else mempty
-          , flag WithLibnuma ? if not (null libnumaLibraryDir) then arg ("-L" ++ libnumaLibraryDir) else mempty
           , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
           -- Set the namespace for the rts fs functions
           , arg $ "-DFS_NAMESPACE=rts"
