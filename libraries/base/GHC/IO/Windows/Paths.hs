@@ -47,4 +47,3 @@ getDevicePath path
        newPath <- peekCWString str
        free str
        return newPath
-
