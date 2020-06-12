@@ -4,7 +4,7 @@
 [2 of 2] Processing q
 Unexpected instantiations in cycle [p[H=A],
                                     ModSummary {
-                                       ms_hs_date = 2020-05-21 02:10:31.685714926 UTC
+                                       ms_hs_date = 2020-06-11 15:49:40.634611971 UTC
                                        ms_mod = A[sig],
                                        ms_textual_imps = [(Nothing, Prelude), (Nothing, I)]
                                        ms_srcimps = []
