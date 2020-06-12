@@ -13,7 +13,7 @@ See Note [Core Lint guarantee].
 module GHC.Core.Lint (
     lintCoreBindings, lintUnfolding,
     lintPassResult, lintInteractiveExpr, lintExpr,
-    lintAnnots, lintTypes,
+    lintAnnots, lintAxiom,
 
     -- ** Debug output
     endPass, endPassIO,
@@ -1490,17 +1490,32 @@ lintIdBndr top_lvl bind_site id thing_inside
 %************************************************************************
 -}
 
-lintTypes :: DynFlags
-          -> [TyCoVar]   -- Treat these as in scope
-          -> [Type]
+lintAxiom :: DynFlags
+          -> CoAxiom Unbranched
           -> Maybe MsgDoc -- Nothing => OK
-lintTypes dflags vars tys
+lintAxiom dflags axiom
   | isEmptyBag errs = Nothing
   | otherwise       = Just (pprMessageBag errs)
   where
-    (_warns, errs) = initL dflags defaultLintFlags vars linter
-    linter = lintBinders LambdaBind vars $ \_ ->
-             mapM_ lintType tys
+    (_warns, errs) = initL dflags defaultLintFlags [] $
+                     lint_axiom axiom
+
+lint_axiom :: CoAxiom Unbranched -> LintM ()
+lint_axiom ax@(CoAxiom { co_ax_tc = fam_tc })
+  = lintBinders LambdaBind (tvs ++ cvs) $ \_ ->
+    do { let lhs = mkTyConApp fam_tc lhs_args
+       ; lhs' <- lintType lhs
+       ; rhs' <- lintType rhs
+       ; let lhs_kind = typeKind lhs'
+             rhs_kind = typeKind rhs'
+       ; checkL (lhs_kind `eqType` rhs_kind) $
+         hang (text "Inhomogeneous axiom")
+            2 (ppr ax $$ text "lhs:" <+> ppr lhs <+> dcolon <+> ppr lhs_kind
+                      $$ text "rhs:" <+> ppr rhs <+> dcolon <+> ppr rhs_kind) }
+  where
+   CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
+              , cab_lhs = lhs_args, cab_rhs = rhs } = coAxiomSingleBranch ax
+
 
 lintValueType :: Type -> LintM LintedType
 -- Types only, not kinds
@@ -1520,7 +1535,7 @@ checkTyCon tc
   = checkL (not (isTcTyCon tc)) (text "Found TcTyCon:" <+> ppr tc)
 
 -------------------
-lintType :: LintedType -> LintM LintedType
+lintType :: Type -> LintM LintedType
 
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]

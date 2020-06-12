@@ -2896,7 +2896,7 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
                 pprUFM (imp_dep_mods imports) (ppr . sort)
          , text "Dependent packages:" <+>
                 ppr (S.toList $ imp_dep_pkgs imports)]
-  where         -- The use of sort is just to reduce unnecessary
+                -- The use of sort is just to reduce unnecessary
                 -- wobbling in testsuite output
 
 ppr_rules :: [LRuleDecl GhcTc] -> SDoc
