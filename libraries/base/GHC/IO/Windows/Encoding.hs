@@ -217,4 +217,3 @@ withUTF16ToGhcInternal ptr len fn
                                                     (fromIntegral w_len) ptr
                                                     mbchars' nullPtr nullPtr
                   return $ fromIntegral mbchars
-
