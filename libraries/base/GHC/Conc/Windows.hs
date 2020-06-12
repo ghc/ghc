@@ -49,11 +49,6 @@ import qualified GHC.Conc.IOCP as WINIO
 import GHC.Event.Windows.ConsoleEvent
 import GHC.IO.SubSystem ((<!>))
 import GHC.Ptr
-import GHC.Read (Read)
-import GHC.Real (div, fromIntegral)
-import GHC.Show (Show)
-import GHC.Word (Word32, Word64)
-import GHC.Windows
 import Unsafe.Coerce ( unsafeCoerceUnlifted )
 
 -- ----------------------------------------------------------------------------

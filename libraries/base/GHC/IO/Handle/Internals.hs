@@ -82,8 +82,6 @@ import System.Posix.Internals hiding (FD)
 
 import Foreign.C
 
-import {-# SOURCE #-} Debug.Trace (traceEventIO)
-
 c_DEBUG_DUMP :: Bool
 c_DEBUG_DUMP = False
 
