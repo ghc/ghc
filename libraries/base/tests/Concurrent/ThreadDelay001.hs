@@ -42,4 +42,3 @@ delay n = do
 
   when (obs < req) $ print (tS, tE, req, obs, diff, diff')
 #endif
-
