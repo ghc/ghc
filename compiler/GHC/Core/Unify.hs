@@ -1,6 +1,6 @@
 -- (c) The University of Glasgow 2006
 
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, PatternSynonyms #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 
@@ -44,6 +44,7 @@ import GHC.Data.Pair
 import GHC.Utils.Outputable
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
+import GHC.Exts( oneShot )
 
 import Control.Monad
 import Control.Applicative hiding ( empty )
@@ -1211,6 +1212,77 @@ data BindFlag
 ************************************************************************
 -}
 
+{- Note [The one-shot state monad trick]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Many places in GHC use a state monad, and we really want those
+functions to be eta-expanded (#18202).  Consider
+
+    newtype M a = MkM (State -> (State, a))
+
+    instance Monad M where
+       mf >>= k = MkM (\s -> case mf  of MkM f  ->
+                             case f s of (s',r) ->
+                             case k r of MkM g  ->
+                             g s')
+
+    foo :: Int -> M Int
+    foo x = g y >>= \r -> h r
+      where
+        y = expensive x
+
+In general, you might say (map (foo 4) xs), and expect (expensive 4)
+to be evaluated only once.  So foo should have arity 1 (not 2).
+But that's rare, and if you /aren't/ re-using (M a) values it's much
+more efficient to make foo have arity 2.
+
+See https://www.joachim-breitner.de/blog/763-Faster_Winter_5__Eta-Expanding_ReaderT
+
+So here is the trick.  Define
+
+    data M a = MkM' (State -> (State, a))
+    pattern MkM f <- MkM' f
+      where
+        MkM f = MkM' (oneShot f)
+
+The patten synonm means that whenever we write (MkM f), we'll
+actually get (MkM' (oneShot f)), so we'll pin a one-shot flag
+on f's lambda-binder. Now look at foo:
+
+  foo = \x. g (expensive x) >>= \r -> h r
+      = \x. let mf = g (expensive x)
+                k  = \r -> h r
+            in MkM' (oneShot (\s -> case mf  of MkM' f  ->
+                                    case f s of (s',r) ->
+                                    case k r of MkM' g  ->
+                                    g s'))
+      -- The MkM' are just newtype casts nt_co
+      = \x. let mf = g (expensive x)
+                k  = \r -> h r
+            in (\s{os}. case (mf |> nt_co) s of (s',r) ->
+                        (k r) |> nt_co s')
+               |> sym nt_co
+
+      -- Float into that \s{os}
+      = \x. (\s{os}. case (g (expensive x) |> nt_co) s of (s',r) ->
+                     h r |> nt_co s')
+            |> sym nt_co
+
+and voila!  In summary:
+
+* It's a very simple, two-line change
+
+* It eta-expands all uses of the monad, automatically
+
+* It is very similar to the built-in "state hack" (see
+  GHC.Core.Opt.Arity Note [The state-transformer hack]) but the trick
+  described here is applicable on a monad-by-monad basis under
+  programmer control.
+
+* Beware: itt changes the behaviour of
+     map (foo 3) xs
+  ToDo: explain what to do if you want to do this
+-}
+
 data UMEnv
   = UMEnv { um_unif :: AmIUnifying
 
@@ -1237,8 +1309,16 @@ data UMState = UMState
                    { um_tv_env   :: TvSubstEnv
                    , um_cv_env   :: CvSubstEnv }
 
-newtype UM a = UM { unUM :: UMState -> UnifyResultM (UMState, a) }
-    deriving (Functor)
+newtype UM a
+  = UM' { unUM :: UMState -> UnifyResultM (UMState, a) }
+    -- See Note [The one-shot state monad trick]
+  deriving (Functor)
+
+pattern UM :: (UMState -> UnifyResultM (UMState, a)) -> UM a
+-- See Note [The one-shot state monad trick]
+pattern UM m <- UM' m
+  where
+    UM m = UM' (oneShot m)
 
 instance Applicative UM where
       pure a = UM (\s -> pure (s, a))
