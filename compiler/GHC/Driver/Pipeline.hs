@@ -379,7 +379,7 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
   -- https://gitlab.haskell.org/ghc/ghc/issues/12673
   -- and https://github.com/haskell/cabal/issues/2257
   empty_stub <- newTempName dflags TFL_CurrentModule "c"
-  let src = text "int" <+> ppr (mkModule (thisPackage dflags) mod_name) <+> text "= 0;"
+  let src = text "int" <+> ppr (mkHomeModule dflags mod_name) <+> text "= 0;"
   writeFile empty_stub (showSDoc dflags (pprCode CStyle src))
   _ <- runPipeline StopLn hsc_env
                   (empty_stub, Nothing, Nothing)
@@ -513,9 +513,9 @@ linkingNeeded dflags staticLink linkables pkg_deps = do
 
         -- next, check libraries. XXX this only checks Haskell libraries,
         -- not extra_libraries or -l things from the command line.
-        let pkgstate = pkgState dflags
+        let pkgstate = unitState dflags
         let pkg_hslibs  = [ (collectLibraryPaths dflags [c], lib)
-                          | Just c <- map (lookupInstalledPackage pkgstate) pkg_deps,
+                          | Just c <- map (lookupUnitId pkgstate) pkg_deps,
                             lib <- packageHsLibs dflags c ]
 
         pkg_libfiles <- mapM (uncurry (findHSLib dflags)) pkg_hslibs
@@ -1233,7 +1233,7 @@ runPhase (RealPhase cc_phase) input_fn dflags
         -- add package include paths even if we're just compiling .c
         -- files; this is the Value Add(TM) that using ghc instead of
         -- gcc gives you :)
-        pkg_include_dirs <- liftIO $ getPackageIncludePath dflags pkgs
+        pkg_include_dirs <- liftIO $ getUnitIncludePath dflags pkgs
         let include_paths_global = foldr (\ x xs -> ("-I" ++ x) : xs) []
               (includePathsGlobal cmdline_include_paths ++ pkg_include_dirs)
         let include_paths_quote = foldr (\ x xs -> ("-iquote" ++ x) : xs) []
@@ -1261,11 +1261,11 @@ runPhase (RealPhase cc_phase) input_fn dflags
         pkg_extra_cc_opts <- liftIO $
           if hcc
              then return []
-             else getPackageExtraCcOpts dflags pkgs
+             else getUnitExtraCcOpts dflags pkgs
 
         framework_paths <-
             if platformUsesFrameworks platform
-            then do pkgFrameworkPaths <- liftIO $ getPackageFrameworkPath dflags pkgs
+            then do pkgFrameworkPaths <- liftIO $ getUnitFrameworkPath dflags pkgs
                     let cmdlineFrameworkPaths = frameworkPaths dflags
                     return $ map ("-F"++)
                                  (cmdlineFrameworkPaths ++ pkgFrameworkPaths)
@@ -1312,7 +1312,7 @@ runPhase (RealPhase cc_phase) input_fn dflags
                 -- way we do the import depends on whether we're currently compiling
                 -- the base package or not.
                        ++ (if platformOS platform == OSMinGW32 &&
-                              thisPackage dflags == baseUnitId
+                              homeUnitId dflags == baseUnitId
                                 then [ "-DCOMPILING_BASE_PACKAGE" ]
                                 else [])
 
@@ -1654,7 +1654,7 @@ linkBinary :: DynFlags -> [FilePath] -> [UnitId] -> IO ()
 linkBinary = linkBinary' False
 
 linkBinary' :: Bool -> DynFlags -> [FilePath] -> [UnitId] -> IO ()
-linkBinary' staticLink dflags o_files dep_packages = do
+linkBinary' staticLink dflags o_files dep_units = do
     let platform = targetPlatform dflags
         toolSettings' = toolSettings dflags
         verbFlags = getVerbFlags dflags
@@ -1668,7 +1668,7 @@ linkBinary' staticLink dflags o_files dep_packages = do
                       then return output_fn
                       else do d <- getCurrentDirectory
                               return $ normalise (d </> output_fn)
-    pkg_lib_paths <- getPackageLibraryPath dflags dep_packages
+    pkg_lib_paths <- getUnitLibraryPath dflags dep_units
     let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
         get_pkg_lib_path_opts l
          | osElfTarget (platformOS platform) &&
@@ -1706,7 +1706,7 @@ linkBinary' staticLink dflags o_files dep_packages = do
     pkg_lib_path_opts <-
       if gopt Opt_SingleLibFolder dflags
       then do
-        libs <- getLibs dflags dep_packages
+        libs <- getLibs dflags dep_units
         tmpDir <- newTempDir dflags
         sequence_ [ copyFile lib (tmpDir </> basename)
                   | (lib, basename) <- libs]
@@ -1723,7 +1723,7 @@ linkBinary' staticLink dflags o_files dep_packages = do
     let lib_path_opts = map ("-L"++) lib_paths
 
     extraLinkObj <- mkExtraObjToLinkIntoBinary dflags
-    noteLinkObjs <- mkNoteObjsToLinkIntoBinary dflags dep_packages
+    noteLinkObjs <- mkNoteObjsToLinkIntoBinary dflags dep_units
 
     let
       (pre_hs_libs, post_hs_libs)
@@ -1736,7 +1736,7 @@ linkBinary' staticLink dflags o_files dep_packages = do
         = ([],[])
 
     pkg_link_opts <- do
-        (package_hs_libs, extra_libs, other_flags) <- getPackageLinkOpts dflags dep_packages
+        (package_hs_libs, extra_libs, other_flags) <- getUnitLinkOpts dflags dep_units
         return $ if staticLink
             then package_hs_libs -- If building an executable really means making a static
                                  -- library (e.g. iOS), then we only keep the -l options for
@@ -1758,7 +1758,7 @@ linkBinary' staticLink dflags o_files dep_packages = do
                  -- that defines the symbol."
 
     -- frameworks
-    pkg_framework_opts <- getPkgFrameworkOpts dflags platform dep_packages
+    pkg_framework_opts <- getUnitFrameworkOpts dflags platform dep_units
     let framework_opts = getFrameworkOpts dflags platform
 
         -- probably _stub.o files
@@ -1911,7 +1911,7 @@ maybeCreateManifest dflags exe_filename
 
 
 linkDynLibCheck :: DynFlags -> [String] -> [UnitId] -> IO ()
-linkDynLibCheck dflags o_files dep_packages
+linkDynLibCheck dflags o_files dep_units
  = do
     when (haveRtsOptsFlags dflags) $ do
       putLogMsg dflags NoReason SevInfo noSrcSpan
@@ -1919,13 +1919,13 @@ linkDynLibCheck dflags o_files dep_packages
           (text "Warning: -rtsopts and -with-rtsopts have no effect with -shared." $$
            text "    Call hs_init_ghc() from your main() function to set these options.")
 
-    linkDynLib dflags o_files dep_packages
+    linkDynLib dflags o_files dep_units
 
 -- | Linking a static lib will not really link anything. It will merely produce
 -- a static archive of all dependent static libraries. The resulting library
 -- will still need to be linked with any remaining link flags.
 linkStaticLib :: DynFlags -> [String] -> [UnitId] -> IO ()
-linkStaticLib dflags o_files dep_packages = do
+linkStaticLib dflags o_files dep_units = do
   let extra_ld_inputs = [ f | FileOption _ f <- ldInputs dflags ]
       modules = o_files ++ extra_ld_inputs
       output_fn = exeFileName True dflags
@@ -1937,7 +1937,7 @@ linkStaticLib dflags o_files dep_packages = do
   output_exists <- doesFileExist full_output_fn
   (when output_exists) $ removeFile full_output_fn
 
-  pkg_cfgs <- getPreloadPackagesAnd dflags dep_packages
+  pkg_cfgs <- getPreloadUnitsAnd dflags dep_units
   archives <- concatMapM (collectArchives dflags) pkg_cfgs
 
   ar <- foldl mappend
@@ -1959,7 +1959,7 @@ doCpp dflags raw input_fn output_fn = do
     let hscpp_opts = picPOpts dflags
     let cmdline_include_paths = includePaths dflags
 
-    pkg_include_dirs <- getPackageIncludePath dflags []
+    pkg_include_dirs <- getUnitIncludePath dflags []
     let include_paths_global = foldr (\ x xs -> ("-I" ++ x) : xs) []
           (includePathsGlobal cmdline_include_paths ++ pkg_include_dirs)
     let include_paths_quote = foldr (\ x xs -> ("-iquote" ++ x) : xs) []
@@ -2002,8 +2002,9 @@ doCpp dflags raw input_fn output_fn = do
     let hsSourceCppOpts = [ "-include", ghcVersionH ]
 
     -- MIN_VERSION macros
-    let uids = explicitPackages (pkgState dflags)
-        pkgs = catMaybes (map (lookupUnit dflags) uids)
+    let state = unitState dflags
+        uids = explicitUnits state
+        pkgs = catMaybes (map (lookupUnit state) uids)
     mb_macro_include <-
         if not (null pkgs) && gopt Opt_VersionMacros dflags
             then do macro_stub <- newTempName dflags TFL_CurrentModule "h"
@@ -2222,7 +2223,7 @@ getGhcVersionPathName dflags = do
   candidates <- case ghcVersionFile dflags of
     Just path -> return [path]
     Nothing -> (map (</> "ghcversion.h")) <$>
-               (getPackageIncludePath dflags [toUnitId rtsUnitId])
+               (getUnitIncludePath dflags [rtsUnitId])
 
   found <- filterM doesFileExist candidates
   case found of

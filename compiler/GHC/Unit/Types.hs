@@ -39,8 +39,8 @@ module GHC.Unit.Types
    , fsToUnit
    , unitFS
    , unitString
-   , instUnitToUnit
    , toUnitId
+   , virtualUnitId
    , stringToUnit
    , stableUnitCmp
    , unitIsDefinite
@@ -62,6 +62,16 @@ module GHC.Unit.Types
    , mainUnitId
    , thisGhcUnitId
    , interactiveUnitId
+
+   , primUnit
+   , integerUnit
+   , baseUnit
+   , rtsUnit
+   , thUnit
+   , mainUnit
+   , thisGhcUnit
+   , interactiveUnit
+
    , isInteractiveModule
    , wiredInUnitIds
 
@@ -93,8 +103,8 @@ import Data.Bifunctor
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS.Char8
 
-import {-# SOURCE #-} GHC.Unit.State (improveUnit, PackageState, unitInfoMap, displayUnitId)
-import {-# SOURCE #-} GHC.Driver.Session (pkgState)
+import {-# SOURCE #-} GHC.Unit.State (displayUnitId)
+import {-# SOURCE #-} GHC.Driver.Session (unitState)
 
 ---------------------------------------------------------------------
 -- MODULES
@@ -162,7 +172,7 @@ pprModule mod@(Module p n)  = getPprStyle doc
  where
   doc sty
     | codeStyle sty =
-        (if p == mainUnitId
+        (if p == mainUnit
                 then empty -- never qualify the main package in code
                 else ztext (zEncodeFS (unitFS p)) <> char '_')
             <> pprModuleName n
@@ -446,30 +456,16 @@ mapGenUnit f gunitFS = go
                      (fmap (second (fmap go)) (instUnitInsts i))
 
 
--- | Check the database to see if we already have an installed unit that
--- corresponds to the given 'InstantiatedUnit'.
---
--- Return a `UnitId` which either wraps the `InstantiatedUnit` unchanged or
--- references a matching installed unit.
---
--- See Note [VirtUnit to RealUnit improvement]
-instUnitToUnit :: PackageState -> InstantiatedUnit -> Unit
-instUnitToUnit pkgstate iuid =
-    -- NB: suppose that we want to compare the indefinite
-    -- unit id p[H=impl:H] against p+abcd (where p+abcd
-    -- happens to be the existing, installed version of
-    -- p[H=impl:H].  If we *only* wrap in p[H=impl:H]
-    -- VirtUnit, they won't compare equal; only
-    -- after improvement will the equality hold.
-    improveUnit (unitInfoMap pkgstate) $
-        VirtUnit iuid
-
--- | Return the UnitId of the Unit. For instantiated units, return the
--- UnitId of the indefinite unit this unit is an instance of.
+-- | Return the UnitId of the Unit. For on-the-fly instantiated units, return
+-- the UnitId of the indefinite unit this unit is an instance of.
 toUnitId :: Unit -> UnitId
 toUnitId (RealUnit (Definite iuid)) = iuid
 toUnitId (VirtUnit indef)           = indefUnit (instUnitInstanceOf indef)
 toUnitId HoleUnit                   = error "Hole unit"
+
+-- | Return the virtual UnitId of an on-the-fly instantiated unit.
+virtualUnitId :: InstantiatedUnit -> UnitId
+virtualUnitId i = UnitId (instUnitFS i)
 
 -- | A 'Unit' is definite if it has no free holes.
 unitIsDefinite :: Unit -> Bool
@@ -515,7 +511,7 @@ instance Outputable UnitId where
     ppr uid@(UnitId fs) =
         getPprDebug $ \debug ->
         sdocWithDynFlags $ \dflags ->
-          case displayUnitId (pkgState dflags) uid of
+          case displayUnitId (unitState dflags) uid of
             Just str | not debug -> text str
             _ -> ftext fs
 
@@ -605,34 +601,45 @@ had used @-ignore-package@).
 The affected packages are compiled with, e.g., @-this-unit-id base@, so that
 the symbols in the object files have the unversioned unit id in their name.
 
-Make sure you change 'GHC.Unit.State.findWiredInPackages' if you add an entry here.
+Make sure you change 'GHC.Unit.State.findWiredInUnits' if you add an entry here.
 
 For `integer-gmp`/`integer-simple` we also change the base name to
 `integer-wired-in`, but this is fundamentally no different.
 See Note [The integer library] in "GHC.Builtin.Names".
 -}
 
-integerUnitId, primUnitId,
-  baseUnitId, rtsUnitId,
-  thUnitId, mainUnitId, thisGhcUnitId, interactiveUnitId  :: Unit
-primUnitId        = fsToUnit (fsLit "ghc-prim")
-integerUnitId     = fsToUnit (fsLit "integer-wired-in")
-   -- See Note [The integer library] in "GHC.Builtin.Names"
-baseUnitId        = fsToUnit (fsLit "base")
-rtsUnitId         = fsToUnit (fsLit "rts")
-thUnitId          = fsToUnit (fsLit "template-haskell")
-thisGhcUnitId     = fsToUnit (fsLit "ghc")
-interactiveUnitId = fsToUnit (fsLit "interactive")
+integerUnitId, primUnitId, baseUnitId, rtsUnitId,
+  thUnitId, mainUnitId, thisGhcUnitId, interactiveUnitId  :: UnitId
+
+integerUnit, primUnit, baseUnit, rtsUnit,
+  thUnit, mainUnit, thisGhcUnit, interactiveUnit  :: Unit
+
+primUnitId        = UnitId (fsLit "ghc-prim")
+integerUnitId     = UnitId (fsLit "integer-wired-in")
+baseUnitId        = UnitId (fsLit "base")
+rtsUnitId         = UnitId (fsLit "rts")
+thisGhcUnitId     = UnitId (fsLit "ghc")
+interactiveUnitId = UnitId (fsLit "interactive")
+thUnitId          = UnitId (fsLit "template-haskell")
+
+thUnit            = RealUnit (Definite thUnitId)
+primUnit          = RealUnit (Definite primUnitId)
+integerUnit       = RealUnit (Definite integerUnitId)
+baseUnit          = RealUnit (Definite baseUnitId)
+rtsUnit           = RealUnit (Definite rtsUnitId)
+thisGhcUnit       = RealUnit (Definite thisGhcUnitId)
+interactiveUnit   = RealUnit (Definite interactiveUnitId)
 
 -- | This is the package Id for the current program.  It is the default
 -- package Id if you don't specify a package name.  We don't add this prefix
 -- to symbol names, since there can be only one main package per program.
-mainUnitId      = fsToUnit (fsLit "main")
+mainUnitId = UnitId (fsLit "main")
+mainUnit = RealUnit (Definite mainUnitId)
 
 isInteractiveModule :: Module -> Bool
-isInteractiveModule mod = moduleUnit mod == interactiveUnitId
+isInteractiveModule mod = moduleUnit mod == interactiveUnit
 
-wiredInUnitIds :: [Unit]
+wiredInUnitIds :: [UnitId]
 wiredInUnitIds =
    [ primUnitId
    , integerUnitId

@@ -307,10 +307,11 @@ warnUnusedPackages = do
     eps <- liftIO $ hscEPS hsc_env
 
     let dflags = hsc_dflags hsc_env
+        state  = unitState dflags
         pit = eps_PIT eps
 
     let loadedPackages
-          = map (unsafeGetUnitInfo dflags)
+          = map (unsafeLookupUnit state)
           . nub . sort
           . map moduleUnit
           . moduleEnvKeys
@@ -319,7 +320,7 @@ warnUnusedPackages = do
         requestedArgs = mapMaybe packageArg (packageFlags dflags)
 
         unusedArgs
-          = filter (\arg -> not $ any (matching dflags arg) loadedPackages)
+          = filter (\arg -> not $ any (matching state arg) loadedPackages)
                    requestedArgs
 
     let warn = makeIntoWarning
@@ -347,15 +348,15 @@ warnUnusedPackages = do
                 =  str == unitPackageIdString p
                 || str == unitPackageNameString p
 
-        matching :: DynFlags -> PackageArg -> UnitInfo -> Bool
+        matching :: UnitState -> PackageArg -> UnitInfo -> Bool
         matching _ (PackageArg str) p = matchingStr str p
-        matching dflags (UnitIdArg uid) p = uid == realUnit dflags p
+        matching state (UnitIdArg uid) p = uid == realUnit state p
 
         -- For wired-in packages, we have to unwire their id,
         -- otherwise they won't match package flags
-        realUnit :: DynFlags -> UnitInfo -> Unit
-        realUnit dflags
-          = unwireUnit dflags
+        realUnit :: UnitState -> UnitInfo -> Unit
+        realUnit state
+          = unwireUnit state
           . RealUnit
           . Definite
           . unitId
@@ -656,7 +657,7 @@ discardIC hsc_env
     | nameIsFromExternalPackage this_pkg old_name = old_name
     | otherwise = ic_name empty_ic
     where
-    this_pkg = thisPackage dflags
+    this_pkg = homeUnit dflags
     old_name = ic_name old_ic
 
 -- | If there is no -o option, guess the name of target executable
@@ -1200,7 +1201,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags mHscMessage cleanup 
             zipWith f home_imps     (repeat NotBoot) ++
             zipWith f home_src_imps (repeat IsBoot)
           where f mn isBoot = GWIB
-                  { gwib_mod = mkModule (thisPackage lcl_dflags) mn
+                  { gwib_mod = mkHomeModule lcl_dflags mn
                   , gwib_isBoot = isBoot
                   }
 
@@ -1526,13 +1527,13 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
 
                 upsweep' old_hpt1 done' mods (mod_index+1) nmods uids_to_check' done_holes'
 
--- | Return a list of instantiated units to type check from the PackageState.
+-- | Return a list of instantiated units to type check from the UnitState.
 --
 -- Use explicit (instantiated) units as roots and also return their
 -- instantiations that are themselves instantiations and so on recursively.
 instantiatedUnitsToCheck :: DynFlags -> [Unit]
 instantiatedUnitsToCheck dflags =
-  nubSort $ concatMap goUnit (explicitPackages (pkgState dflags))
+  nubSort $ concatMap goUnit (explicitUnits (unitState dflags))
  where
   goUnit HoleUnit         = []
   goUnit (RealUnit _)     = []
@@ -2213,7 +2214,7 @@ enableCodeGenForTH =
       hscTarget dflags == HscNothing &&
       -- Don't enable codegen for TH on indefinite packages; we
       -- can't compile anything anyway! See #16219.
-      not (isIndefinite dflags)
+      homeUnitIsDefinite dflags
 
 -- | Update the every ModSummary that is depended on
 -- by a module that needs unboxed tuples. We enable codegen to
@@ -2560,12 +2561,12 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                               $$ text "Saw:" <+> quotes (ppr pi_mod_name)
                               $$ text "Expected:" <+> quotes (ppr wanted_mod)
 
-        when (hsc_src == HsigFile && isNothing (lookup pi_mod_name (thisUnitIdInsts dflags))) $
+        when (hsc_src == HsigFile && isNothing (lookup pi_mod_name (homeUnitInstantiations dflags))) $
             let suggested_instantiated_with =
                     hcat (punctuate comma $
                         [ ppr k <> text "=" <> ppr v
                         | (k,v) <- ((pi_mod_name, mkHoleModule pi_mod_name)
-                                : thisUnitIdInsts dflags)
+                                : homeUnitInstantiations dflags)
                         ])
             in throwE $ unitBag $ mkPlainErrMsg pi_local_dflags pi_mod_name_loc $
                 text "Unexpected signature:" <+> quotes (ppr pi_mod_name)

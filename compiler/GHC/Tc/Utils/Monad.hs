@@ -265,7 +265,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_rdr_env        = emptyGlobalRdrEnv,
                 tcg_fix_env        = emptyNameEnv,
                 tcg_field_env      = emptyNameEnv,
-                tcg_default        = if moduleUnit mod == primUnitId
+                tcg_default        = if moduleUnit mod == primUnit
                                      then Just []  -- See Note [Default types]
                                      else Nothing,
                 tcg_type_env       = emptyNameEnv,
@@ -1857,8 +1857,8 @@ initIfaceTcRn thing_inside
         ; let !mod = tcg_semantic_mod tcg_env
               -- When we are instantiating a signature, we DEFINITELY
               -- do not want to knot tie.
-              is_instantiate = unitIsDefinite (thisPackage dflags) &&
-                               not (null (thisUnitIdInsts dflags))
+              is_instantiate = homeUnitIsDefinite dflags &&
+                               not (null (homeUnitInstantiations dflags))
         ; let { if_env = IfGblEnv {
                             if_doc = text "initIfaceTcRn",
                             if_rec_types =

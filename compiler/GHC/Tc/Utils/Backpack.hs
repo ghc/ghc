@@ -231,7 +231,7 @@ check_inst sig_inst = do
 
 -- | Return this list of requirement interfaces that need to be merged
 -- to form @mod_name@, or @[]@ if this is not a requirement.
-requirementMerges :: PackageState -> ModuleName -> [InstantiatedModule]
+requirementMerges :: UnitState -> ModuleName -> [InstantiatedModule]
 requirementMerges pkgstate mod_name =
     fmap fixupModule $ fromMaybe [] (Map.lookup mod_name (requirementContext pkgstate))
     where
@@ -274,7 +274,7 @@ findExtraSigImports' hsc_env HsigFile modname =
             $ moduleFreeHolesPrecise (text "findExtraSigImports")
                 (mkModule (VirtUnit iuid) mod_name)))
   where
-    pkgstate = pkgState (hsc_dflags hsc_env)
+    pkgstate = unitState (hsc_dflags hsc_env)
     reqs = requirementMerges pkgstate modname
 
 findExtraSigImports' _ _ _ = return emptyUniqDSet
@@ -309,7 +309,7 @@ implicitRequirements' hsc_env normal_imports
     forM normal_imports $ \(mb_pkg, L _ imp) -> do
         found <- findImportedModule hsc_env imp mb_pkg
         case found of
-            Found _ mod | thisPackage dflags /= moduleUnit mod ->
+            Found _ mod | not (isHomeModule dflags mod) ->
                 return (uniqDSetToList (moduleFreeHoles mod))
             _ -> return []
   where dflags = hsc_dflags hsc_env
@@ -535,7 +535,7 @@ mergeSignatures
     let outer_mod = tcg_mod tcg_env
         inner_mod = tcg_semantic_mod tcg_env
         mod_name = moduleName (tcg_mod tcg_env)
-        pkgstate = pkgState dflags
+        pkgstate = unitState dflags
 
     -- STEP 1: Figure out all of the external signature interfaces
     -- we are going to merge in.
@@ -568,7 +568,7 @@ mergeSignatures
             let insts = instUnitInsts iuid
                 isFromSignaturePackage =
                     let inst_uid = instUnitInstanceOf iuid
-                        pkg = getInstalledPackageDetails pkgstate (indefUnit inst_uid)
+                        pkg = unsafeLookupUnitId pkgstate (indefUnit inst_uid)
                     in null (unitExposedModules pkg)
             -- 3(a). Rename the exports according to how the dependency
             -- was instantiated.  The resulting export list will be accurate
@@ -731,7 +731,7 @@ mergeSignatures
     -- STEP 4: Rename the interfaces
     ext_ifaces <- forM thinned_ifaces $ \((Module iuid _), ireq_iface) ->
         tcRnModIface (instUnitInsts iuid) (Just nsubst) ireq_iface
-    lcl_iface <- tcRnModIface (thisUnitIdInsts dflags) (Just nsubst) lcl_iface0
+    lcl_iface <- tcRnModIface (homeUnitInstantiations dflags) (Just nsubst) lcl_iface0
     let ifaces = lcl_iface : ext_ifaces
 
     -- STEP 4.1: Merge fixities (we'll verify shortly) tcg_fix_env
@@ -753,7 +753,7 @@ mergeSignatures
     let infos = zip ifaces detailss
 
     -- Test for cycles
-    checkSynCycles (thisPackage dflags) (typeEnvTyCons type_env) []
+    checkSynCycles (homeUnit dflags) (typeEnvTyCons type_env) []
 
     -- NB on type_env: it contains NO dfuns.  DFuns are recorded inside
     -- detailss, and given a Name that doesn't correspond to anything real.  See
@@ -1000,9 +1000,13 @@ instantiateSignature = do
     -- TODO: setup the local RdrEnv so the error messages look a little better.
     -- But this information isn't stored anywhere. Should we RETYPECHECK
     -- the local one just to get the information?  Hmm...
-    MASSERT( moduleUnit outer_mod == thisPackage dflags )
+    MASSERT( isHomeModule dflags outer_mod )
+    MASSERT( isJust (homeUnitInstanceOfId dflags) )
+    let uid  = fromJust (homeUnitInstanceOfId dflags)
+        -- we need to fetch the most recent ppr infos from the unit
+        -- database because we might have modified it
+        uid' = updateIndefUnitId (unitState dflags) uid
     inner_mod `checkImplements`
         Module
-            (mkInstantiatedUnit (thisComponentId dflags)
-                                (thisUnitIdInsts dflags))
+            (mkInstantiatedUnit uid' (homeUnitInstantiations dflags))
             (moduleName outer_mod)

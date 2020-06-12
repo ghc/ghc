@@ -470,12 +470,12 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
         dflags = hsc_dflags hsc_env
         outer_mod = ms_mod mod_summary
         mod_name = moduleName outer_mod
-        outer_mod' = mkModule (thisPackage dflags) mod_name
+        outer_mod' = mkHomeModule dflags mod_name
         inner_mod = canonicalizeHomeModule dflags mod_name
         src_filename  = ms_hspp_file mod_summary
         real_loc = realSrcLocSpan $ mkRealSrcLoc (mkFastString src_filename) 1 1
         keep_rn' = gopt Opt_WriteHie dflags || keep_rn
-    MASSERT( moduleUnit outer_mod == thisPackage dflags )
+    MASSERT( isHomeModule dflags outer_mod )
     tc_result <- if hsc_src == HsigFile && not (isHoleModule inner_mod)
         then ioMsgMaybe $ tcRnInstantiateSignature hsc_env outer_mod' real_loc
         else
@@ -1116,8 +1116,8 @@ hscCheckSafe' m l = do
     dflags <- getDynFlags
     (tw, pkgs) <- isModSafe m l
     case tw of
-        False                     -> return (Nothing, pkgs)
-        True | isHomePkg dflags m -> return (Nothing, pkgs)
+        False                        -> return (Nothing, pkgs)
+        True | isHomeModule dflags m -> return (Nothing, pkgs)
              -- TODO: do we also have to check the trust of the instantiation?
              -- Not necessary if that is reflected in dependencies
              | otherwise   -> return (Just $ toUnitId (moduleUnit m), pkgs)
@@ -1159,21 +1159,22 @@ hscCheckSafe' m l = do
                     return (trust == Sf_Trustworthy, pkgRs)
 
                 where
+                    state = unitState dflags
                     inferredImportWarn = unitBag
                         $ makeIntoWarning (Reason Opt_WarnInferredSafeImports)
-                        $ mkWarnMsg dflags l (pkgQual dflags)
+                        $ mkWarnMsg dflags l (pkgQual state)
                         $ sep
                             [ text "Importing Safe-Inferred module "
                                 <> ppr (moduleName m)
                                 <> text " from explicitly Safe module"
                             ]
-                    pkgTrustErr = unitBag $ mkErrMsg dflags l (pkgQual dflags) $
+                    pkgTrustErr = unitBag $ mkErrMsg dflags l (pkgQual state) $
                         sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
                             , text "The package (" <> ppr (moduleUnit m)
                                 <> text ") the module resides in isn't trusted."
                             ]
-                    modTrustErr = unitBag $ mkErrMsg dflags l (pkgQual dflags) $
+                    modTrustErr = unitBag $ mkErrMsg dflags l (pkgQual state) $
                         sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
                             , text "The module itself isn't safe." ]
@@ -1191,8 +1192,8 @@ hscCheckSafe' m l = do
     packageTrusted _ Sf_Safe  False _ = True
     packageTrusted _ Sf_SafeInferred False _ = True
     packageTrusted dflags _ _ m
-        | isHomePkg dflags m = True
-        | otherwise = unitIsTrusted $ unsafeGetUnitInfo dflags (moduleUnit m)
+        | isHomeModule dflags m = True
+        | otherwise = unitIsTrusted $ unsafeLookupUnit (unitState dflags) (moduleUnit m)
 
     lookup' :: Module -> Hsc (Maybe ModIface)
     lookup' m = do
@@ -1210,21 +1211,17 @@ hscCheckSafe' m l = do
         return iface'
 
 
-    isHomePkg :: DynFlags -> Module -> Bool
-    isHomePkg dflags m
-        | thisPackage dflags == moduleUnit m = True
-        | otherwise                               = False
-
 -- | Check the list of packages are trusted.
 checkPkgTrust :: Set UnitId -> Hsc ()
 checkPkgTrust pkgs = do
     dflags <- getDynFlags
     let errors = S.foldr go [] pkgs
+        state  = unitState dflags
         go pkg acc
-            | unitIsTrusted $ getInstalledPackageDetails (pkgState dflags) pkg
+            | unitIsTrusted $ unsafeLookupUnitId state pkg
             = acc
             | otherwise
-            = (:acc) $ mkErrMsg dflags noSrcSpan (pkgQual dflags)
+            = (:acc) $ mkErrMsg dflags noSrcSpan (pkgQual state)
                      $ text "The package (" <> ppr pkg <> text ") is required" <>
                        text " to be trusted but it isn't!"
     case errors of
@@ -1493,7 +1490,7 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
         let -- Make up a module name to give the NCG. We can't pass bottom here
             -- lest we reproduce #11784.
             mod_name = mkModuleName $ "Cmm$" ++ FilePath.takeFileName filename
-            cmm_mod = mkModule (thisPackage dflags) mod_name
+            cmm_mod = mkHomeModule dflags mod_name
 
         -- Compile decls in Cmm files one decl at a time, to avoid re-ordering
         -- them in SRT analysis.

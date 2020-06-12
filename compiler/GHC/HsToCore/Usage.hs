@@ -86,7 +86,7 @@ mkDependencies iuid pluginModules
 
           raw_pkgs = foldr Set.insert (imp_dep_pkgs imports) plugin_dep_pkgs
 
-          pkgs | th_used   = Set.insert (toUnitId thUnitId) raw_pkgs
+          pkgs | th_used   = Set.insert thUnitId raw_pkgs
                | otherwise = raw_pkgs
 
           -- Set the packages required to be Safe according to Safe Haskell.
@@ -169,7 +169,7 @@ One way to improve this is to either:
 -}
 mkPluginUsage :: HscEnv -> ModIface -> IO [Usage]
 mkPluginUsage hsc_env pluginModule
-  = case lookupPluginModuleWithSuggestions dflags pNm Nothing of
+  = case lookupPluginModuleWithSuggestions pkgs pNm Nothing of
     LookupFound _ pkg -> do
     -- The plugin is from an external package:
     -- search for the library files containing the plugin.
@@ -215,6 +215,7 @@ mkPluginUsage hsc_env pluginModule
   where
     dflags   = hsc_dflags hsc_env
     platform = targetPlatform dflags
+    pkgs     = unitState dflags
     pNm      = moduleName $ mi_module pluginModule
     pPkg     = moduleUnit $ mi_module pluginModule
     deps     = map gwib_mod $
@@ -250,7 +251,7 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
   where
     hpt = hsc_HPT hsc_env
     dflags = hsc_dflags hsc_env
-    this_pkg = thisPackage dflags
+    this_pkg = homeUnit dflags
 
     used_mods    = moduleEnvKeys ent_map
     dir_imp_mods = moduleEnvKeys direct_imports

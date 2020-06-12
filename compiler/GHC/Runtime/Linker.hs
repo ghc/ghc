@@ -48,7 +48,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Unit.Module
 import GHC.Data.List.SetOps
-import GHC.Runtime.Linker.Types (DynLinker(..), LinkerUnitId, PersistentLinkerState(..))
+import GHC.Runtime.Linker.Types (DynLinker(..), PersistentLinkerState(..))
 import GHC.Driver.Session
 import GHC.Types.Basic
 import GHC.Utils.Outputable
@@ -143,7 +143,7 @@ emptyPLS = PersistentLinkerState
   --
   -- The linker's symbol table is populated with RTS symbols using an
   -- explicit list.  See rts/Linker.c for details.
-  where init_pkgs = map toUnitId [rtsUnitId]
+  where init_pkgs = [rtsUnitId]
 
 extendLoadedPkgs :: DynLinker -> [UnitId] -> IO ()
 extendLoadedPkgs dl pkgs =
@@ -287,7 +287,7 @@ reallyInitDynLinker hsc_env = do
   initObjLinker hsc_env
 
   -- (b) Load packages from the command-line (Note [preload packages])
-  pls <- linkPackages' hsc_env (preloadPackages (pkgState dflags)) pls0
+  pls <- linkPackages' hsc_env (preloadUnits (unitState dflags)) pls0
 
   -- steps (c), (d) and (e)
   linkCmdLineLibs' hsc_env pls
@@ -655,7 +655,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
       ; return (lnks_needed, pkgs_needed) }
   where
     dflags = hsc_dflags hsc_env
-    this_pkg = thisPackage dflags
+    this_pkg = homeUnit dflags
 
         -- The ModIface contains the transitive closure of the module dependencies
         -- within the current package, *except* for boot modules: if we encounter
@@ -1227,7 +1227,7 @@ showLS (Framework nm) = "(framework) " ++ nm
 -- automatically, and it doesn't matter what order you specify the input
 -- packages.
 --
-linkPackages :: HscEnv -> [LinkerUnitId] -> IO ()
+linkPackages :: HscEnv -> [UnitId] -> IO ()
 -- NOTE: in fact, since each module tracks all the packages it depends on,
 --       we don't really need to use the package-config dependencies.
 --
@@ -1244,16 +1244,16 @@ linkPackages hsc_env new_pkgs = do
   modifyPLS_ dl $ \pls -> do
     linkPackages' hsc_env new_pkgs pls
 
-linkPackages' :: HscEnv -> [LinkerUnitId] -> PersistentLinkerState
+linkPackages' :: HscEnv -> [UnitId] -> PersistentLinkerState
              -> IO PersistentLinkerState
 linkPackages' hsc_env new_pks pls = do
     pkgs' <- link (pkgs_loaded pls) new_pks
     return $! pls { pkgs_loaded = pkgs' }
   where
      dflags = hsc_dflags hsc_env
-     pkgstate = pkgState dflags
+     pkgstate = unitState dflags
 
-     link :: [LinkerUnitId] -> [LinkerUnitId] -> IO [LinkerUnitId]
+     link :: [UnitId] -> [UnitId] -> IO [UnitId]
      link pkgs new_pkgs =
          foldM link_one pkgs new_pkgs
 
@@ -1261,7 +1261,7 @@ linkPackages' hsc_env new_pks pls = do
         | new_pkg `elem` pkgs   -- Already linked
         = return pkgs
 
-        | Just pkg_cfg <- lookupInstalledPackage pkgstate new_pkg
+        | Just pkg_cfg <- lookupUnitId pkgstate new_pkg
         = do {  -- Link dependents first
                pkgs' <- link pkgs (unitDepends pkg_cfg)
                 -- Now link the package itself
