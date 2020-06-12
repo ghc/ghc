@@ -184,9 +184,10 @@ Note [Storing compatibility]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 During axiom application, we need to be aware of which branches are compatible
 with which others. The full explanation is in Note [Compatibility] in
-FamInstEnv. (The code is placed there to avoid a dependency from CoAxiom on
-the unification algorithm.) Although we could theoretically compute
-compatibility on the fly, this is silly, so we store it in a CoAxiom.
+GHc.Core.FamInstEnv. (The code is placed there to avoid a dependency from
+GHC.Core.Coercion.Axiom on the unification algorithm.) Although we could
+theoretically compute compatibility on the fly, this is silly, so we store it
+in a CoAxiom.
 
 Specifically, each branch refers to all other branches with which it is
 incompatible. This list might well be empty, and it will always be for the
@@ -233,8 +234,8 @@ data CoAxBranch
     { cab_loc      :: SrcSpan       -- Location of the defining equation
                                     -- See Note [CoAxiom locations]
     , cab_tvs      :: [TyVar]       -- Bound type variables; not necessarily fresh
-    , cab_eta_tvs  :: [TyVar]       -- Eta-reduced tyvars
                                     -- See Note [CoAxBranch type variables]
+    , cab_eta_tvs  :: [TyVar]       -- Eta-reduced tyvars
                                     -- cab_tvs and cab_lhs may be eta-reduced; see
                                     -- Note [Eta reduction for data families]
     , cab_cvs      :: [CoVar]       -- Bound coercion variables

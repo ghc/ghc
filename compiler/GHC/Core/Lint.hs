@@ -8,13 +8,12 @@ See Note [Core Lint guarantee].
 -}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE ScopedTypeVariables, DeriveFunctor #-}
+{-# LANGUAGE ViewPatterns, ScopedTypeVariables, DeriveFunctor, MultiWayIf #-}
 
 module GHC.Core.Lint (
     lintCoreBindings, lintUnfolding,
     lintPassResult, lintInteractiveExpr, lintExpr,
-    lintAnnots, lintTypes,
+    lintAnnots, lintAxioms,
 
     -- ** Debug output
     endPass, endPassIO,
@@ -36,7 +35,7 @@ import GHC.Types.Literal
 import GHC.Core.DataCon
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types ( multiplicityTy )
-import GHC.Tc.Utils.TcType ( isFloatingTy )
+import GHC.Tc.Utils.TcType ( isFloatingTy, isTyFamFree )
 import GHC.Types.Var as Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -56,9 +55,10 @@ import GHC.Types.RepType
 import GHC.Core.TyCo.Rep   -- checks validity of types/coercions
 import GHC.Core.TyCo.Subst
 import GHC.Core.TyCo.FVs
-import GHC.Core.TyCo.Ppr ( pprTyVar )
+import GHC.Core.TyCo.Ppr ( pprTyVar, pprTyVars )
 import GHC.Core.TyCon as TyCon
 import GHC.Core.Coercion.Axiom
+import GHC.Core.Unify
 import GHC.Types.Basic
 import GHC.Utils.Error as Err
 import GHC.Data.List.SetOps
@@ -76,7 +76,7 @@ import GHC.Driver.Session
 import Control.Monad
 import GHC.Utils.Monad
 import Data.Foldable      ( toList )
-import Data.List.NonEmpty ( NonEmpty )
+import Data.List.NonEmpty ( NonEmpty(..), groupWith )
 import Data.List          ( partition )
 import Data.Maybe
 import GHC.Data.Pair
@@ -1587,18 +1587,6 @@ lintIdBndr top_lvl bind_site id thing_inside
 %************************************************************************
 -}
 
-lintTypes :: DynFlags
-          -> [TyCoVar]   -- Treat these as in scope
-          -> [Type]
-          -> Maybe MsgDoc -- Nothing => OK
-lintTypes dflags vars tys
-  | isEmptyBag errs = Nothing
-  | otherwise       = Just (pprMessageBag errs)
-  where
-    (_warns, errs) = initL dflags (defaultLintFlags dflags) vars linter
-    linter = lintBinders LambdaBind vars $ \_ ->
-             mapM_ lintType tys
-
 lintValueType :: Type -> LintM LintedType
 -- Types only, not kinds
 -- Check the type, and apply the substitution to it
@@ -1617,7 +1605,7 @@ checkTyCon tc
   = checkL (not (isTcTyCon tc)) (text "Found TcTyCon:" <+> ppr tc)
 
 -------------------
-lintType :: LintedType -> LintM LintedType
+lintType :: Type -> LintM LintedType
 
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
@@ -2342,6 +2330,175 @@ lintCoercion (HoleCo h)
   = do { addErrL $ text "Unfilled coercion hole:" <+> ppr h
        ; lintCoercion (CoVarCo (coHoleCoVar h)) }
 
+{-
+************************************************************************
+*                                                                      *
+              Axioms
+*                                                                      *
+************************************************************************
+-}
+
+lintAxioms :: DynFlags
+           -> [CoAxiom Branched]
+           -> WarnsAndErrs
+lintAxioms dflags axioms
+  = initL dflags (defaultLintFlags dflags) [] $
+    do { mapM_ lint_axiom axioms
+       ; let axiom_groups = groupWith coAxiomTyCon axioms
+       ; mapM_ lint_axiom_group axiom_groups }
+
+lint_axiom :: CoAxiom Branched -> LintM ()
+lint_axiom ax@(CoAxiom { co_ax_tc = tc, co_ax_branches = branches
+                       , co_ax_role = ax_role })
+  = addLoc (InAxiom ax) $
+    do { mapM_ (lint_branch tc) branch_list
+       ; extra_checks }
+  where
+    branch_list = fromBranches branches
+
+    extra_checks
+      | isNewTyCon tc
+      = do { CoAxBranch { cab_tvs     = tvs
+                        , cab_eta_tvs = eta_tvs
+                        , cab_cvs     = cvs
+                        , cab_roles   = roles
+                        , cab_lhs     = lhs_tys }
+              <- case branch_list of
+               [branch] -> return branch
+               _        -> failWithL (text "multi-branch axiom with newtype")
+           ; let ax_lhs = mkInfForAllTys tvs $
+                          mkTyConApp tc lhs_tys
+                 nt_tvs = takeList tvs (tyConTyVars tc)
+                    -- axiom may be eta-reduced: Note [Newtype eta] in GHC.Core.TyCon
+                 nt_lhs = mkInfForAllTys nt_tvs $
+                          mkTyConApp tc (mkTyVarTys nt_tvs)
+                 -- See Note [Newtype eta] in GHC.Core.TyCon
+           ; lintL (ax_lhs `eqType` nt_lhs)
+                   (text "Newtype axiom LHS does not match newtype definition")
+           ; lintL (null cvs)
+                   (text "Newtype axiom binds coercion variables")
+           ; lintL (null eta_tvs)  -- See Note [Eta reduction for data families]
+                                   -- which is not about newtype axioms
+                   (text "Newtype axiom has eta-tvs")
+           ; lintL (ax_role == Representational)
+                   (text "Newtype axiom role not representational")
+           ; lintL (roles `equalLength` tvs)
+                   (text "Newtype axiom roles list is the wrong length." $$
+                    text "roles:" <+> sep (map ppr roles))
+           ; lintL (roles == takeList roles (tyConRoles tc))
+                   (vcat [ text "Newtype axiom roles do not match newtype tycon's."
+                         , text "axiom roles:" <+> sep (map ppr roles)
+                         , text "tycon roles:" <+> sep (map ppr (tyConRoles tc)) ])
+           }
+
+      | isFamilyTyCon tc
+      = do { if | isTypeFamilyTyCon tc
+                  -> lintL (ax_role == Nominal)
+                           (text "type family axiom is not nominal")
+
+                | isDataFamilyTyCon tc
+                  -> lintL (ax_role == Representational)
+                           (text "data family axiom is not representational")
+
+                | otherwise
+                  -> addErrL (text "A family TyCon is neither a type family nor a data family:" <+> ppr tc)
+
+           ; mapM_ (lint_family_branch tc) branch_list }
+
+      | otherwise
+      = addErrL (text "Axiom tycon is neither a newtype nor a family.")
+
+lint_branch :: TyCon -> CoAxBranch -> LintM ()
+lint_branch ax_tc (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
+                              , cab_lhs = lhs_args, cab_rhs = rhs })
+  = lintBinders LambdaBind (tvs ++ cvs) $ \_ ->
+    do { let lhs = mkTyConApp ax_tc lhs_args
+       ; lhs' <- lintType lhs
+       ; rhs' <- lintType rhs
+       ; let lhs_kind = typeKind lhs'
+             rhs_kind = typeKind rhs'
+       ; lintL (lhs_kind `eqType` rhs_kind) $
+         hang (text "Inhomogeneous axiom")
+            2 (text "lhs:" <+> ppr lhs <+> dcolon <+> ppr lhs_kind $$
+               text "rhs:" <+> ppr rhs <+> dcolon <+> ppr rhs_kind) }
+
+-- these checks do not apply to newtype axioms
+lint_family_branch :: TyCon -> CoAxBranch -> LintM ()
+lint_family_branch fam_tc br@(CoAxBranch { cab_tvs     = tvs
+                                         , cab_eta_tvs = eta_tvs
+                                         , cab_cvs     = cvs
+                                         , cab_roles   = roles
+                                         , cab_lhs     = lhs
+                                         , cab_incomps = incomps })
+  = do { lintL (isDataFamilyTyCon fam_tc || null eta_tvs)
+               (text "Type family axiom has eta-tvs")
+       ; lintL (all (`elemVarSet` tyCoVarsOfTypes lhs) tvs)
+               (text "Quantified variable in family axiom unused in LHS")
+       ; lintL (all isTyFamFree lhs)
+               (text "Type family application on LHS of family axiom")
+       ; lintL (all (== Nominal) roles)
+               (text "Non-nominal role in family axiom" $$
+                text "roles:" <+> sep (map ppr roles))
+       ; lintL (null cvs)
+               (text "Coercion variables bound in family axiom")
+       ; forM_ incomps $ \ br' ->
+           lintL (not (compatible_branches br br')) $
+           text "Incorrect incompatible branch:" <+> ppr br' }
+
+lint_axiom_group :: NonEmpty (CoAxiom Branched) -> LintM ()
+lint_axiom_group (_  :| []) = return ()
+lint_axiom_group (ax :| axs)
+  = do { lintL (isOpenFamilyTyCon tc)
+               (text "Non-open-family with multiple axioms")
+       ; let all_pairs = [ (ax1, ax2) | ax1 <- all_axs
+                                      , ax2 <- all_axs ]
+       ; mapM_ (lint_axiom_pair tc) all_pairs }
+  where
+    all_axs = ax : axs
+    tc      = coAxiomTyCon ax
+
+lint_axiom_pair :: TyCon -> (CoAxiom Branched, CoAxiom Branched) -> LintM ()
+lint_axiom_pair tc (ax1, ax2)
+  | Just br1@(CoAxBranch { cab_tvs = tvs1
+                         , cab_lhs = lhs1
+                         , cab_rhs = rhs1 }) <- coAxiomSingleBranch_maybe ax1
+  , Just br2@(CoAxBranch { cab_tvs = tvs2
+                         , cab_lhs = lhs2
+                         , cab_rhs = rhs2 }) <- coAxiomSingleBranch_maybe ax2
+  = lintL (compatible_branches br1 br2) $
+    vcat [ hsep [ text "Axioms", ppr ax1, text "and", ppr ax2
+                , text "are incompatible" ]
+         , text "tvs1 =" <+> pprTyVars tvs1
+         , text "lhs1 =" <+> ppr (mkTyConApp tc lhs1)
+         , text "rhs1 =" <+> ppr rhs1
+         , text "tvs2 =" <+> pprTyVars tvs2
+         , text "lhs2 =" <+> ppr (mkTyConApp tc lhs2)
+         , text "rhs2 =" <+> ppr rhs2 ]
+
+  | otherwise
+  = addErrL (text "Open type family axiom has more than one branch: either" <+>
+             ppr ax1 <+> text "or" <+> ppr ax2)
+
+compatible_branches :: CoAxBranch -> CoAxBranch -> Bool
+-- True <=> branches are compatible. See Note [Compatibility] in GHC.Core.FamInstEnv.
+compatible_branches (CoAxBranch { cab_tvs = tvs1
+                                , cab_lhs = lhs1
+                                , cab_rhs = rhs1 })
+                    (CoAxBranch { cab_tvs = tvs2
+                                , cab_lhs = lhs2
+                                , cab_rhs = rhs2 })
+  = -- we need to freshen ax2 w.r.t. ax1
+    -- do this by pretending tvs1 are in scope when processing tvs2
+    let in_scope       = mkInScopeSet (mkVarSet tvs1)
+        subst0         = mkEmptyTCvSubst in_scope
+        (subst, _)     = substTyVarBndrs subst0 tvs2
+        lhs2'          = substTys subst lhs2
+        rhs2'          = substTy  subst rhs2
+    in
+    case tcUnifyTys (const BindMe) lhs1 lhs2' of
+      Just unifying_subst -> substTy unifying_subst rhs1  `eqType`
+                             substTy unifying_subst rhs2'
+      Nothing             -> True
 
 {-
 ************************************************************************
@@ -2539,6 +2696,7 @@ data LintLocInfo
   | TopLevelBindings
   | InType Type         -- Inside a type
   | InCo   Coercion     -- Inside a coercion
+  | InAxiom (CoAxiom Branched)   -- Inside a CoAxiom
 
 initL :: DynFlags -> LintFlags -> [Var]
        -> LintM a -> WarnsAndErrs    -- Warnings and errors
@@ -2822,6 +2980,34 @@ dumpLoc (InType ty)
   = (noSrcLoc, text "In the type" <+> quotes (ppr ty))
 dumpLoc (InCo co)
   = (noSrcLoc, text "In the coercion" <+> quotes (ppr co))
+dumpLoc (InAxiom ax)
+  = (getSrcLoc ax_name, text "In the coercion axiom" <+> ppr ax_name <+> dcolon <+> pp_ax)
+  where
+    CoAxiom { co_ax_name     = ax_name
+            , co_ax_tc       = tc
+            , co_ax_role     = ax_role
+            , co_ax_branches = branches } = ax
+    branch_list = fromBranches branches
+
+    pp_ax
+      | [branch] <- branch_list
+      = pp_branch branch
+
+      | otherwise
+      = braces $ vcat (map pp_branch branch_list)
+
+    pp_branch (CoAxBranch { cab_tvs = tvs
+                          , cab_cvs = cvs
+                          , cab_lhs = lhs_tys
+                          , cab_rhs = rhs_ty })
+      = sep [ brackets (pprWithCommas pprTyVar (tvs ++ cvs)) <> dot
+            , ppr (mkTyConApp tc lhs_tys)
+            , text "~_" <> pp_role ax_role
+            , ppr rhs_ty ]
+
+    pp_role Nominal          = text "N"
+    pp_role Representational = text "R"
+    pp_role Phantom          = text "P"
 
 pp_binders :: [Var] -> SDoc
 pp_binders bs = sep (punctuate comma (map pp_binder bs))

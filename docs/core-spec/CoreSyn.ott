@@ -52,10 +52,10 @@ l :: 'Label_' ::= {{ com Labels for join points, also \coderef{GHC/Types/Var.hs}
 
 vars :: 'Vars_' ::= {{ com List of variables }}
   | </ ni // , // i />       ::   :: List
-  | fv ( t )                 :: M :: fv_t
-    {{ tex \textit{fv}([[t]]) }}
   | fv ( e )                 :: M :: fv_e
     {{ tex \textit{fv}([[e]]) }}
+  | fv ( types )             :: M :: fv_types
+    {{ tex \textit{fv}([[types]]) }}
   | empty                    :: M :: empty
   | vars1 \inter vars2       :: M :: intersection
     {{ tex [[vars1]] \cap [[vars2]] }}
@@ -197,7 +197,7 @@ R {{ tex \rho }} :: 'Role_' ::= {{ com Roles, \coderef{GHC/Core/Coercion/Axiom.h
 
 axBranch, b :: 'CoAxBranch_' ::= {{ com Axiom branches, \coderef{GHC/Core/TyCon.hs}{CoAxBranch} }}
   | forall </ ni RAi // i /> . ( </ tj // j /> ~> s )  ::   :: CoAxBranch  {{ com \ctor{CoAxBranch}: Axiom branch }}
-  | ( </ axBranchi // i /> ) [ ind ]               :: M :: lookup      {{ com List lookup }}
+  | ( </ axBranchi // i /> ) [ ind ]                   :: M :: lookup      {{ com List lookup }}
 
 mu {{ tex \mu }} :: 'CoAxiomRule_' ::= {{ com CoAxiomRules, \coderef{GHC/Core/Coercion/Axiom.hs}{CoAxiomRule} }}
   | M ( I , role_list , R' )   ::  :: CoAxiomRule  {{ com Named rule, with parameter info }}
@@ -376,6 +376,10 @@ terminals :: 'terminals_' ::=
   | dataConTyCon ::   :: dataConTyCon     {{ tex \textsf{dataConTyCon} }}
   | dataConRepType :: :: dataConRepType   {{ tex \textsf{dataConRepType} }}
   | isNewTyCon   ::   :: isNewTyCon       {{ tex \textsf{isNewTyCon} }}
+  | isOpenTypeFamilyTyCon :: :: isOpenTypeFamilyTyCon {{ tex \textsf{isOpenTypeFamilyTyCon} }}
+  | isClosedTypeFamilyTyCon :: :: isClosedTypeFamilyTyCon {{ tex \textsf{isClosedTypeFamilyTyCon} }}
+  | isDataFamilyTyCon :: :: isDataFamilyTyCon {{ tex \textsf{isDataFamilyTyCon} }}
+  | isTyFamFree  ::   :: isTyFamFree      {{ tex \textsf{isTyFamFree} }}
   | Constraint   ::   :: Constraint       {{ tex \textsf{Constraint} }}
   | TYPE         ::   :: TYPE             {{ tex \textsf{TYPE} }}
   | RuntimeRep   ::   :: RuntimeRep       {{ tex \textsf{RuntimeRep} }}
@@ -449,6 +453,10 @@ formula :: 'formula_' ::=
   | G |- tylit lit : k                 ::   :: lintTyLit
     {{ tex [[G]] \labeledjudge{tylit} [[lit]] : [[k]] }}
   | isNewTyCon T                       ::   :: isNewTyCon
+  | isOpenTypeFamilyTyCon T            ::   :: isOpenTypeFamilyTyCon
+  | isClosedTypeFamilyTyCon T          ::   :: isClosedTypeFamilyTyCon
+  | isDataFamilyTyCon T                ::   :: isDataFamilyTyCon
+  | isTyFamFree t                      ::   :: isTyFamFree
   | k1 elt { </ ki // , // i /> }      ::   :: kind_elt
   | e is_a_type                        ::   :: is_a_type
     {{ tex \exists \tau \text{ s.t.~} [[e]] = \tau }}
@@ -526,3 +534,4 @@ Expr_Coercion <= Subst_TmMapping
 
 Type_CastTy <= Var_IdOrTyVar
 
+Expr_Type <= Vars_fv_e

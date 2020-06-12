@@ -1,0 +1,7 @@
+
+T18357a.hs:9:10: error:
+    • Couldn't match kind ‘r’ with ‘'LiftedRep’
+      Expected a type, but ‘Int’ has kind ‘*’
+    • In the type ‘Int’
+      In the definition of data constructor ‘MkT’
+      In the newtype declaration for ‘T’
