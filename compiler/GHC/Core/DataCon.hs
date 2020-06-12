@@ -418,7 +418,7 @@ data DataCon
                 -- NB: for a data instance, the original user result type may
                 -- differ from the DataCon's representation TyCon.  Example
                 --      data instance T [a] where MkT :: a -> T [a]
-                -- The OrigResTy is T [a], but the dcRepTyCon might be :T123
+                -- The dcOrigResTy is T [a], but the dcRepTyCon might be R:TList
 
         -- Now the strictness annotations and field labels of the constructor
         dcSrcBangs :: [HsSrcBang],

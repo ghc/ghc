@@ -292,7 +292,14 @@ See also Note [Wrappers for data instance tycons] in GHC.Types.Id.Make
     Indeed the latter type is unknown to the programmer.
 
   - There *is* an instance for (T Int) in the type-family instance
-    environment, but it is only used for overlap checking
+    environment, but it is looked up (via tcLookupDataFamilyInst)
+    in can_eq_nc (via tcTopNormaliseNewTypeTF_maybe) when trying to
+    solve representational equalities like
+         T Int ~R# Bool
+    Here we look up (T Int), convert it to R:TInt, and then unwrap the
+    newtype R:TInt.
+
+    It is also looked up in reduceTyFamApp_maybe.
 
   - It's fine to have T in the LHS of a type function:
     type instance F (T a) = [a]
