@@ -94,7 +94,7 @@ lockFile(StgWord id, StgWord64 dev, StgWord64 ino, int for_writing)
         lock->inode  = ino;
         lock->readers = for_writing ? -1 : 1;
         insertHashTable_(obj_hash, (StgWord)lock, (void *)lock, hashLock);
-        insertHashTable(key_hash, fd, lock);
+        insertHashTable(key_hash, id, lock);
         RELEASE_LOCK(&file_lock_mutex);
         return 0;
     }
