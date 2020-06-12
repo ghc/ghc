@@ -564,4 +564,3 @@ closeMutex (Mutex* pMut)
 {
   (void)pMut;
 }
-

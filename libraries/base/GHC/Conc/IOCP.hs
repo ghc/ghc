@@ -27,4 +27,3 @@ module GHC.Conc.IOCP
        ( module GHC.Event.Windows.Thread ) where
 
 import GHC.Event.Windows.Thread
-
