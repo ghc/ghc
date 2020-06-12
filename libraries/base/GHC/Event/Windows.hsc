@@ -78,33 +78,36 @@ module GHC.Event.Windows (
 #include <Rts.h>
 #include "winio_structs.h"
 
+-- There doesn't seem to be  GHC.* import for these
+import Control.Concurrent.MVar (modifyMVar)
+import {-# SOURCE #-} Control.Concurrent (forkOS)
+import Data.Semigroup.Internal (stimesMonoid)
+import Data.Foldable (mapM_, length, forM_)
+import Data.Maybe (isJust, maybe)
+
 import GHC.Event.Windows.Clock   (Clock, Seconds, getClock, getTime)
 import GHC.Event.Windows.FFI     (LPOVERLAPPED, OVERLAPPED_ENTRY(..))
 import GHC.Event.Windows.ManagedThreadPool
 import GHC.Event.Internal.Types
+import GHC.Event.Unique
+import GHC.Event.TimeOut
+import GHC.Event.Windows.ConsoleEvent
 import qualified GHC.Event.Windows.FFI    as FFI
 import qualified GHC.Event.PSQ            as Q
 import qualified GHC.Event.IntTable       as IT
 import qualified GHC.Event.Internal as I
 
-import {-# SOURCE #-} Control.Concurrent
-import Control.Concurrent.MVar
-import Control.Exception as E
-import Data.IORef
-import Data.Foldable (mapM_, length, forM_)
-import Data.Maybe
-import Data.Word
-import Data.Semigroup.Internal (stimesMonoid)
-import Data.OldList (deleteBy)
+import GHC.MVar
+import GHC.Exception as E
+import GHC.IORef
+import GHC.Maybe
+import GHC.Word
+import GHC.OldList (deleteBy)
 import Foreign
 import qualified GHC.Event.Array    as A
 import GHC.Base
-import GHC.Conc.Sync (forkIO, showThreadId,
-                      ThreadId(..), ThreadStatus(..),
-                      threadStatus, sharedCAF)
-import GHC.Event.Unique
-import GHC.Event.TimeOut
-import GHC.Event.Windows.ConsoleEvent
+import GHC.Conc.Sync
+import GHC.IO
 import GHC.IOPort
 import GHC.Num
 import GHC.Real
@@ -112,19 +115,19 @@ import GHC.Enum (maxBound)
 import GHC.Windows
 import GHC.List (null)
 import GHC.Ptr
-import System.IO.Unsafe     (unsafePerformIO)
 import Text.Show
 
--- if defined(DEBUG)
-#if 1
+#if defined(DEBUG)
 import Foreign.C
 import System.Posix.Internals (c_write)
-import GHC.Conc.Sync (myThreadId, labelThread)
+import GHC.Conc.Sync (myThreadId)
 #endif
 
 import qualified GHC.Windows as Win32
 
+#if defined(DEBUG_TRACE)
 import {-# SOURCE #-} Debug.Trace (traceEventIO)
+#endif
 
 -- Note [WINIO Manager design]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -673,7 +676,7 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                         -- the pointer.
                         debugIO $ "## Waiting for cancellation record... "
                         _ <- FFI.getOverlappedResult h lpol True
-                        let oldDataPtr = exchangePtr ptr_lpol nullReq
+                        oldDataPtr <- exchangePtr ptr_lpol nullReq
                         -- Check if we have to free and cleanup pointer
                         when (oldDataPtr == cdData) $
                           do free oldDataPtr
@@ -1044,11 +1047,11 @@ processCompletion Manager{..} n delay = do
                     ++ " offset: " ++ show cdOffset
                     ++ " cdData: " ++ show cdDataCheck
                     ++ " at idx " ++ show idx
-          let oldDataPtr = exchangePtr ptr_lpol nullReq
+          oldDataPtr <- exchangePtr ptr_lpol nullReq :: IO (Ptr CompletionData)
           debugIO $ ":: oldDataPtr " ++ show oldDataPtr
-          when (oldDataPtr /= nullPtr && oldDataPtr /= nullReq) $
+          when (oldDataPtr /= nullPtr) $
             do debugIO $ "exchanged: " ++ show oldDataPtr
-               payload <- peek oldDataPtr
+               payload <- peek oldDataPtr :: IO CompletionData
                let !cb = cdCallback payload
                free oldDataPtr
                reqs <- removeRequest
@@ -1185,13 +1188,10 @@ foreign import ccall unsafe "getIOManagerEvent" -- in the RTS (ThrIOManager.c)
 foreign import ccall unsafe "readIOManagerEvent" -- in the RTS (ThrIOManager.c)
   c_readIOManagerEvent :: IO Word32
 
-foreign import ccall unsafe "sendIOManagerEvent" -- in the RTS (ThrIOManager.c)
-  c_sendIOManagerEvent :: Word32 -> IO ()
-
 foreign import ccall unsafe "rtsSupportsBoundThreads" threadedIOMgr :: Bool
 
 -- | Sleep for n ms
-foreign import stdcall unsafe "Sleep" sleepBlock :: Int -> IO ()
+foreign import WINDOWS_CCONV unsafe "Sleep" sleepBlock :: Int -> IO ()
 
 -- ---------------------------------------------------------------------------
 -- I/O manager event notifications
