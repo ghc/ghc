@@ -9,12 +9,9 @@ module GHC.Event.Windows.Thread (
 
 import GHC.Conc.Sync
 import GHC.Base
+import GHC.Event.Windows
 import GHC.IO
 import GHC.IOPort
-import GHC.Real
-
-import GHC.Event.Windows.Clock
-import GHC.Event.Windows
 
 ensureIOManagerIsRunning :: IO ()
 ensureIOManagerIsRunning = wakeupIOManager
