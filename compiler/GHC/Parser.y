@@ -1930,7 +1930,7 @@ unpackedness :: { Located ([AddApiAnn], SourceText, SrcUnpackedness) }
         | '{-# NOUNPACK' '#-}' { sLL $1 $> ([mo $1, mc $2], getNOUNPACK_PRAGs $1, SrcNoUnpack) }
 
 -- AZ: this is new, will need work
-forall_telescope :: { Located ([AddAnn], HsForAllTelescope GhcPs) }
+forall_telescope :: { Located ([AddApiAnn], HsForAllTelescope GhcPs) }
         : 'forall' tv_bndrs '.'  {% do { hintExplicitForall $1
                                        ; pure $ sLL $1 $>
                                            ( [mu AnnForall $1, mu AnnDot $3]
@@ -1952,15 +1952,12 @@ ktypedoc :: { LHsType GhcPs }
 
 -- A ctype is a for-all type
 ctype   :: { LHsType GhcPs }
-  -- AZ: next two productions are new, will need work
         : forall_telescope ctype      {% let (forall_anns, forall_tele) = unLoc $1 in
-                                         ams (sLL $1 $> $
+                                         acsA (\cs -> sLL $1 (reLoc $>) $
                                               HsForAllTy { hst_tele = forall_tele
-                                                         , hst_xforall = noExtField
-                                                         , hst_body = $2 })
-                                             forall_anns }
-        | context '=>' ctype          {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
-                                         >> return (sLL $1 $> $
+                                                         , hst_xforall = ApiAnn (glR $1) forall_anns cs
+                                                         , hst_body = $2 }) }
+        | context '=>' ctype          {% acsA (\cs -> (sLL (reLoc $1) (reLoc $>) $
                                             HsQualTy { hst_ctxt = $1
                                                      , hst_xqual = ApiAnn (glAR $1) [mu AnnDarrow $2] cs
                                                      , hst_body = $3 })) }
@@ -1982,16 +1979,14 @@ ctype   :: { LHsType GhcPs }
 ctypedoc :: { LHsType GhcPs }
   -- AZ: next two productions are new, will need work
         : forall_telescope ctypedoc   {% let (forall_anns, forall_tele) = unLoc $1 in
-                                         ams (sLL $1 $> $
+                                         acsA (\cs -> (sLL $1 (reLoc $>) $
                                               HsForAllTy { hst_tele = forall_tele
-                                                         , hst_xforall = noExtField
-                                                         , hst_body = $2 })
-                                             forall_anns }
-        | context '=>' ctypedoc       {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
-                                         >> return (sLL $1 $> $
+                                                         , hst_xforall = ApiAnn (glR $1) forall_anns cs
+                                                         , hst_body = $2 })) }
+        | context '=>' ctypedoc       {% acsA (\cs -> (sLL (reLoc $1) (reLoc $>) $
                                             HsQualTy { hst_ctxt = $1
                                                      , hst_xqual = ApiAnn (glAR $1) [mu AnnDarrow $2] cs
-                                                     , hst_body = $3 }) )}
+                                                     , hst_body = $3 })) }
         | ipvar '::' type             {% acsA (\cs -> sLL $1 (reLoc $>) (HsIParamTy (ApiAnn (glR $1) [mu AnnDcolon $2] cs) $1 $3)) }
         | typedoc                     { $1 }
 

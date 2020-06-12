@@ -17,7 +17,7 @@ showGhc = undefined
 -- ---------------------------------------------------------------------
 
 tt :: IO ()
-tt = testOneFile "/home/alanz/mysrc/git.haskell.org/ghc/_build/bindist/ghc-8.11.0.20200524-x86_64-unknown-linux/lib"
+tt = testOneFile "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib"
   "Test.hs"
 
 -- exact = ppr
@@ -49,7 +49,7 @@ testOneFile libdir fileName = do
          anns'   = pm_annotations p
          -- pped    = pragmas ++ "\n" ++ (exactPrint $ pm_parsed_source p)
          pped    = exactPrint (pm_parsed_source p) anns'
-         pragmas = getPragmas anns'
+         -- pragmas = getPragmas anns'
 
          newFile = dropExtension fileName <.> "ppr" <.> takeExtension fileName
          astFile = fileName <.> "ast"
@@ -57,6 +57,9 @@ testOneFile libdir fileName = do
 
        writeFile astFile origAst
        writeFile newFile pped
+
+       -- putStrLn $ "anns':" ++ showGhc (apiAnnComments anns')
+       -- putStrLn $ "anns':" ++ showGhc (apiAnnRogueComments anns')
 
        p' <- parseOneFile libdir newFile
 
@@ -66,8 +69,6 @@ testOneFile libdir fileName = do
                                                          (pm_parsed_source p')
        writeFile newAstFile newAstStr
 
-       putStrLn $ "anns':" ++ showGhc (apiAnnComments anns')
-       putStrLn $ "anns':" ++ showGhc (apiAnnRogueComments anns')
 
        if origAst == newAstStr
          then do
@@ -115,8 +116,8 @@ getPragmas anns' = pragmaStr
     pragmas = filter (\c -> isPrefixOf "{-#" c ) comments'
     pragmaStr = intercalate "\n" pragmas
 
-pp :: (Outputable a) => a -> String
-pp a = showPpr unsafeGlobalDynFlags a
+-- pp :: (Outputable a) => a -> String
+-- pp a = showPpr unsafeGlobalDynFlags a
 
 -- ---------------------------------------------------------------------
 

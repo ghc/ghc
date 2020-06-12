@@ -2445,10 +2445,10 @@ getGhciStepIO = do
     let ghciM   = nlHsAppTy (nlHsTyVar ghciTy) (nlHsTyVar a_tv)
         ioM     = nlHsAppTy (nlHsTyVar ioTyConName) (nlHsTyVar a_tv)
 
-        step_ty = noLoc $ HsForAllTy
+        step_ty = noLocA $ HsForAllTy
                      { hst_tele = mkHsForAllInvisTele
-                                  [noLoc $ UserTyVar noExtField SpecifiedSpec (noLoc a_tv)]
-                     , hst_xforall = noExtField
+                                  [noLoc $ UserTyVar noAnn SpecifiedSpec (noLocA a_tv)]
+                     , hst_xforall = noAnn
                      , hst_body  = nlHsFunTy ghciM ioM }
 
         stepTy :: LHsSigWcType GhcRn

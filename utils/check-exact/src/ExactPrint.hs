@@ -30,7 +30,7 @@ import Control.Monad.Identity
 import Control.Monad.RWS
 import Data.Data (Data, Typeable, toConstr,cast)
 import Data.Foldable
-import Data.List (sortBy, elemIndex)
+import Data.List (sortBy, elemIndex, partition, intercalate)
 import Data.Maybe (fromMaybe)
 import Data.Ord (comparing)
 
@@ -93,7 +93,9 @@ defaultEPState as = EPState
              , epLHS    = 0
              , epMarkLayout = False
              , priorEndPosition = (1,1)
+             , epComments = rogueComments as
              }
+
 
 -- ---------------------------------------------------------------------
 ------------------------------------------------------
@@ -151,12 +153,19 @@ data EPState = EPState
              , epLHS :: LayoutStartCol
              , priorEndPosition :: !Pos -- ^ Position reached when
                                         -- processing the last element
+             , epComments :: ![Comment]
              }
 
 -- ---------------------------------------------------------------------
 
-class Data ast => Annotate ast where
-  markAST :: SrcSpan -> ast -> Annotated ()
+-- class Data ast => Annotate ast where
+--   markAST :: SrcSpan -> ast -> Annotated ()
+
+-- ---------------------------------------------------------------------
+
+-- AZ:TODO: this can just be a function :: (ApiAnn' a) -> Entry
+class HasEntry ast where
+  fromAnn :: ast -> Entry
 
 -- ---------------------------------------------------------------------
 
@@ -171,8 +180,8 @@ type Annotated a = EP String Identity a
 -- annotate :: (Data ast, Annotate ast) => Located ast -> Annotated ()
 -- annotate = markLocated
 
-instance (Annotate ast) => Annotate (Located ast) where
-  markAST l (L _ ast) = markAST l ast
+-- instance (Annotate ast) => Annotate (Located ast) where
+--   markAST l (L _ ast) = markAST l ast
 
 -- ---------------------------------------------------------------------
 
@@ -182,14 +191,19 @@ markAnnotated a = enterAnn (getApiAnnotation a) a
 data Entry = Entry RealSrcSpan [RealLocated AnnotationComment]
            | NoEntryVal
 
-fromAnn :: ApiAnn -> Entry
-fromAnn (ApiAnn anchor _ cs) = Entry anchor cs
-fromAnn ApiAnnNotUsed = NoEntryVal
+instance HasEntry (ApiAnn' a) where
+  -- fromAnn :: ApiAnn -> Entry
+  fromAnn (ApiAnn anchor _ cs) = Entry anchor cs
+  fromAnn ApiAnnNotUsed = NoEntryVal
 
-fromAnnCo :: ApiAnnCO -> Entry
-fromAnnCo (ApiAnn anchor _ cs) = Entry anchor cs
-fromAnnCo ApiAnnNotUsed = NoEntryVal
+-- instance HasEntry ApiAnnCO where
+--   fromAnn :: ApiAnnCO -> Entry
+--   fromAnn (ApiAnn anchor _ cs) = Entry anchor cs
+--   fromAnn ApiAnnNotUsed = NoEntryVal
 
+
+-- | "Enter" an annotation, by using the associated 'anchor' field as
+-- the new reference point for calculating all DeltaPos positions.
 enterAnn :: (ExactPrint a) => Entry -> a -> Annotated ()
 enterAnn NoEntryVal a = do
   p <- getPos
@@ -205,8 +219,7 @@ enterAnn (Entry anchor cs) a = do
   -- the current position, and the anchor.
   -- off <- gets apLayoutStart
   off <- gets epLHS
-  -- priorEndAfterComments <- getPriorEnd
-  priorEndAfterComments <- getPos
+  priorEndAfterComments <- getPriorEnd
   let ss = anchor
   let edp = adjustDeltaForOffset
               -- Use the propagated offset if one is set
@@ -215,7 +228,6 @@ enterAnn (Entry anchor cs) a = do
               off (ss2delta priorEndAfterComments ss)
 
   let
-    -- edp = DP (1,0)
     st = annNone { annEntryDelta = edp }
   withOffset st (advance edp >> exact a)
 
@@ -248,9 +260,30 @@ enterAnn (Entry anchor cs) a = do
 
 -- ---------------------------------------------------------------------
 -- ---------------------------------------------------------------------
+-- ---------------------------------------------------------------------
 
-instance Annotate HsModule where
-  markAST l hsmod = undefined
+-- |In order to interleave annotations into the stream, we turn them into
+-- comments.
+-- annotationsToCommentsDelta :: [AnnKeywordId] -> Delta ()
+-- annotationsToCommentsDelta kws = do
+--   ss <- getSrcSpan
+--   cs <- gets apComments
+--   let
+--     doOne :: AnnKeywordId -> Delta [Comment]
+--     doOne kw = do
+--       (spans,_) <- getAndRemoveAnnotationDelta ss kw
+--       return $ map (mkKWComment kw) spans
+--     -- TODO:AZ make sure these are sorted/merged properly when the invariant for
+--     -- allocateComments is re-established.
+--   newComments <- mapM doOne kws
+--   putUnallocatedComments (cs ++ concat newComments)
+
+
+-- ---------------------------------------------------------------------
+-- ---------------------------------------------------------------------
+
+-- instance Annotate HsModule where
+--   markAST l hsmod = undefined
 
 withPpr :: (Outputable a) => a -> Annotated ()
 withPpr a = printString False (showGhc a)
@@ -288,10 +321,13 @@ instance ExactPrint HsModule where
 
     -- exact = withPpr
   exact (HsModule anns@(ApiAnn ss as cs) mmn mexports imports decls mdeprec mbDoc) = do
+
+    as <- gets epApiAnns
+    debugM $ "rogue comments:\n" ++ (intercalate "\n" (map show $ rogueComments as))
     case mmn of
       Nothing -> return ()
       Just (L ln mn) -> do
-        mark anns AnnModule
+        markApiAnn anns AnnModule
         -- markExternal ln AnnVal (moduleNameString mn)
         debugM $ "HsModule name: (ss,ln)=" ++ show (ss2pos ss,ss2pos (realSrcSpan ln))
         printStringAtSs ss ln (moduleNameString mn)
@@ -302,7 +338,7 @@ instance ExactPrint HsModule where
         -- forM_ mexports markLocated
         forM_ mexports markAnnotated
 
-        mark anns AnnWhere
+        markApiAnn anns AnnWhere
 
     -- markOptional GHC.AnnOpenC -- Possible '{'
     -- markManyOptional GHC.AnnSemi -- possible leading semis
@@ -326,29 +362,82 @@ printStringAtSs anchor (RealSrcSpan ss _) str = do
 
 -- ---------------------------------------------------------------------
 
-printStringAtKw :: ApiAnn -> AnnKeywordId -> String -> EPP ()
-printStringAtKw ApiAnnNotUsed _ str = printString True str
-printStringAtKw (ApiAnn anchor anns _cs) kw str = do
-  case find (\(AddApiAnn k _) -> k == kw) anns of
-    Nothing -> printString True str
-    Just (AddApiAnn _ ss) -> do
-      dp <- nextDP ss
-      p <- getPos
-      debugM $ "printStringAtKw: (dp,p) = " ++ show (dp,p)
-      printStringAtLsDelta [] dp str
+-- printStringAtKw :: ApiAnn' ann -> AnnKeywordId -> String -> EPP ()
+-- printStringAtKw ApiAnnNotUsed _ str = printString True str
+-- printStringAtKw (ApiAnn anchor anns _cs) kw str = do
+--   case find (\(AddApiAnn k _) -> k == kw) anns of
+--     Nothing -> printString True str
+--     Just (AddApiAnn _ ss) -> printStringAtKw' ss str
+
+printStringAtKw' :: RealSrcSpan -> String -> EPP ()
+printStringAtKw' ss str = do
+  dp <- nextDP ss
+  p <- getPos
+  debugM $ "printStringAtKw': (dp,p) = " ++ show (dp,p)
+  printStringAtLsDelta [] dp str
 
 -- ---------------------------------------------------------------------
 
-mark :: ApiAnn -> AnnKeywordId -> EPP ()
-mark ApiAnnNotUsed _ = return ()
-mark (ApiAnn anchor anns _cs) kw = do
+markALocatedA :: ApiAnn' AnnListItem -> AnnKeywordId -> EPP ()
+markALocatedA ApiAnnNotUsed  _  = return ()
+markALocatedA (ApiAnn _ a _) kw = mark (lann_trailing a) kw
+
+markALocatedN :: ApiAnn' NameAnn -> AnnKeywordId -> EPP ()
+markALocatedN ApiAnnNotUsed  _  = return ()
+markALocatedN (ApiAnn _ a _) kw = mark (nann_trailing a) kw
+
+markApiAnn :: ApiAnn -> AnnKeywordId -> EPP ()
+markApiAnn ApiAnnNotUsed _ = return ()
+markApiAnn (ApiAnn _ a _) kw = mark a kw
+
+
+mark :: [AddApiAnn] -> AnnKeywordId -> EPP ()
+mark anns kw = do
   case find (\(AddApiAnn k _) -> k == kw) anns of
     Nothing -> return ()
-    Just (AddApiAnn _ ss) -> do
-      dp <- nextDP ss
-      p <- getPos
-      debugM $ "mark: (dp,p) = " ++ show (dp,p)
-      printStringAtLsDelta [] dp (keywordToString (G kw))
+    Just aa -> markKw aa
+
+-- | This should be the main driver of the process, managing comments
+markKw :: AddApiAnn -> EPP ()
+markKw (AddApiAnn kw ss) = do
+  p' <- getPos
+  cs <- commentAllocation ss
+  debugM $ "markKw: (ss,comment locations): " ++ showGhc (ss,map (commentIdentifier . fst) cs)
+  mapM_ (uncurry printQueuedComment) cs
+  dp <- nextDP ss
+  p <- getPos
+  debugM $ "markKw: (dp,p,p') = " ++ show (dp,p,p')
+  printStringAtLsDelta [] dp (keywordToString (G kw))
+
+-- ---------------------------------------------------------------------
+
+commentAllocation :: RealSrcSpan -> EPP [(Comment, DeltaPos)]
+commentAllocation ss = do
+  p <- getPos
+  cs <- getUnallocatedComments
+  let (earlier,later) = partition (\(Comment _str loc _mo) -> loc <= ss) cs
+  putUnallocatedComments later
+  return $ map (\c@(Comment _str loc _mo) -> (c, ss2delta p loc)) earlier
+
+-- ---------------------------------------------------------------------
+
+-- commentAllocation :: (Comment -> Bool)
+--                   -> EPP a
+-- commentAllocation p = do
+--   cs <- getUnallocatedComments
+--   let (allocated,cs') = allocateComments p cs
+--   putUnallocatedComments cs'
+--   mapM makeDeltaComment (sortBy (comparing commentIdentifier) allocated)
+
+-- makeDeltaComment :: Comment -> EPP (Comment, DeltaPos)
+-- makeDeltaComment c = do
+--   let pa = commentIdentifier c
+--   pe <- getPriorEnd
+--   let p = ss2delta pe pa
+--   p' <- adjustDeltaForOffsetM p
+--   setPriorEnd (ss2posEnd pa)
+--   return (c, p')
+
 
 -- ---------------------------------------------------------------------
 
@@ -360,7 +449,7 @@ markLocatedA (L (SrcSpanAnn ann l) a) = do
 -- ---------------------------------------------------------------------
 
 markLocatedN :: (ExactPrint a) => LocatedN a -> EPP ()
-markLocatedN (N (SrcSpanAnn ann l) a) = do
+markLocatedN (L (SrcSpanAnn ann l) a) = do
   debugM $ "markLocatedN:ann=" ++ showGhc ann
   exact a
 
@@ -529,10 +618,10 @@ instance ExactPrint (Match GhcPs (LHsExpr GhcPs)) where
       _ -> withPpr mctxt
 
     case grhs of
-      (GHC.L _ (GHC.GRHS _ [] _):_) -> when (isFunBind mctxt) $ mark anns AnnEqual -- empty guards
+      (GHC.L _ (GHC.GRHS _ [] _):_) -> when (isFunBind mctxt) $ markApiAnn anns AnnEqual -- empty guards
       _ -> return ()
     case mctxt of
-      LambdaExpr -> mark anns AnnRarrow -- For HsLam
+      LambdaExpr -> markApiAnn anns AnnRarrow -- For HsLam
       _ -> return ()
 
     mapM_ markAnnotated grhs
@@ -546,14 +635,14 @@ instance ExactPrint (GRHS GhcPs (LHsExpr GhcPs)) where
     case guards of
       [] -> return ()
       (_:_) -> do
-        mark anns AnnVbar
+        markApiAnn anns AnnVbar
         -- unsetContext Intercalate $ setContext (Set.fromList [LeftMost,PrefixOp])
         --   $ markListIntercalate guards
         -- ifInContext (Set.fromList [CaseAlt])
         --   (return ())
         --   (mark GHC.AnnEqual)
         markListA guards
-        mark anns AnnEqual
+        markApiAnn anns AnnEqual
 
     -- markOptional GHC.AnnEqual -- For apply-refact Structure8.hs test
 
@@ -582,19 +671,19 @@ instance ExactPrint (HsExpr GhcPs) where
   getApiAnnotation (HsUnboundVar ann _)         = fromAnn ann
   getApiAnnotation (HsConLikeOut{})             = NoEntryVal
   getApiAnnotation (HsRecFld{})                 = NoEntryVal
-  getApiAnnotation (HsOverLabel ann _ _)        = fromAnnCo ann
-  getApiAnnotation (HsIPVar ann _)              = fromAnnCo ann
-  getApiAnnotation (HsOverLit ann _)            = fromAnnCo ann
-  getApiAnnotation (HsLit ann _)                = fromAnnCo ann
+  getApiAnnotation (HsOverLabel ann _ _)        = fromAnn ann
+  getApiAnnotation (HsIPVar ann _)              = fromAnn ann
+  getApiAnnotation (HsOverLit ann _)            = fromAnn ann
+  getApiAnnotation (HsLit ann _)                = fromAnn ann
   getApiAnnotation (HsLam ann _)                = fromAnn ann
   getApiAnnotation (HsLamCase ann _)            = fromAnn ann
-  getApiAnnotation (HsApp ann _ _)              = fromAnnCo ann
-  getApiAnnotation (HsAppType ann _ _)          = fromAnnCo ann
+  getApiAnnotation (HsApp ann _ _)              = fromAnn ann
+  getApiAnnotation (HsAppType ann _ _)          = fromAnn ann
   getApiAnnotation (OpApp ann _ _ _)            = fromAnn ann
   getApiAnnotation (NegApp ann _ _)             = fromAnn ann
   getApiAnnotation (HsPar ann _)                = fromAnn ann
-  getApiAnnotation (SectionL ann _ _)           = fromAnnCo ann
-  getApiAnnotation (SectionR ann _ _)           = fromAnnCo ann
+  getApiAnnotation (SectionL ann _ _)           = fromAnn ann
+  getApiAnnotation (SectionR ann _ _)           = fromAnn ann
   getApiAnnotation (ExplicitTuple ann _ _)      = fromAnn ann
   getApiAnnotation (ExplicitSum ann _ _ _)      = fromAnn ann
   getApiAnnotation (HsCase (ApiAnn a _ cs) _ _) = Entry a cs
@@ -611,7 +700,7 @@ instance ExactPrint (HsExpr GhcPs) where
   getApiAnnotation (HsBracket ann _)            = fromAnn ann
   getApiAnnotation (HsRnBracketOut{})           = NoEntryVal
   getApiAnnotation (HsTcBracketOut{})           = NoEntryVal
-  getApiAnnotation (HsSpliceE ann _)            = fromAnnCo ann
+  getApiAnnotation (HsSpliceE ann _)            = fromAnn ann
   getApiAnnotation (HsProc ann _ _)             = fromAnn ann
   getApiAnnotation (HsStatic{})                 = NoEntryVal
   getApiAnnotation (HsTick {})                  = NoEntryVal
@@ -676,22 +765,52 @@ instance ExactPrint (HsExpr GhcPs) where
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (LocatedN RdrName) where
-  getApiAnnotation (N (SrcSpanAnn ann _) _) = fromAnn ann
-  exact (N (SrcSpanAnn ann _) a) = do
-    mark ann AnnOpenP
-    mark ann AnnBackquote
-    printStringAtKw ann AnnVal (showGhc a)
-    mark ann AnnBackquote
-    mark ann AnnCloseP
+  getApiAnnotation (L (SrcSpanAnn ann _) _) = fromAnn ann
+  exact (L (SrcSpanAnn ApiAnnNotUsed _) n) = printString False (showGhc n)
+  exact (L (SrcSpanAnn (ApiAnn anchor ann cs) _) n) = do
+    case ann of
+      NameAnn a o l c t -> do
+        markName a o (Just (l,n)) c
+        markTrailing t
+      NameAnnCommas a o cs c t -> do
+        markName a o Nothing c
+        markTrailing t
+      NameAnnOnly a o c t -> do
+        markName a o Nothing c
+        markTrailing t
+      NameAnnRArrow n t -> do
+        markKw (AddApiAnn AnnRarrow n)
+        markTrailing t
+      NameAnnTrailing t -> do
+        markTrailing t
+
+markName :: NameAdornment
+         -> RealSrcSpan -> Maybe (RealSrcSpan,RdrName) -> RealSrcSpan -> EPP ()
+markName adorn open mname close = do
+  let (kwo,kwc) = adornments adorn
+  markKw (AddApiAnn kwo open)
+  case mname of
+    Nothing -> return ()
+    Just (name, a) -> printStringAtKw' name (showGhc a)
+  markKw (AddApiAnn kwc close)
+  where
+    adornments :: NameAdornment -> (AnnKeywordId, AnnKeywordId)
+    adornments NameParens     = (AnnOpenP, AnnCloseP)
+    adornments NameParensHash = (AnnOpenPH, AnnClosePH)
+    adornments NameBackquotes = (AnnBackquote, AnnBackquote)
+    adornments NameSquare     = (AnnOpenS, AnnCloseS)
+
+markTrailing ts = do
+  return ()
 
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (LocatedA [LIE GhcPs]) where
   getApiAnnotation (L (SrcSpanAnn ann _) _) = fromAnn ann
   exact (L (SrcSpanAnn ann _) ies) = do
-    mark ann AnnOpenP
+    markALocatedA ann AnnOpenP
     mapM_ markAnnotated ies
-    mark ann AnnCloseP
+    markALocatedA ann AnnCloseP
 
 -- ---------------------------------------------------------------------
 
@@ -699,7 +818,7 @@ instance ExactPrint (LIE GhcPs) where
   getApiAnnotation _ = NoEntryVal
   exact (L (SrcSpanAnn ann _) a) = do
     markAnnotated a
-    mark ann AnnComma
+    markALocatedA ann AnnComma
 
 instance ExactPrint (IE GhcPs) where
   getApiAnnotation (IEVar anns _)             = fromAnn anns
@@ -870,13 +989,15 @@ isGoodDeltaWithOffset :: DeltaPos -> LayoutStartCol -> Bool
 isGoodDeltaWithOffset dp colOffset = isGoodDelta (DP (undelta (0,0) dp colOffset))
 
 printQueuedComment :: (Monad m, Monoid w) => Comment -> DeltaPos -> EP w m ()
-printQueuedComment Comment{commentContents} dp = do
+printQueuedComment Comment{commentContents,commentIdentifier} dp = do
   p <- getPos
   colOffset <- getLayoutOffset
   let (dr,dc) = undelta (0,0) dp colOffset
+  debugM $ "printQueuedComment: (p,dp,colOffset,undelta)=" ++ show (p,dp,colOffset,undelta p dp colOffset)
   -- do not lose comments against the left margin
   when (isGoodDelta (DP (dr,max 0 dc))) $
     printCommentAt (undelta p dp colOffset) commentContents
+  -- debugM $ "printQueuedComment: (p,colOffset,(dr,dc),commentIdentifier)=" ++ show (p,colOffset,(dr,dc),commentIdentifier)
 
 
 -- ---------------------------------------------------------------------
@@ -922,6 +1043,12 @@ getPos = gets epPos
 
 setPos :: (Monad m, Monoid w) => Pos -> EP w m ()
 setPos l = modify (\s -> s {epPos = l})
+
+getUnallocatedComments :: (Monad m, Monoid w) => EP w m [Comment]
+getUnallocatedComments = gets epComments
+
+putUnallocatedComments :: (Monad m, Monoid w) => [Comment] -> EP w m ()
+putUnallocatedComments cs = modify (\s -> s { epComments = cs } )
 
 -- |Get the current column offset
 getLayoutOffset :: (Monad m, Monoid w) => EP w m LayoutStartCol
@@ -1036,7 +1163,9 @@ printWhitespace :: (Monad m, Monoid w) => Pos -> EP w m ()
 printWhitespace = padUntil
 
 printCommentAt :: (Monad m, Monoid w) => Pos -> String -> EP w m ()
-printCommentAt p str = printWhitespace p >> printString False str
+printCommentAt p str = do
+  debugM $ "printCommentAt: (pos,str)" ++ show (p,str)
+  printWhitespace p >> printString False str
 
 printStringAt :: (Monad m, Monoid w) => Pos -> String -> EP w m ()
 printStringAt p str = printWhitespace p >> printString True str

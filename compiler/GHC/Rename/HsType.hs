@@ -385,7 +385,8 @@ rnImplicitBndrs mb_assoc implicit_vs_with_dups thing_inside
          -- Use the currently set SrcSpan as the new source location for each Name.
          -- See Note [Source locations for implicitly bound type variables].
        ; loc <- getSrcSpanM
-       ; vars <- mapM (newTyVarNameRn mb_assoc . L loc . unLoc) implicit_vs
+       ; let loc' = noAnnSrcSpan loc
+       ; vars <- mapM (newTyVarNameRn mb_assoc . L loc' . unLoc) implicit_vs
 
        ; bindLocalNamesFV vars $
          thing_inside vars }
@@ -563,7 +564,7 @@ rnHsTyKi env ty@(HsForAllTy { hst_tele = tele, hst_body = tau })
   = do { checkPolyKinds env ty
        ; bindHsForAllTelescope (rtke_ctxt env) tele $ \ tele' ->
     do { (tau',  fvs) <- rnLHsTyKi env tau
-       ; return ( HsForAllTy { hst_xforall = noExtField
+       ; return ( HsForAllTy { hst_xforall = noAnn
                              , hst_tele = tele' , hst_body =  tau' }
                 , fvs) } }
 
@@ -885,13 +886,8 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
              bndrs        = map hsLTyVarLocName hs_tv_bndrs
              implicit_kvs = filterFreeVarsToBind bndrs $
                bndr_kv_occs ++ body_kv_occs
-<<<<<<< variant A
              body_remaining = filterFreeVarsToBind bndr_kv_occs $
               filterFreeVarsToBind bndrs body_kv_occs
->>>>>>> variant B
-             del          = deleteBys eqLocated
-             body_remaining = (body_kv_occs `del` bndrs) `del` bndr_kv_occs
-======= end
              all_bound_on_lhs = null body_remaining
 
        ; traceRn "checkMixedVars3" $
@@ -927,7 +923,7 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
     --
     --   class C (a :: j) (b :: k) where
     --            ^^^^^^^^^^^^^^^
-    bndrs_loc = case map getLoc hs_tv_bndrs ++ map getLoc body_kv_occs of
+    bndrs_loc = case map getLoc hs_tv_bndrs ++ map getLocA body_kv_occs of
       []         -> panic "bindHsQTyVars.bndrs_loc"
       [loc]      -> loc
       (loc:locs) -> loc `combineSrcSpans` last locs
@@ -1128,24 +1124,15 @@ bindLHsTyVarBndr doc mb_assoc (L loc (KindedTyVar x fl lrdr@(L lv _) kind))
                $ thing_inside (L loc (KindedTyVar x fl (L lv tv_nm) kind'))
            ; return (b, fvs1 `plusFV` fvs2) }
 
-<<<<<<< variant A
 newTyVarNameRn :: Maybe a -- associated class
-               -> Located RdrName -> RnM Name
+               -> LocatedN RdrName -> RnM Name
 newTyVarNameRn mb_assoc lrdr@(L _ rdr)
->>>>>>> variant B
-newTyVarNameRn :: Maybe a -> LocatedN RdrName -> RnM Name
-newTyVarNameRn mb_assoc (L loc rdr)
-======= end
   = do { rdr_env <- getLocalRdrEnv
        ; case (mb_assoc, lookupLocalRdrEnv rdr_env rdr) of
            (Just _, Just n) -> return n
               -- Use the same Name as the parent class decl
 
-<<<<<<< variant A
            _                -> newLocalBndrRn lrdr }
->>>>>>> variant B
-           _                -> newLocalBndrRn (L loc rdr) }
-======= end
 {-
 *********************************************************
 *                                                       *
@@ -1792,11 +1779,7 @@ extractHsTyVarBndrsKVs tv_bndrs = extract_hs_tv_bndrs_kvs tv_bndrs
 -- Returns the free kind variables in a type family result signature, returning
 -- variable occurrences in left-to-right order.
 -- See Note [Ordering of implicit variables].
-<<<<<<< variant A
 extractRdrKindSigVars :: LFamilyResultSig GhcPs -> FreeKiTyVars
->>>>>>> variant B
-extractRdrKindSigVars :: LFamilyResultSig GhcPs -> [LocatedN RdrName]
-======= end
 extractRdrKindSigVars (L _ resultSig) = case resultSig of
   KindSig _ k                            -> extractHsTyRdrTyVars k
   TyVarSig _ (L _ (KindedTyVar _ _ _ k)) -> extractHsTyRdrTyVars k
@@ -1905,12 +1888,7 @@ extract_hs_tv_bndrs_kvs tv_bndrs =
     foldr extract_lty []
           [k | L _ (KindedTyVar _ _ _ k) <- tv_bndrs]
 
-<<<<<<< variant A
-extract_tv :: Located RdrName -> FreeKiTyVars -> FreeKiTyVars
->>>>>>> variant B
-extract_tv :: LocatedN RdrName
-           -> [LocatedN RdrName] -> [LocatedN RdrName]
-======= end
+extract_tv :: LocatedN RdrName -> FreeKiTyVars -> FreeKiTyVars
 extract_tv tv acc =
   if isRdrTyVar (unLoc tv) then tv:acc else acc
 

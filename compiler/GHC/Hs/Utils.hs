@@ -712,9 +712,9 @@ typeToLHsType ty
                                       , hst_body = go tau })
 
     go ty@(ForAllTy (Bndr _ argf) _)
-      = noLoc (HsForAllTy { hst_tele = tele
-                          , hst_xforall = noAnn
-                          , hst_body = go tau })
+      = noLocA (HsForAllTy { hst_tele = tele
+                           , hst_xforall = noAnn
+                           , hst_body = go tau })
       where
         (tele, tau)
           | isVisibleArgFlag argf
@@ -770,7 +770,7 @@ typeToLHsType ty
     go_tv :: VarBndr TyVar flag -> LHsTyVarBndr flag GhcPs
     go_tv (Bndr tv flag) = noLoc $ KindedTyVar noAnn
                                                flag
-                                               (noLoc (getRdrName tv))
+                                               (noLocA (getRdrName tv))
                                                (go (tyVarKind tv))
 
 {-

@@ -1313,8 +1313,8 @@ type LHsTypeArg p = HsArg (LHsType p) (LHsKind p)
 -- | Compute the 'SrcSpan' associated with an 'LHsTypeArg'.
 lhsTypeArgSrcSpan :: LHsTypeArg pass -> SrcSpan
 lhsTypeArgSrcSpan arg = case arg of
-  HsValArg  tm    -> getLoc tm
-  HsTypeArg at ty -> at `combineSrcSpans` getLoc ty
+  HsValArg  tm    -> getLocA tm
+  HsTypeArg at ty -> at `combineSrcSpans` getLocA ty
   HsArgPar  sp    -> sp
 
 instance (Outputable tm, Outputable ty) => Outputable (HsArg tm ty) where

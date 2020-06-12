@@ -136,7 +136,7 @@ checkShadowedRdrNames loc_rdr_names
   where
     filtered_rdrs = filterOut (isExact . unLoc) loc_rdr_names
                 -- See Note [Binders in Template Haskell] in "GHC.ThToHs"
-    get_loc_occ (L loc rdr) = (loc,rdrNameOcc rdr)
+    get_loc_occ (L loc rdr) = (locA loc,rdrNameOcc rdr)
 
 checkDupAndShadowedNames :: (GlobalRdrEnv, LocalRdrEnv) -> [Name] -> RnM ()
 checkDupAndShadowedNames envs names

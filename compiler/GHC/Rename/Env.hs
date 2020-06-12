@@ -267,6 +267,9 @@ lookupTopBndrRn rdr_name =
 lookupLocatedTopBndrRn :: Located RdrName -> RnM (Located Name)
 lookupLocatedTopBndrRn = wrapLocM lookupTopBndrRn
 
+lookupLocatedTopBndrRnN :: LocatedN RdrName -> RnM (LocatedN Name)
+lookupLocatedTopBndrRnN = wrapLocMN lookupTopBndrRn
+
 -- | Lookup an @Exact@ @RdrName@. See Note [Looking up Exact RdrNames].
 -- This never adds an error, but it may return one, see
 -- Note [Errors in lookup functions]

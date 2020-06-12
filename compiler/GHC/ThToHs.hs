@@ -1518,9 +1518,10 @@ cvtTypeKind ty_str ty
                    ; cxt' <- cvtContext funPrec cxt
                    ; ty'  <- cvtType ty
                    ; loc <- getL
+                   ; let loc' = noAnnSrcSpan loc
                    ; let tele   = mkHsForAllInvisTele tvs'
-                         hs_ty  = mkHsForAllTy loc tele rho_ty
-                         rho_ty = mkHsQualTy cxt loc cxt' ty'
+                         hs_ty  = mkHsForAllTy loc' tele rho_ty
+                         rho_ty = mkHsQualTy cxt loc' cxt' ty'
 
                    ; return hs_ty }
 
@@ -1529,8 +1530,9 @@ cvtTypeKind ty_str ty
              -> do { tvs' <- cvtTvs tvs
                    ; ty'  <- cvtType ty
                    ; loc  <- getL
+                   ; let loc' = noAnnSrcSpan loc
                    ; let tele = mkHsForAllVisTele tvs'
-                   ; pure $ mkHsForAllTy loc tele ty' }
+                   ; pure $ mkHsForAllTy loc' tele ty' }
 
            SigT ty ki
              -> do { ty' <- cvtType ty
@@ -1765,13 +1767,14 @@ cvtPatSynSigTy (ForallT univs reqs (ForallT exis provs ty))
                                                         , hst_xqual = noAnn
                                                         , hst_body = ty' }) }
   | null reqs             = do { l'      <- getL
-                               ; let l = noAnnSrcSpan l'
+                               ; let l   = noAnnSrcSpan l'
+                               ; let l'' = noAnnSrcSpan l'
                                ; univs' <- cvtTvs univs
                                ; ty'    <- cvtType (ForallT exis provs ty)
                                ; let forTy = HsForAllTy
                                               { hst_tele = mkHsForAllInvisTele univs'
-                                              , hst_xforall = noExtField
-                                              , hst_body = L l cxtTy }
+                                              , hst_xforall = noAnn
+                                              , hst_body = L l'' cxtTy }
                                      cxtTy = HsQualTy { hst_ctxt = L l []
                                                       , hst_xqual = noAnn
                                                       , hst_body = ty' }
@@ -1830,7 +1833,7 @@ mkHsForAllTy :: SrcSpanAnn
 mkHsForAllTy loc tele rho_ty
   | no_tvs    = rho_ty
   | otherwise = L loc $ HsForAllTy { hst_tele = tele
-                                   , hst_xforall = noExtField
+                                   , hst_xforall = noAnn
                                    , hst_body = rho_ty }
   where
     no_tvs = case tele of

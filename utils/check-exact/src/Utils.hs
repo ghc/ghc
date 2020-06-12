@@ -253,11 +253,22 @@ mkKWComment kw ss = Comment (keywordToString $ G kw) ss (Just kw)
 comment2dp :: (Comment,  DeltaPos) -> (KeywordId, DeltaPos)
 comment2dp = first AnnComment
 
+
+rogueComments :: ApiAnns -> [Comment]
+rogueComments as = extractRogueComments as
+  -- where
+  --   go :: Comment -> (Comment, DeltaPos)
+  --   go c@(Comment _str loc _mo) = (c, ss2delta (1,1) loc)
+
 extractComments :: ApiAnns -> [Comment]
 extractComments anns
   -- cm has type :: Map RealSrcSpan [RealLocated AnnotationComment]
   = map tokComment . sortRealLocated . concat $ Map.elems (apiAnnComments anns)
-  -- TODO: apiAnnRogueComments.
+
+extractRogueComments :: ApiAnns -> [Comment]
+extractRogueComments anns
+  -- cm has type :: Map RealSrcSpan [RealLocated AnnotationComment]
+  = map tokComment $ sortRealLocated  (apiAnnRogueComments anns)
 
 
 getAnnotationEP :: (Data a) =>  Located a  -> Anns -> Maybe Annotation

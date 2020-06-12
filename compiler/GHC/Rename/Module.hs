@@ -730,7 +730,7 @@ rnFamInstEqn doc atfi rhs_kvars
              -- is what lhs_loc corresponds to.
              all_imp_var_names = map (`setNameLoc` lhs_loc) all_imp_var_names'
 
-             groups :: [NonEmpty (Located RdrName)]
+             groups :: [NonEmpty (LocatedN RdrName)]
              groups = equivClasses cmpLocated $
                       pat_kity_vars_with_dups
        ; nms_dups <- mapM (lookupOccRn . unLoc) $
@@ -783,7 +783,7 @@ rnFamInstEqn doc atfi rhs_kvars
     --
     --   type instance F a b c = Either a b
     --                   ^^^^^
-    lhs_loc = case map lhsTypeArgSrcSpan pats ++ map getLoc rhs_kvars of
+    lhs_loc = case map lhsTypeArgSrcSpan pats ++ map getLocA rhs_kvars of
       []         -> panic "rnFamInstEqn.lhs_loc"
       [loc]      -> loc
       (loc:locs) -> loc `combineSrcSpans` last locs
@@ -2188,12 +2188,12 @@ rnConDecl (XConDecl (ConDeclGADTPrefixPs { con_gp_names = names, con_gp_ty = ty
        ; case res_ty of
            L l (HsForAllTy { hst_tele = tele })
              |  HsForAllVis{} <- tele
-             -> setSrcSpan l $ addErr $ withHsDocContext ctxt $ vcat
+             -> setSrcSpanA l $ addErr $ withHsDocContext ctxt $ vcat
                 [ text "Illegal visible, dependent quantification" <+>
                   text "in the type of a term"
                 , text "(GHC does not yet support this)" ]
              |  HsForAllInvis{} <- tele
-             -> nested_foralls_contexts_err l ctxt
+             -> nested_foralls_contexts_err (locA l) ctxt
            L l (HsQualTy {})
              -> nested_foralls_contexts_err (locA l) ctxt
            _ -> pure ()
