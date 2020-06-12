@@ -1,6 +1,6 @@
 -- (c) The University of Glasgow 2006
 
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, PatternSynonyms #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 
@@ -44,6 +44,7 @@ import GHC.Data.Pair
 import GHC.Utils.Outputable
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
+import GHC.Exts( oneShot )
 
 import Control.Monad
 import Control.Applicative hiding ( empty )
@@ -1235,8 +1236,14 @@ data UMState = UMState
                    { um_tv_env   :: TvSubstEnv
                    , um_cv_env   :: CvSubstEnv }
 
-newtype UM a = UM { unUM :: UMState -> UnifyResultM (UMState, a) }
-    deriving (Functor)
+newtype UM a
+  = UMNoEta { unUM :: UMState -> UnifyResultM (UMState, a) }
+  deriving (Functor)
+
+pattern UM :: (UMState -> UnifyResultM (UMState, a)) -> UM a
+pattern UM m <- UMNoEta m
+  where
+    UM m = UMNoEta (oneShot m)
 
 instance Applicative UM where
       pure a = UM (\s -> pure (s, a))
