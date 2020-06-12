@@ -202,7 +202,7 @@ mkPluginUsage hsc_env pluginModule
              (ppr pNm)
         _  -> mapM hashFile (nub files)
     _ -> do
-      foundM <- findPluginModule hsc_env pNm
+      foundM <- findPluginModule hsc_env (hsc_dflags hsc_env) pNm
       case foundM of
       -- The plugin was built locally: look up the object file containing
       -- the `plugin` binder, and all object files belong to modules that are
