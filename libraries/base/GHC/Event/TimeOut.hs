@@ -38,4 +38,3 @@ type TimeoutEdit = TimeoutQueue -> TimeoutQueue
 -- | A timeout registration cookie.
 newtype TimeoutKey = TK Unique
     deriving (Eq, Ord)
-

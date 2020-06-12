@@ -245,4 +245,3 @@ ddwordToDwords n =
 
 dwordsToDdword:: (DWORD,DWORD) -> DDWORD
 dwordsToDdword (hi,low) = (fromIntegral low) .|. (fromIntegral hi `shiftL` finiteBitSize hi)
-

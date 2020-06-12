@@ -22,11 +22,4 @@ extern void registerAlertableWait (bool has_timeout, DWORD mssec, uint64_t num_r
 
 extern OVERLAPPED_ENTRY* getOverlappedEntries (uint32_t *num);
 extern void completeSynchronousRequest (void);
-<<<<<<< HEAD
-
-=======
 extern bool queueIOThread(void);
->>>>>>> f1207f6124... winio: nontreaded: Create io processing threads in main thread.
-
-
-

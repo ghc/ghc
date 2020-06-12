@@ -544,17 +544,3 @@ static DWORD WINAPI runner (LPVOID lpParam STG_UNUSED)
     return 0;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-

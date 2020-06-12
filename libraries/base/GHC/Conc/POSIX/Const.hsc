@@ -28,4 +28,3 @@ import Data.Word
 io_MANAGER_WAKEUP, io_MANAGER_DIE :: Word32
 io_MANAGER_WAKEUP = #{const IO_MANAGER_WAKEUP}
 io_MANAGER_DIE    = #{const IO_MANAGER_DIE}
-

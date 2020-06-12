@@ -38,5 +38,3 @@ typedef struct _HASKELL_OVERLAPPED {
      order to correctly handle multiple threads using it.  */
   LPCompletionData hoData ALIGNMENT;
 } HASKELL_OVERLAPPED;
-
-
