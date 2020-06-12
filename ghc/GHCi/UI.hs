@@ -57,8 +57,8 @@ import GHC.Driver.Types ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, 
                   hsc_dynLinker, hsc_interp )
 import GHC.Unit.Module
 import GHC.Types.Name
-import GHC.Unit.State ( unitIsTrusted, unsafeGetUnitInfo, getInstalledPackageDetails,
-                             listVisibleModuleNames, pprFlag )
+import GHC.Unit.State   ( unitIsTrusted, unsafeLookupUnit, unsafeLookupUnitId,
+                          listVisibleModuleNames, pprFlag, preloadUnits )
 import GHC.Iface.Syntax ( showToHeader )
 import GHC.Core.Ppr.TyThing
 import GHC.Builtin.Names
@@ -2054,7 +2054,7 @@ keepPackageImports = filterM is_pkg_import
          = do e <- MC.try $ GHC.findModule mod_name (fmap sl_fs $ ideclPkgQual d)
               case e :: Either SomeException Module of
                 Left _  -> return False
-                Right m -> return (not (isHomeModule m))
+                Right m -> return (not (isMainUnitModule m))
         where
           mod_name = unLoc (ideclName d)
 
@@ -2359,13 +2359,13 @@ isSafeModule m = do
     mname = GHC.moduleNameString $ GHC.moduleName m
 
     packageTrusted dflags md
-        | thisPackage dflags == moduleUnit md = True
-        | otherwise = unitIsTrusted $ unsafeGetUnitInfo dflags (moduleUnit md)
+        | isHomeModule dflags md = True
+        | otherwise = unitIsTrusted $ unsafeLookupUnit (unitState dflags) (moduleUnit md)
 
     tallyPkgs dflags deps | not (packageTrustOn dflags) = (S.empty, S.empty)
                           | otherwise = S.partition part deps
-        where part pkg = unitIsTrusted $ getInstalledPackageDetails pkgstate pkg
-              pkgstate = pkgState dflags
+        where part pkg = unitIsTrusted $ unsafeLookupUnitId pkgstate pkg
+              pkgstate = unitState dflags
 
 -----------------------------------------------------------------------------
 -- :browse
@@ -2934,7 +2934,7 @@ newDynFlags interactive_only minus_opts = do
 
       when (not interactive_only) $ do
         (dflags1, _, _) <- liftIO $ GHC.parseDynamicFlags dflags0 lopts
-        new_pkgs <- GHC.setProgramDynFlags dflags1
+        must_reload <- GHC.setProgramDynFlags dflags1
 
         -- if the package flags changed, reset the context and link
         -- the new packages.
@@ -2946,14 +2946,16 @@ newDynFlags interactive_only minus_opts = do
               "package flags have changed, resetting and loading new packages..."
           -- delete targets and all eventually defined breakpoints. (#1620)
           clearAllTargets
-          liftIO $ linkPackages hsc_env new_pkgs
+          when must_reload $ do
+            let units = preloadUnits (unitState dflags2)
+            liftIO $ linkPackages hsc_env units
           -- package flags changed, we can't re-use any of the old context
           setContextAfterLoad False []
           -- and copy the package state to the interactive DynFlags
           idflags <- GHC.getInteractiveDynFlags
           GHC.setInteractiveDynFlags
-              idflags{ pkgState = pkgState dflags2
-                     , pkgDatabase = pkgDatabase dflags2
+              idflags{ unitState = unitState dflags2
+                     , unitDatabases = unitDatabases dflags2
                      , packageFlags = packageFlags dflags2 }
 
         let ld0length   = length $ ldInputs dflags0
@@ -3074,7 +3076,7 @@ showCmd str = do
                liftIO $ putLogMsg dflags NoReason SevDump noSrcSpan msg
             , action "breaks"     $ showBkptTable
             , action "context"    $ showContext
-            , action "packages"   $ showPackages
+            , action "packages"   $ showUnits
             , action "paths"      $ showPaths
             , action "language"   $ showLanguages
             , hidden "languages"  $ showLanguages -- backwards compat
@@ -3212,8 +3214,8 @@ pprStopped res =
  where
   mb_mod_name = moduleName <$> GHC.breakInfo_module <$> GHC.resumeBreakInfo res
 
-showPackages :: GHC.GhcMonad m => m ()
-showPackages = do
+showUnits :: GHC.GhcMonad m => m ()
+showUnits = do
   dflags <- getDynFlags
   let pkg_flags = packageFlags dflags
   liftIO $ putStrLn $ showSDoc dflags $
@@ -3516,7 +3518,7 @@ wrapIdentCompleterWithModifier modifChars fun = completeWordWithPrev Nothing wor
 -- | Return a list of visible module names for autocompletion.
 -- (NB: exposed != visible)
 allVisibleModules :: DynFlags -> [ModuleName]
-allVisibleModules dflags = listVisibleModuleNames dflags
+allVisibleModules dflags = listVisibleModuleNames (unitState dflags)
 
 completeExpression = completeQuotedWord (Just '\\') "\"" listFiles
                         completeIdentifier
@@ -4206,8 +4208,8 @@ lookupModule mName = lookupModuleName (GHC.mkModuleName mName)
 lookupModuleName :: GHC.GhcMonad m => ModuleName -> m Module
 lookupModuleName mName = GHC.lookupModule mName Nothing
 
-isHomeModule :: Module -> Bool
-isHomeModule m = GHC.moduleUnit m == mainUnitId
+isMainUnitModule :: Module -> Bool
+isMainUnitModule m = GHC.moduleUnit m == mainUnit
 
 -- TODO: won't work if home dir is encoded.
 -- (changeDirectory may not work either in that case.)
@@ -4231,7 +4233,7 @@ wantInterpretedModuleName modname = do
    modl <- lookupModuleName modname
    let str = moduleNameString modname
    dflags <- getDynFlags
-   when (GHC.moduleUnit modl /= thisPackage dflags) $
+   unless (isHomeModule dflags modl) $
       throwGhcException (CmdLineError ("module '" ++ str ++ "' is from another package;\nthis command requires an interpreted module"))
    is_interpreted <- GHC.moduleIsInterpreted modl
    when (not is_interpreted) $

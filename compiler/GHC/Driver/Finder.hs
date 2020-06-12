@@ -63,7 +63,7 @@ type BaseName = String  -- Basename of file
 -- source, interface, and object files for that module live.
 
 -- It does *not* know which particular package a module lives in.  Use
--- Packages.lookupModuleInAllPackages for that.
+-- Packages.lookupModuleInAllUnits for that.
 
 -- -----------------------------------------------------------------------------
 -- The finder's cache
@@ -74,7 +74,7 @@ flushFinderCaches :: HscEnv -> IO ()
 flushFinderCaches hsc_env =
   atomicModifyIORef' fc_ref $ \fm -> (filterInstalledModuleEnv is_ext fm, ())
  where
-        this_pkg = thisPackage (hsc_dflags hsc_env)
+        this_pkg = homeUnit (hsc_dflags hsc_env)
         fc_ref = hsc_FC hsc_env
         is_ext mod _ | not (moduleUnit mod `unitIdEq` this_pkg) = True
                      | otherwise = False
@@ -135,7 +135,7 @@ findPluginModule hsc_env mod_name =
 findExactModule :: HscEnv -> InstalledModule -> IO InstalledFindResult
 findExactModule hsc_env mod =
     let dflags = hsc_dflags hsc_env
-    in if moduleUnit mod `unitIdEq` thisPackage dflags
+    in if moduleUnit mod `unitIdEq` homeUnit dflags
        then findInstalledHomeModule hsc_env (moduleName mod)
        else findPackageModule hsc_env mod
 
@@ -182,14 +182,14 @@ findExposedPackageModule :: HscEnv -> ModuleName -> Maybe FastString
 findExposedPackageModule hsc_env mod_name mb_pkg
   = findLookupResult hsc_env
   $ lookupModuleWithSuggestions
-        (hsc_dflags hsc_env) mod_name mb_pkg
+        (unitState (hsc_dflags hsc_env)) mod_name mb_pkg
 
 findExposedPluginPackageModule :: HscEnv -> ModuleName
                                -> IO FindResult
 findExposedPluginPackageModule hsc_env mod_name
   = findLookupResult hsc_env
   $ lookupPluginModuleWithSuggestions
-        (hsc_dflags hsc_env) mod_name Nothing
+        (unitState (hsc_dflags hsc_env)) mod_name Nothing
 
 findLookupResult :: HscEnv -> LookupResult -> IO FindResult
 findLookupResult hsc_env r = case r of
@@ -226,12 +226,15 @@ findLookupResult hsc_env r = case r of
                           , fr_mods_hidden = []
                           , fr_unusables = unusables'
                           , fr_suggestions = [] })
-     LookupNotFound suggest ->
+     LookupNotFound suggest -> do
+       let suggest'
+             | gopt Opt_HelpfulErrors (hsc_dflags hsc_env) = suggest
+             | otherwise = []
        return (NotFound{ fr_paths = [], fr_pkg = Nothing
                        , fr_pkgs_hidden = []
                        , fr_mods_hidden = []
                        , fr_unusables = []
-                       , fr_suggestions = suggest })
+                       , fr_suggestions = suggest' })
 
 modLocationCache :: HscEnv -> InstalledModule -> IO InstalledFindResult -> IO InstalledFindResult
 modLocationCache hsc_env mod do_this = do
@@ -245,7 +248,7 @@ modLocationCache hsc_env mod do_this = do
 
 mkHomeInstalledModule :: DynFlags -> ModuleName -> InstalledModule
 mkHomeInstalledModule dflags mod_name =
-  let iuid = thisUnitId dflags
+  let iuid = homeUnitId dflags
   in Module iuid mod_name
 
 -- This returns a module because it's more convenient for users
@@ -253,7 +256,7 @@ addHomeModuleToFinder :: HscEnv -> ModuleName -> ModLocation -> IO Module
 addHomeModuleToFinder hsc_env mod_name loc = do
   let mod = mkHomeInstalledModule (hsc_dflags hsc_env) mod_name
   addToFinderCache (hsc_FC hsc_env) mod (InstalledFound loc mod)
-  return (mkModule (thisPackage (hsc_dflags hsc_env)) mod_name)
+  return (mkHomeModule (hsc_dflags hsc_env) mod_name)
 
 uncacheModule :: HscEnv -> ModuleName -> IO ()
 uncacheModule hsc_env mod_name = do
@@ -279,7 +282,7 @@ findHomeModule hsc_env mod_name = do
       }
  where
   dflags = hsc_dflags hsc_env
-  uid = thisPackage dflags
+  uid    = homeUnit dflags
 
 -- | Implements the search for a module name in the home package only.  Calling
 -- this function directly is usually *not* what you want; currently, it's used
@@ -340,9 +343,9 @@ findPackageModule hsc_env mod = do
   let
         dflags = hsc_dflags hsc_env
         pkg_id = moduleUnit mod
-        pkgstate = pkgState dflags
+        pkgstate = unitState dflags
   --
-  case lookupInstalledPackage pkgstate pkg_id of
+  case lookupUnitId pkgstate pkg_id of
      Nothing -> return (InstalledNoPackage pkg_id)
      Just pkg_conf -> findPackageModule_ hsc_env mod pkg_conf
 
@@ -669,6 +672,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
   = ptext cannot_find <+> quotes (ppr mod_name)
     $$ more_info
   where
+    pkgs = unitState dflags
     more_info
       = case find_result of
             NoPackage pkg
@@ -678,7 +682,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
             NotFound { fr_paths = files, fr_pkg = mb_pkg
                      , fr_mods_hidden = mod_hiddens, fr_pkgs_hidden = pkg_hiddens
                      , fr_unusables = unusables, fr_suggestions = suggest }
-                | Just pkg <- mb_pkg, pkg /= thisPackage dflags
+                | Just pkg <- mb_pkg, pkg /= homeUnit dflags
                 -> not_found_in_package pkg files
 
                 | not (null suggest)
@@ -723,11 +727,11 @@ cantFindErr cannot_find _ dflags mod_name find_result
         <> dot $$ pkg_hidden_hint uid
     pkg_hidden_hint uid
      | gopt Opt_BuildingCabalPackage dflags
-        = let pkg = expectJust "pkg_hidden" (lookupUnit dflags uid)
+        = let pkg = expectJust "pkg_hidden" (lookupUnit pkgs uid)
            in text "Perhaps you need to add" <+>
               quotes (ppr (unitPackageName pkg)) <+>
               text "to the build-depends in your .cabal file."
-     | Just pkg <- lookupUnit dflags uid
+     | Just pkg <- lookupUnit pkgs uid
          = text "You can run" <+>
            quotes (text ":set -package " <> ppr (unitPackageName pkg)) <+>
            text "to expose it." $$
@@ -754,7 +758,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
     pp_sugg (SuggestVisible m mod o) = ppr m <+> provenance o
       where provenance ModHidden = Outputable.empty
             provenance (ModUnusable _) = Outputable.empty
-            provenance (ModOrigin{ fromOrigPackage = e,
+            provenance (ModOrigin{ fromOrigUnit = e,
                                    fromExposedReexport = res,
                                    fromPackageFlag = f })
               | Just True <- e
@@ -771,7 +775,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
     pp_sugg (SuggestHidden m mod o) = ppr m <+> provenance o
       where provenance ModHidden =  Outputable.empty
             provenance (ModUnusable _) = Outputable.empty
-            provenance (ModOrigin{ fromOrigPackage = e,
+            provenance (ModOrigin{ fromOrigUnit = e,
                                    fromHiddenReexport = rhs })
               | Just False <- e
                  = parens (text "needs flag -package-id"
@@ -794,7 +798,7 @@ cantFindInstalledErr cannot_find _ dflags mod_name find_result
                    text "was found" $$ looks_like_srcpkgid pkg
 
             InstalledNotFound files mb_pkg
-                | Just pkg <- mb_pkg, not (pkg `unitIdEq` thisPackage dflags)
+                | Just pkg <- mb_pkg, not (pkg `unitIdEq` homeUnit dflags)
                 -> not_found_in_package pkg files
 
                 | null files
@@ -806,7 +810,7 @@ cantFindInstalledErr cannot_find _ dflags mod_name find_result
             _ -> panic "cantFindInstalledErr"
 
     build_tag = buildTag dflags
-    pkgstate = pkgState dflags
+    pkgstate = unitState dflags
 
     looks_like_srcpkgid :: UnitId -> SDoc
     looks_like_srcpkgid pk

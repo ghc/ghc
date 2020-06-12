@@ -144,7 +144,7 @@ When GHC reads the package data base, it (internally only) pretends it has UnitI
 `integer-wired-in` instead of the actual UnitId (which includes the version
 number); just like for `base` and other packages, as described in
 Note [Wired-in units] in GHC.Unit.Module. This is done in
-GHC.Unit.State.findWiredInPackages.
+GHC.Unit.State.findWiredInUnits.
 -}
 
 {-# LANGUAGE CPP #-}
@@ -614,7 +614,7 @@ rOOT_MAIN       = mkMainModule (fsLit ":Main") -- Root module for initialisation
 
 mkInteractiveModule :: Int -> Module
 -- (mkInteractiveMoudule 9) makes module 'interactive:M9'
-mkInteractiveModule n = mkModule interactiveUnitId (mkModuleName ("Ghci" ++ show n))
+mkInteractiveModule n = mkModule interactiveUnit (mkModuleName ("Ghci" ++ show n))
 
 pRELUDE_NAME, mAIN_NAME :: ModuleName
 pRELUDE_NAME   = mkModuleNameFS (fsLit "Prelude")
@@ -625,28 +625,28 @@ dATA_ARRAY_PARALLEL_NAME      = mkModuleNameFS (fsLit "Data.Array.Parallel")
 dATA_ARRAY_PARALLEL_PRIM_NAME = mkModuleNameFS (fsLit "Data.Array.Parallel.Prim")
 
 mkPrimModule :: FastString -> Module
-mkPrimModule m = mkModule primUnitId (mkModuleNameFS m)
+mkPrimModule m = mkModule primUnit (mkModuleNameFS m)
 
 mkIntegerModule :: FastString -> Module
-mkIntegerModule m = mkModule integerUnitId (mkModuleNameFS m)
+mkIntegerModule m = mkModule integerUnit (mkModuleNameFS m)
 
 mkBaseModule :: FastString -> Module
-mkBaseModule m = mkModule baseUnitId (mkModuleNameFS m)
+mkBaseModule m = mkBaseModule_ (mkModuleNameFS m)
 
 mkBaseModule_ :: ModuleName -> Module
-mkBaseModule_ m = mkModule baseUnitId m
+mkBaseModule_ m = mkModule baseUnit m
 
 mkThisGhcModule :: FastString -> Module
-mkThisGhcModule m = mkModule thisGhcUnitId (mkModuleNameFS m)
+mkThisGhcModule m = mkThisGhcModule_ (mkModuleNameFS m)
 
 mkThisGhcModule_ :: ModuleName -> Module
-mkThisGhcModule_ m = mkModule thisGhcUnitId m
+mkThisGhcModule_ m = mkModule thisGhcUnit m
 
 mkMainModule :: FastString -> Module
-mkMainModule m = mkModule mainUnitId (mkModuleNameFS m)
+mkMainModule m = mkModule mainUnit (mkModuleNameFS m)
 
 mkMainModule_ :: ModuleName -> Module
-mkMainModule_ m = mkModule mainUnitId m
+mkMainModule_ m = mkModule mainUnit m
 
 {-
 ************************************************************************

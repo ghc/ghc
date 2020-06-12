@@ -12,8 +12,6 @@ module GHC.Unit.Info
    , mkUnitPprInfo
 
    , mkUnit
-   , expandedUnitInfoId
-   , definiteUnitInfoId
 
    , PackageId(..)
    , PackageName(..)
@@ -155,21 +153,19 @@ pprUnitInfo GenericUnitInfo {..} =
   where
     field name body = text name <> colon <+> nest 4 body
 
+-- | Make a `Unit` from a `UnitInfo`
+--
+-- If the unit is definite, make a `RealUnit` from `unitId` field.
+--
+-- If the unit is indefinite, make a `VirtUnit` from `unitInstanceOf` and
+-- `unitInstantiations` fields. Note that in this case we don't keep track of
+-- `unitId`. It can be retrieved later with "improvement", i.e. matching on
+-- `unitInstanceOf/unitInstantiations` fields (see Note [About units] in
+-- GHC.Unit).
 mkUnit :: UnitInfo -> Unit
-mkUnit p =
-    if unitIsIndefinite p
-        then mkVirtUnit (unitInstanceOf p) (unitInstantiations p)
-        else RealUnit (Definite (unitId p))
-
-expandedUnitInfoId :: UnitInfo -> Unit
-expandedUnitInfoId p =
-    mkVirtUnit (unitInstanceOf p) (unitInstantiations p)
-
-definiteUnitInfoId :: UnitInfo -> Maybe DefUnitId
-definiteUnitInfoId p =
-    case mkUnit p of
-        RealUnit def_uid -> Just def_uid
-        _               -> Nothing
+mkUnit p
+   | unitIsIndefinite p = mkVirtUnit (unitInstanceOf p) (unitInstantiations p)
+   | otherwise          = RealUnit (Definite (unitId p))
 
 -- | Create a UnitPprInfo from a UnitInfo
 mkUnitPprInfo :: GenUnitInfo u -> UnitPprInfo
