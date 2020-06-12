@@ -640,16 +640,13 @@ that Note.
 mkCoAxBranch :: [TyVar] -- original, possibly stale, tyvars
              -> [TyVar] -- Extra eta tyvars
              -> [CoVar] -- possibly stale covars
-             -> TyCon   -- family/newtype TyCon (for error-checking only)
              -> [Type]  -- LHS patterns
              -> Type    -- RHS
              -> [Role]
              -> SrcSpan
              -> CoAxBranch
-mkCoAxBranch tvs eta_tvs cvs ax_tc lhs rhs roles loc
-  = -- See Note [CoAxioms are homogeneous] in "GHC.Core.Coercion.Axiom"
-    ASSERT( typeKind (mkTyConApp ax_tc lhs) `eqType` typeKind rhs )
-    CoAxBranch { cab_tvs     = tvs'
+mkCoAxBranch tvs eta_tvs cvs lhs rhs roles loc
+  = CoAxBranch { cab_tvs     = tvs'
                , cab_eta_tvs = eta_tvs'
                , cab_cvs     = cvs'
                , cab_lhs     = tidyTypes env lhs
@@ -703,7 +700,7 @@ mkSingleCoAxiom role ax_name tvs eta_tvs cvs fam_tc lhs_tys rhs_ty
             , co_ax_implicit = False
             , co_ax_branches = unbranched (branch { cab_incomps = [] }) }
   where
-    branch = mkCoAxBranch tvs eta_tvs cvs fam_tc lhs_tys rhs_ty
+    branch = mkCoAxBranch tvs eta_tvs cvs lhs_tys rhs_ty
                           (map (const Nominal) tvs)
                           (getSrcSpan ax_name)
 
@@ -721,7 +718,7 @@ mkNewTypeCoAxiom name tycon tvs roles rhs_ty
             , co_ax_tc       = tycon
             , co_ax_branches = unbranched (branch { cab_incomps = [] }) }
   where
-    branch = mkCoAxBranch tvs [] [] tycon (mkTyVarTys tvs) rhs_ty
+    branch = mkCoAxBranch tvs [] [] (mkTyVarTys tvs) rhs_ty
                           roles (getSrcSpan name)
 
 {-

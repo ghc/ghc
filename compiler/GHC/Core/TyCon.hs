@@ -293,7 +293,14 @@ See also Note [Wrappers for data instance tycons] in GHC.Types.Id.Make
     Indeed the latter type is unknown to the programmer.
 
   - There *is* an instance for (T Int) in the type-family instance
-    environment, but it is only used for overlap checking
+    environment, but it is looked up (via tcLookupDataFamilyInst)
+    in can_eq_nc (via tcTopNormaliseNewTypeTF_maybe) when trying to
+    solve representational equalities like
+         T Int ~R# Bool
+    Here we look up (T Int), convert it to R:TInt, and then unwrap the
+    newtype R:TInt.
+
+    It is also looked up in reduceTyFamApp_maybe.
 
   - It's fine to have T in the LHS of a type function:
     type instance F (T a) = [a]
@@ -1251,34 +1258,21 @@ example,
 
    newtype T a = MkT (a -> a)
 
-the NewTyCon for T will contain nt_co = CoT where CoT t : T t ~ t -> t.
+the NewTyCon for T will contain nt_co = CoT where CoT :: forall a. T a ~ a -> a.
 
-In the case that the right hand side is a type application
-ending with the same type variables as the left hand side, we
-"eta-contract" the coercion.  So if we had
-
-   newtype S a = MkT [a]
-
-then we would generate the arity 0 axiom CoS : S ~ [].  The
-primary reason we do this is to make newtype deriving cleaner.
-
-In the paper we'd write
-        axiom CoT : (forall t. T t) ~ (forall t. [t])
-and then when we used CoT at a particular type, s, we'd say
-        CoT @ s
-which encodes as (TyConApp instCoercionTyCon [TyConApp CoT [], s])
+We might also eta-contract the axiom: see Note [Newtype eta].
 
 Note [Newtype eta]
 ~~~~~~~~~~~~~~~~~~
 Consider
         newtype Parser a = MkParser (IO a) deriving Monad
-Are these two types equal (to Core)?
+Are these two types equal (that is, does a coercion exist between them)?
         Monad Parser
         Monad IO
 which we need to make the derived instance for Monad Parser.
 
 Well, yes.  But to see that easily we eta-reduce the RHS type of
-Parser, in this case to ([], Froogle), so that even unsaturated applications
+Parser, in this case to IO, so that even unsaturated applications
 of Parser will work right.  This eta reduction is done when the type
 constructor is built, and cached in NewTyCon.
 
