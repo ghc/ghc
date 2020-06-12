@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 
 --------------------------------------------------------------------------------
 -- | Pretty print LLVM IR Code.
@@ -21,6 +22,12 @@ module GHC.Llvm.Ppr (
     ppLlvmFunctions,
     ppLlvmFunction,
 
+    ppVar,
+    ppLit,
+    ppTypeLit,
+    ppName,
+    ppPlainName
+
     ) where
 
 #include "HsVersions.h"
@@ -30,26 +37,26 @@ import GHC.Prelude
 import GHC.Llvm.Syntax
 import GHC.Llvm.MetaData
 import GHC.Llvm.Types
-import GHC.Platform
 
+import Data.Int
 import Data.List ( intersperse )
 import GHC.Utils.Outputable
 import GHC.Types.Unique
-import GHC.Data.FastString ( sLit )
+import GHC.Data.FastString
 
 --------------------------------------------------------------------------------
 -- * Top Level Print functions
 --------------------------------------------------------------------------------
 
 -- | Print out a whole LLVM module.
-ppLlvmModule :: Platform -> LlvmModule -> SDoc
-ppLlvmModule platform (LlvmModule comments aliases meta globals decls funcs)
+ppLlvmModule :: LlvmOpts -> LlvmModule -> SDoc
+ppLlvmModule opts (LlvmModule comments aliases meta globals decls funcs)
   = ppLlvmComments comments $+$ newLine
     $+$ ppLlvmAliases aliases $+$ newLine
-    $+$ ppLlvmMetas meta $+$ newLine
-    $+$ ppLlvmGlobals globals $+$ newLine
+    $+$ ppLlvmMetas opts meta $+$ newLine
+    $+$ ppLlvmGlobals opts globals $+$ newLine
     $+$ ppLlvmFunctionDecls decls $+$ newLine
-    $+$ ppLlvmFunctions platform funcs
+    $+$ ppLlvmFunctions opts funcs
 
 -- | Print out a multi-line comment, can be inside a function or on its own
 ppLlvmComments :: [LMString] -> SDoc
@@ -61,12 +68,12 @@ ppLlvmComment com = semi <+> ftext com
 
 
 -- | Print out a list of global mutable variable definitions
-ppLlvmGlobals :: [LMGlobal] -> SDoc
-ppLlvmGlobals ls = vcat $ map ppLlvmGlobal ls
+ppLlvmGlobals :: LlvmOpts -> [LMGlobal] -> SDoc
+ppLlvmGlobals opts ls = vcat $ map (ppLlvmGlobal opts) ls
 
 -- | Print out a global mutable variable definition
-ppLlvmGlobal :: LMGlobal -> SDoc
-ppLlvmGlobal (LMGlobal var@(LMGlobalVar _ _ link x a c) dat) =
+ppLlvmGlobal :: LlvmOpts -> LMGlobal -> SDoc
+ppLlvmGlobal opts (LMGlobal var@(LMGlobalVar _ _ link x a c) dat) =
     let sect = case x of
             Just x' -> text ", section" <+> doubleQuotes (ftext x')
             Nothing -> empty
@@ -76,7 +83,7 @@ ppLlvmGlobal (LMGlobal var@(LMGlobalVar _ _ link x a c) dat) =
             Nothing -> empty
 
         rhs = case dat of
-            Just stat -> pprSpecialStatic stat
+            Just stat -> pprSpecialStatic opts stat
             Nothing   -> ppr (pLower $ getVarType var)
 
         -- Position of linkage is different for aliases.
@@ -85,11 +92,11 @@ ppLlvmGlobal (LMGlobal var@(LMGlobalVar _ _ link x a c) dat) =
           Constant -> "constant"
           Alias    -> "alias"
 
-    in ppAssignment var $ ppr link <+> text const <+> rhs <> sect <> align
+    in ppAssignment opts var $ ppr link <+> text const <+> rhs <> sect <> align
        $+$ newLine
 
-ppLlvmGlobal (LMGlobal var val) = pprPanic "ppLlvmGlobal" $
-  text "Non Global var ppr as global! " <> ppr var <> text "=" <> ppr val
+ppLlvmGlobal opts (LMGlobal var val) = pprPanic "ppLlvmGlobal" $
+  text "Non Global var ppr as global! " <> ppVar opts var <> text "=" <> ppr (fmap (ppStatic opts) val)
 
 
 -- | Print out a list of LLVM type aliases.
@@ -103,38 +110,38 @@ ppLlvmAlias (name, ty)
 
 
 -- | Print out a list of LLVM metadata.
-ppLlvmMetas :: [MetaDecl] -> SDoc
-ppLlvmMetas metas = vcat $ map ppLlvmMeta metas
+ppLlvmMetas :: LlvmOpts -> [MetaDecl] -> SDoc
+ppLlvmMetas opts metas = vcat $ map (ppLlvmMeta opts) metas
 
 -- | Print out an LLVM metadata definition.
-ppLlvmMeta :: MetaDecl -> SDoc
-ppLlvmMeta (MetaUnnamed n m)
-  = ppr n <+> equals <+> ppr m
+ppLlvmMeta :: LlvmOpts -> MetaDecl -> SDoc
+ppLlvmMeta opts (MetaUnnamed n m)
+  = ppr n <+> equals <+> ppMetaExpr opts m
 
-ppLlvmMeta (MetaNamed n m)
+ppLlvmMeta _opts (MetaNamed n m)
   = exclamation <> ftext n <+> equals <+> exclamation <> braces nodes
   where
     nodes = hcat $ intersperse comma $ map ppr m
 
 
 -- | Print out a list of function definitions.
-ppLlvmFunctions :: Platform -> LlvmFunctions -> SDoc
-ppLlvmFunctions platform funcs = vcat $ map (ppLlvmFunction platform) funcs
+ppLlvmFunctions :: LlvmOpts -> LlvmFunctions -> SDoc
+ppLlvmFunctions opts funcs = vcat $ map (ppLlvmFunction opts) funcs
 
 -- | Print out a function definition.
-ppLlvmFunction :: Platform -> LlvmFunction -> SDoc
-ppLlvmFunction platform fun =
+ppLlvmFunction :: LlvmOpts -> LlvmFunction -> SDoc
+ppLlvmFunction opts fun =
     let attrDoc = ppSpaceJoin (funcAttrs fun)
         secDoc = case funcSect fun of
                       Just s' -> text "section" <+> (doubleQuotes $ ftext s')
                       Nothing -> empty
         prefixDoc = case funcPrefix fun of
-                        Just v  -> text "prefix" <+> ppr v
+                        Just v  -> text "prefix" <+> ppStatic opts v
                         Nothing -> empty
     in text "define" <+> ppLlvmFunctionHeader (funcDecl fun) (funcArgs fun)
         <+> attrDoc <+> secDoc <+> prefixDoc
         $+$ lbrace
-        $+$ ppLlvmBlocks platform (funcBody fun)
+        $+$ ppLlvmBlocks opts (funcBody fun)
         $+$ rbrace
         $+$ newLine
         $+$ newLine
@@ -178,21 +185,21 @@ ppLlvmFunctionDecl (LlvmFunctionDecl n l c r varg p a)
 
 
 -- | Print out a list of LLVM blocks.
-ppLlvmBlocks :: Platform -> LlvmBlocks -> SDoc
-ppLlvmBlocks platform blocks = vcat $ map (ppLlvmBlock platform) blocks
+ppLlvmBlocks :: LlvmOpts -> LlvmBlocks -> SDoc
+ppLlvmBlocks opts blocks = vcat $ map (ppLlvmBlock opts) blocks
 
 -- | Print out an LLVM block.
 -- It must be part of a function definition.
-ppLlvmBlock :: Platform -> LlvmBlock -> SDoc
-ppLlvmBlock platform (LlvmBlock blockId stmts) =
+ppLlvmBlock :: LlvmOpts -> LlvmBlock -> SDoc
+ppLlvmBlock opts (LlvmBlock blockId stmts) =
   let isLabel (MkLabel _) = True
       isLabel _           = False
       (block, rest)       = break isLabel stmts
       ppRest = case rest of
-        MkLabel id:xs -> ppLlvmBlock platform (LlvmBlock id xs)
+        MkLabel id:xs -> ppLlvmBlock opts (LlvmBlock id xs)
         _             -> empty
   in ppLlvmBlockLabel blockId
-           $+$ (vcat $ map (ppLlvmStatement platform) block)
+           $+$ (vcat $ map (ppLlvmStatement opts) block)
            $+$ newLine
            $+$ ppRest
 
@@ -202,47 +209,55 @@ ppLlvmBlockLabel id = pprUniqueAlways id <> colon
 
 
 -- | Print out an LLVM statement.
-ppLlvmStatement :: Platform -> LlvmStatement -> SDoc
-ppLlvmStatement platform stmt =
+ppLlvmStatement :: LlvmOpts -> LlvmStatement -> SDoc
+ppLlvmStatement opts stmt =
   let ind = (text "  " <>)
   in case stmt of
-        Assignment  dst expr      -> ind $ ppAssignment dst (ppLlvmExpression platform expr)
+        Assignment  dst expr      -> ind $ ppAssignment opts dst (ppLlvmExpression opts expr)
         Fence       st ord        -> ind $ ppFence st ord
-        Branch      target        -> ind $ ppBranch target
-        BranchIf    cond ifT ifF  -> ind $ ppBranchIf cond ifT ifF
+        Branch      target        -> ind $ ppBranch opts target
+        BranchIf    cond ifT ifF  -> ind $ ppBranchIf opts cond ifT ifF
         Comment     comments      -> ind $ ppLlvmComments comments
         MkLabel     label         -> ppLlvmBlockLabel label
-        Store       value ptr     -> ind $ ppStore value ptr
-        Switch      scrut def tgs -> ind $ ppSwitch scrut def tgs
-        Return      result        -> ind $ ppReturn result
-        Expr        expr          -> ind $ ppLlvmExpression platform expr
+        Store       value ptr     -> ind $ ppStore opts value ptr
+        Switch      scrut def tgs -> ind $ ppSwitch opts scrut def tgs
+        Return      result        -> ind $ ppReturn opts result
+        Expr        expr          -> ind $ ppLlvmExpression opts expr
         Unreachable               -> ind $ text "unreachable"
         Nop                       -> empty
-        MetaStmt    meta s        -> ppMetaStatement platform meta s
+        MetaStmt    meta s        -> ppMetaStatement opts meta s
 
 
 -- | Print out an LLVM expression.
-ppLlvmExpression :: Platform -> LlvmExpression -> SDoc
-ppLlvmExpression platform expr
+ppLlvmExpression :: LlvmOpts -> LlvmExpression -> SDoc
+ppLlvmExpression opts expr
   = case expr of
-        Alloca     tp amount        -> ppAlloca tp amount
-        LlvmOp     op left right    -> ppMachOp op left right
-        Call       tp fp args attrs -> ppCall tp fp (map MetaVar args) attrs
-        CallM      tp fp args attrs -> ppCall tp fp args attrs
-        Cast       op from to       -> ppCast op from to
-        Compare    op left right    -> ppCmpOp op left right
-        Extract    vec idx          -> ppExtract vec idx
-        ExtractV   struct idx       -> ppExtractV struct idx
-        Insert     vec elt idx      -> ppInsert vec elt idx
-        GetElemPtr inb ptr indexes  -> ppGetElementPtr inb ptr indexes
-        Load       ptr              -> ppLoad ptr
-        ALoad      ord st ptr       -> ppALoad platform ord st ptr
-        Malloc     tp amount        -> ppMalloc tp amount
-        AtomicRMW  aop tgt src ordering -> ppAtomicRMW aop tgt src ordering
-        CmpXChg    addr old new s_ord f_ord -> ppCmpXChg addr old new s_ord f_ord
-        Phi        tp predecessors  -> ppPhi tp predecessors
-        Asm        asm c ty v se sk -> ppAsm asm c ty v se sk
-        MExpr      meta expr        -> ppMetaExpr platform meta expr
+        Alloca     tp amount        -> ppAlloca opts tp amount
+        LlvmOp     op left right    -> ppMachOp opts op left right
+        Call       tp fp args attrs -> ppCall opts tp fp (map MetaVar args) attrs
+        CallM      tp fp args attrs -> ppCall opts tp fp args attrs
+        Cast       op from to       -> ppCast opts op from to
+        Compare    op left right    -> ppCmpOp opts op left right
+        Extract    vec idx          -> ppExtract opts vec idx
+        ExtractV   struct idx       -> ppExtractV opts struct idx
+        Insert     vec elt idx      -> ppInsert opts vec elt idx
+        GetElemPtr inb ptr indexes  -> ppGetElementPtr opts inb ptr indexes
+        Load       ptr              -> ppLoad opts ptr
+        ALoad      ord st ptr       -> ppALoad opts ord st ptr
+        Malloc     tp amount        -> ppMalloc opts tp amount
+        AtomicRMW  aop tgt src ordering -> ppAtomicRMW opts aop tgt src ordering
+        CmpXChg    addr old new s_ord f_ord -> ppCmpXChg opts addr old new s_ord f_ord
+        Phi        tp predecessors  -> ppPhi opts tp predecessors
+        Asm        asm c ty v se sk -> ppAsm opts asm c ty v se sk
+        MExpr      meta expr        -> ppMetaAnnotExpr opts meta expr
+
+ppMetaExpr :: LlvmOpts -> MetaExpr -> SDoc
+ppMetaExpr opts = \case
+  MetaVar (LMLitVar (LMNullLit _)) -> text "null"
+  MetaStr    s                     -> char '!' <> doubleQuotes (ftext s)
+  MetaNode   n                     -> ppr n
+  MetaVar    v                     -> ppVar opts v
+  MetaStruct es                    -> char '!' <> braces (ppCommaJoin (map (ppMetaExpr opts) es))
 
 
 --------------------------------------------------------------------------------
@@ -251,8 +266,8 @@ ppLlvmExpression platform expr
 
 -- | Should always be a function pointer. So a global var of function type
 -- (since globals are always pointers) or a local var of pointer function type.
-ppCall :: LlvmCallType -> LlvmVar -> [MetaExpr] -> [LlvmFuncAttr] -> SDoc
-ppCall ct fptr args attrs = case fptr of
+ppCall :: LlvmOpts -> LlvmCallType -> LlvmVar -> [MetaExpr] -> [LlvmFuncAttr] -> SDoc
+ppCall opts ct fptr args attrs = case fptr of
                            --
     -- if local var function pointer, unwrap
     LMLocalVar _ (LMPointer (LMFunction d)) -> ppCall' d
@@ -269,29 +284,29 @@ ppCall ct fptr args attrs = case fptr of
         ppCall' (LlvmFunctionDecl _ _ cc ret argTy params _) =
             let tc = if ct == TailCall then text "tail " else empty
                 ppValues = hsep $ punctuate comma $ map ppCallMetaExpr args
-                ppArgTy  = (ppCommaJoin $ map fst params) <>
+                ppArgTy  = (ppCommaJoin $ map (ppr . fst) params) <>
                            (case argTy of
                                VarArgs   -> text ", ..."
                                FixedArgs -> empty)
                 fnty = space <> lparen <> ppArgTy <> rparen
                 attrDoc = ppSpaceJoin attrs
             in  tc <> text "call" <+> ppr cc <+> ppr ret
-                    <> fnty <+> ppName fptr <> lparen <+> ppValues
+                    <> fnty <+> ppName opts fptr <> lparen <+> ppValues
                     <+> rparen <+> attrDoc
 
         -- Metadata needs to be marked as having the `metadata` type when used
         -- in a call argument
-        ppCallMetaExpr (MetaVar v) = ppr v
-        ppCallMetaExpr v           = text "metadata" <+> ppr v
+        ppCallMetaExpr (MetaVar v) = ppVar opts v
+        ppCallMetaExpr v           = text "metadata" <+> ppMetaExpr opts v
 
-ppMachOp :: LlvmMachOp -> LlvmVar -> LlvmVar -> SDoc
-ppMachOp op left right =
-  (ppr op) <+> (ppr (getVarType left)) <+> ppName left
-        <> comma <+> ppName right
+ppMachOp :: LlvmOpts -> LlvmMachOp -> LlvmVar -> LlvmVar -> SDoc
+ppMachOp opts op left right =
+  (ppr op) <+> (ppr (getVarType left)) <+> ppName opts left
+        <> comma <+> ppName opts right
 
 
-ppCmpOp :: LlvmCmpOp -> LlvmVar -> LlvmVar -> SDoc
-ppCmpOp op left right =
+ppCmpOp :: LlvmOpts -> LlvmCmpOp -> LlvmVar -> LlvmVar -> SDoc
+ppCmpOp opts op left right =
   let cmpOp
         | isInt (getVarType left) && isInt (getVarType right) = text "icmp"
         | isFloat (getVarType left) && isFloat (getVarType right) = text "fcmp"
@@ -302,11 +317,11 @@ ppCmpOp op left right =
                 ++ (show $ getVarType right))
         -}
   in cmpOp <+> ppr op <+> ppr (getVarType left)
-        <+> ppName left <> comma <+> ppName right
+        <+> ppName opts left <> comma <+> ppName opts right
 
 
-ppAssignment :: LlvmVar -> SDoc -> SDoc
-ppAssignment var expr = ppName var <+> equals <+> expr
+ppAssignment :: LlvmOpts -> LlvmVar -> SDoc -> SDoc
+ppAssignment opts var expr = ppName opts var <+> equals <+> expr
 
 ppFence :: Bool -> LlvmSyncOrdering -> SDoc
 ppFence st ord =
@@ -335,15 +350,15 @@ ppAtomicOp LAO_Min  = text "min"
 ppAtomicOp LAO_Umax = text "umax"
 ppAtomicOp LAO_Umin = text "umin"
 
-ppAtomicRMW :: LlvmAtomicOp -> LlvmVar -> LlvmVar -> LlvmSyncOrdering -> SDoc
-ppAtomicRMW aop tgt src ordering =
-  text "atomicrmw" <+> ppAtomicOp aop <+> ppr tgt <> comma
-  <+> ppr src <+> ppSyncOrdering ordering
+ppAtomicRMW :: LlvmOpts -> LlvmAtomicOp -> LlvmVar -> LlvmVar -> LlvmSyncOrdering -> SDoc
+ppAtomicRMW opts aop tgt src ordering =
+  text "atomicrmw" <+> ppAtomicOp aop <+> ppVar opts tgt <> comma
+  <+> ppVar opts src <+> ppSyncOrdering ordering
 
-ppCmpXChg :: LlvmVar -> LlvmVar -> LlvmVar
+ppCmpXChg :: LlvmOpts -> LlvmVar -> LlvmVar -> LlvmVar
           -> LlvmSyncOrdering -> LlvmSyncOrdering -> SDoc
-ppCmpXChg addr old new s_ord f_ord =
-  text "cmpxchg" <+> ppr addr <> comma <+> ppr old <> comma <+> ppr new
+ppCmpXChg opts addr old new s_ord f_ord =
+  text "cmpxchg" <+> ppVar opts addr <> comma <+> ppVar opts old <> comma <+> ppVar opts new
   <+> ppSyncOrdering s_ord <+> ppSyncOrdering f_ord
 
 -- XXX: On x86, vector types need to be 16-byte aligned for aligned access, but
@@ -354,138 +369,228 @@ ppCmpXChg addr old new s_ord f_ord =
 -- access patterns are aligned, in which case we will need a more granular way
 -- of specifying alignment.
 
-ppLoad :: LlvmVar -> SDoc
-ppLoad var = text "load" <+> ppr derefType <> comma <+> ppr var <> align
+ppLoad :: LlvmOpts -> LlvmVar -> SDoc
+ppLoad opts var = text "load" <+> ppr derefType <> comma <+> ppVar opts var <> align
   where
     derefType = pLower $ getVarType var
     align | isVector . pLower . getVarType $ var = text ", align 1"
           | otherwise = empty
 
-ppALoad :: Platform -> LlvmSyncOrdering -> SingleThreaded -> LlvmVar -> SDoc
-ppALoad platform ord st var =
-  let alignment = (llvmWidthInBits platform $ getVarType var) `quot` 8
+ppALoad :: LlvmOpts -> LlvmSyncOrdering -> SingleThreaded -> LlvmVar -> SDoc
+ppALoad opts ord st var =
+  let alignment = (llvmWidthInBits (llvmOptsPlatform opts) $ getVarType var) `quot` 8
       align     = text ", align" <+> ppr alignment
       sThreaded | st        = text " singlethread"
                 | otherwise = empty
       derefType = pLower $ getVarType var
-  in text "load atomic" <+> ppr derefType <> comma <+> ppr var <> sThreaded
+  in text "load atomic" <+> ppr derefType <> comma <+> ppVar opts var <> sThreaded
             <+> ppSyncOrdering ord <> align
 
-ppStore :: LlvmVar -> LlvmVar -> SDoc
-ppStore val dst
-    | isVecPtrVar dst = text "store" <+> ppr val <> comma <+> ppr dst <>
+ppStore :: LlvmOpts -> LlvmVar -> LlvmVar -> SDoc
+ppStore opts val dst
+    | isVecPtrVar dst = text "store" <+> ppVar opts val <> comma <+> ppVar opts dst <>
                         comma <+> text "align 1"
-    | otherwise       = text "store" <+> ppr val <> comma <+> ppr dst
+    | otherwise       = text "store" <+> ppVar opts val <> comma <+> ppVar opts dst
   where
     isVecPtrVar :: LlvmVar -> Bool
     isVecPtrVar = isVector . pLower . getVarType
 
 
-ppCast :: LlvmCastOp -> LlvmVar -> LlvmType -> SDoc
-ppCast op from to
+ppCast :: LlvmOpts -> LlvmCastOp -> LlvmVar -> LlvmType -> SDoc
+ppCast opts op from to
     =   ppr op
-    <+> ppr (getVarType from) <+> ppName from
+    <+> ppr (getVarType from) <+> ppName opts from
     <+> text "to"
     <+> ppr to
 
 
-ppMalloc :: LlvmType -> Int -> SDoc
-ppMalloc tp amount =
+ppMalloc :: LlvmOpts -> LlvmType -> Int -> SDoc
+ppMalloc opts tp amount =
   let amount' = LMLitVar $ LMIntLit (toInteger amount) i32
-  in text "malloc" <+> ppr tp <> comma <+> ppr amount'
+  in text "malloc" <+> ppr tp <> comma <+> ppVar opts amount'
 
 
-ppAlloca :: LlvmType -> Int -> SDoc
-ppAlloca tp amount =
+ppAlloca :: LlvmOpts -> LlvmType -> Int -> SDoc
+ppAlloca opts tp amount =
   let amount' = LMLitVar $ LMIntLit (toInteger amount) i32
-  in text "alloca" <+> ppr tp <> comma <+> ppr amount'
+  in text "alloca" <+> ppr tp <> comma <+> ppVar opts amount'
 
 
-ppGetElementPtr :: Bool -> LlvmVar -> [LlvmVar] -> SDoc
-ppGetElementPtr inb ptr idx =
-  let indexes = comma <+> ppCommaJoin idx
+ppGetElementPtr :: LlvmOpts -> Bool -> LlvmVar -> [LlvmVar] -> SDoc
+ppGetElementPtr opts inb ptr idx =
+  let indexes = comma <+> ppCommaJoin (map (ppVar opts) idx)
       inbound = if inb then text "inbounds" else empty
       derefType = pLower $ getVarType ptr
-  in text "getelementptr" <+> inbound <+> ppr derefType <> comma <+> ppr ptr
+  in text "getelementptr" <+> inbound <+> ppr derefType <> comma <+> ppVar opts ptr
                             <> indexes
 
 
-ppReturn :: Maybe LlvmVar -> SDoc
-ppReturn (Just var) = text "ret" <+> ppr var
-ppReturn Nothing    = text "ret" <+> ppr LMVoid
+ppReturn :: LlvmOpts -> Maybe LlvmVar -> SDoc
+ppReturn opts (Just var) = text "ret" <+> ppVar opts var
+ppReturn _    Nothing    = text "ret" <+> ppr LMVoid
 
 
-ppBranch :: LlvmVar -> SDoc
-ppBranch var = text "br" <+> ppr var
+ppBranch :: LlvmOpts -> LlvmVar -> SDoc
+ppBranch opts var = text "br" <+> ppVar opts var
 
 
-ppBranchIf :: LlvmVar -> LlvmVar -> LlvmVar -> SDoc
-ppBranchIf cond trueT falseT
-  = text "br" <+> ppr cond <> comma <+> ppr trueT <> comma <+> ppr falseT
+ppBranchIf :: LlvmOpts -> LlvmVar -> LlvmVar -> LlvmVar -> SDoc
+ppBranchIf opts cond trueT falseT
+  = text "br" <+> ppVar opts cond <> comma <+> ppVar opts trueT <> comma <+> ppVar opts falseT
 
 
-ppPhi :: LlvmType -> [(LlvmVar,LlvmVar)] -> SDoc
-ppPhi tp preds =
-  let ppPreds (val, label) = brackets $ ppName val <> comma <+> ppName label
+ppPhi :: LlvmOpts -> LlvmType -> [(LlvmVar,LlvmVar)] -> SDoc
+ppPhi opts tp preds =
+  let ppPreds (val, label) = brackets $ ppName opts val <> comma <+> ppName opts label
   in text "phi" <+> ppr tp <+> hsep (punctuate comma $ map ppPreds preds)
 
 
-ppSwitch :: LlvmVar -> LlvmVar -> [(LlvmVar,LlvmVar)] -> SDoc
-ppSwitch scrut dflt targets =
-  let ppTarget  (val, lab) = ppr val <> comma <+> ppr lab
+ppSwitch :: LlvmOpts -> LlvmVar -> LlvmVar -> [(LlvmVar,LlvmVar)] -> SDoc
+ppSwitch opts scrut dflt targets =
+  let ppTarget  (val, lab) = ppVar opts val <> comma <+> ppVar opts lab
       ppTargets  xs        = brackets $ vcat (map ppTarget xs)
-  in text "switch" <+> ppr scrut <> comma <+> ppr dflt
+  in text "switch" <+> ppVar opts scrut <> comma <+> ppVar opts dflt
         <+> ppTargets targets
 
 
-ppAsm :: LMString -> LMString -> LlvmType -> [LlvmVar] -> Bool -> Bool -> SDoc
-ppAsm asm constraints rty vars sideeffect alignstack =
+ppAsm :: LlvmOpts -> LMString -> LMString -> LlvmType -> [LlvmVar] -> Bool -> Bool -> SDoc
+ppAsm opts asm constraints rty vars sideeffect alignstack =
   let asm'  = doubleQuotes $ ftext asm
       cons  = doubleQuotes $ ftext constraints
       rty'  = ppr rty
-      vars' = lparen <+> ppCommaJoin vars <+> rparen
+      vars' = lparen <+> ppCommaJoin (map (ppVar opts) vars) <+> rparen
       side  = if sideeffect then text "sideeffect" else empty
       align = if alignstack then text "alignstack" else empty
   in text "call" <+> rty' <+> text "asm" <+> side <+> align <+> asm' <> comma
         <+> cons <> vars'
 
-ppExtract :: LlvmVar -> LlvmVar -> SDoc
-ppExtract vec idx =
+ppExtract :: LlvmOpts -> LlvmVar -> LlvmVar -> SDoc
+ppExtract opts vec idx =
     text "extractelement"
-    <+> ppr (getVarType vec) <+> ppName vec <> comma
-    <+> ppr idx
+    <+> ppr (getVarType vec) <+> ppName opts vec <> comma
+    <+> ppVar opts idx
 
-ppExtractV :: LlvmVar -> Int -> SDoc
-ppExtractV struct idx =
+ppExtractV :: LlvmOpts -> LlvmVar -> Int -> SDoc
+ppExtractV opts struct idx =
     text "extractvalue"
-    <+> ppr (getVarType struct) <+> ppName struct <> comma
+    <+> ppr (getVarType struct) <+> ppName opts struct <> comma
     <+> ppr idx
 
-ppInsert :: LlvmVar -> LlvmVar -> LlvmVar -> SDoc
-ppInsert vec elt idx =
+ppInsert :: LlvmOpts -> LlvmVar -> LlvmVar -> LlvmVar -> SDoc
+ppInsert opts vec elt idx =
     text "insertelement"
-    <+> ppr (getVarType vec) <+> ppName vec <> comma
-    <+> ppr (getVarType elt) <+> ppName elt <> comma
-    <+> ppr idx
+    <+> ppr (getVarType vec) <+> ppName opts vec <> comma
+    <+> ppr (getVarType elt) <+> ppName opts elt <> comma
+    <+> ppVar opts idx
 
 
-ppMetaStatement :: Platform -> [MetaAnnot] -> LlvmStatement -> SDoc
-ppMetaStatement platform meta stmt =
-   ppLlvmStatement platform stmt <> ppMetaAnnots meta
+ppMetaStatement :: LlvmOpts -> [MetaAnnot] -> LlvmStatement -> SDoc
+ppMetaStatement opts meta stmt =
+   ppLlvmStatement opts stmt <> ppMetaAnnots opts meta
 
-ppMetaExpr :: Platform -> [MetaAnnot] -> LlvmExpression -> SDoc
-ppMetaExpr platform meta expr =
-   ppLlvmExpression platform expr <> ppMetaAnnots meta
+ppMetaAnnotExpr :: LlvmOpts -> [MetaAnnot] -> LlvmExpression -> SDoc
+ppMetaAnnotExpr opts meta expr =
+   ppLlvmExpression opts expr <> ppMetaAnnots opts meta
 
-ppMetaAnnots :: [MetaAnnot] -> SDoc
-ppMetaAnnots meta = hcat $ map ppMeta meta
+ppMetaAnnots :: LlvmOpts -> [MetaAnnot] -> SDoc
+ppMetaAnnots opts meta = hcat $ map ppMeta meta
   where
     ppMeta (MetaAnnot name e)
         = comma <+> exclamation <> ftext name <+>
           case e of
             MetaNode n    -> ppr n
-            MetaStruct ms -> exclamation <> braces (ppCommaJoin ms)
-            other         -> exclamation <> braces (ppr other) -- possible?
+            MetaStruct ms -> exclamation <> braces (ppCommaJoin (map (ppMetaExpr opts) ms))
+            other         -> exclamation <> braces (ppMetaExpr opts other) -- possible?
+
+-- | Return the variable name or value of the 'LlvmVar'
+-- in Llvm IR textual representation (e.g. @\@x@, @%y@ or @42@).
+ppName :: LlvmOpts -> LlvmVar -> SDoc
+ppName opts v = case v of
+   LMGlobalVar {} -> char '@' <> ppPlainName opts v
+   LMLocalVar  {} -> char '%' <> ppPlainName opts v
+   LMNLocalVar {} -> char '%' <> ppPlainName opts v
+   LMLitVar    {} ->             ppPlainName opts v
+
+-- | Return the variable name or value of the 'LlvmVar'
+-- in a plain textual representation (e.g. @x@, @y@ or @42@).
+ppPlainName :: LlvmOpts -> LlvmVar -> SDoc
+ppPlainName opts v = case v of
+   (LMGlobalVar x _ _ _ _ _) -> ftext x
+   (LMLocalVar  x LMLabel  ) -> text (show x)
+   (LMLocalVar  x _        ) -> text ('l' : show x)
+   (LMNLocalVar x _        ) -> ftext x
+   (LMLitVar    x          ) -> ppLit opts x
+
+-- | Print a literal value. No type.
+ppLit :: LlvmOpts -> LlvmLit -> SDoc
+ppLit opts l = case l of
+   (LMIntLit i (LMInt 32))  -> ppr (fromInteger i :: Int32)
+   (LMIntLit i (LMInt 64))  -> ppr (fromInteger i :: Int64)
+   (LMIntLit   i _       )  -> ppr ((fromInteger i)::Int)
+   (LMFloatLit r LMFloat )  -> ppFloat (llvmOptsPlatform opts) $ narrowFp r
+   (LMFloatLit r LMDouble)  -> ppDouble (llvmOptsPlatform opts) r
+   f@(LMFloatLit _ _)       -> pprPanic "ppLit" (text "Can't print this float literal: " <> ppTypeLit opts f)
+   (LMVectorLit ls  )       -> char '<' <+> ppCommaJoin (map (ppTypeLit opts) ls) <+> char '>'
+   (LMNullLit _     )       -> text "null"
+   -- #11487 was an issue where we passed undef for some arguments
+   -- that were actually live. By chance the registers holding those
+   -- arguments usually happened to have the right values anyways, but
+   -- that was not guaranteed. To find such bugs reliably, we set the
+   -- flag below when validating, which replaces undef literals (at
+   -- common types) with values that are likely to cause a crash or test
+   -- failure.
+   (LMUndefLit t    )
+      | llvmOptsFillUndefWithGarbage opts
+      , Just lit <- garbageLit t   -> ppLit opts lit
+      | otherwise                  -> text "undef"
+
+ppVar :: LlvmOpts -> LlvmVar -> SDoc
+ppVar opts v = case v of
+  LMLitVar x -> ppTypeLit opts x
+  x          -> ppr (getVarType x) <+> ppName opts x
+
+ppTypeLit :: LlvmOpts -> LlvmLit -> SDoc
+ppTypeLit opts l = case l of
+  LMVectorLit {} -> ppLit opts l
+  _              -> ppr (getLitType l) <+> ppLit opts l
+
+ppStatic :: LlvmOpts -> LlvmStatic -> SDoc
+ppStatic opts st = case st of
+  LMComment       s -> text "; " <> ftext s
+  LMStaticLit   l   -> ppTypeLit opts l
+  LMUninitType    t -> ppr t <> text " undef"
+  LMStaticStr   s t -> ppr t <> text " c\"" <> ftext s <> text "\\00\""
+  LMStaticArray d t -> ppr t <> text " [" <> ppCommaJoin (map (ppStatic opts) d) <> char ']'
+  LMStaticStruc d t -> ppr t <> text "<{" <> ppCommaJoin (map (ppStatic opts) d) <> text "}>"
+  LMStaticPointer v -> ppVar opts v
+  LMTrunc v t       -> ppr t <> text " trunc (" <> ppStatic opts v <> text " to " <> ppr t <> char ')'
+  LMBitc v t        -> ppr t <> text " bitcast (" <> ppStatic opts v <> text " to " <> ppr t <> char ')'
+  LMPtoI v t        -> ppr t <> text " ptrtoint (" <> ppStatic opts v <> text " to " <> ppr t <> char ')'
+  LMAdd s1 s2       -> pprStaticArith opts s1 s2 (sLit "add") (sLit "fadd") "LMAdd"
+  LMSub s1 s2       -> pprStaticArith opts s1 s2 (sLit "sub") (sLit "fsub") "LMSub"
+
+
+pprSpecialStatic :: LlvmOpts -> LlvmStatic -> SDoc
+pprSpecialStatic opts stat = case stat of
+   LMBitc v t        -> ppr (pLower t)
+                        <> text ", bitcast ("
+                        <> ppStatic opts v <> text " to " <> ppr t
+                        <> char ')'
+   LMStaticPointer x -> ppr (pLower $ getVarType x)
+                        <> comma <+> ppStatic opts stat
+   _                 -> ppStatic opts stat
+
+
+pprStaticArith :: LlvmOpts -> LlvmStatic -> LlvmStatic -> PtrString -> PtrString
+                  -> String -> SDoc
+pprStaticArith opts s1 s2 int_op float_op op_name =
+  let ty1 = getStatType s1
+      op  = if isFloat ty1 then float_op else int_op
+  in if ty1 == getStatType s2
+     then ppr ty1 <+> ptext op <+> lparen <> ppStatic opts s1 <> comma <> ppStatic opts s2 <> rparen
+     else pprPanic "pprStaticArith" $
+            text op_name <> text " with different types! s1: " <> ppStatic opts s1
+                         <> text", s2: " <> ppStatic opts s2
 
 
 --------------------------------------------------------------------------------
