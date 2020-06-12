@@ -386,9 +386,12 @@ rtsPackageArgs = package rts ? do
           , any (wayUnit Dynamic) rtsWays ? arg "dynamic"
           , Debug `wayUnit` way           ? arg "find-ptr"
           ]
-        , builder (Cabal Setup) ?
-               if not (null libnumaLibraryDir) then arg ("--extra-lib-dirs="++libnumaLibraryDir) else mempty
-            <> if not (null libnumaIncludeDir) then arg ("--extra-include-dirs="++libnumaIncludeDir) else mempty
+        , builder (Cabal Setup) ? mconcat
+          [ if not (null libdwLibraryDir) then arg ("--extra-lib-dirs="++libdwLibraryDir) else mempty
+          , if not (null libdwIncludeDir) then arg ("--extra-include-dirs="++libdwIncludeDir) else mempty
+          , if not (null libnumaLibraryDir) then arg ("--extra-lib-dirs="++libnumaLibraryDir) else mempty
+          , if not (null libnumaIncludeDir) then arg ("--extra-include-dirs="++libnumaIncludeDir) else mempty
+          ]
         , builder (Cc FindCDependencies) ? cArgs
         , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs
         , builder Ghc ? ghcArgs
