@@ -195,7 +195,7 @@ bool __createUUIDTempFileErrNo (wchar_t* pathName, wchar_t* prefix,
 
       /* Only add a slash if path didn't already end in one, otherwise we create
          an invalid path.  */
-      bool slashed = devName[strlen(devName)-1] == '\\';
+      bool slashed = devName[wcslen(devName)-1] == '\\';
       wchar_t* sep = slashed ? L"" : L"\\";
       if (-1 == swprintf_s (*tempFileName, len, L"%ls%ls%ls-%ls%ls",
                             devName, sep, prefix, guidStr, suffix))
@@ -218,14 +218,6 @@ fail:
   maperrno();
   return false;
 }
-
-typedef struct _PUBLIC_OBJECT_BASIC_INFORMATION {
-    ULONG Attributes;
-    ACCESS_MASK GrantedAccess;
-    ULONG HandleCount;
-    ULONG PointerCount;
-    ULONG Reserved[10];    // reserved for internal use
- } PUBLIC_OBJECT_BASIC_INFORMATION, *PPUBLIC_OBJECT_BASIC_INFORMATION;
 
 ACCESS_MASK __get_handle_access_mask (HANDLE handle)
 {
