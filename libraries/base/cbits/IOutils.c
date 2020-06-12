@@ -38,7 +38,7 @@ __handle_ready(HANDLE hFile, bool write, int msecs)
     DWORD handleType = GetFileType (hFile);
 
     DWORD rc;
-	DWORD avail;
+        DWORD avail;
 
     switch (handleType)
       {
@@ -252,7 +252,7 @@ __set_console_buffering(HANDLE hFile, bool cooked)
     DWORD disabled = (st | ENABLE_LINE_INPUT) & ~ENABLE_VIRTUAL_TERMINAL_INPUT;
 
 
-	return SetConsoleMode(hFile, cooked ? enabled : disabled);
+        return SetConsoleMode(hFile, cooked ? enabled : disabled);
 }
 
 bool
@@ -265,8 +265,8 @@ __set_console_echo(HANDLE hFile, bool on)
         return false;
     }
 
-	return GetConsoleMode(hFile, &st) &&
-	       SetConsoleMode(hFile, ( on ? (st | flgs) : (st & ~flgs)));
+        return GetConsoleMode(hFile, &st) &&
+               SetConsoleMode(hFile, ( on ? (st | flgs) : (st & ~flgs)));
 }
 
 bool
@@ -278,8 +278,8 @@ __get_console_echo(HANDLE hFile)
         return false;
     }
 
-	return GetConsoleMode(hFile, &st) &&
-	       (st & ENABLE_ECHO_INPUT) == ENABLE_ECHO_INPUT;
+        return GetConsoleMode(hFile, &st) &&
+               (st & ENABLE_ECHO_INPUT) == ENABLE_ECHO_INPUT;
 }
 
 bool
@@ -288,17 +288,17 @@ __flush_input_console(HANDLE hFile)
     if ( hFile == INVALID_HANDLE_VALUE )
       return false;
 
-	/* If the 'handle' isn't connected to a console; treat the flush
-	 * operation as a NOP.
-	 */
-	DWORD unused;
-	if ( !GetConsoleMode(hFile, &unused) &&
-	     GetLastError() == ERROR_INVALID_HANDLE ) {
-	    return false;
-	}
+        /* If the 'handle' isn't connected to a console; treat the flush
+         * operation as a NOP.
+         */
+        DWORD unused;
+        if ( !GetConsoleMode(hFile, &unused) &&
+             GetLastError() == ERROR_INVALID_HANDLE ) {
+            return false;
+        }
 
-	if ( FlushConsoleInputBuffer(hFile) )
-	    return true;
+        if ( FlushConsoleInputBuffer(hFile) )
+            return true;
 
     maperrno();
     return false;
