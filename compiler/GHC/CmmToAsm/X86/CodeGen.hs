@@ -2518,7 +2518,6 @@ genCCall' _ is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] _ = d
   where
     format = intFormat width
 
-<<<<<<< HEAD
 genCCall' config is32Bit (PrimTarget (MO_Xchg width)) [dst] [addr, value] _
   | (is32Bit && width == W64) = panic "gencCall: 64bit atomic exchange not supported on 32bit platforms"
   | otherwise = do
@@ -2529,18 +2528,6 @@ genCCall' config is32Bit (PrimTarget (MO_Xchg width)) [dst] [addr, value] _
     let code     = toOL
                    [ MOV format (OpReg newval) (OpReg dst_r)
                    , XCHG format (OpAddr amode) dst_r
-=======
-genCCall' dflags is32Bit (PrimTarget MO_Xchg) [dst] [addr, value] _ = do
-    Amode amode addr_code <- getSimpleAmode is32Bit addr
-    newval <- getNewRegNat format
-    newval_code <- getAnyReg value
-    let platform = targetPlatform dflags
-        dst_r    = getRegisterReg platform (CmmLocal dst)
-        code     = toOL
-                   [ MOV format (OpReg newval) (OpReg eax)
-                   , LOCK (XCHG format (OpReg eax) (OpAddr amode))
-                   , MOV format (OpReg eax) (OpReg dst_r)
->>>>>>> 2fe6e3d19a... Fix build after merging with master
                    ]
     return $ addr_code `appOL` newval_code `appOL` code
   where

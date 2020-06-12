@@ -26,6 +26,7 @@ module GHC.Event.Windows.ManagedThreadPool
   , startThreadPool
   , notifyRunning
   , notifyWaiting
+  , monitorThreadPool
   ) where
 
 import Control.Concurrent.MVar
@@ -34,15 +35,9 @@ import Foreign
 import GHC.Base
 import GHC.Num ((-), (+))
 import GHC.Real (fromIntegral)
-import GHC.Show
-import GHC.Windows
 import qualified GHC.Event.Array as A
-import qualified GHC.Windows     as Win32
 import GHC.IO.Handle.Internals (debugIO)
-import GHC.Conc.Sync (forkIO, showThreadId,
-                      ThreadId(..), ThreadStatus(..),
-                      threadStatus, sharedCAF)
-import System.IO.Unsafe     (unsafePerformIO)
+import GHC.Conc.Sync (ThreadId(..))
 import GHC.RTS.Flags
 
 ------------------------------------------------------------------------
@@ -79,7 +74,7 @@ startThreadPool job = do
 
 monitorThreadPool :: MVar () -> IO ()
 monitorThreadPool monitor = do
-  active <- takeMVar monitor
+  _active <- takeMVar monitor
 
   return ()
 
