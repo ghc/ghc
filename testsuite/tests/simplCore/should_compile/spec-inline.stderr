@@ -14,7 +14,7 @@ Roman.$trModule4 = "main"#
 Roman.$trModule3 :: GHC.Types.TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 Roman.$trModule3 = GHC.Types.TrNameS Roman.$trModule4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
@@ -28,14 +28,14 @@ Roman.$trModule2 = "Roman"#
 Roman.$trModule1 :: GHC.Types.TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 Roman.$trModule1 = GHC.Types.TrNameS Roman.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 Roman.$trModule :: GHC.Types.Module
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 Roman.$trModule
   = GHC.Types.Module Roman.$trModule3 Roman.$trModule1
 
@@ -130,14 +130,14 @@ Roman.foo_go
 Roman.foo2 :: Int
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 Roman.foo2 = GHC.Types.I# 6#
 
 -- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
 Roman.foo1 :: Maybe Int
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 Roman.foo1 = GHC.Maybe.Just @Int Roman.foo2
 
 -- RHS size: {terms: 11, types: 4, coercions: 0, joins: 0/0}
