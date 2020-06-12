@@ -1791,6 +1791,272 @@ and take the wired-in information.  That avoids complications.
 e.g. the need to make the data constructor worker name for
      a constraint tuple match the wired-in one
 
+Note [Datatype return kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There are several poorly lit corners around datatype/newtype return kinds.
+This Note explains these.  We cover data/newtype families and instances
+in Note [Data family/instance return kinds].
+
+data    T a :: <kind> where ...   -- See Point DT4
+newtype T a :: <kind> where ...   -- See Point DT5
+
+DT1 Where this applies: Only GADT syntax for data/newtype/instance declarations
+    can have declared return kinds. This Note does not apply to Haskell98
+    syntax.
+
+DT2 Where these kinds come from: The return kind is part of the TyCon kind, gotten either
+     by checkInitialKind (standalone kind signature / CUSK) or
+     inferInitialKind. It is extracted by bindTyClTyVars in tcTyClDecl1. It is
+     then passed to tcDataDefn.
+
+DT3 Eta-expansion: Any forall-bound variables and function arguments in a result kind
+    become parameters to the type. That is, when we say
+
+     data T a :: Type -> Type where ...
+
+    we really mean for T to have two parameters. The second parameter
+    is produced by processing the return kind in etaExpandAlgTyCon,
+    called in tcDataDefn.
+
+    See also Note [TyConBinders for the result kind signatures of a data type]
+    in GHC.Tc.Gen.HsType.
+
+DT4 Datatype return kind restriction: A data type return kind must end
+    in a type that, after type-synonym expansion, yields `TYPE LiftedRep`. By
+    "end in", we mean we strip any foralls and function arguments off before
+    checking.
+
+    Examples:
+      data T1 :: Type                          -- good
+      data T2 :: Bool -> Type                  -- good
+      data T3 :: Bool -> forall k. Type        -- strange, but still accepted
+      data T4 :: forall k. k -> Type           -- good
+      data T5 :: Bool                          -- bad
+      data T6 :: Type -> Bool                  -- bad
+
+    Exactly the same applies to data instance (but not data family)
+    declarations.  Examples
+      data instance D1 :: Type                 -- good
+      data instance D2 :: Bool -> Type         -- good
+
+    We can "look through" type synonyms
+      type Star = Type
+      data T7 :: Bool -> Star                  -- good (synonym expansion ok)
+      type Arrow = (->)
+      data T8 :: Arrow Bool Type               -- good (ditto)
+
+    But we specifically do *not* do type family reduction here.
+      type family ARROW where
+        ARROW = (->)
+      data T9 :: ARROW Bool Type               -- bad
+
+      type family F a where
+        F Int  = Bool
+        F Bool = Type
+      data T10 :: Bool -> F Bool               -- bad
+
+    The /principle/ here is that in the TyCon for a data type or data instance,
+    we must be able to lay out all the type-variable binders, one by one, until
+    we reach (TYPE xx).  There is no place for a cast here.  We could add one,
+    but let's not!
+
+    This check is done in checkDataKindSig. For data declarations, this
+    call is in tcDataDefn; for data instances, this call is in tcDataFamInstDecl.
+
+DT5 Newtype return kind restriction.
+    If -XUnliftedNewtypes is not on, then newtypes are treated just
+    like datatypes --- see (4) above.
+
+    If -XUnliftedNewtypes is on, then a newtype return kind must end in
+    TYPE xyz, for some xyz (after type synonym expansion). The "xyz"
+    may include type families, but the TYPE part must be visible
+    /without/ expanding type families (only synonyms).
+
+    This kind is unified with the kind of the representation type (the
+    type of the one argument to the one constructor). See also steps
+    (2) and (3) of Note [Implementation of UnliftedNewtypes].
+
+    The checks are done in the same places as for datatypes.
+    Examples (assume -XUnliftedNewtypes):
+
+      newtype N1 :: Type                       -- good
+      newtype N2 :: Bool -> Type               -- good
+      newtype N3 :: forall r. Bool -> TYPE r   -- good
+
+      type family F (t :: Type) :: RuntimeRep
+      newtype N4 :: forall t -> TYPE (F t)     -- good
+
+      type family STAR where
+        STAR = Type
+      newtype N5 :: Bool -> STAR               -- bad
+
+Note [Data family/instance return kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Within this note, understand "instance" to mean data or newtype
+instance, and understand "family" to mean data family. No type
+families or classes here. Some examples:
+
+data family T a :: <kind>          -- See Point DF56
+
+data    instance T [a] :: <kind> where ...   -- See Point DF2
+newtype instance T [a] :: <kind> where ...   -- See Point DF2
+
+Here is the Plan for Data Families:
+
+DF0 Where these kinds come from:
+
+    Families: The return kind is either written in a standalone signature
+     or extracted from a family declaration in getInitialKind.
+     If a family declaration is missing a result kind, it is assumed to be
+     Type. This assumption is in getInitialKind for CUSKs or
+     get_fam_decl_initial_kind for non-signature & non-CUSK cases.
+
+   Instances: The data family already has a known kind. The return kind
+     of an instance is then calculated by applying the data family tycon
+     to the patterns provided, as computed by the typeKind lhs_ty in the
+     end of tcDataFamInstHeader. In the case of an instance written in GADT
+     syntax, there are potentially *two* return kinds: the one computed from
+     applying the data family tycon to the patterns, and the one given by
+     the user. This second kind is checked by the tc_kind_sig function within
+     tcDataFamInstHeader. See also DF3, below.
+
+DF1 In a data/newtype instance, we treat the kind of the /data family/,
+    once instantiated, as the "master kind" for the representation
+    TyCon.  For example:
+        data family T1 :: Type -> Type -> Type
+        data instance T1 Int :: F Bool -> Type where ...
+    The "master kind" for the representation TyCon R:T1Int comes
+    from T1, not from the signature on the data instance.  It is as
+    if we declared
+        data R:T1Int :: Type -> Type where ...
+     See Note [Liberalising data family return kinds] for an alternative
+     plan.  But this current plan is simple, and ensures that all instances
+     are simple instantiations of the master, without strange casts.
+
+     An example with non-trivial instantiation:
+        data family T2 :: forall k. Type -> k
+        data instance T2 :: Type -> Type -> Type where ...
+     Here 'k' gets instantiated with (Type -> Type), driven by
+     the signature on the 'data instance'. (See also DT3 of
+     Note [Datatype return kinds] about eta-expansion, which applies here,
+     too; see tcDataFamInstDecl's call of etaExpandAlgTyCon.)
+
+     A newtype example:
+
+       data Color = Red | Blue
+       type family Interpret (x :: Color) :: RuntimeRep where
+         Interpret 'Red = 'IntRep
+         Interpret 'Blue = 'WordRep
+       data family Foo (x :: Color) :: TYPE (Interpret x)
+       newtype instance Foo 'Red :: TYPE IntRep where
+         FooRedC :: Int# -> Foo 'Red
+
+    Here we get that Foo 'Red :: TYPE (Interpret Red), and our
+    representation newtype looks like
+         newtype R:FooRed :: TYPE (Interpret Red) where
+            FooRedC :: Int# -> R:FooRed
+    Remember: the master kind comes from the /family/ tycon.
+
+DF2 /After/ this instantiation, the return kind of the master kind
+    must obey the usual rules for data/newtype return kinds (DT4, DT5)
+    of Note [Datatype return kinds].  Examples:
+        data family T3 k :: k
+        data instance T3 Type where ...          -- OK
+        data instance T3 (Type->Type) where ...  -- OK
+        data instance T3 (F Int) where ...       -- Not OK
+
+DF3 Any kind signatures on the data/newtype instance are checked for
+    equality with the master kind (and hence may guide instantiation)
+    but are otherwise ignored. So in the T1 example above, we check
+    that (F Int ~ Type) by unification; but otherwise ignore the
+    user-supplied signature from the /family/ not the /instance/.
+
+    We must be sure to instantiate any trailing invisible binders
+    before doing this unification.  See the call to tcInstInvisibleBinders
+    in tcDataFamInstHeader. For example:
+       data family D :: forall k. k
+       data instance D :: Type               -- forall k. k   <:  Type
+       data instance D :: Type -> Type       -- forall k. k   <:  Type -> Type
+         -- NB: these do not overlap
+    we must instantiate D before unifying with the signature in the
+    data instance declaration
+
+DF4 We also (redundantly) check that any user-specified return kind
+    signature in the data instance also obeys DT4/DT5.  For example we
+    reject
+        data family T1 :: Type -> Type -> Type
+        data instance T1 Int :: Type -> F Int
+    even if (F Int ~ Type).  We could omit this check, because we
+    use the master kind; but it seems more uniform to check it, again
+    with checkDataKindSig.
+
+DF5 Data /family/ return kind restrictions. Consider
+       data family D8 a :: F a
+    where F is a type family.  No data/newtype instance can instantiate
+    this so that it obeys the rules of DT4 or DT5.  So GHC proactively
+    rejects the data /family/ declaration if it can never satisfy (DT4)/(DT5).
+    Remember that a data family supports both data and newtype instances.
+
+    More precisely, the return kind of a data family must be either
+        * TYPE xyz (for some type xyz) or
+        * a kind variable
+    Only in these cases can a data/newtype instance possibly satisfy (DT4)/(DT5).
+    This is checked by the call to checkDataKindSig in tcFamDecl1.  Examples:
+
+      data family D1 :: Type              -- good
+      data family D2 :: Bool -> Type      -- good
+      data family D3 k :: k               -- good
+      data family D4 :: forall k -> k     -- good
+      data family D5 :: forall k. k -> k  -- good
+      data family D6 :: forall r. TYPE r  -- good
+      data family D7 :: Bool -> STAR      -- bad (see STAR from point 5)
+
+DF6 Two return kinds for instances: If an instance has two return kinds,
+    one from the family declaration and one from the instance declaration
+    (see point DF3 above), they are unified. More accurately, we make sure
+    that the kind of the applied data family is a subkind of the user-written
+    kind. GHC.Tc.Gen.HsType.checkExpectedKind normally does this check for types, but
+    that's overkill for our needs here. Instead, we just instantiate any
+    invisible binders in the (instantiated) kind of the data family
+    (called lhs_kind in tcDataFamInstHeader) with tcInstInvisibleTyBinders
+    and then unify the resulting kind with the kind written by the user.
+    This unification naturally produces a coercion, which we can drop, as
+    the kind annotation on the instance is redundant (except perhaps for
+    effects of unification).
+
+    This all is Wrinkle (3) in Note [Implementation of UnliftedNewtypes].
+
+Note [Liberalising data family return kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Could we allow this?
+   type family F a where { F Int = Type }
+   data family T a :: F a
+   data instance T Int where
+      MkT :: T Int
+
+In the 'data instance', T Int :: F Int, and F Int = Type, so all seems
+well.  But there are lots of complications:
+
+* The representation constructor R:TInt presumably has kind Type.
+  So the axiom connecting the two would have to look like
+       axTInt :: T Int ~ R:TInt |> sym axFInt
+  and that doesn't match expectation in DataFamInstTyCon
+  in AlgTyConFlav
+
+* The wrapper can't have type
+     $WMkT :: Int -> T Int
+  because T Int has the wrong kind.  It would have to be
+     $WMkT :: Int -> (T Int) |> axFInt
+
+* The code for $WMkT would also be more complicated, needing
+  two coherence coercions. Try it!
+
+* Code for pattern matching would be complicated in an
+  exactly dual way.
+
+So yes, we could allow this, but we currently do not. That's
+why we have DF2 in Note [Data family/instance return kinds].
+
 Note [Implementation of UnliftedNewtypes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Expected behavior of UnliftedNewtypes:
@@ -1867,11 +2133,12 @@ Wrinkle: Consider (#17021, typecheck/should_fail/T17021)
     newtype T :: TYPE (Id LiftedRep) where
       MkT :: Int -> T
 
-  In the type of MkT, we must end with (Int |> TYPE (sym axId)) -> T, never Int -> (T |>
-  TYPE axId); otherwise, the result type of the constructor wouldn't match the
-  datatype. However, type-checking the HsType T might reasonably result in
-  (T |> hole). We thus must ensure that this cast is dropped, forcing the
-  type-checker to add one to the Int instead.
+  In the type of MkT, we must end with (Int |> TYPE (sym axId)) -> T,
+  never Int -> (T |> TYPE axId); otherwise, the result type of the
+  constructor wouldn't match the datatype. However, type-checking the
+  HsType T might reasonably result in (T |> hole). We thus must ensure
+  that this cast is dropped, forcing the type-checker to add one to
+  the Int instead.
 
   Why is it always safe to drop the cast? This result type is type-checked by
   tcHsOpenType, so its kind definitely looks like TYPE r, for some r. It is
@@ -1883,7 +2150,7 @@ Wrinkle: Consider (#17021, typecheck/should_fail/T17021)
 Note that this is possible in the H98 case only for a data family, because
 the H98 syntax doesn't permit a kind signature on the newtype itself.
 
-There are also some changes for deailng with families:
+There are also some changes for dealing with families:
 
 1. In tcFamDecl1, we suppress a tcIsLiftedTypeKind check if
    UnliftedNewtypes is on. This allows us to write things like:
@@ -1905,7 +2172,7 @@ There are also some changes for deailng with families:
    we use that kind signature.
 
 3. A data family and its newtype instance may be declared with slightly
-   different kinds. See point 7 in Note [Datatype return kinds].
+   different kinds. See point DF6 in Note [Data family/instance return kinds]
 
 There's also a change in the renamer:
 
@@ -2292,187 +2559,6 @@ Since the LHS of an associated type family default is always just variables,
 it won't contain any tycons. Accordingly, the patterns used in the substitution
 won't actually be knot-tied, even though we're in the knot. This is too
 delicate for my taste, but it works.
-
-Note [Datatype return kinds]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-There are several poorly lit corners around datatype/newtype return kinds.
-This Note explains these. Within this note, always understand "instance"
-to mean data or newtype instance, and understand "family" to mean data
-family. No type families or classes here. Some examples:
-
-data    T a :: <kind> where ...   -- See Point 4
-newtype T a :: <kind> where ...   -- See Point 5
-
-data family T a :: <kind>          -- See Point 6
-
-data    instance T [a] :: <kind> where ...   -- See Point 4
-newtype instance T [a] :: <kind> where ...   -- See Point 5
-
-1. Where this applies: Only GADT syntax for data/newtype/instance declarations
-   can have declared return kinds. This Note does not apply to Haskell98
-   syntax.
-
-2. Where these kinds come from: Return kinds are processed through several
-   different code paths:
-
-   Data/newtypes: The return kind is part of the TyCon kind, gotten either
-     by checkInitialKind (standalone kind signature / CUSK) or
-     inferInitialKind. It is extracted by bindTyClTyVars in tcTyClDecl1. It is
-     then passed to tcDataDefn.
-
-   Families: The return kind is either written in a standalone signature
-     or extracted from a family declaration in getInitialKind.
-     If a family declaration is missing a result kind, it is assumed to be
-     Type. This assumption is in getInitialKind for CUSKs or
-     get_fam_decl_initial_kind for non-signature & non-CUSK cases.
-
-   Instances: The data family already has a known kind. The return kind
-     of an instance is then calculated by applying the data family tycon
-     to the patterns provided, as computed by the typeKind lhs_ty in the
-     end of tcDataFamInstHeader. In the case of an instance written in GADT
-     syntax, there are potentially *two* return kinds: the one computed from
-     applying the data family tycon to the patterns, and the one given by
-     the user. This second kind is checked by the tc_kind_sig function within
-     tcDataFamInstHeader.
-
-3. Eta-expansion: Any forall-bound variables and function arguments in a result kind
-   become parameters to the type. That is, when we say
-
-     data T a :: Type -> Type where ...
-
-   we really mean for T to have two parameters. The second parameter
-   is produced by processing the return kind in etaExpandAlgTyCon,
-   called in tcDataDefn for data/newtypes and in tcDataFamInstDecl
-   for instances. This is true for data families as well, though their
-   arity only matters for pretty-printing.
-
-   See also Note [TyConBinders for the result kind signatures of a data type]
-   in GHC.Tc.Gen.HsType.
-
-4. Datatype return kind restriction: A data/data-instance return kind must end
-   in a type that, after type-synonym expansion, yields `TYPE LiftedRep`. By
-   "end in", we mean we strip any foralls and function arguments off before
-   checking: this remaining part of the type is returned from etaExpandAlgTyCon.
-
-   Examples:
-     data T1 :: Type                          -- good
-     data T2 :: Bool -> Type                  -- good
-     data T3 :: Bool -> forall k. Type        -- strange, but still accepted
-     data T4 :: forall k. k -> Type           -- good
-     data T5 :: Bool                          -- bad
-     data T6 :: Type -> Bool                  -- bad
-
-   Exactly the same applies to data instance (but not data family)
-   declarations.  Examples
-     data instance D1 :: Type                 -- good
-     data instance D2 :: Boool -> Type        -- good
-
-   We can "look through" type synonyms
-     type Star = Type
-     data T7 :: Bool -> Star                  -- good (synonym expansion ok)
-     type Arrow = (->)
-     data T8 :: Arrow Bool Type               -- good (ditto)
-
-   But we specifically do *not* do type family reduction here.
-     type family ARROW where
-       ARROW = (->)
-     data T9 :: ARROW Bool Type               -- bad
-
-     type family F a where
-       F Int  = Bool
-       F Bool = Type
-     data T10 :: Bool -> F Bool               -- bad
-
-   The /principle/ here is that in the TyCon for a data type or data instance,
-   we must be able to lay out all the type-variable binders, one by one, until
-   we reach (TYPE xx).  There is no place for a cast here.  We could add one,
-   but let's not!
-
-   This check is done in checkDataKindSig. For data declarations, this
-   call is in tcDataDefn; for data instances, this call is in tcDataFamInstDecl.
-
-4a  Because data instances in GADT syntax can have two return kinds (see
-    point (2) above), we must check both return kinds. The user-written return
-    kind is checked by the call to checkDataKindSig in tcDataFamInstDecl. Examples:
-
-     data family D (a :: Nat) :: k     -- good (see Point 6)
-
-     data instance D 1 :: Type         -- good
-     data instance D 2 :: F Bool       -- bad
-
-5. Newtype return kind restriction: If -XUnliftedNewtypes is on, then
-   a newtype/newtype-instance return kind must end in TYPE xyz, for some
-   xyz (after type synonym expansion). The "xyz" may include type families,
-   but the TYPE part must be visible with expanding type families (only synonyms).
-   This kind is unified with the kind of the representation type (the type
-   of the one argument to the one constructor). See also steps (2) and (3)
-   of Note [Implementation of UnliftedNewtypes].
-
-   If -XUnliftedNewtypes is not on, then newtypes are treated just like datatypes.
-
-   The checks are done in the same places as for datatypes.
-   Examples (assume -XUnliftedNewtypes):
-
-     newtype N1 :: Type                       -- good
-     newtype N2 :: Bool -> Type               -- good
-     newtype N3 :: forall r. Bool -> TYPE r   -- good
-
-     type family F (t :: Type) :: RuntimeRep
-     newtype N4 :: forall t -> TYPE (F t)     -- good
-
-     type family STAR where
-       STAR = Type
-     newtype N5 :: Bool -> STAR               -- bad
-
-6. Family return kind restrictions: The return kind of a data family must
-   be either TYPE xyz (for some xyz) or a kind variable. The idea is that
-   instances may specialise the kind variable to fit one of the restrictions
-   above. This is checked by the call to checkDataKindSig in tcFamDecl1.
-   Examples:
-
-     data family D1 :: Type              -- good
-     data family D2 :: Bool -> Type      -- good
-     data family D3 k :: k               -- good
-     data family D4 :: forall k -> k     -- good
-     data family D5 :: forall k. k -> k  -- good
-     data family D6 :: forall r. TYPE r  -- good
-     data family D7 :: Bool -> STAR      -- bad (see STAR from point 5)
-
-7. Two return kinds for instances: If an instance has two return kinds,
-   one from the family declaration and one from the instance declaration
-   (see point (2) above), they are unified. More accurately, we make sure
-   that the kind of the applied data family is a subkind of the user-written
-   kind. GHC.Tc.Gen.HsType.checkExpectedKind normally does this check for types, but
-   that's overkill for our needs here. Instead, we just instantiate any
-   invisible binders in the (instantiated) kind of the data family
-   (called lhs_kind in tcDataFamInstHeader) with tcInstInvisibleTyBinders
-   and then unify the resulting kind with the kind written by the user.
-   This unification naturally produces a coercion, which we can drop, as
-   the kind annotation on the instance is redundant (except perhaps for
-   effects of unification).
-
-   Example:
-
-      data Color = Red | Blue
-      type family Interpret (x :: Color) :: RuntimeRep where
-        Interpret 'Red = 'IntRep
-        Interpret 'Blue = 'WordRep
-      data family Foo (x :: Color) :: TYPE (Interpret x)
-      newtype instance Foo 'Red :: TYPE IntRep where
-        FooRedC :: Int# -> Foo 'Red
-
-   Here we get that Foo 'Red :: TYPE (Interpret Red) and we have to
-   unify the kind with TYPE IntRep.
-
-   Example requiring subkinding:
-
-      data family D :: forall k. k
-      data instance D :: Type               -- forall k. k   <:  Type
-      data instance D :: Type -> Type       -- forall k. k   <:  Type -> Type
-        -- NB: these do not overlap
-
-   This all is Wrinkle (3) in Note [Implementation of UnliftedNewtypes].
-
 -}
 
 {- *********************************************************************
@@ -2502,8 +2588,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
   -- When UnliftedNewtypes is enabled, we loosen this restriction
   -- on the return kind. See Note [Implementation of UnliftedNewtypes], wrinkle (1).
   -- See also Note [Datatype return kinds]
-  ; let (_, final_res_kind) = splitPiTys res_kind
-  ; checkDataKindSig DataFamilySort final_res_kind
+  ; checkDataKindSig DataFamilySort res_kind
   ; tc_rep_name <- newTyConRepName tc_name
   ; let inj   = Injective $ replicate (length binders) True
         tycon = mkFamilyTyCon tc_name binders
@@ -2798,7 +2883,7 @@ tcTyFamInstEqn fam_tc mb_clsinfo
                                       hs_pats hs_rhs_ty
        -- Don't print results they may be knot-tied
        -- (tcFamInstEqnGuts zonks to Type)
-       ; return (mkCoAxBranch qtvs [] [] fam_tc pats rhs_ty
+       ; return (mkCoAxBranch qtvs [] [] pats rhs_ty
                               (map (const Nominal) qtvs)
                               loc) }
 
@@ -3170,8 +3255,8 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
        }
 
 tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
-  -- NB: don't use res_kind here, as it's ill-scoped. Instead, we get
-  -- the res_kind by typechecking the result type.
+  -- NB: don't use res_kind here, as it's ill-scoped. Instead,
+  -- we get the res_kind by typechecking the result type.
           (ConDeclGADT { con_g_ext = implicit_tkv_nms
                        , con_names = names
                        , con_qvars = explicit_tkv_nms
@@ -3188,16 +3273,12 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
               bindImplicitTKBndrs_Skol implicit_tkv_nms $
               bindExplicitTKBndrs_Skol explicit_tkv_nms $
               do { ctxt <- tcHsMbContext cxt
-                 ; casted_res_ty <- tcHsOpenType hs_res_ty
-                 ; res_ty <- if not debugIsOn then return $ discardCast casted_res_ty
-                             else case splitCastTy_maybe casted_res_ty of
-                               Just (ty, _) -> do unlifted_nts <- xoptM LangExt.UnliftedNewtypes
-                                                  MASSERT( unlifted_nts )
-                                                  MASSERT( new_or_data == NewType )
-                                                  return ty
-                               _ -> return casted_res_ty
+                 ; (res_ty, res_kind) <- tcInferLHsTypeKind hs_res_ty
+                         -- See Note [GADT return kinds]
+
                    -- See Note [Datatype return kinds]
-                 ; let exp_kind = getArgExpKind new_or_data (typeKind res_ty)
+                 ; let exp_kind = getArgExpKind new_or_data res_kind
+
                  ; btys <- tcConArgs exp_kind hs_args
                  ; let (arg_tys, stricts) = unzip btys
                  ; field_lbls <- lookupConstructorFields name
@@ -3251,6 +3332,20 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
        ; traceTc "tcConDecl 2" (ppr names)
        ; mapM buildOneDataCon names
        }
+
+{- Note [GADT return kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   type family Star where Star = Type
+   data T :: Type where
+      MkT :: Int -> T
+
+If, for some stupid reason, tcInferLHsTypeKind on the return type of
+MkT returned (T |> ax, Star), then the return-type check in
+checkValidDataCon would reject the decl (although of course there is
+nothing wrong with it).  We are implicitly requiring tha
+tcInferLHsTypeKind doesn't any gratuitous top-level casts.
+-}
 
 -- | Produce an "expected kind" for the arguments of a data/newtype.
 -- If the declaration is indeed for a newtype,
@@ -3924,11 +4019,16 @@ checkValidDataCon dflags existential_ok tc con
               , ppr orig_res_ty <+> dcolon <+> ppr (tcTypeKind orig_res_ty)])
 
 
-        ; checkTc (isJust (tcMatchTy res_ty_tmpl orig_res_ty))
+        ; checkTc (isJust (tcMatchTyKi res_ty_tmpl orig_res_ty))
                   (badDataConTyCon con res_ty_tmpl)
             -- Note that checkTc aborts if it finds an error. This is
             -- critical to avoid panicking when we call dataConDisplayType
             -- on an un-rejiggable datacon!
+            -- Also NB that we match the *kind* as well as the *type* (#18357)
+            -- However, if the kind is the only thing that doesn't match, the
+            -- error message is terrible.  E.g. test T18357b
+            --    type family Star where Star = Type
+            --    newtype T :: Type where MkT :: Int -> (T :: Star)
 
         ; traceTc "checkValidDataCon 2" (ppr data_con_display_type)
 

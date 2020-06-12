@@ -656,3 +656,43 @@ unify(</ tj // j />, </ t'j // j />) = subst
 subst(s) = subst(s')
 ----------------------------------------- :: CompatCoincident
 no_conflict(C, </ sj // j />, ind1, ind2)
+
+defn |- axiom C ok :: :: lint_axiom :: 'Ax_'
+  {{ com Coercion axiom linting, \coderef{GHC/Core/Lint.hs}{lint\_axiom} }}
+  {{ tex \labeledjudge{axiom} [[C]] [[ok]] }}
+by
+
+isNewTyCon T
+</ Ri // i /> = tyConRoles T
+</ alphai_ki // i /> |-ty T </ alphai$ // i /> : k0
+</ alphai_ki // i /> |-ty s : k0
+------------------------------ :: Newtype
+|-axiom T_Rep forall </ alphai_ki RAi // i />. (</ alphai$ // i /> ~> s) ok
+
+isOpenTypeFamilyTyCon T
+T |-branch b ok
+------------------------------ :: OpenTypeFamily
+|-axiom T_Nom b ok
+
+isClosedTypeFamilyTyCon T
+</ T |-branch bi ok // i />
+--------------------------- :: ClosedTypeFamily
+|-axiom T_Nom </ bi // i /> ok
+
+isDataFamilyTyCon T
+T |-branch b ok
+--------------------------- :: DataFamily
+|-axiom T_Rep b ok
+
+defn T |- branch b ok :: :: lint_family_branch :: 'Br_'
+  {{ com Type family branch linting, \coderef{GHC/Core/Lint.hs}{lint\_family\_branch} }}
+  {{ tex [[T]] \labeledjudge{branch} [[b]] [[ok]] }}
+by
+
+</ Ri = Nom // i />
+</ isTyFamFree tj // j />
+fv(</ tj // j />) = </ alphai$ // i />
+</ alphai_ki // i /> |-ty T </ tj // j /> : k0
+</ alphai_ki // i /> |-ty s : k0
+---------------------------------------------------------------- :: OK
+T |-branch forall </ alphai_ki RAi // i />. (</ tj // j /> ~> s) ok

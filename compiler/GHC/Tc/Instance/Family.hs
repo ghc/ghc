@@ -18,7 +18,6 @@ import GHC.Driver.Types
 import GHC.Core.FamInstEnv
 import GHC.Core.InstEnv( roughMatchTcs )
 import GHC.Core.Coercion
-import GHC.Core.Lint
 import GHC.Tc.Types.Evidence
 import GHC.Iface.Load
 import GHC.Tc.Utils.Monad
@@ -162,34 +161,13 @@ addressed yet.
 newFamInst :: FamFlavor -> CoAxiom Unbranched -> TcM FamInst
 -- Freshen the type variables of the FamInst branches
 newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
-  = ASSERT2( tyCoVarsOfTypes lhs `subVarSet` tcv_set, text "lhs" <+> pp_ax )
-    ASSERT2( lhs_kind `eqType` rhs_kind, text "kind" <+> pp_ax $$ ppr lhs_kind $$ ppr rhs_kind )
-    -- We used to have an assertion that the tyvars of the RHS were bound
-    -- by tcv_set, but in error situations like  F Int = a that isn't
-    -- true; a later check in checkValidFamInst rejects it
-    do { (subst, tvs') <- freshenTyVarBndrs tvs
+  = do {
+         -- Freshen the type variables
+         (subst, tvs') <- freshenTyVarBndrs tvs
        ; (subst, cvs') <- freshenCoVarBndrsX subst cvs
-       ; dflags <- getDynFlags
        ; let lhs'     = substTys subst lhs
              rhs'     = substTy  subst rhs
-             tcvs'    = tvs' ++ cvs'
-       ; ifErrsM (return ()) $ -- Don't lint when there are errors, because
-                               -- errors might mean TcTyCons.
-                               -- See Note [Recover from validity error] in GHC.Tc.TyCl
-         when (gopt Opt_DoCoreLinting dflags) $
-           -- Check that the types involved in this instance are well formed.
-           -- Do /not/ expand type synonyms, for the reasons discussed in
-           -- Note [Linting type synonym applications].
-           case lintTypes dflags tcvs' (rhs':lhs') of
-             Nothing       -> pure ()
-             Just fail_msg -> pprPanic "Core Lint error in newFamInst" $
-                              vcat [ fail_msg
-                                   , ppr fam_tc
-                                   , ppr subst
-                                   , ppr tvs'
-                                   , ppr cvs'
-                                   , ppr lhs'
-                                   , ppr rhs' ]
+
        ; return (FamInst { fi_fam      = tyConName fam_tc
                          , fi_flavor   = flavor
                          , fi_tcs      = roughMatchTcs lhs
@@ -199,10 +177,6 @@ newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
                          , fi_rhs      = rhs'
                          , fi_axiom    = axiom }) }
   where
-    lhs_kind = tcTypeKind (mkTyConApp fam_tc lhs)
-    rhs_kind = tcTypeKind rhs
-    tcv_set  = mkVarSet (tvs ++ cvs)
-    pp_ax    = pprCoAxiom axiom
     CoAxBranch { cab_tvs = tvs
                , cab_cvs = cvs
                , cab_lhs = lhs

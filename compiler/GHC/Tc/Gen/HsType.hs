@@ -46,7 +46,8 @@ module GHC.Tc.Gen.HsType (
         tcNamedWildCardBinders,
         tcHsLiftedType,   tcHsOpenType,
         tcHsLiftedTypeNC, tcHsOpenTypeNC,
-        tcInferLHsType, tcInferLHsTypeUnsaturated, tcCheckLHsType,
+        tcInferLHsTypeKind, tcInferLHsType, tcInferLHsTypeUnsaturated,
+        tcCheckLHsType,
         tcHsMbContext, tcHsContext, tcLHsPredType,
         failIfEmitsConstraints,
         solveEqualities, -- useful re-export
@@ -77,6 +78,7 @@ import GHC.Tc.Types.Origin
 import GHC.Core.Predicate
 import GHC.Tc.Types.Constraint
 import GHC.Tc.Utils.Env
+import GHC.Tc.Utils.Instantiate( tcInstInvisibleTyBinders )
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity
 import GHC.Tc.Utils.Unify
@@ -87,7 +89,7 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
 import GHC.Tc.Errors      ( reportAllUnsolved )
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Utils.Instantiate ( tcInstInvisibleTyBinders, tcInstInvisibleTyBinder )
+import GHC.Tc.Utils.Instantiate ( tcInstInvisibleTyBindersN, tcInstInvisibleTyBinder )
 import GHC.Core.Type
 import GHC.Builtin.Types.Prim
 import GHC.Types.Name.Reader( lookupLocalRdrOcc )
@@ -615,12 +617,11 @@ tcHsOpenType, tcHsLiftedType,
   tcHsOpenTypeNC, tcHsLiftedTypeNC :: LHsType GhcRn -> TcM TcType
 -- Used for type signatures
 -- Do not do validity checking
-tcHsOpenType ty   = addTypeCtxt ty $ tcHsOpenTypeNC ty
-tcHsLiftedType ty = addTypeCtxt ty $ tcHsLiftedTypeNC ty
+tcHsOpenType   hs_ty = addTypeCtxt hs_ty $ tcHsOpenTypeNC hs_ty
+tcHsLiftedType hs_ty = addTypeCtxt hs_ty $ tcHsLiftedTypeNC hs_ty
 
-tcHsOpenTypeNC   ty = do { ek <- newOpenTypeKind
-                         ; tcLHsType ty ek }
-tcHsLiftedTypeNC ty = tcLHsType ty liftedTypeKind
+tcHsOpenTypeNC   hs_ty = do { ek <- newOpenTypeKind; tcLHsType hs_ty ek }
+tcHsLiftedTypeNC hs_ty = tcLHsType hs_ty liftedTypeKind
 
 -- Like tcHsType, but takes an expected kind
 tcCheckLHsType :: LHsType GhcRn -> ContextKind -> TcM TcType
@@ -630,15 +631,24 @@ tcCheckLHsType hs_ty exp_kind
        ; tcLHsType hs_ty ek }
 
 tcInferLHsType :: LHsType GhcRn -> TcM TcType
--- Called from outside: set the context
 tcInferLHsType hs_ty
-  = addTypeCtxt hs_ty $
-    do { (ty, _kind) <- tc_infer_lhs_type (mkMode TypeLevel) hs_ty
+  = do { (ty,_kind) <- tcInferLHsTypeKind hs_ty
        ; return ty }
+
+tcInferLHsTypeKind :: LHsType GhcRn -> TcM (TcType, TcKind)
+-- Called from outside: set the context
+-- Eagerly instantiate any trailing invisible binders
+tcInferLHsTypeKind lhs_ty@(L loc hs_ty)
+  = addTypeCtxt lhs_ty $
+    setSrcSpan loc     $  -- Cover the tcInstInvisibleTyBinders
+    do { (res_ty, res_kind) <- tc_infer_hs_type (mkMode TypeLevel) hs_ty
+       ; tcInstInvisibleTyBinders res_ty res_kind }
+  -- See Note [Do not always instantiate eagerly in types]
 
 -- Used to check the argument of GHCi :kind
 -- Allow and report wildcards, e.g. :kind T _
 -- Do not saturate family applications: see Note [Dealing with :kind]
+-- Does not instantiate eagerly; See Note [Do not always instantiate eagerly in types]
 tcInferLHsTypeUnsaturated :: LHsType GhcRn -> TcM (TcType, TcKind)
 tcInferLHsTypeUnsaturated hs_ty
   = addTypeCtxt hs_ty $
@@ -672,6 +682,19 @@ to switch off saturation.
 So tcInferLHsTypeUnsaturated does a little special case for top level
 applications.  Actually the common case is a bare variable, as above.
 
+Note [Do not always instantiate eagerly in types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Terms are eagerly instantiated. This means that if you say
+
+  x = id
+
+then `id` gets instantiated to have type alpha -> alpha. The variable
+alpha is then unconstrained and regeneralized. But we cannot do this
+in types, as we have no type-level lambda. So, when we are sure
+that we will not want to regeneralize later -- because we are done
+checking a type, for example -- we can instantiate. But we do not
+instantiate at variables, nor do we in tcInferLHsTypeUnsaturated,
+which is used by :kind in GHCi.
 
 ************************************************************************
 *                                                                      *
@@ -1596,14 +1619,14 @@ saturateFamApp :: TcType -> TcKind -> TcM (TcType, TcKind)
 --     tcTypeKind ty = kind
 --
 -- If 'ty' is an unsaturated family application with trailing
--- invisible arguments, instanttiate them.
+-- invisible arguments, instantiate them.
 -- See Note [saturateFamApp]
 
 saturateFamApp ty kind
   | Just (tc, args) <- tcSplitTyConApp_maybe ty
   , mustBeSaturated tc
   , let n_to_inst = tyConArity tc - length args
-  = do { (extra_args, ki') <- tcInstInvisibleTyBinders n_to_inst kind
+  = do { (extra_args, ki') <- tcInstInvisibleTyBindersN n_to_inst kind
        ; return (ty `mkTcAppTys` extra_args, ki') }
   | otherwise
   = return (ty, kind)
@@ -1660,7 +1683,7 @@ checkExpectedKind :: HasDebugCallStack
 checkExpectedKind hs_ty ty act_kind exp_kind
   = do { traceTc "checkExpectedKind" (ppr ty $$ ppr act_kind)
 
-       ; (new_args, act_kind') <- tcInstInvisibleTyBinders n_to_inst act_kind
+       ; (new_args, act_kind') <- tcInstInvisibleTyBindersN n_to_inst act_kind
 
        ; let origin = TypeEqOrigin { uo_actual   = act_kind'
                                    , uo_expected = exp_kind
@@ -1711,6 +1734,7 @@ tc_lhs_pred mode pred = tc_lhs_type mode pred constraintKind
 tcTyVar :: TcTyMode -> Name -> TcM (TcType, TcKind)
 -- See Note [Type checking recursive type and class declarations]
 -- in GHC.Tc.TyCl
+-- This does not instantiate. See Note [Do not always instantiate eagerly in types]
 tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
   = do { traceTc "lk1" (ppr name)
        ; thing <- tcLookup name
@@ -3241,12 +3265,18 @@ data DataSort
 -- 2. @k@ (where @k@ is a bare kind variable; see #12369)
 --
 -- See also Note [Datatype return kinds] in GHC.Tc.TyCl
-checkDataKindSig :: DataSort -> Kind -> TcM ()
-checkDataKindSig data_sort kind = do
-  dflags <- getDynFlags
-  traceTc "checkDataKindSig" (ppr kind)
-  checkTc (is_TYPE_or_Type dflags || is_kind_var) (err_msg dflags)
+checkDataKindSig :: DataSort -> Kind  -- any arguments in the kind are stripped off
+                 -> TcM ()
+checkDataKindSig data_sort kind
+  = do { dflags <- getDynFlags
+       ; traceTc "checkDataKindSig" (ppr kind)
+       ; checkTc (is_TYPE_or_Type dflags || is_kind_var)
+                 (err_msg dflags) }
   where
+    res_kind = snd (tcSplitPiTys kind)
+       -- Look for the result kind after
+       -- peeling off any foralls and arrows
+
     pp_dec :: SDoc
     pp_dec = text $
       case data_sort of
@@ -3283,16 +3313,19 @@ checkDataKindSig data_sort kind = do
            -- have return kind `TYPE r` unconditionally (#16827).
 
     is_TYPE :: Bool
-    is_TYPE = tcIsRuntimeTypeKind kind
+    is_TYPE = tcIsRuntimeTypeKind res_kind
+
+    is_Type :: Bool
+    is_Type = tcIsLiftedTypeKind res_kind
 
     is_TYPE_or_Type :: DynFlags -> Bool
     is_TYPE_or_Type dflags | tYPE_ok dflags = is_TYPE
-                           | otherwise      = tcIsLiftedTypeKind kind
+                           | otherwise      = is_Type
 
     -- In the particular case of a data family, permit a return kind of the
     -- form `:: k` (where `k` is a bare kind variable).
     is_kind_var :: Bool
-    is_kind_var | is_data_family = isJust (tcGetCastedTyVar_maybe kind)
+    is_kind_var | is_data_family = isJust (tcGetCastedTyVar_maybe res_kind)
                 | otherwise      = False
 
     err_msg :: DynFlags -> SDoc
@@ -3301,7 +3334,7 @@ checkDataKindSig data_sort kind = do
                    text "has non-" <>
                    (if tYPE_ok dflags then text "TYPE" else ppr liftedTypeKind)
                  , (if is_data_family then text "and non-variable" else empty) <+>
-                   text "return kind" <+> quotes (ppr kind) ])
+                   text "return kind" <+> quotes (ppr res_kind) ])
           , if not (tYPE_ok dflags) && is_TYPE && is_newtype &&
                not (xopt LangExt.UnliftedNewtypes dflags)
             then text "Perhaps you intended to use UnliftedNewtypes"

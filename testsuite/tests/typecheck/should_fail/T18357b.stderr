@@ -1,0 +1,6 @@
+
+T18357b.hs:10:3: error:
+    • Data constructor ‘MkT’ returns type ‘T’
+        instead of an instance of its parent type ‘T’
+    • In the definition of data constructor ‘MkT’
+      In the newtype declaration for ‘T’

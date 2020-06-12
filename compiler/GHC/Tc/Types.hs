@@ -79,7 +79,10 @@ module GHC.Tc.Types(
 
         -- Role annotations
         RoleAnnotEnv, emptyRoleAnnotEnv, mkRoleAnnotEnv,
-        lookupRoleAnnot, getRoleAnnots
+        lookupRoleAnnot, getRoleAnnots,
+
+        -- Linting
+        lintGblEnv
   ) where
 
 #include "HsVersions.h"
@@ -93,6 +96,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Core.Type
 import GHC.Core.TyCon  ( TyCon, tyConKind )
 import GHC.Core.PatSyn ( PatSyn )
+import GHC.Core.Lint   ( lintAxioms )
 import GHC.Types.Id         ( idType, idName )
 import GHC.Types.FieldLabel ( FieldLabel )
 import GHC.Core.UsageEnv
@@ -1738,3 +1742,16 @@ lookupRoleAnnot = lookupNameEnv
 getRoleAnnots :: [Name] -> RoleAnnotEnv -> [LRoleAnnotDecl GhcRn]
 getRoleAnnots bndrs role_env
   = mapMaybe (lookupRoleAnnot role_env) bndrs
+
+{- *********************************************************************
+*                                                                      *
+                  Linting a TcGblEnv
+*                                                                      *
+********************************************************************* -}
+
+-- | Check the 'TcGblEnv' for consistency. Currently, only checks
+-- axioms, but should check other aspects, too.
+lintGblEnv :: DynFlags -> TcGblEnv -> (Bag SDoc, Bag SDoc)
+lintGblEnv dflags tcg_env = lintAxioms dflags axioms
+  where
+    axioms = typeEnvCoAxioms (tcg_type_env tcg_env)

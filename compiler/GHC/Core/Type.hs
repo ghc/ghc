@@ -70,7 +70,6 @@ module GHC.Core.Type (
         getRuntimeRep_maybe, kindRep_maybe, kindRep,
 
         mkCastTy, mkCoercionTy, splitCastTy_maybe,
-        discardCast,
 
         userTypeError_maybe, pprUserTypeErrorTy,
 
@@ -1401,20 +1400,6 @@ tyConBindersTyCoBinders = map to_tyb
   where
     to_tyb (Bndr tv (NamedTCB vis)) = Named (Bndr tv vis)
     to_tyb (Bndr tv (AnonTCB af))   = Anon af (tymult (varType tv))
-
--- | Drop the cast on a type, if any. If there is no
--- cast, just return the original type. This is rarely what
--- you want. The CastTy data constructor (in GHC.Core.TyCo.Rep) has the
--- invariant that another CastTy is not inside. See the
--- data constructor for a full description of this invariant.
--- Since CastTy cannot be nested, the result of discardCast
--- cannot be a CastTy.
-discardCast :: Type -> Type
-discardCast (CastTy ty _) = ASSERT(not (isCastTy ty)) ty
-  where
-  isCastTy CastTy{} = True
-  isCastTy _        = False
-discardCast ty            = ty
 
 
 {-

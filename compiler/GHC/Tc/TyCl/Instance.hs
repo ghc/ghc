@@ -704,7 +704,6 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
 
        -- Check the result kind; it may come from a user-written signature.
        -- See Note [Datatype return kinds] in GHC.Tc.TyCl point 4(a)
-       ; checkDataKindSig (DataInstanceSort new_or_data) final_res_kind
        ; let extra_pats  = map (mkTyVarTy . binderVar) extra_tcbs
              all_pats    = pats `chkAppend` extra_pats
              orig_res_ty = mkTyConApp fam_tc all_pats
@@ -713,10 +712,12 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
        ; traceTc "tcDataFamInstDecl" $
          vcat [ text "Fam tycon:" <+> ppr fam_tc
               , text "Pats:" <+> ppr pats
-              , text "visibliities:" <+> ppr (tcbVisibilities fam_tc pats)
+              , text "visiblities:" <+> ppr (tcbVisibilities fam_tc pats)
               , text "all_pats:" <+> ppr all_pats
               , text "ty_binders" <+> ppr ty_binders
               , text "fam_tc_binders:" <+> ppr (tyConBinders fam_tc)
+              , text "res_kind:" <+> ppr res_kind
+              , text "final_res_kind:" <+> ppr final_res_kind
               , text "eta_pats" <+> ppr eta_pats
               , text "eta_tcbs" <+> ppr eta_tcbs ]
 
@@ -734,9 +735,9 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
                      NewType  -> ASSERT( not (null data_cons) )
                                  mkNewTyConRhs rep_tc_name rec_rep_tc (head data_cons)
 
-              ; let axiom  = mkSingleCoAxiom Representational axiom_name
-                                 post_eta_qtvs eta_tvs [] fam_tc eta_pats
-                                 (mkTyConApp rep_tc (mkTyVarTys post_eta_qtvs))
+              ; let ax_rhs = mkTyConApp rep_tc (mkTyVarTys post_eta_qtvs)
+                    axiom  = mkSingleCoAxiom Representational axiom_name
+                                 post_eta_qtvs eta_tvs [] fam_tc eta_pats ax_rhs
                     parent = DataFamInstTyCon axiom fam_tc all_pats
 
                       -- NB: Use the full ty_binders from the pats. See bullet toward
@@ -851,13 +852,17 @@ tcDataFamInstHeader
 tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
                     hs_ctxt hs_pats m_ksig hs_cons new_or_data
   = do { traceTc "tcDataFamInstHeader {" (ppr fam_tc <+> ppr hs_pats)
-       ; (imp_tvs, (exp_tvs, (stupid_theta, lhs_ty, res_kind)))
+       ; (imp_tvs, (exp_tvs, (stupid_theta, lhs_ty, master_res_kind, instance_res_kind)))
             <- pushTcLevelM_                                $
                solveEqualities                              $
                bindImplicitTKBndrs_Q_Skol imp_vars          $
                bindExplicitTKBndrs_Q_Skol AnyKind exp_bndrs $
                do { stupid_theta <- tcHsContext hs_ctxt
                   ; (lhs_ty, lhs_kind) <- tcFamTyPats fam_tc hs_pats
+                  ; (lhs_applied_ty, lhs_applied_kind)
+                      <- tcInstInvisibleTyBinders lhs_ty lhs_kind
+                      -- See Note [Data family/instance return kinds]
+                      -- in GHC.Tc.TyCl point (DF3)
 
                   -- Ensure that the instance is consistent
                   -- with its parent class
@@ -869,21 +874,17 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
                   -- Add constraints from the data constructors
                   ; kcConDecls new_or_data res_kind hs_cons
 
-                  -- See Note [Datatype return kinds] in GHC.Tc.TyCl, point (7).
-                  ; (lhs_extra_args, lhs_applied_kind)
-                      <- tcInstInvisibleTyBinders (invisibleTyBndrCount lhs_kind)
-                                                  lhs_kind
-                  ; let lhs_applied_ty = lhs_ty `mkTcAppTys` lhs_extra_args
-                        hs_lhs         = nlHsTyConApp fixity (getName fam_tc) hs_pats
+                  -- Check that the result kind of the TyCon applied to its args
+                  -- is compatible with the explicit signature (or Type, if there
+                  -- is none)
+                  ; let hs_lhs = nlHsTyConApp fixity (getName fam_tc) hs_pats
                   ; _ <- unifyKind (Just (unLoc hs_lhs)) lhs_applied_kind res_kind
-                    -- Check that the result kind of the TyCon applied to its args
-                    -- is compatible with the explicit signature (or Type, if there
-                    -- is none)
 
                   ; traceTc "tcDataFamInstHeader" $
                     vcat [ ppr fam_tc, ppr m_ksig, ppr lhs_applied_kind, ppr res_kind ]
                   ; return ( stupid_theta
                            , lhs_applied_ty
+                           , lhs_applied_kind
                            , res_kind ) }
 
        -- See GHC.Tc.TyCl Note [Generalising in tcFamTyPatsGuts]
@@ -900,12 +901,16 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
        ; (ze, qtvs)   <- zonkTyBndrs qtvs
        ; lhs_ty       <- zonkTcTypeToTypeX ze lhs_ty
        ; stupid_theta <- zonkTcTypesToTypesX ze stupid_theta
-       ; res_kind     <- zonkTcTypeToTypeX ze res_kind
+       ; master_res_kind   <- zonkTcTypeToTypeX ze master_res_kind
+       ; instance_res_kind <- zonkTcTypeToTypeX ze instance_res_kind
 
        -- We check that res_kind is OK with checkDataKindSig in
        -- tcDataFamInstDecl, after eta-expansion.  We need to check that
        -- it's ok because res_kind can come from a user-written kind signature.
        -- See Note [Datatype return kinds], point (4a)
+
+       ; checkDataKindSig (DataInstanceSort new_or_data) master_res_kind
+       ; checkDataKindSig (DataInstanceSort new_or_data) instance_res_kind
 
        -- Check that type patterns match the class instance head
        -- The call to splitTyConApp_maybe here is just an inlining of
@@ -914,7 +919,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
            Just (_, pats) -> pure pats
            Nothing -> pprPanic "tcDataFamInstHeader" (ppr lhs_ty)
 
-       ; return (qtvs, pats, res_kind, stupid_theta) }
+       ; return (qtvs, pats, master_res_kind, stupid_theta) }
   where
     fam_name  = tyConName fam_tc
     data_ctxt = DataKindCtxt fam_name
@@ -973,7 +978,7 @@ however, so this Note aims to describe these subtleties:
 * The representation tycon Drep is parameterised over the free
   variables of the pattern, in no particular order. So there is no
   guarantee that 'p' and 'q' will come last in Drep's parameters, and
-  in the right order.  So, if the /patterns/ of the family insatance
+  in the right order.  So, if the /patterns/ of the family instance
   are eta-reducible, we re-order Drep's parameters to put the
   eta-reduced type variables last.
 

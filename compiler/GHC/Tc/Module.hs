@@ -268,6 +268,14 @@ tcRnModuleTcRnM hsc_env mod_sum
                             then tcRnHsBootDecls hsc_src local_decls
                             else {-# SCC "tcRnSrcDecls" #-}
                                  tcRnSrcDecls explicit_mod_hdr local_decls export_ies
+
+               ; whenM (goptM Opt_DoCoreLinting) $
+                 do { let (warns, errs) = lintGblEnv (hsc_dflags hsc_env) tcg_env
+                    ; mapBagM_ (addWarn NoReason) warns
+                    ; mapBagM_ addErr errs
+                    ; failIfErrsM }  -- if we have a lint error, we're only
+                                     -- going to get in deeper trouble by proceeding
+
                ; setGblEnv tcg_env
                  $ do { -- Process the export list
                         traceRn "rn4a: before exports" empty
@@ -2896,7 +2904,7 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
                 pprUFM (imp_dep_mods imports) (ppr . sort)
          , text "Dependent packages:" <+>
                 ppr (S.toList $ imp_dep_pkgs imports)]
-  where         -- The use of sort is just to reduce unnecessary
+                -- The use of sort is just to reduce unnecessary
                 -- wobbling in testsuite output
 
 ppr_rules :: [LRuleDecl GhcTc] -> SDoc
