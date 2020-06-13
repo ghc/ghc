@@ -59,7 +59,7 @@ a type-level literal. This is done with the functions ``natVal`` and
 These functions are overloaded because they need to return a different
 result, depending on the type at which they are instantiated. ::
 
-    natVal :: KnownNat n => proxy n -> Integer
+    natVal :: KnownNat n => proxy n -> Natural
 
     -- instance KnownNat 0
     -- instance KnownNat 1
@@ -79,7 +79,7 @@ will be unknown at compile-time, so it is hidden in an existential type.
 The conversion may be performed using ``someNatVal`` for integers and
 ``someSymbolVal`` for strings: ::
 
-    someNatVal :: Integer -> Maybe SomeNat
+    someNatVal :: Natural -> Maybe SomeNat
     SomeNat    :: KnownNat n => Proxy n -> SomeNat
 
 The operations on strings are similar.
