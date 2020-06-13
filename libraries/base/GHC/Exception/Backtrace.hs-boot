@@ -1,8 +1,10 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
-module GHC.Exception.Backtrace (Backtrace) where
+module GHC.Exception.Backtrace (Backtrace, showBacktraces) where
 
+import GHC.Base
 import GHC.Show
 
 data Backtrace
-instance Show Backtrace
+
+showBacktraces :: [Backtrace] -> String

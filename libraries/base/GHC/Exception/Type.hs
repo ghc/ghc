@@ -22,14 +22,14 @@ module GHC.Exception.Type
        ( -- * Fundamentals
          Exception(..)
        , SomeException(..)
-       , pattern SomeException
+       , SomeExceptionWithLocation(..)
          -- * Concrete exception types
        , ArithException(..)
        , divZeroException, overflowException, ratioZeroDenomException
        , underflowException
        ) where
 
-import {-# SOURCE #-} GHC.Exception.Backtrace (Backtrace)
+import {-# SOURCE #-} GHC.Exception.Backtrace (Backtrace, showBacktraces)
 
 import Data.Maybe
 import Data.Typeable (Typeable, cast)
@@ -38,26 +38,30 @@ import GHC.Base
 import GHC.Show
 
 {- |
-The @SomeException@ type is the root of the exception type hierarchy.
+The @SomeExceptionWithLocation@ type is the root of the exception type hierarchy.
 When an exception of type @e@ is thrown, behind the scenes it is
 encapsulated in a @SomeException@.
+
+@since 4.16.0.0
 -}
-data SomeException = forall e. Exception e => SomeExceptionWithLocation (Maybe Backtrace) e
+data SomeExceptionWithLocation = forall e. Exception e => SomeExceptionWithLocation [Backtrace] e
+
+{- |
+The @SomeException@ type represents any exception. This used to be the root of
+the exception type hierarchy, although this role is now played by
+'SomeExceptionWithLocation'
+-}
+data SomeException = forall e. Exception e => SomeException e
+
+-- | @since 3.0
+instance Show SomeExceptionWithLocation where
+        -- TODO: Should this obey the usual Show-is-Haskell invariant?
+    showsPrec p (SomeExceptionWithLocation bts e) =
+        showsPrec p e . showString (showBacktraces bts)
 
 -- | @since 3.0
 instance Show SomeException where
-        -- TODO: Should this obey the usual Show-is-Haskell invariant?
-    showsPrec p (SomeExceptionWithLocation mb_bt e) =
-        showsPrec p e <> backtrace
-      where
-        backtrace =
-          case mb_bt of
-            Nothing -> ""
-            Just bt -> "\nBacktrace:\n" <> show bt
-
-pattern SomeException e <- SomeExceptionWithLocation _ e
-  where
-    SomeException e = SomeExceptionWithLocation Nothing e
+    showsPrec p (SomeException e) = showsPrec p e
 
 
 {- |
@@ -147,11 +151,11 @@ Caught MismatchedParentheses
 
 -}
 class (Typeable e, Show e) => Exception e where
-    toException   :: e -> SomeException
-    fromException :: SomeException -> Maybe e
+    toException   :: e -> SomeExceptionWithLocation
+    fromException :: SomeExceptionWithLocation -> Maybe e
 
-    toException = SomeException
-    fromException (SomeException e) = cast e
+    toException = SomeExceptionWithLocation []
+    fromException (SomeExceptionWithLocation _ e) = cast e
 
     -- | Render this exception value in a human-friendly manner.
     --
@@ -161,10 +165,16 @@ class (Typeable e, Show e) => Exception e where
     displayException :: e -> String
     displayException = show
 
--- | @since 3.0
-instance Exception SomeException where
+-- | @since 4.16.0.0
+instance Exception SomeExceptionWithLocation where
     toException se = se
     fromException = Just
+    displayException (SomeExceptionWithLocation bt e) = displayException e <> showBacktraces bt
+
+-- | @since 3.0
+instance Exception SomeException where
+    toException e = SomeExceptionWithLocation [] e
+    fromException (SomeExceptionWithLocation _ e) = Just (SomeException e)
     displayException (SomeException e) = displayException e
 
 -- |Arithmetic exceptions.
@@ -179,7 +189,7 @@ data ArithException
            , Ord -- ^ @since 3.0
            )
 
-divZeroException, overflowException, ratioZeroDenomException, underflowException  :: SomeException
+divZeroException, overflowException, ratioZeroDenomException, underflowException  :: SomeExceptionWithLocation
 divZeroException        = toException DivideByZero
 overflowException       = toException Overflow
 ratioZeroDenomException = toException RatioZeroDenominator

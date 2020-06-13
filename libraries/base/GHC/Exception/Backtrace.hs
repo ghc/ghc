@@ -25,8 +25,13 @@ module GHC.Exception.Backtrace
        ( Backtrace(..)
        , setGlobalBacktraceMechanism
        , getGlobalBacktraceMechanism
+       , showBacktraces
        ) where
 
+import Data.Maybe
+import Data.List
+import GHC.IORef
+import GHC.IO.Unsafe
 import GHC.Ptr
 import GHC.Stack.CCS
 import GHC.Stack
@@ -54,38 +59,39 @@ instance Show Backtrace where
 
 -- | How to collect a backtrace when an exception is thrown.
 data BacktraceMechanism
-    = NoBacktrace
-      -- ^ don't collect a backtrace
-    | CostCenterBacktrace
+    = CostCenterBacktraceMech
       -- ^ collect a cost center stacktrace (only available when built with profiling)
-    | ExecutionStackBacktrace (Maybe Int)
+    | ExecutionStackBacktraceMech (Maybe Int)
       -- ^ use execution stack unwinding with given limit
 
-currentBacktraceMechanism :: IORef BacktraceMechanism
-currentBacktraceMechanism = unsafePerformIO $ mkIORef Nothing
+showBacktraces :: [Backtrace] -> String
+showBacktraces bts = 
+    unlines $ intersperse "" $ map show bts
+
+currentBacktraceMechanism :: IORef [BacktraceMechanism]
+currentBacktraceMechanism = unsafePerformIO $ newIORef []
 {-# NOINLINE currentBacktraceMechanism #-}
 
 -- | Set how 'Control.Exception.throwIO', et al. collect backtraces.
-setGlobalBacktraceMechanism :: BacktraceMechanism -> IO ()
+setGlobalBacktraceMechanism :: [BacktraceMechanism] -> IO ()
 setGlobalBacktraceMechanism = writeIORef currentBacktraceMechanism
 
 -- | Returns the currently selected 'BacktraceMechanism'.
-getGlobalBacktraceMechanism :: IO BacktraceMechanism
+getGlobalBacktraceMechanism :: IO [BacktraceMechanism]
 getGlobalBacktraceMechanism = readIORef currentBacktraceMechanism
 
 -- | Collect a 'Backtrace' via the current global 'BacktraceMechanism'. See
 -- 'setGlobalBacktraceMechanism'.
-collectBacktrace :: IO (Maybe Backtrace)
+collectBacktrace :: IO [Backtrace]
 collectBacktrace = do
     mech <- getGlobalBacktraceMechanism
-    collectBacktrace' mech
+    catMaybes `fmap` mapM collectBacktrace' mech
 
 -- | Collect a 'Backtrace' via the given 'BacktraceMechanism'.
 collectBacktrace' :: BacktraceMechanism -> IO (Maybe Backtrace)
-collectBacktrace' NoBacktrace = Nothing
-collectBacktrace' CostCenterBacktrace = do
-  ptr <- getCurrentCCS ()
-  -- TODO: is the unit here safe? Is this dummy argument really needed? Why
-  -- isn't the state token sufficient?
-  return $ if ptr == nullPtr then Nothing else Just (CostCenterBacktrace ptr)
-collectBacktrace' ExecutionStackBacktrace = fmap ExecutionBacktrace <$> getStackTrace
+collectBacktrace' CostCenterBacktraceMech = do
+    ptr <- getCurrentCCS ()
+    -- TODO: is the unit here safe? Is this dummy argument really needed? Why
+    -- isn't the state token sufficient?
+    return $ if ptr == nullPtr then Nothing else Just (CostCenterBacktrace ptr)
+collectBacktrace' (ExecutionStackBacktraceMech n) = fmap ExecutionBacktrace `fmap` getStackTrace

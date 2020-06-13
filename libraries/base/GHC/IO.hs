@@ -458,5 +458,5 @@ use 'catch' rather than 'catchException'.
 -}
 
 -- For SOURCE import by GHC.Base to define failIO.
-mkUserError       :: [Char]  -> SomeException
+mkUserError       :: [Char]  -> SomeExceptionWithLocation
 mkUserError str   = toException (userError str)
