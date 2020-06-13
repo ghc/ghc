@@ -4,6 +4,10 @@ import Expression
 import Flavour
 import {-# SOURCE #-} Settings.Default
 
+{-
+    TODO use these flags:
+    -fPIC -threaded -static -O2 -optl -static -optP -static
+-}
 -- Please update doc/flavours.md when changing this file.
 staticFlavour :: Flavour
 staticFlavour = defaultFlavour
