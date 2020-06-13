@@ -40,12 +40,14 @@ import GHC.Core.Coercion
 import GHC.Core.FamInstEnv
 import GHC.Types.Basic       ( Boxity(..) )
 import GHC.Core.TyCon
+import GHC.Core.Map (TypeMap, lookupTypeMap, extendTypeMap)
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique
 import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Driver.Session
+import GHC.Data.TrieMap
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
 
@@ -1001,30 +1003,47 @@ findTypeShape :: FamInstEnvs -> Type -> TypeShape
 -- The data type TypeShape is defined in GHC.Types.Demand
 -- See Note [Trimming a demand to a type] in GHC.Core.Opt.DmdAnal
 findTypeShape fam_envs ty
-  = go (setRecTcMaxBound 2 initRecTc) ty
-       -- You might think this bound of 2 is low, but actually
-       -- I think even 1 would be fine.  This only bites for recursive
-       -- product types, which are rare, and we really don't want
-       -- to look deep into such products -- see #18034
-  where
-    go rec_tc ty
-       | Just (_, res) <- splitFunTy_maybe ty
-       = TsFun (go rec_tc res)
+  = go emptyTM ty
+       -- We keep track of types we have seen to avoid looking deep
+       -- into recursive types -- see #18304.
 
+       -- The solution is simple. If a type is recursive one of it's
+       -- fields will eventually mention it's outermost type.
+       -- So we check for this using TypeMap.
+
+       -- TypeMap isn't ideal for this. It covers types we will never
+       -- see here, and it wastes space as it's a map used as set.
+
+       -- This makes this somewhat more expensive (~0.1 allocations)
+       -- than using checkRecTc. But it's more precise as things like
+       -- deeply nested tuples won't bail out early so still desireable.
+
+       -- Implementing a typeset suitable for this use could increase
+       -- performance further if this ever becomes a bottleneck.
+
+  where
+    prodFieldShape :: TypeMap () -> Type -> Type -> TypeShape
+    prodFieldShape tyMap origTy fldTy
+      | Just _ <- lookupTypeMap tyMap' fldTy
+      = TsRecField
+      | otherwise
+      = go tyMap' fldTy
+      where
+        tyMap' = extendTypeMap tyMap origTy ()
+    go tyMap ty
+       | Just (_, res) <- splitFunTy_maybe ty
+       = TsFun (go tyMap res)
+
+       -- Product types
        | Just (tc, tc_args)  <- splitTyConApp_maybe ty
        , Just con <- isDataProductTyCon_maybe tc
-       , Just rec_tc <- if isTupleTyCon tc
-                        then Just rec_tc
-                        else checkRecTc rec_tc tc
-         -- We treat tuples specially because they can't cause loops.
-         -- Maybe we should do so in checkRecTc.
-       = TsProd (map (go rec_tc) (dataConInstArgTys con tc_args))
+       = TsProd (map (prodFieldShape tyMap ty) (dataConInstArgTys con tc_args))
 
        | Just (_, ty') <- splitForAllTy_maybe ty
-       = go rec_tc ty'
+       = go tyMap ty'
 
        | Just (_, ty') <- topNormaliseType_maybe fam_envs ty
-       = go rec_tc ty'
+       = go tyMap ty'
 
        | otherwise
        = TsUnk

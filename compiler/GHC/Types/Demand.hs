@@ -833,6 +833,8 @@ data TypeShape -- See Note [Trimming a demand to a type]
                --     in GHC.Core.Opt.DmdAnal
   = TsFun TypeShape
   | TsProd [TypeShape]
+  | TsRecField -- ^ A field which refers to a type it's a part of.
+               -- e.g. the second field in data T = MkT Int T
   | TsUnk
 
 trimToType :: Demand -> TypeShape -> Demand
@@ -864,6 +866,7 @@ trimToType (JD { sd = ms, ud = mu }) ts
 
 instance Outputable TypeShape where
   ppr TsUnk        = text "TsUnk"
+  ppr TsRecField   = text "TsRecField"
   ppr (TsFun ts)   = text "TsFun" <> parens (ppr ts)
   ppr (TsProd tss) = parens (hsep $ punctuate comma $ map ppr tss)
 
