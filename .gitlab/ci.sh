@@ -443,16 +443,20 @@ case $1 in
   build_make) build_make ;;
   test_make)
     fetch_perf_notes
-    test_make || push_perf_notes
-    push_perf_notes ;;
+    res=0
+    test_make || res=$?
+    push_perf_notes
+    exit $res ;;
   build_hadrian) build_hadrian ;;
   # N.B. Always push notes, even if the build fails. This is okay to do as the
   # testsuite driver doesn't record notes for tests that fail due to
   # correctness.
   test_hadrian)
     fetch_perf_notes
-    test_hadrian || push_perf_notes
-    push_perf_notes ;;
+    res=0
+    test_hadrian || res=$?
+    push_perf_notes
+    exit $res ;;
   run_hadrian) run_hadrian $@ ;;
   clean) clean ;;
   shell) shell $@ ;;
