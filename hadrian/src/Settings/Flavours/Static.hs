@@ -18,6 +18,4 @@ staticArgs = sourceArgs SourceArgs
     , hsGhc      = mconcat
         [ stage0 ? arg "-O"
         , notStage0 ? arg "-O2"
-        , pure [ "-static"
-               , "-optl", "-static"
-               , "-optP", "-static" ] ] }
+        , pure [ "-static" , "-optl", "-static" ] ] }
