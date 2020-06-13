@@ -282,6 +282,7 @@ test('T15517', normal, compile, ['-O0'])
 test('T15517a', normal, compile, ['-O0'])
 test('T15453', normal, compile, ['-dcore-lint -O1'])
 test('T15445', normal, multimod_compile, ['T15445', '-v0 -O -ddump-rule-firings'])
+test('T15630', normal, compile, ['-O2'])
 test('T15631',
      normal,
      makefile_test, ['T15631'])
