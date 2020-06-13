@@ -441,9 +441,18 @@ case $1 in
   setup) setup && cleanup_submodules ;;
   configure) configure ;;
   build_make) build_make ;;
-  test_make) fetch_perf_notes; test_make; push_perf_notes ;;
+  test_make)
+    fetch_perf_notes
+    test_make || push_perf_notes
+    push_perf_notes ;;
   build_hadrian) build_hadrian ;;
-  test_hadrian) fetch_perf_notes; test_hadrian; push_perf_notes ;;
+  # N.B. Always push notes, even if the build fails. This is okay to do as the
+  # testsuite driver doesn't record notes for tests that fail due to
+  # correctness.
+  test_hadrian)
+    fetch_perf_notes
+    test_hadrian || push_perf_notes
+    push_perf_notes ;;
   run_hadrian) run_hadrian $@ ;;
   clean) clean ;;
   shell) shell $@ ;;
