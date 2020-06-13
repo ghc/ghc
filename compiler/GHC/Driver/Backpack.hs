@@ -86,7 +86,7 @@ doBackpack [src_filename] = do
         POk _ pkgname_bkp -> do
             -- OK, so we have an LHsUnit PackageName, but we want an
             -- LHsUnit HsComponentId.  So let's rename it.
-            let pkgstate = pkgState dflags
+            let pkgstate = unitState dflags
             let bkp = renameHsUnits pkgstate (bkpPackageNameMap pkgstate pkgname_bkp) pkgname_bkp
             initBkpM src_filename bkp $
                 forM_ (zip [1..] bkp) $ \(i, lunit) -> do
@@ -171,9 +171,12 @@ withBkpSession cid insts deps session_type do_this = do
         hscTarget   = case session_type of
                         TcSession -> HscNothing
                         _ -> hscTarget dflags,
-        thisUnitIdInsts_ = Just insts,
-        thisComponentId_ = Just cid,
-        thisUnitId =
+        homeUnitInstantiations = insts,
+                                 -- if we don't have any instantiation, don't
+                                 -- fill `homeUnitInstanceOfId` as it makes no
+                                 -- sense (we're not instantiating anything)
+        homeUnitInstanceOfId   = if null insts then Nothing else Just cid,
+        homeUnitId =
             case session_type of
                 TcSession -> newUnitId cid Nothing
                 -- No hash passed if no instances
@@ -191,7 +194,8 @@ withBkpSession cid insts deps session_type do_this = do
         importPaths = [],
         -- Synthesized the flags
         packageFlags = packageFlags dflags ++ map (\(uid0, rn) ->
-          let uid = unwireUnit dflags (improveUnit (unitInfoMap (pkgState dflags)) $ renameHoleUnit (pkgState dflags) (listToUFM insts) uid0)
+          let state = unitState dflags
+              uid = unwireUnit state (improveUnit state $ renameHoleUnit state (listToUFM insts) uid0)
           in ExposePackage
             (showSDoc dflags
                 (text "-unit-id" <+> ppr uid <+> ppr rn))
@@ -199,8 +203,7 @@ withBkpSession cid insts deps session_type do_this = do
       } )) $ do
         dflags <- getSessionDynFlags
         -- pprTrace "flags" (ppr insts <> ppr deps) $ return ()
-        -- Calls initPackages
-        _ <- setSessionDynFlags dflags
+        setSessionDynFlags dflags -- calls initUnits
         do_this
 
 withBkpExeSession :: [(Unit, ModRenaming)] -> BkpM a -> BkpM a
@@ -259,7 +262,7 @@ buildUnit session cid insts lunit = do
     -- The compilation dependencies are just the appropriately filled
     -- in unit IDs which must be compiled before we can compile.
     let hsubst = listToUFM insts
-        deps0 = map (renameHoleUnit (pkgState dflags) hsubst) raw_deps
+        deps0 = map (renameHoleUnit (unitState dflags) hsubst) raw_deps
 
     -- Build dependencies OR make sure they make sense. BUT NOTE,
     -- we can only check the ones that are fully filled; the rest
@@ -272,7 +275,7 @@ buildUnit session cid insts lunit = do
 
     dflags <- getDynFlags
     -- IMPROVE IT
-    let deps = map (improveUnit (unitInfoMap (pkgState dflags))) deps0
+    let deps = map (improveUnit (unitState dflags)) deps0
 
     mb_old_eps <- case session of
                     TcSession -> fmap Just getEpsGhc
@@ -302,6 +305,7 @@ buildUnit session cid insts lunit = do
                       $ home_mod_infos
             getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
             obj_files = concatMap getOfiles linkables
+            state     = unitState (hsc_dflags hsc_env)
 
         let compat_fs = unitIdFS (indefUnit cid)
             compat_pn = PackageName compat_fs
@@ -312,7 +316,7 @@ buildUnit session cid insts lunit = do
             unitPackageId = PackageId compat_fs,
             unitPackageName = compat_pn,
             unitPackageVersion = makeVersion [],
-            unitId = toUnitId (thisPackage dflags),
+            unitId = toUnitId (homeUnit dflags),
             unitComponentName = Nothing,
             unitInstanceOf = cid,
             unitInstantiations = insts,
@@ -326,7 +330,7 @@ buildUnit session cid insts lunit = do
                         -- really used for anything, so we leave it
                         -- blank for now.
                         TcSession -> []
-                        _ -> map (toUnitId . unwireUnit dflags)
+                        _ -> map (toUnitId . unwireUnit state)
                                 $ deps ++ [ moduleUnit mod
                                           | (_, mod) <- insts
                                           , not (isHoleModule mod) ],
@@ -363,7 +367,7 @@ buildUnit session cid insts lunit = do
 
 compileExe :: LHsUnit HsComponentId -> BkpM ()
 compileExe lunit = do
-    msgUnitId mainUnitId
+    msgUnitId mainUnit
     let deps_w_rns = hsunitDeps False (unLoc lunit)
         deps = map fst deps_w_rns
         -- no renaming necessary
@@ -376,30 +380,29 @@ compileExe lunit = do
         ok <- load' LoadAllTargets (Just msg) mod_graph
         when (failed ok) (liftIO $ exitWith (ExitFailure 1))
 
--- | Register a new virtual package database containing a single unit
+-- | Register a new virtual unit database containing a single unit
 addPackage :: GhcMonad m => UnitInfo -> m ()
 addPackage pkg = do
     dflags <- GHC.getSessionDynFlags
-    case pkgDatabase dflags of
+    case unitDatabases dflags of
         Nothing -> panic "addPackage: called too early"
         Just dbs -> do
-         let newdb = PackageDatabase
-               { packageDatabasePath  = "(in memory " ++ showSDoc dflags (ppr (unitId pkg)) ++ ")"
-               , packageDatabaseUnits = [pkg]
+         let newdb = UnitDatabase
+               { unitDatabasePath  = "(in memory " ++ showSDoc dflags (ppr (unitId pkg)) ++ ")"
+               , unitDatabaseUnits = [pkg]
                }
-         _ <- GHC.setSessionDynFlags (dflags { pkgDatabase = Just (dbs ++ [newdb]) })
-         return ()
+         GHC.setSessionDynFlags (dflags { unitDatabases = Just (dbs ++ [newdb]) })
 
 compileInclude :: Int -> (Int, Unit) -> BkpM ()
 compileInclude n (i, uid) = do
     hsc_env <- getSession
-    let dflags = hsc_dflags hsc_env
+    let pkgs = unitState (hsc_dflags hsc_env)
     msgInclude (i, n) uid
     -- Check if we've compiled it already
     case uid of
       HoleUnit   -> return ()
       RealUnit _ -> return ()
-      VirtUnit i -> case lookupUnit dflags uid of
+      VirtUnit i -> case lookupUnit pkgs uid of
         Nothing -> innerBkpM $ compileUnit (instUnitInstanceOf i) (instUnitInsts i)
         Just _  -> return ()
 
@@ -557,14 +560,14 @@ type PackageNameMap a = Map PackageName a
 
 -- For now, something really simple, since we're not actually going
 -- to use this for anything
-unitDefines :: PackageState -> LHsUnit PackageName -> (PackageName, HsComponentId)
+unitDefines :: UnitState -> LHsUnit PackageName -> (PackageName, HsComponentId)
 unitDefines pkgstate (L _ HsUnit{ hsunitName = L _ pn@(PackageName fs) })
     = (pn, HsComponentId pn (mkIndefUnitId pkgstate fs))
 
-bkpPackageNameMap :: PackageState -> [LHsUnit PackageName] -> PackageNameMap HsComponentId
+bkpPackageNameMap :: UnitState -> [LHsUnit PackageName] -> PackageNameMap HsComponentId
 bkpPackageNameMap pkgstate units = Map.fromList (map (unitDefines pkgstate) units)
 
-renameHsUnits :: PackageState -> PackageNameMap HsComponentId -> [LHsUnit PackageName] -> [LHsUnit HsComponentId]
+renameHsUnits :: UnitState -> PackageNameMap HsComponentId -> [LHsUnit PackageName] -> [LHsUnit HsComponentId]
 renameHsUnits pkgstate m units = map (fmap renameHsUnit) units
   where
 
@@ -652,7 +655,7 @@ hsunitModuleGraph dflags unit = do
     --  requirement.
     let node_map = Map.fromList [ ((ms_mod_name n, ms_hsc_src n == HsigFile), n)
                                 | n <- nodes ]
-    req_nodes <- fmap catMaybes . forM (thisUnitIdInsts dflags) $ \(mod_name, _) ->
+    req_nodes <- fmap catMaybes . forM (homeUnitInstantiations dflags) $ \(mod_name, _) ->
         let has_local = Map.member (mod_name, True) node_map
         in if has_local
             then return Nothing

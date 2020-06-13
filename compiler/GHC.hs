@@ -594,10 +594,10 @@ checkBrokenTablesNextToCode' dflags
 -- flags.  If you are not doing linking or doing static linking, you
 -- can ignore the list of packages returned.
 --
-setSessionDynFlags :: GhcMonad m => DynFlags -> m [UnitId]
+setSessionDynFlags :: GhcMonad m => DynFlags -> m ()
 setSessionDynFlags dflags = do
   dflags' <- checkNewDynFlags dflags
-  (dflags''', preload) <- liftIO $ initPackages dflags'
+  dflags''' <- liftIO $ initUnits dflags'
 
   -- Interpreter
   interp  <- if gopt Opt_ExternalInterpreter dflags
@@ -637,12 +637,14 @@ setSessionDynFlags dflags = do
                            -- already one set up
                          }
   invalidateModSummaryCache
-  return preload
 
 -- | Sets the program 'DynFlags'.  Note: this invalidates the internal
 -- cached module graph, causing more work to be done the next time
 -- 'load' is called.
-setProgramDynFlags :: GhcMonad m => DynFlags -> m [UnitId]
+--
+-- Returns a boolean indicating if preload units have changed and need to be
+-- reloaded.
+setProgramDynFlags :: GhcMonad m => DynFlags -> m Bool
 setProgramDynFlags dflags = setProgramDynFlags_ True dflags
 
 -- | Set the action taken when the compiler produces a message.  This
@@ -654,17 +656,17 @@ setLogAction action = do
   void $ setProgramDynFlags_ False $
     dflags' { log_action = action }
 
-setProgramDynFlags_ :: GhcMonad m => Bool -> DynFlags -> m [UnitId]
+setProgramDynFlags_ :: GhcMonad m => Bool -> DynFlags -> m Bool
 setProgramDynFlags_ invalidate_needed dflags = do
   dflags' <- checkNewDynFlags dflags
   dflags_prev <- getProgramDynFlags
-  (dflags'', preload) <-
-    if (packageFlagsChanged dflags_prev dflags')
-       then liftIO $ initPackages dflags'
-       else return (dflags', [])
+  let changed = packageFlagsChanged dflags_prev dflags'
+  dflags'' <- if changed
+               then liftIO $ initUnits dflags'
+               else return dflags'
   modifySession $ \h -> h{ hsc_dflags = dflags'' }
   when invalidate_needed $ invalidateModSummaryCache
-  return preload
+  return changed
 
 
 -- When changing the DynFlags, we want the changes to apply to future
@@ -699,7 +701,7 @@ getProgramDynFlags = getSessionDynFlags
 -- | Set the 'DynFlags' used to evaluate interactive expressions.
 -- Note: this cannot be used for changes to packages.  Use
 -- 'setSessionDynFlags', or 'setProgramDynFlags' and then copy the
--- 'pkgState' into the interactive @DynFlags@.
+-- 'unitState' into the interactive @DynFlags@.
 setInteractiveDynFlags :: GhcMonad m => DynFlags -> m ()
 setInteractiveDynFlags dflags = do
   dflags' <- checkNewDynFlags dflags
@@ -1355,7 +1357,7 @@ packageDbModules :: GhcMonad m =>
                  -> m [Module]
 packageDbModules only_exposed = do
    dflags <- getSessionDynFlags
-   let pkgs = eltsUFM (unitInfoMap (pkgState dflags))
+   let pkgs = eltsUFM (unitInfoMap (unitState dflags))
    return $
      [ mkModule pid modname
      | p <- pkgs
@@ -1489,7 +1491,7 @@ findModule :: GhcMonad m => ModuleName -> Maybe FastString -> m Module
 findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
   let
     dflags   = hsc_dflags hsc_env
-    this_pkg = thisPackage dflags
+    this_pkg = homeUnit dflags
   --
   case maybe_pkg of
     Just pkg | fsToUnit pkg /= this_pkg && pkg /= fsLit "this" -> liftIO $ do
@@ -1677,9 +1679,11 @@ interpretPackageEnv dflags = do
   where
     -- Loading environments (by name or by location)
 
+    platformArchOs = platformMini (targetPlatform dflags)
+
     namedEnvPath :: String -> MaybeT IO FilePath
     namedEnvPath name = do
-     appdir <- versionedAppDir dflags
+     appdir <- versionedAppDir (programName dflags) platformArchOs
      return $ appdir </> "environments" </> name
 
     probeEnvName :: String -> MaybeT IO FilePath
@@ -1716,7 +1720,7 @@ interpretPackageEnv dflags = do
 
     -- e.g. .ghc.environment.x86_64-linux-7.6.3
     localEnvFileName :: FilePath
-    localEnvFileName = ".ghc.environment" <.> versionedFilePath dflags
+    localEnvFileName = ".ghc.environment" <.> versionedFilePath platformArchOs
 
     -- Search for an env file, starting in the current dir and looking upwards.
     -- Fail if we get to the users home dir or the filesystem root. That is,

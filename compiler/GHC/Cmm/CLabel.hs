@@ -186,7 +186,7 @@ data CLabel
 
   -- | A label from a .cmm file that is not associated with a .hs level Id.
   | CmmLabel
-        Unit                    -- what package the label belongs to.
+        UnitId                  -- what package the label belongs to.
         FastString              -- identifier giving the prefix of the label
         CmmLabelInfo            -- encodes the suffix of the label
 
@@ -552,7 +552,7 @@ mkSRTInfoLabel n = CmmLabel rtsUnitId lbl CmmInfo
 -----
 mkCmmInfoLabel,   mkCmmEntryLabel, mkCmmRetInfoLabel, mkCmmRetLabel,
   mkCmmCodeLabel, mkCmmDataLabel,  mkCmmClosureLabel
-        :: Unit -> FastString -> CLabel
+        :: UnitId -> FastString -> CLabel
 
 mkCmmInfoLabel      pkg str     = CmmLabel pkg str CmmInfo
 mkCmmEntryLabel     pkg str     = CmmLabel pkg str CmmEntry
@@ -583,7 +583,7 @@ mkApEntryLabel       upd off    = RtsLabel (RtsApEntry           upd off)
 -- A call to some primitive hand written Cmm code
 mkPrimCallLabel :: PrimCall -> CLabel
 mkPrimCallLabel (PrimCall str pkg)
-        = CmmLabel pkg str CmmPrimCall
+        = CmmLabel (toUnitId pkg) str CmmPrimCall
 
 
 -- Constructing ForeignLabels
@@ -1032,7 +1032,7 @@ labelDynamic config this_mod lbl =
   case lbl of
    -- is the RTS in a DLL or not?
    RtsLabel _ ->
-     externalDynamicRefs && (this_pkg /= rtsUnitId)
+     externalDynamicRefs && (this_pkg /= rtsUnit)
 
    IdLabel n _ _ ->
      externalDynamicRefs && isDynLinkName platform this_mod n
@@ -1040,7 +1040,7 @@ labelDynamic config this_mod lbl =
    -- When compiling in the "dyn" way, each package is to be linked into
    -- its own shared library.
    CmmLabel pkg _ _
-    | os == OSMinGW32 -> externalDynamicRefs && (this_pkg /= pkg)
+    | os == OSMinGW32 -> externalDynamicRefs && (toUnitId this_pkg /= pkg)
     | otherwise       -> externalDynamicRefs
 
    LocalBlockLabel _    -> False
@@ -1169,11 +1169,11 @@ instance Outputable CLabel where
 
 pprCLabel :: DynFlags -> CLabel -> SDoc
 pprCLabel dflags = \case
-   (LocalBlockLabel u) -> tempLabelPrefixOrUnderscore <> pprUniqueAlways u
+   (LocalBlockLabel u) -> tempLabelPrefixOrUnderscore platform <> pprUniqueAlways u
 
    (AsmTempLabel u)
       | not (platformUnregisterised platform)
-      -> tempLabelPrefixOrUnderscore <> pprUniqueAlways u
+      -> tempLabelPrefixOrUnderscore platform <> pprUniqueAlways u
 
    (AsmTempDerivedLabel l suf)
       | useNCG
@@ -1231,8 +1231,8 @@ pprCLabel dflags = \case
 pprCLbl :: DynFlags -> CLabel -> SDoc
 pprCLbl dflags = \case
    (StringLitLabel u)   -> pprUniqueAlways u <> text "_str"
-   (SRTLabel u)         -> tempLabelPrefixOrUnderscore <> pprUniqueAlways u <> pp_cSEP <> text "srt"
-   (LargeBitmapLabel u) -> tempLabelPrefixOrUnderscore
+   (SRTLabel u)         -> tempLabelPrefixOrUnderscore platform <> pprUniqueAlways u <> pp_cSEP <> text "srt"
+   (LargeBitmapLabel u) -> tempLabelPrefixOrUnderscore platform
                            <> char 'b' <> pprUniqueAlways u <> pp_cSEP <> text "btm"
                            -- Some bitmaps for tuple constructors have a numeric tag (e.g. '7')
                            -- until that gets resolved we'll just force them to start
@@ -1242,7 +1242,7 @@ pprCLbl dflags = \case
    (CmmLabel _ str CmmData)     -> ftext str
    (CmmLabel _ str CmmPrimCall) -> ftext str
 
-   (LocalBlockLabel u) -> tempLabelPrefixOrUnderscore <> text "blk_" <> pprUniqueAlways u
+   (LocalBlockLabel u) -> tempLabelPrefixOrUnderscore platform <> text "blk_" <> pprUniqueAlways u
 
    (RtsLabel (RtsApFast str)) -> ftext str <> text "_fast"
 
@@ -1290,7 +1290,7 @@ pprCLbl dflags = \case
 
    (ForeignLabel str _ _ _) -> ftext str
 
-   (IdLabel name _cafs flavor) -> internalNamePrefix name <> ppr name <> ppIdFlavor flavor
+   (IdLabel name _cafs flavor) -> internalNamePrefix platform name <> ppr name <> ppIdFlavor flavor
 
    (CC_Label cc)       -> ppr cc
    (CCS_Label ccs)     -> ppr ccs
@@ -1301,6 +1301,8 @@ pprCLbl dflags = \case
    (DynamicLinkerLabel {})  -> panic "pprCLbl DynamicLinkerLabel"
    (PicBaseLabel {})        -> panic "pprCLbl PicBaseLabel"
    (DeadStripPreventer {})  -> panic "pprCLbl DeadStripPreventer"
+  where
+   platform = targetPlatform dflags
 
 ppIdFlavor :: IdLabelInfo -> SDoc
 ppIdFlavor x = pp_cSEP <> text
@@ -1331,21 +1333,20 @@ instance Outputable ForeignLabelSource where
         ForeignLabelInThisPackage       -> parens $ text "this package"
         ForeignLabelInExternalPackage   -> parens $ text "external package"
 
-internalNamePrefix :: Name -> SDoc
-internalNamePrefix name = getPprStyle $ \ sty ->
+internalNamePrefix :: Platform -> Name -> SDoc
+internalNamePrefix platform name = getPprStyle $ \ sty ->
   if asmStyle sty && isRandomGenerated then
-    sdocWithDynFlags $ \dflags ->
-      ptext (asmTempLabelPrefix (targetPlatform dflags))
+      ptext (asmTempLabelPrefix platform)
   else
     empty
   where
     isRandomGenerated = not $ isExternalName name
 
-tempLabelPrefixOrUnderscore :: SDoc
-tempLabelPrefixOrUnderscore = sdocWithDynFlags $ \dflags ->
+tempLabelPrefixOrUnderscore :: Platform -> SDoc
+tempLabelPrefixOrUnderscore platform =
   getPprStyle $ \ sty ->
    if asmStyle sty then
-      ptext (asmTempLabelPrefix (targetPlatform dflags))
+      ptext (asmTempLabelPrefix platform)
    else
       char '_'
 
