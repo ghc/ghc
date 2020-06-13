@@ -50,12 +50,14 @@ mkExtraObj dflags extn xs
                     else asmOpts ccInfo)
       return oFile
     where
+      pkgs = unitState dflags
+
       -- Pass a different set of options to the C compiler depending one whether
       -- we're compiling C or assembler. When compiling C, we pass the usual
       -- set of include directories and PIC flags.
       cOpts = map Option (picCCOpts dflags)
                     ++ map (FileOption "-I")
-                            (unitIncludeDirs $ unsafeGetUnitInfo dflags rtsUnitId)
+                            (unitIncludeDirs $ unsafeLookupUnit pkgs rtsUnit)
 
       -- When compiling assembler code, we drop the usual C options, and if the
       -- compiler is Clang, we add an extra argument to tell Clang to ignore
@@ -168,9 +170,9 @@ mkNoteObjsToLinkIntoBinary dflags dep_packages = do
 -- See Note [LinkInfo section]
 getLinkInfo :: DynFlags -> [UnitId] -> IO String
 getLinkInfo dflags dep_packages = do
-   package_link_opts <- getPackageLinkOpts dflags dep_packages
+   package_link_opts <- getUnitLinkOpts dflags dep_packages
    pkg_frameworks <- if platformUsesFrameworks (targetPlatform dflags)
-                     then getPackageFrameworks dflags dep_packages
+                     then getUnitFrameworks dflags dep_packages
                      else return []
    let extra_ld_inputs = ldInputs dflags
    let

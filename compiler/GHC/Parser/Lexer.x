@@ -55,7 +55,7 @@ module GHC.Parser.Lexer (
    appendError,
    allocateComments,
    MonadP(..),
-   getRealSrcLoc, getPState, withThisPackage,
+   getRealSrcLoc, getPState, withHomeUnitId,
    failMsgP, failLocMsgP, srcParseFail,
    getErrorMessages, getMessages,
    popContext, pushModuleContext, setLastToken, setSrcLoc,
@@ -2088,7 +2088,7 @@ warnopt f options = f `EnumSet.member` pWarningFlags options
 -- See 'mkParserFlags' or 'mkParserFlags'' for ways to construct this.
 data ParserFlags = ParserFlags {
     pWarningFlags   :: EnumSet WarningFlag
-  , pThisPackage    :: Unit        -- ^ key of package currently being compiled
+  , pHomeUnitId     :: UnitId      -- ^ unit currently being compiled
   , pExtsBitmap     :: !ExtsBitmap -- ^ bitmap of permitted extensions
   }
 
@@ -2183,8 +2183,8 @@ failLocMsgP loc1 loc2 str =
 getPState :: P PState
 getPState = P $ \s -> POk s s
 
-withThisPackage :: (Unit -> a) -> P a
-withThisPackage f = P $ \s@(PState{options = o}) -> POk s (f (pThisPackage o))
+withHomeUnitId :: (UnitId -> a) -> P a
+withHomeUnitId f = P $ \s@(PState{options = o}) -> POk s (f (pHomeUnitId o))
 
 getExts :: P ExtsBitmap
 getExts = P $ \s -> POk s (pExtsBitmap . options $ s)
@@ -2500,7 +2500,7 @@ pragState dynflags buf loc = (mkPState dynflags buf loc) {
 mkParserFlags'
   :: EnumSet WarningFlag        -- ^ warnings flags enabled
   -> EnumSet LangExt.Extension  -- ^ permitted language extensions enabled
-  -> Unit                       -- ^ key of package currently being compiled
+  -> UnitId                     -- ^ id of the unit currently being compiled
   -> Bool                       -- ^ are safe imports on?
   -> Bool                       -- ^ keeping Haddock comment tokens
   -> Bool                       -- ^ keep regular comment tokens
@@ -2512,12 +2512,12 @@ mkParserFlags'
 
   -> ParserFlags
 -- ^ Given exactly the information needed, set up the 'ParserFlags'
-mkParserFlags' warningFlags extensionFlags thisPackage
+mkParserFlags' warningFlags extensionFlags homeUnitId
   safeImports isHaddock rawTokStream usePosPrags =
     ParserFlags {
       pWarningFlags = warningFlags
-    , pThisPackage = thisPackage
-    , pExtsBitmap = safeHaskellBit .|. langExtBits .|. optBits
+    , pHomeUnitId   = homeUnitId
+    , pExtsBitmap   = safeHaskellBit .|. langExtBits .|. optBits
     }
   where
     safeHaskellBit = SafeHaskellBit `setBitIf` safeImports
@@ -2578,7 +2578,7 @@ mkParserFlags =
   mkParserFlags'
     <$> DynFlags.warningFlags
     <*> DynFlags.extensionFlags
-    <*> DynFlags.thisPackage
+    <*> DynFlags.homeUnitId
     <*> safeImportsOn
     <*> gopt Opt_Haddock
     <*> gopt Opt_KeepRawTokenStream

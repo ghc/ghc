@@ -350,8 +350,17 @@ test ('WWRec',
       ['-v0 -O'])
 
 test('T16190',
-      [req_th, collect_compiler_stats()],
+      [ req_th,
+        unless(have_ncg(), skip), # T16190 tests a NCG feature
+        collect_compiler_stats()
+      ],
       multimod_compile,
       ['T16190.hs', '-v0'])
 
 test('T16473', normal, makefile_test, ['T16473'])
+
+test ('T18304',
+      [ collect_compiler_stats('bytes allocated',2)
+      ],
+      compile,
+      ['-v0 -O'])

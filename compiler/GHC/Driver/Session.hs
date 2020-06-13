@@ -66,7 +66,7 @@ module GHC.Driver.Session (
 
         addWay', updateWays,
 
-        thisPackage, thisComponentId, thisUnitIdInsts,
+        homeUnit, mkHomeModule, isHomeModule,
 
         -- ** Log output
         putLogMsg,
@@ -254,7 +254,7 @@ import GHC.Unit.Module
 import {-# SOURCE #-} GHC.Driver.Plugins
 import {-# SOURCE #-} GHC.Driver.Hooks
 import GHC.Builtin.Names ( mAIN )
-import {-# SOURCE #-} GHC.Unit.State (PackageState, emptyPackageState, PackageDatabase, mkIndefUnitId, updateIndefUnitId)
+import {-# SOURCE #-} GHC.Unit.State (UnitState, emptyUnitState, UnitDatabase, updateIndefUnitId)
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Flags
 import GHC.Driver.Ways
@@ -528,9 +528,9 @@ data DynFlags = DynFlags {
   solverIterations      :: IntWithInf,   -- ^ Number of iterations in the constraints solver
                                          --   Typically only 1 is needed
 
-  thisUnitId   :: UnitId,              -- ^ Target unit-id
-  thisComponentId_      :: Maybe IndefUnitId,            -- ^ Unit-id to instantiate
-  thisUnitIdInsts_      :: Maybe [(ModuleName, Module)], -- ^ How to instantiate the unit-id above
+  homeUnitId            :: UnitId,                 -- ^ Target home unit-id
+  homeUnitInstanceOfId  :: Maybe IndefUnitId,      -- ^ Unit-id to instantiate
+  homeUnitInstantiations:: [(ModuleName, Module)], -- ^ How to instantiate `homeUnitInstanceOfId` unit
 
   -- ways
   ways                  :: Set Way,     -- ^ Way flags from the command line
@@ -617,7 +617,7 @@ data DynFlags = DynFlags {
         -- *reverse* order that they're specified on the command line.
         -- This is intended to be applied with the list of "initial"
         -- package databases derived from @GHC_PACKAGE_PATH@; see
-        -- 'getPackageConfRefs'.
+        -- 'getUnitDbRefs'.
 
   ignorePackageFlags    :: [IgnorePackageFlag],
         -- ^ The @-ignore-package@ flags from the command line.
@@ -634,21 +634,18 @@ data DynFlags = DynFlags {
   packageEnv            :: Maybe FilePath,
         -- ^ Filepath to the package environment file (if overriding default)
 
-  pkgDatabase           :: Maybe [PackageDatabase UnitId],
-        -- ^ Stack of package databases for the target platform.
+  unitDatabases         :: Maybe [UnitDatabase UnitId],
+        -- ^ Stack of unit databases for the target platform.
         --
-        -- A "package database" is a misleading name as it is really a Unit
-        -- database (cf Note [About Units]).
-        --
-        -- This field is populated by `initPackages`.
+        -- This field is populated by `initUnits`.
         --
         -- 'Nothing' means the databases have never been read from disk. If
-        -- `initPackages` is called again, it doesn't reload the databases from
+        -- `initUnits` is called again, it doesn't reload the databases from
         -- disk.
 
-  pkgState              :: PackageState,
-        -- ^ Consolidated unit database built by 'initPackages' from the package
-        -- databases in 'pkgDatabase' and flags ('-ignore-package', etc.).
+  unitState             :: UnitState,
+        -- ^ Consolidated unit database built by 'initUnits' from the unit
+        -- databases in 'unitDatabases' and flags ('-ignore-package', etc.).
         --
         -- It also contains mapping from module names to actual Modules.
 
@@ -1008,14 +1005,14 @@ tablesNextToCode = platformMisc_tablesNextToCode . platformMisc
 -- | The directory for this version of ghc in the user's app directory
 -- (typically something like @~/.ghc/x86_64-linux-7.6.3@)
 --
-versionedAppDir :: DynFlags -> MaybeT IO FilePath
-versionedAppDir dflags = do
+versionedAppDir :: String -> PlatformMini -> MaybeT IO FilePath
+versionedAppDir appname platform = do
   -- Make sure we handle the case the HOME isn't set (see #11678)
-  appdir <- tryMaybeT $ getAppUserDataDirectory (programName dflags)
-  return $ appdir </> versionedFilePath dflags
+  appdir <- tryMaybeT $ getAppUserDataDirectory appname
+  return $ appdir </> versionedFilePath platform
 
-versionedFilePath :: DynFlags -> FilePath
-versionedFilePath dflags = uniqueSubdir $ platformMini $ targetPlatform dflags
+versionedFilePath :: PlatformMini -> FilePath
+versionedFilePath platform = uniqueSubdir platform
 
 -- | The target code type of the compilation (if any).
 --
@@ -1329,9 +1326,9 @@ defaultDynFlags mySettings llvmConfig =
         reductionDepth          = treatZeroAsInf mAX_REDUCTION_DEPTH,
         solverIterations        = treatZeroAsInf mAX_SOLVER_ITERATIONS,
 
-        thisUnitId     = toUnitId mainUnitId,
-        thisUnitIdInsts_        = Nothing,
-        thisComponentId_        = Nothing,
+        homeUnitId              = mainUnitId,
+        homeUnitInstanceOfId    = Nothing,
+        homeUnitInstantiations  = [],
 
         objectDir               = Nothing,
         dylibInstallName        = Nothing,
@@ -1379,8 +1376,8 @@ defaultDynFlags mySettings llvmConfig =
         ignorePackageFlags      = [],
         trustFlags              = [],
         packageEnv              = Nothing,
-        pkgDatabase             = Nothing,
-        pkgState                = emptyPackageState,
+        unitDatabases           = Nothing,
+        unitState               = emptyUnitState,
         ways                    = defaultWays mySettings,
         buildTag                = waysTag (defaultWays mySettings),
         splitInfo               = Nothing,
@@ -1961,34 +1958,31 @@ setOutputHi   f d = d { outputHi   = f}
 setJsonLogAction :: DynFlags -> DynFlags
 setJsonLogAction d = d { log_action = jsonLogAction }
 
-thisComponentId :: DynFlags -> IndefUnitId
-thisComponentId dflags =
-  let pkgstate = pkgState dflags
-  in case thisComponentId_ dflags of
-    Just uid -> updateIndefUnitId pkgstate uid
-    Nothing  ->
-      case thisUnitIdInsts_ dflags of
-        Just _  ->
-          throwGhcException $ CmdLineError ("Use of -instantiated-with requires -this-component-id")
-        Nothing -> mkIndefUnitId pkgstate (unitFS (thisPackage dflags))
+-- | Make a module in home unit
+mkHomeModule :: DynFlags -> ModuleName -> Module
+mkHomeModule dflags = mkModule (homeUnit dflags)
 
-thisUnitIdInsts :: DynFlags -> [(ModuleName, Module)]
-thisUnitIdInsts dflags =
-    case thisUnitIdInsts_ dflags of
-        Just insts -> insts
-        Nothing    -> []
+-- | Test if the module comes from the home unit
+isHomeModule :: DynFlags -> Module -> Bool
+isHomeModule dflags m = moduleUnit m == homeUnit dflags
 
-thisPackage :: DynFlags -> Unit
-thisPackage dflags =
-    case thisUnitIdInsts_ dflags of
-        Nothing -> default_uid
-        Just insts
-          | all (\(x,y) -> mkHoleModule x == y) insts
-          -> mkVirtUnit (thisComponentId dflags) insts
-          | otherwise
-          -> default_uid
-  where
-    default_uid = RealUnit (Definite (thisUnitId dflags))
+-- | Get home unit
+homeUnit :: DynFlags -> Unit
+homeUnit dflags =
+   case (homeUnitInstanceOfId dflags, homeUnitInstantiations dflags) of
+      (Nothing,[]) -> RealUnit (Definite (homeUnitId dflags))
+      (Nothing, _) -> throwGhcException $ CmdLineError ("Use of -instantiated-with requires -this-component-id")
+      (Just _, []) -> throwGhcException $ CmdLineError ("Use of -this-component-id requires -instantiated-with")
+      (Just u, is)
+         -- detect fully indefinite units: all their instantiations are hole
+         -- modules and the home unit id is the same as the instantiating unit
+         -- id (see Note [About units] in GHC.Unit)
+         | all (isHoleModule . snd) is && indefUnit u == homeUnitId dflags
+         -> mkVirtUnit (updateIndefUnitId (unitState dflags) u) is
+         -- otherwise it must be that we compile a fully definite units
+         -- TODO: error when the unit is partially instantiated??
+         | otherwise
+         -> RealUnit (Definite (homeUnitId dflags))
 
 parseUnitInsts :: String -> Instantiations
 parseUnitInsts str = case filter ((=="").snd) (readP_to_S parse str) of
@@ -2001,13 +1995,13 @@ parseUnitInsts str = case filter ((=="").snd) (readP_to_S parse str) of
             m <- parseHoleyModule
             return (n, m)
 
-setUnitIdInsts :: String -> DynFlags -> DynFlags
-setUnitIdInsts s d =
-    d { thisUnitIdInsts_ = Just (parseUnitInsts s) }
+setUnitInstantiations :: String -> DynFlags -> DynFlags
+setUnitInstantiations s d =
+    d { homeUnitInstantiations = parseUnitInsts s }
 
-setComponentId :: String -> DynFlags -> DynFlags
-setComponentId s d =
-    d { thisComponentId_ = Just (Indefinite (UnitId (fsLit s)) Nothing) }
+setUnitInstanceOf :: String -> DynFlags -> DynFlags
+setUnitInstanceOf s d =
+    d { homeUnitInstanceOfId = Just (Indefinite (UnitId (fsLit s)) Nothing) }
 
 addPluginModuleName :: String -> DynFlags -> DynFlags
 addPluginModuleName name d = d { pluginModNames = (mkModuleName name) : (pluginModNames d) }
@@ -2330,8 +2324,8 @@ dynamic_flags_deps = [
                  -- as specifying that the number of
                  -- parallel builds is equal to the
                  -- result of getNumProcessors
-  , make_ord_flag defFlag "instantiated-with"   (sepArg setUnitIdInsts)
-  , make_ord_flag defFlag "this-component-id"   (sepArg setComponentId)
+  , make_ord_flag defFlag "instantiated-with"   (sepArg setUnitInstantiations)
+  , make_ord_flag defFlag "this-component-id"   (sepArg setUnitInstanceOf)
 
     -- RTS options -------------------------------------------------------------
   , make_ord_flag defFlag "H"           (HasArg (\s -> upd (\d ->
@@ -4588,20 +4582,20 @@ parseUnitArg =
     fmap UnitIdArg parseUnit
 
 setUnitId :: String -> DynFlags -> DynFlags
-setUnitId p d = d { thisUnitId = stringToUnitId p }
+setUnitId p d = d { homeUnitId = stringToUnitId p }
 
 -- | Given a 'ModuleName' of a signature in the home library, find
 -- out how it is instantiated.  E.g., the canonical form of
 -- A in @p[A=q[]:A]@ is @q[]:A@.
 canonicalizeHomeModule :: DynFlags -> ModuleName -> Module
 canonicalizeHomeModule dflags mod_name =
-    case lookup mod_name (thisUnitIdInsts dflags) of
-        Nothing  -> mkModule (thisPackage dflags) mod_name
+    case lookup mod_name (homeUnitInstantiations dflags) of
+        Nothing  -> mkHomeModule dflags mod_name
         Just mod -> mod
 
 canonicalizeModuleIfHome :: DynFlags -> Module -> Module
 canonicalizeModuleIfHome dflags mod
-    = if thisPackage dflags == moduleUnit mod
+    = if homeUnit dflags == moduleUnit mod
                       then canonicalizeHomeModule dflags (moduleName mod)
                       else mod
 
@@ -4640,10 +4634,10 @@ setMainIs arg
   | not (null main_fn) && isLower (head main_fn)
      -- The arg looked like "Foo.Bar.baz"
   = upd $ \d -> d { mainFunIs = Just main_fn,
-                   mainModIs = mkModule mainUnitId (mkModuleName main_mod) }
+                   mainModIs = mkModule mainUnit (mkModuleName main_mod) }
 
   | isUpper (head arg)  -- The arg looked like "Foo" or "Foo.Bar"
-  = upd $ \d -> d { mainModIs = mkModule mainUnitId (mkModuleName arg) }
+  = upd $ \d -> d { mainModIs = mkModule mainUnit (mkModuleName arg) }
 
   | otherwise                   -- The arg looked like "baz"
   = upd $ \d -> d { mainFunIs = Just arg }
