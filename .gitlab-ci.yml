@@ -185,7 +185,8 @@ lint-release-changelogs:
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
     - .gitlab/ci.sh build_hadrian
-    - .gitlab/ci.sh test_hadrian
+      #!!!
+      #- .gitlab/ci.sh test_hadrian
   cache:
     key: hadrian
     paths:
@@ -693,7 +694,8 @@ build-x86_64-linux-alpine-hadrian:
   variables:
     INTEGER_LIBRARY: integer-simple
     TEST_ENV: "x86_64-linux-alpine"
-    FLAVOUR: "static"
+    #FLAVOUR: "static"
+    FLAVOUR: "perf"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-alpine-linux.tar.xz"
     # Can't use ld.gold due to #13958.
     CONFIGURE_ARGS: "--disable-ld-override"
