@@ -8,10 +8,10 @@ import {-# SOURCE #-} Settings.Default
 staticFlavour :: Flavour
 staticFlavour = defaultFlavour
     { name = "static"
-    , args = defaultBuilderArgs <> performanceArgs <> defaultPackageArgs }
+    , args = defaultBuilderArgs <> staticArgs <> defaultPackageArgs }
 
-performanceArgs :: Args
-performanceArgs = sourceArgs SourceArgs
+staticArgs :: Args
+staticArgs = sourceArgs SourceArgs
     { hsDefault  = pure ["-O", "-H64m"]
     , hsLibrary  = notStage0 ? arg "-O2"
     , hsCompiler = pure ["-O2"]
