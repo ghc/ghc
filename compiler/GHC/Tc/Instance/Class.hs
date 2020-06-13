@@ -259,12 +259,12 @@ Note [KnownNat & KnownSymbol and EvLit]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A part of the type-level literals implementation are the classes
 "KnownNat" and "KnownSymbol", which provide a "smart" constructor for
-defining singleton values.  Here is the key stuff from GHC.TypeLits
+defining singleton values.  Here is the key stuff from GHC.TypeNats
 
   class KnownNat (n :: Nat) where
     natSing :: SNat n
 
-  newtype SNat (n :: Nat) = SNat Integer
+  newtype SNat (n :: Nat) = SNat Natural
 
 Conceptually, this class has infinitely many instances:
 
@@ -291,10 +291,10 @@ Also note that `natSing` and `SNat` are never actually exposed from the
 library---they are just an implementation detail.  Instead, users see
 a more convenient function, defined in terms of `natSing`:
 
-  natVal :: KnownNat n => proxy n -> Integer
+  natVal :: KnownNat n => proxy n -> Natural
 
 The reason we don't use this directly in the class is that it is simpler
-and more efficient to pass around an integer rather than an entire function,
+and more efficient to pass around a Natural rather than an entire function,
 especially when the `KnowNat` evidence is packaged up in an existential.
 
 The story for kind `Symbol` is analogous:

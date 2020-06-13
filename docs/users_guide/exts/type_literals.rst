@@ -10,10 +10,10 @@ Numeric literals are of kind ``Nat``, while string literals are of kind
 extension.
 
 The kinds of the literals and all other low-level operations for this
-feature are defined in module ``GHC.TypeLits``. Note that the module
-defines some type-level operators that clash with their value-level
-counterparts (e.g. ``(+)``). Import and export declarations referring to
-these operators require an explicit namespace annotation (see
+feature are defined in modules ``GHC.TypeLits`` and ``GHC.TypeNats``.
+Note that these modules define some type-level operators that clash with their
+value-level counterparts (e.g. ``(+)``). Import and export declarations
+referring to these operators require an explicit namespace annotation (see
 :ref:`explicit-namespaces`).
 
 Here is an example of using type-level numeric literals to provide a
@@ -59,7 +59,8 @@ a type-level literal. This is done with the functions ``natVal`` and
 These functions are overloaded because they need to return a different
 result, depending on the type at which they are instantiated. ::
 
-    natVal :: KnownNat n => proxy n -> Integer
+    natVal :: KnownNat n => proxy n -> Natural  -- from GHC.TypeNats
+    natVal :: KnownNat n => proxy n -> Integer  -- from GHC.TypeLits
 
     -- instance KnownNat 0
     -- instance KnownNat 1
@@ -79,7 +80,9 @@ will be unknown at compile-time, so it is hidden in an existential type.
 The conversion may be performed using ``someNatVal`` for integers and
 ``someSymbolVal`` for strings: ::
 
-    someNatVal :: Integer -> Maybe SomeNat
+    someNatVal :: Natural -> Maybe SomeNat  -- from GHC.TypeNats
+    someNatVal :: Integer -> Maybe SomeNat  -- from GHC.TypeLits
+
     SomeNat    :: KnownNat n => Proxy n -> SomeNat
 
 The operations on strings are similar.
