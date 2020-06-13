@@ -48,6 +48,7 @@ import GHC.Types.Unique.Set
 ************************************************************************
 -}
 
+{-# NOINLINE dmdAnalProgram #-}
 dmdAnalProgram :: DynFlags -> FamInstEnvs -> CoreProgram -> IO CoreProgram
 dmdAnalProgram dflags fam_envs binds = do
   let env             = emptyAnalEnv dflags fam_envs
@@ -1252,7 +1253,14 @@ findBndrDmd env arg_of_dfun dmd_ty id
   = (dmd_ty', dmd')
   where
     dmd' = strictify $
-           trimToType starting_dmd (findTypeShape fam_envs id_ty)
+          --  pprTrace "trimToType"
+          --     (ppr id <> text "::" <> ppr id_ty $$
+          --      text "shape" <+> ppr (findTypeShape fam_envs id_ty) $$
+          --     (text "untrimmed" <+> ppr starting_dmd) $$
+          --     (text "trimmed" <+> ppr (trimToType starting_dmd (findTypeShape fam_envs id_ty))))
+          --     $
+
+                trimToType starting_dmd (findTypeShape fam_envs id_ty)
 
     (dmd_ty', starting_dmd) = peelFV dmd_ty id
 
