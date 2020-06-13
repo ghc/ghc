@@ -333,8 +333,8 @@ Redirecting the compilation output(s)
     :category:
 
     The ``-outputdir`` option is shorthand for the combination of
-    :ghc-flag:`-odir ⟨dir⟩`, :ghc-flag:`-hidir ⟨dir⟩`, :ghc-flag:`-stubdir
-    ⟨dir⟩` and :ghc-flag:`-dumpdir ⟨dir⟩`.
+    :ghc-flag:`-odir ⟨dir⟩`, :ghc-flag:`-hidir ⟨dir⟩`, :ghc-flag:`-hiedir ⟨dir⟩`, 
+    :ghc-flag:`-stubdir ⟨dir⟩` and :ghc-flag:`-dumpdir ⟨dir⟩`.
 
 .. ghc-flag:: -osuf ⟨suffix⟩
     :shortdesc: set the output file suffix
