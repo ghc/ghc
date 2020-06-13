@@ -16,7 +16,7 @@ module GHC.Event.Thread
     , blockedOnBadFD -- used by RTS
     ) where
 -- TODO: Use new Windows I/O manager
-import Control.Exception (finally, SomeException, toException)
+import Control.Exception (finally, SomeExceptionWithLocation, toException)
 import Data.Foldable (forM_, mapM_, sequence_)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Maybe (fromMaybe)
@@ -126,7 +126,7 @@ threadWait evt fd = mask_ $ do
     else return ()
 
 -- used at least by RTS in 'select()' IO manager backend
-blockedOnBadFD :: SomeException
+blockedOnBadFD :: SomeExceptionWithLocation
 blockedOnBadFD = toException $ errnoToIOError "awaitEvent" eBADF Nothing Nothing
 
 threadWaitSTM :: Event -> Fd -> IO (STM (), IO ())

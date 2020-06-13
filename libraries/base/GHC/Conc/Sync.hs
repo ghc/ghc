@@ -386,14 +386,14 @@ numSparks = IO $ \s -> case numSparks# s of (# s', n #) -> (# s', I# n #)
 
 foreign import ccall "&enabled_capabilities" enabled_capabilities :: Ptr CInt
 
-childHandler :: SomeException -> IO ()
+childHandler :: SomeExceptionWithLocation -> IO ()
 childHandler err = catch (real_handler err) childHandler
   -- We must use catch here rather than catchException. If the
   -- raised exception throws an (imprecise) exception, then real_handler err
   -- will do so as well. If we use catchException here, then we could miss
   -- that exception.
 
-real_handler :: SomeException -> IO ()
+real_handler :: SomeExceptionWithLocation -> IO ()
 real_handler se
   | Just BlockedIndefinitelyOnMVar <- fromException se  =  return ()
   | Just BlockedIndefinitelyOnSTM  <- fromException se  =  return ()
@@ -886,7 +886,7 @@ reportStackOverflow = do
      ThreadId tid <- myThreadId
      c_reportStackOverflow tid
 
-reportError :: SomeException -> IO ()
+reportError :: SomeExceptionWithLocation -> IO ()
 reportError ex = do
    handler <- getUncaughtExceptionHandler
    handler ex
@@ -900,11 +900,11 @@ foreign import ccall unsafe "reportHeapOverflow"
         reportHeapOverflow :: IO ()
 
 {-# NOINLINE uncaughtExceptionHandler #-}
-uncaughtExceptionHandler :: IORef (SomeException -> IO ())
+uncaughtExceptionHandler :: IORef (SomeExceptionWithLocation -> IO ())
 uncaughtExceptionHandler = unsafePerformIO (newIORef defaultHandler)
    where
-      defaultHandler :: SomeException -> IO ()
-      defaultHandler se@(SomeException ex) = do
+      defaultHandler :: SomeExceptionWithLocation -> IO ()
+      defaultHandler se@(SomeExceptionWithLocation _ ex) = do
          (hFlush stdout) `catchAny` (\ _ -> return ())
          let msg = case cast ex of
                Just Deadlock -> "no threads to run:  infinite loop or deadlock?"
@@ -918,8 +918,8 @@ uncaughtExceptionHandler = unsafePerformIO (newIORef defaultHandler)
 foreign import ccall unsafe "HsBase.h errorBelch2"
    errorBelch :: CString -> CString -> IO ()
 
-setUncaughtExceptionHandler :: (SomeException -> IO ()) -> IO ()
+setUncaughtExceptionHandler :: (SomeExceptionWithLocation -> IO ()) -> IO ()
 setUncaughtExceptionHandler = writeIORef uncaughtExceptionHandler
 
-getUncaughtExceptionHandler :: IO (SomeException -> IO ())
+getUncaughtExceptionHandler :: IO (SomeExceptionWithLocation -> IO ())
 getUncaughtExceptionHandler = readIORef uncaughtExceptionHandler

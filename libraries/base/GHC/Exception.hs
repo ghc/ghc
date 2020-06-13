@@ -2,6 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude
            , ExistentialQuantification
            , MagicHash
+           , UnboxedTuples
            , RecordWildCards
            , PatternSynonyms
   #-}
@@ -41,13 +42,18 @@ import Data.List (intercalate, reverse) -- TODO: remove import list?
 import GHC.Prim
 import GHC.IO.Unsafe
 import {-# SOURCE #-} GHC.Stack.CCS
+import {-# SOURCE #-} GHC.Exception.Backtrace (collectBacktrace)
 import GHC.Exception.Type
 
 -- | Throw an exception.  Exceptions may be thrown from purely
 -- functional code, but may only be caught within the 'IO' monad.
 throw :: forall (r :: RuntimeRep). forall (a :: TYPE r). forall e.
          Exception e => e -> a
-throw e = raise# (toException e)
+throw e = runRW# (\s0 ->
+    case unIO collectBacktrace s0 of
+      (# s1, bts #) ->
+        let e' = foldr addBacktrace (toException e) bts
+        in raise# e' )
 
 -- | This is thrown when the user calls 'error'. The first @String@ is the
 -- argument given to 'error', second @String@ is the location.
@@ -71,10 +77,10 @@ instance Show ErrorCall where
   showsPrec _ (ErrorCallWithLocation err loc) =
       showString err . showChar '\n' . showString loc
 
-errorCallException :: String -> SomeException
+errorCallException :: String -> SomeExceptionWithLocation
 errorCallException s = toException (ErrorCall s)
 
-errorCallWithCallStackException :: String -> CallStack -> SomeException
+errorCallWithCallStackException :: String -> CallStack -> SomeExceptionWithLocation
 errorCallWithCallStackException s stk = unsafeDupablePerformIO $ do
   ccsStack <- currentCallStack
   let

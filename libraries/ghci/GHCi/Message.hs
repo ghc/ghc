@@ -408,13 +408,13 @@ data SerializableException
   | EOtherException String
   deriving (Generic, Show)
 
-toSerializableException :: SomeException -> SerializableException
+toSerializableException :: SomeExceptionWithLocation -> SerializableException
 toSerializableException ex
   | Just UserInterrupt <- fromException ex  = EUserInterrupt
   | Just (ec::ExitCode) <- fromException ex = (EExitCode ec)
-  | otherwise = EOtherException (show (ex :: SomeException))
+  | otherwise = EOtherException (show (ex :: SomeExceptionWithLocation))
 
-fromSerializableException :: SerializableException -> SomeException
+fromSerializableException :: SerializableException -> SomeExceptionWithLocation
 fromSerializableException EUserInterrupt = toException UserInterrupt
 fromSerializableException (EExitCode c) = toException c
 fromSerializableException (EOtherException str) = toException (ErrorCall str)

@@ -476,7 +476,7 @@ hGetContents' handle = do
             Just ioe -> throwIO (augmentIOError ioe "hGetContents'" handle)
             Nothing -> throwIO e
 
-strictRead :: Handle -> Handle__ -> IO (Handle__, Either SomeException String)
+strictRead :: Handle -> Handle__ -> IO (Handle__, Either SomeExceptionWithLocation String)
 strictRead h handle_@Handle__{..} = do
     cbuf <- readIORef haCharBuffer
     cbufs <- strictReadLoop' handle_ [] cbuf
