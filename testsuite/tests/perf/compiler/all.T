@@ -346,6 +346,11 @@ test ('T15164',
       ],
       compile,
       ['-v0 -O'])
+test('T15630',
+      [collect_compiler_stats()
+      ],
+      compile,
+      ['-O2'])
 
 # See https://gitlab.haskell.org/ghc/ghc/merge_requests/312#note_186960
 test ('WWRec',
