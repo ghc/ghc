@@ -915,7 +915,9 @@ zonkExpr env (XExpr (HsWrap co_fn expr))
 zonkExpr _ e@(HsUnboundVar {})
   = return e
 
-zonkExpr _ expr = pprPanic "zonkExpr" (ppr expr)
+zonkExpr _ e@(HsBracket _ _) = pprPanic "zonkExpr" (ppr e)
+zonkExpr _ e@(HsTick _ _ _) = pprPanic "zonkExpr" (ppr e)
+zonkExpr _ e@(HsBinTick _ _ _ _) = pprPanic "zonkExpr" (ppr e)
 
 -------------------------------------------------------------------------
 {-

@@ -482,7 +482,6 @@ type family XXRoleAnnotDecl  x
 type family XVar            x
 type family XUnboundVar     x
 type family XConLikeOut     x
-type family XRecFld         x
 type family XOverLabel      x
 type family XIPVar          x
 type family XOverLitE       x
@@ -509,7 +508,6 @@ type family XRecordUpd      x
 type family XExprWithTySig  x
 type family XArithSeq       x
 type family XBracket        x
-type family XRnBracketOut   x
 type family XTcBracketOut   x
 type family XSpliceE        x
 type family XProc           x

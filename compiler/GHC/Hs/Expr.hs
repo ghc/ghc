@@ -654,7 +654,6 @@ type instance XArithSeq      GhcTc = PostTcExpr
 
 type instance XBracket       (GhcPass _) = NoExtField
 
-type instance XRnBracketOut  (GhcPass _) = NoExtField
 type instance XTcBracketOut  (GhcPass _) = NoExtField
 
 type instance XSpliceE       (GhcPass _) = NoExtField
