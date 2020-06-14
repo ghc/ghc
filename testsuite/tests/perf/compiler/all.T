@@ -364,6 +364,14 @@ test('T16190',
 
 test('T16473', normal, makefile_test, ['T16473'])
 
+test('T17516',
+      [ collect_compiler_stats(),
+        extra_clean(['T17516A.hi', 'T17516A.o'])
+      ],
+      multimod_compile,
+      ['T17516', '-O -v0'])
+
+
 test ('T18304',
       [ collect_compiler_stats('bytes allocated',2)
       ],
