@@ -6,7 +6,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <Winsock2.h>
+#include <winsock2.h>
 #include <windows.h>
 #include <io.h>
 #include <math.h>
