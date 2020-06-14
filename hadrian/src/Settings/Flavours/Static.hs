@@ -13,13 +13,8 @@ staticFlavour = defaultFlavour
 staticArgs :: Args
 staticArgs = sourceArgs SourceArgs
     { hsDefault  = pure ["-O", "-H64m"]
-
-    , hsLibrary  = mconcat
-        [ notStage0 ? arg "-O2"
-        , pure ["-staticlib"]
-
+    , hsLibrary  = notStage0 ? arg "-O2"
     , hsCompiler = pure ["-O2"]
-
     , hsGhc      = mconcat
         [ stage0 ? arg "-O"
         , notStage0 ? arg "-O2"
