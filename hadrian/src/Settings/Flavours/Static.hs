@@ -19,6 +19,4 @@ staticArgs = sourceArgs SourceArgs
         [ stage0 ? arg "-O"
         , notStage0 ? arg "-O2"
         , pure [ "-static" , "-optl", "-static" ]
-        , pure [ "-optl", "-L/lib" ]
-        , pure [ "-optl", "-L/usr/lib" ]
         ] }
