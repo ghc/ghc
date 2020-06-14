@@ -2520,7 +2520,7 @@ files like <progname>.eventlog, not arbitrary files.
 
 bool is_io_mng_native_p (void)
 {
-#if defined (mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
   return RtsFlags.MiscFlags.ioManager == IO_MNGR_NATIVE;
 #else
   return false;
