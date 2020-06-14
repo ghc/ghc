@@ -220,7 +220,6 @@ Library
         GHC.Environment
         GHC.Err
         GHC.Event.TimeOut
-        GHC.Event.Windows.ConsoleEvent
         GHC.Exception
         GHC.Exception.Type
         GHC.ExecutionStack
@@ -406,6 +405,7 @@ Library
             GHC.Windows
             GHC.Event.Windows
             GHC.Event.Windows.Clock
+            GHC.Event.Windows.ConsoleEvent
             GHC.Event.Windows.FFI
             GHC.Event.Windows.ManagedThreadPool
             GHC.Event.Windows.Thread
