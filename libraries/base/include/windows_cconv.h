@@ -1,4 +1,4 @@
-#ifndef __WINDOWS_CCONV_H
+#if !defined(__WINDOWS_CCONV_H)
 #define __WINDOWS_CCONV_H
 
 #if defined(i386_HOST_ARCH)
