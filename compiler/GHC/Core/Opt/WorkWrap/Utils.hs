@@ -570,7 +570,7 @@ Does 'main' print "error 1" or "error no"?  We don't really want 'f'
 to unbox its second argument.  This actually happened in GHC's onwn
 source code, in Packages.applyPackageFlag, which ended up un-boxing
 the enormous DynFlags tuple, and being strict in the
-as-yet-un-filled-in unitState files.
+as-yet-un-filled-in pkgState files.
 -}
 
 ----------------------
@@ -1003,7 +1003,7 @@ findTypeShape :: FamInstEnvs -> Type -> TypeShape
 -- The data type TypeShape is defined in GHC.Types.Demand
 -- See Note [Trimming a demand to a type] in GHC.Core.Opt.DmdAnal
 findTypeShape fam_envs ty
-  = go emptyTM (setRecTcMaxBound 2 initRecTc) ty
+  = go emptyTM (setRecTcMaxBound 4 initRecTc) ty
        -- You might think this bound of 2 is low, but actually
        -- I think even 1 would be fine.  This only bites for recursive
        -- product types, which are rare, and we really don't want
@@ -1011,8 +1011,16 @@ findTypeShape fam_envs ty
   where
     fieldShape :: TypeMap () -> RecTcChecker -> Type -> Type -> TypeShape
     fieldShape tyMap rec_tc origTy fldTy
-      | Just _ <- lookupTypeMap tyMap' fldTy = TsRecField
-      | otherwise = go tyMap' rec_tc fldTy
+      | Just _ <- lookupTypeMap tyMap' fldTy
+      = TsRecField
+
+      -- | Just (tc, tc_args)  <- splitTyConApp_maybe fldTy
+      -- , Just rec_tc' <- checkRecTc rec_tc tc
+      -- = go tyMap' rec_tc fldTy
+
+      | otherwise
+      = go tyMap' rec_tc fldTy
+
       where
         tyMap' = extendTypeMap tyMap origTy ()
     go tyMap rec_tc ty
