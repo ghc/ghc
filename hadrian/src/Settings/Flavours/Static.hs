@@ -16,12 +16,11 @@ staticArgs = sourceArgs SourceArgs
 
     , hsLibrary  = mconcat
         [ notStage0 ? arg "-O2"
-        , pure ["-staticlib"]
+        , pure ["-staticlib"] ]
 
     , hsCompiler = pure ["-O2"]
 
     , hsGhc      = mconcat
         [ stage0 ? arg "-O"
         , notStage0 ? arg "-O2"
-        , pure [ "-static" , "-optl", "-static" ]
-        ] }
+        , pure [ "-static" , "-optl", "-static" ] ] }
