@@ -1003,14 +1003,14 @@ findTypeShape :: FamInstEnvs -> Type -> TypeShape
 -- The data type TypeShape is defined in GHC.Types.Demand
 -- See Note [Trimming a demand to a type] in GHC.Core.Opt.DmdAnal
 findTypeShape fam_envs ty
-  = go emptyTM (setRecTcMaxBound 4 initRecTc) ty
+  = go emptyTM ty
        -- You might think this bound of 2 is low, but actually
        -- I think even 1 would be fine.  This only bites for recursive
        -- product types, which are rare, and we really don't want
        -- to look deep into such products -- see #18034
   where
-    fieldShape :: TypeMap () -> RecTcChecker -> Type -> Type -> TypeShape
-    fieldShape tyMap rec_tc origTy fldTy
+    fieldShape :: TypeMap () -> Type -> Type -> TypeShape
+    fieldShape tyMap origTy fldTy
       | Just _ <- lookupTypeMap tyMap' fldTy
       = TsRecField
 
@@ -1019,38 +1019,38 @@ findTypeShape fam_envs ty
       -- = go tyMap' rec_tc fldTy
 
       | otherwise
-      = go tyMap' rec_tc fldTy
+      = go tyMap' fldTy
 
       where
         tyMap' = extendTypeMap tyMap origTy ()
-    go tyMap rec_tc ty
+    go tyMap ty
        | Just (_, res) <- splitFunTy_maybe ty
-       = TsFun (go tyMap rec_tc res)
+       = TsFun (go tyMap res)
 
        -- Tuples are never recursive
        | Just (tc, tc_args)  <- splitTyConApp_maybe ty
        , Just con <- isDataProductTyCon_maybe tc
        , isTupleTyCon tc
-       = TsProd (map (go tyMap rec_tc) (dataConInstArgTys con tc_args))
+       = TsProd (map (go tyMap) (dataConInstArgTys con tc_args))
 
+       -- Other product types
        | Just (tc, tc_args)  <- splitTyConApp_maybe ty
        , Just con <- isDataProductTyCon_maybe tc
-      --  , fieldTys <- dataConInstArgTys con
-       = TsProd (map (fieldShape tyMap rec_tc ty) (dataConInstArgTys con tc_args))
+       = TsProd (map (fieldShape tyMap ty) (dataConInstArgTys con tc_args))
 
-       -- Check for recursion using rec_tc
-       | Just (tc, tc_args)  <- splitTyConApp_maybe ty
-       , Just con <- isDataProductTyCon_maybe tc
-       , Just rec_tc <- checkRecTc rec_tc tc
-         -- We treat tuples specially because they can't cause loops.
-         -- Maybe we should do so in checkRecTc.
-       =     TsProd (map (go tyMap rec_tc) (dataConInstArgTys con tc_args))
+      --  -- Check for recursion using rec_tc
+      --  | Just (tc, tc_args)  <- splitTyConApp_maybe ty
+      --  , Just con <- isDataProductTyCon_maybe tc
+      --  , Just rec_tc <- checkRecTc rec_tc tc
+      --    -- We treat tuples specially because they can't cause loops.
+      --    -- Maybe we should do so in checkRecTc.
+      --  =     TsProd (map (go tyMap rec_tc) (dataConInstArgTys con tc_args))
 
        | Just (_, ty') <- splitForAllTy_maybe ty
-       = go tyMap rec_tc ty'
+       = go tyMap ty'
 
        | Just (_, ty') <- topNormaliseType_maybe fam_envs ty
-       = go tyMap rec_tc ty'
+       = go tyMap ty'
 
        | otherwise
        = TsUnk
