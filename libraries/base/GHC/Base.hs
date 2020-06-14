@@ -595,6 +595,19 @@ class Functor f => Applicative f where
     -- A few functors support an implementation of '<*>' that is more
     -- efficient than the default one.
     --
+    -- ==== __Example__
+    -- Used in combination with @(<$>)@, '<*>' can be used to build a record.
+    --
+    -- > data MyState = MyState {arg1 :: Foo, arg2 :: Bar, arg3 :: Baz}
+    --
+    -- > produceFoo :: Applicative f => f Foo
+    -- > produceBar :: Applicative f => f Bar
+    -- > produceBaz :: Applicative f => f Baz
+    --
+    -- > mkState :: Applicative f => f MyState
+    -- > mkState = MyState <$> produceFoo
+    --                     <*> produceBar
+    --                     <*> produceBaz
     (<*>) :: f (a -> b) -> f a -> f b
     (<*>) = liftA2 id
 
