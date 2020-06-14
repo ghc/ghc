@@ -166,14 +166,14 @@ getClosureData = getClosureDataX getClosureRaw
 -- @collect_pointers()@ in @rts/Heap.c@.
 --
 -- For most use cases 'getClosureData' is an easier to use alternative.
-getClosureX :: forall a b .
-            (a -> IO (Ptr StgInfoTable, [Word], [b]))
+getClosureX :: forall a b.
+            (forall c . c -> IO (Ptr StgInfoTable, [Word], [b]))
             -- ^ Helper function to get info table, memory and pointers of the
             -- closure
             -> a -- ^ Closure to decode
             -> IO (GenClosure b) -- ^ Heap representation of the closure
 getClosureX get_closure_raw x = do
-    (iptr, wds, pts) <- get_closure_raw x
+    (iptr, wds, pts) <- get_closure_raw (unsafeCoerce# x)
     itbl <- peekItbl iptr
     -- The remaining words after the header
     let rawWds = drop (closureTypeHeaderSize (tipe itbl)) wds
