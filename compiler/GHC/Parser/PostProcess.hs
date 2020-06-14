@@ -120,6 +120,8 @@ import GHC.Builtin.Types( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
                           listTyConName, listTyConKey, eqTyCon_RDR,
                           tupleTyConName, cTupleTyConNameArity_maybe )
+import GHC.Builtin.Types.Prim ( funTyConName )
+import GHC.Builtin.Names ( funTyConKey )
 import GHC.Types.ForeignCall
 import GHC.Builtin.Names ( allNameStrings )
 import GHC.Types.SrcLoc
@@ -771,6 +773,9 @@ ty_con_data_con tc
 
   | tc `hasKey` listTyConKey
   = Exact nilDataConName
+
+  | tc `hasKey` funTyConKey
+  = Exact funTyConName  -- Used in T16999
 
   | otherwise  -- See Note [setRdrNameSpace for wired-in names]
   = Unqual (setOccNameSpace srcDataName (getOccName tc))
