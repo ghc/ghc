@@ -114,7 +114,7 @@ rnBracket e br_body
                           setStage (Brack cur_stage (RnPendingUntyped ps_var)) $
                                    rn_bracket cur_stage br_body
                         ; pendings <- readMutVar ps_var
-                        ; return (HsRnBracketOut noExtField body' pendings, fvs_e) }
+                        ; return (XExpr (HsRnBracketOut body' pendings), fvs_e) }
        }
 
 rn_bracket :: ThStage -> HsBracket GhcPs -> RnM (HsBracket GhcRn, FreeVars)

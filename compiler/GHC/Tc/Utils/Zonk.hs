@@ -762,9 +762,6 @@ zonkExpr env (HsAppType ty e t)
        return (HsAppType new_ty new_e t)
        -- NB: the type is an HsType; can't zonk that!
 
-zonkExpr _ e@(HsRnBracketOut _ _ _)
-  = pprPanic "zonkExpr: HsRnBracketOut" (ppr e)
-
 zonkExpr env (HsTcBracketOut x wrap body bs)
   = do wrap' <- traverse zonkQuoteWrap wrap
        bs' <- mapM (zonk_b env) bs

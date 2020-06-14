@@ -1142,10 +1142,6 @@ instance HiePass p => ToHie (LHsExpr (GhcPass p)) where
       HsBracket _ b ->
         [ toHie b
         ]
-      HsRnBracketOut _ b p ->
-        [ toHie b
-        , toHie p
-        ]
       HsTcBracketOut _ _wrap b p ->
         [ toHie b
         , toHie p
@@ -1157,6 +1153,11 @@ instance HiePass p => ToHie (LHsExpr (GhcPass p)) where
         | GhcRn <- ghcPass @p
         , HsRecFld fld <- x
         -> [ toHie $ RFC RecFieldOcc Nothing (L mspan fld)
+           ]
+        | GhcRn <- ghcPass @p
+        , HsRnBracketOut b p <- x
+        -> [ toHie b
+           , toHie p
            ]
         | GhcTc <- ghcPass @p
         , HsWrap w a <- x

@@ -623,7 +623,6 @@ addTickHsExpr (HsPragE x p e) =
         liftM (HsPragE x p) (addTickLHsExpr e)
 addTickHsExpr e@(HsBracket     {})   = return e
 addTickHsExpr e@(HsTcBracketOut  {}) = return e
-addTickHsExpr e@(HsRnBracketOut  {}) = return e
 addTickHsExpr e@(HsSpliceE  {})      = return e
 addTickHsExpr (HsProc x pat cmdtop) =
         liftM2 (HsProc x)

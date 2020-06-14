@@ -1014,7 +1014,7 @@ tcExpr (HsSpliceE _ (HsSpliced _ mod_finalizers (HsSplicedExpr expr)))
        tcExpr expr res_ty
 tcExpr (HsSpliceE _ splice)          res_ty = tcSpliceExpr splice res_ty
 tcExpr e@(HsBracket _ brack)         res_ty = tcTypedBracket e brack res_ty
-tcExpr e@(HsRnBracketOut _ brack ps) res_ty = tcUntypedBracket e brack ps res_ty
+tcExpr e@(XExpr (HsRnBracketOut brack ps)) res_ty = tcUntypedBracket e brack ps res_ty
 
 {-
 ************************************************************************

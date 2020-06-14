@@ -490,12 +490,6 @@ data HsExpr p
   | HsBracket    (XBracket p) (HsBracket p)
 
     -- See Note [Pending Splices]
-  | HsRnBracketOut
-      (XRnBracketOut p)
-      (HsBracket GhcRn)    -- Output of the renamer is the *original* renamed
-                           -- expression, plus
-      [PendingRnSplice]    -- _renamed_ splices to be type checked
-
   | HsTcBracketOut
       (XTcBracketOut p)
       (Maybe QuoteWrapper) -- The wrapper to apply type and dictionary argument
@@ -584,7 +578,14 @@ data HsWrap hs_syn = HsWrap HsWrapper      -- the wrapper
 
 deriving instance (Data (hs_syn GhcTc), Typeable hs_syn) => Data (HsWrap hs_syn)
 
-data HsRecFld = HsRecFld (AmbiguousFieldOcc GhcRn)  -- ^ Variable pointing to record selector
+data HsRnXExpr = HsRecFld (AmbiguousFieldOcc GhcRn)  -- ^ Variable pointing to record selector
+
+                 -- See Note [Pending Splices]
+               | HsRnBracketOut
+                  (HsBracket GhcRn)    -- Output of the renamer is the *original* renamed
+                                       -- expression, plus
+                  [PendingRnSplice]    -- _renamed_ splices to be type checked
+
 
 -- ---------------------------------------------------------------------
 
@@ -669,7 +670,7 @@ type instance XBinTick       (GhcPass _) = NoExtField
 type instance XPragE         (GhcPass _) = NoExtField
 
 type instance XXExpr         GhcPs       = NoExtCon
-type instance XXExpr         GhcRn       = HsRecFld
+type instance XXExpr         GhcRn       = HsRnXExpr
 type instance XXExpr         GhcTc       = HsWrap HsExpr
 
 -- ---------------------------------------------------------------------
@@ -1060,8 +1061,6 @@ ppr_expr (ArithSeq _ _ info) = brackets (ppr info)
 
 ppr_expr (HsSpliceE _ s)         = pprSplice s
 ppr_expr (HsBracket _ b)         = pprHsBracket b
-ppr_expr (HsRnBracketOut _ e []) = ppr e
-ppr_expr (HsRnBracketOut _ e ps) = ppr e $$ text "pending(rn)" <+> ppr ps
 ppr_expr (HsTcBracketOut _ _wrap e []) = ppr e
 ppr_expr (HsTcBracketOut _ _wrap e ps) = ppr e $$ text "pending(tc)" <+> pprIfTc @p (ppr ps)
 
@@ -1089,6 +1088,8 @@ ppr_expr (XExpr x) = case ghcPass @p of
 #endif
   GhcRn -> case x of
     HsRecFld f -> ppr f
+    HsRnBracketOut e [] -> ppr e
+    HsRnBracketOut e ps -> ppr e $$ text "pending(rn)" <+> ppr ps
   GhcTc -> case x of
     HsWrap co_fn e -> pprHsWrapper co_fn (\parens -> if parens then pprExpr e
                                                       else pprExpr e)
@@ -1194,7 +1195,6 @@ hsExprNeedsParens p = go
     go (HsPragE{})                    = p >= appPrec
     go (HsSpliceE{})                  = False
     go (HsBracket{})                  = False
-    go (HsRnBracketOut{})             = False
     go (HsTcBracketOut{})             = False
     go (HsProc{})                     = p > topPrec
     go (HsStatic{})                   = p >= appPrec
@@ -1204,6 +1204,10 @@ hsExprNeedsParens p = go
     go (XExpr x)
       | GhcRn <- ghcPass @p
       , HsRecFld{} <- x
+      = False
+
+      | GhcRn <- ghcPass @p
+      , HsRnBracketOut{} <- x
       = False
 
       | GhcTc <- ghcPass @p

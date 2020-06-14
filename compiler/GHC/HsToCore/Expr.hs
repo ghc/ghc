@@ -771,7 +771,6 @@ Thus, we pass @r@ as the scrutinee expression to @matchWrapper@ above.
 
 -- Template Haskell stuff
 
-dsExpr (HsRnBracketOut _ _ _)  = panic "dsExpr HsRnBracketOut"
 dsExpr (HsTcBracketOut _ hs_wrapper x ps) = dsBracket hs_wrapper x ps
 dsExpr (HsSpliceE _ s)         = pprPanic "dsExpr:splice" (ppr s)
 
