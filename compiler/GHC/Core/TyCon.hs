@@ -167,6 +167,7 @@ import GHC.Settings.Constants
 import GHC.Utils.Misc
 import GHC.Types.Unique( tyConRepNameUnique, dataConTyRepNameUnique )
 import GHC.Types.Unique.Set
+import GHC.Types.Unique.FM
 import GHC.Unit.Module
 
 import qualified Data.Data as Data
@@ -2746,13 +2747,16 @@ good to be able to unwrap multiple layers.
 The function that manages all this is checkRecTc.
 -}
 
-data RecTcChecker = RC !Int (NameEnv Int)
+data RecTcChecker = RC !Int (UniqFM Int)
   -- The upper bound, and the number of times
   -- we have encountered each TyCon
+  -- We use UniqFM since:
+  -- * Conveniently tyCons already have uniques to identenfy them
+  -- * Insertion order does not matter for this use case
 
 -- | Initialise a 'RecTcChecker' with 'defaultRecTcMaxBound'.
 initRecTc :: RecTcChecker
-initRecTc = RC defaultRecTcMaxBound emptyNameEnv
+initRecTc = RC defaultRecTcMaxBound emptyUFM
 
 -- | The default upper bound (100) for the number of times a 'RecTcChecker' is
 -- allowed to encounter each 'TyCon'.
@@ -2769,12 +2773,15 @@ checkRecTc :: RecTcChecker -> TyCon -> Maybe RecTcChecker
 -- Nothing      => Recursion detected
 -- Just rec_tcs => Keep going
 checkRecTc (RC bound rec_nts) tc
-  = case lookupNameEnv rec_nts tc_name of
+  | isTupleTyCon tc
+  = Just (RC bound rec_nts)
+  | otherwise
+  = case lookupUFM rec_nts tc_unique of
       Just n | n >= bound -> Nothing
-             | otherwise  -> Just (RC bound (extendNameEnv rec_nts tc_name (n+1)))
-      Nothing             -> Just (RC bound (extendNameEnv rec_nts tc_name 1))
+             | otherwise  -> Just (RC bound (addToUFM rec_nts tc_unique $! (n+1)))
+      Nothing             -> Just (RC bound (addToUFM rec_nts tc_unique 1))
   where
-    tc_name = tyConName tc
+    tc_unique = tyConUnique tc
 
 -- | Returns whether or not this 'TyCon' is definite, or a hole
 -- that may be filled in at some later point.  See Note [Skolem abstract data]
