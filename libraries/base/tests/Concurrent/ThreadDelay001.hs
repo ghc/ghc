@@ -12,7 +12,7 @@ module Main (main) where
 import Control.Concurrent
 import Control.Monad
 import Data.Time
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 import GHC.Event.Windows.Clock
 #endif
 main :: IO ()
@@ -20,7 +20,7 @@ main = mapM_ delay (0 : take 7 (iterate (*5) 100))
 
 delay :: Int -> IO ()
 delay n = do
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
   !sec_start <- getClock >>= getTime
   threadDelay n
   !sec_end <- getClock >>= getTime
