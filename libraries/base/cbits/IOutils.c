@@ -226,7 +226,7 @@ __is_console(HANDLE hFile)
     return true;
 }
 
-#ifndef ENABLE_VIRTUAL_TERMINAL_INPUT
+#if !defined(ENABLE_VIRTUAL_TERMINAL_INPUT)
 #define ENABLE_VIRTUAL_TERMINAL_INPUT 0x0200
 #endif
 
