@@ -1305,7 +1305,7 @@ get_op :: LHsExpr GhcRn -> OpName
 -- See GHC.Rename.Expr.rnUnboundVar
 get_op (L _ (HsVar _ n))         = NormalOp (unLoc n)
 get_op (L _ (HsUnboundVar _ uv)) = UnboundOp uv
-get_op (L _ (HsRecFld _ fld))    = RecFldOp fld
+get_op (L _ (XExpr (HsRecFld fld))) = RecFldOp fld
 get_op other                     = pprPanic "get_op" (ppr other)
 
 -- Parser left-associates everything, but

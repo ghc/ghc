@@ -754,7 +754,6 @@ instance HiePass p => HasType (LHsExpr (GhcPass p)) where
             HsVar{}          -> False
             HsUnboundVar{}   -> False
             HsConLikeOut{}   -> False
-            HsRecFld{}       -> False
             HsOverLabel{}    -> False
             HsIPVar{}        -> False
             XExpr (HsWrap{}) -> False
@@ -1042,9 +1041,6 @@ instance HiePass p => ToHie (LHsExpr (GhcPass p)) where
       HsConLikeOut _ con ->
         [ toHie $ C Use $ L mspan $ conLikeName con
         ]
-      HsRecFld _ fld ->
-        [ toHie $ RFC RecFieldOcc Nothing (L mspan fld)
-        ]
       HsOverLabel _ _ _ -> []
       HsIPVar _ _ -> []
       HsOverLit _ _ -> []
@@ -1158,6 +1154,10 @@ instance HiePass p => ToHie (LHsExpr (GhcPass p)) where
         [ toHie $ L mspan x
         ]
       XExpr x
+        | GhcRn <- ghcPass @p
+        , HsRecFld fld <- x
+        -> [ toHie $ RFC RecFieldOcc Nothing (L mspan fld)
+           ]
         | GhcTc <- ghcPass @p
         , HsWrap w a <- x
         -> [ toHie $ L mspan a

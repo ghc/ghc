@@ -396,12 +396,12 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
 
        ; tcWrapResult expr expr' op_res_ty res_ty }
 
-  | L loc (HsRecFld _ (Ambiguous _ lbl)) <- op
+  | L loc (XExpr (HsRecFld (Ambiguous _ lbl))) <- op
   , Just sig_ty <- obviousSig (unLoc arg1)
     -- See Note [Disambiguating record fields]
   = do { sig_tc_ty <- tcHsSigWcType ExprSigCtxt sig_ty
        ; sel_name <- disambiguateSelector lbl sig_tc_ty
-       ; let op' = L loc (HsRecFld noExtField (Unambiguous sel_name lbl))
+       ; let op' = L loc (XExpr (HsRecFld (Unambiguous sel_name lbl)))
        ; tcExpr (OpApp fix arg1 op' arg2) res_ty
        }
 
@@ -980,7 +980,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
 
         ; tcWrapResult expr expr' rec_res_ty res_ty }
 
-tcExpr e@(HsRecFld _ f) res_ty
+tcExpr e@(XExpr (HsRecFld f)) res_ty
     = tcCheckRecSelId e f res_ty
 
 {-
@@ -1264,7 +1264,7 @@ tcInferApp :: HsExpr GhcRn
 -- Also used by Module.tcRnExpr to implement GHCi :type
 tcInferApp expr
   | -- Gruesome special case for ambiguous record selectors
-    HsRecFld _ fld_lbl        <- fun
+    XExpr (HsRecFld fld_lbl)  <- fun
   , Ambiguous _ lbl           <- fld_lbl  -- Still ambiguous
   , HsEValArg _ (L _ arg) : _ <- filterOut isArgPar args -- A value arg is first
   , Just sig_ty               <- obviousSig arg  -- A type sig on the arg disambiguates
@@ -1314,7 +1314,7 @@ tcInferAppHead :: HsExpr GhcRn -> TcM (HsExpr GhcTc, TcSigmaType)
 tcInferAppHead e
   = case e of
       HsVar _ (L _ nm)        -> tcInferId nm
-      HsRecFld _ f            -> tcInferRecSelId f
+      XExpr (HsRecFld f)      -> tcInferRecSelId f
       ExprWithTySig _ e hs_ty -> add_ctxt $ tcExprWithSig e hs_ty
       _                       -> add_ctxt $ tcInfer (tcExpr e)
   where

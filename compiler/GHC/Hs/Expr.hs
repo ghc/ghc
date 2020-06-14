@@ -256,10 +256,6 @@ data HsExpr p
                  ConLike     -- ^ After typechecker only; must be different
                              -- HsVar for pretty printing
 
-  | HsRecFld  (XRecFld p)
-              (AmbiguousFieldOcc p) -- ^ Variable pointing to record selector
-                                    -- Not in use after typechecking
-
   | HsOverLabel (XOverLabel p)
                 (Maybe (IdP p)) FastString
      -- ^ Overloaded label (Note [Overloaded labels] in GHC.OverloadedLabels)
@@ -588,12 +584,13 @@ data HsWrap hs_syn = HsWrap HsWrapper      -- the wrapper
 
 deriving instance (Data (hs_syn GhcTc), Typeable hs_syn) => Data (HsWrap hs_syn)
 
+data HsRecFld = HsRecFld (AmbiguousFieldOcc GhcRn)  -- ^ Variable pointing to record selector
+
 -- ---------------------------------------------------------------------
 
 type instance XVar           (GhcPass _) = NoExtField
 type instance XUnboundVar    (GhcPass _) = NoExtField
 type instance XConLikeOut    (GhcPass _) = NoExtField
-type instance XRecFld        (GhcPass _) = NoExtField
 type instance XOverLabel     (GhcPass _) = NoExtField
 type instance XIPVar         (GhcPass _) = NoExtField
 type instance XOverLitE      (GhcPass _) = NoExtField
@@ -672,7 +669,7 @@ type instance XBinTick       (GhcPass _) = NoExtField
 type instance XPragE         (GhcPass _) = NoExtField
 
 type instance XXExpr         GhcPs       = NoExtCon
-type instance XXExpr         GhcRn       = NoExtCon
+type instance XXExpr         GhcRn       = HsRecFld
 type instance XXExpr         GhcTc       = HsWrap HsExpr
 
 -- ---------------------------------------------------------------------
@@ -1086,12 +1083,12 @@ ppr_expr (HsBinTick _ tickIdTrue tickIdFalse exp)
           text ">(",
           ppr exp, text ")"]
 
-ppr_expr (HsRecFld _ f) = ppr f
 ppr_expr (XExpr x) = case ghcPass @p of
 #if __GLASGOW_HASKELL__ < 811
   GhcPs -> ppr x
-  GhcRn -> ppr x
 #endif
+  GhcRn -> case x of
+    HsRecFld f -> ppr f
   GhcTc -> case x of
     HsWrap co_fn e -> pprHsWrapper co_fn (\parens -> if parens then pprExpr e
                                                       else pprExpr e)
@@ -1099,9 +1096,11 @@ ppr_expr (XExpr x) = case ghcPass @p of
 ppr_infix_expr :: forall p. (OutputableBndrId p) => HsExpr (GhcPass p) -> Maybe SDoc
 ppr_infix_expr (HsVar _ (L _ v))    = Just (pprInfixOcc v)
 ppr_infix_expr (HsConLikeOut _ c)   = Just (pprInfixOcc (conLikeName c))
-ppr_infix_expr (HsRecFld _ f)       = Just (pprInfixOcc f)
 ppr_infix_expr (HsUnboundVar _ occ) = Just (pprInfixOcc occ)
 ppr_infix_expr (XExpr x)
+  | GhcRn <- ghcPass @p
+  , HsRecFld f <- x
+  = Just (pprInfixOcc f)
   | GhcTc <- ghcPass @p
   , HsWrap _ e <- x
   = ppr_infix_expr e
@@ -1202,8 +1201,11 @@ hsExprNeedsParens p = go
     go (HsTick _ _ (L _ e))           = go e
     go (HsBinTick _ _ _ (L _ e))      = go e
     go (RecordCon{})                  = False
-    go (HsRecFld{})                   = False
     go (XExpr x)
+      | GhcRn <- ghcPass @p
+      , HsRecFld{} <- x
+      = False
+
       | GhcTc <- ghcPass @p
       , HsWrap _ e <- x
       = go e
@@ -1237,8 +1239,9 @@ isAtomicHsExpr (HsIPVar {})      = True
 isAtomicHsExpr (HsOverLabel {})  = True
 isAtomicHsExpr (HsUnboundVar {}) = True
 isAtomicHsExpr (HsPar _ e)       = isAtomicHsExpr (unLoc e)
-isAtomicHsExpr (HsRecFld{})      = True
 isAtomicHsExpr (XExpr x)
+  | GhcRn <- ghcPass @p
+  , HsRecFld {} <- x             = True
   | GhcTc <- ghcPass @p
   , HsWrap _ e <- x              = isAtomicHsExpr e
 isAtomicHsExpr _                 = False

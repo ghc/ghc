@@ -800,7 +800,6 @@ dsExpr (HsBinTick _ ixT ixF e) = do
 -- HsSyn constructs that just shouldn't be here:
 dsExpr (HsBracket     {})  = panic "dsExpr:HsBracket"
 dsExpr (HsDo          {})  = panic "dsExpr:HsDo"
-dsExpr (HsRecFld      {})  = panic "dsExpr:HsRecFld"
 
 ds_prag_expr :: HsPragE GhcTc -> LHsExpr GhcTc -> DsM CoreExpr
 ds_prag_expr (HsPragSCC _ _ cc) expr = do

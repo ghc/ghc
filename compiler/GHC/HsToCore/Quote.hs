@@ -1421,7 +1421,7 @@ repE (HsVar _ (L _ x)) =
 repE (HsIPVar _ n) = rep_implicit_param_name n >>= repImplicitParamVar
 repE (HsOverLabel _ _ s) = repOverLabel s
 
-repE e@(HsRecFld _ f) = case f of
+repE e@(XExpr (HsRecFld f)) = case f of
   Unambiguous x _ -> repE (HsVar noExtField (noLoc x))
   Ambiguous{}     -> notHandled "Ambiguous record selectors" (ppr e)
 

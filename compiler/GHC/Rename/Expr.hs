@@ -132,9 +132,9 @@ rnExpr (HsVar _ (L l v))
               | otherwise
               -> finishHsVar (L l name) ;
             Just (Right [s]) ->
-              return ( HsRecFld noExtField (Unambiguous s (L l v) ), unitFV s) ;
+              return ( XExpr (HsRecFld (Unambiguous s (L l v) )), unitFV s) ;
            Just (Right fs@(_:_:_)) ->
-              return ( HsRecFld noExtField (Ambiguous noExtField (L l v))
+              return ( XExpr (HsRecFld (Ambiguous noExtField (L l v)))
                      , mkFVs fs);
            Just (Right [])         -> panic "runExpr/HsVar" } }
 
@@ -194,7 +194,7 @@ rnExpr (OpApp _ e1 op e2)
         -- should prevent bad things happening.
         ; fixity <- case op' of
               L _ (HsVar _ (L _ n)) -> lookupFixityRn n
-              L _ (HsRecFld _ f)    -> lookupFieldFixityRn f
+              L _ (XExpr (HsRecFld f)) -> lookupFieldFixityRn f
               _ -> return (Fixity NoSourceText minPrecedence InfixL)
                    -- c.f. lookupFixity for unbound
 
