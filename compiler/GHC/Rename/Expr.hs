@@ -233,7 +233,7 @@ rnExpr (HsVar _ (L l v))
                     ; this_mod <- getModule
                     ; when (nameIsLocalOrFrom this_mod sel_name) $
                         checkThLocalName sel_name
-                    ; return ( HsRecSel noExtField (FieldOcc sel_name (L l v) ), unitFV sel_name)
+                    ; return (XExpr $ HsRecSel (FieldOcc sel_name (L l v) ), unitFV sel_name)
                     }
          }
        }
@@ -298,7 +298,7 @@ rnExpr (OpApp _ e1 op e2)
         -- should prevent bad things happening.
         ; fixity <- case op' of
               L _ (HsVar _ (L _ n)) -> lookupFixityRn n
-              L _ (HsRecSel _ f)    -> lookupFieldFixityRn f
+              L _ (XExpr (HsRecSel _ f)) -> lookupFieldFixityRn f
               _ -> return (Fixity NoSourceText minPrecedence InfixL)
                    -- c.f. lookupFixity for unbound
 

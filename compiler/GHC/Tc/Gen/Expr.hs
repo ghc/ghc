@@ -199,7 +199,7 @@ tcExpr e@(HsApp {})              res_ty = tcApp e res_ty
 tcExpr e@(OpApp {})              res_ty = tcApp e res_ty
 tcExpr e@(HsAppType {})          res_ty = tcApp e res_ty
 tcExpr e@(ExprWithTySig {})      res_ty = tcApp e res_ty
-tcExpr e@(HsRecSel {})           res_ty = tcApp e res_ty
+tcExpr e@(XExpr (HsRecSel {}))   res_ty = tcApp e res_ty
 tcExpr e@(XExpr (HsExpanded {})) res_ty = tcApp e res_ty
 
 tcExpr e@(HsOverLit _ lit) res_ty

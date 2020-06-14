@@ -162,6 +162,45 @@ instance Outputable SyntaxExprTc where
 
   ppr NoSyntaxExprTc = text "<no syntax expr>"
 
+-- | HsWrap appears only in typechecker output
+data HsWrap hs_syn = HsWrap HsWrapper      -- the wrapper
+                            (hs_syn GhcTc) -- the thing that is wrapped
+
+deriving instance (Data (hs_syn GhcTc), Typeable hs_syn) => Data (HsWrap hs_syn)
+
+
+{-
+Note [Record selectors in the AST]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here is how record selectors are expressed in GHC's AST:
+
+Example data type
+  data T = MkT { size :: Int }
+
+Record selectors:
+                      |    GhcPs     |   GhcRn              |    GhcTc            |
+----------------------------------------------------------------------------------|
+size (assuming one    | HsVar        | HsRecSel             | HsRecSel            |
+     'size' in scope) |              |                      |                     |
+----------------------|--------------|----------------------|---------------------|
+.size (assuming       | HsProjection | getField @"size"     | getField @"size"    |
+ OverloadedRecordDot) |              |                      |                     |
+----------------------|--------------|----------------------|---------------------|
+e.size (assuming      | HsGetField   | getField @"size" e   | getField @"size" e  |
+ OverloadedRecordDot) |              |                      |                     |
+
+NB 1: DuplicateRecordFields makes no difference to the first row of
+this table, except that if 'size' is a field of more than one data
+type, then a naked use of the record selector 'size' may well be
+ambiguous. You have to use a qualified name. And there is no way to do
+this if both data types are declared in the same module.
+
+NB 2: The notation getField @"size" e is short for
+HsApp (HsAppType (HsVar "getField") (HsWC (HsTyLit (HsStrTy "size")) [])) e.
+We track the original parsed syntax via HsExpanded.
+
+-}
+
 -- | Extra data fields for a 'RecordUpd', added by the type checker
 data RecordUpdTc = RecordUpdTc
       { rupd_cons :: [ConLike]
@@ -177,11 +216,10 @@ data RecordUpdTc = RecordUpdTc
       , rupd_wrap :: HsWrapper  -- See Note [Record Update HsWrapper]
       }
 
--- | HsWrap appears only in typechecker output
-data HsWrap hs_syn = HsWrap HsWrapper      -- the wrapper
-                            (hs_syn GhcTc) -- the thing that is wrapped
+data HsRecSel (FieldOcc p) -- ^ Variable pointing to record selector
+                           -- See Note [Non-overloaded record field selectors] and
+                           -- Note [Record selectors in the AST]
 
-deriving instance (Data (hs_syn GhcTc), Typeable hs_syn) => Data (HsWrap hs_syn)
 
 -- ---------------------------------------------------------------------
 
@@ -286,13 +324,6 @@ data EpAnnUnboundVar = EpAnnUnboundVar
      } deriving Data
 
 type instance XVar           (GhcPass _) = NoExtField
-
--- Record selectors at parse time are HsVar; they convert to HsRecSel
--- on renaming.
-type instance XRecSel              GhcPs = DataConCantHappen
-type instance XRecSel              GhcRn = NoExtField
-type instance XRecSel              GhcTc = NoExtField
-
 type instance XLam           (GhcPass _) = NoExtField
 
 -- OverLabel not present in GhcTc pass; see GHC.Rename.Expr
@@ -491,13 +522,20 @@ type instance XXExpr GhcRn = HsExpansion (HsExpr GhcRn) (HsExpr GhcRn)
 type instance XXExpr GhcTc = XXExprGhcTc
 -- HsExpansion: see Note [Rebindable syntax and HsExpansion] below
 
+data XXExprGhcRn
+  = ExpansionExprRn
+      {-# UNPACK #-} !(HsExpansion (HsExpr GhcRn) (HsExpr GhcRn))
+
+  | HsRecSelRn {-# UNPACK #-} HsRecSel
 
 data XXExprGhcTc
   = WrapExpr        -- Type and evidence application and abstractions
       {-# UNPACK #-} !(HsWrap HsExpr)
 
-  | ExpansionExpr   -- See Note [Rebindable syntax and HsExpansion] below
+  | ExpansionExprTc   -- See Note [Rebindable syntax and HsExpansion] below
       {-# UNPACK #-} !(HsExpansion (HsExpr GhcRn) (HsExpr GhcTc))
+
+  | HsRecSelRn {-# UNPACK #-} HsRecSel
 
   | ConLikeTc      -- Result of typechecking a data-con
                    -- See Note [Typechecking data constructors] in
@@ -769,7 +807,6 @@ instance Outputable XXExprGhcTc where
 
 ppr_infix_expr :: forall p. (OutputableBndrId p) => HsExpr (GhcPass p) -> Maybe SDoc
 ppr_infix_expr (HsVar _ (L _ v))    = Just (pprInfixOcc v)
-ppr_infix_expr (HsRecSel _ f)       = Just (pprInfixOcc f)
 ppr_infix_expr (HsUnboundVar _ occ) = Just (pprInfixOcc occ)
 ppr_infix_expr (XExpr x)            = case ghcPass @p of
 #if __GLASGOW_HASKELL__ < 901
@@ -780,7 +817,8 @@ ppr_infix_expr (XExpr x)            = case ghcPass @p of
 ppr_infix_expr _ = Nothing
 
 ppr_infix_expr_rn :: HsExpansion (HsExpr GhcRn) (HsExpr GhcRn) -> Maybe SDoc
-ppr_infix_expr_rn (HsExpanded a _) = ppr_infix_expr a
+ppr_infix_expr_tc (ExpansionExpr (HsExpanded a _)) = ppr_infix_expr a
+ppr_infix_expr_rn (HsRecSel _ f)                   = Just (pprInfixOcc f)
 
 ppr_infix_expr_tc :: XXExprGhcTc -> Maybe SDoc
 ppr_infix_expr_tc (WrapExpr (HsWrap _ e))          = ppr_infix_expr e
@@ -871,7 +909,6 @@ hsExprNeedsParens prec = go
     go (HsProc{})                     = prec > topPrec
     go (HsStatic{})                   = prec >= appPrec
     go (RecordCon{})                  = False
-    go (HsRecSel{})                   = False
     go (HsProjection{})               = True
     go (HsGetField{})                 = False
     go (XExpr x) = case ghcPass @p of
@@ -889,7 +926,8 @@ hsExprNeedsParens prec = go
     go_x_tc (HsBinTick _ _ (L _ e))          = hsExprNeedsParens prec e
 
     go_x_rn :: HsExpansion (HsExpr GhcRn) (HsExpr GhcRn) -> Bool
-    go_x_rn (HsExpanded a _) = hsExprNeedsParens prec a
+    go_x_rn (ExpansionExpr (HsExpanded a _)) = hsExprNeedsParens prec a
+    go_x_rn (HsRecSel{})                     = False
 
 
 -- | Parenthesize an expression without token information
@@ -919,7 +957,6 @@ isAtomicHsExpr (HsOverLit {})    = True
 isAtomicHsExpr (HsIPVar {})      = True
 isAtomicHsExpr (HsOverLabel {})  = True
 isAtomicHsExpr (HsUnboundVar {}) = True
-isAtomicHsExpr (HsRecSel{})      = True
 isAtomicHsExpr (XExpr x)
   | GhcTc <- ghcPass @p          = go_x_tc x
   | GhcRn <- ghcPass @p          = go_x_rn x
@@ -930,7 +967,8 @@ isAtomicHsExpr (XExpr x)
     go_x_tc (HsTick {}) = False
     go_x_tc (HsBinTick {}) = False
 
-    go_x_rn (HsExpanded a _) = isAtomicHsExpr a
+    go_x_rn (ExpansionExpr (HsExpanded a _)) = isAtomicHsExpr a
+    go_x_rn (HsRecSel{})                     = True
 
 isAtomicHsExpr _ = False
 

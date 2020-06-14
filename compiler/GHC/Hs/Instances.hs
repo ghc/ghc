@@ -286,6 +286,8 @@ deriving instance Data (HsPragE GhcPs)
 deriving instance Data (HsPragE GhcRn)
 deriving instance Data (HsPragE GhcTc)
 
+deriving instance Data HsRecSel
+
 -- deriving instance (DataIdLR p p) => Data (HsExpr p)
 deriving instance Data (HsExpr GhcPs)
 deriving instance Data (HsExpr GhcRn)

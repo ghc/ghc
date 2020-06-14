@@ -243,7 +243,6 @@ dsLExpr (L loc e) =
 
 dsExpr :: HsExpr GhcTc -> DsM CoreExpr
 dsExpr (HsVar    _ (L _ id))           = dsHsVar id
-dsExpr (HsRecSel _ (FieldOcc id _))    = dsHsVar id
 dsExpr (HsUnboundVar (HER ref _ _) _)  = dsEvTerm =<< readMutVar ref
         -- See Note [Holes] in GHC.Tc.Types.Constraint
 
@@ -266,6 +265,7 @@ dsExpr (HsOverLit _ lit)
 dsExpr e@(XExpr ext_expr_tc)
   = case ext_expr_tc of
       ExpansionExpr (HsExpanded _ b) -> dsExpr b
+      HsRecSel (FieldOcc id _)       -> dsHsVar id
       WrapExpr {}                    -> dsHsWrapped e
       ConLikeTc con tvs tys          -> dsConLike con tvs tys
       -- Hpc Support

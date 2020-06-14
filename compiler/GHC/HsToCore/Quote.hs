@@ -1490,7 +1490,7 @@ repE (HsVar _ (L _ x)) =
 repE (HsIPVar _ n) = rep_implicit_param_name n >>= repImplicitParamVar
 repE (HsOverLabel _ s) = repOverLabel s
 
-repE (HsRecSel _ (FieldOcc x _)) = repE (HsVar noExtField (noLocA x))
+repE (XExpr (HsRecSel _ (FieldOcc x _))) = repE (HsVar noExtField (noLocA x))
 
         -- Remember, we're desugaring renamer output here, so
         -- HsOverlit can definitely occur

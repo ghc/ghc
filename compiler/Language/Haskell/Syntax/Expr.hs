@@ -269,38 +269,6 @@ is Less Cool because
 -}
 
 {-
-Note [Record selectors in the AST]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Here is how record selectors are expressed in GHC's AST:
-
-Example data type
-  data T = MkT { size :: Int }
-
-Record selectors:
-                      |    GhcPs     |   GhcRn              |    GhcTc            |
-----------------------------------------------------------------------------------|
-size (assuming one    | HsVar        | HsRecSel             | HsRecSel            |
-     'size' in scope) |              |                      |                     |
-----------------------|--------------|----------------------|---------------------|
-.size (assuming       | HsProjection | getField @"size"     | getField @"size"    |
- OverloadedRecordDot) |              |                      |                     |
-----------------------|--------------|----------------------|---------------------|
-e.size (assuming      | HsGetField   | getField @"size" e   | getField @"size" e  |
- OverloadedRecordDot) |              |                      |                     |
-
-NB 1: DuplicateRecordFields makes no difference to the first row of
-this table, except that if 'size' is a field of more than one data
-type, then a naked use of the record selector 'size' may well be
-ambiguous. You have to use a qualified name. And there is no way to do
-this if both data types are declared in the same module.
-
-NB 2: The notation getField @"size" e is short for
-HsApp (HsAppType (HsVar "getField") (HsWC (HsTyLit (HsStrTy "size")) [])) e.
-We track the original parsed syntax via HsExpanded.
-
--}
-
-{-
 Note [Non-overloaded record field selectors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -334,11 +302,6 @@ data HsExpr p
                              --   erroring expression will be written after
                              --   solving. See Note [Holes] in GHC.Tc.Types.Constraint.
 
-
-  | HsRecSel  (XRecSel p)
-              (FieldOcc p) -- ^ Variable pointing to record selector
-                           -- See Note [Non-overloaded record field selectors] and
-                           -- Note [Record selectors in the AST]
 
   | HsOverLabel (XOverLabel p) FastString
      -- ^ Overloaded label (Note [Overloaded labels] in GHC.OverloadedLabels)
@@ -632,6 +595,8 @@ data HsExpr p
   -- Note [Trees That Grow] in Language.Haskell.Syntax.Extension for the
   -- general idea, and Note [Rebindable syntax and HsExpansion] in GHC.Hs.Expr
   -- for an example of how we use it.
+
+data HsRecFld = HsRecFld (AmbiguousFieldOcc GhcRn)  -- ^ Variable pointing to record selector
 
 -- ---------------------------------------------------------------------
 
