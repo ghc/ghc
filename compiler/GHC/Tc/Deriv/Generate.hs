@@ -46,8 +46,6 @@ import GHC.Types.Name.Reader
 import GHC.Types.Basic
 import GHC.Core.DataCon
 import GHC.Types.Name
-import GHC.Utils.Fingerprint
-import GHC.Utils.Encoding
 
 import GHC.Driver.Session
 import GHC.Builtin.Utils
@@ -81,22 +79,18 @@ import Data.List  ( find, partition, intersperse )
 
 type BagDerivStuff = Bag DerivStuff
 
-data AuxBindSpec
-  = DerivCon2Tag TyCon  -- The con2Tag for given TyCon
-  | DerivTag2Con TyCon  -- ...ditto tag2Con
-  | DerivMaxTag  TyCon  -- ...and maxTag
-  deriving( Eq )
-  -- All these generate ZERO-BASED tag operations
-  -- I.e first constructor has tag 0
-
 data DerivStuff     -- Please add this auxiliary stuff
-  = DerivAuxBind AuxBindSpec
-
-  -- Generics and DeriveAnyClass
-  | DerivFamInst FamInst               -- New type family instances
+  = DerivFamInst FamInst
+    -- ^ A new type family instance. Used for:
+    --
+    -- * @DeriveGeneric@, which generates instances of @Rep(1)@
+    --
+    -- * @DeriveAnyClass@, which can fill in associated type family defaults
 
   -- New top-level auxiliary bindings
-  | DerivHsBind (LHsBind GhcPs, LSig GhcPs) -- Also used for SYB
+  | DerivHsBind (LHsBind GhcPs, LSig GhcPs)
+    -- ^ A new, top-level auxiliary binding. Used for deriving 'Eq', 'Ord',
+    --   'Enum', 'Ix', and 'Data'. See Note [Auxiliary binders].
 
 
 {-
@@ -160,8 +154,11 @@ produced don't get through the typechecker.
 
 gen_Eq_binds :: SrcSpan -> TyCon -> TcM (LHsBinds GhcPs, BagDerivStuff)
 gen_Eq_binds loc tycon = do
-    dflags <- getDynFlags
-    return (method_binds dflags, aux_binds)
+    -- See Note [Auxiliary binders]
+    con2tag_occ <- chooseUniqueOccTc (mkCon2TagOcc (getOccName tycon))
+    let con2tag_RDR = mkRdrUnqual con2tag_occ
+
+    return (method_binds con2tag_RDR, aux_binds con2tag_RDR)
   where
     all_cons = tyConDataCons tycon
     (nullary_cons, non_nullary_cons) = partition isNullarySrcDataCon all_cons
@@ -175,7 +172,7 @@ gen_Eq_binds loc tycon = do
 
     no_tag_match_cons = null tag_match_cons
 
-    fall_through_eqn dflags
+    fall_through_eqn con2tag_RDR
       | no_tag_match_cons   -- All constructors have arguments
       = case pat_match_cons of
           []  -> []   -- No constructors; no fall-though case
@@ -187,16 +184,18 @@ gen_Eq_binds loc tycon = do
       | otherwise -- One or more tag_match cons; add fall-through of
                   -- extract tags compare for equality
       = [([a_Pat, b_Pat],
-         untag_Expr dflags tycon [(a_RDR,ah_RDR), (b_RDR,bh_RDR)]
+         untag_Expr con2tag_RDR [(a_RDR,ah_RDR), (b_RDR,bh_RDR)]
                     (genPrimOpApp (nlHsVar ah_RDR) eqInt_RDR (nlHsVar bh_RDR)))]
 
-    aux_binds | no_tag_match_cons = emptyBag
-              | otherwise         = unitBag $ DerivAuxBind $ DerivCon2Tag tycon
+    aux_binds con2tag_RDR
+      | no_tag_match_cons = emptyBag
+      | otherwise         = unitBag $ genCon2Tag con2tag_RDR loc tycon
 
-    method_binds dflags = unitBag (eq_bind dflags)
-    eq_bind dflags = mkFunBindEC 2 loc eq_RDR (const true_Expr)
-                                 (map pats_etc pat_match_cons
-                                   ++ fall_through_eqn dflags)
+    method_binds con2tag_RDR = unitBag (eq_bind con2tag_RDR)
+    eq_bind con2tag_RDR
+      = mkFunBindEC 2 loc eq_RDR (const true_Expr)
+                    (map pats_etc pat_match_cons
+                      ++ fall_through_eqn con2tag_RDR)
 
     ------------------------------------------------------------------
     pats_etc data_con
@@ -340,21 +339,26 @@ gtResult OrdGT      = true_Expr
 ------------
 gen_Ord_binds :: SrcSpan -> TyCon -> TcM (LHsBinds GhcPs, BagDerivStuff)
 gen_Ord_binds loc tycon = do
-    dflags <- getDynFlags
+    -- See Note [Auxiliary binders]
+    con2tag_occ <- chooseUniqueOccTc (mkCon2TagOcc (getOccName tycon))
+    let con2tag_RDR = mkRdrUnqual con2tag_occ
+
     return $ if null tycon_data_cons -- No data-cons => invoke bale-out case
       then ( unitBag $ mkFunBindEC 2 loc compare_RDR (const eqTag_Expr) []
            , emptyBag)
-      else ( unitBag (mkOrdOp dflags OrdCompare) `unionBags` other_ops dflags
-           , aux_binds)
+      else ( unitBag (mkOrdOp con2tag_RDR OrdCompare)
+             `unionBags` other_ops con2tag_RDR
+           , aux_binds con2tag_RDR)
   where
-    aux_binds | single_con_type = emptyBag
-              | otherwise       = unitBag $ DerivAuxBind $ DerivCon2Tag tycon
+    aux_binds con2tag_RDR
+      | single_con_type = emptyBag
+      | otherwise       = unitBag $ genCon2Tag con2tag_RDR loc tycon
 
         -- Note [Game plan for deriving Ord]
-    other_ops dflags
+    other_ops con2tag_RDR
       | (last_tag - first_tag) <= 2     -- 1-3 constructors
         || null non_nullary_cons        -- Or it's an enumeration
-      = listToBag [mkOrdOp dflags OrdLT, lE, gT, gE]
+      = listToBag [mkOrdOp con2tag_RDR OrdLT, lE, gT, gE]
       | otherwise
       = emptyBag
 
@@ -380,39 +384,40 @@ gen_Ord_binds loc tycon = do
     (nullary_cons, non_nullary_cons) = partition isNullarySrcDataCon tycon_data_cons
 
 
-    mkOrdOp :: DynFlags -> OrdOp -> LHsBind GhcPs
+    mkOrdOp :: RdrName -> OrdOp -> LHsBind GhcPs
     -- Returns a binding   op a b = ... compares a and b according to op ....
-    mkOrdOp dflags op = mkSimpleGeneratedFunBind loc (ordMethRdr op) [a_Pat, b_Pat]
-                                        (mkOrdOpRhs dflags op)
+    mkOrdOp con2tag_RDR op
+      = mkSimpleGeneratedFunBind loc (ordMethRdr op) [a_Pat, b_Pat]
+                        (mkOrdOpRhs con2tag_RDR op)
 
-    mkOrdOpRhs :: DynFlags -> OrdOp -> LHsExpr GhcPs
-    mkOrdOpRhs dflags op       -- RHS for comparing 'a' and 'b' according to op
+    mkOrdOpRhs :: RdrName -> OrdOp -> LHsExpr GhcPs
+    mkOrdOpRhs con2tag_RDR op -- RHS for comparing 'a' and 'b' according to op
       | nullary_cons `lengthAtMost` 2 -- Two nullary or fewer, so use cases
       = nlHsCase (nlHsVar a_RDR) $
-        map (mkOrdOpAlt dflags op) tycon_data_cons
+        map (mkOrdOpAlt con2tag_RDR op) tycon_data_cons
         -- i.e.  case a of { C1 x y -> case b of C1 x y -> ....compare x,y...
         --                   C2 x   -> case b of C2 x -> ....comopare x.... }
 
       | null non_nullary_cons    -- All nullary, so go straight to comparing tags
-      = mkTagCmp dflags op
+      = mkTagCmp con2tag_RDR op
 
       | otherwise                -- Mixed nullary and non-nullary
       = nlHsCase (nlHsVar a_RDR) $
-        (map (mkOrdOpAlt dflags op) non_nullary_cons
-         ++ [mkHsCaseAlt nlWildPat (mkTagCmp dflags op)])
+        (map (mkOrdOpAlt con2tag_RDR op) non_nullary_cons
+         ++ [mkHsCaseAlt nlWildPat (mkTagCmp con2tag_RDR op)])
 
 
-    mkOrdOpAlt :: DynFlags -> OrdOp -> DataCon
+    mkOrdOpAlt :: RdrName -> OrdOp -> DataCon
                   -> LMatch GhcPs (LHsExpr GhcPs)
     -- Make the alternative  (Ki a1 a2 .. av ->
-    mkOrdOpAlt dflags op data_con
+    mkOrdOpAlt con2tag_RDR op data_con
       = mkHsCaseAlt (nlConVarPat data_con_RDR as_needed)
-                    (mkInnerRhs dflags op data_con)
+                    (mkInnerRhs con2tag_RDR op data_con)
       where
         as_needed    = take (dataConSourceArity data_con) as_RDRs
         data_con_RDR = getRdrName data_con
 
-    mkInnerRhs dflags op data_con
+    mkInnerRhs con2tag_RDR op data_con
       | single_con_type
       = nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt op data_con ]
 
@@ -435,14 +440,14 @@ gen_Ord_binds loc tycon = do
                                  , mkHsCaseAlt nlWildPat (gtResult op) ]
 
       | tag > last_tag `div` 2  -- lower range is larger
-      = untag_Expr dflags tycon [(b_RDR, bh_RDR)] $
+      = untag_Expr con2tag_RDR [(b_RDR, bh_RDR)] $
         nlHsIf (genPrimOpApp (nlHsVar bh_RDR) ltInt_RDR tag_lit)
                (gtResult op) $  -- Definitely GT
         nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt op data_con
                                  , mkHsCaseAlt nlWildPat (ltResult op) ]
 
       | otherwise               -- upper range is larger
-      = untag_Expr dflags tycon [(b_RDR, bh_RDR)] $
+      = untag_Expr con2tag_RDR [(b_RDR, bh_RDR)] $
         nlHsIf (genPrimOpApp (nlHsVar bh_RDR) gtInt_RDR tag_lit)
                (ltResult op) $  -- Definitely LT
         nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt op data_con
@@ -461,11 +466,11 @@ gen_Ord_binds loc tycon = do
         data_con_RDR = getRdrName data_con
         bs_needed    = take (dataConSourceArity data_con) bs_RDRs
 
-    mkTagCmp :: DynFlags -> OrdOp -> LHsExpr GhcPs
+    mkTagCmp :: RdrName -> OrdOp -> LHsExpr GhcPs
     -- Both constructors known to be nullary
     -- generates (case data2Tag a of a# -> case data2Tag b of b# -> a# `op` b#
-    mkTagCmp dflags op =
-      untag_Expr dflags tycon[(a_RDR, ah_RDR),(b_RDR, bh_RDR)] $
+    mkTagCmp con2tag_RDR op =
+      untag_Expr con2tag_RDR [(a_RDR, ah_RDR),(b_RDR, bh_RDR)] $
         unliftedOrdOp intPrimTy op ah_RDR bh_RDR
 
 mkCompareFields :: OrdOp -> [Type] -> LHsExpr GhcPs
@@ -585,78 +590,89 @@ For @enumFromTo@ and @enumFromThenTo@, we use the default methods.
 
 gen_Enum_binds :: SrcSpan -> TyCon -> TcM (LHsBinds GhcPs, BagDerivStuff)
 gen_Enum_binds loc tycon = do
-    dflags <- getDynFlags
-    return (method_binds dflags, aux_binds)
+    -- See Note [Auxiliary binders]
+    con2tag_occ <- chooseUniqueOccTc (mkCon2TagOcc (getOccName tycon))
+    tag2con_occ <- chooseUniqueOccTc (mkTag2ConOcc (getOccName tycon))
+    maxtag_occ  <- chooseUniqueOccTc (mkMaxTagOcc  (getOccName tycon))
+    let con2tag_RDR = mkRdrUnqual con2tag_occ
+        tag2con_RDR = mkRdrUnqual tag2con_occ
+        maxtag_RDR  = mkRdrUnqual maxtag_occ
+
+    return ( method_binds con2tag_RDR tag2con_RDR maxtag_RDR
+           , aux_binds    con2tag_RDR tag2con_RDR maxtag_RDR )
   where
-    method_binds dflags = listToBag
-      [ succ_enum      dflags
-      , pred_enum      dflags
-      , to_enum        dflags
-      , enum_from      dflags -- [0 ..]
-      , enum_from_then dflags -- [0, 1 ..]
-      , from_enum      dflags
+    method_binds con2tag_RDR tag2con_RDR maxtag_RDR = listToBag
+      [ succ_enum      con2tag_RDR tag2con_RDR maxtag_RDR
+      , pred_enum      con2tag_RDR tag2con_RDR
+      , to_enum                    tag2con_RDR maxtag_RDR
+      , enum_from      con2tag_RDR tag2con_RDR maxtag_RDR -- [0 ..]
+      , enum_from_then con2tag_RDR tag2con_RDR maxtag_RDR -- [0, 1 ..]
+      , from_enum      con2tag_RDR
       ]
-    aux_binds = listToBag $ map DerivAuxBind
-                  [DerivCon2Tag tycon, DerivTag2Con tycon, DerivMaxTag tycon]
+    aux_binds con2tag_RDR tag2con_RDR maxtag_RDR = listToBag
+      [ genCon2Tag con2tag_RDR loc tycon
+      , genTag2Con tag2con_RDR loc tycon
+      , genMaxTag  maxtag_RDR  loc tycon
+      ]
 
     occ_nm = getOccString tycon
 
-    succ_enum dflags
+    succ_enum con2tag_RDR tag2con_RDR maxtag_RDR
       = mkSimpleGeneratedFunBind loc succ_RDR [a_Pat] $
-        untag_Expr dflags tycon [(a_RDR, ah_RDR)] $
-        nlHsIf (nlHsApps eq_RDR [nlHsVar (maxtag_RDR dflags tycon),
+        untag_Expr con2tag_RDR [(a_RDR, ah_RDR)] $
+        nlHsIf (nlHsApps eq_RDR [nlHsVar maxtag_RDR,
                                nlHsVarApps intDataCon_RDR [ah_RDR]])
              (illegal_Expr "succ" occ_nm "tried to take `succ' of last tag in enumeration")
-             (nlHsApp (nlHsVar (tag2con_RDR dflags tycon))
+             (nlHsApp (nlHsVar tag2con_RDR)
                     (nlHsApps plus_RDR [nlHsVarApps intDataCon_RDR [ah_RDR],
                                         nlHsIntLit 1]))
 
-    pred_enum dflags
+    pred_enum con2tag_RDR tag2con_RDR
       = mkSimpleGeneratedFunBind loc pred_RDR [a_Pat] $
-        untag_Expr dflags tycon [(a_RDR, ah_RDR)] $
+        untag_Expr con2tag_RDR [(a_RDR, ah_RDR)] $
         nlHsIf (nlHsApps eq_RDR [nlHsIntLit 0,
                                nlHsVarApps intDataCon_RDR [ah_RDR]])
              (illegal_Expr "pred" occ_nm "tried to take `pred' of first tag in enumeration")
-             (nlHsApp (nlHsVar (tag2con_RDR dflags tycon))
+             (nlHsApp (nlHsVar tag2con_RDR)
                       (nlHsApps plus_RDR
                             [ nlHsVarApps intDataCon_RDR [ah_RDR]
                             , nlHsLit (HsInt noExtField
                                                 (mkIntegralLit (-1 :: Int)))]))
 
-    to_enum dflags
+    to_enum tag2con_RDR maxtag_RDR
       = mkSimpleGeneratedFunBind loc toEnum_RDR [a_Pat] $
         nlHsIf (nlHsApps and_RDR
                 [nlHsApps ge_RDR [nlHsVar a_RDR, nlHsIntLit 0],
                  nlHsApps le_RDR [ nlHsVar a_RDR
-                                 , nlHsVar (maxtag_RDR dflags tycon)]])
-             (nlHsVarApps (tag2con_RDR dflags tycon) [a_RDR])
-             (illegal_toEnum_tag occ_nm (maxtag_RDR dflags tycon))
+                                 , nlHsVar maxtag_RDR]])
+             (nlHsVarApps tag2con_RDR [a_RDR])
+             (illegal_toEnum_tag occ_nm maxtag_RDR)
 
-    enum_from dflags
+    enum_from con2tag_RDR tag2con_RDR maxtag_RDR
       = mkSimpleGeneratedFunBind loc enumFrom_RDR [a_Pat] $
-          untag_Expr dflags tycon [(a_RDR, ah_RDR)] $
+          untag_Expr con2tag_RDR [(a_RDR, ah_RDR)] $
           nlHsApps map_RDR
-                [nlHsVar (tag2con_RDR dflags tycon),
+                [nlHsVar tag2con_RDR,
                  nlHsPar (enum_from_to_Expr
                             (nlHsVarApps intDataCon_RDR [ah_RDR])
-                            (nlHsVar (maxtag_RDR dflags tycon)))]
+                            (nlHsVar maxtag_RDR))]
 
-    enum_from_then dflags
+    enum_from_then con2tag_RDR tag2con_RDR maxtag_RDR
       = mkSimpleGeneratedFunBind loc enumFromThen_RDR [a_Pat, b_Pat] $
-          untag_Expr dflags tycon [(a_RDR, ah_RDR), (b_RDR, bh_RDR)] $
-          nlHsApp (nlHsVarApps map_RDR [tag2con_RDR dflags tycon]) $
+          untag_Expr con2tag_RDR [(a_RDR, ah_RDR), (b_RDR, bh_RDR)] $
+          nlHsApp (nlHsVarApps map_RDR [tag2con_RDR]) $
             nlHsPar (enum_from_then_to_Expr
                     (nlHsVarApps intDataCon_RDR [ah_RDR])
                     (nlHsVarApps intDataCon_RDR [bh_RDR])
                     (nlHsIf  (nlHsApps gt_RDR [nlHsVarApps intDataCon_RDR [ah_RDR],
                                                nlHsVarApps intDataCon_RDR [bh_RDR]])
                            (nlHsIntLit 0)
-                           (nlHsVar (maxtag_RDR dflags tycon))
+                           (nlHsVar maxtag_RDR)
                            ))
 
-    from_enum dflags
+    from_enum con2tag_RDR
       = mkSimpleGeneratedFunBind loc fromEnum_RDR [a_Pat] $
-          untag_Expr dflags tycon [(a_RDR, ah_RDR)] $
+          untag_Expr con2tag_RDR [(a_RDR, ah_RDR)] $
           (nlHsVarApps intDataCon_RDR [ah_RDR])
 
 {-
@@ -757,35 +773,42 @@ we follow the scheme given in Figure~19 of the Haskell~1.2 report
 gen_Ix_binds :: SrcSpan -> TyCon -> TcM (LHsBinds GhcPs, BagDerivStuff)
 
 gen_Ix_binds loc tycon = do
-    dflags <- getDynFlags
+    -- See Note [Auxiliary binders]
+    con2tag_occ <- chooseUniqueOccTc (mkCon2TagOcc (getOccName tycon))
+    tag2con_occ <- chooseUniqueOccTc (mkTag2ConOcc (getOccName tycon))
+    let con2tag_RDR = mkRdrUnqual con2tag_occ
+        tag2con_RDR = mkRdrUnqual tag2con_occ
+
     return $ if isEnumerationTyCon tycon
-      then (enum_ixes dflags, listToBag $ map DerivAuxBind
-                   [DerivCon2Tag tycon, DerivTag2Con tycon, DerivMaxTag tycon])
-      else (single_con_ixes, unitBag (DerivAuxBind (DerivCon2Tag tycon)))
+      then ( enum_ixes con2tag_RDR tag2con_RDR
+           , listToBag [ genCon2Tag con2tag_RDR loc tycon
+                       , genTag2Con tag2con_RDR loc tycon
+                       ])
+      else (single_con_ixes, unitBag (genCon2Tag con2tag_RDR loc tycon))
   where
     --------------------------------------------------------------
-    enum_ixes dflags = listToBag
-      [ enum_range   dflags
-      , enum_index   dflags
-      , enum_inRange dflags
+    enum_ixes con2tag_RDR tag2con_RDR = listToBag
+      [ enum_range   con2tag_RDR tag2con_RDR
+      , enum_index   con2tag_RDR
+      , enum_inRange con2tag_RDR
       ]
 
-    enum_range dflags
+    enum_range con2tag_RDR tag2con_RDR
       = mkSimpleGeneratedFunBind loc range_RDR [nlTuplePat [a_Pat, b_Pat] Boxed] $
-          untag_Expr dflags tycon [(a_RDR, ah_RDR)] $
-          untag_Expr dflags tycon [(b_RDR, bh_RDR)] $
-          nlHsApp (nlHsVarApps map_RDR [tag2con_RDR dflags tycon]) $
+          untag_Expr con2tag_RDR [(a_RDR, ah_RDR)] $
+          untag_Expr con2tag_RDR [(b_RDR, bh_RDR)] $
+          nlHsApp (nlHsVarApps map_RDR [tag2con_RDR]) $
               nlHsPar (enum_from_to_Expr
                         (nlHsVarApps intDataCon_RDR [ah_RDR])
                         (nlHsVarApps intDataCon_RDR [bh_RDR]))
 
-    enum_index dflags
+    enum_index con2tag_RDR
       = mkSimpleGeneratedFunBind loc unsafeIndex_RDR
                 [noLoc (AsPat noExtField (noLoc c_RDR)
                            (nlTuplePat [a_Pat, nlWildPat] Boxed)),
                                 d_Pat] (
-           untag_Expr dflags tycon [(a_RDR, ah_RDR)] (
-           untag_Expr dflags tycon [(d_RDR, dh_RDR)] (
+           untag_Expr con2tag_RDR [(a_RDR, ah_RDR)] (
+           untag_Expr con2tag_RDR [(d_RDR, dh_RDR)] (
            let
                 rhs = nlHsVarApps intDataCon_RDR [c_RDR]
            in
@@ -796,11 +819,11 @@ gen_Ix_binds loc tycon = do
         )
 
     -- This produces something like `(ch >= ah) && (ch <= bh)`
-    enum_inRange dflags
+    enum_inRange con2tag_RDR
       = mkSimpleGeneratedFunBind loc inRange_RDR [nlTuplePat [a_Pat, b_Pat] Boxed, c_Pat] $
-          untag_Expr dflags tycon [(a_RDR, ah_RDR)] (
-          untag_Expr dflags tycon [(b_RDR, bh_RDR)] (
-          untag_Expr dflags tycon [(c_RDR, ch_RDR)] (
+          untag_Expr con2tag_RDR [(a_RDR, ah_RDR)] (
+          untag_Expr con2tag_RDR [(b_RDR, bh_RDR)] (
+          untag_Expr con2tag_RDR [(c_RDR, ch_RDR)] (
           -- This used to use `if`, which interacts badly with RebindableSyntax.
           -- See #11396.
           nlHsApps and_RDR
@@ -1324,54 +1347,17 @@ gen_Data_binds loc rep_tc
              dc_rdrs = map mkRdrUnqual dc_occs
 
        -- OK, now do the work
-       ; return (gen_data dflags dt_rdr dc_rdrs loc rep_tc) }
-
-gen_data :: DynFlags -> RdrName -> [RdrName]
-         -> SrcSpan -> TyCon
-         -> (LHsBinds GhcPs,      -- The method bindings
-             BagDerivStuff)       -- Auxiliary bindings
-gen_data dflags data_type_name constr_names loc rep_tc
-  = (listToBag [gfoldl_bind, gunfold_bind, toCon_bind, dataTypeOf_bind]
-     `unionBags` gcast_binds,
+       ; pure ( listToBag [ gfoldl_bind, gunfold_bind
+                          , toCon_bind dc_rdrs, dataTypeOf_bind dt_rdr ]
+                `unionBags` gcast_binds
                 -- Auxiliary definitions: the data type and constructors
-     listToBag ( genDataTyCon
-               : zipWith genDataDataCon data_cons constr_names ) )
+              , listToBag ( genDataTyCon dflags dt_rdr dc_rdrs loc rep_tc
+                          : zipWith (genDataDataCon dt_rdr loc) data_cons dc_rdrs )
+              ) }
   where
     data_cons  = tyConDataCons rep_tc
     n_cons     = length data_cons
     one_constr = n_cons == 1
-    genDataTyCon :: DerivStuff
-    genDataTyCon        --  $dT
-      = DerivHsBind (mkHsVarBind loc data_type_name rhs,
-                     L loc (TypeSig noExtField [L loc data_type_name] sig_ty))
-
-    sig_ty = mkLHsSigWcType (nlHsTyVar dataType_RDR)
-    ctx    = initDefaultSDocContext dflags
-    rhs    = nlHsVar mkDataType_RDR
-             `nlHsApp` nlHsLit (mkHsString (showSDocOneLine ctx (ppr rep_tc)))
-             `nlHsApp` nlList (map nlHsVar constr_names)
-
-    genDataDataCon :: DataCon -> RdrName -> DerivStuff
-    genDataDataCon dc constr_name       --  $cT1 etc
-      = DerivHsBind (mkHsVarBind loc constr_name rhs,
-                     L loc (TypeSig noExtField [L loc constr_name] sig_ty))
-      where
-        sig_ty   = mkLHsSigWcType (nlHsTyVar constr_RDR)
-        rhs      = nlHsApps mkConstr_RDR constr_args
-
-        constr_args
-           = [ -- nlHsIntLit (toInteger (dataConTag dc)),   -- Tag
-               nlHsVar (data_type_name)                     -- DataType
-             , nlHsLit (mkHsString (occNameString dc_occ))  -- String name
-             , nlList  labels                               -- Field labels
-             , nlHsVar fixity ]                             -- Fixity
-
-        labels   = map (nlHsLit . mkHsString . unpackFS . flLabel)
-                       (dataConFieldLabels dc)
-        dc_occ   = getOccName dc
-        is_infix = isDataSymOcc dc_occ
-        fixity | is_infix  = infix_RDR
-               | otherwise = prefix_RDR
 
         ------------ gfoldl
     gfoldl_bind = mkFunBindEC 3 loc gfoldl_RDR id (map gfoldl_eqn data_cons)
@@ -1410,16 +1396,18 @@ gen_data dflags data_type_name constr_names loc rep_tc
         tag = dataConTag dc
 
         ------------ toConstr
-    toCon_bind = mkFunBindEC 1 loc toConstr_RDR id
-                     (zipWith to_con_eqn data_cons constr_names)
+    toCon_bind constr_names
+      = mkFunBindEC 1 loc toConstr_RDR id
+            (zipWith to_con_eqn data_cons constr_names)
     to_con_eqn dc con_name = ([nlWildConPat dc], nlHsVar con_name)
 
         ------------ dataTypeOf
-    dataTypeOf_bind = mkSimpleGeneratedFunBind
-                        loc
-                        dataTypeOf_RDR
-                        [nlWildPat]
-                        (nlHsVar data_type_name)
+    dataTypeOf_bind data_type_name
+      = mkSimpleGeneratedFunBind
+          loc
+          dataTypeOf_RDR
+          [nlWildPat]
+          (nlHsVar data_type_name)
 
         ------------ gcast1/2
         -- Make the binding    dataCast1 x = gcast1 x  -- if T :: * -> *
@@ -1934,7 +1922,7 @@ mkCoerceClassMethEqn cls inst_tvs inst_tys rhs_ty id
 {-
 ************************************************************************
 *                                                                      *
-\subsection{Generating extra binds (@con2tag@ and @tag2con@)}
+\subsection{Generating extra binds (@con2tag@, @tag2con@, etc.)}
 *                                                                      *
 ************************************************************************
 
@@ -1950,75 +1938,18 @@ The `tags' here start at zero, hence the @fIRST_TAG@ (currently one)
 fiddling around.
 -}
 
-genAuxBindSpec :: DynFlags -> SrcSpan -> AuxBindSpec
-                  -> (LHsBind GhcPs, LSig GhcPs)
-genAuxBindSpec dflags loc (DerivCon2Tag tycon)
-  = (mkFunBindSE 0 loc rdr_name eqns,
-     L loc (TypeSig noExtField [L loc rdr_name] sig_ty))
-  where
-    rdr_name = con2tag_RDR dflags tycon
-
-    sig_ty = mkLHsSigWcType $ L loc $ XHsType $ NHsCoreTy $
-             mkSpecSigmaTy (tyConTyVars tycon) (tyConStupidTheta tycon) $
-             mkParentType tycon `mkVisFunTy` intPrimTy
-
-    lots_of_constructors = tyConFamilySize tycon > 8
-                        -- was: mAX_FAMILY_SIZE_FOR_VEC_RETURNS
-                        -- but we don't do vectored returns any more.
-
-    eqns | lots_of_constructors = [get_tag_eqn]
-         | otherwise = map mk_eqn (tyConDataCons tycon)
-
-    get_tag_eqn = ([nlVarPat a_RDR], nlHsApp (nlHsVar getTag_RDR) a_Expr)
-
-    mk_eqn :: DataCon -> ([LPat GhcPs], LHsExpr GhcPs)
-    mk_eqn con = ([nlWildConPat con],
-                  nlHsLit (HsIntPrim NoSourceText
-                                    (toInteger ((dataConTag con) - fIRST_TAG))))
-
-genAuxBindSpec dflags loc (DerivTag2Con tycon)
-  = (mkFunBindSE 0 loc rdr_name
-        [([nlConVarPat intDataCon_RDR [a_RDR]],
-           nlHsApp (nlHsVar tagToEnum_RDR) a_Expr)],
-     L loc (TypeSig noExtField [L loc rdr_name] sig_ty))
-  where
-    sig_ty = mkLHsSigWcType $ L loc $
-             XHsType $ NHsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
-             intTy `mkVisFunTy` mkParentType tycon
-
-    rdr_name = tag2con_RDR dflags tycon
-
-genAuxBindSpec dflags loc (DerivMaxTag tycon)
-  = (mkHsVarBind loc rdr_name rhs,
-     L loc (TypeSig noExtField [L loc rdr_name] sig_ty))
-  where
-    rdr_name = maxtag_RDR dflags tycon
-    sig_ty = mkLHsSigWcType (L loc (XHsType (NHsCoreTy intTy)))
-    rhs = nlHsApp (nlHsVar intDataCon_RDR)
-                  (nlHsLit (HsIntPrim NoSourceText max_tag))
-    max_tag =  case (tyConDataCons tycon) of
-                 data_cons -> toInteger ((length data_cons) - fIRST_TAG)
-
 type SeparateBagsDerivStuff =
   -- AuxBinds and SYB bindings
   ( Bag (LHsBind GhcPs, LSig GhcPs)
   -- Extra family instances (used by Generic and DeriveAnyClass)
   , Bag (FamInst) )
 
-genAuxBinds :: DynFlags -> SrcSpan -> BagDerivStuff -> SeparateBagsDerivStuff
-genAuxBinds dflags loc b = genAuxBinds' b2 where
-  (b1,b2) = partitionBagWith splitDerivAuxBind b
-  splitDerivAuxBind (DerivAuxBind x) = Left x
-  splitDerivAuxBind  x               = Right x
-
-  rm_dups = foldr dup_check emptyBag
-  dup_check a b = if anyBag (== a) b then b else consBag a b
-
+genAuxBinds :: BagDerivStuff -> SeparateBagsDerivStuff
+genAuxBinds b = genAuxBinds' b where
   genAuxBinds' :: BagDerivStuff -> SeparateBagsDerivStuff
-  genAuxBinds' = foldr f ( mapBag (genAuxBindSpec dflags loc) (rm_dups b1)
-                            , emptyBag )
+  genAuxBinds' = foldr f (emptyBag, emptyBag)
+
   f :: DerivStuff -> SeparateBagsDerivStuff -> SeparateBagsDerivStuff
-  f (DerivAuxBind _) = panic "genAuxBinds'" -- We have removed these before
   f (DerivHsBind  b) = add1 b
   f (DerivFamInst t) = add2 t
 
@@ -2258,13 +2189,12 @@ eq_Expr ty a b
  where
    (_, _, prim_eq, _, _) = primOrdOps "Eq" ty
 
-untag_Expr :: DynFlags -> TyCon -> [( RdrName,  RdrName)]
+untag_Expr :: RdrName -> [( RdrName,  RdrName)]
               -> LHsExpr GhcPs -> LHsExpr GhcPs
-untag_Expr _ _ [] expr = expr
-untag_Expr dflags tycon ((untag_this, put_tag_here) : more) expr
-  = nlHsCase (nlHsPar (nlHsVarApps (con2tag_RDR dflags tycon)
-                                   [untag_this])) {-of-}
-      [mkHsCaseAlt (nlVarPat put_tag_here) (untag_Expr dflags tycon more expr)]
+untag_Expr _ [] expr = expr
+untag_Expr con2tag_RDR ((untag_this, put_tag_here) : more) expr
+  = nlHsCase (nlHsPar (nlHsVarApps con2tag_RDR [untag_this])) {-of-}
+      [mkHsCaseAlt (nlVarPat put_tag_here) (untag_Expr con2tag_RDR more expr)]
 
 enum_from_to_Expr
         :: LHsExpr GhcPs -> LHsExpr GhcPs
@@ -2376,54 +2306,203 @@ minusInt_RDR, tagToEnum_RDR :: RdrName
 minusInt_RDR  = getRdrName (primOpId IntSubOp   )
 tagToEnum_RDR = getRdrName (primOpId TagToEnumOp)
 
-con2tag_RDR, tag2con_RDR, maxtag_RDR :: DynFlags -> TyCon -> RdrName
--- Generates Orig s RdrName, for the binding positions
-con2tag_RDR dflags tycon = mk_tc_deriv_name dflags tycon mkCon2TagOcc
-tag2con_RDR dflags tycon = mk_tc_deriv_name dflags tycon mkTag2ConOcc
-maxtag_RDR  dflags tycon = mk_tc_deriv_name dflags tycon mkMaxTagOcc
-
-mk_tc_deriv_name :: DynFlags -> TyCon -> (OccName -> OccName) -> RdrName
-mk_tc_deriv_name dflags tycon occ_fun =
-   mkAuxBinderName dflags (tyConName tycon) occ_fun
-
-mkAuxBinderName :: DynFlags -> Name -> (OccName -> OccName) -> RdrName
--- ^ Make a top-level binder name for an auxiliary binding for a parent name
--- See Note [Auxiliary binders]
-mkAuxBinderName dflags parent occ_fun
-  = mkRdrUnqual (occ_fun stable_parent_occ)
+-- Generate @$con2tag_T :: T -> Int#@, which returns the tag corresponding to a
+-- constructor of type @T@.
+genCon2Tag :: RdrName -> SrcSpan -> TyCon -> DerivStuff
+genCon2Tag con2tag_RDR loc tycon
+  = DerivHsBind (mkFunBindSE 0 loc con2tag_RDR eqns,
+                 L loc (TypeSig noExtField [L loc con2tag_RDR] sig_ty))
   where
-    stable_parent_occ = mkOccName (occNameSpace parent_occ) stable_string
-    stable_string
-      | hasPprDebug dflags = parent_stable
-      | otherwise          = parent_stable_hash
-    parent_stable = nameStableString parent
-    parent_stable_hash =
-      let Fingerprint high low = fingerprintString parent_stable
-      in toBase62 high ++ toBase62Padded low
-      -- See Note [Base 62 encoding 128-bit integers] in GHC.Utils.Encoding
-    parent_occ  = nameOccName parent
+    sig_ty = mkLHsSigWcType $ L loc $ XHsType $ NHsCoreTy $
+             mkSpecSigmaTy (tyConTyVars tycon) (tyConStupidTheta tycon) $
+             mkParentType tycon `mkVisFunTy` intPrimTy
 
+    lots_of_constructors = tyConFamilySize tycon > 8
+                        -- was: mAX_FAMILY_SIZE_FOR_VEC_RETURNS
+                        -- but we don't do vectored returns any more.
+
+    eqns | lots_of_constructors = [get_tag_eqn]
+         | otherwise = map mk_eqn (tyConDataCons tycon)
+
+    get_tag_eqn = ([nlVarPat a_RDR], nlHsApp (nlHsVar getTag_RDR) a_Expr)
+
+    mk_eqn :: DataCon -> ([LPat GhcPs], LHsExpr GhcPs)
+    mk_eqn con = ([nlWildConPat con],
+                  nlHsLit (HsIntPrim NoSourceText
+                                    (toInteger ((dataConTag con) - fIRST_TAG))))
+
+-- Generate @$tag2con_T :: Int -> T@, which returns the data constructor (of
+-- type @T@) corresponding to a particular tag.
+genTag2Con :: RdrName -> SrcSpan -> TyCon -> DerivStuff
+genTag2Con tag2con_RDR loc tycon
+  = DerivHsBind (mkFunBindSE 0 loc tag2con_RDR
+                    [([nlConVarPat intDataCon_RDR [a_RDR]],
+                       nlHsApp (nlHsVar tagToEnum_RDR) a_Expr)],
+                 L loc (TypeSig noExtField [L loc tag2con_RDR] sig_ty))
+  where
+    sig_ty = mkLHsSigWcType $ L loc $
+             XHsType $ NHsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
+             intTy `mkVisFunTy` mkParentType tycon
+
+-- Generate @$maxtag_T :: Int@, which returns the maximum tag for the data
+-- constructors of some data type @T@.
+genMaxTag :: RdrName -> SrcSpan -> TyCon -> DerivStuff
+genMaxTag maxtag_RDR loc tycon
+  = DerivHsBind (mkHsVarBind loc maxtag_RDR rhs,
+                 L loc (TypeSig noExtField [L loc maxtag_RDR] sig_ty))
+  where
+    sig_ty = mkLHsSigWcType (L loc (XHsType (NHsCoreTy intTy)))
+    rhs = nlHsApp (nlHsVar intDataCon_RDR)
+                  (nlHsLit (HsIntPrim NoSourceText max_tag))
+    max_tag =  case (tyConDataCons tycon) of
+                 data_cons -> toInteger ((length data_cons) - fIRST_TAG)
+
+-- Generate @$tT :: Data.Data.DataType@, which contains the representation for
+-- the data type @T@.
+genDataTyCon :: DynFlags -> RdrName -> [RdrName] -> SrcSpan -> TyCon -> DerivStuff
+genDataTyCon dflags data_type_name constr_names loc rep_tc
+  = DerivHsBind (mkHsVarBind loc data_type_name rhs,
+                 L loc (TypeSig noExtField [L loc data_type_name] sig_ty))
+  where
+    sig_ty = mkLHsSigWcType (nlHsTyVar dataType_RDR)
+    ctx    = initDefaultSDocContext dflags
+    rhs    = nlHsVar mkDataType_RDR
+             `nlHsApp` nlHsLit (mkHsString (showSDocOneLine ctx (ppr rep_tc)))
+             `nlHsApp` nlList (map nlHsVar constr_names)
+
+-- Generate @$cD :: Data.Data.Constr@, which contains the representation for
+-- the data constructor @D@.
+genDataDataCon :: RdrName -> SrcSpan -> DataCon -> RdrName -> DerivStuff
+genDataDataCon data_type_name loc dc constr_name
+  = DerivHsBind (mkHsVarBind loc constr_name rhs,
+                 L loc (TypeSig noExtField [L loc constr_name] sig_ty))
+  where
+    sig_ty   = mkLHsSigWcType (nlHsTyVar constr_RDR)
+    rhs      = nlHsApps mkConstr_RDR constr_args
+
+    constr_args
+       = [ -- nlHsIntLit (toInteger (dataConTag dc)),   -- Tag
+           nlHsVar (data_type_name)                     -- DataType
+         , nlHsLit (mkHsString (occNameString dc_occ))  -- String name
+         , nlList  labels                               -- Field labels
+         , nlHsVar fixity ]                             -- Fixity
+
+    labels   = map (nlHsLit . mkHsString . unpackFS . flLabel)
+                   (dataConFieldLabels dc)
+    dc_occ   = getOccName dc
+    is_infix = isDataSymOcc dc_occ
+    fixity | is_infix  = infix_RDR
+           | otherwise = prefix_RDR
 
 {-
 Note [Auxiliary binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-We often want to make a top-level auxiliary binding.  E.g. for comparison we have
+We often want to make a top-level auxiliary bindings in derived instances.
+E.g. for derived Ord instances we have:
+
+  data T = ...
+  deriving instance Ord T
+
+  ==>
 
   instance Ord T where
-    compare a b = $con2tag a `compare` $con2tag b
+    compare a b = $con2tag_T a `compare` $con2tag_T b
 
-  $con2tag :: T -> Int
-  $con2tag = ...code....
+  $con2tag_T :: T -> Int
+  $con2tag_T = ...code....
 
-Of course these top-level bindings should all have distinct name, and we are
-generating RdrNames here.  We can't just use the TyCon or DataCon to distinguish
-because with standalone deriving two imported TyCons might both be called T!
-(See #7947.)
+Note that multiple instances of the same type might need to use the same sort
+of auxiliary binding. For example, $con2tag is used not only in derived Ord
+instances, but also in derived Eq instances:
 
-So we use package name, module name and the name of the parent
-(T in this example) as part of the OccName we generate for the new binding.
-To make the symbol names short we take a base62 hash of the full name.
+  deriving instance Eq T
 
-In the past we used the *unique* from the parent, but that's not stable across
-recompilations as uniques are nondeterministic.
+  ==>
+
+  instance Eq T where
+    a == b = $con2tag_T a == $con2tag_T b
+
+In fact, there are situations where the same sort of auxiliary binding can be
+used in multiple instances of the same type /and/ the same type class. Consider
+this example:
+
+  data S a = ...
+
+  deriving instance Eq (S Int)
+  deriving instance Eq (S Bool)
+
+  ==>
+
+  instance Eq (S Int) where
+    a == b = $con2tag_S a == $con2tag_S b
+  instance Eq (S Int) where
+    a == b = $con2tag_S a == $con2tag_S b
+
+  $con2tag_S :: S a -> Int
+  $con2tag_S = ...code....
+
+These examples can prove challenging because if GHC implements `deriving` in a
+naïve way, then it is easy to generate multiple copies of the same sort of
+auxiliary binding per type constructor /with the same name/. When these copies
+are colocated in the same module, bad things usually follow.
+See #7947, #12245, and #18321 for examples of bad things that can happen.
+
+Note that we are really only concerned about duplicate auxiliary binding names
+within the same module. If there are two copies of $con2tag_T in two different
+modules, then we don't have to worry, since GHC will be able to distinguish
+them. In order to avoid duplicates within the same module, we have considered
+three options:
+
+1. Always generate a unique copy of each sort of auxiliary binding per data type
+   definition, and use these unique copies across all derived instances for
+   each data type.
+
+2. In each derived instance, generate a copy of each sort of auxiliary
+   binding, but without any effort to make the names unique. Later, perform a
+   deduplication pass to ensure that there is only one copy per module.
+
+3. In each derived instance, generate a copy of each sort of auxiliary
+   binding, giving each copy a unique name.
+
+Here are the pros and cons of each approach:
+
+1. Pros: Because each data type has unique auxiliary bindings associated with
+   it, there is no danger of having name clashes between instances that use
+   these auxiliary bindings.
+
+   Cons: GHC would need to make sure that the implementations for each sort of
+   auxiliary binding are available for each data type. If a data type never
+   has any derived instances that use these bindings, then users pay the cost
+   of compiling extra code that never gets used.
+
+2. Pros: If implementing correctly, this option ensures that at most one copy
+   of each sort of auxiliary binding is defined per data type. Therefore, this
+   option promises to have the least code bloat.
+
+   Cons: It's surprisingly awkward to implement this in practice, especially
+   when instances across Template Haskell splice boundaries (see #18321). It's
+   possible to deduplicate auxiliary bindings with a dedicated pass in the
+   renamer, but it's rather grungy.
+   (See https://gitlab.haskell.org/ghc/ghc/issues/18321#note_281178.)
+
+3. Pros: This option is conceptually very simple to implement, as it requires
+   no manual deduplication. Just generate auxiliary bindings for each instance
+   on the fly, and use a unique number as a suffix to avoid intra-module name
+   clashes.
+
+   Cons: It's easy to end up with multiple copies of the same sort of auxiliary
+   binding, but with different names. This increases the potential for code
+   bloat, but given that most auxiliary bindings are quite small in size, a
+   CSE pass will often deduplicate these copies anyway when optimizations are
+   enabled.
+
+In practice, GHC implements option (3). As a result, any gen_* function defined
+in this module that needs to use auxiliary bindings must use TcM. This is
+because each auxiliary binding name needs a unique number, so these unique
+numbers are taken from a global counter that is incremented each time an
+auxiliary binding is defined.
+
+In the past we used the Unique from the parent TyCon rather than taking it from
+a dedicated global counter, but that's not stable across recompilations as
+Uniques are nondeterministic.
 -}
