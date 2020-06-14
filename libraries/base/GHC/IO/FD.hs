@@ -105,7 +105,7 @@ instance Show FD where
 ifSupported :: String -> a -> a
 #if defined(mingw32_HOST_OS)
 ifSupported s a = a <!> (error $ "FD:" ++ s ++ " not supported")
-#elif
+#else
 ifSupported _ = id
 #endif
 
