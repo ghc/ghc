@@ -608,6 +608,9 @@ class Functor f => Applicative f where
     -- This became a typeclass method in 4.10.0.0. Prior to that, it was
     -- a function defined in terms of '<*>' and 'fmap'.
     --
+    -- ==== __Example__
+    -- > liftA2 (,) (Just 3) (Just 5)
+    -- Just (3,5)
 
     liftA2 :: (a -> b -> c) -> f a -> f b -> f c
     liftA2 f x = (<*>) (fmap f x)
