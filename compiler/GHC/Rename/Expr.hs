@@ -554,8 +554,10 @@ rnExpr (HsProc x pat body)
       { (body',fvBody) <- rnCmdTop body
       ; return (HsProc x pat' body', fvBody) }
 
-rnExpr other = pprPanic "rnExpr: unexpected expression" (ppr other)
-        -- HsWrap
+rnExpr expr@(HsConLikeOut _ _) = pprPanic "rnExpr: unexpected expression" (ppr expr)
+rnExpr expr@(HsTcBracketOut _ _ _ _) = pprPanic "rnExpr: unexpected expression" (ppr expr)
+rnExpr expr@(HsTick _ _ _) = pprPanic "rnExpr: unexpected expression" (ppr expr)
+rnExpr expr@(HsBinTick _ _ _ _) = pprPanic "rnExpr: unexpected expression" (ppr expr)
 
 {- *********************************************************************
 *                                                                      *
