@@ -620,7 +620,7 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
       where newTyVars = replicateM refLvl $ setLvl <$>
                             (newOpenTypeKind >>= newFlexiTyVar)
             setLvl = flip setMetaTyVarTcLevel hole_lvl
-            wrapWithVars vars = mkVisFunTys (map mkTyVarTy vars) hole_ty
+            wrapWithVars vars = mkVisFunTysMany (map mkTyVarTy vars) hole_ty
 
     sortFits :: SortingAlg    -- How we should sort the hole fits
              -> [HoleFit]     -- The subs to sort
@@ -758,34 +758,34 @@ tcFilterHoleFits limit typed_hole ht@(hole_ty, _) candidates =
         do { traceTc "lookingUp" $ ppr el
            ; maybeThing <- lookup el
            ; case maybeThing of
-               Just id | not_trivial id ->
-                       do { fits <- fitsHole ty (idType id)
+               Just (id, id_ty) | not_trivial id ->
+                       do { fits <- fitsHole ty id_ty
                           ; case fits of
-                              Just (wrp, matches) -> keep_it id wrp matches
+                              Just (wrp, matches) -> keep_it id id_ty wrp matches
                               _ -> discard_it }
                _ -> discard_it }
         where
           -- We want to filter out undefined and the likes from GHC.Err
           not_trivial id = nameModule_maybe (idName id) /= Just gHC_ERR
 
-          lookup :: HoleFitCandidate -> TcM (Maybe Id)
-          lookup (IdHFCand id) = return (Just id)
+          lookup :: HoleFitCandidate -> TcM (Maybe (Id, Type))
+          lookup (IdHFCand id) = return (Just (id, idType id))
           lookup hfc = do { thing <- tcLookup name
                           ; return $ case thing of
-                                       ATcId {tct_id = id} -> Just id
-                                       AGlobal (AnId id)   -> Just id
+                                       ATcId {tct_id = id} -> Just (id, idType id)
+                                       AGlobal (AnId id)   -> Just (id, idType id)
                                        AGlobal (AConLike (RealDataCon con)) ->
-                                           Just (dataConWrapId con)
+                                           Just (dataConWrapId con, dataConNonlinearType con)
                                        _ -> Nothing }
             where name = case hfc of
                            IdHFCand id -> idName id
                            GreHFCand gre -> gre_name gre
                            NameHFCand name -> name
           discard_it = go subs seen maxleft ty elts
-          keep_it eid wrp ms = go (fit:subs) (extendVarSet seen eid)
+          keep_it eid eid_ty wrp ms = go (fit:subs) (extendVarSet seen eid)
                                  ((\n -> n - 1) <$> maxleft) ty elts
             where
-              fit = HoleFit { hfId = eid, hfCand = el, hfType = (idType eid)
+              fit = HoleFit { hfId = eid, hfCand = el, hfType = eid_ty
                             , hfRefLvl = length (snd ty)
                             , hfWrap = wrp, hfMatches = ms
                             , hfDoc = Nothing }

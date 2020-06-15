@@ -78,6 +78,7 @@ import GHC.Data.FastString
 import GHC.Types.Basic hiding ( SuccessFlag(..) )
 import GHC.Data.List.SetOps
 import GHC.Fingerprint
+import GHC.Core.Multiplicity
 import qualified GHC.Data.BooleanFormula as BF
 
 import Control.Monad
@@ -924,7 +925,7 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
           -- below is always guaranteed to succeed.
         ; user_tv_bndrs <- mapM (\(Bndr bd vis) ->
                                    case bd of
-                                     IfaceIdBndr (name, _) ->
+                                     IfaceIdBndr (_, name, _) ->
                                        Bndr <$> tcIfaceLclId name <*> pure vis
                                      IfaceTvBndr (name, _) ->
                                        Bndr <$> tcIfaceTyVar name <*> pure vis)
@@ -945,7 +946,7 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
                 -- the argument types was recursively defined.
                 -- See also Note [Tying the knot]
                 ; arg_tys <- forkM (mk_doc dc_name <+> text "arg_tys")
-                           $ mapM tcIfaceType args
+                           $ mapM (\(w, ty) -> mkScaled <$> tcIfaceType w <*> tcIfaceType ty) args
                 ; stricts <- mapM tc_strict if_stricts
                         -- The IfBang field can mention
                         -- the type itself; hence inside forkM
@@ -1164,11 +1165,11 @@ tcIfaceCompleteSig (IfaceCompleteMatch ms t) = return (CompleteMatch ms t)
 tcIfaceType :: IfaceType -> IfL Type
 tcIfaceType = go
   where
-    go (IfaceTyVar n)          = TyVarTy <$> tcIfaceTyVar n
-    go (IfaceFreeTyVar n)      = pprPanic "tcIfaceType:IfaceFreeTyVar" (ppr n)
-    go (IfaceLitTy l)          = LitTy <$> tcIfaceTyLit l
-    go (IfaceFunTy flag t1 t2) = FunTy flag <$> go t1 <*> go t2
-    go (IfaceTupleTy s i tks)  = tcIfaceTupleTy s i tks
+    go (IfaceTyVar n)            = TyVarTy <$> tcIfaceTyVar n
+    go (IfaceFreeTyVar n)        = pprPanic "tcIfaceType:IfaceFreeTyVar" (ppr n)
+    go (IfaceLitTy l)            = LitTy <$> tcIfaceTyLit l
+    go (IfaceFunTy flag w t1 t2) = FunTy flag <$> tcIfaceType w <*> go t1 <*> go t2
+    go (IfaceTupleTy s i tks)    = tcIfaceTupleTy s i tks
     go (IfaceAppTy t ts)
       = do { t'  <- go t
            ; ts' <- traverse go (appArgsIfaceTypes ts)
@@ -1240,7 +1241,7 @@ tcIfaceCo = go
 
     go (IfaceReflCo t)           = Refl <$> tcIfaceType t
     go (IfaceGReflCo r t mco)    = GRefl r <$> tcIfaceType t <*> go_mco mco
-    go (IfaceFunCo r c1 c2)      = mkFunCo r <$> go c1 <*> go c2
+    go (IfaceFunCo r w c1 c2)    = mkFunCo r <$> go w <*> go c1 <*> go c2
     go (IfaceTyConAppCo r tc cs)
       = TyConAppCo r <$> tcIfaceTyCon tc <*> mapM go cs
     go (IfaceAppCo c1 c2)        = AppCo <$> go c1 <*> go c2
@@ -1342,7 +1343,8 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
     case_bndr_name <- newIfaceName (mkVarOccFS case_bndr)
     let
         scrut_ty   = exprType scrut'
-        case_bndr' = mkLocalIdOrCoVar case_bndr_name scrut_ty
+        case_mult = Many
+        case_bndr' = mkLocalIdOrCoVar case_bndr_name case_mult scrut_ty
      -- "OrCoVar" since a coercion can be a scrutinee with -fdefer-type-errors
      -- (e.g. see test T15695). Ticket #17291 covers fixing this problem.
         tc_app     = splitTyConApp scrut_ty
@@ -1353,7 +1355,7 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
                 --     corresponds to the datacon in this case alternative
 
     extendIfaceIdEnv [case_bndr'] $ do
-     alts' <- mapM (tcIfaceAlt scrut' tc_app) alts
+     alts' <- mapM (tcIfaceAlt scrut' case_mult tc_app) alts
      return (Case scrut' case_bndr' (coreAltsType alts') alts')
 
 tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info ji) rhs) body)
@@ -1361,7 +1363,7 @@ tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info ji) rhs) body)
         ; ty'     <- tcIfaceType ty
         ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
                               NotTopLevel name ty' info
-        ; let id = mkLocalIdWithInfo name ty' id_info
+        ; let id = mkLocalIdWithInfo name Many ty' id_info
                      `asJoinId_maybe` tcJoinInfo ji
         ; rhs' <- tcIfaceExpr rhs
         ; body' <- extendIfaceIdEnv [id] (tcIfaceExpr body)
@@ -1377,7 +1379,7 @@ tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
    tc_rec_bndr (IfLetBndr fs ty _ ji)
      = do { name <- newIfaceName (mkVarOccFS fs)
           ; ty'  <- tcIfaceType ty
-          ; return (mkLocalId name ty' `asJoinId_maybe` tcJoinInfo ji) }
+          ; return (mkLocalId name Many ty' `asJoinId_maybe` tcJoinInfo ji) }
    tc_pair (IfLetBndr _ _ info _, rhs) id
      = do { rhs' <- tcIfaceExpr rhs
           ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
@@ -1418,15 +1420,15 @@ tcIfaceLit (LitNumber LitNumNatural i _)
 tcIfaceLit lit = return lit
 
 -------------------------
-tcIfaceAlt :: CoreExpr -> (TyCon, [Type])
+tcIfaceAlt :: CoreExpr -> Mult -> (TyCon, [Type])
            -> (IfaceConAlt, [FastString], IfaceExpr)
            -> IfL (AltCon, [TyVar], CoreExpr)
-tcIfaceAlt _ _ (IfaceDefault, names, rhs)
+tcIfaceAlt _ _ _ (IfaceDefault, names, rhs)
   = ASSERT( null names ) do
     rhs' <- tcIfaceExpr rhs
     return (DEFAULT, [], rhs')
 
-tcIfaceAlt _ _ (IfaceLitAlt lit, names, rhs)
+tcIfaceAlt _ _ _ (IfaceLitAlt lit, names, rhs)
   = ASSERT( null names ) do
     lit' <- tcIfaceLit lit
     rhs' <- tcIfaceExpr rhs
@@ -1435,19 +1437,19 @@ tcIfaceAlt _ _ (IfaceLitAlt lit, names, rhs)
 -- A case alternative is made quite a bit more complicated
 -- by the fact that we omit type annotations because we can
 -- work them out.  True enough, but its not that easy!
-tcIfaceAlt scrut (tycon, inst_tys) (IfaceDataAlt data_occ, arg_strs, rhs)
+tcIfaceAlt scrut mult (tycon, inst_tys) (IfaceDataAlt data_occ, arg_strs, rhs)
   = do  { con <- tcIfaceDataCon data_occ
         ; when (debugIsOn && not (con `elem` tyConDataCons tycon))
                (failIfM (ppr scrut $$ ppr con $$ ppr tycon $$ ppr (tyConDataCons tycon)))
-        ; tcIfaceDataAlt con inst_tys arg_strs rhs }
+        ; tcIfaceDataAlt mult con inst_tys arg_strs rhs }
 
-tcIfaceDataAlt :: DataCon -> [Type] -> [FastString] -> IfaceExpr
+tcIfaceDataAlt :: Mult -> DataCon -> [Type] -> [FastString] -> IfaceExpr
                -> IfL (AltCon, [TyVar], CoreExpr)
-tcIfaceDataAlt con inst_tys arg_strs rhs
+tcIfaceDataAlt mult con inst_tys arg_strs rhs
   = do  { us <- newUniqueSupply
         ; let uniqs = uniqsFromSupply us
         ; let (ex_tvs, arg_ids)
-                      = dataConRepFSInstPat arg_strs uniqs con inst_tys
+                      = dataConRepFSInstPat arg_strs uniqs mult con inst_tys
 
         ; rhs' <- extendIfaceEnvs  ex_tvs       $
                   extendIfaceIdEnv arg_ids      $
@@ -1804,10 +1806,11 @@ tcIfaceImplicit n = do
 -}
 
 bindIfaceId :: IfaceIdBndr -> (Id -> IfL a) -> IfL a
-bindIfaceId (fs, ty) thing_inside
+bindIfaceId (w, fs, ty) thing_inside
   = do  { name <- newIfaceName (mkVarOccFS fs)
         ; ty' <- tcIfaceType ty
-        ; let id = mkLocalIdOrCoVar name ty'
+        ; w' <- tcIfaceType w
+        ; let id = mkLocalIdOrCoVar name w' ty'
           -- We should not have "OrCoVar" here, this is a bug (#17545)
         ; extendIfaceIdEnv [id] (thing_inside id) }
 
