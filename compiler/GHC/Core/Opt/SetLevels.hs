@@ -84,6 +84,7 @@ import GHC.Core.Utils   ( exprType, exprIsHNF
                         , exprIsTopLevelBindable
                         , isExprLevPoly
                         , collectMakeStaticArgs
+                        , mkLamTypes
                         )
 import GHC.Core.Opt.Arity   ( exprBotStrictness_maybe )
 import GHC.Core.FVs     -- all of it
@@ -103,7 +104,7 @@ import GHC.Types.Cpr          ( mkCprSig, botCpr )
 import GHC.Types.Name         ( getOccName, mkSystemVarName )
 import GHC.Types.Name.Occurrence ( occNameString )
 import GHC.Types.Unique       ( hasKey )
-import GHC.Core.Type    ( Type, mkLamTypes, splitTyConApp_maybe, tyCoVarsOfType
+import GHC.Core.Type    ( Type, splitTyConApp_maybe, tyCoVarsOfType
                         , mightBeUnliftedType, closeOverKindsDSet )
 import GHC.Core.Multiplicity     ( pattern Many )
 import GHC.Types.Basic  ( Arity, RecFlag(..), isRec )

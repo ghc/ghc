@@ -161,7 +161,6 @@ import GHC.Core.DataCon
 import {-# SOURCE #-} GHC.Core.ConLike
 import GHC.Core.TyCon
 import GHC.Core.Class     ( Class, mkClass )
-import GHC.Core.Multiplicity
 import GHC.Types.Name.Reader
 import GHC.Types.Name as Name
 import GHC.Types.Name.Env ( NameEnv, mkNameEnv, lookupNameEnv, lookupNameEnv_NF )
