@@ -39,6 +39,7 @@ import GHC.Core
 import GHC.Core.Make
 import GHC.Core.TyCon
 import GHC.Core.DataCon
+import GHC.Core.Multiplicity
 import GHC.Tc.Utils.Zonk ( shortCutLit )
 import GHC.Tc.Utils.TcType
 import GHC.Types.Name
@@ -148,7 +149,7 @@ warnAboutIdentities :: DynFlags -> CoreExpr -> Type -> DsM ()
 warnAboutIdentities dflags (Var conv_fn) type_of_conv
   | wopt Opt_WarnIdentities dflags
   , idName conv_fn `elem` conversionNames
-  , Just (arg_ty, res_ty) <- splitFunTy_maybe type_of_conv
+  , Just (Scaled _ arg_ty, res_ty) <- splitFunTy_maybe type_of_conv
   , arg_ty `eqType` res_ty  -- So we are converting  ty -> ty
   = warnDs (Reason Opt_WarnIdentities)
            (vcat [ text "Call of" <+> ppr conv_fn <+> dcolon <+> ppr type_of_conv

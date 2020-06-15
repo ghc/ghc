@@ -26,12 +26,16 @@ module GHC.Builtin.Types.Prim(
         runtimeRep1TyVar, runtimeRep2TyVar, runtimeRep1Ty, runtimeRep2Ty,
         openAlphaTy, openBetaTy, openAlphaTyVar, openBetaTyVar,
 
+        multiplicityTyVar,
+        multiplicityTyVarList,
+
         -- Kind constructors...
         tYPETyCon, tYPETyConName,
 
         -- Kinds
         tYPE, primRepToRuntimeRep,
 
+        functionWithMultiplicity,
         funTyCon, funTyConName,
         unexposedPrimTyCons, exposedPrimTyCons, primTyCons,
 
@@ -108,7 +112,7 @@ import {-# SOURCE #-} GHC.Builtin.Types
   , int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy
   , word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy
   , doubleElemRepDataConTy
-  , mkPromotedListTy )
+  , mkPromotedListTy, multiplicityTy )
 
 import GHC.Types.Var    ( TyVar, mkTyVar )
 import GHC.Types.Name
@@ -385,6 +389,14 @@ openAlphaTy, openBetaTy :: Type
 openAlphaTy = mkTyVarTy openAlphaTyVar
 openBetaTy  = mkTyVarTy openBetaTyVar
 
+multiplicityTyVar :: TyVar
+multiplicityTyVar = mkTemplateTyVars (repeat multiplicityTy) !! 13  -- selects 'n'
+
+-- Create 'count' multiplicity TyVars
+multiplicityTyVarList :: Int -> [TyVar]
+multiplicityTyVarList count = take count $
+                              drop 13 $  -- selects 'n', 'o'...
+                              mkTemplateTyVars (repeat multiplicityTy)
 {-
 ************************************************************************
 *                                                                      *
@@ -394,13 +406,13 @@ openBetaTy  = mkTyVarTy openBetaTyVar
 -}
 
 funTyConName :: Name
-funTyConName = mkPrimTyConName (fsLit "->") funTyConKey funTyCon
+funTyConName = mkPrimTyConName (fsLit "FUN") funTyConKey funTyCon
 
--- | The @(->)@ type constructor.
+-- | The @FUN@ type constructor.
 --
 -- @
--- (->) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
---         TYPE rep1 -> TYPE rep2 -> Type
+-- FUN :: forall {m :: Multiplicity} {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
+--         TYPE rep1 -> TYPE rep2 -> *
 -- @
 --
 -- The runtime representations quantification is left inferred. This
@@ -413,13 +425,15 @@ funTyConName = mkPrimTyConName (fsLit "->") funTyConKey funTyCon
 -- @
 -- type Arr :: forall (rep1 :: RuntimeRep) (rep2 :: RuntimeRep).
 --             TYPE rep1 -> TYPE rep2 -> Type
--- type Arr = (->)
+-- type Arr = FUN
 -- @
 --
 funTyCon :: TyCon
 funTyCon = mkFunTyCon funTyConName tc_bndrs tc_rep_nm
   where
-    tc_bndrs = [ mkNamedTyConBinder Inferred runtimeRep1TyVar
+    -- See also unrestrictedFunTyCon
+    tc_bndrs = [ mkNamedTyConBinder Required multiplicityTyVar
+               , mkNamedTyConBinder Inferred runtimeRep1TyVar
                , mkNamedTyConBinder Inferred runtimeRep2TyVar ]
                ++ mkTemplateAnonTyConBinders [ tYPE runtimeRep1Ty
                                              , tYPE runtimeRep2Ty
@@ -542,6 +556,10 @@ mkPrimTcName built_in_syntax occ key tycon
 -- see Note [TYPE and RuntimeRep]
 tYPE :: Type -> Type
 tYPE rr = TyConApp tYPETyCon [rr]
+
+-- Given a Multiplicity, applies FUN to it.
+functionWithMultiplicity :: Type -> Type
+functionWithMultiplicity mul = TyConApp funTyCon [mul]
 
 {-
 ************************************************************************

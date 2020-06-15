@@ -1413,14 +1413,14 @@ normalise_type ty
     go (TyConApp tc tys) = normalise_tc_app tc tys
     go ty@(LitTy {})     = do { r <- getRole
                               ; return (mkReflCo r ty, ty) }
-
     go (AppTy ty1 ty2) = go_app_tys ty1 [ty2]
 
-    go ty@(FunTy { ft_arg = ty1, ft_res = ty2 })
+    go ty@(FunTy { ft_mult = w, ft_arg = ty1, ft_res = ty2 })
       = do { (co1, nty1) <- go ty1
            ; (co2, nty2) <- go ty2
+           ; (wco, wty) <- go w
            ; r <- getRole
-           ; return (mkFunCo r co1 co2, ty { ft_arg = nty1, ft_res = nty2 }) }
+           ; return (mkFunCo r wco co1 co2, ty { ft_mult = wty, ft_arg = nty1, ft_res = nty2 }) }
     go (ForAllTy (Bndr tcvar vis) ty)
       = do { (lc', tv', h, ki') <- normalise_var_bndr tcvar
            ; (co, nty)          <- withLC lc' $ normalise_type ty
@@ -1749,10 +1749,11 @@ coreFlattenTy subst = go
       = let (env', tys') = coreFlattenTys subst env tys in
         (env', mkTyConApp tc tys')
 
-    go env ty@(FunTy { ft_arg = ty1, ft_res = ty2 })
+    go env ty@(FunTy { ft_mult = mult, ft_arg = ty1, ft_res = ty2 })
       = let (env1, ty1') = go env  ty1
-            (env2, ty2') = go env1 ty2 in
-        (env2, ty { ft_arg = ty1', ft_res = ty2' })
+            (env2, ty2') = go env1 ty2
+            (env3, mult') = go env2 mult in
+        (env3, ty { ft_mult = mult', ft_arg = ty1', ft_res = ty2' })
 
     go env (ForAllTy (Bndr tv vis) ty)
       = let (env1, subst', tv') = coreFlattenVarBndr subst env tv
@@ -1769,6 +1770,7 @@ coreFlattenTy subst = go
     go env (CoercionTy co)
       = let (env', co') = coreFlattenCo subst env co in
         (env', CoercionTy co')
+
 
 -- when flattening, we don't care about the contents of coercions.
 -- so, just return a fresh variable of the right (flattened) type

@@ -29,6 +29,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Origin
 import GHC.Tc.Types.Evidence
+import GHC.Core.Multiplicity
 import GHC.Types.Id( mkLocalId )
 import GHC.Tc.Utils.Instantiate
 import GHC.Builtin.Types
@@ -92,7 +93,7 @@ tcProc pat cmd exp_ty
         ; (co, (exp_ty1, res_ty)) <- matchExpectedAppTy exp_ty
         ; (co1, (arr_ty, arg_ty)) <- matchExpectedAppTy exp_ty1
         ; let cmd_env = CmdEnv { cmd_arr = arr_ty }
-        ; (pat', cmd') <- tcCheckPat ProcExpr pat arg_ty $
+        ; (pat', cmd') <- tcCheckPat ProcExpr pat (unrestricted arg_ty) $
                           tcCmdTop cmd_env cmd (unitTy, res_ty)
         ; let res_co = mkTcTransCo co
                          (mkTcAppCo co1 (mkTcNomReflCo res_ty))
@@ -179,7 +180,7 @@ tc_cmd env (HsCmdIf x fun@(SyntaxExprRn {}) pred b1 b2) res_ty -- Rebindable syn
                   (text "Predicate type of `ifThenElse' depends on result type")
         ; (pred', fun')
             <- tcSyntaxOp IfOrigin fun (map synKnownType [pred_ty, r_ty, r_ty])
-                                       (mkCheckExpType r_ty) $ \ _ ->
+                                       (mkCheckExpType r_ty) $ \ _ _ ->
                tcCheckMonoExpr pred pred_ty
 
         ; b1'   <- tcCmd env b1 res_ty
@@ -254,13 +255,13 @@ tc_cmd env
 
                 -- Check the patterns, and the GRHSs inside
         ; (pats', grhss') <- setSrcSpan mtch_loc                                 $
-                             tcPats LambdaExpr pats (map mkCheckExpType arg_tys) $
+                             tcPats LambdaExpr pats (map (unrestricted . mkCheckExpType) arg_tys) $
                              tc_grhss grhss cmd_stk' (mkCheckExpType res_ty)
 
         ; let match' = L mtch_loc (Match { m_ext = noExtField
                                          , m_ctxt = LambdaExpr, m_pats = pats'
                                          , m_grhss = grhss' })
-              arg_tys = map hsLPatType pats'
+              arg_tys = map (unrestricted . hsLPatType) pats'
               cmd' = HsCmdLam x (MG { mg_alts = L l [match']
                                     , mg_ext = MatchGroupTc arg_tys res_ty
                                     , mg_origin = origin })
@@ -309,7 +310,7 @@ tc_cmd env cmd@(HsCmdArrForm x expr f fixity cmd_args) (cmd_stk, res_ty)
     do  { (cmd_args', cmd_tys) <- mapAndUnzipM tc_cmd_arg cmd_args
                               -- We use alphaTyVar for 'w'
         ; let e_ty = mkInfForAllTy alphaTyVar $
-                     mkVisFunTys cmd_tys $
+                     mkVisFunTysMany cmd_tys $
                      mkCmdArrTy env (mkPairTy alphaTy cmd_stk) res_ty
         ; expr' <- tcCheckPolyExpr expr e_ty
         ; return (HsCmdArrForm x expr' f fixity cmd_args') }
@@ -340,7 +341,7 @@ tcCmdMatches :: CmdEnv
              -> CmdType
              -> TcM (MatchGroup GhcTcId (LHsCmd GhcTcId))
 tcCmdMatches env scrut_ty matches (stk, res_ty)
-  = tcMatchesCase match_ctxt scrut_ty matches (mkCheckExpType res_ty)
+  = tcMatchesCase match_ctxt (unrestricted scrut_ty) matches (mkCheckExpType res_ty)
   where
     match_ctxt = MC { mc_what = CaseAlt,
                       mc_body = mc_body }
@@ -382,7 +383,7 @@ tcArrDoStmt env _ (BodyStmt _ rhs _ _) res_ty thing_inside
 
 tcArrDoStmt env ctxt (BindStmt _ pat rhs) res_ty thing_inside
   = do  { (rhs', pat_ty) <- tc_arr_rhs env rhs
-        ; (pat', thing)  <- tcCheckPat (StmtCtxt ctxt) pat pat_ty $
+        ; (pat', thing)  <- tcCheckPat (StmtCtxt ctxt) pat (unrestricted pat_ty) $
                             thing_inside res_ty
         ; return (mkTcBindStmt pat' rhs', thing) }
 
@@ -390,7 +391,7 @@ tcArrDoStmt env ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
                             , recS_rec_ids = rec_names }) res_ty thing_inside
   = do  { let tup_names = rec_names ++ filterOut (`elem` rec_names) later_names
         ; tup_elt_tys <- newFlexiTyVarTys (length tup_names) liftedTypeKind
-        ; let tup_ids = zipWith mkLocalId tup_names tup_elt_tys
+        ; let tup_ids = zipWith (\n p -> mkLocalId n Many p) tup_names tup_elt_tys -- Many because it's a recursive definition
         ; tcExtendIdEnv tup_ids $ do
         { (stmts', tup_rets)
                 <- tcStmtsAndThen ctxt (tcArrDoStmt env) stmts res_ty   $ \ _res_ty' ->
@@ -439,7 +440,7 @@ mkPairTy :: Type -> Type -> Type
 mkPairTy t1 t2 = mkTyConApp pairTyCon [t1,t2]
 
 arrowTyConKind :: Kind          --  *->*->*
-arrowTyConKind = mkVisFunTys [liftedTypeKind, liftedTypeKind] liftedTypeKind
+arrowTyConKind = mkVisFunTysMany [liftedTypeKind, liftedTypeKind] liftedTypeKind
 
 {-
 ************************************************************************

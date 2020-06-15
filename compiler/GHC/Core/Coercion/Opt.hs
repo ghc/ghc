@@ -251,14 +251,15 @@ opt_co4 env sym rep r (ForAllCo tv k_co co)
                             opt_co4_wrap env' sym rep r co
      -- Use the "mk" functions to check for nested Refls
 
-opt_co4 env sym rep r (FunCo _r co1 co2)
+opt_co4 env sym rep r (FunCo _r cow co1 co2)
   = ASSERT( r == _r )
     if rep
-    then mkFunCo Representational co1' co2'
-    else mkFunCo r co1' co2'
+    then mkFunCo Representational cow' co1' co2'
+    else mkFunCo r cow' co1' co2'
   where
     co1' = opt_co4_wrap env sym rep r co1
     co2' = opt_co4_wrap env sym rep r co2
+    cow' = opt_co1 env sym cow
 
 opt_co4 env sym rep r (CoVarCo cv)
   | Just co <- lookupCoVar (lcTCvSubst env) cv
@@ -648,10 +649,10 @@ opt_trans_rule is in_co1@(TyConAppCo r1 tc1 cos1) in_co2@(TyConAppCo r2 tc2 cos2
     fireTransRule "PushTyConApp" in_co1 in_co2 $
     mkTyConAppCo r1 tc1 (opt_transList is cos1 cos2)
 
-opt_trans_rule is in_co1@(FunCo r1 co1a co1b) in_co2@(FunCo r2 co2a co2b)
-  = ASSERT( r1 == r2 )   -- Just like the TyConAppCo/TyConAppCo case
+opt_trans_rule is in_co1@(FunCo r1 w1 co1a co1b) in_co2@(FunCo r2 w2 co2a co2b)
+  = ASSERT( r1 == r2)   -- Just like the TyConAppCo/TyConAppCo case
     fireTransRule "PushFun" in_co1 in_co2 $
-    mkFunCo r1 (opt_trans is co1a co2a) (opt_trans is co1b co2b)
+    mkFunCo r1 (opt_trans is w1 w2) (opt_trans is co1a co2a) (opt_trans is co1b co2b)
 
 opt_trans_rule is in_co1@(AppCo co1a co1b) in_co2@(AppCo co2a co2b)
   -- Must call opt_trans_rule_app; see Note [EtaAppCo]
