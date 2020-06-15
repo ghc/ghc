@@ -27,7 +27,7 @@ module GHC.Core.TyCo.Rep (
         -- * Types
         Type( TyVarTy, AppTy, TyConApp, ForAllTy
             , LitTy, CastTy, CoercionTy
-            , FunTy, ft_arg, ft_res, ft_af
+            , FunTy, ft_mult, ft_arg, ft_res, ft_af
             ),  -- Export the type synonym FunTy too
 
         TyLit(..),
@@ -46,9 +46,13 @@ module GHC.Core.TyCo.Rep (
         -- * Functions over types
         mkTyConTy, mkTyVarTy, mkTyVarTys,
         mkTyCoVarTy, mkTyCoVarTys,
-        mkFunTy, mkVisFunTy, mkInvisFunTy, mkVisFunTys, mkInvisFunTys,
+        mkFunTy, mkVisFunTy, mkInvisFunTy, mkVisFunTys,
         mkForAllTy, mkForAllTys, mkInvisForAllTys,
         mkPiTy, mkPiTys,
+        mkFunTyMany,
+        mkScaledFunTy,
+        mkVisFunTyMany, mkVisFunTysMany,
+        mkInvisFunTyMany, mkInvisFunTysMany,
 
         -- * Functions over binders
         TyCoBinder(..), TyCoVarBinder, TyBinder,
@@ -83,6 +87,7 @@ import GHC.Iface.Type
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Name hiding ( varName )
+import GHC.Core.Multiplicity
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
@@ -210,9 +215,10 @@ data Type
              -- be mentioned in the Type. See
              -- Note [Unused coercion variable in ForAllTy]
 
-  | FunTy      -- ^ t1 -> t2   Very common, so an important special case
+  | FunTy      -- ^ FUN m t1 t2   Very common, so an important special case
                 -- See Note [Function types]
-     { ft_af  :: AnonArgFlag  -- Is this (->) or (=>)?
+     { ft_af  :: AnonArgFlag    -- Is this (->) or (=>)?
+     , ft_mult :: Mult          -- Multiplicity
      , ft_arg :: Type           -- Argument type
      , ft_res :: Type }         -- Result type
 
@@ -680,8 +686,8 @@ type KnotTied ty = ty
 -- not. See Note [TyCoBinders]
 data TyCoBinder
   = Named TyCoVarBinder    -- A type-lambda binder
-  | Anon AnonArgFlag Type  -- A term-lambda binder. Type here can be CoercionTy.
-                           -- Visibility is determined by the AnonArgFlag
+  | Anon AnonArgFlag (Scaled Type)  -- A term-lambda binder. Type here can be CoercionTy.
+                                    -- Visibility is determined by the AnonArgFlag
   deriving Data.Data
 
 instance Outputable TyCoBinder where
@@ -980,19 +986,41 @@ mkTyCoVarTy v
 mkTyCoVarTys :: [TyCoVar] -> [Type]
 mkTyCoVarTys = map mkTyCoVarTy
 
-infixr 3 `mkFunTy`, `mkVisFunTy`, `mkInvisFunTy`      -- Associates to the right
+infixr 3 `mkFunTy`, `mkVisFunTy`, `mkInvisFunTy`, `mkVisFunTyMany`,
+         `mkInvisFunTyMany`      -- Associates to the right
 
-mkFunTy :: AnonArgFlag -> Type -> Type -> Type
-mkFunTy af arg res = FunTy { ft_af = af, ft_arg = arg, ft_res = res }
+mkFunTy :: AnonArgFlag -> Mult -> Type -> Type -> Type
+mkFunTy af mult arg res = FunTy { ft_af = af
+                                , ft_mult = mult
+                                , ft_arg = arg
+                                , ft_res = res }
 
-mkVisFunTy, mkInvisFunTy :: Type -> Type -> Type
+mkScaledFunTy :: AnonArgFlag -> Scaled Type -> Type -> Type
+mkScaledFunTy af (Scaled mult arg) res = mkFunTy af mult arg res
+
+mkVisFunTy, mkInvisFunTy :: Mult -> Type -> Type -> Type
 mkVisFunTy   = mkFunTy VisArg
 mkInvisFunTy = mkFunTy InvisArg
 
+mkFunTyMany :: AnonArgFlag -> Type -> Type -> Type
+mkFunTyMany af = mkFunTy af Many
+
+-- | Special, common, case: Arrow type with mult Many
+mkVisFunTyMany :: Type -> Type -> Type
+mkVisFunTyMany = mkVisFunTy Many
+
+mkInvisFunTyMany :: Type -> Type -> Type
+mkInvisFunTyMany = mkInvisFunTy Many
+
 -- | Make nested arrow types
-mkVisFunTys, mkInvisFunTys :: [Type] -> Type -> Type
-mkVisFunTys   tys ty = foldr mkVisFunTy   ty tys
-mkInvisFunTys tys ty = foldr mkInvisFunTy ty tys
+mkVisFunTys :: [Scaled Type] -> Type -> Type
+mkVisFunTys tys ty = foldr (mkScaledFunTy VisArg) ty tys
+
+mkVisFunTysMany :: [Type] -> Type -> Type
+mkVisFunTysMany tys ty = foldr mkVisFunTyMany ty tys
+
+mkInvisFunTysMany :: [Type] -> Type -> Type
+mkInvisFunTysMany tys ty = foldr mkInvisFunTyMany ty tys
 
 -- | Like 'mkTyCoForAllTy', but does not check the occurrence of the binder
 -- See Note [Unused coercion variable in ForAllTy]
@@ -1007,8 +1035,8 @@ mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
 mkInvisForAllTys :: [InvisTVBinder] -> Type -> Type
 mkInvisForAllTys tyvars ty = foldr ForAllTy ty $ tyVarSpecToBinders tyvars
 
-mkPiTy:: TyCoBinder -> Type -> Type
-mkPiTy (Anon af ty1) ty2        = FunTy { ft_af = af, ft_arg = ty1, ft_res = ty2 }
+mkPiTy :: TyCoBinder -> Type -> Type
+mkPiTy (Anon af ty1) ty2        = mkScaledFunTy af ty1 ty2
 mkPiTy (Named (Bndr tv vis)) ty = mkForAllTy tv vis ty
 
 mkPiTys :: [TyCoBinder] -> Type -> Type
@@ -1079,8 +1107,8 @@ data Coercion
   | ForAllCo TyCoVar KindCoercion Coercion
          -- ForAllCo :: _ -> N -> e -> e
 
-  | FunCo Role Coercion Coercion         -- lift FunTy
-         -- FunCo :: "e" -> e -> e -> e
+  | FunCo Role CoercionN Coercion Coercion         -- lift FunTy
+         -- FunCo :: "e" -> N -> e -> e -> e
          -- Note: why doesn't FunCo have a AnonArgFlag, like FunTy?
          -- Because the AnonArgFlag has no impact on Core; it is only
          -- there to guide implicit instantiation of Haskell source
@@ -1825,7 +1853,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_ty _   (LitTy {})        = mempty
     go_ty env (CastTy ty co)    = go_ty env ty `mappend` go_co env co
     go_ty env (CoercionTy co)   = go_co env co
-    go_ty env (FunTy _ arg res) = go_ty env arg `mappend` go_ty env res
+    go_ty env (FunTy _ w arg res) = go_ty env w `mappend` go_ty env arg `mappend` go_ty env res
     go_ty env (TyConApp _ tys)  = go_tys env tys
     go_ty env (ForAllTy (Bndr tv vis) inner)
       = let !env' = tycobinder env tv vis  -- Avoid building a thunk here
@@ -1845,7 +1873,9 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_co env (GRefl _ ty (MCo co))   = go_ty env ty `mappend` go_co env co
     go_co env (TyConAppCo _ _ args)   = go_cos env args
     go_co env (AppCo c1 c2)           = go_co env c1 `mappend` go_co env c2
-    go_co env (FunCo _ c1 c2)         = go_co env c1 `mappend` go_co env c2
+    go_co env (FunCo _ cw c1 c2)      = go_co env cw `mappend`
+                                        go_co env c1 `mappend`
+                                        go_co env c2
     go_co env (CoVarCo cv)            = covar env cv
     go_co env (AxiomInstCo _ _ args)  = go_cos env args
     go_co env (HoleCo hole)           = cohole env hole
@@ -1892,7 +1922,7 @@ typeSize :: Type -> Int
 typeSize (LitTy {})                 = 1
 typeSize (TyVarTy {})               = 1
 typeSize (AppTy t1 t2)              = typeSize t1 + typeSize t2
-typeSize (FunTy _ t1 t2)            = typeSize t1 + typeSize t2
+typeSize (FunTy _ _ t1 t2)          = typeSize t1 + typeSize t2
 typeSize (ForAllTy (Bndr tv _) t)   = typeSize (varType tv) + typeSize t
 typeSize (TyConApp _ ts)            = 1 + sum (map typeSize ts)
 typeSize (CastTy ty co)             = typeSize ty + coercionSize co
@@ -1905,7 +1935,8 @@ coercionSize (GRefl _ ty (MCo co)) = 1 + typeSize ty + coercionSize co
 coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (AppCo co arg)      = coercionSize co + coercionSize arg
 coercionSize (ForAllCo _ h co)   = 1 + coercionSize co + coercionSize h
-coercionSize (FunCo _ co1 co2)   = 1 + coercionSize co1 + coercionSize co2
+coercionSize (FunCo _ w co1 co2) = 1 + coercionSize co1 + coercionSize co2
+                                                        + coercionSize w
 coercionSize (CoVarCo _)         = 1
 coercionSize (HoleCo _)          = 1
 coercionSize (AxiomInstCo _ _ args) = 1 + sum (map coercionSize args)

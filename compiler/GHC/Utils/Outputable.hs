@@ -28,8 +28,8 @@ module GHC.Utils.Outputable (
         parens, cparen, brackets, braces, quotes, quote,
         doubleQuotes, angleBrackets,
         semi, comma, colon, dcolon, space, equals, dot, vbar,
-        arrow, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt,
-        lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
+        arrow, lollipop, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt,
+        lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore, mulArrow,
         blankLine, forAllLit, bullet,
         (<>), (<+>), hcat, hsep,
         ($$), ($+$), vcat,
@@ -357,6 +357,7 @@ data SDocContext = SDC
   , sdocSuppressStgExts             :: !Bool
   , sdocErrorSpans                  :: !Bool
   , sdocStarIsType                  :: !Bool
+  , sdocLinearTypes                 :: !Bool
   , sdocImpredicativeTypes          :: !Bool
   , sdocDynFlags                    :: DynFlags -- TODO: remove
   }
@@ -644,12 +645,13 @@ quotes d = sdocOption sdocCanUseUnicode $ \case
         _other              -> Pretty.quotes pp_d
 
 semi, comma, colon, equals, space, dcolon, underscore, dot, vbar :: SDoc
-arrow, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt :: SDoc
+arrow, lollipop, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt :: SDoc
 lparen, rparen, lbrack, rbrack, lbrace, rbrace, blankLine :: SDoc
 
 blankLine  = docToSDoc $ Pretty.text ""
 dcolon     = unicodeSyntax (char '∷') (docToSDoc $ Pretty.text "::")
 arrow      = unicodeSyntax (char '→') (docToSDoc $ Pretty.text "->")
+lollipop   = unicodeSyntax (char '⊸') (docToSDoc $ Pretty.text "#->")
 larrow     = unicodeSyntax (char '←') (docToSDoc $ Pretty.text "<-")
 darrow     = unicodeSyntax (char '⇒') (docToSDoc $ Pretty.text "=>")
 arrowt     = unicodeSyntax (char '⤚') (docToSDoc $ Pretty.text ">-")
@@ -670,6 +672,10 @@ lbrack     = docToSDoc $ Pretty.lbrack
 rbrack     = docToSDoc $ Pretty.rbrack
 lbrace     = docToSDoc $ Pretty.lbrace
 rbrace     = docToSDoc $ Pretty.rbrace
+
+mulArrow :: SDoc -> SDoc
+mulArrow d = text "#" <+> d <+> arrow
+
 
 forAllLit :: SDoc
 forAllLit = unicodeSyntax (char '∀') (text "forall")

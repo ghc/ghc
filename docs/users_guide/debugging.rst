@@ -837,6 +837,16 @@ Checking for consistency
     Turn on heavyweight intra-pass sanity-checking within GHC, at Core
     level. (It checks GHC's sanity, not yours.)
 
+.. ghc-flag:: -dlinear-core-lint
+    :shortdesc: Turn on internal sanity checking
+    :type: dynamic
+
+    Turn on linearity checking in GHC. Currently, some optimizations
+    in GHC might not preserve linearity and they valid programs might
+    fail Linear Core Lint.
+    In the near future, this option will be removed and folded into
+    normal Core Lint.
+
 .. ghc-flag:: -dstg-lint
     :shortdesc: STG pass sanity checking
     :type: dynamic

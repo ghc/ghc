@@ -69,6 +69,9 @@ module GHC.Tc.Utils.Monad(
   addMessages,
   discardWarnings,
 
+  -- * Usage environment
+  tcCollectingUsage, tcScalingUsage, tcEmitBindingUsage,
+
   -- * Shared error message stuff: renamer and typechecker
   mkLongErrAt, mkErrDocAt, addLongErrAt, reportErrors, reportError,
   reportWarning, recoverM, mapAndRecoverM, mapAndReportM, foldAndRecoverM,
@@ -157,6 +160,8 @@ import GHC.Driver.Types
 import GHC.Unit
 import GHC.Types.Name.Reader
 import GHC.Types.Name
+import GHC.Core.UsageEnv
+import GHC.Core.Multiplicity
 import GHC.Core.Type
 
 import GHC.Tc.Utils.TcType
@@ -332,6 +337,7 @@ initTcWithGbl :: HscEnv
 initTcWithGbl hsc_env gbl_env loc do_this
  = do { lie_var      <- newIORef emptyWC
       ; errs_var     <- newIORef (emptyBag, emptyBag)
+      ; usage_var    <- newIORef zeroUE
       ; let lcl_env = TcLclEnv {
                 tcl_errs       = errs_var,
                 tcl_loc        = loc,     -- Should be over-ridden very soon!
@@ -341,6 +347,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_th_bndrs   = emptyNameEnv,
                 tcl_arrow_ctxt = NoArrowCtxt,
                 tcl_env        = emptyNameEnv,
+                tcl_usage      = usage_var,
                 tcl_bndrs      = [],
                 tcl_lie        = lie_var,
                 tcl_tclvl      = topTcLevel
@@ -625,15 +632,16 @@ newSysName occ
   = do { uniq <- newUnique
        ; return (mkSystemName uniq occ) }
 
-newSysLocalId :: FastString -> TcType -> TcRnIf gbl lcl TcId
-newSysLocalId fs ty
+newSysLocalId :: FastString -> Mult -> TcType -> TcRnIf gbl lcl TcId
+newSysLocalId fs w ty
   = do  { u <- newUnique
-        ; return (mkSysLocal fs u ty) }
+        ; return (mkSysLocal fs u w ty) }
 
-newSysLocalIds :: FastString -> [TcType] -> TcRnIf gbl lcl [TcId]
+newSysLocalIds :: FastString -> [Scaled TcType] -> TcRnIf gbl lcl [TcId]
 newSysLocalIds fs tys
   = do  { us <- newUniqueSupply
-        ; return (zipWith (mkSysLocal fs) (uniqsFromSupply us) tys) }
+        ; let mkId' n (Scaled w t) = mkSysLocal fs n w t
+        ; return (zipWith mkId' (uniqsFromSupply us) tys) }
 
 instance MonadUnique (IOEnv (Env gbl lcl)) where
         getUniqueM = newUnique
@@ -1189,6 +1197,36 @@ captureConstraints thing_inside
        ; case mb_res of
            Nothing  -> do { emitConstraints lie; failM }
            Just res -> return (res, lie) }
+
+-----------------------
+-- | @tcCollectingUsage thing_inside@ runs @thing_inside@ and returns the usage
+-- information which was collected as part of the execution of
+-- @thing_inside@. Careful: @tcCollectingUsage thing_inside@ itself does not
+-- report any usage information, it's up to the caller to incorporate the
+-- returned usage information into the larger context appropriately.
+tcCollectingUsage :: TcM a -> TcM (UsageEnv,a)
+tcCollectingUsage thing_inside
+  = do { env0 <- getLclEnv
+       ; local_usage_ref <- newTcRef zeroUE
+       ; let env1 = env0 { tcl_usage = local_usage_ref }
+       ; result <- setLclEnv env1 thing_inside
+       ; local_usage <- readTcRef local_usage_ref
+       ; return (local_usage,result) }
+
+-- | @tcScalingUsage mult thing_inside@ runs @thing_inside@ and scales all the
+-- usage information by @mult@.
+tcScalingUsage :: Mult -> TcM a -> TcM a
+tcScalingUsage mult thing_inside
+  = do { (usage, result) <- tcCollectingUsage thing_inside
+       ; traceTc "tcScalingUsage" (ppr mult)
+       ; tcEmitBindingUsage $ scaleUE mult usage
+       ; return result }
+
+tcEmitBindingUsage :: UsageEnv -> TcM ()
+tcEmitBindingUsage ue
+  = do { lcl_env <- getLclEnv
+       ; let usage = tcl_usage lcl_env
+       ; updTcRef usage (addUE ue) }
 
 -----------------------
 attemptM :: TcRn r -> TcRn (Maybe r)

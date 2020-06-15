@@ -2133,7 +2133,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
           -- See #14808.
         ; implicit_bndrs <- forAllOrNothing explicit_forall
             $ extractHsTvBndrs explicit_tkvs
-            $ extractHsTysRdrTyVars (theta ++ arg_tys ++ [res_ty])
+            $ extractHsTysRdrTyVars (theta ++ map hsScaledThing arg_tys ++ [res_ty])
 
         ; let ctxt = ConDeclCtx new_names
 
@@ -2166,6 +2166,7 @@ rnConDecl (XConDecl (ConDeclGADTPrefixPs { con_gp_names = names, con_gp_ty = ty
 
        ; let ctxt = ConDeclCtx new_names
        ; (ty', fvs) <- rnHsSigType ctxt TypeLevel Nothing ty
+       ; linearTypes <- xopt LangExt.LinearTypes <$> getDynFlags
 
          -- Now that operator precedence has been resolved, we can split the
          -- GADT type into its individual components below.
@@ -2174,7 +2175,9 @@ rnConDecl (XConDecl (ConDeclGADTPrefixPs { con_gp_names = names, con_gp_ty = ty
              lhas_forall       = L (getLoc body) $ isJust mb_explicit_tkvs
              explicit_tkvs     = fromMaybe [] mb_explicit_tkvs
              (arg_tys, res_ty) = splitHsFunType tau
-             arg_details       = PrefixCon arg_tys
+             arg_details | linearTypes = PrefixCon arg_tys
+                         | otherwise   = PrefixCon $ map (hsLinear . hsScaledThing) arg_tys
+
                -- NB: The only possibility here is PrefixCon. RecCon is handled
                -- separately, through ConDeclGADT, from the parser onwards.
 
@@ -2217,16 +2220,16 @@ rnMbContext doc (Just cxt) = do { (ctx',fvs) <- rnContext doc cxt
 rnConDeclDetails
    :: Name
    -> HsDocContext
-   -> HsConDetails (LHsType GhcPs) (Located [LConDeclField GhcPs])
-   -> RnM (HsConDetails (LHsType GhcRn) (Located [LConDeclField GhcRn]),
+   -> HsConDetails (HsScaled GhcPs (LHsType GhcPs)) (Located [LConDeclField GhcPs])
+   -> RnM ((HsConDetails (HsScaled GhcRn (LHsType GhcRn))) (Located [LConDeclField GhcRn]),
            FreeVars)
 rnConDeclDetails _ doc (PrefixCon tys)
-  = do { (new_tys, fvs) <- rnLHsTypes doc tys
+  = do { (new_tys, fvs) <- mapFvRn (rnScaledLHsType doc) tys
        ; return (PrefixCon new_tys, fvs) }
 
 rnConDeclDetails _ doc (InfixCon ty1 ty2)
-  = do { (new_ty1, fvs1) <- rnLHsType doc ty1
-       ; (new_ty2, fvs2) <- rnLHsType doc ty2
+  = do { (new_ty1, fvs1) <- rnScaledLHsType doc ty1
+       ; (new_ty2, fvs2) <- rnScaledLHsType doc ty2
        ; return (InfixCon new_ty1 new_ty2, fvs1 `plusFV` fvs2) }
 
 rnConDeclDetails con doc (RecCon (L l fields))

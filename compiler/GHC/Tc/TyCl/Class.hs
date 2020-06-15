@@ -40,6 +40,7 @@ import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.TcMType
 import GHC.Core.Type     ( piResultTys )
 import GHC.Core.Predicate
+import GHC.Core.Multiplicity
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Monad
@@ -284,7 +285,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
 
              ctxt = FunSigCtxt sel_name warn_redundant
 
-       ; let local_dm_id = mkLocalId local_dm_name local_dm_ty
+       ; let local_dm_id = mkLocalId local_dm_name Many local_dm_ty
              local_dm_sig = CompleteSig { sig_bndr = local_dm_id
                                         , sig_ctxt  = ctxt
                                         , sig_loc   = getLoc (hsSigType hs_ty) }

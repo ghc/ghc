@@ -46,6 +46,7 @@ import GHC.Tc.Instance.Family
 import GHC.Core.FamInstEnv
 import GHC.Core.Coercion
 import GHC.Core.Type
+import GHC.Core.Multiplicity
 import GHC.Types.ForeignCall
 import GHC.Utils.Error
 import GHC.Types.Id
@@ -93,20 +94,6 @@ parameters.
 
 Similarly, we don't need to look in AppTy's, because nothing headed by
 an AppTy will be marshalable.
-
-Note [FFI type roles]
-~~~~~~~~~~~~~~~~~~~~~
-The 'go' helper function within normaliseFfiType' always produces
-representational coercions. But, in the "children_only" case, we need to
-use these coercions in a TyConAppCo. Accordingly, the roles on the coercions
-must be twiddled to match the expectation of the enclosing TyCon. However,
-we cannot easily go from an R coercion to an N one, so we forbid N roles
-on FFI type constructors. Currently, only two such type constructors exist:
-IO and FunPtr. Thus, this is not an onerous burden.
-
-If we ever want to lift this restriction, we would need to make 'go' take
-the target role as a parameter. This wouldn't be hard, but it's a complication
-not yet necessary and so is not yet implemented.
 -}
 
 -- normaliseFfiType takes the type from an FFI declaration, and
@@ -120,33 +107,31 @@ normaliseFfiType ty
          normaliseFfiType' fam_envs ty
 
 normaliseFfiType' :: FamInstEnvs -> Type -> TcM (Coercion, Type, Bag GlobalRdrElt)
-normaliseFfiType' env ty0 = go initRecTc ty0
+normaliseFfiType' env ty0 = go Representational initRecTc ty0
   where
-    go :: RecTcChecker -> Type -> TcM (Coercion, Type, Bag GlobalRdrElt)
-    go rec_nts ty
+    go :: Role -> RecTcChecker -> Type -> TcM (Coercion, Type, Bag GlobalRdrElt)
+    go role rec_nts ty
       | Just ty' <- tcView ty     -- Expand synonyms
-      = go rec_nts ty'
+      = go role rec_nts ty'
 
       | Just (tc, tys) <- splitTyConApp_maybe ty
-      = go_tc_app rec_nts tc tys
+      = go_tc_app role rec_nts tc tys
 
       | (bndrs, inner_ty) <- splitForAllVarBndrs ty
       , not (null bndrs)
-      = do (coi, nty1, gres1) <- go rec_nts inner_ty
+      = do (coi, nty1, gres1) <- go role rec_nts inner_ty
            return ( mkHomoForAllCos (binderVars bndrs) coi
                   , mkForAllTys bndrs nty1, gres1 )
 
       | otherwise -- see Note [Don't recur in normaliseFfiType']
-      = return (mkRepReflCo ty, ty, emptyBag)
+      = return (mkReflCo role ty, ty, emptyBag)
 
-    go_tc_app :: RecTcChecker -> TyCon -> [Type]
+    go_tc_app :: Role -> RecTcChecker -> TyCon -> [Type]
               -> TcM (Coercion, Type, Bag GlobalRdrElt)
-    go_tc_app rec_nts tc tys
+    go_tc_app role rec_nts tc tys
         -- We don't want to look through the IO newtype, even if it is
         -- in scope, so we have a special case for it:
         | tc_key `elem` [ioTyConKey, funPtrTyConKey, funTyConKey]
-                  -- These *must not* have nominal roles on their parameters!
-                  -- See Note [FFI type roles]
         = children_only
 
         | isNewTyCon tc         -- Expand newtypes
@@ -160,13 +145,13 @@ normaliseFfiType' env ty0 = go initRecTc ty0
         = do { rdr_env <- getGlobalRdrEnv
              ; case checkNewtypeFFI rdr_env tc of
                  Nothing  -> nothing
-                 Just gre -> do { (co', ty', gres) <- go rec_nts' nt_rhs
+                 Just gre -> do { (co', ty', gres) <- go role rec_nts' nt_rhs
                                 ; return (mkTransCo nt_co co', ty', gre `consBag` gres) } }
 
         | isFamilyTyCon tc              -- Expand open tycons
-        , (co, ty) <- normaliseTcApp env Representational tc tys
+        , (co, ty) <- normaliseTcApp env role tc tys
         , not (isReflexiveCo co)
-        = do (co', ty', gres) <- go rec_nts ty
+        = do (co', ty', gres) <- go role rec_nts ty
              return (mkTransCo co co', ty', gres)
 
         | otherwise
@@ -174,19 +159,15 @@ normaliseFfiType' env ty0 = go initRecTc ty0
         where
           tc_key = getUnique tc
           children_only
-            = do xs <- mapM (go rec_nts) tys
+            = do xs <- zipWithM (\ty r -> go r rec_nts ty) tys (tyConRolesX role tc)
                  let (cos, tys', gres) = unzip3 xs
-                        -- the (repeat Representational) is because 'go' always
-                        -- returns R coercions
-                     cos' = zipWith3 downgradeRole (tyConRoles tc)
-                                     (repeat Representational) cos
-                 return ( mkTyConAppCo Representational tc cos'
+                 return ( mkTyConAppCo role tc cos
                         , mkTyConApp tc tys', unionManyBags gres)
-          nt_co  = mkUnbranchedAxInstCo Representational (newTyConCo tc) tys []
+          nt_co  = mkUnbranchedAxInstCo role (newTyConCo tc) tys []
           nt_rhs = newTyConInstRhs tc tys
 
           ty      = mkTyConApp tc tys
-          nothing = return (mkRepReflCo ty, ty, emptyBag)
+          nothing = return (mkReflCo role ty, ty, emptyBag)
 
 checkNewtypeFFI :: GlobalRdrEnv -> TyCon -> Maybe GlobalRdrElt
 checkNewtypeFFI rdr_env tc
@@ -251,12 +232,12 @@ tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
            -- Drop the foralls before inspecting the
            -- structure of the foreign type.
              (arg_tys, res_ty) = tcSplitFunTys (dropForAlls norm_sig_ty)
-             id                = mkLocalId nm sig_ty
+             id                = mkLocalId nm Many sig_ty
                  -- Use a LocalId to obey the invariant that locally-defined
                  -- things are LocalIds.  However, it does not need zonking,
                  -- (so GHC.Tc.Utils.Zonk.zonkForeignExports ignores it).
 
-       ; imp_decl' <- tcCheckFIType arg_tys res_ty imp_decl
+       ; imp_decl' <- tcCheckFIType (map scaledThing arg_tys) res_ty imp_decl
           -- Can't use sig_ty here because sig_ty :: Type and
           -- we need HsType Id hence the undefined
        ; let fi_decl = ForeignImport { fd_name = L nloc id
@@ -275,7 +256,7 @@ tcCheckFIType arg_tys res_ty (CImport (L lc cconv) safety mh l@(CLabel _) src)
   = do checkCg checkCOrAsmOrLlvmOrInterp
        -- NB check res_ty not sig_ty!
        --    In case sig_ty is (forall a. ForeignPtr a)
-       check (isFFILabelTy (mkVisFunTys arg_tys res_ty)) (illegalForeignTyErr Outputable.empty)
+       check (isFFILabelTy (mkVisFunTysMany arg_tys res_ty)) (illegalForeignTyErr Outputable.empty)
        cconv' <- checkCConv cconv
        return (CImport (L lc cconv') safety mh l src)
 
@@ -287,7 +268,7 @@ tcCheckFIType arg_tys res_ty (CImport (L lc cconv) safety mh CWrapper src) = do
     checkCg checkCOrAsmOrLlvmOrInterp
     cconv' <- checkCConv cconv
     case arg_tys of
-        [arg1_ty] -> do checkForeignArgs isFFIExternalTy arg1_tys
+        [arg1_ty] -> do checkForeignArgs isFFIExternalTy (map scaledThing arg1_tys)
                         checkForeignRes nonIOok  checkSafe isFFIExportResultTy res1_ty
                         checkForeignRes mustBeIO checkSafe (isFFIDynTy arg1_ty) res_ty
                   where
@@ -305,7 +286,7 @@ tcCheckFIType arg_tys res_ty idecl@(CImport (L lc cconv) (L ls safety) mh
           addErrTc (illegalForeignTyErr Outputable.empty (text "At least one argument expected"))
         (arg1_ty:arg_tys) -> do
           dflags <- getDynFlags
-          let curried_res_ty = mkVisFunTys arg_tys res_ty
+          let curried_res_ty = mkVisFunTysMany arg_tys res_ty
           check (isFFIDynTy curried_res_ty arg1_ty)
                 (illegalForeignTyErr argument)
           checkForeignArgs (isFFIArgumentTy dflags safety) arg_tys
@@ -418,7 +399,7 @@ tcCheckFEType sig_ty (CExport (L l (CExportStatic esrc str cconv)) src) = do
     checkCg checkCOrAsmOrLlvm
     checkTc (isCLabelString str) (badCName str)
     cconv' <- checkCConv cconv
-    checkForeignArgs isFFIExternalTy arg_tys
+    checkForeignArgs isFFIExternalTy (map scaledThing arg_tys)
     checkForeignRes nonIOok noCheckSafe isFFIExportResultTy res_ty
     return (CExport (L l (CExportStatic esrc str cconv')) src)
   where

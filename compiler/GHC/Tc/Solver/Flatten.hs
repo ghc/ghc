@@ -39,6 +39,8 @@ import Data.Foldable ( foldrM )
 
 import Control.Arrow ( first )
 
+import GHC.Core.Multiplicity
+
 {-
 Note [The flattening story]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1175,12 +1177,13 @@ flatten_one (TyConApp tc tys)
 --                   _ -> fmode
   = flatten_ty_con_app tc tys
 
-flatten_one ty@(FunTy { ft_arg = ty1, ft_res = ty2 })
+flatten_one ty@(FunTy { ft_mult = mult, ft_arg = ty1, ft_res = ty2 })
   = do { (xi1,co1) <- flatten_one ty1
        ; (xi2,co2) <- flatten_one ty2
+       ; (xi3,co3) <- flatten_one mult
        ; role <- getRole
-       ; return (ty { ft_arg = xi1, ft_res = xi2 }
-                , mkFunCo role co1 co2) }
+       ; return (ty { ft_mult = xi3, ft_arg = xi1, ft_res = xi2 }
+                , mkFunCo role co3 co1 co2) }
 
 flatten_one ty@(ForAllTy {})
 -- TODO (RAE): This is inadequate, as it doesn't flatten the kind of
@@ -1921,9 +1924,9 @@ split_pi_tys' ty = split ty ty
   split orig_ty ty | Just ty' <- coreView ty = split orig_ty ty'
   split _       (ForAllTy b res) = let (bs, ty, _) = split res res
                                    in  (Named b : bs, ty, True)
-  split _       (FunTy { ft_af = af, ft_arg = arg, ft_res = res })
+  split _       (FunTy { ft_af = af, ft_mult = w, ft_arg = arg, ft_res = res })
                                  = let (bs, ty, named) = split res res
-                                   in  (Anon af arg : bs, ty, named)
+                                   in  (Anon af (mkScaled w arg) : bs, ty, named)
   split orig_ty _                = ([], orig_ty, False)
 {-# INLINE split_pi_tys' #-}
 
@@ -1935,6 +1938,6 @@ ty_con_binders_ty_binders' = foldr go ([], False)
     go (Bndr tv (NamedTCB vis)) (bndrs, _)
       = (Named (Bndr tv vis) : bndrs, True)
     go (Bndr tv (AnonTCB af))   (bndrs, n)
-      = (Anon af (tyVarKind tv)   : bndrs, n)
+      = (Anon af (unrestricted (tyVarKind tv))   : bndrs, n)
     {-# INLINE go #-}
 {-# INLINE ty_con_binders_ty_binders' #-}

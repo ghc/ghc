@@ -694,6 +694,9 @@ appKindT ty ki = do
 arrowT :: Quote m => m Type
 arrowT = pure ArrowT
 
+mulArrowT :: Quote m => m Type
+mulArrowT = pure MulArrowT
+
 listT :: Quote m => m Type
 listT = pure ListT
 

@@ -27,7 +27,7 @@ module GHC.CString (
         unpackNBytes#,
     ) where
 
-import GHC.Types
+import GHC.Types hiding (One)
 import GHC.Prim
 
 {-

@@ -192,7 +192,7 @@ STG programs after unarisation have these invariants:
   * Binders always have zero (for void arguments) or one PrimRep.
 -}
 
-{-# LANGUAGE CPP, TupleSections #-}
+{-# LANGUAGE CPP, TupleSections, PatternSynonyms #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -220,6 +220,7 @@ import GHC.Builtin.Types
 import GHC.Types.Unique.Supply
 import GHC.Utils.Misc
 import GHC.Types.Var.Env
+import GHC.Core.Multiplicity ( pattern Many )
 
 import Data.Bifunctor (second)
 import Data.Maybe (mapMaybe)
@@ -740,7 +741,7 @@ mkIds :: FastString -> [UnaryType] -> UniqSM [Id]
 mkIds fs tys = mapM (mkId fs) tys
 
 mkId :: FastString -> UnaryType -> UniqSM Id
-mkId = mkSysLocalM
+mkId s t = mkSysLocalM s Many t
 
 isMultiValBndr :: Id -> Bool
 isMultiValBndr id

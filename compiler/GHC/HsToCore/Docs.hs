@@ -206,8 +206,9 @@ subordinates instMap decl = case decl of
 -- | Extract constructor argument docs from inside constructor decls.
 conArgDocs :: ConDecl GhcRn -> Map Int (HsDocString)
 conArgDocs con = case getConArgs con of
-                   PrefixCon args -> go 0 (map unLoc args ++ ret)
-                   InfixCon arg1 arg2 -> go 0 ([unLoc arg1, unLoc arg2] ++ ret)
+                   PrefixCon args -> go 0 (map (unLoc . hsScaledThing) args ++ ret)
+                   InfixCon arg1 arg2 -> go 0 ([unLoc (hsScaledThing arg1),
+                                                unLoc (hsScaledThing arg2)] ++ ret)
                    RecCon _ -> go 1 ret
   where
     go n = M.fromList . catMaybes . zipWith f [n..]
@@ -260,12 +261,12 @@ typeDocs :: HsType GhcRn -> Map Int (HsDocString)
 typeDocs = go 0
   where
     go n = \case
-      HsForAllTy { hst_body = ty }        -> go n (unLoc ty)
-      HsQualTy   { hst_body = ty }        -> go n (unLoc ty)
-      HsFunTy _ (unLoc->HsDocTy _ _ x) ty -> M.insert n (unLoc x) $ go (n+1) (unLoc ty)
-      HsFunTy _ _ ty                      -> go (n+1) (unLoc ty)
-      HsDocTy _ _ doc                     -> M.singleton n (unLoc doc)
-      _                                   -> M.empty
+      HsForAllTy { hst_body = ty }          -> go n (unLoc ty)
+      HsQualTy   { hst_body = ty }          -> go n (unLoc ty)
+      HsFunTy _ _ (unLoc->HsDocTy _ _ x) ty -> M.insert n (unLoc x) $ go (n+1) (unLoc ty)
+      HsFunTy _ _ _ ty                      -> go (n+1) (unLoc ty)
+      HsDocTy _ _ doc                       -> M.singleton n (unLoc doc)
+      _                                     -> M.empty
 
 -- | The top-level declarations of a module that we care about,
 -- ordered by source location, with documentation attached if it exists.

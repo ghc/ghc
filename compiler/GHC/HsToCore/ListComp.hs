@@ -30,6 +30,7 @@ import GHC.Driver.Session
 import GHC.Core.Utils
 import GHC.Types.Id
 import GHC.Core.Type
+import GHC.Core.Multiplicity
 import GHC.Builtin.Types
 import GHC.HsToCore.Match
 import GHC.Builtin.Names
@@ -278,11 +279,11 @@ deBindComp pat core_list1 quals core_list2 = do
     let u2_ty = hsLPatType pat
 
     let res_ty = exprType core_list2
-        h_ty   = u1_ty `mkVisFunTy` res_ty
+        h_ty   = u1_ty `mkVisFunTyMany` res_ty
 
        -- no levity polymorphism here, as list comprehensions don't work
        -- with RebindableSyntax. NB: These are *not* monad comps.
-    [h, u1, u2, u3] <- newSysLocalsDs [h_ty, u1_ty, u2_ty, u3_ty]
+    [h, u1, u2, u3] <- newSysLocalsDs $ map unrestricted [h_ty, u1_ty, u2_ty, u3_ty]
 
     -- the "fail" value ...
     let
@@ -371,8 +372,8 @@ dfBindComp c_id n_id (pat, core_list1) quals = do
     let b_ty   = idType n_id
 
     -- create some new local id's
-    b <- newSysLocalDs b_ty
-    x <- newSysLocalDs x_ty
+    b <- newSysLocalDs Many b_ty
+    x <- newSysLocalDs Many x_ty
 
     -- build rest of the comprehension
     core_rest <- dfListComp c_id b quals
@@ -402,11 +403,11 @@ mkZipBind :: [Type] -> DsM (Id, CoreExpr)
 --                              (a2:as'2) -> (a1, a2) : zip as'1 as'2)]
 
 mkZipBind elt_tys = do
-    ass  <- mapM newSysLocalDs  elt_list_tys
-    as'  <- mapM newSysLocalDs  elt_tys
-    as's <- mapM newSysLocalDs  elt_list_tys
+    ass  <- mapM (newSysLocalDs Many)  elt_list_tys
+    as'  <- mapM (newSysLocalDs Many)  elt_tys
+    as's <- mapM (newSysLocalDs Many)  elt_list_tys
 
-    zip_fn <- newSysLocalDs zip_fn_ty
+    zip_fn <- newSysLocalDs Many zip_fn_ty
 
     let inner_rhs = mkConsExpr elt_tuple_ty
                         (mkBigCoreVarTup as')
@@ -419,7 +420,7 @@ mkZipBind elt_tys = do
     elt_tuple_ty      = mkBigCoreTupTy elt_tys
     elt_tuple_list_ty = mkListTy elt_tuple_ty
 
-    zip_fn_ty         = mkVisFunTys elt_list_tys elt_tuple_list_ty
+    zip_fn_ty         = mkVisFunTysMany elt_list_tys elt_tuple_list_ty
 
     mk_case (as, a', as') rest
           = Case (Var as) as elt_tuple_list_ty
@@ -441,13 +442,13 @@ mkUnzipBind :: TransForm -> [Type] -> DsM (Maybe (Id, CoreExpr))
 mkUnzipBind ThenForm _
  = return Nothing    -- No unzipping for ThenForm
 mkUnzipBind _ elt_tys
-  = do { ax  <- newSysLocalDs elt_tuple_ty
-       ; axs <- newSysLocalDs elt_list_tuple_ty
-       ; ys  <- newSysLocalDs elt_tuple_list_ty
-       ; xs  <- mapM newSysLocalDs elt_tys
-       ; xss <- mapM newSysLocalDs elt_list_tys
+  = do { ax  <- newSysLocalDs Many elt_tuple_ty
+       ; axs <- newSysLocalDs Many elt_list_tuple_ty
+       ; ys  <- newSysLocalDs Many elt_tuple_list_ty
+       ; xs  <- mapM (newSysLocalDs Many) elt_tys
+       ; xss <- mapM (newSysLocalDs Many) elt_list_tys
 
-       ; unzip_fn <- newSysLocalDs unzip_fn_ty
+       ; unzip_fn <- newSysLocalDs Many unzip_fn_ty
 
        ; [us1, us2] <- sequence [newUniqueSupply, newUniqueSupply]
 
@@ -467,7 +468,7 @@ mkUnzipBind _ elt_tys
     elt_list_tys       = map mkListTy elt_tys
     elt_list_tuple_ty  = mkBigCoreTupTy elt_list_tys
 
-    unzip_fn_ty        = elt_tuple_list_ty `mkVisFunTy` elt_list_tuple_ty
+    unzip_fn_ty        = elt_tuple_list_ty `mkVisFunTyMany` elt_list_tuple_ty
 
     mkConcatExpression (list_element_ty, head, tail) = mkConsExpr list_element_ty head tail
 
@@ -551,8 +552,8 @@ dsMcStmt (TransStmt { trS_stmts = stmts, trS_bndrs = bndrs
        ; let tup_n_ty' = mkBigCoreVarTupTy to_bndrs
 
        ; body        <- dsMcStmts stmts_rest
-       ; n_tup_var'  <- newSysLocalDsNoLP n_tup_ty'
-       ; tup_n_var'  <- newSysLocalDs tup_n_ty'
+       ; n_tup_var'  <- newSysLocalDsNoLP Many n_tup_ty'
+       ; tup_n_var'  <- newSysLocalDs Many tup_n_ty'
        ; tup_n_expr' <- mkMcUnzipM form fmap_op n_tup_var' from_bndr_tys
        ; us          <- newUniqueSupply
        ; let rhs'  = mkApps usingExpr' usingArgs'
@@ -601,7 +602,7 @@ matchTuple :: [Id] -> CoreExpr -> DsM CoreExpr
 --  \x. case x of (a,b,c) -> body
 matchTuple ids body
   = do { us <- newUniqueSupply
-       ; tup_id <- newSysLocalDs (mkBigCoreVarTupTy ids)
+       ; tup_id <- newSysLocalDs Many (mkBigCoreVarTupTy ids)
        ; return (Lam tup_id $ mkTupleCase us ids body tup_id (Var tup_id)) }
 
 -- general `rhs' >>= \pat -> stmts` desugaring where `rhs'` is already a
@@ -615,7 +616,7 @@ dsMcBindStmt :: LPat GhcTc
              -> DsM CoreExpr
 dsMcBindStmt pat rhs' bind_op fail_op res1_ty stmts
   = do  { body     <- dsMcStmts stmts
-        ; var      <- selectSimpleMatchVarL pat
+        ; var      <- selectSimpleMatchVarL Many pat
         ; match <- matchSinglePatVar var (StmtCtxt DoExpr) pat
                                   res1_ty (cantFailMatchResult body)
         ; match_code <- dsHandleMonadicFailure pat match fail_op
@@ -656,9 +657,9 @@ mkMcUnzipM ThenForm _ ys _
 
 mkMcUnzipM _ fmap_op ys elt_tys
   = do { fmap_op' <- dsExpr fmap_op
-       ; xs       <- mapM newSysLocalDs elt_tys
+       ; xs       <- mapM (newSysLocalDs Many) elt_tys
        ; let tup_ty = mkBigCoreTupTy elt_tys
-       ; tup_xs   <- newSysLocalDs tup_ty
+       ; tup_xs   <- newSysLocalDs Many tup_ty
 
        ; let mk_elt i = mkApps fmap_op'  -- fmap :: forall a b. (a -> b) -> n a -> n b
                            [ Type tup_ty, Type (getNth elt_tys i)

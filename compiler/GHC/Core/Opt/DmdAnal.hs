@@ -19,6 +19,7 @@ import GHC.Driver.Session
 import GHC.Core.Opt.WorkWrap.Utils
 import GHC.Types.Demand   -- All of it
 import GHC.Core
+import GHC.Core.Multiplicity ( scaledThing )
 import GHC.Core.Seq     ( seqBinds )
 import GHC.Utils.Outputable
 import GHC.Types.Var.Env
@@ -358,7 +359,7 @@ forcesRealWorld fam_envs ty
   | Just DataConAppContext{ dcac_dc = dc, dcac_arg_tys = field_tys }
       <- deepSplitProductType_maybe fam_envs ty
   , isUnboxedTupleCon dc
-  = any (\(ty,_) -> ty `eqType` realWorldStatePrimTy) field_tys
+  = any (\(ty,_) -> scaledThing ty `eqType` realWorldStatePrimTy) field_tys
   | otherwise
   = False
 

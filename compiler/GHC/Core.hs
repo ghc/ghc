@@ -518,6 +518,10 @@ checked by Core Lint.
 7. The type of the scrutinee must be the same as the type
    of the case binder, obviously.  Checked in lintCaseExpr.
 
+8. The multiplicity of the binders in constructor patterns must be the
+   multiplicity of the corresponding field /scaled by the multiplicity of the
+   case binder/. Checked in lintCoreAlt.
+
 Note [Core type and coercion invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We allow a /non-recursive/, /non-top-level/ let to bind type and

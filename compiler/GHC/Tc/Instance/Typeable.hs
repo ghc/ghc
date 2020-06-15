@@ -34,6 +34,7 @@ import GHC.Types.Id
 import GHC.Core.Type
 import GHC.Core.TyCon
 import GHC.Core.DataCon
+import GHC.Core.Multiplicity
 import GHC.Unit.Module
 import GHC.Hs
 import GHC.Driver.Session
@@ -437,7 +438,9 @@ kindIsTypeable ty
   | isLiftedTypeKind ty             = True
 kindIsTypeable (TyVarTy _)          = True
 kindIsTypeable (AppTy a b)          = kindIsTypeable a && kindIsTypeable b
-kindIsTypeable (FunTy _ a b)        = kindIsTypeable a && kindIsTypeable b
+kindIsTypeable (FunTy _ w a b)      = kindIsTypeable w &&
+                                      kindIsTypeable a &&
+                                      kindIsTypeable b
 kindIsTypeable (TyConApp tc args)   = tyConIsTypeable tc
                                    && all kindIsTypeable args
 kindIsTypeable (ForAllTy{})         = False
@@ -466,8 +469,8 @@ liftTc = KindRepM . lift
 builtInKindReps :: [(Kind, Name)]
 builtInKindReps =
     [ (star, starKindRepName)
-    , (mkVisFunTy star star, starArrStarKindRepName)
-    , (mkVisFunTys [star, star] star, starArrStarArrStarKindRepName)
+    , (mkVisFunTyMany star star, starArrStarKindRepName)
+    , (mkVisFunTysMany [star, star] star, starArrStarArrStarKindRepName)
     ]
   where
     star = liftedTypeKind
@@ -537,7 +540,7 @@ getKindRep stuff@(Stuff {..}) in_scope = go
       = do -- Place a NOINLINE pragma on KindReps since they tend to be quite
            -- large and bloat interface files.
            rep_bndr <- (`setInlinePragma` neverInlinePragma)
-                   <$> newSysLocalId (fsLit "$krep") (mkTyConTy kindRepTyCon)
+                   <$> newSysLocalId (fsLit "$krep") Many (mkTyConTy kindRepTyCon)
 
            -- do we need to tie a knot here?
            flip runStateT env $ unKindRepM $ do
@@ -591,7 +594,7 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep
     new_kind_rep (ForAllTy (Bndr var _) ty)
       = pprPanic "mkTyConKindRepBinds(ForAllTy)" (ppr var $$ ppr ty)
 
-    new_kind_rep (FunTy _ t1 t2)
+    new_kind_rep (FunTy _ _ t1 t2)
       = do rep1 <- getKindRep stuff in_scope t1
            rep2 <- getKindRep stuff in_scope t2
            return $ nlHsDataCon kindRepFunDataCon

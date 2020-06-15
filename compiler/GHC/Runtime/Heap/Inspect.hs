@@ -36,6 +36,7 @@ import GHCi.Message ( fromSerializableException )
 import GHC.Core.DataCon
 import GHC.Core.Type
 import GHC.Types.RepType
+import GHC.Core.Multiplicity
 import qualified GHC.Core.Unify as U
 import GHC.Types.Var
 import GHC.Tc.Utils.Monad
@@ -760,9 +761,9 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
          traceTR (text "Following a MutVar")
          contents_tv <- newVar liftedTypeKind
          MASSERT(isUnliftedType my_ty)
-         (mutvar_ty,_) <- instScheme $ quantifyType $ mkVisFunTy
+         (mutvar_ty,_) <- instScheme $ quantifyType $ mkVisFunTyMany
                             contents_ty (mkTyConApp tycon [world,contents_ty])
-         addConstraint (mkVisFunTy contents_tv my_ty) mutvar_ty
+         addConstraint (mkVisFunTyMany contents_tv my_ty) mutvar_ty
          x <- go (pred max_depth) contents_tv contents_ty contents
          return (RefWrap my_ty x)
 
@@ -1055,7 +1056,7 @@ getDataConArgTys dc con_app_ty
        ; (subst, _) <- instTyVars (univ_tvs ++ ex_tvs)
        ; addConstraint rep_con_app_ty (substTy subst (dataConOrigResTy dc))
               -- See Note [Constructor arg types]
-       ; let con_arg_tys = substTys subst (dataConRepArgTys dc)
+       ; let con_arg_tys = substTys subst (map scaledThing $ dataConRepArgTys dc)
        ; traceTR (text "getDataConArgTys 2" <+> (ppr rep_con_app_ty $$ ppr con_arg_tys $$ ppr subst))
        ; return con_arg_tys }
   where
@@ -1263,11 +1264,12 @@ congruenceNewtypes lhs rhs = go lhs rhs >>= \rhs' -> return (lhs,rhs')
                           ppr tv, equals, ppr ty_v]
          go ty_v r
 -- FunTy inductive case
-    | Just (l1,l2) <- splitFunTy_maybe l
-    , Just (r1,r2) <- splitFunTy_maybe r
+    | Just (Scaled w1 l1,l2) <- splitFunTy_maybe l
+    , Just (Scaled w2 r1,r2) <- splitFunTy_maybe r
+    , w1 `eqType` w2
     = do r2' <- go l2 r2
          r1' <- go l1 r1
-         return (mkVisFunTy r1' r2')
+         return (mkVisFunTy w1 r1' r2')
 -- TyconApp Inductive case; this is the interesting bit.
     | Just (tycon_l, _) <- tcSplitTyConApp_maybe lhs
     , Just (tycon_r, _) <- tcSplitTyConApp_maybe rhs
@@ -1333,7 +1335,7 @@ isMonomorphicOnNonPhantomArgs ty
                            , tyv `notElem` phantom_vars]
   = all isMonomorphicOnNonPhantomArgs concrete_args
   | Just (ty1, ty2) <- splitFunTy_maybe ty
-  = all isMonomorphicOnNonPhantomArgs [ty1,ty2]
+  = all isMonomorphicOnNonPhantomArgs [scaledThing ty1,ty2]
   | otherwise = isMonomorphic ty
 
 tyConPhantomTyVars :: TyCon -> [TyVar]

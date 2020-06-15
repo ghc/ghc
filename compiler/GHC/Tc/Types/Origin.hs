@@ -34,6 +34,7 @@ import GHC.Core.ConLike
 import GHC.Core.TyCon
 import GHC.Core.InstEnv
 import GHC.Core.PatSyn
+import GHC.Core.Multiplicity ( scaledThing )
 
 import GHC.Unit.Module
 import GHC.Types.Name
@@ -285,12 +286,13 @@ pprSigSkolInfo ctxt ty
 
 pprPatSkolInfo :: ConLike -> SDoc
 pprPatSkolInfo (RealDataCon dc)
-  = sep [ text "a pattern with constructor:"
-        , nest 2 $ ppr dc <+> dcolon
-          <+> pprType (dataConUserType dc) <> comma ]
-          -- pprType prints forall's regardless of -fprint-explicit-foralls
-          -- which is what we want here, since we might be saying
-          -- type variable 't' is bound by ...
+  = sdocWithDynFlags (\dflags ->
+      sep [ text "a pattern with constructor:"
+          , nest 2 $ ppr dc <+> dcolon
+            <+> pprType (dataConDisplayType dflags dc) <> comma ])
+            -- pprType prints forall's regardless of -fprint-explicit-foralls
+            -- which is what we want here, since we might be saying
+            -- type variable 't' is bound by ...
 
 pprPatSkolInfo (PatSynCon ps)
   = sep [ text "a pattern with pattern synonym:"
@@ -444,6 +446,9 @@ data CtOrigin
   | InstProvidedOrigin Module ClsInst
         -- Skolem variable arose when we were testing if an instance
         -- is solvable or not.
+  | NonLinearPatternOrigin
+  | UsageEnvironmentOf Name
+
 -- An origin is visible if the place where the constraint arises is manifest
 -- in user code. Currently, all origins are visible except for invisible
 -- TypeEqOrigins. This is used when choosing which error of
@@ -575,7 +580,7 @@ pprCtOrigin (UnboundOccurrenceOf name)
 pprCtOrigin (DerivOriginDC dc n _)
   = hang (ctoHerald <+> text "the" <+> speakNth n
           <+> text "field of" <+> quotes (ppr dc))
-       2 (parens (text "type" <+> quotes (ppr ty)))
+       2 (parens (text "type" <+> quotes (ppr (scaledThing ty))))
   where
     ty = dataConOrigArgTys dc !! (n-1)
 
@@ -650,5 +655,7 @@ pprCtO (TypeHoleOrigin occ)  = text "a use of wildcard" <+> quotes (ppr occ)
 pprCtO PatCheckOrigin        = text "a pattern-match completeness check"
 pprCtO ListOrigin            = text "an overloaded list"
 pprCtO StaticOrigin          = text "a static form"
+pprCtO NonLinearPatternOrigin = text "a non-linear pattern"
+pprCtO (UsageEnvironmentOf x) = hsep [text "multiplicity of", quotes (ppr x)]
 pprCtO BracketOrigin         = text "a quotation bracket"
 pprCtO _                     = panic "pprCtOrigin"

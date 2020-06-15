@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -18,6 +19,7 @@ import GHC.Prelude
 import GHC.Types.Id
 import GHC.Tc.Utils.TcType hiding( substTy )
 import GHC.Core.Type  hiding( substTy, extendTvSubstList )
+import GHC.Core.Multiplicity
 import GHC.Core.Predicate
 import GHC.Unit.Module( Module, HasModule(..) )
 import GHC.Core.Coercion( Coercion )
@@ -1130,9 +1132,10 @@ specCase env scrut' case_bndr [(con, args, rhs)]
     sc_args' = filter is_flt_sc_arg args'
 
     clone_me bndr = do { uniq <- getUniqueM
-                       ; return (mkUserLocalOrCoVar occ uniq ty loc) }
+                       ; return (mkUserLocalOrCoVar occ uniq wght ty loc) }
        where
          name = idName bndr
+         wght = idMult bndr
          ty   = idType bndr
          occ  = nameOccName name
          loc  = getSrcSpan name
@@ -1423,7 +1426,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                  (spec_bndrs, spec_rhs, spec_fn_ty)
                    | add_void_arg = ( voidPrimId : spec_bndrs1
                                     , Lam        voidArgId  spec_rhs1
-                                    , mkVisFunTy voidPrimTy spec_fn_ty1)
+                                    , mkVisFunTyMany voidPrimTy spec_fn_ty1)
                    | otherwise   = (spec_bndrs1, spec_rhs1, spec_fn_ty1)
 
                  join_arity_decr = length rule_lhs_args - length spec_bndrs
@@ -2504,7 +2507,7 @@ mkCallUDs' env f args
     -- we decide on a case by case basis if we want to specialise
     -- on this argument; if so, SpecDict, if not UnspecArg
     mk_spec_arg arg (Anon InvisArg pred)
-      | type_determines_value pred
+      | type_determines_value (scaledThing pred)
       , interestingDict env arg -- Note [Interesting dictionary arguments]
       = SpecDict arg
       | otherwise = UnspecArg
@@ -2890,7 +2893,7 @@ newDictBndr :: SpecEnv -> CoreBndr -> SpecM CoreBndr
 newDictBndr env b = do { uniq <- getUniqueM
                         ; let n   = idName b
                               ty' = substTy env (idType b)
-                        ; return (mkUserLocal (nameOccName n) uniq ty' (getSrcSpan n)) }
+                        ; return (mkUserLocal (nameOccName n) uniq Many ty' (getSrcSpan n)) }
 
 newSpecIdSM :: Id -> Type -> Maybe JoinArity -> SpecM Id
     -- Give the new Id a similar occurrence name to the old one
@@ -2898,7 +2901,7 @@ newSpecIdSM old_id new_ty join_arity_maybe
   = do  { uniq <- getUniqueM
         ; let name    = idName old_id
               new_occ = mkSpecOcc (nameOccName name)
-              new_id  = mkUserLocal new_occ uniq new_ty (getSrcSpan name)
+              new_id  = mkUserLocal new_occ uniq Many new_ty (getSrcSpan name)
                           `asJoinId_maybe` join_arity_maybe
         ; return new_id }
 

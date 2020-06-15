@@ -46,6 +46,7 @@ import GHC.Core.DataCon ( dataConTagZ, dataConTyCon, dataConWrapId, dataConWorkI
 import GHC.Core.Utils  ( eqExpr, cheapEqExpr, exprIsHNF, exprType
                        , stripTicksTop, stripTicksTopT, mkTicks )
 import GHC.Core.Unfold ( exprIsConApp_maybe )
+import GHC.Core.Multiplicity
 import GHC.Core.FVs
 import GHC.Core.Type
 import GHC.Types.Var.Set
@@ -549,7 +550,7 @@ litEq is_eq = msum
   where
     do_lit_eq platform lit expr = do
       guard (not (litIsLifted lit))
-      return (mkWildCase expr (literalType lit) intPrimTy
+      return (mkWildCase expr (unrestricted $ literalType lit) intPrimTy
                     [(DEFAULT,    [], val_if_neq),
                      (LitAlt lit, [], val_if_eq)])
       where
@@ -1557,8 +1558,8 @@ match_inline _ = Nothing
 match_magicDict :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
 match_magicDict [Type _, Var wrap `App` Type a `App` Type _ `App` f, x, y ]
   | Just (fieldTy, _)   <- splitFunTy_maybe $ dropForAlls $ idType wrap
-  , Just (dictTy, _)    <- splitFunTy_maybe fieldTy
-  , Just dictTc         <- tyConAppTyCon_maybe dictTy
+  , Just (dictTy, _)    <- splitFunTy_maybe (scaledThing fieldTy)
+  , Just dictTc         <- tyConAppTyCon_maybe (scaledThing dictTy)
   , Just (_,_,co)       <- unwrapNewTyCon_maybe dictTc
   = Just
   $ f `App` Cast x (mkSymCo (mkUnbranchedAxInstCo Representational co [a] []))

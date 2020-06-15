@@ -12,6 +12,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TypeApplications #-}
@@ -1573,7 +1574,7 @@ data MatchGroup p body
 
 data MatchGroupTc
   = MatchGroupTc
-       { mg_arg_tys :: [Type]  -- Types of the arguments, t1..tn
+       { mg_arg_tys :: [Scaled Type]  -- Types of the arguments, t1..tn
        , mg_res_ty  :: Type    -- Type of the result, tr
        } deriving Data
 
@@ -1851,9 +1852,9 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | BindStmt (XBindStmt idL idR body)
              -- ^ Post renaming has optional fail and bind / (>>=) operator.
-             -- Post typechecking, also has result type of the
-             -- function passed to bind; that is, S in (>>=)
-             -- :: Q -> (R -> S) -> T
+             -- Post typechecking, also has multiplicity of the argument
+             -- and the result type of the function passed to bind;
+             -- that is, (P, S) in (>>=) :: Q -> (R # P -> S) -> T
              -- See Note [The type of bind in Stmts]
              (LPat idL)
              body
@@ -1980,6 +1981,7 @@ data XBindStmtRn = XBindStmtRn
 data XBindStmtTc = XBindStmtTc
   { xbstc_bindOp :: SyntaxExpr GhcTc
   , xbstc_boundResultType :: Type -- If (>>=) :: Q -> (R -> S) -> T, this is S
+  , xbstc_boundResultMult :: Mult -- If (>>=) :: Q -> (R -> S) -> T, this is S
   , xbstc_failOp :: FailOperator GhcTc
   }
 

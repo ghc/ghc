@@ -16,6 +16,7 @@ module GHC.Tc.Utils.Unify (
   tcWrapResult, tcWrapResultO, tcWrapResultMono,
   tcSkolemise, tcSkolemiseScoped, tcSkolemiseET,
   tcSubType, tcSubTypeSigma, tcSubTypePat,
+  tcSubMult,
   checkConstraints, checkTvConstraints,
   buildImplicationFor, buildTvImplication, emitResidualTvConstraint,
 
@@ -51,6 +52,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Env
 import GHC.Core.Type
 import GHC.Core.Coercion
+import GHC.Core.Multiplicity
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Types.Constraint
 import GHC.Core.Predicate
@@ -145,7 +147,7 @@ matchExpectedFunTys :: forall a.
                     -> UserTypeCtxt
                     -> Arity
                     -> ExpRhoType      -- Skolemised
-                    -> ([ExpSigmaType] -> ExpRhoType -> TcM a)
+                    -> ([Scaled ExpSigmaType] -> ExpRhoType -> TcM a)
                     -> TcM (HsWrapper, a)
 -- If    matchExpectedFunTys n ty = (_, wrap)
 -- then  wrap : (t1 -> ... -> tn -> ty_r) ~> ty,
@@ -173,11 +175,11 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
     go acc_arg_tys n ty
       | Just ty' <- tcView ty = go acc_arg_tys n ty'
 
-    go acc_arg_tys n (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
+    go acc_arg_tys n (FunTy { ft_mult = mult, ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
       = ASSERT( af == VisArg )
-        do { (wrap_res, result) <- go (mkCheckExpType arg_ty : acc_arg_tys)
+        do { (wrap_res, result) <- go ((Scaled mult $ mkCheckExpType arg_ty) : acc_arg_tys)
                                       (n-1) res_ty
-           ; let fun_wrap = mkWpFun idHsWrapper wrap_res arg_ty res_ty doc
+           ; let fun_wrap = mkWpFun idHsWrapper wrap_res (Scaled mult arg_ty) res_ty doc
            ; return ( fun_wrap, result ) }
       where
         doc = text "When inferring the argument type of a function with type" <+>
@@ -209,25 +211,25 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
                           defer acc_arg_tys n (mkCheckExpType ty)
 
     ------------
-    defer :: [ExpSigmaType] -> Arity -> ExpRhoType -> TcM (HsWrapper, a)
+    defer :: [Scaled ExpSigmaType] -> Arity -> ExpRhoType -> TcM (HsWrapper, a)
     defer acc_arg_tys n fun_ty
       = do { more_arg_tys <- replicateM n newInferExpType
            ; res_ty       <- newInferExpType
-           ; result       <- thing_inside (reverse acc_arg_tys ++ more_arg_tys) res_ty
+           ; result       <- thing_inside (reverse acc_arg_tys ++ (map unrestricted more_arg_tys)) res_ty
            ; more_arg_tys <- mapM readExpType more_arg_tys
            ; res_ty       <- readExpType res_ty
-           ; let unif_fun_ty = mkVisFunTys more_arg_tys res_ty
+           ; let unif_fun_ty = mkVisFunTysMany more_arg_tys res_ty
            ; wrap <- tcSubType AppOrigin ctx unif_fun_ty fun_ty
                          -- Not a good origin at all :-(
            ; return (wrap, result) }
 
     ------------
-    mk_ctxt :: [ExpSigmaType] -> TcType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
+    mk_ctxt :: [Scaled ExpSigmaType] -> TcType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
     mk_ctxt arg_tys res_ty env
       = do { (env', ty) <- zonkTidyTcType env (mkVisFunTys arg_tys' res_ty)
            ; return ( env', mk_fun_tys_msg herald ty arity) }
       where
-        arg_tys' = map (checkingExpType "matchExpectedFunTys") (reverse arg_tys)
+        arg_tys' = map (\(Scaled u v) -> Scaled u (checkingExpType "matchExpectedFunTys" v)) (reverse arg_tys)
             -- this is safe b/c we're called from "go"
 
 -- Like 'matchExpectedFunTys', but used when you have an "actual" type,
@@ -237,7 +239,7 @@ matchActualFunTysRho :: SDoc   -- See Note [Herald for matchExpectedFunTys]
                      -> Maybe (HsExpr GhcRn)   -- the thing with type TcSigmaType
                      -> Arity
                      -> TcSigmaType
-                     -> TcM (HsWrapper, [TcSigmaType], TcRhoType)
+                     -> TcM (HsWrapper, [Scaled TcSigmaType], TcRhoType)
 -- If    matchActualFunTysRho n ty = (wrap, [t1,..,tn], res_ty)
 -- then  wrap : ty ~> (t1 -> ... -> tn -> res_ty)
 --       and res_ty is a RhoType
@@ -266,12 +268,12 @@ matchActualFunTySigma
   :: SDoc -- See Note [Herald for matchExpectedFunTys]
   -> CtOrigin
   -> Maybe (HsExpr GhcRn)   -- The thing with type TcSigmaType
-  -> (Arity, [TcSigmaType]) -- Total number of value args in the call, and
+  -> (Arity, [Scaled TcSigmaType]) -- Total number of value args in the call, and
                             -- types of values args to which function has
                             --   been applied already (reversed)
                             -- Both are used only for error messages)
   -> TcSigmaType            -- Type to analyse
-  -> TcM (HsWrapper, TcSigmaType, TcSigmaType)
+  -> TcM (HsWrapper, Scaled TcSigmaType, TcSigmaType)
 -- See Note [matchActualFunTys error handling] for all these arguments
 
 -- If   (wrap, arg_ty, res_ty) = matchActualFunTySigma ... fun_ty
@@ -295,7 +297,7 @@ matchActualFunTySigma herald ct_orig mb_thing err_info fun_ty
 
   where
     go :: TcSigmaType   -- The remainder of the type as we're processing
-       -> TcM (HsWrapper, TcSigmaType, TcSigmaType)
+       -> TcM (HsWrapper, Scaled TcSigmaType, TcSigmaType)
     go ty | Just ty' <- tcView ty = go ty'
 
     go ty
@@ -306,9 +308,9 @@ matchActualFunTySigma herald ct_orig mb_thing err_info fun_ty
       where
         (tvs, theta, _) = tcSplitSigmaTy ty
 
-    go (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
+    go (FunTy { ft_af = af, ft_mult = w, ft_arg = arg_ty, ft_res = res_ty })
       = ASSERT( af == VisArg )
-        return (idHsWrapper, arg_ty, res_ty)
+        return (idHsWrapper, Scaled w arg_ty, res_ty)
 
     go ty@(TyVarTy tv)
       | isMetaTyVar tv
@@ -338,9 +340,9 @@ matchActualFunTySigma herald ct_orig mb_thing err_info fun_ty
     defer fun_ty
       = do { arg_ty <- newOpenFlexiTyVarTy
            ; res_ty <- newOpenFlexiTyVarTy
-           ; let unif_fun_ty = mkVisFunTy arg_ty res_ty
+           ; let unif_fun_ty = mkVisFunTyMany arg_ty res_ty
            ; co <- unifyType mb_thing fun_ty unif_fun_ty
-           ; return (mkWpCastN co, arg_ty, res_ty) }
+           ; return (mkWpCastN co, unrestricted arg_ty, res_ty) }
 
     ------------
     mk_ctxt :: TcType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
@@ -405,7 +407,7 @@ matchExpectedTyConApp :: TyCon                -- T :: forall kv1 ... kvm. k1 -> 
 -- Postcondition: (T k1 k2 k3 a b c) is well-kinded
 
 matchExpectedTyConApp tc orig_ty
-  = ASSERT(tc /= funTyCon) go orig_ty
+  = ASSERT(not $ isFunTyCon tc) go orig_ty
   where
     go ty
        | Just ty' <- tcView ty
@@ -475,7 +477,7 @@ matchExpectedAppTy orig_ty
            ; return (co, (ty1, ty2)) }
 
     orig_kind = tcTypeKind orig_ty
-    kind1 = mkVisFunTy liftedTypeKind orig_kind
+    kind1 = mkVisFunTyMany liftedTypeKind orig_kind
     kind2 = liftedTypeKind    -- m :: * -> k
                               -- arg type :: *
 
@@ -722,6 +724,48 @@ to a UserTypeCtxt of GenSigCtxt.  Why?
   See Note [When to build an implication]
 -}
 
+
+-- Note [tcSubMult's wrapper]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- There is no notion of multiplicity coercion in Core, therefore the wrapper
+-- returned by tcSubMult (and derived function such as tcCheckUsage and
+-- checkManyPattern) is quite unlike any other wrapper: it checks whether the
+-- coercion produced by the constraint solver is trivial and disappears (it
+-- produces a type error is the constraint is not trivial). See [Checking
+-- multiplicity coercions] in TcEvidence.
+--
+-- This wrapper need to be placed in the term, otherwise checking of the
+-- eventual coercion won't be triggered during desuraging. But it can be put
+-- anywhere, since it doesn't affect the desugared code.
+--
+-- Why do we check this in the desugarer? It's a convenient place, since it's
+-- right after all the constraints are solved. We need the constraints to be
+-- solved to check whether they are trivial or not. Plus there are precedent for
+-- type errors during desuraging (such as the levity polymorphism
+-- restriction). An alternative would be to have a kind of constraints which can
+-- only produce trivial evidence, then this check would happen in the constraint
+-- solver.
+tcSubMult :: CtOrigin -> Mult -> Mult -> TcM HsWrapper
+tcSubMult origin (MultMul w1 w2) w_expected =
+  do { w1 <- tcSubMult origin w1 w_expected
+     ; w2 <- tcSubMult origin w2 w_expected
+     ; return (w1 <.> w2) }
+  -- Currently, we consider p*q and sup p q to be equal.  Therefore, p*q <= r is
+  -- equivalent to p <= r and q <= r.  For other cases, we approximate p <= q by p
+  -- ~ q.  This is not complete, but it's sound. See also Note [Overapproximating
+  -- multiplicities] in Multiplicity.
+tcSubMult origin w_actual w_expected =
+  case submult w_actual w_expected of
+    Submult -> return WpHole
+    Unknown -> tcEqMult origin w_actual w_expected
+
+tcEqMult :: CtOrigin -> Mult -> Mult -> TcM HsWrapper
+tcEqMult origin w_actual w_expected = do
+  {
+  -- Note that here we do not call to `submult`, so we check
+  -- for strict equality.
+  ; coercion <- uType TypeLevel origin w_actual w_expected
+  ; return $ if isReflCo coercion then WpHole else WpMultCoercion coercion }
 
 {- **********************************************************************
 %*                                                                      *
@@ -1308,10 +1352,11 @@ uType t_or_k origin orig_ty1 orig_ty2
       | Just ty2' <- tcView ty2 = go ty1  ty2'
 
         -- Functions (or predicate functions) just check the two parts
-    go (FunTy _ fun1 arg1) (FunTy _ fun2 arg2)
+    go (FunTy _ w1 fun1 arg1) (FunTy _ w2 fun2 arg2)
       = do { co_l <- uType t_or_k origin fun1 fun2
            ; co_r <- uType t_or_k origin arg1 arg2
-           ; return $ mkFunCo Nominal co_l co_r }
+           ; co_w <- uType t_or_k origin w1 w2
+           ; return $ mkFunCo Nominal co_w co_l co_r }
 
         -- Always defer if a type synonym family (type function)
         -- is involved.  (Data families behave rigidly.)
@@ -1975,9 +2020,9 @@ matchExpectedFunKind hs_ty n k = go n k
                 Indirect fun_kind -> go n fun_kind
                 Flexi ->             defer n k }
 
-    go n (FunTy _ arg res)
+    go n (FunTy _ w arg res)
       = do { co <- go (n-1) res
-           ; return (mkTcFunCo Nominal (mkTcNomReflCo arg) co) }
+           ; return (mkTcFunCo Nominal (mkTcNomReflCo w) (mkTcNomReflCo arg) co) }
 
     go n other
      = defer n other
@@ -1985,7 +2030,7 @@ matchExpectedFunKind hs_ty n k = go n k
     defer n k
       = do { arg_kinds <- newMetaKindVars n
            ; res_kind  <- newMetaKindVar
-           ; let new_fun = mkVisFunTys arg_kinds res_kind
+           ; let new_fun = mkVisFunTysMany arg_kinds res_kind
                  origin  = TypeEqOrigin { uo_actual   = k
                                         , uo_expected = new_fun
                                         , uo_thing    = Just (ppr hs_ty)
@@ -2156,10 +2201,10 @@ preCheck dflags ty_fam_ok tv ty
       | bad_tc tc              = MTVU_Bad
       | otherwise              = mapM fast_check tys >> ok
     fast_check (LitTy {})      = ok
-    fast_check (FunTy{ft_af = af, ft_arg = a, ft_res = r})
+    fast_check (FunTy{ft_af = af, ft_mult = w, ft_arg = a, ft_res = r})
       | InvisArg <- af
       , not impredicative_ok   = MTVU_Bad
-      | otherwise              = fast_check a   >> fast_check r
+      | otherwise              = fast_check w   >> fast_check a >> fast_check r
     fast_check (AppTy fun arg) = fast_check fun >> fast_check arg
     fast_check (CastTy ty co)  = fast_check ty  >> fast_check_co co
     fast_check (CoercionTy co) = fast_check_co co

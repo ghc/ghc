@@ -41,6 +41,7 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.TyCl.Build
 import GHC.Tc.Utils.Instantiate
 import GHC.Tc.Instance.Class( AssocInstInfo(..), isNotAssociated )
+import GHC.Core.Multiplicity
 import GHC.Core.InstEnv
 import GHC.Tc.Instance.Family
 import GHC.Core.FamInstEnv
@@ -1318,7 +1319,7 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds sc_theta
            ; addTcEvBind ev_binds_var $ mkWantedEvBind sc_ev_id sc_ev_tm
            ; let sc_top_ty = mkInfForAllTys tyvars $
                              mkPhiTy (map idType dfun_evs) sc_pred
-                 sc_top_id = mkLocalId sc_top_name sc_top_ty
+                 sc_top_id = mkLocalId sc_top_name Many sc_top_ty
                  export = ABE { abe_ext  = noExtField
                               , abe_wrap = idHsWrapper
                               , abe_poly = sc_top_id
@@ -1798,7 +1799,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
        ; let ctxt = FunSigCtxt sel_name True
                     -- True <=> check for redundant constraints in the
                     --          user-specified instance signature
-             inner_meth_id  = mkLocalId inner_meth_name sig_ty
+             inner_meth_id  = mkLocalId inner_meth_name Many sig_ty
              inner_meth_sig = CompleteSig { sig_bndr = inner_meth_id
                                           , sig_ctxt = ctxt
                                           , sig_loc  = getLoc (hsSigType hs_sig_ty) }
@@ -1849,8 +1850,8 @@ mkMethIds clas tyvars dfun_ev_vars inst_tys sel_id
         ; local_meth_name <- newName sel_occ
                   -- Base the local_meth_name on the selector name, because
                   -- type errors from tcMethodBody come from here
-        ; let poly_meth_id  = mkLocalId poly_meth_name  poly_meth_ty
-              local_meth_id = mkLocalId local_meth_name local_meth_ty
+        ; let poly_meth_id  = mkLocalId poly_meth_name  Many poly_meth_ty
+              local_meth_id = mkLocalId local_meth_name Many local_meth_ty
 
         ; return (poly_meth_id, local_meth_id) }
   where

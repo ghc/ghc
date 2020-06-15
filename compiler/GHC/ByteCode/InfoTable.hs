@@ -19,6 +19,7 @@ import GHC.Types.Name       ( Name, getName )
 import GHC.Types.Name.Env
 import GHC.Core.DataCon     ( DataCon, dataConRepArgTys, dataConIdentity )
 import GHC.Core.TyCon       ( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
+import GHC.Core.Multiplicity     ( scaledThing )
 import GHC.Types.RepType
 import GHC.StgToCmm.Layout  ( mkVirtConstrSizes )
 import GHC.StgToCmm.Closure ( tagForCon, NonVoid (..) )
@@ -58,7 +59,7 @@ make_constr_itbls hsc_env cons =
   mk_itbl dcon conNo = do
      let rep_args = [ NonVoid prim_rep
                     | arg <- dataConRepArgTys dcon
-                    , prim_rep <- typePrimRep arg ]
+                    , prim_rep <- typePrimRep (scaledThing arg) ]
 
          (tot_wds, ptr_wds) =
              mkVirtConstrSizes dflags rep_args

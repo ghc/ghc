@@ -125,7 +125,17 @@ module GHC.Builtin.Types (
         int8ElemRepDataConTy, int16ElemRepDataConTy, int32ElemRepDataConTy,
         int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy,
         word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy,
-        doubleElemRepDataConTy
+
+        doubleElemRepDataConTy,
+
+        -- * Multiplicity and friends
+        multiplicityTyConName, oneDataConName, manyDataConName, multiplicityTy,
+        multiplicityTyCon, oneDataCon, manyDataCon, oneDataConTy, manyDataConTy,
+        oneDataConTyCon, manyDataConTyCon,
+        multMulTyCon,
+
+        unrestrictedFunTyCon, unrestrictedFunTyConName
+
     ) where
 
 #include "HsVersions.h"
@@ -142,6 +152,7 @@ import {-# SOURCE #-} GHC.Builtin.Uniques
 -- others:
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Id
+import GHC.Types.Var (VarBndr (Bndr))
 import GHC.Settings.Constants ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE, mAX_SUM_SIZE )
 import GHC.Unit.Module        ( Module )
 import GHC.Core.Type
@@ -150,6 +161,7 @@ import GHC.Core.DataCon
 import {-# SOURCE #-} GHC.Core.ConLike
 import GHC.Core.TyCon
 import GHC.Core.Class     ( Class, mkClass )
+import GHC.Core.Multiplicity
 import GHC.Types.Name.Reader
 import GHC.Types.Name as Name
 import GHC.Types.Name.Env ( NameEnv, mkNameEnv, lookupNameEnv, lookupNameEnv_NF )
@@ -240,6 +252,7 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because they
                 , vecElemTyCon
                 , constraintKindTyCon
                 , liftedTypeKindTyCon
+                , multiplicityTyCon
                 ]
 
 mkWiredInTyConName :: BuiltInSyntax -> Module -> FastString -> Unique -> TyCon -> Name
@@ -461,6 +474,20 @@ constraintKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Constr
 liftedTypeKindTyConName :: Name
 liftedTypeKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Type") liftedTypeKindTyConKey liftedTypeKindTyCon
 
+multiplicityTyConName :: Name
+multiplicityTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Multiplicity")
+                          multiplicityTyConKey multiplicityTyCon
+
+oneDataConName, manyDataConName :: Name
+oneDataConName = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit "One") oneDataConKey oneDataCon
+manyDataConName = mkWiredInDataConName BuiltInSyntax gHC_TYPES (fsLit "Many") manyDataConKey manyDataCon
+ -- It feels wrong to have One and Many be BuiltInSyntax. But otherwise,
+ -- `Many`, in particular, is considered out of scope unless an appropriate
+ -- file is open. The problem with this is that `Many` appears implicitly in
+ -- types every time there is an `(->)`, hence out-of-scope errors get
+ -- reported. Making them built-in make it so that they are always considered in
+ -- scope.
+
 runtimeRepTyConName, vecRepDataConName, tupleRepDataConName, sumRepDataConName :: Name
 runtimeRepTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "RuntimeRep") runtimeRepTyConKey runtimeRepTyCon
 vecRepDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "VecRep") vecRepDataConKey vecRepDataCon
@@ -544,16 +571,20 @@ pcTyCon name cType tyvars cons
                 False           -- Not in GADT syntax
 
 pcDataCon :: Name -> [TyVar] -> [Type] -> TyCon -> DataCon
-pcDataCon n univs = pcDataConWithFixity False n univs
+pcDataCon n univs tys = pcDataConW n univs (map linear tys)
+
+pcDataConW :: Name -> [TyVar] -> [Scaled Type] -> TyCon -> DataCon
+pcDataConW n univs tys = pcDataConWithFixity False n univs
                       []    -- no ex_tvs
                       univs -- the univs are precisely the user-written tyvars
+                      tys
 
 pcDataConWithFixity :: Bool      -- ^ declared infix?
                     -> Name      -- ^ datacon name
                     -> [TyVar]   -- ^ univ tyvars
                     -> [TyCoVar] -- ^ ex tycovars
                     -> [TyCoVar] -- ^ user-written tycovars
-                    -> [Type]    -- ^ args
+                    -> [Scaled Type]    -- ^ args
                     -> TyCon
                     -> DataCon
 pcDataConWithFixity infx n = pcDataConWithFixity' infx n (dataConWorkerUnique (nameUnique n))
@@ -567,7 +598,7 @@ pcDataConWithFixity infx n = pcDataConWithFixity' infx n (dataConWorkerUnique (n
 
 pcDataConWithFixity' :: Bool -> Name -> Unique -> RuntimeRepInfo
                      -> [TyVar] -> [TyCoVar] -> [TyCoVar]
-                     -> [Type] -> TyCon -> DataCon
+                     -> [Scaled Type] -> TyCon -> DataCon
 -- The Name should be in the DataName name space; it's the name
 -- of the DataCon itself.
 --
@@ -625,7 +656,7 @@ mkDataConWorkerName data_con wrk_key =
 pcSpecialDataCon :: Name -> [Type] -> TyCon -> RuntimeRepInfo -> DataCon
 pcSpecialDataCon dc_name arg_tys tycon rri
   = pcDataConWithFixity' False dc_name (dataConWorkerUnique (nameUnique dc_name)) rri
-                         [] [] [] arg_tys tycon
+                         [] [] [] (map linear arg_tys) tycon
 
 {-
 ************************************************************************
@@ -651,7 +682,7 @@ constraintKindTyCon = pcTyCon constraintKindTyConName Nothing [] []
 
 liftedTypeKind, typeToTypeKind, constraintKind :: Kind
 liftedTypeKind   = tYPE liftedRepTy
-typeToTypeKind   = liftedTypeKind `mkVisFunTy` liftedTypeKind
+typeToTypeKind   = liftedTypeKind `mkVisFunTyMany` liftedTypeKind
 constraintKind   = mkTyConApp constraintKindTyCon []
 
 {-
@@ -791,7 +822,8 @@ isBuiltInOcc_maybe occ =
       "~"    -> Just eqTyConName
 
       -- function tycon
-      "->"   -> Just funTyConName
+      "FUN"  -> Just funTyConName
+      "->"  -> Just unrestrictedFunTyConName
 
       -- boxed tuple data/tycon
       -- We deliberately exclude Solo (the boxed 1-tuple).
@@ -1149,7 +1181,7 @@ eqSCSelId, heqSCSelId, coercibleSCSelId :: Id
                              rhs klass
                              (mkPrelTyConRepName eqTyConName)
     klass     = mk_class tycon sc_pred sc_sel_id
-    datacon   = pcDataCon eqDataConName tvs [sc_pred] tycon
+    datacon   = pcDataConW eqDataConName tvs [unrestricted sc_pred] tycon
 
     -- Kind: forall k. k -> k -> Constraint
     binders   = mkTemplateTyConBinders [liftedTypeKind] (\[k] -> [k,k])
@@ -1167,7 +1199,7 @@ eqSCSelId, heqSCSelId, coercibleSCSelId :: Id
                              rhs klass
                              (mkPrelTyConRepName heqTyConName)
     klass     = mk_class tycon sc_pred sc_sel_id
-    datacon   = pcDataCon heqDataConName tvs [sc_pred] tycon
+    datacon   = pcDataConW heqDataConName tvs [unrestricted sc_pred] tycon
 
     -- Kind: forall k1 k2. k1 -> k2 -> Constraint
     binders   = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] id
@@ -1185,7 +1217,7 @@ eqSCSelId, heqSCSelId, coercibleSCSelId :: Id
                              rhs klass
                              (mkPrelTyConRepName coercibleTyConName)
     klass     = mk_class tycon sc_pred sc_sel_id
-    datacon   = pcDataCon coercibleDataConName tvs [sc_pred] tycon
+    datacon   = pcDataConW coercibleDataConName tvs [unrestricted sc_pred] tycon
 
     -- Kind: forall k. k -> k -> Constraint
     binders   = mkTemplateTyConBinders [liftedTypeKind] (\[k] -> [k,k])
@@ -1202,6 +1234,67 @@ mk_class tycon sc_pred sc_sel_id
             [] [] (mkAnd []) tycon
 
 
+
+{- *********************************************************************
+*                                                                      *
+                Multiplicity Polymorphism
+*                                                                      *
+********************************************************************* -}
+
+{- Multiplicity polymorphism is implemented very similarly to levity
+ polymorphism. We write in the multiplicity kind and the One and Many
+ types which can appear in user programs. These are defined properly in GHC.Types.
+
+data Multiplicity = One | Many
+-}
+
+multiplicityTy :: Type
+multiplicityTy = mkTyConTy multiplicityTyCon
+
+multiplicityTyCon :: TyCon
+multiplicityTyCon = pcTyCon multiplicityTyConName Nothing []
+                          [oneDataCon, manyDataCon]
+
+oneDataCon, manyDataCon :: DataCon
+oneDataCon = pcDataCon oneDataConName [] [] multiplicityTyCon
+manyDataCon = pcDataCon manyDataConName [] [] multiplicityTyCon
+
+oneDataConTy, manyDataConTy :: Type
+oneDataConTy = mkTyConTy oneDataConTyCon
+manyDataConTy = mkTyConTy manyDataConTyCon
+
+oneDataConTyCon, manyDataConTyCon :: TyCon
+oneDataConTyCon = promoteDataCon oneDataCon
+manyDataConTyCon = promoteDataCon manyDataCon
+
+multMulTyConName :: Name
+multMulTyConName =
+    mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "MultMul") multMulTyConKey multMulTyCon
+
+multMulTyCon :: TyCon
+multMulTyCon = mkFamilyTyCon multMulTyConName binders multiplicityTy Nothing
+                         (BuiltInSynFamTyCon trivialBuiltInFamily)
+                         Nothing
+                         NotInjective
+  where
+    binders = mkTemplateAnonTyConBinders [multiplicityTy, multiplicityTy]
+
+unrestrictedFunTy :: Type
+unrestrictedFunTy = functionWithMultiplicity manyDataConTy
+
+unrestrictedFunTyCon :: TyCon
+unrestrictedFunTyCon = buildSynTyCon unrestrictedFunTyConName [] arrowKind [] unrestrictedFunTy
+  where arrowKind = mkTyConKind binders liftedTypeKind
+        -- See also funTyCon
+        binders = [ Bndr runtimeRep1TyVar (NamedTCB Inferred)
+                  , Bndr runtimeRep2TyVar (NamedTCB Inferred)
+                  ]
+                  ++ mkTemplateAnonTyConBinders [ tYPE runtimeRep1Ty
+                                                , tYPE runtimeRep2Ty
+                                                ]
+
+unrestrictedFunTyConName :: Name
+unrestrictedFunTyConName = mkWiredInTyConName BuiltInSyntax gHC_TYPES (fsLit "->") unrestrictedFunTyConKey unrestrictedFunTyCon
 
 {- *********************************************************************
 *                                                                      *
@@ -1576,7 +1669,7 @@ consDataCon :: DataCon
 consDataCon = pcDataConWithFixity True {- Declared infix -}
                consDataConName
                alpha_tyvar [] alpha_tyvar
-               [alphaTy, mkTyConApp listTyCon alpha_ty] listTyCon
+               (map linear [alphaTy, mkTyConApp listTyCon alpha_ty]) listTyCon
 -- Interesting: polymorphic recursion would help here.
 -- We can't use (mkListTy alphaTy) in the defn of consDataCon, else mkListTy
 -- gets the over-specific type (Type -> Type)

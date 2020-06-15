@@ -39,6 +39,7 @@ import GHC.Types.Basic
 import GHC.Core.TyCo.Rep (Type, ThetaType)
 import GHC.Types.Var
 import GHC.Core.Type(mkTyConApp)
+import GHC.Core.Multiplicity
 
 import qualified Data.Data as Data
 
@@ -108,11 +109,11 @@ conLikeFieldLabels (PatSynCon pat_syn)    = patSynFieldLabels pat_syn
 
 -- | Returns just the instantiated /value/ argument types of a 'ConLike',
 -- (excluding dictionary args)
-conLikeInstOrigArgTys :: ConLike -> [Type] -> [Type]
+conLikeInstOrigArgTys :: ConLike -> [Type] -> [Scaled Type]
 conLikeInstOrigArgTys (RealDataCon data_con) tys =
     dataConInstOrigArgTys data_con tys
 conLikeInstOrigArgTys (PatSynCon pat_syn) tys =
-    patSynInstArgTys pat_syn tys
+    map unrestricted $ patSynInstArgTys pat_syn tys
 
 -- | 'TyVarBinder's for the type variables of the 'ConLike'. For pattern
 -- synonyms, this will always consist of the universally quantified variables
@@ -181,7 +182,7 @@ conLikeFullSig :: ConLike
                -> ([TyVar], [TyCoVar], [EqSpec]
                    -- Why tyvars for universal but tycovars for existential?
                    -- See Note [Existential coercion variables] in GHC.Core.DataCon
-                  , ThetaType, ThetaType, [Type], Type)
+                  , ThetaType, ThetaType, [Scaled Type], Type)
 conLikeFullSig (RealDataCon con) =
   let (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, res_ty) = dataConFullSig con
   -- Required theta is empty as normal data cons require no additional

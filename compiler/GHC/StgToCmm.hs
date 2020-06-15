@@ -43,6 +43,7 @@ import GHC.Types.Id.Info
 import GHC.Types.RepType
 import GHC.Core.DataCon
 import GHC.Core.TyCon
+import GHC.Core.Multiplicity
 import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Data.Stream
@@ -242,7 +243,7 @@ cgDataCon data_con
             arg_reps :: [NonVoid PrimRep]
             arg_reps = [ NonVoid rep_ty
                        | ty <- dataConRepArgTys data_con
-                       , rep_ty <- typePrimRep ty
+                       , rep_ty <- typePrimRep (scaledThing ty)
                        , not (isVoidRep rep_ty) ]
 
         ; emitClosureAndInfoTable dyn_info_tbl NativeDirectCall [] $

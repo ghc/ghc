@@ -1,8 +1,9 @@
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TupleSections, PatternSynonyms #-}
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Types.Id
 import GHC.Core.Type
+import GHC.Core.Multiplicity ( pattern Many )
 import GHC.Core.Make
 import GHC.Core.Opt.CallArity (callArityRHS)
 import GHC.Types.Id.Make
@@ -27,16 +28,16 @@ import GHC.Data.FastString
 go, go2, x, d, n, y, z, scrutf, scruta :: Id
 [go, go2, x,d, n, y, z, scrutf, scruta, f] = mkTestIds
     (words "go go2 x d n y z scrutf scruta f")
-    [ mkVisFunTys [intTy, intTy] intTy
-    , mkVisFunTys [intTy, intTy] intTy
+    [ mkVisFunTysMany [intTy, intTy] intTy
+    , mkVisFunTysMany [intTy, intTy] intTy
     , intTy
-    , mkVisFunTys [intTy] intTy
-    , mkVisFunTys [intTy] intTy
+    , mkVisFunTysMany [intTy] intTy
+    , mkVisFunTysMany [intTy] intTy
     , intTy
     , intTy
-    , mkVisFunTys [boolTy] boolTy
+    , mkVisFunTysMany [boolTy] boolTy
     , boolTy
-    , mkVisFunTys [intTy, intTy] intTy -- protoypical external function
+    , mkVisFunTysMany [intTy, intTy] intTy -- protoypical external function
     ]
 
 exprs :: [(String, CoreExpr)]
@@ -188,7 +189,7 @@ mkLApps v = mkApps (Var v) . map mkLit
 mkACase = mkIfThenElse (mkVarApps (Var scrutf) [scruta])
 
 mkTestId :: Int -> String -> Type -> Id
-mkTestId i s ty = mkSysLocal (mkFastString s) (mkBuiltinUnique i) ty
+mkTestId i s ty = mkSysLocal (mkFastString s) (mkBuiltinUnique i) Many ty
 
 mkTestIds :: [String] -> [Type] -> [Id]
 mkTestIds ns tys = zipWith3 mkTestId [0..] ns tys

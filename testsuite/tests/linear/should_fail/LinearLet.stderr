@@ -1,0 +1,5 @@
+
+LinearLet.hs:5:3: error:
+    • Couldn't match type ‘'Many’ with ‘'One’
+        arising from multiplicity of ‘x’
+    • In an equation for ‘f’: f x = let y = x in (y, y)

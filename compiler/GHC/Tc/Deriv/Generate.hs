@@ -66,6 +66,7 @@ import GHC.Core.Coercion.Axiom ( coAxiomSingleBranch )
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
 import GHC.Core.Type
+import GHC.Core.Multiplicity
 import GHC.Core.Class
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -210,7 +211,7 @@ gen_Eq_binds loc tycon = do
             bs_needed   = take con_arity bs_RDRs
             tys_needed  = dataConOrigArgTys data_con
         in
-        ([con1_pat, con2_pat], nested_eq_expr tys_needed as_needed bs_needed)
+        ([con1_pat, con2_pat], nested_eq_expr (map scaledThing tys_needed) as_needed bs_needed)
       where
         nested_eq_expr []  [] [] = true_Expr
         nested_eq_expr tys as bs
@@ -456,7 +457,7 @@ gen_Ord_binds loc tycon = do
     -- Returns a case alternative  Ki b1 b2 ... bv -> compare (a1,a2,...) with (b1,b2,...)
     mkInnerEqAlt op data_con
       = mkHsCaseAlt (nlConVarPat data_con_RDR bs_needed) $
-        mkCompareFields op (dataConOrigArgTys data_con)
+        mkCompareFields op (map scaledThing $ dataConOrigArgTys data_con)
       where
         data_con_RDR = getRdrName data_con
         bs_needed    = take (dataConSourceArity data_con) bs_RDRs
@@ -1044,7 +1045,7 @@ gen_Read_binds get_fixity loc tycon
         is_infix     = dataConIsInfix data_con
         is_record    = labels `lengthExceeds` 0
         as_needed    = take con_arity as_RDRs
-        read_args    = zipWithEqual "gen_Read_binds" read_arg as_needed (dataConOrigArgTys data_con)
+        read_args    = zipWithEqual "gen_Read_binds" read_arg as_needed (map scaledThing $ dataConOrigArgTys data_con)
         (read_a1:read_a2:_) = read_args
 
         prefix_prec = appPrecedence
@@ -1187,7 +1188,7 @@ gen_Show_binds get_fixity loc tycon
                  where
                    nm       = wrapOpParens (unpackFS l)
 
-             show_args               = zipWithEqual "gen_Show_binds" show_arg bs_needed arg_tys
+             show_args               = zipWithEqual "gen_Show_binds" show_arg bs_needed (map scaledThing arg_tys)
              (show_arg1:show_arg2:_) = show_args
              show_prefix_args        = intersperse (nlHsVar showSpace_RDR) show_args
 
@@ -1378,7 +1379,7 @@ gen_data dflags data_type_name constr_names loc rep_tc
 
     gfoldl_eqn con
       = ([nlVarPat k_RDR, z_Pat, nlConVarPat con_name as_needed],
-                   foldl' mk_k_app (z_Expr `nlHsApp` nlHsVar con_name) as_needed)
+                   foldl' mk_k_app (z_Expr `nlHsApp` (eta_expand_data_con con)) as_needed)
                    where
                      con_name ::  RdrName
                      con_name = getRdrName con
@@ -1398,8 +1399,17 @@ gen_data dflags data_type_name constr_names loc rep_tc
 
     gunfold_alt dc = mkHsCaseAlt (mk_unfold_pat dc) (mk_unfold_rhs dc)
     mk_unfold_rhs dc = foldr nlHsApp
-                           (z_Expr `nlHsApp` nlHsVar (getRdrName dc))
+                           (z_Expr `nlHsApp` (eta_expand_data_con dc))
                            (replicate (dataConSourceArity dc) (nlHsVar k_RDR))
+
+    eta_expand_data_con dc =
+        mkHsLam eta_expand_pats
+          (foldl nlHsApp (nlHsVar (getRdrName dc)) eta_expand_hsvars)
+      where
+        eta_expand_pats = map nlVarPat eta_expand_vars
+        eta_expand_hsvars = map nlHsVar eta_expand_vars
+        eta_expand_vars = take (dataConSourceArity dc) as_RDRs
+
 
     mk_unfold_pat dc    -- Last one is a wild-pat, to avoid
                         -- redundant test, and annoying warning
@@ -1448,7 +1458,7 @@ gen_data dflags data_type_name constr_names loc rep_tc
 
 kind1, kind2 :: Kind
 kind1 = typeToTypeKind
-kind2 = liftedTypeKind `mkVisFunTy` kind1
+kind2 = liftedTypeKind `mkVisFunTyMany` kind1
 
 gfoldl_RDR, gunfold_RDR, toConstr_RDR, dataTypeOf_RDR, mkConstr_RDR,
     mkDataType_RDR, conIndex_RDR, prefix_RDR, infix_RDR,
@@ -1960,7 +1970,7 @@ genAuxBindSpec dflags loc (DerivCon2Tag tycon)
 
     sig_ty = mkLHsSigWcType $ L loc $ XHsType $ NHsCoreTy $
              mkSpecSigmaTy (tyConTyVars tycon) (tyConStupidTheta tycon) $
-             mkParentType tycon `mkVisFunTy` intPrimTy
+             mkParentType tycon `mkVisFunTyMany` intPrimTy
 
     lots_of_constructors = tyConFamilySize tycon > 8
                         -- was: mAX_FAMILY_SIZE_FOR_VEC_RETURNS
@@ -1984,7 +1994,7 @@ genAuxBindSpec dflags loc (DerivTag2Con tycon)
   where
     sig_ty = mkLHsSigWcType $ L loc $
              XHsType $ NHsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
-             intTy `mkVisFunTy` mkParentType tycon
+             intTy `mkVisFunTyMany` mkParentType tycon
 
     rdr_name = tag2con_RDR dflags tycon
 

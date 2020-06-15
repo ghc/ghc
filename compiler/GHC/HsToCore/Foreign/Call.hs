@@ -37,6 +37,7 @@ import GHC.HsToCore.Utils
 
 import GHC.Tc.Utils.TcType
 import GHC.Core.Type
+import GHC.Core.Multiplicity
 import GHC.Types.Id   ( Id )
 import GHC.Core.Coercion
 import GHC.Builtin.PrimOps
@@ -125,7 +126,7 @@ mkFCall dflags uniq the_fcall val_args res_ty
     mkApps (mkVarApps (Var the_fcall_id) tyvars) val_args
   where
     arg_tys = map exprType val_args
-    body_ty = (mkVisFunTys arg_tys res_ty)
+    body_ty = (mkVisFunTysMany arg_tys res_ty)
     tyvars  = tyCoVarsOfTypeWellScoped body_ty
     ty      = mkInfForAllTys tyvars body_ty
     the_fcall_id = mkFCallId dflags uniq the_fcall ty
@@ -154,7 +155,7 @@ unboxArg arg
     tc `hasKey` boolTyConKey
   = do dflags <- getDynFlags
        let platform = targetPlatform dflags
-       prim_arg <- newSysLocalDs intPrimTy
+       prim_arg <- newSysLocalDs Many intPrimTy
        return (Var prim_arg,
               \ body -> Case (mkIfThenElse arg (mkIntLit platform 1) (mkIntLit platform 0))
                              prim_arg
@@ -166,8 +167,8 @@ unboxArg arg
   | is_product_type && data_con_arity == 1
   = ASSERT2(isUnliftedType data_con_arg_ty1, pprType arg_ty)
                         -- Typechecker ensures this
-    do case_bndr <- newSysLocalDs arg_ty
-       prim_arg <- newSysLocalDs data_con_arg_ty1
+    do case_bndr <- newSysLocalDs Many arg_ty
+       prim_arg <- newSysLocalDs Many data_con_arg_ty1
        return (Var prim_arg,
                \ body -> Case arg case_bndr (exprType body) [(DataAlt data_con,[prim_arg],body)]
               )
@@ -181,8 +182,8 @@ unboxArg arg
     isJust maybe_arg3_tycon &&
     (arg3_tycon ==  byteArrayPrimTyCon ||
      arg3_tycon ==  mutableByteArrayPrimTyCon)
-  = do case_bndr <- newSysLocalDs arg_ty
-       vars@[_l_var, _r_var, arr_cts_var] <- newSysLocalsDs data_con_arg_tys
+  = do case_bndr <- newSysLocalDs Many arg_ty
+       vars@[_l_var, _r_var, arr_cts_var] <- newSysLocalsDs (map unrestricted data_con_arg_tys)
        return (Var arr_cts_var,
                \ body -> Case arg case_bndr (exprType body) [(DataAlt data_con,vars,body)]
               )
@@ -194,7 +195,8 @@ unboxArg arg
     arg_ty                                      = exprType arg
     maybe_product_type                          = splitDataProductType_maybe arg_ty
     is_product_type                             = isJust maybe_product_type
-    Just (_, _, data_con, data_con_arg_tys)     = maybe_product_type
+    Just (_, _, data_con, scaled_data_con_arg_tys) = maybe_product_type
+    data_con_arg_tys                            = map scaledThing scaled_data_con_arg_tys
     data_con_arity                              = dataConSourceArity data_con
     (data_con_arg_ty1 : _)                      = data_con_arg_tys
 
@@ -240,7 +242,7 @@ boxResult result_ty
 
         ; (ccall_res_ty, the_alt) <- mk_alt return_result res
 
-        ; state_id <- newSysLocalDs realWorldStatePrimTy
+        ; state_id <- newSysLocalDs Many realWorldStatePrimTy
         ; let io_data_con = head (tyConDataCons io_tycon)
               toIOCon     = dataConWrapId io_data_con
 
@@ -249,12 +251,12 @@ boxResult result_ty
                                      [ Type io_res_ty,
                                        Lam state_id $
                                        mkWildCase (App the_call (Var state_id))
-                                             ccall_res_ty
+                                             (unrestricted ccall_res_ty)
                                              (coreAltType the_alt)
                                              [the_alt]
                                      ]
 
-        ; return (realWorldStatePrimTy `mkVisFunTy` ccall_res_ty, wrap) }
+        ; return (realWorldStatePrimTy `mkVisFunTyMany` ccall_res_ty, wrap) }
 
 boxResult result_ty
   = do -- It isn't IO, so do unsafePerformIO
@@ -263,10 +265,10 @@ boxResult result_ty
        (ccall_res_ty, the_alt) <- mk_alt return_result res
        let
            wrap = \ the_call -> mkWildCase (App the_call (Var realWorldPrimId))
-                                           ccall_res_ty
+                                           (unrestricted ccall_res_ty)
                                            (coreAltType the_alt)
                                            [the_alt]
-       return (realWorldStatePrimTy `mkVisFunTy` ccall_res_ty, wrap)
+       return (realWorldStatePrimTy `mkVisFunTyMany` ccall_res_ty, wrap)
   where
     return_result _ [ans] = ans
     return_result _ _     = panic "return_result: expected single result"
@@ -277,7 +279,7 @@ mk_alt :: (Expr Var -> [Expr Var] -> Expr Var)
        -> DsM (Type, (AltCon, [Id], Expr Var))
 mk_alt return_result (Nothing, wrap_result)
   = do -- The ccall returns ()
-       state_id <- newSysLocalDs realWorldStatePrimTy
+       state_id <- newSysLocalDs Many realWorldStatePrimTy
        let
              the_rhs = return_result (Var state_id)
                                      [wrap_result (panic "boxResult")]
@@ -291,8 +293,8 @@ mk_alt return_result (Just prim_res_ty, wrap_result)
   = -- The ccall returns a non-() value
     ASSERT2( isPrimitiveType prim_res_ty, ppr prim_res_ty )
              -- True because resultWrapper ensures it is so
-    do { result_id <- newSysLocalDs prim_res_ty
-       ; state_id <- newSysLocalDs realWorldStatePrimTy
+    do { result_id <- newSysLocalDs Many prim_res_ty
+       ; state_id <- newSysLocalDs Many realWorldStatePrimTy
        ; let the_rhs = return_result (Var state_id)
                                 [wrap_result (Var result_id)]
              ccall_res_ty = mkTupleTy Unboxed [realWorldStatePrimTy, prim_res_ty]
@@ -322,7 +324,7 @@ resultWrapper result_ty
   -- Base case 2: the unit type ()
   | Just (tc,_) <- maybe_tc_app
   , tc `hasKey` unitTyConKey
-  = return (Nothing, \_ -> Var unitDataConId)
+  = return (Nothing, \_ -> unitExpr)
 
   -- Base case 3: the boolean type
   | Just (tc,_) <- maybe_tc_app
@@ -330,7 +332,7 @@ resultWrapper result_ty
   = do { dflags <- getDynFlags
        ; let platform = targetPlatform dflags
        ; let marshal_bool e
-               = mkWildCase e intPrimTy boolTy
+               = mkWildCase e (unrestricted intPrimTy) boolTy
                    [ (DEFAULT                     ,[],Var trueDataConId )
                    , (LitAlt (mkLitInt platform 0),[],Var falseDataConId)]
        ; return (Just intPrimTy, marshal_bool) }
@@ -350,7 +352,7 @@ resultWrapper result_ty
   -- This includes types like Ptr and ForeignPtr
   | Just (tycon, tycon_arg_tys) <- maybe_tc_app
   , Just data_con <- isDataProductTyCon_maybe tycon  -- One constructor, no existentials
-  , [unwrapped_res_ty] <- dataConInstOrigArgTys data_con tycon_arg_tys  -- One argument
+  , [Scaled _ unwrapped_res_ty] <- dataConInstOrigArgTys data_con tycon_arg_tys  -- One argument
   = do { dflags <- getDynFlags
        ; let platform = targetPlatform dflags
        ; (maybe_ty, wrapper) <- resultWrapper unwrapped_res_ty

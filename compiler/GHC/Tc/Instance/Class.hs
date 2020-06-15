@@ -32,6 +32,7 @@ import GHC.Builtin.Names
 
 import GHC.Types.Id
 import GHC.Core.Type
+import GHC.Core.Multiplicity
 import GHC.Core.Make ( mkStringExprFS, mkNaturalExpr )
 
 import GHC.Types.Name   ( Name, pprDefinedAt )
@@ -430,15 +431,15 @@ matchTypeable clas [k,t]  -- clas = Typeable
 matchTypeable _ _ = return NoInstance
 
 -- | Representation for a type @ty@ of the form @arg -> ret@.
-doFunTy :: Class -> Type -> Type -> Type -> TcM ClsInstResult
-doFunTy clas ty arg_ty ret_ty
+doFunTy :: Class -> Type -> Scaled Type -> Type -> TcM ClsInstResult
+doFunTy clas ty (Scaled mult arg_ty) ret_ty
   = return $ OneInst { cir_new_theta = preds
                      , cir_mk_ev     = mk_ev
                      , cir_what      = BuiltinInstance }
   where
-    preds = map (mk_typeable_pred clas) [arg_ty, ret_ty]
-    mk_ev [arg_ev, ret_ev] = evTypeable ty $
-                             EvTypeableTrFun (EvExpr arg_ev) (EvExpr ret_ev)
+    preds = map (mk_typeable_pred clas) [mult, arg_ty, ret_ty]
+    mk_ev [mult_ev, arg_ev, ret_ev] = evTypeable ty $
+                        EvTypeableTrFun (EvExpr mult_ev) (EvExpr arg_ev) (EvExpr ret_ev)
     mk_ev _ = panic "GHC.Tc.Solver.Interact.doFunTy"
 
 
@@ -685,7 +686,7 @@ matchHasField dflags short_cut clas tys
                          -- the HasField x r a dictionary.  The preds will
                          -- typically be empty, but if the datatype has a
                          -- "stupid theta" then we have to include it here.
-                   ; let theta = mkPrimEqPred sel_ty (mkVisFunTy r_ty a_ty) : preds
+                   ; let theta = mkPrimEqPred sel_ty (mkVisFunTyMany r_ty a_ty) : preds
 
                          -- Use the equality proof to cast the selector Id to
                          -- type (r -> a), then use the newtype coercion to cast

@@ -89,6 +89,8 @@ These functions do not bind a levity-polymorphic variable, and
 so are accepted. Their polymorphism allows users to use these to conveniently
 stub out functions that return unboxed types.
 
+.. _printing-levity-polymorphic-types:
+
 Printing levity-polymorphic types
 ---------------------------------
 

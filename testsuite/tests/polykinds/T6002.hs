@@ -6,7 +6,7 @@
  - phantom types (when GHC 7.4 arrives, the user-defined kinds)
  - corresponding singleton types
 
-These are basically the constructs from Omega,
+These are basically the constructs from Many,
 reimplemented in Haskell for our purposes. -}
 
 {-# LANGUAGE GADTs, KindSignatures, StandaloneDeriving,

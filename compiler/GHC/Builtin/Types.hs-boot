@@ -44,4 +44,13 @@ anyTypeOfKind :: Kind -> Type
 unboxedTupleKind :: [Type] -> Type
 mkPromotedListTy :: Type -> [Type] -> Type
 
+multiplicityTyCon :: TyCon
+multiplicityTy :: Type
+oneDataConTy :: Type
+oneDataConTyCon :: TyCon
+manyDataConTy :: Type
+manyDataConTyCon :: TyCon
+unrestrictedFunTyCon :: TyCon
+multMulTyCon :: TyCon
+
 tupleTyConName :: TupleSort -> Arity -> Name

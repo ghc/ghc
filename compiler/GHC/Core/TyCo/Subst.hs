@@ -33,12 +33,12 @@ module GHC.Core.TyCo.Subst
 
         substTyWith, substTyWithCoVars, substTysWith, substTysWithCoVars,
         substCoWith,
-        substTy, substTyAddInScope,
-        substTyUnchecked, substTysUnchecked, substThetaUnchecked,
-        substTyWithUnchecked,
+        substTy, substTyAddInScope, substScaledTy,
+        substTyUnchecked, substTysUnchecked, substScaledTysUnchecked, substThetaUnchecked,
+        substTyWithUnchecked, substScaledTyUnchecked,
         substCoUnchecked, substCoWithUnchecked,
         substTyWithInScope,
-        substTys, substTheta,
+        substTys, substScaledTys, substTheta,
         lookupTyVar,
         substCo, substCos, substCoVar, substCoVars, lookupCoVar,
         cloneTyVarBndr, cloneTyVarBndrs,
@@ -69,6 +69,7 @@ import {-# SOURCE #-} GHC.Core.Coercion
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr
+import GHC.Core.Multiplicity
 
 import GHC.Types.Var
 import GHC.Types.Var.Set
@@ -673,6 +674,12 @@ substTyUnchecked subst ty
                  | isEmptyTCvSubst subst = ty
                  | otherwise             = subst_ty subst ty
 
+substScaledTy :: HasCallStack => TCvSubst -> Scaled Type -> Scaled Type
+substScaledTy subst scaled_ty = mapScaledType (substTy subst) scaled_ty
+
+substScaledTyUnchecked :: HasCallStack => TCvSubst -> Scaled Type -> Scaled Type
+substScaledTyUnchecked subst scaled_ty = mapScaledType (substTyUnchecked subst) scaled_ty
+
 -- | Substitute within several 'Type's
 -- The substitution has to satisfy the invariants described in
 -- Note [The substitution invariant].
@@ -680,6 +687,12 @@ substTys :: HasCallStack => TCvSubst -> [Type] -> [Type]
 substTys subst tys
   | isEmptyTCvSubst subst = tys
   | otherwise = checkValidSubst subst tys [] $ map (subst_ty subst) tys
+
+substScaledTys :: HasCallStack => TCvSubst -> [Scaled Type] -> [Scaled Type]
+substScaledTys subst scaled_tys
+  | isEmptyTCvSubst subst = scaled_tys
+  | otherwise = checkValidSubst subst (map scaledMult scaled_tys ++ map scaledThing scaled_tys) [] $
+                map (mapScaledType (subst_ty subst)) scaled_tys
 
 -- | Substitute within several 'Type's disabling the sanity checks.
 -- The problems that the sanity checks in substTys catch are described in
@@ -690,6 +703,11 @@ substTysUnchecked :: TCvSubst -> [Type] -> [Type]
 substTysUnchecked subst tys
                  | isEmptyTCvSubst subst = tys
                  | otherwise             = map (subst_ty subst) tys
+
+substScaledTysUnchecked :: TCvSubst -> [Scaled Type] -> [Scaled Type]
+substScaledTysUnchecked subst tys
+                 | isEmptyTCvSubst subst = tys
+                 | otherwise             = map (mapScaledType (subst_ty subst)) tys
 
 -- | Substitute within a 'ThetaType'
 -- The substitution has to satisfy the invariants described in
@@ -721,10 +739,11 @@ subst_ty subst ty
                 -- by [Int], represented with TyConApp
     go (TyConApp tc tys) = let args = map go tys
                            in  args `seqList` TyConApp tc args
-    go ty@(FunTy { ft_arg = arg, ft_res = res })
-      = let !arg' = go arg
+    go ty@(FunTy { ft_mult = mult, ft_arg = arg, ft_res = res })
+      = let !mult' = go mult
+            !arg' = go arg
             !res' = go res
-        in ty { ft_arg = arg', ft_res = res' }
+        in ty { ft_mult = mult', ft_arg = arg', ft_res = res' }
     go (ForAllTy (Bndr tv vis) ty)
                          = case substVarBndrUnchecked subst tv of
                              (subst', tv') ->
@@ -805,7 +824,7 @@ subst_co subst co
       = case substForAllCoBndrUnchecked subst tv kind_co of
          (subst', tv', kind_co') ->
           ((mkForAllCo $! tv') $! kind_co') $! subst_co subst' co
-    go (FunCo r co1 co2)     = (mkFunCo r $! go co1) $! go co2
+    go (FunCo r w co1 co2)   = ((mkFunCo r $! go w) $! go co1) $! go co2
     go (CoVarCo cv)          = substCoVar subst cv
     go (AxiomInstCo con ind cos) = mkAxiomInstCo con ind $! map go cos
     go (UnivCo p r t1 t2)    = (((mkUnivCo $! go_prov p) $! r) $!
@@ -827,7 +846,7 @@ subst_co subst co
 
     -- See Note [Substituting in a coercion hole]
     go_hole h@(CoercionHole { ch_co_var = cv })
-      = h { ch_co_var = updateVarType go_ty cv }
+      = h { ch_co_var = updateVarTypeAndMult go_ty cv }
 
 substForAllCoBndr :: TCvSubst -> TyCoVar -> KindCoercion
                   -> (TCvSubst, TyCoVar, Coercion)

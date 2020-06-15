@@ -56,6 +56,7 @@ module Language.Haskell.TH.Lib (
 
     -- *** Types
         forallT, forallVisT, varT, conT, appT, appKindT, arrowT, infixT,
+        mulArrowT,
         uInfixT, parensT, equalityT, listT, tupleT, unboxedTupleT, unboxedSumT,
         sigT, litT, wildCardT, promotedT, promotedTupleT, promotedNilT,
         promotedConsT, implicitParamT,

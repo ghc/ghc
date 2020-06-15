@@ -141,7 +141,7 @@ data HieType a
   | HAppTy a (HieArgs a)
   | HTyConApp IfaceTyCon (HieArgs a)
   | HForAllTy ((Name, a),ArgFlag) a
-  | HFunTy  a a
+  | HFunTy a a a
   | HQualTy a a           -- ^ type with constraint: @t1 => t2@ (see 'IfaceDFunTy')
   | HLitTy IfaceTyLit
   | HCastTy a
@@ -169,8 +169,9 @@ instance Binary (HieType TypeIndex) where
     putByte bh 3
     put_ bh bndr
     put_ bh a
-  put_ bh (HFunTy a b) = do
+  put_ bh (HFunTy w a b) = do
     putByte bh 4
+    put_ bh w
     put_ bh a
     put_ bh b
   put_ bh (HQualTy a b) = do
@@ -192,7 +193,7 @@ instance Binary (HieType TypeIndex) where
       1 -> HAppTy <$> get bh <*> get bh
       2 -> HTyConApp <$> get bh <*> get bh
       3 -> HForAllTy <$> get bh <*> get bh
-      4 -> HFunTy <$> get bh <*> get bh
+      4 -> HFunTy <$> get bh <*> get bh <*> get bh
       5 -> HQualTy <$> get bh <*> get bh
       6 -> HLitTy <$> get bh
       7 -> HCastTy <$> get bh

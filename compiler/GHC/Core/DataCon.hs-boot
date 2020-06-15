@@ -9,6 +9,7 @@ import GHC.Types.Unique ( Uniquable )
 import GHC.Utils.Outputable ( Outputable, OutputableBndr )
 import GHC.Types.Basic (Arity)
 import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type, ThetaType )
+import GHC.Core.Multiplicity (Scaled)
 
 data DataCon
 data DataConRep
@@ -21,10 +22,10 @@ dataConUserTyVars :: DataCon -> [TyVar]
 dataConUserTyVarBinders :: DataCon -> [InvisTVBinder]
 dataConSourceArity  :: DataCon -> Arity
 dataConFieldLabels :: DataCon -> [FieldLabel]
-dataConInstOrigArgTys  :: DataCon -> [Type] -> [Type]
+dataConInstOrigArgTys  :: DataCon -> [Type] -> [Scaled Type]
 dataConStupidTheta :: DataCon -> ThetaType
 dataConFullSig :: DataCon
-               -> ([TyVar], [TyCoVar], [EqSpec], ThetaType, [Type], Type)
+               -> ([TyVar], [TyCoVar], [EqSpec], ThetaType, [Scaled Type], Type)
 isUnboxedSumCon :: DataCon -> Bool
 
 instance Eq DataCon

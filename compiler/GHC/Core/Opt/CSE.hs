@@ -16,7 +16,7 @@ module GHC.Core.Opt.CSE (cseProgram, cseOneExpr) where
 import GHC.Prelude
 
 import GHC.Core.Subst
-import GHC.Types.Var    ( Var )
+import GHC.Types.Var    ( Var, varMultMaybe )
 import GHC.Types.Var.Env ( mkInScopeSet )
 import GHC.Types.Id     ( Id, idType, idHasRules
                         , idInlineActivation, setInlineActivation
@@ -33,6 +33,7 @@ import GHC.Types.Basic
 import GHC.Core.Map
 import GHC.Utils.Misc   ( filterOut, equalLength, debugIsOn )
 import Data.List        ( mapAccumL )
+import GHC.Core.Multiplicity
 
 {-
                         Simple common sub-expression
@@ -449,8 +450,34 @@ noCSE id =  not (isAlwaysActive (idInlineActivation id)) &&
              -- See Note [CSE for INLINE and NOINLINE]
          || isAnyInlinePragma (idInlinePragma id)
              -- See Note [CSE for stable unfoldings]
+         || not (multiplicityOkForCSE id)
          || isJoinId id
              -- See Note [CSE for join points?]
+  where
+    -- It doesn't make sense to do CSE for a binding which can't be freely
+    -- shared or dropped. In particular linear bindings, but this is true for
+    -- any binding whose multiplicity contains a variable.
+    --
+    -- This shows up, in particular, when performing a substitution
+    --
+    --   CSE[let x # 'One = y in x]
+    --   ==> let x # 'One = y in CSE[x[x\y]]
+    --   ==> let x # 'One = y in y
+    --
+    -- Here @x@ doesn't appear in the body, but it is required by linearity!
+    -- Also @y@ appears shared, while we expect it to be a linear variable.
+    --
+    -- This is usually not a problem with let-binders because they are aliases.
+    -- But we don't have such luxury for case binders. Still, substitution of
+    -- the case binder by the scrutinee happens routinely in CSE to discover
+    -- more CSE opportunities (see Note [CSE for case expressions]).
+    --
+    -- It's alright, though! Because there is never a need to share linear
+    -- definitions.
+    multiplicityOkForCSE v = case varMultMaybe v of
+                                Just Many -> True
+                                Just _ -> False
+                                Nothing -> True
 
 
 {- Note [Take care with literal strings]
