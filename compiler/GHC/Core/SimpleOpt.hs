@@ -42,7 +42,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Core.DataCon
 import GHC.Types.Demand( etaConvertStrictSig )
-import GHC.Core.Coercion.Opt ( optCoercion )
+import GHC.Core.Coercion.Opt ( optCoercion, OptCoercionOpts (..) )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
 import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
@@ -132,9 +132,7 @@ simpleOptExprWith :: HasDebugCallStack => DynFlags -> Subst -> InExpr -> OutExpr
 simpleOptExprWith dflags subst expr
   = simple_opt_expr init_env (occurAnalyseExpr expr)
   where
-    init_env = SOE { soe_dflags = dflags
-                   , soe_inl = emptyVarEnv
-                   , soe_subst = subst }
+    init_env = (emptyEnv dflags) { soe_subst = subst }
 
 ----------------------
 simpleOptPgm :: DynFlags -> Module
@@ -171,13 +169,16 @@ type SimpleClo = (SimpleOptEnv, InExpr)
 
 data SimpleOptEnv
   = SOE { soe_dflags :: DynFlags
+        , soe_co_opt_opts :: !OptCoercionOpts
+             -- ^ Options for the coercion optimiser
+
         , soe_inl   :: IdEnv SimpleClo
-             -- Deals with preInlineUnconditionally; things
+             -- ^ Deals with preInlineUnconditionally; things
              -- that occur exactly once and are inlined
              -- without having first been simplified
 
         , soe_subst :: Subst
-             -- Deals with cloning; includes the InScopeSet
+             -- ^ Deals with cloning; includes the InScopeSet
         }
 
 instance Outputable SimpleOptEnv where
@@ -190,7 +191,11 @@ emptyEnv :: DynFlags -> SimpleOptEnv
 emptyEnv dflags
   = SOE { soe_dflags = dflags
         , soe_inl = emptyVarEnv
-        , soe_subst = emptySubst }
+        , soe_subst = emptySubst
+        , soe_co_opt_opts = OptCoercionOpts
+           { optCoercionEnabled = not (hasNoOptCoercion dflags)
+           }
+        }
 
 soeZapSubst :: SimpleOptEnv -> SimpleOptEnv
 soeZapSubst env@(SOE { soe_subst = subst })
@@ -263,7 +268,7 @@ simple_opt_expr env expr
         (env', b') = subst_opt_bndr env b
 
     ----------------------
-    go_co co = optCoercion (soe_dflags env) (getTCvSubst subst) co
+    go_co co = optCoercion (soe_co_opt_opts env) (getTCvSubst subst) co
 
     ----------------------
     go_alt env (con, bndrs, rhs)
@@ -392,7 +397,7 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
     (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
 
   | Coercion co <- in_rhs
-  , let out_co = optCoercion (soe_dflags env) (getTCvSubst (soe_subst rhs_env)) co
+  , let out_co = optCoercion (soe_co_opt_opts env) (getTCvSubst (soe_subst rhs_env)) co
   = ASSERT( isCoVar in_bndr )
     (env { soe_subst = extendCvSubst subst in_bndr out_co }, Nothing)
 
