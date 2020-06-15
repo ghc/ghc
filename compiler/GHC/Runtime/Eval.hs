@@ -118,11 +118,8 @@ import GHC.Tc.Module ( runTcInteractive, tcRnType, loadUnqualIfaces )
 import GHC.Tc.Utils.Zonk ( ZonkFlexi (SkolemiseFlexi) )
 import GHC.Tc.Utils.Env (tcGetInstEnvs)
 import GHC.Tc.Utils.Instantiate (instDFunType)
-import GHC.Tc.Solver (solveWanteds)
+import GHC.Tc.Solver (simplifyWantedsTcM)
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Types.Evidence
-import Data.Bifunctor (second)
-import GHC.Tc.Solver.Monad (runTcS)
 import GHC.Core.Class (classTyCon)
 
 -- -----------------------------------------------------------------------------
@@ -1069,24 +1066,22 @@ parseInstanceHead str = withSession $ \hsc_env0 -> do
   return ty
 
 -- Get all the constraints required of a dictionary binding
-getDictionaryBindings :: PredType -> TcM WantedConstraints
+getDictionaryBindings :: PredType -> TcM CtEvidence
 getDictionaryBindings theta = do
   dictName <- newName (mkDictOcc (mkVarOcc "magic"))
   let dict_var = mkVanillaGlobal dictName theta
   loc <- getCtLocM (GivenOrigin UnkSkol) Nothing
 
-  -- Generate a wanted constraint here because at the end of constraint
+  -- Generate a wanted here because at the end of constraint
   -- solving, most derived constraints get thrown away, which in certain
   -- cases, notably with quantified constraints makes it impossible to rule
   -- out instances as invalid. (See #18071)
-  let wCs = mkSimpleWC [CtWanted {
+  return CtWanted {
     ctev_pred = varType dict_var,
     ctev_dest = EvVarDest dict_var,
     ctev_nosh = WDeriv,
     ctev_loc = loc
-  }]
-
-  return wCs
+  }
 
 -- Find instances where the head unifies with the provided type
 findMatchingInstances :: Type -> TcM [(ClsInst, [DFunInstType])]
@@ -1142,17 +1137,18 @@ checkForExistence clsInst mb_inst_tys = do
   -- thetas of clsInst.
   (tys, thetas) <- instDFunType (is_dfun clsInst) mb_inst_tys
   wanteds <- mapM getDictionaryBindings thetas
-  (residuals, _) <- second evBindMapBinds <$> runTcS (solveWanteds (unionsWC wanteds))
+  -- It's important to zonk constraints after solving in order to expose things like TypeErrors
+  -- which otherwise appear as opaque type variables. (See #18262).
+  WC { wc_simple = simples, wc_impl = impls } <- simplifyWantedsTcM wanteds
 
-  let WC { wc_simple = simples, wc_impl = impls } = (dropDerivedWC residuals)
-
-  let resPreds = mapBag ctPred simples
-
-  if allBag isSatisfiablePred resPreds && solvedImplics impls
-  then return . Just $ substInstArgs tys (bagToList resPreds) clsInst
+  if allBag allowedSimple simples && solvedImplics impls
+  then return . Just $ substInstArgs tys (bagToList (mapBag ctPred simples)) clsInst
   else return Nothing
 
   where
+  allowedSimple :: Ct -> Bool
+  allowedSimple ct = isSatisfiablePred (ctPred ct)
+
   solvedImplics :: Bag Implication -> Bool
   solvedImplics impls = allBag (isSolvedStatus . ic_status) impls
 

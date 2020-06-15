@@ -2518,6 +2518,25 @@ commonly used commands.
          instance Show _ => Show (Maybe _) -- Defined in ‘GHC.Show’
          instance Read _ => Read (Maybe _) -- Defined in ‘GHC.Read’
 
+    Only instances which could potentially be used will be displayed in the results.
+    Instances which require unsatisfiable constraints such as ``TypeError`` will not be
+    included. In the following example, the instance for ``A`` is not shown because it cannot
+    be used.
+
+    .. code-block:: none
+        ghci>:set -XDataKinds -XUndecidableInstances
+        ghci>import GHC.TypeLits
+        ghci>class A a
+        ghci>instance (TypeError (Text "Not possible")) => A Bool
+        ghci>:instances Bool
+        instance Eq Bool -- Defined in ‘GHC.Classes’
+        instance Ord Bool -- Defined in ‘GHC.Classes’
+        instance Enum Bool -- Defined in ‘GHC.Enum’
+        instance Show Bool -- Defined in ‘GHC.Show’
+        instance Read Bool -- Defined in ‘GHC.Read’
+        instance Bounded Bool -- Defined in ‘GHC.Enum’
+
+
 .. ghci-cmd:: :issafe; [⟨module⟩]
 
     Displays Safe Haskell information about the given module (or the
