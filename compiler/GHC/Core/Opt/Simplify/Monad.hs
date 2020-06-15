@@ -10,7 +10,7 @@ module GHC.Core.Opt.Simplify.Monad (
         -- The monad
         SimplM,
         initSmpl, traceSmpl,
-        getSimplRules, getFamEnvs,
+        getSimplRules, getFamEnvs, getOptCoercionOpts,
 
         -- Unique supply
         MonadUnique(..), newId, newJoinId,
@@ -31,6 +31,7 @@ import GHC.Core.Type       ( Type, Mult )
 import GHC.Core.FamInstEnv ( FamInstEnv )
 import GHC.Core            ( RuleEnv(..) )
 import GHC.Core.Utils      ( mkLamTypes )
+import GHC.Core.Coercion.Opt
 import GHC.Types.Unique.Supply
 import GHC.Driver.Session
 import GHC.Core.Opt.Monad
@@ -78,9 +79,13 @@ pattern SM m <- SM' m
 
 data SimplTopEnv
   = STE { st_flags     :: DynFlags
-        , st_max_ticks :: IntWithInf  -- Max #ticks in this simplifier run
+        , st_max_ticks :: IntWithInf  -- ^ Max #ticks in this simplifier run
         , st_rules     :: RuleEnv
-        , st_fams      :: (FamInstEnv, FamInstEnv) }
+        , st_fams      :: (FamInstEnv, FamInstEnv)
+
+        , st_co_opt_opts :: !OptCoercionOpts
+            -- ^ Coercion optimiser options
+        }
 
 initSmpl :: DynFlags -> RuleEnv -> (FamInstEnv, FamInstEnv)
          -> UniqSupply          -- No init count; set to 0
@@ -95,7 +100,11 @@ initSmpl dflags rules fam_envs us size m
   where
     env = STE { st_flags = dflags, st_rules = rules
               , st_max_ticks = computeMaxTicks dflags size
-              , st_fams = fam_envs }
+              , st_fams = fam_envs
+              , st_co_opt_opts = OptCoercionOpts
+                  { optCoercionEnabled = not (hasNoOptCoercion dflags)
+                  }
+              }
 
 computeMaxTicks :: DynFlags -> Int -> IntWithInf
 -- Compute the max simplifier ticks as
@@ -194,6 +203,9 @@ getSimplRules = SM (\st_env us sc -> return (st_rules st_env, us, sc))
 
 getFamEnvs :: SimplM (FamInstEnv, FamInstEnv)
 getFamEnvs = SM (\st_env us sc -> return (st_fams st_env, us, sc))
+
+getOptCoercionOpts :: SimplM OptCoercionOpts
+getOptCoercionOpts = SM (\st_env us sc -> return (st_co_opt_opts st_env, us, sc))
 
 newId :: FastString -> Mult -> Type -> SimplM Id
 newId fs w ty = do uniq <- getUniqueM

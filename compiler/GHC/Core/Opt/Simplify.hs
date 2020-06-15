@@ -30,7 +30,7 @@ import qualified GHC.Core.Make
 import GHC.Types.Id.Info
 import GHC.Types.Name           ( mkSystemVarName, isExternalName, getOccFS )
 import GHC.Core.Coercion hiding ( substCo, substCoVar )
-import GHC.Core.Coercion.Opt    ( optCoercion )
+import GHC.Core.Coercion.Opt    ( optCoercion, OptCoercionOpts (..) )
 import GHC.Core.FamInstEnv      ( topNormaliseType_maybe )
 import GHC.Core.DataCon
    ( DataCon, dataConWorkId, dataConRepStrictness
@@ -987,7 +987,9 @@ simplExprF1 env (Var v)        cont = {-#SCC "simplIdF" #-} simplIdF env v cont
 simplExprF1 env (Lit lit)      cont = {-#SCC "rebuild" #-} rebuild env (Lit lit) cont
 simplExprF1 env (Tick t expr)  cont = {-#SCC "simplTick" #-} simplTick env t expr cont
 simplExprF1 env (Cast body co) cont = {-#SCC "simplCast" #-} simplCast env body co cont
-simplExprF1 env (Coercion co)  cont = {-#SCC "simplCoercionF" #-} simplCoercionF env co cont
+simplExprF1 env (Coercion co)  cont = do
+                                      co_opts <- getOptCoercionOpts
+                                      {-#SCC "simplCoercionF" #-} simplCoercionF env co_opts co cont
 
 simplExprF1 env (App fun arg) cont
   = {-#SCC "simplExprF1-App" #-} case arg of
@@ -1142,16 +1144,15 @@ simplType env ty
     new_ty = substTy env ty
 
 ---------------------------------
-simplCoercionF :: SimplEnv -> InCoercion -> SimplCont
+simplCoercionF :: SimplEnv -> OptCoercionOpts -> InCoercion -> SimplCont
                -> SimplM (SimplFloats, OutExpr)
-simplCoercionF env co cont
-  = do { co' <- simplCoercion env co
+simplCoercionF env opts co cont
+  = do { co' <- simplCoercion env opts co
        ; rebuild env (Coercion co') cont }
 
-simplCoercion :: SimplEnv -> InCoercion -> SimplM OutCoercion
-simplCoercion env co
-  = do { dflags <- getDynFlags
-       ; let opt_co = optCoercion dflags (getTCvSubst env) co
+simplCoercion :: SimplEnv -> OptCoercionOpts -> InCoercion -> SimplM OutCoercion
+simplCoercion env opts co
+  = do { let opt_co = optCoercion opts (getTCvSubst env) co
        ; seqCo opt_co `seq` return opt_co }
 
 -----------------------------------
@@ -1380,7 +1381,8 @@ coercion shrinkage. See #15090.
 simplCast :: SimplEnv -> InExpr -> Coercion -> SimplCont
           -> SimplM (SimplFloats, OutExpr)
 simplCast env body co0 cont0
-  = do  { co1   <- {-#SCC "simplCast-simplCoercion" #-} simplCoercion env co0
+  = do  { co_opts <- getOptCoercionOpts
+        ; co1   <- {-#SCC "simplCast-simplCoercion" #-} simplCoercion env co_opts co0
         ; cont1 <- {-#SCC "simplCast-addCoerce" #-}
                    if isReflCo co1
                    then return cont0  -- See Note [Optimising reflexivity]
