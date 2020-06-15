@@ -1418,7 +1418,7 @@ normalise_type ty
     go ty@(FunTy { ft_mult = w, ft_arg = ty1, ft_res = ty2 })
       = do { (co1, nty1) <- go ty1
            ; (co2, nty2) <- go ty2
-           ; (wco, wty) <- go w
+           ; (wco, wty) <- withRole Nominal $ go w
            ; r <- getRole
            ; return (mkFunCo r wco co1 co2, ty { ft_mult = wty, ft_arg = nty1, ft_res = nty2 }) }
     go (ForAllTy (Bndr tcvar vis) ty)

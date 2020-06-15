@@ -27,9 +27,10 @@ import GHC.Types.Var       ( Var, isId, mkLocalVar )
 import GHC.Types.Name      ( mkSystemVarName )
 import GHC.Types.Id        ( Id, mkSysLocalOrCoVar )
 import GHC.Types.Id.Info   ( IdDetails(..), vanillaIdInfo, setArityInfo )
-import GHC.Core.Type       ( Type, mkLamTypes, Mult )
+import GHC.Core.Type       ( Type, Mult )
 import GHC.Core.FamInstEnv ( FamInstEnv )
 import GHC.Core            ( RuleEnv(..) )
+import GHC.Core.Utils      ( mkLamTypes )
 import GHC.Types.Unique.Supply
 import GHC.Driver.Session
 import GHC.Core.Opt.Monad

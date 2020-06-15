@@ -52,7 +52,7 @@ tidyVarBndr tidy_env@(occ_env, subst) var
       (occ_env', occ') -> ((occ_env', subst'), var')
         where
           subst' = extendVarEnv subst var var'
-          var'   = updateVarTypeAndMult (tidyType tidy_env) (setVarName var name')
+          var'   = updateVarType (tidyType tidy_env) (setVarName var name')
           name'  = tidyNameOcc name occ'
           name   = varName var
 
@@ -119,7 +119,7 @@ tidyOpenTyCoVar env@(_, subst) tyvar
 tidyTyCoVarOcc :: TidyEnv -> TyCoVar -> TyCoVar
 tidyTyCoVarOcc env@(_, subst) tv
   = case lookupVarEnv subst tv of
-        Nothing  -> updateVarTypeAndMult (tidyType env) tv
+        Nothing  -> updateVarType (tidyType env) tv
         Just tv' -> tv'
 
 ---------------

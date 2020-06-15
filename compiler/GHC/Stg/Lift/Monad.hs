@@ -34,7 +34,7 @@ import GHC.Utils.Outputable
 import GHC.Data.OrdList
 import GHC.Stg.Subst
 import GHC.Stg.Syntax
-import GHC.Core.Type
+import GHC.Core.Utils
 import GHC.Types.Unique.Supply
 import GHC.Utils.Misc
 import GHC.Types.Var.Env
