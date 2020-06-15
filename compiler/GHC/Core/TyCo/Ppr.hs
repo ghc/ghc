@@ -1,3 +1,5 @@
+{-# LANGUAGE PatternSynonyms #-}
+
 -- | Pretty-printing types and coercions.
 module GHC.Core.TyCo.Ppr
   (
@@ -34,10 +36,8 @@ import {-# SOURCE #-} GHC.CoreToIface
 import {-# SOURCE #-} GHC.Core.DataCon
    ( dataConFullSig , dataConUserTyVarBinders
    , DataCon )
-import GHC.Core.Multiplicity
 
-import {-# SOURCE #-} GHC.Core.Type
-   ( isLiftedTypeKind )
+import GHC.Core.Type ( isLiftedTypeKind, pattern One, pattern Many )
 
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep

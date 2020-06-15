@@ -622,7 +622,7 @@ tc_sub_type unify inst_orig ctxt ty_actual ty_expected
   where
     possibly_poly ty
       | isForAllTy ty                        = True
-      | Just (_, res) <- splitFunTy_maybe ty = possibly_poly res
+      | Just (_, _, res) <- splitFunTy_maybe ty = possibly_poly res
       | otherwise                            = False
       -- NB *not* tcSplitFunTy, because here we want
       -- to decompose type-class arguments too
@@ -746,7 +746,8 @@ to a UserTypeCtxt of GenSigCtxt.  Why?
 -- only produce trivial evidence, then this check would happen in the constraint
 -- solver.
 tcSubMult :: CtOrigin -> Mult -> Mult -> TcM HsWrapper
-tcSubMult origin (MultMul w1 w2) w_expected =
+tcSubMult origin w_actual w_expected
+  | Just (w1, w2) <- isMultMul w_actual =
   do { w1 <- tcSubMult origin w1 w_expected
      ; w2 <- tcSubMult origin w2 w_expected
      ; return (w1 <.> w2) }
