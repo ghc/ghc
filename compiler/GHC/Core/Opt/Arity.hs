@@ -36,6 +36,7 @@ import GHC.Core.TyCon     ( initRecTc, checkRecTc )
 import GHC.Core.Predicate ( isDictTy )
 import GHC.Core.Coercion as Coercion
 import GHC.Core.Multiplicity
+import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Types.Unique
 import GHC.Driver.Session ( DynFlags, GeneralFlag(..), gopt )
@@ -156,7 +157,9 @@ exprBotStrictness_maybe e
         Nothing -> Nothing
         Just ar -> Just (ar, sig ar)
   where
-    env    = AE { ae_ped_bot = True, ae_cheap_fn = \ _ _ -> False }
+    env    = AE { ae_ped_bot = True
+                , ae_cheap_fn = \ _ _ -> False
+                , ae_joins = emptyVarSet }
     sig ar = mkClosedStrictSig (replicate ar topDmd) botDiv
 
 {-
@@ -506,7 +509,8 @@ exprEtaExpandArity dflags e
       ABot n   -> n
   where
     env = AE { ae_cheap_fn = mk_cheap_fn dflags isCheapApp
-             , ae_ped_bot  = gopt Opt_PedanticBottoms dflags }
+             , ae_ped_bot  = gopt Opt_PedanticBottoms dflags
+             , ae_joins    = emptyVarSet }
 
 getBotArity :: ArityType -> Maybe Arity
 -- Arity of a divergent function
@@ -578,7 +582,8 @@ findRhsArity dflags bndr rhs old_arity
           ATop _  -> (0,              False)    -- Note [Eta expanding thunks]
        where
          env = AE { ae_cheap_fn = mk_cheap_fn dflags cheap_app
-                  , ae_ped_bot  = gopt Opt_PedanticBottoms dflags }
+                  , ae_ped_bot  = gopt Opt_PedanticBottoms dflags
+                  , ae_joins    = emptyVarSet }
 
 {-
 Note [Arity analysis]
@@ -736,8 +741,15 @@ type CheapFun = CoreExpr -> Maybe Type -> Bool
 data ArityEnv
   = AE { ae_cheap_fn :: CheapFun
        , ae_ped_bot  :: Bool       -- True <=> be pedantic about bottoms
+       , ae_joins    :: IdSet      -- In-scope join points
+                                   -- See Note [Eta-expansion and join points]
   }
 
+extendJoinEnv :: ArityEnv -> [JoinId] -> ArityEnv
+extendJoinEnv env@(AE { ae_joins = joins }) join_ids
+  = env { ae_joins = joins `extendVarSetList` join_ids }
+
+----------------
 arityType :: ArityEnv -> CoreExpr -> ArityType
 
 arityType env (Cast e co)
@@ -755,7 +767,10 @@ arityType env (Cast e co)
     -- However, do make sure that ATop -> ATop and ABot -> ABot!
     --   Casts don't affect that part. Getting this wrong provoked #5475
 
-arityType _ (Var v)
+arityType env (Var v)
+  | v `elemVarSet` ae_joins env
+  = ABot 0  -- See Note [Eta-expansion and join points]
+
   | strict_sig <- idStrictness v
   , not $ isTopSig strict_sig
   , (ds, res) <- splitStrictSig strict_sig
@@ -804,6 +819,28 @@ arityType env (Case scrut _ _ alts)
   where
     alts_type = foldr1 andArityType [arityType env rhs | (_,_,rhs) <- alts]
 
+arityType env (Let (NonRec j rhs) body)
+  | Just join_arity <- isJoinId_maybe j
+  , (_, rhs_body)   <- collectNBinders join_arity rhs
+  = -- See Note [Eta-expansion and join points]
+    andArityType (arityType env rhs_body)
+                 (arityType env' body)
+  where
+     env' = extendJoinEnv env [j]
+
+arityType env (Let (Rec pairs) body)
+  | ((j,_):_) <- pairs
+  , isJoinId j
+  = -- See Note [Eta-expansion and join points]
+    foldr (andArityType . do_one) (arityType env' body) pairs
+  where
+    env' = extendJoinEnv env (map fst pairs)
+    do_one (j,rhs)
+      | Just arity <- isJoinId_maybe j
+      = arityType env' $ snd $ collectNBinders arity rhs
+      | otherwise
+      = pprPanic "arityType:joinrec" (ppr pairs)
+
 arityType env (Let b e)
   = floatIn (cheap_bind b) (arityType env e)
   where
@@ -815,6 +852,58 @@ arityType env (Tick t e)
   | not (tickishIsCode t)     = arityType env e
 
 arityType _ _ = vanillaArityType
+
+{- Note [Eta-expansion and join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this (#18328)
+
+  f x = join j y = case y of
+                      True -> \a. blah
+                      False -> \b. blah
+        in case x of
+              A -> j True
+              B -> \c. blah
+              C -> j False
+
+and suppose the join point is too big to inline.  Now, what is the
+arity of f?  If we inlined the join point, we'd definitely say "arity
+2" because we are prepared to push case-scrutinisation inside a
+lambda.  But currently the join point totally messes all that up,
+because (thought of as a vanilla let-binding) the arity pinned on 'j'
+is just 1.
+
+Why don't we eta-expand j?  Because of
+Note [Do not eta-expand join points] in GHC.Core.Opt.Simplify.Utils
+
+Even if we don't eta-expand j, why is its arity only 1?
+See invariant 2b in Note [Invariants on join points] in GHC.Core.
+
+So we do this:
+
+* Treat the RHS of a join-point binding, /after/ stripping off
+  join-arity lambda-binders, as very like the body of the let.
+  More precisely, do andArityType with the arityType from the
+  body of the let.
+
+* Dually, when we come to a /call/ of a join point, just no-op
+  by returning (ABot 0), the neutral element of ArityType.
+
+* This works if the join point is bound in the expression we are
+  taking the arityType of.  But if it's bound further out, it makes
+  no sense to say that (say) the arityType of (j False) is ABot 0.
+  Bad things happen.  So we keep track of the in-scope join-point Ids
+  in ae_join.
+
+This will make f, above, have arity 2. Then, we'll eta-expand it thus:
+
+  f x eta = (join j y = ... in case x of ...) eta
+
+and the Simplify will automatically push that application of eta into
+the join points.
+
+An alternative (roughly equivalent) idea would be to carry an
+environment mapping let-bound Ids to their ArityType.
+-}
 
 {-
 %************************************************************************
