@@ -2,13 +2,17 @@
 
 {-# LANGUAGE CPP #-}
 
-module GHC.Core.Coercion.Opt ( optCoercion, checkAxInstCo ) where
+module GHC.Core.Coercion.Opt
+   ( optCoercion
+   , checkAxInstCo
+   , OptCoercionOpts (..)
+   )
+where
 
 #include "HsVersions.h"
 
 import GHC.Prelude
 
-import GHC.Driver.Session
 import GHC.Driver.Ppr
 
 import GHC.Core.TyCo.Rep
@@ -109,12 +113,17 @@ So we substitute the coercion variable c for the coercion
 (h1 ~N (n1; h2; sym n2)) in g.
 -}
 
-optCoercion :: DynFlags -> TCvSubst -> Coercion -> NormalCo
+-- | Coercion optimisation options
+newtype OptCoercionOpts = OptCoercionOpts
+   { optCoercionEnabled :: Bool  -- ^ Enable coercion optimisation (reduce its size)
+   }
+
+optCoercion :: OptCoercionOpts -> TCvSubst -> Coercion -> NormalCo
 -- ^ optCoercion applies a substitution to a coercion,
 --   *and* optimises it to reduce its size
-optCoercion dflags env co
-  | hasNoOptCoercion dflags = substCo env co
-  | otherwise               = optCoercion' env co
+optCoercion opts env co
+  | optCoercionEnabled opts = optCoercion' env co
+  | otherwise               = substCo env co
 
 optCoercion' :: TCvSubst -> Coercion -> NormalCo
 optCoercion' env co
