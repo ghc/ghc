@@ -161,23 +161,23 @@ Where:
 
 - ``btype`` is a type that is not allowed to have an outermost
   ``forall``/``=>`` unless it is surrounded by parentheses. For example,
-  ``forall a. a`` and ``Eq a => a`` are not legal ``btype``s, but
+  ``forall a. a`` and ``Eq a => a`` are not legal ``btype``\ s, but
   ``(forall a. a)`` and ``(Eq a => a)`` are legal.
 - ``ctype`` is a ``btype`` that has no restrictions on an outermost
-  ``forall``/``=>``, so ``forall a. a`` and ``Eq a => a`` are legal ``ctype``s.
-- ``return_type`` is a type that is not allowed to have ``forall``s, ``=>``s,
-  or ``->``s.
+  ``forall``/``=>``, so ``forall a. a`` and ``Eq a => a`` are legal ``ctype``\ s.
+- ``return_type`` is a type that is not allowed to have ``forall``\ s, ``=>``\ s,
+  or ``->``\ s.
 
 This is a simplified grammar that does not fully delve into all of the
 implementation details of GHC's parser (such as the placement of Haddock
 comments), but it is sufficient to attain an understanding of what is
 syntactically allowed. Some further various observations about this grammar:
 
-- GADT constructor types are currently not permitted to have nested ``forall``s
-  or ``=>``s. (e.g., something like ``MkT :: Int -> forall a. a -> T`` would be
+- GADT constructor types are currently not permitted to have nested ``forall``\ s
+  or ``=>``\ s. (e.g., something like ``MkT :: Int -> forall a. a -> T`` would be
   rejected.) As a result, ``gadt_sig`` puts all of its quantification and
   constraints up front with ``opt_forall`` and ``opt_context``. Note that
-  higher-rank ``forall``s and ``=>``s are only permitted if they do not appear
+  higher-rank ``forall``\ s and ``=>``\ s are only permitted if they do not appear
   directly to the right of a function arrow in a `prefix_gadt_body`. (e.g.,
   something like ``MkS :: Int -> (forall a. a) -> S`` is allowed, since
   parentheses separate the ``forall`` from the ``->``.)

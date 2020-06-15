@@ -239,8 +239,7 @@ of ``-W(no-)*``.
 
      - ``Data.List`` due to the future addition of ``Data.List.singleton`` and
        specialisation of exports to the ``[]`` type. See the
-       :ref:`mailing list
-       <https://groups.google.com/forum/#!topic/haskell-core-libraries/q3zHLmzBa5E>`
+       `mailing list <https://groups.google.com/forum/#!topic/haskell-core-libraries/q3zHLmzBa5E>`_
        for details.
 
     This warning can be addressed by either adding an explicit import list or
