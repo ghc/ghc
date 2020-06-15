@@ -1,0 +1,87 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 69, types: 61, coercions: 0, joins: 1/1}
+
+-- RHS size: {terms: 42, types: 28, coercions: 0, joins: 1/1}
+T18328.$wf [InlPrag=NOUSERINLINE[2]]
+  :: forall {a}. GHC.Prim.Int# -> [a] -> [a] -> [a]
+[GblId,
+ Arity=3,
+ Str=<S,U><S,U><L,1*U>,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [182 0 0] 312 0}]
+T18328.$wf
+  = \ (@a) (ww :: GHC.Prim.Int#) (w :: [a]) (w1 :: [a]) ->
+      join {
+        $wj [InlPrag=NOINLINE, Dmd=<L,1*C1(U)>]
+          :: forall {p}. GHC.Prim.Void# -> [a]
+        [LclId[JoinId(2)], Arity=1, Str=<L,A>, Unf=OtherCon []]
+        $wj (@p) _ [Occ=Dead, OS=OneShot]
+          = case ww of {
+              __DEFAULT -> ++ @a w (++ @a w (++ @a w w1));
+              3# -> ++ @a w (++ @a w (++ @a w (++ @a w w1)))
+            } } in
+      case ww of {
+        __DEFAULT -> ++ @a w w1;
+        1# -> jump $wj @Integer GHC.Prim.void#;
+        2# -> jump $wj @Integer GHC.Prim.void#;
+        3# -> jump $wj @Integer GHC.Prim.void#
+      }
+
+-- RHS size: {terms: 11, types: 10, coercions: 0, joins: 0/0}
+f [InlPrag=NOUSERINLINE[2]] :: forall a. Int -> [a] -> [a] -> [a]
+[GblId,
+ Arity=3,
+ Str=<S(S),1*U(U)><S,U><L,1*U>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=3,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (@a)
+                 (w [Occ=Once!] :: Int)
+                 (w1 [Occ=Once] :: [a])
+                 (w2 [Occ=Once] :: [a]) ->
+                 case w of { GHC.Types.I# ww1 [Occ=Once] ->
+                 T18328.$wf @a ww1 w1 w2
+                 }}]
+f = \ (@a) (w :: Int) (w1 :: [a]) (w2 :: [a]) ->
+      case w of { GHC.Types.I# ww1 -> T18328.$wf @a ww1 w1 w2 }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18328.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T18328.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18328.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T18328.$trModule3 = GHC.Types.TrNameS T18328.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18328.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T18328.$trModule2 = "T18328"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18328.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T18328.$trModule1 = GHC.Types.TrNameS T18328.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T18328.$trModule :: GHC.Types.Module
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+T18328.$trModule
+  = GHC.Types.Module T18328.$trModule3 T18328.$trModule1
+
+
+
