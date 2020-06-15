@@ -1114,7 +1114,7 @@ ocBuildSegments_MachO(ObjectCode *oc)
         return 1;
     }
 
-    mem = mmapForLinker(size_compound, MAP_ANON, -1, 0);
+    mem = mmapForLinker(size_compound, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0);
     if (NULL == mem) return 0;
 
     IF_DEBUG(linker, debugBelch("ocBuildSegments: allocating %d segments\n", n_activeSegments));
