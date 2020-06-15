@@ -68,7 +68,6 @@ import GHC.Utils.Monad hiding (foldlM)
 import GHC.HsToCore.Monad hiding (foldlM)
 import GHC.Tc.Instance.Family
 import GHC.Core.FamInstEnv
-import GHC.Core.Multiplicity
 
 import Control.Monad (guard, mzero, when)
 import Control.Monad.Trans.Class (lift)

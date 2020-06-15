@@ -76,7 +76,6 @@ import GHC.Core.TyCo.FVs
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Core.FamInstEnv
-import GHC.Core.Multiplicity
 import GHC.Builtin.Types( unrestrictedFunTyConName )
 import GHC.Builtin.Types.Prim( funTyConName )
 import GHC.Data.Maybe( orElse )

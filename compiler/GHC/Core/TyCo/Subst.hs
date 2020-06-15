@@ -65,11 +65,10 @@ import {-# SOURCE #-} GHC.Core.Coercion
    , mkInstCo, mkLRCo, mkTyConAppCo
    , mkCoercionType
    , coercionKind, coercionLKind, coVarKindsTypesRole )
+import {-# SOURCE #-} GHC.Core.TyCo.Ppr ( pprTyVar )
 
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
-import GHC.Core.TyCo.Ppr
-import GHC.Core.Multiplicity
 
 import GHC.Types.Var
 import GHC.Types.Var.Set
@@ -733,12 +732,15 @@ subst_ty subst ty
    = go ty
   where
     go (TyVarTy tv)      = substTyVar subst tv
-    go (AppTy fun arg)   = mkAppTy (go fun) $! (go arg)
+    go (AppTy fun arg)   = (mkAppTy $! (go fun)) $! (go arg)
                 -- The mkAppTy smart constructor is important
                 -- we might be replacing (a Int), represented with App
                 -- by [Int], represented with TyConApp
-    go (TyConApp tc tys) = let args = map go tys
-                           in  args `seqList` TyConApp tc args
+    go ty@(TyConApp tc []) = tc `seq` ty  -- avoid allocation in this common case
+    go (TyConApp tc tys) = (mkTyConApp $! tc) $! strictMap go tys
+                               -- NB: mkTyConApp, not TyConApp.
+                               -- mkTyConApp has optimizations.
+                               -- See Note [mkTyConApp and Type] in GHC.Core.TyCo.Rep
     go ty@(FunTy { ft_mult = mult, ft_arg = arg, ft_res = res })
       = let !mult' = go mult
             !arg' = go arg
@@ -846,7 +848,7 @@ subst_co subst co
 
     -- See Note [Substituting in a coercion hole]
     go_hole h@(CoercionHole { ch_co_var = cv })
-      = h { ch_co_var = updateVarTypeAndMult go_ty cv }
+      = h { ch_co_var = updateVarType go_ty cv }
 
 substForAllCoBndr :: TCvSubst -> TyCoVar -> KindCoercion
                   -> (TCvSubst, TyCoVar, Coercion)

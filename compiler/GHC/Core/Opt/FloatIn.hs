@@ -36,9 +36,7 @@ import GHC.Types.Var.Set
 import GHC.Utils.Misc
 import GHC.Driver.Session
 import GHC.Utils.Outputable
--- import Data.List        ( mapAccumL )
 import GHC.Types.Basic      ( RecFlag(..), isRec )
-import GHC.Core.Multiplicity
 
 {-
 Top-level interface function, @floatInwards@.  Note that we do not
@@ -202,12 +200,12 @@ fiExpr platform to_drop ann_expr@(_,AnnApp {})
       = (piResultTy fun_ty ty, extra_fvs)
 
     add_arg (fun_ty, extra_fvs) (arg_fvs, arg)
-      | noFloatIntoArg arg (irrelevantMult arg_ty)
+      | noFloatIntoArg arg arg_ty
       = (res_ty, extra_fvs `unionDVarSet` arg_fvs)
       | otherwise
       = (res_ty, extra_fvs)
       where
-       (arg_ty, res_ty) = splitFunTy fun_ty
+       (_, arg_ty, res_ty) = splitFunTy fun_ty
 
 {- Note [Dead bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~

@@ -8,8 +8,7 @@ import GHC.Types.FieldLabel ( FieldLabel )
 import GHC.Types.Unique ( Uniquable )
 import GHC.Utils.Outputable ( Outputable, OutputableBndr )
 import GHC.Types.Basic (Arity)
-import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type, ThetaType )
-import GHC.Core.Multiplicity (Scaled)
+import {-# SOURCE #-} GHC.Core.TyCo.Rep ( Type, ThetaType, Scaled )
 
 data DataCon
 data DataConRep

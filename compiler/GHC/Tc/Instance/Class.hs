@@ -32,7 +32,6 @@ import GHC.Builtin.Names
 
 import GHC.Types.Id
 import GHC.Core.Type
-import GHC.Core.Multiplicity
 import GHC.Core.Make ( mkStringExprFS, mkNaturalExpr )
 
 import GHC.Types.Name   ( Name, pprDefinedAt )
@@ -423,7 +422,7 @@ matchTypeable clas [k,t]  -- clas = Typeable
   | k `eqType` typeNatKind                 = doTyLit knownNatClassName         t
   | k `eqType` typeSymbolKind              = doTyLit knownSymbolClassName      t
   | tcIsConstraintKind t                   = doTyConApp clas t constraintKindTyCon []
-  | Just (arg,ret) <- splitFunTy_maybe t   = doFunTy    clas t arg ret
+  | Just (mult,arg,ret) <- splitFunTy_maybe t   = doFunTy    clas t mult arg ret
   | Just (tc, ks) <- splitTyConApp_maybe t -- See Note [Typeable (T a b c)]
   , onlyNamedBndrsApplied tc ks            = doTyConApp clas t tc ks
   | Just (f,kt)   <- splitAppTy_maybe t    = doTyApp    clas t f kt
@@ -431,8 +430,8 @@ matchTypeable clas [k,t]  -- clas = Typeable
 matchTypeable _ _ = return NoInstance
 
 -- | Representation for a type @ty@ of the form @arg -> ret@.
-doFunTy :: Class -> Type -> Scaled Type -> Type -> TcM ClsInstResult
-doFunTy clas ty (Scaled mult arg_ty) ret_ty
+doFunTy :: Class -> Type -> Mult -> Type -> Type -> TcM ClsInstResult
+doFunTy clas ty mult arg_ty ret_ty
   = return $ OneInst { cir_new_theta = preds
                      , cir_mk_ev     = mk_ev
                      , cir_what      = BuiltinInstance }

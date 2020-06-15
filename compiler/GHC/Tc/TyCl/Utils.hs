@@ -600,7 +600,7 @@ irType = go
                                           lcls' = extendVarSet lcls tv
                                     ; markNominal lcls (tyVarKind tv)
                                     ; go lcls' ty }
-    go lcls (FunTy _ w arg res)  = go lcls w >> go lcls arg >> go lcls res
+    go lcls (FunTy _ w arg res)  = markNominal lcls w >> go lcls arg >> go lcls res
     go _    (LitTy {})         = return ()
       -- See Note [Coercions in role inference]
     go lcls (CastTy ty _)      = go lcls ty

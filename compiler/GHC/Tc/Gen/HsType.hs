@@ -88,7 +88,6 @@ import GHC.Core.TyCo.Ppr
 import GHC.Tc.Errors      ( reportAllUnsolved )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Instantiate ( tcInstInvisibleTyBinders, tcInstInvisibleTyBinder )
-import GHC.Core.Multiplicity
 import GHC.Core.Type
 import GHC.Builtin.Types.Prim
 import GHC.Types.Name.Reader( lookupLocalRdrOcc )

@@ -30,7 +30,6 @@ import GHC.Driver.Session
 import GHC.Core.Utils
 import GHC.Types.Id
 import GHC.Core.Type
-import GHC.Core.Multiplicity
 import GHC.Builtin.Types
 import GHC.HsToCore.Match
 import GHC.Builtin.Names

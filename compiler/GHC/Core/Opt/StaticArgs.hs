@@ -56,7 +56,6 @@ import GHC.Prelude
 import GHC.Types.Var
 import GHC.Core
 import GHC.Core.Utils
-import GHC.Core.Multiplicity ( pattern Many )
 import GHC.Core.Type
 import GHC.Core.Coercion
 import GHC.Types.Id

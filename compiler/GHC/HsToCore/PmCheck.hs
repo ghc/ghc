@@ -57,7 +57,6 @@ import GHC.Data.IOEnv (unsafeInterleaveM)
 import GHC.Data.OrdList
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
-import GHC.Core.Multiplicity
 import GHC.HsToCore.Utils       (isTrueLHsExpr)
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt

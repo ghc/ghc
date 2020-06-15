@@ -41,7 +41,6 @@ import GHC.Tc.Utils.TcType
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Ppr (pprTyVars)
 import GHC.Core.Type
-import GHC.Core.Multiplicity
 import GHC.Tc.Solver
 import GHC.Tc.Validity (validDerivPred)
 import GHC.Tc.Utils.Unify (buildImplicationFor, checkConstraints)

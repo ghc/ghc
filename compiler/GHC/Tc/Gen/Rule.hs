@@ -28,7 +28,6 @@ import GHC.Tc.Utils.Unify( buildImplicationFor )
 import GHC.Tc.Types.Evidence( mkTcCoVarCo )
 import GHC.Core.Type
 import GHC.Core.TyCon( isTypeFamilyTyCon )
-import GHC.Core.Multiplicity
 import GHC.Types.Id
 import GHC.Types.Var( EvVar )
 import GHC.Types.Var.Set

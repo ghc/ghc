@@ -220,7 +220,6 @@ import GHC.Builtin.Types
 import GHC.Types.Unique.Supply
 import GHC.Utils.Misc
 import GHC.Types.Var.Env
-import GHC.Core.Multiplicity ( pattern Many )
 
 import Data.Bifunctor (second)
 import Data.Maybe (mapMaybe)

@@ -14,7 +14,7 @@ module GHC.Core.Multiplicity
   ( Mult
   , pattern One
   , pattern Many
-  , pattern MultMul
+  , isMultMul
   , mkMultAdd
   , mkMultMul
   , mkMultSup
@@ -34,11 +34,10 @@ module GHC.Core.Multiplicity
 
 import GHC.Prelude
 
-import Data.Data
 import GHC.Utils.Outputable
-import {-# SOURCE #-} GHC.Core.TyCo.Rep (Type)
-import {-# SOURCE #-} GHC.Builtin.Types ( oneDataConTy, manyDataConTy, multMulTyCon )
-import {-# SOURCE #-} GHC.Core.Type( eqType, splitTyConApp_maybe, mkTyConApp )
+import GHC.Core.TyCo.Rep
+import {-# SOURCE #-} GHC.Builtin.Types ( multMulTyCon )
+import GHC.Core.Type
 import GHC.Builtin.Names (multMulTyConKey)
 import GHC.Types.Unique (hasKey)
 
@@ -271,44 +270,10 @@ To add a new multiplicity, you need to:
   and Zero
 -}
 
---
--- * Core properties of multiplicities
---
-
-{-
-Note [Mult is type]
-~~~~~~~~~~~~~~~~~~~
-Mult is a type alias for Type.
-
-Mult must contain Type because multiplicity variables are mere type variables
-(of kind Multiplicity) in Haskell. So the simplest implementation is to make
-Mult be Type.
-
-Multiplicities can be formed with:
-- One: GHC.Types.One (= oneDataCon)
-- Many: GHC.Types.Many (= manyDataCon)
-- Multiplication: GHC.Types.MultMul (= multMulTyCon)
-
-So that Mult feels a bit more structured, we provide pattern synonyms and smart
-constructors for these.
--}
-type Mult = Type
-
-pattern One :: Mult
-pattern One <- (eqType oneDataConTy -> True)
-  where One = oneDataConTy
-
-pattern Many :: Mult
-pattern Many <- (eqType manyDataConTy -> True)
-  where Many = manyDataConTy
-
 isMultMul :: Mult -> Maybe (Mult, Mult)
 isMultMul ty | Just (tc, [x, y]) <- splitTyConApp_maybe ty
              , tc `hasKey` multMulTyConKey = Just (x, y)
              | otherwise = Nothing
-
-pattern MultMul :: Mult -> Mult -> Mult
-pattern MultMul p q <- (isMultMul -> Just (p,q))
 
 {-
 Note [Overapproximating multiplicities]
@@ -341,6 +306,9 @@ mkMultMul Many _ = Many
 mkMultMul _ Many = Many
 mkMultMul p q = mkTyConApp multMulTyCon [p, q]
 
+scaleScaled :: Mult -> Scaled a -> Scaled a
+scaleScaled m' (Scaled m t) = Scaled (m' `mkMultMul` m) t
+
 -- See Note [Joining usages]
 -- | @mkMultSup w1 w2@ returns a multiplicity such that @mkMultSup w1
 -- w2 >= w1@ and @mkMultSup w1 w2 >= w2@. See Note [Overapproximating multiplicities].
@@ -368,43 +336,3 @@ submult One   One  = Submult
 -- The 1 <= p rule
 submult One   _    = Submult
 submult _     _    = Unknown
-
---
--- * Utilities
---
-
--- | A shorthand for data with an attached 'Mult' element (the multiplicity).
-data Scaled a = Scaled Mult a
-  deriving (Data)
-
-scaledMult :: Scaled a -> Mult
-scaledMult (Scaled m _) = m
-
-scaledThing :: Scaled a -> a
-scaledThing (Scaled _ t) = t
-
-unrestricted, linear, tymult :: a -> Scaled a
-unrestricted = Scaled Many
-linear = Scaled One
-
--- Used for type arguments in core
-tymult = Scaled Many
-
-irrelevantMult :: Scaled a -> a
-irrelevantMult = scaledThing
-
-mkScaled :: Mult -> a -> Scaled a
-mkScaled = Scaled
-
-instance (Outputable a) => Outputable (Scaled a) where
-   ppr (Scaled _cnt t) = ppr t
-     -- Do not print the multiplicity here because it tends to be too verbose
-
-scaledSet :: Scaled a -> b -> Scaled b
-scaledSet (Scaled m _) b = Scaled m b
-
-scaleScaled :: Mult -> Scaled a -> Scaled a
-scaleScaled m' (Scaled m t) = Scaled (m' `mkMultMul` m) t
-
-mapScaledType :: (Type -> Type) -> Scaled Type -> Scaled Type
-mapScaledType f (Scaled m t) = Scaled (f m) (f t)

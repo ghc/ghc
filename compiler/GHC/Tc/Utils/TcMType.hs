@@ -127,7 +127,6 @@ import GHC.Data.FastString
 import GHC.Data.Bag
 import GHC.Data.Pair
 import GHC.Types.Unique.Set
-import GHC.Core.Multiplicity
 import GHC.Driver.Session
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Types.Basic ( TypeOrKind(..) )
@@ -2040,7 +2039,7 @@ zonkImplication implic@(Implic { ic_skols  = skols
                         , ic_info   = info' }) }
 
 zonkEvVar :: EvVar -> TcM EvVar
-zonkEvVar var = updateVarTypeAndMultM zonkTcType var
+zonkEvVar var = updateIdTypeAndMultM zonkTcType var
 
 
 zonkWC :: WantedConstraints -> TcM WantedConstraints
@@ -2315,7 +2314,7 @@ tidyHole env h@(Hole { hole_ty = ty }) = h { hole_ty = tidyType env ty }
 
 ----------------
 tidyEvVar :: TidyEnv -> EvVar -> EvVar
-tidyEvVar env var = updateVarTypeAndMult (tidyType env) var
+tidyEvVar env var = updateIdTypeAndMult (tidyType env) var
 
 ----------------
 tidySkolemInfo :: TidyEnv -> SkolemInfo -> SkolemInfo

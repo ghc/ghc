@@ -12,6 +12,9 @@ data TyLit
 data TyCoBinder
 data MCoercion
 
+data Scaled a
+type Mult = Type
+
 type PredType = Type
 type Kind = Type
 type ThetaType = [PredType]

@@ -1,11 +1,11 @@
 
-T13233.hs:23:16: error:
+T13233.hs:22:16: error:
     A levity-polymorphic type is not allowed here:
       Type: a
       Kind: TYPE rep1
     When trying to create a variable of type: a
 
-T13233.hs:28:10: error:
+T13233.hs:27:10: error:
     Cannot use function with levity-polymorphic arguments:
       mkWeak# :: a
                  -> b

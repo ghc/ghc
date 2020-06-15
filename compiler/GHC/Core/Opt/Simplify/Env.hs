@@ -63,7 +63,6 @@ import qualified GHC.Core.Type as Type
 import GHC.Core.Type hiding     ( substTy, substTyVar, substTyVarBndr, extendTvSubst, extendCvSubst )
 import qualified GHC.Core.Coercion as Coercion
 import GHC.Core.Coercion hiding ( substCo, substCoVar, substCoVarBndr )
-import GHC.Core.Multiplicity
 import GHC.Types.Basic
 import GHC.Utils.Monad
 import GHC.Utils.Outputable

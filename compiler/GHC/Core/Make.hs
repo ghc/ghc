@@ -165,9 +165,9 @@ mkCoreAppTyped _ (fun, fun_ty) (Coercion co)
   = (App fun (Coercion co), funResultTy fun_ty)
 mkCoreAppTyped d (fun, fun_ty) arg
   = ASSERT2( isFunTy fun_ty, ppr fun $$ ppr arg $$ d )
-    (mkValApp fun arg arg_ty res_ty, res_ty)
+    (mkValApp fun arg (Scaled mult arg_ty) res_ty, res_ty)
   where
-    (arg_ty, res_ty) = splitFunTy fun_ty
+    (mult, arg_ty, res_ty) = splitFunTy fun_ty
 
 mkValApp :: CoreExpr -> CoreExpr -> Scaled Type -> Type -> CoreExpr
 -- Build an application (e1 e2),

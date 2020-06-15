@@ -25,10 +25,7 @@ module GHC.Core.TyCo.Rep (
         TyThing(..), tyThingCategory, pprTyThingCategory, pprShortTyThing,
 
         -- * Types
-        Type( TyVarTy, AppTy, TyConApp, ForAllTy
-            , LitTy, CastTy, CoercionTy
-            , FunTy, ft_mult, ft_arg, ft_res, ft_af
-            ),  -- Export the type synonym FunTy too
+        Type(..),
 
         TyLit(..),
         KindOrType, Kind,
@@ -53,6 +50,7 @@ module GHC.Core.TyCo.Rep (
         mkScaledFunTy,
         mkVisFunTyMany, mkVisFunTysMany,
         mkInvisFunTyMany, mkInvisFunTysMany,
+        mkTyConApp,
 
         -- * Functions over binders
         TyCoBinder(..), TyCoVarBinder, TyBinder,
@@ -69,7 +67,10 @@ module GHC.Core.TyCo.Rep (
         TyCoFolder(..), foldTyCo,
 
         -- * Sizes
-        typeSize, coercionSize, provSize
+        typeSize, coercionSize, provSize,
+
+        -- * Multiplicities
+        Scaled(..), scaledMult, scaledThing, mapScaledType, Mult
     ) where
 
 #include "HsVersions.h"
@@ -87,12 +88,14 @@ import GHC.Iface.Type
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Name hiding ( varName )
-import GHC.Core.Multiplicity
 import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 
 -- others
+import GHC.Builtin.Names ( liftedTypeKindTyConKey, manyDataConKey )
+import {-# SOURCE #-} GHC.Builtin.Types ( liftedTypeKindTyCon, manyDataConTy )
 import GHC.Types.Basic ( LeftOrRight(..), pickLR )
+import GHC.Types.Unique ( hasKey )
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Utils.Misc
@@ -1003,14 +1006,14 @@ mkVisFunTy   = mkFunTy VisArg
 mkInvisFunTy = mkFunTy InvisArg
 
 mkFunTyMany :: AnonArgFlag -> Type -> Type -> Type
-mkFunTyMany af = mkFunTy af Many
+mkFunTyMany af = mkFunTy af manyDataConTy
 
 -- | Special, common, case: Arrow type with mult Many
 mkVisFunTyMany :: Type -> Type -> Type
-mkVisFunTyMany = mkVisFunTy Many
+mkVisFunTyMany = mkVisFunTy manyDataConTy
 
 mkInvisFunTyMany :: Type -> Type -> Type
-mkInvisFunTyMany = mkInvisFunTy Many
+mkInvisFunTyMany = mkInvisFunTy manyDataConTy
 
 -- | Make nested arrow types
 mkVisFunTys :: [Scaled Type] -> Type -> Type
@@ -1045,6 +1048,58 @@ mkPiTys tbs ty = foldr mkPiTy ty tbs
 -- | Create the plain type constructor type which has been applied to no type arguments at all.
 mkTyConTy :: TyCon -> Type
 mkTyConTy tycon = TyConApp tycon []
+
+-- | A key function: builds a 'TyConApp' or 'FunTy' as appropriate to
+-- its arguments.  Applies its arguments to the constructor from left to right.
+mkTyConApp :: TyCon -> [Type] -> Type
+mkTyConApp tycon tys
+  | isFunTyCon tycon
+  , [w, _rep1,_rep2,ty1,ty2] <- tys
+  -- The FunTyCon (->) is always a visible one
+  = FunTy { ft_af = VisArg, ft_mult = w, ft_arg = ty1, ft_res = ty2 }
+
+  -- Note [mkTyConApp and Type]
+  | tycon `hasKey` liftedTypeKindTyConKey
+  = ASSERT2( null tys, ppr tycon $$ ppr tys )
+    liftedTypeKindTyConApp
+  | tycon `hasKey` manyDataConKey
+  -- There are a lot of occurrences of 'Many' so it's a small optimisation to
+  -- avoid reboxing every time `mkTyConApp` is called.
+  = ASSERT2( null tys, ppr tycon $$ ppr tys )
+    manyDataConTy
+  | otherwise
+  = TyConApp tycon tys
+
+-- This is a single, global definition of the type `Type`
+-- Defined here so it is only allocated once.
+-- See Note [mkTyConApp and Type]
+liftedTypeKindTyConApp :: Type
+liftedTypeKindTyConApp = TyConApp liftedTypeKindTyCon []
+
+{-
+Note [mkTyConApp and Type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Whilst benchmarking it was observed in #17292 that GHC allocated a lot
+of `TyConApp` constructors. Upon further inspection a large number of these
+TyConApp constructors were all duplicates of `Type` applied to no arguments.
+
+```
+(From a sample of 100000 TyConApp closures)
+0x45f3523    - 28732 - `Type`
+0x420b840702 - 9629  - generic type constructors
+0x42055b7e46 - 9596
+0x420559b582 - 9511
+0x420bb15a1e - 9509
+0x420b86c6ba - 9501
+0x42055bac1e - 9496
+0x45e68fd    - 538 - `TYPE ...`
+```
+
+Therefore in `mkTyConApp` we have a special case for `Type` to ensure that
+only one `TyConApp 'Type []` closure is allocated during the course of
+compilation. In order to avoid a potentially expensive series of checks in
+`mkTyConApp` only this egregious case is special cased at the moment.
+-}
 
 {-
 %************************************************************************
@@ -1954,3 +2009,50 @@ provSize :: UnivCoProvenance -> Int
 provSize (PhantomProv co)    = 1 + coercionSize co
 provSize (ProofIrrelProv co) = 1 + coercionSize co
 provSize (PluginProv _)      = 1
+
+{-
+************************************************************************
+*                                                                      *
+                    Multiplicities
+*                                                                      *
+************************************************************************
+
+These definitions are here to avoid module loops, and to keep
+GHC.Core.Multiplicity above this module.
+
+-}
+
+-- | A shorthand for data with an attached 'Mult' element (the multiplicity).
+data Scaled a = Scaled Mult a
+  deriving (Data.Data)
+
+instance (Outputable a) => Outputable (Scaled a) where
+   ppr (Scaled _cnt t) = ppr t
+     -- Do not print the multiplicity here because it tends to be too verbose
+
+scaledMult :: Scaled a -> Mult
+scaledMult (Scaled m _) = m
+
+scaledThing :: Scaled a -> a
+scaledThing (Scaled _ t) = t
+
+-- | Apply a function to both the Mult and the Type in a 'Scaled Type'
+mapScaledType :: (Type -> Type) -> Scaled Type -> Scaled Type
+mapScaledType f (Scaled m t) = Scaled (f m) (f t)
+
+{- |
+Mult is a type alias for Type.
+
+Mult must contain Type because multiplicity variables are mere type variables
+(of kind Multiplicity) in Haskell. So the simplest implementation is to make
+Mult be Type.
+
+Multiplicities can be formed with:
+- One: GHC.Types.One (= oneDataCon)
+- Many: GHC.Types.Many (= manyDataCon)
+- Multiplication: GHC.Types.MultMul (= multMulTyCon)
+
+So that Mult feels a bit more structured, we provide pattern synonyms and smart
+constructors for these.
+-}
+type Mult = Type

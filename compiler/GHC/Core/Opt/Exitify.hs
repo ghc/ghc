@@ -50,7 +50,6 @@ import GHC.Types.Var.Env
 import GHC.Core.FVs
 import GHC.Data.FastString
 import GHC.Core.Type
-import GHC.Core.Multiplicity ( pattern Many )
 import GHC.Utils.Misc( mapSnd )
 
 import Data.Bifunctor

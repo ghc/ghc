@@ -66,7 +66,6 @@ import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Core.Type
-import GHC.Core.Multiplicity
 import GHC.Core.Coercion
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
@@ -142,7 +141,7 @@ selectMatchVar _w (VarPat _ var)  = return (localiseId (unLoc var))
                                   -- multiplicity stored within the variable
                                   -- itself. It's easier to pull it from the
                                   -- variable, so we ignore the multiplicity.
-selectMatchVar _w (AsPat _ var _) = return (unLoc var)
+selectMatchVar _w (AsPat _ var _) = ASSERT( isManyDataConTy _w ) (return (unLoc var))
 selectMatchVar w other_pat     = newSysLocalDsNoLP w (hsPatType other_pat)
 
 {- Note [Localise pattern binders]
@@ -371,7 +370,7 @@ mkDataConCase var ty alts@(alt1 :| _)
           Just (DCB boxer) -> do
             us <- newUniqueSupply
             let (rep_ids, binds) = initUs_ us (boxer ty_args args)
-            let rep_ids' = map (scaleIdBy (idMult var)) rep_ids
+            let rep_ids' = map (scaleVarBy (idMult var)) rep_ids
               -- Upholds the invariant that the binders of a case expression
               -- must be scaled by the case multiplicity. See Note [Case
               -- expression invariants] in CoreSyn.
