@@ -775,7 +775,7 @@ each case:
     package/field-n
 
 To read an interface file from an external tool without linking to GHC, the format
-is described at `Extensible Interface Files<https://gitlab.haskell.org/ghc/ghc/wikis/Extensible-Interface-Files>`_.
+is described at `Extensible Interface Files <https://gitlab.haskell.org/ghc/ghc/wikis/Extensible-Interface-Files>`_.
 
 Source plugin example
 ^^^^^^^^^^^^^^^^^^^^^

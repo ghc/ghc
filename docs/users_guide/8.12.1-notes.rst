@@ -21,11 +21,10 @@ Highlights
 
 * Pattern-Match Coverage Checking
 
-  - The revamp of the pattern-match coverage checker that started in 8.10 concludes with this release and implements the 
+  - The revamp of the pattern-match coverage checker that started in 8.10 concludes with this release and implements the
     novel `*Lower Your Guards* <https://www.microsoft.com/en-us/research/uploads/prod/2020/03/lyg.pdf>`_ algorithm.
-  - Compared to 8.10, end users might notice improvements to "long-distance information": :: haskell
+  - Compared to 8.10, end users might notice improvements to "long-distance information": ::
 
-      :linenos:   
       f True = 1
       f x    = ... case x of { False -> 2; True -> 3 } ...
 
@@ -125,14 +124,14 @@ Language
       MkT2 :: (forall a. a -> T)
 
   ``MkT1`` and ``MkT2`` are rejected because the lack of an outermost
-  ``forall`` triggers implicit quantification, making the explicit ``forall``s
+  ``forall`` triggers implicit quantification, making the explicit ``forall``\ s
   nested. Furthermore, GADT constructors do not permit the use of nested
-  ``forall``s, as explained in :ref:`formal-gadt-syntax`.
+  ``forall``\ s, as explained in :ref:`formal-gadt-syntax`.
 
-  In addition to rejecting nested ``forall``s, GHC is now more stringent about
+  In addition to rejecting nested ``forall``\ s, GHC is now more stringent about
   rejecting uses of nested *contexts* in GADT constructors. For example, the
   following example, which previous versions of GHC would accept, is now
-  rejected:
+  rejected: ::
 
     data U a where
       MkU :: (Show a => U a)

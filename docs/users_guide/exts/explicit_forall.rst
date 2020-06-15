@@ -112,9 +112,9 @@ Notes:
 
     {-# RULES "f" forall (g :: forall a. a -> b) x. f g x = g x :: b #-}
 
-- GADT constructors are extra particular about their ``forall``s. In addition
+- GADT constructors are extra particular about their ``forall``\ s. In addition
   to adhering to the ``forall``-or-nothing rule, GADT constructors also forbid
-  nested ``forall``s. For example, GHC would reject the following GADT: ::
+  nested ``forall``\ s. For example, GHC would reject the following GADT: ::
 
     data T where
       MkT :: (forall a. a -> b -> T)
@@ -122,4 +122,4 @@ Notes:
   Because of the lack of an outermost ``forall`` in the type of ``MkT``, the
   ``b`` would be implicitly quantified. In effect, it would be as if one had
   written ``MkT :: forall b. (forall a. a -> b -> T)``, which contains nested
-  ``forall``s. See :ref:`formal-gadt-syntax`.
+  ``forall``\ s. See :ref:`formal-gadt-syntax`.
