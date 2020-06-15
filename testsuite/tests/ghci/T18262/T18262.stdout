@@ -1,0 +1,3 @@
+instance [safe] (TypeError ...) => Err 'A
+  -- Defined at T18262.hs:9:10
+instance [safe] Err 'B -- Defined at T18262.hs:10:10
