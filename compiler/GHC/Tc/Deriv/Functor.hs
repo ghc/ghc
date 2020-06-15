@@ -40,7 +40,6 @@ import GHC.Tc.Utils.TcType
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
-import GHC.Core.Multiplicity
 import GHC.Utils.Misc
 import GHC.Types.Var
 import GHC.Types.Var.Set

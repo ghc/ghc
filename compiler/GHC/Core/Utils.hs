@@ -23,7 +23,9 @@ module GHC.Core.Utils (
         scaleAltsBy,
 
         -- * Properties of expressions
-        exprType, coreAltType, coreAltsType, isExprLevPoly,
+        exprType, coreAltType, coreAltsType, mkLamType, mkLamTypes,
+        mkFunctionType,
+        isExprLevPoly,
         exprIsDupable, exprIsTrivial, getIdFromTrivialExpr, exprIsDeadEnd,
         getIdFromTrivialExpr_maybe,
         exprIsCheap, exprIsExpandable, exprIsCheapX, CheapAppFun,
@@ -151,6 +153,38 @@ coreAltsType :: [CoreAlt] -> Type
 coreAltsType (alt:_) = coreAltType alt
 coreAltsType []      = panic "corAltsType"
 
+mkLamType  :: Var -> Type -> Type
+-- ^ Makes a @(->)@ type or an implicit forall type, depending
+-- on whether it is given a type variable or a term variable.
+-- This is used, for example, when producing the type of a lambda.
+-- Always uses Inferred binders.
+mkLamTypes :: [Var] -> Type -> Type
+-- ^ 'mkLamType' for multiple type or value arguments
+
+mkLamType v body_ty
+   | isTyVar v
+   = mkForAllTy v Inferred body_ty
+
+   | isCoVar v
+   , v `elemVarSet` tyCoVarsOfType body_ty
+   = mkForAllTy v Required body_ty
+
+   | otherwise
+   = mkFunctionType (varMult v) (varType v) body_ty
+
+mkFunctionType :: Mult -> Type -> Type -> Type
+-- This one works out the AnonArgFlag from the argument type
+-- See GHC.Types.Var Note [AnonArgFlag]
+mkFunctionType mult arg_ty res_ty
+   | isPredTy arg_ty -- See GHC.Types.Var Note [AnonArgFlag]
+   = ASSERT(eqType mult Many)
+     mkInvisFunTy mult arg_ty res_ty
+
+   | otherwise
+   = mkVisFunTy mult arg_ty res_ty
+
+mkLamTypes vs ty = foldr mkLamType ty vs
+
 -- | Is this expression levity polymorphic? This should be the
 -- same as saying (isKindLevPoly . typeKind . exprType) but
 -- much faster.
@@ -237,7 +271,7 @@ applyTypeToArgs e op_ty args
     go op_ty []                   = op_ty
     go op_ty (Type ty : args)     = go_ty_args op_ty [ty] args
     go op_ty (Coercion co : args) = go_ty_args op_ty [mkCoercionTy co] args
-    go op_ty (_ : args)           | Just (_, res_ty) <- splitFunTy_maybe op_ty
+    go op_ty (_ : args)           | Just (_, _, res_ty) <- splitFunTy_maybe op_ty
                                   = go res_ty args
     go _ args = pprPanic "applyTypeToArgs" (panic_msg args)
 
@@ -944,7 +978,7 @@ scaleAltsBy w alts = map scaleAlt alts
     scaleAlt (con, bndrs, rhs) = (con, map scaleBndr bndrs, rhs)
 
     scaleBndr :: CoreBndr -> CoreBndr
-    scaleBndr = scaleVarBy w
+    scaleBndr b = scaleVarBy w b
 
 
 {- *********************************************************************
@@ -2454,13 +2488,13 @@ tryEtaReduce bndrs body
     ok_arg bndr (Var v) co fun_ty
        | bndr == v
        , let mult = idMult bndr
-       , Just (Scaled fun_mult _, _) <- splitFunTy_maybe fun_ty
+       , Just (fun_mult, _, _) <- splitFunTy_maybe fun_ty
        , mult `eqType` fun_mult -- There is no change in multiplicity, otherwise we must abort
        = let reflCo = mkRepReflCo (idType bndr)
          in Just (mkFunCo Representational (multToCo mult) reflCo co, [])
     ok_arg bndr (Cast e co_arg) co fun_ty
        | (ticks, Var v) <- stripTicksTop tickishFloatable e
-       , Just (Scaled fun_mult _, _) <- splitFunTy_maybe fun_ty
+       , Just (fun_mult, _, _) <- splitFunTy_maybe fun_ty
        , bndr == v
        , fun_mult `eqType` idMult bndr
        = Just (mkFunCo Representational (multToCo fun_mult) (mkSymCo co_arg) co, ticks)
