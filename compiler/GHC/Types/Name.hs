@@ -66,6 +66,7 @@ module GHC.Types.Name (
         wiredInNameTyThing_maybe,
         nameIsLocalOrFrom, nameIsHomePackage,
         nameIsHomePackageImport, nameIsFromExternalPackage,
+        nameIsFromOneOfTheUnits,
         stableNameCmp,
 
         -- * Class 'NamedThing' and overloaded friends
@@ -88,6 +89,7 @@ import GHC.Types.Name.Occurrence
 import GHC.Unit.Module
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
+import GHC.Types.Unique.Set
 import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Utils.Binary
@@ -341,6 +343,17 @@ nameIsFromExternalPackage this_unit name
   | Just mod <- nameModule_maybe name
   , moduleUnit mod /= this_unit   -- Not the current unit
   , not (isInteractiveModule mod) -- Not the 'interactive' package
+  = True
+  | otherwise
+  = False
+
+-- | Returns True if the name comes from some of the provided units
+-- and is not from the interactive package.
+nameIsFromOneOfTheUnits :: UniqSet UnitId -> Name -> Bool
+nameIsFromOneOfTheUnits modules name
+  | Just mod <- nameModule_maybe name
+  , elementOfUniqSet (toUnitId (moduleUnit mod)) modules
+  , not (isInteractiveModule mod)
   = True
   | otherwise
   = False

@@ -30,3 +30,7 @@ test('Overflow', expect_broken_for(16543, ['hpc']), compile, [''])
 
 test('UnusedPackages', normal, multimod_compile,
     ['UnusedPackages.hs', '-package=bytestring -package=base -package=process -package=ghc -Wunused-packages'])
+
+test('AcceptOrphans01', normal, compile, ['-Wwarn-orphans'])
+test('AcceptOrphans02', normal, compile, ['-Wwarn-orphans'])
+test('AcceptOrphans03', normal, compile, ['-Wwarn-orphans'])

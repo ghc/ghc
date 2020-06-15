@@ -248,6 +248,7 @@ import GHC.Prelude
 
 import GHC.Platform
 import GHC.UniqueSubdir (uniqueSubdir)
+import GHC.Unit.Info (PackageName (..))
 import GHC.Unit.Types
 import GHC.Unit.Parser
 import GHC.Unit.Module
@@ -311,6 +312,8 @@ import Text.ParserCombinators.ReadP as R
 
 import GHC.Data.EnumSet (EnumSet)
 import qualified GHC.Data.EnumSet as EnumSet
+
+import GHC.Types.Unique.Set
 
 import GHC.Foreign (withCString, peekCString)
 import qualified GHC.LanguageExtensions as LangExt
@@ -667,6 +670,7 @@ data DynFlags = DynFlags {
   generalFlags          :: EnumSet GeneralFlag,
   warningFlags          :: EnumSet WarningFlag,
   fatalWarningFlags     :: EnumSet WarningFlag,
+  orphanParents         :: UniqSet PackageName,
   -- Don't change this without updating extensionFlags:
   language              :: Maybe Language,
   -- | Safe Haskell mode
@@ -1410,6 +1414,7 @@ defaultDynFlags mySettings llvmConfig =
         generalFlags = EnumSet.fromList (defaultFlags mySettings),
         warningFlags = EnumSet.fromList standardWarnings,
         fatalWarningFlags = EnumSet.empty,
+        orphanParents = emptyUniqSet,
         ghciScripts = [],
         language = Nothing,
         safeHaskell = Sf_None,
@@ -2903,6 +2908,13 @@ dynamic_flags_deps = [
                                                setWarningFlag minusWcompatOpts))
   , make_ord_flag defFlag "Wno-compat"     (NoArg (mapM_
                                              unSetWarningFlag minusWcompatOpts))
+
+     -- Flags controlling orphan instance warnings
+     --
+  , make_ord_flag defFlag "faccept-orphans"
+      $ hasArg $ \s d -> d { orphanParents = addOneToUniqSet (orphanParents d) (PackageName (mkFastString s)) }
+  , make_ord_flag defFlag "faccept-no-orphans"
+      $ noArg  $ \  d -> d { orphanParents = emptyUniqSet }
 
         ------ Plugin flags ------------------------------------------------
   , make_ord_flag defGhcFlag "fplugin-opt" (hasArg addPluginModuleNameOption)
