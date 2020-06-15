@@ -22,6 +22,7 @@ module GHC.Driver.Types (
         FinderCache, FindResult(..), InstalledFindResult(..),
         Target(..), TargetId(..), InputFileBuffer, pprTarget, pprTargetId,
         HscStatus(..),
+        HasHscEnv(..),
 
         -- * ModuleGraph
         ModuleGraph, emptyMG, mkModuleGraph, extendMG, mapMG,
@@ -474,6 +475,10 @@ data HscEnv
         hsc_FC   :: {-# UNPACK #-} !(IORef FinderCache),
                 -- ^ The cached result of performing finding in the file system
 
+        hsc_extensible_fields :: {-# UNPACK #-} !(IORef ExtensibleFields),
+                -- ^ Extensible interface field data stored by plugins to be output
+                -- in the `.hi` file.
+
         hsc_type_env_var :: Maybe (Module, IORef TypeEnv)
                 -- ^ Used for one-shot compilation only, to initialise
                 -- the 'IfGblEnv'. See 'GHC.Tc.Utils.tcg_type_env_var' for
@@ -486,7 +491,15 @@ data HscEnv
         , hsc_dynLinker :: DynLinker
                 -- ^ dynamic linker.
 
+
  }
+
+
+class HasHscEnv m where
+  getHscEnv :: m HscEnv
+
+instance HasHscEnv Hsc where
+  getHscEnv = Hsc $ \e w -> return (e, w)
 
 {-
 
@@ -3432,3 +3445,14 @@ deleteField name (ExtensibleFields fs) = ExtensibleFields $ Map.delete name fs
 deleteIfaceField :: FieldName -> ModIface -> ModIface
 deleteIfaceField name iface = iface { mi_ext_fields = deleteField name (mi_ext_fields iface) }
 
+registerInterfaceData :: (Binary a, HasHscEnv m, MonadIO m) => FieldName -> a -> m ()
+registerInterfaceData name x = registerInterfaceDataWith name (`put_` x)
+
+registerInterfaceDataWith :: (HasHscEnv m, MonadIO m) => FieldName -> (BinHandle -> IO ()) -> m ()
+registerInterfaceDataWith name write = do
+  env <- getHscEnv
+  let ext_fs_ref = hsc_extensible_fields env
+  liftIO $ do
+    ext_fs  <- readIORef ext_fs_ref
+    ext_fs' <- writeFieldWith name write ext_fs
+    writeIORef ext_fs_ref ext_fs'

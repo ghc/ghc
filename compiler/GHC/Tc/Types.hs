@@ -5,7 +5,7 @@
 -}
 
 {-# LANGUAGE CPP, DeriveFunctor, ExistentialQuantification, GeneralizedNewtypeDeriving,
-             ViewPatterns #-}
+             ViewPatterns, FlexibleInstances #-}
 
 -- | Various types used during typechecking.
 --
@@ -193,6 +193,9 @@ type DsM        = TcRnIf DsGblEnv DsLclEnv    -- Desugaring
 -- information we've accumulated while checking a module, while the
 -- local environment is 'TcLclEnv', which tracks local information as
 -- we move inside expressions.
+
+instance HasHscEnv (IOEnv (Env a b)) where
+    getHscEnv = env_top <$> getEnv
 
 -- | Historical "renaming monad" (now it's just 'TcRn').
 type RnM  = TcRn

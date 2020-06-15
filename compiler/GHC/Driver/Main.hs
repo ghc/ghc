@@ -196,6 +196,7 @@ newHscEnv dflags = do
     us      <- mkSplitUniqSupply 'r'
     nc_var  <- newIORef (initNameCache us knownKeyNames)
     fc_var  <- newIORef emptyInstalledModuleEnv
+    ext_fs  <- newIORef emptyExtensibleFields
     emptyDynLinker <- uninitializedLinker
     return HscEnv {  hsc_dflags       = dflags
                   ,  hsc_targets      = []
@@ -205,6 +206,7 @@ newHscEnv dflags = do
                   ,  hsc_EPS          = eps_var
                   ,  hsc_NC           = nc_var
                   ,  hsc_FC           = fc_var
+                  ,  hsc_extensible_fields = ext_fs
                   ,  hsc_type_env_var = Nothing
                   ,  hsc_interp       = Nothing
                   ,  hsc_dynLinker    = emptyDynLinker
@@ -220,9 +222,6 @@ clearWarnings = Hsc $ \_ _ -> return ((), emptyBag)
 
 logWarnings :: WarningMessages -> Hsc ()
 logWarnings w = Hsc $ \_ w0 -> return ((), w0 `unionBags` w)
-
-getHscEnv :: Hsc HscEnv
-getHscEnv = Hsc $ \e w -> return (e, w)
 
 handleWarnings :: Hsc ()
 handleWarnings = do

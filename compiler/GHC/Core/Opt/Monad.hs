@@ -612,6 +612,9 @@ instance MonadUnique CoreM where
         mask <- read cr_uniq_mask
         liftIO $! uniqFromMask mask
 
+instance HasHscEnv CoreM where
+  getHscEnv = read cr_hsc_env
+
 runCoreM :: HscEnv
          -> RuleBase
          -> Char -- ^ Mask
@@ -676,9 +679,6 @@ liftIOWithCount what = liftIO what >>= (\(count, x) -> addSimplCount count >> re
 *                                                                      *
 ************************************************************************
 -}
-
-getHscEnv :: CoreM HscEnv
-getHscEnv = read cr_hsc_env
 
 getRuleBase :: CoreM RuleBase
 getRuleBase = read cr_rule_base
