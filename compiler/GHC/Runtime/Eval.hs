@@ -120,9 +120,7 @@ import GHC.Tc.Utils.Env (tcGetInstEnvs)
 import GHC.Tc.Utils.Instantiate (instDFunType)
 import GHC.Tc.Solver (solveWanteds)
 import GHC.Tc.Utils.Monad
-import GHC.Tc.Types.Evidence
-import Data.Bifunctor (second)
-import GHC.Tc.Solver.Monad (runTcS)
+import GHC.Tc.Solver.Monad (runTcS, zonkWC)
 import GHC.Core.Class (classTyCon)
 
 -- -----------------------------------------------------------------------------
@@ -1142,17 +1140,20 @@ checkForExistence clsInst mb_inst_tys = do
   -- thetas of clsInst.
   (tys, thetas) <- instDFunType (is_dfun clsInst) mb_inst_tys
   wanteds <- mapM getDictionaryBindings thetas
-  (residuals, _) <- second evBindMapBinds <$> runTcS (solveWanteds (unionsWC wanteds))
+  (solvedWcs, _) <- runTcS (solveWanteds (unionsWC wanteds) >>= zonkWC)
 
-  let WC { wc_simple = simples, wc_impl = impls } = (dropDerivedWC residuals)
+  let WC { wc_simple = simples, wc_impl = impls } = dropDerivedWC solvedWcs
 
-  let resPreds = mapBag ctPred simples
-
-  if allBag isSatisfiablePred resPreds && solvedImplics impls
-  then return . Just $ substInstArgs tys (bagToList resPreds) clsInst
+  if allBag allowedSimple simples && solvedImplics impls
+  then return . Just $ substInstArgs tys (bagToList (mapBag ctPred simples)) clsInst
   else return Nothing
 
   where
+
+  -- The allowed Cts are either predicates that mention a variable from the query or TypeErrors.
+  allowedSimple :: Ct -> Bool
+  allowedSimple ct = isSatisfiablePred (ctPred ct) || isUserTypeErrorCt ct
+
   solvedImplics :: Bag Implication -> Bool
   solvedImplics impls = allBag (isSolvedStatus . ic_status) impls
 
