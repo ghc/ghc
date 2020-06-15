@@ -39,6 +39,7 @@ import GHC.Types.Unique.Supply
 import GHC.Utils.Misc
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
+import GHC.Core.Multiplicity
 
 import Control.Arrow ( second )
 import Control.Monad.Trans.Class
@@ -274,7 +275,7 @@ withLiftedBndr abs_ids bndr inner = do
         -- See Note [transferPolyIdInfo] in GHC.Types.Id. We need to do this at least
         -- for arity information.
         = transferPolyIdInfo bndr (dVarSetElems abs_ids)
-        . mkSysLocal (mkFastString str) uniq
+        . mkSysLocal (mkFastString str) uniq Many
         $ ty
   LiftM $ RWS.local
     (\e -> e

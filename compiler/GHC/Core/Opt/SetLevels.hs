@@ -47,9 +47,20 @@
   The simplifier tries to get rid of occurrences of x, in favour of wild,
   in the hope that there will only be one remaining occurrence of x, namely
   the scrutinee of the case, and we can inline it.
+
+  This can only work if @wild@ is an unrestricted binder. Indeed, even with the
+  extended typing rule (in the linter) for case expressions, if
+       case x of wild # 1 { p -> e}
+  is well-typed, then
+       case x of wild # 1 { p -> e[wild\x] }
+  is only well-typed if @e[wild\x] = e@ (that is, if @wild@ is not used in @e@
+  at all). In which case, it is, of course, pointless to do the substitution
+  anyway. So for a linear binder (and really anything which isn't unrestricted),
+  doing this substitution would either produce ill-typed terms or be the
+  identity.
 -}
 
-{-# LANGUAGE CPP, MultiWayIf #-}
+{-# LANGUAGE CPP, MultiWayIf, PatternSynonyms #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module GHC.Core.Opt.SetLevels (
@@ -94,6 +105,7 @@ import GHC.Types.Name.Occurrence ( occNameString )
 import GHC.Types.Unique       ( hasKey )
 import GHC.Core.Type    ( Type, mkLamTypes, splitTyConApp_maybe, tyCoVarsOfType
                         , mightBeUnliftedType, closeOverKindsDSet )
+import GHC.Core.Multiplicity     ( pattern Many )
 import GHC.Types.Basic  ( Arity, RecFlag(..), isRec )
 import GHC.Core.DataCon ( dataConOrigResTy )
 import GHC.Builtin.Types
@@ -477,6 +489,7 @@ lvlCase env scrut_fvs scrut' case_bndr ty alts
   , exprIsHNF (deTagExpr scrut')  -- See Note [Check the output scrutinee for exprIsHNF]
   , not (isTopLvl dest_lvl)       -- Can't have top-level cases
   , not (floatTopLvlOnly env)     -- Can float anywhere
+  , Many <- idMult case_bndr     -- See Note [Floating linear case]
   =     -- Always float the case if possible
         -- Unlike lets we don't insist that it escapes a value lambda
     do { (env1, (case_bndr' : bs')) <- cloneCaseBndrs env dest_lvl (case_bndr : bs)
@@ -546,6 +559,18 @@ Things to note:
    If we floated the cases out we could eliminate one of them.
 
  * We only do this with a single-alternative case
+
+
+Note [Floating linear case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Linear case can't be floated past case branches:
+    case u of { p1 -> case[1] v of { C x -> ...x...}; p2 -> ... }
+Is well typed, but
+    case[1] v of { C x -> case u of { p1 -> ...x...; p2 -> ... }}
+Will not be, because of how `x` is used in one alternative but not the other.
+
+It is not easy to float this linear cases precisely, so, instead, we elect, for
+the moment, to simply not float linear case.
 
 
 Note [Setting levels when floating single-alternative cases]
@@ -1579,6 +1604,7 @@ extendCaseBndrEnv :: LevelEnv
                   -> LevelEnv
 extendCaseBndrEnv le@(LE { le_subst = subst, le_env = id_env })
                   case_bndr (Var scrut_var)
+    | Many <- varMult case_bndr
   = le { le_subst   = extendSubstWithVar subst case_bndr scrut_var
        , le_env     = add_id id_env (case_bndr, scrut_var) }
 extendCaseBndrEnv env _ _ = env
@@ -1682,7 +1708,7 @@ newPolyBndrs dest_lvl
 
     mk_poly_bndr bndr uniq = transferPolyIdInfo bndr abs_vars $ -- Note [transferPolyIdInfo] in GHC.Types.Id
                              transfer_join_info bndr $
-                             mkSysLocal (mkFastString str) uniq poly_ty
+                             mkSysLocal (mkFastString str) uniq (idMult bndr) poly_ty
                            where
                              str     = "poly_" ++ occNameString (getOccName bndr)
                              poly_ty = mkLamTypes abs_vars (GHC.Core.Subst.substTy subst (idType bndr))
@@ -1717,7 +1743,7 @@ newLvlVar lvld_rhs join_arity_maybe is_mk_static
       = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr"))
                             rhs_ty
       | otherwise
-      = mkSysLocal (mkFastString "lvl") uniq rhs_ty
+      = mkSysLocal (mkFastString "lvl") uniq Many rhs_ty
 
 -- | Clone the binders bound by a single-alternative case.
 cloneCaseBndrs :: LevelEnv -> Level -> [Var] -> LvlM (LevelEnv, [Var])

@@ -57,6 +57,8 @@ holes3.hs:11:15: error:
         LT :: Ordering
         EQ :: Ordering
         GT :: Ordering
+        One :: GHC.Types.Multiplicity
+        Many :: GHC.Types.Multiplicity
         () :: ()
         lines :: String -> [String]
         unlines :: [String] -> String

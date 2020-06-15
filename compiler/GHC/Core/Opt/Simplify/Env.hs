@@ -63,6 +63,7 @@ import qualified GHC.Core.Type as Type
 import GHC.Core.Type hiding     ( substTy, substTyVar, substTyVarBndr, extendTvSubst, extendCvSubst )
 import qualified GHC.Core.Coercion as Coercion
 import GHC.Core.Coercion hiding ( substCo, substCoVar, substCoVarBndr )
+import GHC.Core.Multiplicity
 import GHC.Types.Basic
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
@@ -276,7 +277,7 @@ mkSimplEnv mode
         -- The top level "enclosing CC" is "SUBSUMED".
 
 init_in_scope :: InScopeSet
-init_in_scope = mkInScopeSet (unitVarSet (mkWildValBinder unitTy))
+init_in_scope = mkInScopeSet (unitVarSet (mkWildValBinder Many unitTy))
               -- See Note [WildCard binders]
 
 {-
@@ -724,6 +725,8 @@ changed!!
 That's why we pass res_ty into simplNonRecJoinBndr, and substIdBndr
 takes a (Just res_ty) argument so that it knows to do the type-changing
 thing.
+
+See also Note [Scaling join point arguments].
 -}
 
 simplBinders :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
@@ -927,12 +930,15 @@ substCo env co = Coercion.substCo (getTCvSubst env) co
 ------------------
 substIdType :: SimplEnv -> Id -> Id
 substIdType (SimplEnv { seInScope = in_scope, seTvSubst = tv_env, seCvSubst = cv_env }) id
-  |  (isEmptyVarEnv tv_env && isEmptyVarEnv cv_env)
-  || noFreeVarsOfType old_ty
+  | (isEmptyVarEnv tv_env && isEmptyVarEnv cv_env)
+    || no_free_vars
   = id
-  | otherwise = Id.setIdType id (Type.substTy (TCvSubst in_scope tv_env cv_env) old_ty)
+  | otherwise = Id.updateIdTypeAndMult (Type.substTyUnchecked subst) id
                 -- The tyCoVarsOfType is cheaper than it looks
                 -- because we cache the free tyvars of the type
                 -- in a Note in the id's type itself
   where
+    no_free_vars = noFreeVarsOfType old_ty && noFreeVarsOfType old_w
+    subst = TCvSubst in_scope tv_env cv_env
     old_ty = idType id
+    old_w  = varMult id

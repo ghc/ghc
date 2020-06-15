@@ -52,8 +52,7 @@ tidyVarBndr tidy_env@(occ_env, subst) var
       (occ_env', occ') -> ((occ_env', subst'), var')
         where
           subst' = extendVarEnv subst var var'
-          var'   = setVarType (setVarName var name') type'
-          type'  = tidyType tidy_env (varType var)
+          var'   = updateVarTypeAndMult (tidyType tidy_env) (setVarName var name')
           name'  = tidyNameOcc name occ'
           name   = varName var
 
@@ -120,7 +119,7 @@ tidyOpenTyCoVar env@(_, subst) tyvar
 tidyTyCoVarOcc :: TidyEnv -> TyCoVar -> TyCoVar
 tidyTyCoVarOcc env@(_, subst) tv
   = case lookupVarEnv subst tv of
-        Nothing  -> updateVarType (tidyType env) tv
+        Nothing  -> updateVarTypeAndMult (tidyType env) tv
         Just tv' -> tv'
 
 ---------------
@@ -134,9 +133,10 @@ tidyType env (TyVarTy tv)          = TyVarTy (tidyTyCoVarOcc env tv)
 tidyType env (TyConApp tycon tys)  = let args = tidyTypes env tys
                                      in args `seqList` TyConApp tycon args
 tidyType env (AppTy fun arg)       = (AppTy $! (tidyType env fun)) $! (tidyType env arg)
-tidyType env ty@(FunTy _ arg res)  = let { !arg' = tidyType env arg
-                                         ; !res' = tidyType env res }
-                                     in ty { ft_arg = arg', ft_res = res' }
+tidyType env ty@(FunTy _ w arg res)  = let { !w'   = tidyType env w
+                                           ; !arg' = tidyType env arg
+                                           ; !res' = tidyType env res }
+                                       in ty { ft_mult = w', ft_arg = arg', ft_res = res' }
 tidyType env (ty@(ForAllTy{}))     = mkForAllTys' (zip tvs' vis) $! tidyType env' body_ty
   where
     (tvs, vis, body_ty) = splitForAllTys' ty
@@ -208,7 +208,7 @@ tidyCo env@(_, subst) co
                                where (envp, tvp) = tidyVarBndr env tv
             -- the case above duplicates a bit of work in tidying h and the kind
             -- of tv. But the alternative is to use coercionKind, which seems worse.
-    go (FunCo r co1 co2)     = (FunCo r $! go co1) $! go co2
+    go (FunCo r w co1 co2)   = ((FunCo r $! go w) $! go co1) $! go co2
     go (CoVarCo cv)          = case lookupVarEnv subst cv of
                                  Nothing  -> CoVarCo cv
                                  Just cv' -> CoVarCo cv'

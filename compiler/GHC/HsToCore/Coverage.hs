@@ -712,6 +712,7 @@ addTickStmt _isGuard (BindStmt xbs pat e) = do
         liftM4 (\b f -> BindStmt $ XBindStmtTc
                     { xbstc_bindOp = b
                     , xbstc_boundResultType = xbstc_boundResultType xbs
+                    , xbstc_boundResultMult = xbstc_boundResultMult xbs
                     , xbstc_failOp = f
                     })
                 (addTickSyntaxExpr hpcSrcSpan (xbstc_bindOp xbs))
