@@ -35,6 +35,7 @@ import GHC.Core.Type as Type
 import GHC.Core.TyCon     ( initRecTc, checkRecTc )
 import GHC.Core.Predicate ( isDictTy )
 import GHC.Core.Coercion as Coercion
+import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Types.Unique
 import GHC.Driver.Session ( DynFlags, GeneralFlag(..), gopt )
@@ -155,7 +156,9 @@ exprBotStrictness_maybe e
         Nothing -> Nothing
         Just ar -> Just (ar, sig ar)
   where
-    env    = AE { ae_ped_bot = True, ae_cheap_fn = \ _ _ -> False }
+    env    = AE { ae_ped_bot = True
+                , ae_cheap_fn = \ _ _ -> False
+                , ae_joins = emptyVarSet }
     sig ar = mkClosedStrictSig (replicate ar topDmd) botDiv
 
 {-
@@ -505,7 +508,8 @@ exprEtaExpandArity dflags e
       ABot n   -> n
   where
     env = AE { ae_cheap_fn = mk_cheap_fn dflags isCheapApp
-             , ae_ped_bot  = gopt Opt_PedanticBottoms dflags }
+             , ae_ped_bot  = gopt Opt_PedanticBottoms dflags
+             , ae_joins    = emptyVarSet }
 
 getBotArity :: ArityType -> Maybe Arity
 -- Arity of a divergent function
@@ -577,7 +581,8 @@ findRhsArity dflags bndr rhs old_arity
           ATop _  -> (0,              False)    -- Note [Eta expanding thunks]
        where
          env = AE { ae_cheap_fn = mk_cheap_fn dflags cheap_app
-                  , ae_ped_bot  = gopt Opt_PedanticBottoms dflags }
+                  , ae_ped_bot  = gopt Opt_PedanticBottoms dflags
+                  , ae_joins    = emptyVarSet }
 
 {-
 Note [Arity analysis]
@@ -735,8 +740,14 @@ type CheapFun = CoreExpr -> Maybe Type -> Bool
 data ArityEnv
   = AE { ae_cheap_fn :: CheapFun
        , ae_ped_bot  :: Bool       -- True <=> be pedantic about bottoms
+       , ae_joins    :: IdSet      -- In-scope join points
   }
 
+extendJoinEnv :: ArityEnv -> [JoinId] -> ArityEnv
+extendJoinEnv env@(AE { ae_joins = joins }) join_ids
+  = env { ae_joins = joins `extendVarSetList` join_ids }
+
+----------------
 arityType :: ArityEnv -> CoreExpr -> ArityType
 
 arityType env (Cast e co)
@@ -754,7 +765,10 @@ arityType env (Cast e co)
     -- However, do make sure that ATop -> ATop and ABot -> ABot!
     --   Casts don't affect that part. Getting this wrong provoked #5475
 
-arityType _ (Var v)
+arityType env (Var v)
+  | v `elemVarSet` ae_joins env
+  = ABot 0
+
   | strict_sig <- idStrictness v
   , not $ isTopSig strict_sig
   , (ds, res) <- splitStrictSig strict_sig
@@ -802,6 +816,26 @@ arityType env (Case scrut _ _ alts)
              | otherwise                     -> ATop (takeWhile isOneShotInfo as)
   where
     alts_type = foldr1 andArityType [arityType env rhs | (_,_,rhs) <- alts]
+
+arityType env (Let (NonRec j rhs) body)
+  | Just join_arity <- isJoinId_maybe j
+  , (_, rhs_body)   <- collectNBinders join_arity rhs
+  = andArityType (arityType env rhs_body)
+                 (arityType env' body)
+  where
+     env' = extendJoinEnv env [j]
+
+arityType env (Let (Rec pairs) body)
+  | ((j,_):_) <- pairs
+  , isJoinId j
+  = foldr (andArityType . do_one) (arityType env' body) pairs
+  where
+    env' = extendJoinEnv env (map fst pairs)
+    do_one (j,rhs)
+      | Just arity <- isJoinId_maybe j
+      = arityType env' $ snd $ collectNBinders arity rhs
+      | otherwise
+      = pprPanic "arityType:joinrec" (ppr pairs)
 
 arityType env (Let b e)
   = floatIn (cheap_bind b) (arityType env e)
