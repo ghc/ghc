@@ -328,4 +328,5 @@ test('T18231', [ only_ways(['optasm']), grep_errmsg(r'^[\w\.]+ ::.*->.*') ], com
 # Cast WW
 test('T17673', [ only_ways(['optasm']), grep_errmsg(r'^\w+\.\$wf') ], compile, ['-ddump-simpl -dsuppress-uniques -dppr-cols=9999'])
 test('T18078', [ only_ways(['optasm']), grep_errmsg(r'^\w+\.\$wf') ], compile, ['-ddump-simpl -dsuppress-uniques -dppr-cols=9999'])
+test('T18328', [ only_ways(['optasm']), grep_errmsg(r'Arity=') ], compile, ['-ddump-simpl -dsuppress-uniques'])
 test('T18347', normal, compile, ['-dcore-lint -O'])
