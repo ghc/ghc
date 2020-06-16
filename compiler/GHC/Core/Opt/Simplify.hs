@@ -16,6 +16,8 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Driver.Config
+import GHC.Core.SimpleOpt   ( exprIsConApp_maybe )
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Type hiding ( substTy, substTyVar, extendTvSubst, extendCvSubst )
 import GHC.Core.Opt.Simplify.Env
@@ -46,6 +48,7 @@ import GHC.Types.Cpr    ( mkCprSig, botCpr )
 import GHC.Core.Ppr     ( pprCoreExpr )
 import GHC.Types.Unique ( hasKey )
 import GHC.Core.Unfold
+import GHC.Core.Unfold.Make
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity ( ArityType(..), arityTypeArity, isBotArityType
                           , idArityType, etaExpandAT )
@@ -341,7 +344,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                 else                    -- Do type-abstraction first
                      {-#SCC "simplLazyBind-type-abstraction-first" #-}
                      do { tick LetFloatFromLet
-                        ; (poly_binds, body3) <- abstractFloats (seDynFlags env) top_lvl
+                        ; (poly_binds, body3) <- abstractFloats (seUnfoldingOpts env) top_lvl
                                                                 tvs' body_floats2 body2
                         ; let floats = foldl' extendFloats (emptyFloats env) poly_binds
                         ; rhs' <- mkLam env tvs' body3 rhs_cont
@@ -675,7 +678,7 @@ makeTrivialBinding mode top_lvl occ_fs info expr expr_ty
         -- Now something very like completeBind,
         -- but without the postInlineUnconditionally part
         ; (arity_type, expr2) <- tryEtaExpandRhs mode var expr1
-        ; unf <- mkLetUnfolding (sm_dflags mode) top_lvl InlineRhs var expr2
+        ; unf <- mkLetUnfolding (sm_uf_opts mode) top_lvl InlineRhs var expr2
 
         ; let final_id = addLetBndrInfo var arity_type unf
               bind     = NonRec final_id expr2
@@ -3008,7 +3011,7 @@ addAltUnfoldings env scrut case_bndr con_app
        ; traceSmpl "addAltUnf" (vcat [ppr case_bndr <+> ppr scrut, ppr con_app])
        ; return env2 }
   where
-    mk_simple_unf = mkSimpleUnfolding (seDynFlags env)
+    mk_simple_unf = mkSimpleUnfolding (seUnfoldingOpts env)
 
 addBinderUnfolding :: SimplEnv -> Id -> Unfolding -> SimplEnv
 addBinderUnfolding env bndr unf
@@ -3431,7 +3434,8 @@ mkDupableAlt platform case_bndr jfloats (con, bndrs', rhs')
   = return (jfloats, (con, bndrs', rhs'))
 
   | otherwise
-  = do  { let rhs_ty'  = exprType rhs'
+  = do  { simpl_opts <- initSimpleOptOpts <$> getDynFlags
+        ; let rhs_ty'  = exprType rhs'
               scrut_ty = idType case_bndr
               case_bndr_w_unf
                 = case con of
@@ -3439,7 +3443,7 @@ mkDupableAlt platform case_bndr jfloats (con, bndrs', rhs')
                       DataAlt dc -> setIdUnfolding case_bndr unf
                           where
                                  -- See Note [Case binders and join points]
-                             unf = mkInlineUnfolding rhs
+                             unf = mkInlineUnfolding simpl_opts rhs
                              rhs = mkConApp2 dc (tyConAppArgs scrut_ty) bndrs'
 
                       LitAlt {} -> WARN( True, text "mkDupableAlt"
@@ -3778,14 +3782,14 @@ simplLetUnfolding env top_lvl cont_mb id new_rhs rhs_ty arity unf
   | isExitJoinId id
   = return noUnfolding -- See Note [Do not inline exit join points] in GHC.Core.Opt.Exitify
   | otherwise
-  = mkLetUnfolding (seDynFlags env) top_lvl InlineRhs id new_rhs
+  = mkLetUnfolding (seUnfoldingOpts env) top_lvl InlineRhs id new_rhs
 
 -------------------
-mkLetUnfolding :: DynFlags -> TopLevelFlag -> UnfoldingSource
+mkLetUnfolding :: UnfoldingOpts -> TopLevelFlag -> UnfoldingSource
                -> InId -> OutExpr -> SimplM Unfolding
-mkLetUnfolding dflags top_lvl src id new_rhs
+mkLetUnfolding uf_opts top_lvl src id new_rhs
   = is_bottoming `seq`  -- See Note [Force bottoming field]
-    return (mkUnfolding dflags src is_top_lvl is_bottoming new_rhs)
+    return (mkUnfolding uf_opts src is_top_lvl is_bottoming new_rhs)
             -- We make an  unfolding *even for loop-breakers*.
             -- Reason: (a) It might be useful to know that they are WHNF
             --         (b) In GHC.Iface.Tidy we currently assume that, if we want to
@@ -3848,14 +3852,14 @@ simplStableUnfolding env top_lvl mb_cont id rhs_ty id_arity unf
                             -- See Note [Top-level flag on inline rules] in GHC.Core.Unfold
 
                   _other              -- Happens for INLINABLE things
-                     -> mkLetUnfolding dflags top_lvl src id expr' }
+                     -> mkLetUnfolding uf_opts top_lvl src id expr' }
                 -- If the guidance is UnfIfGoodArgs, this is an INLINABLE
                 -- unfolding, and we need to make sure the guidance is kept up
                 -- to date with respect to any changes in the unfolding.
 
         | otherwise -> return noUnfolding   -- Discard unstable unfoldings
   where
-    dflags     = seDynFlags env
+    uf_opts    = seUnfoldingOpts env
     is_top_lvl = isTopLevel top_lvl
     act        = idInlineActivation id
     unf_env    = updMode (updModeForStableUnfoldings act) env

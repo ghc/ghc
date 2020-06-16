@@ -54,7 +54,8 @@ import GHC.Tc.Utils.TcType as TcType
 import GHC.Core.Make
 import GHC.Core.FVs     ( mkRuleInfo )
 import GHC.Core.Utils   ( mkCast, mkDefaultCase )
-import GHC.Core.Unfold
+import GHC.Core.Unfold.Make
+import GHC.Core.SimpleOpt
 import GHC.Types.Literal
 import GHC.Core.TyCon
 import GHC.Core.Class
@@ -486,6 +487,7 @@ mkDictSelId name clas
     info | new_tycon
          = base_info `setInlinePragInfo` alwaysInlinePragma
                      `setUnfoldingInfo`  mkInlineUnfoldingWithArity 1
+                                           defaultSimpleOptOpts
                                            (mkDictSelRhs clas val_index)
                    -- See Note [Single-method classes] in GHC.Tc.TyCl.Instance
                    -- for why alwaysInlinePragma
@@ -600,7 +602,7 @@ mkDataConWorkId wkr_name data_con
                             isSingleton arg_tys
                           , ppr data_con  )
                               -- Note [Newtype datacons]
-                   mkCompulsoryUnfolding $
+                   mkCompulsoryUnfolding defaultSimpleOptOpts $
                    mkLams univ_tvs $ Lam id_arg1 $
                    wrapNewTypeBody tycon res_ty_args (Var id_arg1)
 
@@ -733,9 +735,9 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
              -- See Note [Inline partially-applied constructor wrappers]
              -- Passing Nothing here allows the wrapper to inline when
              -- unsaturated.
-             wrap_unf | isNewTyCon tycon = mkCompulsoryUnfolding wrap_rhs
+             wrap_unf | isNewTyCon tycon = mkCompulsoryUnfolding defaultSimpleOptOpts wrap_rhs
                         -- See Note [Compulsory newtype unfolding]
-                      | otherwise        = mkInlineUnfolding wrap_rhs
+                      | otherwise        = mkInlineUnfolding defaultSimpleOptOpts wrap_rhs
              wrap_rhs = mkLams wrap_tvs $
                         mkLams wrap_args $
                         wrapFamInstBody tycon res_ty_args $
@@ -1463,7 +1465,7 @@ nullAddrId :: Id
 nullAddrId = pcMiscPrelId nullAddrName addrPrimTy info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
-                       `setUnfoldingInfo`  mkCompulsoryUnfolding (Lit nullAddrLit)
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOptOpts (Lit nullAddrLit)
                        `setNeverLevPoly`   addrPrimTy
 
 ------------------------------------------------
@@ -1471,7 +1473,7 @@ seqId :: Id     -- See Note [seqId magic]
 seqId = pcMiscPrelId seqName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` inline_prag
-                       `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOptOpts rhs
 
     inline_prag
          = alwaysInlinePragma `setInlinePragmaActivation` ActiveAfter
@@ -1508,7 +1510,7 @@ oneShotId :: Id -- See Note [The oneShot function]
 oneShotId = pcMiscPrelId oneShotName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
-                       `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOptOpts rhs
     ty  = mkSpecForAllTys [ runtimeRep1TyVar, runtimeRep2TyVar
                           , openAlphaTyVar, openBetaTyVar ]
                           (mkVisFunTyMany fun_ty fun_ty)
@@ -1534,7 +1536,7 @@ coerceId :: Id
 coerceId = pcMiscPrelId coerceName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
-                       `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding defaultSimpleOptOpts rhs
     eqRTy     = mkTyConApp coercibleTyCon [ tYPE r , a, b ]
     eqRPrimTy = mkTyConApp eqReprPrimTyCon [ tYPE r, tYPE r, a, b ]
     ty        = mkInvisForAllTys [ Bndr rv InferredSpec
@@ -1781,7 +1783,7 @@ voidPrimId :: Id     -- Global constant :: Void#
                      -- We cannot define it in normal Haskell, since it's
                      -- a top-level unlifted value.
 voidPrimId  = pcMiscPrelId voidPrimIdName unboxedUnitTy
-                (noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
+                (noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding defaultSimpleOptOpts rhs
                              `setNeverLevPoly`  unboxedUnitTy)
     where rhs = Var (dataConWorkId unboxedUnitDataCon)
 

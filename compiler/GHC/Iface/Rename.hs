@@ -23,6 +23,7 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Driver.Types
 import GHC.Unit
+import GHC.Unit.State
 import GHC.Types.Unique.FM
 import GHC.Types.Avail
 import GHC.Iface.Syntax

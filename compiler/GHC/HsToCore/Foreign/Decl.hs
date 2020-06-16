@@ -27,7 +27,7 @@ import GHC.HsToCore.Monad
 
 import GHC.Hs
 import GHC.Core.DataCon
-import GHC.Core.Unfold
+import GHC.Core.Unfold.Make
 import GHC.Types.Id
 import GHC.Types.Literal
 import GHC.Unit.Module
@@ -53,6 +53,7 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Driver.Session
+import GHC.Driver.Config
 import GHC.Platform
 import GHC.Data.OrdList
 import GHC.Utils.Misc
@@ -286,8 +287,11 @@ dsFCall fn_id co fcall mDeclHeader = do
         wrapper_body = foldr ($) (res_wrapper work_app) arg_wrappers
         wrap_rhs     = mkLams (tvs ++ args) wrapper_body
         wrap_rhs'    = Cast wrap_rhs co
+        simpl_opts   = initSimpleOptOpts dflags
         fn_id_w_inl  = fn_id `setIdUnfolding` mkInlineUnfoldingWithArity
-                                                (length args) wrap_rhs'
+                                                (length args)
+                                                simpl_opts
+                                                wrap_rhs'
 
     return ([(work_id, work_rhs), (fn_id_w_inl, wrap_rhs')], empty, cDoc)
 

@@ -26,6 +26,7 @@ import GHC.Core.Coercion( Coercion )
 import GHC.Core.Opt.Monad
 import qualified GHC.Core.Subst as Core
 import GHC.Core.Unfold
+import GHC.Core.Unfold.Make
 import GHC.Types.Var      ( isLocalVar )
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -47,6 +48,7 @@ import GHC.Driver.Types
 import GHC.Data.Bag
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Driver.Config
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
@@ -1478,6 +1480,8 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                 -- See Note [Specialising Calls]
                 spec_uds = foldr consDictBind rhs_uds dx_binds
 
+                simpl_opts = initSimpleOptOpts dflags
+
                 --------------------------------------
                 -- Add a suitable unfolding if the spec_inl_prag says so
                 -- See Note [Inline specialisations]
@@ -1490,7 +1494,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                   = (inl_prag { inl_inline = NoUserInline }, noUnfolding)
 
                   | otherwise
-                  = (inl_prag, specUnfolding dflags spec_bndrs (`mkApps` spec_args)
+                  = (inl_prag, specUnfolding simpl_opts spec_bndrs (`mkApps` spec_args)
                                              rule_lhs_args fn_unf)
 
                 --------------------------------------

@@ -13,7 +13,7 @@ import GHC.Prelude
 
 import GHC.Driver.Session
 import GHC.Core
-import GHC.Core.Unfold  ( couldBeSmallEnoughToInline )
+import GHC.Core.Unfold
 import GHC.Builtin.Types ( unitDataConId )
 import GHC.Types.Id
 import GHC.Types.Var.Env
@@ -104,12 +104,23 @@ and the level of @h@ is zero (NB not one).
 -}
 
 liberateCase :: DynFlags -> CoreProgram -> CoreProgram
-liberateCase dflags binds = do_prog (initEnv dflags) binds
+liberateCase dflags binds = do_prog (initLiberateCaseEnv dflags) binds
   where
     do_prog _   [] = []
     do_prog env (bind:binds) = bind' : do_prog env' binds
                              where
                                (env', bind') = libCaseBind env bind
+
+
+initLiberateCaseEnv :: DynFlags -> LibCaseEnv
+initLiberateCaseEnv dflags = LibCaseEnv
+   { lc_threshold = liberateCaseThreshold dflags
+   , lc_uf_opts   = unfoldingOpts dflags
+   , lc_lvl       = 0
+   , lc_lvl_env   = emptyVarEnv
+   , lc_rec_env   = emptyVarEnv
+   , lc_scruts    = []
+   }
 
 {-
 ************************************************************************
@@ -152,9 +163,9 @@ libCaseBind env (Rec pairs)
     --       size, build a fake binding (let { dup_pairs } in (),
     --       and find the size of that
     -- See Note [Small enough]
-    small_enough = case bombOutSize env of
+    small_enough = case lc_threshold env of
                       Nothing   -> True   -- Infinity
-                      Just size -> couldBeSmallEnoughToInline (lc_dflags env) size $
+                      Just size -> couldBeSmallEnoughToInline (lc_uf_opts env) size $
                                    Let (Rec dup_pairs) (Var unitDataConId)
 
     ok_pair (id,_)
@@ -392,23 +403,28 @@ topLevel = 0
 
 data LibCaseEnv
   = LibCaseEnv {
-        lc_dflags :: DynFlags,
+        lc_threshold :: Maybe Int,
+                -- ^ Bomb-out size for deciding if potential liberatees are too
+                -- big.
 
-        lc_lvl :: LibCaseLevel, -- Current level
+        lc_uf_opts :: UnfoldingOpts,
+                -- ^ Unfolding options
+
+        lc_lvl :: LibCaseLevel, -- ^ Current level
                 -- The level is incremented when (and only when) going
                 -- inside the RHS of a (sufficiently small) recursive
                 -- function.
 
         lc_lvl_env :: IdEnv LibCaseLevel,
-                -- Binds all non-top-level in-scope Ids (top-level and
+                -- ^ Binds all non-top-level in-scope Ids (top-level and
                 -- imported things have a level of zero)
 
         lc_rec_env :: IdEnv CoreBind,
-                -- Binds *only* recursively defined ids, to their own
+                -- ^ Binds *only* recursively defined ids, to their own
                 -- binding group, and *only* in their own RHSs
 
         lc_scruts :: [(Id, LibCaseLevel, LibCaseLevel)]
-                -- Each of these Ids was scrutinised by an enclosing
+                -- ^ Each of these Ids was scrutinised by an enclosing
                 -- case expression, at a level deeper than its binding
                 -- level.
                 --
@@ -426,17 +442,3 @@ data LibCaseEnv
                 --    although that'd be unusual:
                 --       case x of { (a,b) -> ....(case x of ...) .. }
         }
-
-initEnv :: DynFlags -> LibCaseEnv
-initEnv dflags
-  = LibCaseEnv { lc_dflags = dflags,
-                 lc_lvl = 0,
-                 lc_lvl_env = emptyVarEnv,
-                 lc_rec_env = emptyVarEnv,
-                 lc_scruts = [] }
-
--- Bomb-out size for deciding if
--- potential liberatees are too big.
--- (passed in from cmd-line args)
-bombOutSize :: LibCaseEnv -> Maybe Int
-bombOutSize = liberateCaseThreshold . lc_dflags

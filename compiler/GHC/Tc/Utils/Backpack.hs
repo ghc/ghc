@@ -68,6 +68,7 @@ import GHC.Tc.Errors
 import GHC.Tc.Utils.Unify
 import GHC.Iface.Rename
 import GHC.Utils.Misc
+import GHC.Unit.State
 
 import Control.Monad
 import Data.List (find)

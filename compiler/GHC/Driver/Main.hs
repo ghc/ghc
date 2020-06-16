@@ -102,6 +102,7 @@ import GHC.Core.ConLike
 
 import GHC.Parser.Annotation
 import GHC.Unit
+import GHC.Unit.State
 import GHC.Types.Name.Reader
 import GHC.Hs
 import GHC.Hs.Dump

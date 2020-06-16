@@ -47,7 +47,7 @@ import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Core
 import GHC.Core.Utils
-import GHC.Core.Unfold
+import GHC.Core.Unfold.Make
 import GHC.Core.Lint
 import GHC.Core.Make
 import GHC.Types.Id
@@ -1544,13 +1544,13 @@ tcLFInfo lfi = case lfi of
 
 tcUnfolding :: TopLevelFlag -> Name -> Type -> IdInfo -> IfaceUnfolding -> IfL Unfolding
 tcUnfolding toplvl name _ info (IfCoreUnfold stable if_expr)
-  = do  { dflags <- getDynFlags
+  = do  { uf_opts <- unfoldingOpts <$> getDynFlags
         ; mb_expr <- tcPragExpr False toplvl name if_expr
         ; let unf_src | stable    = InlineStable
                       | otherwise = InlineRhs
         ; return $ case mb_expr of
             Nothing -> NoUnfolding
-            Just expr -> mkFinalUnfolding dflags unf_src strict_sig expr
+            Just expr -> mkFinalUnfolding uf_opts unf_src strict_sig expr
         }
   where
     -- Strictness should occur before unfolding!
@@ -1560,7 +1560,7 @@ tcUnfolding toplvl name _ _ (IfCompulsory if_expr)
   = do  { mb_expr <- tcPragExpr True toplvl name if_expr
         ; return (case mb_expr of
                     Nothing   -> NoUnfolding
-                    Just expr -> mkCompulsoryUnfolding expr) }
+                    Just expr -> mkCompulsoryUnfolding' expr) }
 
 tcUnfolding toplvl name _ _ (IfInlineRule arity unsat_ok boring_ok if_expr)
   = do  { mb_expr <- tcPragExpr False toplvl name if_expr

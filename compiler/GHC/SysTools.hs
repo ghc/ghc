@@ -43,6 +43,7 @@ import GHC.Prelude
 import GHC.Settings.Utils
 
 import GHC.Unit
+import GHC.Unit.State
 import GHC.Utils.Error
 import GHC.Utils.Panic
 import GHC.Utils.Outputable

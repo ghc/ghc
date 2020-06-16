@@ -250,6 +250,7 @@ import GHC.Driver.Flags
 import GHC.Driver.Backend
 import GHC.Settings.Config
 import GHC.Utils.CliOption
+import {-# SOURCE #-} GHC.Core.Unfold
 import GHC.Driver.CmdLine hiding (WarnReason(..))
 import qualified GHC.Driver.CmdLine as Cmd
 import GHC.Settings.Constants
@@ -693,14 +694,9 @@ data DynFlags = DynFlags {
   -- by template-haskell
   extensionFlags        :: EnumSet LangExt.Extension,
 
-  -- Unfolding control
+  -- | Unfolding control
   -- See Note [Discounts and thresholds] in GHC.Core.Unfold
-  ufCreationThreshold   :: Int,
-  ufUseThreshold        :: Int,
-  ufFunAppDiscount      :: Int,
-  ufDictDiscount        :: Int,
-  ufDearOp              :: Int,
-  ufVeryAggressive      :: Bool,
+  unfoldingOpts         :: !UnfoldingOpts,
 
   maxWorkerArgs         :: Int,
 
@@ -1303,25 +1299,7 @@ defaultDynFlags mySettings llvmConfig =
         extensions = [],
         extensionFlags = flattenExtensionFlags Nothing [],
 
-        ufCreationThreshold = 750,
-           -- The ufCreationThreshold threshold must be reasonably high
-           -- to take account of possible discounts.
-           -- E.g. 450 is not enough in 'fulsom' for Interval.sqr to
-           -- inline into Csg.calc (The unfolding for sqr never makes it
-           -- into the interface file.)
-
-        ufUseThreshold = 90,
-           -- Last adjusted upwards in #18282, when I reduced
-           -- the result discount for constructors.
-
-        ufFunAppDiscount = 60,
-           -- Be fairly keen to inline a function if that means
-           -- we'll be able to pick the right method from a dictionary
-
-        ufDictDiscount      = 30,
-        ufDearOp            = 40,
-        ufVeryAggressive    = False,
-
+        unfoldingOpts = defaultUnfoldingOpts,
         maxWorkerArgs = 10,
 
         ghciHistSize = 50, -- keep a log of length 50 by default
@@ -2893,17 +2871,20 @@ dynamic_flags_deps = [
                 parseWeights s (cfgWeights d)})))
   , make_ord_flag defFlag "fhistory-size"
       (intSuffix (\n d -> d { historySize = n }))
+
   , make_ord_flag defFlag "funfolding-creation-threshold"
-      (intSuffix   (\n d -> d {ufCreationThreshold = n}))
+      (intSuffix   (\n d -> d { unfoldingOpts = updateCreationThreshold n (unfoldingOpts d)}))
   , make_ord_flag defFlag "funfolding-use-threshold"
-      (intSuffix   (\n d -> d {ufUseThreshold = n}))
+      (intSuffix   (\n d -> d { unfoldingOpts = updateUseThreshold n (unfoldingOpts d)}))
   , make_ord_flag defFlag "funfolding-fun-discount"
-      (intSuffix   (\n d -> d {ufFunAppDiscount = n}))
+      (intSuffix   (\n d -> d { unfoldingOpts = updateFunAppDiscount n (unfoldingOpts d)}))
   , make_ord_flag defFlag "funfolding-dict-discount"
-      (intSuffix   (\n d -> d {ufDictDiscount = n}))
+      (intSuffix   (\n d -> d { unfoldingOpts = updateDictDiscount n (unfoldingOpts d)}))
+
   , make_dep_flag defFlag "funfolding-keeness-factor"
       (floatSuffix (\_ d -> d))
       "-funfolding-keeness-factor is no longer respected as of GHC 8.12"
+
   , make_ord_flag defFlag "fmax-worker-args"
       (intSuffix (\n d -> d {maxWorkerArgs = n}))
   , make_ord_flag defGhciFlag "fghci-hist-size"

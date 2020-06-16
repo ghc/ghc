@@ -41,6 +41,7 @@ import GHC.Runtime.Interpreter
 import GHC.Runtime.Interpreter.Types
 import GHCi.RemoteTypes
 import GHCi.BreakArray
+import GHC.Unit.State
 import GHC.Driver.Session as DynFlags
 import GHC.Driver.Ppr hiding (printForUser)
 import GHC.Utils.Error hiding (traceCmd)

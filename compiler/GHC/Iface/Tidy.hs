@@ -22,6 +22,7 @@ import GHC.Driver.Backend
 import GHC.Driver.Ppr
 import GHC.Core
 import GHC.Core.Unfold
+import GHC.Core.Unfold.Make
 import GHC.Core.FVs
 import GHC.Core.Tidy
 import GHC.Core.Opt.Monad
@@ -381,8 +382,9 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
         ; let { (trimmed_binds, trimmed_rules)
                     = findExternalRules omit_prags binds imp_rules unfold_env }
 
+        ; let uf_opts = unfoldingOpts dflags
         ; (tidy_env, tidy_binds)
-                 <- tidyTopBinds hsc_env unfold_env tidy_occ_env trimmed_binds
+                 <- tidyTopBinds uf_opts unfold_env tidy_occ_env trimmed_binds
 
           -- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
         ; (spt_entries, tidy_binds') <-
@@ -1108,43 +1110,41 @@ tidyTopName mod nc_var maybe_ref occ_env id
 --
 --   * subst_env: A Var->Var mapping that substitutes the new Var for the old
 
-tidyTopBinds :: HscEnv
+tidyTopBinds :: UnfoldingOpts
              -> UnfoldEnv
              -> TidyOccEnv
              -> CoreProgram
              -> IO (TidyEnv, CoreProgram)
 
-tidyTopBinds hsc_env unfold_env init_occ_env binds
+tidyTopBinds uf_opts unfold_env init_occ_env binds
   = do let result = tidy init_env binds
        seqBinds (snd result) `seq` return result
        -- This seqBinds avoids a spike in space usage (see #13564)
   where
-    dflags = hsc_dflags hsc_env
-
     init_env = (init_occ_env, emptyVarEnv)
 
-    tidy = mapAccumL (tidyTopBind dflags unfold_env)
+    tidy = mapAccumL (tidyTopBind uf_opts unfold_env)
 
 ------------------------
-tidyTopBind  :: DynFlags
+tidyTopBind  :: UnfoldingOpts
              -> UnfoldEnv
              -> TidyEnv
              -> CoreBind
              -> (TidyEnv, CoreBind)
 
-tidyTopBind dflags unfold_env
+tidyTopBind uf_opts unfold_env
             (occ_env,subst1) (NonRec bndr rhs)
   = (tidy_env2,  NonRec bndr' rhs')
   where
     Just (name',show_unfold) = lookupVarEnv unfold_env bndr
-    (bndr', rhs') = tidyTopPair dflags show_unfold tidy_env2 name' (bndr, rhs)
+    (bndr', rhs') = tidyTopPair uf_opts show_unfold tidy_env2 name' (bndr, rhs)
     subst2        = extendVarEnv subst1 bndr bndr'
     tidy_env2     = (occ_env, subst2)
 
-tidyTopBind dflags unfold_env (occ_env, subst1) (Rec prs)
+tidyTopBind uf_opts unfold_env (occ_env, subst1) (Rec prs)
   = (tidy_env2, Rec prs')
   where
-    prs' = [ tidyTopPair dflags show_unfold tidy_env2 name' (id,rhs)
+    prs' = [ tidyTopPair uf_opts show_unfold tidy_env2 name' (id,rhs)
            | (id,rhs) <- prs,
              let (name',show_unfold) =
                     expectJust "tidyTopBind" $ lookupVarEnv unfold_env id
@@ -1156,7 +1156,7 @@ tidyTopBind dflags unfold_env (occ_env, subst1) (Rec prs)
     bndrs = map fst prs
 
 -----------------------------------------------------------
-tidyTopPair :: DynFlags
+tidyTopPair :: UnfoldingOpts
             -> Bool  -- show unfolding
             -> TidyEnv  -- The TidyEnv is used to tidy the IdInfo
                         -- It is knot-tied: don't look at it!
@@ -1169,14 +1169,14 @@ tidyTopPair :: DynFlags
         -- group, a variable late in the group might be mentioned
         -- in the IdInfo of one early in the group
 
-tidyTopPair dflags show_unfold rhs_tidy_env name' (bndr, rhs)
+tidyTopPair uf_opts show_unfold rhs_tidy_env name' (bndr, rhs)
   = (bndr1, rhs1)
   where
     bndr1    = mkGlobalId details name' ty' idinfo'
     details  = idDetails bndr   -- Preserve the IdDetails
     ty'      = tidyTopType (idType bndr)
     rhs1     = tidyExpr rhs_tidy_env rhs
-    idinfo'  = tidyTopIdInfo dflags rhs_tidy_env name' rhs rhs1 (idInfo bndr)
+    idinfo'  = tidyTopIdInfo uf_opts rhs_tidy_env name' rhs rhs1 (idInfo bndr)
                              show_unfold
 
 -- tidyTopIdInfo creates the final IdInfo for top-level
@@ -1186,9 +1186,9 @@ tidyTopPair dflags show_unfold rhs_tidy_env name' (bndr, rhs)
 --      Indeed, CorePrep must eta expand where necessary to make
 --      the manifest arity equal to the claimed arity.
 --
-tidyTopIdInfo :: DynFlags -> TidyEnv -> Name -> CoreExpr -> CoreExpr
+tidyTopIdInfo :: UnfoldingOpts -> TidyEnv -> Name -> CoreExpr -> CoreExpr
               -> IdInfo -> Bool -> IdInfo
-tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
+tidyTopIdInfo uf_opts rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
   | not is_external     -- For internal Ids (not externally visible)
   = vanillaIdInfo       -- we only need enough info for code generation
                         -- Arity and strictness info are enough;
@@ -1245,7 +1245,7 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
       | otherwise
       = minimal_unfold_info
     minimal_unfold_info = zapUnfolding unf_info
-    unf_from_rhs = mkFinalUnfolding dflags InlineRhs final_sig tidy_rhs
+    unf_from_rhs = mkFinalUnfolding uf_opts InlineRhs final_sig tidy_rhs
     -- NB: do *not* expose the worker if show_unfold is off,
     --     because that means this thing is a loop breaker or
     --     marked NOINLINE or something like that

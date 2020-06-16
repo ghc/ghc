@@ -20,6 +20,7 @@ import GHC.Tc.Types
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Unit
+import GHC.Unit.State
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Types.Unique.Set
