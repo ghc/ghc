@@ -608,7 +608,7 @@ mkDataConWrapperOcc, mkWorkerOcc,
         mkGenR, mkGen1R,
         mkDataConWorkerOcc, mkNewTyCoOcc,
         mkInstTyCoOcc, mkEqPredCoOcc, mkClassOpAuxOcc,
-        mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
+        mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc, mkDataTOcc, mkDataCOcc,
         mkTyConRepOcc
    :: OccName -> OccName
 
@@ -629,10 +629,13 @@ mkNewTyCoOcc        = mk_simple_deriv tcName   "N:"   -- Coercion for newtypes
 mkInstTyCoOcc       = mk_simple_deriv tcName   "D:"   -- Coercion for type functions
 mkEqPredCoOcc       = mk_simple_deriv tcName   "$co"
 
--- Used in derived instances
+-- Used in derived instances for the names of auxilary bindings.
+-- See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate.
 mkCon2TagOcc        = mk_simple_deriv varName  "$con2tag_"
 mkTag2ConOcc        = mk_simple_deriv varName  "$tag2con_"
 mkMaxTagOcc         = mk_simple_deriv varName  "$maxtag_"
+mkDataTOcc          = mk_simple_deriv varName  "$t"
+mkDataCOcc          = mk_simple_deriv varName  "$c"
 
 -- TyConRepName stuff; see Note [Grand plan for Typeable] in GHC.Tc.Instance.Typeable
 mkTyConRepOcc occ = mk_simple_deriv varName prefix occ
@@ -696,16 +699,6 @@ mkDFunOcc info_str is_boot set
   where
     prefix | is_boot   = "$fx"
            | otherwise = "$f"
-
-mkDataTOcc, mkDataCOcc
-  :: OccName            -- ^ TyCon or data con string
-  -> OccSet             -- ^ avoid these Occs
-  -> OccName            -- ^ E.g. @$f3OrdMaybe@
--- data T = MkT ... deriving( Data ) needs definitions for
---      $tT   :: Data.Generics.Basics.DataType
---      $cMkT :: Data.Generics.Basics.Constr
-mkDataTOcc occ = chooseUniqueOcc VarName ("$t" ++ occNameString occ)
-mkDataCOcc occ = chooseUniqueOcc VarName ("$c" ++ occNameString occ)
 
 {-
 Sometimes we need to pick an OccName that has not already been used,
