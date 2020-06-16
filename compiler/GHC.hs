@@ -313,6 +313,7 @@ import GHC.Iface.Load        ( loadSysInterface )
 import GHC.Tc.Types
 import GHC.Core.Predicate
 import GHC.Unit
+import GHC.Unit.State
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Hs

@@ -34,6 +34,7 @@ import GHC.Core.Utils      ( mkLamTypes )
 import GHC.Core.Coercion.Opt
 import GHC.Types.Unique.Supply
 import GHC.Driver.Session
+import GHC.Driver.Config
 import GHC.Core.Opt.Monad
 import GHC.Utils.Outputable
 import GHC.Data.FastString
@@ -98,12 +99,11 @@ initSmpl dflags rules fam_envs us size m
   = do (result, _, count) <- unSM m env us (zeroSimplCount dflags)
        return (result, count)
   where
-    env = STE { st_flags = dflags, st_rules = rules
+    env = STE { st_flags = dflags
+              , st_rules = rules
               , st_max_ticks = computeMaxTicks dflags size
               , st_fams = fam_envs
-              , st_co_opt_opts = OptCoercionOpts
-                  { optCoercionEnabled = not (hasNoOptCoercion dflags)
-                  }
+              , st_co_opt_opts = initOptCoercionOpts dflags
               }
 
 computeMaxTicks :: DynFlags -> Int -> IntWithInf

@@ -41,6 +41,7 @@ import GHC.Prelude
 
 import GHC.Driver.Pipeline.Monad
 import GHC.Unit
+import GHC.Unit.State
 import GHC.Platform.Ways
 import GHC.Platform.ArchOS
 import GHC.Parser.Header
