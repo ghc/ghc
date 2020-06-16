@@ -43,6 +43,7 @@ import GHC.Prelude
 import GHC.Settings.Utils
 
 import GHC.Unit
+import GHC.Unit.State
 import GHC.Utils.Outputable
 import GHC.Utils.Error
 import GHC.Platform
