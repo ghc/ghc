@@ -774,6 +774,9 @@ handle_get_console_size hwnd =
 -- -----------------------------------------------------------------------------
 -- opening files
 
+-- | Describes if and which temp file flags to use.
+data TempFileOptions = NoTemp | TempNonExcl | TempExcl deriving Eq
+
 -- | Open a file and make an 'NativeHandle' for it.  Truncates the file to zero
 -- size when the `IOMode` is `WriteMode`.
 openFile
@@ -781,7 +784,27 @@ openFile
   -> IOMode   -- ^ mode in which to open the file
   -> Bool     -- ^ open the file in non-blocking mode?
   -> IO (Io NativeHandle, IODeviceType)
-openFile filepath iomode non_blocking =
+openFile filepath iomode non_blocking = openFile' filepath iomode non_blocking NoTemp
+
+-- | Open a file as a temporary file and make an 'NativeHandle' for it.
+-- Truncates the file to zero size when the `IOMode` is `WriteMode`.
+openFileAsTemp
+  :: FilePath -- ^ file to open
+  -> Bool     -- ^ open the file in non-blocking mode?
+  -> Bool     -- ^ Exclusive mode
+  -> IO (Io NativeHandle, IODeviceType)
+openFileAsTemp filepath non_blocking excl
+  = openFile' filepath ReadWriteMode non_blocking (if excl then TempExcl else TempNonExcl)
+
+-- | Open a file and make an 'NativeHandle' for it.  Truncates the file to zero
+-- size when the `IOMode` is `WriteMode`.
+openFile'
+  :: FilePath -- ^ file to open
+  -> IOMode   -- ^ mode in which to open the file
+  -> Bool     -- ^ open the file in non-blocking mode?
+  -> TempFileOptions
+  -> IO (Io NativeHandle, IODeviceType)
+openFile' filepath iomode non_blocking tmp_opts =
    do devicepath <- getDevicePath filepath
       h <- createFile devicepath
       -- Attach the handle to the I/O manager's CompletionPort.  This allows the
@@ -816,12 +839,17 @@ openFile filepath iomode non_blocking =
 
       return (hwnd, _type)
         where
+          flagIf p f2
+            | p         = f2
+            | otherwise = 0
           -- We have to use in-process locking (e.g. use the locking mechanism
           -- in the rts) so we're consistent with the linux behavior and the
           -- rts knows about the lock.  See #4363 for more.
           file_share_mode =  #{const FILE_SHARE_READ}
-                         .|. #{const FILE_SHARE_WRITE}
                          .|. #{const FILE_SHARE_DELETE}
+                         -- Don't support shared writing for temp files.
+                         .|. (flagIf (tmp_opts == NoTemp)
+                                     #{const FILE_SHARE_WRITE})
 
           file_access_mode =
             case iomode of
@@ -836,7 +864,11 @@ openFile filepath iomode non_blocking =
             case iomode of
               ReadMode      -> #{const OPEN_EXISTING} -- O_RDONLY
               WriteMode     -> #{const OPEN_ALWAYS}   -- O_CREAT | O_WRONLY | O_TRUNC
-              ReadWriteMode -> #{const OPEN_ALWAYS}   -- O_CREAT | O_RDWR
+              ReadWriteMode ->
+                case tmp_opts of
+                  NoTemp    -> #{const OPEN_ALWAYS}   -- O_CREAT | O_RDWR
+                  TempNonExcl ->  #{const CREATE_ALWAYS} -- O_CREAT | O_RDWR
+                  TempExcl  -> #{const CREATE_NEW}    -- O_CREAT | O_RDWR | O_EXCL
               AppendMode    -> #{const OPEN_ALWAYS}   -- O_APPEND
 
           file_create_flags =
@@ -860,76 +892,13 @@ openFile filepath iomode non_blocking =
                     -- operations we know are sequential.  This parameter should
                     -- be usable by madvise too.
                     .|. #{const FILE_FLAG_SEQUENTIAL_SCAN}
+                    .|. (flagIf (tmp_opts /= NoTemp)
+                                -- Hold data in cache for as long as possible
+                                #{const FILE_ATTRIBUTE_TEMPORARY} )
                else #{const FILE_ATTRIBUTE_NORMAL}
-
-          createFile devicepath =
-            withCWString devicepath $ \fp ->
-                failIf (== iNVALID_HANDLE_VALUE) "CreateFile" $
-                      c_CreateFile fp file_access_mode
-                                      file_share_mode
-                                      nullPtr
-                                      file_open_mode
-                                      file_create_flags
-                                      nullPtr
-
--- | Open a file as a temporary file and make an 'NativeHandle' for it.
--- Truncates the file to zero size when the `IOMode` is `WriteMode`.
-openFileAsTemp
-  :: FilePath -- ^ file to open
-  -> Bool     -- ^ open the file in non-blocking mode?
-  -> Bool     -- ^ Exclusive mode
-  -> IO (Io NativeHandle, IODeviceType)
-openFileAsTemp filepath non_blocking excl =
-   do devicepath <- getDevicePath filepath
-      h <- createFile devicepath
-      -- Attach the handle to the I/O manager's CompletionPort.  This allows the
-      -- I/O manager to service requests for this Handle.
-      Mgr.associateHandle' h
-      let hwnd = fromHANDLE h
-      _type <- devType hwnd
-
-      -- Use the rts to enforce any file locking we may need.
-      let write_lock = True
-
-      case _type of
-        -- Regular files need to be locked.
-        RegularFile -> do
-          optimizeFileAccess h -- Set a few optimization flags on file handles.
-          (unique_dev, unique_ino) <- getUniqueFileInfo hwnd
-          r <- lockFile (fromIntegral $ ptrToWordPtr h) unique_dev unique_ino
-                        (fromBool write_lock)
-          when (r == -1)  $
-               ioException (IOError Nothing ResourceBusy "openFile"
-                                  "file is locked" Nothing Nothing)
-
-        _ -> return ()
-
-      return (hwnd, _type)
-        where
-          -- We have to use in-process locking (e.g. use the locking mechanism
-          -- in the rts) so we're consistent with the linux behavior and the
-          -- rts knows about the lock.  See #4363 for more.
-          file_share_mode =  #{const FILE_SHARE_READ}
-                         .|. #{const FILE_SHARE_DELETE}
-
-          file_access_mode =  #{const GENERIC_READ}
-                            .|. #{const GENERIC_WRITE}
-
-          file_open_mode =
-            case excl of
-              True      -> #{const CREATE_NEW}    -- O_CREAT | O_RDWR | O_EXCL
-              False     -> #{const CREATE_ALWAYS} -- O_CREAT | O_RDWR
-
-          file_create_flags =
-            if non_blocking
-               then #{const FILE_FLAG_OVERLAPPED}
-                    -- Open temp files sequentially
-                    .|. #{const FILE_FLAG_SEQUENTIAL_SCAN}
-                    -- Hold data in cache for as long as possible
-                    .|. #{const FILE_ATTRIBUTE_TEMPORARY}
-               else #{const FILE_ATTRIBUTE_NORMAL}
-                    -- Hold data in cache for as long as possible
-                    .|. #{const FILE_ATTRIBUTE_TEMPORARY}
+                    .|. (flagIf (tmp_opts /= NoTemp)
+                                -- Hold data in cache for as long as possible
+                                #{const FILE_ATTRIBUTE_TEMPORARY} )
 
           createFile devicepath =
             withCWString devicepath $ \fp ->
@@ -954,14 +923,13 @@ optimizeFileAccess handle =
 handleToMode :: HANDLE -> IO IOMode
 handleToMode hwnd = do
   mask <- c_get_handle_access_mask hwnd
-  let flag = flagOn mask
+  let hasFlag flag = (flag .&. mask) == flag
   case () of
-    () | flag (#{const FILE_APPEND_DATA})                        -> return AppendMode
-       | flag (#{const GENERIC_WRITE} .|. #{const GENERIC_READ}) -> return ReadWriteMode
-       | flag (#{const GENERIC_READ})                            -> return ReadMode
-       | flag (#{const GENERIC_WRITE})                           -> return WriteMode
+    () | hasFlag (#{const FILE_APPEND_DATA})                        -> return AppendMode
+       | hasFlag (#{const GENERIC_WRITE} .|. #{const GENERIC_READ}) -> return ReadWriteMode
+       | hasFlag (#{const GENERIC_READ})                            -> return ReadMode
+       | hasFlag (#{const GENERIC_WRITE})                           -> return WriteMode
        | otherwise -> error "unknown access mask in handleToMode."
-    where flagOn mask v = (v .&. mask) == v
 
 foreign import ccall unsafe "__get_handle_access_mask"
   c_get_handle_access_mask :: HANDLE -> IO DWORD
