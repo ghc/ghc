@@ -191,10 +191,14 @@ markAnnotated a = enterAnn (getApiAnnotation a) a
 data Entry = Entry RealSrcSpan [RealLocated AnnotationComment]
            | NoEntryVal
 
+instance (HasEntry (ApiAnn' ann)) =>  HasEntry (SrcSpanAnn' (ApiAnn' ann)) where
+  fromAnn (SrcSpanAnn ApiAnnNotUsed ss) = Entry (realSrcSpan ss) []
+  fromAnn (SrcSpanAnn ann _) = fromAnn ann
+
 instance HasEntry (ApiAnn' a) where
-  -- fromAnn :: ApiAnn -> Entry
   fromAnn (ApiAnn anchor _ cs) = Entry anchor cs
   fromAnn ApiAnnNotUsed = NoEntryVal
+
 
 -- instance HasEntry ApiAnnCO where
 --   fromAnn :: ApiAnnCO -> Entry
@@ -210,6 +214,7 @@ enterAnn NoEntryVal a = do
   debugM $ "enterAnn:NO ANN:p =" ++ show p
   exact a
 enterAnn (Entry anchor cs) a = do
+  printComments anchor
   p <- getPos
   debugM $ "enterAnn:(anchor(pos),p)=" ++ show (ss2pos(anchor),p)
   -- do all the machinery of advancing to the anchor, with a local etc
@@ -219,7 +224,7 @@ enterAnn (Entry anchor cs) a = do
   -- the current position, and the anchor.
   -- off <- gets apLayoutStart
   off <- gets epLHS
-  priorEndAfterComments <- getPriorEnd
+  priorEndAfterComments <- getPos
   let ss = anchor
   let edp = adjustDeltaForOffset
               -- Use the propagated offset if one is set
@@ -292,12 +297,9 @@ withPpr a = printString False (showGhc a)
 -- | Modeled on Outputable
 
 class ExactPrint a where
-  exact :: a -> Annotated ()
   getApiAnnotation :: a -> Entry
+  exact :: a -> Annotated ()
   -- exactPrint :: ApiAnn -> a -> Annotated ()
-
--- class Data ast => Annotate ast where
---   markAST :: SrcSpan -> ast -> Annotated ()
 
 -- ---------------------------------------------------------------------
 
@@ -310,9 +312,9 @@ instance (ExactPrint a) => ExactPrint (Located a) where
 -- instance ExactPrint (LocatedA RdrName) where
 --   exact (L l n) = withPpr n
 
-instance ExactPrint RdrName where
-  getApiAnnotation _ = NoEntryVal
-  exact = withPpr
+-- instance ExactPrint RdrName where
+--   getApiAnnotation _ = NoEntryVal
+--   exact = withPpr
 
 -- ---------------------------------------------------------------------
 -- ParsedSource
@@ -330,7 +332,7 @@ instance ExactPrint HsModule where
         markApiAnn anns AnnModule
         -- markExternal ln AnnVal (moduleNameString mn)
         debugM $ "HsModule name: (ss,ln)=" ++ show (ss2pos ss,ss2pos (realSrcSpan ln))
-        printStringAtSs ss ln (moduleNameString mn)
+        printStringAtSs ln (moduleNameString mn)
 
         -- forM_ mdeprec markLocated
 
@@ -351,14 +353,10 @@ instance ExactPrint HsModule where
 
     -- markEOF
     eof <- getEofPos
-    printStringAt eof ""
+    printStringAtKw' eof ""
 
-printStringAtSs :: RealSrcSpan -> SrcSpan -> String -> EPP ()
-printStringAtSs anchor (RealSrcSpan ss _) str = do
-  dp <- nextDP ss
-  p <- getPos
-  debugM $ "printStringAtSs: (dp,p) = " ++ show (dp,p)
-  printStringAtLsDelta [] dp str
+printStringAtSs :: SrcSpan -> String -> EPP ()
+printStringAtSs ss str = printStringAtKw' (realSrcSpan ss) str
 
 -- ---------------------------------------------------------------------
 
@@ -371,6 +369,7 @@ printStringAtSs anchor (RealSrcSpan ss _) str = do
 
 printStringAtKw' :: RealSrcSpan -> String -> EPP ()
 printStringAtKw' ss str = do
+  printComments ss
   dp <- nextDP ss
   p <- getPos
   debugM $ "printStringAtKw': (dp,p) = " ++ show (dp,p)
@@ -401,9 +400,7 @@ mark anns kw = do
 markKw :: AddApiAnn -> EPP ()
 markKw (AddApiAnn kw ss) = do
   p' <- getPos
-  cs <- commentAllocation ss
-  debugM $ "markKw: (ss,comment locations): " ++ showGhc (ss,map (commentIdentifier . fst) cs)
-  mapM_ (uncurry printQueuedComment) cs
+  printComments ss
   dp <- nextDP ss
   p <- getPos
   debugM $ "markKw: (dp,p,p') = " ++ show (dp,p,p')
@@ -411,13 +408,36 @@ markKw (AddApiAnn kw ss) = do
 
 -- ---------------------------------------------------------------------
 
-commentAllocation :: RealSrcSpan -> EPP [(Comment, DeltaPos)]
+printTrailingComments :: EPP ()
+printTrailingComments = do
+  cs <- getUnallocatedComments
+  mapM_ printOneComment cs
+
+-- ---------------------------------------------------------------------
+
+printComments :: RealSrcSpan -> EPP ()
+printComments ss = do
+  cs <- commentAllocation ss
+  debugM $ "printComments: (ss,comment locations): " ++ showGhc (ss,map commentIdentifier cs)
+  mapM_ printOneComment cs
+
+-- ---------------------------------------------------------------------
+
+printOneComment :: Comment -> EPP ()
+printOneComment c@(Comment _str loc _mo) = do
+  p <- getPos
+  let dp = ss2delta p loc
+  printQueuedComment c dp
+
+-- ---------------------------------------------------------------------
+
+commentAllocation :: RealSrcSpan -> EPP [Comment]
 commentAllocation ss = do
   p <- getPos
   cs <- getUnallocatedComments
   let (earlier,later) = partition (\(Comment _str loc _mo) -> loc <= ss) cs
   putUnallocatedComments later
-  return $ map (\c@(Comment _str loc _mo) -> (c, ss2delta p loc)) earlier
+  return earlier
 
 -- ---------------------------------------------------------------------
 
@@ -438,20 +458,6 @@ commentAllocation ss = do
 --   setPriorEnd (ss2posEnd pa)
 --   return (c, p')
 
-
--- ---------------------------------------------------------------------
-
-markLocatedA :: (ExactPrint a) => LocatedA a -> EPP ()
-markLocatedA (L (SrcSpanAnn ann l) a) = do
-  debugM $ "markLocatedA:ann=" ++ showGhc ann
-  exact a
-
--- ---------------------------------------------------------------------
-
-markLocatedN :: (ExactPrint a) => LocatedN a -> EPP ()
-markLocatedN (L (SrcSpanAnn ann l) a) = do
-  debugM $ "markLocatedN:ann=" ++ showGhc ann
-  exact a
 
 -- ---------------------------------------------------------------------
 
@@ -614,7 +620,8 @@ instance ExactPrint (Match GhcPs (LHsExpr GhcPs)) where
     case mctxt of
       FunRhs fun fix str -> do
         debugM $ "exact Match FunRhs:" ++ showGhc fun
-        markLocatedN fun
+        -- exact fun
+        markAnnotated fun
       _ -> withPpr mctxt
 
     case grhs of
@@ -765,8 +772,11 @@ instance ExactPrint (HsExpr GhcPs) where
 -- ---------------------------------------------------------------------
 
 instance ExactPrint (LocatedN RdrName) where
-  getApiAnnotation (L (SrcSpanAnn ann _) _) = fromAnn ann
-  exact (L (SrcSpanAnn ApiAnnNotUsed _) n) = printString False (showGhc n)
+  getApiAnnotation (L sann _) = fromAnn sann
+
+  exact (L (SrcSpanAnn ApiAnnNotUsed ss) n) = do
+    -- printComments (realSrcSpan ss)
+    printString False (showGhc n)
   exact (L (SrcSpanAnn (ApiAnn anchor ann cs) _) n) = do
     case ann of
       NameAnn a o l c t -> do
@@ -1054,12 +1064,12 @@ putUnallocatedComments cs = modify (\s -> s { epComments = cs } )
 getLayoutOffset :: (Monad m, Monoid w) => EP w m LayoutStartCol
 getLayoutOffset = gets epLHS
 
-getEofPos :: (Monad m, Monoid w) => EP w m Pos
+getEofPos :: (Monad m, Monoid w) => EP w m RealSrcSpan
 getEofPos = do
   as <- gets epApiAnns
   case apiAnnEofPos as of
-    Nothing -> return (0,0)
-    Just ss -> return (ss2pos ss)
+    Nothing -> return placeholderRealSpan
+    Just ss -> return ss
 
 -- ---------------------------------------------------------------------
 -------------------------------------------------------------------------
@@ -1168,4 +1178,4 @@ printCommentAt p str = do
   printWhitespace p >> printString False str
 
 printStringAt :: (Monad m, Monoid w) => Pos -> String -> EP w m ()
-printStringAt p str = printWhitespace p >> printString True str
+printStringAt p str = printWhitespace p >> printString False str

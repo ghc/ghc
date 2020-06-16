@@ -60,7 +60,10 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
               `extQ` dataCon
               `extQ` bagName `extQ` bagRdrName `extQ` bagVar `extQ` nameSet
               `extQ` fixity
-              `ext2Q` located
+              `ext1Q` locatedA
+              `ext1Q` locatedL
+              `ext1Q` locatedC
+              `ext1Q` locatedN
 
       where generic :: Data a => a -> SDoc
             generic t = parens $ text (showConstr (toConstr t))
@@ -188,17 +191,29 @@ showAstData bs ba a0 = blankLine $$ showAstData' a0
                          text "Fixity: "
                       <> ppr fx
 
-            located :: (Data b,Data loc) => GenLocated loc b -> SDoc
-            located (L ss a) = parens $
-                   case cast ss of
-                        Just (s :: SrcSpan) ->
-                          srcSpan s
-                        Nothing -> case cast ss of
-                          Just ((SrcSpanAnn a s) :: SrcSpanAnn) ->
-                            text "SrcSpanAnn" <+> showAstData' a <+> srcSpan s
-                          Nothing -> text "nnnnnnnn"
-                      $$ showAstData' a
+            locatedA :: (Data a) => LocatedA  a -> SDoc
+            locatedA = locatedAnn (text "LocatedA")
 
+            locatedL :: (Data a) => LocatedL  a -> SDoc
+            locatedL = locatedAnn (text "LocatedL")
+
+            locatedC :: (Data a) => LocatedC  a -> SDoc
+            locatedC = locatedAnn (text "LocatedC")
+
+            locatedN :: (Data a) => LocatedN  a -> SDoc
+            locatedN = locatedAnn (text "LocatedN")
+
+            locatedAnn :: forall a b.(Data b,Data a, Typeable a)
+                       => SDoc -> GenLocated (SrcSpanAnn' a) b -> SDoc
+            locatedAnn tag (L ss a) = parens $
+                   case cast ss of
+                     Just (s :: SrcSpan) ->
+                       srcSpan s
+                     Nothing -> case cast ss of
+                       Just ((SrcSpanAnn ann s) :: SrcSpanAnn' a) ->
+                         text "SrcSpanAnn" <+> showAstData' ann <+> srcSpan s
+                       Nothing -> tag <+> (parens $ text (showConstr (toConstr ss)))
+                   $$ showAstData' a
 
 normalize_newlines :: String -> String
 normalize_newlines ('\\':'r':'\\':'n':xs) = '\\':'n':normalize_newlines xs

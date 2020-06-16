@@ -10,9 +10,9 @@ import GHC.Utils.Outputable hiding (space)
 import System.Environment( getArgs )
 import System.Exit
 import System.FilePath
--- import ExactPrint
-exactPrint = undefined
-showGhc = undefined
+import ExactPrint
+-- exactPrint = undefined
+-- showGhc = undefined
 
 -- ---------------------------------------------------------------------
 
@@ -69,6 +69,7 @@ testOneFile libdir fileName = do
                                                          (pm_parsed_source p')
        writeFile newAstFile newAstStr
 
+       putStrLn $ "\n\nanns':" ++ showGhc (apiAnnRogueComments anns')
 
        if origAst == newAstStr
          then do
