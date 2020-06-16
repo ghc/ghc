@@ -199,11 +199,11 @@ newHscEnv dflags = do
     fc_var  <- newIORef emptyInstalledModuleEnv
     emptyDynLinker <- uninitializedLinker
     return HscEnv
-      { hsc_internalUnitEnv = M.singleton (thisUnitId dflags) $ InternalUnitEnv
+      { hsc_internalUnitEnv = M.singleton (homeUnitId dflags) $ InternalUnitEnv
           { internalUnitEnv_dflags = dflags
           , internalUnitEnv_homePackageTable = emptyHomePackageTable
           }
-      , hsc_currentPackage  = thisUnitId dflags
+      , hsc_currentPackage  = homeUnitId dflags
       , hsc_targets         = []
       , hsc_mod_graph       = emptyMG
       , hsc_IC              = emptyInteractiveContext dflags

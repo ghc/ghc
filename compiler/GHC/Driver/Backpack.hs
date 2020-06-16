@@ -194,7 +194,7 @@ withBkpSession cid insts deps session_type do_this = do
                   (text "-unit-id" <+> ppr uid <+> ppr rn))
               (UnitIdArg uid) rn) deps
           }
-        iUnitId = thisUnitId dflags
+        iUnitId = homeUnitId dflags
     -- modifySession $ \hsc_env ->
     --     singleton_hsc_unitEnv hsc_env iUnitId
     --         (InternalUnitEnv
@@ -649,7 +649,7 @@ hsunitModuleGraph dflags unit = do
     --  1. Create a HsSrcFile/HsigFile summary for every
     --  explicitly mentioned module/signature.
     let get_decl (L _ (DeclD hsc_src lmodname mb_hsmod)) = do
-          Just `fmap` summariseDecl pn (homeUnit dflags) hsc_src lmodname mb_hsmod
+          Just `fmap` summariseDecl pn (homeUnitId dflags) hsc_src lmodname mb_hsmod
         get_decl _ = return Nothing
     nodes <- catMaybes `fmap` mapM get_decl decls
 

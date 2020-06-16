@@ -82,10 +82,6 @@ addToFinderCache :: IORef FinderCache -> InstalledModule -> InstalledFindResult 
 addToFinderCache ref key val =
   atomicModifyIORef' ref $ \c -> (extendInstalledModuleEnv c key val, ())
 
-removeFromFinderCache :: IORef FinderCache -> InstalledModule -> IO ()
-removeFromFinderCache ref key =
-  atomicModifyIORef' ref $ \c -> (delInstalledModuleEnv c key, ())
-
 lookupFinderCache :: IORef FinderCache -> InstalledModule -> IO (Maybe InstalledFindResult)
 lookupFinderCache ref key = do
    c <- readIORef ref
@@ -134,7 +130,7 @@ findPluginModule hsc_env mod_name =
 findExactModule :: HscEnv -> InstalledModule -> IO InstalledFindResult
 findExactModule hsc_env mod =
     let dflags = hsc_dflags hsc_env
-    in if moduleUnit mod `unitIdEq` thisPackage dflags
+    in if moduleUnit mod `unitIdEq` homeUnit dflags
        then findInstalledHomeModule hsc_env (moduleName mod)
        else findPackageModule hsc_env mod
 
