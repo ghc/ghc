@@ -51,6 +51,7 @@ module GHC.Core.Opt.Monad (
 import GHC.Prelude hiding ( read )
 
 import GHC.Core
+import GHC.Core.Unfold
 import GHC.Driver.Types
 import GHC.Unit.Module
 import GHC.Driver.Session
@@ -159,6 +160,7 @@ data SimplMode             -- See comments in GHC.Core.Opt.Simplify.Monad
         , sm_phase      :: CompilerPhase
         , sm_dflags     :: DynFlags -- Just for convenient non-monadic
                                     -- access; we don't override these
+        , sm_uf_opts    :: !UnfoldingOpts -- ^ Unfolding options
         , sm_rules      :: Bool     -- Whether RULES are enabled
         , sm_inline     :: Bool     -- Whether inlining is enabled
         , sm_case_case  :: Bool     -- Whether case-of-case is enabled

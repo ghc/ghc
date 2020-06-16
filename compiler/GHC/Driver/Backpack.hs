@@ -32,6 +32,7 @@ import GHC.Driver.Session
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Module
 import GHC.Unit
+import GHC.Unit.State
 import GHC.Driver.Types
 import GHC.Data.StringBuffer
 import GHC.Data.FastString

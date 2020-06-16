@@ -158,6 +158,7 @@ import GHC.Tc.Types.Origin
 import GHC.Hs hiding (LIE)
 import GHC.Driver.Types
 import GHC.Unit
+import GHC.Unit.State
 import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Core.UsageEnv
