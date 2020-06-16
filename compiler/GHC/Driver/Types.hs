@@ -88,7 +88,7 @@ module GHC.Driver.Types (
         extendInteractiveContext, extendInteractiveContextWithIds,
         substInteractiveContext,
         setInteractivePrintName, icInteractiveModule,
-        InteractiveImport(..),
+        InteractiveImport(..), setInteractivePackage,
         mkPrintUnqualified, pprModulePrefix,
         mkQualPackage, mkQualModule, pkgQual,
 
