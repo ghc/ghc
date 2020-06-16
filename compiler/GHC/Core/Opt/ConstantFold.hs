@@ -48,7 +48,7 @@ import GHC.Core.TyCon
 import GHC.Core.DataCon ( dataConTagZ, dataConTyCon, dataConWrapId, dataConWorkId )
 import GHC.Core.Utils  ( eqExpr, cheapEqExpr, exprIsHNF, exprType
                        , stripTicksTop, stripTicksTopT, mkTicks )
-import GHC.Core.Unfold ( exprIsConApp_maybe )
+import GHC.Core.SimpleOpt ( exprIsConApp_maybe )
 import GHC.Core.Multiplicity
 import GHC.Core.FVs
 import GHC.Core.Type
