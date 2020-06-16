@@ -42,7 +42,7 @@ import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.Make
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity     ( etaExpand )
-import GHC.Core.Unfold
+import GHC.Core.Unfold.Make
 import GHC.Core.FVs
 import GHC.Data.Graph.Directed
 import GHC.Core.Predicate
@@ -72,6 +72,7 @@ import GHC.Data.Bag
 import GHC.Types.Basic
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Driver.Config
 import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Types.Unique.Set( nonDetEltsUniqSet )
@@ -380,7 +381,7 @@ makeCorePair :: DynFlags -> Id -> Bool -> Arity -> CoreExpr
 makeCorePair dflags gbl_id is_default_method dict_arity rhs
   | is_default_method    -- Default methods are *always* inlined
                          -- See Note [INLINE and default methods] in GHC.Tc.TyCl.Instance
-  = (gbl_id `setIdUnfolding` mkCompulsoryUnfolding rhs, rhs)
+  = (gbl_id `setIdUnfolding` mkCompulsoryUnfolding simpl_opts rhs, rhs)
 
   | otherwise
   = case inlinePragmaSpec inline_prag of
@@ -390,20 +391,21 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
           Inline       -> inline_pair
 
   where
+    simpl_opts    = initSimpleOptOpts dflags
     inline_prag   = idInlinePragma gbl_id
-    inlinable_unf = mkInlinableUnfolding dflags rhs
+    inlinable_unf = mkInlinableUnfolding simpl_opts rhs
     inline_pair
        | Just arity <- inlinePragmaSat inline_prag
         -- Add an Unfolding for an INLINE (but not for NOINLINE)
         -- And eta-expand the RHS; see Note [Eta-expanding INLINE things]
        , let real_arity = dict_arity + arity
         -- NB: The arity in the InlineRule takes account of the dictionaries
-       = ( gbl_id `setIdUnfolding` mkInlineUnfoldingWithArity real_arity rhs
+       = ( gbl_id `setIdUnfolding` mkInlineUnfoldingWithArity real_arity simpl_opts rhs
          , etaExpand real_arity rhs)
 
        | otherwise
        = pprTrace "makeCorePair: arity missing" (ppr gbl_id) $
-         (gbl_id `setIdUnfolding` mkInlineUnfolding rhs, rhs)
+         (gbl_id `setIdUnfolding` mkInlineUnfolding simpl_opts rhs, rhs)
 
 dictArity :: [Var] -> Arity
 -- Don't count coercion variables in arity
@@ -704,8 +706,9 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
 
        { this_mod <- getModule
        ; let fn_unf    = realIdUnfolding poly_id
-             spec_unf  = specUnfolding dflags spec_bndrs core_app rule_lhs_args fn_unf
-             spec_id   = mkLocalId spec_name Many spec_ty -- Specialised binding is toplevel, hence Many.
+             simpl_opts = initSimpleOptOpts dflags
+             spec_unf   = specUnfolding simpl_opts spec_bndrs core_app rule_lhs_args fn_unf
+             spec_id    = mkLocalId spec_name Many spec_ty -- Specialised binding is toplevel, hence Many.
                             `setInlinePragma` inl_prag
                             `setIdUnfolding`  spec_unf
 
@@ -863,8 +866,9 @@ decomposeRuleLhs dflags orig_bndrs orig_lhs
   | otherwise
   = Left bad_shape_msg
  where
+   simpl_opts   = initSimpleOptOpts dflags
    lhs1         = drop_dicts orig_lhs
-   lhs2         = simpleOptExpr dflags lhs1  -- See Note [Simplify rule LHS]
+   lhs2         = simpleOptExpr simpl_opts lhs1  -- See Note [Simplify rule LHS]
    (fun2,args2) = collectArgs lhs2
 
    lhs_fvs    = exprFreeVars lhs2
