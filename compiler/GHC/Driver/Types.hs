@@ -156,6 +156,7 @@ module GHC.Driver.Types (
         readField, readFieldWith, readIfaceField, readIfaceFieldWith,
         writeField, writeFieldWith, writeIfaceField, writeIfaceFieldWith,
         deleteField, deleteIfaceField,
+        registerInterfaceData, registerInterfaceDataWith,
     ) where
 
 #include "HsVersions.h"
@@ -3445,14 +3446,11 @@ deleteField name (ExtensibleFields fs) = ExtensibleFields $ Map.delete name fs
 deleteIfaceField :: FieldName -> ModIface -> ModIface
 deleteIfaceField name iface = iface { mi_ext_fields = deleteField name (mi_ext_fields iface) }
 
-registerInterfaceData :: (Binary a, HasHscEnv m, MonadIO m) => FieldName -> a -> m ()
-registerInterfaceData name x = registerInterfaceDataWith name (`put_` x)
+registerInterfaceData :: Binary a => FieldName -> HscEnv -> a -> IO ()
+registerInterfaceData name env x = registerInterfaceDataWith name env (`put_` x)
 
-registerInterfaceDataWith :: (HasHscEnv m, MonadIO m) => FieldName -> (BinHandle -> IO ()) -> m ()
-registerInterfaceDataWith name write = do
-  env <- getHscEnv
-  let ext_fs_ref = hsc_extensible_fields env
-  liftIO $ do
-    ext_fs  <- readIORef ext_fs_ref
-    ext_fs' <- writeFieldWith name write ext_fs
-    writeIORef ext_fs_ref ext_fs'
+registerInterfaceDataWith :: FieldName -> HscEnv -> (BinHandle -> IO ()) -> IO ()
+registerInterfaceDataWith name env write = do
+  ext_fs  <- readIORef (hsc_extensible_fields env)
+  ext_fs' <- writeFieldWith name write ext_fs
+  writeIORef (hsc_extensible_fields env) ext_fs'
