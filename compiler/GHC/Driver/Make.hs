@@ -533,6 +533,7 @@ load' how_much mHscMessage mod_graph = do
     if succeeded upsweep_ok
 
      then
+       -- TODO @fendor: This needs to be done for every home package
        -- Easy; just relink it all.
        do liftIO $ debugTraceMsg dflags 2 (text "Upsweep completely successful.")
 
