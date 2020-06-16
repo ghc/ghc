@@ -83,9 +83,9 @@ addToFinderCache :: IORef FinderCache -> InstalledModule -> InstalledFindResult 
 addToFinderCache ref key val =
   atomicModifyIORef' ref $ \c -> (extendInstalledModuleEnv c key val, ())
 
-removeFromFinderCache :: IORef FinderCache -> InstalledModule -> IO ()
-removeFromFinderCache ref key =
-  atomicModifyIORef' ref $ \c -> (delInstalledModuleEnv c key, ())
+-- removeFromFinderCache :: IORef FinderCache -> InstalledModule -> IO ()
+-- removeFromFinderCache ref key =
+--   atomicModifyIORef' ref $ \c -> (delInstalledModuleEnv c key, ())
 
 lookupFinderCache :: IORef FinderCache -> InstalledModule -> IO (Maybe InstalledFindResult)
 lookupFinderCache ref key = do

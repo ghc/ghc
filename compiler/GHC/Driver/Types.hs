@@ -1968,10 +1968,10 @@ shadowed_by ids = shadowed
     shadowed id = getOccName id `elemOccSet` new_occs
     new_occs = mkOccSet (map getOccName ids)
 
--- | Set the 'DynFlags.homeUnitId' to 'interactive'
-setInteractivePackage :: HscEnv -> HscEnv
-setInteractivePackage hsc_env
-   = modify_hsc_dflags hsc_env $ \d -> d { homeUnitId = interactiveUnitId }
+-- -- | Set the 'DynFlags.homeUnitId' to 'interactive'
+-- setInteractivePackage :: HscEnv -> HscEnv
+-- setInteractivePackage hsc_env
+--    = modify_hsc_dflags hsc_env $ \d -> d { homeUnitId = interactiveUnitId }
 
 setInteractivePrintName :: InteractiveContext -> Name -> InteractiveContext
 setInteractivePrintName ic n = ic{ic_int_print = n}
