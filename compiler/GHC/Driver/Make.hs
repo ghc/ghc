@@ -287,8 +287,7 @@ data LoadHowMuch
 --
 load :: GhcMonad m => LoadHowMuch -> m SuccessFlag
 load how_much = do
-    (errs, mod_graph) <- depanalE [] False
-    liftIO $ putStrLn "finished depanal"                  -- #17459
+    (errs, mod_graph) <- depanalE [] False                        -- #17459
     success <- load' how_much (Just batchMsg) mod_graph
     warnUnusedPackages
     if isEmptyBag errs
@@ -381,7 +380,6 @@ load' how_much mHscMessage mod_graph = do
     let all_home_mods =
           mkUniqSet [ ms_mod_name s
                     | s <- mgModSummaries mod_graph, isBootSummary s == NotBoot]
-    liftIO $ putStrLn $ "load': " ++ (showSDoc dflags (ppr all_home_mods))
     -- TODO: Figure out what the correct form of this assert is. It's violated
     -- when you have HsBootMerge nodes in the graph: then you'll have hs-boot
     -- files without corresponding hs files.
@@ -533,6 +531,7 @@ load' how_much mHscMessage mod_graph = do
     if succeeded upsweep_ok
 
      then
+       -- TODO @fendor: This needs to be done for every home package
        -- Easy; just relink it all.
        do liftIO $ debugTraceMsg dflags 2 (text "Upsweep completely successful.")
 
@@ -1460,6 +1459,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
         type_env_var <- liftIO $ newIORef emptyNameEnv
         let hsc_env1 = hsc_env { hsc_type_env_var =
                                     Just (ms_mod mod, type_env_var) }
+        -- TODO @fendor: is this save? We modify the current package and never reset it.
         hsc_env1 <- pure $ hsc_env1 { hsc_currentPackage = homeUnitId $ ms_hspp_opts mod }
         setSession hsc_env1
 
@@ -2102,7 +2102,6 @@ downsweep :: HscEnv
 downsweep hsc_env old_summaries excl_mods allow_dup_roots
    = do
        rootSummaries <- mapM getRootSummary roots
-       putStrLn "downsweep, got all root summaries"
        let (errs, rootSummariesOk) = partitionEithers rootSummaries -- #17549
            root_map = mkRootMap rootSummariesOk
        checkDuplicates root_map
@@ -2149,7 +2148,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                                            (L rootLoc modl) package obj_allowed
                                            maybe_buf excl_mods
                 case maybe_summary of
-                   Nothing -> return $ Left $ moduleNotFoundErr dflags modl
+                   Nothing -> return $ Left $ moduleNotFoundErr (hsc_unitDflags hsc_env package) modl
                    Just s  -> return s
 
         rootLoc = mkGeneralSrcSpan (fsLit "<command line>")
@@ -2396,6 +2395,8 @@ summariseFile hsc_env old_summaries src_fn package mb_phase obj_allowed maybe_bu
                         -- getModificationUTCTime may fail
 
     new_summary src_fn src_timestamp = runExceptT $ do
+        -- Temporary modification, so consumers can call 'hsc_dflags' and 'hsc_HPT'
+        -- directly, without explicitly passing the UnitId around.
         hsc_env <- pure hsc_env { hsc_currentPackage = package }
         preimps@PreprocessedImports {..}
             <- getPreprocessedImports hsc_env src_fn mb_phase maybe_buf
@@ -2546,6 +2547,8 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
 
     new_summary location mod src_fn src_timestamp
       = runExceptT $ do
+        -- Temporary modification, so consumers can call 'hsc_dflags' and 'hsc_HPT'
+        -- directly, without explicitly passing the UnitId around.
         hsc_env <- pure hsc_env { hsc_currentPackage = package }
         preimps@PreprocessedImports {..}
             <- getPreprocessedImports hsc_env src_fn Nothing maybe_buf
