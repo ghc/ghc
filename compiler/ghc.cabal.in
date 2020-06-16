@@ -300,6 +300,7 @@ Library
         GHC.Data.TrieMap
         GHC.Core.Tidy
         GHC.Core.Unfold
+        GHC.Core.Unfold.Make
         GHC.Core.Utils
         GHC.Core.Map
         GHC.Core.Seq
@@ -353,6 +354,7 @@ Library
         GHC.Iface.Recomp.Flags
         GHC.Types.Annotations
         GHC.Driver.CmdLine
+        GHC.Driver.Config
         GHC.Driver.CodeOutput
         GHC.Settings.Config
         GHC.Settings.Constants

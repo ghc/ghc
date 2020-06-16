@@ -22,6 +22,7 @@ import GHC.Prelude
 
 import GHC.HsToCore.Usage
 import GHC.Driver.Session
+import GHC.Driver.Config
 import GHC.Driver.Types
 import GHC.Driver.Backend
 import GHC.Hs
@@ -38,7 +39,7 @@ import GHC.Core
 import GHC.Core.FVs       ( exprsSomeFreeVarsList )
 import GHC.Core.SimpleOpt ( simpleOptPgm, simpleOptExpr )
 import GHC.Core.Utils
-import GHC.Core.Unfold
+import GHC.Core.Unfold.Make
 import GHC.Core.Ppr
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Expr
@@ -170,10 +171,13 @@ deSugar hsc_env
         -- things into the in-scope set before simplifying; so we get no unfolding for F#!
 
         ; endPassIO hsc_env print_unqual CoreDesugar final_pgm rules_for_imps
-        ; (ds_binds, ds_rules_for_imps)
-            <- simpleOptPgm dflags mod final_pgm rules_for_imps
+        ; let simpl_opts = initSimpleOptOpts dflags
+        ; let (ds_binds, ds_rules_for_imps, occ_anald_binds)
+                = simpleOptPgm simpl_opts mod final_pgm rules_for_imps
                          -- The simpleOptPgm gets rid of type
                          -- bindings plus any stupid dead code
+        ; dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
+            FormatCore (pprCoreBindings occ_anald_binds $$ pprRules ds_rules_for_imps )
 
         ; endPassIO hsc_env print_unqual CoreDesugarOpt ds_binds ds_rules_for_imps
 
@@ -409,7 +413,8 @@ dsRule (L loc (HsRule { rd_name = name
                 -- we don't want to attach rules to the bindings of implicit Ids,
                 -- because they don't show up in the bindings until just before code gen
               fn_name   = idName fn_id
-              final_rhs = simpleOptExpr dflags rhs''    -- De-crap it
+              simpl_opts = initSimpleOptOpts dflags
+              final_rhs = simpleOptExpr simpl_opts rhs''    -- De-crap it
               rule_name = snd (unLoc name)
               final_bndrs_set = mkVarSet final_bndrs
               arg_ids = filterOut (`elemVarSet` final_bndrs_set) $
@@ -738,7 +743,7 @@ mkUnsafeCoercePrimPair _old_id old_expr
 
 
              info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
-                                `setUnfoldingInfo` mkCompulsoryUnfolding rhs
+                                `setUnfoldingInfo` mkCompulsoryUnfolding' rhs
 
              ty = mkSpecForAllTys [ runtimeRep1TyVar, runtimeRep2TyVar
                                   , openAlphaTyVar, openBetaTyVar ] $
