@@ -364,16 +364,6 @@ That is, in Y,
 
 In the result of mkIfaceExports, the names are grouped by defining module,
 so we may need to split up a single Avail into multiple ones.
-
-Note [Internal used_names]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-Most of the used_names are External Names, but we can have Internal
-Names too: see Note [Binders in Template Haskell] in "GHC.ThToHs", and
-#5362 for an example.  Such Names are always
-  - Such Names are always for locally-defined things, for which we
-    don't gather usage info, so we can just ignore them in ent_map
-  - They are always System Names, hence the assert, just as a double check.
-
 -}
 
 

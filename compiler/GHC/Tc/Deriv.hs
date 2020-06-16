@@ -38,11 +38,10 @@ import GHC.Tc.Gen.HsType
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr ( pprTyVars )
 
-import GHC.Rename.Names  ( extendGlobalRdrEnvRn )
 import GHC.Rename.Bind
 import GHC.Rename.Env
 import GHC.Rename.Module ( addTcgDUs )
-import GHC.Types.Avail
+import GHC.Rename.Utils
 
 import GHC.Core.Unify( tcUnifyTy )
 import GHC.Core.Class
@@ -294,11 +293,12 @@ renameDeriv inst_infos bagBinds
         ; traceTc "rnd" (vcat (map (\i -> pprInstInfoDetails i $$ text "") inst_infos))
         ; (aux_binds, aux_sigs) <- mapAndUnzipBagM return bagBinds
         ; let aux_val_binds = ValBinds noExtField aux_binds (bagToList aux_sigs)
-        ; rn_aux_lhs <- rnTopBindsLHS emptyFsEnv aux_val_binds
-        ; let bndrs = collectHsValBinders rn_aux_lhs
-        ; envs <- extendGlobalRdrEnvRn (map avail bndrs) emptyFsEnv ;
-        ; setEnvs envs $
-    do  { (rn_aux, dus_aux) <- rnValBindsRHS (TopSigCtxt (mkNameSet bndrs)) rn_aux_lhs
+        -- Importantly, we use rnLocalValBindsLHS, not rnTopBindsLHS, to rename
+        -- auxiliary bindings as if they were defined locally.
+        -- See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate.
+        ; (bndrs, rn_aux_lhs) <- rnLocalValBindsLHS emptyFsEnv aux_val_binds
+        ; bindLocalNames bndrs $
+    do  { (rn_aux, dus_aux) <- rnLocalValBindsRHS (mkNameSet bndrs) rn_aux_lhs
         ; (rn_inst_infos, fvs_insts) <- mapAndUnzipM rn_inst_info inst_infos
         ; return (listToBag rn_inst_infos, rn_aux,
                   dus_aux `plusDU` usesOnly (plusFVs fvs_insts)) } }

@@ -377,3 +377,19 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
               from generating many of these usages (at least in
               one-shot mode), but that's even more bogus!
         -}
+
+{-
+Note [Internal used_names]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Most of the used_names are External Names, but we can have System
+Names too. Two examples:
+
+* Names arising from Language.Haskell.TH.newName.
+  See Note [Binders in Template Haskell] in GHC.ThToHs (and #5362).
+* The names of auxiliary bindings in derived instances.
+  See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate.
+
+Such Names are always for locally-defined things, for which we don't gather
+usage info, so we can just ignore them in ent_map. Moreover, they are always
+System Names, hence the assert, just as a double check.
+-}
