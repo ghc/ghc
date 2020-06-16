@@ -48,51 +48,40 @@ import GHC.Real
 encodeMultiByte :: CodePage -> String -> String
 encodeMultiByte cp = unsafeLocalState . encodeMultiByteIO cp
 
+{-# INLINE encodeMultiByteIO' #-}
+-- | String must not be zero length.
+encodeMultiByteIO' :: CodePage -> String -> ((LPCSTR, CInt) -> IO a) -> IO a
+encodeMultiByteIO' cp wstr transformer =
+  withCWStringLen wstr $ \(cwstr,len) -> do
+    mbchars' <- failIfZero "WideCharToMultiByte" $ wideCharToMultiByte
+                cp
+                0
+                cwstr
+                (fromIntegral len)
+                nullPtr 0
+                nullPtr nullPtr
+    -- mbchar' is the length of buffer required
+    allocaArray (fromIntegral mbchars') $ \mbstr -> do
+      mbchars <- failIfZero "WideCharToMultiByte" $ wideCharToMultiByte
+                 cp
+                 0
+                 cwstr
+                 (fromIntegral len)
+                 mbstr mbchars'
+                 nullPtr nullPtr
+      transformer (mbstr,fromIntegral mbchars)
+
+-- converts [Char] to UTF-16
 encodeMultiByteIO :: CodePage -> String -> IO String
 encodeMultiByteIO _ "" = return ""
-  -- WideCharToMultiByte doesn't handle empty strings
-encodeMultiByteIO cp wstr =
-  withCWStringLen wstr $ \(cwstr,len) -> do
-    mbchars' <- failIfZero "WideCharToMultiByte" $ wideCharToMultiByte
-                cp
-                0
-                cwstr
-                (fromIntegral len)
-                nullPtr 0
-                nullPtr nullPtr
-    -- mbchar' is the length of buffer required
-    allocaArray (fromIntegral mbchars') $ \mbstr -> do
-      mbchars <- failIfZero "WideCharToMultiByte" $ wideCharToMultiByte
-                 cp
-                 0
-                 cwstr
-                 (fromIntegral len)
-                 mbstr mbchars'
-                 nullPtr nullPtr
-      peekCAStringLen (mbstr,fromIntegral mbchars)  -- converts [Char] to UTF-16
+encodeMultiByteIO cp s = encodeMultiByteIO' cp s toString
+  where toString (s,l) = peekCAStringLen (s,fromIntegral l)
 
+-- converts [Char] to UTF-16
 encodeMultiByteRawIO :: CodePage -> String -> IO (LPCSTR, CInt)
 encodeMultiByteRawIO _ "" = return (nullPtr, 0)
-  -- WideCharToMultiByte doesn't handle empty strings
-encodeMultiByteRawIO cp wstr =
-  withCWStringLen wstr $ \(cwstr,len) -> do
-    mbchars' <- failIfZero "WideCharToMultiByte" $ wideCharToMultiByte
-                cp
-                0
-                cwstr
-                (fromIntegral len)
-                nullPtr 0
-                nullPtr nullPtr
-    -- mbchar' is the length of buffer required
-    allocaArray (fromIntegral mbchars') $ \mbstr -> do
-      mbchars <- failIfZero "WideCharToMultiByte" $ wideCharToMultiByte
-                 cp
-                 0
-                 cwstr
-                 (fromIntegral len)
-                 mbstr mbchars'
-                 nullPtr nullPtr
-      return (mbstr,fromIntegral mbchars)  -- converts [Char] to UTF-16
+encodeMultiByteRawIO cp s = encodeMultiByteIO' cp s toSizedCString
+  where toSizedCString (s,l) = return (s, fromIntegral l)
 
 foreign import WINDOWS_CCONV "WideCharToMultiByte"
   wideCharToMultiByte
@@ -191,13 +180,22 @@ foreign import WINDOWS_CCONV "WideCharToMultiByte"
 -- TODO: GHC is internally UTF-32 which means we have re-encode for
 --       Windows which is annoying. Switch to UTF-16 on IoNative
 --       being default.
-withUTF16ToGhcInternal :: Ptr Word8 -> Int
-                       -> (CInt -> Ptr Word16 -> IO CInt) -> IO Int
+
+-- | Decode a UTF16 buffer into the given buffer in the current code page.
+-- The source UTF16 buffer is filled by the function given as argument.
+withUTF16ToGhcInternal :: Ptr Word8 -- Buffer to store the encoded string in.
+                       -> Int       -- Length of the buffer
+                       -- Function to fill source buffer.
+                       ->  ( CInt       -- Size of available buffer in bytes
+                          -> Ptr Word16 -- Temporary source buffer.
+                          -> IO CInt    -- Actual length of buffer content.
+                           )
+                       -> IO Int    -- Returns number of bytes stored in buffer.
 withUTF16ToGhcInternal ptr len fn
  = do cp <- getCurrentCodePage
       -- Annoyingly the IO system is very UTF-32 oriented and asks for bytes
       -- as buffer reads.  Problem is we don't know how many bytes we'll end up
-      -- having as UTF-32 MultiByte encoded UTF-16. So be conservative.  We
+      -- having as UTF-32 MultiByte encoded UTF-16. So be conservative.  We assume
       -- that a single byte may expand to atmost 1 Word16.  So assume that each
       -- byte does and divide the requested number of bytes by two since each
       -- Word16 encoded wchar may expand to only two Word8 sequences.
@@ -206,6 +204,7 @@ withUTF16ToGhcInternal ptr len fn
         w_len <- fn (fromIntegral reqBytes) w_ptr
         if w_len == 0
            then return 0 else do
+                -- Get required length of encoding
                 mbchars' <- failIfZero "withUTF16ToGhcInternal" $
                               wideCharToMultiByte' cp 0 w_ptr
                                                   (fromIntegral w_len) nullPtr
