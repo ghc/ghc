@@ -8,7 +8,7 @@
 
 module GHC.Core.Opt.Simplify.Env (
         -- * The simplifier mode
-        setMode, getMode, updMode, seDynFlags,
+        setMode, getMode, updMode, seDynFlags, seUnfoldingOpts,
 
         -- * Environments
         SimplEnv(..), pprSimplEnv,   -- Temp not abstract
@@ -52,6 +52,7 @@ import GHC.Core.Opt.Monad        ( SimplMode(..) )
 import GHC.Core
 import GHC.Core.Utils
 import GHC.Core.Multiplicity     ( scaleScaled )
+import GHC.Core.Unfold
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
@@ -308,6 +309,10 @@ getMode env = seMode env
 
 seDynFlags :: SimplEnv -> DynFlags
 seDynFlags env = sm_dflags (seMode env)
+
+seUnfoldingOpts :: SimplEnv -> UnfoldingOpts
+seUnfoldingOpts env = sm_uf_opts (seMode env)
+
 
 setMode :: SimplMode -> SimplEnv -> SimplEnv
 setMode mode env = env { seMode = mode }

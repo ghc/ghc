@@ -11,7 +11,8 @@ import GHC.Prelude
 
 import GHC.Core.Opt.Arity  ( manifestArity )
 import GHC.Core
-import GHC.Core.Unfold ( certainlyWillInline, mkWwInlineRule, mkWorkerUnfolding )
+import GHC.Core.Unfold
+import GHC.Core.Unfold.Make
 import GHC.Core.Utils  ( exprType, exprIsHNF )
 import GHC.Core.FVs    ( exprFreeVars )
 import GHC.Types.Var
@@ -22,6 +23,7 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Basic
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Driver.Config
 import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Core.Opt.WorkWrap.Utils
@@ -467,7 +469,7 @@ tryWW   :: DynFlags
 tryWW dflags fam_envs is_rec fn_id rhs
   -- See Note [Worker-wrapper for NOINLINE functions]
 
-  | Just stable_unf <- certainlyWillInline dflags fn_info
+  | Just stable_unf <- certainlyWillInline uf_opts fn_info
   = return [ (fn_id `setIdUnfolding` stable_unf, rhs) ]
         -- See Note [Don't w/w INLINE things]
         -- See Note [Don't w/w inline small non-loop-breaker things]
@@ -482,6 +484,7 @@ tryWW dflags fam_envs is_rec fn_id rhs
   = return [ (new_fn_id, rhs) ]
 
   where
+    uf_opts      = unfoldingOpts dflags
     fn_info      = idInfo fn_id
     (wrap_dmds, div) = splitStrictSig (strictnessInfo fn_info)
 
@@ -602,6 +605,8 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
               -- worker is join point iff wrapper is join point
               -- (see Note [Don't w/w join points for CPR])
 
+            simpl_opts = initSimpleOptOpts dflags
+
             work_id  = mkWorkerId work_uniq fn_id (exprType work_rhs)
                         `setIdOccInfo` occInfo fn_info
                                 -- Copy over occurrence info from parent
@@ -611,7 +616,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
 
                         `setInlinePragma` work_prag
 
-                        `setIdUnfolding` mkWorkerUnfolding dflags work_fn fn_unfolding
+                        `setIdUnfolding` mkWorkerUnfolding simpl_opts work_fn fn_unfolding
                                 -- See Note [Worker-wrapper for INLINABLE functions]
 
                         `setIdStrictness` mkClosedStrictSig work_demands div
@@ -637,7 +642,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
 
             wrap_rhs  = wrap_fn work_id
             wrap_prag = mkStrWrapperInlinePrag fn_inl_prag
-            wrap_id   = fn_id `setIdUnfolding`  mkWwInlineRule dflags wrap_rhs arity
+            wrap_id   = fn_id `setIdUnfolding`  mkWwInlineRule simpl_opts wrap_rhs arity
                               `setInlinePragma` wrap_prag
                               `setIdOccInfo`    noOccInfo
                                 -- Zap any loop-breaker-ness, to avoid bleating from Lint

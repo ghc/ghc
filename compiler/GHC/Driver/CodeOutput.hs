@@ -39,6 +39,7 @@ import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Unit
+import GHC.Unit.State
 import GHC.Types.SrcLoc
 import GHC.Types.CostCentre
 

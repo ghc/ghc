@@ -30,6 +30,7 @@ import GHC.Prelude
 import GHC.HsToCore.PmCheck.Types
 
 import GHC.Driver.Session
+import GHC.Driver.Config
 import GHC.Utils.Outputable
 import GHC.Utils.Error
 import GHC.Utils.Misc
@@ -1667,8 +1668,8 @@ representCoreExpr delta@MkDelta{ delta_tm_st = ts@TmSt{ ts_reps = reps } } e
 --     want to record @x ~ y@.
 addCoreCt :: Delta -> Id -> CoreExpr -> MaybeT DsM Delta
 addCoreCt delta x e = do
-  dflags <- getDynFlags
-  let e' = simpleOptExpr dflags e
+  simpl_opts <- initSimpleOptOpts <$> getDynFlags
+  let e' = simpleOptExpr simpl_opts e
   lift $ tracePm "addCoreCt" (ppr x <+> dcolon <+> ppr (idType x) $$ ppr e $$ ppr e')
   execStateT (core_expr x e') delta
   where
