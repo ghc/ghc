@@ -82,21 +82,35 @@ import Data.List  ( find, partition, intersperse )
 type BagDerivStuff = Bag DerivStuff
 
 data AuxBindSpec
-  = DerivCon2Tag TyCon  -- The con2Tag for given TyCon
-  | DerivTag2Con TyCon  -- ...ditto tag2Con
-  | DerivMaxTag  TyCon  -- ...and maxTag
+    -- These are used in derived Eq, Ord, Enum, and Ix instances.
+    -- All these generate ZERO-BASED tag operations
+    -- I.e first constructor has tag 0
+  = DerivCon2Tag TyCon  -- ^ The @con2tag@ for given 'TyCon'
+  | DerivTag2Con TyCon  -- ^ ...ditto @tag2con@
+  | DerivMaxTag  TyCon  -- ^ ...and @maxtag@
+
+    -- These are only used in derived Data instances
+  | DerivDataDataType TyCon
+      -- ^ The @DataType@ representation for a @Data@ instance
+  | DerivDataConstr TyCon DataCon
+      -- ^ The @Constr@ representation for a @Data@ instance
   deriving( Eq )
-  -- All these generate ZERO-BASED tag operations
-  -- I.e first constructor has tag 0
 
 data DerivStuff     -- Please add this auxiliary stuff
   = DerivAuxBind AuxBindSpec
+    -- ^ A new, top-level auxiliary binding. Used for deriving 'Eq', 'Ord',
+    --   'Enum', 'Ix', and 'Data'. See Note [Auxiliary binders].
 
   -- Generics and DeriveAnyClass
   | DerivFamInst FamInst               -- New type family instances
-
-  -- New top-level auxiliary bindings
-  | DerivHsBind (LHsBind GhcPs, LSig GhcPs) -- Also used for SYB
+    -- ^ A new type family instance. Used for:
+    --
+    -- * @DeriveGeneric@, which generates instances of @Rep(1)@
+    --
+    -- * @DeriveAnyClass@, which can fill in associated type family defaults
+    --
+    -- * @GeneralizedNewtypeDeriving@, which generates instances of associated
+    --   type families for newtypes
 
 
 {-
@@ -760,7 +774,7 @@ gen_Ix_binds loc tycon = do
     dflags <- getDynFlags
     return $ if isEnumerationTyCon tycon
       then (enum_ixes dflags, listToBag $ map DerivAuxBind
-                   [DerivCon2Tag tycon, DerivTag2Con tycon, DerivMaxTag tycon])
+                   [DerivCon2Tag tycon, DerivTag2Con tycon])
       else (single_con_ixes, unitBag (DerivAuxBind (DerivCon2Tag tycon)))
   where
     --------------------------------------------------------------
@@ -1313,65 +1327,18 @@ gen_Data_binds :: SrcSpan
                        BagDerivStuff)   -- Auxiliary bindings
 gen_Data_binds loc rep_tc
   = do { dflags  <- getDynFlags
-
-       -- Make unique names for the data type and constructor
-       -- auxiliary bindings.  Start with the name of the TyCon/DataCon
-       -- but that might not be unique: see #12245.
-       ; dt_occ  <- chooseUniqueOccTc (mkDataTOcc (getOccName rep_tc))
-       ; dc_occs <- mapM (chooseUniqueOccTc . mkDataCOcc . getOccName)
-                         (tyConDataCons rep_tc)
-       ; let dt_rdr  = mkRdrUnqual dt_occ
-             dc_rdrs = map mkRdrUnqual dc_occs
-
-       -- OK, now do the work
-       ; return (gen_data dflags dt_rdr dc_rdrs loc rep_tc) }
-
-gen_data :: DynFlags -> RdrName -> [RdrName]
-         -> SrcSpan -> TyCon
-         -> (LHsBinds GhcPs,      -- The method bindings
-             BagDerivStuff)       -- Auxiliary bindings
-gen_data dflags data_type_name constr_names loc rep_tc
-  = (listToBag [gfoldl_bind, gunfold_bind, toCon_bind, dataTypeOf_bind]
-     `unionBags` gcast_binds,
-                -- Auxiliary definitions: the data type and constructors
-     listToBag ( genDataTyCon
-               : zipWith genDataDataCon data_cons constr_names ) )
+       ; return ( listToBag [ gfoldl_bind, gunfold_bind
+                            , toCon_bind dflags, dataTypeOf_bind dflags ]
+                  `unionBags` gcast_binds
+                            -- Auxiliary definitions: the data type and constructors
+                , listToBag $ map DerivAuxBind
+                    ( DerivDataDataType rep_tc
+                    : map (DerivDataConstr rep_tc) data_cons )
+                ) }
   where
     data_cons  = tyConDataCons rep_tc
     n_cons     = length data_cons
     one_constr = n_cons == 1
-    genDataTyCon :: DerivStuff
-    genDataTyCon        --  $dT
-      = DerivHsBind (mkHsVarBind loc data_type_name rhs,
-                     L loc (TypeSig noExtField [L loc data_type_name] sig_ty))
-
-    sig_ty = mkLHsSigWcType (nlHsTyVar dataType_RDR)
-    ctx    = initDefaultSDocContext dflags
-    rhs    = nlHsVar mkDataType_RDR
-             `nlHsApp` nlHsLit (mkHsString (showSDocOneLine ctx (ppr rep_tc)))
-             `nlHsApp` nlList (map nlHsVar constr_names)
-
-    genDataDataCon :: DataCon -> RdrName -> DerivStuff
-    genDataDataCon dc constr_name       --  $cT1 etc
-      = DerivHsBind (mkHsVarBind loc constr_name rhs,
-                     L loc (TypeSig noExtField [L loc constr_name] sig_ty))
-      where
-        sig_ty   = mkLHsSigWcType (nlHsTyVar constr_RDR)
-        rhs      = nlHsApps mkConstr_RDR constr_args
-
-        constr_args
-           = [ -- nlHsIntLit (toInteger (dataConTag dc)),   -- Tag
-               nlHsVar (data_type_name)                     -- DataType
-             , nlHsLit (mkHsString (occNameString dc_occ))  -- String name
-             , nlList  labels                               -- Field labels
-             , nlHsVar fixity ]                             -- Fixity
-
-        labels   = map (nlHsLit . mkHsString . unpackFS . flLabel)
-                       (dataConFieldLabels dc)
-        dc_occ   = getOccName dc
-        is_infix = isDataSymOcc dc_occ
-        fixity | is_infix  = infix_RDR
-               | otherwise = prefix_RDR
 
         ------------ gfoldl
     gfoldl_bind = mkFunBindEC 3 loc gfoldl_RDR id (map gfoldl_eqn data_cons)
@@ -1410,16 +1377,17 @@ gen_data dflags data_type_name constr_names loc rep_tc
         tag = dataConTag dc
 
         ------------ toConstr
-    toCon_bind = mkFunBindEC 1 loc toConstr_RDR id
-                     (zipWith to_con_eqn data_cons constr_names)
+    toCon_bind dflags = mkFunBindEC 1 loc toConstr_RDR id
+                            (zipWith to_con_eqn data_cons
+                                     (map (dataC_RDR dflags) data_cons))
     to_con_eqn dc con_name = ([nlWildConPat dc], nlHsVar con_name)
 
         ------------ dataTypeOf
-    dataTypeOf_bind = mkSimpleGeneratedFunBind
-                        loc
-                        dataTypeOf_RDR
-                        [nlWildPat]
-                        (nlHsVar data_type_name)
+    dataTypeOf_bind dflags = mkSimpleGeneratedFunBind
+                               loc
+                               dataTypeOf_RDR
+                               [nlWildPat]
+                               (nlHsVar (dataT_RDR dflags rep_tc))
 
         ------------ gcast1/2
         -- Make the binding    dataCast1 x = gcast1 x  -- if T :: * -> *
@@ -1934,7 +1902,7 @@ mkCoerceClassMethEqn cls inst_tvs inst_tys rhs_ty id
 {-
 ************************************************************************
 *                                                                      *
-\subsection{Generating extra binds (@con2tag@ and @tag2con@)}
+\subsection{Generating extra binds (@con2tag@, @tag2con@, etc.)}
 *                                                                      *
 ************************************************************************
 
@@ -1999,31 +1967,59 @@ genAuxBindSpec dflags loc (DerivMaxTag tycon)
     max_tag =  case (tyConDataCons tycon) of
                  data_cons -> toInteger ((length data_cons) - fIRST_TAG)
 
+genAuxBindSpec dflags loc (DerivDataDataType tycon)
+  = (mkHsVarBind loc data_type_name rhs,
+     L loc (TypeSig noExtField [L loc data_type_name] sig_ty))
+  where
+    data_type_name = dataT_RDR dflags tycon
+    constr_names   = map (dataC_RDR dflags) (tyConDataCons tycon)
+    sig_ty = mkLHsSigWcType (nlHsTyVar dataType_RDR)
+    ctx    = initDefaultSDocContext dflags
+    rhs    = nlHsVar mkDataType_RDR
+             `nlHsApp` nlHsLit (mkHsString (showSDocOneLine ctx (ppr tycon)))
+             `nlHsApp` nlList (map nlHsVar constr_names)
+
+genAuxBindSpec dflags loc (DerivDataConstr tycon dc)
+  = (mkHsVarBind loc constr_name rhs,
+     L loc (TypeSig noExtField [L loc constr_name] sig_ty))
+  where
+    constr_name    = dataC_RDR dflags dc
+    data_type_name = dataT_RDR dflags tycon
+    sig_ty = mkLHsSigWcType (nlHsTyVar constr_RDR)
+    rhs    = nlHsApps mkConstr_RDR constr_args
+
+    constr_args
+       = [ -- nlHsIntLit (toInteger (dataConTag dc)),   -- Tag
+           nlHsVar (data_type_name)                     -- DataType
+         , nlHsLit (mkHsString (occNameString dc_occ))  -- String name
+         , nlList  labels                               -- Field labels
+         , nlHsVar fixity ]                             -- Fixity
+
+    labels   = map (nlHsLit . mkHsString . unpackFS . flLabel)
+                   (dataConFieldLabels dc)
+    dc_occ   = getOccName dc
+    is_infix = isDataSymOcc dc_occ
+    fixity | is_infix  = infix_RDR
+           | otherwise = prefix_RDR
+
 type SeparateBagsDerivStuff =
-  -- AuxBinds and SYB bindings
+  -- DerivAuxBinds
   ( Bag (LHsBind GhcPs, LSig GhcPs)
-  -- Extra family instances (used by Generic and DeriveAnyClass)
-  , Bag (FamInst) )
+  -- Extra family instances (used by DeriveGeneric, DeriveAnyClass, and
+  -- GeneralizedNewtypeDeriving)
+  , Bag FamInst )
 
 genAuxBinds :: DynFlags -> SrcSpan -> BagDerivStuff -> SeparateBagsDerivStuff
-genAuxBinds dflags loc b = genAuxBinds' b2 where
+genAuxBinds dflags loc b = (deriv_aux_bind_bag, b2) where
   (b1,b2) = partitionBagWith splitDerivAuxBind b
   splitDerivAuxBind (DerivAuxBind x) = Left x
-  splitDerivAuxBind  x               = Right x
+  splitDerivAuxBind (DerivFamInst t) = Right t
 
+  deriv_aux_bind_bag = mapBag (genAuxBindSpec dflags loc) (rm_dups b1)
+  -- Remove duplicate DerivAuxBinds so that only one copy of each sort
+  -- auxiliary binding is generated per data type. See Note [Auxiliary binders].
   rm_dups = foldr dup_check emptyBag
   dup_check a b = if anyBag (== a) b then b else consBag a b
-
-  genAuxBinds' :: BagDerivStuff -> SeparateBagsDerivStuff
-  genAuxBinds' = foldr f ( mapBag (genAuxBindSpec dflags loc) (rm_dups b1)
-                            , emptyBag )
-  f :: DerivStuff -> SeparateBagsDerivStuff -> SeparateBagsDerivStuff
-  f (DerivAuxBind _) = panic "genAuxBinds'" -- We have removed these before
-  f (DerivHsBind  b) = add1 b
-  f (DerivFamInst t) = add2 t
-
-  add1 x (a,b) = (x `consBag` a,b)
-  add2 x (a,b) = (a,x `consBag` b)
 
 mkParentType :: TyCon -> Type
 -- Turn the representation tycon of a family into
@@ -2382,13 +2378,23 @@ con2tag_RDR dflags tycon = mk_tc_deriv_name dflags tycon mkCon2TagOcc
 tag2con_RDR dflags tycon = mk_tc_deriv_name dflags tycon mkTag2ConOcc
 maxtag_RDR  dflags tycon = mk_tc_deriv_name dflags tycon mkMaxTagOcc
 
+dataT_RDR :: DynFlags -> TyCon -> RdrName
+dataT_RDR dflags tycon = mk_tc_deriv_name dflags tycon mkDataTOcc
+
+dataC_RDR :: DynFlags -> DataCon -> RdrName
+dataC_RDR dflags dc = mk_dc_deriv_name dflags dc mkDataCOcc
+
 mk_tc_deriv_name :: DynFlags -> TyCon -> (OccName -> OccName) -> RdrName
 mk_tc_deriv_name dflags tycon occ_fun =
    mkAuxBinderName dflags (tyConName tycon) occ_fun
 
+mk_dc_deriv_name :: DynFlags -> DataCon -> (OccName -> OccName) -> RdrName
+mk_dc_deriv_name dflags dc occ_fun =
+   mkAuxBinderName dflags (dataConName dc) occ_fun
+
 mkAuxBinderName :: DynFlags -> Name -> (OccName -> OccName) -> RdrName
--- ^ Make a top-level binder name for an auxiliary binding for a parent name
--- See Note [Auxiliary binders]
+-- ^ Make a top-level binder name for an auxiliary binding for a parent name.
+-- See @Note [Auxiliary binders] (Wrinkle: Name suffixes)@.
 mkAuxBinderName dflags parent occ_fun
   = mkRdrUnqual (occ_fun stable_parent_occ)
   where
@@ -2407,23 +2413,209 @@ mkAuxBinderName dflags parent occ_fun
 {-
 Note [Auxiliary binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-We often want to make a top-level auxiliary binding.  E.g. for comparison we have
+We often want to make top-level auxiliary bindings in derived instances.
+E.g. for derived Ord instances we have:
+
+  data T = ...
+  deriving instance Ord T
+
+  ==>
 
   instance Ord T where
-    compare a b = $con2tag a `compare` $con2tag b
+    compare a b = $con2tag_T a `compare` $con2tag_T b
 
-  $con2tag :: T -> Int
-  $con2tag = ...code....
+  $con2tag_T :: T -> Int
+  $con2tag_T = ...code....
 
-Of course these top-level bindings should all have distinct name, and we are
-generating RdrNames here.  We can't just use the TyCon or DataCon to distinguish
-because with standalone deriving two imported TyCons might both be called T!
-(See #7947.)
+(Note that in reality, the name of the generated $con2tag definition for T
+would be closer to something like $con2tag_B4iUvrAY4wB3YczpMJQUOX due to the
+fact that we hash the names. See "Wrinkle: Name suffixes" below.
 
-So we use package name, module name and the name of the parent
-(T in this example) as part of the OccName we generate for the new binding.
-To make the symbol names short we take a base62 hash of the full name.
+Note that multiple instances of the same type might need to use the same sort
+of auxiliary binding. For example, $con2tag is used not only in derived Ord
+instances, but also in derived Eq instances:
 
-In the past we used the *unique* from the parent, but that's not stable across
-recompilations as uniques are nondeterministic.
+  deriving instance Eq T
+
+  ==>
+
+  instance Eq T where
+    a == b = $con2tag_T a == $con2tag_T b
+
+We would like to reuse the same $con2tag_T definition across these two
+instances if at all possible to avoid code duplication. As long as the two
+instances are in the same module, this is generally possible. To accomplish
+this within GHC, each derived instance that needs one or more auxiliary
+bindings produces the corresponding DerivAuxBinds. All DerivAuxBinds in that
+module are then put into the same list from which duplicates are removed
+(in genAuxBinds).
+
+Note that there are some situations where we cannot easily remove duplicate
+copies of an auxiliary binding:
+
+1. When derived instances are contained in different modules, as in the
+   following example:
+
+     module A where
+       data T = ...
+     module B where
+       import A
+       deriving instance Eq T
+     module C where
+       import B
+       deriving instance Enum T
+
+   The derived Eq and Enum instances for T make use of $con2tag_T, and since
+   they are defined in separate modules, each module must produce its own copy
+   of $con2tag_T.
+
+2. When derived instances are separated by TH splices (#18321), as in the
+   following example:
+
+     module M where
+
+     data T = ...
+     deriving instance Eq T
+     deriving instance Ord T
+     $(pure [])
+     deriving instance Enum T
+
+   Due to the way that GHC typechecks TyClGroups, genAuxBinds will run twice
+   in this program: once for all the declarations before the TH splice, and
+   once again for all the declarations after the TH splice. As a result,
+   $con2tag_T will be generated twice, since genAuxBinds will be unable to
+   recognize the presence of duplicates.
+
+These situations are much rarer, so we do not spend any additional effort to
+deduplicate auxiliary bindings there. Instead, we just allow GHC to generate
+duplicate versions of each auxiliary binding and make sure that each copy has
+a distinct name to avoid name clashes. To illustrate how this works, consider
+the code that the example from situation (2) above would generate:
+
+  module M where
+
+  instance Eq T where
+    a == b = $con2tag_T a == $con2tag_T b
+
+  instance Ord T where
+    compare a b = $con2tag_T a `compare` $con2tag_T b
+
+  $con2tag_T :: T -> Int
+  $con2tag_T = ...code....
+
+  -- $(pure [])
+
+  instance Enum T where
+    fromEnum = $con2tag_T
+    ...
+
+  $con2tag_T :: T -> Int
+  $con2tag_T = ...code....
+
+At first glance, it would appear that the two copies of $con2tag_T are doomed
+to clash with one another. But it need not be this way. Conceptually, we could
+imagine that each copy is /local/ to a specific part of the module. Using some
+hypothetical Haskell syntax, it might look like this:
+
+  module M where
+
+  let {
+    $con2tag_T :: T -> Int
+    $con2tag_T = ...code....
+  } in {
+    instance Eq T where
+      a == b = $con2tag_T a == $con2tag_T b
+
+    instance Ord T where
+      compare a b = $con2tag_T a `compare` $con2tag_T b
+  }
+
+  -- $(pure [])
+
+  let {
+    $con2tag_T :: T -> Int
+    $con2tag_T = ...code....
+  } in {
+    instance Enum T where
+      fromEnum = $con2tag_T
+      ...
+  }
+
+Now it is clear that each copy has a particular scope, which allows us to
+define multiple copies of $con2tag_T without having to manually generate unique
+names for each copy. Even though no such syntax exists in source Haskell, we
+accomplish the same end result through some sleight of hand in renameDeriv:
+we rename each set of declarations (before and after the TH splice) with
+rnLocalValBindsLHS. This ensures that each copy of $con2tag_T is given its own
+Unique, making it distinct from other copies separated by TH splices. If we had
+used rnTopBindsLHS to rename them instead of rnLocalValBindsLHS, then each copy
+of $con2tag_T would receive the same Unique, leading to disaster
+(as in #18321). See Note [The Name Cache] in GHC.Types.Name.Cache.
+
+While we rename auxiliary bindings as if they were locally defined, we can
+typecheck them as normal top-level bindings. This is because by the time they
+have been renamed, they have been given Internal Names with distinct Uniques.
+There is no danger in typechecking top-level bindings with Internal Names.
+
+-----
+-- Wrinkle: Name suffixes
+-----
+
+Note [Auxiliary binders] discusses how to avoid name clashes between sets of
+auxiliary bindings separated by TH splices. How do we ensure that there are no
+name clashes between auxiliary bindings within the same set, however? For
+instance, both derived instances in the program below will need a version of
+$con2tag:
+
+  data T1 = ...
+  data T2 = ...
+
+  deriving instance Eq T1
+  deriving instance Eq T2
+
+A first attempt at deduplicating these is to attach the name of the data type
+as a suffix to the generated $con2tag names:
+
+  instance Eq T1 where
+    a == b = $con2tag_T1 a == $con2tag_T1 b
+  instance Eq T2 where
+    a == b = $con2tag_T2 a == $con2tag_T2 b
+
+  $con2tag_T1 :: T1 -> Int
+  $con2tag_T1 = ...code....
+
+  $con2tag_T2 :: T2 -> Int
+  $con2tag_T2 = ...code....
+
+This works, but it does not scale up to more complicated examples. Consider
+this program (inspired by #7947):
+
+  module A where
+    data T = ...
+  module B where
+    data T = ...
+  module C where
+    import qualified A
+    import qualified B
+    deriving instance Eq A.T
+    deriving instance Eq B.T
+
+Here, attaching the suffix `_T` won't be enough to disambiguate the two copies
+of $con2tag. To disambiguate as much as possible, we include the following
+information into the suffix:
+
+* Package name
+* Module name
+* Name of the parent (T in the example above)
+
+Because that's a lot of information, we shorten it by taking a base62 hash of
+the full name.
+(See Note [Base 62 encoding 128-bit integers] in GHC.Utils.Encoding.)
+As a result, the name of a copy of $con2tag will typically look something like
+$con2tag_B4iUvrAY4wB3YczpMJQUOX.
+
+One might wonder if we could get away with using the parent's Unique as the
+suffix. We used to do so in the past, but that's not stable across
+recompilations as uniques are nondeterministic. As a result, we avoid leaking
+Uniques into the OccName of an auxiliary binding.
 -}

@@ -23,8 +23,8 @@ Derived class instances:
     Data.Data.gfoldl k z (T14682.Foo a1 a2)
       = ((z T14682.Foo `k` a1) `k` a2)
     Data.Data.gunfold k z _ = k (k (z T14682.Foo))
-    Data.Data.toConstr (T14682.Foo _ _) = T14682.$cFoo
-    Data.Data.dataTypeOf _ = T14682.$tFoo
+    Data.Data.toConstr (T14682.Foo _ _) = $cB4iUvrAY4wB3YczpMJQUOX
+    Data.Data.dataTypeOf _ = $tB4iUvrAY4wB3YczpMJQUOX
   
   instance GHC.Classes.Eq T14682.Foo where
     (GHC.Classes.==) (T14682.Foo a1 a2) (T14682.Foo b1 b2)
@@ -71,14 +71,15 @@ Derived class instances:
       = (GHC.Ix.inRange (a1, b1) c1
            GHC.Classes.&& GHC.Ix.inRange (a2, b2) c2)
   
-  T14682.$con2tag_B4iUvrAY4wB3YczpMJQUOX ::
-    T14682.Foo -> GHC.Prim.Int#
-  T14682.$con2tag_B4iUvrAY4wB3YczpMJQUOX (T14682.Foo _ _) = 0#
-  T14682.$tFoo :: Data.Data.DataType
-  T14682.$cFoo :: Data.Data.Constr
-  T14682.$tFoo = Data.Data.mkDataType "Foo" [T14682.$cFoo]
-  T14682.$cFoo
-    = Data.Data.mkConstr T14682.$tFoo "Foo" [] Data.Data.Prefix
+  $tB4iUvrAY4wB3YczpMJQUOX :: Data.Data.DataType
+  $cB4iUvrAY4wB3YczpMJQUOX :: Data.Data.Constr
+  $con2tag_B4iUvrAY4wB3YczpMJQUOX :: T14682.Foo -> GHC.Prim.Int#
+  $con2tag_B4iUvrAY4wB3YczpMJQUOX (T14682.Foo _ _) = 0#
+  $tB4iUvrAY4wB3YczpMJQUOX
+    = Data.Data.mkDataType "Foo" [$cB4iUvrAY4wB3YczpMJQUOX]
+  $cB4iUvrAY4wB3YczpMJQUOX
+    = Data.Data.mkConstr
+        $tB4iUvrAY4wB3YczpMJQUOX "Foo" [] Data.Data.Prefix
 
 Derived type family instances:
 
