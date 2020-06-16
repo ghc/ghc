@@ -16,7 +16,7 @@ module GHC.HsToCore.ListComp ( dsListComp, dsMonadComp ) where
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.HsToCore.Expr ( dsHandleMonadicFailure, dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds, dsSyntaxExpr )
+import {-# SOURCE #-} GHC.HsToCore.Expr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds, dsSyntaxExpr )
 
 import GHC.Hs
 import GHC.Tc.Utils.Zonk
@@ -618,7 +618,7 @@ dsMcBindStmt pat rhs' bind_op fail_op res1_ty stmts
         ; var      <- selectSimpleMatchVarL Many pat
         ; match <- matchSinglePatVar var (StmtCtxt (DoExpr Nothing)) pat
                                   res1_ty (cantFailMatchResult body)
-        ; match_code <- dsHandleMonadicFailure pat match fail_op
+        ; match_code <- dsHandleMonadicFailure MonadComp pat match fail_op
         ; dsSyntaxExpr bind_op [rhs', Lam var match_code] }
 
 -- Desugar nested monad comprehensions, for example in `then..` constructs
