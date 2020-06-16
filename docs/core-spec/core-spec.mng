@@ -573,6 +573,37 @@ taking care to map identical type family applications to the same fresh variable
 The algorithm $[[unify]]$ is implemented in \coderef{GHC/Core/Unify.hs}{tcUnifyTys}.
 It performs a standard unification, returning a substitution upon success.
 
+\subsection{Axioms}
+
+After type-checking the type and class declarations of a file, the axioms
+in the file are optionally linted. This is done from \coderef{GHC/Tc/Types.hs}{lintGblEnv},
+which calls \coderef{GHC/Core/Lint.hs}{lintAxioms}. That function ensures
+the following judgement on each axiom:
+
+\ottdefnlintXXaxiom{}
+
+\ottdefnlintXXfamilyXXbranch{}
+
+In addition to these checks, the linter will also check several other conditions:
+
+\begin{itemize}
+\item Every \texttt{CoAxBranch} has a \texttt{cab\_cvs} field. This is unused
+currently and should always be empty.
+\item Every \texttt{CoAxBranch} has a \texttt{cab\_eta\_tvs} field. This is used
+only for data family instances, but is not involved in type correctness. (It is
+used for pretty-printing.) The implemented linter checks to make sure this field
+is empty for axioms that are not associated with data family instances.
+\item Every \texttt{CoAxBranch} has a \texttt{cab\_incomps} field that stores
+a list of incompatible branches. The implemented linter checks that these
+branches are indeed incompatible with the current one.
+\item The linter checks that newtypes are associated with exactly one axiom,
+as are closed type families.
+\item The linter checks that all instances of the same open family are compatible.
+\end{itemize}
+
+A nice summary of the required checks is in Section F.1 of the \emph{Safe Coercions}
+paper (JFP'16).
+
 \section{Operational semantics}
 
 \subsection{Disclaimer}

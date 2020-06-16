@@ -3235,7 +3235,8 @@ data DataSort
 -- 2. @k@ (where @k@ is a bare kind variable; see #12369)
 --
 -- See also Note [Datatype return kinds] in GHC.Tc.TyCl
-checkDataKindSig :: DataSort -> Kind -> TcM ()
+checkDataKindSig :: DataSort -> Kind  -- any arguments in the kind are stripped off
+                 -> TcM ()
 checkDataKindSig data_sort kind
   = do { dflags <- getDynFlags
        ; traceTc "checkDataKindSig" (ppr kind)

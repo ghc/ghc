@@ -162,27 +162,13 @@ addressed yet.
 newFamInst :: FamFlavor -> CoAxiom Unbranched -> TcM FamInst
 -- Freshen the type variables of the FamInst branches
 newFamInst flavor axiom@(CoAxiom { co_ax_tc = fam_tc })
-  = do { -- Use lintAxiom to check that the axiom is well formed
-         dflags <- getDynFlags
-       ; ifErrsM (return ()) $ -- Don't lint when there are errors, because
-                               -- errors might mean TcTyCons.
-                               -- See Note [Recover from validity error] in GHC.Tc.TyCl
-         when (gopt Opt_DoCoreLinting dflags) $
-         case lintAxiom dflags axiom of
-             Nothing       -> pure ()
-             Just fail_msg -> pprPanic "Core Lint error in newFamInst" $
-                              vcat [ fail_msg
-                                   , ppr fam_tc
-                                   , ppr tvs
-                                   , ppr cvs
-                                   , ppr lhs
-                                   , ppr rhs ]
-
-       -- Freshen the type variables
-       ; (subst, tvs') <- freshenTyVarBndrs tvs
+  = do {
+         -- Freshen the type variables
+         (subst, tvs') <- freshenTyVarBndrs tvs
        ; (subst, cvs') <- freshenCoVarBndrsX subst cvs
        ; let lhs'     = substTys subst lhs
              rhs'     = substTy  subst rhs
+
        ; return (FamInst { fi_fam      = tyConName fam_tc
                          , fi_flavor   = flavor
                          , fi_tcs      = roughMatchTcs lhs

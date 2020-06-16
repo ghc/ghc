@@ -647,13 +647,13 @@ mkCoAxBranch :: [TyVar] -- original, possibly stale, tyvars
              -> CoAxBranch
 mkCoAxBranch tvs eta_tvs cvs lhs rhs roles loc
   = CoAxBranch { cab_tvs     = tvs'
-                    , cab_eta_tvs = eta_tvs'
-                    , cab_cvs     = cvs'
-                    , cab_lhs     = tidyTypes env lhs
-                    , cab_roles   = roles
-                    , cab_rhs     = tidyType env rhs
-                    , cab_loc     = loc
-                    , cab_incomps = placeHolderIncomps }
+               , cab_eta_tvs = eta_tvs'
+               , cab_cvs     = cvs'
+               , cab_lhs     = tidyTypes env lhs
+               , cab_roles   = roles
+               , cab_rhs     = tidyType env rhs
+               , cab_loc     = loc
+               , cab_incomps = placeHolderIncomps }
   where
     (env1, tvs')     = tidyVarBndrs init_tidy_env tvs
     (env2, eta_tvs') = tidyVarBndrs env1          eta_tvs

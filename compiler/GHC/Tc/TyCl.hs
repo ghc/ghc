@@ -1803,28 +1803,10 @@ DT1 Where this applies: Only GADT syntax for data/newtype/instance declarations
     can have declared return kinds. This Note does not apply to Haskell98
     syntax.
 
-DT2 Where these kinds come from: Return kinds are processed through several
-    different code paths:
-
-   Data/newtypes: The return kind is part of the TyCon kind, gotten either
+DT2 Where these kinds come from: The return kind is part of the TyCon kind, gotten either
      by checkInitialKind (standalone kind signature / CUSK) or
      inferInitialKind. It is extracted by bindTyClTyVars in tcTyClDecl1. It is
      then passed to tcDataDefn.
-
-   Families: The return kind is either written in a standalone signature
-     or extracted from a family declaration in getInitialKind.
-     If a family declaration is missing a result kind, it is assumed to be
-     Type. This assumption is in getInitialKind for CUSKs or
-     get_fam_decl_initial_kind for non-signature & non-CUSK cases.
-
-   Instances: The data family already has a known kind. The return kind
-     of an instance is then calculated by applying the data family tycon
-     to the patterns provided, as computed by the typeKind lhs_ty in the
-     end of tcDataFamInstHeader. In the case of an instance written in GADT
-     syntax, there are potentially *two* return kinds: the one computed from
-     applying the data family tycon to the patterns, and the one given by
-     the user. This second kind is checked by the tc_kind_sig function within
-     tcDataFamInstHeader.
 
 DT3 Eta-expansion: Any forall-bound variables and function arguments in a result kind
     become parameters to the type. That is, when we say
@@ -1833,9 +1815,7 @@ DT3 Eta-expansion: Any forall-bound variables and function arguments in a result
 
     we really mean for T to have two parameters. The second parameter
     is produced by processing the return kind in etaExpandAlgTyCon,
-    called in tcDataDefn for data/newtypes and in tcDataFamInstDecl
-    for instances. This is true for data families as well, though their
-    arity only matters for pretty-printing.
+    called in tcDataDefn.
 
     See also Note [TyConBinders for the result kind signatures of a data type]
     in GHC.Tc.Gen.HsType.
@@ -1856,7 +1836,7 @@ DT4 Datatype return kind restriction: A data type return kind must end
     Exactly the same applies to data instance (but not data family)
     declarations.  Examples
       data instance D1 :: Type                 -- good
-      data instance D2 :: Boool -> Type        -- good
+      data instance D2 :: Bool -> Type         -- good
 
     We can "look through" type synonyms
       type Star = Type
@@ -1885,7 +1865,6 @@ DT4 Datatype return kind restriction: A data type return kind must end
 DT5 Newtype return kind restriction.
     If -XUnliftedNewtypes is not on, then newtypes are treated just
     like datatypes --- see (4) above.
-
 
     If -XUnliftedNewtypes is on, then a newtype return kind must end in
     TYPE xyz, for some xyz (after type synonym expansion). The "xyz"
@@ -1921,7 +1900,24 @@ data family T a :: <kind>          -- See Point DF56
 data    instance T [a] :: <kind> where ...   -- See Point DF2
 newtype instance T [a] :: <kind> where ...   -- See Point DF2
 
-Here is the Plan for Data Families
+Here is the Plan for Data Families:
+
+DF0 Where these kinds come from:
+
+    Families: The return kind is either written in a standalone signature
+     or extracted from a family declaration in getInitialKind.
+     If a family declaration is missing a result kind, it is assumed to be
+     Type. This assumption is in getInitialKind for CUSKs or
+     get_fam_decl_initial_kind for non-signature & non-CUSK cases.
+
+   Instances: The data family already has a known kind. The return kind
+     of an instance is then calculated by applying the data family tycon
+     to the patterns provided, as computed by the typeKind lhs_ty in the
+     end of tcDataFamInstHeader. In the case of an instance written in GADT
+     syntax, there are potentially *two* return kinds: the one computed from
+     applying the data family tycon to the patterns, and the one given by
+     the user. This second kind is checked by the tc_kind_sig function within
+     tcDataFamInstHeader. See also DF3, below.
 
 DF1 In a data/newtype instance, we treat the kind of the /data family/,
     once instantiated, as the "master kind" for the representation
@@ -1933,14 +1929,16 @@ DF1 In a data/newtype instance, we treat the kind of the /data family/,
     if we declared
         data R:T1Int :: Type -> Type where ...
      See Note [Liberalising data family return kinds] for an alternative
-     plan.  But this plan is simple, and ensures that all instances
-     are simple instantiations of the matster, without strange casts.
+     plan.  But this current plan is simple, and ensures that all instances
+     are simple instantiations of the master, without strange casts.
 
      An example with non-trivial instantiation:
         data family T2 :: forall k. Type -> k
-        data instance T :: Type -> Type -> Type where ...
+        data instance T2 :: Type -> Type -> Type where ...
      Here 'k' gets instantiated with (Type -> Type), driven by
-     the signature on the 'data instance'
+     the signature on the 'data instance'. (See also DT3 of
+     Note [Datatype return kinds] about eta-expansion, which applies here,
+     too; see tcDataFamInstDecl's call of etaExpandAlgTyCon.)
 
      A newtype example:
 
@@ -1960,7 +1958,7 @@ DF1 In a data/newtype instance, we treat the kind of the /data family/,
 
 DF2 /After/ this instantiation, the return kind of the master kind
     must obey the usual rules for data/newtype return kinds (DT4, DT5)
-    above.  Examples:
+    of Note [Datatype return kinds].  Examples:
         data family T3 k :: k
         data instance T3 Type where ...          -- OK
         data instance T3 (Type->Type) where ...  -- OK
@@ -1983,25 +1981,25 @@ DF3 Any kind signatures on the data/newtype instance are checked for
     data instance declaration
 
 DF4 We also (redundantly) check that any user-specified return kind
-    signature in the data instance also obeys (4).  For example we
+    signature in the data instance also obeys DT4/DT5.  For example we
     reject
         data family T1 :: Type -> Type -> Type
         data instance T1 Int :: Type -> F Int
-    even if (F Int ~ Bool).  We could omit this check, because we
+    even if (F Int ~ Type).  We could omit this check, because we
     use the master kind; but it seems more uniform to check it, again
     with checkDataKindSig.
 
 DF5 Data /family/ return kind restrictions. Consider
        data family D8 a :: F a
     where F is a type family.  No data/newtype instance can instantiate
-    this so that it obeys the rules of (4) and (5).  So GHC proactively
+    this so that it obeys the rules of DT4 or DT5.  So GHC proactively
     rejects the data /family/ declaration if it can never satisfy (DT4)/(DT5).
     Remember that a data family supports both data and newtype instances.
 
     More precisely, the return kind of a data family must be either
         * TYPE xyz (for some type xyz) or
         * a kind variable
-    Only in these cases can a data/newtype instance possibly satisfy (4)/(5).
+    Only in these cases can a data/newtype instance possibly satisfy (DT4)/(DT5).
     This is checked by the call to checkDataKindSig in tcFamDecl1.  Examples:
 
       data family D1 :: Type              -- good
@@ -2014,7 +2012,7 @@ DF5 Data /family/ return kind restrictions. Consider
 
 DF6 Two return kinds for instances: If an instance has two return kinds,
     one from the family declaration and one from the instance declaration
-    (see point (2) above), they are unified. More accurately, we make sure
+    (see point DF3 above), they are unified. More accurately, we make sure
     that the kind of the applied data family is a subkind of the user-written
     kind. GHC.Tc.Gen.HsType.checkExpectedKind normally does this check for types, but
     that's overkill for our needs here. Instead, we just instantiate any
@@ -2024,8 +2022,6 @@ DF6 Two return kinds for instances: If an instance has two return kinds,
     This unification naturally produces a coercion, which we can drop, as
     the kind annotation on the instance is redundant (except perhaps for
     effects of unification).
-
-
 
     This all is Wrinkle (3) in Note [Implementation of UnliftedNewtypes].
 
@@ -2058,7 +2054,7 @@ well.  But there are lots of complications:
   exactly dual way.
 
 So yes, we could allow this, but we currently do not. That's
-why we have
+why we have DF2 in Note [Data family/instance return kinds].
 
 Note [Implementation of UnliftedNewtypes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2175,7 +2171,7 @@ There are also some changes for dealing with families:
    we use that kind signature.
 
 3. A data family and its newtype instance may be declared with slightly
-   different kinds. See point 7 in Note [Datatype return kinds].
+   different kinds. See point DF6 in Note [Data family/instance return kinds]
 
 There's also a change in the renamer:
 
