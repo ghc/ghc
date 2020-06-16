@@ -21,7 +21,7 @@ import GHC.Prelude
 import GHC.Core
 import GHC.Core.Subst
 import GHC.Core.Utils
-import GHC.Core.Unfold  ( couldBeSmallEnoughToInline )
+import GHC.Core.Unfold
 import GHC.Core.FVs     ( exprsFreeVarsList )
 import GHC.Core.Opt.Monad
 import GHC.Types.Literal ( litIsLifted )
@@ -783,6 +783,7 @@ the function is applied to a data constructor.
 -}
 
 data ScEnv = SCE { sc_dflags    :: DynFlags,
+                   sc_uf_opts   :: !UnfoldingOpts, -- ^ Unfolding options
                    sc_module    :: !Module,
                    sc_size      :: Maybe Int,   -- Size threshold
                                                 -- Nothing => no limit
@@ -835,6 +836,7 @@ instance Outputable Value where
 initScEnv :: DynFlags -> Module -> ScEnv
 initScEnv dflags this_mod
   = SCE { sc_dflags      = dflags,
+          sc_uf_opts     = unfoldingOpts dflags,
           sc_module      = this_mod,
           sc_size        = specConstrThreshold dflags,
           sc_count       = specConstrCount     dflags,
@@ -1364,7 +1366,7 @@ scTopBind _ usage _
 scTopBind env body_usage (Rec prs)
   | Just threshold <- sc_size env
   , not force_spec
-  , not (all (couldBeSmallEnoughToInline (sc_dflags env) threshold) rhss)
+  , not (all (couldBeSmallEnoughToInline (sc_uf_opts env) threshold) rhss)
                 -- No specialisation
   = -- pprTrace "scTopBind: nospec" (ppr bndrs) $
     do  { (rhs_usgs, rhss')   <- mapAndUnzipM (scExpr env) rhss
