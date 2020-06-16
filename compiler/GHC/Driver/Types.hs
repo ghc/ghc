@@ -332,7 +332,7 @@ runHsc hsc_env (Hsc hsc) = do
 
 mkInteractiveHscEnv :: HscEnv -> HscEnv
 mkInteractiveHscEnv hsc_env = hsc_env
-    { hsc_internalUnitEnv = Map.insert interactiveUnit interactiveInternalUnitEnv $ hsc_internalUnitEnv hsc_env
+    { hsc_internalUnitEnv = Map.insert interactiveUnitId interactiveInternalUnitEnv $ hsc_internalUnitEnv hsc_env
     }
   where
     interactiveInternalUnitEnv = InternalUnitEnv

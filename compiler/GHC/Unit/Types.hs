@@ -44,6 +44,7 @@ module GHC.Unit.Types
    , stringToUnit
    , stableUnitCmp
    , unitIsDefinite
+   , wiredInUnitIds
 
      -- * Unit Ids
    , unitIdString

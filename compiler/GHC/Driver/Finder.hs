@@ -148,35 +148,34 @@ findAnyHomeModule :: HscEnv -> ModuleName -> Maybe FastString -> IO FindResult
 findAnyHomeModule hsc_env mod_name _mb_pkg =
     foldl' orIfNotFound (pure notFound)
     $ fmap (\dflags -> findHomeModule hsc_env dflags mod_name)
-    $ filter ((`elem` deps) . thisPackage)
+    $ filter ((`elem` deps) . homeUnit)
     $ fmap internalUnitEnv_dflags
     $ M.elems $ hsc_internalUnitEnv hsc_env
   where
     notFound = NotFound [] Nothing [] [] [] []
     deps = explicitUnits $ unitState $ hsc_dflags hsc_env
-    homeDeps = filter (flip M.member $ hsc_internalUnitEnv hsc_env) deps
 
 -- TODO: fix this
 emptyModuleOrigin :: ModuleOrigin
 emptyModuleOrigin = ModOrigin Nothing [] [] False
 
 handleAnyHomeModule :: HscEnv -> ModuleName -> FindResult -> Unit -> IO FindResult
-handleAnyHomeModule hsc_env mod_name fr unitId = do
-  result <- flip findInstalledHomeModule mod_name $ hsc_env { hsc_currentPackage = unitId }
+handleAnyHomeModule hsc_env mod_name fr unit = do
+  result <- findInstalledHomeModule  (hsc_FC hsc_env) (toUnitId unit) (hsc_dflags hsc_env) mod_name
   return $ case (result, fr) of
     (InstalledFound iml _, Found ml m) ->
-      FoundMultiple [(m, emptyModuleOrigin), (mkModule unitId mod_name, emptyModuleOrigin)]
+      FoundMultiple [(m, emptyModuleOrigin), (mkModule unit mod_name, emptyModuleOrigin)]
     (InstalledFound iml _, FoundMultiple results) ->
-      FoundMultiple $ results ++ [(mkModule unitId mod_name, emptyModuleOrigin)]
+      FoundMultiple $ results ++ [(mkModule unit mod_name, emptyModuleOrigin)]
     (InstalledFound iml _, _) ->
-      Found iml $ mkModule unitId mod_name
+      Found iml $ mkModule unit mod_name
 
     (InstalledNoPackage _, fr') -> fr'
 
     (InstalledNotFound ipaths _, NotFound paths pkg mods_hidden pkgs_hidden unusables suggestions) ->
       NotFound
         { fr_paths = paths ++ ipaths
-        , fr_pkg = Just unitId
+        , fr_pkg = Just unit
         , fr_mods_hidden = mods_hidden
         , fr_pkgs_hidden = pkgs_hidden
         , fr_unusables = unusables
@@ -291,7 +290,7 @@ mkHomeInstalledModule dflags mod_name =
 addHomeModuleToFinder :: HscEnv -> ModuleName -> ModLocation -> UnitId -> IO Module
 addHomeModuleToFinder hsc_env mod_name loc iuid = do
   let package = case M.lookup iuid (hsc_internalUnitEnv hsc_env) of
-        Just unitEnv -> thisPackage $ internalUnitEnv_dflags unitEnv
+        Just unitEnv -> homeUnitId $ internalUnitEnv_dflags unitEnv
         Nothing -> pprPanic "addHomeModuleToFinder" $
           ppr iuid <+> text "not found in internal unit env"
   let mod = Module iuid mod_name
@@ -318,7 +317,7 @@ findHomeModule hsc_env dflags mod_name = do
  where
   dflags = hsc_dflags hsc_env
   uid    = homeUnit dflags
-  iuid   = homeUnidId dflags
+  iuid   = homeUnitId dflags
 
 -- | Implements the search for a module name in the home package only.  Calling
 -- this function directly is usually *not* what you want; currently, it's used

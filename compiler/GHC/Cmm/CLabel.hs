@@ -510,24 +510,24 @@ mkDirty_MUT_VAR_Label,
     mkSMAP_DIRTY_infoLabel, mkBadAlignmentLabel :: CLabel
 mkDirty_MUT_VAR_Label           = mkForeignLabel (fsLit "dirty_MUT_VAR") Nothing ForeignLabelInExternalPackage IsFunction
 mkNonmovingWriteBarrierEnabledLabel
-                                = CmmLabel rtsUnit (fsLit "nonmoving_write_barrier_enabled") CmmData
-mkUpdInfoLabel                  = CmmLabel rtsUnit (fsLit "stg_upd_frame")         CmmInfo
-mkBHUpdInfoLabel                = CmmLabel rtsUnit (fsLit "stg_bh_upd_frame" )     CmmInfo
-mkIndStaticInfoLabel            = CmmLabel rtsUnit (fsLit "stg_IND_STATIC")        CmmInfo
-mkMainCapabilityLabel           = CmmLabel rtsUnit (fsLit "MainCapability")        CmmData
-mkMAP_FROZEN_CLEAN_infoLabel    = CmmLabel rtsUnit (fsLit "stg_MUT_ARR_PTRS_FROZEN_CLEAN") CmmInfo
-mkMAP_FROZEN_DIRTY_infoLabel    = CmmLabel rtsUnit (fsLit "stg_MUT_ARR_PTRS_FROZEN_DIRTY") CmmInfo
-mkMAP_DIRTY_infoLabel           = CmmLabel rtsUnit (fsLit "stg_MUT_ARR_PTRS_DIRTY") CmmInfo
-mkTopTickyCtrLabel              = CmmLabel rtsUnit (fsLit "top_ct")                CmmData
-mkCAFBlackHoleInfoTableLabel    = CmmLabel rtsUnit (fsLit "stg_CAF_BLACKHOLE")     CmmInfo
-mkArrWords_infoLabel            = CmmLabel rtsUnit (fsLit "stg_ARR_WORDS")         CmmInfo
-mkSMAP_FROZEN_CLEAN_infoLabel   = CmmLabel rtsUnit (fsLit "stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN") CmmInfo
-mkSMAP_FROZEN_DIRTY_infoLabel   = CmmLabel rtsUnit (fsLit "stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY") CmmInfo
-mkSMAP_DIRTY_infoLabel          = CmmLabel rtsUnit (fsLit "stg_SMALL_MUT_ARR_PTRS_DIRTY") CmmInfo
-mkBadAlignmentLabel             = CmmLabel rtsUnit (fsLit "stg_badAlignment")      CmmEntry
+                                = CmmLabel rtsUnitId (fsLit "nonmoving_write_barrier_enabled") CmmData
+mkUpdInfoLabel                  = CmmLabel rtsUnitId (fsLit "stg_upd_frame")         CmmInfo
+mkBHUpdInfoLabel                = CmmLabel rtsUnitId (fsLit "stg_bh_upd_frame" )     CmmInfo
+mkIndStaticInfoLabel            = CmmLabel rtsUnitId (fsLit "stg_IND_STATIC")        CmmInfo
+mkMainCapabilityLabel           = CmmLabel rtsUnitId (fsLit "MainCapability")        CmmData
+mkMAP_FROZEN_CLEAN_infoLabel    = CmmLabel rtsUnitId (fsLit "stg_MUT_ARR_PTRS_FROZEN_CLEAN") CmmInfo
+mkMAP_FROZEN_DIRTY_infoLabel    = CmmLabel rtsUnitId (fsLit "stg_MUT_ARR_PTRS_FROZEN_DIRTY") CmmInfo
+mkMAP_DIRTY_infoLabel           = CmmLabel rtsUnitId (fsLit "stg_MUT_ARR_PTRS_DIRTY") CmmInfo
+mkTopTickyCtrLabel              = CmmLabel rtsUnitId (fsLit "top_ct")                CmmData
+mkCAFBlackHoleInfoTableLabel    = CmmLabel rtsUnitId (fsLit "stg_CAF_BLACKHOLE")     CmmInfo
+mkArrWords_infoLabel            = CmmLabel rtsUnitId (fsLit "stg_ARR_WORDS")         CmmInfo
+mkSMAP_FROZEN_CLEAN_infoLabel   = CmmLabel rtsUnitId (fsLit "stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN") CmmInfo
+mkSMAP_FROZEN_DIRTY_infoLabel   = CmmLabel rtsUnitId (fsLit "stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY") CmmInfo
+mkSMAP_DIRTY_infoLabel          = CmmLabel rtsUnitId (fsLit "stg_SMALL_MUT_ARR_PTRS_DIRTY") CmmInfo
+mkBadAlignmentLabel             = CmmLabel rtsUnitId (fsLit "stg_badAlignment")      CmmEntry
 
 mkSRTInfoLabel :: Int -> CLabel
-mkSRTInfoLabel n = CmmLabel rtsUnit lbl CmmInfo
+mkSRTInfoLabel n = CmmLabel rtsUnitId lbl CmmInfo
  where
    lbl =
      case n of
@@ -794,7 +794,7 @@ needsCDecl (RtsLabel _)                 = False
 needsCDecl (CmmLabel pkgId _ _)
         -- Prototypes for labels defined in the runtime system are imported
         --      into HC files via includes/Stg.h.
-        | pkgId == rtsUnit              = False
+        | pkgId == rtsUnitId            = False
 
         -- For other labels we inline one into the HC file directly.
         | otherwise                     = True
