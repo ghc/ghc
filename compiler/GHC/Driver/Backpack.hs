@@ -189,7 +189,8 @@ withBkpSession cid insts deps session_type do_this = do
           -- Synthesized the flags
           , packageFlags = packageFlags dflags ++ map (\(uid0, rn) ->
           let state = unitState dflags
-              uid = unwireUnit state (improveUnit state $ renameHoleUnit state (listToUFM insts) uid0)            in ExposePackage
+              uid = unwireUnit state (improveUnit state $ renameHoleUnit state (listToUFM insts) uid0)
+          in ExposePackage
               (showSDoc dflags0
                   (text "-unit-id" <+> ppr uid <+> ppr rn))
               (UnitIdArg uid) rn) deps
