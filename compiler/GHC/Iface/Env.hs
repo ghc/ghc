@@ -54,7 +54,7 @@ See Also: Note [The Name Cache] in GHC.Types.Name.Cache
 newGlobalBinder :: Module -> OccName -> SrcSpan -> TcRnIf a b Name
 -- Used for source code and interface files, to make the
 -- Name for a thing, given its Module and OccName
--- See Note [The Name Cache]
+-- See Note [The Name Cache] in GHC.Types.Name.Cache
 --
 -- The cache may already already have a binding for this thing,
 -- because we may have seen an occurrence before, but now is the
@@ -79,7 +79,7 @@ allocateGlobalBinder
   :: NameCache
   -> Module -> OccName -> SrcSpan
   -> (NameCache, Name)
--- See Note [The Name Cache]
+-- See Note [The Name Cache] in GHC.Types.Name.Cache
 allocateGlobalBinder name_supply mod occ loc
   = case lookupOrigNameCache (nsNames name_supply) mod occ of
         -- A hit in the cache!  We are at the binding site of the name.

@@ -591,6 +591,10 @@ hasStockDeriving clas
       = let (binds, deriv_stuff) = gen_fn loc tc
         in return (binds, deriv_stuff, [])
 
+    -- Like `simple`, but monadic. The only monadic thing that these functions
+    -- do is allocate new Uniques, which are used for generating the names of
+    -- auxiliary bindings.
+    -- See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate.
     simpleM gen_fn loc tc _
       = do { (binds, deriv_stuff) <- gen_fn loc tc
            ; return (binds, deriv_stuff, []) }
