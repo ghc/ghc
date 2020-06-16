@@ -21,6 +21,7 @@ module GHC.Driver.Finder (
     mkHiPath,
     mkObjPath,
     addHomeModuleToFinder,
+    uncacheModule,
     mkStubPaths,
 
     findObjectLinkableMaybe,
@@ -278,6 +279,12 @@ addHomeModuleToFinder hsc_env mod_name loc package = do
   let mod = mkHomeInstalledModule dflags mod_name
   addToFinderCache (hsc_FC hsc_env) mod (InstalledFound loc mod)
   return (mkHomeModule (hsc_dflags hsc_env) mod_name)
+
+uncacheModule :: HscEnv -> ModuleName -> IO ()
+uncacheModule hsc_env mod_name = do
+  let mod = mkHomeInstalledModule (hsc_dflags hsc_env) mod_name
+  removeFromFinderCache (hsc_FC hsc_env) mod
+
 
 -- -----------------------------------------------------------------------------
 --      The internal workers
