@@ -640,10 +640,12 @@ tcInferLHsTypeKind lhs_ty@(L loc hs_ty)
     setSrcSpan loc     $  -- Cover the tcInstInvisibleTyBinders
     do { (res_ty, res_kind) <- tc_infer_hs_type (mkMode TypeLevel) hs_ty
        ; tcInstInvisibleTyBinders res_ty res_kind }
+  -- See Note [Do not always instantiate eagerly in types]
 
 -- Used to check the argument of GHCi :kind
 -- Allow and report wildcards, e.g. :kind T _
 -- Do not saturate family applications: see Note [Dealing with :kind]
+-- Does not instantiate eagerly; See Note [Do not always instantiate eagerly in types]
 tcInferLHsTypeUnsaturated :: LHsType GhcRn -> TcM (TcType, TcKind)
 tcInferLHsTypeUnsaturated hs_ty
   = addTypeCtxt hs_ty $
@@ -677,6 +679,19 @@ to switch off saturation.
 So tcInferLHsTypeUnsaturated does a little special case for top level
 applications.  Actually the common case is a bare variable, as above.
 
+Note [Do not always instantiate eagerly in types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Terms are eagerly instantiated. This means that if you say
+
+  x = id
+
+then `id` gets instantiated to have type alpha -> alpha. The variable
+alpha is then unconstrained and regeneralized. But we cannot do this
+in types, as we have no type-level lambda. So, when we are sure
+that we will not want to regeneralize later -- because we are done
+checking a type, for example -- we can instantiate. But we do not
+instantiate at variables, nor do we in tcInferLHsTypeUnsaturated,
+which is used by :kind in GHCi.
 
 ************************************************************************
 *                                                                      *
@@ -1705,6 +1720,7 @@ tc_lhs_pred mode pred = tc_lhs_type mode pred constraintKind
 tcTyVar :: TcTyMode -> Name -> TcM (TcType, TcKind)
 -- See Note [Type checking recursive type and class declarations]
 -- in GHC.Tc.TyCl
+-- This does not instantiate. See Note [Do not always instantiate eagerly in types]
 tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
   = do { traceTc "lk1" (ppr name)
        ; thing <- tcLookup name
