@@ -1217,8 +1217,6 @@ freePreloadObjectFile (ObjectCode *oc)
  */
 void freeObjectCode (ObjectCode *oc)
 {
-    freePreloadObjectFile(oc);
-
     if (oc->symbols != NULL) {
         stgFree(oc->symbols);
         oc->symbols = NULL;
@@ -1294,6 +1292,8 @@ void freeObjectCode (ObjectCode *oc)
     stgFree(oc->archiveMemberName);
 
     freeHashTable(oc->dependencies, NULL);
+
+    freePreloadObjectFile(oc);
 
     stgFree(oc);
 }
