@@ -62,7 +62,7 @@ Note [The flattening story]
 
    - A unification flatten-skolem, fmv, stands for the as-yet-unknown
      type to which (F xis) will eventually reduce.  It is filled in
-
+     only by dischargeFmv.
 
    - All fsk/fmv variables are "untouchable".  To make it simple to test,
      we simply give them TcLevel=0.  This means that in a CTyVarEq, say,
