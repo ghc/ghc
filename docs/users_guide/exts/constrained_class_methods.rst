@@ -19,8 +19,7 @@ class type variable, thus: ::
 
 The type of ``elem`` is illegal in Haskell 98, because it contains the
 constraint ``Eq a``, which constrains only the class type variable (in
-this case ``a``).
-this case ``a``).  More precisely, a constraint in a class method signature is rejected if
+this case ``a``). More precisely, a constraint in a class method signature is rejected if
 
 - The constraint mentions at least one type variable.  So this is allowed: ::
 
