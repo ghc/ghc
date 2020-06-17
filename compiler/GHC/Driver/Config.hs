@@ -1,7 +1,7 @@
 -- | Subsystem configuration
 module GHC.Driver.Config
    ( initOptCoercionOpts
-   , initSimpleOptOpts
+   , initSimpleOpts
    )
 where
 
@@ -18,8 +18,8 @@ initOptCoercionOpts dflags = OptCoercionOpts
    }
 
 -- | Initialise Simple optimiser configuration from DynFlags
-initSimpleOptOpts :: DynFlags -> SimpleOptOpts
-initSimpleOptOpts dflags = SimpleOptOpts
+initSimpleOpts :: DynFlags -> SimpleOpts
+initSimpleOpts dflags = SimpleOpts
    { so_uf_opts = unfoldingOpts dflags
    , so_co_opts = initOptCoercionOpts dflags
    }

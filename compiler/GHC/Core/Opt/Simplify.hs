@@ -3434,7 +3434,7 @@ mkDupableAlt platform case_bndr jfloats (con, bndrs', rhs')
   = return (jfloats, (con, bndrs', rhs'))
 
   | otherwise
-  = do  { simpl_opts <- initSimpleOptOpts <$> getDynFlags
+  = do  { simpl_opts <- initSimpleOpts <$> getDynFlags
         ; let rhs_ty'  = exprType rhs'
               scrut_ty = idType case_bndr
               case_bndr_w_unf

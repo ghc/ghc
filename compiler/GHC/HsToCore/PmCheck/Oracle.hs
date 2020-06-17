@@ -1668,7 +1668,7 @@ representCoreExpr delta@MkDelta{ delta_tm_st = ts@TmSt{ ts_reps = reps } } e
 --     want to record @x ~ y@.
 addCoreCt :: Delta -> Id -> CoreExpr -> MaybeT DsM Delta
 addCoreCt delta x e = do
-  simpl_opts <- initSimpleOptOpts <$> getDynFlags
+  simpl_opts <- initSimpleOpts <$> getDynFlags
   let e' = simpleOptExpr simpl_opts e
   lift $ tracePm "addCoreCt" (ppr x <+> dcolon <+> ppr (idType x) $$ ppr e $$ ppr e')
   execStateT (core_expr x e') delta

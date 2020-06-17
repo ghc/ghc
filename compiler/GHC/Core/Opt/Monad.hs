@@ -157,15 +157,16 @@ pprPassDetails _ = Outputable.empty
 
 data SimplMode             -- See comments in GHC.Core.Opt.Simplify.Monad
   = SimplMode
-        { sm_names      :: [String] -- Name(s) of the phase
+        { sm_names      :: [String]       -- ^ Name(s) of the phase
         , sm_phase      :: CompilerPhase
         , sm_dflags     :: DynFlags -- Just for convenient non-monadic
                                     -- access; we don't override these
         , sm_uf_opts    :: !UnfoldingOpts -- ^ Unfolding options
-        , sm_rules      :: Bool     -- Whether RULES are enabled
-        , sm_inline     :: Bool     -- Whether inlining is enabled
-        , sm_case_case  :: Bool     -- Whether case-of-case is enabled
-        , sm_eta_expand :: Bool     -- Whether eta-expansion is enabled
+        , sm_rules      :: !Bool          -- ^ Whether RULES are enabled
+        , sm_inline     :: !Bool          -- ^ Whether inlining is enabled
+        , sm_case_case  :: !Bool          -- ^ Whether case-of-case is enabled
+        , sm_eta_expand :: !Bool          -- ^ Whether eta-expansion is enabled
+        , sm_pre_inline :: !Bool          -- ^ Whether pre-inlining is enabled
         }
 
 instance Outputable SimplMode where

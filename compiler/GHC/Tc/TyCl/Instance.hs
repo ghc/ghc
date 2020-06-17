@@ -1208,7 +1208,7 @@ addDFunPrags :: DFunId -> [Id] -> DFunId
 -- is messing with.
 addDFunPrags dfun_id sc_meth_ids
  | is_newtype
-  = dfun_id `setIdUnfolding`  mkInlineUnfoldingWithArity 0 defaultSimpleOptOpts con_app
+  = dfun_id `setIdUnfolding`  mkInlineUnfoldingWithArity 0 defaultSimpleOpts con_app
             `setInlinePragma` alwaysInlinePragma { inl_sat = Just 0 }
  | otherwise
  = dfun_id `setIdUnfolding`  mkDFunUnfolding dfun_bndrs dict_con dict_args

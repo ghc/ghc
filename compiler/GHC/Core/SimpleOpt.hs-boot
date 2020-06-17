@@ -4,8 +4,8 @@ import GHC.Core
 import {-# SOURCE #-} GHC.Core.Unfold
 import GHC.Utils.Misc (HasDebugCallStack)
 
-data SimpleOptOpts
+data SimpleOpts
 
-so_uf_opts :: SimpleOptOpts -> UnfoldingOpts
+so_uf_opts :: SimpleOpts -> UnfoldingOpts
 
-simpleOptExpr :: HasDebugCallStack => SimpleOptOpts -> CoreExpr -> CoreExpr
+simpleOptExpr :: HasDebugCallStack => SimpleOpts -> CoreExpr -> CoreExpr

@@ -1480,7 +1480,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                 -- See Note [Specialising Calls]
                 spec_uds = foldr consDictBind rhs_uds dx_binds
 
-                simpl_opts = initSimpleOptOpts dflags
+                simpl_opts = initSimpleOpts dflags
 
                 --------------------------------------
                 -- Add a suitable unfolding if the spec_inl_prag says so

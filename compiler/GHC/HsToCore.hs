@@ -171,7 +171,7 @@ deSugar hsc_env
         -- things into the in-scope set before simplifying; so we get no unfolding for F#!
 
         ; endPassIO hsc_env print_unqual CoreDesugar final_pgm rules_for_imps
-        ; let simpl_opts = initSimpleOptOpts dflags
+        ; let simpl_opts = initSimpleOpts dflags
         ; let (ds_binds, ds_rules_for_imps, occ_anald_binds)
                 = simpleOptPgm simpl_opts mod final_pgm rules_for_imps
                          -- The simpleOptPgm gets rid of type
@@ -413,7 +413,7 @@ dsRule (L loc (HsRule { rd_name = name
                 -- we don't want to attach rules to the bindings of implicit Ids,
                 -- because they don't show up in the bindings until just before code gen
               fn_name   = idName fn_id
-              simpl_opts = initSimpleOptOpts dflags
+              simpl_opts = initSimpleOpts dflags
               final_rhs = simpleOptExpr simpl_opts rhs''    -- De-crap it
               rule_name = snd (unLoc name)
               final_bndrs_set = mkVarSet final_bndrs

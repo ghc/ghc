@@ -866,14 +866,18 @@ simplEnvForGHCi dflags
                            , sm_uf_opts = uf_opts
                            , sm_rules  = rules_on
                            , sm_inline = False
+                              -- Do not do any inlining, in case we expose some
+                              -- unboxed tuple stuff that confuses the bytecode
+                              -- interpreter
                            , sm_eta_expand = eta_expand_on
-                           , sm_case_case  = True }
+                           , sm_case_case  = True
+                           , sm_pre_inline = pre_inline_on
+                           }
   where
     rules_on      = gopt Opt_EnableRewriteRules   dflags
     eta_expand_on = gopt Opt_DoLambdaEtaExpansion dflags
+    pre_inline_on = gopt Opt_SimplPreInlining     dflags
     uf_opts       = unfoldingOpts                 dflags
-   -- Do not do any inlining, in case we expose some unboxed
-   -- tuple stuff that confuses the bytecode interpreter
 
 updModeForStableUnfoldings :: Activation -> SimplMode -> SimplMode
 -- See Note [Simplifying inside stable unfoldings]
@@ -1259,7 +1263,7 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
                   , occ_int_cxt = IsInteresting } = canInlineInLam rhs
     one_occ _                                     = False
 
-    pre_inline_unconditionally = gopt Opt_SimplPreInlining (seDynFlags env)
+    pre_inline_unconditionally = sm_pre_inline mode
     mode   = getMode env
     active = isActive (sm_phase mode) (inlinePragmaActivation inline_prag)
              -- See Note [pre/postInlineUnconditionally in gentle mode]
