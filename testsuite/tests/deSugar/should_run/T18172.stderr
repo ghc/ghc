@@ -1,0 +1,23 @@
+<interactive>:2:3: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal -1 is out of the Word8 range 0..255
+
+<interactive>:3:2: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal 256 is out of the Word8 range 0..255
+
+<interactive>:5:3: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal -1 is out of the Word8 range 0..255
+
+<interactive>:6:2: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal 256 is out of the Word8 range 0..255
+
+<interactive>:8:3: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal -1 is out of the Word8 range 0..255
+
+<interactive>:9:2: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal 256 is out of the Word8 range 0..255
+
+<interactive>:11:11: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal -1 is out of the Word8 range 0..255
+
+<interactive>:12:10: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal 256 is out of the Word8 range 0..255

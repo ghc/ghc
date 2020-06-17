@@ -1,0 +1,12 @@
+import Data.Word
+[-1]  :: [Word8]
+[256] :: [Word8]
+:set -XOverloadedLists
+[-1]  :: [Word8]
+[256] :: [Word8]
+import Data.List.NonEmpty
+[-1]  :: NonEmpty Word8
+[256] :: NonEmpty Word8
+import Control.Applicative
+ZipList [-1]  :: ZipList Word8
+ZipList [256] :: ZipList Word8
