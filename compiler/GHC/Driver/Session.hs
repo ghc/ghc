@@ -5177,6 +5177,7 @@ initSDocContext dflags style = SDC
   , sdocColScheme                   = colScheme dflags
   , sdocLastColour                  = Col.colReset
   , sdocShouldUseColor              = overrideWith (canUseColor dflags) (useColor dflags)
+  , sdocDefaultDepth                = pprUserLength dflags
   , sdocLineLength                  = pprCols dflags
   , sdocCanUseUnicode               = useUnicode dflags
   , sdocHexWordLiterals             = gopt Opt_HexWordLiterals dflags
