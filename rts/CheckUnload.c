@@ -365,10 +365,9 @@ void checkUnload()
 
         removeOCSectionIndices(s_indices, oc);
 
-        // TODO (osa): These should not be necessary: we should be calling
-        // checkUnload_ instead
-        removeOcSymbols(oc);
-        freeOcStablePtrs(oc);
+        // Symbols should be removed by unloadObj_
+        ASSERT(oc->symbols == NULL);
+
         freeObjectCode(oc);
     }
 
