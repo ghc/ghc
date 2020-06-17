@@ -181,7 +181,7 @@ typedef struct _ObjectCode {
     /* If this object is a member of an archive, archiveMemberName is
      * like "libarchive.a(object.o)". Otherwise it's NULL.
      */
-    char*      archiveMemberName;
+    pathchar*      archiveMemberName;
 
     /* An array containing ptrs to all the symbol names copied from
        this object into the global symbol hash table.  This is so that
@@ -348,7 +348,7 @@ resolveSymbolAddr (pathchar* buffer, int size,
 HsInt isAlreadyLoaded( pathchar *path );
 HsInt loadOc( ObjectCode* oc );
 ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
-                  bool mapped, char *archiveMemberName,
+                  bool mapped, pathchar *archiveMemberName,
                   int misalignment
                   );
 
