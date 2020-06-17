@@ -16,7 +16,7 @@
 --  // GHC can derive any class for a newtype, so we make use of that here...
 
 #define ARITHMETIC_CLASSES  Eq,Ord,Num,Enum,Storable,Real
-#define INTEGRAL_CLASSES Bounded,Integral,Bits,FiniteBits
+#define INTEGRAL_CLASSES Bounded,Integral,Bits,PopCount,Complement,FiniteBits
 #define FLOATING_CLASSES Fractional,Floating,RealFrac,RealFloat
 #define OPAQUE_CLASSES Eq,Ord,Storable
 
