@@ -51,7 +51,7 @@ mkFinalUnfolding opts src strict_sig expr
                 expr
 
 -- | Used for things that absolutely must be unfolded
-mkCompulsoryUnfolding :: SimpleOptOpts -> CoreExpr -> Unfolding
+mkCompulsoryUnfolding :: SimpleOpts -> CoreExpr -> Unfolding
 mkCompulsoryUnfolding opts expr = mkCompulsoryUnfolding' (simpleOptExpr opts expr)
 
 -- | Same as 'mkCompulsoryUnfolding' but no simple optimiser pass is performed
@@ -80,14 +80,14 @@ mkDFunUnfolding bndrs con ops
                   , df_args = map occurAnalyseExpr ops }
                   -- See Note [Occurrence analysis of unfoldings]
 
-mkWwInlineRule :: SimpleOptOpts -> CoreExpr -> Arity -> Unfolding
+mkWwInlineRule :: SimpleOpts -> CoreExpr -> Arity -> Unfolding
 mkWwInlineRule opts expr arity
   = mkCoreUnfolding InlineStable True
                    (simpleOptExpr opts expr)
                    (UnfWhen { ug_arity = arity, ug_unsat_ok = unSaturatedOk
                             , ug_boring_ok = boringCxtNotOk })
 
-mkWorkerUnfolding :: SimpleOptOpts -> (CoreExpr -> CoreExpr) -> Unfolding -> Unfolding
+mkWorkerUnfolding :: SimpleOpts -> (CoreExpr -> CoreExpr) -> Unfolding -> Unfolding
 -- See Note [Worker-wrapper for INLINABLE functions] in GHC.Core.Opt.WorkWrap
 mkWorkerUnfolding opts work_fn
                   (CoreUnfolding { uf_src = src, uf_tmpl = tmpl
@@ -104,7 +104,7 @@ mkWorkerUnfolding _ _ _ = noUnfolding
 -- (ug_unsat_ok = unSaturatedOk) and that is reported as having its
 -- manifest arity (the number of outer lambdas applications will
 -- resolve before doing any work).
-mkInlineUnfolding :: SimpleOptOpts -> CoreExpr -> Unfolding
+mkInlineUnfolding :: SimpleOpts -> CoreExpr -> Unfolding
 mkInlineUnfolding opts expr
   = mkCoreUnfolding InlineStable
                     True         -- Note [Top-level flag on inline rules]
@@ -118,7 +118,7 @@ mkInlineUnfolding opts expr
 
 -- | Make an unfolding that will be used once the RHS has been saturated
 -- to the given arity.
-mkInlineUnfoldingWithArity :: Arity -> SimpleOptOpts -> CoreExpr -> Unfolding
+mkInlineUnfoldingWithArity :: Arity -> SimpleOpts -> CoreExpr -> Unfolding
 mkInlineUnfoldingWithArity arity opts expr
   = mkCoreUnfolding InlineStable
                     True         -- Note [Top-level flag on inline rules]
@@ -133,13 +133,13 @@ mkInlineUnfoldingWithArity arity opts expr
     boring_ok | arity == 0 = True
               | otherwise  = inlineBoringOk expr'
 
-mkInlinableUnfolding :: SimpleOptOpts -> CoreExpr -> Unfolding
+mkInlinableUnfolding :: SimpleOpts -> CoreExpr -> Unfolding
 mkInlinableUnfolding opts expr
   = mkUnfolding (so_uf_opts opts) InlineStable False False expr'
   where
     expr' = simpleOptExpr opts expr
 
-specUnfolding :: SimpleOptOpts
+specUnfolding :: SimpleOpts
               -> [Var] -> (CoreExpr -> CoreExpr)
               -> [CoreArg]   -- LHS arguments in the RULE
               -> Unfolding -> Unfolding

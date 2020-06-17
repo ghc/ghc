@@ -16,7 +16,7 @@ import GHC.Driver.Session
 import GHC.Driver.Ppr
 import GHC.Core
 import GHC.Driver.Types
-import GHC.Core.Opt.CSE ( cseProgram )
+import GHC.Core.Opt.CSE  ( cseProgram )
 import GHC.Core.Rules   ( mkRuleBase, unionRuleBase,
                           extendRuleBaseList, ruleCheckProgram, addRuleInfo,
                           getRules, initRuleOpts )
@@ -141,6 +141,7 @@ getCoreToDo dflags
     static_args   = gopt Opt_StaticArgumentTransformation dflags
     rules_on      = gopt Opt_EnableRewriteRules           dflags
     eta_expand_on = gopt Opt_DoLambdaEtaExpansion         dflags
+    pre_inline_on = gopt Opt_SimplPreInlining             dflags
     ww_on         = gopt Opt_WorkerWrapper                dflags
     static_ptrs   = xopt LangExt.StaticPointers           dflags
 
@@ -158,7 +159,9 @@ getCoreToDo dflags
                           , sm_rules      = rules_on
                           , sm_eta_expand = eta_expand_on
                           , sm_inline     = True
-                          , sm_case_case  = True }
+                          , sm_case_case  = True
+                          , sm_pre_inline = pre_inline_on
+                          }
 
     simpl_phase phase name iter
       = CoreDoPasses
