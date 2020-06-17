@@ -169,9 +169,6 @@ Mutex linker_mutex;
 /* Generic wrapper function to try and Resolve and RunInit oc files */
 int ocTryLoad( ObjectCode* oc );
 
-void removeOcSymbols (ObjectCode *oc);
-void freeOcStablePtrs (ObjectCode *oc);
-
 /* Link objects into the lower 2Gb on x86_64 and AArch64.  GHC assumes the
  * small memory model on this architecture (see gcc docs,
  * -mcmodel=small).
@@ -1156,7 +1153,7 @@ void mmapForLinkerMarkExecutable(void *start, size_t len)
  * Remove symbols from the symbol table, and free oc->symbols.
  * This operation is idempotent.
  */
-void removeOcSymbols (ObjectCode *oc)
+static void removeOcSymbols (ObjectCode *oc)
 {
     if (oc->symbols == NULL) return;
 
@@ -1176,7 +1173,7 @@ void removeOcSymbols (ObjectCode *oc)
  * Release StablePtrs and free oc->stable_ptrs.
  * This operation is idempotent.
  */
-void freeOcStablePtrs (ObjectCode *oc)
+static void freeOcStablePtrs (ObjectCode *oc)
 {
     // Release any StablePtrs that were created when this
     // object module was initialized.
