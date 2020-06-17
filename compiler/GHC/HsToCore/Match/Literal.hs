@@ -55,6 +55,7 @@ import GHC.Driver.Session
 import GHC.Utils.Misc
 import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Core.FamInstEnv ( FamInstEnvs, normaliseType )
 
 import Control.Monad
 import Data.Int
@@ -169,7 +170,8 @@ conversionNames
 warnAboutOverflowedOverLit :: HsOverLit GhcTc -> DsM ()
 warnAboutOverflowedOverLit hsOverLit = do
   dflags <- getDynFlags
-  warnAboutOverflowedLiterals dflags (getIntegralLit hsOverLit)
+  fam_envs <- dsGetFamInstEnvs
+  warnAboutOverflowedLiterals dflags (getIntegralLit fam_envs hsOverLit)
 
 -- | Emit warnings on integral literals which overflow the bounds implied by
 -- their type.
@@ -256,13 +258,20 @@ but perhaps that does not matter too much.
 
 warnAboutEmptyEnumerations :: DynFlags -> LHsExpr GhcTc -> Maybe (LHsExpr GhcTc)
                            -> LHsExpr GhcTc -> DsM ()
+warnAboutEmptyEnumerations dflags fromExpr mThnExpr toExpr = do
+        fam_envs <- dsGetFamInstEnvs
+        warnAboutEmptyEnumerations' fam_envs dflags fromExpr mThnExpr toExpr
+
+warnAboutEmptyEnumerations' :: FamInstEnvs -> DynFlags -> LHsExpr GhcTc
+                           -> Maybe (LHsExpr GhcTc)
+                           -> LHsExpr GhcTc -> DsM ()
 -- ^ Warns about @[2,3 .. 1]@ which returns the empty list.
 -- Only works for integral types, not floating point.
-warnAboutEmptyEnumerations dflags fromExpr mThnExpr toExpr
+warnAboutEmptyEnumerations' fam_envs dflags fromExpr mThnExpr toExpr
   | wopt Opt_WarnEmptyEnumerations dflags
-  , Just (from,tc) <- getLHsIntegralLit fromExpr
-  , Just mThn      <- traverse getLHsIntegralLit mThnExpr
-  , Just (to,_)    <- getLHsIntegralLit toExpr
+  , Just (from,tc) <- getLHsIntegralLit fam_envs fromExpr
+  , Just mThn      <- traverse (getLHsIntegralLit fam_envs) mThnExpr
+  , Just (to,_)    <- getLHsIntegralLit fam_envs toExpr
   , let check :: forall a. (Enum a, Num a) => Proxy a -> DsM ()
         check _proxy
           = when (null enumeration) $
@@ -292,22 +301,39 @@ warnAboutEmptyEnumerations dflags fromExpr mThnExpr toExpr
 
   | otherwise = return ()
 
-getLHsIntegralLit :: LHsExpr GhcTc -> Maybe (Integer, Name)
+getLHsIntegralLit :: FamInstEnvs -> LHsExpr GhcTc -> Maybe (Integer, Name)
 -- ^ See if the expression is an 'Integral' literal.
 -- Remember to look through automatically-added tick-boxes! (#8384)
-getLHsIntegralLit (L _ (HsPar _ e))            = getLHsIntegralLit e
-getLHsIntegralLit (L _ (HsTick _ _ e))         = getLHsIntegralLit e
-getLHsIntegralLit (L _ (HsBinTick _ _ _ e))    = getLHsIntegralLit e
-getLHsIntegralLit (L _ (HsOverLit _ over_lit)) = getIntegralLit over_lit
-getLHsIntegralLit (L _ (HsLit _ lit))          = getSimpleIntegralLit lit
-getLHsIntegralLit _ = Nothing
+getLHsIntegralLit fe (L _ (HsPar _ e))            = getLHsIntegralLit fe e
+getLHsIntegralLit fe (L _ (HsTick _ _ e))         = getLHsIntegralLit fe e
+getLHsIntegralLit fe (L _ (HsBinTick _ _ _ e))    = getLHsIntegralLit fe e
+getLHsIntegralLit fe (L _ (HsOverLit _ over_lit)) = getIntegralLit fe over_lit
+getLHsIntegralLit _  (L _ (HsLit _ lit))          = getSimpleIntegralLit lit
+getLHsIntegralLit _ _ = Nothing
 
 -- | If 'Integral', extract the value and type name of the overloaded literal.
-getIntegralLit :: HsOverLit GhcTc -> Maybe (Integer, Name)
-getIntegralLit (OverLit { ol_val = HsIntegral i, ol_ext = OverLitTc _ ty })
-  | Just tc <- tyConAppTyCon_maybe ty
+-- See Note [Literals and the OverloadedLists extension]
+getIntegralLit :: FamInstEnvs -> HsOverLit GhcTc -> Maybe (Integer, Name)
+getIntegralLit fam_envs (OverLit { ol_val = HsIntegral i, ol_ext = OverLitTc _ ty })
+  | Just tc <- tyConAppTyCon_maybe $
+      snd $ normaliseType fam_envs Nominal ty                   -- #18172
   = Just (il_value i, tyConName tc)
-getIntegralLit _ = Nothing
+getIntegralLit _ _ = Nothing
+
+{-
+Note [Literals and the OverloadedLists extension]
+~~~~
+Consider the Literal `[256] :: [Data.Word.Word8]`
+
+When the `OverloadedLists` extension is not active, then the `ol_ext` field
+in the `OverLitTc` record that is passed to the function `getIntegralLit`
+contains the type `Word8`. This is a simple type, and we can use its
+type constructor immediately for the `warnAboutOverflowedLiterals` function.
+
+When the `OverloadedLists` extension is active, then the `ol_ext` field
+contains the type family `Item [Word8]`. The function `nomaliseType` is used
+to convert it to the needed type `Word8`.
+-}
 
 -- | If 'Integral', extract the value and type name of the non-overloaded
 -- literal.
