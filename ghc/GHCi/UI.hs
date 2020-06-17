@@ -68,7 +68,7 @@ import GHC.Types.SrcLoc as SrcLoc
 import qualified GHC.Parser.Lexer as Lexer
 
 import GHC.Data.StringBuffer
-import GHC.Utils.Outputable hiding ( printForUser, printForUserPartWay )
+import GHC.Utils.Outputable hiding ( printForUser )
 
 import GHC.Runtime.Loader ( initializePlugins )
 
