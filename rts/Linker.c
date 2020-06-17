@@ -1297,23 +1297,6 @@ void freeObjectCode (ObjectCode *oc)
     stgFree(oc);
 }
 
-/* -----------------------------------------------------------------------------
-* Sets the initial status of a fresh ObjectCode
-*/
-static void setOcInitialStatus(ObjectCode* oc) {
-    /* If a target has requested the ObjectCode not to be resolved then
-       honor this requests.  Usually this means the ObjectCode has not been
-       initialized and can't be.  */
-    if (oc->status == OBJECT_DONT_RESOLVE)
-      return;
-
-    if (oc->archiveMemberName == NULL) {
-        oc->status = OBJECT_NEEDED;
-    } else {
-        oc->status = OBJECT_LOADED;
-    }
-}
-
 ObjectCode*
 mkOc( pathchar *path, char *image, int imageSize,
       bool mapped, char *archiveMemberName, int misalignment ) {
@@ -1346,7 +1329,11 @@ mkOc( pathchar *path, char *image, int imageSize,
        oc->archiveMemberName = NULL;
    }
 
-   setOcInitialStatus( oc );
+   if (oc->archiveMemberName == NULL) {
+       oc->status = OBJECT_NEEDED;
+   } else {
+       oc->status = OBJECT_LOADED;
+   }
 
    oc->fileSize          = imageSize;
    oc->n_symbols         = 0;
@@ -1638,8 +1625,17 @@ HsInt loadOc (ObjectCode* oc)
 #  endif
 #endif
 
-   /* loaded, but not resolved yet, ensure the OC is in a consistent state */
-   setOcInitialStatus( oc );
+   /* Loaded, but not resolved yet, ensure the OC is in a consistent state.
+      If a target has requested the ObjectCode not to be resolved then honor
+      this requests.  Usually this means the ObjectCode has not been initialized
+      and can't be. */
+   if (oc->status != OBJECT_DONT_RESOLVE) {
+       if (oc->archiveMemberName == NULL) {
+           oc->status = OBJECT_NEEDED;
+       } else {
+           oc->status = OBJECT_LOADED;
+       }
+   }
    IF_DEBUG(linker, debugBelch("loadOc: done.\n"));
 
    return 1;
