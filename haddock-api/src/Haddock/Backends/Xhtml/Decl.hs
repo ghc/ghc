@@ -41,6 +41,7 @@ import GHC.Exts
 import GHC.Types.Name
 import GHC.Data.BooleanFormula
 import GHC.Types.Name.Reader ( rdrNameOcc )
+import GHC.Core.Multiplicity
 
 -- | Pretty print a declaration
 ppDecl :: Bool                                     -- ^ print summary info only
@@ -163,14 +164,14 @@ ppSubSigLike unicode qual typ argDocs subdocs sep emptyCtxts = do_args 0 sep typ
       = (leader <+> ppLContextNoArrow lctxt unicode qual emptyCtxts, Nothing, [])
         : do_largs n (darrow unicode) ltype
 
-    do_args n leader (HsFunTy _ (L _ (HsRecTy _ fields)) r)
+    do_args n leader (HsFunTy _ _w (L _ (HsRecTy _ fields)) r)
       = [ (ldr <+> html, mdoc, subs)
         | (L _ field, ldr) <- zip fields (leader <+> gadtOpen : repeat gadtComma)
         , let (html, mdoc, subs) = ppSideBySideField subdocs unicode qual field
         ]
         ++ do_largs (n+1) (gadtEnd <+> arrow unicode) r
 
-    do_args n leader (HsFunTy _ lt r)
+    do_args n leader (HsFunTy _ _w lt r)
       = (leader <+> ppLFunLhType unicode qual emptyCtxts lt, argDoc n, [])
         : do_largs (n+1) (arrow unicode) r
 
@@ -836,7 +837,8 @@ ppShortConstrParts summary dataInst con unicode qual
 
         -- Prefix constructor, e.g. 'Just a'
         PrefixCon args ->
-          ( header_ +++ hsep (ppOcc : map (ppLParendType unicode qual HideEmptyContexts) args)
+          ( header_ +++
+              hsep (ppOcc : map ((ppLParendType unicode qual HideEmptyContexts) . hsScaledThing) args)
           , noHtml
           , noHtml
           )
@@ -852,9 +854,9 @@ ppShortConstrParts summary dataInst con unicode qual
 
         -- Infix constructor, e.g. 'a :| [a]'
         InfixCon arg1 arg2 ->
-          ( header_ +++ hsep [ ppLParendType unicode qual HideEmptyContexts arg1
+          ( header_ +++ hsep [ ppLParendType unicode qual HideEmptyContexts (hsScaledThing arg1)
                              , ppOccInfix
-                             , ppLParendType unicode qual HideEmptyContexts arg2
+                             , ppLParendType unicode qual HideEmptyContexts (hsScaledThing arg2)
                              ]
           , noHtml
           , noHtml
@@ -910,7 +912,7 @@ ppSideBySideConstr subdocs fixities unicode pkg qual (L _ con)
         PrefixCon args
           | hasArgDocs -> header_ +++ ppOcc <+> fixity
           | otherwise -> hsep [ header_ +++ ppOcc
-                              , hsep (map (ppLParendType unicode qual HideEmptyContexts) args)
+                              , hsep (map ((ppLParendType unicode qual HideEmptyContexts) . hsScaledThing) args)
                               , fixity
                               ]
 
@@ -920,9 +922,9 @@ ppSideBySideConstr subdocs fixities unicode pkg qual (L _ con)
         -- Infix constructor, e.g. 'a :| [a]'
         InfixCon arg1 arg2
           | hasArgDocs -> header_ +++ ppOcc <+> fixity
-          | otherwise -> hsep [ header_ +++ ppLParendType unicode qual HideEmptyContexts arg1
+          | otherwise -> hsep [ header_ +++ ppLParendType unicode qual HideEmptyContexts (hsScaledThing arg1)
                               , ppOccInfix
-                              , ppLParendType unicode qual HideEmptyContexts arg2
+                              , ppLParendType unicode qual HideEmptyContexts (hsScaledThing arg2)
                               , fixity
                               ]
 
@@ -957,7 +959,7 @@ ppSideBySideConstr subdocs fixities unicode pkg qual (L _ con)
     doConstrArgsWithDocs args = subFields pkg qual $ case con of
       ConDeclH98{} ->
         [ (ppLParendType unicode qual HideEmptyContexts arg, mdoc, [])
-        | (i, arg) <- zip [0..] args
+        | (i, arg) <- zip [0..] (map hsScaledThing args)
         , let mdoc = Map.lookup i argDocs
         ]
       ConDeclGADT{} ->
@@ -1150,14 +1152,14 @@ patSigContext typ | hasNonEmptyContext typ && isFirstContextEmpty typ =  ShowEmp
       case unLoc t of
         HsForAllTy _ _ s -> hasNonEmptyContext s
         HsQualTy _ cxt s -> if null (unLoc cxt) then hasNonEmptyContext s else True
-        HsFunTy _ _ s    -> hasNonEmptyContext s
+        HsFunTy _ _ _ s    -> hasNonEmptyContext s
         _ -> False
     isFirstContextEmpty :: LHsType name -> Bool
     isFirstContextEmpty t =
       case unLoc t of
         HsForAllTy _ _ s -> isFirstContextEmpty s
         HsQualTy _ cxt _ -> null (unLoc cxt)
-        HsFunTy _ _ s    -> isFirstContextEmpty s
+        HsFunTy _ _ _ s    -> isFirstContextEmpty s
         _ -> False
 
 
@@ -1197,7 +1199,7 @@ ppr_mono_ty (HsTyVar _ prom (L _ name)) _ q _
   | otherwise = ppDocName q Prefix True name
 ppr_mono_ty (HsStarTy _ isUni) u _ _ =
   toHtml (if u || isUni then "★" else "*")
-ppr_mono_ty (HsFunTy _ ty1 ty2) u q e =
+ppr_mono_ty (HsFunTy _ _ ty1 ty2) u q e =
   hsep [ ppr_mono_lty ty1 u q HideEmptyContexts
        , arrow u <+> ppr_mono_lty ty2 u q e
        ]

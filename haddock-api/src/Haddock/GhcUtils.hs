@@ -33,6 +33,7 @@ import GHC.Driver.Types
 import GHC
 import GHC.Core.Class
 import GHC.Driver.Session
+import GHC.Core.Multiplicity
 import GHC.Types.SrcLoc  ( advanceSrcLoc )
 import GHC.Types.Var     ( Specificity, VarBndr(..), TyVarBinder
                          , tyVarKind, updateTyVarKind, isInvisibleArgFlag )
@@ -205,12 +206,13 @@ getGADTConType (ConDeclGADT { con_forall = L _ has_forall
             | otherwise
             = tau_ty
 
+--   tau_ty :: LHsType DocNameI
    tau_ty = case args of
-              RecCon flds -> noLoc (HsFunTy noExtField (noLoc (HsRecTy noExtField (unLoc flds))) res_ty)
-              PrefixCon pos_args -> foldr mkFunTy res_ty pos_args
-              InfixCon arg1 arg2 -> arg1 `mkFunTy` (arg2 `mkFunTy` res_ty)
+              RecCon flds ->  mkFunTy (noLoc (HsRecTy noExtField (unLoc flds))) res_ty
+              PrefixCon pos_args -> foldr mkFunTy res_ty (map hsScaledThing pos_args)
+              InfixCon arg1 arg2 -> (hsScaledThing arg1) `mkFunTy` ((hsScaledThing arg2) `mkFunTy` res_ty)
 
-   mkFunTy a b = noLoc (HsFunTy noExtField a b)
+   mkFunTy a b = noLoc (HsFunTy noExtField HsUnrestrictedArrow a b)
 
 getGADTConType (ConDeclH98 {}) = panic "getGADTConType"
   -- Should only be called on ConDeclGADT
@@ -259,12 +261,14 @@ getGADTConTypeG (ConDeclGADT { con_forall = L _ has_forall
             | otherwise
             = tau_ty
 
+--   tau_ty :: LHsType DocNameI
    tau_ty = case args of
-              RecCon flds -> noLoc (HsFunTy noExtField (noLoc (HsRecTy noExtField (unLoc flds))) res_ty)
-              PrefixCon pos_args -> foldr mkFunTy res_ty pos_args
-              InfixCon arg1 arg2 -> arg1 `mkFunTy` (arg2 `mkFunTy` res_ty)
+              RecCon flds ->  mkFunTy (noLoc (HsRecTy noExtField (unLoc flds))) res_ty
+              PrefixCon pos_args -> foldr mkFunTy res_ty (map hsScaledThing pos_args)
+              InfixCon arg1 arg2 -> (hsScaledThing arg1) `mkFunTy` ((hsScaledThing arg2) `mkFunTy` res_ty)
 
-   mkFunTy a b = noLoc (HsFunTy noExtField a b)
+   -- mkFunTy :: LHsType DocNameI -> LHsType DocNameI -> LHsType DocNameI
+   mkFunTy a b = noLoc (HsFunTy noExtField HsUnrestrictedArrow a b)
 
 getGADTConTypeG (ConDeclH98 {}) = panic "getGADTConTypeG"
   -- Should only be called on ConDeclGADT
@@ -316,8 +320,8 @@ reparenTypePrec = go
     = paren p PREC_CTX $ HsForAllTy x (reparenHsForAllTelescope tele) (reparenLType ty)
   go p (HsQualTy x ctxt ty)
     = paren p PREC_FUN $ HsQualTy x (fmap (map reparenLType) ctxt) (reparenLType ty)
-  go p (HsFunTy x ty1 ty2)
-    = paren p PREC_FUN $ HsFunTy x (goL PREC_FUN ty1) (goL PREC_TOP ty2)
+  go p (HsFunTy x w ty1 ty2)
+    = paren p PREC_FUN $ HsFunTy x w (goL PREC_FUN ty1) (goL PREC_TOP ty2)
   go p (HsAppTy x fun_ty arg_ty)
     = paren p PREC_CON $ HsAppTy x (goL PREC_FUN fun_ty) (goL PREC_CON arg_ty)
   go p (HsAppKindTy x fun_ty arg_ki)
@@ -642,7 +646,9 @@ tyCoFVsOfType' (TyVarTy v)        a b c = (FV.unitFV v `unionFV` tyCoFVsOfType' 
 tyCoFVsOfType' (TyConApp _ tys)   a b c = tyCoFVsOfTypes' tys a b c
 tyCoFVsOfType' (LitTy {})         a b c = emptyFV a b c
 tyCoFVsOfType' (AppTy fun arg)    a b c = (tyCoFVsOfType' arg `unionFV` tyCoFVsOfType' fun) a b c
-tyCoFVsOfType' (FunTy _ arg res)  a b c = (tyCoFVsOfType' res `unionFV` tyCoFVsOfType' arg) a b c
+tyCoFVsOfType' (FunTy _ w arg res)  a b c = (tyCoFVsOfType' w `unionFV`
+                                           tyCoFVsOfType' res `unionFV`
+                                           tyCoFVsOfType' arg) a b c
 tyCoFVsOfType' (ForAllTy bndr ty) a b c = tyCoFVsBndr' bndr (tyCoFVsOfType' ty)  a b c
 tyCoFVsOfType' (CastTy ty _)      a b c = (tyCoFVsOfType' ty) a b c
 tyCoFVsOfType' (CoercionTy _ )    a b c = emptyFV a b c
@@ -688,8 +694,8 @@ defaultRuntimeRepVars = go emptyVarEnv
     go subs (TyConApp tc tc_args)
       = TyConApp tc (map (go subs) tc_args)
 
-    go subs (FunTy af arg res)
-      = FunTy af (go subs arg) (go subs res)
+    go subs (FunTy af w arg res)
+      = FunTy af (go subs w) (go subs arg) (go subs res)
 
     go subs (AppTy t u)
       = AppTy (go subs t) (go subs u)

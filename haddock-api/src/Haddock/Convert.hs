@@ -57,6 +57,8 @@ import Haddock.Types
 import Haddock.Interface.Specialize
 import Haddock.GhcUtils                      ( orderedFVs, defaultRuntimeRepVars )
 
+import GHC.Core.Multiplicity
+
 import Data.Maybe                            ( catMaybes, mapMaybe, maybeToList )
 
 
@@ -151,7 +153,7 @@ tyThingToLHsDecl prr t = case t of
 
   -- a data-constructor alone just gets rendered as a function:
   AConLike (RealDataCon dc) -> allOK $ SigD noExtField (TypeSig noExtField [synifyName dc]
-    (synifySigWcType ImplicitizeForAll [] (dataConUserType dc)))
+    (synifySigWcType ImplicitizeForAll [] (dataConWrapperType dc)))
 
   AConLike (PatSynCon ps) ->
     allOK . SigD noExtField $ PatSynSig noExtField [synifyName ps] (synifyPatSynSigType ps)
@@ -205,7 +207,7 @@ synifyTyCon prr _coax tc
     DataDecl { tcdLName = synifyName tc
              , tcdTyVars = HsQTvs  { hsq_ext = []   -- No kind polymorphism
                                    , hsq_explicit = zipWith mk_hs_tv
-                                                            tyVarKinds
+                                                            (map scaledThing tyVarKinds)
                                                             alphaTyVars --a, b, c... which are unfortunately all kind *
                                    }
 
@@ -374,7 +376,7 @@ synifyDataCon use_gadt_syntax dc =
 
   linear_tys =
     zipWith (\ty bang ->
-               let tySyn = synifyType WithinType [] ty
+               let tySyn = synifyType WithinType [] (scaledThing ty)
                in case bang of
                     (HsSrcBang _ NoSrcUnpack NoSrcStrict) -> tySyn
                     bang' -> noLoc $ HsBangTy noExtField bang' tySyn)
@@ -387,9 +389,9 @@ synifyDataCon use_gadt_syntax dc =
   hs_arg_tys = case (use_named_field_syntax, use_infix_syntax) of
           (True,True) -> Left "synifyDataCon: contradiction!"
           (True,False) -> return $ RecCon (noLoc field_tys)
-          (False,False) -> return $ PrefixCon linear_tys
+          (False,False) -> return $ PrefixCon (map hsUnrestricted linear_tys)
           (False,True) -> case linear_tys of
-                           [a,b] -> return $ InfixCon a b
+                           [a,b] -> return $ InfixCon (hsUnrestricted a) (hsUnrestricted b)
                            _ -> Left "synifyDataCon: infix with non-2 args?"
  -- finally we get synifyDataCon's result!
  in hs_arg_tys >>=
@@ -628,11 +630,12 @@ synifyType _ vs (AppTy t1 t2) = let
   s1 = synifyType WithinType vs t1
   s2 = synifyType WithinType vs t2
   in noLoc $ HsAppTy noExtField s1 s2
-synifyType s vs funty@(FunTy InvisArg _ _) = synifySigmaType s vs funty
-synifyType _ vs       (FunTy VisArg t1 t2) = let
+synifyType s vs funty@(FunTy InvisArg _ _ _) = synifySigmaType s vs funty
+synifyType _ vs       (FunTy VisArg w t1 t2) = let
   s1 = synifyType WithinType vs t1
   s2 = synifyType WithinType vs t2
-  in noLoc $ HsFunTy noExtField s1 s2
+  w' = synifyMult vs w
+  in noLoc $ HsFunTy noExtField w' s1 s2
 synifyType s vs forallty@(ForAllTy (Bndr _ argf) _ty) =
   case argf of
     Required    -> synifyVisForAllType vs forallty
@@ -749,7 +752,7 @@ noKindTyVars ts ty
   = let args = map (noKindTyVars ts) xs
         func = case f of
                  TyVarTy var | (xsKinds, outKind) <- splitFunTys (tyVarKind var)
-                             , xsKinds `eqTypes` map typeKind xs
+                             , map scaledThing xsKinds `eqTypes` map typeKind xs
                              , isLiftedTypeKind outKind
                              -> unitVarSet var
                  TyConApp t ks | t `elem` ts
@@ -758,9 +761,19 @@ noKindTyVars ts ty
                  _ -> noKindTyVars ts f
     in unionVarSets (func : args)
 noKindTyVars ts (ForAllTy _ t) = noKindTyVars ts t
-noKindTyVars ts (FunTy _ t1 t2) = noKindTyVars ts t1 `unionVarSet` noKindTyVars ts t2
+noKindTyVars ts (FunTy _ w t1 t2) = noKindTyVars ts w `unionVarSet`
+                                    noKindTyVars ts t1 `unionVarSet`
+                                    noKindTyVars ts t2
 noKindTyVars ts (CastTy t _) = noKindTyVars ts t
 noKindTyVars _ _ = emptyVarSet
+
+synifyMult :: [TyVar] -> Mult -> HsArrow GhcRn
+synifyMult vs t = case t of
+                    One  -> HsLinearArrow
+                    Many -> HsUnrestrictedArrow
+                    ty -> HsExplicitMult (synifyType WithinType vs ty)
+
+
 
 synifyPatSynType :: PatSyn -> LHsType GhcRn
 synifyPatSynType ps =
@@ -923,5 +936,5 @@ tcSplitPhiTyPreserveSynonyms ty0 = split ty0 []
 
 -- | See Note [Invariant: Never expand type synonyms]
 tcSplitPredFunTyPreserveSynonyms_maybe :: Type -> Maybe (PredType, Type)
-tcSplitPredFunTyPreserveSynonyms_maybe (FunTy InvisArg arg res) = Just (arg, res)
+tcSplitPredFunTyPreserveSynonyms_maybe (FunTy InvisArg _ arg res) = Just (arg, res)
 tcSplitPredFunTyPreserveSynonyms_maybe _ = Nothing

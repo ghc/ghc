@@ -16,7 +16,7 @@ import GHC
 import GHC.Types.Name
 import GHC.Data.FastString
 import GHC.Builtin.Types.Prim ( funTyConName )
-import GHC.Builtin.Types ( listTyConName )
+import GHC.Builtin.Types ( listTyConName, unrestrictedFunTyConName )
 
 import Control.Monad
 import Control.Monad.Trans.State
@@ -136,7 +136,7 @@ sugarTuples typ =
 sugarOperators :: NamedThing (IdP (GhcPass p)) => HsType (GhcPass p) -> HsType (GhcPass p)
 sugarOperators (HsAppTy _ (L _ (HsAppTy _ (L _ (HsTyVar _ _ (L l name))) la)) lb)
     | isSymOcc $ getOccName name' = mkHsOpTy la (L l name) lb
-    | funTyConName == name' = HsFunTy noExtField la lb
+    | unrestrictedFunTyConName == name' = HsFunTy noExtField HsUnrestrictedArrow la lb
   where
     name' = getName name
 sugarOperators typ = typ
@@ -260,7 +260,7 @@ renameType (HsTyVar x ip name) = HsTyVar x ip <$> located renameName name
 renameType t@(HsStarTy _ _) = pure t
 renameType (HsAppTy x lf la) = HsAppTy x <$> renameLType lf <*> renameLType la
 renameType (HsAppKindTy x lt lk) = HsAppKindTy x <$> renameLType lt <*> renameLKind lk
-renameType (HsFunTy x la lr) = HsFunTy x <$> renameLType la <*> renameLType lr
+renameType (HsFunTy x w la lr) = HsFunTy x <$> renameHsArrow w <*> renameLType la <*> renameLType lr
 renameType (HsListTy x lt) = HsListTy x <$> renameLType lt
 renameType (HsTupleTy x srt lt) = HsTupleTy x srt <$> mapM renameLType lt
 renameType (HsSumTy x lt) = HsSumTy x <$> mapM renameLType lt
@@ -280,6 +280,10 @@ renameType (HsExplicitTupleTy x ltys) =
     HsExplicitTupleTy x <$> renameLTypes ltys
 renameType t@(HsTyLit _ _) = pure t
 renameType (HsWildCardTy wc) = pure (HsWildCardTy wc)
+
+renameHsArrow :: HsArrow GhcRn -> Rename (IdP GhcRn) (HsArrow GhcRn)
+renameHsArrow (HsExplicitMult p) = HsExplicitMult <$> renameLType p
+renameHsArrow mult = pure mult
 
 
 renameLType :: LHsType GhcRn -> Rename (IdP GhcRn) (LHsType GhcRn)

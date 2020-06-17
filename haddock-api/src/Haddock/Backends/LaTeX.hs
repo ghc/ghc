@@ -41,6 +41,7 @@ import Control.Monad
 import Data.Maybe
 import Data.List
 import Prelude hiding ((<>))
+import GHC.Core.Multiplicity
 
 import Haddock.Doc (combineDocumentation)
 
@@ -483,13 +484,13 @@ ppSubSigLike unicode typ argDocs subdocs leader = do_args 0 leader typ
       = (decltt leader, ppLContextNoArrow lctxt unicode <+> nl)
         : do_largs n (darrow unicode) ltype
 
-    do_args n leader (HsFunTy _ (L _ (HsRecTy _ fields)) r)
+    do_args n leader (HsFunTy _ _w (L _ (HsRecTy _ fields)) r)
       = [ (decltt ldr, latex <+> nl)
         | (L _ field, ldr) <- zip fields (leader <+> gadtOpen : repeat gadtComma)
         , let latex = ppSideBySideField subdocs unicode field
         ]
         ++ do_largs (n+1) (gadtEnd <+> arrow unicode) r
-    do_args n leader (HsFunTy _ lt r)
+    do_args n leader (HsFunTy _ _w lt r)
       = (decltt leader, decltt (ppLFunLhType unicode lt) <-> arg_doc n <+> nl)
         : do_largs (n+1) (arrow unicode) r
     do_args n leader t
@@ -773,7 +774,7 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
           | hasArgDocs -> header_ <+> ppOcc
           | otherwise -> hsep [ header_
                               , ppOcc
-                              , hsep (map (ppLParendType unicode) args)
+                              , hsep (map ((ppLParendType unicode) . hsScaledThing) args)
                               ]
 
         -- Record constructor, e.g. 'Identity { runIdentity :: a }'
@@ -783,9 +784,9 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
         InfixCon arg1 arg2
           | hasArgDocs -> header_ <+> ppOcc
           | otherwise -> hsep [ header_
-                              , ppLParendType unicode arg1
+                              , ppLParendType unicode (hsScaledThing arg1)
                               , ppOccInfix
-                              , ppLParendType unicode arg2
+                              , ppLParendType unicode (hsScaledThing arg2)
                               ]
 
       ConDeclGADT{}
@@ -804,10 +805,10 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
         (_, RecCon (L _ fields))             -> doRecordFields fields
 
         -- Any GADT or a regular H98 prefix data constructor
-        (_, PrefixCon args)     | hasArgDocs -> doConstrArgsWithDocs args
+        (_, PrefixCon args)     | hasArgDocs -> doConstrArgsWithDocs (map hsScaledThing args)
 
         -- An infix H98 data constructor
-        (_, InfixCon arg1 arg2) | hasArgDocs -> doConstrArgsWithDocs [arg1,arg2]
+        (_, InfixCon arg1 arg2) | hasArgDocs -> doConstrArgsWithDocs (map hsScaledThing [arg1,arg2])
 
         _ -> empty
 
@@ -1047,7 +1048,7 @@ ppr_mono_ty (HsForAllTy _ tele ty) unicode
 ppr_mono_ty (HsQualTy _ ctxt ty) unicode
   = sep [ ppLContext ctxt unicode
         , ppr_mono_lty ty unicode ]
-ppr_mono_ty (HsFunTy _ ty1 ty2)   u
+ppr_mono_ty (HsFunTy _ _ ty1 ty2)   u
   = sep [ ppr_mono_lty ty1 u
         , arrow u <+> ppr_mono_lty ty2 u ]
 

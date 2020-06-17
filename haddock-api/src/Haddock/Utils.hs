@@ -90,6 +90,8 @@ import qualified System.Posix.Internals
 
 import GHC.Utils.Monad ( MonadIO(..) )
 
+import GHC.Core.Multiplicity
+
 
 --------------------------------------------------------------------------------
 -- * Logging
@@ -200,7 +202,7 @@ restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
         field_avail :: LConDeclField GhcRn -> Bool
         field_avail (L _ (ConDeclField _ fs _ _))
             = all (\f -> extFieldOcc (unLoc f) `elem` names) fs
-        field_types flds = [ t | ConDeclField _ _ t _ <- flds ]
+        field_types flds = [ hsUnrestricted t | ConDeclField _ _ t _ <- flds ]
 
     keep _ = Nothing
 

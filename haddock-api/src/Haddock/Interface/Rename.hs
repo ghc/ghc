@@ -221,6 +221,11 @@ renameMaybeInjectivityAnn :: Maybe (LInjectivityAnn GhcRn)
                           -> RnM (Maybe (LInjectivityAnn DocNameI))
 renameMaybeInjectivityAnn = traverse renameInjectivityAnn
 
+renameArrow :: HsArrow GhcRn -> RnM (HsArrow DocNameI)
+renameArrow HsUnrestrictedArrow = return HsUnrestrictedArrow
+renameArrow HsLinearArrow = return HsLinearArrow
+renameArrow (HsExplicitMult p) = HsExplicitMult <$> renameLType p
+
 renameType :: HsType GhcRn -> RnM (HsType DocNameI)
 renameType t = case t of
   HsForAllTy { hst_tele = tele, hst_body = ltype } -> do
@@ -249,10 +254,11 @@ renameType t = case t of
     b' <- renameLKind b
     return (HsAppKindTy noExtField a' b')
 
-  HsFunTy _ a b -> do
+  HsFunTy _ w a b -> do
     a' <- renameLType a
     b' <- renameLType b
-    return (HsFunTy noExtField a' b')
+    w' <- renameArrow w
+    return (HsFunTy noExtField w' a' b')
 
   HsListTy _ ty -> return . (HsListTy noExtField) =<< renameLType ty
   HsIParamTy _ n ty -> liftM (HsIParamTy noExtField n) (renameLType ty)
@@ -491,14 +497,20 @@ renameCon decl@(ConDeclGADT { con_names = lnames, con_qvars = ltyvars
                    , con_mb_cxt = lcontext', con_args = details'
                    , con_res_ty = res_ty', con_doc = mbldoc' })
 
+renameHsScaled :: HsScaled GhcRn (LHsType GhcRn)
+               -> RnM (HsScaled DocNameI (LHsType DocNameI))
+renameHsScaled (HsScaled w ty) = HsScaled <$> renameArrow w <*> renameLType ty
+
 renameDetails :: HsConDeclDetails GhcRn -> RnM (HsConDeclDetails DocNameI)
 renameDetails (RecCon (L l fields)) = do
   fields' <- mapM renameConDeclFieldField fields
   return (RecCon (L l fields'))
-renameDetails (PrefixCon ps) = return . PrefixCon =<< mapM renameLType ps
+                               -- This causes an assertion failure
+--renameDetails (PrefixCon ps) = -- return . PrefixCon =<< mapM (_renameLType) ps
+renameDetails (PrefixCon ps) = PrefixCon <$> mapM renameHsScaled ps
 renameDetails (InfixCon a b) = do
-  a' <- renameLType a
-  b' <- renameLType b
+  a' <- renameHsScaled a
+  b' <- renameHsScaled b
   return (InfixCon a' b')
 
 renameConDeclFieldField :: LConDeclField GhcRn -> RnM (LConDeclField DocNameI)
