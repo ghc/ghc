@@ -605,7 +605,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
               -- worker is join point iff wrapper is join point
               -- (see Note [Don't w/w join points for CPR])
 
-            simpl_opts = initSimpleOptOpts dflags
+            simpl_opts = initSimpleOpts dflags
 
             work_id  = mkWorkerId work_uniq fn_id (exprType work_rhs)
                         `setIdOccInfo` occInfo fn_info

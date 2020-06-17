@@ -287,7 +287,7 @@ dsFCall fn_id co fcall mDeclHeader = do
         wrapper_body = foldr ($) (res_wrapper work_app) arg_wrappers
         wrap_rhs     = mkLams (tvs ++ args) wrapper_body
         wrap_rhs'    = Cast wrap_rhs co
-        simpl_opts   = initSimpleOptOpts dflags
+        simpl_opts   = initSimpleOpts dflags
         fn_id_w_inl  = fn_id `setIdUnfolding` mkInlineUnfoldingWithArity
                                                 (length args)
                                                 simpl_opts
