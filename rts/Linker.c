@@ -1346,7 +1346,11 @@ mkOc( pathchar *path, char *image, int imageSize,
        oc->archiveMemberName = NULL;
    }
 
-   setOcInitialStatus( oc );
+   if (oc->archiveMemberName == NULL) {
+       oc->status = OBJECT_NEEDED;
+   } else {
+       oc->status = OBJECT_LOADED;
+   }
 
    oc->fileSize          = imageSize;
    oc->n_symbols         = 0;
