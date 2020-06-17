@@ -96,7 +96,7 @@ mkPmId :: Type -> DsM Id
 mkPmId ty = getUniqueM >>= \unique ->
   let occname = mkVarOccFS $ fsLit "pm"
       name    = mkInternalName unique occname noSrcSpan
-  in  return (mkLocalIdOrCoVar name ty)
+  in  return (mkLocalIdOrCoVar name Many ty)
 
 -----------------------------------------------
 -- * Caching possible matches of a COMPLETE set
@@ -145,7 +145,7 @@ mkOneConFull arg_tys con = do
   -- Instantiate fresh existentials as arguments to the constructor. This is
   -- important for instantiating the Thetas and field types.
   (subst, _) <- cloneTyVarBndrs subst_univ ex_tvs <$> getUniqueSupplyM
-  let field_tys' = substTys subst field_tys
+  let field_tys' = substTys subst $ map scaledThing field_tys
   -- Instantiate fresh term variables (VAs) as arguments to the constructor
   vars <- mapM mkPmId field_tys'
   -- All constraints bound by the constructor (alpha-renamed), these are added
@@ -501,7 +501,7 @@ nameTyCt pred_ty = do
   unique <- getUniqueM
   let occname = mkVarOccFS (fsLit ("pm_"++show unique))
       idname  = mkInternalName unique occname noSrcSpan
-  return (mkLocalIdOrCoVar idname pred_ty)
+  return (mkLocalIdOrCoVar idname Many pred_ty)
 
 -- | Add some extra type constraints to the 'TyState'; return 'Nothing' if we
 -- find a contradiction (e.g. @Int ~ Bool@).

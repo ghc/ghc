@@ -11,12 +11,12 @@ Dependent packages: [base-4.14.0.0, ghc-prim-0.6.1,
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 18, types: 53, coercions: 0, joins: 0/0}
+  = {terms: 24, types: 61, coercions: 0, joins: 0/0}
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 7, types: 8, coercions: 0, joins: 0/0}
 T18052a.$b:||: :: forall {a} {b}. a -> b -> (a, b)
 [GblId, Arity=2, Unf=OtherCon []]
-T18052a.$b:||: = GHC.Tuple.(,)
+T18052a.$b:||: = \ (@a) (@b) (x :: a) (y :: b) -> (x, y)
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 (+++) :: forall {a}. [a] -> [a] -> [a]

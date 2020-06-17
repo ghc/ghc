@@ -916,7 +916,7 @@ cpeApp top_env expr
                    (_   : ss_rest, True)  -> (topDmd, ss_rest)
                    (ss1 : ss_rest, False) -> (ss1,    ss_rest)
                    ([],            _)     -> (topDmd, [])
-            (arg_ty, res_ty) =
+            (_, arg_ty, res_ty) =
               case splitFunTy_maybe fun_ty of
                 Just as -> as
                 Nothing -> pprPanic "cpeBody" (ppr fun_ty $$ ppr expr)
@@ -1252,7 +1252,7 @@ tryEtaReducePrep bndrs expr@(App _ _)
     ok _    _         = False
 
     -- We can't eta reduce something which must be saturated.
-    ok_to_eta_reduce (Var f) = not (hasNoBinding f)
+    ok_to_eta_reduce (Var f) = not (hasNoBinding f) && not (isLinearType (idType f))
     ok_to_eta_reduce _       = False -- Safe. ToDo: generalise
 
 
@@ -1687,7 +1687,7 @@ newVar :: Type -> UniqSM Id
 newVar ty
  = seqType ty `seq` do
      uniq <- getUniqueM
-     return (mkSysLocalOrCoVar (fsLit "sat") uniq ty)
+     return (mkSysLocalOrCoVar (fsLit "sat") uniq Many ty)
 
 
 ------------------------------------------------------------------------------

@@ -36,7 +36,6 @@ import GHC.Types.Var.Set
 import GHC.Utils.Misc
 import GHC.Driver.Session
 import GHC.Utils.Outputable
--- import Data.List        ( mapAccumL )
 import GHC.Types.Basic      ( RecFlag(..), isRec )
 
 {-
@@ -206,7 +205,7 @@ fiExpr platform to_drop ann_expr@(_,AnnApp {})
       | otherwise
       = (res_ty, extra_fvs)
       where
-       (arg_ty, res_ty) = splitFunTy fun_ty
+       (_, arg_ty, res_ty) = splitFunTy fun_ty
 
 {- Note [Dead bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~
