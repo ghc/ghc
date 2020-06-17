@@ -298,6 +298,9 @@ void addProddableBlock ( ObjectCode* oc, void* start, int size );
 void checkProddableBlock (ObjectCode *oc, void *addr, size_t size );
 void freeProddableBlocks (ObjectCode *oc);
 
+void freeOcStablePtrs (ObjectCode *oc);
+void removeOcSymbols (ObjectCode *oc);
+
 void addSection (Section *s, SectionKind kind, SectionAlloc alloc,
                  void* start, StgWord size, StgWord mapped_offset,
                  void* mapped_start, StgWord mapped_size);
