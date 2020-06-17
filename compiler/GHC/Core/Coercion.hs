@@ -1782,6 +1782,9 @@ liftCoSubstWith r tvs cos ty
 -- @lc_left@ is a substitution mapping type variables to the left-hand
 -- types of the mapped coercions in @lc@, and similar for @lc_right@.
 liftCoSubst :: HasDebugCallStack => Role -> LiftingContext -> Type -> Coercion
+{-# INLINE liftCoSubst #-}
+-- Inlining this function is worth 2% of allocation in T9872d,
+-- mainly in Flatten.flatten_args_slow
 liftCoSubst r lc@(LC subst env) ty
   | isEmptyVarEnv env = mkReflCo r (substTy subst ty)
   | otherwise         = ty_co_subst lc r ty
