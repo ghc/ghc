@@ -234,7 +234,6 @@ Library
         GHC.IO.FD
         GHC.IO.Handle
         GHC.IO.Handle.FD
-        GHC.IO.Handle.Windows
         GHC.IO.Handle.Internals
         GHC.IO.Handle.Lock
         GHC.IO.Handle.Text
@@ -398,6 +397,7 @@ Library
             GHC.Event.Windows.FFI
             GHC.Event.Windows.ManagedThreadPool
             GHC.Event.Windows.Thread
+            GHC.IO.Handle.Windows
             GHC.IO.Windows.Handle
             GHC.IO.Windows.Encoding
             GHC.IO.Windows.Paths
