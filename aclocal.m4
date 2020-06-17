@@ -1333,7 +1333,7 @@ AC_DEFUN([FP_GCC_VERSION], [
     AC_MSG_ERROR([C compiler is required])
   fi
 
-  if $CC --version | grep --quiet gcc; then
+  if $CC --version | grep -q gcc; then
     AC_CACHE_CHECK([version of gcc], [fp_cv_gcc_version],
     [
         # Be sure only to look at the first occurrence of the "version " string;
