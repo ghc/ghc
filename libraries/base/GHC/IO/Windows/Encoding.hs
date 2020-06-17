@@ -75,13 +75,13 @@ encodeMultiByteIO' cp wstr transformer =
 encodeMultiByteIO :: CodePage -> String -> IO String
 encodeMultiByteIO _ "" = return ""
 encodeMultiByteIO cp s = encodeMultiByteIO' cp s toString
-  where toString (s,l) = peekCAStringLen (s,fromIntegral l)
+  where toString (st,l) = peekCAStringLen (st,fromIntegral l)
 
 -- converts [Char] to UTF-16
 encodeMultiByteRawIO :: CodePage -> String -> IO (LPCSTR, CInt)
 encodeMultiByteRawIO _ "" = return (nullPtr, 0)
 encodeMultiByteRawIO cp s = encodeMultiByteIO' cp s toSizedCString
-  where toSizedCString (s,l) = return (s, fromIntegral l)
+  where toSizedCString (st,l) = return (st, fromIntegral l)
 
 foreign import WINDOWS_CCONV "WideCharToMultiByte"
   wideCharToMultiByte
