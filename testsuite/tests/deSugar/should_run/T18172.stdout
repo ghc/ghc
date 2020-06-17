@@ -1,0 +1,14 @@
+[255]
+[0]
+[254]
+[1]
+253 :| []
+2 :| []
+ZipList {getZipList = [252]}
+ZipList {getZipList = [3]}
+[Just 4]
+[Just [Just 5]]
+[(6,0)]
+[]
+[]
+Wombat [4,8,10]

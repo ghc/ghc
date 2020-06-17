@@ -1,0 +1,47 @@
+<interactive>:2:3: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal -1 is out of the Word8 range 0..255
+
+<interactive>:3:2: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal 256 is out of the Word8 range 0..255
+
+<interactive>:5:3: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal -2 is out of the Word8 range 0..255
+
+<interactive>:6:2: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal 257 is out of the Word8 range 0..255
+
+<interactive>:8:3: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal -3 is out of the Word8 range 0..255
+
+<interactive>:9:2: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal 258 is out of the Word8 range 0..255
+
+<interactive>:11:11: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal -4 is out of the Word8 range 0..255
+
+<interactive>:12:10: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal 259 is out of the Word8 range 0..255
+
+<interactive>:14:7: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal 260 is out of the Word8 range 0..255
+
+<interactive>:15:13: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal 261 is out of the Word8 range 0..255
+
+<interactive>:16:3: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal 262 is out of the Word8 range 0..255
+
+<interactive>:16:8: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal 65536 is out of the Word16 range 0..65535
+
+<interactive>:18:3: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal -5 is out of the Word8 range 0..255
+
+<interactive>:19:1: warning: [-Wempty-enumerations (in -Wdefault)]
+    Enumeration is empty
+
+<interactive>:19:7: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal 263 is out of the Word8 range 0..255
+
+<interactive>:22:12: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal 264 is out of the Word8 range 0..255
