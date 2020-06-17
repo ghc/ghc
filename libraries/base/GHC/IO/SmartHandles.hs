@@ -25,13 +25,12 @@ module GHC.IO.SmartHandles
 
 import GHC.IO
 import GHC.IO.IOMode
-import GHC.IO.SubSystem
 import GHC.IO.Handle.Types
 
 import qualified GHC.IO.Handle.FD as POSIX
 #if defined(mingw32_HOST_OS)
+import GHC.IO.SubSystem
 import qualified GHC.IO.Handle.Windows as Win
-#endif
 
 stdin :: Handle
 stdin = POSIX.stdin <!> Win.stdin
@@ -50,3 +49,25 @@ openBinaryFile = POSIX.openBinaryFile <!> Win.openBinaryFile
 
 openFileBlocking :: FilePath -> IOMode -> IO Handle
 openFileBlocking = POSIX.openFileBlocking <!> Win.openFileBlocking
+
+#else
+
+stdin :: Handle
+stdin = POSIX.stdin
+
+stdout :: Handle
+stdout = POSIX.stdout
+
+stderr :: Handle
+stderr = POSIX.stderr
+
+openFile :: FilePath -> IOMode -> IO Handle
+openFile = POSIX.openFile
+
+openBinaryFile :: FilePath -> IOMode -> IO Handle
+openBinaryFile = POSIX.openBinaryFile
+
+openFileBlocking :: FilePath -> IOMode -> IO Handle
+openFileBlocking = POSIX.openFileBlocking
+
+#endif
