@@ -1810,8 +1810,8 @@ makeSymbolExtra_PEi386( ObjectCode* oc, uint64_t index, size_t s, char* symbol )
     SymbolExtra *extra;
     curr_thunk = oc->first_symbol_extra + index;
     if (index >= oc->n_symbol_extras) {
-      IF_DEBUG(linker, debugBelch("makeSymbolExtra first:%d, num:%lu, member:%s, index:%llu\n", curr_thunk, oc->n_symbol_extras, oc->archiveMemberName, index));
-      barf("Can't allocate thunk for `%s' in `%" PATH_FMT "' with member `%s'", symbol, oc->fileName, oc->archiveMemberName);
+      IF_DEBUG(linker, debugBelch("makeSymbolExtra first:%d, num:%lu, member:%" PATH_FMT ", index:%llu\n", curr_thunk, oc->n_symbol_extras, oc->archiveMemberName, index));
+      barf("Can't allocate thunk for `%s' in `%" PATH_FMT "' with member `%" PATH_FMT "'", symbol, oc->fileName, oc->archiveMemberName);
     }
 
     extra = oc->symbol_extras + curr_thunk;
@@ -2177,9 +2177,7 @@ resolveSymbolAddr_PEi386 (pathchar* buffer, int size,
                   wcscat (buffer, WSTR(" "));
                   if (oc->archiveMemberName)
                   {
-                      pathchar* name = mkPath (oc->archiveMemberName);
-                      wcscat (buffer, name);
-                      stgFree (name);
+                      wcscat (buffer, oc->archiveMemberName);
                   }
                   else
                   {
