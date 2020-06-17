@@ -378,7 +378,7 @@ warningsToMessages dflags =
 
 printBagOfErrors :: DynFlags -> Bag ErrMsg -> IO ()
 printBagOfErrors dflags bag_of_errors
-  = sequence_ [ let style = mkErrStyle dflags unqual
+  = sequence_ [ let style = mkErrStyle unqual
                     ctx   = initSDocContext dflags style
                 in putLogMsg dflags reason sev s $ withPprStyle style (formatErrDoc ctx doc)
               | ErrMsg { errMsgSpan      = s,
@@ -621,15 +621,15 @@ ifVerbose dflags val act
 
 errorMsg :: DynFlags -> MsgDoc -> IO ()
 errorMsg dflags msg
-   = putLogMsg dflags NoReason SevError noSrcSpan $ withPprStyle (defaultErrStyle dflags) msg
+   = putLogMsg dflags NoReason SevError noSrcSpan $ withPprStyle defaultErrStyle msg
 
 warningMsg :: DynFlags -> MsgDoc -> IO ()
 warningMsg dflags msg
-   = putLogMsg dflags NoReason SevWarning noSrcSpan $ withPprStyle (defaultErrStyle dflags) msg
+   = putLogMsg dflags NoReason SevWarning noSrcSpan $ withPprStyle defaultErrStyle msg
 
 fatalErrorMsg :: DynFlags -> MsgDoc -> IO ()
 fatalErrorMsg dflags msg =
-    putLogMsg dflags NoReason SevFatal noSrcSpan $ withPprStyle (defaultErrStyle dflags) msg
+    putLogMsg dflags NoReason SevFatal noSrcSpan $ withPprStyle defaultErrStyle msg
 
 fatalErrorMsg'' :: FatalMessager -> String -> IO ()
 fatalErrorMsg'' fm msg = fm msg

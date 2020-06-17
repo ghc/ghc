@@ -43,7 +43,7 @@ module GHC.Utils.Outputable (
         coloured, keyword,
 
         -- * Converting 'SDoc' into strings and outputting it
-        printSDoc, printSDocLn, printForUser, printForUserPartWay,
+        printSDoc, printSDocLn, printForUser,
         printForC, bufLeftRenderSDoc,
         pprCode, mkCodeStyle,
         showSDoc, showSDocUnsafe, showSDocOneLine,
@@ -96,7 +96,6 @@ import GHC.Prelude
 
 import {-# SOURCE #-}   GHC.Driver.Session
                            ( DynFlags, hasPprDebug, hasNoDebugOutput
-                           , pprUserLength
                            , unsafeGlobalDynFlags, initSDocContext
                            )
 import {-# SOURCE #-}   GHC.Unit.Types ( Unit, Module, moduleName )
@@ -165,8 +164,10 @@ data PprStyle
 data CodeStyle = CStyle         -- The format of labels differs for C and assembler
                | AsmStyle
 
-data Depth = AllTheWay
-           | PartWay Int        -- 0 => stop
+data Depth
+   = AllTheWay
+   | PartWay Int  -- ^ 0 => stop
+   | DefaultDepth -- ^ Use 'sdocDefaultDepth' field as depth
 
 data Coloured
   = Uncoloured
@@ -263,13 +264,12 @@ mkDumpStyle print_unqual = PprDump print_unqual
 -- | Default style for error messages, when we don't know PrintUnqualified
 -- It's a bit of a hack because it doesn't take into account what's in scope
 -- Only used for desugarer warnings, and typechecker errors in interface sigs
-defaultErrStyle :: DynFlags -> PprStyle
-defaultErrStyle dflags = mkErrStyle dflags neverQualify
+defaultErrStyle :: PprStyle
+defaultErrStyle = mkErrStyle neverQualify
 
 -- | Style for printing error messages
-mkErrStyle :: DynFlags -> PrintUnqualified -> PprStyle
-mkErrStyle dflags qual =
-   mkUserStyle qual (PartWay (pprUserLength dflags))
+mkErrStyle :: PrintUnqualified -> PprStyle
+mkErrStyle unqual = mkUserStyle unqual DefaultDepth
 
 cmdlineParserStyle :: PprStyle
 cmdlineParserStyle = mkUserStyle alwaysQualify AllTheWay
@@ -282,8 +282,7 @@ withUserStyle unqual depth doc = withPprStyle (PprUser unqual depth Uncoloured) 
 
 withErrStyle :: PrintUnqualified -> SDoc -> SDoc
 withErrStyle unqual doc =
-   sdocWithDynFlags $ \dflags ->
-   withPprStyle (mkErrStyle dflags unqual) doc
+   withPprStyle (mkErrStyle unqual) doc
 
 setStyleColoured :: Bool -> PprStyle -> PprStyle
 setStyleColoured col style =
@@ -329,6 +328,7 @@ data SDocContext = SDC
       -- ^ The most recently used colour.
       -- This allows nesting colours.
   , sdocShouldUseColor              :: !Bool
+  , sdocDefaultDepth                :: !Int
   , sdocLineLength                  :: !Int
   , sdocCanUseUnicode               :: !Bool
       -- ^ True if Unicode encoding is supported
@@ -373,11 +373,16 @@ withPprStyle :: PprStyle -> SDoc -> SDoc
 withPprStyle sty d = SDoc $ \ctxt -> runSDoc d ctxt{sdocStyle=sty}
 
 pprDeeper :: SDoc -> SDoc
-pprDeeper d = SDoc $ \ctx -> case ctx of
-  SDC{sdocStyle=PprUser _ (PartWay 0) _} -> Pretty.text "..."
-  SDC{sdocStyle=PprUser q (PartWay n) c} ->
-    runSDoc d ctx{sdocStyle = PprUser q (PartWay (n-1)) c}
+pprDeeper d = SDoc $ \ctx -> case sdocStyle ctx of
+  PprUser q depth c ->
+   let deeper 0 = Pretty.text "..."
+       deeper n = runSDoc d ctx{sdocStyle = PprUser q (PartWay (n-1)) c}
+   in case depth of
+         DefaultDepth -> deeper (sdocDefaultDepth ctx)
+         PartWay n    -> deeper n
+         AllTheWay    -> runSDoc d ctx
   _ -> runSDoc d ctx
+
 
 -- | Truncate a list that is longer than the current depth.
 pprDeeperList :: ([SDoc] -> SDoc) -> [SDoc] -> SDoc
@@ -385,14 +390,17 @@ pprDeeperList f ds
   | null ds   = f []
   | otherwise = SDoc work
  where
-  work ctx@SDC{sdocStyle=PprUser q (PartWay n) c}
-   | n==0      = Pretty.text "..."
-   | otherwise =
-      runSDoc (f (go 0 ds)) ctx{sdocStyle = PprUser q (PartWay (n-1)) c}
-   where
-     go _ [] = []
-     go i (d:ds) | i >= n    = [text "...."]
-                 | otherwise = d : go (i+1) ds
+  work ctx@SDC{sdocStyle=PprUser q depth c}
+   | DefaultDepth <- depth
+   = work (ctx { sdocStyle = PprUser q (PartWay (sdocDefaultDepth ctx)) c })
+   | PartWay 0 <- depth
+   = Pretty.text "..."
+   | PartWay n <- depth
+   = let
+        go _ [] = []
+        go i (d:ds) | i >= n    = [text "...."]
+                    | otherwise = d : go (i+1) ds
+     in runSDoc (f (go 0 ds)) ctx{sdocStyle = PprUser q (PartWay (n-1)) c}
   work other_ctx = runSDoc (f ds) other_ctx
 
 pprSetDepth :: Depth -> SDoc -> SDoc
@@ -484,16 +492,10 @@ printSDocLn :: SDocContext -> Mode -> Handle -> SDoc -> IO ()
 printSDocLn ctx mode handle doc =
   printSDoc ctx mode handle (doc $$ text "")
 
-printForUser :: DynFlags -> Handle -> PrintUnqualified -> SDoc -> IO ()
-printForUser dflags handle unqual doc
+printForUser :: DynFlags -> Handle -> PrintUnqualified -> Depth -> SDoc -> IO ()
+printForUser dflags handle unqual depth doc
   = printSDocLn ctx PageMode handle doc
-    where ctx = initSDocContext dflags (mkUserStyle unqual AllTheWay)
-
-printForUserPartWay :: DynFlags -> Handle -> Int -> PrintUnqualified -> SDoc
-                    -> IO ()
-printForUserPartWay dflags handle d unqual doc
-  = printSDocLn ctx PageMode handle doc
-    where ctx = initSDocContext dflags (mkUserStyle unqual (PartWay d))
+    where ctx = initSDocContext dflags (mkUserStyle unqual depth)
 
 -- | Like 'printSDocLn' but specialized with 'LeftMode' and
 -- @'PprCode' 'CStyle'@.  This is typically used to output C-- code.
