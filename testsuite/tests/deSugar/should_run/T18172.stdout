@@ -1,0 +1,11 @@
+[255]
+[0]
+[255]
+[0]
+255 :| []
+0 :| []
+ZipList {getZipList = [255]}
+ZipList {getZipList = [0]}
+[Just 1]
+[Just [Just 2]]
+[(4,0)]

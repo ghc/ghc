@@ -303,11 +303,35 @@ getLHsIntegralLit (L _ (HsLit _ lit))          = getSimpleIntegralLit lit
 getLHsIntegralLit _ = Nothing
 
 -- | If 'Integral', extract the value and type name of the overloaded literal.
+-- See Note [Literals and the OverloadedLists extension]
 getIntegralLit :: HsOverLit GhcTc -> Maybe (Integer, Name)
-getIntegralLit (OverLit { ol_val = HsIntegral i, ol_ext = OverLitTc _ ty })
-  | Just tc <- tyConAppTyCon_maybe ty
-  = Just (il_value i, tyConName tc)
+getIntegralLit OverLit { ol_val = HsIntegral i, ol_ext = OverLitTc _ ty }
+    | Just (tc, _) <- unwrapBasicTyCon ty = Just (il_value i, tyConName tc)
+  where
+    unwrapBasicTyCon :: Type ->  Maybe (TyCon, [Type])              -- #18172
+    unwrapBasicTyCon typ
+        | mbSplit@(Just (_, tys)) <- splitTyConApp_maybe typ
+        = case tys of
+          [] -> mbSplit
+          _  -> unwrapBasicTyCon $ head tys
+        | otherwise = Nothing
 getIntegralLit _ = Nothing
+
+{-
+Note [Literals and the OverloadedLists extension]
+~~~~
+Consider the Literal `[256] :: [Data.Word.Word8]`
+
+When the `OverloadedLists` extension is not active, then the `ol_ext` field
+in the `OverLitTc` record that is passed to the function `getIntegralLit`
+contains the type `Word8`. As this is a simple basic type, the `name` of
+the type constructor can be used directly as an argument for the
+`warnAboutOverflowedLiterals` function.
+
+When the `OverloadedLists` extension is active, then the `ol_ext` field contains
+the type `Item ([] Word8)`. The function `getIntegralLit.unwrapBasicTyCon`
+unwraps this type to extract the needed basic type constructor `Word8`.
+-}
 
 -- | If 'Integral', extract the value and type name of the non-overloaded
 -- literal.
