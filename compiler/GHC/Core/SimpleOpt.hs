@@ -7,7 +7,7 @@
 {-# LANGUAGE MultiWayIf #-}
 
 module GHC.Core.SimpleOpt (
-        SimpleOptOpts (..), defaultSimpleOptOpts,
+        SimpleOpts (..), defaultSimpleOpts,
 
         -- ** Simple expression optimiser
         simpleOptPgm, simpleOptExpr, simpleOptExprWith,
@@ -96,26 +96,20 @@ little dance in action; the full Simplifier is a lot more complicated.
 -}
 
 -- | Simple optimiser options
-data SimpleOptOpts = SimpleOptOpts
+data SimpleOpts = SimpleOpts
    { so_uf_opts :: !UnfoldingOpts   -- ^ Unfolding options
    , so_co_opts :: !OptCoercionOpts -- ^ Coercion optimiser options
    }
 
 -- | Default options for the Simple optimiser.
---
--- These are used:
---    - to optimise compulsory unfolding in 'GHC.Core.Unfold.mkCompulsoryUnfolding'
---    - to perform beta-reduction in 'exprIsLambda_maybe'
---
--- For now these can't be overriden by user flags.
-defaultSimpleOptOpts :: SimpleOptOpts
-defaultSimpleOptOpts = SimpleOptOpts
+defaultSimpleOpts :: SimpleOpts
+defaultSimpleOpts = SimpleOpts
    { so_uf_opts = defaultUnfoldingOpts
    , so_co_opts = OptCoercionOpts
       { optCoercionEnabled = False }
    }
 
-simpleOptExpr :: HasDebugCallStack => SimpleOptOpts -> CoreExpr -> CoreExpr
+simpleOptExpr :: HasDebugCallStack => SimpleOpts -> CoreExpr -> CoreExpr
 -- See Note [The simple optimiser]
 -- Do simple optimisation on an expression
 -- The optimisation is very straightforward: just
@@ -147,7 +141,7 @@ simpleOptExpr opts expr
         -- It's a bit painful to call exprFreeVars, because it makes
         -- three passes instead of two (occ-anal, and go)
 
-simpleOptExprWith :: HasDebugCallStack => SimpleOptOpts -> Subst -> InExpr -> OutExpr
+simpleOptExprWith :: HasDebugCallStack => SimpleOpts -> Subst -> InExpr -> OutExpr
 -- See Note [The simple optimiser]
 simpleOptExprWith opts subst expr
   = simple_opt_expr init_env (occurAnalyseExpr expr)
@@ -155,7 +149,7 @@ simpleOptExprWith opts subst expr
     init_env = (emptyEnv opts) { soe_subst = subst }
 
 ----------------------
-simpleOptPgm :: SimpleOptOpts
+simpleOptPgm :: SimpleOpts
              -> Module
              -> CoreProgram
              -> [CoreRule]
@@ -208,7 +202,7 @@ instance Outputable SimpleOptEnv where
                             , text "soe_subst =" <+> ppr subst ]
                    <+> text "}"
 
-emptyEnv :: SimpleOptOpts -> SimpleOptEnv
+emptyEnv :: SimpleOpts -> SimpleOptEnv
 emptyEnv opts = SOE
    { soe_inl         = emptyVarEnv
    , soe_subst       = emptySubst
@@ -1336,7 +1330,7 @@ exprIsLambda_maybe (in_scope_set, id_unf) e
     -- Make sure there is hope to get a lambda
     , Just rhs <- expandUnfolding_maybe (id_unf f)
     -- Optimize, for beta-reduction
-    , let e' = simpleOptExprWith defaultSimpleOptOpts (mkEmptySubst in_scope_set) (rhs `mkApps` as)
+    , let e' = simpleOptExprWith defaultSimpleOpts (mkEmptySubst in_scope_set) (rhs `mkApps` as)
     -- Recurse, because of possible casts
     , Just (x', e'', ts') <- exprIsLambda_maybe (in_scope_set, id_unf) e'
     , let res = Just (x', e'', ts++ts')
