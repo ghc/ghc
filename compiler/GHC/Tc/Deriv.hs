@@ -202,9 +202,7 @@ tcDeriving deriv_infos deriv_decls
         ; dflags <- getDynFlags
 
         ; let (_, deriv_stuff, fvs) = unzip3 (insts1 ++ insts2)
-        ; loc <- getSrcSpanM
-        ; let (binds, famInsts) = genAuxBinds dflags loc
-                                    (unionManyBags deriv_stuff)
+        ; let (binds, famInsts) = genAuxBinds (unionManyBags deriv_stuff)
 
         ; let mk_inst_infos1 = map fstOf3 insts1
         ; inst_infos1 <- apply_inst_infos mk_inst_infos1 given_specs

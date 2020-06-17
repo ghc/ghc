@@ -608,7 +608,6 @@ mkDataConWrapperOcc, mkWorkerOcc,
         mkGenR, mkGen1R,
         mkDataConWorkerOcc, mkNewTyCoOcc,
         mkInstTyCoOcc, mkEqPredCoOcc, mkClassOpAuxOcc,
-        mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
         mkTyConRepOcc
    :: OccName -> OccName
 
@@ -628,11 +627,6 @@ mkClassDataConOcc   = mk_simple_deriv dataName "C:"   -- Data con for a class
 mkNewTyCoOcc        = mk_simple_deriv tcName   "N:"   -- Coercion for newtypes
 mkInstTyCoOcc       = mk_simple_deriv tcName   "D:"   -- Coercion for type functions
 mkEqPredCoOcc       = mk_simple_deriv tcName   "$co"
-
--- Used in derived instances
-mkCon2TagOcc        = mk_simple_deriv varName  "$con2tag_"
-mkTag2ConOcc        = mk_simple_deriv varName  "$tag2con_"
-mkMaxTagOcc         = mk_simple_deriv varName  "$maxtag_"
 
 -- TyConRepName stuff; see Note [Grand plan for Typeable] in GHC.Tc.Instance.Typeable
 mkTyConRepOcc occ = mk_simple_deriv varName prefix occ
@@ -697,15 +691,17 @@ mkDFunOcc info_str is_boot set
     prefix | is_boot   = "$fx"
            | otherwise = "$f"
 
-mkDataTOcc, mkDataCOcc
+mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc, mkDataTOcc, mkDataCOcc
   :: OccName            -- ^ TyCon or data con string
   -> OccSet             -- ^ avoid these Occs
   -> OccName            -- ^ E.g. @$f3OrdMaybe@
--- data T = MkT ... deriving( Data ) needs definitions for
---      $tT   :: Data.Generics.Basics.DataType
---      $cMkT :: Data.Generics.Basics.Constr
-mkDataTOcc occ = chooseUniqueOcc VarName ("$t" ++ occNameString occ)
-mkDataCOcc occ = chooseUniqueOcc VarName ("$c" ++ occNameString occ)
+-- Generates the names of auxiliary bindings used for derived instances.
+-- See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate.
+mkCon2TagOcc occ = chooseUniqueOcc VarName ("$con2tag_" ++ occNameString occ)
+mkTag2ConOcc occ = chooseUniqueOcc VarName ("$tag2con_" ++ occNameString occ)
+mkMaxTagOcc  occ = chooseUniqueOcc VarName ("$maxtag_"  ++ occNameString occ)
+mkDataTOcc   occ = chooseUniqueOcc VarName ("$t" ++ occNameString occ)
+mkDataCOcc   occ = chooseUniqueOcc VarName ("$c" ++ occNameString occ)
 
 {-
 Sometimes we need to pick an OccName that has not already been used,
