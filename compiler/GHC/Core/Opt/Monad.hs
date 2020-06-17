@@ -778,7 +778,7 @@ msg sev reason doc
                      SevWarning -> err_sty
                      SevDump    -> dump_sty
                      _          -> user_sty
-             err_sty  = mkErrStyle dflags unqual
+             err_sty  = mkErrStyle unqual
              user_sty = mkUserStyle unqual AllTheWay
              dump_sty = mkDumpStyle unqual
        ; liftIO $ putLogMsg dflags reason sev loc (withPprStyle sty doc) }

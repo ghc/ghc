@@ -1623,7 +1623,7 @@ printMinimalImports imports_w_usage
        ; this_mod <- getModule
        ; dflags   <- getDynFlags
        ; liftIO $ withFile (mkFilename dflags this_mod) WriteMode $ \h ->
-          printForUser dflags h neverQualify (vcat (map ppr imports'))
+          printForUser dflags h neverQualify AllTheWay (vcat (map ppr imports'))
               -- The neverQualify is important.  We are printing Names
               -- but they are in the context of an 'import' decl, and
               -- we never qualify things inside there
