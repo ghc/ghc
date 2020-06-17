@@ -74,9 +74,11 @@ testRules = do
                 need (ghcPath : depsLibs)
 
             bindir <- getBinaryDirectory testGhc
+            debugged <- ghcDebugged <$> flavour
             cmd [bindir </> "ghc" <.> exe] $
                 concatMap (\p -> ["-package", pkgName p]) depsPkgs ++
-                ["-o", top -/- path, top -/- sourcePath]
+                ["-o", top -/- path, top -/- sourcePath] ++
+                if debugged then ["-debug"] else []
 
     root -/- ghcConfigPath %> \_ -> do
         args <- userSetting defaultTestArgs
