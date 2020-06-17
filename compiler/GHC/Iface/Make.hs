@@ -61,7 +61,6 @@ import Util             hiding ( eqListBy )
 import FastString
 import Maybes
 import GHC.HsToCore.Docs
-import GHC.Iface.Binary
 
 import Data.Function
 import Data.List ( findIndex, mapAccumL, sortBy )
@@ -69,7 +68,6 @@ import Data.Ord
 import Data.IORef
 import GHC.Driver.Plugins
 
-import Control.Monad
 
 {-
 ************************************************************************
@@ -99,7 +97,9 @@ mkPartialIface hsc_env mod_details
               , mg_decl_docs    = decl_docs
               , mg_arg_docs     = arg_docs
               }
-  = withPlugins dflags (\p opts -> interfaceWriteAction p opts hsc_env mod_details guts) iface
+  = do iface' <- withPlugins dflags (\p opts -> interfaceWriteAction p opts hsc_env mod_details guts) iface
+       ext_fs <- readIORef $ hsc_extensible_fields hsc_env
+       return $ iface'{mi_ext_fields = ext_fs}
   -- | gopt Opt_WriteCoreField dflags = do
   --   fields <- writeFieldWith "ghc/core" write (mi_ext_fields iface)
   --   forM_ (mg_binds guts) go
@@ -787,6 +787,9 @@ toIfaceModGuts (ModGuts f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f
     f28
     f29
 
+isRealBinding :: Bind Id -> Bool
 isRealBinding (NonRec n _) = isExternalName (idName n)
+isRealBinding _ = True
 
+toIfaceBind' :: Bind Id -> (Bool, IfaceBinding)
 toIfaceBind' b = (isRealBinding b, toIfaceBind b)

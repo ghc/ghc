@@ -83,8 +83,6 @@ import qualified BooleanFormula as BF
 import Control.Monad
 import qualified Data.Map as Map
 
-import Data.IORef
-import GHC.Types.Name.Cache
 {-
 This module takes
 
@@ -1862,7 +1860,7 @@ tcIfaceBinding mod loc ibind = do
 
 tcIfaceBinding' :: Module -> SrcSpan -> (Bool, IfaceBinding) -> IfL (Bind Id)
 tcIfaceBinding' _   _    (_p, (IfaceRec _)) = panic "tcIfaceBinding: expected NonRec at top level"
-tcIfaceBinding' mod loc b@(p, IfaceNonRec (IfLetBndr fs ty info ji) rhs) = do
+tcIfaceBinding' _mod _loc _b@(_p, IfaceNonRec (IfLetBndr fs ty _info ji) rhs) = do
   name <- lookupIfaceTop (mkVarOccFS fs)
 
 
