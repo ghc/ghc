@@ -261,7 +261,7 @@ tcExpr e@(HsOverLabel _ mb_fromLabel l) res_ty
   origin = OverLabelOrigin l
   lbl = mkStrLitTy l
 
-  applyFromLabel :: SrcSpanAnn -> IdP GhcRn -> HsExpr GhcRn -- AZ Temp
+  applyFromLabel :: SrcSpanAnnA -> IdP GhcRn -> HsExpr GhcRn -- AZ Temp
   applyFromLabel loc fromLabel =
     HsAppType NoExtField
          (L loc (HsVar noExtField (L (la2na loc) fromLabel)))

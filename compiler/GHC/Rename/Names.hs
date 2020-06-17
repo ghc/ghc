@@ -905,8 +905,8 @@ although we never look up data constructors.
 filterImports
     :: ModIface
     -> ImpDeclSpec                     -- The span for the entire import decl
-    -> Maybe (Bool, LocatedA [LIE GhcPs])    -- Import spec; True => hiding
-    -> RnM (Maybe (Bool, LocatedA [LIE GhcRn]), -- Import spec w/ Names
+    -> Maybe (Bool, LocatedL [LIE GhcPs])    -- Import spec; True => hiding
+    -> RnM (Maybe (Bool, LocatedL [LIE GhcRn]), -- Import spec w/ Names
             [GlobalRdrElt])                   -- Same again, but in GRE form
 filterImports iface decl_spec Nothing
   = return (Nothing, gresFromAvails (Just imp_spec) (mi_exports iface))
@@ -1569,6 +1569,7 @@ decls, and simply trim their import lists.  NB that
 getMinimalImports :: [ImportDeclUsage] -> RnM [LImportDecl GhcRn]
 getMinimalImports = mapM mk_minimal
   where
+    mk_minimal :: ImportDeclUsage -> RnM (LImportDecl GhcRn) -- AZ temp
     mk_minimal (L l decl, used_gres, unused)
       | null unused
       , Just (False, _) <- ideclHiding decl
@@ -1580,7 +1581,7 @@ getMinimalImports = mapM mk_minimal
            ; iface <- loadSrcInterface doc mod_name is_boot (fmap sl_fs mb_pkg)
            ; let used_avails = gresToAvailInfo used_gres
                  lies = map (L l) (concatMap (to_ie iface) used_avails)
-           ; return (L l (decl { ideclHiding = Just (False, L l lies) })) }
+           ; return (L l (decl { ideclHiding = Just (False, L (l2l l) lies) })) }
       where
         doc = text "Compute minimal imports for" <+> ppr decl
 

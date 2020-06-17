@@ -44,7 +44,9 @@ testOneFile libdir fileName = do
 
        let sspans = Set.fromList $ getAllSrcSpans (pm_parsed_source p)
 
-           ann_items = apiAnnItems anns'
+           ann_items ::  Map.Map ApiAnnKey [RealSrcSpan]
+           -- ann_items = apiAnnItems anns'
+           ann_items = Map.empty
 
            exploded = [((kw,ss),[anchor])
                       | ((anchor,kw),sss) <- Map.toList ann_items,ss <- sss]

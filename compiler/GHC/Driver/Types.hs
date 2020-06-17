@@ -182,7 +182,6 @@ import GHC.Types.Id
 import GHC.Types.Id.Info ( IdDetails(..), RecSelParent(..))
 import GHC.Core.Type
 
-import GHC.Parser.Annotation    ( ApiAnns )
 import GHC.Types.Annotations ( Annotation, AnnEnv, mkAnnEnv, plusAnnEnv )
 import GHC.Core.Class
 import GHC.Core.TyCon

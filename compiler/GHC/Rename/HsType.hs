@@ -1222,7 +1222,7 @@ mkHsOpTyRn mk1 _ _ ty1 ty2              -- Default case, no rearrangment
 mk_hs_op_ty :: (LHsType GhcRn -> LHsType GhcRn -> HsType GhcRn)
             -> Name -> Fixity -> LHsType GhcRn
             -> (LHsType GhcRn -> LHsType GhcRn -> HsType GhcRn)
-            -> Name -> Fixity -> LHsType GhcRn -> LHsType GhcRn -> SrcSpanAnn
+            -> Name -> Fixity -> LHsType GhcRn -> LHsType GhcRn -> SrcSpanAnnA
             -> RnM (HsType GhcRn)
 mk_hs_op_ty mk1 op1 fix1 ty1
             mk2 op2 fix2 ty21 ty22 loc2

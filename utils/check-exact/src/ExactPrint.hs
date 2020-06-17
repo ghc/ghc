@@ -20,7 +20,7 @@ module ExactPrint
 import GHC hiding (getAndRemoveAnnotation)
 -- import GHC.Hs.Exact
 import GHC.Hs.Extension
-import GHC.Parser.Lexer (AddApiAnn(..))
+-- import GHC.Parser.Lexer (AddApiAnn(..))
 import GHC.Types.Basic hiding (EP)
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
@@ -336,7 +336,7 @@ instance ExactPrint HsModule where
 
         -- forM_ mdeprec markLocated
 
-        -- hsmodExports :: Maybe (LocatedA [LIE GhcPs]),
+        -- hsmodExports :: Maybe (LocatedL [LIE GhcPs]),
         -- forM_ mexports markLocated
         forM_ mexports markAnnotated
 
@@ -374,6 +374,14 @@ printStringAtKw' ss str = do
   p <- getPos
   debugM $ "printStringAtKw': (dp,p) = " ++ show (dp,p)
   printStringAtLsDelta [] dp str
+
+-- ---------------------------------------------------------------------
+
+markLocatedAA :: ApiAnn' a -> (a -> AddApiAnn) -> EPP ()
+markLocatedAA ApiAnnNotUsed  _  = return ()
+markLocatedAA (ApiAnn _ a _) f = mark [f a] kw
+  where
+    AddApiAnn kw _ = f a
 
 -- ---------------------------------------------------------------------
 
@@ -815,12 +823,14 @@ markTrailing ts = do
 
 -- ---------------------------------------------------------------------
 
-instance ExactPrint (LocatedA [LIE GhcPs]) where
+instance ExactPrint (LocatedL [LIE GhcPs]) where
   getApiAnnotation (L (SrcSpanAnn ann _) _) = fromAnn ann
   exact (L (SrcSpanAnn ann _) ies) = do
-    markALocatedA ann AnnOpenP
+    -- markLocatedL ann AnnOpenP
+    markLocatedAA ann al_open
     mapM_ markAnnotated ies
-    markALocatedA ann AnnCloseP
+    markLocatedAA ann al_close
+    -- markLocatedL ann AnnCloseP
 
 -- ---------------------------------------------------------------------
 

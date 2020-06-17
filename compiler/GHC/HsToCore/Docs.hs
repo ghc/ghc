@@ -20,6 +20,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.SrcLoc
 import GHC.Tc.Types
+import GHC.Parser.Annotation
 
 import Control.Applicative
 import Data.Bifunctor (first)

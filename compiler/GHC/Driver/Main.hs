@@ -170,7 +170,6 @@ import Data.IORef
 import System.FilePath as FilePath
 import System.Directory
 import System.IO (fixIO)
-import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Set (Set)
 import Data.Functor
@@ -394,10 +393,7 @@ hscParse' mod_summary
             srcs2 <- liftIO $ filterM doesFileExist srcs1
 
             let api_anns = ApiAnns {
-                      -- AZ apiAnnItems = M.fromListWith (++) $ annotations pst,
-                      apiAnnItems = M.empty,
                       apiAnnEofPos = eof_pos pst,
-                      apiAnnComments = M.fromList (annotations_comments pst),
                       apiAnnRogueComments = comment_q pst
                    }
                 res = HsParsedModule {

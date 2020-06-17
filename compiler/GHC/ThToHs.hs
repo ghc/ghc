@@ -1821,7 +1821,7 @@ unboxedSumChecks alt arity
 -- | If passed an empty list of 'LHsTyVarBndr's, this simply returns the
 -- third argument (an 'LHsType'). Otherwise, return an 'HsForAllTy'
 -- using the provided 'LHsQTyVars' and 'LHsType'.
-mkHsForAllTy :: SrcSpanAnn
+mkHsForAllTy :: SrcSpanAnnA
              -- ^ The location of the returned 'LHsType' if it needs an
              --   explicit forall
              -> HsForAllTelescope GhcPs
@@ -1849,7 +1849,7 @@ mkHsForAllTy loc tele rho_ty
 -- they're empty. See #13183.
 mkHsQualTy :: TH.Cxt
            -- ^ The original Template Haskell context
-           -> SrcSpanAnn
+           -> SrcSpanAnnA
            -- ^ The location of the returned 'LHsType' if it needs an
            --   explicit context
            -> LHsContext GhcPs

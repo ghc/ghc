@@ -395,7 +395,7 @@ tcRnImports hsc_env import_decls
 
 tcRnSrcDecls :: Bool  -- False => no 'module M(..) where' header at all
              -> [LHsDecl GhcPs]               -- Declarations
-             -> Maybe (LocatedA [LIE GhcPs])
+             -> Maybe (LocatedL [LIE GhcPs])
              -> TcM TcGblEnv
 tcRnSrcDecls explicit_mod_hdr decls export_ies
  = do { -- Do all the declarations
@@ -1712,7 +1712,7 @@ tcTyClsInstDecls tycl_decls deriv_decls binds
 -}
 
 checkMain :: Bool  -- False => no 'module M(..) where' header at all
-          -> Maybe (LocatedA [LIE GhcPs])  -- Export specs of Main module
+          -> Maybe (LocatedL [LIE GhcPs])  -- Export specs of Main module
           -> TcM TcGblEnv
 -- If we are in module Main, check that 'main' is defined and exported.
 checkMain explicit_mod_hdr export_ies
@@ -1720,7 +1720,7 @@ checkMain explicit_mod_hdr export_ies
         ; tcg_env <- getGblEnv
         ; check_main dflags tcg_env explicit_mod_hdr export_ies }
 
-check_main :: DynFlags -> TcGblEnv -> Bool -> Maybe (LocatedA [LIE GhcPs])
+check_main :: DynFlags -> TcGblEnv -> Bool -> Maybe (LocatedL [LIE GhcPs])
            -> TcM TcGblEnv
 check_main dflags tcg_env explicit_mod_hdr export_ies
  | mod /= main_mod
@@ -1832,7 +1832,7 @@ check_main dflags tcg_env explicit_mod_hdr export_ies
 
     -- Select the main functions from the export list.
     -- Only the module name is needed, the function name is fixed.
-    selExportMains :: Maybe (LocatedA [LIE GhcPs]) -> [ModuleName]    -- #16453
+    selExportMains :: Maybe (LocatedL [LIE GhcPs]) -> [ModuleName]    -- #16453
     selExportMains Nothing = [main_mod_nm]
         -- no main specified, but there is a header.
     selExportMains (Just exps) = fmap fst $
@@ -2739,7 +2739,7 @@ tcRnLookupRdrName :: HscEnv -> LocatedN RdrName
 -- ^ Find all the Names that this RdrName could mean, in GHCi
 tcRnLookupRdrName hsc_env (L loc rdr_name)
   = runTcInteractive hsc_env $
-    setSrcSpanN loc          $
+    setSrcSpanA loc          $
     do {   -- If the identifier is a constructor (begins with an
            -- upper-case letter), then we need to consider both
            -- constructor and type class identifiers.

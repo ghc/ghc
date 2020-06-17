@@ -263,7 +263,8 @@ rogueComments as = extractRogueComments as
 extractComments :: ApiAnns -> [Comment]
 extractComments anns
   -- cm has type :: Map RealSrcSpan [RealLocated AnnotationComment]
-  = map tokComment . sortRealLocated . concat $ Map.elems (apiAnnComments anns)
+  -- = map tokComment . sortRealLocated . concat $ Map.elems (apiAnnComments anns)
+  = []
 
 extractRogueComments :: ApiAnns -> [Comment]
 extractRogueComments anns

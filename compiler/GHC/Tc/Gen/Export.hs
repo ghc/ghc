@@ -152,7 +152,7 @@ type ExportOccMap = OccEnv (Name, IE GhcPs)
         --   that have the same occurrence name
 
 tcRnExports :: Bool       -- False => no 'module M(..) where' header at all
-          -> Maybe (LocatedA [LIE GhcPs]) -- Nothing => no explicit export list
+          -> Maybe (LocatedL [LIE GhcPs]) -- Nothing => no explicit export list
           -> TcGblEnv
           -> RnM TcGblEnv
 
@@ -212,7 +212,7 @@ tcRnExports explicit_mod exports
         ; failIfErrsM
         ; return new_tcg_env }
 
-exports_from_avail :: Maybe (LocatedA [LIE GhcPs])
+exports_from_avail :: Maybe (LocatedL [LIE GhcPs])
                          -- ^ 'Nothing' means no explicit export list
                    -> GlobalRdrEnv
                    -> ImportAvails

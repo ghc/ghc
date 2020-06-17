@@ -113,6 +113,7 @@ import GHC.Hs.Pat
 import GHC.Hs.Type
 import GHC.Hs.Lit
 import GHC.Hs.Extension
+import GHC.Parser.Annotation
 
 import GHC.Tc.Types.Evidence
 import GHC.Types.Name.Reader

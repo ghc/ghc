@@ -130,7 +130,6 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Utils.Misc
-import GHC.Parser.Annotation
 import Data.List
 import GHC.Driver.Session ( WarningFlag(..), DynFlags )
 import GHC.Utils.Error ( Messages )
@@ -1444,7 +1443,7 @@ instance Outputable TyEl where
 -- 'TyEl' list.
 pUnpackedness
   :: [LocatedA TyEl] -- reversed TyEl
-  -> Maybe ( SrcSpanAnn
+  -> Maybe ( SrcSpanAnnA
            , [AddApiAnn]
            , SourceText
            , SrcUnpackedness
@@ -1916,7 +1915,7 @@ class b ~ (Body b) GhcPs => DisambECP b where
   superInfixOp
     :: (DisambInfixOp (InfixOp b) => PV (LocatedA b )) -> PV (LocatedA b)
   -- | Disambiguate "f # x" (infix operator)
-  mkHsOpAppPV :: SrcSpanAnn -> LocatedA b -> LocatedN (InfixOp b) -> LocatedA b
+  mkHsOpAppPV :: SrcSpanAnnA -> LocatedA b -> LocatedN (InfixOp b) -> LocatedA b
               -> ApiAnn -> PV (LocatedA b)
   -- | Disambiguate "case ... of ..."
   mkHsCasePV :: SrcSpan -> LHsExpr GhcPs -> MatchGroup GhcPs (LocatedA b)
@@ -1929,9 +1928,9 @@ class b ~ (Body b) GhcPs => DisambECP b where
   -- See Note [UndecidableSuperClasses for associated types]
   superFunArg :: (DisambECP (FunArg b) => PV (LocatedA b)) -> PV (LocatedA b)
   -- | Disambiguate "f x" (function application)
-  mkHsAppPV :: SrcSpanAnn -> LocatedA b -> LocatedA (FunArg b) -> PV (LocatedA b)
+  mkHsAppPV :: SrcSpanAnnA -> LocatedA b -> LocatedA (FunArg b) -> PV (LocatedA b)
   -- | Disambiguate "f @t" (visible type application)
-  mkHsAppTypePV :: SrcSpanAnn -> LocatedA b -> LHsType GhcPs -> [AddApiAnn] -> PV (LocatedA b)
+  mkHsAppTypePV :: SrcSpanAnnA -> LocatedA b -> LHsType GhcPs -> [AddApiAnn] -> PV (LocatedA b)
   -- | Disambiguate "if ... then ... else ..."
   mkHsIfPV :: SrcSpan
          -> LHsExpr GhcPs
@@ -1956,7 +1955,7 @@ class b ~ (Body b) GhcPs => DisambECP b where
   mkHsWildCardPV :: SrcSpan -> PV (Located b)
   -- | Disambiguate "a :: t" (type annotation)
   mkHsTySigPV
-    :: SrcSpanAnn -> LocatedA b -> LHsType GhcPs -> [AddApiAnn] -> PV (LocatedA b)
+    :: SrcSpanAnnA -> LocatedA b -> LHsType GhcPs -> [AddApiAnn] -> PV (LocatedA b)
   -- | Disambiguate "[a,b,c]" (list syntax)
   mkHsExplicitListPV :: SrcSpan -> [LocatedA b] -> [AddApiAnn] -> PV (LocatedA b)
   -- | Disambiguate "$(...)" and "[quasi|...|]" (TH splices)
@@ -1970,7 +1969,7 @@ class b ~ (Body b) GhcPs => DisambECP b where
     [AddApiAnn] ->
     PV (LocatedA b)
   -- | Disambiguate "-a" (negation)
-  mkHsNegAppPV :: SrcSpanAnn -> LocatedA b -> [AddApiAnn] -> PV (LocatedA b)
+  mkHsNegAppPV :: SrcSpanAnnA -> LocatedA b -> [AddApiAnn] -> PV (LocatedA b)
   -- | Disambiguate "(# a)" (right operator section)
   mkHsSectionR_PV
     :: SrcSpan -> LocatedA (InfixOp b) -> LocatedA b -> PV (Located b)
@@ -1986,7 +1985,7 @@ class b ~ (Body b) GhcPs => DisambECP b where
   mkHsBangPatPV :: SrcSpan -> Located b -> [AddApiAnn] -> PV (LocatedA b)
   -- | Disambiguate tuple sections and unboxed sums
   mkSumOrTuplePV
-    :: SrcSpanAnn -> Boxity -> SumOrTuple b -> [AddApiAnn] -> PV (LocatedA b)
+    :: SrcSpanAnnA -> Boxity -> SumOrTuple b -> [AddApiAnn] -> PV (LocatedA b)
   -- | Validate infixexp LHS to reject unwanted {-# SCC ... #-} pragmas
   rejectPragmaPV :: LocatedA b -> PV ()
 
@@ -3010,7 +3009,7 @@ mkTypeImpExp name =
        text "Illegal keyword 'type' (use ExplicitNamespaces to enable)"
      return (fmap (`setRdrNameSpace` tcClsName) name)
 
-checkImportSpec :: LocatedA [LIE GhcPs] -> P (LocatedA [LIE GhcPs])
+checkImportSpec :: LocatedL [LIE GhcPs] -> P (LocatedL [LIE GhcPs])
 checkImportSpec ie@(L _ specs) =
     case [l | (L l (IEThingWith _ _ (IEWildcard _) _ _)) <- specs] of
       [] -> return ie
@@ -3104,7 +3103,6 @@ data PV_Context =
 data PV_Accum =
   PV_Accum
     { pv_messages :: DynFlags -> Messages
-    -- AZ , pv_annotations :: [(ApiAnnKey,[RealSrcSpan])]
     , pv_comment_q :: [RealLocated AnnotationComment]
     , pv_annotations_comments :: [(RealSrcSpan,[RealLocated AnnotationComment])]
     }
@@ -3291,7 +3289,7 @@ pprSumOrTuple boxity = \case
         Boxed -> (text "(", text ")")
         Unboxed -> (text "(#", text "#)")
 
-mkSumOrTupleExpr :: SrcSpanAnn -> Boxity -> SumOrTuple (HsExpr GhcPs)
+mkSumOrTupleExpr :: SrcSpanAnnA -> Boxity -> SumOrTuple (HsExpr GhcPs)
                  -> [AddApiAnn]
                  -> PV (LHsExpr GhcPs)
 
@@ -3312,7 +3310,7 @@ mkSumOrTupleExpr l Boxed a@Sum{} _ =
                       (pprSumOrTuple Boxed a))
 
 mkSumOrTuplePat
-  :: SrcSpanAnn -> Boxity -> SumOrTuple (PatBuilder GhcPs) -> [AddApiAnn]
+  :: SrcSpanAnnA -> Boxity -> SumOrTuple (PatBuilder GhcPs) -> [AddApiAnn]
   -> PV (LocatedA (PatBuilder GhcPs))
 
 -- Tuple

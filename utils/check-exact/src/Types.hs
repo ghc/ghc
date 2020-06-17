@@ -13,7 +13,7 @@ module Types
 
 import GHC hiding (getAndRemoveAnnotation)
 import GHC.Hs.Extension
-import GHC.Parser.Lexer (AddApiAnn(..))
+-- import GHC.Parser.Lexer (AddApiAnn(..))
 import GHC.Types.Basic hiding (EP)
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc

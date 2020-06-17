@@ -50,7 +50,7 @@ import GHC.Core.Utils
 import GHC.Core.Unfold
 import GHC.Core.Lint
 import GHC.Core.Make
-import GHC.Hs.Extension ( noLocA )
+import GHC.Parser.Annotation ( noLocA )
 import GHC.Types.Id
 import GHC.Types.Id.Make
 import GHC.Types.Id.Info

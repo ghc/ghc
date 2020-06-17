@@ -296,7 +296,7 @@ tcLookupLocatedClass :: LocatedA Name -> TcM Class
 tcLookupLocatedClass = addLocMA tcLookupClass
 
 tcLookupLocatedTyCon :: LocatedN Name -> TcM TyCon
-tcLookupLocatedTyCon = addLocMN tcLookupTyCon
+tcLookupLocatedTyCon = addLocMA tcLookupTyCon
 
 -- Find the instance that exactly matches a type class application.  The class arguments must be precisely
 -- the same as in the instance declaration (modulo renaming & casts).

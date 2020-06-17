@@ -35,7 +35,7 @@ import GHC.Hs.Lit
 import GHC.Hs.Extension
 import GHC.Hs.Type
 import GHC.Hs.Binds
-import GHC.Parser.Lexer (AddApiAnn)
+import GHC.Parser.Annotation
 
 -- others:
 import GHC.Tc.Types.Evidence

@@ -82,6 +82,7 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Hs.Expr ( HsSplice, pprSplice )
 
 import GHC.Hs.Extension
+import GHC.Parser.Annotation
 
 import GHC.Types.Id ( Id )
 import GHC.Types.Name( Name, NamedThing(getName) )

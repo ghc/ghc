@@ -384,7 +384,7 @@ enrichHie ts (hsGrp, imports, exports, _) ev_bs insts tcs =
       , toHie $ hs_ruleds grp
       ]
 
-getRealSpanA :: SrcSpanAnn -> Maybe Span
+getRealSpanA :: SrcSpanAnnA -> Maybe Span
 getRealSpanA la = getRealSpan (locA la)
 
 getRealSpan :: SrcSpan -> Maybe Span
@@ -1027,8 +1027,8 @@ instance HiePass p => ToHie (PScoped (LocatedA (Pat (GhcPass p)))) where
       contextify (RecCon r) = RecCon $ RC RecFieldMatch $ contextify_rec r
       contextify_rec (HsRecFields fds a) = HsRecFields (map go scoped_fds) a
         where
-          go :: RScoped (GenLocated SrcSpanAnn (HsRecField' id a1))
-                      -> GenLocated SrcSpanAnn (HsRecField' id (PScoped a1)) -- AZ
+          go :: RScoped (LocatedA (HsRecField' id a1))
+                      -> LocatedA (HsRecField' id (PScoped a1)) -- AZ
           go (RS fscope (L spn (HsRecField x lbl pat pun))) =
             L spn $ HsRecField x lbl (PS rsp scope fscope pat) pun
           scoped_fds = listScopesA pscope fds

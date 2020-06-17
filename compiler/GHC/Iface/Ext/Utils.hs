@@ -23,7 +23,7 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.Type
 import GHC.Types.Var
 import GHC.Types.Var.Env
-import GHC.Hs.Extension
+import GHC.Parser.Annotation
 
 import GHC.Iface.Ext.Types
 
@@ -522,7 +522,7 @@ locOnly (RealSrcSpan span _) = do
   pure [Node e span []]
 locOnly _ = pure []
 
-mkScopeA :: SrcSpanAnn -> Scope
+mkScopeA :: SrcSpanAnnA -> Scope
 mkScopeA l = mkScope (locA l)
 
 mkScope :: SrcSpan -> Scope
@@ -554,7 +554,7 @@ mkSourcedNodeInfo org ni = SourcedNodeInfo $ M.singleton org ni
 makeNodeA
   :: (Monad m, Data a)
   => a                       -- ^ helps fill in 'nodeAnnotations' (with 'Data')
-  -> SrcSpanAnn              -- ^ return an empty list if this is unhelpful
+  -> SrcSpanAnnA             -- ^ return an empty list if this is unhelpful
   -> ReaderT NodeOrigin m [HieAST b]
 makeNodeA x spn = makeNode x (locA spn)
 
@@ -577,7 +577,7 @@ makeNode x spn = do
 makeTypeNodeA
   :: (Monad m, Data a)
   => a                       -- ^ helps fill in 'nodeAnnotations' (with 'Data')
-  -> SrcSpanAnn              -- ^ return an empty list if this is unhelpful
+  -> SrcSpanAnnA             -- ^ return an empty list if this is unhelpful
   -> Type                    -- ^ type to associate with the node
   -> ReaderT NodeOrigin m [HieAST Type]
 makeTypeNodeA x spn etyp = makeTypeNode x (locA spn) etyp

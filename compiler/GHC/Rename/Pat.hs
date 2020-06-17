@@ -141,7 +141,7 @@ wrapSrcSpanCps fn (L loc a)
 
 lookupConCps :: LocatedN RdrName -> CpsRn (LocatedN Name)
 lookupConCps con_rdr
-  = CpsRn (\k -> do { con_name <- lookupLocatedOccRnN con_rdr
+  = CpsRn (\k -> do { con_name <- lookupLocatedOccRn con_rdr
                     ; (r, fvs) <- k con_name
                     ; return (r, addOneFV fvs (unLoc con_name)) })
     -- We add the constructor name to the free vars

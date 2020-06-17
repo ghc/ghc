@@ -385,7 +385,7 @@ rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
                                , fd_fi = spec' }, fvs) }
 
 rnHsForeignDecl (ForeignExport { fd_name = name, fd_sig_ty = ty, fd_fe = spec })
-  = do { name' <- lookupLocatedOccRnN name
+  = do { name' <- lookupLocatedOccRn name
        ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel Nothing ty
        ; return (ForeignExport { fd_e_ext = noExtField
                                , fd_name = name', fd_sig_ty = ty'
@@ -2087,7 +2087,7 @@ rnConDecl :: ConDecl GhcPs -> RnM (ConDecl GhcRn, FreeVars)
 rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                            , con_mb_cxt = mcxt, con_args = args
                            , con_doc = mb_doc })
-  = do  { _        <- addLocMN checkConName name
+  = do  { _        <- addLocMA checkConName name
         ; new_name <- lookupLocatedTopBndrRnN name
         ; mb_doc'  <- rnMbLHsDoc mb_doc
 
@@ -2123,7 +2123,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
                             , con_args    = args
                             , con_res_ty  = res_ty
                             , con_doc = mb_doc })
-  = do  { mapM_ (addLocMN checkConName) names
+  = do  { mapM_ (addLocMA checkConName) names
         ; new_names <- mapM lookupLocatedTopBndrRnN names
         ; mb_doc'   <- rnMbLHsDoc mb_doc
 
@@ -2164,7 +2164,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
 -- GHC.Hs.Decls for the full story.
 rnConDecl (XConDecl (ConDeclGADTPrefixPs { con_gp_names = names, con_gp_ty = ty
                                          , con_gp_doc = mb_doc }))
-  = do { mapM_ (addLocMN checkConName) names
+  = do { mapM_ (addLocMA checkConName) names
        ; new_names <- mapM lookupLocatedTopBndrRnN names
        ; mb_doc'   <- rnMbLHsDoc mb_doc
 

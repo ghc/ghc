@@ -29,6 +29,7 @@ module GHC.Hs (
         module GHC.Hs.Utils,
         module GHC.Hs.Doc,
         module GHC.Hs.Extension,
+        module GHC.Parser.Annotation,
         Fixity,
 
         HsModule(..),
@@ -43,6 +44,7 @@ import GHC.Hs.Expr
 import GHC.Hs.ImpExp
 import GHC.Hs.Lit
 import GHC.Hs.Extension
+import GHC.Parser.Annotation
 import GHC.Hs.Pat
 import GHC.Hs.Type
 import GHC.Types.Basic ( Fixity, WarningTxt )
@@ -67,7 +69,7 @@ data HsModule
       hsmodName :: Maybe (Located ModuleName),
         -- ^ @Nothing@: \"module X where\" is omitted (in which case the next
         --     field is Nothing too)
-      hsmodExports :: Maybe (LocatedA [LIE GhcPs]),
+      hsmodExports :: Maybe (LocatedL [LIE GhcPs]),
         -- ^ Export list
         --
         --  - @Nothing@: export list omitted, so export everything

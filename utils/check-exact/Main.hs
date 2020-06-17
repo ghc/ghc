@@ -58,7 +58,6 @@ testOneFile libdir fileName = do
        writeFile astFile origAst
        writeFile newFile pped
 
-       -- putStrLn $ "anns':" ++ showGhc (apiAnnComments anns')
        -- putStrLn $ "anns':" ++ showGhc (apiAnnRogueComments anns')
 
        p' <- parseOneFile libdir newFile

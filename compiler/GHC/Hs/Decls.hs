@@ -120,6 +120,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Types.SrcLoc
 import GHC.Core.Type
+import GHC.Parser.Annotation
 
 import GHC.Data.Bag
 import GHC.Data.Maybe

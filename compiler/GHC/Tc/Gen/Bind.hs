@@ -267,7 +267,7 @@ tcCompleteSigs sigs =
       checkCLType :: (CompleteSigType, [ConLike]) -> LocatedN Name
                   -> TcM (CompleteSigType, [ConLike])
       checkCLType (cst, cs) n = do
-        cl <- addLocMN tcLookupConLike n
+        cl <- addLocMA tcLookupConLike n
         let   (_,_,_,_,_,_, res_ty) = conLikeFullSig cl
               res_ty_con = fst <$> splitTyConApp_maybe res_ty
         case (cst, res_ty_con) of

@@ -59,9 +59,9 @@ module GHC.Tc.Utils.Monad(
   addDependentFiles,
 
   -- * Error management
-  getSrcSpanM, setSrcSpan, setSrcSpanA, setSrcSpanN, addLocM, addLocMA, addLocMN,
+  getSrcSpanM, setSrcSpan, setSrcSpanA, addLocM, addLocMA,
   wrapLocM, wrapLocFstM, wrapLocFstMA, wrapLocSndM, wrapLocSndMA, wrapLocM_,
-  wrapLocMA_,wrapLocMA, wrapLocMN,
+  wrapLocMA_,wrapLocMA,
   getErrsVar, setErrsVar,
   addErr,
   failWith, failAt,
@@ -864,32 +864,34 @@ setSrcSpan (RealSrcSpan real_loc _) thing_inside
 -- Don't overwrite useful info with useless:
 setSrcSpan (UnhelpfulSpan _) thing_inside = thing_inside
 
-setSrcSpanA :: SrcSpanAnn -> TcRn a -> TcRn a
+setSrcSpanA :: SrcSpanAnn' ann -> TcRn a -> TcRn a
 setSrcSpanA l = setSrcSpan (locA l)
 
-setSrcSpanN :: SrcSpanAnnName -> TcRn a -> TcRn a
-setSrcSpanN l = setSrcSpan (locA l)
+-- setSrcSpanN :: SrcSpanAnnName -> TcRn a -> TcRn a
+-- setSrcSpanN l = setSrcSpan (locA l)
 
 addLocM :: (a -> TcM b) -> Located a -> TcM b
 addLocM fn (L loc a) = setSrcSpan loc $ fn a
 
-addLocMA :: (a -> TcM b) -> LocatedA a -> TcM b
+addLocMA :: (a -> TcM b) -> GenLocated (SrcSpanAnn' ann) a -> TcM b
+-- addLocMA :: (t -> TcRn a) -> GenLocated (SrcSpanAnn' ann) t -> TcRn a
 addLocMA fn (L loc a) = setSrcSpanA loc $ fn a
 
-addLocMN :: (a -> TcM b) -> LocatedN a -> TcM b
-addLocMN fn (L loc a) = setSrcSpanN loc $ fn a
+-- addLocMN :: (a -> TcM b) -> LocatedN a -> TcM b
+-- addLocMN fn (L loc a) = setSrcSpanA loc $ fn a
 
 wrapLocM :: (a -> TcM b) -> Located a -> TcM (Located b)
 wrapLocM fn (L loc a) = setSrcSpan loc $ do { b <- fn a
                                             ; return (L loc b) }
 
-wrapLocMA :: (a -> TcM b) -> LocatedA a -> TcM (LocatedA b)
+-- wrapLocMA :: (a -> TcM b) -> LocatedA a -> TcM (LocatedA b)
+wrapLocMA :: (a -> TcM b) -> GenLocated (SrcSpanAnn' ann) a -> TcRn (GenLocated (SrcSpanAnn' ann) b)
 wrapLocMA fn (L loc a) = setSrcSpanA loc $ do { b <- fn a
                                               ; return (L loc b) }
 
-wrapLocMN :: (a -> TcM b) -> LocatedN a -> TcM (LocatedN b)
-wrapLocMN fn (L loc a) = setSrcSpanN loc $ do { b <- fn a
-                                              ; return (L loc b) }
+-- wrapLocMN :: (a -> TcM b) -> LocatedN a -> TcM (LocatedN b)
+-- wrapLocMN fn (L loc a) = setSrcSpanA loc $ do { b <- fn a
+--                                               ; return (L loc b) }
 
 wrapLocFstM :: (a -> TcM (b,c)) -> Located a -> TcM (Located b, c)
 wrapLocFstM fn (L loc a) =

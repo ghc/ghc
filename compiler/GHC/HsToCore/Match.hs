@@ -502,7 +502,7 @@ tidy1 _ _ non_interesting_pat
   = return (idDsWrapper, non_interesting_pat)
 
 --------------------
-tidy_bang_pat :: Id -> Origin -> SrcSpanAnn -> Pat GhcTc
+tidy_bang_pat :: Id -> Origin -> SrcSpanAnnA -> Pat GhcTc
               -> DsM (DsWrapper, Pat GhcTc)
 
 -- Discard par/sig under a bang
@@ -555,7 +555,7 @@ tidy_bang_pat v o l p@(ConPat { pat_con = L _ (RealDataCon dc)
 tidy_bang_pat _ _ l p = return (idDsWrapper, BangPat noExtField (L l p))
 
 -------------------
-push_bang_into_newtype_arg :: SrcSpanAnn
+push_bang_into_newtype_arg :: SrcSpanAnnA
                            -> Type -- The type of the argument we are pushing
                                    -- onto
                            -> HsConPatDetails GhcTc -> HsConPatDetails GhcTc

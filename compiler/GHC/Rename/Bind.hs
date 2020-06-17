@@ -426,7 +426,7 @@ rnBindLHS name_maker _ bind@(FunBind { fun_id = rdr_name })
 
 rnBindLHS name_maker _ (PatSynBind x psb@PSB{ psb_id = rdrname })
   | isTopRecNameMaker name_maker
-  = do { addLocMN checkConName rdrname
+  = do { addLocMA checkConName rdrname
        ; name <- lookupLocatedTopBndrRnN rdrname -- Should be in scope already
        ; return (PatSynBind x psb{ psb_ext = noExtField, psb_id = name }) }
 
@@ -738,7 +738,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
   where
     -- See Note [Renaming pattern synonym variables]
     lookupPatSynBndr :: LocatedN RdrName -> TcM (LocatedN Name) -- AZ
-    lookupPatSynBndr = wrapLocMN lookupLocalOccRn
+    lookupPatSynBndr = wrapLocMA lookupLocalOccRn
 
     patternSynonymErr :: SDoc
     patternSynonymErr
@@ -889,7 +889,7 @@ rnMethodBindLHS :: Bool -> Name
                 -> RnM (LHsBindsLR GhcRn GhcPs)
 rnMethodBindLHS _ cls (L loc bind@(FunBind { fun_id = name })) rest
   = setSrcSpanA loc $ do
-    do { sel_name <- wrapLocMN (lookupInstDeclBndr cls (text "method")) name
+    do { sel_name <- wrapLocMA (lookupInstDeclBndr cls (text "method")) name
                      -- We use the selector name as the binder
        ; let bind' = bind { fun_id = sel_name, fun_ext = noExtField }
        ; return (L loc bind' `consBag` rest ) }
@@ -990,7 +990,7 @@ renameSig _ (SpecInstSig _ src ty)
 -- then the SPECIALISE pragma is ambiguous, unlike all other signatures
 renameSig ctxt sig@(SpecSig _ v tys inl)
   = do  { new_v <- case ctxt of
-                     TopSigCtxt {} -> lookupLocatedOccRnN v
+                     TopSigCtxt {} -> lookupLocatedOccRn v
                      _             -> lookupSigOccRnN ctxt sig v
         ; (new_ty, fvs) <- foldM do_one ([],emptyFVs) tys
         ; return (SpecSig noAnn new_v new_ty inl, fvs) }
@@ -1028,8 +1028,8 @@ renameSig ctxt sig@(SCCFunSig _ st v s)
 -- COMPLETE Sigs can refer to imported IDs which is why we use
 -- lookupLocatedOccRn rather than lookupSigOccRn
 renameSig _ctxt sig@(CompleteMatchSig _ s (L l bf) mty)
-  = do new_bf <- traverse lookupLocatedOccRnN bf
-       new_mty  <- traverse lookupLocatedOccRnN mty
+  = do new_bf <- traverse lookupLocatedOccRn bf
+       new_mty  <- traverse lookupLocatedOccRn mty
 
        this_mod <- fmap tcg_mod getGblEnv
        unless (any (nameIsLocalOrFrom this_mod . unLoc) new_bf) $ do
@@ -1266,7 +1266,7 @@ rnSrcFixityDecl sig_ctxt = rn_decl
 
     lookup_one :: LocatedN RdrName -> RnM [LocatedN Name]
     lookup_one (L name_loc rdr_name)
-      = setSrcSpanN name_loc $
+      = setSrcSpanA name_loc $
                     -- This lookup will fail if the name is not defined in the
                     -- same binding group as this fixity declaration.
         do names <- lookupLocalTcNames sig_ctxt what rdr_name

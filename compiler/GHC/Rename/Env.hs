@@ -10,7 +10,7 @@ GHC.Rename.Env contains functions which convert RdrNames into Names.
 module GHC.Rename.Env (
         newTopSrcBinder,
         lookupLocatedTopBndrRn, lookupLocatedTopBndrRnN, lookupTopBndrRn,
-        lookupLocatedOccRn, lookupLocatedOccRnN, lookupOccRn, lookupOccRn_maybe,
+        lookupLocatedOccRn, lookupOccRn, lookupOccRn_maybe,
         lookupLocalOccRn_maybe, lookupInfoOccRn,
         lookupLocalOccThLvl_maybe, lookupLocalOccRn,
         lookupTypeOccRn,
@@ -268,7 +268,7 @@ lookupLocatedTopBndrRn :: Located RdrName -> RnM (Located Name)
 lookupLocatedTopBndrRn = wrapLocM lookupTopBndrRn
 
 lookupLocatedTopBndrRnN :: LocatedN RdrName -> RnM (LocatedN Name)
-lookupLocatedTopBndrRnN = wrapLocMN lookupTopBndrRn
+lookupLocatedTopBndrRnN = wrapLocMA lookupTopBndrRn
 
 -- | Lookup an @Exact@ @RdrName@. See Note [Looking up Exact RdrNames].
 -- This never adds an error, but it may return one, see
@@ -377,9 +377,9 @@ lookupFamInstName :: Maybe Name -> LocatedN RdrName
 -- Used for TyData and TySynonym family instances only,
 -- See Note [Family instance binders]
 lookupFamInstName (Just cls) tc_rdr  -- Associated type; c.f GHC.Rename.Bind.rnMethodBind
-  = wrapLocMN (lookupInstDeclBndr cls (text "associated type")) tc_rdr
+  = wrapLocMA (lookupInstDeclBndr cls (text "associated type")) tc_rdr
 lookupFamInstName Nothing tc_rdr     -- Family instance; tc_rdr is an *occurrence*
-  = lookupLocatedOccRnN tc_rdr
+  = lookupLocatedOccRn tc_rdr
 
 -----------------------------------------------
 lookupConstructorFields :: Name -> RnM [FieldLabel]
@@ -916,11 +916,12 @@ we'll miss the fact that the qualified import is redundant.
 -}
 
 
-lookupLocatedOccRn :: LocatedA RdrName -> RnM (LocatedA Name)
+lookupLocatedOccRn :: GenLocated (SrcSpanAnn' ann) RdrName
+                   -> TcRn (GenLocated (SrcSpanAnn' ann) Name)
 lookupLocatedOccRn = wrapLocMA lookupOccRn
 
-lookupLocatedOccRnN :: LocatedN RdrName -> RnM (LocatedN Name)
-lookupLocatedOccRnN = wrapLocMN lookupOccRn
+-- lookupLocatedOccRnN :: LocatedN RdrName -> RnM (LocatedN Name)
+-- lookupLocatedOccRnN = wrapLocMA lookupOccRn
 
 lookupLocalOccRn_maybe :: RdrName -> RnM (Maybe Name)
 -- Just look in the local environment
@@ -1487,7 +1488,7 @@ lookupSigCtxtOccRnN :: HsSigCtxt
                                    -- like "type family"
                     -> LocatedN RdrName -> RnM (LocatedN Name)
 lookupSigCtxtOccRnN ctxt what
-  = wrapLocMN $ \ rdr_name ->
+  = wrapLocMA $ \ rdr_name ->
     do { mb_name <- lookupBindGroupOcc ctxt what rdr_name
        ; case mb_name of
            Left err   -> do { addErr err; return (mkUnboundNameRdr rdr_name) }

@@ -22,7 +22,7 @@ import Data.Data hiding (Fixity)
 import GHC.Data.Bag
 import GHC.Types.Basic
 import GHC.Data.FastString
-import GHC.Parser.Lexer (AddApiAnn)
+import GHC.Parser.Annotation
 import GHC.Types.Name.Set
 import GHC.Types.Name
 import GHC.Core.DataCon
@@ -31,7 +31,6 @@ import GHC.Hs
 import GHC.Types.Var
 import GHC.Unit.Module
 import GHC.Utils.Outputable
-import GHC.Parser.Lexer (AddApiAnn(..))
 
 import qualified Data.ByteString as B
 

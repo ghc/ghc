@@ -65,7 +65,7 @@ module GHC.Parser.Lexer (
    ExtBits(..),
    xtest,
    lexTokenStream,
-   AddApiAnn(..),mkParensApiAnn,
+   mkParensApiAnn,
    addAnnsAt,
    commentToAnnotation
   ) where
@@ -79,7 +79,6 @@ import Data.Char
 import Data.List
 import Data.Maybe
 import Data.Word
-import Data.Data
 
 import GHC.Data.EnumSet as EnumSet
 
@@ -2132,7 +2131,6 @@ data PState = PState {
         -- locations of 'noise' tokens in the source, so that users of
         -- the GHC API can do source to source conversions.
         -- See note [Api annotations] in GHC.Parser.Annotation
-        -- AZ annotations :: [(ApiAnnKey,[RealSrcSpan])],
         eof_pos :: Maybe RealSrcSpan,
         comment_q :: [RealLocated AnnotationComment],
         annotations_comments :: [(RealSrcSpan,[RealLocated AnnotationComment])]
@@ -2698,8 +2696,6 @@ instance MonadP P where
   getBit ext = P $ \s -> let b =  ext `xtest` pExtsBitmap (options s)
                          in b `seq` POk s b
   addAnnotation l a v = do
-    -- AZ addAnnotationOnly l a v
-    _ <- allocateCommentsP l
     return ()
   allocateCommentsP ss = P $ \s ->
     let (comment_q', newAnns) = allocateComments ss (comment_q s) in
@@ -2711,7 +2707,6 @@ instance MonadP P where
 addAnnsAt :: (MonadP m) => SrcSpan -> [AddApiAnn] -> m [RealLocated AnnotationComment]
 addAnnsAt (RealSrcSpan l _) anns = do
   cs <- allocateCommentsP l
-  mapM_ (\(AddApiAnn a v) -> addAnnotation l a v) anns
   return cs
 addAnnsAt _ _ = return []
 
@@ -3218,35 +3213,6 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
 %************************************************************************
 -}
 
--- | Encapsulated call to addAnnotation, requiring only the SrcSpan of
---   the AST construct the annotation belongs to; together with the
---   AnnKeywordId, this is the key of the annotation map.
---
---   This type is useful for places in the parser where it is not yet
---   known what SrcSpan an annotation should be added to.  The most
---   common situation is when we are parsing a list: the annotations
---   need to be associated with the AST element that *contains* the
---   list, not the list itself.  'AddApiAnn' lets us defer adding the
---   annotations until we finish parsing the list and are now parsing
---   the enclosing element; we then apply the 'AddApiAnn' to associate
---   the annotations.  Another common situation is where a common fragment of
---   the AST has been factored out but there is no separate AST node for
---   this fragment (this occurs in class and data declarations). In this
---   case, the annotation belongs to the parent data declaration.
---
---   The usual way an 'AddApiAnn' is created is using the 'mj' ("make jump")
---   function, and then it can be discharged using the 'ams' function.
-data AddApiAnn = AddApiAnn AnnKeywordId RealSrcSpan deriving (Data,Show,Eq)
-
-instance Outputable AddApiAnn where
-  ppr (AddApiAnn kw ss) = text "AddApiAnn" <+> ppr kw <+> ppr ss
-
-{- AZ
-addAnnotationOnly :: RealSrcSpan -> AnnKeywordId -> RealSrcSpan -> P ()
-addAnnotationOnly l a v = P $ \s -> POk s {
-  annotations = ((l,a), [v]) : annotations s
-  } ()
--}
 
 -- |Given a 'SrcSpan' that surrounds a 'HsPar' or 'HsParTy', generate
 -- 'AddApiAnn' values for the opening and closing bordering on the start

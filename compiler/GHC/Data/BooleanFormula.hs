@@ -24,7 +24,7 @@ import Data.Data
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Utils.Binary
-import GHC.Hs.Extension ( LocatedA )
+import GHC.Parser.Annotation ( LocatedA )
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Unique.Set

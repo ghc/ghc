@@ -28,6 +28,7 @@ import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Types.SrcLoc
 import GHC.Hs.Extension
+import GHC.Parser.Annotation
 
 import Data.Data
 import Data.Maybe
@@ -88,7 +89,7 @@ data ImportDecl pass
       ideclQualified :: ImportDeclQualifiedStyle, -- ^ If/how the import is qualified.
       ideclImplicit  :: Bool,          -- ^ True => implicit import (of Prelude)
       ideclAs        :: Maybe (Located ModuleName),  -- ^ as Module
-      ideclHiding    :: Maybe (Bool, LocatedA [LIE pass])
+      ideclHiding    :: Maybe (Bool, LocatedL [LIE pass])
                                        -- ^ (True => hiding, names)
     }
   | XImportDecl !(XXImportDecl pass)

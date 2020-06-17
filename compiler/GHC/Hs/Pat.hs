@@ -75,6 +75,7 @@ import GHC.Types.SrcLoc
 import GHC.Data.Bag -- collect ev vars from pats
 import GHC.Data.Maybe
 import GHC.Types.Name (Name)
+import GHC.Parser.Annotation
 -- libraries:
 import Data.Data hiding (TyCon,Fixity)
 
