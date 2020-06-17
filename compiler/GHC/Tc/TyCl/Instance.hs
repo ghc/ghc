@@ -514,7 +514,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
                     ; tf_insts2 <- mapM (tcATDefault loc mini_subst defined_ats)
                       -- Don't default type family instances, but rather omit,
                       -- in hsig/hs-boot. There's no way for users to opt out of this,
-                      -- and it's meaningful restriction on possible
+                      -- and including the defaults would induce a meaningful restriction on possible
                       -- instantiations. Plus, type families sneaking in like
                       -- this breaks the current implementation.
                       --
