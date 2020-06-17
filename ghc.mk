@@ -420,7 +420,7 @@ PACKAGES_STAGE0 += terminfo
 endif
 
 PACKAGES_STAGE1 += ghc-prim
-PACKAGES_STAGE1 += $(INTEGER_LIBRARY)
+PACKAGES_STAGE1 += ghc-bignum
 PACKAGES_STAGE1 += base
 PACKAGES_STAGE1 += filepath
 PACKAGES_STAGE1 += array
@@ -451,6 +451,7 @@ PACKAGES_STAGE1 += parsec
 PACKAGES_STAGE1 += Cabal/Cabal
 PACKAGES_STAGE1 += ghc-compact
 PACKAGES_STAGE1 += ghc-heap
+PACKAGES_STAGE1 += integer-gmp # compat library
 
 ifeq "$(HADDOCK_DOCS)" "YES"
 PACKAGES_STAGE1 += xhtml
@@ -465,6 +466,15 @@ endif
 # ghc-cabal doesn't currently support packages containing both libraries
 # and executables. This flag disables the latter.
 libraries/haskeline_CONFIGURE_OPTS += --flags=-examples
+
+libraries/ghc-bignum_CONFIGURE_OPTS += -f $(BIGNUM_BACKEND)
+
+ifeq "$(BIGNUM_BACKEND)" "gmp"
+GMP_ENABLED = YES
+libraries/ghc-bignum_CONFIGURE_OPTS += --configure-option="--with-gmp"
+else
+GMP_ENABLED = NO
+endif
 
 PACKAGES_STAGE1 += stm
 PACKAGES_STAGE1 += exceptions
@@ -605,21 +615,6 @@ libraries/ghc-prim/dist-install/build/GHC/PrimopWrappers.hs : $$(genprimopcode_I
 # Required so that Haddock documents the primops.
 libraries/ghc-prim_dist-install_EXTRA_HADDOCK_SRCS = libraries/ghc-prim/dist-install/build/autogen/GHC/Prim.hs
 
-# ----------------------------------------
-# Special magic for the integer package
-
-ifneq "$(CLEANING)" "YES"
-ifeq "$(INTEGER_LIBRARY)" "integer-gmp"
-libraries/base_dist-install_CONFIGURE_OPTS += --flags=integer-gmp
-compiler_stage2_CONFIGURE_OPTS += --flags=integer-gmp
-else ifeq "$(INTEGER_LIBRARY)" "integer-simple"
-libraries/base_dist-install_CONFIGURE_OPTS += --flags=integer-simple
-compiler_stage2_CONFIGURE_OPTS += --flags=integer-simple
-else
-$(error Unknown integer library: $(INTEGER_LIBRARY))
-endif
-endif
-
 # -----------------------------------------------------------------------------
 # Include build instructions from all subdirs
 BUILD_DIRS += utils/mkdirhier
@@ -656,7 +651,7 @@ BUILD_DIRS += $(patsubst %, libraries/%, $(PACKAGES_STAGE1))
 BUILD_DIRS += $(patsubst %, libraries/%, $(filter-out $(PACKAGES_STAGE1),$(PACKAGES_STAGE0)))
 endif
 
-BUILD_DIRS += libraries/integer-gmp/gmp
+BUILD_DIRS += libraries/ghc-bignum/gmp
 BUILD_DIRS += utils/haddock
 BUILD_DIRS += utils/haddock/doc
 BUILD_DIRS += compiler
@@ -701,9 +696,6 @@ endif
 ifeq "$(GhcWithInterpreter)" "NO"
 # runghc is just GHCi in disguise
 BUILD_DIRS := $(filter-out utils/runghc,$(BUILD_DIRS))
-endif
-ifneq "$(INTEGER_LIBRARY)" "integer-gmp"
-BUILD_DIRS := $(filter-out libraries/integer-gmp/gmp,$(BUILD_DIRS))
 endif
 ifneq "$(CrossCompiling) $(Stage1Only)" "NO NO"
 # See Note [No stage2 packages when CrossCompiling or Stage1Only].
@@ -1301,7 +1293,8 @@ sdist_%:
 
 .PHONY: clean
 
-CLEAN_FILES += libraries/integer-gmp/include/HsIntegerGmp.h
+CLEAN_FILES += libraries/ghc-bignum/include/ghc-gmp.h
+CLEAN_FILES += libraries/ghc-bignum/include/HsIntegerGmp.h
 CLEAN_FILES += libraries/base/include/EventConfig.h
 CLEAN_FILES += mk/config.mk.old
 CLEAN_FILES += mk/project.mk.old
