@@ -87,6 +87,8 @@ runTestBuilderArgs = builder RunTest ? do
     top         <- expr $ topDirectory
     ghcFlags    <- expr runTestGhcFlags
     cmdrootdirs <- expr (testRootDirs <$> userSetting defaultTestArgs)
+    bignumBackend <- getBignumBackend
+    bignumCheck   <- getBignumCheck
     let defaultRootdirs = ("testsuite" -/- "tests") : libTests
         rootdirs | null cmdrootdirs = defaultRootdirs
                  | otherwise        = cmdrootdirs
@@ -121,8 +123,10 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "-e", arg $ asBool "config.have_vanilla="   (hasLibWay vanilla)
             , arg "-e", arg $ asBool "config.have_dynamic="   (hasLibWay dynamic)
             , arg "-e", arg $ asBool "config.have_profiling=" (hasLibWay profiling)
+            , arg "-e", arg $ asBool "config.have_fast_bignum=" (bignumBackend /= "native" && not bignumCheck)
             , arg "-e", arg $ asBool "ghc_with_smp=" withSMP
             , arg "-e", arg $ asBool "ghc_with_llvm=" withLlvm
+
 
             , arg "-e", arg $ "config.ghc_dynamic_by_default=" ++ show hasDynamicByDefault
             , arg "-e", arg $ "config.ghc_dynamic=" ++ show hasDynamic

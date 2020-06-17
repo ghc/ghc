@@ -93,9 +93,7 @@ minusPtr (Ptr a1) (Ptr a2) = I# (minusAddr# a1 a2)
 ------------------------------------------------------------------------
 -- Function pointers for the default calling convention.
 
--- 'FunPtr' has a phantom role for similar reasons to 'Ptr'. Note
--- that 'FunPtr's role cannot become nominal without changes elsewhere
--- in GHC. See Note [FFI type roles] in GHC.Tc.Gen.Foreign.
+-- 'FunPtr' has a phantom role for similar reasons to 'Ptr'.
 type role FunPtr phantom
 data FunPtr a = FunPtr Addr# deriving (Eq, Ord)
 -- ^ A value of type @'FunPtr' a@ is a pointer to a function callable
@@ -181,7 +179,7 @@ exchangePtr (Ptr dst) (Ptr val) =
 
 -- | @since 2.01
 instance Show (Ptr a) where
-   showsPrec _ (Ptr a) rs = pad_out (showHex (wordToInteger(int2Word#(addr2Int# a))) "")
+   showsPrec _ (Ptr a) rs = pad_out (showHex (integerFromWord#(int2Word#(addr2Int# a))) "")
      where
         -- want 0s prefixed to pad it out to a fixed length.
        pad_out ls =

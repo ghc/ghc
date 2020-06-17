@@ -553,7 +553,7 @@ translatePat fam_insts x pat = case pat of
 -- | 'translatePat', but also select and return a new match var.
 translatePatV :: FamInstEnvs -> Pat GhcTc -> DsM (Id, GrdVec)
 translatePatV fam_insts pat = do
-  x <- selectMatchVar pat
+  x <- selectMatchVar Many pat
   grds <- translatePat fam_insts x pat
   pure (x, grds)
 
@@ -581,7 +581,7 @@ translateConPatOut fam_insts x con univ_tys ex_tvs dicts = \case
     RecCon    (HsRecFields fs _) -> go_field_pats (rec_field_ps fs)
   where
     -- The actual argument types (instantiated)
-    arg_tys     = conLikeInstOrigArgTys con (univ_tys ++ mkTyVarTys ex_tvs)
+    arg_tys     = map scaledThing $ conLikeInstOrigArgTys con (univ_tys ++ mkTyVarTys ex_tvs)
 
     -- Extract record field patterns tagged by field index from a list of
     -- LHsRecField

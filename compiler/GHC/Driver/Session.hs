@@ -128,8 +128,6 @@ module GHC.Driver.Session (
         sOpt_i,
         sExtraGccViaCFlags,
         sTargetPlatformString,
-        sIntegerLibrary,
-        sIntegerLibraryType,
         sGhcWithInterpreter,
         sGhcWithNativeCodeGen,
         sGhcWithSMP,
@@ -139,7 +137,6 @@ module GHC.Driver.Session (
         sGhcThreaded,
         sGhcDebugged,
         sGhcRtsWithLibdw,
-        IntegerLibrary(..),
         GhcNameVersion(..),
         FileSettings(..),
         PlatformMisc(..),
@@ -460,9 +457,6 @@ data DynFlags = DynFlags {
   platformConstants :: PlatformConstants,
   rawSettings       :: [(String, String)],
 
-  integerLibrary        :: IntegerLibrary,
-    -- ^ IntegerGMP or IntegerSimple. Set at configure time, but may be overridden
-    --   by GHC-API users. See Note [The integer library] in GHC.Builtin.Names
   llvmConfig            :: LlvmConfig,
     -- ^ N.B. It's important that this field is lazy since we load the LLVM
     -- configuration lazily. See Note [LLVM Configuration] in GHC.SysTools.
@@ -1286,7 +1280,6 @@ defaultDynFlags mySettings llvmConfig =
         ghcMode                 = CompManager,
         ghcLink                 = LinkBinary,
         hscTarget               = defaultHscTarget (sTargetPlatform mySettings) (sPlatformMisc mySettings),
-        integerLibrary          = sIntegerLibraryType mySettings,
         verbosity               = 0,
         optLevel                = 0,
         debugLevel              = 0,
@@ -2807,6 +2800,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_rtti)
   , make_ord_flag defGhcFlag "dcore-lint"
         (NoArg (setGeneralFlag Opt_DoCoreLinting))
+  , make_ord_flag defGhcFlag "dlinear-core-lint"
+        (NoArg (setGeneralFlag Opt_DoLinearCoreLinting))
   , make_ord_flag defGhcFlag "dstg-lint"
         (NoArg (setGeneralFlag Opt_DoStgLinting))
   , make_ord_flag defGhcFlag "dcmm-lint"
@@ -3805,6 +3800,7 @@ xFlagsDeps = [
   flagSpec "KindSignatures"                   LangExt.KindSignatures,
   flagSpec "LambdaCase"                       LangExt.LambdaCase,
   flagSpec "LiberalTypeSynonyms"              LangExt.LiberalTypeSynonyms,
+  flagSpec "LinearTypes"                      LangExt.LinearTypes,
   flagSpec "MagicHash"                        LangExt.MagicHash,
   flagSpec "MonadComprehensions"              LangExt.MonadComprehensions,
   depFlagSpec "MonadFailDesugaring"           LangExt.MonadFailDesugaring
@@ -3957,6 +3953,7 @@ default_PIC platform =
 impliedGFlags :: [(GeneralFlag, TurnOnFlag, GeneralFlag)]
 impliedGFlags = [(Opt_DeferTypeErrors, turnOn, Opt_DeferTypedHoles)
                 ,(Opt_DeferTypeErrors, turnOn, Opt_DeferOutOfScopeVariables)
+                ,(Opt_DoLinearCoreLinting, turnOn, Opt_DoCoreLinting)
                 ,(Opt_Strictness, turnOn, Opt_WorkerWrapper)
                 ] ++ validHoleFitsImpliedGFlags
 
@@ -5207,6 +5204,7 @@ initSDocContext dflags style = SDC
   , sdocErrorSpans                  = gopt Opt_ErrorSpans dflags
   , sdocStarIsType                  = xopt LangExt.StarIsType dflags
   , sdocImpredicativeTypes          = xopt LangExt.ImpredicativeTypes dflags
+  , sdocLinearTypes                 = xopt LangExt.LinearTypes dflags
   , sdocDynFlags                    = dflags
   }
 

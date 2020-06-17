@@ -453,7 +453,7 @@ Duplicate      YES           NO
   just look at Control.Monad.ST.Lazy.Imp.strictToLazy!  We get
   something like this
         p = case readMutVar# s v of
-              (# s', r #) -> (S# s', r)
+              (# s', r #) -> (State# s', r)
         s' = case p of (s', r) -> s'
         r  = case p of (s', r) -> r
 
@@ -579,7 +579,7 @@ primOpType op
     Compare _occ ty -> compare_fun_ty ty
 
     GenPrimOp _occ tyvars arg_tys res_ty ->
-        mkSpecForAllTys tyvars (mkVisFunTys arg_tys res_ty)
+        mkSpecForAllTys tyvars (mkVisFunTysMany arg_tys res_ty)
 
 primOpOcc :: PrimOp -> OccName
 primOpOcc op = case primOpInfo op of
@@ -739,9 +739,9 @@ commutableOp :: PrimOp -> Bool
 -- Utils:
 
 dyadic_fun_ty, monadic_fun_ty, compare_fun_ty :: Type -> Type
-dyadic_fun_ty  ty = mkVisFunTys [ty, ty] ty
-monadic_fun_ty ty = mkVisFunTy  ty ty
-compare_fun_ty ty = mkVisFunTys [ty, ty] intPrimTy
+dyadic_fun_ty  ty = mkVisFunTysMany [ty, ty] ty
+monadic_fun_ty ty = mkVisFunTyMany  ty ty
+compare_fun_ty ty = mkVisFunTysMany [ty, ty] intPrimTy
 
 -- Output stuff:
 

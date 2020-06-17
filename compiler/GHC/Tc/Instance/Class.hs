@@ -354,9 +354,7 @@ matchKnownNat :: DynFlags
                            -- See Note [Shortcut solving: overlap]
               -> Class -> [Type] -> TcM ClsInstResult
 matchKnownNat _ _ clas [ty]     -- clas = KnownNat
-  | Just n <- isNumLitTy ty = do
-        et <- mkNaturalExpr n
-        makeLitDict clas ty et
+  | Just n <- isNumLitTy ty  = makeLitDict clas ty (mkNaturalExpr n)
 matchKnownNat df sc clas tys = matchInstEnv df sc clas tys
  -- See Note [Fabricating Evidence for Literals in Backpack] for why
  -- this lookup into the instance environment is required.
@@ -422,7 +420,7 @@ matchTypeable clas [k,t]  -- clas = Typeable
   | k `eqType` typeNatKind                 = doTyLit knownNatClassName         t
   | k `eqType` typeSymbolKind              = doTyLit knownSymbolClassName      t
   | tcIsConstraintKind t                   = doTyConApp clas t constraintKindTyCon []
-  | Just (arg,ret) <- splitFunTy_maybe t   = doFunTy    clas t arg ret
+  | Just (mult,arg,ret) <- splitFunTy_maybe t   = doFunTy    clas t mult arg ret
   | Just (tc, ks) <- splitTyConApp_maybe t -- See Note [Typeable (T a b c)]
   , onlyNamedBndrsApplied tc ks            = doTyConApp clas t tc ks
   | Just (f,kt)   <- splitAppTy_maybe t    = doTyApp    clas t f kt
@@ -430,15 +428,15 @@ matchTypeable clas [k,t]  -- clas = Typeable
 matchTypeable _ _ = return NoInstance
 
 -- | Representation for a type @ty@ of the form @arg -> ret@.
-doFunTy :: Class -> Type -> Type -> Type -> TcM ClsInstResult
-doFunTy clas ty arg_ty ret_ty
+doFunTy :: Class -> Type -> Mult -> Type -> Type -> TcM ClsInstResult
+doFunTy clas ty mult arg_ty ret_ty
   = return $ OneInst { cir_new_theta = preds
                      , cir_mk_ev     = mk_ev
                      , cir_what      = BuiltinInstance }
   where
-    preds = map (mk_typeable_pred clas) [arg_ty, ret_ty]
-    mk_ev [arg_ev, ret_ev] = evTypeable ty $
-                             EvTypeableTrFun (EvExpr arg_ev) (EvExpr ret_ev)
+    preds = map (mk_typeable_pred clas) [mult, arg_ty, ret_ty]
+    mk_ev [mult_ev, arg_ev, ret_ev] = evTypeable ty $
+                        EvTypeableTrFun (EvExpr mult_ev) (EvExpr arg_ev) (EvExpr ret_ev)
     mk_ev _ = panic "GHC.Tc.Solver.Interact.doFunTy"
 
 
@@ -685,7 +683,7 @@ matchHasField dflags short_cut clas tys
                          -- the HasField x r a dictionary.  The preds will
                          -- typically be empty, but if the datatype has a
                          -- "stupid theta" then we have to include it here.
-                   ; let theta = mkPrimEqPred sel_ty (mkVisFunTy r_ty a_ty) : preds
+                   ; let theta = mkPrimEqPred sel_ty (mkVisFunTyMany r_ty a_ty) : preds
 
                          -- Use the equality proof to cast the selector Id to
                          -- type (r -> a), then use the newtype coercion to cast

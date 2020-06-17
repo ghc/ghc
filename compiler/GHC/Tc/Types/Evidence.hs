@@ -88,6 +88,7 @@ import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 import Data.IORef( IORef )
 import GHC.Types.Unique.Set
+import GHC.Core.Multiplicity
 
 {-
 Note [TcCoercions]
@@ -117,7 +118,7 @@ mkTcNomReflCo          :: TcType -> TcCoercionN
 mkTcRepReflCo          :: TcType -> TcCoercionR
 mkTcTyConAppCo         :: Role -> TyCon -> [TcCoercion] -> TcCoercion
 mkTcAppCo              :: TcCoercion -> TcCoercionN -> TcCoercion
-mkTcFunCo              :: Role -> TcCoercion -> TcCoercion -> TcCoercion
+mkTcFunCo              :: Role -> TcCoercion -> TcCoercion -> TcCoercion -> TcCoercion
 mkTcAxInstCo           :: Role -> CoAxiom br -> BranchIndex
                        -> [TcType] -> [TcCoercion] -> TcCoercion
 mkTcUnbranchedAxInstCo :: CoAxiom Unbranched -> [TcType]
@@ -201,8 +202,8 @@ data HsWrapper
        -- Hence  (\a. []) `WpCompose` (\b. []) = (\a b. [])
        -- But    ([] a)   `WpCompose` ([] b)   = ([] b a)
 
-  | WpFun HsWrapper HsWrapper TcType SDoc
-       -- (WpFun wrap1 wrap2 t1)[e] = \(x:t1). wrap2[ e wrap1[x] ]
+  | WpFun HsWrapper HsWrapper (Scaled TcType) SDoc
+       -- (WpFun wrap1 wrap2 (w, t1))[e] = \(x:_w t1). wrap2[ e wrap1[x] ]
        -- So note that if  wrap1 :: exp_arg <= act_arg
        --                  wrap2 :: act_res <= exp_res
        --           then   WpFun wrap1 wrap2 : (act_arg -> arg_res) <= (exp_arg -> exp_res)
@@ -228,6 +229,18 @@ data HsWrapper
 
   | WpLet TcEvBinds             -- Non-empty (or possibly non-empty) evidence bindings,
                                 -- so that the identity coercion is always exactly WpHole
+  | WpMultCoercion Coercion
+  -- Note [Checking multiplicity coercions]
+  -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  -- This wrapper can be returned from tcSubMult.
+  -- It is used in case a variable is used with multiplicity m1,
+  -- we need it with multiplicity m2 and we have a coercion c :: m1 ~ m2.
+  -- Compiling such code would require multiplicity coercions in Core,
+  -- which we don't have. If the desugarer sees WpMultCoercion
+  -- with a non-reflexive coercion, it gives an error.
+  -- This is a temporary measure, as we don't really know yet exactly
+  -- what multiplicity coercions should be. But it serves as a good
+  -- approximation for the first iteration for the first iteration of linear types.
 
 -- Cannot derive Data instance because SDoc is not Data (it stores a function).
 -- So we do it manually:
@@ -241,6 +254,7 @@ instance Data.Data HsWrapper where
   gfoldl k z (WpTyLam a1)       = z WpTyLam `k` a1
   gfoldl k z (WpTyApp a1)       = z WpTyApp `k` a1
   gfoldl k z (WpLet a1)         = z WpLet `k` a1
+  gfoldl k z (WpMultCoercion a1) = z WpMultCoercion `k` a1
 
   gunfold k z c = case Data.constrIndex c of
                     1 -> z WpHole
@@ -251,7 +265,8 @@ instance Data.Data HsWrapper where
                     6 -> k (z WpEvApp)
                     7 -> k (z WpTyLam)
                     8 -> k (z WpTyApp)
-                    _ -> k (z WpLet)
+                    9 -> k (z WpLet)
+                    _ -> k (z WpMultCoercion)
 
   toConstr WpHole          = wpHole_constr
   toConstr (WpCompose _ _) = wpCompose_constr
@@ -262,6 +277,7 @@ instance Data.Data HsWrapper where
   toConstr (WpTyLam _)     = wpTyLam_constr
   toConstr (WpTyApp _)     = wpTyApp_constr
   toConstr (WpLet _)       = wpLet_constr
+  toConstr (WpMultCoercion _) = wpMultCoercion_constr
 
   dataTypeOf _ = hsWrapper_dataType
 
@@ -270,10 +286,11 @@ hsWrapper_dataType
   = Data.mkDataType "HsWrapper"
       [ wpHole_constr, wpCompose_constr, wpFun_constr, wpCast_constr
       , wpEvLam_constr, wpEvApp_constr, wpTyLam_constr, wpTyApp_constr
-      , wpLet_constr]
+      , wpLet_constr, wpMultCoercion_constr ]
 
 wpHole_constr, wpCompose_constr, wpFun_constr, wpCast_constr, wpEvLam_constr,
-  wpEvApp_constr, wpTyLam_constr, wpTyApp_constr, wpLet_constr :: Data.Constr
+  wpEvApp_constr, wpTyLam_constr, wpTyApp_constr, wpLet_constr,
+  wpMultCoercion_constr :: Data.Constr
 wpHole_constr    = mkHsWrapperConstr "WpHole"
 wpCompose_constr = mkHsWrapperConstr "WpCompose"
 wpFun_constr     = mkHsWrapperConstr "WpFun"
@@ -283,11 +300,12 @@ wpEvApp_constr   = mkHsWrapperConstr "WpEvApp"
 wpTyLam_constr   = mkHsWrapperConstr "WpTyLam"
 wpTyApp_constr   = mkHsWrapperConstr "WpTyApp"
 wpLet_constr     = mkHsWrapperConstr "WpLet"
+wpMultCoercion_constr     = mkHsWrapperConstr "WpMultCoercion"
 
 mkHsWrapperConstr :: String -> Data.Constr
 mkHsWrapperConstr name = Data.mkConstr hsWrapper_dataType name [] Data.Prefix
 
-wpFunEmpty :: HsWrapper -> HsWrapper -> TcType -> HsWrapper
+wpFunEmpty :: HsWrapper -> HsWrapper -> Scaled TcType -> HsWrapper
 wpFunEmpty c1 c2 t1 = WpFun c1 c2 t1 empty
 
 (<.>) :: HsWrapper -> HsWrapper -> HsWrapper
@@ -296,15 +314,15 @@ c <.> WpHole = c
 c1 <.> c2    = c1 `WpCompose` c2
 
 mkWpFun :: HsWrapper -> HsWrapper
-        -> TcType    -- the "from" type of the first wrapper
+        -> (Scaled TcType)    -- the "from" type of the first wrapper
         -> TcType    -- either type of the second wrapper (used only when the
                      -- second wrapper is the identity)
         -> SDoc      -- what caused you to want a WpFun? Something like "When converting ..."
         -> HsWrapper
 mkWpFun WpHole       WpHole       _  _  _ = WpHole
-mkWpFun WpHole       (WpCast co2) t1 _  _ = WpCast (mkTcFunCo Representational (mkTcRepReflCo t1) co2)
-mkWpFun (WpCast co1) WpHole       _  t2 _ = WpCast (mkTcFunCo Representational (mkTcSymCo co1) (mkTcRepReflCo t2))
-mkWpFun (WpCast co1) (WpCast co2) _  _  _ = WpCast (mkTcFunCo Representational (mkTcSymCo co1) co2)
+mkWpFun WpHole       (WpCast co2) (Scaled w t1) _  _ = WpCast (mkTcFunCo Representational (multToCo w) (mkTcRepReflCo t1) co2)
+mkWpFun (WpCast co1) WpHole       (Scaled w _)  t2 _ = WpCast (mkTcFunCo Representational (multToCo w) (mkTcSymCo co1) (mkTcRepReflCo t2))
+mkWpFun (WpCast co1) (WpCast co2) (Scaled w _)  _  _ = WpCast (mkTcFunCo Representational (multToCo w) (mkTcSymCo co1) co2)
 mkWpFun co1          co2          t1 _  d = WpFun co1 co2 t1 d
 
 mkWpCastR :: TcCoercionR -> HsWrapper
@@ -375,6 +393,7 @@ hsWrapDictBinders wrap = go wrap
    go (WpTyLam {})        = emptyBag
    go (WpTyApp {})        = emptyBag
    go (WpLet   {})        = emptyBag
+   go (WpMultCoercion {}) = emptyBag
 
 collectHsWrapBinders :: HsWrapper -> ([Var], HsWrapper)
 -- Collect the outer lambda binders of a HsWrapper,
@@ -608,9 +627,9 @@ data EvTypeable
     -- ^ Dictionary for @Typeable (s t)@,
     -- given a dictionaries for @s@ and @t@.
 
-  | EvTypeableTrFun EvTerm EvTerm
-    -- ^ Dictionary for @Typeable (s -> t)@,
-    -- given a dictionaries for @s@ and @t@.
+  | EvTypeableTrFun EvTerm EvTerm EvTerm
+    -- ^ Dictionary for @Typeable (s # w -> t)@,
+    -- given a dictionaries for @w@, @s@, and @t@.
 
   | EvTypeableTyLit EvTerm
     -- ^ Dictionary for a type literal,
@@ -893,10 +912,10 @@ evVarsOfTerms = mapUnionVarSet evVarsOfTerm
 evVarsOfTypeable :: EvTypeable -> VarSet
 evVarsOfTypeable ev =
   case ev of
-    EvTypeableTyCon _ e   -> mapUnionVarSet evVarsOfTerm e
-    EvTypeableTyApp e1 e2 -> evVarsOfTerms [e1,e2]
-    EvTypeableTrFun e1 e2 -> evVarsOfTerms [e1,e2]
-    EvTypeableTyLit e     -> evVarsOfTerm e
+    EvTypeableTyCon _ e      -> mapUnionVarSet evVarsOfTerm e
+    EvTypeableTyApp e1 e2    -> evVarsOfTerms [e1,e2]
+    EvTypeableTrFun em e1 e2 -> evVarsOfTerms [em,e1,e2]
+    EvTypeableTyLit e        -> evVarsOfTerm e
 
 
 {- Note [Free vars of EvFun]
@@ -937,7 +956,7 @@ pprHsWrapper wrap pp_thing_inside
     -- False <=> appears as body of let or lambda
     help it WpHole             = it
     help it (WpCompose f1 f2)  = help (help it f2) f1
-    help it (WpFun f1 f2 t1 _) = add_parens $ text "\\(x" <> dcolon <> ppr t1 <> text ")." <+>
+    help it (WpFun f1 f2 (Scaled w t1) _) = add_parens $ text "\\(x" <> dcolon <> brackets (ppr w) <> ppr t1 <> text ")." <+>
                                               help (\_ -> it True <+> help (\_ -> text "x") f1 True) f2 False
     help it (WpCast co)   = add_parens $ sep [it False, nest 2 (text "|>"
                                               <+> pprParendCo co)]
@@ -946,6 +965,8 @@ pprHsWrapper wrap pp_thing_inside
     help it (WpEvLam id)  = add_parens $ sep [ text "\\" <> pprLamBndr id <> dot, it False]
     help it (WpTyLam tv)  = add_parens $ sep [text "/\\" <> pprLamBndr tv <> dot, it False]
     help it (WpLet binds) = add_parens $ sep [text "let" <+> braces (ppr binds), it False]
+    help it (WpMultCoercion co)   = add_parens $ sep [it False, nest 2 (text "<multiplicity coercion>"
+                                              <+> pprParendCo co)]
 
 pprLamBndr :: Id -> SDoc
 pprLamBndr v = pprBndr LambdaBind v
@@ -992,7 +1013,7 @@ instance Outputable EvCallStack where
 instance Outputable EvTypeable where
   ppr (EvTypeableTyCon ts _)  = text "TyCon" <+> ppr ts
   ppr (EvTypeableTyApp t1 t2) = parens (ppr t1 <+> ppr t2)
-  ppr (EvTypeableTrFun t1 t2) = parens (ppr t1 <+> arrow <+> ppr t2)
+  ppr (EvTypeableTrFun tm t1 t2) = parens (ppr t1 <+> mulArrow (ppr tm) <+> ppr t2)
   ppr (EvTypeableTyLit t1)    = text "TyLit" <> ppr t1
 
 

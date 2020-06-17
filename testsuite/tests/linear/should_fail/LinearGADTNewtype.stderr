@@ -1,0 +1,5 @@
+
+LinearGADTNewtype.hs:3:4: error:
+    • A newtype constructor must be linear
+    • In the definition of data constructor ‘A’
+      In the newtype declaration for ‘A’

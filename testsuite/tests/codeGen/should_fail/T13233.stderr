@@ -1,25 +1,9 @@
 
-T13233.hs:14:11: error:
-    Cannot use function with levity-polymorphic arguments:
-      (#,#) :: a -> a -> (# a, a #)
-    (Note that levity-polymorphic primops such as 'coerce' and unboxed tuples
-    are eta-expanded internally because they must occur fully saturated.
-    Use -fprint-typechecker-elaboration to display the full expression.)
-    Levity-polymorphic arguments:
-      a :: TYPE rep
-      a :: TYPE rep
-
 T13233.hs:22:16: error:
-    Cannot use function with levity-polymorphic arguments:
-      (#,#) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}
-                      {a :: TYPE rep1} {b :: TYPE rep2}.
-               a -> b -> (# a, b #)
-    (Note that levity-polymorphic primops such as 'coerce' and unboxed tuples
-    are eta-expanded internally because they must occur fully saturated.
-    Use -fprint-typechecker-elaboration to display the full expression.)
-    Levity-polymorphic arguments:
-      a :: TYPE rep1
-      b :: TYPE rep2
+    A levity-polymorphic type is not allowed here:
+      Type: a
+      Kind: TYPE rep1
+    When trying to create a variable of type: a
 
 T13233.hs:27:10: error:
     Cannot use function with levity-polymorphic arguments:

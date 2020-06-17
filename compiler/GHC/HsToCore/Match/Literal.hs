@@ -101,13 +101,13 @@ dsLit l = do
     HsDoublePrim _ d -> return (Lit (LitDouble (fl_value d)))
     HsChar _ c       -> return (mkCharExpr c)
     HsString _ str   -> mkStringExprFS str
-    HsInteger _ i _  -> mkIntegerExpr i
+    HsInteger _ i _  -> return (mkIntegerExpr i)
     HsInt _ i        -> return (mkIntExpr platform (il_value i))
     HsRat _ (FL _ _ val) ty -> do
-      num   <- mkIntegerExpr (numerator val)
-      denom <- mkIntegerExpr (denominator val)
       return (mkCoreConApps ratio_data_con [Type integer_ty, num, denom])
       where
+        num   = mkIntegerExpr (numerator val)
+        denom = mkIntegerExpr (denominator val)
         (ratio_data_con, integer_ty)
             = case tcSplitTyConApp ty of
                     (tycon, [i_ty]) -> ASSERT(isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
@@ -148,7 +148,7 @@ warnAboutIdentities :: DynFlags -> CoreExpr -> Type -> DsM ()
 warnAboutIdentities dflags (Var conv_fn) type_of_conv
   | wopt Opt_WarnIdentities dflags
   , idName conv_fn `elem` conversionNames
-  , Just (arg_ty, res_ty) <- splitFunTy_maybe type_of_conv
+  , Just (_, arg_ty, res_ty) <- splitFunTy_maybe type_of_conv
   , arg_ty `eqType` res_ty  -- So we are converting  ty -> ty
   = warnDs (Reason Opt_WarnIdentities)
            (vcat [ text "Call of" <+> ppr conv_fn <+> dcolon <+> ppr type_of_conv

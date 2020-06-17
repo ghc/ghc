@@ -35,6 +35,7 @@ import GHC.Core.Type as Type
 import GHC.Core.TyCon     ( initRecTc, checkRecTc )
 import GHC.Core.Predicate ( isDictTy )
 import GHC.Core.Coercion as Coercion
+import GHC.Core.Multiplicity
 import GHC.Types.Basic
 import GHC.Types.Unique
 import GHC.Driver.Session ( DynFlags, GeneralFlag(..), gopt )
@@ -124,7 +125,7 @@ typeArity ty
       | Just (_, ty')  <- splitForAllTy_maybe ty
       = go rec_nts ty'
 
-      | Just (arg,res) <- splitFunTy_maybe ty
+      | Just (_,arg,res) <- splitFunTy_maybe ty
       = typeOneShot arg : go rec_nts res
 
       | Just (tc,tys) <- splitTyConApp_maybe ty
@@ -1089,17 +1090,18 @@ mkEtaWW orig_n ppr_orig_expr in_scope orig_ty
                --   lambda \co:ty. e co. In this case we generate a new variable
                --   of the coercion type, update the scope, and reduce n by 1.
                | isTyVar tcv = ((subst', tcv'), n)
-               | otherwise   = (freshEtaId n subst' (varType tcv'), n-1)
+                    -- covar case:
+               | otherwise   = (freshEtaId n subst' (unrestricted (varType tcv')), n-1)
            -- Avoid free vars of the original expression
          in go n_n n_subst ty' (EtaVar n_tcv : eis)
 
        ----------- Function types  (t1 -> t2)
-       | Just (arg_ty, res_ty) <- splitFunTy_maybe ty
+       | Just (mult, arg_ty, res_ty) <- splitFunTy_maybe ty
        , not (isTypeLevPoly arg_ty)
           -- See Note [Levity polymorphism invariants] in GHC.Core
           -- See also test case typecheck/should_run/EtaExpandLevPoly
 
-       , let (subst', eta_id') = freshEtaId n subst arg_ty
+       , let (subst', eta_id') = freshEtaId n subst (Scaled mult arg_ty)
            -- Avoid free vars of the original expression
        = go (n-1) subst' res_ty (EtaVar eta_id' : eis)
 
@@ -1182,8 +1184,8 @@ etaBodyForJoinPoint need_args body
       | Just (tv, res_ty) <- splitForAllTy_maybe ty
       , let (subst', tv') = Type.substVarBndr subst tv
       = go (n-1) res_ty subst' (tv' : rev_bs) (e `App` varToCoreExpr tv')
-      | Just (arg_ty, res_ty) <- splitFunTy_maybe ty
-      , let (subst', b) = freshEtaId n subst arg_ty
+      | Just (mult, arg_ty, res_ty) <- splitFunTy_maybe ty
+      , let (subst', b) = freshEtaId n subst (Scaled mult arg_ty)
       = go (n-1) res_ty subst' (b : rev_bs) (e `App` Var b)
       | otherwise
       = pprPanic "etaBodyForJoinPoint" $ int need_args $$
@@ -1192,7 +1194,7 @@ etaBodyForJoinPoint need_args body
     init_subst e = mkEmptyTCvSubst (mkInScopeSet (exprFreeVars e))
 
 --------------
-freshEtaId :: Int -> TCvSubst -> Type -> (TCvSubst, Id)
+freshEtaId :: Int -> TCvSubst -> Scaled Type -> (TCvSubst, Id)
 -- Make a fresh Id, with specified type (after applying substitution)
 -- It should be "fresh" in the sense that it's not in the in-scope set
 -- of the TvSubstEnv; and it should itself then be added to the in-scope
@@ -1203,9 +1205,9 @@ freshEtaId :: Int -> TCvSubst -> Type -> (TCvSubst, Id)
 freshEtaId n subst ty
       = (subst', eta_id')
       where
-        ty'     = Type.substTyUnchecked subst ty
+        Scaled mult' ty' = Type.substScaledTyUnchecked subst ty
         eta_id' = uniqAway (getTCvInScope subst) $
-                  mkSysLocalOrCoVar (fsLit "eta") (mkBuiltinUnique n) ty'
+                  mkSysLocalOrCoVar (fsLit "eta") (mkBuiltinUnique n) mult' ty'
                   -- "OrCoVar" since this can be used to eta-expand
                   -- coercion abstractions
         subst'  = extendTCvInScope subst eta_id'

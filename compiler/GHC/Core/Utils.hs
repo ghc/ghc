@@ -20,9 +20,12 @@ module GHC.Core.Utils (
         findDefault, addDefault, findAlt, isDefaultAlt,
         mergeAlts, trimConArgs,
         filterAlts, combineIdenticalAlts, refineDefaultAlt,
+        scaleAltsBy,
 
         -- * Properties of expressions
-        exprType, coreAltType, coreAltsType, isExprLevPoly,
+        exprType, coreAltType, coreAltsType, mkLamType, mkLamTypes,
+        mkFunctionType,
+        isExprLevPoly,
         exprIsDupable, exprIsTrivial, getIdFromTrivialExpr, exprIsDeadEnd,
         getIdFromTrivialExpr_maybe,
         exprIsCheap, exprIsExpandable, exprIsCheapX, CheapAppFun,
@@ -88,6 +91,7 @@ import GHC.Core.Predicate
 import GHC.Core.TyCo.Rep( TyCoBinder(..), TyBinder )
 import GHC.Core.Coercion
 import GHC.Core.TyCon
+import GHC.Core.Multiplicity
 import GHC.Types.Unique
 import GHC.Utils.Outputable
 import GHC.Builtin.Types.Prim
@@ -148,6 +152,38 @@ coreAltsType :: [CoreAlt] -> Type
 -- ^ Returns the type of the first alternative, which should be the same as for all alternatives
 coreAltsType (alt:_) = coreAltType alt
 coreAltsType []      = panic "corAltsType"
+
+mkLamType  :: Var -> Type -> Type
+-- ^ Makes a @(->)@ type or an implicit forall type, depending
+-- on whether it is given a type variable or a term variable.
+-- This is used, for example, when producing the type of a lambda.
+-- Always uses Inferred binders.
+mkLamTypes :: [Var] -> Type -> Type
+-- ^ 'mkLamType' for multiple type or value arguments
+
+mkLamType v body_ty
+   | isTyVar v
+   = mkForAllTy v Inferred body_ty
+
+   | isCoVar v
+   , v `elemVarSet` tyCoVarsOfType body_ty
+   = mkForAllTy v Required body_ty
+
+   | otherwise
+   = mkFunctionType (varMult v) (varType v) body_ty
+
+mkFunctionType :: Mult -> Type -> Type -> Type
+-- This one works out the AnonArgFlag from the argument type
+-- See GHC.Types.Var Note [AnonArgFlag]
+mkFunctionType mult arg_ty res_ty
+   | isPredTy arg_ty -- See GHC.Types.Var Note [AnonArgFlag]
+   = ASSERT(eqType mult Many)
+     mkInvisFunTy mult arg_ty res_ty
+
+   | otherwise
+   = mkVisFunTy mult arg_ty res_ty
+
+mkLamTypes vs ty = foldr mkLamType ty vs
 
 -- | Is this expression levity polymorphic? This should be the
 -- same as saying (isKindLevPoly . typeKind . exprType) but
@@ -235,9 +271,9 @@ applyTypeToArgs e op_ty args
     go op_ty []                   = op_ty
     go op_ty (Type ty : args)     = go_ty_args op_ty [ty] args
     go op_ty (Coercion co : args) = go_ty_args op_ty [mkCoercionTy co] args
-    go op_ty (_ : args)           | Just (_, res_ty) <- splitFunTy_maybe op_ty
+    go op_ty (_ : args)           | Just (_, _, res_ty) <- splitFunTy_maybe op_ty
                                   = go res_ty args
-    go _ _ = pprPanic "applyTypeToArgs" panic_msg
+    go _ args = pprPanic "applyTypeToArgs" (panic_msg args)
 
     -- go_ty_args: accumulate type arguments so we can
     -- instantiate all at once with piResultTys
@@ -248,9 +284,10 @@ applyTypeToArgs e op_ty args
     go_ty_args op_ty rev_tys args
        = go (piResultTys op_ty (reverse rev_tys)) args
 
-    panic_msg = vcat [ text "Expression:" <+> pprCoreExpr e
+    panic_msg as = vcat [ text "Expression:" <+> pprCoreExpr e
                      , text "Type:" <+> ppr op_ty
-                     , text "Args:" <+> ppr args ]
+                     , text "Args:" <+> ppr args
+                     , text "Args':" <+> ppr as ]
 
 
 {-
@@ -295,7 +332,8 @@ mkCast expr co
     WARN( not (from_ty `eqType` exprType expr),
           text "Trying to coerce" <+> text "(" <> ppr expr
           $$ text "::" <+> ppr (exprType expr) <> text ")"
-          $$ ppr co $$ ppr (coercionType co) )
+          $$ ppr co $$ ppr (coercionType co)
+          $$ callStackDoc )
     (Cast expr co)
 
 -- | Wraps the given expression in the source annotation, dropping the
@@ -701,12 +739,13 @@ filterAlts _tycon inst_tys imposs_cons alts
 -- | Refine the default alternative to a 'DataAlt', if there is a unique way to do so.
 -- See Note [Refine DEFAULT case alternatives]
 refineDefaultAlt :: [Unique]          -- ^ Uniques for constructing new binders
+                 -> Mult              -- ^ Multiplicity annotation of the case expression
                  -> TyCon             -- ^ Type constructor of scrutinee's type
                  -> [Type]            -- ^ Type arguments of scrutinee's type
                  -> [AltCon]          -- ^ Constructors that cannot match the DEFAULT (if any)
                  -> [CoreAlt]
                  -> (Bool, [CoreAlt]) -- ^ 'True', if a default alt was replaced with a 'DataAlt'
-refineDefaultAlt us tycon tys imposs_deflt_cons all_alts
+refineDefaultAlt us mult tycon tys imposs_deflt_cons all_alts
   | (DEFAULT,_,rhs) : rest_alts <- all_alts
   , isAlgTyCon tycon            -- It's a data type, tuple, or unboxed tuples.
   , not (isNewTyCon tycon)      -- We can have a newtype, if we are just doing an eval:
@@ -727,7 +766,7 @@ refineDefaultAlt us tycon tys imposs_deflt_cons all_alts
        [con] -> (True, mergeAlts rest_alts [(DataAlt con, ex_tvs ++ arg_ids, rhs)])
                        -- We need the mergeAlts to keep the alternatives in the right order
              where
-                (ex_tvs, arg_ids) = dataConRepInstPat us con tys
+                (ex_tvs, arg_ids) = dataConRepInstPat us mult con tys
 
        -- It matches more than one, so do nothing
        _  -> (False, all_alts)
@@ -929,6 +968,18 @@ combineIdenticalAlts imposs_deflt_cons ((con1,bndrs1,rhs1) : rest_alts)
 
 combineIdenticalAlts imposs_cons alts
   = (False, imposs_cons, alts)
+
+-- Scales the multiplicity of the binders of a list of case alternatives. That
+-- is, in [C x1…xn -> u], the multiplicity of x1…xn is scaled.
+scaleAltsBy :: Mult -> [CoreAlt] -> [CoreAlt]
+scaleAltsBy w alts = map scaleAlt alts
+  where
+    scaleAlt :: CoreAlt -> CoreAlt
+    scaleAlt (con, bndrs, rhs) = (con, map scaleBndr bndrs, rhs)
+
+    scaleBndr :: CoreBndr -> CoreBndr
+    scaleBndr b = scaleVarBy w b
+
 
 {- *********************************************************************
 *                                                                      *
@@ -1608,7 +1659,7 @@ app_ok primop_ok fun args
     primop_arg_ok :: TyBinder -> CoreExpr -> Bool
     primop_arg_ok (Named _) _ = True   -- A type argument
     primop_arg_ok (Anon _ ty) arg      -- A term argument
-       | isUnliftedType ty = expr_ok primop_ok arg
+       | isUnliftedType (scaledThing ty) = expr_ok primop_ok arg
        | otherwise         = True  -- See Note [Primops with lifted arguments]
 
 -----------------------------
@@ -1941,18 +1992,19 @@ exprIsTickedString_maybe _ = Nothing
 These InstPat functions go here to avoid circularity between DataCon and Id
 -}
 
-dataConRepInstPat   ::                 [Unique] -> DataCon -> [Type] -> ([TyCoVar], [Id])
-dataConRepFSInstPat :: [FastString] -> [Unique] -> DataCon -> [Type] -> ([TyCoVar], [Id])
+dataConRepInstPat   ::                 [Unique] -> Mult -> DataCon -> [Type] -> ([TyCoVar], [Id])
+dataConRepFSInstPat :: [FastString] -> [Unique] -> Mult -> DataCon -> [Type] -> ([TyCoVar], [Id])
 
 dataConRepInstPat   = dataConInstPat (repeat ((fsLit "ipv")))
 dataConRepFSInstPat = dataConInstPat
 
 dataConInstPat :: [FastString]          -- A long enough list of FSs to use for names
                -> [Unique]              -- An equally long list of uniques, at least one for each binder
+               -> Mult                  -- The multiplicity annotation of the case expression: scales the multiplicity of variables
                -> DataCon
                -> [Type]                -- Types to instantiate the universally quantified tyvars
                -> ([TyCoVar], [Id])     -- Return instantiated variables
--- dataConInstPat arg_fun fss us con inst_tys returns a tuple
+-- dataConInstPat arg_fun fss us mult con inst_tys returns a tuple
 -- (ex_tvs, arg_ids),
 --
 --   ex_tvs are intended to be used as binders for existential type args
@@ -1979,7 +2031,7 @@ dataConInstPat :: [FastString]          -- A long enough list of FSs to use for 
 --
 --  where the double-primed variables are created with the FastStrings and
 --  Uniques given as fss and us
-dataConInstPat fss uniqs con inst_tys
+dataConInstPat fss uniqs mult con inst_tys
   = ASSERT( univ_tvs `equalLength` inst_tys )
     (ex_bndrs, arg_ids)
   where
@@ -2013,9 +2065,9 @@ dataConInstPat fss uniqs con inst_tys
 
       -- Make value vars, instantiating types
     arg_ids = zipWith4 mk_id_var id_uniqs id_fss arg_tys arg_strs
-    mk_id_var uniq fs ty str
+    mk_id_var uniq fs (Scaled m ty) str
       = setCaseBndrEvald str $  -- See Note [Mark evaluated arguments]
-        mkLocalIdOrCoVar name (Type.substTy full_subst ty)
+        mkLocalIdOrCoVar name (mult `mkMultMul` m) (Type.substTy full_subst ty)
       where
         name = mkInternalName uniq (mkVarOccFS fs) noSrcSpan
 
@@ -2299,6 +2351,14 @@ There are some particularly delicate points here:
 
   So it's important to do the right thing.
 
+* With linear types, eta-reduction can break type-checking:
+        f :: A ⊸ B
+        g :: A -> B
+        g = \x. f x
+
+  The above is correct, but eta-reducing g would yield g=f, the linter will
+  complain that g and f don't have the same type.
+
 * Note [Arity care]: we need to be careful if we just look at f's
   arity. Currently (Dec07), f's arity is visible in its own RHS (see
   Note [Arity robustness] in GHC.Core.Opt.Simplify.Env) so we must *not* trust the
@@ -2382,7 +2442,7 @@ tryEtaReduce bndrs body
       -- Float app ticks: \x -> Tick t (e x) ==> Tick t e
 
     go (b : bs) (App fun arg) co
-      | Just (co', ticks) <- ok_arg b arg co
+      | Just (co', ticks) <- ok_arg b arg co (exprType fun)
       = fmap (flip (foldr mkTick) ticks) $ go bs fun co'
             -- Float arg ticks: \x -> e (Tick t x) ==> Tick t e
 
@@ -2417,27 +2477,34 @@ tryEtaReduce bndrs body
     ok_arg :: Var              -- Of type bndr_t
            -> CoreExpr         -- Of type arg_t
            -> Coercion         -- Of kind (t1~t2)
+           -> Type             -- Type of the function to which the argument is applied
            -> Maybe (Coercion  -- Of type (arg_t -> t1 ~  bndr_t -> t2)
                                --   (and similarly for tyvars, coercion args)
                     , [Tickish Var])
     -- See Note [Eta reduction with casted arguments]
-    ok_arg bndr (Type ty) co
+    ok_arg bndr (Type ty) co _
        | Just tv <- getTyVar_maybe ty
        , bndr == tv  = Just (mkHomoForAllCos [tv] co, [])
-    ok_arg bndr (Var v) co
-       | bndr == v   = let reflCo = mkRepReflCo (idType bndr)
-                       in Just (mkFunCo Representational reflCo co, [])
-    ok_arg bndr (Cast e co_arg) co
+    ok_arg bndr (Var v) co fun_ty
+       | bndr == v
+       , let mult = idMult bndr
+       , Just (fun_mult, _, _) <- splitFunTy_maybe fun_ty
+       , mult `eqType` fun_mult -- There is no change in multiplicity, otherwise we must abort
+       = let reflCo = mkRepReflCo (idType bndr)
+         in Just (mkFunCo Representational (multToCo mult) reflCo co, [])
+    ok_arg bndr (Cast e co_arg) co fun_ty
        | (ticks, Var v) <- stripTicksTop tickishFloatable e
+       , Just (fun_mult, _, _) <- splitFunTy_maybe fun_ty
        , bndr == v
-       = Just (mkFunCo Representational (mkSymCo co_arg) co, ticks)
+       , fun_mult `eqType` idMult bndr
+       = Just (mkFunCo Representational (multToCo fun_mult) (mkSymCo co_arg) co, ticks)
        -- The simplifier combines multiple casts into one,
        -- so we can have a simple-minded pattern match here
-    ok_arg bndr (Tick t arg) co
-       | tickishFloatable t, Just (co', ticks) <- ok_arg bndr arg co
+    ok_arg bndr (Tick t arg) co fun_ty
+       | tickishFloatable t, Just (co', ticks) <- ok_arg bndr arg co fun_ty
        = Just (co', t:ticks)
 
-    ok_arg _ _ _ = Nothing
+    ok_arg _ _ _ _ = Nothing
 
 {-
 Note [Eta reduction of an eval'd function]

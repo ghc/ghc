@@ -1100,7 +1100,7 @@ findMatchingInstances ty = do
     k -> Constraint where k is the type of the queried type.
   -}
   try_cls ies cls
-    | Just (arg_kind, res_kind) <- splitFunTy_maybe (tyConKind $ classTyCon cls)
+    | Just (_, arg_kind, res_kind) <- splitFunTy_maybe (tyConKind $ classTyCon cls)
     , tcIsConstraintKind res_kind
     , Type.typeKind ty `eqType` arg_kind
     , (matches, _, _) <- lookupInstEnv True ies cls [ty]

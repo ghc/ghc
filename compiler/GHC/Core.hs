@@ -345,9 +345,10 @@ We have one literal, a literal Integer, that is lifted, and we don't
 allow in a LitAlt, because LitAlt cases don't do any evaluation. Also
 (see #5603) if you say
     case 3 of
-      S# x -> ...
-      J# _ _ -> ...
-(where S#, J# are the constructors for Integer) we don't want the
+      IS x -> ...
+      IP _ -> ...
+      IN _ -> ...
+(where IS, IP, IN are the constructors for Integer) we don't want the
 simplifier calling findAlt with argument (LitAlt 3).  No no.  Integer
 literals are an opaque encoding of an algebraic data type, not of
 an unlifted literal, like all the others.
@@ -517,6 +518,10 @@ checked by Core Lint.
 
 7. The type of the scrutinee must be the same as the type
    of the case binder, obviously.  Checked in lintCaseExpr.
+
+8. The multiplicity of the binders in constructor patterns must be the
+   multiplicity of the corresponding field /scaled by the multiplicity of the
+   case binder/. Checked in lintCoreAlt.
 
 Note [Core type and coercion invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

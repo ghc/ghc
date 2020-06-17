@@ -854,7 +854,7 @@ When you compile a simple module that contains Template Haskell splice
 
     a = ()
 
-$(return [])
+    $(return [])
 
 with the compiler flags ``-fplugin SourcePlugin`` it will give the following
 output:
@@ -865,16 +865,12 @@ output:
     module A where
     a = ()
     $(return [])
-    interface loaded: Prelude
-    interface loaded: GHC.Float
-    interface loaded: GHC.Base
+    typeCheckPlugin (rn): a = ()
     interface loaded: Language.Haskell.TH.Lib.Internal
-    interface loaded: Language.Haskell.TH.Syntax
-    interface loaded: GHC.Types
     meta: return []
-    interface loaded: GHC.Integer.Type
     typeCheckPlugin (rn):
-    Just a = ()
+    typeCheckPlugin (rn):
+    Nothing
     typeCheckPlugin (tc):
     {$trModule = Module (TrNameS "main"#) (TrNameS "A"#), a = ()}
 

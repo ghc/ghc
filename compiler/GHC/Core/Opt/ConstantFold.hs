@@ -21,6 +21,7 @@ module GHC.Core.Opt.ConstantFold
    ( primOpRules
    , builtinRules
    , caseRules
+   , EnableBignumRules (..)
    )
 where
 
@@ -46,6 +47,7 @@ import GHC.Core.DataCon ( dataConTagZ, dataConTyCon, dataConWrapId, dataConWorkI
 import GHC.Core.Utils  ( eqExpr, cheapEqExpr, exprIsHNF, exprType
                        , stripTicksTop, stripTicksTopT, mkTicks )
 import GHC.Core.Unfold ( exprIsConApp_maybe )
+import GHC.Core.Multiplicity
 import GHC.Core.FVs
 import GHC.Core.Type
 import GHC.Types.Var.Set
@@ -396,7 +398,7 @@ cmpOp platform cmp = go
     go (LitChar i1)   (LitChar i2)   = done (i1 `cmp` i2)
     go (LitFloat i1)  (LitFloat i2)  = done (i1 `cmp` i2)
     go (LitDouble i1) (LitDouble i2) = done (i1 `cmp` i2)
-    go (LitNumber nt1 i1 _) (LitNumber nt2 i2 _)
+    go (LitNumber nt1 i1) (LitNumber nt2 i2)
       | nt1 /= nt2 = Nothing
       | otherwise  = done (i1 `cmp` i2)
     go _               _               = Nothing
@@ -409,16 +411,15 @@ negOp env = \case
    (LitFloat f)    -> Just (mkFloatVal env (-f))
    (LitDouble 0.0) -> Nothing
    (LitDouble d)   -> Just (mkDoubleVal env (-d))
-   (LitNumber nt i t)
-      | litNumIsSigned nt -> Just (Lit (mkLitNumberWrap (roPlatform env) nt (-i) t))
+   (LitNumber nt i)
+      | litNumIsSigned nt -> Just (Lit (mkLitNumberWrap (roPlatform env) nt (-i)))
    _ -> Nothing
 
 complementOp :: RuleOpts -> Literal -> Maybe CoreExpr  -- Binary complement
-complementOp env (LitNumber nt i t) =
-   Just (Lit (mkLitNumberWrap (roPlatform env) nt (complement i) t))
+complementOp env (LitNumber nt i) =
+   Just (Lit (mkLitNumberWrap (roPlatform env) nt (complement i)))
 complementOp _      _            = Nothing
 
---------------------------
 intOp2 :: (Integral a, Integral b)
        => (a -> b -> Integer)
        -> RuleOpts -> Literal -> Literal -> Maybe CoreExpr
@@ -427,17 +428,17 @@ intOp2 = intOp2' . const
 intOp2' :: (Integral a, Integral b)
         => (RuleOpts -> a -> b -> Integer)
         -> RuleOpts -> Literal -> Literal -> Maybe CoreExpr
-intOp2' op env (LitNumber LitNumInt i1 _) (LitNumber LitNumInt i2 _) =
+intOp2' op env (LitNumber LitNumInt i1) (LitNumber LitNumInt i2) =
   let o = op env
   in  intResult (roPlatform env) (fromInteger i1 `o` fromInteger i2)
-intOp2' _  _      _            _            = Nothing  -- Could find LitLit
+intOp2' _ _ _ _ = Nothing
 
 intOpC2 :: (Integral a, Integral b)
         => (a -> b -> Integer)
         -> RuleOpts -> Literal -> Literal -> Maybe CoreExpr
-intOpC2 op env (LitNumber LitNumInt i1 _) (LitNumber LitNumInt i2 _) = do
+intOpC2 op env (LitNumber LitNumInt i1) (LitNumber LitNumInt i2) = do
   intCResult (roPlatform env) (fromInteger i1 `op` fromInteger i2)
-intOpC2 _  _      _            _            = Nothing  -- Could find LitLit
+intOpC2 _ _ _ _ = Nothing
 
 shiftRightLogical :: Platform -> Integer -> Int -> Integer
 -- Shift right, putting zeros in rather than sign-propagating as Bits.shiftR would do
@@ -462,16 +463,16 @@ retLitNoC l = do platform <- getPlatform
 wordOp2 :: (Integral a, Integral b)
         => (a -> b -> Integer)
         -> RuleOpts -> Literal -> Literal -> Maybe CoreExpr
-wordOp2 op env (LitNumber LitNumWord w1 _) (LitNumber LitNumWord w2 _)
+wordOp2 op env (LitNumber LitNumWord w1) (LitNumber LitNumWord w2)
     = wordResult (roPlatform env) (fromInteger w1 `op` fromInteger w2)
-wordOp2 _ _ _ _ = Nothing  -- Could find LitLit
+wordOp2 _ _ _ _ = Nothing
 
 wordOpC2 :: (Integral a, Integral b)
         => (a -> b -> Integer)
         -> RuleOpts -> Literal -> Literal -> Maybe CoreExpr
-wordOpC2 op env (LitNumber LitNumWord w1 _) (LitNumber LitNumWord w2 _) =
+wordOpC2 op env (LitNumber LitNumWord w1) (LitNumber LitNumWord w2) =
   wordCResult (roPlatform env) (fromInteger w1 `op` fromInteger w2)
-wordOpC2 _ _ _ _ = Nothing  -- Could find LitLit
+wordOpC2 _ _ _ _ = Nothing
 
 shiftRule :: (Platform -> Integer -> Int -> Integer) -> RuleM CoreExpr
 -- Shifts take an Int; hence third arg of op is Int
@@ -480,21 +481,21 @@ shiftRule :: (Platform -> Integer -> Int -> Integer) -> RuleM CoreExpr
 --    SllOp, SrlOp           :: Word# -> Int# -> Word#
 shiftRule shift_op
   = do { platform <- getPlatform
-       ; [e1, Lit (LitNumber LitNumInt shift_len _)] <- getArgs
+       ; [e1, Lit (LitNumber LitNumInt shift_len)] <- getArgs
        ; case e1 of
            _ | shift_len == 0
              -> return e1
              -- See Note [Guarding against silly shifts]
              | shift_len < 0 || shift_len > toInteger (platformWordSizeInBits platform)
-             -> return $ Lit $ mkLitNumberWrap platform LitNumInt 0 (exprType e1)
+             -> return $ Lit $ mkLitNumberWrap platform LitNumInt 0
 
            -- Do the shift at type Integer, but shift length is Int
-           Lit (LitNumber nt x t)
+           Lit (LitNumber nt x)
              | 0 < shift_len
              , shift_len <= toInteger (platformWordSizeInBits platform)
              -> let op = shift_op platform
                     y  = x `op` fromInteger shift_len
-                in  liftMaybe $ Just (Lit (mkLitNumberWrap platform nt y t))
+                in  liftMaybe $ Just (Lit (mkLitNumberWrap platform nt y))
 
            _ -> mzero }
 
@@ -549,7 +550,7 @@ litEq is_eq = msum
   where
     do_lit_eq platform lit expr = do
       guard (not (litIsLifted lit))
-      return (mkWildCase expr (literalType lit) intPrimTy
+      return (mkWildCase expr (unrestricted $ literalType lit) intPrimTy
                     [(DEFAULT,    [], val_if_neq),
                      (LitAlt lit, [], val_if_eq)])
       where
@@ -583,7 +584,7 @@ mkRuleFn _ _ _ _                                           = Nothing
 
 isMinBound :: Platform -> Literal -> Bool
 isMinBound _        (LitChar c)        = c == minBound
-isMinBound platform (LitNumber nt i _) = case nt of
+isMinBound platform (LitNumber nt i)   = case nt of
    LitNumInt     -> i == platformMinInt platform
    LitNumInt64   -> i == toInteger (minBound :: Int64)
    LitNumWord    -> i == 0
@@ -594,7 +595,7 @@ isMinBound _        _                  = False
 
 isMaxBound :: Platform -> Literal -> Bool
 isMaxBound _        (LitChar c)        = c == maxBound
-isMaxBound platform (LitNumber nt i _) = case nt of
+isMaxBound platform (LitNumber nt i)   = case nt of
    LitNumInt     -> i == platformMaxInt platform
    LitNumInt64   -> i == toInteger (maxBound :: Int64)
    LitNumWord    -> i == platformMaxWord platform
@@ -671,7 +672,7 @@ narrowSubsumesAnd and_primop narrw n = do
   [Var primop_id `App` x `App` y] <- getArgs
   matchPrimOpId and_primop primop_id
   let mask = bit n -1
-      g v (Lit (LitNumber _ m _)) = do
+      g v (Lit (LitNumber _ m)) = do
          guard (m .&. mask == mask)
          return (Var (mkPrimOpId narrw) `App` v)
       g _ _ = mzero
@@ -1060,7 +1061,7 @@ tagToEnumRule :: RuleM CoreExpr
 -- If     data T a = A | B | C
 -- then   tagToEnum# (T ty) 2# -->  B ty
 tagToEnumRule = do
-  [Type ty, Lit (LitNumber LitNumInt i _)] <- getArgs
+  [Type ty, Lit (LitNumber LitNumInt i)] <- getArgs
   case splitTyConApp_maybe ty of
     Just (tycon, tc_args) | isEnumerationTyCon tycon -> do
       let tag = fromInteger i
@@ -1253,9 +1254,11 @@ bindings (see occurAnalysePgm), which sorts out the dependency, so all
 is fine.
 -}
 
-builtinRules :: [CoreRule]
+newtype EnableBignumRules = EnableBignumRules Bool
+
+builtinRules :: EnableBignumRules -> [CoreRule]
 -- Rules for non-primops that can't be expressed using a RULE pragma
-builtinRules
+builtinRules enableBignumRules
   = [BuiltinRule { ru_name = fsLit "AppendLitString",
                    ru_fn = unpackCStringFoldrName,
                    ru_nargs = 4, ru_try = match_append_lit_C },
@@ -1277,7 +1280,7 @@ builtinRules
         [ nonZeroLit 1 >> binaryLit (intOp2 div)
         , leftZero zeroi
         , do
-          [arg, Lit (LitNumber LitNumInt d _)] <- getArgs
+          [arg, Lit (LitNumber LitNumInt d)] <- getArgs
           Just n <- return $ exactLog2 d
           platform <- getPlatform
           return $ Var (mkPrimOpId ISraOp) `App` arg `App` mkIntVal platform n
@@ -1287,98 +1290,100 @@ builtinRules
         [ nonZeroLit 1 >> binaryLit (intOp2 mod)
         , leftZero zeroi
         , do
-          [arg, Lit (LitNumber LitNumInt d _)] <- getArgs
+          [arg, Lit (LitNumber LitNumInt d)] <- getArgs
           Just _ <- return $ exactLog2 d
           platform <- getPlatform
           return $ Var (mkPrimOpId AndIOp)
             `App` arg `App` mkIntVal platform (d - 1)
         ]
      ]
- ++ builtinIntegerRules
- ++ builtinNaturalRules
+ ++ builtinBignumRules enableBignumRules
 {-# NOINLINE builtinRules #-}
 -- there is no benefit to inlining these yet, despite this, GHC produces
 -- unfoldings for this regardless since the floated list entries look small.
 
-builtinIntegerRules :: [CoreRule]
-builtinIntegerRules =
- [rule_IntToInteger   "smallInteger"        smallIntegerName,
-  rule_WordToInteger  "wordToInteger"       wordToIntegerName,
-  rule_Int64ToInteger  "int64ToInteger"     int64ToIntegerName,
-  rule_Word64ToInteger "word64ToInteger"    word64ToIntegerName,
-  rule_convert        "integerToWord"       integerToWordName       mkWordLitWord,
-  rule_convert        "integerToInt"        integerToIntName        mkIntLitInt,
-  rule_convert        "integerToWord64"     integerToWord64Name     (\_ -> mkWord64LitWord64),
-  rule_convert        "integerToInt64"      integerToInt64Name      (\_ -> mkInt64LitInt64),
-  rule_binop          "plusInteger"         plusIntegerName         (+),
-  rule_binop          "minusInteger"        minusIntegerName        (-),
-  rule_binop          "timesInteger"        timesIntegerName        (*),
-  rule_unop           "negateInteger"       negateIntegerName       negate,
-  rule_binop_Prim     "eqInteger#"          eqIntegerPrimName       (==),
-  rule_binop_Prim     "neqInteger#"         neqIntegerPrimName      (/=),
-  rule_unop           "absInteger"          absIntegerName          abs,
-  rule_unop           "signumInteger"       signumIntegerName       signum,
-  rule_binop_Prim     "leInteger#"          leIntegerPrimName       (<=),
-  rule_binop_Prim     "gtInteger#"          gtIntegerPrimName       (>),
-  rule_binop_Prim     "ltInteger#"          ltIntegerPrimName       (<),
-  rule_binop_Prim     "geInteger#"          geIntegerPrimName       (>=),
-  rule_binop_Ordering "compareInteger"      compareIntegerName      compare,
-  rule_encodeFloat    "encodeFloatInteger"  encodeFloatIntegerName  mkFloatLitFloat,
-  rule_convert        "floatFromInteger"    floatFromIntegerName    (\_ -> mkFloatLitFloat),
-  rule_encodeFloat    "encodeDoubleInteger" encodeDoubleIntegerName mkDoubleLitDouble,
-  rule_decodeDouble   "decodeDoubleInteger" decodeDoubleIntegerName,
-  rule_convert        "doubleFromInteger"   doubleFromIntegerName   (\_ -> mkDoubleLitDouble),
-  rule_rationalTo     "rationalToFloat"     rationalToFloatName     mkFloatExpr,
-  rule_rationalTo     "rationalToDouble"    rationalToDoubleName    mkDoubleExpr,
-  rule_binop          "gcdInteger"          gcdIntegerName          gcd,
-  rule_binop          "lcmInteger"          lcmIntegerName          lcm,
-  rule_binop          "andInteger"          andIntegerName          (.&.),
-  rule_binop          "orInteger"           orIntegerName           (.|.),
-  rule_binop          "xorInteger"          xorIntegerName          xor,
-  rule_unop           "complementInteger"   complementIntegerName   complement,
-  rule_shift_op       "shiftLInteger"       shiftLIntegerName       shiftL,
-  rule_shift_op       "shiftRInteger"       shiftRIntegerName       shiftR,
-  rule_bitInteger     "bitInteger"          bitIntegerName,
-  -- See Note [Integer division constant folding] in libraries/base/GHC/Real.hs
-  rule_divop_one      "quotInteger"         quotIntegerName         quot,
-  rule_divop_one      "remInteger"          remIntegerName          rem,
-  rule_divop_one      "divInteger"          divIntegerName          div,
-  rule_divop_one      "modInteger"          modIntegerName          mod,
-  rule_divop_both     "divModInteger"       divModIntegerName       divMod,
-  rule_divop_both     "quotRemInteger"      quotRemIntegerName      quotRem,
-  -- These rules below don't actually have to be built in, but if we
-  -- put them in the Haskell source then we'd have to duplicate them
-  -- between all Integer implementations
-  rule_XToIntegerToX "smallIntegerToInt"       integerToIntName    smallIntegerName,
-  rule_XToIntegerToX "wordToIntegerToWord"     integerToWordName   wordToIntegerName,
-  rule_XToIntegerToX "int64ToIntegerToInt64"   integerToInt64Name  int64ToIntegerName,
-  rule_XToIntegerToX "word64ToIntegerToWord64" integerToWord64Name word64ToIntegerName,
-  rule_smallIntegerTo "smallIntegerToWord"   integerToWordName     Int2WordOp,
-  rule_smallIntegerTo "smallIntegerToFloat"  floatFromIntegerName  Int2FloatOp,
-  rule_smallIntegerTo "smallIntegerToDouble" doubleFromIntegerName Int2DoubleOp
-  ]
+builtinBignumRules :: EnableBignumRules -> [CoreRule]
+builtinBignumRules (EnableBignumRules False) = []
+builtinBignumRules _ =
+      [ rule_IntegerFromLitNum  "Word# -> Integer"    integerFromWordName
+      , rule_IntegerFromLitNum  "Int64# -> Integer"   integerFromInt64Name
+      , rule_IntegerFromLitNum  "Word64# -> Integer"  integerFromWord64Name
+      , rule_IntegerFromLitNum  "Natural -> Integer"  integerFromNaturalName
+      , rule_convert            "Integer -> Word#"    integerToWordName       mkWordLitWord
+      , rule_convert            "Integer -> Int#"     integerToIntName        mkIntLitInt
+      , rule_convert            "Integer -> Word64#"  integerToWord64Name     (\_ -> mkWord64LitWord64)
+      , rule_convert            "Integer -> Int64#"   integerToInt64Name      (\_ -> mkInt64LitInt64)
+      , rule_binopi             "integerAdd"          integerAddName          (+)
+      , rule_binopi             "integerSub"          integerSubName          (-)
+      , rule_binopi             "integerMul"          integerMulName          (*)
+      , rule_unop               "integerNegate"       integerNegateName       negate
+      , rule_binop_Prim         "integerEq#"          integerEqPrimName       (==)
+      , rule_binop_Prim         "integerNe#"          integerNePrimName       (/=)
+      , rule_binop_Prim         "integerLe#"          integerLePrimName       (<=)
+      , rule_binop_Prim         "integerGt#"          integerGtPrimName       (>)
+      , rule_binop_Prim         "integerLt#"          integerLtPrimName       (<)
+      , rule_binop_Prim         "integerGe#"          integerGePrimName       (>=)
+      , rule_unop               "integerAbs"          integerAbsName          abs
+      , rule_unop               "integerSignum"       integerSignumName       signum
+      , rule_binop_Ordering     "integerCompare"      integerCompareName      compare
+      , rule_encodeFloat        "integerEncodeFloat"  integerEncodeFloatName  mkFloatLitFloat
+      , rule_convert            "integerToFloat"      integerToFloatName      (\_ -> mkFloatLitFloat)
+      , rule_encodeFloat        "integerEncodeDouble" integerEncodeDoubleName mkDoubleLitDouble
+      , rule_decodeDouble       "integerDecodeDouble" integerDecodeDoubleName
+      , rule_convert            "integerToDouble"     integerToDoubleName     (\_ -> mkDoubleLitDouble)
+      , rule_binopi             "integerGcd"          integerGcdName          gcd
+      , rule_binopi             "integerLcm"          integerLcmName          lcm
+      , rule_binopi             "integerAnd"          integerAndName          (.&.)
+      , rule_binopi             "integerOr"           integerOrName           (.|.)
+      , rule_binopi             "integerXor"          integerXorName          xor
+      , rule_unop               "integerComplement"   integerComplementName   complement
+      , rule_shift_op           "integerShiftL"       integerShiftLName       shiftL
+      , rule_shift_op           "integerShiftR"       integerShiftRName       shiftR
+      , rule_integerBit         "integerBit"          integerBitName
+        -- See Note [Integer division constant folding] in libraries/base/GHC/Real.hs
+      , rule_divop_one          "integerQuot"         integerQuotName         quot
+      , rule_divop_one          "integerRem"          integerRemName          rem
+      , rule_divop_one          "integerDiv"          integerDivName          div
+      , rule_divop_one          "integerMod"          integerModName          mod
+      , rule_divop_both         "integerDivMod"       integerDivModName       divMod
+      , rule_divop_both         "integerQuotRem"      integerQuotRemName      quotRem
+
+        -- These rules below don't actually have to be built in, but if we
+        -- put them in the Haskell source then we'd have to duplicate them
+        -- between all Integer implementations
+        -- TODO: let's put them into ghc-bignum package or remove them and let the
+        -- inliner do the job
+      , rule_passthrough      "Int# -> Integer -> Int#"         integerToIntName    integerISDataConName
+      , rule_passthrough      "Word# -> Integer -> Word#"       integerToWordName   integerFromWordName
+      , rule_passthrough      "Int64# -> Integer -> Int64#"     integerToInt64Name  integerFromInt64Name
+      , rule_passthrough      "Word64# -> Integer -> Word64#"   integerToWord64Name integerFromWord64Name
+      , rule_smallIntegerTo   "IS -> Word#"                     integerToWordName   Int2WordOp
+      , rule_smallIntegerTo   "IS -> Float"                     integerToFloatName  Int2FloatOp
+      , rule_smallIntegerTo   "IS -> Double"                    integerToDoubleName Int2DoubleOp
+      , rule_passthrough      "Word# -> Natural -> Word#"       naturalToWordName   naturalNSDataConName
+
+      , rule_IntegerToNaturalClamp "Integer -> Natural (clamp)" integerToNaturalClampName
+      , rule_binopn             "naturalAdd"          naturalAddName       (+)
+      , rule_partial_binopn     "naturalSub"          naturalSubName       (\a b -> if a >= b then Just (a - b) else Nothing)
+      , rule_binopn             "naturalMul"          naturalMulName       (*)
+
+      -- TODO: why is that here?
+      , rule_rationalTo     "rationalToFloat"     rationalToFloatName     mkFloatExpr
+      , rule_rationalTo     "rationalToDouble"    rationalToDoubleName    mkDoubleExpr
+      ]
     where rule_convert str name convert
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_Integer_convert convert }
-          rule_IntToInteger str name
+          rule_IntegerFromLitNum str name
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
-                           ru_try = match_IntToInteger }
-          rule_WordToInteger str name
-           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
-                           ru_try = match_WordToInteger }
-          rule_Int64ToInteger str name
-           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
-                           ru_try = match_Int64ToInteger }
-          rule_Word64ToInteger str name
-           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
-                           ru_try = match_Word64ToInteger }
+                           ru_try = match_LitNumToInteger }
           rule_unop str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_Integer_unop op }
-          rule_bitInteger str name
+          rule_integerBit str name
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
-                           ru_try = match_bitInteger }
-          rule_binop str name op
+                           ru_try = match_integerBit }
+          rule_binopi str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Integer_binop op }
           rule_divop_both str name op
@@ -1402,40 +1407,24 @@ builtinIntegerRules =
           rule_decodeDouble str name
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_decodeDouble }
-          rule_XToIntegerToX str name toIntegerName
+          rule_passthrough str name toIntegerName
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
-                           ru_try = match_XToIntegerToX toIntegerName }
+                           ru_try = match_passthrough toIntegerName }
           rule_smallIntegerTo str name primOp
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
                            ru_try = match_smallIntegerTo primOp }
           rule_rationalTo str name mkLit
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_rationalTo mkLit }
-
-builtinNaturalRules :: [CoreRule]
-builtinNaturalRules =
- [rule_binop              "plusNatural"        plusNaturalName         (+)
- ,rule_partial_binop      "minusNatural"       minusNaturalName        (\a b -> if a >= b then Just (a - b) else Nothing)
- ,rule_binop              "timesNatural"       timesNaturalName        (*)
- ,rule_NaturalFromInteger "naturalFromInteger" naturalFromIntegerName
- ,rule_NaturalToInteger   "naturalToInteger"   naturalToIntegerName
- ,rule_WordToNatural      "wordToNatural"      wordToNaturalName
- ]
-    where rule_binop str name op
+          rule_IntegerToNaturalClamp str name
+           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
+                           ru_try = match_IntegerToNaturalClamp }
+          rule_binopn str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Natural_binop op }
-          rule_partial_binop str name op
+          rule_partial_binopn str name op
            = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 2,
                            ru_try = match_Natural_partial_binop op }
-          rule_NaturalToInteger str name
-           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
-                           ru_try = match_NaturalToInteger }
-          rule_NaturalFromInteger str name
-           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
-                           ru_try = match_NaturalFromInteger }
-          rule_WordToNatural str name
-           = BuiltinRule { ru_name = fsLit str, ru_fn = name, ru_nargs = 1,
-                           ru_try = match_WordToNatural }
 
 ---------------------------------------------------
 -- The rule is this:
@@ -1556,93 +1545,37 @@ match_inline _ = Nothing
 -- for a description of what is going on here.
 match_magicDict :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
 match_magicDict [Type _, Var wrap `App` Type a `App` Type _ `App` f, x, y ]
-  | Just (fieldTy, _)   <- splitFunTy_maybe $ dropForAlls $ idType wrap
-  , Just (dictTy, _)    <- splitFunTy_maybe fieldTy
-  , Just dictTc         <- tyConAppTyCon_maybe dictTy
-  , Just (_,_,co)       <- unwrapNewTyCon_maybe dictTc
+  | Just (_, fieldTy, _)  <- splitFunTy_maybe $ dropForAlls $ idType wrap
+  , Just (_, dictTy, _)   <- splitFunTy_maybe fieldTy
+  , Just dictTc           <- tyConAppTyCon_maybe dictTy
+  , Just (_,_,co)         <- unwrapNewTyCon_maybe dictTc
   = Just
   $ f `App` Cast x (mkSymCo (mkUnbranchedAxInstCo Representational co [a] []))
       `App` y
 
 match_magicDict _ = Nothing
 
--------------------------------------------------
--- Integer rules
---   smallInteger  (79::Int#)  = 79::Integer
---   wordToInteger (79::Word#) = 79::Integer
--- Similarly Int64, Word64
+match_LitNumToInteger :: RuleFun
+match_LitNumToInteger _ id_unf _ [xl]
+  | Just (LitNumber _ x) <- exprIsLiteral_maybe id_unf xl
+  = Just (Lit (mkLitInteger x))
+match_LitNumToInteger _ _ _ _ = Nothing
 
-match_IntToInteger :: RuleFun
-match_IntToInteger = match_IntToInteger_unop id
-
-match_WordToInteger :: RuleFun
-match_WordToInteger _ id_unf id [xl]
-  | Just (LitNumber LitNumWord x _) <- exprIsLiteral_maybe id_unf xl
-  = case splitFunTy_maybe (idType id) of
-    Just (_, integerTy) ->
-        Just (Lit (mkLitInteger x integerTy))
-    _ ->
-        panic "match_WordToInteger: Id has the wrong type"
-match_WordToInteger _ _ _ _ = Nothing
-
-match_Int64ToInteger :: RuleFun
-match_Int64ToInteger _ id_unf id [xl]
-  | Just (LitNumber LitNumInt64 x _) <- exprIsLiteral_maybe id_unf xl
-  = case splitFunTy_maybe (idType id) of
-    Just (_, integerTy) ->
-        Just (Lit (mkLitInteger x integerTy))
-    _ ->
-        panic "match_Int64ToInteger: Id has the wrong type"
-match_Int64ToInteger _ _ _ _ = Nothing
-
-match_Word64ToInteger :: RuleFun
-match_Word64ToInteger _ id_unf id [xl]
-  | Just (LitNumber LitNumWord64 x _) <- exprIsLiteral_maybe id_unf xl
-  = case splitFunTy_maybe (idType id) of
-    Just (_, integerTy) ->
-        Just (Lit (mkLitInteger x integerTy))
-    _ ->
-        panic "match_Word64ToInteger: Id has the wrong type"
-match_Word64ToInteger _ _ _ _ = Nothing
-
-match_NaturalToInteger :: RuleFun
-match_NaturalToInteger _ id_unf id [xl]
-  | Just (LitNumber LitNumNatural x _) <- exprIsLiteral_maybe id_unf xl
-  = case splitFunTy_maybe (idType id) of
-    Just (_, naturalTy) ->
-        Just (Lit (LitNumber LitNumInteger x naturalTy))
-    _ ->
-        panic "match_NaturalToInteger: Id has the wrong type"
-match_NaturalToInteger _ _ _ _ = Nothing
-
-match_NaturalFromInteger :: RuleFun
-match_NaturalFromInteger _ id_unf id [xl]
-  | Just (LitNumber LitNumInteger x _) <- exprIsLiteral_maybe id_unf xl
-  , x >= 0
-  = case splitFunTy_maybe (idType id) of
-    Just (_, naturalTy) ->
-        Just (Lit (LitNumber LitNumNatural x naturalTy))
-    _ ->
-        panic "match_NaturalFromInteger: Id has the wrong type"
-match_NaturalFromInteger _ _ _ _ = Nothing
-
-match_WordToNatural :: RuleFun
-match_WordToNatural _ id_unf id [xl]
-  | Just (LitNumber LitNumWord x _) <- exprIsLiteral_maybe id_unf xl
-  = case splitFunTy_maybe (idType id) of
-    Just (_, naturalTy) ->
-        Just (Lit (LitNumber LitNumNatural x naturalTy))
-    _ ->
-        panic "match_WordToNatural: Id has the wrong type"
-match_WordToNatural _ _ _ _ = Nothing
+match_IntegerToNaturalClamp :: RuleFun
+match_IntegerToNaturalClamp _ id_unf _ [xl]
+  | Just (LitNumber LitNumInteger x) <- exprIsLiteral_maybe id_unf xl
+  = if x >= 0
+      then Just (Lit (mkLitNatural x))
+      else Just (Lit (mkLitNatural 0))
+match_IntegerToNaturalClamp _ _ _ _ = Nothing
 
 -------------------------------------------------
-{- Note [Rewriting bitInteger]
+{- Note [Rewriting integerBit]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For most types the bitInteger operation can be implemented in terms of shifts.
-The integer-gmp package, however, can do substantially better than this if
+For most types the integerBit operation can be implemented in terms of shifts.
+The ghc-bignum package, however, can do substantially better than this if
 allowed to provide its own implementation. However, in so doing it previously lost
-constant-folding (see #8832). The bitInteger rule above provides constant folding
+constant-folding (see #8832). The integerBit rule above provides constant folding
 specifically for this function.
 
 There is, however, a bit of trickiness here when it comes to ranges. While the
@@ -1653,23 +1586,19 @@ should expect some funniness given that they will have at very least ignored a
 warning in this case.
 -}
 
-match_bitInteger :: RuleFun
--- Just for GHC.Integer.Type.bitInteger :: Int# -> Integer
-match_bitInteger env id_unf fn [arg]
-  | Just (LitNumber LitNumInt x _) <- exprIsLiteral_maybe id_unf arg
+-- | Constant folding for `GHC.Num.Integer.integerBit# :: Word# -> Integer`
+match_integerBit :: RuleFun
+match_integerBit env id_unf _fn [arg]
+  | Just (LitNumber _ x) <- exprIsLiteral_maybe id_unf arg
   , x >= 0
-  , x <= (toInteger (platformWordSizeInBits (roPlatform env)) - 1)
+  , x <= fromIntegral (platformWordSizeInBits (roPlatform env))
     -- Make sure x is small enough to yield a decently small integer
     -- Attempting to construct the Integer for
-    --    (bitInteger 9223372036854775807#)
+    --    (integerBit 9223372036854775807#)
     -- would be a bad idea (#14959)
   , let x_int = fromIntegral x :: Int
-  = case splitFunTy_maybe (idType fn) of
-    Just (_, integerTy)
-      -> Just (Lit (LitNumber LitNumInteger (bit x_int) integerTy))
-    _ -> panic "match_IntToInteger_unop: Id has the wrong type"
-
-match_bitInteger _ _ _ _ = Nothing
+  = Just (Lit (mkLitInteger (bit x_int)))
+match_integerBit _ _ _ _ = Nothing
 
 
 -------------------------------------------------
@@ -1677,92 +1606,83 @@ match_Integer_convert :: Num a
                       => (Platform -> a -> Expr CoreBndr)
                       -> RuleFun
 match_Integer_convert convert env id_unf _ [xl]
-  | Just (LitNumber LitNumInteger x _) <- exprIsLiteral_maybe id_unf xl
+  | Just (LitNumber LitNumInteger x) <- exprIsLiteral_maybe id_unf xl
   = Just (convert (roPlatform env) (fromInteger x))
 match_Integer_convert _ _ _ _ _ = Nothing
 
 match_Integer_unop :: (Integer -> Integer) -> RuleFun
 match_Integer_unop unop _ id_unf _ [xl]
-  | Just (LitNumber LitNumInteger x i) <- exprIsLiteral_maybe id_unf xl
-  = Just (Lit (LitNumber LitNumInteger (unop x) i))
+  | Just (LitNumber LitNumInteger x) <- exprIsLiteral_maybe id_unf xl
+  = Just (Lit (LitNumber LitNumInteger (unop x)))
 match_Integer_unop _ _ _ _ _ = Nothing
-
-match_IntToInteger_unop :: (Integer -> Integer) -> RuleFun
-match_IntToInteger_unop unop _ id_unf fn [xl]
-  | Just (LitNumber LitNumInt x _) <- exprIsLiteral_maybe id_unf xl
-  = case splitFunTy_maybe (idType fn) of
-    Just (_, integerTy) ->
-        Just (Lit (LitNumber LitNumInteger (unop x) integerTy))
-    _ ->
-        panic "match_IntToInteger_unop: Id has the wrong type"
-match_IntToInteger_unop _ _ _ _ _ = Nothing
 
 match_Integer_binop :: (Integer -> Integer -> Integer) -> RuleFun
 match_Integer_binop binop _ id_unf _ [xl,yl]
-  | Just (LitNumber LitNumInteger x i) <- exprIsLiteral_maybe id_unf xl
-  , Just (LitNumber LitNumInteger y _) <- exprIsLiteral_maybe id_unf yl
-  = Just (Lit (mkLitInteger (x `binop` y) i))
+  | Just (LitNumber LitNumInteger x) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitNumber LitNumInteger y) <- exprIsLiteral_maybe id_unf yl
+  = Just (Lit (mkLitInteger (x `binop` y)))
 match_Integer_binop _ _ _ _ _ = Nothing
 
 match_Natural_binop :: (Integer -> Integer -> Integer) -> RuleFun
 match_Natural_binop binop _ id_unf _ [xl,yl]
-  | Just (LitNumber LitNumNatural x i) <- exprIsLiteral_maybe id_unf xl
-  , Just (LitNumber LitNumNatural y _) <- exprIsLiteral_maybe id_unf yl
-  = Just (Lit (mkLitNatural (x `binop` y) i))
+  | Just (LitNumber LitNumNatural x) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitNumber LitNumNatural y) <- exprIsLiteral_maybe id_unf yl
+  = Just (Lit (mkLitNatural (x `binop` y)))
 match_Natural_binop _ _ _ _ _ = Nothing
 
 match_Natural_partial_binop :: (Integer -> Integer -> Maybe Integer) -> RuleFun
 match_Natural_partial_binop binop _ id_unf _ [xl,yl]
-  | Just (LitNumber LitNumNatural x i) <- exprIsLiteral_maybe id_unf xl
-  , Just (LitNumber LitNumNatural y _) <- exprIsLiteral_maybe id_unf yl
+  | Just (LitNumber LitNumNatural x) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitNumber LitNumNatural y) <- exprIsLiteral_maybe id_unf yl
   , Just z <- x `binop` y
-  = Just (Lit (mkLitNatural z i))
+  = Just (Lit (mkLitNatural z))
 match_Natural_partial_binop _ _ _ _ _ = Nothing
 
 -- This helper is used for the quotRem and divMod functions
 match_Integer_divop_both
    :: (Integer -> Integer -> (Integer, Integer)) -> RuleFun
 match_Integer_divop_both divop _ id_unf _ [xl,yl]
-  | Just (LitNumber LitNumInteger x t) <- exprIsLiteral_maybe id_unf xl
-  , Just (LitNumber LitNumInteger y _) <- exprIsLiteral_maybe id_unf yl
+  | Just (LitNumber LitNumInteger x) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitNumber LitNumInteger y) <- exprIsLiteral_maybe id_unf yl
   , y /= 0
   , (r,s) <- x `divop` y
-  = Just $ mkCoreUbxTup [t,t] [Lit (mkLitInteger r t), Lit (mkLitInteger s t)]
+  = Just $ mkCoreUbxTup [integerTy,integerTy]
+                        [Lit (mkLitInteger r), Lit (mkLitInteger s)]
 match_Integer_divop_both _ _ _ _ _ = Nothing
 
 -- This helper is used for the quot and rem functions
 match_Integer_divop_one :: (Integer -> Integer -> Integer) -> RuleFun
 match_Integer_divop_one divop _ id_unf _ [xl,yl]
-  | Just (LitNumber LitNumInteger x i) <- exprIsLiteral_maybe id_unf xl
-  , Just (LitNumber LitNumInteger y _) <- exprIsLiteral_maybe id_unf yl
+  | Just (LitNumber LitNumInteger x) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitNumber LitNumInteger y) <- exprIsLiteral_maybe id_unf yl
   , y /= 0
-  = Just (Lit (mkLitInteger (x `divop` y) i))
+  = Just (Lit (mkLitInteger (x `divop` y)))
 match_Integer_divop_one _ _ _ _ _ = Nothing
 
 match_Integer_shift_op :: (Integer -> Int -> Integer) -> RuleFun
--- Used for shiftLInteger, shiftRInteger :: Integer -> Int# -> Integer
+-- Used for integerShiftL#, integerShiftR :: Integer -> Word# -> Integer
 -- See Note [Guarding against silly shifts]
 match_Integer_shift_op binop _ id_unf _ [xl,yl]
-  | Just (LitNumber LitNumInteger x i) <- exprIsLiteral_maybe id_unf xl
-  , Just (LitNumber LitNumInt y _)     <- exprIsLiteral_maybe id_unf yl
+  | Just (LitNumber LitNumInteger x) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitNumber LitNumWord y)    <- exprIsLiteral_maybe id_unf yl
   , y >= 0
   , y <= 4   -- Restrict constant-folding of shifts on Integers, somewhat
              -- arbitrary.  We can get huge shifts in inaccessible code
              -- (#15673)
-  = Just (Lit (mkLitInteger (x `binop` fromIntegral y) i))
+  = Just (Lit (mkLitInteger (x `binop` fromIntegral y)))
 match_Integer_shift_op _ _ _ _ _ = Nothing
 
 match_Integer_binop_Prim :: (Integer -> Integer -> Bool) -> RuleFun
 match_Integer_binop_Prim binop env id_unf _ [xl, yl]
-  | Just (LitNumber LitNumInteger x _) <- exprIsLiteral_maybe id_unf xl
-  , Just (LitNumber LitNumInteger y _) <- exprIsLiteral_maybe id_unf yl
+  | Just (LitNumber LitNumInteger x) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitNumber LitNumInteger y) <- exprIsLiteral_maybe id_unf yl
   = Just (if x `binop` y then trueValInt (roPlatform env) else falseValInt (roPlatform env))
 match_Integer_binop_Prim _ _ _ _ _ = Nothing
 
 match_Integer_binop_Ordering :: (Integer -> Integer -> Ordering) -> RuleFun
 match_Integer_binop_Ordering binop _ id_unf _ [xl, yl]
-  | Just (LitNumber LitNumInteger x _) <- exprIsLiteral_maybe id_unf xl
-  , Just (LitNumber LitNumInteger y _) <- exprIsLiteral_maybe id_unf yl
+  | Just (LitNumber LitNumInteger x) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitNumber LitNumInteger y) <- exprIsLiteral_maybe id_unf yl
   = Just $ case x `binop` y of
              LT -> ltVal
              EQ -> eqVal
@@ -1773,8 +1693,8 @@ match_Integer_Int_encodeFloat :: RealFloat a
                               => (a -> Expr CoreBndr)
                               -> RuleFun
 match_Integer_Int_encodeFloat mkLit _ id_unf _ [xl,yl]
-  | Just (LitNumber LitNumInteger x _) <- exprIsLiteral_maybe id_unf xl
-  , Just (LitNumber LitNumInt y _)     <- exprIsLiteral_maybe id_unf yl
+  | Just (LitNumber LitNumInteger x) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitNumber LitNumInt y)     <- exprIsLiteral_maybe id_unf yl
   = Just (mkLit $ encodeFloat x (fromInteger y))
 match_Integer_Int_encodeFloat _ _ _ _ _ = Nothing
 
@@ -1792,8 +1712,8 @@ match_rationalTo :: RealFloat a
                  => (a -> Expr CoreBndr)
                  -> RuleFun
 match_rationalTo mkLit _ id_unf _ [xl, yl]
-  | Just (LitNumber LitNumInteger x _) <- exprIsLiteral_maybe id_unf xl
-  , Just (LitNumber LitNumInteger y _) <- exprIsLiteral_maybe id_unf yl
+  | Just (LitNumber LitNumInteger x) <- exprIsLiteral_maybe id_unf xl
+  , Just (LitNumber LitNumInteger y) <- exprIsLiteral_maybe id_unf yl
   , y /= 0
   = Just (mkLit (fromRational (x % y)))
 match_rationalTo _ _ _ _ _ = Nothing
@@ -1802,27 +1722,27 @@ match_decodeDouble :: RuleFun
 match_decodeDouble env id_unf fn [xl]
   | Just (LitDouble x) <- exprIsLiteral_maybe id_unf xl
   = case splitFunTy_maybe (idType fn) of
-    Just (_, res)
-      | Just [_lev1, _lev2, integerTy, intHashTy] <- tyConAppArgs_maybe res
+    Just (_, _, res)
+      | Just [_lev1, _lev2, _integerTy, intHashTy] <- tyConAppArgs_maybe res
       -> case decodeFloat (fromRational x :: Double) of
            (y, z) ->
              Just $ mkCoreUbxTup [integerTy, intHashTy]
-                                 [Lit (mkLitInteger y integerTy),
+                                 [Lit (mkLitInteger y),
                                   Lit (mkLitInt (roPlatform env) (toInteger z))]
     _ ->
         pprPanic "match_decodeDouble: Id has the wrong type"
           (ppr fn <+> dcolon <+> ppr (idType fn))
 match_decodeDouble _ _ _ _ = Nothing
 
-match_XToIntegerToX :: Name -> RuleFun
-match_XToIntegerToX n _ _ _ [App (Var x) y]
+match_passthrough :: Name -> RuleFun
+match_passthrough n _ _ _ [App (Var x) y]
   | idName x == n
   = Just y
-match_XToIntegerToX _ _ _ _ _ = Nothing
+match_passthrough _ _ _ _ _ = Nothing
 
 match_smallIntegerTo :: PrimOp -> RuleFun
 match_smallIntegerTo primOp _ _ _ [App (Var x) y]
-  | idName x == smallIntegerName
+  | idName x == integerISDataConName
   = Just $ App (Var (mkPrimOpId primOp)) y
 match_smallIntegerTo _ _ _ _ _ = Nothing
 
@@ -2213,7 +2133,7 @@ tx_con_tte platform (DataAlt dc)  -- See Note [caseRules for tagToEnum]
 
 tx_con_dtt :: Type -> AltCon -> Maybe AltCon
 tx_con_dtt _  DEFAULT = Just DEFAULT
-tx_con_dtt ty (LitAlt (LitNumber LitNumInt i _))
+tx_con_dtt ty (LitAlt (LitNumber LitNumInt i))
    | tag >= 0
    , tag < n_data_cons
    = Just (DataAlt (data_cons !! tag))   -- tag is zero-indexed, as is (!!)
