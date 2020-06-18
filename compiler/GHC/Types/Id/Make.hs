@@ -80,6 +80,7 @@ import GHC.Types.Var (VarBndr(Bndr))
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Maybe       ( maybeToList )
+import Data.Int         ( Int8 )
 
 {-
 ************************************************************************
@@ -1050,9 +1051,40 @@ dataConArgUnpack arg_ty
           ; return (rep_ids, Var (dataConWorkId con)
                              `mkTyApps` (substTysUnchecked subst tc_args)
                              `mkVarApps` rep_ids ) } ) )
+  | Just (rep_id_ty, narrowOp, extendOp) <- unpackEnumerationType arg_ty
+  = ( [(rep_id_ty, NotMarkedStrict)]
+    , ( \ arg_id ->
+        do { rep_id <- newLocal rep_id_ty
+           ; let unbox_fn body
+                  = mkSingleAltCase (Var (mkPrimOpId narrowOp) `App` (Var (mkPrimOpId DataToTagOp) `App` mkTyArg arg_ty `App` Var arg_id))
+                            rep_id DEFAULT [] body
+           ; return ([rep_id], unbox_fn) }
+      , Boxer $ \subst ->
+        do { rep_id <- newLocal (TcType.substTyUnchecked subst rep_id_ty) -- TODO probably don't need substitution
+           ; return ([rep_id], Var (mkPrimOpId TagToEnumOp) `App` mkTyArg arg_ty  `App`
+                                 (Var (mkPrimOpId extendOp) `App` Var rep_id)) }
+      )
+    )
   | otherwise
   = pprPanic "dataConArgUnpack" (ppr arg_ty)
     -- An interface file specified Unpacked, but we couldn't unpack it
+
+-- | Determines the representation types for an enumeration type constructor.
+unpackEnumerationType
+  :: Type
+  -> Maybe ( Type   -- representation type t
+           , PrimOp -- narrow: int# -> t
+           , PrimOp -- exend:  t    -> int#
+           )
+unpackEnumerationType ty
+  | Just (tc, _) <- splitTyConApp_maybe ty
+  , isEnumerationTyCon tc
+  , let num_dcs = length (tyConDataCons tc)
+  , num_dcs < fromIntegral (maxBound :: Int8)
+  = Just (int8PrimTy, Int8Narrow, Int8Extend)
+    -- N.B. don't bother optimizing for types with >256 constructors.
+  | otherwise
+  = Nothing
 
 isUnpackableType :: DynFlags -> FamInstEnvs -> Type -> Bool
 -- True if we can unpack the UNPACK the argument type
@@ -1061,10 +1093,10 @@ isUnpackableType :: DynFlags -> FamInstEnvs -> Type -> Bool
 -- we encounter on the way, because otherwise we might well
 -- end up relying on ourselves!
 isUnpackableType dflags fam_envs ty
-  | Just data_con <- unpackable_type ty
+  | Just data_con <- unpackable_product_type ty
   = ok_con_args emptyNameSet data_con
   | otherwise
-  = False
+  = unpackable_enumeration_type ty
   where
     ok_con_args dcs con
        | dc_name `elemNameSet` dcs
@@ -1084,7 +1116,7 @@ isUnpackableType dflags fam_envs ty
         norm_ty = topNormaliseType fam_envs ty
 
     ok_ty dcs ty
-      | Just data_con <- unpackable_type ty
+      | Just data_con <- unpackable_product_type ty
       = ok_con_args dcs data_con
       | otherwise
       = True        -- NB True here, in contrast to False at top level
@@ -1099,9 +1131,9 @@ isUnpackableType dflags fam_envs ty
       = xopt LangExt.StrictData dflags -- Be conservative
     attempt_unpack _ = False
 
-    unpackable_type :: Type -> Maybe DataCon
+    unpackable_product_type :: Type -> Maybe DataCon
     -- Works just on a single level
-    unpackable_type ty
+    unpackable_product_type ty
       | Just (tc, _) <- splitTyConApp_maybe ty
       , Just data_con <- tyConSingleAlgDataCon_maybe tc
       , null (dataConExTyCoVars data_con)
@@ -1109,6 +1141,13 @@ isUnpackableType dflags fam_envs ty
       = Just data_con
       | otherwise
       = Nothing
+
+    unpackable_enumeration_type :: Type -> Bool
+    unpackable_enumeration_type ty
+      | Just (tc, _) <- splitTyConApp_maybe ty
+      = isEnumerationTyCon tc
+      | otherwise
+      = False
 
 {-
 Note [Unpacking GADTs and existentials]
