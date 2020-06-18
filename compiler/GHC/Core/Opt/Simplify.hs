@@ -46,7 +46,8 @@ import GHC.Core.Ppr     ( pprCoreExpr )
 import GHC.Types.Unique ( hasKey )
 import GHC.Core.Unfold
 import GHC.Core.Utils
-import GHC.Core.Opt.Arity ( etaExpand )
+import GHC.Core.Opt.Arity ( ArityType(..), arityTypeArity, isBotArityType
+                          , idArityType, etaExpandAT )
 import GHC.Core.SimpleOpt ( pushCoTyArg, pushCoValArg
                           , joinPointBinding_maybe, joinPointBindings_maybe )
 import GHC.Core.FVs     ( mkRuleInfo )
@@ -706,10 +707,10 @@ makeTrivialBinding mode top_lvl occ_fs info expr expr_ty
 
         -- Now something very like completeBind,
         -- but without the postInlineUnconditionally part
-        ; (arity, is_bot, expr2) <- tryEtaExpandRhs mode var expr1
+        ; (arity_type, expr2) <- tryEtaExpandRhs mode var expr1
         ; unf <- mkLetUnfolding (sm_dflags mode) top_lvl InlineRhs var expr2
 
-        ; let final_id = addLetBndrInfo var arity is_bot unf
+        ; let final_id = addLetBndrInfo var arity_type unf
               bind     = NonRec final_id expr2
 
         ; return ( floats `addLetFlts` unitLetFloat bind, final_id ) }
@@ -799,14 +800,13 @@ completeBind env top_lvl mb_cont old_bndr new_bndr new_rhs
 
          -- Do eta-expansion on the RHS of the binding
          -- See Note [Eta-expanding at let bindings] in GHC.Core.Opt.Simplify.Utils
-      ; (new_arity, is_bot, final_rhs) <- tryEtaExpandRhs (getMode env)
-                                                          new_bndr new_rhs
+      ; (new_arity, final_rhs) <- tryEtaExpandRhs (getMode env) new_bndr new_rhs
 
         -- Simplify the unfolding
       ; new_unfolding <- simplLetUnfolding env top_lvl mb_cont old_bndr
                           final_rhs (idType new_bndr) new_arity old_unf
 
-      ; let final_bndr = addLetBndrInfo new_bndr new_arity is_bot new_unfolding
+      ; let final_bndr = addLetBndrInfo new_bndr new_arity new_unfolding
         -- See Note [In-scope set as a substitution]
 
       ; if postInlineUnconditionally env top_lvl final_bndr occ_info final_rhs
@@ -823,10 +823,13 @@ completeBind env top_lvl mb_cont old_bndr new_bndr new_rhs
              -- pprTrace "Binding" (ppr final_bndr <+> ppr new_unfolding) $
              return (mkFloatBind env (NonRec final_bndr final_rhs)) }
 
-addLetBndrInfo :: OutId -> Arity -> Bool -> Unfolding -> OutId
-addLetBndrInfo new_bndr new_arity is_bot new_unf
+addLetBndrInfo :: OutId -> ArityType -> Unfolding -> OutId
+addLetBndrInfo new_bndr new_arity_type new_unf
   = new_bndr `setIdInfo` info5
   where
+    new_arity = arityTypeArity new_arity_type
+    is_bot    = isBotArityType new_arity_type
+
     info1 = idInfo new_bndr `setArityInfo` new_arity
 
     -- Unfolding info: Note [Setting the new unfolding]
@@ -844,11 +847,12 @@ addLetBndrInfo new_bndr new_arity is_bot new_unf
           = info2
 
     -- Bottoming bindings: see Note [Bottoming bindings]
-    info4 | is_bot    = info3
-                          `setStrictnessInfo`
-                            mkClosedStrictSig (replicate new_arity topDmd) botDiv
-                          `setCprInfo` mkCprSig new_arity botCpr
+    info4 | is_bot    = info3 `setStrictnessInfo` bot_sig
+                              `setCprInfo`        bot_cpr
           | otherwise = info3
+
+    bot_sig = mkClosedStrictSig (replicate new_arity topDmd) botDiv
+    bot_cpr = mkCprSig new_arity botCpr
 
      -- Zap call arity info. We have used it by now (via
      -- `tryEtaExpandRhs`), and the simplifier can invalidate this
@@ -860,9 +864,9 @@ addLetBndrInfo new_bndr new_arity is_bot new_unf
 ~~~~~~~~~~~~~~~~~~~~~~~~
 Generally speaking the arity of a binding should not decrease.  But it *can*
 legitimately happen because of RULES.  Eg
-        f = g Int
+        f = g @Int
 where g has arity 2, will have arity 2.  But if there's a rewrite rule
-        g Int --> h
+        g @Int --> h
 where h has arity 1, then f's arity will decrease.  Here's a real-life example,
 which is in the output of Specialise:
 
@@ -892,7 +896,7 @@ Then we'd like to drop the dead <alts> immediately.  So it's good to
 propagate the info that x's RHS is bottom to x's IdInfo as rapidly as
 possible.
 
-We use tryEtaExpandRhs on every binding, and it turns ou that the
+We use tryEtaExpandRhs on every binding, and it turns out that the
 arity computation it performs (via GHC.Core.Opt.Arity.findRhsArity) already
 does a simple bottoming-expression analysis.  So all we need to do
 is propagate that info to the binder's IdInfo.
@@ -1550,7 +1554,7 @@ simplLamBndr env bndr
   | isId bndr && hasCoreUnfolding old_unf   -- Special case
   = do { (env1, bndr1) <- simplBinder env bndr
        ; unf'          <- simplStableUnfolding env1 NotTopLevel Nothing bndr
-                                      (idType bndr1) (idArity bndr1) old_unf
+                                      (idType bndr1) (idArityType bndr1) old_unf
        ; let bndr2 = bndr1 `setIdUnfolding` unf'
        ; return (modifyInScope env1 bndr2, bndr2) }
 
@@ -3734,7 +3738,7 @@ because we don't know its usage in each RHS separately
 simplLetUnfolding :: SimplEnv-> TopLevelFlag
                   -> MaybeJoinCont
                   -> InId
-                  -> OutExpr -> OutType -> Arity
+                  -> OutExpr -> OutType -> ArityType
                   -> Unfolding -> SimplM Unfolding
 simplLetUnfolding env top_lvl cont_mb id new_rhs rhs_ty arity unf
   | isStableUnfolding unf
@@ -3764,7 +3768,9 @@ mkLetUnfolding dflags top_lvl src id new_rhs
 simplStableUnfolding :: SimplEnv -> TopLevelFlag
                      -> MaybeJoinCont  -- Just k => a join point with continuation k
                      -> InId
-                     -> OutType -> Arity -> Unfolding
+                     -> OutType
+                     -> ArityType      -- Used to eta expand, but only for non-join-points
+                     -> Unfolding
                      ->SimplM Unfolding
 -- Note [Setting the new unfolding]
 simplStableUnfolding env top_lvl mb_cont id rhs_ty id_arity unf
@@ -3827,7 +3833,7 @@ simplStableUnfolding env top_lvl mb_cont id rhs_ty id_arity unf
     eta_expand expr
       | not eta_on         = expr
       | exprIsTrivial expr = expr
-      | otherwise          = etaExpand id_arity expr
+      | otherwise          = etaExpandAT id_arity expr
     eta_on = sm_eta_expand (getMode env)
 
 {- Note [Eta-expand stable unfoldings]
