@@ -170,7 +170,10 @@ withBkpSession cid insts deps session_type do_this = do
               CompSession -> generalFlags dflags0
               ExeSession -> generalFlags dflags0
           , homeUnitInstantiations = insts
-          , homeUnitInstanceOfId = Just cid
+                                   -- if we don't have any instantiation, don't
+                                   -- fill `homeUnitInstanceOfId` as it makes no
+                                   -- sense (we're not instantiating anything)
+          , homeUnitInstanceOfId = if null insts then Nothing else Just cid
           , homeUnitId = newUnitId cid $ case session_type of
               TcSession -> Nothing
               -- No hash passed if no instances
@@ -187,8 +190,8 @@ withBkpSession cid insts deps session_type do_this = do
           -- Clear the import path so we don't accidentally grab anything
           , importPaths = []
           -- Synthesized the flags
-          , packageFlags = packageFlags dflags ++ map (\(uid0, rn) ->
-          let state = unitState dflags
+          , packageFlags = packageFlags dflags0 ++ map (\(uid0, rn) ->
+          let state = unitState dflags0
               uid = unwireUnit state (improveUnit state $ renameHoleUnit state (listToUFM insts) uid0)
           in ExposePackage
               (showSDoc dflags0
