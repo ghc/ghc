@@ -1,0 +1,70 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 32, types: 23, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 17, types: 10, coercions: 0, joins: 0/0}
+f :: forall {a}. Num a => a -> Bool -> a -> a
+[GblId,
+ Arity=4,
+ Str=<S,1*U(1*C1(C1(U)),1*C1(C1(U)),A,A,A,A,A)><L,U><S,1*U><L,U>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=4,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (@a)
+                 ($dNum [Occ=Once*] :: Num a)
+                 (x [Occ=Once*] :: a)
+                 (b [Occ=Once!] :: Bool)
+                 (eta [Occ=Once*, OS=OneShot] :: a) ->
+                 case b of {
+                   False -> - @a $dNum x eta;
+                   True -> + @a $dNum x eta
+                 }}]
+f = \ (@a)
+      ($dNum :: Num a)
+      (x :: a)
+      (b :: Bool)
+      (eta [OS=OneShot] :: a) ->
+      case b of {
+        False -> - @a $dNum x eta;
+        True -> + @a $dNum x eta
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18355.$trModule4 :: Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T18355.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18355.$trModule3 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T18355.$trModule3 = GHC.Types.TrNameS T18355.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T18355.$trModule2 :: Addr#
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T18355.$trModule2 = "T18355"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T18355.$trModule1 :: GHC.Types.TrName
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T18355.$trModule1 = GHC.Types.TrNameS T18355.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T18355.$trModule :: GHC.Types.Module
+[GblId,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+T18355.$trModule
+  = GHC.Types.Module T18355.$trModule3 T18355.$trModule1
+
+
+
