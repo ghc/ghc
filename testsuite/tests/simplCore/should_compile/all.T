@@ -329,3 +329,4 @@ test('T18231', [ only_ways(['optasm']), grep_errmsg(r'^[\w\.]+ ::.*->.*') ], com
 test('T17673', [ only_ways(['optasm']), grep_errmsg(r'^\w+\.\$wf') ], compile, ['-ddump-simpl -dsuppress-uniques -dppr-cols=9999'])
 test('T18078', [ only_ways(['optasm']), grep_errmsg(r'^\w+\.\$wf') ], compile, ['-ddump-simpl -dsuppress-uniques -dppr-cols=9999'])
 test('T18328', [ only_ways(['optasm']), grep_errmsg(r'Arity=') ], compile, ['-ddump-simpl -dsuppress-uniques'])
+test('T18355', [ grep_errmsg(r'OneShot') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])

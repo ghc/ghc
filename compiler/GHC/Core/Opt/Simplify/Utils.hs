@@ -1453,9 +1453,9 @@ mkLam env bndrs body cont
       , sm_eta_expand (getMode env)
       , any isRuntimeVar bndrs
       , let body_arity = exprEtaExpandArity dflags body
-      , body_arity > 0
+      , expandableArityType body_arity
       = do { tick (EtaExpansion (head bndrs))
-           ; let res = mkLams bndrs (etaExpand body_arity body)
+           ; let res = mkLams bndrs (etaExpandAT body_arity body)
            ; traceSmpl "eta expand" (vcat [text "before" <+> ppr (mkLams bndrs body)
                                           , text "after" <+> ppr res])
            ; return res }
@@ -1525,7 +1525,7 @@ because the latter is not well-kinded.
 -}
 
 tryEtaExpandRhs :: SimplMode -> OutId -> OutExpr
-                -> SimplM (Arity, Bool, OutExpr)
+                -> SimplM (ArityType, OutExpr)
 -- See Note [Eta-expanding at let bindings]
 -- If tryEtaExpandRhs rhs = (n, is_bot, rhs') then
 --   (a) rhs' has manifest arity n
@@ -1533,42 +1533,69 @@ tryEtaExpandRhs :: SimplMode -> OutId -> OutExpr
 tryEtaExpandRhs mode bndr rhs
   | Just join_arity <- isJoinId_maybe bndr
   = do { let (join_bndrs, join_body) = collectNBinders join_arity rhs
-       ; return (count isId join_bndrs, exprIsDeadEnd join_body, rhs) }
+             oss   = [idOneShotInfo id | id <- join_bndrs, isId id]
+             arity_type | exprIsDeadEnd join_body = ABot (length oss)
+                        | otherwise               = ATop oss
+       ; return (arity_type, rhs) }
          -- Note [Do not eta-expand join points]
          -- But do return the correct arity and bottom-ness, because
          -- these are used to set the bndr's IdInfo (#15517)
          -- Note [Invariants on join points] invariant 2b, in GHC.Core
 
+  | sm_eta_expand mode      -- Provided eta-expansion is on
+  , new_arity > old_arity   -- And the current manifest arity isn't enough
+  , want_eta rhs
+  = pprTrace "eta expand" (vcat [ ppr bndr <+> equals <+> ppr rhs
+                                , ppr arity_type ]) $
+    do { tick (EtaExpansion bndr)
+       ; return (arity_type, etaExpandAT arity_type rhs) }
+
   | otherwise
-  = do { (new_arity, is_bot, new_rhs) <- try_expand
+  = return (arity_type, rhs)
 
-       ; WARN( new_arity < old_id_arity,
-               (text "Arity decrease:" <+> (ppr bndr <+> ppr old_id_arity
-                <+> ppr old_arity <+> ppr new_arity) $$ ppr new_rhs) )
-                        -- Note [Arity decrease] in GHC.Core.Opt.Simplify
-         return (new_arity, is_bot, new_rhs) }
   where
-    try_expand
-      | exprIsTrivial rhs  -- See Note [Do not eta-expand trivial expressions]
-      = return (exprArity rhs, False, rhs)
+    dflags    = sm_dflags mode
+    old_arity = exprArity rhs -- See Note [Do not expand eta-expand PAPs]
 
-      | sm_eta_expand mode      -- Provided eta-expansion is on
-      , new_arity > old_arity   -- And the current manifest arity isn't enough
-      = do { tick (EtaExpansion bndr)
-           ; return (new_arity, is_bot, etaExpand new_arity rhs) }
+    arity_type = findRhsArity dflags bndr rhs old_arity
+                 `maxWithArity` idCallArity bndr
+    new_arity = arityTypeArity arity_type
 
-      | otherwise
-      = return (old_arity, is_bot && new_arity == old_arity, rhs)
+    -- See Note [Do not eta-expand trivial expressions]
+    want_eta (Cast e _)        = want_eta e
+    want_eta (Tick _ e)        = want_eta e
+    want_eta (App e (Type {})) = want_eta e
+    want_eta (Var _)           = False
 
-    dflags       = sm_dflags mode
-    old_arity    = exprArity rhs -- See Note [Do not expand eta-expand PAPs]
-    old_id_arity = idArity bndr
+    -- Eta-expand if there is a value lambda already
+    want_eta (Lam b e) = isId b || want_eta e
 
-    (new_arity1, is_bot) = findRhsArity dflags bndr rhs old_arity
-    new_arity2 = idCallArity bndr
-    new_arity  = max new_arity1 new_arity2
+    -- Otherwise don't a expand PAPs/thunks, unless it
+    -- is headed with a one-shot lambda
+    -- Note [Eta expanding thunks]
+    want_eta _ = case arity_type of
+                   ATop (os:_) -> isOneShotInfo os
+                   ATop []     -> False
+                   ABot {}     -> True
 
-{-
+{- Note [Eta expanding thunks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We don't eta-expand
+   * Trivial RHSs     x = y
+   * PAPs             x = map g
+   * Thunks           f = case y of p -> \x -> blah
+
+When we see
+     f = case y of p -> \x -> blah
+should we eta-expand it? Well, if 'x' is a one-shot state token
+then 'yes' because 'f' will only be applied once.  But otherwise
+we (conservatively) say no.  My main reason is to avoid expanding
+PAPSs
+        f = g d  ==>  f = \x. g d x
+because that might in turn make g inline (if it has an inline pragma),
+which we might not want.  After all, INLINE pragmas say "inline only
+when saturated" so we don't want to be too gung-ho about saturating!
+
 Note [Eta-expanding at let bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We now eta expand at let-bindings, which is where the payoff comes.
