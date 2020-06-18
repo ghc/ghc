@@ -187,8 +187,8 @@ withBkpSession cid insts deps session_type do_this = do
           -- Clear the import path so we don't accidentally grab anything
           , importPaths = []
           -- Synthesized the flags
-          , packageFlags = packageFlags dflags ++ map (\(uid0, rn) ->
-          let state = unitState dflags
+          , packageFlags = packageFlags dflags0 ++ map (\(uid0, rn) ->
+          let state = unitState dflags0
               uid = unwireUnit state (improveUnit state $ renameHoleUnit state (listToUFM insts) uid0)
           in ExposePackage
               (showSDoc dflags0
