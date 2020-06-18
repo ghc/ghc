@@ -1405,7 +1405,8 @@ simplCast env body co0 cont0
           = {-#SCC "addCoerce-pushCoValArg" #-}
             do { tail' <- addCoerceM m_co2 tail
                ; if isReflCo co1
-                 then return (cont { sc_cont = tail' })
+                 then return (cont { sc_cont = tail'
+                                   , sc_hole_ty = coercionLKind co })
                       -- Avoid simplifying if possible;
                       -- See Note [Avoiding exponential behaviour]
                  else do

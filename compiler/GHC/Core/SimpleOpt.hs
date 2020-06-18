@@ -209,6 +209,7 @@ simple_opt_expr env expr
     subst        = soe_subst env
     in_scope     = substInScope subst
     in_scope_env = (in_scope, simpleUnfoldingFun)
+    opt_co co = optCoercion (soe_dflags env) (getTCvSubst subst) co
 
     go (Var v)
        | Just clo <- lookupVarEnv (soe_inl env) v
@@ -218,16 +219,11 @@ simple_opt_expr env expr
 
     go (App e1 e2)      = simple_app env e1 [(env,e2)]
     go (Type ty)        = Type     (substTy subst ty)
-    go (Coercion co)    = Coercion (optCoercion (soe_dflags env) (getTCvSubst subst) co)
+    go (Coercion co)    = Coercion (opt_co co)
     go (Lit lit)        = Lit lit
     go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
-    go (Cast e co)      = case go e of
-                            -- flatten nested casts before calling the coercion optimizer;
-                            -- see #18112 (note that mkCast handles dropping Refl coercions)
-                            Cast e' co' -> mkCast e' (opt_co (mkTransCo co' co))
-                            e'          -> mkCast e' (opt_co co)
-                          where
-                            opt_co = optCoercion (soe_dflags env) (getTCvSubst subst)
+    go (Cast e co)      = mkCast (go e) (opt_co co)
+                          -- Use mkCast to flatten nested casts (#18112)
 
     go (Let bind body)  = case simple_opt_bind env bind NotTopLevel of
                              (env', Nothing)   -> simple_opt_expr env' body
