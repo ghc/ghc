@@ -483,7 +483,7 @@ static HsInt loadArchive_ (pathchar *path)
         DEBUG_LOG("\tisObject = %d\n", isObject);
 
         if (isObject) {
-            char *archiveMemberName;
+            pathchar *archiveMemberName;
 
             DEBUG_LOG("Member is an object file...loading...\n");
 
@@ -515,10 +515,11 @@ static HsInt loadArchive_ (pathchar *path)
                 }
             }
 
-            archiveMemberName = stgMallocBytes(pathlen(path) + thisFileNameSize + 3,
+            int size = pathlen(path) + thisFileNameSize + 3;
+            archiveMemberName = stgMallocBytes(size * pathsize,
                                                "loadArchive(file)");
-            sprintf(archiveMemberName, "%" PATH_FMT "(%.*s)",
-                    path, (int)thisFileNameSize, fileName);
+            pathprintf(archiveMemberName, size, WSTR("%" PATH_FMT "(%.*s)"),
+                       path, (int)thisFileNameSize, fileName);
 
             oc = mkOc(path, image, memberSize, false, archiveMemberName
                      , misalignment);
