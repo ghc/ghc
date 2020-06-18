@@ -8,7 +8,6 @@ import Data.List (intercalate)
 import System.IO
 import GHC
 import GHC.Driver.Session
-import GHC.Driver.Types
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Data.Bag (filterBag,isEmptyBag)
@@ -27,9 +26,8 @@ testOneFile libdir fileName = do
         dflags <- getSessionDynFlags
         setSessionDynFlags dflags
         let mn =mkModuleName fileName
-        unitId <- hsc_currentPackage <$> getSession
         addTarget Target { targetId = TargetModule mn
-                         , targetPackage = unitId
+                         , targetPackage = homeUnitId dflags
                          , targetAllowObjCode = True
                          , targetContents = Nothing }
         load LoadAllTargets

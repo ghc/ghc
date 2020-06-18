@@ -9,7 +9,6 @@ import GHC
 import qualified GHC.Settings.Config as GHC
 import qualified GHC.Utils.Outputable as GHC
 import GHC.Driver.Monad (liftIO)
-import GHC.Driver.Types (hsc_currentPackage)
 import GHC.Utils.Outputable (PprStyle, queryQual)
 
 compileInGhc :: [FilePath]          -- ^ Targets
@@ -23,8 +22,7 @@ compileInGhc targets handlerOutput = do
     -- Set up targets.
     oldTargets <- getTargets
     let oldFiles = map fileFromTarget oldTargets
-    unitId <- hsc_currentPackage <$> getSession
-    mapM_ (addSingle unitId) (targets \\ oldFiles)
+    mapM_ (addSingle (homeUnitId flags)) (targets \\ oldFiles)
     mapM_ (removeTarget . targetIdFromFile) $ oldFiles \\ targets
     -- Load modules to typecheck
     void $ load LoadAllTargets
