@@ -51,7 +51,7 @@ import GHC.Real (quot, fromIntegral)
 import GHC.Show (Show(..))
 import GHC.Event.Control
 import GHC.Event.Internal (Backend, Event, evtRead, Timeout(..))
-import GHC.Event.Unique (Unique, UniqueSource, newSource, newUnique)
+import GHC.Event.Unique (UniqueSource, newSource, newUnique)
 import GHC.Event.TimeOut
 import System.Posix.Types (Fd)
 
