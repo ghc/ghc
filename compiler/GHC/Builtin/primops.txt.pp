@@ -1570,6 +1570,20 @@ primop  NewSmallArrayOp "newSmallArray#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
+primop SmallArrayOfOp "smallArrayOf#" GenPrimOp
+   o -> SmallArray# b
+   {Create a new immutable array from the elements passed in an arbitrarily
+   nested homogeneous (i.e. after flattening all elements must be of the same
+   lifted type) unboxed tuple. This is not enforced by the type system.
+   Nesting is required to overcome the {\tt mAX_TUPLE_SIZE \#} limitation.
+   Example: {\tt smallArrayOf# (# 1, (# 2, 3, (# #) #) #) \#} is equivalent to
+   {\tt smallArrayOf# (# 1, 2, 3 #) \#}.}
+   with
+   has_side_effects = True
+{}
+primop  SameSmallMutableArrayOp "sameSmallMutableArray#" GenPrimOp
+   SmallMutableArray# s a -> SmallMutableArray# s a -> Int#
+
 primop  ShrinkSmallMutableArrayOp_Char "shrinkSmallMutableArray#" GenPrimOp
    SmallMutableArray# s a -> Int# -> State# s -> State# s
    {Shrink mutable array to new specified size, in
@@ -3584,7 +3598,7 @@ pseudoop   "unsafeCoerce#"
 
          * Casting an unboxed type to another unboxed type of the same size.
            (Casting between floating-point and integral types does not work.
-           See the {\tt GHC.Float} module for functions to do work.)
+           See the {\tt GHC.Float} module for functions to do this.)
 
          * Casting between two types that have the same runtime representation.  One case is when
            the two types differ only in "phantom" type parameters, for example

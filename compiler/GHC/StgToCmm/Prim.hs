@@ -223,6 +223,16 @@ emitPrimOp dflags primop = case primop of
         (replicate (fromIntegral n) init)
     _ -> PrimopCmmEmit_External
 
+  SmallArrayOfOp -> \elems -> opAllDone $ \[res] ->
+    let n = length elems
+      in doNewArrayOp
+          res
+          (smallArrPtrsRep (fromIntegral n))
+          mkSMAP_FROZEN_DIRTY_infoLabel
+          [ ( mkIntExpr platform n
+            , fixedHdrSize dflags + oFFSET_StgSmallMutArrPtrs_ptrs dflags ) ]
+          elems
+
   CopySmallArrayOp -> \case
     [src, src_off, dst, dst_off, (CmmLit (CmmInt n _))] ->
       opIntoRegs $ \ [] -> doCopySmallArrayOp src src_off dst dst_off (fromInteger n)
