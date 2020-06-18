@@ -213,6 +213,7 @@ simple_opt_expr env expr
     in_scope     = substInScope subst
     in_scope_env = (in_scope, simpleUnfoldingFun)
 
+    ---------------
     go (Var v)
        | Just clo <- lookupVarEnv (soe_inl env) v
        = simple_opt_clo env clo
@@ -221,17 +222,10 @@ simple_opt_expr env expr
 
     go (App e1 e2)      = simple_app env e1 [(env,e2)]
     go (Type ty)        = Type     (substTy subst ty)
-    go (Coercion co)    = Coercion (optCoercion (soe_dflags env) (getTCvSubst subst) co)
+    go (Coercion co)    = Coercion (go_co co)
     go (Lit lit)        = Lit lit
     go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
-    go (Cast e co)      = case go e of
-                            -- flatten nested casts before calling the coercion optimizer;
-                            -- see #18112 (note that mkCast handles dropping Refl coercions)
-                            Cast e' co' -> mkCast e' (opt_co (mkTransCo co' co))
-                            e'          -> mkCast e' (opt_co co)
-                          where
-                            opt_co = optCoercion (soe_dflags env) (getTCvSubst subst)
-
+    go (Cast e co)      = mk_cast (go e) (go_co co)
     go (Let bind body)  = case simple_opt_bind env bind NotTopLevel of
                              (env', Nothing)   -> simple_opt_expr env' body
                              (env', Just bind) -> Let bind (simple_opt_expr env' body)
@@ -267,6 +261,9 @@ simple_opt_expr env expr
         (env', b') = subst_opt_bndr env b
 
     ----------------------
+    go_co co = optCoercion (soe_dflags env) (getTCvSubst subst) co
+
+    ----------------------
     go_alt env (con, bndrs, rhs)
       = (con, bndrs', simple_opt_expr env' rhs)
       where
@@ -284,6 +281,15 @@ simple_opt_expr env expr
        where
          bs = reverse bs'
          e' = simple_opt_expr env e
+
+mk_cast :: CoreExpr -> CoercionR -> CoreExpr
+-- Like GHC.Core.Utils.mkCast, but does a full reflexivity check.
+-- mkCast doesn't do that because the Simplifier does (in simplCast)
+-- But in SimpleOpt it's nice to kill those nested casts (#18112)
+mk_cast (Cast e co1) co2        = mk_cast e (co1 `mkTransCo` co2)
+mk_cast (Tick t e)   co         = Tick t (mk_cast e co)
+mk_cast e co | isReflexiveCo co = e
+             | otherwise        = Cast e co
 
 ----------------------
 -- simple_app collects arguments for beta reduction
