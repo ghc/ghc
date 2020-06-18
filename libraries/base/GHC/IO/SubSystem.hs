@@ -29,9 +29,11 @@ module GHC.IO.SubSystem (
  ) where
 
 import GHC.Base
-
-import GHC.IO.Unsafe
 import GHC.RTS.Flags
+
+#if defined(mingw32_HOST_OS)
+import GHC.IO.Unsafe
+#endif
 
 infixl 7 <!>
 
