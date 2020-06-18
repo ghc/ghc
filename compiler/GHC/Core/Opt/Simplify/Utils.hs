@@ -1478,9 +1478,9 @@ mkLam env bndrs body cont
       , sm_eta_expand (getMode env)
       , any isRuntimeVar bndrs
       , let body_arity = exprEtaExpandArity dflags body
-      , body_arity > 0
+      , expandableArityType body_arity
       = do { tick (EtaExpansion (head bndrs))
-           ; let res = mkLams bndrs (etaExpand body_arity body)
+           ; let res = mkLams bndrs (etaExpandAT body_arity body)
            ; traceSmpl "eta expand" (vcat [text "before" <+> ppr (mkLams bndrs body)
                                           , text "after" <+> ppr res])
            ; return res }
@@ -1550,7 +1550,7 @@ because the latter is not well-kinded.
 -}
 
 tryEtaExpandRhs :: SimplMode -> OutId -> OutExpr
-                -> SimplM (Arity, Bool, OutExpr)
+                -> SimplM (ArityType, OutExpr)
 -- See Note [Eta-expanding at let bindings]
 -- If tryEtaExpandRhs rhs = (n, is_bot, rhs') then
 --   (a) rhs' has manifest arity n
@@ -1558,40 +1558,46 @@ tryEtaExpandRhs :: SimplMode -> OutId -> OutExpr
 tryEtaExpandRhs mode bndr rhs
   | Just join_arity <- isJoinId_maybe bndr
   = do { let (join_bndrs, join_body) = collectNBinders join_arity rhs
-       ; return (count isId join_bndrs, exprIsDeadEnd join_body, rhs) }
+             oss   = [idOneShotInfo id | id <- join_bndrs, isId id]
+             arity_type | exprIsDeadEnd join_body = ABot (length oss)
+                        | otherwise               = ATop oss
+       ; return (arity_type, rhs) }
          -- Note [Do not eta-expand join points]
          -- But do return the correct arity and bottom-ness, because
          -- these are used to set the bndr's IdInfo (#15517)
          -- Note [Invariants on join points] invariant 2b, in GHC.Core
 
+  | sm_eta_expand mode      -- Provided eta-expansion is on
+  , new_arity > old_arity   -- And the current manifest arity isn't enough
+  , want_eta rhs
+  = do { tick (EtaExpansion bndr)
+       ; return (arity_type, etaExpandAT arity_type rhs) }
+
   | otherwise
-  = do { (new_arity, is_bot, new_rhs) <- try_expand
+  = return (arity_type, rhs)
 
-       ; WARN( new_arity < old_id_arity,
-               (text "Arity decrease:" <+> (ppr bndr <+> ppr old_id_arity
-                <+> ppr old_arity <+> ppr new_arity) $$ ppr new_rhs) )
-                        -- Note [Arity decrease] in GHC.Core.Opt.Simplify
-         return (new_arity, is_bot, new_rhs) }
   where
-    try_expand
-      | exprIsTrivial rhs  -- See Note [Do not eta-expand trivial expressions]
-      = return (exprArity rhs, False, rhs)
+    dflags    = sm_dflags mode
+    old_arity = exprArity rhs
 
-      | sm_eta_expand mode      -- Provided eta-expansion is on
-      , new_arity > old_arity   -- And the current manifest arity isn't enough
-      = do { tick (EtaExpansion bndr)
-           ; return (new_arity, is_bot, etaExpand new_arity rhs) }
+    arity_type = findRhsArity dflags bndr rhs old_arity
+                 `maxWithArity` idCallArity bndr
+    new_arity = arityTypeArity arity_type
 
-      | otherwise
-      = return (old_arity, is_bot && new_arity == old_arity, rhs)
-
-    dflags       = sm_dflags mode
-    old_arity    = exprArity rhs -- See Note [Do not expand eta-expand PAPs]
-    old_id_arity = idArity bndr
-
-    (new_arity1, is_bot) = findRhsArity dflags bndr rhs old_arity
-    new_arity2 = idCallArity bndr
-    new_arity  = max new_arity1 new_arity2
+    -- See Note [Which RHSs do we eta-expand?]
+    want_eta (Cast e _)                  = want_eta e
+    want_eta (Tick _ e)                  = want_eta e
+    want_eta (Lam b e) | isTyVar b       = want_eta e
+    want_eta (App e a) | exprIsTrivial a = want_eta e
+    want_eta (Var {})                    = False
+    want_eta (Lit {})                    = False
+    want_eta _ = True
+{-
+    want_eta _ = case arity_type of
+                   ATop (os:_) -> isOneShotInfo os
+                   ATop []     -> False
+                   ABot {}     -> True
+-}
 
 {-
 Note [Eta-expanding at let bindings]
@@ -1618,14 +1624,53 @@ because then 'genMap' will inline, and it really shouldn't: at least
 as far as the programmer is concerned, it's not applied to two
 arguments!
 
-Note [Do not eta-expand trivial expressions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Do not eta-expand a trivial RHS like
-  f = g
-If we eta expand do
-  f = \x. g x
-we'll just eta-reduce again, and so on; so the
-simplifier never terminates.
+Note [Which RHSs do we eta-expand?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We don't eta-expand:
+
+* Trivial RHSs, e.g.     f = g
+  If we eta expand do
+    f = \x. g x
+  we'll just eta-reduce again, and so on; so the
+  simplifier never terminates.
+
+* PAPs: see Note [Do not eta-expand PAPs]
+
+What about things like this?
+   f = case y of p -> \x -> blah
+
+Here we do eta-expand.  This is a change (Jun 20), but if we have
+really decided that f has arity 1, then putting that lambda at the top
+seems like a Good idea.
+
+Note [Do not eta-expand PAPs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We used to have old_arity = manifestArity rhs, which meant that we
+would eta-expand even PAPs.  But this gives no particular advantage,
+and can lead to a massive blow-up in code size, exhibited by #9020.
+Suppose we have a PAP
+    foo :: IO ()
+    foo = returnIO ()
+Then we can eta-expand do
+    foo = (\eta. (returnIO () |> sym g) eta) |> g
+where
+    g :: IO () ~ State# RealWorld -> (# State# RealWorld, () #)
+
+But there is really no point in doing this, and it generates masses of
+coercions and whatnot that eventually disappear again. For T9020, GHC
+allocated 6.6G before, and 0.8G afterwards; and residency dropped from
+1.8G to 45M.
+
+Moreover, if we eta expand
+        f = g d  ==>  f = \x. g d x
+that might in turn make g inline (if it has an inline pragma), which
+we might not want.  After all, INLINE pragmas say "inline only when
+saturated" so we don't want to be too gung-ho about saturating!
+
+But note that this won't eta-expand, say
+  f = \g -> map g
+Does it matter not eta-expanding such functions?  I'm not sure.  Perhaps
+strictness analysis will have less to bite on?
 
 Note [Do not eta-expand join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1665,29 +1710,6 @@ CorePrep comes around, the code is very likely to look more like this:
              $j2 :: Int -> State# RealWorld -> (# State# RealWorld, ())
              $j2 = if n > 0 then $j1
                             else (...) eta
-
-Note [Do not eta-expand PAPs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We used to have old_arity = manifestArity rhs, which meant that we
-would eta-expand even PAPs.  But this gives no particular advantage,
-and can lead to a massive blow-up in code size, exhibited by #9020.
-Suppose we have a PAP
-    foo :: IO ()
-    foo = returnIO ()
-Then we can eta-expand do
-    foo = (\eta. (returnIO () |> sym g) eta) |> g
-where
-    g :: IO () ~ State# RealWorld -> (# State# RealWorld, () #)
-
-But there is really no point in doing this, and it generates masses of
-coercions and whatnot that eventually disappear again. For T9020, GHC
-allocated 6.6G before, and 0.8G afterwards; and residency dropped from
-1.8G to 45M.
-
-But note that this won't eta-expand, say
-  f = \g -> map g
-Does it matter not eta-expanding such functions?  I'm not sure.  Perhaps
-strictness analysis will have less to bite on?
 
 
 ************************************************************************
