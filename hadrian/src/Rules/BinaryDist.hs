@@ -115,7 +115,7 @@ bindistRules = do
     phony "binary-dist-dir" $ do
         -- We 'need' all binaries and libraries
         targets <- mapM pkgTarget =<< stagePackages Stage1
-        cross <- flag undefined CrossCompiling
+        cross <- flag (Global CrossCompiling)
         need targets
         unless cross $ needIservBins
 

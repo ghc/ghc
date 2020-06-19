@@ -234,7 +234,7 @@ generateGhcPlatformH = do
     hostArch       <- chooseSetting HostArch      TargetArch
     hostOs         <- chooseSetting HostOs        TargetOs
     hostVendor     <- chooseSetting HostVendor    TargetVendor
-    ghcUnreg       <- getFlag    GhcUnregisterised
+    ghcUnreg       <- getFlag (Global GhcUnregisterised)
     return . unlines $
         [ "#if !defined(__GHCPLATFORM_H__)"
         , "#define __GHCPLATFORM_H__"
@@ -290,14 +290,14 @@ generateSettings = do
         , ("ld is GNU ld", expr $ lookupValueOrError configFile "ld-is-gnu-ld")
         , ("ar command", expr $ settingsFileSetting SettingsFileSetting_ArCommand)
         , ("ar flags", expr $ lookupValueOrError configFile "ar-args")
-        , ("ar supports at file", yesNo <$> getFlag ArSupportsAtFile)
+        , ("ar supports at file", yesNo <$> getFlag (Global ArSupportsAtFile))
         , ("ranlib command", expr $ settingsFileSetting SettingsFileSetting_RanlibCommand)
         , ("touch command", expr $ settingsFileSetting SettingsFileSetting_TouchCommand)
         , ("dllwrap command", expr $ settingsFileSetting SettingsFileSetting_DllWrapCommand)
         , ("windres command", expr $ settingsFileSetting SettingsFileSetting_WindresCommand)
         , ("libtool command", expr $ settingsFileSetting SettingsFileSetting_LibtoolCommand)
         , ("unlit command", ("$topdir/bin/" <>) <$> expr (programName (ctx { Context.package = unlit })))
-        , ("cross compiling", yesNo <$> getFlag CrossCompiling)
+        , ("cross compiling", yesNo <$> getFlag (Global CrossCompiling))
         , ("target platform string", getSetting TargetPlatform)
         , ("target os", getSetting TargetOsHaskell)
         , ("target arch", getSetting TargetArchHaskell)
@@ -307,7 +307,7 @@ generateSettings = do
         , ("target has .ident directive", expr $ lookupValueOrError configFile "target-has-ident-directive")
         , ("target has subsections via symbols", expr $ lookupValueOrError configFile "target-has-subsections-via-symbols")
         , ("target has RTS linker", expr $ lookupValueOrError configFile "target-has-rts-linker")
-        , ("Unregisterised", yesNo <$> getFlag GhcUnregisterised)
+        , ("Unregisterised", yesNo <$> getFlag (Global GhcUnregisterised))
         , ("LLVM target", getSetting LlvmTarget)
         , ("LLVM llc command", expr $ settingsFileSetting SettingsFileSetting_LlcCommand)
         , ("LLVM opt command", expr $ settingsFileSetting SettingsFileSetting_OptCommand)
@@ -318,12 +318,12 @@ generateSettings = do
         , ("Use native code generator", expr $ yesNo <$> ghcWithNativeCodeGen)
         , ("Support SMP", expr $ yesNo <$> targetSupportsSMP)
         , ("RTS ways", unwords . map show <$> getRtsWays)
-        , ("Tables next to code", yesNo <$> getFlag TablesNextToCode)
-        , ("Leading underscore", yesNo <$> getFlag LeadingUnderscore)
+        , ("Tables next to code", yesNo <$> getFlag (Global TablesNextToCode))
+        , ("Leading underscore", yesNo <$> getFlag (Global LeadingUnderscore))
         , ("Use LibFFI", expr $ yesNo <$> useLibFFIForAdjustors)
         , ("Use Threads", expr $ yesNo . ghcThreaded <$> flavour)
         , ("Use Debugging", expr $ yesNo . ghcDebugged <$> flavour)
-        , ("RTS expects libdw", yesNo <$> getFlag WithLibdw)
+        , ("RTS expects libdw", yesNo <$> getFlag (Global WithLibdw))
         ]
     let showTuple (k, v) = "(" ++ show k ++ ", " ++ show v ++ ")"
     pure $ case settings of

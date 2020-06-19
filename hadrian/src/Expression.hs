@@ -122,7 +122,7 @@ notStage0 = notM stage0
 --   compiler's RTS ways. See Note [Linking ghc-bin against threaded stage0 RTS]
 --   in Settings.Packages for details.
 threadedBootstrapper :: Predicate
-threadedBootstrapper = expr (flag undefined BootstrapThreadedRts)
+threadedBootstrapper = expr (flag (Global BootstrapThreadedRts))
 
 -- | Is a certain package /not/ built right now?
 notPackage :: Package -> Predicate

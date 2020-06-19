@@ -17,7 +17,7 @@ packageArgs = do
     let -- Do not bind the result to a Boolean: this forces the configure rule
         -- immediately and may lead to cyclic dependencies.
         -- See: https://gitlab.haskell.org/ghc/ghc/issues/16809.
-        cross = flag stage CrossCompiling
+        cross = flag (Staged stage CrossCompiling)
 
         -- Check if the bootstrap compiler has the same version as the one we
         -- are building. This is used to build cross-compilers
@@ -56,7 +56,7 @@ packageArgs = do
           , builder (Cabal Setup) ? mconcat
             [ arg "--disable-library-for-ghci"
             , anyTargetOs ["openbsd"] ? arg "--ld-options=-E"
-            , flag stage GhcUnregisterised ? arg "--ghc-option=-DNO_REGS"
+            , flag (Staged stage GhcUnregisterised) ? arg "--ghc-option=-DNO_REGS"
             , notM targetSupportsSMP ? arg "--ghc-option=-DNOSMP"
             , notM targetSupportsSMP ? arg "--ghc-option=-optc-DNOSMP"
             -- When building stage 1 or later, use thread-safe RTS functions if
@@ -117,7 +117,7 @@ packageArgs = do
         , package ghcPrim ? mconcat
           [ builder (Cabal Flags) ? arg "include-ghc-prim"
 
-          , builder (Cc CompileC) ? (not <$> flag stage CcLlvmBackend) ?
+          , builder (Cc CompileC) ? (not <$> flag (Staged stage CcLlvmBackend)) ?
             input "**/cbits/atomic.c"  ? arg "-Wno-sync-nand" ]
 
         --------------------------------- ghci ---------------------------------
@@ -224,15 +224,15 @@ ghcBignumArgs = package ghcBignum ? do
 
                        -- enable in-tree support: don't depend on external "gmp"
                        -- library
-                     , flag undefined GmpInTree ? arg "--configure-option=--with-intree-gmp"
+                     , flag (Global GmpInTree) ? arg "--configure-option=--with-intree-gmp"
 
                        -- prefer framework over library (on Darwin)
-                     , flag undefined GmpFrameworkPref ?
+                     , flag (Global GmpFrameworkPref) ?
                        arg "--configure-option=--with-gmp-framework-preferred"
 
                        -- Ensure that the ghc-bignum package registration includes
                        -- knowledge of the system gmp's library and include directories.
-                     , notM (flag undefined GmpInTree) ? mconcat
+                     , notM (flag (Global GmpInTree)) ? mconcat
                        [ if not (null librariesGmp) then arg ("--extra-lib-dirs=" ++ librariesGmp) else mempty
                        , if not (null includesGmp) then arg ("--extra-include-dirs=" ++ includesGmp) else mempty
                        ]
@@ -257,8 +257,8 @@ rtsPackageArgs = package rts ? do
     targetArch     <- getSetting TargetArch
     targetOs       <- getSetting TargetOs
     targetVendor   <- getSetting TargetVendor
-    ghcUnreg       <- yesNo <$> getFlag GhcUnregisterised
-    ghcEnableTNC   <- yesNo <$> getFlag TablesNextToCode
+    ghcUnreg       <- yesNo <$> getFlag (Global GhcUnregisterised)
+    ghcEnableTNC   <- yesNo <$> getFlag (Global TablesNextToCode)
     rtsWays        <- getRtsWays
     way            <- getWay
     path           <- getBuildPath
@@ -289,8 +289,8 @@ rtsPackageArgs = package rts ? do
 
     let cArgs = mconcat
           [ rtsWarnings
-          , flag undefined UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
-          , flag undefined WithLibdw ? arg ("-I" ++ libdwIncludeDir)
+          , flag (Global UseSystemFfi) ? arg ("-I" ++ ffiIncludeDir)
+          , flag (Global WithLibdw) ? arg ("-I" ++ libdwIncludeDir)
           , arg "-fomit-frame-pointer"
           -- RTS *must* be compiled with optimisations. The INLINE_HEADER macro
           -- requires that functions are inlined to work as expected. Inlining
@@ -363,10 +363,10 @@ rtsPackageArgs = package rts ? do
             -- any warnings in the module. See:
             -- https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions#Warnings
 
-            , (not <$> flag undefined CcLlvmBackend) ?
+            , (not <$> flag (Global CcLlvmBackend)) ?
               inputs ["**/Compact.c"] ? arg "-finline-limit=2500"
 
-            , input "**/RetainerProfile.c" ? flag undefined CcLlvmBackend ?
+            , input "**/RetainerProfile.c" ? flag (Global CcLlvmBackend) ?
               arg "-Wno-incompatible-pointer-types"
             , windowsHost ? arg ("-DWINVER=" ++ windowsVersion)
 
@@ -401,8 +401,8 @@ rtsPackageArgs = package rts ? do
           , "-DFFI_LIB="         ++ show libffiName
           , "-DLIBDW_LIB_DIR="   ++ show libdwLibraryDir ]
 
-        , builder HsCpp ? flag undefined WithLibdw ? arg "-DUSE_LIBDW"
-        , builder HsCpp ? flag undefined HaveLibMingwEx ? arg "-DHAVE_LIBMINGWEX" ]
+        , builder HsCpp ? flag (Global WithLibdw) ? arg "-DUSE_LIBDW"
+        , builder HsCpp ? flag (Global HaveLibMingwEx) ? arg "-DHAVE_LIBMINGWEX" ]
 
 -- Compile various performance-critical pieces *without* -fPIC -dynamic
 -- even when building a shared library.  If we don't do this, then the

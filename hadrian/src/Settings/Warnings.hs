@@ -10,8 +10,8 @@ import Packages
 defaultGhcWarningsArgs :: Args
 defaultGhcWarningsArgs = mconcat
     [ notStage0 ? arg "-Wnoncanonical-monad-instances"
-    , notM (flag undefined CcLlvmBackend) ? arg "-optc-Wno-error=inline"
-    , flag undefined CcLlvmBackend ? arg "-optc-Wno-unknown-pragmas"
+    , notM (flag (Global CcLlvmBackend)) ? arg "-optc-Wno-error=inline"
+    , flag (Global CcLlvmBackend) ? arg "-optc-Wno-unknown-pragmas"
     , arg "-optP-Wno-nonportable-include-path" -- #17798
     ]
 
