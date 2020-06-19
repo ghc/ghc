@@ -633,11 +633,25 @@ setSessionDynFlags dflags = do
       return Nothing
 #endif
 
-  modifySession $ \h -> (set_hsc_dflags h dflags''')
+  modifySession $ \h -> h
     { hsc_IC = (hsc_IC h){ ic_dflags = dflags''' }
     , hsc_interp = hsc_interp h <|> interp
       -- we only update the interpreter if there wasn't already one set up
     }
+  -- Actually modify the session dflags.
+  -- If the dflags have a different homeUnitId than the current package,
+  -- then we assume it has been renamed.
+  -- We overwrite the old value in the Internal Unit Env and set
+  -- current package to the new home unit id.
+  -- This is absolutely necessary to maintain backwards compatibility.
+  modifySession $ \h ->
+    if hsc_currentPackage h == homeUnitId dflags'''
+        then set_hsc_dflags h dflags'''
+        else singleton_hsc_unitEnv h (homeUnitId dflags''')
+                InternalUnitEnv
+                  { internalUnitEnv_dflags = dflags'''
+                  , internalUnitEnv_homePackageTable = hsc_HPT h
+                  }
   invalidateModSummaryCache
 
 -- | Sets the program 'DynFlags'.  Note: this invalidates the internal
@@ -776,7 +790,7 @@ removeTarget :: GhcMonad m => TargetId -> m ()
 removeTarget target_id
   = modifySession (\h -> h{ hsc_targets = filter (hsc_targets h) })
   where
-   filter targets = [ t | t@(Target id _ _ _) <- targets, id /= target_id ]
+   filter targets = [ t | t@Target { targetId = tid } <- targets, tid /= target_id ]
 
 -- | Attempts to guess what Target a string refers to.  This function
 -- implements the @--make@/GHCi command-line syntax for filenames:
