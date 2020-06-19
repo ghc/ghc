@@ -7,7 +7,7 @@ import GHC.Types.Basic (Arity, TupleSort)
 import GHC.Types.Name (Name)
 
 listTyCon :: TyCon
-typeNatKind, typeSymbolKind :: Type
+typeSymbolKind :: Type
 mkBoxedTupleTy :: [Type] -> Type
 
 coercibleTyCon, heqTyCon :: TyCon
