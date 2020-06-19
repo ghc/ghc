@@ -91,7 +91,7 @@ import GHC.List ( splitAt, foldl', elem )
 import GHC.Word
 import GHC.Show
 import GHC.TypeLits ( KnownSymbol, symbolVal', AppendSymbol )
-import GHC.TypeNats ( KnownNat, natVal' )
+import GHC.TypeNats ( KnownNat, Nat, natVal' )
 import Unsafe.Coerce ( unsafeCoerce )
 
 import GHC.Fingerprint.Type

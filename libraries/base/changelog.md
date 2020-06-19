@@ -36,6 +36,12 @@
   * `catMaybes` is now implemented using `mapMaybe`, so that it is both a "good
     consumer" and "good producer" for list-fusion (#18574)
    
+  * Make it possible to promote `Natural`s and remove the separate `Nat` kind.
+    For backwards compatibility, `Nat` is now a type synonym for `Natural`.
+    As a consequence, one must enable `TypeSynonymInstances`
+    in order to define instances for `Nat`. Also, different instances for `Nat` and `Natural`
+    won't typecheck anymore.
+
 ## 4.14.0.0 *TBA*
   * Bundled with GHC 8.10.1
 
