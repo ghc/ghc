@@ -372,16 +372,9 @@ pmTopNormaliseType (TySt inert) typ
 
     tyFamStepper :: FamInstEnvs -> NormaliseStepper ([Type] -> [Type], a -> a)
     tyFamStepper env rec_nts tc tys  -- Try to step a type/data family
-      = let (_args_co, ntys, _res_co) = normaliseTcArgs env Representational tc tys in
-          -- NB: It's OK to use normaliseTcArgs here instead of
-          -- normalise_tc_args (which takes the LiftingContext described
-          -- in Note [Normalising types]) because the reduceTyFamApp below
-          -- works only at top level. We'll never recur in this function
-          -- after reducing the kind of a bound tyvar.
-
-        case reduceTyFamApp_maybe env Representational tc ntys of
-          Just (_co, rhs) -> NS_Step rec_nts rhs ((rhs:), id)
-          _               -> NS_Done
+      = case topReduceTyFamApp_maybe env tc tys of
+          Just (_, rhs, _) -> NS_Step rec_nts rhs ((rhs:), id)
+          _                -> NS_Done
 
 -- | Returns 'True' if the argument 'Type' is a fully saturated application of
 -- a closed type constructor.
