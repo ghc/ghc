@@ -24,7 +24,7 @@ cabalBuilderArgs = builder (Cabal Setup) ? do
             -- we might have issues with stripping on Windows, as I can't see a
             -- consumer of 'stripCmdPath'.
             -- TODO: See https://github.com/snowleopard/hadrian/issues/549.
-            , flag stage CrossCompiling ? pure [ "--disable-executable-stripping"
+            , flag (Staged stage CrossCompiling) ? pure [ "--disable-executable-stripping"
                                                , "--disable-library-stripping" ]
             -- We don't want to strip the debug RTS
             , S.package rts ? pure [ "--disable-executable-stripping"
@@ -125,7 +125,7 @@ configureArgs = do
         , conf "--with-gmp-includes"      $ arg =<< getSetting GmpIncludeDir
         , conf "--with-gmp-libraries"     $ arg =<< getSetting GmpLibDir
         , conf "--with-curses-libraries"  $ arg =<< getSetting CursesLibDir
-        , flag stage CrossCompiling ? (conf "--host" $ arg =<< getSetting TargetPlatformFull)
+        , flag (Staged stage CrossCompiling) ? (conf "--host" $ arg =<< getSetting TargetPlatformFull)
         , conf "--with-cc" $ arg =<< getBuilderPath . (Cc CompileC) =<< getStage
         , notStage0 ? (arg =<< ("--ghc-option=-ghcversion-file=" ++) <$> expr ((-/-) <$> topDirectory <*> ghcVersionH stage))]
 
