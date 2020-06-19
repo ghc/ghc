@@ -23,8 +23,8 @@ for working with type-level naturals should be defined in a separate library.
 
 module GHC.TypeNats
   ( -- * Nat Kind
-    Nat -- declared in GHC.Types in package ghc-prim
-
+    Natural -- declared in GHC.Types in package ghc-prim
+  , Nat
     -- * Linking type and value level
   , KnownNat, natVal, natVal'
   , SomeNat(..)
@@ -38,8 +38,8 @@ module GHC.TypeNats
 
   ) where
 
-import GHC.Base(Eq(..), Ord(..), Bool(True), Ordering(..), otherwise)
-import GHC.Types( Nat )
+import GHC.Base(Eq(..), Ord(..), otherwise)
+import GHC.Types
 import GHC.Num.Natural(Natural)
 import GHC.Show(Show(..))
 import GHC.Read(Read(..))
@@ -49,6 +49,8 @@ import Data.Proxy (Proxy(..))
 import Data.Type.Equality((:~:)(Refl))
 import Unsafe.Coerce(unsafeCoerce)
 
+
+type Nat = Natural
 --------------------------------------------------------------------------------
 
 -- | This class gives the integer associated with a type-level natural.
