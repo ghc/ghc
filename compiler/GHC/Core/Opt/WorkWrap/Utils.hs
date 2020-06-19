@@ -1025,7 +1025,19 @@ findTypeShape fam_envs ty
        = TsFun (go rec_tc res)
 
        | Just (tc, tc_args)  <- splitTyConApp_maybe ty
-       , Just con <- isDataProductTyCon_maybe tc
+       = go_tc rec_tc tc tc_args
+
+       | Just (_, ty') <- splitForAllTy_maybe ty
+       = go rec_tc ty'
+
+       | otherwise
+       = TsUnk
+
+    go_tc rec_tc tc tc_args
+       | Just (_, rhs, _) <- topReduceTyFamApp_maybe fam_envs tc tc_args
+       = go rec_tc rhs
+
+       | Just con <- isDataProductTyCon_maybe tc
        , Just rec_tc <- if isTupleTyCon tc
                         then Just rec_tc
                         else checkRecTc rec_tc tc
@@ -1033,10 +1045,8 @@ findTypeShape fam_envs ty
          -- Maybe we should do so in checkRecTc.
        = TsProd (map (go rec_tc . scaledThing) (dataConInstArgTys con tc_args))
 
-       | Just (_, ty') <- splitForAllTy_maybe ty
-       = go rec_tc ty'
-
-       | Just (_, ty') <- topNormaliseType_maybe fam_envs ty
+       | Just (ty', _) <- instNewTyCon_maybe tc tc_args
+       , Just rec_tc <- checkRecTc rec_tc tc
        = go rec_tc ty'
 
        | otherwise
