@@ -25,3 +25,4 @@ Syntax
     block_arguments
     typed_holes
     arrows
+    lexical_negation
