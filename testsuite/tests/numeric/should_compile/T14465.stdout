@@ -21,7 +21,7 @@ M.$trModule4 = "main"#
 M.$trModule3 :: GHC.Types.TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 M.$trModule3 = GHC.Types.TrNameS M.$trModule4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
@@ -35,14 +35,14 @@ M.$trModule2 = "M"#
 M.$trModule1 :: GHC.Types.TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 M.$trModule1 = GHC.Types.TrNameS M.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 M.$trModule :: GHC.Types.Module
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 M.$trModule = GHC.Types.Module M.$trModule3 M.$trModule1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
