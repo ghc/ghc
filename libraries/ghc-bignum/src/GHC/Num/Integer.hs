@@ -407,7 +407,7 @@ integerMul x        (IS 1#)  = x
 integerMul (IS 1#)  y        = y
 integerMul x        (IS -1#) = integerNegate x
 integerMul (IS -1#) y        = integerNegate y
-#if __GLASGOW_HASKELL__ < 809
+#if __GLASGOW_HASKELL__ < 811
 integerMul (IS x)   (IS y)   = case mulIntMayOflo# x y of
    0# -> IS (x *# y)
    _  -> case (# isTrue# (x >=# 0#), isTrue# (y >=# 0#) #) of
