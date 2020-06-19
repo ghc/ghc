@@ -28,7 +28,7 @@
 #include "CNF.h"
 #include "Scav.h"
 #include "NonMoving.h"
-#include "CheckUnload.h" // markObjectCode
+#include "CheckUnload.h" // n_unloaded_objects and markObjectCode
 
 #if defined(THREADED_RTS) && !defined(PARALLEL_GC)
 #define evacuate(p) evacuate1(p)
@@ -595,7 +595,9 @@ loop:
       if (!major_gc) return;
 
       // Note [Object unloading] in CheckUnload.c
-      markObjectCode(q);
+      if (n_unloaded_objects != 0) {
+          markObjectCode(q);
+      }
 
       info = get_itbl(q);
       switch (info->type) {

@@ -146,6 +146,17 @@ ObjectCode *objects = NULL;
 // back to `objects`. Remaining objects are freed.
 static ObjectCode *old_objects = NULL;
 
+// Number of objects that are currently marked as `unload`. When this value is 0
+// we skip static object marking during GC and `checkUnload`. See `unload` field
+// of `ObjectCode` and Note [Object unloading] above for more details.
+//
+// Not static: we use this value to skip static object marking in evacuate when
+// this is 0.
+//
+// Incremented in `unloadObj_`, decremented as we unload objects in
+// `checkUnload`.
+int n_unloaded_objects = 0;
+
 // Section index table for currently loaded objects. New indices are added by
 // `loadObj_`, indices of unloaded objects are removed in `checkUnload`.
 static OCSectionIndices *global_s_indices = NULL;
@@ -437,6 +448,7 @@ void checkUnload()
         ASSERT(oc->symbols == NULL);
 
         freeObjectCode(oc);
+        n_unloaded_objects -= 1;
     }
 
     old_objects = NULL;

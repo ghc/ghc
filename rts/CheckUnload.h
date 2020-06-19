@@ -23,6 +23,10 @@ extern ObjectCode *loaded_objects;
 // Mark bit for live objects
 extern uint8_t object_code_mark_bit;
 
+// Number of object code currently marked for unloading. See the definition in
+// CheckUnload.c for details.
+extern int n_unloaded_objects;
+
 void initUnloadCheck(void);
 void exitUnloadCheck(void);
 

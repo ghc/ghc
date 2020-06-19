@@ -1779,6 +1779,7 @@ static HsInt unloadObj_ (pathchar *path, bool just_purge)
 
             if (!just_purge) {
                 oc->unload = true;
+                n_unloaded_objects += 1;
             }
         }
     }
