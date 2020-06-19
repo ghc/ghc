@@ -505,19 +505,19 @@ $tab          { warnTab }
   0[bB] @numspc @binary                / { ifExtension BinaryLiteralsBit }   { tok_num positive 2 2 binary }
   0[oO] @numspc @octal                                                       { tok_num positive 2 2 octal }
   0[xX] @numspc @hexadecimal                                                 { tok_num positive 2 2 hexadecimal }
-  @negative @decimal                   / { ifExtension NegativeLiteralsBit } { tok_num negative 1 1 decimal }
-  @negative 0[bB] @numspc @binary      / { ifExtension NegativeLiteralsBit `alexAndPred`
+  @negative @decimal                   / { negLitPred }                      { tok_num negative 1 1 decimal }
+  @negative 0[bB] @numspc @binary      / { negLitPred `alexAndPred`
                                            ifExtension BinaryLiteralsBit }   { tok_num negative 3 3 binary }
-  @negative 0[oO] @numspc @octal       / { ifExtension NegativeLiteralsBit } { tok_num negative 3 3 octal }
-  @negative 0[xX] @numspc @hexadecimal / { ifExtension NegativeLiteralsBit } { tok_num negative 3 3 hexadecimal }
+  @negative 0[oO] @numspc @octal       / { negLitPred }                      { tok_num negative 3 3 octal }
+  @negative 0[xX] @numspc @hexadecimal / { negLitPred }                      { tok_num negative 3 3 hexadecimal }
 
   -- Normal rational literals (:: Fractional a => a, from Rational)
   @floating_point                                                            { tok_frac 0 tok_float }
-  @negative @floating_point            / { ifExtension NegativeLiteralsBit } { tok_frac 0 tok_float }
+  @negative @floating_point            / { negLitPred }                      { tok_frac 0 tok_float }
   0[xX] @numspc @hex_floating_point    / { ifExtension HexFloatLiteralsBit } { tok_frac 0 tok_hex_float }
   @negative 0[xX] @numspc @hex_floating_point
                                        / { ifExtension HexFloatLiteralsBit `alexAndPred`
-                                           ifExtension NegativeLiteralsBit } { tok_frac 0 tok_hex_float }
+                                           negLitPred }                      { tok_frac 0 tok_hex_float }
 }
 
 <0> {
@@ -771,7 +771,8 @@ data Token
   | ITrarrow            IsUnicodeSyntax
   | ITlolly             IsUnicodeSyntax
   | ITdarrow            IsUnicodeSyntax
-  | ITminus
+  | ITminus       -- See Note [Minus tokens]
+  | ITprefixminus -- See Note [Minus tokens]
   | ITbang     -- Prefix (!) only, e.g. f !x = rhs
   | ITtilde    -- Prefix (~) only, e.g. f ~x = rhs
   | ITat       -- Tight infix (@) only, e.g. f x@pat = rhs
@@ -870,6 +871,37 @@ data Token
 instance Outputable Token where
   ppr x = text (show x)
 
+
+{- Note [Minus tokens]
+~~~~~~~~~~~~~~~~~~~~~~
+A minus sign can be used in prefix form (-x) and infix form (a - b).
+
+When LexicalNegation is on:
+  * ITprefixminus  represents the prefix form
+  * ITvarsym "-"   represents the infix form
+  * ITminus        is not used
+
+When LexicalNegation is off:
+  * ITminus        represents all forms
+  * ITprefixminus  is not used
+  * ITvarsym "-"   is not used
+-}
+
+{- Note [Why not LexicalNegationBit]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+One might wonder why we define NoLexicalNegationBit instead of
+LexicalNegationBit. The problem lies in the following line in reservedSymsFM:
+
+    ,("-", ITminus, NormalSyntax, xbit NoLexicalNegationBit)
+
+We want to generate ITminus only when LexicalNegation is off. How would one
+do it if we had LexicalNegationBit? I (int-index) tried to use bitwise
+complement:
+
+    ,("-", ITminus, NormalSyntax, complement (xbit LexicalNegationBit))
+
+This did not work, so I opted for NoLexicalNegationBit instead.
+-}
 
 
 -- the bitmap provided as the third component indicates whether the
@@ -975,7 +1007,7 @@ reservedSymsFM = listToUFM $
        ,("<-",  ITlarrow NormalSyntax,      NormalSyntax,  0 )
        ,("->",  ITrarrow NormalSyntax,      NormalSyntax,  0 )
        ,("=>",  ITdarrow NormalSyntax,      NormalSyntax,  0 )
-       ,("-",   ITminus,                    NormalSyntax,  0 )
+       ,("-",   ITminus,                    NormalSyntax,  xbit NoLexicalNegationBit)
 
        ,("*",   ITstar NormalSyntax,        NormalSyntax,  xbit StarIsTypeBit)
 
@@ -1155,6 +1187,27 @@ afterOptionalSpace buf p
 
 atEOL :: AlexAccPred ExtsBitmap
 atEOL _ _ _ (AI _ buf) = atEnd buf || currentChar buf == '\n'
+
+-- Check if we should parse a negative literal (e.g. -123) as a single token.
+negLitPred :: AlexAccPred ExtsBitmap
+negLitPred =
+    negative_literals `alexOrPred`
+    (lexical_negation `alexAndPred` prefix_minus)
+  where
+    negative_literals = ifExtension NegativeLiteralsBit
+
+    lexical_negation  =
+      -- See Note [Why not LexicalNegationBit]
+      alexNotPred (ifExtension NoLexicalNegationBit)
+
+    prefix_minus =
+      -- The condition for a prefix occurrence of an operator is:
+      --
+      --   not precededByClosingToken && followedByOpeningToken
+      --
+      -- but we don't check followedByOpeningToken here as it holds
+      -- simply because we immediately lex a literal after the minus.
+      alexNotPred precededByClosingToken
 
 ifExtension :: ExtBits -> AlexAccPred ExtsBitmap
 ifExtension extBits bits _ _ _ = extBits `xtest` bits
@@ -1483,6 +1536,9 @@ varsym_prefix = sym $ \exts s ->
      -> return ITdollar
      | ThQuotesBit `xtest` exts, s == fsLit "$$"
      -> return ITdollardollar
+     | s == fsLit "-"   -- Only when LexicalNegation is on, otherwise we get ITminus and
+                        -- don't hit this code path. See Note [Minus tokens]
+     -> return ITprefixminus
      | s == fsLit "!" -> return ITbang
      | s == fsLit "~" -> return ITtilde
      | otherwise -> return (ITvarsym s)
@@ -2500,6 +2556,7 @@ data ExtBits
   | GadtSyntaxBit
   | ImportQualifiedPostBit
   | LinearTypesBit
+  | NoLexicalNegationBit   -- See Note [Why not LexicalNegationBit]
 
   -- Flags that are updated once parsing starts
   | InRulePragBit
@@ -2588,12 +2645,14 @@ mkParserFlags' warningFlags extensionFlags homeUnitId
       .|. GadtSyntaxBit               `xoptBit` LangExt.GADTSyntax
       .|. ImportQualifiedPostBit      `xoptBit` LangExt.ImportQualifiedPost
       .|. LinearTypesBit              `xoptBit` LangExt.LinearTypes
+      .|. NoLexicalNegationBit     `xoptNotBit` LangExt.LexicalNegation -- See Note [Why not LexicalNegationBit]
     optBits =
           HaddockBit        `setBitIf` isHaddock
       .|. RawTokenStreamBit `setBitIf` rawTokStream
       .|. UsePosPragsBit    `setBitIf` usePosPrags
 
     xoptBit bit ext = bit `setBitIf` EnumSet.member ext extensionFlags
+    xoptNotBit bit ext = bit `setBitIf` not (EnumSet.member ext extensionFlags)
 
     setBitIf :: ExtBits -> Bool -> ExtsBitmap
     b `setBitIf` cond | cond      = xbit b
