@@ -180,7 +180,7 @@ classify tok =
     ITdata                 -> TkKeyword
     ITdefault              -> TkKeyword
     ITderiving             -> TkKeyword
-    ITdo                   -> TkKeyword
+    ITdo                {} -> TkKeyword
     ITelse                 -> TkKeyword
     IThiding               -> TkKeyword
     ITforeign              -> TkKeyword
@@ -213,7 +213,7 @@ classify tok =
     ITcapiconv             -> TkKeyword
     ITprimcallconv         -> TkKeyword
     ITjavascriptcallconv   -> TkKeyword
-    ITmdo                  -> TkKeyword
+    ITmdo               {} -> TkKeyword
     ITfamily               -> TkKeyword
     ITrole                 -> TkKeyword
     ITgroup                -> TkKeyword
