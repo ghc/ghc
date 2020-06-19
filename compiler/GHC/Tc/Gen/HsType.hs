@@ -1192,8 +1192,8 @@ tc_hs_type _ rn_ty@(HsStarTy _ _) exp_kind
 
 --------- Literals
 tc_hs_type _ rn_ty@(HsTyLit _ (HsNumTy _ n)) exp_kind
-  = do { checkWiredInTyCon typeNatKindCon
-       ; checkExpectedKind rn_ty (mkNumLitTy n) typeNatKind exp_kind }
+  = do { checkWiredInTyCon naturalTyCon
+       ; checkExpectedKind rn_ty (mkNumLitTy n) naturalTy exp_kind }
 
 tc_hs_type _ rn_ty@(HsTyLit _ (HsStrTy _ s)) exp_kind
   = do { checkWiredInTyCon typeSymbolKindCon
