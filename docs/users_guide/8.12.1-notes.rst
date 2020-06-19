@@ -265,6 +265,16 @@ Arrow notation
   in an upcoming ``bytestring`` release to improve the performance of
   ``ByteString`` literals created with ``OverloadedStrings``.
 
+- It possible now to promote ``Natural`` type: :: 
+    
+    data C = MkC Natural
+    type CC = MkC 1
+    
+  The separate kind ``Nat`` is removed and now it is just a type synonym for 
+  ``Natural``. As a consequence, one must enable ``TypeSynonymInstances`` 
+  in order to define instances for ``Nat``.
+
+
 Build system
 ~~~~~~~~~~~~
 
