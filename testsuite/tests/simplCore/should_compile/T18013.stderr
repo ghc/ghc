@@ -138,7 +138,7 @@ mapMaybeRule
  Arity=1,
  Str=<S,1*U>,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [20] 150 30}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [20] 150 10}]
 mapMaybeRule
   = \ (@a) (@b) (f :: Rule IO a b) ->
       case f of { Rule @s t0 g ->
@@ -178,7 +178,7 @@ T18013.$trModule4 = "main"#
 T18013.$trModule3 :: GHC.Types.TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T18013.$trModule3 = GHC.Types.TrNameS T18013.$trModule4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
@@ -192,14 +192,14 @@ T18013.$trModule2 = "T18013"#
 T18013.$trModule1 :: GHC.Types.TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T18013.$trModule1 = GHC.Types.TrNameS T18013.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T18013.$trModule :: GHC.Types.Module
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T18013.$trModule
   = GHC.Types.Module T18013.$trModule3 T18013.$trModule1
 
