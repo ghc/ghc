@@ -82,9 +82,33 @@ void *      removeHashTable_ ( HashTable *table, StgWord key,
 /* Freeing hash tables
  */
 void freeHashTable ( HashTable *table, void (*freeDataFun)(void *) );
-#define freeStrHashTable(table, f) \
-    (freeHashTable((HashTable*) table, f))
 
-void exitHashTable ( void );
+INLINE_HEADER void freeStrHashTable ( StrHashTable *table, void (*freeDataFun)(void *) )
+{
+    freeHashTable((HashTable*)table, freeDataFun);
+}
+
+/*
+ * Hash set API
+ *
+ * A hash set is bascially a hash table where values are NULL.
+ */
+
+typedef struct hashtable HashSet;
+
+INLINE_HEADER HashSet *allocHashSet ( void )
+{
+    return (HashSet*)allocHashTable();
+}
+
+INLINE_HEADER void freeHashSet ( HashSet *set )
+{
+    freeHashTable((HashTable*)set, NULL);
+}
+
+INLINE_HEADER void insertHashSet ( HashSet *set, StgWord key )
+{
+    insertHashTable((HashTable*)set, key, NULL);
+}
 
 #include "EndPrivate.h"

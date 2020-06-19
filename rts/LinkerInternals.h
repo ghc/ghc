@@ -228,9 +228,8 @@ typedef struct _ObjectCode {
     // Mark bit
     uint8_t mark;
 
-    // Set of dependencies of the object file. Keys are `ObjectCode*`s for
-    // dependencies, values are NULL. Traverse dependencies using
-    // `iterHashTable`.
+    // Set of dependencies (ObjectCode*) of the object file. Traverse
+    // dependencies using `iterHashTable`.
     //
     // New entries are added as we resolve symbols in an object file, in
     // `lookupDependentSymbol`. When an object file uses multiple symbols from
@@ -239,7 +238,7 @@ typedef struct _ObjectCode {
     //
     // Used when unloading object files. See Note [Object unloading] in
     // CheckUnload.c.
-    HashTable *dependencies;
+    HashSet *dependencies;
 
     //
     // End of garbage collection fields

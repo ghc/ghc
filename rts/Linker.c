@@ -854,7 +854,7 @@ SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent)
             ObjectCode *owner = pinfo->owner;
             if (owner) {
                 // TODO: what does it mean for a symbol to not have an owner?
-                insertHashTable(dependent->dependencies, (W_)owner, NULL);
+                insertHashSet(dependent->dependencies, (W_)owner);
             }
         }
         return loadSymbol(lbl, pinfo);
@@ -1287,7 +1287,7 @@ void freeObjectCode (ObjectCode *oc)
     stgFree(oc->fileName);
     stgFree(oc->archiveMemberName);
 
-    freeHashTable(oc->dependencies, NULL);
+    freeHashSet(oc->dependencies);
 
     stgFree(oc);
 }
@@ -1354,7 +1354,7 @@ mkOc( pathchar *path, char *image, int imageSize,
    oc->prev              = NULL;
    oc->next_loaded_object = NULL;
    oc->mark              = object_code_mark_bit;
-   oc->dependencies      = allocHashTable();
+   oc->dependencies      = allocHashSet();
 
 #if RTS_LINKER_USE_MMAP
    oc->rw_m32 = m32_allocator_new(false);
