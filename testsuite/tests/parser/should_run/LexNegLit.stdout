@@ -1,0 +1,4 @@
+FromInteger (-123)
+FromRational ((-3) % 2)
+Negate (FromInteger 5)
+FromInteger 5 `Subtract` FromInteger 1
