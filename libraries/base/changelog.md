@@ -25,6 +25,12 @@
 
   * An issue with list fusion and `elem` was fixed. `elem` applied to known
     small lists will now compile to a simple case statement more often.
+  
+  * Add the possibility of promotion `Natural` data type and remove separate `Nat` kind. 
+    For backward compatibility type synonym `Nat` for `Natural` was added. 
+    It means that now for writing instances for `Nat` `TypeSynonymInstances` 
+    extension should be enabled. Also, different instances for `Nat` and `Natural`
+    won't be compiled anymore. 
    
 ## 4.14.0.0 *TBA*
   * Bundled with GHC 8.10.1
