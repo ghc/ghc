@@ -17,7 +17,3 @@ main = do
   hClose h
   s <- readFile testfile
   putStrLn s
-<<<<<<< HEAD
-
-=======
->>>>>>> 5f3eba6572... winio: Fix sqrt and openFile009 test cases
