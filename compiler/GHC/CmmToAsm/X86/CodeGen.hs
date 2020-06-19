@@ -1241,71 +1241,89 @@ reg2reg format src dst = MOV format (OpReg src) (OpReg dst)
 
 
 --------------------------------------------------------------------------------
+
+-- | Convert a 'CmmExpr' representing a memory address into an 'Amode'.
+--
+-- An 'Amode' is a datatype representing a valid address form for the target
+-- (e.g. "Base + Index + disp" or immediate) and the code to compute it.
 getAmode :: CmmExpr -> NatM Amode
-getAmode e = do is32Bit <- is32BitPlatform
-                getAmode' is32Bit e
+getAmode e = do
+   platform <- getPlatform
+   let is32Bit = target32Bit platform
 
-getAmode' :: Bool -> CmmExpr -> NatM Amode
-getAmode' _ (CmmRegOff r n) = do platform <- getPlatform
-                                 getAmode $ mangleIndexTree platform r n
+   case e of
+      CmmRegOff r n
+         -> getAmode $ mangleIndexTree platform r n
 
-getAmode' is32Bit (CmmMachOp (MO_Add W64) [CmmReg (CmmGlobal PicBaseReg),
-                                                  CmmLit displacement])
- | not is32Bit
-    = return $ Amode (ripRel (litToImm displacement)) nilOL
+      CmmMachOp (MO_Add W64) [CmmReg (CmmGlobal PicBaseReg), CmmLit displacement]
+         | not is32Bit
+         -> return $ Amode (ripRel (litToImm displacement)) nilOL
+
+      -- This is all just ridiculous, since it carefully undoes
+      -- what mangleIndexTree has just done.
+      CmmMachOp (MO_Sub _rep) [x, CmmLit lit@(CmmInt i _)]
+         | is32BitLit is32Bit lit
+         -- ASSERT(rep == II32)???
+         -> do
+            (x_reg, x_code) <- getSomeReg x
+            let off = ImmInt (-(fromInteger i))
+            return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
+
+      CmmMachOp (MO_Add _rep) [x, CmmLit lit]
+         | is32BitLit is32Bit lit
+         -- ASSERT(rep == II32)???
+         -> do
+            (x_reg, x_code) <- getSomeReg x
+            let off = litToImm lit
+            return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
+
+      -- Turn (lit1 << n  + lit2) into  (lit2 + lit1 << n) so it will be
+      -- recognised by the next rule.
+      CmmMachOp (MO_Add rep) [a@(CmmMachOp (MO_Shl _) _), b@(CmmLit _)]
+         -> getAmode (CmmMachOp (MO_Add rep) [b,a])
+
+      -- Matches: (x + offset) + (y << shift)
+      CmmMachOp (MO_Add _) [CmmRegOff x offset, CmmMachOp (MO_Shl _) [y, CmmLit (CmmInt shift _)]]
+         | shift == 0 || shift == 1 || shift == 2 || shift == 3
+         -> x86_complex_amode (CmmReg x) y shift (fromIntegral offset)
+
+      CmmMachOp (MO_Add _) [x, CmmMachOp (MO_Shl _) [y, CmmLit (CmmInt shift _)]]
+         | shift == 0 || shift == 1 || shift == 2 || shift == 3
+         -> x86_complex_amode x y shift 0
+
+      CmmMachOp (MO_Add _) [x, CmmMachOp (MO_Add _) [CmmMachOp (MO_Shl _)
+                                                    [y, CmmLit (CmmInt shift _)], CmmLit (CmmInt offset _)]]
+         | shift == 0 || shift == 1 || shift == 2 || shift == 3
+         && is32BitInteger offset
+         -> x86_complex_amode x y shift offset
+
+      CmmMachOp (MO_Add _) [x,y]
+         | not (isLit y) -- we already handle valid literals above.
+         -> x86_complex_amode x y 0 0
+
+      CmmLit lit
+         | is32BitLit is32Bit lit
+         -> return (Amode (ImmAddr (litToImm lit) 0) nilOL)
+
+      -- Literal with offsets too big (> 32 bits) fails during the linking phase
+      -- (#15570). We already handled valid literals above so we don't have to
+      -- test anything here.
+      CmmLit (CmmLabelOff l off)
+         -> getAmode (CmmMachOp (MO_Add W64) [ CmmLit (CmmLabel l)
+                                             , CmmLit (CmmInt (fromIntegral off) W64)
+                                             ])
+      CmmLit (CmmLabelDiffOff l1 l2 off w)
+         -> getAmode (CmmMachOp (MO_Add W64) [ CmmLit (CmmLabelDiffOff l1 l2 0 w)
+                                             , CmmLit (CmmInt (fromIntegral off) W64)
+                                             ])
+
+      -- in case we can't do something better, we just compute the expression
+      -- and put the result in a register
+      _ -> do
+        (reg,code) <- getSomeReg e
+        return (Amode (AddrBaseIndex (EABaseReg reg) EAIndexNone (ImmInt 0)) code)
 
 
--- This is all just ridiculous, since it carefully undoes
--- what mangleIndexTree has just done.
-getAmode' is32Bit (CmmMachOp (MO_Sub _rep) [x, CmmLit lit@(CmmInt i _)])
-  | is32BitLit is32Bit lit
-  -- ASSERT(rep == II32)???
-  = do (x_reg, x_code) <- getSomeReg x
-       let off = ImmInt (-(fromInteger i))
-       return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
-
-getAmode' is32Bit (CmmMachOp (MO_Add _rep) [x, CmmLit lit])
-  | is32BitLit is32Bit lit
-  -- ASSERT(rep == II32)???
-  = do (x_reg, x_code) <- getSomeReg x
-       let off = litToImm lit
-       return (Amode (AddrBaseIndex (EABaseReg x_reg) EAIndexNone off) x_code)
-
--- Turn (lit1 << n  + lit2) into  (lit2 + lit1 << n) so it will be
--- recognised by the next rule.
-getAmode' is32Bit (CmmMachOp (MO_Add rep) [a@(CmmMachOp (MO_Shl _) _),
-                                  b@(CmmLit _)])
-  = getAmode' is32Bit (CmmMachOp (MO_Add rep) [b,a])
-
--- Matches: (x + offset) + (y << shift)
-getAmode' _ (CmmMachOp (MO_Add _) [CmmRegOff x offset,
-                                   CmmMachOp (MO_Shl _)
-                                        [y, CmmLit (CmmInt shift _)]])
-  | shift == 0 || shift == 1 || shift == 2 || shift == 3
-  = x86_complex_amode (CmmReg x) y shift (fromIntegral offset)
-
-getAmode' _ (CmmMachOp (MO_Add _) [x, CmmMachOp (MO_Shl _)
-                                        [y, CmmLit (CmmInt shift _)]])
-  | shift == 0 || shift == 1 || shift == 2 || shift == 3
-  = x86_complex_amode x y shift 0
-
-getAmode' _ (CmmMachOp (MO_Add _)
-                [x, CmmMachOp (MO_Add _)
-                        [CmmMachOp (MO_Shl _) [y, CmmLit (CmmInt shift _)],
-                         CmmLit (CmmInt offset _)]])
-  | shift == 0 || shift == 1 || shift == 2 || shift == 3
-  && is32BitInteger offset
-  = x86_complex_amode x y shift offset
-
-getAmode' _ (CmmMachOp (MO_Add _) [x,y])
-  = x86_complex_amode x y 0 0
-
-getAmode' is32Bit (CmmLit lit) | is32BitLit is32Bit lit
-  = return (Amode (ImmAddr (litToImm lit) 0) nilOL)
-
-getAmode' _ expr = do
-  (reg,code) <- getSomeReg expr
-  return (Amode (AddrBaseIndex (EABaseReg reg) EAIndexNone (ImmInt 0)) code)
 
 -- | Like 'getAmode', but on 32-bit use simple register addressing
 -- (i.e. no index register). This stops us from running out of
@@ -1510,11 +1528,17 @@ getRegOrMem e = do
     return (OpReg reg, code)
 
 is32BitLit :: Bool -> CmmLit -> Bool
-is32BitLit is32Bit (CmmInt i W64)
- | not is32Bit
-    = -- assume that labels are in the range 0-2^31-1: this assumes the
+is32BitLit is32Bit lit
+   | not is32Bit = case lit of
+      CmmInt i W64              -> is32BitInteger i
+      -- assume that labels are in the range 0-2^31-1: this assumes the
       -- small memory model (see gcc docs, -mcmodel=small).
-      is32BitInteger i
+      CmmLabel _                -> True
+      -- however we can't assume that label offsets are in this range
+      -- (see #15570)
+      CmmLabelOff _ off         -> is32BitInteger (fromIntegral off)
+      CmmLabelDiffOff _ _ off _ -> is32BitInteger (fromIntegral off)
+      _                         -> True
 is32BitLit _ _ = True
 
 
