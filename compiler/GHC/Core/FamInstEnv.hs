@@ -32,8 +32,8 @@ module GHC.Core.FamInstEnv (
 
         -- Normalisation
         topNormaliseType, topNormaliseType_maybe,
-        normaliseType, normaliseTcApp, normaliseTcArgs,
-        reduceTyFamApp_maybe,
+        normaliseType, normaliseTcApp,
+        topReduceTyFamApp_maybe, reduceTyFamApp_maybe,
 
         -- Flattening
         flattenTys
@@ -1100,7 +1100,7 @@ reduceTyFamApp_maybe :: FamInstEnvs
 --     the role we seek is representational
 -- It does *not* normalise the type arguments first, so this may not
 --     go as far as you want. If you want normalised type arguments,
---     use normaliseTcArgs first.
+--     use topReduceTyFamApp_maybe
 --
 -- The TyCon can be oversaturated.
 -- Works on both open and closed families
@@ -1308,10 +1308,9 @@ topNormaliseType_maybe env ty
       -- to the normalised type's kind
     tyFamStepper :: NormaliseStepper (Coercion, MCoercionN)
     tyFamStepper rec_nts tc tys  -- Try to step a type/data family
-      = let (args_co, ntys, res_co) = normaliseTcArgs env Representational tc tys in
-        case reduceTyFamApp_maybe env Representational tc ntys of
-          Just (co, rhs) -> NS_Step rec_nts rhs (args_co `mkTransCo` co, MCo res_co)
-          _              -> NS_Done
+      = case topReduceTyFamApp_maybe env tc tys of
+          Just (co, rhs, res_co) -> NS_Step rec_nts rhs (co, MCo res_co)
+          _                      -> NS_Done
 
 ---------------
 normaliseTcApp :: FamInstEnvs -> Role -> TyCon -> [Type] -> (Coercion, Type)
@@ -1366,18 +1365,23 @@ normalise_tc_app tc tys
         final_co     = mkCoherenceRightCo r nty (mkSymCo kind_co) orig_to_nty
 
 ---------------
--- | Normalise arguments to a tycon
-normaliseTcArgs :: FamInstEnvs          -- ^ env't with family instances
-                -> Role                 -- ^ desired role of output coercion
-                -> TyCon                -- ^ tc
-                -> [Type]               -- ^ tys
-                -> (Coercion, [Type], CoercionN)
-                                        -- ^ co :: tc tys ~ tc new_tys
-                                        -- NB: co might not be homogeneous
-                                        -- last coercion :: kind(tc tys) ~ kind(tc new_tys)
-normaliseTcArgs env role tc tys
-  = initNormM env role (tyCoVarsOfTypes tys) $
-    normalise_tc_args tc tys
+-- | Try to simplify a type-family application, by *one* step
+-- If topReduceTyFamApp_maybe env r F tys = Just (co, rhs, res_co)
+-- then    co     :: F tys ~R# rhs
+--         res_co :: typeKind(F tys) ~ typeKind(rhs)
+-- Type families and data families; always Representational role
+topReduceTyFamApp_maybe :: FamInstEnvs -> TyCon -> [Type]
+                        -> Maybe (Coercion, Type, Coercion)
+topReduceTyFamApp_maybe envs fam_tc arg_tys
+  | isFamilyTyCon fam_tc   -- type families and data families
+  , Just (co, rhs) <- reduceTyFamApp_maybe envs role fam_tc ntys
+  = Just (args_co `mkTransCo` co, rhs, res_co)
+  | otherwise
+  = Nothing
+  where
+    role = Representational
+    (args_co, ntys, res_co) = initNormM envs role (tyCoVarsOfTypes arg_tys) $
+                              normalise_tc_args fam_tc arg_tys
 
 normalise_tc_args :: TyCon -> [Type]             -- tc tys
                   -> NormM (Coercion, [Type], CoercionN)
