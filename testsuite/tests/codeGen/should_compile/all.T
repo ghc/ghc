@@ -91,3 +91,8 @@ test('T17648', normal, makefile_test, [])
 test('T17904', normal, compile, ['-O'])
 test('T18227A', normal, compile, [''])
 test('T18227B', normal, compile, [''])
+test('T15570',
+   when(unregisterised(), skip),
+   compile, ['-Wno-overflowed-literals'])
+   # skipped with CmmToC because it generates a warning:
+   #   warning: integer constant is so large that it is unsigned
