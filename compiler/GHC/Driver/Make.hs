@@ -2867,15 +2867,12 @@ cyclicModuleErr mss
   = ASSERT( not (null mss) )
     case findCycle graph of
        Nothing   -> text "Unexpected non-cycle" <+> ppr mss
-       Just path0 -> case deps of
-         [] -> vcat
-           [ text "Module imports form a cycle:"
-           , nest 2 (show_path $ fst <$> path)
-           ]
-         _ -> text "Unexpected instantiations in cycle"
-           <+> ppr mss
-           <> text ". Cyclic instantiations haven't been implemented yet and so shouldn't happen."
-         where (deps, path) = partitionNodes path0
+       Just path0 -> vcat
+        [ case partitionNodes path0 of
+            ([],_) -> text "Module imports form a cycle:"
+            (_,[]) -> text "Module instantiations form a cycle:"
+            _ -> text "Module imports and instantiations form a cycle:"
+        , nest 2 (show_path path0)]
   where
     graph :: [Node NodeKey WorkGraphNode]
     graph =
@@ -2902,16 +2899,19 @@ cyclicModuleErr mss
         | inst_unit <- bsd
         ]
 
-    show_path []         = panic "show_path"
-    show_path [m]        = text "module" <+> ppr_ms m
-                           <+> text "imports itself"
-    show_path (m1:m2:ms) = vcat ( nest 7 (text "module" <+> ppr_ms m1)
-                                : nest 6 (text "imports" <+> ppr_ms m2)
+    show_path :: [WorkGraphNode] -> SDoc
+    show_path []  = panic "show_path"
+    show_path [m] = ppr_node m <+> text "imports itself"
+    show_path (m1:m2:ms) = vcat ( nest 6 (ppr_node m1)
+                                : nest 6 (text "imports" <+> ppr_node m2)
                                 : go ms )
        where
-         go []     = [text "which imports" <+> ppr_ms m1]
-         go (m:ms) = (text "which imports" <+> ppr_ms m) : go ms
+         go []     = [text "which imports" <+> ppr_node m1]
+         go (m:ms) = (text "which imports" <+> ppr_node m) : go ms
 
+    ppr_node :: WorkGraphNode -> SDoc
+    ppr_node (ModuleNode m _) = text "module" <+> ppr_ms m
+    ppr_node (InstantiationNode u) = text "instantiated unit" <+> ppr u
 
     ppr_ms :: ModSummary -> SDoc
     ppr_ms ms = quotes (ppr (moduleName (ms_mod ms))) <+>
