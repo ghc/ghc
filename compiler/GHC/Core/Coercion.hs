@@ -1794,6 +1794,8 @@ liftCoSubstWith r tvs cos ty
 -- @lc_left@ is a substitution mapping type variables to the left-hand
 -- types of the mapped coercions in @lc@, and similar for @lc_right@.
 liftCoSubst :: HasDebugCallStack => Role -> LiftingContext -> Type -> Coercion
+{-# INLINE liftCoSubst #-}
+-- Inlining this function is worth 2% of allocation in T9872d,
 liftCoSubst r lc@(LC subst env) ty
   | isEmptyVarEnv env = mkReflCo r (substTy subst ty)
   | otherwise         = ty_co_subst lc r ty
@@ -2846,7 +2848,9 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
        -> [Role]      -- Roles at which to flatten these ...
        -> [(Type, Coercion)]  -- flattened arguments, with their flattening coercions
        -> ([Type], [Coercion], CoercionN)
-    go acc_xis acc_cos lc binders inner_ki _ []
+    go acc_xis acc_cos !lc binders inner_ki _ []
+        -- The !lc makes the function strict in the lifting context
+        -- which means GHC can unbox that pair.  A modest win.
       = (reverse acc_xis, reverse acc_cos, kind_co)
       where
         final_kind = mkPiTys binders inner_ki
