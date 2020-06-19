@@ -35,9 +35,8 @@ python         = @PythonCmd@
 #============================
 
 ar-supports-at-file-stage0 = @ArSupportsAtFile_STAGE0@
-ar-supports-at-file-stage1 = @ArSupportsAtFile@
-ar-supports-at-file-stage2 = @ArSupportsAtFile@
-ar-supports-at-file-stage3 = @ArSupportsAtFile@
+ar-supports-at-file = @ArSupportsAtFile@
+
 cc-llvm-backend     = @CcLlvmBackend@
 hs-cpp-args         = @HaskellCPPArgs@
 
