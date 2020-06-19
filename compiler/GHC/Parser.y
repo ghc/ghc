@@ -93,7 +93,7 @@ import GHC.Builtin.Types ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nil
                            manyDataConTyCon)
 }
 
-%expect 232 -- shift/reduce conflicts
+%expect 234 -- shift/reduce conflicts
 
 {- Last updated: 04 June 2018
 
@@ -547,6 +547,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '-'            { L _ ITminus }
  PREFIX_TILDE   { L _ ITtilde }
  PREFIX_BANG    { L _ ITbang }
+ PREFIX_MINUS   { L _ ITprefixminus }
  '*'            { L _ (ITstar _) }
  '-<'           { L _ (ITlarrowtail _) }            -- for arrow notation
  '>-'           { L _ (ITrarrowtail _) }            -- for arrow notation
@@ -692,10 +693,21 @@ litpkgname_segment :: { Located FastString }
         | CONID  { sL1 $1 $ getCONID $1 }
         | special_id { $1 }
 
+-- Parse a minus sign regardless of whether -XLexicalNegation is turned on or off.
+-- See Note [Minus tokens] in GHC.Parser.Lexer
+HYPHEN :: { [AddAnn] }
+      : '-'          { [mj AnnMinus $1 ] }
+      | PREFIX_MINUS { [mj AnnMinus $1 ] }
+      | VARSYM  {% if (getVARSYM $1 == fsLit "-")
+                   then return [mj AnnMinus $1]
+                   else do { addError (getLoc $1) $ text "Expected a hyphen"
+                           ; return [] } }
+
+
 litpkgname :: { Located FastString }
         : litpkgname_segment { $1 }
         -- a bit of a hack, means p - b is parsed same as p-b, enough for now.
-        | litpkgname_segment '-' litpkgname  { sLL $1 $> $ appendFS (unLoc $1) (consFS '-' (unLoc $3)) }
+        | litpkgname_segment HYPHEN litpkgname  { sLL $1 $> $ appendFS (unLoc $1) (consFS '-' (unLoc $3)) }
 
 mayberns :: { Maybe [LRenaming] }
         : {- empty -} { Nothing }
@@ -2727,12 +2739,12 @@ prag_e :: { Located ([AddAnn], HsPragE GhcPs) }
                                                   HsPragSCC noExtField
                                                     (getSCC_PRAGs $1)
                                                     (StringLiteral NoSourceText (getVARID $2))) }
-      | '{-# GENERATED' STRING INTEGER ':' INTEGER '-' INTEGER ':' INTEGER '#-}'
+      | '{-# GENERATED' STRING INTEGER ':' INTEGER HYPHEN INTEGER ':' INTEGER '#-}'
                                       { let getINT = fromInteger . il_value . getINTEGER in
                                         sLL $1 $> $ ([mo $1,mj AnnVal $2
                                               ,mj AnnVal $3,mj AnnColon $4
-                                              ,mj AnnVal $5,mj AnnMinus $6
-                                              ,mj AnnVal $7,mj AnnColon $8
+                                              ,mj AnnVal $5] ++ $6 ++
+                                              [mj AnnVal $7,mj AnnColon $8
                                               ,mj AnnVal $9,mc $10],
                                               HsPragTick noExtField
                                                 (getGENERATED_PRAGs $1)
@@ -2778,6 +2790,9 @@ aexp    :: { ECP }
         | PREFIX_BANG aexp      { ECP $
                                    runECP_PV $2 >>= \ $2 ->
                                    amms (mkHsBangPatPV (comb2 $1 $>) $2) [mj AnnBang $1] }
+        | PREFIX_MINUS aexp     { ECP $
+                                   runECP_PV $2 >>= \ $2 ->
+                                   amms (mkHsNegAppPV (comb2 $1 $>) $2) [mj AnnMinus $1] }
 
         | '\\' apat apats '->' exp
                    {  ECP $

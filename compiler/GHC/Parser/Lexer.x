@@ -764,7 +764,8 @@ data Token
   | ITrarrow            IsUnicodeSyntax
   | ITlolly             IsUnicodeSyntax
   | ITdarrow            IsUnicodeSyntax
-  | ITminus
+  | ITminus       -- See Note [Minus tokens]
+  | ITprefixminus -- See Note [Minus tokens]
   | ITbang     -- Prefix (!) only, e.g. f !x = rhs
   | ITtilde    -- Prefix (~) only, e.g. f ~x = rhs
   | ITat       -- Tight infix (@) only, e.g. f x@pat = rhs
@@ -862,6 +863,38 @@ data Token
 
 instance Outputable Token where
   ppr x = text (show x)
+
+
+{- Note [Minus tokens]
+~~~~~~~~~~~~~~~~~~~~~~
+A minus sign can be used in prefix form (-x) and infix form (a - b).
+
+When LexicalNegation is on:
+  * ITprefixminus  represents the prefix form
+  * ITvarsym "-"   represents the infix form
+  * ITminus        is not used
+
+When LexicalNegation is off:
+  * ITminus        represents all forms
+  * ITprefixminus  is not used
+  * ITvarsym "-"   is not used
+-}
+
+{- Note [Why not LexicalNegationBit]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+One might wonder why we define NoLexicalNegationBit instead of
+LexicalNegationBit. The problem lies in the following line in reservedSymsFM:
+
+    ,("-", ITminus, NormalSyntax, xbit NoLexicalNegationBit)
+
+We want to generate ITminus only when LexicalNegation is off. How would one
+do it if we had LexicalNegationBit? I (int-index) tried to use bitwise
+complement:
+
+    ,("-", ITminus, NormalSyntax, complement (xbit LexicalNegationBit))
+
+This did not work, so I opted for NoLexicalNegationBit instead.
+-}
 
 
 -- the bitmap provided as the third component indicates whether the
@@ -967,7 +1000,7 @@ reservedSymsFM = listToUFM $
        ,("<-",  ITlarrow NormalSyntax,      NormalSyntax,  0 )
        ,("->",  ITrarrow NormalSyntax,      NormalSyntax,  0 )
        ,("=>",  ITdarrow NormalSyntax,      NormalSyntax,  0 )
-       ,("-",   ITminus,                    NormalSyntax,  0 )
+       ,("-",   ITminus,                    NormalSyntax,  xbit NoLexicalNegationBit)
 
        ,("*",   ITstar NormalSyntax,        NormalSyntax,  xbit StarIsTypeBit)
 
@@ -1464,6 +1497,7 @@ varsym_prefix = sym $ \exts s ->
      -> return ITdollar
      | ThQuotesBit `xtest` exts, s == fsLit "$$"
      -> return ITdollardollar
+     | s == fsLit "-" -> return ITprefixminus  -- See Note [Minus tokens]
      | s == fsLit "!" -> return ITbang
      | s == fsLit "~" -> return ITtilde
      | otherwise -> return (ITvarsym s)
@@ -2480,6 +2514,7 @@ data ExtBits
   | GadtSyntaxBit
   | ImportQualifiedPostBit
   | LinearTypesBit
+  | NoLexicalNegationBit   -- See Note [Why not LexicalNegationBit]
 
   -- Flags that are updated once parsing starts
   | InRulePragBit
@@ -2567,12 +2602,14 @@ mkParserFlags' warningFlags extensionFlags homeUnitId
       .|. GadtSyntaxBit               `xoptBit` LangExt.GADTSyntax
       .|. ImportQualifiedPostBit      `xoptBit` LangExt.ImportQualifiedPost
       .|. LinearTypesBit              `xoptBit` LangExt.LinearTypes
+      .|. NoLexicalNegationBit     `xoptNotBit` LangExt.LexicalNegation -- See Note [Why not LexicalNegationBit]
     optBits =
           HaddockBit        `setBitIf` isHaddock
       .|. RawTokenStreamBit `setBitIf` rawTokStream
       .|. UsePosPragsBit    `setBitIf` usePosPrags
 
     xoptBit bit ext = bit `setBitIf` EnumSet.member ext extensionFlags
+    xoptNotBit bit ext = bit `setBitIf` not (EnumSet.member ext extensionFlags)
 
     setBitIf :: ExtBits -> Bool -> ExtsBitmap
     b `setBitIf` cond | cond      = xbit b

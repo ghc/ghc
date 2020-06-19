@@ -152,6 +152,7 @@ test('proposal-229a', normal, compile, [''])
 test('proposal-229b', normal, compile, [''])
 test('proposal-229d', normal, compile, [''])
 test('proposal-229e', normal, compile, [''])
+test('LexicalNegation', normal, compile, [''])
 
 # We omit 'profasm' because it fails with:
 # Cannot load -prof objects when GHC is built with -dynamic

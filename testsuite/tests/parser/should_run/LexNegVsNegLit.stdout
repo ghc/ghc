@@ -1,0 +1,2 @@
+FromInteger (-123)
+Negate (FromInteger 5)

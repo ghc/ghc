@@ -145,6 +145,16 @@ Language
     data U a where
       MkU :: (Show a => U a)
 
+* :extension:`LexicalNegation` is a new extension that detects whether the
+  minus sign stands for negation during lexical analysis by checking for the
+  surrounding whitespace: ::
+
+    a = x - y  -- subtraction
+    b = f -x   -- negation
+
+    f = (- x)  -- operator section
+    c = (-x)   -- negation
+
 Compiler
 ~~~~~~~~
 

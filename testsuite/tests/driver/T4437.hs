@@ -41,6 +41,7 @@ expectedGhcOnlyExtensions =
     , "AlternativeLayoutRule"
     , "AlternativeLayoutRuleTransitional"
     , "LinearTypes"
+    , "LexicalNegation"
     ]
 
 expectedCabalOnlyExtensions :: [String]

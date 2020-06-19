@@ -18,3 +18,4 @@ test('CountParserDeps',
      [ only_ways(['normal']), extra_run_opts('"' + config.libdir + '"') ],
      compile_and_run,
      ['-package ghc'])
+test('LexNegVsNegLit', normal, compile_and_run, [''])
