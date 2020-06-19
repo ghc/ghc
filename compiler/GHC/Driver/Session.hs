@@ -1414,16 +1414,21 @@ defaultDynFlags mySettings llvmConfig =
         extensions = [],
         extensionFlags = flattenExtensionFlags Nothing [],
 
-        -- The ufCreationThreshold threshold must be reasonably high to
-        -- take account of possible discounts.
-        -- E.g. 450 is not enough in 'fulsom' for Interval.sqr to inline
-        -- into Csg.calc (The unfolding for sqr never makes it into the
-        -- interface file.)
         ufCreationThreshold = 750,
-        ufUseThreshold      = 80,
-        ufFunAppDiscount    = 60,
-        -- Be fairly keen to inline a function if that means
-        -- we'll be able to pick the right method from a dictionary
+           -- The ufCreationThreshold threshold must be reasonably high
+           -- to take account of possible discounts.
+           -- E.g. 450 is not enough in 'fulsom' for Interval.sqr to
+           -- inline into Csg.calc (The unfolding for sqr never makes it
+           -- into the interface file.)
+
+        ufUseThreshold = 90,
+           -- Last adjusted upwards in #18282, when I reduced
+           -- the result discount for constructors.
+
+        ufFunAppDiscount = 60,
+           -- Be fairly keen to inline a function if that means
+           -- we'll be able to pick the right method from a dictionary
+
         ufDictDiscount      = 30,
         ufDearOp            = 40,
         ufVeryAggressive    = False,

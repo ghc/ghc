@@ -3,4 +3,4 @@
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
 f = \ (@p) _ [Occ=Dead] -> GHC.Types.True
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 80 30}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 80 10}]
