@@ -12,4 +12,4 @@ good: *
 good: Int -> Int
 good: 5
 good: "hello world"
-good: 'Just Nat 5
+good: 'Just Natural 5
