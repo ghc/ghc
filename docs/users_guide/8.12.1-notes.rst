@@ -167,6 +167,8 @@ Language
 Compiler
 ~~~~~~~~
 
+- Type checker plugins which work with the natural numbers now 
+  should use ``naturalTy`` kind instead of removed ``typeNatKind``
 
 GHCi
 ~~~~
@@ -278,6 +280,16 @@ Arrow notation
   and unlocks important Core-to-Core optimizations. ``FinalPtr`` will be used
   in an upcoming ``bytestring`` release to improve the performance of
   ``ByteString`` literals created with ``OverloadedStrings``.
+
+- It possible now to promote the ``Natural`` type: :: 
+    
+    data C = MkC Natural
+    type CC = MkC 1
+    
+  The separate kind ``Nat`` is removed and now it is just a type synonym for
+  ``Natural``. As a consequence, one must enable ``TypeSynonymInstances``
+  in order to define instances for ``Nat``.
+
 
 Build system
 ~~~~~~~~~~~~
