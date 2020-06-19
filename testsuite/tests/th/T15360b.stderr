@@ -5,7 +5,7 @@ T15360b.hs:10:13: error:
       In the type signature: x :: Proxy (Type Double)
 
 T15360b.hs:13:13: error:
-    • Expected kind ‘* -> k2’, but ‘1’ has kind ‘GHC.Types.Nat’
+    • Expected kind ‘* -> k2’, but ‘1’ has kind ‘GHC.Num.Natural.Natural’
     • In the first argument of ‘Proxy’, namely ‘(1 Int)’
       In the type signature: y :: Proxy (1 Int)
 

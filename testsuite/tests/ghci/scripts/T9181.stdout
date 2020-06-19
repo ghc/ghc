@@ -39,47 +39,53 @@ GHC.TypeLits.symbolVal ::
   GHC.TypeLits.KnownSymbol n => proxy n -> String
 GHC.TypeLits.symbolVal' ::
   GHC.TypeLits.KnownSymbol n => GHC.Prim.Proxy# n -> String
-type (GHC.TypeNats.*) :: GHC.Types.Nat
-                         -> GHC.Types.Nat -> GHC.Types.Nat
+type (GHC.TypeNats.*) :: GHC.Num.Natural.Natural
+                         -> GHC.Num.Natural.Natural -> GHC.Num.Natural.Natural
 type family (GHC.TypeNats.*) a b
-type (GHC.TypeNats.+) :: GHC.Types.Nat
-                         -> GHC.Types.Nat -> GHC.Types.Nat
+type (GHC.TypeNats.+) :: GHC.Num.Natural.Natural
+                         -> GHC.Num.Natural.Natural -> GHC.Num.Natural.Natural
 type family (GHC.TypeNats.+) a b
-type (GHC.TypeNats.-) :: GHC.Types.Nat
-                         -> GHC.Types.Nat -> GHC.Types.Nat
+type (GHC.TypeNats.-) :: GHC.Num.Natural.Natural
+                         -> GHC.Num.Natural.Natural -> GHC.Num.Natural.Natural
 type family (GHC.TypeNats.-) a b
-type (GHC.TypeNats.<=) :: GHC.Types.Nat
-                          -> GHC.Types.Nat -> Constraint
+type (GHC.TypeNats.<=) :: GHC.Num.Natural.Natural
+                          -> GHC.Num.Natural.Natural -> Constraint
 type (GHC.TypeNats.<=) x y =
   (x GHC.TypeNats.<=? y) ~ 'True :: Constraint
-type (GHC.TypeNats.<=?) :: GHC.Types.Nat -> GHC.Types.Nat -> Bool
+type (GHC.TypeNats.<=?) :: GHC.Num.Natural.Natural
+                           -> GHC.Num.Natural.Natural -> Bool
 type family (GHC.TypeNats.<=?) a b
-type GHC.TypeNats.CmpNat :: GHC.Types.Nat
-                            -> GHC.Types.Nat -> Ordering
+type GHC.TypeNats.CmpNat :: GHC.Num.Natural.Natural
+                            -> GHC.Num.Natural.Natural -> Ordering
 type family GHC.TypeNats.CmpNat a b
-type GHC.TypeNats.Div :: GHC.Types.Nat
-                         -> GHC.Types.Nat -> GHC.Types.Nat
+type GHC.TypeNats.Div :: GHC.Num.Natural.Natural
+                         -> GHC.Num.Natural.Natural -> GHC.Num.Natural.Natural
 type family GHC.TypeNats.Div a b
-type GHC.TypeNats.KnownNat :: GHC.Types.Nat -> Constraint
+type GHC.TypeNats.KnownNat :: GHC.TypeNats.Nat -> Constraint
 class GHC.TypeNats.KnownNat n where
   GHC.TypeNats.natSing :: GHC.TypeNats.SNat n
   {-# MINIMAL natSing #-}
-type GHC.TypeNats.Log2 :: GHC.Types.Nat -> GHC.Types.Nat
+type GHC.TypeNats.Log2 :: GHC.Num.Natural.Natural
+                          -> GHC.Num.Natural.Natural
 type family GHC.TypeNats.Log2 a
-type GHC.TypeNats.Mod :: GHC.Types.Nat
-                         -> GHC.Types.Nat -> GHC.Types.Nat
+type GHC.TypeNats.Mod :: GHC.Num.Natural.Natural
+                         -> GHC.Num.Natural.Natural -> GHC.Num.Natural.Natural
 type family GHC.TypeNats.Mod a b
-type GHC.Types.Nat :: *
-data GHC.Types.Nat
+type GHC.TypeNats.Nat :: *
+type GHC.TypeNats.Nat = GHC.Num.Natural.Natural
+type GHC.Num.Natural.Natural :: *
+data GHC.Num.Natural.Natural
+  = GHC.Num.Natural.NS GHC.Prim.Word#
+  | GHC.Num.Natural.NB GHC.Prim.ByteArray#
 type GHC.TypeNats.SomeNat :: *
 data GHC.TypeNats.SomeNat
-  = forall (n :: GHC.Types.Nat).
+  = forall (n :: GHC.TypeNats.Nat).
     GHC.TypeNats.KnownNat n =>
     GHC.TypeNats.SomeNat (Data.Proxy.Proxy n)
 type GHC.Types.Symbol :: *
 data GHC.Types.Symbol
-type (GHC.TypeNats.^) :: GHC.Types.Nat
-                         -> GHC.Types.Nat -> GHC.Types.Nat
+type (GHC.TypeNats.^) :: GHC.Num.Natural.Natural
+                         -> GHC.Num.Natural.Natural -> GHC.Num.Natural.Natural
 type family (GHC.TypeNats.^) a b
 GHC.TypeNats.sameNat ::
   (GHC.TypeNats.KnownNat a, GHC.TypeNats.KnownNat b) =>

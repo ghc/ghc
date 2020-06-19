@@ -31,7 +31,7 @@ working with type-level data will be defined in a separate library.
 
 module GHC.TypeLits
   ( -- * Kinds
-    Nat, Symbol  -- Both declared in GHC.Types in package ghc-prim
+    Natural, Nat, Symbol  -- Symbol is declared in GHC.Types in package ghc-prim
 
     -- * Linking type and value level
   , N.KnownNat, natVal, natVal'
@@ -54,7 +54,7 @@ module GHC.TypeLits
   ) where
 
 import GHC.Base(Eq(..), Ord(..), Ordering(..), String, otherwise)
-import GHC.Types( Nat, Symbol )
+import GHC.Types(Symbol)
 import GHC.Num(Integer, fromInteger)
 import GHC.Show(Show(..))
 import GHC.Read(Read(..))
@@ -65,7 +65,7 @@ import Data.Proxy (Proxy(..))
 import Data.Type.Equality((:~:)(Refl))
 import Unsafe.Coerce(unsafeCoerce)
 
-import GHC.TypeNats (KnownNat)
+import GHC.TypeNats (Natural, Nat, KnownNat)
 import qualified GHC.TypeNats as N
 
 --------------------------------------------------------------------------------

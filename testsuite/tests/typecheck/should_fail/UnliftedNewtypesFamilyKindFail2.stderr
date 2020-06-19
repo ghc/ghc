@@ -1,10 +1,10 @@
 UnliftedNewtypesFamilyKindFail2.hs:12:20:
-     Expected a type, but ‘5’ has kind ‘GHC.Types.Nat’
+     Expected a type, but ‘5’ has kind ‘GHC.Num.Natural.Natural’
      In the first argument of ‘F’, namely ‘5’
       In the newtype instance declaration for ‘F’
 
 UnliftedNewtypesFamilyKindFail2.hs:12:31:
-     Expected a type, but ‘5’ has kind ‘GHC.Types.Nat’
+     Expected a type, but ‘5’ has kind ‘GHC.Num.Natural.Natural’
      In the first argument of ‘F’, namely ‘5’
       In the type ‘(F 5)’
       In the definition of data constructor ‘MkF’

@@ -236,7 +236,7 @@ typeNatLogTyCon = mkTypeNatFunTyCon1 name
 typeNatLeqTyCon :: TyCon
 typeNatLeqTyCon =
   mkFamilyTyCon name
-    (mkTemplateAnonTyConBinders [ typeNatKind, typeNatKind ])
+    (mkTemplateAnonTyConBinders [ naturalTy, naturalTy ])
     boolTy
     Nothing
     (BuiltInSynFamTyCon ops)
@@ -255,7 +255,7 @@ typeNatLeqTyCon =
 typeNatCmpTyCon :: TyCon
 typeNatCmpTyCon =
   mkFamilyTyCon name
-    (mkTemplateAnonTyConBinders [ typeNatKind, typeNatKind ])
+    (mkTemplateAnonTyConBinders [ naturalTy, naturalTy ])
     orderingKind
     Nothing
     (BuiltInSynFamTyCon ops)
@@ -301,14 +301,12 @@ typeSymbolAppendTyCon = mkTypeSymbolFunTyCon2 name
   name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "AppendSymbol")
                 typeSymbolAppendFamNameKey typeSymbolAppendTyCon
 
-
-
 -- Make a unary built-in constructor of kind: Nat -> Nat
 mkTypeNatFunTyCon1 :: Name -> BuiltInSynFamily -> TyCon
 mkTypeNatFunTyCon1 op tcb =
   mkFamilyTyCon op
-    (mkTemplateAnonTyConBinders [ typeNatKind ])
-    typeNatKind
+    (mkTemplateAnonTyConBinders [ naturalTy ])
+    naturalTy
     Nothing
     (BuiltInSynFamTyCon tcb)
     Nothing
@@ -319,8 +317,8 @@ mkTypeNatFunTyCon1 op tcb =
 mkTypeNatFunTyCon2 :: Name -> BuiltInSynFamily -> TyCon
 mkTypeNatFunTyCon2 op tcb =
   mkFamilyTyCon op
-    (mkTemplateAnonTyConBinders [ typeNatKind, typeNatKind ])
-    typeNatKind
+    (mkTemplateAnonTyConBinders [ naturalTy, naturalTy ])
+    naturalTy
     Nothing
     (BuiltInSynFamTyCon tcb)
     Nothing

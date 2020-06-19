@@ -28,8 +28,24 @@ Compiler
   since the argument was already forced in the first equation. For more
   details see :ghc-flag:`-Wredundant-bang-patterns`.
 
+- Type checker plugins which work with the natural numbers now
+  should use ``naturalTy`` kind instead of ``typeNatKind``, which has been removed.
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
 - ``Void#`` is now a type synonym for the unboxed tuple ``(# #)``.
   Code using ``Void#`` now has to enable :extension:`UnboxedTuples`.
+
+``base`` library
+~~~~~~~~~~~~~~~~
+
+- It's possible now to promote the ``Natural`` type: :: 
+    
+    data Coordinate = Mk2D Natural Natural
+    type MyCoordinate = Mk2D 1 10
+    
+  The separate kind ``Nat`` is removed and now it is just a type synonym for
+  ``Natural``. As a consequence, one must enable ``TypeSynonymInstances``
+  in order to define instances for ``Nat``.
+
