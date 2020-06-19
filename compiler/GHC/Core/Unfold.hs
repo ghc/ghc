@@ -887,16 +887,13 @@ conSize dc n_val_args
   | n_val_args == 0 = SizeIs 0 emptyBag 10    -- Like variables
 
 -- See Note [Unboxed tuple size and result discount]
-  | isUnboxedTupleCon dc = SizeIs 0 emptyBag (10 * (1 + n_val_args))
+  | isUnboxedTupleCon dc = SizeIs 0 emptyBag 10
 
 -- See Note [Constructor size and result discount]
-  | otherwise = SizeIs 10 emptyBag (10 * (1 + n_val_args))
+  | otherwise = SizeIs 10 emptyBag 10
 
--- XXX still looks to large to me
-
-{-
-Note [Constructor size and result discount]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Constructor size and result discount]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Treat a constructors application as size 10, regardless of how many
 arguments it has; we are keen to expose them (and we charge separately
 for their args).  We can't treat them as size zero, else we find that
@@ -907,14 +904,32 @@ The "result discount" is applied if the result of the call is
 scrutinised (say by a case).  For a constructor application that will
 mean the constructor application will disappear, so we don't need to
 charge it to the function.  So the discount should at least match the
-cost of the constructor application, namely 10.  But to give a bit
-of extra incentive we give a discount of 10*(1 + n_val_args).
+cost of the constructor application, namely 10.
 
-Simon M tried a MUCH bigger discount: (10 * (10 + n_val_args)),
-and said it was an "unambiguous win", but its terribly dangerous
-because a function with many many case branches, each finishing with
-a constructor, can have an arbitrarily large discount.  This led to
-terrible code bloat: see #6099.
+Historical note 1: Until Jun 2020 we gave it a "bit of extra
+incentive" via a discount of 10*(1 + n_val_args), but that was FAR too
+much (#18282).  In particular, consider a huge case tree like
+
+   let r = case y1 of
+          Nothing -> B1 a b c
+          Just v1 -> case y2 of
+                      Nothing -> B1 c b a
+                      Just v2 -> ...
+
+If conSize gives a cost of 10 (regardless of n_val_args) and a
+discount of 10, that'll make each alternative RHS cost zero.  We
+charge 10 for each case alternative (see size_up_alt).  If we give a
+bigger discount (say 20) in conSize, we'll make the case expression
+cost *nothing*, and that can make a huge case tree cost nothing. This
+leads to massive, sometimes exponenial inlinings (#18282).  In short,
+don't give a discount that give a negative size to a sub-expression!
+
+Historical note 2: Much longer ago, Simon M tried a MUCH bigger
+discount: (10 * (10 + n_val_args)), and said it was an "unambiguous
+win", but its terribly dangerous because a function with many many
+case branches, each finishing with a constructor, can have an
+arbitrarily large discount.  This led to terrible code bloat: see
+#6099.
 
 Note [Unboxed tuple size and result discount]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -924,7 +939,7 @@ and f wasn't getting inlined.
 
 I tried giving unboxed tuples a *result discount* of zero (see the
 commented-out line).  Why?  When returned as a result they do not
-allocate, so maybe we don't want to charge so much for them If you
+allocate, so maybe we don't want to charge so much for them. If you
 have a non-zero discount here, we find that workers often get inlined
 back into wrappers, because it look like
     f x = case $wf x of (# a,b #) -> (a,b)
@@ -932,6 +947,9 @@ and we are keener because of the case.  However while this change
 shrank binary sizes by 0.5% it also made spectral/boyer allocate 5%
 more. All other changes were very small. So it's not a big deal but I
 didn't adopt the idea.
+
+When fixing #18282 (see Note [Constructor size and result discount])
+I changed the result discount to be just 10, not 10*(1+n_val_args).
 
 Note [Function and non-function discounts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -14,7 +14,7 @@ T7116.$trModule4 = "main"#
 T7116.$trModule3 :: GHC.Types.TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T7116.$trModule3 = GHC.Types.TrNameS T7116.$trModule4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
@@ -28,14 +28,14 @@ T7116.$trModule2 = "T7116"#
 T7116.$trModule1 :: GHC.Types.TrName
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T7116.$trModule1 = GHC.Types.TrNameS T7116.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T7116.$trModule :: GHC.Types.Module
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 10}]
 T7116.$trModule
   = GHC.Types.Module T7116.$trModule3 T7116.$trModule1
 
