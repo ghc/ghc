@@ -40,6 +40,29 @@ Highlights
     GHC is now able to detect the case alt returning 3 as redundant.
   - Some more performance improvements in edge cases.
 
+* Big-number support
+
+  - GHC now relies on a new "ghc-bignum" package to provide Integer/Natural
+    implementations. This package supports the following backends:
+      - gmp: adapted from integer-gmp package that was used before
+      - native: new Haskell implementation, faster than integer-simple which is
+        not used anymore
+
+  - All backends now use the same representation for big numbers (the one that
+    was previously used only by integer-gmp). It led to several compiler
+    simplifications, performance improvements and bug fixes (e.g.
+    :ghc-ticket:`15262`, :ghc-ticket:`15286`).
+
+  - All backends must provide exactly the same set of functions with
+    deterministic results so that they can be tested one against the other (they
+    can only differ in performance). As a consequence, some functions that were
+    only provided by integer-gmp (prime test, secure powmod, etc.) are no longer
+    provided by ghc-bignum. Note that other packages (e.g. hgmp) provide these
+    functions.
+
+  - For now GHC still doesn't allow dynamic selection of the ghc-bignum backend
+    to use.
+
 Full details
 ------------
 
