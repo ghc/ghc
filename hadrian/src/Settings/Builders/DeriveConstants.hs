@@ -41,7 +41,7 @@ includeCcArgs = do
     mconcat [ cArgs
             , cWarnings
             , getSettingList $ ConfCcArgs Stage1
-            , flag GhcUnregisterised ? arg "-DUSE_MINIINTERPRETER"
+            , flag stage GhcUnregisterised ? arg "-DUSE_MINIINTERPRETER"
             , arg "-Irts"
             , arg "-Iincludes"
             , arg $ "-I" ++ libPath
