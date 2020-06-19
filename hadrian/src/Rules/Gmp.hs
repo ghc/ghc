@@ -13,7 +13,7 @@ import Hadrian.BuildPath
 -- their paths.
 gmpObjects :: Stage -> Action [FilePath]
 gmpObjects s = do
-  isInTree <- flag s GmpInTree
+  isInTree <- flag (Staged s GmpInTree)
   if not isInTree
     then return []
     else do
@@ -62,7 +62,7 @@ gmpRules = do
             librariesP = takeDirectory packageP
             stageP     = takeDirectory librariesP
 
-        isInTree <- flag undefined GmpInTree
+        isInTree <- flag (Global GmpInTree)
 
         if isInTree
         then do
