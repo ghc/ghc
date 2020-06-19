@@ -531,7 +531,7 @@ bigNatQuotWord a (W# b) = bigNatQuotWord# a b
 --    b /= 0
 bigNatRemWord# :: BigNat -> Word# -> Word#
 bigNatRemWord# a b
-   | 0## <- b       = 1## `remWord#` 0##
+   | 0## <- b       = case divByZero of _ -> 0##
    | 1## <- b       = 0##
    | bigNatIsZero a = 0##
    | True           = inline bignat_rem_word a b
