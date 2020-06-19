@@ -35,8 +35,8 @@ cIncludeArgs = do
             , arg $ "-I" ++ libPath
             , arg $ "-I" ++ path
             , pure . map ("-I"++) . filter (/= "") $ [iconvIncludeDir, gmpIncludeDir]
-            , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
-            , flag WithLibdw ? if not (null libdwIncludeDir) then arg ("-I" ++ libdwIncludeDir) else mempty
+            , flag undefined UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
+            , flag undefined WithLibdw ? if not (null libdwIncludeDir) then arg ("-I" ++ libdwIncludeDir) else mempty
             -- Add @incDirs@ in the build directory, since some files generated
             -- with @autoconf@ may end up in the build directory.
             , pure [ "-I" ++ path        -/- dir | dir <- incDirs ]
@@ -55,9 +55,9 @@ cArgs = mempty
 cWarnings :: Args
 cWarnings = mconcat
     [ arg "-Wall"
-    , flag CcLlvmBackend ? arg "-Wno-unknown-pragmas"
-    , notM (flag CcLlvmBackend) ? not windowsHost ? arg "-Werror=unused-but-set-variable"
-    , notM (flag CcLlvmBackend) ? arg "-Wno-error=inline" ]
+    , flag undefined CcLlvmBackend ? arg "-Wno-unknown-pragmas"
+    , notM (flag undefined CcLlvmBackend) ? not windowsHost ? arg "-Werror=unused-but-set-variable"
+    , notM (flag undefined CcLlvmBackend) ? arg "-Wno-error=inline" ]
 
 packageDatabaseArgs :: Args
 packageDatabaseArgs = do

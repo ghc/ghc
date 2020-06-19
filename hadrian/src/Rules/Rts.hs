@@ -46,7 +46,7 @@ withLibffi stage action = needLibffi stage
 copyLibffiHeaders :: Stage -> Action ()
 copyLibffiHeaders stage = do
     rtsPath      <- rtsBuildPath stage
-    useSystemFfi <- flag UseSystemFfi
+    useSystemFfi <- flag stage UseSystemFfi
     (fromStr, headers) <- if useSystemFfi
         then ("system",) <$> libffiSystemHeaders
         else needLibffi stage
@@ -114,7 +114,7 @@ rtsLibffiLibrary stage way = do
 needRtsLibffiTargets :: Stage -> Action [FilePath]
 needRtsLibffiTargets stage = do
     rtsPath      <- rtsBuildPath stage
-    useSystemFfi <- flag UseSystemFfi
+    useSystemFfi <- flag stage UseSystemFfi
 
     -- Header files (in the rts build dir).
     let headers = fmap (rtsPath -/-) libffiHeaderFiles

@@ -97,7 +97,7 @@ buildProgram bin ctx@(Context{..}) rs = do
   -- so we use pkgRegisteredLibraryFile instead.
   registerPackages =<< contextDependencies ctx
 
-  cross <- flag CrossCompiling
+  cross <- flag stage CrossCompiling
   -- For cross compiler, copy @stage0/bin/<pgm>@ to @stage1/bin/@.
   case (cross, stage) of
     (True, s) | s > Stage0 -> do

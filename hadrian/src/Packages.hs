@@ -130,7 +130,7 @@ setPath pkg path = pkg { pkgPath = path }
 -- 'Library', the function simply returns its name.
 programName :: Context -> Action String
 programName Context {..} = do
-    cross <- flag CrossCompiling
+    cross <- flag stage CrossCompiling
     targetPlatform <- setting TargetPlatformFull
     let prefix = if cross then targetPlatform ++ "-" else ""
     -- TODO: Can we extract this information from Cabal files?
@@ -213,7 +213,7 @@ libffiBuildPath stage = buildPath $ Context
 -- | Name of the 'libffi' library.
 libffiLibraryName :: Action FilePath
 libffiLibraryName = do
-    useSystemFfi <- flag UseSystemFfi
+    useSystemFfi <- flag undefined UseSystemFfi
     return $ case (useSystemFfi, windowsHost) of
         (True , False) -> "ffi"
         (False, False) -> "Cffi"

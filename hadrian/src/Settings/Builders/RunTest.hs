@@ -20,7 +20,7 @@ getBooleanSetting key = fromMaybe (error msg) <$> parseYesNo <$> getTestSetting 
 -- | Extra flags to send to the Haskell compiler to run tests.
 runTestGhcFlags :: Action String
 runTestGhcFlags = do
-    unregisterised <- flag GhcUnregisterised
+    unregisterised <- flag undefined GhcUnregisterised
 
     let ifMinGhcVer ver opt = do v <- ghcCanonVersion
                                  if ver <= v then pure opt
