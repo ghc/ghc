@@ -254,7 +254,7 @@ import GHC.Types.Unique.Set
 import GHC.Core.TyCon
 import GHC.Builtin.Types.Prim
 import {-# SOURCE #-} GHC.Builtin.Types
-                                 ( listTyCon, typeNatKind
+                                 ( naturalTy, listTyCon
                                  , typeSymbolKind, liftedTypeKind
                                  , constraintKind
                                  , unrestrictedFunTyCon
@@ -2600,7 +2600,7 @@ tcReturnsConstraintKind _                       = False
 
 --------------------------
 typeLiteralKind :: TyLit -> Kind
-typeLiteralKind (NumTyLit {}) = typeNatKind
+typeLiteralKind (NumTyLit {}) = naturalTy
 typeLiteralKind (StrTyLit {}) = typeSymbolKind
 
 -- | Returns True if a type is levity polymorphic. Should be the same
