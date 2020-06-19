@@ -25,8 +25,8 @@
 //
 // Overview of object unloading:
 //
-// - In a major GC, for every static object we mark the object's object code and
-//   its dependencies as 'live'. This is done by `markObjectCode`, called by
+// - In a major GC, for every static closure we mark the closure's object code
+//   and its dependencies as 'live'. This is done by `markObjectCode`, called by
 //   `evacuate`.
 //
 // - Marking object code is done using a global "section index table"
@@ -34,7 +34,7 @@
 //   indices to the table. `markObjectCode` does binary search on this table to
 //   find object code for the marked object, and mark it and its dependencies.
 //
-//   Dependency of an object code is simply other object code that the object
+//   Dependencies of an object code are simply other object code that the object
 //   code refers to in its code. We know these dependencies by the relocations
 //   present in the referent. This is recorded by lookupSymbolDependent.
 //
@@ -59,13 +59,12 @@
 // - Sometimes we load objects that are not Haskell objects.
 //
 // To avoid unloading objects that are unreachable but are not asked for
-// unloading we maintain a "root set" of object code, `loaded_objects` below.
-// `loadObj` adds the loaded objects (and its dependencies) to the list.
-// `unloadObj` removes. After a major GC, `checkUnload` first marks the root set
-// (`loaded_objects`) to avoid unloading objects that are not asked for
-// unloading.
+// unloading we maintain have a `unload` field in `ObjectCode`, initially
+// `false`. When we call `unloadObj` the object code is marked as `unload`.
+// `checkUnload` marks every `ObjectCode` whose `unload` field is `false` and
+// unloads remaining unmarked objects.
 //
-// Two other lists `objects` and `old_objects` are similar to large object lists
+// The two lists `objects` and `old_objects` are similar to large object lists
 // in GC. Before a major GC we move `objects` to `old_objects`, and move marked
 // objects back to `objects` during evacuation and when marking roots in
 // `checkUnload`. Any objects in `old_objects` after that is unloaded.
@@ -75,14 +74,24 @@
 //
 // - Maintain a "snapshot":
 //
-//   - Copy `loaded_objects` as the root set of the snapshot
-//
 //   - Stash `objects` to `old_objects` as the snapshot. We don't need a new
 //     list for this as `old_objects` won't be used by any other code when
 //     non-moving GC is enabled.
 //
 //   - Copy `global_s_indices` table to be able to mark objects while mutators
 //     call `loadObj_` and `unloadObj_` concurrently.
+//
+// - The write barrier: we need one of these two to make sure we won't be
+//   incorerctly unloading objects as `unloadObj_` is called concurrently by
+//   mutators:
+//
+//   - Implement a write barrier in `unloadObj_`: if the old value of `unload`
+//     was false then we can't unload the object in the concurrent collection so
+//     we need to mark the object (or somehow let the mark thread know that the
+//     object was alive by the time snapshot was taken).
+//
+//   - Stash `unload` fields of all objects in the first step above and use that
+//     field in the collection thread.
 //
 // - Don't mark object code in `evacuate`, marking will be done in the
 //   non-moving collector.
@@ -103,28 +112,6 @@
 //   the snapshot, unload those. The unload loop will be the same as in
 //   `checkUnload`. This step needs to happen in the final sync (before sweep
 //   begins) to avoid races when updating `global_s_indices`.
-//
-// - NOTE: We don't need write barriers in loadObj/unloadObj as we don't
-//   introduce a dependency from an already-loaded object to a newly loaded
-//   object and we don't delete existing dependencies.
-//
-
-//
-// Note [Speeding up checkUnload]
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// In certain circumstances, there may be a lot of unloaded ObjectCode structs
-// chained in `unloaded_objects` (such as when users `:load` a module in a very
-// big repo in GHCi). To speed up checking whether an address lies within any of
-// these objects, we populate the addresses of their mapped sections in
-// an array sorted by their `start` address and do binary search for our address
-// on that array. Note that this works because the sections are mapped to mutual
-// exclusive memory regions, so we can simply find the largest lower bound among
-// the `start` addresses of the sections and then check if our address is inside
-// that section. In particular, we store the start address and end address of
-// each mapped section in a OCSectionIndex, arrange them all on a contiguous
-// memory range and then sort by start address. We then put this array in an
-// OCSectionIndices struct to be passed into `checkAddress` to do binary search
-// on.
 //
 
 uint8_t object_code_mark_bit = 0;
@@ -158,14 +145,6 @@ ObjectCode *objects = NULL;
 // `objects` list is moved here before unload check. Marked objects are moved
 // back to `objects`. Remaining objects are freed.
 static ObjectCode *old_objects = NULL;
-
-// List of loaded objects. Used as root set for unload check in `checkUnload`.
-// Objects are added with `loadObj_` and removed with `unloadObj_`.
-//
-// List formed with `next_loaded_object` field of `ObjectCode`.
-//
-// Not static: used in Linker.c.
-ObjectCode *loaded_objects;
 
 // Section index table for currently loaded objects. New indices are added by
 // `loadObj_`, indices of unloaded objects are removed in `checkUnload`.
@@ -440,9 +419,11 @@ void checkUnload()
     OCSectionIndices *s_indices = global_s_indices;
     ASSERT(s_indices->sorted);
 
-    // Mark roots
-    for (ObjectCode *oc = loaded_objects; oc != NULL; oc = oc->next_loaded_object) {
-        markObjectLive(NULL, (W_)oc, NULL);
+    // Mark objects that are not explicitly asked for unloading
+    for (ObjectCode *oc = old_objects; oc != NULL; oc = oc->next) {
+        if (!oc->unload) {
+            markObjectLive(NULL, (W_)oc, NULL);
+        }
     }
 
     // Free unmarked objects

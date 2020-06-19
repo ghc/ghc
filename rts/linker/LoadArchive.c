@@ -5,7 +5,7 @@
 #include "sm/OSMem.h"
 #include "RtsUtils.h"
 #include "LinkerInternals.h"
-#include "CheckUnload.h" // loaded_objects
+#include "CheckUnload.h" // insertOCSectionIndices
 #include "linker/M32Alloc.h"
 
 /* Platform specific headers */
@@ -537,8 +537,7 @@ static HsInt loadArchive_ (pathchar *path)
                 fclose(f);
                 return 0;
             } else {
-                oc->next_loaded_object = loaded_objects;
-                loaded_objects = oc;
+                insertOCSectionIndices(oc); // also adds the object to `objects` list
             }
         }
         else if (isGnuIndex) {

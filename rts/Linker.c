@@ -1352,7 +1352,7 @@ mkOc( pathchar *path, char *image, int imageSize,
    /* chain it onto the list of objects */
    oc->next              = NULL;
    oc->prev              = NULL;
-   oc->next_loaded_object = NULL;
+   oc->unload            = false;
    oc->mark              = object_code_mark_bit;
    oc->dependencies      = allocHashSet();
 
@@ -1518,21 +1518,21 @@ static HsInt loadObj_ (pathchar *path)
    }
 
    ObjectCode *oc = preloadObjectFile(path);
-   if (oc == NULL) return 0;
+   if (oc == NULL) {
+       return 0; // error
+   }
 
    if (! loadOc(oc)) {
        // failed; free everything we've allocated
        removeOcSymbols(oc);
        // no need to freeOcStablePtrs, they aren't created until resolveObjs()
        freeObjectCode(oc);
-       return 0;
+       return 0; // error
    }
 
-   insertOCSectionIndices(oc);
+   insertOCSectionIndices(oc); // also adds the object to `objects` list
 
-   oc->next_loaded_object = loaded_objects;
-   loaded_objects = oc;
-   return 1;
+   return 1; // success
 }
 
 HsInt loadObj (pathchar *path)
@@ -1766,8 +1766,7 @@ static HsInt unloadObj_ (pathchar *path, bool just_purge)
     IF_DEBUG(linker, debugBelch("unloadObj: %" PATH_FMT "\n", path));
 
     bool unloadedAnyObj = false;
-    ObjectCode *prev = NULL;
-    for (ObjectCode *oc = loaded_objects; oc; oc = oc->next_loaded_object) {
+    for (ObjectCode *oc = objects; oc; oc = oc->next) {
         if (pathcmp(oc->fileName,path) == 0) {
             oc->status = OBJECT_UNLOADED;
 
@@ -1779,15 +1778,8 @@ static HsInt unloadObj_ (pathchar *path, bool just_purge)
             unloadedAnyObj = true;
 
             if (!just_purge) {
-                // Remove object code from root set
-                if (prev == NULL) {
-                    loaded_objects = oc->next_loaded_object;
-                } else {
-                    prev->next_loaded_object = oc->next_loaded_object;
-                }
+                oc->unload = true;
             }
-        } else {
-            prev = oc;
         }
     }
 
