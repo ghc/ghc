@@ -94,7 +94,7 @@ module GHC.Builtin.Types (
         mkSumTy, sumTyCon, sumDataCon,
 
         -- * Kinds
-        typeNatKindCon, typeNatKind, typeSymbolKindCon, typeSymbolKind,
+        typeSymbolKindCon, typeSymbolKind,
         isLiftedTypeKindTyConName, liftedTypeKind,
         typeToTypeKind, constraintKind,
         liftedTypeKindTyCon, constraintKindTyCon,  constraintKindTyConName,
@@ -255,7 +255,6 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because they
                 , heqTyCon
                 , eqTyCon
                 , coercibleTyCon
-                , typeNatKindCon
                 , typeSymbolKindCon
                 , runtimeRepTyCon
                 , vecCountTyCon
@@ -476,8 +475,7 @@ makeRecoveryTyCon tc
         -- at (promoted) use-sites of MkT.
 
 -- Kinds
-typeNatKindConName, typeSymbolKindConName :: Name
-typeNatKindConName    = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Nat")    typeNatKindConNameKey    typeNatKindCon
+typeSymbolKindConName :: Name
 typeSymbolKindConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Symbol") typeSymbolKindConNameKey typeSymbolKindCon
 
 constraintKindTyConName :: Name
@@ -678,14 +676,11 @@ pcSpecialDataCon dc_name arg_tys tycon rri
 ************************************************************************
 -}
 
-typeNatKindCon, typeSymbolKindCon :: TyCon
--- data Nat
+typeSymbolKindCon :: TyCon
 -- data Symbol
-typeNatKindCon    = pcTyCon typeNatKindConName    Nothing [] []
 typeSymbolKindCon = pcTyCon typeSymbolKindConName Nothing [] []
 
-typeNatKind, typeSymbolKind :: Kind
-typeNatKind    = mkTyConTy typeNatKindCon
+typeSymbolKind :: Kind
 typeSymbolKind = mkTyConTy typeSymbolKindCon
 
 constraintKindTyCon :: TyCon
