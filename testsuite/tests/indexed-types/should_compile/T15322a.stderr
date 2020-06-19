@@ -4,7 +4,7 @@ T15322a.hs:12:7: error:
         arising from a use of ‘typeRep’
       from the context: KnownNat n
         bound by the type signature for:
-                   f :: forall (n :: GHC.Types.Nat).
+                   f :: forall (n :: GHC.TypeNats.Nat).
                         KnownNat n =>
                         Proxy n -> TypeRep (n + 1)
         at T15322a.hs:11:1-56
