@@ -27,6 +27,12 @@
     small lists will now compile to a simple case statement more often.
 
   * Add `MonadFix` and `MonadZip` instances for `Complex`
+  
+  * Make it possible to promote `Natural`s and remove the separate `Nat` kind.
+    For backwards compatibility, `Nat` is now a type synonym for `Natural`. 
+    As a consequence, one must enable `TypeSynonymInstances` 
+    in order to define instances for `Nat`. Also, different instances for `Nat` and `Natural`
+    won't typecheck anymore.
    
 ## 4.14.0.0 *TBA*
   * Bundled with GHC 8.10.1
