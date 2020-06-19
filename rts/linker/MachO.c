@@ -678,7 +678,7 @@ relocateSection(ObjectCode* oc, int curSection)
 {
     Section * sect = &oc->sections[curSection];
 
-    IF_DEBUG(linker, debugBelch("relocateSection %d, info: %x\n", curSection, sect->info));
+    IF_DEBUG(linker, debugBelch("relocateSection %d, info: %p\n", curSection, (void*)sect->info));
 
     // empty sections (without segments), won't have their info filled.
     // there is no relocation to be done for them.
