@@ -50,11 +50,16 @@ flag f = do
             UseSystemFfi         -> "use-system-ffi"
             BootstrapThreadedRts -> "bootstrap-threaded-rts"
 
-    let key = case f of
-            Global fn   -> configName fn
-            Staged s fn -> configName fn ++ "-" ++ stageString s
+    (key, value) <- case f of
+            Global fn   -> let key = configName fn in (key,) <$> lookupValueOrError configFile key
+            Staged s fn -> do
+                let key = configName fn
+                    stagedKey = key ++ "-" ++ stageString s
+                    msg = "Key " ++ quote stagedKey ++ " or " ++ quote key ++ " not found in file " ++ quote configFile
+                mStagedVal <- fmap (stagedKey,) <$> lookupValue configFile stagedKey
+                mGlobalVal <- fmap (key,) <$> lookupValue configFile key
+                return $ fromMaybe (error msg) (mStagedVal <|> mGlobalVal)
 
-    value <- lookupValueOrError configFile key
     when (value `notElem` ["YES", "NO", ""]) . error $ "Configuration flag "
         ++ quote (key ++ " = " ++ value) ++ " cannot be parsed."
     return $ value == "YES"
