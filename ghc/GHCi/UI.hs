@@ -1889,8 +1889,8 @@ addModule files = do
   return ()
   where
     checkTarget :: GHC.GhcMonad m => Target -> m Bool
-    checkTarget (Target (TargetModule m) _ _ _) = checkTargetModule m
-    checkTarget (Target (TargetFile f _) _ _ _) = liftIO $ checkTargetFile f
+    checkTarget (Target { targetId = TargetModule m }) = checkTargetModule m
+    checkTarget (Target { targetId = TargetFile f _ })  = liftIO $ checkTargetFile f
 
     checkTargetModule :: GHC.GhcMonad m => ModuleName -> m Bool
     checkTargetModule m = do
@@ -3273,8 +3273,8 @@ showTargets :: GHC.GhcMonad m => m ()
 showTargets = mapM_ showTarget =<< GHC.getTargets
   where
     showTarget :: GHC.GhcMonad m => Target -> m ()
-    showTarget (Target (TargetFile f _) _ _ _) = liftIO (putStrLn f)
-    showTarget (Target (TargetModule m) _ _ _) =
+    showTarget (Target { targetId = TargetFile f _ }) = liftIO (putStrLn f)
+    showTarget (Target { targetId = TargetModule m }) =
       liftIO (putStrLn $ moduleNameString m)
 
 -- -----------------------------------------------------------------------------
