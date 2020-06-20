@@ -688,7 +688,7 @@ release-x86_64-linux-deb8:
 build-x86_64-linux-alpine-hadrian:
   extends: .validate-linux-hadrian
   stage: full-build
-  image: "registry.gitlab.haskell.org/bjaress/ci-images/x86_64-linux-alpine:latest"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine:2e59067d7371d19c7c829e803ecfe4c07aa76245"
   # There are currently a few failing tests
   allow_failure: true
   variables:
