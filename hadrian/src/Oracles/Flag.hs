@@ -12,6 +12,18 @@ import Base
 import Context
 import Oracles.Setting
 
+-- Flags can be either staged or not.  Global flags are assumed to be identical
+-- across all stages.  While staged flags are specific to a given stage.  Flags
+-- are read from the @cfg/system.config@ (the result of configure processing
+-- @cfg/system.config.in@).  See @flag@ below for the actual FlagName to lookup
+-- key mapping.  If staged flags can not be found, they fall back to the Global
+-- flag.  Thus we can special case only single stages while falling back to the
+-- global value.
+--
+-- Example: When cross compiling the Stage0 (bootstrap) @ar@ might be bsd ar and
+-- thus not support \@ response files.  However the the Stage1+ toolchain might.
+-- Therefore we must special case @ArSupportsAtFile@ for stage0 to be NO, while
+-- it can be YES for stage1+.
 data FlagName = ArSupportsAtFile
               | CrossCompiling
               | CcLlvmBackend
@@ -27,6 +39,9 @@ data FlagName = ArSupportsAtFile
               | UseSystemFfi
               | BootstrapThreadedRts
 
+-- Use Global if you are certain the flag is global across all stages (or there
+-- simply is no stage/context available).  Use of Staged is preferred as it
+-- provides more precise information about the use of the Flag.
 data Flag = Global FlagName
           | Staged Stage FlagName
 
