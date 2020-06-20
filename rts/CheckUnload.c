@@ -25,8 +25,8 @@
 //
 // Overview of object unloading:
 //
-// - In a major GC, for every static closure we mark the closure's object code
-//   and its dependencies as 'live'. This is done by `markObjectCode`, called by
+// - In a major GC, for every static object we mark the object's object code and
+//   its dependencies as 'live'. This is done by `markObjectCode`, called by
 //   `evacuate`.
 //
 // - Marking object code is done using a global "section index table"
@@ -34,7 +34,7 @@
 //   indices to the table. `markObjectCode` does binary search on this table to
 //   find object code for the marked object, and mark it and its dependencies.
 //
-//   Dependencies of an object code are simply other object code that the object
+//   Dependency of an object code is simply other object code that the object
 //   code refers to in its code. We know these dependencies by the relocations
 //   present in the referent. This is recorded by lookupSymbolDependent.
 //
@@ -59,12 +59,13 @@
 // - Sometimes we load objects that are not Haskell objects.
 //
 // To avoid unloading objects that are unreachable but are not asked for
-// unloading we maintain have a `unload` field in `ObjectCode`, initially
-// `false`. When we call `unloadObj` the object code is marked as `unload`.
-// `checkUnload` marks every `ObjectCode` whose `unload` field is `false` and
-// unloads remaining unmarked objects.
+// unloading we maintain a "root set" of object code, `loaded_objects` below.
+// `loadObj` adds the loaded objects (and its dependencies) to the list.
+// `unloadObj` removes. After a major GC, `checkUnload` first marks the root set
+// (`loaded_objects`) to avoid unloading objects that are not asked for
+// unloading.
 //
-// The two lists `objects` and `old_objects` are similar to large object lists
+// Two other lists `objects` and `old_objects` are similar to large object lists
 // in GC. Before a major GC we move `objects` to `old_objects`, and move marked
 // objects back to `objects` during evacuation and when marking roots in
 // `checkUnload`. Any objects in `old_objects` after that is unloaded.
@@ -74,24 +75,14 @@
 //
 // - Maintain a "snapshot":
 //
+//   - Copy `loaded_objects` as the root set of the snapshot
+//
 //   - Stash `objects` to `old_objects` as the snapshot. We don't need a new
 //     list for this as `old_objects` won't be used by any other code when
 //     non-moving GC is enabled.
 //
 //   - Copy `global_s_indices` table to be able to mark objects while mutators
 //     call `loadObj_` and `unloadObj_` concurrently.
-//
-// - The write barrier: we need one of these two to make sure we won't be
-//   incorerctly unloading objects as `unloadObj_` is called concurrently by
-//   mutators:
-//
-//   - Implement a write barrier in `unloadObj_`: if the old value of `unload`
-//     was false then we can't unload the object in the concurrent collection so
-//     we need to mark the object (or somehow let the mark thread know that the
-//     object was alive by the time snapshot was taken).
-//
-//   - Stash `unload` fields of all objects in the first step above and use that
-//     field in the collection thread.
 //
 // - Don't mark object code in `evacuate`, marking will be done in the
 //   non-moving collector.
@@ -112,6 +103,10 @@
 //   the snapshot, unload those. The unload loop will be the same as in
 //   `checkUnload`. This step needs to happen in the final sync (before sweep
 //   begins) to avoid races when updating `global_s_indices`.
+//
+// - NOTE: We don't need write barriers in loadObj/unloadObj as we don't
+//   introduce a dependency from an already-loaded object to a newly loaded
+//   object and we don't delete existing dependencies.
 //
 
 uint8_t object_code_mark_bit = 0;
@@ -146,9 +141,8 @@ ObjectCode *objects = NULL;
 // back to `objects`. Remaining objects are freed.
 static ObjectCode *old_objects = NULL;
 
-// Number of objects that are currently marked as `unload`. When this value is 0
-// we skip static object marking during GC and `checkUnload`. See `unload` field
-// of `ObjectCode` and Note [Object unloading] above for more details.
+// Number of objects that we want to unload. When this value is 0 we skip static
+// object marking during GC and `checkUnload`.
 //
 // Not static: we use this value to skip static object marking in evacuate when
 // this is 0.
@@ -157,8 +151,18 @@ static ObjectCode *old_objects = NULL;
 // `checkUnload`.
 int n_unloaded_objects = 0;
 
+// List of objects that we don't want to unload (i.e. we haven't called
+// unloadObj on these yet). Used as root set for unload check in checkUnload.
+// Objects are added with loadObj_ and removed with unloadObj_.
+//
+// List formed with `next_loaded_object` field of `ObjectCode`.
+//
+// Not static: used in Linker.c.
+ObjectCode *loaded_objects;
+
 // Section index table for currently loaded objects. New indices are added by
-// `loadObj_`, indices of unloaded objects are removed in `checkUnload`.
+// `loadObj_`, indices of unloaded objects are removed in `checkUnload`. Used to
+// map static closures to their ObjectCode.
 static OCSectionIndices *global_s_indices = NULL;
 
 static OCSectionIndices *createOCSectionIndices(void)
@@ -430,11 +434,9 @@ void checkUnload()
     OCSectionIndices *s_indices = global_s_indices;
     ASSERT(s_indices->sorted);
 
-    // Mark objects that are not explicitly asked for unloading
-    for (ObjectCode *oc = old_objects; oc != NULL; oc = oc->next) {
-        if (!oc->unload) {
-            markObjectLive(NULL, (W_)oc, NULL);
-        }
+    // Mark roots
+    for (ObjectCode *oc = loaded_objects; oc != NULL; oc = oc->next_loaded_object) {
+        markObjectLive(NULL, (W_)oc, NULL);
     }
 
     // Free unmarked objects
@@ -444,7 +446,11 @@ void checkUnload()
 
         removeOCSectionIndices(s_indices, oc);
 
-        // Symbols should be removed by unloadObj_
+        // Symbols should be removed by unloadObj_.
+        // NB (osa): If this assertion doesn't hold then freeObjectCode below
+        // will corrupt symhash as keys of that table live in ObjectCodes. If
+        // you see a segfault in a hash table operation in linker (in non-debug
+        // RTS) then it's probably becuse this assertion did not hold.
         ASSERT(oc->symbols == NULL);
 
         freeObjectCode(oc);

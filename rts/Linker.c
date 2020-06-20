@@ -1352,7 +1352,7 @@ mkOc( pathchar *path, char *image, int imageSize,
    /* chain it onto the list of objects */
    oc->next              = NULL;
    oc->prev              = NULL;
-   oc->unload            = false;
+   oc->next_loaded_object = NULL;
    oc->mark              = object_code_mark_bit;
    oc->dependencies      = allocHashSet();
 
@@ -1518,21 +1518,21 @@ static HsInt loadObj_ (pathchar *path)
    }
 
    ObjectCode *oc = preloadObjectFile(path);
-   if (oc == NULL) {
-       return 0; // error
-   }
+   if (oc == NULL) return 0;
 
    if (! loadOc(oc)) {
        // failed; free everything we've allocated
        removeOcSymbols(oc);
        // no need to freeOcStablePtrs, they aren't created until resolveObjs()
        freeObjectCode(oc);
-       return 0; // error
+       return 0;
    }
 
-   insertOCSectionIndices(oc); // also adds the object to `objects` list
+   insertOCSectionIndices(oc);
 
-   return 1; // success
+   oc->next_loaded_object = loaded_objects;
+   loaded_objects = oc;
+   return 1;
 }
 
 HsInt loadObj (pathchar *path)
@@ -1766,7 +1766,8 @@ static HsInt unloadObj_ (pathchar *path, bool just_purge)
     IF_DEBUG(linker, debugBelch("unloadObj: %" PATH_FMT "\n", path));
 
     bool unloadedAnyObj = false;
-    for (ObjectCode *oc = objects; oc; oc = oc->next) {
+    ObjectCode *prev = NULL;
+    for (ObjectCode *oc = loaded_objects; oc; oc = oc->next_loaded_object) {
         if (pathcmp(oc->fileName,path) == 0) {
             oc->status = OBJECT_UNLOADED;
 
@@ -1778,9 +1779,16 @@ static HsInt unloadObj_ (pathchar *path, bool just_purge)
             unloadedAnyObj = true;
 
             if (!just_purge) {
-                oc->unload = true;
                 n_unloaded_objects += 1;
+                // Remove object code from root set
+                if (prev == NULL) {
+                    loaded_objects = oc->next_loaded_object;
+                } else {
+                    prev->next_loaded_object = oc->next_loaded_object;
+                }
             }
+        } else {
+            prev = oc;
         }
     }
 

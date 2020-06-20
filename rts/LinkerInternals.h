@@ -215,9 +215,6 @@ typedef struct _ObjectCode {
     //
     // Garbage collection fields
     //
-    // See Note [Object unloading] in CheckUnload.c for details of how these
-    // fields are used.
-    //
 
     // Next object in `objects` list
     struct _ObjectCode *next;
@@ -225,17 +222,8 @@ typedef struct _ObjectCode {
     // Previous object in `objects` list
     struct _ObjectCode *prev;
 
-    // Do we want to unload this object file? Set with `unloadObj`. We don't
-    // unload an object code even if it's unreachable from the heap if this is
-    // not set. See Note [Object unloading] in CheckUnload.c for details.
-    //
-    // NOTE (osa): I may be possible to use the `status` field instead of this
-    // field and only unload an object when `status` is `OBJECT_UNLOADED`, but I
-    // think that may break user programs as `purgeObj` sets it
-    // `OBJECT_UNLOADED` but doesn't actually unload the object. I don't
-    // understand what the use case here is... so for now to avoid breakage I'm
-    // introducing a new field.
-    bool unload;
+    // Next object in `loaded_objects` list
+    struct _ObjectCode *next_loaded_object;
 
     // Mark bit
     uint8_t mark;
