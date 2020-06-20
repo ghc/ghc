@@ -1767,6 +1767,8 @@ static HsInt unloadObj_ (pathchar *path, bool just_purge)
 
     bool unloadedAnyObj = false;
     ObjectCode *prev = NULL;
+    // NOTE (osa): There may be more than one object with the same file name
+    // (happens when loading archive files) so we don't stop after unloading one
     for (ObjectCode *oc = loaded_objects; oc; oc = oc->next_loaded_object) {
         if (pathcmp(oc->fileName,path) == 0) {
             oc->status = OBJECT_UNLOADED;
