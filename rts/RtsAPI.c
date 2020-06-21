@@ -651,6 +651,8 @@ static bool rts_paused = false;
 // Halt execution of all Haskell threads.
 // It is different to rts_lock because it pauses all capabilities. rts_lock
 // only pauses a single capability.
+// rts_pause() and rts_unpause() have to be executed from the same OS thread
+// (i.e. myTask() must stay the same).
 RtsPaused rts_pause (void)
 {
     struct RtsPaused_ paused;
@@ -661,6 +663,8 @@ RtsPaused rts_pause (void)
 }
 
 // Counterpart of rts_pause: Continue from a pause.
+// rts_pause() and rts_unpause() have to be executed from the same OS thread
+// (i.e. myTask() must stay the same).
 void rts_unpause (RtsPaused paused)
 {
     rts_paused = false;
