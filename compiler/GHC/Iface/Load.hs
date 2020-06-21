@@ -591,16 +591,14 @@ dontLeakTheHPT thing_inside = do
       { hsc_targets      = panic "cleanTopEnv: hsc_targets"
       , hsc_mod_graph    = panic "cleanTopEnv: hsc_mod_graph"
       , hsc_IC           = panic "cleanTopEnv: hsc_IC"
-      -- wrinkle: when we're typechecking in --backpack mode, the
-      -- instantiation of a signature might reside in the HPT, so
-      -- this case breaks the assumption that EPS interfaces only
-      -- refer to other EPS interfaces. We can detect when we're in
-      -- typechecking-only mode by using backend==NoBackend, and
-      -- in that case we don't empty the HPT.  (admittedly this is
-      -- a bit of a hack, better suggestions welcome). A number of
-      -- tests in testsuite/tests/backpack break without this
-      -- tweak.
-      , hsc_internalUnitEnv = (\f -> Map.adjust f hsc_currentPackage hsc_internalUnitEnv) $
+      -- wrinkle: when we're typechecking in --backpack mode, the instantiation
+      -- of a signature might reside in the HPT, so this case breaks the
+      -- assumption that EPS interfaces only refer to other EPS interfaces. We
+      -- can detect when we're in typechecking-only mode by using
+      -- hscTarget==HscNothing, and in that case we don't empty the HPT.
+      -- (admittedly this is a bit of a hack, better suggestions welcome). A
+      -- number of tests in testsuite/tests/backpack break without this tweak.
+      , hsc_internalUnitEnv = (\f -> Map.adjust f hsc_currentUnit hsc_internalUnitEnv) $
         \(InternalUnitEnv dflags hpt) -> InternalUnitEnv dflags $
           if backend dflags == NoBackend
           then hpt

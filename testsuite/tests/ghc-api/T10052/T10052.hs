@@ -10,7 +10,7 @@ main :: IO ()
 main = do
     flags <- getArgs
     runGhc' flags $ do
-      unitId <- hsc_currentPackage <$> getSession
+      unitId <- hsc_currentUnit <$> getSession
       setTargets [Target (TargetFile "T10052-input.hs" Nothing) unitId True Nothing]
       _success <- load LoadAllTargets
       return ()
