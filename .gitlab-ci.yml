@@ -703,8 +703,8 @@ build-x86_64-linux-alpine-hadrian:
     # T10458 due to fact that dynamic linker tries to reload libAS
     BROKEN_TESTS: "encoding004 T10458"
   after_script:
-    # confirm the compiler is statically linked
-    - ! ldd _build/stage1/bin/ghc
+    # confirm *all* the binaries are statically built
+    - for binary in _build/stage1/bin/* ; do ! ldd ${binary} ; done
   cache:
     key: linux-x86_64-alpine
   artifacts:
