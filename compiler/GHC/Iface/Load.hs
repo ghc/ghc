@@ -597,7 +597,7 @@ dontLeakTheHPT thing_inside = do
       -- hscTarget==HscNothing, and in that case we don't empty the HPT.
       -- (admittedly this is a bit of a hack, better suggestions welcome). A
       -- number of tests in testsuite/tests/backpack break without this tweak.
-      , hsc_internalUnitEnv = (\f -> Map.adjust f hsc_currentPackage hsc_internalUnitEnv) $
+      , hsc_internalUnitEnv = (\f -> Map.adjust f hsc_currentUnit hsc_internalUnitEnv) $
         \(InternalUnitEnv dflags hpt) -> InternalUnitEnv dflags $
           if hscTarget dflags == HscNothing
           then hpt
