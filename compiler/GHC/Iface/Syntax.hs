@@ -1712,8 +1712,9 @@ freeNamesIfIdInfo :: IfaceIdInfo -> NameSet
 freeNamesIfIdInfo = fnList freeNamesItem
 
 freeNamesItem :: IfaceInfoItem -> NameSet
-freeNamesItem (HsUnfold _ u) = freeNamesIfUnfold u
-freeNamesItem _              = emptyNameSet
+freeNamesItem (HsUnfold _ u)         = freeNamesIfUnfold u
+freeNamesItem (HsLFInfo (IfLFCon n)) = unitNameSet n
+freeNamesItem _                      = emptyNameSet
 
 freeNamesIfUnfold :: IfaceUnfolding -> NameSet
 freeNamesIfUnfold (IfCoreUnfold _ e)     = freeNamesIfExpr e
