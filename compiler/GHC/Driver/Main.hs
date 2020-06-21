@@ -203,7 +203,7 @@ newHscEnv dflags = do
           { internalUnitEnv_dflags = dflags
           , internalUnitEnv_homePackageTable = emptyHomePackageTable
           }
-      , hsc_currentPackage  = homeUnitId dflags
+      , hsc_currentUnit  = homeUnitId dflags
       , hsc_targets         = []
       , hsc_mod_graph       = emptyMG
       , hsc_IC              = emptyInteractiveContext dflags
