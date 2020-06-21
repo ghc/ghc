@@ -3,4 +3,4 @@ test('pause_and_unpause',
       ignore_stdout,
       ignore_stderr
      ],
-     multi_compile_and_run, ['pause_and_unpause', [('pause_and_unpause_thread.c','-optc=-g3 -optc=-O0 -opta=-g')], '-threaded -debug -O0 -g'])
+     multi_compile_and_run, ['pause_and_unpause', [('pause_and_unpause_thread.c','')], '-threaded'])
