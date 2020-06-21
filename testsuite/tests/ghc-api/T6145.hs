@@ -22,7 +22,7 @@ main = do
                         dflags <- getSessionDynFlags
                         setSessionDynFlags dflags
                         let mn =mkModuleName "Test"
-                        unitId <- hsc_currentPackage <$> getSession
+                        unitId <- hsc_currentUnit <$> getSession
                         addTarget Target { targetId = TargetModule mn, targetPackage = unitId, targetAllowObjCode = True, targetContents = Nothing }
                         load LoadAllTargets
                         modSum <- getModSummary mn

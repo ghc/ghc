@@ -34,7 +34,7 @@ testOneFile libdir fileName = do
                         addTarget Target { targetId = TargetFile fileName Nothing
                                          , targetAllowObjCode = True
                                          , targetContents = Nothing
-                                         , targetPackage = hsc_currentPackage hsc_env
+                                         , targetPackage = hsc_currentUnit hsc_env
                                          }
                         _ <- load LoadAllTargets
                         graph <- getModuleGraph
