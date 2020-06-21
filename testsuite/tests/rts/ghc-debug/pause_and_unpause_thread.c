@@ -27,14 +27,14 @@ void pauseAndUnpause(void){
     pthread_detach(threadId);
 }
 
-time_t getPauseBegin() {
+time_t getPauseBegin(void) {
     return timestamps.begin;
 }
 
-time_t getPauseEnd() {
+time_t getPauseEnd(void) {
     return timestamps.end;
 }
 
-time_t getUnixTime(){
+time_t getUnixTime(void){
     return time(NULL);
 }
