@@ -6,6 +6,6 @@ struct PauseTimestamps{
 };
 
 void pauseAndUnpause(void);
-time_t getPauseBegin();
-time_t getPauseEnd();
-time_t getUnixTime();
+time_t getPauseBegin(void);
+time_t getPauseEnd(void);
+time_t getUnixTime(void);
