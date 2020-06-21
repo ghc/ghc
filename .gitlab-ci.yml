@@ -706,7 +706,8 @@ build-x86_64-linux-alpine-hadrian:
     # confirm *all* the binaries are statically built
     # ldd always fails => every file succeeds => build step succeeds
     # ldd succeeds => that file fails => build step fails
-    - for binary in _build/stage1/bin/* ; do ( ! ldd ${binary} ) || exit 1; done
+    - for binary in _build/stage1/bin/* ; do ldd ${binary} && touch NOT_STATIC; done
+    - ! test -a NOT_STATIC
   cache:
     key: linux-x86_64-alpine
   artifacts:
