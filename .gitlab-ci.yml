@@ -704,7 +704,9 @@ build-x86_64-linux-alpine-hadrian:
     BROKEN_TESTS: "encoding004 T10458"
   after_script:
     # confirm *all* the binaries are statically built
-    - for binary in _build/stage1/bin/* ; do ! ldd ${binary} ; done
+    # ldd always fails => every file succeeds => build step succeeds
+    # ldd succeeds => that file fails => build step fails
+    - for binary in _build/stage1/bin/* ; do ( ! ldd ${binary} ) || exit 1; done
   cache:
     key: linux-x86_64-alpine
   artifacts:
