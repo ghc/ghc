@@ -300,16 +300,16 @@ instance HasDynFlags Hsc where
     getDynFlags = Hsc $ \e w -> return (hsc_dflags e, w)
 
 assertHscEnv :: HasCallStack => HscEnv -> HscEnv
-assertHscEnv e = assertUnitKnown (hsc_currentPackage e) e
+assertHscEnv e = assertUnitKnown (hsc_currentUnit e) e
 
 assertUnitKnown :: HasCallStack => UnitId -> HscEnv -> HscEnv
 assertUnitKnown pkg e =
   ASSERT2(Map.member pkg (hsc_internalUnitEnv e), errMsg) e
   where
-    errMsg = text "assertUnitKnown" <+> ppr (hsc_currentPackage e) $$ nest 2 (ppr (pprInternalUnitMap e))
+    errMsg = text "assertUnitKnown" <+> ppr (hsc_currentUnit e) $$ nest 2 (ppr (pprInternalUnitMap e))
 
 pprInternalUnitMap :: HasCallStack => HscEnv -> SDoc
-pprInternalUnitMap env = text "pprInternalUnitMap:" <+> text "(package: " <>  ppr (hsc_currentPackage env) <> text ")"
+pprInternalUnitMap env = text "pprInternalUnitMap:" <+> text "(package: " <>  ppr (hsc_currentUnit env) <> text ")"
   $$ nest 2 (vcat (map (\(k, v) -> pprInternalUnitEnv k v) $ Map.assocs $ hsc_internalUnitEnv env))
 
 pprInternalUnitEnv :: HasCallStack => UnitId -> InternalUnitEnv -> SDoc
@@ -317,10 +317,10 @@ pprInternalUnitEnv uid InternalUnitEnv {..} = ppr uid <+> text "->" <+> pprHPT i
 
 hsc_currentInternalUnitEnv :: HasCallStack => HscEnv -> InternalUnitEnv
 hsc_currentInternalUnitEnv e =
-  case hsc_findInternalUnitEnv_maybe (assertHscEnv e) (hsc_currentPackage e) of
+  case hsc_findInternalUnitEnv_maybe (assertHscEnv e) (hsc_currentUnit e) of
     Just unitEnv -> unitEnv
     Nothing -> pprPanic "packageNotFound" $
-      ppr $ hsc_currentPackage e
+      ppr $ hsc_currentUnit e
 
 hsc_findInternalUnitEnv_maybe :: HasCallStack => HscEnv -> UnitId -> Maybe InternalUnitEnv
 hsc_findInternalUnitEnv_maybe e uid = Map.lookup uid (hsc_internalUnitEnv e)
@@ -334,7 +334,7 @@ hsc_memberInternalUnitEnv e uid = Map.member uid (hsc_internalUnitEnv e)
 singleton_hsc_unitEnv :: HasCallStack => HscEnv -> UnitId -> InternalUnitEnv -> HscEnv
 singleton_hsc_unitEnv e unitId unitEnv = assertHscEnv $ e
   { hsc_internalUnitEnv = Map.singleton unitId unitEnv
-  , hsc_currentPackage = unitId
+  , hsc_currentUnit = unitId
   }
 
 set_hsc_internalUnitEnvList :: HasCallStack => HscEnv -> [(UnitId, InternalUnitEnv)] -> HscEnv
@@ -362,7 +362,7 @@ set_hsc_unitDflags :: HasCallStack => HscEnv -> UnitId -> DynFlags -> HscEnv
 set_hsc_unitDflags e uid dflags = modify_hsc_unitDflags e uid $ const dflags
 
 set_hsc_dflags :: HasCallStack => HscEnv -> DynFlags -> HscEnv
-set_hsc_dflags e dflags = set_hsc_unitDflags e (hsc_currentPackage e) dflags
+set_hsc_dflags e dflags = set_hsc_unitDflags e (hsc_currentUnit e) dflags
 
 modify_hsc_unitDflags :: HasCallStack => HscEnv -> UnitId -> (DynFlags -> DynFlags) -> HscEnv
 modify_hsc_unitDflags e uid f = (assertUnitKnown uid e)
@@ -372,7 +372,7 @@ modify_hsc_unitDflags e uid f = (assertUnitKnown uid e)
     update unitEnv = unitEnv { internalUnitEnv_dflags = f $ internalUnitEnv_dflags unitEnv }
 
 modify_hsc_dflags :: HasCallStack => HscEnv -> (DynFlags -> DynFlags) -> HscEnv
-modify_hsc_dflags e f = modify_hsc_unitDflags e (hsc_currentPackage e) f
+modify_hsc_dflags e f = modify_hsc_unitDflags e (hsc_currentUnit e) f
 
 hsc_HPT :: HasCallStack => HscEnv -> HomePackageTable
 hsc_HPT = internalUnitEnv_homePackageTable . hsc_currentInternalUnitEnv
@@ -403,7 +403,7 @@ modify_hsc_unitHPT e uid f = (assertUnitKnown uid e)
     update unitEnv = unitEnv { internalUnitEnv_homePackageTable = f $ internalUnitEnv_homePackageTable unitEnv }
 
 modify_hsc_HPT :: HasCallStack => HscEnv -> (HomePackageTable -> HomePackageTable) -> HscEnv
-modify_hsc_HPT e f = modify_hsc_unitHPT e (hsc_currentPackage e) f
+modify_hsc_HPT e f = modify_hsc_unitHPT e (hsc_currentUnit e) f
 
 insert_hsc_unitEnv :: HasCallStack => HscEnv -> UnitId -> InternalUnitEnv -> HscEnv
 insert_hsc_unitEnv e unitId unitEnv = assertHscEnv $ e
@@ -580,7 +580,7 @@ data HscEnv
                 -- ^ Information per package / unit, for "internal" (not already
                 -- installed) units.
 
-        hsc_currentPackage :: UnitId,
+        hsc_currentUnit :: UnitId,
 
         hsc_targets :: [Target],
                 -- ^ The targets (or roots) of the current session

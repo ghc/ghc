@@ -179,9 +179,9 @@ depanalPartial excluded_mods allow_dup_roots = do
               text "Chasing modules from: ",
               hcat (punctuate comma (map pprTarget targets))])
 
-    -- Home package modules may have been moved or deleted, and new
-    -- source files may have appeared in the home package that shadow
-    -- external package modules, so we have to discard the existing
+    -- Home unit modules may have been moved or deleted, and new
+    -- source files may have appeared in the home unit that shadow
+    -- external unit modules, so we have to discard the existing
     -- cached finder data.
     liftIO $ flushFinderCaches hsc_env
 
@@ -199,7 +199,7 @@ depanalPartial excluded_mods allow_dup_roots = do
 -- when building a library, so that GHC warns user about modules, not listed
 -- neither in `exposed-modules`, nor in `other-modules`.
 --
--- Here "home module" means a module, that doesn't come from an other package.
+-- Here "home module" means a module, that doesn't come from an other unit.
 --
 -- For example, if GHC is invoked with modules "A" and "B" as targets,
 -- but "A" imports some other module "C", then GHC will issue a warning
@@ -1460,7 +1460,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
         let hsc_env1 = hsc_env { hsc_type_env_var =
                                     Just (ms_mod mod, type_env_var) }
         -- TODO @fendor: is this save? We modify the current package and never reset it.
-        hsc_env1 <- pure $ hsc_env1 { hsc_currentPackage = homeUnitId $ ms_hspp_opts mod }
+        hsc_env1 <- pure $ hsc_env1 { hsc_currentUnit = ms_unit mod }
         setSession hsc_env1
 
         -- Lazily reload the HPT modules participating in the loop.
@@ -2136,19 +2136,19 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
         old_summary_map = mkNodeMap old_summaries
 
         getRootSummary :: Target -> IO (Either ErrorMessages ModSummary)
-        getRootSummary (Target (TargetFile file mb_phase) package obj_allowed maybe_buf)
+        getRootSummary (Target (TargetFile file mb_phase) unit obj_allowed maybe_buf)
            = do exists <- liftIO $ doesFileExist file
                 if exists || isJust maybe_buf
-                    then summariseFile hsc_env old_summaries file package mb_phase
+                    then summariseFile hsc_env old_summaries file unit mb_phase
                                        obj_allowed maybe_buf
-                    else return $ Left $ unitBag $ mkPlainErrMsg (hsc_unitDflags hsc_env package) noSrcSpan $
+                    else return $ Left $ unitBag $ mkPlainErrMsg (hsc_unitDflags hsc_env unit) noSrcSpan $
                            text "can't find file:" <+> text file
-        getRootSummary (Target (TargetModule modl) package obj_allowed maybe_buf)
+        getRootSummary (Target (TargetModule modl) unit obj_allowed maybe_buf)
            = do maybe_summary <- summariseModule hsc_env old_summary_map NotBoot
-                                           (L rootLoc modl) package obj_allowed
+                                           (L rootLoc modl) unit obj_allowed
                                            maybe_buf excl_mods
                 case maybe_summary of
-                   Nothing -> return $ Left $ moduleNotFoundErr (hsc_unitDflags hsc_env package) modl
+                   Nothing -> return $ Left $ moduleNotFoundErr (hsc_unitDflags hsc_env unit) modl
                    Just s  -> return s
 
         rootLoc = mkGeneralSrcSpan (fsLit "<command line>")
@@ -2175,15 +2175,15 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
              -> IO (NodeMap [Either ErrorMessages ModSummary])
                         -- The result is the completed NodeMap
         loop [] done = return done
-        loop ((s, package) : ss) done
+        loop ((s, unit) : ss) done
           | Just summs <- Map.lookup key done
           = if isSingleton summs then
                 loop ss done
             else
-                do { multiRootsErr (hsc_unitDflags hsc_env package) (rights summs); return Map.empty }
+                do { multiRootsErr (hsc_unitDflags hsc_env unit) (rights summs); return Map.empty }
           | otherwise
           = do mb_s <- summariseModule hsc_env old_summary_map
-                                       is_boot wanted_mod package True
+                                       is_boot wanted_mod unit True
                                        Nothing excl_mods
                case mb_s of
                    Nothing -> loop ss done
@@ -2365,14 +2365,14 @@ summariseFile
         -> Maybe (StringBuffer,UTCTime)
         -> IO (Either ErrorMessages ModSummary)
 
-summariseFile hsc_env old_summaries src_fn package mb_phase obj_allowed maybe_buf
+summariseFile hsc_env old_summaries src_fn unit mb_phase obj_allowed maybe_buf
         -- we can use a cached summary if one is available and the
         -- source file hasn't changed,  But we have to look up the summary
         -- by source file, rather than module name as we do in summarise.
    | Just old_summary <- findSummaryBySourceFile old_summaries src_fn
    = do
         let location = ms_location old_summary
-            dflags = hsc_unitDflags hsc_env package
+            dflags = hsc_unitDflags hsc_env unit
 
         src_timestamp <- get_src_timestamp
                 -- The file exists; we checked in getRootSummary above.
@@ -2383,7 +2383,7 @@ summariseFile hsc_env old_summaries src_fn package mb_phase obj_allowed maybe_bu
                 -- return the cached summary if the source didn't change
         checkSummaryTimestamp
             hsc_env dflags obj_allowed NotBoot (new_summary src_fn)
-            old_summary location package src_timestamp
+            old_summary location unit src_timestamp
 
    | otherwise
    = do src_timestamp <- get_src_timestamp
@@ -2397,7 +2397,7 @@ summariseFile hsc_env old_summaries src_fn package mb_phase obj_allowed maybe_bu
     new_summary src_fn src_timestamp = runExceptT $ do
         -- Temporary modification, so consumers can call 'hsc_dflags' and 'hsc_HPT'
         -- directly, without explicitly passing the UnitId around.
-        hsc_env <- pure hsc_env { hsc_currentPackage = package }
+        hsc_env <- pure hsc_env { hsc_currentUnit = unit }
         preimps@PreprocessedImports {..}
             <- getPreprocessedImports hsc_env src_fn mb_phase maybe_buf
 
@@ -2407,7 +2407,7 @@ summariseFile hsc_env old_summaries src_fn package mb_phase obj_allowed maybe_bu
 
         -- Tell the Finder cache where it is, so that subsequent calls
         -- to findModule will find it, even if it's not on any search path
-        mod <- liftIO $ addHomeModuleToFinder hsc_env pi_mod_name location package
+        mod <- liftIO $ addHomeModuleToFinder hsc_env pi_mod_name location unit
 
         liftIO $ makeNewModSummary hsc_env $ MakeNewModSummary
             { nms_src_fn = src_fn
@@ -2437,7 +2437,7 @@ checkSummaryTimestamp
     -> IO (Either e ModSummary)
 checkSummaryTimestamp
   hsc_env dflags obj_allowed is_boot new_summary
-  old_summary location package src_timestamp
+  old_summary location unit src_timestamp
   | ms_hs_date old_summary == src_timestamp &&
       not (gopt Opt_ForceRecomp (hsc_dflags hsc_env)) = do
            -- update the object-file timestamp
@@ -2453,7 +2453,7 @@ checkSummaryTimestamp
            -- needed when we're called from sumariseModule but it shouldn't
            -- hurt.
            _ <- addHomeModuleToFinder hsc_env
-                  (moduleName (ms_mod old_summary)) location package
+                  (moduleName (ms_mod old_summary)) location unit
 
            hi_timestamp <- maybeGetIfaceDate dflags location
            hie_timestamp <- modificationTimeIfExists (ml_hie_file location)
@@ -2481,7 +2481,7 @@ summariseModule
           -> IO (Maybe (Either ErrorMessages ModSummary))      -- Its new summary
 
 summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
-                package obj_allowed maybe_buf excl_mods
+                unit obj_allowed maybe_buf excl_mods
   | wanted_mod `elem` excl_mods
   = return Nothing
 
@@ -2509,20 +2509,20 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
 
   | otherwise  = find_it
   where
-    dflags = hsc_unitDflags hsc_env package
+    dflags = hsc_unitDflags hsc_env unit
 
     check_timestamp old_summary location src_fn =
         checkSummaryTimestamp
           hsc_env dflags obj_allowed is_boot
           (new_summary location (ms_mod old_summary) src_fn)
-          old_summary location package
+          old_summary location unit
 
     find_it = do
         found <- findImportedModule hsc_env wanted_mod Nothing
         case found of
              Found location mod
                 | isJust (ml_hs_file location) ->
-                        -- Home package
+                        -- Home unit
                          Just <$> just_found location mod
 
              _ -> return Nothing
@@ -2549,7 +2549,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
       = runExceptT $ do
         -- Temporary modification, so consumers can call 'hsc_dflags' and 'hsc_HPT'
         -- directly, without explicitly passing the UnitId around.
-        hsc_env <- pure hsc_env { hsc_currentPackage = package }
+        hsc_env <- pure hsc_env { hsc_currentUnit = unit }
         preimps@PreprocessedImports {..}
             <- getPreprocessedImports hsc_env src_fn Nothing maybe_buf
 

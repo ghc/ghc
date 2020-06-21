@@ -1110,7 +1110,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
 
   -- Tell the finder cache about this module
         mod <- liftIO $ addHomeModuleToFinder hsc_env' mod_name location
-                        $ hsc_currentPackage hsc_env'
+                        $ hsc_currentUnit hsc_env'
 
   -- Make the ModSummary to hand to hscMain
         let
