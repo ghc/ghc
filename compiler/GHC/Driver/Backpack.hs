@@ -680,7 +680,7 @@ summariseRequirement pn mod_name = do
     hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
     let loc = srcLocSpan (mkSrcLoc (mkFastString (bkp_filename env)) 1 1)
 
-    mod <- liftIO $ addHomeModuleToFinder hsc_env mod_name location --  $ hsc_currentPackage hsc_env
+    mod <- liftIO $ addHomeModuleToFinder hsc_env mod_name location $ hsc_currentPackage hsc_env
 
     extra_sig_imports <- liftIO $ findExtraSigImports hsc_env HsigFile mod_name
 
@@ -795,7 +795,7 @@ hsModuleToModSummary pn hsc_src modname
     required_by_imports <- liftIO $ implicitRequirements hsc_env normal_imports
 
     -- So that Finder can find it, even though it doesn't exist...
-    this_mod <- liftIO $ addHomeModuleToFinder hsc_env modname location --  $ hsc_currentPackage hsc_env
+    this_mod <- liftIO $ addHomeModuleToFinder hsc_env modname location $ hsc_currentPackage hsc_env
     return ModSummary {
             ms_mod = this_mod,
             ms_hsc_src = hsc_src,
