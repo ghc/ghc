@@ -471,7 +471,7 @@ hsc_typecheck :: Bool -- ^ Keep renamed source?
 hsc_typecheck keep_rn mod_summary mb_rdr_module = do
     hsc_env <- getHscEnv
     let hsc_src = ms_hsc_src mod_summary
-        dflags = hsc_dflags hsc_env
+        dflags = hsc_unitDflags hsc_env (ms_unit mod_summary)
         outer_mod = ms_mod mod_summary
         mod_name = moduleName outer_mod
         outer_mod' = mkHomeModule dflags mod_name
@@ -725,6 +725,7 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
   = do
     unitEnvs <- forM (hsc_internalUnitEnv hsc_env') $ \ue -> do
       dflags <- initializePlugins hsc_env' $ internalUnitEnv_dflags ue
+      dflags <- initUnits dflags
       return $ ue { internalUnitEnv_dflags = dflags }
     let hsc_env'' = hsc_env' { hsc_internalUnitEnv = unitEnvs }
 
