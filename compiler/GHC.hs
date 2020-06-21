@@ -643,7 +643,7 @@ setSessionDynFlags dflags = do
   -- current package to the new home unit id.
   -- This is absolutely necessary to maintain backwards compatibility.
   modifySession $ \h ->
-    if hsc_currentPackage h == homeUnitId dflags'''
+    if hsc_currentUnit h == homeUnitId dflags'''
         then set_hsc_dflags h dflags'''
         else singleton_hsc_unitEnv h (homeUnitId dflags''')
                 InternalUnitEnv
@@ -804,7 +804,7 @@ removeTarget target_id
 guessTarget :: GhcMonad m => String -> Maybe Phase -> m Target
 guessTarget str (Just phase) = do
    hsc_env <- getSession
-   return (Target (TargetFile str (Just phase)) (hsc_currentPackage hsc_env) True Nothing)
+   return (Target (TargetFile str (Just phase)) (hsc_currentUnit hsc_env) True Nothing)
 guessTarget str Nothing
    | isHaskellSrcFilename file
    = target $ TargetFile file Nothing
@@ -835,7 +835,7 @@ guessTarget str Nothing
 
          target tid = do
              hsc_env <- getSession
-             return $ Target tid (hsc_currentPackage hsc_env) obj_allowed Nothing
+             return $ Target tid (hsc_currentUnit hsc_env) obj_allowed Nothing
 
 
 -- | Inform GHC that the working directory has changed.  GHC will flush
