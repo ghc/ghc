@@ -381,6 +381,20 @@ function build_hadrian() {
 }
 
 function test_hadrian() {
+  if [[ "${FLAVOUR}" = *static* ]]
+  then
+    for binary in _build/stage1/bin/*
+    do
+      if ldd "${binary}" &> /dev/null
+      then
+        echo "${binary} is not static!"
+        ldd "${binary}"
+        exit 1
+      fi
+    done
+    exit 0 #!!!
+  fi
+
   cd _build/bindist/ghc-*/
   run ./configure --prefix="$TOP"/_build/install
   run "$MAKE" install

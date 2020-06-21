@@ -185,8 +185,7 @@ lint-release-changelogs:
     - .gitlab/ci.sh setup
     - .gitlab/ci.sh configure
     - .gitlab/ci.sh build_hadrian
-      #!!!
-      #- .gitlab/ci.sh test_hadrian
+    - .gitlab/ci.sh test_hadrian
   cache:
     key: hadrian
     paths:
@@ -702,12 +701,6 @@ build-x86_64-linux-alpine-hadrian:
     # encoding004 due to lack of locale support
     # T10458 due to fact that dynamic linker tries to reload libAS
     BROKEN_TESTS: "encoding004 T10458"
-  after_script:
-    # confirm *all* the binaries are statically built
-    # ldd always fails => every file succeeds => build step succeeds
-    # ldd succeeds => that file fails => build step fails
-    - for binary in _build/stage1/bin/* ; do ldd ${binary} && touch NOT_STATIC; done
-    - ! test -a NOT_STATIC
   cache:
     key: linux-x86_64-alpine
   artifacts:
