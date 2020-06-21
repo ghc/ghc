@@ -492,14 +492,24 @@ typedef struct RtsPaused_ {
     Capability *capabilities;
 } RtsPaused;
 
+// Halt execution of all Haskell threads.
+// It is different to rts_lock because it pauses all capabilities. rts_lock
+// only pauses a single capability.
+// rts_pause() and rts_unpause() have to be executed from the same OS thread
+// (i.e. myTask() must stay the same).
 RtsPaused rts_pause (void);
+
+// Counterpart of rts_pause: Continue from a pause.
+// rts_pause() and rts_unpause() have to be executed from the same OS thread
+// (i.e. myTask() must stay the same).
 void rts_unpause (RtsPaused paused);
 
-// List all live threads. Must be done while RTS is paused.
+// List all live threads. Must be done while RTS is paused (see rts_pause()).
 typedef void (*ListThreadsCb)(void *user, StgTSO *);
 void rts_listThreads(ListThreadsCb cb, void *user);
 
-// List all non-thread GC roots. Must be done while RTS is paused.
+// List all non-thread GC roots. Must be done while RTS is paused (see
+// rts_pause()).
 typedef void (*ListRootsCb)(void *user, StgClosure *);
 void rts_listMiscRoots(ListRootsCb cb, void *user);
 
