@@ -8,7 +8,6 @@
            , StandaloneDeriving
            , RankNTypes
   #-}
-{-# OPTIONS_GHC -Wno-missing-signatures #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
