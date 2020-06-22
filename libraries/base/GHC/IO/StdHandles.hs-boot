@@ -4,7 +4,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  GHC.IO.SmartHandles [boot]
+-- Module      :  GHC.IO.StdHandles [boot]
 -- Copyright   :  (c) The University of Glasgow, 2017
 -- License     :  see libraries/base/LICENSE
 --
@@ -14,7 +14,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.IO.SmartHandles where
+module GHC.IO.StdHandles where
 
 import GHC.IO.Handle.Types
 
