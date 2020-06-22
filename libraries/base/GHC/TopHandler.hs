@@ -41,7 +41,7 @@ import GHC.Conc hiding (throwTo)
 import GHC.Real
 import GHC.IO
 import GHC.IO.Handle
-import GHC.IO.SmartHandles
+import GHC.IO.StdHandles
 import GHC.IO.Exception
 import GHC.Weak
 
