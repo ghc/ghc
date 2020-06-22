@@ -818,6 +818,7 @@ openFile' filepath iomode non_blocking tmp_opts =
 
       case _type of
         -- Regular files need to be locked.
+        -- See also Note [RTS File locking]
         RegularFile -> do
           optimizeFileAccess h -- Set a few optimization flags on file handles.
           (unique_dev, unique_ino) <- getUniqueFileInfo hwnd
