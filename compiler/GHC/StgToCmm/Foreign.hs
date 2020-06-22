@@ -46,6 +46,7 @@ import GHC.Data.Maybe
 import GHC.Utils.Outputable
 import GHC.Types.Unique.Supply
 import GHC.Types.Basic
+import GHC.Unit.Types
 
 import GHC.Core.TyCo.Rep
 import GHC.Builtin.Types.Prim
@@ -90,7 +91,7 @@ cgForeignCall (CCall (CCallSpec target cconv safety)) typ stg_args res_ty
                      -> let labelSource
                                 = case mPkgId of
                                         Nothing         -> ForeignLabelInThisPackage
-                                        Just pkgId      -> ForeignLabelInPackage pkgId
+                                        Just pkgId      -> ForeignLabelInPackage (toUnitId pkgId)
                             size = call_size cmm_args
                         in  ( unzip cmm_args
                             , CmmLit (CmmLabel
