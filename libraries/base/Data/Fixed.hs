@@ -94,6 +94,64 @@ withResolution :: (HasResolution a) => (Integer -> f a) -> f a
 withResolution foo = withType (foo . resolution)
 
 -- | @since 2.01
+--
+-- Recall that, for numeric types, 'succ' and 'pred' typically add and subtract
+-- @1@, respectively. This is not true in the case of 'Fixed', whose successor
+-- and predecessor functions intuitively return the "next" and "previous" values
+-- in the enumeration. The results of these functions thus depend on the
+-- resolution of the 'Fixed' value. For example, when enumerating values of
+-- resolution @10^-3@ of @type Milli = Fixed E3@,
+--
+-- @
+--   succ (0.000 :: Milli) == 1.001
+-- @
+--
+--
+-- and likewise
+--
+-- @
+--   pred (0.000 :: Milli) == -0.001
+-- @
+--
+--
+-- In other words, 'succ' and 'pred' increment and decrement a fixed-precision
+-- value by the least amount such that the value's resolution is unchanged.
+-- For example, @10^-12@ is the smallest (positive) amount that can be added to
+-- a value of @type Pico = Fixed E12@ without changing its resolution, and so
+--
+-- @
+--   succ (0.000000000000 :: Pico) == 0.000000000001
+-- @
+--
+--
+-- and similarly
+--
+-- @
+--   pred (0.000000000000 :: Pico) == -0.000000000001
+-- @
+--
+--
+-- This is worth bearing in mind when defining 'Fixed' arithmetic sequences. In
+-- particular, you may be forgiven for thinking the sequence
+--
+-- @
+--   [1..10] :: [Pico]
+-- @
+--
+--
+-- evaluates to @[1, 2, 3, 4, 5, 6, 7, 8, 9, 10] :: [Pico]@.
+--
+-- However, this is not true. On the contrary, similarly to the above
+-- implementations of 'succ' and 'pred', @enumFromTo :: Pico -> Pico -> [Pico]@
+-- has a "step size" of @10^-12@. Hence, the list @[1..10] :: [Pico]@ has
+-- the form
+--
+-- @
+--   [1.000000000000, 1.00000000001, 1.00000000002, ..., 10.000000000000]
+-- @
+--
+--
+-- and contains @9 * 10^12 + 1@ values.
 instance Enum (Fixed a) where
     succ (MkFixed a) = MkFixed (succ a)
     pred (MkFixed a) = MkFixed (pred a)
