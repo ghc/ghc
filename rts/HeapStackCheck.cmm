@@ -86,6 +86,7 @@ import LeaveCriticalSection;
 stg_gc_noregs
 {
     W_ ret;
+    bits64 wds;
 
     DEBUG_ONLY(foreign "C" heapCheckFail());
     if (Hp > HpLim) {
@@ -98,10 +99,10 @@ stg_gc_noregs
             && bdescr_link(CurrentNursery) != NULL) {
             HpAlloc = 0;
             CLOSE_NURSERY();
+            wds = BYTES_TO_WDS(bdescr_free(CurrentNursery) -
+                               bdescr_start(CurrentNursery));
             Capability_total_allocated(MyCapability()) =
-              Capability_total_allocated(MyCapability()) +
-              BYTES_TO_WDS(bdescr_free(CurrentNursery) -
-                           bdescr_start(CurrentNursery));
+               Capability_total_allocated(MyCapability()) + wds;
             CurrentNursery = bdescr_link(CurrentNursery);
             bdescr_free(CurrentNursery) = bdescr_start(CurrentNursery);
             OPEN_NURSERY();
