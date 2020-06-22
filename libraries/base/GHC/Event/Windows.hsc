@@ -528,6 +528,30 @@ associateHandle Manager{..} h =
       -- completion
       FFI.associateHandleWithIOCP mgrIOCP h (fromIntegral $ ptrToWordPtr h)
 
+
+{- Note [Why use non-waiting getOverlappedResult requests.]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  When waiting for a request that is bound to be done soon
+  we spin inside waitForCompletion. There are multiple reasons
+  for this.
+
+  In the non-threaded RTS we can't perform blocking calls to
+  C functions without blocking the whole RTS so immediately
+  a blocking call is not an option there.
+
+  In the threaded RTS we don't use a blocking wait for different
+  reasons. In particular performing a waiting request using
+  getOverlappedResult uses the hEvent object embedded in the
+  OVERLAPPED structure to wait for a signal.
+  However we do not provide such an object as their creation
+  would incur to much overhead. Making a waiting request a
+  less useful operation as it doesn't guarantee that the
+  operation we were waiting one finished. Only that some
+  operation on the handle did.
+
+-}
+
 -- | Start an overlapped I/O operation, and wait for its completion.  If
 -- 'withOverlapped' is interrupted by an asynchronous exception, the operation
 -- will be canceled using @CancelIoEx@.
@@ -638,6 +662,9 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
               -- This status indicates that the request hasn't finished early,
               -- but it will finish shortly.  The I/O manager will not be
               -- enqueuing this either.  Also needs to be handled inline.
+              -- Sadly named pipes will always return this error, so in practice
+              -- we end up always handling them synchronously. There is no good
+              -- documentation on this.
               let will_finish_sync = lasterr == #{const ERROR_IO_INCOMPLETE}
 
               debugIO $ "== >*< " ++ show (finished, done_early, will_finish_sync, h, lpol, lasterr)
@@ -756,6 +783,11 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
               -- Wait for the request to finish as it was running before and
               -- The I/O manager won't enqueue it due to our optimizations to
               -- prevent context switches in such cases.
+              -- In the non-threaded case we must use a non-waiting query here
+              -- otherwise the RTS will lock up until we get a result back.
+              -- In the threaded case it can be beneficial to spin on the haskell
+              -- side versus
+              -- See also Note [Why use non-waiting getOverlappedResult requests.]
               res <- FFI.getOverlappedResult fhndl lpol False
               status <- FFI.overlappedIOStatus lpol
               case res of
