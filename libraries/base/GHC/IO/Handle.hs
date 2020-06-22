@@ -56,7 +56,7 @@ import GHC.IO.Encoding
 import GHC.IO.Buffer
 import GHC.IO.BufferedIO ( BufferedIO )
 import GHC.IO.Device as IODevice
-import GHC.IO.SmartHandles
+import GHC.IO.StdHandles
 import GHC.IO.SubSystem
 import GHC.IO.Handle.Lock
 import GHC.IO.Handle.Types
