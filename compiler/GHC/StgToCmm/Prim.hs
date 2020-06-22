@@ -53,6 +53,9 @@ import Data.Maybe
 
 import Control.Monad (liftM, when, unless)
 
+import GHC.Types.CostCentre (dontCareCCS)
+import GHC.StgToCmm.Closure
+
 ------------------------------------------------------------------------
 --      Primitive operations and foreign calls
 ------------------------------------------------------------------------
@@ -223,15 +226,27 @@ emitPrimOp dflags primop = case primop of
         (replicate (fromIntegral n) init)
     _ -> PrimopCmmEmit_External
 
-  SmallArrayOfOp -> \elems -> opAllDone $ \[res] ->
+  op@SmallArrayOfOp -> \elems -> opAllDone $ \[res] -> do
     let n = length elems
-      in doNewArrayOp
-          res
-          (smallArrPtrsRep (fromIntegral n))
-          mkSMAP_FROZEN_DIRTY_infoLabel
-          [ ( mkIntExpr platform n
-            , fixedHdrSize dflags + oFFSET_StgSmallMutArrPtrs_ptrs dflags ) ]
-          elems
+    case allStatic elems of
+      Just known -> do
+        u <- newUnique
+        let lbl = mkUnliftedDataLabel u op
+        emitDataCon lbl (smallArrayStaticInfoTable n) dontCareCCS known
+        emit $ mkAssign (CmmLocal res) (CmmLit $ CmmLabel lbl)
+      Nothing -> doNewArrayOp
+        res
+        (smallArrPtrsRep (fromIntegral n))
+        mkSMAP_FROZEN_DIRTY_infoLabel
+        [ ( mkIntExpr platform n
+          , fixedHdrSize dflags + oFFSET_StgSmallMutArrPtrs_ptrs dflags ) ]
+        elems
+      where
+        -- todo: comment
+        allStatic = foldr step (Just [])
+
+        step (CmmLit l) (Just acc) = Just (l : acc) -- c.f. XXX getLit
+        step _ _ = Nothing
 
   CopySmallArrayOp -> \case
     [src, src_off, dst, dst_off, (CmmLit (CmmInt n _))] ->

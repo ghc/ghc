@@ -46,7 +46,7 @@ module GHC.Cmm.CLabel (
         mkAsmTempEndLabel,
         mkAsmTempProcEndLabel,
         mkAsmTempDieLabel,
-
+        mkUnliftedDataLabel,
         mkDirty_MUT_VAR_Label,
         mkNonmovingWriteBarrierEnabledLabel,
         mkUpdInfoLabel,
@@ -273,7 +273,6 @@ data CLabel
   -- | A label before an info table to prevent excessive dead-stripping on darwin
   | DeadStripPreventer CLabel
 
-
   -- | Per-module table of tick locations
   | HpcTicksLabel Module
 
@@ -285,6 +284,9 @@ data CLabel
   | LargeBitmapLabel
         {-# UNPACK #-} !Unique
 
+  -- | Static data from local definitions allocated in the data section,
+  -- arising from a primop, like 'arrayOf#'
+  | UnliftedDataLabel {-# UNPACK #-} !Unique PrimOp
   deriving Eq
 
 instance Show CLabel where
@@ -292,6 +294,9 @@ instance Show CLabel where
 
 instance Outputable CLabel where
   ppr = text . show
+
+mkUnliftedDataLabel :: Unique -> PrimOp -> CLabel
+mkUnliftedDataLabel = UnliftedDataLabel
 
 isIdLabel :: CLabel -> Bool
 isIdLabel IdLabel{} = True
@@ -369,6 +374,8 @@ instance Ord CLabel where
     nonDetCmpUnique u1 u2
   compare (LargeBitmapLabel u1) (LargeBitmapLabel u2) =
     nonDetCmpUnique u1 u2
+  compare (UnliftedDataLabel u1 _) (UnliftedDataLabel u2 _) =
+    nonDetCmpUnique u1 u2
   compare IdLabel{} _ = LT
   compare _ IdLabel{} = GT
   compare CmmLabel{} _ = LT
@@ -401,6 +408,8 @@ instance Ord CLabel where
   compare _ SRTLabel{} = GT
   compare (IPE_Label {}) _ = LT
   compare  _ (IPE_Label{}) = GT
+  compare UnliftedDataLabel{} _ = LT
+  compare _ UnliftedDataLabel{} = GT
 
 -- | Record where a foreign label is stored.
 data ForeignLabelSource
@@ -731,6 +740,8 @@ isStaticClosureLabel :: CLabel -> Bool
 isStaticClosureLabel (IdLabel _ _ Closure) = True
 -- Closure defined in cmm
 isStaticClosureLabel (CmmLabel _ _ _ CmmClosure) = True
+-- Unlifted data allocated in the data
+isStaticClosureLabel UnliftedDataLabel{} = True
 isStaticClosureLabel _lbl = False
 
 -- | Whether label is a .rodata label
@@ -845,9 +856,10 @@ mkAsmTempDieLabel l = mkAsmTempDerivedLabel l (fsLit "_die")
 
 toClosureLbl :: Platform -> CLabel -> CLabel
 toClosureLbl platform lbl = case lbl of
-   IdLabel n c _        -> IdLabel n c Closure
-   CmmLabel m ext str _ -> CmmLabel m ext str CmmClosure
-   _                    -> pprPanic "toClosureLbl" (pprDebugCLabel platform lbl)
+   IdLabel n c _         -> IdLabel n c Closure
+   CmmLabel m ext str _  -> CmmLabel m ext str CmmClosure
+   l@UnliftedDataLabel{} -> l
+   _                     -> pprPanic "toClosureLbl" (pprDebugCLabel platform lbl)
 
 toSlowEntryLbl :: Platform -> CLabel -> CLabel
 toSlowEntryLbl platform lbl = case lbl of
@@ -914,7 +926,7 @@ hasCAF _                            = False
 -- -----------------------------------------------------------------------------
 -- Does a CLabel need declaring before use or not?
 --
--- See wiki:commentary/compiler/backends/ppr-c#prototypes
+-- See wiki: https://gitlab.haskell.org/ghc/ghc/-/wikis/commentary/compiler/backends/ppr-c#prototypes
 
 needsCDecl :: CLabel -> Bool
   -- False <=> it's pre-declared; don't bother
@@ -946,10 +958,11 @@ needsCDecl (CC_Label _)                 = True
 needsCDecl (CCS_Label _)                = True
 needsCDecl (IPE_Label {})               = True
 needsCDecl (HpcTicksLabel _)            = True
+needsCDecl UnliftedDataLabel{}          = True
+
 needsCDecl (DynamicLinkerLabel {})      = panic "needsCDecl DynamicLinkerLabel"
 needsCDecl PicBaseLabel                 = panic "needsCDecl PicBaseLabel"
 needsCDecl (DeadStripPreventer {})      = panic "needsCDecl DeadStripPreventer"
-
 -- | If a label is a local block label then return just its 'BlockId', otherwise
 -- 'Nothing'.
 maybeLocalBlockLabel :: CLabel -> Maybe BlockId
@@ -1072,6 +1085,7 @@ externallyVisibleCLabel (DynamicLinkerLabel _ _)  = False
 externallyVisibleCLabel (HpcTicksLabel _)       = True
 externallyVisibleCLabel (LargeBitmapLabel _)    = False
 externallyVisibleCLabel (SRTLabel _)            = False
+externallyVisibleCLabel UnliftedDataLabel{}     = False
 externallyVisibleCLabel (PicBaseLabel {}) = panic "externallyVisibleCLabel PicBaseLabel"
 externallyVisibleCLabel (DeadStripPreventer {}) = panic "externallyVisibleCLabel DeadStripPreventer"
 
@@ -1133,6 +1147,7 @@ labelType PicBaseLabel                          = DataLabel
 labelType (DeadStripPreventer _)                = DataLabel
 labelType (HpcTicksLabel _)                     = DataLabel
 labelType (LargeBitmapLabel _)                  = DataLabel
+labelType UnliftedDataLabel{}                   = GcPtrLabel
 
 idInfoLabelType :: IdLabelInfo -> CLabelType
 idInfoLabelType info =
@@ -1401,6 +1416,9 @@ pprCLabel !platform !sty lbl = -- see Note [Bangs in CLabel]
 
    SRTLabel u
       -> maybe_underscore $ tempLabelPrefixOrUnderscore platform <> pprUniqueAlways u <> pp_cSEP <> text "srt"
+
+   UnliftedDataLabel u op
+      -> maybe_underscore $ tempLabelPrefixOrUnderscore platform <> pprUniqueAlways u <> pp_cSEP <> ppr op
 
    RtsLabel (RtsApFast (NonDetFastString str))
       -> maybe_underscore $ ftext str <> text "_fast"

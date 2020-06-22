@@ -66,6 +66,7 @@ module GHC.StgToCmm.Closure (
         cafBlackHoleInfoTable,
         indStaticInfoTable,
         staticClosureNeedsLink,
+        smallArrayStaticInfoTable,
     ) where
 
 import GHC.Prelude
@@ -944,6 +945,14 @@ indStaticInfoTable :: CmmInfoTable
 indStaticInfoTable
   = CmmInfoTable { cit_lbl  = mkIndStaticInfoLabel
                  , cit_rep  = indStaticRep
+                 , cit_prof = NoProfilingInfo
+                 , cit_srt  = Nothing
+                 , cit_clo  = Nothing }
+
+smallArrayStaticInfoTable :: WordOff -> CmmInfoTable
+smallArrayStaticInfoTable n
+  = CmmInfoTable { cit_lbl  = mkSMAP_FROZEN_DIRTY_infoLabel
+                 , cit_rep  = smallArrPtrsRep (fromIntegral n)
                  , cit_prof = NoProfilingInfo
                  , cit_srt  = Nothing
                  , cit_clo  = Nothing }

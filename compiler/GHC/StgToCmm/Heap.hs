@@ -173,11 +173,14 @@ mkStaticClosureFields
         -> [CmmLit]             -- Payload
         -> [CmmLit]             -- The full closure
 mkStaticClosureFields profile info_tbl ccs caf_refs payload
-  = mkStaticClosure profile info_lbl ccs payload padding
+  = mkStaticClosure profile info_lbl ccs header payload padding
         static_link_field saved_info_field
   where
     platform = profilePlatform profile
     info_lbl = cit_lbl info_tbl
+    header = case cit_rep info_tbl of
+      SmallArrayPtrsRep size -> [mkIntCLit (targetPlatform dflags) size]
+      _ -> []
 
     -- CAFs must have consistent layout, regardless of whether they
     -- are actually updatable or not.  The layout of a CAF is:
@@ -218,11 +221,12 @@ mkStaticClosureFields profile info_tbl ccs caf_refs payload
                                       -- See Note [STATIC_LINK fields]
                                       -- in rts/sm/Storage.h
 
-mkStaticClosure :: Profile -> CLabel -> CostCentreStack -> [CmmLit]
+mkStaticClosure :: Profile -> CLabel -> CostCentreStack -> [CmmLit] -> [CmmLit]
   -> [CmmLit] -> [CmmLit] -> [CmmLit] -> [CmmLit]
-mkStaticClosure profile info_lbl ccs payload padding static_link_field saved_info_field
+mkStaticClosure dflags info_lbl ccs header payload padding static_link_field saved_info_field
   =  [CmmLabel info_lbl]
   ++ staticProfHdr profile ccs
+  ++ header
   ++ payload
   ++ padding
   ++ static_link_field

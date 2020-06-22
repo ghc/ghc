@@ -56,8 +56,8 @@ import GHC.Types.Name.Set
 
 {- Note [SRTs]
 
-SRTs are the mechanism by which the garbage collector can determine
-the live CAFs in the program.
+Static Reference Tables (SRTs) are the mechanism by which the garbage collector
+can determine the live CAFs in the program.
 
 Representation
 ^^^^^^^^^^^^^^
@@ -1130,7 +1130,6 @@ buildSRTChain profile cafSet =
   where
     mAX_SRT_SIZE = 16
 
-
 buildSRT :: Profile -> [SRTEntry] -> UniqSM (CmmDeclSRTs, SRTEntry)
 buildSRT profile refs = do
   id <- getUniqueM
@@ -1140,6 +1139,7 @@ buildSRT profile refs = do
     srt_n_info = mkSRTInfoLabel (length refs)
     fields =
       mkStaticClosure profile srt_n_info dontCareCCS
+        [] -- no header
         [ CmmLabel lbl | SRTEntry lbl <- refs ]
         [] -- no padding
         [mkIntCLit platform 0] -- link field
