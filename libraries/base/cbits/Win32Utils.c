@@ -170,6 +170,7 @@ BOOL file_exists(LPCTSTR path)
 bool __createUUIDTempFileErrNo (wchar_t* pathName, wchar_t* prefix,
                                 wchar_t* suffix, wchar_t** tempFileName)
 {
+  *tempFileName = NULL;
   int retry = 5;
   bool success = false;
   while (retry-- > 0 && !success)
@@ -215,6 +216,9 @@ bool __createUUIDTempFileErrNo (wchar_t* pathName, wchar_t* prefix,
   return success;
 
 fail:
+  if (*tempFileName != NULL) {
+    free (*tempFileName);
+  }
   maperrno();
   return false;
 }
