@@ -264,6 +264,7 @@ mkFD fd iomode mb_stat is_socket is_nonblock = do
         RegularFile -> do
            -- On Windows we need an additional call to get a unique device id
            -- and inode, since fstat just returns 0 for both.
+           -- See also Note [RTS File locking]
            (unique_dev, unique_ino) <- getUniqueFileInfo fd dev ino
            r <- lockFile (fromIntegral fd) unique_dev unique_ino
                          (fromBool write)
