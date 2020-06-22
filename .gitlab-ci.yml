@@ -1171,7 +1171,9 @@ pages:
       EOF
     - cp -f index.html public/doc
   rules:
-    - if: '$CI_COMMIT_BRANCH == "master"'
+    # N.B. only run this on ghc/ghc since the deployed pages are quite large
+    # and we only serve GitLab Pages for ghc/ghc.
+    - if: '$CI_COMMIT_BRANCH == "master" && $CI_PROJECT_NAMESPACE == "ghc"'
   artifacts:
     paths:
       - public
