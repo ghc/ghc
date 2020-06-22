@@ -1179,8 +1179,26 @@ type DFunFlag = Bool  -- indicates if the lambda being considered is in the
 notArgOfDfun :: DFunFlag
 notArgOfDfun = False
 
+{-  Note [dmdAnalEnv performance]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+It's tempting to think that removing the dynflags from AnalEnv would improve
+performance. After all when analysing recursive groups we end up allocating
+a lot of environments. However this is not the case.
+
+We do get some performance by making AnalEnv smaller. However very often we
+defer computation which means we have to capture the dynflags in the thunks
+we allocate. Doing this naively in practice causes more allocation than the
+removal of DynFlags saves us.
+
+In theory it should be possible to make this better if we are stricter in
+the analysis and therefore allocate fewer thunks. But I couldn't get there
+in a few hours and overall the impact on GHC here is small, and there are
+bigger fish to fry. So for new the env will keep a reference to the flags.
+-}
+
 data AnalEnv
-  = AE { ae_dflags :: DynFlags
+  = AE { ae_dflags :: DynFlags -- See Note [dmdAnalEnv performance]
        , ae_sigs   :: SigEnv
        , ae_virgin :: Bool    -- True on first iteration only
                               -- See Note [Initialising strictness]
