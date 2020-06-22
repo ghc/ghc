@@ -406,19 +406,15 @@ removeStrHashTable(StrHashTable *table, const char * key, const void *data)
 void
 freeHashTable(HashTable *table, void (*freeDataFun)(void *) )
 {
-    long segment;
-    long index;
-    HashList *hl;
-    HashList *next;
-    HashListChunk *cl, *cl_next;
-
     /* The last bucket with something in it is table->max + table->split - 1 */
-    segment = (table->max + table->split - 1) / HSEGSIZE;
-    index = (table->max + table->split - 1) % HSEGSIZE;
+    long segment = (table->max + table->split - 1) / HSEGSIZE;
+    long index = (table->max + table->split - 1) % HSEGSIZE;
 
+    /* Free table segments */
     while (segment >= 0) {
         while (index >= 0) {
-            for (hl = table->dir[segment][index]; hl != NULL; hl = next) {
+            HashList *next;
+            for (HashList *hl = table->dir[segment][index]; hl != NULL; hl = next) {
                 next = hl->next;
                 if (freeDataFun != NULL)
                     (*freeDataFun)((void *) hl->data);
@@ -429,11 +425,24 @@ freeHashTable(HashTable *table, void (*freeDataFun)(void *) )
         segment--;
         index = HSEGSIZE - 1;
     }
-    for (cl = table->chunks; cl != NULL; cl = cl_next) {
-        cl_next = cl->next;
-        stgFree(cl->chunk);
-        stgFree(cl);
+
+    /* Free chunks */
+    HashListChunk *cl = table->chunks;
+    while (cl != NULL) {
+        HashListChunk *old = cl;
+        cl = cl->next;
+        stgFree(old->chunk);
+        stgFree(old);
     }
+
+    /* Free free-list */
+    HashList *hl = table->freeList;
+    while (hl != NULL) {
+        HashList *old = hl;
+        hl = hl->next;
+        stgFree(old);
+    }
+
     stgFree(table);
 }
 
