@@ -934,6 +934,11 @@ ifneq "$(INSTALL_HTML_DOC_DIRS)" ""
 	for i in $(INSTALL_HTML_DOC_DIRS); do \
 		$(CP) -Rp $$i "$(DESTDIR)$(docdir)/html"; \
 	done
+	for i in "$(DESTDIR)$(docdir)/html"/*/.doctrees; do \
+		if [ -d "$$i" ]; then \
+			rm -r "$$i"; \
+		fi \
+	done
 endif
 
 INSTALLED_PACKAGE_CONF=$(DESTDIR)$(topdir)/package.conf.d
