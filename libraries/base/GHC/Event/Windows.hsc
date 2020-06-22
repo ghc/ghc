@@ -181,6 +181,9 @@ import {-# SOURCE #-} Debug.Trace (traceEventIO)
 -- Unlike MIO, we don't threat network I/O any differently than file I/O. Hence
 -- any network specific code is now only in the network package.
 --
+-- See also Note [Completion Ports] which has some of the details which
+-- informed this design.
+--
 -- Note [Threaded WINIO design]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- The threaded WiNIO is designed around a simple blocking call that's called in
