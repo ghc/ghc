@@ -598,7 +598,7 @@ dontLeakTheHPT thing_inside = do
       -- (admittedly this is a bit of a hack, better suggestions welcome). A
       -- number of tests in testsuite/tests/backpack break without this tweak.
       , hsc_internalUnitEnv = (\f -> Map.adjust f hsc_currentUnit hsc_internalUnitEnv) $
-        \(InternalUnitEnv dflags hpt) -> InternalUnitEnv dflags $
+        \(InternalUnitEnv dflags hpt) -> InternalUnitEnv dflags $!
           if hscTarget dflags == HscNothing
           then hpt
           else emptyHomePackageTable
