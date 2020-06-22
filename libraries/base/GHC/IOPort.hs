@@ -21,6 +21,9 @@
 -- It gives us the ability to have one thread to block, wait for a result from
 -- another thread and then being woken up. *Nothing* more.
 --
+-- This type is very much GHC internal. It might be changed or removed without
+-- notice in future releases.
+--
 -----------------------------------------------------------------------------
 
 module GHC.IOPort (
@@ -53,16 +56,23 @@ for communication between concurrent threads, where one of the threads is
 controlled by an external state. e.g. by an I/O action that is serviced by the
 runtime.  It can be thought of as a box, which may be empty or full.
 
-It is mostly similar to the behavior of MVar except writeIOPort doesn't block if
-the variable is full and the GC won't forcibly release the lock if it thinks
+It is mostly similar to the behavior of 'Control.Concurrent.MVar.MVar'
+except 'writeIOPort' doesn't block if the variable is full and the GC
+won't forcibly release the lock if it thinks
 there's a deadlock.
 
 The properties of IOPorts are:
 * Writing to an empty IOPort will not block.
-* Writing to an full  IOPort will not block and throw an exception.
-* Reading from an IOPort for the second time will throw an exception.
+* Writing to an full  IOPort will not block. It might throw an exception.
+* Reading from an IOPort for the second time might throw an exception.
 * Reading from a full IOPort will not block, return the value and empty the port.
 * Reading from an empty IOPort will block until a write.
+* Reusing an IOPort (that is, reading or writing twice) is not supported
+  and might throw an exception. Even if reads and writes are
+  interleaved.
+
+This type is very much GHC internal. It might be changed or removed without
+notice in future releases.
 
 -}
 
@@ -89,18 +99,16 @@ newIOPort value =
 -- |Atomically read the the contents of the 'IOPort'.  If the 'IOPort' is
 -- currently empty, 'readIOPort' will wait until it is full.  After a
 -- 'readIOPort', the 'IOPort' is left empty.
--- TODO: Figure out how to make this an exception for better debugging.
 --
 -- There is one important property of 'readIOPort':
 --
---   * Only a single threads can be blocked on an 'IOPort', The second thread
---     attempting to block will be silently ignored.
+--   * Only a single threads can be blocked on an 'IOPort'.
 --
 readIOPort :: IOPort a -> IO a
 readIOPort (IOPort ioport#) = IO $ \ s# -> readIOPort# ioport# s#
 
 -- |Put a value into an 'IOPort'.  If the 'IOPort' is currently full,
--- 'writeIOPort' will return False and not block.
+-- 'writeIOPort' will throw an exception.
 --
 -- There is one important property of 'writeIOPort':
 --
