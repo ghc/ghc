@@ -370,31 +370,6 @@ data Manager = Manager
     , mgrThreadPool   :: Maybe ThreadPool
     }
 
--- | Create a new I/O manager. In the Threaded I/O manager this call doesn't
--- have any side effects, but in the Non-Threaded I/O manager the newly
--- created IOCP handle will be registered with the RTS.  Users should never
--- call this.
---
--- NOTE: This needs to finish without making any calls to anything requiring the
--- I/O manager otherwise we'll get into some weird synchronization issues.
--- Essentially this means avoid using long running operations here.
-newManager :: IO Manager
-newManager = do
-    debugIO "Starting io-manager..."
-    mgrIOCP         <- FFI.newIOCP
-    when (not threadedIOMgr) $
-      registerIOCPHandle mgrIOCP
-    debugIO $ "iocp: " ++ show mgrIOCP
-    mgrClock             <- getClock
-    mgrUniqueSource      <- newSource
-    mgrTimeouts          <- newIORef Q.empty
-    mgrOverlappedEntries <- A.new 64
-    mgrEvntHandlers      <- newMVar =<< IT.new callbackArraySize
-    let mgrThreadPool    = Nothing
-
-    let !mgr = Manager{..}
-    return mgr
-
 {-# INLINE startIOManagerThread #-}
 -- | Starts a new I/O manager thread.
 -- For the threaded runtime it creates a pool of OS threads which stays alive
@@ -443,7 +418,34 @@ getSystemManager = readMVar managerRef
 
 -- | Mutable reference to the IO manager
 managerRef :: MVar Manager
-managerRef = unsafePerformIO $ newManager >>= newMVar
+managerRef = unsafePerformIO $ createManager >>= newMVar
+  where
+    -- | Create the I/O manager. In the Threaded I/O manager this call doesn't
+    -- have any side effects, but in the Non-Threaded I/O manager the newly
+    -- created IOCP handle will be registered with the RTS.  Users should never
+    -- call this.
+    -- It's only used to create the single global manager which is stored
+    -- in an MVar.
+    --
+    -- NOTE: This needs to finish without making any calls to anything requiring the
+    -- I/O manager otherwise we'll get into some weird synchronization issues.
+    -- Essentially this means avoid using long running operations here.
+    createManager :: IO Manager
+    createManager = do
+        debugIO "Starting io-manager..."
+        mgrIOCP         <- FFI.newIOCP
+        when (not threadedIOMgr) $
+          registerIOCPHandle mgrIOCP
+        debugIO $ "iocp: " ++ show mgrIOCP
+        mgrClock             <- getClock
+        mgrUniqueSource      <- newSource
+        mgrTimeouts          <- newIORef Q.empty
+        mgrOverlappedEntries <- A.new 64
+        mgrEvntHandlers      <- newMVar =<< IT.new callbackArraySize
+        let mgrThreadPool    = Nothing
+
+        let !mgr = Manager{..}
+        return mgr
 {-# NOINLINE managerRef #-}
 
 -- | Interrupts an I/O manager Wait.  This will force the I/O manager to process
