@@ -387,7 +387,7 @@ instance Ord CLabel where
 data ForeignLabelSource
 
    -- | Label is in a named package
-   = ForeignLabelInPackage Unit
+   = ForeignLabelInPackage UnitId
 
    -- | Label is in some external, system package that doesn't also
    --   contain compiled Haskell code, and is not associated with any .hi files.
@@ -1087,15 +1087,15 @@ labelDynamic config this_mod lbl =
   case lbl of
    -- is the RTS in a DLL or not?
    RtsLabel _ ->
-     externalDynamicRefs && (this_pkg /= rtsUnit)
+     externalDynamicRefs && (this_unit /= rtsUnitId)
 
    IdLabel n _ _ ->
      externalDynamicRefs && isDynLinkName platform this_mod n
 
    -- When compiling in the "dyn" way, each package is to be linked into
    -- its own shared library.
-   CmmLabel pkg _ _ _
-    | os == OSMinGW32 -> externalDynamicRefs && (toUnitId this_pkg /= pkg)
+   CmmLabel lbl_unit _ _ _
+    | os == OSMinGW32 -> externalDynamicRefs && (this_unit /= lbl_unit)
     | otherwise       -> externalDynamicRefs
 
    LocalBlockLabel _    -> False
@@ -1114,7 +1114,7 @@ labelDynamic config this_mod lbl =
             -- When compiling in the "dyn" way, each package is to be
             -- linked into its own DLL.
             ForeignLabelInPackage pkgId ->
-                externalDynamicRefs && (this_pkg /= pkgId)
+                externalDynamicRefs && (this_unit /= pkgId)
 
        else -- On Mac OS X and on ELF platforms, false positives are OK,
             -- so we claim that all foreign imports come from dynamic
@@ -1136,7 +1136,7 @@ labelDynamic config this_mod lbl =
     externalDynamicRefs = ncgExternalDynamicRefs config
     platform = ncgPlatform config
     os = platformOS platform
-    this_pkg = moduleUnit this_mod
+    this_unit = toUnitId (moduleUnit this_mod)
 
 
 -----------------------------------------------------------------------------
