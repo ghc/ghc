@@ -157,13 +157,13 @@ foreign import WINDOWS_CCONV safe "windows.h GetQueuedCompletionStatusEx"
 -- 4.) When a thread calls this method it is associated with the I/O manager's
 --     worker threads pool.  You should always use dedicated threads for this
 --     since the OS I/O manager will now monitor the threads.  If the thread
---     becomes blocked for whatever reason, the I/O manager will wake up
+--     becomes blocked for whatever reason, the Haskell I/O manager will wake up
 --     another threads from it's pool to service the remaining results.
 --     A new thread will also be woken up from the pool when the previous thread
 --     is busy servicing requests and new requests have finished.  For this
---     reason the I/O manager multiplexes I/O operations from N haskell threads
---     into 1 completion port, which is serviced by M native threads in an
---     asynchronous method.  This allows it to scale efficiently.
+--     reason the Haskell I/O manager multiplexes I/O operations from N haskell
+--     threads into 1 completion port, which is serviced by M native threads in
+--     an asynchronous method. This allows it to scale efficiently.
 getQueuedCompletionStatusEx :: IOCP
                             -> A.Array OVERLAPPED_ENTRY
                             -> DWORD  -- ^ Timeout in milliseconds (or
