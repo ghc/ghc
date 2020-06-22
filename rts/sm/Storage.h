@@ -94,8 +94,8 @@ INLINE_HEADER void newNurseryBlock (bdescr *bd) {
     bd->free = bd->start;
 }
 
-void    updateNurseriesStats (void);
-StgWord calcTotalAllocated   (void);
+void     updateNurseriesStats (void);
+uint64_t calcTotalAllocated   (void);
 
 /* -----------------------------------------------------------------------------
    Stats 'n' DEBUG stuff
