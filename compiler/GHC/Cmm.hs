@@ -103,6 +103,7 @@ data GenCmmDecl d h g
   deriving (Functor)
 
 type CmmDecl     = GenCmmDecl CmmStatics    CmmTopInfo CmmGraph
+
 type CmmDeclSRTs = GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph
 
 type RawCmmDecl
@@ -288,4 +289,3 @@ instance OutputableP env instr => OutputableP env (GenBasicBlock instr) where
 pprBBlock :: Outputable stmt => GenBasicBlock stmt -> SDoc
 pprBBlock (BasicBlock ident stmts) =
     hang (ppr ident <> colon) 4 (vcat (map ppr stmts))
-

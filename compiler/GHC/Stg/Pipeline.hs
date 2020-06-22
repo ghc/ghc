@@ -83,9 +83,6 @@ stg2stg logger dflags ictxt for_bytecode this_mod binds
     do_stg_pass :: [StgTopBinding] -> StgToDo -> StgM [StgTopBinding]
     do_stg_pass binds to_do
       = case to_do of
-          StgDoNothing ->
-            return binds
-
           StgStats ->
             logTraceMsg logger "STG stats" (text (showStgStats binds)) (return binds)
 
@@ -152,10 +149,9 @@ getStgToDo for_bytecode dflags =
     , optional Opt_StgLiftLams StgLiftLams
     , runWhen for_bytecode StgBcPrep
     , optional Opt_StgStats StgStats
-    ] where
-      optional opt = runWhen (gopt opt dflags)
-      mandatory = id
-
-runWhen :: Bool -> StgToDo -> StgToDo
-runWhen True todo = todo
-runWhen _    _    = StgDoNothing
+    ]
+    where
+      optional opt x
+        | gopt opt dflags = Just x
+        | otherwise = Nothing
+      mandatory = Just
