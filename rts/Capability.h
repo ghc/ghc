@@ -114,7 +114,7 @@ struct Capability_ {
 
     // Total words allocated by this cap since rts start
     // See Note [allocation accounting] in Storage.c
-    W_ total_allocated;
+    uint64_t total_allocated;
 
 #if defined(THREADED_RTS)
     // Worker Tasks waiting in the wings.  Singly-linked.

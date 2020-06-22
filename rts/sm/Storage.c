@@ -1455,10 +1455,10 @@ dirty_MVAR(StgRegTable *reg, StgClosure *p, StgClosure *old_val)
 // program.  Also emits events reporting the per-cap allocation
 // totals.
 //
-StgWord
+uint64_t
 calcTotalAllocated (void)
 {
-    W_ tot_alloc = 0;
+    uint64_t tot_alloc = 0;
     W_ n;
 
     for (n = 0; n < n_capabilities; n++) {
