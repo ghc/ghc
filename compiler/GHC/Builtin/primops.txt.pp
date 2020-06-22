@@ -1249,7 +1249,7 @@ primop  NewSmallArrayOp "newSmallArray#" GenPrimOp
 
 primop SmallArrayOfOp "smallArrayOf#" GenPrimOp
    o -> SmallArray# b
-   {Create a new immutable array with two elements.}
+   {smallArrayOf# :: (# a, .., a #) -> Array# a}
    with
    has_side_effects = True
 

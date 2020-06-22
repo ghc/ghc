@@ -47,8 +47,8 @@ import GHC.Types.Name.Set
 
 {- Note [SRTs]
 
-SRTs are the mechanism by which the garbage collector can determine
-the live CAFs in the program.
+Static Reference Tables (SRTs) are the mechanism by which the garbage collector
+can determine the live CAFs in the program.
 
 Representation
 ^^^^^^^^^^^^^^
@@ -481,9 +481,7 @@ addCafLabel l s
   | otherwise
   = s
 
-cafAnalData
-  :: CmmStatics
-  -> CAFSet
+cafAnalData :: CmmStatics -> CAFSet
 
 cafAnalData (CmmStaticsRaw _lbl _data) =
     Set.empty
@@ -1111,7 +1109,6 @@ buildSRTChain dflags cafSet =
   where
     mAX_SRT_SIZE = 16
 
-
 buildSRT :: DynFlags -> [SRTEntry] -> UniqSM (CmmDeclSRTs, SRTEntry)
 buildSRT dflags refs = do
   id <- getUniqueM
@@ -1121,6 +1118,7 @@ buildSRT dflags refs = do
     srt_n_info = mkSRTInfoLabel (length refs)
     fields =
       mkStaticClosure dflags srt_n_info dontCareCCS
+        [] -- no header
         [ CmmLabel lbl | SRTEntry lbl <- refs ]
         [] -- no padding
         [mkIntCLit platform 0] -- link field

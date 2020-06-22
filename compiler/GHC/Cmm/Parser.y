@@ -423,7 +423,7 @@ static  :: { CmmParse [CmmStatic] }
                         mkStaticClosure dflags (mkForeignLabel $3 Nothing ForeignLabelInExternalPackage IsData)
                          -- mkForeignLabel because these are only used
                          -- for CHARLIKE and INTLIKE closures in the RTS.
-                        dontCareCCS (map getLit lits) [] [] [] } }
+                        dontCareCCS (map getLit lits) [] [] [] [] } }
         -- arrays of closures required for the CHARLIKE & INTLIKE arrays
 
 lits    :: { [CmmParse CmmExpr] }
@@ -1166,7 +1166,7 @@ profilingInfo dflags desc_str ty_str
 staticClosure :: Unit -> FastString -> FastString -> [CmmLit] -> CmmParse ()
 staticClosure pkg cl_label info payload
   = do dflags <- getDynFlags
-       let lits = mkStaticClosure dflags (mkCmmInfoLabel pkg info) dontCareCCS payload [] [] []
+       let lits = mkStaticClosure dflags (mkCmmInfoLabel pkg info) dontCareCCS payload [] [] [] []
        code $ emitDataLits (mkCmmDataLabel pkg cl_label) lits
 
 foreignCall
