@@ -387,7 +387,7 @@ Library
             GHC.IO.Encoding.CodePage.API
             GHC.IO.Encoding.CodePage.Table
             GHC.Conc.Windows
-            GHC.Conc.IOCP
+            GHC.Conc.WinIO
             GHC.Conc.POSIX
             GHC.Conc.POSIX.Const
             GHC.Windows

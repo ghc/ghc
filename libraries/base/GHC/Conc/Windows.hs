@@ -45,7 +45,7 @@ module GHC.Conc.Windows
 import GHC.Base
 import GHC.Conc.Sync
 import qualified GHC.Conc.POSIX as POSIX
-import qualified GHC.Conc.IOCP as WINIO
+import qualified GHC.Conc.WinIO as WINIO
 import GHC.Event.Windows.ConsoleEvent
 import GHC.IO.SubSystem ((<!>))
 import GHC.Ptr
