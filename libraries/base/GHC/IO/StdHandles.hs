@@ -4,7 +4,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  GHC.IO.SmartHandles
+-- Module      :  GHC.IO.StdHandles
 -- Copyright   :  (c) The University of Glasgow, 2017
 -- License     :  see libraries/base/LICENSE
 --
@@ -17,7 +17,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.IO.SmartHandles
+module GHC.IO.StdHandles
   ( -- std handles
     stdin, stdout, stderr,
     openFile, openBinaryFile, openFileBlocking
