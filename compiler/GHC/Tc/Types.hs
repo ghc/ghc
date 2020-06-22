@@ -25,7 +25,7 @@ module GHC.Tc.Types(
 
         -- The environment types
         Env(..),
-        TcGblEnv(..), TcLclEnv(..),
+        TcGblEnv(..), TcLclEnv(..), TcRnError(..), tcRnErrorDoc,
         setLclEnvTcLevel, getLclEnvTcLevel,
         setLclEnvLoc, getLclEnvLoc,
         IfGblEnv(..), IfLclEnv(..),
@@ -48,7 +48,7 @@ module GHC.Tc.Types(
         pprTcTyThingCategory, pprPECategory, CompleteMatch(..),
 
         -- Desugaring types
-        DsM, DsLclEnv(..), DsGblEnv(..),
+        DsM, DsLclEnv(..), DsGblEnv(..), DsError,
         DsMetaEnv, DsMetaVal(..), CompleteMatchMap,
         mkCompleteMatchMap, extendCompleteMatchMap,
 
@@ -296,12 +296,14 @@ a @UniqueSupply@ and some annotations, which
 presumably include source-file location information:
 -}
 
+type DsError = TcRnError
+
 data DsGblEnv
         = DsGblEnv
         { ds_mod          :: Module             -- For SCC profiling
         , ds_fam_inst_env :: FamInstEnv         -- Like tcg_fam_inst_env
         , ds_unqual  :: PrintUnqualified
-        , ds_msgs    :: IORef (Messages ErrDoc) -- Warning messages
+        , ds_msgs    :: IORef (Messages DsError) -- Warning messages
         , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global,
                                                 -- possibly-imported things
         , ds_complete_matches :: CompleteMatchMap
@@ -744,6 +746,14 @@ Why?  Because they are now Ids not TcIds.  This final GlobalEnv is
         b) used in the ModDetails of this module
 -}
 
+data TcRnError = TcRnErrorDoc ErrDoc
+
+tcRnErrorDoc :: TcRnError -> ErrDoc
+tcRnErrorDoc (TcRnErrorDoc d) = d
+
+instance RenderableError TcRnError where
+  renderError = tcRnErrorDoc
+
 data TcLclEnv           -- Changes as we move inside an expression
                         -- Discarded after typecheck/rename; not passed on to desugarer
   = TcLclEnv {
@@ -779,7 +789,7 @@ data TcLclEnv           -- Changes as we move inside an expression
                                       -- and for tidying types
 
         tcl_lie  :: TcRef WantedConstraints,    -- Place to accumulate type constraints
-        tcl_errs :: TcRef (Messages ErrDoc)     -- Place to accumulate errors
+        tcl_errs :: TcRef (Messages TcRnError)     -- Place to accumulate errors
     }
 
 setLclEnvTcLevel :: TcLclEnv -> TcLevel -> TcLclEnv

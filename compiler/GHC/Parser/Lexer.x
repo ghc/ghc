@@ -2099,6 +2099,9 @@ data PsError = PsErrorDoc ErrDoc
 psErrorDoc :: PsError -> ErrDoc
 psErrorDoc (PsErrorDoc d) = d
 
+instance RenderableError PsError where
+  renderError = psErrorDoc
+
 data PState = PState {
         buffer     :: StringBuffer,
         options    :: ParserFlags,

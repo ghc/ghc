@@ -1274,7 +1274,7 @@ runTH ty fhv = do
 -- See Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs.
 runRemoteTH
   :: IServInstance
-  -> [Messages ErrDoc]   --  saved from nested calls to qRecover
+  -> [Messages TcRnError] --  saved from nested calls to qRecover
   -> TcM ()
 runRemoteTH iserv recovers = do
   THMsg msg <- liftIO $ readIServ iserv getTHMessage

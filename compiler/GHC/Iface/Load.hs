@@ -64,6 +64,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Avail
 import GHC.Unit.Module
+import GHC.Data.Bag           ( mapBag )
 import GHC.Data.Maybe
 import GHC.Utils.Error
 import GHC.Driver.Finder
@@ -652,7 +653,7 @@ computeInterface doc_str hi_boot_file mod0 = do
                                    Nothing iface0
                     case r of
                         Right x -> return (Succeeded (x, path))
-                        Left errs -> liftIO . throwIO . mkSrcErr $ errs
+                        Left errs -> liftIO . throwIO . mkSrcErr $ mapBag (fmap renderError) errs
                 Failed err -> return (Failed err)
         (mod, _) ->
             findAndReadIface doc_str mod mod0 hi_boot_file

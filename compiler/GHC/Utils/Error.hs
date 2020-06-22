@@ -19,7 +19,7 @@ module GHC.Utils.Error (
         -- * Messages
         ErrMsg, errMsgDoc, errMsgSeverity, errMsgReason,
         ErrDoc, errDoc, errDocImportant, errDocContext, errDocSupplementary,
-        WarnMsg, MsgDoc,
+        WarnMsg, MsgDoc, RenderableError(..),
         Messages, ErrorMessages, WarningMessages,
         mapMessages, unionMessages,
         errMsgSpan, errMsgContext,
@@ -192,9 +192,14 @@ data Severity
 instance ToJson Severity where
   json s = JSString (show s)
 
-
 instance Show (ErrMsg e) where
-    show em = errMsgShortString em
+  show em = errMsgShortString em
+
+class RenderableError e where
+  renderError :: e -> ErrDoc
+
+instance RenderableError ErrDoc where
+  renderError = id
 
 pprMessageBag :: Bag MsgDoc -> SDoc
 pprMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))
@@ -334,16 +339,18 @@ makeIntoWarning reason err = err
 -- -----------------------------------------------------------------------------
 -- Collecting up messages for later ordering and printing.
 
-mk_err_msg :: DynFlags -> Severity -> SrcSpan -> PrintUnqualified -> ErrDoc -> ErrMsg ErrDoc
-mk_err_msg dflags sev locn print_unqual doc
+mk_err_msg
+  :: RenderableError e
+  => DynFlags -> Severity -> SrcSpan -> PrintUnqualified -> e -> ErrMsg e
+mk_err_msg dflags sev locn print_unqual err
  = ErrMsg { errMsgSpan = locn
           , errMsgContext = print_unqual
-          , errMsgDoc = doc
-          , errMsgShortString = showSDoc dflags (vcat (errDocImportant doc))
+          , errMsgDoc = err
+          , errMsgShortString = showSDoc dflags (vcat (errDocImportant $ renderError err))
           , errMsgSeverity = sev
           , errMsgReason = NoReason }
 
-mkErrDoc :: DynFlags -> SrcSpan -> PrintUnqualified -> ErrDoc -> ErrMsg ErrDoc
+mkErrDoc :: RenderableError e => DynFlags -> SrcSpan -> PrintUnqualified -> e -> ErrMsg e
 mkErrDoc dflags = mk_err_msg dflags SevError
 
 mkLongErrMsg, mkLongWarnMsg   :: DynFlags -> SrcSpan -> PrintUnqualified -> MsgDoc -> MsgDoc -> ErrMsg ErrDoc
@@ -404,13 +411,13 @@ formatErrDoc ctx (ErrDoc important context supplementary)
 pprErrMsgBagWithLoc :: Bag (ErrMsg ErrDoc) -> [SDoc]
 pprErrMsgBagWithLoc bag = [ pprLocErrMsg item | item <- sortMsgBag Nothing bag ]
 
-pprLocErrMsg :: ErrMsg ErrDoc -> SDoc
+pprLocErrMsg :: RenderableError e => ErrMsg e -> SDoc
 pprLocErrMsg (ErrMsg { errMsgSpan      = s
-                     , errMsgDoc       = doc
+                     , errMsgDoc       = e
                      , errMsgSeverity  = sev
                      , errMsgContext   = unqual })
   = sdocWithContext $ \ctx ->
-    withErrStyle unqual $ mkLocMessage sev s (formatErrDoc ctx doc)
+    withErrStyle unqual $ mkLocMessage sev s (formatErrDoc ctx $ renderError e)
 
 sortMsgBag :: Maybe DynFlags -> Bag (ErrMsg e) -> [ErrMsg e]
 sortMsgBag dflags = maybeLimit . sortBy (cmp `on` errMsgSpan) . bagToList

@@ -264,17 +264,17 @@ handleWarningsThrowErrors (warns, errs) = do
 --  2. If there are no error messages, but the second result indicates failure
 --     there should be warnings in the first result. That is, if the action
 --     failed, it must have been due to the warnings (i.e., @-Werror@).
-ioMsgMaybe :: IO (Messages ErrDoc, Maybe a) -> Hsc a
+ioMsgMaybe :: RenderableError e => IO (Messages e, Maybe a) -> Hsc a
 ioMsgMaybe ioA = do
     ((warns,errs), mb_r) <- liftIO ioA
     logWarnings warns
     case mb_r of
-        Nothing -> throwErrors errs
+        Nothing -> throwErrors $ mapBag (fmap renderError) errs
         Just r  -> ASSERT( isEmptyBag errs ) return r
 
 -- | like ioMsgMaybe, except that we ignore error messages and return
 -- 'Nothing' instead.
-ioMsgMaybe' :: IO (Messages ErrDoc, Maybe a) -> Hsc (Maybe a)
+ioMsgMaybe' :: RenderableError e => IO (Messages e, Maybe a) -> Hsc (Maybe a)
 ioMsgMaybe' ioA = do
     ((warns,_errs), mb_r) <- liftIO $ ioA
     logWarnings warns

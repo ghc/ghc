@@ -514,7 +514,7 @@ tyOracle (TySt inert) cts
        ; case res of
             Just True  -> return (Just (TySt new_inert))
             Just False -> return Nothing
-            Nothing    -> pprPanic "tyOracle" (vcat $ pprErrMsgBagWithLoc errs) }
+            Nothing    -> pprPanic "tyOracle" (vcat $ pprErrMsgBagWithLoc $ mapBag (fmap renderError) errs) }
 
 -- | A 'SatisfiabilityCheck' based on new type-level constraints.
 -- Returns a new 'Delta' if the new constraints are compatible with existing

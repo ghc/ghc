@@ -81,7 +81,7 @@ import GHC.Driver.Plugins ( LoadedPlugin(..) )
 -}
 
 -- | Main entry point to the desugarer.
-deSugar :: HscEnv -> ModLocation -> TcGblEnv -> IO (Messages ErrDoc, Maybe ModGuts)
+deSugar :: HscEnv -> ModLocation -> TcGblEnv -> IO (Messages DsError, Maybe ModGuts)
 -- Can modify PCS by faulting in more declarations
 
 deSugar hsc_env
@@ -261,7 +261,7 @@ So we pull out the type/coercion variables (which are in dependency order),
 and Rec the rest.
 -}
 
-deSugarExpr :: HscEnv -> LHsExpr GhcTc -> IO (Messages ErrDoc, Maybe CoreExpr)
+deSugarExpr :: HscEnv -> LHsExpr GhcTc -> IO (Messages DsError, Maybe CoreExpr)
 
 deSugarExpr hsc_env tc_expr = do {
          let dflags = hsc_dflags hsc_env
