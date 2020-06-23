@@ -387,7 +387,7 @@ instance Uniquable OccName where
   getUnique (OccName TvName    fs) = mkTvOccUnique   fs
   getUnique (OccName TcClsName fs) = mkTcOccUnique   fs
 
-newtype OccEnv a = A (UniqFM a)
+newtype OccEnv a = A (UniqFM OccName a)
   deriving Data
 
 emptyOccEnv :: OccEnv a
@@ -829,7 +829,7 @@ This is #12382.
 
 -}
 
-type TidyOccEnv = UniqFM Int    -- The in-scope OccNames
+type TidyOccEnv = UniqFM FastString Int    -- The in-scope OccNames
   -- See Note [TidyOccEnv]
 
 emptyTidyOccEnv :: TidyOccEnv

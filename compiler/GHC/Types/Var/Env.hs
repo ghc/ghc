@@ -440,7 +440,7 @@ delTidyEnvList (occ_env, var_env) vs = (occ_env', var_env')
 -}
 
 -- | Variable Environment
-type VarEnv elt     = UniqFM elt
+type VarEnv elt     = UniqFM Var elt
 
 -- | Identifier Environment
 type IdEnv elt      = VarEnv elt
@@ -533,7 +533,7 @@ modifyVarEnv mangle_fn env key
       Nothing -> env
       Just xx -> extendVarEnv env key (mangle_fn xx)
 
-modifyVarEnv_Directly :: (a -> a) -> UniqFM a -> Unique -> UniqFM a
+modifyVarEnv_Directly :: (a -> a) -> UniqFM key a -> Unique -> UniqFM key a
 modifyVarEnv_Directly mangle_fn env key
   = case (lookupUFM_Directly env key) of
       Nothing -> env
@@ -544,7 +544,7 @@ modifyVarEnv_Directly mangle_fn env key
 -- DVarEnv.
 
 -- | Deterministic Variable Environment
-type DVarEnv elt = UniqDFM elt
+type DVarEnv elt = UniqDFM Var elt
 
 -- | Deterministic Identifier Environment
 type DIdEnv elt = DVarEnv elt

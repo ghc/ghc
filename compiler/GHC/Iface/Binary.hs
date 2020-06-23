@@ -262,7 +262,7 @@ putWithUserData log_action bh payload = do
     -- Write the dictionary itself
     dict_next <- readFastMutInt dict_next_ref
     dict_map  <- readIORef dict_map_ref
-    putDictionary bh dict_next dict_map
+    putDictionary bh dict_next dict_map :: _
     log_action (text "writeBinIface:" <+> int dict_next
                                 <+> text "dict entries")
 
