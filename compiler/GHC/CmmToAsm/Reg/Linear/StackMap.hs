@@ -35,7 +35,7 @@ data StackMap
           stackMapNextFreeSlot  :: !Int
 
           -- | Assignment of vregs to stack slots.
-        , stackMapAssignment    :: UniqFM StackSlot }
+        , stackMapAssignment    :: UniqFM Unique StackSlot }
 
 
 -- | An empty stack map, with all slots available.

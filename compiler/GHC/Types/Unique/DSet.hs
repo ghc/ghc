@@ -52,7 +52,7 @@ import qualified Data.Semigroup as Semi
 -- Beyond preserving invariants, we may also want to 'override' typeclass
 -- instances.
 
-newtype UniqDSet a = UniqDSet {getUniqDSet' :: UniqDFM a}
+newtype UniqDSet a = UniqDSet {getUniqDSet' :: UniqDFM a a}
                    deriving (Data, Semi.Semigroup, Monoid)
 
 emptyUniqDSet :: UniqDSet a
@@ -87,14 +87,14 @@ unionManyUniqDSets (x:xs) = foldl' unionUniqDSets x xs
 minusUniqDSet :: UniqDSet a -> UniqDSet a -> UniqDSet a
 minusUniqDSet (UniqDSet s) (UniqDSet t) = UniqDSet (minusUDFM s t)
 
-uniqDSetMinusUniqSet :: UniqDSet a -> UniqSet b -> UniqDSet a
+uniqDSetMinusUniqSet :: UniqDSet a -> UniqSet a -> UniqDSet a
 uniqDSetMinusUniqSet xs ys
   = UniqDSet (udfmMinusUFM (getUniqDSet xs) (getUniqSet ys))
 
 intersectUniqDSets :: UniqDSet a -> UniqDSet a -> UniqDSet a
 intersectUniqDSets (UniqDSet s) (UniqDSet t) = UniqDSet (intersectUDFM s t)
 
-uniqDSetIntersectUniqSet :: UniqDSet a -> UniqSet b -> UniqDSet a
+uniqDSetIntersectUniqSet :: UniqDSet a -> UniqSet a -> UniqDSet a
 uniqDSetIntersectUniqSet xs ys
   = UniqDSet (udfmIntersectUFM (getUniqDSet xs) (getUniqSet ys))
 
@@ -134,7 +134,7 @@ mapUniqDSet f = mkUniqDSet . map f . uniqDSetToList
 instance Eq (UniqDSet a) where
   UniqDSet a == UniqDSet b = equalKeysUDFM a b
 
-getUniqDSet :: UniqDSet a -> UniqDFM a
+getUniqDSet :: UniqDSet a -> UniqDFM a a
 getUniqDSet = getUniqDSet'
 
 instance Outputable a => Outputable (UniqDSet a) where
