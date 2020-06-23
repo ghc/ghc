@@ -68,8 +68,8 @@ module GHC.Num.Primitives
    , wordWriteMutableByteArrayLE#
    , wordWriteMutableByteArrayBE#
    -- * Exception
-   , underflow
-   , divByZero
+   , raiseUnderflow
+   , raiseDivZero
    , unexpectedValue
    -- * IO
    , ioWord#
@@ -87,6 +87,9 @@ where
 
 #if (__GLASGOW_HASKELL__ < 811)
 import GHC.Magic
+#else
+import GHC.Prim.Panic
+import GHC.Prim.Exception
 #endif
 
 import GHC.Prim
@@ -241,7 +244,7 @@ wordLog2# w   = (WORD_SIZE_IN_BITS## `minusWord#` 1##) `minusWord#` (clz# w)
 wordLogBase# :: Word# -> Word# -> Word#
 wordLogBase# base a
    | isTrue# (base `leWord#` 1##)
-   = case unexpectedValue of _ -> 0##
+   = case unexpectedValue of W# err -> err
 
    | 2## <- base
    = wordLog2# a
@@ -592,30 +595,26 @@ ioBool (IO io) s = case io s of
 
 #if (__GLASGOW_HASKELL__ >= 811)
 
-underflow :: a
-underflow = raiseUnderflow# void#
-
-divByZero :: a
-divByZero = raiseDivZero# void#
-
 unexpectedValue :: a
-unexpectedValue = raiseOverflow# void#
+{-# NOINLINE unexpectedValue #-}
+unexpectedValue = panicError "Unexpected value"#
 
 #else
 
 -- Before GHC 8.11 we use the exception trick taken from #14664
 exception :: a
+{-# NOINLINE exception #-}
 exception = runRW# \s ->
    case atomicLoop s of
       (# _, a #) -> a
    where
       atomicLoop s = atomically# atomicLoop s
 
-underflow :: a
-underflow = exception
+raiseUnderflow :: a
+raiseUnderflow = exception
 
-divByZero :: a
-divByZero = exception
+raiseDivZero :: a
+raiseDivZero = exception
 
 unexpectedValue :: a
 unexpectedValue = exception
