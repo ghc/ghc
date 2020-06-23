@@ -11,6 +11,7 @@ import GHC.Prelude
 import GHC.CmmToAsm.Reg.Linear.Base
 import GHC.CmmToAsm.Reg.Liveness
 import GHC.CmmToAsm.Instr
+import GHC.Types.Unique (Unique)
 
 import GHC.Types.Unique.FM
 import GHC.Utils.Outputable
@@ -19,8 +20,8 @@ import GHC.Utils.Monad.State
 
 -- | Build a map of how many times each reg was alloced, clobbered, loaded etc.
 binSpillReasons
-        :: [SpillReason] -> UniqFM [Int]
-
+        :: [SpillReason] -> UniqFM Unique [Int]
+        -- See Note [UniqFM and the register allocator]
 binSpillReasons reasons
         = addListToUFM_C
                 (zipWith (+))
@@ -61,6 +62,8 @@ pprStats
 
 pprStats code statss
  = let  -- sum up all the instrs inserted by the spiller
+        -- See Note [UniqFM and the register allocator]
+        spills :: UniqFM Unique [Int]
         spills          = foldl' (plusUFM_C (zipWith (+)))
                                 emptyUFM
                         $ map ra_spillInstrs statss

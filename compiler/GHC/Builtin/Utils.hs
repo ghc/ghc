@@ -198,15 +198,15 @@ knownKeyNamesOkay all_names
 -- known-key thing.
 lookupKnownKeyName :: Unique -> Maybe Name
 lookupKnownKeyName u =
-    knownUniqueName u <|> lookupUFM knownKeysMap u
+    knownUniqueName u <|> lookupUFM_Directly knownKeysMap u
 
 -- | Is a 'Name' known-key?
 isKnownKeyName :: Name -> Bool
 isKnownKeyName n =
     isJust (knownUniqueName $ nameUnique n) || elemUFM n knownKeysMap
 
-knownKeysMap :: UniqFM Name
-knownKeysMap = listToUFM [ (nameUnique n, n) | n <- knownKeyNames ]
+knownKeysMap :: UniqFM Name Name
+knownKeysMap = listToIdentityUFM knownKeyNames
 
 -- | Given a 'Unique' lookup any associated arbitrary SDoc's to be displayed by
 -- GHCi's ':info' command.
