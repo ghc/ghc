@@ -596,11 +596,14 @@ flushCharReadBuffer Handle__{..} = do
       (bbuf1,cbuf1) <- (streamEncode decoder) bbuf0
                                cbuf0{ bufL=0, bufR=0, bufSize = bufL cbuf0 }
 
-      let bbuf2 = bbuf1 -- {bufOffset = bufOffset bbuf1 - fromIntegral (bufL bbuf1)}
-      debugIO ("finished, bbuf=" ++ summaryBuffer bbuf2 ++
-               " cbuf=" ++ summaryBuffer cbuf1)
+      -- We should not need to update the offset here. The bytebuffer contains the
+      -- offset for the next read after it's used up. But this function only flushes
+      -- the char buffer.
+      -- let bbuf2 = bbuf1 -- {bufOffset = bufOffset bbuf1 - fromIntegral (bufL bbuf1)}
+      -- debugIO ("finished, bbuf=" ++ summaryBuffer bbuf2 ++
+      --          " cbuf=" ++ summaryBuffer cbuf1)
 
-      writeIORef haByteBuffer bbuf2
+      writeIORef haByteBuffer bbuf1
 
 
 -- When flushing the byte read buffer, we seek backwards by the number
