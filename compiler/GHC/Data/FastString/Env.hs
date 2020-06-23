@@ -40,7 +40,7 @@ import GHC.Data.FastString
 -- deterministic and why it matters. Use DFastStringEnv if the set eventually
 -- gets converted into a list or folded over in a way where the order
 -- changes the generated code.
-type FastStringEnv a = UniqFM a  -- Domain is FastString
+type FastStringEnv a = UniqFM FastString a  -- Domain is FastString
 
 emptyFsEnv         :: FastStringEnv a
 mkFsEnv            :: [(FastString,a)] -> FastStringEnv a
@@ -85,7 +85,7 @@ lookupFsEnv_NF env n = expectJust "lookupFsEnv_NF" (lookupFsEnv env n)
 -- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for explanation why we need
 -- DFastStringEnv.
 
-type DFastStringEnv a = UniqDFM a  -- Domain is FastString
+type DFastStringEnv a = UniqDFM FastString a  -- Domain is FastString
 
 emptyDFsEnv :: DFastStringEnv a
 emptyDFsEnv = emptyUDFM

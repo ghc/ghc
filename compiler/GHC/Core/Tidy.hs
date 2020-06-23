@@ -26,6 +26,7 @@ import GHC.Core.Type     ( tidyType, tidyVarBndr )
 import GHC.Core.Coercion ( tidyCo )
 import GHC.Types.Var
 import GHC.Types.Var.Env
+import GHC.Types.Unique (getUnique)
 import GHC.Types.Unique.FM
 import GHC.Types.Name hiding (tidyNameOcc)
 import GHC.Types.SrcLoc
@@ -121,7 +122,7 @@ tidyRule env rule@(Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs,
 tidyNameOcc :: TidyEnv -> Name -> Name
 -- In rules and instances, we have Names, and we must tidy them too
 -- Fortunately, we can lookup in the VarEnv with a name
-tidyNameOcc (_, var_env) n = case lookupUFM var_env n of
+tidyNameOcc (_, var_env) n = case lookupUFM_Directly var_env (getUnique n) of
                                 Nothing -> n
                                 Just v  -> idName v
 

@@ -100,7 +100,9 @@ data SpillReason
 -- | Used to carry interesting stats out of the register allocator.
 data RegAllocStats
         = RegAllocStats
-        { ra_spillInstrs        :: UniqFM [Int]
+        { ra_spillInstrs        :: UniqFM Unique [Int] -- Keys are the uniques of regs
+                                                       -- and taken from SpillReason
+                                                       -- See Note [UniqFM and the register allocator]
         , ra_fixupList     :: [(BlockId,BlockId,BlockId)]
         -- ^ (from,fixup,to) : We inserted fixup code between from and to
         }

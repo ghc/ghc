@@ -643,10 +643,13 @@ absentLiteralOf :: TyCon -> Maybe Literal
 -- Rubbish literals are handled in GHC.Core.Opt.WorkWrap.Utils, because
 --  1. Looking at the TyCon is not enough, we need the actual type
 --  2. This would need to return a type application to a literal
-absentLiteralOf tc = lookupUFM absent_lits (tyConName tc)
+absentLiteralOf tc = lookupUFM absent_lits tc
 
-absent_lits :: UniqFM Literal
-absent_lits = listToUFM [ (addrPrimTyConKey,    LitNullAddr)
+absent_lits :: UniqFM TyCon Literal
+absent_lits = listToUFM_Directly
+                        -- Explicitly construct the mape from the known
+                        -- keys of these tyCons.
+                        [ (addrPrimTyConKey,    LitNullAddr)
                         , (charPrimTyConKey,    LitChar 'x')
                         , (intPrimTyConKey,     mkLitIntUnchecked 0)
                         , (int64PrimTyConKey,   mkLitInt64Unchecked 0)

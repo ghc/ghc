@@ -32,6 +32,7 @@ where
 
 import GHC.Prelude
 
+import GHC.Unit.Module.Name (ModuleName)
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
@@ -191,12 +192,12 @@ UniqFM.
 -}
 
 -- | A map keyed off of 'ModuleName's (actually, their 'Unique's)
-type ModuleNameEnv elt = UniqFM elt
+type ModuleNameEnv elt = UniqFM ModuleName elt
 
 
 -- | A map keyed off of 'ModuleName's (actually, their 'Unique's)
 -- Has deterministic folds and can be deterministically converted to a list
-type DModuleNameEnv elt = UniqDFM elt
+type DModuleNameEnv elt = UniqDFM ModuleName elt
 
 
 --------------------------------------------------------------------

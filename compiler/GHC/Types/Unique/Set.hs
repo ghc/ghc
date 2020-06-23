@@ -63,7 +63,7 @@ import qualified Data.Semigroup as Semi
 -- It means that to implement mapUniqSet you have to update
 -- both the keys and the values.
 
-newtype UniqSet a = UniqSet {getUniqSet' :: UniqFM a}
+newtype UniqSet a = UniqSet {getUniqSet' :: UniqFM a a}
                   deriving (Data, Semi.Semigroup, Monoid)
 
 emptyUniqSet :: UniqSet a
@@ -109,13 +109,13 @@ intersectUniqSets (UniqSet s) (UniqSet t) = UniqSet (intersectUFM s t)
 disjointUniqSets :: UniqSet a -> UniqSet a -> Bool
 disjointUniqSets (UniqSet s) (UniqSet t) = disjointUFM s t
 
-restrictUniqSetToUFM :: UniqSet a -> UniqFM b -> UniqSet a
+restrictUniqSetToUFM :: UniqSet key -> UniqFM key b -> UniqSet key
 restrictUniqSetToUFM (UniqSet s) m = UniqSet (intersectUFM s m)
 
-uniqSetMinusUFM :: UniqSet a -> UniqFM b -> UniqSet a
+uniqSetMinusUFM :: UniqSet key -> UniqFM key b -> UniqSet key
 uniqSetMinusUFM (UniqSet s) t = UniqSet (minusUFM s t)
 
-uniqSetMinusUDFM :: UniqSet a -> UniqDFM b -> UniqSet a
+uniqSetMinusUDFM :: UniqSet key -> UniqDFM key b -> UniqSet key
 uniqSetMinusUDFM (UniqSet s) t = UniqSet (ufmMinusUDFM s t)
 
 elementOfUniqSet :: Uniquable a => a -> UniqSet a -> Bool
@@ -145,7 +145,9 @@ sizeUniqSet (UniqSet s) = sizeUFM s
 isEmptyUniqSet :: UniqSet a -> Bool
 isEmptyUniqSet (UniqSet s) = isNullUFM s
 
-lookupUniqSet :: Uniquable a => UniqSet b -> a -> Maybe b
+-- | What's the point you might ask? We might have changed an object
+-- without it's key changing. In which case this lookup makes sense.
+lookupUniqSet :: Uniquable key => UniqSet key -> key -> Maybe key
 lookupUniqSet (UniqSet s) k = lookupUFM s k
 
 lookupUniqSet_Directly :: UniqSet a -> Unique -> Maybe a
@@ -178,13 +180,13 @@ mapUniqSet f = mkUniqSet . map f . nonDetEltsUniqSet
 instance Eq (UniqSet a) where
   UniqSet a == UniqSet b = equalKeysUFM a b
 
-getUniqSet :: UniqSet a -> UniqFM a
+getUniqSet :: UniqSet a -> UniqFM a a
 getUniqSet = getUniqSet'
 
 -- | 'unsafeUFMToUniqSet' converts a @'UniqFM' a@ into a @'UniqSet' a@
 -- assuming, without checking, that it maps each 'Unique' to a value
 -- that has that 'Unique'. See Note [UniqSet invariant].
-unsafeUFMToUniqSet :: UniqFM a -> UniqSet a
+unsafeUFMToUniqSet :: UniqFM  a a -> UniqSet a
 unsafeUFMToUniqSet = UniqSet
 
 instance Outputable a => Outputable (UniqSet a) where

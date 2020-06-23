@@ -2420,7 +2420,7 @@ not match the requested info exactly!
 
 -}
 
-type TcAppMap a = UniqDFM (ListMap LooseTypeMap a)
+type TcAppMap a = UniqDFM Unique (ListMap LooseTypeMap a)
     -- Indexed by tycon then the arg types, using "loose" matching, where
     -- we don't require kind equality. This allows, for example, (a |> co)
     -- to match (a).
@@ -2539,7 +2539,7 @@ findDict m loc cls tys
 
 findDictsByClass :: DictMap a -> Class -> Bag a
 findDictsByClass m cls
-  | Just tm <- lookupUDFM m cls = foldTM consBag tm emptyBag
+  | Just tm <- lookupUDFM_Directly m (getUnique cls) = foldTM consBag tm emptyBag
   | otherwise                  = emptyBag
 
 delDict :: DictMap a -> Class -> [Type] -> DictMap a
@@ -2550,7 +2550,7 @@ addDict m cls tys item = insertTcApp m (getUnique cls) tys item
 
 addDictsByClass :: DictMap Ct -> Class -> Bag Ct -> DictMap Ct
 addDictsByClass m cls items
-  = addToUDFM m cls (foldr add emptyTM items)
+  = addToUDFM_Directly m (getUnique cls) (foldr add emptyTM items)
   where
     add ct@(CDictCan { cc_tyargs = tys }) tm = insertTM tys ct tm
     add ct _ = pprPanic "addDictsByClass" (ppr ct)
@@ -2600,8 +2600,8 @@ findFunEqsByTyCon :: FunEqMap a -> TyCon -> [a]
 -- We use this to check for derived interactions with built-in type-function
 -- constructors.
 findFunEqsByTyCon m tc
-  | Just tm <- lookupUDFM m tc = foldTM (:) tm []
-  | otherwise                 = []
+  | Just tm <- lookupUDFM m (getUnique tc) = foldTM (:) tm []
+  | otherwise                              = []
 
 foldFunEqs :: (a -> b -> b) -> FunEqMap a -> b -> b
 foldFunEqs = foldTcAppMap
@@ -2632,17 +2632,17 @@ delFunEq :: FunEqMap a -> TyCon -> [Type] -> FunEqMap a
 delFunEq m tc tys = delTcApp m (getUnique tc) tys
 
 ------------------------------
-type ExactFunEqMap a = UniqFM (ListMap TypeMap a)
+type ExactFunEqMap a = UniqFM TyCon (ListMap TypeMap a)
 
 emptyExactFunEqs :: ExactFunEqMap a
 emptyExactFunEqs = emptyUFM
 
 findExactFunEq :: ExactFunEqMap a -> TyCon -> [Type] -> Maybe a
-findExactFunEq m tc tys = do { tys_map <- lookupUFM m (getUnique tc)
+findExactFunEq m tc tys = do { tys_map <- lookupUFM m tc
                              ; lookupTM tys tys_map }
 
 insertExactFunEq :: ExactFunEqMap a -> TyCon -> [Type] -> a -> ExactFunEqMap a
-insertExactFunEq m tc tys val = alterUFM alter_tm m (getUnique tc)
+insertExactFunEq m tc tys val = alterUFM alter_tm m tc
   where alter_tm mb_tm = Just (insertTM tys val (mb_tm `orElse` emptyTM))
 
 {-

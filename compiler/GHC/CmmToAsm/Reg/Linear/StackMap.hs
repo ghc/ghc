@@ -34,8 +34,9 @@ data StackMap
         { -- | The slots that are still available to be allocated.
           stackMapNextFreeSlot  :: !Int
 
+          -- See Note [UniqFM and the register allocator]
           -- | Assignment of vregs to stack slots.
-        , stackMapAssignment    :: UniqFM StackSlot }
+        , stackMapAssignment    :: UniqFM Unique StackSlot }
 
 
 -- | An empty stack map, with all slots available.

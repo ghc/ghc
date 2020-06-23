@@ -1730,7 +1730,7 @@ mkModuleNameProvidersMap ctx cfg pkg_map closure vis_map =
             in (pk', m', fromReexportedModules e pkg')
      return (m, mkModMap pk' m' origin')
 
-    esmap :: UniqFM (Map Module ModuleOrigin)
+    esmap :: UniqFM ModuleName (Map Module ModuleOrigin)
     esmap = listToUFM (es False) -- parameter here doesn't matter, orig will
                                  -- be overwritten
 
