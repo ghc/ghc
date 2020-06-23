@@ -1148,7 +1148,7 @@ undef s = panic ("Binary.UserData: no " ++ s)
 type Dictionary = Array Int FastString -- The dictionary
                                        -- Should be 0-indexed
 
-putDictionary :: BinHandle -> Int -> UniqFM (Int,FastString) -> IO ()
+putDictionary :: BinHandle -> Int -> UniqFM FastString (Int,FastString) -> IO ()
 putDictionary bh sz dict = do
   put_ bh sz
   mapM_ (putFS bh) (elems (array (0,sz-1) (nonDetEltsUFM dict)))

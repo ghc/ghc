@@ -10,6 +10,7 @@ module GHC.CmmToAsm.Reg.Graph.Spill (
 import GHC.Prelude
 
 import GHC.CmmToAsm.Reg.Liveness
+import GHC.CmmToAsm.Reg.Utils
 import GHC.CmmToAsm.Instr
 import GHC.Platform.Reg
 import GHC.Cmm hiding (RegSet)
@@ -69,8 +70,11 @@ regSpill platform code slotsFree slotCount regs
         = do
                 -- Allocate a slot for each of the spilled regs.
                 let slots       = take (sizeUniqSet regs) $ nonDetEltsUniqSet slotsFree
-                let regSlotMap  = listToUFM
-                                $ zip (nonDetEltsUniqSet regs) slots
+                let
+                    regSlotMap  = toRegMap -- Cast keys from VirtualReg to Reg
+                                           -- See Note [UniqFM and the register allocator]
+                                $ listToUFM
+                                $ zip (nonDetEltsUniqSet regs) slots :: UniqFM Reg Int
                     -- This is non-deterministic but we do not
                     -- currently support deterministic code-generation.
                     -- See Note [Unique Determinism and code generation]
@@ -158,7 +162,7 @@ regSpill_top platform regSlotMap cmm
 regSpill_block
         :: Instruction instr
         => Platform
-        -> UniqFM Int   -- ^ map of vregs to slots they're being spilled to.
+        -> UniqFM Reg Int   -- ^ map of vregs to slots they're being spilled to.
         -> LiveBasicBlock instr
         -> SpillM (LiveBasicBlock instr)
 
@@ -174,7 +178,7 @@ regSpill_block platform regSlotMap (BasicBlock i instrs)
 regSpill_instr
         :: Instruction instr
         => Platform
-        -> UniqFM Int -- ^ map of vregs to slots they're being spilled to.
+        -> UniqFM Reg Int -- ^ map of vregs to slots they're being spilled to.
         -> LiveInstr instr
         -> SpillM [LiveInstr instr]
 
@@ -223,7 +227,7 @@ regSpill_instr platform regSlotMap
 --   writes to a vreg that is being spilled.
 spillRead
         :: Instruction instr
-        => UniqFM Int
+        => UniqFM Reg Int
         -> instr
         -> Reg
         -> SpillM (instr, ([LiveInstr instr'], [LiveInstr instr']))
@@ -246,7 +250,7 @@ spillRead regSlotMap instr reg
 --   writes to a vreg that is being spilled.
 spillWrite
         :: Instruction instr
-        => UniqFM Int
+        => UniqFM Reg Int
         -> instr
         -> Reg
         -> SpillM (instr, ([LiveInstr instr'], [LiveInstr instr']))
@@ -269,7 +273,7 @@ spillWrite regSlotMap instr reg
 --   both reads and writes to a vreg that is being spilled.
 spillModify
         :: Instruction instr
-        => UniqFM Int
+        => UniqFM Reg Int
         -> instr
         -> Reg
         -> SpillM (instr, ([LiveInstr instr'], [LiveInstr instr']))
@@ -334,7 +338,7 @@ data SpillS
           stateUS       :: UniqSupply
 
           -- | Spilled vreg vs the number of times it was loaded, stored.
-        , stateSpillSL  :: UniqFM (Reg, Int, Int) }
+        , stateSpillSL  :: UniqFM Reg (Reg, Int, Int) }
 
 
 -- | Create a new spiller state.
@@ -366,7 +370,7 @@ accSpillSL (r1, s1, l1) (_, s2, l2)
 --   Tells us what registers were spilled.
 data SpillStats
         = SpillStats
-        { spillStoreLoad        :: UniqFM (Reg, Int, Int) }
+        { spillStoreLoad        :: UniqFM Reg (Reg, Int, Int) }
 
 
 -- | Extract spiller statistics from the spiller state.

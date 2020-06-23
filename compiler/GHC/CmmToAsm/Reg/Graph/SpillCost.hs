@@ -48,9 +48,9 @@ type SpillCostRecord
 
 -- | Map of `SpillCostRecord`
 type SpillCostInfo
-        = UniqFM SpillCostRecord
+        = UniqFM VirtualReg SpillCostRecord
 
-type SpillCostState = State (UniqFM SpillCostRecord) ()
+type SpillCostState = State SpillCostInfo ()
 
 -- | An empty map of spill costs.
 zeroSpillCostInfo :: SpillCostInfo
@@ -264,7 +264,7 @@ spillCost_length info _ reg
 
 
 -- | Extract a map of register lifetimes from a `SpillCostInfo`.
-lifeMapFromSpillCostInfo :: SpillCostInfo -> UniqFM (VirtualReg, Int)
+lifeMapFromSpillCostInfo :: SpillCostInfo -> UniqFM VirtualReg (VirtualReg, Int)
 lifeMapFromSpillCostInfo info
         = listToUFM
         $ map (\(r, _, _, life) -> (r, (r, life)))

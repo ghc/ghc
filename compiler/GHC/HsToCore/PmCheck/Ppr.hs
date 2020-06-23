@@ -98,7 +98,7 @@ substitution to the vectors before printing them out (see function `pprOne' in
 -- | Extract and assigns pretty names to constraint variables with refutable
 -- shapes.
 prettifyRefuts :: Delta -> DIdEnv SDoc -> DIdEnv (SDoc, [PmAltCon])
-prettifyRefuts delta = listToUDFM . map attach_refuts . udfmToList
+prettifyRefuts delta = listToUDFM_Directly . map attach_refuts . udfmToList
   where
     attach_refuts (u, sdoc) = (u, (sdoc, lookupRefuts delta u))
 

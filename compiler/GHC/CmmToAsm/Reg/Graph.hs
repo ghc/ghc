@@ -46,7 +46,7 @@ maxSpinCount    = 10
 regAlloc
         :: (Outputable statics, Outputable instr, Instruction instr)
         => NCGConfig
-        -> UniqFM (UniqSet RealReg)     -- ^ registers we can use for allocation
+        -> UniqFM RegClass (UniqSet RealReg)     -- ^ registers we can use for allocation
         -> UniqSet Int                  -- ^ set of available spill slots.
         -> Int                          -- ^ current number of spill slots
         -> [LiveCmmDecl statics instr]  -- ^ code annotated with liveness information.
@@ -96,7 +96,7 @@ regAlloc_spin
         -> Color.Triv VirtualReg RegClass RealReg
                 -- ^ Function for calculating whether a register is trivially
                 --   colourable.
-        -> UniqFM (UniqSet RealReg)      -- ^ Free registers that we can allocate.
+        -> UniqFM RegClass (UniqSet RealReg)      -- ^ Free registers that we can allocate.
         -> UniqSet Int                   -- ^ Free stack slots that we can use.
         -> Int                           -- ^ Number of spill slots in use
         -> [RegAllocStats statics instr] -- ^ Current regalloc stats to add to.

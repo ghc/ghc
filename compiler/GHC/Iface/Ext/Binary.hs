@@ -2,6 +2,8 @@
 Binary serialization for .hie files.
 -}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns #-}
+
 module GHC.Iface.Ext.Binary
    ( readHieFile
    , readHieFileWithVersion
@@ -48,12 +50,12 @@ import GHC.Iface.Ext.Types
 
 data HieSymbolTable = HieSymbolTable
   { hie_symtab_next :: !FastMutInt
-  , hie_symtab_map  :: !(IORef (UniqFM (Int, HieName)))
+  , hie_symtab_map  :: !(IORef (UniqFM Name (Int, HieName)))
   }
 
 data HieDictionary = HieDictionary
   { hie_dict_next :: !FastMutInt -- The next index to use
-  , hie_dict_map  :: !(IORef (UniqFM (Int,FastString))) -- indexed by FastString
+  , hie_dict_map  :: !(IORef (UniqFM FastString (Int,FastString))) -- indexed by FastString
   }
 
 initBinMemSize :: Int
@@ -97,7 +99,7 @@ writeHieFile hie_file_path hiefile = do
   -- Make some initial state
   symtab_next <- newFastMutInt
   writeFastMutInt symtab_next 0
-  symtab_map <- newIORef emptyUFM
+  symtab_map <- newIORef emptyUFM :: IO (IORef (UniqFM Name (Int, HieName)))
   let hie_symtab = HieSymbolTable {
                       hie_symtab_next = symtab_next,
                       hie_symtab_map  = symtab_map }
@@ -257,16 +259,16 @@ putFastString HieDictionary { hie_dict_next = j_r,
                               hie_dict_map  = out_r}  bh f
   = do
     out <- readIORef out_r
-    let unique = getUnique f
-    case lookupUFM out unique of
+    let !unique = getUnique f
+    case lookupUFM_Directly out unique of
         Just (j, _)  -> put_ bh (fromIntegral j :: Word32)
         Nothing -> do
            j <- readFastMutInt j_r
            put_ bh (fromIntegral j :: Word32)
            writeFastMutInt j_r (j + 1)
-           writeIORef out_r $! addToUFM out unique (j, f)
+           writeIORef out_r $! addToUFM_Directly out unique (j, f)
 
-putSymbolTable :: BinHandle -> Int -> UniqFM (Int,HieName) -> IO ()
+putSymbolTable :: BinHandle -> Int -> UniqFM Name (Int,HieName) -> IO ()
 putSymbolTable bh next_off symtab = do
   put_ bh next_off
   let names = A.elems (A.array (0,next_off-1) (nonDetEltsUFM symtab))
