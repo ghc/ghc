@@ -213,8 +213,9 @@ ioManagerLock = unsafePerformIO $ do
 
 getSystemTimerManager :: IO TM.TimerManager
 getSystemTimerManager = do
-  Just mgr <- readIORef timerManager
-  return mgr
+  fromMaybe err <$> readIORef timerManager
+  where
+    err = error "GHC.Event.Thread.getSystemTimerManager: the TimerManager requires linking against the threaded runtime"
 
 foreign import ccall unsafe "getOrSetSystemTimerThreadEventManagerStore"
     getOrSetSystemTimerThreadEventManagerStore :: Ptr a -> IO (Ptr a)
