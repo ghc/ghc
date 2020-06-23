@@ -140,6 +140,35 @@ import Data.List
 import Control.Monad
 import Control.Applicative
 
+{- Note [UniqFM and the register allocator]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   Before UniqFM had a key type the register allocator
+   wasn't picky about key types, using VirtualReg, Reg
+   and Unique at various use sites for the same map.
+
+   This is safe.
+   * The Unique values come from registers at various
+     points where we lose a reference to the original
+     register value, but the unique is still valid.
+
+   * VirtualReg is a subset of the registers in Reg's type.
+     Making a value of VirtualReg into a Reg in fact doesn't
+     change it's unique. This is because Reg consists of virtual
+     regs and real regs, whose unique values do not overlap.
+
+   * Since the code was written in the assumption that keys are
+     not typed it's hard to reverse this assumption now. So we get
+     some gnarly but correct code as result where we cast the types
+     of keys in some places and introduce other sins. But the sins
+     were always here. The now-typed keys just make them visible.
+
+   TODO: If you take offense to this I encourage you to refactor this
+   code. I'm sure we can do with less casting of keys and direct use
+   of uniques. It might also be reasonable to just use a IntMap directly
+   instead of dealing with UniqFM at all.
+-}
+
 -- -----------------------------------------------------------------------------
 -- Top level of the register allocator
 
@@ -564,6 +593,7 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
         patch_map :: UniqFM Reg Reg
         patch_map
                 = unsafeCastUFMKey $ -- Cast key from VirtualReg to Reg
+                                     -- See Note [UniqFM and the register allocator]
                   listToUFM
                         [ (t, RegReal r)
                                 | (t, r) <- zip virt_read    r_allocd
@@ -774,6 +804,7 @@ allocateRegsAndSpill _       _    spills alloc []
 allocateRegsAndSpill reading keep spills alloc (r:rs)
  = do   assig <- getAssigR :: RegM freeRegs (RegMap Loc)
         -- pprTraceM "allocateRegsAndSpill:assig" (ppr (r:rs) $$ ppr assig)
+        -- See Note [UniqFM and the register allocator]
         let doSpill = allocRegsAndSpill_spill reading keep spills alloc r rs (unsafeCastUFMKey assig)
         case lookupUFM_U assig r of
                 -- case (1a): already in a register

@@ -153,12 +153,14 @@ setFreeRegsR regs = RegM $ \ s ->
 
 -- | Key will always be Reg or VirtualReg.
 -- But UniqFM doesn't support polymorphic keys...
+-- See Note [UniqFM and the register allocator]
 getAssigR :: RegM freeRegs (UniqFM key Loc)
 getAssigR = RegM $ \ s@RA_State{ra_assig = assig} ->
   RA_Result s (unsafeCastUFMKey assig)
 
 -- | Key will always be Reg or VirtualReg.
 -- But UniqFM doesn't support polymorphic keys...
+-- See Note [UniqFM and the register allocator]
 setAssigR :: UniqFM key Loc -> RegM freeRegs ()
 setAssigR assig = RegM $ \ s ->
   RA_Result s{ra_assig=unsafeCastUFMKey assig} ()

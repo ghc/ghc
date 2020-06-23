@@ -71,6 +71,7 @@ regSpill platform code slotsFree slotCount regs
                 let slots       = take (sizeUniqSet regs) $ nonDetEltsUniqSet slotsFree
                 let
                     regSlotMap  = unsafeCastUFMKey -- Cast keys from VirtualReg to Reg
+                                                   -- See Note [UniqFM and the register allocator]
                                 $ listToUFM
                                 $ zip (nonDetEltsUniqSet regs) slots :: UniqFM Reg Int
                     -- This is non-deterministic but we do not
