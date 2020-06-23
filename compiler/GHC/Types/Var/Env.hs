@@ -439,20 +439,24 @@ delTidyEnvList (occ_env, var_env) vs = (occ_env', var_env')
 ************************************************************************
 -}
 
+-- We would like this to be `UniqFM Var elt`
+-- but the code uses various key types.
+-- So for now make it explicitly untyped
+
 -- | Variable Environment
-type VarEnv elt     = UniqFM elt
+type VarEnv elt     = UniqFM Var elt
 
 -- | Identifier Environment
-type IdEnv elt      = VarEnv elt
+type IdEnv elt      = UniqFM Id elt
 
 -- | Type Variable Environment
-type TyVarEnv elt   = VarEnv elt
+type TyVarEnv elt   = UniqFM Var elt
 
 -- | Type or Coercion Variable Environment
-type TyCoVarEnv elt = VarEnv elt
+type TyCoVarEnv elt = UniqFM TyCoVar elt
 
 -- | Coercion Variable Environment
-type CoVarEnv elt   = VarEnv elt
+type CoVarEnv elt   = UniqFM CoVar elt
 
 emptyVarEnv       :: VarEnv a
 mkVarEnv          :: [(Var, a)] -> VarEnv a
@@ -533,7 +537,7 @@ modifyVarEnv mangle_fn env key
       Nothing -> env
       Just xx -> extendVarEnv env key (mangle_fn xx)
 
-modifyVarEnv_Directly :: (a -> a) -> UniqFM a -> Unique -> UniqFM a
+modifyVarEnv_Directly :: (a -> a) -> UniqFM key a -> Unique -> UniqFM key a
 modifyVarEnv_Directly mangle_fn env key
   = case (lookupUFM_Directly env key) of
       Nothing -> env
@@ -544,13 +548,14 @@ modifyVarEnv_Directly mangle_fn env key
 -- DVarEnv.
 
 -- | Deterministic Variable Environment
-type DVarEnv elt = UniqDFM elt
+type DVarEnv elt = UniqDFM Var elt
 
 -- | Deterministic Identifier Environment
-type DIdEnv elt = DVarEnv elt
+-- Sadly not always indexed by Id, but it is in the common case.
+type DIdEnv elt = UniqDFM Var elt
 
 -- | Deterministic Type Variable Environment
-type DTyVarEnv elt = DVarEnv elt
+type DTyVarEnv elt = UniqDFM TyVar elt
 
 emptyDVarEnv :: DVarEnv a
 emptyDVarEnv = emptyUDFM
