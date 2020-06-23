@@ -11,9 +11,16 @@ staticFlavour = defaultFlavour
     , args = defaultBuilderArgs <> staticArgs <> defaultPackageArgs
     , dynamicGhcPrograms = return False }
 
+staticFlags :: Args
+staticFlags = mconcat
+    [ stage0 ? arg "-O"
+    , notStage0 ? arg "-O2"
+    , pure [ "-static" , "-optl", "-static" ]
+    ]
+
 staticArgs :: Args
 staticArgs = sourceArgs SourceArgs
     { hsDefault  = pure ["-O", "-H64m"]
     , hsLibrary  = notStage0 ? arg "-O2"
     , hsCompiler = pure ["-O2"]
-    , hsGhc      = mconcat [stage0 ? arg "-O", notStage0 ? arg "-O2"] }
+    , hsGhc      = staticFlags }
