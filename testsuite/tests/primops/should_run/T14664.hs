@@ -3,6 +3,7 @@
 module Main where
 
 import GHC.Exts
+import GHC.Prim.Exception
 import Control.Exception
 
 main :: IO ()
@@ -12,6 +13,6 @@ main = do
       printE :: ArithException -> IO ()
       printE = print
 
-   catch (raiseUnderflow# void#) printE
-   catch (raiseOverflow#  void#) printE
-   catch (raiseDivZero#   void#) printE
+   catch raiseUnderflow printE
+   catch raiseOverflow  printE
+   catch raiseDivZero   printE
