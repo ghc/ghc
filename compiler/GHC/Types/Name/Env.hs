@@ -93,7 +93,7 @@ depAnal get_defs get_uses nodes
 -}
 
 -- | Name Environment
-type NameEnv a = UniqFM a       -- Domain is Name
+type NameEnv a = UniqFM Name a       -- Domain is Name
 
 emptyNameEnv       :: NameEnv a
 isEmptyNameEnv     :: NameEnv a -> Bool
@@ -152,7 +152,7 @@ lookupNameEnv_NF env n = expectJust "lookupNameEnv_NF" (lookupNameEnv env n)
 --
 -- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for explanation why
 -- we need DNameEnv.
-type DNameEnv a = UniqDFM a
+type DNameEnv a = UniqDFM Name a
 
 emptyDNameEnv :: DNameEnv a
 emptyDNameEnv = emptyUDFM

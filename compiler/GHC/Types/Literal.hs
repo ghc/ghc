@@ -63,6 +63,7 @@ import GHC.Types.Basic
 import GHC.Utils.Binary
 import GHC.Settings.Constants
 import GHC.Platform
+import GHC.Types.Name
 import GHC.Types.Unique.FM
 import GHC.Utils.Misc
 
@@ -643,9 +644,11 @@ absentLiteralOf :: TyCon -> Maybe Literal
 -- Rubbish literals are handled in GHC.Core.Opt.WorkWrap.Utils, because
 --  1. Looking at the TyCon is not enough, we need the actual type
 --  2. This would need to return a type application to a literal
-absentLiteralOf tc = lookupUFM absent_lits (tyConName tc)
+absentLiteralOf tc = lookupUFM absent_lits (getUnique $ tyConName tc)
 
-absent_lits :: UniqFM Literal
+-- TODO: This should be a map from TyCon -> Literal. But I don't want
+-- to make semantic changes while I refactor UniqFM
+absent_lits :: UniqFM Unique Literal
 absent_lits = listToUFM [ (addrPrimTyConKey,    LitNullAddr)
                         , (charPrimTyConKey,    LitChar 'x')
                         , (intPrimTyConKey,     mkLitIntUnchecked 0)

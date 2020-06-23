@@ -507,8 +507,8 @@ classifyEdges root getSucc edges =
         endFrom   = getTime ends   from
         endTo     = getTime ends   to
 
-    addTimes :: (Time, UniqFM Time, UniqFM Time) -> key
-             -> (Time, UniqFM Time, UniqFM Time)
+    addTimes :: (Time, UniqFM key Time, UniqFM key Time) -> key
+             -> (Time, UniqFM key Time, UniqFM key Time)
     addTimes (time,starts,ends) n
       --Dont reenter nodes
       | elemUFM n starts

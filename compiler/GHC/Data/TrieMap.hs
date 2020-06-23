@@ -202,8 +202,8 @@ See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for more details on how 
 deterministic.
 -}
 
-instance TrieMap UniqDFM where
-  type Key UniqDFM = Unique
+instance forall key. TrieMap (UniqDFM key elt) where
+  type Key (UniqDFM key elt) = key
   emptyTM = emptyUDFM
   lookupTM k m = lookupUDFM m k
   alterTM k f m = alterUDFM f m k

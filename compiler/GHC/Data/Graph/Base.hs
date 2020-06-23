@@ -45,7 +45,7 @@ type Triv k cls color
 data Graph k cls color
         = Graph {
         -- | All active nodes in the graph.
-          graphMap              :: UniqFM (Node k cls color)  }
+          graphMap              :: UniqFM k (Node k cls color)  }
 
 
 -- | An empty graph.
@@ -57,7 +57,7 @@ initGraph
 
 -- | Modify the finite map holding the nodes in the graph.
 graphMapModify
-        :: (UniqFM (Node k cls color) -> UniqFM (Node k cls color))
+        :: (UniqFM k (Node k cls color) -> UniqFM k (Node k cls color))
         -> Graph k cls color -> Graph k cls color
 
 graphMapModify f graph
