@@ -571,8 +571,8 @@ toIfaceBind fvs (Rec prs)    = IfaceRec [(toIfaceLetBndr b, toIfaceExpr fvs r) |
 
 ---------------------
 toIfaceAlt :: VarSet -> (AltCon, [Var], CoreExpr)
-           -> (IfaceConAlt, [FastString], IfaceExpr)
-toIfaceAlt fvs (c,bs,r) = (toIfaceCon c, map getOccFS bs, toIfaceExpr fvs r)
+           -> (IfaceConAlt, [IfaceBndr], IfaceExpr)
+toIfaceAlt fvs (c,bs,r) = (toIfaceCon c, map toIfaceBndr bs, toIfaceExpr fvs r)
 
 ---------------------
 toIfaceCon :: AltCon -> IfaceConAlt

@@ -1442,7 +1442,7 @@ tcIfaceLit lit = return lit
 
 -------------------------
 tcIfaceAlt :: CoreExpr -> (TyCon, [Type])
-           -> (IfaceConAlt, [FastString], IfaceExpr)
+           -> (IfaceConAlt, [IfaceBndr], IfaceExpr)
            -> IfL (AltCon, [TyVar], CoreExpr)
 tcIfaceAlt _ _ (IfaceDefault, names, rhs)
   = ASSERT( null names ) do
@@ -1464,18 +1464,20 @@ tcIfaceAlt scrut (tycon, inst_tys) (IfaceDataAlt data_occ, arg_strs, rhs)
                (failIfM (ppr scrut $$ ppr con $$ ppr tycon $$ ppr (tyConDataCons tycon)))
         ; tcIfaceDataAlt con inst_tys arg_strs rhs }
 
-tcIfaceDataAlt :: DataCon -> [Type] -> [FastString] -> IfaceExpr
+tcIfaceDataAlt :: DataCon -> [Type] -> [IfaceBndr] -> IfaceExpr
                -> IfL (AltCon, [TyVar], CoreExpr)
 tcIfaceDataAlt con inst_tys arg_strs rhs
   = do  { us <- newUniqueSupply
         ; let uniqs = uniqsFromSupply us
-        ; let (ex_tvs, arg_ids)
-                      = dataConRepFSInstPat arg_strs uniqs con inst_tys
-
-        ; rhs' <- extendIfaceEnvs  ex_tvs       $
-                  extendIfaceIdEnv arg_ids      $
+        -- TODO: This is a hack to reuse dataConRepFS but this is the
+        -- only call site
+        ; let (_ex_tvs, _arg_ids)
+                      = dataConRepFSInstPat (replicate (length arg_strs) (mkFastString "a")) uniqs con inst_tys
+        ; bindIfaceBndrs arg_strs $ \arg_ids -> do
+            rhs' <-
+                  extendIfaceEnvs arg_ids $
                   tcIfaceExpr rhs
-        ; return (DataAlt con, ex_tvs ++ arg_ids, rhs') }
+            return (DataAlt con, arg_ids, rhs') }
 
 {-
 ************************************************************************

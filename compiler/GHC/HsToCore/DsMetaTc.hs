@@ -93,7 +93,7 @@ dsBracketTc :: (Type, Type)
 -- IfaceExpr.
 
 dsBracketTc (rty, ur_ty) exp q@(QuoteWrapper ev_var m_tau) brack splices ev_zs zs
-  = newSysLocalDs (mkListTy (mkBoxedTupleTy [intTy, intTy])) >>= \env_var -> dsExtendBindVar env_var $
+  = newSysLocalDs (mkListTy (mkBoxedTupleTy [intTy, intTy])) >>= \env_var -> dsExtendBindVar env_var $ \env_expr ->
     do
       (bounds_vars, body) <- do_brack brack
       sps <- mapMaybeM (do_one (dVarSetToVarSet bounds_vars)) splices

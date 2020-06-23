@@ -543,12 +543,15 @@ dsGetBindEnv = dsl_binds_env <$> getLclEnv
 dsGetBindVar :: DsM CoreExpr
 dsGetBindVar = dsl_bind_var <$> getLclEnv
 
-dsExtendBindVar :: Var -> DsM a -> DsM a
+dsExtendBindVar :: Var -> (CoreExpr -> DsM a) -> DsM a
 dsExtendBindVar v thing = do
   cc <- dsLookupGlobalId appendName
   updLclEnv (\env ->
     let new_expr e = mkCoreApps (Var cc) [Type (mkBoxedTupleTy [intTy, intTy]), Var v, e]
-    in env { dsl_bind_var = new_expr (dsl_bind_var env) } ) thing
+        nn = new_expr (dsl_bind_var env)
+    in env { dsl_bind_var = nn }) $ do
+      dsGetBindVar >>= thing
+
 
 -- | The @COMPLETE@ pragmas provided by the user for a given `TyCon`.
 dsGetCompleteMatches :: TyCon -> DsM [CompleteMatch]

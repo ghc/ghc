@@ -508,7 +508,7 @@ data IfaceTickish
   | IfaceSource  RealSrcSpan String        -- from SourceNote
   -- no breakpoints: we never export these into interface files
 
-type IfaceAlt = (IfaceConAlt, [IfLclName], IfaceExpr)
+type IfaceAlt = (IfaceConAlt, [IfaceBndr], IfaceExpr)
         -- Note: IfLclName, not IfaceBndr (and same with the case binder)
         -- We reconstruct the kind/type of the thing from the context
         -- thus saving bulk in interface files
@@ -1346,11 +1346,11 @@ pprIfaceExpr add_par (IfaceLet (IfaceRec pairs) body)
 pprIfaceExpr add_par (IfaceTick tickish e)
   = add_par (pprIfaceTickish tickish <+> pprIfaceExpr noParens e)
 
-ppr_alt :: (IfaceConAlt, [IfLclName], IfaceExpr) -> SDoc
+ppr_alt :: (IfaceConAlt, [IfaceBndr], IfaceExpr) -> SDoc
 ppr_alt (con, bs, rhs) = sep [ppr_con_bs con bs,
                          arrow <+> pprIfaceExpr noParens rhs]
 
-ppr_con_bs :: IfaceConAlt -> [IfLclName] -> SDoc
+ppr_con_bs :: IfaceConAlt -> [IfaceBndr] -> SDoc
 ppr_con_bs con bs = ppr con <+> hsep (map ppr bs)
 
 ppr_bind :: (IfaceLetBndr, IfaceExpr) -> SDoc
@@ -1676,7 +1676,7 @@ freeNamesIfExpr (IfaceECase e ty)     = freeNamesIfExpr e &&& freeNamesIfType ty
 freeNamesIfExpr (IfaceCase s _ alts)
   = freeNamesIfExpr s &&& fnList fn_alt alts &&& fn_cons alts
   where
-    fn_alt (_con,_bs,r) = freeNamesIfExpr r
+    fn_alt (_con, bs,r) = freeNamesIfExpr r &&& fnList freeNamesIfBndr bs
 
     -- Depend on the data constructors.  Just one will do!
     -- Note [Tracking data constructors]

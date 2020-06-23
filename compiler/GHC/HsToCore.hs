@@ -67,7 +67,6 @@ import Util
 import MonadUtils
 import OrdList
 import GHC.HsToCore.Docs
-import GHC.Types.Unique.Set
 
 import Data.List
 import Data.IORef
@@ -306,10 +305,6 @@ runTopSplices cbs splices = do
         doOne (SpliceNode (ce, h)) =
           runTopSpliceDs [] ce h
         doOne (DefnNode (v, ce)) = compileDefnDS v ce
-
-
-
-
 
 
 {-
