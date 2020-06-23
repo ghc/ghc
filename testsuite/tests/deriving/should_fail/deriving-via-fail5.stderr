@@ -59,12 +59,12 @@ deriving-via-fail5.hs:8:1: error:
         at deriving-via-fail5.hs:(8,1)-(9,24)
     • In the expression:
         GHC.Prim.coerce
-          @([] (Identity b) -> ShowS) @([] (Foo4 a) -> ShowS)
+          @([Identity b] -> ShowS) @([Foo4 a] -> ShowS)
           (showList @(Identity b))
       In an equation for ‘showList’:
           showList
             = GHC.Prim.coerce
-                @([] (Identity b) -> ShowS) @([] (Foo4 a) -> ShowS)
+                @([Identity b] -> ShowS) @([Foo4 a] -> ShowS)
                 (showList @(Identity b))
       When typechecking the code for ‘showList’
         in a derived instance for ‘Show (Foo4 a)’:
