@@ -85,7 +85,14 @@ import Data.Data
 import qualified Data.Semigroup as Semi
 import Data.Functor.Classes (Eq1 (..))
 
-
+-- | A finite map from @uniques@ of one type to
+-- elements in another type.
+--
+-- The key is just here to keep us honest. It's always safe
+-- to use a single type as key.
+-- If two types don't overlap in their uniques it's also safe
+-- to index the same map at multiple key types. But this is
+-- very much discouraged.
 newtype UniqFM key ele = UFM (M.IntMap ele)
   deriving (Data, Eq, Functor)
   -- Nondeterministic Foldable and Traversable instances are accessible through

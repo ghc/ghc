@@ -129,6 +129,12 @@ instance Eq val => Eq (TaggedVal val) where
   (TaggedVal v1 _) == (TaggedVal v2 _) = v1 == v2
 
 -- | Type of unique deterministic finite maps
+--
+-- The key is just here to keep us honest. It's always safe
+-- to use a single type as key.
+-- If two types don't overlap in their uniques it's also safe
+-- to index the same map at multiple key types. But this is
+-- very much discouraged.
 data UniqDFM key ele =
   UDFM
     !(M.IntMap (TaggedVal ele)) -- A map where keys are Unique's values and
