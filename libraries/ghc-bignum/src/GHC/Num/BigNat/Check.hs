@@ -8,7 +8,6 @@
 {-# LANGUAGE NegativeLiterals #-}
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
-{-# OPTIONS_GHC -ddump-simpl -ddump-to-file #-}
 
 -- | Check Native implementation against another backend
 module GHC.Num.BigNat.Check where
@@ -43,7 +42,7 @@ bignat_compare a b =
       gr = Other.bignat_compare a b
       nr = Native.bignat_compare a b
    in case gr ==# nr of
-         0# -> case unexpectedValue of I# x -> x
+         0# -> unexpectedValue_Int# void#
          _  -> gr
 
 mwaCompare
@@ -81,7 +80,10 @@ mwaCompareOp mwa f g s =
    case mwaTrimZeroes# mwa s of { s ->
    case mwaTrimZeroes# mwb s of { s ->
    case mwaCompare mwa mwb s of
-      (# s, 0# #) -> case unexpectedValue of _ -> s
+      (# s, 0# #) -> case unexpectedValue of
+                        !_ -> s
+                        -- see Note [ghc-bignum exceptions] in
+                        -- GHC.Num.Primitives
       (# s, _  #) -> s
    }}}}}}
 
@@ -106,7 +108,9 @@ mwaCompareOp2 mwa mwb f g s =
    case mwaCompare mwa mwa' s of { (# s, ba #) ->
    case mwaCompare mwb mwb' s of { (# s, bb #) ->
    case ba &&# bb of
-      0# -> case unexpectedValue of _ -> s
+      0# -> case unexpectedValue of
+               !_ -> s
+               -- see Note [ghc-bignum exceptions] in GHC.Num.Primitives
       _  -> s
    }}}}}}}}}}}}
 
@@ -122,13 +126,18 @@ mwaCompareOpBool mwa f g s =
    case f mwa s of { (# s, ra #) ->
    case g mwb s of { (# s, rb #) ->
    case ra ==# rb of
-      0# -> case unexpectedValue of _ -> (# s, ra #)
+      0# -> case unexpectedValue of
+               !_ -> (# s, ra #)
+               -- see Note [ghc-bignum exceptions] in GHC.Num.Primitives
       _  -> case (ra ==# 1#) of -- don't compare MWAs if overflow signaled!
          1# -> (# s, ra #)
          _  -> case mwaTrimZeroes# mwa s of { s ->
                case mwaTrimZeroes# mwb s of { s ->
                case mwaCompare mwa mwb s of
-                  (# s, 0# #) -> case unexpectedValue of _ -> (# s, ra #)
+                  (# s, 0# #) -> case unexpectedValue of
+                                    !_ -> (# s, ra #)
+                                    -- see Note [ghc-bignum exceptions] in
+                                    -- GHC.Num.Primitives
                   _  -> (# s, ra #)
    }}}}}}
 
@@ -147,7 +156,9 @@ mwaCompareOpWord mwa f g s =
    case mwaTrimZeroes# mwb s of { s ->
    case mwaCompare mwa mwb s of
       (# s, b #) -> case b &&# (ra `eqWord#` rb) of
-         0# -> case unexpectedValue of _ -> (# s, ra #)
+         0# -> case unexpectedValue of
+                  !_ -> (# s, ra #)
+                  -- see Note [ghc-bignum exceptions] in GHC.Num.Primitives
          _  -> (# s, ra #)
    }}}}}}
 
@@ -369,8 +380,7 @@ bignat_rem_word wa b =
       nr = Native.bignat_rem_word wa b
    in case gr `eqWord#` nr of
        1# -> gr
-       _  -> case unexpectedValue of
-               W# e -> e
+       _  -> unexpectedValue_Word# void#
 
 bignat_gcd
    :: MutableWordArray# RealWorld
@@ -393,8 +403,7 @@ bignat_gcd_word wa b =
       nr = Native.bignat_gcd_word wa b
    in case gr `eqWord#` nr of
        1# -> gr
-       _  -> case unexpectedValue of
-               W# e -> e
+       _  -> unexpectedValue_Word# void#
 
 bignat_gcd_word_word
    :: Word#
@@ -406,8 +415,7 @@ bignat_gcd_word_word a b =
       nr = Native.bignat_gcd_word_word a b
    in case gr `eqWord#` nr of
        1# -> gr
-       _  -> case unexpectedValue of
-               W# e -> e
+       _  -> unexpectedValue_Word# void#
 
 bignat_encode_double :: WordArray# -> Int# -> Double#
 bignat_encode_double a e =
@@ -417,7 +425,8 @@ bignat_encode_double a e =
    in case gr ==## nr of
        1# -> gr
        _  -> case unexpectedValue of
-               _ -> gr
+               !_ -> 0.0##
+               -- see Note [ghc-bignum exceptions] in GHC.Num.Primitives
 
 bignat_powmod_word :: WordArray# -> WordArray# -> Word# -> Word#
 bignat_powmod_word b e m =
@@ -426,8 +435,7 @@ bignat_powmod_word b e m =
       nr = Native.bignat_powmod_word b e m
    in case gr `eqWord#` nr of
        1# -> gr
-       _  -> case unexpectedValue of
-               W# e -> e
+       _  -> unexpectedValue_Word# void#
 
 bignat_powmod
    :: MutableWordArray# RealWorld
@@ -452,5 +460,4 @@ bignat_powmod_words b e m =
       nr = Native.bignat_powmod_words b e m
    in case gr `eqWord#` nr of
        1# -> gr
-       _  -> case unexpectedValue of
-               W# e -> e
+       _  -> unexpectedValue_Word# void#
