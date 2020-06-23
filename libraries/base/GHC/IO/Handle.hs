@@ -237,7 +237,8 @@ hSetBuffering handle mode =
                 case mode of
 #if !defined(mingw32_HOST_OS)
         -- 'raw' mode under win32 is a bit too specialised (and troublesome
-        -- for most common uses), so simply disable its use here.
+        -- for most common uses), so simply disable its use here when not using
+        -- WinIO.
                   NoBuffering -> IODevice.setRaw haDevice True
 #else
                   NoBuffering -> return () <!> IODevice.setRaw haDevice True
