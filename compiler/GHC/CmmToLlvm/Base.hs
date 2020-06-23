@@ -315,7 +315,7 @@ data LlvmEnv = LlvmEnv
   , envOutput :: BufHandle         -- ^ Output buffer
   , envMask :: !Char               -- ^ Mask for creating unique values
   , envFreshMeta :: MetaId         -- ^ Supply of fresh metadata IDs
-  , envUniqMeta :: UniqFM MetaId   -- ^ Global metadata nodes
+  , envUniqMeta :: UniqFM Unique MetaId   -- ^ Global metadata nodes
   , envFunMap :: LlvmEnvMap        -- ^ Global functions so far, with type
   , envAliases :: UniqSet LMString -- ^ Globals that we had to alias, see [Llvm Forward References]
   , envUsedVars :: [LlvmVar]       -- ^ Pointers to be added to llvm.used (see @cmmUsedLlvmGens@)
@@ -325,7 +325,7 @@ data LlvmEnv = LlvmEnv
   , envStackRegs :: [GlobalReg]    -- ^ Non-constant registers (alloca'd in the function prelude)
   }
 
-type LlvmEnvMap = UniqFM LlvmType
+type LlvmEnvMap = UniqFM Unique LlvmType
 
 -- | The Llvm monad. Wraps @LlvmEnv@ state as well as the @IO@ monad
 newtype LlvmM a = LlvmM { runLlvmM :: LlvmEnv -> IO (a, LlvmEnv) }
@@ -407,13 +407,13 @@ withClearVars m = LlvmM $ \env -> do
 
 -- | Insert variables or functions into the environment.
 varInsert, funInsert :: Uniquable key => key -> LlvmType -> LlvmM ()
-varInsert s t = modifyEnv $ \env -> env { envVarMap = addToUFM (envVarMap env) s t }
-funInsert s t = modifyEnv $ \env -> env { envFunMap = addToUFM (envFunMap env) s t }
+varInsert s t = modifyEnv $ \env -> env { envVarMap = addToUFM (envVarMap env) (getUnique s) t }
+funInsert s t = modifyEnv $ \env -> env { envFunMap = addToUFM (envFunMap env) (getUnique s) t }
 
 -- | Lookup variables or functions in the environment.
 varLookup, funLookup :: Uniquable key => key -> LlvmM (Maybe LlvmType)
-varLookup s = getEnv (flip lookupUFM s . envVarMap)
-funLookup s = getEnv (flip lookupUFM s . envFunMap)
+varLookup s = getEnv (flip lookupUFM (getUnique s) . envVarMap)
+funLookup s = getEnv (flip lookupUFM (getUnique s) . envFunMap)
 
 -- | Set a register as allocated on the stack
 markStackReg :: GlobalReg -> LlvmM ()

@@ -871,7 +871,7 @@ instance Outputable Token where
 -- facilitates using a keyword in two different extensions that can be
 -- activated independently)
 --
-reservedWordsFM :: UniqFM (Token, ExtsBitmap)
+reservedWordsFM :: UniqFM FastString (Token, ExtsBitmap)
 reservedWordsFM = listToUFM $
     map (\(x, y, z) -> (mkFastString x, (y, z)))
         [( "_",              ITunderscore,    0 ),
@@ -954,7 +954,7 @@ Also, note that these are included in the `varid` production in the parser --
 a key detail to make all this work.
 -------------------------------------}
 
-reservedSymsFM :: UniqFM (Token, IsUnicodeSyntax, ExtsBitmap)
+reservedSymsFM :: UniqFM FastString (Token, IsUnicodeSyntax, ExtsBitmap)
 reservedSymsFM = listToUFM $
     map (\ (x,w,y,z) -> (mkFastString x,(w,y,z)))
       [ ("..",  ITdotdot,                   NormalSyntax,  0 )
