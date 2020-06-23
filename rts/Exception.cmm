@@ -14,6 +14,9 @@
 #include "RaiseAsync.h"
 
 import CLOSURE ghczmprim_GHCziTypes_True_closure;
+import CLOSURE base_GHCziExceptionziType_divZZeroException_closure;
+import CLOSURE base_GHCziExceptionziType_underflowException_closure;
+import CLOSURE base_GHCziExceptionziType_overflowException_closure;
 
 /* -----------------------------------------------------------------------------
    Exception Primitives
@@ -631,6 +634,22 @@ retry_pop_stack:
 stg_raiseIOzh (P_ exception)
 {
     jump stg_raisezh (exception);
+}
+
+
+stg_raiseDivZZerozh ()
+{
+    jump stg_raisezh(base_GHCziExceptionziType_divZZeroException_closure);
+}
+
+stg_raiseUnderflowzh ()
+{
+    jump stg_raisezh(base_GHCziExceptionziType_underflowException_closure);
+}
+
+stg_raiseOverflowzh ()
+{
+    jump stg_raisezh(base_GHCziExceptionziType_overflowException_closure);
 }
 
 /* The FFI doesn't support variadic C functions so we can't directly expose

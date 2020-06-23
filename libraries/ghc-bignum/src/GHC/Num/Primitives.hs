@@ -87,6 +87,8 @@ where
 
 #if (__GLASGOW_HASKELL__ < 811)
 import GHC.Magic
+#else
+import GHC.Prim.Exception
 #endif
 
 import GHC.Prim
@@ -241,7 +243,7 @@ wordLog2# w   = (WORD_SIZE_IN_BITS## `minusWord#` 1##) `minusWord#` (clz# w)
 wordLogBase# :: Word# -> Word# -> Word#
 wordLogBase# base a
    | isTrue# (base `leWord#` 1##)
-   = case unexpectedValue of _ -> 0##
+   = case unexpectedValue of W# err -> err
 
    | 2## <- base
    = wordLog2# a
@@ -593,13 +595,13 @@ ioBool (IO io) s = case io s of
 #if (__GLASGOW_HASKELL__ >= 811)
 
 underflow :: a
-underflow = raiseUnderflow# void#
+underflow = raiseUnderflow
 
 divByZero :: a
-divByZero = raiseDivZero# void#
+divByZero = raiseDivZero
 
 unexpectedValue :: a
-unexpectedValue = raiseOverflow# void#
+unexpectedValue = raiseOverflow
 
 #else
 
