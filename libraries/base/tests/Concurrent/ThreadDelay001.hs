@@ -30,7 +30,7 @@ delay n = do
     putStrLn "threadDelay returned early"
     print(sec_start, sec_end, n, diff*1000000)
 
-#elif
+#else
   tS <- getCurrentTime
   threadDelay n
   tE <- getCurrentTime
