@@ -74,6 +74,12 @@ integerZero = IS 0#
 integerOne :: Integer
 integerOne = IS 1#
 
+raiseDivZero_Integer :: Integer
+raiseDivZero_Integer = case raiseDivZero of
+   !_ -> IS 0#
+   -- see Note [ghc-bignum exceptions] in GHC.Num.Primitives
+
+
 ---------------------------------------------------------------------
 -- Conversions
 ---------------------------------------------------------------------
@@ -767,7 +773,9 @@ integerQuotRem# :: Integer -> Integer -> (# Integer, Integer #)
 {-# NOINLINE integerQuotRem# #-}
 integerQuotRem# !n      (IS 1#) = (# n, IS 0# #)
 integerQuotRem# !n     (IS -1#) = let !q = integerNegate n in (# q, (IS 0#) #)
-integerQuotRem# !_      (IS 0#) = (# divByZero, divByZero #)
+integerQuotRem# !_      (IS 0#) = case raiseDivZero of
+                                    !_ -> (# IS 0#, IS 0# #)
+                                    -- see Note [ghc-bignum exceptions] in GHC.Num.Primitives
 integerQuotRem# (IS 0#) _       = (# IS 0#, IS 0# #)
 integerQuotRem# (IS n#) (IS d#) = case quotRemInt# n# d# of
     (# q#, r# #) -> (# IS q#, IS r# #)
@@ -808,7 +816,7 @@ integerQuot :: Integer -> Integer -> Integer
 {-# NOINLINE integerQuot #-}
 integerQuot !n      (IS 1#)  = n
 integerQuot !n      (IS -1#) = integerNegate n
-integerQuot !_      (IS 0#)  = divByZero
+integerQuot !_      (IS 0#)  = raiseDivZero_Integer
 integerQuot (IS 0#) _        = IS 0#
 integerQuot (IS n#) (IS d#)  = IS (quotInt# n# d#)
 integerQuot (IP n)  (IS d#)
