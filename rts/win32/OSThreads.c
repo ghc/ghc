@@ -513,11 +513,6 @@ KernelThreadId kernelThreadId (void)
 
 /* A Condition is represented by a Win32 Event object;
  * a Mutex by a Mutex kernel object.
- *
- * ToDo: go through the defn and usage of these to
- * make sure the semantics match up with that of
- * the (assumed) pthreads behaviour. This is really
- * just a first pass at getting something compilable.
  */
 
 void
