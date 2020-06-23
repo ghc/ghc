@@ -90,6 +90,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Instantiate ( tcInstInvisibleTyBinders, tcInstInvisibleTyBinder )
 import GHC.Core.Type
 import GHC.Builtin.Types.Prim
+import GHC.Types.Name.Env
 import GHC.Types.Name.Reader( lookupLocalRdrOcc )
 import GHC.Types.Var
 import GHC.Types.Var.Set
@@ -106,6 +107,7 @@ import GHC.Types.SrcLoc
 import GHC.Settings.Constants ( mAX_CTUPLE_SIZE )
 import GHC.Utils.Error( MsgDoc )
 import GHC.Types.Unique
+import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Utils.Misc
 import GHC.Types.Unique.Supply
@@ -833,8 +835,17 @@ tc_infer_hs_type mode (HsSpliceTy _ (HsSpliced _ _ (HsSplicedTy ty)))
   = tc_infer_hs_type mode ty
 
 tc_infer_hs_type mode (HsDocTy _ ty _) = tc_infer_lhs_type mode ty
-tc_infer_hs_type _    (XHsType (NHsCoreTy ty))
-  = return (ty, tcTypeKind ty)
+
+-- See Note [Typechecking NHsCoreTys]
+tc_infer_hs_type _ (XHsType (NHsCoreTy ty))
+  = do env <- getLclEnv
+       let subst_prs = [ (nm, tv)
+                       | ATyVar nm tv <- nameEnvElts (tcl_env env) ]
+           subst = mkTvSubst
+                     (mkInScopeSet $ mkVarSet $ map snd subst_prs)
+                     (listToUFM $ map (liftSnd mkTyVarTy) subst_prs)
+           ty' = substTy subst ty
+       return (ty', tcTypeKind ty')
 
 tc_infer_hs_type _ (HsExplicitListTy _ _ tys)
   | null tys  -- this is so that we can use visible kind application with '[]
@@ -846,6 +857,47 @@ tc_infer_hs_type mode other_ty
   = do { kv <- newMetaKindVar
        ; ty' <- tc_hs_type mode other_ty kv
        ; return (ty', kv) }
+
+{-
+Note [Typechecking NHsCoreTys]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+NHsCoreTy is an escape hatch that allows embedding Core Types in HsTypes.
+As such, there's not much to be done in order to typecheck an NHsCoreTy,
+since it's already been typechecked to some extent. There is one thing that
+we must do, however: we must substitute the type variables from the tcl_env.
+To see why, consider GeneralizedNewtypeDeriving, which is one of the main
+clients of NHsCoreTy (example adapted from #14579):
+
+  newtype T a = MkT a deriving newtype Eq
+
+This will produce an InstInfo GhcPs that looks roughly like this:
+
+  instance forall a_1. Eq a_1 => Eq (T a_1) where
+    (==) = coerce @(  a_1 ->   a_1 -> Bool) -- The type within @(...) is an NHsCoreTy
+                  @(T a_1 -> T a_1 -> Bool) -- So is this
+                  (==)
+
+This is then fed into the renamer. Since all of the type variables in this
+InstInfo use Exact RdrNames, the resulting InstInfo GhcRn looks basically
+identical. Things get more interesting when the InstInfo is fed into the
+typechecker, however. GHC will first generate fresh skolems to instantiate
+the instance-bound type variables with. In the example above, we might generate
+the skolem a_2 and use that to instantiate a_1, which extends the local type
+environment (tcl_env) with [a_1 :-> a_2]. This gives us:
+
+  instance forall a_2. Eq a_2 => Eq (T a_2) where ...
+
+To ensure that the body of this instance is well scoped, every occurrence of
+the `a` type variable should refer to a_2, the new skolem. However, the
+NHsCoreTys mention a_1, not a_2. Luckily, the tcl_env provides exactly the
+substitution we need ([a_1 :-> a_2]) to fix up the scoping. We apply this
+substitution to each NHsCoreTy and all is well:
+
+  instance forall a_2. Eq a_2 => Eq (T a_2) where
+    (==) = coerce @(  a_2 ->   a_2 -> Bool)
+                  @(T a_2 -> T a_2 -> Bool)
+                  (==)
+-}
 
 ------------------------------------------
 tcLHsType :: LHsType GhcRn -> TcKind -> TcM TcType
