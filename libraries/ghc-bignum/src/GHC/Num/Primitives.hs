@@ -68,9 +68,13 @@ module GHC.Num.Primitives
    , wordWriteMutableByteArrayLE#
    , wordWriteMutableByteArrayBE#
    -- * Exception
-   , underflow
-   , divByZero
+   , raiseUnderflow
+   , raiseUnderflow_Word#
+   , raiseDivZero
+   , raiseDivZero_Word#
    , unexpectedValue
+   , unexpectedValue_Int#
+   , unexpectedValue_Word#
    -- * IO
    , ioWord#
    , ioInt#
@@ -87,6 +91,8 @@ where
 
 #if (__GLASGOW_HASKELL__ < 811)
 import GHC.Magic
+#else
+import GHC.Prim.Exception
 #endif
 
 import GHC.Prim
@@ -241,7 +247,7 @@ wordLog2# w   = (WORD_SIZE_IN_BITS## `minusWord#` 1##) `minusWord#` (clz# w)
 wordLogBase# :: Word# -> Word# -> Word#
 wordLogBase# base a
    | isTrue# (base `leWord#` 1##)
-   = case unexpectedValue of _ -> 0##
+   = unexpectedValue_Word# void#
 
    | 2## <- base
    = wordLog2# a
@@ -590,32 +596,63 @@ ioBool (IO io) s = case io s of
 -- Exception
 ----------------------------------
 
+-- Note [ghc-bignum exceptions]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- `ghc-bignum` package can't depend on `base` package (it would create a cyclic
+-- dependency). Hence it can't import "Control.Exception" and throw exceptions
+-- the usual way. Instead it uses some wired-in functions from `ghc-prim` which
+-- themselves call wired-in functions from the RTS: raiseOverflow,
+-- raiseUnderflow, raiseDivZero.
+--
+-- We have to be careful when we want to throw an exception instead of returning
+-- an unlifted value (e.g. Word#, unboxed tuple, etc.). We have to ensure the
+-- evaluation of the exception throwing function before returning a dummy value,
+-- otherwise it will be removed by the simplifier as dead-code.
+--
+--    foo :: ... -> Word#
+--    foo = ... case raiseDivZero of
+--                !_ -> 0## -- the bang-pattern is necessary!
+--                          -- 0## is a dummy value (unreachable code)
+--
+
+unexpectedValue_Int# :: Void# -> Int#
+unexpectedValue_Int# _ = case unexpectedValue of
+   !_ -> 0# -- see Note [ghc-bignum exceptions]
+
+unexpectedValue_Word# :: Void# -> Word#
+unexpectedValue_Word# _ = case unexpectedValue of
+   !_ -> 0## -- see Note [ghc-bignum exceptions]
+
+raiseDivZero_Word# :: Void# -> Word#
+raiseDivZero_Word# _ = case raiseDivZero of
+   !_ -> 0## -- see Note [ghc-bignum exceptions]
+
+raiseUnderflow_Word# :: Void# -> Word#
+raiseUnderflow_Word# _ = case raiseUnderflow of
+   !_ -> 0## -- see Note [ghc-bignum exceptions]
+
 #if (__GLASGOW_HASKELL__ >= 811)
 
-underflow :: a
-underflow = raiseUnderflow# void#
-
-divByZero :: a
-divByZero = raiseDivZero# void#
-
 unexpectedValue :: a
-unexpectedValue = raiseOverflow# void#
+unexpectedValue = raiseOverflow
 
 #else
 
 -- Before GHC 8.11 we use the exception trick taken from #14664
 exception :: a
+{-# NOINLINE exception #-}
 exception = runRW# \s ->
    case atomicLoop s of
       (# _, a #) -> a
    where
       atomicLoop s = atomically# atomicLoop s
 
-underflow :: a
-underflow = exception
+raiseUnderflow :: a
+raiseUnderflow = exception
 
-divByZero :: a
-divByZero = exception
+raiseDivZero :: a
+raiseDivZero = exception
 
 unexpectedValue :: a
 unexpectedValue = exception

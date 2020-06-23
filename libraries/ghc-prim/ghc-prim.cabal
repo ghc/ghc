@@ -47,6 +47,7 @@ Library
         GHC.Magic
         GHC.Prim.Ext
         GHC.Prim.Panic
+        GHC.Prim.Exception
         GHC.PrimopWrappers
         GHC.Tuple
         GHC.Types

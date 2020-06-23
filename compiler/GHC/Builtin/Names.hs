@@ -533,7 +533,8 @@ genericTyConNames = [
 pRELUDE :: Module
 pRELUDE         = mkBaseModule_ pRELUDE_NAME
 
-gHC_PRIM, gHC_PRIM_PANIC, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
+gHC_PRIM, gHC_PRIM_PANIC, gHC_PRIM_EXCEPTION,
+    gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     gHC_CLASSES, gHC_PRIMOPWRAPPERS, gHC_BASE, gHC_ENUM,
     gHC_GHCI, gHC_GHCI_HELPERS, gHC_CSTRING,
     gHC_SHOW, gHC_READ, gHC_NUM, gHC_MAYBE,
@@ -551,6 +552,7 @@ gHC_PRIM, gHC_PRIM_PANIC, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
 
 gHC_PRIM        = mkPrimModule (fsLit "GHC.Prim")   -- Primitive types and values
 gHC_PRIM_PANIC  = mkPrimModule (fsLit "GHC.Prim.Panic")
+gHC_PRIM_EXCEPTION = mkPrimModule (fsLit "GHC.Prim.Exception")
 gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
 gHC_MAGIC       = mkPrimModule (fsLit "GHC.Magic")
 gHC_CSTRING     = mkPrimModule (fsLit "GHC.CString")
@@ -2190,7 +2192,9 @@ wildCardKey, absentErrorIdKey, augmentIdKey, appendIdKey,
     unpackCStringFoldrIdKey, unpackCStringFoldrUtf8IdKey,
     unpackCStringIdKey,
     typeErrorIdKey, divIntIdKey, modIntIdKey,
-    absentSumFieldErrorIdKey, cstringLengthIdKey :: Unique
+    absentSumFieldErrorIdKey, cstringLengthIdKey,
+    raiseOverflowIdKey, raiseUnderflowIdKey, raiseDivZeroIdKey
+    :: Unique
 
 wildCardKey                   = mkPreludeMiscIdUnique  0  -- See Note [WildCard binders]
 absentErrorIdKey              = mkPreludeMiscIdUnique  1
@@ -2220,6 +2224,9 @@ typeErrorIdKey                = mkPreludeMiscIdUnique 23
 divIntIdKey                   = mkPreludeMiscIdUnique 24
 modIntIdKey                   = mkPreludeMiscIdUnique 25
 cstringLengthIdKey            = mkPreludeMiscIdUnique 26
+raiseOverflowIdKey            = mkPreludeMiscIdUnique 27
+raiseUnderflowIdKey           = mkPreludeMiscIdUnique 28
+raiseDivZeroIdKey             = mkPreludeMiscIdUnique 29
 
 concatIdKey, filterIdKey, zipIdKey,
     bindIOIdKey, returnIOIdKey, newStablePtrIdKey,
