@@ -347,6 +347,16 @@ LDV_recordDead( const StgClosure *c, uint32_t size )
 STATIC_INLINE void
 initEra(Census *census)
 {
+    // N.B. When not LDV profiling we reinitialise the same Census over
+    // and over again. Consequently, we need to ensure that we free the
+    // resources from the previous census.
+    if (census->hash) {
+        freeHashTable(census->hash, NULL);
+    }
+    if (census->arena) {
+        arenaFree(census->arena);
+    }
+
     census->hash  = allocHashTable();
     census->ctrs  = NULL;
     census->arena = newArena();
@@ -511,6 +521,11 @@ initHeapProfiling(void)
 
     censuses = stgMallocBytes(sizeof(Census) * n_censuses, "initHeapProfiling");
 
+    // Ensure that arena and hash are NULL since otherwise initEra will attempt to free them.
+    for (unsigned int i=0; i < n_censuses; i++) {
+        censuses[i].arena = NULL;
+        censuses[i].hash = NULL;
+    }
     initEra( &censuses[era] );
 
     /* initProfilingLogFile(); */
