@@ -352,7 +352,10 @@ UniqFM and UniqDFM.
 See Note [Deterministic UniqFM].
 -}
 
-type FamInstEnv = UniqDFM FamilyInstEnv  -- Maps a family to its instances
+-- This is used both with Names, and TyCons.
+-- But every tyCon has a name so just use the
+-- names as key for now.
+type FamInstEnv = UniqDFM Name FamilyInstEnv  -- Maps a family to its instances
      -- See Note [FamInstEnv]
      -- See Note [FamInstEnv determinism]
 
@@ -388,7 +391,7 @@ familyInstances :: (FamInstEnv, FamInstEnv) -> TyCon -> [FamInst]
 familyInstances (pkg_fie, home_fie) fam
   = get home_fie ++ get pkg_fie
   where
-    get env = case lookupUDFM env fam of
+    get env = case lookupUDFM env (tyConName fam) of
                 Just (FamIE insts) -> insts
                 Nothing                      -> []
 
@@ -767,7 +770,7 @@ lookupFamInstEnvByTyCon :: FamInstEnvs -> TyCon -> [FamInst]
 lookupFamInstEnvByTyCon (pkg_ie, home_ie) fam_tc
   = get pkg_ie ++ get home_ie
   where
-    get ie = case lookupUDFM ie fam_tc of
+    get ie = case lookupUDFM ie (tyConName fam_tc) of
                Nothing          -> []
                Just (FamIE fis) -> fis
 
@@ -939,7 +942,7 @@ lookupFamInstEnvInjectivityConflicts injList (pkg_ie, home_ie)
           | otherwise = True
 
       lookup_inj_fam_conflicts ie
-          | isOpenFamilyTyCon fam, Just (FamIE insts) <- lookupUDFM ie fam
+          | isOpenFamilyTyCon fam, Just (FamIE insts) <- lookupUDFM ie (tyConName fam)
           = map (coAxiomSingleBranch . fi_axiom) $
             filter isInjConflict insts
           | otherwise = []
@@ -979,7 +982,7 @@ lookup_fam_inst_env'          -- The worker, local to this module
     -> [FamInstMatch]
 lookup_fam_inst_env' match_fun ie fam match_tys
   | isOpenFamilyTyCon fam
-  , Just (FamIE insts) <- lookupUDFM ie fam
+  , Just (FamIE insts) <- lookupUDFM ie (tyConName fam)
   = find insts    -- The common case
   | otherwise = []
   where

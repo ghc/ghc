@@ -63,7 +63,6 @@ import GHC.Types.Basic
 import GHC.Utils.Binary
 import GHC.Settings.Constants
 import GHC.Platform
-import GHC.Types.Name
 import GHC.Types.Unique.FM
 import GHC.Utils.Misc
 

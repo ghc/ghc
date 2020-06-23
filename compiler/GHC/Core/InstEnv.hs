@@ -385,7 +385,12 @@ Testing with nofib and validate detected no difference between UniqFM and
 UniqDFM. See also Note [Deterministic UniqFM]
 -}
 
-type InstEnv = UniqDFM ClsInstEnv      -- Maps Class to instances for that class
+-- Class has a Unique which is the same as it's tyCon.
+-- TyCon has a unique which is the same as it's Name.
+-- Name just has a unique which is it's own.
+-- We use all three to index into InstEnv ... so I'm giving
+-- it a key of Name for now.
+type InstEnv = UniqDFM Name ClsInstEnv      -- Maps Class to instances for that class
   -- See Note [InstEnv determinism]
 
 -- | 'InstEnvs' represents the combination of the global type class instance
@@ -448,7 +453,7 @@ classInstances :: InstEnvs -> Class -> [ClsInst]
 classInstances (InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = vis_mods }) cls
   = get home_ie ++ get pkg_ie
   where
-    get env = case lookupUDFM env cls of
+    get env = case lookupUDFM env (className cls) of
                 Just (ClsIE insts) -> filter (instIsVisible vis_mods) insts
                 Nothing            -> []
 
@@ -480,7 +485,7 @@ deleteFromInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm })
 deleteDFunFromInstEnv :: InstEnv -> DFunId -> InstEnv
 -- Delete a specific instance fron an InstEnv
 deleteDFunFromInstEnv inst_env dfun
-  = adjustUDFM adjust inst_env cls
+  = adjustUDFM adjust inst_env (className cls)
   where
     (_, _, cls, _) = tcSplitDFunTy (idType dfun)
     adjust (ClsIE items) = ClsIE (filterOut same_dfun items)
@@ -790,7 +795,7 @@ lookupInstEnv' ie vis_mods cls tys
     all_tvs    = all isNothing rough_tcs
 
     --------------
-    lookup env = case lookupUDFM env cls of
+    lookup env = case lookupUDFM env (className cls) of
                    Nothing -> ([],[])   -- No instances for this class
                    Just (ClsIE insts) -> find [] [] insts
 

@@ -270,7 +270,7 @@ assignColors colors graph ks
  where  assignColors' :: UniqFM cls (UniqSet color)       -- ^ map of (node class -> set of colors available for this class).
                         -> Graph k cls color            -- ^ the graph
                         -> [k]                          -- ^ nodes to assign a color to.
-                        -> [k]                          -- ^ Assigned nodes?
+                        -> [k]
                         -> ( Graph k cls color          -- the colored graph
                         , [k])
         assignColors' _ graph prob []

@@ -645,7 +645,7 @@ checkNode graph node
 
 slurpNodeConflictCount
         :: Graph k cls color
-        -> UniqFM k (Int, Int)    -- ^ (conflict neighbours, num nodes with that many conflicts)
+        -> UniqFM Unique (Int, Int)    -- ^ (conflict neighbours, num nodes with that many conflicts)
 
 slurpNodeConflictCount graph
         = addListToUFM_C_Directly

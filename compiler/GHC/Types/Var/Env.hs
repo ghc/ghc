@@ -439,20 +439,24 @@ delTidyEnvList (occ_env, var_env) vs = (occ_env', var_env')
 ************************************************************************
 -}
 
+-- We would like this to be `UniqFM Var elt`
+-- but the code uses various key types.
+-- So for now make it explicitly untyped
+
 -- | Variable Environment
 type VarEnv elt     = UniqFM Var elt
 
 -- | Identifier Environment
-type IdEnv elt      = VarEnv elt
+type IdEnv elt      = UniqFM Id elt
 
 -- | Type Variable Environment
-type TyVarEnv elt   = VarEnv elt
+type TyVarEnv elt   = UniqFM Var elt
 
 -- | Type or Coercion Variable Environment
-type TyCoVarEnv elt = VarEnv elt
+type TyCoVarEnv elt = UniqFM TyCoVar elt
 
 -- | Coercion Variable Environment
-type CoVarEnv elt   = VarEnv elt
+type CoVarEnv elt   = UniqFM CoVar elt
 
 emptyVarEnv       :: VarEnv a
 mkVarEnv          :: [(Var, a)] -> VarEnv a

@@ -32,7 +32,7 @@ where
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Types.Name (ModuleName)
+import GHC.Unit.Module.Name (ModuleName)
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
