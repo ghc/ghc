@@ -352,7 +352,10 @@ UniqFM and UniqDFM.
 See Note [Deterministic UniqFM].
 -}
 
-type FamInstEnv = UniqDFM FamilyInstEnv  -- Maps a family to its instances
+-- Internally we sometimes index by Name instead of TyCon despite
+-- of what the type says. This is safe since
+-- getUnique (tyCon) == getUniqe (tcName tyCon)
+type FamInstEnv = UniqDFM TyCon FamilyInstEnv  -- Maps a family to its instances
      -- See Note [FamInstEnv]
      -- See Note [FamInstEnv determinism]
 
@@ -364,6 +367,14 @@ newtype FamilyInstEnv
 
 instance Outputable FamilyInstEnv where
   ppr (FamIE fs) = text "FamIE" <+> vcat (map ppr fs)
+
+-- | Index a FamInstEnv by the tyCons name.
+toNameInstEnv :: FamInstEnv -> UniqDFM Name FamilyInstEnv
+toNameInstEnv = unsafeCastUDFMKey
+
+-- | Create a FamInstEnv from Name indices.
+fromNameInstEnv :: UniqDFM Name FamilyInstEnv -> FamInstEnv
+fromNameInstEnv = unsafeCastUDFMKey
 
 -- INVARIANTS:
 --  * The fs_tvs are distinct in each FamInst
@@ -398,7 +409,7 @@ extendFamInstEnvList inst_env fis = foldl' extendFamInstEnv inst_env fis
 extendFamInstEnv :: FamInstEnv -> FamInst -> FamInstEnv
 extendFamInstEnv inst_env
                  ins_item@(FamInst {fi_fam = cls_nm})
-  = addToUDFM_C add inst_env cls_nm (FamIE [ins_item])
+  = fromNameInstEnv $ addToUDFM_C add (toNameInstEnv inst_env) cls_nm (FamIE [ins_item])
   where
     add (FamIE items) _ = FamIE (ins_item:items)
 

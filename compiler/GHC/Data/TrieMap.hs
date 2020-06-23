@@ -33,7 +33,7 @@ import GHC.Prelude
 
 import GHC.Types.Literal
 import GHC.Types.Unique.DFM
-import GHC.Types.Unique( Unique )
+import GHC.Types.Unique( Uniquable )
 
 import qualified Data.Map    as Map
 import qualified Data.IntMap as IntMap
@@ -202,8 +202,8 @@ See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for more details on how 
 deterministic.
 -}
 
-instance TrieMap UniqDFM where
-  type Key UniqDFM = Unique
+instance forall key. Uniquable key => TrieMap (UniqDFM key) where
+  type Key (UniqDFM key) = key
   emptyTM = emptyUDFM
   lookupTM k m = lookupUDFM m k
   alterTM k f m = alterUDFM f m k

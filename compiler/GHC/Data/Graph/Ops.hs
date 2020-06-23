@@ -218,8 +218,8 @@ addConflicts conflicts getClass
 
 addConflictSet1 :: Uniquable k
                 => k -> (k -> cls) -> UniqSet k
-                -> UniqFM (Node k cls color)
-                -> UniqFM (Node k cls color)
+                -> UniqFM k (Node k cls color)
+                -> UniqFM k (Node k cls color)
 addConflictSet1 u getClass set
  = case delOneFromUniqSet set u of
     set' -> adjustWithDefaultUFM
@@ -645,7 +645,7 @@ checkNode graph node
 
 slurpNodeConflictCount
         :: Graph k cls color
-        -> UniqFM (Int, Int)    -- ^ (conflict neighbours, num nodes with that many conflicts)
+        -> UniqFM Int (Int, Int)    -- ^ (conflict neighbours, num nodes with that many conflicts)
 
 slurpNodeConflictCount graph
         = addListToUFM_C
@@ -676,7 +676,7 @@ setColor u color
 adjustWithDefaultUFM
         :: Uniquable k
         => (a -> a) -> a -> k
-        -> UniqFM a -> UniqFM a
+        -> UniqFM k a -> UniqFM k a
 
 adjustWithDefaultUFM f def k map
         = addToUFM_C
@@ -689,7 +689,7 @@ adjustWithDefaultUFM f def k map
 adjustUFM_C
         :: Uniquable k
         => (a -> a)
-        -> k -> UniqFM a -> UniqFM a
+        -> k -> UniqFM k a -> UniqFM k a
 
 adjustUFM_C f k map
  = case lookupUFM map k of

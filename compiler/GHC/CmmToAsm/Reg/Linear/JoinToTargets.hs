@@ -146,8 +146,8 @@ joinToTargets_again :: (Instruction instr, FR freeRegs, Outputable instr)
                     -> instr
                     -> BlockId
                     -> [BlockId]
-                    -> UniqFM Loc
-                    -> UniqFM Loc
+                    -> UniqFM Reg Loc
+                    -> UniqFM Reg Loc
                     -> RegM freeRegs ([NatBasicBlock instr], instr)
 joinToTargets_again
     block_live new_blocks block_id instr dest dests
