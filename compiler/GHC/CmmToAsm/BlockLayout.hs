@@ -29,7 +29,6 @@ import GHC.Platform
 import GHC.Driver.Session (gopt, GeneralFlag(..), DynFlags, targetPlatform)
 import GHC.Types.Unique.FM
 import GHC.Utils.Misc
-import GHC.Types.Unique
 
 import GHC.Data.Graph.Directed
 import GHC.Utils.Outputable
@@ -926,8 +925,8 @@ seqBlocks infos blocks = placeNext pullable0 todo0
         = pprPanic "seqBlocks" (ppr tooManyNextNodes)
 
 
-lookupDeleteUFM :: Uniquable key => UniqFM elt -> key
-                -> Maybe (elt, UniqFM elt)
+lookupDeleteUFM :: UniqFM BlockId elt -> BlockId
+                -> Maybe (elt, UniqFM BlockId elt)
 lookupDeleteUFM m k = do -- Maybe monad
     v <- lookupUFM m k
     return (v, delFromUFM m k)

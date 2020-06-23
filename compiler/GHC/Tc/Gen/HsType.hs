@@ -862,11 +862,13 @@ tc_infer_hs_type mode (HsDocTy _ ty _) = tc_infer_lhs_type mode ty
 -- See Note [Typechecking NHsCoreTys]
 tc_infer_hs_type _ (XHsType (NHsCoreTy ty))
   = do env <- getLclEnv
-       let subst_prs = [ (nm, tv)
+       -- Raw uniques since we go from NameEnv to TvSubstEnv.
+       let subst_prs :: [(Unique, TcTyVar)]
+           subst_prs = [ (getUnique nm, tv)
                        | ATyVar nm tv <- nameEnvElts (tcl_env env) ]
            subst = mkTvSubst
                      (mkInScopeSet $ mkVarSet $ map snd subst_prs)
-                     (listToUFM $ map (liftSnd mkTyVarTy) subst_prs)
+                     (listToUFM_Directly $ map (liftSnd mkTyVarTy) subst_prs)
            ty' = substTy subst ty
        return (ty', tcTypeKind ty')
 

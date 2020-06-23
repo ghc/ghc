@@ -3221,10 +3221,10 @@ instance Outputable CompleteMatch where
   ppr (CompleteMatch cl ty) = text "CompleteMatch:" <+> ppr cl
                                                     <+> dcolon <+> ppr ty
 
--- | A map keyed by the 'completeMatchTyCon'.
+-- | A map keyed by the 'completeMatchTyCon' which has type Name.
 
 -- See Note [Implementation of COMPLETE signatures]
-type CompleteMatchMap = UniqFM [CompleteMatch]
+type CompleteMatchMap = UniqFM Name [CompleteMatch]
 
 mkCompleteMatchMap :: [CompleteMatch] -> CompleteMatchMap
 mkCompleteMatchMap = extendCompleteMatchMap emptyUFM
