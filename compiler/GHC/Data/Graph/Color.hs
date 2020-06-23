@@ -4,6 +4,7 @@
 --
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module GHC.Data.Graph.Color (
         module GHC.Data.Graph.Base,
@@ -37,19 +38,20 @@ import Data.List
 --      the stack (ie in reverse order) and assigning them colors different to their neighbors.
 --
 colorGraph
-        :: ( Uniquable  k, Uniquable cls,  Uniquable  color
+        :: forall k cls color.
+           ( Uniquable  k, Uniquable cls,  Uniquable  color
            , Eq cls, Ord k
            , Outputable k, Outputable cls, Outputable color)
         => Bool                         -- ^ whether to do iterative coalescing
         -> Int                          -- ^ how many times we've tried to color this graph so far.
-        -> UniqFM (UniqSet color)       -- ^ map of (node class -> set of colors available for this class).
+        -> UniqFM cls (UniqSet color)       -- ^ map of (node class -> set of colors available for this class).
         -> Triv   k cls color           -- ^ fn to decide whether a node is trivially colorable.
         -> (Graph k cls color -> k)     -- ^ fn to choose a node to potentially leave uncolored if nothing is trivially colorable.
         -> Graph  k cls color           -- ^ the graph to color.
 
         -> ( Graph k cls color          -- the colored graph.
            , UniqSet k                  -- the set of nodes that we couldn't find a color for.
-           , UniqFM  k )                -- map of regs (r1 -> r2) that were coalesced
+           , UniqFM k k )                -- map of regs (r1 -> r2) that were coalesced
                                         --       r1 should be replaced by r2 in the source
 
 colorGraph iterative spinCount colors triv spill graph0
@@ -71,7 +73,7 @@ colorGraph iterative spinCount colors triv spill graph0
 
         -- run the scanner to slurp out all the trivially colorable nodes
         --      (and do coalescing if iterative coalescing is enabled)
-        (ksTriv, ksProblems, kksCoalesce2)
+        (ksTriv, ksProblems, kksCoalesce2 :: [(k,k)])
                 = colorScan iterative triv spill graph_coalesced
 
         -- If iterative coalescing is enabled, the scanner will coalesce the graph as does its business.
@@ -253,9 +255,10 @@ colorScan_spill iterative triv spill graph
 -- | Try to assign a color to all these nodes.
 
 assignColors
-        :: ( Uniquable k, Uniquable cls, Uniquable color
+        :: forall k cls color.
+           ( Uniquable k, Uniquable cls, Uniquable color
            , Outputable cls)
-        => UniqFM (UniqSet color)       -- ^ map of (node class -> set of colors available for this class).
+        => UniqFM cls (UniqSet color)       -- ^ map of (node class -> set of colors available for this class).
         -> Graph k cls color            -- ^ the graph
         -> [k]                          -- ^ nodes to assign a color to.
         -> ( Graph k cls color          -- the colored graph
@@ -264,7 +267,13 @@ assignColors
 assignColors colors graph ks
         = assignColors' colors graph [] ks
 
- where  assignColors' _ graph prob []
+ where  assignColors' :: UniqFM cls (UniqSet color)       -- ^ map of (node class -> set of colors available for this class).
+                        -> Graph k cls color            -- ^ the graph
+                        -> [k]                          -- ^ nodes to assign a color to.
+                        -> [k]
+                        -> ( Graph k cls color          -- the colored graph
+                        , [k])
+        assignColors' _ graph prob []
                 = (graph, prob)
 
         assignColors' colors graph prob (k:ks)
@@ -293,7 +302,7 @@ assignColors colors graph ks
 selectColor
         :: ( Uniquable k, Uniquable cls, Uniquable color
            , Outputable cls)
-        => UniqFM (UniqSet color)       -- ^ map of (node class -> set of colors available for this class).
+        => UniqFM cls (UniqSet color)       -- ^ map of (node class -> set of colors available for this class).
         -> Graph k cls color            -- ^ the graph
         -> k                            -- ^ key of the node to select a color for.
         -> Maybe color
