@@ -1,11 +1,10 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnboxedTuples #-}
-{-# OPTIONS_GHC -Wno-missing-signatures #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  GHC.Conc.IOCP
+-- Module      :  GHC.Conc.WinIO
 -- Copyright   :  (c) The University of Glasgow, 1994-2002
 -- License     :  see libraries/base/LICENSE
 --
@@ -23,7 +22,7 @@
 -----------------------------------------------------------------------------
 
 -- #not-home
-module GHC.Conc.IOCP
+module GHC.Conc.WinIO
        ( module GHC.Event.Windows.Thread ) where
 
 import GHC.Event.Windows.Thread

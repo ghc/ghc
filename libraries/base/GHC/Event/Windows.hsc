@@ -6,7 +6,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS -ddump-simpl -ddump-cmm -ddump-to-file -fforce-recomp #-}
 
 -------------------------------------------------------------------------------
 -- |
@@ -151,15 +150,16 @@ import {-# SOURCE #-} Debug.Trace (traceEventIO)
 --
 -- The I/O manager itself has two mode of operation:
 -- 1) Threaded: We have N dedicated OS threads in the Haskell world that service
---    completion requests.  Everything is Handled 100% in view of the runtime.
+--    completion requests. Everything is Handled 100% in view of the runtime.
 --    Whenever the OS has completions that need to be serviced it wakes up one
 --    one of the OS threads that are blocked in GetQueuedCompletionStatusEx and
 --    lets it proceed  with the list of completions that are finished. If more
 --    completions finish before the first list is done being processed then
 --    another thread is woken up.  These threads are associated with the I/O
---    manager through the completion port.  If it blocks for any reason the
---    I/O manager will wake up another thread from the pool to finish processing
---    the remaining entries.  This worker threads must be able to handle the
+--    manager through the completion port.  If a thread blocks for any reason the
+--    OS I/O manager will wake up another thread blocked in GetQueuedCompletionStatusEx
+--    from the pool to finish processing the remaining entries.  This worker thread
+--    must be able to handle the
 --    fact that something else has finished the remainder of their queue or must
 --    have a guarantee to never block.  In this implementation we strive to
 --    never block.   This is achieved by not having the worker threads call out
@@ -169,17 +169,23 @@ import {-# SOURCE #-} Debug.Trace (traceEventIO)
 --    receiver.  As such, dropping the message does not change anything as there
 --    will never be anyone to receive it. e.g. it is an impossible situation to
 --    land in.
--- 2) Non-threaded: We don't have any dedicated Haskell threads at servicing
+--    Note that it is valid (and perhaps expected) that at times two workers
+--    will receive the same requests to handle. We deal with this by using
+--    atomic operations to prevent race conditions. See processCompletion
+--    for details.
+-- 2) Non-threaded: We don't have any dedicated Haskell threads servicing
 --    I/O Requests. Instead we have an OS thread inside the RTS that gets
 --    notified of new requests and does the servicing.  When a request completes
 --    a Haskell thread is scheduled to run to finish off the processing of any
 --    completed requests. See Note [Non-Threaded WINIO design].
 --
 -- These two modes of operations share the majority of the code and so they both
--- support the same operations and fixing one will fix the other. (See the step
--- function.)
+-- support the same operations and fixing one will fix the other.
 -- Unlike MIO, we don't threat network I/O any differently than file I/O. Hence
 -- any network specific code is now only in the network package.
+--
+-- See also Note [Completion Ports] which has some of the details which
+-- informed this design.
 --
 -- Note [Threaded WINIO design]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -240,7 +246,7 @@ import {-# SOURCE #-} Debug.Trace (traceEventIO)
 -- One very important property of the I/O subsystem is that each I/O request
 -- now requires an `OVERLAPPED` structure be given to the I/O manager.  See
 -- `withOverlappedEx`.  This buffer is used by the OS to fill in various state
--- information by the OS. Throughout the duration of I/O call, this buffer MUST
+-- information. Throughout the duration of I/O call, this buffer MUST
 -- remain live.  The address is pinned by the kernel, which means that the
 -- pointer must remain accessible until `GetQueuedCompletionStatusEx` returns
 -- the completion associated with the handle and not just until the call to what
@@ -370,31 +376,6 @@ data Manager = Manager
     , mgrThreadPool   :: Maybe ThreadPool
     }
 
--- | Create a new I/O manager. In the Threaded I/O manager this call doesn't
--- have any side effects, but in the Non-Threaded I/O manager the newly
--- created IOCP handle will be registered with the RTS.  Users should never
--- call this.
---
--- NOTE: This needs to finish without making any calls to anything requiring the
--- I/O manager otherwise we'll get into some weird synchronization issues.
--- Essentially this means avoid using long running operations here.
-newManager :: IO Manager
-newManager = do
-    debugIO "Starting io-manager..."
-    mgrIOCP         <- FFI.newIOCP
-    when (not threadedIOMgr) $
-      registerIOCPHandle mgrIOCP
-    debugIO $ "iocp: " ++ show mgrIOCP
-    mgrClock             <- getClock
-    mgrUniqueSource      <- newSource
-    mgrTimeouts          <- newIORef Q.empty
-    mgrOverlappedEntries <- A.new 64
-    mgrEvntHandlers      <- newMVar =<< IT.new callbackArraySize
-    let mgrThreadPool    = Nothing
-
-    let !mgr = Manager{..}
-    return mgr
-
 {-# INLINE startIOManagerThread #-}
 -- | Starts a new I/O manager thread.
 -- For the threaded runtime it creates a pool of OS threads which stays alive
@@ -443,7 +424,34 @@ getSystemManager = readMVar managerRef
 
 -- | Mutable reference to the IO manager
 managerRef :: MVar Manager
-managerRef = unsafePerformIO $ newManager >>= newMVar
+managerRef = unsafePerformIO $ createManager >>= newMVar
+  where
+    -- | Create the I/O manager. In the Threaded I/O manager this call doesn't
+    -- have any side effects, but in the Non-Threaded I/O manager the newly
+    -- created IOCP handle will be registered with the RTS.  Users should never
+    -- call this.
+    -- It's only used to create the single global manager which is stored
+    -- in an MVar.
+    --
+    -- NOTE: This needs to finish without making any calls to anything requiring the
+    -- I/O manager otherwise we'll get into some weird synchronization issues.
+    -- Essentially this means avoid using long running operations here.
+    createManager :: IO Manager
+    createManager = do
+        debugIO "Starting io-manager..."
+        mgrIOCP         <- FFI.newIOCP
+        when (not threadedIOMgr) $
+          registerIOCPHandle mgrIOCP
+        debugIO $ "iocp: " ++ show mgrIOCP
+        mgrClock             <- getClock
+        mgrUniqueSource      <- newSource
+        mgrTimeouts          <- newIORef Q.empty
+        mgrOverlappedEntries <- A.new 64
+        mgrEvntHandlers      <- newMVar =<< IT.new callbackArraySize
+        let mgrThreadPool    = Nothing
+
+        let !mgr = Manager{..}
+        return mgr
 {-# NOINLINE managerRef #-}
 
 -- | Interrupts an I/O manager Wait.  This will force the I/O manager to process
@@ -525,6 +533,30 @@ associateHandle Manager{..} h =
       -- Use as completion key the file handle itself, so we can track
       -- completion
       FFI.associateHandleWithIOCP mgrIOCP h (fromIntegral $ ptrToWordPtr h)
+
+
+{- Note [Why use non-waiting getOverlappedResult requests.]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  When waiting for a request that is bound to be done soon
+  we spin inside waitForCompletion. There are multiple reasons
+  for this.
+
+  In the non-threaded RTS we can't perform blocking calls to
+  C functions without blocking the whole RTS so immediately
+  a blocking call is not an option there.
+
+  In the threaded RTS we don't use a blocking wait for different
+  reasons. In particular performing a waiting request using
+  getOverlappedResult uses the hEvent object embedded in the
+  OVERLAPPED structure to wait for a signal.
+  However we do not provide such an object as their creation
+  would incur to much overhead. Making a waiting request a
+  less useful operation as it doesn't guarantee that the
+  operation we were waiting one finished. Only that some
+  operation on the handle did.
+
+-}
 
 -- | Start an overlapped I/O operation, and wait for its completion.  If
 -- 'withOverlapped' is interrupted by an asynchronous exception, the operation
@@ -636,6 +668,9 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
               -- This status indicates that the request hasn't finished early,
               -- but it will finish shortly.  The I/O manager will not be
               -- enqueuing this either.  Also needs to be handled inline.
+              -- Sadly named pipes will always return this error, so in practice
+              -- we end up always handling them synchronously. There is no good
+              -- documentation on this.
               let will_finish_sync = lasterr == #{const ERROR_IO_INCOMPLETE}
 
               debugIO $ "== >*< " ++ show (finished, done_early, will_finish_sync, h, lpol, lasterr)
@@ -754,6 +789,11 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
               -- Wait for the request to finish as it was running before and
               -- The I/O manager won't enqueue it due to our optimizations to
               -- prevent context switches in such cases.
+              -- In the non-threaded case we must use a non-waiting query here
+              -- otherwise the RTS will lock up until we get a result back.
+              -- In the threaded case it can be beneficial to spin on the haskell
+              -- side versus
+              -- See also Note [Why use non-waiting getOverlappedResult requests.]
               res <- FFI.getOverlappedResult fhndl lpol False
               status <- FFI.overlappedIOStatus lpol
               case res of

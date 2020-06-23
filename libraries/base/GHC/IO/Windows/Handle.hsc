@@ -818,6 +818,7 @@ openFile' filepath iomode non_blocking tmp_opts =
 
       case _type of
         -- Regular files need to be locked.
+        -- See also Note [RTS File locking]
         RegularFile -> do
           optimizeFileAccess h -- Set a few optimization flags on file handles.
           (unique_dev, unique_ino) <- getUniqueFileInfo hwnd
@@ -950,9 +951,13 @@ foreign import ccall unsafe "lockFile"
 foreign import ccall unsafe "unlockFile"
   unlockFile :: CUIntPtr -> IO CInt
 
+-- | Returns -1 on error. Otherwise writes two values representing
+-- the file into the given ptrs.
 foreign import ccall unsafe "get_unique_file_info_hwnd"
   c_getUniqueFileInfo :: HANDLE -> Ptr Word64 -> Ptr Word64 -> IO ()
 
+-- | getUniqueFileInfo assumes the C call to getUniqueFileInfo
+-- succeeds.
 getUniqueFileInfo :: RawHandle a => a -> IO (Word64, Word64)
 getUniqueFileInfo handle = do
   with 0 $ \devptr -> do

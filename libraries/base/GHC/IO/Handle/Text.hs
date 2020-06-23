@@ -6,7 +6,6 @@
            , NondecreasingIndentation
            , MagicHash
   #-}
--- {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# OPTIONS_GHC -Wno-unused-matches #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -984,8 +983,7 @@ bufReadEmpty h_@Handle__{..}
         writeIORef haByteBuffer buf'
         if r == 0 -- end of file reached
             then return so_far
-            else do writeIORef haByteBuffer buf'
-                    bufReadNonEmpty h_ buf' ptr so_far count
+            else bufReadNonEmpty h_ buf' ptr so_far count
  where
   -- Read @bytes@ byte into ptr. Repeating the read until either zero
   -- bytes where read, or we are done reading.

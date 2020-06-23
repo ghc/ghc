@@ -258,7 +258,7 @@ Library
         GHC.IO.Handle.Types
         GHC.IO.IOMode
         GHC.IO.Unsafe
-        GHC.IO.SmartHandles
+        GHC.IO.StdHandles
         GHC.IO.SubSystem
         GHC.IOArray
         GHC.IORef
@@ -398,7 +398,7 @@ Library
             GHC.IO.Encoding.CodePage.API
             GHC.IO.Encoding.CodePage.Table
             GHC.Conc.Windows
-            GHC.Conc.IOCP
+            GHC.Conc.WinIO
             GHC.Conc.POSIX
             GHC.Conc.POSIX.Const
             GHC.Windows

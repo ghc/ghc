@@ -14,7 +14,13 @@
 -- Portability :  non-portable (GHC extensions)
 --
 -- Windows I/O manager
--- TODO: Switch this to use new I/O manager.
+--
+-- This is the I/O manager based on posix FDs for windows.
+-- When using the winio manager these functions may not
+-- be used as they will behave in unexpected ways.
+--
+-- TODO: This manager is currently the default. But we will eventually
+-- switch to use winio instead.
 --
 -----------------------------------------------------------------------------
 
