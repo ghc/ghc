@@ -511,7 +511,8 @@ KernelThreadId kernelThreadId (void)
 
 /* Win32 threads and synchronisation objects */
 
-/* A Condition is represented by a Win32 Event object;
+/* A Condition is represented by a Win32 Conditional variable which is a
+ * user-mode object and so incurs no context switching overhead.
  * a Mutex by a Mutex kernel object.
  */
 
