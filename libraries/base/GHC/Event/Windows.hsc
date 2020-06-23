@@ -6,7 +6,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# OPTIONS -ddump-simpl -ddump-cmm -ddump-to-file -fforce-recomp #-}
 
 -------------------------------------------------------------------------------
 -- |
@@ -151,15 +150,16 @@ import {-# SOURCE #-} Debug.Trace (traceEventIO)
 --
 -- The I/O manager itself has two mode of operation:
 -- 1) Threaded: We have N dedicated OS threads in the Haskell world that service
---    completion requests.  Everything is Handled 100% in view of the runtime.
+--    completion requests. Everything is Handled 100% in view of the runtime.
 --    Whenever the OS has completions that need to be serviced it wakes up one
 --    one of the OS threads that are blocked in GetQueuedCompletionStatusEx and
 --    lets it proceed  with the list of completions that are finished. If more
 --    completions finish before the first list is done being processed then
 --    another thread is woken up.  These threads are associated with the I/O
---    manager through the completion port.  If it blocks for any reason the
---    I/O manager will wake up another thread from the pool to finish processing
---    the remaining entries.  This worker threads must be able to handle the
+--    manager through the completion port.  If a thread blocks for any reason the
+--    OS I/O manager will wake up another thread blocked in GetQueuedCompletionStatusEx
+--    from the pool to finish processing the remaining entries.  This worker thread
+--    must be able to handle the
 --    fact that something else has finished the remainder of their queue or must
 --    have a guarantee to never block.  In this implementation we strive to
 --    never block.   This is achieved by not having the worker threads call out
@@ -169,15 +169,18 @@ import {-# SOURCE #-} Debug.Trace (traceEventIO)
 --    receiver.  As such, dropping the message does not change anything as there
 --    will never be anyone to receive it. e.g. it is an impossible situation to
 --    land in.
--- 2) Non-threaded: We don't have any dedicated Haskell threads at servicing
+--    Note that it is valid (and perhaps expected) that at times two workers
+--    will receive the same requests to handle. We deal with this by using
+--    atomic operations to prevent race conditions. See processCompletion
+--    for details.
+-- 2) Non-threaded: We don't have any dedicated Haskell threads servicing
 --    I/O Requests. Instead we have an OS thread inside the RTS that gets
 --    notified of new requests and does the servicing.  When a request completes
 --    a Haskell thread is scheduled to run to finish off the processing of any
 --    completed requests. See Note [Non-Threaded WINIO design].
 --
 -- These two modes of operations share the majority of the code and so they both
--- support the same operations and fixing one will fix the other. (See the step
--- function.)
+-- support the same operations and fixing one will fix the other.
 -- Unlike MIO, we don't threat network I/O any differently than file I/O. Hence
 -- any network specific code is now only in the network package.
 --
@@ -243,7 +246,7 @@ import {-# SOURCE #-} Debug.Trace (traceEventIO)
 -- One very important property of the I/O subsystem is that each I/O request
 -- now requires an `OVERLAPPED` structure be given to the I/O manager.  See
 -- `withOverlappedEx`.  This buffer is used by the OS to fill in various state
--- information by the OS. Throughout the duration of I/O call, this buffer MUST
+-- information. Throughout the duration of I/O call, this buffer MUST
 -- remain live.  The address is pinned by the kernel, which means that the
 -- pointer must remain accessible until `GetQueuedCompletionStatusEx` returns
 -- the completion associated with the handle and not just until the call to what
