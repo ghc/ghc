@@ -8,18 +8,12 @@ import {-# SOURCE #-} Settings.Default
 staticFlavour :: Flavour
 staticFlavour = defaultFlavour
     { name = "static"
-    , args = defaultBuilderArgs <> staticArgs <> defaultPackageArgs }
-
-staticFlags :: Args
-staticFlags = mconcat
-    [ stage0 ? arg "-O"
-    , notStage0 ? arg "-O2"
-    , pure [ "-static" , "-optl", "-static" ]
-    ]
+    , args = defaultBuilderArgs <> staticArgs <> defaultPackageArgs
+    , dynamicGhcPrograms = return False }
 
 staticArgs :: Args
 staticArgs = sourceArgs SourceArgs
     { hsDefault  = pure ["-O", "-H64m"]
-    , hsLibrary  = staticFlags
+    , hsLibrary  = notStage0 ? arg "-O2"
     , hsCompiler = pure ["-O2"]
-    , hsGhc      = staticFlags }
+    , hsGhc      = mconcat [stage0 ? arg "-O", notStage0 ? arg "-O2"] }
