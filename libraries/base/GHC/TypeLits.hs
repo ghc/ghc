@@ -41,6 +41,8 @@ module GHC.TypeLits
   , N.SomeNat(..), SomeSymbol(..)
   , someNatVal, someSymbolVal
   , N.sameNat, sameSymbol
+  , SymbolOrdering(..)
+  , cmpSymbol
 
 
     -- * Functions on type literals
@@ -207,6 +209,22 @@ sameSymbol :: (KnownSymbol a, KnownSymbol b) =>
 sameSymbol x y
   | symbolVal x == symbolVal y  = Just (unsafeCoerce Refl)
   | otherwise                   = Nothing
+
+-- | Like 'sameSymbol', but if the symbols aren't equal, this additionally
+-- provides proof of LT or GT.
+cmpSymbol :: (KnownSymbol a, KnownSymbol b) =>
+             proxy1 a -> proxy2 b -> SymbolOrdering a b
+cmpSymbol x y = case compare (symbolVal x) (symbolVal y) of
+  EQ -> SymbolEq (unsafeCoerce Refl)
+  LT -> SymbolLt (unsafeCoerce Refl)
+  GT -> SymbolGt (unsafeCoerce Refl)
+
+-- | Proof that either 2 symbols are equal or the second is less than or greater
+-- than the first.
+data SymbolOrdering a b =
+    SymbolEq (a :~: b)
+  | SymbolLt (CmpSymbol a b :~: 'LT)
+  | SymbolGt (CmpSymbol a b :~: 'GT)
 
 --------------------------------------------------------------------------------
 -- PRIVATE:
