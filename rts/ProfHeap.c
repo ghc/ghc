@@ -498,16 +498,17 @@ initHeapProfiling(void)
 #if defined(PROFILING)
     if (doingLDVProfiling()) {
         era = 1;
+        n_censuses = 32;
     } else
 #endif
     {
         era = 0;
+        n_censuses = 1;
     }
 
     // max_era = 2^LDV_SHIFT
     max_era = 1 << LDV_SHIFT;
 
-    n_censuses = 32;
     censuses = stgMallocBytes(sizeof(Census) * n_censuses, "initHeapProfiling");
 
     initEra( &censuses[era] );
