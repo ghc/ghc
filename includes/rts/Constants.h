@@ -257,7 +257,9 @@
 #define ThreadMigrating     13
 
 /* Lightweight non-deadlock checked version of MVar.  Used for the why_blocked
-   field of a TSO.  */
+   field of a TSO. Threads blocked for this reason are not forcibly release by
+   the GC, as we expect them to be unblocked in the future based on outstanding
+   IO events.  */
 #define BlockedOnIOCompletion  15
 
 /* Next number is 16.  */
