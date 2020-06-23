@@ -2230,12 +2230,12 @@ addAppCtxt :: OccEnv -> [Arg CoreBndr] -> OccEnv
 addAppCtxt env@(OccEnv { occ_one_shots = ctxt }) args
   = env { occ_one_shots = replicate (valArgCount args) OneShotLam ++ ctxt }
 
-transClosureFV :: UniqFM VarSet -> UniqFM VarSet
+transClosureFV :: VarEnv VarSet -> VarEnv VarSet
 -- If (f,g), (g,h) are in the input, then (f,h) is in the output
 --                                   as well as (f,g), (g,h)
 transClosureFV env
   | no_change = env
-  | otherwise = transClosureFV (listToUFM new_fv_list)
+  | otherwise = transClosureFV (listToUFM_Directly new_fv_list)
   where
     (no_change, new_fv_list) = mapAccumL bump True (nonDetUFMToList env)
       -- It's OK to use nonDetUFMToList here because we'll forget the
@@ -2247,10 +2247,10 @@ transClosureFV env
         (new_fvs, no_change_here) = extendFvs env fvs
 
 -------------
-extendFvs_ :: UniqFM VarSet -> VarSet -> VarSet
+extendFvs_ :: VarEnv VarSet -> VarSet -> VarSet
 extendFvs_ env s = fst (extendFvs env s)   -- Discard the Bool flag
 
-extendFvs :: UniqFM VarSet -> VarSet -> (VarSet, Bool)
+extendFvs :: VarEnv VarSet -> VarSet -> (VarSet, Bool)
 -- (extendFVs env s) returns
 --     (s `union` env(s), env(s) `subset` s)
 extendFvs env s

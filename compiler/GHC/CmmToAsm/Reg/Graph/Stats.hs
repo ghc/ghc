@@ -64,7 +64,7 @@ data RegAllocStats statics instr
         , raGraph       :: Color.Graph VirtualReg RegClass RealReg
 
           -- | The regs that were coalesced.
-        , raCoalesced   :: UniqFM VirtualReg
+        , raCoalesced   :: UniqFM VirtualReg VirtualReg
 
           -- | Spiller stats.
         , raSpillStats  :: SpillStats
@@ -88,7 +88,7 @@ data RegAllocStats statics instr
         , raGraphColored  :: Color.Graph VirtualReg RegClass RealReg
 
           -- | Regs that were coalesced.
-        , raCoalesced     :: UniqFM VirtualReg
+        , raCoalesced     :: UniqFM VirtualReg VirtualReg
 
           -- | Code with coalescings applied.
         , raCodeCoalesced :: [LiveCmmDecl statics instr]
@@ -242,7 +242,7 @@ pprStatsLifetimes stats
         $$ text "\n")
 
 
-binLifetimeCount :: UniqFM (VirtualReg, Int) -> UniqFM (Int, Int)
+binLifetimeCount :: UniqFM VirtualReg (VirtualReg, Int) -> UniqFM Int (Int, Int)
 binLifetimeCount fm
  = let  lifes   = map (\l -> (l, (l, 1)))
                 $ map snd

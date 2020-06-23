@@ -66,6 +66,7 @@ import GHC.Settings.Config
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.PIC
 import GHC.Platform.Reg
+import GHC.Platform.Reg.Class (RegClass)
 import GHC.CmmToAsm.Monad
 import GHC.CmmToAsm.CFG
 import GHC.CmmToAsm.Dwarf
@@ -607,7 +608,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
            || gopt Opt_RegsIterative dflags )
           then do
                 -- the regs usable for allocation
-                let (alloc_regs :: UniqFM (UniqSet RealReg))
+                let (alloc_regs :: UniqFM RegClass (UniqSet RealReg))
                         = foldr (\r -> plusUFM_C unionUniqSets
                                         $ unitUFM (targetClassOfRealReg platform r) (unitUniqSet r))
                                 emptyUFM

@@ -119,7 +119,7 @@ data NatM_State
         -- generated instructions. So instead we update the CFG as we go.
         }
 
-type DwarfFiles = UniqFM (FastString, Int)
+type DwarfFiles = UniqFM FastString (FastString, Int)
 
 newtype NatM result = NatM (NatM_State -> (result, NatM_State))
     deriving (Functor)

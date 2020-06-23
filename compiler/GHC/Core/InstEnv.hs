@@ -388,8 +388,8 @@ UniqDFM. See also Note [Deterministic UniqFM]
 -- Class has a Unique which is the same as it's tyCon.
 -- TyCon has a unique which is the same as it's Name.
 -- Name just has a unique which is it's own.
--- We use all three to index into InstEnv ... so I'm giving
--- it a key of Name for now.
+-- We use all three to index into InstEnv ...
+-- For now I'm giving it a key of Name.
 type InstEnv = UniqDFM Name ClsInstEnv      -- Maps Class to instances for that class
   -- See Note [InstEnv determinism]
 

@@ -788,7 +788,7 @@ lookupRefuts :: Uniquable k => Delta -> k -> [PmAltCon]
 -- Unfortunately we need the extra bit of polymorphism and the unfortunate
 -- duplication of lookupVarInfo here.
 lookupRefuts MkDelta{ delta_tm_st = ts@(TmSt (SDIE env) _) } k =
-  case lookupUDFM env k of
+  case lookupUDFM_Directly env (getUnique k) of
     Nothing -> []
     Just (Indirect y) -> pmAltConSetElems (vi_neg (lookupVarInfo ts y))
     Just (Entry vi)   -> pmAltConSetElems (vi_neg vi)

@@ -420,7 +420,7 @@ tryToInline
 
 tryToInline dflags live node assigs = go usages node emptyLRegSet assigs
  where
-  usages :: UniqFM Int -- Maps each LocalReg to a count of how often it is used
+  usages :: UniqFM LocalReg Int -- Maps each LocalReg to a count of how often it is used
   usages = foldLocalRegsUsed dflags addUsage emptyUFM node
 
   go _usages node _skipped [] = (node, [])
@@ -553,7 +553,7 @@ improveConditional other = other
 -- inline y, and we have a dead assignment to x.  If we don't notice
 -- that x is dead in tryToInline, we end up retaining it.
 
-addUsage :: UniqFM Int -> LocalReg -> UniqFM Int
+addUsage :: UniqFM LocalReg Int -> LocalReg -> UniqFM LocalReg Int
 addUsage m r = addToUFM_C (+) m r 1
 
 regsUsedIn :: LRegSet -> CmmExpr -> Bool

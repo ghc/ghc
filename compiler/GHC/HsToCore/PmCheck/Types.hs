@@ -6,6 +6,8 @@ Author: George Karachalias <george.karachalias@cs.kuleuven.be>
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ApplicativeDo #-}
 
 -- | Types used through-out pattern match checking. This module is mostly there
 -- to be imported from "GHC.Tc.Types". The exposed API is that of
@@ -458,11 +460,14 @@ setEntrySDIE :: SharedDIdEnv a -> Id -> a -> SharedDIdEnv a
 setEntrySDIE sdie@(SDIE env) x a =
   SDIE $ extendDVarEnv env (fst (lookupReprAndEntrySDIE sdie x)) (Entry a)
 
-traverseSDIE :: Applicative f => (a -> f b) -> SharedDIdEnv a -> f (SharedDIdEnv b)
-traverseSDIE f = fmap (SDIE . listToUDFM) . traverse g . udfmToList . unSDIE
+traverseSDIE :: forall a b f. Applicative f => (a -> f b) -> SharedDIdEnv a -> f (SharedDIdEnv b)
+traverseSDIE f = fmap (SDIE . listToUDFM_Directly) . traverse g . udfmToList . unSDIE
   where
+    g :: (Unique, Shared a) -> f (Unique, Shared b)
     g (u, Indirect y) = pure (u,Indirect y)
-    g (u, Entry a)    = (u,) . Entry <$> f a
+    g (u, Entry a)    = do
+        a' <- f a
+        pure (u,Entry a')
 
 instance Outputable a => Outputable (Shared a) where
   ppr (Indirect x) = ppr x

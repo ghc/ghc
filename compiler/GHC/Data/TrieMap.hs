@@ -33,7 +33,7 @@ import GHC.Prelude
 
 import GHC.Types.Literal
 import GHC.Types.Unique.DFM
-import GHC.Types.Unique( Unique, Uniquable )
+import GHC.Types.Unique( Uniquable )
 
 import qualified Data.Map    as Map
 import qualified Data.IntMap as IntMap

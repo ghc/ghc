@@ -37,13 +37,13 @@ module GHC.Types.Unique.FM (
         listToUFM,
         listToUFM_Directly,
         listToUFM_C,
-        addToUFM,addToUFM_C,addToUFM_Acc,
+        addToUFM,addToUFM_C,addToUFM_Acc, addToUFM_C_Directly,
         addListToUFM,addListToUFM_C, addListToUFM_C_Directly,
-        addToUFM_Directly,
+        addToUFM_Directly, addToUFM_U,
         addListToUFM_Directly,
-        adjustUFM, alterUFM,
+        adjustUFM, alterUFM, alterUFM_Directly,
         adjustUFM_Directly,
-        delFromUFM,
+        delFromUFM, delFromUFM_U,
         delFromUFM_Directly,
         delListFromUFM,
         delListFromUFM_Directly,
@@ -65,11 +65,12 @@ module GHC.Types.Unique.FM (
         filterUFM, filterUFM_Directly, partitionUFM,
         sizeUFM,
         isNullUFM,
-        lookupUFM, lookupUFM_Directly,
+        lookupUFM, lookupUFM_Directly, lookupUFM_U,
         lookupWithDefaultUFM, lookupWithDefaultUFM_Directly,
         nonDetEltsUFM, eltsUFM, nonDetKeysUFM,
         ufmToSet_Directly,
         nonDetUFMToList, ufmToIntMap, unsafeIntMapToUFM,
+        unsafeCastUFMKey,
         pprUniqFM, pprUFM, pprUFMWithKeys, pluralUFM
     ) where
 
@@ -129,6 +130,10 @@ addListToUFM_Directly = foldl' (\m (k, v) -> addToUFM_Directly m k v)
 addToUFM_Directly :: UniqFM key elt -> Unique -> elt -> UniqFM key elt
 addToUFM_Directly (UFM m) u v = UFM (M.insert (getKey u) v m)
 
+-- | If you end up using this consider if you really need keys of different types.
+addToUFM_U :: Uniquable anyKey => UniqFM key elt -> anyKey -> elt -> UniqFM key elt
+addToUFM_U (UFM m) u v = UFM (M.insert (getKey $ getUnique u) v m)
+
 addToUFM_C
   :: Uniquable key
   => (elt -> elt -> elt)  -- old -> new -> result
@@ -166,6 +171,13 @@ alterUFM
   -> UniqFM key elt                -- result
 alterUFM f (UFM m) k = UFM (M.alter f (getKey $ getUnique k) m)
 
+alterUFM_Directly
+  :: (Maybe elt -> Maybe elt)  -- How to adjust
+  -> UniqFM key elt                -- old
+  -> Unique                        -- new
+  -> UniqFM key elt                -- result
+alterUFM_Directly f (UFM m) k = UFM (M.alter f (getKey $ getUnique k) m)
+
 -- | Add elements to the map, combining existing values with inserted ones using
 -- the given function.
 addListToUFM_C
@@ -190,6 +202,9 @@ adjustUFM_Directly f (UFM m) u = UFM (M.adjust f (getKey u) m)
 
 delFromUFM :: Uniquable key => UniqFM key elt -> key    -> UniqFM key elt
 delFromUFM (UFM m) k = UFM (M.delete (getKey $ getUnique k) m)
+
+delFromUFM_U :: Uniquable anyKey => UniqFM key elt -> anyKey    -> UniqFM key elt
+delFromUFM_U (UFM m) k = UFM (M.delete (getKey $ getUnique k) m)
 
 delListFromUFM :: Uniquable key => UniqFM key elt -> [key] -> UniqFM key elt
 delListFromUFM = foldl' delFromUFM
@@ -314,6 +329,9 @@ elemUFM_Directly u (UFM m) = M.member (getKey u) m
 lookupUFM :: Uniquable key => UniqFM key elt -> key -> Maybe elt
 lookupUFM (UFM m) k = M.lookup (getKey $ getUnique k) m
 
+lookupUFM_U :: Uniquable anyKey => UniqFM key elt -> anyKey -> Maybe elt
+lookupUFM_U (UFM m) k = M.lookup (getKey $ getUnique k) m
+
 -- when you've got the Unique already
 lookupUFM_Directly :: UniqFM key elt -> Unique -> Maybe elt
 lookupUFM_Directly (UFM m) u = M.lookup (getKey u) m
@@ -400,6 +418,13 @@ ufmToIntMap (UFM m) = m
 
 unsafeIntMapToUFM :: M.IntMap elt -> UniqFM key elt
 unsafeIntMapToUFM = UFM
+
+-- | Cast the key domain of a UniqFM.
+--
+-- As long as the domains don't overlap in their uniques
+-- this is safe.
+unsafeCastUFMKey :: UniqFM key1 elt -> UniqFM key2 elt
+unsafeCastUFMKey (UFM m) = UFM m
 
 -- Determines whether two 'UniqFM's contain the same keys.
 equalKeysUFM :: UniqFM key a -> UniqFM key b -> Bool

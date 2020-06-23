@@ -551,10 +551,11 @@ modifyVarEnv_Directly mangle_fn env key
 type DVarEnv elt = UniqDFM Var elt
 
 -- | Deterministic Identifier Environment
-type DIdEnv elt = DVarEnv elt
+-- Sadly not always indexed by Id, but it is in the common case.
+type DIdEnv elt = UniqDFM Id elt
 
 -- | Deterministic Type Variable Environment
-type DTyVarEnv elt = DVarEnv elt
+type DTyVarEnv elt = UniqDFM TyVar elt
 
 emptyDVarEnv :: DVarEnv a
 emptyDVarEnv = emptyUDFM

@@ -65,7 +65,7 @@ data Named
         | LabelN BlockId        -- ^ A blockid of some code or data.
 
 -- | An environment of named things.
-type Env        = UniqFM Named
+type Env        = UniqFM FastString Named
 
 -- | Local declarations that are in scope during code generation.
 type Decls      = [(FastString,Named)]

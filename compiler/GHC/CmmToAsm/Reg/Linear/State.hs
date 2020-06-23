@@ -52,6 +52,7 @@ import GHC.Cmm.BlockId
 
 import GHC.Platform
 import GHC.Types.Unique
+import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 
 import Control.Monad (ap)
@@ -150,13 +151,17 @@ setFreeRegsR :: freeRegs -> RegM freeRegs ()
 setFreeRegsR regs = RegM $ \ s ->
   RA_Result s{ra_freeregs = regs} ()
 
-getAssigR :: RegM freeRegs (RegMap Loc)
+-- | Key will always be Reg or VirtualReg.
+-- But UniqFM doesn't support polymorphic keys...
+getAssigR :: RegM freeRegs (UniqFM key Loc)
 getAssigR = RegM $ \ s@RA_State{ra_assig = assig} ->
-  RA_Result s assig
+  RA_Result s (unsafeCastUFMKey assig)
 
-setAssigR :: RegMap Loc -> RegM freeRegs ()
+-- | Key will always be Reg or VirtualReg.
+-- But UniqFM doesn't support polymorphic keys...
+setAssigR :: UniqFM key Loc -> RegM freeRegs ()
 setAssigR assig = RegM $ \ s ->
-  RA_Result s{ra_assig=assig} ()
+  RA_Result s{ra_assig=unsafeCastUFMKey assig} ()
 
 getBlockAssigR :: RegM freeRegs (BlockAssignment freeRegs)
 getBlockAssigR = RegM $ \ s@RA_State{ra_blockassig = assig} ->
