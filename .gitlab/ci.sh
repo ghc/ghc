@@ -392,7 +392,6 @@ function test_hadrian() {
         exit 1
       fi
     done
-    exit 0 #!!!
   fi
 
   cd _build/bindist/ghc-*/
