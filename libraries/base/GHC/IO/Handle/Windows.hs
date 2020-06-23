@@ -69,7 +69,6 @@ mkConsoleHandle dev filepath ha_type buffered mb_codec nl finalizer other_side
 stdin :: Handle
 {-# NOINLINE stdin #-}
 stdin = unsafePerformIO $ do
-   -- ToDo: acquire lock
    enc <- getLocaleEncoding
    mkConsoleHandle Win.stdin "<stdin>" ReadHandle True (Just enc)
                    nativeNewlineMode{-translate newlines-}
@@ -79,7 +78,6 @@ stdin = unsafePerformIO $ do
 stdout :: Handle
 {-# NOINLINE stdout #-}
 stdout = unsafePerformIO $ do
-   -- ToDo: acquire lock
    enc <- getLocaleEncoding
    mkConsoleHandle Win.stdout "<stdout>" WriteHandle True (Just enc)
                    nativeNewlineMode{-translate newlines-}
@@ -89,7 +87,6 @@ stdout = unsafePerformIO $ do
 stderr :: Handle
 {-# NOINLINE stderr #-}
 stderr = unsafePerformIO $ do
-   -- ToDo: acquire lock
    enc <- getLocaleEncoding
    mkConsoleHandle Win.stderr "<stderr>" WriteHandle
                    False{-stderr is unbuffered-} (Just enc)
