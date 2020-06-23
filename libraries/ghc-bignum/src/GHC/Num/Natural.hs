@@ -129,7 +129,7 @@ naturalFromIntUnsafe (I# i) = naturalFromIntUnsafe# i
 -- Throws 'Control.Exception.Underflow' when passed a negative 'Int'.
 naturalFromIntThrow# :: Int# -> Natural
 naturalFromIntThrow# i
-   | isTrue# (i <# 0#) = case underflow of _ -> NS 0##
+   | isTrue# (i <# 0#) = raiseUnderflow
    | True              = naturalFromIntUnsafe# i
 
 -- | Create a Natural from an Int
@@ -154,7 +154,7 @@ naturalToInt !n = I# (naturalToInt# n)
 naturalFromInt# :: Int# -> Natural
 naturalFromInt# !i
    | isTrue# (i >=# 0#) = NS (int2Word# i)
-   | True               = case underflow of _ -> NS 0##
+   | True               = raiseUnderflow
 
 -- | Create a Natural from an Int
 --
@@ -269,15 +269,15 @@ naturalSub (NB x) (NB y) =
 --
 -- Throw an Underflow exception if x < y
 naturalSubThrow :: Natural -> Natural -> Natural
-naturalSubThrow (NS _) (NB _) = case underflow of _ -> NS 0##
+naturalSubThrow (NS _) (NB _) = raiseUnderflow
 naturalSubThrow (NB x) (NS y) = naturalFromBigNat (bigNatSubWordUnsafe# x y)
 naturalSubThrow (NS x) (NS y) =
    case subWordC# x y of
       (# l,0# #) -> NS l
-      (# _,_  #) -> case underflow of _ -> NS 0##
+      (# _,_  #) -> raiseUnderflow
 naturalSubThrow (NB x) (NB y) =
    case bigNatSub x y of
-      (# () | #) -> case underflow of _ -> NS 0##
+      (# () | #) -> raiseUnderflow
       (# | z  #) -> naturalFromBigNat z
 
 -- | Sub two naturals
@@ -325,7 +325,7 @@ naturalSignum _        = NS 1##
 naturalNegate :: Natural -> Natural
 {-# NOINLINE naturalNegate #-}
 naturalNegate (NS 0##) = NS 0##
-naturalNegate _        = case underflow of _ -> NS 0##
+naturalNegate _        = raiseUnderflow
 
 -- | Return division quotient and remainder
 --
@@ -463,7 +463,7 @@ naturalLogBase !base !a = W# (naturalLogBase# base a)
 -- | \"@'naturalPowMod' /b/ /e/ /m/@\" computes base @/b/@ raised to
 -- exponent @/e/@ modulo @/m/@.
 naturalPowMod :: Natural -> Natural -> Natural -> Natural
-naturalPowMod !_         !_       (NS 0##) = case divByZero of _ -> naturalZero
+naturalPowMod !_         !_       (NS 0##) = raiseDivZero
 naturalPowMod _          _        (NS 1##) = NS 0##
 naturalPowMod _          (NS 0##) _        = NS 1##
 naturalPowMod (NS 0##)   _        _        = NS 0##
