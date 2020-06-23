@@ -2617,49 +2617,6 @@ primop  RaiseOp "raise#" GenPrimOp
    out_of_line = True
    can_fail = True
 
--- Note [Arithmetic exception primops]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
--- The RTS provides several primops to raise specific exceptions (raiseDivZero#,
--- raiseUnderflow#, raiseOverflow#). These primops are meant to be used by the
--- package implementing arbitrary precision numbers (Natural,Integer). It can't
--- depend on `base` package to raise exceptions in a normal way because it would
--- create a package dependency circle (base <-> bignum package).
---
--- See #14664
-
-primtype Void#
-
-primop  RaiseDivZeroOp "raiseDivZero#" GenPrimOp
-   Void# -> o
-   {Raise a 'DivideByZero' arithmetic exception.}
-      -- NB: the type variable "o" is "a", but with OpenKind
-      -- See Note [Arithmetic exception primops]
-   with
-   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botDiv }
-   out_of_line = True
-   has_side_effects = True
-
-primop  RaiseUnderflowOp "raiseUnderflow#" GenPrimOp
-   Void# -> o
-   {Raise an 'Underflow' arithmetic exception.}
-      -- NB: the type variable "o" is "a", but with OpenKind
-      -- See Note [Arithmetic exception primops]
-   with
-   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botDiv }
-   out_of_line = True
-   has_side_effects = True
-
-primop  RaiseOverflowOp "raiseOverflow#" GenPrimOp
-   Void# -> o
-   {Raise an 'Overflow' arithmetic exception.}
-      -- NB: the type variable "o" is "a", but with OpenKind
-      -- See Note [Arithmetic exception primops]
-   with
-   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botDiv }
-   out_of_line = True
-   has_side_effects = True
-
 primop  RaiseIOOp "raiseIO#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, b #)
    with
@@ -3358,6 +3315,8 @@ primop  GetApStackValOp "getApStackVal#" GenPrimOp
 section "Misc"
         {These aren't nearly as wired in as Etc...}
 ------------------------------------------------------------------------
+
+primtype Void#
 
 primop  GetCCSOfOp "getCCSOf#" GenPrimOp
    a -> State# s -> (# State# s, Addr# #)

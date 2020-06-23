@@ -744,7 +744,10 @@ errorIds
       rEC_SEL_ERROR_ID,
       aBSENT_ERROR_ID,
       aBSENT_SUM_FIELD_ERROR_ID,
-      tYPE_ERROR_ID   -- Used with Opt_DeferTypeErrors, see #10284
+      tYPE_ERROR_ID,   -- Used with Opt_DeferTypeErrors, see #10284
+      rAISE_OVERFLOW_ID,
+      rAISE_UNDERFLOW_ID,
+      rAISE_DIVZERO_ID
       ]
 
 recSelErrorName, runtimeErrorName, absentErrorName :: Name
@@ -752,6 +755,7 @@ recConErrorName, patErrorName :: Name
 nonExhaustiveGuardsErrorName, noMethodBindingErrorName :: Name
 typeErrorName :: Name
 absentSumFieldErrorName :: Name
+raiseOverflowName, raiseUnderflowName, raiseDivZeroName :: Name
 
 recSelErrorName     = err_nm "recSelError"     recSelErrorIdKey     rEC_SEL_ERROR_ID
 absentErrorName     = err_nm "absentError"     absentErrorIdKey     aBSENT_ERROR_ID
@@ -771,6 +775,7 @@ err_nm str uniq id = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit str) uniq id
 rEC_SEL_ERROR_ID, rUNTIME_ERROR_ID, rEC_CON_ERROR_ID :: Id
 pAT_ERROR_ID, nO_METHOD_BINDING_ERROR_ID, nON_EXHAUSTIVE_GUARDS_ERROR_ID :: Id
 tYPE_ERROR_ID, aBSENT_ERROR_ID, aBSENT_SUM_FIELD_ERROR_ID :: Id
+rAISE_OVERFLOW_ID, rAISE_UNDERFLOW_ID, rAISE_DIVZERO_ID :: Id
 rEC_SEL_ERROR_ID                = mkRuntimeErrorId recSelErrorName
 rUNTIME_ERROR_ID                = mkRuntimeErrorId runtimeErrorName
 rEC_CON_ERROR_ID                = mkRuntimeErrorId recConErrorName
@@ -844,8 +849,36 @@ absentSumFieldErrorName
       absentSumFieldErrorIdKey
       aBSENT_SUM_FIELD_ERROR_ID
 
-aBSENT_SUM_FIELD_ERROR_ID
-  = mkVanillaGlobalWithInfo absentSumFieldErrorName
+raiseOverflowName
+   = mkWiredInIdName
+      gHC_PRIM_EXCEPTION
+      (fsLit "raiseOverflow")
+      raiseOverflowIdKey
+      rAISE_OVERFLOW_ID
+
+raiseUnderflowName
+   = mkWiredInIdName
+      gHC_PRIM_EXCEPTION
+      (fsLit "raiseUnderflow")
+      raiseUnderflowIdKey
+      rAISE_UNDERFLOW_ID
+
+raiseDivZeroName
+   = mkWiredInIdName
+      gHC_PRIM_EXCEPTION
+      (fsLit "raiseDivZero")
+      raiseDivZeroIdKey
+      rAISE_DIVZERO_ID
+
+aBSENT_SUM_FIELD_ERROR_ID = mkExceptionId absentSumFieldErrorName
+rAISE_OVERFLOW_ID         = mkExceptionId raiseOverflowName
+rAISE_UNDERFLOW_ID        = mkExceptionId raiseUnderflowName
+rAISE_DIVZERO_ID          = mkExceptionId raiseDivZeroName
+
+-- | Exception with type \"forall a. a\"
+mkExceptionId :: Name -> Id
+mkExceptionId name
+  = mkVanillaGlobalWithInfo name
       (mkSpecForAllTys [alphaTyVar] (mkTyVarTy alphaTyVar)) -- forall a . a
       (vanillaIdInfo `setStrictnessInfo` mkClosedStrictSig [] botDiv
                      `setCprInfo` mkCprSig 0 botCpr

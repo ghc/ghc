@@ -101,6 +101,11 @@ bigNatOne :: Void# -> BigNat -- cf Note [Why Void#?]
 bigNatOne _ = case bigNatOneW of
    BigNatW w -> w
 
+raiseDivZero_BigNat :: Void# -> BigNat
+raiseDivZero_BigNat _ = case raiseDivZero of
+   !_ -> bigNatZero void#
+   -- see Note [ghc-bignum exceptions] in GHC.Num.Primitives
+
 -- | Indicate if a bigNat is zero
 bigNatIsZero :: BigNat -> Bool
 bigNatIsZero bn = isTrue# (bigNatIsZero# bn)
@@ -486,7 +491,10 @@ bigNatSubUnsafe a b
       in withNewWordArrayTrimed# szA \mwa s->
             case inline bignat_sub mwa a b s of
                (# s', 0# #) -> s'
-               (# s', _  #) -> case underflow of _ -> s'
+               (# s', _  #) -> case raiseUnderflow of
+                                 !_ -> s'
+                                 -- see Note [ghc-bignum exceptions] in
+                                 -- GHC.Num.Primitives
 
 -- | Subtract two BigNat
 bigNatSub :: BigNat -> BigNat -> (# () | BigNat #)
@@ -511,7 +519,7 @@ bigNatSub a b
 bigNatQuotWord# :: BigNat -> Word# -> BigNat
 bigNatQuotWord# a b
    | 1## <- b = a
-   | 0## <- b = case divByZero of _ -> bigNatZero void#
+   | 0## <- b = raiseDivZero_BigNat void#
    | True =
    let
       sz = wordArraySize# a
@@ -531,7 +539,7 @@ bigNatQuotWord a (W# b) = bigNatQuotWord# a b
 --    b /= 0
 bigNatRemWord# :: BigNat -> Word# -> Word#
 bigNatRemWord# a b
-   | 0## <- b       = case divByZero of _ -> 0##
+   | 0## <- b       = raiseDivZero_Word# void#
    | 1## <- b       = 0##
    | bigNatIsZero a = 0##
    | True           = inline bignat_rem_word a b
@@ -549,7 +557,9 @@ bigNatRemWord a (W# b) = W# (bigNatRemWord# a b)
 --    b /= 0
 bigNatQuotRemWord# :: BigNat -> Word# -> (# BigNat, Word# #)
 bigNatQuotRemWord# a b
-   | 0## <- b = case divByZero of _ -> (# bigNatZero void#, 0## #)
+   | 0## <- b = case raiseDivZero of
+                  !_ -> (# bigNatZero void#, 0## #)
+                  -- see Note [ghc-bignum exceptions] in GHC.Num.Primitives
    | 1## <- b = (# a, 0## #)
    | isTrue# (bigNatSize# a ==# 1#)
    , a0 <- indexWordArray# a 0#
@@ -575,7 +585,9 @@ bigNatQuotRemWord# a b
 -- | BigNat division returning (quotient,remainder)
 bigNatQuotRem# :: BigNat -> BigNat -> (# BigNat,BigNat #)
 bigNatQuotRem# a b
-   | bigNatIsZero b          = case divByZero of _ -> (# bigNatZero void#, bigNatZero void# #)
+   | bigNatIsZero b          = case raiseDivZero of
+                                 !_ -> (# bigNatZero void#, bigNatZero void# #)
+                                 -- see Note [ghc-bignum exceptions] in GHC.Num.Primitives
    | bigNatIsZero a          = (# bigNatZero void#, bigNatZero void# #)
    | bigNatIsOne b           = (# a               , bigNatZero void# #)
    | LT <- cmp               = (# bigNatZero void#, a #)
@@ -596,7 +608,7 @@ bigNatQuotRem# a b
 -- | BigNat division returning quotient
 bigNatQuot :: BigNat -> BigNat -> BigNat
 bigNatQuot a b
-   | bigNatIsZero b          = case divByZero of _ -> bigNatZero void#
+   | bigNatIsZero b          = raiseDivZero_BigNat void#
    | bigNatIsZero a          = bigNatZero void#
    | bigNatIsOne b           = a
    | LT <- cmp               = bigNatZero void#
@@ -613,7 +625,7 @@ bigNatQuot a b
 -- | BigNat division returning remainder
 bigNatRem :: BigNat -> BigNat -> BigNat
 bigNatRem a b
-   | bigNatIsZero b          = case divByZero of _ -> bigNatZero void#
+   | bigNatIsZero b          = raiseDivZero_BigNat void#
    | bigNatIsZero a          = bigNatZero void#
    | bigNatIsOne b           = bigNatZero void#
    | LT <- cmp               = a
@@ -1036,7 +1048,7 @@ bigNatLog2 a = W# (bigNatLog2# a)
 bigNatLogBase# :: BigNat -> BigNat -> Word#
 bigNatLogBase# base a
    | bigNatIsZero base || bigNatIsOne base
-   = case unexpectedValue of _ -> 0##
+   = unexpectedValue_Word# void#
 
    | 1# <- bigNatSize# base
    , 2## <- bigNatIndex# base 0#
@@ -1062,8 +1074,8 @@ bigNatLogBase base a = W# (bigNatLogBase# base a)
 -- | Logarithm for an arbitrary base
 bigNatLogBaseWord# :: Word# -> BigNat -> Word#
 bigNatLogBaseWord# base a
-   | 0## <- base = case unexpectedValue of _ -> 0##
-   | 1## <- base = case unexpectedValue of _ -> 0##
+   | 0## <- base = unexpectedValue_Word# void#
+   | 1## <- base = unexpectedValue_Word# void#
    | 2## <- base = bigNatLog2# a
    -- TODO: optimize log base power of 2 (256, etc.)
    | True = bigNatLogBase# (bigNatFromWord# base) a
@@ -1082,7 +1094,7 @@ bigNatLogBaseWord (W# base) a = W# (bigNatLogBaseWord# base a)
 bigNatSizeInBase# :: Word# -> BigNat -> Word#
 bigNatSizeInBase# base a
    | isTrue# (base `leWord#` 1##)
-   = case unexpectedValue of _ -> 0##
+   = unexpectedValue_Word# void#
 
    | bigNatIsZero a
    = 0##
@@ -1111,7 +1123,7 @@ powModWord# = bignat_powmod_words
 -- | \"@'bigNatPowModWord#' /b/ /e/ /m/@\" computes base @/b/@ raised to
 -- exponent @/e/@ modulo @/m/@.
 bigNatPowModWord# :: BigNat -> BigNat -> Word# -> Word#
-bigNatPowModWord# !_ !_ 0## = case divByZero of _ -> 0##
+bigNatPowModWord# !_ !_ 0## = raiseDivZero_Word# void#
 bigNatPowModWord# _  _  1## = 0##
 bigNatPowModWord# b  e  m
    | bigNatIsZero e         = 1##
@@ -1125,7 +1137,7 @@ bigNatPowMod :: BigNat -> BigNat -> BigNat -> BigNat
 bigNatPowMod !b !e !m
    | (# m' | #) <- bigNatToWordMaybe# m
    = bigNatFromWord# (bigNatPowModWord# b e m')
-   | bigNatIsZero m = case divByZero of _ -> bigNatZero void#
+   | bigNatIsZero m = raiseDivZero_BigNat void#
    | bigNatIsOne  m = bigNatFromWord# 0##
    | bigNatIsZero e = bigNatFromWord# 1##
    | bigNatIsZero b = bigNatFromWord# 0##
