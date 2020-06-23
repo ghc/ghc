@@ -81,7 +81,7 @@ mwaCompareOp mwa f g s =
    case mwaTrimZeroes# mwa s of { s ->
    case mwaTrimZeroes# mwb s of { s ->
    case mwaCompare mwa mwb s of
-      (# s, 0# #) -> case unexpectedValue of _ -> s
+      (# s, 0# #) -> case unexpectedValue of I# _ -> s
       (# s, _  #) -> s
    }}}}}}
 
@@ -106,7 +106,7 @@ mwaCompareOp2 mwa mwb f g s =
    case mwaCompare mwa mwa' s of { (# s, ba #) ->
    case mwaCompare mwb mwb' s of { (# s, bb #) ->
    case ba &&# bb of
-      0# -> case unexpectedValue of _ -> s
+      0# -> case unexpectedValue of I# _ -> s
       _  -> s
    }}}}}}}}}}}}
 
@@ -122,13 +122,13 @@ mwaCompareOpBool mwa f g s =
    case f mwa s of { (# s, ra #) ->
    case g mwb s of { (# s, rb #) ->
    case ra ==# rb of
-      0# -> case unexpectedValue of _ -> (# s, ra #)
+      0# -> case unexpectedValue of I# _ -> (# s, ra #)
       _  -> case (ra ==# 1#) of -- don't compare MWAs if overflow signaled!
          1# -> (# s, ra #)
          _  -> case mwaTrimZeroes# mwa s of { s ->
                case mwaTrimZeroes# mwb s of { s ->
                case mwaCompare mwa mwb s of
-                  (# s, 0# #) -> case unexpectedValue of _ -> (# s, ra #)
+                  (# s, 0# #) -> case unexpectedValue of I# _ -> (# s, ra #)
                   _  -> (# s, ra #)
    }}}}}}
 
@@ -147,7 +147,7 @@ mwaCompareOpWord mwa f g s =
    case mwaTrimZeroes# mwb s of { s ->
    case mwaCompare mwa mwb s of
       (# s, b #) -> case b &&# (ra `eqWord#` rb) of
-         0# -> case unexpectedValue of _ -> (# s, ra #)
+         0# -> case unexpectedValue of I# _ -> (# s, ra #)
          _  -> (# s, ra #)
    }}}}}}
 
@@ -417,7 +417,7 @@ bignat_encode_double a e =
    in case gr ==## nr of
        1# -> gr
        _  -> case unexpectedValue of
-               _ -> gr
+               D# err -> err
 
 bignat_powmod_word :: WordArray# -> WordArray# -> Word# -> Word#
 bignat_powmod_word b e m =
