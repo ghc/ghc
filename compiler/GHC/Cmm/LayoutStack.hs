@@ -224,7 +224,7 @@ data StackMap = StackMap
  ,  sm_ret_off :: ByteOff
        -- ^ Number of words of stack that we do not describe with an info
        -- table, because it contains an update frame.
- ,  sm_regs :: UniqFM (LocalReg,StackLoc)
+ ,  sm_regs :: UniqFM LocalReg (LocalReg,StackLoc)
        -- ^ regs on the stack
  }
 

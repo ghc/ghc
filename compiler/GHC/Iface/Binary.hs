@@ -282,7 +282,7 @@ binaryInterfaceMagic platform
 -- The symbol table
 --
 
-putSymbolTable :: BinHandle -> Int -> UniqFM (Int,Name) -> IO ()
+putSymbolTable :: BinHandle -> Int -> UniqFM Name (Int,Name) -> IO ()
 putSymbolTable bh next_off symtab = do
     put_ bh next_off
     let names = elems (array (0,next_off-1) (nonDetEltsUFM symtab))
@@ -323,7 +323,7 @@ fromOnDiskName nc (pid, mod_name, occ) =
                    new_cache  = extendNameCache cache mod occ name
                in ( nc{ nsUniqs = us, nsNames = new_cache }, name )
 
-serialiseName :: BinHandle -> Name -> UniqFM (Int,Name) -> IO ()
+serialiseName :: BinHandle -> Name -> UniqFM key (Int,Name) -> IO ()
 serialiseName bh name _ = do
     let mod = ASSERT2( isExternalName name, ppr name ) nameModule name
     put_ bh (moduleUnit mod, moduleName mod, nameOccName name)
@@ -395,7 +395,7 @@ getSymtabName _ncu _dict symtab bh = do
 
 data BinSymbolTable = BinSymbolTable {
         bin_symtab_next :: !FastMutInt, -- The next index to use
-        bin_symtab_map  :: !(IORef (UniqFM (Int,Name)))
+        bin_symtab_map  :: !(IORef (UniqFM Name (Int,Name)))
                                 -- indexed by Name
   }
 
@@ -406,13 +406,13 @@ allocateFastString :: BinDictionary -> FastString -> IO Word32
 allocateFastString BinDictionary { bin_dict_next = j_r,
                                    bin_dict_map  = out_r} f = do
     out <- readIORef out_r
-    let uniq = getUnique f
-    case lookupUFM out uniq of
+    let !uniq = getUnique f
+    case lookupUFM_Directly out uniq of
         Just (j, _)  -> return (fromIntegral j :: Word32)
         Nothing -> do
            j <- readFastMutInt j_r
            writeFastMutInt j_r (j + 1)
-           writeIORef out_r $! addToUFM out uniq (j, f)
+           writeIORef out_r $! addToUFM_Directly out uniq (j, f)
            return (fromIntegral j :: Word32)
 
 getDictFastString :: Dictionary -> BinHandle -> IO FastString
@@ -422,7 +422,7 @@ getDictFastString dict bh = do
 
 data BinDictionary = BinDictionary {
         bin_dict_next :: !FastMutInt, -- The next index to use
-        bin_dict_map  :: !(IORef (UniqFM (Int,FastString)))
+        bin_dict_map  :: !(IORef (UniqFM FastString (Int,FastString)))
                                 -- indexed by FastString
   }
 
