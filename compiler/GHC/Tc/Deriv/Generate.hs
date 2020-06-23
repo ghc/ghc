@@ -529,7 +529,7 @@ unliftedCompare lt_op eq_op a_expr b_expr lt eq gt
                         -- mean more tests (dynamically)
         nlHsIf (ascribeBool $ genPrimOpApp a_expr eq_op b_expr) eq gt
   where
-    ascribeBool e = nlExprWithTySig e boolTy
+    ascribeBool e = nlExprWithTySig e $ nlHsTyVar boolTyCon_RDR
 
 nlConWildPat :: DataCon -> LPat GhcPs
 -- The pattern (K {})
@@ -1855,7 +1855,7 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
           --
           --   op :: forall c. a -> [T x] -> c -> Int
           L loc $ ClassOpSig noExtField False [loc_meth_RDR]
-                $ mkLHsSigType $ typeToLHsType to_ty
+                $ mkLHsSigType $ nlHsCoreTy to_ty
         )
       where
         Pair from_ty to_ty = mkCoerceClassMethEqn cls inst_tvs inst_tys rhs_ty meth_id
@@ -1911,12 +1911,15 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
 nlHsAppType :: LHsExpr GhcPs -> Type -> LHsExpr GhcPs
 nlHsAppType e s = noLoc (HsAppType noExtField e hs_ty)
   where
-    hs_ty = mkHsWildCardBndrs $ parenthesizeHsType appPrec (typeToLHsType s)
+    hs_ty = mkHsWildCardBndrs $ parenthesizeHsType appPrec $ nlHsCoreTy s
 
-nlExprWithTySig :: LHsExpr GhcPs -> Type -> LHsExpr GhcPs
+nlExprWithTySig :: LHsExpr GhcPs -> LHsType GhcPs -> LHsExpr GhcPs
 nlExprWithTySig e s = noLoc $ ExprWithTySig noExtField (parenthesizeHsExpr sigPrec e) hs_ty
   where
-    hs_ty = mkLHsSigWcType (typeToLHsType s)
+    hs_ty = mkLHsSigWcType s
+
+nlHsCoreTy :: Type -> LHsType GhcPs
+nlHsCoreTy = noLoc . XHsType . NHsCoreTy
 
 mkCoerceClassMethEqn :: Class   -- the class being derived
                      -> [TyVar] -- the tvs in the instance head (this includes

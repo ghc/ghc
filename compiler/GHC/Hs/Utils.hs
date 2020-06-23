@@ -47,7 +47,6 @@ module GHC.Hs.Utils(
   nlHsIntLit, nlHsVarApps,
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
   mkLHsTupleExpr, mkLHsVarTuple, missingTupArg,
-  typeToLHsType,
 
   -- * Constructing general big tuples
   -- $big_tuples
@@ -119,9 +118,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Types.Name.Reader
 import GHC.Types.Var
 import GHC.Core.TyCo.Rep
-import GHC.Core.TyCon
-import GHC.Core.Type ( appTyArgFlags, splitAppTys, tyConArgFlags, tyConAppNeedsKindSig )
-import GHC.Core.Multiplicity ( pattern One, pattern Many )
+import GHC.Core.Multiplicity ( pattern Many )
 import GHC.Builtin.Types ( unitTy )
 import GHC.Tc.Utils.TcType
 import GHC.Core.DataCon
@@ -679,139 +676,6 @@ mkClassOpSigs sigs
     fiddle (L loc (TypeSig _ nms ty))
       = L loc (ClassOpSig noExtField False nms (dropWildCards ty))
     fiddle sig = sig
-
-typeToLHsType :: Type -> LHsType GhcPs
--- ^ Converting a Type to an HsType RdrName
--- This is needed to implement GeneralizedNewtypeDeriving.
---
--- Note that we use 'getRdrName' extensively, which
--- generates Exact RdrNames rather than strings.
-typeToLHsType ty
-  = go ty
-  where
-    go :: Type -> LHsType GhcPs
-    go ty@(FunTy { ft_af = af, ft_mult = mult, ft_arg = arg, ft_res = res })
-      = case af of
-          VisArg   -> nlHsFunTy (multToHsArrow mult) (go arg) (go res)
-          InvisArg | (theta, tau) <- tcSplitPhiTy ty
-                   -> noLoc (HsQualTy { hst_ctxt = noLoc (map go theta)
-                                      , hst_xqual = noExtField
-                                      , hst_body = go tau })
-
-    go ty@(ForAllTy (Bndr _ argf) _)
-      = noLoc (HsForAllTy { hst_tele = tele
-                          , hst_xforall = noExtField
-                          , hst_body = go tau })
-      where
-        (tele, tau)
-          | isVisibleArgFlag argf
-          = let (req_tvbs, tau') = tcSplitForAllTysReq ty in
-            (mkHsForAllVisTele (map go_tv req_tvbs), tau')
-          | otherwise
-          = let (inv_tvbs, tau') = tcSplitForAllTysInvis ty in
-            (mkHsForAllInvisTele (map go_tv inv_tvbs), tau')
-    go (TyVarTy tv)         = nlHsTyVar (getRdrName tv)
-    go (LitTy (NumTyLit n))
-      = noLoc $ HsTyLit noExtField (HsNumTy NoSourceText n)
-    go (LitTy (StrTyLit s))
-      = noLoc $ HsTyLit noExtField (HsStrTy NoSourceText s)
-    go ty@(TyConApp tc args)
-      | tyConAppNeedsKindSig True tc (length args)
-        -- We must produce an explicit kind signature here to make certain
-        -- programs kind-check. See Note [Kind signatures in typeToLHsType].
-      = nlHsParTy $ noLoc $ HsKindSig noExtField ty' (go (tcTypeKind ty))
-      | otherwise = ty'
-       where
-        ty' :: LHsType GhcPs
-        ty' = go_app (noLoc $ HsTyVar noExtField prom $ noLoc $ getRdrName tc)
-                     args (tyConArgFlags tc args)
-
-        prom :: PromotionFlag
-        prom = if isPromotedDataCon tc then IsPromoted else NotPromoted
-    go ty@(AppTy {})        = go_app (go head) args (appTyArgFlags head args)
-      where
-        head :: Type
-        args :: [Type]
-        (head, args) = splitAppTys ty
-    go (CastTy ty _)        = go ty
-    go (CoercionTy co)      = pprPanic "typeToLHsType" (ppr co)
-
-         -- Source-language types have _invisible_ kind arguments,
-         -- so we must remove them here (#8563)
-
-    go_app :: LHsType GhcPs -- The type being applied
-           -> [Type]        -- The argument types
-           -> [ArgFlag]     -- The argument types' visibilities
-           -> LHsType GhcPs
-    go_app head args arg_flags =
-      foldl' (\f (arg, flag) ->
-               let arg' = go arg in
-               case flag of
-                 -- See Note [Explicit Case Statement for Specificity]
-                 Invisible spec -> case spec of
-                   InferredSpec  -> f
-                   SpecifiedSpec -> f `nlHsAppKindTy` arg'
-                 Required  -> f `nlHsAppTy`     arg')
-             head (zip args arg_flags)
-
-    go_tv :: VarBndr TyVar flag -> LHsTyVarBndr flag GhcPs
-    go_tv (Bndr tv flag) = noLoc $ KindedTyVar noExtField
-                                               flag
-                                               (noLoc (getRdrName tv))
-                                               (go (tyVarKind tv))
-
--- | This is used to transform an arrow from Core's Type to surface
--- syntax. There is a choice between being very explicit here, or trying to
--- refold arrows into shorthands as much as possible. We choose to do the
--- latter, for it should be more readable. It also helps printing Haskell'98
--- code into Haskell'98 syntax.
-multToHsArrow :: Mult -> HsArrow GhcPs
-multToHsArrow One = HsLinearArrow
-multToHsArrow Many = HsUnrestrictedArrow
-multToHsArrow ty = HsExplicitMult (typeToLHsType ty)
-
-{-
-Note [Kind signatures in typeToLHsType]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-There are types that typeToLHsType can produce which require explicit kind
-signatures in order to kind-check. Here is an example from #14579:
-
-  -- type P :: forall {k} {t :: k}. Proxy t
-  type P = 'Proxy
-
-  -- type Wat :: forall a. Proxy a -> *
-  newtype Wat (x :: Proxy (a :: Type)) = MkWat (Maybe a)
-    deriving Eq
-
-  -- type Wat2 :: forall {a}. Proxy a -> *
-  type Wat2 = Wat
-
-  -- type Glurp :: * -> *
-  newtype Glurp a = MkGlurp (Wat2 (P :: Proxy a))
-    deriving Eq
-
-The derived Eq instance for Glurp (without any kind signatures) would be:
-
-  instance Eq a => Eq (Glurp a) where
-    (==) :: Glurp a -> Glurp a -> Bool
-    (==) = coerce @(Wat2 P  -> Wat2 P  -> Bool)
-                  @(Glurp a -> Glurp a -> Bool)
-                  (==)
-
-(Where the visible type applications use types produced by typeToLHsType.)
-
-The type P (in Wat2 P) has an underspecified kind, so we must ensure that
-typeToLHsType ascribes it with its kind: Wat2 (P :: Proxy a). To accomplish
-this, whenever we see an application of a tycon to some arguments, we use
-the tyConAppNeedsKindSig function to determine if it requires an explicit kind
-signature to resolve some ambiguity. (See Note
-Note [When does a tycon application need an explicit kind signature?] for a
-more detailed explanation of how this works.)
-
-Note that we pass True to tyConAppNeedsKindSig since we are generated code with
-visible kind applications, so even specified arguments count towards injective
-positions in the kind of the tycon.
--}
 
 {- *********************************************************************
 *                                                                      *
