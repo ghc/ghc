@@ -582,6 +582,11 @@ Library
             GHC.CmmToAsm.X86.Cond
             GHC.CmmToAsm.X86.Ppr
             GHC.CmmToAsm.X86.CodeGen
+            GHC.CmmToAsm.ARM.Regs
+            GHC.CmmToAsm.ARM.RegInfo
+            GHC.CmmToAsm.ARM.Instr
+            GHC.CmmToAsm.ARM.Cond
+            GHC.CmmToAsm.ARM.Ppr
             GHC.CmmToAsm.PPC.Regs
             GHC.CmmToAsm.PPC.RegInfo
             GHC.CmmToAsm.PPC.Instr
