@@ -21,7 +21,7 @@
 
 {-# OPTIONS_GHC -O2 -ddump-simpl -ddump-to-file -ddump-stg -ddump-cmm -ddump-asm #-}
 
-module StgInferTags (findTags, EnterLattice) where
+module GHC.Stg.InferTags (findTags, EnterLattice) where
 
 #include "HsVersions.h"
 
