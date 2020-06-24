@@ -1560,9 +1560,8 @@ doCodeGen hsc_env this_mod data_tycons
     let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
 
     -- !start <- getTime
-    let !stg_binds_w_tags = {-# SCC "StgTagFields" #-}
-                          findTags this_mod us stg_binds :: [TgStgTopBinding]
-
+    let (!stg_binds_w_tags, _exports) = {-# SCC "StgTagFields" #-}
+                                        findTags this_mod us stg_binds
     -- !end <- getTime
     -- putStrLn $! "Time(ms) taken by findTags:" ++ (show $ end - start)
     let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds_w_tags
