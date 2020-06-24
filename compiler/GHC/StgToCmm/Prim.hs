@@ -86,16 +86,26 @@ cgOpApp (StgFCallOp fcall ty) stg_args res_ty
 cgOpApp (StgPrimOp primop) args res_ty = do
     dflags <- getDynFlags
     cmm_args <- getNonVoidArgAmodes args
-    case emitPrimOp dflags primop cmm_args of
-        PrimopCmmEmit_Internal f -> emitReturn =<< f res_ty
-        PrimopCmmEmit_External -> do
-          let fun = CmmLit (CmmLabel (mkRtsPrimOpLabel primop))
-          emitCall (NativeNodeCall, NativeReturn) fun cmm_args
+    cmmPrimOpApp dflags primop cmm_args (Just res_ty)
 
 cgOpApp (StgPrimCallOp primcall) args _res_ty
   = do  { cmm_args <- getNonVoidArgAmodes args
         ; let fun = CmmLit (CmmLabel (mkPrimCallLabel primcall))
         ; emitCall (NativeNodeCall, NativeReturn) fun cmm_args }
+
+cmmPrimOpApp :: DynFlags -> PrimOp -> [CmmExpr] -> Maybe Type -> FCode ReturnKind
+cmmPrimOpApp dflags primop cmm_args mres_ty =
+  case emitPrimOp dflags primop cmm_args of
+    PrimopCmmEmit_Internal f ->
+      let
+         -- if the result type isn't explicitly given, we directly use the
+         -- result type of the primop.
+         res_ty = fromMaybe (primOpResultType primop) mres_ty
+      in emitReturn =<< f res_ty
+    PrimopCmmEmit_External -> do
+      let fun = CmmLit (CmmLabel (mkRtsPrimOpLabel primop))
+      emitCall (NativeNodeCall, NativeReturn) fun cmm_args
+
 
 -- | Interpret the argument as an unsigned value, assuming the value
 -- is given in two-complement form in the given width.
@@ -1866,7 +1876,8 @@ genericIntMul2Op [res_c, res_h, res_l] both_args@[arg_x, arg_y]
       let t = cmmExprType platform arg_x
       p   <- newTemp t
       -- 1) compute the multiplication as if numbers were unsigned
-      genericWordMul2Op [p, res_l] both_args
+      _ <- withSequel (AssignTo [p, res_l] False) $
+             cmmPrimOpApp dflags WordMul2Op both_args Nothing
       -- 2) correct the high bits of the unsigned result
       let carryFill x = CmmMachOp (MO_S_Shr ww) [x, wwm1]
           sub x y     = CmmMachOp (MO_Sub   ww) [x, y]
