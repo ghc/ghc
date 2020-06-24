@@ -678,7 +678,7 @@ saveClobberedTemps [] _
 
 saveClobberedTemps clobbered dying
  = do
-        assig   <- getAssigR
+        assig   <- getAssigR :: RegM freeRegs (UniqFM Reg Loc)
         -- Unique represents the VirtualReg
         let to_spill :: [(Unique, RealReg)]
             to_spill

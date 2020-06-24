@@ -645,15 +645,15 @@ checkNode graph node
 
 slurpNodeConflictCount
         :: Graph k cls color
-        -> UniqFM Unique (Int, Int)    -- ^ (conflict neighbours, num nodes with that many conflicts)
+        -> UniqFM Int (Int, Int)    -- ^ (conflict neighbours, num nodes with that many conflicts)
 
 slurpNodeConflictCount graph
-        = addListToUFM_C_Directly
+        = addListToUFM_C
                 (\(c1, n1) (_, n2) -> (c1, n1 + n2))
                 emptyUFM
         $ map   (\node
                   -> let count  = sizeUniqSet $ nodeConflicts node
-                     in  (getUnique count, (count, 1)))
+                     in  (count, (count, 1)))
         $ nonDetEltsUFM
         -- See Note [Unique Determinism and code generation]
         $ graphMap graph

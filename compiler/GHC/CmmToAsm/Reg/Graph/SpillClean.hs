@@ -545,18 +545,16 @@ emptyAssoc      = emptyUFM
 addAssoc :: Store -> Store -> Assoc Store -> Assoc Store
 
 addAssoc a b m
- = let  m1      = addToUFM_C_Directly unionUniqSets m  (getUnique a) (unitUniqSet b)
-        m2      = addToUFM_C_Directly unionUniqSets m1 (getUnique b) (unitUniqSet a)
+ = let  m1      = addToUFM_C unionUniqSets m  a (unitUniqSet b)
+        m2      = addToUFM_C unionUniqSets m1 b (unitUniqSet a)
    in   m2
 
 
 -- | Delete all associations to a node.
-delAssoc :: (Uniquable a)
-         => a -> Assoc a -> Assoc a
-
+delAssoc :: Store -> Assoc Store -> Assoc Store
 delAssoc a m
-        | Just aSet     <- lookupUFM_U  m a
-        , m1            <- delFromUFM_U m a
+        | Just aSet     <- lookupUFM  m a
+        , m1            <- delFromUFM m a
         = nonDetStrictFoldUniqSet (\x m -> delAssoc1 x a m) m1 aSet
           -- It's OK to use a non-deterministic fold here because deletion is
           -- commutative
@@ -565,9 +563,7 @@ delAssoc a m
 
 
 -- | Delete a single association edge (a -> b).
-delAssoc1 :: Uniquable a
-          => a -> a -> Assoc a -> Assoc a
-
+delAssoc1 :: Store -> Store -> Assoc Store -> Assoc Store
 delAssoc1 a b m
         | Just aSet     <- lookupUFM_U m a
         = addToUFM_U m a (delOneFromUniqSet aSet b)
@@ -576,22 +572,17 @@ delAssoc1 a b m
 
 
 -- | Check if these two things are associated.
-elemAssoc :: (Uniquable a)
-          => a -> a -> Assoc a -> Bool
+elemAssoc :: Store -> Store -> Assoc Store -> Bool
 
 elemAssoc a b m
         = elementOfUniqSet b (closeAssoc a m)
 
 
 -- | Find the refl. trans. closure of the association from this point.
-closeAssoc :: (Uniquable a)
-        => a -> Assoc a -> UniqSet a
-
+closeAssoc :: Store -> Assoc Store -> UniqSet Store
 closeAssoc a assoc
  =      closeAssoc' assoc emptyUniqSet (unitUniqSet a)
  where
-        -- closeAssoc' :: UniqFM Unique (UniqSet Unique)
-        --               -> UniqSet Unique -> UniqSet Unique -> UniqSet Unique
         closeAssoc' assoc visited toVisit
          = case nonDetEltsUniqSet toVisit of
              -- See Note [Unique Determinism and code generation]
@@ -617,6 +608,6 @@ closeAssoc a assoc
                         (unionUniqSets   toVisit neighbors)
 
 -- | Intersect two associations.
-intersectAssoc :: Assoc a -> Assoc a -> Assoc a
+intersectAssoc :: Assoc Store -> Assoc Store -> Assoc Store
 intersectAssoc a b
         = intersectUFM_C (intersectUniqSets) a b

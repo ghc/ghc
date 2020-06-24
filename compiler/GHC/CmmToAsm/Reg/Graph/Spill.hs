@@ -282,7 +282,7 @@ spillModify regSlotMap instr reg
  = do    (instr', nReg)  <- patchInstr reg instr
 
          modify $ \s -> s
-                { stateSpillSL  = addToUFM_C_Directly accSpillSL (stateSpillSL s) (getUnique reg) (reg, 1, 1) }
+                { stateSpillSL  = addToUFM_C accSpillSL (stateSpillSL s) reg (reg, 1, 1) }
 
          return  ( instr'
                  , ( [LiveInstr (RELOAD slot nReg) Nothing]

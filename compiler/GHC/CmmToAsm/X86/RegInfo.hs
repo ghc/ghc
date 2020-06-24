@@ -38,15 +38,6 @@ regDotColor platform reg
         Just str -> text str
         _        -> panic "Register not assigned a color"
 
--- regColors :: Platform -> UniqFM RealReg [Char]
--- regColors platform = listToUFM_Directly (normalRegColors platform)
-
-
--- normalRegColors :: Platform -> [(Unique,String)]
--- normalRegColors platform =
---     zip (map (getUnique . regSingle) [0..lastint platform]) colors
---         ++ zip (map (getUnique . regSingle) [firstxmm..lastxmm platform]) greys
-
 regColors :: Platform -> UniqFM RealReg [Char]
 regColors platform = listToUFM (normalRegColors platform)
 
