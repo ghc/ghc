@@ -1027,7 +1027,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
           -- "Referring to an SRT from the info table" of Note [SRTs]). However,
           -- when dynamic linking is used we cannot guarantee that the offset
           -- between the SRT and the info table will fit in the offset field.
-          -- Consequently we build a singleton SRT in in this case.
+          -- Consequently we build a singleton SRT in this case.
           not (labelDynamic config this_mod lbl)
 
           -- MachO relocations can't express offsets between compilation units at

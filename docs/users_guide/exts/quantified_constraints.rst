@@ -95,7 +95,7 @@ Syntax changes
     class ::= qtycls tyvar
             |  qtycls (tyvar atype1 ... atypen)
 
-We to extend ``class`` (warning: this is a rather confusingly named non-terminal symbol) with two extra forms, namely precisely what can appear in an instance declaration
+We extend ``class`` (warning: this is a rather confusingly named non-terminal symbol) with two extra forms, namely precisely what can appear in an instance declaration
 
 .. code-block:: none
 
@@ -108,13 +108,13 @@ The ``context =>`` part is optional.  That is the only syntactic change to the l
 
 Notes:
 
-- Where GHC allows extensions instance declarations we allow exactly the same extensions to this new form of ``class``.  Specifically, with :extension:`ExplicitForAll` and :extension:`MultiParamTypeClasses` the syntax becomes
+- Where GHC allows extensions in instance declarations we allow exactly the same extensions to this new form of ``class``.  Specifically, with :extension:`ExplicitForAll` and :extension:`MultiParamTypeClasses` the syntax becomes
 
   .. code-block:: none
 
     class ::= ...
-           | [forall tyavrs .] [context =>] qtycls inst1 ... instn
-           | [forall tyavrs .] [context =>] tyvar inst1 ... instn
+           | [forall tyvars .] [context =>] qtycls inst1 ... instn
+           | [forall tyvars .] [context =>] tyvar inst1 ... instn
 
   Note that an explicit ``forall`` is often absolutely essential. Consider the rose-tree example ::
 
@@ -222,7 +222,7 @@ trying to solve a class constraint ``C t``
 
 1. First see if there is a given un-quantified constraint ``C t``.  If so, use it to solve the constraint.
 
-2. If not, look at all the available given quantified constraints; if exactly one one matches ``C t``, choose it; if more than one matches, report an error.
+2. If not, look at all the available given quantified constraints; if exactly one matches ``C t``, choose it; if more than one matches, report an error.
 
 3. If no quantified constraints match, look up in the global instances, as described in :ref:`instance-resolution` and :ref:`instance-overlap`.
 

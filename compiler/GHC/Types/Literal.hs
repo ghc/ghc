@@ -99,7 +99,7 @@ import Numeric ( fromRat )
 --   declaration ('LitLabel')
 --
 -- * A 'LitRubbish' to be used in place of values of 'UnliftedRep'
---   (i.e. 'MutVar#') when the the value is never used.
+--   (i.e. 'MutVar#') when the value is never used.
 --
 -- * A character
 -- * A string

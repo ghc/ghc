@@ -504,7 +504,7 @@ lintCoreBindings dflags pass local_in_scope binds
     (_, dups) = removeDups compare binders
 
     -- dups_ext checks for names with different uniques
-    -- but but the same External name M.n.  We don't
+    -- but the same External name M.n.  We don't
     -- allow this at top level:
     --    M.n{r3}  = ...
     --    M.n{r29} = ...

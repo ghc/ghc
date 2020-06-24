@@ -497,7 +497,7 @@ Redirecting temporary files
 
     If you have trouble because of running out of space in ``/tmp`` (or
     wherever your installation thinks temporary files should go), you
-    may use the :ghc-flag:`-tmpdir ⟨dir⟩` option option to specify an
+    may use the :ghc-flag:`-tmpdir ⟨dir⟩` option to specify an
     alternate directory. For example, ``-tmpdir .`` says to put temporary files
     in the current working directory.
 

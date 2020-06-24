@@ -56,7 +56,7 @@ newGlobalBinder :: Module -> OccName -> SrcSpan -> TcRnIf a b Name
 -- Name for a thing, given its Module and OccName
 -- See Note [The Name Cache]
 --
--- The cache may already already have a binding for this thing,
+-- The cache may already have a binding for this thing,
 -- because we may have seen an occurrence before, but now is the
 -- moment when we know its Module and SrcLoc in their full glory
 
