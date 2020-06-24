@@ -867,7 +867,7 @@ A thing can have a bind_lvl of outerLevel, but have an internal name:
    foo = [d| op = 3
              bop = op + 1 |]
 Here the bind_lvl of 'op' is (bogusly) outerLevel, even though it is
-bound inside a bracket.  That is because we don't even even record
+bound inside a bracket.  That is because we don't even record
 binding levels for top-level things; the binding levels are in the
 LocalRdrEnv.
 

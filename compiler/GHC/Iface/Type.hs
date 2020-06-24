@@ -962,7 +962,7 @@ But if we are printing the type
 we do want to turn that (free) r into LiftedRep, so it prints as
     (forall a. blah)
 
-Conclusion: keep track of whether we we are in the kind of a
+Conclusion: keep track of whether we are in the kind of a
 binder; only if so, convert free RuntimeRep variables to LiftedRep.
 -}
 

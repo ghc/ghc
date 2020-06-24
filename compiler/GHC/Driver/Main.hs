@@ -457,7 +457,7 @@ hscTypecheckRename hsc_env mod_summary rdr_module = runHsc hsc_env $
     hsc_typecheck True mod_summary (Just rdr_module)
 
 
--- | A bunch of logic piled around around @tcRnModule'@, concerning a) backpack
+-- | A bunch of logic piled around @tcRnModule'@, concerning a) backpack
 -- b) concerning dumping rename info and hie files. It would be nice to further
 -- separate this stuff out, probably in conjunction better separating renaming
 -- and type checking (#17781).

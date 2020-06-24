@@ -207,7 +207,7 @@ the following invariants hold
 
   (a) if dup = OkToDup, then continuation k is also ok-to-dup
   (b) if dup = OkToDup or Simplified, the subst-env is empty
-      (and and hence no need to re-simplify)
+      (and hence no need to re-simplify)
 -}
 
 instance Outputable DupFlag where

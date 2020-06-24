@@ -2313,7 +2313,7 @@ very same implication" as the equuality constraint.
                            MkS -> [y,z])
           in ...
 
-From the type signature for `g`, we get `y::a` .  Then when when we
+From the type signature for `g`, we get `y::a` .  Then when we
 encounter the `\z`, we'll assign `z :: alpha[1]`, say.  Next, from the
 body of the lambda we'll get
 

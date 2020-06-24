@@ -301,7 +301,7 @@ syntax. This has a few consequences:
 * Writing (a ~ b) does not require enabling -XTypeOperators. It does, however,
   require -XGADTs or -XTypeFamilies.
 
-* The (~) type operator is always in scope. It doesn't need to be be imported,
+* The (~) type operator is always in scope. It doesn't need to be imported,
   and it cannot be hidden.
 
 * We have a bunch of special cases in the compiler to arrange all of the above.

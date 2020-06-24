@@ -435,7 +435,7 @@ than just accumulate an error message, for two reasons:
   * More seriously, we don't have a convenient term-level place to add
     deferred bindings for unsolved kind-equality constraints, so we
     don't build evidence bindings (by usine reportAllUnsolved). That
-    means that we'll be left with with a type that has coercion holes
+    means that we'll be left with a type that has coercion holes
     in it, something like
            <type> |> co-hole
     where co-hole is not filled in.  Eeek!  That un-filled-in
@@ -2268,7 +2268,7 @@ the top-level simple constraints are plausible, but we also float constraints
 out from inside, if they are not captured by skolems.
 
 The same function is used when doing type-class defaulting (see the call
-to applyDefaultingRules) to extract constraints that that might be defaulted.
+to applyDefaultingRules) to extract constraints that might be defaulted.
 
 There is one caveat:
 

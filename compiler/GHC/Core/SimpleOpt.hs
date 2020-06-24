@@ -958,7 +958,7 @@ unfolding, we would end up with
    let a = I#3 in case a of I# y -> ...
 because in general, we do this on-the-fly beta-reduction
    (\x. e) blah  -->  let x = blah in e
-and then float the the let.  (Substitution would risk duplicating 'blah'.)
+and then float the let.  (Substitution would risk duplicating 'blah'.)
 
 But if the case-of-known-constructor doesn't actually fire (i.e.
 exprIsConApp_maybe does not return Just) then nothing happens, and nothing

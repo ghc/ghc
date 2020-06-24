@@ -111,7 +111,7 @@ The hole in `f` would generate the message:
           (and originally defined in ‘GHC.Base’))
 
 Valid hole fits are found by checking top level identifiers and local bindings
-in scope for whether their type can be instantiated to the the type of the hole.
+in scope for whether their type can be instantiated to the type of the hole.
 Additionally, we also need to check whether all relevant constraints are solved
 by choosing an identifier of that type as well, see Note [Relevant constraints]
 
@@ -122,10 +122,10 @@ This is to avoid affecting the hole and later checks by prematurely having
 unified one of the free unification variables.
 
 When outputting, we sort the hole fits by the size of the types we'd need to
-apply by type application to the type of the fit to to make it fit. This is done
+apply by type application to the type of the fit to make it fit. This is done
 in order to display "more relevant" suggestions first. Another option is to
 sort by building a subsumption graph of fits, i.e. a graph of which fits subsume
-what other fits, and then outputting those fits which are are subsumed by other
+what other fits, and then outputting those fits which are subsumed by other
 fits (i.e. those more specific than other fits) first. This results in the ones
 "closest" to the type of the hole to be displayed first.
 
@@ -600,7 +600,7 @@ findValidHoleFits tidy_env implics simples h@(Hole { hole_sort = ExprHole _
      ; return (tidy_env, vMsg $$ refMsg) }
   where
     -- We extract the type, the tcLevel and the types free variables
-    -- from from the constraint.
+    -- from the constraint.
     hole_fvs :: FV
     hole_fvs = tyCoFVsOfType hole_ty
     hole_lvl = ctLocLevel ct_loc

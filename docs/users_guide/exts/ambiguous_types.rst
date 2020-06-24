@@ -13,7 +13,7 @@ Ambiguous types and the ambiguity check
     an unusable binding.
 
 Each user-written type signature is subjected to an *ambiguity check*.
-The ambiguity check rejects functions that can never be called; for
+The ambiguity check rejects functions that can never be called. For
 example: ::
 
        f :: C a => Int
@@ -80,7 +80,7 @@ typecheck. We use a very similar test for *inferred* types, to ensure
 that they too are unambiguous.
 
 *Switching off the ambiguity check.* Even if a function has an
-ambiguous type according the "guiding principle", it is possible that
+ambiguous type according to the "guiding principle", it is possible that
 the function is callable. For example: ::
 
       class D a b where ...

@@ -2218,7 +2218,7 @@ enableCodeGenForTH =
 -- the specified target, disable optimization and change the .hi
 -- and .o file locations to be temporary files.
 --
--- This is used used in order to load code that uses unboxed tuples
+-- This is used in order to load code that uses unboxed tuples
 -- or sums into GHCi while still allowing some code to be interpreted.
 enableCodeGenForUnboxedTuplesOrSums :: HscTarget
   -> NodeMap [Either ErrorMessages ModSummary]

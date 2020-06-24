@@ -497,7 +497,7 @@ Where should the NOINLINE pragma go?  If we leave it on f we'll get
       ; {-# NOINLINE f #-}
         f = $wf |> co
       ; g = ...f... }
-and that is bad bad: the whole point is that we want to inline that
+and that is bad: the whole point is that we want to inline that
 cast!  We want to transfer the pagma to $wf:
   rec { {-# NOINLINE $wf #-}
         $wf = ...g...

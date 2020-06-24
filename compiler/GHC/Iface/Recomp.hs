@@ -303,7 +303,7 @@ pluginRecompileToRecompileRequired old_fp new_fp pr
     -- time or when we go from one recompilation strategy to another: (force ->
     -- no-force, maybe-recomp -> no-force, no-force -> maybe-recomp etc.)
     --
-    -- For example when we go from from ForceRecomp to NoForceRecomp
+    -- For example when we go from ForceRecomp to NoForceRecomp
     -- recompilation is triggered since the old impure plugins could have
     -- changed the build output which is now back to normal.
     = RecompBecause "Plugins changed"

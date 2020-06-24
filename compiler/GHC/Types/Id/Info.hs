@@ -556,7 +556,7 @@ ruleInfoFreeVars (RuleInfo _ fvs) = fvs
 ruleInfoRules :: RuleInfo -> [CoreRule]
 ruleInfoRules (RuleInfo rules _) = rules
 
--- | Change the name of the function the rule is keyed on on all of the 'CoreRule's
+-- | Change the name of the function the rule is keyed on all of the 'CoreRule's
 setRuleInfoHead :: Name -> RuleInfo -> RuleInfo
 setRuleInfoHead fn (RuleInfo rules fvs)
   = RuleInfo (map (setRuleIdName fn) rules) fvs
