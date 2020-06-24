@@ -137,7 +137,7 @@ data Arch
 -- There is a very loose encoding of platforms shared by many tools we are
 -- encoding to here. GNU Config (http://git.savannah.gnu.org/cgit/config.git),
 -- and LLVM's http://llvm.org/doxygen/classllvm_1_1Triple.html are perhaps the
--- most definitional parsers. The basic syntax is a list of of '-'-separated
+-- most definitional parsers. The basic syntax is a list of '-'-separated
 -- components. The Unix 'uname' command syntax is related but briefer.
 --
 -- Those two parsers are quite forgiving, and even the 'config.sub'

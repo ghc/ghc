@@ -3721,7 +3721,7 @@ Consider
 
 Here
  * The pattern (MkT p1 p2) creates a *skolem* type variable 'a_sk',
-   It must be a skolem so that that it retains its identity, and
+   It must be a skolem so that it retains its identity, and
    GHC.Tc.Errors.getSkolemInfo can thereby find the binding site for the skolem.
 
  * The type signature pattern (f :: b -> c) makes freshs meta-tyvars

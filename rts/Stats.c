@@ -796,7 +796,7 @@ static void free_RTSSummaryStats(RTSSummaryStats * sum)
 static void report_summary(const RTSSummaryStats* sum)
 {
     // We should do no calculation, other than unit changes and formatting, and
-    // we should not not use any data from outside of globals, sum and stats
+    // we should not use any data from outside of globals, sum and stats
     // here. See Note [RTS Stats Reporting]
 
     uint32_t g;
@@ -1019,7 +1019,7 @@ static void report_summary(const RTSSummaryStats* sum)
 static void report_machine_readable (const RTSSummaryStats * sum)
 {
     // We should do no calculation, other than unit changes and formatting, and
-    // we should not not use any data from outside of globals, sum and stats
+    // we should not use any data from outside of globals, sum and stats
     // here. See Note [RTS Stats Reporting]
     uint32_t g;
 
@@ -1198,7 +1198,7 @@ static void report_machine_readable (const RTSSummaryStats * sum)
 static void report_one_line(const RTSSummaryStats * sum)
 {
     // We should do no calculation, other than unit changes and formatting, and
-    // we should not not use any data from outside of globals, sum and stats
+    // we should not use any data from outside of globals, sum and stats
     // here. See Note [RTS Stats Reporting]
 
     /* print the long long separately to avoid bugginess on mingwin (2001-07-02,

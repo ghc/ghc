@@ -341,7 +341,7 @@ for non-``-threaded``, see https://gitlab.haskell.org/ghc/ghc/issues/8684),
 and implement the ``EINTR``-retrying in Haskell
 (e.g. using e.g. :base-ref:`Foreign.C.Error.throwErrnoIfMinus1Retry`).
 
-Be especially careful when using ``interruptible`` to check that that
+Be especially careful when using ``interruptible`` to check that
 the called foreign function is prepared to deal with the consequences
 of the call being interrupted.
 On Unix it is considered good practice to always check for ``EINTR`` after
