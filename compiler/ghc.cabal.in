@@ -155,6 +155,8 @@ Library
         NoImplicitPrelude
 
     Exposed-Modules:
+        GHC.Stg.InferTags
+        GHC.Stg.Utils
         GHC.Iface.Ext.Types
         GHC.Iface.Ext.Debug
         GHC.Iface.Ext.Binary
