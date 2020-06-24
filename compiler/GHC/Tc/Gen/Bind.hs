@@ -215,7 +215,7 @@ tcTopBinds binds sigs
 -- a fixed return type must agree with this.
 --
 -- The fields of `Fixed` cache the first conlike and its return type so
--- that that we can compare all the other conlikes to it. The conlike is
+-- that we can compare all the other conlikes to it. The conlike is
 -- stored for error messages.
 --
 -- `Nothing` in the case that the type is fixed by a type signature
@@ -1609,7 +1609,7 @@ We typecheck pattern bindings as follows.  First tcLhs does this:
        generalisation step will do the checking and impedance matching
        against the signature.
 
-     - If for some some reason we are not generalising (plan = NoGen), the
+     - If for some reason we are not generalising (plan = NoGen), the
        LetBndrSpec will be LetGblBndr.  In that case we must bind the
        global version of the Id, and do so with precisely the type given
        in the signature.  (Then we unify with the type from the pattern

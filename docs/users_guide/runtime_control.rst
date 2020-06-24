@@ -85,7 +85,7 @@ As always, for RTS options that take ⟨size⟩s: If the last character of
 or G, by 1,000,000,000. (And any wraparound in the counters is *your*
 fault!)
 
-Giving a ``+RTS -?`` RTS option option will print out the RTS
+Giving a ``+RTS -?`` RTS option will print out the RTS
 options actually available in your program (which vary, depending on how
 you compiled).
 

@@ -909,7 +909,7 @@ Which we want to become:
         x_exported =  tick<x> <expression>
 
 As it makes no sense to keep the tick and the expression on separate
-bindings. Note however that that this might increase the ticks scoping
+bindings. Note however that this might increase the ticks scoping
 over the execution of x_local, so we can only do this for floatable
 ticks. More often than not, other references will be unfoldings of
 x_exported, and therefore carry the tick anyway.

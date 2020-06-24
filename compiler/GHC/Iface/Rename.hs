@@ -148,7 +148,7 @@ rnDepModules sel deps = do
         --
         -- However, we MUST NOT do this for regular modules.
         -- First, for efficiency reasons, doing this
-        -- bloats the the dep_finsts list, because we *already* had
+        -- bloats the dep_finsts list, because we *already* had
         -- those modules in the list (it wasn't a hole module, after
         -- all). But there's a second, more important correctness
         -- consideration: we perform module renaming when running
@@ -158,7 +158,7 @@ rnDepModules sel deps = do
         -- --abi-hash is just to get a hash of the on-disk interfaces
         -- for this *specific* package.  If we go off and tug on the
         -- interface for /everything/ in dep_finsts, we're gonna have a
-        -- bad time.  (It's safe to do do this for hole modules, though,
+        -- bad time.  (It's safe to do this for hole modules, though,
         -- because the hmap for --abi-hash is always trivial, so the
         -- interface we request is local.  Though, maybe we ought
         -- not to do it in this case either...)

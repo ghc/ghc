@@ -715,7 +715,7 @@ We gather three sorts of usage information
       The tcg_keep field is used in two distinct ways:
 
       * Desugar.addExportFlagsAndRules.  Where things like (a-c) are locally
-        defined, we should give them an an Exported flag, so that the
+        defined, we should give them an Exported flag, so that the
         simplifier does not discard them as dead code, and so that they are
         exposed in the interface file (but not to export to the user).
 

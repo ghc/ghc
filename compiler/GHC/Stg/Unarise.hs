@@ -672,7 +672,7 @@ unariseArgBinder is_con_arg rho x =
       --
       -- While not unarising the binder in this case does not break any programs
       -- (because it unarises to a single variable), it triggers StgLint as we
-      -- break the the post-unarisation invariant that says unboxed tuple/sum
+      -- break the post-unarisation invariant that says unboxed tuple/sum
       -- binders should vanish. See Note [Post-unarisation invariants].
       | isUnboxedSumType (idType x) || isUnboxedTupleType (idType x)
       -> do x' <- mkId (mkFastString "us") (primRepToType rep)

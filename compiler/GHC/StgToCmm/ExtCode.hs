@@ -162,7 +162,7 @@ newLabel name = do
    addLabel name (mkBlockId u)
    return (mkBlockId u)
 
--- | Add add a local function to the environment.
+-- | Add a local function to the environment.
 newFunctionName
         :: FastString   -- ^ name of the function
         -> UnitId       -- ^ package of the current module

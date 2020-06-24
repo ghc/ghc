@@ -464,7 +464,7 @@ Note [Compiling case expressions].  However, after eliminating the
 tagToEnum# (#13397) we will have:
    case (a>b) of ...
 Rather than make it behave quite differently, I am testing for a
-comparison operator here in in the general case as well.
+comparison operator here in the general case as well.
 
 ToDo: figure out what the Right Rule should be.
 

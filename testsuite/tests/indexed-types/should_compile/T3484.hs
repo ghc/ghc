@@ -40,4 +40,4 @@ natEqDec m n = caseNat undefined mIsS m where
 
 -- strange things:
 -- (1) commenting out the "Yes" case or changing it to "undefined" makes compilation succeed
--- (2) replacing the "No" line with with the commented out "No" line makes compilation succeed
+-- (2) replacing the "No" line with the commented out "No" line makes compilation succeed

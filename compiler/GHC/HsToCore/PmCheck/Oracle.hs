@@ -199,7 +199,7 @@ that we expect.
 -- together as they see fit.
 newtype SatisfiabilityCheck = SC (Delta -> DsM (Maybe Delta))
 
--- | Check the given 'Delta' for satisfiability by the the given
+-- | Check the given 'Delta' for satisfiability by the given
 -- 'SatisfiabilityCheck'. Return 'Just' a new, potentially extended, 'Delta' if
 -- successful, and 'Nothing' otherwise.
 runSatisfiabilityCheck :: Delta -> SatisfiabilityCheck -> DsM (Maybe Delta)
@@ -1604,7 +1604,7 @@ provideEvidence = go
     instantiate_cons x ty xs n delta (cl:cls) = do
       env <- dsGetFamInstEnvs
       case guessConLikeUnivTyArgsFromResTy env ty cl of
-        Nothing -> pure [delta] -- No idea idea how to refine this one, so just finish off with a wildcard
+        Nothing -> pure [delta] -- No idea how to refine this one, so just finish off with a wildcard
         Just arg_tys -> do
           (tvs, arg_vars, new_ty_cs, strict_arg_tys) <- mkOneConFull arg_tys cl
           let new_tm_cs = unitBag (TmConCt x (PmAltConLike cl) tvs arg_vars)

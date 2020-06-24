@@ -1,4 +1,4 @@
--- | Extract docs from the renamer output so they can be be serialized.
+-- | Extract docs from the renamer output so they can be serialized.
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
