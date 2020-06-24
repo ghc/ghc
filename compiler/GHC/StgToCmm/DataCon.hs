@@ -4,7 +4,7 @@
 --
 -- Stg to C--: code generation for constructors
 --
--- This module provides the support code for StgToCmm to deal with with
+-- This module provides the support code for StgToCmm to deal with
 -- constructors on the RHSs of let(rec)s.
 --
 -- (c) The University of Glasgow 2004-2006

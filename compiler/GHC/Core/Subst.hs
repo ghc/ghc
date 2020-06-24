@@ -84,7 +84,7 @@ import Data.List
 --
 -- 2. Note [Substitutions apply only once] in "GHC.Core.TyCo.Subst"
 data Subst
-  = Subst InScopeSet  -- Variables in in scope (both Ids and TyVars) /after/
+  = Subst InScopeSet  -- Variables in scope (both Ids and TyVars) /after/
                       -- applying the substitution
           IdSubstEnv  -- Substitution from NcIds to CoreExprs
           TvSubstEnv  -- Substitution from TyVars to Types
@@ -757,6 +757,6 @@ A worker can get substituted away entirely.
 We do not treat an InlWrapper as an 'occurrence' in the occurrence
 analyser, so it's possible that the worker is not even in scope any more.
 
-In all all these cases we simply drop the special case, returning to
+In all these cases we simply drop the special case, returning to
 InlVanilla.  The WARN is just so I can see if it happens a lot.
 -}

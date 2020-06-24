@@ -218,7 +218,7 @@ argRegs r
         _       -> panic "MachRegs.argRegs(sparc): don't know about >6 arguments!"
 
 
--- | All all the regs that could possibly be returned by argRegs
+-- | All the regs that could possibly be returned by argRegs
 --
 allArgRegs :: [Reg]
 allArgRegs

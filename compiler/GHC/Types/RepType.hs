@@ -367,7 +367,7 @@ It's all in 1-1 correspondence with PrimRep except for TupleRep and SumRep,
 which describe unboxed products and sums respectively. RuntimeRep is defined
 in the library ghc-prim:GHC.Types. It is also "wired-in" to GHC: see
 GHC.Builtin.Types.runtimeRepTyCon. The unarisation pass, in GHC.Stg.Unarise, transforms the
-program, so that that every variable has a type that has a PrimRep. For
+program, so that every variable has a type that has a PrimRep. For
 example, unarisation transforms our utup function above, to take two Int
 arguments instead of one (# Int, Int #) argument.
 
@@ -392,7 +392,7 @@ Note [Getting from RuntimeRep to PrimRep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 General info on RuntimeRep and PrimRep is in Note [RuntimeRep and PrimRep].
 
-How do we get from an Id to the the list or PrimReps used to store it? We get
+How do we get from an Id to the list or PrimReps used to store it? We get
 the Id's type ty (using idType), then ty's kind ki (using typeKind), then
 pattern-match on ki to extract rep (in kindPrimRep), then extract the PrimRep
 from the RuntimeRep (in runtimeRepPrimRep).

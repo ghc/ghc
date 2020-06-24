@@ -25,7 +25,7 @@ import Control.Monad.Fail
 import qualified Data.ByteString as BS
 
 -- NOTE: Must return a pointer acceptable for use in the header of a closure.
--- If tables_next_to_code is enabled, then it must point the the 'code' field.
+-- If tables_next_to_code is enabled, then it must point the 'code' field.
 -- Otherwise, it should point to the start of the StgInfoTable.
 mkConInfoTable
    :: Bool    -- TABLES_NEXT_TO_CODE

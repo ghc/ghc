@@ -1259,7 +1259,7 @@ rqpart cmp x (y:ys) rle rgt r =
 -- input list.  This is called the decorate-sort-undecorate paradigm, or
 -- Schwartzian transform.
 --
--- Elements are arranged from from lowest to highest, keeping duplicates in
+-- Elements are arranged from lowest to highest, keeping duplicates in
 -- the order they appeared in the input.
 --
 -- >>> sortOn fst [(2, "world"), (4, "!"), (1, "Hello")]

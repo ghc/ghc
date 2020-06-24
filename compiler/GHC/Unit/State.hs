@@ -379,7 +379,7 @@ initUnitConfig dflags =
 
       }
 
--- | Map from 'ModuleName' to a set of of module providers (i.e. a 'Module' and
+-- | Map from 'ModuleName' to a set of module providers (i.e. a 'Module' and
 -- its 'ModuleOrigin').
 --
 -- NB: the set is in fact a 'Map Module ModuleOrigin', probably to keep only one

@@ -174,12 +174,12 @@ EXTERN_INLINE void load_load_barrier(void);
  *    code. See ThreadPaused.c:threadPaused.
  *
  *  - Updating a BLACKHOLE:
- *    This case is protected by explicit write barriers in the the update frame
+ *    This case is protected by explicit write barriers in the update frame
  *    entry code (see rts/Updates.h).
  *
  *  - Blocking on an MVar# (e.g. takeMVar#):
  *    In this case the appropriate MVar primops (e.g. stg_takeMVarzh).  include
- *    explicit memory barriers to ensure that the the newly-allocated
+ *    explicit memory barriers to ensure that the newly-allocated
  *    MVAR_TSO_QUEUE is visible to other cores.
  *
  *  - Write to an MVar# (e.g. putMVar#):

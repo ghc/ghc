@@ -2147,7 +2147,7 @@ tcTagToEnum expr fun args app_res_ty res_ty
 checkThLocalId :: Id -> TcM ()
 -- The renamer has already done checkWellStaged,
 --   in 'GHC.Rename.Splice.checkThLocalName', so don't repeat that here.
--- Here we just just add constraints fro cross-stage lifting
+-- Here we just add constraints fro cross-stage lifting
 checkThLocalId id
   = do  { mb_local_use <- getStageAndBindLevel (idName id)
         ; case mb_local_use of

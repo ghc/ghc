@@ -1901,7 +1901,7 @@ void nonmovingMarkDeadWeaks (struct MarkQueue_ *queue, StgWeak **dead_weaks)
     }
 }
 
-// Non-moving heap variant of of `tidyThreadList`
+// Non-moving heap variant of `tidyThreadList`
 void nonmovingTidyThreads ()
 {
     StgTSO *next;

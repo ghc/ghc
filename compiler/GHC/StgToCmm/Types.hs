@@ -58,7 +58,7 @@ moving parts are:
 * We record the CgInfo in the IdInfo of the Id.
 
 * GHC.Driver.Pipeline: the call to updateModDetailsIdInfos augments the
-  ModDetails constructed at the end of the Core pipeline, with with CgInfo
+  ModDetails constructed at the end of the Core pipeline, with CgInfo
   gleaned from the back end.  The hard work is done in GHC.Iface.UpdateIdInfos.
 
 * For ModIface we generate the final ModIface with CgInfo in

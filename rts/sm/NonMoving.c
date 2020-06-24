@@ -419,7 +419,7 @@ Mutex concurrent_coll_finished_lock;
  *     An object being marked as dirty implies that all of its fields are on
  *     the mark queue (or, equivalently, update remembered set).
  *
- * With this guarantee we can safely make the the write barriers dirty objects
+ * With this guarantee we can safely make the write barriers dirty objects
  * no-ops. We perform this optimisation for the following object types:
  *
  *  - MVAR
@@ -991,7 +991,7 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
 #endif
 }
 
-/* Mark mark queue, threads, and weak pointers until no more weaks have been
+/* Mark queue, threads, and weak pointers until no more weaks have been
  * resuscitated
  */
 static void nonmovingMarkThreadsWeaks(MarkQueue *mark_queue)

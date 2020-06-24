@@ -616,7 +616,7 @@ They fit together like so:
                  , Bndr (a:k->*) AnonTCB
                  , Bndr (b:k)    AnonTCB ]
 
-  Note that that are three binders here, including the
+  Note that there are three binders here, including the
   kind variable k.
 
 * See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in GHC.Core.TyCo.Rep

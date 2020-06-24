@@ -100,7 +100,7 @@ data DerivEnv = DerivEnv
   , denv_cls          :: Class
     -- ^ Class for which we need to derive an instance
   , denv_inst_tys     :: [Type]
-    -- ^ All arguments to to 'denv_cls' in the derived instance.
+    -- ^ All arguments to 'denv_cls' in the derived instance.
   , denv_ctxt         :: DerivContext
     -- ^ @'SupplyContext' theta@ for standalone deriving (where @theta@ is the
     --   context of the instance).

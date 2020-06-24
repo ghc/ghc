@@ -2458,7 +2458,7 @@ See also
  * GHC.Core.Type.occCheckExpand
  * GHC.Core.Utils.coreAltsType
  * GHC.Tc.Validity.checkEscapingKind
-all of which grapple with with the same problem.
+all of which grapple with the same problem.
 
 See #14939.
 -}

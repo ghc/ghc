@@ -545,7 +545,7 @@ buildChains edges blocks
     -- buildNext builds up chains from edges one at a time.
 
     -- We keep a map from the ends of chains to the chains.
-    -- This we we can easily check if an block should be appended to an
+    -- This way we can easily check if an block should be appended to an
     -- existing chain!
     -- We store them using STRefs so we don't have to rebuild the spine of both
     -- maps every time we update a chain.

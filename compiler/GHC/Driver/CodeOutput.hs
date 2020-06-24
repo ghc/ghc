@@ -58,7 +58,7 @@ codeOutput :: DynFlags
            -> ModLocation
            -> ForeignStubs
            -> [(ForeignSrcLang, FilePath)]
-           -- ^ additional files to be compiled with with the C compiler
+           -- ^ additional files to be compiled with the C compiler
            -> [UnitId]
            -> Stream IO RawCmmGroup a                       -- Compiled C--
            -> IO (FilePath,

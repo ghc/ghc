@@ -290,7 +290,7 @@ cause more programs to fail to typecheck.
 In future work, instead of approximating we might add type families
 and allow users to write types involving operations on multiplicities.
 In this case, we could enforce more invariants in Mult, for example,
-enforce that that it is in the form of a sum of products, and even
+enforce that it is in the form of a sum of products, and even
 that the sumands and factors are ordered somehow, to have more equalities.
 -}
 

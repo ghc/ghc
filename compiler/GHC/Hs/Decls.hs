@@ -873,7 +873,7 @@ Examples:
 
 NOTE THAT
   * A CUSK does /not/ mean that everything about the kind signature is
-    fully specified by the user.  Look at T4 and f4: we had do do kind
+    fully specified by the user.  Look at T4 and f4: we had to do kind
     inference to figure out the kind-quantification.  But in both cases
     (T4 and f4) that inference is done looking /only/ at the header of T4
     (or signature for f4), not at the definition thereof.

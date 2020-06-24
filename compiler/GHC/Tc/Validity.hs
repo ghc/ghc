@@ -122,7 +122,7 @@ Consider
 You would think that the definition of g would surely typecheck!
 After all f has exactly the same type, and g=f. But in fact f's type
 is instantiated and the instantiated constraints are solved against
-the originals, so in the case an ambiguous type it won't work.
+the originals, so in the case of an ambiguous type it won't work.
 Consider our earlier example f :: C a => Int.  Then in g's definition,
 we'll instantiate to (C alpha) and try to deduce (C alpha) from (C a),
 and fail.

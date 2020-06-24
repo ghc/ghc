@@ -256,7 +256,7 @@ findDependency  :: HscEnv
                 -> ModuleName           -- Imported module
                 -> IsBootInterface      -- Source import
                 -> Bool                 -- Record dependency on package modules
-                -> IO (Maybe FilePath)  -- Interface file file
+                -> IO (Maybe FilePath)  -- Interface file
 findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps
   = do  {       -- Find the module; this will be fast because
                 -- we've done it once during downsweep
@@ -296,7 +296,7 @@ insertSuffixes
         :: FilePath     -- Original filename;   e.g. "foo.o"
         -> [String]     -- Suffix prefixes      e.g. ["x_", "y_"]
         -> [FilePath]   -- Zapped filenames     e.g. ["foo.x_o", "foo.y_o"]
-        -- Note that that the extra bit gets inserted *before* the old suffix
+        -- Note that the extra bit gets inserted *before* the old suffix
         -- We assume the old suffix contains no dots, so we know where to
         -- split it
 insertSuffixes file_name extras

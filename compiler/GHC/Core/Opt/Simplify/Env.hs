@@ -854,7 +854,7 @@ seqIds (id:ids) = seqId id `seq` seqIds ids
 {-
 Note [Arity robustness]
 ~~~~~~~~~~~~~~~~~~~~~~~
-We *do* transfer the arity from from the in_id of a let binding to the
+We *do* transfer the arity from the in_id of a let binding to the
 out_id.  This is important, so that the arity of an Id is visible in
 its own RHS.  For example:
         f = \x. ....g (\y. f y)....

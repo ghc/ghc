@@ -138,7 +138,7 @@ lookupGlobal hsc_env name
         }
 
 lookupGlobal_maybe :: HscEnv -> Name -> IO (MaybeErr MsgDoc TyThing)
--- This may look up an Id that one one has previously looked up.
+-- This may look up an Id that one has previously looked up.
 -- If so, we are going to read its interface file, and add its bindings
 -- to the ExternalPackageTable.
 lookupGlobal_maybe hsc_env name

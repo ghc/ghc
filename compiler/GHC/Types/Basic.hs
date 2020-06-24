@@ -254,7 +254,7 @@ work.  For example, consider
     (\x{one-shot}. case t of { True -> ...; False -> ... })
 
 Because it's a one-shot lambda, we can safely inline t, giving
-    (\x{one_shot}. case <expensive> of of
+    (\x{one_shot}. case <expensive> of
                        { True -> ...; False -> ... })
 
 Moving parts:
@@ -744,7 +744,7 @@ data OverlapMode  -- See Note [Rules for instance lookup] in GHC.Core.InstEnv
   | Incoherent SourceText
                   -- See Note [Pragma source text]
     -- ^ Behave like Overlappable and Overlapping, and in addition pick
-    -- an an arbitrary one if there are multiple matching candidates, and
+    -- an arbitrary one if there are multiple matching candidates, and
     -- don't worry about later instantiation
     --
     -- Example: constraint (Foo [b])

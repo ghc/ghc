@@ -472,7 +472,7 @@ The 'rr' parameter tells us how the value is represented at runtime.
 Generally speaking, you can't be polymorphic in 'rr'.  E.g
    f :: forall (rr:RuntimeRep) (a:TYPE rr). a -> [a]
    f = /\(rr:RuntimeRep) (a:rr) \(a:rr). ...
-This is no good: we could not generate code code for 'f', because the
+This is no good: we could not generate code for 'f', because the
 calling convention for 'f' varies depending on whether the argument is
 a a Int, Int#, or Float#.  (You could imagine generating specialised
 code, one for each instantiation of 'rr', but we don't do that.)

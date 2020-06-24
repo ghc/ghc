@@ -128,7 +128,7 @@ This rule has occasionally-surprising consequences (see
     type F2 a   -- No right-hand side so F2 :: Type -> Type
 
 The kind-polymorphism from the class declaration makes ``D1``
-kind-polymorphic, but not so ``D2``; and similarly ``F1``, ``F1``.
+kind-polymorphic, but not so ``D2``; and similarly ``F1``, ``F2``.
 
 .. _inferring-variable-order:
 
@@ -276,7 +276,7 @@ signature" for a type constructor? These are the forms:
    unless :extension:`UnliftedNewtypes` is enabled.
    With :extension:`UnliftedNewtypes`, the type constructor
    only has a CUSK if a kind signature is present. As with a datatype
-   with a top-level ``::``, all kind variables must introduced after
+   with a top-level ``::``, all kind variables introduced after
    the ``::`` must be explicitly quantified ::
 
        {-# LANGUAGE UnliftedNewtypes #-}
@@ -613,7 +613,7 @@ right hand side of ``S``::
   type S a b = <rhs> :: k -> k
 
 The reason for this exception is that there may be no other way to bind ``k``.
-For example, suppose we wanted ``S`` to have the the following kind with an
+For example, suppose we wanted ``S`` to have the following kind with an
 *invisible* parameter ``k``::
 
   S :: forall k. Type -> Type -> k -> k
@@ -681,7 +681,7 @@ What is the kind of ``ProxyKVis``? One might say
 ``forall k. Type -> k -> Type``, but this isn't quite right, since this would
 allow incorrect things like ``ProxyKVis Bool Int``, which should be rejected
 due to the fact that ``Int`` is not of kind ``Bool``. The key observation is that
-the kind of the second argument *depend* on the first argument. GHC indicates
+the kind of the second argument *depends* on the first argument. GHC indicates
 this dependency in the syntax that it gives for the kind of ``ProxyKVis``: ::
 
   ProxyKVis :: forall k -> k -> Type
@@ -689,7 +689,7 @@ this dependency in the syntax that it gives for the kind of ``ProxyKVis``: ::
 This kind is similar to the kind of ``ProxyKInvis``, but with a key difference:
 the type variables quantified by the ``forall`` are followed by an arrow
 (``->``), not a dot (``.``). This is a visible, dependent quantifier. It is
-visible in that it the user must pass in a type for ``k`` explicitly, and it is
+visible in that the user must pass in a type for ``k`` explicitly, and it is
 dependent in the sense that ``k`` appears later in the kind of ``ProxyKVis``.
 As a counterpart, the ``k`` binder in ``forall k. k -> Type`` can be thought
 of as an *invisible*, dependent quantifier.

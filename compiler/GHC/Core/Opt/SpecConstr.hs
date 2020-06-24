@@ -753,7 +753,7 @@ Consider this, in (perf/should_run/T9339)
 
 After optimisation, including SpecConstr, we get:
    f :: Int# -> Int -> Int
-   f x y = case case remInt# x 2# of
+   f x y = case remInt# x 2# of
              __DEFAULT -> case x of
                             __DEFAULT -> f (+# wild_Xp 1#) (I# x)
                             1000000# -> ...

@@ -538,7 +538,7 @@ substitutions until the next run of the simplifier.
      case (eq_sel d) of (co :: a ~# b) -> blah
   where eq_sel :: (a~b) -> (a~#b)
 
-  Or even even
+  Or even
       case (df @Int) of (co :: a ~# b) -> blah
   Which is very exotic, and I think never encountered; but see
   Note [Equality superclasses in quantified constraints]

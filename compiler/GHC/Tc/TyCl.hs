@@ -236,7 +236,7 @@ tcTyClDecls tyclds kisig_env role_annots
              tcExtendRecEnv (zipRecTyClss tc_tycons rec_tyclss) $
 
                  -- Also extend the local type envt with bindings giving
-                 -- a TcTyCon for each each knot-tied TyCon or Class
+                 -- a TcTyCon for each knot-tied TyCon or Class
                  -- See Note [Type checking recursive type and class declarations]
                  -- and Note [Type environment evolution]
              tcExtendKindEnvWithTyCons tc_tycons $
@@ -2937,7 +2937,7 @@ unravelFamInstPats fam_app
 
 addConsistencyConstraints :: AssocInstInfo -> TcType -> TcM ()
 -- In the corresponding positions of the class and type-family,
--- ensure the the family argument is the same as the class argument
+-- ensure the family argument is the same as the class argument
 --   E.g    class C a b c d where
 --             F c x y a :: Type
 -- Here the first  arg of F should be the same as the third of C
@@ -4191,7 +4191,7 @@ checkValidClass cls
             -- default-method Name to be that of the generic
             -- default type signature
 
-          -- First, we check that that the method's default type signature
+          -- First, we check that the method's default type signature
           -- aligns with the non-default type signature.
           -- See Note [Default method type signatures must align]
           let cls_pred = mkClassPred cls $ mkTyVarTys $ classTyVars cls
