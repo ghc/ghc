@@ -698,10 +698,10 @@ throwErrnoIfMinus1RetryOnBlock loc f on_block  =
 -- Locking/unlocking
 
 foreign import ccall unsafe "lockFile"
-  lockFile :: Word64 -> Word64 -> Word64 -> CInt -> IO CInt
+  lockFile :: Word -> Word64 -> Word64 -> CInt -> IO CInt
 
 foreign import ccall unsafe "unlockFile"
-  unlockFile :: Word64 -> IO CInt
+  unlockFile :: Word -> IO CInt
 
 #if defined(mingw32_HOST_OS)
 foreign import ccall unsafe "get_unique_file_info"
