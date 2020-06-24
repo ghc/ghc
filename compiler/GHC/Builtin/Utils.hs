@@ -206,7 +206,7 @@ isKnownKeyName n =
     isJust (knownUniqueName $ nameUnique n) || elemUFM n knownKeysMap
 
 knownKeysMap :: UniqFM Name Name
-knownKeysMap = listToUFM_Directly [ (nameUnique n, n) | n <- knownKeyNames ]
+knownKeysMap = listToIdentityUFM knownKeyNames
 
 -- | Given a 'Unique' lookup any associated arbitrary SDoc's to be displayed by
 -- GHCi's ':info' command.

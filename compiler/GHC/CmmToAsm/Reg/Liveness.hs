@@ -67,6 +67,10 @@ import Data.IntSet              (IntSet)
 type RegSet = UniqSet Reg
 
 -- | Map from some kind of register to a.
+--
+-- While we give the type for keys as Reg which is the common case
+-- sometimes we end up using VirtualReq or naked Uniques.
+-- See Note [UniqFM and the register allocator]
 type RegMap a = UniqFM Reg a
 
 emptyRegMap :: RegMap a
@@ -475,6 +479,7 @@ slurpReloadCoalesce live
         mergeSlotMaps map1 map2
                 -- toList sadly means we have to use the _Directly style
                 -- functions.
+                -- TODO: We shouldn't need to go through a list here.
                 = listToUFM_Directly
                 $ [ (k, r1)
                   | (k, r1) <- nonDetUFMToList map1

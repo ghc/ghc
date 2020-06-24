@@ -10,6 +10,7 @@ module GHC.CmmToAsm.Reg.Graph.Spill (
 import GHC.Prelude
 
 import GHC.CmmToAsm.Reg.Liveness
+import GHC.CmmToAsm.Reg.Utils
 import GHC.CmmToAsm.Instr
 import GHC.Platform.Reg
 import GHC.Cmm hiding (RegSet)
@@ -70,8 +71,8 @@ regSpill platform code slotsFree slotCount regs
                 -- Allocate a slot for each of the spilled regs.
                 let slots       = take (sizeUniqSet regs) $ nonDetEltsUniqSet slotsFree
                 let
-                    regSlotMap  = unsafeCastUFMKey -- Cast keys from VirtualReg to Reg
-                                                   -- See Note [UniqFM and the register allocator]
+                    regSlotMap  = toRegMap -- Cast keys from VirtualReg to Reg
+                                           -- See Note [UniqFM and the register allocator]
                                 $ listToUFM
                                 $ zip (nonDetEltsUniqSet regs) slots :: UniqFM Reg Int
                     -- This is non-deterministic but we do not
@@ -278,7 +279,7 @@ spillModify
         -> SpillM (instr, ([LiveInstr instr'], [LiveInstr instr']))
 
 spillModify regSlotMap instr reg
- | Just slot     <- lookupUFM_U regSlotMap reg
+ | Just slot     <- lookupUFM regSlotMap reg
  = do    (instr', nReg)  <- patchInstr reg instr
 
          modify $ \s -> s

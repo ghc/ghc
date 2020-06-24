@@ -29,16 +29,18 @@ module GHC.Types.Unique.DFM (
         unitUDFM,
         addToUDFM,
         addToUDFM_C,
+        addToUDFM_C_Directly,
         addToUDFM_Directly,
         addListToUDFM,
         delFromUDFM,
         delListFromUDFM,
         adjustUDFM,
+        adjustUDFM_Directly,
         alterUDFM,
         mapUDFM,
         plusUDFM,
         plusUDFM_C,
-        lookupUDFM, lookupUDFM_Directly,
+        lookupUDFM, lookupUDFM_Directly, lookupUDFM_uncheckedKey,
         elemUDFM,
         foldUDFM,
         eltsUDFM,
@@ -58,6 +60,7 @@ module GHC.Types.Unique.DFM (
         udfmToList,
         udfmToUfm,
         nonDetStrictFoldUDFM,
+        unsafeCastUDFMKey,
         alwaysUnsafeUfmToUdfm,
     ) where
 
@@ -73,6 +76,7 @@ import Data.List (sortBy)
 import Data.Function (on)
 import qualified Data.Semigroup as Semi
 import GHC.Types.Unique.FM (UniqFM, nonDetUFMToList, ufmToIntMap, unsafeIntMapToUFM)
+import Unsafe.Coerce
 
 -- Note [Deterministic UniqFM]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -175,12 +179,12 @@ addToUDFM_Directly (UDFM m i) u v
       -- This means that udfmToList typically returns elements
       -- in the order of insertion, rather than the reverse
 
-addToUDFM_Directly_C
+addToUDFM_C_Directly
   :: (elt -> elt -> elt)   -- old -> new -> result
   -> UniqDFM key elt
   -> Unique -> elt
   -> UniqDFM key elt
-addToUDFM_Directly_C f (UDFM m i) u v
+addToUDFM_C_Directly f (UDFM m i) u v
   = UDFM (M.insertWith tf (getKey u) (TaggedVal v i) m) (i + 1)
     where
       tf (TaggedVal new_v _) (TaggedVal old_v old_i)
@@ -194,7 +198,7 @@ addToUDFM_C
   -> UniqDFM key elt -- old
   -> key -> elt -- new
   -> UniqDFM key elt -- result
-addToUDFM_C f m k v = addToUDFM_Directly_C f m (getUnique k) v
+addToUDFM_C f m k v = addToUDFM_C_Directly f m (getUnique k) v
 
 addListToUDFM :: Uniquable key => UniqDFM key elt -> [(key,elt)] -> UniqDFM key elt
 addListToUDFM = foldl' (\m (k, v) -> addToUDFM m k v)
@@ -204,7 +208,7 @@ addListToUDFM_Directly = foldl' (\m (k, v) -> addToUDFM_Directly m k v)
 
 addListToUDFM_Directly_C
   :: (elt -> elt -> elt) -> UniqDFM key elt -> [(Unique,elt)] -> UniqDFM key elt
-addListToUDFM_Directly_C f = foldl' (\m (k, v) -> addToUDFM_Directly_C f m k v)
+addListToUDFM_Directly_C f = foldl' (\m (k, v) -> addToUDFM_C_Directly f m k v)
 
 delFromUDFM :: Uniquable key => UniqDFM key elt -> key -> UniqDFM key elt
 delFromUDFM (UDFM m i) k = UDFM (M.delete (getKey $ getUnique k) m) i
@@ -269,6 +273,12 @@ lookupUDFM (UDFM m _i) k = taggedFst `fmap` M.lookup (getKey $ getUnique k) m
 
 lookupUDFM_Directly :: UniqDFM key elt -> Unique -> Maybe elt
 lookupUDFM_Directly (UDFM m _i) k = taggedFst `fmap` M.lookup (getKey k) m
+
+-- | Avoid if possible.
+--
+-- looks up an element by unique ignoring the keys type.
+lookupUDFM_uncheckedKey :: Uniquable anyKey => UniqDFM key elt -> anyKey -> Maybe elt
+lookupUDFM_uncheckedKey (UDFM m _i) k = taggedFst `fmap` M.lookup (getKey $ getUnique k) m
 
 elemUDFM :: Uniquable key => key -> UniqDFM key elt -> Bool
 elemUDFM k (UDFM m _i) = M.member (getKey $ getUnique k) m
@@ -369,6 +379,10 @@ listToUDFM_Directly = foldl' (\m (u, v) -> addToUDFM_Directly m u v) emptyUDFM
 adjustUDFM :: Uniquable key => (elt -> elt) -> UniqDFM key elt -> key -> UniqDFM key elt
 adjustUDFM f (UDFM m i) k = UDFM (M.adjust (fmap f) (getKey $ getUnique k) m) i
 
+-- | Apply a function to a particular element
+adjustUDFM_Directly :: (elt -> elt) -> UniqDFM key elt -> Unique -> UniqDFM key elt
+adjustUDFM_Directly f (UDFM m i) k = UDFM (M.adjust (fmap f) (getKey k) m) i
+
 -- | The expression (alterUDFM f k map) alters value x at k, or absence
 -- thereof. alterUDFM can be used to insert, delete, or update a value in
 -- UniqDFM. Use addToUDFM, delFromUDFM or adjustUDFM when possible, they are
@@ -408,6 +422,14 @@ instance Monoid (UniqDFM key a) where
 -- make ad-hoc conversions when developing
 alwaysUnsafeUfmToUdfm :: UniqFM key elt -> UniqDFM key elt
 alwaysUnsafeUfmToUdfm = listToUDFM_Directly . nonDetUFMToList
+
+-- | Cast the key domain of a UniqFM.
+--
+-- As long as the domains don't overlap in their uniques
+-- this is safe.
+unsafeCastUDFMKey :: UniqDFM key1 elt -> UniqDFM key2 elt
+unsafeCastUDFMKey = unsafeCoerce -- Only phantom parameter changes so
+                                 -- this is safe and avoids reallocation.
 
 -- Output-ery
 

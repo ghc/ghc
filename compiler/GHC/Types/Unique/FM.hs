@@ -37,6 +37,7 @@ module GHC.Types.Unique.FM (
         listToUFM,
         listToUFM_Directly,
         listToUFM_C,
+        listToIdentityUFM,
         addToUFM,addToUFM_C,addToUFM_Acc, addToUFM_C_Directly,
         addListToUFM,addListToUFM_C, addListToUFM_C_Directly,
         addToUFM_Directly, addToUFM_U,
@@ -117,6 +118,9 @@ listToUFM = foldl' (\m (k, v) -> addToUFM m k v) emptyUFM
 
 listToUFM_Directly :: [(Unique, elt)] -> UniqFM key elt
 listToUFM_Directly = foldl' (\m (u, v) -> addToUFM_Directly m u v) emptyUFM
+
+listToIdentityUFM :: Uniquable key => [key] -> UniqFM key key
+listToIdentityUFM = foldl' (\m x -> addToUFM m x x) emptyUFM
 
 listToUFM_C
   :: Uniquable key

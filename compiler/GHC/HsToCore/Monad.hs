@@ -533,6 +533,9 @@ dsGetCompleteMatches :: TyCon -> DsM [CompleteMatch]
 dsGetCompleteMatches tc = do
   eps <- getEps
   env <- getGblEnv
+      -- We index into a UniqFM from Name -> elt, for tyCon it holds that
+      -- getUnique (tyConName tc) == getUnique tc. So we lookup using the
+      -- unique directly instead.
   let lookup_completes ufm = lookupWithDefaultUFM_Directly ufm [] (getUnique tc)
       eps_matches_list = lookup_completes $ eps_complete_matches eps
       env_matches_list = lookup_completes $ ds_complete_matches env

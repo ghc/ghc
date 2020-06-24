@@ -42,6 +42,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Name
 import GHC.Types.Name.Set
+import GHC.Types.Unique (getUnique)
 import GHC.Core.Unify
 import GHC.Utils.Outputable
 import GHC.Utils.Error
@@ -385,12 +386,16 @@ Testing with nofib and validate detected no difference between UniqFM and
 UniqDFM. See also Note [Deterministic UniqFM]
 -}
 
--- Class has a Unique which is the same as it's tyCon.
--- TyCon has a unique which is the same as it's Name.
--- Name just has a unique which is it's own.
--- We use all three to index into InstEnv ...
--- For now I'm giving it a key of Name.
-type InstEnv = UniqDFM Name ClsInstEnv      -- Maps Class to instances for that class
+-- Internally it's safe to indexable this map by
+-- by @Class@, the classes @Name@, the classes @TyCon@
+-- or it's @Unique@.
+-- This is since:
+-- getUnique cls == getUnique (className cls) == getUnique (classTyCon cls)
+--
+-- We still use Class as key type as it's both the common case
+-- and conveys the meaning better. But the implementation of
+--InstEnv is a bit more lax internally.
+type InstEnv = UniqDFM Class ClsInstEnv      -- Maps Class to instances for that class
   -- See Note [InstEnv determinism]
 
 -- | 'InstEnvs' represents the combination of the global type class instance
@@ -453,7 +458,7 @@ classInstances :: InstEnvs -> Class -> [ClsInst]
 classInstances (InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = vis_mods }) cls
   = get home_ie ++ get pkg_ie
   where
-    get env = case lookupUDFM env (className cls) of
+    get env = case lookupUDFM env cls of
                 Just (ClsIE insts) -> filter (instIsVisible vis_mods) insts
                 Nothing            -> []
 
@@ -462,7 +467,7 @@ classInstances (InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = 
 memberInstEnv :: InstEnv -> ClsInst -> Bool
 memberInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm } ) =
     maybe False (\(ClsIE items) -> any (identicalDFunType ins_item) items)
-          (lookupUDFM inst_env cls_nm)
+          (lookupUDFM_Directly inst_env (getUnique cls_nm))
  where
   identicalDFunType cls1 cls2 =
     eqType (varType (is_dfun cls1)) (varType (is_dfun cls2))
@@ -472,20 +477,20 @@ extendInstEnvList inst_env ispecs = foldl' extendInstEnv inst_env ispecs
 
 extendInstEnv :: InstEnv -> ClsInst -> InstEnv
 extendInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm })
-  = addToUDFM_C add inst_env cls_nm (ClsIE [ins_item])
+  = addToUDFM_C_Directly add inst_env (getUnique cls_nm) (ClsIE [ins_item])
   where
     add (ClsIE cur_insts) _ = ClsIE (ins_item : cur_insts)
 
 deleteFromInstEnv :: InstEnv -> ClsInst -> InstEnv
 deleteFromInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm })
-  = adjustUDFM adjust inst_env cls_nm
+  = adjustUDFM_Directly adjust inst_env (getUnique cls_nm)
   where
     adjust (ClsIE items) = ClsIE (filterOut (identicalClsInstHead ins_item) items)
 
 deleteDFunFromInstEnv :: InstEnv -> DFunId -> InstEnv
 -- Delete a specific instance fron an InstEnv
 deleteDFunFromInstEnv inst_env dfun
-  = adjustUDFM adjust inst_env (className cls)
+  = adjustUDFM adjust inst_env cls
   where
     (_, _, cls, _) = tcSplitDFunTy (idType dfun)
     adjust (ClsIE items) = ClsIE (filterOut same_dfun items)
@@ -795,7 +800,7 @@ lookupInstEnv' ie vis_mods cls tys
     all_tvs    = all isNothing rough_tcs
 
     --------------
-    lookup env = case lookupUDFM env (className cls) of
+    lookup env = case lookupUDFM env cls of
                    Nothing -> ([],[])   -- No instances for this class
                    Just (ClsIE insts) -> find [] [] insts
 

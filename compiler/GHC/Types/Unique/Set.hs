@@ -146,7 +146,7 @@ isEmptyUniqSet :: UniqSet a -> Bool
 isEmptyUniqSet (UniqSet s) = isNullUFM s
 
 -- | What's the point you might ask? We might have changed an object
--- without it's key. In which case this lookup makes sense.
+-- without it's key changing. In which case this lookup makes sense.
 lookupUniqSet :: Uniquable key => UniqSet key -> key -> Maybe key
 lookupUniqSet (UniqSet s) k = lookupUFM s k
 

@@ -352,10 +352,10 @@ UniqFM and UniqDFM.
 See Note [Deterministic UniqFM].
 -}
 
--- This is used both with Names, and TyCons.
--- But every tyCon has a name so just use the
--- names as key for now.
-type FamInstEnv = UniqDFM Name FamilyInstEnv  -- Maps a family to its instances
+-- Internally we sometimes index by Name instead of TyCon despite
+-- of what the type says. This is safe since
+-- getUnique (tyCon) == getUniqe (tcName tyCon)
+type FamInstEnv = UniqDFM TyCon FamilyInstEnv  -- Maps a family to its instances
      -- See Note [FamInstEnv]
      -- See Note [FamInstEnv determinism]
 
@@ -367,6 +367,14 @@ newtype FamilyInstEnv
 
 instance Outputable FamilyInstEnv where
   ppr (FamIE fs) = text "FamIE" <+> vcat (map ppr fs)
+
+-- | Index a FamInstEnv by the tyCons name.
+toNameInstEnv :: FamInstEnv -> UniqDFM Name FamilyInstEnv
+toNameInstEnv = unsafeCastUDFMKey
+
+-- | Create a FamInstEnv from Name indices.
+fromNameInstEnv :: UniqDFM Name FamilyInstEnv -> FamInstEnv
+fromNameInstEnv = unsafeCastUDFMKey
 
 -- INVARIANTS:
 --  * The fs_tvs are distinct in each FamInst
@@ -391,7 +399,7 @@ familyInstances :: (FamInstEnv, FamInstEnv) -> TyCon -> [FamInst]
 familyInstances (pkg_fie, home_fie) fam
   = get home_fie ++ get pkg_fie
   where
-    get env = case lookupUDFM env (tyConName fam) of
+    get env = case lookupUDFM env fam of
                 Just (FamIE insts) -> insts
                 Nothing                      -> []
 
@@ -401,7 +409,7 @@ extendFamInstEnvList inst_env fis = foldl' extendFamInstEnv inst_env fis
 extendFamInstEnv :: FamInstEnv -> FamInst -> FamInstEnv
 extendFamInstEnv inst_env
                  ins_item@(FamInst {fi_fam = cls_nm})
-  = addToUDFM_C add inst_env cls_nm (FamIE [ins_item])
+  = fromNameInstEnv $ addToUDFM_C add (toNameInstEnv inst_env) cls_nm (FamIE [ins_item])
   where
     add (FamIE items) _ = FamIE (ins_item:items)
 
@@ -770,7 +778,7 @@ lookupFamInstEnvByTyCon :: FamInstEnvs -> TyCon -> [FamInst]
 lookupFamInstEnvByTyCon (pkg_ie, home_ie) fam_tc
   = get pkg_ie ++ get home_ie
   where
-    get ie = case lookupUDFM ie (tyConName fam_tc) of
+    get ie = case lookupUDFM ie fam_tc of
                Nothing          -> []
                Just (FamIE fis) -> fis
 
@@ -942,7 +950,7 @@ lookupFamInstEnvInjectivityConflicts injList (pkg_ie, home_ie)
           | otherwise = True
 
       lookup_inj_fam_conflicts ie
-          | isOpenFamilyTyCon fam, Just (FamIE insts) <- lookupUDFM ie (tyConName fam)
+          | isOpenFamilyTyCon fam, Just (FamIE insts) <- lookupUDFM ie fam
           = map (coAxiomSingleBranch . fi_axiom) $
             filter isInjConflict insts
           | otherwise = []
@@ -982,7 +990,7 @@ lookup_fam_inst_env'          -- The worker, local to this module
     -> [FamInstMatch]
 lookup_fam_inst_env' match_fun ie fam match_tys
   | isOpenFamilyTyCon fam
-  , Just (FamIE insts) <- lookupUDFM ie (tyConName fam)
+  , Just (FamIE insts) <- lookupUDFM ie fam
   = find insts    -- The common case
   | otherwise = []
   where

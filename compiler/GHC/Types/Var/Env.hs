@@ -552,7 +552,7 @@ type DVarEnv elt = UniqDFM Var elt
 
 -- | Deterministic Identifier Environment
 -- Sadly not always indexed by Id, but it is in the common case.
-type DIdEnv elt = UniqDFM Id elt
+type DIdEnv elt = UniqDFM Var elt
 
 -- | Deterministic Type Variable Environment
 type DTyVarEnv elt = UniqDFM TyVar elt
