@@ -21,7 +21,7 @@
 
 {-# OPTIONS_GHC -O2 -ddump-simpl -ddump-to-file -ddump-stg -ddump-cmm -ddump-asm #-}
 
-module StgInferTags (findTags) where
+module StgInferTags (findTags, EnterLattice) where
 
 #include "HsVersions.h"
 
@@ -59,6 +59,7 @@ import Maybes
 -- import Data.Int
 import Control.Applicative hiding (empty)
 import Control.Monad
+import MonadUtils
 
 import GHC.Generics
 import Control.DeepSeq -- hiding (deepseq)
@@ -146,16 +147,75 @@ to significant speedups. (10% and up for the traversal!)
     Note [Absent error in strict fields]
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Consider this initial code
+Note [Taggedness of absentError]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-f :: C -> (Bool, Foo)
-f c@(C !x !y) = (g c, y)
+WW under certain circumstances will determine that a strict
+field is not used and allocate a temporary constructor with
+an absentError inside the field.
 
-Now worker wrapper will want to turn this into create this worker:
+So we have to take great care to avoid reentering them when
+upholding the strict field invariant.
 
+For this purpose we treat bindings binding such an expression
+as being tagged in all cases.
 
-Here the second field of C is absent inside g's body.
+This happens because when GHC reboxes a constructor, sometimes we
+don't need to recreate the full value and can stub out fields
+which are known to be unused.
 
+For lifted types GHC places an absentError thunk in those fields
+so if anything goes wrong we will get a runtime error instead of
+unpredictable behaviour.
+
+See Note [Absent errors] for the details on why we do this.
+
+The bad news is this means that technically speaking the strict
+field invariant is a lie. To avoid disaster striking when we
+evaluate such values we check for these explicitly.
+
+After all in the absence of bugs in the rest of GHC any such value
+should never be evaluated, and therefore can be treated as already
+evaluated without affecting correctness.
+
+This means we might end up with code like this:
+
+    $wf :: a -> b -> Result
+    $wf a b = let c = absentError "ww_absent"
+            in  g (MkT a b c)
+
+Where we known g will not use the field c.
+
+Since STG is in ANF any such binding will be a function application
+of the known `absentError` id. Which makes it easy to check for this.
+
+We then treat any binding of an absentError application as already evaluated.
+Again this is safe as these bindings can't be evaluated in the absence of bugs
+in the rest of GHC.
+
+In the presence of bugs in the rest of GHC a debug build will still catch these
+error when confirming validity of predicated taggedness. So this seems reasonable.
+
+One issue arises with imported worker functions. What if we inline $wf
+into a module B, but don't do so for c we have to ensure  that c
+is still treated as tagged.
+
+This might seem tricky, as we really want to expose this information from/to
+optimized builds. But we do not want to force it on unoptimized ones.
+
+Consider c to be defined in module A, and $wf to be inlined into B.
+This gives us four cases to consider:
+
+A & B not optimized:
+    Since ww will not run on either, there is no way for this kind of reboxing to happen.
+A & B optimized:
+    A will be analyzed, and export taggedness info about c, B will import this info and
+    treat c accordingly.
+A optimized, B not optimized:
+    If B is not optimized then the body of $wf can't end up in B, so this works out.
+A not optimized, B not optimized:
+    Since A is not optimised GHC won't expose any unfoldings, so again $wf and c can't
+    end up in different modules and things work out.
 
 -}
 
@@ -594,22 +654,35 @@ instance Outputable FieldInfo where
     ppr FieldsNone              = text "none"
     ppr FieldsUndet             = text "undet"
 
+{-  Note [FieldInfo Binary instance]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Putting a data con into a interface file can cause non-trivial overhead
+as it involves type checking at load time among other things.
+
+So we convert all Sum field infos to untyped ones when serializing.
+We currently do not take advantage of the con info so this does not
+weaken the strength of the analysis.
+
+-}
 instance Binary FieldInfo where
-    put_ bh FieldsUnknown           = putByte bh 0
+    put_ bh FieldsNone              = putByte bh 0
     put_ bh (FieldsUntyped fields)  = putByte bh 1 >> put_ bh fields
     put_ bh (FieldsProd fields)     = putByte bh 2 >> put_ bh fields
-    put_ bh (FieldsSum _con fields) = putByte bh 3 >> put_ bh fields
-    put_ bh FieldsNone              = putByte bh 4
+    -- We turn FieldSum into FieldsUntyped here,
+    -- While losing precision it means we don't have to save the con
+    put_ bh (FieldsSum _con fields) = putByte bh 1 >> put_ bh fields
+    put_ bh FieldsUnknown           = putByte bh 4
     put_ bh FieldsUndet             = putByte bh 5
 
     get bh = do
         con <- getByte bh
         case con of
-            0 -> pure FieldsUnknown
+            0 -> pure FieldsNone
             1 -> pure FieldsUntyped <*> B.get bh
             2 -> pure FieldsProd <*> B.get bh
-            3 -> pure FieldsSum <*> pure Nothing <*> B.get bh
-            4 -> pure FieldsNone
+            3 -> panic "get:FieldInfo - invalid byte"
+            4 -> pure FieldsUnknown
             5 -> pure FieldsUndet
             _ -> panic "get:FieldInfo - invalid byte"
 
@@ -766,19 +839,6 @@ However there are some exceptions:
     In order these will only contain tagged references we have to turn them into
     functions who evaluate the possibly untagged arguments.
 
-Note [Taggedness of absentError]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-WW under certain circumstances will determine that a strict
-field is not used and allocate a temporary constructor with
-an absentError inside the field.
-
-So we have to take great care to avoid reentering them when
-upholding the strict field invariant.
-
-For this purpose we treat bindings binding such an expression
-as being tagged in all cases.
-
 -}
 
 -- | Nodes identified by their id have the result mapped back the STG
@@ -807,7 +867,7 @@ instance Uniquable FlowNode where
 data FlowState
     = FlowState
     { fs_us :: !UniqSupply
-    , fs_idNodeMap :: !(UniqFM FlowNode) -- ^ Map of imported id nodes (indexed by `Id`).
+    , fs_idNodeMap :: !(UniqFM NodeId) -- ^ Map of imported id nodes (indexed by `Id`).
     , fs_uqNodeMap :: !(UniqFM FlowNode) -- ^ Transient results, index by `NodeId`
     , fs_doneNodes :: !(UniqFM FlowNode) -- ^ We can be sure these will no longer change, index by `NodeId`
     }
@@ -1084,7 +1144,7 @@ mkOutConLattice con outer fields
     conCount = length (tyConDataCons $ dataConTyCon con)
 
 {-# NOINLINE findTags #-}
-findTags :: Module -> UniqSupply -> [StgTopBinding] -> ([TgStgTopBinding])
+findTags :: Module -> UniqSupply -> [StgTopBinding] -> ([TgStgTopBinding], [(Id,EnterLattice)])
 -- findTags this_mod us binds = passTopBinds binds
 findTags this_mod us binds =
     -- pprTrace "findTags" (ppr this_mod) $
@@ -1094,15 +1154,16 @@ findTags this_mod us binds =
             fs_uqNodeMap = emptyUFM,
             fs_doneNodes = emptyUFM }
     -- Run the analysis
-        (!binds') = (flip evalState) state $ do
+        (!binds', exports) = (flip evalState) state $ do
             addConstantNodes
-            binds' <- nodesTopBinds this_mod binds
-            _nodes <- solveConstraints
-            finalBinds <- rewriteTopBinds binds'
-            return $! finalBinds
+            (binds',mapping) <- nodesTopBinds this_mod binds
+            solveConstraints
+            exports <- exportTaggedness mapping
+            !finalBinds <- rewriteTopBinds binds'
+            return (finalBinds, exports)
     in  (seqTopBinds binds') `seq`
             -- pprTrace "foundBinds" (ppr this_mod)
-                binds'
+                (binds',exports)
 
 -- passTopBinds :: [StgTopBinding] -> [TgStgTopBinding]
 -- passTopBinds binds = map (passTop) binds
@@ -1196,8 +1257,8 @@ The next time we come across the same id mkIdNodeId will check
 fs_idNodeMap, find the node we created earlier and return the
 same node.
 
-TODO: Currently we store the id-based nodes twice, once in idNodeMap
-and once in uniqNodeMap. idNodeMap should only store the nodeId instead.
+!! Note that the Unique of an ID, and it's corresponding NodeId !!
+!! are not correlated.                                          !!
 
 # Taggedness of imported ids
 
@@ -1239,7 +1300,7 @@ mkIdNodeId ctxt id
     | otherwise = do
         s <- get
         return $! fromMaybe (pprPanic "Unmapped id" (ppr id)) $
-            node_id <$> lookupUFM (fs_idNodeMap s) id
+            lookupUFM (fs_idNodeMap s) id
 
 -- See Note [Shadowing and NodeIds]
 mkLocalIdNodeId :: HasDebugCallStack => [SynContext] -> Id -> NodeId
@@ -1265,7 +1326,7 @@ addImportedNode this_mod id
         node_id <- mkUniqueId
         s <- get
         let idNodes = fs_idNodeMap s
-        -- Check if not is already cached.
+        -- Check if it is already cached.
         when (not $ elemUFM id idNodes) $ do
             let node
                     -- Functions tagged with arity are never entered as atoms.
@@ -1289,7 +1350,7 @@ addImportedNode this_mod id
                     = (mkConstNode node_id (flatLattice MaybeEnter))
                                 `set_desc` (text "ext_unknown" <-> ppr id)
             put $!
-                s { fs_idNodeMap = addToUFM (fs_idNodeMap s) id node
+                s { fs_idNodeMap = addToUFM (fs_idNodeMap s) id node_id
                 , fs_doneNodes = addToUFM (fs_doneNodes s) node node }
   where
     isFun = isFunTy (unwrapType $ idType id)
@@ -1302,7 +1363,7 @@ importedFuncNode this_mod var_id
     = return Nothing
     | otherwise = do
         s <- get
-        case node_id <$> lookupUFM (fs_idNodeMap s) var_id of
+        case lookupUFM (fs_idNodeMap s) var_id of
             Just node_id -> return $! Just node_id
             Nothing -> pprPanic "Imported id not mapped" (ppr var_id)
 
@@ -1316,14 +1377,16 @@ mkCtxtEntry ctxt v
         return $! (v, node_id)
 
 {-# NOINLINE nodesTopBinds #-}
-nodesTopBinds :: Module -> [StgTopBinding] -> AM [InferStgTopBinding]
+nodesTopBinds :: Module -> [StgTopBinding] -> AM ([InferStgTopBinding], [(Id,NodeId)])
 nodesTopBinds this_mod binds = do
     let top_level_binds = (bindersOfTopBinds binds) :: IdSet
     -- We preallocate node ids for the case where we must reference an node by id
     -- before we traversed the defining binding.
-    mappings <- mkVarEnv <$> mapM (mkCtxtEntry [CNone]) (nonDetEltsUniqSet top_level_binds) ::  AM (VarEnv NodeId)
-    let topCtxt = CTopLevel mappings
-    mapM (nodesTop this_mod topCtxt) binds
+    let bind_ids = (nonDetEltsUniqSet top_level_binds)
+    mappings <- mapM (mkCtxtEntry [CNone]) bind_ids :: AM [(Id,NodeId)]
+    let topCtxt = CTopLevel $ mkVarEnv mappings
+    binds' <- mapM (nodesTop this_mod topCtxt) binds
+    return (binds', mappings)
 
 nodesTop :: Module -> SynContext -> StgTopBinding -> AM InferStgTopBinding
 nodesTop _this_mod ctxt (StgTopStringLit v str) = do
@@ -2314,6 +2377,46 @@ rewriteApp True (StgApp nodeId f args)
 rewriteApp _ (StgApp _ f args) = return $ StgApp MayEnter f args -- TODO? Also apply here?
 rewriteApp _ _ = panic "Impossible"
 
+----------------------------------------------
+-- Deal with exporting tagging information
+
+exportTaggedness :: [(Id,NodeId)] -> AM [(Id, EnterLattice)]
+exportTaggedness xs = mapMaybeM export xs
+    where
+        export (v,nid)
+            | isInternalName (idName v)
+            = return Nothing
+            | isUnliftedType (idType v)
+            = return Nothing
+            | otherwise
+            = do
+                !res <- lookupNodeResult nid
+                return $ Just (v,res)
+
+-- rewriteTopBinds :: [InferStgTopBinding] -> AM [TgStgTopBinding]
+-- rewriteTopBinds binds = mapM (rewriteTop) binds
+
+-- rewriteTop :: InferStgTopBinding -> AM TgStgTopBinding
+-- rewriteTop (StgTopStringLit v s) = return $! (StgTopStringLit v s)
+-- rewriteTop (StgTopLifted bind)  = do
+--     let ids = stgBindIds bind
+--     let node_ids =
+
+
+--     (StgTopLifted . fst) <$!> (rewriteBinds bind)
+
+-- -- For top level binds, the wrapper is guaranteed to be `id`
+-- rewriteBinds :: InferStgBinding -> AM (TgStgBinding, TgStgExpr -> TgStgExpr)
+-- rewriteBinds (StgNonRec v rhs) = do
+--         (!rhs, wrapper) <-  rewriteRhs v rhs
+--         return $! (StgNonRec v rhs, wrapper)
+-- rewriteBinds (StgRec binds) =do
+--         (rhss, wrappers) <- unzip <$> mapM (uncurry rewriteRhs) binds
+--         let wrapper = foldl1 (.) wrappers
+--         return $! (mkRec rhss, wrapper)
+--   where
+--     mkRec :: [TgStgRhs] -> TgStgBinding
+--     mkRec rhss = StgRec (zip (map fst binds) rhss)
 
 ----------------------------------------------
 -- Utilities for rewriting RhsCon to ConClosure
