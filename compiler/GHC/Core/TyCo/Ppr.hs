@@ -304,7 +304,7 @@ pprTypeApp tc tys
 ------------------
 -- | Display all kind information (with @-fprint-explicit-kinds@) when the
 -- provided 'Bool' argument is 'True'.
--- See @Note [Kind arguments in error messages]@ in GHC.Tc.Errors.
+-- See @Note [Kind arguments in error messages]@ in "GHC.Tc.Errors".
 pprWithExplicitKindsWhen :: Bool -> SDoc -> SDoc
 pprWithExplicitKindsWhen b
   = updSDocContext $ \ctx ->

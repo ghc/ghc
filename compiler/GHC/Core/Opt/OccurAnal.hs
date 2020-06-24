@@ -2850,7 +2850,7 @@ setBinderOcc occ_info bndr
 -- the decision about another binding 'g' might be invalidated if (say)
 -- 'f' tail-calls 'g'.
 --
--- See Note [Invariants on join points] in GHC.Core.
+-- See Note [Invariants on join points] in "GHC.Core".
 decideJoinPointHood :: TopLevelFlag -> UsageDetails
                     -> [CoreBndr]
                     -> Bool

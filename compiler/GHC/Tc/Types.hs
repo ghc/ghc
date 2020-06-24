@@ -9,7 +9,7 @@
 
 -- | Various types used during typechecking.
 --
--- Please see GHC.Tc.Utils.Monad as well for operations on these types. You probably
+-- Please see "GHC.Tc.Utils.Monad" as well for operations on these types. You probably
 -- want to import it, instead of this module.
 --
 -- All the monads exported here are built on top of the same IOEnv monad. The
@@ -144,14 +144,14 @@ import qualified Language.Haskell.TH as TH
 
 -- | A 'NameShape' is a substitution on 'Name's that can be used
 -- to refine the identities of a hole while we are renaming interfaces
--- (see 'GHC.Iface.Rename').  Specifically, a 'NameShape' for
+-- (see "GHC.Iface.Rename").  Specifically, a 'NameShape' for
 -- 'ns_module_name' @A@, defines a mapping from @{A.T}@
 -- (for some 'OccName' @T@) to some arbitrary other 'Name'.
 --
 -- The most intruiging thing about a 'NameShape', however, is
 -- how it's constructed.  A 'NameShape' is *implied* by the
 -- exported 'AvailInfo's of the implementor of an interface:
--- if an implementor of signature @<H>@ exports @M.T@, you implicitly
+-- if an implementor of signature @\<H>@ exports @M.T@, you implicitly
 -- define a substitution from @{H.T}@ to @M.T@.  So a 'NameShape'
 -- is computed from the list of 'AvailInfo's that are exported
 -- by the implementation of a module, or successively merged
@@ -419,7 +419,7 @@ data TcGblEnv
 
         tcg_fix_env   :: FixityEnv,     -- ^ Just for things in this module
         tcg_field_env :: RecFieldEnv,   -- ^ Just for things in this module
-                                        -- See Note [The interactive package] in GHC.Driver.Types
+                                        -- See Note [The interactive package] in "GHC.Driver.Types"
 
         tcg_type_env :: TypeEnv,
           -- ^ Global type env for the module we are compiling now.  All
@@ -430,7 +430,7 @@ data TcGblEnv
           --  move to the global envt during zonking)
           --
           -- NB: for what "things in this module" means, see
-          -- Note [The interactive package] in GHC.Driver.Types
+          -- Note [The interactive package] in "GHC.Driver.Types"
 
         tcg_type_env_var :: TcRef TypeEnv,
                 -- Used only to initialise the interface-file
@@ -477,7 +477,7 @@ data TcGblEnv
           --      (tcRnExports)
           --    - imp_mods is used to compute usage info (mkIfaceTc, deSugar)
           --    - imp_trust_own_pkg is used for Safe Haskell in interfaces
-          --      (mkIfaceTc, as well as in GHC.Driver.Main)
+          --      (mkIfaceTc, as well as in "GHC.Driver.Main")
           --    - To create the Dependencies field in interface (mkDependencies)
 
           -- These three fields track unused bindings and imports
@@ -487,7 +487,7 @@ data TcGblEnv
         tcg_keep      :: TcRef NameSet,
 
         tcg_th_used :: TcRef Bool,
-          -- ^ @True@ <=> Template Haskell syntax used.
+          -- ^ @True@ \<=> Template Haskell syntax used.
           --
           -- We need this so that we can generate a dependency on the
           -- Template Haskell package, because the desugarer is going
@@ -496,7 +496,7 @@ data TcGblEnv
           -- mutable variable.
 
         tcg_th_splice_used :: TcRef Bool,
-          -- ^ @True@ <=> A Template Haskell splice was used.
+          -- ^ @True@ \<=> A Template Haskell splice was used.
           --
           -- Splices disable recompilation avoidance (see #481)
 
@@ -523,7 +523,7 @@ data TcGblEnv
                 -- voluminous and are needed if you want to report unused imports
 
         tcg_rn_decls :: Maybe (HsGroup GhcRn),
-          -- ^ Renamed decls, maybe.  @Nothing@ <=> Don't retain renamed
+          -- ^ Renamed decls, maybe.  @Nothing@ \<=> Don't retain renamed
           -- decls.
 
         tcg_dependent_files :: TcRef [FilePath], -- ^ dependencies from addDependentFile
@@ -1059,7 +1059,7 @@ data ArrowCtxt   -- Note [Escaping the arrow scope]
 
 -- | A typecheckable thing available in a local context.  Could be
 -- 'AGlobal' 'TyThing', but also lexically scoped variables, etc.
--- See 'GHC.Tc.Utils.Env' for how to retrieve a 'TyThing' given a 'Name'.
+-- See "GHC.Tc.Utils.Env" for how to retrieve a 'TyThing' given a 'Name'.
 data TcTyThing
   = AGlobal TyThing             -- Used only in the return type of a lookup
 
@@ -1112,9 +1112,9 @@ instance Outputable TcTyThing where     -- Debugging only
 -- | IdBindingInfo describes how an Id is bound.
 --
 -- It is used for the following purposes:
--- a) for static forms in GHC.Tc.Gen.Expr.checkClosedInStaticForm and
+-- a) for static forms in 'GHC.Tc.Gen.Expr.checkClosedInStaticForm' and
 -- b) to figure out when a nested binding can be generalised,
---    in GHC.Tc.Gen.Bind.decideGeneralisationPlan.
+--    in 'GHC.Tc.Gen.Bind.decideGeneralisationPlan'.
 --
 data IdBindingInfo -- See Note [Meaning of IdBindingInfo and ClosedTypeId]
     = NotLetBound
@@ -1336,7 +1336,7 @@ data ImportAvails
           --      = ModuleEnv [ImportedModsVal],
           -- ^ Domain is all directly-imported modules
           --
-          -- See the documentation on ImportedModsVal in GHC.Driver.Types for the
+          -- See the documentation on ImportedModsVal in "GHC.Driver.Types" for the
           -- meaning of the fields.
           --
           -- We need a full ModuleEnv rather than a ModuleNameEnv here,
@@ -1368,13 +1368,13 @@ data ImportAvails
           -- where True for the bool indicates the package is required to be
           -- trusted is the more logical  design, doing so complicates a lot
           -- of code not concerned with Safe Haskell.
-          -- See Note [Tracking Trust Transitively] in GHC.Rename.Names
+          -- See Note [Tracking Trust Transitively] in "GHC.Rename.Names"
 
         imp_trust_own_pkg :: Bool,
           -- ^ Do we require that our own package is trusted?
           -- This is to handle efficiently the case where a Safe module imports
           -- a Trustworthy module that resides in the same package as it.
-          -- See Note [Trust Own Package] in GHC.Rename.Names
+          -- See Note [Trust Own Package] in "GHC.Rename.Names"
 
         imp_orphs :: [Module],
           -- ^ Orphan modules below us in the import tree (and maybe including

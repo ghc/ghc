@@ -7,7 +7,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
 
--- | Typechecking \tr{foreign} declarations
+-- | Typechecking @foreign@ declarations
 --
 -- A foreign declaration is used to either give an externally
 -- implemented function a Haskell type (and calling interface) or

@@ -900,7 +900,7 @@ data TyCon
     }
 
   -- | These exist only during type-checking. See Note [How TcTyCons work]
-  -- in GHC.Tc.TyCl
+  -- in "GHC.Tc.TyCl"
   | TcTyCon {
         tyConUnique :: Unique,
         tyConName   :: Name,
@@ -1043,7 +1043,7 @@ mkDataTyConRhs cons
 -- constructor of 'PrimRep'. This data structure allows us to store this
 -- information right in the 'TyCon'. The other approach would be to look
 -- up things like @RuntimeRep@'s @PrimRep@ by known-key every time.
--- See also Note [Getting from RuntimeRep to PrimRep] in GHC.Types.RepType
+-- See also Note [Getting from RuntimeRep to PrimRep] in "GHC.Types.RepType"
 data RuntimeRepInfo
   = NoRRI       -- ^ an ordinary promoted data con
   | RuntimeRep ([Type] -> [PrimRep])
@@ -1078,7 +1078,7 @@ data AlgTyConFlav
        (Maybe TyConRepName)
 
   -- | Type constructors representing a class dictionary.
-  -- See Note [ATyCon for classes] in GHC.Core.TyCo.Rep
+  -- See Note [ATyCon for classes] in "GHC.Core.TyCo.Rep"
   | ClassTyCon
         Class           -- INVARIANT: the classTyCon of this Class is the
                         -- current tycon
@@ -1334,7 +1334,7 @@ tyConRepName_maybe _ = Nothing
 
 -- | Make a 'Name' for the 'Typeable' representation of the given wired-in type
 mkPrelTyConRepName :: Name -> TyConRepName
--- See Note [Grand plan for Typeable] in 'GHC.Tc.Instance.Typeable'.
+-- See Note [Grand plan for Typeable] in "GHC.Tc.Instance.Typeable".
 mkPrelTyConRepName tc_name  -- Prelude tc_name is always External,
                             -- so nameModule will work
   = mkExternalName rep_uniq rep_mod rep_occ (nameSrcSpan tc_name)
@@ -1349,7 +1349,7 @@ mkPrelTyConRepName tc_name  -- Prelude tc_name is always External,
 -- | The name (and defining module) for the Typeable representation (TyCon) of a
 -- type constructor.
 --
--- See Note [Grand plan for Typeable] in 'GHC.Tc.Instance.Typeable'.
+-- See Note [Grand plan for Typeable] in "GHC.Tc.Instance.Typeable".
 tyConRepModOcc :: Module -> OccName -> (Module, OccName)
 tyConRepModOcc tc_module tc_occ = (rep_module, mkTyConRepOcc tc_occ)
   where
@@ -1428,7 +1428,7 @@ See Note [RuntimeRep and PrimRep] in GHC.Types.RepType.
 -- | A 'PrimRep' is an abstraction of a type.  It contains information that
 -- the code generator needs in order to pass arguments, return results,
 -- and store values of this type. See also Note [RuntimeRep and PrimRep] in
--- GHC.Types.RepType and Note [VoidRep] in GHC.Types.RepType.
+-- "GHC.Types.RepType" and Note [VoidRep] in "GHC.Types.RepType".
 data PrimRep
   = VoidRep
   | LiftedRep
@@ -1705,7 +1705,7 @@ mkSumTyCon name binders res_kind arity tyvars cons parent
 -- mutually-recursive group of tycons; it is then zonked to a proper
 -- TyCon in zonkTcTyCon.
 -- See also Note [Kind checking recursive type and class declarations]
--- in GHC.Tc.TyCl.
+-- in "GHC.Tc.TyCl".
 mkTcTyCon :: Name
           -> [TyConBinder]
           -> Kind                -- ^ /result/ kind only
@@ -1907,7 +1907,7 @@ isDataTyCon _ = False
 -- (where X is the role passed in):
 --   If (T a1 b1 c1) ~X (T a2 b2 c2), then (a1 ~X1 a2), (b1 ~X2 b2), and (c1 ~X3 c2)
 -- (where X1, X2, and X3, are the roles given by tyConRolesX tc X)
--- See also Note [Decomposing equality] in GHC.Tc.Solver.Canonical
+-- See also Note [Decomposing equality] in "GHC.Tc.Solver.Canonical"
 isInjectiveTyCon :: TyCon -> Role -> Bool
 isInjectiveTyCon _                             Phantom          = False
 isInjectiveTyCon (FunTyCon {})                 _                = True
@@ -1928,7 +1928,7 @@ isInjectiveTyCon (TcTyCon {})                  _                = True
 -- | 'isGenerativeTyCon' is true of 'TyCon's for which this property holds
 -- (where X is the role passed in):
 --   If (T tys ~X t), then (t's head ~X T).
--- See also Note [Decomposing equality] in GHC.Tc.Solver.Canonical
+-- See also Note [Decomposing equality] in "GHC.Tc.Solver.Canonical"
 isGenerativeTyCon :: TyCon -> Role -> Bool
 isGenerativeTyCon (FamilyTyCon { famTcFlav = DataFamilyTyCon _ }) Nominal = True
 isGenerativeTyCon (FamilyTyCon {}) _ = False

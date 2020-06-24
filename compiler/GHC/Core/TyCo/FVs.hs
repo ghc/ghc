@@ -523,14 +523,14 @@ closeOverKindsDSet = fvDVarSet . closeOverKindsFV . dVarSetElems
 
 -- | `tyCoFVsOfType` that returns free variables of a type in a deterministic
 -- set. For explanation of why using `VarSet` is not deterministic see
--- Note [Deterministic FV] in GHC.Utils.FV.
+-- Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoVarsOfTypeDSet :: Type -> DTyCoVarSet
 -- See Note [Free variables of types]
 tyCoVarsOfTypeDSet ty = fvDVarSet $ tyCoFVsOfType ty
 
 -- | `tyCoFVsOfType` that returns free variables of a type in deterministic
 -- order. For explanation of why using `VarSet` is not deterministic see
--- Note [Deterministic FV] in GHC.Utils.FV.
+-- Note [Deterministic FV] in "GHC.Utils.FV".
 tyCoVarsOfTypeList :: Type -> [TyCoVar]
 -- See Note [Free variables of types]
 tyCoVarsOfTypeList ty = fvVarList $ tyCoFVsOfType ty
@@ -554,10 +554,10 @@ tyCoVarsOfTypesList tys = fvVarList $ tyCoFVsOfTypes tys
 -- make the function quadratic.
 -- It's exported, so that it can be composed with
 -- other functions that compute free variables.
--- See Note [FV naming conventions] in GHC.Utils.FV.
+-- See Note [FV naming conventions] in "GHC.Utils.FV".
 --
 -- Eta-expanded because that makes it run faster (apparently)
--- See Note [FV eta expansion] in GHC.Utils.FV for explanation.
+-- See Note [FV eta expansion] in "GHC.Utils.FV" for explanation.
 tyCoFVsOfType :: Type -> FV
 -- See Note [Free variables of types]
 tyCoFVsOfType (TyVarTy v)        f bound_vars (acc_list, acc_set)
@@ -655,7 +655,7 @@ tyCoFVsOfCos (co:cos) fv_cand in_scope acc = (tyCoFVsOfCo co `unionFV` tyCoFVsOf
 
 -- | Given a covar and a coercion, returns True if covar is almost devoid in
 -- the coercion. That is, covar can only appear in Refl and GRefl.
--- See last wrinkle in Note [Unused coercion variable in ForAllCo] in GHC.Core.Coercion
+-- See last wrinkle in Note [Unused coercion variable in ForAllCo] in "GHC.Core.Coercion"
 almostDevoidCoVarOfCo :: CoVar -> Coercion -> Bool
 almostDevoidCoVarOfCo cv co =
   almost_devoid_co_var_of_co co cv
@@ -777,7 +777,7 @@ almost_devoid_co_var_of_types (ty:tys) cv
 -- See @Note [When does a tycon application need an explicit kind signature?]@.
 injectiveVarsOfType :: Bool   -- ^ Should we look under injective type families?
                               -- See Note [Coverage condition for injective type families]
-                              -- in GHC.Tc.Instance.Family.
+                              -- in "GHC.Tc.Instance.Family".
                     -> Type -> FV
 injectiveVarsOfType look_under_tfs = go
   where
@@ -812,7 +812,7 @@ injectiveVarsOfType look_under_tfs = go
 -- See @Note [When does a tycon application need an explicit kind signature?]@.
 injectiveVarsOfTypes :: Bool -- ^ look under injective type families?
                              -- See Note [Coverage condition for injective type families]
-                             -- in GHC.Tc.Instance.Family.
+                             -- in "GHC.Tc.Instance.Family".
                      -> [Type] -> FV
 injectiveVarsOfTypes look_under_tfs = mapUnionFV (injectiveVarsOfType look_under_tfs)
 
@@ -831,7 +831,7 @@ injectiveVarsOfTypes look_under_tfs = mapUnionFV (injectiveVarsOfType look_under
 --   * In the kind of a bound variable in a forall
 --   * In a coercion
 --   * In a Specified or Inferred argument to a function
--- See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in GHC.Core.TyCo.Rep
+-- See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in "GHC.Core.TyCo.Rep"
 invisibleVarsOfType :: Type -> FV
 invisibleVarsOfType = go
   where
@@ -935,7 +935,7 @@ types/kinds are fully settled and zonked.
 --
 -- It is also meant to be stable: that is, variables should not
 -- be reordered unnecessarily. This is specified in Note [ScopedSort]
--- See also Note [Ordering of implicit variables] in GHC.Rename.HsType
+-- See also Note [Ordering of implicit variables] in "GHC.Rename.HsType"
 
 scopedSort :: [TyCoVar] -> [TyCoVar]
 scopedSort = go [] []

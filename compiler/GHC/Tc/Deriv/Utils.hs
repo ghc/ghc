@@ -60,7 +60,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import GHC.Data.List.SetOps (assocMaybe)
 
 -- | To avoid having to manually plumb everything in 'DerivEnv' throughout
--- various functions in @GHC.Tc.Deriv@ and @GHC.Tc.Deriv.Infer@, we use 'DerivM', which
+-- various functions in "GHC.Tc.Deriv" and "GHC.Tc.Deriv.Infer", we use 'DerivM', which
 -- is a simple reader around 'TcRn'.
 type DerivM = ReaderT DerivEnv TcRn
 

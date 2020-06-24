@@ -358,21 +358,21 @@ nonDetUFMToList (UFM m) = map (\(k, v) -> (getUnique k, v)) $ M.toList m
 -- nondeterministic.
 -- If you use this please provide a justification why it doesn't introduce
 -- nondeterminism.
--- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM to learn about determinism.
+-- See Note [Deterministic UniqFM] in "GHC.Types.Unique.DFM" to learn about determinism.
 newtype NonDetUniqFM ele = NonDetUniqFM { getNonDet :: UniqFM ele }
   deriving (Functor)
 
 -- | Inherently nondeterministic.
 -- If you use this please provide a justification why it doesn't introduce
 -- nondeterminism.
--- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM to learn about determinism.
+-- See Note [Deterministic UniqFM] in "GHC.Types.Unique.DFM" to learn about determinism.
 instance Foldable NonDetUniqFM where
   foldr f z (NonDetUniqFM (UFM m)) = foldr f z m
 
 -- | Inherently nondeterministic.
 -- If you use this please provide a justification why it doesn't introduce
 -- nondeterminism.
--- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM to learn about determinism.
+-- See Note [Deterministic UniqFM] in "GHC.Types.Unique.DFM" to learn about determinism.
 instance Traversable NonDetUniqFM where
   traverse f (NonDetUniqFM (UFM m)) = NonDetUniqFM . UFM <$> traverse f m
 

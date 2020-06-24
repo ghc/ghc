@@ -304,7 +304,7 @@ quantified in left-to-right order in kind signatures is nice since:
 
 -- | Located Haskell Context
 type LHsContext pass = Located (HsContext pass)
-      -- ^ 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnUnit'
+      -- ^ 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnUnit'
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
 noLHsContext :: LHsContext pass
@@ -320,7 +320,7 @@ type HsContext pass = [LHsType pass]
 
 -- | Located Haskell Type
 type LHsType pass = Located (HsType pass)
-      -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma' when
+      -- ^ May have 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnComma' when
       --   in a list
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
@@ -330,7 +330,7 @@ type HsKind pass = HsType pass
 
 -- | Located Haskell Kind
 type LHsKind pass = Located (HsKind pass)
-      -- ^ 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
+      -- ^ 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDcolon'
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
@@ -646,8 +646,8 @@ data HsTyVarBndr flag pass
          (Located (IdP pass))
          (LHsKind pass)  -- The user-supplied kind signature
         -- ^
-        --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
-        --          'ApiAnnotation.AnnDcolon', 'ApiAnnotation.AnnClose'
+        --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
+        --          'GHC.Parser.Annotation.AnnDcolon', 'GHC.Parser.Annotation.AnnClose'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
@@ -692,9 +692,9 @@ data HsType pass
                                      -- Explicit, user-supplied 'forall a {b} c'
       , hst_body    :: LHsType pass  -- body type
       }
-      -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnForall',
-      --         'ApiAnnotation.AnnDot','ApiAnnotation.AnnDarrow'
-      -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+      -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnForall',
+      --         'GHC.Parser.Annotation.AnnDot','GHC.Parser.Annotation.AnnDarrow'
+      -- For details on above see note [Api annotations] in "GHC.Parser.Annotation"
 
   | HsQualTy   -- See Note [HsType binders]
       { hst_xqual :: XQualTy pass
@@ -708,14 +708,14 @@ data HsType pass
                   -- Type variable, type constructor, or data constructor
                   -- see Note [Promotions (HsTyVar)]
                   -- See Note [Located RdrNames] in GHC.Hs.Expr
-      -- ^ - 'ApiAnnotation.AnnKeywordId' : None
+      -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : None
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsAppTy             (XAppTy pass)
                         (LHsType pass)
                         (LHsType pass)
-      -- ^ - 'ApiAnnotation.AnnKeywordId' : None
+      -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : None
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
@@ -727,35 +727,35 @@ data HsType pass
                         (HsArrow pass)
                         (LHsType pass)   -- function type
                         (LHsType pass)
-      -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow',
+      -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnRarrow',
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsListTy            (XListTy pass)
                         (LHsType pass)  -- Element type
-      -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'['@,
-      --         'ApiAnnotation.AnnClose' @']'@
+      -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'['@,
+      --         'GHC.Parser.Annotation.AnnClose' @']'@
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsTupleTy           (XTupleTy pass)
                         HsTupleSort
                         [LHsType pass]  -- Element types (length gives arity)
-    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'(' or '(#'@,
-    --         'ApiAnnotation.AnnClose' @')' or '#)'@
+    -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'(' or '(#'@,
+    --         'GHC.Parser.Annotation.AnnClose' @')' or '#)'@
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsSumTy             (XSumTy pass)
                         [LHsType pass]  -- Element types (length gives arity)
-    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'(#'@,
-    --         'ApiAnnotation.AnnClose' '#)'@
+    -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'(#'@,
+    --         'GHC.Parser.Annotation.AnnClose' '#)'@
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsOpTy              (XOpTy pass)
                         (LHsType pass) (Located (IdP pass)) (LHsType pass)
-      -- ^ - 'ApiAnnotation.AnnKeywordId' : None
+      -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : None
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
@@ -764,8 +764,8 @@ data HsType pass
         -- Parenthesis preserved for the precedence re-arrangement in
         -- GHC.Rename.HsType
         -- It's important that a * (b + c) doesn't get rearranged to (a*b) + c!
-      -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
-      --         'ApiAnnotation.AnnClose' @')'@
+      -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'('@,
+      --         'GHC.Parser.Annotation.AnnClose' @')'@
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
@@ -776,14 +776,14 @@ data HsType pass
       -- ^
       -- > (?x :: ty)
       --
-      -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
+      -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDcolon'
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsStarTy            (XStarTy pass)
                         Bool             -- Is this the Unicode variant?
                                          -- Note [HsStarTy]
-      -- ^ - 'ApiAnnotation.AnnKeywordId' : None
+      -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : None
 
   | HsKindSig           (XKindSig pass)
                         (LHsType pass)  -- (ty :: kind)
@@ -791,43 +791,43 @@ data HsType pass
       -- ^
       -- > (ty :: kind)
       --
-      -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
-      --         'ApiAnnotation.AnnDcolon','ApiAnnotation.AnnClose' @')'@
+      -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'('@,
+      --         'GHC.Parser.Annotation.AnnDcolon','GHC.Parser.Annotation.AnnClose' @')'@
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsSpliceTy          (XSpliceTy pass)
                         (HsSplice pass)   -- Includes quasi-quotes
-      -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'$('@,
-      --         'ApiAnnotation.AnnClose' @')'@
+      -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'$('@,
+      --         'GHC.Parser.Annotation.AnnClose' @')'@
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsDocTy             (XDocTy pass)
                         (LHsType pass) LHsDocString -- A documented type
-      -- ^ - 'ApiAnnotation.AnnKeywordId' : None
+      -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : None
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsBangTy    (XBangTy pass)
                 HsSrcBang (LHsType pass)   -- Bang-style type annotations
-      -- ^ - 'ApiAnnotation.AnnKeywordId' :
-      --         'ApiAnnotation.AnnOpen' @'{-\# UNPACK' or '{-\# NOUNPACK'@,
-      --         'ApiAnnotation.AnnClose' @'#-}'@
-      --         'ApiAnnotation.AnnBang' @\'!\'@
+      -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' :
+      --         'GHC.Parser.Annotation.AnnOpen' @'{-\# UNPACK' or '{-\# NOUNPACK'@,
+      --         'GHC.Parser.Annotation.AnnClose' @'#-}'@
+      --         'GHC.Parser.Annotation.AnnBang' @\'!\'@
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsRecTy     (XRecTy pass)
                 [LConDeclField pass]    -- Only in data type declarations
-      -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{'@,
-      --         'ApiAnnotation.AnnClose' @'}'@
+      -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'{'@,
+      --         'GHC.Parser.Annotation.AnnClose' @'}'@
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   -- | HsCoreTy (XCoreTy pass) Type -- An escape hatch for tunnelling a *closed*
   --                                -- Core Type through HsSyn.
-  --     -- ^ - 'ApiAnnotation.AnnKeywordId' : None
+  --     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : None
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
@@ -835,27 +835,27 @@ data HsType pass
         (XExplicitListTy pass)
         PromotionFlag      -- whether explicitly promoted, for pretty printer
         [LHsType pass]
-      -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @"'["@,
-      --         'ApiAnnotation.AnnClose' @']'@
+      -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @"'["@,
+      --         'GHC.Parser.Annotation.AnnClose' @']'@
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsExplicitTupleTy      -- A promoted explicit tuple
         (XExplicitTupleTy pass)
         [LHsType pass]
-      -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @"'("@,
-      --         'ApiAnnotation.AnnClose' @')'@
+      -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @"'("@,
+      --         'GHC.Parser.Annotation.AnnClose' @')'@
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsTyLit (XTyLit pass) HsTyLit      -- A promoted numeric literal.
-      -- ^ - 'ApiAnnotation.AnnKeywordId' : None
+      -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : None
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsWildCardTy (XWildCardTy pass)  -- A type wildcard
       -- See Note [The wildcard story for types]
-      -- ^ - 'ApiAnnotation.AnnKeywordId' : None
+      -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : None
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
@@ -867,7 +867,7 @@ data NewHsTypeX
   = NHsCoreTy Type -- An escape hatch for tunnelling a *closed*
                    -- Core Type through HsSyn.
     deriving Data
-      -- ^ - 'ApiAnnotation.AnnKeywordId' : None
+      -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : None
 
 instance Outputable NewHsTypeX where
   ppr (NHsCoreTy ty) = ppr ty
@@ -1074,7 +1074,7 @@ data HsTupleSort = HsUnboxedTuple
 
 -- | Located Constructor Declaration Field
 type LConDeclField pass = Located (ConDeclField pass)
-      -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma' when
+      -- ^ May have 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnComma' when
       --   in a list
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
@@ -1086,7 +1086,7 @@ data ConDeclField pass  -- Record fields have Haddock docs on them
                                    -- ^ See Note [ConDeclField passs]
                    cd_fld_type :: LBangType pass,
                    cd_fld_doc  :: Maybe LHsDocString }
-      -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
+      -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDcolon'
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | XConDeclField !(XXConDeclField pass)
@@ -1556,7 +1556,7 @@ type LFieldOcc pass = Located (FieldOcc pass)
 -- renamer, the selector function.
 data FieldOcc pass = FieldOcc { extFieldOcc     :: XCFieldOcc pass
                               , rdrNameFieldOcc :: Located RdrName
-                                 -- ^ See Note [Located RdrNames] in GHC.Hs.Expr
+                                 -- ^ See Note [Located RdrNames] in "GHC.Hs.Expr"
                               }
 
   | XFieldOcc
@@ -1585,9 +1585,9 @@ mkFieldOcc rdr = FieldOcc noExtField rdr
 -- (for unambiguous occurrences) or the typechecker (for ambiguous
 -- occurrences).
 --
--- See Note [HsRecField and HsRecUpdField] in GHC.Hs.Pat and
--- Note [Disambiguating record fields] in GHC.Tc.Gen.Expr.
--- See Note [Located RdrNames] in GHC.Hs.Expr
+-- See Note [HsRecField and HsRecUpdField] in "GHC.Hs.Pat" and
+-- Note [Disambiguating record fields] in "GHC.Tc.Gen.Expr".
+-- See Note [Located RdrNames] in "GHC.Hs.Expr"
 data AmbiguousFieldOcc pass
   = Unambiguous (XUnambiguous pass) (Located RdrName)
   | Ambiguous   (XAmbiguous pass)   (Located RdrName)

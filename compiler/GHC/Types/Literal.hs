@@ -256,7 +256,7 @@ instance Eq Literal where
     a == b = compare a b == EQ
 
 -- | Needed for the @Ord@ instance of 'AltCon', which in turn is needed in
--- 'TrieMap.CoreMap'.
+-- 'GHC.Data.TrieMap.CoreMap'.
 instance Ord Literal where
     compare = cmpLit
 
