@@ -33,5 +33,5 @@
 
 /* No valid FD would be negative, so use a word instead of int so the value
    is compatible with a Windows handle.  */
-int  lockFile(StgWord id, StgWord64 dev, StgWord64 ino, int for_writing);
-int  unlockFile(StgWord id);
+int  lockFile(StgWord64 id, StgWord64 dev, StgWord64 ino, int for_writing);
+int  unlockFile(StgWord64 id);
