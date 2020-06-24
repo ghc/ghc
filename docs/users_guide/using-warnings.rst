@@ -94,6 +94,11 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wpartial-fields`
         * :ghc-flag:`-Wmissed-specialisations`
         * :ghc-flag:`-Wall-missed-specialisations`
+        * :ghc-flag:`-Wcpp-undef`
+        * :ghc-flag:`-Wduplicate-constraints`
+        * :ghc-flag:`-Wmissing-deriving-strategies`
+        * :ghc-flag:`-Wunused-packages`
+        * :ghc-flag:`-Wunused-type-patterns`
 
 .. ghc-flag:: -Weverything
     :shortdesc: enable all warnings supported by GHC
@@ -119,7 +124,6 @@ The following flags are simple ways to select standard "packages" of warnings:
     .. hlist::
         :columns: 3
 
-        * :ghc-flag:`-Wmissing-monadfail-instances`
         * :ghc-flag:`-Wsemigroup`
         * :ghc-flag:`-Wnoncanonical-monoid-instances`
         * :ghc-flag:`-Wstar-is-type`
