@@ -8,7 +8,7 @@
 
 module GHC.Builtin.PrimOps (
         PrimOp(..), PrimOpVecCat(..), allThePrimOps,
-        primOpType, primOpSig,
+        primOpType, primOpSig, primOpResultType,
         primOpTag, maxPrimOpTag, primOpOcc,
         primOpWrapperId,
 
@@ -580,6 +580,14 @@ primOpType op
 
     GenPrimOp _occ tyvars arg_tys res_ty ->
         mkSpecForAllTys tyvars (mkVisFunTysMany arg_tys res_ty)
+
+primOpResultType :: PrimOp -> Type
+primOpResultType op
+  = case primOpInfo op of
+    Dyadic  _occ ty  -> ty
+    Monadic _occ ty  -> ty
+    Compare _occ _ty -> intPrimTy
+    GenPrimOp _occ _tyvars _arg_tys res_ty -> res_ty
 
 primOpOcc :: PrimOp -> OccName
 primOpOcc op = case primOpInfo op of
