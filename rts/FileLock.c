@@ -76,7 +76,7 @@ freeFileLocking(void)
 }
 
 int
-lockFile(StgWord id, StgWord64 dev, StgWord64 ino, int for_writing)
+lockFile(StgWord64 id, StgWord64 dev, StgWord64 ino, int for_writing)
 {
     Lock key, *lock;
 
@@ -113,7 +113,7 @@ lockFile(StgWord id, StgWord64 dev, StgWord64 ino, int for_writing)
 }
 
 int
-unlockFile(StgWord id)
+unlockFile(StgWord64 id)
 {
     Lock *lock;
 
