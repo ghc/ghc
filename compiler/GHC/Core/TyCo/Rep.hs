@@ -129,7 +129,7 @@ The Class and its associated TyCon have the same Name.
 
 -- | A global typecheckable-thing, essentially anything that has a name.
 -- Not to be confused with a 'TcTyThing', which is also a typecheckable
--- thing but in the *local* context.  See 'GHC.Tc.Utils.Env' for how to retrieve
+-- thing but in the *local* context.  See "GHC.Tc.Utils.Env" for how to retrieve
 -- a 'TyThing' given a 'Name'.
 data TyThing
   = AnId     Id
@@ -189,7 +189,7 @@ data Type
                         --
                         --  1) Function: must /not/ be a 'TyConApp' or 'CastTy',
                         --     must be another 'AppTy', or 'TyVarTy'
-                        --     See Note [Respecting definitional equality] (EQ1) about the
+                        --     See Note [Respecting definitional equality] \(EQ1) about the
                         --     no 'CastTy' requirement
                         --
                         --  2) Argument type
@@ -233,7 +233,7 @@ data Type
                       -- INVARIANT: The cast is never reflexive
                       -- INVARIANT: The Type is not a CastTy (use TransCo instead)
                       -- INVARIANT: The Type is not a ForAllTy over a type variable
-                      -- See Note [Respecting definitional equality] (EQ2), (EQ3), (EQ4)
+                      -- See Note [Respecting definitional equality] \(EQ2), (EQ3), (EQ4)
 
   | CoercionTy
         Coercion    -- ^ Injection of a Coercion into a type
@@ -675,7 +675,7 @@ are truly unrelated.
 
 -- | A type labeled 'KnotTied' might have knot-tied tycons in it. See
 -- Note [Type checking recursive type and class declarations] in
--- GHC.Tc.TyCl
+-- "GHC.Tc.TyCl"
 type KnotTied ty = ty
 
 {- **********************************************************************
@@ -1886,7 +1886,7 @@ data TyCoFolder env a
       , tcf_covar :: env -> CoVar -> a
       , tcf_hole  :: env -> CoercionHole -> a
           -- ^ What to do with coercion holes.
-          -- See Note [Coercion holes] in GHC.Core.TyCo.Rep.
+          -- See Note [Coercion holes] in "GHC.Core.TyCo.Rep".
 
       , tcf_tycobinder :: env -> TyCoVar -> ArgFlag -> env
           -- ^ The returned env is used in the extended scope

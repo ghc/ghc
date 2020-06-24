@@ -453,7 +453,7 @@ classInstances (InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = 
                 Nothing            -> []
 
 -- | Checks for an exact match of ClsInst in the instance environment.
--- We use this when we do signature checking in GHC.Tc.Module
+-- We use this when we do signature checking in "GHC.Tc.Module"
 memberInstEnv :: InstEnv -> ClsInst -> Bool
 memberInstEnv inst_env ins_item@(ClsInst { is_cls_nm = cls_nm } ) =
     maybe False (\(ClsIE items) -> any (identicalDFunType ins_item) items)
@@ -835,8 +835,8 @@ lookupInstEnv :: Bool              -- Check Safe Haskell overlap restrictions
               -> Class -> [Type]   -- What we are looking for
               -> ClsInstLookupResult
 -- ^ See Note [Rules for instance lookup]
--- ^ See Note [Safe Haskell Overlapping Instances] in GHC.Tc.Solver
--- ^ See Note [Safe Haskell Overlapping Instances Implementation] in GHC.Tc.Solver
+-- ^ See Note [Safe Haskell Overlapping Instances] in "GHC.Tc.Solver"
+-- ^ See Note [Safe Haskell Overlapping Instances Implementation] in "GHC.Tc.Solver"
 lookupInstEnv check_overlap_safe
               (InstEnvs { ie_global = pkg_ie
                         , ie_local = home_ie

@@ -148,7 +148,7 @@ halfWordSizeInBits platform = platformWordSizeInBits platform `div` 2
 -}
 
 -- | A description of the layout of a closure.  Corresponds directly
--- to the closure types in includes/rts/storage/ClosureTypes.h.
+-- to the closure types in includes\/rts\/storage\/ClosureTypes.h.
 data SMRep
   = HeapRep              -- GC routines consult sizes in info tbl
         IsStatic
@@ -173,7 +173,7 @@ data SMRep
         Int             -- type tags, so this form lets us override the default
         SMRep           -- tag for an SMRep.
 
--- | True <=> This is a static closure.  Affects how we garbage-collect it.
+-- | True \<=> This is a static closure.  Affects how we garbage-collect it.
 -- Static closure have an extra static link field at the end.
 -- Constructors do not have a static variant; see Note [static constructors]
 type IsStatic = Bool
@@ -274,12 +274,12 @@ isStaticNoCafCon _                        = False
 fixedHdrSize :: DynFlags -> ByteOff
 fixedHdrSize dflags = wordsToBytes (targetPlatform dflags) (fixedHdrSizeW dflags)
 
--- | Size of a closure header (StgHeader in includes/rts/storage/Closures.h)
+-- | Size of a closure header (StgHeader in includes\/rts\/storage\/Closures.h)
 fixedHdrSizeW :: DynFlags -> WordOff
 fixedHdrSizeW dflags = sTD_HDR_SIZE dflags + profHdrSize dflags
 
 -- | Size of the profiling part of a closure header
--- (StgProfHeader in includes/rts/storage/Closures.h)
+-- (StgProfHeader in includes\/rts\/storage\/Closures.h)
 profHdrSize  :: DynFlags -> WordOff
 profHdrSize dflags
  | gopt Opt_SccProfilingOn dflags = pROF_HDR_SIZE dflags

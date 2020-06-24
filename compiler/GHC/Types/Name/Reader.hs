@@ -9,18 +9,18 @@
 -- #name_types#
 -- GHC uses several kinds of name internally:
 --
--- * 'OccName.OccName': see "OccName#name_types"
+-- * 'GHC.Types.Name.Occurrence.OccName': see "GHC.Types.Name.Occurrence#name_types"
 --
--- * 'RdrName.RdrName' is the type of names that come directly from the parser. They
+-- * 'GHC.Types.Name.Reader.RdrName' is the type of names that come directly from the parser. They
 --   have not yet had their scoping and binding resolved by the renamer and can be
---   thought of to a first approximation as an 'OccName.OccName' with an optional module
+--   thought of to a first approximation as an 'GHC.Types.Name.Occurrence.OccName' with an optional module
 --   qualifier
 --
--- * 'Name.Name': see "Name#name_types"
+-- * 'GHC.Types.Name.Name': see "GHC.Types.Name#name_types"
 --
--- * 'Id.Id': see "Id#name_types"
+-- * 'GHC.Types.Id.Id': see "GHC.Types.Id#name_types"
 --
--- * 'Var.Var': see "Var#name_types"
+-- * 'GHC.Types.Var.Var': see "GHC.Types.Var#name_types"
 
 module GHC.Types.Name.Reader (
         -- * The main type
@@ -110,14 +110,14 @@ import Data.List( sortBy )
 -- > `bar`
 -- > ( ~ )
 --
--- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnType',
---           'ApiAnnotation.AnnOpen'  @'('@ or @'['@ or @'[:'@,
---           'ApiAnnotation.AnnClose' @')'@ or @']'@ or @':]'@,,
---           'ApiAnnotation.AnnBackquote' @'`'@,
---           'ApiAnnotation.AnnVal'
---           'ApiAnnotation.AnnTilde',
+-- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnType',
+--           'GHC.Parser.Annotation.AnnOpen'  @'('@ or @'['@ or @'[:'@,
+--           'GHC.Parser.Annotation.AnnClose' @')'@ or @']'@ or @':]'@,,
+--           'GHC.Parser.Annotation.AnnBackquote' @'`'@,
+--           'GHC.Parser.Annotation.AnnVal'
+--           'GHC.Parser.Annotation.AnnTilde',
 
--- For details on above see note [Api annotations] in GHC.Parser.Annotation
+-- For details on above see note [Api annotations] in "GHC.Parser.Annotation"
 data RdrName
   = Unqual OccName
         -- ^ Unqualified  name
@@ -344,7 +344,7 @@ instance Ord RdrName where
 -- (@let@, @where@, lambda, @case@).
 -- It is keyed by OccName, because we never use it for qualified names
 -- We keep the current mapping, *and* the set of all Names in scope
--- Reason: see Note [Splicing Exact names] in GHC.Rename.Env
+-- Reason: see Note [Splicing Exact names] in "GHC.Rename.Env"
 data LocalRdrEnv = LRE { lre_env      :: OccEnv Name
                        , lre_in_scope :: NameSet }
 
@@ -934,7 +934,7 @@ pickGREsModExp :: ModuleName -> [GlobalRdrElt] -> [(GlobalRdrElt,GlobalRdrElt)]
 -- it is in scope qualified an unqualified respectively
 --
 -- Used only for the 'module M' item in export list;
---   see GHC.Rename.Names.exports_from_avail
+--   see 'GHC.Tc.Gen.Export.exports_from_avail'
 pickGREsModExp mod gres = mapMaybe (pickBothGRE mod) gres
 
 pickBothGRE :: ModuleName -> GlobalRdrElt -> Maybe (GlobalRdrElt, GlobalRdrElt)

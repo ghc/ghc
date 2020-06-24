@@ -42,6 +42,8 @@ import GHC.Float (Floating(..))
 import Data.Data (Data)
 import Foreign (Storable, castPtr, peek, poke, pokeElemOff, peekElemOff, sizeOf,
                 alignment)
+import Control.Monad.Fix (MonadFix(..))
+import Control.Monad.Zip (MonadZip(..))
 
 infix  6  :+
 
@@ -250,6 +252,14 @@ instance Applicative Complex where
 -- | @since 4.9.0.0
 instance Monad Complex where
   a :+ b >>= f = realPart (f a) :+ imagPart (f b)
+
+-- | @since 4.15.0.0
+instance MonadZip Complex where
+  mzipWith = liftA2
+
+-- | @since 4.15.0.0
+instance MonadFix Complex where
+  mfix f = (let a :+ _ = f a in a) :+ (let _ :+ a = f a in a)
 
 -- -----------------------------------------------------------------------------
 -- Rules on Complex

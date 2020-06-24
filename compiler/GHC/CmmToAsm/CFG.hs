@@ -107,7 +107,7 @@ instance Outputable EdgeWeight where
 type EdgeInfoMap edgeInfo = LabelMap (LabelMap edgeInfo)
 
 -- | A control flow graph where edges have been annotated with a weight.
--- Implemented as IntMap (IntMap <edgeData>)
+-- Implemented as IntMap (IntMap \<edgeData>)
 -- We must uphold the invariant that for each edge A -> B we must have:
 -- A entry B in the outer map.
 -- A entry B in the map we get when looking up A.
@@ -148,7 +148,7 @@ instance Outputable CfgEdge where
 -- | Can we trace back a edge to a specific Cmm Node
 -- or has it been introduced during assembly codegen. We use this to maintain
 -- some information which would otherwise be lost during the
--- Cmm <-> asm transition.
+-- Cmm \<-> asm transition.
 -- See also Note [Inverting Conditional Branches]
 data TransitionSource
   = CmmSource { trans_cmmNode :: (CmmNode O C)

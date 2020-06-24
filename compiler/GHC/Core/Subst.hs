@@ -80,9 +80,9 @@ import Data.List
 --
 -- Some invariants apply to how you use the substitution:
 --
--- 1. Note [The substitution invariant] in GHC.Core.TyCo.Subst
+-- 1. Note [The substitution invariant] in "GHC.Core.TyCo.Subst"
 --
--- 2. Note [Substitutions apply only once] in GHC.Core.TyCo.Subst
+-- 2. Note [Substitutions apply only once] in "GHC.Core.TyCo.Subst"
 data Subst
   = Subst InScopeSet  -- Variables in in scope (both Ids and TyVars) /after/
                       -- applying the substitution
@@ -172,7 +172,7 @@ mkEmptySubst in_scope = Subst in_scope emptyVarEnv emptyVarEnv emptyVarEnv
 mkSubst :: InScopeSet -> TvSubstEnv -> CvSubstEnv -> IdSubstEnv -> Subst
 mkSubst in_scope tvs cvs ids = Subst in_scope ids tvs cvs
 
--- | Find the in-scope set: see TyCoSubst Note [The substitution invariant]
+-- | Find the in-scope set: see "GHC.Core.TyCo.Subst" Note [The substitution invariant]
 substInScope :: Subst -> InScopeSet
 substInScope (Subst in_scope _ _ _) = in_scope
 
@@ -199,7 +199,7 @@ extendIdSubstList (Subst in_scope ids tvs cvs) prs
 -- | Add a substitution for a 'TyVar' to the 'Subst'
 -- The 'TyVar' *must* be a real TyVar, and not a CoVar
 -- You must ensure that the in-scope set is such that
--- TyCoSubst Note [The substitution invariant] holds
+-- "GHC.Core.TyCo.Subst" Note [The substitution invariant] holds
 -- after extending the substitution like this.
 extendTvSubst :: Subst -> TyVar -> Type -> Subst
 extendTvSubst (Subst in_scope ids tvs cvs) tv ty
@@ -215,7 +215,7 @@ extendTvSubstList subst vrs
 
 -- | Add a substitution from a 'CoVar' to a 'Coercion' to the 'Subst':
 -- you must ensure that the in-scope set satisfies
--- TyCoSubst Note [The substitution invariant]
+-- "GHC.Core.TyCo.Subst" Note [The substitution invariant]
 -- after extending the substitution like this
 extendCvSubst :: Subst -> CoVar -> Coercion -> Subst
 extendCvSubst (Subst in_scope ids tvs cvs) v r
@@ -340,7 +340,7 @@ instance Outputable Subst where
 
 -- | Apply a substitution to an entire 'CoreExpr'. Remember, you may only
 -- apply the substitution /once/:
--- See Note [Substitutions apply only once] in GHC.Core.TyCo.Subst
+-- See Note [Substitutions apply only once] in "GHC.Core.TyCo.Subst"
 --
 -- Do *not* attempt to short-cut in the case of an empty substitution!
 -- See Note [Extending the Subst]

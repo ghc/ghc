@@ -106,7 +106,7 @@ exprFreeVars :: CoreExpr -> VarSet
 exprFreeVars = fvVarSet . exprFVs
 
 -- | Find all locally-defined free Ids or type variables in an expression
--- returning a composable FV computation. See Note [FV naming conventions] in GHC.Utils.FV
+-- returning a composable FV computation. See Note [FV naming conventions] in "GHC.Utils.FV"
 -- for why export it.
 exprFVs :: CoreExpr -> FV
 exprFVs = filterFV isLocalVar . expr_fvs
@@ -151,7 +151,7 @@ exprsFreeVars :: [CoreExpr] -> VarSet
 exprsFreeVars = fvVarSet . exprsFVs
 
 -- | Find all locally-defined free Ids or type variables in several expressions
--- returning a composable FV computation. See Note [FV naming conventions] in GHC.Utils.FV
+-- returning a composable FV computation. See Note [FV naming conventions] in "GHC.Utils.FV"
 -- for why export it.
 exprsFVs :: [CoreExpr] -> FV
 exprsFVs exprs = mapUnionFV exprFVs exprs

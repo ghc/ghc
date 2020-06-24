@@ -312,7 +312,7 @@ fitsIn ty1 ty2
 Note [RuntimeRep and PrimRep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This Note describes the relationship between GHC.Types.RuntimeRep
-(of levity-polymorphism fame) and TyCon.PrimRep, as these types
+(of levity-polymorphism fame) and GHC.Core.TyCon.PrimRep, as these types
 are closely related.
 
 A "primitive entity" is one that can be
@@ -329,7 +329,7 @@ Examples include:
  * ...etc...
 
 The "representation or a primitive entity" specifies what kind of register is
-needed and how many bits are required. The data type TyCon.PrimRep
+needed and how many bits are required. The data type GHC.Core.TyCon.PrimRep
 enumerates all the possibilities.
 
 data PrimRep

@@ -184,7 +184,7 @@ tcClassSigs clas sigs def_methods
 -}
 
 tcClassDecl2 :: LTyClDecl GhcRn          -- The class declaration
-             -> TcM (LHsBinds GhcTcId)
+             -> TcM (LHsBinds GhcTc)
 
 tcClassDecl2 (L _ (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
                                 tcdMeths = default_binds}))
@@ -218,7 +218,7 @@ tcClassDecl2 d = pprPanic "tcClassDecl2" (ppr d)
 
 tcDefMeth :: Class -> [TyVar] -> EvVar -> LHsBinds GhcRn
           -> HsSigFun -> TcPragEnv -> ClassOpItem
-          -> TcM (LHsBinds GhcTcId)
+          -> TcM (LHsBinds GhcTc)
 -- Generate code for default methods
 -- This is incompatible with Hugs, which expects a polymorphic
 -- default method for every class op, regardless of whether or not

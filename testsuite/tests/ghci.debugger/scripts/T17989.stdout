@@ -1,9 +1,20 @@
-7 7 ":break "
+18 18 ":break "
 "B.bar"
 "B.foo"
+"B.foo.x"
+"B.foo.y"
 "T17989A.bar"
 "T17989A.foo"
+"T17989A.foo.x"
+"T17989A.foo.y"
+"T17989A.priv"
+"T17989B.bar"
+"T17989B.foo"
+"T17989B.foo.x"
+"T17989B.foo.y"
+"T17989B.priv"
 "T17989C.foo"
+"T17989C.priv"
 "foo"
 "main"
 Breakpoint 0 activated at T17989B.hs:10:9-25
@@ -13,8 +24,10 @@ Breakpoint 3 activated at T17989A.hs:4:9-14
 Breakpoint 4 activated at T17989C.hs:4:9-26
 Breakpoint 4 was already set at T17989C.hs:4:9-26
 Breakpoint 5 activated at T17989M.hs:6:8-51
-2 2 ":break "
+4 4 ":break "
 "B.bar"
 "B.foo"
+"B.foo.x"
+"B.foo.y"
 1 1 ":break "
 "foo"

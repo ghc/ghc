@@ -1,0 +1,22 @@
+import Data.Word
+[-1]  :: [Word8]
+[256] :: [Word8]
+:set -XOverloadedLists
+[-2]  :: [Word8]
+[257] :: [Word8]
+import Data.List.NonEmpty
+[-3]  :: NonEmpty Word8
+[258] :: NonEmpty Word8
+import Control.Applicative
+ZipList [-4]  :: ZipList Word8
+ZipList [259] :: ZipList Word8
+
+[Just 260] :: [Maybe Word8]
+[Just [Just 261]] :: [Maybe ([Maybe Word8])]
+[(262, 65536)] :: [(Word8, Word16)]
+
+[-5..100]::[Word8]
+[100..263]::[Word8]
+
+:l T18172.hs
+Wombat [4, 264, 10]

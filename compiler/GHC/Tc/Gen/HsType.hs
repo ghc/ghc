@@ -3036,7 +3036,7 @@ zonkAndScopedSort spec_tkvs
 -- you likely need to push the level before creating whatever type
 -- gets passed here. Any variable whose level is greater than the
 -- ambient level but is not selected to be generalized will be
--- promoted. (See [Promoting unification variables] in GHC.Tc.Solver
+-- promoted. (See [Promoting unification variables] in "GHC.Tc.Solver"
 -- and Note [Recipe for checking a signature].)
 -- The resulting KindVar are the variables to
 -- quantify over, in the correct, well-scoped order. They should
@@ -3240,7 +3240,7 @@ data DataSort
 --
 -- 2. @k@ (where @k@ is a bare kind variable; see #12369)
 --
--- See also Note [Datatype return kinds] in GHC.Tc.TyCl
+-- See also Note [Datatype return kinds] in "GHC.Tc.TyCl"
 checkDataKindSig :: DataSort -> Kind -> TcM ()
 checkDataKindSig data_sort kind = do
   dflags <- getDynFlags

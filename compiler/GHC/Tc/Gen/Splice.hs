@@ -151,10 +151,10 @@ import Data.Proxy    ( Proxy (..) )
 ************************************************************************
 -}
 
-tcTypedBracket   :: HsExpr GhcRn -> HsBracket GhcRn -> ExpRhoType -> TcM (HsExpr GhcTcId)
+tcTypedBracket   :: HsExpr GhcRn -> HsBracket GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcUntypedBracket :: HsExpr GhcRn -> HsBracket GhcRn -> [PendingRnSplice] -> ExpRhoType
-                 -> TcM (HsExpr GhcTcId)
-tcSpliceExpr     :: HsSplice GhcRn  -> ExpRhoType -> TcM (HsExpr GhcTcId)
+                 -> TcM (HsExpr GhcTc)
+tcSpliceExpr     :: HsSplice GhcRn  -> ExpRhoType -> TcM (HsExpr GhcTc)
         -- None of these functions add constraints to the LIE
 
 -- runQuasiQuoteExpr :: HsQuasiQuote RdrName -> RnM (LHsExpr RdrName)

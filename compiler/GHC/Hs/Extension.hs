@@ -222,10 +222,9 @@ data Pass = Parsed | Renamed | Typechecked
          deriving (Data)
 
 -- Type synonyms as a shorthand for tagging
-type GhcPs   = GhcPass 'Parsed      -- Old 'RdrName' type param
-type GhcRn   = GhcPass 'Renamed     -- Old 'Name' type param
-type GhcTc   = GhcPass 'Typechecked -- Old 'Id' type para,
-type GhcTcId = GhcTc                -- Old 'TcId' type param
+type GhcPs   = GhcPass 'Parsed      -- Output of parser
+type GhcRn   = GhcPass 'Renamed     -- Output of renamer
+type GhcTc   = GhcPass 'Typechecked -- Output of typechecker
 
 -- | Allows us to check what phase we're in at GHC's runtime.
 -- For example, this class allows us to write

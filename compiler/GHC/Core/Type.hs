@@ -660,7 +660,7 @@ data TyCoMapper env m
       , tcm_covar :: env -> CoVar -> m Coercion
       , tcm_hole  :: env -> CoercionHole -> m Coercion
           -- ^ What to do with coercion holes.
-          -- See Note [Coercion holes] in GHC.Core.TyCo.Rep.
+          -- See Note [Coercion holes] in "GHC.Core.TyCo.Rep".
 
       , tcm_tycobinder :: env -> TyCoVar -> ArgFlag -> m (env, TyCoVar)
           -- ^ The returned env is used in the extended scope
@@ -670,7 +670,7 @@ data TyCoMapper env m
           -- a) To zonk TcTyCons
           -- b) To turn TcTyCons into TyCons.
           --    See Note [Type checking recursive type and class declarations]
-          --    in GHC.Tc.TyCl
+          --    in "GHC.Tc.TyCl"
       }
 
 {-# INLINE mapTyCo #-}  -- See Note [Specialising mappers]
@@ -1326,7 +1326,7 @@ repSplitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 -- have enough info to extract the runtime-rep arguments that
 -- the funTyCon requires.  This will usually be true;
 -- but may be temporarily false during canonicalization:
---     see Note [FunTy and decomposing tycon applications] in GHC.Tc.Solver.Canonical
+--     see Note [FunTy and decomposing tycon applications] in "GHC.Tc.Solver.Canonical"
 --
 repSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 repSplitTyConApp_maybe (FunTy _ w arg res)
@@ -1367,7 +1367,7 @@ splitCastTy_maybe ty
 
 -- | Make a 'CastTy'. The Coercion must be nominal. Checks the
 -- Coercion for reflexivity, dropping it if it's reflexive.
--- See Note [Respecting definitional equality] in GHC.Core.TyCo.Rep
+-- See Note [Respecting definitional equality] in "GHC.Core.TyCo.Rep"
 mkCastTy :: Type -> Coercion -> Type
 mkCastTy ty co | isReflexiveCo co = ty  -- (EQ2) from the Note
 -- NB: Do the slow check here. This is important to keep the splitXXX
@@ -1404,7 +1404,7 @@ tyConBindersTyCoBinders = map to_tyb
 
 -- | Drop the cast on a type, if any. If there is no
 -- cast, just return the original type. This is rarely what
--- you want. The CastTy data constructor (in GHC.Core.TyCo.Rep) has the
+-- you want. The CastTy data constructor (in "GHC.Core.TyCo.Rep") has the
 -- invariant that another CastTy is not inside. See the
 -- data constructor for a full description of this invariant.
 -- Since CastTy cannot be nested, the result of discardCast
@@ -1949,7 +1949,7 @@ isFamFreeTy (CoercionTy _)    = False  -- Not sure about this
 -- | Does this type classify a core (unlifted) Coercion?
 -- At either role nominal or representational
 --    (t1 ~# t2) or (t1 ~R# t2)
--- See Note [Types for coercions, predicates, and evidence] in GHC.Core.TyCo.Rep
+-- See Note [Types for coercions, predicates, and evidence] in "GHC.Core.TyCo.Rep"
 isCoVarType :: Type -> Bool
   -- ToDo: should we check saturation?
 isCoVarType ty
@@ -2091,7 +2091,7 @@ isPrimitiveType ty = case splitTyConApp_maybe ty of
 -- in its return type, since given
 --   join j @a @b x y z = e1 in e2,
 -- the types of e1 and e2 must be the same, and a and b are not in scope for e2.
--- (See Note [The polymorphism rule of join points] in GHC.Core.) Returns False
+-- (See Note [The polymorphism rule of join points] in "GHC.Core".) Returns False
 -- also if the type simply doesn't have enough arguments.
 --
 -- Note that we need to know how many arguments (type *and* value) the putative
@@ -2197,7 +2197,7 @@ eqType :: Type -> Type -> Bool
 -- checks whether the types are equal, ignoring casts and coercions.
 -- (The kind check is a recursive call, but since all kinds have type
 -- @Type@, there is no need to check the types of kinds.)
--- See also Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep.
+-- See also Note [Non-trivial definitional equality] in "GHC.Core.TyCo.Rep".
 eqType t1 t2 = isEqual $ nonDetCmpType t1 t2
   -- It's OK to use nonDetCmpType here and eqType is deterministic,
   -- nonDetCmpType does equality deterministically

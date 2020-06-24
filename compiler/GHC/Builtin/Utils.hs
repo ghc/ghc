@@ -111,7 +111,7 @@ Note [About wired-in things]
 
 -- | This list is used to ensure that when you say "Prelude.map" in your source
 -- code, or in an interface file, you get a Name with the correct known key (See
--- Note [Known-key names] in GHC.Builtin.Names)
+-- Note [Known-key names] in "GHC.Builtin.Names")
 knownKeyNames :: [Name]
 knownKeyNames
   | debugIsOn

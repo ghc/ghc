@@ -36,7 +36,7 @@ import GHC.Data.FastString
 
 
 -- | A non-deterministic set of FastStrings.
--- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for explanation why it's not
+-- See Note [Deterministic UniqFM] in "GHC.Types.Unique.DFM" for explanation why it's not
 -- deterministic and why it matters. Use DFastStringEnv if the set eventually
 -- gets converted into a list or folded over in a way where the order
 -- changes the generated code.

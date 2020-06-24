@@ -302,8 +302,8 @@ Note that (Foo a) might not be an instance of Ord.
 
 -- | A data constructor
 --
--- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
---             'ApiAnnotation.AnnClose','ApiAnnotation.AnnComma'
+-- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
+--             'GHC.Parser.Annotation.AnnClose','GHC.Parser.Annotation.AnnComma'
 
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 data DataCon
@@ -953,7 +953,7 @@ mkDataCon :: Name
           -> KnotTied ThetaType -- ^ Theta-type occurring before the arguments proper
           -> [KnotTied (Scaled Type)]    -- ^ Original argument types
           -> KnotTied Type      -- ^ Original result type
-          -> RuntimeRepInfo     -- ^ See comments on 'TyCon.RuntimeRepInfo'
+          -> RuntimeRepInfo     -- ^ See comments on 'GHC.Core.TyCon.RuntimeRepInfo'
           -> KnotTied TyCon     -- ^ Representation type constructor
           -> ConTag             -- ^ Constructor tag
           -> ThetaType          -- ^ The "stupid theta", context of the data

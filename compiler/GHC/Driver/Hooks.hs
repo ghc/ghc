@@ -95,7 +95,7 @@ data Hooks = Hooks
   , tcForeignImportsHook   :: Maybe ([LForeignDecl GhcRn]
                           -> TcM ([Id], [LForeignDecl GhcTc], Bag GlobalRdrElt))
   , tcForeignExportsHook   :: Maybe ([LForeignDecl GhcRn]
-            -> TcM (LHsBinds GhcTcId, [LForeignDecl GhcTcId], Bag GlobalRdrElt))
+            -> TcM (LHsBinds GhcTc, [LForeignDecl GhcTc], Bag GlobalRdrElt))
   , hscFrontendHook        :: Maybe (ModSummary -> Hsc FrontendResult)
   , hscCompileCoreExprHook ::
                Maybe (HscEnv -> SrcSpan -> CoreExpr -> IO ForeignHValue)

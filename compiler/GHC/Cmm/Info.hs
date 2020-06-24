@@ -281,7 +281,7 @@ mkSRTLit platform _ (Just lbl) = ([CmmLabel lbl], CmmInt 1 (halfWordWidth platfo
 -- | Is the SRT offset field inline in the info table on this platform?
 --
 -- See the section "Referring to an SRT from the info table" in
--- Note [SRTs] in GHC.Cmm.Info.Build
+-- Note [SRTs] in "GHC.Cmm.Info.Build"
 inlineSRT :: Platform -> Bool
 inlineSRT platform = platformArch platform == ArchX86_64
   && platformTablesNextToCode platform

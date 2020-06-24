@@ -1520,12 +1520,52 @@ breakpoint is to name a top-level function:
 
 .. code-block:: none
 
-       :break identifier
+        :break identifier
 
 Where ⟨identifier⟩ names any top-level function in an interpreted module
 currently loaded into GHCi (qualified names may be used). The breakpoint
-will be set on the body of the function, when it is fully applied but
-before any pattern matching has taken place.
+will be set on the body of the function, when it is fully applied.
+If the function has several patterns, then a breakpoint will be set on
+each of them.
+
+By using qualified names, one can set breakpoints on all functions
+(top-level and nested) in every loaded and interpreted module:
+
+.. code-block:: none
+
+    :break [ModQual.]topLevelIdent[.nestedIdent]...[.nestedIdent]
+
+⟨ModQual⟩ is optional and is either the effective name of a module or
+the local alias of a qualified import statement.
+
+⟨topLevelIdent⟩ is the name of a top level function in the module
+referenced by ⟨ModQual⟩.
+
+⟨nestedIdent⟩ is optional and the name of a function nested in a let or
+where clause inside the previously mentioned function ⟨nestedIdent⟩ or
+⟨topLevelIdent⟩.
+
+If ⟨ModQual⟩ is a module name, then ⟨topLevelIdent⟩ can be any top level
+identifier in this module. If ⟨ModQual⟩ is missing or a local alias of a
+qualified import, then ⟨topLevelIdent⟩ must be in scope.
+
+Breakpoints can be set on arbitrarily deeply nested functions, but the
+whole chain of nested function names must be specified.
+
+Consider the function ``foo`` in a module ``Main``:
+
+.. code-block:: none
+
+    foo s = 'a' : add s
+        where add = (++"z")
+
+The breakpoint on the function ``add`` can be set with one of the
+following commands:
+
+.. code-block:: none
+
+       :break Main.foo.add
+       :break foo.add
 
 Breakpoints can also be set by line (and optionally column) number:
 

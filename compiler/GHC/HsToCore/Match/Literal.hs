@@ -55,6 +55,7 @@ import GHC.Driver.Session
 import GHC.Utils.Misc
 import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Core.FamInstEnv ( FamInstEnvs, normaliseType )
 
 import Control.Monad
 import Data.Int
@@ -169,14 +170,17 @@ conversionNames
 warnAboutOverflowedOverLit :: HsOverLit GhcTc -> DsM ()
 warnAboutOverflowedOverLit hsOverLit = do
   dflags <- getDynFlags
-  warnAboutOverflowedLiterals dflags (getIntegralLit hsOverLit)
+  fam_envs <- dsGetFamInstEnvs
+  warnAboutOverflowedLiterals dflags $
+      getIntegralLit hsOverLit >>= getNormalisedTyconName fam_envs
 
 -- | Emit warnings on integral literals which overflow the bounds implied by
 -- their type.
 warnAboutOverflowedLit :: HsLit GhcTc -> DsM ()
 warnAboutOverflowedLit hsLit = do
   dflags <- getDynFlags
-  warnAboutOverflowedLiterals dflags (getSimpleIntegralLit hsLit)
+  warnAboutOverflowedLiterals dflags $
+      getSimpleIntegralLit hsLit >>= getTyconName
 
 -- | Emit warnings on integral literals which overflow the bounds implied by
 -- their type.
@@ -254,15 +258,17 @@ We get an erroneous suggestion for
 but perhaps that does not matter too much.
 -}
 
-warnAboutEmptyEnumerations :: DynFlags -> LHsExpr GhcTc -> Maybe (LHsExpr GhcTc)
+warnAboutEmptyEnumerations :: FamInstEnvs -> DynFlags -> LHsExpr GhcTc
+                           -> Maybe (LHsExpr GhcTc)
                            -> LHsExpr GhcTc -> DsM ()
 -- ^ Warns about @[2,3 .. 1]@ which returns the empty list.
 -- Only works for integral types, not floating point.
-warnAboutEmptyEnumerations dflags fromExpr mThnExpr toExpr
+warnAboutEmptyEnumerations fam_envs dflags fromExpr mThnExpr toExpr
   | wopt Opt_WarnEmptyEnumerations dflags
-  , Just (from,tc) <- getLHsIntegralLit fromExpr
-  , Just mThn      <- traverse getLHsIntegralLit mThnExpr
-  , Just (to,_)    <- getLHsIntegralLit toExpr
+  , Just from_ty@(from,_) <- getLHsIntegralLit fromExpr
+  , Just (_, tc)          <- getNormalisedTyconName fam_envs from_ty
+  , Just mThn             <- traverse getLHsIntegralLit mThnExpr
+  , Just (to,_)           <- getLHsIntegralLit toExpr
   , let check :: forall a. (Enum a, Num a) => Proxy a -> DsM ()
         check _proxy
           = when (null enumeration) $
@@ -292,7 +298,7 @@ warnAboutEmptyEnumerations dflags fromExpr mThnExpr toExpr
 
   | otherwise = return ()
 
-getLHsIntegralLit :: LHsExpr GhcTc -> Maybe (Integer, Name)
+getLHsIntegralLit :: LHsExpr GhcTc -> Maybe (Integer, Type)
 -- ^ See if the expression is an 'Integral' literal.
 -- Remember to look through automatically-added tick-boxes! (#8384)
 getLHsIntegralLit (L _ (HsPar _ e))            = getLHsIntegralLit e
@@ -302,25 +308,55 @@ getLHsIntegralLit (L _ (HsOverLit _ over_lit)) = getIntegralLit over_lit
 getLHsIntegralLit (L _ (HsLit _ lit))          = getSimpleIntegralLit lit
 getLHsIntegralLit _ = Nothing
 
--- | If 'Integral', extract the value and type name of the overloaded literal.
-getIntegralLit :: HsOverLit GhcTc -> Maybe (Integer, Name)
+-- | If 'Integral', extract the value and type of the overloaded literal.
+-- See Note [Literals and the OverloadedLists extension]
+getIntegralLit :: HsOverLit GhcTc -> Maybe (Integer, Type)
 getIntegralLit (OverLit { ol_val = HsIntegral i, ol_ext = OverLitTc _ ty })
-  | Just tc <- tyConAppTyCon_maybe ty
-  = Just (il_value i, tyConName tc)
+  = Just (il_value i, ty)
 getIntegralLit _ = Nothing
 
--- | If 'Integral', extract the value and type name of the non-overloaded
--- literal.
-getSimpleIntegralLit :: HsLit GhcTc -> Maybe (Integer, Name)
-getSimpleIntegralLit (HsInt _ IL{ il_value = i }) = Just (i, intTyConName)
-getSimpleIntegralLit (HsIntPrim _ i) = Just (i, intPrimTyConName)
-getSimpleIntegralLit (HsWordPrim _ i) = Just (i, wordPrimTyConName)
-getSimpleIntegralLit (HsInt64Prim _ i) = Just (i, int64PrimTyConName)
-getSimpleIntegralLit (HsWord64Prim _ i) = Just (i, word64PrimTyConName)
-getSimpleIntegralLit (HsInteger _ i ty)
-  | Just tc <- tyConAppTyCon_maybe ty
-  = Just (i, tyConName tc)
+-- | If 'Integral', extract the value and type of the non-overloaded literal.
+getSimpleIntegralLit :: HsLit GhcTc -> Maybe (Integer, Type)
+getSimpleIntegralLit (HsInt _ IL{ il_value = i }) = Just (i, intTy)
+getSimpleIntegralLit (HsIntPrim _ i)    = Just (i, intPrimTy)
+getSimpleIntegralLit (HsWordPrim _ i)   = Just (i, wordPrimTy)
+getSimpleIntegralLit (HsInt64Prim _ i)  = Just (i, int64PrimTy)
+getSimpleIntegralLit (HsWord64Prim _ i) = Just (i, word64PrimTy)
+getSimpleIntegralLit (HsInteger _ i ty) = Just (i, ty)
 getSimpleIntegralLit _ = Nothing
+
+-- | Convert a pair (Integer, Type) to (Integer, Name) after eventually
+-- normalising the type
+getNormalisedTyconName :: FamInstEnvs -> (Integer, Type) -> Maybe (Integer, Name)
+getNormalisedTyconName fam_envs (i,ty)
+    | Just tc <- tyConAppTyCon_maybe (normaliseNominal fam_envs ty)
+    = Just (i, tyConName tc)
+    | otherwise = Nothing
+  where
+    normaliseNominal :: FamInstEnvs -> Type -> Type
+    normaliseNominal fam_envs ty = snd $ normaliseType fam_envs Nominal ty
+
+-- | Convert a pair (Integer, Type) to (Integer, Name) without normalising
+-- the type
+getTyconName :: (Integer, Type) -> Maybe (Integer, Name)
+getTyconName (i,ty)
+  | Just tc <- tyConAppTyCon_maybe ty = Just (i, tyConName tc)
+  | otherwise = Nothing
+
+{-
+Note [Literals and the OverloadedLists extension]
+~~~~
+Consider the Literal `[256] :: [Data.Word.Word8]`
+
+When the `OverloadedLists` extension is not active, then the `ol_ext` field
+in the `OverLitTc` record that is passed to the function `getIntegralLit`
+contains the type `Word8`. This is a simple type, and we can use its
+type constructor immediately for the `warnAboutOverflowedLiterals` function.
+
+When the `OverloadedLists` extension is active, then the `ol_ext` field
+contains the type family `Item [Word8]`. The function `nomaliseType` is used
+to convert it to the needed type `Word8`.
+-}
 
 {-
 ************************************************************************

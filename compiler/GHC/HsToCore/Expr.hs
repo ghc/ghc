@@ -252,8 +252,8 @@ dsLExpr (L loc e)
 -- | Variant of 'dsLExpr' that ensures that the result is not levity
 -- polymorphic. This should be used when the resulting expression will
 -- be an argument to some other function.
--- See Note [Levity polymorphism checking] in GHC.HsToCore.Monad
--- See Note [Levity polymorphism invariants] in GHC.Core
+-- See Note [Levity polymorphism checking] in "GHC.HsToCore.Monad"
+-- See Note [Levity polymorphism invariants] in "GHC.Core"
 dsLExprNoLP :: LHsExpr GhcTc -> DsM CoreExpr
 dsLExprNoLP (L loc e)
   = putSrcSpanDs loc $
@@ -945,8 +945,9 @@ dsArithSeq :: PostTcExpr -> (ArithSeqInfo GhcTc) -> DsM CoreExpr
 dsArithSeq expr (From from)
   = App <$> dsExpr expr <*> dsLExprNoLP from
 dsArithSeq expr (FromTo from to)
-  = do dflags <- getDynFlags
-       warnAboutEmptyEnumerations dflags from Nothing to
+  = do fam_envs <- dsGetFamInstEnvs
+       dflags <- getDynFlags
+       warnAboutEmptyEnumerations fam_envs dflags from Nothing to
        expr' <- dsExpr expr
        from' <- dsLExprNoLP from
        to'   <- dsLExprNoLP to
@@ -954,8 +955,9 @@ dsArithSeq expr (FromTo from to)
 dsArithSeq expr (FromThen from thn)
   = mkApps <$> dsExpr expr <*> mapM dsLExprNoLP [from, thn]
 dsArithSeq expr (FromThenTo from thn to)
-  = do dflags <- getDynFlags
-       warnAboutEmptyEnumerations dflags from (Just thn) to
+  = do fam_envs <- dsGetFamInstEnvs
+       dflags <- getDynFlags
+       warnAboutEmptyEnumerations fam_envs dflags from (Just thn) to
        expr' <- dsExpr expr
        from' <- dsLExprNoLP from
        thn'  <- dsLExprNoLP thn

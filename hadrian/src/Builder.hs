@@ -140,6 +140,7 @@ data Builder = Alex
              | Tar TarMode
              | Unlit
              | Xelatex
+             | Makeindex  -- ^ from xelatex
              deriving (Eq, Generic, Show)
 
 instance Binary   Builder
@@ -279,13 +280,8 @@ instance H.Builder Builder where
                 Makeinfo -> do
                   cmd' echo [path] "--no-split" [ "-o", output] [input]
 
-                Xelatex -> do
-                    unit $ cmd' [Cwd output] [path]        buildArgs
-                    unit $ cmd' [Cwd output] [path]        buildArgs
-                    unit $ cmd' [Cwd output] [path]        buildArgs
-                    unit $ cmd' [Cwd output] ["makeindex"] (input -<.> "idx")
-                    unit $ cmd' [Cwd output] [path]        buildArgs
-                    unit $ cmd' [Cwd output] [path]        buildArgs
+                Xelatex   -> unit $ cmd' [Cwd output] [path] buildArgs
+                Makeindex -> unit $ cmd' [Cwd output] [path] buildArgs
 
                 Tar _ -> cmd' buildOptions echo [path] buildArgs
                 _  -> cmd' echo [path] buildArgs
@@ -326,6 +322,7 @@ systemBuilderPath builder = case builder of
     Sphinx _        -> fromKey "sphinx-build"
     Tar _           -> fromKey "tar"
     Xelatex         -> fromKey "xelatex"
+    Makeindex       -> fromKey "makeindex"
     _               -> error $ "No entry for " ++ show builder ++ inCfg
   where
     inCfg = " in " ++ quote configFile ++ " file."
