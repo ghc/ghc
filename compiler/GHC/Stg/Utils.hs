@@ -13,21 +13,21 @@ module GHC.Stg.Utils
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import Id
-import Type
-import TyCon
-import DataCon
-import CoreSyn (AltCon(..), Tickish(..))
-import CoreUtils
+import GHC.Types.Id
+import GHC.Core.Type
+import GHC.Core.TyCon
+import GHC.Core.DataCon
+import GHC.Core (AltCon(..), Tickish(..))
+import GHC.Core.Utils
 
-import RepType
-import StgSyn
+import GHC.Types.RepType
+import GHC.Stg.Syntax
 
-import VarSet
-import Util
-import Outputable
+import GHC.Types.Var.Set
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
 
 -- Checks if id is a top level error application.
 -- isErrorAp_maybe :: Id ->
@@ -82,8 +82,9 @@ bindersOfTop (StgTopLifted bind) = bindersOf bind
 bindersOfTop (StgTopStringLit binder _) = [binder]
 
 -- All ids we bind something to on the top level.
-bindersOfTopBinds :: BinderP a ~ Id => [GenStgTopBinding a] -> IdSet
-bindersOfTopBinds binds = mapUnionVarSet (mkVarSet . bindersOfTop) binds
+bindersOfTopBinds :: BinderP a ~ Id => [GenStgTopBinding a] -> [Id]
+-- bindersOfTopBinds binds = mapUnionVarSet (mkVarSet . bindersOfTop) binds
+bindersOfTopBinds binds = foldr ((++) . bindersOfTop) [] binds
 
 idArgs :: [StgArg] -> [Id]
 idArgs args = [v | StgVarArg v <- args]

@@ -22,6 +22,7 @@ import GHC.Core.Utils   ( exprType, findDefault, isJoinBind
                         , exprIsTickedString_maybe )
 import GHC.Core.Opt.Arity   ( manifestArity )
 import GHC.Stg.Syntax
+import GHC.Stg.Utils
 
 import GHC.Core.Type
 import GHC.Types.RepType
@@ -45,7 +46,7 @@ import GHC.Driver.Session
 import GHC.Driver.Ways
 import GHC.Types.ForeignCall
 import GHC.Types.Demand    ( isUsedOnce )
-import GHC.Builtin.PrimOps ( PrimCall(..) )
+import GHC.Builtin.PrimOps ( PrimCall(..), primOpWrapperId )
 import GHC.Types.SrcLoc    ( mkGeneralSrcSpan )
 import GHC.Builtin.Names   ( unsafeEqualityProofName )
 
@@ -435,8 +436,8 @@ coreToStgExpr e0@(Case scrut bndr _ alts) = do
     let stg = StgCase scrut2 bndr (mkStgAltType bndr alts) alts2
     -- See (U2) in Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
     case scrut2 of
-      StgApp id [] | idName id == unsafeEqualityProofName
-                   , isDeadBinder bndr ->
+      StgApp _ id [] | idName id == unsafeEqualityProofName
+                     , isDeadBinder bndr ->
         -- We can only discard the case if the case-binder is dead
         -- It usually is, but see #18227
         case alts2 of
@@ -502,19 +503,11 @@ coreToStgApp f args ticks = do
                                       (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
 
                 -- Some primitive operator that might be implemented as a library call.
-<<<<<<< HEAD:compiler/GHC/CoreToStg.hs
                 -- As noted by Note [Eta expanding primops] in GHC.Builtin.PrimOps
                 -- we require that primop applications be saturated.
-                PrimOpId op      -> ASSERT( saturated )
-                                    StgOpApp (StgPrimOp op) args' res_ty
-=======
-                -- As described in Note [Primop wrappers] in PrimOp.hs, here we
-                -- turn unsaturated primop applications into applications of
-                -- the primop's wrapper.
                 PrimOpId op
                   | saturated    -> StgOpApp (StgPrimOp op) args' res_ty
                   | otherwise    -> StgApp MayEnter (primOpWrapperId op) args'
->>>>>>> Tag inferrence work.:compiler/stgSyn/CoreToStg.hs
 
                 -- A call to some primitive Cmm function.
                 FCallId (CCall (CCallSpec (StaticTarget _ lbl (Just pkgId) True)

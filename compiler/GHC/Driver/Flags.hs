@@ -69,6 +69,7 @@ data DumpFlag
    | Opt_D_dump_spec
    | Opt_D_dump_prep
    | Opt_D_dump_stg -- CoreToStg output
+   | Opt_D_dump_stg_tag_nodes
    | Opt_D_dump_stg_unarised -- STG after unarise
    | Opt_D_dump_stg_final -- STG after stg2stg
    | Opt_D_dump_call_arity
@@ -129,7 +130,6 @@ data GeneralFlag
    | Opt_NoLlvmMangler                  -- hidden flag
    | Opt_FastLlvm                       -- hidden flag
    | Opt_NoTypeableBinds
-
    | Opt_WarnIsError                    -- -Werror; makes warnings fatal
    | Opt_ShowWarnGroups                 -- Show the group a warning belongs to
    | Opt_HideSourcePaths                -- Hide module source/object paths
@@ -198,6 +198,10 @@ data GeneralFlag
    | Opt_AlignmentSanitisation
    | Opt_CatchBottoms
    | Opt_NumConstantFolding
+
+   -- Inference flags
+   | Opt_DoTagInferenceChecks
+   | Opt_StgCSR
 
    -- PreInlining is on by default. The option is there just to see how
    -- bad things get if you turn it off!

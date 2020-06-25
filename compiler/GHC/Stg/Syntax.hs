@@ -58,7 +58,7 @@ module GHC.Stg.Syntax (
         isDllConApp,
         stgArgType,
         stgCaseBndrInScope,
-        bindersOf, bindersOfTop, bindersOfTopBinds,
+        -- bindersOf, bindersOfTop, bindersOfTopBinds,
 
         -- todo: use bindersOf
         stgBindIds,
@@ -91,6 +91,7 @@ import GHC.Core.TyCon    ( PrimRep(..), TyCon )
 import GHC.Core.Type     ( Type )
 import GHC.Types.RepType ( typePrimRep1 )
 import GHC.Utils.Misc
+import GHC.Data.FastString
 
 import Data.List.NonEmpty ( NonEmpty, toList )
 
@@ -434,17 +435,7 @@ important):
                         -- are not allocated.
         [StgArg]        -- Args
 
-<<<<<<< HEAD:compiler/GHC/Stg/Syntax.hs
--- | Used as a data type index for the stgSyn AST
-data StgPass
-  = Vanilla
-  | LiftLams
-  | CodeGen
-
 -- | Like 'GHC.Hs.Extension.NoExtField', but with an 'Outputable' instance that
-=======
--- | Like 'HsExtension.NoExtField', but with an 'Outputable' instance that
->>>>>>> Tag inferrence work.:compiler/stgSyn/StgSyn.hs
 -- returns 'empty'.
 data NoExtFieldSilent = NoExtFieldSilent
   deriving (Data, Eq, Ord)
@@ -465,85 +456,6 @@ stgRhsArity (StgRhsClosure _ _ _ bndrs _)
   -- The arity never includes type parameters, but they should have gone by now
 stgRhsArity (StgRhsCon _ _ _ _) = 0
 
-<<<<<<< HEAD:compiler/GHC/Stg/Syntax.hs
-=======
--- Note [CAF consistency]
--- ~~~~~~~~~~~~~~~~~~~~~~
---
--- `topStgBindHasCafRefs` is only used by an assert (`consistentCafInfo` in
--- `CoreToStg`) to make sure CAF-ness predicted by `TidyPgm` is consistent with
--- reality.
---
--- Specifically, if the RHS mentions any Id that itself is marked
--- `MayHaveCafRefs`; or if the binding is a top-level updateable thunk; then the
--- `Id` for the binding should be marked `MayHaveCafRefs`. The potential trouble
--- is that `TidyPgm` computed the CAF info on the `Id` but some transformations
--- have taken place since then.
-
-topStgBindHasCafRefs :: GenStgTopBinding pass -> Bool
-topStgBindHasCafRefs (StgTopLifted (StgNonRec _ rhs))
-  = topRhsHasCafRefs rhs
-topStgBindHasCafRefs (StgTopLifted (StgRec binds))
-  = any topRhsHasCafRefs (map snd binds)
-topStgBindHasCafRefs StgTopStringLit{}
-  = False
-
-topRhsHasCafRefs :: GenStgRhs pass -> Bool
-topRhsHasCafRefs (StgRhsClosure _ _ upd _ body)
-  = -- See Note [CAF consistency]
-    isUpdatable upd || exprHasCafRefs body
-topRhsHasCafRefs (StgRhsCon _ _ _ args)
-  = any stgArgHasCafRefs args
-
-exprHasCafRefs :: GenStgExpr pass -> Bool
-exprHasCafRefs (StgApp _ f args)
-  = stgIdHasCafRefs f || any stgArgHasCafRefs args
-exprHasCafRefs StgLit{}
-  = False
-exprHasCafRefs (StgConApp _ _ args _)
-  = any stgArgHasCafRefs args
-exprHasCafRefs (StgOpApp _ args _)
-  = any stgArgHasCafRefs args
-exprHasCafRefs (StgLam _ body)
-  = exprHasCafRefs body
-exprHasCafRefs (StgCase scrt _ _ alts)
-  = exprHasCafRefs scrt || any altHasCafRefs alts
-exprHasCafRefs (StgLet _ bind body)
-  = bindHasCafRefs bind || exprHasCafRefs body
-exprHasCafRefs (StgLetNoEscape _ bind body)
-  = bindHasCafRefs bind || exprHasCafRefs body
-exprHasCafRefs (StgTick _ expr)
-  = exprHasCafRefs expr
-
-bindHasCafRefs :: GenStgBinding pass -> Bool
-bindHasCafRefs (StgNonRec _ rhs)
-  = rhsHasCafRefs rhs
-bindHasCafRefs (StgRec binds)
-  = any rhsHasCafRefs (map snd binds)
-
-rhsHasCafRefs :: GenStgRhs pass -> Bool
-rhsHasCafRefs (StgRhsClosure _ _ _ _ body)
-  = exprHasCafRefs body
-rhsHasCafRefs (StgRhsCon _ _ _ args)
-  = any stgArgHasCafRefs args
-
-altHasCafRefs :: GenStgAlt pass -> Bool
-altHasCafRefs (_, _, rhs) = exprHasCafRefs rhs
-
-stgArgHasCafRefs :: StgArg -> Bool
-stgArgHasCafRefs (StgVarArg id)
-  = stgIdHasCafRefs id
-stgArgHasCafRefs _
-  = False
-
-stgIdHasCafRefs :: Id -> Bool
-stgIdHasCafRefs id =
-  -- We are looking for occurrences of an Id that is bound at top level, and may
-  -- have CAF refs. At this point (after TidyPgm) top-level Ids (whether
-  -- imported or defined in this module) are GlobalIds, so the test is easy.
-  isGlobalId id && mayHaveCafRefs (idCafInfo id)
-
->>>>>>> Tag inferrence work.:compiler/stgSyn/StgSyn.hs
 {-
 ************************************************************************
 *                                                                      *
@@ -776,16 +688,16 @@ Utilities
 ************************************************************************
 -}
 
-bindersOf :: BinderP a ~ Id => GenStgBinding a -> [Id]
-bindersOf (StgNonRec binder _) = [binder]
-bindersOf (StgRec pairs)       = [binder | (binder, _) <- pairs]
+-- bindersOf :: BinderP a ~ Id => GenStgBinding a -> [Id]
+-- bindersOf (StgNonRec binder _) = [binder]
+-- bindersOf (StgRec pairs)       = [binder | (binder, _) <- pairs]
 
-bindersOfTop :: BinderP a ~ Id => GenStgTopBinding a -> [Id]
-bindersOfTop (StgTopLifted bind) = bindersOf bind
-bindersOfTop (StgTopStringLit binder _) = [binder]
+-- bindersOfTop :: BinderP a ~ Id => GenStgTopBinding a -> [Id]
+-- bindersOfTop (StgTopLifted bind) = bindersOf bind
+-- bindersOfTop (StgTopStringLit binder _) = [binder]
 
-bindersOfTopBinds :: BinderP a ~ Id => [GenStgTopBinding a] -> [Id]
-bindersOfTopBinds = foldr ((++) . bindersOfTop) []
+-- bindersOfTopBinds :: BinderP a ~ Id => [GenStgTopBinding a] -> [Id]
+-- bindersOfTopBinds = foldr ((++) . bindersOfTop) []
 
 {-
 ************************************************************************
@@ -968,8 +880,6 @@ instance Outputable AltType where
 
 pprStgRhs :: OutputablePass pass => GenStgRhs pass -> SDoc
 
-<<<<<<< HEAD:compiler/GHC/Stg/Syntax.hs
-=======
 -- special case
 pprStgRhs (StgRhsClosure ext cc upd_flag [{-no args-}] (StgApp _ func []))
   = sdocWithDynFlags $ \dflags ->
@@ -979,7 +889,6 @@ pprStgRhs (StgRhsClosure ext cc upd_flag [{-no args-}] (StgApp _ func []))
            text " \\", ppr upd_flag, ptext (sLit " [] "), ppr func ]
 
 -- general case
->>>>>>> Tag inferrence work.:compiler/stgSyn/StgSyn.hs
 pprStgRhs (StgRhsClosure ext cc upd_flag args body)
   = sdocWithDynFlags $ \dflags ->
     hang (hsep [if gopt Opt_SccProfilingOn dflags then ppr cc else empty,

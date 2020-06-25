@@ -25,56 +25,57 @@ module GHC.Stg.InferTags (findTags, EnterLattice) where
 
 #include "HsVersions.h"
 
-import GhcPrelude
+import GHC.Prelude
 
-import BasicTypes
-import Binary hiding (put, get)
-import qualified Binary as B
-import DataCon
-import Id
-import Outputable
-import CoreSyn (AltCon(..))
-import Module
-import VarSet
-import TyCon (tyConDataCons)
-import Type
-import UniqSupply
-import RepType
-import StgSyn hiding (AlwaysEnter)
-import StgUtil
+import GHC.Types.Basic
+import GHC.Utils.Binary hiding (put, get)
+import qualified GHC.Utils.Binary as B
+import GHC.Core.DataCon
+import GHC.Types.Id
+import GHC.Utils.Outputable
+import GHC.Core (AltCon(..))
+import GHC.Unit.Types --Module
+import GHC.Types.Var.Set
+import GHC.Core.TyCon (tyConDataCons)
+import GHC.Core.Type
+import GHC.Types.Unique.Supply
+import GHC.Types.RepType
+import GHC.Stg.Syntax as StgSyn hiding (AlwaysEnter)
+import GHC.Stg.Utils
 
-import Name
-import PrelNames
+import GHC.Types.Name
+import GHC.Builtin.Names
 
 
-import Unique
-import UniqFM
-import UniqSet (nonDetEltsUniqSet)
-import Util
-import Data.Ord (comparing)
+import GHC.Types.Unique
+import GHC.Types.Unique.FM
+import GHC.Types.Unique.Set (nonDetEltsUniqSet)
+import GHC.Utils.Misc
+import GHC.Utils.Monad.State -- See Note [Useless Bangs]
+import GHC.Data.Maybe
 
-import State -- See Note [Useless Bangs]
-import Maybes
-
--- import Data.Int
-import Control.Applicative hiding (empty)
-import Control.Monad
-import MonadUtils
-
+import GHC.Utils.Monad
 import GHC.Generics
-import Control.DeepSeq -- hiding (deepseq)
 import GHC.Stack
 
-import ErrUtils
-import Digraph
+import GHC.Utils.Error
+import GHC.Data.Graph.Directed
 
-import VarEnv
+import GHC.Types.Var.Env
 
 -- Fast comparisons
 import GHC.Exts (reallyUnsafePtrEquality#, isTrue#)
 
 -- Used for dumping nodes with -ddump-stg-tag-nodes
-import DynFlags
+import GHC.Driver.Session
+
+import Data.Ord (comparing)
+
+-- import Data.Int
+import Control.Applicative hiding (empty)
+import Control.Monad
+
+import Control.DeepSeq -- hiding (deepseq)
 import System.IO.Unsafe
 
 {-
@@ -1379,7 +1380,7 @@ mkCtxtEntry ctxt v
 {-# NOINLINE nodesTopBinds #-}
 nodesTopBinds :: Module -> [StgTopBinding] -> AM ([InferStgTopBinding], [(Id,NodeId)])
 nodesTopBinds this_mod binds = do
-    let top_level_binds = (bindersOfTopBinds binds) :: IdSet
+    let top_level_binds = mkVarSet (bindersOfTopBinds binds) :: IdSet
     -- We preallocate node ids for the case where we must reference an node by id
     -- before we traversed the defining binding.
     let bind_ids = (nonDetEltsUniqSet top_level_binds)
@@ -2184,8 +2185,8 @@ solveConstraints = do
         uqList <- map snd . nonDetUFMToList . fs_uqNodeMap <$> get
         doneList <- map snd . nonDetUFMToList . fs_doneNodes <$> get
         let resultNodes =  (uqList ++ doneList)
-        seq (unsafePerformIO $ dumpIfSet_dyn unsafeGlobalDynFlags
-                Opt_D_dump_stg_tag_nodes "STG Infered tags"
+        seq (unsafePerformIO $ GHC.Utils.Error.dumpIfSet_dyn unsafeGlobalDynFlags
+                Opt_D_dump_stg_tag_nodes "STG Infered tags" FormatText
                 (vcat $ map ppr resultNodes)) (return ())
         -- mapM_ (pprTraceM "node:" . ppr) resultNodes
         return ()

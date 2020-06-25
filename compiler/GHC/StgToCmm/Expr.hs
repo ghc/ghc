@@ -439,13 +439,8 @@ because bottom must be untagged, it will be entered.  The Sequel is a
 type-correct assignment, albeit bogus.  The (dead) continuation loops;
 it would be better to invoke some kind of panic function here.
 -}
-<<<<<<< HEAD:compiler/GHC/StgToCmm/Expr.hs
-cgCase scrut@(StgApp v []) _ (PrimAlt _) _
-  = do { platform <- getPlatform
-=======
 cgCase scrut@(StgApp _ext v []) _ (PrimAlt _) _
-  = do { dflags <- getDynFlags
->>>>>>> Tag inferrence work.:compiler/codeGen/StgCmmExpr.hs
+  = do { platform <- getPlatform
        ; mb_cc <- maybeSaveCostCentre True
        ; _ <- withSequel
                   (AssignTo [idToReg platform (NonVoid v)] False) (cgExpr scrut)
@@ -483,14 +478,10 @@ cgCase scrut bndr alt_type alts
     do { platform <- getPlatform
        ; up_hp_usg <- getVirtHp        -- Upstream heap usage
        ; let ret_bndrs = chooseReturnBndrs bndr alt_type alts
-<<<<<<< HEAD:compiler/GHC/StgToCmm/Expr.hs
              alt_regs  = map (idToReg platform) ret_bndrs
-=======
-             alt_regs  = map (idToReg dflags) ret_bndrs
 
        -- Todo: Non evaluating cases always have simple scruts.
 
->>>>>>> Tag inferrence work.:compiler/codeGen/StgCmmExpr.hs
        ; simple_scrut <- isSimpleScrut scrut alt_type
        ; let do_gc  | is_cmp_op scrut  = False  -- See Note [GC for conditionals]
                     | not simple_scrut = True
