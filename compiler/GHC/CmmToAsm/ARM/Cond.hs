@@ -1,42 +1,34 @@
 module GHC.CmmToAsm.ARM.Cond
   ( Cond (..)
-  , condNegate
   , condUnsigned
   ) where
 
 import GHC.Prelude
-import GHC.Utils.Panic
 
+-- | ARM Cond codes
 data Cond
-  = ALWAYS
-  | EQQ
+  = AL
+  | CC
+  -- ^ Also LO, unsigned lower
+  | CS
+  -- ^ Also HS, unsigned higher
+  | EQ
   | GE
-  | GEU
-  | GTT
-  | GU
+  | GT
+  | HI
   | LE
-  | LEU
-  | LTT
-  | LU
+  | LS
+  | LT
+  | MI
   | NE
+  | PL
+  | VC
+  | VS
   deriving Eq
 
-condNegate :: Cond -> Cond
-condNegate ALWAYS  = panic "condNegate: ALWAYS"
-condNegate EQQ     = NE
-condNegate GE      = LTT
-condNegate GEU     = LU
-condNegate GTT     = LE
-condNegate GU      = LEU
-condNegate LE      = GTT
-condNegate LEU     = GU
-condNegate LTT     = GE
-condNegate LU      = GEU
-condNegate NE      = EQQ
-
 condUnsigned :: Cond -> Bool
-condUnsigned GU  = True
-condUnsigned LU  = True
-condUnsigned GEU = True
-condUnsigned LEU = True
+condUnsigned CC  = True
+condUnsigned CS  = True
+condUnsigned HI  = True
+condUnsigned LS  = True
 condUnsigned _   = False
