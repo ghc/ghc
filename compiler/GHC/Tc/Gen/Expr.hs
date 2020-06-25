@@ -71,7 +71,6 @@ import GHC.Core.Type
 import GHC.Tc.Types.Evidence
 import GHC.Types.Var.Set
 import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim( multiplicityTyVarList )
 import GHC.Builtin.PrimOps( tagToEnumKey )
 import GHC.Builtin.Names
 import GHC.Driver.Session
@@ -500,22 +499,17 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
        -- Handle tuple sections where
        ; tup_args1 <- tcTupArgs tup_args arg_tys
 
-       ; let expr'      = ExplicitTuple x tup_args1 boxity
+       ; let expr'       = ExplicitTuple x tup_args1 boxity
+             missing_tys = [Scaled mult ty | (L _ (Missing (Scaled mult _)), ty) <- zip tup_args1 arg_tys]
 
-             missing_tys = [ty | (ty, L _ (Missing _)) <- zip arg_tys tup_args]
-             w_tyvars = multiplicityTyVarList (length missing_tys)
-               -- See Note [Linear fields generalization]
-             w_tvb = map (mkTyVarBinder Inferred) w_tyvars
+             -- See Note [Linear fields generalization]
              act_res_ty
-                 =  mkForAllTys w_tvb $
-                    mkVisFunTys [ mkScaled (mkTyVarTy w_ty) ty |
-                              (ty, w_ty) <- zip missing_tys w_tyvars]
-                            (mkTupleTy1 boxity arg_tys)
+                 = mkVisFunTys missing_tys (mkTupleTy1 boxity arg_tys)
                    -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
 
        ; traceTc "ExplicitTuple" (ppr act_res_ty $$ ppr res_ty)
 
-       ; tcWrapResult expr expr' act_res_ty res_ty }
+       ; tcWrapResultMono expr expr' act_res_ty res_ty }
 
 tcExpr (ExplicitSum _ alt arity expr) res_ty
   = do { let sum_tc = sumTyCon arity
@@ -1557,7 +1551,8 @@ tcTupArgs :: [LHsTupArg GhcRn] -> [TcSigmaType] -> TcM [LHsTupArg GhcTc]
 tcTupArgs args tys
   = ASSERT( equalLength args tys ) mapM go (args `zip` tys)
   where
-    go (L l (Missing {}),   arg_ty) = return (L l (Missing arg_ty))
+    go (L l (Missing {}),   arg_ty) = do { mult <- newFlexiTyVarTy multiplicityTy
+                                         ; return (L l (Missing (Scaled mult arg_ty))) }
     go (L l (Present x expr), arg_ty) = do { expr' <- tcCheckPolyExpr expr arg_ty
                                            ; return (L l (Present x expr')) }
 

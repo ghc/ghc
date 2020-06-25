@@ -27,7 +27,6 @@ module GHC.Builtin.Types.Prim(
         openAlphaTy, openBetaTy, openAlphaTyVar, openBetaTyVar,
 
         multiplicityTyVar,
-        multiplicityTyVarList,
 
         -- Kind constructors...
         tYPETyCon, tYPETyConName,
@@ -392,11 +391,6 @@ openBetaTy  = mkTyVarTy openBetaTyVar
 multiplicityTyVar :: TyVar
 multiplicityTyVar = mkTemplateTyVars (repeat multiplicityTy) !! 13  -- selects 'n'
 
--- Create 'count' multiplicity TyVars
-multiplicityTyVarList :: Int -> [TyVar]
-multiplicityTyVarList count = take count $
-                              drop 13 $  -- selects 'n', 'o'...
-                              mkTemplateTyVars (repeat multiplicityTy)
 {-
 ************************************************************************
 *                                                                      *

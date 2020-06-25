@@ -811,7 +811,7 @@ zonkExpr env (ExplicitTuple x tup_args boxed)
   where
     zonk_tup_arg (L l (Present x e)) = do { e' <- zonkLExpr env e
                                           ; return (L l (Present x e')) }
-    zonk_tup_arg (L l (Missing t)) = do { t' <- zonkTcTypeToTypeX env t
+    zonk_tup_arg (L l (Missing t)) = do { t' <- zonkScaledTcTypeToTypeX env t
                                         ; return (L l (Missing t')) }
 
 
