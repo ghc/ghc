@@ -740,7 +740,7 @@ type instance XPresent         (GhcPass _) = NoExtField
 
 type instance XMissing         GhcPs = NoExtField
 type instance XMissing         GhcRn = NoExtField
-type instance XMissing         GhcTc = Type
+type instance XMissing         GhcTc = Scaled Type
 
 type instance XXTupArg         (GhcPass _) = NoExtCon
 
