@@ -1423,6 +1423,7 @@ distclean : clean
 CLEAN_LIBRARY_GHC_MK_FILES += $(patsubst %, libraries/%/ghc.mk, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2))
 # Don't clean `libraries/ghc-boot/ghc.mk`, since it's intended to be version-controlled (#16953)
 CLEAN_LIBRARY_GHC_MK_FILES := $(filter-out libraries/ghc-boot/ghc.mk,$(CLEAN_LIBRARY_GHC_MK_FILES))
+CLEAN_LIBRARY_GHC_MK_FILES := $(filter-out libraries/integer-gmp/ghc.mk,$(CLEAN_LIBRARY_GHC_MK_FILES))
 
 maintainer-clean : distclean
 	$(call removeFiles,configure mk/config.h.in)
