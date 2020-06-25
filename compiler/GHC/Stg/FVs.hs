@@ -1,3 +1,7 @@
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE DataKinds #-}
+
 {- |
 Non-global free variable analysis on STG terms. This pass annotates
 non-top-level closure bindings with captured variables. Global variables are not
@@ -75,7 +79,9 @@ XRhsClosure extension points with DIdSet.
 FVPass encodes this fact in the form of a constraint.
 -}
 
-type FVPass i o = (BinderP i ~ Id, BinderP o ~ Id,
+type FVPass i o = (BinderP i ~ Id,
+                   BinderP o ~ Id,
+
                    -- The RhsClosure extension will contain the free variables afterwards
                    XRhsClosure o ~ DIdSet,
                    XRhsCon i ~ XRhsCon o,
@@ -85,6 +91,9 @@ type FVPass i o = (BinderP i ~ Id, BinderP o ~ Id,
                   --  XStgCase i ~ XStgCase o,
                   XStgApp i ~ XStgApp o
                   )
+
+foo :: GHC.Stg.FVs.FVPass 'Vanilla 'CodeGen => Int
+foo = 1
 
 
 emptyEnv :: Env

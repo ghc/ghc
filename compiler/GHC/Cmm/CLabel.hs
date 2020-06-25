@@ -1346,6 +1346,7 @@ pprCLbl platform = \case
    (DynamicLinkerLabel {})  -> panic "pprCLbl DynamicLinkerLabel"
    (PicBaseLabel {})        -> panic "pprCLbl PicBaseLabel"
    (DeadStripPreventer {})  -> panic "pprCLbl DeadStripPreventer"
+   (IdLabel {})             -> panic "pprCLbl IdLabel"
 
 ppIdFlavor :: IdLabelInfo -> SDoc
 ppIdFlavor x = pp_cSEP <> text

@@ -40,6 +40,7 @@ module GHC.Stg.Lint ( lintStgTopBindings ) where
 import GHC.Prelude
 
 import GHC.Stg.Syntax
+import GHC.Stg.Utils
 
 import GHC.Driver.Session
 import GHC.Data.Bag         ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
@@ -86,7 +87,7 @@ lintStgTopBindings dflags this_mod unarised whodunnit binds
   where
     -- Bring all top-level binds into scope because CoreToStg does not generate
     -- bindings in dependency order (so we may see a use before its definition).
-    top_level_binds = (bindersOfTopBinds binds)
+    top_level_binds = mkVarSet (bindersOfTopBinds binds) :: IdSet
 
     lint_binds :: [GenStgTopBinding a] -> LintM ()
 

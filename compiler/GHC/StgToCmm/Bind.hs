@@ -38,6 +38,7 @@ import GHC.Cmm.Info
 import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 import GHC.Stg.Syntax
+import GHC.Stg.Utils
 import GHC.Types.CostCentre
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -89,7 +90,7 @@ cgTopRhsClosure dflags rec id ccs upd_flag args body =
   -- hole detection from working in that case.  Test
   -- concurrent/should_run/4030 fails, for instance.
   --
-  gen_code dflags _ closure_label
+  gen_code _dflags _ closure_label
     | StgApp _ext f [] <- body, null args, isNonRec rec
     = do
          cg_info <- getCgIdInfo f
@@ -201,7 +202,7 @@ cgRhs :: Id
                )
 
 cgRhs id (StgRhsCon _ext cc con args)
-  = withNewTickyCounterCon (idName id) $
+  = withNewTickyCounterCon (idName id) con $
     buildDynCon id True cc con (assertNonVoidStgArgs args)
       -- con args are always non-void,
       -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise

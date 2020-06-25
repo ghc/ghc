@@ -519,13 +519,8 @@ getCallMethod dflags _ id _ n_args v_args _cg_loc
   -- self-recursive tail calls] in GHC.StgToCmm.Expr for more details
   = JumpToIt block_id args
 
-<<<<<<< HEAD:compiler/GHC/StgToCmm/Closure.hs
 getCallMethod dflags name id (LFReEntrant _ arity _ _) n_args _v_args _cg_loc
-              _self_loop_info
-=======
-getCallMethod dflags name id (LFReEntrant _ _ arity _ _) n_args _v_args _cg_loc
               _self_loop_info _appEnterInfo
->>>>>>> Tag inferrence work.:compiler/codeGen/StgCmmClosure.hs
   | n_args == 0 -- No args at all
   && not (gopt Opt_SccProfilingOn dflags)
      -- See Note [Evaluating functions with profiling] in rts/Apply.cmm

@@ -184,8 +184,8 @@ import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
 
 -- Tag infer perf debugging
 import System.CPUTime
-import StgUtil (seqTopBinds)
-
+import GHC.Stg.Utils (seqTopBinds)
+import GHC.Stg.InferTags
 #include "HsVersions.h"
 
 -- In ms
@@ -1557,7 +1557,7 @@ doCodeGen hsc_env this_mod data_tycons
     let dflags = hsc_dflags hsc_env
     us <- mkSplitUniqSupply 't'
     return $! seqTopBinds stg_binds
-    let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
+    -- let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
 
     -- !start <- getTime
     let (!stg_binds_w_tags, _exports) = {-# SCC "StgTagFields" #-}
@@ -1571,7 +1571,7 @@ doCodeGen hsc_env this_mod data_tycons
     let cmm_stream :: Stream IO CmmGroup ModuleLFInfos
         -- See Note [Forcing of stg_binds]
         cmm_stream = stg_binds_w_fvs `seqList` {-# SCC "StgToCmm" #-}
-            lookupHook stgToCmmHook StgCmm.codeGen dflags dflags this_mod data_tycons
+            lookupHook stgToCmmHook StgToCmm.codeGen dflags dflags this_mod data_tycons
                            cost_centre_info stg_binds_w_fvs hpc_info
 
 
