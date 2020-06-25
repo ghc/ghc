@@ -42,3 +42,10 @@ test('tso_and_stack_closures',
       ignore_stderr
      ],
      multi_compile_and_run, ['tso_and_stack_closures', [('create_tso.c','')], ''])
+
+test('list_threads_and_misc_roots',
+     [extra_files(['list_threads_and_misc_roots_c.c','list_threads_and_misc_roots_c.h']),
+      ignore_stdout,
+      ignore_stderr
+     ],
+     multi_compile_and_run, ['list_threads_and_misc_roots', [('list_threads_and_misc_roots_c.c','')], '-threaded'])
