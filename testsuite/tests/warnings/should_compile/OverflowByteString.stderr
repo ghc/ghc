@@ -1,0 +1,9 @@
+
+OverflowByteString.hs:10:15: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal "\331" contains non ascii characters but BS.ByteString only supports octets
+
+OverflowByteString.hs:11:16: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal "\331" contains non ascii characters but LBS.ByteString only supports octets
+
+OverflowByteString.hs:12:31: warning: [-Woverflowed-literals (in -Wdefault)]
+    Literal "\331" contains non ascii characters but SBS.ShortByteString only supports octets
