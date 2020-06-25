@@ -81,7 +81,7 @@ data ClosureType
     | SMALL_MUT_ARR_PTRS_FROZEN_CLEAN
     | COMPACT_NFDATA
     | N_CLOSURE_TYPES
- deriving (Enum, Eq, Ord, Show, Generic)
+ deriving (Enum, Eq, Ord, Show, Generic, Bounded)
 
 -- | Return the size of the closures header in words
 closureTypeHeaderSize :: ClosureType -> Int
