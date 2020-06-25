@@ -64,7 +64,6 @@ import GHC.Types.Basic
 import GHC.Data.Maybe
 import GHC.Types.Var.Env
 import GHC.Types.SrcLoc
-import GHC.Builtin.Types.Prim ( mkTemplateTyVars )
 import GHC.Utils.Misc
 import GHC.Data.Bag
 import GHC.Utils.Outputable as Outputable
@@ -427,26 +426,22 @@ dsExpr e@(SectionR _ op expr) = do
                                                           core_op [Var x_id, Var y_id]))
 
 dsExpr (ExplicitTuple _ tup_args boxity)
-  = do { let go (lam_vars, args, usedmults, mult:mults) (L _ (Missing ty))
+  = do { let go (lam_vars, args) (L _ (Missing (Scaled mult ty)))
                     -- For every missing expression, we need
-                    -- another lambda in the desugaring. This lambda is linear
-                    -- since tuples are linear
-               = do { lam_var <- newSysLocalDsNoLP (mkTyVarTy mult) ty
-                    ; return (lam_var : lam_vars, Var lam_var : args, mult:usedmults, mults) }
-             go (lam_vars, args, missing, mults) (L _ (Present _ expr))
+                    -- another lambda in the desugaring.
+               = do { lam_var <- newSysLocalDsNoLP mult ty
+                    ; return (lam_var : lam_vars, Var lam_var : args) }
+             go (lam_vars, args) (L _ (Present _ expr))
                     -- Expressions that are present don't generate
                     -- lambdas, just arguments.
                = do { core_expr <- dsLExprNoLP expr
-                    ; return (lam_vars, core_expr : args, missing, mults) }
-             go (lam_vars, args, missing, mults) _ = pprPanic "dsExpr" (ppr lam_vars <+> ppr args <+> ppr missing <+> ppr mults)
+                    ; return (lam_vars, core_expr : args) }
 
-       ; let multiplicityVars = mkTemplateTyVars (repeat multiplicityTy)
-       ; dsWhenNoErrs (foldM go ([], [], [], multiplicityVars) (reverse tup_args))
+       ; dsWhenNoErrs (foldM go ([], []) (reverse tup_args))
                 -- The reverse is because foldM goes left-to-right
-                      (\(lam_vars, args, usedmults, _) ->
-                      mkCoreLams usedmults $
+                      (\(lam_vars, args) ->
                         mkCoreLams lam_vars $
-                                            mkCoreTupBoxity boxity args) }
+                          mkCoreTupBoxity boxity args) }
                         -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
 
 dsExpr (ExplicitSum types alt arity expr)
