@@ -2,10 +2,11 @@ module GHC.CmmToAsm.ARM.Instr where
 
 import GHC.Cmm
 import GHC.Cmm.BlockId
+import GHC.Cmm.CLabel
 import GHC.Cmm.Dataflow.Label
 import GHC.CmmToAsm.Config
 import GHC.CmmToAsm.Instr
-import GHC.Cmm.CLabel
+import GHC.Data.FastString
 import GHC.Platform
 import GHC.Platform.Reg
 import GHC.Prelude
@@ -36,7 +37,27 @@ data RI
     | RIImm Imm
 
 data Instr
-  = Add Reg Reg RI
+  -- comment pseudo-op
+  = COMMENT FastString
+
+  -- location pseudo-op (file, line, col, name)
+  | LOCATION Int Int Int String
+
+  -- some static data spat out during code
+  -- generation.  Will be extracted before
+  -- pretty-printing.
+  | LDATA   Section RawCmmStatics
+
+  -- start a new basic block.  Useful during
+  -- codegen, removed later.  Preceding
+  -- instruction should be a jump, as per the
+  -- invariants for a BasicBlock (see Cmm).
+  | NEWBLOCK BlockId
+
+  -- specify current stack offset for
+  -- benefit of subsequent passes
+  | DELTA   Int
+
 
 instance Instruction Instr where
   regUsageOfInstr         = arm_regUsageOfInstr
@@ -79,7 +100,14 @@ arm_takeDeltaInstr :: Instr -> Maybe Int
 arm_takeDeltaInstr = undefined
 
 arm_isMetaInstr :: Instr -> Bool
-arm_isMetaInstr = undefined
+arm_isMetaInstr instr =
+ case instr of
+   COMMENT{}   -> True
+   LOCATION{}  -> True
+   LDATA{}     -> True
+   NEWBLOCK{}  -> True
+   DELTA{}     -> True
+   _           -> False
 
 arm_mkRegRegMoveInstr :: Reg -> Reg -> Instr
 arm_mkRegRegMoveInstr = undefined
