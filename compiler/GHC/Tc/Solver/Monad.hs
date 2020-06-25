@@ -728,7 +728,7 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
               -- failure.
               --
               -- ^ See Note [Safe Haskell Overlapping Instances Implementation]
-              -- in GHC.Tc.Solver
+              -- in "GHC.Tc.Solver"
 
        , inert_irreds :: Cts
               -- Irreducible predicates that cannot be made canonical,
@@ -2177,7 +2177,7 @@ getNoGivenEqs tclvl skol_tvs
 -- | Returns Given constraints that might,
 -- potentially, match the given pred. This is used when checking to see if a
 -- Given might overlap with an instance. See Note [Instance and Given overlap]
--- in GHC.Tc.Solver.Interact.
+-- in "GHC.Tc.Solver.Interact"
 matchableGivens :: CtLoc -> PredType -> InertSet -> Cts
 matchableGivens loc_w pred_w (IS { inert_cans = inert_cans })
   = filterBag matchable_given all_relevant_givens

@@ -12,17 +12,17 @@
 -- #name_types#
 -- GHC uses several kinds of name internally:
 --
--- * 'OccName.OccName' represents names as strings with just a little more information:
+-- * 'GHC.Types.Name.Occurrence.OccName' represents names as strings with just a little more information:
 --   the \"namespace\" that the name came from, e.g. the namespace of value, type constructors or
 --   data constructors
 --
--- * 'RdrName.RdrName': see "RdrName#name_types"
+-- * 'GHC.Types.Name.Reader.RdrName': see "GHC.Types.Name.Reader#name_types"
 --
--- * 'Name.Name': see "Name#name_types"
+-- * 'GHC.Types.Name.Name': see "GHC.Types.Name#name_types"
 --
--- * 'Id.Id': see "Id#name_types"
+-- * 'GHC.Types.Id.Id': see "GHC.Types.Id#name_types"
 --
--- * 'Var.Var': see "Var#name_types"
+-- * 'GHC.Types.Var.Var': see "GHC.Types.Var#name_types"
 
 module GHC.Types.Name.Occurrence (
         -- * The 'NameSpace' type
@@ -592,7 +592,7 @@ isDefaultMethodOcc occ =
 
 -- | Is an 'OccName' one of a Typeable @TyCon@ or @Module@ binding?
 -- This is needed as these bindings are renamed differently.
--- See Note [Grand plan for Typeable] in GHC.Tc.Instance.Typeable.
+-- See Note [Grand plan for Typeable] in "GHC.Tc.Instance.Typeable".
 isTypeableBindOcc :: OccName -> Bool
 isTypeableBindOcc occ =
    case occNameString occ of

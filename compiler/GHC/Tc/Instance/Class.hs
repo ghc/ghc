@@ -60,7 +60,7 @@ data AssocInstInfo
   | InClsInst { ai_class    :: Class
               , ai_tyvars   :: [TyVar]      -- ^ The /scoped/ tyvars of the instance
                                             -- Why scoped?  See bind_me in
-                                            -- GHC.Tc.Validity.checkConsistentFamInst
+                                            -- 'GHC.Tc.Validity.checkConsistentFamInst'
               , ai_inst_env :: VarEnv Type  -- ^ Maps /class/ tyvars to their instance types
                 -- See Note [Matching in the consistent-instantiation check]
     }

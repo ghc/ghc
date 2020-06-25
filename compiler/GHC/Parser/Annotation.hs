@@ -200,7 +200,7 @@ getAndRemoveAnnotationComments anns span =
 -- The annotations, together with original source comments are made
 -- available in the @'pm_annotations'@ field of @'GHC.ParsedModule'@.
 -- Comments are only retained if @'Opt_KeepRawTokenStream'@ is set in
--- @'DynFlags.DynFlags'@ before parsing.
+-- @'GHC.Driver.Session.DynFlags'@ before parsing.
 --
 -- The wiki page describing this feature is
 -- https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
@@ -334,11 +334,11 @@ data AnnotationComment =
 instance Outputable AnnotationComment where
   ppr x = text (show x)
 
--- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
---             'ApiAnnotation.AnnClose','ApiAnnotation.AnnComma',
---             'ApiAnnotation.AnnRarrow'
---             'ApiAnnotation.AnnTilde'
---   - May have 'ApiAnnotation.AnnComma' when in a list
+-- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
+--             'GHC.Parser.Annotation.AnnClose','GHC.Parser.Annotation.AnnComma',
+--             'GHC.Parser.Annotation.AnnRarrow'
+--             'GHC.Parser.Annotation.AnnTilde'
+--   - May have 'GHC.Parser.Annotation.AnnComma' when in a list
 type LRdrName = Located RdrName
 
 

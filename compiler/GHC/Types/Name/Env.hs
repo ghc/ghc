@@ -150,7 +150,7 @@ lookupNameEnv_NF env n = expectJust "lookupNameEnv_NF" (lookupNameEnv env n)
 
 -- | Deterministic Name Environment
 --
--- See Note [Deterministic UniqFM] in GHC.Types.Unique.DFM for explanation why
+-- See Note [Deterministic UniqFM] in "GHC.Types.Unique.DFM" for explanation why
 -- we need DNameEnv.
 type DNameEnv a = UniqDFM a
 

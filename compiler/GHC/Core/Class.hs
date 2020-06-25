@@ -77,7 +77,7 @@ data Class
 --
 --  Here fun-deps are [([a,b],[c]), ([a,c],[b])]
 --
---  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow'',
+--  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnRarrow'',
 
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 type FunDep a = ([a],[a])

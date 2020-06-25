@@ -10,7 +10,7 @@ Wired-in knowledge about {\em non-primitive} types
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- | This module is about types that can be defined in Haskell, but which
---   must be wired into the compiler nonetheless.  C.f module GHC.Builtin.Types.Prim
+--   must be wired into the compiler nonetheless.  C.f module "GHC.Builtin.Types.Prim"
 module GHC.Builtin.Types (
         -- * Helper functions defined here
         mkWiredInTyConName, -- This is used in GHC.Builtin.Types.Literals to define the
@@ -1755,7 +1755,7 @@ mkTupleTy boxity  tys  = mkTupleTy1 boxity tys
 -- | Make a tuple type. The list of types should /not/ include any
 -- RuntimeRep specifications. Boxed 1-tuples are *not* flattened.
 -- See Note [One-tuples] and Note [Don't flatten tuples from HsSyn]
--- in GHC.Core.Make
+-- in "GHC.Core.Make"
 mkTupleTy1 :: Boxity -> [Type] -> Type
 mkTupleTy1 Boxed   tys  = mkTyConApp (tupleTyCon Boxed (length tys)) tys
 mkTupleTy1 Unboxed tys  = mkTyConApp (tupleTyCon Unboxed (length tys))

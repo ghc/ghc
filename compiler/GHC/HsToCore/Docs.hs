@@ -3,10 +3,11 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE BangPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
-module GHC.HsToCore.Docs (extractDocs) where
+module GHC.HsToCore.Docs where
 
 import GHC.Prelude
 import GHC.Data.Bag
@@ -147,6 +148,9 @@ getInstLoc = \case
   --                 ^^^
   DataFamInstD _ (DataFamInstDecl
     { dfid_eqn = HsIB { hsib_body = FamEqn { feqn_tycon = L l _ }}}) -> l
+  -- Since CoAxioms' Names refer to the whole line for type family instances
+  -- in particular, we need to dig a bit deeper to pull out the entire
+  -- equation. This does not happen for data family instances, for some reason.
   TyFamInstD _ (TyFamInstDecl
     { tfid_eqn = HsIB { hsib_body = FamEqn { feqn_tycon = L l _ }}}) -> l
 
@@ -214,6 +218,7 @@ conArgDocs con = case getConArgs con of
     go n = M.fromList . catMaybes . zipWith f [n..]
       where
         f n (HsDocTy _ _ lds) = Just (n, unLoc lds)
+        f n (HsBangTy _ _ (L _ (HsDocTy _ _ lds))) = Just (n, unLoc lds)
         f _ _ = Nothing
 
     ret = case con of
@@ -251,7 +256,7 @@ nubByName f ns = go emptyNameSet ns
     go _ [] = []
     go s (x:xs)
       | y `elemNameSet` s = go s xs
-      | otherwise         = let s' = extendNameSet s y
+      | otherwise         = let !s' = extendNameSet s y
                             in x : go s' xs
       where
         y = f x

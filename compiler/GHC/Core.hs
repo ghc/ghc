@@ -144,10 +144,10 @@ These data types are the heart of the compiler
 -- We get from Haskell source to this Core language in a number of stages:
 --
 -- 1. The source code is parsed into an abstract syntax tree, which is represented
---    by the data type 'GHC.Hs.Expr.HsExpr' with the names being 'RdrName.RdrNames'
+--    by the data type 'GHC.Hs.Expr.HsExpr' with the names being 'GHC.Types.Name.Reader.RdrNames'
 --
--- 2. This syntax tree is /renamed/, which attaches a 'Unique.Unique' to every 'RdrName.RdrName'
---    (yielding a 'Name.Name') to disambiguate identifiers which are lexically identical.
+-- 2. This syntax tree is /renamed/, which attaches a 'GHC.Types.Unique.Unique' to every 'GHC.Types.Name.Reader.RdrName'
+--    (yielding a 'GHC.Types.Name.Name') to disambiguate identifiers which are lexically identical.
 --    For example, this program:
 --
 -- @
@@ -164,7 +164,7 @@ These data types are the heart of the compiler
 --    But see Note [Shadowing] below.
 --
 -- 3. The resulting syntax tree undergoes type checking (which also deals with instantiating
---    type class arguments) to yield a 'GHC.Hs.Expr.HsExpr' type that has 'Id.Id' as it's names.
+--    type class arguments) to yield a 'GHC.Hs.Expr.HsExpr' type that has 'GHC.Types.Id.Id' as it's names.
 --
 -- 4. Finally the syntax tree is /desugared/ from the expressive 'GHC.Hs.Expr.HsExpr' type into
 --    this 'Expr' type, which has far fewer constructors and hence is easier to perform
@@ -965,10 +965,10 @@ data Tickish id =
     { breakpointId     :: !Int
     , breakpointFVs    :: [id]  -- ^ the order of this list is important:
                                 -- it matches the order of the lists in the
-                                -- appropriate entry in GHC.Driver.Types.ModBreaks.
+                                -- appropriate entry in 'GHC.Driver.Types.ModBreaks'.
                                 --
                                 -- Careful about substitution!  See
-                                -- Note [substTickish] in GHC.Core.Subst.
+                                -- Note [substTickish] in "GHC.Core.Subst".
     }
 
   -- | A source note.
@@ -1338,7 +1338,7 @@ data CoreRule
 
         -- Rough-matching stuff
         -- see comments with InstEnv.ClsInst( is_cls, is_rough )
-        ru_fn    :: Name,               -- ^ Name of the 'Id.Id' at the head of this rule
+        ru_fn    :: Name,               -- ^ Name of the 'GHC.Types.Id.Id' at the head of this rule
         ru_rough :: [Maybe Name],       -- ^ Name at the head of each argument to the left hand side
 
         -- Proper-matching stuff
@@ -1355,7 +1355,7 @@ data CoreRule
         ru_auto :: Bool,   -- ^ @True@  <=> this rule is auto-generated
                            --               (notably by Specialise or SpecConstr)
                            --   @False@ <=> generated at the user's behest
-                           -- See Note [Trimming auto-rules] in GHC.Iface.Tidy
+                           -- See Note [Trimming auto-rules] in "GHC.Iface.Tidy"
                            -- for the sole purpose of this field.
 
         ru_origin :: !Module,   -- ^ 'Module' the rule was defined in, used
@@ -1429,14 +1429,14 @@ ruleActivation :: CoreRule -> Activation
 ruleActivation (BuiltinRule { })       = AlwaysActive
 ruleActivation (Rule { ru_act = act }) = act
 
--- | The 'Name' of the 'Id.Id' at the head of the rule left hand side
+-- | The 'Name' of the 'GHC.Types.Id.Id' at the head of the rule left hand side
 ruleIdName :: CoreRule -> Name
 ruleIdName = ru_fn
 
 isLocalRule :: CoreRule -> Bool
 isLocalRule = ru_local
 
--- | Set the 'Name' of the 'Id.Id' at the head of the rule left hand side
+-- | Set the 'Name' of the 'GHC.Types.Id.Id' at the head of the rule left hand side
 setRuleIdName :: Name -> CoreRule -> CoreRule
 setRuleIdName nm ru = ru { ru_fn = nm }
 
@@ -1452,13 +1452,13 @@ The @Unfolding@ type is declared here to avoid numerous loops
 
 -- | Records the /unfolding/ of an identifier, which is approximately the form the
 -- identifier would have if we substituted its definition in for the identifier.
--- This type should be treated as abstract everywhere except in GHC.Core.Unfold
+-- This type should be treated as abstract everywhere except in "GHC.Core.Unfold"
 data Unfolding
   = NoUnfolding        -- ^ We have no information about the unfolding.
 
   | BootUnfolding      -- ^ We have no information about the unfolding, because
                        -- this 'Id' came from an @hi-boot@ file.
-                       -- See Note [Inlining and hs-boot files] in GHC.CoreToIface
+                       -- See Note [Inlining and hs-boot files] in "GHC.CoreToIface"
                        -- for what this is used for.
 
   | OtherCon [AltCon]  -- ^ It ain't one of these constructors.

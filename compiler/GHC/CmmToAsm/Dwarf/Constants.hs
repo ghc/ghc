@@ -1,5 +1,5 @@
 -- | Constants describing the DWARF format. Most of this simply
--- mirrors /usr/include/dwarf.h.
+-- mirrors \/usr\/include\/dwarf.h.
 
 module GHC.CmmToAsm.Dwarf.Constants where
 

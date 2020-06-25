@@ -98,10 +98,10 @@ explains a very similar design when generalising over a type family instance
 equation.
 -}
 
-tcRules :: [LRuleDecls GhcRn] -> TcM [LRuleDecls GhcTcId]
+tcRules :: [LRuleDecls GhcRn] -> TcM [LRuleDecls GhcTc]
 tcRules decls = mapM (wrapLocM tcRuleDecls) decls
 
-tcRuleDecls :: RuleDecls GhcRn -> TcM (RuleDecls GhcTcId)
+tcRuleDecls :: RuleDecls GhcRn -> TcM (RuleDecls GhcTc)
 tcRuleDecls (HsRules { rds_src = src
                      , rds_rules = decls })
    = do { tc_decls <- mapM (wrapLocM tcRule) decls
@@ -109,7 +109,7 @@ tcRuleDecls (HsRules { rds_src = src
                            , rds_src   = src
                            , rds_rules = tc_decls } }
 
-tcRule :: RuleDecl GhcRn -> TcM (RuleDecl GhcTcId)
+tcRule :: RuleDecl GhcRn -> TcM (RuleDecl GhcTc)
 tcRule (HsRule { rd_ext  = ext
                , rd_name = rname@(L _ (_,name))
                , rd_act  = act

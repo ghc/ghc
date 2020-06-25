@@ -166,7 +166,7 @@ reportUnsolved wanted
 -- NB: Type-level holes are OK, because there are no bindings.
 -- See Note [Deferring coercion errors to runtime]
 -- Used by solveEqualities for kind equalities
---      (see Note [Fail fast on kind errors] in GHC.Tc.Solver)
+--      (see Note [Fail fast on kind errors] in "GHC.Tc.Solver")
 -- and for simplifyDefault.
 reportAllUnsolved :: WantedConstraints -> TcM ()
 reportAllUnsolved wanted
@@ -183,7 +183,7 @@ reportAllUnsolved wanted
 
 -- | Report all unsolved goals as warnings (but without deferring any errors to
 -- run-time). See Note [Safe Haskell Overlapping Instances Implementation] in
--- GHC.Tc.Solver
+-- "GHC.Tc.Solver"
 warnAllUnsolved :: WantedConstraints -> TcM ()
 warnAllUnsolved wanted
   = do { ev_binds <- newTcEvBinds

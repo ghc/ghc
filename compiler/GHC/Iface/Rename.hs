@@ -76,18 +76,18 @@ failWithRn doc = do
     failM
 
 -- | What we have is a generalized ModIface, which corresponds to
--- a module that looks like p[A=<A>]:B.  We need a *specific* ModIface, e.g.
--- p[A=q():A]:B (or maybe even p[A=<B>]:B) which we load
+-- a module that looks like p[A=\<A>]:B.  We need a *specific* ModIface, e.g.
+-- p[A=q():A]:B (or maybe even p[A=\<B>]:B) which we load
 -- up (either to merge it, or to just use during typechecking).
 --
 -- Suppose we have:
 --
---  p[A=<A>]:M  ==>  p[A=q():A]:M
+--  p[A=\<A>]:M  ==>  p[A=q():A]:M
 --
--- Substitute all occurrences of <A> with q():A (renameHoleModule).
+-- Substitute all occurrences of \<A> with q():A (renameHoleModule).
 -- Then, for any Name of form {A.T}, replace the Name with
 -- the Name according to the exports of the implementing module.
--- This works even for p[A=<B>]:M, since we just read in the
+-- This works even for p[A=\<B>]:M, since we just read in the
 -- exports of B.hi, which is assumed to be ready now.
 --
 -- This function takes an optional 'NameShape', which can be used
@@ -261,9 +261,9 @@ rnFieldLabel (FieldLabel l b sel) = do
 
 -- | The key function.  This gets called on every Name embedded
 -- inside a ModIface.  Our job is to take a Name from some
--- generalized unit ID p[A=<A>, B=<B>], and change
+-- generalized unit ID p[A=\<A>, B=\<B>], and change
 -- it to the correct name for a (partially) instantiated unit
--- ID, e.g. p[A=q[]:A, B=<B>].
+-- ID, e.g. p[A=q[]:A, B=\<B>].
 --
 -- There are two important things to do:
 --
@@ -278,12 +278,12 @@ rnFieldLabel (FieldLabel l b sel) = do
 -- interface precisely to "merge it in".
 --
 --     External case:
---         p[A=<B>]:A (and thisUnitId is something else)
+--         p[A=\<B>]:A (and thisUnitId is something else)
 --     We are loading this in order to determine B.hi!  So
 --     don't load B.hi to find the exports.
 --
 --     Local case:
---         p[A=<A>]:A (and thisUnitId is p[A=<A>])
+--         p[A=\<A>]:A (and thisUnitId is p[A=\<A>])
 --     This should not happen, because the rename is not necessary
 --     in this case, but if it does we shouldn't load A.hi!
 --

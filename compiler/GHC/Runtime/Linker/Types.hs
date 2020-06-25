@@ -91,7 +91,7 @@ data Unlinked
                        -- carries some static pointer table entries which
                        -- should be loaded along with the BCOs.
                        -- See Note [Grant plan for static forms] in
-                       -- GHC.Iface.Tidy.StaticPtrTable.
+                       -- "GHC.Iface.Tidy.StaticPtrTable".
 
 instance Outputable Unlinked where
   ppr (DotO path)   = text "DotO" <+> text path
@@ -100,7 +100,7 @@ instance Outputable Unlinked where
   ppr (BCOs bcos spt) = text "BCOs" <+> ppr bcos <+> ppr spt
 
 -- | An entry to be inserted into a module's static pointer table.
--- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
+-- See Note [Grand plan for static forms] in "GHC.Iface.Tidy.StaticPtrTable".
 data SptEntry = SptEntry Id Fingerprint
 
 instance Outputable SptEntry where

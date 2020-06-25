@@ -344,7 +344,7 @@ entryHeapCheck cl_info nodeSet arity args code
                  Just (_, ArgGen _) -> False
                  _otherwise         -> True
 
--- | lower-level version for GHC.Cmm.Parser
+-- | lower-level version for "GHC.Cmm.Parser"
 entryHeapCheck' :: Bool           -- is a known function pattern
                 -> CmmExpr        -- expression for the closure pointer
                 -> Int            -- Arity -- not same as len args b/c of voids

@@ -5,6 +5,7 @@
 --   Handling of join points
 --   ~~~~~~~~~~~~~~~~~~~~~~~
 --
+--   @
 --   B1:                          B2:
 --    ...                          ...
 --       RELOAD SLOT(0), %r1          RELOAD SLOT(0), %r1
@@ -14,9 +15,11 @@
 --                B3: ... C ...
 --                    RELOAD SLOT(0), %r1
 --                    ...
+--   @
 --
 --   The Plan
 --   ~~~~~~~~
+--
 --   As long as %r1 hasn't been written to in A, B or C then we don't need
 --   the reload in B3.
 --

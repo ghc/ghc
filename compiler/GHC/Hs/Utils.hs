@@ -1002,7 +1002,7 @@ BUT we have a special case when abs_sig is true;
 -- | Should we treat this as an unlifted bind? This will be true for any
 -- bind that binds an unlifted variable, but we must be careful around
 -- AbsBinds. See Note [Unlifted id check in isUnliftedHsBind]. For usage
--- information, see Note [Strict binds check] is GHC.HsToCore.Binds.
+-- information, see Note [Strict binds check] is "GHC.HsToCore.Binds".
 isUnliftedHsBind :: HsBind GhcTc -> Bool  -- works only over typechecked binds
 isUnliftedHsBind bind
   | AbsBinds { abs_exports = exports, abs_sig = has_sig } <- bind

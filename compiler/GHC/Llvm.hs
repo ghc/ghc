@@ -6,7 +6,7 @@
 -- LLVM binding library in Haskell, but enough to generate code for GHC.
 --
 -- This code is derived from code taken from the Essential Haskell Compiler
--- (EHC) project (<http://www.cs.uu.nl/wiki/Ehc/WebHome>).
+-- (EHC) project.
 --
 
 module GHC.Llvm (

@@ -457,7 +457,7 @@ data DynFlags = DynFlags {
 
   llvmConfig            :: LlvmConfig,
     -- ^ N.B. It's important that this field is lazy since we load the LLVM
-    -- configuration lazily. See Note [LLVM Configuration] in GHC.SysTools.
+    -- configuration lazily. See Note [LLVM Configuration] in "GHC.SysTools".
   verbosity             :: Int,         -- ^ Verbosity level: see Note [Verbosity levels]
   optLevel              :: Int,         -- ^ Optimisation level
   debugLevel            :: Int,         -- ^ How much debug information to produce
@@ -500,7 +500,7 @@ data DynFlags = DynFlags {
                                         --   by the assembler code generator (0 to disable)
   liberateCaseThreshold :: Maybe Int,   -- ^ Threshold for LiberateCase
   floatLamArgs          :: Maybe Int,   -- ^ Arg count for lambda floating
-                                        --   See GHC.Core.Opt.Monad.FloatOutSwitches
+                                        --   See 'GHC.Core.Opt.Monad.FloatOutSwitches'
 
   liftLamsRecArgs       :: Maybe Int,   -- ^ Maximum number of arguments after lambda lifting a
                                         --   recursive function.
@@ -729,7 +729,7 @@ data DynFlags = DynFlags {
 
   nextWrapperNum        :: IORef (ModuleEnv Int),
 
-  -- | Machine dependent flags (-m<blah> stuff)
+  -- | Machine dependent flags (-m\<blah> stuff)
   sseVersion            :: Maybe SseVersion,
   bmiVersion            :: Maybe BmiVersion,
   avx                   :: Bool,
@@ -882,7 +882,7 @@ data LlvmTarget = LlvmTarget
   , lAttributes :: [String]
   }
 
--- | See Note [LLVM Configuration] in GHC.SysTools.
+-- | See Note [LLVM Configuration] in "GHC.SysTools".
 data LlvmConfig = LlvmConfig { llvmTargets :: [(String, LlvmTarget)]
                              , llvmPasses  :: [(Int, String)]
                              }
@@ -1045,13 +1045,13 @@ targetRetainsAllBindings _              = False
 -- | The 'GhcMode' tells us whether we're doing multi-module
 -- compilation (controlled via the "GHC" API) or one-shot
 -- (single-module) compilation.  This makes a difference primarily to
--- the "Finder": in one-shot mode we look for interface files for
+-- the "GHC.Driver.Finder": in one-shot mode we look for interface files for
 -- imported modules, but in multi-module mode we look for source files
 -- in order to check whether they need to be recompiled.
 data GhcMode
   = CompManager         -- ^ @\-\-make@, GHCi, etc.
   | OneShot             -- ^ @ghc -c Foo.hs@
-  | MkDepend            -- ^ @ghc -M@, see "Finder" for why we need this
+  | MkDepend            -- ^ @ghc -M@, see "GHC.Driver.Finder" for why we need this
   deriving Eq
 
 instance Outputable GhcMode where
@@ -1625,7 +1625,7 @@ flattenExtensionFlags ml = foldr f defaultExtensionFlags
 
 -- | The language extensions implied by the various language variants.
 -- When updating this be sure to update the flag documentation in
--- @docs/users-guide/glasgow_exts.rst@.
+-- @docs/users_guide/exts@.
 languageExtensions :: Maybe Language -> [LangExt.Extension]
 
 languageExtensions Nothing
@@ -3614,7 +3614,7 @@ fFlagsDeps = [
 
 -- | These @-f\<blah\>@ flags have to do with the typed-hole error message or
 -- the valid hole fits in that message. See Note [Valid hole fits include ...]
--- in the GHC.Tc.Errors.Hole module. These flags can all be reversed with
+-- in the "GHC.Tc.Errors.Hole" module. These flags can all be reversed with
 -- @-fno-\<blah\>@
 fHoleFlags :: [(Deprecation, FlagSpec GeneralFlag)]
 fHoleFlags = [
@@ -3910,7 +3910,7 @@ defaultFlags settings
 
 -- | These are the default settings for the display and sorting of valid hole
 --  fits in typed-hole error messages. See Note [Valid hole fits include ...]
- -- in the GHC.Tc.Errors.Hole module.
+ -- in the "GHC.Tc.Errors.Hole" module.
 validHoleFitDefaults :: [GeneralFlag]
 validHoleFitDefaults
   =  [ Opt_ShowTypeAppOfHoleFits
