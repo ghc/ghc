@@ -41,6 +41,7 @@ import {-# SOURCE #-} GHC.IfaceToCore
    , tcIfaceAnnotations, tcIfaceCompleteSigs )
 
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Iface.Syntax
 import GHC.Iface.Env
 import GHC.Driver.Types

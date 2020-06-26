@@ -23,7 +23,9 @@ import GHC.Core.Type
 import GHC.Hs
 import GHC.Unit
 import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Core.ConLike
 import Control.Monad
 import GHC.Types.SrcLoc

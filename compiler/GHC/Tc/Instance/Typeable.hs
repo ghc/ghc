@@ -43,6 +43,7 @@ import GHC.Core.Map
 import GHC.Settings.Constants
 import GHC.Utils.Fingerprint(Fingerprint(..), fingerprintString, fingerprintFingerprints)
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString ( FastString, mkFastString, fsLit )
 
 import Control.Monad.Trans.State

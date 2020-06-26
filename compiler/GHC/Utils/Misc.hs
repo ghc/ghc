@@ -166,7 +166,8 @@ import qualified Data.Set as Set
 import Data.Time
 
 #if defined(DEBUG)
-import {-# SOURCE #-} GHC.Utils.Outputable ( warnPprTrace, text )
+import {-# SOURCE #-} GHC.Utils.Outputable ( text )
+import {-# SOURCE #-} GHC.Driver.Ppr ( warnPprTrace )
 #endif
 
 infixr 9 `thenCmp`

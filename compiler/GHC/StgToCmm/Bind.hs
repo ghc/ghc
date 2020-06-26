@@ -48,8 +48,10 @@ import GHC.Utils.Misc
 import GHC.Types.Var.Set
 import GHC.Types.Basic
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 
 import Control.Monad
 

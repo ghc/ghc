@@ -43,14 +43,16 @@ import GHC.Types.Var.Set
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Core.Unify
-import GHC.Utils.Outputable
-import GHC.Utils.Error
 import GHC.Types.Basic
 import GHC.Types.Unique.DFM
-import GHC.Utils.Misc
 import GHC.Types.Id
 import Data.Data        ( Data )
 import Data.Maybe       ( isJust, isNothing )
+
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Error
+import GHC.Utils.Panic
 
 {-
 ************************************************************************

@@ -226,6 +226,7 @@ import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Data.List.SetOps ( getNth, findDupsEq )
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Utils.Error( Validity(..), MsgDoc, isValid )
 import qualified GHC.LanguageExtensions as LangExt

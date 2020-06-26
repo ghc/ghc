@@ -58,6 +58,7 @@ import GHC.Data.OrdList
 import GHC.Types.Id as Id
 import GHC.Core.Make            ( mkWildValBinder )
 import GHC.Driver.Session       ( DynFlags )
+import GHC.Driver.Ppr
 import GHC.Builtin.Types
 import qualified GHC.Core.Type as Type
 import GHC.Core.Type hiding     ( substTy, substTyVar, substTyVarBndr, extendTvSubst, extendCvSubst )
@@ -66,6 +67,7 @@ import GHC.Core.Coercion hiding ( substCo, substCoVar, substCoVarBndr )
 import GHC.Types.Basic
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Types.Unique.FM      ( pprUniqFM )
 

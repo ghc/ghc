@@ -72,6 +72,7 @@ import GHC.Data.Bag
 import GHC.Utils.Misc
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
 
 import Control.Monad
 import Control.Arrow ( second )

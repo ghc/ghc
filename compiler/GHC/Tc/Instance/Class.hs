@@ -41,6 +41,7 @@ import GHC.Core.TyCon
 import GHC.Core.Class
 import GHC.Driver.Session
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Utils.Misc( splitAtList, fstOf3 )
 import Data.Maybe
 

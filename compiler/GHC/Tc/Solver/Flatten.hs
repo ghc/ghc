@@ -28,6 +28,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Tc.Solver.Monad as TcS
 import GHC.Types.Basic( SwapFlag(..) )
 

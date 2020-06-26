@@ -25,6 +25,7 @@ import GHC.Cmm.Dataflow.Label
 
 import GHC.Data.Maybe
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 -----------------------------------------------------------------------------
 -- Calculating what variables are live on entry to a basic block
