@@ -41,6 +41,7 @@ import GHC.Llvm.Types
 import Data.Int
 import Data.List ( intersperse )
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.Unique
 import GHC.Data.FastString
 

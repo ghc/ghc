@@ -38,11 +38,13 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr( pprWithExplicitKindsWhen )
-import GHC.Utils.FV
-import GHC.Utils.Outputable
-import GHC.Utils.Error( Validity(..), allValid )
 import GHC.Types.SrcLoc
+
+import GHC.Utils.Outputable
+import GHC.Utils.FV
+import GHC.Utils.Error( Validity(..), allValid )
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 import GHC.Data.Pair             ( Pair(..) )
 import Data.List        ( nubBy )

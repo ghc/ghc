@@ -82,6 +82,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.Supply
 import GHC.Data.FastString
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Utils.Misc
 
 import Control.Monad

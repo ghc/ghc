@@ -68,6 +68,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import Data.List (mapAccumL)
 import GHC.Data.FastString

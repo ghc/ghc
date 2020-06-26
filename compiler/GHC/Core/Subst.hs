@@ -39,6 +39,8 @@ module GHC.Core.Subst (
 
 import GHC.Prelude
 
+import GHC.Driver.Ppr
+
 import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Seq
@@ -63,6 +65,7 @@ import GHC.Types.Unique.Supply
 import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import Data.List
 
 

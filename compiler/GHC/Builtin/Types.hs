@@ -181,9 +181,11 @@ import GHC.Types.SrcLoc   ( noSrcSpan )
 import GHC.Types.Unique
 import Data.Array
 import GHC.Data.FastString
+import GHC.Data.BooleanFormula ( mkAnd )
+
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
-import GHC.Data.BooleanFormula ( mkAnd )
+import GHC.Utils.Panic
 
 import qualified Data.ByteString.Char8 as BS
 

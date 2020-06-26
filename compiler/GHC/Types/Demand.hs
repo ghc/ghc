@@ -59,19 +59,23 @@ module GHC.Types.Demand (
 
 import GHC.Prelude
 
-import GHC.Utils.Outputable
 import GHC.Types.Var ( Var )
 import GHC.Types.Var.Env
 import GHC.Types.Unique.FM
-import GHC.Utils.Misc
 import GHC.Types.Basic
-import GHC.Utils.Binary
 import GHC.Data.Maybe   ( orElse )
 
 import GHC.Core.Type    ( Type )
 import GHC.Core.TyCon   ( isNewTyCon, isClassTyCon )
 import GHC.Core.DataCon ( splitDataProductType_maybe )
 import GHC.Core.Multiplicity    ( scaledThing )
+
+import GHC.Utils.Binary
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+
+import GHC.Driver.Ppr
 
 {-
 ************************************************************************

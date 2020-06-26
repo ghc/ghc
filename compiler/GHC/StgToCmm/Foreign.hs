@@ -44,7 +44,7 @@ import GHC.Cmm.CLabel
 import GHC.Runtime.Heap.Layout
 import GHC.Types.ForeignCall
 import GHC.Data.Maybe
-import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.Unique.Supply
 import GHC.Types.Basic
 

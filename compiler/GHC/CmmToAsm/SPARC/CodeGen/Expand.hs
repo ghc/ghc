@@ -18,8 +18,8 @@ import GHC.Platform.Reg
 import GHC.CmmToAsm.Format
 import GHC.Cmm
 
-
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.OrdList
 
 -- | Expand out synthetic instructions in this top level thing

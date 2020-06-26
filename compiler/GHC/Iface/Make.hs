@@ -49,6 +49,7 @@ import GHC.Hs
 import GHC.Driver.Types
 import GHC.Driver.Backend
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Types.Var.Env
 import GHC.Types.Var
 import GHC.Types.Name
@@ -59,6 +60,7 @@ import GHC.Types.Name.Set
 import GHC.Unit.Module
 import GHC.Utils.Error
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.Basic hiding ( SuccessFlag(..) )
 import GHC.Utils.Misc  hiding ( eqListBy )
 import GHC.Data.FastString

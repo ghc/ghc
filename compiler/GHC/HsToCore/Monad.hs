@@ -84,7 +84,9 @@ import GHC.Types.Unique.Supply
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Utils.Error
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Types.Unique.FM ( lookupWithDefaultUFM_Directly )
 import GHC.Types.Literal ( mkLitString )

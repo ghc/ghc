@@ -25,6 +25,7 @@ import GHC.Utils.Misc
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import GHC.Utils.Fingerprint
+import GHC.Utils.Panic
 import GHC.Data.Maybe
 import GHC.Driver.Finder
 

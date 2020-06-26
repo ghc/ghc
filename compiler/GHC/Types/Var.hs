@@ -109,6 +109,7 @@ import GHC.Types.Unique ( Uniquable, Unique, getKey, getUnique
 import GHC.Utils.Misc
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import Data.Data
 

@@ -276,6 +276,7 @@ import {-# SOURCE #-} GHC.Core.Coercion
 import GHC.Utils.Misc
 import GHC.Utils.FV
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Data.Pair
 import GHC.Data.List.SetOps

@@ -79,6 +79,7 @@ import GHC.Types.SrcLoc
 import GHC.Data.Bag
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Types.Unique.FM
 import GHC.Core.Multiplicity
 import GHC.Core

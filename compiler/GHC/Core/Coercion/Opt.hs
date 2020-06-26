@@ -9,6 +9,8 @@ module GHC.Core.Coercion.Opt ( optCoercion, checkAxInstCo ) where
 import GHC.Prelude
 
 import GHC.Driver.Session
+import GHC.Driver.Ppr
+
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Subst
 import GHC.Core.Coercion
@@ -18,14 +20,16 @@ import GHC.Core.TyCon
 import GHC.Core.Coercion.Axiom
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
-import GHC.Utils.Outputable
 import GHC.Core.FamInstEnv ( flattenTys )
 import GHC.Data.Pair
 import GHC.Data.List.SetOps ( getNth )
-import GHC.Utils.Misc
 import GHC.Core.Unify
 import GHC.Core.InstEnv
 import Control.Monad   ( zipWithM )
+
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 {-
 %************************************************************************

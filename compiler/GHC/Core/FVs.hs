@@ -79,10 +79,11 @@ import GHC.Core.FamInstEnv
 import GHC.Builtin.Types( unrestrictedFunTyConName )
 import GHC.Builtin.Types.Prim( funTyConName )
 import GHC.Data.Maybe( orElse )
-import GHC.Utils.Misc
 import GHC.Types.Basic( Activation )
-import GHC.Utils.Outputable
+
 import GHC.Utils.FV as FV
+import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 {-
 ************************************************************************

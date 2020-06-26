@@ -96,6 +96,7 @@ import GHC.Core.DataCon
 import GHC.Types.Id
 import GHC.Stg.Syntax
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.Basic (isWeakLoopBreaker)
 import GHC.Types.Var.Env
 import GHC.Core (AltCon(..))

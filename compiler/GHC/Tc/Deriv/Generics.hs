@@ -49,6 +49,7 @@ import GHC.Data.Bag
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set (elemVarSet)
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Utils.Misc
 

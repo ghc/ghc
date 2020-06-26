@@ -81,6 +81,7 @@ import GHC.Types.Basic
 import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 -- just for implementing a fast [0,61) -> Char function
 import GHC.Exts (indexCharOffAddr#, Char(..), Int(..))

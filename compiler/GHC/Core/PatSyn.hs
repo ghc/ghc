@@ -30,12 +30,14 @@ import GHC.Prelude
 import GHC.Core.Type
 import GHC.Core.TyCo.Ppr
 import GHC.Types.Name
-import GHC.Utils.Outputable
 import GHC.Types.Unique
-import GHC.Utils.Misc
 import GHC.Types.Basic
 import GHC.Types.Var
 import GHC.Types.FieldLabel
+
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import qualified Data.Data as Data
 import Data.Function

@@ -15,6 +15,7 @@ import GHC.CmmToAsm.Instr
 import GHC.Cmm
 
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 
 -- | Enforce intra-block invariants.

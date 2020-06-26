@@ -60,8 +60,10 @@ import GHC.Types.Unique.FM
 import GHC.Core.Unify as Unify ( ruleMatchTyKiX )
 import GHC.Types.Basic
 import GHC.Driver.Session      ( DynFlags, gopt, targetPlatform )
+import GHC.Driver.Ppr
 import GHC.Driver.Flags
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Data.Bag

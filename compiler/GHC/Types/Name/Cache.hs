@@ -16,9 +16,11 @@ import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Types.Unique.Supply
 import GHC.Builtin.Types
+import GHC.Builtin.Names
+
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
-import GHC.Builtin.Names
+import GHC.Utils.Panic
 
 #include "HsVersions.h"
 

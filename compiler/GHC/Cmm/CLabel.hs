@@ -127,6 +127,7 @@ import GHC.Types.Unique
 import GHC.Builtin.PrimOps
 import GHC.Types.CostCentre
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Driver.Session
 import GHC.Driver.Backend

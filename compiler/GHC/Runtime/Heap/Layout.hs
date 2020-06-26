@@ -48,11 +48,13 @@ import GHC.Prelude
 
 import GHC.Types.Basic( ConTagZ )
 import GHC.Driver.Session
-import GHC.Utils.Outputable
 import GHC.Platform
 import GHC.Platform.Profile
 import GHC.Data.FastString
 import GHC.StgToCmm.Types
+
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import Data.Word
 import Data.Bits

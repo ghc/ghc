@@ -42,6 +42,7 @@ import GHC.Runtime.Interpreter.Types
 import GHCi.RemoteTypes
 import GHCi.BreakArray
 import GHC.Driver.Session as DynFlags
+import GHC.Driver.Ppr hiding (printForUser)
 import GHC.Utils.Error hiding (traceCmd)
 import GHC.Driver.Finder as Finder
 import GHC.Driver.Monad ( modifySession )
@@ -69,7 +70,7 @@ import GHC.Types.SrcLoc as SrcLoc
 import qualified GHC.Parser.Lexer as Lexer
 
 import GHC.Data.StringBuffer
-import GHC.Utils.Outputable hiding ( printForUser )
+import GHC.Utils.Outputable
 
 import GHC.Runtime.Loader ( initializePlugins )
 
@@ -3430,8 +3431,9 @@ completeBreakpoint = wrapCompleter spaces $ \w -> do          -- #3000
     -- Extract all bids from all top-level identifiers in scope.
     bidsFromInscopes :: GhciMonad m => m [String]
     bidsFromInscopes = do
+        dflags <- getDynFlags
         rdrs <- GHC.getRdrNamesInScope
-        inscopess <- mapM createInscope $ (showSDocUnsafe . ppr) <$> rdrs
+        inscopess <- mapM createInscope $ (showSDoc dflags . ppr) <$> rdrs
         imods <- interpretedHomeMods
         let topLevels = filter ((`elem` imods) . snd) $ concat inscopess
         bidss <- mapM (addNestedDecls) topLevels

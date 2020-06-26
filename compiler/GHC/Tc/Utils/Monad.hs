@@ -149,6 +149,8 @@ module GHC.Tc.Utils.Monad(
 
 import GHC.Prelude
 
+import GHC.Driver.Ppr
+
 import GHC.Tc.Types     -- Re-export all
 import GHC.Data.IOEnv -- Re-export all
 import GHC.Tc.Types.Constraint

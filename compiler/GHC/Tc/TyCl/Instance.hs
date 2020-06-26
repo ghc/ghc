@@ -65,6 +65,7 @@ import GHC.Types.Var.Set
 import GHC.Data.Bag
 import GHC.Types.Basic
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Utils.Error
 import GHC.Data.FastString
 import GHC.Types.Id
@@ -72,6 +73,7 @@ import GHC.Data.List.SetOps
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Data.BooleanFormula ( isUnsatisfied, pprBooleanFormulaNice )

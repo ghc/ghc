@@ -42,6 +42,7 @@ module GHC.Driver.Phases (
 import GHC.Prelude
 
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 import System.FilePath
 import GHC.Utils.Binary

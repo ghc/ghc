@@ -37,6 +37,7 @@ import GHC.Stg.Syntax
 import GHC.Core.Utils
 import GHC.Types.Unique.Supply
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Core.Multiplicity

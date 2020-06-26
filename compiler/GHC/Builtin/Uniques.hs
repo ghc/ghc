@@ -33,10 +33,12 @@ import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Types.Id
 import GHC.Types.Basic
-import GHC.Utils.Outputable
 import GHC.Types.Unique
 import GHC.Types.Name
+
+import GHC.Utils.Outputable
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 import Data.Bits
 import Data.Maybe

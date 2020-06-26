@@ -30,6 +30,7 @@ import GHC.Types.Basic  ( Fixity(..), FixityDirection(..), minPrecedence,
                           defaultFixity, SourceText(..) )
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.Maybe
 import Data.List
 import Data.Function    ( on )

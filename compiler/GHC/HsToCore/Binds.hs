@@ -63,6 +63,7 @@ import GHC.Core.Rules
 import GHC.Types.Var.Env
 import GHC.Types.Var( EvVar )
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Unit.Module
 import GHC.Types.SrcLoc
 import GHC.Data.Maybe
@@ -70,6 +71,7 @@ import GHC.Data.OrdList
 import GHC.Data.Bag
 import GHC.Types.Basic
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Types.Unique.Set( nonDetEltsUniqSet )

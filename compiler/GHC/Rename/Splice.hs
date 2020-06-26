@@ -43,6 +43,7 @@ import GHC.Builtin.Names.TH ( liftName )
 import GHC.Driver.Session
 import GHC.Data.FastString
 import GHC.Utils.Error  ( dumpIfSet_dyn_printer, DumpFormat (..) )
+import GHC.Utils.Panic
 import GHC.Tc.Utils.Env ( tcMetaTy )
 import GHC.Driver.Hooks
 import GHC.Builtin.Names.TH ( quoteExpName, quotePatName, quoteDecName, quoteTypeName

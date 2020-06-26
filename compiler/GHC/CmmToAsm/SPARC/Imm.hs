@@ -13,6 +13,7 @@ import GHC.Cmm
 import GHC.Cmm.CLabel
 
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 -- | An immediate value.
 --      Not all of these are directly representable by the machine.

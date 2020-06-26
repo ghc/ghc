@@ -35,6 +35,7 @@ import GHC.HsToCore.Match
 import GHC.Builtin.Names
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Tc.Utils.TcType
 import GHC.Data.List.SetOps( getNth )
 import GHC.Utils.Misc

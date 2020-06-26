@@ -83,6 +83,7 @@ import GHC.Types.SrcLoc  ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
 import GHC.Types.ForeignCall ( CCallConv(..) )
 import GHC.Data.OrdList
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Driver.Session
 import GHC.Utils.Misc

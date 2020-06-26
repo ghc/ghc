@@ -88,6 +88,7 @@ import GHC.Core.TyCon    ( PrimRep(..), TyCon )
 import GHC.Core.Type     ( Type )
 import GHC.Types.RepType ( typePrimRep1 )
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 import Data.List.NonEmpty ( NonEmpty, toList )
 

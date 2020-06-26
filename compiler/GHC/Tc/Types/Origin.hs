@@ -28,7 +28,6 @@ import GHC.Tc.Utils.TcType
 
 import GHC.Hs
 
-import GHC.Types.Id
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.TyCon
@@ -37,13 +36,17 @@ import GHC.Core.PatSyn
 import GHC.Core.Multiplicity ( scaledThing )
 
 import GHC.Unit.Module
+import GHC.Types.Id
 import GHC.Types.Name
 import GHC.Types.Name.Reader
-
-import GHC.Types.SrcLoc
-import GHC.Data.FastString
-import GHC.Utils.Outputable
 import GHC.Types.Basic
+import GHC.Types.SrcLoc
+
+import GHC.Data.FastString
+
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Driver.Ppr
 
 {- *********************************************************************
 *                                                                      *

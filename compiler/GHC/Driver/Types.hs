@@ -161,6 +161,10 @@ module GHC.Driver.Types (
 
 import GHC.Prelude
 
+import GHC.Driver.Ppr
+import GHC.Driver.CmdLine
+import GHC.Driver.Session
+
 import GHC.ByteCode.Types
 import GHC.Runtime.Eval.Types ( Resume )
 import GHC.Runtime.Interpreter.Types (Interp)
@@ -193,8 +197,6 @@ import GHC.Core.PatSyn
 import GHC.Builtin.Names ( gHC_PRIM, ioTyConName, printName, mkInteractiveModule )
 import GHC.Builtin.Types
 import GHC.Driver.Backend
-import GHC.Driver.CmdLine
-import GHC.Driver.Session
 import GHC.Runtime.Linker.Types ( DynLinker, Linkable(..), Unlinked(..), SptEntry(..) )
 import GHC.Driver.Phases
    ( Phase, HscSource(..), hscSourceString
@@ -214,6 +216,7 @@ import GHC.Utils.Monad
 import GHC.Data.Bag
 import GHC.Utils.Binary
 import GHC.Utils.Error
+import GHC.Utils.Panic
 import GHC.Types.Name.Cache
 import GHC.Platform
 import GHC.Utils.Misc

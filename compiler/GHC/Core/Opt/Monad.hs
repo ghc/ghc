@@ -78,7 +78,7 @@ import qualified Data.Map.Strict as MapStrict
 import Data.Word
 import Control.Monad
 import Control.Applicative ( Alternative(..) )
-import GHC.Utils.Panic (throwGhcException, GhcException(..))
+import GHC.Utils.Panic (throwGhcException, GhcException(..), panic)
 
 {-
 ************************************************************************

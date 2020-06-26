@@ -37,6 +37,7 @@ import GHC.Core.Ppr.TyThing
 import GHC.Utils.Error
 import GHC.Utils.Monad
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Utils.Exception
 
 import Control.Monad

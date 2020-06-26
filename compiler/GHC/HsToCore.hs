@@ -61,6 +61,7 @@ import GHC.Types.Var.Set
 import GHC.Data.FastString
 import GHC.Utils.Error
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.SrcLoc
 import GHC.HsToCore.Coverage
 import GHC.Utils.Misc

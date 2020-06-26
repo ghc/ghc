@@ -41,6 +41,7 @@ import GHC.Types.Unique
 import GHC.Types.Var
 import GHC.Utils.Misc
 import GHC.Utils.Binary
+import GHC.Utils.Panic
 import GHC.Data.Pair
 import GHC.Types.Basic
 import Data.Typeable ( Typeable )

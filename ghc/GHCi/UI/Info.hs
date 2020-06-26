@@ -38,6 +38,7 @@ import           GHC.Driver.Session (HasDynFlags(..))
 import           GHC.Data.FastString
 import           GHC
 import           GHC.Driver.Monad
+import           GHC.Driver.Ppr
 import           GHC.Types.Name
 import           GHC.Types.Name.Set
 import           GHC.Utils.Outputable

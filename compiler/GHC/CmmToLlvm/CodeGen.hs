@@ -10,6 +10,9 @@ module GHC.CmmToLlvm.CodeGen ( genLlvmProc ) where
 
 import GHC.Prelude
 
+import GHC.Driver.Session
+import GHC.Driver.Ppr
+
 import GHC.Llvm
 import GHC.CmmToLlvm.Base
 import GHC.CmmToLlvm.Regs
@@ -25,11 +28,11 @@ import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Collections
 
-import GHC.Driver.Session
 import GHC.Data.FastString
 import GHC.Types.ForeignCall
-import GHC.Utils.Outputable hiding (panic, pprPanic)
-import qualified GHC.Utils.Outputable as Outputable
+import GHC.Utils.Outputable
+import GHC.Utils.Panic (assertPanic)
+import qualified GHC.Utils.Panic as Panic
 import GHC.Platform
 import GHC.Data.OrdList
 import GHC.Types.Unique.Supply
@@ -2001,10 +2004,10 @@ toIWord platform = mkIntLit (llvmWord platform)
 
 -- | Error functions
 panic :: HasCallStack => String -> a
-panic s = Outputable.panic $ "GHC.CmmToLlvm.CodeGen." ++ s
+panic s = Panic.panic $ "GHC.CmmToLlvm.CodeGen." ++ s
 
 pprPanic :: HasCallStack => String -> SDoc -> a
-pprPanic s d = Outputable.pprPanic ("GHC.CmmToLlvm.CodeGen." ++ s) d
+pprPanic s d = Panic.pprPanic ("GHC.CmmToLlvm.CodeGen." ++ s) d
 
 
 -- | Returns TBAA meta data by unique

@@ -20,6 +20,7 @@ import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Builtin.Types
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import Control.Monad.Trans.RWS.CPS
 import GHC.Utils.Misc
 import GHC.Data.Maybe

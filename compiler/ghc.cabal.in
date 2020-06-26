@@ -181,6 +181,7 @@ Library
         GHC.Driver.Monad
         GHC.Driver.Hooks
         GHC.Driver.Flags
+        GHC.Driver.Ppr
         GHC.Types.Id
         GHC.Types.Id.Info
         GHC.Core.Predicate

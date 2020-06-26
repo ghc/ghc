@@ -41,8 +41,10 @@ where
 
 import GHC.Prelude
 
-import GHC.Platform
 import GHC.Driver.Session (targetPlatform)
+import GHC.Driver.Ppr
+
+import GHC.Platform
 import GHC.Cmm.Expr
 
 import GHC.Utils.Outputable

@@ -9,6 +9,7 @@ import GHC.Types.Id
 import GHC.Types.Name (Name, nameIsLocalOrFrom)
 import GHC.Types.Name.Env
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 import GHC.Types.Var.Set
 import GHC.Unit.Module (Module)

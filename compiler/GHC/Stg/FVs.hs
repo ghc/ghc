@@ -50,6 +50,7 @@ import GHC.Types.Var.Set
 import GHC.Core    ( Tickish(Breakpoint) )
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 import Data.Maybe ( mapMaybe )
 

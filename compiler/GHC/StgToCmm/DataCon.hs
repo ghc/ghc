@@ -48,7 +48,7 @@ import GHC.Types.Name (isInternalName)
 import GHC.Types.RepType (countConRepArgs)
 import GHC.Types.Literal
 import GHC.Builtin.Utils
-import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Utils.Monad (mapMaybeM)
 

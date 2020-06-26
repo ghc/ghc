@@ -29,6 +29,8 @@ where
 
 import GHC.Prelude
 
+import GHC.Driver.Ppr
+
 import {-# SOURCE #-} GHC.Types.Id.Make ( mkPrimOpId, magicDictId )
 
 import GHC.Core
@@ -61,6 +63,7 @@ import GHC.Data.FastString
 import GHC.Types.Basic
 import GHC.Platform
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Core.Coercion   (mkUnbranchedAxInstCo,mkSymCo,Role(..))
 
 import Control.Applicative ( Alternative(..) )

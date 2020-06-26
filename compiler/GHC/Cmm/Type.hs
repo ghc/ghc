@@ -34,6 +34,7 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.Data.FastString
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import Data.Word
 import Data.Int

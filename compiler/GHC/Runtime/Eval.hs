@@ -80,6 +80,7 @@ import GHC.Types.Var.Env
 import GHC.ByteCode.Types
 import GHC.Runtime.Linker as Linker
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.LanguageExtensions
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply

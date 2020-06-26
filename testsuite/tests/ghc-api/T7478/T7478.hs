@@ -8,6 +8,7 @@ import System.Environment
 import GHC
 import qualified GHC.Settings.Config as GHC
 import qualified GHC.Utils.Outputable as GHC
+import qualified GHC.Driver.Ppr as GHC
 import GHC.Driver.Monad (liftIO)
 import GHC.Utils.Outputable (PprStyle, queryQual)
 

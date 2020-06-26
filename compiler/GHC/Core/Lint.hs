@@ -64,6 +64,7 @@ import GHC.Utils.Error as Err
 import GHC.Data.List.SetOps
 import GHC.Builtin.Names
 import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Core.InstEnv      ( instanceDFunId )
@@ -73,6 +74,7 @@ import GHC.Types.Demand      ( splitStrictSig, isDeadEndDiv )
 
 import GHC.Driver.Types hiding (Usage)
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import Control.Monad
 import GHC.Utils.Monad
 import Data.Foldable      ( toList )

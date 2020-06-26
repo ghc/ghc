@@ -65,6 +65,7 @@ import GHC.Settings.Constants
 import GHC.Platform
 import GHC.Types.Unique.FM
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 import Data.ByteString (ByteString)
 import Data.Int

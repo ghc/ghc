@@ -30,12 +30,14 @@ import GHC.Cmm              ( RawCmmGroup )
 import GHC.Cmm.CLabel
 import GHC.Driver.Types
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Data.Stream           ( Stream )
 import qualified GHC.Data.Stream as Stream
 import GHC.SysTools.FileCleanup
 
 import GHC.Utils.Error
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Unit
 import GHC.Types.SrcLoc
 import GHC.Types.CostCentre

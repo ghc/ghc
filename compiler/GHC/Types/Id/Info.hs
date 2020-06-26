@@ -104,11 +104,13 @@ import GHC.Core.TyCon
 import GHC.Core.PatSyn
 import GHC.Core.Type
 import GHC.Types.ForeignCall
-import GHC.Utils.Outputable
 import GHC.Unit.Module
 import GHC.Types.Demand
 import GHC.Types.Cpr
+
 import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import Data.Word
 import Data.Bits

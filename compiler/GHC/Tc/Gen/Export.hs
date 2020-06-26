@@ -30,6 +30,7 @@ import GHC.Core.TyCon
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.Types
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.PatSyn

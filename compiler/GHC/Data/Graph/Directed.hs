@@ -46,6 +46,7 @@ import GHC.Prelude
 
 import GHC.Utils.Misc ( minWith, count )
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.Maybe ( expectJust )
 
 -- std interfaces

@@ -14,9 +14,11 @@ import GHC.Prelude
 
 import GHC.Data.Bag
 import GHC.Hs
-import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
+
+import GHC.Utils.Outputable
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 import Data.Char
 

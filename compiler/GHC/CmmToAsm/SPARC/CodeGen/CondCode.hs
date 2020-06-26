@@ -22,6 +22,7 @@ import GHC.Cmm
 
 import GHC.Data.OrdList
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 
 getCondCode :: CmmExpr -> NatM CondCode

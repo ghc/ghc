@@ -28,6 +28,7 @@ import GHC.Data.FastString        ( FastString )
 import GHC.Types.Name
 import GHC.Types.Name.Cache
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Builtin.Utils
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Unique.Supply    ( takeUniqFromSupply )

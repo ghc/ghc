@@ -58,6 +58,7 @@ import GHC.Platform.Reg.Class
 import GHC.Cmm
 import GHC.Cmm.CLabel           ( CLabel )
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 
 import qualified Data.Array as A

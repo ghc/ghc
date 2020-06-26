@@ -4,6 +4,7 @@ import GHC.Types.Basic
 import GHC
 import GHC.Driver.Monad
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.RepType
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types

@@ -38,6 +38,7 @@ import GHC.Builtin.Types.Prim
 import GHC.Types.Basic( Arity )
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Utils.Misc
 
 import Control.Monad

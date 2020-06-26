@@ -85,6 +85,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Types.Name.Env
 
 import Data.Data

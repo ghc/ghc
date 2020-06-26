@@ -91,6 +91,7 @@ import GHC.Utils.Binary
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 import Data.Maybe( isJust )
 import qualified Data.Semigroup as Semi

@@ -22,6 +22,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Builtin.Names
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
 

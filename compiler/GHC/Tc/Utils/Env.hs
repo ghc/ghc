@@ -107,6 +107,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Basic hiding( SuccessFlag(..) )
 import GHC.Unit.Module
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Utils.Encoding
 import GHC.Data.FastString
 import GHC.Data.Bag

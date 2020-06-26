@@ -66,6 +66,7 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Data.Bag
 import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
 import GHC.Core.PatSyn
 
 import Control.Monad

@@ -27,10 +27,12 @@ import GHC.Driver.Backend
 import GHC.Driver.Types
 import GHC.Driver.Finder
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Unit.Module
 import GHC.Utils.Error
+import GHC.Utils.Panic
 import GHC.Data.Graph.Directed
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable as Outputable

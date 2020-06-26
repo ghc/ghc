@@ -41,6 +41,7 @@ import GHC.Builtin.Types
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Types.Var (EvVar)

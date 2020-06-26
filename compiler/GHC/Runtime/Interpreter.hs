@@ -70,7 +70,8 @@ import GHC.Types.Basic
 import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Runtime.Eval.Types(BreakInfo(..))
-import GHC.Utils.Outputable(brackets, ppr, showSDocUnqual)
+import GHC.Utils.Outputable(brackets, ppr)
+import GHC.Driver.Ppr (showSDoc)
 import GHC.Types.SrcLoc
 import GHC.Data.Maybe
 import GHC.Unit.Module
@@ -413,7 +414,7 @@ handleSeqHValueStatus hsc_env eval_status = do
              | otherwise = Just (BreakInfo modl ix)
           sdocBpLoc = brackets . ppr . getSeqBpSpan
       putStrLn ("*** Ignoring breakpoint " ++
-            (showSDocUnqual (hsc_dflags hsc_env) $ sdocBpLoc bp))
+            (showSDoc (hsc_dflags hsc_env) $ sdocBpLoc bp))
       -- resume the seq (:force) processing in the iserv process
       withForeignRef resume_ctxt_fhv $ \hval ->
         iservCmd hsc_env (ResumeSeq hval) >>= handleSeqHValueStatus hsc_env

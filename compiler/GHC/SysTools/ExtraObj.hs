@@ -16,6 +16,7 @@ module GHC.SysTools.ExtraObj (
 import GHC.Utils.Asm
 import GHC.Utils.Error
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Unit.State
 import GHC.Platform
 import GHC.Utils.Outputable as Outputable

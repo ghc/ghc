@@ -20,7 +20,7 @@ import GHC.Cmm
 import GHC.Platform
 
 import GHC.Data.FastString
-import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import qualified Data.ByteString as BS
 
 -- ----------------------------------------------------------------------------

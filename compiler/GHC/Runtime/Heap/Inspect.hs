@@ -57,7 +57,9 @@ import GHC.Types.Basic ( Boxity(..) )
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Utils.Outputable as Ppr
+import GHC.Utils.Panic
 import GHC.Char
 import GHC.Exts.Heap
 import GHC.Runtime.Heap.Layout ( roundUpTo )

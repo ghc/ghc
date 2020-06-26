@@ -27,6 +27,7 @@ import GHC.Types.Avail
 import GHC.Types.Unique
 import qualified GHC.Utils.Outputable as O ( (<>) )
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 import qualified Data.Array as A
 import qualified Data.Map as M

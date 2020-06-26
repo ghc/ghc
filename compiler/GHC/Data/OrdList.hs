@@ -22,6 +22,7 @@ import GHC.Prelude
 import Data.Foldable
 
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import qualified Data.Semigroup as Semigroup
 

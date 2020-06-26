@@ -34,6 +34,7 @@ import GHC.Types.Var.Set
 import GHC.Types.Basic ( RuleName )
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Data.Bag
 

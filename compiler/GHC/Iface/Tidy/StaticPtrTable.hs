@@ -135,6 +135,7 @@ import GHC.Core.Make (mkStringExprFSWith)
 import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Builtin.Names
 import GHC.Tc.Utils.Env (lookupGlobal)

@@ -73,6 +73,7 @@ import GHC.Data.Maybe
 import GHC.Types.SrcLoc
 import GHC.Driver.Session
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Types.Basic hiding ( SuccessFlag(..) )
 import GHC.Data.List.SetOps

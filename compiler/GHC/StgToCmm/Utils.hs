@@ -76,6 +76,7 @@ import GHC.Types.Unique.Supply (MonadUnique(..))
 import GHC.Driver.Session
 import GHC.Data.FastString
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.RepType
 import GHC.Types.CostCentre
 

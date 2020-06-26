@@ -47,6 +47,7 @@ import GHC.Cmm.Dataflow.Collections
 
 import GHC.Types.Unique ( pprUniqueAlways )
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Data.FastString
 

@@ -4,7 +4,9 @@ import Control.Monad.IO.Class
 import Data.List (intercalate)
 import Data.Maybe (isJust)
 import GHC.Driver.Plugins
+import GHC.Driver.Session
 import GHC.Driver.Types
+import GHC.Driver.Ppr
 import GHC.Tc.Types
 import GHC.Hs.Extension
 import GHC.Types.Avail
@@ -42,11 +44,13 @@ typecheckPlugin _ _ tc
 
 metaPlugin' :: [CommandLineOption] -> LHsExpr GhcTc -> TcM (LHsExpr GhcTc)
 metaPlugin' _ meta
-  = do liftIO $ putStrLn $ "metaPlugin: " ++ (showSDocUnsafe $ ppr meta)
+  = do dflags <- getDynFlags
+       liftIO $ putStrLn $ "metaPlugin: " ++ (showSDoc dflags $ ppr meta)
        return meta
 
 interfaceLoadPlugin' :: [CommandLineOption] -> ModIface -> IfM lcl ModIface
 interfaceLoadPlugin' _ iface
-  = do liftIO $ putStrLn $ "interfacePlugin: "
-                              ++ (showSDocUnsafe $ ppr $ mi_module iface)
+  = do dflags <- getDynFlags
+       liftIO $ putStrLn $ "interfacePlugin: "
+                              ++ (showSDoc dflags $ ppr $ mi_module iface)
        return iface

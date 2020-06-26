@@ -62,6 +62,7 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Unique
 import GHC.Types.Basic
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.Bag
 import GHC.Driver.Session
 import GHC.Data.FastString

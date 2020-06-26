@@ -9,6 +9,7 @@ import Data.List (intercalate)
 import System.IO
 import GHC
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Data.Bag (filterBag,isEmptyBag)
@@ -71,7 +72,7 @@ testOneFile libdir fileName = do
        = ["HsIsString [" ++ src ++ "] " ++ show c]
      doOverLit _ = []
 
-pp a = showPpr unsafeGlobalDynFlags a
+pp a = showPprUnsafe a
 
 -- ---------------------------------------------------------------------
 

@@ -46,6 +46,7 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique
 import GHC.Utils.Monad.State
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Cmm.Dataflow.Collections
 

@@ -50,6 +50,7 @@ import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Data.FastString
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import Control.Monad ( unless, void )
 import Control.Arrow ( first )

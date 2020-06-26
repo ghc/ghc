@@ -29,6 +29,7 @@ import GHC.Stg.Syntax
 import GHC.Utils.Outputable
 import GHC.Types.Unique.Supply
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Types.Var.Set
 import Control.Monad ( when )
 import Data.Maybe ( isNothing )

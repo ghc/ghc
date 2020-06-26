@@ -34,6 +34,7 @@ import GHC.Types.Name
 import GHC.Tc.Utils.Monad
 import GHC.Utils.Misc
 import GHC.Utils.Fingerprint
+import GHC.Utils.Panic
 import GHC.Types.Basic
 
 -- a bit vexing

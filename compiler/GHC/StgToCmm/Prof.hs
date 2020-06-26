@@ -25,6 +25,9 @@ module GHC.StgToCmm.Prof (
 
 import GHC.Prelude
 
+import GHC.Driver.Session
+import GHC.Driver.Ppr
+
 import GHC.Platform
 import GHC.Platform.Profile
 import GHC.StgToCmm.Closure
@@ -38,10 +41,10 @@ import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 
 import GHC.Types.CostCentre
-import GHC.Driver.Session
 import GHC.Data.FastString
 import GHC.Unit.Module as Module
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import Control.Monad
 import Data.Char (ord)

@@ -60,19 +60,21 @@ import GHC.Types.Literal
 import GHC.Types.ForeignCall
 import GHC.Types.Annotations( AnnPayload, AnnTarget )
 import GHC.Types.Basic
-import GHC.Utils.Outputable as Outputable
 import GHC.Unit.Module
 import GHC.Types.SrcLoc
-import GHC.Utils.Fingerprint
-import GHC.Utils.Binary
 import GHC.Data.BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
 import GHC.Types.Var( VarBndr(..), binderVar, tyVarSpecToBinders )
 import GHC.Core.TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
+import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
+import GHC.Builtin.Types ( constraintKindTyConName )
+
+import GHC.Utils.Lexeme (isLexSym)
+import GHC.Utils.Fingerprint
+import GHC.Utils.Binary
+import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
 import GHC.Utils.Misc( dropList, filterByList, notNull, unzipWith, debugIsOn,
                        seqList, zipWithEqual )
-import GHC.Core.DataCon (SrcStrictness(..), SrcUnpackedness(..))
-import GHC.Utils.Lexeme (isLexSym)
-import GHC.Builtin.Types ( constraintKindTyConName )
 
 import Control.Monad
 import System.IO.Unsafe

@@ -43,6 +43,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Types.Unique.Supply
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 
 mkNewTyConRhs :: Name -> TyCon -> DataCon -> TcRnIf m n AlgTyConRhs

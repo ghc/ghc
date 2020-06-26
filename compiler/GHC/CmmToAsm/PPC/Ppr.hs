@@ -34,6 +34,7 @@ import GHC.Types.Unique ( pprUniqueAlways, getUnique )
 import GHC.Platform
 import GHC.Data.FastString
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Driver.Session (targetPlatform)
 
 import Data.Word

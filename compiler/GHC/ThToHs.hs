@@ -50,6 +50,7 @@ import GHC.Utils.Lexeme
 import GHC.Utils.Misc
 import GHC.Data.FastString
 import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
 
 import qualified Data.ByteString as BS
 import Control.Monad( unless, ap )

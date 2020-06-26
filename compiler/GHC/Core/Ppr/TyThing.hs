@@ -26,6 +26,7 @@ import GHC.Iface.Syntax ( ShowSub(..), ShowHowMuch(..), AltPpr(..)
   , showToHeader, pprIfaceDecl )
 import GHC.Core.Coercion.Axiom ( coAxiomTyCon )
 import GHC.Driver.Types( tyThingParent_maybe )
+import GHC.Driver.Ppr
 import GHC.Iface.Make ( tyThingToIfaceDecl )
 import GHC.Core.FamInstEnv( FamInst(..), FamFlavor(..) )
 import GHC.Core.TyCo.Ppr ( pprUserForAll, pprTypeApp, pprSigmaType )

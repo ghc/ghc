@@ -115,6 +115,7 @@ import GHC.Prelude
 
 import GHC.Data.FastString
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.SrcLoc ( Located,unLoc )
 import Data.Data hiding (Fixity, Prefix, Infix)
 import Data.Function (on)

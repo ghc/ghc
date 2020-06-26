@@ -92,21 +92,19 @@ import Data.ByteString (ByteString)
 import Data.Map (Map)
 import qualified Data.Map as Map
 
--- compiler/utils
+-- compiler
 import GHC.Data.Bag
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
 import GHC.Types.Unique.FM
 import GHC.Data.Maybe
 import GHC.Data.OrdList
 import GHC.Utils.Misc ( readRational, readHexRational )
-
--- compiler/main
 import GHC.Utils.Error
 import GHC.Driver.Session as DynFlags
 
--- compiler/basicTypes
 import GHC.Types.SrcLoc
 import GHC.Unit
 import GHC.Types.Basic ( InlineSpec(..), RuleMatchInfo(..),
@@ -114,7 +112,6 @@ import GHC.Types.Basic ( InlineSpec(..), RuleMatchInfo(..),
                          SourceText(..) )
 import GHC.Hs.Doc
 
--- compiler/parser
 import GHC.Parser.CharClass
 
 import GHC.Parser.Annotation

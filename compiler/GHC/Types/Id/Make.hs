@@ -74,7 +74,9 @@ import GHC.Builtin.Names
 import GHC.Types.Basic       hiding ( SuccessFlag(..) )
 import GHC.Utils.Misc
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
 import GHC.Types.Var (VarBndr(Bndr))

@@ -86,6 +86,7 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Data.Maybe
 import GHC.Utils.Outputable
 

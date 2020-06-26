@@ -28,7 +28,9 @@ module GHC.Data.List.SetOps (
 import GHC.Prelude
 
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Utils.Misc
+import GHC.Driver.Ppr
 
 import qualified Data.List as L
 import qualified Data.List.NonEmpty as NE

@@ -51,6 +51,7 @@ import GHC.Unit.State ( pprUnits, pprUnitsSimple )
 import GHC.Driver.Phases
 import GHC.Types.Basic     ( failed )
 import GHC.Driver.Session hiding (WarnReason(..))
+import GHC.Driver.Ppr
 import GHC.Utils.Error
 import GHC.Data.FastString
 import GHC.Utils.Outputable as Outputable

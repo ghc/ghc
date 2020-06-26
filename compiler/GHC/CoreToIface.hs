@@ -48,6 +48,7 @@ module GHC.CoreToIface
 
 import GHC.Prelude
 
+import GHC.Driver.Ppr
 import GHC.Iface.Syntax
 import GHC.Core.DataCon
 import GHC.Types.Id
@@ -66,6 +67,7 @@ import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Core.PatSyn
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Types.Var

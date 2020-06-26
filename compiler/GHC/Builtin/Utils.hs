@@ -72,6 +72,7 @@ import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Types.Unique.FM
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Builtin.Types.Literals ( typeNatTyCons )
 import GHC.Hs.Doc
 

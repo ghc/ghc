@@ -16,6 +16,7 @@ import GHC.Prelude
 
 import GHC.Utils.Outputable
 import GHC.Driver.Backend
+import GHC.Utils.Panic
 import GHC.Cmm.Dataflow.Label (Label)
 
 import Data.Maybe

@@ -47,6 +47,7 @@ module GHC.Core.Unfold (
 import GHC.Prelude
 
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Core
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.SimpleOpt
@@ -65,6 +66,7 @@ import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 import GHC.Data.Bag
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.ForeignCall
 import GHC.Types.Name
 import GHC.Utils.Error

@@ -53,17 +53,19 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Name
 import GHC.Types.Unique.DFM
-import GHC.Utils.Outputable
 import GHC.Data.Maybe
 import GHC.Core.Map
 import GHC.Types.Unique
-import GHC.Utils.Misc
 import GHC.Types.Var
 import GHC.Types.SrcLoc
 import GHC.Data.FastString
 import Control.Monad
 import Data.List( mapAccumL )
 import Data.Array( Array, assocs )
+
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 {-
 ************************************************************************

@@ -55,7 +55,7 @@ import GHC.CmmToAsm.CPrim
 import GHC.Types.Basic
 import GHC.Data.FastString
 import GHC.Data.OrdList
-import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 
 import Control.Monad    ( mapAndUnzipM )

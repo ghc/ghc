@@ -117,6 +117,7 @@ import GHC.Types.Name.Set
 import GHC.Core.Class
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Types.SrcLoc
 import GHC.Core.Type
 

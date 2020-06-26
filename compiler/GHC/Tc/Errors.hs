@@ -58,8 +58,10 @@ import GHC.Core.ConLike ( ConLike(..))
 import GHC.Utils.Misc
 import GHC.Data.FastString
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.SrcLoc
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Data.List.SetOps ( equivClasses )
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt

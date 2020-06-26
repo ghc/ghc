@@ -30,7 +30,7 @@ import GHC.Data.Bag
 import GHC.Core.DataCon
 import GHC.Data.FastString
 import GHC.Hs
-import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Builtin.Names
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
