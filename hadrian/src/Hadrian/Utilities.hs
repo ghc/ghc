@@ -39,8 +39,8 @@ import Control.Monad.Extra
 import Data.Char
 import Data.Dynamic (Dynamic, fromDynamic, toDyn)
 import Data.HashMap.Strict (HashMap)
+import Data.List.Extra (repeatedly, dropWhileEnd)
 import Data.List (isPrefixOf)
-import Data.List.Extra
 import Data.Maybe
 import Data.Typeable (TypeRep, typeOf)
 import Development.Shake hiding (Normal)
