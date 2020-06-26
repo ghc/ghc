@@ -17,7 +17,6 @@ module Haddock.Interface.AttachInstances (attachInstances) where
 
 import Haddock.Types
 import Haddock.Convert
-import Haddock.GhcUtils
 
 import Control.Applicative ((<|>))
 import Control.Arrow hiding ((<+>))

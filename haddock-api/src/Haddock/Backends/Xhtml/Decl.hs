@@ -41,7 +41,6 @@ import GHC.Exts
 import GHC.Types.Name
 import GHC.Data.BooleanFormula
 import GHC.Types.Name.Reader ( rdrNameOcc )
-import GHC.Core.Multiplicity
 
 -- | Pretty print a declaration
 ppDecl :: Bool                                     -- ^ print summary info only
@@ -1143,18 +1142,16 @@ ppLKind unicode qual y = ppKind unicode qual (unLoc y)
 ppKind :: Unicode -> Qualification -> HsKind DocNameI -> Html
 ppKind unicode qual ki = ppr_mono_ty (reparenTypePrec PREC_TOP ki) unicode qual HideEmptyContexts
 
-patSigContext :: LHsType name -> HideEmptyContexts
+patSigContext :: LHsType DocNameI -> HideEmptyContexts
 patSigContext typ | hasNonEmptyContext typ && isFirstContextEmpty typ =  ShowEmptyToplevelContexts
                   | otherwise = HideEmptyContexts
   where
-    hasNonEmptyContext :: LHsType name -> Bool
     hasNonEmptyContext t =
       case unLoc t of
         HsForAllTy _ _ s -> hasNonEmptyContext s
         HsQualTy _ cxt s -> if null (unLoc cxt) then hasNonEmptyContext s else True
         HsFunTy _ _ _ s    -> hasNonEmptyContext s
         _ -> False
-    isFirstContextEmpty :: LHsType name -> Bool
     isFirstContextEmpty t =
       case unLoc t of
         HsForAllTy _ _ s -> isFirstContextEmpty s

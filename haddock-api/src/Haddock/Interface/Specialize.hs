@@ -3,6 +3,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE GADTs #-}
 
 module Haddock.Interface.Specialize
     ( specializeInstHead
@@ -15,7 +16,6 @@ import Haddock.Types
 import GHC
 import GHC.Types.Name
 import GHC.Data.FastString
-import GHC.Builtin.Types.Prim ( funTyConName )
 import GHC.Builtin.Types ( listTyConName, unrestrictedFunTyConName )
 
 import Control.Monad
@@ -36,7 +36,7 @@ specialize specs = go spec_map0
     go :: forall x. Data x => Map Name (HsType GhcRn) -> x -> x
     go spec_map = everywhereButType @Name $ mkT $ sugar . strip_kind_sig . specialize_ty_var spec_map
 
-    strip_kind_sig :: HsType name -> HsType name
+    strip_kind_sig :: HsType GhcRn -> HsType GhcRn
     strip_kind_sig (HsKindSig _ (L _ t) _) = t
     strip_kind_sig typ = typ
 
@@ -205,6 +205,7 @@ freeVariables :: HsType GhcRn -> Set Name
 freeVariables =
     everythingWithState Set.empty Set.union query
   where
+    query :: forall a . Data a => a -> Set Name -> (Set Name, Set Name)
     query term ctx = case cast term :: Maybe (HsType GhcRn) of
         Just (HsForAllTy _ tele _) ->
             (Set.empty, Set.union ctx (teleNames tele))
@@ -213,6 +214,7 @@ freeVariables =
             | otherwise -> (Set.singleton $ getName name, ctx)
         _ -> (Set.empty, ctx)
 
+    teleNames :: HsForAllTelescope GhcRn -> Set Name
     teleNames (HsForAllVis   _ bndrs) = bndrsNames bndrs
     teleNames (HsForAllInvis _ bndrs) = bndrsNames bndrs
 
@@ -366,7 +368,6 @@ located :: Functor f => (a -> f b) -> Located a -> f (Located b)
 located f (L loc e) = L loc <$> f e
 
 
-tyVarName :: HsTyVarBndr flag name -> IdP name
+tyVarName :: HsTyVarBndr flag GhcRn -> IdP GhcRn
 tyVarName (UserTyVar _ _ name) = unLoc name
 tyVarName (KindedTyVar _ _ (L _ name) _) = name
-tyVarName (XTyVarBndr _ ) = error "haddock:tyVarName"

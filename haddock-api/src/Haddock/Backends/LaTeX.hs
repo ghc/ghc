@@ -41,7 +41,6 @@ import Control.Monad
 import Data.Maybe
 import Data.List
 import Prelude hiding ((<>))
-import GHC.Core.Multiplicity
 
 import Haddock.Doc (combineDocumentation)
 

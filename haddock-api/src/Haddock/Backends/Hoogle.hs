@@ -69,7 +69,7 @@ ppModule dflags iface =
 ---------------------------------------------------------------------
 -- Utility functions
 
-dropHsDocTy :: HsType a -> HsType a
+dropHsDocTy :: HsType (GhcPass p) -> HsType (GhcPass p)
 dropHsDocTy = f
     where
         g (L src x) = L src (f x)
