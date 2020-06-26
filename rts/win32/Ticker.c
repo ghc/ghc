@@ -59,7 +59,7 @@ startTicker(void)
                               tick_callback,
                               0,
                               0,
-                              TimeToMS(tick_interval), // ms
+                              TimeToUS(tick_interval) / 1000, // ms
                               WT_EXECUTEINTIMERTHREAD);
     if (r == 0) {
         sysErrorBelch("CreateTimerQueueTimer");

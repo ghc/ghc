@@ -6,7 +6,6 @@
 {-# OPTIONS_GHC -Wno-identities #-}
 -- Whether there are identities depends on the platform
 {-# OPTIONS_HADDOCK not-home #-}
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.IO.FD
@@ -46,6 +45,7 @@ import GHC.IO.Exception
 #if defined(mingw32_HOST_OS)
 import GHC.Windows
 import Data.Bool
+import GHC.IO.SubSystem ((<!>))
 #endif
 
 import Foreign
@@ -101,29 +101,37 @@ fdIsSocket fd = fdIsSocket_ fd /= 0
 instance Show FD where
   show fd = show (fdFD fd)
 
+{-# INLINE ifSupported #-}
+ifSupported :: String -> a -> a
+#if defined(mingw32_HOST_OS)
+ifSupported s a = a <!> (error $ "FD:" ++ s ++ " not supported")
+#else
+ifSupported _ = id
+#endif
+
 -- | @since 4.1.0.0
 instance GHC.IO.Device.RawIO FD where
-  read             = fdRead
-  readNonBlocking  = fdReadNonBlocking
-  write            = fdWrite
-  writeNonBlocking = fdWriteNonBlocking
+  read             = ifSupported "fdRead" fdRead
+  readNonBlocking  = ifSupported "fdReadNonBlocking" fdReadNonBlocking
+  write            = ifSupported "fdWrite" fdWrite
+  writeNonBlocking = ifSupported "fdWriteNonBlocking" fdWriteNonBlocking
 
 -- | @since 4.1.0.0
 instance GHC.IO.Device.IODevice FD where
-  ready         = ready
-  close         = close
-  isTerminal    = isTerminal
-  isSeekable    = isSeekable
-  seek          = seek
-  tell          = tell
-  getSize       = getSize
-  setSize       = setSize
-  setEcho       = setEcho
-  getEcho       = getEcho
-  setRaw        = setRaw
-  devType       = devType
-  dup           = dup
-  dup2          = dup2
+  ready         = ifSupported "ready" ready
+  close         = ifSupported "close" close
+  isTerminal    = ifSupported "isTerm" isTerminal
+  isSeekable    = ifSupported "isSeek" isSeekable
+  seek          = ifSupported "seek" seek
+  tell          = ifSupported "tell" tell
+  getSize       = ifSupported "getSize" getSize
+  setSize       = ifSupported "setSize" setSize
+  setEcho       = ifSupported "setEcho" setEcho
+  getEcho       = ifSupported "getEcho" getEcho
+  setRaw        = ifSupported "setRaw" setRaw
+  devType       = ifSupported "devType" devType
+  dup           = ifSupported "dup" dup
+  dup2          = ifSupported "dup2" dup2
 
 -- We used to use System.Posix.Internals.dEFAULT_BUFFER_SIZE, which is
 -- taken from the value of BUFSIZ on the current platform.  This value
@@ -134,11 +142,11 @@ dEFAULT_FD_BUFFER_SIZE = 8192
 
 -- | @since 4.1.0.0
 instance BufferedIO FD where
-  newBuffer _dev state = newByteBuffer dEFAULT_FD_BUFFER_SIZE state
-  fillReadBuffer    fd buf = readBuf' fd buf
-  fillReadBuffer0   fd buf = readBufNonBlocking fd buf
-  flushWriteBuffer  fd buf = writeBuf' fd buf
-  flushWriteBuffer0 fd buf = writeBufNonBlocking fd buf
+  newBuffer _dev state = ifSupported "newBuf" $ newByteBuffer dEFAULT_FD_BUFFER_SIZE state
+  fillReadBuffer    fd buf = ifSupported "readBuf" $ readBuf' fd buf
+  fillReadBuffer0   fd buf = ifSupported "readBufNonBlock" $ readBufNonBlocking fd buf
+  flushWriteBuffer  fd buf = ifSupported "writeBuf" $ writeBuf' fd buf
+  flushWriteBuffer0 fd buf = ifSupported "writeBufNonBlock" $ writeBufNonBlocking fd buf
 
 readBuf' :: FD -> Buffer Word8 -> IO (Int, Buffer Word8)
 readBuf' fd buf = do
@@ -256,8 +264,10 @@ mkFD fd iomode mb_stat is_socket is_nonblock = do
         RegularFile -> do
            -- On Windows we need an additional call to get a unique device id
            -- and inode, since fstat just returns 0 for both.
+           -- See also Note [RTS File locking]
            (unique_dev, unique_ino) <- getUniqueFileInfo fd dev ino
-           r <- lockFile fd unique_dev unique_ino (fromBool write)
+           r <- lockFile (fromIntegral fd) unique_dev unique_ino
+                         (fromBool write)
            when (r == -1)  $
                 ioException (IOError Nothing ResourceBusy "openFile"
                                    "file is locked" Nothing Nothing)
@@ -335,7 +345,7 @@ close fd =
      closeFdWith closer (fromIntegral (fdFD fd))
 
 release :: FD -> IO ()
-release fd = do _ <- unlockFile (fdFD fd)
+release fd = do _ <- unlockFile (fromIntegral $ fdFD fd)
                 return ()
 
 #if defined(mingw32_HOST_OS)
@@ -348,10 +358,10 @@ isSeekable fd = do
   t <- devType fd
   return (t == RegularFile || t == RawDevice)
 
-seek :: FD -> SeekMode -> Integer -> IO ()
-seek fd mode off = do
-  throwErrnoIfMinus1Retry_ "seek" $
-     c_lseek (fdFD fd) (fromIntegral off) seektype
+seek :: FD -> SeekMode -> Integer -> IO Integer
+seek fd mode off = fromIntegral `fmap`
+  (throwErrnoIfMinus1Retry "seek" $
+     c_lseek (fdFD fd) (fromIntegral off) seektype)
  where
     seektype :: CInt
     seektype = case mode of
@@ -436,14 +446,14 @@ setRaw fd raw = System.Posix.Internals.setCooked (fdFD fd) (not raw)
 -- -----------------------------------------------------------------------------
 -- Reading and Writing
 
-fdRead :: FD -> Ptr Word8 -> Int -> IO Int
-fdRead fd ptr bytes
+fdRead :: FD -> Ptr Word8 -> Word64 -> Int -> IO Int
+fdRead fd ptr _offset bytes
   = do { r <- readRawBufferPtr "GHC.IO.FD.fdRead" fd ptr 0
                 (fromIntegral $ clampReadSize bytes)
        ; return (fromIntegral r) }
 
-fdReadNonBlocking :: FD -> Ptr Word8 -> Int -> IO (Maybe Int)
-fdReadNonBlocking fd ptr bytes = do
+fdReadNonBlocking :: FD -> Ptr Word8 -> Word64 -> Int -> IO (Maybe Int)
+fdReadNonBlocking fd ptr _offset bytes = do
   r <- readRawBufferPtrNoBlock "GHC.IO.FD.fdReadNonBlocking" fd ptr
            0 (fromIntegral $ clampReadSize bytes)
   case fromIntegral r of
@@ -451,18 +461,18 @@ fdReadNonBlocking fd ptr bytes = do
     n    -> return (Just n)
 
 
-fdWrite :: FD -> Ptr Word8 -> Int -> IO ()
-fdWrite fd ptr bytes = do
+fdWrite :: FD -> Ptr Word8 -> Word64 -> Int -> IO ()
+fdWrite fd ptr _offset bytes = do
   res <- writeRawBufferPtr "GHC.IO.FD.fdWrite" fd ptr 0
           (fromIntegral $ clampWriteSize bytes)
   let res' = fromIntegral res
   if res' < bytes
-     then fdWrite fd (ptr `plusPtr` res') (bytes - res')
+     then fdWrite fd (ptr `plusPtr` res') (_offset + fromIntegral res') (bytes - res')
      else return ()
 
 -- XXX ToDo: this isn't non-blocking
-fdWriteNonBlocking :: FD -> Ptr Word8 -> Int -> IO Int
-fdWriteNonBlocking fd ptr bytes = do
+fdWriteNonBlocking :: FD -> Ptr Word8 -> Word64 -> Int -> IO Int
+fdWriteNonBlocking fd ptr _offset bytes = do
   res <- writeRawBufferPtrNoBlock "GHC.IO.FD.fdWriteNonBlocking" fd ptr 0
             (fromIntegral $ clampWriteSize bytes)
   return (fromIntegral res)
@@ -688,10 +698,10 @@ throwErrnoIfMinus1RetryOnBlock loc f on_block  =
 -- Locking/unlocking
 
 foreign import ccall unsafe "lockFile"
-  lockFile :: CInt -> Word64 -> Word64 -> CInt -> IO CInt
+  lockFile :: Word64 -> Word64 -> Word64 -> CInt -> IO CInt
 
 foreign import ccall unsafe "unlockFile"
-  unlockFile :: CInt -> IO CInt
+  unlockFile :: Word64 -> IO CInt
 
 #if defined(mingw32_HOST_OS)
 foreign import ccall unsafe "get_unique_file_info"
