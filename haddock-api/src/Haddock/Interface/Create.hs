@@ -44,6 +44,7 @@ import qualified GHC.Types.SrcLoc as SrcLoc
 import GHC.Core.ConLike (ConLike(..))
 import GHC
 import GHC.Driver.Types
+import GHC.Driver.Ppr
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
@@ -53,6 +54,7 @@ import GHC.Tc.Types
 import GHC.Data.FastString ( unpackFS, bytesFS )
 import GHC.Types.Basic ( StringLiteral(..), SourceText(..), PromotionFlag(..) )
 import qualified GHC.Utils.Outputable as O
+import GHC.Utils.Panic
 import GHC.HsToCore.Docs hiding (mkMaps)
 
 
@@ -722,7 +724,7 @@ hiDecl dflags t = do
       warnLine x = O.text "haddock-bug:" O.<+> O.text x O.<>
                    O.comma O.<+> O.quotes (O.ppr t) O.<+>
                    O.text "-- Please report this on Haddock issue tracker!"
-      bugWarn = O.showSDoc dflags . warnLine
+      bugWarn = showSDoc dflags . warnLine
 
 -- | This function is called for top-level bindings without type signatures.
 -- It gets the type signature from GHC and that means it's not going to
@@ -884,7 +886,7 @@ extractDecl declMap name decl
           ([], [])
             | Just (famInstDecl:_) <- M.lookup name declMap
             -> extractDecl declMap name famInstDecl
-          _ -> O.pprPanic "extractDecl" (O.text "Ambiguous decl for" O.<+> O.ppr name O.<+> O.text "in class:"
+          _ -> pprPanic "extractDecl" (O.text "Ambiguous decl for" O.<+> O.ppr name O.<+> O.text "in class:"
                                          O.$$ O.nest 4 (O.ppr d)
                                          O.$$ O.text "Matches:"
                                          O.$$ O.nest 4 (O.ppr matchesMethod O.<+> O.ppr matchesAssociatedType))
@@ -927,7 +929,7 @@ extractDecl declMap name decl
             in case matches of
               [d0] -> extractDecl declMap name (noLoc . InstD noExtField $ DataFamInstD noExtField d0)
               _ -> error "internal: extractDecl (ClsInstD)"
-      _ -> O.pprPanic "extractDecl" $
+      _ -> pprPanic "extractDecl" $
         O.text "Unhandled decl for" O.<+> O.ppr name O.<> O.text ":"
         O.$$ O.nest 4 (O.ppr decl)
 

@@ -31,7 +31,7 @@ import GHC.Types.Name        ( nameOccName )
 import GHC.Types.Name.Reader ( rdrNameOcc )
 import GHC.Core.Type         ( Specificity(..) )
 import GHC.Data.FastString   ( unpackFS )
-import GHC.Utils.Outputable  ( panic)
+import GHC.Utils.Panic       ( panic)
 
 import qualified Data.Map as Map
 import System.Directory
