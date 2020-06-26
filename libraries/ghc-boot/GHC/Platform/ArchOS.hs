@@ -41,7 +41,7 @@ data Arch
    | ArchSPARC
    | ArchSPARC64
    | ArchARM ArmISA [ArmISAExt] ArmABI
-   | ArchARM64
+   | ArchAArch64
    | ArchAlpha
    | ArchMipseb
    | ArchMipsel
@@ -130,7 +130,7 @@ stringEncodeArch = \case
   ArchARM ARMv5 _ _ -> "armv5"
   ArchARM ARMv6 _ _ -> "armv6"
   ArchARM ARMv7 _ _ -> "armv7"
-  ArchARM64         -> "aarch64"
+  ArchAArch64       -> "aarch64"
   ArchAlpha         -> "alpha"
   ArchMipseb        -> "mipseb"
   ArchMipsel        -> "mipsel"

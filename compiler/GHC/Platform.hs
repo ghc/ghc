@@ -104,7 +104,7 @@ platformOS platform = case platformArchOS platform of
 
 isARM :: Arch -> Bool
 isARM (ArchARM {}) = True
-isARM ArchARM64    = True
+isARM ArchAArch64    = True
 isARM _ = False
 
 -- | This predicate tells us whether the platform is 32-bit.
@@ -196,7 +196,6 @@ data BmiVersion
    = BMI1
    | BMI2
    deriving (Eq, Ord)
-
 
 -- | Platform-specific settings formerly hard-coded in Config.hs.
 --
