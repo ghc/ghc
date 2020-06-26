@@ -35,6 +35,7 @@ module GHC.Rename.Names (
 import GHC.Prelude
 
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Core.TyCo.Ppr
 import GHC.Hs
 import GHC.Tc.Utils.Env
@@ -58,6 +59,7 @@ import GHC.Data.Maybe
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Basic  ( TopLevelFlag(..), StringLiteral(..) )
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Data.FastString.Env
 import GHC.Types.Id

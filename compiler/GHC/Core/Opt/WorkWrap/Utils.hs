@@ -46,6 +46,7 @@ import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Data.FastString
 import GHC.Data.List.SetOps
 

@@ -11,6 +11,7 @@ import System.IO
 import GHC
 import GHC.Types.Basic
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Parser.Annotation
@@ -70,7 +71,7 @@ showAnns anns = "[\n" ++ (intercalate "\n"
    $ Map.toList anns)
     ++ "]\n"
 
-pp a = showPpr unsafeGlobalDynFlags a
+pp a = showPprUnsafe a
 
 
 -- ---------------------------------------------------------------------

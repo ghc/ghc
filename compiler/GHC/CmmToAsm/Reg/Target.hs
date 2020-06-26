@@ -28,6 +28,7 @@ import GHC.Platform.Reg.Class
 import GHC.CmmToAsm.Format
 
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.Unique
 import GHC.Platform
 

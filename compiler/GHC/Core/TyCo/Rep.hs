@@ -99,6 +99,7 @@ import GHC.Types.Unique ( hasKey )
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 -- libraries
 import qualified Data.Data as Data hiding ( TyCon )

@@ -31,6 +31,7 @@ import GHC.Builtin.Names ( mkUnboundName, isUnboundName, getUnique)
 import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Data.FastString
 import Data.List
 import Data.Function ( on )

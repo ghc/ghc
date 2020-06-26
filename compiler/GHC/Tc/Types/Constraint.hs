@@ -97,6 +97,7 @@ import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 import GHC.Data.Bag
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 import Control.Monad ( msum )
 

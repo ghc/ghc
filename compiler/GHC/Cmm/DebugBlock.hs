@@ -36,6 +36,7 @@ import GHC.Core
 import GHC.Data.FastString ( nilFS, mkFastString )
 import GHC.Unit.Module
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Cmm.Ppr.Expr ( pprExpr )
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc      ( seqList )

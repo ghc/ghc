@@ -10,6 +10,7 @@ import Data.List (intercalate)
 import System.IO
 import GHC
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
 import GHC.Data.Bag (filterBag,isEmptyBag)
@@ -67,4 +68,4 @@ showAnns anns = "[\n" ++ (intercalate "\n"
 showToks ts = intercalate ",\n\n"
             $ map (\(L p t) -> "(" ++ pp p ++ "," ++ show t ++ ")") ts
 
-pp a = showPpr unsafeGlobalDynFlags a
+pp a = showPprUnsafe a

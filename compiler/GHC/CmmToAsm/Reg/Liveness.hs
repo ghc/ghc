@@ -52,6 +52,7 @@ import GHC.Cmm hiding (RegSet, emptyRegSet)
 import GHC.Data.Graph.Directed
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
