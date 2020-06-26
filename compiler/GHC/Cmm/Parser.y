@@ -1021,6 +1021,45 @@ machOps = listToUFM $
 callishMachOps :: Platform -> UniqFM FastString ([CmmExpr] -> (CallishMachOp, [CmmExpr]))
 callishMachOps platform = listToUFM $
         map (\(x, y) -> (mkFastString x, y)) [
+
+        ( "pow64f", (MO_F64_Pwr,) ),
+        ( "sin64f", (MO_F64_Sin,) ),
+        ( "cos64f", (MO_F64_Cos,) ),
+        ( "tan64f", (MO_F64_Tan,) ),
+        ( "sinh64f", (MO_F64_Sinh,) ),
+        ( "cosh64f", (MO_F64_Cosh,) ),
+        ( "tanh64f", (MO_F64_Tanh,) ),
+        ( "asin64f", (MO_F64_Asin,) ),
+        ( "acos64f", (MO_F64_Acos,) ),
+        ( "atan64f", (MO_F64_Atan,) ),
+        ( "asinh64f", (MO_F64_Asinh,) ),
+        ( "acosh64f", (MO_F64_Acosh,) ),
+        ( "log64f", (MO_F64_Log,) ),
+        ( "log1p64f", (MO_F64_Log1P,) ),
+        ( "exp64f", (MO_F64_Exp,) ),
+        ( "expM164f", (MO_F64_ExpM1,) ),
+        ( "fabs64f", (MO_F64_Fabs,) ),
+        ( "sqrt64f", (MO_F64_Sqrt,) ),
+
+        ( "pow32f", (MO_F32_Pwr,) ),
+        ( "sin32f", (MO_F32_Sin,) ),
+        ( "cos32f", (MO_F32_Cos,) ),
+        ( "tan32f", (MO_F32_Tan,) ),
+        ( "sinh32f", (MO_F32_Sinh,) ),
+        ( "cosh32f", (MO_F32_Cosh,) ),
+        ( "tanh32f", (MO_F32_Tanh,) ),
+        ( "asin32f", (MO_F32_Asin,) ),
+        ( "acos32f", (MO_F32_Acos,) ),
+        ( "atan32f", (MO_F32_Atan,) ),
+        ( "asinh32f", (MO_F32_Asinh,) ),
+        ( "acosh32f", (MO_F32_Acosh,) ),
+        ( "log32f", (MO_F32_Log,) ),
+        ( "log1p32f", (MO_F32_Log1P,) ),
+        ( "exp32f", (MO_F32_Exp,) ),
+        ( "expM132f", (MO_F32_ExpM1,) ),
+        ( "fabs32f", (MO_F32_Fabs,) ),
+        ( "sqrt32f", (MO_F32_Sqrt,) ),
+
         ( "read_barrier", (MO_ReadBarrier,)),
         ( "write_barrier", (MO_WriteBarrier,)),
         ( "memcpy", memcpyLikeTweakArgs MO_Memcpy ),
@@ -1058,9 +1097,7 @@ callishMachOps platform = listToUFM $
         ( "xchg32", (MO_Xchg W32,)),
         ( "xchg64", (MO_Xchg W64,))
 
-        -- ToDo: the rest, maybe
-        -- edit: which rest?
-        -- also: how do we tell CMM Lint how to type check callish macops?
+        -- ToDo: how do we tell CMM Lint how to type check callish macops?
     ]
   where
     memcpyLikeTweakArgs :: (Int -> CallishMachOp) -> [CmmExpr] -> (CallishMachOp, [CmmExpr])

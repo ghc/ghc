@@ -1,0 +1,37 @@
+// RUN: "$HC" -cpp -dcmm-lint -keep-s-file -c "$1" && cat "${1%%.*}.s" | FileCheck "$1" -check-prefix=CHECK-A64
+// RUN: "$LN" -sf "$1" "${1%%.*}.c"
+// RUN: "$CC" -DC -c "${1%%.*}.c" -o "${1%%.*}_stub.o"
+// RUN: "$CC" "${1%%.*}.o" "${1%%.*}_stub.o" -o "${1%%.*}.exe"
+// RUN: "$EXEC" "${1%%.*}.exe"
+
+#if defined(C) // the C part
+double mega_fadd(double a, double b, double c, double d, double e, double f, double g, double h, double i, double j, double k) {
+    return a + b + c + d + e + f + g + h + i + j + k;
+}
+
+#else // the CMM part
+#include "Cmm.h"
+#include "Types.h"
+
+// Let's ensure we can call functions with lots of arguments, and they are
+// passed correctly.
+main () {
+
+    // create some fake stack space and assign to Sp.
+    I64 sp;
+    (sp) = foreign "C" malloc(1024);
+    Sp = sp;
+
+    F64 fx, fy;
+    F64 fa, fb, fc, fd, fe, ff, fg, fh, fi, fj, fk;
+    fa = 1.0; fb = 2.0; fc = 4.0; fd = 8.0; fe = 16.0; ff = 32.0; fg = 64.0; fh = 128.0; fi = 256.0; fj = 512.0; fk = 1024.0;
+
+    // We have 3 excess arguments; thus we need 4 slots (32 bytes)
+    // CHECK-A64: sub sp, sp, #32
+    // CHECK-A64: add sp, sp, #32
+    (fy) = foreign "C" mega_fadd(fa,fb,fc,fd,fe,ff,fg,fh,fi,fj,fk);
+    fx = fa + fb + fc + fd + fe + ff + fg + fh + fi + fj + fk;
+
+    foreign "C" exit(fy != fx);
+}
+#endif

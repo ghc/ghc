@@ -1,0 +1,65 @@
+// RUN: "$HC" -cpp -dcmm-lint -keep-s-file -c "$1" && cat "${1%%.*}.s" | FileCheck "$1" -check-prefix=CHECK-A64
+// RUN: "$HC" -no-hs-main "${1%%.*}.o" -o "${1%%.*}.exe"
+// RUN: "$EXEC" "${1%%.cmm}.exe" | FileCheck "$1" -check-prefix=CHECK-RUN-A64
+
+#include "Cmm.h"
+
+// Too bad this won't work. We can't construct Cmm Immediates.
+// Often ghc will just optimize it away.
+
+// CHECK-A64: .globl main
+// CHECK-A64: main:
+main () {
+
+    // CHECK-A64: mov w22, #1
+    // CHECK-RUN-A64: 1 = 1
+    R1 = 1 :: I64; foreign "C" printf("1 = %ld\n", R1);
+
+    // CHECK-A64: mov w22, #-1
+    // CHECK-RUN-A64: -1 = -1
+    R1 = -1; foreign "C" printf("-1 = %ld\n", R1);
+
+    // CHECK-A64: mov w22, #4096
+    // CHECK-RUN-A64: 4096 = 4096
+    R1 = 1 << 12 :: I64; foreign "C" printf("4096 = %ld\n", R1);
+
+    // CHECK-A64: mov w22, #-4096
+    // CHECK-RUN-A64: -4096 = -4096
+    R1 = -1 << 12 :: I64; foreign "C" printf("-4096 = %ld\n", R1);
+
+    // CHECK-A64:      mov w22, #0
+    // CHECK-A64-NEXT: movk w22, #1, lsl #16
+    // CHECK-RUN-A64: 65536 = 65536
+    R1 = 1 << 16 :: I64; foreign "C" printf("65536 = %ld\n", R1);
+
+    // CHECK-A64:      mov w22, #0
+    // CHECK-A64-NEXT: movk w22, #65535, lsl #16
+    // CHECK-RUN-A64: -65536 = -65536
+    R1 = -1 << 16 :: I64; foreign "C" printf("-65536 = %ld\n", R1);
+
+    // CHECK-A64:      mov w22, #0
+    // CHECK-A64-NEXT: movk w22, #256, lsl #16
+    // CHECK-RUN-A64: 16777216 = 16777216
+    R1 = 1 << 24 :: I64; foreign "C" printf("16777216 = %ld\n", R1);
+
+    // CHECK-A64:      mov w22, #0
+    // CHECK-A64-NEXT: movk w22, #65280, lsl #16
+    // CHECK-RUN-A64: -16777216 = -16777216
+    R1 = -1 << 24 :: I64; foreign "C" printf("-16777216 = %ld\n", R1);
+
+    // CHECK-A64:      mov x22, #0
+    // CHECK-A64-NEXT: movk x22, #0, lsl #16
+    // CHECK-A64-NEXT: movk x22, #16, lsl #32
+    // CHECK-A64-NEXT: movk x22, #0, lsl #48
+    // CHECK-RUN-A64: 68719476736 = 68719476736
+    R1 = 1 << 36 :: I64; foreign "C" printf("68719476736 = %ld\n", R1);
+
+    // CHECK-A64:      mov x22, #0
+    // CHECK-A64-NEXT: movk x22, #0, lsl #16
+    // CHECK-A64-NEXT: movk x22, #65520, lsl #32
+    // CHECK-A64-NEXT: movk x22, #65535, lsl #48
+    // CHECK-RUN-A64: -68719476736 = -68719476736
+    R1 = -1 << 36 :: I64; foreign "C" printf("-68719476736 = %ld\n", R1);
+
+    foreign "C" exit(0::I64);
+}
