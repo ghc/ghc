@@ -73,6 +73,7 @@ import GHC.Types.Var.Env
 import GHC.Utils.Misc
 import GHC.Types.Var
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Utils.Lexeme
 import GHC.Data.FastString
 import GHC.Data.Pair

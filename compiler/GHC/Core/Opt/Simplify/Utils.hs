@@ -44,6 +44,7 @@ import GHC.Prelude
 import GHC.Core.Opt.Simplify.Env
 import GHC.Core.Opt.Monad        ( SimplMode(..), Tick(..) )
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Core
 import qualified GHC.Core.Subst
 import GHC.Core.Ppr
@@ -68,6 +69,7 @@ import GHC.Utils.Misc
 import GHC.Data.OrdList ( isNilOL )
 import GHC.Utils.Monad
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Core.Opt.ConstantFold
 import GHC.Data.FastString ( fsLit )
 

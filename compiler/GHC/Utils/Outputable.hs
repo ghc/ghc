@@ -16,7 +16,7 @@ module GHC.Utils.Outputable (
         Outputable(..), OutputableBndr(..),
 
         -- * Pretty printing combinators
-        SDoc, runSDoc, initSDocContext,
+        SDoc, runSDoc,
         docToSDoc,
         interppSP, interpp'SP,
         pprQuotedList, pprWithCommas, quotedListWithOr, quotedListWithNor,
@@ -43,12 +43,10 @@ module GHC.Utils.Outputable (
         coloured, keyword,
 
         -- * Converting 'SDoc' into strings and outputting it
-        printSDoc, printSDocLn, printForUser,
-        printForC, bufLeftRenderSDoc,
+        printSDoc, printSDocLn,
+        bufLeftRenderSDoc,
         pprCode, mkCodeStyle,
-        showSDoc, showSDocUnsafe, showSDocOneLine,
-        showSDocForUser, showSDocDebug, showSDocDump, showSDocDumpOneLine,
-        showSDocUnqual, showPpr,
+        showSDocOneLine,
         renderWithStyle,
 
         pprInfixVar, pprPrefixVar,
@@ -84,20 +82,11 @@ module GHC.Utils.Outputable (
 
         ifPprDebug, whenPprDebug, getPprDebug,
 
-        -- * Error handling and debugging utilities
-        pprPanic, pprSorry, assertPprPanic, pprPgmError,
-        pprTrace, pprTraceDebug, pprTraceWith, pprTraceIt, warnPprTrace,
-        pprSTrace, pprTraceException, pprTraceM, pprTraceWithFlags,
-        trace, pgmError, panic, sorry, assertPanic,
-        pprDebugAndThen, callStackDoc,
     ) where
 
 import GHC.Prelude
 
-import {-# SOURCE #-}   GHC.Driver.Session
-                           ( DynFlags, hasPprDebug, hasNoDebugOutput
-                           , unsafeGlobalDynFlags, initSDocContext
-                           )
+import {-# SOURCE #-}   GHC.Driver.Session ( DynFlags )
 import {-# SOURCE #-}   GHC.Unit.Types ( Unit, Module, moduleName )
 import {-# SOURCE #-}   GHC.Unit.Module.Name( ModuleName )
 import {-# SOURCE #-}   GHC.Types.Name.Occurrence( OccName )
@@ -105,10 +94,8 @@ import {-# SOURCE #-}   GHC.Types.Name.Occurrence( OccName )
 import GHC.Utils.BufHandle (BufHandle)
 import GHC.Data.FastString
 import qualified GHC.Utils.Ppr as Pretty
-import GHC.Utils.Misc
 import qualified GHC.Utils.Ppr.Colour as Col
 import GHC.Utils.Ppr       ( Doc, Mode(..) )
-import GHC.Utils.Panic
 import GHC.Serialized
 import GHC.LanguageExtensions (Extension)
 
@@ -133,8 +120,6 @@ import qualified Data.List.NonEmpty as NEL
 
 import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
-import GHC.Stack        ( callStack, prettyCallStack )
-import Control.Monad.IO.Class
 import GHC.Utils.Exception
 
 {-
@@ -493,18 +478,6 @@ printSDocLn :: SDocContext -> Mode -> Handle -> SDoc -> IO ()
 printSDocLn ctx mode handle doc =
   printSDoc ctx mode handle (doc $$ text "")
 
-printForUser :: DynFlags -> Handle -> PrintUnqualified -> Depth -> SDoc -> IO ()
-printForUser dflags handle unqual depth doc
-  = printSDocLn ctx PageMode handle doc
-    where ctx = initSDocContext dflags (mkUserStyle unqual depth)
-
--- | Like 'printSDocLn' but specialized with 'LeftMode' and
--- @'PprCode' 'CStyle'@.  This is typically used to output C-- code.
-printForC :: DynFlags -> Handle -> SDoc -> IO ()
-printForC dflags handle doc =
-  printSDocLn ctx LeftMode handle doc
-  where ctx = initSDocContext dflags (PprCode CStyle)
-
 -- | An efficient variant of 'printSDoc' specialized for 'LeftMode' that
 -- outputs to a 'BufHandle'.
 bufLeftRenderSDoc :: SDocContext -> BufHandle -> SDoc -> IO ()
@@ -516,39 +489,6 @@ pprCode cs d = withPprStyle (PprCode cs) d
 
 mkCodeStyle :: CodeStyle -> PprStyle
 mkCodeStyle = PprCode
-
--- Can't make SDoc an instance of Show because SDoc is just a function type
--- However, Doc *is* an instance of Show
--- showSDoc just blasts it out as a string
-showSDoc :: DynFlags -> SDoc -> String
-showSDoc dflags sdoc = renderWithStyle (initSDocContext dflags defaultUserStyle) sdoc
-
--- showSDocUnsafe is unsafe, because `unsafeGlobalDynFlags` might not be
--- initialised yet.
-showSDocUnsafe :: SDoc -> String
-showSDocUnsafe sdoc = showSDoc unsafeGlobalDynFlags sdoc
-
-showPpr :: Outputable a => DynFlags -> a -> String
-showPpr dflags thing = showSDoc dflags (ppr thing)
-
-showSDocUnqual :: DynFlags -> SDoc -> String
--- Only used by Haddock
-showSDocUnqual dflags sdoc = showSDoc dflags sdoc
-
-showSDocForUser :: DynFlags -> PrintUnqualified -> SDoc -> String
--- Allows caller to specify the PrintUnqualified to use
-showSDocForUser dflags unqual doc
- = renderWithStyle (initSDocContext dflags (mkUserStyle unqual AllTheWay)) doc
-
-showSDocDump :: DynFlags -> SDoc -> String
-showSDocDump dflags d = renderWithStyle (initSDocContext dflags defaultDumpStyle) d
-
-showSDocDebug :: DynFlags -> SDoc -> String
-showSDocDebug dflags d = renderWithStyle ctx d
-   where
-      ctx = (initSDocContext dflags defaultDumpStyle)
-               { sdocPprDebug = True
-               }
 
 renderWithStyle :: SDocContext -> SDoc -> String
 renderWithStyle ctx sdoc
@@ -565,17 +505,6 @@ showSDocOneLine ctx d
                          Pretty.lineLength = sdocLineLength ctx } in
    Pretty.renderStyle s $
       runSDoc d ctx
-
-showSDocDumpOneLine :: DynFlags -> SDoc -> String
-showSDocDumpOneLine dflags d
- = let s = Pretty.style{ Pretty.mode = OneLineMode,
-                         Pretty.lineLength = irrelevantNCols } in
-   Pretty.renderStyle s $
-      runSDoc d (initSDocContext dflags defaultDumpStyle)
-
-irrelevantNCols :: Int
--- Used for OneLineMode and LeftMode when number of cols isn't used
-irrelevantNCols = 1
 
 isEmpty :: SDocContext -> SDoc -> Bool
 isEmpty ctx sdoc = Pretty.isEmpty $ runSDoc sdoc (ctx {sdocPprDebug = True})
@@ -641,10 +570,11 @@ quotes d = sdocOption sdocCanUseUnicode $ \case
    False -> SDoc $ \sty ->
       let pp_d = runSDoc d sty
           str  = show pp_d
-      in case (str, lastMaybe str) of
-        (_, Just '\'') -> pp_d
-        ('\'' : _, _)       -> pp_d
-        _other              -> Pretty.quotes pp_d
+      in case str of
+         []                   -> Pretty.quotes pp_d
+         '\'' : _             -> pp_d
+         _ | '\'' <- last str -> pp_d
+           | otherwise        -> Pretty.quotes pp_d
 
 semi, comma, colon, equals, space, dcolon, underscore, dot, vbar :: SDoc
 arrow, lollipop, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt :: SDoc
@@ -1210,96 +1140,3 @@ doOrDoes _   = text "do"
 itsOrTheir :: [a] -> SDoc
 itsOrTheir [_] = text "its"
 itsOrTheir _   = text "their"
-
-{-
-************************************************************************
-*                                                                      *
-\subsection{Error handling}
-*                                                                      *
-************************************************************************
--}
-
-callStackDoc :: HasCallStack => SDoc
-callStackDoc =
-    hang (text "Call stack:")
-       4 (vcat $ map text $ lines (prettyCallStack callStack))
-
-pprPanic :: HasCallStack => String -> SDoc -> a
--- ^ Throw an exception saying "bug in GHC"
-pprPanic s doc = panicDoc s (doc $$ callStackDoc)
-
-pprSorry :: String -> SDoc -> a
--- ^ Throw an exception saying "this isn't finished yet"
-pprSorry    = sorryDoc
-
-
-pprPgmError :: String -> SDoc -> a
--- ^ Throw an exception saying "bug in pgm being compiled" (used for unusual program errors)
-pprPgmError = pgmErrorDoc
-
-pprTraceDebug :: String -> SDoc -> a -> a
-pprTraceDebug str doc x
-   | debugIsOn && hasPprDebug unsafeGlobalDynFlags = pprTrace str doc x
-   | otherwise                                     = x
-
--- | If debug output is on, show some 'SDoc' on the screen
-pprTrace :: String -> SDoc -> a -> a
-pprTrace str doc x = pprTraceWithFlags unsafeGlobalDynFlags str doc x
-
--- | If debug output is on, show some 'SDoc' on the screen
-pprTraceWithFlags :: DynFlags -> String -> SDoc -> a -> a
-pprTraceWithFlags dflags str doc x
-  | hasNoDebugOutput dflags = x
-  | otherwise               = pprDebugAndThen dflags trace (text str) doc x
-
-pprTraceM :: Applicative f => String -> SDoc -> f ()
-pprTraceM str doc = pprTrace str doc (pure ())
-
--- | @pprTraceWith desc f x@ is equivalent to @pprTrace desc (f x) x@.
--- This allows you to print details from the returned value as well as from
--- ambient variables.
-pprTraceWith :: String -> (a -> SDoc) -> a -> a
-pprTraceWith desc f x = pprTrace desc (f x) x
-
--- | @pprTraceIt desc x@ is equivalent to @pprTrace desc (ppr x) x@
-pprTraceIt :: Outputable a => String -> a -> a
-pprTraceIt desc x = pprTraceWith desc ppr x
-
--- | @pprTraceException desc x action@ runs action, printing a message
--- if it throws an exception.
-pprTraceException :: ExceptionMonad m => String -> SDoc -> m a -> m a
-pprTraceException heading doc =
-    handleGhcException $ \exc -> liftIO $ do
-        putStrLn $ showSDocDump unsafeGlobalDynFlags (sep [text heading, nest 2 doc])
-        throwGhcExceptionIO exc
-
--- | If debug output is on, show some 'SDoc' on the screen along
--- with a call stack when available.
-pprSTrace :: HasCallStack => SDoc -> a -> a
-pprSTrace doc = pprTrace "" (doc $$ callStackDoc)
-
-warnPprTrace :: HasCallStack => Bool -> String -> Int -> SDoc -> a -> a
--- ^ Just warn about an assertion failure, recording the given file and line number.
--- Should typically be accessed with the WARN macros
-warnPprTrace _     _     _     _    x | not debugIsOn     = x
-warnPprTrace _     _file _line _msg x
-   | hasNoDebugOutput unsafeGlobalDynFlags = x
-warnPprTrace False _file _line _msg x = x
-warnPprTrace True   file  line  msg x
-  = pprDebugAndThen unsafeGlobalDynFlags trace heading
-                    (msg $$ callStackDoc )
-                    x
-  where
-    heading = hsep [text "WARNING: file", text file <> comma, text "line", int line]
-
--- | Panic with an assertion failure, recording the given file and
--- line number. Should typically be accessed with the ASSERT family of macros
-assertPprPanic :: HasCallStack => String -> Int -> SDoc -> a
-assertPprPanic _file _line msg
-  = pprPanic "ASSERT failed!" msg
-
-pprDebugAndThen :: DynFlags -> (String -> a) -> SDoc -> SDoc -> a
-pprDebugAndThen dflags cont heading pretty_msg
- = cont (showSDocDump dflags doc)
- where
-     doc = sep [heading, nest 2 pretty_msg]

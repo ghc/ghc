@@ -16,6 +16,9 @@ where
 #include "HsVersions.h"
 import GHC.Prelude
 
+import GHC.Driver.Session (gopt, GeneralFlag(..), DynFlags, targetPlatform)
+import GHC.Driver.Ppr     (pprTrace)
+
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Monad
 import GHC.CmmToAsm.CFG
@@ -26,12 +29,12 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 
 import GHC.Platform
-import GHC.Driver.Session (gopt, GeneralFlag(..), DynFlags, targetPlatform)
 import GHC.Types.Unique.FM
 import GHC.Utils.Misc
 
 import GHC.Data.Graph.Directed
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.Maybe
 
 -- DEBUGGING ONLY

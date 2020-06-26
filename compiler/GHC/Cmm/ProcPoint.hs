@@ -24,6 +24,7 @@ import Data.List (sortBy)
 import GHC.Data.Maybe
 import Control.Monad
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Types.Unique.Supply
 import GHC.Cmm.Dataflow.Block

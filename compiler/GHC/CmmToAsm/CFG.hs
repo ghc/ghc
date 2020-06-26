@@ -73,6 +73,7 @@ import Data.Tree
 import Data.Bifunctor
 
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 -- DEBUGGING ONLY
 --import GHC.Cmm.DebugBlock
 --import GHC.Data.OrdList

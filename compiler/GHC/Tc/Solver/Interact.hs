@@ -37,6 +37,7 @@ import GHC.Core.Unify ( tcUnifyTyWithTFs, ruleMatchTyKiX )
 
 import GHC.Tc.Types.Evidence
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import GHC.Tc.Types
 import GHC.Tc.Types.Constraint

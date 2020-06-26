@@ -14,7 +14,7 @@ import GHC.Iface.Ext.Utils
 import Data.Maybe (fromJust)
 import GHC.Driver.Session
 import GHC.SysTools
-import GHC.Utils.Outputable                 ( Outputable, renderWithStyle, ppr, defaultUserStyle, initSDocContext, text)
+import GHC.Utils.Outputable                 ( Outputable, renderWithStyle, ppr, defaultUserStyle, text)
 import qualified Data.Map as M
 import Data.Foldable
 

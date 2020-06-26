@@ -127,6 +127,7 @@ import GHC.Utils.Outputable
 import GHC.Data.List.SetOps
 import GHC.Utils.Fingerprint
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Builtin.Names ( isUnboundName )
 import GHC.Types.CostCentre.State
 

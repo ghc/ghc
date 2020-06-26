@@ -38,6 +38,7 @@ import GHC.Iface.Load   (loadInterfaceForName)
 import GHC.Unit.Module (getModule)
 import GHC.Types.Name
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Builtin.Names
 import GHC.Types.SrcLoc
 import GHC.Tc.Deriv.Generate

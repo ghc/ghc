@@ -33,6 +33,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.Var
 import GHC.Utils.Outputable
 import GHC.Types.SrcLoc (Located, unLoc, noLoc)
+import GHC.Utils.Panic
 
 import Data.Kind
 

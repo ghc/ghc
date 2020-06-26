@@ -25,6 +25,7 @@ import GHC.Core.DataCon
 import GHC.Utils.Error
 import GHC.Tc.Utils.Instantiate
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.Pair
 import GHC.Builtin.Names
 import GHC.Tc.Deriv.Utils

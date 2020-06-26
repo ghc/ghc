@@ -29,6 +29,7 @@ import GHC.Cmm
 import GHC.CmmToAsm.Config
 import GHC.Data.FastString
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 
 import qualified Data.Array.Unsafe as U ( castSTUArray )

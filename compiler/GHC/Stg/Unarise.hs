@@ -214,6 +214,7 @@ import GHC.Core.Make (aBSENT_SUM_FIELD_ERROR_ID)
 import GHC.Types.Id.Make (voidPrimId, voidArgId)
 import GHC.Utils.Monad (mapAccumLM)
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.RepType
 import GHC.Stg.Syntax
 import GHC.Core.Type
