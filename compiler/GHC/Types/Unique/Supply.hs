@@ -48,6 +48,7 @@ import GHC.Utils.Monad
 import Control.Monad
 import Data.Bits
 import Data.Char
+import GHC.Exts( inline )
 
 #include "Unique.h"
 
@@ -111,8 +112,15 @@ Why doesn't full laziness float out the (\s2...)?  Because of
 the state hack (#18238).
 
 So for this module we switch the state hack off -- it's an example
-of when it makes things worse rather than better. Now full laziness
-can float that lambda out, and we get
+of when it makes things worse rather than better.  And we use
+multiShotIO (see Note [multiShotIO]) thus:
+
+     mk_supply = multiShotIO $
+                 unsafeInterleaveIO $
+                 genSym      >>= \ u ->
+                 ...
+
+Now full laziness can float that lambda out, and we get
 
   $wmkSplitUniqSupply c# s
     = letrec
@@ -146,6 +154,38 @@ bit slower.  (Test perf/should_run/UniqLoop had a 20% perf change.)
 
 Sigh.  The test perf/should_run/UniqLoop keeps track of this loop.
 Watch it carefully.
+
+Note [multiShotIO]
+~~~~~~~~~~~~~~~~~~
+The function multiShotIO :: IO a -> IO a
+says that the argument IO action may be invoked repeatedly (is
+multi-shot), and so there should be a multi-shot lambda around it.
+It's quite easy to define, in any module with `-fno-state-hack`:
+    multiShotIO :: IO a -> IO a
+    {-# INLINE multiShotIO #-}
+    multiShotIO (IO m) = IO (\s -> inline m s)
+
+Because of -fno-state-hack, that '\s' will be multi-shot. Now,
+ignoring the casts from IO:
+    multiShotIO (\ss{one-shot}. blah)
+    ==> let m = \ss{one-shot}. blah
+        in \s. inline m s
+    ==> \s. (\ss{one-shot}.blah) s
+    ==> \s. blah[s/ss]
+
+The magic `inline` function does two things
+* It prevents eta reduction.  If we wrote just
+      multiShotIO (IO m) = IO (\s -> m s)
+  the lamda would eta-reduce to 'm' and all would be lost.
+
+* It helps ensure that 'm' really does inline.
+
+Note that 'inline' evaporates in phase 0.  See Note [inlineIdMagic]
+in GHC.Core.Opt.ConstantFold.match_inline.
+
+The INLINE pragma on multiShotIO is very important, else the
+'inline' call will evaporate when compiling the module that
+defines 'multiShotIO', before it is ever exported.
 -}
 
 
@@ -176,11 +216,17 @@ mkSplitUniqSupply c
         -- This is one of the most hammered bits in the whole compiler
         -- See Note [Optimising the unique supply]
         -- NB: Use unsafeInterleaveIO for thread-safety.
-     mk_supply = unsafeInterleaveIO $
+     mk_supply = multiShotIO $
+                 unsafeInterleaveIO $
                  genSym      >>= \ u ->
                  mk_supply   >>= \ s1 ->
                  mk_supply   >>= \ s2 ->
                  return (MkSplitUniqSupply (mask .|. u) s1 s2)
+
+multiShotIO :: IO a -> IO a
+{-# INLINE multiShotIO #-}
+-- See Note [multiShotIO]
+multiShotIO (IO m) = IO (\s -> inline m s)
 
 foreign import ccall unsafe "genSym" genSym :: IO Int
 foreign import ccall unsafe "initGenSym" initUniqSupply :: Int -> Int -> IO ()

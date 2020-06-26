@@ -1519,18 +1519,40 @@ match_cstring_length env id_unf _ [lit1]
 match_cstring_length _ _ _ _ = Nothing
 
 ---------------------------------------------------
--- The rule is this:
---      inline f_ty (f a b c) = <f's unfolding> a b c
--- (if f has an unfolding, EVEN if it's a loop breaker)
---
--- It's important to allow the argument to 'inline' to have args itself
--- (a) because its more forgiving to allow the programmer to write
---       inline f a b c
---   or  inline (f a b c)
--- (b) because a polymorphic f wll get a type argument that the
---     programmer can't avoid
---
--- Also, don't forget about 'inline's type argument!
+{- Note [inlineId magic]
+~~~~~~~~~~~~~~~~~~~~~~~~
+The call 'inline f' arranges that 'f' is inlined, regardless of
+its size. More precisely, the call 'inline f' rewrites to the
+right-hand side of 'f's definition. This allows the programmer to
+control inlining from a particular call site rather than the
+definition site of the function.
+
+The moving parts are simple:
+
+* A very simple definition in the library base:GHC.Magic
+     {-# NOINLINE[0] inline #-}
+     inline :: a -> a
+     inline x = x
+  So in phase 0, 'inline' will be inlined, so its use imposes
+  no overhead.
+
+* A rewrite rule, in GHC.Core.Opt.ConstantFold, which makes
+  (inline f) inline, implemented by match_inline.
+  The rule for the 'inline' function is this:
+     inline f_ty (f a b c) = <f's unfolding> a b c
+  (if f has an unfolding, EVEN if it's a loop breaker)
+
+  It's important to allow the argument to 'inline' to have args itself
+  (a) because its more forgiving to allow the programmer to write
+      either  inline f a b c
+      or      inline (f a b c)
+  (b) because a polymorphic f wll get a type argument that the
+      programmer can't avoid, so the call may look like
+        inline (map @Int @Bool) g xs
+
+  Also, don't forget about 'inline's type argument!
+-}
+
 match_inline :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
 match_inline (Type _ : e : _)
   | (Var f, args1) <- collectArgs e,
@@ -1540,7 +1562,7 @@ match_inline (Type _ : e : _)
 
 match_inline _ = Nothing
 
-
+---------------------------------------------------
 -- See Note [magicDictId magic] in "GHC.Types.Id.Make"
 -- for a description of what is going on here.
 match_magicDict :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
