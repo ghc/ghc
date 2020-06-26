@@ -41,8 +41,10 @@ import GHC.Utils.Outputable
 import GHC.Utils.Monad
 import GHC.Data.FastString
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Driver.Session
 import GHC.Driver.Ways
+import GHC.Driver.Ppr
 import GHC.Types.ForeignCall
 import GHC.Types.Demand    ( isUsedOnce )
 import GHC.Builtin.PrimOps ( PrimCall(..) )

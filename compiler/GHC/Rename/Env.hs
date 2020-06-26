@@ -74,6 +74,7 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Utils.Outputable as Outputable
 import GHC.Types.Unique.Set ( uniqSetAny )
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Data.Maybe
 import GHC.Driver.Session
 import GHC.Data.FastString

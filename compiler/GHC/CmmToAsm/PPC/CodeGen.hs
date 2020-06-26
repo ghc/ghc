@@ -62,6 +62,7 @@ import GHC.Types.SrcLoc      ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
 -- The rest:
 import GHC.Data.OrdList
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import Control.Monad    ( mapAndUnzipM, when )
 import Data.Bits

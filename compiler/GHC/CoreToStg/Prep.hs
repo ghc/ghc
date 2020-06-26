@@ -24,6 +24,7 @@ import GHC.Platform
 import GHC.Core.Opt.OccurAnal
 
 import GHC.Driver.Types
+import GHC.Driver.Ppr
 import GHC.Builtin.Names
 import GHC.Types.Id.Make ( realWorldPrimId )
 import GHC.Core.Utils
@@ -55,6 +56,7 @@ import GHC.Utils.Error
 import GHC.Driver.Session
 import GHC.Driver.Ways
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Types.Name   ( NamedThing(..), nameSrcSpan, isInternalName )

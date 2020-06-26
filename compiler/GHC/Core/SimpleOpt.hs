@@ -54,7 +54,9 @@ import GHC.Types.Basic
 import GHC.Unit.Module ( Module )
 import GHC.Utils.Error
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.Pair
 import GHC.Utils.Misc
 import GHC.Data.Maybe       ( orElse )

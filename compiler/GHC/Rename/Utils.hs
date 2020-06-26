@@ -46,6 +46,7 @@ import GHC.Types.Name.Env
 import GHC.Core.DataCon
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Types.Basic  ( TopLevelFlag(..) )
 import GHC.Data.List.SetOps ( removeDups )

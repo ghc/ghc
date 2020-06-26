@@ -43,6 +43,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Cmm.Expr
 import GHC.Cmm.Utils
 import GHC.Driver.Types
+import GHC.Driver.Ppr
 import GHC.Types.ForeignCall
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
@@ -55,6 +56,7 @@ import GHC.Driver.Session
 import GHC.Platform
 import GHC.Data.OrdList
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Driver.Hooks
 import GHC.Utils.Encoding
 

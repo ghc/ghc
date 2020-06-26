@@ -18,7 +18,7 @@ import GHC.Settings.Config
 import GHC.Utils.CliOption
 import GHC.Utils.Fingerprint
 import GHC.Platform
-import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Settings
 import GHC.SysTools.BaseDir
 

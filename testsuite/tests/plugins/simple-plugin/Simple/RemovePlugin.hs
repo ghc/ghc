@@ -10,6 +10,7 @@ import GHC.Tc.Types
 import GHC.Hs.Extension
 import GHC.Hs.Expr
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.SrcLoc
 import GHC.Hs
 import GHC.Hs.Binds

@@ -60,6 +60,7 @@ import GHC.Data.FastString
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.Session
 import GHC.Utils.Misc   ( debugIsOn, lengthExceeds, partitionWith )
+import GHC.Utils.Panic
 import GHC.Driver.Types ( HscEnv, hsc_dflags )
 import GHC.Data.List.SetOps ( findDupsEq, removeDups, equivClasses )
 import GHC.Data.Graph.Directed ( SCC, flattenSCC, flattenSCCs, Node(..)

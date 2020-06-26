@@ -20,6 +20,7 @@ import GHC.Prelude
 import GHC.Cmm.Type
 import GHC.Cmm.MachOp
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 popCntLabel :: Width -> String
 popCntLabel w = "hs_popcnt" ++ pprWidth w

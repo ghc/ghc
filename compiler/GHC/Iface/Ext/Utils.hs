@@ -10,6 +10,7 @@ import GHC.Prelude
 
 import GHC.Core.Map
 import GHC.Driver.Session    ( DynFlags )
+import GHC.Driver.Ppr
 import GHC.Data.FastString   ( FastString, mkFastString )
 import GHC.Iface.Type
 import GHC.Core.Multiplicity
@@ -54,7 +55,7 @@ generateReferencesMap = foldr (\ast m -> M.unionWith (++) (go ast) m) M.empty
         this = fmap (pure . (nodeSpan ast,)) $ sourcedNodeIdents $ sourcedNodeInfo ast
 
 renderHieType :: DynFlags -> HieTypeFix -> String
-renderHieType dflags ht = renderWithStyle (initSDocContext dflags defaultUserStyle) (ppr $ hieTypeToIface ht)
+renderHieType dflags ht = showSDoc dflags (ppr $ hieTypeToIface ht)
 
 resolveVisibility :: Type -> [Type] -> [(Bool,Type)]
 resolveVisibility kind ty_args

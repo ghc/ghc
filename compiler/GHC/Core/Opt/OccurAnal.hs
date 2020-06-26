@@ -20,6 +20,8 @@ module GHC.Core.Opt.OccurAnal ( occurAnalysePgm, occurAnalyseExpr ) where
 
 import GHC.Prelude
 
+import GHC.Driver.Ppr
+
 import GHC.Core
 import GHC.Core.FVs
 import GHC.Core.Utils   ( exprIsTrivial, isDefaultAlt, isExpandableApp,
@@ -46,6 +48,7 @@ import GHC.Types.Unique.Set
 import GHC.Utils.Misc
 import GHC.Data.Maybe( orElse, isJust )
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import Data.List
 
 {-

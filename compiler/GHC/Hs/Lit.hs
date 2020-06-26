@@ -28,6 +28,7 @@ import GHC.Types.Basic
    , PprPrec(..), topPrec )
 import GHC.Core.Type
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Hs.Extension
 

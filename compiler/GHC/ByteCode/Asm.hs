@@ -33,6 +33,7 @@ import GHC.StgToCmm.Layout     ( ArgRep(..) )
 import GHC.Runtime.Heap.Layout
 import GHC.Driver.Session
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Utils.Misc
 import GHC.Types.Unique

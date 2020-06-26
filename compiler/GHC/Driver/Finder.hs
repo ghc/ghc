@@ -44,6 +44,7 @@ import GHC.Builtin.Names ( gHC_PRIM )
 import GHC.Driver.Session
 import GHC.Driver.Ways
 import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
 import GHC.Data.Maybe    ( expectJust )
 
 import Data.IORef       ( IORef, readIORef, atomicModifyIORef' )

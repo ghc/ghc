@@ -15,6 +15,7 @@ import GHC.Cmm.Ppr () -- For Outputable instances
 import GHC.Driver.Session
 import GHC.Platform
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 -- Calculate the 'GlobalReg' or stack locations for function call
 -- parameters as used by the Cmm calling convention.

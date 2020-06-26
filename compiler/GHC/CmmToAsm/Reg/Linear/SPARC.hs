@@ -12,6 +12,7 @@ import GHC.Platform.Reg
 
 import GHC.Platform.Regs
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 
 import Data.Word
