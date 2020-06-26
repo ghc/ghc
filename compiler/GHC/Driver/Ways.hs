@@ -30,6 +30,7 @@ module GHC.Driver.Ways
    , wayRTSOnly
    , wayTag
    , waysTag
+   , waysBuildTag
    -- * Host GHC ways
    , hostFullWays
    , hostIsProfiled
@@ -70,9 +71,16 @@ allowed_combination ways = not disallowed
    -- List of disallowed couples of ways
    couples = [] -- we don't have any disallowed combination of ways nowadays
 
--- | Unique build-tag associated to a list of ways
+-- | Unique tag associated to a list of ways
 waysTag :: Set Way -> String
 waysTag = concat . intersperse "_" . map wayTag . Set.toAscList
+
+-- | Unique build-tag associated to a list of ways
+--
+-- RTS only ways are filtered out because they have no impact on the build.
+waysBuildTag :: Set Way -> String
+waysBuildTag ws = waysTag (Set.filter (not . wayRTSOnly) ws)
+
 
 -- | Unique build-tag associated to a way
 wayTag :: Way -> String
