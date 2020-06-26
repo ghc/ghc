@@ -23,6 +23,7 @@ import GHC.Prelude
 import GHC.Data.FastString
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Unit.Module
 import GHC.Types.Basic ( SourceText, pprWithSourceText )
 

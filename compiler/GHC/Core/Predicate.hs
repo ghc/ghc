@@ -35,13 +35,14 @@ import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Types.Var
 import GHC.Core.Coercion
+import GHC.Core.Multiplicity ( scaledThing )
 
 import GHC.Builtin.Names
 
 import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
-import GHC.Core.Multiplicity ( scaledThing )
+import GHC.Utils.Panic
 
 import Control.Monad ( guard )
 

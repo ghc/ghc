@@ -111,6 +111,7 @@ import GHC.Prelude
 import GHC.Utils.Misc
 import GHC.Utils.Json
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 
 import Control.DeepSeq

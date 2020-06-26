@@ -74,6 +74,7 @@ import GHC.Types.Basic
 import GHC.Unit.Module
 
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import GHC.Driver.Session
 import GHC.Data.FastString

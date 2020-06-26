@@ -53,6 +53,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Types.Basic
 import GHC.Driver.Session
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Core.FamInstEnv ( FamInstEnvs, normaliseType )

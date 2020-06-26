@@ -121,6 +121,7 @@ import GHC.Types.Unique
 import GHC.Builtin.Names
 import GHC.Data.FastString
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Core.TyCo.Rep -- Doesn't need special access, but this is easier to avoid
                          -- import loops which show up if you import Type instead
 

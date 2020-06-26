@@ -28,6 +28,7 @@ import GHC.Cmm.Ppr.Expr () -- For Outputable instances
 import GHC.Platform
 
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.OrdList
 
 --------------------------------------------------------------------------------

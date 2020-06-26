@@ -15,6 +15,7 @@ module GHC.Cmm.Switch (
 import GHC.Prelude
 
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Driver.Session
 import GHC.Cmm.Dataflow.Label (Label)
 

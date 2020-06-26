@@ -26,6 +26,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Tc.Utils.Monad
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Iface.Env
 
 import Control.Monad

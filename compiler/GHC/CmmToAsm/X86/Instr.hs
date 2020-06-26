@@ -36,6 +36,7 @@ import GHC.Platform.Regs
 import GHC.Cmm
 import GHC.Data.FastString
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 
 import GHC.Types.Basic (Alignment)

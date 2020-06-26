@@ -35,6 +35,7 @@ import GHC.Platform
 import GHC.Driver.Session
 import GHC.Data.FastString
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import Data.Word
 import Data.Int

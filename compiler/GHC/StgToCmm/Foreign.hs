@@ -43,7 +43,7 @@ import GHC.Types.ForeignCall
 import GHC.Driver.Session
 import GHC.Platform
 import GHC.Data.Maybe
-import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.Unique.Supply
 import GHC.Types.Basic
 

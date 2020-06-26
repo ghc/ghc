@@ -80,6 +80,7 @@ import GHC.Types.Var.Env  ( emptyTidyEnv, mkInScopeSet )
 import GHC.Data.List.SetOps
 import GHC.Data.Maybe
 import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import Control.Monad
 import GHC.Core.Class(classTyCon)

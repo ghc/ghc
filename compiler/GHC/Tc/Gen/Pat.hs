@@ -63,6 +63,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Var.Set
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
 import qualified GHC.LanguageExtensions as LangExt
 import Control.Arrow  ( second )
 import Control.Monad  ( when )

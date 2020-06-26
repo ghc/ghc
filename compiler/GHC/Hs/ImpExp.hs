@@ -25,6 +25,7 @@ import GHC.Types.Basic        ( SourceText(..), StringLiteral(..), pprWithSource
 import GHC.Types.FieldLabel   ( FieldLbl(..) )
 
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Types.SrcLoc
 import GHC.Hs.Extension

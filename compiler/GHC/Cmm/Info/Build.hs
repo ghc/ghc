@@ -27,6 +27,7 @@ import GHC.Cmm.Utils
 import GHC.Driver.Session
 import GHC.Data.Maybe
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Runtime.Heap.Layout
 import GHC.Types.Unique.Supply
 import GHC.Types.CostCentre
