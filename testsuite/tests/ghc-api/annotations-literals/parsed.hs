@@ -71,7 +71,7 @@ testOneFile libdir fileName = do
        = ["HsIsString [" ++ src ++ "] " ++ show c]
      doOverLit _ = []
 
-pp a = showPpr unsafeGlobalDynFlags a
+pp a = showPprUnsafe a
 
 -- ---------------------------------------------------------------------
 

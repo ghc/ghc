@@ -48,13 +48,15 @@ import GHC.Core.Type
 import GHC.Core.TyCo.Rep
 import GHC.Types.Var
 import GHC.Data.FastString(FastString)
+
 import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import qualified Data.Map    as Map
 import qualified Data.IntMap as IntMap
 import GHC.Types.Var.Env
 import GHC.Types.Name.Env
-import GHC.Utils.Outputable
 import Control.Monad( (>=>) )
 
 {-

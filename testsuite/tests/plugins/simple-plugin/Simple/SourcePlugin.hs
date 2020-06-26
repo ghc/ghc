@@ -42,11 +42,13 @@ typecheckPlugin _ _ tc
 
 metaPlugin' :: [CommandLineOption] -> LHsExpr GhcTc -> TcM (LHsExpr GhcTc)
 metaPlugin' _ meta
-  = do liftIO $ putStrLn $ "metaPlugin: " ++ (showSDocUnsafe $ ppr meta)
+  = do dflags <- getDynFlags
+       liftIO $ putStrLn $ "metaPlugin: " ++ (showSDoc dflags $ ppr meta)
        return meta
 
 interfaceLoadPlugin' :: [CommandLineOption] -> ModIface -> IfM lcl ModIface
 interfaceLoadPlugin' _ iface
-  = do liftIO $ putStrLn $ "interfacePlugin: "
-                              ++ (showSDocUnsafe $ ppr $ mi_module iface)
+  = do dflags <- getDynFlags
+       liftIO $ putStrLn $ "interfacePlugin: "
+                              ++ (showSDoc dflags $ ppr $ mi_module iface)
        return iface

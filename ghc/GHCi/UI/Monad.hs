@@ -38,8 +38,8 @@ module GHCi.UI.Monad (
 import GHCi.UI.Info (ModInfo)
 import qualified GHC
 import GHC.Driver.Monad hiding (liftIO)
-import GHC.Utils.Outputable       hiding (printForUser)
-import qualified GHC.Utils.Outputable as Outputable
+import GHC.Utils.Outputable
+import qualified GHC.Driver.Ppr as Ppr
 import GHC.Types.Name.Occurrence
 import GHC.Driver.Session
 import GHC.Data.FastString
@@ -235,7 +235,7 @@ prettyLocations  locs =
 instance Outputable BreakLocation where
    ppr loc = (ppr $ breakModule loc) <+> ppr (breakLoc loc) <+> pprEnaDisa <+>
                 if null (onBreakCmd loc)
-                   then Outputable.empty
+                   then empty
                    else doubleQuotes (text (onBreakCmd loc))
       where pprEnaDisa = case breakEnabled loc of
                 True  -> text "enabled"
@@ -331,26 +331,26 @@ unsetOption opt
 printForUserNeverQualify :: GhcMonad m => SDoc -> m ()
 printForUserNeverQualify doc = do
   dflags <- getDynFlags
-  liftIO $ Outputable.printForUser dflags stdout neverQualify AllTheWay doc
+  liftIO $ Ppr.printForUser dflags stdout neverQualify AllTheWay doc
 
 printForUserModInfo :: GhcMonad m => GHC.ModuleInfo -> SDoc -> m ()
 printForUserModInfo info doc = do
   dflags <- getDynFlags
   mUnqual <- GHC.mkPrintUnqualifiedForModule info
   unqual <- maybe GHC.getPrintUnqual return mUnqual
-  liftIO $ Outputable.printForUser dflags stdout unqual AllTheWay doc
+  liftIO $ Ppr.printForUser dflags stdout unqual AllTheWay doc
 
 printForUser :: GhcMonad m => SDoc -> m ()
 printForUser doc = do
   unqual <- GHC.getPrintUnqual
   dflags <- getDynFlags
-  liftIO $ Outputable.printForUser dflags stdout unqual AllTheWay doc
+  liftIO $ Ppr.printForUser dflags stdout unqual AllTheWay doc
 
 printForUserPartWay :: GhcMonad m => SDoc -> m ()
 printForUserPartWay doc = do
   unqual <- GHC.getPrintUnqual
   dflags <- getDynFlags
-  liftIO $ Outputable.printForUser dflags stdout unqual Outputable.DefaultDepth doc
+  liftIO $ Ppr.printForUser dflags stdout unqual DefaultDepth doc
 
 -- | Run a single Haskell expression
 runStmt
@@ -438,7 +438,7 @@ runWithStats getAllocs action = do
 printStats :: DynFlags -> ActionStats -> IO ()
 printStats dflags ActionStats{actionAllocs = mallocs, actionElapsedTime = secs}
    = do let secs_str = showFFloat (Just 2) secs
-        putStrLn (showSDoc dflags (
+        putStrLn (Ppr.showSDoc dflags (
                  parens (text (secs_str "") <+> text "secs" <> comma <+>
                          case mallocs of
                            Nothing -> empty

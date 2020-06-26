@@ -27,15 +27,17 @@ import GHC.Prelude
 
 import GHC.Types.Basic (Arity, RepArity)
 import GHC.Core.DataCon
-import GHC.Utils.Outputable
 import GHC.Builtin.Names
 import GHC.Core.Coercion
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.Type
-import GHC.Utils.Misc
 import GHC.Builtin.Types.Prim
 import {-# SOURCE #-} GHC.Builtin.Types ( anyTypeOfKind )
+
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import Data.List (sort)
 import qualified Data.IntSet as IS

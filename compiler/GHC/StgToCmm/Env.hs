@@ -37,17 +37,21 @@ import GHC.Cmm.CLabel
 import GHC.Cmm.BlockId
 import GHC.Cmm.Expr
 import GHC.Cmm.Utils
-import GHC.Driver.Session
 import GHC.Types.Id
 import GHC.Cmm.Graph
 import GHC.Types.Name
-import GHC.Utils.Outputable
 import GHC.Stg.Syntax
 import GHC.Core.Type
 import GHC.Builtin.Types.Prim
 import GHC.Types.Unique.FM
-import GHC.Utils.Misc
 import GHC.Types.Var.Env
+
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+
+import GHC.Driver.Session
+
 
 -------------------------------------
 --        Manipulating CgIdInfo

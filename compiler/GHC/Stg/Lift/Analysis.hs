@@ -33,6 +33,7 @@ import qualified GHC.StgToCmm.ArgRep  as StgToCmm.ArgRep
 import qualified GHC.StgToCmm.Closure as StgToCmm.Closure
 import qualified GHC.StgToCmm.Layout  as StgToCmm.Layout
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Types.Var.Set
 

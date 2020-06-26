@@ -9,6 +9,7 @@ import GHC.Core.Multiplicity
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 --
 -- * Usage environments

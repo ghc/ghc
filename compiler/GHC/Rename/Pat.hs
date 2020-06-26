@@ -70,6 +70,7 @@ import GHC.Types.Basic
 import GHC.Utils.Misc
 import GHC.Data.List.SetOps( removeDups )
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.SrcLoc
 import GHC.Types.Literal   ( inCharRange )
 import GHC.Builtin.Types   ( nilDataCon )

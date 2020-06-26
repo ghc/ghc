@@ -67,4 +67,4 @@ showAnns anns = "[\n" ++ (intercalate "\n"
 showToks ts = intercalate ",\n\n"
             $ map (\(L p t) -> "(" ++ pp p ++ "," ++ show t ++ ")") ts
 
-pp a = showPpr unsafeGlobalDynFlags a
+pp a = showPprUnsafe a

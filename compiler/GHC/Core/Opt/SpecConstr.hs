@@ -42,6 +42,7 @@ import GHC.Types.Name
 import GHC.Types.Basic
 import GHC.Driver.Session ( DynFlags(..), GeneralFlag( Opt_SpecConstrKeen )
                           , gopt, hasPprDebug )
+import GHC.Driver.Ppr
 import GHC.Data.Maybe     ( orElse, catMaybes, isJust, isNothing )
 import GHC.Types.Demand
 import GHC.Types.Cpr
@@ -49,6 +50,7 @@ import GHC.Utils.Misc
 import GHC.Data.Pair
 import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Types.Unique.FM
 import GHC.Utils.Monad

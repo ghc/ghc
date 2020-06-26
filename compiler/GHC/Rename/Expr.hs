@@ -57,6 +57,7 @@ import Data.List
 import GHC.Utils.Misc
 import GHC.Data.List.SetOps ( removeDups )
 import GHC.Utils.Error
+import GHC.Utils.Panic
 import GHC.Utils.Outputable as Outputable
 import GHC.Types.SrcLoc
 import GHC.Data.FastString

@@ -65,6 +65,7 @@ import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Types.Basic
 import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
 import GHC.Builtin.Names( ipClassName )
 import GHC.Tc.Validity (checkValidType)
 import GHC.Types.Unique.FM

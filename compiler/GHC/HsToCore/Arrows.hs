@@ -52,6 +52,7 @@ import GHC.Builtin.Types
 import GHC.Types.Basic
 import GHC.Builtin.Names
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.Var.Set
 import GHC.Types.SrcLoc
 import GHC.Data.List.SetOps( assocMaybe )

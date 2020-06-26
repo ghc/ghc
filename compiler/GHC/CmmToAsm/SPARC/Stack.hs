@@ -16,6 +16,7 @@ import GHC.CmmToAsm.SPARC.Imm
 import GHC.CmmToAsm.Config
 
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 -- | Get an AddrMode relative to the address in sp.
 --      This gives us a stack relative addressing mode for volatile

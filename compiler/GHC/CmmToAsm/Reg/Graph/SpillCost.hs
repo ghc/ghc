@@ -29,6 +29,7 @@ import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Data.Graph.Directed          (flattenSCCs)
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Utils.Monad.State
 import GHC.CmmToAsm.CFG

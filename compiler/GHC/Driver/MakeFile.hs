@@ -20,6 +20,7 @@ import GHC.Prelude
 import qualified GHC
 import GHC.Driver.Monad
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Driver.Ways
 import GHC.Utils.Misc
 import GHC.Driver.Types

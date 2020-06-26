@@ -121,6 +121,7 @@ import GHC.Types.SrcLoc
 import GHC.Driver.Types
 import GHC.Data.List.SetOps
 import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
 import GHC.Core.ConLike
 import GHC.Core.DataCon
 import GHC.Core.Type

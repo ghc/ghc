@@ -58,4 +58,4 @@ showAnns anns = "[\n" ++ (intercalate "\n"
    $ Map.toList anns)
     ++ "]\n"
 
-pp a = showPpr unsafeGlobalDynFlags a
+pp a = showPprUnsafe a

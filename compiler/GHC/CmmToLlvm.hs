@@ -34,6 +34,7 @@ import GHC.Platform ( platformArch, Arch(..) )
 import GHC.Utils.Error
 import GHC.Data.FastString
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.SysTools ( figureLlvmVersion )
 import qualified GHC.Data.Stream as Stream
 

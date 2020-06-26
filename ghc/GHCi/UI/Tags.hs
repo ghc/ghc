@@ -31,6 +31,7 @@ import Data.List
 import Data.Maybe
 import Data.Ord
 import GHC.Driver.Phases
+import GHC.Driver.Ppr
 import GHC.Utils.Panic
 import Prelude
 import System.Directory

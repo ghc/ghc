@@ -40,4 +40,4 @@ showToks ts = intercalate ",\n\n"
             $ map (\((L p t),s) ->
                          "(" ++ pp p ++ "," ++ show t ++ ",[" ++ s ++ "])") ts
 
-pp a = showPpr unsafeGlobalDynFlags a
+pp a = showPprUnsafe a

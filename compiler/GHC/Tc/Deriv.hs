@@ -62,6 +62,7 @@ import GHC.Builtin.Names
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Data.Bag
 import GHC.Utils.FV as FV (fvVarList, unionFV, mkFVs)
