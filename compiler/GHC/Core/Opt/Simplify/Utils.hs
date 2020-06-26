@@ -1804,7 +1804,7 @@ abstractFloats dflags top_lvl main_tvs floats body
   = ASSERT( notNull body_floats )
     ASSERT( isNilOL (sfJoinFloats floats) )
     do  { (subst, float_binds) <- mapAccumLM abstract empty_subst body_floats
-        ; return (float_binds, GHC.Core.Subst.substExpr (text "abstract_floats1") subst body) }
+        ; return (float_binds, GHC.Core.Subst.substExpr subst body) }
   where
     is_top_lvl  = isTopLevel top_lvl
     main_tv_set = mkVarSet main_tvs
@@ -1818,7 +1818,7 @@ abstractFloats dflags top_lvl main_tvs floats body
                  subst' = GHC.Core.Subst.extendIdSubst subst id poly_app
            ; return (subst', NonRec poly_id2 poly_rhs) }
       where
-        rhs' = GHC.Core.Subst.substExpr (text "abstract_floats2") subst rhs
+        rhs' = GHC.Core.Subst.substExpr subst rhs
 
         -- tvs_here: see Note [Which type variables to abstract over]
         tvs_here = scopedSort $
@@ -1831,8 +1831,7 @@ abstractFloats dflags top_lvl main_tvs floats body
             ; let subst' = GHC.Core.Subst.extendSubstList subst (ids `zip` poly_apps)
                   poly_pairs = [ mk_poly2 poly_id tvs_here rhs'
                                | (poly_id, rhs) <- poly_ids `zip` rhss
-                               , let rhs' = GHC.Core.Subst.substExpr (text "abstract_floats")
-                                                                subst' rhs ]
+                               , let rhs' = GHC.Core.Subst.substExpr subst' rhs ]
             ; return (subst', Rec poly_pairs) }
        where
          (ids,rhss) = unzip prs

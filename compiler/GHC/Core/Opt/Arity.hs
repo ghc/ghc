@@ -1023,7 +1023,7 @@ etaInfoApp subst (Tick t e) eis
 
 etaInfoApp subst expr _
   | (Var fun, _) <- collectArgs expr
-  , Var fun' <- lookupIdSubst (text "etaInfoApp" <+> ppr fun) subst fun
+  , Var fun' <- lookupIdSubst subst fun
   , isJoinId fun'
   = subst_expr subst expr
 
@@ -1138,7 +1138,7 @@ mkEtaWW orig_n ppr_orig_expr in_scope orig_ty
 -- TODO Check if we actually *are* changing any join points' types
 
 subst_expr :: Subst -> CoreExpr -> CoreExpr
-subst_expr = substExpr (text "GHC.Core.Opt.Arity:substExpr")
+subst_expr = substExpr
 
 
 --------------

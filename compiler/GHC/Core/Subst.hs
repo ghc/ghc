@@ -246,13 +246,13 @@ extendSubstList subst []              = subst
 extendSubstList subst ((var,rhs):prs) = extendSubstList (extendSubst subst var rhs) prs
 
 -- | Find the substitution for an 'Id' in the 'Subst'
-lookupIdSubst :: SDoc -> Subst -> Id -> CoreExpr
-lookupIdSubst doc (Subst in_scope ids _ _) v
+lookupIdSubst :: HasDebugCallStack => Subst -> Id -> CoreExpr
+lookupIdSubst (Subst in_scope ids _ _) v
   | not (isLocalId v) = Var v
   | Just e  <- lookupVarEnv ids       v = e
   | Just v' <- lookupInScope in_scope v = Var v'
         -- Vital! See Note [Extending the Subst]
-  | otherwise = WARN( True, text "GHC.Core.Subst.lookupIdSubst" <+> doc <+> ppr v
+  | otherwise = WARN( True, text "GHC.Core.Subst.lookupIdSubst" <+> ppr v
                             $$ ppr in_scope)
                 Var v
 
@@ -344,20 +344,20 @@ instance Outputable Subst where
 --
 -- Do *not* attempt to short-cut in the case of an empty substitution!
 -- See Note [Extending the Subst]
-substExprSC :: SDoc -> Subst -> CoreExpr -> CoreExpr
-substExprSC doc subst orig_expr
+substExprSC :: HasDebugCallStack => Subst -> CoreExpr -> CoreExpr
+substExprSC subst orig_expr
   | isEmptySubst subst = orig_expr
   | otherwise          = -- pprTrace "enter subst-expr" (doc $$ ppr orig_expr) $
-                         subst_expr doc subst orig_expr
+                         subst_expr subst orig_expr
 
-substExpr :: SDoc -> Subst -> CoreExpr -> CoreExpr
-substExpr doc subst orig_expr = subst_expr doc subst orig_expr
+substExpr :: HasDebugCallStack => Subst -> CoreExpr -> CoreExpr
+substExpr subst orig_expr = subst_expr subst orig_expr
 
-subst_expr :: SDoc -> Subst -> CoreExpr -> CoreExpr
-subst_expr doc subst expr
+subst_expr :: HasDebugCallStack => Subst -> CoreExpr -> CoreExpr
+subst_expr subst expr
   = go expr
   where
-    go (Var v)         = lookupIdSubst (doc $$ text "subst_expr") subst v
+    go (Var v)         = lookupIdSubst subst v
     go (Type ty)       = Type (substTy subst ty)
     go (Coercion co)   = Coercion (substCo subst co)
     go (Lit lit)       = Lit lit
@@ -370,11 +370,11 @@ subst_expr doc subst expr
        --         lose a binder. We optimise the LHS of rules at
        --         construction time
 
-    go (Lam bndr body) = Lam bndr' (subst_expr doc subst' body)
+    go (Lam bndr body) = Lam bndr' (subst_expr subst' body)
                        where
                          (subst', bndr') = substBndr subst bndr
 
-    go (Let bind body) = Let bind' (subst_expr doc subst' body)
+    go (Let bind body) = Let bind' (subst_expr subst' body)
                        where
                          (subst', bind') = substBind subst bind
 
@@ -382,7 +382,7 @@ subst_expr doc subst expr
                                  where
                                  (subst', bndr') = substBndr subst bndr
 
-    go_alt subst (con, bndrs, rhs) = (con, bndrs', subst_expr doc subst' rhs)
+    go_alt subst (con, bndrs, rhs) = (con, bndrs', subst_expr subst' rhs)
                                  where
                                    (subst', bndrs') = substBndrs subst bndrs
 
@@ -405,10 +405,10 @@ substBindSC subst bind    -- Short-cut if the substitution is empty
             rhss' | isEmptySubst subst'
                   = rhss
                   | otherwise
-                  = map (subst_expr (text "substBindSC") subst') rhss
+                  = map (subst_expr subst') rhss
 
 substBind subst (NonRec bndr rhs)
-  = (subst', NonRec bndr' (subst_expr (text "substBind") subst rhs))
+  = (subst', NonRec bndr' (subst_expr subst rhs))
   where
     (subst', bndr') = substBndr subst bndr
 
@@ -417,7 +417,7 @@ substBind subst (Rec pairs)
    where
        (bndrs, rhss)    = unzip pairs
        (subst', bndrs') = substRecBndrs subst bndrs
-       rhss' = map (subst_expr (text "substBind") subst') rhss
+       rhss' = map (subst_expr subst') rhss
 
 -- | De-shadowing the program is sometimes a useful pre-pass. It can be done simply
 -- by running over the bindings with an empty substitution, because substitution
@@ -638,7 +638,7 @@ substUnfolding subst df@(DFunUnfolding { df_bndrs = bndrs, df_args = args })
   = df { df_bndrs = bndrs', df_args = args' }
   where
     (subst',bndrs') = substBndrs subst bndrs
-    args'           = map (substExpr (text "subst-unf:dfun") subst') args
+    args'           = map (substExpr subst') args
 
 substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src })
         -- Retain an InlineRule!
@@ -648,14 +648,14 @@ substUnfolding subst unf@(CoreUnfolding { uf_tmpl = tmpl, uf_src = src })
   = seqExpr new_tmpl `seq`
     unf { uf_tmpl = new_tmpl }
   where
-    new_tmpl = substExpr (text "subst-unf") subst tmpl
+    new_tmpl = substExpr subst tmpl
 
 substUnfolding _ unf = unf      -- NoUnfolding, OtherCon
 
 ------------------
 substIdOcc :: Subst -> Id -> Id
 -- These Ids should not be substituted to non-Ids
-substIdOcc subst v = case lookupIdSubst (text "substIdOcc") subst v of
+substIdOcc subst v = case lookupIdSubst subst v of
                         Var v' -> v'
                         other  -> pprPanic "substIdOcc" (vcat [ppr v <+> ppr other, ppr subst])
 
@@ -693,12 +693,11 @@ substRule subst subst_ru_fn rule@(Rule { ru_bndrs = bndrs, ru_args = args
          , ru_fn    = if is_local
                         then subst_ru_fn fn_name
                         else fn_name
-         , ru_args  = map (substExpr doc subst') args
-         , ru_rhs   = substExpr (text "foo") subst' rhs }
+         , ru_args  = map (substExpr subst') args
+         , ru_rhs   = substExpr subst' rhs }
            -- Do NOT optimise the RHS (previously we did simplOptExpr here)
            -- See Note [Substitute lazily]
   where
-    doc = text "subst-rule" <+> ppr fn_name
     (subst', bndrs') = substBndrs subst bndrs
 
 ------------------
@@ -707,7 +706,7 @@ substDVarSet subst fvs
   = mkDVarSet $ fst $ foldr (subst_fv subst) ([], emptyVarSet) $ dVarSetElems fvs
   where
   subst_fv subst fv acc
-     | isId fv = expr_fvs (lookupIdSubst (text "substDVarSet") subst fv) isLocalVar emptyVarSet $! acc
+     | isId fv = expr_fvs (lookupIdSubst subst fv) isLocalVar emptyVarSet $! acc
      | otherwise = tyCoFVsOfType (lookupTCvSubst subst fv) (const True) emptyVarSet $! acc
 
 ------------------
@@ -715,7 +714,7 @@ substTickish :: Subst -> Tickish Id -> Tickish Id
 substTickish subst (Breakpoint n ids)
    = Breakpoint n (map do_one ids)
  where
-    do_one = getIdFromTrivialExpr . lookupIdSubst (text "subst_tickish") subst
+    do_one = getIdFromTrivialExpr . lookupIdSubst subst
 substTickish _subst other = other
 
 {- Note [Substitute lazily]
