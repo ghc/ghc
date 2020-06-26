@@ -95,7 +95,7 @@ import GHC.Builtin.Types ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nil
 
 %expect 232 -- shift/reduce conflicts
 
-{- Last updated: 04 June 2018
+{- Last updated: 08 June 2020
 
 If you modify this parser and add a conflict, please update this comment.
 You can learn more about the conflicts by passing 'happy' the -i flag:
@@ -136,7 +136,7 @@ state 60 contains 1 shift/reduce conflict.
 
 -------------------------------------------------------------------------------
 
-state 61 contains 47 shift/reduce conflicts.
+state 61 contains 46 shift/reduce conflicts.
 
     *** btype -> tyapps .
         tyapps -> tyapps . tyapp
@@ -154,7 +154,7 @@ Shift parses as (per longest-parse rule):
 
 -------------------------------------------------------------------------------
 
-state 143 contains 15 shift/reduce conflicts.
+state 143 contains 14 shift/reduce conflicts.
 
         exp -> infixexp . '::' sigtype
         exp -> infixexp . '-<' exp
@@ -179,7 +179,7 @@ Shift parses as (per longest-parse rule):
 
 -------------------------------------------------------------------------------
 
-state 148 contains 67 shift/reduce conflicts.
+state 146 contains 66 shift/reduce conflicts.
 
     *** exp10 -> fexp .
         fexp -> fexp . aexp
@@ -197,7 +197,7 @@ Shift parses as (per longest-parse rule):
 
 -------------------------------------------------------------------------------
 
-state 203 contains 27 shift/reduce conflicts.
+state 200 contains 27 shift/reduce conflicts.
 
         aexp2 -> TH_TY_QUOTE . tyvar
         aexp2 -> TH_TY_QUOTE . gtycon
@@ -216,7 +216,7 @@ Shift parses as (per longest-parse rule):
 
 -------------------------------------------------------------------------------
 
-state 299 contains 1 shift/reduce conflicts.
+state 294 contains 1 shift/reduce conflicts.
 
         rule -> STRING . rule_activation rule_forall infixexp '=' exp
 
@@ -234,7 +234,7 @@ a rule instructing how to rewrite the expression '[0] f'.
 
 -------------------------------------------------------------------------------
 
-state 309 contains 1 shift/reduce conflict.
+state 305 contains 1 shift/reduce conflict.
 
     *** type -> btype .
         type -> btype . '->' ctype
@@ -245,7 +245,7 @@ Same as state 61 but without contexts.
 
 -------------------------------------------------------------------------------
 
-state 353 contains 1 shift/reduce conflicts.
+state 349 contains 1 shift/reduce conflicts.
 
         tup_exprs -> commas . tup_tail
         sysdcon_nolist -> '(' commas . ')'
@@ -262,7 +262,7 @@ See also Note [ExplicitTuple] in GHC.Hs.Expr.
 
 -------------------------------------------------------------------------------
 
-state 408 contains 1 shift/reduce conflicts.
+state 407 contains 1 shift/reduce conflicts.
 
         tup_exprs -> commas . tup_tail
         sysdcon_nolist -> '(#' commas . '#)'
@@ -274,17 +274,17 @@ Same as State 354 for unboxed tuples.
 
 -------------------------------------------------------------------------------
 
-state 416 contains 67 shift/reduce conflicts.
+state 416 contains 66 shift/reduce conflicts.
 
     *** exp10 -> '-' fexp .
         fexp -> fexp . aexp
         fexp -> fexp . TYPEAPP atype
 
-Same as 149 but with a unary minus.
+Same as 146 but with a unary minus.
 
 -------------------------------------------------------------------------------
 
-state 481 contains 1 shift/reduce conflict.
+state 472 contains 1 shift/reduce conflict.
 
         oqtycon -> '(' qtyconsym . ')'
     *** qtyconop -> qtyconsym .
@@ -298,7 +298,7 @@ parenthesized infix type expression of length 1.
 
 -------------------------------------------------------------------------------
 
-state 678 contains 1 shift/reduce conflicts.
+state 665 contains 1 shift/reduce conflicts.
 
     *** aexp2 -> ipvar .
         dbind -> ipvar . '=' exp
@@ -313,7 +313,7 @@ sensible meaning, namely the lhs of an implicit binding.
 
 -------------------------------------------------------------------------------
 
-state 756 contains 1 shift/reduce conflicts.
+state 750 contains 1 shift/reduce conflicts.
 
         rule -> STRING rule_activation . rule_forall infixexp '=' exp
 
@@ -330,7 +330,7 @@ doesn't include 'forall'.
 
 -------------------------------------------------------------------------------
 
-state 992 contains 1 shift/reduce conflicts.
+state 986 contains 1 shift/reduce conflicts.
 
         transformqual -> 'then' 'group' . 'using' exp
         transformqual -> 'then' 'group' . 'by' exp 'using' exp
@@ -340,7 +340,7 @@ state 992 contains 1 shift/reduce conflicts.
 
 -------------------------------------------------------------------------------
 
-state 1089 contains 1 shift/reduce conflicts.
+state 1084 contains 1 shift/reduce conflicts.
 
         rule_foralls -> 'forall' rule_vars '.' . 'forall' rule_vars '.'
     *** rule_foralls -> 'forall' rule_vars '.' .
@@ -362,7 +362,15 @@ Shift means the parser only allows the former. Also see conflict 753 above.
 
 -------------------------------------------------------------------------------
 
-state 1390 contains 1 shift/reduce conflict.
+state 1285 contains 1 shift/reduce conflict.
+
+        constrs1 -> constrs1 maybe_docnext '|' . maybe_docprev constr
+
+   Conflict: DOCPREV
+
+-------------------------------------------------------------------------------
+
+state 1375 contains 1 shift/reduce conflict.
 
     *** atype -> tyvar .
         tv_bndr -> '(' tyvar . '::' kind ')'
@@ -460,7 +468,6 @@ are the most common patterns, rewritten as regular expressions for clarity:
  'data'         { L _ ITdata }
  'default'      { L _ ITdefault }
  'deriving'     { L _ ITderiving }
- 'do'           { L _ ITdo }
  'else'         { L _ ITelse }
  'hiding'       { L _ IThiding }
  'if'           { L _ ITif }
@@ -487,7 +494,6 @@ are the most common patterns, rewritten as regular expressions for clarity:
  'safe'         { L _ ITsafe }
  'interruptible' { L _ ITinterruptible }
  'unsafe'       { L _ ITunsafe }
- 'mdo'          { L _ ITmdo }
  'family'       { L _ ITfamily }
  'role'         { L _ ITrole }
  'stdcall'      { L _ ITstdcallconv }
@@ -580,6 +586,11 @@ are the most common patterns, rewritten as regular expressions for clarity:
  QCONID         { L _ (ITqconid   _) }
  QVARSYM        { L _ (ITqvarsym  _) }
  QCONSYM        { L _ (ITqconsym  _) }
+
+
+ -- QualifiedDo
+ DO             { L _ (ITdo  _) }
+ MDO            { L _ (ITmdo _) }
 
  IPDUPVARID     { L _ (ITdupipvarid   _) }              -- GHC extension
  LABELVARID     { L _ (ITlabelvarid   _) }
@@ -2820,14 +2831,21 @@ aexp    :: { ECP }
                                                    FromSource (snd $ unLoc $4)))
                                                (mj AnnCase $1:mj AnnOf $3
                                                   :(fst $ unLoc $4)) }
-        | 'do' stmtlist              { ECP $
+        -- QualifiedDo.
+        | DO  stmtlist               {% do
+                                      hintQualifiedDo $1
+                                      return $ ECP $
                                         $2 >>= \ $2 ->
-                                        amms (mkHsDoPV (comb2 $1 $2) (mapLoc snd $2))
-                                               (mj AnnDo $1:(fst $ unLoc $2)) }
-        | 'mdo' stmtlist            {% runPV $2 >>= \ $2 ->
+                                        amms (mkHsDoPV (comb2 $1 $2)
+                                                       (fmap mkModuleNameFS (getDO $1))
+                                                       (mapLoc snd $2))
+                                             (mj AnnDo $1:(fst $ unLoc $2)) }
+        | MDO stmtlist             {% hintQualifiedDo $1 >> runPV $2 >>= \ $2 ->
                                        fmap ecpFromExp $
                                        ams (L (comb2 $1 $2)
-                                              (mkHsDo MDoExpr (snd $ unLoc $2)))
+                                              (mkHsDo (MDoExpr $
+                                                        fmap mkModuleNameFS (getMDO $1))
+                                                        (snd $ unLoc $2)))
                                            (mj AnnMdo $1:(fst $ unLoc $2)) }
         | 'proc' aexp '->' exp
                        {% (checkPattern <=< runECP_P) $2 >>= \ p ->
@@ -3836,6 +3854,8 @@ getVARID        (L _ (ITvarid    x)) = x
 getCONID        (L _ (ITconid    x)) = x
 getVARSYM       (L _ (ITvarsym   x)) = x
 getCONSYM       (L _ (ITconsym   x)) = x
+getDO           (L _ (ITdo      x)) = x
+getMDO          (L _ (ITmdo     x)) = x
 getQVARID       (L _ (ITqvarid   x)) = x
 getQCONID       (L _ (ITqconid   x)) = x
 getQVARSYM      (L _ (ITqvarsym  x)) = x
@@ -4028,6 +4048,23 @@ hintExplicitForall tok = do
       ]
   where
     forallSymDoc = text (forallSym (isUnicode tok))
+
+-- Hint about qualified-do
+hintQualifiedDo :: Located Token -> P ()
+hintQualifiedDo tok = do
+    qualifiedDo   <- getBit QualifiedDoBit
+    case maybeQDoDoc of
+      Just qdoDoc | not qualifiedDo ->
+        addError (getLoc tok) $ vcat
+          [ text "Illegal qualified" <+> quotes qdoDoc <+> text "block"
+          , text "Perhaps you intended to use QualifiedDo"
+          ]
+      _ -> return ()
+  where
+    maybeQDoDoc = case unLoc tok of
+      ITdo (Just m) -> Just $ ftext m <> text ".do"
+      ITmdo (Just m) -> Just $ ftext m <> text ".mdo"
+      t -> Nothing
 
 -- When two single quotes don't followed by tyvar or gtycon, we report the
 -- error as empty character literal, or TH quote that missing proper type

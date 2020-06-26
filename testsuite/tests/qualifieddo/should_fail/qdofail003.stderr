@@ -1,0 +1,8 @@
+
+qdofail003.hs:11:5:
+    Not in scope: ‘P.>>’
+    Perhaps you meant one of these:
+      ‘P.*>’ (imported from Prelude), ‘P.<>’ (imported from Prelude),
+      ‘P.>>=’ (imported from Prelude)
+    Perhaps you want to remove ‘>>’ from the explicit hiding list
+    in the import of ‘Prelude’ (qdofail003.hs:3:1-33).
