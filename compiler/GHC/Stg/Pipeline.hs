@@ -29,6 +29,7 @@ import GHC.Driver.Session
 import GHC.Utils.Error
 import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.State.Strict

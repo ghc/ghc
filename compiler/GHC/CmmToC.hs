@@ -42,8 +42,10 @@ import GHC.Cmm.Switch
 -- Utils
 import GHC.CmmToAsm.CPrim
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Data.FastString
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM

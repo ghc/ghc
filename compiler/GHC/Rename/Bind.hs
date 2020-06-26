@@ -57,6 +57,7 @@ import GHC.Data.Graph.Directed ( SCC(..) )
 import GHC.Data.Bag
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.Unique.Set
 import GHC.Data.Maybe          ( orElse )
 import GHC.Data.OrdList

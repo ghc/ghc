@@ -46,8 +46,10 @@ import GHC.Types.Basic
 import GHC.Driver.Types
 import GHC.Data.Bag
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Utils.Monad.State
 import GHC.Types.Unique.DFM

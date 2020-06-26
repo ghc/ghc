@@ -37,12 +37,14 @@ import GHC.Tc.Types.Evidence
 import GHC.Core.Type
 import GHC.Types.Name.Set
 import GHC.Types.Basic
-import GHC.Utils.Outputable
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Types.Var
 import GHC.Data.Bag
 import GHC.Data.FastString
 import GHC.Data.BooleanFormula (LBooleanFormula)
+
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import Data.Data hiding ( Fixity )
 import Data.List hiding ( foldr )

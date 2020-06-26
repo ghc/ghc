@@ -79,6 +79,7 @@ import GHC.Cmm
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Driver.Session
 import GHC.Types.Unique
 import GHC.Platform.Regs

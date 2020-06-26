@@ -34,6 +34,9 @@ module GHC.StgToCmm.Layout (
 
 import GHC.Prelude hiding ((<*>))
 
+import GHC.Driver.Session
+import GHC.Driver.Ppr
+
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Env
 import GHC.StgToCmm.ArgRep -- notably: ( slowCallPattern )
@@ -52,13 +55,13 @@ import GHC.Stg.Syntax
 import GHC.Types.Id
 import GHC.Core.TyCon    ( PrimRep(..), primRepSizeB )
 import GHC.Types.Basic   ( RepArity )
-import GHC.Driver.Session
 import GHC.Platform
 import GHC.Unit
 
 import GHC.Utils.Misc
 import Data.List
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import Control.Monad
 

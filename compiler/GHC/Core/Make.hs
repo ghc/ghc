@@ -83,6 +83,7 @@ import GHC.Data.FastString
 import GHC.Types.Unique.Supply
 import GHC.Types.Basic
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 import Data.List
 
 import Data.Char        ( ord )

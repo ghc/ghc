@@ -82,9 +82,11 @@ import GHC.Core.Class ( classSCSelId )
 import GHC.Core.FVs   ( exprSomeFreeVars )
 
 import GHC.Utils.Misc
+import GHC.Utils.Panic
+import GHC.Utils.Outputable
+
 import GHC.Data.Bag
 import qualified Data.Data as Data
-import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 import Data.IORef( IORef )
 import GHC.Types.Unique.Set

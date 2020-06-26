@@ -12,6 +12,7 @@ import GHC
 import GHC.Ptr (Ptr (..))
 import GHCi.Util
 import GHC.Driver.Types
+import GHC.Driver.Ppr
 import GHC.Utils.Outputable
 import GHC.Platform (target32Bit)
 import Prelude

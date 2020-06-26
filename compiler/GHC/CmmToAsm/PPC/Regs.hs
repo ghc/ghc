@@ -62,6 +62,7 @@ import GHC.Types.Unique
 
 import GHC.Platform.Regs
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 
 import Data.Word        ( Word8, Word16, Word32, Word64 )

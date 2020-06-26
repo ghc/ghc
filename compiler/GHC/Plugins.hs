@@ -26,6 +26,7 @@ module GHC.Plugins
    , module GHC.Core.Rules
    , module GHC.Types.Annotations
    , module GHC.Driver.Session
+   , module GHC.Driver.Ppr
    , module GHC.Unit.State
    , module GHC.Unit.Module
    , module GHC.Core.Type
@@ -46,6 +47,7 @@ module GHC.Plugins
    , module GHC.Serialized
    , module GHC.Types.SrcLoc
    , module GHC.Utils.Outputable
+   , module GHC.Utils.Panic
    , module GHC.Types.Unique.Supply
    , module GHC.Data.FastString
    , module GHC.Tc.Errors.Hole.FitTypes   -- for hole-fit plugins
@@ -111,6 +113,8 @@ import GHC.Utils.Misc
 import GHC.Serialized
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
+import GHC.Driver.Ppr
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique ( Unique, Uniquable(..) )
 import GHC.Data.FastString

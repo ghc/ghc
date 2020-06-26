@@ -47,6 +47,7 @@ import GHC.Core.ConLike
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Core.Type
 import GHC.Builtin.Types (mkTupleStr)

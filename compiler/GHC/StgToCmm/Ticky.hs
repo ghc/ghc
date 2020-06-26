@@ -120,9 +120,11 @@ import GHC.Types.Id
 import GHC.Types.Basic
 import GHC.Data.FastString
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Utils.Misc
 
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 
 -- Turgid imports for showTypeCategory
 import GHC.Builtin.Names

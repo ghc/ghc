@@ -114,11 +114,15 @@ import GHC.Types.Literal
 import GHC.Core.DataCon
 import GHC.Unit.Module
 import GHC.Types.Basic
-import GHC.Utils.Outputable
-import GHC.Utils.Misc
 import GHC.Types.Unique.Set
 import GHC.Types.SrcLoc ( RealSrcSpan, containsSpan )
+
 import GHC.Utils.Binary
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
+
+import GHC.Driver.Ppr
 
 import Data.Data hiding (TyCon)
 import Data.Int

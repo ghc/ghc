@@ -51,6 +51,7 @@ import GHC.Core.Utils
 import GHC.Core.Make
 
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Types.CostCentre
 import GHC.Types.Id
 import GHC.Types.Id.Make
@@ -68,6 +69,7 @@ import GHC.Builtin.Types.Prim ( mkTemplateTyVars )
 import GHC.Utils.Misc
 import GHC.Data.Bag
 import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
 import GHC.Core.PatSyn
 
 import Control.Monad

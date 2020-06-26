@@ -13,6 +13,7 @@ module GHC.Core.Opt.Driver ( core2core, simplifyExpr ) where
 import GHC.Prelude
 
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Core
 import GHC.Driver.Types
 import GHC.Core.Opt.CSE  ( cseProgram )
@@ -58,6 +59,7 @@ import GHC.Runtime.Loader -- ( initializePlugins )
 import GHC.Types.Unique.Supply ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
 import GHC.Types.Unique.FM
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import Control.Monad
 import qualified GHC.LanguageExtensions as LangExt
 {-

@@ -40,6 +40,7 @@ import GHC.Driver.Session
 import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
 import GHC.Data.Maybe
 import GHC.Data.Bag         ( emptyBag, listToBag, unitBag )
 import GHC.Utils.Monad

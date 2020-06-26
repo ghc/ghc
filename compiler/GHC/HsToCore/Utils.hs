@@ -77,9 +77,11 @@ import GHC.Unit.Module
 import GHC.Builtin.Names
 import GHC.Types.Name( isInternalName )
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Data.FastString
 import qualified GHC.LanguageExtensions as LangExt
 
