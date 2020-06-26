@@ -114,6 +114,7 @@ import GHC.Types.Unique.Set
 import GHC.Utils.Misc
 import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Builtin.Names hiding ( wildCardName )
 import GHC.Driver.Session

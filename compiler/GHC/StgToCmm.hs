@@ -47,6 +47,7 @@ import GHC.Core.TyCon
 import GHC.Core.Multiplicity
 import GHC.Unit.Module
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.Stream
 import GHC.Types.Basic
 import GHC.Types.Var.Set ( isEmptyDVarSet )

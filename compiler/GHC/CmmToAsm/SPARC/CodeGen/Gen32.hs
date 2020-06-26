@@ -27,7 +27,7 @@ import GHC.Cmm
 
 import Control.Monad (liftM)
 import GHC.Data.OrdList
-import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 -- | The dual to getAnyReg: compute an expression into a register, but
 --      we don't mind which one it is.

@@ -19,6 +19,7 @@ import GHC.Prelude
 import GHC.Tc.Types
 import GHC.Driver.Session
 import GHC.Driver.Backend
+import GHC.Driver.Ppr
 import GHC.Core
 import GHC.Core.Unfold
 import GHC.Core.FVs
@@ -59,6 +60,7 @@ import GHC.Data.Maybe
 import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable
 import GHC.Utils.Misc( filterOut )
+import GHC.Utils.Panic
 import qualified GHC.Utils.Error as Err
 
 import Control.Monad

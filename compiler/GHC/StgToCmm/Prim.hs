@@ -54,8 +54,8 @@ import GHC.Cmm.Utils
 import GHC.Builtin.PrimOps
 import GHC.Runtime.Heap.Layout
 import GHC.Data.FastString
-import GHC.Utils.Outputable
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 import Data.Maybe
 
 import Data.Bits ((.&.), bit)

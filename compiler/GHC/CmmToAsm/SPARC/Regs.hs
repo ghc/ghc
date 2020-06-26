@@ -41,6 +41,7 @@ import GHC.CmmToAsm.Format
 
 import GHC.Types.Unique
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 {-
         The SPARC has 64 registers of interest; 32 integer registers and 32

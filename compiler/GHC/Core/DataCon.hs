@@ -78,14 +78,16 @@ import GHC.Types.Name
 import GHC.Builtin.Names
 import GHC.Core.Predicate
 import GHC.Types.Var
-import GHC.Utils.Outputable
-import GHC.Utils.Misc
 import GHC.Types.Basic
 import GHC.Data.FastString
 import GHC.Unit
 import GHC.Utils.Binary
 import GHC.Types.Unique.Set
 import GHC.Types.Unique( mkAlphaTyVarUnique )
+
+import GHC.Utils.Outputable
+import GHC.Utils.Misc
+import GHC.Utils.Panic
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Builder as BSB

@@ -162,6 +162,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.Bag as Bag
 import GHC.Types.Unique.Supply
 import GHC.Utils.Misc

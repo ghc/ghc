@@ -42,6 +42,7 @@ import {-# SOURCE #-} GHC.IfaceToCore
 
 import GHC.Driver.Session
 import GHC.Driver.Backend
+import GHC.Driver.Ppr
 import GHC.Iface.Syntax
 import GHC.Iface.Env
 import GHC.Driver.Types

@@ -44,6 +44,7 @@ import GHC.Core.Multiplicity
 
 import GHC.Driver.Session
 import GHC.Driver.Backend
+import GHC.Driver.Ppr
 import GHC.Types.Var ( TyVar, Specificity(..), tyVarKind, binderVars )
 import GHC.Types.Id  ( Id, idName, idType, idInlinePragma, setInlinePragma, mkLocalId )
 import GHC.Builtin.Names( mkUnboundName )
@@ -52,6 +53,7 @@ import GHC.Unit.Module( getModule )
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc( singleton )
 import GHC.Data.Maybe( orElse )

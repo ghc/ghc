@@ -28,6 +28,7 @@ import GHC.Data.Bag
 import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Core.Type
 import qualified Data.IntMap as M
 

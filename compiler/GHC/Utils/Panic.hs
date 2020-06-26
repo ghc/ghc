@@ -10,27 +10,45 @@
 --
 -- It's hard to put these functions anywhere else without causing
 -- some unnecessary loops in the module dependency graph.
-module GHC.Utils.Panic (
-     GhcException(..), showGhcException,
-     throwGhcException, throwGhcExceptionIO,
-     handleGhcException,
-     GHC.Utils.Panic.Plain.progName,
-     pgmError,
+module GHC.Utils.Panic
+   ( GhcException(..)
+   , showGhcException
+   , showGhcExceptionUnsafe
+   , throwGhcException
+   , throwGhcExceptionIO
+   , handleGhcException
 
-     panic, sorry, assertPanic, trace,
-     panicDoc, sorryDoc, pgmErrorDoc,
+   , GHC.Utils.Panic.Plain.progName
+   , pgmError
+   , panic
+   , pprPanic
+   , assertPanic
+   , assertPprPanic
+   , sorry
+   , trace
+   , panicDoc
+   , sorryDoc
+   , pgmErrorDoc
+   , cmdLineError
+   , cmdLineErrorIO
+   , callStackDoc
 
-     cmdLineError, cmdLineErrorIO,
-
-     Exception.Exception(..), showException, safeShowException,
-     try, tryMost, throwTo,
-
-     withSignalHandlers,
-) where
+   , Exception.Exception(..)
+   , showException
+   , safeShowException
+   , try
+   , tryMost
+   , throwTo
+   , withSignalHandlers
+   )
+where
 
 import GHC.Prelude
+import GHC.Stack
 
-import {-# SOURCE #-} GHC.Utils.Outputable (SDoc, showSDocUnsafe)
+import GHC.Utils.Outputable
+import {-# SOURCE #-} GHC.Driver.Session (DynFlags, unsafeGlobalDynFlags)
+import {-# SOURCE #-} GHC.Driver.Ppr (showSDoc)
 import GHC.Utils.Panic.Plain
 
 import GHC.Utils.Exception as Exception
@@ -105,9 +123,9 @@ instance Exception GhcException where
     | otherwise = Nothing
 
 instance Show GhcException where
-  showsPrec _ e@(ProgramError _) = showGhcException e
-  showsPrec _ e@(CmdLineError _) = showString "<command line>: " . showGhcException e
-  showsPrec _ e = showString progName . showString ": " . showGhcException e
+  showsPrec _ e@(ProgramError _) = showGhcExceptionUnsafe e
+  showsPrec _ e@(CmdLineError _) = showString "<command line>: " . showGhcExceptionUnsafe e
+  showsPrec _ e = showString progName . showString ": " . showGhcExceptionUnsafe e
 
 -- | Show an exception as a string.
 showException :: Exception e => e -> String
@@ -132,8 +150,12 @@ safeShowException e = do
 -- uninitialized fields if invoked before 'GHC.initGhcMonad' has been called.
 -- If the error message to be printed includes a pretty-printer document
 -- which forces one of these fields this call may bottom.
-showGhcException :: GhcException -> ShowS
-showGhcException = showPlainGhcException . \case
+showGhcExceptionUnsafe :: GhcException -> ShowS
+showGhcExceptionUnsafe = showGhcException unsafeGlobalDynFlags
+
+-- | Append a description of the given exception to this string.
+showGhcException :: DynFlags -> GhcException -> ShowS
+showGhcException dflags = showPlainGhcException . \case
   Signal n -> PlainSignal n
   UsageError str -> PlainUsageError str
   CmdLineError str -> PlainCmdLineError str
@@ -143,11 +165,11 @@ showGhcException = showPlainGhcException . \case
   ProgramError str -> PlainProgramError str
 
   PprPanic str sdoc -> PlainPanic $
-      concat [str, "\n\n", showSDocUnsafe sdoc]
+      concat [str, "\n\n", showSDoc dflags sdoc]
   PprSorry str sdoc -> PlainProgramError $
-      concat [str, "\n\n", showSDocUnsafe sdoc]
+      concat [str, "\n\n", showSDoc dflags sdoc]
   PprProgramError str sdoc -> PlainProgramError $
-      concat [str, "\n\n", showSDocUnsafe sdoc]
+      concat [str, "\n\n", showSDoc dflags sdoc]
 
 throwGhcException :: GhcException -> a
 throwGhcException = Exception.throw
@@ -158,9 +180,20 @@ throwGhcExceptionIO = Exception.throwIO
 handleGhcException :: ExceptionMonad m => (GhcException -> m a) -> m a -> m a
 handleGhcException = MC.handle
 
-panicDoc, sorryDoc, pgmErrorDoc :: String -> SDoc -> a
-panicDoc    x doc = throwGhcException (PprPanic        x doc)
-sorryDoc    x doc = throwGhcException (PprSorry        x doc)
+-- | Throw an exception saying "bug in GHC" with a callstack
+pprPanic :: HasCallStack => String -> SDoc -> a
+pprPanic s doc = panicDoc s (doc $$ callStackDoc)
+
+-- | Throw an exception saying "bug in GHC"
+panicDoc :: String -> SDoc -> a
+panicDoc x doc = throwGhcException (PprPanic x doc)
+
+-- | Throw an exception saying "this isn't finished yet"
+sorryDoc :: String -> SDoc -> a
+sorryDoc x doc = throwGhcException (PprSorry x doc)
+
+-- | Throw an exception saying "bug in pgm being compiled" (used for unusual program errors)
+pgmErrorDoc :: String -> SDoc -> a
 pgmErrorDoc x doc = throwGhcException (PprProgramError x doc)
 
 -- | Like try, but pass through UserInterrupt and Panic exceptions.
@@ -258,3 +291,14 @@ withSignalHandlers act = do
 
   mayInstallHandlers
   act `MC.finally` mayUninstallHandlers
+
+callStackDoc :: HasCallStack => SDoc
+callStackDoc =
+    hang (text "Call stack:")
+       4 (vcat $ map text $ lines (prettyCallStack callStack))
+
+-- | Panic with an assertion failure, recording the given file and
+-- line number. Should typically be accessed with the ASSERT family of macros
+assertPprPanic :: HasCallStack => String -> Int -> SDoc -> a
+assertPprPanic _file _line msg
+  = pprPanic "ASSERT failed!" msg

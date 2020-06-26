@@ -24,6 +24,7 @@ import GHC.Types.Basic (defaultFixity, TypeOrKind(..))
 import GHC.Unit.State
 import GHC.Tc.Gen.Export
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Hs
 import GHC.Types.Name.Reader
 import GHC.Tc.Utils.Monad
@@ -49,6 +50,7 @@ import GHC.Types.Avail
 import GHC.Types.SrcLoc
 import GHC.Driver.Types
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Core.Type
 import GHC.Core.Multiplicity
 import GHC.Data.FastString

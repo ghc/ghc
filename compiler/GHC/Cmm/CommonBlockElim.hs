@@ -24,6 +24,7 @@ import qualified Data.List as List
 import Data.Word
 import qualified Data.Map as M
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import qualified GHC.Data.TrieMap as TM
 import GHC.Types.Unique.FM
 import GHC.Types.Unique

@@ -90,6 +90,7 @@ import GHC.Core.TyCon
 import GHC.Types.RepType
 import GHC.Types.Basic
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Utils.Misc
 
 import Data.Coerce (coerce)

@@ -166,7 +166,7 @@ go label mods cnd =
 
     hsc_env <- getSession
     emss <- liftIO $ downsweep hsc_env [] [] False
-    -- liftIO $ hPutStrLn stderr $ showSDocUnsafe $ ppr $ rights emss
+    -- liftIO $ hPutStrLn stderr $ showSDoc (hsc_dflags hsc_env) $ ppr $ rights emss
     -- liftIO $ hPrint stderr $ bagToList $ unionManyBags $ lefts emss
 
     it label $ cnd (rights emss)
