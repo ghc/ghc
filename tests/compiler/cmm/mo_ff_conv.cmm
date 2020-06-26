@@ -1,0 +1,12 @@
+// RUN: "$HC" -cpp -dcmm-lint -keep-s-file -c "$1" && cat "${1%%.*}.s" | FileCheck "$1" -check-prefix=CHECK-A64
+#include "Cmm.h"
+#include "Types.h"
+
+w64 () {
+    F64 x;
+    F32 y;
+    // CHECK-A64: fmov d31, d12
+    x = D1;
+    // CHECK-A64: fcvt s31, d31
+    y = %f2f32(x);
+}
