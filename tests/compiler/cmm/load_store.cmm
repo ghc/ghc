@@ -1,0 +1,9 @@
+
+// XXX: todo
+main () {
+    // test load_store
+    // write 64bit word, load lower 8bits, 16bits, 32bits,
+    // and ensure we get exactly what we asked for!
+
+    // write byte, half, word, ... load 64bit, verify.
+}

@@ -1802,7 +1802,7 @@ linkBinary' staticLink dflags o_files dep_units = do
                                ArchX86 -> True
                                ArchX86_64 -> True
                                ArchARM {} -> True
-                               ArchARM64  -> True
+                               ArchAArch64  -> True
                                _ -> False
                           then ["-Wl,-no_compact_unwind"]
                           else [])

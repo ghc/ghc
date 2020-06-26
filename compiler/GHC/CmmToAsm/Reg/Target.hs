@@ -35,6 +35,8 @@ import qualified GHC.CmmToAsm.X86.Regs       as X86
 import qualified GHC.CmmToAsm.X86.RegInfo    as X86
 import qualified GHC.CmmToAsm.PPC.Regs       as PPC
 import qualified GHC.CmmToAsm.SPARC.Regs     as SPARC
+import qualified GHC.CmmToAsm.AArch64.Regs   as AArch64
+
 
 targetVirtualRegSqueeze :: Platform -> RegClass -> VirtualReg -> Int
 targetVirtualRegSqueeze platform
@@ -47,7 +49,7 @@ targetVirtualRegSqueeze platform
       ArchSPARC64   -> panic "targetVirtualRegSqueeze ArchSPARC64"
       ArchPPC_64 _  -> PPC.virtualRegSqueeze
       ArchARM _ _ _ -> panic "targetVirtualRegSqueeze ArchARM"
-      ArchARM64     -> panic "targetVirtualRegSqueeze ArchARM64"
+      ArchAArch64     -> AArch64.virtualRegSqueeze
       ArchAlpha     -> panic "targetVirtualRegSqueeze ArchAlpha"
       ArchMipseb    -> panic "targetVirtualRegSqueeze ArchMipseb"
       ArchMipsel    -> panic "targetVirtualRegSqueeze ArchMipsel"
@@ -66,7 +68,7 @@ targetRealRegSqueeze platform
       ArchSPARC64   -> panic "targetRealRegSqueeze ArchSPARC64"
       ArchPPC_64 _  -> PPC.realRegSqueeze
       ArchARM _ _ _ -> panic "targetRealRegSqueeze ArchARM"
-      ArchARM64     -> panic "targetRealRegSqueeze ArchARM64"
+      ArchAArch64     -> AArch64.realRegSqueeze
       ArchAlpha     -> panic "targetRealRegSqueeze ArchAlpha"
       ArchMipseb    -> panic "targetRealRegSqueeze ArchMipseb"
       ArchMipsel    -> panic "targetRealRegSqueeze ArchMipsel"
@@ -84,7 +86,7 @@ targetClassOfRealReg platform
       ArchSPARC64   -> panic "targetClassOfRealReg ArchSPARC64"
       ArchPPC_64 _  -> PPC.classOfRealReg
       ArchARM _ _ _ -> panic "targetClassOfRealReg ArchARM"
-      ArchARM64     -> panic "targetClassOfRealReg ArchARM64"
+      ArchAArch64     -> AArch64.classOfRealReg
       ArchAlpha     -> panic "targetClassOfRealReg ArchAlpha"
       ArchMipseb    -> panic "targetClassOfRealReg ArchMipseb"
       ArchMipsel    -> panic "targetClassOfRealReg ArchMipsel"
@@ -102,7 +104,7 @@ targetMkVirtualReg platform
       ArchSPARC64   -> panic "targetMkVirtualReg ArchSPARC64"
       ArchPPC_64 _  -> PPC.mkVirtualReg
       ArchARM _ _ _ -> panic "targetMkVirtualReg ArchARM"
-      ArchARM64     -> panic "targetMkVirtualReg ArchARM64"
+      ArchAArch64     -> AArch64.mkVirtualReg
       ArchAlpha     -> panic "targetMkVirtualReg ArchAlpha"
       ArchMipseb    -> panic "targetMkVirtualReg ArchMipseb"
       ArchMipsel    -> panic "targetMkVirtualReg ArchMipsel"
@@ -120,7 +122,7 @@ targetRegDotColor platform
       ArchSPARC64   -> panic "targetRegDotColor ArchSPARC64"
       ArchPPC_64 _  -> PPC.regDotColor
       ArchARM _ _ _ -> panic "targetRegDotColor ArchARM"
-      ArchARM64     -> panic "targetRegDotColor ArchARM64"
+      ArchAArch64     -> AArch64.regDotColor
       ArchAlpha     -> panic "targetRegDotColor ArchAlpha"
       ArchMipseb    -> panic "targetRegDotColor ArchMipseb"
       ArchMipsel    -> panic "targetRegDotColor ArchMipsel"
