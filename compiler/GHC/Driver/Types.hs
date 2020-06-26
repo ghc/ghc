@@ -154,7 +154,7 @@ module GHC.Driver.Types (
         emptyExtensibleFields,
         readField, readIfaceField, readIfaceFieldWith,
         writeField, writeIfaceField, writeIfaceFieldWith,
-        deleteField, deleteIfaceField,
+        deleteField, deleteIfaceField
     ) where
 
 #include "HsVersions.h"
@@ -193,6 +193,7 @@ import GHC.Core.PatSyn
 import GHC.Builtin.Names ( gHC_PRIM, ioTyConName, printName, mkInteractiveModule )
 import GHC.Builtin.Types
 import GHC.Driver.CmdLine
+import {-# SOURCE #-} GHC.Driver.Error
 import GHC.Driver.Session
 import GHC.Runtime.Linker.Types ( DynLinker, Linkable(..), Unlinked(..), SptEntry(..) )
 import GHC.Driver.Phases
@@ -313,19 +314,19 @@ runInteractiveHsc hsc_env = runHsc (mkInteractiveHscEnv hsc_env)
 -- When the compiler (GHC.Driver.Main) discovers errors, it throws an
 -- exception in the IO monad.
 
-mkSrcErr :: ErrorMessages ErrDoc -> SourceError
+mkSrcErr :: ErrorMessages GhcError -> SourceError
 mkSrcErr = SourceError
 
-srcErrorMessages :: SourceError -> ErrorMessages ErrDoc
+srcErrorMessages :: SourceError -> ErrorMessages GhcError
 srcErrorMessages (SourceError msgs) = msgs
 
 mkApiErr :: DynFlags -> SDoc -> GhcApiError
 mkApiErr dflags msg = GhcApiError (showSDoc dflags msg)
 
-throwErrors :: MonadIO io => ErrorMessages ErrDoc -> io a
+throwErrors :: MonadIO io => ErrorMessages GhcError -> io a
 throwErrors = liftIO . throwIO . mkSrcErr
 
-throwOneError :: MonadIO io => ErrMsg ErrDoc -> io a
+throwOneError :: MonadIO io => ErrMsg GhcError -> io a
 throwOneError = throwErrors . unitBag
 
 -- | A source error is an error that is caused by one or more errors in the
@@ -344,7 +345,7 @@ throwOneError = throwErrors . unitBag
 --
 -- See 'printExceptionAndWarnings' for more information on what to take care
 -- of when writing a custom error handler.
-newtype SourceError = SourceError (ErrorMessages ErrDoc)
+newtype SourceError = SourceError (ErrorMessages GhcError)
 
 instance Show SourceError where
   show (SourceError msgs) = unlines . map show . bagToList $ msgs
@@ -384,7 +385,7 @@ printOrThrowWarnings dflags warns = do
                            }))
           False warns
   if make_error
-    then throwIO (mkSrcErr warns')
+    then throwIO (mkSrcErr $ mapBag (fmap ghcErrorFromWarn) warns')
     else printBagOfErrors dflags warns
 
 handleFlagWarnings :: DynFlags -> [Warn] -> IO ()

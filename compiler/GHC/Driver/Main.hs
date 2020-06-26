@@ -80,6 +80,7 @@ module GHC.Driver.Main
     , oneShotMsg
     , dumpIfaceStats
     , ioMsgMaybe
+    , wrappingErrors
     , showModuleIndex
     , hscAddSptEntries
     ) where
@@ -148,6 +149,7 @@ import GHC.Builtin.Names
 import GHC.Driver.Plugins
 import GHC.Runtime.Loader   ( initializePlugins )
 
+import GHC.Driver.Error
 import GHC.Driver.Session
 import GHC.Utils.Error
 
@@ -233,20 +235,20 @@ handleWarnings = do
 
 -- | log warning in the monad, and if there are errors then
 -- throw a SourceError exception.
-logWarningsReportErrors :: Messages ErrDoc -> Hsc ()
+logWarningsReportErrors :: Messages GhcError -> Hsc ()
 logWarningsReportErrors (warns,errs) = do
     logWarnings warns
     when (not $ isEmptyBag errs) $ throwErrors errs
 
 -- | Log warnings and throw errors, assuming the messages
 -- contain at least one error (e.g. coming from PFailed)
-handleWarningsThrowErrors :: Messages ErrDoc -> Hsc a
+handleWarningsThrowErrors :: Messages GhcError -> Hsc a
 handleWarningsThrowErrors (warns, errs) = do
     logWarnings warns
     dflags <- getDynFlags
     (wWarns, wErrs) <- warningsToMessages dflags <$> getWarnings
     liftIO $ printBagOfErrors dflags wWarns
-    throwErrors (unionBags errs wErrs)
+    throwErrors (unionBags errs $ mapBag (fmap ghcErrorFromWarn) wErrs)
 
 -- | Deal with errors and warnings returned by a compilation step
 --
@@ -264,21 +266,27 @@ handleWarningsThrowErrors (warns, errs) = do
 --  2. If there are no error messages, but the second result indicates failure
 --     there should be warnings in the first result. That is, if the action
 --     failed, it must have been due to the warnings (i.e., @-Werror@).
-ioMsgMaybe :: RenderableError e => IO (Messages e, Maybe a) -> Hsc a
+ioMsgMaybe :: IO (Messages GhcError, Maybe a) -> Hsc a
 ioMsgMaybe ioA = do
     ((warns,errs), mb_r) <- liftIO ioA
     logWarnings warns
     case mb_r of
-        Nothing -> throwErrors $ mapBag (fmap renderError) errs
+        Nothing -> throwErrors errs
         Just r  -> ASSERT( isEmptyBag errs ) return r
 
 -- | like ioMsgMaybe, except that we ignore error messages and return
 -- 'Nothing' instead.
-ioMsgMaybe' :: RenderableError e => IO (Messages e, Maybe a) -> Hsc (Maybe a)
+ioMsgMaybe' :: IO (Messages e, Maybe a) -> Hsc (Maybe a)
 ioMsgMaybe' ioA = do
     ((warns,_errs), mb_r) <- liftIO $ ioA
     logWarnings warns
     return mb_r
+
+wrappingErrors
+  :: (e -> GhcError)
+  -> IO (Messages e, Maybe a)
+  -> IO (Messages GhcError, Maybe a)
+wrappingErrors f = fmap (\(e, ma) -> (mapMessages f e, ma))
 
 -- -----------------------------------------------------------------------------
 -- | Lookup things in the compiler's environment
@@ -287,7 +295,8 @@ hscTcRnLookupRdrName :: HscEnv -> Located RdrName -> IO [Name]
 hscTcRnLookupRdrName hsc_env0 rdr_name
   = runInteractiveHsc hsc_env0 $
     do { hsc_env <- getHscEnv
-       ; ioMsgMaybe $ tcRnLookupRdrName hsc_env rdr_name }
+       ; ioMsgMaybe . wrappingErrors GhcErrorTcRn $
+         tcRnLookupRdrName hsc_env rdr_name }
 
 hscTcRcLookupName :: HscEnv -> Name -> IO (Maybe TyThing)
 hscTcRcLookupName hsc_env0 name = runInteractiveHsc hsc_env0 $ do
@@ -306,19 +315,20 @@ hscTcRnGetInfo hsc_env0 name
 
 hscIsGHCiMonad :: HscEnv -> String -> IO Name
 hscIsGHCiMonad hsc_env name
-  = runHsc hsc_env $ ioMsgMaybe $ isGHCiMonad hsc_env name
+  = runHsc hsc_env $ ioMsgMaybe . wrappingErrors GhcErrorTcRn $
+    isGHCiMonad hsc_env name
 
 hscGetModuleInterface :: HscEnv -> Module -> IO ModIface
 hscGetModuleInterface hsc_env0 mod = runInteractiveHsc hsc_env0 $ do
   hsc_env <- getHscEnv
-  ioMsgMaybe $ getModuleInterface hsc_env mod
+  ioMsgMaybe . wrappingErrors GhcErrorTcRn $ getModuleInterface hsc_env mod
 
 -- -----------------------------------------------------------------------------
 -- | Rename some import declarations
 hscRnImportDecls :: HscEnv -> [LImportDecl GhcPs] -> IO GlobalRdrEnv
 hscRnImportDecls hsc_env0 import_decls = runInteractiveHsc hsc_env0 $ do
   hsc_env <- getHscEnv
-  ioMsgMaybe $ tcRnImportDecls hsc_env import_decls
+  ioMsgMaybe . wrappingErrors GhcErrorTcRn $ tcRnImportDecls hsc_env import_decls
 
 -- -----------------------------------------------------------------------------
 -- | parse a file, returning the abstract syntax
@@ -353,7 +363,7 @@ hscParse' mod_summary
     case unP parseMod (mkPState dflags buf loc) of
         PFailed pst ->
             handleWarningsThrowErrors $
-                mapMessages psErrorDoc (getMessages pst dflags)
+                mapMessages GhcErrorPs (getMessages pst dflags)
         POk pst rdr_module -> do
             let (warns, errs) = getMessages pst dflags
             logWarnings warns
@@ -364,7 +374,7 @@ hscParse' mod_summary
             liftIO $ dumpIfSet_dyn dflags Opt_D_source_stats "Source Statistics"
                         FormatText (ppSourceStats False rdr_module)
             when (not $ isEmptyBag errs) $
-                throwErrors (mapBag (fmap psErrorDoc) errs)
+                throwErrors (mapBag (fmap GhcErrorPs) errs)
 
             -- To get the list of extra source files, we take the list
             -- that the parser gave us,
@@ -478,7 +488,8 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
         keep_rn' = gopt Opt_WriteHie dflags || keep_rn
     MASSERT( moduleUnit outer_mod == thisPackage dflags )
     tc_result <- if hsc_src == HsigFile && not (isHoleModule inner_mod)
-        then ioMsgMaybe $ tcRnInstantiateSignature hsc_env outer_mod' real_loc
+        then ioMsgMaybe . wrappingErrors GhcErrorTcRn $
+             tcRnInstantiateSignature hsc_env outer_mod' real_loc
         else
          do hpm <- case mb_rdr_module of
                     Just hpm -> return hpm
@@ -486,7 +497,7 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
             tc_result0 <- tcRnModule' mod_summary keep_rn' hpm
             if hsc_src == HsigFile
                 then do (iface, _, _) <- liftIO $ hscSimpleIface hsc_env tc_result0 Nothing
-                        ioMsgMaybe $
+                        ioMsgMaybe . wrappingErrors GhcErrorTcRn $
                             tcRnMergeSignatures hsc_env hpm tc_result0 iface
                 else return tc_result0
     -- TODO are we extracting anything when we merely instantiate a signature?
@@ -510,7 +521,7 @@ tcRnModule' sum save_rn_syntax mod = do
         warnMissingSafeHaskellMode
 
     tcg_res <- {-# SCC "Typecheck-Rename" #-}
-               ioMsgMaybe $
+               ioMsgMaybe . wrappingErrors GhcErrorTcRn $
                    tcRnModule hsc_env sum
                      save_rn_syntax mod
 
@@ -561,7 +572,7 @@ hscDesugar hsc_env mod_summary tc_result =
 hscDesugar' :: ModLocation -> TcGblEnv -> Hsc ModGuts
 hscDesugar' mod_location tc_result = do
     hsc_env <- getHscEnv
-    r <- ioMsgMaybe $
+    r <- ioMsgMaybe . wrappingErrors GhcErrorDs $
       {-# SCC "deSugar" #-}
       deSugar hsc_env mod_location tc_result
 
@@ -1033,7 +1044,8 @@ checkSafeImports tcg_env
 
         case (isEmptyBag safeErrs) of
           -- Failed safe check
-          False -> liftIO . throwIO . mkSrcErr $ safeErrs
+          False -> liftIO . throwIO . mkSrcErr $
+            mapBag (fmap ghcErrorRawErrDoc) safeErrs
 
           -- Passed safe check
           True -> do
@@ -1063,7 +1075,7 @@ checkSafeImports tcg_env
         | imv_is_safe v1 /= imv_is_safe v2
         = do
             dflags <- getDynFlags
-            throwOneError $ mkPlainErrMsg dflags (imv_span v1)
+            throwOneError . fmap ghcErrorRawErrDoc $ mkPlainErrMsg dflags (imv_span v1)
               (text "Module" <+> ppr (imv_name v1) <+>
               (text $ "is imported both as a safe and unsafe import!"))
         | otherwise
@@ -1129,9 +1141,10 @@ hscCheckSafe' m l = do
         iface <- lookup' m
         case iface of
             -- can't load iface to check trust!
-            Nothing -> throwOneError $ mkPlainErrMsg dflags l
-                         $ text "Can't load the interface file for" <+> ppr m
-                           <> text ", to check that it can be safely imported"
+            Nothing -> throwOneError . fmap ghcErrorRawErrDoc $
+              mkPlainErrMsg dflags l
+                $ text "Can't load the interface file for" <+> ppr m
+               <> text ", to check that it can be safely imported"
 
             -- got iface, check trust
             Just iface' ->
@@ -1225,9 +1238,10 @@ checkPkgTrust pkgs = do
             | unitIsTrusted $ getInstalledPackageDetails (pkgState dflags) pkg
             = acc
             | otherwise
-            = (:acc) $ mkErrMsg dflags noSrcSpan (pkgQual dflags)
-                     $ text "The package (" <> ppr pkg <> text ") is required" <>
-                       text " to be trusted but it isn't!"
+            = (:acc) . fmap ghcErrorRawErrDoc
+              $ mkErrMsg dflags noSrcSpan (pkgQual dflags)
+              $ text "The package (" <> ppr pkg <> text ") is required" <>
+                text " to be trusted but it isn't!"
     case errors of
         [] -> return ()
         _  -> (liftIO . throwIO . mkSrcErr . listToBag) errors
@@ -1488,7 +1502,7 @@ hscInteractive hsc_env cgguts location = do
 hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> IO ()
 hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
     let dflags = hsc_dflags hsc_env
-    cmm <- ioMsgMaybe . fmap (\(m, r) -> (mapMessages psErrorDoc m, r)) $
+    cmm <- ioMsgMaybe . wrappingErrors GhcErrorPs $
         parseCmmFile dflags filename
     liftIO $ do
         dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose_by_proc "Parsed Cmm" FormatCMM (ppr cmm)
@@ -1652,10 +1666,12 @@ hscParsedStmt :: HscEnv
                     , FixityEnv))
 hscParsedStmt hsc_env stmt = runInteractiveHsc hsc_env $ do
   -- Rename and typecheck it
-  (ids, tc_expr, fix_env) <- ioMsgMaybe $ tcRnStmt hsc_env stmt
+  (ids, tc_expr, fix_env) <- ioMsgMaybe . wrappingErrors GhcErrorTcRn $
+    tcRnStmt hsc_env stmt
 
   -- Desugar it
-  ds_expr <- ioMsgMaybe $ deSugarExpr hsc_env tc_expr
+  ds_expr <- ioMsgMaybe . wrappingErrors GhcErrorDs $
+    deSugarExpr hsc_env tc_expr
   liftIO (lintInteractiveExpr "desugar expression" hsc_env ds_expr)
   handleWarnings
 
@@ -1697,7 +1713,7 @@ hscParsedDecls :: HscEnv -> [LHsDecl GhcPs] -> IO ([TyThing], InteractiveContext
 hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
     {- Rename and typecheck it -}
     hsc_env <- getHscEnv
-    tc_gblenv <- ioMsgMaybe $ tcRnDeclsi hsc_env decls
+    tc_gblenv <- ioMsgMaybe . wrappingErrors GhcErrorTcRn $ tcRnDeclsi hsc_env decls
 
     {- Grab the new instances -}
     -- We grab the whole environment because of the overlapping that may have
@@ -1800,7 +1816,7 @@ hscImport hsc_env str = runInteractiveHsc hsc_env $ do
        hscParseThing parseModule str
     case is of
         [L _ i] -> return i
-        _ -> liftIO $ throwOneError $
+        _ -> liftIO $ throwOneError . fmap ghcErrorRawErrDoc $
                  mkPlainErrMsg (hsc_dflags hsc_env) noSrcSpan $
                      text "parse error in import declaration"
 
@@ -1812,7 +1828,7 @@ hscTcExpr :: HscEnv
 hscTcExpr hsc_env0 mode expr = runInteractiveHsc hsc_env0 $ do
   hsc_env <- getHscEnv
   parsed_expr <- hscParseExpr expr
-  ioMsgMaybe $ tcRnExpr hsc_env mode parsed_expr
+  ioMsgMaybe . wrappingErrors GhcErrorTcRn $ tcRnExpr hsc_env mode parsed_expr
 
 -- | Find the kind of a type, after generalisation
 hscKcType
@@ -1823,7 +1839,8 @@ hscKcType
 hscKcType hsc_env0 normalise str = runInteractiveHsc hsc_env0 $ do
     hsc_env <- getHscEnv
     ty <- hscParseType str
-    ioMsgMaybe $ tcRnType hsc_env DefaultFlexi normalise ty
+    ioMsgMaybe . wrappingErrors GhcErrorTcRn $
+      tcRnType hsc_env DefaultFlexi normalise ty
 
 hscParseExpr :: String -> Hsc (LHsExpr GhcPs)
 hscParseExpr expr = do
@@ -1831,8 +1848,9 @@ hscParseExpr expr = do
   maybe_stmt <- hscParseStmt expr
   case maybe_stmt of
     Just (L _ (BodyStmt _ expr _ _)) -> return expr
-    _ -> throwOneError $ mkPlainErrMsg (hsc_dflags hsc_env) noSrcSpan
-      (text "not an expression:" <+> quotes (text expr))
+    _ -> throwOneError . fmap ghcErrorRawErrDoc $
+      mkPlainErrMsg (hsc_dflags hsc_env) noSrcSpan
+                    (text "not an expression:" <+> quotes (text expr))
 
 hscParseStmt :: String -> Hsc (Maybe (GhciLStmt GhcPs))
 hscParseStmt = hscParseThing parseStmt
@@ -1867,11 +1885,11 @@ hscParseThingWithLocation source linenumber parser str
     case unP parser (mkPState dflags buf loc) of
         PFailed pst -> do
             handleWarningsThrowErrors $
-              mapMessages psErrorDoc (getMessages pst dflags)
+              mapMessages GhcErrorPs (getMessages pst dflags)
 
         POk pst thing -> do
             logWarningsReportErrors $
-              mapMessages psErrorDoc (getMessages pst dflags)
+              mapMessages GhcErrorPs (getMessages pst dflags)
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser"
                         FormatHaskell (ppr thing)
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed_ast "Parser AST"

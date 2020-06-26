@@ -306,6 +306,7 @@ import GHC.Driver.Main
 import GHC.Driver.Make
 import GHC.Driver.Hooks
 import GHC.Driver.Pipeline   ( compileOne' )
+import GHC.Driver.Error
 import GHC.Driver.Monad
 import GHC.Tc.Utils.Monad    ( finalSafeMode, fixSafeInstances, initIfaceTcRn )
 import GHC.Iface.Load        ( loadSysInterface )
@@ -1417,7 +1418,7 @@ getTokenStream mod = do
     POk _ ts  -> return ts
     PFailed pst ->
         do dflags <- getDynFlags
-           throwErrors $ mapBag (fmap psErrorDoc) (getErrorMessages pst dflags)
+           throwErrors $ mapBag (fmap GhcErrorPs) (getErrorMessages pst dflags)
 
 -- | Give even more information on the source than 'getTokenStream'
 -- This function allows reconstructing the source completely with
@@ -1430,7 +1431,7 @@ getRichTokenStream mod = do
     POk _ ts -> return $ addSourceToTokens startLoc source ts
     PFailed pst ->
         do dflags <- getDynFlags
-           throwErrors $ mapBag (fmap psErrorDoc) (getErrorMessages pst dflags)
+           throwErrors $ mapBag (fmap GhcErrorPs) (getErrorMessages pst dflags)
 
 -- | Given a source location and a StringBuffer corresponding to this
 -- location, return a rich token stream with the source associated to the

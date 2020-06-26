@@ -27,6 +27,7 @@ import GHC.Parser.Annotation
 import GHC hiding (Failed, Succeeded)
 import GHC.Parser
 import GHC.Parser.Lexer
+import GHC.Driver.Error
 import GHC.Driver.Monad
 import GHC.Driver.Session
 import GHC.Tc.Utils.Monad
@@ -83,7 +84,7 @@ doBackpack [src_filename] = do
     buf <- liftIO $ hGetStringBuffer src_filename
     let loc = mkRealSrcLoc (mkFastString src_filename) 1 1 -- TODO: not great
     case unP parseBackpack (mkPState dflags buf loc) of
-        PFailed pst -> throwErrors $ mapBag (fmap psErrorDoc) (getErrorMessages pst dflags)
+        PFailed pst -> throwErrors $ mapBag (fmap GhcErrorPs) (getErrorMessages pst dflags)
         POk _ pkgname_bkp -> do
             -- OK, so we have an LHsUnit PackageName, but we want an
             -- LHsUnit HsComponentId.  So let's rename it.
@@ -726,7 +727,8 @@ summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
                          Nothing -- GHC API buffer support not supported
                          [] -- No exclusions
          case r of
-            Nothing -> throwOneError (mkPlainErrMsg dflags loc (text "module" <+> ppr modname <+> text "was not found"))
+            Nothing -> throwOneError . fmap ghcErrorRawErrDoc $
+              mkPlainErrMsg dflags loc (text "module" <+> ppr modname <+> text "was not found")
             Just (Left err) -> throwErrors err
             Just (Right summary) -> return summary
 

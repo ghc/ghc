@@ -40,6 +40,7 @@ import {-# SOURCE #-} GHC.IfaceToCore
    ( tcIfaceDecl, tcIfaceRules, tcIfaceInst, tcIfaceFamInst
    , tcIfaceAnnotations, tcIfaceCompleteSigs )
 
+import GHC.Driver.Error
 import GHC.Driver.Session
 import GHC.Iface.Syntax
 import GHC.Iface.Env
@@ -653,7 +654,7 @@ computeInterface doc_str hi_boot_file mod0 = do
                                    Nothing iface0
                     case r of
                         Right x -> return (Succeeded (x, path))
-                        Left errs -> liftIO . throwIO . mkSrcErr $ mapBag (fmap renderError) errs
+                        Left errs -> liftIO . throwIO . mkSrcErr $ mapBag (fmap GhcErrorTcRn) errs
                 Failed err -> return (Failed err)
         (mod, _) ->
             findAndReadIface doc_str mod mod0 hi_boot_file

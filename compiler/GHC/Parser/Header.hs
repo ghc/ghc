@@ -36,6 +36,7 @@ import GHC.Unit.Module
 import GHC.Builtin.Names
 import GHC.Data.StringBuffer
 import GHC.Types.SrcLoc
+import GHC.Driver.Error
 import GHC.Driver.Session
 import GHC.Utils.Error
 import GHC.Utils.Misc
@@ -83,7 +84,7 @@ getImports dflags buf filename source_filename = do
           ms = (emptyBag, errs)
       -- logWarnings warns
       if errorsFound dflags ms
-        then throwIO $ mkSrcErr (mapBag (fmap psErrorDoc) errs)
+        then throwIO $ mkSrcErr (mapBag (fmap (ghcErrorRawErrDoc . psErrorDoc)) errs)
         else
           let   hsmod = unLoc rdr_module
                 mb_mod = hsmodName hsmod
@@ -299,7 +300,7 @@ getOptions' dflags toks
 checkProcessArgsResult :: MonadIO m => DynFlags -> [Located String] -> m ()
 checkProcessArgsResult dflags flags
   = when (notNull flags) $
-      liftIO $ throwIO $ mkSrcErr $ listToBag $ map mkMsg flags
+      liftIO $ throwIO $ mkSrcErr $ listToBag $ map (fmap ghcErrorRawErrDoc . mkMsg) flags
     where mkMsg (L loc flag)
               = mkPlainErrMsg dflags loc $
                   (text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+>
@@ -358,4 +359,4 @@ optionsParseError str dflags loc =
 
 throwErr :: DynFlags -> SrcSpan -> SDoc -> a                -- #15053
 throwErr dflags loc doc =
-  throw $ mkSrcErr $ unitBag $ mkPlainErrMsg dflags loc doc
+  throw $ mkSrcErr $ unitBag . fmap ghcErrorRawErrDoc $ mkPlainErrMsg dflags loc doc
