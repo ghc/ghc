@@ -14,7 +14,7 @@ module GHC.Tc.Gen.Sig(
        TcSigFun,
 
        isPartialSig, hasCompleteSig, tcIdSigName, tcSigInfoName,
-       completeSigPolyId_maybe,
+       completeSigPolyId_maybe, isCompleteHsSig,
 
        tcTySigs, tcUserTypeSig, completeSigFromId,
        tcInstSig,

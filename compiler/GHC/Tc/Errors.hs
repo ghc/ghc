@@ -1449,8 +1449,8 @@ mkTyVarEqErr dflags ctxt report ct tv1 ty2
        ; mkTyVarEqErr' dflags ctxt report ct tv1 ty2 }
 
 mkTyVarEqErr' dflags ctxt report ct tv1 ty2
-  | isUserSkolem ctxt tv1  -- ty2 won't be a meta-tyvar; we would have
-                           -- swapped in Solver.Canonical.canEqTyVarHomo
+  | isSkolemTyVar tv1  -- ty2 won't be a meta-tyvar; we would have
+                       -- swapped in Solver.Canonical.canEqTyVarHomo
     || isTyVarTyVar tv1 && not (isTyVarTy ty2)
     || ctEqRel ct == ReprEq
      -- The cases below don't really apply to ReprEq (except occurs check)
@@ -1592,6 +1592,7 @@ mkEqInfoMsg ct ty1 ty2
                 <+> text "is a non-injective type family"
               | otherwise = empty
 
+{-
 isUserSkolem :: ReportErrCtxt -> TcTyVar -> Bool
 -- See Note [Reporting occurs-check errors]
 isUserSkolem ctxt tv
@@ -1602,6 +1603,7 @@ isUserSkolem ctxt tv
 
     is_user_skol_info (InferSkol {}) = False
     is_user_skol_info _ = True
+-}
 
 misMatchOrCND :: Bool -> ReportErrCtxt -> Ct
               -> TcType -> TcType -> Report

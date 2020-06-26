@@ -1,8 +1,7 @@
 
 abstract_refinement_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: [Integer] -> Integer
-    • In the expression: _
-      In an equation for ‘f’: f = _
+    • In an equation for ‘f’: f = _
     • Relevant bindings include
         f :: [Integer] -> Integer
           (bound at abstract_refinement_hole_fits.hs:4:1)
