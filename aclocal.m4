@@ -209,7 +209,7 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
             test -z "[$]2" || eval "[$]2=\"ArchARM {armISA = \$ARM_ISA, armISAExt = \$ARM_ISA_EXT, armABI = \$ARM_ABI}\""
             ;;
         aarch64)
-            test -z "[$]2" || eval "[$]2=ArchARM64"
+            test -z "[$]2" || eval "[$]2=ArchAArch64"
             ;;
         alpha)
             test -z "[$]2" || eval "[$]2=ArchAlpha"

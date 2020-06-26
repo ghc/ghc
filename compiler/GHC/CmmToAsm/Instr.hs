@@ -41,6 +41,7 @@ data RegUsage
                 reads :: [Reg],
                 writes :: [Reg]
                 }
+        deriving Show
 
 -- | No regs read or written to.
 noUsage :: RegUsage

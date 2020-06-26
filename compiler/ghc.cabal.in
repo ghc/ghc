@@ -258,7 +258,7 @@ Library
         GHC.Data.Bitmap
         GHC.Platform.Regs
         GHC.Platform.ARM
-        GHC.Platform.ARM64
+        GHC.Platform.AArch64
         GHC.Platform.NoRegs
         GHC.Platform.PPC
         GHC.Platform.S390X
@@ -582,6 +582,12 @@ Library
             GHC.CmmToAsm.X86.Cond
             GHC.CmmToAsm.X86.Ppr
             GHC.CmmToAsm.X86.CodeGen
+            GHC.CmmToAsm.AArch64.Regs
+            GHC.CmmToAsm.AArch64.RegInfo
+            GHC.CmmToAsm.AArch64.Instr
+            GHC.CmmToAsm.AArch64.Cond
+            GHC.CmmToAsm.AArch64.Ppr
+            GHC.CmmToAsm.AArch64.CodeGen
             GHC.CmmToAsm.PPC.Regs
             GHC.CmmToAsm.PPC.RegInfo
             GHC.CmmToAsm.PPC.Instr
@@ -626,6 +632,7 @@ Library
             GHC.CmmToAsm.Reg.Linear.X86_64
             GHC.CmmToAsm.Reg.Linear.PPC
             GHC.CmmToAsm.Reg.Linear.SPARC
+            GHC.CmmToAsm.Reg.Linear.AArch64
             GHC.CmmToAsm.Dwarf
             GHC.CmmToAsm.Dwarf.Types
             GHC.CmmToAsm.Dwarf.Constants

@@ -1,0 +1,34 @@
+// RUN: "$HC" -cpp -dcmm-lint -keep-s-file -c "$1" && cat "${1%%.*}.s" | FileCheck "$1" -check-prefix=CHECK-A64
+#include "Cmm.h"
+#include "Types.h"
+
+// Original failing cmm:
+//
+// (_ckSs::F32) = call MO_F32_ExpM1(_shwV::F32);   // CmmUnsafeForeignCall
+//
+// One issue with the cmm parser is, that we can't build the following expressions
+// the parser will deconstruct them into arg0 <- arg0_expr; f(arg0); instead of f(arg0_expr)
+//
+// (_ckSz::F32) = call MO_F32_Log(%MO_F_Neg_W32(_ckSs::F32));   // CmmUnsafeForeignCall
+// (_ckqE::F64) = call MO_F64_Log(2.0 :: W64);   // CmmUnsafeForeignCall
+// (_cjE1::F64) = call MO_F64_Atan(%MO_F_Quot_W64(_shFv::F64, _shFw::F64));   // CmmUnsafeForeignCall
+//
+//
+foreign_calls () {
+    F32 x, y;
+    x = F1;
+
+    // CHECK-A64: adrp x18, expm1f
+    // CHECK-A64: add x18, x18, :lo12:expm1f
+    // CHECK-A64: fmov s0, s30
+    // CHECK-A64: blr x18
+    (y) = prim %expM132f(F1);
+    // CHECK-A64: fmov s8, s30
+    F1 = y;
+    F2 = y;
+    (y) = prim %log32f(%fneg(x));
+
+    prim %log64f(2.0);
+
+    prim %atan64f(%fquot(D1,D2));
+}
