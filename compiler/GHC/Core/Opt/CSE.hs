@@ -775,7 +775,7 @@ csEnvSubst :: CSEnv -> Subst
 csEnvSubst = cs_subst
 
 lookupSubst :: CSEnv -> Id -> OutExpr
-lookupSubst (CS { cs_subst = sub}) x = lookupIdSubst (text "CSE.lookupSubst") sub x
+lookupSubst (CS { cs_subst = sub}) x = lookupIdSubst sub x
 
 extendCSSubst :: CSEnv -> Id  -> CoreExpr -> CSEnv
 extendCSSubst cse x rhs = cse { cs_subst = extendSubst (cs_subst cse) x rhs }
