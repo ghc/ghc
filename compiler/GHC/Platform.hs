@@ -212,7 +212,6 @@ data BmiVersion
    | BMI2
    deriving (Eq, Ord)
 
-
 -- | Platform-specific settings formerly hard-coded in Config.hs.
 --
 -- These should probably be all be triaged whether they can be computed from
