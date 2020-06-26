@@ -727,15 +727,15 @@ lintJoinLams :: JoinArity -> Maybe Id -> CoreExpr -> LintM (LintedType, UsageEnv
 lintJoinLams join_arity enforce rhs
   = go join_arity rhs
   where
-    go 0 rhs             = lintCoreExpr rhs
-    go n (Lam var expr)  = lintLambda var $ go (n-1) expr
+    go 0 expr            = lintCoreExpr expr
+    go n (Lam var body)  = lintLambda var $ go (n-1) body
       -- N.B. join points can be cast. e.g. we consider ((\x -> ...) `cast` ...)
       -- to be a join point at join arity 1.
-    go n _other | Just bndr <- enforce -- Join point with too few RHS lambdas
-                = failWithL $ mkBadJoinArityMsg bndr join_arity n rhs
-                | otherwise -- Future join point, not yet eta-expanded
-                = markAllJoinsBad $ lintCoreExpr rhs
-                  -- Body of lambda is not a tail position
+    go n expr | Just bndr <- enforce -- Join point with too few RHS lambdas
+              = failWithL $ mkBadJoinArityMsg bndr join_arity n rhs
+              | otherwise -- Future join point, not yet eta-expanded
+              = markAllJoinsBad $ lintCoreExpr expr
+                -- Body of lambda is not a tail position
 
 lintIdUnfolding :: Id -> Type -> Unfolding -> LintM ()
 lintIdUnfolding bndr bndr_ty uf
