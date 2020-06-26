@@ -1,0 +1,13 @@
+// RUN: "$HC" -cpp -dcmm-lint -keep-s-file -c "$1" && cat "${1%%.*}.s" | FileCheck "$1" -check-prefix=CHECK-A64
+#include "Cmm.h"
+#include "Types.h"
+
+store_neg_float_on_heap () {
+    // CHECK-A64: fneg s31, s8
+    // CHECK-A64-NEXT: str s31, [ x21 ]
+    F32[Hp] = %fneg(F1);
+
+    // CHECK-A64: fneg d31, d12
+    // CHECK-A64-NEXT: str d31, [ x21 ]
+    F64[Hp] = %fneg(D1);
+}

@@ -1,0 +1,26 @@
+// RUN: "$HC" -cpp -dcmm-lint -keep-s-file -c "$1" && cat "${1%%.*}.s" | FileCheck "$1" -check-prefix=CHECK-A64
+// We need ghc to link this
+// RUN: "$HC" -no-hs-main -debug "${1%%.*}.o" -o "${1%%.*}.exe"
+// RUN: "$EXEC" "${1%%.cmm}.exe" | FileCheck "$1" -check-prefix=CHECK-RUN-A64
+
+#define DEBUG
+
+#include "Cmm.h"
+
+main () {
+  // CHECK-RUN-A64: Sp: 0; SpLim: 0
+  foreign "C" printf("Sp: %x; SpLim: %x\n", Sp, SpLim);
+
+  Sp = 0x105368;
+  SpLim = 0x1050c0;
+
+  // XXX: This might just work with qemu, which provides predictable memory
+  //      locations.
+  // CHECK-RUN-A64: Sp: 105368; SpLim: 1050c0
+  foreign "C" printf("Sp: %x; SpLim: %x\n", Sp, SpLim);
+
+  // CHECK-A64: x18, x18, :lo12:_assertFail
+  ASSERT(SpLim - WDS(RESERVED_STACK_WORDS) <= Sp);
+
+  foreign "C" exit(0::I64);
+}

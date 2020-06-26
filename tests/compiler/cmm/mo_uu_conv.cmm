@@ -1,0 +1,20 @@
+// RUN: "$HC" -cpp -dcmm-lint -keep-s-file -dppr-debug -c "$1" && cat "${1%%.*}.s" | FileCheck "$1" -check-prefix=CHECK-A64
+#include "Cmm.h"
+#include "Types.h"
+
+w32_w64 () {
+    I64 m;
+    m = 1234 :: I64;
+    // lobits64 is MO_UU_Conv_W32_W64, when given a I32
+    // zx32 is MO_UU_Conv_W64_W32
+    //
+    // First we extract the lower 32 bits from x18 (32 bit value -> 64 bit value)
+    // CHECK-A64: ubfm x22, x18, #0, #31
+    R1 = %lobits64(I32[m]);
+
+    // then we extract the lower 32 bits from x22 (64 bit value -> 32 bit value)
+    // CHECK-A64-NEXT: ubfm x18, x22, #0, #31
+    // and finally extend it again.
+    // CHECK-A64-NEXT: ubfm x23, x18, #0, #31
+    R2 = %lobits64(%zx32(R1));
+}

@@ -1,0 +1,57 @@
+// RUN: "$HC" -cpp -dcmm-lint -keep-s-file -c "$1" && cat "${1%%.*}.s" | FileCheck "$1" -check-prefix=CHECK-A64
+// RUN: "$LN" -sf "$1" "${1%%.*}.c"
+// RUN: "$CC" -DC -c "${1%%.*}.c" -o "${1%%.*}_stub.o"
+// RUN: "$CC" "${1%%.*}.o" "${1%%.*}_stub.o" -o "${1%%.*}.exe"
+// RUN: "$EXEC" "${1%%.*}.exe"
+
+#if defined(C) // the C part
+#include <stdlib.h>
+#include <stdio.h>
+
+void *mega_mixed_add(int a, double fa, int b, double fb, int c, double fc,
+                             int d, double fd, int e, double fe, int f, double ff,
+                             int g, double fg, int h, double fh, int i, double fi,
+                             int j, double fj, int k, double fk) {
+
+    void *r = (void *)calloc(1,16);
+    *(int*)r = a + b + c + d + e + f + g + h + i + j + k;
+    *(double*)(r+8) = fa + fb + fc + fd + fe + ff + fg + fh + fi + fj + fk;
+    return r;
+}
+
+#else // the CMM part
+#include "Cmm.h"
+#include "Types.h"
+
+// Let's ensure we can call functions with lots of arguments, and they are
+// passed correctly.
+main () {
+
+    // create some fake stack space and assign to Sp.
+    I64 sp;
+    (sp) = foreign "C" malloc(1024);
+    Sp = sp;
+
+    I64 x, y;
+    I64 a, b, c, d, e, f, g, h, i, j, k;
+    a = 1; b = 2; c = 4; d = 8; e = 16; f = 32; g = 64; h = 128; i = 256; j = 512; k = 1024;
+
+    F64 fx, fy;
+    F64 fa, fb, fc, fd, fe, ff, fg, fh, fi, fj, fk;
+    fa = 1.0; fb = 2.0; fc = 4.0; fd = 8.0; fe = 16.0; ff = 32.0; fg = 64.0; fh = 128.0; fi = 256.0; fj = 512.0; fk = 1024.0;
+
+    // We have 6 excess arguments; thus we need 6 slots (48 bytes)
+    // CHECK-A64: sub sp, sp, #48
+    // CHECK-A64: add sp, sp, #48
+    I64 rptr;
+    (rptr) = foreign "C" mega_mixed_add(a,fa,b,fb,c,fc,d,fd,e,fe,f,ff,g,fg,h,fh,  i,fi,j,fj,k,fk);
+
+    y = I64[rptr];
+    fy = F64[rptr + 8];
+
+    x = a + b + c + d + e + f + g + h + i + j + k;
+    fx = fa + fb + fc + fd + fe + ff + fg + fh + fi + fj + fk;
+
+    foreign "C" exit((fy != fx) == (f != y));
+}
+#endif
