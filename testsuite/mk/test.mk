@@ -250,13 +250,13 @@ endif
 RUNTEST_OPTS +=  \
 	--rootdir=. \
 	--config-file=$(CONFIG) \
+	--top="$(TOP_ABS)" \
 	-e 'config.platform="$(TARGETPLATFORM)"' \
 	-e 'config.os="$(TargetOS_CPP)"' \
 	-e 'config.arch="$(TargetARCH_CPP)"' \
 	-e 'config.wordsize="$(WORDSIZE)"' \
 	-e 'config.timeout=int($(TIMEOUT)) or config.timeout' \
-	-e 'config.exeext="$(exeext)"' \
-	-e 'config.top="$(TOP_ABS)"'
+	-e 'config.exeext="$(exeext)"'
 
 # Wrap non-empty program paths in quotes, because they may contain spaces. Do
 # it here, so we don't have to (and don't forget to do it) in the .T test

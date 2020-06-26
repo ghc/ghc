@@ -14,6 +14,7 @@ import tempfile
 import time
 import re
 import traceback
+from pathlib import Path
 
 # We don't actually need subprocess in runtests.py, but:
 # * We do need it in testlibs.py
@@ -56,6 +57,7 @@ parser = argparse.ArgumentParser(description="GHC's testsuite driver")
 perf_group = parser.add_mutually_exclusive_group()
 
 parser.add_argument("-e", action='append', help="A string to execute from the command line.")
+parser.add_argument("--top", type=Path, help="path to top of testsuite/ tree")
 parser.add_argument("--config-file", action="append", help="config file")
 parser.add_argument("--config", action='append', help="config field")
 parser.add_argument("--rootdir", action='append', help="root of tree containing tests (default: .)")
@@ -103,6 +105,9 @@ hasMetricsFile = config.metrics_file is not None
 config.summary_file = args.summary_file
 config.no_print_summary = args.no_print_summary
 config.baseline_commit = args.perf_baseline
+
+if args.top:
+    config.top = args.top
 
 if args.only:
     config.only = args.only
@@ -274,7 +279,7 @@ testopts_local.x = TestOptions()
 
 # if timeout == -1 then we try to calculate a sensible value
 if config.timeout == -1:
-    config.timeout = int(read_no_crs(config.top + '/timeout/calibrate.out'))
+    config.timeout = int(read_no_crs(config.top / 'timeout' / 'calibrate.out'))
 
 print('Timeout is ' + str(config.timeout))
 print('Known ways: ' + ', '.join(config.other_ways))

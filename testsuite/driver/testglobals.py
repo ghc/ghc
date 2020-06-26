@@ -22,7 +22,7 @@ class TestConfig:
     def __init__(self):
 
         # Where the testsuite root is
-        self.top = ''
+        self.top = Path('.')
 
         # Directories below which to look for test description files (foo.T)
         self.rootdirs = []
