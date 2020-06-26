@@ -55,6 +55,7 @@ import GHC.Types.Name
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.List.SetOps (unionLists)
 import GHC.Data.Maybe
 import GHC.Core.Type

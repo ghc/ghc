@@ -39,7 +39,7 @@ import GHC.Cmm.CLabel
 import GHC.Cmm.MachOp
 import GHC.Cmm.Type
 import GHC.Driver.Session
-import GHC.Utils.Outputable (panic)
+import GHC.Utils.Panic (panic)
 import GHC.Types.Unique
 
 import Data.Set (Set)

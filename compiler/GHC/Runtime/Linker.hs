@@ -50,6 +50,7 @@ import GHC.Unit.Module
 import GHC.Data.List.SetOps
 import GHC.Runtime.Linker.Types (DynLinker(..), PersistentLinkerState(..))
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Types.Basic
 import GHC.Utils.Outputable
 import GHC.Utils.Panic

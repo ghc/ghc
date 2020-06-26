@@ -29,6 +29,7 @@ import GHC.Parser
 import GHC.Parser.Lexer
 import GHC.Driver.Monad
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Module
 import GHC.Unit
@@ -561,7 +562,7 @@ type PackageNameMap a = Map PackageName a
 -- to use this for anything
 unitDefines :: UnitState -> LHsUnit PackageName -> (PackageName, HsComponentId)
 unitDefines pkgstate (L _ HsUnit{ hsunitName = L _ pn@(PackageName fs) })
-    = (pn, HsComponentId pn (mkIndefUnitId pkgstate fs))
+    = (pn, HsComponentId pn (updateIndefUnitId pkgstate (Indefinite (UnitId fs) Nothing)))
 
 bkpPackageNameMap :: UnitState -> [LHsUnit PackageName] -> PackageNameMap HsComponentId
 bkpPackageNameMap pkgstate units = Map.fromList (map (unitDefines pkgstate) units)

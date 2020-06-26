@@ -22,6 +22,7 @@ module GHC.Runtime.Loader (
 
 import GHC.Prelude
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 
 import GHC.Runtime.Linker      ( linkModule, getHValue )
 import GHC.Runtime.Interpreter ( wormhole, withInterp )

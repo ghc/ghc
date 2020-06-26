@@ -59,6 +59,7 @@ import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Types.Name
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.Basic ( isGenerated, il_value, fl_value, Boxity(..) )
 import GHC.Data.FastString
 import GHC.Types.Unique
