@@ -125,7 +125,7 @@ data Arch
           , armISAExt :: [ArmISAExt]
           , armABI    :: ArmABI
           }
-        | ArchARM64
+        | ArchAArch64
         | ArchAlpha
         | ArchMipseb
         | ArchMipsel
@@ -166,7 +166,7 @@ stringEncodeArch = \case
         ARMv5 -> "v5"
         ARMv6 -> "v6"
         ARMv7 -> "v7"
-  ArchARM64 -> "aarch64"
+  ArchAArch64 -> "aarch64"
   ArchAlpha -> "alpha"
   ArchMipseb -> "mipseb"
   ArchMipsel -> "mipsel"
@@ -174,7 +174,7 @@ stringEncodeArch = \case
 
 isARM :: Arch -> Bool
 isARM (ArchARM {}) = True
-isARM ArchARM64    = True
+isARM ArchAArch64    = True
 isARM _ = False
 
 -- | Operating systems that the native code generator knows about.
@@ -350,4 +350,3 @@ data BmiVersion
    = BMI1
    | BMI2
    deriving (Eq, Ord)
-

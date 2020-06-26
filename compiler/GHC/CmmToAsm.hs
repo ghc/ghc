@@ -50,6 +50,12 @@ import qualified GHC.CmmToAsm.PPC.RegInfo as PPC.RegInfo
 import qualified GHC.CmmToAsm.PPC.Instr   as PPC.Instr
 import qualified GHC.CmmToAsm.PPC.Ppr     as PPC.Ppr
 
+import qualified GHC.CmmToAsm.AArch64.CodeGen as AArch64.CodeGen
+import qualified GHC.CmmToAsm.AArch64.Regs    as AArch64.Regs
+import qualified GHC.CmmToAsm.AArch64.RegInfo as AArch64.RegInfo
+import qualified GHC.CmmToAsm.AArch64.Instr   as AArch64.Instr
+import qualified GHC.CmmToAsm.AArch64.Ppr     as AArch64.Ppr
+
 import GHC.CmmToAsm.Reg.Liveness
 import qualified GHC.CmmToAsm.Reg.Linear                as Linear
 
@@ -169,15 +175,15 @@ nativeCodeGen dflags this_mod modLoc h us cmms
             => NcgImpl statics instr jumpDest -> IO a
        nCG' ncgImpl = nativeCodeGen' dflags this_mod modLoc ncgImpl h us cmms
    in case platformArch platform of
-      ArchX86       -> nCG' (x86NcgImpl    config)
-      ArchX86_64    -> nCG' (x86_64NcgImpl config)
-      ArchPPC       -> nCG' (ppcNcgImpl    config)
+      ArchX86       -> nCG' (x86NcgImpl     config)
+      ArchX86_64    -> nCG' (x86_64NcgImpl  config)
+      ArchPPC       -> nCG' (ppcNcgImpl     config)
       ArchS390X     -> panic "nativeCodeGen: No NCG for S390X"
-      ArchSPARC     -> nCG' (sparcNcgImpl  config)
+      ArchSPARC     -> nCG' (sparcNcgImpl   config)
       ArchSPARC64   -> panic "nativeCodeGen: No NCG for SPARC64"
       ArchARM {}    -> panic "nativeCodeGen: No NCG for ARM"
-      ArchARM64     -> panic "nativeCodeGen: No NCG for ARM64"
-      ArchPPC_64 _  -> nCG' (ppcNcgImpl    config)
+      ArchAArch64     -> nCG' (aarch64NcgImpl config)
+      ArchPPC_64 _  -> nCG' (ppcNcgImpl     config)
       ArchAlpha     -> panic "nativeCodeGen: No NCG for Alpha"
       ArchMipseb    -> panic "nativeCodeGen: No NCG for mipseb"
       ArchMipsel    -> panic "nativeCodeGen: No NCG for mipsel"
@@ -256,6 +262,27 @@ sparcNcgImpl config
     where
       platform = ncgPlatform config
 
+aarch64NcgImpl :: NCGConfig -> NcgImpl RawCmmStatics AArch64.Instr.Instr AArch64.RegInfo.JumpDest
+aarch64NcgImpl config
+ = NcgImpl {
+        ncgConfig                 = config
+       ,cmmTopCodeGen             = AArch64.CodeGen.cmmTopCodeGen
+       ,generateJumpTableForInstr = AArch64.CodeGen.generateJumpTableForInstr config
+       ,getJumpDestBlockId        = AArch64.RegInfo.getJumpDestBlockId
+       ,canShortcut               = AArch64.RegInfo.canShortcut
+       ,shortcutStatics           = AArch64.RegInfo.shortcutStatics
+       ,shortcutJump              = AArch64.RegInfo.shortcutJump
+       ,pprNatCmmDecl             = AArch64.Ppr.pprNatCmmDecl config
+       ,maxSpillSlots             = AArch64.Instr.maxSpillSlots config
+       ,allocatableRegs           = AArch64.Regs.allocatableRegs platform
+       ,ncgAllocMoreStack         = noAllocMoreStack
+       ,ncgExpandTop              = id
+       ,ncgMakeFarBranches        = const id
+       ,extractUnwindPoints       = const []
+       ,invertCondBranches        = \_ _ -> id
+  }
+    where
+      platform = ncgPlatform config
 --
 -- Allocating more stack space for spilling is currently only
 -- supported for the linear register allocator on x86/x86_64, the rest
