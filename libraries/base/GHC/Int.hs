@@ -208,7 +208,7 @@ instance Bits Int8 where
     isSigned _                = True
     popCount (I8# x#)         = I# (word2Int# (popCnt8# (int2Word# x#)))
     bit                       = bitDefault
-    testBit                   = testBitDefault
+    testBit (I8# x#) (I# b#)  = tagToEnum# ((x# `uncheckedIShiftRL#` b#) `andI#` 1#)
 
 -- | @since 4.6.0.0
 instance FiniteBits Int8 where
@@ -415,7 +415,7 @@ instance Bits Int16 where
     isSigned _                 = True
     popCount (I16# x#)         = I# (word2Int# (popCnt16# (int2Word# x#)))
     bit                        = bitDefault
-    testBit                    = testBitDefault
+    testBit (I16# x#) (I# b#)  = tagToEnum# ((x# `uncheckedIShiftRL#` b#) `andI#` 1#)
 
 -- | @since 4.6.0.0
 instance FiniteBits Int16 where
@@ -625,7 +625,7 @@ instance Bits Int32 where
     isSigned _                 = True
     popCount (I32# x#)         = I# (word2Int# (popCnt32# (int2Word# x#)))
     bit                        = bitDefault
-    testBit                    = testBitDefault
+    testBit (I32# x#) (I# b#)  = tagToEnum# ((x# `uncheckedIShiftRL#` b#) `andI#` 1#)
 
 -- | @since 4.6.0.0
 instance FiniteBits Int32 where
@@ -1043,7 +1043,7 @@ instance Bits Int64 where
     isSigned _                 = True
     popCount (I64# x#)         = I# (word2Int# (popCnt64# (int2Word# x#)))
     bit                        = bitDefault
-    testBit                    = testBitDefault
+    testBit (I64# x#) (I# b#)  = tagToEnum# ((x# `uncheckedIShiftRL#` b#) `andI#` 1#)
 
 {-# RULES
 "fromIntegral/a->Int64" fromIntegral = \x -> case fromIntegral x of I# x# -> I64# x#

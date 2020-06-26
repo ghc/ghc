@@ -449,7 +449,7 @@ instance Bits Int where
 
     bit     = bitDefault
 
-    testBit = testBitDefault
+    testBit (I# x#) (I# b#) = tagToEnum# ((x# `uncheckedIShiftRL#` b#) `andI#` 1#)
 
     (I# x#) .&.   (I# y#)          = I# (x# `andI#` y#)
     (I# x#) .|.   (I# y#)          = I# (x# `orI#`  y#)
@@ -521,7 +521,7 @@ instance Bits Word where
     isSigned _               = False
     popCount (W# x#)         = I# (word2Int# (popCnt# x#))
     bit                      = bitDefault
-    testBit                  = testBitDefault
+    testBit (W# x#) (I# b#)  = tagToEnum# (word2Int# ((x# `uncheckedShiftRL#` b#) `and#` 1##))
 
 -- | @since 4.6.0.0
 instance FiniteBits Word where
