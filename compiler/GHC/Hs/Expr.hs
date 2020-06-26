@@ -772,6 +772,27 @@ we're going to get in generated code. Once we get to sub-trees that
 are not generated, then we update the RealSrcSpan appropriately, and
 set the tcl_in_gen_code Bool to False.
 
+---
+
+A general recipe to follow this approach for new constructs could go as follows:
+
+- Remove any GhcRn-time SyntaxExpr extensions to the relevant constructor for your
+  construct, in HsExpr or related syntax data types.
+- At renaming-time:
+    - take your original node of interest (HsIf above)
+    - rename its subexpressions (condition, true branch, false branch above)
+    - construct the suitable "rebound"-and-renamed result (ifThenElse call
+      above), where the 'SrcSpan' attached to any _fabricated node_ (the
+      HsVar/HsApp nodes, above) is set to 'generatedSrcSpan'
+    - take both the original node and that rebound-and-renamed result and wrap
+      them in an XExpr: XExpr (HsExpanded <original node> <desugared>)
+ - At typechecking-time:
+    - remove any logic that was previously dealing with your rebindable
+      construct, typically involving [tc]SyntaxOp, SyntaxExpr and friends.
+    - the XExpr (HsExpanded ... ...) case in tcExpr already makes sure that we
+      typecheck the desugared expression while reporting the original one in
+      errors
+
 -}
 
 -- See Note [Rebindable syntax and HsExpansion] just above.
