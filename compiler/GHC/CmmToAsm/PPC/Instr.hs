@@ -43,7 +43,7 @@ import GHC.Cmm
 import GHC.Cmm.Info
 import GHC.Data.FastString
 import GHC.Cmm.CLabel
-import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Types.Unique.FM (listToUFM, lookupUFM)
 import GHC.Types.Unique.Supply

@@ -247,6 +247,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.SrcLoc
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Utils.Error
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
@@ -1047,7 +1048,7 @@ callishMachOps = listToUFM $
         args' = init args
         align = case last args of
           CmmLit (CmmInt alignInteger _) -> fromInteger alignInteger
-          e -> pprPgmError "Non-constant alignment in memcpy-like function:" (ppr e)
+          e -> pgmErrorDoc "Non-constant alignment in memcpy-like function:" (ppr e)
         -- The alignment of memcpy-ish operations must be a
         -- compile-time constant. We verify this here, passing it around
         -- in the MO_* constructor. In order to do this, however, we

@@ -38,6 +38,7 @@ import GHC.Types.FieldLabel
 import GHC.Utils.Binary
 import GHC.Data.List.SetOps
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Utils.Misc
 
 import Data.Data ( Data )

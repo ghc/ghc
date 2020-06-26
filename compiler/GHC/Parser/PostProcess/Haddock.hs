@@ -57,6 +57,7 @@ import GHC.Hs
 import GHC.Types.SrcLoc
 import GHC.Driver.Session ( WarningFlag(..) )
 import GHC.Utils.Outputable hiding ( (<>) )
+import GHC.Utils.Panic
 import GHC.Data.Bag
 
 import Data.Semigroup

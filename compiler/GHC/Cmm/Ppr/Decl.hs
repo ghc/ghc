@@ -46,6 +46,7 @@ import GHC.Platform
 import GHC.Cmm.Ppr.Expr
 import GHC.Cmm
 
+import GHC.Driver.Ppr
 import GHC.Driver.Session
 import GHC.Utils.Outputable
 import GHC.Data.FastString

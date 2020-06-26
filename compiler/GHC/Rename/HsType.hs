@@ -63,6 +63,7 @@ import GHC.Types.Basic  ( compareFixity, funTyFixity, negateFixity
                         , Fixity(..), FixityDirection(..), LexicalFixity(..)
                         , TypeOrKind(..) )
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt

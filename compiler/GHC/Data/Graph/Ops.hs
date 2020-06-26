@@ -41,6 +41,7 @@ import GHC.Prelude
 import GHC.Data.Graph.Base
 
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Types.Unique
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM

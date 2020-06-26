@@ -3,6 +3,7 @@ module Main (main) where
 
 import GHC
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Utils.Outputable
 import GHC.Utils.Monad
 import GHC.Types.Name.Set

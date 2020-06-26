@@ -18,6 +18,7 @@ import GHC.Types.Name.Set
 import GHC.Types.Var
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 #include "HsVersions.h"
 
