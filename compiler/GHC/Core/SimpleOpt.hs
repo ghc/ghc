@@ -93,7 +93,7 @@ little dance in action; the full Simplifier is a lot more complicated.
 
 -}
 
-simpleOptExpr :: DynFlags -> CoreExpr -> CoreExpr
+simpleOptExpr :: HasDebugCallStack => DynFlags -> CoreExpr -> CoreExpr
 -- See Note [The simple optimiser]
 -- Do simple optimisation on an expression
 -- The optimisation is very straightforward: just
@@ -125,7 +125,7 @@ simpleOptExpr dflags expr
         -- It's a bit painful to call exprFreeVars, because it makes
         -- three passes instead of two (occ-anal, and go)
 
-simpleOptExprWith :: DynFlags -> Subst -> InExpr -> OutExpr
+simpleOptExprWith :: HasDebugCallStack => DynFlags -> Subst -> InExpr -> OutExpr
 -- See Note [The simple optimiser]
 simpleOptExprWith dflags subst expr
   = simple_opt_expr init_env (occurAnalyseExpr expr)
@@ -218,7 +218,7 @@ simple_opt_expr env expr
        | Just clo <- lookupVarEnv (soe_inl env) v
        = simple_opt_clo env clo
        | otherwise
-       = lookupIdSubst (text "simpleOptExpr") (soe_subst env) v
+       = lookupIdSubst (soe_subst env) v
 
     go (App e1 e2)      = simple_app env e1 [(env,e2)]
     go (Type ty)        = Type     (substTy subst ty)
@@ -293,7 +293,7 @@ mk_cast e co | isReflexiveCo co = e
 
 ----------------------
 -- simple_app collects arguments for beta reduction
-simple_app :: SimpleOptEnv -> InExpr -> [SimpleClo] -> CoreExpr
+simple_app :: HasDebugCallStack => SimpleOptEnv -> InExpr -> [SimpleClo] -> CoreExpr
 
 simple_app env (Var v) as
   | Just (env', e) <- lookupVarEnv (soe_inl env) v
@@ -306,7 +306,7 @@ simple_app env (Var v) as
   = simple_app (soeZapSubst env) (unfoldingTemplate unf) as
 
   | otherwise
-  , let out_fn = lookupIdSubst (text "simple_app") (soe_subst env) v
+  , let out_fn = lookupIdSubst (soe_subst env) v
   = finish_app env out_fn as
 
 simple_app env (App e1 e2) as
@@ -1064,7 +1064,8 @@ data ConCont = CC [CoreExpr] Coercion
 --
 -- We also return the incoming InScopeSet, augmented with
 -- the binders from any [FloatBind] that we return
-exprIsConApp_maybe :: InScopeEnv -> CoreExpr
+exprIsConApp_maybe :: HasDebugCallStack
+                   => InScopeEnv -> CoreExpr
                    -> Maybe (InScopeSet, [FloatBind], DataCon, [Type], [CoreExpr])
 exprIsConApp_maybe (in_scope, id_unf) expr
   = go (Left in_scope) [] expr (CC [] (mkRepReflCo (exprType expr)))
@@ -1118,7 +1119,7 @@ exprIsConApp_maybe (in_scope, id_unf) expr
     go (Right sub) floats (Var v) cont
        = go (Left (substInScope sub))
             floats
-            (lookupIdSubst (text "exprIsConApp" <+> ppr expr) sub v)
+            (lookupIdSubst sub v)
             cont
 
     go (Left in_scope) floats (Var fun) cont@(CC args co)
@@ -1141,7 +1142,7 @@ exprIsConApp_maybe (in_scope, id_unf) expr
         , bndrs `equalLength` args    -- See Note [DFun arity check]
         , let subst = mkOpenSubst in_scope (bndrs `zip` args)
         = succeedWith in_scope floats $
-          pushCoDataCon con (map (substExpr (text "exprIsConApp1") subst) dfun_args) co
+          pushCoDataCon con (map (substExpr subst) dfun_args) co
 
         -- Look through unfoldings, but only arity-zero one;
         -- if arity > 0 we are effectively inlining a function call,
@@ -1180,7 +1181,7 @@ exprIsConApp_maybe (in_scope, id_unf) expr
     subst_co (Right s) co = GHC.Core.Subst.substCo s co
 
     subst_expr (Left {}) e = e
-    subst_expr (Right s) e = substExpr (text "exprIsConApp2") s e
+    subst_expr (Right s) e = substExpr s e
 
     subst_bndr msubst bndr
       = (Right subst', bndr')
@@ -1461,7 +1462,7 @@ pushCoercionIntoLambda in_scope x e co
           subst = extendIdSubst (mkEmptySubst in_scope')
                                 x
                                 (mkCast (Var x') co1)
-      in Just (x', substExpr (text "pushCoercionIntoLambda") subst e `mkCast` co2)
+      in Just (x', substExpr subst e `mkCast` co2)
     | otherwise
     = pprTrace "exprIsLambda_maybe: Unexpected lambda in case" (ppr (Lam x e))
       Nothing

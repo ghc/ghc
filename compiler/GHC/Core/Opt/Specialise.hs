@@ -1008,7 +1008,7 @@ instance Outputable SpecEnv where
         , text "interesting =" <+> ppr interesting ])
 
 specVar :: SpecEnv -> Id -> CoreExpr
-specVar env v = Core.lookupIdSubst (text "specVar") (se_subst env) v
+specVar env v = Core.lookupIdSubst (se_subst env) v
 
 specExpr :: SpecEnv -> CoreExpr -> SpecM (CoreExpr, UsageDetails)
 

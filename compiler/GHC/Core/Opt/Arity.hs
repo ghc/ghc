@@ -1023,7 +1023,7 @@ etaInfoApp subst (Tick t e) eis
 
 etaInfoApp subst expr _
   | (Var fun, _) <- collectArgs expr
-  , Var fun' <- lookupIdSubst (text "etaInfoApp" <+> ppr fun) subst fun
+  , Var fun' <- lookupIdSubst subst fun
   , isJoinId fun'
   = subst_expr subst expr
 
@@ -1132,13 +1132,16 @@ mkEtaWW orig_n ppr_orig_expr in_scope orig_ty
 
 
 
---------------
--- Don't use short-cutting substitution - we may be changing the types of join
--- points, so applying the in-scope set is necessary
--- TODO Check if we actually *are* changing any join points' types
-
+------------
 subst_expr :: Subst -> CoreExpr -> CoreExpr
-subst_expr = substExpr (text "GHC.Core.Opt.Arity:substExpr")
+-- Apply a substitution to an expression.  We use substExpr
+-- not substExprSC (short-cutting substitution) because
+-- we may be changing the types of join points, so applying
+-- the in-scope set is necessary.
+--
+-- ToDo: we could instead check if we actually *are*
+-- changing any join points' types, and if not use substExprSC.
+subst_expr = substExpr
 
 
 --------------
