@@ -131,10 +131,12 @@ import GHC.Types.Name.Env
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
 import GHC.Data.FastString
-import GHC.Utils.Misc
 import GHC.Data.Bag
-import GHC.Utils.Outputable
 import GHC.Settings.Constants
+
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import Data.Either
 import Data.Function

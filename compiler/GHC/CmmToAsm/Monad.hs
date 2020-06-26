@@ -69,7 +69,8 @@ import GHC.Unit.Module
 import Control.Monad    ( ap )
 
 import GHC.CmmToAsm.Instr
-import GHC.Utils.Outputable (SDoc, pprPanic, ppr)
+import GHC.Utils.Outputable (SDoc, ppr)
+import GHC.Utils.Panic      (pprPanic)
 import GHC.Cmm (RawCmmDecl, RawCmmStatics)
 import GHC.CmmToAsm.CFG
 

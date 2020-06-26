@@ -76,6 +76,7 @@ import GHC.Builtin.Names
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.Session
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Utils.Outputable
 import GHC.Types.Basic ( TypeOrKind(..) )
 import qualified GHC.LanguageExtensions as LangExt

@@ -247,6 +247,7 @@ import GHC.UniqueSubdir (uniqueSubdir)
 import GHC.Unit.Types
 import GHC.Unit.Parser
 import GHC.Unit.Module
+import GHC.Driver.Ppr
 import {-# SOURCE #-} GHC.Driver.Plugins
 import {-# SOURCE #-} GHC.Driver.Hooks
 import GHC.Builtin.Names ( mAIN )
@@ -5167,7 +5168,6 @@ data FilesToClean = FilesToClean {
 emptyFilesToClean :: FilesToClean
 emptyFilesToClean = FilesToClean Set.empty Set.empty
 
-
 -- | Initialize the pretty-printing options
 initSDocContext :: DynFlags -> PprStyle -> SDocContext
 initSDocContext dflags style = SDC
@@ -5210,3 +5210,4 @@ initSDocContext dflags style = SDC
 -- | Initialize the pretty-printing options using the default user style
 initDefaultSDocContext :: DynFlags -> SDocContext
 initDefaultSDocContext dflags = initSDocContext dflags defaultUserStyle
+

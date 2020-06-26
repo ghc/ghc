@@ -29,6 +29,7 @@ import GHC.Types.Var.Env
 import GHC.Data.Bag
 import GHC.Core.ConLike ( ConLike(..) )
 import GHC.Utils.Misc
+import GHC.Utils.Panic
 import GHC.Tc.Utils.Env (tcLookup)
 import GHC.Utils.Outputable
 import GHC.Driver.Session

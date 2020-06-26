@@ -139,9 +139,7 @@ import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
 import GHC.Types.Name hiding ( varName )
-import GHC.Utils.Misc
 import GHC.Types.Basic
-import GHC.Utils.Outputable
 import GHC.Types.Unique
 import GHC.Data.Pair
 import GHC.Types.SrcLoc
@@ -150,6 +148,10 @@ import GHC.Builtin.Types.Prim
 import GHC.Data.List.SetOps
 import GHC.Data.Maybe
 import GHC.Types.Unique.FM
+
+import GHC.Utils.Misc
+import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 import Control.Monad (foldM, zipWithM)
 import Data.Function ( on )

@@ -336,6 +336,7 @@ import GHC.Driver.Finder
 import GHC.Driver.Types
 import GHC.Driver.CmdLine
 import GHC.Driver.Session hiding (WarnReason(..))
+import GHC.Driver.Ppr
 import GHC.Driver.Ways
 import GHC.SysTools
 import GHC.SysTools.BaseDir

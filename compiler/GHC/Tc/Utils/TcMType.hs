@@ -120,11 +120,13 @@ import GHC.Types.Var.Env
 import GHC.Types.Name.Env
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Data.Bag
 import GHC.Data.Pair
 import GHC.Types.Unique.Set
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Types.Basic ( TypeOrKind(..) )
 

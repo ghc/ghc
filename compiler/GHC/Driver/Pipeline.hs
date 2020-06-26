@@ -53,6 +53,7 @@ import GHC.Utils.Outputable
 import GHC.Unit.Module
 import GHC.Utils.Error
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Data.StringBuffer ( hGetStringBuffer, hPutStringBuffer )

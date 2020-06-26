@@ -43,8 +43,8 @@ import GHC.Prelude
 import GHC.Settings.Utils
 
 import GHC.Unit
-import GHC.Utils.Outputable
 import GHC.Utils.Error
+import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Driver.Session
 import GHC.Driver.Ways

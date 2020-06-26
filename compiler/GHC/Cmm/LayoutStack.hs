@@ -33,6 +33,7 @@ import GHC.Platform
 import GHC.Driver.Session
 import GHC.Data.FastString
 import GHC.Utils.Outputable hiding ( isEmpty )
+import GHC.Utils.Panic
 import qualified Data.Set as Set
 import Control.Monad.Fix
 import Data.Array as Array

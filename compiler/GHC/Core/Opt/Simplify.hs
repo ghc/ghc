@@ -15,6 +15,7 @@ import GHC.Prelude
 
 import GHC.Platform
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Core.Opt.Simplify.Monad
 import GHC.Core.Type hiding ( substTy, substTyVar, extendTvSubst, extendCvSubst )
 import GHC.Core.Opt.Simplify.Env
@@ -58,6 +59,7 @@ import GHC.Types.Var    ( isTyCoVar )
 import GHC.Data.Maybe   ( orElse )
 import Control.Monad
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Utils.Error

@@ -58,6 +58,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Builtin.Names
 import GHC.Driver.Session
 import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Types.SrcLoc
 import GHC.Data.Bag

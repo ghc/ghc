@@ -5,6 +5,7 @@ import GHC.Types.SrcLoc
 import GHC hiding (moduleName)
 import GHC.Hs.Dump
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Utils.Outputable hiding (space)
 import System.Environment( getArgs )
 import System.Exit
@@ -29,7 +30,7 @@ testOneFile :: FilePath -> String -> IO ()
 testOneFile libdir fileName = do
        p <- parseOneFile libdir fileName
        let
-         origAst = showSDoc unsafeGlobalDynFlags
+         origAst = showPprUnsafe
                      $ showAstData BlankSrcSpan (pm_parsed_source p)
          pped    = pragmas ++ "\n" ++ pp (pm_parsed_source p)
          anns    = pm_annotations p
@@ -45,7 +46,7 @@ testOneFile libdir fileName = do
        p' <- parseOneFile libdir newFile
 
        let newAstStr :: String
-           newAstStr = showSDoc unsafeGlobalDynFlags
+           newAstStr = showPprUnsafe
                          $ showAstData BlankSrcSpan (pm_parsed_source p')
        writeFile newAstFile newAstStr
 
@@ -96,6 +97,6 @@ getPragmas anns = pragmaStr
     pragmaStr = intercalate "\n" pragmas
 
 pp :: (Outputable a) => a -> String
-pp a = showPpr unsafeGlobalDynFlags a
+pp a = showPprUnsafe a
 
 

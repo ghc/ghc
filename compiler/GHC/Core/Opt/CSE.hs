@@ -32,6 +32,7 @@ import GHC.Utils.Outputable
 import GHC.Types.Basic
 import GHC.Core.Map
 import GHC.Utils.Misc   ( filterOut, equalLength, debugIsOn )
+import GHC.Utils.Panic
 import Data.List        ( mapAccumL )
 
 {-

@@ -24,6 +24,8 @@ module GHC.CmmToAsm.Dwarf.Types
 
 import GHC.Prelude
 
+import GHC.Driver.Session (initSDocContext)
+
 import GHC.Cmm.DebugBlock
 import GHC.Cmm.CLabel
 import GHC.Cmm.Expr         ( GlobalReg(..) )

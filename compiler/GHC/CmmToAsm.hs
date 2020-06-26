@@ -87,12 +87,14 @@ import GHC.Cmm.CLabel
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Driver.Session
+import GHC.Driver.Ppr
 import GHC.Utils.Misc
 
 import GHC.Types.Basic       ( Alignment )
 import qualified GHC.Utils.Ppr as Pretty
 import GHC.Utils.BufHandle
 import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Types.Unique.Set
 import GHC.Utils.Error

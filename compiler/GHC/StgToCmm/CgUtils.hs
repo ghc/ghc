@@ -25,7 +25,7 @@ import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 import GHC.Driver.Session
-import GHC.Utils.Outputable
+import GHC.Utils.Panic
 
 -- -----------------------------------------------------------------------------
 -- Information about global registers

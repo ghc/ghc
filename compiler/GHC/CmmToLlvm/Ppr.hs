@@ -11,6 +11,8 @@ module GHC.CmmToLlvm.Ppr (
 
 import GHC.Prelude
 
+import GHC.Driver.Ppr
+
 import GHC.Llvm
 import GHC.CmmToLlvm.Base
 import GHC.CmmToLlvm.Data
