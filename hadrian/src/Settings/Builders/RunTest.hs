@@ -102,6 +102,7 @@ runTestBuilderArgs = builder RunTest ? do
     -- TODO: set CABAL_MINIMAL_BUILD/CABAL_PLUGIN_BUILD
     mconcat [ arg $ "testsuite/driver/runtests.py"
             , pure [ "--rootdir=" ++ testdir | testdir <- rootdirs ]
+            , arg "--top", arg (top -/- "testsuite")
             , arg "-e", arg $ "windows=" ++ show windowsHost
             , arg "-e", arg $ "darwin=" ++ show osxHost
             , arg "-e", arg $ "config.local=False"
@@ -129,7 +130,6 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "-e", arg $ "config.ghc_dynamic_by_default=" ++ show hasDynamicByDefault
             , arg "-e", arg $ "config.ghc_dynamic=" ++ show hasDynamic
 
-            , arg "-e", arg $ "config.top=" ++ show (top -/- "testsuite")
             , arg "-e", arg $ "config.wordsize=" ++ show wordsize
             , arg "-e", arg $ "config.os="       ++ show os
             , arg "-e", arg $ "config.arch="     ++ show arch
