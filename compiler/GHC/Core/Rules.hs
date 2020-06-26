@@ -917,7 +917,7 @@ match_var renv@(RV { rv_tmpls = tmpls, rv_lcl = rn_env, rv_fltR = flt_env })
        Var v2 | v1' == rnOccR rn_env v2
               -> Just subst
 
-              | Var v2' <- lookupIdSubst (text "match_var") flt_env v2
+              | Var v2' <- lookupIdSubst flt_env v2
               , v1' == v2'
               -> Just subst
 
@@ -965,7 +965,7 @@ match_tmpl_var renv@(RV { rv_lcl = rn_env, rv_fltR = flt_env })
   where
     -- e2' is the result of applying flt_env to e2
     e2' | isEmptyVarSet let_bndrs = e2
-        | otherwise = substExpr (text "match_tmpl_var") flt_env e2
+        | otherwise = substExpr flt_env e2
 
     id_subst' = extendVarEnv (rs_id_subst subst) v1' e2'
          -- No further renaming to do on e2',
