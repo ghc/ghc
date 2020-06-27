@@ -8,15 +8,18 @@ import {-# SOURCE #-} Settings.Default
 staticFlavour :: Flavour
 staticFlavour = defaultFlavour
     { name = "static"
-    , args = defaultBuilderArgs <> staticArgs <> defaultPackageArgs <> staticExec
+    , args = defaultBuilderArgs <> perfArgs <> defaultPackageArgs <> staticExec
     , dynamicGhcPrograms = return False }
 
 staticExec :: Args
-staticExec = builder (Ghc LinkHs) ? pure [ "-static" , "-optl", "-static" ]
+staticExec = mconcat
+    [ builder (Ghc LinkHs) ? pure [ "-optl", "-static" ]
+    [ builder (Ghc CompileCWithGhc) ? pure [ "-optc", "-static" ]
+    , pure [ "-static" , "-fPIC" ] ]
 
-staticArgs :: Args
-staticArgs = sourceArgs SourceArgs
-    { hsDefault  = pure ["-O", "-H64m", "-fPIC"]
+perfArgs :: Args
+perfArgs = sourceArgs SourceArgs
+    { hsDefault  = pure ["-O", "-H64m"]
     , hsLibrary  = notStage0 ? arg "-O2"
     , hsCompiler = pure ["-O2"]
     , hsGhc      = mconcat [stage0 ? arg "-O", notStage0 ? arg "-O2"] }
