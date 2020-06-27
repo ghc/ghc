@@ -11,12 +11,17 @@ staticFlavour = defaultFlavour
     , args = defaultBuilderArgs <> perfArgs <> defaultPackageArgs <> staticExec
     , dynamicGhcPrograms = return False }
 
+
 staticExec :: Args
 staticExec = mconcat
-    [ builder (Ghc LinkHs) ? pure [ "-optl", "-static" ]
-    , builder (Ghc CompileCWithGhc) ? pure [ "-optc", "-static" ]
-    , pure [ "-static" , "-fPIC" ] ]
+    [ builder (Ghc CompileHs) ? pure [ "-fPIC", "-static" ]
+    , builder (Ghc CompileCWithGhc) ? pure [ "-fPIC", "-optc", "-static"]
+    , builder (Ghc LinkHs) ? pure [ "-optl", "-static" ]
+    ]
 
+{-
+ Same as in the performance flavour
+-}
 perfArgs :: Args
 perfArgs = sourceArgs SourceArgs
     { hsDefault  = pure ["-O", "-H64m"]
