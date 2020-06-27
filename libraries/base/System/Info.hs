@@ -35,15 +35,34 @@ compilerVersion = Version [major, minor] []
 #include "ghcplatform.h"
 
 -- | The operating system on which the program is running.
+-- The most commonly encountered values are:
+-- * "darwin"
+-- * "freebsd"
+-- * "linux"
+-- * "linux-android"
+-- * "mingw32"
+-- * "netbsd"
+-- * "openbsd"
 os :: String
 os = HOST_OS
 
 -- | The machine architecture on which the program is running.
+-- The most commonly encountered values are:
+-- * "aarch64"
+-- * "arm"
+-- * "i386"
+-- * "powerpc"
+-- * "powerpc64"
+-- * "powerpc64le"
+-- * "sparc"
+-- * "sparc64"
+-- * "x86_64"
 arch :: String
 arch = HOST_ARCH
 
 -- | The Haskell implementation with which the program was compiled
 -- or is being interpreted.
+-- On the GHC platform, this function returns "ghc".
 compilerName :: String
 compilerName = "ghc"
 
