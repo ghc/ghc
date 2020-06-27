@@ -16,7 +16,7 @@ staticExec = builder (Ghc LinkHs) ? pure [ "-static" , "-optl", "-static" ]
 
 staticArgs :: Args
 staticArgs = sourceArgs SourceArgs
-    { hsDefault  = pure ["-O", "-H64m"]
+    { hsDefault  = pure ["-O", "-H64m", "-fPIC"]
     , hsLibrary  = notStage0 ? arg "-O2"
     , hsCompiler = pure ["-O2"]
     , hsGhc      = mconcat [stage0 ? arg "-O", notStage0 ? arg "-O2"] }
