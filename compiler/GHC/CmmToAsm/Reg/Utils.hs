@@ -16,7 +16,7 @@ where
 
    * VirtualReg is a subset of the registers in Reg's type.
      Making a value of VirtualReg into a Reg in fact doesn't
-     change it's unique. This is because Reg consists of virtual
+     change its unique. This is because Reg consists of virtual
      regs and real regs, whose unique values do not overlap.
 
    * Since the code was written in the assumption that keys are
