@@ -24,9 +24,10 @@ function pull() {
 
 function setup_ssh() {
   # Add gitlab as a known host.
+  # This can be generated with `ssh-keyscan -H gitlab.haskell.org`
   mkdir -p ~/.ssh
-  echo "|1|+AUrMGS1elvPeLNt+NHGa5+c6pU=|4XvfRsQftO1OgZD4c0JJ7oNaii8= ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDXilA5l4kOZPx0nM6xDATF+t4fS6te0eYPDwBI/jLWD9cJVtCnsrwMl5ar+/NfmcD0jnCYztUiVHuXyTaWPJYSQpwltfpTeqpo9/z/0MxkPtSl1uMP2cLbDiqA01OWveChktOXwU6hRQ+7MmO+dNRS/iXrRmYrGv/p1W811QgLBLS9fefEdF25n+0dP71L7Ov7riOawlDmd0C11FraE/R8HX6gs6lbXta1kisdxGyKojYSiCtobUaJxRoatMfUP0a9rwTAyl8tf56LgB+igjMky879VAbL7eQ/AmfHYPrSGJ/YlWP6Jj23Dnos5nOVlWL/rVTs9Y/NakLpPwMs75KTC0Pd74hdf2e3folDdAi2kLrQgO2SI6so7rOYZ+mFkCM751QdDVy4DzjmDvSgSIVf9SV7RQf7e7unE7pSZ/ILupZqz9KhR1MOwVO+ePa5qJMNSdC204PIsRWkIO5KP0QLl507NI9Ri84+aODoHD7gDIWNhU08J2P8/E6r0wcC8uWaxh+HaOjI9BkHjqRYsrgfn54BAuO9kw1cDvyi3c8n7VFlNtvQP15lANwim3gr9upV+r95KEPJCgZMYWJBDPIVtp4GdYxCfXxWj5oMXbA5pf0tNixwNJjAsY7I6RN2htHbuySH36JybOZk+gCj6mQkxpCT/tKaUn14hBJWLq7Q+Q==" >> ~/.ssh/known_hosts
-  echo "|1|JZkdAPJmpX6SzGeqhmQLfMWLGQA=|4vTELroOlbFxbCr0WX+PK9EcpD0= ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJknufU+I6A5Nm58lmse4/o11Ai2UzYbYe7782J1+kRk" >> ~/.ssh/known_hosts
+  echo "|1|cta91z3DoAGdpX2Epe9WF+sr+Rk=|1qlsbqiTTa8YsDyQBjVnzANFQ3Y= ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDSzzl8mwY6ohtW6MftKaQfta8yTL8cTxtA7lcueo2mkPpwBBQ7FA6z3nFATx25QwdV7fa7DuNRDX57f/a/W7+wMhXZ6yyQr+gwr0h4vdZ8Nt4XNfNdkdGw4fZKRApWxyvfSkxjs/E9+G0o3eQLspxjVohBkmkcsowpFUI5Aazv/K6QIf1gKt+4iPvYcB/dBJ1yF1qmpayz4htrKyUC5l3GCBEwvMdAjIQ2bX8pyjTtqcJDLosAVzQ5wprkdgkL29MgJXEbM+B1d1log0hnX4AsbOlL7tWhTO1Je2hSuEeiVaDDPFUyCoGQRFDrisQU5lb8NrzuN3jpNc+PxOHbXHfaTppAoED/++UepvgtLF1zUM13cRk56YmpmABOa48W72VJuzLLm8DF+KBWBs6TDuVk3y9z/SS6zDS0VGkHotldopW2kpsjErJIdWVKIL3RP/Flay7mzl3l/izIMTHXXKMxV3/+XaBjG/gDOCld3JjORQXah2hvJfvXeNaePE1RKAMS63cj3XTE77fsYH7VmEdE34RTBDtsZR5WhEjdf29hjEcQDPf0vDphxRHr6IqUSwVcd7ps6nVoccTfaepJm62IIXDgOsc2piWl2xXNZJVtph6U+MzsPDSSbu1MTwalwgqpApcYK7ZzUjGHA7+NBhjjSuUZO6eHzwxjAn0FXZyrpQ==" >> ~/.ssh/known_hosts
+  echo "|1|uZkjsBS2bmdh7L/8zBquxJd/F20=|by/tpuDAPT6BpEXrDOiOv1/Zx/A= ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA7ltOZyaULDgxE3Vw6RgQVp+OPKQi79ssUenbhdWy36" >> ~/.ssh/known_hosts
 
   # Setup ssh keys.
   eval `ssh-agent`
