@@ -725,17 +725,36 @@ StgRunIsImplementedInAssembler(void)
    -------------------------------------------------------------------------- */
 
 #if defined(powerpc64_HOST_ARCH)
-
+/* 64-bit PowerPC ELF ABI 1.9
+ *
+ * Stack frame organization (see Figure 3-17, ELF ABI 1.9, p 14)
+ *
+ * +-> Back Chain (points to the prevoius stack frame)
+ * |   Floating point register save area (f14-f31)
+ * |   General register save area (r14-r31)
+ * |   ... unused save areas (size 0)
+ * |   Local variable space
+ * |   Parameter save area
+ * |   ... stack header (TOC, link editor, compiler, LR, CR)
+ * +-- Back chain           <---- SP (r1)
+ *
+ * We save all callee-saves general purpose registers (r14-r31, _savegpr1_14)
+ * and all callee-saves floating point registers (f14-31, _savefpr14) and
+ * the return address of the caller (LR), which is saved in the caller's
+ * stack frame as required by the ABI. We only modify the CR0 and CR1 fields
+ * of the condition register and those are caller-saves, so we don't save CR.
+ *
+ * StgReturn restores all saved registers from their respective locations
+ * on the stack before returning to the caller.
+ *
+ * There is no need to save the TOC register (r2) because we will return
+ * through StgReturn and the calling convention requires that we load
+ * the TOC pointer from the function descriptor upon a call to StgReturn.
+ * That TOC pointer is the same as the TOC pointer in StgRun.
+ */
 static void GNUC3_ATTRIBUTE(used)
 StgRunIsImplementedInAssembler(void)
 {
-        // r0 volatile
-        // r1 stack pointer
-        // r2 toc - needs to be saved
-        // r3-r10 argument passing, volatile
-        // r11, r12 very volatile (not saved across cross-module calls)
-        // r13 thread local state (never modified, don't need to save)
-        // r14-r31 callee-save
         __asm__ volatile (
                 ".section \".opd\",\"aw\"\n"
                 ".align 3\n"
@@ -743,108 +762,32 @@ StgRunIsImplementedInAssembler(void)
                 ".hidden StgRun\n"
                 "StgRun:\n"
                 "\t.quad\t.StgRun,.TOC.@tocbase,0\n"
-                "\t.size StgRun,24\n"
+                "\t.size StgRun,.-StgRun\n"
                 ".globl StgReturn\n"
                 "StgReturn:\n"
                 "\t.quad\t.StgReturn,.TOC.@tocbase,0\n"
-                "\t.size StgReturn,24\n"
+                "\t.size StgReturn,.-StgReturn\n"
                 ".previous\n"
-                ".globl .StgRun\n"
-                ".type .StgRun,@function\n"
+                ".type StgRun,@function\n"
                 ".StgRun:\n"
                 "\tmflr 0\n"
-                "\tmr 5, 1\n"
-                "\tstd 0, 16(1)\n"
+                "\taddi 12,1,-(8*18)\n"
+                "\tbl _savegpr1_14\n"
+                "\tbl _savefpr_14\n"
                 "\tstdu 1, -%0(1)\n"
-                "\tstd 2, -296(5)\n"
-                "\tstd 14, -288(5)\n"
-                "\tstd 15, -280(5)\n"
-                "\tstd 16, -272(5)\n"
-                "\tstd 17, -264(5)\n"
-                "\tstd 18, -256(5)\n"
-                "\tstd 19, -248(5)\n"
-                "\tstd 20, -240(5)\n"
-                "\tstd 21, -232(5)\n"
-                "\tstd 22, -224(5)\n"
-                "\tstd 23, -216(5)\n"
-                "\tstd 24, -208(5)\n"
-                "\tstd 25, -200(5)\n"
-                "\tstd 26, -192(5)\n"
-                "\tstd 27, -184(5)\n"
-                "\tstd 28, -176(5)\n"
-                "\tstd 29, -168(5)\n"
-                "\tstd 30, -160(5)\n"
-                "\tstd 31, -152(5)\n"
-                "\tstfd 14, -144(5)\n"
-                "\tstfd 15, -136(5)\n"
-                "\tstfd 16, -128(5)\n"
-                "\tstfd 17, -120(5)\n"
-                "\tstfd 18, -112(5)\n"
-                "\tstfd 19, -104(5)\n"
-                "\tstfd 20, -96(5)\n"
-                "\tstfd 21, -88(5)\n"
-                "\tstfd 22, -80(5)\n"
-                "\tstfd 23, -72(5)\n"
-                "\tstfd 24, -64(5)\n"
-                "\tstfd 25, -56(5)\n"
-                "\tstfd 26, -48(5)\n"
-                "\tstfd 27, -40(5)\n"
-                "\tstfd 28, -32(5)\n"
-                "\tstfd 29, -24(5)\n"
-                "\tstfd 30, -16(5)\n"
-                "\tstfd 31, -8(5)\n"
                 "\tmr 27, 4\n"  // BaseReg == r27
-                "\tld 2, 8(3)\n"
                 "\tld 3, 0(3)\n"
+                "\tld 2, 8(3)\n"
                 "\tmtctr 3\n"
                 "\tbctr\n"
-                ".globl .StgReturn\n"
-                ".type .StgReturn,@function\n"
+                ".type StgReturn,@function\n"
                 ".StgReturn:\n"
                 "\tmr 3,14\n"
-                "\tla 5, %0(1)\n" // load address == addi r5, r1, %0
-                "\tld 2, -296(5)\n"
-                "\tld 14, -288(5)\n"
-                "\tld 15, -280(5)\n"
-                "\tld 16, -272(5)\n"
-                "\tld 17, -264(5)\n"
-                "\tld 18, -256(5)\n"
-                "\tld 19, -248(5)\n"
-                "\tld 20, -240(5)\n"
-                "\tld 21, -232(5)\n"
-                "\tld 22, -224(5)\n"
-                "\tld 23, -216(5)\n"
-                "\tld 24, -208(5)\n"
-                "\tld 25, -200(5)\n"
-                "\tld 26, -192(5)\n"
-                "\tld 27, -184(5)\n"
-                "\tld 28, -176(5)\n"
-                "\tld 29, -168(5)\n"
-                "\tld 30, -160(5)\n"
-                "\tld 31, -152(5)\n"
-                "\tlfd 14, -144(5)\n"
-                "\tlfd 15, -136(5)\n"
-                "\tlfd 16, -128(5)\n"
-                "\tlfd 17, -120(5)\n"
-                "\tlfd 18, -112(5)\n"
-                "\tlfd 19, -104(5)\n"
-                "\tlfd 20, -96(5)\n"
-                "\tlfd 21, -88(5)\n"
-                "\tlfd 22, -80(5)\n"
-                "\tlfd 23, -72(5)\n"
-                "\tlfd 24, -64(5)\n"
-                "\tlfd 25, -56(5)\n"
-                "\tlfd 26, -48(5)\n"
-                "\tlfd 27, -40(5)\n"
-                "\tlfd 28, -32(5)\n"
-                "\tlfd 29, -24(5)\n"
-                "\tlfd 30, -16(5)\n"
-                "\tlfd 31, -8(5)\n"
-                "\tmr 1, 5\n"
-                "\tld 0, 16(1)\n"
-                "\tmtlr 0\n"
-                "\tblr\n"
-        : : "i"(RESERVED_C_STACK_BYTES+304 /*stack frame size*/));
+                "\tla 1, %0(1)\n" // load address == addi r1, r1, %0
+                "\taddi 12,1,-(8*18)\n"
+                "\tbl _restgpr1_14\n"
+                "\tb _restfpr_14\n"
+        : : "i"((RESERVED_C_STACK_BYTES+288+15) & ~15 /*stack frame size*/));
 }
 
 #endif

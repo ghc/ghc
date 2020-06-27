@@ -58,7 +58,7 @@ import Data.Bits
 -- If we are using the .subsections_via_symbols directive
 -- (available on recent versions of Darwin),
 -- we have to make sure that there is some kind of reference
--- from the entry code to a label on the _top_ of of the info table,
+-- from the entry code to a label on the _top_ of the info table,
 -- so that the linker will not think it is unreferenced and dead-strip
 -- it. That's why the label is called a DeadStripPreventer (_dsp).
 --

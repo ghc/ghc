@@ -194,7 +194,7 @@ Thread and scheduling events
    :field ThreadId: thread id
    :field CapNo: other capability
 
-   The indicated thread has been been woken up on another capability.
+   The indicated thread has been woken up on another capability.
 
 .. event-type:: THREAD_LABEL
 

@@ -1,7 +1,7 @@
 -----------------------------------------------------------------------------
 -- A Parser monad with access to the 'DynFlags'.
 --
--- The 'P' monad  only has access to the subset of of 'DynFlags'
+-- The 'P' monad only has access to the subset of 'DynFlags'
 -- required for parsing Haskell.
 
 -- The parser for C-- requires access to a lot more of the 'DynFlags',

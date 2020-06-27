@@ -223,7 +223,7 @@ combineMatchResults :: MatchResult CoreExpr -> MatchResult CoreExpr -> MatchResu
 combineMatchResults match_result1@(MR_Infallible _) _
   = match_result1
 combineMatchResults match_result1 match_result2 =
-  -- if the first pattern needs a failure handler (i.e. if it is is fallible),
+  -- if the first pattern needs a failure handler (i.e. if it is fallible),
   -- make it let-bind it bind it with `shareFailureHandler`.
   case shareFailureHandler match_result1 of
     MR_Infallible _ -> match_result1

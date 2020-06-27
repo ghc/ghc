@@ -95,6 +95,7 @@ import GHC.Types.Name( Name, NamedThing(getName) )
 import GHC.Types.Name.Reader ( RdrName )
 import GHC.Core.DataCon( HsSrcBang(..), HsImplBang(..),
                          SrcStrictness(..), SrcUnpackedness(..) )
+import GHC.Core.TyCo.Rep ( Type(..) )
 import GHC.Builtin.Types( manyDataConName, oneDataConName, mkTupleStr )
 import GHC.Core.Type
 import GHC.Hs.Doc
@@ -866,6 +867,8 @@ data HsType pass
 data NewHsTypeX
   = NHsCoreTy Type -- An escape hatch for tunnelling a *closed*
                    -- Core Type through HsSyn.
+                   -- See also Note [Typechecking NHsCoreTys] in
+                   -- GHC.Tc.Gen.HsType.
     deriving Data
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : None
 
@@ -1870,32 +1873,43 @@ ppr_tylit (HsStrTy _ s) = text (show s)
 
 -- | @'hsTypeNeedsParens' p t@ returns 'True' if the type @t@ needs parentheses
 -- under precedence @p@.
-hsTypeNeedsParens :: PprPrec -> HsType pass -> Bool
-hsTypeNeedsParens p = go
+hsTypeNeedsParens :: PprPrec -> HsType (GhcPass p) -> Bool
+hsTypeNeedsParens p = go_hs_ty
   where
-    go (HsForAllTy{})        = p >= funPrec
-    go (HsQualTy{})          = p >= funPrec
-    go (HsBangTy{})          = p > topPrec
-    go (HsRecTy{})           = False
-    go (HsTyVar{})           = False
-    go (HsFunTy{})           = p >= funPrec
-    go (HsTupleTy{})         = False
-    go (HsSumTy{})           = False
-    go (HsKindSig{})         = p >= sigPrec
-    go (HsListTy{})          = False
-    go (HsIParamTy{})        = p > topPrec
-    go (HsSpliceTy{})        = False
-    go (HsExplicitListTy{})  = False
-    go (HsExplicitTupleTy{}) = False
-    go (HsTyLit{})           = False
-    go (HsWildCardTy{})      = False
-    go (HsStarTy{})          = p >= starPrec
-    go (HsAppTy{})           = p >= appPrec
-    go (HsAppKindTy{})       = p >= appPrec
-    go (HsOpTy{})            = p >= opPrec
-    go (HsParTy{})           = False
-    go (HsDocTy _ (L _ t) _) = go t
-    go (XHsType{})           = False
+    go_hs_ty (HsForAllTy{})           = p >= funPrec
+    go_hs_ty (HsQualTy{})             = p >= funPrec
+    go_hs_ty (HsBangTy{})             = p > topPrec
+    go_hs_ty (HsRecTy{})              = False
+    go_hs_ty (HsTyVar{})              = False
+    go_hs_ty (HsFunTy{})              = p >= funPrec
+    go_hs_ty (HsTupleTy{})            = False
+    go_hs_ty (HsSumTy{})              = False
+    go_hs_ty (HsKindSig{})            = p >= sigPrec
+    go_hs_ty (HsListTy{})             = False
+    go_hs_ty (HsIParamTy{})           = p > topPrec
+    go_hs_ty (HsSpliceTy{})           = False
+    go_hs_ty (HsExplicitListTy{})     = False
+    go_hs_ty (HsExplicitTupleTy{})    = False
+    go_hs_ty (HsTyLit{})              = False
+    go_hs_ty (HsWildCardTy{})         = False
+    go_hs_ty (HsStarTy{})             = p >= starPrec
+    go_hs_ty (HsAppTy{})              = p >= appPrec
+    go_hs_ty (HsAppKindTy{})          = p >= appPrec
+    go_hs_ty (HsOpTy{})               = p >= opPrec
+    go_hs_ty (HsParTy{})              = False
+    go_hs_ty (HsDocTy _ (L _ t) _)    = go_hs_ty t
+    go_hs_ty (XHsType (NHsCoreTy ty)) = go_core_ty ty
+
+    go_core_ty (TyVarTy{})    = False
+    go_core_ty (AppTy{})      = p >= appPrec
+    go_core_ty (TyConApp _ args)
+      | null args             = False
+      | otherwise             = p >= appPrec
+    go_core_ty (ForAllTy{})   = p >= funPrec
+    go_core_ty (FunTy{})      = p >= funPrec
+    go_core_ty (LitTy{})      = False
+    go_core_ty (CastTy t _)   = go_core_ty t
+    go_core_ty (CoercionTy{}) = False
 
 maybeAddSpace :: [LHsType pass] -> SDoc -> SDoc
 -- See Note [Printing promoted type constructors]

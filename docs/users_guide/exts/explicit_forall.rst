@@ -32,7 +32,7 @@ in :ref:`data-instance-declarations`, :ref:`type-instance-declarations`,
 
 Notes:
 
-- As well in type signatures, you can also use an explicit ``forall``
+- As well as in type signatures, you can also use an explicit ``forall``
   in an instance declaration: ::
 
       instance forall a. Eq a => Eq [a] where ...

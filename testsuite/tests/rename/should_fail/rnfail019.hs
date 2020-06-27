@@ -1,6 +1,6 @@
 module ShouldFail where
 
--- !!! Section with with a bad precedence
+-- !!! Section with a bad precedence
 
 f x y = (x:y:)
 

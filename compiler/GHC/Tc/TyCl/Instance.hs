@@ -1604,7 +1604,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
                -> TcM (TcId, LHsBind GhcTc, Maybe Implication)
 
     tc_default sel_id (Just (dm_name, _))
-      = do { (meth_bind, inline_prags) <- mkDefMethBind clas inst_tys sel_id dm_name
+      = do { (meth_bind, inline_prags) <- mkDefMethBind dfun_id clas sel_id dm_name
            ; tcMethodBody clas tyvars dfun_ev_vars inst_tys
                           dfun_ev_binds is_derived hs_sig_fn
                           spec_inst_prags inline_prags
@@ -1947,7 +1947,7 @@ mk_meth_spec_prags meth_id spec_inst_prags spec_prags_for_me
          | L inst_loc (SpecPrag _       wrap inl) <- spec_inst_prags]
 
 
-mkDefMethBind :: Class -> [Type] -> Id -> Name
+mkDefMethBind :: DFunId -> Class -> Id -> Name
               -> TcM (LHsBind GhcRn, [LSig GhcRn])
 -- The is a default method (vanailla or generic) defined in the class
 -- So make a binding   op = $dmop @t1 @t2
@@ -1955,7 +1955,7 @@ mkDefMethBind :: Class -> [Type] -> Id -> Name
 -- and t1,t2 are the instance types.
 -- See Note [Default methods in instances] for why we use
 -- visible type application here
-mkDefMethBind clas inst_tys sel_id dm_name
+mkDefMethBind dfun_id clas sel_id dm_name
   = do  { dflags <- getDynFlags
         ; dm_id <- tcLookupId dm_name
         ; let inline_prag = idInlinePragma dm_id
@@ -1980,6 +1980,8 @@ mkDefMethBind clas inst_tys sel_id dm_name
 
        ; return (bind, inline_prags) }
   where
+    (_, _, _, inst_tys) = tcSplitDFunTy (idType dfun_id)
+
     mk_vta :: LHsExpr GhcRn -> Type -> LHsExpr GhcRn
     mk_vta fun ty = noLoc (HsAppType noExtField fun (mkEmptyWildCardBndrs $ nlHsParTy
                                                 $ noLoc $ XHsType $ NHsCoreTy ty))
