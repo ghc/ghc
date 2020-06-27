@@ -14,7 +14,7 @@ staticFlavour = defaultFlavour
 staticExec :: Args
 staticExec = mconcat
     [ builder (Ghc LinkHs) ? pure [ "-optl", "-static" ]
-    [ builder (Ghc CompileCWithGhc) ? pure [ "-optc", "-static" ]
+    , builder (Ghc CompileCWithGhc) ? pure [ "-optc", "-static" ]
     , pure [ "-static" , "-fPIC" ] ]
 
 perfArgs :: Args
