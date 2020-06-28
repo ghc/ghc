@@ -262,6 +262,9 @@ class a ~~ b
 -- can be bogus (deferred type error). By homogeneous, the two
 -- types @a@ and @b@ must have the same kinds.
 class a ~ b
+
+-- | This fixity was chosen because it coincides with the fixity of (:~:)
+infix 4 ~
   -- See also Note [The equality types story] in GHC.Builtin.Types.Prim
 
 -- | @Coercible@ is a two-parameter class that has instances for types @a@ and @b@ if
