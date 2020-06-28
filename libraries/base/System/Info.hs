@@ -43,7 +43,7 @@ compilerVersion = Version [major, minor] []
 --     * "freebsd"
 --     * "linux"
 --     * "linux-android"
---     * "mingw32"
+--     * "mingw32" — Windows
 --     * "netbsd"
 --     * "openbsd"
 os :: String
