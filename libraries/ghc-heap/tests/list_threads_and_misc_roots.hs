@@ -11,7 +11,7 @@ import GHC.Exts
 -- Invent a type to bypass the type constraints of getClosureData.
 -- Infact this will be a Word#, that is directly given to unpackClosure#
 -- (which is a primop that expects a pointer to a closure).
-data FoolStgTSO
+data FoolClosure
 
 foreign import ccall safe "list_threads_and_misc_roots_c.h listThreadsAndMiscRoots"
     listThreadsAndMiscRoots_c :: IO ()
@@ -31,28 +31,42 @@ foreign import ccall safe "list_threads_and_misc_roots_c.h getMiscRoots"
 main :: IO ()
 main = do
     listThreadsAndMiscRoots_c
+
     tsoCount <- getTSOCount_c
-    print tsoCount
     tsos <- getTSOs_c
     tsoList <- peekArray tsoCount tsos
-    tsoClosures <- sequence $ map createClosure tsoList
-    print tsoClosures
-    -- TODO: assert...
+    tsoClosures <- mapM createClosure tsoList
+    assertEqual tsoCount $ length tsoClosures
+    mapM (assertEqual TSO) $ map (tipe . info) tsoClosures
 
     miscRootsCount <- getMiscRootsCount_c
-    print miscRootsCount
     miscRoots <- getMiscRoots_c
     miscRootsList <- peekArray miscRootsCount miscRoots
-    heapClosures <- sequence $ map createClosure miscRootsList
-    print heapClosures
-    -- TODO: assert...
+    heapClosures <- mapM createClosure miscRootsList
+    assertEqual miscRootsCount $ length heapClosures
+    -- Regarding the type system, this always has to be True, but we want to
+    -- force evaluation / de-serialization with a simple check.
+    mapM assertIsClosureType $ map (tipe . info) heapClosures
 
     return ()
 
 createClosure :: Word -> IO (GenClosure Box)
 createClosure tsoPtr = do
     let wPtr = unpackWord# tsoPtr
-    getClosureData ((unsafeCoerce# wPtr) :: FoolStgTSO)
+    getClosureData ((unsafeCoerce# wPtr) :: FoolClosure)
 
 unpackWord# :: Word -> Word#
 unpackWord# (W# w#) = w#
+
+assertEqual :: (Show a, Eq a) => a -> a -> IO ()
+assertEqual a b
+    | a /= b = error (show a ++ " /= " ++ show b)
+    | otherwise = return ()
+
+assertIsClosureType :: ClosureType -> IO ()
+assertIsClosureType t
+    | t `elem` enumerate = return ()
+    | otherwise = error (show t ++ " not in  " ++ show enumerate)
+    where
+        enumerate :: [ClosureType]
+        enumerate = [minBound..maxBound]

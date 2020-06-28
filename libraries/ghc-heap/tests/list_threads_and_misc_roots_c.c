@@ -13,13 +13,13 @@ StgClosure** miscRoots;
 void collectTSOsCallback(void *user, StgTSO* tso){
     tsoCount++;
     tsos = realloc(tsos, sizeof(StgTSO*) * tsoCount);
-    tsos[tsoCount-1] = tso;
+    tsos[tsoCount - 1] = tso;
 }
 
 void collectMiscRootsCallback(void *user, StgClosure* closure){
     miscRootsCount++;
-    miscRoots = realloc(tsos, sizeof(StgTSO*) * miscRootsCount);
-    miscRoots[miscRootsCount-1] = closure;
+    miscRoots = realloc(miscRoots, sizeof(StgClosure*) * miscRootsCount);
+    miscRoots[miscRootsCount - 1] = closure;
 }
 
 void* listThreads_thread(void* unused){
