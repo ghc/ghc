@@ -256,13 +256,20 @@ inside GHC, to change the kind and type.
 -- about the difference between heterogeneous equality @~~@ and
 -- homogeneous equality @~@, this is printed as @~@ unless
 -- @-fprint-equality-relations@ is set.
+--
+-- In @0.7.0@, the fixity was set to @infix 4@ to match the fixity of 'Data.Type.Equality.:~~:'.
 class a ~~ b
+
   -- See also Note [The equality types story] in GHC.Builtin.Types.Prim
 
 -- | Lifted, homogeneous equality. By lifted, we mean that it
 -- can be bogus (deferred type error). By homogeneous, the two
 -- types @a@ and @b@ must have the same kinds.
+
+-- In @0.7.0@, the fixity was set to @infix 4@ to match the fixity of 'Data.Type.Equality.:~:'.
 class a ~ b
+
+infix 4 ~, ~~
   -- See also Note [The equality types story] in GHC.Builtin.Types.Prim
 
 -- | @Coercible@ is a two-parameter class that has instances for types @a@ and @b@ if
