@@ -10,3 +10,4 @@ instance Semigroup b => Semigroup (a -> b) -- Defined in ‘GHC.Base’
 type (~) :: forall k. k -> k -> Constraint
 class (a ~ b) => (~) a b
   	-- Defined in ‘GHC.Types’
+infix 4 ~
