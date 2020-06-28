@@ -27,6 +27,8 @@
     small lists will now compile to a simple case statement more often.
 
   * Add `MonadFix` and `MonadZip` instances for `Complex`
+
+  * Add `Ix` instances for tuples of size 6 through 15
    
 ## 4.14.0.0 *TBA*
   * Bundled with GHC 8.10.1
