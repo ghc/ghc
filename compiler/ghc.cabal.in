@@ -587,6 +587,7 @@ Library
             GHC.CmmToAsm.ARM.Instr
             GHC.CmmToAsm.ARM.Cond
             GHC.CmmToAsm.ARM.Ppr
+            GHC.CmmToAsm.ARM.CodeGen
             GHC.CmmToAsm.PPC.Regs
             GHC.CmmToAsm.PPC.RegInfo
             GHC.CmmToAsm.PPC.Instr
