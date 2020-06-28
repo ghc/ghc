@@ -324,6 +324,8 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4) => Ix (a1,a2,a3,a4)  where
       inRange (l3,u3) i3 && inRange (l4,u4) i4
 
     -- Default method for index
+
+----------------------------------------------------------------------
 -- | @since 2.01
 instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5) => Ix (a1,a2,a3,a4,a5)  where
     range ((l1,l2,l3,l4,l5),(u1,u2,u3,u4,u5)) =
@@ -344,5 +346,430 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5) => Ix (a1,a2,a3,a4,a5)  where
       inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
       inRange (l3,u3) i3 && inRange (l4,u4) i4 &&
       inRange (l5,u5) i5
+
+    -- Default method for index
+
+----------------------------------------------------------------------
+-- | @since 4.15.0.0
+instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6) =>
+      Ix (a1,a2,a3,a4,a5,a6)  where
+    range ((l1,l2,l3,l4,l5,l6),(u1,u2,u3,u4,u5,u6)) =
+      [(i1,i2,i3,i4,i5,i6) | i1 <- range (l1,u1),
+                             i2 <- range (l2,u2),
+                             i3 <- range (l3,u3),
+                             i4 <- range (l4,u4),
+                             i5 <- range (l5,u5),
+                             i6 <- range (l6,u6)]
+
+    unsafeIndex ((l1,l2,l3,l4,l5,l6),(u1,u2,u3,u4,u5,u6)) (i1,i2,i3,i4,i5,i6) =
+      unsafeIndex (l6,u6) i6 + unsafeRangeSize (l6,u6) * (
+      unsafeIndex (l5,u5) i5 + unsafeRangeSize (l5,u5) * (
+      unsafeIndex (l4,u4) i4 + unsafeRangeSize (l4,u4) * (
+      unsafeIndex (l3,u3) i3 + unsafeRangeSize (l3,u3) * (
+      unsafeIndex (l2,u2) i2 + unsafeRangeSize (l2,u2) * (
+      unsafeIndex (l1,u1) i1)))))
+
+    inRange ((l1,l2,l3,l4,l5,l6),(u1,u2,u3,u4,u5,u6)) (i1,i2,i3,i4,i5,i6) =
+      inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
+      inRange (l3,u3) i3 && inRange (l4,u4) i4 &&
+      inRange (l5,u5) i5 && inRange (l6,u6) i6
+
+    -- Default method for index
+
+----------------------------------------------------------------------
+-- | @since 4.15.0.0
+instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7) =>
+      Ix (a1,a2,a3,a4,a5,a6,a7)  where
+    range ((l1,l2,l3,l4,l5,l6,l7),(u1,u2,u3,u4,u5,u6,u7)) =
+      [(i1,i2,i3,i4,i5,i6,i7) | i1 <- range (l1,u1),
+                                i2 <- range (l2,u2),
+                                i3 <- range (l3,u3),
+                                i4 <- range (l4,u4),
+                                i5 <- range (l5,u5),
+                                i6 <- range (l6,u6),
+                                i7 <- range (l7,u7)]
+
+    unsafeIndex ((l1,l2,l3,l4,l5,l6,l7),(u1,u2,u3,u4,u5,u6,u7))
+        (i1,i2,i3,i4,i5,i6,i7) =
+      unsafeIndex (l7,u7) i7 + unsafeRangeSize (l7,u7) * (
+      unsafeIndex (l6,u6) i6 + unsafeRangeSize (l6,u6) * (
+      unsafeIndex (l5,u5) i5 + unsafeRangeSize (l5,u5) * (
+      unsafeIndex (l4,u4) i4 + unsafeRangeSize (l4,u4) * (
+      unsafeIndex (l3,u3) i3 + unsafeRangeSize (l3,u3) * (
+      unsafeIndex (l2,u2) i2 + unsafeRangeSize (l2,u2) * (
+      unsafeIndex (l1,u1) i1))))))
+
+    inRange ((l1,l2,l3,l4,l5,l6,l7),(u1,u2,u3,u4,u5,u6,u7))
+        (i1,i2,i3,i4,i5,i6,i7) =
+      inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
+      inRange (l3,u3) i3 && inRange (l4,u4) i4 &&
+      inRange (l5,u5) i5 && inRange (l6,u6) i6 &&
+      inRange (l7,u7) i7
+
+    -- Default method for index
+
+----------------------------------------------------------------------
+-- | @since 4.15.0.0
+instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8) =>
+      Ix (a1,a2,a3,a4,a5,a6,a7,a8)  where
+    range ((l1,l2,l3,l4,l5,l6,l7,l8),(u1,u2,u3,u4,u5,u6,u7,u8)) =
+      [(i1,i2,i3,i4,i5,i6,i7,i8) | i1 <- range (l1,u1),
+                                   i2 <- range (l2,u2),
+                                   i3 <- range (l3,u3),
+                                   i4 <- range (l4,u4),
+                                   i5 <- range (l5,u5),
+                                   i6 <- range (l6,u6),
+                                   i7 <- range (l7,u7),
+                                   i8 <- range (l8,u8)]
+
+    unsafeIndex ((l1,l2,l3,l4,l5,l6,l7,l8),(u1,u2,u3,u4,u5,u6,u7,u8))
+        (i1,i2,i3,i4,i5,i6,i7,i8) =
+      unsafeIndex (l8,u8) i8 + unsafeRangeSize (l8,u8) * (
+      unsafeIndex (l7,u7) i7 + unsafeRangeSize (l7,u7) * (
+      unsafeIndex (l6,u6) i6 + unsafeRangeSize (l6,u6) * (
+      unsafeIndex (l5,u5) i5 + unsafeRangeSize (l5,u5) * (
+      unsafeIndex (l4,u4) i4 + unsafeRangeSize (l4,u4) * (
+      unsafeIndex (l3,u3) i3 + unsafeRangeSize (l3,u3) * (
+      unsafeIndex (l2,u2) i2 + unsafeRangeSize (l2,u2) * (
+      unsafeIndex (l1,u1) i1)))))))
+
+    inRange ((l1,l2,l3,l4,l5,l6,l7,l8),(u1,u2,u3,u4,u5,u6,u7,u8))
+        (i1,i2,i3,i4,i5,i6,i7,i8) =
+      inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
+      inRange (l3,u3) i3 && inRange (l4,u4) i4 &&
+      inRange (l5,u5) i5 && inRange (l6,u6) i6 &&
+      inRange (l7,u7) i7 && inRange (l8,u8) i8
+
+    -- Default method for index
+
+----------------------------------------------------------------------
+-- | @since 4.15.0.0
+instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9) =>
+      Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9)  where
+    range ((l1,l2,l3,l4,l5,l6,l7,l8,l9),(u1,u2,u3,u4,u5,u6,u7,u8,u9)) =
+      [(i1,i2,i3,i4,i5,i6,i7,i8,i9) | i1 <- range (l1,u1),
+                                      i2 <- range (l2,u2),
+                                      i3 <- range (l3,u3),
+                                      i4 <- range (l4,u4),
+                                      i5 <- range (l5,u5),
+                                      i6 <- range (l6,u6),
+                                      i7 <- range (l7,u7),
+                                      i8 <- range (l8,u8),
+                                      i9 <- range (l9,u9)]
+
+    unsafeIndex ((l1,l2,l3,l4,l5,l6,l7,l8,l9),(u1,u2,u3,u4,u5,u6,u7,u8,u9))
+        (i1,i2,i3,i4,i5,i6,i7,i8,i9) =
+      unsafeIndex (l9,u9) i9 + unsafeRangeSize (l9,u9) * (
+      unsafeIndex (l8,u8) i8 + unsafeRangeSize (l8,u8) * (
+      unsafeIndex (l7,u7) i7 + unsafeRangeSize (l7,u7) * (
+      unsafeIndex (l6,u6) i6 + unsafeRangeSize (l6,u6) * (
+      unsafeIndex (l5,u5) i5 + unsafeRangeSize (l5,u5) * (
+      unsafeIndex (l4,u4) i4 + unsafeRangeSize (l4,u4) * (
+      unsafeIndex (l3,u3) i3 + unsafeRangeSize (l3,u3) * (
+      unsafeIndex (l2,u2) i2 + unsafeRangeSize (l2,u2) * (
+      unsafeIndex (l1,u1) i1))))))))
+
+    inRange ((l1,l2,l3,l4,l5,l6,l7,l8,l9),(u1,u2,u3,u4,u5,u6,u7,u8,u9))
+        (i1,i2,i3,i4,i5,i6,i7,i8,i9) =
+      inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
+      inRange (l3,u3) i3 && inRange (l4,u4) i4 &&
+      inRange (l5,u5) i5 && inRange (l6,u6) i6 &&
+      inRange (l7,u7) i7 && inRange (l8,u8) i8 &&
+      inRange (l9,u9) i9
+
+    -- Default method for index
+
+----------------------------------------------------------------------
+-- | @since 4.15.0.0
+instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
+           Ix aA) =>
+      Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA)  where
+    range ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA),(u1,u2,u3,u4,u5,u6,u7,u8,u9,uA)) =
+      [(i1,i2,i3,i4,i5,i6,i7,i8,i9,iA) | i1 <- range (l1,u1),
+                                         i2 <- range (l2,u2),
+                                         i3 <- range (l3,u3),
+                                         i4 <- range (l4,u4),
+                                         i5 <- range (l5,u5),
+                                         i6 <- range (l6,u6),
+                                         i7 <- range (l7,u7),
+                                         i8 <- range (l8,u8),
+                                         i9 <- range (l9,u9),
+                                         iA <- range (lA,uA)]
+
+    unsafeIndex ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA),
+                 (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA))
+        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA) =
+      unsafeIndex (lA,uA) iA + unsafeRangeSize (lA,uA) * (
+      unsafeIndex (l9,u9) i9 + unsafeRangeSize (l9,u9) * (
+      unsafeIndex (l8,u8) i8 + unsafeRangeSize (l8,u8) * (
+      unsafeIndex (l7,u7) i7 + unsafeRangeSize (l7,u7) * (
+      unsafeIndex (l6,u6) i6 + unsafeRangeSize (l6,u6) * (
+      unsafeIndex (l5,u5) i5 + unsafeRangeSize (l5,u5) * (
+      unsafeIndex (l4,u4) i4 + unsafeRangeSize (l4,u4) * (
+      unsafeIndex (l3,u3) i3 + unsafeRangeSize (l3,u3) * (
+      unsafeIndex (l2,u2) i2 + unsafeRangeSize (l2,u2) * (
+      unsafeIndex (l1,u1) i1)))))))))
+
+    inRange ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA),(u1,u2,u3,u4,u5,u6,u7,u8,u9,uA))
+        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA) =
+      inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
+      inRange (l3,u3) i3 && inRange (l4,u4) i4 &&
+      inRange (l5,u5) i5 && inRange (l6,u6) i6 &&
+      inRange (l7,u7) i7 && inRange (l8,u8) i8 &&
+      inRange (l9,u9) i9 && inRange (lA,uA) iA
+
+    -- Default method for index
+
+----------------------------------------------------------------------
+-- | @since 4.15.0.0
+instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
+           Ix aA, Ix aB) =>
+      Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA,aB)  where
+    range ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB),
+           (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB)) =
+      [(i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB) | i1 <- range (l1,u1),
+                                            i2 <- range (l2,u2),
+                                            i3 <- range (l3,u3),
+                                            i4 <- range (l4,u4),
+                                            i5 <- range (l5,u5),
+                                            i6 <- range (l6,u6),
+                                            i7 <- range (l7,u7),
+                                            i8 <- range (l8,u8),
+                                            i9 <- range (l9,u9),
+                                            iA <- range (lA,uA),
+                                            iB <- range (lB,uB)]
+
+    unsafeIndex ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB),
+                 (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB))
+        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB) =
+      unsafeIndex (lB,uB) iB + unsafeRangeSize (lB,uB) * (
+      unsafeIndex (lA,uA) iA + unsafeRangeSize (lA,uA) * (
+      unsafeIndex (l9,u9) i9 + unsafeRangeSize (l9,u9) * (
+      unsafeIndex (l8,u8) i8 + unsafeRangeSize (l8,u8) * (
+      unsafeIndex (l7,u7) i7 + unsafeRangeSize (l7,u7) * (
+      unsafeIndex (l6,u6) i6 + unsafeRangeSize (l6,u6) * (
+      unsafeIndex (l5,u5) i5 + unsafeRangeSize (l5,u5) * (
+      unsafeIndex (l4,u4) i4 + unsafeRangeSize (l4,u4) * (
+      unsafeIndex (l3,u3) i3 + unsafeRangeSize (l3,u3) * (
+      unsafeIndex (l2,u2) i2 + unsafeRangeSize (l2,u2) * (
+      unsafeIndex (l1,u1) i1))))))))))
+
+    inRange ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB),
+             (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB))
+        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB) =
+      inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
+      inRange (l3,u3) i3 && inRange (l4,u4) i4 &&
+      inRange (l5,u5) i5 && inRange (l6,u6) i6 &&
+      inRange (l7,u7) i7 && inRange (l8,u8) i8 &&
+      inRange (l9,u9) i9 && inRange (lA,uA) iA &&
+      inRange (lB,uB) iB
+
+    -- Default method for index
+
+----------------------------------------------------------------------
+-- | @since 4.15.0.0
+instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
+           Ix aA, Ix aB, Ix aC) =>
+      Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA,aB,aC)  where
+    range ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB,lC),
+           (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB,uC)) =
+      [(i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC) | i1 <- range (l1,u1),
+                                               i2 <- range (l2,u2),
+                                               i3 <- range (l3,u3),
+                                               i4 <- range (l4,u4),
+                                               i5 <- range (l5,u5),
+                                               i6 <- range (l6,u6),
+                                               i7 <- range (l7,u7),
+                                               i8 <- range (l8,u8),
+                                               i9 <- range (l9,u9),
+                                               iA <- range (lA,uA),
+                                               iB <- range (lB,uB),
+                                               iC <- range (lC,uC)]
+
+    unsafeIndex ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB,lC),
+                 (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB,uC))
+        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC) =
+      unsafeIndex (lC,uC) iC + unsafeRangeSize (lC,uC) * (
+      unsafeIndex (lB,uB) iB + unsafeRangeSize (lB,uB) * (
+      unsafeIndex (lA,uA) iA + unsafeRangeSize (lA,uA) * (
+      unsafeIndex (l9,u9) i9 + unsafeRangeSize (l9,u9) * (
+      unsafeIndex (l8,u8) i8 + unsafeRangeSize (l8,u8) * (
+      unsafeIndex (l7,u7) i7 + unsafeRangeSize (l7,u7) * (
+      unsafeIndex (l6,u6) i6 + unsafeRangeSize (l6,u6) * (
+      unsafeIndex (l5,u5) i5 + unsafeRangeSize (l5,u5) * (
+      unsafeIndex (l4,u4) i4 + unsafeRangeSize (l4,u4) * (
+      unsafeIndex (l3,u3) i3 + unsafeRangeSize (l3,u3) * (
+      unsafeIndex (l2,u2) i2 + unsafeRangeSize (l2,u2) * (
+      unsafeIndex (l1,u1) i1)))))))))))
+
+    inRange ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB,lC),
+             (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB,uC))
+        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC) =
+      inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
+      inRange (l3,u3) i3 && inRange (l4,u4) i4 &&
+      inRange (l5,u5) i5 && inRange (l6,u6) i6 &&
+      inRange (l7,u7) i7 && inRange (l8,u8) i8 &&
+      inRange (l9,u9) i9 && inRange (lA,uA) iA &&
+      inRange (lB,uB) iB && inRange (lC,uC) iC
+
+    -- Default method for index
+
+----------------------------------------------------------------------
+-- | @since 4.15.0.0
+instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
+           Ix aA, Ix aB, Ix aC, Ix aD) =>
+      Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA,aB,aC,aD)  where
+    range ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB,lC,lD),
+           (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB,uC,uD)) =
+      [(i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC,iD) | i1 <- range (l1,u1),
+                                                  i2 <- range (l2,u2),
+                                                  i3 <- range (l3,u3),
+                                                  i4 <- range (l4,u4),
+                                                  i5 <- range (l5,u5),
+                                                  i6 <- range (l6,u6),
+                                                  i7 <- range (l7,u7),
+                                                  i8 <- range (l8,u8),
+                                                  i9 <- range (l9,u9),
+                                                  iA <- range (lA,uA),
+                                                  iB <- range (lB,uB),
+                                                  iC <- range (lC,uC),
+                                                  iD <- range (lD,uD)]
+
+    unsafeIndex ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB,lC,lD),
+                 (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB,uC,uD))
+        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC,iD) =
+      unsafeIndex (lD,uD) iD + unsafeRangeSize (lD,uD) * (
+      unsafeIndex (lC,uC) iC + unsafeRangeSize (lC,uC) * (
+      unsafeIndex (lB,uB) iB + unsafeRangeSize (lB,uB) * (
+      unsafeIndex (lA,uA) iA + unsafeRangeSize (lA,uA) * (
+      unsafeIndex (l9,u9) i9 + unsafeRangeSize (l9,u9) * (
+      unsafeIndex (l8,u8) i8 + unsafeRangeSize (l8,u8) * (
+      unsafeIndex (l7,u7) i7 + unsafeRangeSize (l7,u7) * (
+      unsafeIndex (l6,u6) i6 + unsafeRangeSize (l6,u6) * (
+      unsafeIndex (l5,u5) i5 + unsafeRangeSize (l5,u5) * (
+      unsafeIndex (l4,u4) i4 + unsafeRangeSize (l4,u4) * (
+      unsafeIndex (l3,u3) i3 + unsafeRangeSize (l3,u3) * (
+      unsafeIndex (l2,u2) i2 + unsafeRangeSize (l2,u2) * (
+      unsafeIndex (l1,u1) i1))))))))))))
+
+    inRange ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB,lC,lD),
+             (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB,uC,uD))
+        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC,iD) =
+      inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
+      inRange (l3,u3) i3 && inRange (l4,u4) i4 &&
+      inRange (l5,u5) i5 && inRange (l6,u6) i6 &&
+      inRange (l7,u7) i7 && inRange (l8,u8) i8 &&
+      inRange (l9,u9) i9 && inRange (lA,uA) iA &&
+      inRange (lB,uB) iB && inRange (lC,uC) iC &&
+      inRange (lD,uD) iD
+
+    -- Default method for index
+
+----------------------------------------------------------------------
+-- | @since 4.15.0.0
+instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
+           Ix aA, Ix aB, Ix aC, Ix aD, Ix aE) =>
+      Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA,aB,aC,aD,aE)  where
+    range ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB,lC,lD,lE),
+           (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB,uC,uD,uE)) =
+      [(i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC,iD,iE) | i1 <- range (l1,u1),
+                                                     i2 <- range (l2,u2),
+                                                     i3 <- range (l3,u3),
+                                                     i4 <- range (l4,u4),
+                                                     i5 <- range (l5,u5),
+                                                     i6 <- range (l6,u6),
+                                                     i7 <- range (l7,u7),
+                                                     i8 <- range (l8,u8),
+                                                     i9 <- range (l9,u9),
+                                                     iA <- range (lA,uA),
+                                                     iB <- range (lB,uB),
+                                                     iC <- range (lC,uC),
+                                                     iD <- range (lD,uD),
+                                                     iE <- range (lE,uE)]
+
+    unsafeIndex ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB,lC,lD,lE),
+                 (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB,uC,uD,uE))
+        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC,iD,iE) =
+      unsafeIndex (lE,uE) iE + unsafeRangeSize (lE,uE) * (
+      unsafeIndex (lD,uD) iD + unsafeRangeSize (lD,uD) * (
+      unsafeIndex (lC,uC) iC + unsafeRangeSize (lC,uC) * (
+      unsafeIndex (lB,uB) iB + unsafeRangeSize (lB,uB) * (
+      unsafeIndex (lA,uA) iA + unsafeRangeSize (lA,uA) * (
+      unsafeIndex (l9,u9) i9 + unsafeRangeSize (l9,u9) * (
+      unsafeIndex (l8,u8) i8 + unsafeRangeSize (l8,u8) * (
+      unsafeIndex (l7,u7) i7 + unsafeRangeSize (l7,u7) * (
+      unsafeIndex (l6,u6) i6 + unsafeRangeSize (l6,u6) * (
+      unsafeIndex (l5,u5) i5 + unsafeRangeSize (l5,u5) * (
+      unsafeIndex (l4,u4) i4 + unsafeRangeSize (l4,u4) * (
+      unsafeIndex (l3,u3) i3 + unsafeRangeSize (l3,u3) * (
+      unsafeIndex (l2,u2) i2 + unsafeRangeSize (l2,u2) * (
+      unsafeIndex (l1,u1) i1)))))))))))))
+
+    inRange ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB,lC,lD,lE),
+             (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB,uC,uD,uE))
+        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC,iD,iE) =
+      inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
+      inRange (l3,u3) i3 && inRange (l4,u4) i4 &&
+      inRange (l5,u5) i5 && inRange (l6,u6) i6 &&
+      inRange (l7,u7) i7 && inRange (l8,u8) i8 &&
+      inRange (l9,u9) i9 && inRange (lA,uA) iA &&
+      inRange (lB,uB) iB && inRange (lC,uC) iC &&
+      inRange (lD,uD) iD && inRange (lE,uE) iE
+
+    -- Default method for index
+
+----------------------------------------------------------------------
+-- | @since 4.15.0.0
+instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5, Ix a6, Ix a7, Ix a8, Ix a9,
+           Ix aA, Ix aB, Ix aC, Ix aD, Ix aE, Ix aF) =>
+      Ix (a1,a2,a3,a4,a5,a6,a7,a8,a9,aA,aB,aC,aD,aE,aF)  where
+    range ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB,lC,lD,lE,lF),
+           (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB,uC,uD,uE,uF)) =
+      [(i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC,iD,iE,iF) | i1 <- range (l1,u1),
+                                                        i2 <- range (l2,u2),
+                                                        i3 <- range (l3,u3),
+                                                        i4 <- range (l4,u4),
+                                                        i5 <- range (l5,u5),
+                                                        i6 <- range (l6,u6),
+                                                        i7 <- range (l7,u7),
+                                                        i8 <- range (l8,u8),
+                                                        i9 <- range (l9,u9),
+                                                        iA <- range (lA,uA),
+                                                        iB <- range (lB,uB),
+                                                        iC <- range (lC,uC),
+                                                        iD <- range (lD,uD),
+                                                        iE <- range (lE,uE),
+                                                        iF <- range (lF,uF)]
+
+    unsafeIndex ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB,lC,lD,lE,lF),
+                 (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB,uC,uD,uE,uF))
+        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC,iD,iE,iF) =
+      unsafeIndex (lF,uF) iF + unsafeRangeSize (lF,uF) * (
+      unsafeIndex (lE,uE) iE + unsafeRangeSize (lE,uE) * (
+      unsafeIndex (lD,uD) iD + unsafeRangeSize (lD,uD) * (
+      unsafeIndex (lC,uC) iC + unsafeRangeSize (lC,uC) * (
+      unsafeIndex (lB,uB) iB + unsafeRangeSize (lB,uB) * (
+      unsafeIndex (lA,uA) iA + unsafeRangeSize (lA,uA) * (
+      unsafeIndex (l9,u9) i9 + unsafeRangeSize (l9,u9) * (
+      unsafeIndex (l8,u8) i8 + unsafeRangeSize (l8,u8) * (
+      unsafeIndex (l7,u7) i7 + unsafeRangeSize (l7,u7) * (
+      unsafeIndex (l6,u6) i6 + unsafeRangeSize (l6,u6) * (
+      unsafeIndex (l5,u5) i5 + unsafeRangeSize (l5,u5) * (
+      unsafeIndex (l4,u4) i4 + unsafeRangeSize (l4,u4) * (
+      unsafeIndex (l3,u3) i3 + unsafeRangeSize (l3,u3) * (
+      unsafeIndex (l2,u2) i2 + unsafeRangeSize (l2,u2) * (
+      unsafeIndex (l1,u1) i1))))))))))))))
+
+    inRange ((l1,l2,l3,l4,l5,l6,l7,l8,l9,lA,lB,lC,lD,lE,lF),
+             (u1,u2,u3,u4,u5,u6,u7,u8,u9,uA,uB,uC,uD,uE,uF))
+        (i1,i2,i3,i4,i5,i6,i7,i8,i9,iA,iB,iC,iD,iE,iF) =
+      inRange (l1,u1) i1 && inRange (l2,u2) i2 &&
+      inRange (l3,u3) i3 && inRange (l4,u4) i4 &&
+      inRange (l5,u5) i5 && inRange (l6,u6) i6 &&
+      inRange (l7,u7) i7 && inRange (l8,u8) i8 &&
+      inRange (l9,u9) i9 && inRange (lA,uA) iA &&
+      inRange (lB,uB) iB && inRange (lC,uC) iC &&
+      inRange (lD,uD) iD && inRange (lE,uE) iE &&
+      inRange (lF,uF) iF
 
     -- Default method for index
