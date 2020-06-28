@@ -504,6 +504,9 @@ RtsPaused rts_pause (void);
 // (i.e. myTask() must stay the same).
 void rts_unpause (RtsPaused paused);
 
+// Tells the current state of the RTS regarding rts_pause() and rts_unpause().
+bool rts_isPaused(void);
+
 // List all live threads. Must be done while RTS is paused (see rts_pause()).
 typedef void (*ListThreadsCb)(void *user, StgTSO *);
 void rts_listThreads(ListThreadsCb cb, void *user);

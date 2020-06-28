@@ -12,6 +12,11 @@ struct PauseTimestamps timestamps = {0, 0};
 void* pauseAndUnpause_thread(void* unused){
     RtsPaused r_paused = rts_pause();
 
+    if(!rts_isPaused()) {
+        errorBelch("Expected the RTS to be paused.");
+        exit(1);
+    }
+
     timestamps.begin = time(NULL);
     sleep(5);
     timestamps.end = time(NULL);
