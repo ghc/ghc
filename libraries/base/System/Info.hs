@@ -11,7 +11,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- Information about the characteristics of the host 
+-- Information about the characteristics of the host
 -- system lucky enough to run your program.
 --
 -- For a comprehensive listing of supported platforms, please refer to
@@ -30,6 +30,9 @@ import Data.Version
 
 -- | The version of 'compilerName' with which the program was compiled
 -- or is being interpreted.
+-- ==== __Example__
+-- > compilerVersion
+-- Version {versionBranch = [8,8], versionTags = []}
 compilerVersion :: Version
 compilerVersion = Version [major, minor] []
   where (major, minor) = compilerVersionRaw `divMod` 100
@@ -37,7 +40,7 @@ compilerVersion = Version [major, minor] []
 #include "ghcplatform.h"
 
 -- | The operating system on which the program is running.
--- You may encounter the following values: 
+-- You may encounter the following values:
 --
 --     * "darwin"
 --     * "freebsd"
@@ -50,7 +53,7 @@ os :: String
 os = HOST_OS
 
 -- | The machine architecture on which the program is running.
--- You may encounter the following values: 
+-- You may encounter the following values:
 --
 --    * "aarch64"
 --    * "alpha"
