@@ -42,7 +42,7 @@ compilerVersion = Version [major, minor] []
 -- | The operating system on which the program is running.
 -- You may encounter the following values:
 --
---     * "darwin"
+--     * "darwin" — (macOS)
 --     * "freebsd"
 --     * "linux"
 --     * "linux-android"
