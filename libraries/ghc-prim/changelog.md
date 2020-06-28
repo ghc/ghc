@@ -24,6 +24,10 @@
         interlockedExchangeAddr# :: Addr# -> Addr# -> State# s -> (# State# s, Addr# #)
         interlockedExchangeInt# :: Addr# -> Int# -> State# s -> (# State# s, Int# #)
 
+- Add an explicit fixity for `(~)` and `(~~)`: 
+
+        infix 4 ~, ~~
+
 ## 0.6.1 (edit as necessary)
 
 - Shipped with GHC 8.10.1
