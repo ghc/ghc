@@ -30,9 +30,10 @@ import Data.Version
 
 -- | The version of 'compilerName' with which the program was compiled
 -- or is being interpreted.
+-- 
 -- ==== __Example__
 -- > compilerVersion
--- Version {versionBranch = [8,8], versionTags = []}
+-- > Version {versionBranch = [8,8], versionTags = []}
 compilerVersion :: Version
 compilerVersion = Version [major, minor] []
   where (major, minor) = compilerVersionRaw `divMod` 100
@@ -42,7 +43,7 @@ compilerVersion = Version [major, minor] []
 -- | The operating system on which the program is running.
 -- You may encounter the following values:
 --
---     * "darwin"
+--     * "darwin" — (macOS)
 --     * "freebsd"
 --     * "linux"
 --     * "linux-android"
