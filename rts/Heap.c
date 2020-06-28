@@ -247,6 +247,13 @@ static StgWord collect_pointers(StgClosure *closure, StgWord size, StgClosure *p
 }
 
 StgArrBytes *heap_view_closurePtrsAsWords(Capability *cap, StgClosure *closure) {
+    if(!rts_isPaused()){
+        errorBelch("Warning: "
+            "The RTS must be paused (see rts_pause()) to inspect it's heap!");
+
+        return NULL;
+    }
+
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(closure));
 
     StgWord size = heap_view_closureSize(closure);

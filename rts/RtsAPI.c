@@ -672,6 +672,12 @@ void rts_unpause (RtsPaused paused)
     freeTask(paused.pausing_task);
 }
 
+// Tells the current state of the RTS regarding rts_pause() and rts_unpause().
+bool rts_isPaused(void)
+{
+    return rts_paused;
+}
+
 // Call cb for all StgTSOs. *user is a user defined payload to cb. It's not
 // used by the RTS.
 // rts_listThreads should only be called when the RTS is paused, i.e. rts_pause
@@ -730,6 +736,13 @@ void rts_unpause (RtsPaused paused STG_UNUSED)
 {
     errorBelch("Warning: Unpausing the RTS is only possible for "
                "multithreaded RTS.");
+}
+
+bool rts_isPaused(void)
+{
+    errorBelch("Warning: (Un-) Pausing the RTS is only possible for "
+               "multithreaded RTS.");
+    return false;
 }
 
 
