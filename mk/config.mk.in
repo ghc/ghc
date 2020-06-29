@@ -182,10 +182,6 @@ GhcUnregisterised=@Unregisterised@
 ArchSupportsNCG=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 powerpc powerpc64 powerpc64le sparc)))
 OsSupportsNCG=$(strip $(patsubst $(TargetOS_CPP), YES, $(patsubst ios,,$(TargetOS_CPP))))
 
-GhcWithNativeCodeGen := $(strip\
-    $(if $(filter YESYESNO,\
-		  $(OsSupportsNCG)$(ArchSupportsNCG)$(GhcUnregisterised)),YES,NO))
-
 # ArchSupportsSMP should be set iff there is support for that arch in
 # includes/stg/SMP.h
 ifeq "$(TargetArch_CPP)" "arm"

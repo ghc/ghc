@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 -- Note [Settings file]
 -- ~~~~~~~~~~~~~~~~~~~~
 --
