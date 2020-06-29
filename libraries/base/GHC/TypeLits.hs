@@ -49,6 +49,7 @@ module GHC.TypeLits
   , type N.Div, type N.Mod, type N.Log2
   , AppendSymbol
   , N.CmpNat, CmpSymbol, CmpChar
+  , GeneralCharCategory
   , IsControl, IsSpace, IsLower
   , IsUpper, IsAlpha, IsAlphaNum
   , IsPrint, IsDigit, IsOctDigit
@@ -66,7 +67,7 @@ module GHC.TypeLits
   ) where
 
 import GHC.Base(Eq(..), Ord(..), Ordering(..), otherwise)
-import GHC.Types(Bool, Nat, Symbol, Char)
+import GHC.Types(Bool(..), Nat, Symbol, Char)
 import GHC.Num(Integer, fromInteger)
 import GHC.Base(String)
 import GHC.Show(Show(..))
@@ -78,6 +79,7 @@ import Data.Proxy (Proxy(..))
 import Data.Type.Equality((:~:)(Refl))
 import Unsafe.Coerce(unsafeCoerce)
 
+import Data.Char (GeneralCategory (..))
 import GHC.TypeNats (KnownNat)
 import qualified GHC.TypeNats as N
 
@@ -240,53 +242,120 @@ type family TypeError (a :: ErrorMessage) :: b where
 
 
 -- @Char-related type families
+
+-- | Comparison of type level characters, as a type family.
 type family CmpChar (a :: Char) (b :: Char) :: Ordering
 
+-- | Extending a type-level symbol with a type-level character
 type family ConsSymbol (a :: Char) (b :: Symbol) :: Symbol
 
+-- | This type family yields type-level `Just` storing the first character
+-- of a symbol and its tail if it is defined and `Nothing` otherwise.
 type family UnconsSymbol (a :: Symbol) :: Maybe (Char, Symbol)
 
-type family IsControl (a :: Char) :: Bool
-
-type family IsSpace (a :: Char) :: Bool
-
-type family IsLower (a :: Char) :: Bool
-
-type family IsUpper (a :: Char) :: Bool
-
-type family IsAlpha (a :: Char) :: Bool
-
-type family IsAlphaNum (a :: Char) :: Bool
-
-type family IsPrint (a :: Char) :: Bool
-
-type family IsDigit (a :: Char) :: Bool
-
-type family IsOctDigit (a :: Char) :: Bool
-
-type family IsHexDigit (a :: Char) :: Bool
-
-type family IsLetter (a :: Char) :: Bool
-
-type family IsMark (a :: Char) :: Bool
-
-type family IsNumber (a :: Char) :: Bool
-
-type family IsPunctuation (a :: Char) :: Bool
-
-type family IsSymbol (a :: Char) :: Bool
-
-type family IsSeparator (a :: Char) :: Bool
-
+-- | A type-level analogue of the function `toUpper` from 'Data.Char'.
 type family ToUpper (a :: Char) :: Char
 
+-- | A type-level analogue of the function `toLower` from 'Data.Char'.
 type family ToLower (a :: Char) :: Char
 
+-- | A type-level analogue of the function `toTitle` from 'Data.Char'.
 type family ToTitle (a :: Char) :: Char
 
+-- | These type families are type-level analogues of the functions `ord` and `chr` respectively.
 type family CharToNat (a :: Char) :: Nat
 
 type family NatToChar (a :: Nat) :: Char
+
+-- | A type-level analogue of the function `generalCategory` from
+type family GeneralCharCategory (a :: Char) :: GeneralCategory
+
+-- @Char-related built-in unary predicates
+
+-- | A type-level analogue of the `isAlpha` function from 'Data.Char'.
+type family IsAlpha (a :: Char) :: Bool
+
+-- | A type-level analogue of the `isAlphaNum` function from 'Data.Char'.
+type family IsAlphaNum (a :: Char) :: Bool
+
+-- | A type-level analogue of the `isControl` function from 'Data.Char'.
+type family IsControl (a :: Char) :: Bool
+
+-- | A type-level analogue of the `isPrint` function from 'Data.Char'.
+type family IsPrint (a :: Char) :: Bool
+
+-- | A type-level analogue of the `isUpper` function from 'Data.Char'.
+type family IsUpper (a :: Char) :: Bool
+
+-- | A type-level analogue of the `isUpper` function from 'Data.Char'.
+type family IsLower (a :: Char) :: Bool
+
+-- | A type-level analogue of the `isSpace` function from 'Data.Char'.
+type family IsSpace (a :: Char) :: Bool
+
+-- | A type-level analogue of the `isDigit` function from 'Data.Char'.
+type family IsDigit (a :: Char) :: Bool
+
+-- | A type-level analogue of the `isOctDigit` function from 'Data.Char'.
+type family IsOctDigit (a :: Char) :: Bool
+
+-- | A type-level analogue of the `isHexDigit` function from 'Data.Char'.
+type family IsHexDigit (a :: Char) :: Bool
+
+-- | A type-level analogue of the `isLetter` function from 'Data.Char'.
+type family IsLetter (a :: Char) :: Bool
+
+-- @Derived `Char`-related type families.
+
+-- | A type-level analogue of the `isMark` function from 'Data.Char'.
+type IsMark a = IsMarkCategory (GeneralCharCategory a)
+
+type family IsMarkCategory (c :: GeneralCategory) :: Bool where
+  IsMarkCategory 'NonSpacingMark       = 'True
+  IsMarkCategory 'SpacingCombiningMark = 'True
+  IsMarkCategory 'EnclosingMark        = 'True
+  IsMarkCategory _                     = 'False
+
+-- | A type-level analogue of the `isNumber` function from 'Data.Char'.
+type IsNumber a = IsNumberCategory (GeneralCharCategory a)
+
+type family IsNumberCategory c where
+  IsNumberCategory 'DecimalNumber = 'True
+  IsNumberCategory 'LetterNumber  = 'True
+  IsNumberCategory 'OtherNumber   = 'True
+  IsNumberCategory _              = 'False
+
+-- | A type-level analogue of the `isPunctuation` function from 'Data.Char'.
+type IsPunctuation a = IsPunctuationCategory (GeneralCharCategory a)
+
+type family IsPunctuationCategory c where
+  IsPunctuationCategory 'ConnectorPunctuation = 'True
+  IsPunctuationCategory 'DashPunctuation      = 'True
+  IsPunctuationCategory 'OpenPunctuation      = 'True
+  IsPunctuationCategory 'ClosePunctuation     = 'True
+  IsPunctuationCategory 'InitialQuote         = 'True
+  IsPunctuationCategory 'FinalQuote           = 'True
+  IsPunctuationCategory 'OtherPunctuation     = 'True
+  IsPunctuationCategory _                     = 'False
+
+-- | A type-level analogue of the `isSymbol` function from 'Data.Char'.
+type IsSymbol a = IsSymbolCategory (GeneralCharCategory a)
+
+type family IsSymbolCategory c where
+  IsSymbolCategory 'MathSymbol     = 'True
+  IsSymbolCategory 'CurrencySymbol = 'True
+  IsSymbolCategory 'ModifierSymbol = 'True
+  IsSymbolCategory 'OtherSymbol    = 'True
+  IsSymbolCategory _               = 'False
+
+-- | A type-level analogue of the `isSeparator` function from 'Data.Char'.
+type IsSeparator a = IsSeparatorCategory (GeneralCharCategory a)
+
+type family IsSeparatorCategory c where
+  IsSeparatorCategory 'Space              = 'True
+  IsSeparatorCategory 'LineSeparator      = 'True
+  IsSeparatorCategory 'ParagraphSeparator = 'True
+  IsSeparatorCategory _                   = 'False
 
 --------------------------------------------------------------------------------
 
