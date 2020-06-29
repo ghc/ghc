@@ -53,6 +53,7 @@ import GHC.Utils.Outputable
 import GHC.Unit.Module
 import GHC.Utils.Error
 import GHC.Driver.Session
+import GHC.Driver.Backend
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Data.StringBuffer ( hGetStringBuffer, hPutStringBuffer )
@@ -183,25 +184,25 @@ compileOne' m_tc_result mHscMessage
    -- hscIncrementalCompile)
    let hsc_env' = hsc_env{ hsc_dflags = plugin_dflags }
 
-   case (status, hsc_lang) of
+   case (status, bcknd) of
         (HscUpToDate iface hmi_details, _) ->
             -- TODO recomp014 triggers this assert. What's going on?!
             -- ASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
             return $! HomeModInfo iface hmi_details mb_old_linkable
-        (HscNotGeneratingCode iface hmi_details, HscNothing) ->
+        (HscNotGeneratingCode iface hmi_details, NoBackend) ->
             let mb_linkable = if isHsBootOrSig src_flavour
                                 then Nothing
                                 -- TODO: Questionable.
                                 else Just (LM (ms_hs_date summary) this_mod [])
             in return $! HomeModInfo iface hmi_details mb_linkable
         (HscNotGeneratingCode _ _, _) -> panic "compileOne HscNotGeneratingCode"
-        (_, HscNothing) -> panic "compileOne HscNothing"
-        (HscUpdateBoot iface hmi_details, HscInterpreted) -> do
+        (_, NoBackend) -> panic "compileOne NoBackend"
+        (HscUpdateBoot iface hmi_details, Interpreter) -> do
             return $! HomeModInfo iface hmi_details Nothing
         (HscUpdateBoot iface hmi_details, _) -> do
             touchObjectFile dflags object_filename
             return $! HomeModInfo iface hmi_details Nothing
-        (HscUpdateSig iface hmi_details, HscInterpreted) -> do
+        (HscUpdateSig iface hmi_details, Interpreter) -> do
             let !linkable = LM (ms_hs_date summary) this_mod []
             return $! HomeModInfo iface hmi_details (Just linkable)
         (HscUpdateSig iface hmi_details, _) -> do
@@ -229,7 +230,7 @@ compileOne' m_tc_result mHscMessage
                      hscs_mod_details = hmi_details,
                      hscs_partial_iface = partial_iface,
                      hscs_old_iface_hash = mb_old_iface_hash,
-                     hscs_iface_dflags = iface_dflags }, HscInterpreted) -> do
+                     hscs_iface_dflags = iface_dflags }, Interpreter) -> do
             -- In interpreted mode the regular codeGen backend is not run so we
             -- generate a interface without codeGen info.
             final_iface <- mkFullIface hsc_env'{hsc_dflags=iface_dflags} partial_iface Nothing
@@ -285,7 +286,7 @@ compileOne' m_tc_result mHscMessage
 
        src_flavour = ms_hsc_src summary
        mod_name = ms_mod_name summary
-       next_phase = hscPostBackendPhase src_flavour hsc_lang
+       next_phase = hscPostBackendPhase src_flavour bcknd
        object_filename = ml_obj_file location
 
        -- #8180 - when using TemplateHaskell, switch on -dynamic-too so
@@ -320,8 +321,8 @@ compileOne' m_tc_result mHscMessage
                   -- to re-summarize all the source files.
        hsc_env     = hsc_env0 {hsc_dflags = dflags}
 
-       -- Figure out what lang we're generating
-       hsc_lang = hscTarget dflags
+       -- Figure out which backend we're using
+       bcknd = backend dflags
 
        -- -fforce-recomp should also work with --make
        force_recomp = gopt Opt_ForceRecomp dflags
@@ -329,8 +330,8 @@ compileOne' m_tc_result mHscMessage
          | force_recomp = SourceModified
          | otherwise = source_modified0
 
-       always_do_basic_recompilation_check = case hsc_lang of
-                                             HscInterpreted -> True
+       always_do_basic_recompilation_check = case bcknd of
+                                             Interpreter -> True
                                              _ -> False
 
 -----------------------------------------------------------------------------
@@ -562,7 +563,7 @@ compileFile hsc_env stop_phase (src, mb_phase) = do
          -- If we are doing -fno-code, then act as if the output is
          -- 'Temporary'. This stops GHC trying to copy files to their
          -- final location.
-         | HscNothing <- hscTarget dflags = Temporary TFL_CurrentModule
+         | NoBackend <- backend dflags = Temporary TFL_CurrentModule
          | StopLn <- stop_phase, not (isNoLink ghc_link) = Persistent
                 -- -o foo applies to linker
          | isJust mb_o_file = SpecificFile
@@ -1144,8 +1145,7 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
         setModLocation location
 
         let o_file = ml_obj_file location -- The real object file
-            hsc_lang = hscTarget dflags
-            next_phase = hscPostBackendPhase src_flavour hsc_lang
+            next_phase = hscPostBackendPhase src_flavour (backend dflags)
 
         case result of
             HscNotGeneratingCode _ _ ->
@@ -1209,8 +1209,7 @@ runPhase (RealPhase CmmCpp) input_fn dflags
        return (RealPhase Cmm, output_fn)
 
 runPhase (RealPhase Cmm) input_fn dflags
-  = do let hsc_lang = hscTarget dflags
-       let next_phase = hscPostBackendPhase HsSrcFile hsc_lang
+  = do let next_phase = hscPostBackendPhase HsSrcFile (backend dflags)
        output_fn <- phaseOutputFilename next_phase
        PipeState{hsc_env} <- getPipeState
        liftIO $ hscCompileCmmFile hsc_env input_fn output_fn
@@ -1355,7 +1354,7 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
   = do
         -- LLVM from version 3.0 onwards doesn't support the OS X system
         -- assembler, so we use clang as the assembler instead. (#5636)
-        let as_prog | hscTarget dflags == HscLlvm &&
+        let as_prog | backend dflags == LLVM &&
                       platformOS (targetPlatform dflags) == OSDarwin
                     = GHC.SysTools.runClang
                     | otherwise = GHC.SysTools.runAs
@@ -2060,7 +2059,7 @@ doCpp dflags raw input_fn output_fn = do
                        ])
 
 getBackendDefs :: DynFlags -> IO [String]
-getBackendDefs dflags | hscTarget dflags == HscLlvm = do
+getBackendDefs dflags | backend dflags == LLVM = do
     llvmVer <- figureLlvmVersion dflags
     return $ case fmap llvmVersionList llvmVer of
                Just [m] -> [ "-D__GLASGOW_HASKELL_LLVM__=" ++ format (m,0) ]
@@ -2199,7 +2198,7 @@ joinObjectFiles dflags o_files output_fn = do
 writeInterfaceOnlyMode :: DynFlags -> Bool
 writeInterfaceOnlyMode dflags =
  gopt Opt_WriteInterface dflags &&
- HscNothing == hscTarget dflags
+ NoBackend == backend dflags
 
 -- | Figure out if a source file was modified after an output file (or if we
 -- anyways need to consider the source file modified since the output is gone).
@@ -2214,16 +2213,16 @@ sourceModified dest_file src_timestamp = do
              return (t2 <= src_timestamp)
 
 -- | What phase to run after one of the backend code generators has run
-hscPostBackendPhase :: HscSource -> HscTarget -> Phase
+hscPostBackendPhase :: HscSource -> Backend -> Phase
 hscPostBackendPhase HsBootFile _    =  StopLn
 hscPostBackendPhase HsigFile _      =  StopLn
-hscPostBackendPhase _ hsc_lang =
-  case hsc_lang of
-        HscC           -> HCc
-        HscAsm         -> As False
-        HscLlvm        -> LlvmOpt
-        HscNothing     -> StopLn
-        HscInterpreted -> StopLn
+hscPostBackendPhase _ bcknd =
+  case bcknd of
+        ViaC        -> HCc
+        NCG         -> As False
+        LLVM        -> LlvmOpt
+        NoBackend   -> StopLn
+        Interpreter -> StopLn
 
 touchObjectFile :: DynFlags -> FilePath -> IO ()
 touchObjectFile dflags path = do
