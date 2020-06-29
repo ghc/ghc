@@ -41,7 +41,7 @@ compilerVersion = Version [major, minor] []
 #include "ghcplatform.h"
 
 -- | The operating system on which the program is running.
--- You may encounter the following values:
+-- Common values include:
 --
 --     * "darwin" — macOS
 --     * "freebsd"
