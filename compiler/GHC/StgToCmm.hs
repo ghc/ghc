@@ -37,6 +37,7 @@ import GHC.Driver.Session
 import GHC.Utils.Error
 
 import GHC.Driver.Types
+import GHC.Driver.Backend
 import GHC.Types.CostCentre
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -165,7 +166,7 @@ cgTopBinding dflags (StgTopStringLit id str) = do
   -- emit either a CmmString literal or dump the string in a file and emit a
   -- CmmFileEmbed literal.
   -- See Note [Embedding large binary blobs] in GHC.CmmToAsm.Ppr
-  let isNCG    = hscTarget dflags == HscAsm
+  let isNCG    = backend dflags == NCG
       isSmall  = fromIntegral (BS.length str) <= binBlobThreshold dflags
       asString = binBlobThreshold dflags == 0 || isSmall
 
