@@ -8,14 +8,14 @@ module GHC.Cmm.Switch (
      switchTargetsToList, eqSwitchTargetWith,
 
      SwitchPlan(..),
-     targetSupportsSwitch,
+     backendSupportsSwitch,
      createSwitchPlan,
   ) where
 
 import GHC.Prelude
 
 import GHC.Utils.Outputable
-import GHC.Driver.Session
+import GHC.Driver.Backend
 import GHC.Cmm.Dataflow.Label (Label)
 
 import Data.Maybe
@@ -316,12 +316,12 @@ and slowed down all other cases making it not worthwhile.
 -}
 
 
--- | Does the target support switch out of the box? Then leave this to the
--- target!
-targetSupportsSwitch :: HscTarget -> Bool
-targetSupportsSwitch HscC = True
-targetSupportsSwitch HscLlvm = True
-targetSupportsSwitch _ = False
+-- | Does the backend support switch out of the box? Then leave this to the
+-- backend!
+backendSupportsSwitch :: Backend -> Bool
+backendSupportsSwitch ViaC = True
+backendSupportsSwitch LLVM = True
+backendSupportsSwitch _    = False
 
 -- | This function creates a SwitchPlan from a SwitchTargets value, breaking it
 -- down into smaller pieces suitable for code generation.

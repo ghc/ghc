@@ -27,8 +27,8 @@ module GHC (
         needsTemplateHaskellOrQQ,
 
         -- * Flags and settings
-        DynFlags(..), GeneralFlag(..), Severity(..), HscTarget(..), gopt,
-        GhcMode(..), GhcLink(..), defaultObjectTarget,
+        DynFlags(..), GeneralFlag(..), Severity(..), Backend(..), gopt,
+        GhcMode(..), GhcLink(..),
         parseDynamicFlags,
         getSessionDynFlags, setSessionDynFlags,
         getProgramDynFlags, setProgramDynFlags, setLogAction,
@@ -302,6 +302,7 @@ import GHC.Runtime.Interpreter.Types
 import GHCi.RemoteTypes
 
 import GHC.Core.Ppr.TyThing  ( pprFamInst )
+import GHC.Driver.Backend
 import GHC.Driver.Main
 import GHC.Driver.Make
 import GHC.Driver.Hooks
@@ -1010,7 +1011,7 @@ desugarModule tcm = do
 --
 -- A module must be loaded before dependent modules can be typechecked.  This
 -- always includes generating a 'ModIface' and, depending on the
--- @DynFlags@\'s 'GHC.Driver.Session.hscTarget', may also include code generation.
+-- @DynFlags@\'s 'GHC.Driver.Session.backend', may also include code generation.
 --
 -- This function will always cause recompilation and will always overwrite
 -- previous compilation results (potentially files on disk).
