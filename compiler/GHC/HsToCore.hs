@@ -23,6 +23,7 @@ import GHC.Prelude
 import GHC.HsToCore.Usage
 import GHC.Driver.Session
 import GHC.Driver.Types
+import GHC.Driver.Backend
 import GHC.Hs
 import GHC.Tc.Types
 import GHC.Tc.Utils.Monad  ( finalSafeMode, fixSafeInstances )
@@ -123,7 +124,7 @@ deSugar hsc_env
                      (const ()) $
      do { -- Desugar the program
         ; let export_set = availsToNameSet exports
-              target     = hscTarget dflags
+              bcknd      = backend dflags
               hpcInfo    = emptyHpcInfo other_hpc_info
 
         ; (binds_cvr, ds_hpc_info, modBreaks)
@@ -153,7 +154,7 @@ deSugar hsc_env
      do {       -- Add export flags to bindings
           keep_alive <- readIORef keep_var
         ; let (rules_for_locals, rules_for_imps) = partition isLocalRule all_rules
-              final_prs = addExportFlagsAndRules target export_set keep_alive
+              final_prs = addExportFlagsAndRules bcknd export_set keep_alive
                                                  rules_for_locals (fromOL all_prs)
 
               final_pgm = combineEvBinds ds_ev_binds final_prs
@@ -288,9 +289,9 @@ deSugarExpr hsc_env tc_expr = do {
 -}
 
 addExportFlagsAndRules
-    :: HscTarget -> NameSet -> NameSet -> [CoreRule]
+    :: Backend -> NameSet -> NameSet -> [CoreRule]
     -> [(Id, t)] -> [(Id, t)]
-addExportFlagsAndRules target exports keep_alive rules prs
+addExportFlagsAndRules bcknd exports keep_alive rules prs
   = mapFst add_one prs
   where
     add_one bndr = add_rules name (add_export name bndr)
@@ -326,7 +327,7 @@ addExportFlagsAndRules target exports keep_alive rules prs
         -- isExternalName separates the user-defined top-level names from those
         -- introduced by the type checker.
     is_exported :: Name -> Bool
-    is_exported | targetRetainsAllBindings target = isExternalName
+    is_exported | backendRetainsAllBindings bcknd = isExternalName
                 | otherwise                       = (`elemNameSet` exports)
 
 {-

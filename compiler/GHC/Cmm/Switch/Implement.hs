@@ -35,7 +35,7 @@ import GHC.Utils.Monad (concatMapM)
 cmmImplementSwitchPlans :: DynFlags -> CmmGraph -> UniqSM CmmGraph
 cmmImplementSwitchPlans dflags g
     -- Switch generation done by backend (LLVM/C)
-    | targetSupportsSwitch (hscTarget dflags) = return g
+    | backendSupportsSwitch (backend dflags) = return g
     | otherwise = do
     blocks' <- concatMapM (visitSwitches (targetPlatform dflags)) (toBlockList g)
     return $ ofBlockList (g_entry g) blocks'
