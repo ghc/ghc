@@ -253,6 +253,7 @@ import {-# SOURCE #-} GHC.Unit.State (UnitState, emptyUnitState, UnitDatabase, u
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Flags
 import GHC.Driver.Ways
+import GHC.Driver.Backend
 import GHC.Settings.Config
 import GHC.Utils.CliOption
 import GHC.Driver.CmdLine hiding (WarnReason(..))
@@ -1151,16 +1152,15 @@ instance Outputable PackageFlag where
 -- | The 'HscTarget' value corresponding to the default way to create
 -- object files on the current platform.
 
-defaultHscTarget :: Platform -> PlatformMisc -> HscTarget
-defaultHscTarget platform pMisc
-  | platformUnregisterised platform = HscC
-  | platformMisc_ghcWithNativeCodeGen pMisc = HscAsm
+defaultHscTarget :: Platform -> HscTarget
+defaultHscTarget platform
+  | platformUnregisterised platform        = HscC
+  | NCG <- platformDefaultBackend platform = HscAsm
   | otherwise = HscLlvm
 
 defaultObjectTarget :: DynFlags -> HscTarget
 defaultObjectTarget dflags = defaultHscTarget
   (targetPlatform dflags)
-  (platformMisc dflags)
 
 data DynLibLoader
   = Deployable
@@ -1272,7 +1272,7 @@ defaultDynFlags mySettings llvmConfig =
      DynFlags {
         ghcMode                 = CompManager,
         ghcLink                 = LinkBinary,
-        hscTarget               = defaultHscTarget (sTargetPlatform mySettings) (sPlatformMisc mySettings),
+        hscTarget               = defaultHscTarget (sTargetPlatform mySettings),
         verbosity               = 0,
         optLevel                = 0,
         debugLevel              = 0,
@@ -4856,7 +4856,8 @@ compilerInfo dflags
        ("Target platform",             platformMisc_targetPlatformString $ platformMisc dflags),
        ("Have interpreter",            showBool $ platformMisc_ghcWithInterpreter $ platformMisc dflags),
        ("Object splitting supported",  showBool False),
-       ("Have native code generator",  showBool $ platformMisc_ghcWithNativeCodeGen $ platformMisc dflags),
+       ("Have native code generator",  showBool $ platformNcgSupported (targetPlatform dflags)),
+       ("Target default backend",      show $ platformDefaultBackend (targetPlatform dflags)),
        -- Whether or not we support @-dynamic-too@
        ("Support dynamic-too",         showBool $ not isWindows),
        -- Whether or not we support the @-j@ flag with @--make@.
@@ -4951,28 +4952,35 @@ makeDynFlagsConsistent dflags
     = let dflags' = gopt_unset dflags Opt_BuildDynamicToo
           warn    = "-dynamic-too is not supported on Windows"
       in loop dflags' warn
+
+   -- Via-C backend only supports unregisterised convention. Switch to a backend
+   -- supporting it if possible.
  | hscTarget dflags == HscC &&
    not (platformUnregisterised (targetPlatform dflags))
-    = if platformMisc_ghcWithNativeCodeGen $ platformMisc dflags
-      then let dflags' = dflags { hscTarget = HscAsm }
-               warn = "Compiler not unregisterised, so using native code generator rather than compiling via C"
-           in loop dflags' warn
-      else let dflags' = dflags { hscTarget = HscLlvm }
-               warn = "Compiler not unregisterised, so using LLVM rather than compiling via C"
-           in loop dflags' warn
+    = case platformDefaultBackend (targetPlatform dflags) of
+         NCG  -> let dflags' = dflags { hscTarget = HscAsm }
+                     warn = "Target platform doesn't use unregisterised ABI, so using native code generator rather than compiling via C"
+                 in loop dflags' warn
+         LLVM -> let dflags' = dflags { hscTarget = HscLlvm }
+                     warn = "Target platform doesn't use unregisterised ABI, so using LLVM rather than compiling via C"
+                 in loop dflags' warn
+         _    -> pgmError "Compiling via C is only supported with unregisterised ABI but target platform doesn't use it."
  | gopt Opt_Hpc dflags && hscTarget dflags == HscInterpreted
     = let dflags' = gopt_unset dflags Opt_Hpc
           warn = "Hpc can't be used with byte-code interpreter. Ignoring -fhpc."
       in loop dflags' warn
+
  | hscTarget dflags `elem` [HscAsm, HscLlvm] &&
    platformUnregisterised (targetPlatform dflags)
     = loop (dflags { hscTarget = HscC })
-           "Compiler unregisterised, so compiling via C"
+           "Target platform uses unregisterised ABI, so compiling via C"
+
  | hscTarget dflags == HscAsm &&
-   not (platformMisc_ghcWithNativeCodeGen $ platformMisc dflags)
+   not (platformNcgSupported $ targetPlatform dflags)
       = let dflags' = dflags { hscTarget = HscLlvm }
-            warn = "No native code generator, so using LLVM"
+            warn = "Native code generator doesn't support target platform, so using LLVM"
         in loop dflags' warn
+
  | not (osElfTarget os) && gopt Opt_PIE dflags
     = loop (gopt_unset dflags Opt_PIE)
            "Position-independent only supported on ELF platforms"

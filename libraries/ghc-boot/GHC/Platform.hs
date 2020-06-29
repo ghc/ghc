@@ -295,7 +295,6 @@ data PlatformMisc = PlatformMisc
   { -- TODO Recalculate string from richer info?
     platformMisc_targetPlatformString :: String
   , platformMisc_ghcWithInterpreter   :: Bool
-  , platformMisc_ghcWithNativeCodeGen :: Bool
   , platformMisc_ghcWithSMP           :: Bool
   , platformMisc_ghcRTSWays           :: String
   , platformMisc_libFFI               :: Bool
