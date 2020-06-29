@@ -165,7 +165,7 @@ cgTopBinding dflags (StgTopStringLit id str) = do
   -- emit either a CmmString literal or dump the string in a file and emit a
   -- CmmFileEmbed literal.
   -- See Note [Embedding large binary blobs] in GHC.CmmToAsm.Ppr
-  let isNCG    = platformMisc_ghcWithNativeCodeGen $ platformMisc dflags
+  let isNCG    = hscTarget dflags == HscAsm
       isSmall  = fromIntegral (BS.length str) <= binBlobThreshold dflags
       asString = binBlobThreshold dflags == 0 || isSmall
 
