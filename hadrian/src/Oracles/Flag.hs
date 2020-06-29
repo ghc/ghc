@@ -2,7 +2,7 @@
 
 module Oracles.Flag (
     Flag (..), flag, getFlag, platformSupportsSharedLibs,
-    ghcWithNativeCodeGen, targetSupportsSMP
+    targetSupportsSMP
     ) where
 
 import Hadrian.Oracles.TextFile
@@ -77,10 +77,3 @@ targetSupportsSMP = do
      , ver < ARMv7          -> return False
      | goodArch             -> return True
      | otherwise            -> return False
-
-ghcWithNativeCodeGen :: Action Bool
-ghcWithNativeCodeGen = do
-    goodArch <- anyTargetArch ["i386", "x86_64", "sparc", "powerpc"]
-    badOs    <- anyTargetOs ["ios", "aix"]
-    ghcUnreg <- flag GhcUnregisterised
-    return $ goodArch && not badOs && not ghcUnreg
