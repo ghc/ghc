@@ -159,7 +159,6 @@ outputAsm :: DynFlags -> Module -> ModLocation -> FilePath
           -> Stream IO RawCmmGroup a
           -> IO a
 outputAsm dflags this_mod location filenm cmm_stream
- | platformMisc_ghcWithNativeCodeGen $ platformMisc dflags
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
 
        debugTraceMsg dflags 4 (text "Outputing asm to" <+> text filenm)
@@ -167,9 +166,6 @@ outputAsm dflags this_mod location filenm cmm_stream
        {-# SCC "OutputAsm" #-} doOutput filenm $
            \h -> {-# SCC "NativeCodeGen" #-}
                  nativeCodeGen dflags this_mod location h ncg_uniqs cmm_stream
-
- | otherwise
-  = panic "This compiler was built without a native code generator"
 
 {-
 ************************************************************************
