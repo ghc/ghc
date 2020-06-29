@@ -56,7 +56,6 @@ module GHC.Settings
   , sExtraGccViaCFlags
   , sTargetPlatformString
   , sGhcWithInterpreter
-  , sGhcWithNativeCodeGen
   , sGhcWithSMP
   , sGhcRTSWays
   , sLibFFI
@@ -261,8 +260,6 @@ sTargetPlatformString :: Settings -> String
 sTargetPlatformString = platformMisc_targetPlatformString . sPlatformMisc
 sGhcWithInterpreter :: Settings -> Bool
 sGhcWithInterpreter = platformMisc_ghcWithInterpreter . sPlatformMisc
-sGhcWithNativeCodeGen :: Settings -> Bool
-sGhcWithNativeCodeGen = platformMisc_ghcWithNativeCodeGen . sPlatformMisc
 sGhcWithSMP :: Settings -> Bool
 sGhcWithSMP = platformMisc_ghcWithSMP . sPlatformMisc
 sGhcRTSWays :: Settings -> String
