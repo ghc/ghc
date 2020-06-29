@@ -47,8 +47,6 @@ module GHC.Driver.Session (
         FlagSpec(..),
         HasDynFlags(..), ContainsDynFlags(..),
         RtsOptsEnabled(..),
-        HscTarget(..), isObjectTarget, defaultObjectTarget,
-        targetRetainsAllBindings,
         GhcMode(..), isOneShot,
         GhcLink(..), isNoLink,
         PackageFlag(..), PackageArg(..), ModRenaming(..),
@@ -445,7 +443,20 @@ instance Outputable SafeHaskellMode where
 data DynFlags = DynFlags {
   ghcMode               :: GhcMode,
   ghcLink               :: GhcLink,
-  hscTarget             :: HscTarget,
+  backend               :: !Backend,
+   -- ^ The backend to use (if any).
+   --
+   -- Whenever you change the backend, also make sure to set 'ghcLink' to
+   -- something sensible.
+   --
+   -- 'NoBackend' can be used to avoid generating any output, however, note that:
+   --
+   --  * If a program uses Template Haskell the typechecker may need to run code
+   --    from an imported module.  To facilitate this, code generation is enabled
+   --    for modules imported by modules that use template haskell, using the
+   --    default backend for the platform.
+   --    See Note [-fno-code mode].
+
 
   -- formerly Settings
   ghcNameVersion    :: {-# UNPACK #-} !GhcNameVersion,
@@ -1003,45 +1014,6 @@ versionedAppDir appname platform = do
 versionedFilePath :: PlatformMini -> FilePath
 versionedFilePath platform = uniqueSubdir platform
 
--- | The target code type of the compilation (if any).
---
--- Whenever you change the target, also make sure to set 'ghcLink' to
--- something sensible.
---
--- 'HscNothing' can be used to avoid generating any output, however, note
--- that:
---
---  * If a program uses Template Haskell the typechecker may need to run code
---    from an imported module.  To facilitate this, code generation is enabled
---    for modules imported by modules that use template haskell.
---    See Note [-fno-code mode].
---
-data HscTarget
-  = HscC           -- ^ Generate C code.
-  | HscAsm         -- ^ Generate assembly using the native code generator.
-  | HscLlvm        -- ^ Generate assembly using the llvm code generator.
-  | HscInterpreted -- ^ Generate bytecode.  (Requires 'LinkInMemory')
-  | HscNothing     -- ^ Don't generate any code.  See notes above.
-  deriving (Eq, Show)
-
--- | Will this target result in an object file on the disk?
-isObjectTarget :: HscTarget -> Bool
-isObjectTarget HscC     = True
-isObjectTarget HscAsm   = True
-isObjectTarget HscLlvm  = True
-isObjectTarget _        = False
-
--- | Does this target retain *all* top-level bindings for a module,
--- rather than just the exported bindings, in the TypeEnv and compiled
--- code (if any)?  In interpreted mode we do this, so that GHCi can
--- call functions inside a module.  In HscNothing mode we also do it,
--- so that Haddock can get access to the GlobalRdrEnv for a module
--- after typechecking it.
-targetRetainsAllBindings :: HscTarget -> Bool
-targetRetainsAllBindings HscInterpreted = True
-targetRetainsAllBindings HscNothing     = True
-targetRetainsAllBindings _              = False
-
 -- | The 'GhcMode' tells us whether we're doing multi-module
 -- compilation (controlled via the "GHC" API) or one-shot
 -- (single-module) compilation.  This makes a difference primarily to
@@ -1148,19 +1120,6 @@ packageFlagsChanged idflags1 idflags0 =
 instance Outputable PackageFlag where
     ppr (ExposePackage n arg rn) = text n <> braces (ppr arg <+> ppr rn)
     ppr (HidePackage str) = text "-hide-package" <+> text str
-
--- | The 'HscTarget' value corresponding to the default way to create
--- object files on the current platform.
-
-defaultHscTarget :: Platform -> HscTarget
-defaultHscTarget platform
-  | platformUnregisterised platform        = HscC
-  | NCG <- platformDefaultBackend platform = HscAsm
-  | otherwise = HscLlvm
-
-defaultObjectTarget :: DynFlags -> HscTarget
-defaultObjectTarget dflags = defaultHscTarget
-  (targetPlatform dflags)
 
 data DynLibLoader
   = Deployable
@@ -1272,7 +1231,7 @@ defaultDynFlags mySettings llvmConfig =
      DynFlags {
         ghcMode                 = CompManager,
         ghcLink                 = LinkBinary,
-        hscTarget               = defaultHscTarget (sTargetPlatform mySettings),
+        backend                 = platformDefaultBackend (sTargetPlatform mySettings),
         verbosity               = 0,
         optLevel                = 0,
         debugLevel              = 0,
@@ -2492,9 +2451,9 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "keep-s-files"
         (NoArg (setGeneralFlag Opt_KeepSFiles))
   , make_ord_flag defGhcFlag "keep-llvm-file"
-        (NoArg $ setObjTarget HscLlvm >> setGeneralFlag Opt_KeepLlvmFiles)
+        (NoArg $ setObjBackend LLVM >> setGeneralFlag Opt_KeepLlvmFiles)
   , make_ord_flag defGhcFlag "keep-llvm-files"
-        (NoArg $ setObjTarget HscLlvm >> setGeneralFlag Opt_KeepLlvmFiles)
+        (NoArg $ setObjBackend LLVM >> setGeneralFlag Opt_KeepLlvmFiles)
      -- This only makes sense as plural
   , make_ord_flag defGhcFlag "keep-tmp-files"
         (NoArg (setGeneralFlag Opt_KeepTmpFiles))
@@ -2667,7 +2626,7 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "ddump-asm-expanded"
         (setDumpFlag Opt_D_dump_asm_expanded)
   , make_ord_flag defGhcFlag "ddump-llvm"
-        (NoArg $ setObjTarget HscLlvm >> setDumpFlag' Opt_D_dump_llvm)
+        (NoArg $ setObjBackend LLVM >> setDumpFlag' Opt_D_dump_llvm)
   , make_ord_flag defGhcFlag "ddump-deriv"
         (setDumpFlag Opt_D_dump_deriv)
   , make_ord_flag defGhcFlag "ddump-ds"
@@ -3060,24 +3019,24 @@ dynamic_flags_deps = [
 
         ------ Compiler flags -----------------------------------------------
 
-  , make_ord_flag defGhcFlag "fasm"             (NoArg (setObjTarget HscAsm))
+  , make_ord_flag defGhcFlag "fasm"             (NoArg (setObjBackend NCG))
   , make_ord_flag defGhcFlag "fvia-c"           (NoArg
          (deprecate $ "The -fvia-c flag does nothing; " ++
                       "it will be removed in a future GHC release"))
   , make_ord_flag defGhcFlag "fvia-C"           (NoArg
          (deprecate $ "The -fvia-C flag does nothing; " ++
                       "it will be removed in a future GHC release"))
-  , make_ord_flag defGhcFlag "fllvm"            (NoArg (setObjTarget HscLlvm))
+  , make_ord_flag defGhcFlag "fllvm"            (NoArg (setObjBackend LLVM))
 
   , make_ord_flag defFlag "fno-code"         (NoArg ((upd $ \d ->
-                  d { ghcLink=NoLink }) >> setTarget HscNothing))
+                  d { ghcLink=NoLink }) >> setBackend NoBackend))
   , make_ord_flag defFlag "fbyte-code"
       (noArgM $ \dflags -> do
-        setTarget HscInterpreted
+        setBackend Interpreter
         pure $ gopt_set dflags Opt_ByteCode)
   , make_ord_flag defFlag "fobject-code"     $ NoArg $ do
       dflags <- liftEwM getCmdLineState
-      setTarget $ defaultObjectTarget dflags
+      setBackend $ platformDefaultBackend (targetPlatform dflags)
 
   , make_dep_flag defFlag "fglasgow-exts"
       (NoArg enableGlasgowExts) "Use individual extensions instead"
@@ -4590,24 +4549,24 @@ canonicalizeModuleIfHome dflags mod
                       then canonicalizeHomeModule dflags (moduleName mod)
                       else mod
 
--- If we're linking a binary, then only targets that produce object
+-- If we're linking a binary, then only backends that produce object
 -- code are allowed (requests for other target types are ignored).
-setTarget :: HscTarget -> DynP ()
-setTarget l = upd $ \ dfs ->
-  if ghcLink dfs /= LinkBinary || isObjectTarget l
-  then dfs{ hscTarget = l }
+setBackend :: Backend -> DynP ()
+setBackend l = upd $ \ dfs ->
+  if ghcLink dfs /= LinkBinary || backendProducesObject l
+  then dfs{ backend = l }
   else dfs
 
 -- Changes the target only if we're compiling object code.  This is
 -- used by -fasm and -fllvm, which switch from one to the other, but
 -- not from bytecode to object-code.  The idea is that -fasm/-fllvm
 -- can be safely used in an OPTIONS_GHC pragma.
-setObjTarget :: HscTarget -> DynP ()
-setObjTarget l = updM set
+setObjBackend :: Backend -> DynP ()
+setObjBackend l = updM set
   where
    set dflags
-     | isObjectTarget (hscTarget dflags)
-       = return $ dflags { hscTarget = l }
+     | backendProducesObject (backend dflags)
+       = return $ dflags { backend = l }
      | otherwise = return dflags
 
 setOptLevel :: Int -> DynFlags -> DynP DynFlags
@@ -4615,7 +4574,7 @@ setOptLevel n dflags = return (updOptLevel n dflags)
 
 checkOptLevel :: Int -> DynFlags -> Either String DynFlags
 checkOptLevel n dflags
-   | hscTarget dflags == HscInterpreted && n > 0
+   | backend dflags == Interpreter && n > 0
      = Left "-O conflicts with --interactive; -O ignored."
    | otherwise
      = Right dflags
@@ -4953,31 +4912,32 @@ makeDynFlagsConsistent dflags
           warn    = "-dynamic-too is not supported on Windows"
       in loop dflags' warn
 
-   -- Via-C backend only supports unregisterised convention. Switch to a backend
+   -- Via-C backend only supports unregisterised ABI. Switch to a backend
    -- supporting it if possible.
- | hscTarget dflags == HscC &&
+ | backend dflags == ViaC &&
    not (platformUnregisterised (targetPlatform dflags))
     = case platformDefaultBackend (targetPlatform dflags) of
-         NCG  -> let dflags' = dflags { hscTarget = HscAsm }
+         NCG ->  let dflags' = dflags { backend = NCG }
                      warn = "Target platform doesn't use unregisterised ABI, so using native code generator rather than compiling via C"
                  in loop dflags' warn
-         LLVM -> let dflags' = dflags { hscTarget = HscLlvm }
+         LLVM -> let dflags' = dflags { backend = LLVM }
                      warn = "Target platform doesn't use unregisterised ABI, so using LLVM rather than compiling via C"
                  in loop dflags' warn
-         _    -> pgmError "Compiling via C is only supported with unregisterised ABI but target platform doesn't use it."
- | gopt Opt_Hpc dflags && hscTarget dflags == HscInterpreted
+         _    -> pgmError "Compiling via C only supports unregisterised ABI but target platform doesn't use it."
+
+ | gopt Opt_Hpc dflags && backend dflags == Interpreter
     = let dflags' = gopt_unset dflags Opt_Hpc
           warn = "Hpc can't be used with byte-code interpreter. Ignoring -fhpc."
       in loop dflags' warn
 
- | hscTarget dflags `elem` [HscAsm, HscLlvm] &&
+ | backend dflags `elem` [NCG, LLVM] &&
    platformUnregisterised (targetPlatform dflags)
-    = loop (dflags { hscTarget = HscC })
+    = loop (dflags { backend = ViaC })
            "Target platform uses unregisterised ABI, so compiling via C"
 
- | hscTarget dflags == HscAsm &&
+ | backend dflags == NCG &&
    not (platformNcgSupported $ targetPlatform dflags)
-      = let dflags' = dflags { hscTarget = HscLlvm }
+      = let dflags' = dflags { backend = LLVM }
             warn = "Native code generator doesn't support target platform, so using LLVM"
         in loop dflags' warn
 
@@ -4995,7 +4955,7 @@ makeDynFlagsConsistent dflags
  | LinkInMemory <- ghcLink dflags
  , not (gopt Opt_ExternalInterpreter dflags)
  , hostIsProfiled
- , isObjectTarget (hscTarget dflags)
+ , backendProducesObject (backend dflags)
  , WayProf `Set.notMember` ways dflags
     = loop dflags{ways = Set.insert WayProf (ways dflags)}
          "Enabling -prof, because -fobject-code is enabled and GHCi is profiled"

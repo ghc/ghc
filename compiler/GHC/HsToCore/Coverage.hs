@@ -24,6 +24,7 @@ import GHC.Hs
 import GHC.Unit
 import GHC.Utils.Outputable as Outputable
 import GHC.Driver.Session
+import GHC.Driver.Backend
 import GHC.Core.ConLike
 import Control.Monad
 import GHC.Types.SrcLoc
@@ -1050,7 +1051,7 @@ coveragePasses dflags =
 
 -- | Should we produce 'Breakpoint' ticks?
 breakpointsEnabled :: DynFlags -> Bool
-breakpointsEnabled dflags = hscTarget dflags == HscInterpreted
+breakpointsEnabled dflags = backend dflags == Interpreter
 
 -- | Tickishs that only make sense when their source code location
 -- refers to the current file. This might not always be true due to
