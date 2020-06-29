@@ -70,10 +70,13 @@ class LineLinter(Linter):
     issues found.
     """
     def lint(self, path: Path):
-        if path.is_file():
-            with path.open('r') as f:
-                for line_no, line in enumerate(f):
-                    self.lint_line(path, line_no+1, line)
+        try:
+            if path.is_file():
+                with path.open('r') as f:
+                    for line_no, line in enumerate(f):
+                        self.lint_line(path, line_no+1, line)
+        except e:
+            raise RuntimeError("Failed to lint file: " + path) from e
 
     def lint_line(self, path: Path, line_no: int, line: str):
         raise NotImplementedError
