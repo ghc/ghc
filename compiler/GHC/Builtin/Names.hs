@@ -544,7 +544,7 @@ gHC_PRIM, gHC_PRIM_PANIC, gHC_PRIM_EXCEPTION,
     dATA_FOLDABLE, dATA_TRAVERSABLE,
     gHC_CONC, gHC_IO, gHC_IO_Exception,
     gHC_ST, gHC_IX, gHC_STABLE, gHC_PTR, gHC_ERR, gHC_REAL,
-    gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC,
+    gHC_FLOAT, gHC_TOP_HANDLER, gHC_UNICODE, sYSTEM_IO, dYNAMIC,
     tYPEABLE, tYPEABLE_INTERNAL, gENERICS,
     rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP, mONAD_FAIL,
     aRROW, cONTROL_APPLICATIVE, gHC_DESUGAR, rANDOM, gHC_EXTS,
@@ -590,6 +590,7 @@ gHC_ERR         = mkBaseModule (fsLit "GHC.Err")
 gHC_REAL        = mkBaseModule (fsLit "GHC.Real")
 gHC_FLOAT       = mkBaseModule (fsLit "GHC.Float")
 gHC_TOP_HANDLER = mkBaseModule (fsLit "GHC.TopHandler")
+gHC_UNICODE     = mkBaseModule (fsLit "GHC.Unicode")
 sYSTEM_IO       = mkBaseModule (fsLit "System.IO")
 dYNAMIC         = mkBaseModule (fsLit "Data.Dynamic")
 tYPEABLE        = mkBaseModule (fsLit "Data.Typeable")
@@ -963,6 +964,50 @@ eitherTyConName, leftDataConName, rightDataConName :: Name
 eitherTyConName   = tcQual  dATA_EITHER (fsLit "Either") eitherTyConKey
 leftDataConName   = dcQual dATA_EITHER (fsLit "Left")   leftDataConKey
 rightDataConName  = dcQual dATA_EITHER (fsLit "Right")  rightDataConKey
+
+generalCategoryTyConName, genCatUppercaseDataConName, genCatLowercaseDataConName,
+    genCatTitlecaseDataConName, genCatModifierDataConName, genCatOtherLetterDataConName,
+    genCatNonSpacingDataConName, genCatSpacingCombiningMarkDataConName,
+    genCatEnclosingDataConName, genCatDecimalDataConName, genCatLetterNumberDataConName,
+    genCatOtherNumberDataConName, genCatConnectorDataConName, genCatDashDataConName,
+    genCatOpenPunctuationDataConName, genCatClosePunctuationDataConName,
+    genCatInitialQuoteDataConName, genCatFinalQuoteDataConName,
+    genCatOtherPunctuationDataConName, genCatMathSymbolDataConName,
+    genCatCurrencySymbolDataConName, genCatModifierSymbolDataConName,
+    genCatOtherSymbolDataConName, genCatSpaceDataConName, genCatLineSeparatorDataConName,
+    genCatParagraphSeparatorDataConName, genCatControlDataConName, genCatFormatDataConName,
+    genCatSurrogateDataConName, genCatPrivateUseDataConName, genCatNotAssignedDataConName :: Name
+generalCategoryTyConName              = tcQual gHC_UNICODE (fsLit "GeneralCategory") generalCategoryTyConKey
+genCatUppercaseDataConName            = dcQual gHC_UNICODE (fsLit "UppercaseLetter") genCatUppercaseDataConKey
+genCatLowercaseDataConName            = dcQual gHC_UNICODE (fsLit "LowercaseLetter") genCatLowercaseDataConKey
+genCatTitlecaseDataConName            = dcQual gHC_UNICODE (fsLit "TitlecaseLetter") genCatTitlecaseDataConKey
+genCatModifierDataConName             = dcQual gHC_UNICODE (fsLit "ModifierLetter")  genCatModifierDataConKey
+genCatOtherLetterDataConName          = dcQual gHC_UNICODE (fsLit "OtherLetter")     genCatOtherLetterDataConKey
+genCatNonSpacingDataConName           = dcQual gHC_UNICODE (fsLit "NonSpacingMark")  genCatNonSpacingDataConKey
+genCatSpacingCombiningMarkDataConName = dcQual gHC_UNICODE (fsLit "SpacingCombiningMark") genCatSpacingCombiningMarkDataConKey
+genCatEnclosingDataConName            = dcQual gHC_UNICODE (fsLit "EnclosingMark") genCatEnclosingDataConKey
+genCatDecimalDataConName              = dcQual gHC_UNICODE (fsLit "DecimalNumber") genCatDecimalDataConKey
+genCatLetterNumberDataConName         = dcQual gHC_UNICODE (fsLit "LetterNumber")  genCatLetterNumberDataConKey
+genCatOtherNumberDataConName          = dcQual gHC_UNICODE (fsLit "OtherNumber")   genCatOtherNumberDataConKey
+genCatConnectorDataConName            = dcQual gHC_UNICODE (fsLit "ConnectorPunctuation") genCatConnectorDataConKey
+genCatDashDataConName                 = dcQual gHC_UNICODE (fsLit "DashPunctuation") genCatDashDataConKey
+genCatOpenPunctuationDataConName      = dcQual gHC_UNICODE (fsLit "OpenPunctuation") genCatOpenPunctuationDataConKey
+genCatClosePunctuationDataConName     = dcQual gHC_UNICODE (fsLit "ClosePunctuation") genCatClosePunctuationDataKey
+genCatInitialQuoteDataConName         = dcQual gHC_UNICODE (fsLit "InitialQuote") genCatInitialQuoteDataConKey
+genCatFinalQuoteDataConName           = dcQual gHC_UNICODE (fsLit "FinalQuote") genCatFinalQuoteDataConKey
+genCatOtherPunctuationDataConName     = dcQual gHC_UNICODE (fsLit "OtherPunctuation") genCatOtherPunctuationDataConKey
+genCatMathSymbolDataConName           = dcQual gHC_UNICODE (fsLit "MathSymbol") genCatMathSymbolDataConKey
+genCatCurrencySymbolDataConName       = dcQual gHC_UNICODE (fsLit "CurrencySymbol") genCatCurrencySymbolDataConKey
+genCatModifierSymbolDataConName       = dcQual gHC_UNICODE (fsLit "ModifierSymbol") genCatModifierSymbolDataConKey
+genCatOtherSymbolDataConName          = dcQual gHC_UNICODE (fsLit "OtherSymbol") genCatOtherSymbolDataConKey
+genCatSpaceDataConName                = dcQual gHC_UNICODE (fsLit "Space") genCatSpaceDataConKey
+genCatLineSeparatorDataConName        = dcQual gHC_UNICODE (fsLit "LineSeparator") genCatLineSeparatorDataConKey
+genCatParagraphSeparatorDataConName   = dcQual gHC_UNICODE (fsLit "ParagraphSeparator") genCatParagraphSeparatorDataConKey
+genCatControlDataConName              = dcQual gHC_UNICODE (fsLit "Control") genCatControlDataConKey
+genCatFormatDataConName               = dcQual gHC_UNICODE (fsLit "Format") genCatFormatDataConKey
+genCatSurrogateDataConName            = dcQual gHC_UNICODE (fsLit "Surrogate") genCatSurrogateDataConKey
+genCatPrivateUseDataConName           = dcQual gHC_UNICODE (fsLit "PrivateUse") genCatPrivateUseDataConKey
+genCatNotAssignedDataConName          = dcQual gHC_UNICODE (fsLit "NotAssigned") genCatNotAssignedDataConKey
 
 -- Generics (types)
 v1TyConName, u1TyConName, par1TyConName, rec1TyConName,
@@ -1919,6 +1964,7 @@ typeNatKindConNameKey, typeSymbolKindConNameKey, typeCharKindConNameKey,
   typeNatAddTyFamNameKey, typeNatMulTyFamNameKey, typeNatExpTyFamNameKey,
   typeNatLeqTyFamNameKey, typeNatSubTyFamNameKey
   , typeSymbolCmpTyFamNameKey, typeNatCmpTyFamNameKey, typeCharCmpTyFamNameKey
+  , typeLeqCharTyFamNameKey
   , typeNatDivTyFamNameKey
   , typeNatModTyFamNameKey
   , typeNatLogTyFamNameKey
@@ -1935,67 +1981,68 @@ typeNatSubTyFamNameKey    = mkPreludeTyConUnique 171
 typeSymbolCmpTyFamNameKey = mkPreludeTyConUnique 172
 typeNatCmpTyFamNameKey    = mkPreludeTyConUnique 173
 typeCharCmpTyFamNameKey   = mkPreludeTyConUnique 174
-typeNatDivTyFamNameKey  = mkPreludeTyConUnique 175
-typeNatModTyFamNameKey  = mkPreludeTyConUnique 176
-typeNatLogTyFamNameKey  = mkPreludeTyConUnique 177
-typeConsSymbolTyFamNameKey = mkPreludeTyConUnique 178
-typeUnconsSymbolTyFamNameKey = mkPreludeTyConUnique 179
+typeLeqCharTyFamNameKey   = mkPreludeTyConUnique 175
+typeNatDivTyFamNameKey  = mkPreludeTyConUnique 176
+typeNatModTyFamNameKey  = mkPreludeTyConUnique 177
+typeNatLogTyFamNameKey  = mkPreludeTyConUnique 178
+typeConsSymbolTyFamNameKey = mkPreludeTyConUnique 179
+typeUnconsSymbolTyFamNameKey = mkPreludeTyConUnique 180
 
 -- Custom user type-errors
 errorMessageTypeErrorFamKey :: Unique
-errorMessageTypeErrorFamKey =  mkPreludeTyConUnique 180
+errorMessageTypeErrorFamKey =  mkPreludeTyConUnique 181
 
 
 
 ntTyConKey:: Unique
-ntTyConKey = mkPreludeTyConUnique 181
+ntTyConKey = mkPreludeTyConUnique 182
 coercibleTyConKey :: Unique
-coercibleTyConKey = mkPreludeTyConUnique 182
+coercibleTyConKey = mkPreludeTyConUnique 183
 
 proxyPrimTyConKey :: Unique
-proxyPrimTyConKey = mkPreludeTyConUnique 183
+proxyPrimTyConKey = mkPreludeTyConUnique 184
 
 specTyConKey :: Unique
-specTyConKey = mkPreludeTyConUnique 184
+specTyConKey = mkPreludeTyConUnique 185
 
 anyTyConKey :: Unique
-anyTyConKey = mkPreludeTyConUnique 185
+anyTyConKey = mkPreludeTyConUnique 186
 
-smallArrayPrimTyConKey        = mkPreludeTyConUnique  186
-smallMutableArrayPrimTyConKey = mkPreludeTyConUnique  187
+smallArrayPrimTyConKey        = mkPreludeTyConUnique  187
+smallMutableArrayPrimTyConKey = mkPreludeTyConUnique  188
 
 staticPtrTyConKey  :: Unique
-staticPtrTyConKey  = mkPreludeTyConUnique 188
+staticPtrTyConKey  = mkPreludeTyConUnique 189
 
 staticPtrInfoTyConKey :: Unique
-staticPtrInfoTyConKey = mkPreludeTyConUnique 189
+staticPtrInfoTyConKey = mkPreludeTyConUnique 190
 
 callStackTyConKey :: Unique
-callStackTyConKey = mkPreludeTyConUnique 190
+callStackTyConKey = mkPreludeTyConUnique 191
 
 -- Typeables
 typeRepTyConKey, someTypeRepTyConKey, someTypeRepDataConKey :: Unique
-typeRepTyConKey       = mkPreludeTyConUnique 191
-someTypeRepTyConKey   = mkPreludeTyConUnique 192
-someTypeRepDataConKey = mkPreludeTyConUnique 193
+typeRepTyConKey       = mkPreludeTyConUnique 192
+someTypeRepTyConKey   = mkPreludeTyConUnique 193
+someTypeRepDataConKey = mkPreludeTyConUnique 194
 
 
 typeSymbolAppendFamNameKey :: Unique
-typeSymbolAppendFamNameKey = mkPreludeTyConUnique 194
+typeSymbolAppendFamNameKey = mkPreludeTyConUnique 195
 
 -- Unsafe equality
 unsafeEqualityTyConKey :: Unique
-unsafeEqualityTyConKey = mkPreludeTyConUnique 195
+unsafeEqualityTyConKey = mkPreludeTyConUnique 196
 
 -- Linear types
 multiplicityTyConKey :: Unique
-multiplicityTyConKey = mkPreludeTyConUnique 196
+multiplicityTyConKey = mkPreludeTyConUnique 197
 
 unrestrictedFunTyConKey :: Unique
-unrestrictedFunTyConKey = mkPreludeTyConUnique 197
+unrestrictedFunTyConKey = mkPreludeTyConUnique 198
 
 multMulTyConKey :: Unique
-multMulTyConKey = mkPreludeTyConUnique 198
+multMulTyConKey = mkPreludeTyConUnique 199
 
 ---------------- Template Haskell -------------------
 --      GHC.Builtin.Names.TH: USES TyConUniques 200-299
@@ -2580,10 +2627,9 @@ bignatFromWordListIdKey    = mkPreludeMiscIdUnique 670
 typeIsControlTyFamNameKey, typeIsSpaceTyFamNameKey, typeIsLowerTyFamNameKey,
     typeIsUpperTyFamNameKey, typeIsAlphaTyFamNameKey, typeIsAlphaNumTyFamNameKey,
     typeIsPrintTyFamNameKey, typeIsDigitTyFamNameKey, typeIsOctDigitTyFamNameKey,
-    typeIsHexDigitTyFamNameKey, typeIsLetterTyFamNameKey, typeIsMarkTyFamNameKey,
-    typeIsNumberTyFamNameKey, typeIsPunctuationTyFamNameKey, typeIsSymbolTyFamNameKey,
-    typeToUpperTyFamNameKey, typeToLowerTyFamNameKey, typeToTitleTyFamNameKey, typeNatToCharTyFamNameKey,
-    typeCharToNatTyFamNameKey, typeIsSeparatorTyFamNameKey :: Unique
+    typeIsHexDigitTyFamNameKey, typeIsLetterTyFamNameKey, typeToUpperTyFamNameKey,
+    typeToLowerTyFamNameKey, typeToTitleTyFamNameKey, typeNatToCharTyFamNameKey,
+    typeCharToNatTyFamNameKey :: Unique
 typeIsControlTyFamNameKey = mkPreludeTyConUnique 573
 typeIsSpaceTyFamNameKey = mkPreludeTyConUnique 574
 typeIsLowerTyFamNameKey = mkPreludeTyConUnique 575
@@ -2595,17 +2641,56 @@ typeIsDigitTyFamNameKey = mkPreludeTyConUnique 580
 typeIsOctDigitTyFamNameKey = mkPreludeTyConUnique 581
 typeIsHexDigitTyFamNameKey = mkPreludeTyConUnique 582
 typeIsLetterTyFamNameKey = mkPreludeTyConUnique 583
-typeIsMarkTyFamNameKey = mkPreludeTyConUnique 584
-typeIsNumberTyFamNameKey = mkPreludeTyConUnique 585
-typeIsPunctuationTyFamNameKey = mkPreludeTyConUnique 586
-typeIsSymbolTyFamNameKey = mkPreludeTyConUnique 587
-typeIsSeparatorTyFamNameKey = mkPreludeTyConUnique 588
-typeToUpperTyFamNameKey = mkPreludeTyConUnique 589
-typeToLowerTyFamNameKey = mkPreludeTyConUnique 590
-typeToTitleTyFamNameKey = mkPreludeTyConUnique 591
-typeNatToCharTyFamNameKey = mkPreludeTyConUnique 592
-typeCharToNatTyFamNameKey = mkPreludeTyConUnique 593
+typeToUpperTyFamNameKey = mkPreludeTyConUnique 584
+typeToLowerTyFamNameKey = mkPreludeTyConUnique 585
+typeToTitleTyFamNameKey = mkPreludeTyConUnique 586
+typeNatToCharTyFamNameKey = mkPreludeTyConUnique 587
+typeCharToNatTyFamNameKey = mkPreludeTyConUnique 588
 
+-- General category kind keys
+generalCategoryTyConKey, genCatUppercaseDataConKey, genCatLowercaseDataConKey,
+    genCatTitlecaseDataConKey, genCatModifierDataConKey, genCatOtherLetterDataConKey,
+    genCatNonSpacingDataConKey, genCatSpacingCombiningMarkDataConKey, genCatEnclosingDataConKey,
+    genCatDecimalDataConKey, genCatLetterNumberDataConKey, genCatOtherNumberDataConKey,
+    genCatConnectorDataConKey, genCatDashDataConKey, genCatOpenPunctuationDataConKey,
+    genCatClosePunctuationDataKey, genCatInitialQuoteDataConKey, genCatFinalQuoteDataConKey,
+    genCatOtherPunctuationDataConKey, genCatMathSymbolDataConKey, genCatCurrencySymbolDataConKey,
+    genCatModifierSymbolDataConKey, genCatOtherSymbolDataConKey, genCatSpaceDataConKey,
+    genCatLineSeparatorDataConKey, genCatParagraphSeparatorDataConKey, genCatControlDataConKey,
+    genCatFormatDataConKey, genCatSurrogateDataConKey, genCatPrivateUseDataConKey,
+    genCatNotAssignedDataConKey, typeGeneralCharCategoryTyFamKey :: Unique
+generalCategoryTyConKey = mkPreludeTyConUnique 700
+genCatUppercaseDataConKey = mkPreludeDataConUnique 701
+genCatLowercaseDataConKey = mkPreludeDataConUnique 702
+genCatTitlecaseDataConKey = mkPreludeDataConUnique 703
+genCatModifierDataConKey = mkPreludeDataConUnique 704
+genCatOtherLetterDataConKey = mkPreludeDataConUnique 705
+genCatNonSpacingDataConKey = mkPreludeDataConUnique 706
+genCatSpacingCombiningMarkDataConKey = mkPreludeDataConUnique 707
+genCatEnclosingDataConKey = mkPreludeDataConUnique 708
+genCatDecimalDataConKey = mkPreludeDataConUnique 709
+genCatLetterNumberDataConKey = mkPreludeDataConUnique 710
+genCatOtherNumberDataConKey = mkPreludeDataConUnique 711
+genCatConnectorDataConKey = mkPreludeDataConUnique 712
+genCatDashDataConKey = mkPreludeDataConUnique 713
+genCatOpenPunctuationDataConKey = mkPreludeDataConUnique 714
+genCatClosePunctuationDataKey = mkPreludeDataConUnique 715
+genCatInitialQuoteDataConKey = mkPreludeDataConUnique 716
+genCatFinalQuoteDataConKey = mkPreludeDataConUnique 717
+genCatOtherPunctuationDataConKey = mkPreludeDataConUnique 718
+genCatMathSymbolDataConKey = mkPreludeDataConUnique 719
+genCatCurrencySymbolDataConKey = mkPreludeDataConUnique 720
+genCatModifierSymbolDataConKey = mkPreludeDataConUnique 721
+genCatOtherSymbolDataConKey = mkPreludeDataConUnique 722
+genCatSpaceDataConKey = mkPreludeDataConUnique 723
+genCatLineSeparatorDataConKey = mkPreludeDataConUnique 724
+genCatParagraphSeparatorDataConKey = mkPreludeDataConUnique 725
+genCatControlDataConKey = mkPreludeDataConUnique 726
+genCatFormatDataConKey = mkPreludeDataConUnique 727
+genCatSurrogateDataConKey = mkPreludeDataConUnique 728
+genCatPrivateUseDataConKey = mkPreludeDataConUnique 729
+genCatNotAssignedDataConKey = mkPreludeDataConUnique 730
+typeGeneralCharCategoryTyFamKey = mkPreludeTyConUnique 731
 
 
 {-
