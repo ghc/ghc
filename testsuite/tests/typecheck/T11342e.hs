@@ -80,3 +80,18 @@ charToNatTest = Refl
 
 natToCharTest :: '[ NatToChar 97, NatToChar 57, NatToChar 47] :~: ' [ 'a', '9', '/']
 natToCharTest = Refl
+
+testIsAscii :: '[ IsAscii 'a', IsAscii '1', IsAscii '\x80'] :~: '[ True, True, False]
+testIsAscii = Refl
+
+testIsLatin1 :: '[ IsLatin1 'ф', IsLatin1 'b'] :~: '[ False, True]
+testIsLatin1 = Refl
+
+testIsAsciiUpper :: '[ IsAsciiUpper 'A', IsAsciiUpper 'a'] :~: '[ True, False]
+testIsAsciiUpper = Refl
+
+testIsAsciiLower :: '[ IsAsciiLower 'A', IsAsciiLower 'a'] :~: '[ False, True]
+testIsAsciiLower = Refl
+
+testLeqChar :: LeqChar 'a' 'a' :~: True
+testLeqChar = Refl
