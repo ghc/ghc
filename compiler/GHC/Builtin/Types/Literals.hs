@@ -38,11 +38,7 @@ module GHC.Builtin.Types.Literals
   , typeIsOctDigitTyCon
   , typeIsHexDigitTyCon
   , typeIsLetterTyCon
-  , typeIsMarkTyCon
-  , typeIsNumberTyCon
-  , typeIsPunctuationTyCon
-  , typeIsSymbolTyCon
-  , typeIsSeparatorTyCon
+  , typeGeneralCharCategoryTyCon
   ) where
 
 import GHC.Prelude
@@ -56,6 +52,7 @@ import GHC.Core.Coercion ( Role(..) )
 import GHC.Tc.Types.Constraint ( Xi )
 import GHC.Core.Coercion.Axiom ( CoAxiomRule(..), BuiltInSynFamily(..), TypeEqn )
 import GHC.Types.Name          ( Name, BuiltInSyntax(..) )
+import GHC.Unicode             ( GeneralCategory (..), generalCategory )
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim  ( mkTemplateAnonTyConBinders )
 import GHC.Builtin.Names
@@ -91,11 +88,7 @@ import GHC.Builtin.Names
                   , typeIsOctDigitTyFamNameKey
                   , typeIsHexDigitTyFamNameKey
                   , typeIsLetterTyFamNameKey
-                  , typeIsMarkTyFamNameKey
-                  , typeIsNumberTyFamNameKey
-                  , typeIsPunctuationTyFamNameKey
-                  , typeIsSymbolTyFamNameKey
-                  , typeIsSeparatorTyFamNameKey
+                  , typeGeneralCharCategoryTyFamKey
                   )
 import GHC.Data.FastString
 import qualified Data.Char as Char
@@ -217,11 +210,7 @@ typeNatTyCons =
   , typeIsOctDigitTyCon
   , typeIsHexDigitTyCon
   , typeIsLetterTyCon
-  , typeIsMarkTyCon
-  , typeIsNumberTyCon
-  , typeIsPunctuationTyCon
-  , typeIsSymbolTyCon
-  , typeIsSeparatorTyCon
+  , typeGeneralCharCategoryTyCon
   ]
 
 typeNatAddTyCon :: TyCon
@@ -539,6 +528,18 @@ mkTypeCharPredicateTyCon op tcb =
     Nothing
     NotInjective
 
+    -- Make a unary built-in constructor of kind: Char -> GeneralCategory
+mkTypeCharCategoryTyCon :: Name -> BuiltInSynFamily -> TyCon
+mkTypeCharCategoryTyCon op tcb =
+  mkFamilyTyCon op
+    (mkTemplateAnonTyConBinders [ charTy ])
+    generalCategoryTy
+    Nothing
+    (BuiltInSynFamTyCon tcb)
+    Nothing
+    NotInjective
+
+
 {-------------------------------------------------------------------------------
 Built-in rules axioms
 -------------------------------------------------------------------------------}
@@ -803,13 +804,9 @@ typeNatCoAxiomRules = Map.fromList $ map (\x -> (coaxrName x, x))
   , axIsOctDigitDef
   , axIsHexDigitDef
   , axIsLetterDef
-  , axIsMarkDef
-  , axIsNumberDef
-  , axIsPunctuationDef
-  , axIsSymbolDef
-  , axIsSeparatorDef
   , axIsPrintDef
   , axIsDigitDef
+  , axGeneralCharCategoryDef
   ]
 
 
@@ -906,6 +903,38 @@ isOrderingLitTy tc =
          | tc1 == promotedEQDataCon -> return EQ
          | tc1 == promotedGTDataCon -> return GT
          | otherwise                -> Nothing
+
+generalCat :: GeneralCategory -> Type
+generalCat UppercaseLetter      = mkTyConApp promotedUppercaseLetterDataCon []
+generalCat LowercaseLetter      = mkTyConApp promotedLowercaseLetterDataCon []
+generalCat TitlecaseLetter      = mkTyConApp promotedTitlecaseLetterDataCon []
+generalCat ModifierLetter       = mkTyConApp promotedModifierLetterDataCon []
+generalCat OtherLetter          = mkTyConApp promotedOtherLetterDataCon []
+generalCat NonSpacingMark       = mkTyConApp promotedNonSpacingMarkDataCon []
+generalCat SpacingCombiningMark = mkTyConApp promotedSpacingCombiningMarkDataCon []
+generalCat EnclosingMark        = mkTyConApp promotedEnclosingMarkDataCon []
+generalCat DecimalNumber        = mkTyConApp promotedDecimalNumberDataCon []
+generalCat LetterNumber         = mkTyConApp promotedLetterNumberDataCon []
+generalCat OtherNumber          = mkTyConApp promotedOtherNumberDataCon []
+generalCat ConnectorPunctuation = mkTyConApp promotedConnectorPunctuationDataCon []
+generalCat DashPunctuation      = mkTyConApp promotedDashPunctuationDataCon []
+generalCat OpenPunctuation      = mkTyConApp promotedOpenPunctuationDataCon []
+generalCat ClosePunctuation     = mkTyConApp promotedClosePunctuationDataCon []
+generalCat InitialQuote         = mkTyConApp promotedInitialQuoteDataCon []
+generalCat FinalQuote           = mkTyConApp promotedFinalQuoteDataCon []
+generalCat OtherPunctuation     = mkTyConApp promotedOtherPunctuationDataCon []
+generalCat MathSymbol           = mkTyConApp promotedMathSymbolDataCon []
+generalCat CurrencySymbol       = mkTyConApp promotedCurrencySymbolDataCon []
+generalCat ModifierSymbol       = mkTyConApp promotedModifierSymbolDataCon []
+generalCat OtherSymbol          = mkTyConApp promotedOtherSymbolDataCon []
+generalCat Space                = mkTyConApp promotedSpaceDataCon []
+generalCat LineSeparator        = mkTyConApp promotedLineSeparatorDataCon []
+generalCat ParagraphSeparator   = mkTyConApp promotedParagraphSeparatorDataCon []
+generalCat Control              = mkTyConApp promotedControlDataCon []
+generalCat Format               = mkTyConApp promotedFormatDataCon []
+generalCat Surrogate            = mkTyConApp promotedSurrogateDataCon []
+generalCat PrivateUse           = mkTyConApp promotedPrivateUseDataCon []
+generalCat NotAssigned          = mkTyConApp promotedNotAssignedDataCon []
 
 isMaybeType :: Type -> Maybe (Maybe Type)
 isMaybeType tc | Just (tc1,[t]) <- splitTyConApp_maybe tc, tc1 == promotedJustDataCon = return $ Just t
@@ -1612,61 +1641,6 @@ typeIsLetterTyCon = mkTypeCharPredicateTyCon name
   name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "IsLetter")
                   typeIsLetterTyFamNameKey typeIsLetterTyCon
 
-typeIsMarkTyCon :: TyCon
-typeIsMarkTyCon = mkTypeCharPredicateTyCon name
-  BuiltInSynFamily
-    { sfMatchFam      = matchFamIsMark
-    , sfInteractTop   = \_ _ -> []
-    , sfInteractInert = \_ _ _ _ -> []
-    }
-  where
-  name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "IsMark")
-                  typeIsMarkTyFamNameKey typeIsMarkTyCon
-
-typeIsNumberTyCon :: TyCon
-typeIsNumberTyCon = mkTypeCharPredicateTyCon name
-  BuiltInSynFamily
-    { sfMatchFam      = matchFamIsNumber
-    , sfInteractTop   = \_ _ -> []
-    , sfInteractInert = \_ _ _ _ -> []
-    }
-  where
-  name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "IsNumber")
-                  typeIsNumberTyFamNameKey typeIsNumberTyCon
-
-typeIsPunctuationTyCon :: TyCon
-typeIsPunctuationTyCon = mkTypeCharPredicateTyCon name
-  BuiltInSynFamily
-    { sfMatchFam      = matchFamIsPunctuation
-    , sfInteractTop   = \_ _ -> []
-    , sfInteractInert = \_ _ _ _ -> []
-    }
-  where
-  name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "IsPunctuation")
-                  typeIsPunctuationTyFamNameKey typeIsPunctuationTyCon
-
-typeIsSymbolTyCon :: TyCon
-typeIsSymbolTyCon = mkTypeCharPredicateTyCon name
-  BuiltInSynFamily
-    { sfMatchFam      = matchFamIsSymbol
-    , sfInteractTop   = \_ _ -> []
-    , sfInteractInert = \_ _ _ _ -> []
-    }
-  where
-  name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "IsSymbol")
-                  typeIsSymbolTyFamNameKey typeIsSymbolTyCon
-
-typeIsSeparatorTyCon :: TyCon
-typeIsSeparatorTyCon = mkTypeCharPredicateTyCon name
-  BuiltInSynFamily
-    { sfMatchFam      = matchFamIsSeparator
-    , sfInteractTop   = \_ _ -> []
-    , sfInteractInert = \_ _ _ _ -> []
-    }
-  where
-  name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "IsSeparator")
-                  typeIsSeparatorTyFamNameKey typeIsSeparatorTyCon
-
 
 
 -- | Reduction rules
@@ -1696,11 +1670,6 @@ axIsControlDef
   , axIsOctDigitDef
   , axIsHexDigitDef
   , axIsLetterDef
-  , axIsMarkDef
-  , axIsNumberDef
-  , axIsPunctuationDef
-  , axIsSymbolDef
-  , axIsSeparatorDef
   , axIsPrintDef
   , axIsDigitDef
   :: CoAxiomRule
@@ -1730,21 +1699,6 @@ axIsHexDigitDef = mkAxiomCharPredicate "IsHexDigitDef" typeIsHexDigitTyCon $
 
 axIsLetterDef = mkAxiomCharPredicate "IsLetterDef" typeIsLetterTyCon $
                   \x -> return $ bool (Char.isLetter x)
-
-axIsMarkDef = mkAxiomCharPredicate "IsMarkDef" typeIsMarkTyCon $
-                \x -> return $ bool (Char.isMark x)
-
-axIsNumberDef = mkAxiomCharPredicate "IsNumberDef" typeIsNumberTyCon $
-                  \x -> return $ bool (Char.isNumber x)
-
-axIsPunctuationDef = mkAxiomCharPredicate "IsPunctuationDef" typeIsPunctuationTyCon $
-                       \x -> return $ bool (Char.isPunctuation x)
-
-axIsSymbolDef = mkAxiomCharPredicate "IsSymbolDef" typeIsSymbolTyCon $
-                  \x -> return $ bool (Char.isSymbol x)
-
-axIsSeparatorDef = mkAxiomCharPredicate "IsSeparatorDef" typeIsSeparatorTyCon $
-                     \x -> return $ bool (Char.isSeparator x)
 
 axIsPrintDef = mkAxiomCharPredicate "IsPrintDef" typeIsPrintTyCon $
                  \x -> return $ bool (Char.isPrint x)
@@ -1819,32 +1773,38 @@ matchFamIsLetter [c]
   | otherwise = Nothing
 matchFamIsLetter _ = Nothing
 
-matchFamIsMark :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
-matchFamIsMark [c]
-  | Just c' <- isCharLitTy c = Just (axIsMarkDef, [c], bool (Char.isMark c'))
-  | otherwise = Nothing
-matchFamIsMark _ = Nothing
+-- | The function required for the GeneralCharCategory type family
 
-matchFamIsNumber :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
-matchFamIsNumber [c]
-  | Just c' <- isCharLitTy c = Just (axIsNumberDef, [c], bool (Char.isNumber c'))
-  | otherwise = Nothing
-matchFamIsNumber _ = Nothing
+typeGeneralCharCategoryTyCon :: TyCon
+typeGeneralCharCategoryTyCon = mkTypeCharCategoryTyCon name
+  BuiltInSynFamily
+    { sfMatchFam      = matchFamGeneralCharCategory
+    , sfInteractTop   = \_ _ -> []
+    , sfInteractInert = \_ _ _ _ -> []
+    }
+  where
+  name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "GeneralCharCategory")
+                  typeGeneralCharCategoryTyFamKey typeGeneralCharCategoryTyCon
 
-matchFamIsPunctuation :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
-matchFamIsPunctuation [c]
-  | Just c' <- isCharLitTy c = Just (axIsPunctuationDef, [c], bool (Char.isPunctuation c'))
-  | otherwise = Nothing
-matchFamIsPunctuation _ = Nothing
+mkAxiomCharGeneral :: String -> TyCon -> (Char -> Maybe Type) -> CoAxiomRule
+mkAxiomCharGeneral str tc f =
+  CoAxiomRule
+    { coaxrName      = fsLit str
+    , coaxrAsmpRoles = [Nominal]
+    , coaxrRole      = Nominal
+    , coaxrProves    = \cs ->
+        do [Pair s1 s2] <- return cs
+           s2' <- isCharLitTy s2
+           z   <- f s2'
+           return (mkTyConApp tc [s1] === z)
+    }
 
-matchFamIsSymbol :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
-matchFamIsSymbol [c]
-  | Just c' <- isCharLitTy c = Just (axIsSymbolDef, [c], bool (Char.isSymbol c'))
-  | otherwise = Nothing
-matchFamIsSymbol _ = Nothing
+axGeneralCharCategoryDef :: CoAxiomRule
+axGeneralCharCategoryDef = mkAxiomCharGeneral "GeneralCharCategory" typeGeneralCharCategoryTyCon $
+                             \x -> return $ generalCat (generalCategory x)
 
-matchFamIsSeparator :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
-matchFamIsSeparator [c]
-  | Just c' <- isCharLitTy c = Just (axIsSeparatorDef, [c], bool (Char.isSeparator c'))
+matchFamGeneralCharCategory :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
+matchFamGeneralCharCategory [c]
+  | Just c' <- isCharLitTy c = Just (axGeneralCharCategoryDef, [c], generalCat (generalCategory c'))
   | otherwise = Nothing
-matchFamIsSeparator _ = Nothing
+matchFamGeneralCharCategory _ = Nothing
