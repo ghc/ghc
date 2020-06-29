@@ -162,15 +162,15 @@ withBkpSession cid insts deps session_type do_this = do
       (case session_type of
         -- Make sure to write interfaces when we are type-checking
         -- indefinite packages.
-        TcSession | hscTarget dflags /= HscNothing
+        TcSession | backend dflags /= NoBackend
                   -> flip gopt_set Opt_WriteInterface
                   | otherwise -> id
         CompSession -> id
         ExeSession -> id) $
       dflags {
-        hscTarget   = case session_type of
-                        TcSession -> HscNothing
-                        _ -> hscTarget dflags,
+        backend   = case session_type of
+                        TcSession -> NoBackend
+                        _ -> backend dflags,
         homeUnitInstantiations = insts,
                                  -- if we don't have any instantiation, don't
                                  -- fill `homeUnitInstanceOfId` as it makes no
@@ -505,8 +505,7 @@ mkBackpackMsg = do
           showMsg msg reason =
             backpackProgressMsg level dflags $
                 showModuleIndex mod_index ++
-                msg ++ showModMsg dflags (hscTarget dflags)
-                                  (recompileRequired recomp) mod_summary
+                msg ++ showModMsg dflags (recompileRequired recomp) mod_summary
                     ++ reason
       in case recomp of
             MustCompile -> showMsg "Compiling " ""

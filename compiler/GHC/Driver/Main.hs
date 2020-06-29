@@ -149,6 +149,7 @@ import GHC.Runtime.Loader   ( initializePlugins )
 import GHC.StgToCmm.Types (CgInfos (..), ModuleLFInfos)
 
 import GHC.Driver.Session
+import GHC.Driver.Backend
 import GHC.Utils.Error
 
 import GHC.Utils.Outputable
@@ -784,7 +785,7 @@ finish :: ModSummary
 finish summary tc_result mb_old_hash = do
   hsc_env <- getHscEnv
   let dflags = hsc_dflags hsc_env
-      target = hscTarget dflags
+      bcknd  = backend dflags
       hsc_src = ms_hsc_src summary
 
   -- Desugar, if appropriate
@@ -802,7 +803,7 @@ finish summary tc_result mb_old_hash = do
   -- interface file.
   case mb_desugar of
       -- Just cause we desugared doesn't mean we are generating code, see above.
-      Just desugared_guts | target /= HscNothing -> do
+      Just desugared_guts | bcknd /= NoBackend -> do
           plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
           simplified_guts <- hscSimplify' plugins desugared_guts
 
@@ -830,11 +831,12 @@ finish summary tc_result mb_old_hash = do
 
         liftIO $ hscMaybeWriteIface dflags iface mb_old_iface_hash (ms_location summary)
 
-        return $ case (target, hsc_src) of
-          (HscNothing, _) -> HscNotGeneratingCode iface details
-          (_, HsBootFile) -> HscUpdateBoot iface details
-          (_, HsigFile) -> HscUpdateSig iface details
-          _ -> panic "finish"
+        return $ case bcknd of
+          NoBackend -> HscNotGeneratingCode iface details
+          _         -> case hsc_src of
+                        HsBootFile -> HscUpdateBoot iface details
+                        HsigFile   -> HscUpdateSig iface details
+                        _          -> panic "finish"
 
 {-
 Note [Writing interface files]
@@ -853,10 +855,10 @@ hscMaybeWriteIface, but only once per compilation (twice with dynamic-too).
 hscMaybeWriteIface :: DynFlags -> ModIface -> Maybe Fingerprint -> ModLocation -> IO ()
 hscMaybeWriteIface dflags iface old_iface location = do
     let force_write_interface = gopt Opt_WriteInterface dflags
-        write_interface = case hscTarget dflags of
-                            HscNothing      -> False
-                            HscInterpreted  -> False
-                            _               -> True
+        write_interface = case backend dflags of
+                            NoBackend    -> False
+                            Interpreter  -> False
+                            _            -> True
         no_change = old_iface == Just (mi_iface_hash (mi_final_exts iface))
 
     when (write_interface || force_write_interface) $
@@ -901,8 +903,7 @@ batchMsg hsc_env mod_index recomp mod_summary =
         showMsg msg reason =
             compilationProgressMsg dflags $
             (showModuleIndex mod_index ++
-            msg ++ showModMsg dflags (hscTarget dflags)
-                              (recompileRequired recomp) mod_summary)
+            msg ++ showModMsg dflags (recompileRequired recomp) mod_summary)
                 ++ reason
 
 --------------------------------------------------------------

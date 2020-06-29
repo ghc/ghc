@@ -24,6 +24,7 @@ import GHC.Cmm.Dataflow.Collections
 
 import GHC.Types.Unique.Supply
 import GHC.Driver.Session
+import GHC.Driver.Backend
 import GHC.Utils.Error
 import GHC.Driver.Types
 import Control.Monad
@@ -171,7 +172,7 @@ cpsTop hsc_env proc =
         -- tablesNextToCode is off.  The latter is because we have no
         -- label to put on info tables for basic blocks that are not
         -- the entry point.
-        splitting_proc_points = hscTarget dflags /= HscAsm
+        splitting_proc_points = backend dflags /= NCG
                              || not (platformTablesNextToCode platform)
                              || -- Note [inconsistent-pic-reg]
                                 usingInconsistentPicReg
