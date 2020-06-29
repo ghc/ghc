@@ -16,9 +16,7 @@ module Main (main) where
 
 -- The official GHC API
 import qualified GHC
-import GHC              ( -- DynFlags(..), HscTarget(..),
-                          -- GhcMode(..), GhcLink(..),
-                          Ghc, GhcMonad(..),
+import GHC              ( Ghc, GhcMonad(..), Backend (..),
                           LoadHowMuch(..) )
 import GHC.Driver.CmdLine
 
@@ -152,23 +150,23 @@ main = do
 main' :: PostLoadMode -> DynFlags -> [Located String] -> [Warn]
       -> Ghc ()
 main' postLoadMode dflags0 args flagWarnings = do
-  -- set the default GhcMode, HscTarget and GhcLink.  The HscTarget
+  -- set the default GhcMode, backend and GhcLink.  The backend
   -- can be further adjusted on a module by module basis, using only
-  -- the -fvia-C and -fasm flags.  If the default HscTarget is not
-  -- HscC or HscAsm, -fvia-C and -fasm have no effect.
-  let dflt_target = hscTarget dflags0
-      (mode, lang, link)
+  -- the -fllvm and -fasm flags.  If the default backend is not
+  -- LLVM or NCG, -fllvm and -fasm have no effect.
+  let dflt_backend = backend dflags0
+      (mode, bcknd, link)
          = case postLoadMode of
-               DoInteractive   -> (CompManager, HscInterpreted, LinkInMemory)
-               DoEval _        -> (CompManager, HscInterpreted, LinkInMemory)
-               DoMake          -> (CompManager, dflt_target,    LinkBinary)
-               DoBackpack      -> (CompManager, dflt_target,    LinkBinary)
-               DoMkDependHS    -> (MkDepend,    dflt_target,    LinkBinary)
-               DoAbiHash       -> (OneShot,     dflt_target,    LinkBinary)
-               _               -> (OneShot,     dflt_target,    LinkBinary)
+               DoInteractive   -> (CompManager, Interpreter,  LinkInMemory)
+               DoEval _        -> (CompManager, Interpreter,  LinkInMemory)
+               DoMake          -> (CompManager, dflt_backend, LinkBinary)
+               DoBackpack      -> (CompManager, dflt_backend, LinkBinary)
+               DoMkDependHS    -> (MkDepend,    dflt_backend, LinkBinary)
+               DoAbiHash       -> (OneShot,     dflt_backend, LinkBinary)
+               _               -> (OneShot,     dflt_backend, LinkBinary)
 
   let dflags1 = dflags0{ ghcMode   = mode,
-                         hscTarget = lang,
+                         backend   = bcknd,
                          ghcLink   = link,
                          verbosity = case postLoadMode of
                                          DoEval _ -> 0
@@ -195,8 +193,8 @@ main' postLoadMode dflags0 args flagWarnings = do
   (dflags3, fileish_args, dynamicFlagWarnings) <-
       GHC.parseDynamicFlags dflags2 args
 
-  let dflags4 = case lang of
-                HscInterpreted | not (gopt Opt_ExternalInterpreter dflags3) ->
+  let dflags4 = case bcknd of
+                Interpreter | not (gopt Opt_ExternalInterpreter dflags3) ->
                     let platform = targetPlatform dflags3
                         dflags3a = dflags3 { ways = hostFullWays }
                         dflags3b = foldl gopt_set dflags3a
@@ -383,7 +381,7 @@ checkOptions mode dflags srcs objs = do
         else do
 
    case mode of
-      StopBefore HCc | hscTarget dflags /= HscC
+      StopBefore HCc | backend dflags /= ViaC
         -> throwGhcException $ UsageError $
            "the option -C is only available with an unregisterised GHC"
       StopBefore (As False) | ghcLink dflags == NoLink

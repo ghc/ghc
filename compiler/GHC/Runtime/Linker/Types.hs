@@ -71,7 +71,7 @@ data Linkable = LM {
     --
     -- INVARIANT: A valid linkable always has at least one 'Unlinked' item.
     -- If this list is empty, the Linkable represents a fake linkable, which
-    -- is generated in HscNothing mode to avoid recompiling modules.
+    -- is generated with no backend is used to avoid recompiling modules.
     --
     -- ToDo: Do items get removed from this list when they get linked?
  }
