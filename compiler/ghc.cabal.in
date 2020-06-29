@@ -162,6 +162,7 @@ Library
         GHC.Iface.Ext.Ast
         GHC.SysTools.Ar
         GHC.SysTools.FileCleanup
+        GHC.Driver.Backend
         GHC.Driver.Backpack
         GHC.Driver.Backpack.Syntax
         GHC.Types.Name.Shape

@@ -62,7 +62,6 @@ if [ ! -f b2-stamp ]; then
    # code too.  If you don't want it to, then comment out this line:
    echo "GhcUnregisterised = YES" >> mk/build.mk
    echo "SRC_HC_OPTS += -keep-hc-file -fvia-C" >> mk/build.mk
-   echo "GhcWithNativeCodeGen = NO" >> mk/build.mk
    echo "GhcWithInterpreter = NO" >> mk/build.mk
 
    # we just need to build the compiler and utils...

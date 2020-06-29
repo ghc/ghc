@@ -149,7 +149,6 @@ initSettings top_dir = do
   let iserv_prog = libexec "ghc-iserv"
 
   ghcWithInterpreter <- getBooleanSetting "Use interpreter"
-  ghcWithNativeCodeGen <- getBooleanSetting "Use native code generator"
   ghcWithSMP <- getBooleanSetting "Support SMP"
   ghcRTSWays <- getSetting "RTS ways"
   useLibFFI <- getBooleanSetting "Use LibFFI"
@@ -216,7 +215,6 @@ initSettings top_dir = do
     , sPlatformMisc = PlatformMisc
       { platformMisc_targetPlatformString = targetPlatformString
       , platformMisc_ghcWithInterpreter = ghcWithInterpreter
-      , platformMisc_ghcWithNativeCodeGen = ghcWithNativeCodeGen
       , platformMisc_ghcWithSMP = ghcWithSMP
       , platformMisc_ghcRTSWays = ghcRTSWays
       , platformMisc_libFFI = useLibFFI

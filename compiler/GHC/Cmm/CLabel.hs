@@ -1255,7 +1255,7 @@ pprCLabel dflags = \case
 
   where
     platform = targetPlatform dflags
-    useNCG   = platformMisc_ghcWithNativeCodeGen (platformMisc dflags)
+    useNCG   = hscTarget dflags == HscAsm
 
     maybe_underscore :: SDoc -> SDoc
     maybe_underscore doc =
