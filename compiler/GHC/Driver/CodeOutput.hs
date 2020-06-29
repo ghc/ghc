@@ -23,6 +23,7 @@ import GHC.CmmToLlvm    ( llvmCodeGen )
 import GHC.Types.Unique.Supply ( mkSplitUniqSupply )
 
 import GHC.Driver.Finder    ( mkStubPaths )
+import GHC.Driver.Backend
 import GHC.CmmToC           ( writeC )
 import GHC.Cmm.Lint         ( cmmLint )
 import GHC.Cmm              ( RawCmmGroup )
@@ -94,13 +95,13 @@ codeOutput dflags this_mod filenm location foreign_stubs foreign_fps pkg_deps
                 }
 
         ; stubs_exist <- outputForeignStubs dflags this_mod location foreign_stubs
-        ; a <- case hscTarget dflags of
-                 HscAsm         -> outputAsm dflags this_mod location filenm
-                                             linted_cmm_stream
-                 HscC           -> outputC dflags filenm linted_cmm_stream pkg_deps
-                 HscLlvm        -> outputLlvm dflags filenm linted_cmm_stream
-                 HscInterpreted -> panic "codeOutput: HscInterpreted"
-                 HscNothing     -> panic "codeOutput: HscNothing"
+        ; a <- case backend dflags of
+                 NCG         -> outputAsm dflags this_mod location filenm
+                                          linted_cmm_stream
+                 ViaC        -> outputC dflags filenm linted_cmm_stream pkg_deps
+                 LLVM        -> outputLlvm dflags filenm linted_cmm_stream
+                 Interpreter -> panic "codeOutput: Interpreter"
+                 NoBackend   -> panic "codeOutput: NoBackend"
         ; return (filenm, stubs_exist, foreign_fps, a)
         }
 
