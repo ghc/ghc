@@ -73,8 +73,7 @@ packageArgs = do
               notStage0 ? arg "--ghc-pkg-option=--force" ]
 
           , builder (Cabal Flags) ? mconcat
-            [ ghcWithNativeCodeGen ? arg "ncg"
-            , ghcWithInterpreter ? notStage0 ? arg "ghci"
+            [ ghcWithInterpreter ? notStage0 ? arg "ghci"
             , cross ? arg "-terminfo"
             ]
 

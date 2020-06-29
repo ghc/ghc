@@ -200,11 +200,6 @@ ifeq "$(GhcThreadedRts)" "YES"
 compiler_stage1_CONFIGURE_OPTS += --ghc-option=-optc-DTHREADED_RTS
 endif
 
-ifeq "$(GhcWithNativeCodeGen)" "YES"
-compiler_stage1_CONFIGURE_OPTS += --flags=ncg
-compiler_stage2_CONFIGURE_OPTS += --flags=ncg
-endif
-
 ifeq "$(GhcWithInterpreter)" "YES"
 compiler_stage2_CONFIGURE_OPTS += --flags=ghci
 
