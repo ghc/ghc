@@ -54,7 +54,7 @@ os :: String
 os = HOST_OS
 
 -- | The machine architecture on which the program is running.
--- You may encounter the following values:
+-- Common values include:
 --
 --    * "aarch64"
 --    * "alpha"
