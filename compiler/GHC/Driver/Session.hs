@@ -130,7 +130,6 @@ module GHC.Driver.Session (
         sExtraGccViaCFlags,
         sTargetPlatformString,
         sGhcWithInterpreter,
-        sGhcWithNativeCodeGen,
         sGhcWithSMP,
         sGhcRTSWays,
         sLibFFI,
