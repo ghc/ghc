@@ -45,6 +45,29 @@ Highlights
   This improves runtime but causes increased memory usage on Windows versions
   older than Win 8.1/Server 2012.
 
+* Big-number support
+
+  - GHC now relies on a new "ghc-bignum" package to provide Integer/Natural
+    implementations. This package supports the following backends:
+      - gmp: adapted from integer-gmp package that was used before
+      - native: new Haskell implementation, faster than integer-simple which is
+        not used anymore
+
+  - All backends now use the same representation for big numbers (the one that
+    was previously used only by integer-gmp). It led to several compiler
+    simplifications, performance improvements and bug fixes (e.g.
+    :ghc-ticket:`15262`, :ghc-ticket:`15286`).
+
+  - All backends must provide exactly the same set of functions with
+    deterministic results so that they can be tested one against the other (they
+    can only differ in performance). As a consequence, some functions that were
+    only provided by integer-gmp (prime test, secure powmod, etc.) are no longer
+    provided by ghc-bignum. Note that other packages (e.g. hgmp) provide these
+    functions.
+
+  - For now GHC still doesn't allow dynamic selection of the ghc-bignum backend
+    to use.
+
 Full details
 ------------
 
@@ -149,6 +172,22 @@ Language
 
     data U a where
       MkU :: (Show a => U a)
+
+* GHC more strictly enforces the rule that the type in the top of an instance
+  declaration is not permitted to contain nested ``forall``\ s or contexts, as
+  documented in :ref:`formal-instance-syntax`. For example, the following
+  examples, which previous versions of GHC would accept, are now rejected:
+
+    instance (forall a. C a) where ...
+    instance (Show a => C a) where ...
+
+  In addition, GHC now enforces the rule that the types in ``deriving`` clauses
+  and ``via`` types (for instances derived with :extension:`DerivingVia`)
+  cannot contain nested ``forall``\ s or contexts. For example, the following
+  examples, which previous versions of GHC would accept, are now rejected: ::
+
+    data T = MkT deriving (C1, (forall x. C2 x))
+    deriving via (forall x. V x) instance C (S x)
 
 * A new language extension :extension:`QualifiedDo` is implemented, allowing
   to qualify a do block to control which operations to use for desugaring do
