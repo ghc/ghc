@@ -46,6 +46,7 @@ import GHC.Core.FamInstEnv
 import GHC.Tc.Utils.Monad
 import GHC.Hs
 import GHC.Driver.Types
+import GHC.Driver.Backend
 import GHC.Driver.Session
 import GHC.Types.Var.Env
 import GHC.Types.Var
@@ -144,7 +145,7 @@ updateDecl decls (Just CgInfos{ cgNonCafs = NonCaffySet non_cafs, cgLFInfos = lf
 
 -- | Make an interface from the results of typechecking only.  Useful
 -- for non-optimising compilation, or where we aren't generating any
--- object code at all ('HscNothing').
+-- object code at all ('NoBackend').
 mkIfaceTc :: HscEnv
           -> SafeHaskellMode    -- The safe haskell mode
           -> ModDetails         -- gotten from mkBootModDetails, probably
@@ -301,8 +302,8 @@ mkIface_ hsc_env
      -- scope available. (#5534)
      maybeGlobalRdrEnv :: GlobalRdrEnv -> Maybe GlobalRdrEnv
      maybeGlobalRdrEnv rdr_env
-         | targetRetainsAllBindings (hscTarget dflags) = Just rdr_env
-         | otherwise                                   = Nothing
+         | backendRetainsAllBindings (backend dflags) = Just rdr_env
+         | otherwise                                  = Nothing
 
      ifFamInstTcName = ifFamInstFam
 

@@ -40,6 +40,7 @@ import qualified GHC.Runtime.Linker as Linker
 import GHC.Driver.Phases
 import GHC.Driver.Pipeline
 import GHC.Driver.Session
+import GHC.Driver.Backend
 import GHC.Utils.Error
 import GHC.Driver.Finder
 import GHC.Driver.Monad
@@ -274,7 +275,7 @@ data LoadHowMuch
 --
 -- This function implements the core of GHC's @--make@ mode.  It preprocesses,
 -- compiles and loads the specified modules, avoiding re-compilation wherever
--- possible.  Depending on the target (see 'GHC.Driver.Session.hscTarget') compiling
+-- possible.  Depending on the backend (see 'DynFlags.backend' field) compiling
 -- and loading may result in files being created on disk.
 --
 -- Calls the 'defaultWarnErrLogger' after each compiling each module, whether
@@ -1516,7 +1517,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
                         -- Add any necessary entries to the static pointer
                         -- table. See Note [Grand plan for static forms] in
                         -- GHC.Iface.Tidy.StaticPtrTable.
-                when (hscTarget (hsc_dflags hsc_env4) == HscInterpreted) $
+                when (backend (hsc_dflags hsc_env4) == Interpreter) $
                     liftIO $ hscAddSptEntries hsc_env4
                                  [ spt
                                  | Just linkable <- pure $ hm_linkable mod_info
@@ -1575,24 +1576,25 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
             -- We're using the dflags for this module now, obtained by
             -- applying any options in its LANGUAGE & OPTIONS_GHC pragmas.
             dflags = ms_hspp_opts summary
-            prevailing_target = hscTarget (hsc_dflags hsc_env)
-            local_target      = hscTarget dflags
+            prevailing_backend = backend (hsc_dflags hsc_env)
+            local_backend      = backend dflags
 
             -- If OPTIONS_GHC contains -fasm or -fllvm, be careful that
             -- we don't do anything dodgy: these should only work to change
             -- from -fllvm to -fasm and vice-versa, or away from -fno-code,
             -- otherwise we could end up trying to link object code to byte
             -- code.
-            target = if prevailing_target /= local_target
-                        && (not (isObjectTarget prevailing_target)
-                            || not (isObjectTarget local_target))
-                        && not (prevailing_target == HscNothing)
-                        && not (prevailing_target == HscInterpreted)
-                        then prevailing_target
-                        else local_target
+            bcknd = case (prevailing_backend,local_backend) of
+               (LLVM,NCG) -> NCG
+               (NCG,LLVM) -> LLVM
+               (NoBackend,b)
+                  | backendProducesObject b -> b
+               (Interpreter,b)
+                  | backendProducesObject b -> b
+               _ -> prevailing_backend
 
-            -- store the corrected hscTarget into the summary
-            summary' = summary{ ms_hspp_opts = dflags { hscTarget = target } }
+            -- store the corrected backend into the summary
+            summary' = summary{ ms_hspp_opts = dflags { backend = bcknd } }
 
             -- The old interface is ok if
             --  a) we're compiling a source file, and the old HPT
@@ -1623,9 +1625,9 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
                   compileOne' Nothing mHscMessage hsc_env summary' mod_index nmods
                              Nothing mb_linkable src_modified
 
-            -- With the HscNothing target we create empty linkables to avoid
-            -- recompilation.  We have to detect these to recompile anyway if
-            -- the target changed since the last compile.
+            -- With NoBackend we create empty linkables to avoid recompilation.
+            -- We have to detect these to recompile anyway if the backend changed
+            -- since the last compile.
             is_fake_linkable
                | Just hmi <- old_hmi, Just l <- hm_linkable hmi =
                   null (linkableUnlinked l)
@@ -1658,8 +1660,8 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
                 -- object is stable, but we need to load the interface
                 -- off disk to make a HMI.
 
-          | not (isObjectTarget target), is_stable_bco,
-            (target /= HscNothing) `implies` not is_fake_linkable ->
+          | not (backendProducesObject bcknd), is_stable_bco,
+            (bcknd /= NoBackend) `implies` not is_fake_linkable ->
                 ASSERT(isJust old_hmi) -- must be in the old_hpt
                 let Just hmi = old_hmi in do
                 liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
@@ -1667,11 +1669,11 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
                 return hmi
                 -- BCO is stable: nothing to do
 
-          | not (isObjectTarget target),
+          | not (backendProducesObject bcknd),
             Just hmi <- old_hmi,
             Just l <- hm_linkable hmi,
             not (isObjectLinkable l),
-            (target /= HscNothing) `implies` not is_fake_linkable,
+            (bcknd /= NoBackend) `implies` not is_fake_linkable,
             linkableTime l >= ms_hs_date summary -> do
                 liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
                            (text "compiling non-stable BCO mod:" <+> ppr this_mod_name)
@@ -1688,7 +1690,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
           -- separately and generated a new interface, that we must
           -- read from the disk.
           --
-          | isObjectTarget target,
+          | backendProducesObject bcknd,
             Just obj_date <- mb_obj_date,
             obj_date >= hs_date -> do
                 case old_hmi of
@@ -1728,7 +1730,7 @@ possible.
 When GHC is invoked with -fno-code no object files or linked output will be
 generated. As many errors and warnings as possible will be generated, as if
 -fno-code had not been passed. The session DynFlags will have
-hscTarget == HscNothing.
+backend == NoBackend.
 
 -fwrite-interface
 ~~~~~~~~~~~~~~~~
@@ -2109,15 +2111,11 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
        -- for dependencies of modules that have -XTemplateHaskell,
        -- otherwise those modules will fail to compile.
        -- See Note [-fno-code mode] #8025
-       map1 <- if hscTarget dflags == HscNothing
-         then enableCodeGenForTH
-           (defaultObjectTarget dflags)
-           map0
-         else if hscTarget dflags == HscInterpreted
-           then enableCodeGenForUnboxedTuplesOrSums
-             (defaultObjectTarget dflags)
-             map0
-           else return map0
+       let default_backend = platformDefaultBackend (targetPlatform dflags)
+       map1 <- case backend dflags of
+         NoBackend   -> enableCodeGenForTH default_backend map0
+         Interpreter -> enableCodeGenForUnboxedTuplesOrSums default_backend map0
+         _           -> return map0
        if null errs
          then pure $ concat $ nodeMapElts map1
          else pure $ map Left errs
@@ -2200,7 +2198,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
 -- the specified target, disable optimization and change the .hi
 -- and .o file locations to be temporary files.
 -- See Note [-fno-code mode]
-enableCodeGenForTH :: HscTarget
+enableCodeGenForTH :: Backend
   -> NodeMap [Either ErrorMessages ModSummary]
   -> IO (NodeMap [Either ErrorMessages ModSummary])
 enableCodeGenForTH =
@@ -2208,7 +2206,7 @@ enableCodeGenForTH =
   where
     condition = isTemplateHaskellOrQQNonBoot
     should_modify (ModSummary { ms_hspp_opts = dflags }) =
-      hscTarget dflags == HscNothing &&
+      backend dflags == NoBackend &&
       -- Don't enable codegen for TH on indefinite packages; we
       -- can't compile anything anyway! See #16219.
       homeUnitIsDefinite dflags
@@ -2220,7 +2218,7 @@ enableCodeGenForTH =
 --
 -- This is used in order to load code that uses unboxed tuples
 -- or sums into GHCi while still allowing some code to be interpreted.
-enableCodeGenForUnboxedTuplesOrSums :: HscTarget
+enableCodeGenForUnboxedTuplesOrSums :: Backend
   -> NodeMap [Either ErrorMessages ModSummary]
   -> IO (NodeMap [Either ErrorMessages ModSummary])
 enableCodeGenForUnboxedTuplesOrSums =
@@ -2233,7 +2231,7 @@ enableCodeGenForUnboxedTuplesOrSums =
     unboxed_tuples_or_sums d =
       xopt LangExt.UnboxedTuples d || xopt LangExt.UnboxedSums d
     should_modify (ModSummary { ms_hspp_opts = dflags }) =
-      hscTarget dflags == HscInterpreted
+      backend dflags == Interpreter
 
 -- | Helper used to implement 'enableCodeGenForTH' and
 -- 'enableCodeGenForUnboxedTuples'. In particular, this enables
@@ -2246,10 +2244,10 @@ enableCodeGenWhen
   -> (ModSummary -> Bool)
   -> TempFileLifetime
   -> TempFileLifetime
-  -> HscTarget
+  -> Backend
   -> NodeMap [Either ErrorMessages ModSummary]
   -> IO (NodeMap [Either ErrorMessages ModSummary])
-enableCodeGenWhen condition should_modify staticLife dynLife target nodemap =
+enableCodeGenWhen condition should_modify staticLife dynLife bcknd nodemap =
   traverse (traverse (traverse enable_code_gen)) nodemap
   where
     enable_code_gen ms
@@ -2282,7 +2280,7 @@ enableCodeGenWhen condition should_modify staticLife dynLife target nodemap =
           ms
           { ms_location =
               ms_location {ml_hi_file = hi_file, ml_obj_file = o_file}
-          , ms_hspp_opts = updOptLevel 0 $ dflags {hscTarget = target}
+          , ms_hspp_opts = updOptLevel 0 $ dflags {backend = bcknd}
           }
       | otherwise = return ms
 
@@ -2433,7 +2431,7 @@ checkSummaryTimestamp
       not (gopt Opt_ForceRecomp (hsc_dflags hsc_env)) = do
            -- update the object-file timestamp
            obj_timestamp <-
-             if isObjectTarget (hscTarget (hsc_dflags hsc_env))
+             if backendProducesObject (backend (hsc_dflags hsc_env))
                  || obj_allowed -- bug #1205
                  then liftIO $ getObjTimestamp location is_boot
                  else return Nothing
@@ -2609,7 +2607,7 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
   -- when the user asks to load a source file by name, we only
   -- use an object file if -fobject-code is on.  See #1205.
   obj_timestamp <- liftIO $
-      if isObjectTarget (hscTarget dflags)
+      if backendProducesObject (backend dflags)
          || nms_obj_allowed -- bug #1205
           then getObjTimestamp nms_location nms_is_boot
           else return Nothing

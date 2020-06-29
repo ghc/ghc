@@ -18,6 +18,7 @@ import GHC.Prelude
 
 import GHC.Tc.Types
 import GHC.Driver.Session
+import GHC.Driver.Backend
 import GHC.Core
 import GHC.Core.Unfold
 import GHC.Core.FVs
@@ -383,10 +384,10 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
              sptCreateStaticBinds hsc_env mod tidy_binds
         ; let { spt_init_code = sptModuleInitCode mod spt_entries
               ; add_spt_init_code =
-                  case hscTarget dflags of
+                  case backend dflags of
                     -- If we are compiling for the interpreter we will insert
                     -- any necessary SPT entries dynamically
-                    HscInterpreted -> id
+                    Interpreter -> id
                     -- otherwise add a C stub to do so
                     _              -> (`appendStubC` spt_init_code)
 

@@ -57,6 +57,7 @@ import GHC.Core.TyCon
 import GHC.Tc.Utils.TcType
 import GHC.Builtin.Names
 import GHC.Driver.Session
+import GHC.Driver.Backend
 import GHC.Utils.Outputable as Outputable
 import GHC.Platform
 import GHC.Types.SrcLoc
@@ -474,31 +475,31 @@ checkSafe, noCheckSafe :: Bool
 checkSafe   = True
 noCheckSafe = False
 
--- Checking a supported backend is in use
-
-checkCOrAsmOrLlvm :: HscTarget -> Validity
-checkCOrAsmOrLlvm HscC    = IsValid
-checkCOrAsmOrLlvm HscAsm  = IsValid
-checkCOrAsmOrLlvm HscLlvm = IsValid
+-- | Checking a supported backend is in use
+checkCOrAsmOrLlvm :: Backend -> Validity
+checkCOrAsmOrLlvm ViaC = IsValid
+checkCOrAsmOrLlvm NCG  = IsValid
+checkCOrAsmOrLlvm LLVM = IsValid
 checkCOrAsmOrLlvm _
   = NotValid (text "requires unregisterised, llvm (-fllvm) or native code generation (-fasm)")
 
-checkCOrAsmOrLlvmOrInterp :: HscTarget -> Validity
-checkCOrAsmOrLlvmOrInterp HscC           = IsValid
-checkCOrAsmOrLlvmOrInterp HscAsm         = IsValid
-checkCOrAsmOrLlvmOrInterp HscLlvm        = IsValid
-checkCOrAsmOrLlvmOrInterp HscInterpreted = IsValid
+-- | Checking a supported backend is in use
+checkCOrAsmOrLlvmOrInterp :: Backend -> Validity
+checkCOrAsmOrLlvmOrInterp ViaC        = IsValid
+checkCOrAsmOrLlvmOrInterp NCG         = IsValid
+checkCOrAsmOrLlvmOrInterp LLVM        = IsValid
+checkCOrAsmOrLlvmOrInterp Interpreter = IsValid
 checkCOrAsmOrLlvmOrInterp _
   = NotValid (text "requires interpreted, unregisterised, llvm or native code generation")
 
-checkCg :: (HscTarget -> Validity) -> TcM ()
+checkCg :: (Backend -> Validity) -> TcM ()
 checkCg check = do
     dflags <- getDynFlags
-    let target = hscTarget dflags
-    case target of
-      HscNothing -> return ()
+    let bcknd = backend dflags
+    case bcknd of
+      NoBackend -> return ()
       _ ->
-        case check target of
+        case check bcknd of
           IsValid      -> return ()
           NotValid err -> addErrTc (text "Illegal foreign declaration:" <+> err)
 

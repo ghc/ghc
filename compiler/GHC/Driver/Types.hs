@@ -192,6 +192,7 @@ import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Builtin.Names ( gHC_PRIM, ioTyConName, printName, mkInteractiveModule )
 import GHC.Builtin.Types
+import GHC.Driver.Backend
 import GHC.Driver.CmdLine
 import GHC.Driver.Session
 import GHC.Runtime.Linker.Types ( DynLinker, Linkable(..), Unlinked(..), SptEntry(..) )
@@ -2997,8 +2998,8 @@ instance Outputable ModSummary where
              char '}'
             ]
 
-showModMsg :: DynFlags -> HscTarget -> Bool -> ModSummary -> String
-showModMsg dflags target recomp mod_summary = showSDoc dflags $
+showModMsg :: DynFlags -> Bool -> ModSummary -> String
+showModMsg dflags recomp mod_summary = showSDoc dflags $
    if gopt Opt_HideSourcePaths dflags
       then text mod_str
       else hsep $
@@ -3017,10 +3018,10 @@ showModMsg dflags target recomp mod_summary = showSDoc dflags $
     mod      = moduleName (ms_mod mod_summary)
     mod_str  = showPpr dflags mod ++ hscSourceString (ms_hsc_src mod_summary)
     dyn_file = op $ msDynObjFilePath mod_summary dflags
-    obj_file = case target of
-                HscInterpreted | recomp -> "interpreted"
-                HscNothing              -> "nothing"
-                _                       -> (op $ msObjFilePath mod_summary)
+    obj_file = case backend dflags of
+                Interpreter | recomp -> "interpreted"
+                NoBackend            -> "nothing"
+                _                    -> (op $ msObjFilePath mod_summary)
 
 {-
 ************************************************************************
@@ -3171,7 +3172,7 @@ isObjectLinkable l = not (null unlinked) && all isObject unlinked
   where unlinked = linkableUnlinked l
         -- A linkable with no Unlinked's is treated as a BCO.  We can
         -- generate a linkable with no Unlinked's as a result of
-        -- compiling a module in HscNothing mode, and this choice
+        -- compiling a module in NoBackend mode, and this choice
         -- happens to work well with checkStability in module GHC.
 
 linkableObjs :: Linkable -> [FilePath]

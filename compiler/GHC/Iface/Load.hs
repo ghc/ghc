@@ -41,6 +41,7 @@ import {-# SOURCE #-} GHC.IfaceToCore
    , tcIfaceAnnotations, tcIfaceCompleteSigs )
 
 import GHC.Driver.Session
+import GHC.Driver.Backend
 import GHC.Iface.Syntax
 import GHC.Iface.Env
 import GHC.Driver.Types
@@ -592,12 +593,12 @@ dontLeakTheHPT thing_inside = do
          -- instantiation of a signature might reside in the HPT, so
          -- this case breaks the assumption that EPS interfaces only
          -- refer to other EPS interfaces. We can detect when we're in
-         -- typechecking-only mode by using hscTarget==HscNothing, and
+         -- typechecking-only mode by using backend==NoBackend, and
          -- in that case we don't empty the HPT.  (admittedly this is
          -- a bit of a hack, better suggestions welcome). A number of
          -- tests in testsuite/tests/backpack break without this
          -- tweak.
-         !hpt | hscTarget hsc_dflags == HscNothing = hsc_HPT
+         !hpt | backend hsc_dflags == NoBackend = hsc_HPT
               | otherwise = emptyHomePackageTable
        in
        HscEnv {  hsc_targets      = panic "cleanTopEnv: hsc_targets"

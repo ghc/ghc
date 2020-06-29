@@ -129,6 +129,7 @@ import GHC.Types.CostCentre
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Driver.Session
+import GHC.Driver.Backend
 import GHC.Platform
 import GHC.Types.Unique.Set
 import GHC.Utils.Misc
@@ -1255,7 +1256,7 @@ pprCLabel dflags = \case
 
   where
     platform = targetPlatform dflags
-    useNCG   = hscTarget dflags == HscAsm
+    useNCG   = backend dflags == NCG
 
     maybe_underscore :: SDoc -> SDoc
     maybe_underscore doc =

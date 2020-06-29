@@ -21,7 +21,7 @@ runGhc' args act = do
       dflags0 <- getSessionDynFlags
       (dflags1, _leftover, _warns) <- parseDynamicFlags dflags0 flags
       let dflags2 = dflags1 {
-              hscTarget = HscInterpreted
+              backend   = Interpreter
             , ghcLink   = LinkInMemory
             , verbosity = 1
             }

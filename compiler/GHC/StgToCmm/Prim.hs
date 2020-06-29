@@ -37,6 +37,7 @@ import GHC.StgToCmm.Heap
 import GHC.StgToCmm.Prof ( costCentreFrom )
 
 import GHC.Driver.Session
+import GHC.Driver.Backend
 import GHC.Platform
 import GHC.Types.Basic
 import GHC.Cmm.BlockId
@@ -1594,12 +1595,8 @@ emitPrimOp dflags primop = case primop of
     [_, CmmLit (CmmInt n _) ] -> isJust (exactLog2 n)
     _                         -> False
 
-  ncg = case hscTarget dflags of
-           HscAsm -> True
-           _      -> False
-  llvm = case hscTarget dflags of
-           HscLlvm -> True
-           _       -> False
+  ncg  = backend dflags == NCG
+  llvm = backend dflags == LLVM
   x86ish = case platformArch platform of
              ArchX86    -> True
              ArchX86_64 -> True
@@ -2169,7 +2166,7 @@ vecElemProjectCast _        _        _   =  Nothing
 
 checkVecCompatibility :: DynFlags -> PrimOpVecCat -> Length -> Width -> FCode ()
 checkVecCompatibility dflags vcat l w = do
-    when (hscTarget dflags /= HscLlvm) $ do
+    when (backend dflags /= LLVM) $ do
         sorry $ unlines ["SIMD vector instructions require the LLVM back-end."
                          ,"Please use -fllvm."]
     check vecWidth vcat l w
