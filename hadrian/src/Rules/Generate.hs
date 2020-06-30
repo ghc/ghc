@@ -407,7 +407,8 @@ generateGhcVersionH = do
         , "#define __GLASGOW_HASKELL__ " ++ version
         , "#endif"
         , "#if !defined(__GLASGOW_HASKELL_FULL_VERSION__)"
-        , "#define __GLASGOW_HASKELL_FULL_VERSION__ " ++ fullVersion
+        , "#define __GLASGOW_HASKELL_FULL_VERSION__ \"" ++ fullVersion ++ "\""
+
         , "#endif"
         , ""]
         ++
