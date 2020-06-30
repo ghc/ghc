@@ -12,6 +12,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 {-|
 
@@ -41,8 +42,8 @@ module GHC.TypeLits
   , N.SomeNat(..), SomeSymbol(..)
   , someNatVal, someSymbolVal
   , N.sameNat, sameSymbol
-  , SymbolOrdering(..)
-  , cmpSymbol
+  , Compare, LitOrdering(..)
+  , cmpNat, cmpSymbol
 
 
     -- * Functions on type literals
@@ -210,21 +211,42 @@ sameSymbol x y
   | symbolVal x == symbolVal y  = Just (unsafeCoerce Refl)
   | otherwise                   = Nothing
 
+-- | 'Compare' branches on the kind of its arguments to either compare by 
+-- 'Symbol' or 'Nat'.
+type family Compare (a :: k) (b :: k) :: Ordering where
+  Compare (a :: Symbol) b = CmpSymbol a b
+  Compare (a :: Nat)    b = CmpNat    a b
+
+-- | Ordering data type for type literals that provides proof of their ordering.
+data LitOrdering a b where
+  LitLt :: Compare a b ~ 'LT => LitOrdering a b
+  LitEq :: LitOrdering a a
+  LitGt :: Compare a b ~ 'GT => LitOrdering a b
+
+deriving instance Show (LitOrdering a b)
+deriving instance Eq   (LitOrdering a b)
+
+-- | Like 'sameNat', but if the numbers aren't equal, this additionally
+-- provides proof of LT or GT.
+cmpNat :: forall a b proxy1 proxy2. (KnownNat a, KnownNat b)
+       => proxy1 a -> proxy2 b -> LitOrdering a b
+cmpNat x y = case compare (natVal x) (natVal y) of
+  EQ -> unsafeCoerce LitEq
+  LT -> case unsafeCoerce Refl :: (CmpNat a b :~: 'LT) of
+    Refl -> LitLt
+  GT -> case unsafeCoerce Refl :: (CmpNat a b :~: 'GT) of
+    Refl -> LitGt
+
 -- | Like 'sameSymbol', but if the symbols aren't equal, this additionally
 -- provides proof of LT or GT.
-cmpSymbol :: (KnownSymbol a, KnownSymbol b) =>
-             proxy1 a -> proxy2 b -> SymbolOrdering a b
+cmpSymbol :: forall a b proxy1 proxy2. (KnownSymbol a, KnownSymbol b)
+          => proxy1 a -> proxy2 b -> LitOrdering a b
 cmpSymbol x y = case compare (symbolVal x) (symbolVal y) of
-  EQ -> SymbolEq (unsafeCoerce Refl)
-  LT -> SymbolLt (unsafeCoerce Refl)
-  GT -> SymbolGt (unsafeCoerce Refl)
-
--- | Proof that either 2 symbols are equal or the second is less than or greater
--- than the first.
-data SymbolOrdering a b =
-    SymbolEq (a :~: b)
-  | SymbolLt (CmpSymbol a b :~: 'LT)
-  | SymbolGt (CmpSymbol a b :~: 'GT)
+  EQ -> unsafeCoerce LitEq
+  LT -> case unsafeCoerce Refl :: (CmpSymbol a b :~: 'LT) of
+    Refl -> LitLt
+  GT -> case unsafeCoerce Refl :: (CmpSymbol a b :~: 'GT) of
+    Refl -> LitGt
 
 --------------------------------------------------------------------------------
 -- PRIVATE:
