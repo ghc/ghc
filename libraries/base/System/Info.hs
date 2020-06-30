@@ -26,7 +26,7 @@ module System.Info
 
 import qualified Data.Text      as T
 import           Data.Text.Read (decimal)
-import           Data.Version   (Version (..))
+import           Data.Version
 import           GHC.Version    (cProjectVersion)
 
 -- | The version of 'compilerName' with which the program was compiled
