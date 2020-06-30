@@ -211,7 +211,7 @@ sameSymbol x y
   | symbolVal x == symbolVal y  = Just (unsafeCoerce Refl)
   | otherwise                   = Nothing
 
--- | 'Compare' branches on the kind of its arguments to either compare by 
+-- | 'Compare' branches on the kind of its arguments to either compare by
 -- 'Symbol' or 'Nat'.
 type family Compare (a :: k) (b :: k) :: Ordering where
   Compare (a :: Symbol) b = CmpSymbol a b
