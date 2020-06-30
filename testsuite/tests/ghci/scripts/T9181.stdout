@@ -23,9 +23,21 @@ data GHC.TypeLits.SomeSymbol
   = forall (n :: GHC.Types.Symbol).
     GHC.TypeLits.KnownSymbol n =>
     GHC.TypeLits.SomeSymbol (Data.Proxy.Proxy n)
+type role GHC.TypeLits.SymbolOrdering nominal nominal
+type GHC.TypeLits.SymbolOrdering :: GHC.Types.Symbol
+                                    -> GHC.Types.Symbol -> *
+data GHC.TypeLits.SymbolOrdering a b
+  = GHC.TypeLits.SymbolEq (a Data.Type.Equality.:~: b)
+  | GHC.TypeLits.SymbolLt (GHC.TypeLits.CmpSymbol a b
+                           Data.Type.Equality.:~: 'LT)
+  | GHC.TypeLits.SymbolGt (GHC.TypeLits.CmpSymbol a b
+                           Data.Type.Equality.:~: 'GT)
 type GHC.TypeLits.TypeError :: forall b.
                                GHC.TypeLits.ErrorMessage -> b
 type family GHC.TypeLits.TypeError a where
+GHC.TypeLits.cmpSymbol ::
+  (GHC.TypeLits.KnownSymbol a, GHC.TypeLits.KnownSymbol b) =>
+  proxy1 a -> proxy2 b -> GHC.TypeLits.SymbolOrdering a b
 GHC.TypeLits.natVal ::
   GHC.TypeNats.KnownNat n => proxy n -> Integer
 GHC.TypeLits.natVal' ::
