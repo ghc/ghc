@@ -65,3 +65,6 @@ test('T11747', normal, compile_and_run, ['-dcore-lint'])
 test('T12595', normal, compile_and_run, [''])
 test('T13285', normal, compile_and_run, [''])
 test('T18151', normal, compile_and_run, [''])
+
+test('DsDoExprFailMsg', exit_code(1), compile_and_run, [''])
+test('DsMonadCompFailMsg', exit_code(1), compile_and_run, [''])
