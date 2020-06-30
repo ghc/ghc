@@ -131,6 +131,7 @@ executable hadrian
                        , RecordWildCards
                        , ScopedTypeVariables
                        , TupleSections
+                       , BangPatterns
     other-extensions:    MultiParamTypeClasses
                        , TypeFamilies
     build-depends:       Cabal                >= 3.0     && < 3.3
