@@ -336,7 +336,7 @@ defined by your local GHC installation, the following trick is useful:
     .. index::
        single: __GLASGOW_HASKELL_FULL_VERSION__
        This macro exposes the full version string.
-       For instance: ``__FULL_GHC_VERSION__==8.11.0.20200319``.
+       For instance: ``__GLASGOW_HASKELL_FULL_VERSION__==8.11.0.20200319``.
        Its value comes from the ``ProjectVersion`` Autotools variable.
 
 ``__GLASGOW_HASKELL_PATCHLEVEL1__``; \ ``__GLASGOW_HASKELL_PATCHLEVEL2__``
