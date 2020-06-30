@@ -4,22 +4,22 @@ module Rules.Generate (
     ghcPrimDependencies
     ) where
 
-import Data.Foldable (for_)
+import           Data.Foldable                     (for_)
 
-import Base
+import           Base
 import qualified Context
-import Expression
-import Flavour
-import Hadrian.Oracles.TextFile (lookupValueOrError)
-import Oracles.Flag
-import Oracles.ModuleFiles
-import Oracles.Setting
-import Packages
-import Rules.Libffi
-import Settings
-import Settings.Builders.DeriveConstants (deriveConstantsPairs)
-import Target
-import Utilities
+import           Expression
+import           Flavour
+import           Hadrian.Oracles.TextFile          (lookupValueOrError)
+import           Oracles.Flag
+import           Oracles.ModuleFiles
+import           Oracles.Setting
+import           Packages
+import           Rules.Libffi
+import           Settings
+import           Settings.Builders.DeriveConstants (deriveConstantsPairs)
+import           Target
+import           Utilities
 
 -- | Track this file to rebuild generated files whenever it changes.
 trackGenerateHs :: Expr ()
@@ -410,7 +410,7 @@ generateGhcVersionH = do
         , "#define __GLASGOW_HASKELL__ " ++ version
         , "#endif"
         , "#if !defined(__GLASGOW_HASKELL_FULL_VERSION__)"
-        , "#define __GLASGOW_HASKELL_FULL_VERSION__ " ++ fullVersion
+        , "#define __GLASGOW_HASKELL_FULL_VERSION__ \"" ++ fullVersion ++ "\""
         , "#endif"
         , ""]
         ++
