@@ -97,7 +97,6 @@ Library
         CPP-Options: -DCAN_LOAD_DLL
 
     Other-Extensions:
-        BangPatterns
         CPP
         DataKinds
         DeriveDataTypeable
@@ -116,7 +115,6 @@ Library
         NondecreasingIndentation
         RankNTypes
         RecordWildCards
-        ScopedTypeVariables
         StandaloneDeriving
         Trustworthy
         TupleSections
@@ -153,6 +151,8 @@ Library
     -- we use an explicit Prelude
     Default-Extensions:
         NoImplicitPrelude
+       ,BangPatterns
+       ,ScopedTypeVariables
 
     Exposed-Modules:
         GHC.Iface.Ext.Types
