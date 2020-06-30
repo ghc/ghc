@@ -530,9 +530,8 @@ Large tuple support
     The Haskell Report only requires implementations to provide tuple
     types and their accompanying standard instances up to size 15. GHC
     limits the size of tuple types to 62 and provides instances of
-    ``Eq``, ``Ord``, ``Bounded``, ``Read``, and ``Show`` for tuples up
-    to size 15. However, ``Ix`` instances are provided only for tuples
-    up to size 5.
+    ``Eq``, ``Ord``, ``Bounded``, ``Read``, ``Show``, and ``Ix`` for
+    tuples up to size 15.
 
 .. _bugs:
 
