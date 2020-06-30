@@ -73,8 +73,9 @@ Executable ghc
             GHCi.UI.Monad
             GHCi.UI.Tags
             GHCi.Util
-        Other-Extensions:
+        Default-Extensions:
             BangPatterns
+        Other-Extensions:
             FlexibleInstances
             LambdaCase
             MagicHash

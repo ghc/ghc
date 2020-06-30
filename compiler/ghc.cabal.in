@@ -96,8 +96,10 @@ Library
     if flag(dynamic-system-linker)
         CPP-Options: -DCAN_LOAD_DLL
 
-    Other-Extensions:
+    Default-Extensions:
         BangPatterns
+
+    Other-Extensions:
         CPP
         DataKinds
         DeriveDataTypeable
