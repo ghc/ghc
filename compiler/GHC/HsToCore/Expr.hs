@@ -988,7 +988,7 @@ dsDo ctx stmts
             ; var   <- selectSimpleMatchVarL (xbstc_boundResultMult xbs) pat
             ; match <- matchSinglePatVar var (StmtCtxt ctx) pat
                          (xbstc_boundResultType xbs) (cantFailMatchResult body)
-            ; match_code <- dsHandleMonadicFailure DoExpr pat match (xbstc_failOp xbs)
+            ; match_code <- dsHandleMonadicFailure ctx pat match (xbstc_failOp xbs)
             ; dsSyntaxExpr (xbstc_bindOp xbs) [rhs', Lam var match_code] }
 
     go _ (ApplicativeStmt body_ty args mb_join) stmts
@@ -1009,7 +1009,7 @@ dsDo ctx stmts
                    = do { var   <- selectSimpleMatchVarL Many pat
                         ; match <- matchSinglePatVar var (StmtCtxt ctx) pat
                                    body_ty (cantFailMatchResult body)
-                        ; match_code <- dsHandleMonadicFailure DoExpr pat match fail_op
+                        ; match_code <- dsHandleMonadicFailure ctx pat match fail_op
                         ; return (var:vs, match_code)
                         }
 
