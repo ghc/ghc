@@ -29,12 +29,14 @@ import           Data.Text.Read (decimal)
 import           Data.Version
 import           GHC.Version    (cProjectVersion)
 
--- | The version of 'compilerName' with which the program was compiled
--- or is being interpreted.
+-- | The short version of 'compilerName' with which the program was compiled
+-- or is being interpreted. It only includes the major and minor version numbers.
 compilerVersion :: Version
 compilerVersion = Version [major, minor] []
   where (major, minor) = compilerVersionRaw `divMod` 100
 
+-- | The full version of 'compilerName' with which the program was compiled
+-- or is being interpreted. It includes the major, minor and revision numbers.
 fullCompilerVersion :: Version
 fullCompilerVersion = Version [major, minor, revision]
   where
