@@ -673,13 +673,13 @@ type instance XPragE         (GhcPass _) = NoExtField
 type instance XXExpr         GhcPs       = NoExtCon
 
 -- See Note [Rebindable syntax and HsExpansion] below
-type instance XXExpr         GhcRn       = HsExpansion (HsExpr GhcPs)
+type instance XXExpr         GhcRn       = HsExpansion (HsExpr GhcRn)
                                                        (HsExpr GhcRn)
 type instance XXExpr         GhcTc       = XXExprGhcTc
 
 data XXExprGhcTc
   = WrapExpr {-# UNPACK #-} !(HsWrap HsExpr)
-  | ExpansionExpr {-# UNPACK #-} !(HsExpansion (HsExpr GhcPs) (HsExpr GhcTc))
+  | ExpansionExpr {-# UNPACK #-} !(HsExpansion (HsExpr GhcRn) (HsExpr GhcTc))
 
 
 {-
