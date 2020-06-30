@@ -86,6 +86,7 @@ Library
         Unsafe
 
     build-depends:
+        ghc-boot >= 8.11 < 8.15
         rts == 1.0,
         ghc-prim >= 0.5.1.0 && < 0.8,
         ghc-bignum >= 1.0 && < 2.0
