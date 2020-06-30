@@ -1,17 +1,17 @@
+{-# LANGUAGE CPP  #-}
 {-# LANGUAGE Safe #-}
-{-# LANGUAGE CPP #-}
 
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  System.Info
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- Information about the characteristics of the host 
+-- Information about the characteristics of the host
 -- system lucky enough to run your program.
 --
 -----------------------------------------------------------------------------
@@ -24,13 +24,25 @@ module System.Info
        compilerVersion
    ) where
 
-import Data.Version
+import qualified Data.Text      as T
+import           Data.Text.Read (decimal)
+import           Data.Version
+import           GHC.Version    (cProjectVersion)
 
--- | The version of 'compilerName' with which the program was compiled
--- or is being interpreted.
+-- | The short version of 'compilerName' with which the program was compiled
+-- or is being interpreted. It only includes the major and minor version numbers.
 compilerVersion :: Version
 compilerVersion = Version [major, minor] []
   where (major, minor) = compilerVersionRaw `divMod` 100
+
+-- | The full version of 'compilerName' with which the program was compiled
+-- or is being interpreted. It includes the major, minor and revision numbers.
+fullCompilerVersion :: Version
+fullCompilerVersion = Version [major, minor, revision]
+  where
+    versions = T.splitOn "." (pack cProjectVersion)
+    [major, minor, revision, _] = fmap (\v ->
+      either error fst (decimal v)) versions
 
 #include "ghcplatform.h"
 

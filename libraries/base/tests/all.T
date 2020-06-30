@@ -12,6 +12,7 @@ def normalise_quotes (str):
 #--------------------------------------
 # Test functions
 #--------------------------------------
+test('SystemInfoTest', normal, compile_and_run, [''])
 test('readFloat', exit_code(1), compile_and_run, [''])
 test('enumDouble', normal, compile_and_run, [''])
 test('enumRatio', normal, compile_and_run, [''])
