@@ -74,7 +74,6 @@ Executable ghc
             GHCi.UI.Tags
             GHCi.Util
         Other-Extensions:
-            BangPatterns
             FlexibleInstances
             LambdaCase
             MagicHash
@@ -102,3 +101,5 @@ Executable ghc
     -- GHCi can be used to load it all at once.
     Default-Extensions:
         NoImplicitPrelude
+      , ScopedTypeVariables
+      , BangPatterns
