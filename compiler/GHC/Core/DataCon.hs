@@ -53,7 +53,7 @@ module GHC.Core.DataCon (
         -- ** Predicates on DataCons
         isNullarySrcDataCon, isNullaryRepDataCon, isTupleDataCon, isUnboxedTupleCon,
         isUnboxedSumCon,
-        isVanillaDataCon, classDataCon, dataConCannotMatch,
+        isVanillaDataCon, isNewDataCon, classDataCon, dataConCannotMatch,
         dataConUserTyVarsArePermuted,
         isBanged, isMarkedStrict, eqHsBang, isSrcStrict, isSrcUnpacked,
         specialPromotedDc,
@@ -1476,6 +1476,10 @@ isUnboxedSumCon (MkData {dcRepTyCon = tc}) = isUnboxedSumTyCon tc
 -- | Vanilla 'DataCon's are those that are nice boring Haskell 98 constructors
 isVanillaDataCon :: DataCon -> Bool
 isVanillaDataCon dc = dcVanilla dc
+
+-- | Is this the 'DataCon' of a newtype?
+isNewDataCon :: DataCon -> Bool
+isNewDataCon dc = isNewTyCon (dataConTyCon dc)
 
 -- | Should this DataCon be allowed in a type even without -XDataKinds?
 -- Currently, only Lifted & Unlifted

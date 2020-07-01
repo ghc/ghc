@@ -35,7 +35,7 @@ import GHC.Tc.Utils.Zonk
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.Monad
 import GHC.HsToCore.PmCheck
-import GHC.HsToCore.PmCheck.Types ( Deltas, initDeltas )
+import GHC.HsToCore.PmCheck.Types ( Nablas, initNablas )
 import GHC.Core
 import GHC.Types.Literal
 import GHC.Core.Utils
@@ -766,31 +766,31 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
                                                 (hsLMatchPats m))
 
         -- Pattern match check warnings for /this match-group/.
-        -- @rhss_deltas@ is a flat list of covered Deltas for each RHS.
-        -- Each Match will split off one Deltas for its RHSs from this.
-        ; matches_deltas <- if isMatchContextPmChecked dflags origin ctxt
+        -- @rhss_nablas@ is a flat list of covered Nablas for each RHS.
+        -- Each Match will split off one Nablas for its RHSs from this.
+        ; matches_nablas <- if isMatchContextPmChecked dflags origin ctxt
             then addHsScrutTmCs mb_scr new_vars $
                  -- See Note [Long-distance information]
                  covCheckMatches (DsMatchContext ctxt locn) new_vars matches
-            else pure (initDeltasMatches matches)
+            else pure (initNablasMatches matches)
 
-        ; eqns_info   <- zipWithM mk_eqn_info matches matches_deltas
+        ; eqns_info   <- zipWithM mk_eqn_info matches matches_nablas
 
         ; result_expr <- handleWarnings $
                          matchEquations ctxt new_vars eqns_info rhs_ty
         ; return (new_vars, result_expr) }
   where
     -- Called once per equation in the match, or alternative in the case
-    mk_eqn_info :: LMatch GhcTc (LHsExpr GhcTc) -> (Deltas, NonEmpty Deltas) -> DsM EquationInfo
-    mk_eqn_info (L _ (Match { m_pats = pats, m_grhss = grhss })) (pat_deltas, rhss_deltas)
+    mk_eqn_info :: LMatch GhcTc (LHsExpr GhcTc) -> (Nablas, NonEmpty Nablas) -> DsM EquationInfo
+    mk_eqn_info (L _ (Match { m_pats = pats, m_grhss = grhss })) (pat_nablas, rhss_nablas)
       = do { dflags <- getDynFlags
            ; let upats = map (unLoc . decideBangHood dflags) pats
-           -- pat_deltas is the covered set *after* matching the pattern, but
-           -- before any of the GRHSs. We extend the environment with pat_deltas
-           -- (via updPmDeltas) so that the where-clause of 'grhss' can profit
+           -- pat_nablas is the covered set *after* matching the pattern, but
+           -- before any of the GRHSs. We extend the environment with pat_nablas
+           -- (via updPmNablas) so that the where-clause of 'grhss' can profit
            -- from that knowledge (#18533)
-           ; match_result <- updPmDeltas pat_deltas $
-                             dsGRHSs ctxt grhss rhs_ty rhss_deltas
+           ; match_result <- updPmNablas pat_nablas $
+                             dsGRHSs ctxt grhss rhs_ty rhss_nablas
            ; return EqnInfo { eqn_pats = upats
                             , eqn_orig = FromSource
                             , eqn_rhs  = match_result } }
@@ -799,14 +799,14 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
                      then discardWarningsDs
                      else id
 
-    initDeltasMatches :: [LMatch GhcTc b] -> [(Deltas, NonEmpty Deltas)]
-    initDeltasMatches ms
-      = map (\(L _ m) -> (initDeltas, initDeltasGRHSs (m_grhss m))) ms
+    initNablasMatches :: [LMatch GhcTc b] -> [(Nablas, NonEmpty Nablas)]
+    initNablasMatches ms
+      = map (\(L _ m) -> (initNablas, initNablasGRHSs (m_grhss m))) ms
 
-    initDeltasGRHSs :: GRHSs GhcTc b -> NonEmpty Deltas
-    initDeltasGRHSs m = expectJust "GRHSs non-empty"
+    initNablasGRHSs :: GRHSs GhcTc b -> NonEmpty Nablas
+    initNablasGRHSs m = expectJust "GRHSs non-empty"
                       $ NEL.nonEmpty
-                      $ replicate (length (grhssGRHSs m)) initDeltas
+                      $ replicate (length (grhssGRHSs m)) initNablas
 
 
 matchEquations  :: HsMatchContext GhcRn
