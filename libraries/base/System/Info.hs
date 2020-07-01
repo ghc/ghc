@@ -36,13 +36,12 @@ compilerVersion = Version [major, minor] []
   where (major, minor) = compilerVersionRaw `divMod` 100
 
 -- | The full version of 'compilerName' with which the program was compiled
--- or is being interpreted. It includes the major, minor and revision numbers.
+-- or is being interpreted. It includes the major, minor, revision and an additional
+-- identifier, generally in the form "<year><month><day>".
 fullCompilerVersion :: Version
-fullCompilerVersion = Version [major, minor, revision]
+fullCompilerVersion = Version version
   where
-    versions = T.splitOn "." (pack cProjectVersion)
-    [major, minor, revision, _] = fmap (\v ->
-      either error fst (decimal v)) versions
+    version = parseVersion cProjectVersion
 
 #include "ghcplatform.h"
 
