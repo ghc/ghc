@@ -73,8 +73,6 @@ Executable ghc
             GHCi.UI.Monad
             GHCi.UI.Tags
             GHCi.Util
-        Default-Extensions:
-            BangPatterns
         Other-Extensions:
             FlexibleInstances
             LambdaCase
@@ -103,3 +101,5 @@ Executable ghc
     -- GHCi can be used to load it all at once.
     Default-Extensions:
         NoImplicitPrelude
+      , ScopedTypeVariables
+      , BangPatterns

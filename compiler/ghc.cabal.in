@@ -96,9 +96,6 @@ Library
     if flag(dynamic-system-linker)
         CPP-Options: -DCAN_LOAD_DLL
 
-    Default-Extensions:
-        BangPatterns
-
     Other-Extensions:
         CPP
         DataKinds
@@ -118,7 +115,6 @@ Library
         NondecreasingIndentation
         RankNTypes
         RecordWildCards
-        ScopedTypeVariables
         StandaloneDeriving
         Trustworthy
         TupleSections
@@ -155,6 +151,8 @@ Library
     -- we use an explicit Prelude
     Default-Extensions:
         NoImplicitPrelude
+       ,BangPatterns
+       ,ScopedTypeVariables
 
     Exposed-Modules:
         GHC.Iface.Ext.Types
