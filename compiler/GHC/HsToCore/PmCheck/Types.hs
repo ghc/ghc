@@ -15,6 +15,7 @@ Author: George Karachalias <george.karachalias@cs.kuleuven.be>
 module GHC.HsToCore.PmCheck.Types (
         -- * Representations for Literals and AltCons
         PmLit(..), PmLitValue(..), PmAltCon(..), pmLitType, pmAltConType,
+        pmAltConImplBangs,
 
         -- ** Equality on 'PmAltCon's
         PmEquality(..), eqPmAltCon,
@@ -225,6 +226,10 @@ instance Eq PmAltCon where
 pmAltConType :: PmAltCon -> [Type] -> Type
 pmAltConType (PmAltLit lit)     _arg_tys = ASSERT( null _arg_tys ) pmLitType lit
 pmAltConType (PmAltConLike con) arg_tys  = conLikeResTy con arg_tys
+
+pmAltConImplBangs :: PmAltCon -> [HsImplBang]
+pmAltConImplBangs PmAltLit{}         = []
+pmAltConImplBangs (PmAltConLike con) = conLikeImplBangs con
 
 {- Note [Undecidable Equality for PmAltCons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

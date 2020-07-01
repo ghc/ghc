@@ -633,9 +633,8 @@ desugarConPatOut x con univ_tys ex_tvs dicts = \case
 
     go_field_pats tagged_pats = do
       -- The fields that appear might not be in the correct order. So first
-      -- do a PmCon match, then force according to field strictness and then
-      -- force evaluation of the field patterns in the order given by
-      -- the first field of @tagged_pats@.
+      -- do a PmCon match, then pattern match on the fields in the order given
+      -- by the first field of @tagged_pats@.
       -- See Note [Field match order for RecCon]
 
       -- Desugar the mentioned field patterns. We're doing this first to get
@@ -649,23 +648,15 @@ desugarConPatOut x con univ_tys ex_tvs dicts = \case
             Just var -> pure var
             Nothing  -> mkPmId ty
 
-      -- 1. the constructor pattern match itself
+      -- the constructor pattern match itself
       arg_ids <- zipWithM get_pat_id [0..] arg_tys
       let con_grd = PmCon x (PmAltConLike con) ex_tvs dicts arg_ids
 
-      -- 2. bang strict fields
-      let arg_is_banged = map isBanged $ conLikeImplBangs con
-          noSrcPmBang i = PmBang {pm_id = i, pm_loc = Nothing}
-          bang_grds     = map noSrcPmBang (filterByList arg_is_banged arg_ids)
-
-      -- 3. guards from field selector patterns
+      -- guards from field selector patterns
       let arg_grds = concat arg_grdss
 
       -- tracePm "ConPatOut" (ppr x $$ ppr con $$ ppr arg_ids)
-      --
-      -- Store the guards in exactly that order
-      --      1.         2.           3.
-      pure (con_grd : bang_grds ++ arg_grds)
+      pure (con_grd : arg_grds)
 
 desugarPatBind :: SrcSpan -> Id -> Pat GhcTc -> DsM GrdPatBind
 -- See 'GrdPatBind' for how this simply repurposes GrdGRHS.
@@ -760,23 +751,38 @@ desugarBoolGuard e
 The order for RecCon field patterns actually determines evaluation order of
 the pattern match. For example:
 
-  data T = T { a :: !Bool, b :: Char, c :: Int }
+  data T = T { a :: Char, b :: Int }
   f :: T -> ()
-  f T{ c = 42, b = 'b' } = ()
+  f T{ b = 42, a = 'a' } = ()
 
-Then
-  * @f (T (error "a") (error "b") (error "c"))@ errors out with "a" because of
-    the strict field.
-  * @f (T True        (error "b") (error "c"))@ errors out with "c" because it
-    is mentioned frist in the pattern match.
+Then @f (T (error "a") (error "b"))@ errors out with "b" because it is mentioned
+frist in the pattern match.
 
-This means we can't just desugar the pattern match to the PatVec
-@[T !_ 'b' 42]@. Instead we have to generate variable matches that have
-strictness according to the field declarations and afterwards force them in the
-right order. As a result, we get the PatVec @[T !_ b c, 42 <- c, 'b' <- b]@.
+This means we can't just desugar the pattern match to
+@[T a b <- x, 'a' <- a, 42 <- b]@. Instead we have to force them in the
+right order: @[T a b <- x, 42 <- b, 'a' <- a]@.
 
-Of course, when the labels occur in the order they are defined, we can just use
-the simpler desugaring.
+Note [Strict fields and fields of unlifted type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+How do strict fields play into Note [Field match order for RecCon]? Answer:
+They don't. Desugaring is entirely unconcerned by strict fields; the forcing
+happens *before* pattern matching. But for each strict (or more generally,
+unlifted) field @s@ we have to add @s /~ ⊥@ constraints when we check the PmCon
+guard in 'checkGrd'. Strict fields are devoid of ⊥ by construction, there's
+nothing that a bang pattern would act on. Example from #18341:
+
+  data T = MkT !Int
+  f :: T -> ()
+  f (MkT  _) | False = () -- inaccessible
+  f (MkT !_) | False = () -- redundant, not only inaccessible!
+  f _                = ()
+
+The second clause desugars to @MkT n <- x, !n@. When coverage checked, the
+'PmCon' @MkT n <- x@ refines the set of values that reach the bang pattern with
+the constraints @x ~ MkT n, n /~ ⊥@ (this list is computed by 'pmConCts').
+Checking the 'PmBang' @!n@ will then try to add the constraint @n ~ ⊥@ to this
+set to get the diverging set, which is found to be empty. Hence the whole
+clause is detected as redundant, as expected.
 
 Note [Order of guards matters]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -920,7 +926,25 @@ conMatchForces (PmAltConLike (RealDataCon dc))
   | isNewTyCon (dataConTyCon dc) = False
 conMatchForces _                 = True
 
--- First the functions that correspond to checking LYG primitives:
+-- | The 'PmCts' arising from a successful  'PmCon' match @T gammas as ys <- x@.
+-- These include
+--
+--   * @gammas@: Constraints arising from the bound evidence vars
+--   * @y /~ ⊥@ constraitns for each unlifted field (including strict fields)
+--     @y@ in @ys@
+--   * The constructor constraint itself: @x ~ T as ys@.
+--
+-- See Note [Strict fields and fields of unlifted type].
+pmConCts :: Id -> PmAltCon -> [TyVar] -> [EvVar] -> [Id] -> PmCts
+pmConCts x con tvs dicts args = gammas `unionBags` unlifted `snocBag` con_ct
+  where
+    gammas   = listToBag $ map (PmTyCt . evVarPred) dicts
+    con_ct   = PmConCt x con tvs args
+    unlifted = listToBag [ PmNotBotCt arg
+                         | (arg, bang) <-
+                             zipEqual "pmConCts" args (pmAltConImplBangs con)
+                         , isBanged bang || isUnliftedType (idType arg)
+                         ]
 
 checkSequence :: (grdtree -> CheckAction anntree) -> NonEmpty grdtree -> CheckAction (NonEmpty anntree)
 -- The implementation is pretty similar to
@@ -955,8 +979,7 @@ checkGrd grd = CA $ \inc -> case grd of
       then addPmCtDeltas inc (PmBotCt x)
       else pure mempty
     uncov <- addPmCtDeltas inc (PmNotConCt x con)
-    matched <- addPmCtsDeltas inc $
-      listToBag (PmTyCt . evVarPred <$> dicts) `snocBag` PmConCt x con tvs args
+    matched <- addPmCtsDeltas inc (pmConCts x con tvs dicts args)
     -- tracePm "checkGrd:Con" (ppr inc $$ ppr x $$ ppr con $$ ppr dicts $$ ppr matched)
     pure CheckResult { cr_ret = emptyRedSets { rs_cov = matched, rs_div = div }
                      , cr_uncov = uncov
