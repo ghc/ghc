@@ -106,7 +106,7 @@ import GHC.Tc.Types.Origin
 import GHC.Types.Annotations
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
-import {-# SOURCE #-} GHC.HsToCore.PmCheck.Types (Deltas)
+import {-# SOURCE #-} GHC.HsToCore.PmCheck.Types (Nablas)
 import GHC.Data.IOEnv
 import GHC.Types.Name.Reader
 import GHC.Types.Name
@@ -324,9 +324,9 @@ data DsLclEnv = DsLclEnv {
         dsl_loc     :: RealSrcSpan,      -- To put in pattern-matching error msgs
 
         -- See Note [Note [Long-distance information] in "GHC.HsToCore.PmCheck"
-        -- The set of reaching values Deltas is augmented as we walk inwards,
+        -- The set of reaching values Nablas is augmented as we walk inwards,
         -- refined through each pattern match in turn
-        dsl_deltas  :: Deltas
+        dsl_nablas  :: Nablas
      }
 
 -- Inside [| |] brackets, the desugarer looks

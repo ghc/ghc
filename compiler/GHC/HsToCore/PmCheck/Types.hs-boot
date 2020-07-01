@@ -2,8 +2,8 @@ module GHC.HsToCore.PmCheck.Types where
 
 import GHC.Data.Bag
 
-data Delta
+data Nabla
 
-newtype Deltas = MkDeltas (Bag Delta)
+newtype Nablas = MkNablas (Bag Nabla)
 
-initDeltas :: Deltas
+initNablas :: Nablas

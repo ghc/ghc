@@ -34,7 +34,7 @@ module GHC.HsToCore.Monad (
         DsMetaEnv, DsMetaVal(..), dsGetMetaEnv, dsLookupMetaEnv, dsExtendMetaEnv,
 
         -- Getting and setting pattern match oracle states
-        getPmDeltas, updPmDeltas,
+        getPmNablas, updPmNablas,
 
         -- Get COMPLETE sets of a TyCon
         dsGetCompleteMatches,
@@ -304,7 +304,7 @@ mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var cc_st_var
                            }
         lcl_env = DsLclEnv { dsl_meta    = emptyNameEnv
                            , dsl_loc     = real_span
-                           , dsl_deltas  = initDeltas
+                           , dsl_nablas  = initNablas
                            }
     in (gbl_env, lcl_env)
 
@@ -403,14 +403,14 @@ the @SrcSpan@ being carried around.
 getGhcModeDs :: DsM GhcMode
 getGhcModeDs =  getDynFlags >>= return . ghcMode
 
--- | Get the current pattern match oracle state. See 'dsl_deltas'.
-getPmDeltas :: DsM Deltas
-getPmDeltas = do { env <- getLclEnv; return (dsl_deltas env) }
+-- | Get the current pattern match oracle state. See 'dsl_nablas'.
+getPmNablas :: DsM Nablas
+getPmNablas = do { env <- getLclEnv; return (dsl_nablas env) }
 
 -- | Set the pattern match oracle state within the scope of the given action.
--- See 'dsl_deltas'.
-updPmDeltas :: Deltas -> DsM a -> DsM a
-updPmDeltas deltas = updLclEnv (\env -> env { dsl_deltas = deltas })
+-- See 'dsl_nablas'.
+updPmNablas :: Nablas -> DsM a -> DsM a
+updPmNablas nablas = updLclEnv (\env -> env { dsl_nablas = nablas })
 
 getSrcSpanDs :: DsM SrcSpan
 getSrcSpanDs = do { env <- getLclEnv

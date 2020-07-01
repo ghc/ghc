@@ -1,0 +1,4 @@
+
+T17729.hs:5:17: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In a case alternative: Patterns not matched: ((Just _), ())

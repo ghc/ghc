@@ -15,6 +15,7 @@ Author: George Karachalias <george.karachalias@cs.kuleuven.be>
 module GHC.HsToCore.PmCheck.Types (
         -- * Representations for Literals and AltCons
         PmLit(..), PmLitValue(..), PmAltCon(..), pmLitType, pmAltConType,
+        isPmAltConMatchStrict, pmAltConImplBangs,
 
         -- ** Equality on 'PmAltCon's
         PmEquality(..), eqPmAltCon,
@@ -35,8 +36,8 @@ module GHC.HsToCore.PmCheck.Types (
         setIndirectSDIE, setEntrySDIE, traverseSDIE,
 
         -- * The pattern match oracle
-        VarInfo(..), TmState(..), TyState(..), Delta(..),
-        Deltas(..), initDeltas, liftDeltasM
+        BotInfo(..), VarInfo(..), TmState(..), TyState(..), Nabla(..),
+        Nablas(..), initNablas, liftNablasM
     ) where
 
 #include "HsVersions.h"
@@ -225,6 +226,19 @@ instance Eq PmAltCon where
 pmAltConType :: PmAltCon -> [Type] -> Type
 pmAltConType (PmAltLit lit)     _arg_tys = ASSERT( null _arg_tys ) pmLitType lit
 pmAltConType (PmAltConLike con) arg_tys  = conLikeResTy con arg_tys
+
+-- | Is a match on this constructor forcing the match variable?
+-- True of data constructors, literals and pattern synonyms (#17357), but not of
+-- newtypes.
+-- See Note [Coverage checking Newtype matches] in "GHC.HsToCore.PmCheck.Oracle".
+isPmAltConMatchStrict :: PmAltCon -> Bool
+isPmAltConMatchStrict PmAltLit{}                      = True
+isPmAltConMatchStrict (PmAltConLike PatSynCon{})      = True -- #17357
+isPmAltConMatchStrict (PmAltConLike (RealDataCon dc)) = not (isNewDataCon dc)
+
+pmAltConImplBangs :: PmAltCon -> [HsImplBang]
+pmAltConImplBangs PmAltLit{}         = []
+pmAltConImplBangs (PmAltConLike con) = conLikeImplBangs con
 
 {- Note [Undecidable Equality for PmAltCons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -477,6 +491,13 @@ instance Outputable a => Outputable (Shared a) where
 instance Outputable a => Outputable (SharedDIdEnv a) where
   ppr (SDIE env) = ppr env
 
+-- | See 'vi_bot'.
+data BotInfo
+  = IsBot
+  | IsNotBot
+  | MaybeBot
+  deriving Eq
+
 -- | The term oracle state. Stores 'VarInfo' for encountered 'Id's. These
 -- entries are possibly shared when we figure out that two variables must be
 -- equal, thus represent the same set of values.
@@ -531,6 +552,13 @@ data VarInfo
   -- because files like Cabal's `LicenseId` define relatively huge enums
   -- that lead to quadratic or worse behavior.
 
+  , vi_bot :: BotInfo
+  -- ^ Can this variable be ⊥? Models (mutually contradicting) @x ~ ⊥@ and
+  --   @x ≁ ⊥@ constraints. E.g.
+  --    * 'MaybeBot': Don't know; Neither @x ~ ⊥@ nor @x ≁ ⊥@.
+  --    * 'IsBot': @x ~ ⊥@
+  --    * 'IsNotBot': @x ≁ ⊥@
+
   , vi_cache :: !PossibleMatches
   -- ^ A cache of the associated COMPLETE sets. At any time a superset of
   -- possible constructors of each COMPLETE set. So, if it's not in here, we
@@ -538,14 +566,19 @@ data VarInfo
   -- to recognise completion of a COMPLETE set efficiently for large enums.
   }
 
+instance Outputable BotInfo where
+  ppr MaybeBot = empty
+  ppr IsBot    = text "~⊥"
+  ppr IsNotBot = text "≁⊥"
+
 -- | Not user-facing.
 instance Outputable TmState where
   ppr (TmSt state reps) = ppr state $$ ppr reps
 
 -- | Not user-facing.
 instance Outputable VarInfo where
-  ppr (VI ty pos neg cache)
-    = braces (hcat (punctuate comma [ppr ty, ppr pos, ppr neg, ppr cache]))
+  ppr (VI ty pos neg bot cache)
+    = braces (hcat (punctuate comma [ppr ty, ppr pos, ppr neg, ppr bot, ppr cache]))
 
 -- | Initial state of the term oracle.
 initTmState :: TmState
@@ -563,37 +596,38 @@ instance Outputable TyState where
 initTyState :: TyState
 initTyState = TySt emptyBag
 
--- | An inert set of canonical (i.e. mutually compatible) term and type
--- constraints.
-data Delta = MkDelta { delta_ty_st :: TyState    -- Type oracle; things like a~Int
-                     , delta_tm_st :: TmState }  -- Term oracle; things like x~Nothing
+-- | A normalised refinement type ∇ (\"nabla\"), comprised of an inert set of
+-- canonical (i.e. mutually compatible) term and type constraints that form the
+-- refinement type's predicate.
+data Nabla = MkNabla { nabla_ty_st :: TyState    -- Type oracle; things like a~Int
+                     , nabla_tm_st :: TmState }  -- Term oracle; things like x~Nothing
 
--- | An initial delta that is always satisfiable
-initDelta :: Delta
-initDelta = MkDelta initTyState initTmState
+-- | An initial nabla that is always satisfiable
+initNabla :: Nabla
+initNabla = MkNabla initTyState initTmState
 
-instance Outputable Delta where
-  ppr delta = hang (text "Delta") 2 $ vcat [
+instance Outputable Nabla where
+  ppr nabla = hang (text "Nabla") 2 $ vcat [
       -- intentionally formatted this way enable the dev to comment in only
       -- the info she needs
-      ppr (delta_tm_st delta),
-      ppr (delta_ty_st delta)
+      ppr (nabla_tm_st nabla),
+      ppr (nabla_ty_st nabla)
     ]
 
--- | A disjunctive bag of 'Delta's, representing a refinement type.
-newtype Deltas = MkDeltas (Bag Delta)
+-- | A disjunctive bag of 'Nabla's, representing a refinement type.
+newtype Nablas = MkNablas (Bag Nabla)
 
-initDeltas :: Deltas
-initDeltas = MkDeltas (unitBag initDelta)
+initNablas :: Nablas
+initNablas = MkNablas (unitBag initNabla)
 
-instance Outputable Deltas where
-  ppr (MkDeltas deltas) = ppr deltas
+instance Outputable Nablas where
+  ppr (MkNablas nablas) = ppr nablas
 
-instance Semigroup Deltas where
-  MkDeltas l <> MkDeltas r = MkDeltas (l `unionBags` r)
+instance Semigroup Nablas where
+  MkNablas l <> MkNablas r = MkNablas (l `unionBags` r)
 
-instance Monoid Deltas where
-  mempty = MkDeltas emptyBag
+instance Monoid Nablas where
+  mempty = MkNablas emptyBag
 
-liftDeltasM :: Monad m => (Delta -> m (Maybe Delta)) -> Deltas -> m Deltas
-liftDeltasM f (MkDeltas ds) = MkDeltas . catBagMaybes <$> (traverse f ds)
+liftNablasM :: Monad m => (Nabla -> m (Maybe Nabla)) -> Nablas -> m Nablas
+liftNablasM f (MkNablas ds) = MkNablas . catBagMaybes <$> (traverse f ds)

@@ -6,7 +6,7 @@
 Bag: an unordered collection with duplicates
 -}
 
-{-# LANGUAGE ScopedTypeVariables, CPP, DeriveFunctor #-}
+{-# LANGUAGE ScopedTypeVariables, CPP, DeriveFunctor, TypeFamilies #-}
 
 module GHC.Data.Bag (
         Bag, -- abstract type
@@ -27,9 +27,9 @@ module GHC.Data.Bag (
 
 import GHC.Prelude
 
+import GHC.Exts ( IsList(..) )
 import GHC.Utils.Outputable
 import GHC.Utils.Misc
-
 import GHC.Utils.Monad
 import Control.Monad
 import Data.Data
@@ -333,3 +333,8 @@ instance Traversable Bag where
   traverse f (UnitBag x)     = UnitBag <$> f x
   traverse f (TwoBags b1 b2) = TwoBags <$> traverse f b1 <*> traverse f b2
   traverse f (ListBag xs)    = ListBag <$> traverse f xs
+
+instance IsList (Bag a) where
+  type Item (Bag a) = a
+  fromList = listToBag
+  toList   = bagToList
