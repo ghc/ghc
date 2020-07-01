@@ -36,6 +36,8 @@ test('T9951b', [], compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T9951', [], compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T10183', [], compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T11303', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M1G -RTS'])
 test('T11276', collect_compiler_stats('bytes allocated',10), compile,
@@ -108,11 +110,17 @@ test('T17357', expect_broken(17357), compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T17376', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17378', normal, compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T17465', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T17646', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T17703', normal, compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17725', normal, compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17729', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T17783', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
@@ -122,12 +130,18 @@ test('T17977b', collect_compiler_stats('bytes allocated',10), compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T18049', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T18273', normal, compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T18341', normal, compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T18478', collect_compiler_stats('bytes allocated',10), compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T18533', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T18572', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-incomplete-uni-patterns -fwarn-overlapping-patterns'])
+test('T18670', normal, compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 
 # Other tests
 test('pmc001', [], compile,
