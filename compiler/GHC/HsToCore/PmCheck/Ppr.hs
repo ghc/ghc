@@ -2,7 +2,7 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
--- | Provides factilities for pretty-printing 'Delta's in a way appropriate for
+-- | Provides factilities for pretty-printing 'Nabla's in a way appropriate for
 -- user facing pattern match warnings.
 module GHC.HsToCore.PmCheck.Ppr (
         pprUncovered
@@ -42,8 +42,8 @@ import GHC.HsToCore.PmCheck.Oracle
 --
 -- When the set of refutable shapes contains more than 3 elements, the
 -- additional elements are indicated by "...".
-pprUncovered :: Delta -> [Id] -> SDoc
-pprUncovered delta vas
+pprUncovered :: Nabla -> [Id] -> SDoc
+pprUncovered nabla vas
   | isNullUDFM refuts = fsep vec -- there are no refutations
   | otherwise         = hang (fsep vec) 4 $
                           text "where" <+> vcat (map (pprRefutableShapes . snd) (udfmToList refuts))
@@ -54,8 +54,8 @@ pprUncovered delta vas
       | [_] <- vas   = topPrec
       | otherwise    = appPrec
     ppr_action       = mapM (pprPmVar init_prec) vas
-    (vec, renamings) = runPmPpr delta ppr_action
-    refuts           = prettifyRefuts delta renamings
+    (vec, renamings) = runPmPpr nabla ppr_action
+    refuts           = prettifyRefuts nabla renamings
 
 -- | Output refutable shapes of a variable in the form of @var is not one of {2,
 -- Nothing, 3}@. Will never print more than 3 refutable shapes, the tail is
@@ -98,21 +98,21 @@ substitution to the vectors before printing them out (see function `pprOne' in
 
 -- | Extract and assigns pretty names to constraint variables with refutable
 -- shapes.
-prettifyRefuts :: Delta -> DIdEnv SDoc -> DIdEnv (SDoc, [PmAltCon])
-prettifyRefuts delta = listToUDFM_Directly . map attach_refuts . udfmToList
+prettifyRefuts :: Nabla -> DIdEnv SDoc -> DIdEnv (SDoc, [PmAltCon])
+prettifyRefuts nabla = listToUDFM_Directly . map attach_refuts . udfmToList
   where
-    attach_refuts (u, sdoc) = (u, (sdoc, lookupRefuts delta u))
+    attach_refuts (u, sdoc) = (u, (sdoc, lookupRefuts nabla u))
 
 
-type PmPprM a = RWS Delta () (DIdEnv SDoc, [SDoc]) a
+type PmPprM a = RWS Nabla () (DIdEnv SDoc, [SDoc]) a
 
 -- Try nice names p,q,r,s,t before using the (ugly) t_i
 nameList :: [SDoc]
 nameList = map text ["p","q","r","s","t"] ++
             [ text ('t':show u) | u <- [(0 :: Int)..] ]
 
-runPmPpr :: Delta -> PmPprM a -> (a, DIdEnv SDoc)
-runPmPpr delta m = case runRWS m delta (emptyDVarEnv, nameList) of
+runPmPpr :: Nabla -> PmPprM a -> (a, DIdEnv SDoc)
+runPmPpr nabla m = case runRWS m nabla (emptyDVarEnv, nameList) of
   (a, (renamings, _), _) -> (a, renamings)
 
 -- | Allocates a new, clean name for the given 'Id' if it doesn't already have
@@ -129,8 +129,8 @@ getCleanName x = do
 
 checkRefuts :: Id -> PmPprM (Maybe SDoc) -- the clean name if it has negative info attached
 checkRefuts x = do
-  delta <- ask
-  case lookupRefuts delta x of
+  nabla <- ask
+  case lookupRefuts nabla x of
     [] -> pure Nothing -- Will just be a wildcard later on
     _  -> Just <$> getCleanName x
 
@@ -144,8 +144,8 @@ pprPmVar :: PprPrec -> Id -> PmPprM SDoc
 -- The useful information in the latter case is the constructor that we missed,
 -- not the types of the wildcards in the places that aren't matched as a result.
 pprPmVar prec x = do
-  delta <- ask
-  case lookupSolution delta x of
+  nabla <- ask
+  case lookupSolution nabla x of
     Just (alt, _tvs, args) -> pprPmAltCon prec alt args
     Nothing          -> fromMaybe typed_wildcard <$> checkRefuts x
       where
@@ -160,24 +160,24 @@ pprPmVar prec x = do
 pprPmAltCon :: PprPrec -> PmAltCon -> [Id] -> PmPprM SDoc
 pprPmAltCon _prec (PmAltLit l)      _    = pure (ppr l)
 pprPmAltCon prec  (PmAltConLike cl) args = do
-  delta <- ask
-  pprConLike delta prec cl args
+  nabla <- ask
+  pprConLike nabla prec cl args
 
-pprConLike :: Delta -> PprPrec -> ConLike -> [Id] -> PmPprM SDoc
-pprConLike delta _prec cl args
-  | Just pm_expr_list <- pmExprAsList delta (PmAltConLike cl) args
+pprConLike :: Nabla -> PprPrec -> ConLike -> [Id] -> PmPprM SDoc
+pprConLike nabla _prec cl args
+  | Just pm_expr_list <- pmExprAsList nabla (PmAltConLike cl) args
   = case pm_expr_list of
       NilTerminated list ->
         brackets . fsep . punctuate comma <$> mapM (pprPmVar appPrec) list
       WcVarTerminated pref x ->
         parens   . fcat . punctuate colon <$> mapM (pprPmVar appPrec) (toList pref ++ [x])
-pprConLike _delta _prec (RealDataCon con) args
+pprConLike _nabla _prec (RealDataCon con) args
   | isUnboxedTupleCon con
   , let hash_parens doc = text "(#" <+> doc <+> text "#)"
   = hash_parens . fsep . punctuate comma <$> mapM (pprPmVar appPrec) args
   | isTupleDataCon con
   = parens . fsep . punctuate comma <$> mapM (pprPmVar appPrec) args
-pprConLike _delta prec cl args
+pprConLike _nabla prec cl args
   | conLikeIsInfix cl = case args of
       [x, y] -> do x' <- pprPmVar funPrec x
                    y' <- pprPmVar funPrec y
@@ -202,11 +202,11 @@ data PmExprList
 --   ending in a wildcard variable x (of list type). Should be pretty-printed as
 --   (1:2:_).
 -- * @pmExprAsList [] == Just ('NilTerminated' [])@
-pmExprAsList :: Delta -> PmAltCon -> [Id] -> Maybe PmExprList
-pmExprAsList delta = go_con []
+pmExprAsList :: Nabla -> PmAltCon -> [Id] -> Maybe PmExprList
+pmExprAsList nabla = go_con []
   where
     go_var rev_pref x
-      | Just (alt, _tvs, args) <- lookupSolution delta x
+      | Just (alt, _tvs, args) <- lookupSolution nabla x
       = go_con rev_pref alt args
     go_var rev_pref x
       | Just pref <- nonEmpty (reverse rev_pref)
