@@ -655,23 +655,51 @@ internal_dlsym(const char *symbol) {
 
     // We acquire dl_mutex as concurrent dl* calls may alter dlerror
     ACQUIRE_LOCK(&dl_mutex);
+
+    // clears dlerror
     dlerror();
+
     // look in program first
     v = dlsym(dl_prog_handle, symbol);
     if (dlerror() == NULL) {
         RELEASE_LOCK(&dl_mutex);
+        IF_DEBUG(linker, debugBelch("internal_dlsym: found symbol '%s' in program\n", symbol));
         return v;
     }
 
     for (o_so = openedSOs; o_so != NULL; o_so = o_so->next) {
         v = dlsym(o_so->handle, symbol);
         if (dlerror() == NULL) {
+            IF_DEBUG(linker, debugBelch("internal_dlsym: found symbol '%s' in shared object\n", symbol));
             RELEASE_LOCK(&dl_mutex);
             return v;
         }
     }
     RELEASE_LOCK(&dl_mutex);
-    return v;
+
+#   if defined(HAVE_SYS_STAT_H) && defined(linux_HOST_OS) && defined(__GLIBC__)
+    // HACK: GLIBC implements these functions with a great deal of trickery where
+    //       they are either inlined at compile time to their corresponding
+    //       __xxxx(SYS_VER, ...) function or direct syscalls, or resolved at
+    //       link time via libc_nonshared.a.
+    //
+    //       We borrow the approach that the LLVM JIT uses to resolve these
+    //       symbols. See http://llvm.org/PR274 and #7072 for more info.
+
+    IF_DEBUG(linker, debugBelch("internal_dlsym: looking for symbol '%s' in GLIBC special cases\n", symbol));
+
+    if (strcmp(symbol, "stat") == 0) return (void*)&stat;
+    if (strcmp(symbol, "fstat") == 0) return (void*)&fstat;
+    if (strcmp(symbol, "lstat") == 0) return (void*)&lstat;
+    if (strcmp(symbol, "stat64") == 0) return (void*)&stat64;
+    if (strcmp(symbol, "fstat64") == 0) return (void*)&fstat64;
+    if (strcmp(symbol, "lstat64") == 0) return (void*)&lstat64;
+    if (strcmp(symbol, "atexit") == 0) return (void*)&atexit;
+    if (strcmp(symbol, "mknod") == 0) return (void*)&mknod;
+#   endif
+
+    // we failed to find the symbol
+    return NULL;
 }
 #  endif
 
@@ -847,13 +875,13 @@ SymbolAddr* lookupSymbol_ (SymbolName* lbl)
 
 SymbolAddr* lookupSymbol_ (SymbolName* lbl)
 {
-    IF_DEBUG(linker, debugBelch("lookupSymbol: looking up %s\n", lbl));
+    IF_DEBUG(linker, debugBelch("lookupSymbol: looking up '%s'\n", lbl));
 
     ASSERT(symhash != NULL);
     RtsSymbolInfo *pinfo;
 
     if (!ghciLookupSymbolInfo(symhash, lbl, &pinfo)) {
-        IF_DEBUG(linker, debugBelch("lookupSymbol: symbol not found\n"));
+        IF_DEBUG(linker, debugBelch("lookupSymbol: symbol '%s' not found, trying dlsym\n", lbl));
 
 #       if defined(OBJFORMAT_ELF)
         return internal_dlsym(lbl);
