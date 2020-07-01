@@ -24,9 +24,3 @@ will elicit an unexpected integer-literal-overflow message.
 Whitespace can be inserted, as in ``- 123``, to force interpretation
 as two tokens.
 
-One pitfall is that with :extension:`NegativeLiterals`, ``x-1`` will
-be parsed as ``x`` applied to the argument ``-1``, which is usually
-not what you want.  ``x - 1`` or even ``x- 1`` can be used instead
-for subtraction. To avoid this, consider using :extension:`LexicalNegation`
-instead.
-

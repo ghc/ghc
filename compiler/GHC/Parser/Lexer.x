@@ -1191,8 +1191,8 @@ atEOL _ _ _ (AI _ buf) = atEnd buf || currentChar buf == '\n'
 -- Check if we should parse a negative literal (e.g. -123) as a single token.
 negLitPred :: AlexAccPred ExtsBitmap
 negLitPred =
-    negative_literals `alexOrPred`
-    (lexical_negation `alexAndPred` prefix_minus)
+    prefix_minus `alexAndPred`
+    (negative_literals `alexOrPred` lexical_negation)
   where
     negative_literals = ifExtension NegativeLiteralsBit
 
