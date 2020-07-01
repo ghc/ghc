@@ -59,9 +59,10 @@ pkgGenericDescription = fmap genericPackageDescription . readPackageData
 --
 -- Inverse of 'Cabal.Distribution.Simple.GHC.ghcArchString'.
 cabalArchString :: String -> String
-cabalArchString "powerpc"   = "ppc"
-cabalArchString "powerpc64" = "ppc64"
-cabalArchString other       = other
+cabalArchString "powerpc"     = "ppc"
+cabalArchString "powerpc64"   = "ppc64"
+cabalArchString "powerpc64le" = "ppc64"
+cabalArchString other         = other
 
 -- | Cabal's rendering of an OS as used in its directory structure.
 --
