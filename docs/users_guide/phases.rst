@@ -332,6 +332,13 @@ defined by your local GHC installation, the following trick is useful:
     source, including the C source generated from a Haskell module (i.e.
     ``.hs``, ``.lhs``, ``.c`` and ``.hc`` files).
 
+``__GLASGOW_HASKELL_FULL_VERSION__``
+    .. index::
+       single: __GLASGOW_HASKELL_FULL_VERSION__
+       This macro exposes the full version string.
+       For instance: ``__FULL_GHC_VERSION__==8.11.0.20200319``.
+       Its value comes from the ``ProjectVersion`` Autotools variable.
+
 ``__GLASGOW_HASKELL_PATCHLEVEL1__``; \ ``__GLASGOW_HASKELL_PATCHLEVEL2__``
     .. index::
        single: __GLASGOW_HASKELL_PATCHLEVEL2__
