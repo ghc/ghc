@@ -398,6 +398,7 @@ generateGhcAutoconfH = do
 generateGhcVersionH :: Expr String
 generateGhcVersionH = do
     trackGenerateHs
+    fullVersion <- getSetting ProjectVersion
     version     <- getSetting ProjectVersionInt
     patchLevel1 <- getSetting ProjectPatchLevel1
     patchLevel2 <- getSetting ProjectPatchLevel2
@@ -406,7 +407,10 @@ generateGhcVersionH = do
         , "#define __GHCVERSION_H__"
         , ""
         , "#if !defined(__GLASGOW_HASKELL__)"
-        , "# define __GLASGOW_HASKELL__ " ++ version
+        , "#define __GLASGOW_HASKELL__ " ++ version
+        , "#endif"
+        , "#if !defined(__GLASGOW_HASKELL_FULL_VERSION__)"
+        , "#define __GLASGOW_HASKELL_FULL_VERSION__ " ++ fullVersion
         , "#endif"
         , ""]
         ++
