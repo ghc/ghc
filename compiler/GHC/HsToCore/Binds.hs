@@ -184,8 +184,8 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
 dsHsBind dflags (PatBind { pat_lhs = pat, pat_rhs = grhss
                          , pat_ext = ty
                          , pat_ticks = (rhs_tick, var_ticks) })
-  = do  { rhss_deltas <- covCheckGRHSs PatBindGuards grhss
-        ; body_expr <- dsGuarded grhss ty rhss_deltas
+  = do  { rhss_nablas <- covCheckGRHSs PatBindGuards grhss
+        ; body_expr <- dsGuarded grhss ty rhss_nablas
         ; let body' = mkOptTickBox rhs_tick body_expr
               pat'  = decideBangHood dflags pat
         ; (force_var,sel_binds) <- mkSelectorBinds var_ticks pat body'
