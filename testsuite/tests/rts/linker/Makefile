@@ -96,3 +96,8 @@ linker_error3:
 	"$(TEST_HC)" -c linker_error3.c -o linker_error3_o.o
 	"$(TEST_HC)" linker_error3.o -o linker_error3 -no-hs-main -optc-g -debug -threaded
 	./linker_error3 linker_error3_o.o
+
+.PHONY: T7072
+T7072:
+	"$(TEST_HC)" -c T7072.c -o T7072.o
+	"$(TEST_HC)" --interactive -e ":q" T7072.o

@@ -837,6 +837,26 @@ SymbolAddr* lookupSymbol_ (SymbolName* lbl)
     if (!ghciLookupSymbolInfo(symhash, lbl, &pinfo)) {
         IF_DEBUG(linker, debugBelch("lookupSymbol: symbol not found\n"));
 
+#       if defined(HAVE_SYS_STAT_H) && defined(linux_HOST_OS) && defined(__GLIBC__)
+        // HACK: GLIBC implements these functions with a great deal of trickery where
+        //       they are either inlined at compile time to their corresponding
+        //       __xxxx(SYS_VER, ...) function or direct syscalls, or resolved at
+        //       link time via libc_nonshared.a.
+        //
+        //       We borrow the approach that the LLVM JIT uses to resolve these
+        //       symbols. See http://llvm.org/PR274 and #7072 for more info.
+
+        if (strcmp(lbl, "stat") == 0) return (SymbolAddr*)&stat;
+        if (strcmp(lbl, "fstat") == 0) return (SymbolAddr*)&fstat;
+        if (strcmp(lbl, "lstat") == 0) return (SymbolAddr*)&lstat;
+        if (strcmp(lbl, "stat64") == 0) return (SymbolAddr*)&stat64;
+        if (strcmp(lbl, "fstat64") == 0) return (SymbolAddr*)&fstat64;
+        if (strcmp(lbl, "lstat64") == 0) return (SymbolAddr*)&lstat64;
+        if (strcmp(lbl, "atexit") == 0) return (SymbolAddr*)&atexit;
+        if (strcmp(lbl, "mknod") == 0) return (SymbolAddr*)&mknod;
+#       endif
+
+
 #       if defined(OBJFORMAT_ELF)
         return internal_dlsym(lbl);
 #       elif defined(OBJFORMAT_MACHO)

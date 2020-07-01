@@ -102,3 +102,6 @@ test('rdynamic', [ unless(opsys('linux') or opsys('mingw32'), skip)
                  , omit_ways(['ghci'])
                  ],
      compile_and_run, ['-rdynamic -package ghc'])
+
+
+test('T7072', [unless(opsys('linux'), skip), req_rts_linker], makefile_test, ['T7072'])
