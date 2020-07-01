@@ -199,7 +199,6 @@ $docsym    = [\| \^ \* \$]
 -- normal signed numerical literals can only be explicitly negative,
 -- not explicitly positive (contrast @exponent)
 @negative = \-
-@signed = @negative ?
 
 
 -- -----------------------------------------------------------------------------
@@ -531,12 +530,12 @@ $tab          { warnTab }
                                            ifExtension BinaryLiteralsBit }   { tok_primint positive 2 3 binary }
   0[oO] @numspc @octal              \# / { ifExtension MagicHashBit }        { tok_primint positive 2 3 octal }
   0[xX] @numspc @hexadecimal        \# / { ifExtension MagicHashBit }        { tok_primint positive 2 3 hexadecimal }
-  @negative @decimal                \# / { ifExtension MagicHashBit }        { tok_primint negative 1 2 decimal }
-  @negative 0[bB] @numspc @binary   \# / { ifExtension MagicHashBit `alexAndPred`
+  @negative @decimal                \# / { negHashLitPred }                  { tok_primint negative 1 2 decimal }
+  @negative 0[bB] @numspc @binary   \# / { negHashLitPred `alexAndPred`
                                            ifExtension BinaryLiteralsBit }   { tok_primint negative 3 4 binary }
-  @negative 0[oO] @numspc @octal    \# / { ifExtension MagicHashBit }        { tok_primint negative 3 4 octal }
+  @negative 0[oO] @numspc @octal    \# / { negHashLitPred }                  { tok_primint negative 3 4 octal }
   @negative 0[xX] @numspc @hexadecimal \#
-                                       / { ifExtension MagicHashBit }        { tok_primint negative 3 4 hexadecimal }
+                                       / { negHashLitPred }                  { tok_primint negative 3 4 hexadecimal }
 
   @decimal                       \# \# / { ifExtension MagicHashBit }        { tok_primword 0 2 decimal }
   0[bB] @numspc @binary          \# \# / { ifExtension MagicHashBit `alexAndPred`
@@ -546,8 +545,11 @@ $tab          { warnTab }
 
   -- Unboxed floats and doubles (:: Float#, :: Double#)
   -- prim_{float,double} work with signed literals
-  @signed @floating_point           \# / { ifExtension MagicHashBit }        { tok_frac 1 tok_primfloat }
-  @signed @floating_point        \# \# / { ifExtension MagicHashBit }        { tok_frac 2 tok_primdouble }
+  @floating_point                  \# / { ifExtension MagicHashBit }        { tok_frac 1 tok_primfloat }
+  @floating_point               \# \# / { ifExtension MagicHashBit }        { tok_frac 2 tok_primdouble }
+
+  @negative @floating_point        \# / { negHashLitPred }                  { tok_frac 1 tok_primfloat }
+  @negative @floating_point     \# \# / { negHashLitPred }                  { tok_frac 2 tok_primdouble }
 }
 
 -- Strings and chars are lexed by hand-written code.  The reason is
@@ -1192,8 +1194,8 @@ atEOL _ _ _ (AI _ buf) = atEnd buf || currentChar buf == '\n'
 -- Check if we should parse a negative literal (e.g. -123) as a single token.
 negLitPred :: AlexAccPred ExtsBitmap
 negLitPred =
-    negative_literals `alexOrPred`
-    (lexical_negation `alexAndPred` prefix_minus)
+    prefix_minus `alexAndPred`
+    (negative_literals `alexOrPred` lexical_negation)
   where
     negative_literals = ifExtension NegativeLiteralsBit
 
@@ -1202,13 +1204,32 @@ negLitPred =
       alexNotPred (ifExtension NoLexicalNegationBit)
 
     prefix_minus =
-      -- The condition for a prefix occurrence of an operator is:
-      --
-      --   not precededByClosingToken && followedByOpeningToken
-      --
-      -- but we don't check followedByOpeningToken here as it holds
-      -- simply because we immediately lex a literal after the minus.
+      -- Note [prefix_minus in negLitPred and negHashLitPred]
       alexNotPred precededByClosingToken
+
+-- Check if we should parse an unboxed negative literal (e.g. -123#) as a single token.
+negHashLitPred :: AlexAccPred ExtsBitmap
+negHashLitPred = prefix_minus `alexAndPred` magic_hash
+  where
+    magic_hash = ifExtension MagicHashBit
+    prefix_minus =
+      -- Note [prefix_minus in negLitPred and negHashLitPred]
+      alexNotPred precededByClosingToken
+
+{- Note [prefix_minus in negLitPred and negHashLitPred]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We want to parse -1 as a single token, but x-1 as three tokens.
+So in negLitPred (and negHashLitPred) we require that we have a prefix
+occurrence of the minus sign. See Note [Whitespace-sensitive operator parsing]
+for a detailed definition of a prefix occurrence.
+
+The condition for a prefix occurrence of an operator is:
+
+  not precededByClosingToken && followedByOpeningToken
+
+but we don't check followedByOpeningToken when parsing a negative literal.
+It holds simply because we immediately lex a literal after the minus.
+-}
 
 ifExtension :: ExtBits -> AlexAccPred ExtsBitmap
 ifExtension extBits bits _ _ _ = extBits `xtest` bits
