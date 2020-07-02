@@ -943,7 +943,7 @@ conMatchForces _                 = True
 -- These include
 --
 --   * @gammas@: Constraints arising from the bound evidence vars
---   * @y /~ ⊥@ constraitns for each unlifted field (including strict fields)
+--   * @y /~ ⊥@ constraints for each unlifted field (including strict fields)
 --     @y@ in @ys@
 --   * The constructor constraint itself: @x ~ T as ys@.
 --
@@ -971,6 +971,7 @@ checkGrd grd = CA $ \inc -> case grd of
   -- let x = e: Refine with x ~ e
   PmLet x e -> do
     matched <- addPmCtDeltas inc (PmCoreCt x e)
+    -- tracePm "check:Let" (ppr x <+> char '=' <+> ppr e)
     pure CheckResult { cr_ret = emptyRedSets { rs_cov = matched }
                      , cr_uncov = mempty
                      , cr_approx = Precise }
@@ -982,6 +983,7 @@ checkGrd grd = CA $ \inc -> case grd of
     -- mb_info = Just info <==> PmBang originates from bang pattern in source
     let bangs | Just info <- mb_info = unitOL (div, info)
               | otherwise            = NilOL
+    -- tracePm "check:Bang" (ppr x <+> ppr div)
     pure CheckResult { cr_ret = RedSets { rs_cov = matched, rs_div = div, rs_bangs = bangs }
                      , cr_uncov = mempty
                      , cr_approx = Precise }

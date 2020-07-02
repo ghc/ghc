@@ -108,6 +108,8 @@ test('T17357', expect_broken(17357), compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T17376', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17378', normal, compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T17465', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T17646', normal, compile,
