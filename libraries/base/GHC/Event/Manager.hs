@@ -54,6 +54,7 @@ module GHC.Event.Manager
     ) where
 
 #include "EventConfig.h"
+#include "HsBaseConfig.h"
 
 ------------------------------------------------------------------------
 -- Imports
@@ -87,6 +88,8 @@ import qualified GHC.Event.Internal as I
 
 #if defined(HAVE_KQUEUE)
 import qualified GHC.Event.KQueue as KQueue
+#elif defined(HAVE_IO_URING)
+import qualified GHC.Event.IoUring as IoUring
 #elif defined(HAVE_EPOLL)
 import qualified GHC.Event.EPoll  as EPoll
 #elif defined(HAVE_POLL)
@@ -167,6 +170,8 @@ handleControlEvent mgr fd _evt = do
 newDefaultBackend :: IO Backend
 #if defined(HAVE_KQUEUE)
 newDefaultBackend = KQueue.new
+#elif defined(HAVE_IO_URING)
+newDefaultBackend = IoUring.new
 #elif defined(HAVE_EPOLL)
 newDefaultBackend = EPoll.new
 #elif defined(HAVE_POLL)
