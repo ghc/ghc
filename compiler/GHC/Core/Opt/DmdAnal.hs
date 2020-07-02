@@ -41,6 +41,9 @@ import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
 import GHC.Utils.Error        ( dumpIfSet_dyn, DumpFormat (..) )
 import GHC.Types.Unique.Set
 
+import GHC.Types.Unique
+import GHC.Builtin.Names
+
 {-
 ************************************************************************
 *                                                                      *
@@ -159,7 +162,8 @@ dmdAnal' _ _ (Coercion co)
   = (unitDmdType (coercionDmdEnv co), Coercion co)
 
 dmdAnal' env dmd (Var var)
-  = (dmdTransform env var dmd, Var var)
+  = pprTrace "dmdAnalVar" (ppr var) $
+    (dmdTransform env var dmd, Var var)
 
 dmdAnal' env dmd (Cast e co)
   = (dmd_ty `bothDmdType` mkBothDmdArg (coercionDmdEnv co), Cast e' co)
@@ -172,7 +176,8 @@ dmdAnal' env dmd (Tick t e)
     (dmd_ty, e') = dmdAnal env dmd e
 
 dmdAnal' env dmd (App fun (Type ty))
-  = (fun_ty, App fun' (Type ty))
+  = -- pprTrace "dmdAnalAppTy" (ppr fun <+> ppr ty) $
+    (fun_ty, App fun' (Type ty))
   where
     (fun_ty, fun') = dmdAnal env dmd fun
 
@@ -287,7 +292,8 @@ dmdAnal' env dmd (Case scrut case_bndr ty alts)
 -- This is the LetUp rule in the paper “Higher-Order Cardinality Analysis”.
 dmdAnal' env dmd (Let (NonRec id rhs) body)
   | useLetUp id
-  = (final_ty, Let (NonRec id' rhs') body')
+  = pprTrace "LetUpOn" (ppr id)
+    (final_ty, Let (NonRec id' rhs') body')
   where
     (body_ty, body')   = dmdAnal env dmd body
     (body_ty', id_dmd) = findBndrDmd env notArgOfDfun body_ty id
@@ -490,10 +496,19 @@ dmdTransform env var dmd
     Just _ <- isClassOpId_maybe var
   = dmdTransformDictSelSig (idStrictness var) dmd
   -- Imported functions
+  | getUnique var == impossibleIdKey
+  = panic "impossible"
   | isGlobalId var
   , let res = dmdTransformSig (idStrictness var) dmd
-  = -- pprTrace "dmdTransform:import" (vcat [ppr var, ppr (idStrictness var), ppr dmd, ppr res])
-    res
+  =
+    pprTrace "dmdTransform:import"
+      (vcat [ppr var
+            , ppr (idStrictness var)
+            , ppr dmd
+            , ppr res
+            , ppr (getKey $ getUnique var)
+            , ppr (getKey $ impossibleIdKey)])
+      res
   -- Top-level or local let-bound thing for which we use LetDown ('useLetUp').
   -- In that case, we have a strictness signature to unleash in our AnalEnv.
   | Just (sig, top_lvl) <- lookupSigEnv env var
@@ -537,7 +552,17 @@ dmdAnalRhsLetDown
 -- to the Id, and augment the environment with the signature as well.
 -- See Note [NOINLINE and strictness]
 dmdAnalRhsLetDown rec_flag env let_dmd id rhs
-  = (lazy_fv, sig, rhs')
+  =
+    pprTrace "dmdAnalRhsLetDown"
+      (ppr id $$
+       text "sig:" <+> ppr sig $$
+      --  text "rhs:" <+> ppr rhs' $$
+      --  text "rhs_dmd" <+> ppr rhs_dmd $$
+      --  text "_dmdAnalRes:" <+> ppr _dmdAnalRes $$
+       text "div:" <+> ppr rhs_div $$
+       text "thunk:" <+> ppr is_thunk
+      )
+      (lazy_fv, sig, rhs')
   where
     rhs_arity = idArity id
     rhs_dmd -- See Note [Demand analysis for join points]
@@ -550,7 +575,7 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
             -- See Note [Demand signatures are computed for a threshold demand based on idArity]
             = mkRhsDmd env rhs_arity rhs
 
-    (DmdType rhs_fv rhs_dmds rhs_div, rhs') = dmdAnal env rhs_dmd rhs
+    _dmdAnalRes@(DmdType rhs_fv rhs_dmds rhs_div, rhs') = dmdAnal env rhs_dmd rhs
     sig = mkStrictSigForArity rhs_arity (DmdType sig_fv rhs_dmds rhs_div)
 
     -- See Note [Aggregated demand for cardinality]
