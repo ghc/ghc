@@ -43,7 +43,7 @@ import GHC.Unit.State as Packages
 import GHC.Driver.Phases
 import GHC.Driver.Finder
 import GHC.Driver.Types
-import GHC.Driver.Ways
+import GHC.Platform.Ways
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Unit.Module

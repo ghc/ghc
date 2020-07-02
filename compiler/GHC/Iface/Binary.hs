@@ -43,7 +43,7 @@ import GHC.Driver.Types
 import GHC.Unit
 import GHC.Types.Name
 import GHC.Driver.Session
-import GHC.Driver.Ways
+import GHC.Platform.Ways
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Utils.Panic

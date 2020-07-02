@@ -42,7 +42,7 @@ import GHC.Utils.Monad
 import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Driver.Session
-import GHC.Driver.Ways
+import GHC.Platform.Ways
 import GHC.Types.ForeignCall
 import GHC.Types.Demand    ( isUsedOnce )
 import GHC.Builtin.PrimOps ( PrimCall(..) )

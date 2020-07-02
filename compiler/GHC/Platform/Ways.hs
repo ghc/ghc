@@ -18,7 +18,7 @@
 -- We then find the "build-tag" associated with this way, and this
 -- becomes the suffix used to find .hi files and libraries used in
 -- this compilation.
-module GHC.Driver.Ways
+module GHC.Platform.Ways
    ( Way(..)
    , hasWay
    , allowed_combination
