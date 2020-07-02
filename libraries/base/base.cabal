@@ -346,6 +346,7 @@ Library
         cbits/primFloat.c
         cbits/sysconf.c
         cbits/fs.c
+        cbits/syscall.c
 
     cmm-sources:
         cbits/CastFloatWord.cmm
@@ -423,6 +424,7 @@ Library
             GHC.Event.EPoll
             GHC.Event.IntTable
             GHC.Event.Internal
+            GHC.Event.IoUring
             GHC.Event.KQueue
             GHC.Event.Manager
             GHC.Event.PSQ
@@ -435,6 +437,18 @@ Library
             System.CPUTime.Posix.Times
             System.CPUTime.Posix.RUsage
             System.CPUTime.Unsupported
+            System.Linux.IO.URing
+            System.Linux.IO.URing.Cqe
+            System.Linux.IO.URing.PollEvent
+            System.Linux.IO.URing.IoVec
+            System.Linux.IO.URing.Ring
+            System.Linux.IO.URing.Sqe
+            System.Linux.IO.URing.Barrier
+            System.Linux.IO.URing.PVar
+        c-sources:
+            cbits/hs_uring.c
+        cmm-sources:
+            cbits/barriers.cmm
 
     -- We need to set the unit id to base (without a version number)
     -- as it's magic.
