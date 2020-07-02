@@ -79,7 +79,7 @@ import GHC.Types.Unique
 
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import GHCi.Run
-import GHC.Driver.Ways
+import GHC.Platform.Ways
 #endif
 
 import Control.Concurrent
