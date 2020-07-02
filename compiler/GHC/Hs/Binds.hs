@@ -987,6 +987,10 @@ data Sig pass
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | SpecInstSig (XSpecInstSig pass) SourceText (LHsSigType pass)
                   -- Note [Pragma source text] in GHC.Types.Basic
+  | SpecializableSig     (XSpecializableSig pass)
+                         SourceText
+                         -- Note [Pragma source text] in GHC.Types.Basic
+                         (Located (IdP pass)) -- Function or datatype to make specializable
 
         -- | A minimal complete definition pragma
         --
@@ -1034,6 +1038,7 @@ type instance XFixSig           (GhcPass p) = NoExtField
 type instance XInlineSig        (GhcPass p) = NoExtField
 type instance XSpecSig          (GhcPass p) = NoExtField
 type instance XSpecInstSig      (GhcPass p) = NoExtField
+type instance XSpecializableSig (GhcPass p) = NoExtField
 type instance XMinimalSig       (GhcPass p) = NoExtField
 type instance XSCCFunSig        (GhcPass p) = NoExtField
 type instance XCompleteMatchSig (GhcPass p) = NoExtField
@@ -1138,6 +1143,7 @@ hsSigDoc (SpecSig _ _ _ inl)
 hsSigDoc (InlineSig _ _ prag)   = ppr (inlinePragmaSpec prag) <+> text "pragma"
 hsSigDoc (SpecInstSig _ src _)
                                 = pprWithSourceText src empty <+> text "instance pragma"
+hsSigDoc (SpecializableSig {})  = text "SPECIALIZABLE pragma"
 hsSigDoc (FixSig {})            = text "fixity declaration"
 hsSigDoc (MinimalSig {})        = text "MINIMAL pragma"
 hsSigDoc (SCCFunSig {})         = text "SCC pragma"
@@ -1172,6 +1178,8 @@ ppr_sig (InlineSig _ var inl)
                                    <+> pprPrefixOcc (unLoc var))
 ppr_sig (SpecInstSig _ src ty)
   = pragSrcBrackets src "{-# pragma" (text "instance" <+> ppr ty)
+ppr_sig (SpecializableSig _ src var)
+  = pragSrcBrackets src "{-# SPECIALIZABLE" $ pprPrefixOcc $ unLoc var
 ppr_sig (MinimalSig _ src bf)
   = pragSrcBrackets src "{-# MINIMAL" (pprMinimalSig bf)
 ppr_sig (PatSynSig _ names sig_ty)

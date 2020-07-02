@@ -513,6 +513,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '{-# INLINE'             { L _ (ITinline_prag _ _ _) } -- INLINE or INLINABLE
  '{-# SPECIALISE'         { L _ (ITspec_prag _) }
  '{-# SPECIALISE_INLINE'  { L _ (ITspec_inline_prag _ _) }
+ '{-# SPECIALISABLE'      { L _ (ITspecializable_prag _) }
  '{-# SOURCE'             { L _ (ITsource_prag _) }
  '{-# RULES'              { L _ (ITrules_prag _) }
  '{-# CORE'               { L _ (ITcore_prag _) }      -- hdaume: annotated core
@@ -2572,6 +2573,11 @@ sigdecl :: { LHsDecl GhcPs }
                                   $ SigD noExtField (SpecInstSig noExtField (getSPEC_PRAGs $1) $3))
                        [mo $1,mj AnnInstance $2,mc $4] }
 
+        | '{-# SPECIALISABLE' qvar '#-}'
+             {% ams (
+                  sLL $1 $> $ SigD noExtField (SpecializableSig noExtField (getSPECIALIZABLE_PRAGs $1) $2))
+                  [mo $1,mc $3] }
+
         -- A minimal complete definition
         | '{-# MINIMAL' name_boolformula_opt '#-}'
             {% ams (sLL $1 $> $ SigD noExtField (MinimalSig noExtField (getMINIMAL_PRAGs $1) $2))
@@ -3874,6 +3880,7 @@ getPRIMWORDs    (L _ (ITprimword   src _)) = src
 getINLINE_PRAGs       (L _ (ITinline_prag       src _ _)) = src
 getSPEC_PRAGs         (L _ (ITspec_prag         src))     = src
 getSPEC_INLINE_PRAGs  (L _ (ITspec_inline_prag  src _))   = src
+getSPECIALIZABLE_PRAGs(L _ (ITspecializable_prag src))    = src
 getSOURCE_PRAGs       (L _ (ITsource_prag       src)) = src
 getRULES_PRAGs        (L _ (ITrules_prag        src)) = src
 getWARNING_PRAGs      (L _ (ITwarning_prag      src)) = src

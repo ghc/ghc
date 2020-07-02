@@ -1627,6 +1627,9 @@ instance HiePass p => ToHie (SigContext (LSig (GhcPass p))) where
         SpecInstSig _ _ typ ->
           [ toHie $ TS (ResolvedScopes []) typ
           ]
+        SpecializableSig _ _ name ->
+          [ toHie $ (C Use) name -- TODO
+          ]
         MinimalSig _ _ form ->
           [ toHie form
           ]

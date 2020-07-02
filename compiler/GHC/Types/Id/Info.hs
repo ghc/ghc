@@ -52,6 +52,10 @@ module GHC.Types.Id.Info (
         -- ** The InlinePragInfo type
         InlinePragInfo,
         inlinePragInfo, setInlinePragInfo,
+        setSpecializablePragInfo,
+
+        -- ** Specializable info
+        specializablePragEnabled,
 
         -- ** The OccInfo type
         OccInfo(..),
@@ -259,6 +263,9 @@ data IdInfo
         -- ^ The 'Id's unfolding
         inlinePragInfo  :: InlinePragma,
         -- ^ Any inline pragma attached to the 'Id'
+        specializablePragEnabled  :: Bool, --TODO SpecializablePragInfo
+        -- TODO I don't yet attach the Sig stuff to this. Where? same as addInlinePrags?
+        -- ^ Any specializable pragma attached to the 'Id'
         occInfo         :: OccInfo,
         -- ^ How the 'Id' occurs in the program
         strictnessInfo  :: StrictSig,
@@ -373,6 +380,8 @@ setRuleInfo :: IdInfo -> RuleInfo -> IdInfo
 setRuleInfo       info sp = sp `seq` info { ruleInfo = sp }
 setInlinePragInfo :: IdInfo -> InlinePragma -> IdInfo
 setInlinePragInfo info pr = pr `seq` info { inlinePragInfo = pr }
+setSpecializablePragInfo :: IdInfo -> Bool -> IdInfo
+setSpecializablePragInfo info pr = pr `seq` info { specializablePragEnabled = pr }
 setOccInfo :: IdInfo -> OccInfo -> IdInfo
 setOccInfo        info oc = oc `seq` info { occInfo = oc }
         -- Try to avoid space leaks by seq'ing
@@ -420,6 +429,7 @@ vanillaIdInfo
             ruleInfo            = emptyRuleInfo,
             unfoldingInfo       = noUnfolding,
             inlinePragInfo      = defaultInlinePragma,
+            specializablePragEnabled = False,
             occInfo             = noOccInfo,
             demandInfo          = topDmd,
             strictnessInfo      = nopSig,

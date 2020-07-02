@@ -83,6 +83,9 @@ module GHC.Types.Id (
         idInlinePragma, setInlinePragma, modifyInlinePragma,
         idInlineActivation, setInlineActivation, idRuleMatchInfo,
 
+        -- ** Specializable pragma stuff
+        idSpecializablePragma, setSpecializablePragma,
+
         -- ** One-shot lambdas
         isOneShotBndr, isProbablyOneShotLambda,
         setOneShotLambda, clearOneShotLambda,
@@ -800,6 +803,17 @@ idRuleMatchInfo id = inlinePragmaRuleMatchInfo (idInlinePragma id)
 
 isConLikeId :: Id -> Bool
 isConLikeId id = isConLike (idRuleMatchInfo id)
+
+{-
+        ---------------------------------
+        -- SPECIALIZABLE
+-}
+
+idSpecializablePragma :: Id -> Bool
+idSpecializablePragma id = specializablePragEnabled (idInfo id)
+
+setSpecializablePragma :: Id -> Bool -> Id
+setSpecializablePragma id prag = modifyIdInfo (`setSpecializablePragInfo` prag) id
 
 {-
         ---------------------------------

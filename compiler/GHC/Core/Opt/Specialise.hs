@@ -770,6 +770,7 @@ spec_import dflags this_mod top_env callers
        -- SUPER IMPORTANT!  Drop calls that (directly or indirectly) refer to fn
        -- See Note [Avoiding loops in specImports]
 
+-- TODO add warnings on missing specializable specs by default
 -- | Returns whether or not to show a missed-spec warning.
 -- If -Wall-missed-specializations is on, show the warning.
 -- Otherwise, if -Wmissed-specializations is on, only show a warning

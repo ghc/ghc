@@ -728,6 +728,7 @@ data Token
   | ITinline_prag       SourceText InlineSpec RuleMatchInfo
   | ITspec_prag         SourceText                -- SPECIALISE
   | ITspec_inline_prag  SourceText Bool    -- SPECIALISE INLINE (or NOINLINE)
+  | ITspecializable_prag SourceText                -- SPECIALISABLE
   | ITsource_prag       SourceText
   | ITrules_prag        SourceText
   | ITwarning_prag      SourceText
@@ -3145,6 +3146,7 @@ oneWordPrags = Map.fromList [
      ("notinline",
          strtoken (\s -> (ITinline_prag (SourceText s) NoInline FunLike))),
      ("specialize", strtoken (\s -> ITspec_prag (SourceText s))),
+     ("specializable", strtoken (\s -> ITspecializable_prag (SourceText s))),
      ("source", strtoken (\s -> ITsource_prag (SourceText s))),
      ("warning", strtoken (\s -> ITwarning_prag (SourceText s))),
      ("deprecated", strtoken (\s -> ITdeprecated_prag (SourceText s))),
