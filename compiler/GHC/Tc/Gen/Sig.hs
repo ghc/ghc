@@ -20,7 +20,8 @@ module GHC.Tc.Gen.Sig(
        tcInstSig,
 
        TcPragEnv, emptyPragEnv, lookupPragEnv, extendPragEnv,
-       mkPragEnv, tcSpecPrags, tcSpecWrapper, tcImpPrags, addInlinePrags
+       mkPragEnv, tcSpecPrags, tcSpecWrapper, tcImpPrags, addInlinePrags,
+       addSpecializablePrags
    ) where
 
 #include "HsVersions.h"
@@ -44,7 +45,7 @@ import GHC.Core.Multiplicity
 
 import GHC.Driver.Session
 import GHC.Types.Var ( TyVar, Specificity(..), tyVarKind, binderVars )
-import GHC.Types.Id  ( Id, idName, idType, idInlinePragma, setInlinePragma, mkLocalId )
+import GHC.Types.Id  ( Id, idName, idType, idInlinePragma, setInlinePragma, setSpecializablePragma, mkLocalId )
 import GHC.Builtin.Names( mkUnboundName )
 import GHC.Types.Basic
 import GHC.Unit.Module( getModule )
@@ -616,6 +617,29 @@ addInlinePrags poly_id prags_for_me
                      (hang (text "Multiple INLINE pragmas for" <+> ppr poly_id)
                        2 (vcat (text "Ignoring all but the first"
                                 : map pp_inl (inl1:inl2:inls))))
+
+    pp_inl (L loc prag) = ppr prag <+> parens (ppr loc)
+
+-----------------
+addSpecializablePrags :: TcId -> [LSig GhcRn] -> TcM TcId
+addSpecializablePrags poly_id prags_for_me
+  | spec@(L _ prag) : specs <- spec_prags
+  = do { traceTc "addSpecializablePrag" (ppr poly_id $$ ppr prag)
+       ; unless (null specs) (warn_multiple_specs spec specs)
+       ; return (poly_id `setSpecializablePragma` prag) }
+  | otherwise
+  = return poly_id
+  where
+    spec_prags = [L loc True | L loc SpecializableSig {} <- prags_for_me]
+
+    warn_multiple_specs _ [] = return ()
+
+    warn_multiple_specs spec1@(L loc _) (spec2 : specs)
+       = setSrcSpan loc $
+         addWarnTc NoReason
+                     (hang (text "Multiple INLINE pragmas for" <+> ppr poly_id)
+                       2 (vcat (text "Ignoring all but the first"
+                                : map pp_inl (spec1:spec2:specs))))
 
     pp_inl (L loc prag) = ppr prag <+> parens (ppr loc)
 

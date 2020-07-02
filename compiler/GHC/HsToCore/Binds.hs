@@ -381,6 +381,8 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
                          -- See Note [INLINE and default methods] in GHC.Tc.TyCl.Instance
   = (gbl_id `setIdUnfolding` mkCompulsoryUnfolding rhs, rhs)
 
+  -- TODO both at the same time?
+  | idSpecializablePragma gbl_id = (gbl_id `setIdUnfolding` specializable_unf, rhs)
   | otherwise
   = case inlinePragmaSpec inline_prag of
           NoUserInline -> (gbl_id, rhs)
@@ -391,6 +393,7 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
   where
     inline_prag   = idInlinePragma gbl_id
     inlinable_unf = mkInlinableUnfolding dflags rhs
+    specializable_unf = mkInlinableUnfolding dflags rhs -- TODO mkSpecializableUnfolding
     inline_pair
        | Just arity <- inlinePragmaSat inline_prag
         -- Add an Unfolding for an INLINE (but not for NOINLINE)

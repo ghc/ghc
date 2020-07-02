@@ -987,6 +987,7 @@ rep_sig (L loc (InlineSig _ nm ispec))= rep_inline nm ispec loc
 rep_sig (L loc (SpecSig _ nm tys ispec))
   = concatMapM (\t -> rep_specialise nm t ispec loc) tys
 rep_sig (L loc (SpecInstSig _ _ ty))  = rep_specialiseInst ty loc
+rep_sig (L _   (SpecializableSig {})) = notHandled "SPECIALIZABLE pragmas" empty -- TODO
 rep_sig (L _   (MinimalSig {}))       = notHandled "MINIMAL pragmas" empty
 rep_sig (L _   (SCCFunSig {}))        = notHandled "SCC pragmas" empty
 rep_sig (L loc (CompleteMatchSig _ _st cls mty))
