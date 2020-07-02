@@ -84,7 +84,7 @@ import GHC.Unit.Info
 import GHC.Unit.Types
 import GHC.Unit.Module
 import GHC.Driver.Session
-import GHC.Driver.Ways
+import GHC.Platform.Ways
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.Set
