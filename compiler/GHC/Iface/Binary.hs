@@ -17,7 +17,7 @@ module GHC.Iface.Binary (
         getSymtabName,
         getDictFastString,
         CheckHiWay(..),
-        TraceBinIFaceReading(..),
+        TraceBinIFace(..),
         getWithUserData,
         putWithUserData,
 
@@ -49,7 +49,6 @@ import GHC.Types.Unique.Supply
 import GHC.Utils.Panic
 import GHC.Utils.Binary as Binary
 import GHC.Types.SrcLoc
-import GHC.Utils.Error
 import GHC.Data.FastMutInt
 import GHC.Types.Unique
 import GHC.Utils.Outputable
@@ -80,11 +79,12 @@ import qualified Control.Monad.Trans.State.Strict as State
 data CheckHiWay = CheckHiWay | IgnoreHiWay
     deriving Eq
 
-data TraceBinIFaceReading = TraceBinIFaceReading | QuietBinIFaceReading
-    deriving Eq
+data TraceBinIFace
+   = TraceBinIFace (SDoc -> IO ())
+   | QuietBinIFace
 
 -- | Read an interface file
-readBinIface :: CheckHiWay -> TraceBinIFaceReading -> FilePath
+readBinIface :: CheckHiWay -> TraceBinIFace -> FilePath
              -> TcRnIf a b ModIface
 readBinIface checkHiWay traceBinIFaceReading hi_path = do
     ncu <- mkNameCacheUpdater
@@ -92,27 +92,20 @@ readBinIface checkHiWay traceBinIFaceReading hi_path = do
     liftIO $ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu
 
 -- | Read an interface file in 'IO'.
-readBinIface_ :: DynFlags -> CheckHiWay -> TraceBinIFaceReading -> FilePath
+readBinIface_ :: DynFlags -> CheckHiWay -> TraceBinIFace -> FilePath
               -> NameCacheUpdater
               -> IO ModIface
-readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
+readBinIface_ dflags checkHiWay traceBinIFace hi_path ncu = do
     let platform = targetPlatform dflags
-
-        printer :: SDoc -> IO ()
-        printer = case traceBinIFaceReading of
-                      TraceBinIFaceReading -> \sd ->
-                          putLogMsg dflags
-                                    NoReason
-                                    SevOutput
-                                    noSrcSpan
-                                    $ withPprStyle defaultDumpStyle sd
-                      QuietBinIFaceReading -> \_ -> return ()
 
         wantedGot :: String -> a -> a -> (a -> SDoc) -> IO ()
         wantedGot what wanted got ppr' =
-            printer (text what <> text ": " <>
+            case traceBinIFace of
+               QuietBinIFace         -> return ()
+               TraceBinIFace printer -> printer $
+                     text what <> text ": " <>
                      vcat [text "Wanted " <> ppr' wanted <> text ",",
-                           text "got    " <> ppr' got])
+                           text "got    " <> ppr' got]
 
         errorOnMismatch :: (Eq a, Show a) => String -> a -> a -> IO ()
         errorOnMismatch what wanted got =
@@ -185,8 +178,8 @@ getWithUserData ncu bh = do
     get bh
 
 -- | Write an interface file
-writeBinIface :: DynFlags -> FilePath -> ModIface -> IO ()
-writeBinIface dflags hi_path mod_iface = do
+writeBinIface :: DynFlags -> TraceBinIFace -> FilePath -> ModIface -> IO ()
+writeBinIface dflags traceBinIface hi_path mod_iface = do
     bh <- openBinMem initBinMemSize
     let platform = targetPlatform dflags
     put_ bh (binaryInterfaceMagic platform)
@@ -199,7 +192,7 @@ writeBinIface dflags hi_path mod_iface = do
     extFields_p_p <- tellBin bh
     put_ bh extFields_p_p
 
-    putWithUserData (debugTraceMsg dflags 3) bh mod_iface
+    putWithUserData traceBinIface bh mod_iface
 
     extFields_p <- tellBin bh
     putAt bh extFields_p_p extFields_p
@@ -213,8 +206,8 @@ writeBinIface dflags hi_path mod_iface = do
 -- is necessary if you want to serialise Names or FastStrings.
 -- It also writes a symbol table and the dictionary.
 -- This segment should be read using `getWithUserData`.
-putWithUserData :: Binary a => (SDoc -> IO ()) -> BinHandle -> a -> IO ()
-putWithUserData log_action bh payload = do
+putWithUserData :: Binary a => TraceBinIFace -> BinHandle -> a -> IO ()
+putWithUserData traceBinIface bh payload = do
     -- Remember where the dictionary pointer will go
     dict_p_p <- tellBin bh
     -- Placeholder for ptr to dictionary
@@ -252,8 +245,11 @@ putWithUserData log_action bh payload = do
     symtab_next <- readFastMutInt symtab_next
     symtab_map  <- readIORef symtab_map
     putSymbolTable bh symtab_next symtab_map
-    log_action (text "writeBinIface:" <+> int symtab_next
-                                <+> text "Names")
+    case traceBinIface of
+      QuietBinIFace         -> return ()
+      TraceBinIFace printer ->
+         printer (text "writeBinIface:" <+> int symtab_next
+                                        <+> text "Names")
 
     -- NB. write the dictionary after the symbol table, because
     -- writing the symbol table may create more dictionary entries.
@@ -267,8 +263,11 @@ putWithUserData log_action bh payload = do
     dict_next <- readFastMutInt dict_next_ref
     dict_map  <- readIORef dict_map_ref
     putDictionary bh dict_next dict_map
-    log_action (text "writeBinIface:" <+> int dict_next
-                                <+> text "dict entries")
+    case traceBinIface of
+      QuietBinIFace         -> return ()
+      TraceBinIFace printer ->
+         printer (text "writeBinIface:" <+> int dict_next
+                                        <+> text "dict entries")
 
 
 
