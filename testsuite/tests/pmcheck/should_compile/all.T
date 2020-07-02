@@ -36,6 +36,8 @@ test('T9951b', [], compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T9951', [], compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T10183', [], compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T11303', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M1G -RTS'])
 test('T11276', collect_compiler_stats('bytes allocated',10), compile,
