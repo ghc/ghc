@@ -1047,48 +1047,71 @@ failIfErrsM = ifErrsM failM (return ())
 ************************************************************************
 -}
 
+{- Note [Inlining addErrCtxt]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+You will notice a bunch of INLINE pragamas on addErrCtxt and friends.
+The reason is to promote better eta-expansion in client modules.
+Consider
+    \e s. addErrCtxt c (tc_foo x) e s
+It looks as if tc_foo is applied to only two arguments, but if we
+inline addErrCtxt it'll turn into something more like
+    \e s. tc_foo x (munge c e) s
+This is much better because Called Arity analysis can see that tc_foo
+is applied to four arguments.  See #18379 for a concrete example.
+
+This reliance on delicate inlining and Called Arity is not good.
+See #18202 for a more general approach.  But meanwhile, these
+ininings seem unobjectional, and they solve the immediate
+problem. -}
+
 getErrCtxt :: TcM [ErrCtxt]
 getErrCtxt = do { env <- getLclEnv; return (tcl_ctxt env) }
 
 setErrCtxt :: [ErrCtxt] -> TcM a -> TcM a
+{-# INLINE setErrCtxt #-}   -- Note [Inlining addErrCtxt]
 setErrCtxt ctxt = updLclEnv (\ env -> env { tcl_ctxt = ctxt })
 
 -- | Add a fixed message to the error context. This message should not
 -- do any tidying.
 addErrCtxt :: MsgDoc -> TcM a -> TcM a
+{-# INLINE addErrCtxt #-}   -- Note [Inlining addErrCtxt]
 addErrCtxt msg = addErrCtxtM (\env -> return (env, msg))
 
 -- | Add a message to the error context. This message may do tidying.
 addErrCtxtM :: (TidyEnv -> TcM (TidyEnv, MsgDoc)) -> TcM a -> TcM a
-addErrCtxtM ctxt m = do
-  shouldPushCtxt <- not <$> inGeneratedCode
-  if shouldPushCtxt
-    then updCtxt (\ ctxts -> (False, ctxt) : ctxts) m
-    else m
+{-# INLINE addErrCtxtM #-}  -- Note [Inlining addErrCtxt]
+addErrCtxtM ctxt m = updCtxt (push_ctxt (False, ctxt)) m
 
 -- | Add a fixed landmark message to the error context. A landmark
 -- message is always sure to be reported, even if there is a lot of
 -- context. It also doesn't count toward the maximum number of contexts
 -- reported.
 addLandmarkErrCtxt :: MsgDoc -> TcM a -> TcM a
+{-# INLINE addLandmarkErrCtxt #-}  -- Note [Inlining addErrCtxt]
 addLandmarkErrCtxt msg = addLandmarkErrCtxtM (\env -> return (env, msg))
 
 -- | Variant of 'addLandmarkErrCtxt' that allows for monadic operations
 -- and tidying.
 addLandmarkErrCtxtM :: (TidyEnv -> TcM (TidyEnv, MsgDoc)) -> TcM a -> TcM a
-addLandmarkErrCtxtM ctxt m = do
-  shouldPushCtxt <- not <$> inGeneratedCode
-  if shouldPushCtxt
-    then updCtxt (\ctxts -> (True, ctxt) : ctxts) m
-    else m
+{-# INLINE addLandmarkErrCtxtM #-}  -- Note [Inlining addErrCtxt]
+addLandmarkErrCtxtM ctxt m = updCtxt (push_ctxt (True, ctxt)) m
 
+push_ctxt :: (Bool, TidyEnv -> TcM (TidyEnv, MsgDoc))
+          -> Bool -> [ErrCtxt] -> [ErrCtxt]
+push_ctxt ctxt in_gen ctxts
+  | in_gen    = ctxts
+  | otherwise = ctxt : ctxts
+
+updCtxt :: (Bool -> [ErrCtxt] -> [ErrCtxt]) -> TcM a -> TcM a
+{-# INLINE updCtxt #-} -- Note [Inlining addErrCtxt]
 -- Helper function for the above
-updCtxt :: ([ErrCtxt] -> [ErrCtxt]) -> TcM a -> TcM a
-updCtxt upd = updLclEnv (\ env@(TcLclEnv { tcl_ctxt = ctxt }) ->
-                           env { tcl_ctxt = upd ctxt })
+-- The Bool is true if we are in generated code
+updCtxt upd = updLclEnv (\ env@(TcLclEnv { tcl_ctxt = ctxt
+                                         , tcl_in_gen_code = in_gen }) ->
+                           env { tcl_ctxt = upd in_gen ctxt })
 
 popErrCtxt :: TcM a -> TcM a
-popErrCtxt = updCtxt (\ msgs -> case msgs of { [] -> []; (_ : ms) -> ms })
+popErrCtxt = updCtxt (\ _ msgs -> case msgs of { [] -> []; (_ : ms) -> ms })
 
 getCtLocM :: CtOrigin -> Maybe TypeOrKind -> TcM CtLoc
 getCtLocM origin t_or_k
