@@ -290,7 +290,7 @@ traversePushClosure(traverseState *ts, StgClosure *c, StgClosure *cp, stackEleme
     se.info.next.cp = cp;
     se.sep = sep;
     se.data = data;
-    se.accum = (stackAccum)(StgWord)0;
+    se.accum = (stackAccum){};
     se.info.type = posTypeFresh;
 
     pushStackElement(ts, se);
