@@ -368,6 +368,19 @@ Miscellaneous RTS options
     thread can execute its exception handlers. The ``-xq`` controls the
     size of this additional quota.
 
+.. rts-flag:: --use-io-uring-backend
+
+    :default: false
+
+    This option controls the use of the experimental ``io_uring``
+    backend for the I/O event manager on Linux systems that support
+    it. The minimum Linux kernel version that supports the features
+    required is version 5.4. If the system does not support ``io_uring``,
+    this flag does nothing. Note that both the system on which the
+    program is compiled and the system on which it runs must support
+    ``io_uring``. This option only makes sense (and is only available)
+    for programs that have been compiled with ``--threaded``.
+
 .. _rts-options-gc:
 
 RTS options to control the garbage collector

@@ -176,6 +176,7 @@ data MiscFlags = MiscFlags
       -- ^ address to ask the OS for memory for the linker, 0 ==> off
     , ioManager             :: IoSubSystem
     , numIoWorkerThreads    :: Word32
+    , useIOUringBackend     :: Bool
     } deriving ( Show -- ^ @since 4.8.0.0
                , Generic -- ^ @since 4.15.0.0
                )
@@ -503,6 +504,8 @@ getMiscFlags = do
                  <$> (#{peek MISC_FLAGS, ioManager} ptr :: IO Word32))
             <*> (fromIntegral
                  <$> (#{peek MISC_FLAGS, numIoWorkerThreads} ptr :: IO Word32))
+            <*> (toBool <$>
+                  (#{peek MISC_FLAGS, useIoUringBackend} ptr :: IO CBool))
 
 {- Note [The need for getIoManagerFlag]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
