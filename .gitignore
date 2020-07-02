@@ -232,3 +232,6 @@ ghc.nix/
 
 # Tooling - vscode
 .vscode
+
+# Tooling - ghcide
+*.hiedb

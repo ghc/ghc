@@ -4,7 +4,7 @@ Authors: George Karachalias <george.karachalias@cs.kuleuven.be>
          Ryan Scott <ryan.gl.scott@gmail.com>
 -}
 
-{-# LANGUAGE CPP, LambdaCase, TupleSections, PatternSynonyms, ViewPatterns, MultiWayIf #-}
+{-# LANGUAGE CPP, LambdaCase, TupleSections, PatternSynonyms, ViewPatterns, MultiWayIf, ScopedTypeVariables #-}
 
 -- | The pattern match oracle. The main export of the module are the functions
 -- 'addPmCts' for adding facts to the oracle, and 'provideEvidence' to turn a
@@ -153,12 +153,7 @@ mkOneConFull arg_tys con = do
   -- to the type oracle
   let ty_cs = substTheta subst (eqSpecPreds eq_spec ++ thetas)
   -- Figure out the types of strict constructor fields
-  let arg_is_strict
-        | RealDataCon dc <- con
-        , isNewTyCon (dataConTyCon dc)
-        = [True] -- See Note [Divergence of Newtype matches]
-        | otherwise
-        = map isBanged $ conLikeImplBangs con
+  let arg_is_strict = map isBanged $ conLikeImplBangs con
       strict_arg_tys = filterByList arg_is_strict field_tys'
   return (ex_tvs, vars, listToBag ty_cs, strict_arg_tys)
 
@@ -627,11 +622,34 @@ tmIsSatisfiable new_tm_cs = SC $ \delta -> runMaybeT $ foldlM addTmCt delta new_
 -- * Looking up VarInfo
 
 emptyVarInfo :: Id -> VarInfo
-emptyVarInfo x = VI (idType x) [] emptyPmAltConSet NoPM
+-- We could initialise @bot@ to @Just False@ in case of an unlifted type here,
+-- but it's cleaner to let the user of the constraint solver take care of this.
+-- After all, there are also strict fields, the unliftedness of which isn't
+-- evident in the type. So treating unlifted types here would never be
+-- sufficient anyway.
+emptyVarInfo x = VI (idType x) [] emptyPmAltConSet Nothing NoPM
 
 lookupVarInfo :: TmState -> Id -> VarInfo
 -- (lookupVarInfo tms x) tells what we know about 'x'
 lookupVarInfo (TmSt env _) x = fromMaybe (emptyVarInfo x) (lookupSDIE env x)
+
+-- | Like @lookupVarInfo ts x@, but @lookupVarInfo ts x = (y, vi)@ also looks
+-- through newtype constructors. We have @x ~ N1 (... (Nk y))@ such that the
+-- returned @y@ doesn't have a positive newtype constructor constraint
+-- associated with it (yet). The 'VarInfo' returned is that of @y@'s
+-- representative.
+--
+-- Careful, this means that @idType x@ might be different to @idType y@, even
+-- modulo type normalisation!
+lookupVarInfoNT :: TmState -> Id -> (Id, VarInfo)
+lookupVarInfoNT ts x = case lookupVarInfo ts x of
+  VI{ vi_pos = as_newtype -> Just y } -> lookupVarInfoNT ts y
+  res                                 -> (x, res)
+  where
+    as_newtype = listToMaybe . mapMaybe go
+    go (PmAltConLike (RealDataCon dc), _, [y])
+      | isNewTyCon (dataConTyCon dc) = Just y
+    go _                             = Nothing
 
 initPossibleMatches :: TyState -> VarInfo -> DsM VarInfo
 initPossibleMatches ty_st vi@VI{ vi_ty = ty, vi_cache = NoPM } = do
@@ -724,14 +742,10 @@ TyCon, so tc_rep = tc_fam afterwards.
 
 -- | Check whether adding a constraint @x ~ BOT@ to 'Delta' succeeds.
 canDiverge :: Delta -> Id -> Bool
-canDiverge delta@MkDelta{ delta_tm_st = ts } x
-  | VI _ pos neg _ <- lookupVarInfo ts x
-  = isEmptyPmAltConSet neg && all pos_can_diverge pos
-  where
-    pos_can_diverge (PmAltConLike (RealDataCon dc), _, [y])
-      -- See Note [Divergence of Newtype matches]
-      | isNewTyCon (dataConTyCon dc) = canDiverge delta y
-    pos_can_diverge _ = False
+canDiverge MkDelta{ delta_tm_st = ts } x
+  -- See Note [Divergence of Newtype matches]
+  | (_, VI _ _ _ bot _) <- lookupVarInfoNT ts x
+  = bot /= Just False
 
 {- Note [Divergence of Newtype matches]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -870,27 +884,17 @@ addTmCt delta (TmBotCt x)              = addBotCt delta x
 addTmCt delta (TmNotBotCt x)           = addNotBotCt delta x
 
 -- | Adds the constraint @x ~ ⊥@, e.g. that evaluation of a particular 'Id' @x@
--- surely diverges.
---
--- Only that's a lie, because we don't currently preserve the fact in 'Delta'
--- after we checked compatibility. See Note [Preserving TmBotCt]
+-- surely diverges. Quite similar to 'addConCt', only that it only cares about
+-- ⊥.
 addBotCt :: Delta -> Id -> MaybeT DsM Delta
-addBotCt delta x
-  | canDiverge delta x = pure delta
-  | otherwise          = mzero
-
-{- Note [Preserving TmBotCt]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Whenever we add a new constraint to 'Delta' via 'addTmCt', we want to check it
-for compatibility with existing constraints in the modeled indert set and then
-add it the constraint itself to the inert set.
-For a 'TmBotCt' @x ~ ⊥@ we don't actually add it to the inert set after checking
-it for compatibility with 'Delta'.
-And that is fine in the context of the patter-match checking algorithm!
-Whenever we add a 'TmBotCt' (we only do so for checking divergence of bang
-patterns and strict constructor matches), we don't add any more constraints to
-the inert set afterwards, so we don't need to preserve it.
--}
+addBotCt delta@MkDelta{ delta_tm_st = TmSt env reps } x = do
+  let (y, vi@VI { vi_bot = bot }) = lookupVarInfoNT (delta_tm_st delta) x
+  case bot of
+    Just False -> mzero      -- There was x /~ ⊥. Contradiction!
+    Just True  -> pure delta -- There already is x ~ ⊥. Nothing left to do
+    Nothing    -> do         -- We add x ~ ⊥
+      let vi' = vi{ vi_bot = Just True }
+      pure delta{ delta_tm_st = TmSt (setEntrySDIE env y vi') reps}
 
 -- | Record a @x ~/ K@ constraint, e.g. that a particular 'Id' @x@ can't
 -- take the shape of a 'PmAltCon' @K@ in the 'Delta' and return @Nothing@ if
@@ -898,7 +902,7 @@ the inert set afterwards, so we don't need to preserve it.
 -- See Note [TmState invariants].
 addNotConCt :: Delta -> Id -> PmAltCon -> MaybeT DsM Delta
 addNotConCt delta@MkDelta{ delta_tm_st = TmSt env reps } x nalt = do
-  vi@(VI _ pos neg pm) <- lift (initLookupVarInfo delta x)
+  vi@(VI _ pos neg _ pm) <- lift (initLookupVarInfo delta x)
   -- 1. Bail out quickly when nalt contradicts a solution
   let contradicts nalt (cl, _tvs, _args) = eqPmAltCon cl nalt == Equal
   guard (not (any (contradicts nalt) pos))
@@ -979,18 +983,17 @@ guessConLikeUnivTyArgsFromResTy _   res_ty (PatSynCon ps)  = do
   subst <- tcMatchTy con_res_ty res_ty
   traverse (lookupTyVar subst) univ_tvs
 
--- | Adds the constraint @x ~/ ⊥@ to 'Delta'.
---
--- But doesn't really commit to upholding that constraint in the future. This
--- will be rectified in a follow-up patch. The status quo should work good
--- enough for now.
+-- | Adds the constraint @x ~/ ⊥@ to 'Delta'. Quite similar to 'addNotConCt',
+-- but only cares for the ⊥ "constructor".
 addNotBotCt :: Delta -> Id -> MaybeT DsM Delta
 addNotBotCt delta@MkDelta{ delta_tm_st = TmSt env reps } x = do
-  vi  <- lift $ initLookupVarInfo delta x
-  vi' <- MaybeT $ ensureInhabited delta vi
-  -- vi' has probably constructed and then thinned out some PossibleMatches.
-  -- We want to cache that work
-  pure delta{ delta_tm_st = TmSt (setEntrySDIE env x vi') reps}
+  let (y, vi@VI { vi_bot = bot }) = lookupVarInfoNT (delta_tm_st delta) x
+  case bot of
+    Just True  -> mzero      -- There was x ~ ⊥. Contradiction!
+    Just False -> pure delta -- There already is x /~ ⊥. Nothing left to do
+    Nothing -> do            -- We add x /~ ⊥ and test if x is still inhabited
+      vi' <- MaybeT $ ensureInhabited delta vi{ vi_bot = Just False }
+      pure delta{ delta_tm_st = TmSt (setEntrySDIE env y vi') reps}
 
 ensureInhabited :: Delta -> VarInfo -> DsM (Maybe VarInfo)
    -- Returns (Just vi) if at least one member of each ConLike in the COMPLETE
@@ -1001,6 +1004,8 @@ ensureInhabited :: Delta -> VarInfo -> DsM (Maybe VarInfo)
    -- NB: Does /not/ filter each ConLikeSet with the oracle; members may
    --     remain that do not statisfy it.  This lazy approach just
    --     avoids doing unnecessary work.
+ensureInhabited _ vi@VI{ vi_bot = Nothing }   = pure (Just vi)
+ensureInhabited _ vi@VI{ vi_bot = Just True } = pure (Just vi)
 ensureInhabited delta vi = fmap (set_cache vi) <$> test (vi_cache vi) -- This would be much less tedious with lenses
   where
     set_cache vi cache = vi { vi_cache = cache }
@@ -1115,7 +1120,7 @@ equate delta@MkDelta{ delta_tm_st = TmSt env reps } x y
 -- See Note [TmState invariants].
 addConCt :: Delta -> Id -> PmAltCon -> [TyVar] -> [Id] -> MaybeT DsM Delta
 addConCt delta@MkDelta{ delta_tm_st = TmSt env reps } x alt tvs args = do
-  VI ty pos neg cache <- lift (initLookupVarInfo delta x)
+  VI ty pos neg bot cache <- lift (initLookupVarInfo delta x)
   -- First try to refute with a negative fact
   guard (not (elemPmAltConSet alt neg))
   -- Then see if any of the other solutions (remember: each of them is an
@@ -1134,7 +1139,17 @@ addConCt delta@MkDelta{ delta_tm_st = TmSt env reps } x alt tvs args = do
       MaybeT $ addPmCts delta (listToBag ty_cts `unionBags` listToBag tm_cts)
     Nothing -> do
       let pos' = (alt, tvs, args):pos
-      pure delta{ delta_tm_st = TmSt (setEntrySDIE env x (VI ty pos' neg cache)) reps}
+      let delta' = delta{ delta_tm_st = TmSt (setEntrySDIE env x (VI ty pos' neg bot cache)) reps}
+      -- In case of a newtype constructor, we have to make sure that x ~ ⊥ and
+      -- x /~ ⊥ constraints now apply to the wrapped thing, as 'lookupVarInfoNT'
+      -- looks through newtype constructors.
+      case (alt, args) of
+        (PmAltConLike (RealDataCon dc), [y]) | isNewTyCon (dataConTyCon dc) ->
+          case bot of
+            Nothing -> pure delta'
+            Just True -> addBotCt delta' y
+            Just False -> addNotBotCt delta' y
+        _ -> pure delta'
 
 equateTys :: [Type] -> [Type] -> [PmCt]
 equateTys ts us =
@@ -1530,7 +1545,7 @@ provideEvidence = go
     go []     _ delta = pure [delta]
     go (x:xs) n delta = do
       tracePm "provideEvidence" (ppr x $$ ppr xs $$ ppr delta $$ ppr n)
-      VI _ pos neg _ <- initLookupVarInfo delta x
+      VI _ pos neg _ _ <- initLookupVarInfo delta x
       case pos of
         _:_ -> do
           -- All solutions must be valid at once. Try to find candidates for their
@@ -1712,9 +1727,11 @@ addCoreCt delta x e = do
 
     -- | Look at @let x = K taus theta es@ and generate the following
     -- constraints (assuming universals were dropped from @taus@ before):
-    --   1. @a_1 ~ tau_1, ..., a_n ~ tau_n@ for fresh @a_i@
-    --   2. @y_1 ~ e_1, ..., y_m ~ e_m@ for fresh @y_i@
-    --   3. @x ~ K as ys@
+    --   1. @x /~ ⊥@ if 'K' is not a Newtype constructor.
+    --   2. @a_1 ~ tau_1, ..., a_n ~ tau_n@ for fresh @a_i@
+    --   3. @y_1 ~ e_1, ..., y_m ~ e_m@ for fresh @y_i@
+    --   4. @x ~ K as ys@
+    -- This is quite similar to PmCheck.pmConCts.
     data_con_app :: Id -> InScopeSet -> DataCon -> [CoreExpr] -> StateT Delta (MaybeT DsM) ()
     data_con_app x in_scope dc args = do
       let dc_ex_tvs              = dataConExTyCoVars dc
@@ -1725,11 +1742,14 @@ addCoreCt delta x e = do
       uniq_supply <- lift $ lift $ getUniqueSupplyM
       let (_, ex_tvs) = cloneTyVarBndrs (mkEmptyTCvSubst in_scope) dc_ex_tvs uniq_supply
           ty_cts      = equateTys (map mkTyVarTy ex_tvs) ex_tys
-      -- 1. @a_1 ~ tau_1, ..., a_n ~ tau_n@ for fresh @a_i@. See also #17703
+      -- 1. @x /~ ⊥@ if 'K' is not a Newtype constructor (#18341)
+      when (not (isNewTyCon (dataConTyCon dc))) $
+        modifyT $ \delta -> addNotBotCt delta x
+      -- 2. @a_1 ~ tau_1, ..., a_n ~ tau_n@ for fresh @a_i@. See also #17703
       modifyT $ \delta -> MaybeT $ addPmCts delta (listToBag ty_cts)
-      -- 2. @y_1 ~ e_1, ..., y_m ~ e_m@ for fresh @y_i@
+      -- 3. @y_1 ~ e_1, ..., y_m ~ e_m@ for fresh @y_i@
       arg_ids <- traverse bind_expr vis_args
-      -- 3. @x ~ K as ys@
+      -- 4. @x ~ K as ys@
       pm_alt_con_app x (PmAltConLike (RealDataCon dc)) ex_tvs arg_ids
 
     -- | Adds a literal constraint, i.e. @x ~ 42@.

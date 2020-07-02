@@ -15,7 +15,7 @@ Author: George Karachalias <george.karachalias@cs.kuleuven.be>
 module GHC.HsToCore.PmCheck.Types (
         -- * Representations for Literals and AltCons
         PmLit(..), PmLitValue(..), PmAltCon(..), pmLitType, pmAltConType,
-        pmAltConImplBangs,
+        isPmAltConMatchStrict, pmAltConImplBangs,
 
         -- ** Equality on 'PmAltCon's
         PmEquality(..), eqPmAltCon,
@@ -226,6 +226,14 @@ instance Eq PmAltCon where
 pmAltConType :: PmAltCon -> [Type] -> Type
 pmAltConType (PmAltLit lit)     _arg_tys = ASSERT( null _arg_tys ) pmLitType lit
 pmAltConType (PmAltConLike con) arg_tys  = conLikeResTy con arg_tys
+
+-- | Is a match on this constructor forcing the match variable?
+-- True of data constructors, literals and pattern synonyms (#17357), but not of
+-- newtypes.
+isPmAltConMatchStrict :: PmAltCon -> Bool
+isPmAltConMatchStrict PmAltLit{}                      = True
+isPmAltConMatchStrict (PmAltConLike PatSynCon{})      = True -- #17357
+isPmAltConMatchStrict (PmAltConLike (RealDataCon dc)) = not (isNewTyCon (dataConTyCon dc))
 
 pmAltConImplBangs :: PmAltCon -> [HsImplBang]
 pmAltConImplBangs PmAltLit{}         = []
@@ -536,6 +544,13 @@ data VarInfo
   -- because files like Cabal's `LicenseId` define relatively huge enums
   -- that lead to quadratic or worse behavior.
 
+  , vi_bot :: Maybe Bool
+  -- ^ Can this variable be ⊥? Models (mutually contradicting) @x ~ ⊥@ and
+  --   @x ~/ ⊥@ constraints. E.g.
+  --    * 'Nothing': Don't know; Neither @x ~ ⊥@ nor @x /~ ⊥@.
+  --    * 'Just True': @x ~ ⊥@
+  --    * 'Just False': @x /~ ⊥@
+
   , vi_cache :: !PossibleMatches
   -- ^ A cache of the associated COMPLETE sets. At any time a superset of
   -- possible constructors of each COMPLETE set. So, if it's not in here, we
@@ -549,8 +564,12 @@ instance Outputable TmState where
 
 -- | Not user-facing.
 instance Outputable VarInfo where
-  ppr (VI ty pos neg cache)
-    = braces (hcat (punctuate comma [ppr ty, ppr pos, ppr neg, ppr cache]))
+  ppr (VI ty pos neg bot cache)
+    = braces (hcat (punctuate comma [ppr ty, ppr pos, ppr neg, pp_bot bot, ppr cache]))
+    where
+      pp_bot Nothing = empty
+      pp_bot (Just True) = text "~⊥"
+      pp_bot (Just False) = text "/~⊥"
 
 -- | Initial state of the term oracle.
 initTmState :: TmState
