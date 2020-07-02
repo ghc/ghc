@@ -43,7 +43,7 @@ import GHC.Driver.Types
 import GHC.Unit
 import GHC.Types.Name
 import GHC.Driver.Session
-import GHC.Platform.Ways
+import GHC.Platform.Profile
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Utils.Panic
@@ -58,7 +58,6 @@ import GHC.Data.FastString
 import GHC.Settings.Constants
 import GHC.Utils.Misc
 
-import Data.Set (Set)
 import Data.Array
 import Data.Array.ST
 import Data.Array.Unsafe
@@ -89,14 +88,15 @@ readBinIface :: CheckHiWay -> TraceBinIFace -> FilePath
 readBinIface checkHiWay traceBinIFaceReading hi_path = do
     ncu <- mkNameCacheUpdater
     dflags <- getDynFlags
-    liftIO $ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu
+    let profile = targetProfile dflags
+    liftIO $ readBinIface_ profile checkHiWay traceBinIFaceReading hi_path ncu
 
 -- | Read an interface file in 'IO'.
-readBinIface_ :: DynFlags -> CheckHiWay -> TraceBinIFace -> FilePath
+readBinIface_ :: Profile -> CheckHiWay -> TraceBinIFace -> FilePath
               -> NameCacheUpdater
               -> IO ModIface
-readBinIface_ dflags checkHiWay traceBinIFace hi_path ncu = do
-    let platform = targetPlatform dflags
+readBinIface_ profile checkHiWay traceBinIFace hi_path ncu = do
+    let platform = profilePlatform profile
 
         wantedGot :: String -> a -> a -> (a -> SDoc) -> IO ()
         wantedGot what wanted got ppr' =
@@ -124,17 +124,17 @@ readBinIface_ dflags checkHiWay traceBinIFace hi_path ncu = do
     errorOnMismatch "magic number mismatch: old/corrupt interface file?"
         (unFixedLength $ binaryInterfaceMagic platform) (unFixedLength magic)
 
-    -- Check the interface file version and ways.
+    -- Check the interface file version and profile tag.
     check_ver  <- get bh
     let our_ver = show hiVersion
     wantedGot "Version" our_ver check_ver text
     errorOnMismatch "mismatched interface file versions" our_ver check_ver
 
-    check_way <- get bh
-    let way_descr = getWayDescr platform (ways dflags)
-    wantedGot "Way" way_descr check_way ppr
+    check_tag <- get bh
+    let tag = profileBuildTag profile
+    wantedGot "Way" tag check_tag ppr
     when (checkHiWay == CheckHiWay) $
-        errorOnMismatch "mismatched interface file ways" way_descr check_way
+        errorOnMismatch "mismatched interface file profile tag" tag check_tag
 
     extFields_p <- get bh
 
@@ -178,16 +178,16 @@ getWithUserData ncu bh = do
     get bh
 
 -- | Write an interface file
-writeBinIface :: DynFlags -> TraceBinIFace -> FilePath -> ModIface -> IO ()
-writeBinIface dflags traceBinIface hi_path mod_iface = do
+writeBinIface :: Profile -> TraceBinIFace -> FilePath -> ModIface -> IO ()
+writeBinIface profile traceBinIface hi_path mod_iface = do
     bh <- openBinMem initBinMemSize
-    let platform = targetPlatform dflags
+    let platform = profilePlatform profile
     put_ bh (binaryInterfaceMagic platform)
 
-    -- The version and way descriptor go next
+    -- The version and profile tag go next
     put_ bh (show hiVersion)
-    let way_descr = getWayDescr platform (ways dflags)
-    put_  bh way_descr
+    let tag = profileBuildTag profile
+    put_  bh tag
 
     extFields_p_p <- tellBin bh
     put_ bh extFields_p_p
@@ -429,10 +429,3 @@ data BinDictionary = BinDictionary {
                                 -- indexed by FastString
   }
 
-getWayDescr :: Platform -> Set Way -> String
-getWayDescr platform ws
-  | platformUnregisterised platform = 'u':tag
-  | otherwise                       =     tag
-  where tag = waysBuildTag ws
-        -- if this is an unregisterised build, make sure our interfaces
-        -- can't be used by a registerised build.

@@ -63,7 +63,7 @@ module GHC.Driver.Session (
         optimisationFlags,
         setFlagsFromEnvFile,
 
-        addWay',
+        addWay', targetProfile,
 
         homeUnit, mkHomeModule, isHomeModule,
 
@@ -4865,6 +4865,10 @@ bLOCK_SIZE_W dflags = bLOCK_SIZE dflags `quot` platformWordSizeInBytes platform
 
 wordAlignment :: Platform -> Alignment
 wordAlignment platform = alignmentOf (platformWordSizeInBytes platform)
+
+-- | Get target profile
+targetProfile :: DynFlags -> Profile
+targetProfile dflags = Profile (targetPlatform dflags) (ways dflags)
 
 tAG_MASK :: DynFlags -> Int
 tAG_MASK dflags = (1 `shiftL` tAG_BITS dflags) - 1

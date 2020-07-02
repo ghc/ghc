@@ -984,7 +984,8 @@ writeIface :: DynFlags -> FilePath -> ModIface -> IO ()
 writeIface dflags hi_file_path new_iface
     = do createDirectoryIfMissing True (takeDirectory hi_file_path)
          let printer = TraceBinIFace (debugTraceMsg dflags 3)
-         writeBinIface dflags printer hi_file_path new_iface
+             profile = targetProfile dflags
+         writeBinIface profile printer hi_file_path new_iface
 
 -- @readIface@ tries just the one file.
 readIface :: Module -> FilePath
