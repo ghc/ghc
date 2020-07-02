@@ -229,6 +229,7 @@ typedef struct _MISC_FLAGS {
                                   * for the linker, NULL ==> off */
     IO_MANAGER ioManager;        /* The I/O manager to use.  */
     uint32_t numIoWorkerThreads; /* Number of I/O worker threads to use.  */
+    bool useIoUringBackend;      /* Use the io_uring backend for the event manager */
 } MISC_FLAGS;
 
 /* See Note [Synchronization of flags and base APIs] */
