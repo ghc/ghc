@@ -983,7 +983,8 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
 writeIface :: DynFlags -> FilePath -> ModIface -> IO ()
 writeIface dflags hi_file_path new_iface
     = do createDirectoryIfMissing True (takeDirectory hi_file_path)
-         writeBinIface dflags hi_file_path new_iface
+         let printer = TraceBinIFace (debugTraceMsg dflags 3)
+         writeBinIface dflags printer hi_file_path new_iface
 
 -- @readIface@ tries just the one file.
 readIface :: Module -> FilePath
@@ -993,7 +994,7 @@ readIface :: Module -> FilePath
 
 readIface wanted_mod file_path
   = do  { res <- tryMostM $
-                 readBinIface CheckHiWay QuietBinIFaceReading file_path
+                 readBinIface CheckHiWay QuietBinIFace file_path
         ; case res of
             Right iface
                 -- NB: This check is NOT just a sanity check, it is
@@ -1112,12 +1113,15 @@ For some background on this choice see trac #15269.
 -- | Read binary interface, and print it out
 showIface :: HscEnv -> FilePath -> IO ()
 showIface hsc_env filename = do
+   let dflags  = hsc_dflags hsc_env
+       printer = putLogMsg dflags NoReason SevOutput noSrcSpan . withPprStyle defaultDumpStyle
+
    -- skip the hi way check; we don't want to worry about profiled vs.
    -- non-profiled interfaces, for example.
    iface <- initTcRnIf 's' hsc_env () () $
-       readBinIface IgnoreHiWay TraceBinIFaceReading filename
-   let dflags = hsc_dflags hsc_env
-       -- See Note [Name qualification with --show-iface]
+       readBinIface IgnoreHiWay (TraceBinIFace printer) filename
+
+   let -- See Note [Name qualification with --show-iface]
        qualifyImportedNames mod _
            | mod == mi_module iface = NameUnqual
            | otherwise              = NameNotInScope1
