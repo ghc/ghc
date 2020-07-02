@@ -77,10 +77,15 @@ typedef union stackAccum_ {
  * stores it's parent, associated data and an accumulator.
  *
  * When 'info.type == posTypeFresh' a 'stackElement' represents just one
- * closure, namely 'c' and 'cp' being it's parent. Otherwise 'info' specifies an
- * offset into the children of 'c'. This is to support returning a closure's
- * children one-by-one without pushing one element per child onto the stack. See
- * traverseGetChildren() and traversePop().
+ * closure, namely 'c' with its parent stored as 'info.next.cp'.
+ *
+ * Otherwise this stack element specifies the list of child closures of 'c'. The
+ * 'info' field represents an offset into this list, among other things. This is
+ * to support returning a closure's children one-by-one without pushing one
+ * element per child onto the stack which would use more space on the stack.
+ *
+ * See traverseGetChildren() and traversePop() for the code dealing with this
+ * structure.
  *
  */
 typedef struct stackElement_ {
