@@ -500,7 +500,7 @@ tyIsSatisfiable recheck_complete_sets new_ty_cs = SC $ \delta ->
       Just ty_st'               -> do
         let delta' = delta{ delta_ty_st = ty_st' }
         if recheck_complete_sets
-          then ensureAllPossibleMatchesInhabited delta'
+          then ensureAllInhabited delta'
           else pure (Just delta')
 
 
@@ -686,13 +686,6 @@ initPossibleMatches ty_st vi@VI{ vi_ty = ty, vi_cache = NoPM } = do
         Nothing -> pure vi{ vi_ty = ty' } -- Didn't find any COMPLETE sets
         Just cs -> pure vi{ vi_ty = ty', vi_cache = PM (mkUniqDSet <$> cs) }
 initPossibleMatches _     vi                                   = pure vi
-
--- | @initLookupVarInfo ts x@ looks up the 'VarInfo' for @x@ in @ts@ and tries
--- to initialise the 'vi_cache' component if it was 'NoPM' through
--- 'initPossibleMatches'.
-initLookupVarInfo :: Delta -> Id -> DsM VarInfo
-initLookupVarInfo MkDelta{ delta_tm_st = ts, delta_ty_st = ty_st } x
-  = initPossibleMatches ty_st (lookupVarInfo ts x)
 
 {- Note [COMPLETE sets on data families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -901,8 +894,8 @@ addBotCt delta@MkDelta{ delta_tm_st = TmSt env reps } x = do
 -- that leads to a contradiction.
 -- See Note [TmState invariants].
 addNotConCt :: Delta -> Id -> PmAltCon -> MaybeT DsM Delta
-addNotConCt delta@MkDelta{ delta_tm_st = TmSt env reps } x nalt = do
-  vi@(VI _ pos neg _ pm) <- lift (initLookupVarInfo delta x)
+addNotConCt delta@MkDelta{ delta_tm_st = ts@(TmSt env reps) } x nalt = do
+  let vi@(VI _ pos neg _ pm) = lookupVarInfo ts x
   -- 1. Bail out quickly when nalt contradicts a solution
   let contradicts nalt (cl, _tvs, _args) = eqPmAltCon cl nalt == Equal
   guard (not (any (contradicts nalt) pos))
@@ -914,13 +907,13 @@ addNotConCt delta@MkDelta{ delta_tm_st = TmSt env reps } x nalt = do
         -- See Note [Completeness checking with required Thetas]
         | hasRequiredTheta nalt  = neg
         | otherwise              = extendPmAltConSet neg nalt
-  let vi_ext = vi{ vi_neg = neg' }
+  let vi1 = vi{ vi_neg = neg' }
   -- 3. Make sure there's at least one other possible constructor
-  vi' <- case nalt of
+  vi2 <- case nalt of
     PmAltConLike cl
-      -> MaybeT (ensureInhabited delta vi_ext{ vi_cache = markMatched cl pm })
-    _ -> pure vi_ext
-  pure delta{ delta_tm_st = TmSt (setEntrySDIE env x vi') reps }
+      -> MaybeT (ensureInhabited delta vi1{ vi_cache = markMatched cl pm })
+    _ -> pure vi1
+  pure delta{ delta_tm_st = TmSt (setEntrySDIE env x vi2) reps }
 
 hasRequiredTheta :: PmAltCon -> Bool
 hasRequiredTheta (PmAltConLike cl) = notNull req_theta
@@ -992,8 +985,8 @@ addNotBotCt delta@MkDelta{ delta_tm_st = TmSt env reps } x = do
     Just True  -> mzero      -- There was x ~ ⊥. Contradiction!
     Just False -> pure delta -- There already is x /~ ⊥. Nothing left to do
     Nothing -> do            -- We add x /~ ⊥ and test if x is still inhabited
-      vi' <- MaybeT $ ensureInhabited delta vi{ vi_bot = Just False }
-      pure delta{ delta_tm_st = TmSt (setEntrySDIE env y vi') reps}
+      vi <- MaybeT $ ensureInhabited delta vi{ vi_bot = Just False }
+      pure delta{ delta_tm_st = TmSt (setEntrySDIE env y vi) reps}
 
 ensureInhabited :: Delta -> VarInfo -> DsM (Maybe VarInfo)
    -- Returns (Just vi) if at least one member of each ConLike in the COMPLETE
@@ -1006,7 +999,9 @@ ensureInhabited :: Delta -> VarInfo -> DsM (Maybe VarInfo)
    --     avoids doing unnecessary work.
 ensureInhabited _ vi@VI{ vi_bot = Nothing }   = pure (Just vi)
 ensureInhabited _ vi@VI{ vi_bot = Just True } = pure (Just vi)
-ensureInhabited delta vi = fmap (set_cache vi) <$> test (vi_cache vi) -- This would be much less tedious with lenses
+ensureInhabited delta vi = do
+  vi <- initPossibleMatches (delta_ty_st delta) vi
+  fmap (set_cache vi) <$> test (vi_cache vi)
   where
     set_cache vi cache = vi { vi_cache = cache }
 
@@ -1041,7 +1036,7 @@ ensureInhabited delta vi = fmap (set_cache vi) <$> test (vi_cache vi) -- This wo
           -- No need to run the term oracle compared to pmIsSatisfiable
           fmap isJust <$> runSatisfiabilityCheck delta $ mconcat
             -- Important to pass False to tyIsSatisfiable here, so that we won't
-            -- recursively call ensureAllPossibleMatchesInhabited, leading to an
+            -- recursively call ensureAllInhabited, leading to an
             -- endless recursion.
             [ tyIsSatisfiable False ty_cs
             , tysAreNonVoid initRecTc strict_arg_tys
@@ -1051,8 +1046,8 @@ ensureInhabited delta vi = fmap (set_cache vi) <$> test (vi_cache vi) -- This wo
 -- 'vi_cache', considering the current type information in 'Delta'.
 -- This check is necessary after having matched on a GADT con to weed out
 -- impossible matches.
-ensureAllPossibleMatchesInhabited :: Delta -> DsM (Maybe Delta)
-ensureAllPossibleMatchesInhabited delta@MkDelta{ delta_tm_st = TmSt env reps }
+ensureAllInhabited :: Delta -> DsM (Maybe Delta)
+ensureAllInhabited delta@MkDelta{ delta_tm_st = TmSt env reps }
   = runMaybeT (set_tm_cs_env delta <$> traverseSDIE go env)
   where
     set_tm_cs_env delta env = delta{ delta_tm_st = TmSt env reps }
@@ -1119,8 +1114,8 @@ equate delta@MkDelta{ delta_tm_st = TmSt env reps } x y
 --
 -- See Note [TmState invariants].
 addConCt :: Delta -> Id -> PmAltCon -> [TyVar] -> [Id] -> MaybeT DsM Delta
-addConCt delta@MkDelta{ delta_tm_st = TmSt env reps } x alt tvs args = do
-  VI ty pos neg bot cache <- lift (initLookupVarInfo delta x)
+addConCt delta@MkDelta{ delta_tm_st = ts@(TmSt env reps) } x alt tvs args = do
+  let VI ty pos neg bot cache = lookupVarInfo ts x
   -- First try to refute with a negative fact
   guard (not (elemPmAltConSet alt neg))
   -- Then see if any of the other solutions (remember: each of them is an
@@ -1545,7 +1540,7 @@ provideEvidence = go
     go []     _ delta = pure [delta]
     go (x:xs) n delta = do
       tracePm "provideEvidence" (ppr x $$ ppr xs $$ ppr delta $$ ppr n)
-      VI _ pos neg _ _ <- initLookupVarInfo delta x
+      let VI _ pos neg _ _ = lookupVarInfo (delta_tm_st delta) x
       case pos of
         _:_ -> do
           -- All solutions must be valid at once. Try to find candidates for their
@@ -1583,8 +1578,9 @@ provideEvidence = go
         Nothing -> pure []
         Just (y, newty_delta) -> do
           -- Pick a COMPLETE set and instantiate it (n at max). Take care of ⊥.
-          pm     <- vi_cache <$> initLookupVarInfo newty_delta y
-          mb_cls <- pickMinimalCompleteSet newty_delta pm
+          let vi = lookupVarInfo (delta_tm_st newty_delta) y
+          vi <- initPossibleMatches (delta_ty_st newty_delta) vi
+          mb_cls <- pickMinimalCompleteSet newty_delta (vi_cache vi)
           case uniqDSetToList <$> mb_cls of
             Just cls@(_:_) -> instantiate_cons y core_ty xs n newty_delta cls
             Just [] | not (canDiverge newty_delta y) -> pure []

@@ -985,12 +985,12 @@ checkGrd grd = CA $ \inc -> case grd of
     pure CheckResult { cr_ret = RedSets { rs_cov = matched, rs_div = div, rs_bangs = bangs }
                      , cr_uncov = mempty
                      , cr_approx = Precise }
-  -- Con: Fall through on x /~ K and refine with x ~ K ys
-  --      and type info
+  -- Con: Fall through on x /~ K and refine with x ~ K ys and type info
   PmCon x con tvs dicts args -> do
+    let con_cts = pmConCts x con tvs dicts args
+    matched <- addPmCtsDeltas inc con_cts
     uncov   <- addPmCtDeltas  inc (PmNotConCt x con)
-    matched <- addPmCtsDeltas inc (pmConCts x con tvs dicts args)
-    -- tracePm "checkGrd:Con" (ppr inc $$ ppr x $$ ppr con $$ ppr dicts $$ ppr matched)
+    -- tracePm "checkGrd:Con" (ppr inc $$ ppr grd $$ ppr con_cts $$ ppr matched)
     pure CheckResult { cr_ret = emptyRedSets { rs_cov = matched, rs_div = div }
                      , cr_uncov = uncov
                      , cr_approx = Precise }
