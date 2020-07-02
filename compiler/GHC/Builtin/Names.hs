@@ -2272,6 +2272,8 @@ coercionTokenIdKey :: Unique
 coercionTokenIdKey    = mkPreludeMiscIdUnique 124
 
 noinlineIdKey                 = mkPreludeMiscIdUnique 125
+impossibleIdKey :: Unique
+impossibleIdKey               = mkPreludeMiscIdUnique 126
 
 rationalToFloatIdKey, rationalToDoubleIdKey :: Unique
 rationalToFloatIdKey   = mkPreludeMiscIdUnique 130

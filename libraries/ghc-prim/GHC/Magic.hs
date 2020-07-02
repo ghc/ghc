@@ -6,6 +6,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# OPTIONS -O #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -24,7 +25,8 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Magic ( inline, noinline, lazy, oneShot, runRW# ) where
+module GHC.Magic ( inline, noinline, lazy, oneShot, runRW#, impossible
+                 ) where
 
 --------------------------------------------------
 --        See Note [magicIds] in GHC.Types.Id.Make
@@ -66,6 +68,15 @@ inline x = x
 {-# NOINLINE noinline #-}
 noinline :: a -> a
 noinline x = x
+
+-- | It's impossible that (impossible x) will be evaluated unless
+-- there is a compiler bug.
+--
+-- Only used to encode strictiness signature for absentError
+-- TODO: Explain better.
+{-# INLINE impossible #-}
+impossible :: a -> a
+impossible x = impossible x
 
 -- | The 'lazy' function restrains strictness analysis a little. The
 -- call @lazy e@ means the same as @e@, but 'lazy' has a magical
