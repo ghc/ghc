@@ -69,7 +69,6 @@ typedef union stackData_ {
 extern const stackData nullStackData;
 
 typedef union stackAccum_ {
-    StgWord subtree_sizeW;
 } stackAccum;
 
 /**
