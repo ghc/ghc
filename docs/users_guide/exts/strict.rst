@@ -46,7 +46,7 @@ Bang patterns
 GHC supports an extension of pattern matching called *bang patterns*,
 written ``!pat``. Bang patterns are under consideration for Haskell
 Prime. The `Haskell prime feature
-description <http://ghc.haskell.org/trac/haskell-prime/wiki/BangPatterns>`__
+description <https://gitlab.haskell.org/haskell/prime/-/wikis/BangPatterns>`__
 contains more discussion and examples than the material below.
 
 The main idea is to add a single new production to the syntax of
