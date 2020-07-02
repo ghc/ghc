@@ -47,6 +47,8 @@ lmGlobalReg platform suf reg
         VanillaReg 6 _ -> wordGlobal $ "R6" ++ suf
         VanillaReg 7 _ -> wordGlobal $ "R7" ++ suf
         VanillaReg 8 _ -> wordGlobal $ "R8" ++ suf
+        VanillaReg 9 _ -> wordGlobal $ "R9" ++ suf
+        VanillaReg 10 _ -> wordGlobal $ "R10" ++ suf
         SpLim          -> wordGlobal $ "SpLim" ++ suf
         FloatReg 1     -> floatGlobal $"F1" ++ suf
         FloatReg 2     -> floatGlobal $"F2" ++ suf
