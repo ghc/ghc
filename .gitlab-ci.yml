@@ -792,6 +792,10 @@ nightly-x86_64-linux-deb10-llvm:
 #################################
 
 .build-x86_64-linux-ubuntu2004:
+  # We use the ubuntu 20.04 job to test the uring-io based IO manager
+  tags:
+    - x86_64-linux
+    - uring
   extends: .validate-linux
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu20_04:$DOCKER_REV"
@@ -801,10 +805,11 @@ nightly-x86_64-linux-deb10-llvm:
   cache:
     key: linux-x86_64-ubuntu2004
 
-# Disabled to alleviate CI load
-.validate-x86_64-linux-ubuntu2004:
+validate-x86_64-linux-ubuntu2004:
   extends: .build-x86_64-linux-ubuntu2004
   stage: full-build
+  # Disabled to alleviate CI load
+  when: manual
 
 nightly-x86_64-linux-ubuntu2004:
   <<: *nightly
