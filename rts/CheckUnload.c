@@ -17,43 +17,99 @@
 #include "CheckUnload.h"
 #include "sm/Storage.h"
 #include "sm/GCThread.h"
+#include "sm/HeapUtils.h"
 
 //
-// Code that we unload may be referenced from:
-//   - info pointers in heap objects and stack frames
-//   - pointers to static objects from the heap
-//   - StablePtrs to static objects
-//   - pointers to cost centres from the cost centre tree
+// Note [Object unloading]
+// ~~~~~~~~~~~~~~~~~~~~~~~
 //
-// We can find live static objects after a major GC, so we don't have
-// to look at every closure pointer in the heap.  However, we do have
-// to look at every info pointer.  So this is like a heap census
-// traversal: we look at the header of every object, but not its
-// contents.
+// Overview of object unloading:
 //
-// On the assumption that there aren't many different info pointers in
-// a typical heap, we insert addresses into a hash table.  The
-// first time we see an address, we check it against the pending
-// unloadable objects and if it lies within any of them, we mark that
-// object as referenced so that it won't get unloaded in this round.
+// - In a major GC, for every static object we mark the object's object code and
+//   its dependencies as 'live'. This is done by `markObjectCode`, called by
+//   `evacuate`.
+//
+// - Marking object code is done using a global "section index table"
+//   (global_s_indices below). When we load an object code we add its section
+//   indices to the table. `markObjectCode` does binary search on this table to
+//   find object code for the marked object, and mark it and its dependencies.
+//
+//   Dependency of an object code is simply other object code that the object
+//   code refers to in its code. We know these dependencies by the relocations
+//   present in the referent. This is recorded by lookupSymbolDependent.
+//
+// - global_s_indices is updated as we load and unload objects. When we load an
+//   object code we add its section indices to the table, we remove those
+//   indices when we unload.
+//
+//   The table is sorted and old indices are removed in `checkUnload`, instead
+//   on every load/unload, to avoid quadratic behavior when we load a list of
+//   objects.
+//
+// - After a major GC `checkUnload` unloads objects that are (1) explicitly
+//   asked for unloading (via `unloadObj`) and (2) are not marked during GC.
+//
+// Note that, crucially, we don't unload an object code even if it's not
+// reachable from the heap, unless it's explicitly asked for unloading (via
+// `unloadObj`). This is a feature and not a but! Two use cases:
+//
+// - The user might request a symbol from a loaded object at any point with
+//   lookupSymbol (e.g. GHCi might do this).
+//
+// - Sometimes we load objects that are not Haskell objects.
+//
+// To avoid unloading objects that are unreachable but are not asked for
+// unloading we maintain a "root set" of object code, `loaded_objects` below.
+// `loadObj` adds the loaded objects (and its dependencies) to the list.
+// `unloadObj` removes. After a major GC, `checkUnload` first marks the root set
+// (`loaded_objects`) to avoid unloading objects that are not asked for
+// unloading.
+//
+// Two other lists `objects` and `old_objects` are similar to large object lists
+// in GC. Before a major GC we move `objects` to `old_objects`, and move marked
+// objects back to `objects` during evacuation and when marking roots in
+// `checkUnload`. Any objects in `old_objects` after that is unloaded.
+//
+// TODO: We currently don't unload objects when non-moving GC is enabled. The
+// implementation would be similar to `nonmovingGcCafs`:
+//
+// - Maintain a "snapshot":
+//
+//   - Copy `loaded_objects` as the root set of the snapshot
+//
+//   - Stash `objects` to `old_objects` as the snapshot. We don't need a new
+//     list for this as `old_objects` won't be used by any other code when
+//     non-moving GC is enabled.
+//
+//   - Copy `global_s_indices` table to be able to mark objects while mutators
+//     call `loadObj_` and `unloadObj_` concurrently.
+//
+// - Don't mark object code in `evacuate`, marking will be done in the
+//   non-moving collector.
+//
+// - After preparation, bump the object code mark bit (`object_code_mark_bit`
+//   below) and mark static objects using a version of `markObjectCode` that
+//   basically does the same thing but:
+//
+//   - Needs to update `objects` list in a thread-safe way, as mutators will be
+//     concurrently calling `loadObj_` and add new stuff to `objects`.
+//     (alternatively we could have a new list for non-moving GC's objects list,
+//     and then merge it to the global list in the pause before moving to
+//     concurrent sweep phase)
+//
+//   - Needs to use the copied `global_s_indices`
+//
+// - After marking anything left in `old_objects` are unreachable objects within
+//   the snapshot, unload those. The unload loop will be the same as in
+//   `checkUnload`. This step needs to happen in the final sync (before sweep
+//   begins) to avoid races when updating `global_s_indices`.
+//
+// - NOTE: We don't need write barriers in loadObj/unloadObj as we don't
+//   introduce a dependency from an already-loaded object to a newly loaded
+//   object and we don't delete existing dependencies.
 //
 
-// Note [Speeding up checkUnload]
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-// In certain circumstances, there may be a lot of unloaded ObjectCode structs
-// chained in `unloaded_objects` (such as when users `:load` a module in a very
-// big repo in GHCi). To speed up checking whether an address lies within any of
-// these objects, we populate the addresses of their mapped sections in
-// an array sorted by their `start` address and do binary search for our address
-// on that array. Note that this works because the sections are mapped to mutual
-// exclusive memory regions, so we can simply find the largest lower bound among
-// the `start` addresses of the sections and then check if our address is inside
-// that section. In particular, we store the start address and end address of
-// each mapped section in a OCSectionIndex, arrange them all on a contiguous
-// memory range and then sort by start address. We then put this array in an
-// OCSectionIndices struct to be passed into `checkAddress` to do binary search
-// on.
-//
+uint8_t object_code_mark_bit = 0;
 
 typedef struct {
     W_ start;
@@ -62,18 +118,83 @@ typedef struct {
 } OCSectionIndex;
 
 typedef struct {
+    int capacity; // Doubled on resize
     int n_sections;
+    bool sorted; // Invalidated on insertion. Sorted in checkUnload.
+    bool unloaded; // Whether we removed anything from the table in
+                   // removeOCSectionIndices. If this is set we "compact" the
+                   // table (remove unused entries) in `sortOCSectionIndices.
     OCSectionIndex *indices;
 } OCSectionIndices;
 
-static OCSectionIndices *createOCSectionIndices(int n_sections)
+// List of currently live objects. Moved to `old_objects` before unload check.
+// Marked objects moved back to this list in `markObjectLive`. Remaining objects
+// are freed at the end of `checkUnload`.
+//
+// Double-linked list to be able to remove marked objects. List formed with
+// `next` and `prev` fields of `ObjectCode`.
+//
+// Not static: used in Linker.c.
+ObjectCode *objects = NULL;
+
+// `objects` list is moved here before unload check. Marked objects are moved
+// back to `objects`. Remaining objects are freed.
+static ObjectCode *old_objects = NULL;
+
+// Number of objects that we want to unload. When this value is 0 we skip static
+// object marking during GC and `checkUnload`.
+//
+// Not static: we use this value to skip static object marking in evacuate when
+// this is 0.
+//
+// Incremented in `unloadObj_`, decremented as we unload objects in
+// `checkUnload`.
+int n_unloaded_objects = 0;
+
+// List of objects that we don't want to unload (i.e. we haven't called
+// unloadObj on these yet). Used as root set for unload check in checkUnload.
+// Objects are added with loadObj_ and removed with unloadObj_.
+//
+// List formed with `next_loaded_object` field of `ObjectCode`.
+//
+// Not static: used in Linker.c.
+ObjectCode *loaded_objects;
+
+// Section index table for currently loaded objects. New indices are added by
+// `loadObj_`, indices of unloaded objects are removed in `checkUnload`. Used to
+// map static closures to their ObjectCode.
+static OCSectionIndices *global_s_indices = NULL;
+
+static OCSectionIndices *createOCSectionIndices(void)
 {
-    OCSectionIndices *s_indices;
-    s_indices = stgMallocBytes(sizeof(OCSectionIndices), "OCSectionIndices");
-    s_indices->n_sections = n_sections;
-    s_indices->indices = stgMallocBytes(n_sections*sizeof(OCSectionIndex),
+    // TODO (osa): Maybe initialize as empty (without allocation) and allocate
+    // on first insertion?
+    OCSectionIndices *s_indices = stgMallocBytes(sizeof(OCSectionIndices), "OCSectionIndices");
+    int capacity = 1024;
+    s_indices->capacity = capacity;
+    s_indices->n_sections = 0;
+    s_indices->sorted = true;
+    s_indices->unloaded = false;
+    s_indices->indices = stgMallocBytes(capacity * sizeof(OCSectionIndex),
         "OCSectionIndices::indices");
     return s_indices;
+}
+
+static void freeOCSectionIndices(OCSectionIndices *s_indices)
+{
+    free(s_indices->indices);
+    free(s_indices);
+}
+
+void initUnloadCheck()
+{
+    global_s_indices = createOCSectionIndices();
+}
+
+void exitUnloadCheck()
+{
+    freeOCSectionIndices(global_s_indices);
+    global_s_indices = NULL;
 }
 
 static int cmpSectionIndex(const void* indexa, const void *indexb)
@@ -88,44 +209,124 @@ static int cmpSectionIndex(const void* indexa, const void *indexb)
     return 0;
 }
 
-static OCSectionIndices* buildOCSectionIndices(ObjectCode *ocs)
+static void reserveOCSectionIndices(OCSectionIndices *s_indices, int len)
 {
-    int cnt_sections = 0;
-    ObjectCode *oc;
-    for (oc = ocs; oc; oc = oc->next) {
-        cnt_sections += oc->n_sections;
+    int current_capacity = s_indices->capacity;
+    int current_len = s_indices->n_sections;
+    if (current_capacity - current_len >= len) {
+        return;
     }
-    OCSectionIndices* s_indices = createOCSectionIndices(cnt_sections);
-    int s_i = 0, i;
-    for (oc = ocs; oc; oc = oc->next) {
-        for (i = 0; i < oc->n_sections; i++) {
-            if (oc->sections[i].kind != SECTIONKIND_OTHER) {
-                s_indices->indices[s_i].start = (W_)oc->sections[i].start;
-                s_indices->indices[s_i].end = (W_)oc->sections[i].start
-                    + oc->sections[i].size;
-                s_indices->indices[s_i].oc = oc;
-                s_i++;
+
+    // Round up to nearest power of 2
+    int new_capacity = 1 << (int)ceil(log2(current_len + len));
+
+    OCSectionIndex *old_indices = s_indices->indices;
+    OCSectionIndex *new_indices = stgMallocBytes(new_capacity * sizeof(OCSectionIndex),
+        "reserveOCSectionIndices");
+
+    for (int i = 0; i < current_len; ++i) {
+        new_indices[i] = old_indices[i];
+    }
+
+    s_indices->capacity = new_capacity;
+    s_indices->indices = new_indices;
+
+    free(old_indices);
+}
+
+// Insert object section indices of a single ObjectCode. Invalidates 'sorted'
+// state.
+void insertOCSectionIndices(ObjectCode *oc)
+{
+    reserveOCSectionIndices(global_s_indices, oc->n_sections);
+    global_s_indices->sorted = false;
+
+    int s_i = global_s_indices->n_sections;
+    for (int i = 0; i < oc->n_sections; i++) {
+        if (oc->sections[i].kind != SECTIONKIND_OTHER) {
+            global_s_indices->indices[s_i].start = (W_)oc->sections[i].start;
+            global_s_indices->indices[s_i].end = (W_)oc->sections[i].start
+                + oc->sections[i].size;
+            global_s_indices->indices[s_i].oc = oc;
+            s_i++;
+        }
+    }
+
+    global_s_indices->n_sections = s_i;
+
+    // Add object to 'objects' list
+    if (objects != NULL) {
+        objects->prev = oc;
+    }
+    oc->next = objects;
+    objects = oc;
+}
+
+static int findSectionIdx(OCSectionIndices *s_indices, const void *addr);
+
+static void removeOCSectionIndices(OCSectionIndices *s_indices, ObjectCode *oc)
+{
+    // To avoid quadratic behavior in checkUnload we set `oc` fields of indices
+    // of unloaded objects NULL here. Removing unused entries is done in
+    // `sortOCSectionIndices`.
+
+    s_indices->unloaded = true;
+
+    for (int i = 0; i < oc->n_sections; i++) {
+        if (oc->sections[i].kind != SECTIONKIND_OTHER) {
+            int section_idx = findSectionIdx(s_indices, oc->sections[i].start);
+            if (section_idx != -1) {
+                s_indices->indices[section_idx].oc = NULL;
             }
         }
     }
-    s_indices->n_sections = s_i;
+}
+
+static void sortOCSectionIndices(OCSectionIndices *s_indices) {
+    if (s_indices->sorted) {
+        return;
+    }
+
     qsort(s_indices->indices,
         s_indices->n_sections,
         sizeof(OCSectionIndex),
         cmpSectionIndex);
-    return s_indices;
+
+    s_indices->sorted = true;
 }
 
-static void freeOCSectionIndices(OCSectionIndices *section_indices)
-{
-    free(section_indices->indices);
-    free(section_indices);
+static void removeRemovedOCSections(OCSectionIndices *s_indices) {
+    if (!s_indices->unloaded) {
+        return;
+    }
+
+    int next_free_idx = 0;
+    for (int i = 0; i < s_indices->n_sections; ++i) {
+        if (s_indices->indices[i].oc == NULL) {
+            // free entry, skip
+        } else if (i == next_free_idx) {
+            ++next_free_idx;
+        } else {
+            s_indices->indices[next_free_idx] = s_indices->indices[i];
+            ++next_free_idx;
+        }
+    }
+
+    s_indices->n_sections = next_free_idx;
+    s_indices->unloaded = true;
 }
 
-static ObjectCode *findOC(OCSectionIndices *s_indices, const void *addr) {
+// Returns -1 if not found
+static int findSectionIdx(OCSectionIndices *s_indices, const void *addr) {
+    ASSERT(s_indices->sorted);
+
     W_ w_addr = (W_)addr;
-    if (s_indices->n_sections <= 0) return NULL;
-    if (w_addr < s_indices->indices[0].start) return NULL;
+    if (s_indices->n_sections <= 0) {
+        return -1;
+    }
+    if (w_addr < s_indices->indices[0].start) {
+        return -1;
+    }
 
     int left = 0, right = s_indices->n_sections;
     while (left + 1 < right) {
@@ -139,330 +340,122 @@ static ObjectCode *findOC(OCSectionIndices *s_indices, const void *addr) {
     }
     ASSERT(w_addr >= s_indices->indices[left].start);
     if (w_addr < s_indices->indices[left].end) {
-        return s_indices->indices[left].oc;
+        return left;
     }
-    return NULL;
+    return -1;
 }
 
-static void checkAddress (HashTable *addrs, const void *addr,
-        OCSectionIndices *s_indices)
-{
-    ObjectCode *oc;
+static ObjectCode *findOC(OCSectionIndices *s_indices, const void *addr) {
+    int oc_idx = findSectionIdx(s_indices, addr);
 
-    if (!lookupHashTable(addrs, (W_)addr)) {
-        insertHashTable(addrs, (W_)addr, addr);
-
-        oc = findOC(s_indices, addr);
-        if (oc != NULL) {
-            oc->referenced = 1;
-            return;
-        }
+    if (oc_idx == -1) {
+        return NULL;
     }
+
+    return s_indices->indices[oc_idx].oc;
 }
 
-static void searchStackChunk (HashTable *addrs, StgPtr sp, StgPtr stack_end,
-        OCSectionIndices *s_indices)
-{
-    StgPtr p;
-    const StgRetInfoTable *info;
-
-    p = sp;
-    while (p < stack_end) {
-        info = get_ret_itbl((StgClosure *)p);
-
-        switch (info->i.type) {
-        case RET_SMALL:
-        case RET_BIG:
-            checkAddress(addrs, (const void*)info, s_indices);
-            break;
-
-        default:
-            break;
-        }
-
-        p += stack_frame_sizeW((StgClosure*)p);
+static bool markObjectLive(void *data STG_UNUSED, StgWord key, const void *value STG_UNUSED) {
+    ObjectCode *oc = (ObjectCode*)key;
+    if (oc->mark == object_code_mark_bit) {
+        return true; // for hash table iteration
     }
+
+    oc->mark = object_code_mark_bit;
+    // Remove from 'old_objects' list
+    if (oc->prev != NULL) {
+        // TODO(osa): Maybe 'prev' should be a pointer to the referencing
+        // *field* ? (instead of referencing *object*)
+        oc->prev->next = oc->next;
+    } else {
+        old_objects = oc->next;
+    }
+    if (oc->next != NULL) {
+        oc->next->prev = oc->prev;
+    }
+
+    // Add it to 'objects' list
+    oc->prev = NULL;
+    oc->next = objects;
+    if (objects != NULL) {
+        objects->prev = oc;
+    }
+    objects = oc;
+
+    // Mark its dependencies
+    iterHashTable(oc->dependencies, NULL, markObjectLive);
+
+    return true; // for hash table iteration
 }
 
-
-static void searchHeapBlocks (HashTable *addrs, bdescr *bd,
-        OCSectionIndices *s_indices)
+void markObjectCode(const void *addr)
 {
-    StgPtr p;
-    const StgInfoTable *info;
-    uint32_t size;
-    bool prim;
+    if (global_s_indices == NULL) {
+        return;
+    }
 
-    for (; bd != NULL; bd = bd->link) {
+    // This should be checked at the call site
+    ASSERT(!HEAP_ALLOCED(addr));
 
-        if (bd->flags & BF_PINNED) {
-            // Assume that objects in PINNED blocks cannot refer to
-            continue;
-        }
-
-        p = bd->start;
-        while (p < bd->free) {
-            info = get_itbl((StgClosure *)p);
-            prim = false;
-
-            switch (info->type) {
-
-            case THUNK:
-                size = thunk_sizeW_fromITBL(info);
-                break;
-
-            case THUNK_1_1:
-            case THUNK_0_2:
-            case THUNK_2_0:
-                size = sizeofW(StgThunkHeader) + 2;
-                break;
-
-            case THUNK_1_0:
-            case THUNK_0_1:
-            case THUNK_SELECTOR:
-                size = sizeofW(StgThunkHeader) + 1;
-                break;
-
-            case FUN:
-            case FUN_1_0:
-            case FUN_0_1:
-            case FUN_1_1:
-            case FUN_0_2:
-            case FUN_2_0:
-            case CONSTR:
-            case CONSTR_NOCAF:
-            case CONSTR_1_0:
-            case CONSTR_0_1:
-            case CONSTR_1_1:
-            case CONSTR_0_2:
-            case CONSTR_2_0:
-                size = sizeW_fromITBL(info);
-                break;
-
-            case BLACKHOLE:
-            case BLOCKING_QUEUE:
-                prim = true;
-                size = sizeW_fromITBL(info);
-                break;
-
-            case IND:
-                // Special case/Delicate Hack: INDs don't normally
-                // appear, since we're doing this heap census right
-                // after GC.  However, GarbageCollect() also does
-                // resurrectThreads(), which can update some
-                // blackholes when it calls raiseAsync() on the
-                // resurrected threads.  So we know that any IND will
-                // be the size of a BLACKHOLE.
-                prim = true;
-                size = BLACKHOLE_sizeW();
-                break;
-
-            case BCO:
-                prim = true;
-                size = bco_sizeW((StgBCO *)p);
-                break;
-
-            case MVAR_CLEAN:
-            case MVAR_DIRTY:
-            case TVAR:
-            case WEAK:
-            case PRIM:
-            case MUT_PRIM:
-            case MUT_VAR_CLEAN:
-            case MUT_VAR_DIRTY:
-                prim = true;
-                size = sizeW_fromITBL(info);
-                break;
-
-            case AP:
-                prim = true;
-                size = ap_sizeW((StgAP *)p);
-                break;
-
-            case PAP:
-                prim = true;
-                size = pap_sizeW((StgPAP *)p);
-                break;
-
-            case AP_STACK:
-            {
-                StgAP_STACK *ap = (StgAP_STACK *)p;
-                prim = true;
-                size = ap_stack_sizeW(ap);
-                searchStackChunk(addrs, (StgPtr)ap->payload,
-                                 (StgPtr)ap->payload + ap->size, s_indices);
-                break;
-            }
-
-            case ARR_WORDS:
-                prim = true;
-                size = arr_words_sizeW((StgArrBytes*)p);
-                break;
-
-            case MUT_ARR_PTRS_CLEAN:
-            case MUT_ARR_PTRS_DIRTY:
-            case MUT_ARR_PTRS_FROZEN_CLEAN:
-            case MUT_ARR_PTRS_FROZEN_DIRTY:
-                prim = true;
-                size = mut_arr_ptrs_sizeW((StgMutArrPtrs *)p);
-                break;
-
-            case SMALL_MUT_ARR_PTRS_CLEAN:
-            case SMALL_MUT_ARR_PTRS_DIRTY:
-            case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
-            case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
-                prim = true;
-                size = small_mut_arr_ptrs_sizeW((StgSmallMutArrPtrs *)p);
-                break;
-
-            case TSO:
-                prim = true;
-                size = sizeofW(StgTSO);
-                break;
-
-            case STACK: {
-                StgStack *stack = (StgStack*)p;
-                prim = true;
-                searchStackChunk(addrs, stack->sp,
-                                 stack->stack + stack->stack_size, s_indices);
-                size = stack_sizeW(stack);
-                break;
-            }
-
-            case TREC_CHUNK:
-                prim = true;
-                size = sizeofW(StgTRecChunk);
-                break;
-
-            default:
-                barf("searchHeapBlocks, unknown object: %d", info->type);
-            }
-
-            if (!prim) {
-                checkAddress(addrs,info, s_indices);
-            }
-
-            p += size;
-        }
+    ObjectCode *oc = findOC(global_s_indices, addr);
+    if (oc != NULL) {
+        // Mark the object code and its dependencies
+        markObjectLive(NULL, (W_)oc, NULL);
     }
 }
 
-#if defined(PROFILING)
-//
-// Do not unload the object if the CCS tree refers to a CCS or CC which
-// originates in the object.
-//
-static void searchCostCentres (HashTable *addrs, CostCentreStack *ccs,
-        OCSectionIndices* s_indices)
+void prepareUnloadCheck()
 {
-    IndexTable *i;
-
-    checkAddress(addrs, ccs, s_indices);
-    checkAddress(addrs, ccs->cc, s_indices);
-    for (i = ccs->indexTable; i != NULL; i = i->next) {
-        if (!i->back_edge) {
-            searchCostCentres(addrs, i->ccs, s_indices);
-        }
+    if (global_s_indices == NULL) {
+        return;
     }
+
+    removeRemovedOCSections(global_s_indices);
+    sortOCSectionIndices(global_s_indices);
+
+    ASSERT(old_objects == NULL);
+
+    object_code_mark_bit = ~object_code_mark_bit;
+    old_objects = objects;
+    objects = NULL;
 }
-#endif
 
-//
-// Check whether we can unload any object code.  This is called at the
-// appropriate point during a GC, where all the heap data is nice and
-// packed together and we have a linked list of the static objects.
-//
-// The check involves a complete heap traversal, but you only pay for
-// this (a) when you have called unloadObj(), and (b) at a major GC,
-// which is much more expensive than the traversal we're doing here.
-//
-void checkUnload (StgClosure *static_objects)
+void checkUnload()
 {
-  uint32_t g, n;
-  HashTable *addrs;
-  StgClosure* p;
-  const StgInfoTable *info;
-  ObjectCode *oc, *prev, *next;
-  gen_workspace *ws;
-  StgClosure* link;
+    if (global_s_indices == NULL) {
+        return;
+    }
 
-  if (unloaded_objects == NULL) return;
+    // At this point we've marked all dynamically loaded static objects
+    // (including their dependencies) during GC, but not the root set of object
+    // code (loaded_objects). Mark the roots first, then unload any unmarked
+    // objects.
 
-  ACQUIRE_LOCK(&linker_unloaded_mutex);
+    OCSectionIndices *s_indices = global_s_indices;
+    ASSERT(s_indices->sorted);
 
-  OCSectionIndices *s_indices = buildOCSectionIndices(unloaded_objects);
-  // Mark every unloadable object as unreferenced initially
-  for (oc = unloaded_objects; oc; oc = oc->next) {
-      IF_DEBUG(linker, debugBelch("Checking whether to unload %" PATH_FMT "\n",
-                                  oc->fileName));
-      oc->referenced = false;
-  }
+    // Mark roots
+    for (ObjectCode *oc = loaded_objects; oc != NULL; oc = oc->next_loaded_object) {
+        markObjectLive(NULL, (W_)oc, NULL);
+    }
 
-  addrs = allocHashTable();
+    // Free unmarked objects
+    ObjectCode *next = NULL;
+    for (ObjectCode *oc = old_objects; oc != NULL; oc = next) {
+        next = oc->next;
 
-  for (p = static_objects; p != END_OF_STATIC_OBJECT_LIST; p = link) {
-      p = UNTAG_STATIC_LIST_PTR(p);
-      checkAddress(addrs, p, s_indices);
-      info = get_itbl(p);
-      checkAddress(addrs, info, s_indices);
-      link = *STATIC_LINK(info, p);
-  }
+        removeOCSectionIndices(s_indices, oc);
 
-  // CAFs on revertible_caf_list are not on static_objects
-  for (p = (StgClosure*)revertible_caf_list;
-       p != END_OF_CAF_LIST;
-       p = ((StgIndStatic *)p)->static_link) {
-      p = UNTAG_STATIC_LIST_PTR(p);
-      checkAddress(addrs, p, s_indices);
-  }
+        // Symbols should be removed by unloadObj_.
+        // NB (osa): If this assertion doesn't hold then freeObjectCode below
+        // will corrupt symhash as keys of that table live in ObjectCodes. If
+        // you see a segfault in a hash table operation in linker (in non-debug
+        // RTS) then it's probably becuse this assertion did not hold.
+        ASSERT(oc->symbols == NULL);
 
-  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-      searchHeapBlocks (addrs, generations[g].blocks, s_indices);
-      searchHeapBlocks (addrs, generations[g].large_objects, s_indices);
+        freeObjectCode(oc);
+        n_unloaded_objects -= 1;
+    }
 
-      for (n = 0; n < n_capabilities; n++) {
-          ws = &gc_threads[n]->gens[g];
-          searchHeapBlocks(addrs, ws->todo_bd, s_indices);
-          searchHeapBlocks(addrs, ws->part_list, s_indices);
-          searchHeapBlocks(addrs, ws->scavd_list, s_indices);
-      }
-  }
-
-#if defined(PROFILING)
-  /* Traverse the cost centre tree, calling checkAddress on each CCS/CC */
-  searchCostCentres(addrs, CCS_MAIN, s_indices);
-
-  /* Also check each cost centre in the CC_LIST */
-  CostCentre *cc;
-  for (cc = CC_LIST; cc != NULL; cc = cc->link) {
-      checkAddress(addrs, cc, s_indices);
-  }
-#endif /* PROFILING */
-
-  freeOCSectionIndices(s_indices);
-  // Look through the unloadable objects, and any object that is still
-  // marked as unreferenced can be physically unloaded, because we
-  // have no references to it.
-  prev = NULL;
-  for (oc = unloaded_objects; oc; oc = next) {
-      next = oc->next;
-      if (oc->referenced == 0) {
-          if (prev == NULL) {
-              unloaded_objects = oc->next;
-          } else {
-              prev->next = oc->next;
-          }
-          IF_DEBUG(linker, debugBelch("Unloading object file %" PATH_FMT "\n",
-                                      oc->fileName));
-          freeObjectCode(oc);
-      } else {
-          IF_DEBUG(linker, debugBelch("Object file still in use: %"
-                                      PATH_FMT "\n", oc->fileName));
-          prev = oc;
-      }
-  }
-
-  freeHashTable(addrs, NULL);
-
-  RELEASE_LOCK(&linker_unloaded_mutex);
+    old_objects = NULL;
 }
