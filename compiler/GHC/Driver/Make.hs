@@ -1373,7 +1373,8 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags mHscMessage cleanup 
 --
 -- There better had not be any cyclic groups here -- we check for them.
 upsweep
-    :: GhcMonad m
+    :: forall m
+     . GhcMonad m
     => Maybe Messager
     -> HomePackageTable            -- ^ HPT from last time round (pruned)
     -> StableModules               -- ^ stable modules (see checkStability)
@@ -1415,8 +1416,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
     return (Failed, done')
 
   upsweep'
-    :: GhcMonad m
-    => HomePackageTable
+    :: HomePackageTable
     -> ModuleGraph
     -> [SCC ModSummary]
     -> Int

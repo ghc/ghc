@@ -1134,6 +1134,7 @@ unload_wkr hsc_env keep_linkables pls@PersistentLinkerState{..}  = do
       -- Note that we want to remove all *local*
       -- (i.e. non-isExternal) names too (these are the
       -- temporary bindings from the command line).
+      keep_name :: (Name, a) -> Bool
       keep_name (n,_) = isExternalName n &&
                         nameModule n `elemModuleSet` bcos_retained
 
