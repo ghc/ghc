@@ -54,8 +54,6 @@ w (T2 _) True = () -- redundant
 w !_     True = () -- inaccessible
 w _      _    = ()
 
--- do we expect the bang warning here?
--- we do warn but I don't think we should?
 z :: T2 a -> Bool -> ()
 z _ True                = ()
 z t2 !x | T2 _ <- t2, x = () -- redundant
@@ -138,3 +136,4 @@ z t2 !x | T2 _ <- t2, x = () -- redundant
 -- more top-level banged binds
 -- more numeric patterns
 -- more view patterns
+
