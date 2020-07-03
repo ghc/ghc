@@ -261,18 +261,19 @@ but perhaps that does not matter too much.
 warnAboutEmptyEnumerations :: FamInstEnvs -> DynFlags -> LHsExpr GhcTc
                            -> Maybe (LHsExpr GhcTc)
                            -> LHsExpr GhcTc -> DsM ()
--- ^ Warns about @[2,3 .. 1]@ which returns the empty list.
--- Only works for integral types, not floating point.
+-- ^ Warns about @[2,3 .. 1]@ or @['b' .. 'a']@ which return the empty list.
+-- For numeric literals, only works for integral types, not floating point.
 warnAboutEmptyEnumerations fam_envs dflags fromExpr mThnExpr toExpr
-  | wopt Opt_WarnEmptyEnumerations dflags
-  , Just from_ty@(from,_) <- getLHsIntegralLit fromExpr
+  | not $ wopt Opt_WarnEmptyEnumerations dflags
+  = return ()
+  -- Numeric Literals
+  | Just from_ty@(from,_) <- getLHsIntegralLit fromExpr
   , Just (_, tc)          <- getNormalisedTyconName fam_envs from_ty
   , Just mThn             <- traverse getLHsIntegralLit mThnExpr
   , Just (to,_)           <- getLHsIntegralLit toExpr
   , let check :: forall a. (Enum a, Num a) => Proxy a -> DsM ()
         check _proxy
-          = when (null enumeration) $
-            warnDs (Reason Opt_WarnEmptyEnumerations) (text "Enumeration is empty")
+          = when (null enumeration) raiseWarning
           where
             enumeration :: [a]
             enumeration = case mThn of
@@ -296,7 +297,18 @@ warnAboutEmptyEnumerations fam_envs dflags fromExpr mThnExpr toExpr
       -- See the T10930b test case for an example of where this matters.
     else return ()
 
+  -- Char literals (#18402)
+  | Just fromChar <- getLHsCharLit fromExpr
+  , Just mThnChar <- traverse getLHsCharLit mThnExpr
+  , Just toChar   <- getLHsCharLit toExpr
+  , let enumeration = case mThnChar of
+                        Nothing      -> [fromChar          .. toChar]
+                        Just thnChar -> [fromChar, thnChar .. toChar]
+  = when (null enumeration) raiseWarning
+
   | otherwise = return ()
+  where
+    raiseWarning = warnDs (Reason Opt_WarnEmptyEnumerations) (text "Enumeration is empty")
 
 getLHsIntegralLit :: LHsExpr GhcTc -> Maybe (Integer, Type)
 -- ^ See if the expression is an 'Integral' literal.
@@ -324,6 +336,14 @@ getSimpleIntegralLit (HsInt64Prim _ i)  = Just (i, int64PrimTy)
 getSimpleIntegralLit (HsWord64Prim _ i) = Just (i, word64PrimTy)
 getSimpleIntegralLit (HsInteger _ i ty) = Just (i, ty)
 getSimpleIntegralLit _ = Nothing
+
+-- | Extract the Char if the expression is a Char literal.
+getLHsCharLit :: LHsExpr GhcTc -> Maybe Char
+getLHsCharLit (L _ (HsPar _ e))            = getLHsCharLit e
+getLHsCharLit (L _ (HsTick _ _ e))         = getLHsCharLit e
+getLHsCharLit (L _ (HsBinTick _ _ _ e))    = getLHsCharLit e
+getLHsCharLit (L _ (HsLit _ (HsChar _ c))) = Just c
+getLHsCharLit _ = Nothing
 
 -- | Convert a pair (Integer, Type) to (Integer, Name) after eventually
 -- normalising the type
