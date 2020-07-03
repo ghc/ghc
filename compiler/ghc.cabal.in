@@ -153,6 +153,7 @@ Library
         NoImplicitPrelude
        ,BangPatterns
        ,ScopedTypeVariables
+       ,MonoLocalBinds
 
     Exposed-Modules:
         GHC.Iface.Ext.Types
