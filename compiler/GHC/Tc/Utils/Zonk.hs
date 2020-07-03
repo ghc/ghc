@@ -527,10 +527,10 @@ zonkRecMonoBinds env binds
 zonkMonoBinds :: ZonkEnv -> LHsBinds GhcTc -> TcM (LHsBinds GhcTc)
 zonkMonoBinds env binds = mapBagM (zonk_lbind env) binds
 
-zonk_lbind :: ZonkEnv -> LHsBind GhcTcId -> TcM (LHsBind GhcTc)
+zonk_lbind :: ZonkEnv -> LHsBind GhcTc -> TcM (LHsBind GhcTc)
 zonk_lbind env = wrapLocM (zonk_bind env)
 
-zonk_bind :: ZonkEnv -> HsBind GhcTcId -> TcM (HsBind GhcTc)
+zonk_bind :: ZonkEnv -> HsBind GhcTc -> TcM (HsBind GhcTc)
 zonk_bind env bind@(PatBind { pat_lhs = pat, pat_rhs = grhss
                             , pat_ext = NPatBindTc fvs ty})
   = do  { (_env, new_pat) <- zonkPat env pat            -- Env already extended
