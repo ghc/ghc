@@ -29,7 +29,6 @@ module System.Info
 import qualified Data.Text      as T
 import           Data.Text.Read (decimal)
 import           Data.Version
-import           GHC.Version    (cProjectVersion)
 
 -- | The version of 'compilerName' with which the program was compiled
 -- or is being interpreted.
@@ -47,7 +46,7 @@ compilerVersion = Version [major, minor] []
 fullCompilerVersion :: Version
 fullCompilerVersion = Version version
   where
-    version = parseVersion cProjectVersion
+    version = parseVersion __GLASGOW_HASKELL_FULL_VERSION__
 
 #include "ghcplatform.h"
 
