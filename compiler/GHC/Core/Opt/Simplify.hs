@@ -1909,7 +1909,7 @@ completeCall env var cont
             log_inlining $
                 sep [text "Inlining done:", nest 4 (ppr var)]
       | otherwise
-      = liftIO $ log_inlining $
+      = log_inlining $
            sep [text "Inlining done: " <> ppr var,
                 nest 4 (vcat [text "Inlined fn: " <+> nest 2 (ppr unfolding),
                               text "Cont:  " <+> ppr cont])]

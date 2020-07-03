@@ -2290,6 +2290,7 @@ lintCoercion this@(AxiomRuleCo ax cos)
            Nothing -> err "Malformed use of AxiomRuleCo" [ ppr this ]
            Just _  -> return (AxiomRuleCo ax cos') }
   where
+  err :: forall a. String -> [SDoc] -> LintM a
   err m xs  = failWithL $
               hang (text m) 2 $ vcat (text "Rule:" <+> ppr (coaxrName ax) : xs)
 

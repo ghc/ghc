@@ -138,15 +138,17 @@ lazyInitLlvmConfig :: String
                -> IO LlvmConfig
 lazyInitLlvmConfig top_dir
   = unsafeInterleaveIO $ do    -- see Note [LLVM configuration]
-      targets <- readAndParse "llvm-targets" mkLlvmTarget
-      passes <- readAndParse "llvm-passes" id
-      return $ LlvmConfig { llvmTargets = targets, llvmPasses = passes }
+      targets <- readAndParse "llvm-targets"
+      passes <- readAndParse "llvm-passes"
+      return $ LlvmConfig { llvmTargets = fmap mkLlvmTarget <$> targets,
+                            llvmPasses = passes }
   where
-    readAndParse name builder =
+    readAndParse :: Read a => String -> IO a
+    readAndParse name =
       do let llvmConfigFile = top_dir </> name
          llvmConfigStr <- readFile llvmConfigFile
          case maybeReadFuzzy llvmConfigStr of
-           Just s -> return (fmap builder <$> s)
+           Just s -> return s
            Nothing -> pgmError ("Can't parse " ++ show llvmConfigFile)
 
     mkLlvmTarget :: (String, String, String) -> LlvmTarget
