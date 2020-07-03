@@ -16,7 +16,7 @@ module GHC.Tc.Utils.Instantiate (
        instCall, instDFunType, instStupidTheta, instTyVarsWith,
        newWanted, newWanteds,
 
-       tcInstInvisibleTyBinders, tcInstInvisibleTyBinder,
+       tcInstInvisibleTyBindersN, tcInstInvisibleTyBinders, tcInstInvisibleTyBinder,
 
        newOverloadedLit, mkOverLit,
 
@@ -366,13 +366,19 @@ instStupidTheta orig theta
 *                                                                      *
 ********************************************************************* -}
 
--- | Instantiates up to n invisible binders
--- Returns the instantiating types, and body kind
-tcInstInvisibleTyBinders :: Int -> TcKind -> TcM ([TcType], TcKind)
+-- | Given ty::forall k1 k2. k, instantiate all the invisible forall-binders
+--   returning ty @kk1 @kk2 :: k[kk1/k1, kk2/k1]
+tcInstInvisibleTyBinders :: TcType -> TcKind -> TcM (TcType, TcKind)
+tcInstInvisibleTyBinders ty kind
+  = do { (extra_args, kind') <- tcInstInvisibleTyBindersN n_invis kind
+       ; return (mkAppTys ty extra_args, kind') }
+  where
+    n_invis = invisibleTyBndrCount kind
 
-tcInstInvisibleTyBinders 0 kind
+tcInstInvisibleTyBindersN :: Int -> TcKind -> TcM ([TcType], TcKind)
+tcInstInvisibleTyBindersN 0 kind
   = return ([], kind)
-tcInstInvisibleTyBinders n ty
+tcInstInvisibleTyBindersN n ty
   = go n empty_subst ty
   where
     empty_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ty))
