@@ -64,7 +64,6 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Core.DataCon
-import GHC.Core.TyCon
 import GHC.Types.Var (EvVar)
 import GHC.Core.Coercion
 import GHC.Tc.Types.Evidence (HsWrapper(..), isIdHsWrapper)
@@ -227,8 +226,8 @@ data PmGrd
     -- bang pattern, in which case we might want to report it as redundant.
     -- See Note [Dead bang patterns].
   | PmBang {
-      pm_id          :: !Id,
-      pm_loc         :: !(Maybe SrcInfo)
+      pm_id   :: !Id,
+      _pm_loc :: !(Maybe SrcInfo)
     }
 
     -- | @PmLet x expr@ corresponds to a @let x = expr@ guard. This actually
@@ -993,7 +992,7 @@ checkGrd grd = CA $ \inc -> case grd of
     matched <- addPmCtsDeltas inc con_cts
     uncov   <- addPmCtDeltas  inc (PmNotConCt x con)
     -- tracePm "checkGrd:Con" (ppr inc $$ ppr grd $$ ppr con_cts $$ ppr matched)
-    pure CheckResult { cr_ret = emptyRedSets { rs_cov = matched, rs_div = div }
+    pure CheckResult { cr_ret = emptyRedSets { rs_cov = matched }
                      , cr_uncov = uncov
                      , cr_approx = Precise }
 

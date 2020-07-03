@@ -997,42 +997,44 @@ ensureInhabited :: Delta -> VarInfo -> DsM (Maybe VarInfo)
    -- NB: Does /not/ filter each ConLikeSet with the oracle; members may
    --     remain that do not statisfy it.  This lazy approach just
    --     avoids doing unnecessary work.
-ensureInhabited _ vi@VI{ vi_bot = Nothing }   = pure (Just vi)
-ensureInhabited _ vi@VI{ vi_bot = Just True } = pure (Just vi)
-ensureInhabited delta vi = do
-  vi <- initPossibleMatches (delta_ty_st delta) vi
-  fmap (set_cache vi) <$> test (vi_cache vi)
+ensureInhabited delta vi = case vi_bot vi of
+  Nothing    -> pure (Just vi) -- The |-Bot rule from the paper
+  Just True  -> pure (Just vi)
+  Just False -> initPossibleMatches (delta_ty_st delta) vi >>= inst_complete_sets
   where
-    set_cache vi cache = vi { vi_cache = cache }
+    -- | This is the |-Inst rule from the paper (section 4.5). Tries to
+    -- find an inhabitant in every complete set by instantiating with one their
+    -- constructors. If there is any complete set where we can't find an
+    -- inhabitant, the whole thing is uninhabited.
+    inst_complete_sets :: VarInfo -> DsM (Maybe VarInfo)
+    inst_complete_sets vi@VI{ vi_cache = NoPM }  = pure (Just vi)
+    inst_complete_sets vi@VI{ vi_cache = PM ms } = runMaybeT $ do
+      ms <- traverse (\cs -> inst_complete_set vi cs (uniqDSetToList cs)) ms
+      pure vi{ vi_cache = PM ms }
 
-    test NoPM    = pure (Just NoPM)
-    test (PM ms) = runMaybeT (PM <$> traverse one_set ms)
-
-    one_set cs = find_one_inh cs (uniqDSetToList cs)
-
-    find_one_inh :: ConLikeSet -> [ConLike] -> MaybeT DsM ConLikeSet
-    -- (find_one_inh cs cls) iterates over cls, deleting from cs
+    inst_complete_set :: VarInfo -> ConLikeSet -> [ConLike] -> MaybeT DsM ConLikeSet
+    -- (inst_complete_set cs cls) iterates over cls, deleting from cs
     -- any uninhabited elements of cls.  Stop (returning Just cs)
     -- when you see an inhabited element; return Nothing if all
     -- are uninhabited
-    find_one_inh _  [] = mzero
-    find_one_inh cs (con:cons) = lift (inh_test con) >>= \case
+    inst_complete_set _ _  [] = mzero
+    inst_complete_set vi cs (con:cons) = lift (inst_and_test vi con) >>= \case
       True  -> pure cs
-      False -> find_one_inh (delOneFromUniqDSet cs con) cons
+      False -> inst_complete_set vi (delOneFromUniqDSet cs con) cons
 
-    inh_test :: ConLike -> DsM Bool
-    -- @inh_test K@ Returns False if a non-bottom value @v::ty@ cannot possibly
+    inst_and_test :: VarInfo -> ConLike -> DsM Bool
+    -- @inst_and_test K@ Returns False if a non-bottom value @v::ty@ cannot possibly
     -- be of form @K _ _ _@. Returning True is always sound.
     --
     -- It's like 'DataCon.dataConCannotMatch', but more clever because it takes
     -- the facts in Delta into account.
-    inh_test con = do
+    inst_and_test vi con = do
       env <- dsGetFamInstEnvs
       case guessConLikeUnivTyArgsFromResTy env (vi_ty vi) con of
         Nothing -> pure True -- be conservative about this
         Just arg_tys -> do
           (_tvs, _vars, ty_cs, strict_arg_tys) <- mkOneConFull arg_tys con
-          tracePm "inh_test" (ppr con $$ ppr ty_cs)
+          tracePm "inst_and_test" (ppr con $$ ppr ty_cs)
           -- No need to run the term oracle compared to pmIsSatisfiable
           fmap isJust <$> runSatisfiabilityCheck delta $ mconcat
             -- Important to pass False to tyIsSatisfiable here, so that we won't
