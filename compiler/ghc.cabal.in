@@ -153,6 +153,7 @@ Library
     -- we use an explicit Prelude
     Default-Extensions:
         NoImplicitPrelude
+        MonoLocalBinds
 
     Exposed-Modules:
         GHC.Iface.Ext.Types
