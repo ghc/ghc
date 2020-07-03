@@ -4,6 +4,10 @@ type family GHC.TypeLits.AppendSymbol a b
 type GHC.TypeLits.CmpSymbol :: GHC.Types.Symbol
                                -> GHC.Types.Symbol -> Ordering
 type family GHC.TypeLits.CmpSymbol a b
+type GHC.TypeLits.Compare :: forall k. k -> k -> Ordering
+type family GHC.TypeLits.Compare a b where
+    GHC.TypeLits.Compare a b = GHC.TypeLits.CmpSymbol a b
+    GHC.TypeLits.Compare a b = GHC.TypeNats.CmpNat a b
 type GHC.TypeLits.ErrorMessage :: *
 data GHC.TypeLits.ErrorMessage
   = GHC.TypeLits.Text GHC.Types.Symbol
@@ -18,6 +22,17 @@ type GHC.TypeLits.KnownSymbol :: GHC.Types.Symbol -> Constraint
 class GHC.TypeLits.KnownSymbol n where
   GHC.TypeLits.symbolSing :: GHC.TypeLits.SSymbol n
   {-# MINIMAL symbolSing #-}
+type role GHC.TypeLits.LitOrdering nominal nominal
+type GHC.TypeLits.LitOrdering :: forall {k}. k -> k -> *
+data GHC.TypeLits.LitOrdering a b where
+  GHC.TypeLits.LitLt :: forall {k} (a :: k) (b :: k).
+                        (GHC.TypeLits.Compare a b ~ 'LT) =>
+                        GHC.TypeLits.LitOrdering a b
+  GHC.TypeLits.LitEq :: forall {k} (a :: k).
+                        GHC.TypeLits.LitOrdering a a
+  GHC.TypeLits.LitGt :: forall {k} (a :: k) (b :: k).
+                        (GHC.TypeLits.Compare a b ~ 'GT) =>
+                        GHC.TypeLits.LitOrdering a b
 type GHC.TypeLits.SomeSymbol :: *
 data GHC.TypeLits.SomeSymbol
   = forall (n :: GHC.Types.Symbol).
@@ -26,6 +41,12 @@ data GHC.TypeLits.SomeSymbol
 type GHC.TypeLits.TypeError :: forall b.
                                GHC.TypeLits.ErrorMessage -> b
 type family GHC.TypeLits.TypeError a where
+GHC.TypeLits.cmpNat ::
+  (GHC.TypeNats.KnownNat a, GHC.TypeNats.KnownNat b) =>
+  proxy1 a -> proxy2 b -> GHC.TypeLits.LitOrdering a b
+GHC.TypeLits.cmpSymbol ::
+  (GHC.TypeLits.KnownSymbol a, GHC.TypeLits.KnownSymbol b) =>
+  proxy1 a -> proxy2 b -> GHC.TypeLits.LitOrdering a b
 GHC.TypeLits.natVal ::
   GHC.TypeNats.KnownNat n => proxy n -> Integer
 GHC.TypeLits.natVal' ::
