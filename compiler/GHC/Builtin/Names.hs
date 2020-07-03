@@ -1962,6 +1962,7 @@ typeNatKindConNameKey, typeSymbolKindConNameKey, typeCharKindConNameKey,
   typeNatAddTyFamNameKey, typeNatMulTyFamNameKey, typeNatExpTyFamNameKey,
   typeNatLeqTyFamNameKey, typeNatSubTyFamNameKey
   , typeSymbolCmpTyFamNameKey, typeNatCmpTyFamNameKey, typeCharCmpTyFamNameKey
+  , typeLeqCharTyFamNameKey
   , typeNatDivTyFamNameKey
   , typeNatModTyFamNameKey
   , typeNatLogTyFamNameKey
@@ -1978,67 +1979,68 @@ typeNatSubTyFamNameKey    = mkPreludeTyConUnique 171
 typeSymbolCmpTyFamNameKey = mkPreludeTyConUnique 172
 typeNatCmpTyFamNameKey    = mkPreludeTyConUnique 173
 typeCharCmpTyFamNameKey   = mkPreludeTyConUnique 174
-typeNatDivTyFamNameKey  = mkPreludeTyConUnique 175
-typeNatModTyFamNameKey  = mkPreludeTyConUnique 176
-typeNatLogTyFamNameKey  = mkPreludeTyConUnique 177
-typeConsSymbolTyFamNameKey = mkPreludeTyConUnique 178
-typeUnconsSymbolTyFamNameKey = mkPreludeTyConUnique 179
+typeLeqCharTyFamNameKey   = mkPreludeTyConUnique 175
+typeNatDivTyFamNameKey  = mkPreludeTyConUnique 176
+typeNatModTyFamNameKey  = mkPreludeTyConUnique 177
+typeNatLogTyFamNameKey  = mkPreludeTyConUnique 178
+typeConsSymbolTyFamNameKey = mkPreludeTyConUnique 179
+typeUnconsSymbolTyFamNameKey = mkPreludeTyConUnique 180
 
 -- Custom user type-errors
 errorMessageTypeErrorFamKey :: Unique
-errorMessageTypeErrorFamKey =  mkPreludeTyConUnique 180
+errorMessageTypeErrorFamKey =  mkPreludeTyConUnique 181
 
 
 
 ntTyConKey:: Unique
-ntTyConKey = mkPreludeTyConUnique 181
+ntTyConKey = mkPreludeTyConUnique 182
 coercibleTyConKey :: Unique
-coercibleTyConKey = mkPreludeTyConUnique 182
+coercibleTyConKey = mkPreludeTyConUnique 183
 
 proxyPrimTyConKey :: Unique
-proxyPrimTyConKey = mkPreludeTyConUnique 183
+proxyPrimTyConKey = mkPreludeTyConUnique 184
 
 specTyConKey :: Unique
-specTyConKey = mkPreludeTyConUnique 184
+specTyConKey = mkPreludeTyConUnique 185
 
 anyTyConKey :: Unique
-anyTyConKey = mkPreludeTyConUnique 185
+anyTyConKey = mkPreludeTyConUnique 186
 
-smallArrayPrimTyConKey        = mkPreludeTyConUnique  186
-smallMutableArrayPrimTyConKey = mkPreludeTyConUnique  187
+smallArrayPrimTyConKey        = mkPreludeTyConUnique  187
+smallMutableArrayPrimTyConKey = mkPreludeTyConUnique  188
 
 staticPtrTyConKey  :: Unique
-staticPtrTyConKey  = mkPreludeTyConUnique 188
+staticPtrTyConKey  = mkPreludeTyConUnique 189
 
 staticPtrInfoTyConKey :: Unique
-staticPtrInfoTyConKey = mkPreludeTyConUnique 189
+staticPtrInfoTyConKey = mkPreludeTyConUnique 190
 
 callStackTyConKey :: Unique
-callStackTyConKey = mkPreludeTyConUnique 190
+callStackTyConKey = mkPreludeTyConUnique 191
 
 -- Typeables
 typeRepTyConKey, someTypeRepTyConKey, someTypeRepDataConKey :: Unique
-typeRepTyConKey       = mkPreludeTyConUnique 191
-someTypeRepTyConKey   = mkPreludeTyConUnique 192
-someTypeRepDataConKey = mkPreludeTyConUnique 193
+typeRepTyConKey       = mkPreludeTyConUnique 192
+someTypeRepTyConKey   = mkPreludeTyConUnique 193
+someTypeRepDataConKey = mkPreludeTyConUnique 194
 
 
 typeSymbolAppendFamNameKey :: Unique
-typeSymbolAppendFamNameKey = mkPreludeTyConUnique 194
+typeSymbolAppendFamNameKey = mkPreludeTyConUnique 195
 
 -- Unsafe equality
 unsafeEqualityTyConKey :: Unique
-unsafeEqualityTyConKey = mkPreludeTyConUnique 195
+unsafeEqualityTyConKey = mkPreludeTyConUnique 196
 
 -- Linear types
 multiplicityTyConKey :: Unique
-multiplicityTyConKey = mkPreludeTyConUnique 196
+multiplicityTyConKey = mkPreludeTyConUnique 197
 
 unrestrictedFunTyConKey :: Unique
-unrestrictedFunTyConKey = mkPreludeTyConUnique 197
+unrestrictedFunTyConKey = mkPreludeTyConUnique 198
 
 multMulTyConKey :: Unique
-multMulTyConKey = mkPreludeTyConUnique 198
+multMulTyConKey = mkPreludeTyConUnique 199
 
 ---------------- Template Haskell -------------------
 --      GHC.Builtin.Names.TH: USES TyConUniques 200-299

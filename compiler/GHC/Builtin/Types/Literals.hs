@@ -20,6 +20,7 @@ module GHC.Builtin.Types.Literals
   , typeSymbolCmpTyCon
   , typeSymbolAppendTyCon
   , typeCharCmpTyCon
+  , typeLeqCharTyCon
   , typeConsSymbolTyCon
   , typeUnconsSymbolTyCon
   , typeToUpperTyCon
@@ -70,6 +71,7 @@ import GHC.Builtin.Names
                   , typeSymbolCmpTyFamNameKey
                   , typeSymbolAppendFamNameKey
                   , typeCharCmpTyFamNameKey
+                  , typeLeqCharTyFamNameKey
                   , typeConsSymbolTyFamNameKey
                   , typeUnconsSymbolTyFamNameKey
                   , typeToUpperTyFamNameKey
@@ -762,6 +764,7 @@ typeNatCoAxiomRules = Map.fromList $ map (\x -> (coaxrName x, x))
   , axCmpNatDef
   , axCmpSymbolDef
   , axCmpCharDef
+  , axLeqCharDef
   , axAppendSymbolDef
   , axConsSymbolDef
   , axConsSymbol0
@@ -785,6 +788,7 @@ typeNatCoAxiomRules = Map.fromList $ map (\x -> (coaxrName x, x))
   , axCmpNatRefl
   , axCmpSymbolRefl
   , axCmpCharRefl
+  , axLeqCharRefl
   , axLeq0L
   , axSubDef
   , axSub0R
@@ -1462,7 +1466,7 @@ genLog x base = Just (exactLoop 0 x)
     | i < base  = s
     | otherwise = let s1 = s + 1 in s1 `seq` underLoop s1 (div i base)
 
--- | TODO: One needs to comment on the following code properly and determine a suitable location.
+-----------------------------------------------------------------------------
 
 typeCharCmpTyCon :: TyCon
 typeCharCmpTyCon =
@@ -1514,8 +1518,61 @@ matchFamCmpChar [s,t]
         mbY = isCharLitTy t
 matchFamCmpChar _ = Nothing
 
+-----------------------------------------------------------------------------
 
--- | Type level char predicates
+typeLeqCharTyCon :: TyCon
+typeLeqCharTyCon =
+  mkFamilyTyCon name
+    (mkTemplateAnonTyConBinders [ charTy, charTy ])
+    boolTy
+    Nothing
+    (BuiltInSynFamTyCon ops)
+    Nothing
+    NotInjective
+  where
+  name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "LeqChar")
+                  typeLeqCharTyFamNameKey typeLeqCharTyCon
+  ops = BuiltInSynFamily
+      { sfMatchFam      = matchFamLeqChar
+      , sfInteractTop   = interactTopLeqChar
+      , sfInteractInert = \_ _ _ _ -> []
+      }
+
+interactTopLeqChar :: [Xi] -> Xi -> [Pair Type]
+interactTopLeqChar [s,t] r
+  | Just True <- isBoolLitTy r = [ s === t ]
+interactTopLeqChar _ _ = []
+
+leqChar :: Type -> Type -> Type
+leqChar s t = mkTyConApp typeLeqCharTyCon [s,t]
+
+axLeqCharDef, axLeqCharRefl :: CoAxiomRule
+axLeqCharDef =
+  CoAxiomRule
+    { coaxrName      = fsLit "LeqCharDef"
+    , coaxrAsmpRoles = [Nominal, Nominal]
+    , coaxrRole      = Nominal
+    , coaxrProves    = \cs ->
+        do [Pair s1 s2, Pair t1 t2] <- return cs
+           s2' <- isCharLitTy s2
+           t2' <- isCharLitTy t2
+           return (mkTyConApp typeLeqCharTyCon [s1,t1] ===
+                   bool (s2' <= t2')) }
+axLeqCharRefl = mkAxiom1 "CmpCharRefl"
+  $ \(Pair s _) -> (leqChar s s) === bool True
+
+matchFamLeqChar :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
+matchFamLeqChar [s,t]
+  | Just x <- mbX, Just y <- mbY =
+    Just (axLeqCharDef, [s,t], bool (x <= y))
+  | tcEqType s t = Just (axLeqCharRefl, [s], bool True)
+  where mbX = isCharLitTy s
+        mbY = isCharLitTy t
+matchFamLeqChar _ = Nothing
+
+-----------------------------------------------------------------------------
+
+-- | Type-level char predicates
 
 -- | TyCons
 
@@ -1773,7 +1830,7 @@ matchFamIsLetter [c]
   | otherwise = Nothing
 matchFamIsLetter _ = Nothing
 
--- | The function required for the GeneralCharCategory type family
+-- | The functions required for the GeneralCharCategory built-in type family
 
 typeGeneralCharCategoryTyCon :: TyCon
 typeGeneralCharCategoryTyCon = mkTypeCharCategoryTyCon name

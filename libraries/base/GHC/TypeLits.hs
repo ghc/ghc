@@ -48,14 +48,15 @@ module GHC.TypeLits
   , type (N.<=), type (N.<=?), type (N.+), type (N.*), type (N.^), type (N.-)
   , type N.Div, type N.Mod, type N.Log2
   , AppendSymbol
-  , N.CmpNat, CmpSymbol, CmpChar
+  , N.CmpNat, CmpSymbol, CmpChar, LeqChar
   , GeneralCharCategory
   , IsControl, IsSpace, IsLower
   , IsUpper, IsAlpha, IsAlphaNum
   , IsPrint, IsDigit, IsOctDigit
   , IsHexDigit, IsLetter, IsMark
   , IsNumber, IsPunctuation, IsSymbol
-  , IsSeparator
+  , IsSeparator, IsAscii, IsLatin1
+  , IsAsciiUpper, IsAsciiLower
   , ToUpper, ToLower, ToTitle
   , CharToNat, NatToChar, ConsSymbol
   , UnconsSymbol
@@ -76,6 +77,7 @@ import GHC.Real(toInteger)
 import GHC.Prim(magicDict, Proxy#)
 import Data.Maybe(Maybe(..))
 import Data.Proxy (Proxy(..))
+import Data.Type.Bool(type (&&))
 import Data.Type.Equality((:~:)(Refl))
 import Unsafe.Coerce(unsafeCoerce)
 
@@ -243,8 +245,11 @@ type family TypeError (a :: ErrorMessage) :: b where
 
 -- @Char-related type families
 
--- | Comparison of type level characters, as a type family.
+-- | Comparison of type-level characters, as a type family.
 type family CmpChar (a :: Char) (b :: Char) :: Ordering
+
+-- | Boolean comparison of type-level characters
+type family LeqChar (a :: Char) (b :: Char) :: Bool
 
 -- | Extending a type-level symbol with a type-level character
 type family ConsSymbol (a :: Char) (b :: Symbol) :: Symbol
@@ -262,7 +267,7 @@ type family ToLower (a :: Char) :: Char
 -- | A type-level analogue of the function `toTitle` from 'Data.Char'.
 type family ToTitle (a :: Char) :: Char
 
--- | These type families are type-level analogues of the functions `ord` and `chr` respectively.
+-- | These type families are type-level analogues of the functions `ord` and `chr` from Data.Char respectively.
 type family CharToNat (a :: Char) :: Nat
 
 type family NatToChar (a :: Nat) :: Char
@@ -270,7 +275,10 @@ type family NatToChar (a :: Nat) :: Char
 -- | A type-level analogue of the function `generalCategory` from
 type family GeneralCharCategory (a :: Char) :: GeneralCategory
 
--- @Char-related built-in unary predicates
+
+--------------------------------------------------------------------------------
+
+-- | Char-related built-in unary predicates
 
 -- | A type-level analogue of the `isAlpha` function from 'Data.Char'.
 type family IsAlpha (a :: Char) :: Bool
@@ -304,8 +312,6 @@ type family IsHexDigit (a :: Char) :: Bool
 
 -- | A type-level analogue of the `isLetter` function from 'Data.Char'.
 type family IsLetter (a :: Char) :: Bool
-
--- @Derived `Char`-related type families.
 
 -- | A type-level analogue of the `isMark` function from 'Data.Char'.
 type IsMark a = IsMarkCategory (GeneralCharCategory a)
@@ -356,6 +362,22 @@ type family IsSeparatorCategory c where
   IsSeparatorCategory 'LineSeparator      = 'True
   IsSeparatorCategory 'ParagraphSeparator = 'True
   IsSeparatorCategory _                   = 'False
+
+--------------------------------------------------------------------------------
+
+-- | Type-level char subranges
+
+-- | A type-level analogue of the `isAscii` function from 'Data.Char'
+type IsAscii c = LeqChar c '\DEL'
+
+-- | A type-level analogue of the `isLatin1` function from 'Data.Char'
+type IsLatin1 c = LeqChar c '\xff'
+
+-- | A type-level analogue of the `isAsciiUpper` function from 'Data.Char'
+type IsAsciiUpper c = LeqChar 'A' c && LeqChar c 'Z'
+
+-- | A type-level analogue of the `isAsciiLower` function from 'Data.Char'
+type IsAsciiLower c = LeqChar 'a' c && LeqChar c 'z'
 
 --------------------------------------------------------------------------------
 
