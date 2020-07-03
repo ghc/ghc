@@ -11,7 +11,7 @@ n0 = \f z -> z
 n1 :: CNat
 n1 = \f z -> f z
 
--- nsucc :: CNat -> CNat
+nsucc :: CNat -> CNat
 nsucc (n::CNat) = \f z -> f (n f z)
 
 add, mul :: CNat -> CNat -> CNat

@@ -48,7 +48,6 @@ module GHC.Tc.Gen.HsType (
         tcHsLiftedTypeNC, tcHsOpenTypeNC,
         tcInferLHsType, tcInferLHsTypeUnsaturated, tcCheckLHsType,
         tcHsMbContext, tcHsContext, tcLHsPredType,
-        failIfEmitsConstraints,
         solveEqualities, -- useful re-export
 
         kindGeneralizeAll, kindGeneralizeSome, kindGeneralizeNone,
@@ -85,7 +84,6 @@ import GHC.Tc.Solver
 import GHC.Tc.Utils.Zonk
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
-import GHC.Tc.Errors      ( reportAllUnsolved )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Instantiate ( tcInstInvisibleTyBinders, tcInstInvisibleTyBinder )
 import GHC.Core.Type
@@ -443,16 +441,19 @@ tc_top_lhs_type :: TcTyMode -> LHsSigType GhcRn -> ContextKind -> TcM Type
 tc_top_lhs_type mode hs_sig_type ctxt_kind
   | HsIB { hsib_ext = sig_vars, hsib_body = hs_ty } <- hs_sig_type
   = do { traceTc "tcTopLHsType {" (ppr hs_ty)
-       ; (spec_tkvs, ty)
-              <- pushTcLevelM_                     $
-                 solveEqualities                   $
-                 bindImplicitTKBndrs_Skol sig_vars $
+       ; (tclvl, (wanted, (spec_tkvs, ty)))
+              <- pushTcLevelM                            $
+                 solveLocalEqualitiesX "tc_top_lhs_type" $
+                 bindImplicitTKBndrs_Skol sig_vars       $
                  do { kind <- newExpectedKind ctxt_kind
                     ; tc_lhs_type mode hs_ty kind }
 
        ; spec_tkvs <- zonkAndScopedSort spec_tkvs
        ; let ty1 = mkSpecForAllTys spec_tkvs ty
        ; kvs <- kindGeneralizeAll ty1  -- "All" because it's a top-level type
+
+       ; reportUnsolvedEqualities InstSkol (kvs ++ spec_tkvs) tclvl wanted
+
        ; final_ty <- zonkTcTypeToType (mkInfForAllTys kvs ty1)
        ; traceTc "End tcTopLHsType }" (vcat [ppr hs_ty, ppr final_ty])
        ; return final_ty}
@@ -3776,19 +3777,6 @@ promotionErr name err
 ************************************************************************
 -}
 
-
--- | If the inner action emits constraints, report them as errors and fail;
--- otherwise, propagates the return value. Useful as a wrapper around
--- 'tcImplicitTKBndrs', which uses solveLocalEqualities, when there won't be
--- another chance to solve constraints
-failIfEmitsConstraints :: TcM a -> TcM a
-failIfEmitsConstraints thing_inside
-  = checkNoErrs $  -- We say that we fail if there are constraints!
-                   -- c.f same checkNoErrs in solveEqualities
-    do { (res, lie) <- captureConstraints thing_inside
-       ; reportAllUnsolved lie
-       ; return res
-       }
 
 -- | Make an appropriate message for an error in a function argument.
 -- Used for both expressions and types.

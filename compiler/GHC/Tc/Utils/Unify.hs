@@ -372,18 +372,23 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
 mkFunTysMsg :: TidyEnv -> SDoc -> [Scaled TcType] -> TcType -> Arity
             -> TcM (TidyEnv, MsgDoc)
 mkFunTysMsg env herald arg_tys res_ty n_val_args_in_call
-  = do { (env', ty) <- zonkTidyTcType env $
-                       mkVisFunTys arg_tys res_ty
-       ; return (env', mk_msg ty) }
+  = do { (env', fun_rho) <- zonkTidyTcType env $
+                            mkVisFunTys arg_tys res_ty
+
+       ; let (all_arg_tys, _) = splitFunTys fun_rho
+             n_fun_args = length all_arg_tys
+
+             msg | n_val_args_in_call <= n_fun_args  -- Enough args, in the end
+                 = text "In the result of a function call"
+                 | otherwise
+                 = hang (full_herald <> comma)
+                      2 (sep [ text "but its type" <+> quotes (pprType fun_rho)
+                             , if n_fun_args == 0 then text "has none"
+                               else text "has only" <+> speakN n_fun_args])
+
+       ; return (env', msg) }
  where
-   n_fun_args = length arg_tys
-   mk_msg ty | n_val_args_in_call <= n_fun_args  -- Enough args, in the end
-             = text "In the result of a function call"
-             | otherwise
-             = hang (herald <+> speakNOf n_val_args_in_call (text "value argument") <> comma)
-                  2 (sep [ text "but its type" <+> quotes (pprType ty)
-                         , if n_fun_args == 0 then text "has none"
-                           else text "has only" <+> speakN n_fun_args])
+  full_herald = herald <+> speakNOf n_val_args_in_call (text "value argument")
 
 ----------------------
 matchExpectedListTy :: TcRhoType -> TcM (TcCoercionN, TcRhoType)

@@ -251,8 +251,8 @@ data HsExpr p
                              -- Turned from HsVar to HsUnboundVar by the
                              --   renamer, when it finds an out-of-scope
                              --   variable or hole.
-                             -- Turned into HsVar by type checker, to support
-                             --   deferred type errors.
+                             -- The (XUnboundVar p) field becomes Id
+                             --   after typechecking
 
   | HsConLikeOut (XConLikeOut p)
                  ConLike     -- ^ After typechecker only; must be different

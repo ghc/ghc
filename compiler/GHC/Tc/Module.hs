@@ -73,7 +73,7 @@ import GHC.Builtin.Utils
 import GHC.Types.Name.Reader
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Gen.Expr
-import GHC.Tc.Gen.App( tcInferSigmaTy )
+import GHC.Tc.Gen.App( tcInferSigma )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Gen.Export
 import GHC.Tc.Types.Evidence
@@ -99,7 +99,7 @@ import GHC.Tc.TyCl.Instance
 import GHC.IfaceToCore
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
-import GHC.Tc.Utils.Instantiate (tcGetInsts, topInstantiate)
+import GHC.Tc.Utils.Instantiate (tcGetInsts)
 import GHC.Tc.Solver
 import GHC.Tc.TyCl
 import GHC.Tc.Instance.Typeable ( mkTypeableBinds )
@@ -2489,14 +2489,11 @@ tcRnExpr hsc_env mode rdr_expr
     (rn_expr, _fvs) <- rnLExpr rdr_expr ;
     failIfErrsM ;
 
-        -- Now typecheck the expression, and generalise its type
-        -- it might have a rank-2 type (e.g. :t runST)
+    -- Typecheck the expression
     ((tclvl, res_ty), lie)
           <- captureTopConstraints $
              pushTcLevelM          $
-             tcInferSigmaTy rn_expr ;
-
-    res_ty <- instantiate (lexprCtOrigin rn_expr) res_ty ;
+             tcInferSigma inst rn_expr ;
 
     -- Generalise
     uniq <- newUnique ;
@@ -2524,11 +2521,7 @@ tcRnExpr hsc_env mode rdr_expr
     return (snd (normaliseType fam_envs Nominal ty))
     }
   where
-    instantiate orig res_ty
-      | not inst  = return res_ty
-      | otherwise = do { (_,rho) <- topInstantiate orig res_ty
-                       ; return rho }
-
+    -- Optionally instantiate the type of the expression
     -- See Note [TcRnExprMode]
     (inst, infer_mode, perhaps_disable_default_warnings) = case mode of
       TM_Inst    -> (True,  NoRestrictions, id)

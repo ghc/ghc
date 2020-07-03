@@ -30,6 +30,7 @@ import GHC.Prelude
 import GHC.Hs
 import GHC.Driver.Types
 import GHC.Tc.TyCl.Build
+import GHC.Tc.Solver( solveLocalEqualitiesX, reportUnsolvedEqualities )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
 import GHC.Tc.Validity
@@ -3086,11 +3087,11 @@ tcConDecl :: KnotTied TyCon          -- Representation tycon. Knot-tied!
           -> TcM [DataCon]
 
 tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
-          (ConDeclH98 { con_name = name
+          (ConDeclH98 { con_name = lname@(L _ name)
                       , con_ex_tvs = explicit_tkv_nms
                       , con_mb_cxt = hs_ctxt
                       , con_args = hs_args })
-  = addErrCtxt (dataConCtxtName [name]) $
+  = addErrCtxt (dataConCtxtName [lname]) $
     do { -- NB: the tyvars from the declaration header are in scope
 
          -- Get hold of the existential type variables
@@ -3101,14 +3102,14 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
 
        ; traceTc "tcConDecl 1" (vcat [ ppr name, ppr explicit_tkv_nms ])
 
-       ; (exp_tvbndrs, (ctxt, arg_tys, field_lbls, stricts))
-           <- pushTcLevelM_                             $
-              solveEqualities                           $
+       ; (tclvl, (wanted, (exp_tvbndrs, (ctxt, arg_tys, field_lbls, stricts))))
+           <- pushTcLevelM                              $
+              solveLocalEqualitiesX "tcConDecl:H98"     $
               bindExplicitTKBndrs_Skol explicit_tkv_nms $
               do { ctxt <- tcHsMbContext hs_ctxt
                  ; let exp_kind = getArgExpKind new_or_data res_kind
                  ; btys <- tcConArgs exp_kind hs_args
-                 ; field_lbls <- lookupConstructorFields (unLoc name)
+                 ; field_lbls <- lookupConstructorFields name
                  ; let (arg_tys, stricts) = unzip btys
                  ; return (ctxt, arg_tys, field_lbls, stricts)
                  }
@@ -3131,32 +3132,32 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
                  -- we're only doing this to find the right kind variables to
                  -- quantify over, and this type is fine for that purpose.
 
+       ; let skol_tvs = kvs ++ tmpl_tvs ++ binderVars exp_tvbndrs
+       ; reportUnsolvedEqualities (DataConSkol name) skol_tvs tclvl wanted
+
              -- Zonk to Types
        ; (ze, qkvs)          <- zonkTyBndrs kvs
        ; (ze, user_qtvbndrs) <- zonkTyVarBindersX ze exp_tvbndrs
-       ; let user_qtvs       = binderVars user_qtvbndrs
        ; arg_tys             <- zonkScaledTcTypesToTypesX ze arg_tys
        ; ctxt                <- zonkTcTypesToTypesX ze ctxt
-
-       ; fam_envs <- tcGetFamInstEnvs
 
        -- Can't print univ_tvs, arg_tys etc, because we are inside the knot here
        ; traceTc "tcConDecl 2" (ppr name $$ ppr field_lbls)
        ; let
            univ_tvbs = tyConInvisTVBinders tmpl_bndrs
            univ_tvs  = binderVars univ_tvbs
-           ex_tvbs   = mkTyVarBinders InferredSpec qkvs ++
-                       user_qtvbndrs
-           ex_tvs    = qkvs ++ user_qtvs
+           ex_tvbs   = mkTyVarBinders InferredSpec qkvs ++ user_qtvbndrs
+           ex_tvs    = binderVars ex_tvbs
            -- For H98 datatypes, the user-written tyvar binders are precisely
            -- the universals followed by the existentials.
            -- See Note [DataCon user type variable binders] in GHC.Core.DataCon.
            user_tvbs = univ_tvbs ++ ex_tvbs
-           buildOneDataCon (L _ name) = do
-             { is_infix <- tcConIsInfixH98 name hs_args
-             ; rep_nm   <- newTyConRepName name
 
-             ; buildDataCon fam_envs name is_infix rep_nm
+       ; traceTc "tcConDecl 2" (ppr name)
+       ; is_infix <- tcConIsInfixH98 name hs_args
+       ; rep_nm   <- newTyConRepName name
+       ; fam_envs <- tcGetFamInstEnvs
+       ; dc <- buildDataCon fam_envs name is_infix rep_nm
                             stricts Nothing field_lbls
                             univ_tvs ex_tvs user_tvbs
                             [{- no eq_preds -}] ctxt arg_tys
@@ -3164,10 +3165,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
                   -- NB:  we put data_tc, the type constructor gotten from the
                   --      constructor type signature into the data constructor;
                   --      that way checkValidDataCon can complain if it's wrong.
-             }
-       ; traceTc "tcConDecl 2" (ppr name)
-       ; mapM buildOneDataCon [name]
-       }
+       ; return [dc] }
 
 tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
   -- NB: don't use res_kind here, as it's ill-scoped. Instead, we get
@@ -3181,10 +3179,9 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
     do { traceTc "tcConDecl 1 gadt" (ppr names)
        ; let (L _ name : _) = names
 
-       ; (imp_tvs, (exp_tvbndrs, (ctxt, arg_tys, res_ty, field_lbls, stricts)))
-           <- pushTcLevelM_    $  -- We are going to generalise
-              solveEqualities  $  -- We won't get another crack, and we don't
-                                  -- want an error cascade
+       ; (tclvl, (wanted, (imp_tvs, (exp_tvbndrs, (ctxt, arg_tys, res_ty, field_lbls, stricts)))))
+           <- pushTcLevelM                              $
+              solveLocalEqualitiesX "tcConDecl:GADT"    $
               bindImplicitTKBndrs_Skol implicit_tkv_nms $
               bindExplicitTKBndrs_Skol explicit_tkv_nms $
               do { ctxt <- tcHsMbContext cxt
@@ -3210,6 +3207,9 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
                                     mkPhiTy ctxt $
                                     mkVisFunTys arg_tys $
                                     res_ty)
+
+       ; let skol_tvs = tkvs ++ imp_tvs ++ binderVars exp_tvbndrs
+       ; reportUnsolvedEqualities (DataConSkol name) skol_tvs tclvl wanted
 
        ; let tvbndrs =  (mkTyVarBinders InferredSpec tkvs)
                      ++ (mkTyVarBinders SpecifiedSpec imp_tvs)

@@ -830,7 +830,11 @@ eq_lhs_type ct1 ct2
        _ -> pprPanic "mkSkolReporter" (ppr ct1 $$ ppr ct2)
 
 cmp_loc :: Ct -> Ct -> Ordering
-cmp_loc ct1 ct2 = ctLocSpan (ctLoc ct1) `compare` ctLocSpan (ctLoc ct2)
+cmp_loc ct1 ct2 = get ct1 `compare` get ct2
+  where
+    get ct = realSrcSpanStart (ctLocSpan (ctLoc ct))
+             -- Reduce duplication by reporting only one error from each
+             -- *starting* location even if the end location differs
 
 reportGroup :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg) -> Reporter
 reportGroup mk_err ctxt cts =

@@ -30,12 +30,13 @@ import GHC.Prelude
 import GHC.Hs
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Types
+import GHC.Tc.Solver( solveLocalEqualitiesX, reportUnsolvedEqualities )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity ( checkValidType )
-import GHC.Tc.Utils.Unify( tcSkolemise, unifyType )
+import GHC.Tc.Utils.Unify( tcSkolemise, unifyType,  )
 import GHC.Tc.Utils.Instantiate( topInstantiate )
 import GHC.Tc.Utils.Env( tcLookupId )
 import GHC.Tc.Types.Evidence( HsWrapper, (<.>) )
@@ -385,9 +386,9 @@ tcPatSynSig name sig_ty
   , (univ_hs_tvbndrs, hs_req,  hs_ty1)     <- splitLHsSigmaTyInvis hs_ty
   , (ex_hs_tvbndrs,   hs_prov, hs_body_ty) <- splitLHsSigmaTyInvis hs_ty1
   = do {  traceTc "tcPatSynSig 1" (ppr sig_ty)
-       ; (implicit_tvs, (univ_tvbndrs, (ex_tvbndrs, (req, prov, body_ty))))
-           <- pushTcLevelM_   $
-              solveEqualities $ -- See Note [solveEqualities in tcPatSynSig]
+       ; (tclvl, (wanted, (implicit_tvs, (univ_tvbndrs, (ex_tvbndrs, (req, prov, body_ty))))))
+           <- pushTcLevelM                             $
+              solveLocalEqualitiesX "tcPatSynSig"      $
               bindImplicitTKBndrs_Skol implicit_hs_tvs $
               bindExplicitTKBndrs_Skol univ_hs_tvbndrs $
               bindExplicitTKBndrs_Skol ex_hs_tvbndrs   $
@@ -403,12 +404,18 @@ tcPatSynSig name sig_ty
 
        -- Kind generalisation
        ; kvs <- kindGeneralizeAll ungen_patsyn_ty
+       ; implicit_tvs <- zonkAndScopedSort implicit_tvs
        ; traceTc "tcPatSynSig" (ppr ungen_patsyn_ty)
+
+       ; let skol_tvs  = kvs ++ implicit_tvs ++ binderVars (univ_tvbndrs ++ ex_tvbndrs)
+             skol_info = DataConSkol name
+       ; reportUnsolvedEqualities skol_info skol_tvs tclvl wanted
+               -- See Note [solveEqualities in tcPatSynSig]
 
        -- These are /signatures/ so we zonk to squeeze out any kind
        -- unification variables.  Do this after kindGeneralize which may
        -- default kind variables to *.
-       ; implicit_tvs <- zonkAndScopedSort implicit_tvs
+       ; implicit_tvs <- mapM zonkTcTyVarToTyVar    implicit_tvs
        ; univ_tvbndrs <- mapM zonkTyCoVarKindBinder univ_tvbndrs
        ; ex_tvbndrs   <- mapM zonkTyCoVarKindBinder ex_tvbndrs
        ; req          <- zonkTcTypes req

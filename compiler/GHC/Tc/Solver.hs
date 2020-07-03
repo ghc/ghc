@@ -8,6 +8,7 @@ module GHC.Tc.Solver(
        simplifyTop, simplifyTopImplic,
        simplifyInteractive,
        solveEqualities, solveLocalEqualities, solveLocalEqualitiesX,
+       reportUnsolvedEqualities,
        simplifyWantedsTcM,
        tcCheckSatisfiability,
        tcNormalise,
@@ -42,6 +43,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Tc.Solver.Interact
 import GHC.Tc.Solver.Canonical   ( makeSuperClasses, solveCallStack )
 import GHC.Tc.Solver.Flatten     ( flattenType )
+import GHC.Tc.Utils.Unify        ( buildTvImplication )
 import GHC.Tc.Utils.TcMType   as TcM
 import GHC.Tc.Utils.Monad as TcM
 import GHC.Tc.Solver.Monad  as TcS
@@ -237,7 +239,7 @@ an example (T15076b):
          C a b => Proxy a -> Proxy b -> ()
   bar _ _ = const () (undefined :: forall (x :: a) (y :: b). SameKind x y)
 
-Consider the type singature on 'undefined'. It's ill-kinded unless
+Consider the type signature on 'undefined'. It's ill-kinded unless
 a~b.  But the superclass of (C a b) means that indeed (a~b). So all
 should be well. BUT it's hard to see that when kind-checking the signature
 for undefined.  We want to emit a residual (a~b) constraint, to solve
@@ -333,6 +335,17 @@ solveEqualities thing_inside
        ; traceTc "End solveEqualities }" empty
        ; reportAllUnsolved final_wc
        ; return result }
+
+reportUnsolvedEqualities :: SkolemInfo -> [TcTyVar] -> TcLevel
+                         -> WantedConstraints -> TcM ()
+reportUnsolvedEqualities skol_info skol_tvs tclvl wanted
+  | isEmptyWC wanted
+  = return ()
+  | otherwise
+  = checkNoErrs $
+    do { implic <- buildTvImplication skol_info skol_tvs tclvl wanted
+       ; reportAllUnsolved (mkImplicWC (unitBag implic)) }
+
 
 -- | Simplify top-level constraints, but without reporting any unsolved
 -- constraints nor unsafe overlapping.

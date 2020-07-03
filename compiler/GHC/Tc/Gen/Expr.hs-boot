@@ -26,8 +26,6 @@ tcExpr :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 tcExprWithSig :: LHsExpr GhcRn -> LHsSigWcType (NoGhcTc GhcRn)
               -> TcM (HsExpr GhcTc, TcSigmaType)
 
-tcInferSigma :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcSigmaType)
-
 tcInferRho, tcInferRhoNC ::
           LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcRhoType)
 

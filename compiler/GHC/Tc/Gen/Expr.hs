@@ -16,7 +16,7 @@
 module GHC.Tc.Gen.Expr
        ( tcCheckPolyExpr, tcCheckPolyExprNC,
          tcCheckMonoExpr, tcCheckMonoExprNC, tcMonoExpr, tcMonoExprNC,
-         tcInferSigma, tcInferRho, tcInferRhoNC,
+         tcInferRho, tcInferRhoNC,
          tcExpr, tcExprWithSig,
          tcSyntaxOp, tcSyntaxOpGen, SyntaxOpType(..), synKnownType,
          tcCheckId,
@@ -125,16 +125,6 @@ tcPolyExprNC (L loc expr) res_ty
        ; return $ L loc (mkHsWrap wrap expr') }
 
 ---------------
-tcInferSigma :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcSigmaType)
--- Used by tcRnExpr to implement GHCi :type
--- It goes against the principle of eager instantiation,
--- so we expect very very few calls to this function
--- Most clients will want tcInferRho
-tcInferSigma le
-  = pprTrace "ToDo: improve this again" (ppr le) $
-    tcInferRho le
-
----------------
 tcCheckMonoExpr, tcCheckMonoExprNC
     :: LHsExpr GhcRn     -- Expression to type check
     -> TcRhoType         -- Expected type
@@ -194,12 +184,10 @@ tcExpr :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
 -- We use tcApp even for lone variables, to ensure that they
 -- can get an impredicative instatiation driven by res_ty
 -- (in checking mode)
-tcExpr e@(HsVar {})     res_ty = tcApp e res_ty
-tcExpr e@(HsApp {})     res_ty = tcApp e res_ty
-tcExpr e@(HsAppType {}) res_ty = tcApp e res_ty
-
-tcExpr e@(HsUnboundVar _ uv) res_ty
-  = tcUnboundId e uv res_ty
+tcExpr e@(HsVar {})        res_ty = tcApp e res_ty
+tcExpr e@(HsApp {})        res_ty = tcApp e res_ty
+tcExpr e@(HsAppType {})    res_ty = tcApp e res_ty
+tcExpr e@(HsUnboundVar {}) res_ty = tcApp e res_ty
 
 tcExpr e@(HsLit x lit) res_ty
   = do { let lit_ty = hsLitType lit
@@ -984,27 +972,6 @@ tcExpr e@(HsRnBracketOut _ brack ps) res_ty = tcUntypedBracket e brack ps res_ty
 tcExpr other _ = pprPanic "tcLExpr" (ppr other)
   -- Include ArrForm, ArrApp, which shouldn't appear at all
   -- Also HsTcBracketOut, HsQuasiQuoteE
-
-
-{- *********************************************************************
-*                                                                      *
-                Unbound (wildcard) Ids
-*                                                                      *
-********************************************************************* -}
-
-tcUnboundId :: HsExpr GhcRn -> OccName -> ExpRhoType -> TcM (HsExpr GhcTc)
--- Typecheck an occurrence of an unbound Id
---
--- Some of these started life as a true expression hole "_".
--- Others might simply be variables that accidentally have no binding site
-tcUnboundId rn_expr occ res_ty
- = do { ty <- newOpenFlexiTyVarTy  -- Allow Int# etc (#12531)
-      ; name <- newSysName occ
-      ; let ev = mkLocalId name Many ty
-      ; emitNewExprHole occ ev ty
-      ; let expr' = HsUnboundVar ev occ
-            orig  = UnboundOccurrenceOf occ
-      ; tcWrapResultO orig rn_expr expr' ty res_ty }
 
 
 {- *********************************************************************

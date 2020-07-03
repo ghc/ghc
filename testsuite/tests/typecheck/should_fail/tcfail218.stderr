@@ -7,4 +7,5 @@ tcfail218.hs:16:5: error:
       (The choice depends on the instantiation of ‘a’
        To pick the first instance above, use IncoherentInstances
        when compiling the other instance declarations)
-    • In an equation for ‘x’: x = foo
+    • In the expression: foo
+      In an equation for ‘x’: x = foo
