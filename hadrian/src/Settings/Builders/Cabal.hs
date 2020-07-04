@@ -60,6 +60,7 @@ cabalBuilderArgs = builder (Cabal Setup) ? do
             , withStaged (Ar Pack)
             , with Alex
             , with Happy
+            -- Update Target.trackArgument if changing these:
             , verbosity < Chatty ?
               pure [ "-v0", "--configure-option=--quiet"
                    , "--configure-option=--disable-option-checking" ] ]
