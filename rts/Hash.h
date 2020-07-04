@@ -19,7 +19,7 @@ typedef struct strhashtable StrHashTable;
  * `const` so that calling function can mutate what the pointer points to if it
  * needs to.
  */
-HashTable * allocHashTable    ( void );
+HashTable * allocHashTable  ( void );
 void        insertHashTable ( HashTable *table, StgWord key, const void *data );
 void *      lookupHashTable ( const HashTable *table, StgWord key );
 void *      removeHashTable ( HashTable *table, StgWord key, const void *data );
@@ -35,9 +35,12 @@ int keysHashTable(HashTable *table, StgWord keys[], int szKeys);
 
 typedef void (*MapHashFn)(void *data, StgWord key, const void *value);
 typedef void (*MapHashFnKeys)(void *data, StgWord *key, const void *value);
+// Return true -> continue; false -> stop
+typedef bool (*IterHashFn)(void *data, StgWord key, const void *value);
 
 void mapHashTable(HashTable *table, void *data, MapHashFn fn);
 void mapHashTableKeys(HashTable *table, void *data, MapHashFnKeys fn);
+void iterHashTable(HashTable *table, void *data, IterHashFn);
 
 /* Hash table access where the keys are C strings (the strings are
  * assumed to be allocated by the caller, and mustn't be deallocated

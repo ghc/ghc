@@ -12,6 +12,22 @@
 
 #include "BeginPrivate.h"
 
-void checkUnload (StgClosure *static_objects);
+#include "LinkerInternals.h"
+
+// Currently live objects
+extern ObjectCode *objects;
+
+// Root set for object collection
+extern ObjectCode *loaded_objects;
+
+// Mark bit for live objects
+extern uint8_t object_code_mark_bit;
+
+void initUnloadCheck(void);
+void exitUnloadCheck(void);
+void checkUnload(StgClosure *static_objects);
+
+// Call on loaded object codes
+void insertOCSectionIndices(ObjectCode *oc);
 
 #include "EndPrivate.h"
