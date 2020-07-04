@@ -10,6 +10,7 @@ Pattern Matching Coverage Checking.
 {-# LANGUAGE ViewPatterns   #-}
 {-# LANGUAGE MultiWayIf     #-}
 {-# LANGUAGE LambdaCase     #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module GHC.HsToCore.PmCheck (
         -- Checking and printing
@@ -103,7 +104,9 @@ data PmGrd
     }
 
     -- | @PmBang x@ corresponds to a @seq x True@ guard.
-    -- Track extra location info to report redundant bangs.
+    -- If the extra SrcInfo is present, the bang guard came from a source
+    -- bang pattern, in which case we might want to report it as redundant,
+    -- see Note [Warning about dead bangs].
   | PmBang {
       pm_id          :: !Id,
       pm_loc         :: !(Maybe SrcInfo)
@@ -160,46 +163,42 @@ data GrdTree
   -- ^ A @GrdTree@ that always fails. Most useful for
   -- Note [Checking EmptyCase]. A neutral element to 'Sequence'.
 
-{- Note [Warning about dead bangs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider example:
+{- Note [Dead bang patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
 
   f :: Bool -> Int
   f True = 1
   f !x   = 2
 
-Notice that the bang is redundant. By the time that we're looking at the second
-equation, we've evaluated the argument - the bang serves no purpose and should
-be warned about.
+Whenever we fall through to the second equation, we will already have evaluated
+the argument. Thus, the bang pattern serves no purpose and should be warned
+about. We call this kind of bang patterns "dead". Dead bangs are the ones
+that under no circumstances can force a thunk that wasn't already focred.
+Dead bangs are a form of redundant bangs; see below.
 
-Bang is considered redundant if omission doesn't change strictness of a pattern
-match. "Dead" bangs are the ones that under no circumstances can force a thunk
-that wasn't already focred. Dead bangs are a form of redundant bangs. Therefore,
-the coverage checker must soundly approximate the absence of satisfiability of
-constraints of the form x ~ ⊥
+We can detect dead bang patterns by checking whether @x ~ ⊥@ is satisfiable
+where the PmBang appears in 'checkGrdTree'. If not, then clearly the bang is
+dead. Such a dead bang is then indicated in the annotated pattern-match tree by
+a 'RedundantSrcBang' wrapping. In 'redundantAndInaccessibles', we collect
+all dead bangs to warn about.
 
-This is done by extending the annotated pattern-match tree with another constuctor
-that tracks all the 'dead' bang instances. The tree is then being traversed to
-collect all the warnings so that they can be warned about.
+Note that we don't want to warn for a dead bang that appears on a redundant
+clause. That is because in that case, we recommend to delete the clause wholly,
+including its leading pattern match.
 
-The idea is to only emit warning for the redundant bang if there are no accessible
-or inacessible GRHSs in the sub-tree. Note that we dont want to generate a warning
-for dead bang when we recommend to delete the whole clause (which includes the
-pattern patch and one or more guarded RHS) anyway! But we can only do that if all
-its GRHSs are redundant.
-
-Note that this approach won't flag such cases like
+Dead bang patterns are redundant. But there are bang patterns which are
+redundant that aren't dead, for example
 
   f !() = 0
 
-because the bang isn't dead per se; it still forces the match variable, before we
-attempt to match on (). But it is redundant with the forcing done by the ()
-match. So, whether a bang is redundant is a property of whether the next PmGrd
-forces the same variable as the PmBang.
+the bang still forces the match variable, before we attempt to match on (). But
+it is redundant with the forcing done by the () match. We currently don't
+detect redundant bangs that aren't dead.
 -}
 
 -- | The digest of 'checkGrdTree', representing the annotated pattern-match
--- tree. 'redundantAndInaccessibles' can figure out redundant and proper
+-- tree. 'extractRedundancyInfo' can figure out redundant and proper
 -- inaccessible RHSs from this, as well as dead bangs.
 data AnnotatedTree
   = AccessibleRhs !Deltas !SrcInfo
@@ -984,8 +983,9 @@ mayDiverge a                = MayDiverge a
 --     'GrdTree'. Note that 'PmCon' guards are the only way in which values
 --     fall through from one 'Many' branch to the next.
 --   * An 'AnnotatedTree' that contains divergence and inaccessibility info
---     for all clauses. Will be fed to 'redundantAndInaccessibles' for
---     presenting redundant and proper innaccessible RHSs to the user.
+--     for all clauses. Will be fed to 'extractRedundancyInfo' for
+--     presenting redundant and proper innaccessible RHSs, as well as dead
+--     bangs to the user.
 checkGrdTree' :: GrdTree -> Deltas -> DsM CheckResult
 -- RHS: Check that it covers something and wrap Inaccessible if not
 checkGrdTree' (Rhs sdoc) deltas = do
@@ -1155,8 +1155,19 @@ needToRunPmCheck dflags origin
   | otherwise
   = notNull (filter (`wopt` dflags) allPmCheckWarnings)
 
-redundantAndInaccessibles :: AnnotatedTree -> ([SrcInfo], [SrcInfo], [Located SDoc])
-redundantAndInaccessibles tree = (fromOL ol_red, fromOL ol_inacc, fromOL ol_bangs)
+-- | A type for organising information to be used in warnings.
+data RedundancyInfo
+  = RedundancyInfo
+  { redundant_rhss    :: ![SrcInfo]
+  , inaccessible_rhss :: ![SrcInfo]
+  , redundant_bangs   :: ![Located SDoc]
+  }
+
+extractRedundancyInfo :: AnnotatedTree -> RedundancyInfo
+extractRedundancyInfo tree =
+  RedundancyInfo { redundant_rhss    = fromOL ol_red
+                 , inaccessible_rhss = fromOL ol_inacc
+                 , redundant_bangs   = fromOL ol_bangs }
   where
     (_ol_acc, ol_inacc, ol_red, ol_bangs) = go tree
     -- | Collects
@@ -1210,7 +1221,7 @@ inaccessible ones, we report the first clause as inaccessible.
 Clearly, it is enough if we say that we only degrade if *not all* of the child
 clauses are redundant. As long as there is at least one clause which we announce
 not to be redundant, the guard prefix responsible for the 'MayDiverge' will
-survive. Hence we check for that in 'redundantAndInaccessibles'.
+survive. Hence we check for that in 'extractRedundancyInfo'.
 -}
 
 -- | Issue all the warnings (coverage, exhaustiveness, inaccessibility)
@@ -1218,23 +1229,23 @@ dsPmWarn :: DynFlags -> DsMatchContext -> [Id] -> CheckResult -> DsM ()
 dsPmWarn dflags ctx@(DsMatchContext kind loc) vars result
   = when (flag_i || flag_u || flag_b) $ do
       unc_examples <- getNFirstUncovered vars (maxPatterns + 1) uncovered
-      let exists_r = flag_i && notNull redundant
-          exists_i = flag_i && notNull inaccessible
+      let exists_r = flag_i && notNull redundant_rhss
+          exists_i = flag_i && notNull inaccessible_rhss
           exists_u = flag_u && notNull unc_examples
-          exists_b = flag_b && notNull unneeded_bangs
+          exists_b = flag_b && notNull redundant_bangs
           approx   = precision == Approximate
 
       when (approx && (exists_u || exists_i)) $
         putSrcSpanDs loc (warnDs NoReason approx_msg)
 
-      when exists_b $ forM_ unneeded_bangs $ \(L l q) -> do
+      when exists_b $ forM_ redundant_bangs $ \(L l q) -> do
         putSrcSpanDs l (warnDs (Reason Opt_WarnRedundantBangPatterns)
                                (pprEqn q "has redundant bang"))
 
-      when exists_r $ forM_ redundant $ \(L l q) -> do
+      when exists_r $ forM_ redundant_rhss $ \(L l q) -> do
         putSrcSpanDs l (warnDs (Reason Opt_WarnOverlappingPatterns)
                                (pprEqn q "is redundant"))
-      when exists_i $ forM_ inaccessible $ \(L l q) -> do
+      when exists_i $ forM_ inaccessible_rhss $ \(L l q) -> do
         putSrcSpanDs l (warnDs (Reason Opt_WarnOverlappingPatterns)
                                (pprEqn q "has inaccessible right hand side"))
 
@@ -1245,12 +1256,12 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) vars result
       { cr_clauses = clauses
       , cr_uncov   = uncovered
       , cr_approx  = precision } = result
-    (redundant, inaccessible, unneeded_bangs)
-      = redundantAndInaccessibles clauses
+    RedundancyInfo{redundant_rhss, inaccessible_rhss, redundant_bangs}
+      = extractRedundancyInfo clauses
 
     flag_i = overlapping dflags kind
     flag_u = exhaustive dflags kind
-    flag_b = redundant_bangs dflags
+    flag_b = redundant_bang dflags
     flag_u_reason = maybe NoReason Reason (exhaustiveWarningFlag kind)
 
     maxPatterns = maxUncoveredPatterns dflags
@@ -1346,8 +1357,8 @@ exhaustive :: DynFlags -> HsMatchContext id -> Bool
 exhaustive  dflags = maybe False (`wopt` dflags) . exhaustiveWarningFlag
 
 -- | Check whether unnecessary bangs should be warned about
-redundant_bangs :: DynFlags -> Bool
-redundant_bangs dflags = wopt Opt_WarnRedundantBangPatterns dflags
+redundant_bang :: DynFlags -> Bool
+redundant_bang dflags = wopt Opt_WarnRedundantBangPatterns dflags
 
 -- | Denotes whether an exhaustiveness check is supported, and if so,
 -- via which 'WarningFlag' it's controlled.
