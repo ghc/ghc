@@ -19,14 +19,15 @@
 -----------------------------------------------------------------------------
 
 module System.Info
-   (
-       os,
-       arch,
-       compilerName,
-       compilerVersion
-   ) where
+  ( arch
+  , compilerName
+  , compilerVersion
+  , fullCompilerVersion
+  , os
+  ) where
 
-import           Data.Version
+import           Data.Version                 (Version (..), parseVersion)
+import           Text.ParserCombinators.ReadP (readP_to_S)
 
 -- | The version of 'compilerName' with which the program was compiled
 -- or is being interpreted.
@@ -42,9 +43,18 @@ compilerVersion = Version [major, minor] []
 -- or is being interpreted. It includes the major, minor, revision and an additional
 -- identifier, generally in the form "<year><month><day>".
 fullCompilerVersion :: Version
-fullCompilerVersion = Version version
+fullCompilerVersion = Version version []
   where
-    version = parseVersion __GLASGOW_HASKELL_FULL_VERSION__
+    version :: [Int]
+    version = fmap read $ splitVersion __GLASGOW_HASKELL_FULL_VERSION__
+
+splitVersion :: String -> [String]
+splitVersion s =
+  case dropWhile (== '.') s of
+    "" -> []
+    s' -> let (w, s'') = break (== '.') s'
+           in w : splitVersion s''
+
 
 #include "ghcplatform.h"
 
