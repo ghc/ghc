@@ -26,8 +26,7 @@ module System.Info
   , fullCompilerVersion
   ) where
 
-import           Data.Version                 (Version (..), parseVersion)
-import           Text.ParserCombinators.ReadP (readP_to_S)
+import           Data.Version (Version (..), parseVersion)
 
 -- | The version of 'compilerName' with which the program was compiled
 -- or is being interpreted.
