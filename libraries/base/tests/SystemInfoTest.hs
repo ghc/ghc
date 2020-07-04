@@ -5,8 +5,8 @@ import           System.Info (fullCompilerVersion)
 
 main :: IO ()
 main = if textualVersion == majMinRev
-       then ()
-       else error "[!]" <> textualVersion <> "should be equal to " <> majMinRev
+       then "Match"
+       else "[!]" <> textualVersion <> "should be equal to " <> majMinRev
   where
     macroVersion = __GLASGOW_HASKELL_FULL_VERSION__
     textualversion = show fullCompilerVersion
