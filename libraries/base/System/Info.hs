@@ -54,7 +54,6 @@ splitVersion s =
     s' -> let (w, s'') = break (== '.') s'
            in w : splitVersion s''
 
-
 #include "ghcplatform.h"
 
 -- | The operating system on which the program is running.
