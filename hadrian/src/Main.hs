@@ -35,6 +35,9 @@ main = do
                   ] ++
                   [ (RebuildLater, buildRoot -/- "stage1/**")
                   | CommandLine.lookupFreeze2 argsMap
+                  ] ++
+                  [ (RebuildLater, buildRoot -/- "**/.dependencies.mk")
+                  | CommandLine.lookupSkipDepends argsMap
                   ]
 
     cwd <- getCurrentDirectory
