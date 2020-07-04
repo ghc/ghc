@@ -26,7 +26,7 @@ module System.Info
   , fullCompilerVersion
   ) where
 
-import           Data.Version (Version (..), parseVersion)
+import           Data.Version (Version (..))
 
 -- | The version of 'compilerName' with which the program was compiled
 -- or is being interpreted.
