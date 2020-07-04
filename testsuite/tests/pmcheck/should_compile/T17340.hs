@@ -136,3 +136,4 @@ z t2 !x | T2 _ <- t2, x = () -- redundant
 -- more top-level banged binds
 -- more numeric patterns
 -- more view patterns
+
