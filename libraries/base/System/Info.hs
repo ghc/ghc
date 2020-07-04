@@ -19,11 +19,11 @@
 -----------------------------------------------------------------------------
 
 module System.Info
-  ( arch
+  ( os
+  , arch
   , compilerName
   , compilerVersion
   , fullCompilerVersion
-  , os
   ) where
 
 import           Data.Version                 (Version (..), parseVersion)
