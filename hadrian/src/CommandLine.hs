@@ -1,5 +1,5 @@
 module CommandLine (
-    optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, lookupFreeze2,
+    optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, lookupFreeze2, lookupSkipDepends,
     cmdBignum, cmdBignumCheck, cmdProgressInfo, cmdConfigure, cmdCompleteSetting,
     cmdDocsArgs, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs,
     cmdPrefix
@@ -26,6 +26,7 @@ data CommandLineArgs = CommandLineArgs
     , flavour        :: Maybe String
     , freeze1        :: Bool
     , freeze2        :: Bool
+    , skipDepends    :: Bool
     , bignum         :: Maybe String
     , bignumCheck    :: Bool
     , progressInfo   :: ProgressInfo
@@ -43,6 +44,7 @@ defaultCommandLineArgs = CommandLineArgs
     , flavour        = Nothing
     , freeze1        = False
     , freeze2        = False
+    , skipDepends    = False
     , bignum         = Nothing
     , bignumCheck    = False
     , progressInfo   = Brief
@@ -114,9 +116,10 @@ readBuildRoot ms =
     set :: BuildRoot -> CommandLineArgs -> CommandLineArgs
     set flag flags = flags { buildRoot = flag }
 
-readFreeze1, readFreeze2 :: Either String (CommandLineArgs -> CommandLineArgs)
+readFreeze1, readFreeze2, readSkipDepends :: Either String (CommandLineArgs -> CommandLineArgs)
 readFreeze1 = Right $ \flags -> flags { freeze1 = True }
 readFreeze2 = Right $ \flags -> flags { freeze1 = True, freeze2 = True }
+readSkipDepends = Right $ \flags -> flags { skipDepends = True }
 
 readProgressInfo :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readProgressInfo ms =
@@ -256,6 +259,8 @@ optDescrs =
       "Freeze Stage1 GHC."
     , Option [] ["freeze2"] (NoArg readFreeze2)
       "Freeze Stage2 GHC."
+    , Option [] ["skip-depends"] (NoArg readSkipDepends)
+      "Skip rebuilding dependency information."
     , Option [] ["bignum"] (OptArg readBignum "BIGNUM")
       "Select GHC BigNum backend: native, gmp, ffi."
     , Option [] ["progress-info"] (OptArg readProgressInfo "STYLE")
@@ -360,6 +365,9 @@ lookupFreeze1 = freeze1 . lookupExtra defaultCommandLineArgs
 
 lookupFreeze2 :: Map.HashMap TypeRep Dynamic -> Bool
 lookupFreeze2 = freeze2 . lookupExtra defaultCommandLineArgs
+
+lookupSkipDepends :: Map.HashMap TypeRep Dynamic -> Bool
+lookupSkipDepends = skipDepends . lookupExtra defaultCommandLineArgs
 
 cmdBignum :: Action (Maybe String)
 cmdBignum = bignum <$> cmdLineArgs

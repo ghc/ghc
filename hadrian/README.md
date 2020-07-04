@@ -104,6 +104,8 @@ simply drop the `--freeze1` flag and Hadrian will rebuild all out-of-date files.
 * `--freeze2`: just like `--freeze1` but tell Hadrian to additionally freeze
 Stage2 GHC.
 
+* `--skip-depends`: skips rebuilding Haskell module dependency files.
+
 * `--integer-simple`: build GHC using the `integer-simple` integer library
 (instead of `integer-gmp`).
 

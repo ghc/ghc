@@ -35,7 +35,10 @@ main = do
                   ] ++
                   [ (RebuildLater, buildRoot -/- "stage1/**")
                   | CommandLine.lookupFreeze2 argsMap
-                  ]
+                  ] ++
+                  (if CommandLine.lookupSkipDepends argsMap
+                   then [(RebuildLater, buildRoot -/- "**/.dependencies.mk"), (RebuildLater, buildRoot -/- "**/.dependencies")]
+                   else [])
 
     cwd <- getCurrentDirectory
     shakeColor <- shouldUseColor

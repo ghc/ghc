@@ -208,3 +208,17 @@ time you fire up a build. This is not possible with the Make build system.
   # Hadrian
   build nofib # builds the compiler and everything we need if necessary, too
   ```
+
+- `make FAST=YES`
+
+  Partially supported in hadrian with the `--skip-depends` argument. Since
+  hadrian is not directory aware some of the features of `FAST=YES` are not
+  replicated.
+
+  ```sh
+  # Make
+  make FAST=YES
+
+  # Hadrian
+  build --skip-depends
+  ```
