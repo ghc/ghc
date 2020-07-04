@@ -26,8 +26,6 @@ module System.Info
        compilerVersion
    ) where
 
-import qualified Data.Text      as T
-import           Data.Text.Read (decimal)
 import           Data.Version
 
 -- | The version of 'compilerName' with which the program was compiled
