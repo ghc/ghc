@@ -22,7 +22,10 @@ trackArgument :: Target -> String -> Bool
 trackArgument target arg = case builder target of
     Make _    -> not $ threadArg arg
     Ghc _ _   -> not $ verbosityArg arg
+    Cabal _ _ -> not $ verbosityArg arg || cabal_configure_ignore arg
     _         -> True
   where
     threadArg s = dropWhileEnd isDigit s `elem` ["-j", "MAKEFLAGS=-j", "THREADS="]
     verbosityArg s = dropWhileEnd isDigit s == "-v"
+    cabal_configure_ignore s =
+      s `elem` [ "--configure-option=--quiet", "--configure-option=--disable-option-checking" ]
