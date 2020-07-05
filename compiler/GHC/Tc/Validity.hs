@@ -11,7 +11,7 @@
 module GHC.Tc.Validity (
   Rank, UserTypeCtxt(..), checkValidType, checkValidMonoType,
   checkValidTheta,
-  checkValidInstance, checkValidInstHead, validDerivPred,
+  checkValidInstance, checkValidInstance', checkValidInstHead, validDerivPred,
   checkTySynRhs,
   checkValidCoAxiom, checkValidCoAxBranch,
   checkValidTyFamEqn, checkValidAssocTyFamDeflt, checkConsistentFamInst,
@@ -1832,6 +1832,7 @@ and we /really/ don't want that.  So we carefully do /not/ expand
 synonyms, by matching on TyConApp directly.
 -}
 
+-- TODO RGS: Delete this
 checkValidInstance :: UserTypeCtxt -> LHsSigType GhcRn -> Type -> TcM ()
 checkValidInstance ctxt hs_type ty
   | not is_tc_app
@@ -1889,6 +1890,65 @@ checkValidInstance ctxt hs_type ty
 
         -- The location of the "head" of the instance
     head_loc = getLoc (getLHsInstDeclHead hs_type)
+
+-- TODO RGS: This is the REAL checkValidInstance. Delete the one above when ready.
+checkValidInstance' :: UserTypeCtxt -> LHsSigType' GhcRn -> Type -> TcM ()
+checkValidInstance' ctxt hs_type ty
+  | not is_tc_app
+  = failWithTc (hang (text "Instance head is not headed by a class:")
+                   2 ( ppr tau))
+
+  | isNothing mb_cls
+  = failWithTc (vcat [ text "Illegal instance for a" <+> ppr (tyConFlavour tc)
+                     , text "A class instance must be for a class" ])
+
+  | not arity_ok
+  = failWithTc (text "Arity mis-match in instance head")
+
+  | otherwise
+  = do  { setSrcSpan head_loc $
+          checkValidInstHead ctxt clas inst_tys
+
+        ; traceTc "checkValidInstance {" (ppr ty)
+
+        ; env0 <- tcInitTidyEnv
+        ; expand <- initialExpandMode
+        ; check_valid_theta env0 ctxt expand theta
+
+        -- The Termination and Coverate Conditions
+        -- Check that instance inference will terminate (if we care)
+        -- For Haskell 98 this will already have been done by checkValidTheta,
+        -- but as we may be using other extensions we need to check.
+        --
+        -- Note that the Termination Condition is *more conservative* than
+        -- the checkAmbiguity test we do on other type signatures
+        --   e.g.  Bar a => Bar Int is ambiguous, but it also fails
+        --   the termination condition, because 'a' appears more often
+        --   in the constraint than in the head
+        ; undecidable_ok <- xoptM LangExt.UndecidableInstances
+        ; if undecidable_ok
+          then checkAmbiguity ctxt ty
+          else checkInstTermination theta tau
+
+        ; traceTc "cvi 2" (ppr ty)
+
+        ; case (checkInstCoverage undecidable_ok clas theta inst_tys) of
+            IsValid      -> return ()   -- Check succeeded
+            NotValid msg -> addErrTc (instTypeErr clas inst_tys msg)
+
+        ; traceTc "End checkValidInstance }" empty
+
+        ; return () }
+  where
+    (_tvs, theta, tau)   = tcSplitSigmaTy ty
+    is_tc_app            = case tau of { TyConApp {} -> True; _ -> False }
+    TyConApp tc inst_tys = tau   -- See Note [Instances and constraint synonyms]
+    mb_cls               = tyConClass_maybe tc
+    Just clas            = mb_cls
+    arity_ok             = inst_tys `lengthIs` classArity clas
+
+        -- The location of the "head" of the instance
+    head_loc = getLoc (getLHsInstDeclHead' hs_type)
 
 {-
 Note [Paterson conditions]

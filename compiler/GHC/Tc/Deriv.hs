@@ -449,7 +449,7 @@ makeDerivSpecs deriv_infos deriv_decls
         ; eqns2 <- mapM (recoverM (pure Nothing) . deriveStandalone) deriv_decls
         ; return $ concat eqns1 ++ catMaybes eqns2 }
   where
-    deriv_clause_preds :: LDerivClauseTys GhcRn -> [LHsSigType GhcRn]
+    deriv_clause_preds :: LDerivClauseTys GhcRn -> [LHsSigType' GhcRn]
     deriv_clause_preds (L _ dct) = case dct of
       DctSingle _ ty -> [ty]
       DctMulti _ tys -> tys
@@ -460,7 +460,7 @@ deriveClause :: TyCon
              -> [(Name, TcTyVar)]  -- Scoped type variables taken from tcTyConScopedTyVars
                                    -- See Note [Scoped tyvars in a TcTyCon] in "GHC.Core.TyCon"
              -> Maybe (LDerivStrategy GhcRn)
-             -> [LHsSigType GhcRn] -> SDoc
+             -> [LHsSigType' GhcRn] -> SDoc
              -> TcM [EarlyDerivSpec]
 deriveClause rep_tc scoped_tvs mb_lderiv_strat deriv_preds err_ctxt
   = addErrCtxt err_ctxt $ do
@@ -496,12 +496,12 @@ deriveClause rep_tc scoped_tvs mb_lderiv_strat deriv_preds err_ctxt
 -- This returns a 'Maybe' because the user might try to derive 'Typeable',
 -- which is a no-op nowadays.
 derivePred :: TyCon -> [Type] -> Maybe (LDerivStrategy GhcTc) -> [TyVar]
-           -> LHsSigType GhcRn -> TcM (Maybe EarlyDerivSpec)
+           -> LHsSigType' GhcRn -> TcM (Maybe EarlyDerivSpec)
 derivePred tc tys mb_lderiv_strat via_tvs deriv_pred =
   -- We carefully set up uses of recoverM to minimize error message
   -- cascades. See Note [Recovering from failures in deriving clauses].
   recoverM (pure Nothing) $
-  setSrcSpan (getLoc (hsSigType deriv_pred)) $ do
+  setSrcSpan (getLoc deriv_pred) $ do
     traceTc "derivePred" $ vcat
       [ text "tc"              <+> ppr tc
       , text "tys"             <+> ppr tys
@@ -633,7 +633,7 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mb_lderiv_strat overlap_mode))
        ; (mb_lderiv_strat, via_tvs) <- tcDerivStrategy mb_lderiv_strat
        ; (cls_tvs, deriv_ctxt, cls, inst_tys)
            <- tcExtendTyVarEnv via_tvs $
-              tcStandaloneDerivInstType ctxt deriv_ty
+              tcStandaloneDerivInstType' ctxt deriv_ty
        ; let mb_deriv_strat = fmap unLoc mb_lderiv_strat
              tvs            = via_tvs ++ cls_tvs
          -- See Note [Unify kinds in deriving]
@@ -735,6 +735,27 @@ tcStandaloneDerivInstType ctxt
        pure (tvs, InferContext (Just wc_span), cls, inst_tys)
   | otherwise
   = do dfun_ty <- tcHsClsInstType ctxt deriv_ty
+       let (tvs, theta, cls, inst_tys) = tcSplitDFunTy dfun_ty
+       pure (tvs, SupplyContext theta, cls, inst_tys)
+
+-- TODO RGS: This is the REAL tcStandaloneDerivInstType. Delete the one above when ready.
+tcStandaloneDerivInstType'
+  :: UserTypeCtxt -> LHsSigWcType' GhcRn
+  -> TcM ([TyVar], DerivContext, Class, [Type])
+tcStandaloneDerivInstType' ctxt
+    (HsWC { hswc_body = deriv_ty@(L loc (HsSig { sig_bndrs = outer_bndrs
+                                               , sig_body = deriv_ty_body }))})
+  | (theta, rho) <- splitLHsQualTy deriv_ty_body
+  , L _ [wc_pred] <- theta
+  , L wc_span (HsWildCardTy _) <- ignoreParens wc_pred
+  = do dfun_ty <- tcHsClsInstType' ctxt $ L loc $
+                  HsSig { sig_ext   = noExtField
+                        , sig_bndrs = outer_bndrs
+                        , sig_body  = rho }
+       let (tvs, _theta, cls, inst_tys) = tcSplitDFunTy dfun_ty
+       pure (tvs, InferContext (Just wc_span), cls, inst_tys)
+  | otherwise
+  = do dfun_ty <- tcHsClsInstType' ctxt deriv_ty
        let (tvs, theta, cls, inst_tys) = tcSplitDFunTy dfun_ty
        pure (tvs, SupplyContext theta, cls, inst_tys)
 
@@ -2211,7 +2232,7 @@ What con2tag/tag2con functions are available?
 ************************************************************************
 -}
 
-nonUnaryErr :: LHsSigType GhcRn -> SDoc
+nonUnaryErr :: LHsSigType' GhcRn -> SDoc
 nonUnaryErr ct = quotes (ppr ct)
   <+> text "is not a unary constraint, as expected by a deriving clause"
 
@@ -2301,6 +2322,6 @@ derivingHiddenErr tc
   = hang (text "The data constructors of" <+> quotes (ppr tc) <+> ptext (sLit "are not all in scope"))
        2 (text "so you cannot derive an instance for it")
 
-standaloneCtxt :: LHsSigWcType GhcRn -> SDoc
+standaloneCtxt :: LHsSigWcType' GhcRn -> SDoc
 standaloneCtxt ty = hang (text "In the stand-alone deriving instance for")
                        2 (quotes (ppr ty))

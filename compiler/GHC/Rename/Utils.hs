@@ -28,7 +28,7 @@ module GHC.Rename.Utils (
 
         addNameClashErrRn, extendTyVarEnvFVRn,
 
-        checkInferredVars,
+        checkInferredVars, checkInferredVars',
         noNestedForallsContextsErr, addNoNestedForallsContextsErr
 )
 
@@ -206,6 +206,25 @@ checkInferredVars ctxt (Just msg) ty =
       HsForAllTy { hst_tele = HsForAllInvis { hsf_invis_bndrs = tvs }}
                     -> map unLoc tvs
       _             -> []
+
+-- | TODO RGS: This is the REAL checkInferredVars. Delete the one above when ready
+checkInferredVars' :: HsDocContext
+                  -> Maybe SDoc
+                  -- ^ The error msg if the signature is not allowed to contain
+                  --   manually written inferred variables.
+                  -> LHsSigType' GhcPs
+                  -> RnM ()
+checkInferredVars' _    Nothing    _  = return ()
+checkInferredVars' ctxt (Just msg) ty =
+  let bndrs = sig_exp_bndrs ty
+  in case find ((==) InferredSpec . hsTyVarBndrFlag) bndrs of
+    Nothing -> return ()
+    Just _  -> addErr $ withHsDocContext ctxt msg
+  where
+    sig_exp_bndrs :: LHsSigType' GhcPs -> [HsTyVarBndr Specificity GhcPs]
+    sig_exp_bndrs (L _ (HsSig{sig_bndrs = outer_bndrs})) = case outer_bndrs of
+      HsOuterImplicit{}                      -> []
+      HsOuterExplicit{hso_bndrs = exp_bndrs} -> map unLoc exp_bndrs
 
 {-
 Note [Unobservably inferred type variables]

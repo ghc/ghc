@@ -49,8 +49,7 @@ module GHC.Hs.Decls (
   TyFamDefltDecl, LTyFamDefltDecl,
   DataFamInstDecl(..), LDataFamInstDecl,
   pprDataFamInstFlavour, pprTyFamInstDecl, pprHsFamInstLHS,
-  FamInstEqn, LFamInstEqn, FamEqn(..),
-  TyFamInstEqn, LTyFamInstEqn, HsTyPats,
+  FamEqn(..), TyFamInstEqn, LTyFamInstEqn, HsTyPats,
   LClsInstDecl, ClsInstDecl(..),
 
   -- ** Standalone deriving declarations
@@ -755,8 +754,7 @@ tyFamInstDeclName :: TyFamInstDecl (GhcPass p) -> IdP (GhcPass p)
 tyFamInstDeclName = unLoc . tyFamInstDeclLName
 
 tyFamInstDeclLName :: TyFamInstDecl (GhcPass p) -> Located (IdP (GhcPass p))
-tyFamInstDeclLName (TyFamInstDecl { tfid_eqn =
-                     (HsIB { hsib_body = FamEqn { feqn_tycon = ln }}) })
+tyFamInstDeclLName (TyFamInstDecl { tfid_eqn = FamEqn { feqn_tycon = ln }})
   = ln
 
 tyClDeclLName :: TyClDecl (GhcPass p) -> Located (IdP (GhcPass p))
@@ -1365,13 +1363,13 @@ data DerivClauseTys pass
     -- be a type constructor without any arguments.
     --
     -- Example: @deriving Eq@
-    DctSingle (XDctSingle pass) (LHsSigType pass)
+    DctSingle (XDctSingle pass) (LHsSigType' pass)
 
     -- | A @deriving@ clause with a comma-separated list of types, surrounded
     -- by enclosing parentheses.
     --
     -- Example: @deriving (Eq, C a)@
-  | DctMulti (XDctMulti pass) [LHsSigType pass]
+  | DctMulti (XDctMulti pass) [LHsSigType' pass]
 
   | XDerivClauseTys !(XXDerivClauseTys pass)
 
@@ -1389,7 +1387,7 @@ type LStandaloneKindSig pass = XRec pass (StandaloneKindSig pass)
 data StandaloneKindSig pass
   = StandaloneKindSig (XStandaloneKindSig pass)
       (LIdP pass)           -- Why a single binder? See #16754
-      (LHsSigType pass)     -- Why not LHsSigWcType? See Note [Wildcards in standalone kind signatures]
+      (LHsSigType' pass)    -- Why not LHsSigWcType? See Note [Wildcards in standalone kind signatures]
   | XStandaloneKindSig !(XXStandaloneKindSig pass)
 
 type instance XStandaloneKindSig (GhcPass p) = NoExtField
@@ -1461,8 +1459,12 @@ data ConDecl pass
       { con_g_ext   :: XConDeclGADT pass
       , con_names   :: [LIdP pass]
 
+      -- TODO RGS: Update all of these comments yo
       -- The following fields describe the type after the '::'
       -- See Note [GADT abstract syntax]
+      {-
+      TODO RGS: Delete me
+
       , con_forall  :: XRec pass Bool    -- ^ True <=> explicit forall
                                          --   False => hsq_explicit is empty
                                          --
@@ -1471,6 +1473,8 @@ data ConDecl pass
       , con_qvars   :: [LHsTyVarBndr Specificity pass]
                        -- Whether or not there is an /explicit/ forall, we still
                        -- need to capture the implicitly-bound type/kind variables
+      -}
+      , con_bndrs   :: Located (HsOuterSigTyVarBndrs pass) -- ^ TODO RGS: Docs
 
       , con_mb_cxt  :: Maybe (LHsContext pass) -- ^ User-written context (if any)
       , con_args    :: HsConDeclDetails pass   -- ^ Arguments; never InfixCon
@@ -1498,10 +1502,7 @@ data ConDecl pass
       }
   | XConDecl !(XXConDecl pass)
 
-type instance XConDeclGADT GhcPs = NoExtField
-type instance XConDeclGADT GhcRn = [Name] -- Implicitly bound type variables
-type instance XConDeclGADT GhcTc = NoExtField
-
+type instance XConDeclGADT (GhcPass _) = NoExtField
 type instance XConDeclH98  (GhcPass _) = NoExtField
 
 type instance XXConDecl (GhcPass _) = NoExtCon
@@ -1721,11 +1722,11 @@ pprConDecl (ConDeclH98 { con_name = L _ con
                                  <+> pprConDeclFields (unLoc fields)
     cxt = fromMaybe noLHsContext mcxt
 
-pprConDecl (ConDeclGADT { con_names = cons, con_qvars = qvars
+pprConDecl (ConDeclGADT { con_names = cons, con_bndrs = L _ outer_bndrs
                         , con_mb_cxt = mcxt, con_args = args
                         , con_res_ty = res_ty, con_doc = doc })
   = ppr_mbDoc doc <+> ppr_con_names cons <+> dcolon
-    <+> (sep [pprHsForAll (mkHsForAllInvisTele qvars) cxt,
+    <+> (sep [pprHsOuterSigTyVarBndrs outer_bndrs <+> pprLHsContext cxt,
               ppr_arrow_chain (get_args args ++ [ppr res_ty]) ])
   where
     get_args (PrefixCon args) = map ppr args
@@ -1816,7 +1817,9 @@ c.f. Note [TyVar binders for associated decls]
 -}
 
 -- | Type Family Instance Equation
-type TyFamInstEqn pass = FamInstEqn pass (LHsType pass)
+type TyFamInstEqn pass = FamEqn pass (LHsType pass)
+            -- Here, the @pats@ are type patterns (with kind and type bndrs).
+            -- See Note [Family instance declaration binders]
 
 -- | Type family default declarations.
 -- A convenient synonym for 'TyFamInstDecl'.
@@ -1844,7 +1847,7 @@ type LDataFamInstDecl pass = XRec pass (DataFamInstDecl pass)
 
 -- | Data Family Instance Declaration
 newtype DataFamInstDecl pass
-  = DataFamInstDecl { dfid_eqn :: FamInstEqn pass (HsDataDefn pass) }
+  = DataFamInstDecl { dfid_eqn :: FamEqn pass (HsDataDefn pass) }
     -- ^
     --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnData',
     --           'GHC.Parser.Annotation.AnnNewType','GHC.Parser.Annotation.AnnInstance',
@@ -1856,14 +1859,6 @@ newtype DataFamInstDecl pass
 
 ----------------- Family instances (common types) -------------
 
--- | Located Family Instance Equation
-type LFamInstEqn pass rhs = XRec pass (FamInstEqn pass rhs)
-
--- | Family Instance Equation
-type FamInstEqn pass rhs = HsImplicitBndrs pass (FamEqn pass rhs)
-            -- ^ Here, the @pats@ are type patterns (with kind and type bndrs).
-            -- See Note [Family instance declaration binders]
-
 -- | Family Equation
 --
 -- One equation in a type family instance declaration, data family instance
@@ -1874,7 +1869,7 @@ data FamEqn pass rhs
   = FamEqn
        { feqn_ext    :: XCFamEqn pass rhs
        , feqn_tycon  :: LIdP pass
-       , feqn_bndrs  :: Maybe [LHsTyVarBndr () pass] -- ^ Optional quantified type vars
+       , feqn_bndrs  :: HsOuterFamEqnTyVarBndrs pass -- ^ Optional quantified type vars
        , feqn_pats   :: HsTyPats pass
        , feqn_fixity :: LexicalFixity -- ^ Fixity used in the declaration
        , feqn_rhs    :: rhs
@@ -1897,7 +1892,7 @@ type LClsInstDecl pass = XRec pass (ClsInstDecl pass)
 data ClsInstDecl pass
   = ClsInstDecl
       { cid_ext     :: XCClsInstDecl pass
-      , cid_poly_ty :: LHsSigType pass    -- Context => Class Instance-type
+      , cid_poly_ty :: LHsSigType' pass   -- Context => Class Instance-type
                                           -- Using a polytype means that the renamer conveniently
                                           -- figures out the quantified type variables for us.
       , cid_binds         :: LHsBinds pass       -- Class methods
@@ -1963,11 +1958,11 @@ pprTyFamDefltDecl = pprTyFamInstDecl NotTopLevel
 
 ppr_fam_inst_eqn :: (OutputableBndrId p)
                  => TyFamInstEqn (GhcPass p) -> SDoc
-ppr_fam_inst_eqn (HsIB { hsib_body = FamEqn { feqn_tycon  = L _ tycon
-                                            , feqn_bndrs  = bndrs
-                                            , feqn_pats   = pats
-                                            , feqn_fixity = fixity
-                                            , feqn_rhs    = rhs }})
+ppr_fam_inst_eqn (FamEqn { feqn_tycon  = L _ tycon
+                         , feqn_bndrs  = bndrs
+                         , feqn_pats   = pats
+                         , feqn_fixity = fixity
+                         , feqn_rhs    = rhs })
     = pprHsFamInstLHS tycon bndrs pats fixity noLHsContext <+> equals <+> ppr rhs
 
 instance OutputableBndrId p
@@ -1976,12 +1971,12 @@ instance OutputableBndrId p
 
 pprDataFamInstDecl :: (OutputableBndrId p)
                    => TopLevelFlag -> DataFamInstDecl (GhcPass p) -> SDoc
-pprDataFamInstDecl top_lvl (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
-                             FamEqn { feqn_tycon  = L _ tycon
+pprDataFamInstDecl top_lvl (DataFamInstDecl { dfid_eqn =
+                            (FamEqn { feqn_tycon  = L _ tycon
                                     , feqn_bndrs  = bndrs
                                     , feqn_pats   = pats
                                     , feqn_fixity = fixity
-                                    , feqn_rhs    = defn }}})
+                                    , feqn_rhs    = defn })})
   = pp_data_defn pp_hdr defn
   where
     pp_hdr ctxt = ppr_instance_keyword top_lvl
@@ -1989,19 +1984,19 @@ pprDataFamInstDecl top_lvl (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
                   -- pp_data_defn pretty-prints the kind sig. See #14817.
 
 pprDataFamInstFlavour :: DataFamInstDecl (GhcPass p) -> SDoc
-pprDataFamInstFlavour (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
-                        FamEqn { feqn_rhs = HsDataDefn { dd_ND = nd }}}})
+pprDataFamInstFlavour (DataFamInstDecl { dfid_eqn =
+                       (FamEqn { feqn_rhs = HsDataDefn { dd_ND = nd }})})
   = ppr nd
 
 pprHsFamInstLHS :: (OutputableBndrId p)
    => IdP (GhcPass p)
-   -> Maybe [LHsTyVarBndr () (GhcPass p)]
+   -> HsOuterFamEqnTyVarBndrs (GhcPass p)
    -> HsTyPats (GhcPass p)
    -> LexicalFixity
    -> LHsContext (GhcPass p)
    -> SDoc
 pprHsFamInstLHS thing bndrs typats fixity mb_ctxt
-   = hsep [ pprHsExplicitForAll bndrs
+   = hsep [ pprHsOuterFamEqnTyVarBndrs bndrs
           , pprLHsContext mb_ctxt
           , pp_pats typats ]
    where
@@ -2086,7 +2081,7 @@ type LDerivDecl pass = XRec pass (DerivDecl pass)
 -- | Stand-alone 'deriving instance' declaration
 data DerivDecl pass = DerivDecl
         { deriv_ext          :: XCDerivDecl pass
-        , deriv_type         :: LHsSigWcType pass
+        , deriv_type         :: LHsSigWcType' pass
           -- ^ The instance type to derive.
           --
           -- It uses an 'LHsSigWcType' because the context is allowed to be a
@@ -2147,8 +2142,8 @@ data DerivStrategy pass
   | ViaStrategy (XViaStrategy pass)
                      -- ^ @-XDerivingVia@
 
-type instance XViaStrategy GhcPs = LHsSigType GhcPs
-type instance XViaStrategy GhcRn = LHsSigType GhcRn
+type instance XViaStrategy GhcPs = LHsSigType' GhcPs
+type instance XViaStrategy GhcRn = LHsSigType' GhcRn
 type instance XViaStrategy GhcTc = Type
 
 instance OutputableBndrId p
@@ -2239,13 +2234,13 @@ data ForeignDecl pass
   = ForeignImport
       { fd_i_ext  :: XForeignImport pass   -- Post typechecker, rep_ty ~ sig_ty
       , fd_name   :: LIdP pass             -- defines this name
-      , fd_sig_ty :: LHsSigType pass       -- sig_ty
+      , fd_sig_ty :: LHsSigType' pass      -- sig_ty
       , fd_fi     :: ForeignImport }
 
   | ForeignExport
       { fd_e_ext  :: XForeignExport pass   -- Post typechecker, rep_ty ~ sig_ty
       , fd_name   :: LIdP pass             -- uses this name
-      , fd_sig_ty :: LHsSigType pass       -- sig_ty
+      , fd_sig_ty :: LHsSigType' pass      -- sig_ty
       , fd_fe     :: ForeignExport }
         -- ^
         --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnForeign',

@@ -653,9 +653,11 @@ chunkify xs
 *                                                                      *
 ********************************************************************* -}
 
+-- TODO RGS: DELETE THIS
 mkLHsSigType :: LHsType GhcPs -> LHsSigType GhcPs
 mkLHsSigType ty = mkHsImplicitBndrs ty
 
+-- TODO RGS: DELETE THIS
 mkLHsSigWcType :: LHsType GhcPs -> LHsSigWcType GhcPs
 mkLHsSigWcType ty = mkHsWildCardBndrs (mkHsImplicitBndrs ty)
 
@@ -693,7 +695,7 @@ mkClassOpSigs sigs
   = map fiddle sigs
   where
     fiddle (L loc (TypeSig _ nms ty))
-      = L loc (ClassOpSig noExtField False nms (dropWildCards ty))
+      = L loc (ClassOpSig noExtField False nms (dropWildCards' ty))
     fiddle sig = sig
 
 {- *********************************************************************
@@ -1218,8 +1220,7 @@ hsLInstDeclBinders (L _ (TyFamInstD {})) = mempty
 hsDataFamInstBinders :: IsPass p
                      => DataFamInstDecl (GhcPass p)
                      -> ([Located (IdP (GhcPass p))], [LFieldOcc (GhcPass p)])
-hsDataFamInstBinders (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
-                       FamEqn { feqn_rhs = defn }}})
+hsDataFamInstBinders (DataFamInstDecl { dfid_eqn = FamEqn { feqn_rhs = defn }})
   = hsDataDefnBinders defn
   -- There can't be repeated symbols because only data instances have binders
 

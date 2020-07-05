@@ -465,7 +465,7 @@ data HsExpr p
                 (XExprWithTySig p)
 
                 (LHsExpr p)
-                (LHsSigWcType (NoGhcTc p))
+                (LHsSigWcType' (NoGhcTc p))
 
   -- | Arithmetic sequence
   --

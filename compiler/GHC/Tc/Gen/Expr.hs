@@ -416,7 +416,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
   | L loc (HsRecFld _ (Ambiguous _ lbl)) <- op
   , Just sig_ty <- obviousSig (unLoc arg1)
     -- See Note [Disambiguating record fields]
-  = do { sig_tc_ty <- tcHsSigWcType ExprSigCtxt sig_ty
+  = do { sig_tc_ty <- tcLHsSigWcType ExprSigCtxt sig_ty
        ; sel_name <- disambiguateSelector lbl sig_tc_ty
        ; let op' = L loc (HsRecFld noExtField (Unambiguous sel_name lbl))
        ; tcExpr (OpApp fix arg1 op' arg2) res_ty
@@ -1090,7 +1090,7 @@ tcExprPrag (HsPragSCC x1 src ann) = HsPragSCC x1 src ann
 *                                                                      *
 ********************************************************************* -}
 
-tcExprWithSig :: LHsExpr GhcRn -> LHsSigWcType (NoGhcTc GhcRn)
+tcExprWithSig :: LHsExpr GhcRn -> LHsSigWcType' (NoGhcTc GhcRn)
               -> TcM (HsExpr GhcTc, TcSigmaType)
 tcExprWithSig expr hs_ty
   = do { sig_info <- checkNoErrs $  -- Avoid error cascade
@@ -1098,7 +1098,7 @@ tcExprWithSig expr hs_ty
        ; (expr', poly_ty) <- tcExprSig expr sig_info
        ; return (ExprWithTySig noExtField expr' hs_ty, poly_ty) }
   where
-    loc = getLoc (hsSigWcType hs_ty)
+    loc = getLoc (dropWildCards' hs_ty)
 
 {-
 ************************************************************************
@@ -1311,7 +1311,7 @@ tcInferApp expr
   , Ambiguous _ lbl           <- fld_lbl  -- Still ambiguous
   , HsEValArg _ (L _ arg) : _ <- filterOut isArgPar args -- A value arg is first
   , Just sig_ty               <- obviousSig arg  -- A type sig on the arg disambiguates
-  = do { sig_tc_ty <- tcHsSigWcType ExprSigCtxt sig_ty
+  = do { sig_tc_ty <- tcLHsSigWcType ExprSigCtxt sig_ty
        ; sel_name  <- disambiguateSelector lbl sig_tc_ty
        ; (tc_fun, fun_ty) <- tcInferRecSelId (Unambiguous sel_name lbl)
        ; tcInferApp_finish fun tc_fun fun_ty args }
@@ -2518,7 +2518,7 @@ lookupParents rdr
 -- A type signature on the argument of an ambiguous record selector or
 -- the record expression in an update must be "obvious", i.e. the
 -- outermost constructor ignoring parentheses.
-obviousSig :: HsExpr GhcRn -> Maybe (LHsSigWcType GhcRn)
+obviousSig :: HsExpr GhcRn -> Maybe (LHsSigWcType' GhcRn)
 obviousSig (ExprWithTySig _ _ ty) = Just ty
 obviousSig (HsPar _ p)          = obviousSig (unLoc p)
 obviousSig _                    = Nothing

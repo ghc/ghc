@@ -76,7 +76,8 @@ module GHC.Types.Var (
         binderVar, binderVars, binderArgFlag, binderType,
         mkTyCoVarBinder, mkTyCoVarBinders,
         mkTyVarBinder, mkTyVarBinders,
-        isTyVarBinder, tyVarSpecToBinder, tyVarSpecToBinders,
+        isTyVarBinder,
+        tyVarSpecToBinder, tyVarSpecToBinders, tyVarReqToBinder, tyVarReqToBinders,
         mapVarBndr, mapVarBndrs, lookupVarBndr,
 
         -- ** Constructing TyVar's
@@ -627,8 +628,14 @@ type ReqTVBinder       = VarBndr TyVar   ()
 tyVarSpecToBinders :: [VarBndr a Specificity] -> [VarBndr a ArgFlag]
 tyVarSpecToBinders = map tyVarSpecToBinder
 
-tyVarSpecToBinder :: (VarBndr a Specificity) -> (VarBndr a ArgFlag)
+tyVarSpecToBinder :: VarBndr a Specificity -> VarBndr a ArgFlag
 tyVarSpecToBinder (Bndr tv vis) = Bndr tv (Invisible vis)
+
+tyVarReqToBinders :: [VarBndr a ()] -> [VarBndr a ArgFlag]
+tyVarReqToBinders = map tyVarReqToBinder
+
+tyVarReqToBinder :: VarBndr a () -> VarBndr a ArgFlag
+tyVarReqToBinder (Bndr tv _) = Bndr tv Required
 
 binderVar :: VarBndr tv argf -> tv
 binderVar (Bndr v _) = v

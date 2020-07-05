@@ -12,8 +12,8 @@ module GHC.Rename.HsType (
         -- Type related stuff
         rnHsType, rnLHsType, rnLHsTypes, rnContext,
         rnHsKind, rnLHsKind, rnLHsTypeArgs,
-        rnHsSigType, rnHsWcType,
-        HsSigWcTypeScoping(..), rnHsSigWcType, rnHsPatSigType,
+        rnHsSigType, rnLHsSigType, rnHsSigType', rnHsWcType,
+        HsSigWcTypeScoping(..), rnHsSigWcType, rnLHsSigWcType, rnHsPatSigType,
         newTyVarNameRn,
         rnConDeclFields,
         rnLTyVar,
@@ -25,13 +25,13 @@ module GHC.Rename.HsType (
         checkPrecMatch, checkSectionPrec,
 
         -- Binding related stuff
-        bindHsForAllTelescope,
+        bindHsOuterTyVarBndrs, bindHsForAllTelescope,
         bindLHsTyVarBndr, bindLHsTyVarBndrs, WarnUnusedForalls(..),
         rnImplicitBndrs, bindSigTyVarsFV, bindHsQTyVars,
         FreeKiTyVars,
         extractHsTyRdrTyVars, extractHsTyRdrTyVarsKindVars,
         extractHsTysRdrTyVars, extractRdrKindSigVars, extractDataDefnKindVars,
-        extractHsTvBndrs, extractHsTyArgRdrKiTyVars,
+        extractHsOuterTvBndrs, extractHsTyArgRdrKiTyVars,
         forAllOrNothing, nubL
   ) where
 
@@ -131,6 +131,22 @@ rnHsSigWcType doc (HsWC { hswc_body = HsIB { hsib_body = hs_ty }})
     let ib_ty = HsIB { hsib_ext = imp_tvs, hsib_body = body  }
         wc_ty = HsWC { hswc_ext = nwcs,    hswc_body = ib_ty } in
     pure (wc_ty, emptyFVs)
+
+-- TODO RGS: This is the REAL rnHsSigWcType. Delete the one above when ready.
+rnLHsSigWcType :: HsDocContext
+               -> LHsSigWcType' GhcPs
+               -> RnM (LHsSigWcType' GhcRn, FreeVars)
+rnLHsSigWcType doc (HsWC { hswc_body =
+    sig_ty@(L loc (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty })) })
+  = do { free_vars <- filterInScopeM (extract_lhs_sig_ty sig_ty)
+       ; (nwc_rdrs', imp_tv_nms) <- partition_nwcs free_vars
+       ; let nwc_rdrs = nubL nwc_rdrs'
+       ; bindHsOuterTyVarBndrs doc Nothing imp_tv_nms outer_bndrs $ \outer_bndrs' ->
+    do { (wcs, body_ty', fvs) <- rnWcBody doc nwc_rdrs body_ty
+       ; pure ( HsWC  { hswc_ext = wcs, hswc_body = L loc $
+                HsSig { sig_ext = noExtField
+                      , sig_bndrs = outer_bndrs', sig_body = body_ty' }}
+              , fvs) } }
 
 rnHsPatSigType :: HsSigWcTypeScoping
                -> HsDocContext
@@ -308,10 +324,11 @@ of the HsWildCardBndrs structure, and we are done.
 
 *********************************************************
 *                                                       *
-           HsSigtype (i.e. no wildcards)
+           HsSigType (i.e. no wildcards)
 *                                                       *
 ****************************************************** -}
 
+-- TODO RGS: DELETE THIS
 rnHsSigType :: HsDocContext
             -> TypeOrKind
             -> LHsSigType GhcPs
@@ -329,6 +346,34 @@ rnHsSigType ctx level (HsIB { hsib_body = hs_ty })
 
        ; return ( HsIB { hsib_ext = vars
                        , hsib_body = body' }
+                , fvs ) } }
+
+rnLHsSigType :: HsDocContext
+             -> TypeOrKind
+             -> LHsSigType' GhcPs
+             -> RnM (LHsSigType' GhcRn, FreeVars)
+rnLHsSigType ctx level (L loc sig_ty)
+  = setSrcSpan loc $
+    do { (sig_ty', fvs) <- rnHsSigType' ctx level sig_ty
+       ; pure (L loc sig_ty', fvs) }
+
+-- TODO RGS: This is the REAL rnHsSigType. Once we remove the one above,
+-- rename this function.
+rnHsSigType' :: HsDocContext
+            -> TypeOrKind
+            -> HsSigType GhcPs
+            -> RnM (HsSigType GhcRn, FreeVars)
+-- Used for source-language type signatures
+-- that cannot have wildcards
+rnHsSigType' ctx level
+    sig_ty@(HsSig { sig_bndrs = outer_bndrs, sig_body = body })
+  = do { traceRn "rnHsSigType" (ppr sig_ty)
+       ; imp_vars <- filterInScopeM $ extractHsTyRdrTyVars body
+       ; bindHsOuterTyVarBndrs ctx Nothing imp_vars outer_bndrs $ \outer_bndrs' ->
+    do { (body', fvs) <- rnLHsTyKi (mkTyKiEnv ctx level RnTypeBody) body
+
+       ; return ( HsSig { sig_ext = noExtField
+                        , sig_bndrs = outer_bndrs', sig_body = body' }
                 , fvs ) } }
 
 {-
@@ -372,6 +417,7 @@ action:
 -- | See @Note [forall-or-nothing rule]@. This tiny little function is used
 -- (rather than its small body inlined) to indicate that we are implementing
 -- that rule.
+-- TODO RGS: DELETE THIS FUNCTION
 forAllOrNothing :: Bool
                 -- ^ True <=> explicit forall
                 -- E.g.  f :: forall a. a->b
@@ -1065,6 +1111,28 @@ Unlike other forms of type variable binders, dropping "unused" variables in
 an LHsQTyVars can be semantically significant. As a result, we suppress
 -Wunused-foralls warnings in exactly one place: in bindHsQTyVars.
 -}
+
+bindHsOuterTyVarBndrs :: OutputableBndrFlag flag
+                      => HsDocContext
+                      -> Maybe assoc
+                         -- ^ @'Just' _@ => an associated type decl
+                      -> FreeKiTyVars
+                      -> HsOuterTyVarBndrs flag GhcPs
+                      -> (HsOuterTyVarBndrs flag GhcRn -> RnM (a, FreeVars))
+                      -> RnM (a, FreeVars)
+bindHsOuterTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
+  case outer_bndrs of
+    HsOuterImplicit{} ->
+      rnImplicitBndrs mb_cls implicit_vars $ \implicit_vars' ->
+        thing_inside $ HsOuterImplicit{ hso_ximplicit = implicit_vars' }
+    HsOuterExplicit{hso_bndrs = exp_bndrs} ->
+      -- Note: If we pass mb_cls instead of Nothing below, bindLHsTyVarBndrs
+      -- will use class variables for any names the user meant to bring in
+      -- scope here. This is an explicit forall, so we want fresh names, not
+      -- class variables. Thus: always pass Nothing.
+      bindLHsTyVarBndrs doc WarnUnusedForalls Nothing exp_bndrs $ \exp_bndrs' ->
+        thing_inside $ HsOuterExplicit{ hso_xexplicit = noExtField
+                                      , hso_bndrs = exp_bndrs' }
 
 bindHsForAllTelescope :: HsDocContext
                       -> HsForAllTelescope GhcPs
@@ -1861,6 +1929,10 @@ extract_lty (L _ ty) acc
       -- We deal with these separately in rnLHsTypeWithWildCards
       HsWildCardTy {}             -> acc
 
+extract_lhs_sig_ty :: LHsSigType' GhcPs -> FreeKiTyVars
+extract_lhs_sig_ty (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body})) =
+  extractHsOuterTvBndrs outer_bndrs $ extract_lty body []
+
 extract_hs_arrow :: HsArrow GhcPs -> FreeKiTyVars ->
                    FreeKiTyVars
 extract_hs_arrow (HsExplicitMult p) acc = extract_lty p acc
@@ -1877,11 +1949,15 @@ extract_hs_for_all_telescope tele acc_vars body_fvs =
     HsForAllInvis { hsf_invis_bndrs = bndrs } ->
       extract_hs_tv_bndrs bndrs acc_vars body_fvs
 
-extractHsTvBndrs :: [LHsTyVarBndr flag GhcPs]
-                 -> FreeKiTyVars       -- Free in body
-                 -> FreeKiTyVars       -- Free in result
-extractHsTvBndrs tv_bndrs body_fvs
-  = extract_hs_tv_bndrs tv_bndrs [] body_fvs
+extractHsOuterTvBndrs :: HsOuterTyVarBndrs flag GhcPs
+                      -> FreeKiTyVars -- Free in body
+                      -> FreeKiTyVars -- Free in result
+extractHsOuterTvBndrs outer_bndrs body_fvs =
+  case outer_bndrs of
+    HsOuterImplicit{} ->
+      body_fvs
+    HsOuterExplicit { hso_bndrs = bndrs } ->
+      extract_hs_tv_bndrs bndrs [] body_fvs
 
 extract_hs_tv_bndrs :: [LHsTyVarBndr flag GhcPs]
                     -> FreeKiTyVars  -- Accumulator

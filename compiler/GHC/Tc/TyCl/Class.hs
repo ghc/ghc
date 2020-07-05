@@ -159,7 +159,7 @@ tcClassSigs clas sigs def_methods
 
     skol_info = TyConSkol ClassFlavour clas
 
-    tc_sig :: NameEnv (SrcSpan, Type) -> ([Located Name], LHsSigType GhcRn)
+    tc_sig :: NameEnv (SrcSpan, Type) -> ([Located Name], LHsSigType' GhcRn)
            -> TcM [TcMethInfo]
     tc_sig gen_dm_env (op_names, op_hs_ty)
       = do { traceTc "ClsSig 1" (ppr op_names)
@@ -290,7 +290,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
        ; let local_dm_id = mkLocalId local_dm_name Many local_dm_ty
              local_dm_sig = CompleteSig { sig_bndr = local_dm_id
                                         , sig_ctxt  = ctxt
-                                        , sig_loc   = getLoc (hsSigType hs_ty) }
+                                        , sig_loc   = getLoc hs_ty }
 
        ; (ev_binds, (tc_bind, _))
                <- checkConstraints skol_info tyvars [this_dict] $
@@ -363,14 +363,14 @@ instantiateMethod clas sel_id inst_tys
 
 
 ---------------------------
-type HsSigFun = Name -> Maybe (LHsSigType GhcRn)
+type HsSigFun = Name -> Maybe (LHsSigType' GhcRn)
 
 mkHsSigFun :: [LSig GhcRn] -> HsSigFun
 mkHsSigFun sigs = lookupNameEnv env
   where
     env = mkHsSigEnv get_classop_sig sigs
 
-    get_classop_sig :: LSig GhcRn -> Maybe ([Located Name], LHsSigType GhcRn)
+    get_classop_sig :: LSig GhcRn -> Maybe ([Located Name], LHsSigType' GhcRn)
     get_classop_sig  (L _ (ClassOpSig _ _ ns hs_ty)) = Just (ns, hs_ty)
     get_classop_sig  _                               = Nothing
 

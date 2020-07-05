@@ -44,7 +44,7 @@ import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, extendTyVarEnvFVRn
                         , checkDupRdrNames, warnUnusedLocalBinds
                         , checkUnusedRecordWildcard
                         , checkDupAndShadowedNames, bindLocalNamesFV
-                        , addNoNestedForallsContextsErr, checkInferredVars )
+                        , addNoNestedForallsContextsErr, checkInferredVars' )
 import GHC.Driver.Session
 import GHC.Unit.Module
 import GHC.Types.Name
@@ -610,11 +610,11 @@ mkScopedTvFn sigs = \n -> lookupNameEnv env n `orElse` []
     get_scoped_tvs :: LSig GhcRn -> Maybe ([Located Name], [Name])
     -- Returns (binders, scoped tvs for those binders)
     get_scoped_tvs (L _ (ClassOpSig _ _ names sig_ty))
-      = Just (names, hsScopedTvs sig_ty)
+      = Just (names, hsScopedTvs' sig_ty)
     get_scoped_tvs (L _ (TypeSig _ names sig_ty))
-      = Just (names, hsWcScopedTvs sig_ty)
+      = Just (names, hsWcScopedTvs' sig_ty)
     get_scoped_tvs (L _ (PatSynSig _ names sig_ty))
-      = Just (names, hsScopedTvs sig_ty)
+      = Just (names, hsScopedTvs' sig_ty)
     get_scoped_tvs _ = Nothing
 
 -- Process the fixity declarations, making a FastString -> (Located Fixity) map
@@ -957,7 +957,7 @@ renameSig _ (IdSig _ x)
 renameSig ctxt sig@(TypeSig _ vs ty)
   = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
         ; let doc = TypeSigCtx (ppr_sig_bndrs vs)
-        ; (new_ty, fvs) <- rnHsSigWcType doc ty
+        ; (new_ty, fvs) <- rnLHsSigWcType doc ty
         ; return (TypeSig noExtField new_vs new_ty, fvs) }
 
 renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
@@ -965,7 +965,7 @@ renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
         ; when (is_deflt && not defaultSigs_on) $
           addErr (defaultSigErr sig)
         ; new_v <- mapM (lookupSigOccRn ctxt sig) vs
-        ; (new_ty, fvs) <- rnHsSigType ty_ctxt TypeLevel ty
+        ; (new_ty, fvs) <- rnLHsSigType ty_ctxt TypeLevel ty
         ; return (ClassOpSig noExtField is_deflt new_v new_ty, fvs) }
   where
     (v1:_) = vs
@@ -973,14 +973,14 @@ renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
                           <+> quotes (ppr v1))
 
 renameSig _ (SpecInstSig _ src ty)
-  = do  { checkInferredVars doc inf_msg ty
-        ; (new_ty, fvs) <- rnHsSigType doc TypeLevel ty
+  = do  { checkInferredVars' doc inf_msg ty
+        ; (new_ty, fvs) <- rnLHsSigType doc TypeLevel ty
           -- Check if there are any nested `forall`s or contexts, which are
           -- illegal in the type of an instance declaration (see
           -- Note [No nested foralls or contexts in instance types] in
           -- GHC.Hs.Type).
         ; addNoNestedForallsContextsErr doc (text "SPECIALISE instance type")
-            (getLHsInstDeclHead new_ty)
+            (getLHsInstDeclHead' new_ty)
         ; return (SpecInstSig noExtField src new_ty,fvs) }
   where
     doc = SpecInstSigCtx
@@ -1000,7 +1000,7 @@ renameSig ctxt sig@(SpecSig _ v tys inl)
     ty_ctxt = GenericCtx (text "a SPECIALISE signature for"
                           <+> quotes (ppr v))
     do_one (tys,fvs) ty
-      = do { (new_ty, fvs_ty) <- rnHsSigType ty_ctxt TypeLevel ty
+      = do { (new_ty, fvs_ty) <- rnLHsSigType ty_ctxt TypeLevel ty
            ; return ( new_ty:tys, fvs_ty `plusFV` fvs) }
 
 renameSig ctxt sig@(InlineSig _ v s)
@@ -1017,7 +1017,7 @@ renameSig ctxt sig@(MinimalSig _ s (L l bf))
 
 renameSig ctxt sig@(PatSynSig _ vs ty)
   = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
-        ; (ty', fvs) <- rnHsSigType ty_ctxt TypeLevel ty
+        ; (ty', fvs) <- rnLHsSigType ty_ctxt TypeLevel ty
         ; return (PatSynSig noExtField new_vs ty', fvs) }
   where
     ty_ctxt = GenericCtx (text "a pattern synonym signature for"

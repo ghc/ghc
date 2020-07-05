@@ -1,7 +1,7 @@
 
 rnfail052.hs:6:6: error:
     Illegal symbol ‘forall’ in type
-    Perhaps you intended to use RankNTypes or a similar language
+    Perhaps you intended to use ScopedTypeVariables or a similar language
     extension to enable explicit-forall syntax: forall <tvs>. <type>
 
 rnfail052.hs:9:14: error:

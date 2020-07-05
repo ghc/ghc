@@ -800,7 +800,7 @@ getLocalNonValBinders fixity_env
            -- be Nothing.
            mb_cls_nm <- runMaybeT $ do
              -- See (1) above
-             L loc cls_rdr <- MaybeT $ pure $ getLHsInstDeclClass_maybe inst_ty
+             L loc cls_rdr <- MaybeT $ pure $ getLHsInstDeclClass_maybe' inst_ty
              -- See (2) above
              MaybeT $ setSrcSpan loc $ lookupGlobalOccRn_maybe cls_rdr
            -- Assuming the previous step succeeded, process any associated data
@@ -814,8 +814,7 @@ getLocalNonValBinders fixity_env
 
     new_di :: Bool -> Maybe Name -> DataFamInstDecl GhcPs
                    -> RnM (AvailInfo, [(Name, [FieldLabel])])
-    new_di overload_ok mb_cls dfid@(DataFamInstDecl { dfid_eqn =
-                                     HsIB { hsib_body = ti_decl }})
+    new_di overload_ok mb_cls dfid@(DataFamInstDecl { dfid_eqn = ti_decl })
         = do { main_name <- lookupFamInstName mb_cls (feqn_tycon ti_decl)
              ; let (bndrs, flds) = hsDataFamInstBinders dfid
              ; sub_names <- mapM newTopSrcBinder bndrs

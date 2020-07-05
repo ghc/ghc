@@ -893,7 +893,7 @@ data Sig pass
     TypeSig
        (XTypeSig pass)
        [LIdP pass]           -- LHS of the signature; e.g.  f,g,h :: blah
-       (LHsSigWcType pass)   -- RHS of the signature; can have wildcards
+       (LHsSigWcType' pass)  -- RHS of the signature; can have wildcards
 
       -- | A pattern synonym type signature
       --
@@ -904,7 +904,7 @@ data Sig pass
       --           'GHC.Parser.Annotation.AnnDot','GHC.Parser.Annotation.AnnDarrow'
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | PatSynSig (XPatSynSig pass) [LIdP pass] (LHsSigType pass)
+  | PatSynSig (XPatSynSig pass) [LIdP pass] (LHsSigType' pass)
       -- P :: forall a b. Req => Prov => ty
 
       -- | A signature for a class method
@@ -917,7 +917,7 @@ data Sig pass
       --
       --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDefault',
       --           'GHC.Parser.Annotation.AnnDcolon'
-  | ClassOpSig (XClassOpSig pass) Bool [LIdP pass] (LHsSigType pass)
+  | ClassOpSig (XClassOpSig pass) Bool [LIdP pass] (LHsSigType' pass)
 
         -- | A type signature in generated code, notably the code
         -- generated for record selectors.  We simply record
@@ -966,7 +966,7 @@ data Sig pass
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | SpecSig     (XSpecSig pass)
                 (LIdP pass)        -- Specialise a function or datatype  ...
-                [LHsSigType pass]  -- ... to these types
+                [LHsSigType' pass] -- ... to these types
                 InlinePragma       -- The pragma on SPECIALISE_INLINE form.
                                    -- If it's just defaultInlinePragma, then we said
                                    --    SPECIALISE, not SPECIALISE_INLINE
@@ -982,7 +982,7 @@ data Sig pass
         --      'GHC.Parser.Annotation.AnnInstance','GHC.Parser.Annotation.AnnClose'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | SpecInstSig (XSpecInstSig pass) SourceText (LHsSigType pass)
+  | SpecInstSig (XSpecInstSig pass) SourceText (LHsSigType' pass)
                   -- Note [Pragma source text] in GHC.Types.Basic
 
         -- | A minimal complete definition pragma

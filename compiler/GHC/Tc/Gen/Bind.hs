@@ -223,7 +223,7 @@ tcHsBootSigs binds sigs
     tc_boot_sig (TypeSig _ lnames hs_ty) = mapM f lnames
       where
         f (L _ name)
-          = do { sigma_ty <- tcHsSigWcType (FunSigCtxt name False) hs_ty
+          = do { sigma_ty <- tcLHsSigWcType (FunSigCtxt name False) hs_ty
                ; return (mkVanillaGlobal name sigma_ty) }
         -- Notice that we make GlobalIds, not LocalIds
     tc_boot_sig s = pprPanic "tcHsBootSigs/tc_boot_sig" (ppr s)
@@ -1657,7 +1657,8 @@ decideGeneralisationPlan dflags lbinds closed sig_fn
       = [ null theta
         | TcIdSig (PartialSig { psig_hs_ty = hs_ty })
             <- mapMaybe sig_fn (collectHsBindListBinders lbinds)
-        , let (_, L _ theta, _) = splitLHsSigmaTyInvis (hsSigWcType hs_ty) ]
+        -- TODO RGS: What about outer parentheses here?
+        , let (L _ theta, _) = splitLHsQualTy (hsSigWcTypeBody hs_ty) ]
 
     has_partial_sigs   = not (null partial_sig_mrs)
 

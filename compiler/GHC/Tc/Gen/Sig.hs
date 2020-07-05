@@ -203,14 +203,14 @@ tcTySig (L loc (TypeSig _ names sig_ty))
 
 tcTySig (L loc (PatSynSig _ names sig_ty))
   = setSrcSpan loc $
-    do { tpsigs <- sequence [ tcPatSynSig name sig_ty
+    do { tpsigs <- sequence [ tcPatSynSig' name sig_ty
                             | L _ name <- names ]
        ; return (map TcPatSynSig tpsigs) }
 
 tcTySig _ = return []
 
 
-tcUserTypeSig :: SrcSpan -> LHsSigWcType GhcRn -> Maybe Name
+tcUserTypeSig :: SrcSpan -> LHsSigWcType' GhcRn -> Maybe Name
               -> TcM TcIdSigInfo
 -- A function or expression type signature
 -- Returns a fully quantified type signature; even the wildcards
@@ -224,8 +224,8 @@ tcUserTypeSig :: SrcSpan -> LHsSigWcType GhcRn -> Maybe Name
 -- Just n  => Function type signature       name :: type
 -- Nothing => Expression type signature   <expr> :: type
 tcUserTypeSig loc hs_sig_ty mb_name
-  | isCompleteHsSig hs_sig_ty
-  = do { sigma_ty <- tcHsSigWcType ctxt_F hs_sig_ty
+  | isCompleteHsSig' hs_sig_ty
+  = do { sigma_ty <- tcLHsSigWcType ctxt_F hs_sig_ty
        ; traceTc "tcuser" (ppr sigma_ty)
        ; return $
          CompleteSig { sig_bndr  = mkLocalId name Many sigma_ty
@@ -266,10 +266,22 @@ isCompleteHsSig :: LHsSigWcType GhcRn -> Bool
 -- ^ If there are no wildcards, return a LHsSigType
 isCompleteHsSig (HsWC { hswc_ext  = wcs
                       , hswc_body = HsIB { hsib_body = hs_ty } })
-   = null wcs && no_anon_wc hs_ty
+   = null wcs && no_anon_wc_ty hs_ty
 
-no_anon_wc :: LHsType GhcRn -> Bool
-no_anon_wc lty = go lty
+-- TODO RGS: This is the REAL isCompleteHsSig. Delete the one above when ready.
+isCompleteHsSig' :: LHsSigWcType' GhcRn -> Bool
+-- ^ If there are no wildcards, return a LHsSigWcType
+isCompleteHsSig' (HsWC { hswc_ext = wcs, hswc_body = hs_sig_ty })
+   = null wcs && no_anon_wc_sig_ty hs_sig_ty
+
+no_anon_wc_sig_ty :: LHsSigType' GhcRn -> Bool
+no_anon_wc_sig_ty (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body})) =
+  case outer_bndrs of
+    HsOuterImplicit{}                 -> no_anon_wc_ty body
+    HsOuterExplicit{hso_bndrs = ltvs} -> all no_anon_wc_tvb ltvs && no_anon_wc_ty body
+
+no_anon_wc_ty :: LHsType GhcRn -> Bool
+no_anon_wc_ty lty = go lty
   where
     go (L _ ty) = case ty of
       HsWildCardTy _                 -> False
@@ -304,11 +316,13 @@ no_anon_wc lty = go lty
 
 no_anon_wc_tele :: HsForAllTelescope GhcRn -> Bool
 no_anon_wc_tele tele = case tele of
-  HsForAllVis   { hsf_vis_bndrs   = ltvs } -> all (go . unLoc) ltvs
-  HsForAllInvis { hsf_invis_bndrs = ltvs } -> all (go . unLoc) ltvs
-  where
-    go (UserTyVar _ _ _)      = True
-    go (KindedTyVar _ _ _ ki) = no_anon_wc ki
+  HsForAllVis   { hsf_vis_bndrs   = ltvs } -> all no_anon_wc_tvb ltvs
+  HsForAllInvis { hsf_invis_bndrs = ltvs } -> all no_anon_wc_tvb ltvs
+
+no_anon_wc_tvb :: LHsTyVarBndr flag GhcRn -> Bool
+no_anon_wc_tvb (L _ tvb) = case tvb of
+  UserTyVar _ _ _      -> True
+  KindedTyVar _ _ _ ki -> no_anon_wc_ty ki
 
 {- Note [Fail eagerly on bad signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -475,6 +489,105 @@ tcPatSynSig name sig_ty
         mkPhiTy prov $
         body
 
+-- TODO RGS: This is the REAL tcPatSynSig. Delete the one above when ready.
+tcPatSynSig' :: Name -> LHsSigType' GhcRn -> TcM TcPatSynInfo
+-- See Note [Pattern synonym signatures]
+-- See Note [Recipe for checking a signature] in GHC.Tc.Gen.HsType
+tcPatSynSig' name sig_ty@(L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = hs_ty}))
+  | (hs_req, hs_ty1) <- splitLHsQualTy hs_ty
+  , (ex_hs_tvbndrs, hs_prov, hs_body_ty) <- splitLHsSigmaTyInvis hs_ty1
+  = do {  traceTc "tcPatSynSig 1" (ppr sig_ty)
+       ; (implicit_or_univ_tvbndrs, (ex_tvbndrs, (req, prov, body_ty)))
+           <- pushTcLevelM_   $
+              solveEqualities $ -- See Note [solveEqualities in tcPatSynSig]
+              bindOuterSigTKBndrs_Skol outer_bndrs   $
+              bindExplicitTKBndrs_Skol ex_hs_tvbndrs $
+              do { req     <- tcHsContext hs_req
+                 ; prov    <- tcHsContext hs_prov
+                 ; body_ty <- tcHsOpenType hs_body_ty
+                     -- A (literal) pattern can be unlifted;
+                     -- e.g. pattern Zero <- 0#   (#12094)
+                 ; return (req, prov, body_ty) }
+
+         -- TODO RGS: Is this the cleanest way to do this?
+       ; let (implicit_tvs, univ_tvbndrs) = case implicit_or_univ_tvbndrs of
+               Left  implicit_tvs' -> (implicit_tvs', [])
+               Right univ_tvbndrs' -> ([], univ_tvbndrs')
+
+       ; let ungen_patsyn_ty = build_patsyn_type [] implicit_tvs univ_tvbndrs
+                                                 req ex_tvbndrs prov body_ty
+
+       -- Kind generalisation
+       ; kvs <- kindGeneralizeAll ungen_patsyn_ty
+       ; traceTc "tcPatSynSig" (ppr ungen_patsyn_ty)
+
+       -- These are /signatures/ so we zonk to squeeze out any kind
+       -- unification variables.  Do this after kindGeneralize which may
+       -- default kind variables to *.
+       ; implicit_tvs <- zonkAndScopedSort implicit_tvs
+       ; univ_tvbndrs <- mapM zonkTyCoVarKindBinder univ_tvbndrs
+       ; ex_tvbndrs   <- mapM zonkTyCoVarKindBinder ex_tvbndrs
+       ; req          <- zonkTcTypes req
+       ; prov         <- zonkTcTypes prov
+       ; body_ty      <- zonkTcType  body_ty
+
+       -- Skolems have TcLevels too, though they're used only for debugging.
+       -- If you don't do this, the debugging checks fail in GHC.Tc.TyCl.PatSyn.
+       -- Test case: patsyn/should_compile/T13441
+{-
+       ; tclvl <- getTcLevel
+       ; let env0                  = mkEmptyTCvSubst $ mkInScopeSet $ mkVarSet kvs
+             (env1, implicit_tvs') = promoteSkolemsX tclvl env0 implicit_tvs
+             (env2, univ_tvs')     = promoteSkolemsX tclvl env1 univ_tvs
+             (env3, ex_tvs')       = promoteSkolemsX tclvl env2 ex_tvs
+             req'                  = substTys env3 req
+             prov'                 = substTys env3 prov
+             body_ty'              = substTy  env3 body_ty
+-}
+      ; let implicit_tvs' = implicit_tvs
+            univ_tvbndrs' = univ_tvbndrs
+            ex_tvbndrs'   = ex_tvbndrs
+            req'          = req
+            prov'         = prov
+            body_ty'      = body_ty
+
+       -- Now do validity checking
+       ; checkValidType ctxt $
+         build_patsyn_type kvs implicit_tvs' univ_tvbndrs' req' ex_tvbndrs' prov' body_ty'
+
+       -- arguments become the types of binders. We thus cannot allow
+       -- levity polymorphism here
+       ; let (arg_tys, _) = tcSplitFunTys body_ty'
+       ; mapM_ (checkForLevPoly empty . scaledThing) arg_tys
+
+       ; traceTc "tcTySig }" $
+         vcat [ text "implicit_tvs" <+> ppr_tvs implicit_tvs'
+              , text "kvs" <+> ppr_tvs kvs
+              , text "univ_tvs" <+> ppr_tvs (binderVars univ_tvbndrs')
+              , text "req" <+> ppr req'
+              , text "ex_tvs" <+> ppr_tvs (binderVars ex_tvbndrs')
+              , text "prov" <+> ppr prov'
+              , text "body_ty" <+> ppr body_ty' ]
+       ; return (TPSI { patsig_name = name
+                      , patsig_implicit_bndrs = mkTyVarBinders InferredSpec kvs ++
+                                                mkTyVarBinders SpecifiedSpec implicit_tvs'
+                      , patsig_univ_bndrs     = univ_tvbndrs'
+                      , patsig_req            = req'
+                      , patsig_ex_bndrs       = ex_tvbndrs'
+                      , patsig_prov           = prov'
+                      , patsig_body_ty        = body_ty' }) }
+  where
+    ctxt = PatSynCtxt name
+
+    build_patsyn_type kvs imp univ_bndrs req ex_bndrs prov body
+      = mkInfForAllTys kvs $
+        mkSpecForAllTys imp $
+        mkInvisForAllTys univ_bndrs $
+        mkPhiTy req $
+        mkInvisForAllTys ex_bndrs $
+        mkPhiTy prov $
+        body
+
 ppr_tvs :: [TyVar] -> SDoc
 ppr_tvs tvs = braces (vcat [ ppr tv <+> dcolon <+> ppr (tyVarKind tv)
                            | tv <- tvs])
@@ -506,7 +619,7 @@ tcInstSig hs_sig@(PartialSig { psig_hs_ty = hs_ty
                              , sig_loc = loc })
   = setSrcSpan loc $  -- Set the binding site of the tyvars
     do { traceTc "Staring partial sig {" (ppr hs_sig)
-       ; (wcs, wcx, tv_prs, theta, tau) <- tcHsPartialSigType ctxt hs_ty
+       ; (wcs, wcx, tv_prs, theta, tau) <- tcHsPartialSigType' ctxt hs_ty
          -- See Note [Checking partial type signatures] in GHC.Tc.Gen.HsType
        ; let inst_sig = TISI { sig_inst_sig   = hs_sig
                              , sig_inst_skols = tv_prs
@@ -776,7 +889,7 @@ tcSpecPrag poly_id prag@(SpecSig _ fun_name hs_tys inl)
     spec_ctxt prag = hang (text "In the pragma:") 2 (ppr prag)
 
     tc_one hs_ty
-      = do { spec_ty <- tcHsSigType   (FunSigCtxt name False) hs_ty
+      = do { spec_ty <- tcLHsSigType  (FunSigCtxt name False) hs_ty
            ; wrap    <- tcSpecWrapper (FunSigCtxt name True)  poly_ty spec_ty
            ; return (SpecPrag poly_id wrap inl) }
 

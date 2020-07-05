@@ -1442,7 +1442,7 @@ data TcIdSigInfo   -- See Note [Complete and partial type signatures]
                    -- the polymorphic Id, because we are going to /infer/ its
                    -- type, so we can't make the polymorphic Id ab-initio
       { psig_name  :: Name   -- Name of the function; used when report wildcards
-      , psig_hs_ty :: LHsSigWcType GhcRn  -- The original partial signature in
+      , psig_hs_ty :: LHsSigWcType' GhcRn -- The original partial signature in
                                           -- HsSyn form
       , sig_ctxt   :: UserTypeCtxt
       , sig_loc    :: SrcSpan            -- Location of the type signature
