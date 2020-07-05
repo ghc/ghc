@@ -18,8 +18,6 @@ class GHCTestsuiteConfig(TestsuiteConfig):
 
     @staticmethod
     def init_config(config: TestConfig):
-        config.compiler_always_flags = ghc_compiler_always_flags.split()
-
         # By default, the 'normal' and 'hpc' ways are enabled. In addition, certain
         # ways are enabled automatically if this GHC supports them. Ways that fall in
         # this group are 'optasm', 'optllvm', 'profasm', 'threaded1', 'threaded2',
@@ -45,7 +43,7 @@ class GHCTestsuiteConfig(TestsuiteConfig):
                                     'compacting_gc',
                                     ]
 
-        if ghc_with_native_codegen:
+        if config.ghc_with_native_codegen:
             config.compile_ways.append('optasm')
             config.run_ways.append('optasm')
 
@@ -56,21 +54,21 @@ class GHCTestsuiteConfig(TestsuiteConfig):
         if config.have_interp:
             config.run_ways.append('ghci')
 
-        if ghc_with_threaded_rts:
+        if config.ghc_with_threaded_rts:
             config.run_ways.append('threaded1')
-            if ghc_with_smp:
+            if config.ghc_with_smp:
                 config.have_smp = True
                 config.run_ways.append('threaded2')
                 if config.speed == 0:
                     config.run_ways.append('nonmoving_thr')
 
-        if ghc_with_dynamic_rts:
+        if config.ghc_with_dynamic_rts:
             config.have_shared_libs = True
 
         if config.ghc_dynamic_by_default and config.have_vanilla == 1:
             config.run_ways.append('static')
         else:
-            if ghc_with_dynamic_rts:
+            if config.ghc_with_dynamic_rts:
                 config.run_ways.append('dyn')
 
         if (config.have_profiling and ghc_with_threaded_rts):
