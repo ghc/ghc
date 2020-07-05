@@ -24,6 +24,7 @@ module Hadrian.Utilities (
     Colour (..), ANSIColour (..), putColoured, shouldUseColor,
     BuildProgressColour, mkBuildProgressColour, putBuild,
     SuccessColour, mkSuccessColour, putSuccess,
+    FailureColour, mkFailureColour, putFailure,
     ProgressInfo (..), putProgressInfo,
     renderAction, renderActionNoOutput, renderProgram, renderLibrary, renderBox, renderUnicorn,
 
@@ -469,6 +470,23 @@ putSuccess :: String -> Action ()
 putSuccess msg = do
     SuccessColour code <- userSetting green
     putColoured code msg
+
+newtype FailureColour = FailureColour String
+    deriving Typeable
+
+-- | Generate an encoded colour for failure output messages
+mkFailureColour :: Colour -> FailureColour
+mkFailureColour c = FailureColour $ mkColour c
+
+-- | Default 'FailureColour'.
+red :: FailureColour
+red = mkFailureColour (Dull Red)
+
+-- | Print a failure message (e.g. a precondition was not met).
+putFailure :: String -> Action ()
+putFailure msg = do
+  FailureColour code <- userSetting red
+  putColoured code msg
 
 data ProgressInfo = None | Brief | Normal | Unicorn deriving (Eq, Show, Typeable)
 
