@@ -1,0 +1,4 @@
+
+T16762b.hs:7:11: error:
+    Illegal kind: forall k. Type
+    Did you mean to enable PolyKinds?

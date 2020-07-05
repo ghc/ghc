@@ -42,14 +42,15 @@
             (Unqual
              {OccName: TestParens}))]
           ({ T15323.hs:6:20-54 }
-           (True))
-          [({ T15323.hs:6:27 }
-            (UserTyVar
-             (NoExtField)
-             (SpecifiedSpec)
-             ({ T15323.hs:6:27 }
-              (Unqual
-               {OccName: v}))))]
+           (HsOuterExplicit
+            (NoExtField)
+            [({ T15323.hs:6:27 }
+              (UserTyVar
+               (NoExtField)
+               (SpecifiedSpec)
+               ({ T15323.hs:6:27 }
+                (Unqual
+                 {OccName: v}))))]))
           (Just
            ({ T15323.hs:6:31-36 }
             [({ T15323.hs:6:31-36 }

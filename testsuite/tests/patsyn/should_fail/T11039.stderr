@@ -5,6 +5,6 @@ T11039.hs:8:15: error:
         Actual: A a
       ‘f’ is a rigid type variable bound by
         the signature for pattern synonym ‘Q’
-        at T11039.hs:7:1-38
+        at T11039.hs:7:14-38
     • In the pattern: A a
       In the declaration for pattern synonym ‘Q’

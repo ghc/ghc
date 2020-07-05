@@ -2086,7 +2086,7 @@ canEqTyVar2 dflags ev eq_rel swapped tv1 rhs
 
   | otherwise  -- For some reason (occurs check, or forall) we can't unify
                -- We must not use it for further rewriting!
-  = do { traceTcS "canEqTyVar2 can't unify" (ppr tv1 $$ ppr rhs)
+  = do { traceTcS "canEqTyVar2 can't unify" (ppr tv1 $$ ppr rhs $$ ppr mtvu)
        ; new_ev <- rewriteEqEvidence ev swapped lhs rhs rewrite_co1 rewrite_co2
        ; let status | isInsolubleOccursCheck eq_rel tv1 rhs
                     = InsolubleCIS

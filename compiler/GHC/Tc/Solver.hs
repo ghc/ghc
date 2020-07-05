@@ -18,7 +18,7 @@ module GHC.Tc.Solver(
 
        simplifyTopWanteds,
 
-       promoteTyVarSet, emitFlatConstraints,
+       promoteTyVarSet, simplifyAndEmitFlatConstraints,
 
        -- For Rules we need these
        solveWanteds, solveWantedsAndDrop,
@@ -200,24 +200,29 @@ solveEqualities :: String -> TcM a -> TcM a
 solveEqualities callsite thing_inside
   = do { traceTc "solveEqualities {" (text "Called from" <+> text callsite)
        ; (res, wanted)   <- captureConstraints thing_inside
-       ; residual_wanted <- runTcSEqualities (solveWantedsAndDrop wanted)
-       ; emitFlatConstraints residual_wanted
-            -- emitFlatConstraints fails outright unless the only unsolved
-            -- constraints are soluble-looking equalities that can float out
-       ; traceTc "solveEqualities }" (text "Residual: " <+> ppr residual_wanted)
+       ; simplifyAndEmitFlatConstraints wanted
+            -- simplifyAndEmitFlatConstraints fails outright unless
+            --  the only unsolved constraints are soluble-looking
+            --  equalities that can float out
+       ; traceTc "solveEqualities }" empty
        ; return res }
 
-emitFlatConstraints :: WantedConstraints -> TcM ()
+simplifyAndEmitFlatConstraints :: WantedConstraints -> TcM ()
 -- See Note [Failure in local type signatures]
-emitFlatConstraints wanted
-  = do { wanted <- TcM.zonkWC wanted
+simplifyAndEmitFlatConstraints wanted
+  = do { -- Solve and zonk to esablish the
+         -- preconditions for floatKindEqualities
+         wanted <- runTcSEqualities (solveWanteds wanted)
+       ; wanted <- TcM.zonkWC wanted
+
+       ; traceTc "emitFlatConstraints {" (ppr wanted)
        ; case floatKindEqualities wanted of
-           Nothing -> do { traceTc "emitFlatConstraints: failing" (ppr wanted)
+           Nothing -> do { traceTc "emitFlatConstraints } failing" (ppr wanted)
                          ; emitConstraints wanted -- So they get reported!
                          ; failM }
            Just (simples, holes)
-              -> do { _ <- TcM.promoteTyVarSet (tyCoVarsOfCts simples)
-                    ; traceTc "emitFlatConstraints:" $
+              -> do { _ <- promoteTyVarSet (tyCoVarsOfCts simples)
+                    ; traceTc "emitFlatConstraints }" $
                       vcat [ text "simples:" <+> ppr simples
                            , text "holes:  " <+> ppr holes ]
                     ; emitHoles holes -- Holes don't need promotion
@@ -228,6 +233,12 @@ floatKindEqualities :: WantedConstraints -> Maybe (Bag Ct, Bag Hole)
 -- Return Nothing if any constraints can't be floated (captured
 -- by skolems), or if there is an insoluble constraint, or
 -- IC_Telescope telescope error
+-- Precondition 1: we have tried to solve the 'wanteds', both so that
+--    the ic_status field is set, and because solving can make constraints
+--    more floatable.
+-- Precondition 2: the 'wanteds' are zonked, since floatKindEqualities
+--    is not monadic
+-- See Note [floatKindEqualities vs approximateWC]
 floatKindEqualities wc = float_wc emptyVarSet wc
   where
     float_wc :: TcTyCoVarSet -> WantedConstraints -> Maybe (Bag Ct, Bag Hole)
@@ -328,7 +339,7 @@ So here's the plan (see tcHsSigType):
 * buildTvImplication: build an implication for the residual, unsolved
   constraint
 
-* emitFlatConstraints: try to float out every unsolved equalities
+* simplifyAndEmitFlatConstraints: try to float out every unsolved equality
   inside that implication, in the hope that it constrains only global
   type variables, not the locally-quantified ones.
 
@@ -364,6 +375,16 @@ All this is done:
   reporting errors, we avoid that happening.
 
 See also #18062, #11506
+
+Note [floatKindEqualities vs approximateWC]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+floatKindEqualities and approximateWC are strikingly similar to each
+other, but
+
+* floatKindEqualites tries to float /all/ equalities, and fails if
+  it can't, or if any implication is insoluble.
+* approximateWC just floats out any constraints
+  (not just equalities) that can float; it never fails.
 -}
 
 
@@ -1929,7 +1950,7 @@ checkBadTelescope :: Implication -> TcS Bool
 -- See Note [Checking telescopes] in GHC.Tc.Types.Constraint
 checkBadTelescope (Implic { ic_info  = info
                           , ic_skols = skols })
-  | ForAllSkol {} <- info
+  | checkTelescopeSkol info
   = do{ skols <- mapM TcS.zonkTyCoVarKind skols
       ; return (go emptyVarSet (reverse skols))}
 
@@ -2238,6 +2259,7 @@ defaultTyVarTcS the_tv
 approximateWC :: Bool -> WantedConstraints -> Cts
 -- Postcondition: Wanted or Derived Cts
 -- See Note [ApproximateWC]
+-- See Note [floatKindEqualities vs approximateWC]
 approximateWC float_past_equalities wc
   = float_wc emptyVarSet wc
   where

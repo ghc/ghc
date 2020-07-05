@@ -3,7 +3,7 @@ T11142.hs:9:49: error:
     • Expected kind ‘k’, but ‘b’ has kind ‘k0’
         because kind variable ‘k’ would escape its scope
       This (rigid, skolem) kind variable is bound by
-        ‘forall k (a :: k). SameKind a b’
+        an explicit forall k (a :: k)
         at T11142.hs:9:19-49
     • In the second argument of ‘SameKind’, namely ‘b’
       In the type signature:
