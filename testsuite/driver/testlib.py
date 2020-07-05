@@ -502,6 +502,9 @@ def doing_ghci() -> bool:
 def ghc_dynamic() -> bool:
     return config.ghc_dynamic
 
+def ghc_with_threaded_rts() -> bool:
+    return config.ghc_with_threaded_rts
+
 def fast() -> bool:
     return config.speed == 2
 

@@ -79,18 +79,18 @@ else
 dllext = .so
 endif
 
-RUNTEST_OPTS += -e "ghc_compiler_always_flags='$(TEST_HC_OPTS)'"
+RUNTEST_OPTS += --extra-hc-flag='$(TEST_HC_OPTS)'
 
 ifeq "$(GhcDebugged)" "YES"
-RUNTEST_OPTS += -e "config.compiler_debugged=True"
+RUNTEST_OPTS += --config "compiler_debugged=True"
 else
-RUNTEST_OPTS += -e "config.compiler_debugged=False"
+RUNTEST_OPTS += --config "compiler_debugged=False"
 endif
 
 ifeq "$(GhcWithNativeCodeGen)" "YES"
-RUNTEST_OPTS += -e ghc_with_native_codegen=True
+RUNTEST_OPTS += --config "ghc_with_native_codegen=True"
 else
-RUNTEST_OPTS += -e ghc_with_native_codegen=False
+RUNTEST_OPTS += --config "ghc_with_native_codegen=False"
 endif
 
 GHC_PRIM_LIBDIR := $(subst library-dirs: ,,$(shell "$(GHC_PKG)" field ghc-prim library-dirs --simple-output))
@@ -105,21 +105,21 @@ HAVE_READELF := $(shell if readelf --version > /dev/null 2> /dev/null; then echo
 BIGNUM_GMP := $(shell "$(GHC_PKG)" field ghc-bignum exposed-modules | grep GMP)
 
 ifeq "$(HAVE_VANILLA)" "YES"
-RUNTEST_OPTS += -e config.have_vanilla=True
+RUNTEST_OPTS += --config have_vanilla=True
 else
-RUNTEST_OPTS += -e config.have_vanilla=False
+RUNTEST_OPTS += --config have_vanilla=False
 endif
 
 ifeq "$(HAVE_DYNAMIC)" "YES"
-RUNTEST_OPTS += -e config.have_dynamic=True
+RUNTEST_OPTS += --config have_dynamic=True
 else
-RUNTEST_OPTS += -e config.have_dynamic=False
+RUNTEST_OPTS += --config have_dynamic=False
 endif
 
 ifeq "$(HAVE_PROFILING)" "YES"
-RUNTEST_OPTS += -e config.have_profiling=True
+RUNTEST_OPTS += --config have_profiling=True
 else
-RUNTEST_OPTS += -e config.have_profiling=False
+RUNTEST_OPTS += --config have_profiling=False
 endif
 
 ifeq "$(filter thr, $(GhcRTSWays))" "thr"
@@ -135,50 +135,50 @@ RUNTEST_OPTS += -e ghc_with_dynamic_rts=False
 endif
 
 ifeq "$(GhcWithInterpreter)" "NO"
-RUNTEST_OPTS += -e config.have_interp=False
+RUNTEST_OPTS += --config have_interp=False
 else ifeq "$(GhcStage)" "1"
-RUNTEST_OPTS += -e config.have_interp=False
+RUNTEST_OPTS += --config have_interp=False
 else
-RUNTEST_OPTS += -e config.have_interp=True
+RUNTEST_OPTS += --config have_interp=True
 endif
 
 ifeq "$(GhcUnregisterised)" "YES"
-RUNTEST_OPTS += -e config.unregisterised=True
+RUNTEST_OPTS += --config unregisterised=True
 else
-RUNTEST_OPTS += -e config.unregisterised=False
+RUNTEST_OPTS += --config unregisterised=False
 endif
 
 ifeq "$(HAVE_GDB)" "YES"
-RUNTEST_OPTS += -e config.have_gdb=True
+RUNTEST_OPTS += --config have_gdb=True
 else
-RUNTEST_OPTS += -e config.have_gdb=False
+RUNTEST_OPTS += --config have_gdb=False
 endif
 
 ifeq "$(HAVE_READELF)" "YES"
-RUNTEST_OPTS += -e config.have_readelf=True
+RUNTEST_OPTS += --config have_readelf=True
 else
-RUNTEST_OPTS += -e config.have_readelf=False
+RUNTEST_OPTS += --config have_readelf=False
 endif
 
 ifeq "$(BIGNUM_GMP)" ""
-RUNTEST_OPTS += -e config.have_fast_bignum=False
+RUNTEST_OPTS += --config have_fast_bignum=False
 else
-RUNTEST_OPTS += -e config.have_fast_bignum=True
+RUNTEST_OPTS += --config have_fast_bignum=True
 endif
 
 ifeq "$(GhcDynamicByDefault)" "YES"
-RUNTEST_OPTS += -e config.ghc_dynamic_by_default=True
+RUNTEST_OPTS += --config ghc_dynamic_by_default=True
 CABAL_MINIMAL_BUILD = --enable-shared --disable-library-vanilla
 else
-RUNTEST_OPTS += -e config.ghc_dynamic_by_default=False
+RUNTEST_OPTS += --config ghc_dynamic_by_default=False
 CABAL_MINIMAL_BUILD = --enable-library-vanilla --disable-shared
 endif
 
 ifeq "$(GhcDynamic)" "YES"
-RUNTEST_OPTS += -e config.ghc_dynamic=True
+RUNTEST_OPTS += --config ghc_dynamic=True
 CABAL_PLUGIN_BUILD = --enable-shared --disable-library-vanilla
 else
-RUNTEST_OPTS += -e config.ghc_dynamic=False
+RUNTEST_OPTS += --config ghc_dynamic=False
 CABAL_PLUGIN_BUILD = --enable-library-vanilla --disable-shared
 endif
 
@@ -213,9 +213,9 @@ RUNTEST_OPTS += -e darwin=False
 endif
 
 ifeq "$(IN_TREE_COMPILER)" "YES"
-RUNTEST_OPTS += -e config.in_tree_compiler=True
+RUNTEST_OPTS += --config in_tree_compiler=True
 else
-RUNTEST_OPTS += -e config.in_tree_compiler=False
+RUNTEST_OPTS += --config in_tree_compiler=False
 endif
 
 ifneq "$(THREADS)" ""
@@ -243,20 +243,20 @@ RUNTEST_OPTS += --test-env="$(TEST_ENV)"
 endif
 
 ifeq "$(CLEANUP)" "0"
-RUNTEST_OPTS += -e config.cleanup=False
+RUNTEST_OPTS += --config cleanup=False
 else ifeq "$(CLEANUP)" "NO"
-RUNTEST_OPTS += -e config.cleanup=False
+RUNTEST_OPTS += --config cleanup=False
 else
-RUNTEST_OPTS += -e config.cleanup=True
+RUNTEST_OPTS += --config cleanup=True
 endif
 
 ifeq "$(LOCAL)" "0"
 # See Note [Running tests in /tmp].
-RUNTEST_OPTS += -e config.local=False
+RUNTEST_OPTS += --config local=False
 else ifeq "$(LOCAL)" "NO"
-RUNTEST_OPTS += -e config.local=False
+RUNTEST_OPTS += --config local=False
 else
-RUNTEST_OPTS += -e config.local=True
+RUNTEST_OPTS += --config local=True
 endif
 
 RUNTEST_OPTS +=  \
@@ -315,30 +315,30 @@ RUNTEST_OPTS +=  \
 	$(EXTRA_RUNTEST_OPTS)
 
 ifeq "$(list_broken)" "YES"
-set_list_broken = -e config.list_broken=True
+set_list_broken = --config list_broken=True
 else
 set_list_broken =
 endif
 
 # See Note [validate and testsuite speed] in toplevel Makefile.
 ifneq "$(SPEED)" ""
-setspeed = -e config.speed="$(SPEED)"
+setspeed = --config speed="$(SPEED)"
 else ifeq "$(fast)" "YES"
 # Backward compatibility. Maybe some people are running 'make accept fast=YES'?
-setspeed = -e config.speed=2
+setspeed = --config speed=2
 else
 setspeed =
 endif
 
 ifeq "$(accept)" "YES"
-setaccept = -e config.accept=True
+setaccept = --config accept=True
 
 ifeq "$(PLATFORM)" "YES"
-setaccept += -e config.accept_platform=True
+setaccept += --config accept_platform=True
 endif
 
 ifeq "$(OS)" "YES"
-setaccept += -e config.accept_os=True
+setaccept += --config accept_os=True
 endif
 
 else

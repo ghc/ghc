@@ -1,10 +1,12 @@
 # vim: set filetype=python:
 
 import re
+from testglobals import TestConfig, WayName
+from testutil import getStdout
 
 class TestsuiteConfig:
     @staticmethod
-    def init_config(config: TestConfig)
+    def init_config(config: TestConfig) -> None:
         raise NotImplemented
 
     @staticmethod
@@ -18,18 +20,19 @@ class GHCTestsuiteConfig(TestsuiteConfig):
 
     @staticmethod
     def init_config(config: TestConfig):
-        config.compiler_always_flags = ghc_compiler_always_flags.split()
+        WayNames = lambda xs: [ WayName(x) for x in xs ]
 
         # By default, the 'normal' and 'hpc' ways are enabled. In addition, certain
         # ways are enabled automatically if this GHC supports them. Ways that fall in
         # this group are 'optasm', 'optllvm', 'profasm', 'threaded1', 'threaded2',
         # 'profthreaded', 'ghci', and whichever of 'static/dyn' is not this GHC's
         # default mode. Other ways should be set explicitly from .T files.
-        config.compile_ways       = ['normal', 'hpc']
-        config.run_ways           = ['normal', 'hpc']
+        config.compile_ways       = WayNames(['normal', 'hpc'])
+        config.run_ways           = WayNames(['normal', 'hpc'])
 
         # ways that are not enabled by default, but can always be invoked explicitly
-        config.other_ways         = ['prof', 'normal_h',
+        config.other_ways         = WayNames([
+                                    'prof', 'normal_h',
                                     'prof_hc_hb','prof_hb',
                                     'prof_hd','prof_hy','prof_hr',
                                     'sanity',
@@ -43,44 +46,45 @@ class GHCTestsuiteConfig(TestsuiteConfig):
                                     'nonmoving_thr',
                                     'nonmoving_thr_ghc',
                                     'compacting_gc',
-                                    ]
+                                    ])
 
-        if ghc_with_native_codegen:
-            config.compile_ways.append('optasm')
-            config.run_ways.append('optasm')
+        if config.ghc_with_native_codegen:
+            config.compile_ways.append(WayName('optasm'))
+            config.run_ways.append(WayName('optasm'))
 
         if config.have_profiling:
-            config.compile_ways.append('profasm')
-            config.run_ways.append('profasm')
+            config.compile_ways.append(WayName('profasm'))
+            config.run_ways.append(WayName('profasm'))
 
         if config.have_interp:
-            config.run_ways.append('ghci')
+            config.run_ways.append(WayName('ghci'))
 
-        if ghc_with_threaded_rts:
-            config.run_ways.append('threaded1')
-            if ghc_with_smp:
+        if config.ghc_with_threaded_rts:
+            config.run_ways.append(WayName('threaded1'))
+            if config.ghc_with_smp:
                 config.have_smp = True
-                config.run_ways.append('threaded2')
+                config.run_ways.append(WayName('threaded2'))
                 if config.speed == 0:
-                    config.run_ways.append('nonmoving_thr')
+                    config.run_ways.append(WayName('nonmoving_thr'))
 
-        if ghc_with_dynamic_rts:
+        if config.ghc_with_dynamic_rts:
             config.have_shared_libs = True
 
         if config.ghc_dynamic_by_default and config.have_vanilla == 1:
-            config.run_ways.append('static')
+            config.run_ways.append(WayName('static'))
         else:
-            if ghc_with_dynamic_rts:
-                config.run_ways.append('dyn')
+            if config.ghc_with_dynamic_rts:
+                config.run_ways.append(WayName('dyn'))
 
-        if (config.have_profiling and ghc_with_threaded_rts):
-            config.run_ways.append('profthreaded')
+        if (config.have_profiling and config.ghc_with_threaded_rts):
+            config.run_ways.append(WayName('profthreaded'))
 
-        if (ghc_with_llvm and not config.unregisterised):
-            config.compile_ways.append('optllvm')
-            config.run_ways.append('optllvm')
+        if (config.ghc_with_llvm and not config.unregisterised):
+            config.compile_ways.append(WayName('optllvm'))
+            config.run_ways.append(WayName('optllvm'))
 
-        config.way_flags = {
+        WayFlags = lambda d: { WayName(k): v for k, v in d.items() }
+        config.way_flags = WayFlags({
             'normal'       : [],
             'normal_h'     : [],
             'g1'           : [],
@@ -120,9 +124,9 @@ class GHCTestsuiteConfig(TestsuiteConfig):
             'nonmoving_thr': ['-threaded'],
             'nonmoving_thr_ghc': ['+RTS', '-xn', '-N2', '-RTS', '-threaded'],
             'compacting_gc': [],
-        }
+        })
 
-        config.way_rts_flags = {
+        config.way_rts_flags = WayFlags({
             'normal'       : [],
             'normal_h'     : ['-h'], # works without -prof
             'g1'           : ['-G1'],
@@ -162,30 +166,35 @@ class GHCTestsuiteConfig(TestsuiteConfig):
             'nonmoving_thr'    : ['-xn', '-N2'],
             'nonmoving_thr_ghc': ['-xn', '-N2'],
             'compacting_gc': ['-c'],
-        }
+        })
 
         # Useful classes of ways that can be used with only_ways(), omit_ways() and
         # expect_broken_for().
+        # 
+        # These are injected into the global scope which the tests are
+        # evaluated within.
+        globals = {
+            'prof_ways'       : [x[0] for x in config.way_flags.items()
+                                      if '-prof' in x[1]],
 
-        prof_ways     = [x[0] for x in config.way_flags.items()
-                            if '-prof' in x[1]]
+            'threaded_ways'   : [x[0] for x in config.way_flags.items()
+                                      if '-threaded' in x[1] or 'ghci' == x[0]],
 
-        threaded_ways = [x[0] for x in config.way_flags.items()
-                            if '-threaded' in x[1] or 'ghci' == x[0]]
+            # Ways which run with multiple capabilities
+            'concurrent_ways' : [name for name, flags in config.way_flags.items()
+                                      if '-threaded' in flags or 'ghci' == name
+                                      if '-N2' in config.way_rts_flags.get(name, [])],
 
-        # Ways which run with multiple capabilities
-        concurrent_ways = [name for name, flags in config.way_flags.items()
-                                if '-threaded' in flags or 'ghci' == name
-                                if '-N2' in config.way_rts_flags.get(name, [])]
+            'opt_ways'        : [x[0] for x in config.way_flags.items()
+                                      if '-O' in x[1]],
 
-        opt_ways      = [x[0] for x in config.way_flags.items()
-                            if '-O' in x[1]]
-
-        llvm_ways     = [x[0] for x in config.way_flags.items()
-                            if '-fflvm' in x[1]]
+            'llvm_ways'       : [x[0] for x in config.way_flags.items()
+                                      if '-fflvm' in x[1]],
+        }
+        return globals
 
     @staticmethod
-    def get_compiler_info():
+    def get_compiler_info(config):
         s = getStdout([config.compiler, '--info'])
         s = re.sub('[\r\n]', '', s)
         compilerInfoDict = dict(eval(s))

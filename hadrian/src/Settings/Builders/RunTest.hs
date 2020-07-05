@@ -105,38 +105,38 @@ runTestBuilderArgs = builder RunTest ? do
             , pure [ "--rootdir=" ++ testdir | testdir <- rootdirs ]
             , arg "-e", arg $ "windows=" ++ show windowsHost
             , arg "-e", arg $ "darwin=" ++ show osxHost
-            , arg "-e", arg $ "config.local=False"
-            , arg "-e", arg $ "config.cleanup=" ++ show (not keepFiles)
-            , arg "-e", arg $ "config.accept=" ++ show accept
-            , arg "-e", arg $ "config.accept_platform=" ++ show acceptPlatform
-            , arg "-e", arg $ "config.accept_os=" ++ show acceptOS
-            , arg "-e", arg $ "config.exeext=" ++ quote (if null exe then "" else "."<>exe)
-            , arg "-e", arg $ "config.compiler_debugged=" ++
+            , arg "--config", arg $ "local=False"
+            , arg "--config", arg $ "cleanup=" ++ show (not keepFiles)
+            , arg "--config", arg $ "accept=" ++ show accept
+            , arg "--config", arg $ "accept_platform=" ++ show acceptPlatform
+            , arg "--config", arg $ "accept_os=" ++ show acceptOS
+            , arg "--config", arg $ "exeext=" ++ quote (if null exe then "" else "."<>exe)
+            , arg "--config", arg $ "compiler_debugged=" ++
               show debugged
             , arg "-e", arg $ asBool "ghc_with_native_codegen=" withNativeCodeGen
 
-            , arg "-e", arg $ "config.have_interp=" ++ show withInterpreter
-            , arg "-e", arg $ "config.unregisterised=" ++ show unregisterised
+            , arg "--config", arg $ "have_interp=" ++ show withInterpreter
+            , arg "--config", arg $ "unregisterised=" ++ show unregisterised
 
-            , arg "-e", arg $ "ghc_compiler_always_flags=" ++ quote ghcFlags
-            , arg "-e", arg $ asBool "ghc_with_dynamic_rts="  (hasRtsWay "dyn")
-            , arg "-e", arg $ asBool "ghc_with_threaded_rts=" (hasRtsWay "thr")
-            , arg "-e", arg $ asBool "config.have_vanilla="   (hasLibWay vanilla)
-            , arg "-e", arg $ asBool "config.have_dynamic="   (hasLibWay dynamic)
-            , arg "-e", arg $ asBool "config.have_profiling=" (hasLibWay profiling)
-            , arg "-e", arg $ asBool "config.have_fast_bignum=" (bignumBackend /= "native" && not bignumCheck)
-            , arg "-e", arg $ asBool "ghc_with_smp=" withSMP
-            , arg "-e", arg $ asBool "ghc_with_llvm=" withLlvm
+            , arg "--extra-hc-flag", arg (quote ghcFlags)
+            , arg "--config", arg $ asBool "ghc_with_dynamic_rts="  (hasRtsWay "dyn")
+            , arg "--config", arg $ asBool "ghc_with_threaded_rts=" (hasRtsWay "thr")
+            , arg "--config", arg $ asBool "have_vanilla="   (hasLibWay vanilla)
+            , arg "--config", arg $ asBool "have_dynamic="   (hasLibWay dynamic)
+            , arg "--config", arg $ asBool "have_profiling=" (hasLibWay profiling)
+            , arg "--config", arg $ asBool "have_fast_bignum=" (bignumBackend /= "native" && not bignumCheck)
+            , arg "--config", arg $ asBool "ghc_with_smp=" withSMP
+            , arg "--config", arg $ asBool "ghc_with_llvm=" withLlvm
 
 
-            , arg "-e", arg $ "config.ghc_dynamic_by_default=" ++ show hasDynamicByDefault
-            , arg "-e", arg $ "config.ghc_dynamic=" ++ show hasDynamic
+            , arg "--config", arg $ "ghc_dynamic_by_default=" ++ show hasDynamicByDefault
+            , arg "--config", arg $ "ghc_dynamic=" ++ show hasDynamic
 
-            , arg "-e", arg $ "config.top=" ++ show (top -/- "testsuite")
-            , arg "-e", arg $ "config.wordsize=" ++ show wordsize
-            , arg "-e", arg $ "config.os="       ++ show os
-            , arg "-e", arg $ "config.arch="     ++ show arch
-            , arg "-e", arg $ "config.platform=" ++ show platform
+            , arg "--config", arg $ "top=" ++ show (top -/- "testsuite")
+            , arg "--config", arg $ "wordsize=" ++ show wordsize
+            , arg "--config", arg $ "os="       ++ show os
+            , arg "--config", arg $ "arch="     ++ show arch
+            , arg "--config", arg $ "platform=" ++ show platform
 
             , arg "--config", arg $ "gs=gs"                           -- Use the default value as in test.mk
             , arg "--config", arg $ "timeout_prog=" ++ show (top -/- timeoutProg)
