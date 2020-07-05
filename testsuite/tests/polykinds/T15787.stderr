@@ -1,7 +1,7 @@
 
 T15787.hs:15:14: error:
-    • Expected a type, but ‘k’ has kind ‘ob’
-      ‘ob’ is a rigid type variable bound by
+    • Expected a type, but ‘k’ has kind ‘ob1’
+      ‘ob1’ is a rigid type variable bound by
         the data constructor ‘Kl’
         at T15787.hs:15:3-43
     • In the type ‘k’
