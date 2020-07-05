@@ -1682,7 +1682,7 @@ defineMacro overwrite s = do
           ioM = nlHsTyVar (getRdrName ioTyConName) `nlHsAppTy` stringTy
           body = nlHsVar compose_RDR `mkHsApp` (nlHsPar step)
                                      `mkHsApp` (nlHsPar expr)
-          tySig = mkLHsSigWcType (nlHsFunTy HsUnrestrictedArrow stringTy ioM)
+          tySig = hsTypeToHsSigWcType (nlHsFunTy HsUnrestrictedArrow stringTy ioM)
           new_expr = L (getLoc expr) $ ExprWithTySig noExtField body tySig
       hv <- GHC.compileParsedExprRemote new_expr
 
@@ -1750,7 +1750,7 @@ getGhciStepIO = do
       ghciM = nlHsTyVar (getRdrName ghciTyConName) `nlHsAppTy` stringTy
       ioM = nlHsTyVar (getRdrName ioTyConName) `nlHsAppTy` stringTy
       body = nlHsVar (getRdrName ghciStepIoMName)
-      tySig = mkLHsSigWcType (nlHsFunTy HsUnrestrictedArrow ghciM ioM)
+      tySig = hsTypeToHsSigWcType (nlHsFunTy HsUnrestrictedArrow ghciM ioM)
   return $ noLoc $ ExprWithTySig noExtField body tySig
 
 -----------------------------------------------------------------------------

@@ -195,17 +195,15 @@ checkInferredVars :: HsDocContext
                   -> RnM ()
 checkInferredVars _    Nothing    _  = return ()
 checkInferredVars ctxt (Just msg) ty =
-  let bndrs = forallty_bndrs (hsSigType ty)
+  let bndrs = sig_ty_bndrs ty
   in case find ((==) InferredSpec . hsTyVarBndrFlag) bndrs of
     Nothing -> return ()
     Just _  -> addErr $ withHsDocContext ctxt msg
   where
-    forallty_bndrs :: LHsType GhcPs -> [HsTyVarBndr Specificity GhcPs]
-    forallty_bndrs (L _ ty) = case ty of
-      HsParTy _ ty' -> forallty_bndrs ty'
-      HsForAllTy { hst_tele = HsForAllInvis { hsf_invis_bndrs = tvs }}
-                    -> map unLoc tvs
-      _             -> []
+    sig_ty_bndrs :: LHsSigType GhcPs -> [HsTyVarBndr Specificity GhcPs]
+    sig_ty_bndrs (L _ (HsSig{sig_bndrs = outer_bndrs})) = case outer_bndrs of
+      OuterImplicit{}         -> []
+      OuterExplicit exp_bndrs -> map unLoc exp_bndrs
 
 {-
 Note [Unobservably inferred type variables]

@@ -730,8 +730,12 @@ type family XXLHsQTyVars  x
 
 -- -------------------------------------
 
-type family XHsIB              x b
-type family XXHsImplicitBndrs  x b
+type family XHsOuterImplicit    x
+
+-- -------------------------------------
+
+type family XHsSig      x
+type family XXHsSigType x
 
 -- -------------------------------------
 
