@@ -492,7 +492,7 @@ tcInstTypeBndrs id
 
 tcSkolDFunType :: DFunId -> TcM ([TcTyVar], TcThetaType, TcType)
 -- Instantiate a type signature with skolem constants.
--- We could give them fresh names, but no need to do so
+-- This freshens the names, but no need to do so
 tcSkolDFunType dfun
   = do { (tv_prs, theta, tau) <- tcInstType tcInstSuperSkolTyVars dfun
        ; return (map snd tv_prs, theta, tau) }
@@ -524,13 +524,18 @@ tcInstSkolTyVarsX = tcInstSkolTyVarsPushLevel False
 
 tcInstSuperSkolTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
 -- See Note [Skolemising type variables]
+-- This version freshens the names and creates "super skolems";
+-- see comments around superSkolemTv.
 tcInstSuperSkolTyVars = tcInstSuperSkolTyVarsX emptyTCvSubst
 
 tcInstSuperSkolTyVarsX :: TCvSubst -> [TyVar] -> TcM (TCvSubst, [TcTyVar])
 -- See Note [Skolemising type variables]
+-- This version freshens the names and creates "super skolems";
+-- see comments around superSkolemTv.
 tcInstSuperSkolTyVarsX subst = tcInstSkolTyVarsPushLevel True subst
 
-tcInstSkolTyVarsPushLevel :: Bool -> TCvSubst -> [TyVar]
+tcInstSkolTyVarsPushLevel :: Bool  -- True <=> make "super skolem"
+                          -> TCvSubst -> [TyVar]
                           -> TcM (TCvSubst, [TcTyVar])
 -- Skolemise one level deeper, hence pushTcLevel
 -- See Note [Skolemising type variables]
@@ -599,10 +604,22 @@ a) Level allocation. We generally skolemise /before/ calling
 b) The [TyVar] should be ordered (kind vars first)
    See Note [Kind substitution when instantiating]
 
-c) It's a complete freshening operation: the skolems have a fresh
-   unique, and a location from the monad
+c) Clone the variable to give a fresh unique.  This is essential.
+   Consider (tc160)
+       type Foo x = forall a. a -> x
+   And typecheck the expression
+       (e :: Foo (Foo ())
+   We will skolemise the signature, but after expanding synonyms it
+   looks like
+        forall a. a -> forall a. a -> x
+   We don't want to make two big-lambdas with the same unique!
 
-d) The resulting skolems are
+d) We retain locations. Because the location of the variable is the correct
+   location to report in errors (e.g. in the signature). We don't want the
+   location to change to the body of the function, which does *not* explicitly
+   bind the variable.
+
+e) The resulting skolems are
         non-overlappable for tcInstSkolTyVars,
    but overlappable for tcInstSuperSkolTyVars
    See GHC.Tc.Deriv.Infer Note [Overlap and deriving] for an example

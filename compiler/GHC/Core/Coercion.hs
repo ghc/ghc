@@ -1190,7 +1190,7 @@ mkGReflLeftCo r ty co
 mkCoherenceLeftCo :: Role -> Type -> CoercionN -> Coercion -> Coercion
 mkCoherenceLeftCo r ty co co2
   | isGReflCo co = co2
-  | otherwise = (mkSymCo $ GRefl r ty (MCo co)) `mkTransCo` co2
+  | otherwise    = (mkSymCo $ GRefl r ty (MCo co)) `mkTransCo` co2
 
 -- | Given @ty :: k1@, @co :: k1 ~ k2@, @co2:: ty' ~r ty@,
 -- produces @co' :: ty' ~r (ty |> co)
@@ -1199,7 +1199,7 @@ mkCoherenceLeftCo r ty co co2
 mkCoherenceRightCo :: Role -> Type -> CoercionN -> Coercion -> Coercion
 mkCoherenceRightCo r ty co co2
   | isGReflCo co = co2
-  | otherwise = co2 `mkTransCo` GRefl r ty (MCo co)
+  | otherwise    = co2 `mkTransCo` GRefl r ty (MCo co)
 
 -- | Given @co :: (a :: k) ~ (b :: k')@ produce @co' :: k ~ k'@.
 mkKindCo :: Coercion -> Coercion
