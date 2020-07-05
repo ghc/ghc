@@ -30,6 +30,7 @@ from testglobals import getConfig, ghc_env, getTestRun, TestConfig, \
 from my_typing import TestName, List
 from perf_notes import MetricChange, GitRef, inside_git_repo, is_worktree_dirty, format_perf_stat
 import perf_notes as Perf
+import testsuite_config
 from junit import junit
 import term_color
 from term_color import Color, colored
@@ -243,11 +244,6 @@ def main() -> None:
     os.environ['TERM'] = 'vt100'
     ghc_env['TERM'] = 'vt100'
 
-    def get_compiler_info() -> TestConfig:
-        """ Overriddden by configuration file. """
-        raise NotImplementedError
-
-
     # -----------------------------------------------------------------------------
     # cmd-line options
 
@@ -283,9 +279,8 @@ def main() -> None:
         for e in args.e:
             exec(e)
 
-    if args.config_file:
-        for arg in args.config_file:
-            exec(open(arg).read())
+    ts_config = testsuite_config.GHCTestsuiteConfig
+    ts_config.init_config()
 
     if args.config:
         for arg in args.config:
@@ -368,7 +363,7 @@ def main() -> None:
     term_color.enable_color = config.supports_colors
 
     # This has to come after arg parsing as the args can change the compiler
-    get_compiler_info()
+    ts_config.get_compiler_info(config)
 
     # Can't import this earlier as we need to know if threading will be
     # enabled or not
