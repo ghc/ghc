@@ -488,12 +488,12 @@ can't conveniently come up with an Addr#.
 #include "MachDeps.h"
 
 data Module = Module
-                TrName   -- Package name
-                TrName   -- Module name
+                TrName   -- ^ Package name
+                TrName   -- ^ Module name
 
 data TrName
-  = TrNameS Addr#  -- Static
-  | TrNameD [Char] -- Dynamic
+  = TrNameS Addr#  -- ^ Static
+  | TrNameD [Char] -- ^ Dynamic
 
 -- | A de Bruijn index for a binder within a 'KindRep'.
 type KindBndr = Int
@@ -520,8 +520,9 @@ data TypeLitSort = TypeLitSymbol
                  | TypeLitNat
 
 -- Show instance for TyCon found in GHC.Show
-data TyCon = TyCon WORD64_TY WORD64_TY   -- Fingerprint
-                   Module                -- Module in which this is defined
-                   TrName                -- Type constructor name
-                   Int#                  -- How many kind variables do we accept?
-                   KindRep               -- A representation of the type's kind
+data TyCon = TyCon WORD64_TY  -- ^ Fingerprint (high)
+                   WORD64_TY  -- ^ Fingerprint (low)
+                   Module     -- ^ Module in which this is defined
+                   TrName     -- ^ Type constructor name
+                   Int#       -- ^ How many kind variables do we accept?
+                   KindRep    -- ^ A representation of the type's kind
