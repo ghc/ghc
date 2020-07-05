@@ -1610,8 +1610,8 @@ kcConDecl new_or_data res_kind (ConDeclH98
        }
 
 kcConDecl new_or_data res_kind (ConDeclGADT
-    { con_names = names, con_qvars = explicit_tkv_nms, con_mb_cxt = cxt
-    , con_args = args, con_res_ty = res_ty, con_g_ext = implicit_tkv_nms })
+    { con_names = names, con_bndrs = L _ outer_bndrs, con_mb_cxt = cxt
+    , con_args = args, con_res_ty = res_ty })
   = -- Even though the GADT-style data constructor's type is closed,
     -- we must still kind-check the type, because that may influence
     -- the inferred kind of the /type/ constructor.  Example:
@@ -1620,9 +1620,8 @@ kcConDecl new_or_data res_kind (ConDeclGADT
     -- If we don't look at MkT we won't get the correct kind
     -- for the type constructor T
     addErrCtxt (dataConCtxtName names) $
-    discardResult $
-    bindImplicitTKBndrs_Tv implicit_tkv_nms $
-    bindExplicitTKBndrs_Tv explicit_tkv_nms $
+    discardResult                      $
+    bindOuterSigTKBndrs_Tv outer_bndrs $
         -- Why "_Tv"?  See Note [Kind-checking for GADTs]
     do { _ <- tcHsMbContext cxt
        ; kcConArgTys new_or_data res_kind (hsConDeclArgTys args)
@@ -2411,11 +2410,10 @@ tcDefaultAssocDecl _ (d1:_:_)
 
 tcDefaultAssocDecl fam_tc
   [L loc (TyFamInstDecl { tfid_eqn =
-         HsIB { hsib_ext  = imp_vars
-              , hsib_body = FamEqn { feqn_tycon = L _ tc_name
-                                   , feqn_bndrs = mb_expl_bndrs
+                            FamEqn { feqn_tycon = L _ tc_name
+                                   , feqn_bndrs = outer_bndrs
                                    , feqn_pats  = hs_pats
-                                   , feqn_rhs   = hs_rhs_ty }}})]
+                                   , feqn_rhs   = hs_rhs_ty }})]
   = -- See Note [Type-checking default assoc decls]
     setSrcSpan loc $
     tcAddFamInstCtxt (text "default type instance") tc_name $
@@ -2439,8 +2437,7 @@ tcDefaultAssocDecl fam_tc
        -- type default LHS can mention *different* type variables than the
        -- enclosing class. So it's treated more as a freestanding beast.
        ; (qtvs, pats, rhs_ty) <- tcTyFamInstEqnGuts fam_tc NotAssociated
-                                                    imp_vars (mb_expl_bndrs `orElse` [])
-                                                    hs_pats hs_rhs_ty
+                                      outer_bndrs hs_pats hs_rhs_ty
 
        ; let fam_tvs = tyConTyVars fam_tc
        ; traceTc "tcDefaultAssocDecl 2" (vcat
@@ -2819,17 +2816,15 @@ kcTyFamInstEqn :: TcTyCon -> LTyFamInstEqn GhcRn -> TcM ()
 -- Used for the equations of a closed type family only
 -- Not used for data/type instances
 kcTyFamInstEqn tc_fam_tc
-    (L loc (HsIB { hsib_ext = imp_vars
-                 , hsib_body = FamEqn { feqn_tycon = L _ eqn_tc_name
-                                      , feqn_bndrs = mb_expl_bndrs
-                                      , feqn_pats  = hs_pats
-                                      , feqn_rhs   = hs_rhs_ty }}))
+    (L loc (FamEqn { feqn_tycon = L _ eqn_tc_name
+                   , feqn_bndrs = outer_bndrs
+                   , feqn_pats  = hs_pats
+                   , feqn_rhs   = hs_rhs_ty }))
   = setSrcSpan loc $
     do { traceTc "kcTyFamInstEqn" (vcat
            [ text "tc_name ="    <+> ppr eqn_tc_name
            , text "fam_tc ="     <+> ppr tc_fam_tc <+> dcolon <+> ppr (tyConKind tc_fam_tc)
-           , text "hsib_vars ="  <+> ppr imp_vars
-           , text "feqn_bndrs =" <+> ppr mb_expl_bndrs
+           , text "feqn_bndrs =" <+> ppr outer_bndrs
            , text "feqn_pats ="  <+> ppr hs_pats ])
           -- this check reports an arity error instead of a kind error; easier for user
        ; let vis_pats = numVisibleArgs hs_pats
@@ -2845,8 +2840,7 @@ kcTyFamInstEqn tc_fam_tc
                   wrongNumberOfParmsErr vis_arity
 
        ; discardResult $
-         bindImplicitTKBndrs_Q_Tv imp_vars $
-         bindExplicitTKBndrs_Q_Tv AnyKind (mb_expl_bndrs `orElse` []) $
+         bindOuterFamEqnTKBndrs_Q_Tv outer_bndrs $
          do { (_fam_app, res_kind) <- tcFamTyPats tc_fam_tc hs_pats
             ; tcCheckLHsType hs_rhs_ty (TheKind res_kind) }
              -- Why "_Tv" here?  Consider (#14066
@@ -2866,10 +2860,9 @@ tcTyFamInstEqn :: TcTyCon -> AssocInstInfo -> LTyFamInstEqn GhcRn
 -- (typechecked here) have TyFamInstEqns
 
 tcTyFamInstEqn fam_tc mb_clsinfo
-    (L loc (HsIB { hsib_ext = imp_vars
-                 , hsib_body = FamEqn { feqn_bndrs  = mb_expl_bndrs
-                                      , feqn_pats   = hs_pats
-                                      , feqn_rhs    = hs_rhs_ty }}))
+    (L loc (FamEqn { feqn_bndrs  = outer_bndrs
+                   , feqn_pats   = hs_pats
+                   , feqn_rhs    = hs_rhs_ty }))
   = setSrcSpan loc $
     do { traceTc "tcTyFamInstEqn" $
          vcat [ ppr fam_tc <+> ppr hs_pats
@@ -2888,8 +2881,7 @@ tcTyFamInstEqn fam_tc mb_clsinfo
        ; checkTc (vis_pats == vis_arity) $
          wrongNumberOfParmsErr vis_arity
        ; (qtvs, pats, rhs_ty) <- tcTyFamInstEqnGuts fam_tc mb_clsinfo
-                                      imp_vars (mb_expl_bndrs `orElse` [])
-                                      hs_pats hs_rhs_ty
+                                      outer_bndrs hs_pats hs_rhs_ty
        -- Don't print results they may be knot-tied
        -- (tcFamInstEqnGuts zonks to Type)
        ; return (mkCoAxBranch qtvs [] [] pats rhs_ty
@@ -2956,12 +2948,12 @@ generalising over the type of a rewrite rule.
 
 --------------------------
 tcTyFamInstEqnGuts :: TyCon -> AssocInstInfo
-                   -> [Name] -> [LHsTyVarBndr () GhcRn] -- Implicit and explicit binder
+                   -> HsOuterFamEqnTyVarBndrs GhcRn     -- Implicit and explicit binders
                    -> HsTyPats GhcRn                    -- Patterns
                    -> LHsType GhcRn                     -- RHS
                    -> TcM ([TyVar], [TcType], TcType)   -- (tyvars, pats, rhs)
 -- Used only for type families, not data families
-tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
+tcTyFamInstEqnGuts fam_tc mb_clsinfo outer_bndrs hs_pats hs_rhs_ty
   = do { traceTc "tcTyFamInstEqnGuts {" (ppr fam_tc)
 
        -- By now, for type families (but not data families) we should
@@ -2969,10 +2961,9 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
 
        -- This code is closely related to the code
        -- in GHC.Tc.Gen.HsType.kcCheckDeclHeader_cusk
-       ; (tclvl, wanted, (imp_tvs, (exp_tvs, (lhs_ty, rhs_ty))))
+       ; (tclvl, wanted, (scoped_tvs, (lhs_ty, rhs_ty)))
                <- pushLevelAndSolveEqualitiesX "tcTyFamInstEqnGuts" $
-                  bindImplicitTKBndrs_Q_Skol imp_vars               $
-                  bindExplicitTKBndrs_Q_Skol AnyKind exp_bndrs      $
+                  tcOuterFamEqnTKBndrs outer_bndrs $
                   do { (lhs_ty, rhs_kind) <- tcFamTyPats fam_tc hs_pats
                        -- Ensure that the instance is consistent with its
                        -- parent class (#16008)
@@ -2987,7 +2978,7 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
        -- check there too!
 
        -- See Note [Generalising in tcTyFamInstEqnGuts]
-       ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys (imp_tvs ++ exp_tvs))
+       ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys scoped_tvs)
        ; qtvs <- quantifyTyVars dvs
        ; reportUnsolvedEqualities FamInstSkol qtvs tclvl wanted
 
@@ -3192,8 +3183,8 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
        ; traceTc "tcConDecl 1" (vcat [ ppr name, ppr explicit_tkv_nms ])
 
        ; (tclvl, wanted, (exp_tvbndrs, (ctxt, arg_tys, field_lbls, stricts)))
-           <- pushLevelAndSolveEqualitiesX "tcConDecl:H98" $
-              bindExplicitTKBndrs_Skol explicit_tkv_nms    $
+           <- pushLevelAndSolveEqualitiesX "tcConDecl:H98"  $
+              tcExplicitTKBndrs explicit_tkv_nms            $
               do { ctxt <- tcHsMbContext hs_ctxt
                  ; let exp_kind = getArgExpKind new_or_data res_kind
                  ; btys <- tcConArgs exp_kind hs_args
@@ -3263,19 +3254,17 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
 tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
   -- NB: don't use res_kind here, as it's ill-scoped. Instead,
   -- we get the res_kind by typechecking the result type.
-          (ConDeclGADT { con_g_ext = implicit_tkv_nms
-                       , con_names = names
-                       , con_qvars = explicit_tkv_nms
+          (ConDeclGADT { con_names = names
+                       , con_bndrs = L _ outer_bndrs
                        , con_mb_cxt = cxt, con_args = hs_args
                        , con_res_ty = hs_res_ty })
   = addErrCtxt (dataConCtxtName names) $
     do { traceTc "tcConDecl 1 gadt" (ppr names)
        ; let (L _ name : _) = names
 
-       ; (tclvl, wanted, (imp_tvs, (exp_tvbndrs, (ctxt, arg_tys, res_ty, field_lbls, stricts))))
+       ; (tclvl, wanted, (outer_bndrs, (ctxt, arg_tys, res_ty, field_lbls, stricts)))
            <- pushLevelAndSolveEqualitiesX "tcConDecl:GADT" $
-              bindImplicitTKBndrs_Skol implicit_tkv_nms     $
-              bindExplicitTKBndrs_Skol explicit_tkv_nms     $
+              tcOuterTKBndrs skol_info outer_bndrs          $
               do { ctxt <- tcHsMbContext cxt
                  ; (res_ty, res_kind) <- tcInferLHsTypeKind hs_res_ty
                          -- See Note [GADT return kinds]
@@ -3288,19 +3277,16 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
                  ; field_lbls <- lookupConstructorFields name
                  ; return (ctxt, arg_tys, res_ty, field_lbls, stricts)
                  }
-       ; imp_tvs <- zonkAndScopedSort imp_tvs
-       ; let con_ty = mkSpecForAllTys imp_tvs      $
-                      mkInvisForAllTys exp_tvbndrs $
-                      mkPhiTy ctxt                 $
-                      mkVisFunTys arg_tys          $
-                      res_ty
-       ; kvs <- kindGeneralizeAll con_ty
 
-       ; let tvbndrs =  mkTyVarBinders InferredSpec  kvs
-                     ++ mkTyVarBinders SpecifiedSpec imp_tvs
-                     ++ exp_tvbndrs
+       ; (outer_tv_bndrs :: [TcInvisTVBinder]) <- scopedSortOuter outer_bndrs
 
-       ; reportUnsolvedEqualities skol_info (binderVars tvbndrs) tclvl wanted
+       ; tkvs <- kindGeneralizeAll (mkInvisForAllTys outer_tv_bndrs $
+                                    mkPhiTy ctxt $
+                                    mkVisFunTys arg_tys $
+                                    res_ty)
+       ; reportUnsolvedEqualities skol_info tkvs tclvl wanted
+
+       ; let tvbndrs =  mkTyVarBinders InferredSpec tkvs ++ outer_tv_bndrs
 
              -- Zonk to Types
        ; (ze, tvbndrs) <- zonkTyVarBinders       tvbndrs
@@ -4784,8 +4770,7 @@ tcAddTyFamInstCtxt decl
   = tcAddFamInstCtxt (text "type instance") (tyFamInstDeclName decl)
 
 tcMkDataFamInstCtxt :: DataFamInstDecl GhcRn -> SDoc
-tcMkDataFamInstCtxt decl@(DataFamInstDecl { dfid_eqn =
-                            HsIB { hsib_body = eqn }})
+tcMkDataFamInstCtxt decl@(DataFamInstDecl { dfid_eqn = eqn })
   = tcMkFamInstCtxt (pprDataFamInstFlavour decl <+> text "instance")
                     (unLoc (feqn_tycon eqn))
 

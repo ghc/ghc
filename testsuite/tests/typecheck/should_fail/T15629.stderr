@@ -4,16 +4,14 @@ T15629.hs:26:37: error:
       Expected kind ‘x ~> F x ab’,
         but ‘F1Sym :: x ~> F x z’ has kind ‘x ~> F x z’
       ‘z’ is a rigid type variable bound by
-        ‘forall z ab.
-         Proxy ((Comp (F1Sym :: x ~> F x z) F2Sym) :: F x ab ~> F x ab)’
+        an explicit forall z ab
         at T15629.hs:26:17
       ‘ab’ is a rigid type variable bound by
-        ‘forall z ab.
-         Proxy ((Comp (F1Sym :: x ~> F x z) F2Sym) :: F x ab ~> F x ab)’
+        an explicit forall z ab
         at T15629.hs:26:19-20
     • In the first argument of ‘Comp’, namely ‘(F1Sym :: x ~> F x z)’
       In the first argument of ‘Proxy’, namely
         ‘((Comp (F1Sym :: x ~> F x z) F2Sym) :: F x ab ~> F x ab)’
       In the type signature:
-        g :: forall z ab.
-             Proxy ((Comp (F1Sym :: x ~> F x z) F2Sym) :: F x ab ~> F x ab)
+        g :: forall z ab. Proxy ((Comp (F1Sym :: x
+                                                 ~> F x z) F2Sym) :: F x ab ~> F x ab)
