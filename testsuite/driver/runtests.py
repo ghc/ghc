@@ -5,6 +5,7 @@
 #
 
 import argparse
+from copy import copy
 import signal
 import sys
 import os
@@ -264,6 +265,7 @@ def main() -> None:
     parser.add_argument("--verbose", type=int, choices=[0,1,2,3,4,5], help="verbose (Values 0 through 5 accepted)")
     parser.add_argument("--junit", type=argparse.FileType('wb'), help="output testsuite summary in JUnit format")
     parser.add_argument("--broken-test", action="append", default=[], help="a test name to mark as broken for this run")
+    parser.add_argument('--extra-hc-flag', action="append", default=[], help="extra flags to pass to the Haskell compiler")
     parser.add_argument("--test-env", default='local', help="Override default chosen test-env.")
     parser.add_argument("--perf-baseline", type=GitRef, metavar='COMMIT', help="Baseline commit for performance comparsons.")
     perf_group.add_argument("--skip-perf-tests", action="store_true", help="skip performance tests")
@@ -280,7 +282,7 @@ def main() -> None:
             exec(e)
 
     ts_config = testsuite_config.GHCTestsuiteConfig
-    ts_config.init_config()
+    ts_config_globals = ts_config.init_config(config)
 
     if args.config:
         for arg in args.config:
@@ -291,6 +293,8 @@ def main() -> None:
 
     if args.rootdir:
         config.rootdirs = args.rootdir
+
+    config.compiler_always_flags = args.extra_hc_flag
 
     config.metrics_file = args.metrics_file
     hasMetricsFile = config.metrics_file is not None
@@ -440,6 +444,8 @@ def main() -> None:
 
     # First collect all the tests to be run
     t_files_ok = True
+    test_globals = copy(testlib.__dict__)
+    test_globals.update(ts_config_globals)
     for file in t_files:
         testlib.if_verbose(2, '====> Scanning %s' % file)
         testlib.newTestDir(tempdir, os.path.dirname(file))
@@ -447,7 +453,7 @@ def main() -> None:
             with io.open(file, encoding='utf8') as f:
                 src = f.read()
 
-            exec(src)
+            exec(src, test_globals)
         except Exception as e:
             traceback.print_exc()
             testlib.framework_fail(None, None, 'exception: %s' % e)

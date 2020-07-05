@@ -189,6 +189,13 @@ class TestConfig:
         # I have no idea what this does
         self.package_conf_cache_file = None # type: Optional[Path]
 
+        self.ghc_compiler_always_flags = [] # type: List[str]
+        self.ghc_with_native_codegen = False
+        self.ghc_dynamic_by_default = False
+        self.ghc_with_dynamic_rts = False
+        self.ghc_with_threaded_rts = False
+        self.ghc_with_smp = False
+        self.ghc_with_llvm = False
 
 global config
 config = TestConfig()
