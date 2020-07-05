@@ -69,7 +69,7 @@ module GHC.Hs.Utils(
 
   -- * Types
   mkHsAppTy, mkHsAppKindTy,
-  mkLHsSigType, mkLHsSigWcType, mkClassOpSigs, mkHsSigEnv,
+  mkClassOpSigs, mkHsSigEnv,
   nlHsAppTy, nlHsAppKindTy, nlHsTyVar, nlHsFunTy, nlHsParTy, nlHsTyConApp,
 
   -- * Stmts
@@ -653,12 +653,6 @@ chunkify xs
 *                                                                      *
 ********************************************************************* -}
 
-mkLHsSigType :: LHsType GhcPs -> LHsSigType GhcPs
-mkLHsSigType ty = mkHsImplicitBndrs ty
-
-mkLHsSigWcType :: LHsType GhcPs -> LHsSigWcType GhcPs
-mkLHsSigWcType ty = mkHsWildCardBndrs (mkHsImplicitBndrs ty)
-
 mkHsSigEnv :: forall a. (LSig GhcRn -> Maybe ([Located Name], a))
                      -> [LSig GhcRn]
                      -> NameEnv a
@@ -1218,8 +1212,7 @@ hsLInstDeclBinders (L _ (TyFamInstD {})) = mempty
 hsDataFamInstBinders :: IsPass p
                      => DataFamInstDecl (GhcPass p)
                      -> ([Located (IdP (GhcPass p))], [LFieldOcc (GhcPass p)])
-hsDataFamInstBinders (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
-                       FamEqn { feqn_rhs = defn }}})
+hsDataFamInstBinders (DataFamInstDecl { dfid_eqn = FamEqn { feqn_rhs = defn }})
   = hsDataDefnBinders defn
   -- There can't be repeated symbols because only data instances have binders
 

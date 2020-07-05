@@ -290,7 +290,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
        ; let local_dm_id = mkLocalId local_dm_name Many local_dm_ty
              local_dm_sig = CompleteSig { sig_bndr = local_dm_id
                                         , sig_ctxt  = ctxt
-                                        , sig_loc   = getLoc (hsSigType hs_ty) }
+                                        , sig_loc   = getLoc hs_ty }
 
        ; (ev_binds, (tc_bind, _))
                <- checkConstraints skol_info tyvars [this_dict] $

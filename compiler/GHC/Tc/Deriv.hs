@@ -501,7 +501,7 @@ derivePred tc tys mb_lderiv_strat via_tvs deriv_pred =
   -- We carefully set up uses of recoverM to minimize error message
   -- cascades. See Note [Recovering from failures in deriving clauses].
   recoverM (pure Nothing) $
-  setSrcSpan (getLoc (hsSigType deriv_pred)) $ do
+  setSrcSpan (getLoc deriv_pred) $ do
     traceTc "derivePred" $ vcat
       [ text "tc"              <+> ppr tc
       , text "tys"             <+> ppr tys
@@ -719,18 +719,15 @@ tcStandaloneDerivInstType
   :: UserTypeCtxt -> LHsSigWcType GhcRn
   -> TcM ([TyVar], DerivContext, Class, [Type])
 tcStandaloneDerivInstType ctxt
-    (HsWC { hswc_body = deriv_ty@(HsIB { hsib_ext = vars
-                                       , hsib_body   = deriv_ty_body })})
-  | (tvs, theta, rho) <- splitLHsSigmaTyInvis deriv_ty_body
+    (HsWC { hswc_body = deriv_ty@(L loc (HsSig { sig_bndrs = outer_bndrs
+                                               , sig_body = deriv_ty_body }))})
+  | (theta, rho) <- splitLHsQualTy deriv_ty_body
   , L _ [wc_pred] <- theta
   , L wc_span (HsWildCardTy _) <- ignoreParens wc_pred
-  = do dfun_ty <- tcHsClsInstType ctxt $
-                  HsIB { hsib_ext = vars
-                       , hsib_body
-                           = L (getLoc deriv_ty_body) $
-                             HsForAllTy { hst_tele = mkHsForAllInvisTele tvs
-                                        , hst_xforall = noExtField
-                                        , hst_body  = rho }}
+  = do dfun_ty <- tcHsClsInstType ctxt $ L loc $
+                  HsSig { sig_ext   = noExtField
+                        , sig_bndrs = outer_bndrs
+                        , sig_body  = rho }
        let (tvs, _theta, cls, inst_tys) = tcSplitDFunTy dfun_ty
        pure (tvs, InferContext (Just wc_span), cls, inst_tys)
   | otherwise

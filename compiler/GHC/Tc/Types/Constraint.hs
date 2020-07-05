@@ -1241,7 +1241,7 @@ all at once, creating one implication constraint for the lot:
   that binds existentials, where the type of the data constructor is
   known to be valid (it in tcConPat), no need for the check.
 
-  So the check is done if and only if ic_info is ForAllSkol
+  So the check is done /if and only if/ ic_info is ForAllSkol.
 
 * If ic_info is (ForAllSkol dt dvs), the dvs::SDoc displays the
   original, user-written type variables.
@@ -1250,6 +1250,18 @@ all at once, creating one implication constraint for the lot:
   ic_info, even if ic_wanted is empty.  We must give the
   constraint solver a chance to make that bad-telescope test!  Hence
   the extra guard in emitResidualTvConstraint; see #16247
+
+* Don't mix up inferred and explicit variables in the same implication
+  constraint.  E.g.
+      foo :: forall a kx (b :: kx). SameKind a b
+  We want an implication
+      Implic { ic_skol = [(a::kx), kx, (b::kx)], ... }
+  but GHC will attempt to quantify over kx, since it is free in (a::kx),
+  and it's hopelessly confusing to report an error about quantified
+  variables   kx (a::kx) kx (b::kx).
+  Instead, the outer quantification over kx should be in a separate
+  implication. TL;DR: an explicit forall should generate an implication
+  quantified only over those explicitly quantified variables.
 
 Note [Needed evidence variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -520,7 +520,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
 
         -- Finally, construct the Core representation of the instance.
         -- (This no longer includes the associated types.)
-        ; dfun_name <- newDFunName clas inst_tys (getLoc (hsSigType hs_ty))
+        ; dfun_name <- newDFunName clas inst_tys (getLoc hs_ty)
                 -- Dfun location is that of instance *header*
 
         ; ispec <- newClsInst (fmap unLoc overlap_mode) dfun_name
@@ -548,7 +548,6 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
     defined_ats = mkNameSet (map (tyFamInstDeclName . unLoc) ats)
                   `unionNameSet`
                   mkNameSet (map (unLoc . feqn_tycon
-                                        . hsib_body
                                         . dfid_eqn
                                         . unLoc) adts)
 
@@ -572,7 +571,7 @@ tcTyFamInstDecl :: AssocInstInfo
 tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
   = setSrcSpan loc           $
     tcAddTyFamInstCtxt decl  $
-    do { let fam_lname = feqn_tycon (hsib_body eqn)
+    do { let fam_lname = feqn_tycon eqn
        ; fam_tc <- tcLookupLocatedTyCon fam_lname
        ; tcFamInstDeclChecks mb_clsinfo fam_tc
 
@@ -654,9 +653,8 @@ tcDataFamInstDecl ::
   -> LDataFamInstDecl GhcRn -> TcM (FamInst, Maybe DerivInfo)
   -- "newtype instance" and "data instance"
 tcDataFamInstDecl mb_clsinfo tv_skol_env
-    (L loc decl@(DataFamInstDecl { dfid_eqn = HsIB { hsib_ext = imp_vars
-                                                   , hsib_body =
-      FamEqn { feqn_bndrs  = mb_bndrs
+    (L loc decl@(DataFamInstDecl { dfid_eqn =
+      FamEqn { feqn_bndrs  = outer_bndrs
              , feqn_pats   = hs_pats
              , feqn_tycon  = lfam_name@(L _ fam_name)
              , feqn_fixity = fixity
@@ -665,7 +663,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
                                         , dd_ctxt    = hs_ctxt
                                         , dd_cons    = hs_cons
                                         , dd_kindSig = m_ksig
-                                        , dd_derivs  = derivs } }}}))
+                                        , dd_derivs  = derivs } }}))
   = setSrcSpan loc             $
     tcAddDataFamInstCtxt decl  $
     do { fam_tc <- tcLookupLocatedTyCon lfam_name
@@ -678,7 +676,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
           -- Do /not/ check that the number of patterns = tyConArity fam_tc
           -- See [Arity of data families] in GHC.Core.FamInstEnv
        ; (qtvs, pats, res_kind, stupid_theta)
-             <- tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs
+             <- tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs
                                     fixity hs_ctxt hs_pats m_ksig hs_cons
                                     new_or_data
 
@@ -845,7 +843,7 @@ TyVarEnv will simply be empty, and there is nothing to worry about.
 
 -----------------------
 tcDataFamInstHeader
-    :: AssocInstInfo -> TyCon -> [Name] -> Maybe [LHsTyVarBndr () GhcRn]
+    :: AssocInstInfo -> TyCon -> HsOuterFamEqnTyVarBndrs GhcRn
     -> LexicalFixity -> LHsContext GhcRn
     -> HsTyPats GhcRn -> Maybe (LHsKind GhcRn) -> [LConDecl GhcRn]
     -> NewOrData
@@ -854,13 +852,12 @@ tcDataFamInstHeader
 -- the data constructors themselves
 --    e.g.  data instance D [a] :: * -> * where ...
 -- Here the "header" is the bit before the "where"
-tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
+tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
                     hs_ctxt hs_pats m_ksig hs_cons new_or_data
   = do { traceTc "tcDataFamInstHeader {" (ppr fam_tc <+> ppr hs_pats)
-       ; (tclvl, wanted, (imp_tvs, (exp_tvs, (stupid_theta, lhs_ty, master_res_kind, instance_res_kind))))
+       ; (tclvl, wanted, (scoped_tvs, (stupid_theta, lhs_ty, master_res_kind, instance_res_kind)))
             <- pushLevelAndSolveEqualitiesX "tcDataFamInstHeader" $
-               bindImplicitTKBndrs_Q_Skol imp_vars                $
-               bindExplicitTKBndrs_Q_Skol AnyKind exp_bndrs       $
+               bindOuterFamEqnTKBndrs_Q_Skol AnyKind outer_bndrs $
                do { stupid_theta <- tcHsContext hs_ctxt
                   ; (lhs_ty, lhs_kind) <- tcFamTyPats fam_tc hs_pats
                   ; (lhs_applied_ty, lhs_applied_kind)
@@ -898,7 +895,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
        -- check there too!
 
        -- See GHC.Tc.TyCl Note [Generalising in tcFamTyPatsGuts]
-       ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys (imp_tvs ++ exp_tvs))
+       ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys scoped_tvs)
        ; qtvs <- quantifyTyVars dvs
        ; reportUnsolvedEqualities FamInstSkol qtvs tclvl wanted
 
@@ -926,9 +923,8 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
 
        ; return (qtvs, pats, master_res_kind, stupid_theta) }
   where
-    fam_name   = tyConName fam_tc
-    data_ctxt  = DataKindCtxt fam_name
-    exp_bndrs  = mb_bndrs `orElse` []
+    fam_name  = tyConName fam_tc
+    data_ctxt = DataKindCtxt fam_name
 
     -- See Note [Implementation of UnliftedNewtypes] in GHC.Tc.TyCl, wrinkle (2).
     tc_kind_sig Nothing
@@ -1791,7 +1787,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
               -- There is a signature in the instance
               -- See Note [Instance method signatures]
   = do { (sig_ty, hs_wrap)
-             <- setSrcSpan (getLoc (hsSigType hs_sig_ty)) $
+             <- setSrcSpan (getLoc hs_sig_ty) $
                 do { inst_sigs <- xoptM LangExt.InstanceSigs
                    ; checkTc inst_sigs (misplacedInstSig sel_name hs_sig_ty)
                    ; sig_ty  <- tcHsSigType (FunSigCtxt sel_name False) hs_sig_ty
@@ -1812,7 +1808,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
              inner_meth_id  = mkLocalId inner_meth_name Many sig_ty
              inner_meth_sig = CompleteSig { sig_bndr = inner_meth_id
                                           , sig_ctxt = ctxt
-                                          , sig_loc  = getLoc (hsSigType hs_sig_ty) }
+                                          , sig_loc  = getLoc hs_sig_ty }
 
 
        ; (tc_bind, [inner_id]) <- tcPolyCheck no_prag_fn inner_meth_sig meth_bind
