@@ -35,7 +35,7 @@ module GHC.Tc.Types.Constraint (
         isDroppableCt, insolubleImplic,
         arisesFromGivens,
 
-        Implication(..), implicationPrototype,
+        Implication(..), implicationPrototype, checkTelescopeSkol,
         ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
         SubGoalDepth, initialSubGoalDepth, maxSubGoalDepth,
         bumpSubGoalDepth, subGoalDepthExceeded,
@@ -1176,8 +1176,8 @@ data ImplicStatus
 
   | IC_Insoluble  -- At least one insoluble constraint in the tree
 
-  | IC_BadTelescope  -- solved, but the skolems in the telescope are out of
-                     -- dependency order
+  | IC_BadTelescope  -- Solved, but the skolems in the telescope are out of
+                     -- dependency order. See Note [Checking telescopes]
 
   | IC_Unsolved   -- Neither of the above; might go either way
 
@@ -1206,6 +1206,11 @@ instance Outputable ImplicStatus where
   ppr IC_Unsolved     = text "Unsolved"
   ppr (IC_Solved { ics_dead = dead })
     = text "Solved" <+> (braces (text "Dead givens =" <+> ppr dead))
+
+checkTelescopeSkol :: SkolemInfo -> Bool
+-- See Note [Checking telescopes]
+checkTelescopeSkol (ForAllSkol {}) = True
+checkTelescopeSkol _               = False
 
 {- Note [Checking telescopes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1241,7 +1246,7 @@ all at once, creating one implication constraint for the lot:
   that binds existentials, where the type of the data constructor is
   known to be valid (it in tcConPat), no need for the check.
 
-  So the check is done if and only if ic_info is ForAllSkol
+  So the check is done /if and only if/ ic_info is ForAllSkol.
 
 * If ic_info is (ForAllSkol dt dvs), the dvs::SDoc displays the
   original, user-written type variables.
@@ -1250,6 +1255,18 @@ all at once, creating one implication constraint for the lot:
   ic_info, even if ic_wanted is empty.  We must give the
   constraint solver a chance to make that bad-telescope test!  Hence
   the extra guard in emitResidualTvConstraint; see #16247
+
+* Don't mix up inferred and explicit variables in the same implication
+  constraint.  E.g.
+      foo :: forall a kx (b :: kx). SameKind a b
+  We want an implication
+      Implic { ic_skol = [(a::kx), kx, (b::kx)], ... }
+  but GHC will attempt to quantify over kx, since it is free in (a::kx),
+  and it's hopelessly confusing to report an error about quantified
+  variables   kx (a::kx) kx (b::kx).
+  Instead, the outer quantification over kx should be in a separate
+  implication. TL;DR: an explicit forall should generate an implication
+  quantified only over those explicitly quantified variables.
 
 Note [Needed evidence variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1277,14 +1294,30 @@ worrying that 'b' might clash.
 
 Note [Skolems in an implication]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The skolems in an implication are not there to perform a skolem escape
-check.  That happens because all the environment variables are in the
-untouchables, and therefore cannot be unified with anything at all,
-let alone the skolems.
+The skolems in an implication are used:
 
-Instead, ic_skols is used only when considering floating a constraint
-outside the implication in GHC.Tc.Solver.floatEqualities or
-GHC.Tc.Solver.approximateImplications
+* When considering floating a constraint outside the implication in
+  GHC.Tc.Solver.floatEqualities or GHC.Tc.Solver.approximateImplications
+  For this, we can treat ic_skols as a set.
+
+* When checking that a /user-specified/ forall (ic_info = ForAllSkol tvs)
+  has its variables in the correct order; see Note [Checking telescopes].
+  Only for these implications does ic_skols need to be a list.
+
+Nota bene: Although ic_skols is a list, it is not necessarily
+in dependency order:
+- In the ic_info=ForAllSkol case, the user might have written them
+  in the wrong order
+- In the case of a type signature like
+      f :: [a] -> [b]
+  the renamer gathers the implicit "outer" forall'd variables {a,b}, but
+  does not know what order to put them in.  The type checker can sort them
+  into dependency order, but only after solving all the kind constraints;
+  and to do that it's convenient to create the Implication!
+
+So we accept that ic_skols may be out of order.  Think of it as a set or
+(in the case of ic_info=ForAllSkol, a list in user-specified, and possibly
+wrong, order.
 
 Note [Insoluble constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
