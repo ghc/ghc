@@ -814,8 +814,7 @@ getLocalNonValBinders fixity_env
 
     new_di :: Bool -> Maybe Name -> DataFamInstDecl GhcPs
                    -> RnM (AvailInfo, [(Name, [FieldLabel])])
-    new_di overload_ok mb_cls dfid@(DataFamInstDecl { dfid_eqn =
-                                     HsIB { hsib_body = ti_decl }})
+    new_di overload_ok mb_cls dfid@(DataFamInstDecl { dfid_eqn = ti_decl })
         = do { main_name <- lookupFamInstName mb_cls (feqn_tycon ti_decl)
              ; let (bndrs, flds) = hsDataFamInstBinders dfid
              ; sub_names <- mapM newTopSrcBinder bndrs

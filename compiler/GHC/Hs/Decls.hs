@@ -49,8 +49,7 @@ module GHC.Hs.Decls (
   TyFamDefltDecl, LTyFamDefltDecl,
   DataFamInstDecl(..), LDataFamInstDecl,
   pprDataFamInstFlavour, pprTyFamInstDecl, pprHsFamInstLHS,
-  FamInstEqn, LFamInstEqn, FamEqn(..),
-  TyFamInstEqn, LTyFamInstEqn, HsTyPats,
+  FamEqn(..), TyFamInstEqn, LTyFamInstEqn, HsTyPats,
   LClsInstDecl, ClsInstDecl(..),
 
   -- ** Standalone deriving declarations
@@ -755,8 +754,7 @@ tyFamInstDeclName :: TyFamInstDecl (GhcPass p) -> IdP (GhcPass p)
 tyFamInstDeclName = unLoc . tyFamInstDeclLName
 
 tyFamInstDeclLName :: TyFamInstDecl (GhcPass p) -> Located (IdP (GhcPass p))
-tyFamInstDeclLName (TyFamInstDecl { tfid_eqn =
-                     (HsIB { hsib_body = FamEqn { feqn_tycon = ln }}) })
+tyFamInstDeclLName (TyFamInstDecl { tfid_eqn = FamEqn { feqn_tycon = ln }})
   = ln
 
 tyClDeclLName :: TyClDecl (GhcPass p) -> Located (IdP (GhcPass p))
@@ -1463,15 +1461,9 @@ data ConDecl pass
 
       -- The following fields describe the type after the '::'
       -- See Note [GADT abstract syntax]
-      , con_forall  :: XRec pass Bool    -- ^ True <=> explicit forall
-                                         --   False => hsq_explicit is empty
-                                         --
-                                         -- The 'XRec' is used to anchor API
-                                         -- annotations, AnnForall and AnnDot.
-      , con_qvars   :: [LHsTyVarBndr Specificity pass]
-                       -- Whether or not there is an /explicit/ forall, we still
-                       -- need to capture the implicitly-bound type/kind variables
-
+      , con_bndrs   :: XRec pass (HsOuterSigTyVarBndrs pass)
+        -- ^ The outermost type variable binders, be they explicit or implicit.
+        --   The 'XRec' is used to anchor API annotations, AnnForall and AnnDot.
       , con_mb_cxt  :: Maybe (LHsContext pass) -- ^ User-written context (if any)
       , con_args    :: HsConDeclDetails pass   -- ^ Arguments; never InfixCon
       , con_res_ty  :: LHsType pass            -- ^ Result type
@@ -1498,10 +1490,7 @@ data ConDecl pass
       }
   | XConDecl !(XXConDecl pass)
 
-type instance XConDeclGADT GhcPs = NoExtField
-type instance XConDeclGADT GhcRn = [Name] -- Implicitly bound type variables
-type instance XConDeclGADT GhcTc = NoExtField
-
+type instance XConDeclGADT (GhcPass _) = NoExtField
 type instance XConDeclH98  (GhcPass _) = NoExtField
 
 type instance XXConDecl (GhcPass _) = NoExtCon
@@ -1721,11 +1710,11 @@ pprConDecl (ConDeclH98 { con_name = L _ con
                                  <+> pprConDeclFields (unLoc fields)
     cxt = fromMaybe noLHsContext mcxt
 
-pprConDecl (ConDeclGADT { con_names = cons, con_qvars = qvars
+pprConDecl (ConDeclGADT { con_names = cons, con_bndrs = L _ outer_bndrs
                         , con_mb_cxt = mcxt, con_args = args
                         , con_res_ty = res_ty, con_doc = doc })
   = ppr_mbDoc doc <+> ppr_con_names cons <+> dcolon
-    <+> (sep [pprHsForAll (mkHsForAllInvisTele qvars) cxt,
+    <+> (sep [pprHsOuterSigTyVarBndrs outer_bndrs <+> pprLHsContext cxt,
               ppr_arrow_chain (get_args args ++ [ppr res_ty]) ])
   where
     get_args (PrefixCon args) = map ppr args
@@ -1785,7 +1774,7 @@ type HsTyPats pass = [LHsTypeArg pass]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The feqn_pats field of FamEqn (family instance equation) stores the LHS type
 (and kind) patterns. Any type (and kind) variables contained
-in these type patterns are bound in the hsib_vars field of the HsImplicitBndrs
+in these type patterns are bound in the hsib_vars field of the HsImplicitBndrs (TODO RGS: Not any more!)
 in FamInstEqn depending on whether or not an explicit forall is present. In
 the case of an explicit forall, the hsib_vars only includes kind variables not
 bound in the forall. Otherwise, all type (and kind) variables are bound in
@@ -1816,7 +1805,9 @@ c.f. Note [TyVar binders for associated decls]
 -}
 
 -- | Type Family Instance Equation
-type TyFamInstEqn pass = FamInstEqn pass (LHsType pass)
+type TyFamInstEqn pass = FamEqn pass (LHsType pass)
+            -- Here, the @pats@ are type patterns (with kind and type bndrs).
+            -- See Note [Family instance declaration binders]
 
 -- | Type family default declarations.
 -- A convenient synonym for 'TyFamInstDecl'.
@@ -1844,7 +1835,7 @@ type LDataFamInstDecl pass = XRec pass (DataFamInstDecl pass)
 
 -- | Data Family Instance Declaration
 newtype DataFamInstDecl pass
-  = DataFamInstDecl { dfid_eqn :: FamInstEqn pass (HsDataDefn pass) }
+  = DataFamInstDecl { dfid_eqn :: FamEqn pass (HsDataDefn pass) }
     -- ^
     --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnData',
     --           'GHC.Parser.Annotation.AnnNewType','GHC.Parser.Annotation.AnnInstance',
@@ -1856,14 +1847,6 @@ newtype DataFamInstDecl pass
 
 ----------------- Family instances (common types) -------------
 
--- | Located Family Instance Equation
-type LFamInstEqn pass rhs = XRec pass (FamInstEqn pass rhs)
-
--- | Family Instance Equation
-type FamInstEqn pass rhs = HsImplicitBndrs pass (FamEqn pass rhs)
-            -- ^ Here, the @pats@ are type patterns (with kind and type bndrs).
-            -- See Note [Family instance declaration binders]
-
 -- | Family Equation
 --
 -- One equation in a type family instance declaration, data family instance
@@ -1874,7 +1857,7 @@ data FamEqn pass rhs
   = FamEqn
        { feqn_ext    :: XCFamEqn pass rhs
        , feqn_tycon  :: LIdP pass
-       , feqn_bndrs  :: Maybe [LHsTyVarBndr () pass] -- ^ Optional quantified type vars
+       , feqn_bndrs  :: HsOuterFamEqnTyVarBndrs pass -- ^ Optional quantified type vars
        , feqn_pats   :: HsTyPats pass
        , feqn_fixity :: LexicalFixity -- ^ Fixity used in the declaration
        , feqn_rhs    :: rhs
@@ -1963,11 +1946,11 @@ pprTyFamDefltDecl = pprTyFamInstDecl NotTopLevel
 
 ppr_fam_inst_eqn :: (OutputableBndrId p)
                  => TyFamInstEqn (GhcPass p) -> SDoc
-ppr_fam_inst_eqn (HsIB { hsib_body = FamEqn { feqn_tycon  = L _ tycon
-                                            , feqn_bndrs  = bndrs
-                                            , feqn_pats   = pats
-                                            , feqn_fixity = fixity
-                                            , feqn_rhs    = rhs }})
+ppr_fam_inst_eqn (FamEqn { feqn_tycon  = L _ tycon
+                         , feqn_bndrs  = bndrs
+                         , feqn_pats   = pats
+                         , feqn_fixity = fixity
+                         , feqn_rhs    = rhs })
     = pprHsFamInstLHS tycon bndrs pats fixity noLHsContext <+> equals <+> ppr rhs
 
 instance OutputableBndrId p
@@ -1976,12 +1959,12 @@ instance OutputableBndrId p
 
 pprDataFamInstDecl :: (OutputableBndrId p)
                    => TopLevelFlag -> DataFamInstDecl (GhcPass p) -> SDoc
-pprDataFamInstDecl top_lvl (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
-                             FamEqn { feqn_tycon  = L _ tycon
+pprDataFamInstDecl top_lvl (DataFamInstDecl { dfid_eqn =
+                            (FamEqn { feqn_tycon  = L _ tycon
                                     , feqn_bndrs  = bndrs
                                     , feqn_pats   = pats
                                     , feqn_fixity = fixity
-                                    , feqn_rhs    = defn }}})
+                                    , feqn_rhs    = defn })})
   = pp_data_defn pp_hdr defn
   where
     pp_hdr ctxt = ppr_instance_keyword top_lvl
@@ -1989,19 +1972,19 @@ pprDataFamInstDecl top_lvl (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
                   -- pp_data_defn pretty-prints the kind sig. See #14817.
 
 pprDataFamInstFlavour :: DataFamInstDecl (GhcPass p) -> SDoc
-pprDataFamInstFlavour (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
-                        FamEqn { feqn_rhs = HsDataDefn { dd_ND = nd }}}})
+pprDataFamInstFlavour (DataFamInstDecl { dfid_eqn =
+                       (FamEqn { feqn_rhs = HsDataDefn { dd_ND = nd }})})
   = ppr nd
 
 pprHsFamInstLHS :: (OutputableBndrId p)
    => IdP (GhcPass p)
-   -> Maybe [LHsTyVarBndr () (GhcPass p)]
+   -> HsOuterFamEqnTyVarBndrs (GhcPass p)
    -> HsTyPats (GhcPass p)
    -> LexicalFixity
    -> LHsContext (GhcPass p)
    -> SDoc
 pprHsFamInstLHS thing bndrs typats fixity mb_ctxt
-   = hsep [ pprHsExplicitForAll bndrs
+   = hsep [ pprHsOuterFamEqnTyVarBndrs bndrs
           , pprLHsContext mb_ctxt
           , pp_pats typats ]
    where

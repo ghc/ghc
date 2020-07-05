@@ -25,14 +25,14 @@ module GHC.Rename.HsType (
         checkPrecMatch, checkSectionPrec,
 
         -- Binding related stuff
-        bindHsForAllTelescope,
+        bindHsOuterTyVarBndrs, bindHsForAllTelescope,
         bindLHsTyVarBndr, bindLHsTyVarBndrs, WarnUnusedForalls(..),
         rnImplicitBndrs, bindSigTyVarsFV, bindHsQTyVars,
         FreeKiTyVars,
         extractHsTyRdrTyVars, extractHsTyRdrTyVarsKindVars,
         extractHsTysRdrTyVars, extractRdrKindSigVars, extractDataDefnKindVars,
-        extractHsTvBndrs, extractHsTyArgRdrKiTyVars,
-        forAllOrNothing, nubL
+        extractHsOuterTvBndrs, extractHsTyArgRdrKiTyVars,
+        nubL
   ) where
 
 import GHC.Prelude
@@ -103,10 +103,6 @@ data HsSigWcTypeScoping
     -- variables. If a RULE explicitly quantifies its type variables, then
     -- 'NeverBind' is used instead. See also
     -- @Note [Pattern signature binders and scoping]@ in "GHC.Hs.Type".
-  | BindUnlessForall
-    -- ^ Unless there's forall at the top, do the same thing as 'AlwaysBind'.
-    -- This is only ever used in places where the \"@forall@-or-nothing\" rule
-    -- is in effect. See @Note [forall-or-nothing rule]@.
   | NeverBind
     -- ^ Never bind any free tyvars. This is used for RULES that have both
     -- explicit type and term variable binders, e.g.:
@@ -124,11 +120,17 @@ data HsSigWcTypeScoping
 rnHsSigWcType :: HsDocContext
               -> LHsSigWcType GhcPs
               -> RnM (LHsSigWcType GhcRn, FreeVars)
-rnHsSigWcType doc (HsWC { hswc_body = HsIB { hsib_body = hs_ty }})
-  = rn_hs_sig_wc_type BindUnlessForall doc hs_ty $ \nwcs imp_tvs body ->
-    let ib_ty = HsIB { hsib_ext = imp_tvs, hsib_body = body  }
-        wc_ty = HsWC { hswc_ext = nwcs,    hswc_body = ib_ty } in
-    pure (wc_ty, emptyFVs)
+rnHsSigWcType doc (HsWC { hswc_body =
+    sig_ty@(L loc (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty })) })
+  = do { free_vars <- filterInScopeM (extract_lhs_sig_ty sig_ty)
+       ; (nwc_rdrs', imp_tv_nms) <- partition_nwcs free_vars
+       ; let nwc_rdrs = nubL nwc_rdrs'
+       ; bindHsOuterTyVarBndrs doc Nothing imp_tv_nms outer_bndrs $ \outer_bndrs' ->
+    do { (wcs, body_ty', fvs) <- rnWcBody doc nwc_rdrs body_ty
+       ; pure ( HsWC  { hswc_ext = wcs, hswc_body = L loc $
+                HsSig { sig_ext = noExtField
+                      , sig_bndrs = outer_bndrs', sig_body = body_ty' }}
+              , fvs) } }
 
 rnHsPatSigType :: HsSigWcTypeScoping
                -> HsDocContext
@@ -166,7 +168,6 @@ rn_hs_sig_wc_type scoping ctxt hs_ty thing_inside
        ; let nwc_rdrs = nubL nwc_rdrs'
        ; implicit_bndrs <- case scoping of
            AlwaysBind       -> pure tv_rdrs
-           BindUnlessForall -> forAllOrNothing (isLHsInvisForAllTy hs_ty) tv_rdrs
            NeverBind        -> pure []
        ; rnImplicitBndrs Nothing implicit_bndrs $ \ vars ->
     do { (wcs, hs_ty', fvs1) <- rnWcBody ctxt nwc_rdrs hs_ty
@@ -306,7 +307,7 @@ of the HsWildCardBndrs structure, and we are done.
 
 *********************************************************
 *                                                       *
-           HsSigtype (i.e. no wildcards)
+           HsSigType (i.e. no wildcards)
 *                                                       *
 ****************************************************** -}
 
@@ -316,17 +317,16 @@ rnHsSigType :: HsDocContext
             -> RnM (LHsSigType GhcRn, FreeVars)
 -- Used for source-language type signatures
 -- that cannot have wildcards
-rnHsSigType ctx level (HsIB { hsib_body = hs_ty })
-  = do { traceRn "rnHsSigType" (ppr hs_ty)
-       ; rdr_env <- getLocalRdrEnv
-       ; vars0 <- forAllOrNothing (isLHsInvisForAllTy hs_ty)
-           $ filterInScope rdr_env
-           $ extractHsTyRdrTyVars hs_ty
-       ; rnImplicitBndrs Nothing vars0 $ \ vars ->
-    do { (body', fvs) <- rnLHsTyKi (mkTyKiEnv ctx level RnTypeBody) hs_ty
+rnHsSigType ctx level
+    (L loc sig_ty@(HsSig { sig_bndrs = outer_bndrs, sig_body = body }))
+  = setSrcSpan loc $
+    do { traceRn "rnHsSigType" (ppr sig_ty)
+       ; imp_vars <- filterInScopeM $ extractHsTyRdrTyVars body
+       ; bindHsOuterTyVarBndrs ctx Nothing imp_vars outer_bndrs $ \outer_bndrs' ->
+    do { (body', fvs) <- rnLHsTyKi (mkTyKiEnv ctx level RnTypeBody) body
 
-       ; return ( HsIB { hsib_ext = vars
-                       , hsib_body = body' }
+       ; return ( L loc $ HsSig { sig_ext = noExtField
+                                , sig_bndrs = outer_bndrs', sig_body = body' }
                 , fvs ) } }
 
 {-
@@ -366,26 +366,6 @@ action:
 
   type F6 :: forall a -> forall b. b -> c   -- Legal: just like F4.
 -}
-
--- | See @Note [forall-or-nothing rule]@. This tiny little function is used
--- (rather than its small body inlined) to indicate that we are implementing
--- that rule.
-forAllOrNothing :: Bool
-                -- ^ True <=> explicit forall
-                -- E.g.  f :: forall a. a->b
-                --  we do not want to bring 'b' into scope, hence True
-                -- But   f :: a -> b
-                --  we want to bring both 'a' and 'b' into scope, hence False
-                -> FreeKiTyVars
-                -- ^ Free vars of the type
-                -> RnM FreeKiTyVars
-forAllOrNothing has_outer_forall fvs = case has_outer_forall of
-  True -> do
-    traceRn "forAllOrNothing" $ text "has explicit outer forall"
-    pure []
-  False -> do
-    traceRn "forAllOrNothing" $ text "no explicit forall. implicit binders:" <+> ppr fvs
-    pure fvs
 
 rnImplicitBndrs :: Maybe assoc
                 -- ^ @'Just' _@ => an associated type decl
@@ -1054,6 +1034,27 @@ Unlike other forms of type variable binders, dropping "unused" variables in
 an LHsQTyVars can be semantically significant. As a result, we suppress
 -Wunused-foralls warnings in exactly one place: in bindHsQTyVars.
 -}
+
+bindHsOuterTyVarBndrs :: OutputableBndrFlag flag
+                      => HsDocContext
+                      -> Maybe assoc
+                         -- ^ @'Just' _@ => an associated type decl
+                      -> FreeKiTyVars
+                      -> HsOuterTyVarBndrs flag GhcPs
+                      -> (HsOuterTyVarBndrs flag GhcRn -> RnM (a, FreeVars))
+                      -> RnM (a, FreeVars)
+bindHsOuterTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
+  case outer_bndrs of
+    OuterImplicit{} ->
+      rnImplicitBndrs mb_cls implicit_vars $ \implicit_vars' ->
+        thing_inside $ OuterImplicit implicit_vars'
+    OuterExplicit exp_bndrs ->
+      -- Note: If we pass mb_cls instead of Nothing below, bindLHsTyVarBndrs
+      -- will use class variables for any names the user meant to bring in
+      -- scope here. This is an explicit forall, so we want fresh names, not
+      -- class variables. Thus: always pass Nothing.
+      bindLHsTyVarBndrs doc WarnUnusedForalls Nothing exp_bndrs $ \exp_bndrs' ->
+        thing_inside $ OuterExplicit exp_bndrs'
 
 bindHsForAllTelescope :: HsDocContext
                       -> HsForAllTelescope GhcPs
@@ -1844,6 +1845,10 @@ extract_lty (L _ ty) acc
       -- We deal with these separately in rnLHsTypeWithWildCards
       HsWildCardTy {}             -> acc
 
+extract_lhs_sig_ty :: LHsSigType GhcPs -> FreeKiTyVars
+extract_lhs_sig_ty (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body})) =
+  extractHsOuterTvBndrs outer_bndrs $ extract_lty body []
+
 extract_hs_arrow :: HsArrow GhcPs -> FreeKiTyVars ->
                    FreeKiTyVars
 extract_hs_arrow (HsExplicitMult p) acc = extract_lty p acc
@@ -1860,11 +1865,13 @@ extract_hs_for_all_telescope tele acc_vars body_fvs =
     HsForAllInvis { hsf_invis_bndrs = bndrs } ->
       extract_hs_tv_bndrs bndrs acc_vars body_fvs
 
-extractHsTvBndrs :: [LHsTyVarBndr flag GhcPs]
-                 -> FreeKiTyVars       -- Free in body
-                 -> FreeKiTyVars       -- Free in result
-extractHsTvBndrs tv_bndrs body_fvs
-  = extract_hs_tv_bndrs tv_bndrs [] body_fvs
+extractHsOuterTvBndrs :: HsOuterTyVarBndrs flag GhcPs
+                      -> FreeKiTyVars -- Free in body
+                      -> FreeKiTyVars -- Free in result
+extractHsOuterTvBndrs outer_bndrs body_fvs =
+  case outer_bndrs of
+    OuterImplicit{}     -> body_fvs
+    OuterExplicit bndrs -> extract_hs_tv_bndrs bndrs [] body_fvs
 
 extract_hs_tv_bndrs :: [LHsTyVarBndr flag GhcPs]
                     -> FreeKiTyVars  -- Accumulator

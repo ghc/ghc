@@ -628,7 +628,7 @@ tcExprWithSig expr hs_ty
        ; (expr', poly_ty) <- tcExprSig expr sig_info
        ; return (ExprWithTySig noExtField expr' hs_ty, poly_ty) }
   where
-    loc = getLoc (hsSigWcType hs_ty)
+    loc = getLoc (dropWildCards hs_ty)
 
 tcExprSig :: LHsExpr GhcRn -> TcIdSigInfo -> TcM (LHsExpr GhcTc, TcType)
 tcExprSig expr (CompleteSig { sig_bndr = poly_id, sig_loc = loc })

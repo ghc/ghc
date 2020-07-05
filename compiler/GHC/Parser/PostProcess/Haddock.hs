@@ -520,15 +520,14 @@ instance HasHaddock (HsDecl GhcPs) where
     , DataFamInstDecl { dfid_eqn } <- dfid_inst
     = do
       dfid_eqn' <- case dfid_eqn of
-        HsIB _ (FamEqn { feqn_tycon, feqn_bndrs, feqn_pats, feqn_fixity, feqn_rhs })
+        FamEqn { feqn_tycon, feqn_bndrs, feqn_pats, feqn_fixity, feqn_rhs }
           -> do
             registerHdkA feqn_tycon
             feqn_rhs' <- addHaddock feqn_rhs
-            pure $
-              HsIB noExtField (FamEqn {
+            pure $ FamEqn {
                 feqn_ext = noExtField,
                 feqn_tycon, feqn_bndrs, feqn_pats, feqn_fixity,
-                feqn_rhs = feqn_rhs' })
+                feqn_rhs = feqn_rhs' }
       pure $ InstD noExtField (DataFamInstD {
         dfid_ext = noExtField,
         dfid_inst = DataFamInstDecl { dfid_eqn = dfid_eqn' } })
@@ -691,7 +690,7 @@ instance HasHaddock (Located (ConDecl GhcPs)) where
   addHaddock (L l_con_decl con_decl) =
     extendHdkA l_con_decl $
     case con_decl of
-      ConDeclGADT { con_g_ext, con_names, con_forall, con_qvars, con_mb_cxt, con_args, con_res_ty } -> do
+      ConDeclGADT { con_g_ext, con_names, con_bndrs, con_mb_cxt, con_args, con_res_ty } -> do
         -- discardHasInnerDocs is ok because we don't need this info for GADTs.
         con_doc' <- discardHasInnerDocs $ getConDoc (getLoc (head con_names))
         con_args' <-
@@ -704,7 +703,7 @@ instance HasHaddock (Located (ConDecl GhcPs)) where
             InfixCon _ _ -> panic "ConDeclGADT InfixCon"
         con_res_ty' <- addHaddock con_res_ty
         pure $ L l_con_decl $
-          ConDeclGADT { con_g_ext, con_names, con_forall, con_qvars, con_mb_cxt,
+          ConDeclGADT { con_g_ext, con_names, con_bndrs, con_mb_cxt,
                         con_doc = con_doc',
                         con_args = con_args',
                         con_res_ty = con_res_ty' }
@@ -933,8 +932,16 @@ instance HasHaddock a => HasHaddock (HsScaled GhcPs a) where
 instance HasHaddock a => HasHaddock (HsWildCardBndrs GhcPs a) where
   addHaddock (HsWC _ t) = HsWC noExtField <$> addHaddock t
 
-instance HasHaddock a => HasHaddock (HsImplicitBndrs GhcPs a) where
-  addHaddock (HsIB _ t) = HsIB noExtField <$> addHaddock t
+instance HasHaddock (Located (HsSigType GhcPs)) where
+  addHaddock (L l (HsSig{sig_bndrs = outer_bndrs, sig_body = body})) =
+    -- TODO RGS: I cargo-culted this code from the HsForAllTy case of the
+    -- HasHaddock instance for HsType. Is this right? Need Vlad to check.
+    extendHdkA l $ do
+      case outer_bndrs of
+        OuterImplicit{}     -> pure ()
+        OuterExplicit bndrs -> registerLocHdkA (getLHsTyVarBndrsLoc bndrs)
+      body' <- addHaddock body
+      pure $ L l $ HsSig noExtField outer_bndrs body'
 
 -- Process a type, adding documentation comments to function arguments
 -- and the result. Many formatting styles are supported.
@@ -1467,10 +1474,12 @@ mkLHsDocTy t (Just doc) = L (getLoc t) (HsDocTy noExtField t doc)
 
 getForAllTeleLoc :: HsForAllTelescope GhcPs -> SrcSpan
 getForAllTeleLoc tele =
-  foldr combineSrcSpans noSrcSpan $
   case tele of
-    HsForAllVis{ hsf_vis_bndrs } -> map getLoc hsf_vis_bndrs
-    HsForAllInvis { hsf_invis_bndrs } -> map getLoc hsf_invis_bndrs
+    HsForAllVis{ hsf_vis_bndrs } -> getLHsTyVarBndrsLoc hsf_vis_bndrs
+    HsForAllInvis { hsf_invis_bndrs } -> getLHsTyVarBndrsLoc hsf_invis_bndrs
+
+getLHsTyVarBndrsLoc :: [LHsTyVarBndr flag GhcPs] -> SrcSpan
+getLHsTyVarBndrsLoc bndrs = foldr combineSrcSpans noSrcSpan $ map getLoc bndrs
 
 -- | The inverse of 'partitionBindsAndSigs' that merges partitioned items back
 -- into a flat list. Elements are put back into the order in which they

@@ -719,8 +719,8 @@ tcAddDataFamConPlaceholders inst_decls thing_inside
       = concatMap (get_fi_cons . unLoc) fids
 
     get_fi_cons :: DataFamInstDecl GhcRn -> [Name]
-    get_fi_cons (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
-                  FamEqn { feqn_rhs = HsDataDefn { dd_cons = cons } }}})
+    get_fi_cons (DataFamInstDecl { dfid_eqn =
+                  FamEqn { feqn_rhs = HsDataDefn { dd_cons = cons } }})
       = map unLoc $ concatMap (getConNames . unLoc) cons
 
 
