@@ -46,6 +46,7 @@ import GHC.Stg.Utils
 import GHC.Types.Name
 import GHC.Builtin.Names
 
+import GHC.Types.Demand ( Divergence ( Absent ), splitStrictSig )
 
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
@@ -1148,7 +1149,7 @@ mkOutConLattice con outer fields
 findTags :: Module -> UniqSupply -> [StgTopBinding] -> ([TgStgTopBinding], [(Id,EnterLattice)])
 -- findTags this_mod us binds = passTopBinds binds
 findTags this_mod us binds =
-    -- pprTrace "findTags" (ppr this_mod) $
+    pprTrace "findTags" (ppr this_mod) $
     let state = FlowState {
             fs_us = us,
             fs_idNodeMap = mempty,
@@ -1340,6 +1341,10 @@ addImportedNode this_mod id
                     , isNullaryRepDataCon con
                     = (mkConstNode node_id (EnterLattice NeverEnter FieldsNone))
                                 `set_desc` (text "ext_nullCon" <-> ppr id)
+
+                    | (_, Absent) <- splitStrictSig (idStrictness id)
+                    = (mkConstNode node_id (flatLattice NeverEnter))
+                                `set_desc` (text "ext_absent_error" <-> ppr id)
 
                     -- General case, a potentially unevaluated imported id.
                     | not isFun
@@ -2457,5 +2462,7 @@ mkLocalArgId id = do
 isAbsentExpr :: GenStgExpr p -> Bool
 isAbsentExpr (StgTick _t e) = isAbsentExpr e
 isAbsentExpr (StgApp _ f _)
+  | (_, Absent) <- splitStrictSig (idStrictness f)
+  = pprTrace "isAbsentViaImpossible:" (ppr f) True
   | idUnique f == absentErrorIdKey = True
 isAbsentExpr _ = False
