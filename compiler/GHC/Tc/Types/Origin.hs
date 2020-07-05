@@ -184,7 +184,6 @@ data SkolemInfo
                  -- hence, we have less info
 
   | ForAllSkol  -- Bound by a user-written "forall".
-       SDoc        -- Shows the entire forall type
        SDoc        -- Shows just the binders, used when reporting a bad telescope
                    -- See Note [Checking telescopes] in GHC.Tc.Types.Constraint
 
@@ -244,7 +243,7 @@ pprSkolInfo :: SkolemInfo -> SDoc
 -- Complete the sentence "is a rigid type variable bound by..."
 pprSkolInfo (SigSkol cx ty _) = pprSigSkolInfo cx ty
 pprSkolInfo (SigTypeSkol cx)  = pprUserTypeCtxt cx
-pprSkolInfo (ForAllSkol pt _) = quotes pt
+pprSkolInfo (ForAllSkol tvs)  = text "an explicit forall" <+> tvs
 pprSkolInfo (IPSkol ips)      = text "the implicit-parameter binding" <> plural ips <+> text "for"
                                  <+> pprWithCommas ppr ips
 pprSkolInfo (DerivSkol pred)  = text "the deriving clause for" <+> quotes (ppr pred)

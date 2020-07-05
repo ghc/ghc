@@ -141,7 +141,7 @@ sigNameNoLoc _                             = []
 -- instanceMap.
 getInstLoc :: InstDecl (GhcPass p) -> SrcSpan
 getInstLoc = \case
-  ClsInstD _ (ClsInstDecl { cid_poly_ty = ty }) -> getLoc (hsSigType ty)
+  ClsInstD _ (ClsInstDecl { cid_poly_ty = ty }) -> getLoc ty
   -- The Names of data and type family instances have their SrcSpan's attached
   -- to the *type constructor*. For example, the Name "D:R:Foo:Int" would have
   -- its SrcSpan attached here:
@@ -149,12 +149,12 @@ getInstLoc = \case
   --   type instance Foo Int = Bool
   --                 ^^^
   DataFamInstD _ (DataFamInstDecl
-    { dfid_eqn = HsIB { hsib_body = FamEqn { feqn_tycon = L l _ }}}) -> l
+    { dfid_eqn = FamEqn { feqn_tycon = L l _ }}) -> l
   -- Since CoAxioms' Names refer to the whole line for type family instances
   -- in particular, we need to dig a bit deeper to pull out the entire
   -- equation. This does not happen for data family instances, for some reason.
   TyFamInstD _ (TyFamInstDecl
-    { tfid_eqn = HsIB { hsib_body = FamEqn { feqn_tycon = L l _ }}}) -> l
+    { tfid_eqn = FamEqn { feqn_tycon = L l _ }}) -> l
 
 -- | Get all subordinate declarations inside a declaration, and their docs.
 -- A subordinate declaration is something like the associate type or data
@@ -164,12 +164,12 @@ subordinates :: Map RealSrcSpan Name
              -> [(Name, [(HsDocString)], Map Int (HsDocString))]
 subordinates instMap decl = case decl of
   InstD _ (ClsInstD _ d) -> do
-    DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
+    DataFamInstDecl { dfid_eqn =
       FamEqn { feqn_tycon = L l _
-             , feqn_rhs   = defn }}} <- unLoc <$> cid_datafam_insts d
+             , feqn_rhs   = defn }} <- unLoc <$> cid_datafam_insts d
     [ (n, [], M.empty) | Just n <- [lookupSrcSpan l instMap] ] ++ dataSubs defn
 
-  InstD _ (DataFamInstD _ (DataFamInstDecl (HsIB { hsib_body = d })))
+  InstD _ (DataFamInstD _ (DataFamInstDecl d))
     -> dataSubs (feqn_rhs d)
   TyClD _ d | isClassDecl d -> classSubs d
             | isDataDecl  d -> dataSubs (tcdDataDefn d)
@@ -205,12 +205,8 @@ subordinates instMap decl = case decl of
             DctMulti _ tys -> mapMaybe extract_deriv_ty tys
 
         extract_deriv_ty :: LHsSigType GhcRn -> Maybe (SrcSpan, LHsDocString)
-        extract_deriv_ty (HsIB{hsib_body =  L l ty}) =
+        extract_deriv_ty (L l (HsSig{sig_body = L _ ty})) =
           case ty of
-            -- deriving (forall a. C a {- ^ Doc comment -})
-            HsForAllTy{ hst_tele = HsForAllInvis{}
-                      , hst_body = L _ (HsDocTy _ _ doc) }
-                            -> Just (l, doc)
             -- deriving (C a {- ^ Doc comment -})
             HsDocTy _ _ doc -> Just (l, doc)
             _               -> Nothing
@@ -251,10 +247,10 @@ classDecls class_ = filterDecls . collectDocs . sortLocated $ decls
 -- | Extract function argument docs from inside top-level decls.
 declTypeDocs :: HsDecl GhcRn -> Map Int (HsDocString)
 declTypeDocs = \case
-  SigD  _ (TypeSig _ _ ty)          -> typeDocs (unLoc (hsSigWcType ty))
-  SigD  _ (ClassOpSig _ _ _ ty)     -> typeDocs (unLoc (hsSigType ty))
-  SigD  _ (PatSynSig _ _ ty)        -> typeDocs (unLoc (hsSigType ty))
-  ForD  _ (ForeignImport _ _ ty _)  -> typeDocs (unLoc (hsSigType ty))
+  SigD  _ (TypeSig _ _ ty)          -> sigTypeDocs (unLoc (dropWildCards ty))
+  SigD  _ (ClassOpSig _ _ _ ty)     -> sigTypeDocs (unLoc ty)
+  SigD  _ (PatSynSig _ _ ty)        -> sigTypeDocs (unLoc ty)
+  ForD  _ (ForeignImport _ _ ty _)  -> sigTypeDocs (unLoc ty)
   TyClD _ (SynDecl { tcdRhs = ty }) -> typeDocs (unLoc ty)
   _                                 -> M.empty
 
@@ -280,6 +276,10 @@ typeDocs = go 0
       HsFunTy _ _ _ ty                      -> go (n+1) (unLoc ty)
       HsDocTy _ _ doc                       -> M.singleton n (unLoc doc)
       _                                     -> M.empty
+
+-- | Extract function argument docs from inside types.
+sigTypeDocs :: HsSigType GhcRn -> Map Int HsDocString
+sigTypeDocs (HsSig{sig_body = body}) = typeDocs (unLoc body)
 
 -- | The top-level declarations of a module that we care about,
 -- ordered by source location, with documentation attached if it exists.
