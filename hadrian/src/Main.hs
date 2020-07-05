@@ -11,6 +11,7 @@ import qualified CommandLine
 import qualified Environment
 import qualified Rules
 import qualified Rules.Clean
+import qualified Rules.Lint
 import qualified Rules.Documentation
 import qualified Rules.Nofib
 import qualified Rules.SourceDist
@@ -81,6 +82,7 @@ main = do
             Rules.buildRules
             Rules.Documentation.documentationRules
             Rules.Clean.cleanRules
+            Rules.Lint.lintRules
             Rules.Nofib.nofibRules
             Rules.oracleRules
             Rules.Selftest.selftestRules
