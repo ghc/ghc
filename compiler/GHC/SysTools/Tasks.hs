@@ -307,7 +307,7 @@ runLibtool dflags args = traceToolCommand dflags "libtool" $ do
       args2      = [Option "-static"] ++ args1 ++ args ++ linkargs
       libtool    = pgm_libtool dflags
   mb_env <- getGccEnv args2
-  runSomethingFiltered dflags id "Linker" libtool args2 Nothing mb_env
+  runSomethingFiltered dflags id "Libtool" libtool args2 Nothing mb_env
 
 runAr :: DynFlags -> Maybe FilePath -> [Option] -> IO ()
 runAr dflags cwd args = traceToolCommand dflags "ar" $ do
