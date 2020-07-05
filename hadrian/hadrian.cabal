@@ -73,15 +73,16 @@ executable hadrian
                        , Rules.Gmp
                        , Rules.Libffi
                        , Rules.Library
+                       , Rules.Lint
                        , Rules.Nofib
                        , Rules.Program
                        , Rules.Register
                        , Rules.Rts
-                       , Rules.ToolArgs
                        , Rules.Selftest
                        , Rules.SimpleTargets
                        , Rules.SourceDist
                        , Rules.Test
+                       , Rules.ToolArgs
                        , Settings
                        , Settings.Builders.Alex
                        , Settings.Builders.Cabal
@@ -132,15 +133,15 @@ executable hadrian
                        , TupleSections
     other-extensions:    MultiParamTypeClasses
                        , TypeFamilies
-    build-depends:       base                 >= 4.8     && < 5
-                       , Cabal                >= 3.0     && < 3.3
+    build-depends:       Cabal                >= 3.0     && < 3.3
+                       , QuickCheck           >= 2.6     && < 2.14
+                       , base                 >= 4.8     && < 5
                        , containers           >= 0.5     && < 0.7
                        , directory            >= 1.3.1.0 && < 1.4
                        , extra                >= 1.4.7
                        , filepath
                        , mtl                  == 2.2.*
                        , parsec               >= 3.1     && < 3.2
-                       , QuickCheck           >= 2.6     && < 2.14
                        , shake                >= 0.18.3  && < 0.18.6
                        , transformers         >= 0.4     && < 0.6
                        , unordered-containers >= 0.2.1   && < 0.3
