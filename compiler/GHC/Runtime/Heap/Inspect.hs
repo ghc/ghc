@@ -870,20 +870,21 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
                 (error "unboxedTupleTerm: no HValue for unboxed tuple") terms
 
     -- Extract a sub-word sized field from a word
-    index item_size_b index_b word_size endian =
-        (word .&. (mask `shiftL` moveBytes)) `shiftR` moveBytes
-      where
-        mask :: Word
-        mask = case item_size_b of
-            1 -> 0xFF
-            2 -> 0xFFFF
-            4 -> 0xFFFFFFFF
-            _ -> panic ("Weird byte-index: " ++ show index_b)
-        (q,r) = index_b `quotRem` word_size
-        word = array!!q
-        moveBytes = case endian of
-         BigEndian    -> word_size - (r + item_size_b) * 8
-         LittleEndian -> r * 8
+    -- A sub word is aligned to the left-most part of a word on big-endian
+    -- platforms, and to the right-most part of a word on little-endian
+    -- platforms.  This allows to write and read it back from memory
+    -- independent of endianness.  Bits not belonging to a sub word are zeroed
+    -- out, although, this is strictly speaking not necessary since a sub word
+    -- is read back from memory by appropriately casted pointers (see e.g.
+    -- ppr_float of cPprTermBase).
+    index size_b aligned_idx word_size endian = case endian of
+      BigEndian    -> (word `shiftL` moveBits) `shiftR` zeroOutBits `shiftL` zeroOutBits
+      LittleEndian -> (word `shiftR` moveBits) `shiftL` zeroOutBits `shiftR` zeroOutBits
+     where
+      (q, r) = aligned_idx `quotRem` word_size
+      word = array!!q
+      moveBits = r * 8
+      zeroOutBits = (word_size - size_b) * 8
 
 
 -- | Fast, breadth-first Type reconstruction
