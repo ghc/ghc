@@ -184,7 +184,6 @@ data SkolemInfo
                  -- hence, we have less info
 
   | ForAllSkol  -- Bound by a user-written "forall".
-       SDoc        -- Shows the entire forall type
        SDoc        -- Shows just the binders, used when reporting a bad telescope
                    -- See Note [Checking telescopes] in GHC.Tc.Types.Constraint
 
@@ -244,7 +243,7 @@ pprSkolInfo :: SkolemInfo -> SDoc
 -- Complete the sentence "is a rigid type variable bound by..."
 pprSkolInfo (SigSkol cx ty _) = pprSigSkolInfo cx ty
 pprSkolInfo (SigTypeSkol cx)  = pprUserTypeCtxt cx
-pprSkolInfo (ForAllSkol pt _) = quotes pt
+pprSkolInfo (ForAllSkol tvs)  = text "an explicit forall" <+> tvs
 pprSkolInfo (IPSkol ips)      = text "the implicit-parameter binding" <> plural ips <+> text "for"
                                  <+> pprWithCommas ppr ips
 pprSkolInfo (DerivSkol pred)  = text "the deriving clause for" <+> quotes (ppr pred)
@@ -304,7 +303,7 @@ For pattern synonym SkolemInfo we have
 but the type 'ty' is not very helpful.  The full pattern-synonym type
 has the provided and required pieces, which it is inconvenient to
 record and display here. So we simply don't display the type at all,
-contenting outselves with just the name of the pattern synonym, which
+contenting ourselves with just the name of the pattern synonym, which
 is fine.  We could do more, but it doesn't seem worth it.
 
 Note [SigSkol SkolemInfo]

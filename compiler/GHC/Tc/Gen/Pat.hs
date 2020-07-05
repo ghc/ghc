@@ -836,6 +836,15 @@ between alternatives.
 RIP GADT refinement: refinements have been replaced by the use of explicit
 equality constraints that are used in conjunction with implication constraints
 to express the local scope of GADT refinements.
+
+Note [Freshen existentials]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It is essential that these existentials are freshened.
+Otherwise, if we have something like
+  case (a :: Ex, b :: Ex) of (MkEx ..., MkEx ...) -> ...
+we'll give both unpacked existential variables the
+same name, leading to shadowing.
+
 -}
 
 --      Running example:
@@ -886,6 +895,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled
 
         ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX tenv ex_tvs
                      -- Get location from monad, not from ex_tvs
+                     -- This freshens: See Note [Freshen existentials]
 
         ; let -- pat_ty' = mkTyConApp tycon ctxt_res_tys
               -- pat_ty' is type of the actual constructor application
@@ -972,6 +982,8 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
         ; let all_arg_tys = ty : prov_theta ++ (map scaledThing arg_tys)
         ; checkExistentials ex_tvs all_arg_tys penv
         ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX subst ex_tvs
+           -- This freshens: Note [Freshen existentials]
+
         ; let ty'         = substTy tenv ty
               arg_tys'    = substScaledTys tenv arg_tys
               pat_mult    = scaledMult pat_ty
