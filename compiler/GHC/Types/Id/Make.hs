@@ -149,7 +149,7 @@ wiredInIds
   ++ errorIds           -- Defined in GHC.Core.Make
 
 magicIds :: [Id]    -- See Note [magicIds]
-magicIds = [lazyId, oneShotId, noinlineId]
+magicIds = [lazyId, oneShotId, noinlineId, impossibleId]
 
 ghcPrimIds :: [Id]  -- See Note [ghcPrimIds (aka pseudoops)]
 ghcPrimIds
@@ -1420,7 +1420,7 @@ magicDictName     = mkWiredInIdName gHC_PRIM  (fsLit "magicDict")      magicDict
 coerceName        = mkWiredInIdName gHC_PRIM  (fsLit "coerce")         coerceKey          coerceId
 proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHashKey       proxyHashId
 
-lazyIdName, oneShotName, noinlineIdName :: Name
+lazyIdName, oneShotName, noinlineIdName, impossibleIdName :: Name
 lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey          lazyId
 oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
 noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline")       noinlineIdKey      noinlineId
@@ -1495,13 +1495,13 @@ noinlineId = pcMiscPrelId noinlineIdName ty info
 
 impossibleId :: Id -- TODO: See Note [absentError magic]
 impossibleId = --  pcMiscPrelId
-    pprTrace "fooInfoImp" (ppr info) $
+    -- pprTrace "fooInfoImp" (ppr info) $
       mkVanillaGlobalWithInfo impossibleIdName ty info
   -- setIdStrictness
   -- setStrictnessInfo
   where
     info = (vanillaIdInfo
-                     `setStrictnessInfo` mkClosedStrictSig [] botDiv
+                     `setStrictnessInfo` mkClosedStrictSig [] Absent
                      `setCprInfo` mkCprSig 0 botCpr
                      `setArityInfo` 0
                      `setCafInfo` NoCafRefs)

@@ -1065,6 +1065,7 @@ botDiv = Diverges
 isDeadEndDiv :: Divergence -> Bool
 isDeadEndDiv Diverges = True
 isDeadEndDiv ExnOrDiv = True
+isDeadEndDiv Absent   = True -- Should never be entered, but if we do it's a dead end indeed.
 isDeadEndDiv Dunno    = False
 
 -- See Notes [Default demand on free variables and arguments]
@@ -1073,6 +1074,9 @@ defaultFvDmd :: Divergence -> Demand
 defaultFvDmd Dunno    = absDmd
 defaultFvDmd ExnOrDiv = absDmd -- This is the whole point of ExnOrDiv!
 defaultFvDmd Diverges = botDmd -- Diverges
+defaultFvDmd Absent   = absDmd -- While this diverges we compile under the assumption
+                               -- that it's never entered, so the free variables should
+                               -- never be demanded.
 
 defaultArgDmd :: Divergence -> Demand
 -- TopRes and BotRes are polymorphic, so that
@@ -1085,6 +1089,7 @@ defaultArgDmd Dunno    = topDmd
 -- argument. But it is still absent.
 defaultArgDmd ExnOrDiv = absDmd
 defaultArgDmd Diverges = botDmd
+defaultArgDmd Absent   = topDmd
 
 {- Note [Default demand on free variables and arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2070,9 +2075,11 @@ instance Binary Divergence where
   put_ bh Dunno    = putByte bh 0
   put_ bh ExnOrDiv = putByte bh 1
   put_ bh Diverges = putByte bh 2
+  put_ bh Absent = putByte bh 3
 
   get bh = do { h <- getByte bh
               ; case h of
                   0 -> return Dunno
                   1 -> return ExnOrDiv
+                  3 -> return Absent
                   _ -> return Diverges }

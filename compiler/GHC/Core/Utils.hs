@@ -85,7 +85,7 @@ import GHC.Core.DataCon
 import GHC.Builtin.PrimOps
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Builtin.Names( absentErrorIdKey )
+import GHC.Builtin.Names( absentErrorIdKey, impossibleIdKey )
 import GHC.Core.Type as Type
 import GHC.Core.Predicate
 import GHC.Core.TyCo.Rep( TyCoBinder(..), TyBinder )
@@ -1940,6 +1940,7 @@ exprIsHNFlike is_con is_con_unf expr =
        || idArity id > n_val_args
        || id `hasKey` absentErrorIdKey  -- See Note [aBSENT_ERROR_ID] in GHC.Core.Make
                       -- absentError behaves like an honorary data constructor
+       || id `hasKey` impossibleIdKey
 
 
 {-
