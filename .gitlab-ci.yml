@@ -16,6 +16,9 @@ variables:
 
   GIT_SUBMODULE_STRATEGY: "recursive"
 
+  # Commit used by testsuite driver as performance baseline.
+  PERF_BASELINE_COMMIT: "$CI_MERGE_REQUEST_TARGET_BRANCH_SHA"
+
 stages:
   - lint        # Source linting
   - quick-build # A very quick smoke-test to weed out broken commits
@@ -26,12 +29,26 @@ stages:
   - testing     # head.hackage correctness and compiler performance testing
   - deploy      # push documentation
 
+# Note [The CI Story]
+# ~~~~~~~~~~~~~~~~~~~
+#
+# There are roughly three different types of pipelines:
+#
+#  - marge-bot merges to `master`. Here we perform an exhaustive validation
+#    across all of the platforms which we support. In addition, we push
+#    performance metric notes upstream, providing a persistant record of the
+#    performance characteristics of the compiler.
+#
+#  - merge requests. Here we perform a slightly less exhaustive battery of
+#    testing. Namely we omit some configurations (e.g. the unregisterised job).
+
+
 workflow:
-  # N.B.Don't run on wip/ branches, instead on run on merge requests.
+  # N.B. Don't run on wip/ branches, instead on run on merge requests.
   rules:
     - if: $CI_MERGE_REQUEST_ID
     - if: $CI_COMMIT_TAG
-    - if: '$CI_COMMIT_BRANCH == "master"'
+    - if: '$CI_COMMIT_BRANCH == "wip/marge_bot_batch_merge_job"'
     - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
     - if: '$CI_PIPELINE_SOURCE == "web"'
 
