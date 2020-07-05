@@ -4,7 +4,7 @@
 
 from my_typing import *
 from pathlib import Path
-from perf_notes import MetricChange, PerfStat, Baseline, MetricOracles
+from perf_notes import MetricChange, PerfStat, Baseline, MetricOracles, GitRef
 from datetime import datetime
 
 # -----------------------------------------------------------------------------
@@ -159,6 +159,9 @@ class TestConfig:
         # tests which should be considered to be broken during this testsuite
         # run.
         self.broken_tests = set() # type: Set[TestName]
+
+        # Baseline commit for performane metric comparisons.
+        self.baseline_commit = None # type: Optional[GitRef]
 
         # Should we skip performance tests
         self.skip_perf_tests = False
