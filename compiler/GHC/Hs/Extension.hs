@@ -732,9 +732,15 @@ type family XHsQTvs       x
 type family XXLHsQTyVars  x
 
 -- -------------------------------------
--- HsImplicitBndrs type families
-type family XHsIB              x b
-type family XXHsImplicitBndrs  x b
+-- HsOuterTyVarBndrs type families
+type family XHsOuterImplicit    x
+type family XHsOuterExplicit    x flag
+type family XXHsOuterTyVarBndrs x
+
+-- -------------------------------------
+-- HsSigType type families
+type family XHsSig      x
+type family XXHsSigType x
 
 -- -------------------------------------
 -- HsWildCardBndrs type families

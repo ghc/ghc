@@ -2855,7 +2855,7 @@ at all in the kind -- after all, it is Specified so it must have
 occurred.  (It /used/ to be possible; see tests T13983 and T7873.  But
 with the advent of the forall-or-nothing rule for kind variables,
 those strange cases went away. See Note [forall-or-nothing rule] in
-GHC.Rename.HsType.)
+GHC.Hs.Type.)
 
 But one might worry about
     type v k = *
