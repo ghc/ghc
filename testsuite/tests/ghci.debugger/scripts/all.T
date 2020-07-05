@@ -28,9 +28,7 @@ test('print020', [extra_files(['../HappyTest.hs']),
                   omit_ways(['ghci-ext'])], ghci_script, ['print020.script'])
 
 test('print021', normal, ghci_script, ['print021.script'])
-test('print022',
-     [when(arch('powerpc64'), expect_broken(14455))],
-     ghci_script, ['print022.script'])
+test('print022', normal, ghci_script, ['print022.script'])
 test('print023', extra_files(['../Test.hs']), ghci_script, ['print023.script'])
 test('print024', extra_files(['../Test.hs']), ghci_script, ['print024.script'])
 test('print025', normal, ghci_script, ['print025.script'])
