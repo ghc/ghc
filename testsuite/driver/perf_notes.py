@@ -76,8 +76,7 @@ PerfStat = NamedTuple('PerfStat', [('test_env', TestEnv),
 
 # A baseline recovered form stored metrics.
 Baseline = NamedTuple('Baseline', [('perfStat', PerfStat),
-                                   ('commit', GitHash),
-                                   ('commitDepth', int)])
+                                   ('commit', GitHash)])
 
 class MetricChange(Enum):
     # The metric appears to have no baseline and is presumably a new test.
@@ -402,7 +401,8 @@ def baseline_metric(commit: GitHash,
                     name: TestName,
                     test_env: TestEnv,
                     metric: MetricName,
-                    way: WayName
+                    way: WayName,
+                    baseline_commit: Optional[GitRef]
                     ) -> Optional[Baseline]:
     # For performance reasons (in order to avoid calling commit_hash), we assert
     # commit is already a commit hash.
@@ -418,11 +418,18 @@ def baseline_metric(commit: GitHash,
     def find_baseline(namespace: NoteNamespace,
                       test_env: TestEnv
                       ) -> Optional[Baseline]:
+        if baseline_commit is not None:
+            current_metric = get_commit_metric(namespace, baseline_commit, test_env, name, metric, way)
+            if current_metric is not None:
+                return Baseline(current_metric, baseline_commit)
+            else:
+                return None
+
         for depth, current_commit in list(enumerate(commit_hashes))[1:]:
             # Check for a metric on this commit.
             current_metric = get_commit_metric(namespace, current_commit, test_env, name, metric, way)
             if current_metric is not None:
-                return Baseline(current_metric, current_commit, depth)
+                return Baseline(current_metric, current_commit)
 
             # Stop if there is an expected change at this commit. In that case
             # metrics on ancestor commits will not be a valid baseline.
@@ -552,7 +559,7 @@ def check_stats_change(actual: PerfStat,
     result = passed()
     if not change_allowed:
         error = str(change) + ' from ' + baseline.perfStat.test_env + \
-                ' baseline @ HEAD~' + str(baseline.commitDepth)
+                ' baseline @ %s' % baseline.commit
         print(actual.metric, error + ':')
         result = failBecause('stat ' + error, tag='stat')
 
