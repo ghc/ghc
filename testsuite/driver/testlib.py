@@ -477,7 +477,8 @@ def _collect_stats(name: TestName, opts, metrics, deviation, is_compiler_stats_t
         metric = '{}/{}'.format(tag, metric_name)
         def baselineByWay(way, target_commit, metric=metric):
             return Perf.baseline_metric( \
-                              target_commit, name, config.test_env, metric, way)
+                              target_commit, name, config.test_env, metric, way, \
+                              config.baseline_commit )
 
         opts.stats_range_fields[metric] = MetricOracles(baseline=baselineByWay,
                                                         deviation=deviation)
