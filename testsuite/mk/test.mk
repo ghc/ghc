@@ -226,6 +226,10 @@ ifneq "$(VERBOSE)" ""
 RUNTEST_OPTS += --verbose=$(VERBOSE)
 endif
 
+ifneq "$(PERF_TEST_BASELINE_COMMIT)" ""
+RUNTEST_OPTS += --perf-baseline=$(PERF_TEST_BASELINE_COMMIT)
+endif
+
 ifeq "$(SKIP_PERF_TESTS)" "YES"
 RUNTEST_OPTS += --skip-perf-tests
 endif
