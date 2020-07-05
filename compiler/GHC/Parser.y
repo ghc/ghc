@@ -1173,7 +1173,7 @@ inst_decl :: { LInstDecl GhcPs }
                     (mj AnnType $1:mj AnnInstance $2:(fst $ unLoc $3)) }
 
           -- data/newtype instance declaration
-        | data_or_newtype 'instance' capi_ctype tycl_hdr_inst constrs
+        | data_or_newtype 'instance' capi_ctype datafam_inst_hdr constrs
                           maybe_derivings
             {% amms (mkDataFamInst (comb4 $1 $4 $5 $6) (snd $ unLoc $1) $3 (snd $ unLoc $4)
                                       Nothing (reverse (snd  $ unLoc $5))
@@ -1181,7 +1181,7 @@ inst_decl :: { LInstDecl GhcPs }
                     ((fst $ unLoc $1):mj AnnInstance $2:(fst $ unLoc $4)++(fst $ unLoc $5)) }
 
           -- GADT instance declaration
-        | data_or_newtype 'instance' capi_ctype tycl_hdr_inst opt_kind_sig
+        | data_or_newtype 'instance' capi_ctype datafam_inst_hdr opt_kind_sig
                  gadt_constrlist
                  maybe_derivings
             {% amms (mkDataFamInst (comb4 $1 $4 $6 $7) (snd $ unLoc $1) $3 (snd $ unLoc $4)
@@ -1274,11 +1274,11 @@ ty_fam_inst_eqn :: { Located ([AddAnn],TyFamInstEqn GhcPs) }
         : 'forall' tv_bndrs '.' type '=' ktype
               {% do { hintExplicitForall $1
                     ; tvb <- fromSpecTyVarBndrs $2
-                    ; (eqn,ann) <- mkTyFamInstEqn (Just tvb) $4 $6
+                    ; (eqn,ann) <- mkTyFamInstEqn (mkHsOuterExplicit tvb) $4 $6
                     ; return (sLL $1 $>
                                (mu AnnForall $1:mj AnnDot $3:mj AnnEqual $5:ann,eqn)) } }
         | type '=' ktype
-              {% do { (eqn,ann) <- mkTyFamInstEqn Nothing $1 $3
+              {% do { (eqn,ann) <- mkTyFamInstEqn mkHsOuterImplicit $1 $3
                     ; return (sLL $1 $> (mj AnnEqual $2:ann, eqn))  } }
               -- Note the use of type for the head; this allows
               -- infix type constructors and type patterns
@@ -1344,14 +1344,14 @@ at_decl_inst :: { LInstDecl GhcPs }
                         (mj AnnType $1:$2++(fst $ unLoc $3)) }
 
         -- data/newtype instance declaration, with optional 'instance' keyword
-        | data_or_newtype opt_instance capi_ctype tycl_hdr_inst constrs maybe_derivings
+        | data_or_newtype opt_instance capi_ctype datafam_inst_hdr constrs maybe_derivings
                {% amms (mkDataFamInst (comb4 $1 $4 $5 $6) (snd $ unLoc $1) $3 (snd $ unLoc $4)
                                     Nothing (reverse (snd $ unLoc $5))
                                             (fmap reverse $6))
                        ((fst $ unLoc $1):$2++(fst $ unLoc $4)++(fst $ unLoc $5)) }
 
         -- GADT instance declaration, with optional 'instance' keyword
-        | data_or_newtype opt_instance capi_ctype tycl_hdr_inst opt_kind_sig
+        | data_or_newtype opt_instance capi_ctype datafam_inst_hdr opt_kind_sig
                  gadt_constrlist
                  maybe_derivings
                 {% amms (mkDataFamInst (comb4 $1 $4 $6 $7) (snd $ unLoc $1) $3
@@ -1402,23 +1402,23 @@ tycl_hdr :: { Located (Maybe (LHsContext GhcPs), LHsType GhcPs) }
                                     }
         | type                      { sL1 $1 (Nothing, $1) }
 
-tycl_hdr_inst :: { Located ([AddAnn],(Maybe (LHsContext GhcPs), Maybe [LHsTyVarBndr () GhcPs], LHsType GhcPs)) }
+datafam_inst_hdr :: { Located ([AddAnn],(Maybe (LHsContext GhcPs), HsOuterFamEqnTyVarBndrs GhcPs, LHsType GhcPs)) }
         : 'forall' tv_bndrs '.' context '=>' type   {% hintExplicitForall $1
                                                        >> fromSpecTyVarBndrs $2
                                                          >>= \tvbs -> (addAnnotation (gl $4) (toUnicodeAnn AnnDarrow $5) (gl $5)
                                                              >> return (sLL $1 $> ([mu AnnForall $1, mj AnnDot $3]
-                                                                                  , (Just $4, Just tvbs, $6)))
+                                                                                  , (Just $4, mkHsOuterExplicit tvbs, $6)))
                                                           )
                                                     }
         | 'forall' tv_bndrs '.' type   {% do { hintExplicitForall $1
                                              ; tvbs <- fromSpecTyVarBndrs $2
                                              ; return (sLL $1 $> ([mu AnnForall $1, mj AnnDot $3]
-                                                                 , (Nothing, Just tvbs, $4)))
+                                                                 , (Nothing, mkHsOuterExplicit tvbs, $4)))
                                        } }
         | context '=>' type         {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
-                                       >> (return (sLL $1 $>([], (Just $1, Nothing, $3))))
+                                       >> (return (sLL $1 $>([], (Just $1, mkHsOuterImplicit, $3))))
                                     }
-        | type                      { sL1 $1 ([], (Nothing, Nothing, $1)) }
+        | type                      { sL1 $1 ([], (Nothing, mkHsOuterImplicit, $1)) }
 
 
 capi_ctype :: { Maybe (Located CType) }

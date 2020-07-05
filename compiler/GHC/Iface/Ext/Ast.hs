@@ -540,10 +540,11 @@ instance HasLoc a => HasLoc [a] where
   loc xs = foldl1' combineSrcSpans $ map loc xs
 
 instance HasLoc a => HasLoc (FamEqn (GhcPass s) a) where
-  loc (FamEqn _ a Nothing b _ c) = foldl1' combineSrcSpans [loc a, loc b, loc c]
-  loc (FamEqn _ a (Just tvs) b _ c) = foldl1' combineSrcSpans
-                                              [loc a, loc tvs, loc b, loc c]
-
+  loc (FamEqn _ a outer_bndrs b _ c) = case outer_bndrs of
+    HsOuterImplicit{}                -> foldl1' combineSrcSpans
+                                                [loc a, loc b, loc c]
+    HsOuterExplicit{hso_bndrs = tvs} -> foldl1' combineSrcSpans
+                                                [loc a, loc tvs, loc b, loc c]
 instance (HasLoc tm, HasLoc ty) => HasLoc (HsArg tm ty) where
   loc (HsValArg tm) = loc tm
   loc (HsTypeArg _ ty) = loc ty
@@ -1474,9 +1475,12 @@ instance (ToHie rhs, HasLoc rhs)
 
 instance (ToHie rhs, HasLoc rhs)
     => ToHie (FamEqn GhcRn rhs) where
-  toHie fe@(FamEqn _ var tybndrs pats _ rhs) = concatM $
+  toHie fe@(FamEqn _ var outer_bndrs pats _ rhs) = concatM $
     [ toHie $ C (Decl InstDec $ getRealSpan $ loc fe) var
+    {-
+    TODO RGS: Figure out how to do this correctly
     , toHie $ fmap (tvScopes (ResolvedScopes []) scope) tybndrs
+    -}
     , toHie pats
     , toHie rhs
     ]
@@ -1528,11 +1532,15 @@ instance ToHie a => ToHie (HsScaled GhcRn a) where
 
 instance ToHie (Located (ConDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNode decl span : case decl of
-      ConDeclGADT { con_names = names, con_qvars = exp_vars, con_g_ext = imp_vars
+      ConDeclGADT { con_names = names, con_bndrs = L outer_bndrs_loc outer_bndrs
                   , con_mb_cxt = ctx, con_args = args, con_res_ty = typ } ->
         [ toHie $ map (C (Decl ConDec $ getRealSpan span)) names
-        , concatM $ [ bindingsOnly bindings
-                    , toHie $ tvScopes resScope NoScope exp_vars ]
+        , case outer_bndrs of
+            HsOuterImplicit{hso_ximplicit = imp_vars} ->
+              bindingsOnly $ map (C $ TyVarBind (mkScope outer_bndrs_loc) resScope)
+                                 imp_vars
+            HsOuterExplicit{hso_bndrs = exp_bndrs} ->
+              toHie $ tvScopes resScope NoScope exp_bndrs
         , toHie ctx
         , toHie args
         , toHie typ
@@ -1543,7 +1551,6 @@ instance ToHie (Located (ConDecl GhcRn)) where
           argsScope = condecl_scope args
           tyScope = mkLScope typ
           resScope = ResolvedScopes [ctxScope, rhsScope]
-          bindings = map (C $ TyVarBind (mkScope (loc exp_vars)) resScope) imp_vars
       ConDeclH98 { con_name = name, con_ex_tvs = qvars
                  , con_mb_cxt = ctx, con_args = dets } ->
         [ toHie $ C (Decl ConDec $ getRealSpan span) name
@@ -1593,7 +1600,8 @@ instance ToHie (StandaloneKindSig GhcRn) where
   toHie sig = concatM $ case sig of
     StandaloneKindSig _ name typ ->
       [ toHie $ C TyDecl name
-      , toHie $ TS (ResolvedScopes []) typ
+      -- TODO RGS: Figure out how to do this correctly
+      -- , toHie $ TS (ResolvedScopes []) typ
       ]
 
 instance HiePass p => ToHie (SigContext (Located (Sig (GhcPass p)))) where

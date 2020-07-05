@@ -427,6 +427,9 @@ So in repTopDs we bring the binders into scope with mkGenSyms and addBinds.
 And we use lookupOcc, rather than lookupBinder
 in repTyClD and repC.
 
+TODO RGS: lookupBinder is literally an alias for lookupOcc, making the comment
+above outdated.
+
 Note [Don't quantify implicit type variables in quotes]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If you're not careful, it's surprisingly easy to take this quoted declaration:
@@ -500,7 +503,11 @@ repRoleD (L loc (RoleAnnotDecl _ tycon roles))
 repKiSigD :: LStandaloneKindSig GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
 repKiSigD (L loc kisig) =
   case kisig of
-    StandaloneKindSig _ v ki -> rep_ty_sig kiSigDName loc ki v
+    StandaloneKindSig _ v ki -> do
+      MkC th_v  <- lookupLOcc v
+      MkC th_ki <- repLHsSigType ki
+      dec       <- rep2 kiSigDName [th_v, th_ki]
+      pure (loc, dec)
 
 -------------------------
 repDataDefn :: Core TH.Name
@@ -681,27 +688,28 @@ repTyFamInstD (TyFamInstDecl { tfid_eqn = eqn })
        ; repTySynInst eqn1 }
 
 repTyFamEqn :: TyFamInstEqn GhcRn -> MetaM (Core (M TH.TySynEqn))
-repTyFamEqn (HsIB { hsib_ext = var_names
-                  , hsib_body = FamEqn { feqn_tycon = tc_name
-                                       , feqn_bndrs = mb_bndrs
-                                       , feqn_pats = tys
-                                       , feqn_fixity = fixity
-                                       , feqn_rhs  = rhs }})
+repTyFamEqn (FamEqn { feqn_tycon = tc_name
+                    , feqn_bndrs = outer_bndrs
+                    , feqn_pats = tys
+                    , feqn_fixity = fixity
+                    , feqn_rhs  = rhs })
   = do { tc <- lookupLOcc tc_name     -- See note [Binders and occurrences]
+       {-
+       TODO RGS: Delete me
+
        ; let hs_tvs = HsQTvs { hsq_ext = var_names
                              , hsq_explicit = fromMaybe [] mb_bndrs }
        ; addTyClTyVarBinds hs_tvs $ \ _ ->
-         do { mb_bndrs1 <- repMaybeListM tyVarBndrUnitTyConName
-                                        repTyVarBndr
-                                        mb_bndrs
-            ; tys1 <- case fixity of
+       -}
+       ; addHsOuterFamEqnTyVarBinds outer_bndrs $ \mb_exp_bndrs ->
+         do { tys1 <- case fixity of
                         Prefix -> repTyArgs (repNamedTyCon tc) tys
                         Infix  -> do { (HsValArg t1: HsValArg t2: args) <- checkTys tys
                                      ; t1' <- repLTy t1
                                      ; t2'  <- repLTy t2
                                      ; repTyArgs (repTInfix t1' tc t2') args }
             ; rhs1 <- repLTy rhs
-            ; repTySynEqn mb_bndrs1 tys1 rhs1 } }
+            ; repTySynEqn mb_exp_bndrs tys1 rhs1 } }
      where checkTys :: [LHsTypeArg GhcRn] -> MetaM [LHsTypeArg GhcRn]
            checkTys tys@(HsValArg _:HsValArg _:_) = return tys
            checkTys _ = panic "repTyFamEqn:checkTys"
@@ -718,26 +726,27 @@ repTyArgs f (HsArgPar _ : as) = repTyArgs f as
 
 repDataFamInstD :: DataFamInstDecl GhcRn -> MetaM (Core (M TH.Dec))
 repDataFamInstD (DataFamInstDecl { dfid_eqn =
-                  (HsIB { hsib_ext = var_names
-                        , hsib_body = FamEqn { feqn_tycon = tc_name
-                                             , feqn_bndrs = mb_bndrs
+                                      FamEqn { feqn_tycon = tc_name
+                                             , feqn_bndrs = outer_bndrs
                                              , feqn_pats  = tys
                                              , feqn_fixity = fixity
-                                             , feqn_rhs   = defn }})})
+                                             , feqn_rhs   = defn }})
   = do { tc <- lookupLOcc tc_name         -- See note [Binders and occurrences]
+       {-
+       TODO RGS: Delete
+
        ; let hs_tvs = HsQTvs { hsq_ext = var_names
                              , hsq_explicit = fromMaybe [] mb_bndrs }
        ; addTyClTyVarBinds hs_tvs $ \ _ ->
-         do { mb_bndrs1 <- repMaybeListM tyVarBndrUnitTyConName
-                                        repTyVarBndr
-                                        mb_bndrs
-            ; tys1 <- case fixity of
+       -}
+       ; addHsOuterFamEqnTyVarBinds outer_bndrs $ \mb_exp_bndrs ->
+         do { tys1 <- case fixity of
                         Prefix -> repTyArgs (repNamedTyCon tc) tys
                         Infix  -> do { (HsValArg t1: HsValArg t2: args) <- checkTys tys
                                      ; t1' <- repLTy t1
                                      ; t2'  <- repLTy t2
                                      ; repTyArgs (repTInfix t1' tc t2') args }
-            ; repDataDefn tc (Right (mb_bndrs1, tys1)) defn } }
+            ; repDataDefn tc (Right (mb_exp_bndrs, tys1)) defn } }
 
       where checkTys :: [LHsTypeArg GhcRn] -> MetaM [LHsTypeArg GhcRn]
             checkTys tys@(HsValArg _: HsValArg _: _) = return tys
@@ -885,26 +894,38 @@ repC (L _ (ConDeclH98 { con_name = con
             }
        }
 
-repC (L _ (ConDeclGADT { con_g_ext  = imp_tvs
-                       , con_names  = cons
-                       , con_qvars  = exp_tvs
+repC (L _ (ConDeclGADT { con_names  = cons
+                       , con_bndrs  = L _ outer_bndrs
                        , con_mb_cxt = mcxt
                        , con_args   = args
                        , con_res_ty = res_ty }))
-  | null imp_tvs && null exp_tvs -- No implicit or explicit variables
+  | null_outer_imp_tvs && null_outer_exp_tvs
+                                 -- No implicit or explicit variables
   , Nothing <- mcxt              -- No context
                                  -- ==> no need for a forall
   = repGadtDataCons cons args res_ty
 
   | otherwise
-  = addTyVarBinds exp_tvs imp_tvs $ \ ex_bndrs ->
+  = addHsOuterGadtTyVarBinds outer_bndrs $ \ th_outer_bndrs ->
              -- See Note [Don't quantify implicit type variables in quotes]
-    do { c'    <- repGadtDataCons cons args res_ty
+    do { ex_bndrs <- case th_outer_bndrs of
+           Nothing          -> coreListM tyVarBndrSpecTyConName []
+           Just invis_bndrs -> pure invis_bndrs
+       ; c'    <- repGadtDataCons cons args res_ty
        ; ctxt' <- repMbContext mcxt
-       ; if null exp_tvs && isNothing mcxt
+       ; if null_outer_exp_tvs && isNothing mcxt
          then return c'
          else rep2 forallCName ([unC ex_bndrs, unC ctxt', unC c']) }
+  where
+    null_outer_imp_tvs = case outer_bndrs of
+      HsOuterImplicit{hso_ximplicit = imp_bndrs} -> null imp_bndrs
+      HsOuterExplicit{}                          -> True
+        -- Vacuously true, as there is no implicit quantification
 
+    null_outer_exp_tvs = case outer_bndrs of
+      HsOuterExplicit{hso_bndrs = exp_bndrs} -> null exp_bndrs
+      HsOuterImplicit{}                      -> True
+        -- Vacuously true, as there is no outermost explicit quantification
 
 repMbContext :: Maybe (LHsContext GhcRn) -> MetaM (Core (M TH.Cxt))
 repMbContext Nothing          = repContext []
@@ -1002,9 +1023,7 @@ rep_sig (L loc (CompleteMatchSig _ _st cls mty))
 rep_ty_sig_tvs :: [LHsTyVarBndr Specificity GhcRn]
                -> MetaM (Core [M TH.TyVarBndrSpec])
 rep_ty_sig_tvs explicit_tvs
-  = let rep_in_scope_tv tv = do { name <- lookupBinder (hsLTyVarName tv)
-                                ; repTyVarBndrWithKind tv name } in
-    repListM tyVarBndrSpecTyConName rep_in_scope_tv
+  = repListM tyVarBndrSpecTyConName repTyVarBndr
              explicit_tvs
          -- NB: Don't pass any implicit type variables to repList above
          -- See Note [Don't quantify implicit type variables in quotes]
@@ -1155,6 +1174,35 @@ rep_flag :: Specificity -> MetaM (Core TH.Specificity)
 rep_flag SpecifiedSpec = rep2_nw specifiedSpecName []
 rep_flag InferredSpec  = rep2_nw inferredSpecName []
 
+addHsOuterFamEqnTyVarBinds ::
+     HsOuterFamEqnTyVarBndrs GhcRn
+  -> (Core (Maybe [M TH.TyVarBndrUnit]) -> MetaM (Core (M a)))
+  -> MetaM (Core (M a))
+addHsOuterFamEqnTyVarBinds outer_bndrs thing_inside = do
+  elt_ty <- wrapName tyVarBndrUnitTyConName
+  case outer_bndrs of
+    HsOuterImplicit{hso_ximplicit = imp_tvs} ->
+      addTyClTyVarBinds (mk_qtvs imp_tvs []) $ \_th_exp_bndrs ->
+        thing_inside $ coreNothingList elt_ty
+    HsOuterExplicit{hso_bndrs = exp_bndrs} ->
+      addTyClTyVarBinds (mk_qtvs [] exp_bndrs) $ \th_exp_bndrs ->
+        thing_inside $ coreJustList elt_ty th_exp_bndrs
+  where
+    mk_qtvs imp_tvs exp_tvs = HsQTvs { hsq_ext = imp_tvs
+                                     , hsq_explicit = exp_tvs }
+
+addHsOuterGadtTyVarBinds ::
+     HsOuterGadtTyVarBndrs GhcRn
+  -- TODO RGS: Turn that argument into type Core [M TH.TyVarBndrSpec]. It's easier that way,
+  -- and more consistent with what addHsOuterFamEqnTyVarBinds does.
+  -> (Maybe (Core [M TH.TyVarBndrSpec]) -> MetaM (Core (M a)))
+  -> MetaM (Core (M a))
+addHsOuterGadtTyVarBinds outer_bndrs thing_inside = case outer_bndrs of
+  HsOuterImplicit{hso_ximplicit = imp_tvs} ->
+    addSimpleTyVarBinds imp_tvs $ thing_inside Nothing
+  HsOuterExplicit{hso_bndrs = exp_bndrs} ->
+    addHsTyVarBinds exp_bndrs $ thing_inside . Just
+
 addSimpleTyVarBinds :: [Name]             -- the binders to be added
                     -> MetaM (Core (M a)) -- action in the ext env
                     -> MetaM (Core (M a))
@@ -1170,12 +1218,10 @@ addHsTyVarBinds :: forall flag flag' a. RepTV flag flag'
 addHsTyVarBinds exp_tvs thing_inside
   = do { fresh_exp_names <- mkGenSyms (hsLTyVarNames exp_tvs)
        ; term <- addBinds fresh_exp_names $
-                 do { kbs <- repListM (tyVarBndrName @flag @flag') mk_tv_bndr
-                                     (exp_tvs `zip` fresh_exp_names)
+                 do { kbs <- repListM (tyVarBndrName @flag @flag') repTyVarBndr
+                                      exp_tvs
                     ; thing_inside kbs }
        ; wrapGenSyms fresh_exp_names term }
-  where
-    mk_tv_bndr (tv, (_,v)) = repTyVarBndrWithKind tv (coreVar v)
 
 addQTyVarBinds :: LHsQTyVars GhcRn -- the binders to be added
                -> (Core [(M (TH.TyVarBndr ()))] -> MetaM (Core (M a))) -- action in the ext env
@@ -1185,6 +1231,7 @@ addQTyVarBinds (HsQTvs { hsq_ext = imp_tvs
               thing_inside
   = addTyVarBinds exp_tvs imp_tvs thing_inside
 
+-- TODO RGS: Consolidate with addQTyVarBind
 addTyVarBinds :: RepTV flag flag'
               => [LHsTyVarBndr flag GhcRn] -- the binders to be added
               -> [Name]
@@ -1214,25 +1261,11 @@ addTyClTyVarBinds tvs m
             -- This makes things work for family declarations
 
        ; term <- addBinds freshNames $
-                 do { kbs <- repListM tyVarBndrUnitTyConName mk_tv_bndr
+                 do { kbs <- repListM tyVarBndrUnitTyConName repTyVarBndr
                                      (hsQTvExplicit tvs)
                     ; m kbs }
 
        ; wrapGenSyms freshNames term }
-  where
-    mk_tv_bndr :: LHsTyVarBndr () GhcRn -> MetaM (Core (M (TH.TyVarBndr ())))
-    mk_tv_bndr tv = do { v <- lookupBinder (hsLTyVarName tv)
-                       ; repTyVarBndrWithKind tv v }
-
--- Produce kinded binder constructors from the Haskell tyvar binders
---
-repTyVarBndrWithKind :: RepTV flag flag' => LHsTyVarBndr flag GhcRn
-                     -> Core TH.Name -> MetaM (Core (M (TH.TyVarBndr flag')))
-repTyVarBndrWithKind (L _ (UserTyVar _ fl _)) nm
-  = repPlainTV nm fl
-repTyVarBndrWithKind (L _ (KindedTyVar _ fl _ ki)) nm
-  = do { ki' <- repLTy ki
-       ; repKindedTV nm fl ki' }
 
 -- | Represent a type variable binder
 repTyVarBndr :: RepTV flag flag'
@@ -1254,6 +1287,7 @@ repContext :: HsContext GhcRn -> MetaM (Core (M TH.Cxt))
 repContext ctxt = do preds <- repListM typeTyConName repLTy ctxt
                      repCtxt preds
 
+-- TODO RGS: DELETE THIS
 repHsSigType :: LHsSigType GhcRn -> MetaM (Core (M TH.Type))
 repHsSigType (HsIB { hsib_ext = implicit_tvs
                    , hsib_body = body })
@@ -1266,6 +1300,31 @@ repHsSigType (HsIB { hsib_ext = implicit_tvs
        ; if null explicit_tvs && null (unLoc ctxt)
          then return th_ty
          else repTForall th_explicit_tvs th_ctxt th_ty }
+
+repLHsSigType :: LHsSigType' GhcRn -> MetaM (Core (M TH.Type))
+repLHsSigType lsig_ty = repHsSigType' (unLoc lsig_ty)
+
+-- TODO RGS: This is the REAL repHsSigType. Delete the one above when ready
+repHsSigType' :: HsSigType GhcRn -> MetaM (Core (M TH.Type))
+repHsSigType' (HsSig { sig_bndrs = outer_bndrs, sig_body = body }) =
+  case outer_bndrs of
+    HsOuterImplicit{hso_ximplicit = implicit_tvs} ->
+      addSimpleTyVarBinds implicit_tvs $ repLTy body
+    HsOuterExplicit{hso_bndrs = tele} -> case tele of
+      HsForAllInvis{hsf_invis_bndrs = invis_bndrs} ->
+        addHsTyVarBinds invis_bndrs $ \ th_invis_bndrs ->
+          let (ctxt, tau) = splitLHsQualTy body in
+          if null invis_bndrs && null (unLoc ctxt)
+             then repLTy body
+             else do th_ctxt <- repLContext ctxt
+                     th_tau  <- repLTy tau
+                     repTForall th_invis_bndrs th_ctxt th_tau
+      HsForAllVis{hsf_vis_bndrs = vis_bndrs } ->
+        addHsTyVarBinds vis_bndrs $ \ th_vis_bndrs -> do
+          th_body <- repLTy body
+          if null vis_bndrs
+             then pure th_body
+             else repTForallVis th_vis_bndrs th_body
 
 -- yield the representation of a list of types
 repLTys :: [LHsType GhcRn] -> MetaM [Core (M TH.Type)]
@@ -2917,23 +2976,11 @@ coreJust' elt_ty es = MkC (mkJustExpr elt_ty (unC es))
 
 ------------------- Maybe Lists ------------------
 
--- Lookup the name and wrap it with the m variable
-repMaybeListM :: Name -> (a -> MetaM (Core b))
-                        -> Maybe [a] -> MetaM (Core (Maybe [b]))
-repMaybeListM tc_name f xs = do
-  elt_ty <- wrapName tc_name
-  repMaybeListT elt_ty f xs
+coreJustList :: Type -> Core [a] -> Core (Maybe [a])
+coreJustList elt_ty = coreJust' (mkListTy elt_ty)
 
-
-repMaybeListT :: Type -> (a -> MetaM (Core b))
-                        -> Maybe [a] -> MetaM (Core (Maybe [b]))
-repMaybeListT elt_ty _ Nothing = coreNothingList elt_ty
-repMaybeListT elt_ty f (Just args)
-  = do { args1 <- mapM f args
-       ; return $ coreJust' (mkListTy elt_ty) (coreList' elt_ty args1) }
-
-coreNothingList :: Type -> MetaM (Core (Maybe [a]))
-coreNothingList elt_ty = return $ coreNothing' (mkListTy elt_ty)
+coreNothingList :: Type -> Core (Maybe [a])
+coreNothingList elt_ty = coreNothing' (mkListTy elt_ty)
 
 ------------ Literals & Variables -------------------
 

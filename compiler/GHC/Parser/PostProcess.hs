@@ -28,7 +28,7 @@ module GHC.Parser.PostProcess (
         mkTySynonym, mkTyFamInstEqn,
         mkStandaloneKindSig,
         mkTyFamInst,
-        mkFamDecl, mkLHsSigType,
+        mkFamDecl, mkLHsSigType, mkLHsSigType',
         mkInlinePragma,
         mkPatSynMatchGroup,
         mkRecConstrOrUpdate, -- HsExp -> [HsFieldUpdate] -> P HsExp
@@ -252,7 +252,7 @@ mkStandaloneKindSig
 mkStandaloneKindSig loc lhs rhs =
   do { vs <- mapM check_lhs_name (unLoc lhs)
      ; v <- check_singular_lhs (reverse vs)
-     ; return $ L loc $ StandaloneKindSig noExtField v (mkLHsSigType rhs) }
+     ; return $ L loc $ StandaloneKindSig noExtField v (mkLHsSigType' rhs) }
   where
     check_lhs_name v@(unLoc->name) =
       if isUnqual name && isTcOcc (rdrNameOcc name)
@@ -268,25 +268,24 @@ mkStandaloneKindSig loc lhs rhs =
                        2 (pprWithCommas ppr vs)
                   , text "See https://gitlab.haskell.org/ghc/ghc/issues/16754 for details." ]
 
-mkTyFamInstEqn :: Maybe [LHsTyVarBndr () GhcPs]
+mkTyFamInstEqn :: HsOuterFamEqnTyVarBndrs GhcPs
                -> LHsType GhcPs
                -> LHsType GhcPs
                -> P (TyFamInstEqn GhcPs,[AddAnn])
 mkTyFamInstEqn bndrs lhs rhs
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False lhs
-       ; return (mkHsImplicitBndrs
-                  (FamEqn { feqn_ext    = noExtField
-                          , feqn_tycon  = tc
-                          , feqn_bndrs  = bndrs
-                          , feqn_pats   = tparams
-                          , feqn_fixity = fixity
-                          , feqn_rhs    = rhs }),
+       ; return (FamEqn { feqn_ext    = noExtField
+                        , feqn_tycon  = tc
+                        , feqn_bndrs  = bndrs
+                        , feqn_pats   = tparams
+                        , feqn_fixity = fixity
+                        , feqn_rhs    = rhs },
                  ann) }
 
 mkDataFamInst :: SrcSpan
               -> NewOrData
               -> Maybe (Located CType)
-              -> (Maybe ( LHsContext GhcPs), Maybe [LHsTyVarBndr () GhcPs]
+              -> (Maybe ( LHsContext GhcPs), HsOuterFamEqnTyVarBndrs GhcPs
                         , LHsType GhcPs)
               -> Maybe (LHsKind GhcPs)
               -> [LConDecl GhcPs]
@@ -297,13 +296,13 @@ mkDataFamInst loc new_or_data cType (mcxt, bndrs, tycl_hdr)
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
        ; addAnnsAt loc ann -- Add any API Annotations to the top SrcSpan
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
-       ; return (L loc (DataFamInstD noExtField (DataFamInstDecl (mkHsImplicitBndrs
+       ; return (L loc (DataFamInstD noExtField (DataFamInstDecl
                   (FamEqn { feqn_ext    = noExtField
                           , feqn_tycon  = tc
                           , feqn_bndrs  = bndrs
                           , feqn_pats   = tparams
                           , feqn_fixity = fixity
-                          , feqn_rhs    = defn }))))) }
+                          , feqn_rhs    = defn })))) }
 
 mkTyFamInst :: SrcSpan
             -> TyFamInstEqn GhcPs
@@ -697,14 +696,13 @@ mkGadtDecl names ty = do
 
   pure $ ConDeclGADT { con_g_ext  = noExtField
                      , con_names  = names
-                     , con_forall = L (getLoc ty) $ isJust mtvs
-                     , con_qvars  = fromMaybe [] mtvs
+                     , con_bndrs  = L (getLoc ty) outer_bndrs
                      , con_mb_cxt = mcxt
                      , con_args   = args
                      , con_res_ty = res_ty
                      , con_doc    = Nothing }
   where
-    (mtvs, mcxt, body_ty) = splitLHsGadtTy ty
+    (outer_bndrs, mcxt, body_ty) = splitLHsGadtTy $ mkLHsSigType' ty
 
 setRdrNameSpace :: RdrName -> NameSpace -> RdrName
 -- ^ This rather gruesome function is used mainly by the parser.

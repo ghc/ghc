@@ -393,10 +393,20 @@ deriving instance Data (LHsQTyVars GhcPs)
 deriving instance Data (LHsQTyVars GhcRn)
 deriving instance Data (LHsQTyVars GhcTc)
 
+-- deriving instance (DataIdLR p p, Data expBndrs) => Data (HsOuterTyVarBndrs p expBndrs)
+deriving instance Data expBndrs => Data (HsOuterTyVarBndrs GhcPs expBndrs)
+deriving instance Data expBndrs => Data (HsOuterTyVarBndrs GhcRn expBndrs)
+deriving instance Data expBndrs => Data (HsOuterTyVarBndrs GhcTc expBndrs)
+
 -- deriving instance (DataIdLR p p, Data thing) =>Data (HsImplicitBndrs p thing)
 deriving instance (Data thing) => Data (HsImplicitBndrs GhcPs thing)
 deriving instance (Data thing) => Data (HsImplicitBndrs GhcRn thing)
 deriving instance (Data thing) => Data (HsImplicitBndrs GhcTc thing)
+
+-- deriving instance (DataIsLR p p) => Data (HsSigType p)
+deriving instance Data (HsSigType GhcPs)
+deriving instance Data (HsSigType GhcRn)
+deriving instance Data (HsSigType GhcTc)
 
 -- deriving instance (DataIdLR p p, Data thing) =>Data (HsWildCardBndrs p thing)
 deriving instance (Data thing) => Data (HsWildCardBndrs GhcPs thing)

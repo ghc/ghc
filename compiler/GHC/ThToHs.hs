@@ -194,7 +194,7 @@ cvtDec (TH.SigD nm typ)
 cvtDec (TH.KiSigD nm ki)
   = do  { nm' <- tconNameL nm
         ; ki' <- cvtType ki
-        ; let sig' = StandaloneKindSig noExtField nm' (mkLHsSigType ki')
+        ; let sig' = StandaloneKindSig noExtField nm' (mkLHsSigType' ki')
         ; returnJustL $ Hs.KindSigD noExtField sig' }
 
 cvtDec (TH.InfixD fx nm)
@@ -326,7 +326,7 @@ cvtDec (DataInstD ctxt bndrs tys ksig constrs derivs)
 
        ; returnJustL $ InstD noExtField $ DataFamInstD
            { dfid_ext = noExtField
-           , dfid_inst = DataFamInstDecl { dfid_eqn = mkHsImplicitBndrs $
+           , dfid_inst = DataFamInstDecl { dfid_eqn =
                            FamEqn { feqn_ext = noExtField
                                   , feqn_tycon = tc'
                                   , feqn_bndrs = bndrs'
@@ -346,7 +346,7 @@ cvtDec (NewtypeInstD ctxt bndrs tys ksig constr derivs)
                                , dd_cons = [con'], dd_derivs = derivs' }
        ; returnJustL $ InstD noExtField $ DataFamInstD
            { dfid_ext = noExtField
-           , dfid_inst = DataFamInstDecl { dfid_eqn = mkHsImplicitBndrs $
+           , dfid_inst = DataFamInstDecl { dfid_eqn =
                            FamEqn { feqn_ext = noExtField
                                   , feqn_tycon = tc'
                                   , feqn_bndrs = bndrs'
@@ -432,25 +432,26 @@ cvtDec (TH.ImplicitParamBindD _ _)
 cvtTySynEqn :: TySynEqn -> CvtM (LTyFamInstEqn GhcPs)
 cvtTySynEqn (TySynEqn mb_bndrs lhs rhs)
   = do { mb_bndrs' <- traverse (mapM cvt_tv) mb_bndrs
+       ; let outer_bndrs = mkHsOuterFamEqnTyVarBndrs mb_bndrs'
        ; (head_ty, args) <- split_ty_app lhs
        ; case head_ty of
            ConT nm -> do { nm' <- tconNameL nm
                          ; rhs' <- cvtType rhs
                          ; let args' = map wrap_tyarg args
-                         ; returnL $ mkHsImplicitBndrs
+                         ; returnL
                             $ FamEqn { feqn_ext    = noExtField
                                      , feqn_tycon  = nm'
-                                     , feqn_bndrs  = mb_bndrs'
+                                     , feqn_bndrs  = outer_bndrs
                                      , feqn_pats   = args'
                                      , feqn_fixity = Prefix
                                      , feqn_rhs    = rhs' } }
            InfixT t1 nm t2 -> do { nm' <- tconNameL nm
                                  ; args' <- mapM cvtType [t1,t2]
                                  ; rhs' <- cvtType rhs
-                                 ; returnL $ mkHsImplicitBndrs
+                                 ; returnL
                                       $ FamEqn { feqn_ext    = noExtField
                                                , feqn_tycon  = nm'
-                                               , feqn_bndrs  = mb_bndrs'
+                                               , feqn_bndrs  = outer_bndrs
                                                , feqn_pats   =
                                                 (map HsValArg args') ++ args
                                                , feqn_fixity = Hs.Infix
@@ -493,19 +494,20 @@ cvt_tycl_hdr cxt tc tvs
 cvt_datainst_hdr :: TH.Cxt -> Maybe [TH.TyVarBndr ()] -> TH.Type
                -> CvtM ( LHsContext GhcPs
                        , Located RdrName
-                       , Maybe [LHsTyVarBndr () GhcPs]
+                       , HsOuterFamEqnTyVarBndrs GhcPs
                        , HsTyPats GhcPs)
 cvt_datainst_hdr cxt bndrs tys
   = do { cxt' <- cvtContext funPrec cxt
        ; bndrs' <- traverse (mapM cvt_tv) bndrs
+       ; let outer_bndrs = mkHsOuterFamEqnTyVarBndrs bndrs'
        ; (head_ty, args) <- split_ty_app tys
        ; case head_ty of
           ConT nm -> do { nm' <- tconNameL nm
                         ; let args' = map wrap_tyarg args
-                        ; return (cxt', nm', bndrs', args') }
+                        ; return (cxt', nm', outer_bndrs, args') }
           InfixT t1 nm t2 -> do { nm' <- tconNameL nm
                                 ; args' <- mapM cvtType [t1,t2]
-                                ; return (cxt', nm', bndrs',
+                                ; return (cxt', nm', outer_bndrs,
                                          ((map HsValArg args') ++ args)) }
           _ -> failWith $ text "Invalid type instance header:"
                           <+> text (show tys) }
@@ -597,12 +599,19 @@ cvtConstr (ForallC tvs ctxt con)
 
     add_forall :: [LHsTyVarBndr Hs.Specificity GhcPs] -> LHsContext GhcPs
                -> ConDecl GhcPs -> ConDecl GhcPs
-    add_forall tvs' cxt' con@(ConDeclGADT { con_qvars = qvars, con_mb_cxt = cxt })
-      = con { con_forall = noLoc $ not (null all_tvs)
-            , con_qvars  = all_tvs
+    add_forall tvs' cxt' con@(ConDeclGADT { con_bndrs = L l outer_bndrs, con_mb_cxt = cxt })
+      = con { con_bndrs  = L l outer_bndrs'
             , con_mb_cxt = add_cxt cxt' cxt }
       where
-        all_tvs = tvs' ++ qvars
+        outer_bndrs'
+          | null all_tvs = mkHsOuterImplicit
+          | otherwise    = mkHsOuterExplicit all_tvs
+
+        all_tvs = tvs' ++ outer_exp_tvs
+
+        outer_exp_tvs = case outer_bndrs of
+          HsOuterImplicit{}                  -> []
+          HsOuterExplicit{hso_bndrs = bndrs} -> bndrs
 
     add_forall tvs' cxt' con@(ConDeclH98 { con_ex_tvs = ex_tvs, con_mb_cxt = cxt })
       = con { con_forall = noLoc $ not (null all_tvs)
@@ -634,8 +643,7 @@ mk_gadt_decl :: [Located RdrName] -> HsConDeclDetails GhcPs -> LHsType GhcPs
 mk_gadt_decl names args res_ty
   = ConDeclGADT { con_g_ext  = noExtField
                 , con_names  = names
-                , con_forall = noLoc False
-                , con_qvars  = []
+                , con_bndrs  = noLoc mkHsOuterImplicit
                 , con_mb_cxt = Nothing
                 , con_args   = args
                 , con_res_ty = res_ty
@@ -1842,6 +1850,9 @@ mkHsQualTy ctxt loc ctxt' ty
   | otherwise = L loc $ HsQualTy { hst_xqual = noExtField
                                  , hst_ctxt  = ctxt'
                                  , hst_body  = ty }
+
+mkHsOuterFamEqnTyVarBndrs :: Maybe [LHsTyVarBndr () GhcPs] -> HsOuterFamEqnTyVarBndrs GhcPs
+mkHsOuterFamEqnTyVarBndrs = maybe mkHsOuterImplicit mkHsOuterExplicit
 
 --------------------------------------------------------------------
 --      Turning Name back into RdrName

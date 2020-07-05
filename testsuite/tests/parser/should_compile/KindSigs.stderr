@@ -32,40 +32,39 @@
        (ClosedTypeFamily
         (Just
          [({ KindSigs.hs:12:3-21 }
-           (HsIB
+           (FamEqn
             (NoExtField)
-            (FamEqn
-             (NoExtField)
-             ({ KindSigs.hs:12:3-5 }
-              (Unqual
-               {OccName: Foo}))
-             (Nothing)
-             [(HsValArg
-               ({ KindSigs.hs:12:7 }
-                (HsTyVar
-                 (NoExtField)
-                 (NotPromoted)
-                 ({ KindSigs.hs:12:7 }
-                  (Unqual
-                   {OccName: a})))))]
-             (Prefix)
-             ({ KindSigs.hs:12:11-21 }
-              (HsKindSig
-               (NoExtField)
-               ({ KindSigs.hs:12:11-13 }
-                (HsTyVar
-                 (NoExtField)
-                 (NotPromoted)
-                 ({ KindSigs.hs:12:11-13 }
-                  (Unqual
-                   {OccName: Int}))))
-               ({ KindSigs.hs:12:18-21 }
-                (HsTyVar
-                 (NoExtField)
-                 (NotPromoted)
-                 ({ KindSigs.hs:12:18-21 }
-                  (Unqual
-                   {OccName: Type})))))))))]))
+            ({ KindSigs.hs:12:3-5 }
+             (Unqual
+              {OccName: Foo}))
+            (HsOuterImplicit
+             (NoExtField))
+            [(HsValArg
+              ({ KindSigs.hs:12:7 }
+               (HsTyVar
+                (NoExtField)
+                (NotPromoted)
+                ({ KindSigs.hs:12:7 }
+                 (Unqual
+                  {OccName: a})))))]
+            (Prefix)
+            ({ KindSigs.hs:12:11-21 }
+             (HsKindSig
+              (NoExtField)
+              ({ KindSigs.hs:12:11-13 }
+               (HsTyVar
+                (NoExtField)
+                (NotPromoted)
+                ({ KindSigs.hs:12:11-13 }
+                 (Unqual
+                  {OccName: Int}))))
+              ({ KindSigs.hs:12:18-21 }
+               (HsTyVar
+                (NoExtField)
+                (NotPromoted)
+                ({ KindSigs.hs:12:18-21 }
+                 (Unqual
+                  {OccName: Type}))))))))]))
        ({ KindSigs.hs:11:13-15 }
         (Unqual
          {OccName: Foo}))
@@ -612,3 +611,5 @@
       [])))]
   (Nothing)
   (Nothing)))
+
+

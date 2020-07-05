@@ -12,7 +12,7 @@ module GHC.Rename.HsType (
         -- Type related stuff
         rnHsType, rnLHsType, rnLHsTypes, rnContext,
         rnHsKind, rnLHsKind, rnLHsTypeArgs,
-        rnHsSigType, rnHsWcType,
+        rnHsSigType, rnLHsSigType, rnHsSigType', rnHsWcType,
         HsSigWcTypeScoping(..), rnHsSigWcType, rnHsPatSigType,
         newTyVarNameRn,
         rnConDeclFields,
@@ -25,13 +25,14 @@ module GHC.Rename.HsType (
         checkPrecMatch, checkSectionPrec,
 
         -- Binding related stuff
+        bindHsOuterFamEqnTyVarBndrs, bindHsOuterGadtTyVarBndrs,
         bindHsForAllTelescope,
         bindLHsTyVarBndr, bindLHsTyVarBndrs, WarnUnusedForalls(..),
         rnImplicitBndrs, bindSigTyVarsFV, bindHsQTyVars,
         FreeKiTyVars,
         extractHsTyRdrTyVars, extractHsTyRdrTyVarsKindVars,
         extractHsTysRdrTyVars, extractRdrKindSigVars, extractDataDefnKindVars,
-        extractHsTvBndrs, extractHsTyArgRdrKiTyVars,
+        extractHsOuterGadtTvBndrs, extractHsTyArgRdrKiTyVars,
         forAllOrNothing, nubL
   ) where
 
@@ -307,10 +308,11 @@ of the HsWildCardBndrs structure, and we are done.
 
 *********************************************************
 *                                                       *
-           HsSigtype (i.e. no wildcards)
+           HsSigType (i.e. no wildcards)
 *                                                       *
 ****************************************************** -}
 
+-- TODO RGS: DELETE THIS
 rnHsSigType :: HsDocContext
             -> TypeOrKind
             -> LHsSigType GhcPs
@@ -330,6 +332,34 @@ rnHsSigType ctx level (HsIB { hsib_body = hs_ty })
                        , hsib_body = body' }
                 , fvs ) } }
 
+rnLHsSigType :: HsDocContext
+             -> TypeOrKind
+             -> LHsSigType' GhcPs
+             -> RnM (LHsSigType' GhcRn, FreeVars)
+rnLHsSigType ctx level (L loc sig_ty)
+  = setSrcSpan loc $
+    do { (sig_ty', fvs) <- rnHsSigType' ctx level sig_ty
+       ; pure (L loc sig_ty', fvs) }
+
+-- TODO RGS: This is the REAL rnHsSigType. Once we remove the one above,
+-- rename this function.
+rnHsSigType' :: HsDocContext
+            -> TypeOrKind
+            -> HsSigType GhcPs
+            -> RnM (HsSigType GhcRn, FreeVars)
+-- Used for source-language type signatures
+-- that cannot have wildcards
+rnHsSigType' ctx level
+    sig_ty@(HsSig { sig_bndrs = outer_bndrs, sig_body = body })
+  = do { traceRn "rnHsSigType" (ppr sig_ty)
+       ; imp_vars <- filterInScopeM $ extractHsTyRdrTyVars body
+       ; bindHsOuterSigTyVarBndrs ctx imp_vars outer_bndrs $ \outer_bndrs' ->
+    do { (body', fvs) <- rnLHsTyKi (mkTyKiEnv ctx level RnTypeBody) body
+
+       ; return ( HsSig { sig_ext = noExtField
+                        , sig_bndrs = outer_bndrs', sig_body = body' }
+                , fvs ) } }
+
 -- Note [forall-or-nothing rule]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Free variables in signatures are usually bound in an implicit
@@ -345,6 +375,7 @@ rnHsSigType ctx level (HsIB { hsib_body = hs_ty })
 -- | See @Note [forall-or-nothing rule]@. This tiny little function is used
 -- (rather than its small body inlined) to indicate that we are implementing
 -- that rule.
+-- TODO RGS: DELETE THIS FUNCTION
 forAllOrNothing :: Bool
                 -- ^ True <=> explicit forall
                 -- E.g.  f :: forall a. a->b
@@ -1038,6 +1069,57 @@ Unlike other forms of type variable binders, dropping "unused" variables in
 an LHsQTyVars can be semantically significant. As a result, we suppress
 -Wunused-foralls warnings in exactly one place: in bindHsQTyVars.
 -}
+
+bindHsOuterFamEqnTyVarBndrs :: HsDocContext
+                            -> Maybe assoc
+                               -- ^ @'Just' _@ => an associated type decl
+                            -> FreeKiTyVars
+                            -> HsOuterFamEqnTyVarBndrs GhcPs
+                            -> (HsOuterFamEqnTyVarBndrs GhcRn -> RnM (a, FreeVars))
+                            -> RnM (a, FreeVars)
+bindHsOuterFamEqnTyVarBndrs doc mb_cls implicit_vars outer_bndrs thing_inside =
+  case outer_bndrs of
+    HsOuterImplicit{} ->
+      rnImplicitBndrs mb_cls implicit_vars $ \implicit_vars' ->
+        thing_inside $ HsOuterImplicit{ hso_ximplicit = implicit_vars' }
+    HsOuterExplicit{hso_bndrs = exp_bndrs} ->
+      -- Note: If we pass mb_cls instead of Nothing below, bindLHsTyVarBndrs
+      -- will use class variables for any names the user meant to bring in
+      -- scope here. This is an explicit forall, so we want fresh names, not
+      -- class variables. Thus: always pass Nothing.
+      bindLHsTyVarBndrs doc WarnUnusedForalls Nothing exp_bndrs $ \exp_bndrs' ->
+        thing_inside $ HsOuterExplicit{ hso_xexplicit = noExtField
+                                      , hso_bndrs = exp_bndrs' }
+
+bindHsOuterGadtTyVarBndrs :: HsDocContext
+                          -> FreeKiTyVars
+                          -> HsOuterGadtTyVarBndrs GhcPs
+                          -> (HsOuterGadtTyVarBndrs GhcRn -> RnM (a, FreeVars))
+                          -> RnM (a, FreeVars)
+bindHsOuterGadtTyVarBndrs doc implicit_vars outer_bndrs thing_inside =
+  case outer_bndrs of
+    HsOuterImplicit{} ->
+      rnImplicitBndrs Nothing implicit_vars $ \implicit_vars' ->
+        thing_inside $ HsOuterImplicit{ hso_ximplicit = implicit_vars' }
+    HsOuterExplicit{hso_bndrs = exp_bndrs} ->
+      bindLHsTyVarBndrs doc WarnUnusedForalls Nothing exp_bndrs $ \exp_bndrs' ->
+        thing_inside $ HsOuterExplicit{ hso_xexplicit = noExtField
+                                      , hso_bndrs = exp_bndrs' }
+
+bindHsOuterSigTyVarBndrs :: HsDocContext
+                         -> FreeKiTyVars
+                         -> HsOuterSigTyVarBndrs GhcPs
+                         -> (HsOuterSigTyVarBndrs GhcRn -> RnM (a, FreeVars))
+                         -> RnM (a, FreeVars)
+bindHsOuterSigTyVarBndrs doc implicit_vars outer_bndrs thing_inside =
+  case outer_bndrs of
+    HsOuterImplicit{} ->
+      rnImplicitBndrs Nothing implicit_vars $ \implicit_vars' ->
+        thing_inside $ HsOuterImplicit{ hso_ximplicit = implicit_vars' }
+    HsOuterExplicit{hso_bndrs = tele} ->
+      bindHsForAllTelescope doc tele $ \tele' ->
+        thing_inside $ HsOuterExplicit{ hso_xexplicit = noExtField
+                                      , hso_bndrs = tele' }
 
 bindHsForAllTelescope :: HsDocContext
                       -> HsForAllTelescope GhcPs
@@ -1850,11 +1932,15 @@ extract_hs_for_all_telescope tele acc_vars body_fvs =
     HsForAllInvis { hsf_invis_bndrs = bndrs } ->
       extract_hs_tv_bndrs bndrs acc_vars body_fvs
 
-extractHsTvBndrs :: [LHsTyVarBndr flag GhcPs]
-                 -> FreeKiTyVars       -- Free in body
-                 -> FreeKiTyVars       -- Free in result
-extractHsTvBndrs tv_bndrs body_fvs
-  = extract_hs_tv_bndrs tv_bndrs [] body_fvs
+extractHsOuterGadtTvBndrs :: HsOuterGadtTyVarBndrs GhcPs
+                          -> FreeKiTyVars -- Free in body
+                          -> FreeKiTyVars -- Free in result
+extractHsOuterGadtTvBndrs outer_bndrs body_fvs =
+  case outer_bndrs of
+    HsOuterImplicit{} ->
+      body_fvs
+    HsOuterExplicit { hso_bndrs = bndrs } ->
+      extract_hs_tv_bndrs bndrs [] body_fvs
 
 extract_hs_tv_bndrs :: [LHsTyVarBndr flag GhcPs]
                     -> FreeKiTyVars  -- Accumulator
