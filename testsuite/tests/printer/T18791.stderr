@@ -36,8 +36,8 @@
             (Unqual
              {OccName: MkT}))]
           ({ T18791.hs:5:10-17 }
-           (False))
-          []
+           (HsOuterImplicit
+            (NoExtField)))
           (Nothing)
           (PrefixConGADT
            [(HsScaled

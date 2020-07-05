@@ -69,7 +69,7 @@ module GHC.Hs.Utils(
 
   -- * Types
   mkHsAppTy, mkHsAppKindTy,
-  mkLHsSigType, mkLHsSigWcType, mkClassOpSigs, mkHsSigEnv,
+  hsTypeToHsSigType, hsTypeToHsSigWcType, mkClassOpSigs, mkHsSigEnv,
   nlHsAppTy, nlHsAppKindTy, nlHsTyVar, nlHsFunTy, nlHsParTy, nlHsTyConApp,
 
   -- * Stmts
@@ -657,11 +657,17 @@ chunkify xs
 *                                                                      *
 ********************************************************************* -}
 
-mkLHsSigType :: LHsType GhcPs -> LHsSigType GhcPs
-mkLHsSigType ty = mkHsImplicitBndrs ty
+-- | Convert an 'LHsType' to an 'LHsSigType'.
+hsTypeToHsSigType :: LHsType GhcPs -> LHsSigType GhcPs
+hsTypeToHsSigType lty@(L loc ty) = L loc $ case ty of
+  HsForAllTy { hst_tele = HsForAllInvis { hsf_invis_bndrs = bndrs }
+             , hst_body = body }
+    -> mkHsExplicitSigType bndrs body
+  _ -> mkHsImplicitSigType lty
 
-mkLHsSigWcType :: LHsType GhcPs -> LHsSigWcType GhcPs
-mkLHsSigWcType ty = mkHsWildCardBndrs (mkHsImplicitBndrs ty)
+-- | Convert an 'LHsType' to an 'LHsSigWcType'.
+hsTypeToHsSigWcType :: LHsType GhcPs -> LHsSigWcType GhcPs
+hsTypeToHsSigWcType = mkHsWildCardBndrs . hsTypeToHsSigType
 
 mkHsSigEnv :: forall a. (LSig GhcRn -> Maybe ([Located Name], a))
                      -> [LSig GhcRn]
@@ -1222,8 +1228,7 @@ hsLInstDeclBinders (L _ (TyFamInstD {})) = mempty
 hsDataFamInstBinders :: IsPass p
                      => DataFamInstDecl (GhcPass p)
                      -> ([Located (IdP (GhcPass p))], [LFieldOcc (GhcPass p)])
-hsDataFamInstBinders (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
-                       FamEqn { feqn_rhs = defn }}})
+hsDataFamInstBinders (DataFamInstDecl { dfid_eqn = FamEqn { feqn_rhs = defn }})
   = hsDataDefnBinders defn
   -- There can't be repeated symbols because only data instances have binders
 
