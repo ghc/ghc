@@ -78,6 +78,7 @@ runTestBuilderArgs = builder RunTest ? do
             <*> (maybe False (=="YES") <$> lookupEnv "OS")
     (testEnv, testMetricsFile) <- expr . liftIO $
         (,) <$> lookupEnv "TEST_ENV" <*> lookupEnv "METRICS_FILE"
+    perfBaseline <- expr . liftIO $ lookupEnv "PERF_BASELINE_COMMIT"
 
     threads     <- shakeThreads <$> expr getShakeOptions
     os          <- getTestSetting TestHostOS
@@ -141,6 +142,9 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "--config", arg $ "timeout_prog=" ++ show (top -/- timeoutProg)
             , arg "--config", arg $ "stats_files_dir=" ++ statsFilesDir
             , arg $ "--threads=" ++ show threads
+            , case perfBaseline of
+                Just commit | not (null commit) -> arg ("--perf-baseline=" ++ show commit)
+                _ -> mempty
             , emitWhenSet testEnv $ \env -> arg ("--test-env=" ++ show env)
             , emitWhenSet testMetricsFile $ \file -> arg ("--metrics-file=" ++ file)
             , getTestArgs -- User-provided arguments from command line.

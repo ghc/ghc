@@ -363,6 +363,13 @@ function push_perf_notes() {
   "$TOP/.gitlab/test-metrics.sh" push
 }
 
+# Figure out which commit should be used by the testsuite driver as a
+# performance baseline. See Note [The CI Story].
+function determine_metric_baseline() {
+  export PERF_BASELINE_COMMIT="$(git merge-base $CI_MERGE_REQUEST_TARGET_BRANCH_NAME HEAD)"
+  info "Using $PERF_BASELINE_COMMIT for performance metric baseline..."
+}
+
 function test_make() {
   run "$MAKE" test_bindist TEST_PREP=YES
   run "$MAKE" V=0 test \
