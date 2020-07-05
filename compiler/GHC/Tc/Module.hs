@@ -2474,14 +2474,14 @@ getGhciStepIO = do
     let ghciM   = nlHsAppTy (nlHsTyVar ghciTy) (nlHsTyVar a_tv)
         ioM     = nlHsAppTy (nlHsTyVar ioTyConName) (nlHsTyVar a_tv)
 
-        step_ty = noLoc $ HsForAllTy
-                     { hst_tele = mkHsForAllInvisTele
-                                  [noLoc $ UserTyVar noExtField SpecifiedSpec (noLoc a_tv)]
-                     , hst_xforall = noExtField
-                     , hst_body  = nlHsFunTy ghciM ioM }
+        step_ty :: LHsSigType GhcRn
+        step_ty = noLoc $ HsSig
+                     { sig_bndrs = HsOuterImplicit{hso_ximplicit = [a_tv]}
+                     , sig_ext = noExtField
+                     , sig_body = nlHsFunTy ghciM ioM }
 
         stepTy :: LHsSigWcType GhcRn
-        stepTy = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs step_ty)
+        stepTy = mkEmptyWildCardBndrs step_ty
 
     return (noLoc $ ExprWithTySig noExtField (nlHsVar ghciStepIoMName) stepTy)
 
@@ -2614,7 +2614,7 @@ tcRnType hsc_env flexi normalise rdr_type
        ; traceTc "tcRnType" (vcat [ppr wcs, ppr rn_type])
        ; (_tclvl, wanted, (ty, kind))
                <- pushLevelAndSolveEqualitiesX "tcRnType"  $
-                  tcNamedWildCardBinders wcs $ \ wcs' ->
+                  bindNamedWildCardBinders wcs $ \ wcs' ->
                   do { mapM_ emitNamedTypeHole wcs'
                      ; tcInferLHsTypeUnsaturated rn_type }
 
