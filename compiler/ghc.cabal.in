@@ -582,6 +582,12 @@ Library
             GHC.CmmToAsm.X86.Cond
             GHC.CmmToAsm.X86.Ppr
             GHC.CmmToAsm.X86.CodeGen
+            GHC.CmmToAsm.ARM.Regs
+            GHC.CmmToAsm.ARM.RegInfo
+            GHC.CmmToAsm.ARM.Instr
+            GHC.CmmToAsm.ARM.Cond
+            GHC.CmmToAsm.ARM.Ppr
+            GHC.CmmToAsm.ARM.CodeGen
             GHC.CmmToAsm.PPC.Regs
             GHC.CmmToAsm.PPC.RegInfo
             GHC.CmmToAsm.PPC.Instr
@@ -622,6 +628,7 @@ Library
             GHC.CmmToAsm.Reg.Linear.FreeRegs
             GHC.CmmToAsm.Reg.Linear.StackMap
             GHC.CmmToAsm.Reg.Linear.Base
+            GHC.CmmToAsm.Reg.Linear.ARM
             GHC.CmmToAsm.Reg.Linear.X86
             GHC.CmmToAsm.Reg.Linear.X86_64
             GHC.CmmToAsm.Reg.Linear.PPC

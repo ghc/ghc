@@ -30,11 +30,13 @@ import GHC.Platform
 --      getFreeRegs cls f = filter ( (==cls) . regClass . RealReg ) f
 --      allocateReg f r = filter (/= r) f
 
+import qualified GHC.CmmToAsm.Reg.Linear.ARM    as ARM
 import qualified GHC.CmmToAsm.Reg.Linear.PPC    as PPC
 import qualified GHC.CmmToAsm.Reg.Linear.SPARC  as SPARC
 import qualified GHC.CmmToAsm.Reg.Linear.X86    as X86
 import qualified GHC.CmmToAsm.Reg.Linear.X86_64 as X86_64
 
+import qualified GHC.CmmToAsm.ARM.Instr   as ARM.Instr
 import qualified GHC.CmmToAsm.PPC.Instr   as PPC.Instr
 import qualified GHC.CmmToAsm.SPARC.Instr as SPARC.Instr
 import qualified GHC.CmmToAsm.X86.Instr   as X86.Instr
@@ -57,6 +59,12 @@ instance FR X86_64.FreeRegs where
     frInitFreeRegs = X86_64.initFreeRegs
     frReleaseReg   = \_ -> X86_64.releaseReg
 
+instance FR ARM.FreeRegs where
+    frAllocateReg  = \_ -> ARM.allocateReg
+    frGetFreeRegs  = \_ -> ARM.getFreeRegs
+    frInitFreeRegs = ARM.initFreeRegs
+    frReleaseReg   = \_ -> ARM.releaseReg
+
 instance FR PPC.FreeRegs where
     frAllocateReg  = \_ -> PPC.allocateReg
     frGetFreeRegs  = \_ -> PPC.getFreeRegs
@@ -78,7 +86,7 @@ maxSpillSlots config = case platformArch (ncgPlatform config) of
    ArchSPARC     -> SPARC.Instr.maxSpillSlots config
    ArchSPARC64   -> panic "maxSpillSlots ArchSPARC64"
    ArchARM _ _ _ -> panic "maxSpillSlots ArchARM"
-   ArchARM64     -> panic "maxSpillSlots ArchARM64"
+   ArchARM64     -> ARM.Instr.maxSpillSlots config
    ArchPPC_64 _  -> PPC.Instr.maxSpillSlots config
    ArchAlpha     -> panic "maxSpillSlots ArchAlpha"
    ArchMipseb    -> panic "maxSpillSlots ArchMipseb"

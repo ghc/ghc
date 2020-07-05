@@ -50,6 +50,12 @@ import qualified GHC.CmmToAsm.PPC.RegInfo as PPC.RegInfo
 import qualified GHC.CmmToAsm.PPC.Instr   as PPC.Instr
 import qualified GHC.CmmToAsm.PPC.Ppr     as PPC.Ppr
 
+import qualified GHC.CmmToAsm.ARM.CodeGen as ARM.CodeGen
+import qualified GHC.CmmToAsm.ARM.Regs    as ARM.Regs
+import qualified GHC.CmmToAsm.ARM.RegInfo as ARM.RegInfo
+import qualified GHC.CmmToAsm.ARM.Instr   as ARM.Instr
+import qualified GHC.CmmToAsm.ARM.Ppr     as ARM.Ppr
+
 import GHC.CmmToAsm.Reg.Liveness
 import qualified GHC.CmmToAsm.Reg.Linear                as Linear
 
@@ -176,7 +182,7 @@ nativeCodeGen dflags this_mod modLoc h us cmms
       ArchSPARC     -> nCG' (sparcNcgImpl  config)
       ArchSPARC64   -> panic "nativeCodeGen: No NCG for SPARC64"
       ArchARM {}    -> panic "nativeCodeGen: No NCG for ARM"
-      ArchARM64     -> panic "nativeCodeGen: No NCG for ARM64"
+      ArchARM64     -> nCG' (arm64NcgImpl  config)
       ArchPPC_64 _  -> nCG' (ppcNcgImpl    config)
       ArchAlpha     -> panic "nativeCodeGen: No NCG for Alpha"
       ArchMipseb    -> panic "nativeCodeGen: No NCG for mipseb"
@@ -208,6 +214,28 @@ x86_64NcgImpl config
        ,ncgMakeFarBranches        = const id
        ,extractUnwindPoints       = X86.CodeGen.extractUnwindPoints
        ,invertCondBranches        = X86.CodeGen.invertCondBranches
+   }
+    where
+      platform = ncgPlatform config
+
+arm64NcgImpl :: NCGConfig -> NcgImpl RawCmmStatics ARM.Instr.Instr ARM.RegInfo.JumpDest
+arm64NcgImpl config
+ = NcgImpl {
+        ncgConfig                 = config
+       ,cmmTopCodeGen             = ARM.CodeGen.cmmTopCodeGen
+       ,generateJumpTableForInstr = ARM.CodeGen.generateJumpTableForInstr config
+       ,getJumpDestBlockId        = ARM.RegInfo.getJumpDestBlockId
+       ,canShortcut               = ARM.RegInfo.canShortcut
+       ,shortcutStatics           = ARM.RegInfo.shortcutStatics
+       ,shortcutJump              = ARM.RegInfo.shortcutJump
+       ,pprNatCmmDecl             = ARM.Ppr.pprNatCmmDecl config
+       ,maxSpillSlots             = ARM.Instr.maxSpillSlots config
+       ,allocatableRegs           = ARM.Regs.allocatableRegs platform
+       ,ncgAllocMoreStack         = ARM.Instr.allocMoreStack platform
+       ,ncgExpandTop              = id
+       ,ncgMakeFarBranches        = ARM.Instr.makeFarBranches
+       ,extractUnwindPoints       = const []
+       ,invertCondBranches        = \_ _ -> id
    }
     where
       platform = ncgPlatform config
