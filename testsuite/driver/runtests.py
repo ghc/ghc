@@ -27,7 +27,7 @@ from testutil import getStdout, Watcher, str_warn, str_info
 from testglobals import getConfig, ghc_env, getTestRun, TestConfig, \
                         TestOptions, brokens, PerfMetric
 from my_typing import TestName
-from perf_notes import MetricChange, inside_git_repo, is_worktree_dirty, format_perf_stat
+from perf_notes import MetricChange, GitRef, inside_git_repo, is_worktree_dirty, format_perf_stat
 from junit import junit
 import term_color
 from term_color import Color, colored
@@ -70,6 +70,7 @@ parser.add_argument("--verbose", type=int, choices=[0,1,2,3,4,5], help="verbose 
 parser.add_argument("--junit", type=argparse.FileType('wb'), help="output testsuite summary in JUnit format")
 parser.add_argument("--broken-test", action="append", default=[], help="a test name to mark as broken for this run")
 parser.add_argument("--test-env", default='local', help="Override default chosen test-env.")
+parser.add_argument("--perf-baseline", type=GitRef, metavar='COMMIT', help="Baseline commit for performance comparsons.")
 perf_group.add_argument("--skip-perf-tests", action="store_true", help="skip performance tests")
 perf_group.add_argument("--only-perf-tests", action="store_true", help="Only do performance tests")
 
@@ -101,6 +102,7 @@ config.metrics_file = args.metrics_file
 hasMetricsFile = config.metrics_file is not None
 config.summary_file = args.summary_file
 config.no_print_summary = args.no_print_summary
+config.baseline_commit = args.perf_baseline
 
 if args.only:
     config.only = args.only
@@ -351,8 +353,8 @@ def tabulate_metrics(metrics: List[PerfMetric]) -> None:
             rel = 100 * (val1 - val0) / val0
             print("{space:24}  {herald:40}  {value:15.3f}  [{direction}, {rel:2.1f}%]".format(
                 space = "",
-                herald = "(baseline @ HEAD~{depth})".format(
-                    depth = metric.baseline.commitDepth),
+                herald = "(baseline @ {commit})".format(
+                    commit = metric.baseline.commit),
                 value = val0,
                 direction = metric.change,
                 rel = rel
@@ -422,6 +424,8 @@ else:
 
     # Dump metrics data.
     print("\nPerformance Metrics (test environment: {}):\n".format(config.test_env))
+    if config.baseline_commit:
+        print('Performance baseline: %s\n' % config.baseline_commit)
     if any(t.metrics):
         tabulate_metrics(t.metrics)
     else:
@@ -477,19 +481,19 @@ else:
     summary(t, sys.stdout, config.no_print_summary, config.supports_colors)
 
     # Write perf stats if any exist or if a metrics file is specified.
-    stats = [stat for (_, stat, __) in t.metrics]
+    stats_metrics = [stat for (_, stat, __) in t.metrics] # type: List[PerfStat]
     if hasMetricsFile:
-        print('Appending ' + str(len(stats)) + ' stats to file: ' + config.metrics_file)
+        print('Appending ' + str(len(stats_metrics)) + ' stats to file: ' + config.metrics_file)
         with open(config.metrics_file, 'a') as f:
-            f.write("\n" + Perf.format_perf_stat(stats))
-    elif inside_git_repo() and any(stats):
+            f.write("\n" + Perf.format_perf_stat(stats_metrics))
+    elif inside_git_repo() and any(stats_metrics):
         if is_worktree_dirty():
             print()
             print(str_warn('Performance Metrics NOT Saved') + \
                 ' working tree is dirty. Commit changes or use ' + \
                 '--metrics-file to save metrics to a file.')
         else:
-            Perf.append_perf_stat(stats)
+            Perf.append_perf_stat(stats_metrics)
 
     # Write summary
     if config.summary_file:
