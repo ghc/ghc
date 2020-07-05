@@ -1888,7 +1888,7 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
           --
           --   op :: forall c. a -> [T x] -> c -> Int
           L loc $ ClassOpSig noExtField False [loc_meth_RDR]
-                $ mkLHsSigType $ nlHsCoreTy to_ty
+                $ L loc $ mkHsImplicitSigType $ nlHsCoreTy to_ty
         )
       where
         Pair from_ty to_ty = mkCoerceClassMethEqn cls inst_tvs inst_tys rhs_ty meth_id
@@ -1949,7 +1949,7 @@ nlHsAppType e s = noLoc (HsAppType noExtField e hs_ty)
 nlExprWithTySig :: LHsExpr GhcPs -> LHsType GhcPs -> LHsExpr GhcPs
 nlExprWithTySig e s = noLoc $ ExprWithTySig noExtField (parenthesizeHsExpr sigPrec e) hs_ty
   where
-    hs_ty = mkLHsSigWcType s
+    hs_ty = hsTypeToHsSigWcType s
 
 nlHsCoreTy :: Type -> LHsType GhcPs
 nlHsCoreTy = noLoc . XHsType . NHsCoreTy
@@ -2080,19 +2080,21 @@ genAuxBindSpecDup loc original_rdr_name dup_spec
 genAuxBindSpecSig :: SrcSpan -> AuxBindSpec -> LHsSigWcType GhcPs
 genAuxBindSpecSig loc spec = case spec of
   DerivCon2Tag tycon _
-    -> mkLHsSigWcType $ L loc $ XHsType $ NHsCoreTy $
+    -> mk_sig $ L loc $ XHsType $ NHsCoreTy $
        mkSpecSigmaTy (tyConTyVars tycon) (tyConStupidTheta tycon) $
        mkParentType tycon `mkVisFunTyMany` intPrimTy
   DerivTag2Con tycon _
-    -> mkLHsSigWcType $ L loc $
+    -> mk_sig $ L loc $
        XHsType $ NHsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
        intTy `mkVisFunTyMany` mkParentType tycon
   DerivMaxTag _ _
-    -> mkLHsSigWcType (L loc (XHsType (NHsCoreTy intTy)))
+    -> mk_sig (L loc (XHsType (NHsCoreTy intTy)))
   DerivDataDataType _ _ _
-    -> mkLHsSigWcType (nlHsTyVar dataType_RDR)
+    -> mk_sig (nlHsTyVar dataType_RDR)
   DerivDataConstr _ _ _
-    -> mkLHsSigWcType (nlHsTyVar constr_RDR)
+    -> mk_sig (nlHsTyVar constr_RDR)
+  where
+    mk_sig = mkHsWildCardBndrs . L loc . mkHsImplicitSigType
 
 type SeparateBagsDerivStuff =
   -- DerivAuxBinds

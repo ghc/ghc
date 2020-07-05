@@ -508,7 +508,7 @@ warnRedundantConstraints ctxt env info ev_vars
      = any isImprovementPred (pred : transSuperClasses pred)
 
 reportBadTelescope :: ReportErrCtxt -> TcLclEnv -> SkolemInfo -> [TcTyVar] -> TcM ()
-reportBadTelescope ctxt env (ForAllSkol _ telescope) skols
+reportBadTelescope ctxt env (ForAllSkol telescope) skols
   = do { msg <- mkErrorReport ctxt env (important doc)
        ; reportError msg }
   where
