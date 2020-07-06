@@ -100,13 +100,13 @@ sqrInteger = I.integerSqr
 wordToNegInteger :: Word# -> Integer
 wordToNegInteger = I.integerFromWordNeg#
 
-{-# DEPRECATED bigNatToInteger "Use integerFromBigNat instead" #-}
+{-# DEPRECATED bigNatToInteger "Use integerFromBigNat# instead" #-}
 bigNatToInteger :: BigNat -> Integer
-bigNatToInteger (BN# i) = I.integerFromBigNat i
+bigNatToInteger (BN# i) = I.integerFromBigNat# i
 
-{-# DEPRECATED bigNatToNegInteger "Use integerFromBigNatNeg instead" #-}
+{-# DEPRECATED bigNatToNegInteger "Use integerFromBigNatNeg# instead" #-}
 bigNatToNegInteger :: BigNat -> Integer
-bigNatToNegInteger (BN# i) = I.integerFromBigNatNeg i
+bigNatToNegInteger (BN# i) = I.integerFromBigNatNeg# i
 
 type GmpLimb = Word
 type GmpLimb# = Word#

@@ -665,7 +665,7 @@ bignat_encode_double wa e0 = go 0.0## e0 0#
               (i +# 1#)
 
 bignat_powmod_word :: WordArray# -> WordArray# -> Word# -> Word#
-bignat_powmod_word b0 e0 m = go (naturalFromBigNat b0) (naturalFromBigNat e0) (naturalFromWord# 1##)
+bignat_powmod_word b0 e0 m = go (naturalFromBigNat# b0) (naturalFromBigNat# e0) (naturalFromWord# 1##)
    where
       go !b e !r
         | isTrue# (e `naturalTestBit#` 0##)
@@ -690,8 +690,8 @@ bignat_powmod
    -> State# RealWorld
 bignat_powmod r b0 e0 m s = mwaInitCopyShrink# r r' s
    where
-      !r' = go (naturalFromBigNat b0)
-               (naturalFromBigNat e0)
+      !r' = go (naturalFromBigNat# b0)
+               (naturalFromBigNat# e0)
                (naturalFromWord# 1##)
 
       go !b e !r
@@ -699,13 +699,13 @@ bignat_powmod r b0 e0 m s = mwaInitCopyShrink# r r' s
         = go b' e' ((r `naturalMul` b) `naturalRem` m')
 
         | naturalIsZero e
-        = naturalToBigNat r
+        = naturalToBigNat# r
 
         | True
         = go b' e' r
         where
           b' = (b `naturalMul` b) `naturalRem` m'
-          m' = naturalFromBigNat m
+          m' = naturalFromBigNat# m
           e' = e `naturalShiftR#` 1## -- slightly faster than "e `div` 2"
 
 bignat_powmod_words
