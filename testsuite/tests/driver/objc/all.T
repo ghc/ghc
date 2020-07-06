@@ -1,5 +1,5 @@
 def if_not_platform(platforms, f):
-    if not (config.platform in platforms):
+    if not (config.targetPlatform in platforms):
        return f
     else:
        return normal

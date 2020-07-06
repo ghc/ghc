@@ -6,6 +6,8 @@ checkExists = [ -f $1 ] || echo $1 missing
 
 LOCAL_PKGCONF=local.package.conf
 
+SETUP='$(TEST_WRAPPER)' ../Setup -v0
+
 .PHONY: clean
 clean:
 	rm -f Setup.o Setup.hi Setup Setup.exe
@@ -24,14 +26,14 @@ dynamicToo004:
 	"$(TEST_HC)" -v0 --make Setup.hs
 
 # First make the vanilla pkg1
-	cd pkg1 && ../Setup configure -v0 --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF) --enable-library-vanilla --disable-shared
-	cd pkg1 && ../Setup build
-	cd pkg1 && ../Setup register --inplace
+	cd pkg1 && $(SETUP) configure --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF) --enable-library-vanilla --disable-shared
+	cd pkg1 && $(SETUP) build
+	cd pkg1 && $(SETUP) register --inplace
 
 # Then the dynamic pkg1. This has different code in A.hs, so we get
 # a different hash.
-	cd pkg1dyn && ../Setup configure -v0 --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF) --disable-library-vanilla --enable-shared
-	cd pkg1dyn && ../Setup build
+	cd pkg1dyn && $(SETUP) configure --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF) --disable-library-vanilla --enable-shared
+	cd pkg1dyn && $(SETUP) build
 
 # Now merge the dynamic outputs into the registered directory
 	cp pkg1dyn/dist/build/A.dyn_hi   pkg1/dist/build/
@@ -39,9 +41,9 @@ dynamicToo004:
 	cp pkg1dyn/dist/build/libHSpkg1* pkg1/dist/build/
 
 # Next compile pkg2 both ways, which will use -dynamic-too
-	cd pkg2 && ../Setup configure -v0 --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF) --enable-library-vanilla --enable-shared
-	cd pkg2 && ../Setup build
-	cd pkg2 && ../Setup register --inplace
+	cd pkg2 && $(SETUP) configure --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF) --enable-library-vanilla --enable-shared
+	cd pkg2 && $(SETUP) build
+	cd pkg2 && $(SETUP) register --inplace
 
 # And then compile a program using the library both ways
 	"$(TEST_HC)" -package-db $(LOCAL_PKGCONF) --make prog -o progstatic
@@ -49,7 +51,6 @@ dynamicToo004:
 
 # Both should run, giving their respective outputs
 	echo static
-	./progstatic
+	'$(TEST_WRAPPER)' ./progstatic
 	echo dynamic
-	./progdynamic
-
+	'$(TEST_WRAPPER)' ./progdynamic

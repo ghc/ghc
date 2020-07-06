@@ -10,7 +10,7 @@ test('T11489', [req_profiling], makefile_test, ['T11489'])
 
 # Below this line, run tests only with profiling ways.
 setTestOpts(req_profiling)
-setTestOpts(extra_ways(['prof', 'ghci-ext-prof']))
+setTestOpts(unless(cross(), extra_ways(['prof', 'ghci-ext-prof'])))
 setTestOpts(only_ways(prof_ways))
 setTestOpts(keep_prof_callstacks)
 

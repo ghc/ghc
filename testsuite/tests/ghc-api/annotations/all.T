@@ -1,3 +1,6 @@
+# Skip annotation tests when testing cross compilers
+setTestOpts(when(cross(), skip))
+
 test('annotations', [extra_files(['AnnotationLet.hs']),
                      normalise_slashes,
                      ignore_stderr], makefile_test, ['annotations'])

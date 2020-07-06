@@ -1,4 +1,4 @@
-test('T7859', req_interp, makefile_test, [])
+test('T7859', [req_interp, when(cross(), skip)], makefile_test, [])
 
 test('T8601', req_interp, makefile_test, [])
 
@@ -9,9 +9,12 @@ test('T6132', [
      compile, [''])
 
 test('T17171a',
-     [req_interp, exit_code(2), ignore_stdout, grep_errmsg(r'main')],
+     [req_interp, when(cross(), skip),
+     exit_code(2), ignore_stdout, grep_errmsg(r'main')],
      run_command, ['$MAKE -s --no-print-directory T17171a'])
-test('T17171b', req_interp, run_command,
+test('T17171b',
+     [req_interp, when(cross(), skip)],
+     run_command,
      ['$MAKE -s --no-print-directory T17171b'])
 
 test('T-signals-child',

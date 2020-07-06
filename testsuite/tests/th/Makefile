@@ -20,14 +20,14 @@ TH_spliceE5_prof::
 	# Using `-osuf .p.o` should work. Note the dot before the `p` (#9760), and
 	# the dot between the `p` and the `o` (#5554).
 	'$(TEST_HC)' $(TEST_HC_OPTS) $(HC_OPTS) --make -v0 TH_spliceE5_prof.hs -prof -fprof-auto -osuf .p.o -o $@
-	./$@
+	'$(TEST_WRAPPER)' ./$@
 
 # With -fexternal-interpreter, we don't have to build the non-profiled
 # objects first.
 TH_spliceE5_prof_ext::
 	$(RM) TH_spliceE5_prof_ext*.o TH_spliceE5_prof_ext*.hi TH_spliceE5_prof_ext*.p.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) $(HC_OPTS) --make -v0 TH_spliceE5_prof_ext.hs -prof -fprof-auto -fexternal-interpreter -o $@
-	./$@
+	'$(TEST_WRAPPER)' ./$@
 
 .PHONY: TH_Depends
 TH_Depends:
@@ -37,11 +37,11 @@ TH_Depends:
 	$(RM) TH_Depends_External.o TH_Depends_External.hi
 	echo "first run" > TH_Depends_external.txt
 	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) --make -v0 TH_Depends
-	./TH_Depends
+	'$(TEST_WRAPPER)' ./TH_Depends
 	sleep 2
 	echo "second run" > TH_Depends_external.txt
 	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) --make -v0 TH_Depends
-	./TH_Depends
+	'$(TEST_WRAPPER)' ./TH_Depends
 
 
 T8333:
