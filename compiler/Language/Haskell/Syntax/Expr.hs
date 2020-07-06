@@ -265,7 +265,7 @@ data HsExpr p
   -- Note [ExplicitTuple]
   | ExplicitTuple
         (XExplicitTuple p)
-        [LHsTupArg p]
+        [HsTupArg p]
         Boxity
 
   -- | Used for unboxed sum types
@@ -318,7 +318,7 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | HsLet       (XLet p)
-                (LHsLocalBinds p)
+                (HsLocalBinds p)
                 (LHsExpr  p)
 
   -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDo',
@@ -356,6 +356,8 @@ data HsExpr p
   | RecordCon
       { rcon_ext      :: XRecordCon p
       , rcon_con_name :: LIdP p             -- The constructor name;
+      -- , rcon_con_name :: LocatedN (IdP p)   -- The constructor name;
+                       -- AZ: old one
                                             --  not used after type checking
       , rcon_flds     :: HsRecordBinds p }  -- The fields
 
@@ -805,7 +807,7 @@ See also #13680, which requested [] @Int to work.
 
 -----------------------
 pprExternalSrcLoc :: (StringLiteral,(Int,Int),(Int,Int)) -> SDoc
-pprExternalSrcLoc (StringLiteral _ src,(n1,n2),(n3,n4))
+pprExternalSrcLoc (StringLiteral _ src _,(n1,n2),(n3,n4))
   = ppr (src,(n1,n2),(n3,n4))
 
 {-
@@ -912,7 +914,7 @@ data HsCmd id
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsCmdLet    (XCmdLet id)
-                (LHsLocalBinds id)      -- let(rec)
+                (HsLocalBinds id)      -- let(rec)
                 (LHsCmd  id)
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLet',
     --       'GHC.Parser.Annotation.AnnOpen' @'{'@,
@@ -1072,8 +1074,8 @@ isInfixMatch match = case m_ctxt match of
 data GRHSs p body
   = GRHSs {
       grhssExt :: XCGRHSs p body,
-      grhssGRHSs :: [LGRHS p body],      -- ^ Guarded RHSs
-      grhssLocalBinds :: LHsLocalBinds p -- ^ The where clause
+      grhssGRHSs :: [LGRHS p body],     -- ^ Guarded RHSs
+      grhssLocalBinds :: HsLocalBinds p -- ^ The where clause
     }
   | XGRHSs !(XXGRHSs p body)
 
@@ -1190,7 +1192,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
   --          'GHC.Parser.Annotation.AnnOpen' @'{'@,'GHC.Parser.Annotation.AnnClose' @'}'@,
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | LetStmt  (XLetStmt idL idR body) (LHsLocalBindsLR idL idR)
+  | LetStmt  (XLetStmt idL idR body) (HsLocalBindsLR idL idR)
 
   -- ParStmts only occur in a list/monad comprehension
   | ParStmt  (XParStmt idL idR body)    -- Post typecheck,
@@ -1230,7 +1232,8 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | RecStmt
      { recS_ext :: XRecStmt idL idR body
-     , recS_stmts :: [LStmtLR idL idR body]
+     , recS_stmts :: XRec idR [LStmtLR idL idR body]
+     -- Assume XRec is the same for idL and idR, pick one arbitrarily
 
         -- The next two fields are only valid after renaming
      , recS_later_ids :: [IdP idR]
@@ -1577,7 +1580,8 @@ data HsBracket p
   | DecBrL (XDecBrL p)  [LHsDecl p]   -- [d| decls |]; result of parser
   | DecBrG (XDecBrG p)  (HsGroup p)   -- [d| decls |]; result of renamer
   | TypBr  (XTypBr p)   (LHsType p)   -- [t| type  |]
-  | VarBr  (XVarBr p)   Bool (IdP p)  -- True: 'x, False: ''T
+  | VarBr  (XVarBr p)   Bool (LIdP p)
+                                -- True: 'x, False: ''T
                                 -- (The Bool flag is used only in pprHsBracket)
   | TExpBr (XTExpBr p) (LHsExpr p)    -- [||  expr  ||]
   | XBracket !(XXBracket p)           -- Note [Trees that Grow] extension point
