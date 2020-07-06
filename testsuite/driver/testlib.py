@@ -495,8 +495,12 @@ def when(b: bool, f):
 def unless(b: bool, f):
     return when(not b, f)
 
+
+# Cross compilers can't do ghci (for now).  Once we
+# have ghci fully working via iserv (and a test-wrapper)
+# for the iserv process, this can probably work.
 def doing_ghci() -> bool:
-    return 'ghci' in config.run_ways
+    return 'ghci' in config.run_ways and config.hostPlatform == config.targetPlatform
 
 def ghc_dynamic() -> bool:
     return config.ghc_dynamic
@@ -504,8 +508,14 @@ def ghc_dynamic() -> bool:
 def fast() -> bool:
     return config.speed == 2
 
-def platform( plat: str ) -> bool:
-    return config.platform == plat
+def targetPlatform( plat: str ) -> bool:
+    return config.targetPlatform == plat
+
+def hostPlatform( plat: str ) -> bool:
+    return config.hostPlatform == plat
+
+def cross() -> bool:
+    return config.hostPlatform != config.targetPlatform
 
 KNOWN_OPERATING_SYSTEMS = set([
     'mingw32',
@@ -1389,7 +1399,7 @@ def compile_and_run__(name: TestName,
         if badResult(result):
             return result
 
-        cmd = './' + name;
+        cmd = '$TEST_WRAPPER ./' + name;
 
         # we don't check the compiler's stderr for a compile-and-run test
         return simple_run( name, way, cmd, getTestOpts().extra_run_opts )
@@ -1998,8 +2008,8 @@ def compare_outputs(way: WayName,
         elif config.accept and actual_raw:
             if config.accept_platform:
                 if_verbose(1, 'Accepting new output for platform "'
-                              + config.platform + '".')
-                expected_path += '-' + config.platform
+                              + config.targetPlatform + '".')
+                expected_path += '-' + config.targetPlatform
             elif config.accept_os:
                 if_verbose(1, 'Accepting new output for os "'
                               + config.os + '".')
@@ -2415,7 +2425,7 @@ def find_expected_file(name: TestName, suff: str) -> Path:
     basename = getTestOpts().use_specs.get(suff, basename)
 
     files = [str(basename) + ws + plat
-             for plat in ['-' + config.platform, '-' + config.os, '']
+             for plat in ['-' + config.targetPlatform, '-' + config.os, '']
              for ws in ['-ws-' + config.wordsize, '']]
 
     for f in files:

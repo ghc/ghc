@@ -88,7 +88,7 @@ test('T14373d', [],
      switch_skeleton_and_entries_only])
 
 test('T17648', normal, makefile_test, [])
-test('T17904', normal, compile, ['-O'])
+test('T17904', [normal, when(cross(), extra_hc_opts('-fexternal-interpreter -pgmi $WRAPPED_ISERV'))], compile, ['-O'])
 test('T18227A', normal, compile, [''])
 test('T18227B', normal, compile, [''])
 test('T15570',

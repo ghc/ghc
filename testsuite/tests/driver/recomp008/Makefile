@@ -17,12 +17,12 @@ prog : A.o B.o Main.o
 clean :
 	$(RM) *.hi *.o prog
 
-recomp008 : 
+recomp008 :
 	$(MAKE) -s --no-print-directory clean
 	cp A1.hs A.hs
 	$(MAKE) -s --no-print-directory prog
-	./prog
+	'$(TEST_WRAPPER)' ./prog
 	sleep 1
 	cp A2.hs A.hs
 	$(MAKE) -s --no-print-directory prog
-	./prog
+	'$(TEST_WRAPPER)' ./prog

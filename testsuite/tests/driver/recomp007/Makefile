@@ -4,6 +4,8 @@ include $(TOP)/mk/test.mk
 
 LOCAL_PKGCONF=local.package.conf
 
+SETUP='$(TEST_WRAPPER)' ../Setup -v0
+
 clean:
 	rm -f Setup$(exeext)
 	rm -rf a1/dist a2/dist b/dist
@@ -19,10 +21,10 @@ recomp007:
 	$(MAKE) -s --no-print-directory prep.b
 	"$(GHC_PKG)" unregister --package-db=$(LOCAL_PKGCONF) a-1.0
 	$(MAKE) -s --no-print-directory prep.a2
-	cd b && ../Setup configure -v0 --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF)
-	cd b && ../Setup build
+	cd b && $(SETUP) configure -v0 --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF)
+	cd b && $(SETUP) build
 
 prep.%:
-	cd $* && ../Setup configure -v0 --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF)
-	cd $* && ../Setup build -v0
-	cd $* && ../Setup register -v0 --inplace
+	cd $* && $(SETUP) configure -v0 --with-compiler="$(TEST_HC)" --with-hc-pkg="$(GHC_PKG)" --package-db=../$(LOCAL_PKGCONF)
+	cd $* && $(SETUP) build -v0
+	cd $* && $(SETUP) register -v0 --inplace

@@ -1,5 +1,8 @@
 setTestOpts([
     req_interp,
+    # can't use plugins with corss compilers with external-interpreter
+    # > ghc-stage1: Plugins require -fno-external-interpreter
+    when(cross(), skip),
     # The implementation of ghc-pkg doesn't seem to be multi-concurrent process
     # safe on windows. These tests which mutate the package db need to be run
     # sequentially until this is fixed.  This likely means that #13194 isn't fully

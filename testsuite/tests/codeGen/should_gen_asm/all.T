@@ -1,5 +1,5 @@
 is_amd64_codegen = [
-    unless(platform('x86_64-unknown-linux'),skip),
+    unless(targetPlatform('x86_64-unknown-linux'),skip),
     when(unregisterised(), skip),
 ]
 

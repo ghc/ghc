@@ -1,3 +1,4 @@
+setTestOpts([when(cross(), extra_hc_opts('-fexternal-interpreter -pgmi $WRAPPED_ISERV'))])
 
 test('read001', normal, compile, [''])
 test('read002', normal, compile, [''])
