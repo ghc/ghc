@@ -29,6 +29,7 @@ import GHC.HsToCore.Utils
 import GHC.Driver.Session
 import GHC.Core.Utils
 import GHC.Types.Id
+import GHC.Types.Name
 import GHC.Core.Type
 import GHC.Builtin.Types
 import GHC.HsToCore.Match
@@ -89,7 +90,7 @@ dsInnerListComp (ParStmtBlock _ stmts bndrs _)
              list_ty          = mkListTy bndrs_tuple_type
 
              -- really use original bndrs below!
-       ; expr <- dsListComp (stmts ++ [noLoc $ mkLastStmt (mkBigLHsVarTupId bndrs)]) list_ty
+       ; expr <- dsListComp (stmts ++ [noLocA $ mkLastStmt (mkBigLHsVarTupId bndrs)]) list_ty
 
        ; return (expr, bndrs_tuple_type) }
 
@@ -480,7 +481,7 @@ dsMonadComp stmts = dsMcStmts stmts
 
 dsMcStmts :: [ExprLStmt GhcTc] -> DsM CoreExpr
 dsMcStmts []                      = panic "dsMcStmts"
-dsMcStmts ((L loc stmt) : lstmts) = putSrcSpanDs loc (dsMcStmt stmt lstmts)
+dsMcStmts ((L loc stmt) : lstmts) = putSrcSpanDsA loc (dsMcStmt stmt lstmts)
 
 ---------------
 dsMcStmt :: ExprStmt GhcTc -> [ExprLStmt GhcTc] -> DsM CoreExpr
@@ -619,7 +620,7 @@ dsMcBindStmt pat rhs' bind_op fail_op res1_ty stmts
         ; var      <- selectSimpleMatchVarL Many pat
         ; match <- matchSinglePatVar var Nothing (StmtCtxt (DoExpr Nothing)) pat
                                   res1_ty (cantFailMatchResult body)
-        ; match_code <- dsHandleMonadicFailure (MonadComp :: HsStmtContext GhcRn) pat match fail_op
+        ; match_code <- dsHandleMonadicFailure (MonadComp :: HsStmtContext Name) pat match fail_op
         ; dsSyntaxExpr bind_op [rhs', Lam var match_code] }
 
 -- Desugar nested monad comprehensions, for example in `then..` constructs
@@ -633,7 +634,7 @@ dsInnerMonadComp :: [ExprLStmt GhcTc]
                  -> DsM CoreExpr
 dsInnerMonadComp stmts bndrs ret_op
   = dsMcStmts (stmts ++
-                 [noLoc (LastStmt noExtField (mkBigLHsVarTupId bndrs) Nothing ret_op)])
+                 [noLocA (LastStmt noExtField (mkBigLHsVarTupId bndrs) Nothing ret_op)])
 
 
 -- The `unzip` function for `GroupStmt` in a monad comprehensions
