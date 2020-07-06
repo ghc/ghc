@@ -1,3 +1,5 @@
+{-# LANGUAGE ExplicitForAll #-}
+
 module Dead1(foo) where
 
 foo :: Int -> Int
@@ -38,3 +40,5 @@ this work right. Look at the simplifier output just before strictness
 analysis; there should be a binding for 'foo', but for nothing else.
 
 -}
+
+{-# RULES "example" forall a. forall (x :: a). id x = x #-}

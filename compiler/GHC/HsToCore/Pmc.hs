@@ -60,6 +60,7 @@ import GHC.Types.Basic (Origin(..))
 import GHC.Core (CoreExpr)
 import GHC.Driver.Session
 import GHC.Hs
+import GHC.Types.Name (Name)
 import GHC.Types.Id
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc
@@ -110,7 +111,7 @@ pmcPatBind _ _ _ = pure ()
 -- | Exhaustive for guard matches, is used for guards in pattern bindings and
 -- in @MultiIf@ expressions. Returns the 'Nablas' covered by the RHSs.
 pmcGRHSs
-  :: HsMatchContext GhcRn         -- ^ Match context, for warning messages
+  :: HsMatchContext Name          -- ^ Match context, for warning messages
   -> GRHSs GhcTc (LHsExpr GhcTc)  -- ^ The GRHSs to check
   -> DsM (NonEmpty Nablas)        -- ^ Covered 'Nablas' for each RHS, for long
                                   --   distance info
