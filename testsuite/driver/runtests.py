@@ -294,7 +294,11 @@ def main() -> None:
     if args.rootdir:
         config.rootdirs = args.rootdir
 
-    config.compiler_always_flags = args.extra_hc_flag
+    config.compiler_always_flags = [
+        flag
+        for flags in args.extra_hc_flag
+        for flag in flags.split()
+    ]
 
     config.metrics_file = args.metrics_file
     hasMetricsFile = config.metrics_file is not None

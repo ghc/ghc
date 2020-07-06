@@ -2013,7 +2013,7 @@ def compare_outputs(way: WayName,
             else:
                 if_verbose(1, 'Accepting new output.')
 
-            write_file(str(expected_path) + suffix, actual_raw)
+            write_file(expected_path.with_suffix(expected_path.suffix + suffix), actual_raw)
             return True
         elif config.accept:
             if_verbose(1, 'No output. Deleting "{0}".'.format(expected_path))
