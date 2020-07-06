@@ -188,7 +188,7 @@ int ocTryLoad( ObjectCode* oc );
  *
  * MAP_32BIT not available on OpenBSD/amd64
  */
-#if defined(MAP_32BIT) && (defined(x86_64_HOST_ARCH) || (defined(aarch64_TARGET_ARCH) || defined(aarch64_HOST_ARCH)))
+#if defined(MAP_32BIT) && (defined(x86_64_HOST_ARCH) || defined(aarch64_HOST_ARCH))
 #define MAP_LOW_MEM
 #define TRY_MAP_32BIT MAP_32BIT
 #else
