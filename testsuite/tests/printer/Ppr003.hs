@@ -1,4 +1,4 @@
-main = putStrLn "hello"
+module Ppr003 where
 
 foo x =
   case x of

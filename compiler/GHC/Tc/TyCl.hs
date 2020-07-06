@@ -1267,7 +1267,7 @@ inferInitialKinds decls
        ; traceTc "inferInitialKinds done }" empty
        ; return tcs }
   where
-    infer_initial_kind = addLocM (getInitialKind InitialKindInfer)
+    infer_initial_kind = addLocMA (getInitialKind InitialKindInfer)
 
 -- Check type/class declarations against their standalone kind signatures or
 -- CUSKs, producing a generalized TcTyCon for each.
@@ -1279,7 +1279,7 @@ checkInitialKinds decls
        ; return tcs }
   where
     check_initial_kind (ldecl, msig) =
-      addLocM (getInitialKind (InitialKindCheck msig)) ldecl
+      addLocMA (getInitialKind (InitialKindCheck msig)) ldecl
 
 -- | Get the initial kind of a TyClDecl, either generalized or non-generalized,
 -- depending on the 'InitialKindStrategy'.
@@ -1308,7 +1308,7 @@ getInitialKind strategy
             -- See Note [Don't process associated types in getInitialKind]
        ; inner_tcs <-
            tcExtendNameTyVarEnv parent_tv_prs $
-           mapM (addLocM (getAssocFamInitialKind cls)) ats
+           mapM (addLocMA (getAssocFamInitialKind cls)) ats
        ; return (cls : inner_tcs) }
   where
     getAssocFamInitialKind cls =
@@ -1497,7 +1497,7 @@ kcLTyClDecl :: LTyClDecl GhcRn -> TcM ()
   -- See Note [Kind checking for type and class decls]
   -- Called only for declarations without a signature (no CUSKs or SAKs here)
 kcLTyClDecl (L loc decl)
-  = setSrcSpan loc $
+  = setSrcSpanA loc $
     do { tycon <- tcLookupTcTyCon tc_name
        ; traceTc "kcTyClDecl {" (ppr tc_name)
        ; addVDQNote tycon $   -- See Note [Inferring visible dependent quantification]
@@ -1516,8 +1516,9 @@ kcTyClDecl :: TyClDecl GhcRn -> TcTyCon -> TcM ()
 kcTyClDecl (DataDecl { tcdLName    = (L _ name)
                      , tcdDataDefn = defn }) tyCon
   | HsDataDefn { dd_cons = cons@((L _ (ConDeclGADT {})) : _)
-               , dd_ctxt = (L _ [])
+               , dd_ctxt = mctxt
                , dd_ND = new_or_data } <- defn
+  , null $ fromMaybeContext mctxt
   = -- See Note [Implementation of UnliftedNewtypes] STEP 2
     kcConDecls new_or_data (tyConResKind tyCon) cons
 
@@ -1546,7 +1547,7 @@ kcTyClDecl (ClassDecl { tcdLName = L _ name
                       , tcdCtxt = ctxt, tcdSigs = sigs }) _tycon
   = bindTyClTyVars name $ \ _ _ _ ->
     do  { _ <- tcHsContext ctxt
-        ; mapM_ (wrapLocM_ kc_sig) sigs }
+        ; mapM_ (wrapLocMA_ kc_sig) sigs }
   where
     kc_sig (ClassOpSig _ _ nms op_ty) = kcClassSigType skol_info nms op_ty
     kc_sig _                          = return ()
@@ -1580,7 +1581,7 @@ kcConDecls :: NewOrData
            -> [LConDecl GhcRn] -- The data constructors
            -> TcM ()
 kcConDecls new_or_data res_kind cons
-  = mapM_ (wrapLocM_ (kcConDecl new_or_data final_res_kind)) cons
+  = mapM_ (wrapLocMA_ (kcConDecl new_or_data final_res_kind)) cons
   where
     (_, final_res_kind) = splitPiTys res_kind
         -- See Note [kcConDecls result kind]
@@ -1602,7 +1603,7 @@ kcConDecl new_or_data res_kind (ConDeclH98
   = addErrCtxt (dataConCtxtName [name]) $
     discardResult                   $
     bindExplicitTKBndrs_Tv ex_tvs $
-    do { _ <- tcHsMbContext ex_ctxt
+    do { _ <- tcHsContext ex_ctxt
        ; kcConArgTys new_or_data res_kind (hsConDeclArgTys args)
          -- We don't need to check the telescope here,
          -- because that's done in tcConDecl
@@ -1623,7 +1624,7 @@ kcConDecl new_or_data res_kind (ConDeclGADT
     bindImplicitTKBndrs_Tv implicit_tkv_nms $
     bindExplicitTKBndrs_Tv explicit_tkv_nms $
         -- Why "_Tv"?  See Note [Kind-checking for GADTs]
-    do { _ <- tcHsMbContext cxt
+    do { _ <- tcHsContext cxt
        ; kcConArgTys new_or_data res_kind (hsConDeclArgTys args)
        ; _ <- tcHsOpenType res_ty
        ; return () }
@@ -2231,7 +2232,7 @@ tcTyClDecl roles_info (L loc decl)
       _ -> pprPanic "tcTyClDecl" (ppr thing)
 
   | otherwise
-  = setSrcSpan loc $ tcAddDeclCtxt decl $
+  = setSrcSpanA loc $ tcAddDeclCtxt decl $
     do { traceTc "---- tcTyClDecl ---- {" (ppr decl)
        ; (tc, deriv_infos) <- tcTyClDecl1 Nothing roles_info decl
        ; traceTc "---- tcTyClDecl end ---- }" (ppr tc)
@@ -2249,7 +2250,7 @@ wiredInDerivInfo tycon decl
                     if isFunTyCon tycon || isPrimTyCon tycon
                        then []  -- no tyConTyVars
                        else mkTyVarNamePairs (tyConTyVars tycon)
-                , di_clauses = unLoc derivs
+                , di_clauses = derivs
                 , di_ctxt = tcMkDeclCtxt decl } ]
 wiredInDerivInfo _ _ = []
 
@@ -2294,7 +2295,7 @@ tcTyClDecl1 _parent roles_info
 *                                                                      *
 ********************************************************************* -}
 
-tcClassDecl1 :: RolesInfo -> Name -> LHsContext GhcRn
+tcClassDecl1 :: RolesInfo -> Name -> Maybe (LHsContext GhcRn)
              -> LHsBinds GhcRn -> [LHsFunDep GhcRn] -> [LSig GhcRn]
              -> [LFamilyDecl GhcRn] -> [LTyFamDefltDecl GhcRn]
              -> TcM Class
@@ -2312,7 +2313,7 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
                -- The (binderVars binders) is needed bring into scope the
                -- skolems bound by the class decl header (#17841)
                do { ctxt <- tcHsContext hs_ctxt
-                  ; fds  <- mapM (addLocM tc_fundep) fundeps
+                  ; fds  <- mapM (addLocMA tc_fundep) fundeps
                   ; sig_stuff <- tcClassSigs class_name sigs meths
                   ; at_stuff  <- tcClassATs class_name clas ats at_defs
                   ; return (ctxt, fds, sig_stuff, at_stuff) }
@@ -2345,9 +2346,11 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
        ; return clas }
   where
     skol_info = TyConSkol ClassFlavour class_name
-    tc_fundep (tvs1, tvs2) = do { tvs1' <- mapM (tcLookupTyVar . unLoc) tvs1 ;
+    tc_fundep :: GHC.Hs.FunDep GhcRn -> TcM ([Var],[Var])
+    tc_fundep (FunDep _ tvs1 tvs2)
+                           = do { tvs1' <- mapM (tcLookupTyVar . unLoc) tvs1 ;
                                 ; tvs2' <- mapM (tcLookupTyVar . unLoc) tvs2 ;
-                                ; return (tvs1', tvs2') }
+                                ; return (tvs1',tvs2') }
 
 
 {- Note [Associated type defaults]
@@ -2390,7 +2393,7 @@ tcClassATs class_name cls ats at_defs
                                           (at_def_tycon at_def) [at_def])
                         emptyNameEnv at_defs
 
-    tc_at at = do { fam_tc <- addLocM (tcFamDecl1 (Just cls)) at
+    tc_at at = do { fam_tc <- addLocMA (tcFamDecl1 (Just cls)) at
                   ; let at_defs = lookupNameEnv at_defs_map (at_fam_name at)
                                   `orElse` []
                   ; atd <- tcDefaultAssocDecl fam_tc at_defs
@@ -2416,7 +2419,7 @@ tcDefaultAssocDecl fam_tc
                                    , feqn_pats  = hs_pats
                                    , feqn_rhs   = hs_rhs_ty }}})]
   = -- See Note [Type-checking default assoc decls]
-    setSrcSpan loc $
+    setSrcSpanA loc $
     tcAddFamInstCtxt (text "default type instance") tc_name $
     do { traceTc "tcDefaultAssocDecl 1" (ppr tc_name)
        ; let fam_tc_name = tyConName fam_tc
@@ -2458,7 +2461,7 @@ tcDefaultAssocDecl fam_tc
                        -- simply create an empty substitution and let GHC fall
                        -- over later, in GHC.Tc.Validity.checkValidAssocTyFamDeflt.
                        -- See Note [Type-checking default assoc decls].
-       ; pure $ Just (substTyUnchecked subst rhs_ty, ATVI loc pats)
+       ; pure $ Just (substTyUnchecked subst rhs_ty, ATVI (locA loc) pats)
            -- We perform checks for well-formedness and validity later, in
            -- GHC.Tc.Validity.checkValidAssocTyFamDeflt.
      }
@@ -2688,7 +2691,7 @@ tcInjectivity _ Nothing
   -- therefore we can always infer the result kind if we know the result type.
   -- But this does not seem to be useful in any way so we don't do it.  (Another
   -- reason is that the implementation would not be straightforward.)
-tcInjectivity tcbs (Just (L loc (InjectivityAnn _ lInjNames)))
+tcInjectivity tcbs (Just (L loc (InjectivityAnn _ _ lInjNames)))
   = setSrcSpan loc $
     do { let tvs = binderVars tcbs
        ; dflags <- getDynFlags
@@ -2779,7 +2782,7 @@ tcDataDefn err_ctxt roles_info tc_name
                                   gadt_syntax) }
        ; let deriv_info = DerivInfo { di_rep_tc = tycon
                                     , di_scoped_tvs = tcTyConScopedTyVars tctc
-                                    , di_clauses = unLoc derivs
+                                    , di_clauses = derivs
                                     , di_ctxt = err_ctxt }
        ; traceTc "tcDataDefn" (ppr tc_name $$ ppr tycon_binders $$ ppr extra_bndrs)
        ; return (tycon, [deriv_info]) }
@@ -2823,7 +2826,7 @@ kcTyFamInstEqn tc_fam_tc
                                       , feqn_bndrs = mb_expl_bndrs
                                       , feqn_pats  = hs_pats
                                       , feqn_rhs   = hs_rhs_ty }}))
-  = setSrcSpan loc $
+  = setSrcSpanA loc $
     do { traceTc "kcTyFamInstEqn" (vcat
            [ text "tc_name ="    <+> ppr eqn_tc_name
            , text "fam_tc ="     <+> ppr tc_fam_tc <+> dcolon <+> ppr (tyConKind tc_fam_tc)
@@ -2869,7 +2872,7 @@ tcTyFamInstEqn fam_tc mb_clsinfo
                  , hsib_body = FamEqn { feqn_bndrs  = mb_expl_bndrs
                                       , feqn_pats   = hs_pats
                                       , feqn_rhs    = hs_rhs_ty }}))
-  = setSrcSpan loc $
+  = setSrcSpanA loc $
     do { traceTc "tcTyFamInstEqn" $
          vcat [ ppr fam_tc <+> ppr hs_pats
               , text "fam tc bndrs" <+> pprTyVars (tyConTyVars fam_tc)
@@ -2893,7 +2896,7 @@ tcTyFamInstEqn fam_tc mb_clsinfo
        -- (tcFamInstEqnGuts zonks to Type)
        ; return (mkCoAxBranch qtvs [] [] pats rhs_ty
                               (map (const Nominal) qtvs)
-                              loc) }
+                              (locA loc)) }
 
 {-
 Kind check type patterns and kind annotate the embedded type variables.
@@ -3122,11 +3125,12 @@ that 'a' must have that kind, and to bring 'k' into scope.
 -}
 
 dataDeclChecks :: Name -> NewOrData
-               -> LHsContext GhcRn -> [LConDecl GhcRn]
+               -> Maybe (LHsContext GhcRn) -> [LConDecl GhcRn]
                -> TcM Bool
-dataDeclChecks tc_name new_or_data (L _ stupid_theta) cons
-  = do {   -- Check that we don't use GADT syntax in H98 world
-         gadtSyntax_ok <- xoptM LangExt.GADTSyntax
+dataDeclChecks tc_name new_or_data mctxt cons
+  = do { let stupid_theta = fromMaybeContext mctxt
+         -- Check that we don't use GADT syntax in H98 world
+       ;  gadtSyntax_ok <- xoptM LangExt.GADTSyntax
        ; let gadt_syntax = consUseGadtSyntax cons
        ; checkTc (gadtSyntax_ok || not gadt_syntax) (badGadtDecl tc_name)
 
@@ -3159,7 +3163,7 @@ tcConDecls :: KnotTied TyCon -> NewOrData
            -> [TyConBinder] -> TcKind   -- binders and result kind of tycon
            -> KnotTied Type -> [LConDecl GhcRn] -> TcM [DataCon]
 tcConDecls rep_tycon new_or_data tmpl_bndrs res_kind res_tmpl
-  = concatMapM $ addLocM $
+  = concatMapM $ addLocMA $
     tcConDecl rep_tycon (mkTyConTagMap rep_tycon)
               tmpl_bndrs res_kind res_tmpl new_or_data
     -- It's important that we pay for tag allocation here, once per TyCon,
@@ -3193,7 +3197,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
        ; (tclvl, wanted, (exp_tvbndrs, (ctxt, arg_tys, field_lbls, stricts)))
            <- pushLevelAndSolveEqualitiesX "tcConDecl:H98" $
               bindExplicitTKBndrs_Skol explicit_tkv_nms    $
-              do { ctxt <- tcHsMbContext hs_ctxt
+              do { ctxt <- tcHsContext hs_ctxt
                  ; let exp_kind = getArgExpKind new_or_data res_kind
                  ; btys <- tcConArgs exp_kind hs_args
                  ; field_lbls <- lookupConstructorFields name
@@ -3275,7 +3279,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
            <- pushLevelAndSolveEqualitiesX "tcConDecl:GADT" $
               bindImplicitTKBndrs_Skol implicit_tkv_nms     $
               bindExplicitTKBndrs_Skol explicit_tkv_nms     $
-              do { ctxt <- tcHsMbContext cxt
+              do { ctxt <- tcHsContext cxt
                  ; (res_ty, res_kind) <- tcInferLHsTypeKind hs_res_ty
                          -- See Note [GADT return kinds]
 
@@ -4619,7 +4623,7 @@ checkValidRoleAnnots role_annots tc
       = whenIsJust role_annot_decl_maybe $
           \decl@(L loc (RoleAnnotDecl _ _ the_role_annots)) ->
           addRoleAnnotCtxt name $
-          setSrcSpan loc $ do
+          setSrcSpanA loc $ do
           { role_annots_ok <- xoptM LangExt.RoleAnnotations
           ; checkTc role_annots_ok $ needXRoleAnnotations tc
           ; checkTc (vis_vars `equalLength` the_role_annots)
@@ -4816,7 +4820,7 @@ fieldTypeMisMatch field_name con1 con2
   = sep [text "Constructors" <+> ppr con1 <+> text "and" <+> ppr con2,
          text "give different types for field", quotes (ppr field_name)]
 
-dataConCtxtName :: [Located Name] -> SDoc
+dataConCtxtName :: [LocatedN Name] -> SDoc
 dataConCtxtName [con]
    = text "In the definition of data constructor" <+> quotes (ppr con)
 dataConCtxtName con
@@ -4943,7 +4947,7 @@ wrongNumberOfRoles tyvars d@(L _ (RoleAnnotDecl _ _ annots))
 illegalRoleAnnotDecl :: LRoleAnnotDecl GhcRn -> TcM ()
 illegalRoleAnnotDecl (L loc (RoleAnnotDecl _ tycon _))
   = setErrCtxt [] $
-    setSrcSpan loc $
+    setSrcSpanA loc $
     addErrTc (text "Illegal role annotation for" <+> ppr tycon <> char ';' $$
               text "they are allowed only for datatypes and classes.")
 

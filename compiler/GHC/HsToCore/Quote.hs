@@ -171,7 +171,7 @@ dsBracket wrap brack splices
     new_bit = mkNameEnv [(n, DsSplice (unLoc e))
                         | PendingTcSplice n e <- splices]
 
-    do_brack (VarBr _ _ n) = do { MkC e1  <- lookupOccDsM n ; return e1 }
+    do_brack (VarBr _ _ n) = do { MkC e1  <- lookupOccDsM (unLoc n) ; return e1 }
     do_brack (ExpBr _ e)   = runOverloaded $ do { MkC e1  <- repLE e     ; return e1 }
     do_brack (PatBr _ p)   = runOverloaded $ do { MkC p1  <- repTopP p   ; return p1 }
     do_brack (TypBr _ t)   = runOverloaded $ do { MkC t1  <- repLTy t    ; return t1 }
@@ -322,15 +322,15 @@ repTopDs group@(HsGroup { hs_valds   = valds
       }
   where
     no_splice (L loc _)
-      = notHandledL loc "Splices within declaration brackets" empty
+      = notHandledL (locA loc) "Splices within declaration brackets" empty
     no_default_decl (L loc decl)
-      = notHandledL loc "Default declarations" (ppr decl)
+      = notHandledL (locA loc) "Default declarations" (ppr decl)
     no_warn :: LWarnDecl GhcRn -> MetaM a
     no_warn (L loc (Warning _ thing _))
-      = notHandledL loc "WARNING and DEPRECATION pragmas" $
+      = notHandledL (locA loc) "WARNING and DEPRECATION pragmas" $
                     text "Pragma for declaration of" <+> ppr thing
     no_doc (L loc _)
-      = notHandledL loc "Haddock documentation" empty
+      = notHandledL (locA loc) "Haddock documentation" empty
 
 hsScopedTvBinders :: HsValBinds GhcRn -> [Name]
 -- See Note [Scoped type variables in quotes]
@@ -365,7 +365,7 @@ get_scoped_tvs_from_sig sig
   | HsIB { hsib_ext = implicit_vars
          , hsib_body = hs_ty } <- sig
   , (explicit_vars, _) <- splitLHsForAllTyInvis hs_ty
-  = implicit_vars ++ hsLTyVarNames explicit_vars
+  = implicit_vars ++ hsLTyVarNames (snd explicit_vars)
 
 {- Notes
 
@@ -457,24 +457,24 @@ repTyClD (L loc (FamDecl { tcdFam = fam })) = liftM Just $
                                               repFamilyDecl (L loc fam)
 
 repTyClD (L loc (SynDecl { tcdLName = tc, tcdTyVars = tvs, tcdRhs = rhs }))
-  = do { tc1 <- lookupLOcc tc           -- See note [Binders and occurrences]
+  = do { tc1 <- lookupNOcc tc           -- See note [Binders and occurrences]
        ; dec <- addTyClTyVarBinds tvs $ \bndrs ->
                 repSynDecl tc1 bndrs rhs
-       ; return (Just (loc, dec)) }
+       ; return (Just (locA loc, dec)) }
 
 repTyClD (L loc (DataDecl { tcdLName = tc
                           , tcdTyVars = tvs
                           , tcdDataDefn = defn }))
-  = do { tc1 <- lookupLOcc tc           -- See note [Binders and occurrences]
+  = do { tc1 <- lookupNOcc tc           -- See note [Binders and occurrences]
        ; dec <- addTyClTyVarBinds tvs $ \bndrs ->
                 repDataDefn tc1 (Left bndrs) defn
-       ; return (Just (loc, dec)) }
+       ; return (Just (locA loc, dec)) }
 
 repTyClD (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls,
                              tcdTyVars = tvs, tcdFDs = fds,
                              tcdSigs = sigs, tcdMeths = meth_binds,
                              tcdATs = ats, tcdATDefs = atds }))
-  = do { cls1 <- lookupLOcc cls         -- See note [Binders and occurrences]
+  = do { cls1 <- lookupNOcc cls         -- See note [Binders and occurrences]
        ; dec  <- addQTyVarBinds tvs $ \bndrs ->
            do { cxt1   <- repLContext cxt
           -- See Note [Scoped type variables in quotes]
@@ -485,23 +485,23 @@ repTyClD (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls,
               ; decls1 <- repListM decTyConName return (ats1 ++ atds1 ++ sigs_binds)
               ; decls2 <- repClass cxt1 cls1 bndrs fds1 decls1
               ; wrapGenSyms ss decls2 }
-       ; return $ Just (loc, dec)
+       ; return $ Just (locA loc, dec)
        }
 
 -------------------------
 repRoleD :: LRoleAnnotDecl GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
 repRoleD (L loc (RoleAnnotDecl _ tycon roles))
-  = do { tycon1 <- lookupLOcc tycon
+  = do { tycon1 <- lookupNOcc tycon
        ; roles1 <- mapM repRole roles
        ; roles2 <- coreList roleTyConName roles1
        ; dec <- repRoleAnnotD tycon1 roles2
-       ; return (loc, dec) }
+       ; return (locA loc, dec) }
 
 -------------------------
 repKiSigD :: LStandaloneKindSig GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
 repKiSigD (L loc kisig) =
   case kisig of
-    StandaloneKindSig _ v ki -> rep_ty_sig kiSigDName loc ki v
+    StandaloneKindSig _ v ki -> rep_ty_sig kiSigDName (locA loc) ki v
 
 -------------------------
 repDataDefn :: Core TH.Name
@@ -544,7 +544,7 @@ repFamilyDecl decl@(L loc (FamilyDecl { fdInfo      = info
                                       , fdTyVars    = tvs
                                       , fdResultSig = L _ resultSig
                                       , fdInjectivityAnn = injectivity }))
-  = do { tc1 <- lookupLOcc tc           -- See note [Binders and occurrences]
+  = do { tc1 <- lookupNOcc tc           -- See note [Binders and occurrences]
        ; let mkHsQTvs :: [LHsTyVarBndr () GhcRn] -> LHsQTyVars GhcRn
              mkHsQTvs tvs = HsQTvs { hsq_ext = []
                                    , hsq_explicit = tvs }
@@ -569,7 +569,7 @@ repFamilyDecl decl@(L loc (FamilyDecl { fdInfo      = info
              DataFamily ->
                do { kind <- repFamilyResultSigToMaybeKind resultSig
                   ; repDataFamilyD tc1 bndrs kind }
-       ; return (loc, dec)
+       ; return (locA loc, dec)
        }
 
 -- | Represent result signature of a type family
@@ -597,7 +597,7 @@ repInjectivityAnn :: Maybe (LInjectivityAnn GhcRn)
                   -> MetaM (Core (Maybe TH.InjectivityAnn))
 repInjectivityAnn Nothing =
     do { coreNothing injAnnTyConName }
-repInjectivityAnn (Just (L _ (InjectivityAnn lhs rhs))) =
+repInjectivityAnn (Just (L _ (InjectivityAnn _ lhs rhs))) =
     do { lhs'   <- lookupBinder (unLoc lhs)
        ; rhs1   <- mapM (lookupBinder . unLoc) rhs
        ; rhs2   <- coreList nameTyConName rhs1
@@ -617,7 +617,7 @@ repLFunDeps :: [LHsFunDep GhcRn] -> MetaM (Core [TH.FunDep])
 repLFunDeps fds = repList funDepTyConName repLFunDep fds
 
 repLFunDep :: LHsFunDep GhcRn -> MetaM (Core TH.FunDep)
-repLFunDep (L _ (xs, ys))
+repLFunDep (L _ (FunDep _ xs ys))
    = do xs' <- repList nameTyConName (lookupBinder . unLoc) xs
         ys' <- repList nameTyConName (lookupBinder . unLoc) ys
         repFunDep xs' ys'
@@ -627,13 +627,13 @@ repLFunDep (L _ (xs, ys))
 repInstD :: LInstDecl GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
 repInstD (L loc (TyFamInstD { tfid_inst = fi_decl }))
   = do { dec <- repTyFamInstD fi_decl
-       ; return (loc, dec) }
+       ; return (locA loc, dec) }
 repInstD (L loc (DataFamInstD { dfid_inst = fi_decl }))
   = do { dec <- repDataFamInstD fi_decl
-       ; return (loc, dec) }
+       ; return (locA loc, dec) }
 repInstD (L loc (ClsInstD { cid_inst = cls_decl }))
   = do { dec <- repClsInstD cls_decl
-       ; return (loc, dec) }
+       ; return (locA loc, dec) }
 
 repClsInstD :: ClsInstDecl GhcRn -> MetaM (Core (M TH.Dec))
 repClsInstD (ClsInstDecl { cid_poly_ty = ty, cid_binds = binds
@@ -672,7 +672,7 @@ repStandaloneDerivD (L loc (DerivDecl { deriv_strategy = strat
                 do { cxt'     <- repLContext cxt
                    ; inst_ty' <- repLTy inst_ty
                    ; repDeriv strat' cxt' inst_ty' }
-       ; return (loc, dec) }
+       ; return (locA loc, dec) }
   where
     (tvs, cxt, inst_ty) = splitLHsInstDeclTy (dropWildCards ty)
 
@@ -688,7 +688,7 @@ repTyFamEqn (HsIB { hsib_ext = var_names
                                        , feqn_pats = tys
                                        , feqn_fixity = fixity
                                        , feqn_rhs  = rhs }})
-  = do { tc <- lookupLOcc tc_name     -- See note [Binders and occurrences]
+  = do { tc <- lookupNOcc tc_name     -- See note [Binders and occurrences]
        ; let hs_tvs = HsQTvs { hsq_ext = var_names
                              , hsq_explicit = fromMaybe [] mb_bndrs }
        ; addTyClTyVarBinds hs_tvs $ \ _ ->
@@ -725,7 +725,7 @@ repDataFamInstD (DataFamInstDecl { dfid_eqn =
                                              , feqn_pats  = tys
                                              , feqn_fixity = fixity
                                              , feqn_rhs   = defn }})})
-  = do { tc <- lookupLOcc tc_name         -- See note [Binders and occurrences]
+  = do { tc <- lookupNOcc tc_name         -- See note [Binders and occurrences]
        ; let hs_tvs = HsQTvs { hsq_ext = var_names
                              , hsq_explicit = fromMaybe [] mb_bndrs }
        ; addTyClTyVarBinds hs_tvs $ \ _ ->
@@ -744,18 +744,18 @@ repDataFamInstD (DataFamInstDecl { dfid_eqn =
             checkTys tys@(HsValArg _: HsValArg _: _) = return tys
             checkTys _ = panic "repDataFamInstD:checkTys"
 
-repForD :: Located (ForeignDecl GhcRn) -> MetaM (SrcSpan, Core (M TH.Dec))
+repForD :: LForeignDecl GhcRn -> MetaM (SrcSpan, Core (M TH.Dec))
 repForD (L loc (ForeignImport { fd_name = name, fd_sig_ty = typ
                                   , fd_fi = CImport (L _ cc)
                                                     (L _ s) mch cis _ }))
- = do MkC name' <- lookupLOcc name
+ = do MkC name' <- lookupNOcc name
       MkC typ' <- repHsSigType typ
       MkC cc' <- repCCallConv cc
       MkC s' <- repSafety s
       cis' <- conv_cimportspec cis
       MkC str <- coreStringLit (static ++ chStr ++ cis')
       dec <- rep2 forImpDName [cc', s', str, name', typ']
-      return (loc, dec)
+      return (locA loc, dec)
  where
     conv_cimportspec (CLabel cls)
       = notHandled "Foreign label" (doubleQuotes (ppr cls))
@@ -788,7 +788,7 @@ repSafety PlayInterruptible = rep2_nw interruptibleName []
 repSafety PlaySafe = rep2_nw safeName []
 
 repLFixD :: LFixitySig GhcRn -> MetaM [(SrcSpan, Core (M TH.Dec))]
-repLFixD (L loc fix_sig) = rep_fix_d loc fix_sig
+repLFixD (L loc fix_sig) = rep_fix_d (locA loc) fix_sig
 
 rep_fix_d :: SrcSpan -> FixitySig GhcRn -> MetaM [(SrcSpan, Core (M TH.Dec))]
 rep_fix_d loc (FixitySig _ names (Fixity _ prec dir))
@@ -798,7 +798,7 @@ rep_fix_d loc (FixitySig _ names (Fixity _ prec dir))
                         InfixR -> infixRDName
                         InfixN -> infixNDName
        ; let do_one name
-              = do { MkC name' <- lookupLOcc name
+              = do { MkC name' <- lookupNOcc name
                    ; dec <- rep2 rep_fn [prec', name']
                    ; return (loc,dec) }
        ; mapM do_one names }
@@ -827,7 +827,7 @@ repRuleD (L loc (HsRule { rd_name = n
                          ; rhs' <- repLE rhs
                          ; repPragRule n' ty_bndrs' tm_bndrs' lhs' rhs' act' }
            ; wrapGenSyms ss rule  }
-       ; return (loc, rule) }
+       ; return (locA loc, rule) }
 
 ruleBndrNames :: LRuleBndr GhcRn -> [Name]
 ruleBndrNames (L _ (RuleBndr _ n))      = [unLoc n]
@@ -837,10 +837,10 @@ ruleBndrNames (L _ (RuleBndrSig _ n sig))
 
 repRuleBndr :: LRuleBndr GhcRn -> MetaM (Core (M TH.RuleBndr))
 repRuleBndr (L _ (RuleBndr _ n))
-  = do { MkC n' <- lookupLBinder n
+  = do { MkC n' <- lookupNBinder n
        ; rep2 ruleVarName [n'] }
 repRuleBndr (L _ (RuleBndrSig _ n sig))
-  = do { MkC n'  <- lookupLBinder n
+  = do { MkC n'  <- lookupNBinder n
        ; MkC ty' <- repLTy (hsPatSigType sig)
        ; rep2 typedRuleVarName [n', ty'] }
 
@@ -849,7 +849,7 @@ repAnnD (L loc (HsAnnotation _ _ ann_prov (L _ exp)))
   = do { target <- repAnnProv ann_prov
        ; exp'   <- repE exp
        ; dec    <- repPragAnn target exp'
-       ; return (loc, dec) }
+       ; return (locA loc, dec) }
 
 repAnnProv :: AnnProvenance Name -> MetaM (Core TH.AnnTarget)
 repAnnProv (ValueAnnProvenance (L _ n))
@@ -867,13 +867,13 @@ repAnnProv ModuleAnnProvenance
 
 repC :: LConDecl GhcRn -> MetaM (Core (M TH.Con))
 repC (L _ (ConDeclH98 { con_name   = con
-                      , con_forall = (L _ False)
+                      , con_forall = False
                       , con_mb_cxt = Nothing
                       , con_args   = args }))
   = repDataCon con args
 
 repC (L _ (ConDeclH98 { con_name = con
-                      , con_forall = L _ is_existential
+                      , con_forall = is_existential
                       , con_ex_tvs = con_tvs
                       , con_mb_cxt = mcxt
                       , con_args = args }))
@@ -938,7 +938,7 @@ repBangTy ty = do
 -------------------------------------------------------
 
 repDerivs :: HsDeriving GhcRn -> MetaM (Core [M TH.DerivClause])
-repDerivs (L _ clauses)
+repDerivs clauses
   = repListM derivClauseTyConName repDerivClause clauses
 
 repDerivClause :: LHsDerivingClause GhcRn
@@ -984,22 +984,22 @@ rep_sigs = concatMapM rep_sig
 
 rep_sig :: LSig GhcRn -> MetaM [(SrcSpan, Core (M TH.Dec))]
 rep_sig (L loc (TypeSig _ nms ty))
-  = mapM (rep_wc_ty_sig sigDName loc ty) nms
+  = mapM (rep_wc_ty_sig sigDName (locA loc) ty) nms
 rep_sig (L loc (PatSynSig _ nms ty))
-  = mapM (rep_patsyn_ty_sig loc ty) nms
+  = mapM (rep_patsyn_ty_sig (locA loc) ty) nms
 rep_sig (L loc (ClassOpSig _ is_deflt nms ty))
-  | is_deflt     = mapM (rep_ty_sig defaultSigDName loc ty) nms
-  | otherwise    = mapM (rep_ty_sig sigDName loc ty) nms
+  | is_deflt     = mapM (rep_ty_sig defaultSigDName (locA loc) ty) nms
+  | otherwise    = mapM (rep_ty_sig sigDName (locA loc) ty) nms
 rep_sig d@(L _ (IdSig {}))           = pprPanic "rep_sig IdSig" (ppr d)
-rep_sig (L loc (FixSig _ fix_sig))   = rep_fix_d loc fix_sig
-rep_sig (L loc (InlineSig _ nm ispec))= rep_inline nm ispec loc
+rep_sig (L loc (FixSig _ fix_sig))   = rep_fix_d (locA loc) fix_sig
+rep_sig (L loc (InlineSig _ nm ispec))= rep_inline nm ispec (locA loc)
 rep_sig (L loc (SpecSig _ nm tys ispec))
-  = concatMapM (\t -> rep_specialise nm t ispec loc) tys
-rep_sig (L loc (SpecInstSig _ _ ty))  = rep_specialiseInst ty loc
+  = concatMapM (\t -> rep_specialise nm t ispec (locA loc)) tys
+rep_sig (L loc (SpecInstSig _ _ ty))  = rep_specialiseInst ty (locA loc)
 rep_sig (L _   (MinimalSig {}))       = notHandled "MINIMAL pragmas" empty
 rep_sig (L _   (SCCFunSig {}))        = notHandled "SCC pragmas" empty
 rep_sig (L loc (CompleteMatchSig _ _st cls mty))
-  = rep_complete_sig cls mty loc
+  = rep_complete_sig cls mty (locA loc)
 
 -- Desugar the explicit type variable binders in an 'LHsSigType', making
 -- sure not to gensym them.
@@ -1019,10 +1019,10 @@ rep_ty_sig_tvs explicit_tvs
 -- deliberately avoids gensymming the type variables.
 -- See Note [Scoped type variables in quotes]
 -- and Note [Don't quantify implicit type variables in quotes]
-rep_ty_sig :: Name -> SrcSpan -> LHsSigType GhcRn -> Located Name
+rep_ty_sig :: Name -> SrcSpan -> LHsSigType GhcRn -> LocatedN Name
            -> MetaM (SrcSpan, Core (M TH.Dec))
 rep_ty_sig mk_sig loc sig_ty nm
-  = do { nm1 <- lookupLOcc nm
+  = do { nm1 <- lookupNOcc nm
        ; ty1 <- rep_ty_sig' sig_ty
        ; sig <- repProto mk_sig nm1 ty1
        ; return (loc, sig) }
@@ -1039,11 +1039,11 @@ rep_ty_sig' sig_ty
   = do { th_explicit_tvs <- rep_ty_sig_tvs explicit_tvs
        ; th_ctxt <- repLContext ctxt
        ; th_ty   <- repLTy ty
-       ; if null explicit_tvs && null (unLoc ctxt)
+       ; if null explicit_tvs && null (fromMaybeContext ctxt)
             then return th_ty
             else repTForall th_explicit_tvs th_ctxt th_ty }
 
-rep_patsyn_ty_sig :: SrcSpan -> LHsSigType GhcRn -> Located Name
+rep_patsyn_ty_sig :: SrcSpan -> LHsSigType GhcRn -> LocatedN Name
                   -> MetaM (SrcSpan, Core (M TH.Dec))
 -- represents a pattern synonym type signature;
 -- see Note [Pattern synonym type signatures and Template Haskell] in "GHC.ThToHs"
@@ -1054,7 +1054,7 @@ rep_patsyn_ty_sig :: SrcSpan -> LHsSigType GhcRn -> Located Name
 rep_patsyn_ty_sig loc sig_ty nm
   | HsIB { hsib_body = hs_ty } <- sig_ty
   , (univs, reqs, exis, provs, ty) <- splitLHsPatSynTy hs_ty
-  = do { nm1 <- lookupLOcc nm
+  = do { nm1 <- lookupNOcc nm
        ; th_univs <- rep_ty_sig_tvs univs
        ; th_exis  <- rep_ty_sig_tvs exis
 
@@ -1066,17 +1066,17 @@ rep_patsyn_ty_sig loc sig_ty nm
        ; sig      <- repProto patSynSigDName nm1 ty1
        ; return (loc, sig) }
 
-rep_wc_ty_sig :: Name -> SrcSpan -> LHsSigWcType GhcRn -> Located Name
+rep_wc_ty_sig :: Name -> SrcSpan -> LHsSigWcType GhcRn -> LocatedN Name
               -> MetaM (SrcSpan, Core (M TH.Dec))
 rep_wc_ty_sig mk_sig loc sig_ty nm
   = rep_ty_sig mk_sig loc (hswc_body sig_ty) nm
 
-rep_inline :: Located Name
+rep_inline :: LocatedN Name
            -> InlinePragma      -- Never defaultInlinePragma
            -> SrcSpan
            -> MetaM [(SrcSpan, Core (M TH.Dec))]
 rep_inline nm ispec loc
-  = do { nm1    <- lookupLOcc nm
+  = do { nm1    <- lookupNOcc nm
        ; inline <- repInline $ inl_inline ispec
        ; rm     <- repRuleMatch $ inl_rule ispec
        ; phases <- repPhases $ inl_act ispec
@@ -1084,11 +1084,11 @@ rep_inline nm ispec loc
        ; return [(loc, pragma)]
        }
 
-rep_specialise :: Located Name -> LHsSigType GhcRn -> InlinePragma
+rep_specialise :: LocatedN Name -> LHsSigType GhcRn -> InlinePragma
                -> SrcSpan
                -> MetaM [(SrcSpan, Core (M TH.Dec))]
 rep_specialise nm ty ispec loc
-  = do { nm1 <- lookupLOcc nm
+  = do { nm1 <- lookupNOcc nm
        ; ty1 <- repHsSigType ty
        ; phases <- repPhases $ inl_act ispec
        ; let inline = inl_inline ispec
@@ -1125,13 +1125,13 @@ repPhases (ActiveAfter _ i)  = do { MkC arg <- coreIntLit i
                                   ; dataCon' fromPhaseDataConName [arg] }
 repPhases _                  = dataCon allPhasesDataConName
 
-rep_complete_sig :: Located [Located Name]
-                 -> Maybe (Located Name)
+rep_complete_sig :: Located [LocatedN Name]
+                 -> Maybe (LocatedN Name)
                  -> SrcSpan
                  -> MetaM [(SrcSpan, Core (M TH.Dec))]
 rep_complete_sig (L _ cls) mty loc
-  = do { mty' <- repMaybe nameTyConName lookupLOcc mty
-       ; cls' <- repList nameTyConName lookupLOcc cls
+  = do { mty' <- repMaybe nameTyConName lookupNOcc mty
+       ; cls' <- repList nameTyConName lookupNOcc cls
        ; sig <- repPragComplete cls' mty'
        ; return [(loc, sig)] }
 
@@ -1253,8 +1253,9 @@ repTyVarBndr (L _ (KindedTyVar _ fl (L _ nm) ki))
 
 -- represent a type context
 --
-repLContext :: LHsContext GhcRn -> MetaM (Core (M TH.Cxt))
-repLContext ctxt = repContext (unLoc ctxt)
+repLContext :: Maybe (LHsContext GhcRn) -> MetaM (Core (M TH.Cxt))
+repLContext Nothing = repContext []
+repLContext (Just ctxt) = repContext (unLoc ctxt)
 
 repContext :: HsContext GhcRn -> MetaM (Core (M TH.Cxt))
 repContext ctxt = do preds <- repListM typeTyConName repLTy ctxt
@@ -1269,7 +1270,7 @@ repHsSigType (HsIB { hsib_ext = implicit_tvs
     addHsTyVarBinds explicit_tvs $ \ th_explicit_tvs ->
     do { th_ctxt <- repLContext ctxt
        ; th_ty   <- repLTy ty
-       ; if null explicit_tvs && null (unLoc ctxt)
+       ; if null explicit_tvs && null (fromMaybeContext ctxt)
          then return th_ty
          else repTForall th_explicit_tvs th_ctxt th_ty }
 
@@ -1289,7 +1290,7 @@ repLTy ty = repTy (unLoc ty)
 -- handled separately in repTy.
 repForallT :: HsType GhcRn -> MetaM (Core (M TH.Type))
 repForallT ty
- | (tvs, ctxt, tau) <- splitLHsSigmaTyInvis (noLoc ty)
+ | (tvs, ctxt, tau) <- splitLHsSigmaTyInvis (noLocA ty)
  = addHsTyVarBinds tvs $ \bndrs ->
    do { ctxt1  <- repLContext ctxt
       ; tau1   <- repLTy tau
@@ -1431,7 +1432,7 @@ repLEs es = repListM expTyConName repLE es
 --        unless we can make sure that constructs, which are plainly not
 --        supported in TH already lead to error messages at an earlier stage
 repLE :: LHsExpr GhcRn -> MetaM (Core (M TH.Exp))
-repLE (L loc e) = mapReaderT (putSrcSpanDs loc) (repE e)
+repLE (L loc e) = mapReaderT (putSrcSpanDs (locA loc)) (repE e)
 
 repE :: HsExpr GhcRn -> MetaM (Core (M TH.Exp))
 repE (HsVar _ (L _ x)) =
@@ -1446,7 +1447,7 @@ repE (HsIPVar _ n) = rep_implicit_param_name n >>= repImplicitParamVar
 repE (HsOverLabel _ _ s) = repOverLabel s
 
 repE e@(HsRecFld _ f) = case f of
-  Unambiguous x _ -> repE (HsVar noExtField (noLoc x))
+  Unambiguous x _ -> repE (HsVar noExtField (noLocA x))
   Ambiguous{}     -> notHandled "Ambiguous record selectors" (ppr e)
 
         -- Remember, we're desugaring renamer output here, so
@@ -1489,7 +1490,7 @@ repE (HsMultiIf _ alts)
   = do { (binds, alts') <- liftM unzip $ mapM repLGRHS alts
        ; expr' <- repMultiIf (nonEmptyCoreList alts')
        ; wrapGenSyms (concat binds) expr' }
-repE (HsLet _ (L _ bs) e)       = do { (ss,ds) <- repBinds bs
+repE (HsLet _ bs e)             = do { (ss,ds) <- repBinds bs
                                      ; e2 <- addBinds ss (repLE e)
                                      ; z <- repLetE ds e2
                                      ; wrapGenSyms ss z }
@@ -1517,8 +1518,8 @@ repE e@(HsDo _ ctxt (L _ sts))
 
 repE (ExplicitList _ _ es) = do { xs <- repLEs es; repListExp xs }
 repE (ExplicitTuple _ es boxity) =
-  let tupArgToCoreExp :: LHsTupArg GhcRn -> MetaM (Core (Maybe (M TH.Exp)))
-      tupArgToCoreExp (L _ a)
+  let tupArgToCoreExp :: HsTupArg GhcRn -> MetaM (Core (Maybe (M TH.Exp)))
+      tupArgToCoreExp a
         | (Present _ e) <- a = do { e' <- repLE e
                                   ; coreJustM expTyConName e' }
         | otherwise = coreNothingM expTyConName
@@ -1536,7 +1537,7 @@ repE (ExplicitSum _ alt arity e)
       ; repUnboxedSum e1 alt arity }
 
 repE (RecordCon { rcon_con_name = c, rcon_flds = flds })
- = do { x <- lookupLOcc c;
+ = do { x <- lookupNOcc c;
         fs <- repFields flds;
         repRecCon x fs }
 repE (RecordUpd { rupd_expr = e, rupd_flds = flds })
@@ -1584,7 +1585,7 @@ repE e                     = notHandled "Expression form" (ppr e)
 
 repMatchTup ::  LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Match))
 repMatchTup (L _ (Match { m_pats = [p]
-                        , m_grhss = GRHSs _ guards (L _ wheres) })) =
+                        , m_grhss = GRHSs _ guards wheres })) =
   do { ss1 <- mkGenSyms (collectPatBinders p)
      ; addBinds ss1 $ do {
      ; p1 <- repLP p
@@ -1597,7 +1598,7 @@ repMatchTup _ = panic "repMatchTup: case alt with more than one arg"
 
 repClauseTup ::  LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Clause))
 repClauseTup (L _ (Match { m_pats = ps
-                         , m_grhss = GRHSs _ guards (L _ wheres) })) =
+                         , m_grhss = GRHSs _ guards wheres })) =
   do { ss1 <- mkGenSyms (collectPatsBinders ps)
      ; addBinds ss1 $ do {
        ps1 <- repLPs ps
@@ -1633,7 +1634,7 @@ repFields (HsRecFields { rec_flds = flds })
   where
     rep_fld :: LHsRecField GhcRn (LHsExpr GhcRn)
             -> MetaM (Core (M TH.FieldExp))
-    rep_fld (L _ fld) = do { fn <- lookupLOcc (hsRecFieldSel fld)
+    rep_fld (L _ fld) = do { fn <- lookupLOcc (reLocA $ hsRecFieldSel fld)
                            ; e  <- repLE (hsRecFieldArg fld)
                            ; repFieldExp fn e }
 
@@ -1687,7 +1688,7 @@ repSts (BindStmt _ p e : ss) =
       ; (ss2,zs) <- repSts ss
       ; z <- repBindSt p1 e2
       ; return (ss1++ss2, z : zs) }}
-repSts (LetStmt _ (L _ bs) : ss) =
+repSts (LetStmt _ bs : ss) =
    do { (ss1,ds) <- repBinds bs
       ; z <- repLetSt ds
       ; (ss2,zs) <- addBinds ss1 (repSts ss)
@@ -1716,11 +1717,11 @@ repSts [LastStmt _ e _ _]
        ; z <- repNoBindSt e2
        ; return ([], [z]) }
 repSts (stmt@RecStmt{} : ss)
-  = do { let binders = collectLStmtsBinders (recS_stmts stmt)
+  = do { let binders = collectLStmtsBinders (unLoc $ recS_stmts stmt)
        ; ss1 <- mkGenSyms binders
        -- Bring all of binders in the recursive group into scope for the
        -- whole group.
-       ; (ss1_other,rss) <- addBinds ss1 $ repSts (map unLoc (recS_stmts stmt))
+       ; (ss1_other,rss) <- addBinds ss1 $ repSts (map unLoc (unLoc $ recS_stmts stmt))
        ; MASSERT(sort ss1 == sort ss1_other)
        ; z <- repRecSt (nonEmptyCoreList rss)
        ; (ss2,zs) <- addBinds ss1 (repSts ss)
@@ -1766,7 +1767,7 @@ rep_implicit_param_bind (L loc (IPBind _ ename (L _ rhs)))
                         panic "rep_implicit_param_bind: post typechecking"
       ; rhs' <- repE rhs
       ; ipb <- repImplicitParamBind name rhs'
-      ; return (loc, ipb) }
+      ; return (locA loc, ipb) }
 
 rep_implicit_param_name :: HsIPName -> MetaM (Core String)
 rep_implicit_param_name (HsIPName name) = coreStringLit (unpackFS name)
@@ -1794,31 +1795,31 @@ rep_bind (L loc (FunBind
                    fun_matches = MG { mg_alts
                            = (L _ [L _ (Match
                                    { m_pats = []
-                                   , m_grhss = GRHSs _ guards (L _ wheres) }
+                                   , m_grhss = GRHSs _ guards wheres }
                                       )]) } }))
  = do { (ss,wherecore) <- repBinds wheres
         ; guardcore <- addBinds ss (repGuards guards)
-        ; fn'  <- lookupLBinder fn
+        ; fn'  <- lookupNBinder fn
         ; p    <- repPvar fn'
         ; ans  <- repVal p guardcore wherecore
         ; ans' <- wrapGenSyms ss ans
-        ; return (loc, ans') }
+        ; return (locA loc, ans') }
 
 rep_bind (L loc (FunBind { fun_id = fn
                          , fun_matches = MG { mg_alts = L _ ms } }))
  =   do { ms1 <- mapM repClauseTup ms
-        ; fn' <- lookupLBinder fn
+        ; fn' <- lookupNBinder fn
         ; ans <- repFun fn' (nonEmptyCoreList ms1)
-        ; return (loc, ans) }
+        ; return (locA loc, ans) }
 
 rep_bind (L loc (PatBind { pat_lhs = pat
-                         , pat_rhs = GRHSs _ guards (L _ wheres) }))
+                         , pat_rhs = GRHSs _ guards wheres }))
  =   do { patcore <- repLP pat
         ; (ss,wherecore) <- repBinds wheres
         ; guardcore <- addBinds ss (repGuards guards)
         ; ans  <- repVal patcore guardcore wherecore
         ; ans' <- wrapGenSyms ss ans
-        ; return (loc, ans') }
+        ; return (locA loc, ans') }
 
 rep_bind (L _ (VarBind { var_id = v, var_rhs = e}))
  =   do { v' <- lookupBinder v
@@ -1834,7 +1835,7 @@ rep_bind (L loc (PatSynBind _ (PSB { psb_id   = syn
                                    , psb_args = args
                                    , psb_def  = pat
                                    , psb_dir  = dir })))
-  = do { syn'      <- lookupLBinder syn
+  = do { syn'      <- lookupNBinder syn
        ; dir'      <- repPatSynDir dir
        ; ss        <- mkGenArgSyms args
        ; patSynD'  <- addBinds ss (
@@ -1842,7 +1843,7 @@ rep_bind (L loc (PatSynBind _ (PSB { psb_id   = syn
             ; pat'   <- repLP pat
             ; repPatSynD syn' args' dir' pat' })
        ; patSynD'' <- wrapGenArgSyms args ss patSynD'
-       ; return (loc, patSynD'') }
+       ; return (locA loc, patSynD'') }
   where
     mkGenArgSyms :: HsPatSynDetails GhcRn -> MetaM [GenSymBind]
     -- for Record Pattern Synonyms we want to conflate the selector
@@ -1878,14 +1879,14 @@ repPatSynD (MkC syn) (MkC args) (MkC dir) (MkC pat)
 
 repPatSynArgs :: HsPatSynDetails GhcRn -> MetaM (Core (M TH.PatSynArgs))
 repPatSynArgs (PrefixCon args)
-  = do { args' <- repList nameTyConName lookupLOcc args
+  = do { args' <- repList nameTyConName lookupNOcc args
        ; repPrefixPatSynArgs args' }
 repPatSynArgs (InfixCon arg1 arg2)
-  = do { arg1' <- lookupLOcc arg1
-       ; arg2' <- lookupLOcc arg2
+  = do { arg1' <- lookupNOcc arg1
+       ; arg2' <- lookupNOcc arg2
        ; repInfixPatSynArgs arg1' arg2' }
 repPatSynArgs (RecCon fields)
-  = do { sels' <- repList nameTyConName lookupLOcc sels
+  = do { sels' <- repList nameTyConName lookupNOcc sels
        ; repRecordPatSynArgs sels' }
   where sels = map recordPatSynSelectorId fields
 
@@ -1937,7 +1938,7 @@ repExplBidirPatSynDir (MkC cls) = rep2 explBidirPatSynName [cls]
 repLambda :: LMatch GhcRn (LHsExpr GhcRn) -> MetaM (Core (M TH.Exp))
 repLambda (L _ (Match { m_pats = ps
                       , m_grhss = GRHSs _ [L _ (GRHS _ [] e)]
-                                              (L _ (EmptyLocalBinds _)) } ))
+                                              (EmptyLocalBinds _) } ))
  = do { let bndrs = collectPatsBinders ps ;
       ; ss  <- mkGenSyms bndrs
       ; lam <- addBinds ss (
@@ -1967,7 +1968,7 @@ repP (LitPat _ l)       = do { l2 <- repLiteral l; repPlit l2 }
 repP (VarPat _ x)       = do { x' <- lookupBinder (unLoc x); repPvar x' }
 repP (LazyPat _ p)      = do { p1 <- repLP p; repPtilde p1 }
 repP (BangPat _ p)      = do { p1 <- repLP p; repPbang p1 }
-repP (AsPat _ x p)      = do { x' <- lookupLBinder x; p1 <- repLP p
+repP (AsPat _ x p)      = do { x' <- lookupNBinder x; p1 <- repLP p
                              ; repPaspat x' p1 }
 repP (ParPat _ p)       = repLP p
 repP (ListPat Nothing ps)  = do { qs <- repLPs ps; repPlist qs }
@@ -1981,7 +1982,7 @@ repP (TuplePat _ ps boxed)
 repP (SumPat _ p alt arity) = do { p1 <- repLP p
                                  ; repPunboxedSum p1 alt arity }
 repP (ConPat NoExtField dc details)
- = do { con_str <- lookupLOcc dc
+ = do { con_str <- lookupNOcc dc
       ; case details of
          PrefixCon ps -> do { qs <- repLPs ps; repPcon con_str qs }
          RecCon rec   -> do { fps <- repListM fieldPatTyConName rep_fld (rec_flds rec)
@@ -1992,7 +1993,7 @@ repP (ConPat NoExtField dc details)
    }
  where
    rep_fld :: LHsRecField GhcRn (LPat GhcRn) -> MetaM (Core (M (TH.Name, TH.Pat)))
-   rep_fld (L _ fld) = do { MkC v <- lookupLOcc (hsRecFieldSel fld)
+   rep_fld (L _ fld) = do { MkC v <- lookupLOcc (reLocA $ hsRecFieldSel fld)
                           ; MkC p <- repLP (hsRecFieldArg fld)
                           ; rep2 fieldPatName [v,p] }
 
@@ -2048,8 +2049,8 @@ addBinds bs m = mapReaderT (dsExtendMetaEnv (mkNameEnv [(n,DsBound id) | (n,id) 
 
 -- Look up a locally bound name
 --
-lookupLBinder :: Located Name -> MetaM (Core TH.Name)
-lookupLBinder n = lookupBinder (unLoc n)
+lookupNBinder :: LocatedN Name -> MetaM (Core TH.Name)
+lookupNBinder n = lookupBinder (unLoc n)
 
 lookupBinder :: Name -> MetaM (Core TH.Name)
 lookupBinder = lookupOcc
@@ -2063,10 +2064,15 @@ lookupBinder = lookupOcc
 --  * If it is a global name, generate the "original name" representation (ie,
 --   the <module>:<name> form) for the associated entity
 --
-lookupLOcc :: Located Name -> MetaM (Core TH.Name)
+lookupLOcc :: LocatedA Name -> MetaM (Core TH.Name)
 -- Lookup an occurrence; it can't be a splice.
 -- Use the in-scope bindings if they exist
 lookupLOcc n = lookupOcc (unLoc n)
+
+lookupNOcc :: LocatedN Name -> MetaM (Core TH.Name)
+-- Lookup an occurrence; it can't be a splice.
+-- Use the in-scope bindings if they exist
+lookupNOcc n = lookupOcc (unLoc n)
 
 lookupOcc :: Name -> MetaM (Core TH.Name)
 lookupOcc = lift . lookupOccDsM
@@ -2451,14 +2457,14 @@ repDerivStrategy mds thing_inside =
     Nothing -> thing_inside =<< nothing
     Just ds ->
       case unLoc ds of
-        StockStrategy    -> thing_inside =<< just =<< repStockStrategy
-        AnyclassStrategy -> thing_inside =<< just =<< repAnyclassStrategy
-        NewtypeStrategy  -> thing_inside =<< just =<< repNewtypeStrategy
-        ViaStrategy ty   -> addSimpleTyVarBinds (get_scoped_tvs_from_sig ty) $
-                            do ty' <- rep_ty_sig' ty
-                               via_strat <- repViaStrategy ty'
-                               m_via_strat <- just via_strat
-                               thing_inside m_via_strat
+        StockStrategy    _ -> thing_inside =<< just =<< repStockStrategy
+        AnyclassStrategy _ -> thing_inside =<< just =<< repAnyclassStrategy
+        NewtypeStrategy  _ -> thing_inside =<< just =<< repNewtypeStrategy
+        ViaStrategy ty     -> addSimpleTyVarBinds (get_scoped_tvs_from_sig ty) $
+                              do ty' <- rep_ty_sig' ty
+                                 via_strat <- repViaStrategy ty'
+                                 m_via_strat <- just via_strat
+                                 thing_inside m_via_strat
   where
   nothing = coreNothingM derivStrategyTyConName
   just    = coreJustM    derivStrategyTyConName
@@ -2579,19 +2585,19 @@ repImplicitParamBind (MkC n) (MkC e) = rep2 implicitParamBindDName [n, e]
 repCtxt :: Core [(M TH.Pred)] -> MetaM (Core (M TH.Cxt))
 repCtxt (MkC tys) = rep2 cxtName [tys]
 
-repDataCon :: Located Name
+repDataCon :: LocatedN Name
            -> HsConDeclDetails GhcRn
            -> MetaM (Core (M TH.Con))
 repDataCon con details
-    = do con' <- lookupLOcc con -- See Note [Binders and occurrences]
+    = do con' <- lookupNOcc con -- See Note [Binders and occurrences]
          repConstr details Nothing [con']
 
-repGadtDataCons :: [Located Name]
+repGadtDataCons :: [LocatedN Name]
                 -> HsConDeclDetails GhcRn
                 -> LHsType GhcRn
                 -> MetaM (Core (M TH.Con))
 repGadtDataCons cons details res_ty
-    = do cons' <- mapM lookupLOcc cons -- See Note [Binders and occurrences]
+    = do cons' <- mapM lookupNOcc cons -- See Note [Binders and occurrences]
          repConstr details (Just res_ty) cons'
 
 -- Invariant:

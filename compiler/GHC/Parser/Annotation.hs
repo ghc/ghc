@@ -1,8 +1,12 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 module GHC.Parser.Annotation (
-  getAnnotation, getAndRemoveAnnotation,
-  getAnnotationComments,getAndRemoveAnnotationComments,
+  -- getAnnotation, getAndRemoveAnnotation,
+  -- getAnnotationComments,getAndRemoveAnnotationComments,
   ApiAnns(..),
   ApiAnnKey,
   AnnKeywordId(..),
@@ -10,17 +14,57 @@ module GHC.Parser.Annotation (
   IsUnicodeSyntax(..),
   unicodeAnn,
   HasE(..),
-  LRdrName -- Exists for haddocks only
+  LRdrName, -- Exists for haddocks only
+
+  -- * In-tree Api Annotations
+  LocatedA, LocatedL, LocatedC, LocatedN, LocatedAn, LocatedP,
+
+  SrcSpanAnnA, SrcSpanAnnL, SrcSpanAnnP, SrcSpanAnnC, SrcSpanAnnName, SrcSpanAnn'(..),
+  AddApiAnn(..),
+  ApiAnn, ApiAnn'(..),
+  ApiAnnCO, ApiAnnComments,
+  noAnn,
+
+  AnnsModule(..),
+  AnnListItem(..), AnnList(..), AnnParen(..), ParenType(..),
+  AnnPragma(..),
+  AnnContext(..),
+  AnnSortKey(..),
+  NameAnn(..), NameAdornment(..),
+  NoApiAnns(..),
+
+  addCLocA, addCLocAA,
+  combineLocsA, sortLocatedA,
+  noLocA, getLocA, getLocAnn,
+  noSrcSpanA,
+  mapLocA, reAnn,
+  noAnnSrcSpan, noComments, comment,
+  addAnns, addAnnsA, widenSpan, widenRealSpan, widenLocatedAn,
+  apiAnnAnns, apiAnnAnnsL, apiAnnComments,
+  annParen2AddApiAnn, parenTypeKws,
+  realSrcSpan, la2r,
+  la2na, na2la, n2l, l2n, l2l, la2la,
+  combineSrcSpansA,
+  reLocL, reLoc, reLocA, reLocN,
+  TrailingAnn(..), addTrailingAnnToA, addTrailingAnnToL, addTrailingCommaToN,
+  placeholderRealSpan,
+  reAnnL, reAnnC,
+  extraToAnnList
   ) where
 
 import GHC.Prelude
 
-import GHC.Types.Name.Reader
-import GHC.Utils.Outputable
-import GHC.Types.SrcLoc
-import qualified Data.Map as Map
 import Data.Data
-
+import Data.Function (on)
+import Data.List (sortBy)
+-- import qualified Data.Map as Map
+import Data.Semigroup
+import GHC.Data.FastString
+import GHC.Types.Name
+import GHC.Types.Name.Reader
+import GHC.Types.SrcLoc
+import GHC.Utils.Binary
+import GHC.Utils.Outputable hiding ( (<>) )
 
 {-
 Note [Api annotations]
@@ -136,11 +180,10 @@ https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
 -- ---------------------------------------------------------------------
 
 -- If you update this, update the Note [Api annotations] above
+-- AZ:TODO ^^^ take note
 data ApiAnns =
   ApiAnns
-    { apiAnnItems :: Map.Map ApiAnnKey [RealSrcSpan],
-      apiAnnEofPos :: Maybe RealSrcSpan,
-      apiAnnComments :: Map.Map RealSrcSpan [RealLocated AnnotationComment],
+    { apiAnnEofPos :: Maybe RealSrcSpan,
       apiAnnRogueComments :: [RealLocated AnnotationComment]
     }
 
@@ -148,47 +191,47 @@ data ApiAnns =
 type ApiAnnKey = (RealSrcSpan,AnnKeywordId)
 
 
--- | Retrieve a list of annotation 'SrcSpan's based on the 'SrcSpan'
--- of the annotated AST element, and the known type of the annotation.
-getAnnotation :: ApiAnns -> RealSrcSpan -> AnnKeywordId -> [RealSrcSpan]
-getAnnotation anns span ann =
-  case Map.lookup ann_key ann_items of
-    Nothing -> []
-    Just ss -> ss
-  where ann_items = apiAnnItems anns
-        ann_key = (span,ann)
+-- -- | Retrieve a list of annotation 'SrcSpan's based on the 'SrcSpan'
+-- -- of the annotated AST element, and the known type of the annotation.
+-- getAnnotation :: ApiAnns -> RealSrcSpan -> AnnKeywordId -> [RealSrcSpan]
+-- getAnnotation anns span ann =
+--   case Map.lookup ann_key ann_items of
+--     Nothing -> []
+--     Just ss -> ss
+--   where ann_items = apiAnnItems anns
+--         ann_key = (span,ann)
 
--- | Retrieve a list of annotation 'SrcSpan's based on the 'SrcSpan'
--- of the annotated AST element, and the known type of the annotation.
--- The list is removed from the annotations.
-getAndRemoveAnnotation :: ApiAnns -> RealSrcSpan -> AnnKeywordId
-                       -> ([RealSrcSpan],ApiAnns)
-getAndRemoveAnnotation anns span ann =
-  case Map.lookup ann_key ann_items of
-    Nothing -> ([],anns)
-    Just ss -> (ss,anns{ apiAnnItems = Map.delete ann_key ann_items })
-  where ann_items = apiAnnItems anns
-        ann_key = (span,ann)
+-- -- | Retrieve a list of annotation 'SrcSpan's based on the 'SrcSpan'
+-- -- of the annotated AST element, and the known type of the annotation.
+-- -- The list is removed from the annotations.
+-- getAndRemoveAnnotation :: ApiAnns -> RealSrcSpan -> AnnKeywordId
+--                        -> ([RealSrcSpan],ApiAnns)
+-- getAndRemoveAnnotation anns span ann =
+--   case Map.lookup ann_key ann_items of
+--     Nothing -> ([],anns)
+--     Just ss -> (ss,anns{ apiAnnItems = Map.delete ann_key ann_items })
+--   where ann_items = apiAnnItems anns
+--         ann_key = (span,ann)
 
 -- |Retrieve the comments allocated to the current 'SrcSpan'
 --
---  Note: A given 'SrcSpan' may appear in multiple AST elements,
---  beware of duplicates
-getAnnotationComments :: ApiAnns -> RealSrcSpan -> [RealLocated AnnotationComment]
-getAnnotationComments anns span =
-  case Map.lookup span (apiAnnComments anns) of
-    Just cs -> cs
-    Nothing -> []
+-- --  Note: A given 'SrcSpan' may appear in multiple AST elements,
+-- --  beware of duplicates
+-- getAnnotationComments :: ApiAnns -> RealSrcSpan -> [RealLocated AnnotationComment]
+-- getAnnotationComments anns span =
+--   case Map.lookup span (apiAnnComments anns) of
+--     Just cs -> cs
+--     Nothing -> []
 
--- |Retrieve the comments allocated to the current 'SrcSpan', and
--- remove them from the annotations
-getAndRemoveAnnotationComments :: ApiAnns -> RealSrcSpan
-                               -> ([RealLocated AnnotationComment],ApiAnns)
-getAndRemoveAnnotationComments anns span =
-  case Map.lookup span ann_comments of
-    Just cs -> (cs, anns{ apiAnnComments = Map.delete span ann_comments })
-    Nothing -> ([], anns)
-  where ann_comments = apiAnnComments anns
+-- -- |Retrieve the comments allocated to the current 'SrcSpan', and
+-- -- remove them from the annotations
+-- getAndRemoveAnnotationComments :: ApiAnns -> RealSrcSpan
+--                                -> ([RealLocated AnnotationComment],ApiAnns)
+-- getAndRemoveAnnotationComments anns span =
+--   case Map.lookup span ann_comments of
+--     Just cs -> (cs, anns{ apiAnnComments = Map.delete span ann_comments })
+--     Nothing -> ([], anns)
+--   where ann_comments = apiAnnComments anns
 
 -- --------------------------------------------------------------------
 
@@ -223,6 +266,7 @@ data AnnKeywordId
     | AnnCloseQ  -- ^ '|]'
     | AnnCloseQU -- ^ '|]', unicode variant
     | AnnCloseP -- ^ ')'
+    | AnnClosePH -- ^ '\#)'
     | AnnCloseS -- ^ ']'
     | AnnColon
     | AnnComma -- ^ as a list separator
@@ -265,7 +309,7 @@ data AnnKeywordId
     | AnnNewtype
     | AnnName -- ^ where a name loses its location in the AST, this carries it
     | AnnOf
-    | AnnOpen    -- ^ '(\#' or '{-\# LANGUAGE' etc
+    | AnnOpen    -- ^ '{-\# LANGUAGE' etc
     | AnnOpenB   -- ^ '(|'
     | AnnOpenBU  -- ^ '(|', unicode variant
     | AnnOpenC   -- ^ '{'
@@ -274,6 +318,7 @@ data AnnKeywordId
     | AnnOpenEQU -- ^ '[|', unicode variant
     | AnnOpenP   -- ^ '('
     | AnnOpenS   -- ^ '['
+    | AnnOpenPH  -- ^ '(\#'
     | AnnDollar          -- ^ prefix '$'   -- TemplateHaskell
     | AnnDollarDollar    -- ^ prefix '$$'  -- TemplateHaskell
     | AnnPackageName
@@ -374,3 +419,546 @@ unicodeAnn ann           = ann
 -- This type indicates whether the 'e' is present or not.
 data HasE = HasE | NoE
      deriving (Eq, Ord, Data, Show)
+
+-- ---------------------------------------------------------------------
+
+-- | Encapsulated call to addAnnotation, requiring only the SrcSpan of
+--   the AST construct the annotation belongs to; together with the
+--   AnnKeywordId, this is the key of the annotation map.
+--
+--   This type is useful for places in the parser where it is not yet
+--   known what SrcSpan an annotation should be added to.  The most
+--   common situation is when we are parsing a list: the annotations
+--   need to be associated with the AST element that *contains* the
+--   list, not the list itself.  'AddApiAnn' lets us defer adding the
+--   annotations until we finish parsing the list and are now parsing
+--   the enclosing element; we then apply the 'AddApiAnn' to associate
+--   the annotations.  Another common situation is where a common fragment of
+--   the AST has been factored out but there is no separate AST node for
+--   this fragment (this occurs in class and data declarations). In this
+--   case, the annotation belongs to the parent data declaration.
+--
+--   The usual way an 'AddApiAnn' is created is using the 'mj' ("make jump")
+--   function, and then it can be discharged using the 'ams' function.
+data AddApiAnn = AddApiAnn AnnKeywordId RealSrcSpan deriving (Data,Show,Eq,Ord)
+
+instance Outputable AddApiAnn where
+  ppr (AddApiAnn kw ss) = text "AddApiAnn" <+> ppr kw <+> ppr ss
+
+data TrailingAnn
+  = AddSemiAnn RealSrcSpan
+  | AddCommaAnn RealSrcSpan
+  | AddVbarAnn RealSrcSpan
+  | AddRarrowAnn RealSrcSpan
+  | AddRarrowAnnU RealSrcSpan
+  -- | AddLollyAnn RealSrcSpan
+  | AddLollyAnnU RealSrcSpan
+  deriving (Data,Show,Eq, Ord)
+
+instance Outputable TrailingAnn where
+  ppr (AddSemiAnn ss)    = text "AddSemiAnn"    <+> ppr ss
+  ppr (AddCommaAnn ss)   = text "AddCommaAnn"   <+> ppr ss
+  ppr (AddVbarAnn ss)    = text "AddVbarAnn"    <+> ppr ss
+  ppr (AddRarrowAnn ss)  = text "AddRarrowAnn"  <+> ppr ss
+  ppr (AddRarrowAnnU ss) = text "AddRarrowAnnU" <+> ppr ss
+  -- ppr (AddLollyAnn ss)   = text "AddLollyAnn"   <+> ppr ss
+  ppr (AddLollyAnnU ss)  = text "AddLollyAnnU"  <+> ppr ss
+
+-- ---------------------------------------------------------------------
+
+{-
+Note [In-tree Api annotations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Rather than being loosely coupled to the ParsedSource via the location
+of the AST fragment the annotation pertains to, they are now encoded
+directly into the HsSyn AST via the TTG extension points for GhcPs.
+
+In order to do this in a type safe way the following data types are
+defined.
+-}
+
+
+-- | The API Annotations are now kept in the HsSyn AST for the GhcPs
+--   phase. We do not always have API Annotations though, only for
+--   parsed code. This type captures that, and allows the
+--   representation decision to be easily revisited as it evolves.
+--
+-- A goal of the annotations is that an AST can be edited, including
+-- moving subtrees from one place to another, duplicating them, and so
+-- on.  This means that each fragment must be self-contained.  To this
+-- end, each annotated fragment keeps track of the anchor position it
+-- was originally captured at, being simply the start span of the
+-- topmost element of the ast fragment.  This gives us a way to later
+-- re-calculate all Located items in this layer of the AST, as well as
+-- any annotations captured. The comments associated with the AST
+-- fragment are also captured here.
+--
+-- We capture the location of a sub-element here, within a given
+-- sub-element it has its own anchor used to calculate relative
+-- positions, so it means the sub-elements can be relocated, or new
+-- ones synthesised and inserted without hardship.
+--
+-- The ann type parameter allows this general structure to be
+-- specialised to the specific set of locations of original
+-- AnnKeywordId elements. Note: we may reduce the usage of
+-- AnnKeywordId, and use locations only, as captured in that
+-- structure.
+data ApiAnn' ann
+  = ApiAnn { anchor   :: RealSrcSpan -- ^ Base location for the start of
+                                     -- the syntactic element holding the
+                                     -- annotations.
+           , anns     :: ann -- ^ Annotations added by the Parser
+           , comments :: [RealLocated AnnotationComment]
+              -- ^ Comments enclosed in the SrcSpan of the element
+              -- this `ApiAnn'` is attached to
+           }
+  | ApiAnnNotUsed -- ^ No Annotation for generated code,
+                                 -- e.g. from TH, deriving, etc.
+        deriving (Data, Eq, Functor)
+
+type ApiAnn = ApiAnn' [AddApiAnn]
+type ApiAnnComments = [RealLocated AnnotationComment]
+
+data NoApiAnns = NoApiAnns
+  deriving (Data,Eq,Ord)
+
+-- TODO:AZ I think ApiAnnCO is not needed
+type ApiAnnCO = ApiAnn' NoApiAnns -- ^ Api Annotations for comments only
+
+noComments ::ApiAnnCO
+noComments = ApiAnn placeholderRealSpan NoApiAnns []
+
+placeholderRealSpan :: RealSrcSpan
+placeholderRealSpan = realSrcLocSpan (mkRealSrcLoc (mkFastString "placeholder") 0 0)
+
+comment :: RealSrcSpan -> ApiAnnComments -> ApiAnnCO
+comment loc cs = ApiAnn loc NoApiAnns cs
+
+type LocatedA = GenLocated SrcSpanAnnA
+type LocatedL = GenLocated SrcSpanAnnL
+type LocatedP = GenLocated SrcSpanAnnP
+type LocatedC = GenLocated SrcSpanAnnC
+type LocatedN = GenLocated SrcSpanAnnName
+
+type LocatedAn an = GenLocated (SrcSpanAnn' (ApiAnn' an))
+
+type SrcSpanAnnA = SrcSpanAnn' (ApiAnn' AnnListItem)
+type SrcSpanAnnL = SrcSpanAnn' (ApiAnn' AnnList)
+type SrcSpanAnnP = SrcSpanAnn' (ApiAnn' AnnPragma)
+type SrcSpanAnnC = SrcSpanAnn' (ApiAnn' AnnContext)
+type SrcSpanAnnName = SrcSpanAnn' (ApiAnn' NameAnn)
+
+data SrcSpanAnn' a = SrcSpanAnn { ann :: a, locA :: SrcSpan }
+        deriving (Data, Eq)
+
+instance (Outputable a) => Outputable (SrcSpanAnn' a) where
+  ppr (SrcSpanAnn a l) = text "SrcSpanAnn" <+> ppr a <+> ppr l
+
+instance (Outputable a, Outputable e)
+     => Outputable (GenLocated (SrcSpanAnn' a) e) where
+  ppr = pprLocated
+
+instance Outputable AnnListItem where
+  ppr (AnnListItem ts) = text "AnnListItem" <+> ppr ts
+
+instance Outputable NameAdornment where
+  ppr NameParens     = text "NameParens"
+  ppr NameParensHash = text "NameParensHash"
+  ppr NameBackquotes = text "NameBackquotes"
+  ppr NameSquare     = text "NameSquare"
+
+instance Outputable NameAnn where
+  ppr (NameAnn a o n c t)
+    = text "NameAnn" <+> ppr a <+> ppr o <+> ppr n <+> ppr c <+> ppr t
+  ppr (NameAnnCommas a o n c t)
+    = text "NameAnnCommas" <+> ppr a <+> ppr o <+> ppr n <+> ppr c <+> ppr t
+  ppr (NameAnnOnly a o c t)
+    = text "NameAnnOnly" <+> ppr a <+> ppr o <+> ppr c <+> ppr t
+  ppr (NameAnnRArrow n t)
+    = text "NameAnnRArrow" <+> ppr n <+> ppr t
+  ppr (NameAnnQuote q n t)
+    = text "NameAnnQuote" <+> ppr q <+> ppr n <+> ppr t
+  ppr (NameAnnTrailing t)
+    = text "NameAnnTrailing" <+> ppr t
+
+instance Outputable AnnList where
+  ppr (AnnList o c r t) = text "AnnList" <+> ppr o <+> ppr c <+> ppr r <+> ppr t
+
+instance Outputable AnnPragma where
+  ppr (AnnPragma o c r) = text "AnnPragma" <+> ppr o <+> ppr c <+> ppr r
+
+-- sortLocatedA :: [LocatedA a] -> [LocatedA a]
+sortLocatedA :: [GenLocated (SrcSpanAnn' a) e] -> [GenLocated (SrcSpanAnn' a) e]
+sortLocatedA = sortBy (leftmost_smallest `on` getLocA)
+
+mapLocA :: (a -> b) -> GenLocated SrcSpan a -> GenLocated (SrcSpanAnn' (ApiAnn' ann)) b
+mapLocA f (L l a) = L (noAnnSrcSpan l) (f a)
+
+-- AZ:TODO: move this somewhere sane
+
+-- combineLocsA :: LocatedA a -> LocatedA b -> SrcSpanAnn
+combineLocsA :: Semigroup a => GenLocated (SrcSpanAnn' a) e1 -> GenLocated (SrcSpanAnn' a) e2 -> SrcSpanAnn' a
+combineLocsA (L a _) (L b _) = combineSrcSpansA a b
+
+-- combineSrcSpansA :: SrcSpanAnn -> SrcSpanAnn -> SrcSpanAnn
+combineSrcSpansA :: Semigroup a => SrcSpanAnn' a -> SrcSpanAnn' a -> SrcSpanAnn' a
+combineSrcSpansA (SrcSpanAnn aa la) (SrcSpanAnn ab lb)
+  = SrcSpanAnn (aa <> ab) (combineSrcSpans la lb)
+
+-- | Combine locations from two 'Located' things and add them to a third thing
+-- addCLocA :: LocatedA a -> Located b -> c -> LocatedA c
+addCLocA :: GenLocated (SrcSpanAnn' a) e1 -> GenLocated SrcSpan e2 -> e3 -> GenLocated (SrcSpanAnn' (ApiAnn' ann)) e3
+addCLocA a b c = L (noAnnSrcSpan $ combineSrcSpans (locA $ getLoc a) (getLoc b)) c
+
+-- addCLocAA :: LocatedA a -> LocatedA b -> c -> LocatedA c
+addCLocAA :: GenLocated (SrcSpanAnn' a1) e1 -> GenLocated (SrcSpanAnn' a2) e2 -> e3 -> GenLocated (SrcSpanAnn' (ApiAnn' ann)) e3
+addCLocAA a b c = L (noAnnSrcSpan $ combineSrcSpans (locA $ getLoc a) (locA $ getLoc b)) c
+
+-- ---------------------------------------------------------------------
+
+-- AZ: rename this, it is used in more than just HsModule
+data AnnsModule
+  = AnnsModule {
+    am_main :: [AddApiAnn],
+    am_decls :: AnnList
+    } deriving (Data, Eq)
+
+-- ---------------------------------------------------------------------
+-- Annotations for lists of items
+-- ---------------------------------------------------------------------
+
+data AnnListItem
+  = AnnListItem {
+      lann_trailing  :: [TrailingAnn]
+      }
+  deriving (Data, Eq)
+
+-- ---------------------------------------------------------------------
+-- Managing annotations for lists
+-- ---------------------------------------------------------------------
+
+-- AZ:TODO: consider adding an AnnSortKey
+data AnnList
+  = AnnList {
+      al_open      :: Maybe AddApiAnn,
+      al_close     :: Maybe AddApiAnn,
+      al_rest      :: [AddApiAnn],
+      al_trailing  :: [TrailingAnn]
+      } deriving (Data,Eq)
+
+-- ---------------------------------------------------------------------
+
+data AnnParen
+  = AnnParen {
+      ap_adornment :: ParenType,
+      ap_open      :: RealSrcSpan,
+      ap_close     :: RealSrcSpan
+      } deriving (Data)
+
+data ParenType
+  = AnnParens
+  | AnnParensHash
+  | AnnParensSquare
+  deriving (Eq, Ord, Data)
+
+data AnnContext
+  = AnnContext {
+      ac_darrow    :: Maybe (IsUnicodeSyntax, RealSrcSpan),
+      ac_open      :: [RealSrcSpan],
+      ac_close     :: [RealSrcSpan]
+      } deriving (Data)
+
+-- | Captures the sort order of sub elements. This is needed when the
+-- sub-elements have been split (as in a HsLocalBind which holds separate
+-- binds and sigs) or for infix patterns where the order has been
+-- re-arranged. It is captured explicitly so that after the Delta phase a
+-- SrcSpan is used purely as an index into the annotations, allowing
+-- transformations of the AST including the introduction of new Located
+-- items or re-arranging existing ones.
+data AnnSortKey
+  = NoAnnSortKey
+  | AnnSortKey [RealSrcSpan]
+  deriving (Data)
+
+
+-- ---------------------------------------------------------------------
+-- Annotations for names
+-- ---------------------------------------------------------------------
+-- We initially wrapped all names in Located as a hook for the
+-- annotations. Now we can do it directly
+
+
+data NameAnn
+  = NameAnn {
+      nann_adornment :: NameAdornment,
+      nann_open      :: RealSrcSpan,
+      nann_name      :: RealSrcSpan,
+      nann_close     :: RealSrcSpan,
+      nann_trailing  :: [TrailingAnn]
+      }
+  | NameAnnCommas {
+      nann_adornment :: NameAdornment,
+      nann_open      :: RealSrcSpan,
+      nann_commas    :: [RealSrcSpan],
+      nann_close     :: RealSrcSpan,
+      nann_trailing  :: [TrailingAnn]
+      }
+  | NameAnnOnly {
+      nann_adornment :: NameAdornment,
+      nann_open      :: RealSrcSpan,
+      nann_close     :: RealSrcSpan,
+      nann_trailing  :: [TrailingAnn]
+      }
+  | NameAnnRArrow {
+      nann_name      :: RealSrcSpan,
+      nann_trailing  :: [TrailingAnn]
+      }
+  | NameAnnQuote {
+      nann_quote     :: RealSrcSpan,
+      nann_quoted    :: ApiAnn' NameAnn,
+      nann_trailing  :: [TrailingAnn]
+      }
+  | NameAnnTrailing {
+      nann_trailing  :: [TrailingAnn]
+      }
+  deriving (Data, Eq)
+
+data NameAdornment
+  = NameParens
+  | NameParensHash
+  | NameBackquotes
+  | NameSquare
+  deriving (Eq, Ord, Data)
+-- Annotations that can occur for a RdrName
+--
+--  AnnVal - when RdrName has adornments
+--    AnnOpenP, AnnCloseP for '(' ')'
+--    AnnBackquote '`' x 2
+--    AnnOpenPH, AnnClosePH for '(#', '#)'
+--    AnnOpenS, AnnCloseS for '[' ']'
+-- AnnRarrow, AnnRarrowU for '->' or unicode version
+--   with
+--    AnnOpenP, AnnCloseP for '(' ')'
+
+-- ---------------------------------------------------------------------
+
+data AnnPragma
+  = AnnPragma {
+      apr_open      :: AddApiAnn,
+      apr_close     :: AddApiAnn,
+      apr_rest      :: [AddApiAnn]
+      } deriving (Data,Eq)
+
+-- ---------------------------------------------------------------------
+
+addTrailingAnnToL :: SrcSpan -> TrailingAnn -> ApiAnnComments -> ApiAnn' AnnList -> ApiAnn' AnnList
+addTrailingAnnToL s t cs ApiAnnNotUsed = ApiAnn (realSrcSpan s) (AnnList Nothing Nothing [] [t]) cs
+addTrailingAnnToL _ t cs n = n { anns = addTrailing (anns n)
+                               , comments = comments n ++ cs }
+  where
+    addTrailing n = n { al_trailing = t : al_trailing n }
+
+addTrailingAnnToA :: SrcSpan -> TrailingAnn -> ApiAnnComments -> ApiAnn' AnnListItem -> ApiAnn' AnnListItem
+addTrailingAnnToA s t cs ApiAnnNotUsed = ApiAnn (realSrcSpan s) (AnnListItem [t]) cs
+addTrailingAnnToA _ t cs n = n { anns = addTrailing (anns n)
+                               , comments = comments n ++ cs }
+  where
+    addTrailing n = n { lann_trailing = t : lann_trailing n }
+
+addTrailingCommaToN :: SrcSpan -> ApiAnn' NameAnn -> RealSrcSpan -> ApiAnn' NameAnn
+addTrailingCommaToN s ApiAnnNotUsed l = ApiAnn (realSrcSpan s) (NameAnnTrailing [AddCommaAnn l]) []
+addTrailingCommaToN _ n l = n { anns = addTrailing (anns n) l }
+  where
+    addTrailing :: NameAnn -> RealSrcSpan -> NameAnn
+    addTrailing n l = n { nann_trailing = AddCommaAnn l : nann_trailing n }
+
+-- ---------------------------------------------------------------------
+
+-- |Helper function (temporary) during transition of names
+--  Discards any annotations
+l2n :: LocatedAn a1 a2 -> LocatedN a2
+l2n (L la a) = L (noAnnSrcSpan (locA la)) a
+
+n2l :: LocatedN a -> LocatedA a
+n2l (L la a) = L (na2la la) a
+
+-- |Helper function (temporary) during transition of names
+--  Discards any annotations
+-- la2na :: SrcSpanAnn -> SrcSpanAnnName
+la2na :: SrcSpanAnn' a -> SrcSpanAnnName
+la2na l = noAnnSrcSpan (locA l)
+
+-- |Helper function (temporary) during transition of names
+--  Discards any annotations
+la2la :: LocatedAn ann1 a2 -> LocatedAn ann2 a2
+la2la (L la a) = L (noAnnSrcSpan (locA la)) a
+
+-- l2l :: SrcSpanAnn' a -> SrcSpanAnn' b
+l2l :: SrcSpanAnn' a -> SrcSpanAnn' (ApiAnn' ann)
+l2l l = noAnnSrcSpan (locA l)
+
+-- |Helper function (temporary) during transition of names
+--  Discards any annotations
+-- na2la :: SrcSpanAnnName -> SrcSpanAnn
+na2la :: SrcSpanAnn' a -> SrcSpanAnn' (ApiAnn' ann)
+na2la l = noAnnSrcSpan (locA l)
+
+-- ---------------------------------------------------------------------
+
+realSrcSpan :: SrcSpan -> RealSrcSpan
+realSrcSpan (RealSrcSpan s _) = s
+-- realSrcSpan _ = panic "expecting RealSrcSpan"
+realSrcSpan _ = mkRealSrcSpan l l -- AZ temporary
+  where
+    l = mkRealSrcLoc (fsLit "foo") (-1) (-1)
+
+la2r :: SrcSpanAnn' a -> RealSrcSpan
+la2r l = realSrcSpan (locA l)
+
+extraToAnnList :: AnnList -> [AddApiAnn] -> AnnList
+extraToAnnList (AnnList o c e t) as = AnnList o c (e++as) t
+
+reAnn :: [TrailingAnn] -> ApiAnnComments -> Located a -> LocatedA a
+reAnn anns cs (L l a) = L (SrcSpanAnn (ApiAnn (realSrcSpan l) (AnnListItem anns) cs) l) a
+
+reAnnC :: AnnContext -> ApiAnnComments -> Located a -> LocatedC a
+reAnnC anns cs (L l a) = L (SrcSpanAnn (ApiAnn (realSrcSpan l) anns cs) l) a
+
+-- reAnnL :: AnnList -> ApiAnnComments -> Located a -> LocatedL a
+reAnnL :: ann -> ApiAnnComments -> Located e -> GenLocated (SrcSpanAnn' (ApiAnn' ann)) e
+reAnnL anns cs (L l a) = L (SrcSpanAnn (ApiAnn (realSrcSpan l) anns cs) l) a
+
+noLocA :: a -> LocatedAn an a
+noLocA = L (SrcSpanAnn ApiAnnNotUsed noSrcSpan)
+
+getLocA :: GenLocated (SrcSpanAnn' a) e -> SrcSpan
+getLocA (L (SrcSpanAnn _ l) _) = l
+
+getLocAnn :: Located a  -> SrcSpanAnnA
+getLocAnn (L l _) = SrcSpanAnn ApiAnnNotUsed l
+
+noAnnSrcSpan :: SrcSpan -> SrcSpanAnn' (ApiAnn' ann)
+noAnnSrcSpan l = SrcSpanAnn ApiAnnNotUsed l
+
+noSrcSpanA :: SrcSpanAnn' (ApiAnn' ann)
+noSrcSpanA = noAnnSrcSpan noSrcSpan
+
+reLoc :: LocatedAn a e -> Located e
+reLoc (L (SrcSpanAnn _ l) a) = L l a
+
+reLocA :: Located e -> LocatedAn ann e
+reLocA (L l a) = (L (SrcSpanAnn ApiAnnNotUsed l) a)
+
+reLocL :: LocatedN e -> LocatedA e
+reLocL (L l a) = (L (na2la l) a)
+
+reLocN :: LocatedN a -> Located a
+reLocN (L (SrcSpanAnn _ l) a) = L l a
+
+noAnn :: ApiAnn' a
+noAnn = ApiAnnNotUsed
+
+-- TODO:AZ combining anchor locations needs to be done properly.  Or
+-- this function discarded.
+addAnns :: ApiAnn -> [AddApiAnn] -> ApiAnnComments -> ApiAnn
+addAnns (ApiAnn l as1 cs) as2 cs2
+  = ApiAnn (widenRealSpan l (as1 ++ as2)) (as1 ++ as2) (cs ++ cs2)
+addAnns ApiAnnNotUsed [] [] = ApiAnnNotUsed
+addAnns ApiAnnNotUsed as cs = ApiAnn placeholderRealSpan as cs
+
+-- AZ:TODO use widenSpan here too
+addAnnsA :: SrcSpanAnnA -> [TrailingAnn] -> ApiAnnComments -> SrcSpanAnnA
+addAnnsA (SrcSpanAnn (ApiAnn l as1 cs) loc) as2 cs2
+  = SrcSpanAnn (ApiAnn l (AnnListItem (lann_trailing as1 ++ as2)) (cs ++ cs2)) loc
+addAnnsA (SrcSpanAnn ApiAnnNotUsed loc) [] []
+  = SrcSpanAnn ApiAnnNotUsed loc
+addAnnsA (SrcSpanAnn ApiAnnNotUsed loc) as cs
+  = SrcSpanAnn (ApiAnn (realSrcSpan loc) (AnnListItem as) cs) loc
+
+-- | The annotations need to all come after the anchor.  Make sure
+-- this is the case.
+widenSpan :: SrcSpan -> [AddApiAnn] -> SrcSpan
+widenSpan s as = foldl combineSrcSpans s ss
+  where
+    ss = map (\(AddApiAnn _ s) -> RealSrcSpan s Nothing) as
+
+-- | The annotations need to all come after the anchor.  Make sure
+-- this is the case.
+widenRealSpan :: RealSrcSpan -> [AddApiAnn] -> RealSrcSpan
+widenRealSpan s as = foldl combineRealSrcSpans s ss
+  where
+    ss = map (\(AddApiAnn _ s) -> s) as
+
+widenLocatedAn :: SrcSpanAnn' an -> [AddApiAnn] -> SrcSpanAnn' an
+widenLocatedAn (SrcSpanAnn a l) as = SrcSpanAnn a (widenSpan l as)
+
+apiAnnAnnsL :: ApiAnn' a -> [a]
+apiAnnAnnsL ApiAnnNotUsed = []
+apiAnnAnnsL (ApiAnn _ anns _) = [anns]
+
+apiAnnAnns :: ApiAnn -> [AddApiAnn]
+apiAnnAnns ApiAnnNotUsed = []
+apiAnnAnns (ApiAnn _ anns _) = anns
+
+annParen2AddApiAnn :: ApiAnn' AnnParen -> [AddApiAnn]
+annParen2AddApiAnn ApiAnnNotUsed = []
+annParen2AddApiAnn (ApiAnn _ (AnnParen pt o c) _)
+  = [AddApiAnn ai o, AddApiAnn ac c]
+  where
+    (ai,ac) = parenTypeKws pt
+
+parenTypeKws :: ParenType -> (AnnKeywordId, AnnKeywordId)
+parenTypeKws AnnParens       = (AnnOpenP, AnnCloseP)
+parenTypeKws AnnParensHash   = (AnnOpenPH, AnnClosePH)
+parenTypeKws AnnParensSquare = (AnnOpenS, AnnCloseS)
+
+
+apiAnnComments :: ApiAnn' an -> ApiAnnComments
+apiAnnComments ApiAnnNotUsed = []
+apiAnnComments (ApiAnn _ _ cs) = cs
+
+instance (Semigroup an) => Semigroup (SrcSpanAnn' an) where
+  (SrcSpanAnn a1 l1) <> (SrcSpanAnn a2 l2) = SrcSpanAnn (a1 <> a2) (combineSrcSpans l1 l2)
+   -- The critical part about the location is its left edge, and all
+   -- annotations must follow it. So we combine them which yields the
+   -- largest span
+
+instance (Semigroup a) => Semigroup (ApiAnn' a) where
+  ApiAnnNotUsed <> x = x
+  x <> ApiAnnNotUsed = x
+  (ApiAnn l1 a1 b1) <> (ApiAnn l2 a2 b2) = ApiAnn (combineRealSrcSpans l1 l2) (a1 <> a2) (b1 <> b2)
+   -- The critical part about the anchor is its left edge, and all
+   -- annotations must follow it. So we combine them which yields the
+   -- largest span
+
+
+instance (Monoid a) => Monoid (ApiAnn' a) where
+  mempty = ApiAnnNotUsed
+
+instance Semigroup AnnListItem where
+  (AnnListItem l1) <> (AnnListItem l2) = AnnListItem (l1 <> l2)
+
+instance (Outputable a) => Outputable (ApiAnn' a) where
+  ppr (ApiAnn l a c)  = text "ApiAnn" <+> ppr l <+> ppr a <+> ppr c
+  ppr ApiAnnNotUsed = text "ApiAnnNotUsed"
+
+instance (NamedThing (Located a)) => NamedThing (LocatedAn an a) where
+  getName (L l a) = getName (L (locA l) a)
+
+instance Outputable AnnContext where
+  ppr (AnnContext a o c) = text "AnnContext" <+> ppr a <+> ppr o <+> ppr c
+
+instance Outputable IsUnicodeSyntax where
+  ppr = text . show
+
+instance Binary a => Binary (LocatedL a) where
+  -- We do not serialise the annotations
+    put_ bh (L l x) = do
+            put_ bh (locA l)
+            put_ bh x
+
+    get bh = do
+            l <- get bh
+            x <- get bh
+            return (L (noAnnSrcSpan l) x)

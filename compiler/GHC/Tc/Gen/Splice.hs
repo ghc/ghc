@@ -204,7 +204,7 @@ tcTypedBracket rn_expr brack@(TExpBr _ expr) res_ty
                        rn_expr
                        (unLoc (mkHsApp (mkLHsWrap (applyQuoteWrapper wrapper)
                                                   (nlHsTyApp texpco [rep, expr_ty]))
-                                      (noLoc (HsTcBracketOut noExtField (Just wrapper) brack ps'))))
+                                      (noLocA (HsTcBracketOut noExtField (Just wrapper) brack ps'))))
                        meta_ty res_ty }
 tcTypedBracket _ other_brack _
   = pprPanic "tcTypedBracket" (ppr other_brack)
@@ -587,7 +587,7 @@ generated code as FromSource to enable warnings. That effort is tracked in
 
 tcSpliceExpr splice@(HsTypedSplice _ _ name expr) res_ty
   = addErrCtxt (spliceCtxtDoc splice) $
-    setSrcSpan (getLoc expr)    $ do
+    setSrcSpan (getLocA expr)    $ do
     { stage <- getStage
     ; case stage of
           Splice {}            -> tcTopSplice expr res_ty
@@ -634,7 +634,7 @@ tcNestedSplice pop_stage (TcPending ps_var lie_var q@(QuoteWrapper _ m_var)) spl
        -- But we still return a plausible expression
        --   (a) in case we print it in debug messages, and
        --   (b) because we test whether it is tagToEnum in Tc.Gen.Expr.tcApp
-       ; return (HsSpliceE noExtField $
+       ; return (HsSpliceE noAnn $
                  HsSpliced noExtField (ThModFinalizers []) $
                  HsSplicedExpr (unLoc expr'')) }
 
@@ -655,7 +655,7 @@ tcTopSplice expr res_ty
        ; lcl_env <- getLclEnv
        ; let delayed_splice
               = DelayedSplice lcl_env expr res_ty q_expr
-       ; return (HsSpliceE noExtField (XSplice (HsSplicedT delayed_splice)))
+       ; return (HsSpliceE noAnn (XSplice (HsSplicedT delayed_splice)))
 
        }
 
@@ -765,10 +765,11 @@ runAnnotation target expr = do
                 -- LIE consulted by tcTopSpliceExpr
                 -- and hence ensures the appropriate dictionary is bound by const_binds
               ; wrapper <- instCall AnnOrigin [expr_ty] [mkClassPred data_class [expr_ty]]
+              ; let loc' = noAnnSrcSpan loc
               ; let specialised_to_annotation_wrapper_expr
-                      = L loc (mkHsWrap wrapper
-                                 (HsVar noExtField (L loc to_annotation_wrapper_id)))
-              ; return (L loc (HsApp noExtField
+                      = L loc' (mkHsWrap wrapper
+                                 (HsVar noExtField (L (noAnnSrcSpan loc) to_annotation_wrapper_id)))
+              ; return (L loc' (HsApp noComments
                                 specialised_to_annotation_wrapper_expr expr'))
                                 })
 
@@ -948,7 +949,7 @@ runMeta' show_code ppr_hs run_and_convert expr
                 -- encounter them inside the try
                 --
                 -- See Note [Exceptions in TH]
-          let expr_span = getLoc expr
+          let expr_span = getLocA expr
         ; either_tval <- tryAllM $
                          setSrcSpan expr_span $ -- Set the span so that qLocation can
                                                 -- see where this splice is
