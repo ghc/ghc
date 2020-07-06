@@ -425,7 +425,6 @@ PACKAGES_STAGE0 += terminfo
 endif
 
 PACKAGES_STAGE1 += ghc-prim
-PACKAGES_STAGE1 += ghc-bignum
 PACKAGES_STAGE1 += base
 PACKAGES_STAGE1 += filepath
 PACKAGES_STAGE1 += array
