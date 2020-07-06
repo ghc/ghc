@@ -103,7 +103,7 @@ dsForeigns' fos = do
              (vcat cs $$ fe_init_code),
             foldr (appOL . toOL) nilOL bindss)
   where
-   do_ldecl (L loc decl) = putSrcSpanDs loc (do_decl decl)
+   do_ldecl (L loc decl) = putSrcSpanDs (locA loc) (do_decl decl)
 
    do_decl :: ForeignDecl GhcTc -> DsM (SDoc, SDoc, [Id], [Binding])
    do_decl (ForeignImport { fd_name = id, fd_i_ext = co, fd_fi = spec }) = do
