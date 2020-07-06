@@ -807,7 +807,9 @@ candidate.
 
 Outside these two clear cases for ``safe`` and ``unsafe`` foreign functions,
 there is a trade-off between whole-program throughput and efficiency of the
-individual foreign function call.
+individual foreign function call: while ``safe`` calls avoid blocking on
+the foreign call, they incur context switching overhead which may be
+significant for short function calls.
 
 If you are making foreign calls from multiple Haskell threads and using
 :ghc-flag:`-threaded`, make sure that the foreign code you are calling is
