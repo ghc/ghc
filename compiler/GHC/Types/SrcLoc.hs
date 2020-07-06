@@ -49,6 +49,7 @@ module GHC.Types.SrcLoc (
         realSrcSpanStart, realSrcSpanEnd,
         srcSpanFileName_maybe,
         pprUserRealSpan, pprUnhelpfulSpanReason,
+        pprUserSpan,
         unhelpfulSpanFS,
 
         -- ** Unsafely deconstructing SrcSpan
@@ -58,7 +59,7 @@ module GHC.Types.SrcLoc (
         srcSpanStartCol, srcSpanEndCol,
 
         -- ** Predicates on SrcSpan
-        isGoodSrcSpan, isOneLineSpan,
+        isGoodSrcSpan, isOneLineSpan, isZeroWidthSpan,
         containsSpan,
 
         -- * StringBuffer locations
@@ -79,6 +80,7 @@ module GHC.Types.SrcLoc (
         -- ** Deconstructing Located
         getLoc, unLoc,
         unRealSrcSpan, getRealSrcSpan,
+        pprLocated,
 
         -- ** Modifying Located
         mapLoc,
@@ -102,6 +104,7 @@ module GHC.Types.SrcLoc (
         psSpanStart,
         psSpanEnd,
         mkSrcSpanPs,
+        combineRealSrcSpans,
 
         -- * Layout information
         LayoutInfo(..),
@@ -543,6 +546,14 @@ isOneLineSpan :: SrcSpan -> Bool
 isOneLineSpan (RealSrcSpan s _) = srcSpanStartLine s == srcSpanEndLine s
 isOneLineSpan (UnhelpfulSpan _) = False
 
+isZeroWidthSpan :: SrcSpan -> Bool
+-- ^ True if the span has a width of zero, as returned for "virtual"
+-- semicolons in the lexer.
+-- For "bad" 'SrcSpan', it returns False
+isZeroWidthSpan (RealSrcSpan s _) = srcSpanStartLine s == srcSpanEndLine s
+                                 && srcSpanStartCol s == srcSpanEndCol s
+isZeroWidthSpan (UnhelpfulSpan _) = False
+
 -- | Tests whether the first span "contains" the other span, meaning
 -- that it covers at least as much source code. True where spans are equal.
 containsSpan :: RealSrcSpan -> RealSrcSpan -> Bool
@@ -764,8 +775,22 @@ cmpBufSpan (L l1 _) (L l2  _)
 
   | otherwise = panic "cmpBufSpan: no BufSpan"
 
-instance (Outputable l, Outputable e) => Outputable (GenLocated l e) where
-  ppr (L l e) = -- TODO: We can't do this since Located was refactored into
+-- instance (Outputable l, Outputable e) => Outputable (GenLocated l e) where
+instance (Outputable e) => Outputable (Located e) where
+  ppr (L l e) = -- GenLocated:
+                -- Print spans without the file name etc
+                whenPprDebug (braces (pprUserSpan False l))
+             $$ ppr e
+instance (Outputable e) => Outputable (GenLocated RealSrcSpan e) where
+  ppr (L l e) = -- GenLocated:
+                -- Print spans without the file name etc
+                whenPprDebug (braces (pprUserSpan False (RealSrcSpan l Nothing)))
+             $$ ppr e
+
+
+pprLocated :: (Outputable l, Outputable e) => GenLocated l e -> SDoc
+pprLocated (L l e) =
+                -- TODO: We can't do this since Located was refactored into
                 -- GenLocated:
                 -- Print spans without the file name etc
                 -- ifPprDebug (braces (pprUserSpan False l))

@@ -1405,13 +1405,13 @@ instance Binary WarningTxt where
                       return (DeprecatedTxt s d)
 
 instance Binary StringLiteral where
-  put_ bh (StringLiteral st fs) = do
+  put_ bh (StringLiteral st fs _) = do
             put_ bh st
             put_ bh fs
   get bh = do
             st <- get bh
             fs <- get bh
-            return (StringLiteral st fs)
+            return (StringLiteral st fs Nothing)
 
 instance Binary a => Binary (Located a) where
     put_ bh (L l x) = do

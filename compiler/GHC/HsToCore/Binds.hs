@@ -108,7 +108,7 @@ dsTopLHsBinds binds
     bang_binds     = filterBag (isBangedHsBind   . unLoc) binds
 
     top_level_err desc (L loc bind)
-      = putSrcSpanDs loc $
+      = putSrcSpanDs (locA loc) $
         errDs (hang (text "Top-level" <+> text desc <+> text "aren't allowed:")
                   2 (ppr bind))
 
@@ -125,7 +125,7 @@ dsLHsBinds binds
 dsLHsBind :: LHsBind GhcTc
           -> DsM ([Id], [(Id,CoreExpr)])
 dsLHsBind (L loc bind) = do dflags <- getDynFlags
-                            putSrcSpanDs loc $ dsHsBind dflags bind
+                            putSrcSpanDs (locA loc) $ dsHsBind dflags bind
 
 -- | Desugar a single binding (or group of recursive binds).
 dsHsBind :: DynFlags
@@ -660,11 +660,11 @@ dsSpecs poly_rhs (SpecPrags sps)
 dsSpec :: Maybe CoreExpr        -- Just rhs => RULE is for a local binding
                                 -- Nothing => RULE is for an imported Id
                                 --            rhs is in the Id's unfolding
-       -> Located TcSpecPrag
+       -> LocatedA TcSpecPrag
        -> DsM (Maybe (OrdList (Id,CoreExpr), CoreRule))
 dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
   | isJust (isClassOpId_maybe poly_id)
-  = putSrcSpanDs loc $
+  = putSrcSpanDsA loc $
     do { warnDs NoReason (text "Ignoring useless SPECIALISE pragma for class method selector"
                           <+> quotes (ppr poly_id))
        ; return Nothing  }  -- There is no point in trying to specialise a class op
@@ -672,14 +672,14 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
                             -- (it would be Just 0) and that in turn makes makeCorePair bleat
 
   | no_act_spec && isNeverActive rule_act
-  = putSrcSpanDs loc $
+  = putSrcSpanDsA loc $
     do { warnDs NoReason (text "Ignoring useless SPECIALISE pragma for NOINLINE function:"
                           <+> quotes (ppr poly_id))
        ; return Nothing  }  -- Function is NOINLINE, and the specialisation inherits that
                             -- See Note [Activation pragmas for SPECIALISE]
 
   | otherwise
-  = putSrcSpanDs loc $
+  = putSrcSpanDsA loc $
     do { uniq <- newUnique
        ; let poly_name = idName poly_id
              spec_occ  = mkSpecOcc (getOccName poly_name)

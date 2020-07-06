@@ -119,7 +119,7 @@ import GHC.Prelude
 import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Types.SrcLoc ( Located,unLoc )
+import GHC.Types.SrcLoc ( Located,unLoc,RealSrcSpan )
 import Data.Data hiding (Fixity, Prefix, Infix)
 import Data.Function (on)
 import Data.Bits
@@ -430,11 +430,17 @@ instance Outputable FunctionOrData where
 data StringLiteral = StringLiteral
                        { sl_st :: SourceText, -- literal raw source.
                                               -- See not [Literal source text]
-                         sl_fs :: FastString  -- literal string value
+                         sl_fs :: FastString, -- literal string value
+                         sl_tc :: Maybe RealSrcSpan -- Location of
+                                                    -- possible
+                                                    -- trailing comma
+                       -- AZ: if we could have a LocatedA
+                       -- StringLiteral we would not need sl_tc, but
+                       -- that would cause import loops.
                        } deriving Data
 
 instance Eq StringLiteral where
-  (StringLiteral _ a) == (StringLiteral _ b) = a == b
+  (StringLiteral _ a _) == (StringLiteral _ b _) = a == b
 
 instance Outputable StringLiteral where
   ppr sl = pprWithSourceText (sl_st sl) (ftext $ sl_fs sl)
@@ -442,20 +448,20 @@ instance Outputable StringLiteral where
 -- | Warning Text
 --
 -- reason/explanation from a WARNING or DEPRECATED pragma
-data WarningTxt = WarningTxt (Located SourceText)
+data WarningTxt = WarningTxt SourceText
                              [Located StringLiteral]
-                | DeprecatedTxt (Located SourceText)
+                | DeprecatedTxt SourceText
                                 [Located StringLiteral]
     deriving (Eq, Data)
 
 instance Outputable WarningTxt where
-    ppr (WarningTxt    lsrc ws)
-      = case unLoc lsrc of
+    ppr (WarningTxt    src ws)
+      = case src of
           NoSourceText   -> pp_ws ws
           SourceText src -> text src <+> pp_ws ws <+> text "#-}"
 
-    ppr (DeprecatedTxt lsrc  ds)
-      = case unLoc lsrc of
+    ppr (DeprecatedTxt src  ds)
+      = case src of
           NoSourceText   -> pp_ws ds
           SourceText src -> text src <+> pp_ws ds <+> text "#-}"
 
@@ -574,6 +580,7 @@ instance Outputable LexicalFixity where
 data TopLevelFlag
   = TopLevel
   | NotTopLevel
+  deriving Data
 
 isTopLevel, isNotTopLevel :: TopLevelFlag -> Bool
 

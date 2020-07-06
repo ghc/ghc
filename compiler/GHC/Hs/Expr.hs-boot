@@ -13,7 +13,7 @@ module GHC.Hs.Expr where
 import GHC.Utils.Outputable ( SDoc, Outputable )
 import {-# SOURCE #-} GHC.Hs.Pat  ( LPat )
 import GHC.Types.Basic  ( SpliceExplicitFlag(..))
-import GHC.Hs.Extension ( OutputableBndrId, GhcPass, XRec )
+import GHC.Hs.Extension (OutputableBndrId, GhcPass, XRec )
 import Data.Kind  ( Type )
 
 type role HsExpr nominal
@@ -28,10 +28,12 @@ data MatchGroup (a :: Type) (body :: Type)
 data GRHSs (a :: Type) (body :: Type)
 type family SyntaxExpr (i :: Type)
 
-instance OutputableBndrId p => Outputable (HsExpr (GhcPass p))
-instance OutputableBndrId p => Outputable (HsCmd (GhcPass p))
+instance (OutputableBndrId p) => Outputable (HsExpr (GhcPass p))
+instance (OutputableBndrId p) => Outputable (HsCmd (GhcPass p))
 
 type LHsExpr a = XRec a (HsExpr a)
+-- type LHsExpr a = LocatedA (HsExpr a)
+                       -- AZ: old one
 
 pprLExpr :: (OutputableBndrId p) => LHsExpr (GhcPass p) -> SDoc
 
@@ -42,10 +44,9 @@ pprSplice :: (OutputableBndrId p) => HsSplice (GhcPass p) -> SDoc
 pprSpliceDecl ::  (OutputableBndrId p)
           => HsSplice (GhcPass p) -> SpliceExplicitFlag -> SDoc
 
-pprPatBind :: forall bndr p body. (OutputableBndrId bndr,
-                                   OutputableBndrId p,
-                                   Outputable body)
-           => LPat (GhcPass bndr) -> GRHSs (GhcPass p) body -> SDoc
+pprPatBind :: forall bndr p . (OutputableBndrId bndr,
+                               OutputableBndrId p)
+           => LPat (GhcPass bndr) -> GRHSs (GhcPass p) (LHsExpr (GhcPass p)) -> SDoc
 
-pprFunBind :: (OutputableBndrId idR, Outputable body)
-           => MatchGroup (GhcPass idR) body -> SDoc
+pprFunBind :: (OutputableBndrId idR)
+           => MatchGroup (GhcPass idR) (LHsExpr (GhcPass idR)) -> SDoc

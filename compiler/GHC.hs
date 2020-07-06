@@ -274,10 +274,7 @@ module GHC (
         parser,
 
         -- * API Annotations
-        ApiAnns(..),AnnKeywordId(..),AnnotationComment(..), ApiAnnKey,
-        getAnnotation, getAndRemoveAnnotation,
-        getAnnotationComments, getAndRemoveAnnotationComments,
-        unicodeAnn,
+        ApiAnns(..),AnnKeywordId(..),AnnotationComment(..),
 
         -- * Miscellaneous
         --sessionHscEnv,
@@ -357,7 +354,6 @@ import GHC.Types.Basic
 import GHC.Data.FastString
 import qualified GHC.Parser as Parser
 import GHC.Parser.Lexer
-import GHC.Parser.Annotation
 import GHC.Parser.Errors.Ppr
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Types.Name.Env
