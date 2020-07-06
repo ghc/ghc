@@ -45,3 +45,9 @@ T9905b:
 # Ensure that ghc -e does not output extra messages about GHCi configuration files
 T11478:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -ghci-script T11478.script -e 3
+
+T15617a:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -fobject-code -O2 -e "let a = show 5 in a"
+
+T15617b:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -fobject-code -O2 -e "a = show 5"
