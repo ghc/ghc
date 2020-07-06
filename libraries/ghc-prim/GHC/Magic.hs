@@ -74,9 +74,9 @@ noinline x = x
 --
 -- Only used to encode strictiness signature for absentError
 -- TODO: Explain better.
-{-# INLINE impossible #-}
+{-# NOINLINE impossible #-}
 impossible :: a -> a
-impossible x = impossible x
+impossible x = x
 
 -- | The 'lazy' function restrains strictness analysis a little. The
 -- call @lazy e@ means the same as @e@, but 'lazy' has a magical

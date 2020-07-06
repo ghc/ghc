@@ -1,6 +1,7 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# OPTIONS -O1 #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -106,6 +107,7 @@ import GHC.Exception
 import GHC.Show
 -- import GHC.Exception hiding ( Exception )
 import GHC.Conc.Sync
+import GHC.Magic
 
 import Data.Either
 
@@ -383,7 +385,12 @@ recSelError, recConError, runtimeError,
 recSelError              s = throw (RecSelError ("No match in record selector "
                                                  ++ unpackCStringUtf8# s))  -- No location info unfortunately
 runtimeError             s = errorWithoutStackTrace (unpackCStringUtf8# s)                   -- No location info unfortunately
-absentError              s = errorWithoutStackTrace ("Oops!  Entered absent arg " ++ unpackCStringUtf8# s)
+
+-- We don't inline absentError to preserve it's built in magic strictness information.
+-- The nice thing is that it's beneficial anyway. The code is "never" executed so not
+-- inlining is even beneficial as it decreases code size!
+{-# NOINLINE absentError #-}
+absentError              s = impossible $ errorWithoutStackTrace ("Oops!  Entered absent arg " ++ unpackCStringUtf8# s)
 
 nonExhaustiveGuardsError s = throw (PatternMatchFail (untangle s "Non-exhaustive guards in"))
 recConError              s = throw (RecConError      (untangle s "Missing field in record construction"))
