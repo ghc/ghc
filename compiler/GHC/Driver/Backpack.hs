@@ -695,6 +695,7 @@ summariseRequirement pn mod_name = do
         ms_textual_imps = extra_sig_imports,
         ms_parsed_mod = Just (HsParsedModule {
                 hpm_module = L loc (HsModule {
+                        hsmodAnn = noAnn,
                         hsmodName = Just (L loc mod_name),
                         hsmodExports = Nothing,
                         hsmodImports = [],
@@ -703,7 +704,7 @@ summariseRequirement pn mod_name = do
                         hsmodHaddockModHeader = Nothing
                     }),
                 hpm_src_files = [],
-                hpm_annotations = ApiAnns Map.empty Nothing Map.empty []
+                hpm_annotations = ApiAnns Nothing []
             }),
         ms_hspp_file = "", -- none, it came inline
         ms_hspp_opts = dflags,
@@ -813,7 +814,7 @@ hsModuleToModSummary pn hsc_src modname
             ms_parsed_mod = Just (HsParsedModule {
                     hpm_module = hsmod,
                     hpm_src_files = [], -- TODO if we preprocessed it
-                    hpm_annotations = ApiAnns Map.empty Nothing Map.empty [] -- BOGUS
+                    hpm_annotations = ApiAnns Nothing [] -- BOGUS
                 }),
             ms_hs_date = time,
             ms_obj_date = Nothing, -- TODO do this, but problem: hi_timestamp is BOGUS

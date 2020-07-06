@@ -75,6 +75,7 @@ import GHC.Types.SrcLoc
 import GHC.Data.Bag -- collect ev vars from pats
 import GHC.Data.Maybe
 import GHC.Types.Name (Name)
+import GHC.Parser.Annotation
 -- libraries:
 import Data.Data hiding (TyCon,Fixity)
 
@@ -93,7 +94,7 @@ data Pat p
 
        -- AZ:TODO above comment needs to be updated
   | VarPat      (XVarPat p)
-                (Located (IdP p))  -- ^ Variable Pattern
+                (LocatedN (IdP p))  -- ^ Variable Pattern
 
                              -- See Note [Located RdrNames] in GHC.Hs.Expr
   | LazyPat     (XLazyPat p)
@@ -103,7 +104,7 @@ data Pat p
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | AsPat       (XAsPat p)
-                (Located (IdP p)) (LPat p)    -- ^ As pattern
+                (LocatedN (IdP p)) (LPat p)    -- ^ As pattern
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnAt'
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
@@ -176,7 +177,7 @@ data Pat p
         ------------ Constructor patterns ---------------
   | ConPat {
         pat_con_ext :: XConPat p,
-        pat_con     :: Located (ConLikeP p),
+        pat_con     :: LocatedN (ConLikeP p),
         pat_args    :: HsConPatDetails p
     }
     -- ^ Constructor Pattern
@@ -224,7 +225,7 @@ data Pat p
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | NPlusKPat       (XNPlusKPat p)           -- Type of overall pattern
-                    (Located (IdP p))        -- n+k pattern
+                    (LocatedA (IdP p))       -- n+k pattern
                     (Located (HsOverLit p))  -- It'll always be an HsIntegral
                     (HsOverLit p)            -- See Note [NPlusK patterns] in GHC.Tc.Gen.Pat
                      -- NB: This could be (PostTc ...), but that induced a
@@ -262,31 +263,41 @@ type instance XWildPat GhcRn = NoExtField
 type instance XWildPat GhcTc = Type
 
 type instance XVarPat  (GhcPass _) = NoExtField
-type instance XLazyPat (GhcPass _) = NoExtField
-type instance XAsPat   (GhcPass _) = NoExtField
-type instance XParPat  (GhcPass _) = NoExtField
-type instance XBangPat (GhcPass _) = NoExtField
+
+type instance XLazyPat GhcPs = ApiAnn -- For '~'
+type instance XLazyPat GhcRn = NoExtField
+type instance XLazyPat GhcTc = NoExtField
+
+type instance XAsPat   GhcPs = ApiAnn -- For '@'
+type instance XAsPat   GhcRn = NoExtField
+type instance XAsPat   GhcTc = NoExtField
+
+type instance XParPat  (GhcPass _) = ApiAnn' AnnParen
+
+type instance XBangPat GhcPs = ApiAnn -- For '!'
+type instance XBangPat GhcRn = NoExtField
+type instance XBangPat GhcTc = NoExtField
 
 -- Note: XListPat cannot be extended when using GHC 8.0.2 as the bootstrap
 -- compiler, as it triggers https://gitlab.haskell.org/ghc/ghc/issues/14396 for
 -- `SyntaxExpr`
-type instance XListPat GhcPs = NoExtField
+type instance XListPat GhcPs = ApiAnn' AnnList
 type instance XListPat GhcRn = Maybe (SyntaxExpr GhcRn)
 type instance XListPat GhcTc = ListPatTc
 
-type instance XTuplePat GhcPs = NoExtField
+type instance XTuplePat GhcPs = ApiAnn
 type instance XTuplePat GhcRn = NoExtField
 type instance XTuplePat GhcTc = [Type]
 
-type instance XConPat GhcPs = NoExtField
-type instance XConPat GhcRn = NoExtField
-type instance XConPat GhcTc = ConPatTc
-
-type instance XSumPat GhcPs = NoExtField
+type instance XSumPat GhcPs = ApiAnn
 type instance XSumPat GhcRn = NoExtField
 type instance XSumPat GhcTc = [Type]
 
-type instance XViewPat GhcPs = NoExtField
+type instance XConPat GhcPs = ApiAnn
+type instance XConPat GhcRn = NoExtField
+type instance XConPat GhcTc = ConPatTc
+
+type instance XViewPat GhcPs = ApiAnn
 type instance XViewPat GhcRn = NoExtField
 type instance XViewPat GhcTc = Type
 
@@ -297,11 +308,11 @@ type instance XNPat GhcPs = NoExtField
 type instance XNPat GhcRn = NoExtField
 type instance XNPat GhcTc = Type
 
-type instance XNPlusKPat GhcPs = NoExtField
+type instance XNPlusKPat GhcPs = ApiAnn
 type instance XNPlusKPat GhcRn = NoExtField
 type instance XNPlusKPat GhcTc = Type
 
-type instance XSigPat GhcPs = NoExtField
+type instance XSigPat GhcPs = ApiAnn
 type instance XSigPat GhcRn = NoExtField
 type instance XSigPat GhcTc = Type
 
@@ -400,13 +411,13 @@ data HsRecFields p arg         -- A bunch of record fields
 --                     and the remainder being 'filled in' implicitly
 
 -- | Located Haskell Record Field
-type LHsRecField' p arg = Located (HsRecField' p arg)
+type LHsRecField' p arg = LocatedA (HsRecField' p arg)
 
 -- | Located Haskell Record Field
-type LHsRecField  p arg = Located (HsRecField  p arg)
+type LHsRecField  p arg = LocatedA (HsRecField  p arg)
 
 -- | Located Haskell Record Update Field
-type LHsRecUpdField p   = Located (HsRecUpdField p)
+type LHsRecUpdField p   = LocatedA (HsRecUpdField p)
 
 -- | Haskell Record Field
 type HsRecField    p arg = HsRecField' (FieldOcc p) arg
@@ -420,6 +431,7 @@ type HsRecUpdField p     = HsRecField' (AmbiguousFieldOcc p) (LHsExpr p)
 --
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 data HsRecField' id arg = HsRecField {
+        hsRecFieldAnn :: ApiAnn,
         hsRecFieldLbl :: Located id,
         hsRecFieldArg :: arg,           -- ^ Filled in by renamer when punning
         hsRecPun      :: Bool           -- ^ Note [Punning]
@@ -649,23 +661,23 @@ mkPrefixConPat :: DataCon ->
                   [LPat GhcTc] -> [Type] -> LPat GhcTc
 -- Make a vanilla Prefix constructor pattern
 mkPrefixConPat dc pats tys
-  = noLoc $ ConPat { pat_con = noLoc (RealDataCon dc)
-                   , pat_args = PrefixCon pats
-                   , pat_con_ext = ConPatTc
-                     { cpt_tvs = []
-                     , cpt_dicts = []
-                     , cpt_binds = emptyTcEvBinds
-                     , cpt_arg_tys = tys
-                     , cpt_wrap = idHsWrapper
-                     }
-                   }
+  = noLocA $ ConPat { pat_con = noLocA (RealDataCon dc)
+                    , pat_args = PrefixCon pats
+                    , pat_con_ext = ConPatTc
+                      { cpt_tvs = []
+                      , cpt_dicts = []
+                      , cpt_binds = emptyTcEvBinds
+                      , cpt_arg_tys = tys
+                      , cpt_wrap = idHsWrapper
+                      }
+                    }
 
 mkNilPat :: Type -> LPat GhcTc
 mkNilPat ty = mkPrefixConPat nilDataCon [] [ty]
 
 mkCharLitPat :: SourceText -> Char -> LPat GhcTc
 mkCharLitPat src c = mkPrefixConPat charDataCon
-                          [noLoc $ LitPat noExtField (HsCharPrim src c)] []
+                          [noLocA $ LitPat noExtField (HsCharPrim src c)] []
 
 {-
 ************************************************************************
@@ -877,7 +889,7 @@ parenthesizePat :: IsPass p
                 -> LPat (GhcPass p)
                 -> LPat (GhcPass p)
 parenthesizePat p lpat@(L loc pat)
-  | patNeedsParens p pat = L loc (ParPat noExtField lpat)
+  | patNeedsParens p pat = L loc (ParPat noAnn lpat)
   | otherwise            = lpat
 
 {-

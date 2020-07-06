@@ -22,7 +22,7 @@ import Data.Char
 
 -- | Source Statistics
 ppSourceStats :: Bool -> Located HsModule -> SDoc
-ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
+ppSourceStats short (L _ (HsModule _ _ exports imports ldecls _ _))
   = (if short then hcat else vcat)
         (map pp_val
             [("ExportAll        ", export_all), -- 1 if no export list
@@ -136,7 +136,7 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
 
     data_info (DataDecl { tcdDataDefn = HsDataDefn
                                           { dd_cons = cs
-                                          , dd_derivs = L _ derivs}})
+                                          , dd_derivs = derivs}})
         = ( length cs
           , foldl' (\s dc -> length (deriv_clause_tys $ unLoc dc) + s)
                    0 derivs )

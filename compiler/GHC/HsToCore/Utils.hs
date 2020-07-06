@@ -759,7 +759,7 @@ is_triv_pat _            = False
 ********************************************************************* -}
 
 mkLHsPatTup :: [LPat GhcTc] -> LPat GhcTc
-mkLHsPatTup []     = noLoc $ mkVanillaTuplePat [] Boxed
+mkLHsPatTup []     = noLocA $ mkVanillaTuplePat [] Boxed
 mkLHsPatTup [lpat] = lpat
 mkLHsPatTup lpats  = L (getLoc (head lpats)) $
                      mkVanillaTuplePat lpats Boxed
@@ -773,7 +773,7 @@ mkBigLHsVarTupId :: [Id] -> LHsExpr GhcTc
 mkBigLHsVarTupId ids = mkBigLHsTupId (map nlHsVar ids)
 
 mkBigLHsTupId :: [LHsExpr GhcTc] -> LHsExpr GhcTc
-mkBigLHsTupId = mkChunkified mkLHsTupleExpr
+mkBigLHsTupId = mkChunkified (\e -> mkLHsTupleExpr e noExtField)
 
 -- The Big equivalents for the source tuple patterns
 mkBigLHsVarPatTupId :: [Id] -> LPat GhcTc

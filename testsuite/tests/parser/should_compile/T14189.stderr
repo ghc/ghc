@@ -18,7 +18,7 @@
          (True)
          {NameSet:
           [{Name: GHC.Types.Int}]})
-        ({ T14189.hs:6:6-11 }
+        (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:6:6-11 }
          {Name: T14189.MyType})
         (HsQTvs
          []
@@ -34,7 +34,7 @@
          [({ T14189.hs:6:15-20 }
            (ConDeclH98
             (NoExtField)
-            ({ T14189.hs:6:15-16 }
+            (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:6:15-16 }
              {Name: T14189.MT})
             ({ <no location info> }
              (False))
@@ -53,7 +53,7 @@
          ,({ T14189.hs:6:24-25 }
            (ConDeclH98
             (NoExtField)
-            ({ T14189.hs:6:24-25 }
+            (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:6:24-25 }
              {Name: T14189.NT})
             ({ <no location info> }
              (False))
@@ -65,7 +65,7 @@
          ,({ T14189.hs:6:29-42 }
            (ConDeclH98
             (NoExtField)
-            ({ T14189.hs:6:29 }
+            (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:6:29 }
              {Name: T14189.F})
             ({ <no location info> }
              (False))
@@ -79,14 +79,14 @@
                  [({ T14189.hs:6:33 }
                    (FieldOcc
                     {Name: T14189.f}
-                    ({ T14189.hs:6:33 }
+                    (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:6:33 }
                      (Unqual
                       {OccName: f}))))]
                  ({ T14189.hs:6:38-40 }
                   (HsTyVar
-                   (NoExtField)
+                   (ApiAnnNotUsed)
                    (NotPromoted)
-                   ({ T14189.hs:6:38-40 }
+                   (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:6:38-40 }
                     {Name: GHC.Types.Int})))
                  (Nothing)))]))
             (Nothing)))]
@@ -123,12 +123,12 @@
        (NoExtField)
        ({ T14189.hs:3:3-8 }
         (IEName
-         ({ T14189.hs:3:3-8 }
+         (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:3:3-8 }
           {Name: T14189.MyType})))
        (NoIEWildcard)
        [({ T14189.hs:3:13-14 }
          (IEName
-          ({ T14189.hs:3:13-14 }
+          (SrcSpanAnn (ApiAnnNotUsed) { T14189.hs:3:13-14 }
            {Name: T14189.NT})))]
        [({ T14189.hs:3:11 }
          (FieldLabel
