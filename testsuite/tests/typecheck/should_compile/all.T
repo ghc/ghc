@@ -626,7 +626,11 @@ test('SplitWD', normal, compile, [''])
 #       (1) Use -fexternal-interpreter, or
 #       (2) Build the program twice: once with -dynamic, and then
 #           with -prof using -osuf to set a different object file suffix.
-test('T14441', omit_ways(['profasm']), compile, [''])
+#
+# Fails for stage1 cross compilers with:
+# Compile failed (exit code 1) errors were:
+# ghc-stage1: Couldn't find a target code interpreter. Try with -fexternal-interpreter
+test('T14441', [when(cross(), skip), omit_ways(['profasm'])], compile, [''])
 test('T15050', normal, compile, [''])
 test('T14735', normal, compile, [''])
 test('T15180', normal, compile, [''])

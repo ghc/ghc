@@ -16,13 +16,13 @@ hsc2hs002:
 hsc2hs003:
 	'$(HSC2HS)' $@.hsc
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make $@
-	./$@
+	'$(TEST_WRAPPER)' ./$@
 
 .PHONY: hsc2hs004
 hsc2hs004:
 	'$(HSC2HS)' --cross-compile $@.hsc
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make $@
-	./$@
+	'$(TEST_WRAPPER)' ./$@
 
 .PHONY: T3837
 T3837:
@@ -33,13 +33,13 @@ T3837:
 T4340:
 	'$(HSC2HS)' $@.hsc
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make $@
-	./$@
+	'$(TEST_WRAPPER)' ./$@
 
 .PHONY: T10272
 T10272:
 	'$(HSC2HS)' --cross-compile $@.hsc
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make $@
-	./$@
+	'$(TEST_WRAPPER)' ./$@
 
 .PHONY: T11004
 T11004:

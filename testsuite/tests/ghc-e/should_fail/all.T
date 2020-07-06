@@ -1,3 +1,5 @@
+setTestOpts([when(cross(), skip) # <command line>: not built for interactive use
+            ])
 test('T7962', req_interp, makefile_test, ['T7962'])
 
 test('T9905fail1', req_interp, makefile_test, ['T9905fail1'])

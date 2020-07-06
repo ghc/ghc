@@ -33,7 +33,7 @@ Capi_Ctype_001:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c Capi_Ctype_A_001.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c Capi_Ctype_001.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) capi_ctype_001_c.o Capi_Ctype_A_001.o Capi_Ctype_001.o -o Capi_Ctype_001
-	./Capi_Ctype_001
+	'$(TEST_WRAPPER)' ./Capi_Ctype_001
 
 .PHONY: Capi_Ctype_002
 Capi_Ctype_002:
@@ -41,11 +41,11 @@ Capi_Ctype_002:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c Capi_Ctype_A_002.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c Capi_Ctype_002.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) Capi_Ctype_A_002.o Capi_Ctype_002.o -o Capi_Ctype_002
-	./Capi_Ctype_002
+	'$(TEST_WRAPPER)' ./Capi_Ctype_002
 
 .PHONY: T15933
 T15933:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T15933_c.c
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T15933.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) T15933_c.o T15933.o -o T15933
-	./T15933
+	'$(TEST_WRAPPER)' ./T15933

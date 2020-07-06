@@ -16,5 +16,5 @@ linkwhole:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -o host Main.o Types.o -fwhole-archive-hs-libs -package ghci -rdynamic $(NO_GC_SECTIONS)
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c MyCode.hs
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c Handles.hs
-	ld -r -o lib.so MyCode.o Handles.o
-	./host lib.so
+	'$(LD)' -r -o lib.so MyCode.o Handles.o
+	'$(TEST_WRAPPER)' ./host lib.so

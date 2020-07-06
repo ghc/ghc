@@ -18,17 +18,17 @@ mkPackageDatabase.%:
 	$(MAKE) -s --no-print-directory cleanPackageDatabase.$*
 	mkdir pdb.$*
 
-	'$(TEST_HC)' $(TEST_HC_OPTS) -outputdir pdb.$* -o pdb.$*/setup Setup.hs -v0
+	'$(TEST_HC)' $(TEST_HC_OPTS) -outputdir pdb.$* -o pdb.$*/Setup Setup.hs -v0
 
 	'$(GHC_PKG)' init pdb.$*/local.db
 # We don't make use of -rtsopts in this test, and if it's enabled then
 # we get a warning if dynlibs are enabled by default that:
 #     Warning: -rtsopts and -with-rtsopts have no effect with -shared.
 # so we filter the flag out
-	pdb.$*/setup configure -v0 --dist pdb.$*/dist --prefix='$(HERE)/pdb.$*/install' --with-compiler='$(TEST_HC)' --ghc-options='$(filter-out -rtsopts,$(TEST_HC_OPTS)) -trust base -trust bytestring' --with-hc-pkg='$(GHC_PKG)' --package-db='pdb.$*/local.db' $(VANILLA) $(PROF) $(DYN)
-	pdb.$*/setup build     -v0 --dist pdb.$*/dist
-	pdb.$*/setup copy      -v0 --dist pdb.$*/dist
-	pdb.$*/setup register  -v0 --dist pdb.$*/dist --inplace
+	'$(TEST_WRAPPER)' pdb.$*/Setup -v0 configure --dist pdb.$*/dist --prefix='$(HERE)/pdb.$*/install' --with-compiler='$(TEST_HC)' --with-strip='$(STRIP)' --ghc-options='$(filter-out -rtsopts,$(TEST_HC_OPTS)) -trust base -trust bytestring' --with-hc-pkg='$(GHC_PKG)' --package-db='pdb.$*/local.db' $(VANILLA) $(PROF) $(DYN)
+	'$(TEST_WRAPPER)' pdb.$*/Setup -v0 build     --dist pdb.$*/dist
+	'$(TEST_WRAPPER)' pdb.$*/Setup -v0 copy      --dist pdb.$*/dist
+	'$(TEST_WRAPPER)' pdb.$*/Setup -v0 register  --dist pdb.$*/dist --inplace
 
 # We use the global package database as there's no easy way to tell
 # ghc-pkg (via Cabal) to use one in ., and the global one at least
@@ -74,4 +74,3 @@ safePkg01:
 	$(safePkg01_GHC_PKG) field    safePkg01-1.0 trusted
 	$(safePkg01_GHC_PKG) distrust safePkg01-1.0
 	$(safePkg01_GHC_PKG) field    safePkg01-1.0 trusted
-

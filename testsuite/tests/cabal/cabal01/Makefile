@@ -19,26 +19,28 @@ clean:
 PREFIX := $(abspath install)
 $(eval $(call canonicalise,PREFIX))
 
+SETUP='$(TEST_WRAPPER)' '$(PWD)/Setup' -v0
+
 cabal01:
 	$(MAKE) -s --no-print-directory clean
-	'$(TEST_HC)' $(TEST_HC_OPTS) --make -o setup Setup.lhs -v0
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -o Setup Setup.lhs -v0
 
 	'$(GHC_PKG)' init local.db
 # We don't make use of -rtsopts in this test, and if it's enabled then
 # we get a warning if dynlibs are enabled by default that:
 # 	Warning: -rtsopts and -with-rtsopts have no effect with -shared.
 # so we filter the flag out
-	./setup configure -v0 --prefix="$(PREFIX)" --with-compiler='$(TEST_HC)' --ghc-options='$(filter-out -rtsopts,$(TEST_HC_OPTS))' --with-hc-pkg='$(GHC_PKG)' --package-db=local.db $(VANILLA) $(PROF) $(DYN) --libsubdir='$$pkgid'
-	./setup build -v0
-	./setup copy -v0
+	$(SETUP) configure --prefix="$(PREFIX)" --with-compiler='$(TEST_HC)' --with-strip='$(STRIP)' --ghc-options='$(filter-out -rtsopts,$(TEST_HC_OPTS))' --with-hc-pkg='$(GHC_PKG)' --package-db=local.db $(VANILLA) $(PROF) $(DYN) --libsubdir='$$pkgid'
+	$(SETUP) build
+	$(SETUP) copy
 	echo install1:
 	ls -1 install
 	rm -r install
 #	install w/ register!
-	./setup install -v0
+	$(SETUP) install
 	echo install2:
 	ls -1 install
-	./setup sdist -v0
+	$(SETUP) sdist
 	echo dist:
 	ls -1 dist
 	if [ "$(CLEANUP)" != "" ]; then $(MAKE) -s --no-print-directory clean; fi

@@ -7,5 +7,4 @@ clean:
 
 apirecomp001: clean
 	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghciWayFlags) --make -v0 -package ghc myghc.hs
-	./myghc "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" $(TEST_HC_OPTS)
-
+	'$(TEST_WRAPPER)' ./myghc "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" $(TEST_HC_OPTS)

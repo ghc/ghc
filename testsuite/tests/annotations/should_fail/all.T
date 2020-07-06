@@ -1,3 +1,5 @@
+# No annotation tests for cross compilers.
+setTestOpts([when(cross(), skip)])
 
 test('annfail01', normal, compile_fail, [''])
 test('annfail02', normal, compile_fail, [''])

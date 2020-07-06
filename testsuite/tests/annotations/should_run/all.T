@@ -1,5 +1,8 @@
 # These tests are very slow due to their use of package GHC
-setTestOpts(when(fast(), skip))
+# Skip on cross compilers. This would in most cases produce the same output
+# only for stage 3 cross compilers. E.g. cross compilers built against the same
+# ghc version.
+setTestOpts([when(fast(), skip), when(cross(), skip)])
 
 # Annotations, like Template Haskell, require runtime evaluation.  In
 # order for this to work with profiling, we would have to build the

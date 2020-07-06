@@ -2,7 +2,7 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-SETUP = ../Setup -v0
+SETUP = '$(TEST_WRAPPER)' ../Setup -v0
 
 # This test is for package reexports
 #   1. install p
@@ -32,34 +32,34 @@ cabal05: clean
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make Setup
 	# build p
 	cd p && $(SETUP) clean
-	cd p && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --prefix='$(PWD)/$$pkgid'
+	cd p && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --with-strip='$(STRIP)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --prefix='$(PWD)/$$pkgid'
 	cd p && $(SETUP) build
 	cd p && $(SETUP) copy
 	cd p && $(SETUP) register
 	# build q
 	cd q && $(SETUP) clean
-	cd q && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --prefix='$(PWD)/$$pkgid'
+	cd q && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --with-strip='$(STRIP)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --prefix='$(PWD)/$$pkgid'
 	cd q && $(SETUP) build
 	cd q && $(SETUP) copy
 	cd q && $(SETUP) register
 	# build r
 	cd r && $(SETUP) clean
-	cd r && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --prefix='$(PWD)/$$pkgid'
+	cd r && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --with-strip='$(STRIP)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --prefix='$(PWD)/$$pkgid'
 	cd r && $(SETUP) build
 	cd r && $(SETUP) copy
 	cd r && $(SETUP) register
 	# build s
 	cd s && $(SETUP) clean
-	cd s && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d
+	cd s && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --with-strip='$(STRIP)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d
 	cd s && $(SETUP) build
 	# now test that package recaching works
 	rm tmp.d/package.cache
 	'$(GHC_PKG)' --no-user-package-db --global-package-db=tmp.d recache
 	cd s && $(SETUP) clean
-	cd s && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d
+	cd s && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --with-strip='$(STRIP)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d
 	cd s && $(SETUP) build
 	cd t && $(SETUP) clean
-	cd t && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d
+	cd t && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --with-strip='$(STRIP)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d
 	! (cd t && $(SETUP) build)
 ifneq "$(CLEANUP)" ""
 	$(MAKE) -s --no-print-directory clean

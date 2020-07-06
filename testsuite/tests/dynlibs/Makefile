@@ -16,7 +16,7 @@ T3807:
 	# Hence we must explicitly linking with the RTS here.
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 --make -dynamic -fPIC -shared T3807Export.hs T3807-export.c -o T3807test.so -flink-rts
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -no-auto-link-packages -no-hs-main T3807-load.c -o T3807-load -ldl
-	./T3807-load
+	'$(TEST_WRAPPER)' ./T3807-load
 
 .PHONY: T4464dyn
 T4464dyn:
@@ -28,7 +28,7 @@ T4464:
 	$(RM) HS4464.dll HS4464.dll.a t4464.exe
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -shared T4464H.hs T4464B.c -optc-DRTSOPTS=RtsOptsSafeOnly -o HS4464.dll
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 T4464C.c HS4464.dll.a -o t4464.exe -no-hs-main
-	-./t4464.exe
+	-'$(TEST_WRAPPER)' ./t4464.exe
 	echo "====="
 	echo "=====" >&2
 	$(RM) T4464B.o T4464C.o T4464H.hi T4464H.o
@@ -36,7 +36,7 @@ T4464:
 	$(RM) HS4464.dll HS4464.dll.a t4464.exe
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -shared T4464H.hs T4464B.c  -optc-DRTSOPTS=RtsOptsAll -o HS4464.dll
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 T4464C.c HS4464.dll.a -o t4464.exe -no-hs-main
-	./t4464.exe
+	'$(TEST_WRAPPER)' ./t4464.exe
 	echo "====="
 	echo "=====" >&2
 	$(RM) T4464B.o T4464C.o T4464H.hi T4464H.o
@@ -44,7 +44,7 @@ T4464:
 	$(RM) HS4464.dll HS4464.dll.a t4464.exe
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -dynamic -shared T4464H.hs T4464B.c  -optc-DRTSOPTS=RtsOptsAll -o HS4464.dll
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -dynamic T4464C.c -o t4464.exe -no-hs-main -L. -lHS4464
-	./t4464.exe
+	'$(TEST_WRAPPER)' ./t4464.exe
 
 .PHONY: T5373
 T5373:
@@ -52,15 +52,15 @@ T5373:
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -dynamic --make T5373B -rtsopts
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -dynamic --make T5373C -rtsopts=some
 	'$(TEST_HC)' $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 -dynamic --make T5373D -rtsopts=none
-	-./T5373A +RTS -c 2>&1 | grep disabled
-	-./T5373B +RTS -c 2>&1 | grep disabled
-	-./T5373C +RTS -c 2>&1 | grep disabled
-	-./T5373D +RTS -c 2>&1 | grep disabled
+	-'$(TEST_WRAPPER)' ./T5373A +RTS -c 2>&1 | grep disabled
+	-'$(TEST_WRAPPER)' ./T5373B +RTS -c 2>&1 | grep disabled
+	-'$(TEST_WRAPPER)' ./T5373C +RTS -c 2>&1 | grep disabled
+	-'$(TEST_WRAPPER)' ./T5373D +RTS -c 2>&1 | grep disabled
 
 .PHONY: T13702
 T13702:
 	'$(TEST_HC)' -v0 -dynamic -rdynamic -fPIC -pie T13702.hs
-	./T13702
+	'$(TEST_WRAPPER)' ./T13702
 
 .PHONY: T18072
 T18072:

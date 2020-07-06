@@ -8,18 +8,18 @@ include $(TOP)/mk/test.mk
 .PHONY: plugins01
 plugins01:
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 plugins01.hs -package-db simple-plugin/pkg.plugins01/local.package.conf -fplugin Simple.Plugin -fplugin-opt Simple.Plugin:Irrelevant_Option -hide-all-plugin-packages -plugin-package simple-plugin
-	./plugins01
+	'$(TEST_WRAPPER)' ./plugins01
 
 # -hide-all-packages + -plugin-package
 .PHONY: plugins07
 plugins07:
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 -O plugins07.hs -package-db rule-defining-plugin/pkg.plugins07/local.package.conf -hide-all-packages -package base -plugin-package rule-defining-plugin -fplugin=RuleDefiningPlugin
-	./plugins07
+	'$(TEST_WRAPPER)' ./plugins07
 
 .PHONY: plugins08
 plugins08:
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 plugins08.hs -package-db simple-plugin/pkg.plugins08/local.package.conf
-	./plugins08
+	'$(TEST_WRAPPER)' ./plugins08
 
 .PHONY: plugins09
 plugins09:
@@ -53,7 +53,7 @@ plugins15:
 .PHONY: T10420
 T10420:
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --make -v0 -O T10420.hs -package-db rule-defining-plugin/pkg.T10420/local.package.conf -hide-all-packages -package base -package rule-defining-plugin
-	./T10420
+	'$(TEST_WRAPPER)' ./T10420
 
 .PHONY: T10294
 T10294:
@@ -68,7 +68,7 @@ frontend01:
 	$(RM) FrontendPlugin.hi FrontendPlugin.o frontend01 frontend01.hi frontend.o
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -Wall -package ghc -c FrontendPlugin.hs
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) --frontend FrontendPlugin -ffrontend-opt foo -ffrontend-opt bar frontend01
-	./frontend01
+	'$(TEST_WRAPPER)' ./frontend01
 
 # -hide-all-plugin-packages + -package (this should not work!)
 .PHONY: T11244
@@ -84,7 +84,7 @@ T12567a:
 .PHONY: T14335
 T14335:
 	"$(TEST_HC)" $(TEST_HC_OPTS) $(ghcPluginWayFlags) -fexternal-interpreter --make -v0 plugins01.hs -package-db simple-plugin/pkg.plugins01/local.package.conf -fplugin Simple.Plugin -fplugin-opt Simple.Plugin:Irrelevant_Option -hide-all-plugin-packages -plugin-package simple-plugin
-	./plugins01
+	'$(TEST_WRAPPER)' ./plugins01
 
 # Shouldn't recompile the module
 .PHONY: plugin-recomp-pure

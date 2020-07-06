@@ -2,7 +2,7 @@ TOP=../../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-SETUP='$(PWD)/Setup' -v0
+SETUP='$(TEST_WRAPPER)' '$(PWD)/Setup' -v0
 CONFIGURE=$(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db='$(PWD)/tmp.d' --prefix='$(PWD)/inst'
 
 # This test checks if recompilation works correctly when we change an

@@ -2,8 +2,8 @@ TOP=../../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-SETUP=./Setup -v0
-CONFIGURE=$(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=tmp.d --prefix='$(PWD)/inst'
+SETUP='$(TEST_WRAPPER)' ./Setup -v0
+CONFIGURE=$(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --with-strip='$(STRIP)' --ghc-options='$(TEST_HC_OPTS)' --package-db=tmp.d --prefix='$(PWD)/inst'
 
 bkpcabal01: clean
 	$(MAKE) -s --no-print-directory clean
@@ -62,7 +62,7 @@ bkpcabal01: clean
 	# build exe
 	$(CONFIGURE) --cid "exe-0.1" exe
 	$(SETUP) build
-	dist/build/exe/exe
+	'$(TEST_WRAPPER)' dist/build/exe/exe
 ifneq "$(CLEANUP)" ""
 	$(MAKE) -s --no-print-directory clean
 endif

@@ -16,7 +16,7 @@ test('SafeInfered05', [], multimod_compile, ['SafeInfered05', ''])
 
 # Tests that should fail to compile as they should be inferred unsafe
 test('UnsafeInfered01', [], multimod_compile_fail, ['UnsafeInfered01', ''])
-test('UnsafeInfered02', [], multimod_compile_fail, ['UnsafeInfered02', ''])
+test('UnsafeInfered02', [when(cross(), skip)], multimod_compile_fail, ['UnsafeInfered02', ''])
 test('UnsafeInfered03', [], multimod_compile_fail, ['UnsafeInfered03', ''])
 test('UnsafeInfered05', [], multimod_compile_fail, ['UnsafeInfered05', ''])
 test('UnsafeInfered06', [], multimod_compile_fail, ['UnsafeInfered06', ''])
@@ -65,4 +65,3 @@ test('UnsafeWarn07', normal, compile, [''])
 test('SafeWarn01', normal, compile, [''])
 
 test('T16689', normal, compile, ['-Wsafe'])
-

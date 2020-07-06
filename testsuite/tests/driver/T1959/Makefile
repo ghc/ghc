@@ -18,8 +18,8 @@ dotest ::
 	$(MAKE) -s --no-print-directory clean
 	cp E1.hs E.hs
 	$(MAKE) -s --no-print-directory compile
-	./prog
+	'$(TEST_WRAPPER)' ./prog
 	sleep 1
 	cp E2.hs E.hs
 	$(MAKE) -s --no-print-directory compile
-	./prog
+	'$(TEST_WRAPPER)' ./prog

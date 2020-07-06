@@ -6,6 +6,8 @@ LOCAL_PKGCONF=local.package.conf
 
 PKG=bug1465
 
+SETUP='$(TEST_WRAPPER)' ./Setup -v0
+
 clean:
 	rm -f v1/setup v1/Setup.o v1/Setup.hi
 	rm -f v2/setup v2/Setup.o v2/Setup.hi
@@ -27,7 +29,7 @@ prep:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(LOCAL_PKGCONF) -c -package $(PKG)-2.0 B2.hs
 
 prep.%:
-	cd $* && '$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make -o setup Setup.hs
-	cd $* && ./setup configure $(CABAL_MINIMAL_BUILD) -v0 --with-compiler='$(TEST_HC)' --with-ghc-pkg='$(GHC_PKG)' --ghc-options='$(TEST_HC_OPTS)' --package-db ../$(LOCAL_PKGCONF)
-	cd $* && ./setup build -v0
-	cd $* && ./setup register -v0 --inplace
+	cd $* && '$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make -o Setup Setup.hs
+	cd $* && $(SETUP) configure $(CABAL_MINIMAL_BUILD) -v0 --with-compiler='$(TEST_HC)' --with-ghc-pkg='$(GHC_PKG)' --ghc-options='$(TEST_HC_OPTS)' --package-db ../$(LOCAL_PKGCONF)
+	cd $* && $(SETUP) build
+	cd $* && $(SETUP) register --inplace

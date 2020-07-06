@@ -2,7 +2,7 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-SETUP = ./Setup -v0
+SETUP = '$(TEST_WRAPPER)' ./Setup -v0
 
 # This test is for packages in internal libraries
 

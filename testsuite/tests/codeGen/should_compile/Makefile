@@ -11,7 +11,7 @@ debug:
 	echo == Dbg ==
 	'$(TEST_HC)' $(TEST_HC_OPTS) debug -fforce-recomp -g -ddump-cmm-verbose-by-proc \
 		| grep -o src\<debug.hs:.*\> | sort -u
-	./debug
+	'$(TEST_WRAPPER)' ./debug
 
 	# With optimisations we will get fewer annotations.
 	echo == Dbg -O2 ==
@@ -28,7 +28,7 @@ debug:
                   | grep src\<debug.hs:4:.*\> \
                   | grep -o src\<.*\> | sort -u
 
-	./debug
+	'$(TEST_WRAPPER)' ./debug
 	rm debug
 
 T14999:

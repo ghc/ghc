@@ -1,5 +1,7 @@
 # coding=utf8
 
+setTestOpts([when(cross(), skip)])
+
 # Note [Disabling ghci-leak-check]
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # The -fno-ghci-leak-check is because this test prints the current GHC settings

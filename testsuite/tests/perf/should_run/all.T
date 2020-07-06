@@ -85,7 +85,7 @@ test('T4321',
      omit_ways(['ghci']),
      compile_and_run, ['-O ' + sse2_opts])
 
-test('T3736', [], makefile_test, ['T3736'])
+test('T3736', [when(cross(), skip)], makefile_test, ['T3736'])
 test('T3738',
      [extra_clean(['T3738a.hi', 'T3738a.o']),
       collect_stats('peak_megabytes_allocated', 0),

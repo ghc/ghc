@@ -27,6 +27,14 @@ RUNTESTS     = $(TOP)/driver/runtests.py
 COMPILER     = ghc
 CONFIG       = $(TOP)/config/$(COMPILER)
 
+# if no TEST_WRAPPER is set, use an identity wrapper.
+TEST_WRAPPER ?= $(TOP_ABS)/driver/id
+export TEST_WRAPPER
+
+# if no STRIP is set, use `strip`
+STRIP ?= strip
+export STRIP
+
 ifeq "$(GhcUnregisterised)" "YES"
     # Otherwise C backend generates many warnings about
     # imcompatible proto casts for GCC's buitins:
@@ -60,8 +68,17 @@ TEST_HC_OPTS += -Werror=compat
 # removing this line.
 TEST_HC_OPTS += -dno-debug-output
 
-TEST_HC_OPTS_INTERACTIVE = $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci -fno-ghci-history +RTS --io-manager=native -RTS
+# Add WRAPPED_ISERV if it's defined, it should point to a file with the following
+# content:
+#
+#   #/usr/bin/env sh
+#   "$TEST_WRAPPER" /absolute/path/to/ghc-iserv "$@"
+#
+ifneq "$(WRAPPED_ISERV)" ""
+TEST_HC_OPTS += -fexternal-interpreter -pgmi $(WRAPPED_ISERV)
+endif
 
+TEST_HC_OPTS_INTERACTIVE = $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci -fno-ghci-history +RTS --io-manager=native -RTS
 
 RUNTEST_OPTS =
 
@@ -142,7 +159,7 @@ endif
 
 ifeq "$(GhcWithInterpreter)" "NO"
 RUNTEST_OPTS += -e config.have_interp=False
-else ifeq "$(GhcStage)" "1"
+else ifeq "$(GhcStage)x$(WRAPPED_ISERV)y" "1xy"
 RUNTEST_OPTS += -e config.have_interp=False
 else
 RUNTEST_OPTS += -e config.have_interp=True
@@ -261,10 +278,14 @@ else
 RUNTEST_OPTS += -e config.local=True
 endif
 
+# XXX config.platform needs to be removed once all libraries have been updated
+# to use targetPlatform.
 RUNTEST_OPTS +=  \
 	--rootdir=. \
 	--config-file=$(CONFIG) \
 	-e 'config.platform="$(TARGETPLATFORM)"' \
+	-e 'config.targetPlatform="$(TARGETPLATFORM)"' \
+	-e 'config.hostPlatform="$(HOSTPLATFORM)"' \
 	-e 'config.os="$(TargetOS_CPP)"' \
 	-e 'config.arch="$(TargetARCH_CPP)"' \
 	-e 'config.wordsize="$(WORDSIZE)"' \

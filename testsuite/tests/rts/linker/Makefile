@@ -5,12 +5,12 @@ include $(TOP)/mk/test.mk
 unsigned_reloc_macho_x64:
 	as -o unsigned_reloc_macho_x64.o unsigned_reloc_macho_x64.s
 	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RTSOPTS) -v0 --make -no-rtsopts-suggestions -no-hs-main -o runner runner.c
-	./runner unsigned_reloc_macho_x64.o getAnswer
+	'$(TEST_WRAPPER)' ./runner unsigned_reloc_macho_x64.o getAnswer
 
 section_alignment:
 	cc -c -o section_alignment.o section_alignment.c
 	'$(TEST_HC)' $(TEST_HC_OPTS_NO_RTSOPTS) -v0 --make -no-rtsopts-suggestions -no-hs-main -o runner runner.c
-	./runner section_alignment.o isAligned
+	'$(TEST_WRAPPER)' ./runner section_alignment.o isAligned
 
 T2615-prep:
 	$(RM) libfoo_T2615.so
@@ -22,14 +22,14 @@ define run_T5435_v
 $(RM) T5435_load_v_$(1) T5435_v_$(1)$(exeext)
 '$(TEST_HC)' $(TEST_HC_OPTS) -optc-D$(HostOS)_HOST_OS -optc-DLOAD_CONSTR=$(2) -v0 -c T5435_$(1).c -o T5435_load_v_$(1).o
 '$(TEST_HC)' $(TEST_HC_OPTS) -v0 T5435.hs -osuf main_v_$(1)_o -o T5435_v_$(1)$(exeext)
-./T5435_v_$(1) v ./T5435_load_v_$(1).o
+'$(TEST_WRAPPER)' ./T5435_v_$(1) v ./T5435_load_v_$(1).o
 endef
 
 define run_T5435_dyn
 $(RM) T5435_load_dyn_$(1) T5435_dyn_$(1)$(exeext)
 '$(TEST_HC)' $(filter-out -rtsopts, $(TEST_HC_OPTS)) -optc-D$(HostOS)_HOST_OS -v0 -fPIC -shared -c T5435_$(1).c -osuf dyn_$(1)_o -o T5435_load_dyn_$(1)$(dllext)
 '$(TEST_HC)' $(TEST_HC_OPTS) -v0 T5435.hs -osuf main_dyn_$(1)_o -o T5435_dyn_$(1)$(exeext)
-./T5435_dyn_$(1) dyn ./T5435_load_dyn_$(1)$(dllext)
+'$(TEST_WRAPPER)' ./T5435_dyn_$(1) dyn ./T5435_load_dyn_$(1)$(dllext)
 endef
 
 .PHONY: T5435_v_gcc
@@ -57,7 +57,7 @@ linker_unload:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c Test.hs -v0
 	# -rtsopts causes a warning
 	"$(TEST_HC)" LinkerUnload.hs -package ghc $(filter-out -rtsopts, $(TEST_HC_OPTS)) linker_unload.c -o linker_unload -no-hs-main -optc-Werror
-	./linker_unload "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
+	'$(TEST_WRAPPER)' ./linker_unload "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
 
 # -----------------------------------------------------------------------------
 # Testing failures in the RTS linker.  We should be able to repeatedly
@@ -75,7 +75,7 @@ linker_unload:
 linker_error1:
 	"$(TEST_HC)" -c linker_error.c -o linker_error1.o
 	"$(TEST_HC)" linker_error1.o -o linker_error1 -no-hs-main -optc-g -debug -threaded
-	./linker_error1 linker_error.c
+	'$(TEST_WRAPPER)' ./linker_error1 linker_error.c
 
 # linker_error2: the object file has an unknown symbol (fails in
 # resolveObjs())
@@ -85,7 +85,7 @@ linker_error2:
 	"$(TEST_HC)" -c linker_error.c -o linker_error2.o
 	"$(TEST_HC)" -c linker_error2.c -o linker_error2_o.o
 	"$(TEST_HC)" linker_error2.o -o linker_error2 -no-hs-main -optc-g -debug -threaded
-	./linker_error2 linker_error2_o.o
+	'$(TEST_WRAPPER)' ./linker_error2 linker_error2_o.o
 
 # linker_error3: the object file duplicates an existing symbol (fails
 # in loadObj())
@@ -95,11 +95,11 @@ linker_error3:
 	"$(TEST_HC)" -c linker_error.c -o linker_error3.o
 	"$(TEST_HC)" -c linker_error3.c -o linker_error3_o.o
 	"$(TEST_HC)" linker_error3.o -o linker_error3 -no-hs-main -optc-g -debug -threaded
-	./linker_error3 linker_error3_o.o
+	'$(TEST_WRAPPER)' ./linker_error3 linker_error3_o.o
 
 .PHONY: T7072
 T7072:
 	"$(TEST_HC)" -c T7072-obj.c -o T7072-obj.o
 	"$(TEST_HC)" -c T7072-main.c -o T7072-main.o
 	"$(TEST_HC)" T7072-main.c -o T7072-main -no-hs-main -debug
-	./T7072-main T7072-obj.o
+	'$(TEST_WRAPPER)' ./T7072-main T7072-obj.o
