@@ -34,7 +34,7 @@ rn.prog006:
 	echo "version: 1.0" >>pkg.conf
 	echo "id: test-1.0-XXX" >>pkg.conf
 	echo "key: test-1.0-XXX" >>pkg.conf
-	echo "import-dirs: \"`./pwd`\"" >>pkg.conf
+	echo "import-dirs: \"`'$(TEST_WRAPPER)' ./pwd`\"" >>pkg.conf
 	echo "exposed-modules: B.C" >>pkg.conf
 	rm -rf $(LOCAL_PKGCONF)
 	'$(GHC_PKG)' init $(LOCAL_PKGCONF)
@@ -44,4 +44,3 @@ rn.prog006:
 	-'$(TEST_HC)' $(TEST_HC_OPTS) -c -package-db $(LOCAL_PKGCONF) -package test -fforce-recomp Main.hs
 # No -i when compiling Main, so a from-scratch search would find a home-pkg module B.C
 # However, A.hi remembers that B.C came from package test, so all is ok.
-

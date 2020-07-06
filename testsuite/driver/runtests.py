@@ -85,6 +85,7 @@ if args.e:
 
 if args.config_file:
     for arg in args.config_file:
+        print(arg)
         exec(open(arg).read())
 
 if args.config:

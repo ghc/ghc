@@ -13,16 +13,16 @@ recomp011: clean
 	echo "main = putStrLn x" >A.hsinc
 	echo "x = show 42" >B.hsinc
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -O Main.hs
-	./Main
+	'$(TEST_WRAPPER)' ./Main
 	sleep 1
 	echo "x = show 43" >B.hsinc
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -O Main.hs
-	./Main
+	'$(TEST_WRAPPER)' ./Main
 	sleep 1
 	echo "main = putStrLn (x ++ x)" >A.hsinc
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -O Main.hs
 	sleep 1
-	./Main
+	'$(TEST_WRAPPER)' ./Main
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -O Main.hs
 	# don't change anything; check that no compilation happened
-	./Main
+	'$(TEST_WRAPPER)' ./Main

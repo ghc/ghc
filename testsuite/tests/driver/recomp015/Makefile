@@ -25,11 +25,11 @@ recomp015: clean
 	# recompilation (just like recomp011 which does the same thing for a smaller
 	# number of sections)
 	'$(TEST_HC)' $(TEST_HC_OPTS) Generate.hs
-	./Generate > ManySections.s
+	'$(TEST_WRAPPER)' ./Generate > ManySections.s
 	echo 'main = putStrLn "Running main..."' > Main.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c ManySections.s
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -O Main.hs ManySections.o
-	./Main
+	'$(TEST_WRAPPER)' ./Main
 	sleep 1
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -O Main.hs ManySections.o
-	./Main
+	'$(TEST_WRAPPER)' ./Main

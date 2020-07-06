@@ -306,31 +306,31 @@ test062a:
 	$(RM) Hello062a.hs Hello062a.hi Hello062a$(OBJSUFFIX) Hello062a.hc hello062a
 	echo "module Hello062a where { hello062a = putStrLn \"ok\" }" >Hello062a.hs
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make -main-is Hello062a.hello062a Hello062a -o hello062a
-	./hello062a
+	'$(TEST_WRAPPER)' ./hello062a
 test062b:
 	$(RM) Hello062b.hs Hello062b.hi Hello062b$(OBJSUFFIX) Hello062b.hc hello062b
 	echo "module Hello062b where { main = putStrLn \"ok\" }" >Hello062b.hs
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make -main-is Hello062b Hello062b -o hello062b
-	./hello062b
+	'$(TEST_WRAPPER)' ./hello062b
 test062c:
 	$(RM) Hello062c.hs Hello062c.hi Hello062c$(OBJSUFFIX) Hello062c.hc hello062c
 	echo "module Main (hello062c) where { hello062c = putStrLn \"ok\" }" >Hello062c.hs
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make -main-is hello062c Hello062c.hs -o hello062c
-	./hello062c
+	'$(TEST_WRAPPER)' ./hello062c
 test062d:
 	$(RM) -rf B062d
 	$(RM) hello062d
 	mkdir B062d
 	echo "module B062d.Hello062d (hello062d) where { hello062d = putStrLn \"ok\" }" >B062d/Hello062d.hs
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make -main-is B062d.Hello062d.hello062d B062d/Hello062d.hs -o hello062d
-	./hello062d
+	'$(TEST_WRAPPER)' ./hello062d
 test062e:
 	$(RM) -rf B062e
 	$(RM) Hello062e.hc hello062e
 	mkdir B062e
 	echo "module B062e.Hello062e (main) where { main = putStrLn \"ok\" }" >B062e/Hello062e.hs
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make -main-is B062e.Hello062e B062e/Hello062e.hs -o hello062e
-	./hello062e
+	'$(TEST_WRAPPER)' ./hello062e
 
 # Test that -i deletes the list of search paths.
 # The compilation will fail, but we ignore the failure and just
@@ -465,33 +465,33 @@ rtsopts001:
 	$(RM) rtsOpts$(exeext) rtsOpts.hi rtsOpts.o
 	"$(TEST_HC)" $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 --make rtsOpts -rtsopts
 	echo "Normal"
-	-./rtsOpts +RTS -C0 2>&1
+	-'$(TEST_WRAPPER)' ./rtsOpts +RTS -C0 2>&1
 	$(RM) rtsOpts$(exeext) rtsOpts.hi rtsOpts.o
 	"$(TEST_HC)" $(filter-out -rtsopts,$(TEST_HC_OPTS)) -v0 --make rtsOpts
 	echo "No RTS opts"
-	-./rtsOpts +RTS -C0 2>&1
+	-'$(TEST_WRAPPER)' ./rtsOpts +RTS -C0 2>&1
 
 .PHONY: rtsopts002
 rtsopts002:
 	$(RM) rtsopts002$(exeext) rtsopts002.hi rtsopts002.o
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make rtsopts002 -rtsopts=some
-	./rtsopts002
-	./rtsopts002 +RTS --info >/dev/null
-	if ./rtsopts002 +RTS -C0; then exit 1; else exit 0; fi
-	GHCRTS= ./rtsopts002
-	GHCRTS=--info ./rtsopts002 >/dev/null
-	if GHCRTS=-C0 ./rtsopts002; then exit 1; else exit 0; fi
+	'$(TEST_WRAPPER)' ./rtsopts002
+	'$(TEST_WRAPPER)' ./rtsopts002 +RTS --info >/dev/null
+	if '$(TEST_WRAPPER)' ./rtsopts002 +RTS -C0; then exit 1; else exit 0; fi
+	GHCRTS= '$(TEST_WRAPPER)' ./rtsopts002
+	GHCRTS=--info '$(TEST_WRAPPER)' ./rtsopts002 >/dev/null
+	if GHCRTS=-C0 '$(TEST_WRAPPER)' ./rtsopts002; then exit 1; else exit 0; fi
 
 .PHONY: withRtsOpts
 withRtsOpts:
 	$(RM) withRtsOpts$(exeext) withRtsOpts.hi withRtsOpts.o withRtsOpts.out
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make withRtsOpts -with-rtsopts=--info
-	./withRtsOpts | head -1
+	'$(TEST_WRAPPER)' ./withRtsOpts | head -1
 	# Also test for non-safe RTS opts, these should be allowed too,
 	# since the author has explicitly requested them. (#5114)
 	$(RM) withRtsOpts$(exeext) withRtsOpts.hi withRtsOpts.o withRtsOpts.out
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 --make withRtsOpts -with-rtsopts=-twithRtsOpts.out
-	./withRtsOpts | head -1
+	'$(TEST_WRAPPER)' ./withRtsOpts | head -1
 	test -f withRtsOpts.out
 
 .PHONY: T3364
@@ -633,10 +633,10 @@ T12135:
 	mkdir T12135a T12135b
 	cp T12135a.h T12135a/T12135.h
 	"$(TEST_HC)" $(TEST_HC_OPTS) -IT12135b -IT12135a --make T12135.hs
-	./T12135
+	'$(TEST_WRAPPER)' ./T12135
 	cp T12135b.h T12135b/T12135.h
 	"$(TEST_HC)" $(TEST_HC_OPTS) -IT12135b -IT12135a --make T12135.hs
-	./T12135
+	'$(TEST_WRAPPER)' ./T12135
 
 .PHONY: T10923
 T10923:

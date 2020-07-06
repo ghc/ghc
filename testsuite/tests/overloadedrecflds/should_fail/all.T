@@ -20,7 +20,7 @@ test('overloadedrecfldsfail14', normal, compile_fail, [''])
 test('overloadedlabelsfail01', normal, compile_fail, [''])
 test('overloadedlabelsfail02', normal, compile_fail, [''])
 test('overloadedlabelsfail03', normal, compile_fail, [''])
-test('T11103', normal, compile_fail, [''])
+test('T11103', [normal, when(cross(), extra_hc_opts('-fexternal-interpreter -pgmi $WRAPPED_ISERV'))], compile_fail, [''])
 test('T11167_ambiguous_fixity', [], multimod_compile_fail,
      ['T11167_ambiguous_fixity', ''])
 test('T13132_duplicaterecflds', normal, compile_fail, [''])
