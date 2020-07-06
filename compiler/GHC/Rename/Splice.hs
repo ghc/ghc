@@ -106,7 +106,7 @@ rnBracket e br_body
                         ; (body', fvs_e) <-
                           setStage (Brack cur_stage RnPendingTyped) $
                                    rn_bracket cur_stage br_body
-                        ; return (HsBracket noExtField body', fvs_e) }
+                        ; return (HsBracket noAnn body', fvs_e) }
 
             False -> do { traceRn "Renaming untyped TH bracket" empty
                         ; ps_var <- newMutVar []
@@ -121,7 +121,7 @@ rnBracket e br_body
 
 rn_bracket :: ThStage -> HsBracket GhcPs -> RnM (HsBracket GhcRn, FreeVars)
 rn_bracket outer_stage br@(VarBr x flg rdr_name)
-  = do { name <- lookupOccRn rdr_name
+  = do { name <- lookupOccRn (unLoc rdr_name)
        ; this_mod <- getModule
 
        ; when (flg && nameIsLocalOrFrom this_mod name) $
@@ -142,7 +142,7 @@ rn_bracket outer_stage br@(VarBr x flg rdr_name)
                                              (quotedNameStageErr br) }
                         }
                     }
-       ; return (VarBr x flg name, unitFV name) }
+       ; return (VarBr x flg (noLocA name), unitFV name) }
 
 rn_bracket _ (ExpBr x e) = do { (e', fvs) <- rnLExpr e
                             ; return (ExpBr x e', fvs) }
@@ -175,7 +175,7 @@ rn_bracket _ (DecBrL x decls)
            ; Just (splice, rest) ->
                do { group' <- groupDecls rest
                   ; let group'' = appendGroups group group'
-                  ; return group'' { hs_splcds = noLoc splice : hs_splcds group' }
+                  ; return group'' { hs_splcds = noLocA splice : hs_splcds group' }
                   }
            }}
 
@@ -373,14 +373,16 @@ mkQuasiQuoteExpr :: UntypedSpliceFlavour -> Name -> SrcSpan -> FastString
                  -> LHsExpr GhcRn
 -- Return the expression (quoter "...quote...")
 -- which is what we must run in a quasi-quote
-mkQuasiQuoteExpr flavour quoter q_span quote
-  = L q_span $ HsApp noExtField (L q_span
-             $ HsApp noExtField (L q_span (HsVar noExtField (L q_span quote_selector)))
+mkQuasiQuoteExpr flavour quoter q_span' quote
+  = L q_span $ HsApp noComments (L q_span
+             $ HsApp noComments (L q_span
+                    (HsVar noExtField (L (la2na q_span) quote_selector)))
                                 quoterExpr)
                     quoteExpr
   where
-    quoterExpr = L q_span $! HsVar noExtField $! (L q_span quoter)
-    quoteExpr  = L q_span $! HsLit noExtField $! HsString NoSourceText quote
+    q_span = noAnnSrcSpan q_span'
+    quoterExpr = L q_span $! HsVar noExtField $! (L (la2na q_span) quoter)
+    quoteExpr  = L q_span $! HsLit noComments $! HsString NoSourceText quote
     quote_selector = case flavour of
                        UntypedExpSplice  -> quoteExpName
                        UntypedPatSplice  -> quotePatName
@@ -392,19 +394,19 @@ rnSplice :: HsSplice GhcPs -> RnM (HsSplice GhcRn, FreeVars)
 -- Not exported...used for all
 rnSplice (HsTypedSplice x hasParen splice_name expr)
   = do  { loc  <- getSrcSpanM
-        ; n' <- newLocalBndrRn (L loc splice_name)
+        ; n' <- newLocalBndrRn (L (noAnnSrcSpan loc) splice_name)
         ; (expr', fvs) <- rnLExpr expr
         ; return (HsTypedSplice x hasParen n' expr', fvs) }
 
 rnSplice (HsUntypedSplice x hasParen splice_name expr)
   = do  { loc  <- getSrcSpanM
-        ; n' <- newLocalBndrRn (L loc splice_name)
+        ; n' <- newLocalBndrRn (L (noAnnSrcSpan loc) splice_name)
         ; (expr', fvs) <- rnLExpr expr
         ; return (HsUntypedSplice x hasParen n' expr', fvs) }
 
 rnSplice (HsQuasiQuote x splice_name quoter q_loc quote)
   = do  { loc  <- getSrcSpanM
-        ; splice_name' <- newLocalBndrRn (L loc splice_name)
+        ; splice_name' <- newLocalBndrRn (L (noAnnSrcSpan loc) splice_name)
 
           -- Rename the quoter; akin to the HsVar case of rnExpr
         ; quoter' <- lookupOccRn quoter
@@ -424,7 +426,7 @@ rnSpliceExpr splice
   where
     pend_expr_splice :: HsSplice GhcRn -> (PendingRnSplice, HsExpr GhcRn)
     pend_expr_splice rn_splice
-        = (makePending UntypedExpSplice rn_splice, HsSpliceE noExtField rn_splice)
+        = (makePending UntypedExpSplice rn_splice, HsSpliceE noAnn rn_splice)
 
     run_expr_splice :: HsSplice GhcRn -> RnM (HsExpr GhcRn, FreeVars)
     run_expr_splice rn_splice
@@ -437,7 +439,7 @@ rnSpliceExpr splice
                                                      , isLocalGRE gre]
                  lcl_names = mkNameSet (localRdrEnvElts lcl_rdr)
 
-           ; return (HsSpliceE noExtField rn_splice, lcl_names `plusFV` gbl_names) }
+           ; return (HsSpliceE noAnn rn_splice, lcl_names `plusFV` gbl_names) }
 
       | otherwise  -- Run it here, see Note [Running splices in the Renamer]
       = do { traceRn "rnSpliceExpr: untyped expression splice" empty
@@ -445,7 +447,7 @@ rnSpliceExpr splice
                 runRnSplice UntypedExpSplice runMetaE ppr rn_splice
            ; (lexpr3, fvs) <- checkNoErrs (rnLExpr rn_expr)
              -- See Note [Delaying modFinalizers in untyped splices].
-           ; return ( HsPar noExtField $ HsSpliceE noExtField
+           ; return ( HsPar noAnn $ HsSpliceE noAnn
                             . HsSpliced noExtField (ThModFinalizers mod_finalizers)
                             . HsSplicedExpr <$>
                             lexpr3
@@ -620,7 +622,7 @@ rnSpliceType splice
                                  ; checkNoErrs $ rnLHsType doc hs_ty2 }
                                     -- checkNoErrs: see Note [Renamer errors]
              -- See Note [Delaying modFinalizers in untyped splices].
-           ; return ( HsParTy noExtField
+           ; return ( HsParTy noAnn
                               $ HsSpliceTy noExtField
                               . HsSpliced noExtField (ThModFinalizers mod_finalizers)
                               . HsSplicedTy <$>
@@ -690,7 +692,7 @@ rnSplicePat splice
            ; (pat, mod_finalizers) <-
                 runRnSplice UntypedPatSplice runMetaP ppr rn_splice
              -- See Note [Delaying modFinalizers in untyped splices].
-           ; return ( Left $ ParPat noExtField $ ((SplicePat noExtField)
+           ; return ( Left $ ParPat noAnn $ ((SplicePat noExtField)
                               . HsSpliced noExtField (ThModFinalizers mod_finalizers)
                               . HsSplicedPat)  `mapLoc`
                               pat
@@ -810,7 +812,7 @@ traceSplice (SpliceInfo { spliceDescription = sd, spliceSource = mb_src
                         , spliceGenerated = gen, spliceIsDecl = is_decl })
   = do { loc <- case mb_src of
                    Nothing        -> getSrcSpanM
-                   Just (L loc _) -> return loc
+                   Just (L loc _) -> return (locA loc)
        ; traceOptTcRn Opt_D_dump_splices (spliceDebugDoc loc)
 
        ; when is_decl $  -- Raw material for -dth-dec-file

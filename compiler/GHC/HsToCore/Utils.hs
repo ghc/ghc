@@ -760,7 +760,7 @@ is_triv_pat _            = False
 ********************************************************************* -}
 
 mkLHsPatTup :: [LPat GhcTc] -> LPat GhcTc
-mkLHsPatTup []     = noLoc $ mkVanillaTuplePat [] Boxed
+mkLHsPatTup []     = noLocA $ mkVanillaTuplePat [] Boxed
 mkLHsPatTup [lpat] = lpat
 mkLHsPatTup lpats  = L (getLoc (head lpats)) $
                      mkVanillaTuplePat lpats Boxed
@@ -774,7 +774,7 @@ mkBigLHsVarTupId :: [Id] -> LHsExpr GhcTc
 mkBigLHsVarTupId ids = mkBigLHsTupId (map nlHsVar ids)
 
 mkBigLHsTupId :: [LHsExpr GhcTc] -> LHsExpr GhcTc
-mkBigLHsTupId = mkChunkified mkLHsTupleExpr
+mkBigLHsTupId = mkChunkified (\e -> mkLHsTupleExpr e noExtField)
 
 -- The Big equivalents for the source tuple patterns
 mkBigLHsVarPatTupId :: [Id] -> LPat GhcTc
@@ -920,9 +920,10 @@ dsHandleMonadicFailure ctx pat match m_fail_op =
       fail_expr <- dsSyntaxExpr fail_op [fail_msg]
       body fail_expr
 
-mk_fail_msg :: DynFlags -> HsStmtContext GhcRn -> Located e -> String
+mk_fail_msg :: DynFlags -> HsStmtContext GhcRn -> LocatedA e -> String
 mk_fail_msg dflags ctx pat
-  = showPpr dflags $ text "Pattern match failure in" <+> pprStmtContext ctx <+> text "at" <+> ppr (getLoc pat)
+  = showPpr dflags $ text "Pattern match failure in" <+> pprStmtContext ctx
+                   <+> text "at" <+> ppr (getLocA pat)
 
 {- *********************************************************************
 *                                                                      *

@@ -1243,8 +1243,8 @@ runStmt input step = do
     run_decls :: GhciMonad m => [LHsDecl GhcPs] -> m (Maybe GHC.ExecResult)
     -- Only turn `FunBind` and `VarBind` into statements, other bindings
     -- (e.g. `PatBind`) need to stay as decls.
-    run_decls [L l (ValD _ bind@FunBind{})] = run_stmt (mk_stmt l bind)
-    run_decls [L l (ValD _ bind@VarBind{})] = run_stmt (mk_stmt l bind)
+    run_decls [L l (ValD _ bind@FunBind{})] = run_stmt (mk_stmt (locA l) bind)
+    run_decls [L l (ValD _ bind@VarBind{})] = run_stmt (mk_stmt (locA l) bind)
     -- Note that any `x = y` declarations below will be run as declarations
     -- instead of statements (e.g. `...; x = y; ...`)
     run_decls decls = do
@@ -1262,8 +1262,10 @@ runStmt input step = do
     mk_stmt loc bind =
       let
         l :: a -> Located a
-        l = L loc
-      in l (LetStmt noExtField (l (HsValBinds noExtField (ValBinds noExtField (unitBag (l bind)) []))))
+        l  = L loc
+        la  = L (noAnnSrcSpan loc)
+        la' = L (noAnnSrcSpan loc)
+      in la (LetStmt noAnn (HsValBinds noAnn (ValBinds NoAnnSortKey (unitBag (la' bind)) [])))
 
 -- | Clean up the GHCi environment after a statement has run
 afterRunStmt :: GhciMonad m
@@ -1684,7 +1686,7 @@ defineMacro overwrite s = do
           body = nlHsVar compose_RDR `mkHsApp` (nlHsPar step)
                                      `mkHsApp` (nlHsPar expr)
           tySig = mkLHsSigWcType (nlHsFunTy HsUnrestrictedArrow stringTy ioM)
-          new_expr = L (getLoc expr) $ ExprWithTySig noExtField body tySig
+          new_expr = L (getLoc expr) $ ExprWithTySig noAnn body tySig
       hv <- GHC.compileParsedExprRemote new_expr
 
       let newCmd = Command { cmdName = macro_name
@@ -1752,7 +1754,7 @@ getGhciStepIO = do
       ioM = nlHsTyVar (getRdrName ioTyConName) `nlHsAppTy` stringTy
       body = nlHsVar (getRdrName ghciStepIoMName)
       tySig = mkLHsSigWcType (nlHsFunTy HsUnrestrictedArrow ghciM ioM)
-  return $ noLoc $ ExprWithTySig noExtField body tySig
+  return $ noLocA $ ExprWithTySig noAnn body tySig
 
 -----------------------------------------------------------------------------
 -- :check

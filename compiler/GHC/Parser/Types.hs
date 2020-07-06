@@ -21,41 +21,64 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Data.OrdList
 
 import Data.Foldable
+import GHC.Parser.Annotation
 
 data SumOrTuple b
-  = Sum ConTag Arity (Located b)
-  | Tuple [Located (Maybe (Located b))]
+  = Sum ConTag Arity (LocatedA b) [RealSrcSpan] [RealSrcSpan]
+  -- ^ Last two are the locations of the '|' before and after the payload
+  | Tuple [Either (ApiAnn' RealSrcSpan) (LocatedA b)]
+-- data SumOrTuple b
+--   = Sum ConTag Arity (Located b)
+--   | Tuple [Located (Maybe (Located b))]
 
 pprSumOrTuple :: Outputable b => Boxity -> SumOrTuple b -> SDoc
 pprSumOrTuple boxity = \case
-    Sum alt arity e ->
+    Sum alt arity e _ _ ->
       parOpen <+> ppr_bars (alt - 1) <+> ppr e <+> ppr_bars (arity - alt)
               <+> parClose
     Tuple xs ->
-      parOpen <> (fcat . punctuate comma $ map (maybe empty ppr . unLoc) xs)
+      parOpen <> (fcat . punctuate comma $ map ppr_tup xs)
               <> parClose
   where
+    ppr_tup (Left _)  = empty
+    ppr_tup (Right e) = ppr e
+
     ppr_bars n = hsep (replicate n (Outputable.char '|'))
     (parOpen, parClose) =
       case boxity of
         Boxed -> (text "(", text ")")
         Unboxed -> (text "(#", text "#)")
+-- pprSumOrTuple :: Outputable b => Boxity -> SumOrTuple b -> SDoc
+-- pprSumOrTuple boxity = \case
+--     Sum alt arity e ->
+--       parOpen <+> ppr_bars (alt - 1) <+> ppr e <+> ppr_bars (arity - alt)
+--               <+> parClose
+--     Tuple xs ->
+--       parOpen <> (fcat . punctuate comma $ map (maybe empty ppr . unLoc) xs)
+--               <> parClose
+--   where
+--     ppr_bars n = hsep (replicate n (Outputable.char '|'))
+--     (parOpen, parClose) =
+--       case boxity of
+--         Boxed -> (text "(", text ")")
+--         Unboxed -> (text "(#", text "#)")
 
 -- | See Note [Ambiguous syntactic categories] and Note [PatBuilder] in
 -- GHC.parser.PostProcess
 data PatBuilder p
   = PatBuilderPat (Pat p)
-  | PatBuilderPar (Located (PatBuilder p))
-  | PatBuilderApp (Located (PatBuilder p)) (Located (PatBuilder p))
-  | PatBuilderOpApp (Located (PatBuilder p)) (Located RdrName) (Located (PatBuilder p))
-  | PatBuilderVar (Located RdrName)
+  | PatBuilderPar (LocatedA (PatBuilder p)) AnnParen
+  | PatBuilderApp (LocatedA (PatBuilder p)) (LocatedA (PatBuilder p))
+  | PatBuilderOpApp (LocatedA (PatBuilder p)) (LocatedN RdrName)
+                    (LocatedA (PatBuilder p)) ApiAnn
+  | PatBuilderVar (LocatedN RdrName)
   | PatBuilderOverLit (HsOverLit GhcPs)
 
 instance Outputable (PatBuilder GhcPs) where
   ppr (PatBuilderPat p) = ppr p
-  ppr (PatBuilderPar (L _ p)) = parens (ppr p)
+  ppr (PatBuilderPar (L _ p) _) = parens (ppr p)
   ppr (PatBuilderApp (L _ p1) (L _ p2)) = ppr p1 <+> ppr p2
-  ppr (PatBuilderOpApp (L _ p1) op (L _ p2)) = ppr p1 <+> ppr op <+> ppr p2
+  ppr (PatBuilderOpApp (L _ p1) op (L _ p2) _) = ppr p1 <+> ppr op <+> ppr p2
   ppr (PatBuilderVar v) = ppr v
   ppr (PatBuilderOverLit l) = ppr l
 
@@ -81,15 +104,14 @@ instance Outputable (PatBuilder GhcPs) where
 data DataConBuilder
   = PrefixDataConBuilder
       (OrdList (LHsType GhcPs))  -- Data constructor fields
-      (Located RdrName)          -- Data constructor name
+      (LocatedN RdrName)         -- Data constructor name
   | InfixDataConBuilder
-      (LHsType GhcPs)   -- LHS field
-      (Located RdrName) -- Data constructor name
-      (LHsType GhcPs)   -- RHS field
+      (LHsType GhcPs)    -- LHS field
+      (LocatedN RdrName) -- Data constructor name
+      (LHsType GhcPs)    -- RHS field
 
 instance Outputable DataConBuilder where
   ppr (PrefixDataConBuilder flds data_con) =
     hang (ppr data_con) 2 (sep (map ppr (toList flds)))
   ppr (InfixDataConBuilder lhs data_con rhs) =
     ppr lhs <+> ppr data_con <+> ppr rhs
-
