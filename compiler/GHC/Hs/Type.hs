@@ -77,7 +77,7 @@ module GHC.Hs.Type (
         setHsTyVarBndrFlag, hsTyVarBndrFlag,
 
         -- Printing
-        pprHsType, pprHsForAll, pprHsForAllExtra, pprHsExplicitForAll,
+        pprHsType, pprHsForAll, pprHsExplicitForAll,
         pprLHsContext,
         hsTypeNeedsParens, parenthesizeHsType, parenthesizeHsContext
     ) where
@@ -1811,24 +1811,11 @@ pprAnonWildCard = char '_'
 
 -- | Prints a forall; When passed an empty list, prints @forall .@/@forall ->@
 -- only when @-dppr-debug@ is enabled.
-pprHsForAll :: OutputableBndrId p
+pprHsForAll :: forall p. OutputableBndrId p
             => HsForAllTelescope (GhcPass p)
             -> LHsContext (GhcPass p) -> SDoc
-pprHsForAll = pprHsForAllExtra Nothing
-
--- | Version of 'pprHsForAll' that can also print an extra-constraints
--- wildcard, e.g. @_ => a -> Bool@ or @(Show a, _) => a -> String@. This
--- underscore will be printed when the 'Maybe SrcSpan' argument is a 'Just'
--- containing the location of the extra-constraints wildcard. A special
--- function for this is needed, as the extra-constraints wildcard is removed
--- from the actual context and type, and stored in a separate field, thus just
--- printing the type will not print the extra-constraints wildcard.
-pprHsForAllExtra :: forall p. OutputableBndrId p
-                 => Maybe SrcSpan
-                 -> HsForAllTelescope (GhcPass p)
-                 -> LHsContext (GhcPass p) -> SDoc
-pprHsForAllExtra extra tele cxt
-  = pp_tele tele <+> pprLHsContextExtra (isJust extra) cxt
+pprHsForAll tele cxt
+  = pp_tele tele <+> pprLHsContext cxt
   where
     pp_tele :: HsForAllTelescope (GhcPass p) -> SDoc
     pp_tele tele = case tele of
@@ -1862,16 +1849,6 @@ pprLHsContextAlways (L _ ctxt)
       []       -> parens empty             <+> darrow
       [L _ ty] -> ppr_mono_ty ty           <+> darrow
       _        -> parens (interpp'SP ctxt) <+> darrow
-
--- True <=> print an extra-constraints wildcard, e.g. @(Show a, _) =>@
-pprLHsContextExtra :: (OutputableBndrId p)
-                   => Bool -> LHsContext (GhcPass p) -> SDoc
-pprLHsContextExtra show_extra lctxt@(L _ ctxt)
-  | not show_extra = pprLHsContext lctxt
-  | null ctxt      = char '_' <+> darrow
-  | otherwise      = parens (sep (punctuate comma ctxt')) <+> darrow
-  where
-    ctxt' = map ppr ctxt ++ [char '_']
 
 pprConDeclFields :: (OutputableBndrId p)
                  => [LConDeclField (GhcPass p)] -> SDoc
