@@ -135,18 +135,19 @@ mkPrelImports this_mod loc implicit_prelude import_decls
                           <- import_decls
                       , unLoc mod == pRELUDE_NAME ]
 
+      loc' = noAnnSrcSpan loc
       preludeImportDecl :: LImportDecl GhcPs
       preludeImportDecl
-        = L loc $ ImportDecl { ideclExt       = noExtField,
-                               ideclSourceSrc = NoSourceText,
-                               ideclName      = L loc pRELUDE_NAME,
-                               ideclPkgQual   = Nothing,
-                               ideclSource    = NotBoot,
-                               ideclSafe      = False,  -- Not a safe import
-                               ideclQualified = NotQualified,
-                               ideclImplicit  = True,   -- Implicit!
-                               ideclAs        = Nothing,
-                               ideclHiding    = Nothing  }
+        = L loc' $ ImportDecl { ideclExt       = noAnn,
+                                ideclSourceSrc = NoSourceText,
+                                ideclName      = L loc pRELUDE_NAME,
+                                ideclPkgQual   = Nothing,
+                                ideclSource    = NotBoot,
+                                ideclSafe      = False,  -- Not a safe import
+                                ideclQualified = NotQualified,
+                                ideclImplicit  = True,   -- Implicit!
+                                ideclAs        = Nothing,
+                                ideclHiding    = Nothing  }
 
 --------------------------------------------------------------
 -- Get options

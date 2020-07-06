@@ -1,21 +1,40 @@
 
 ==================== Parser AST ====================
 
-({ T17544_kw.hs:1:1 }
+(L
+ { T17544_kw.hs:1:1 }
  (HsModule
+  (ApiAnn
+   { T17544_kw.hs:1:1 }
+   (AnnsModule
+    [(AddApiAnn AnnModule { T17544_kw.hs:11:1-6 })
+    ,(AddApiAnn AnnWhere { T17544_kw.hs:13:13-17 })]
+    (AnnList
+     (Nothing)
+     (Nothing)
+     []
+     []))
+   [])
   (VirtualBraces
    (1))
   (Just
-   ({ T17544_kw.hs:13:3-11 }
+   (L
+    { T17544_kw.hs:13:3-11 }
     {ModuleName: T17544_kw}))
   (Nothing)
   []
-  [({ T17544_kw.hs:(15,1)-(16,20) }
+  [(L
+    (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:(15,1)-(16,20) })
     (TyClD
      (NoExtField)
      (DataDecl
-      (NoExtField)
-      ({ T17544_kw.hs:15:6-8 }
+      (ApiAnn
+       { T17544_kw.hs:(15,1)-(16,20) }
+       [(AddApiAnn AnnData { T17544_kw.hs:15:1-4 })
+       ,(AddApiAnn AnnWhere { T17544_kw.hs:16:3-7 })]
+       [])
+      (L
+       (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:15:6-8 })
        (Unqual
         {OccName: Foo}))
       (HsQTvs
@@ -23,43 +42,63 @@
        [])
       (Prefix)
       (HsDataDefn
-       (NoExtField)
-       (DataType)
-       ({ <no location info> }
+       (ApiAnn
+        { T17544_kw.hs:(15,1)-(16,20) }
+        [(AddApiAnn AnnData { T17544_kw.hs:15:1-4 })
+        ,(AddApiAnn AnnWhere { T17544_kw.hs:16:3-7 })]
         [])
+       (DataType)
        (Nothing)
        (Nothing)
-       [({ T17544_kw.hs:16:9-20 }
+       (Nothing)
+       [(L
+         (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:16:9-20 })
          (ConDeclGADT
-          (NoExtField)
-          [({ T17544_kw.hs:16:9-13 }
+          (ApiAnn
+           { T17544_kw.hs:16:9-20 }
+           [(AddApiAnn AnnDcolon { T17544_kw.hs:16:15-16 })]
+           [])
+          [(L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:16:9-13 })
             (Unqual
              {OccName: MkFoo}))]
-          ({ T17544_kw.hs:16:18-20 }
+          (L
+           (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:16:18-20 })
            (HsOuterImplicit
             (NoExtField)))
           (Nothing)
           (PrefixConGADT
            [])
-          ({ T17544_kw.hs:16:18-20 }
+          (L
+           (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:16:18-20 })
            (HsTyVar
-            (NoExtField)
+            (ApiAnn
+             { T17544_kw.hs:16:18-20 }
+             []
+             [])
             (NotPromoted)
-            ({ T17544_kw.hs:16:18-20 }
+            (L
+             (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:16:18-20 })
              (Unqual
               {OccName: Foo}))))
           (Just
-           ({ T17544_kw.hs:15:10-35 }
+           (L
+            { T17544_kw.hs:15:10-35 }
             (HsDocString
              " Bad comment for MkFoo")))))]
-       ({ <no location info> }
-        [])))))
-  ,({ T17544_kw.hs:(18,1)-(19,26) }
+       []))))
+  ,(L
+    (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:(18,1)-(19,26) })
     (TyClD
      (NoExtField)
      (DataDecl
-      (NoExtField)
-      ({ T17544_kw.hs:18:9-11 }
+      (ApiAnn
+       { T17544_kw.hs:(18,1)-(19,26) }
+       [(AddApiAnn AnnNewtype { T17544_kw.hs:18:1-7 })
+       ,(AddApiAnn AnnWhere { T17544_kw.hs:19:3-7 })]
+       [])
+      (L
+       (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:18:9-11 })
        (Unqual
         {OccName: Bar}))
       (HsQTvs
@@ -67,19 +106,28 @@
        [])
       (Prefix)
       (HsDataDefn
-       (NoExtField)
-       (NewType)
-       ({ <no location info> }
+       (ApiAnn
+        { T17544_kw.hs:(18,1)-(19,26) }
+        [(AddApiAnn AnnNewtype { T17544_kw.hs:18:1-7 })
+        ,(AddApiAnn AnnWhere { T17544_kw.hs:19:3-7 })]
         [])
+       (NewType)
        (Nothing)
        (Nothing)
-       [({ T17544_kw.hs:19:9-26 }
+       (Nothing)
+       [(L
+         (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:19:9-26 })
          (ConDeclGADT
-          (NoExtField)
-          [({ T17544_kw.hs:19:9-13 }
+          (ApiAnn
+           { T17544_kw.hs:19:9-26 }
+           [(AddApiAnn AnnDcolon { T17544_kw.hs:19:15-16 })]
+           [])
+          [(L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:19:9-13 })
             (Unqual
              {OccName: MkBar}))]
-          ({ T17544_kw.hs:19:18-26 }
+          (L
+           (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:19:18-26 })
            (HsOuterImplicit
             (NoExtField)))
           (Nothing)
@@ -87,77 +135,117 @@
            [(HsScaled
              (HsUnrestrictedArrow
               (NormalSyntax))
-             ({ T17544_kw.hs:19:18-19 }
+             (L
+              (SrcSpanAnn (ApiAnn
+                           { T17544_kw.hs:19:18-19 }
+                           (AnnListItem
+                            [(AddRarrowAnn
+                              { T17544_kw.hs:19:21-22 })])
+                           []) { T17544_kw.hs:19:18-19 })
               (HsTupleTy
-               (NoExtField)
+               (ApiAnn
+                { T17544_kw.hs:19:18 }
+                (AnnParen
+                 (AnnParens)
+                 { T17544_kw.hs:19:18 }
+                 { T17544_kw.hs:19:19 })
+                [])
                (HsBoxedOrConstraintTuple)
                [])))])
-          ({ T17544_kw.hs:19:24-26 }
+          (L
+           (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:19:24-26 })
            (HsTyVar
-            (NoExtField)
+            (ApiAnn
+             { T17544_kw.hs:19:24-26 }
+             []
+             [])
             (NotPromoted)
-            ({ T17544_kw.hs:19:24-26 }
+            (L
+             (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:19:24-26 })
              (Unqual
               {OccName: Bar}))))
           (Just
-           ({ T17544_kw.hs:18:13-38 }
+           (L
+            { T17544_kw.hs:18:13-38 }
             (HsDocString
              " Bad comment for MkBar")))))]
-       ({ <no location info> }
-        [])))))
-  ,({ T17544_kw.hs:(21,1)-(24,18) }
+       []))))
+  ,(L
+    (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:(21,1)-(24,18) })
     (TyClD
      (NoExtField)
      (ClassDecl
-      (VirtualBraces
-       (5))
-      ({ <no location info> }
-       [])
-      ({ T17544_kw.hs:21:7-9 }
+      ((,)
+       (ApiAnn
+        { T17544_kw.hs:(21,1)-(24,18) }
+        [(AddApiAnn AnnClass { T17544_kw.hs:21:1-5 })
+        ,(AddApiAnn AnnWhere { T17544_kw.hs:23:3-7 })]
+        [])
+       (VirtualBraces
+        (5)))
+      (Nothing)
+      (L
+       (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:21:7-9 })
        (Unqual
         {OccName: Cls}))
       (HsQTvs
        (NoExtField)
-       [({ T17544_kw.hs:21:11 }
+       [(L
+         (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:21:11 })
          (UserTyVar
-          (NoExtField)
+          (ApiAnn
+           { T17544_kw.hs:21:11 }
+           []
+           [])
           (())
-          ({ T17544_kw.hs:21:11 }
+          (L
+           (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:21:11 })
            (Unqual
             {OccName: a}))))])
       (Prefix)
       []
-      [({ T17544_kw.hs:24:5-18 }
+      [(L
+        (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:24:5-18 })
         (ClassOpSig
-         (NoExtField)
+         (ApiAnn
+          { T17544_kw.hs:24:5-13 }
+          [(AddApiAnn AnnDcolon { T17544_kw.hs:24:15-16 })]
+          [])
          (False)
-         [({ T17544_kw.hs:24:5-13 }
+         [(L
+           (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:24:5-13 })
            (Unqual
             {OccName: clsmethod}))]
-         ({ T17544_kw.hs:24:18 }
+         (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:24:18 })
           (HsSig
            (NoExtField)
            (HsOuterImplicit
             (NoExtField))
-           ({ T17544_kw.hs:24:18 }
+           (L
+            (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:24:18 })
             (HsTyVar
-             (NoExtField)
+             (ApiAnn
+              { T17544_kw.hs:24:18 }
+              []
+              [])
              (NotPromoted)
-             ({ T17544_kw.hs:24:18 }
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:24:18 })
               (Unqual
                {OccName: a}))))))))]
-      {Bag(Located (HsBind GhcPs)):
+      {Bag(LocatedA (HsBind GhcPs)):
        []}
       []
       []
-      [({ T17544_kw.hs:22:5-34 }
+      [(L
+        (SrcSpanAnn (ApiAnnNotUsed) { T17544_kw.hs:22:5-34 })
         (DocCommentNext
          (HsDocString
           " Bad comment for clsmethod")))])))]
   (Nothing)
   (Just
-   ({ T17544_kw.hs:12:3-33 }
+   (L
+    { T17544_kw.hs:12:3-33 }
     (HsDocString
      " Bad comment for the module")))))
-
-

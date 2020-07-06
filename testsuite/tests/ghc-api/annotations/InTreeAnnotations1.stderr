@@ -1,0 +1,438 @@
+
+==================== Parser AST ====================
+
+(L
+ { InTreeAnnotations1.hs:1:1 }
+ (HsModule
+  (ApiAnn
+   (Anchor
+    { InTreeAnnotations1.hs:1:1 })
+   (AnnsModule
+    [(AddApiAnn AnnModule { InTreeAnnotations1.hs:2:1-6 })
+    ,(AddApiAnn AnnWhere { InTreeAnnotations1.hs:2:27-31 })]
+    (AnnList
+     (Nothing)
+     (Nothing)
+     []
+     []))
+   [])
+  (VirtualBraces
+   (1))
+  (Just
+   (L
+    { InTreeAnnotations1.hs:2:8-25 }
+    {ModuleName: InTreeAnnotations1}))
+  (Nothing)
+  []
+  [(L
+    (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:4:1-31 })
+    (ValD
+     (NoExtField)
+     (FunBind
+      (NoExtField)
+      (L
+       (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:4:1-3 })
+       (Unqual
+        {OccName: foo}))
+      (MG
+       (NoExtField)
+       (L
+        (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:4:1-31 })
+        [(L
+          (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:4:1-31 })
+          (Match
+           (ApiAnn
+            (Anchor
+             { InTreeAnnotations1.hs:4:1-31 })
+            []
+            [])
+           (FunRhs
+            (L
+             (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:4:1-3 })
+             (Unqual
+              {OccName: foo}))
+            (Prefix)
+            (NoSrcStrict))
+           [(L
+             (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:4:5-11 })
+             (AsPat
+              (ApiAnn
+               (Anchor
+                { InTreeAnnotations1.hs:4:5-11 })
+               [(AddApiAnn AnnAt { InTreeAnnotations1.hs:4:6 })]
+               [])
+              (L
+               (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:4:5 })
+               (Unqual
+                {OccName: a}))
+              (L
+               (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:4:7-11 })
+               (TuplePat
+                (ApiAnn
+                 (Anchor
+                  { InTreeAnnotations1.hs:4:7-11 })
+                 [(AddApiAnn AnnOpenP { InTreeAnnotations1.hs:4:7 })
+                 ,(AddApiAnn AnnCloseP { InTreeAnnotations1.hs:4:11 })]
+                 [])
+                [(L
+                  (SrcSpanAnn (ApiAnn
+                               (Anchor
+                                { InTreeAnnotations1.hs:4:8 })
+                               (AnnListItem
+                                [(AddCommaAnn
+                                  { InTreeAnnotations1.hs:4:9 })])
+                               []) { InTreeAnnotations1.hs:4:8 })
+                  (WildPat
+                   (NoExtField)))
+                ,(L
+                  (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:4:10 })
+                  (WildPat
+                   (NoExtField)))]
+                (Boxed)))))
+           ,(L
+             (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:4:13-16 })
+             (BangPat
+              (ApiAnn
+               (Anchor
+                { InTreeAnnotations1.hs:4:13-16 })
+               [(AddApiAnn AnnBang { InTreeAnnotations1.hs:4:13 })]
+               [])
+              (L
+               (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:4:14-16 })
+               (LitPat
+                (NoExtField)
+                (HsString
+                 (SourceText "a")
+                 {FastString: "a"})))))
+           ,(L
+             (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:4:18-19 })
+             (LazyPat
+              (ApiAnn
+               (Anchor
+                { InTreeAnnotations1.hs:4:18-19 })
+               [(AddApiAnn AnnTilde { InTreeAnnotations1.hs:4:18 })]
+               [])
+              (L
+               (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:4:19 })
+               (VarPat
+                (NoExtField)
+                (L
+                 (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:4:19 })
+                 (Unqual
+                  {OccName: x}))))))]
+           (GRHSs
+            (NoExtField)
+            [(L
+              { InTreeAnnotations1.hs:4:21-31 }
+              (GRHS
+               (ApiAnn
+                (Anchor
+                 { InTreeAnnotations1.hs:4:21-31 })
+                (GrhsAnn
+                 (Nothing)
+                 (AddApiAnn AnnEqual { InTreeAnnotations1.hs:4:21 }))
+                [])
+               []
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:4:23-31 })
+                (HsVar
+                 (NoExtField)
+                 (L
+                  (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:4:23-31 })
+                  (Unqual
+                   {OccName: undefined}))))))]
+            (EmptyLocalBinds
+             (NoExtField)))))])
+       (FromSource))
+      [])))
+  ,(L
+    (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:6:1-27 })
+    (TyClD
+     (NoExtField)
+     (DataDecl
+      (ApiAnn
+       (Anchor
+        { InTreeAnnotations1.hs:6:1-27 })
+       [(AddApiAnn AnnData { InTreeAnnotations1.hs:6:1-4 })
+       ,(AddApiAnn AnnEqual { InTreeAnnotations1.hs:6:8 })]
+       [])
+      (L
+       (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:6:6 })
+       (Unqual
+        {OccName: T}))
+      (HsQTvs
+       (NoExtField)
+       [])
+      (Prefix)
+      (HsDataDefn
+       (ApiAnn
+        (Anchor
+         { InTreeAnnotations1.hs:6:1-27 })
+        [(AddApiAnn AnnData { InTreeAnnotations1.hs:6:1-4 })
+        ,(AddApiAnn AnnEqual { InTreeAnnotations1.hs:6:8 })]
+        [])
+       (DataType)
+       (Nothing)
+       (Nothing)
+       (Nothing)
+       [(L
+         (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:6:10-27 })
+         (ConDeclH98
+          (ApiAnn
+           (Anchor
+            { InTreeAnnotations1.hs:6:10-27 })
+           []
+           [])
+          (L
+           (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:6:10-12 })
+           (Unqual
+            {OccName: MkT}))
+          (False)
+          []
+          (Nothing)
+          (RecCon
+           (L
+            (SrcSpanAnn (ApiAnn
+                         (Anchor
+                          { InTreeAnnotations1.hs:6:14 })
+                         (AnnList
+                          (Just
+                           (AddApiAnn AnnOpenC { InTreeAnnotations1.hs:6:14 }))
+                          (Just
+                           (AddApiAnn AnnCloseC { InTreeAnnotations1.hs:6:27 }))
+                          []
+                          [])
+                         []) { InTreeAnnotations1.hs:6:14-27 })
+            [(L
+              (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:6:16-25 })
+              (ConDeclField
+               (ApiAnn
+                (Anchor
+                 { InTreeAnnotations1.hs:6:16-18 })
+                [(AddApiAnn AnnDcolon { InTreeAnnotations1.hs:6:20-21 })]
+                [])
+               [(L
+                 { InTreeAnnotations1.hs:6:16 }
+                 (FieldOcc
+                  (NoExtField)
+                  (L
+                   (SrcSpanAnn (ApiAnn
+                                (Anchor
+                                 { InTreeAnnotations1.hs:6:16 })
+                                (NameAnnTrailing
+                                 [(AddCommaAnn
+                                   { InTreeAnnotations1.hs:6:17 })])
+                                []) { InTreeAnnotations1.hs:6:16 })
+                   (Unqual
+                    {OccName: x}))))
+               ,(L
+                 { InTreeAnnotations1.hs:6:18 }
+                 (FieldOcc
+                  (NoExtField)
+                  (L
+                   (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:6:18 })
+                   (Unqual
+                    {OccName: y}))))]
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:6:23-25 })
+                (HsTyVar
+                 (ApiAnn
+                  (Anchor
+                   { InTreeAnnotations1.hs:6:23-25 })
+                  []
+                  [])
+                 (NotPromoted)
+                 (L
+                  (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:6:23-25 })
+                  (Unqual
+                   {OccName: Int}))))
+               (Nothing)))]))
+          (Nothing)))]
+       []))))
+  ,(L
+    (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:1-43 })
+    (ValD
+     (NoExtField)
+     (FunBind
+      (NoExtField)
+      (L
+       (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:1 })
+       (Unqual
+        {OccName: f}))
+      (MG
+       (NoExtField)
+       (L
+        (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:1-43 })
+        [(L
+          (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:1-43 })
+          (Match
+           (ApiAnn
+            (Anchor
+             { InTreeAnnotations1.hs:8:1-43 })
+            []
+            [])
+           (FunRhs
+            (L
+             (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:1 })
+             (Unqual
+              {OccName: f}))
+            (Prefix)
+            (NoSrcStrict))
+           [(L
+             (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:3-35 })
+             (ParPat
+              (ApiAnn
+               (Anchor
+                { InTreeAnnotations1.hs:8:3-35 })
+               (AnnParen
+                (AnnParens)
+                { InTreeAnnotations1.hs:8:3 }
+                { InTreeAnnotations1.hs:8:35 })
+               [])
+              (L
+               (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:4-34 })
+               (ConPat
+                (ApiAnn
+                 (Anchor
+                  { InTreeAnnotations1.hs:8:4-34 })
+                 [(AddApiAnn AnnOpenC { InTreeAnnotations1.hs:8:8 })
+                 ,(AddApiAnn AnnCloseC { InTreeAnnotations1.hs:8:34 })]
+                 [])
+                (L
+                 (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:4-6 })
+                 (Unqual
+                  {OccName: MkT}))
+                (RecCon
+                 (HsRecFields
+                  [(L
+                    (SrcSpanAnn (ApiAnn
+                                 (Anchor
+                                  { InTreeAnnotations1.hs:8:10-15 })
+                                 (AnnListItem
+                                  [(AddCommaAnn
+                                    { InTreeAnnotations1.hs:8:16 })])
+                                 []) { InTreeAnnotations1.hs:8:10-15 })
+                    (HsRecField
+                     (ApiAnn
+                      (Anchor
+                       { InTreeAnnotations1.hs:8:10 })
+                      [(AddApiAnn AnnEqual { InTreeAnnotations1.hs:8:12 })]
+                      [])
+                     (L
+                      { InTreeAnnotations1.hs:8:10 }
+                      (FieldOcc
+                       (NoExtField)
+                       (L
+                        (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:10 })
+                        (Unqual
+                         {OccName: x}))))
+                     (L
+                      (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:14-15 })
+                      (BangPat
+                       (ApiAnn
+                        (Anchor
+                         { InTreeAnnotations1.hs:8:14-15 })
+                        [(AddApiAnn AnnBang { InTreeAnnotations1.hs:8:14 })]
+                        [])
+                       (L
+                        (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:15 })
+                        (VarPat
+                         (NoExtField)
+                         (L
+                          (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:15 })
+                          (Unqual
+                           {OccName: v}))))))
+                     (False)))
+                  ,(L
+                    (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:18-32 })
+                    (HsRecField
+                     (ApiAnn
+                      (Anchor
+                       { InTreeAnnotations1.hs:8:18 })
+                      [(AddApiAnn AnnEqual { InTreeAnnotations1.hs:8:20 })]
+                      [])
+                     (L
+                      { InTreeAnnotations1.hs:8:18 }
+                      (FieldOcc
+                       (NoExtField)
+                       (L
+                        (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:18 })
+                        (Unqual
+                         {OccName: y}))))
+                     (L
+                      (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:22-32 })
+                      (ViewPat
+                       (ApiAnn
+                        (Anchor
+                         { InTreeAnnotations1.hs:8:22-32 })
+                        [(AddApiAnn AnnRarrow { InTreeAnnotations1.hs:8:29-30 })]
+                        [])
+                       (L
+                        (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:22-27 })
+                        (HsVar
+                         (NoExtField)
+                         (L
+                          (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:22-27 })
+                          (Unqual
+                           {OccName: negate}))))
+                       (L
+                        (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:32 })
+                        (VarPat
+                         (NoExtField)
+                         (L
+                          (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:32 })
+                          (Unqual
+                           {OccName: w}))))))
+                     (False)))]
+                  (Nothing)))))))]
+           (GRHSs
+            (NoExtField)
+            [(L
+              { InTreeAnnotations1.hs:8:37-43 }
+              (GRHS
+               (ApiAnn
+                (Anchor
+                 { InTreeAnnotations1.hs:8:37-43 })
+                (GrhsAnn
+                 (Nothing)
+                 (AddApiAnn AnnEqual { InTreeAnnotations1.hs:8:37 }))
+                [])
+               []
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:39-43 })
+                (OpApp
+                 (ApiAnn
+                  (Anchor
+                   { InTreeAnnotations1.hs:8:39-43 })
+                  []
+                  [])
+                 (L
+                  (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:39 })
+                  (HsVar
+                   (NoExtField)
+                   (L
+                    (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:39 })
+                    (Unqual
+                     {OccName: v}))))
+                 (L
+                  (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:41 })
+                  (HsVar
+                   (NoExtField)
+                   (L
+                    (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:41 })
+                    (Unqual
+                     {OccName: +}))))
+                 (L
+                  (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:43 })
+                  (HsVar
+                   (NoExtField)
+                   (L
+                    (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:43 })
+                    (Unqual
+                     {OccName: w}))))))))]
+            (EmptyLocalBinds
+             (NoExtField)))))])
+       (FromSource))
+      [])))]
+  (Nothing)
+  (Nothing)))

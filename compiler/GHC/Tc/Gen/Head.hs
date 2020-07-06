@@ -155,18 +155,18 @@ data TcPass = TcpRn     -- Arguments decomposed
 
 data HsExprArg (p :: TcPass)
   = -- See Note [HsExprArg]
-    EValArg  { eva_loc    :: SrcSpan        -- Of the function
+    EValArg  { eva_loc    :: SrcSpanAnnA     -- Of the function
              , eva_arg    :: EValArg p
              , eva_arg_ty :: !(XEVAType p) }
 
-  | ETypeArg { eva_loc   :: SrcSpan          -- Of the function
+  | ETypeArg { eva_loc   :: SrcSpanAnnA      -- Of the function
              , eva_hs_ty :: LHsWcType GhcRn  -- The type arg
              , eva_ty    :: !(XETAType p) }  -- Kind-checked type arg
 
-  | EPrag    SrcSpan
+  | EPrag    SrcSpanAnnA
              (HsPragE (GhcPass (XPass p)))
 
-  | EPar     SrcSpan         -- Of the nested expr
+  | EPar     SrcSpanAnnA     -- Of the nested expr
 
   | EWrap    !(XEWrap p)     -- Wrapper, after instantiation
 
@@ -201,11 +201,11 @@ type family XEWrap p where
   XEWrap 'TcpRn = NoExtCon
   XEWrap _      = HsWrapper
 
-mkEValArg :: SrcSpan -> LHsExpr GhcRn -> HsExprArg 'TcpRn
+mkEValArg :: SrcSpanAnnA -> LHsExpr GhcRn -> HsExprArg 'TcpRn
 mkEValArg l e = EValArg { eva_loc = l, eva_arg = ValArg e
                         , eva_arg_ty = noExtField }
 
-mkETypeArg :: SrcSpan -> LHsWcType GhcRn -> HsExprArg 'TcpRn
+mkETypeArg :: SrcSpanAnnA -> LHsWcType GhcRn -> HsExprArg 'TcpRn
 mkETypeArg l hs_ty = ETypeArg { eva_loc = l, eva_hs_ty = hs_ty
                               , eva_ty = noExtField }
 
@@ -255,11 +255,11 @@ rebuildPrefixApps fun args
     go fun [] = fun
     go fun (EWrap wrap : args)               = go (mkHsWrap wrap fun) args
     go fun (EValArg { eva_arg = ValArg arg
-                    , eva_loc = l } : args)  = go (HsApp noExtField (L l fun) arg) args
+                    , eva_loc = l } : args)  = go (HsApp noAnn (L l fun) arg) args
     go fun (ETypeArg { eva_hs_ty = hs_ty
                      , eva_ty  = ty
                      , eva_loc = l } : args) = go (HsAppType ty (L l fun) hs_ty) args
-    go fun (EPar l : args)                   = go (HsPar noExtField (L l fun)) args
+    go fun (EPar l : args)                   = go (HsPar noAnn (L l fun)) args
     go fun (EPrag l p : args)                = go (HsPragE noExtField p (L l fun)) args
 
 isHsValArg :: HsExprArg id -> Bool
@@ -288,10 +288,10 @@ setSrcSpanFromArgs (arg:_) thing_inside
   = setSrcSpan (argFunLoc arg) thing_inside
 
 argFunLoc :: HsExprArg 'TcpRn -> SrcSpan
-argFunLoc (EValArg { eva_loc = l }) = l
-argFunLoc (ETypeArg { eva_loc = l}) = l
-argFunLoc (EPrag l _)               = l
-argFunLoc (EPar l)                  = l
+argFunLoc (EValArg { eva_loc = l }) = locA l
+argFunLoc (ETypeArg { eva_loc = l}) = locA l
+argFunLoc (EPrag l _)               = locA l
+argFunLoc (EPar l)                  = locA l
 
 instance OutputableBndrId (XPass p) => Outputable (HsExprArg p) where
   ppr (EValArg { eva_arg = arg })      = text "EValArg" <+> ppr arg
@@ -486,7 +486,7 @@ tcInferRecSelId (Ambiguous _ lbl) args mb_res_ty
         ; return (expr, idType sel_id) }
 
 ------------------------
-tc_rec_sel_id :: Located RdrName -> Name -> TcM TcId
+tc_rec_sel_id :: LocatedN RdrName -> Name -> TcM TcId
 -- Like tc_infer_id, but returns an Id not a HsExpr,
 -- so we can wrap it back up into a HsRecFld
 tc_rec_sel_id lbl sel_name
@@ -509,7 +509,7 @@ tc_rec_sel_id lbl sel_name
     occ = rdrNameOcc (unLoc lbl)
 
 ------------------------
-tcInferAmbiguousRecSelId :: Located RdrName
+tcInferAmbiguousRecSelId :: LocatedN RdrName
                          -> [HsExprArg 'TcpRn] -> Maybe TcRhoType
                          -> TcM Name
 -- Disgusting special case for ambiguous record selectors
@@ -531,7 +531,7 @@ tcInferAmbiguousRecSelId lbl args mb_res_ty
   | otherwise
   = ambiguousSelector lbl
 
-finish_ambiguous_selector :: Located RdrName -> Type -> TcM Name
+finish_ambiguous_selector :: LocatedN RdrName -> Type -> TcM Name
 finish_ambiguous_selector lr@(L _ rdr) parent_type
  = do { fam_inst_envs <- tcGetFamInstEnvs
       ; case tyConOf fam_inst_envs parent_type of {
@@ -549,7 +549,7 @@ finish_ambiguous_selector lr@(L _ rdr) parent_type
 
 -- This field name really is ambiguous, so add a suitable "ambiguous
 -- occurrence" error, then give up.
-ambiguousSelector :: Located RdrName -> TcM a
+ambiguousSelector :: LocatedN RdrName -> TcM a
 ambiguousSelector (L _ rdr)
   = do { addAmbiguousNameErr rdr
        ; failM }
@@ -632,7 +632,7 @@ tcExprWithSig expr hs_ty
        ; (expr', poly_ty) <- tcExprSig expr sig_info
        ; return (ExprWithTySig noExtField expr' hs_ty, poly_ty) }
   where
-    loc = getLoc (dropWildCards hs_ty)
+    loc = getLocA (dropWildCards hs_ty)
 
 tcExprSig :: LHsExpr GhcRn -> TcIdSigInfo -> TcM (LHsExpr GhcTc, TcType)
 tcExprSig expr (CompleteSig { sig_bndr = poly_id, sig_loc = loc })
@@ -723,7 +723,7 @@ tcCheckId name res_ty
   = do { (expr, actual_res_ty) <- tcInferId name
        ; traceTc "tcCheckId" (vcat [ppr name, ppr actual_res_ty, ppr res_ty])
        ; addFunResCtxt expr [] actual_res_ty res_ty $
-         tcWrapResultO (OccurrenceOf name) (HsVar noExtField (noLoc name)) expr
+         tcWrapResultO (OccurrenceOf name) (HsVar noExtField (noLocA name)) expr
                                            actual_res_ty res_ty }
 
 ------------------------
@@ -749,7 +749,7 @@ tc_infer_assert assert_name
   = do { assert_error_id <- tcLookupId assertErrorName
        ; (wrap, id_rho) <- topInstantiate (OccurrenceOf assert_name)
                                           (idType assert_error_id)
-       ; return (mkHsWrap wrap (HsVar noExtField (noLoc assert_error_id)), id_rho)
+       ; return (mkHsWrap wrap (HsVar noExtField (noLocA assert_error_id)), id_rho)
        }
 
 tc_infer_id :: Name -> TcM (HsExpr GhcTc, TcSigmaType)
@@ -800,7 +800,7 @@ tc_infer_id id_name
 
     occ = nameOccName id_name
 
-    return_id id = return (HsVar noExtField (noLoc id), idType id)
+    return_id id = return (HsVar noExtField (noLocA id), idType id)
 
     return_data_con con
       = do { let tvs = dataConUserTyVarBinders con
@@ -994,7 +994,7 @@ checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
         ; lift <- if isStringTy id_ty then
                      do { sid <- tcLookupId GHC.Builtin.Names.TH.liftStringName
                                      -- See Note [Lifting strings]
-                        ; return (HsVar noExtField (noLoc sid)) }
+                        ; return (HsVar noExtField (noLocA sid)) }
                   else
                      setConstraintVar lie_var   $
                           -- Put the 'lift' constraint into the right LIE
@@ -1005,7 +1005,7 @@ checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
                    -- Update the pending splices
         ; ps <- readMutVar ps_var
         ; let pending_splice = PendingTcSplice id_name
-                                 (nlHsApp (mkLHsWrap (applyQuoteWrapper q) (noLoc lift))
+                                 (nlHsApp (mkLHsWrap (applyQuoteWrapper q) (noLocA lift))
                                           (nlHsVar id))
         ; writeMutVar ps_var (pending_splice : ps)
 

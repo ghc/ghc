@@ -1,100 +1,181 @@
 
 ==================== Parser AST ====================
 
-({ T15323.hs:1:1 }
+(L
+ { T15323.hs:1:1 }
  (HsModule
+  (ApiAnn
+   { T15323.hs:1:1 }
+   (AnnsModule
+    [(AddApiAnn AnnModule { T15323.hs:3:1-6 })
+    ,(AddApiAnn AnnWhere { T15323.hs:3:15-19 })]
+    (AnnList
+     (Nothing)
+     (Nothing)
+     []
+     []))
+   [])
   (VirtualBraces
    (1))
   (Just
-   ({ T15323.hs:3:8-13 }
+   (L
+    { T15323.hs:3:8-13 }
     {ModuleName: T15323}))
   (Nothing)
   []
-  [({ T15323.hs:(5,1)-(6,54) }
+  [(L
+    (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:(5,1)-(6,54) })
     (TyClD
      (NoExtField)
      (DataDecl
-      (NoExtField)
-      ({ T15323.hs:5:6-17 }
+      (ApiAnn
+       { T15323.hs:(5,1)-(6,54) }
+       [(AddApiAnn AnnData { T15323.hs:5:1-4 })
+       ,(AddApiAnn AnnWhere { T15323.hs:5:21-25 })]
+       [])
+      (L
+       (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:5:6-17 })
        (Unqual
         {OccName: MaybeDefault}))
       (HsQTvs
        (NoExtField)
-       [({ T15323.hs:5:19 }
+       [(L
+         (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:5:19 })
          (UserTyVar
-          (NoExtField)
+          (ApiAnn
+           { T15323.hs:5:19 }
+           []
+           [])
           (())
-          ({ T15323.hs:5:19 }
+          (L
+           (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:5:19 })
            (Unqual
             {OccName: v}))))])
       (Prefix)
       (HsDataDefn
-       (NoExtField)
-       (DataType)
-       ({ <no location info> }
+       (ApiAnn
+        { T15323.hs:(5,1)-(6,54) }
+        [(AddApiAnn AnnData { T15323.hs:5:1-4 })
+        ,(AddApiAnn AnnWhere { T15323.hs:5:21-25 })]
         [])
+       (DataType)
        (Nothing)
        (Nothing)
-       [({ T15323.hs:6:5-54 }
+       (Nothing)
+       [(L
+         (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:5-54 })
          (ConDeclGADT
-          (NoExtField)
-          [({ T15323.hs:6:5-14 }
+          (ApiAnn
+           { T15323.hs:6:5-54 }
+           [(AddApiAnn AnnDcolon { T15323.hs:6:17-18 })]
+           [])
+          [(L
+            (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:5-14 })
             (Unqual
              {OccName: TestParens}))]
-          ({ T15323.hs:6:20-54 }
+          (L
+           (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:20-54 })
            (HsOuterExplicit
-            (NoExtField)
-            [({ T15323.hs:6:27 }
-              (UserTyVar
-               (NoExtField)
-               (SpecifiedSpec)
-               ({ T15323.hs:6:27 }
-                (Unqual
+            (ApiAnn
+             { T15323.hs:6:20-25 }
+             ((,)
+              (AddApiAnn AnnForall { T15323.hs:6:20-25 })
+              (AddApiAnn AnnDot { T15323.hs:6:29 }))
+             [])
+          [(L
+            (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:27 })
+            (UserTyVar
+             (ApiAnn
+              { T15323.hs:6:27 }
+              []
+              [])
+             (SpecifiedSpec)
+             (L
+              (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:27 })
+              (Unqual
                  {OccName: v}))))]))
           (Just
-           ({ T15323.hs:6:31-36 }
-            [({ T15323.hs:6:31-36 }
+           (L
+            (SrcSpanAnn (ApiAnn
+                         { T15323.hs:6:31-36 }
+                         (AnnContext
+                          (Just
+                           ((,)
+                            (NormalSyntax)
+                            { T15323.hs:6:38-39 }))
+                          [{ T15323.hs:6:31 }]
+                          [{ T15323.hs:6:36 }])
+                         []) { T15323.hs:6:31-36 })
+            [(L
+              (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:31-36 })
               (HsParTy
-               (NoExtField)
-               ({ T15323.hs:6:32-35 }
+               (ApiAnn
+                { T15323.hs:6:31 }
+                (AnnParen
+                 (AnnParens)
+                 { T15323.hs:6:31 }
+                 { T15323.hs:6:36 })
+                [])
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:32-35 })
                 (HsAppTy
                  (NoExtField)
-                 ({ T15323.hs:6:32-33 }
+                 (L
+                  (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:32-33 })
                   (HsTyVar
-                   (NoExtField)
+                   (ApiAnn
+                    { T15323.hs:6:32-33 }
+                    []
+                    [])
                    (NotPromoted)
-                   ({ T15323.hs:6:32-33 }
+                   (L
+                    (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:32-33 })
                     (Unqual
                      {OccName: Eq}))))
-                 ({ T15323.hs:6:35 }
+                 (L
+                  (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:35 })
                   (HsTyVar
-                   (NoExtField)
+                   (ApiAnn
+                    { T15323.hs:6:35 }
+                    []
+                    [])
                    (NotPromoted)
-                   ({ T15323.hs:6:35 }
+                   (L
+                    (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:35 })
                     (Unqual
                      {OccName: v}))))))))]))
           (PrefixConGADT
            [])
-          ({ T15323.hs:6:41-54 }
+          (L
+           (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:41-54 })
            (HsAppTy
             (NoExtField)
-            ({ T15323.hs:6:41-52 }
+            (L
+             (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:41-52 })
              (HsTyVar
-              (NoExtField)
+              (ApiAnn
+               { T15323.hs:6:41-52 }
+               []
+               [])
               (NotPromoted)
-              ({ T15323.hs:6:41-52 }
+              (L
+               (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:41-52 })
                (Unqual
                 {OccName: MaybeDefault}))))
-            ({ T15323.hs:6:54 }
+            (L
+             (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:54 })
              (HsTyVar
-              (NoExtField)
+              (ApiAnn
+               { T15323.hs:6:54 }
+               []
+               [])
               (NotPromoted)
-              ({ T15323.hs:6:54 }
+              (L
+               (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:54 })
                (Unqual
                 {OccName: v}))))))
           (Nothing)))]
-       ({ <no location info> }
-        [])))))]
+       []))))]
   (Nothing)
   (Nothing)))
 

@@ -474,7 +474,7 @@ data TcGblEnv
         -- The binds, rules and foreign-decl fields are collected
         -- initially in un-zonked form and are finally zonked in tcRnSrcDecls
 
-        tcg_rn_exports :: Maybe [(Located (IE GhcRn), Avails)],
+        tcg_rn_exports :: Maybe [(LIE GhcRn, Avails)],
                 -- Nothing <=> no explicit export list
                 -- Is always Nothing if we don't want to retain renamed
                 -- exports.

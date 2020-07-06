@@ -129,10 +129,9 @@ tcPolyExprNC (L loc expr) res_ty
         -- the logic behind this location/context tweaking.
         set_loc_and_ctxt l e m = do
           inGenCode <- inGeneratedCode
-          if inGenCode && not (isGeneratedSrcSpan l)
-            then setSrcSpan l $
-                 addExprCtxt e m
-            else setSrcSpan l m
+          if inGenCode && not (isGeneratedSrcSpan $ locA l)
+            then setSrcSpanA l $ addExprCtxt e m
+            else setSrcSpanA l m
 
 ---------------
 tcCheckMonoExpr, tcCheckMonoExprNC
@@ -154,7 +153,7 @@ tcMonoExpr expr res_ty
     tcMonoExprNC expr res_ty
 
 tcMonoExprNC (L loc expr) res_ty
-  = setSrcSpan loc $
+  = setSrcSpanA loc $
     do  { expr' <- tcExpr expr res_ty
         ; return (L loc expr') }
 
@@ -165,7 +164,7 @@ tcInferRho le = addLExprCtxt le $
                 tcInferRhoNC le
 
 tcInferRhoNC (L loc expr)
-  = setSrcSpan loc $
+  = setSrcSpanA loc $
     do { (expr', rho) <- tcInfer (tcExpr expr)
        ; return (L loc expr', rho) }
 
@@ -240,7 +239,7 @@ tcExpr e@(HsIPVar _ x) res_ty
        ; ipClass <- tcLookupClass ipClassName
        ; ip_var <- emitWantedEvVar origin (mkClassPred ipClass [ip_name, ip_ty])
        ; tcWrapResult e
-                   (fromDict ipClass ip_name ip_ty (HsVar noExtField (noLoc ip_var)))
+                   (fromDict ipClass ip_name ip_ty (HsVar noExtField (noLocA ip_var)))
                    ip_ty res_ty }
   where
   -- Coerces a dictionary for `IP "x" t` into `t`.
@@ -251,15 +250,16 @@ tcExpr e@(HsIPVar _ x) res_ty
 tcExpr e@(HsOverLabel _ mb_fromLabel l) res_ty
   = do { -- See Note [Type-checking overloaded labels]
          loc <- getSrcSpanM
+       ; let loc' = noAnnSrcSpan loc
        ; case mb_fromLabel of
-           Just fromLabel -> tcExpr (applyFromLabel loc fromLabel) res_ty
+           Just fromLabel -> tcExpr (applyFromLabel loc' fromLabel) res_ty
            Nothing -> do { isLabelClass <- tcLookupClass isLabelClassName
                          ; alpha <- newFlexiTyVarTy liftedTypeKind
                          ; let pred = mkClassPred isLabelClass [lbl, alpha]
                          ; loc <- getSrcSpanM
                          ; var <- emitWantedEvVar origin pred
                          ; tcWrapResult e
-                                       (fromDict pred (HsVar noExtField (L loc var)))
+                                       (fromDict pred (HsVar noExtField (L (noAnnSrcSpan loc) var)))
                                         alpha res_ty } }
   where
   -- Coerces a dictionary for `IsLabel "x" t` into `t`,
@@ -268,14 +268,15 @@ tcExpr e@(HsOverLabel _ mb_fromLabel l) res_ty
   origin = OverLabelOrigin l
   lbl = mkStrLitTy l
 
+  applyFromLabel :: SrcSpanAnnA -> IdP GhcRn -> HsExpr GhcRn -- AZ Temp
   applyFromLabel loc fromLabel =
-    HsAppType noExtField
-         (L loc (HsVar noExtField (L loc fromLabel)))
+    HsAppType NoExtField
+         (L loc (HsVar noExtField (L (la2na loc) fromLabel)))
          (mkEmptyWildCardBndrs (L loc (HsTyLit noExtField (HsStrTy NoSourceText l))))
 
-tcExpr (HsLam x match) res_ty
+tcExpr (HsLam _ match) res_ty
   = do  { (wrap, match') <- tcMatchLambda herald match_ctxt match res_ty
-        ; return (mkHsWrap wrap (HsLam x match')) }
+        ; return (mkHsWrap wrap (HsLam noExtField match')) }
   where
     match_ctxt = MC { mc_what = LambdaExpr, mc_body = tcBody }
     herald = sep [ text "The lambda expression" <+>
@@ -410,7 +411,7 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
        ; tup_args1 <- tcTupArgs tup_args arg_tys
 
        ; let expr'       = ExplicitTuple x tup_args1 boxity
-             missing_tys = [Scaled mult ty | (L _ (Missing (Scaled mult _)), ty) <- zip tup_args1 arg_tys]
+             missing_tys = [Scaled mult ty | (Missing (Scaled mult _), ty) <- zip tup_args1 arg_tys]
 
              -- See Note [Linear fields generalization] in GHC.Tc.Gen.App
              act_res_ty
@@ -465,10 +466,10 @@ tcExpr (ExplicitList _ witness exprs) res_ty
 ************************************************************************
 -}
 
-tcExpr (HsLet x (L l binds) expr) res_ty
+tcExpr (HsLet x binds expr) res_ty
   = do  { (binds', expr') <- tcLocalBinds binds $
                              tcMonoExpr expr res_ty
-        ; return (HsLet x (L l binds') expr') }
+        ; return (HsLet x binds' expr') }
 
 tcExpr (HsCase x scrut matches) res_ty
   = do  {  -- We used to typecheck the case alternatives first.
@@ -559,9 +560,9 @@ tcExpr (HsStatic fvs expr) res_ty
                                              [p_ty]
         ; let wrap = mkWpTyApps [expr_ty]
         ; loc <- getSrcSpanM
-        ; return $ mkHsWrapCo co $ HsApp noExtField
-                                         (L loc $ mkHsWrap wrap fromStaticPtr)
-                                         (L loc (HsStatic fvs expr'))
+        ; return $ mkHsWrapCo co $ HsApp noComments
+                            (L (noAnnSrcSpan loc) $ mkHsWrap wrap fromStaticPtr)
+                            (L (noAnnSrcSpan loc) (HsStatic fvs expr'))
         }
 
 {-
@@ -1034,16 +1035,16 @@ arithSeqEltType (Just fl) res_ty
        ; return (idHsWrapper, elt_mult, elt_ty, Just fl') }
 
 ----------------
-tcTupArgs :: [LHsTupArg GhcRn] -> [TcSigmaType] -> TcM [LHsTupArg GhcTc]
+tcTupArgs :: [HsTupArg GhcRn] -> [TcSigmaType] -> TcM [HsTupArg GhcTc]
 tcTupArgs args tys
   = do MASSERT( equalLength args tys )
        checkTupSize (length args)
        mapM go (args `zip` tys)
   where
-    go (L l (Missing {}),     arg_ty) = do { mult <- newFlexiTyVarTy multiplicityTy
-                                           ; return (L l (Missing (Scaled mult arg_ty))) }
-    go (L l (Present x expr), arg_ty) = do { expr' <- tcCheckPolyExpr expr arg_ty
-                                           ; return (L l (Present x expr')) }
+    go (Missing {},     arg_ty) = do { mult <- newFlexiTyVarTy multiplicityTy
+                                     ; return (Missing (Scaled mult arg_ty)) }
+    go (Present x expr, arg_ty) = do { expr' <- tcCheckPolyExpr expr arg_ty
+                                     ; return (Present x expr') }
 
 ---------------------------
 -- See TcType.SyntaxOpType also for commentary
@@ -1372,7 +1373,7 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
            ; let L loc af = hsRecFieldLbl upd
                  lbl      = rdrNameAmbiguousFieldOcc af
            ; return $ L l upd { hsRecFieldLbl
-                                  = L loc (Unambiguous i (L loc lbl)) } }
+                          = L loc (Unambiguous i (L (noAnnSrcSpan loc) lbl)) } }
 
 
 {-
@@ -1434,7 +1435,7 @@ tcRecordUpd con_like arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
                                  , hsRecFieldArg = rhs }))
       = do { let lbl = rdrNameAmbiguousFieldOcc af
                  sel_id = selectorAmbiguousFieldOcc af
-                 f = L loc (FieldOcc (idName sel_id) (L loc lbl))
+                 f = L loc (FieldOcc (idName sel_id) (L (noAnnSrcSpan loc) lbl))
            ; mb <- tcRecordField con_like flds_w_tys f rhs
            ; case mb of
                Nothing         -> return Nothing
@@ -1443,7 +1444,7 @@ tcRecordUpd con_like arg_tys rbinds = fmap catMaybes $ mapM do_bind rbinds
                          (L l (fld { hsRecFieldLbl
                                       = L loc (Unambiguous
                                                (extFieldOcc (unLoc f'))
-                                               (L loc lbl))
+                                               (L (noAnnSrcSpan loc) lbl))
                                    , hsRecFieldArg = rhs' }))) }
 
 tcRecordField :: ConLike -> Assoc Name Type

@@ -30,6 +30,7 @@ import GHC.Utils.Panic
 
 import Data.Function (on)
 import Data.Data
+import GHC.Types.SrcLoc
 
 {-
 Note [Pragma source text]
@@ -214,21 +215,27 @@ instance Outputable FractionalLit where
 data StringLiteral = StringLiteral
                        { sl_st :: SourceText, -- literal raw source.
                                               -- See not [Literal source text]
-                         sl_fs :: FastString  -- literal string value
+                         sl_fs :: FastString, -- literal string value
+                         sl_tc :: Maybe RealSrcSpan -- Location of
+                                                    -- possible
+                                                    -- trailing comma
+                       -- AZ: if we could have a LocatedA
+                       -- StringLiteral we would not need sl_tc, but
+                       -- that would cause import loops.
+
                        } deriving Data
 
 instance Eq StringLiteral where
-  (StringLiteral _ a) == (StringLiteral _ b) = a == b
+  (StringLiteral _ a _) == (StringLiteral _ b _) = a == b
 
 instance Outputable StringLiteral where
   ppr sl = pprWithSourceText (sl_st sl) (ftext $ sl_fs sl)
 
 instance Binary StringLiteral where
-  put_ bh (StringLiteral st fs) = do
+  put_ bh (StringLiteral st fs _) = do
             put_ bh st
             put_ bh fs
   get bh = do
             st <- get bh
             fs <- get bh
-            return (StringLiteral st fs)
-
+            return (StringLiteral st fs Nothing)

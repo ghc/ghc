@@ -185,7 +185,7 @@ checkHsigIface tcg_env gr sig_iface
                          -- TODO: maybe we can be a little more
                          -- precise here and use the Located
                          -- info for the *specific* name we matched.
-                         -> getLoc e
+                         -> getLocA e
                        _ -> nameSrcSpan name
             addErrAt loc
                 (badReexportedBootThing False name name')
@@ -601,7 +601,7 @@ mergeSignatures
                       -- a signature package (i.e., does not expose any
                       -- modules.)  If so, we can thin it.
                       | isFromSignaturePackage
-                      -> setSrcSpan loc $ do
+                      -> setSrcSpanA loc $ do
                         -- Suppress missing errors; they might be used to refer
                         -- to entities from other signatures we are merging in.
                         -- If an identifier truly doesn't exist in any of the
@@ -655,7 +655,7 @@ mergeSignatures
                                             is_mod  = mod_name,
                                             is_as   = mod_name,
                                             is_qual = False,
-                                            is_dloc = loc
+                                            is_dloc = locA loc
                                           } ImpAll
                                 rdr_env = mkGlobalRdrEnv (gresFromAvails (Just ispec) as1)
                             setGblEnv tcg_env {

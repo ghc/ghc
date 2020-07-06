@@ -24,7 +24,7 @@ module GHC.Utils.Outputable (
         -- * Pretty printing combinators
         SDoc, runSDoc, PDoc(..),
         docToSDoc,
-        interppSP, interpp'SP,
+        interppSP, interpp'SP, interpp'SP',
         pprQuotedList, pprWithCommas, quotedListWithOr, quotedListWithNor,
         pprWithBars,
         empty, isEmpty, nest,
@@ -1244,7 +1244,10 @@ interppSP  xs = sep (map ppr xs)
 
 -- | Returns the comma-separated concatenation of the pretty printed things.
 interpp'SP :: Outputable a => [a] -> SDoc
-interpp'SP xs = sep (punctuate comma (map ppr xs))
+interpp'SP xs = interpp'SP' ppr xs
+
+interpp'SP' :: (a -> SDoc) -> [a] -> SDoc
+interpp'SP' f xs = sep (punctuate comma (map f xs))
 
 -- | Returns the comma-separated concatenation of the quoted pretty printed things.
 --

@@ -455,7 +455,7 @@ tidy1 v _ (LazyPat _ pat)
     -- not fully know the zonked types yet. We sure do here.
   = do  { let unlifted_bndrs = filter (isUnliftedType . idType) (collectPatBinders pat)
         ; unless (null unlifted_bndrs) $
-          putSrcSpanDs (getLoc pat) $
+          putSrcSpanDs (getLocA pat) $
           errDs (hang (text "A lazy (~) pattern cannot bind variables of unlifted type." $$
                        text "Unlifted variables:")
                     2 (vcat (map (\id -> ppr id <+> dcolon <+> ppr (idType id))
@@ -514,7 +514,7 @@ tidy1 _ _ non_interesting_pat
   = return (idDsWrapper, non_interesting_pat)
 
 --------------------
-tidy_bang_pat :: Id -> Origin -> SrcSpan -> Pat GhcTc
+tidy_bang_pat :: Id -> Origin -> SrcSpanAnnA -> Pat GhcTc
               -> DsM (DsWrapper, Pat GhcTc)
 
 -- Discard par/sig under a bang
@@ -567,7 +567,7 @@ tidy_bang_pat v o l p@(ConPat { pat_con = L _ (RealDataCon dc)
 tidy_bang_pat _ _ l p = return (idDsWrapper, BangPat noExtField (L l p))
 
 -------------------
-push_bang_into_newtype_arg :: SrcSpan
+push_bang_into_newtype_arg :: SrcSpanAnnA
                            -> Type -- The type of the argument we are pushing
                                    -- onto
                            -> HsConPatDetails GhcTc -> HsConPatDetails GhcTc
@@ -584,7 +584,7 @@ push_bang_into_newtype_arg l _ty (RecCon rf)
                                            = L l (BangPat noExtField arg) })] })
 push_bang_into_newtype_arg l ty (RecCon rf) -- If a user writes !(T {})
   | HsRecFields { rec_flds = [] } <- rf
-  = PrefixCon [L l (BangPat noExtField (noLoc (WildPat ty)))]
+  = PrefixCon [L l (BangPat noExtField (noLocA (WildPat ty)))]
 push_bang_into_newtype_arg _ _ cd
   = pprPanic "push_bang_into_newtype_arg" (pprConArgs cd)
 
@@ -1109,8 +1109,8 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     syn_exp _              _              = False
 
     ---------
-    tup_arg (L _ (Present _ e1)) (L _ (Present _ e2)) = lexp e1 e2
-    tup_arg (L _ (Missing (Scaled _ t1)))   (L _ (Missing (Scaled _ t2)))   = eqType t1 t2
+    tup_arg (Present _ e1)           (Present _ e2)         = lexp e1 e2
+    tup_arg (Missing (Scaled _ t1)) (Missing (Scaled _ t2)) = eqType t1 t2
     tup_arg _ _ = False
 
     ---------

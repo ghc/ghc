@@ -1,21 +1,40 @@
 
 ==================== Parser AST ====================
 
-({ T18791.hs:1:1 }
+(L
+ { T18791.hs:1:1 }
  (HsModule
+  (ApiAnn
+   { T18791.hs:1:1 }
+   (AnnsModule
+    [(AddApiAnn AnnModule { T18791.hs:2:1-6 })
+    ,(AddApiAnn AnnWhere { T18791.hs:2:15-19 })]
+    (AnnList
+     (Nothing)
+     (Nothing)
+     []
+     []))
+   [])
   (VirtualBraces
    (1))
   (Just
-   ({ T18791.hs:2:8-13 }
+   (L
+    { T18791.hs:2:8-13 }
     {ModuleName: T18791}))
   (Nothing)
   []
-  [({ T18791.hs:(4,1)-(5,17) }
+  [(L
+    (SrcSpanAnn (ApiAnnNotUsed) { T18791.hs:(4,1)-(5,17) })
     (TyClD
      (NoExtField)
      (DataDecl
-      (NoExtField)
-      ({ T18791.hs:4:6 }
+      (ApiAnn
+       { T18791.hs:(4,1)-(5,17) }
+       [(AddApiAnn AnnData { T18791.hs:4:1-4 })
+       ,(AddApiAnn AnnWhere { T18791.hs:4:8-12 })]
+       [])
+      (L
+       (SrcSpanAnn (ApiAnnNotUsed) { T18791.hs:4:6 })
        (Unqual
         {OccName: T}))
       (HsQTvs
@@ -23,19 +42,28 @@
        [])
       (Prefix)
       (HsDataDefn
-       (NoExtField)
-       (DataType)
-       ({ <no location info> }
+       (ApiAnn
+        { T18791.hs:(4,1)-(5,17) }
+        [(AddApiAnn AnnData { T18791.hs:4:1-4 })
+        ,(AddApiAnn AnnWhere { T18791.hs:4:8-12 })]
         [])
+       (DataType)
        (Nothing)
        (Nothing)
-       [({ T18791.hs:5:3-17 }
+       (Nothing)
+       [(L
+         (SrcSpanAnn (ApiAnnNotUsed) { T18791.hs:5:3-17 })
          (ConDeclGADT
-          (NoExtField)
-          [({ T18791.hs:5:3-5 }
+          (ApiAnn
+           { T18791.hs:5:3-17 }
+           [(AddApiAnn AnnDcolon { T18791.hs:5:7-8 })]
+           [])
+          [(L
+            (SrcSpanAnn (ApiAnnNotUsed) { T18791.hs:5:3-5 })
             (Unqual
              {OccName: MkT}))]
-          ({ T18791.hs:5:10-17 }
+          (L
+           (SrcSpanAnn (ApiAnnNotUsed) { T18791.hs:5:10-17 })
            (HsOuterImplicit
             (NoExtField)))
           (Nothing)
@@ -43,23 +71,37 @@
            [(HsScaled
              (HsUnrestrictedArrow
               (NormalSyntax))
-             ({ T18791.hs:5:10-12 }
+             (L
+              (SrcSpanAnn (ApiAnn
+                           { T18791.hs:5:10-12 }
+                           (AnnListItem
+                            [(AddRarrowAnn
+                              { T18791.hs:5:14-15 })])
+                           []) { T18791.hs:5:10-12 })
               (HsTyVar
-               (NoExtField)
+               (ApiAnn
+                { T18791.hs:5:10-12 }
+                []
+                [])
                (NotPromoted)
-               ({ T18791.hs:5:10-12 }
+               (L
+                (SrcSpanAnn (ApiAnnNotUsed) { T18791.hs:5:10-12 })
                 (Unqual
                  {OccName: Int})))))])
-          ({ T18791.hs:5:17 }
+          (L
+           (SrcSpanAnn (ApiAnnNotUsed) { T18791.hs:5:17 })
            (HsTyVar
-            (NoExtField)
+            (ApiAnn
+             { T18791.hs:5:17 }
+             []
+             [])
             (NotPromoted)
-            ({ T18791.hs:5:17 }
+            (L
+             (SrcSpanAnn (ApiAnnNotUsed) { T18791.hs:5:17 })
              (Unqual
               {OccName: T}))))
           (Nothing)))]
-       ({ <no location info> }
-        [])))))]
+       []))))]
   (Nothing)
   (Nothing)))
 

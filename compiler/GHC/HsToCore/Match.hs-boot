@@ -6,7 +6,7 @@ import GHC.Tc.Utils.TcType  ( Type )
 import GHC.HsToCore.Monad ( DsM, EquationInfo, MatchResult )
 import GHC.Core ( CoreExpr )
 import GHC.Hs   ( LPat, HsMatchContext, MatchGroup, LHsExpr )
-import GHC.Hs.Extension ( GhcRn, GhcTc )
+import GHC.Hs.Extension ( GhcTc, GhcRn )
 
 match   :: [Id]
         -> Type

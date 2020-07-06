@@ -13,6 +13,7 @@ module GHC.Hs.Dump (
         -- * Dumping ASTs
         showAstData,
         BlankSrcSpan(..),
+        BlankApiAnnotations(..),
     ) where
 
 import GHC.Prelude
@@ -34,27 +35,46 @@ import GHC.Utils.Outputable
 import Data.Data hiding (Fixity)
 import qualified Data.ByteString as B
 
-data BlankSrcSpan = BlankSrcSpan | NoBlankSrcSpan
+data BlankSrcSpan = BlankSrcSpan | BlankSrcSpanFile | NoBlankSrcSpan
+                  deriving (Eq,Show)
+
+data BlankApiAnnotations = BlankApiAnnotations | NoBlankApiAnnotations
                   deriving (Eq,Show)
 
 -- | Show a GHC syntax tree. This parameterised because it is also used for
 -- comparing ASTs in ppr roundtripping tests, where the SrcSpan's are blanked
 -- out, to avoid comparing locations, only structure
-showAstData :: Data a => BlankSrcSpan -> a -> SDoc
-showAstData b a0 = blankLine $$ showAstData' a0
+showAstData :: Data a => BlankSrcSpan -> BlankApiAnnotations -> a -> SDoc
+showAstData bs ba a0 = blankLine $$ showAstData' a0
   where
     showAstData' :: Data a => a -> SDoc
     showAstData' =
       generic
               `ext1Q` list
-              `extQ` string `extQ` fastString `extQ` srcSpan
+              `extQ` string `extQ` fastString `extQ` srcSpan `extQ` realSrcSpan
+              `extQ` annotation
+              `extQ` annotationModule
+              `extQ` annotationAddApiAnn
+              `extQ` annotationGrhsAnn
+              `extQ` annotationApiAnnHsCase
+              `extQ` annotationAnnList
+              `extQ` annotationApiAnnImportDecl
+              `extQ` annotationAnnParen
+              `extQ` annotationTrailingAnn
+              `extQ` addApiAnn
               `extQ` lit `extQ` litr `extQ` litt
+              `extQ` sourceText
               `extQ` bytestring
               `extQ` name `extQ` occName `extQ` moduleName `extQ` var
               `extQ` dataCon
               `extQ` bagName `extQ` bagRdrName `extQ` bagVar `extQ` nameSet
               `extQ` fixity
               `ext2Q` located
+              `extQ` srcSpanAnnA
+              `extQ` srcSpanAnnL
+              `extQ` srcSpanAnnP
+              `extQ` srcSpanAnnC
+              `extQ` srcSpanAnnN
 
       where generic :: Data a => a -> SDoc
             generic t = parens $ text (showConstr (toConstr t))
@@ -106,6 +126,13 @@ showAstData b a0 = blankLine $$ showAstData' a0
                                                , generic x
                                                , generic s ]
 
+            sourceText :: SourceText -> SDoc
+            sourceText NoSourceText = parens $ text "NoSourceText"
+            sourceText (SourceText src) = case bs of
+              NoBlankSrcSpan   -> parens $ text "SourceText" <+> text src
+              BlankSrcSpanFile -> parens $ text "SourceText" <+> text src
+              _                -> parens $ text "SourceText" <+> text "blanked"
+
             name :: Name -> SDoc
             name nm    = braces $ text "Name: " <> ppr nm
 
@@ -117,12 +144,36 @@ showAstData b a0 = blankLine $$ showAstData' a0
             moduleName m = braces $ text "ModuleName: " <> ppr m
 
             srcSpan :: SrcSpan -> SDoc
-            srcSpan ss = case b of
+            srcSpan ss = case bs of
              BlankSrcSpan -> text "{ ss }"
              NoBlankSrcSpan -> braces $ char ' ' <>
                              (hang (ppr ss) 1
                                    -- TODO: show annotations here
                                    (text ""))
+             BlankSrcSpanFile -> braces $ char ' ' <>
+                             (hang (pprUserSpan False ss) 1
+                                   -- TODO: show annotations here
+                                   (text ""))
+
+            realSrcSpan :: RealSrcSpan -> SDoc
+            realSrcSpan ss = case bs of
+             BlankSrcSpan -> text "{ ss }"
+             NoBlankSrcSpan -> braces $ char ' ' <>
+                             (hang (ppr ss) 1
+                                   -- TODO: show annotations here
+                                   (text ""))
+             BlankSrcSpanFile -> braces $ char ' ' <>
+                             (hang (pprUserRealSpan False ss) 1
+                                   -- TODO: show annotations here
+                                   (text ""))
+
+
+            addApiAnn :: AddApiAnn -> SDoc
+            addApiAnn (AddApiAnn a s) = case ba of
+             BlankApiAnnotations -> parens
+                                      $ text "blanked:" <+> text "AddApiAnn"
+             NoBlankApiAnnotations ->
+              parens $ text "AddApiAnn" <+> ppr a <+> realSrcSpan s
 
             var  :: Var -> SDoc
             var v      = braces $ text "Var: " <> ppr v
@@ -130,19 +181,19 @@ showAstData b a0 = blankLine $$ showAstData' a0
             dataCon :: DataCon -> SDoc
             dataCon c  = braces $ text "DataCon: " <> ppr c
 
-            bagRdrName:: Bag (Located (HsBind GhcPs)) -> SDoc
+            bagRdrName:: Bag (LocatedA (HsBind GhcPs)) -> SDoc
             bagRdrName bg =  braces $
-                             text "Bag(Located (HsBind GhcPs)):"
+                             text "Bag(LocatedA (HsBind GhcPs)):"
                           $$ (list . bagToList $ bg)
 
-            bagName   :: Bag (Located (HsBind GhcRn)) -> SDoc
+            bagName   :: Bag (LocatedA (HsBind GhcRn)) -> SDoc
             bagName bg  =  braces $
-                           text "Bag(Located (HsBind Name)):"
+                           text "Bag(LocatedA (HsBind Name)):"
                         $$ (list . bagToList $ bg)
 
-            bagVar    :: Bag (Located (HsBind GhcTc)) -> SDoc
+            bagVar    :: Bag (LocatedA (HsBind GhcTc)) -> SDoc
             bagVar bg  =  braces $
-                          text "Bag(Located (HsBind Var)):"
+                          text "Bag(LocatedA (HsBind Var)):"
                        $$ (list . bagToList $ bg)
 
             nameSet ns =  braces $
@@ -154,13 +205,79 @@ showAstData b a0 = blankLine $$ showAstData' a0
                          text "Fixity: "
                       <> ppr fx
 
-            located :: (Data b,Data loc) => GenLocated loc b -> SDoc
-            located (L ss a) = parens $
-                   case cast ss of
-                        Just (s :: SrcSpan) ->
-                          srcSpan s
-                        Nothing -> text "nnnnnnnn"
-                      $$ showAstData' a
+            located :: (Data a, Data b) => GenLocated a b -> SDoc
+            located (L ss a)
+              = parens (text "L"
+                        $$ vcat [showAstData' ss, showAstData' a])
+
+
+            -- -------------------------
+
+            annotation :: ApiAnn -> SDoc
+            annotation = annotation' (text "ApiAnn")
+
+            annotationModule :: ApiAnn' AnnsModule -> SDoc
+            annotationModule = annotation' (text "ApiAnn' AnnsModule")
+
+            annotationAddApiAnn :: ApiAnn' AddApiAnn -> SDoc
+            annotationAddApiAnn = annotation' (text "ApiAnn' AddApiAnn")
+
+            annotationGrhsAnn :: ApiAnn' GrhsAnn -> SDoc
+            annotationGrhsAnn = annotation' (text "ApiAnn' GrhsAnn")
+
+            annotationApiAnnHsCase :: ApiAnn' ApiAnnHsCase -> SDoc
+            annotationApiAnnHsCase = annotation' (text "ApiAnn' ApiAnnHsCase")
+
+            annotationAnnList :: ApiAnn' AnnList -> SDoc
+            annotationAnnList = annotation' (text "ApiAnn' AnnList")
+
+            annotationApiAnnImportDecl :: ApiAnn' ApiAnnImportDecl -> SDoc
+            annotationApiAnnImportDecl = annotation' (text "ApiAnn' ApiAnnImportDecl")
+
+            annotationAnnParen :: ApiAnn' AnnParen -> SDoc
+            annotationAnnParen = annotation' (text "ApiAnn' AnnParen")
+
+            annotationTrailingAnn :: ApiAnn' TrailingAnn -> SDoc
+            annotationTrailingAnn = annotation' (text "ApiAnn' TrailingAnn")
+
+            annotation' :: forall a .(Data a, Typeable a)
+                       => SDoc -> ApiAnn' a -> SDoc
+            annotation' tag anns = case ba of
+             BlankApiAnnotations -> parens (text "blanked:" <+> tag)
+             NoBlankApiAnnotations -> parens $ text (showConstr (toConstr anns))
+                                               $$ vcat (gmapQ showAstData' anns)
+
+            -- -------------------------
+
+            srcSpanAnnA :: SrcSpanAnn' (ApiAnn' AnnListItem) -> SDoc
+            srcSpanAnnA = locatedAnn'' (text "SrcSpanAnnA")
+
+            srcSpanAnnL :: SrcSpanAnn' (ApiAnn' AnnList) -> SDoc
+            srcSpanAnnL = locatedAnn'' (text "SrcSpanAnnL")
+
+            srcSpanAnnP :: SrcSpanAnn' (ApiAnn' AnnPragma) -> SDoc
+            srcSpanAnnP = locatedAnn'' (text "SrcSpanAnnP")
+
+            srcSpanAnnC :: SrcSpanAnn' (ApiAnn' AnnContext) -> SDoc
+            srcSpanAnnC = locatedAnn'' (text "SrcSpanAnnC")
+
+            srcSpanAnnN :: SrcSpanAnn' (ApiAnn' NameAnn) -> SDoc
+            srcSpanAnnN = locatedAnn'' (text "SrcSpanAnnN")
+
+            locatedAnn'' :: forall a. (Typeable a, Data a)
+              => SDoc -> SrcSpanAnn' a -> SDoc
+            locatedAnn'' tag ss = parens $
+              case cast ss of
+                Just ((SrcSpanAnn ann s) :: SrcSpanAnn' a) ->
+                  case ba of
+                    BlankApiAnnotations
+                      -> parens (text "blanked:" <+> tag)
+                    NoBlankApiAnnotations
+                      -> text "SrcSpanAnn" <+> showAstData' ann
+                              <+> srcSpan s
+                Nothing -> text "locatedAnn:unmatched" <+> tag
+                           <+> (parens $ text (showConstr (toConstr ss)))
+
 
 normalize_newlines :: String -> String
 normalize_newlines ('\\':'r':'\\':'n':xs) = '\\':'n':normalize_newlines xs

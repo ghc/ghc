@@ -318,9 +318,9 @@ getModInfo name = do
 processAllTypeCheckedModule :: forall m . GhcMonad m => TypecheckedModule
                             -> m [SpanInfo]
 processAllTypeCheckedModule tcm = do
-    bts <- mapM getTypeLHsBind $ listifyAllSpans tcs
-    ets <- mapM getTypeLHsExpr $ listifyAllSpans tcs
-    pts <- mapM getTypeLPat    $ listifyAllSpans tcs
+    bts <- mapM (getTypeLHsBind ) $ listifyAllSpans tcs
+    ets <- mapM (getTypeLHsExpr ) $ listifyAllSpans tcs
+    pts <- mapM (getTypeLPat    ) $ listifyAllSpans tcs
     return $ mapMaybe toSpanInfo
            $ sortBy cmpSpan
            $ catMaybes (bts ++ ets ++ pts)
@@ -330,7 +330,7 @@ processAllTypeCheckedModule tcm = do
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LHsBind's
     getTypeLHsBind :: LHsBind GhcTc -> m (Maybe (Maybe Id,SrcSpan,Type))
     getTypeLHsBind (L _spn FunBind{fun_id = pid,fun_matches = MG _ _ _})
-        = pure $ Just (Just (unLoc pid),getLoc pid,varType (unLoc pid))
+        = pure $ Just (Just (unLoc pid), getLocA pid,varType (unLoc pid))
     getTypeLHsBind _ = pure Nothing
 
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LHsExpr's
@@ -338,7 +338,7 @@ processAllTypeCheckedModule tcm = do
     getTypeLHsExpr e = do
         hs_env  <- getSession
         (_,mbe) <- liftIO $ deSugarExpr hs_env e
-        return $ fmap (\expr -> (mid, getLoc e, GHC.Core.Utils.exprType expr)) mbe
+        return $ fmap (\expr -> (mid, getLocA e, GHC.Core.Utils.exprType expr)) mbe
       where
         mid :: Maybe Id
         mid | HsVar _ (L _ i) <- unwrapVar (unLoc e) = Just i
@@ -350,17 +350,17 @@ processAllTypeCheckedModule tcm = do
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LPats's
     getTypeLPat :: LPat GhcTc -> m (Maybe (Maybe Id,SrcSpan,Type))
     getTypeLPat (L spn pat) =
-        pure (Just (getMaybeId pat,spn,hsPatType pat))
+        pure (Just (getMaybeId pat,locA spn,hsPatType pat))
       where
         getMaybeId :: Pat GhcTc -> Maybe Id
         getMaybeId (VarPat _ (L _ vid)) = Just vid
         getMaybeId _                        = Nothing
 
     -- | Get ALL source spans in the source.
-    listifyAllSpans :: Typeable a => TypecheckedSource -> [Located a]
+    listifyAllSpans :: Typeable a => TypecheckedSource -> [LocatedA a]
     listifyAllSpans = everythingAllSpans (++) [] ([] `mkQ` (\x -> [x | p x]))
       where
-        p (L spn _) = isGoodSrcSpan spn
+        p (L spn _) = isGoodSrcSpan (locA spn)
 
     -- | Variant of @syb@'s @everything@ (which summarises all nodes
     -- in top-down, left-to-right order) with a stop-condition on 'NameSet's

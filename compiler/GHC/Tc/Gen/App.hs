@@ -113,7 +113,7 @@ tcInferSigma :: Bool -> LHsExpr GhcRn -> TcM TcSigmaType
 tcInferSigma inst (L loc rn_expr)
   | (rn_fun, rn_args, _) <- splitHsApps rn_expr
   = addExprCtxt rn_expr $
-    setSrcSpan loc      $
+    setSrcSpanA loc     $
     do { do_ql <- wantQuickLook rn_fun
        ; (tc_fun, fun_sigma) <- tcInferAppHead rn_fun rn_args Nothing
        ; (_delta, inst_args, app_res_sigma) <- tcInstFun do_ql inst rn_fun fun_sigma rn_args
@@ -343,7 +343,7 @@ tcEValArg (ValArg arg) exp_arg_sigma
 
 tcEValArg (ValArgQL { va_expr = L loc _, va_fun = fun, va_args = args
                     , va_ty = app_res_rho, va_rebuild = rebuild }) exp_arg_sigma
-  = setSrcSpan loc $
+  = setSrcSpanA loc $
     do { traceTc "tcEValArg {" (vcat [ ppr fun <+> ppr args ])
        ; tc_args <- tcValArgs True fun args
        ; co <- unifyType Nothing app_res_rho exp_arg_sigma
@@ -738,7 +738,7 @@ isGuardedTy ty
 quickLookArg1 :: Bool -> Delta -> LHsExpr GhcRn -> TcSigmaType
               -> TcM (Delta, EValArg 'TcpInst)
 quickLookArg1 guarded delta larg@(L loc arg) arg_ty
-  = setSrcSpan loc $
+  = setSrcSpanA loc $
     do { let (rn_fun,rn_args,rebuild) = splitHsApps arg
        ; mb_fun_ty <- tcInferAppHead_maybe rn_fun rn_args (Just arg_ty)
        ; traceTc "quickLookArg 1" $

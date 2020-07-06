@@ -292,7 +292,7 @@ renameDeriv inst_infos bagBinds
         -- before renaming the instances themselves
         ; traceTc "rnd" (vcat (map (\i -> pprInstInfoDetails i $$ text "") inst_infos))
         ; (aux_binds, aux_sigs) <- mapAndUnzipBagM return bagBinds
-        ; let aux_val_binds = ValBinds noExtField aux_binds (bagToList aux_sigs)
+        ; let aux_val_binds = ValBinds NoAnnSortKey aux_binds (bagToList aux_sigs)
         -- Importantly, we use rnLocalValBindsLHS, not rnTopBindsLHS, to rename
         -- auxiliary bindings as if they were defined locally.
         -- See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate.
@@ -500,7 +500,7 @@ derivePred tc tys mb_lderiv_strat via_tvs deriv_pred =
   -- We carefully set up uses of recoverM to minimize error message
   -- cascades. See Note [Recovering from failures in deriving clauses].
   recoverM (pure Nothing) $
-  setSrcSpan (getLoc deriv_pred) $ do
+  setSrcSpan (getLocA deriv_pred) $ do
     traceTc "derivePred" $ vcat
       [ text "tc"              <+> ppr tc
       , text "tys"             <+> ppr tys
@@ -623,7 +623,7 @@ deriveStandalone :: LDerivDecl GhcRn -> TcM (Maybe EarlyDerivSpec)
 -- This returns a Maybe because the user might try to derive Typeable, which is
 -- a no-op nowadays.
 deriveStandalone (L loc (DerivDecl _ deriv_ty mb_lderiv_strat overlap_mode))
-  = setSrcSpan loc                   $
+  = setSrcSpanA loc                       $
     addErrCtxt (standaloneCtxt deriv_ty)  $
     do { traceTc "Standalone deriving decl for" (ppr deriv_ty)
        ; let ctxt = GHC.Tc.Types.Origin.InstDeclCtxt True
@@ -721,14 +721,14 @@ tcStandaloneDerivInstType ctxt
     (HsWC { hswc_body = deriv_ty@(L loc (HsSig { sig_bndrs = outer_bndrs
                                                , sig_body = deriv_ty_body }))})
   | (theta, rho) <- splitLHsQualTy deriv_ty_body
-  , L _ [wc_pred] <- theta
+  , [wc_pred] <- fromMaybeContext theta
   , L wc_span (HsWildCardTy _) <- ignoreParens wc_pred
   = do dfun_ty <- tcHsClsInstType ctxt $ L loc $
                   HsSig { sig_ext   = noExtField
                         , sig_bndrs = outer_bndrs
                         , sig_body  = rho }
        let (tvs, _theta, cls, inst_tys) = tcSplitDFunTy dfun_ty
-       pure (tvs, InferContext (Just wc_span), cls, inst_tys)
+       pure (tvs, InferContext (Just (locA wc_span)), cls, inst_tys)
   | otherwise
   = do dfun_ty <- tcHsClsInstType ctxt deriv_ty
        let (tvs, theta, cls, inst_tys) = tcSplitDFunTy dfun_ty
@@ -1169,18 +1169,18 @@ mkEqnHelp overlap_mode tvs cls cls_args deriv_ctxt deriv_strat = do
       DerivEnv { denv_inst_tys = cls_args
                , denv_strat    = mb_strat } <- ask
       case mb_strat of
-        Just StockStrategy -> do
+        Just (StockStrategy _) -> do
           (cls_tys, inst_ty) <- expectNonNullaryClsArgs cls_args
           dit                <- expectAlgTyConApp cls_tys inst_ty
           mk_eqn_stock dit
 
-        Just AnyclassStrategy -> mk_eqn_anyclass
+        Just (AnyclassStrategy _) -> mk_eqn_anyclass
 
         Just (ViaStrategy via_ty) -> do
           (cls_tys, inst_ty) <- expectNonNullaryClsArgs cls_args
           mk_eqn_via cls_tys inst_ty via_ty
 
-        Just NewtypeStrategy -> do
+        Just (NewtypeStrategy _) -> do
           (cls_tys, inst_ty) <- expectNonNullaryClsArgs cls_args
           dit                <- expectAlgTyConApp cls_tys inst_ty
           unless (isNewTyCon (dit_rep_tc dit)) $

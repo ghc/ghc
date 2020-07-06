@@ -569,6 +569,7 @@ ghc/stage2/package-data.mk: compiler/stage2/package-data.mk
 utils/haddock/dist/package-data.mk: compiler/stage2/package-data.mk
 utils/check-api-annotations/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/check-ppr/dist-install/package-data.mk: compiler/stage2/package-data.mk
+utils/check-exact/dist-install/package-data.mk: compiler/stage2/package-data.mk
 
 # add the final package.conf dependency: ghc-prim depends on RTS
 libraries/ghc-prim/dist-install/package-data.mk : rts/dist/package.conf.inplace
@@ -667,6 +668,7 @@ BUILD_DIRS += utils/ghc-pkg
 BUILD_DIRS += utils/testremove
 BUILD_DIRS += utils/check-api-annotations
 BUILD_DIRS += utils/check-ppr
+BUILD_DIRS += utils/check-exact
 BUILD_DIRS += utils/ghc-cabal
 BUILD_DIRS += utils/hpc
 BUILD_DIRS += utils/runghc
@@ -709,6 +711,7 @@ ifneq "$(CrossCompiling) $(Stage1Only)" "NO NO"
 # See Note [Stage1Only vs stage=1] in mk/config.mk.in.
 BUILD_DIRS := $(filter-out utils/check-api-annotations,$(BUILD_DIRS))
 BUILD_DIRS := $(filter-out utils/check-ppr,$(BUILD_DIRS))
+BUILD_DIRS := $(filter-out utils/check-exact,$(BUILD_DIRS))
 endif
 endif # CLEANING
 

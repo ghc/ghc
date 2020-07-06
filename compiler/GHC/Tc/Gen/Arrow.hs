@@ -140,7 +140,7 @@ tcCmdTop env names (L loc (HsCmdTop _names cmd)) cmd_ty@(cmd_stk, res_ty)
 tcCmd  :: CmdEnv -> LHsCmd GhcRn -> CmdType -> TcM (LHsCmd GhcTc)
         -- The main recursive function
 tcCmd env (L loc cmd) res_ty
-  = setSrcSpan loc $ do
+  = setSrcSpan (locA loc) $ do
         { cmd' <- tc_cmd env cmd res_ty
         ; return (L loc cmd') }
 
@@ -149,11 +149,11 @@ tc_cmd env (HsCmdPar x cmd) res_ty
   = do  { cmd' <- tcCmd env cmd res_ty
         ; return (HsCmdPar x cmd') }
 
-tc_cmd env (HsCmdLet x (L l binds) (L body_loc body)) res_ty
+tc_cmd env (HsCmdLet x binds (L body_loc body)) res_ty
   = do  { (binds', body') <- tcLocalBinds binds         $
-                             setSrcSpan body_loc        $
+                             setSrcSpan (locA body_loc) $
                              tc_cmd env body res_ty
-        ; return (HsCmdLet x (L l binds') (L body_loc body')) }
+        ; return (HsCmdLet x binds' (L body_loc body')) }
 
 tc_cmd env in_cmd@(HsCmdCase x scrut matches) (stk, res_ty)
   = addErrCtxt (cmdCtxt in_cmd) $ do
@@ -259,11 +259,11 @@ tc_cmd env
     do  { (co, arg_tys, cmd_stk') <- matchExpectedCmdArgs n_pats cmd_stk
 
                 -- Check the patterns, and the GRHSs inside
-        ; (pats', grhss') <- setSrcSpan mtch_loc                                 $
+        ; (pats', grhss') <- setSrcSpanA mtch_loc                                 $
                              tcPats LambdaExpr pats (map (unrestricted . mkCheckExpType) arg_tys) $
                              tc_grhss grhss cmd_stk' (mkCheckExpType res_ty)
 
-        ; let match' = L mtch_loc (Match { m_ext = noExtField
+        ; let match' = L mtch_loc (Match { m_ext = noAnn
                                          , m_ctxt = LambdaExpr, m_pats = pats'
                                          , m_grhss = grhss' })
               arg_tys = map (unrestricted . hsLPatType) pats'
@@ -276,10 +276,10 @@ tc_cmd env
     match_ctxt = (LambdaExpr :: HsMatchContext GhcRn)    -- Maybe KappaExpr?
     pg_ctxt    = PatGuard match_ctxt
 
-    tc_grhss (GRHSs x grhss (L l binds)) stk_ty res_ty
+    tc_grhss (GRHSs x grhss binds) stk_ty res_ty
         = do { (binds', grhss') <- tcLocalBinds binds $
                                    mapM (wrapLocM (tc_grhs stk_ty res_ty)) grhss
-             ; return (GRHSs x grhss' (L l binds')) }
+             ; return (GRHSs x grhss' binds') }
 
     tc_grhs stk_ty res_ty (GRHS x guards body)
         = do { (guards', rhs') <- tcStmtsAndThen pg_ctxt tcGuardStmt guards res_ty $
@@ -393,7 +393,7 @@ tcArrDoStmt env ctxt (BindStmt _ pat rhs) res_ty thing_inside
                             thing_inside res_ty
         ; return (mkTcBindStmt pat' rhs', thing) }
 
-tcArrDoStmt env ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
+tcArrDoStmt env ctxt (RecStmt { recS_stmts = L l stmts, recS_later_ids = later_names
                             , recS_rec_ids = rec_names }) res_ty thing_inside
   = do  { let tup_names = rec_names ++ filterOut (`elem` rec_names) later_names
         ; tup_elt_tys <- newFlexiTyVarTys (length tup_names) liftedTypeKind
@@ -417,7 +417,7 @@ tcArrDoStmt env ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
         ; let ret_table = zip tup_ids tup_rets
         ; let later_rets = [r | i <- later_ids, (j, r) <- ret_table, i == j]
 
-        ; return (emptyRecStmtId { recS_stmts = stmts'
+        ; return (emptyRecStmtId { recS_stmts = L l stmts'
                                  , recS_later_ids = later_ids
                                  , recS_rec_ids = rec_ids
                                  , recS_ext = unitRecStmtTc

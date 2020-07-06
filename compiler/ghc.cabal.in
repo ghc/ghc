@@ -434,6 +434,7 @@ Library
         GHC.HsToCore.Types
         GHC.HsToCore.Usage
         GHC.HsToCore.Utils
+        GHC.Hs.Exact
         GHC.Hs.Type
         GHC.Hs.Utils
         GHC.Iface.Binary

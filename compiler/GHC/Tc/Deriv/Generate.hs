@@ -517,7 +517,8 @@ gen_Ord_binds loc tycon tycon_args = do
                                  , mkHsCaseAlt nlWildPat (gtResult op) ]
       where
         tag     = get_tag data_con
-        tag_lit = noLoc (HsLit noExtField (HsIntPrim NoSourceText (toInteger tag)))
+        tag_lit
+             = noLocA (HsLit noComments (HsIntPrim NoSourceText (toInteger tag)))
 
     mkInnerEqAlt :: OrdOp -> DataCon -> LMatch GhcPs (LHsExpr GhcPs)
     -- First argument 'a' known to be built with K
@@ -596,15 +597,15 @@ unliftedCompare lt_op eq_op a_expr b_expr lt eq gt
                         -- mean more tests (dynamically)
         nlHsIf (ascribeBool $ genPrimOpApp a_expr eq_op b_expr) eq gt
   where
-    ascribeBool e = noLoc $ ExprWithTySig noExtField e
-                          $ mkHsWildCardBndrs $ noLoc $ mkHsImplicitSigType
-                          $ nlHsTyVar boolTyCon_RDR
+    ascribeBool e = noLocA $ ExprWithTySig noAnn e
+                           $ mkHsWildCardBndrs $ noLocA $ mkHsImplicitSigType
+                           $ nlHsTyVar boolTyCon_RDR
 
 nlConWildPat :: DataCon -> LPat GhcPs
 -- The pattern (K {})
-nlConWildPat con = noLoc $ ConPat
-  { pat_con_ext = noExtField
-  , pat_con = noLoc $ getRdrName con
+nlConWildPat con = noLocA $ ConPat
+  { pat_con_ext = noAnn
+  , pat_con = noLocA $ getRdrName con
   , pat_args = RecCon $ HsRecFields
       { rec_flds = []
       , rec_dotdot = Nothing }
@@ -864,7 +865,7 @@ gen_Ix_binds loc tycon _ = do
 
     enum_index con2tag_RDR
       = mkSimpleGeneratedFunBind loc unsafeIndex_RDR
-                [noLoc (AsPat noExtField (noLoc c_RDR)
+                [noLocA (AsPat noAnn (noLocA c_RDR)
                            (nlTuplePat [a_Pat, nlWildPat] Boxed)),
                                 d_Pat] (
            untag_Expr con2tag_RDR [(a_RDR, ah_RDR)] (
@@ -915,13 +916,13 @@ gen_Ix_binds loc tycon _ = do
     single_con_range
       = mkSimpleGeneratedFunBind loc range_RDR
           [nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed] $
-        noLoc (mkHsComp ListComp stmts con_expr)
+        noLocA (mkHsComp ListComp stmts con_expr)
       where
         stmts = zipWith3Equal "single_con_range" mk_qual as_needed bs_needed cs_needed
 
-        mk_qual a b c = noLoc $ mkPsBindStmt (nlVarPat c)
+        mk_qual a b c = noLocA $ mkPsBindStmt noAnn (nlVarPat c)
                                  (nlHsApp (nlHsVar range_RDR)
-                                          (mkLHsVarTuple [a,b]))
+                                          (mkLHsVarTuple [a,b] noAnn))
 
     ----------------
     single_con_index
@@ -943,11 +944,11 @@ gen_Ix_binds loc tycon _ = do
             ) plus_RDR (
                 genOpApp (
                     (nlHsApp (nlHsVar unsafeRangeSize_RDR)
-                             (mkLHsVarTuple [l,u]))
+                             (mkLHsVarTuple [l,u] noAnn))
                 ) times_RDR (mk_index rest)
            )
         mk_one l u i
-          = nlHsApps unsafeIndex_RDR [mkLHsVarTuple [l,u], nlHsVar i]
+          = nlHsApps unsafeIndex_RDR [mkLHsVarTuple [l,u] noAnn, nlHsVar i]
 
     ------------------
     single_con_inRange
@@ -961,7 +962,8 @@ gen_Ix_binds loc tycon _ = do
              else foldl1 and_Expr (zipWith3Equal "single_con_inRange" in_range
                     as_needed bs_needed cs_needed)
       where
-        in_range a b c = nlHsApps inRange_RDR [mkLHsVarTuple [a,b], nlHsVar c]
+        in_range a b c
+          = nlHsApps inRange_RDR [mkLHsVarTuple [a,b] noAnn, nlHsVar c]
 
 {-
 ************************************************************************
@@ -1066,7 +1068,7 @@ gen_Read_binds get_fixity loc tycon _
     read_nullary_cons
       = case nullary_cons of
             []    -> []
-            [con] -> [nlHsDo (DoExpr Nothing) (match_con con ++ [noLoc $ mkLastStmt (result_expr con [])])]
+            [con] -> [nlHsDo (DoExpr Nothing) (match_con con ++ [noLocA $ mkLastStmt (result_expr con [])])]
             _     -> [nlHsApp (nlHsVar choose_RDR)
                               (nlList (map mk_pair nullary_cons))]
         -- NB For operators the parens around (:=:) are matched by the
@@ -1081,7 +1083,7 @@ gen_Read_binds get_fixity loc tycon _
         -- and   Symbol s   for operators
 
     mk_pair con = mkLHsTupleExpr [nlHsLit (mkHsString (data_con_str con)),
-                                  result_expr con []]
+                                  result_expr con []] noAnn
 
     read_non_nullary_con data_con
       | is_infix  = mk_parser infix_prec  infix_stmts  body
@@ -1105,20 +1107,24 @@ gen_Read_binds get_fixity loc tycon _
             | isSym con_str = [symbol_pat con_str]
             | otherwise     = [read_punc "`"] ++ ident_h_pat con_str ++ [read_punc "`"]
 
+        prefix_stmts :: [LStmt GhcPs (LHsExpr GhcPs)] -- AZ
         prefix_stmts            -- T a b c
           = read_prefix_con ++ read_args
 
+        infix_stmts :: [LStmt GhcPs (LHsExpr GhcPs)] -- AZ
         infix_stmts             -- a %% b, or  a `T` b
           = [read_a1]
             ++ read_infix_con
             ++ [read_a2]
 
+        record_stmts :: [LStmt GhcPs (LHsExpr GhcPs)] -- AZ
         record_stmts            -- T { f1 = a, f2 = b }
           = read_prefix_con
             ++ [read_punc "{"]
             ++ concat (intersperse [read_punc ","] field_stmts)
             ++ [read_punc "}"]
 
+        field_stmts :: [[LStmt GhcPs (LHsExpr GhcPs)]] -- AZ
         field_stmts  = zipWithEqual "lbl_stmts" read_field labels as_needed
 
         con_arity    = dataConSourceArity data_con
@@ -1140,7 +1146,7 @@ gen_Read_binds get_fixity loc tycon _
     ------------------------------------------------------------------------
     mk_alt e1 e2       = genOpApp e1 alt_RDR e2                         -- e1 +++ e2
     mk_parser p ss b   = nlHsApps prec_RDR [nlHsIntLit p                -- prec p (do { ss ; b })
-                                           , nlHsDo (DoExpr Nothing) (ss ++ [noLoc $ mkLastStmt b])]
+                                           , nlHsDo (DoExpr Nothing) (ss ++ [noLocA $ mkLastStmt b])]
     con_app con as     = nlHsVarApps (getRdrName con) as                -- con as
     result_expr con as = nlHsApp (nlHsVar returnM_RDR) (con_app con as) -- return (con as)
 
@@ -1150,7 +1156,7 @@ gen_Read_binds get_fixity loc tycon _
     ident_h_pat s | Just (ss, '#') <- snocView s = [ ident_pat ss, symbol_pat "#" ]
                   | otherwise                    = [ ident_pat s ]
 
-    bindLex pat  = noLoc (mkBodyStmt (nlHsApp (nlHsVar expectP_RDR) pat))  -- expectP p
+    bindLex pat  = noLocA (mkBodyStmt (nlHsApp (nlHsVar expectP_RDR) pat)) -- expectP p
                    -- See Note [Use expectP]
     ident_pat  s = bindLex $ nlHsApps ident_RDR  [nlHsLit (mkHsString s)]  -- expectP (Ident "foo")
     symbol_pat s = bindLex $ nlHsApps symbol_RDR [nlHsLit (mkHsString s)]  -- expectP (Symbol ">>")
@@ -1159,7 +1165,7 @@ gen_Read_binds get_fixity loc tycon _
     data_con_str con = occNameString (getOccName con)
 
     read_arg a ty = ASSERT( not (isUnliftedType ty) )
-                    noLoc (mkPsBindStmt (nlVarPat a) (nlHsVarApps step_RDR [readPrec_RDR]))
+                    noLocA (mkPsBindStmt noAnn (nlVarPat a) (nlHsVarApps step_RDR [readPrec_RDR]))
 
     -- When reading field labels we might encounter
     --      a  = 3
@@ -1167,8 +1173,8 @@ gen_Read_binds get_fixity loc tycon _
     -- or   (#) = 4
     -- Note the parens!
     read_field lbl a =
-        [noLoc
-          (mkPsBindStmt
+        [noLocA
+          (mkPsBindStmt noAnn
             (nlVarPat a)
             (nlHsApp
               read_field
@@ -1643,7 +1649,7 @@ gen_Lift_binds loc tycon tycon_args = (listToBag [lift_bind, liftTyped_bind], em
             data_con_RDR = getRdrName data_con
             con_arity    = dataConSourceArity data_con
             as_needed    = take con_arity as_RDRs
-            lift_Expr    = noLoc (HsBracket noExtField (mk_bracket br_body))
+            lift_Expr    = noLocA (HsBracket noAnn (mk_bracket br_body))
             br_body      = nlHsApps (Exact (dataConName data_con))
                                     (map nlHsVar as_needed)
 
@@ -1856,7 +1862,7 @@ gen_Newtype_binds :: SrcSpan
                   -> Type    -- the representation type
                   -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff)
 -- See Note [Newtype-deriving instances]
-gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
+gen_Newtype_binds loc' cls inst_tvs inst_tys rhs_ty
   = do let ats = classATs cls
            (binds, sigs) = mapAndUnzip mk_bind_and_sig (classMethods cls)
        atf_insts <- ASSERT( all (not . isDataFamilyTyCon) ats )
@@ -1865,6 +1871,8 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
               , sigs
               , listToBag $ map DerivFamInst atf_insts )
   where
+    locn = noAnnSrcSpan loc'
+    loca = noAnnSrcSpan loc'
     -- For each class method, generate its derived binding and instance
     -- signature. Using the first example from
     -- Note [Newtype-deriving instances]:
@@ -1891,8 +1899,8 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
         , -- The derived instance signature, e.g.,
           --
           --   op :: forall c. a -> [T x] -> c -> Int
-          L loc $ ClassOpSig noExtField False [loc_meth_RDR]
-                $ L loc $ mkHsImplicitSigType $ nlHsCoreTy to_ty
+          L loca $ ClassOpSig noAnn False [loc_meth_RDR]
+                 $ L loca $ mkHsImplicitSigType $ nlHsCoreTy to_ty
         )
       where
         Pair from_ty to_ty = mkCoerceClassMethEqn cls inst_tvs inst_tys rhs_ty meth_id
@@ -1900,7 +1908,7 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
         (_, _, to_tau)   = tcSplitSigmaTy to_ty
 
         meth_RDR = getRdrName meth_id
-        loc_meth_RDR = L loc meth_RDR
+        loc_meth_RDR = L locn meth_RDR
 
         rhs_expr = nlHsVar (getRdrName coerceId)
                                       `nlHsAppType`     from_tau
@@ -1917,7 +1925,7 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
 
     mk_atf_inst :: TyCon -> TcM FamInst
     mk_atf_inst fam_tc = do
-        rep_tc_name <- newFamInstTyConName (L loc (tyConName fam_tc))
+        rep_tc_name <- newFamInstTyConName (L locn (tyConName fam_tc))
                                            rep_lhs_tys
         let axiom = mkSingleCoAxiom Nominal rep_tc_name rep_tvs' [] rep_cvs'
                                     fam_tc rep_lhs_tys rep_rhs_ty
@@ -1946,12 +1954,12 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
     underlying_inst_tys = changeLast inst_tys rhs_ty
 
 nlHsAppType :: LHsExpr GhcPs -> Type -> LHsExpr GhcPs
-nlHsAppType e s = noLoc (HsAppType noExtField e hs_ty)
+nlHsAppType e s = noLocA (HsAppType noAnn e hs_ty)
   where
     hs_ty = mkHsWildCardBndrs $ parenthesizeHsType appPrec $ nlHsCoreTy s
 
 nlHsCoreTy :: Type -> LHsType GhcPs
-nlHsCoreTy = noLoc . XHsType . NHsCoreTy
+nlHsCoreTy = noLocA . XHsType . NHsCoreTy
 
 mkCoerceClassMethEqn :: Class   -- the class being derived
                      -> [TyVar] -- the tvs in the instance head (this includes
@@ -2001,9 +2009,11 @@ genAuxBindSpecOriginal :: DynFlags -> SrcSpan -> AuxBindSpec
                        -> (LHsBind GhcPs, LSig GhcPs)
 genAuxBindSpecOriginal dflags loc spec
   = (gen_bind spec,
-     L loc (TypeSig noExtField [L loc (auxBindSpecRdrName spec)]
+     L loca (TypeSig noAnn [L locn (auxBindSpecRdrName spec)]
            (genAuxBindSpecSig loc spec)))
   where
+    loca = noAnnSrcSpan loc
+    locn = noAnnSrcSpan loc
     gen_bind :: AuxBindSpec -> LHsBind GhcPs
     gen_bind (DerivCon2Tag tycon con2tag_RDR)
       = mkFunBindSE 0 loc con2tag_RDR eqns
@@ -2069,9 +2079,11 @@ genAuxBindSpecDup :: SrcSpan -> RdrName -> AuxBindSpec
                   -> (LHsBind GhcPs, LSig GhcPs)
 genAuxBindSpecDup loc original_rdr_name dup_spec
   = (mkHsVarBind loc dup_rdr_name (nlHsVar original_rdr_name),
-     L loc (TypeSig noExtField [L loc dup_rdr_name]
+     L loca (TypeSig noAnn [L locn dup_rdr_name]
            (genAuxBindSpecSig loc dup_spec)))
   where
+    loca = noAnnSrcSpan loc
+    locn = noAnnSrcSpan loc
     dup_rdr_name = auxBindSpecRdrName dup_spec
 
 -- | Generate the type signature of an auxiliary binding.
@@ -2079,21 +2091,21 @@ genAuxBindSpecDup loc original_rdr_name dup_spec
 genAuxBindSpecSig :: SrcSpan -> AuxBindSpec -> LHsSigWcType GhcPs
 genAuxBindSpecSig loc spec = case spec of
   DerivCon2Tag tycon _
-    -> mk_sig $ L loc $ XHsType $ NHsCoreTy $
+    -> mk_sig $ L (noAnnSrcSpan loc) $ XHsType $ NHsCoreTy $
        mkSpecSigmaTy (tyConTyVars tycon) (tyConStupidTheta tycon) $
        mkParentType tycon `mkVisFunTyMany` intPrimTy
   DerivTag2Con tycon _
-    -> mk_sig $ L loc $
+    -> mk_sig $ L (noAnnSrcSpan loc) $
        XHsType $ NHsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
        intTy `mkVisFunTyMany` mkParentType tycon
   DerivMaxTag _ _
-    -> mk_sig (L loc (XHsType (NHsCoreTy intTy)))
+    -> mk_sig (L (noAnnSrcSpan loc) (XHsType (NHsCoreTy intTy)))
   DerivDataDataType _ _ _
     -> mk_sig (nlHsTyVar dataType_RDR)
   DerivDataConstr _ _ _
     -> mk_sig (nlHsTyVar constr_RDR)
   where
-    mk_sig = mkHsWildCardBndrs . L loc . mkHsImplicitSigType
+    mk_sig = mkHsWildCardBndrs . L (noAnnSrcSpan loc) . mkHsImplicitSigType
 
 type SeparateBagsDerivStuff =
   -- DerivAuxBinds
@@ -2156,17 +2168,17 @@ mkFunBindSE :: Arity -> SrcSpan -> RdrName
              -> [([LPat GhcPs], LHsExpr GhcPs)]
              -> LHsBind GhcPs
 mkFunBindSE arity loc fun pats_and_exprs
-  = mkRdrFunBindSE arity (L loc fun) matches
+  = mkRdrFunBindSE arity (L (noAnnSrcSpan loc) fun) matches
   where
-    matches = [mkMatch (mkPrefixFunRhs (L loc fun))
+    matches = [mkMatch (mkPrefixFunRhs (L (noAnnSrcSpan loc) fun))
                                (map (parenthesizePat appPrec) p) e
-                               (noLoc emptyLocalBinds)
+                               emptyLocalBinds
               | (p,e) <-pats_and_exprs]
 
-mkRdrFunBind :: Located RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
+mkRdrFunBind :: LocatedN RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
              -> LHsBind GhcPs
 mkRdrFunBind fun@(L loc _fun_rdr) matches
-  = L loc (mkFunBind Generated fun matches)
+  = L (na2la loc) (mkFunBind Generated fun matches)
 
 -- | Make a function binding. If no equations are given, produce a function
 -- with the given arity that uses an empty case expression for the last
@@ -2177,11 +2189,11 @@ mkFunBindEC :: Arity -> SrcSpan -> RdrName
             -> [([LPat GhcPs], LHsExpr GhcPs)]
             -> LHsBind GhcPs
 mkFunBindEC arity loc fun catch_all pats_and_exprs
-  = mkRdrFunBindEC arity catch_all (L loc fun) matches
+  = mkRdrFunBindEC arity catch_all (L (noAnnSrcSpan loc) fun) matches
   where
-    matches = [ mkMatch (mkPrefixFunRhs (L loc fun))
+    matches = [ mkMatch (mkPrefixFunRhs (L (noAnnSrcSpan loc) fun))
                                 (map (parenthesizePat appPrec) p) e
-                                (noLoc emptyLocalBinds)
+                                emptyLocalBinds
               | (p,e) <- pats_and_exprs ]
 
 -- | Produces a function binding. When no equations are given, it generates
@@ -2190,11 +2202,11 @@ mkFunBindEC arity loc fun catch_all pats_and_exprs
 -- the right-hand side.
 mkRdrFunBindEC :: Arity
                -> (LHsExpr GhcPs -> LHsExpr GhcPs)
-               -> Located RdrName
+               -> LocatedN RdrName
                -> [LMatch GhcPs (LHsExpr GhcPs)]
                -> LHsBind GhcPs
-mkRdrFunBindEC arity catch_all
-                 fun@(L loc _fun_rdr) matches = L loc (mkFunBind Generated fun matches')
+mkRdrFunBindEC arity catch_all fun@(L loc _fun_rdr) matches
+  = L (na2la loc) (mkFunBind Generated fun matches')
  where
    -- Catch-all eqn looks like
    --     fmap _ z = case z of {}
@@ -2209,16 +2221,16 @@ mkRdrFunBindEC arity catch_all
               then [mkMatch (mkPrefixFunRhs fun)
                             (replicate (arity - 1) nlWildPat ++ [z_Pat])
                             (catch_all $ nlHsCase z_Expr [])
-                            (noLoc emptyLocalBinds)]
+                            emptyLocalBinds]
               else matches
 
 -- | Produces a function binding. When there are no equations, it generates
 -- a binding with the given arity that produces an error based on the name of
 -- the type of the last argument.
-mkRdrFunBindSE :: Arity -> Located RdrName ->
+mkRdrFunBindSE :: Arity -> LocatedN RdrName ->
                     [LMatch GhcPs (LHsExpr GhcPs)] -> LHsBind GhcPs
-mkRdrFunBindSE arity
-                 fun@(L loc fun_rdr) matches = L loc (mkFunBind Generated fun matches')
+mkRdrFunBindSE arity fun@(L loc fun_rdr) matches
+  = L (na2la loc) (mkFunBind Generated fun matches')
  where
    -- Catch-all eqn looks like
    --     compare _ _ = error "Void compare"
@@ -2228,7 +2240,7 @@ mkRdrFunBindSE arity
    matches' = if null matches
               then [mkMatch (mkPrefixFunRhs fun)
                             (replicate arity nlWildPat)
-                            (error_Expr str) (noLoc emptyLocalBinds)]
+                            (error_Expr str) emptyLocalBinds]
               else matches
    str = "Void " ++ occNameString (rdrNameOcc fun_rdr)
 
