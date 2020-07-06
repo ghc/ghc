@@ -47,7 +47,7 @@ tcDefaults [L _ (DefaultDecl _ [])]
   = return (Just [])            -- Default declaration specifying no types
 
 tcDefaults [L locn (DefaultDecl _ mono_tys)]
-  = setSrcSpan locn                     $
+  = setSrcSpan (locA locn)              $
     addErrCtxt defaultDeclCtxt          $
     do  { ovl_str   <- xoptM LangExt.OverloadedStrings
         ; ext_deflt <- xoptM LangExt.ExtendedDefaultRules
@@ -65,7 +65,7 @@ tcDefaults [L locn (DefaultDecl _ mono_tys)]
         ; return (Just tau_tys) }
 
 tcDefaults decls@(L locn (DefaultDecl _ _) : _)
-  = setSrcSpan locn $
+  = setSrcSpan (locA locn) $
     failWithTc (dupDefaultDeclErr decls)
 
 
@@ -93,14 +93,14 @@ check_instance ty cls
 defaultDeclCtxt :: SDoc
 defaultDeclCtxt = text "When checking the types in a default declaration"
 
-dupDefaultDeclErr :: [Located (DefaultDecl GhcRn)] -> SDoc
+dupDefaultDeclErr :: [LDefaultDecl GhcRn] -> SDoc
 dupDefaultDeclErr (L _ (DefaultDecl _ _) : dup_things)
   = hang (text "Multiple default declarations")
        2 (vcat (map pp dup_things))
   where
-    pp :: Located (DefaultDecl GhcRn) -> SDoc
+    pp :: LDefaultDecl GhcRn -> SDoc
     pp (L locn (DefaultDecl _ _))
-      = text "here was another default declaration" <+> ppr locn
+      = text "here was another default declaration" <+> ppr (locA locn)
 dupDefaultDeclErr [] = panic "dupDefaultDeclErr []"
 
 badDefaultTy :: Type -> [Class] -> SDoc

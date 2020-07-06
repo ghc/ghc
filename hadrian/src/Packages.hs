@@ -2,6 +2,7 @@
 module Packages (
     -- * GHC packages
     array, base, binary, bytestring, cabal, checkApiAnnotations, checkPpr,
+    checkExact,
     compareSizes, compiler, containers, deepseq, deriveConstants, directory,
     exceptions, filepath, genapply, genprimopcode, ghc, ghcBignum, ghcBoot, ghcBootTh,
     ghcCompact, ghcHeap, ghci, ghcPkg, ghcPrim, haddock, haskeline,
@@ -52,6 +53,7 @@ bytestring          = lib  "bytestring"
 cabal               = lib  "Cabal"           `setPath` "libraries/Cabal/Cabal"
 checkApiAnnotations = util "check-api-annotations"
 checkPpr            = util "check-ppr"
+checkExact          = util "check-exact"
 compareSizes        = util "compareSizes"    `setPath` "utils/compare_sizes"
 compiler            = top  "ghc"             `setPath` "compiler"
 containers          = lib  "containers"      `setPath` "libraries/containers/containers"

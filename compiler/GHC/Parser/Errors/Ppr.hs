@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module GHC.Parser.Errors.Ppr
    ( pprWarning
@@ -419,7 +420,7 @@ pp_err = \case
 
    PsErrIllegalDataTypeContext c
       -> text "Illegal datatype context (use DatatypeContexts):"
-         <+> pprLHsContext c
+         <+> pprLHsContext (Just c)
 
    PsErrMalformedDecl what for
       -> text "Malformed" <+> what
@@ -499,6 +500,7 @@ pp_err = \case
          -- so check for that, and suggest.  cf #3805
          -- Sadly 'foreign import' still barfs 'parse error' because
          --  'import' is a keyword
+         -- looks_like :: RdrName -> LHsExpr GhcPs -> Bool -- AZ
          looks_like s (L _ (HsVar _ (L _ v))) = v == s
          looks_like s (L _ (HsApp _ lhs _))   = looks_like s lhs
          looks_like _ _                       = False

@@ -103,6 +103,7 @@ import GHC.Fingerprint
 import qualified GHC.Data.BooleanFormula as BF
 
 import Control.Monad
+import GHC.Parser.Annotation
 
 {-
 This module takes
@@ -255,7 +256,7 @@ mergeIfaceDecl d1 d2
                     (mkNameEnv [ (n, op) | op@(IfaceClassOp n _ _) <- ops2 ])
       in d1 { ifBody = (ifBody d1) {
                 ifSigs  = ops,
-                ifMinDef = BF.mkOr [noLoc bf1, noLoc bf2]
+                ifMinDef = BF.mkOr [noLocA bf1, noLocA bf2]
                 }
             } `withRolesFrom` d2
     -- It doesn't matter; we'll check for consistency later when

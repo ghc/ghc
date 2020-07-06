@@ -139,7 +139,6 @@ import GHC.Core.FamInstEnv
 import GHC.CoreToStg.Prep
 import GHC.CoreToStg    ( coreToStg )
 
-import GHC.Parser.Annotation
 import GHC.Parser.Errors
 import GHC.Parser.Errors.Ppr
 import GHC.Parser
@@ -210,14 +209,13 @@ import qualified GHC.Data.Stream as Stream
 import GHC.Data.Stream (Stream)
 
 import Data.Data hiding (Fixity, TyCon)
-import Data.Maybe       ( fromJust )
+import Data.Maybe       ( fromJust, fromMaybe )
 import Data.List        ( nub, isPrefixOf, partition )
 import Control.Monad
 import Data.IORef
 import System.FilePath as FilePath
 import System.Directory
 import System.IO (fixIO)
-import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Set (Set)
 import Data.Functor
@@ -339,7 +337,7 @@ ioMsgMaybe' ioA = do
 -- -----------------------------------------------------------------------------
 -- | Lookup things in the compiler's environment
 
-hscTcRnLookupRdrName :: HscEnv -> Located RdrName -> IO [Name]
+hscTcRnLookupRdrName :: HscEnv -> LocatedN RdrName -> IO [Name]
 hscTcRnLookupRdrName hsc_env0 rdr_name
   = runInteractiveHsc hsc_env0 $
     do { hsc_env <- getHscEnv
@@ -415,7 +413,9 @@ hscParse' mod_summary
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser"
                         FormatHaskell (ppr rdr_module)
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed_ast "Parser AST"
-                        FormatHaskell (showAstData NoBlankSrcSpan rdr_module)
+                        FormatHaskell (showAstData NoBlankSrcSpan
+                                                   NoBlankApiAnnotations
+                                                   rdr_module)
             liftIO $ dumpIfSet_dyn dflags Opt_D_source_stats "Source Statistics"
                         FormatText (ppSourceStats False rdr_module)
             when (not $ isEmptyBag errs) $ throwErrors errs
@@ -447,10 +447,7 @@ hscParse' mod_summary
             srcs2 <- liftIO $ filterM doesFileExist srcs1
 
             let api_anns = ApiAnns {
-                      apiAnnItems = M.fromListWith (++) $ annotations pst,
-                      apiAnnEofPos = eof_pos pst,
-                      apiAnnComments = M.fromList (annotations_comments pst),
-                      apiAnnRogueComments = comment_q pst
+                      apiAnnRogueComments = (fromMaybe [] (header_comments pst)) ++ comment_q pst
                    }
                 res = HsParsedModule {
                       hpm_module    = rdr_module,
@@ -473,7 +470,8 @@ extract_renamed_stuff mod_summary tc_result = do
 
     dflags <- getDynFlags
     liftIO $ dumpIfSet_dyn dflags Opt_D_dump_rn_ast "Renamer"
-                FormatHaskell (showAstData NoBlankSrcSpan rn_info)
+                FormatHaskell
+                      (showAstData NoBlankSrcSpan NoBlankApiAnnotations rn_info)
 
     -- Create HIE files
     when (gopt Opt_WriteHie dflags) $ do
@@ -1132,9 +1130,9 @@ hscCheckSafeImports tcg_env = do
 
     warns dflags rules = listToBag $ map (warnRules dflags) rules
 
-    warnRules :: DynFlags -> GenLocated SrcSpan (RuleDecl GhcTc) -> ErrMsg
+    warnRules :: DynFlags -> LRuleDecl GhcTc -> ErrMsg
     warnRules dflags (L loc (HsRule { rd_name = n })) =
-        mkPlainWarnMsg dflags loc $
+        mkPlainWarnMsg dflags (locA loc) $
             text "Rule \"" <> ftext (snd $ unLoc n) <> text "\" ignored" $+$
             text "User defined rules are disabled under Safe Haskell"
 
@@ -1969,7 +1967,7 @@ hscParseStmtWithLocation source linenumber stmt =
 hscParseType :: String -> Hsc (LHsType GhcPs)
 hscParseType = hscParseThing parseType
 
-hscParseIdentifier :: HscEnv -> String -> IO (Located RdrName)
+hscParseIdentifier :: HscEnv -> String -> IO (LocatedN RdrName)
 hscParseIdentifier hsc_env str =
     runInteractiveHsc hsc_env $ hscParseThing parseIdentifier str
 
@@ -1996,7 +1994,8 @@ hscParseThingWithLocation source linenumber parser str
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser"
                         FormatHaskell (ppr thing)
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed_ast "Parser AST"
-                        FormatHaskell (showAstData NoBlankSrcSpan thing)
+                      FormatHaskell
+                        (showAstData NoBlankSrcSpan NoBlankApiAnnotations thing)
             return thing
 
 
