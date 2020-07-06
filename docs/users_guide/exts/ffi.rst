@@ -788,7 +788,8 @@ In the multi-threaded runtime (the program was linked using :ghc-flag:`-threaded
 ``foreign import``\ ed functions run concurrently (both ``safe`` and ``unsafe``),
 but a similar effect can happen when you call an ``unsafe`` function, and a global
 garbage collection is triggered in another thread. In this situation, the garbage
-collector cannot proceed, and this can lead to performance issues that often
+collector cannot proceed until the unsafe call has returned. This
+can lead to performance issues that often
 appear under high load, as other threads are more active and thus more prone
 to trigger global garbage collection.
 
