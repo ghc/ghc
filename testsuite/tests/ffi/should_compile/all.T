@@ -8,7 +8,7 @@ test('cc001', normal, compile, [''])
 
 # Non-static C call
 # cc004 test also uses stdcall, so it only works on i386.
-if config.platform.startswith('i386-'):
+if config.targetPlatform.startswith('i386-'):
     ways = normal
 else:
     ways = expect_fail

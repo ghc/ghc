@@ -3,7 +3,7 @@ include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
 # SETUP=../Setup
-SETUP=../Setup -v0
+SETUP='$(TEST_WRAPPER)' ../Setup -v0
 
 # This test is for overlapping/shadowing packages with Cabal.  We
 #   1. install p-1.0
@@ -30,7 +30,7 @@ cabal03: clean
 	cd p && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --ghc-pkg-option=--force --ipid p-withopt
 	cd p && $(SETUP) build
 	cd p && $(SETUP) register
-	cd r && ! ../Setup configure -v0 $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --ghc-pkg-option=--force
+	cd r && ! $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --ghc-pkg-option=--force
 ifneq "$(CLEANUP)" ""
 	$(MAKE) -s --no-print-directory clean
 endif

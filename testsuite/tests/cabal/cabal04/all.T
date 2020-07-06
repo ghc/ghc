@@ -19,6 +19,7 @@ else:
    cleanup = 'CLEANUP=0'
 
 test('cabal04',
-     extra_files(['Library.hs', 'Setup.lhs', 'TH.hs', 'thtest.cabal']),
+     [extra_files(['Library.hs', 'Setup.lhs', 'TH.hs', 'thtest.cabal']),
+      when(cross(), extra_hc_opts('-fexternal-interpreter -pgmi $WRAPPED_ISERV'))],
      run_command,
      ['$MAKE -s --no-print-directory cabal04 VANILLA=' + vanilla + ' PROF=' + prof + ' DYN=' + dyn + ' ' + cleanup])

@@ -60,8 +60,17 @@ TEST_HC_OPTS += -Werror=compat
 # removing this line.
 TEST_HC_OPTS += -dno-debug-output
 
-TEST_HC_OPTS_INTERACTIVE = $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci -fno-ghci-history
+# Add WRAPPED_ISERV if it's defined, it should point to a file with the following
+# content:
+#
+#   #/usr/bin/env sh
+#   "$TEST_WRAPPER" /absolute/path/to/ghc-iserv "$@"
+#
+ifneq "$(WRAPPED_ISERV)" ""
+TEST_HC_OPTS += -fexternal-interpreter -pgmi $(WRAPPED_ISERV)
+endif
 
+TEST_HC_OPTS_INTERACTIVE = $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci -fno-ghci-history
 
 RUNTEST_OPTS =
 
@@ -136,7 +145,7 @@ endif
 
 ifeq "$(GhcWithInterpreter)" "NO"
 RUNTEST_OPTS += -e config.have_interp=False
-else ifeq "$(GhcStage)" "1"
+else ifeq "$(GhcStage)x$(WRAPPED_ISERV)y" "1xy"
 RUNTEST_OPTS += -e config.have_interp=False
 else
 RUNTEST_OPTS += -e config.have_interp=True
@@ -258,7 +267,8 @@ endif
 RUNTEST_OPTS +=  \
 	--rootdir=. \
 	--config-file=$(CONFIG) \
-	-e 'config.platform="$(TARGETPLATFORM)"' \
+	-e 'config.targetPlatform="$(TARGETPLATFORM)"' \
+	-e 'config.hostPlatform="$(HOSTPLATFORM)"' \
 	-e 'config.os="$(TargetOS_CPP)"' \
 	-e 'config.arch="$(TargetARCH_CPP)"' \
 	-e 'config.wordsize="$(WORDSIZE)"' \

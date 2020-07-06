@@ -15,8 +15,8 @@ clean:
 recomp009: clean
 	cp Sub1.hs Sub.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) -v0 --make Main.hs
-	./Main
+	'$(TEST_WRAPPER)' ./Main
 	sleep 1
 	cp Sub2.hs Sub.hs
 	-'$(TEST_HC)' $(TEST_HC_OPTS) $(ghcThWayFlags) -v0 --make Main.hs
-	./Main
+	'$(TEST_WRAPPER)' ./Main
