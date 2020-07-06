@@ -3,4 +3,4 @@ LinearBottomMult.hs:13:3: error:
     • Couldn't match type ‘'Many’ with ‘'One’
         arising from multiplicity of ‘x’
     • In an equation for ‘f’:
-          f x = elim (U (\ (a :: Void) -> case a of))
+          f x = elim (U (\ (a :: Void) -> case a of {}))

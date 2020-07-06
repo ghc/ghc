@@ -118,7 +118,7 @@ desugarPat x pat = case pat of
     -- Add the bang in front of the list, because it will happen before any
     -- nested stuff.
     (PmBang x pm_loc :) <$> desugarLPat x p
-      where pm_loc = Just (SrcInfo (L l (ppr p')))
+      where pm_loc = Just (SrcInfo (L (locA l) (ppr p')))
 
   -- (x@pat)   ==>   Desugar pat with x as match var and handle impedance
   --                 mismatch with incoming match var
@@ -322,7 +322,7 @@ desugarMatches vars matches =
 desugarMatch :: [Id] -> LMatch GhcTc (LHsExpr GhcTc) -> DsM (PmMatch Pre)
 desugarMatch vars (L match_loc (Match { m_pats = pats, m_grhss = grhss })) = do
   pats'  <- concat <$> zipWithM desugarLPat vars pats
-  grhss' <- desugarGRHSs match_loc (sep (map ppr pats)) grhss
+  grhss' <- desugarGRHSs (locA match_loc) (sep (map ppr pats)) grhss
   -- tracePm "desugarMatch" (vcat [ppr pats, ppr pats', ppr grhss'])
   return PmMatch { pm_pats = GrdVec pats', pm_grhss = grhss' }
 
@@ -342,8 +342,8 @@ desugarLGRHS match_loc pp_pats (L _loc (GRHS _ gs _)) = do
   -- pp_pats is the space-separated pattern of the current Match this
   -- GRHS belongs to, so the @A B x@ part in @A B x | 0 <- x@.
   let rhs_info = case gs of
-        []              -> L match_loc pp_pats
-        (L grd_loc _):_ -> L grd_loc   (pp_pats <+> vbar <+> interpp'SP gs)
+        []              -> L match_loc      pp_pats
+        (L grd_loc _):_ -> L (locA grd_loc) (pp_pats <+> vbar <+> interpp'SP gs)
   grds <- concatMapM (desugarGuard . unLoc) gs
   pure PmGRHS { pg_grds = GrdVec grds, pg_rhs = SrcInfo rhs_info }
 
@@ -351,7 +351,7 @@ desugarLGRHS match_loc pp_pats (L _loc (GRHS _ gs _)) = do
 desugarGuard :: GuardStmt GhcTc -> DsM [PmGrd]
 desugarGuard guard = case guard of
   BodyStmt _   e _ _ -> desugarBoolGuard e
-  LetStmt  _   binds -> desugarLet (unLoc binds)
+  LetStmt  _   binds -> desugarLet binds
   BindStmt _ p e     -> desugarBind p e
   LastStmt        {} -> panic "desugarGuard LastStmt"
   ParStmt         {} -> panic "desugarGuard ParStmt"
