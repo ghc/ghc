@@ -154,7 +154,7 @@ type ExportOccMap = OccEnv (GreName, IE GhcPs)
         --   that have the same occurrence name
 
 tcRnExports :: Bool       -- False => no 'module M(..) where' header at all
-          -> Maybe (Located [LIE GhcPs]) -- Nothing => no explicit export list
+          -> Maybe (LocatedL [LIE GhcPs]) -- Nothing => no explicit export list
           -> TcGblEnv
           -> RnM TcGblEnv
 
@@ -187,8 +187,8 @@ tcRnExports explicit_mod exports
         ; let real_exports
                  | explicit_mod = exports
                  | has_main
-                          = Just (noLoc [noLoc (IEVar noExtField
-                                     (noLoc (IEName $ noLoc default_main)))])
+                          = Just (noLocA [noLocA (IEVar noExtField
+                                     (noLocA (IEName $ noLocA default_main)))])
                         -- ToDo: the 'noLoc' here is unhelpful if 'main'
                         --       turns out to be out of scope
                  | otherwise = Nothing
@@ -215,7 +215,7 @@ tcRnExports explicit_mod exports
         ; failIfErrsM
         ; return new_tcg_env }
 
-exports_from_avail :: Maybe (Located [LIE GhcPs])
+exports_from_avail :: Maybe (LocatedL [LIE GhcPs])
                          -- ^ 'Nothing' means no explicit export list
                    -> GlobalRdrEnv
                    -> ImportAvails
@@ -261,7 +261,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
   where
     do_litem :: ExportAccum -> LIE GhcPs
              -> RnM (Maybe (ExportAccum, (LIE GhcRn, Avails)))
-    do_litem acc lie = setSrcSpan (getLoc lie) (exports_from_item acc lie)
+    do_litem acc lie = setSrcSpan (getLocA lie) (exports_from_item acc lie)
 
     -- Maps a parent to its in-scope children
     kids_env :: NameEnv [GlobalRdrElt]
@@ -343,14 +343,14 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
     lookup_ie (IEThingAbs _ (L l rdr))
         = do (name, avail) <- lookupGreAvailRn $ ieWrappedName rdr
-             return (IEThingAbs noExtField (L l (replaceWrappedName rdr name))
+             return (IEThingAbs noAnn (L l (replaceWrappedName rdr name))
                     , avail)
 
     lookup_ie ie@(IEThingAll _ n')
         = do
             (n, avail, flds) <- lookup_ie_all ie n'
             let name = unLoc n
-            return (IEThingAll noExtField (replaceLWrappedName n' (unLoc n))
+            return (IEThingAll noAnn (replaceLWrappedName n' (unLoc n))
                    , availTC name (name:avail) flds)
 
 
@@ -379,8 +379,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
         = do name <- lookupGlobalOccRn $ ieWrappedName rdr
              (non_flds, flds) <- lookupChildrenExport name sub_rdrs
              if isUnboundName name
-                then return (L l name, [], [name], [])
-                else return (L l name, non_flds
+                then return (L (locA l) name, [], [name], [])
+                else return (L (locA l) name, non_flds
                             , map (ieWrappedName . unLoc) non_flds
                             , flds)
 
@@ -400,7 +400,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                   else -- This occurs when you export T(..), but
                        -- only import T abstractly, or T is a synonym.
                        addErr (exportItemErr ie)
-             return (L l name, non_flds, flds)
+             return (L (locA l) name, non_flds, flds)
 
     -------------
     lookup_doc_ie :: IE GhcPs -> Maybe (IE GhcRn)
@@ -516,10 +516,10 @@ lookupChildrenExport spec_parent rdr_items =
           case name of
             NameNotFound -> do { ub <- reportUnboundName unboundName
                                ; let l = getLoc n
-                               ; return (Left (L l (IEName (L l ub))))}
+                               ; return (Left (L l (IEName (L (la2na l) ub))))}
             FoundChild par child -> do { checkPatSynParent spec_parent par child
                                        ; return $ case child of
-                                           FieldGreName fl   -> Right (L (getLoc n) fl)
+                                           FieldGreName fl   -> Right (L (getLocA n) fl)
                                            NormalGreName  name -> Left (replaceLWrappedName n name)
                                        }
             IncorrectParent p c gs -> failWithDcErr p c gs

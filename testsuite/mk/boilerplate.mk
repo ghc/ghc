@@ -227,6 +227,9 @@ ifeq "$(CHECK_PPR)" ""
 CHECK_PPR := $(abspath $(TOP)/../inplace/bin/check-ppr)
 endif
 
+ifeq "$(CHECK_EXACT)" ""
+CHECK_EXACT := $(abspath $(TOP)/../inplace/bin/check-exact)
+endif
 
 # -----------------------------------------------------------------------------
 # configuration of TEST_HC
