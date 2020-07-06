@@ -16,5 +16,5 @@ lint = do
 
 lintBase :: Action ()
 lintBase = do
-    _ <- liftIO system "hlint -j --cpp-define x86_64_HOST_ARCH --cpp-include=./libraries/base/include/ --cpp-include=includes --cpp-include=./_build/stage1/lib/ -h libraries/base/.hlint.yaml libraries/base"
+    _ <- liftIO $ system "hlint -j --cpp-define x86_64_HOST_ARCH --cpp-include=./libraries/base/include/ --cpp-include=includes --cpp-include=./_build/stage1/lib/ -h libraries/base/.hlint.yaml libraries/base"
     pure ()
