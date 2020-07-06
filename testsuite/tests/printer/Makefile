@@ -8,7 +8,8 @@ clean:
 
 .PHONY: ppr001
 ppr001:
-	$(CHECK_PPR) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Ppr001.hs
+	$(CHECK_PPR)   "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Ppr001.hs
+	$(CHECK_EXACT) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Ppr001.hs
 
 .PHONY: ppr002
 ppr002:

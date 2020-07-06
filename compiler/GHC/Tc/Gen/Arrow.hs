@@ -33,6 +33,7 @@ import GHC.Core.Multiplicity
 import GHC.Types.Id( mkLocalId )
 import GHC.Tc.Utils.Instantiate
 import GHC.Builtin.Types
+import GHC.Types.Name
 import GHC.Types.Var.Set
 import GHC.Builtin.Types.Prim
 import GHC.Types.Basic( Arity )
@@ -135,7 +136,7 @@ tcCmdTop env (L loc (HsCmdTop names cmd)) cmd_ty@(cmd_stk, res_ty)
 tcCmd  :: CmdEnv -> LHsCmd GhcRn -> CmdType -> TcM (LHsCmd GhcTc)
         -- The main recursive function
 tcCmd env (L loc cmd) res_ty
-  = setSrcSpan loc $ do
+  = setSrcSpan (locA loc) $ do
         { cmd' <- tc_cmd env cmd res_ty
         ; return (L loc cmd') }
 
@@ -146,7 +147,7 @@ tc_cmd env (HsCmdPar x cmd) res_ty
 
 tc_cmd env (HsCmdLet x (L l binds) (L body_loc body)) res_ty
   = do  { (binds', body') <- tcLocalBinds binds         $
-                             setSrcSpan body_loc        $
+                             setSrcSpan (locA body_loc) $
                              tc_cmd env body res_ty
         ; return (HsCmdLet x (L l binds') (L body_loc body')) }
 
@@ -254,11 +255,11 @@ tc_cmd env
     do  { (co, arg_tys, cmd_stk') <- matchExpectedCmdArgs n_pats cmd_stk
 
                 -- Check the patterns, and the GRHSs inside
-        ; (pats', grhss') <- setSrcSpan mtch_loc                                 $
+        ; (pats', grhss') <- setSrcSpanA mtch_loc                                 $
                              tcPats LambdaExpr pats (map (unrestricted . mkCheckExpType) arg_tys) $
                              tc_grhss grhss cmd_stk' (mkCheckExpType res_ty)
 
-        ; let match' = L mtch_loc (Match { m_ext = noExtField
+        ; let match' = L mtch_loc (Match { m_ext = noAnn
                                          , m_ctxt = LambdaExpr, m_pats = pats'
                                          , m_grhss = grhss' })
               arg_tys = map (unrestricted . hsLPatType) pats'
@@ -268,7 +269,7 @@ tc_cmd env
         ; return (mkHsCmdWrap (mkWpCastN co) cmd') }
   where
     n_pats     = length pats
-    match_ctxt = (LambdaExpr :: HsMatchContext GhcRn)    -- Maybe KappaExpr?
+    match_ctxt = (LambdaExpr :: HsMatchContext Name)    -- Maybe KappaExpr?
     pg_ctxt    = PatGuard match_ctxt
 
     tc_grhss (GRHSs x grhss (L l binds)) stk_ty res_ty
@@ -387,7 +388,7 @@ tcArrDoStmt env ctxt (BindStmt _ pat rhs) res_ty thing_inside
                             thing_inside res_ty
         ; return (mkTcBindStmt pat' rhs', thing) }
 
-tcArrDoStmt env ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
+tcArrDoStmt env ctxt (RecStmt { recS_stmts = L l stmts, recS_later_ids = later_names
                             , recS_rec_ids = rec_names }) res_ty thing_inside
   = do  { let tup_names = rec_names ++ filterOut (`elem` rec_names) later_names
         ; tup_elt_tys <- newFlexiTyVarTys (length tup_names) liftedTypeKind
@@ -411,7 +412,7 @@ tcArrDoStmt env ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
         ; let ret_table = zip tup_ids tup_rets
         ; let later_rets = [r | i <- later_ids, (j, r) <- ret_table, i == j]
 
-        ; return (emptyRecStmtId { recS_stmts = stmts'
+        ; return (emptyRecStmtId { recS_stmts = L l stmts'
                                  , recS_later_ids = later_ids
                                  , recS_rec_ids = rec_ids
                                  , recS_ext = unitRecStmtTc

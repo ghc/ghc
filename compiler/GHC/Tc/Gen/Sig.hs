@@ -288,9 +288,9 @@ no_anon_wc lty = go lty
       HsForAllTy { hst_tele = tele
                  , hst_body = ty } -> no_anon_wc_tele tele
                                         && go ty
-      HsQualTy { hst_ctxt = L _ ctxt
-               , hst_body = ty }  -> gos ctxt && go ty
-      HsSpliceTy _ (HsSpliced _ _ (HsSplicedTy ty)) -> go $ L noSrcSpan ty
+      HsQualTy { hst_ctxt = ctxt
+               , hst_body = ty }  -> gos (fromMaybeContext ctxt) && go ty
+      HsSpliceTy _ (HsSpliced _ _ (HsSplicedTy ty)) -> go $ L noSrcSpanA ty
       HsSpliceTy{} -> True
       HsTyLit{} -> True
       HsTyVar{} -> True

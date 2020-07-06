@@ -53,7 +53,7 @@ module GHC.Types.SrcLoc (
         srcSpanStart, srcSpanEnd,
         realSrcSpanStart, realSrcSpanEnd,
         srcSpanFileName_maybe,
-        pprUserRealSpan,
+        pprUserRealSpan, pprUserSpan,
 
         -- ** Unsafely deconstructing SrcSpan
         -- These are dubious exports, because they crash on some inputs
@@ -62,7 +62,7 @@ module GHC.Types.SrcLoc (
         srcSpanStartCol, srcSpanEndCol,
 
         -- ** Predicates on SrcSpan
-        isGoodSrcSpan, isOneLineSpan,
+        isGoodSrcSpan, isOneLineSpan, isZeroWidthSpan,
         containsSpan,
 
         -- * StringBuffer locations
@@ -448,6 +448,14 @@ isOneLineSpan :: SrcSpan -> Bool
 -- For "bad" 'SrcSpan', it returns False
 isOneLineSpan (RealSrcSpan s _) = srcSpanStartLine s == srcSpanEndLine s
 isOneLineSpan (UnhelpfulSpan _) = False
+
+isZeroWidthSpan :: SrcSpan -> Bool
+-- ^ True if the span has a width of zero, as returned for "virtual"
+-- semicolons in the lexer.
+-- For "bad" 'SrcSpan', it returns False
+isZeroWidthSpan (RealSrcSpan s _) = srcSpanStartLine s == srcSpanEndLine s
+                                 && srcSpanStartCol s == srcSpanEndCol s
+isZeroWidthSpan (UnhelpfulSpan _) = False
 
 -- | Tests whether the first span "contains" the other span, meaning
 -- that it covers at least as much source code. True where spans are equal.

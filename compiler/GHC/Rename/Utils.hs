@@ -10,7 +10,7 @@ This module contains miscellaneous functions related to renaming.
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.Rename.Utils (
-        checkDupRdrNames, checkShadowedRdrNames,
+        checkDupRdrNames, checkDupRdrNamesN, checkShadowedRdrNames,
         checkDupNames, checkDupAndShadowedNames, dupNamesErr,
         checkTupSize,
         addFvRn, mapFvRn, mapMaybeFvRn,
@@ -65,7 +65,7 @@ import qualified GHC.LanguageExtensions as LangExt
 *********************************************************
 -}
 
-newLocalBndrRn :: Located RdrName -> RnM Name
+newLocalBndrRn :: LocatedN RdrName -> RnM Name
 -- Used for non-top-level binders.  These should
 -- never be qualified.
 newLocalBndrRn (L loc rdr_name)
@@ -74,11 +74,11 @@ newLocalBndrRn (L loc rdr_name)
                 -- See Note [Binders in Template Haskell] in "GHC.ThToHs"
   | otherwise
   = do { unless (isUnqual rdr_name)
-                (addErrAt loc (badQualBndrErr rdr_name))
+                (addErrAt (locA loc) (badQualBndrErr rdr_name))
        ; uniq <- newUnique
-       ; return (mkInternalName uniq (rdrNameOcc rdr_name) loc) }
+       ; return (mkInternalName uniq (rdrNameOcc rdr_name) (locA loc)) }
 
-newLocalBndrsRn :: [Located RdrName] -> RnM [Name]
+newLocalBndrsRn :: [LocatedN RdrName] -> RnM [Name]
 newLocalBndrsRn = mapM newLocalBndrRn
 
 bindLocalNames :: [Name] -> RnM a -> RnM a
@@ -103,10 +103,17 @@ extendTyVarEnvFVRn :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
 extendTyVarEnvFVRn tyvars thing_inside = bindLocalNamesFV tyvars thing_inside
 
 -------------------------------------
-checkDupRdrNames :: [Located RdrName] -> RnM ()
+checkDupRdrNames :: [LocatedN RdrName] -> RnM ()
 -- Check for duplicated names in a binding group
 checkDupRdrNames rdr_names_w_loc
-  = mapM_ (dupNamesErr getLoc) dups
+  = mapM_ (dupNamesErr getLocA) dups
+  where
+    (_, dups) = removeDups (\n1 n2 -> unLoc n1 `compare` unLoc n2) rdr_names_w_loc
+
+checkDupRdrNamesN :: [LocatedN RdrName] -> RnM ()
+-- Check for duplicated names in a binding group
+checkDupRdrNamesN rdr_names_w_loc
+  = mapM_ (dupNamesErr getLocA) dups
   where
     (_, dups) = removeDups (\n1 n2 -> unLoc n1 `compare` unLoc n2) rdr_names_w_loc
 
@@ -122,14 +129,14 @@ check_dup_names names
     (_, dups) = removeDups (\n1 n2 -> nameOccName n1 `compare` nameOccName n2) names
 
 ---------------------
-checkShadowedRdrNames :: [Located RdrName] -> RnM ()
+checkShadowedRdrNames :: [LocatedN RdrName] -> RnM ()
 checkShadowedRdrNames loc_rdr_names
   = do { envs <- getRdrEnvs
        ; checkShadowedOccs envs get_loc_occ filtered_rdrs }
   where
     filtered_rdrs = filterOut (isExact . unLoc) loc_rdr_names
                 -- See Note [Binders in Template Haskell] in "GHC.ThToHs"
-    get_loc_occ (L loc rdr) = (loc,rdrNameOcc rdr)
+    get_loc_occ (L loc rdr) = (locA loc,rdrNameOcc rdr)
 
 checkDupAndShadowedNames :: (GlobalRdrEnv, LocalRdrEnv) -> [Name] -> RnM ()
 checkDupAndShadowedNames envs names
@@ -464,15 +471,15 @@ data HsDocContext
   | PatCtx
   | SpecInstSigCtx
   | DefaultDeclCtx
-  | ForeignDeclCtx (Located RdrName)
+  | ForeignDeclCtx (LocatedN RdrName)
   | DerivDeclCtx
   | RuleCtx FastString
-  | TyDataCtx (Located RdrName)
-  | TySynCtx (Located RdrName)
-  | TyFamilyCtx (Located RdrName)
-  | FamPatCtx (Located RdrName)    -- The patterns of a type/data family instance
-  | ConDeclCtx [Located Name]
-  | ClassDeclCtx (Located RdrName)
+  | TyDataCtx (LocatedN RdrName)
+  | TySynCtx (LocatedN RdrName)
+  | TyFamilyCtx (LocatedN RdrName)
+  | FamPatCtx (LocatedN RdrName)    -- The patterns of a type/data family instance
+  | ConDeclCtx [LocatedN Name]
+  | ClassDeclCtx (LocatedN RdrName)
   | ExprWithTySigCtx
   | TypBrCtx
   | HsTypeCtx

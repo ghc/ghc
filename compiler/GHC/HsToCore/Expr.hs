@@ -82,7 +82,7 @@ import Data.List.NonEmpty ( nonEmpty )
 
 dsLocalBinds :: LHsLocalBinds GhcTc -> CoreExpr -> DsM CoreExpr
 dsLocalBinds (L _   (EmptyLocalBinds _))  body = return body
-dsLocalBinds (L loc (HsValBinds _ binds)) body = putSrcSpanDs loc $
+dsLocalBinds (L loc (HsValBinds _ binds)) body = putSrcSpanDsA loc $
                                                  dsValBinds binds body
 dsLocalBinds (L _ (HsIPBinds _ binds))    body = dsIPBinds  binds body
 
@@ -120,7 +120,7 @@ ds_val_bind (NonRecursive, hsbinds) body
         --       could be dict binds in the 'binds'.  (See the notes
         --       below.  Then pattern-match would fail.  Urk.)
   , isUnliftedHsBind bind
-  = putSrcSpanDs loc $
+  = putSrcSpanDs (locA loc) $
      -- see Note [Strict binds checks] in GHC.HsToCore.Binds
     if is_polymorphic bind
     then errDsCoreExpr (poly_bind_err bind)
@@ -240,7 +240,7 @@ dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 dsLExpr :: LHsExpr GhcTc -> DsM CoreExpr
 
 dsLExpr (L loc e)
-  = putSrcSpanDs loc $
+  = putSrcSpanDsA loc $
     do { core_expr <- dsExpr e
    -- uncomment this check to test the hsExprType function in GHC.Tc.Utils.Zonk
    --    ; MASSERT2( exprType core_expr `eqType` hsExprType e
@@ -255,7 +255,7 @@ dsLExpr (L loc e)
 -- See Note [Levity polymorphism invariants] in "GHC.Core"
 dsLExprNoLP :: LHsExpr GhcTc -> DsM CoreExpr
 dsLExprNoLP (L loc e)
-  = putSrcSpanDs loc $
+  = putSrcSpanDsA loc $
     do { e' <- dsExpr e
        ; dsNoLevPolyExpr e' (text "In the type of expression:" <+> ppr e)
        ; return e' }
@@ -298,7 +298,7 @@ dsExpr hswrap@(XExpr (HsWrap co_fn e))
 dsExpr (NegApp _ (L loc
                     (HsOverLit _ lit@(OverLit { ol_val = HsIntegral i})))
                 neg_expr)
-  = do { expr' <- putSrcSpanDs loc $ do
+  = do { expr' <- putSrcSpanDsA loc $ do
           { warnAboutOverflowedOverLit
               (lit { ol_val = HsIntegral (negateIntegralLit i) })
           ; dsOverLit lit }
@@ -487,7 +487,7 @@ dsExpr (HsMultiIf res_ty alts)
   = mkErrorExpr
 
   | otherwise
-  = do { let grhss = GRHSs noExtField alts (noLoc emptyLocalBinds)
+  = do { let grhss = GRHSs noAnn alts (noLocA emptyLocalBinds)
        ; rhss_deltas  <- checkGuardMatches IfAlt grhss
        ; match_result <- dsGRHSs IfAlt grhss res_ty (nonEmpty rhss_deltas)
        ; error_expr   <- mkErrorExpr
@@ -529,7 +529,7 @@ dsExpr (HsStatic _ expr@(L loc _)) = do
 
     dflags <- getDynFlags
     let platform = targetPlatform dflags
-    let (line, col) = case loc of
+    let (line, col) = case locA loc of
            RealSrcSpan r _ ->
                             ( srcLocLine $ realSrcSpanStart r
                             , srcLocCol  $ realSrcSpanStart r
@@ -540,7 +540,7 @@ dsExpr (HsStatic _ expr@(L loc _)) = do
                      , mkIntExprInt platform line, mkIntExprInt platform col
                      ]
 
-    putSrcSpanDs loc $ return $
+    putSrcSpanDsA loc $ return $
       mkCoreApps (Var makeStaticId) [ Type ty, srcLoc, expr_ds ]
 
 {-
@@ -649,7 +649,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
         ; alts <- mapM (mk_alt upd_fld_env) cons_to_upd
         ; ([discrim_var], matching_code)
                 <- matchWrapper RecUpd (Just record_expr) -- See Note [Scrutinee in Record updates]
-                                      (MG { mg_alts = noLoc alts
+                                      (MG { mg_alts = noLocA alts
                                           , mg_ext = MatchGroupTc [unrestricted in_ty] out_ty
                                           , mg_origin = FromSource
                                           })
@@ -703,7 +703,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                  mk_val_arg fl pat_arg_id
                      = nlHsVar (lookupNameEnv upd_fld_env (flSelector fl) `orElse` pat_arg_id)
 
-                 inst_con = noLoc $ mkHsWrap wrap (HsConLikeOut noExtField con)
+                 inst_con = noLocA $ mkHsWrap wrap (HsConLikeOut noExtField con)
                         -- Reconstruct with the WrapId so that unpacking happens
                  wrap = mkWpEvVarApps theta_vars                                <.>
                         dict_req_wrap                                           <.>
@@ -745,16 +745,16 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
 
                  req_wrap = dict_req_wrap <.> mkWpTyApps in_inst_tys
 
-                 pat = noLoc $ ConPat { pat_con = noLoc con
-                                      , pat_args = PrefixCon $ map nlVarPat arg_ids
-                                      , pat_con_ext = ConPatTc
-                                        { cpt_tvs = ex_tvs
-                                        , cpt_dicts = eqs_vars ++ theta_vars
-                                        , cpt_binds = emptyTcEvBinds
-                                        , cpt_arg_tys = in_inst_tys
-                                        , cpt_wrap = req_wrap
-                                        }
-                                      }
+                 pat = noLocA $ ConPat { pat_con = noLocA con
+                                       , pat_args = PrefixCon $ map nlVarPat arg_ids
+                                       , pat_con_ext = ConPatTc
+                                         { cpt_tvs = ex_tvs
+                                         , cpt_dicts = eqs_vars ++ theta_vars
+                                         , cpt_binds = emptyTcEvBinds
+                                         , cpt_arg_tys = in_inst_tys
+                                         , cpt_wrap = req_wrap
+                                         }
+                                       }
            ; return (mkSimpleMatch RecUpd [pat] wrapped_rhs) }
 
 {- Note [Scrutinee in Record updates]
@@ -819,7 +819,7 @@ ds_prag_expr (HsPragSCC _ _ cc) expr = do
         count <- goptM Opt_ProfCountEntries
         let nm = sl_fs cc
         flavour <- ExprCC <$> getCCIndexM nm
-        Tick (ProfNote (mkUserCC nm mod_name (getLoc expr) flavour) count True)
+        Tick (ProfNote (mkUserCC nm mod_name (getLocA expr) flavour) count True)
                <$> dsLExpr expr
       else dsLExpr expr
 ds_prag_expr (HsPragCore _ _ _) expr
@@ -965,12 +965,12 @@ handled in GHC.HsToCore.ListComp).  Basically does the translation given in the
 Haskell 98 report:
 -}
 
-dsDo :: HsStmtContext GhcRn -> [ExprLStmt GhcTc] -> DsM CoreExpr
+dsDo :: HsStmtContext Name -> [ExprLStmt GhcTc] -> DsM CoreExpr
 dsDo ctx stmts
   = goL stmts
   where
     goL [] = panic "dsDo"
-    goL ((L loc stmt):lstmts) = putSrcSpanDs loc (go loc stmt lstmts)
+    goL ((L loc stmt):lstmts) = putSrcSpanDsA loc (go loc stmt lstmts)
 
     go _ (LastStmt _ body _ _) stmts
       = ASSERT( null stmts ) dsLExpr body
@@ -1003,11 +1003,11 @@ dsDo ctx stmts
                do_arg (ApplicativeArgOne fail_op pat expr _) =
                  ((pat, fail_op), dsLExpr expr)
                do_arg (ApplicativeArgMany _ stmts ret pat _) =
-                 ((pat, Nothing), dsDo ctx (stmts ++ [noLoc $ mkLastStmt (noLoc ret)]))
+                 ((pat, Nothing), dsDo ctx (stmts ++ [noLocA $ mkLastStmt (noLocA ret)]))
 
            ; rhss' <- sequence rhss
 
-           ; body' <- dsLExpr $ noLoc $ HsDo body_ty ctx (noLoc stmts)
+           ; body' <- dsLExpr $ noLocA $ HsDo body_ty ctx (noLocA stmts)
 
            ; let match_args (pat, fail_op) (vs,body)
                    = do { var   <- selectSimpleMatchVarL Many pat
@@ -1025,7 +1025,7 @@ dsDo ctx stmts
                Nothing -> return expr
                Just join_op -> dsSyntaxExpr join_op [expr] }
 
-    go loc (RecStmt { recS_stmts = rec_stmts, recS_later_ids = later_ids
+    go loc (RecStmt { recS_stmts = L _ rec_stmts, recS_later_ids = later_ids
                     , recS_rec_ids = rec_ids, recS_ret_fn = return_op
                     , recS_mfix_fn = mfix_op, recS_bind_fn = bind_op
                     , recS_ext = RecStmtTc
@@ -1048,19 +1048,19 @@ dsDo ctx stmts
         tup_ty       = mkBigCoreTupTy (map idType tup_ids) -- Deals with singleton case
         rec_tup_pats = map nlVarPat tup_ids
         later_pats   = rec_tup_pats
-        rets         = map noLoc rec_rets
+        rets         = map noLocA rec_rets
         mfix_app     = nlHsSyntaxApps mfix_op [mfix_arg]
-        mfix_arg     = noLoc $ HsLam noExtField
-                           (MG { mg_alts = noLoc [mkSimpleMatch
+        mfix_arg     = noLocA $ HsLam noExtField
+                           (MG { mg_alts = noLocA [mkSimpleMatch
                                                     LambdaExpr
                                                     [mfix_pat] body]
                                , mg_ext = MatchGroupTc [unrestricted tup_ty] body_ty
                                , mg_origin = Generated })
-        mfix_pat     = noLoc $ LazyPat noExtField $ mkBigLHsPatTupId rec_tup_pats
-        body         = noLoc $ HsDo body_ty
-                                ctx (noLoc (rec_stmts ++ [ret_stmt]))
+        mfix_pat     = noLocA $ LazyPat noExtField $ mkBigLHsPatTupId rec_tup_pats
+        body         = noLocA $ HsDo body_ty
+                                ctx (noLocA (rec_stmts ++ [ret_stmt]))
         ret_app      = nlHsSyntaxApps return_op [mkBigLHsTupId rets]
-        ret_stmt     = noLoc $ mkLastStmt ret_app
+        ret_stmt     = noLocA $ mkLastStmt ret_app
                      -- This LastStmt will be desugared with dsDo,
                      -- which ignores the return_op in the LastStmt,
                      -- so we must apply the return_op explicitly
@@ -1089,9 +1089,9 @@ dsHandleMonadicFailure pat match m_fail_op =
       fail_expr <- dsSyntaxExpr fail_op [fail_msg]
       body fail_expr
 
-mk_fail_msg :: DynFlags -> Located e -> String
+mk_fail_msg :: DynFlags -> LocatedA e -> String
 mk_fail_msg dflags pat = "Pattern match failure in do expression at " ++
-                         showPpr dflags (getLoc pat)
+                         showPpr dflags (getLocA pat)
 
 {-
 ************************************************************************

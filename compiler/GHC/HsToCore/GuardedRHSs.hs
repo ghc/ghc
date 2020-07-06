@@ -26,6 +26,7 @@ import GHC.Core.Utils (bindNonRec)
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Utils
 import GHC.HsToCore.PmCheck.Types ( Deltas, initDeltas )
+import GHC.Types.Name
 import GHC.Core.Type ( Type )
 import GHC.Utils.Misc
 import GHC.Types.SrcLoc
@@ -55,7 +56,7 @@ dsGuarded grhss rhs_ty mb_rhss_deltas = do
 
 -- In contrast, @dsGRHSs@ produces a @MatchResult CoreExpr@.
 
-dsGRHSs :: HsMatchContext GhcRn
+dsGRHSs :: HsMatchContext Name
         -> GRHSs GhcTc (LHsExpr GhcTc) -- ^ Guarded RHSs
         -> Type                        -- ^ Type of RHS
         -> Maybe (NonEmpty Deltas)     -- ^ Refined pattern match checking
@@ -73,7 +74,7 @@ dsGRHSs hs_ctx (GRHSs _ grhss binds) rhs_ty mb_rhss_deltas
                              -- NB: nested dsLet inside matchResult
        ; return match_result2 }
 
-dsGRHS :: HsMatchContext GhcRn -> Type -> Deltas -> LGRHS GhcTc (LHsExpr GhcTc)
+dsGRHS :: HsMatchContext Name -> Type -> Deltas -> LGRHS GhcTc (LHsExpr GhcTc)
        -> DsM (MatchResult CoreExpr)
 dsGRHS hs_ctx rhs_ty rhs_deltas (L _ (GRHS _ guards rhs))
   = updPmDeltas rhs_deltas (matchGuards (map unLoc guards) (PatGuard hs_ctx) rhs rhs_ty)
@@ -87,7 +88,7 @@ dsGRHS hs_ctx rhs_ty rhs_deltas (L _ (GRHS _ guards rhs))
 -}
 
 matchGuards :: [GuardStmt GhcTc]     -- Guard
-            -> HsStmtContext GhcRn   -- Context
+            -> HsStmtContext Name    -- Context
             -> LHsExpr GhcTc         -- RHS
             -> Type                  -- Type of RHS of guard
             -> DsM (MatchResult CoreExpr)

@@ -2,6 +2,7 @@
 {-# LANGUAGE GADTs #-}
 
 -- From https://www.haskell.org/haskellwiki/GHC/Type_families#An_associated_data_type_example
+module Ppr004 where
 
 import qualified Data.IntMap
 import Prelude hiding (lookup)

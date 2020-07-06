@@ -1,0 +1,1600 @@
+
+==================== Parser AST ====================
+
+({ RdrNames.hs:1:1 }
+ (HsModule
+  (ApiAnn
+   [(AddApiAnn AnnModule { RdrNames.hs:4:1-6 })
+   ,(AddApiAnn AnnWhere { RdrNames.hs:4:17-21 })]
+   [])
+  (Just
+   ({ RdrNames.hs:4:8-15 }
+    {ModuleName: RdrNames}))
+  (Nothing)
+  [(SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:6:1-18 }
+    (ImportDecl
+     (ApiAnn
+      [(AddApiAnn AnnImport { RdrNames.hs:6:1-6 })]
+      [])
+     (NoSourceText)
+     ({ RdrNames.hs:6:8-18 }
+      {ModuleName: Data.Monoid})
+     (Nothing)
+     (False)
+     (False)
+     (NotQualified)
+     (False)
+     (Nothing)
+     (Nothing)))]
+  [(SrcSpanAnn (ApiAnn
+                [(AddApiAnn AnnSemi { RdrNames.hs:26:1 })]
+                []) { RdrNames.hs:19:1-23 }
+    (ValD
+     (NoExtField)
+     (FunBind
+      (ApiAnnNotUsed)
+      (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:19:1-2 }
+       (Unqual
+        {OccName: ff}))
+      (MG
+       (NoExtField)
+       ({ RdrNames.hs:19:1-23 }
+        [({ RdrNames.hs:19:1-23 }
+          (Match
+           (ApiAnnNotUsed)
+           (FunRhs
+            (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:19:1-2 }
+             (Unqual
+              {OccName: ff}))
+            (Prefix)
+            (NoSrcStrict))
+           []
+           (GRHSs
+            (NoExtField)
+            [({ RdrNames.hs:19:4-23 }
+              (GRHS
+               (ApiAnnNotUsed)
+               []
+               (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:19:6-23 }
+                (HsApp
+                 (ApiAnn
+                  (NoApiAnns)
+                  [])
+                 (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:19:6-21 }
+                  (HsApp
+                   (ApiAnn
+                    (NoApiAnns)
+                    [])
+                   (SrcSpanAnn (ApiAnn
+                                [(AddApiAnn AnnOpenP { RdrNames.hs:19:6 })
+                                ,(AddApiAnn AnnVal { RdrNames.hs:19:7-18 })
+                                ,(AddApiAnn AnnCloseP { RdrNames.hs:19:19 })]
+                                []) { RdrNames.hs:19:6-19 }
+                    (HsVar
+                     (NoExtField)
+                     (SrcSpanAnn (ApiAnn
+                                  [(AddApiAnn AnnOpenP { RdrNames.hs:19:6 })
+                                  ,(AddApiAnn AnnVal { RdrNames.hs:19:7-18 })
+                                  ,(AddApiAnn AnnCloseP { RdrNames.hs:19:19 })]
+                                  []) { RdrNames.hs:19:6-19 }
+                      (Qual
+                       {ModuleName: RdrNames}
+                       {OccName: :::}))))
+                   (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:19:21 }
+                    (HsOverLit
+                     (ApiAnn
+                      (NoApiAnns)
+                      [])
+                     (OverLit
+                      (NoExtField)
+                      (HsIntegral
+                       (IL
+                        (SourceText
+                         "0")
+                        (False)
+                        (0)))
+                      (HsLit
+                       (ApiAnn
+                        (NoApiAnns)
+                        [])
+                       (HsString
+                        (SourceText
+                         "noExpr")
+                        {FastString: "noExpr"})))))))
+                 (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:19:23 }
+                  (HsOverLit
+                   (ApiAnn
+                    (NoApiAnns)
+                    [])
+                   (OverLit
+                    (NoExtField)
+                    (HsIntegral
+                     (IL
+                      (SourceText
+                       "1")
+                      (False)
+                      (1)))
+                    (HsLit
+                     (ApiAnn
+                      (NoApiAnns)
+                      [])
+                     (HsString
+                      (SourceText
+                       "noExpr")
+                      {FastString: "noExpr"})))))))))]
+            ({ <no location info> }
+             (EmptyLocalBinds
+              (NoExtField))))))])
+       (FromSource))
+      [])))
+  ,(SrcSpanAnn (ApiAnn
+                [(AddApiAnn AnnSemi { RdrNames.hs:33:1 })]
+                []) { RdrNames.hs:26:1-26 }
+    (TyClD
+     (NoExtField)
+     (DataDecl
+      (ApiAnn
+       [(AddApiAnn AnnData { RdrNames.hs:26:1-4 })
+       ,(AddApiAnn AnnEqual { RdrNames.hs:26:9 })]
+       [])
+      (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:26:6-7 }
+       (Unqual
+        {OccName: FF}))
+      (HsQTvs
+       (NoExtField)
+       [])
+      (Prefix)
+      (HsDataDefn
+       (NoExtField)
+       (DataType)
+       (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
+        [])
+       (Nothing)
+       (Nothing)
+       [(SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:26:11-26 }
+         (ConDeclH98
+          (ApiAnn
+           []
+           [])
+          (SrcSpanAnn (ApiAnn
+                       [(AddApiAnn AnnOpenP { RdrNames.hs:26:11 })
+                       ,(AddApiAnn AnnVal { RdrNames.hs:26:13-15 })
+                       ,(AddApiAnn AnnCloseP { RdrNames.hs:26:18 })]
+                       []) { RdrNames.hs:26:11-18 }
+           (Unqual
+            {OccName: :::}))
+          ({ <no location info> }
+           (False))
+          []
+          (Nothing)
+          (PrefixCon
+           [(SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:26:20-22 }
+             (HsTyVar
+              (ApiAnn
+               []
+               [(nnnnnnnn
+                 (AnnLineComment
+                  "parser has not filled in annotation commments properly here"))])
+              (NotPromoted)
+              (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:26:20-22 }
+               (Unqual
+                {OccName: Int}))))
+           ,(SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:26:24-26 }
+             (HsTyVar
+              (ApiAnn
+               []
+               [(nnnnnnnn
+                 (AnnLineComment
+                  "parser has not filled in annotation commments properly here"))])
+              (NotPromoted)
+              (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:26:24-26 }
+               (Unqual
+                {OccName: Int}))))])
+          (Nothing)))]
+       ({ <no location info> }
+        [])))))
+  ,(SrcSpanAnn (ApiAnn
+                [(AddApiAnn AnnSemi { RdrNames.hs:34:1 })]
+                []) { RdrNames.hs:33:1-20 }
+    (TyClD
+     (NoExtField)
+     (DataDecl
+      (ApiAnn
+       [(AddApiAnn AnnData { RdrNames.hs:33:1-4 })
+       ,(AddApiAnn AnnEqual { RdrNames.hs:33:9 })]
+       [])
+      (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:33:6-7 }
+       (Unqual
+        {OccName: GG}))
+      (HsQTvs
+       (NoExtField)
+       [])
+      (Prefix)
+      (HsDataDefn
+       (NoExtField)
+       (DataType)
+       (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
+        [])
+       (Nothing)
+       (Nothing)
+       [(SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:33:11-20 }
+         (ConDeclH98
+          (ApiAnn
+           []
+           [])
+          (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:33:11-12 }
+           (Unqual
+            {OccName: GG}))
+          ({ <no location info> }
+           (False))
+          []
+          (Nothing)
+          (PrefixCon
+           [(SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:33:14-16 }
+             (HsTyVar
+              (ApiAnn
+               []
+               [(nnnnnnnn
+                 (AnnLineComment
+                  "parser has not filled in annotation commments properly here"))])
+              (NotPromoted)
+              (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:33:14-16 }
+               (Unqual
+                {OccName: Int}))))
+           ,(SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:33:18-20 }
+             (HsTyVar
+              (ApiAnn
+               []
+               [(nnnnnnnn
+                 (AnnLineComment
+                  "parser has not filled in annotation commments properly here"))])
+              (NotPromoted)
+              (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:33:18-20 }
+               (Unqual
+                {OccName: Int}))))])
+          (Nothing)))]
+       ({ <no location info> }
+        [])))))
+  ,(SrcSpanAnn (ApiAnn
+                [(AddApiAnn AnnSemi { RdrNames.hs:41:1 })]
+                []) { RdrNames.hs:34:1-16 }
+    (ValD
+     (NoExtField)
+     (FunBind
+      (ApiAnnNotUsed)
+      (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:34:1-2 }
+       (Unqual
+        {OccName: gg}))
+      (MG
+       (NoExtField)
+       ({ RdrNames.hs:34:1-16 }
+        [({ RdrNames.hs:34:1-16 }
+          (Match
+           (ApiAnnNotUsed)
+           (FunRhs
+            (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:34:1-2 }
+             (Unqual
+              {OccName: gg}))
+            (Prefix)
+            (NoSrcStrict))
+           []
+           (GRHSs
+            (NoExtField)
+            [({ RdrNames.hs:34:4-16 }
+              (GRHS
+               (ApiAnnNotUsed)
+               []
+               (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:34:6-16 }
+                (OpApp
+                 (ApiAnn
+                  [(AddApiAnn AnnVal { RdrNames.hs:34:8-14 })]
+                  [(nnnnnnnn
+                    (AnnLineComment
+                     "parser has not filled in annotation commments properly here"))])
+                 (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:34:6 }
+                  (HsOverLit
+                   (ApiAnn
+                    (NoApiAnns)
+                    [])
+                   (OverLit
+                    (NoExtField)
+                    (HsIntegral
+                     (IL
+                      (SourceText
+                       "0")
+                      (False)
+                      (0)))
+                    (HsLit
+                     (ApiAnn
+                      (NoApiAnns)
+                      [])
+                     (HsString
+                      (SourceText
+                       "noExpr")
+                      {FastString: "noExpr"})))))
+                 (SrcSpanAnn (ApiAnn
+                              [(AddApiAnn AnnBackquote { RdrNames.hs:34:8 })
+                              ,(AddApiAnn AnnVal { RdrNames.hs:34:11-12 })
+                              ,(AddApiAnn AnnBackquote { RdrNames.hs:34:14 })]
+                              []) { RdrNames.hs:34:8-14 }
+                  (HsVar
+                   (NoExtField)
+                   (SrcSpanAnn (ApiAnn
+                                [(AddApiAnn AnnBackquote { RdrNames.hs:34:8 })
+                                ,(AddApiAnn AnnVal { RdrNames.hs:34:11-12 })
+                                ,(AddApiAnn AnnBackquote { RdrNames.hs:34:14 })]
+                                []) { RdrNames.hs:34:8-14 }
+                    (Unqual
+                     {OccName: GG}))))
+                 (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:34:16 }
+                  (HsOverLit
+                   (ApiAnn
+                    (NoApiAnns)
+                    [])
+                   (OverLit
+                    (NoExtField)
+                    (HsIntegral
+                     (IL
+                      (SourceText
+                       "1")
+                      (False)
+                      (1)))
+                    (HsLit
+                     (ApiAnn
+                      (NoApiAnns)
+                      [])
+                     (HsString
+                      (SourceText
+                       "noExpr")
+                      {FastString: "noExpr"})))))))))]
+            ({ <no location info> }
+             (EmptyLocalBinds
+              (NoExtField))))))])
+       (FromSource))
+      [])))
+  ,(SrcSpanAnn (ApiAnn
+                [(AddApiAnn AnnSemi { RdrNames.hs:48:1 })]
+                []) { RdrNames.hs:41:1-25 }
+    (ValD
+     (NoExtField)
+     (FunBind
+      (ApiAnnNotUsed)
+      (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:41:1-2 }
+       (Unqual
+        {OccName: vv}))
+      (MG
+       (NoExtField)
+       ({ RdrNames.hs:41:1-25 }
+        [({ RdrNames.hs:41:1-25 }
+          (Match
+           (ApiAnnNotUsed)
+           (FunRhs
+            (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:41:1-2 }
+             (Unqual
+              {OccName: vv}))
+            (Prefix)
+            (NoSrcStrict))
+           []
+           (GRHSs
+            (NoExtField)
+            [({ RdrNames.hs:41:4-25 }
+              (GRHS
+               (ApiAnnNotUsed)
+               []
+               (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:41:6-25 }
+                (OpApp
+                 (ApiAnn
+                  [(AddApiAnn AnnVal { RdrNames.hs:41:10-21 })]
+                  [(nnnnnnnn
+                    (AnnLineComment
+                     "parser has not filled in annotation commments properly here"))])
+                 (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:41:6-8 }
+                  (HsLit
+                   (ApiAnn
+                    (NoApiAnns)
+                    [])
+                   (HsString
+                    (SourceText
+                     "\"a\"")
+                    {FastString: "a"})))
+                 (SrcSpanAnn (ApiAnn
+                              [(AddApiAnn AnnBackquote { RdrNames.hs:41:10 })
+                              ,(AddApiAnn AnnVal { RdrNames.hs:41:12-18 })
+                              ,(AddApiAnn AnnBackquote { RdrNames.hs:41:21 })]
+                              []) { RdrNames.hs:41:10-21 }
+                  (HsVar
+                   (NoExtField)
+                   (SrcSpanAnn (ApiAnn
+                                [(AddApiAnn AnnBackquote { RdrNames.hs:41:10 })
+                                ,(AddApiAnn AnnVal { RdrNames.hs:41:12-18 })
+                                ,(AddApiAnn AnnBackquote { RdrNames.hs:41:21 })]
+                                []) { RdrNames.hs:41:10-21 }
+                    (Unqual
+                     {OccName: mappend}))))
+                 (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:41:23-25 }
+                  (HsLit
+                   (ApiAnn
+                    (NoApiAnns)
+                    [])
+                   (HsString
+                    (SourceText
+                     "\"b\"")
+                    {FastString: "b"})))))))]
+            ({ <no location info> }
+             (EmptyLocalBinds
+              (NoExtField))))))])
+       (FromSource))
+      [])))
+  ,(SrcSpanAnn (ApiAnn
+                [(AddApiAnn AnnSemi { RdrNames.hs:67:1 })]
+                []) { RdrNames.hs:48:1-38 }
+    (ValD
+     (NoExtField)
+     (FunBind
+      (ApiAnnNotUsed)
+      (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:48:1-3 }
+       (Unqual
+        {OccName: vvq}))
+      (MG
+       (NoExtField)
+       ({ RdrNames.hs:48:1-38 }
+        [({ RdrNames.hs:48:1-38 }
+          (Match
+           (ApiAnnNotUsed)
+           (FunRhs
+            (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:48:1-3 }
+             (Unqual
+              {OccName: vvq}))
+            (Prefix)
+            (NoSrcStrict))
+           []
+           (GRHSs
+            (NoExtField)
+            [({ RdrNames.hs:48:5-38 }
+              (GRHS
+               (ApiAnnNotUsed)
+               []
+               (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:48:7-38 }
+                (OpApp
+                 (ApiAnn
+                  [(AddApiAnn AnnVal { RdrNames.hs:48:11-34 })]
+                  [(nnnnnnnn
+                    (AnnLineComment
+                     "parser has not filled in annotation commments properly here"))])
+                 (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:48:7-9 }
+                  (HsLit
+                   (ApiAnn
+                    (NoApiAnns)
+                    [])
+                   (HsString
+                    (SourceText
+                     "\"a\"")
+                    {FastString: "a"})))
+                 (SrcSpanAnn (ApiAnn
+                              [(AddApiAnn AnnBackquote { RdrNames.hs:48:11 })
+                              ,(AddApiAnn AnnVal { RdrNames.hs:48:14-32 })
+                              ,(AddApiAnn AnnBackquote { RdrNames.hs:48:34 })]
+                              []) { RdrNames.hs:48:11-34 }
+                  (HsVar
+                   (NoExtField)
+                   (SrcSpanAnn (ApiAnn
+                                [(AddApiAnn AnnBackquote { RdrNames.hs:48:11 })
+                                ,(AddApiAnn AnnVal { RdrNames.hs:48:14-32 })
+                                ,(AddApiAnn AnnBackquote { RdrNames.hs:48:34 })]
+                                []) { RdrNames.hs:48:11-34 }
+                    (Qual
+                     {ModuleName: Data.Monoid}
+                     {OccName: mappend}))))
+                 (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:48:36-38 }
+                  (HsLit
+                   (ApiAnn
+                    (NoApiAnns)
+                    [])
+                   (HsString
+                    (SourceText
+                     "\"b\"")
+                    {FastString: "b"})))))))]
+            ({ <no location info> }
+             (EmptyLocalBinds
+              (NoExtField))))))])
+       (FromSource))
+      [])))
+  ,(SrcSpanAnn (ApiAnn
+                [(AddApiAnn AnnSemi { RdrNames.hs:68:1 })]
+                []) { RdrNames.hs:67:1-29 }
+    (SigD
+     (NoExtField)
+     (TypeSig
+      (ApiAnn
+       [(AddApiAnn AnnDcolon { RdrNames.hs:67:4-5 })]
+       [(nnnnnnnn
+         (AnnLineComment
+          "parser has not filled in annotation commments properly here"))])
+      [(SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:67:1-2 }
+        (Unqual
+         {OccName: ng}))]
+      (HsWC
+       (NoExtField)
+       (HsIB
+        (ApiAnnNotUsed)
+        (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:67:7-29 }
+         (HsAppTy
+          (NoExtField)
+          (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:67:7-25 }
+           (HsAppTy
+            (NoExtField)
+            (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:67:7-21 }
+             (HsAppTy
+              (NoExtField)
+              (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:67:7-17 }
+               (HsAppTy
+                (NoExtField)
+                (SrcSpanAnn (ApiAnn
+                             [(AddApiAnn AnnOpenP { RdrNames.hs:67:7 })
+                             ,(AddApiAnn AnnCloseP { RdrNames.hs:67:13 })
+                             ,(AddApiAnn AnnCommaTuple { RdrNames.hs:67:8 })
+                             ,(AddApiAnn AnnCommaTuple { RdrNames.hs:67:10 })
+                             ,(AddApiAnn AnnCommaTuple { RdrNames.hs:67:12 })]
+                             []) { RdrNames.hs:67:7-13 }
+                 (HsTyVar
+                  (ApiAnn
+                   []
+                   [(nnnnnnnn
+                     (AnnLineComment
+                      "parser has not filled in annotation commments properly here"))])
+                  (NotPromoted)
+                  (SrcSpanAnn (ApiAnn
+                               [(AddApiAnn AnnOpenP { RdrNames.hs:67:7 })
+                               ,(AddApiAnn AnnCloseP { RdrNames.hs:67:13 })
+                               ,(AddApiAnn AnnCommaTuple { RdrNames.hs:67:8 })
+                               ,(AddApiAnn AnnCommaTuple { RdrNames.hs:67:10 })
+                               ,(AddApiAnn AnnCommaTuple { RdrNames.hs:67:12 })]
+                               []) { RdrNames.hs:67:7-13 }
+                   (Exact
+                    {Name: (,,,)}))))
+                (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:67:15-17 }
+                 (HsTyVar
+                  (ApiAnn
+                   []
+                   [(nnnnnnnn
+                     (AnnLineComment
+                      "parser has not filled in annotation commments properly here"))])
+                  (NotPromoted)
+                  (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:67:15-17 }
+                   (Unqual
+                    {OccName: Int}))))))
+              (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:67:19-21 }
+               (HsTyVar
+                (ApiAnn
+                 []
+                 [(nnnnnnnn
+                   (AnnLineComment
+                    "parser has not filled in annotation commments properly here"))])
+                (NotPromoted)
+                (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:67:19-21 }
+                 (Unqual
+                  {OccName: Int}))))))
+            (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:67:23-25 }
+             (HsTyVar
+              (ApiAnn
+               []
+               [(nnnnnnnn
+                 (AnnLineComment
+                  "parser has not filled in annotation commments properly here"))])
+              (NotPromoted)
+              (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:67:23-25 }
+               (Unqual
+                {OccName: Int}))))))
+          (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:67:27-29 }
+           (HsTyVar
+            (ApiAnn
+             []
+             [(nnnnnnnn
+               (AnnLineComment
+                "parser has not filled in annotation commments properly here"))])
+            (NotPromoted)
+            (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:67:27-29 }
+             (Unqual
+              {OccName: Int})))))))))))
+  ,(SrcSpanAnn (ApiAnn
+                [(AddApiAnn AnnSemi { RdrNames.hs:82:1 })]
+                []) { RdrNames.hs:68:1-14 }
+    (ValD
+     (NoExtField)
+     (FunBind
+      (ApiAnnNotUsed)
+      (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:68:1-2 }
+       (Unqual
+        {OccName: ng}))
+      (MG
+       (NoExtField)
+       ({ RdrNames.hs:68:1-14 }
+        [({ RdrNames.hs:68:1-14 }
+          (Match
+           (ApiAnnNotUsed)
+           (FunRhs
+            (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:68:1-2 }
+             (Unqual
+              {OccName: ng}))
+            (Prefix)
+            (NoSrcStrict))
+           []
+           (GRHSs
+            (NoExtField)
+            [({ RdrNames.hs:68:4-14 }
+              (GRHS
+               (ApiAnnNotUsed)
+               []
+               (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:68:6-14 }
+                (HsVar
+                 (NoExtField)
+                 (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:68:6-14 }
+                  (Unqual
+                   {OccName: undefined}))))))]
+            ({ <no location info> }
+             (EmptyLocalBinds
+              (NoExtField))))))])
+       (FromSource))
+      [])))
+  ,(SrcSpanAnn (ApiAnn
+                [(AddApiAnn AnnSemi { RdrNames.hs:83:1 })]
+                []) { RdrNames.hs:82:1-14 }
+    (SigD
+     (NoExtField)
+     (TypeSig
+      (ApiAnn
+       [(AddApiAnn AnnDcolon { RdrNames.hs:82:4-5 })]
+       [(nnnnnnnn
+         (AnnLineComment
+          "parser has not filled in annotation commments properly here"))])
+      [(SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:82:1-2 }
+        (Unqual
+         {OccName: ft}))]
+      (HsWC
+       (NoExtField)
+       (HsIB
+        (ApiAnnNotUsed)
+        (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:82:7-14 }
+         (HsAppTy
+          (NoExtField)
+          (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:82:7-12 }
+           (HsAppTy
+            (NoExtField)
+            (SrcSpanAnn (ApiAnn
+                         [(AddApiAnn AnnOpenP { RdrNames.hs:82:7 })
+                         ,(AddApiAnn AnnRarrow { RdrNames.hs:82:8-9 })
+                         ,(AddApiAnn AnnCloseP { RdrNames.hs:82:10 })]
+                         []) { RdrNames.hs:82:7-10 }
+             (HsTyVar
+              (ApiAnn
+               []
+               [(nnnnnnnn
+                 (AnnLineComment
+                  "parser has not filled in annotation commments properly here"))])
+              (NotPromoted)
+              (SrcSpanAnn (ApiAnn
+                           [(AddApiAnn AnnOpenP { RdrNames.hs:82:7 })
+                           ,(AddApiAnn AnnRarrow { RdrNames.hs:82:8-9 })
+                           ,(AddApiAnn AnnCloseP { RdrNames.hs:82:10 })]
+                           []) { RdrNames.hs:82:7-10 }
+               (Exact
+                {Name: ->}))))
+            (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:82:12 }
+             (HsTyVar
+              (ApiAnn
+               []
+               [(nnnnnnnn
+                 (AnnLineComment
+                  "parser has not filled in annotation commments properly here"))])
+              (NotPromoted)
+              (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:82:12 }
+               (Unqual
+                {OccName: a}))))))
+          (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:82:14 }
+           (HsTyVar
+            (ApiAnn
+             []
+             [(nnnnnnnn
+               (AnnLineComment
+                "parser has not filled in annotation commments properly here"))])
+            (NotPromoted)
+            (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:82:14 }
+             (Unqual
+              {OccName: b})))))))))))
+  ,(SrcSpanAnn (ApiAnn
+                [(AddApiAnn AnnSemi { RdrNames.hs:85:1 })]
+                []) { RdrNames.hs:83:1-14 }
+    (ValD
+     (NoExtField)
+     (FunBind
+      (ApiAnnNotUsed)
+      (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:83:1-2 }
+       (Unqual
+        {OccName: ft}))
+      (MG
+       (NoExtField)
+       ({ RdrNames.hs:83:1-14 }
+        [({ RdrNames.hs:83:1-14 }
+          (Match
+           (ApiAnnNotUsed)
+           (FunRhs
+            (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:83:1-2 }
+             (Unqual
+              {OccName: ft}))
+            (Prefix)
+            (NoSrcStrict))
+           []
+           (GRHSs
+            (NoExtField)
+            [({ RdrNames.hs:83:4-14 }
+              (GRHS
+               (ApiAnnNotUsed)
+               []
+               (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:83:6-14 }
+                (HsVar
+                 (NoExtField)
+                 (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:83:6-14 }
+                  (Unqual
+                   {OccName: undefined}))))))]
+            ({ <no location info> }
+             (EmptyLocalBinds
+              (NoExtField))))))])
+       (FromSource))
+      [])))
+  ,(SrcSpanAnn (ApiAnn
+                [(AddApiAnn AnnSemi { RdrNames.hs:86:1 })]
+                []) { RdrNames.hs:85:1-21 }
+    (SigD
+     (NoExtField)
+     (TypeSig
+      (ApiAnn
+       [(AddApiAnn AnnDcolon { RdrNames.hs:85:4-5 })]
+       [(nnnnnnnn
+         (AnnLineComment
+          "parser has not filled in annotation commments properly here"))])
+      [(SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:85:1-2 }
+        (Unqual
+         {OccName: fp}))]
+      (HsWC
+       (NoExtField)
+       (HsIB
+        (ApiAnnNotUsed)
+        (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:85:7-21 }
+         (HsAppTy
+          (NoExtField)
+          (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:85:7-19 }
+           (HsAppTy
+            (NoExtField)
+            (SrcSpanAnn (ApiAnn
+                         [(AddApiAnn AnnOpenP { RdrNames.hs:85:7 })
+                         ,(AddApiAnn AnnRarrow { RdrNames.hs:85:11-12 })
+                         ,(AddApiAnn AnnCloseP { RdrNames.hs:85:17 })]
+                         []) { RdrNames.hs:85:7-17 }
+             (HsTyVar
+              (ApiAnn
+               []
+               [(nnnnnnnn
+                 (AnnLineComment
+                  "parser has not filled in annotation commments properly here"))])
+              (NotPromoted)
+              (SrcSpanAnn (ApiAnn
+                           [(AddApiAnn AnnOpenP { RdrNames.hs:85:7 })
+                           ,(AddApiAnn AnnRarrow { RdrNames.hs:85:11-12 })
+                           ,(AddApiAnn AnnCloseP { RdrNames.hs:85:17 })]
+                           []) { RdrNames.hs:85:7-17 }
+               (Exact
+                {Name: ->}))))
+            (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:85:19 }
+             (HsTyVar
+              (ApiAnn
+               []
+               [(nnnnnnnn
+                 (AnnLineComment
+                  "parser has not filled in annotation commments properly here"))])
+              (NotPromoted)
+              (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:85:19 }
+               (Unqual
+                {OccName: a}))))))
+          (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:85:21 }
+           (HsTyVar
+            (ApiAnn
+             []
+             [(nnnnnnnn
+               (AnnLineComment
+                "parser has not filled in annotation commments properly here"))])
+            (NotPromoted)
+            (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:85:21 }
+             (Unqual
+              {OccName: b})))))))))))
+  ,(SrcSpanAnn (ApiAnn
+                [(AddApiAnn AnnSemi { RdrNames.hs:88:1 })]
+                []) { RdrNames.hs:86:1-14 }
+    (ValD
+     (NoExtField)
+     (FunBind
+      (ApiAnnNotUsed)
+      (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:86:1-2 }
+       (Unqual
+        {OccName: fp}))
+      (MG
+       (NoExtField)
+       ({ RdrNames.hs:86:1-14 }
+        [({ RdrNames.hs:86:1-14 }
+          (Match
+           (ApiAnnNotUsed)
+           (FunRhs
+            (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:86:1-2 }
+             (Unqual
+              {OccName: fp}))
+            (Prefix)
+            (NoSrcStrict))
+           []
+           (GRHSs
+            (NoExtField)
+            [({ RdrNames.hs:86:4-14 }
+              (GRHS
+               (ApiAnnNotUsed)
+               []
+               (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:86:6-14 }
+                (HsVar
+                 (NoExtField)
+                 (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:86:6-14 }
+                  (Unqual
+                   {OccName: undefined}))))))]
+            ({ <no location info> }
+             (EmptyLocalBinds
+              (NoExtField))))))])
+       (FromSource))
+      [])))
+  ,(SrcSpanAnn (ApiAnn
+                [(AddApiAnn AnnSemi { RdrNames.hs:89:1 })]
+                []) { RdrNames.hs:88:1-30 }
+    (TyClD
+     (NoExtField)
+     (FamDecl
+      (ApiAnn
+       [(AddApiAnn AnnType { RdrNames.hs:88:1-4 })
+       ,(AddApiAnn AnnFamily { RdrNames.hs:88:6-11 })
+       ,(AddApiAnn AnnDcolon { RdrNames.hs:88:17-18 })]
+       [])
+      (FamilyDecl
+       (NoExtField)
+       (OpenTypeFamily)
+       (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:88:13 }
+        (Unqual
+         {OccName: F}))
+       (HsQTvs
+        (NoExtField)
+        [({ RdrNames.hs:88:15 }
+          (UserTyVar
+           (ApiAnnNotUsed)
+           (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:88:15 }
+            (Unqual
+             {OccName: a}))))])
+       (Prefix)
+       ({ RdrNames.hs:88:17-30 }
+        (KindSig
+         (NoExtField)
+         (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:88:20-30 }
+          (HsFunTy
+           (ApiAnn
+            [(AddApiAnn AnnRarrow { RdrNames.hs:88:22-23 })]
+            [])
+           (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:88:20 }
+            (HsStarTy
+             (NoExtField)
+             (False)))
+           (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:88:25-30 }
+            (HsFunTy
+             (ApiAnn
+              [(AddApiAnn AnnRarrow { RdrNames.hs:88:27-28 })]
+              [])
+             (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:88:25 }
+              (HsStarTy
+               (NoExtField)
+               (False)))
+             (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:88:30 }
+              (HsStarTy
+               (NoExtField)
+               (False)))))))))
+       (Nothing)))))
+  ,(SrcSpanAnn (ApiAnn
+                [(AddApiAnn AnnSemi { RdrNames.hs:90:1 })]
+                []) { RdrNames.hs:89:1-26 }
+    (InstD
+     (NoExtField)
+     (TyFamInstD
+      (ApiAnn
+       [(AddApiAnn AnnType { RdrNames.hs:89:1-4 })
+       ,(AddApiAnn AnnInstance { RdrNames.hs:89:6-13 })]
+       [])
+      (TyFamInstDecl
+       (HsIB
+        (ApiAnnNotUsed)
+        (FamEqn
+         (ApiAnn
+          [(AddApiAnn AnnEqual { RdrNames.hs:89:21 })]
+          [])
+         (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:89:15 }
+          (Unqual
+           {OccName: F}))
+         (Nothing)
+         [(HsValArg
+           (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:89:17-19 }
+            (HsTyVar
+             (ApiAnn
+              []
+              [(nnnnnnnn
+                (AnnLineComment
+                 "parser has not filled in annotation commments properly here"))])
+             (NotPromoted)
+             (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:89:17-19 }
+              (Unqual
+               {OccName: Int})))))]
+         (Prefix)
+         (SrcSpanAnn (ApiAnn
+                      [(AddApiAnn AnnOpenP { RdrNames.hs:89:23 })
+                      ,(AddApiAnn AnnRarrow { RdrNames.hs:89:24-25 })
+                      ,(AddApiAnn AnnCloseP { RdrNames.hs:89:26 })]
+                      []) { RdrNames.hs:89:23-26 }
+          (HsTyVar
+           (ApiAnn
+            []
+            [(nnnnnnnn
+              (AnnLineComment
+               "parser has not filled in annotation commments properly here"))])
+           (NotPromoted)
+           (SrcSpanAnn (ApiAnn
+                        [(AddApiAnn AnnOpenP { RdrNames.hs:89:23 })
+                        ,(AddApiAnn AnnRarrow { RdrNames.hs:89:24-25 })
+                        ,(AddApiAnn AnnCloseP { RdrNames.hs:89:26 })]
+                        []) { RdrNames.hs:89:23-26 }
+            (Exact
+             {Name: ->}))))))))))
+  ,(SrcSpanAnn (ApiAnn
+                [(AddApiAnn AnnSemi { RdrNames.hs:95:1 })]
+                []) { RdrNames.hs:90:1-29 }
+    (InstD
+     (NoExtField)
+     (TyFamInstD
+      (ApiAnn
+       [(AddApiAnn AnnType { RdrNames.hs:90:1-4 })
+       ,(AddApiAnn AnnInstance { RdrNames.hs:90:6-13 })]
+       [])
+      (TyFamInstDecl
+       (HsIB
+        (ApiAnnNotUsed)
+        (FamEqn
+         (ApiAnn
+          [(AddApiAnn AnnEqual { RdrNames.hs:90:22 })]
+          [])
+         (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:90:15 }
+          (Unqual
+           {OccName: F}))
+         (Nothing)
+         [(HsValArg
+           (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:90:17-20 }
+            (HsTyVar
+             (ApiAnn
+              []
+              [(nnnnnnnn
+                (AnnLineComment
+                 "parser has not filled in annotation commments properly here"))])
+             (NotPromoted)
+             (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:90:17-20 }
+              (Unqual
+               {OccName: Char})))))]
+         (Prefix)
+         (SrcSpanAnn (ApiAnn
+                      [(AddApiAnn AnnOpenP { RdrNames.hs:90:24 })
+                      ,(AddApiAnn AnnCloseP { RdrNames.hs:90:29 })
+                      ,(AddApiAnn AnnCommaTuple { RdrNames.hs:90:26 })]
+                      []) { RdrNames.hs:90:24-29 }
+          (HsTyVar
+           (ApiAnn
+            []
+            [(nnnnnnnn
+              (AnnLineComment
+               "parser has not filled in annotation commments properly here"))])
+           (NotPromoted)
+           (SrcSpanAnn (ApiAnn
+                        [(AddApiAnn AnnOpenP { RdrNames.hs:90:24 })
+                        ,(AddApiAnn AnnCloseP { RdrNames.hs:90:29 })
+                        ,(AddApiAnn AnnCommaTuple { RdrNames.hs:90:26 })]
+                        []) { RdrNames.hs:90:24-29 }
+            (Exact
+             {Name: (,)}))))))))))
+  ,(SrcSpanAnn (ApiAnn
+                [(AddApiAnn AnnSemi { RdrNames.hs:96:1 })]
+                []) { RdrNames.hs:95:1-10 }
+    (SigD
+     (NoExtField)
+     (TypeSig
+      (ApiAnn
+       [(AddApiAnn AnnDcolon { RdrNames.hs:95:4-5 })]
+       [(nnnnnnnn
+         (AnnLineComment
+          "parser has not filled in annotation commments properly here"))])
+      [(SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:95:1-2 }
+        (Unqual
+         {OccName: lt}))]
+      (HsWC
+       (NoExtField)
+       (HsIB
+        (ApiAnnNotUsed)
+        (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:95:7-10 }
+         (HsAppTy
+          (NoExtField)
+          (SrcSpanAnn (ApiAnn
+                       [(AddApiAnn AnnOpenS { RdrNames.hs:95:7 })
+                       ,(AddApiAnn AnnCloseS { RdrNames.hs:95:8 })]
+                       []) { RdrNames.hs:95:7-8 }
+           (HsTyVar
+            (ApiAnn
+             []
+             [(nnnnnnnn
+               (AnnLineComment
+                "parser has not filled in annotation commments properly here"))])
+            (NotPromoted)
+            (SrcSpanAnn (ApiAnn
+                         [(AddApiAnn AnnOpenS { RdrNames.hs:95:7 })
+                         ,(AddApiAnn AnnCloseS { RdrNames.hs:95:8 })]
+                         []) { RdrNames.hs:95:7-8 }
+             (Exact
+              {Name: []}))))
+          (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:95:10 }
+           (HsTyVar
+            (ApiAnn
+             []
+             [(nnnnnnnn
+               (AnnLineComment
+                "parser has not filled in annotation commments properly here"))])
+            (NotPromoted)
+            (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:95:10 }
+             (Unqual
+              {OccName: a})))))))))))
+  ,(SrcSpanAnn (ApiAnn
+                [(AddApiAnn AnnSemi { RdrNames.hs:119:1 })]
+                []) { RdrNames.hs:96:1-14 }
+    (ValD
+     (NoExtField)
+     (FunBind
+      (ApiAnnNotUsed)
+      (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:96:1-2 }
+       (Unqual
+        {OccName: lt}))
+      (MG
+       (NoExtField)
+       ({ RdrNames.hs:96:1-14 }
+        [({ RdrNames.hs:96:1-14 }
+          (Match
+           (ApiAnnNotUsed)
+           (FunRhs
+            (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:96:1-2 }
+             (Unqual
+              {OccName: lt}))
+            (Prefix)
+            (NoSrcStrict))
+           []
+           (GRHSs
+            (NoExtField)
+            [({ RdrNames.hs:96:4-14 }
+              (GRHS
+               (ApiAnnNotUsed)
+               []
+               (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:96:6-14 }
+                (HsVar
+                 (NoExtField)
+                 (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:96:6-14 }
+                  (Unqual
+                   {OccName: undefined}))))))]
+            ({ <no location info> }
+             (EmptyLocalBinds
+              (NoExtField))))))])
+       (FromSource))
+      [])))
+  ,(SrcSpanAnn (ApiAnn
+                [(AddApiAnn AnnSemi { RdrNames.hs:120:1 })]
+                []) { RdrNames.hs:119:1-29 }
+    (TyClD
+     (NoExtField)
+     (DataDecl
+      (ApiAnn
+       [(AddApiAnn AnnData { RdrNames.hs:119:1-4 })
+       ,(AddApiAnn AnnEqual { RdrNames.hs:119:14 })]
+       [])
+      (SrcSpanAnn (ApiAnn
+                   [(AddApiAnn AnnOpenP { RdrNames.hs:119:6 })
+                   ,(AddApiAnn AnnVal { RdrNames.hs:119:7 })
+                   ,(AddApiAnn AnnCloseP { RdrNames.hs:119:8 })]
+                   []) { RdrNames.hs:119:6-8 }
+       (Exact
+        {Name: GHC.Types.~}))
+      (HsQTvs
+       (NoExtField)
+       [({ RdrNames.hs:119:10 }
+         (UserTyVar
+          (ApiAnnNotUsed)
+          (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:119:10 }
+           (Unqual
+            {OccName: a}))))
+       ,({ RdrNames.hs:119:12 }
+         (UserTyVar
+          (ApiAnnNotUsed)
+          (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:119:12 }
+           (Unqual
+            {OccName: b}))))])
+      (Prefix)
+      (HsDataDefn
+       (NoExtField)
+       (DataType)
+       (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
+        [])
+       (Nothing)
+       (Nothing)
+       [(SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:119:16-29 }
+         (ConDeclH98
+          (ApiAnn
+           []
+           [])
+          (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:119:16-18 }
+           (Unqual
+            {OccName: Eq#}))
+          ({ <no location info> }
+           (False))
+          []
+          (Nothing)
+          (PrefixCon
+           [(SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:119:20-29 }
+             (HsParTy
+              (ApiAnn
+               [(AddApiAnn AnnOpenP { RdrNames.hs:119:20 })
+               ,(AddApiAnn AnnCloseP { RdrNames.hs:119:29 })]
+               [])
+              (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:119:21-28 }
+               (HsAppTy
+                (NoExtField)
+                (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:119:21-26 }
+                 (HsAppTy
+                  (NoExtField)
+                  (SrcSpanAnn (ApiAnn
+                               [(AddApiAnn AnnOpenP { RdrNames.hs:119:21 })
+                               ,(AddApiAnn AnnVal { RdrNames.hs:119:22-23 })
+                               ,(AddApiAnn AnnCloseP { RdrNames.hs:119:24 })]
+                               []) { RdrNames.hs:119:21-24 }
+                   (HsTyVar
+                    (ApiAnn
+                     []
+                     [(nnnnnnnn
+                       (AnnLineComment
+                        "parser has not filled in annotation commments properly here"))])
+                    (NotPromoted)
+                    (SrcSpanAnn (ApiAnn
+                                 [(AddApiAnn AnnOpenP { RdrNames.hs:119:21 })
+                                 ,(AddApiAnn AnnVal { RdrNames.hs:119:22-23 })
+                                 ,(AddApiAnn AnnCloseP { RdrNames.hs:119:24 })]
+                                 []) { RdrNames.hs:119:21-24 }
+                     (Unqual
+                      {OccName: ~#}))))
+                  (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:119:26 }
+                   (HsTyVar
+                    (ApiAnn
+                     []
+                     [(nnnnnnnn
+                       (AnnLineComment
+                        "parser has not filled in annotation commments properly here"))])
+                    (NotPromoted)
+                    (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:119:26 }
+                     (Unqual
+                      {OccName: a}))))))
+                (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:119:28 }
+                 (HsTyVar
+                  (ApiAnn
+                   []
+                   [(nnnnnnnn
+                     (AnnLineComment
+                      "parser has not filled in annotation commments properly here"))])
+                  (NotPromoted)
+                  (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:119:28 }
+                   (Unqual
+                    {OccName: b}))))))))])
+          (Nothing)))]
+       ({ <no location info> }
+        [])))))
+  ,(SrcSpanAnn (ApiAnn
+                [(AddApiAnn AnnSemi { RdrNames.hs:122:1 })]
+                []) { RdrNames.hs:120:1-35 }
+    (TyClD
+     (NoExtField)
+     (DataDecl
+      (ApiAnn
+       [(AddApiAnn AnnData { RdrNames.hs:120:1-4 })
+       ,(AddApiAnn AnnEqual { RdrNames.hs:120:17 })]
+       [])
+      (SrcSpanAnn (ApiAnn
+                   [(AddApiAnn AnnOpenP { RdrNames.hs:120:6 })
+                   ,(AddApiAnn AnnVal { RdrNames.hs:120:9 })
+                   ,(AddApiAnn AnnCloseP { RdrNames.hs:120:11 })]
+                   []) { RdrNames.hs:120:6-11 }
+       (Exact
+        {Name: GHC.Types.~}))
+      (HsQTvs
+       (NoExtField)
+       [({ RdrNames.hs:120:13 }
+         (UserTyVar
+          (ApiAnnNotUsed)
+          (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:120:13 }
+           (Unqual
+            {OccName: a}))))
+       ,({ RdrNames.hs:120:15 }
+         (UserTyVar
+          (ApiAnnNotUsed)
+          (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:120:15 }
+           (Unqual
+            {OccName: b}))))])
+      (Prefix)
+      (HsDataDefn
+       (NoExtField)
+       (DataType)
+       (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
+        [])
+       (Nothing)
+       (Nothing)
+       [(SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:120:19-35 }
+         (ConDeclH98
+          (ApiAnn
+           []
+           [])
+          (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:120:19-21 }
+           (Unqual
+            {OccName: Eq#}))
+          ({ <no location info> }
+           (False))
+          []
+          (Nothing)
+          (PrefixCon
+           [(SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:120:23-35 }
+             (HsParTy
+              (ApiAnn
+               [(AddApiAnn AnnOpenP { RdrNames.hs:120:23 })
+               ,(AddApiAnn AnnCloseP { RdrNames.hs:120:35 })]
+               [])
+              (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:120:24-34 }
+               (HsAppTy
+                (NoExtField)
+                (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:120:24-32 }
+                 (HsAppTy
+                  (NoExtField)
+                  (SrcSpanAnn (ApiAnn
+                               [(AddApiAnn AnnOpenP { RdrNames.hs:120:24 })
+                               ,(AddApiAnn AnnVal { RdrNames.hs:120:26-27 })
+                               ,(AddApiAnn AnnCloseP { RdrNames.hs:120:30 })]
+                               []) { RdrNames.hs:120:24-30 }
+                   (HsTyVar
+                    (ApiAnn
+                     []
+                     [(nnnnnnnn
+                       (AnnLineComment
+                        "parser has not filled in annotation commments properly here"))])
+                    (NotPromoted)
+                    (SrcSpanAnn (ApiAnn
+                                 [(AddApiAnn AnnOpenP { RdrNames.hs:120:24 })
+                                 ,(AddApiAnn AnnVal { RdrNames.hs:120:26-27 })
+                                 ,(AddApiAnn AnnCloseP { RdrNames.hs:120:30 })]
+                                 []) { RdrNames.hs:120:24-30 }
+                     (Unqual
+                      {OccName: ~#}))))
+                  (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:120:32 }
+                   (HsTyVar
+                    (ApiAnn
+                     []
+                     [(nnnnnnnn
+                       (AnnLineComment
+                        "parser has not filled in annotation commments properly here"))])
+                    (NotPromoted)
+                    (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:120:32 }
+                     (Unqual
+                      {OccName: a}))))))
+                (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:120:34 }
+                 (HsTyVar
+                  (ApiAnn
+                   []
+                   [(nnnnnnnn
+                     (AnnLineComment
+                      "parser has not filled in annotation commments properly here"))])
+                  (NotPromoted)
+                  (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:120:34 }
+                   (Unqual
+                    {OccName: b}))))))))])
+          (Nothing)))]
+       ({ <no location info> }
+        [])))))
+  ,(SrcSpanAnn (ApiAnn
+                [(AddApiAnn AnnSemi { RdrNames.hs:149:1 })]
+                []) { RdrNames.hs:122:1-43 }
+    (TyClD
+     (NoExtField)
+     (DataDecl
+      (ApiAnn
+       [(AddApiAnn AnnData { RdrNames.hs:122:1-4 })
+       ,(AddApiAnn AnnEqual { RdrNames.hs:122:20 })]
+       [])
+      (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:122:6-14 }
+       (Unqual
+        {OccName: Coercible}))
+      (HsQTvs
+       (NoExtField)
+       [({ RdrNames.hs:122:16 }
+         (UserTyVar
+          (ApiAnnNotUsed)
+          (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:122:16 }
+           (Unqual
+            {OccName: a}))))
+       ,({ RdrNames.hs:122:18 }
+         (UserTyVar
+          (ApiAnnNotUsed)
+          (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:122:18 }
+           (Unqual
+            {OccName: b}))))])
+      (Prefix)
+      (HsDataDefn
+       (NoExtField)
+       (DataType)
+       (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
+        [])
+       (Nothing)
+       (Nothing)
+       [(SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:122:22-43 }
+         (ConDeclH98
+          (ApiAnn
+           []
+           [])
+          (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:122:22-32 }
+           (Unqual
+            {OccName: MkCoercible}))
+          ({ <no location info> }
+           (False))
+          []
+          (Nothing)
+          (PrefixCon
+           [(SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:122:34-43 }
+             (HsParTy
+              (ApiAnn
+               [(AddApiAnn AnnOpenP { RdrNames.hs:122:34 })
+               ,(AddApiAnn AnnCloseP { RdrNames.hs:122:43 })]
+               [])
+              (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:122:35-42 }
+               (HsAppTy
+                (NoExtField)
+                (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:122:35-40 }
+                 (HsAppTy
+                  (NoExtField)
+                  (SrcSpanAnn (ApiAnn
+                               [(AddApiAnn AnnOpenP { RdrNames.hs:122:35 })
+                               ,(AddApiAnn AnnVal { RdrNames.hs:122:36-37 })
+                               ,(AddApiAnn AnnCloseP { RdrNames.hs:122:38 })]
+                               []) { RdrNames.hs:122:35-38 }
+                   (HsTyVar
+                    (ApiAnn
+                     []
+                     [(nnnnnnnn
+                       (AnnLineComment
+                        "parser has not filled in annotation commments properly here"))])
+                    (NotPromoted)
+                    (SrcSpanAnn (ApiAnn
+                                 [(AddApiAnn AnnOpenP { RdrNames.hs:122:35 })
+                                 ,(AddApiAnn AnnVal { RdrNames.hs:122:36-37 })
+                                 ,(AddApiAnn AnnCloseP { RdrNames.hs:122:38 })]
+                                 []) { RdrNames.hs:122:35-38 }
+                     (Unqual
+                      {OccName: ~#}))))
+                  (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:122:40 }
+                   (HsTyVar
+                    (ApiAnn
+                     []
+                     [(nnnnnnnn
+                       (AnnLineComment
+                        "parser has not filled in annotation commments properly here"))])
+                    (NotPromoted)
+                    (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:122:40 }
+                     (Unqual
+                      {OccName: a}))))))
+                (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:122:42 }
+                 (HsTyVar
+                  (ApiAnn
+                   []
+                   [(nnnnnnnn
+                     (AnnLineComment
+                      "parser has not filled in annotation commments properly here"))])
+                  (NotPromoted)
+                  (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:122:42 }
+                   (Unqual
+                    {OccName: b}))))))))])
+          (Nothing)))]
+       ({ <no location info> }
+        [])))))
+  ,(SrcSpanAnn (ApiAnn
+                [(AddApiAnn AnnSemi { RdrNames.hs:150:1 })]
+                []) { RdrNames.hs:149:1-34 }
+    (ValD
+     (NoExtField)
+     (FunBind
+      (ApiAnnNotUsed)
+      (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:149:1-3 }
+       (Unqual
+        {OccName: xxx}))
+      (MG
+       (NoExtField)
+       ({ RdrNames.hs:149:1-34 }
+        [({ RdrNames.hs:149:1-34 }
+          (Match
+           (ApiAnnNotUsed)
+           (FunRhs
+            (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:149:1-3 }
+             (Unqual
+              {OccName: xxx}))
+            (Prefix)
+            (NoSrcStrict))
+           []
+           (GRHSs
+            (NoExtField)
+            [({ RdrNames.hs:149:5-34 }
+              (GRHS
+               (ApiAnnNotUsed)
+               []
+               (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:149:7-34 }
+                (OpApp
+                 (ApiAnn
+                  [(AddApiAnn AnnVal { RdrNames.hs:149:13-26 })]
+                  [(nnnnnnnn
+                    (AnnLineComment
+                     "parser has not filled in annotation commments properly here"))])
+                 (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:149:7-11 }
+                  (HsPar
+                   (ApiAnn
+                    [(AddApiAnn AnnOpenP { RdrNames.hs:149:7 })
+                    ,(AddApiAnn AnnCloseP { RdrNames.hs:149:11 })]
+                    [])
+                   (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:149:8-10 }
+                    (SectionR
+                     (ApiAnn
+                      (NoApiAnns)
+                      [])
+                     (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:149:8 }
+                      (HsVar
+                       (NoExtField)
+                       (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:149:8 }
+                        (Unqual
+                         {OccName: +}))))
+                     (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:149:10 }
+                      (HsOverLit
+                       (ApiAnn
+                        (NoApiAnns)
+                        [])
+                       (OverLit
+                        (NoExtField)
+                        (HsIntegral
+                         (IL
+                          (SourceText
+                           "1")
+                          (False)
+                          (1)))
+                        (HsLit
+                         (ApiAnn
+                          (NoApiAnns)
+                          [])
+                         (HsString
+                          (SourceText
+                           "noExpr")
+                          {FastString: "noExpr"})))))))))
+                 (SrcSpanAnn (ApiAnn
+                              [(AddApiAnn AnnBackquote { RdrNames.hs:149:13 })
+                              ,(AddApiAnn AnnVal { RdrNames.hs:149:15-18 })
+                              ,(AddApiAnn AnnBackquote { RdrNames.hs:149:26 })]
+                              []) { RdrNames.hs:149:13-26 }
+                  (HsVar
+                   (NoExtField)
+                   (SrcSpanAnn (ApiAnn
+                                [(AddApiAnn AnnBackquote { RdrNames.hs:149:13 })
+                                ,(AddApiAnn AnnVal { RdrNames.hs:149:15-18 })
+                                ,(AddApiAnn AnnBackquote { RdrNames.hs:149:26 })]
+                                []) { RdrNames.hs:149:13-26 }
+                    (Unqual
+                     {OccName: fmap}))))
+                 (SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:149:28-34 }
+                  (ExplicitList
+                   (ApiAnn
+                    [(AddApiAnn AnnOpenS { RdrNames.hs:149:28 })
+                    ,(AddApiAnn AnnCloseS { RdrNames.hs:149:34 })]
+                    [])
+                   (Nothing)
+                   [(SrcSpanAnn (ApiAnn
+                                 [(AddApiAnn AnnComma { RdrNames.hs:149:30 })]
+                                 []) { RdrNames.hs:149:29 }
+                     (HsOverLit
+                      (ApiAnn
+                       (NoApiAnns)
+                       [])
+                      (OverLit
+                       (NoExtField)
+                       (HsIntegral
+                        (IL
+                         (SourceText
+                          "1")
+                         (False)
+                         (1)))
+                       (HsLit
+                        (ApiAnn
+                         (NoApiAnns)
+                         [])
+                        (HsString
+                         (SourceText
+                          "noExpr")
+                         {FastString: "noExpr"})))))
+                   ,(SrcSpanAnn (ApiAnn
+                                 [(AddApiAnn AnnComma { RdrNames.hs:149:32 })]
+                                 []) { RdrNames.hs:149:31 }
+                     (HsOverLit
+                      (ApiAnn
+                       (NoApiAnns)
+                       [])
+                      (OverLit
+                       (NoExtField)
+                       (HsIntegral
+                        (IL
+                         (SourceText
+                          "2")
+                         (False)
+                         (2)))
+                       (HsLit
+                        (ApiAnn
+                         (NoApiAnns)
+                         [])
+                        (HsString
+                         (SourceText
+                          "noExpr")
+                         {FastString: "noExpr"})))))
+                   ,(SrcSpanAnn (ApiAnnNotUsed) { RdrNames.hs:149:33 }
+                     (HsOverLit
+                      (ApiAnn
+                       (NoApiAnns)
+                       [])
+                      (OverLit
+                       (NoExtField)
+                       (HsIntegral
+                        (IL
+                         (SourceText
+                          "3")
+                         (False)
+                         (3)))
+                       (HsLit
+                        (ApiAnn
+                         (NoApiAnns)
+                         [])
+                        (HsString
+                         (SourceText
+                          "noExpr")
+                         {FastString: "noExpr"})))))]))))))]
+            ({ <no location info> }
+             (EmptyLocalBinds
+              (NoExtField))))))])
+       (FromSource))
+      [])))]
+  (Nothing)
+  (Nothing)))
+
+
+
+RdrNames.hs:119:1: Illegal binding of built-in syntax: ~
+
+RdrNames.hs:120:1: Illegal binding of built-in syntax: ~
+
+RdrNames.hs:120:19:
+    Multiple declarations of ‘Eq#’
+    Declared at: RdrNames.hs:119:16
+                 RdrNames.hs:120:19
+
+<wired into compiler>:
+    Multiple declarations of ‘~’
+    Declared at: <wired into compiler>
+                 <wired into compiler>

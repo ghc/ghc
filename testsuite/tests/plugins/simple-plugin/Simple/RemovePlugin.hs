@@ -59,7 +59,7 @@ metaPlugin' [name, "meta"] (L l (HsPar x (L _ (XExpr (HsWrap w (HsApp noExt (L _
 -- The test should always match this first case. If the desugaring changes
 -- again in the future then the panic is more useful than the previous
 -- inscrutable failure.
-metaPlugin' _ meta = pprPanic "meta" (showAstData BlankSrcSpan meta)
+metaPlugin' _ meta = pprPanic "meta" (showAstData BlankSrcSpan BlankApiAnnotations meta)
 
 interfaceLoadPlugin' :: [CommandLineOption] -> ModIface -> IfM lcl ModIface
 interfaceLoadPlugin' [name, "interface"] iface

@@ -454,7 +454,7 @@ tidy1 v _ (LazyPat _ pat)
     -- not fully know the zonked types yet. We sure do here.
   = do  { let unlifted_bndrs = filter (isUnliftedType . idType) (collectPatBinders pat)
         ; unless (null unlifted_bndrs) $
-          putSrcSpanDs (getLoc pat) $
+          putSrcSpanDs (getLocA pat) $
           errDs (hang (text "A lazy (~) pattern cannot bind variables of unlifted type." $$
                        text "Unlifted variables:")
                     2 (vcat (map (\id -> ppr id <+> dcolon <+> ppr (idType id))
@@ -513,7 +513,7 @@ tidy1 _ _ non_interesting_pat
   = return (idDsWrapper, non_interesting_pat)
 
 --------------------
-tidy_bang_pat :: Id -> Origin -> SrcSpan -> Pat GhcTc
+tidy_bang_pat :: Id -> Origin -> SrcSpanAnnA -> Pat GhcTc
               -> DsM (DsWrapper, Pat GhcTc)
 
 -- Discard par/sig under a bang
@@ -566,7 +566,7 @@ tidy_bang_pat v o l p@(ConPat { pat_con = L _ (RealDataCon dc)
 tidy_bang_pat _ _ l p = return (idDsWrapper, BangPat noExtField (L l p))
 
 -------------------
-push_bang_into_newtype_arg :: SrcSpan
+push_bang_into_newtype_arg :: SrcSpanAnnA
                            -> Type -- The type of the argument we are pushing
                                    -- onto
                            -> HsConPatDetails GhcTc -> HsConPatDetails GhcTc
@@ -583,7 +583,7 @@ push_bang_into_newtype_arg l _ty (RecCon rf)
                                            = L l (BangPat noExtField arg) })] })
 push_bang_into_newtype_arg l ty (RecCon rf) -- If a user writes !(T {})
   | HsRecFields { rec_flds = [] } <- rf
-  = PrefixCon [L l (BangPat noExtField (noLoc (WildPat ty)))]
+  = PrefixCon [L l (BangPat noExtField (noLocA (WildPat ty)))]
 push_bang_into_newtype_arg _ _ cd
   = pprPanic "push_bang_into_newtype_arg" (pprConArgs cd)
 
@@ -714,7 +714,7 @@ Call @match@ with all of this information!
 -}
 
 matchWrapper
-  :: HsMatchContext GhcRn              -- ^ For shadowing warning messages
+  :: HsMatchContext Name              -- ^ For shadowing warning messages
   -> Maybe (LHsExpr GhcTc)             -- ^ Scrutinee. (Just scrut) for a case expr
                                        --      case scrut of { p1 -> e1 ... }
                                        --   (and in this case the MatchGroup will
@@ -809,7 +809,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
                      then discardWarningsDs
                      else id
 
-matchEquations  :: HsMatchContext GhcRn
+matchEquations  :: HsMatchContext Name
                 -> [MatchId] -> [EquationInfo] -> Type
                 -> DsM CoreExpr
 matchEquations ctxt vars eqns_info rhs_ty
@@ -833,7 +833,7 @@ pattern. It returns an expression.
 -}
 
 matchSimply :: CoreExpr                 -- ^ Scrutinee
-            -> HsMatchContext GhcRn     -- ^ Match kind
+            -> HsMatchContext Name      -- ^ Match kind
             -> LPat GhcTc               -- ^ Pattern it should match
             -> CoreExpr                 -- ^ Return this if it matches
             -> CoreExpr                 -- ^ Return this if it doesn't
@@ -847,7 +847,7 @@ matchSimply scrut hs_ctx pat result_expr fail_expr = do
     match_result' <- matchSinglePat scrut hs_ctx pat rhs_ty match_result
     extractMatchResult match_result' fail_expr
 
-matchSinglePat :: CoreExpr -> HsMatchContext GhcRn -> LPat GhcTc
+matchSinglePat :: CoreExpr -> HsMatchContext Name -> LPat GhcTc
                -> Type -> MatchResult CoreExpr -> DsM (MatchResult CoreExpr)
 -- matchSinglePat ensures that the scrutinee is a variable
 -- and then calls matchSinglePatVar
@@ -872,7 +872,7 @@ matchSinglePat scrut hs_ctx pat ty match_result
        }
 
 matchSinglePatVar :: Id   -- See Note [Match Ids]
-                  -> HsMatchContext GhcRn -> LPat GhcTc
+                  -> HsMatchContext Name -> LPat GhcTc
                   -> Type -> MatchResult CoreExpr -> DsM (MatchResult CoreExpr)
 matchSinglePatVar var ctx pat ty match_result
   = ASSERT2( isInternalName (idName var), ppr var )

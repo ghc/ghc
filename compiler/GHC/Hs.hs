@@ -29,6 +29,7 @@ module GHC.Hs (
         module GHC.Hs.Utils,
         module GHC.Hs.Doc,
         module GHC.Hs.Extension,
+        module GHC.Parser.Annotation,
         Fixity,
 
         HsModule(..),
@@ -43,6 +44,7 @@ import GHC.Hs.Expr
 import GHC.Hs.ImpExp
 import GHC.Hs.Lit
 import GHC.Hs.Extension
+import GHC.Parser.Annotation
 import GHC.Hs.Pat
 import GHC.Hs.Type
 import GHC.Types.Basic ( Fixity, WarningTxt )
@@ -63,10 +65,11 @@ import Data.Data hiding ( Fixity )
 -- All we actually declare here is the top-level structure for a module.
 data HsModule
   = HsModule {
+      hsmodAnn :: ApiAnn' AnnsModule,
       hsmodName :: Maybe (Located ModuleName),
         -- ^ @Nothing@: \"module X where\" is omitted (in which case the next
         --     field is Nothing too)
-      hsmodExports :: Maybe (Located [LIE GhcPs]),
+      hsmodExports :: Maybe (LocatedL [LIE GhcPs]),
         -- ^ Export list
         --
         --  - @Nothing@: export list omitted, so export everything
@@ -86,7 +89,7 @@ data HsModule
         -- downstream.
       hsmodDecls :: [LHsDecl GhcPs],
         -- ^ Type, class, value, and interface signature decls
-      hsmodDeprecMessage :: Maybe (Located WarningTxt),
+      hsmodDeprecMessage :: Maybe (LocatedP WarningTxt),
         -- ^ reason\/explanation for warning/deprecation of this module
         --
         --  - 'GHC.Parser.Annotation.AnnKeywordId's : 'GHC.Parser.Annotation.AnnOpen'
@@ -116,11 +119,11 @@ deriving instance Data HsModule
 
 instance Outputable HsModule where
 
-    ppr (HsModule Nothing _ imports decls _ mbDoc)
+    ppr (HsModule _ Nothing _ imports decls _ mbDoc)
       = pp_mb mbDoc $$ pp_nonnull imports
                     $$ pp_nonnull decls
 
-    ppr (HsModule (Just name) exports imports decls deprec mbDoc)
+    ppr (HsModule _ (Just name) exports imports decls deprec mbDoc)
       = vcat [
             pp_mb mbDoc,
             case exports of

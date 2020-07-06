@@ -324,6 +324,7 @@ Library
         GHC.Hs.Binds
         GHC.Hs.Decls
         GHC.Hs.Doc
+        GHC.Hs.Exact
         GHC.Hs.Expr
         GHC.Hs.ImpExp
         GHC.Hs.Lit
