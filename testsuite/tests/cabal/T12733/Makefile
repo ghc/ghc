@@ -2,7 +2,7 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-SETUP=../Setup -v0
+SETUP='$(TEST_WRAPPER)' ../Setup -v0
 
 T12733: clean
 	$(MAKE) -s --no-print-directory clean

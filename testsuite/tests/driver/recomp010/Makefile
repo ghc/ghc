@@ -14,9 +14,9 @@ clean:
 recomp010: clean
 	cp X1.hs X.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make -O Main.hs
-	./Main
+	'$(TEST_WRAPPER)' ./Main
 	sleep 1
 	cp X2.hs X.hs
 	rm X.o
 	-'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make -O Main.hs
-	./Main
+	'$(TEST_WRAPPER)' ./Main

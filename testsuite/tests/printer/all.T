@@ -1,3 +1,8 @@
+# These tests make no sense for cross compilers. They require `check-ppr`, which
+# is not built. Using the bootstrap compilers check-ppr is not going to provide
+# much value.
+setTestOpts([when(cross(), skip)])
+
 test('Ppr001', ignore_stderr, makefile_test, ['ppr001'])
 test('Ppr002', ignore_stderr, makefile_test, ['ppr002'])
 test('Ppr003', ignore_stderr, makefile_test, ['ppr003'])

@@ -11,6 +11,7 @@ test('T2881',      just_ghci, compile_and_run, [''])
 
 test('T3171',
      [when(opsys('mingw32'),skip),
+      when(cross(), skip), # <command line>: not built for interactive use
       fragile(15383),
       req_interp,
       combined_output],

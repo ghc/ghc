@@ -1,4 +1,7 @@
 # Just do the normal way, SafeHaskell is all in the frontend
+# But do skip cross compilers for now:
+# setTestOpts([when(cross(), skip)])
+
 def f( name, opts ):
   opts.only_ways = ['normal']
 
