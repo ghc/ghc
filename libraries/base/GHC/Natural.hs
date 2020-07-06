@@ -10,7 +10,7 @@
 -- | Compatibility module for pre ghc-bignum code.
 module GHC.Natural
    ( Natural (NatS#, NatJ#)
-   , BigNat (..)
+   , B.BigNat (..)
    , mkNatural
    , isValidNatural
      -- * Arithmetic
@@ -53,20 +53,19 @@ import GHC.Types
 import GHC.Maybe
 import GHC.Num.Natural (Natural)
 import GHC.Num.Integer (Integer)
+import qualified GHC.Num.BigNat  as B
 import qualified GHC.Num.Natural as N
 import qualified GHC.Num.Integer as I
-
-data BigNat = BN# { unBigNat :: ByteArray# }
 
 {-# COMPLETE NatS#, NatJ# #-}
 
 pattern NatS# :: Word# -> Natural
 pattern NatS# w = N.NS w
 
-pattern NatJ# :: BigNat -> Natural
-pattern NatJ# b <- N.NB (BN# -> b)
+pattern NatJ# :: B.BigNat -> Natural
+pattern NatJ# b <- N.NB (B.BN# -> b)
    where
-      NatJ# b = N.NB (unBigNat b)
+      NatJ# b = N.NB (B.unBigNat b)
 
 int2Word :: Int -> Word
 int2Word (I# i) = W# (int2Word# i)
