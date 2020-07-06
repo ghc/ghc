@@ -236,7 +236,8 @@ endif
 # This way we cache the results for different values of $(TEST_HC)
 
 $(TOP)/mk/ghc-config : $(TOP)/mk/ghc-config.hs
-	"$(TEST_HC)" --make -o $@ $<
+#	"$(TEST_HC)" --make -o $@ $<
+	ghc --make -o $@ $<
 
 empty=
 space=$(empty) $(empty)
@@ -292,4 +293,3 @@ DARWIN = YES
 else
 DARWIN = NO
 endif
-

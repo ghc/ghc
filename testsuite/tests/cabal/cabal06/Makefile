@@ -2,7 +2,7 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-SETUP=../Setup -v0
+SETUP='$(TEST_WRAPPER)' ../Setup -v0
 
 # This test is for packages whose package IDs overlap, but whose IPIDs
 # do not.
@@ -26,22 +26,22 @@ cabal06: clean
 	'$(GHC_PKG)' init tmp.d
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make Setup
 	cd p-1.0 && $(SETUP) clean
-	cd p-1.0 && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --prefix='$(PWD)/inst-a' --ghc-pkg-options='--enable-multi-instance'
+	cd p-1.0 && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --with-strip='$(STRIP)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --prefix='$(PWD)/inst-a' --ghc-pkg-options='--enable-multi-instance'
 	cd p-1.0 && $(SETUP) build
 	cd p-1.0 && $(SETUP) copy
 	(cd p-1.0 && $(SETUP) register --print-ipid) > tmp_p_1_0
 	cd q && $(SETUP) clean
-	cd q && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --prefix='$(PWD)/inst-b' --ghc-pkg-options='--enable-multi-instance'
+	cd q && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --with-strip='$(STRIP)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --prefix='$(PWD)/inst-b' --ghc-pkg-options='--enable-multi-instance'
 	cd q && $(SETUP) build
 	cd q && $(SETUP) copy
 	(cd q && $(SETUP) register --print-ipid) > tmp_first_q
 	cd p-1.1 && $(SETUP) clean
-	cd p-1.1 && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --prefix='$(PWD)/inst-c' --ghc-pkg-options='--enable-multi-instance'
+	cd p-1.1 && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --with-strip='$(STRIP)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --prefix='$(PWD)/inst-c' --ghc-pkg-options='--enable-multi-instance'
 	cd p-1.1 && $(SETUP) build
 	cd p-1.1 && $(SETUP) copy
 	(cd p-1.1 && $(SETUP) register --print-ipid) > tmp_p_1_1
 	cd q && $(SETUP) clean
-	cd q && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --constraint="p==1.1" --prefix='$(PWD)/inst-d' --ghc-pkg-options='--enable-multi-instance'
+	cd q && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --with-strip='$(STRIP)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --constraint="p==1.1" --prefix='$(PWD)/inst-d' --ghc-pkg-options='--enable-multi-instance'
 	cd q && $(SETUP) build
 	cd q && $(SETUP) copy
 	(cd q && $(SETUP) register --print-ipid) > tmp_second_q
@@ -50,15 +50,15 @@ cabal06: clean
 	@echo "Does the second instance of q depend on p-1.0?"
 	'$(GHC_PKG)' field --ipid `cat tmp_second_q` depends -f tmp.d | grep `cat tmp_p_1_1` | wc -l | sed 's/[[:space:]]//g'
 	cd r && $(SETUP) clean
-	cd r && ../Setup configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --dependency="q=`cat ../tmp_first_q`" --constraint="p==1.0" --prefix='$(PWD)/inst-e' --ghc-pkg-options='--enable-multi-instance'
+	cd r && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --with-strip='$(STRIP)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --dependency="q=`cat ../tmp_first_q`" --constraint="p==1.0" --prefix='$(PWD)/inst-e' --ghc-pkg-options='--enable-multi-instance'
 	cd r && $(SETUP) build
 	cd r && $(SETUP) copy
 	cd r && $(SETUP) clean
-	cd r && ../Setup configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --dependency="q=`cat ../tmp_second_q`" --constraint="p==1.1" --prefix='$(PWD)/inst-f' --ghc-pkg-options='--enable-multi-instance'
+	cd r && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --with-strip='$(STRIP)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --dependency="q=`cat ../tmp_second_q`" --constraint="p==1.1" --prefix='$(PWD)/inst-f' --ghc-pkg-options='--enable-multi-instance'
 	cd r && $(SETUP) build
 	cd r && $(SETUP) copy
-	inst-e/bin/cabal06
-	inst-f/bin/cabal06
+	'$(TEST_WRAPPER)' inst-e/bin/cabal06
+	'$(TEST_WRAPPER)' inst-f/bin/cabal06
 ifneq "$(CLEANUP)" ""
 	$(MAKE) -s --no-print-directory clean
 endif

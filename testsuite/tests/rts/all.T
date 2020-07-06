@@ -35,8 +35,8 @@ test('derefnull',
       when(opsys('linux'), ignore_stderr),
       # SIGBUS on OX X (PPC and x86 only; amd64 gives SEGV)
       # The output under OS X is too unstable to readily compare
-      when(platform('i386-apple-darwin'), [ignore_stderr, exit_code(139)]),
-      when(platform('x86_64-apple-darwin'), [ignore_stderr, exit_code(139)]),
+      when(targetPlatform('i386-apple-darwin'), [ignore_stderr, exit_code(139)]),
+      when(targetPlatform('x86_64-apple-darwin'), [ignore_stderr, exit_code(139)]),
       when(opsys('mingw32'), [ignore_stderr, exit_code(11)]),
       # since these test are supposed to crash the
       # profile report will be empty always.
@@ -58,12 +58,12 @@ test('divbyzero',
       # do not generate an exception (interrupt) for integer
       # division by zero but the result is undefined.
       # C programs compiled with gcc exit normally, so do we.
-      when(platform('powerpc64-unknown-linux'), [ignore_stdout, exit_code(0)]),
-      when(platform('powerpc64le-unknown-linux'), [ignore_stdout, exit_code(0)]),
+      when(targetPlatform('powerpc64-unknown-linux'), [ignore_stdout, exit_code(0)]),
+      when(targetPlatform('powerpc64le-unknown-linux'), [ignore_stdout, exit_code(0)]),
       when(opsys('mingw32'), [ignore_stderr, exit_code(8)]),
       # The output under OS X is too unstable to readily compare
-      when(platform('i386-apple-darwin'), [ignore_stderr, exit_code(136)]),
-      when(platform('x86_64-apple-darwin'), [ignore_stderr, exit_code(136)]),
+      when(targetPlatform('i386-apple-darwin'), [ignore_stderr, exit_code(136)]),
+      when(targetPlatform('x86_64-apple-darwin'), [ignore_stderr, exit_code(136)]),
       # since these test are supposed to crash the
       # profile report will be empty always.
       # so disable the check for profiling
@@ -171,9 +171,13 @@ def config_T5250(name, opts):
 
 test('T5250', [extra_files(['spalign.c']),
                 config_T5250,
+                # once we have proper targetArch support in the testlib, this
+                # can go away.  See config_T5250 where we check against arch,
+                # which is the compiler host, not target arch.
+                when(targetPlatform('aarch64-unknown-linux'), skip),
                 # stack ptr is not 16-byte aligned on 32-bit Windows
-                when(platform('i386-unknown-mingw32'), expect_fail),
-                when(platform('i386-unknown-linux'),
+                when(targetPlatform('i386-unknown-mingw32'), expect_fail),
+                when(targetPlatform('i386-unknown-linux'),
                             expect_broken_for(4211,['llvm'])),
                 extra_clean(['spalign.o']),
                 omit_ways(['ghci']) ],
@@ -222,7 +226,9 @@ test('T7815', [ multi_cpu_race,
 
 # ignore_stderr because it contains a unique:
 #   ffishutdown: Main_dul: interrupted
-test('ffishutdown', [ignore_stderr, only_ways(['threaded1','threaded2'])],
+test('ffishutdown', [ignore_stderr,
+                     when(cross(), skip), # libgcc_s.so.1 must be installed for pthread_cancel to work
+                     only_ways(['threaded1','threaded2'])],
      compile_and_run, [''])
 
 # Times out in ghci way
@@ -239,6 +245,7 @@ test('T8242', [ req_smp, only_ways(threaded_ways), ignore_stdout ],
 
 test('T8124', [ only_ways(threaded_ways), omit_ways(['ghci']),
                  when(opsys('mingw32'), skip), # uses pthreads
+                 when(cross(), skip), # libgcc_s.so.1 must be installed for pthread_cancel to work
                  extra_clean(['T8124_c.o']),
                  pre_cmd('$MAKE -s --no-print-directory T8124_setup') ],
                  # The T8124_setup hack is to ensure that we generate
@@ -322,7 +329,8 @@ test('T10728', [extra_run_opts('+RTS -maxN3 -RTS'), only_ways(['threaded2'])],
 
 test('T9405', [when(msys(), expect_broken(12714))], makefile_test, ['T9405'])
 
-test('T11788', when(ghc_dynamic(), skip),
+test('T11788', [ when(cross(), skip) # GhostScript not available for hp2ps tests:
+               , when(ghc_dynamic(), skip)],
               makefile_test, ['T11788'])
 
 test('T10296a', [req_smp], makefile_test, ['T10296a'])
@@ -352,7 +360,8 @@ test('T13894', normal, compile_and_run, [''])
 # this test fails with the profasm way on some machines but not others,
 # so we just skip it.
 test('T14497', [omit_ways(['profasm']), multi_cpu_race], compile_and_run, ['-O'])
-test('T14695', [normal, ignore_stderr], makefile_test, ['T14695'])
+test('T14695', [ when(cross(), skip) # <command line>: not built for interactive use
+               , normal, ignore_stderr], makefile_test, ['T14695'])
 test('T14702', [ ignore_stdout
                , when(unregisterised(), skip)
                , only_ways(['threaded1', 'threaded2'])

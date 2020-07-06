@@ -74,7 +74,7 @@ compile_libAB_dyn:
 	'$(TEST_HC)' $(MY_TEST_HC_OPTS) -odir "bin_dyn" -shared B.c -o "bin_dyn/$(call DLL,B)" -lA -L"./bin_dyn"
 	rm -f bin_dyn/*.a
 	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -v0 -o "bin_dyn/$(call EXE,T10955dyn)" -L./bin_dyn -lB -lA T10955dyn.hs -v0
-	LD_LIBRARY_PATH=./bin_dyn ./bin_dyn/$(call EXE,T10955dyn)
+	LD_LIBRARY_PATH=./bin_dyn '$(TEST_WRAPPER)' ./bin_dyn/$(call EXE,T10955dyn)
 
 .PHONY: compile_libAS_impl_gcc
 compile_libAS_impl_gcc:

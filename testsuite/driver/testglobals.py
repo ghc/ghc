@@ -73,7 +73,8 @@ class TestConfig:
         self.no_print_summary = False
 
         # What platform are we running on?
-        self.platform = ''
+        self.targetPlatform = ''
+        self.hostPlatform = ''
         self.os = ''
         self.arch = ''
         self.msys = False

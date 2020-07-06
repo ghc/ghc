@@ -1,3 +1,5 @@
+setTestOpts([when(cross(), skip)])
+
 test('ghcilink001',
      [extra_files(['TestLink.hs', 'f.c']),
       when(ghc_dynamic(), expect_fail), # dynamic ghci can't load '.a's
