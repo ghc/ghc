@@ -135,7 +135,12 @@ test('T5313',
      ['-package ghc'])
 
 test('T2464', normal, compile, [''])
-test('T3674', [], makefile_test, [])
+# This one uses a -pgmF pragma, where the program is compiled with the cross
+# compiler.  We won't be able to execute that.  Two options: a) we compile the
+# pgm with the build compiler, but that would be covered by the regular stage
+# 2 test suite alread, or b) we'd figure out how to inject TEST_WRAPPER, but
+# that would end up being really messy I believe.
+test('T3674', when(cross(),skip), makefile_test, [])
 
 test('rtsopts001', [extra_files(['rtsOpts.hs'])], makefile_test, [])
 test('rtsopts002', normal, makefile_test, [])
@@ -153,7 +158,7 @@ test('T4437', only_ways(['normal']), compile_and_run, ['-package ghc'])
 
 test('werror', normal, compile_fail, [''])
 
-test('T706', [req_interp], makefile_test, [])
+test('T706', [req_interp, when(cross(), skip)], makefile_test, [])
 test('spacesInArgs',
      extra_run_opts('"a   b"   "c   d"'),
      compile_and_run,
@@ -227,8 +232,10 @@ test('T365',
      [pre_cmd('touch test_preprocessor.txt'), unless(opsys('mingw32'), skip)],
      compile_fail, [''])
 
-test('T9360a', req_interp, run_command, ['{compiler} --interactive -e "" -ignore-dot-ghci'])
-test('T9360b', req_interp, run_command, ['{compiler} -e "" --interactive -ignore-dot-ghci'])
+# can't build when cross compiling:
+# <command line>: not built for interactive use
+test('T9360a', [req_interp, when(cross(), skip)], run_command, ['{compiler} --interactive -e "" -ignore-dot-ghci'])
+test('T9360b', [req_interp, when(cross(), skip)], run_command, ['{compiler} -e "" --interactive -ignore-dot-ghci'])
 
 test('T10970', normal, compile_and_run, [''])
 test('T4931', normal, compile_and_run, [''])
@@ -261,7 +268,8 @@ test('T12955', normal, makefile_test, [])
 test('T12971', [when(opsys('mingw32'), expect_broken(17945)), ignore_stdout], makefile_test, [])
 test('json', normal, compile_fail, ['-ddump-json'])
 test('json2', normalise_version('base','ghc-prim'), compile, ['-ddump-types -ddump-json'])
-test('T16167', exit_code(1), run_command, 
+test('T16167', [when(cross(), skip), # <command line>: not built for interactive use
+                exit_code(1)], run_command,
      ['{compiler} -x hs -e ":set prog T16167.hs" -ddump-json T16167.hs'])
 test('T13604', [], makefile_test, [])
 test('T13604a', [], makefile_test, [])

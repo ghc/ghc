@@ -13,6 +13,9 @@ if config.have_ext_interp :
      setTestOpts(extra_ways(['ext-interp']))
      setTestOpts(only_ways(['normal','ghci','ext-interp']))
 
+     if cross():
+         setTestOpts(extra_hc_opts('-fexternal-interpreter -pgmi $WRAPPED_ISERV'))
+
      if llvm_build():
          setTestOpts(fragile_for(16087, ['ext-interp']))
 
@@ -263,7 +266,8 @@ test('TH_Roles4', normal, compile, ['-v0'])
 test('T8186', normal, compile_and_run, ['-v0'])
 
 test('T8333',
-     only_ways(['normal']),
+     [when(cross(), skip), # <command line>: not built for interactive use
+      only_ways(['normal'])],
      makefile_test, ['T8333'])
 
 test('T4124', normal, compile, ['-v0'])
@@ -393,6 +397,7 @@ test('T13098', normal, compile, ['-v0'])
 test('T11046', normal, multimod_compile, ['T11046','-v0'])
 test('T13366',
      [expect_broken_for(13366, ['ghci']),
+      when(cross(), skip), # <command line>: user specified .o/.so/.DLL could not be loaded (libgcc_s.so.1: cannot open shared object file: No such file or directory)
       # libstdc++ is named differently on FreeBSD
       when(opsys('freebsd'), expect_broken(17739)),
       when(opsys('darwin'), expect_broken(16083))],

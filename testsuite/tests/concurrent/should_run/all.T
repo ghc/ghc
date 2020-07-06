@@ -148,7 +148,7 @@ test('conc022', normal, compile_and_run, [''])
 # resulting creation of OS threads seems to cause the system to run
 # out of memory sometimes (I'm not sure exactly how/why this happens,
 # but the threaded RTS fixes it).  See #1197.
-if config.platform == 'i386-unknown-mingw32':
+if config.targetPlatform == 'i386-unknown-mingw32':
    conc023_ways = only_ways(['threaded1','threaded2'])
 else:
    conc023_ways = normal
@@ -271,6 +271,7 @@ test('hs_try_putmvar002',
 test('hs_try_putmvar003',
      [
      when(opsys('mingw32'),skip), # uses pthread APIs in the C code
+     when(cross(), skip), # libgcc_s.so.1 must be installed for pthread_cancel to work
      pre_cmd('$MAKE -s --no-print-directory hs_try_putmvar003_setup'),
      only_ways(['threaded1', 'threaded2', 'nonmoving_thr']),
      extra_clean(['hs_try_putmvar003_c.o']),

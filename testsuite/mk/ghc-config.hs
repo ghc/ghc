@@ -9,7 +9,6 @@ main = do
   let fields = read info :: [(String,String)]
   getGhcFieldOrFail fields "HostOS" "Host OS"
   getGhcFieldOrFail fields "WORDSIZE" "Word size"
-  getGhcFieldOrFail fields "TARGETPLATFORM" "Target platform"
   getGhcFieldOrFail fields "TargetOS_CPP" "Target OS"
   getGhcFieldOrFail fields "TargetARCH_CPP" "Target architecture"
 
@@ -23,6 +22,14 @@ main = do
   getGhcFieldOrFail fields "GhcUnregisterised" "Unregisterised"
   getGhcFieldOrFail fields "GhcWithSMP" "Support SMP"
   getGhcFieldOrFail fields "GhcRTSWays" "RTS ways"
+  -- extract the Target platfrom from `ghc --info`. `ghc +RTS --info` will
+  -- give us the rts the compiler is linked against, which for a cross compiler
+  -- will still be the target for the compiler host, not target.
+  -- XXX We should also read Target OS and Target Architecture here, but
+  --     $HC --info returns different fields values for those. Luckily the
+  --     keys are different as well, so we could migrate gracefully.
+  getGhcFieldOrFail fields "HOSTPLATFORM" "Host platform"
+  getGhcFieldOrFail fields "TARGETPLATFORM" "Target platform"
   getGhcFieldOrDefault fields "GhcDynamicByDefault" "Dynamic by default" "NO"
   getGhcFieldOrDefault fields "GhcDynamic" "GHC Dynamic" "NO"
   getGhcFieldOrDefault fields "GhcProfiled" "GHC Profiled" "NO"

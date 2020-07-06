@@ -15,11 +15,10 @@ recomp004:
 	$(CP) Main.hs MainX.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -c c.c -o c.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make MainX.hs c.o -o $(EXECUTABLE)
-	./$(EXECUTABLE)
+	'$(TEST_WRAPPER)' ./$(EXECUTABLE)
 	$(CP) c2.c c.c
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 -c c.c -o c.o
 	# Hack to make sure c.o is really newer
 	touch -t 01010000 MainX.hs MainX.hi MainX.o c.c $(EXECUTABLE)
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make MainX.hs c.o -o $(EXECUTABLE)
-	./$(EXECUTABLE)
-
+	'$(TEST_WRAPPER)' ./$(EXECUTABLE)
