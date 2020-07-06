@@ -1143,7 +1143,7 @@
       SymI_NeedsProto(__floatunsitf)
 
 #if defined(__GNUC__) && SIZEOF_VOID_P <= 4 && !defined(_ABIN32)
-#define RTS_LIBGCC_SYMBOLS LIBGCC_SYMBOLS_32
+#define RTS_LIBGCC_SYMBOLS RTS_LIBGCC_SYMBOLS_32
 #elif defined(__GNUC__) && SIZEOF_VOID_P == 8 && defined(aarch64_HOST_OS)
 #define RTS_LIBGCC_SYMBOLS \
       RTS_LIBGCC_SYMBOLS_64 \
