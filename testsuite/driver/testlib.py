@@ -1945,7 +1945,8 @@ def check_prof_ok(name: TestName, way: WayName) -> bool:
 def compare_outputs(way: WayName,
                     kind: str,
                     normaliser: OutputNormalizer,
-                    expected_file, actual_file, diff_file=None,
+                    expected_file: str, actual_file: str,
+                    diff_file: Optional[str]=None,
                     whitespace_normaliser: OutputNormalizer=lambda x:x) -> bool:
 
     expected_path = in_srcdir(expected_file)
@@ -2000,18 +2001,19 @@ def compare_outputs(way: WayName,
             if_verbose(1, 'Test is expected to fail. Not accepting new output.')
             return False
         elif config.accept and actual_raw:
+            suffix = ''
             if config.accept_platform:
                 if_verbose(1, 'Accepting new output for platform "'
                               + config.platform + '".')
-                expected_path += '-' + config.platform
+                suffix += '-' + config.platform
             elif config.accept_os:
                 if_verbose(1, 'Accepting new output for os "'
                               + config.os + '".')
-                expected_path += '-' + config.os
+                suffix += '-' + config.os
             else:
                 if_verbose(1, 'Accepting new output.')
 
-            write_file(expected_path, actual_raw)
+            write_file(str(expected_path) + suffix, actual_raw)
             return True
         elif config.accept:
             if_verbose(1, 'No output. Deleting "{0}".'.format(expected_path))
