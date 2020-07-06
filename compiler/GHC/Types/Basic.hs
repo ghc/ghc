@@ -466,6 +466,7 @@ pprRuleName rn = doubleQuotes (ftext rn)
 data TopLevelFlag
   = TopLevel
   | NotTopLevel
+  deriving Data
 
 isTopLevel, isNotTopLevel :: TopLevelFlag -> Bool
 
