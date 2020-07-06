@@ -16,6 +16,8 @@ TIMEOUT_PROGRAM = install-inplace/bin/timeout$(exeext)
 PREFIX := $(abspath install-inplace)
 $(eval $(call canonicalise,PREFIX))
 
+SETUP='$(TEST_WRAPPER)' ./Setup -v0
+
 ifneq "$(GCC)" ""
 WITH_GCC = --with-gcc='$(GCC)'
 endif
@@ -38,13 +40,13 @@ else
 $(TIMEOUT_PROGRAM): timeout.hs
 	rm -rf install-inplace
 	'$(TEST_HC)' --make Setup
-	./Setup configure --with-compiler='$(TEST_HC)' \
+	$(SETUP) configure --with-compiler='$(TEST_HC)' \
 	                  --with-hc-pkg='$(GHC_PKG)' \
 	                  --with-hsc2hs='$(HSC2HS)' \
 	                  $(WITH_GCC) \
 	                  --ghc-option=-threaded --prefix='$(PREFIX)'
-	./Setup build
-	./Setup install
+	$(SETUP) build
+	$(SETUP) install
 endif
 
 boot all :: calibrate.out $(TIMEOUT_PROGRAM)
@@ -66,4 +68,3 @@ clean distclean maintainer-clean:
 	$(RM) -rf install-inplace
 	$(RM) -f calibrate.out
 	$(RM) -f Setup Setup.exe Setup.hi Setup.o
-

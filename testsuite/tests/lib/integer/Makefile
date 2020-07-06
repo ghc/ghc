@@ -36,7 +36,7 @@ integerConstantFolding:
 	$(call CHECK,\<200135.0\>,floatFromInteger)
 	$(call CHECK,\<400276.0\>,encodeIntegerDouble)
 	$(call CHECK,\<400280.0\>,encodeIntegerFloat)
-	./integerConstantFolding
+	'$(TEST_WRAPPER)' ./integerConstantFolding
 
 .PHONY: fromToInteger
 fromToInteger:
@@ -57,4 +57,3 @@ IntegerConversionRules:
 	-grep -q int2Float         $@.simpl || echo "int2Float absent"
 	-grep -q integerToWord     $@.simpl && echo "integerToWord present"
 	-grep -q int2Word          $@.simpl || echo "int2Word absent"
-
