@@ -43,7 +43,7 @@ warnAnns :: [LAnnDecl GhcRn] -> TcM [Annotation]
 --- No GHCI; emit a warning (not an error) and ignore. cf #4268
 warnAnns [] = return []
 warnAnns anns@(L loc _ : _)
-  = do { setSrcSpan loc $ addWarnTc NoReason $
+  = do { setSrcSpanA loc $ addWarnTc NoReason $
              (text "Ignoring ANN annotation" <> plural anns <> comma
              <+> text "because this is a stage-1 compiler without -fexternal-interpreter or doesn't support GHCi")
        ; return [] }
@@ -55,7 +55,7 @@ tcAnnotation (L loc ann@(HsAnnotation _ _ provenance expr)) = do
     let target = annProvenanceToTarget mod provenance
 
     -- Run that annotation and construct the full Annotation data structure
-    setSrcSpan loc $ addErrCtxt (annCtxt ann) $ do
+    setSrcSpanA loc $ addErrCtxt (annCtxt ann) $ do
       -- See #10826 -- Annotations allow one to bypass Safe Haskell.
       dflags <- getDynFlags
       when (safeLanguageOn dflags) $ failWithTc safeHsErr
@@ -64,7 +64,7 @@ tcAnnotation (L loc ann@(HsAnnotation _ _ provenance expr)) = do
       safeHsErr = vcat [ text "Annotations are not compatible with Safe Haskell."
                   , text "See https://gitlab.haskell.org/ghc/ghc/issues/10826" ]
 
-annProvenanceToTarget :: Module -> AnnProvenance Name
+annProvenanceToTarget :: Module -> AnnProvenance GhcRn
                       -> AnnTarget Name
 annProvenanceToTarget _   (ValueAnnProvenance (L _ name)) = NamedTarget name
 annProvenanceToTarget _   (TypeAnnProvenance (L _ name))  = NamedTarget name
