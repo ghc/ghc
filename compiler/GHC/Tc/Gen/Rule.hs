@@ -99,12 +99,12 @@ equation.
 -}
 
 tcRules :: [LRuleDecls GhcRn] -> TcM [LRuleDecls GhcTc]
-tcRules decls = mapM (wrapLocM tcRuleDecls) decls
+tcRules decls = mapM (wrapLocMA tcRuleDecls) decls
 
 tcRuleDecls :: RuleDecls GhcRn -> TcM (RuleDecls GhcTc)
 tcRuleDecls (HsRules { rds_src = src
                      , rds_rules = decls })
-   = do { tc_decls <- mapM (wrapLocM tcRule) decls
+   = do { tc_decls <- mapM (wrapLocMA tcRule) decls
         ; return $ HsRules { rds_ext   = noExtField
                            , rds_src   = src
                            , rds_rules = tc_decls } }
@@ -175,7 +175,7 @@ tcRule (HsRule { rd_ext  = ext
                          , rd_name = rname
                          , rd_act = act
                          , rd_tyvs = ty_bndrs -- preserved for ppr-ing
-                         , rd_tmvs = map (noLoc . RuleBndr noExtField . noLoc)
+                         , rd_tmvs = map (noLoc . RuleBndr noAnn . noLocA)
                                          (qtkvs ++ tpl_ids)
                          , rd_lhs  = mkHsDictLet lhs_binds lhs'
                          , rd_rhs  = mkHsDictLet rhs_binds rhs' } }

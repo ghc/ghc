@@ -232,7 +232,7 @@ tcFImport :: LForeignDecl GhcRn
           -> TcM (Id, LForeignDecl GhcTc, Bag GlobalRdrElt)
 tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
                                     , fd_fi = imp_decl }))
-  = setSrcSpan dloc $ addErrCtxt (foreignDeclCtxt fo)  $
+  = setSrcSpanA dloc $ addErrCtxt (foreignDeclCtxt fo)  $
     do { sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
        ; (norm_co, norm_sig_ty, gres) <- normaliseFfiType sig_ty
        ; let
@@ -370,7 +370,7 @@ tcForeignExports' decls
   = foldlM combine (emptyLHsBinds, [], emptyBag) (filter isForeignExport decls)
   where
    combine (binds, fs, gres1) (L loc fe) = do
-       (b, f, gres2) <- setSrcSpan loc (tcFExport fe)
+       (b, f, gres2) <- setSrcSpanA loc (tcFExport fe)
        return (b `consBag` binds, L loc f : fs, gres1 `unionBags` gres2)
 
 tcFExport :: ForeignDecl GhcRn
@@ -394,7 +394,7 @@ tcFExport fo@(ForeignExport { fd_name = L loc nm, fd_sig_ty = hs_ty, fd_fe = spe
     -- We need to give a name to the new top-level binding that
     -- is *stable* (i.e. the compiler won't change it later),
     -- because this name will be referred to by the C code stub.
-    id  <- mkStableIdFromName nm sig_ty loc mkForeignExportOcc
+    id  <- mkStableIdFromName nm sig_ty (locA loc) mkForeignExportOcc
     return ( mkVarBind id rhs
            , ForeignExport { fd_name = L loc id
                            , fd_sig_ty = undefined
