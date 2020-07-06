@@ -27,9 +27,10 @@ import Data.Data hiding ( Fixity )
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Var
-import GHC.Utils.Outputable
-import GHC.Types.SrcLoc (Located, unLoc, noLoc)
+import GHC.Utils.Outputable hiding ((<>))
+import GHC.Types.SrcLoc (GenLocated(..), unLoc)
 import GHC.Utils.Panic
+import GHC.Parser.Annotation
 
 import Data.Kind
 
@@ -99,7 +100,7 @@ Type. We never build an HsType GhcTc. Why do this? Because we need to be
 able to compare type-checked types for equality, and we don't want to do
 this with HsType.
 
-This causes wrinkles within the AST, where we normally thing that the whole
+This causes wrinkles within the AST, where we normally think that the whole
 AST travels through the GhcPs --> GhcRn --> GhcTc pipeline as one. So we
 have the NoGhcTc type family, which just replaces GhcTc with GhcRn, so that
 user-written types can be preserved (as HsType GhcRn) even in e.g. HsExpr GhcTc.
@@ -170,7 +171,27 @@ noExtCon x = case x of {}
 -- See Note [XRec and SrcSpans in the AST]
 type family XRec p a = r | r -> a
 
-type instance XRec (GhcPass p) a = Located a
+-- type instance XRec (GhcPass p) a = Located a
+type instance XRec (GhcPass p) a = GenLocated (Anno a) a
+
+type family Anno a = b
+
+type instance Anno RdrName = SrcSpanAnnName
+type instance Anno Name    = SrcSpanAnnName
+type instance Anno Id      = SrcSpanAnnName
+
+type IsSrcSpanAnn p a = ( Anno (IdGhcP p) ~ SrcSpanAnn' (ApiAnn' a),
+                          IsPass p)
+
+-- AZ old version -----------------------------------------
+-- | GHC's L prefixed variants wrap their vanilla variant in this type family,
+-- to add 'SrcLoc' info via 'Located'. Other passes than 'GhcPass' not
+-- interested in location information can define this instance as @f p@.
+
+-- type family XRec p (f :: Type -> Type) = r | r -> p f
+-- type instance XRec (GhcPass p) f = LocatedA (f (GhcPass p))
+
+-- AZ old version end  -----------------------------------------
 
 {-
 Note [XRec and SrcSpans in the AST]
@@ -203,20 +224,21 @@ class UnXRec p where
 -- the annotation as is.
 -- See Note [XRec and SrcSpans in the AST]
 class MapXRec p where
-  mapXRec :: (a -> b) -> XRec p a -> XRec p b
+  mapXRec :: (Anno a ~ Anno b) => (a -> b) -> XRec p a -> XRec p b
 
 -- | The trivial wrapper that carries no additional information
 -- @noLoc@ for @GhcPass p@
 -- See Note [XRec and SrcSpans in the AST]
-class WrapXRec p where
+-- class WrapXRec p where
+class WrapXRec p a where
   wrapXRec :: a -> XRec p a
 
 instance UnXRec (GhcPass p) where
   unXRec = unLoc
 instance MapXRec (GhcPass p) where
   mapXRec = fmap
-instance WrapXRec (GhcPass p) where
-  wrapXRec = noLoc
+-- instance WrapXRec (GhcPass p) where
+--   wrapXRec = noLoc
 
 {-
 Note [NoExtCon and strict fields]
@@ -263,6 +285,7 @@ instance Typeable p => Data (GhcPass p) where
   gunfold _ _ _ = panic "instance Data GhcPass"
   toConstr  _   = panic "instance Data GhcPass"
   dataTypeOf _  = panic "instance Data GhcPass"
+
 
 data Pass = Parsed | Renamed | Typechecked
          deriving (Data)
@@ -416,6 +439,11 @@ type family XClassDecl     x
 type family XXTyClDecl     x
 
 -- -------------------------------------
+-- FunDep type families
+type family XCFunDep      x
+type family XXFunDep      x
+
+-- -------------------------------------
 -- TyClGroup type families
 type family XCTyClGroup      x
 type family XXTyClGroup      x
@@ -460,6 +488,11 @@ type family XCFamEqn      x r
 type family XXFamEqn      x r
 
 -- -------------------------------------
+-- TyFamInstDecl type families
+type family XCTyFamInstDecl x
+type family XXTyFamInstDecl x
+
+-- -------------------------------------
 -- ClsInstDecl type families
 type family XCClsInstDecl      x
 type family XXClsInstDecl      x
@@ -478,7 +511,10 @@ type family XXDerivDecl      x
 
 -- -------------------------------------
 -- DerivStrategy type family
-type family XViaStrategy x
+type family XStockStrategy    x
+type family XAnyClassStrategy x
+type family XNewtypeStrategy  x
+type family XViaStrategy      x
 
 -- -------------------------------------
 -- DefaultDecl type families
@@ -527,6 +563,11 @@ type family XXAnnDecl      x
 type family XCRoleAnnotDecl  x
 type family XXRoleAnnotDecl  x
 
+-- -------------------------------------
+-- InjectivityAnn type families
+type family XCInjectivityAnn  x
+type family XXInjectivityAnn  x
+
 -- =====================================================================
 -- Type families for the HsExpr extension points
 
@@ -573,6 +614,7 @@ type family XXExpr          x
 -- -------------------------------------
 -- HsPragE type families
 type family XSCC            x
+type family XTickPragma     x
 type family XXPragE         x
 
 
@@ -820,9 +862,6 @@ type family XIEDoc             x
 type family XIEDocNamed        x
 type family XXIE               x
 
--- -------------------------------------
-
-
 -- =====================================================================
 -- End of Type family definitions
 -- =====================================================================
@@ -832,6 +871,9 @@ type family XXIE               x
 type OutputableBndrId pass =
   ( OutputableBndr (IdGhcP pass)
   , OutputableBndr (IdGhcP (NoGhcTcPass pass))
+  -- AZ: suspect the next two are not necessary
+  , Outputable (GenLocated (Anno (IdGhcP pass)) (IdGhcP pass))
+  , Outputable (GenLocated (Anno (IdGhcP (NoGhcTcPass pass))) (IdGhcP (NoGhcTcPass pass)))
   , IsPass pass
   )
 

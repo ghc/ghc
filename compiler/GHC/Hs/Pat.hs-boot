@@ -10,11 +10,13 @@
 module GHC.Hs.Pat where
 
 import GHC.Utils.Outputable
-import GHC.Hs.Extension ( OutputableBndrId, GhcPass, XRec )
+import GHC.Hs.Extension (OutputableBndrId, GhcPass, XRec )
 import Data.Kind
 
 type role Pat nominal
 data Pat (i :: Type)
 type LPat i = XRec i (Pat i)
 
-instance OutputableBndrId p => Outputable (Pat (GhcPass p))
+instance (OutputableBndrId p) => Outputable (Pat (GhcPass p))
+
+pprLPat :: (OutputableBndrId p) => LPat (GhcPass p) -> SDoc

@@ -1032,6 +1032,182 @@ instance Binary Fingerprint where
   put_ h (Fingerprint w1 w2) = do put_ h w1; put_ h w2
   get  h = do w1 <- get h; w2 <- get h; return (Fingerprint w1 w2)
 
+-- instance Binary FunctionOrData where
+--     put_ bh IsFunction = putByte bh 0
+--     put_ bh IsData     = putByte bh 1
+--     get bh = do
+--         h <- getByte bh
+--         case h of
+--           0 -> return IsFunction
+--           1 -> return IsData
+--           _ -> panic "Binary FunctionOrData"
+
+-- instance Binary TupleSort where
+--     put_ bh BoxedTuple      = putByte bh 0
+--     put_ bh UnboxedTuple    = putByte bh 1
+--     put_ bh ConstraintTuple = putByte bh 2
+--     get bh = do
+--       h <- getByte bh
+--       case h of
+--         0 -> do return BoxedTuple
+--         1 -> do return UnboxedTuple
+--         _ -> do return ConstraintTuple
+
+-- instance Binary Activation where
+--     put_ bh NeverActive = do
+--             putByte bh 0
+--     put_ bh FinalActive = do
+--             putByte bh 1
+--     put_ bh AlwaysActive = do
+--             putByte bh 2
+--     put_ bh (ActiveBefore src aa) = do
+--             putByte bh 3
+--             put_ bh src
+--             put_ bh aa
+--     put_ bh (ActiveAfter src ab) = do
+--             putByte bh 4
+--             put_ bh src
+--             put_ bh ab
+--     get bh = do
+--             h <- getByte bh
+--             case h of
+--               0 -> do return NeverActive
+--               1 -> do return FinalActive
+--               2 -> do return AlwaysActive
+--               3 -> do src <- get bh
+--                       aa <- get bh
+--                       return (ActiveBefore src aa)
+--               _ -> do src <- get bh
+--                       ab <- get bh
+--                       return (ActiveAfter src ab)
+
+-- instance Binary InlinePragma where
+--     put_ bh (InlinePragma s a b c d) = do
+--             put_ bh s
+--             put_ bh a
+--             put_ bh b
+--             put_ bh c
+--             put_ bh d
+
+--     get bh = do
+--            s <- get bh
+--            a <- get bh
+--            b <- get bh
+--            c <- get bh
+--            d <- get bh
+--            return (InlinePragma s a b c d)
+
+-- instance Binary RuleMatchInfo where
+--     put_ bh FunLike = putByte bh 0
+--     put_ bh ConLike = putByte bh 1
+--     get bh = do
+--             h <- getByte bh
+--             if h == 1 then return ConLike
+--                       else return FunLike
+
+-- instance Binary InlineSpec where
+--     put_ bh NoUserInlinePrag = putByte bh 0
+--     put_ bh Inline           = putByte bh 1
+--     put_ bh Inlinable        = putByte bh 2
+--     put_ bh NoInline         = putByte bh 3
+
+--     get bh = do h <- getByte bh
+--                 case h of
+--                   0 -> return NoUserInlinePrag
+--                   1 -> return Inline
+--                   2 -> return Inlinable
+--                   _ -> return NoInline
+
+-- instance Binary RecFlag where
+--     put_ bh Recursive = do
+--             putByte bh 0
+--     put_ bh NonRecursive = do
+--             putByte bh 1
+--     get bh = do
+--             h <- getByte bh
+--             case h of
+--               0 -> do return Recursive
+--               _ -> do return NonRecursive
+
+-- instance Binary OverlapMode where
+--     put_ bh (NoOverlap    s) = putByte bh 0 >> put_ bh s
+--     put_ bh (Overlaps     s) = putByte bh 1 >> put_ bh s
+--     put_ bh (Incoherent   s) = putByte bh 2 >> put_ bh s
+--     put_ bh (Overlapping  s) = putByte bh 3 >> put_ bh s
+--     put_ bh (Overlappable s) = putByte bh 4 >> put_ bh s
+--     get bh = do
+--         h <- getByte bh
+--         case h of
+--             0 -> (get bh) >>= \s -> return $ NoOverlap s
+--             1 -> (get bh) >>= \s -> return $ Overlaps s
+--             2 -> (get bh) >>= \s -> return $ Incoherent s
+--             3 -> (get bh) >>= \s -> return $ Overlapping s
+--             4 -> (get bh) >>= \s -> return $ Overlappable s
+--             _ -> panic ("get OverlapMode" ++ show h)
+
+
+-- instance Binary OverlapFlag where
+--     put_ bh flag = do put_ bh (overlapMode flag)
+--                       put_ bh (isSafeOverlap flag)
+--     get bh = do
+--         h <- get bh
+--         b <- get bh
+--         return OverlapFlag { overlapMode = h, isSafeOverlap = b }
+
+-- instance Binary FixityDirection where
+--     put_ bh InfixL = do
+--             putByte bh 0
+--     put_ bh InfixR = do
+--             putByte bh 1
+--     put_ bh InfixN = do
+--             putByte bh 2
+--     get bh = do
+--             h <- getByte bh
+--             case h of
+--               0 -> do return InfixL
+--               1 -> do return InfixR
+--               _ -> do return InfixN
+
+-- instance Binary Fixity where
+--     put_ bh (Fixity src aa ab) = do
+--             put_ bh src
+--             put_ bh aa
+--             put_ bh ab
+--     get bh = do
+--           src <- get bh
+--           aa <- get bh
+--           ab <- get bh
+--           return (Fixity src aa ab)
+
+-- instance Binary WarningTxt where
+--     put_ bh (WarningTxt s w) = do
+--             putByte bh 0
+--             put_ bh s
+--             put_ bh w
+--     put_ bh (DeprecatedTxt s d) = do
+--             putByte bh 1
+--             put_ bh s
+--             put_ bh d
+
+--     get bh = do
+--             h <- getByte bh
+--             case h of
+--               0 -> do s <- get bh
+--                       w <- get bh
+--                       return (WarningTxt s w)
+--               _ -> do s <- get bh
+--                       d <- get bh
+--                       return (DeprecatedTxt s d)
+
+-- instance Binary StringLiteral where
+--   put_ bh (StringLiteral st fs _) = do
+--             put_ bh st
+--             put_ bh fs
+--   get bh = do
+--             st <- get bh
+--             fs <- get bh
+--             return (StringLiteral st fs Nothing)
+
 instance Binary a => Binary (Located a) where
     put_ bh (L l x) = do
             put_ bh l
