@@ -24,7 +24,7 @@ default ()
 -- Invariant: numbers <= WORD_MAXBOUND use the `NS` constructor
 data Natural
    = NS !Word#
-   | NB !BigNat
+   | NB !BigNat#
 
 instance Eq Natural where
    (==) = naturalEq
@@ -66,17 +66,17 @@ naturalIsPowerOf2# :: Natural -> (# () | Word# #)
 naturalIsPowerOf2# (NS w) = wordIsPowerOf2# w
 naturalIsPowerOf2# (NB w) = bigNatIsPowerOf2# w
 
--- | Create a Natural from a BigNat (respect the invariants)
-naturalFromBigNat :: BigNat -> Natural
-naturalFromBigNat x = case bigNatSize# x of
+-- | Create a Natural from a BigNat# (respect the invariants)
+naturalFromBigNat# :: BigNat# -> Natural
+naturalFromBigNat# x = case bigNatSize# x of
    0# -> naturalZero
    1# -> NS (bigNatIndex# x 0#)
    _  -> NB x
 
--- | Convert a Natural into a BigNat
-naturalToBigNat :: Natural -> BigNat
-naturalToBigNat (NS w)  = bigNatFromWord# w
-naturalToBigNat (NB bn) = bn
+-- | Convert a Natural into a BigNat#
+naturalToBigNat# :: Natural -> BigNat#
+naturalToBigNat# (NS w)  = bigNatFromWord# w
+naturalToBigNat# (NB bn) = bn
 
 -- | Create a Natural from a Word#
 naturalFromWord# :: Word# -> Natural
@@ -95,7 +95,7 @@ naturalFromWord (W# x) = NS x
 
 -- | Create a Natural from a list of Word
 naturalFromWordList :: [Word] -> Natural
-naturalFromWordList xs = naturalFromBigNat (bigNatFromWordList xs)
+naturalFromWordList xs = naturalFromBigNat# (bigNatFromWordList xs)
 
 -- | Convert the lower bits of a Natural into a Word#
 naturalToWord# :: Natural -> Word#
@@ -223,7 +223,7 @@ naturalPopCount (NB x) = bigNatPopCount x
 -- | Right shift for Natural
 naturalShiftR# :: Natural -> Word# -> Natural
 naturalShiftR# (NS x) n = NS (x `shiftRW#` n)
-naturalShiftR# (NB x) n = naturalFromBigNat (x `bigNatShiftR#` n)
+naturalShiftR# (NB x) n = naturalFromBigNat# (x `bigNatShiftR#` n)
 
 -- | Right shift for Natural
 naturalShiftR :: Natural -> Word -> Natural
@@ -255,7 +255,7 @@ naturalAdd (NS x) (NS y) =
 naturalSub :: Natural -> Natural -> (# () | Natural #)
 {-# NOINLINE naturalSub #-}
 naturalSub (NS _) (NB _) = (# () | #)
-naturalSub (NB x) (NS y) = (# | naturalFromBigNat (bigNatSubWordUnsafe# x y) #)
+naturalSub (NB x) (NS y) = (# | naturalFromBigNat# (bigNatSubWordUnsafe# x y) #)
 naturalSub (NS x) (NS y) =
    case subWordC# x y of
       (# l,0# #) -> (# | NS l #)
@@ -263,14 +263,14 @@ naturalSub (NS x) (NS y) =
 naturalSub (NB x) (NB y) =
    case bigNatSub x y of
       (# () | #) -> (# () | #)
-      (# | z  #) -> (# | naturalFromBigNat z #)
+      (# | z  #) -> (# | naturalFromBigNat# z #)
 
 -- | Sub two naturals
 --
 -- Throw an Underflow exception if x < y
 naturalSubThrow :: Natural -> Natural -> Natural
 naturalSubThrow (NS _) (NB _) = raiseUnderflow
-naturalSubThrow (NB x) (NS y) = naturalFromBigNat (bigNatSubWordUnsafe# x y)
+naturalSubThrow (NB x) (NS y) = naturalFromBigNat# (bigNatSubWordUnsafe# x y)
 naturalSubThrow (NS x) (NS y) =
    case subWordC# x y of
       (# l,0# #) -> NS l
@@ -278,7 +278,7 @@ naturalSubThrow (NS x) (NS y) =
 naturalSubThrow (NB x) (NB y) =
    case bigNatSub x y of
       (# () | #) -> raiseUnderflow
-      (# | z  #) -> naturalFromBigNat z
+      (# | z  #) -> naturalFromBigNat# z
 
 -- | Sub two naturals
 --
@@ -288,11 +288,11 @@ naturalSubUnsafe :: Natural -> Natural -> Natural
 {-# NOINLINE naturalSubUnsafe #-}
 naturalSubUnsafe (NS x) (NS y) = NS (minusWord# x y)
 naturalSubUnsafe (NS _) (NB _) = naturalZero
-naturalSubUnsafe (NB x) (NS y) = naturalFromBigNat (bigNatSubWordUnsafe# x y)
+naturalSubUnsafe (NB x) (NS y) = naturalFromBigNat# (bigNatSubWordUnsafe# x y)
 naturalSubUnsafe (NB x) (NB y) =
    case bigNatSub x y of
       (# () | #) -> naturalZero
-      (# | z  #) -> naturalFromBigNat z
+      (# | z  #) -> naturalFromBigNat# z
 
 -- | Multiplication
 naturalMul :: Natural -> Natural -> Natural
@@ -335,11 +335,11 @@ naturalQuotRem# :: Natural -> Natural -> (# Natural, Natural #)
 naturalQuotRem# (NS n) (NS d) = case quotRemWord# n d of
                                  (# q, r #) -> (# NS q, NS r #)
 naturalQuotRem# (NB n) (NS d) = case bigNatQuotRemWord# n d of
-                                 (# q, r #) -> (# naturalFromBigNat q, NS r #)
+                                 (# q, r #) -> (# naturalFromBigNat# q, NS r #)
 naturalQuotRem# (NS n) (NB d) = case bigNatQuotRem# (bigNatFromWord# n) d of
-                                 (# q, r #) -> (# naturalFromBigNat q, naturalFromBigNat r #)
+                                 (# q, r #) -> (# naturalFromBigNat# q, naturalFromBigNat# r #)
 naturalQuotRem# (NB n) (NB d) = case bigNatQuotRem# n d of
-                                 (# q, r #) -> (# naturalFromBigNat q, naturalFromBigNat r #)
+                                 (# q, r #) -> (# naturalFromBigNat# q, naturalFromBigNat# r #)
 
 -- | Return division quotient and remainder
 naturalQuotRem :: Natural -> Natural -> (Natural, Natural)
@@ -352,11 +352,11 @@ naturalQuot :: Natural -> Natural -> Natural
 naturalQuot (NS n) (NS d) = case quotWord# n d of
                              q -> NS q
 naturalQuot (NB n) (NS d) = case bigNatQuotWord# n d of
-                             q -> naturalFromBigNat q
+                             q -> naturalFromBigNat# q
 naturalQuot (NS n) (NB d) = case bigNatQuot (bigNatFromWord# n) d of
-                             q -> naturalFromBigNat q
+                             q -> naturalFromBigNat# q
 naturalQuot (NB n) (NB d) = case bigNatQuot n d of
-                             q -> naturalFromBigNat q
+                             q -> naturalFromBigNat# q
 
 -- | Return division remainder
 naturalRem :: Natural -> Natural -> Natural
@@ -366,21 +366,21 @@ naturalRem (NS n) (NS d) = case remWord# n d of
 naturalRem (NB n) (NS d) = case bigNatRemWord# n d of
                              r -> NS r
 naturalRem (NS n) (NB d) = case bigNatRem (bigNatFromWord# n) d of
-                             r -> naturalFromBigNat r
+                             r -> naturalFromBigNat# r
 naturalRem (NB n) (NB d) = case bigNatRem n d of
-                             r -> naturalFromBigNat r
+                             r -> naturalFromBigNat# r
 
 naturalAnd :: Natural -> Natural -> Natural
 naturalAnd (NS n) (NS m) = NS (n `and#` m)
 naturalAnd (NS n) (NB m) = NS (n `and#` bigNatToWord# m)
 naturalAnd (NB n) (NS m) = NS (bigNatToWord# n `and#` m)
-naturalAnd (NB n) (NB m) = naturalFromBigNat (bigNatAnd n m)
+naturalAnd (NB n) (NB m) = naturalFromBigNat# (bigNatAnd n m)
 
 naturalAndNot :: Natural -> Natural -> Natural
 naturalAndNot (NS n) (NS m) = NS (n `and#` not# m)
 naturalAndNot (NS n) (NB m) = NS (n `and#` not# (bigNatToWord# m))
 naturalAndNot (NB n) (NS m) = NS (bigNatToWord# n `and#` not# m)
-naturalAndNot (NB n) (NB m) = naturalFromBigNat (bigNatAndNot n m)
+naturalAndNot (NB n) (NB m) = naturalFromBigNat# (bigNatAndNot n m)
 
 naturalOr :: Natural -> Natural -> Natural
 naturalOr (NS n) (NS m) = NS (n `or#` m)
@@ -392,7 +392,7 @@ naturalXor :: Natural -> Natural -> Natural
 naturalXor (NS n) (NS m) = NS (n `xor#` m)
 naturalXor (NS n) (NB m) = NB (bigNatXorWord# m n)
 naturalXor (NB n) (NS m) = NB (bigNatXorWord# n m)
-naturalXor (NB n) (NB m) = naturalFromBigNat (bigNatXor n m)
+naturalXor (NB n) (NB m) = naturalFromBigNat# (bigNatXor n m)
 
 naturalTestBit# :: Natural -> Word# -> Bool#
 naturalTestBit# (NS w) i  = (i `ltWord#` WORD_SIZE_IN_BITS##) &&#
@@ -416,7 +416,7 @@ naturalGcd (NS 0##) !y       = y
 naturalGcd x        (NS 0##) = x
 naturalGcd (NS 1##) _        = NS 1##
 naturalGcd _        (NS 1##) = NS 1##
-naturalGcd (NB x)   (NB y)   = naturalFromBigNat (bigNatGcd x y)
+naturalGcd (NB x)   (NB y)   = naturalFromBigNat# (bigNatGcd x y)
 naturalGcd (NB x)   (NS y)   = NS (bigNatGcdWord# x y)
 naturalGcd (NS x)   (NB y)   = NS (bigNatGcdWord# y x)
 naturalGcd (NS x)   (NS y)   = NS (gcdWord# x y)
@@ -427,10 +427,10 @@ naturalLcm (NS 0##) !_       = NS 0##
 naturalLcm _        (NS 0##) = NS 0##
 naturalLcm (NS 1##) y        = y
 naturalLcm x        (NS 1##) = x
-naturalLcm (NS a  ) (NS b  ) = naturalFromBigNat (bigNatLcmWordWord# a b)
-naturalLcm (NB a  ) (NS b  ) = naturalFromBigNat (bigNatLcmWord# a b)
-naturalLcm (NS a  ) (NB b  ) = naturalFromBigNat (bigNatLcmWord# b a)
-naturalLcm (NB a  ) (NB b  ) = naturalFromBigNat (bigNatLcm a b)
+naturalLcm (NS a  ) (NS b  ) = naturalFromBigNat# (bigNatLcmWordWord# a b)
+naturalLcm (NB a  ) (NS b  ) = naturalFromBigNat# (bigNatLcmWord# a b)
+naturalLcm (NS a  ) (NB b  ) = naturalFromBigNat# (bigNatLcmWord# b a)
+naturalLcm (NB a  ) (NB b  ) = naturalFromBigNat# (bigNatLcm a b)
 
 -- | Base 2 logarithm
 naturalLog2# :: Natural -> Word#
@@ -470,12 +470,12 @@ naturalPowMod (NS 0##)   _        _        = NS 0##
 naturalPowMod (NS 1##)   _        _        = NS 1##
 naturalPowMod (NS b)    (NS e)   (NS m)    = NS (powModWord# b e m)
 naturalPowMod b         e        (NS m)    = NS (bigNatPowModWord#
-                                                   (naturalToBigNat b)
-                                                   (naturalToBigNat e)
+                                                   (naturalToBigNat# b)
+                                                   (naturalToBigNat# e)
                                                     m)
-naturalPowMod b         e        (NB m)    = naturalFromBigNat
-                                                (bigNatPowMod (naturalToBigNat b)
-                                                              (naturalToBigNat e)
+naturalPowMod b         e        (NB m)    = naturalFromBigNat#
+                                                (bigNatPowMod (naturalToBigNat# b)
+                                                              (naturalToBigNat# e)
                                                               m)
 
 -- | Compute the number of digits of the Natural in the given base.
@@ -518,7 +518,7 @@ naturalToAddr a addr e = IO \s -> case naturalToAddr# a addr e s of
 naturalFromAddr# :: Word# -> Addr# -> Bool# -> State# s -> (# State# s, Natural #)
 naturalFromAddr# sz addr e s =
    case bigNatFromAddr# sz addr e s of
-      (# s', n #) -> (# s', naturalFromBigNat n #)
+      (# s', n #) -> (# s', naturalFromBigNat# n #)
 
 -- | Read a Natural in base-256 representation from an Addr#.
 --
@@ -554,4 +554,4 @@ naturalToMutableByteArray# (NB a) = bigNatToMutableByteArray# a
 -- Null higher limbs are automatically trimed.
 naturalFromByteArray# :: Word# -> ByteArray# -> Word# -> Bool# -> State# s -> (# State# s, Natural #)
 naturalFromByteArray# sz ba off e s = case bigNatFromByteArray# sz ba off e s of
-   (# s', a #) -> (# s', naturalFromBigNat a #)
+   (# s', a #) -> (# s', naturalFromBigNat# a #)
