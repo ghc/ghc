@@ -27,15 +27,26 @@ ghcConfigProgPath = "test/bin/ghc-config" <.> exe
 checkPprProgPath, checkPprSourcePath :: FilePath
 checkPprProgPath = "test/bin/check-ppr" <.> exe
 checkPprSourcePath = "utils/check-ppr/Main.hs"
+checkPprExtra :: Maybe String
+checkPprExtra = Nothing
+
+checkExactProgPath, checkExactSourcePath :: FilePath
+checkExactProgPath = "test/bin/check-exact" <.> exe
+checkExactSourcePath = "utils/check-exact/Main.hs"
+checkExactExtra :: Maybe String
+checkExactExtra = Just "-iutils/check-exact/src"
 
 checkApiAnnotationsProgPath, checkApiAnnotationsSourcePath :: FilePath
 checkApiAnnotationsProgPath = "test/bin/check-api-annotations" <.> exe
 checkApiAnnotationsSourcePath = "utils/check-api-annotations/Main.hs"
+checkApiAnnotationsExtra :: Maybe String
+checkApiAnnotationsExtra = Nothing
 
-checkPrograms :: [(FilePath, FilePath, Package)]
+checkPrograms :: [(FilePath, FilePath, Maybe String, Package)]
 checkPrograms =
-    [ (checkPprProgPath, checkPprSourcePath, checkPpr)
-    , (checkApiAnnotationsProgPath, checkApiAnnotationsSourcePath, checkApiAnnotations)
+    [ (checkPprProgPath, checkPprSourcePath, checkPprExtra, checkPpr)
+    , (checkExactProgPath, checkExactSourcePath, checkExactExtra, checkExact)
+    , (checkApiAnnotationsProgPath, checkApiAnnotationsSourcePath, checkApiAnnotationsExtra, checkApiAnnotations)
     ]
 
 ghcConfigPath :: FilePath
@@ -53,9 +64,10 @@ testRules = do
         -- Reasons why this is required are not entirely clear.
         cmd ["bash"] ["-c", ghc0Path ++ " " ++ ghcConfigHsPath ++ " -o " ++ (root -/- ghcConfigProgPath)]
 
-    -- Rules for building check-ppr and check-ppr-annotations with the compiler
-    -- we are going to test (in-tree or out-of-tree).
-    forM_ checkPrograms $ \(progPath, sourcePath, progPkg) ->
+    -- Rules for building check-ppr, check-exact and
+    -- check-ppr-annotations with the compiler we are going to test
+    -- (in-tree or out-of-tree).
+    forM_ checkPrograms $ \(progPath, sourcePath, mextra, progPkg) ->
         root -/- progPath %> \path -> do
             need [ sourcePath ]
             testGhc <- testCompiler <$> userSetting defaultTestArgs
@@ -79,6 +91,7 @@ testRules = do
             cmd [bindir </> "ghc" <.> exe] $
                 concatMap (\p -> ["-package", pkgName p]) depsPkgs ++
                 ["-o", top -/- path, top -/- sourcePath] ++
+                (maybe [] (\e -> [e]) mextra) ++
                 -- If GHC is build with debug options, then build check-ppr
                 -- also with debug options.  This allows, e.g., to print debug
                 -- messages of various RTS subsystems while using check-ppr.
@@ -125,7 +138,9 @@ testRules = do
               ]
 
         pythonPath      <- builderPath Python
-        need [ root -/- checkPprProgPath, root -/- checkApiAnnotationsProgPath ]
+        need [ root -/- checkPprProgPath
+             , root -/- checkExactProgPath
+             , root -/- checkApiAnnotationsProgPath ]
 
         -- Set environment variables for test's Makefile.
         -- TODO: Ideally we would define all those env vars in 'env', so that
@@ -141,6 +156,7 @@ testRules = do
             setEnv "TEST_HC_OPTS" ghcFlags
             setEnv "TEST_HC_OPTS_INTERACTIVE" ghciFlags
             setEnv "CHECK_PPR" (top -/- root -/- checkPprProgPath)
+            setEnv "CHECK_EXACT" (top -/- root -/- checkExactProgPath)
             setEnv "CHECK_API_ANNOTATIONS"
                    (top -/- root -/- checkApiAnnotationsProgPath)
 
