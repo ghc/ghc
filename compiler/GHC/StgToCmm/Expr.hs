@@ -36,9 +36,9 @@ import GHC.Cmm.Graph
 import GHC.Cmm.BlockId
 import GHC.Cmm hiding ( succ )
 import GHC.Cmm.Info
+import GHC.Cmm.Utils ( mAX_PTR_TAG )
 import GHC.Core
 import GHC.Core.DataCon
-import GHC.Driver.Session ( mAX_PTR_TAG )
 import GHC.Types.ForeignCall
 import GHC.Types.Id
 import GHC.Builtin.PrimOps
@@ -71,13 +71,13 @@ cgExpr (StgOpApp (StgPrimOp SeqOp) [StgVarArg a, _] _res_ty) =
 -- dataToTag# :: a -> Int#
 -- See Note [dataToTag#] in primops.txt.pp
 cgExpr (StgOpApp (StgPrimOp DataToTagOp) [StgVarArg a] _res_ty) = do
-  dflags <- getDynFlags
   platform <- getPlatform
   emitComment (mkFastString "dataToTag#")
   tmp <- newTemp (bWord platform)
   _ <- withSequel (AssignTo [tmp] False) (cgIdApp a [])
   -- TODO: For small types look at the tag bits instead of reading info table
-  emitReturn [getConstrTag dflags (cmmUntag dflags (CmmReg (CmmLocal tmp)))]
+  ptr_opts <- getPtrOpts
+  emitReturn [getConstrTag ptr_opts (cmmUntag platform (CmmReg (CmmLocal tmp)))]
 
 cgExpr (StgOpApp op args ty) = cgOpApp op args ty
 cgExpr (StgConApp con args _)= cgConApp con args
@@ -564,18 +564,17 @@ cgAlts gc_plan bndr (PrimAlt _) alts
         ; return AssignedDirectly }
 
 cgAlts gc_plan bndr (AlgAlt tycon) alts
-  = do  { dflags <- getDynFlags
-        ; platform <- getPlatform
+  = do  { platform <- getPlatform
 
         ; (mb_deflt, branches) <- cgAlgAltRhss gc_plan bndr alts
 
         ; let !fam_sz   = tyConFamilySize tycon
               !bndr_reg = CmmLocal (idToReg platform bndr)
-              !ptag_expr = cmmConstrTag1 dflags (CmmReg bndr_reg)
+              !ptag_expr = cmmConstrTag1 platform (CmmReg bndr_reg)
               !branches' = first succ <$> branches
-              !maxpt = mAX_PTR_TAG dflags
+              !maxpt = mAX_PTR_TAG platform
               (!via_ptr, !via_info) = partition ((< maxpt) . fst) branches'
-              !small = isSmallFamily dflags fam_sz
+              !small = isSmallFamily platform fam_sz
 
                 -- Is the constructor tag in the node reg?
                 -- See Note [Tagging big families]
@@ -587,8 +586,9 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
            else -- No, the get exact tag from info table when mAX_PTR_TAG
                 -- See Note [Double switching for big families]
               do
-                let !untagged_ptr = cmmUntag dflags (CmmReg bndr_reg)
-                    !itag_expr = getConstrTag dflags untagged_ptr
+                ptr_opts <- getPtrOpts
+                let !untagged_ptr = cmmUntag platform (CmmReg bndr_reg)
+                    !itag_expr = getConstrTag ptr_opts untagged_ptr
                     !info0 = first pred <$> via_info
                 if null via_ptr then
                   emitSwitch itag_expr info0 mb_deflt 0 (fam_sz - 1)
@@ -857,17 +857,17 @@ cgConApp con stg_args
 
 cgIdApp :: Id -> [StgArg] -> FCode ReturnKind
 cgIdApp fun_id args = do
-    dflags         <- getDynFlags
     fun_info       <- getCgIdInfo fun_id
     self_loop_info <- getSelfLoop
+    call_opts      <- getCallOpts
+    profile        <- getProfile
     let fun_arg     = StgVarArg fun_id
         fun_name    = idName    fun_id
         fun         = idInfoToAmode fun_info
         lf_info     = cg_lf         fun_info
         n_args      = length args
         v_args      = length $ filter (isVoidTy . stgArgType) args
-        node_points dflags = nodeMustPointToIt dflags lf_info
-    case getCallMethod dflags fun_name fun_id lf_info n_args v_args (cg_loc fun_info) self_loop_info of
+    case getCallMethod call_opts fun_name fun_id lf_info n_args v_args (cg_loc fun_info) self_loop_info of
             -- A value in WHNF, so we can just return it.
         ReturnIt
           | isVoidTy (idType fun_id) -> emitReturn []
@@ -885,7 +885,7 @@ cgIdApp fun_id args = do
         -- A direct function call (possibly with some left-over arguments)
         DirectEntry lbl arity -> do
                 { tickyDirectCall arity args
-                ; if node_points dflags
+                ; if nodeMustPointToIt profile lf_info
                      then directCall NativeNodeCall   lbl arity (fun_arg:args)
                      else directCall NativeDirectCall lbl arity args }
 
@@ -1006,8 +1006,9 @@ cgIdApp fun_id args = do
 
 emitEnter :: CmmExpr -> FCode ReturnKind
 emitEnter fun = do
-  { dflags <- getDynFlags
+  { ptr_opts <- getPtrOpts
   ; platform <- getPlatform
+  ; profile <- getProfile
   ; adjustHpBackwards
   ; sequel <- getSequel
   ; updfr_off <- getUpdFrameOff
@@ -1021,9 +1022,9 @@ emitEnter fun = do
       -- Right now, we do what the old codegen did, and omit the tag
       -- test, just generating an enter.
       Return -> do
-        { let entry = entryCode platform $ closureInfoPtr dflags $ CmmReg nodeReg
-        ; emit $ mkJump dflags NativeNodeCall entry
-                        [cmmUntag dflags fun] updfr_off
+        { let entry = entryCode platform $ closureInfoPtr ptr_opts $ CmmReg nodeReg
+        ; emit $ mkJump profile NativeNodeCall entry
+                        [cmmUntag platform fun] updfr_off
         ; return AssignedDirectly
         }
 
@@ -1054,21 +1055,21 @@ emitEnter fun = do
       --
       AssignTo res_regs _ -> do
        { lret <- newBlockId
-       ; let (off, _, copyin) = copyInOflow dflags NativeReturn (Young lret) res_regs []
+       ; let (off, _, copyin) = copyInOflow profile NativeReturn (Young lret) res_regs []
        ; lcall <- newBlockId
        ; updfr_off <- getUpdFrameOff
        ; let area = Young lret
-       ; let (outArgs, regs, copyout) = copyOutOflow dflags NativeNodeCall Call area
+       ; let (outArgs, regs, copyout) = copyOutOflow profile NativeNodeCall Call area
                                           [fun] updfr_off []
          -- refer to fun via nodeReg after the copyout, to avoid having
          -- both live simultaneously; this sometimes enables fun to be
          -- inlined in the RHS of the R1 assignment.
-       ; let entry = entryCode platform (closureInfoPtr dflags (CmmReg nodeReg))
+       ; let entry = entryCode platform (closureInfoPtr ptr_opts (CmmReg nodeReg))
              the_call = toCall entry (Just lret) updfr_off off outArgs regs
        ; tscope <- getTickScope
        ; emit $
            copyout <*>
-           mkCbranch (cmmIsTagged dflags (CmmReg nodeReg))
+           mkCbranch (cmmIsTagged platform (CmmReg nodeReg))
                      lret lcall Nothing <*>
            outOfLine lcall (the_call,tscope) <*>
            mkLabel lret tscope <*>

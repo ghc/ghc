@@ -12,6 +12,8 @@ module GHC.ByteCode.InfoTable ( mkITbls ) where
 import GHC.Prelude
 
 import GHC.Platform
+import GHC.Platform.Profile
+
 import GHC.ByteCode.Types
 import GHC.Runtime.Interpreter
 import GHC.Driver.Session
@@ -54,7 +56,7 @@ make_constr_itbls :: HscEnv -> [DataCon] -> IO ItblEnv
 make_constr_itbls hsc_env cons =
   mkItblEnv <$> mapM (uncurry mk_itbl) (zip cons [0..])
  where
-  dflags = hsc_dflags hsc_env
+  profile = targetProfile (hsc_dflags hsc_env)
 
   mk_itbl :: DataCon -> Int -> IO (Name,ItblPtr)
   mk_itbl dcon conNo = do
@@ -63,19 +65,20 @@ make_constr_itbls hsc_env cons =
                     , prim_rep <- typePrimRep (scaledThing arg) ]
 
          (tot_wds, ptr_wds) =
-             mkVirtConstrSizes dflags rep_args
+             mkVirtConstrSizes profile rep_args
 
          ptrs'  = ptr_wds
          nptrs' = tot_wds - ptr_wds
          nptrs_really
-            | ptrs' + nptrs' >= mIN_PAYLOAD_SIZE dflags = nptrs'
-            | otherwise = mIN_PAYLOAD_SIZE dflags - ptrs'
+            | ptrs' + nptrs' >= pc_MIN_PAYLOAD_SIZE constants = nptrs'
+            | otherwise = pc_MIN_PAYLOAD_SIZE constants - ptrs'
 
          descr = dataConIdentity dcon
 
-         platform = targetPlatform dflags
+         platform = profilePlatform profile
+         constants = platformConstants platform
          tables_next_to_code = platformTablesNextToCode platform
 
      r <- iservCmd hsc_env (MkConInfoTable tables_next_to_code ptrs' nptrs_really
-                              conNo (tagForCon dflags dcon) descr)
+                              conNo (tagForCon platform dcon) descr)
      return (getName dcon, ItblPtr r)

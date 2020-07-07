@@ -21,7 +21,9 @@ module GHC.Stg.Lift.Analysis (
   ) where
 
 import GHC.Prelude
+
 import GHC.Platform
+import GHC.Platform.Profile
 
 import GHC.Types.Basic
 import GHC.Types.Demand
@@ -375,7 +377,8 @@ goodToLift dflags top_lvl rec_flag expander pairs scope = decide
   , ("args spill on stack", args_spill_on_stack)
   , ("increases allocation", inc_allocs)
   ] where
-      platform = targetPlatform dflags
+      profile  = targetProfile dflags
+      platform = profilePlatform profile
       decide deciders
         | not (fancy_or deciders)
         = llTrace "stgLiftLams:lifting"
@@ -472,7 +475,7 @@ goodToLift dflags top_lvl rec_flag expander pairs scope = decide
       -- GHC does not currently share closure environments, and we either lift
       -- the entire recursive binding group or none of it.
       closuresSize = sum $ flip map rhss $ \rhs ->
-        closureSize dflags
+        closureSize profile
         . dVarSetElems
         . expander
         . flip dVarSetMinusVarSet bndrs_set
@@ -485,14 +488,14 @@ rhsLambdaBndrs (StgRhsClosure _ _ _ bndrs _) = map binderInfoBndr bndrs
 
 -- | The size in words of a function closure closing over the given 'Id's,
 -- including the header.
-closureSize :: DynFlags -> [Id] -> WordOff
-closureSize dflags ids = words + sTD_HDR_SIZE dflags
+closureSize :: Profile -> [Id] -> WordOff
+closureSize profile ids = words + pc_STD_HDR_SIZE (platformConstants (profilePlatform profile))
   -- We go through sTD_HDR_SIZE rather than fixedHdrSizeW so that we don't
   -- optimise differently when profiling is enabled.
   where
     (words, _, _)
       -- Functions have a StdHeader (as opposed to ThunkHeader).
-      = StgToCmm.Layout.mkVirtHeapOffsets dflags StgToCmm.Layout.StdHeader
+      = StgToCmm.Layout.mkVirtHeapOffsets profile StgToCmm.Layout.StdHeader
       . StgToCmm.Closure.addIdReps
       . StgToCmm.Closure.nonVoidIds
       $ ids

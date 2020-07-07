@@ -197,11 +197,7 @@ module GHC.Driver.Session (
         -- * Compiler configuration suitable for display to the user
         compilerInfo,
 
-#include "GHCConstantsHaskellExports.hs"
-        bLOCK_SIZE_W,
         wordAlignment,
-        tAG_MASK,
-        mAX_PTR_TAG,
 
         unsafeGlobalDynFlags, setUnsafeGlobalDynFlags,
 
@@ -240,6 +236,8 @@ module GHC.Driver.Session (
 import GHC.Prelude
 
 import GHC.Platform
+import GHC.Platform.Ways
+import GHC.Platform.Profile
 import GHC.UniqueSubdir (uniqueSubdir)
 import GHC.Unit.Types
 import GHC.Unit.Parser
@@ -250,7 +248,6 @@ import GHC.Builtin.Names ( mAIN )
 import {-# SOURCE #-} GHC.Unit.State (UnitState, emptyUnitState, UnitDatabase, updateIndefUnitId)
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Flags
-import GHC.Platform.Ways
 import GHC.Driver.Backend
 import GHC.Settings.Config
 import GHC.Utils.CliOption
@@ -288,7 +285,6 @@ import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Except
 
 import Data.Ord
-import Data.Bits
 import Data.Char
 import Data.List
 import Data.Map (Map)
@@ -4837,7 +4833,7 @@ compilerInfo dflags
        -- Whether or not we support the @-this-unit-id@ flag
        ("Uses unit IDs",               "YES"),
        -- Whether or not GHC compiles libraries as dynamic by default
-       ("Dynamic by default",          showBool $ dYNAMIC_BY_DEFAULT dflags),
+       ("Dynamic by default",          showBool $ pc_DYNAMIC_BY_DEFAULT constants),
        -- Whether or not GHC was compiled using -dynamic
        ("GHC Dynamic",                 showBool hostIsDynamic),
        -- Whether or not GHC was compiled using -prof
@@ -4850,16 +4846,12 @@ compilerInfo dflags
   where
     showBool True  = "YES"
     showBool False = "NO"
-    isWindows = platformOS (targetPlatform dflags) == OSMinGW32
+    platform  = targetPlatform dflags
+    constants = platformConstants platform
+    isWindows = platformOS platform == OSMinGW32
     expandDirectories :: FilePath -> Maybe FilePath -> String -> String
     expandDirectories topd mtoold = expandToolDir mtoold . expandTopDir topd
 
--- Produced by deriveConstants
-#include "GHCConstantsHaskellWrappers.hs"
-
-bLOCK_SIZE_W :: DynFlags -> Int
-bLOCK_SIZE_W dflags = bLOCK_SIZE dflags `quot` platformWordSizeInBytes platform
-   where platform = targetPlatform dflags
 
 wordAlignment :: Platform -> Alignment
 wordAlignment platform = alignmentOf (platformWordSizeInBytes platform)
@@ -4867,12 +4859,6 @@ wordAlignment platform = alignmentOf (platformWordSizeInBytes platform)
 -- | Get target profile
 targetProfile :: DynFlags -> Profile
 targetProfile dflags = Profile (targetPlatform dflags) (ways dflags)
-
-tAG_MASK :: DynFlags -> Int
-tAG_MASK dflags = (1 `shiftL` tAG_BITS dflags) - 1
-
-mAX_PTR_TAG :: DynFlags -> Int
-mAX_PTR_TAG = tAG_MASK
 
 {- -----------------------------------------------------------------------------
 Note [DynFlags consistency]
@@ -5014,14 +5000,14 @@ setUnsafeGlobalDynFlags = writeIORef v_unsafeGlobalDynFlags
 -- check if SSE is enabled, we might have x86-64 imply the -msse2
 -- flag.
 
-isSseEnabled :: DynFlags -> Bool
-isSseEnabled dflags = case platformArch (targetPlatform dflags) of
+isSseEnabled :: Platform -> Bool
+isSseEnabled platform = case platformArch platform of
     ArchX86_64 -> True
     ArchX86    -> True
     _          -> False
 
-isSse2Enabled :: DynFlags -> Bool
-isSse2Enabled dflags = case platformArch (targetPlatform dflags) of
+isSse2Enabled :: Platform -> Bool
+isSse2Enabled platform = case platformArch platform of
   -- We Assume  SSE1 and SSE2 operations are available on both
   -- x86 and x86_64. Historically we didn't default to SSE2 and
   -- SSE1 on x86, which results in defacto nondeterminism for how
@@ -5073,7 +5059,7 @@ isBmi2Enabled dflags = case platformArch (targetPlatform dflags) of
 
 -- | Indicate if cost-centre profiling is enabled
 sccProfilingEnabled :: DynFlags -> Bool
-sccProfilingEnabled dflags = ways dflags `hasWay` WayProf
+sccProfilingEnabled dflags = profileIsProfiling (targetProfile dflags)
 
 -- -----------------------------------------------------------------------------
 -- Linker/compiler information

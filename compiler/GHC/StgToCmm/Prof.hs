@@ -26,6 +26,7 @@ module GHC.StgToCmm.Prof (
 import GHC.Prelude
 
 import GHC.Platform
+import GHC.Platform.Profile
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Monad
@@ -67,32 +68,30 @@ mkCCostCentre cc = CmmLabel (mkCCLabel cc)
 mkCCostCentreStack :: CostCentreStack -> CmmLit
 mkCCostCentreStack ccs = CmmLabel (mkCCSLabel ccs)
 
-costCentreFrom :: DynFlags
-               -> CmmExpr         -- A closure pointer
+costCentreFrom :: Platform
+               -> CmmExpr        -- A closure pointer
                -> CmmExpr        -- The cost centre from that closure
-costCentreFrom dflags cl = CmmLoad (cmmOffsetB platform cl (oFFSET_StgHeader_ccs dflags)) (ccsType platform)
-  where platform = targetPlatform dflags
+costCentreFrom platform cl = CmmLoad (cmmOffsetB platform cl (pc_OFFSET_StgHeader_ccs (platformConstants platform))) (ccsType platform)
 
 -- | The profiling header words in a static closure
-staticProfHdr :: DynFlags -> CostCentreStack -> [CmmLit]
-staticProfHdr dflags ccs
-  | sccProfilingEnabled dflags = [mkCCostCentreStack ccs, staticLdvInit platform]
+staticProfHdr :: Profile -> CostCentreStack -> [CmmLit]
+staticProfHdr profile ccs
+  | profileIsProfiling profile = [mkCCostCentreStack ccs, staticLdvInit platform]
   | otherwise                  = []
-  where platform = targetPlatform dflags
+  where platform = profilePlatform profile
 
 -- | Profiling header words in a dynamic closure
-dynProfHdr :: DynFlags -> CmmExpr -> [CmmExpr]
-dynProfHdr dflags ccs
-  | sccProfilingEnabled dflags = [ccs, dynLdvInit dflags]
+dynProfHdr :: Profile -> CmmExpr -> [CmmExpr]
+dynProfHdr profile ccs
+  | profileIsProfiling profile = [ccs, dynLdvInit (profilePlatform profile)]
   | otherwise                  = []
 
 -- | Initialise the profiling field of an update frame
 initUpdFrameProf :: CmmExpr -> FCode ()
 initUpdFrameProf frame
   = ifProfiling $        -- frame->header.prof.ccs = CCCS
-    do dflags <- getDynFlags
-       platform <- getPlatform
-       emitStore (cmmOffset platform frame (oFFSET_StgHeader_ccs dflags)) cccsExpr
+    do platform <- getPlatform
+       emitStore (cmmOffset platform frame (pc_OFFSET_StgHeader_ccs (platformConstants platform))) cccsExpr
         -- frame->header.prof.hp.rs = NULL (or frame-header.prof.hp.ldvw = 0)
         -- is unnecessary because it is not used anyhow.
 
@@ -152,9 +151,9 @@ restoreCurrentCostCentre (Just local_cc)
 profDynAlloc :: SMRep -> CmmExpr -> FCode ()
 profDynAlloc rep ccs
   = ifProfiling $
-    do dflags <- getDynFlags
-       platform <- getPlatform
-       profAlloc (mkIntExpr platform (heapClosureSizeW dflags rep)) ccs
+    do profile <- targetProfile <$> getDynFlags
+       let platform = profilePlatform profile
+       profAlloc (mkIntExpr platform (heapClosureSizeW profile rep)) ccs
 
 -- | Record the allocation of a closure (size is given by a CmmExpr)
 -- The size must be in words, because the allocation counter in a CCS counts
@@ -162,16 +161,16 @@ profDynAlloc rep ccs
 profAlloc :: CmmExpr -> CmmExpr -> FCode ()
 profAlloc words ccs
   = ifProfiling $
-        do dflags <- getDynFlags
-           platform <- getPlatform
-           let alloc_rep = rEP_CostCentreStack_mem_alloc dflags
-           emit (addToMemE alloc_rep
-                       (cmmOffsetB platform ccs (oFFSET_CostCentreStack_mem_alloc dflags))
+        do profile <- targetProfile <$> getDynFlags
+           let platform = profilePlatform profile
+           let alloc_rep = rEP_CostCentreStack_mem_alloc platform
+           emit $ addToMemE alloc_rep
+                       (cmmOffsetB platform ccs (pc_OFFSET_CostCentreStack_mem_alloc (platformConstants platform)))
                        (CmmMachOp (MO_UU_Conv (wordWidth platform) (typeWidth alloc_rep)) $
-                         [CmmMachOp (mo_wordSub platform) [words,
-                                                           mkIntExpr platform (profHdrSize dflags)]]))
-                       -- subtract the "profiling overhead", which is the
-                       -- profiling header in a closure.
+                           -- subtract the "profiling overhead", which is the
+                           -- profiling header in a closure.
+                           [CmmMachOp (mo_wordSub platform) [ words, mkIntExpr platform (profHdrSize profile)]]
+                       )
 
 -- -----------------------------------------------------------------------
 -- Setting the current cost centre on entry to a closure
@@ -179,23 +178,23 @@ profAlloc words ccs
 enterCostCentreThunk :: CmmExpr -> FCode ()
 enterCostCentreThunk closure =
   ifProfiling $ do
-      dflags <- getDynFlags
-      emit $ storeCurCCS (costCentreFrom dflags closure)
+      platform <- getPlatform
+      emit $ storeCurCCS (costCentreFrom platform closure)
 
 enterCostCentreFun :: CostCentreStack -> CmmExpr -> FCode ()
 enterCostCentreFun ccs closure =
   ifProfiling $ do
     if isCurrentCCS ccs
-       then do dflags <- getDynFlags
+       then do platform <- getPlatform
                emitRtsCall rtsUnitId (fsLit "enterFunCCS")
                    [(baseExpr, AddrHint),
-                    (costCentreFrom dflags closure, AddrHint)] False
+                    (costCentreFrom platform closure, AddrHint)] False
        else return () -- top-level function, nothing to do
 
 ifProfiling :: FCode () -> FCode ()
 ifProfiling code
-  = do dflags <- getDynFlags
-       if sccProfilingEnabled dflags
+  = do profile <- targetProfile <$> getDynFlags
+       if profileIsProfiling profile
            then code
            else return ()
 
@@ -206,10 +205,9 @@ ifProfiling code
 initCostCentres :: CollectedCCs -> FCode ()
 -- Emit the declarations
 initCostCentres (local_CCs, singleton_CCSs)
-  = do dflags <- getDynFlags
-       when (sccProfilingEnabled dflags) $
-           do mapM_ emitCostCentreDecl local_CCs
-              mapM_ emitCostCentreStackDecl singleton_CCSs
+  = ifProfiling $ do
+      mapM_ emitCostCentreDecl local_CCs
+      mapM_ emitCostCentreStackDecl singleton_CCSs
 
 
 emitCostCentreDecl :: CostCentre -> FCode ()
@@ -243,11 +241,10 @@ emitCostCentreStackDecl :: CostCentreStack -> FCode ()
 emitCostCentreStackDecl ccs
   = case maybeSingletonCCS ccs of
     Just cc ->
-        do dflags <- getDynFlags
-           platform <- getPlatform
+        do platform <- getPlatform
            let mk_lits cc = zero platform :
                             mkCCostCentre cc :
-                            replicate (sizeof_ccs_words dflags - 2) (zero platform)
+                            replicate (sizeof_ccs_words platform - 2) (zero platform)
                 -- Note: to avoid making any assumptions about how the
                 -- C compiler (that compiles the RTS, in particular) does
                 -- layouts of structs containing long-longs, simply
@@ -261,27 +258,26 @@ zero platform = mkIntCLit platform 0
 zero64 :: CmmLit
 zero64 = CmmInt 0 W64
 
-sizeof_ccs_words :: DynFlags -> Int
-sizeof_ccs_words dflags
+sizeof_ccs_words :: Platform -> Int
+sizeof_ccs_words platform
     -- round up to the next word.
   | ms == 0   = ws
   | otherwise = ws + 1
   where
-   platform = targetPlatform dflags
-   (ws,ms) = sIZEOF_CostCentreStack dflags `divMod` platformWordSizeInBytes platform
+   (ws,ms) = pc_SIZEOF_CostCentreStack (platformConstants platform) `divMod` platformWordSizeInBytes platform
 
 -- ---------------------------------------------------------------------------
 -- Set the current cost centre stack
 
 emitSetCCC :: CostCentre -> Bool -> Bool -> FCode ()
 emitSetCCC cc tick push
- = do dflags <- getDynFlags
-      platform <- getPlatform
-      if not (sccProfilingEnabled dflags)
+ = do profile <- targetProfile <$> getDynFlags
+      let platform = profilePlatform profile
+      if not (profileIsProfiling profile)
           then return ()
           else do tmp <- newTemp (ccsType platform)
                   pushCostCentre tmp cccsExpr cc
-                  when tick $ emit (bumpSccCount dflags (CmmReg (CmmLocal tmp)))
+                  when tick $ emit (bumpSccCount platform (CmmReg (CmmLocal tmp)))
                   when push $ emit (storeCurCCS (CmmReg (CmmLocal tmp)))
 
 pushCostCentre :: LocalReg -> CmmExpr -> CostCentre -> FCode ()
@@ -292,11 +288,10 @@ pushCostCentre result ccs cc
                                 (CmmLit (mkCCostCentre cc), AddrHint)]
         False
 
-bumpSccCount :: DynFlags -> CmmExpr -> CmmAGraph
-bumpSccCount dflags ccs
-  = addToMem (rEP_CostCentreStack_scc_count dflags)
-         (cmmOffsetB platform ccs (oFFSET_CostCentreStack_scc_count dflags)) 1
-  where platform = targetPlatform dflags
+bumpSccCount :: Platform -> CmmExpr -> CmmAGraph
+bumpSccCount platform ccs
+  = addToMem (rEP_CostCentreStack_scc_count platform)
+         (cmmOffsetB platform ccs (pc_OFFSET_CostCentreStack_scc_count (platformConstants platform))) 1
 
 -----------------------------------------------------------------------------
 --
@@ -313,22 +308,20 @@ staticLdvInit = zeroCLit
 --
 -- Initial value of the LDV field in a dynamic closure
 --
-dynLdvInit :: DynFlags -> CmmExpr
-dynLdvInit dflags =     -- (era << LDV_SHIFT) | LDV_STATE_CREATE
+dynLdvInit :: Platform -> CmmExpr
+dynLdvInit platform =     -- (era << LDV_SHIFT) | LDV_STATE_CREATE
   CmmMachOp (mo_wordOr platform) [
-      CmmMachOp (mo_wordShl platform) [loadEra dflags, mkIntExpr platform (lDV_SHIFT dflags)],
-      CmmLit (mkWordCLit platform (iLDV_STATE_CREATE dflags))
+      CmmMachOp (mo_wordShl platform) [loadEra platform, mkIntExpr platform (pc_LDV_SHIFT (platformConstants platform))],
+      CmmLit (mkWordCLit platform (pc_ILDV_STATE_CREATE (platformConstants platform)))
   ]
-  where
-   platform = targetPlatform dflags
 
 --
 -- Initialise the LDV word of a new closure
 --
 ldvRecordCreate :: CmmExpr -> FCode ()
 ldvRecordCreate closure = do
-  dflags <- getDynFlags
-  emit $ mkStore (ldvWord dflags closure) (dynLdvInit dflags)
+  platform <- getPlatform
+  emit $ mkStore (ldvWord platform closure) (dynLdvInit platform)
 
 --
 -- | Called when a closure is entered, marks the closure as having
@@ -337,40 +330,37 @@ ldvRecordCreate closure = do
 --
 ldvEnterClosure :: ClosureInfo -> CmmReg -> FCode ()
 ldvEnterClosure closure_info node_reg = do
-    dflags <- getDynFlags
     platform <- getPlatform
-    let tag = funTag dflags closure_info
+    let tag = funTag platform closure_info
     -- don't forget to subtract node's tag
     ldvEnter (cmmOffsetB platform (CmmReg node_reg) (-tag))
 
 ldvEnter :: CmmExpr -> FCode ()
 -- Argument is a closure pointer
 ldvEnter cl_ptr = do
-    dflags <- getDynFlags
     platform <- getPlatform
-    let -- don't forget to subtract node's tag
-        ldv_wd = ldvWord dflags cl_ptr
+    let constants = platformConstants platform
+        -- don't forget to subtract node's tag
+        ldv_wd = ldvWord platform cl_ptr
         new_ldv_wd = cmmOrWord platform
                         (cmmAndWord platform (CmmLoad ldv_wd (bWord platform))
-                                             (CmmLit (mkWordCLit platform (iLDV_CREATE_MASK dflags))))
-                        (cmmOrWord platform (loadEra dflags) (CmmLit (mkWordCLit platform (iLDV_STATE_USE dflags))))
+                                             (CmmLit (mkWordCLit platform (pc_ILDV_CREATE_MASK constants))))
+                        (cmmOrWord platform (loadEra platform) (CmmLit (mkWordCLit platform (pc_ILDV_STATE_USE constants))))
     ifProfiling $
          -- if (era > 0) {
          --    LDVW((c)) = (LDVW((c)) & LDV_CREATE_MASK) |
          --                era | LDV_STATE_USE }
-        emit =<< mkCmmIfThenElse (CmmMachOp (mo_wordUGt platform) [loadEra dflags, CmmLit (zeroCLit platform)])
+        emit =<< mkCmmIfThenElse (CmmMachOp (mo_wordUGt platform) [loadEra platform, CmmLit (zeroCLit platform)])
                      (mkStore ldv_wd new_ldv_wd)
                      mkNop
 
-loadEra :: DynFlags -> CmmExpr
-loadEra dflags = CmmMachOp (MO_UU_Conv (cIntWidth dflags) (wordWidth platform))
+loadEra :: Platform -> CmmExpr
+loadEra platform = CmmMachOp (MO_UU_Conv (cIntWidth platform) (wordWidth platform))
     [CmmLoad (mkLblExpr (mkRtsCmmDataLabel (fsLit "era")))
-             (cInt dflags)]
-    where platform = targetPlatform dflags
+             (cInt platform)]
 
-ldvWord :: DynFlags -> CmmExpr -> CmmExpr
--- Takes the address of a closure, and returns
+-- | Takes the address of a closure, and returns
 -- the address of the LDV word in the closure
-ldvWord dflags closure_ptr
-    = cmmOffsetB platform closure_ptr (oFFSET_StgHeader_ldvw dflags)
-    where platform = targetPlatform dflags
+ldvWord :: Platform -> CmmExpr -> CmmExpr
+ldvWord platform closure_ptr
+    = cmmOffsetB platform closure_ptr (pc_OFFSET_StgHeader_ldvw (platformConstants platform))

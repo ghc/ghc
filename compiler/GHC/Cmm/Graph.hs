@@ -23,6 +23,8 @@ where
 
 import GHC.Prelude hiding ( (<*>) ) -- avoid importing (<*>)
 
+import GHC.Platform.Profile
+
 import GHC.Cmm.BlockId
 import GHC.Cmm
 import GHC.Cmm.CallConv
@@ -31,7 +33,6 @@ import GHC.Cmm.Switch (SwitchTargets)
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Label
-import GHC.Driver.Session
 import GHC.Data.FastString
 import GHC.Types.ForeignCall
 import GHC.Data.OrdList
@@ -196,28 +197,28 @@ mkStore      :: CmmExpr -> CmmExpr -> CmmAGraph
 mkStore  l r  = mkMiddle $ CmmStore  l r
 
 ---------- Control transfer
-mkJump          :: DynFlags -> Convention -> CmmExpr
+mkJump          :: Profile -> Convention -> CmmExpr
                 -> [CmmExpr]
                 -> UpdFrameOffset
                 -> CmmAGraph
-mkJump dflags conv e actuals updfr_off =
-  lastWithArgs dflags Jump Old conv actuals updfr_off $
+mkJump profile conv e actuals updfr_off =
+  lastWithArgs profile Jump Old conv actuals updfr_off $
     toCall e Nothing updfr_off 0
 
 -- | A jump where the caller says what the live GlobalRegs are.  Used
 -- for low-level hand-written Cmm.
-mkRawJump       :: DynFlags -> CmmExpr -> UpdFrameOffset -> [GlobalReg]
+mkRawJump       :: Profile -> CmmExpr -> UpdFrameOffset -> [GlobalReg]
                 -> CmmAGraph
-mkRawJump dflags e updfr_off vols =
-  lastWithArgs dflags Jump Old NativeNodeCall [] updfr_off $
+mkRawJump profile e updfr_off vols =
+  lastWithArgs profile Jump Old NativeNodeCall [] updfr_off $
     \arg_space _  -> toCall e Nothing updfr_off 0 arg_space vols
 
 
-mkJumpExtra :: DynFlags -> Convention -> CmmExpr -> [CmmExpr]
+mkJumpExtra :: Profile -> Convention -> CmmExpr -> [CmmExpr]
                 -> UpdFrameOffset -> [CmmExpr]
                 -> CmmAGraph
-mkJumpExtra dflags conv e actuals updfr_off extra_stack =
-  lastWithArgsAndExtraStack dflags Jump Old conv actuals updfr_off extra_stack $
+mkJumpExtra profile conv e actuals updfr_off extra_stack =
+  lastWithArgsAndExtraStack profile Jump Old conv actuals updfr_off extra_stack $
     toCall e Nothing updfr_off 0
 
 mkCbranch       :: CmmExpr -> BlockId -> BlockId -> Maybe Bool -> CmmAGraph
@@ -227,42 +228,42 @@ mkCbranch pred ifso ifnot likely =
 mkSwitch        :: CmmExpr -> SwitchTargets -> CmmAGraph
 mkSwitch e tbl   = mkLast $ CmmSwitch e tbl
 
-mkReturn        :: DynFlags -> CmmExpr -> [CmmExpr] -> UpdFrameOffset
+mkReturn        :: Profile -> CmmExpr -> [CmmExpr] -> UpdFrameOffset
                 -> CmmAGraph
-mkReturn dflags e actuals updfr_off =
-  lastWithArgs dflags Ret  Old NativeReturn actuals updfr_off $
+mkReturn profile e actuals updfr_off =
+  lastWithArgs profile Ret  Old NativeReturn actuals updfr_off $
     toCall e Nothing updfr_off 0
 
 mkBranch        :: BlockId -> CmmAGraph
 mkBranch bid     = mkLast (CmmBranch bid)
 
-mkFinalCall   :: DynFlags
+mkFinalCall   :: Profile
               -> CmmExpr -> CCallConv -> [CmmExpr] -> UpdFrameOffset
               -> CmmAGraph
-mkFinalCall dflags f _ actuals updfr_off =
-  lastWithArgs dflags Call Old NativeDirectCall actuals updfr_off $
+mkFinalCall profile f _ actuals updfr_off =
+  lastWithArgs profile Call Old NativeDirectCall actuals updfr_off $
     toCall f Nothing updfr_off 0
 
-mkCallReturnsTo :: DynFlags -> CmmExpr -> Convention -> [CmmExpr]
+mkCallReturnsTo :: Profile -> CmmExpr -> Convention -> [CmmExpr]
                 -> BlockId
                 -> ByteOff
                 -> UpdFrameOffset
                 -> [CmmExpr]
                 -> CmmAGraph
-mkCallReturnsTo dflags f callConv actuals ret_lbl ret_off updfr_off extra_stack = do
-  lastWithArgsAndExtraStack dflags Call (Young ret_lbl) callConv actuals
+mkCallReturnsTo profile f callConv actuals ret_lbl ret_off updfr_off extra_stack = do
+  lastWithArgsAndExtraStack profile Call (Young ret_lbl) callConv actuals
      updfr_off extra_stack $
        toCall f (Just ret_lbl) updfr_off ret_off
 
 -- Like mkCallReturnsTo, but does not push the return address (it is assumed to be
 -- already on the stack).
-mkJumpReturnsTo :: DynFlags -> CmmExpr -> Convention -> [CmmExpr]
+mkJumpReturnsTo :: Profile -> CmmExpr -> Convention -> [CmmExpr]
                 -> BlockId
                 -> ByteOff
                 -> UpdFrameOffset
                 -> CmmAGraph
-mkJumpReturnsTo dflags f callConv actuals ret_lbl ret_off updfr_off  = do
-  lastWithArgs dflags JumpRet (Young ret_lbl) callConv actuals updfr_off $
+mkJumpReturnsTo profile f callConv actuals ret_lbl ret_off updfr_off  = do
+  lastWithArgs profile JumpRet (Young ret_lbl) callConv actuals updfr_off $
        toCall f (Just ret_lbl) updfr_off ret_off
 
 mkUnsafeCall  :: ForeignTarget -> [CmmFormal] -> [CmmActual] -> CmmAGraph
@@ -292,25 +293,25 @@ stackStubExpr w = CmmLit (CmmInt 0 w)
 -- variables in their spill slots.  Therefore, for copying arguments
 -- and results, we provide different functions to pass the arguments
 -- in an overflow area and to pass them in spill slots.
-copyInOflow  :: DynFlags -> Convention -> Area
+copyInOflow  :: Profile -> Convention -> Area
              -> [CmmFormal]
              -> [CmmFormal]
              -> (Int, [GlobalReg], CmmAGraph)
 
-copyInOflow dflags conv area formals extra_stk
+copyInOflow profile conv area formals extra_stk
   = (offset, gregs, catAGraphs $ map mkMiddle nodes)
-  where (offset, gregs, nodes) = copyIn dflags conv area formals extra_stk
+  where (offset, gregs, nodes) = copyIn profile conv area formals extra_stk
 
 -- Return the number of bytes used for copying arguments, as well as the
 -- instructions to copy the arguments.
-copyIn :: DynFlags -> Convention -> Area
+copyIn :: Profile -> Convention -> Area
        -> [CmmFormal]
        -> [CmmFormal]
        -> (ByteOff, [GlobalReg], [CmmNode O O])
-copyIn dflags conv area formals extra_stk
+copyIn profile conv area formals extra_stk
   = (stk_size, [r | (_, RegisterParam r) <- args], map ci (stk_args ++ args))
   where
-    platform = targetPlatform dflags
+    platform = profilePlatform profile
     -- See Note [Width of parameters]
     ci (reg, RegisterParam r@(VanillaReg {})) =
         let local = CmmLocal reg
@@ -346,7 +347,7 @@ copyIn dflags conv area formals extra_stk
 
     (stk_off, stk_args) = assignStack platform init_offset localRegType extra_stk
 
-    (stk_size, args) = assignArgumentsPos dflags stk_off conv
+    (stk_size, args) = assignArgumentsPos profile stk_off conv
                                           localRegType formals
 
 -- Factoring out the common parts of the copyout functions yielded something
@@ -354,7 +355,7 @@ copyIn dflags conv area formals extra_stk
 
 data Transfer = Call | JumpRet | Jump | Ret deriving Eq
 
-copyOutOflow :: DynFlags -> Convention -> Transfer -> Area -> [CmmExpr]
+copyOutOflow :: Profile -> Convention -> Transfer -> Area -> [CmmExpr]
              -> UpdFrameOffset
              -> [CmmExpr] -- extra stack args
              -> (Int, [GlobalReg], CmmAGraph)
@@ -368,10 +369,10 @@ copyOutOflow :: DynFlags -> Convention -> Transfer -> Area -> [CmmExpr]
 -- the info table for return and adjust the offsets of the other
 -- parameters.  If this is a call instruction, we adjust the offsets
 -- of the other parameters.
-copyOutOflow dflags conv transfer area actuals updfr_off extra_stack_stuff
+copyOutOflow profile conv transfer area actuals updfr_off extra_stack_stuff
   = (stk_size, regs, graph)
   where
-    platform = targetPlatform dflags
+    platform = profilePlatform profile
     (regs, graph) = foldr co ([], mkNop) (setRA ++ args ++ stack_params)
 
     -- See Note [Width of parameters]
@@ -419,7 +420,7 @@ copyOutOflow dflags conv transfer area actuals updfr_off extra_stack_stuff
        assignStack platform init_offset (cmmExprType platform) extra_stack_stuff
 
     args :: [(CmmExpr, ParamLocation)]   -- The argument and where to put it
-    (stk_size, args) = assignArgumentsPos dflags extra_stack_off conv
+    (stk_size, args) = assignArgumentsPos profile extra_stack_off conv
                                           (cmmExprType platform) actuals
 
 
@@ -450,29 +451,29 @@ copyOutOflow dflags conv transfer area actuals updfr_off extra_stack_stuff
 -- https://github.com/ghc-proposals/ghc-proposals/pull/74
 
 
-mkCallEntry :: DynFlags -> Convention -> [CmmFormal] -> [CmmFormal]
+mkCallEntry :: Profile -> Convention -> [CmmFormal] -> [CmmFormal]
             -> (Int, [GlobalReg], CmmAGraph)
-mkCallEntry dflags conv formals extra_stk
-  = copyInOflow dflags conv Old formals extra_stk
+mkCallEntry profile conv formals extra_stk
+  = copyInOflow profile conv Old formals extra_stk
 
-lastWithArgs :: DynFlags -> Transfer -> Area -> Convention -> [CmmExpr]
+lastWithArgs :: Profile -> Transfer -> Area -> Convention -> [CmmExpr]
              -> UpdFrameOffset
              -> (ByteOff -> [GlobalReg] -> CmmAGraph)
              -> CmmAGraph
-lastWithArgs dflags transfer area conv actuals updfr_off last =
-  lastWithArgsAndExtraStack dflags transfer area conv actuals
+lastWithArgs profile transfer area conv actuals updfr_off last =
+  lastWithArgsAndExtraStack profile transfer area conv actuals
                             updfr_off noExtraStack last
 
-lastWithArgsAndExtraStack :: DynFlags
+lastWithArgsAndExtraStack :: Profile
              -> Transfer -> Area -> Convention -> [CmmExpr]
              -> UpdFrameOffset -> [CmmExpr]
              -> (ByteOff -> [GlobalReg] -> CmmAGraph)
              -> CmmAGraph
-lastWithArgsAndExtraStack dflags transfer area conv actuals updfr_off
+lastWithArgsAndExtraStack profile transfer area conv actuals updfr_off
                           extra_stack last =
   copies <*> last outArgs regs
  where
-  (outArgs, regs, copies) = copyOutOflow dflags conv transfer area actuals
+  (outArgs, regs, copies) = copyOutOflow profile conv transfer area actuals
                                updfr_off extra_stack
 
 

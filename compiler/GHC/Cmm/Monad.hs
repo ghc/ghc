@@ -11,9 +11,16 @@ module GHC.Cmm.Monad (
     PD(..)
   , liftP
   , failMsgPD
+  , getProfile
+  , getPlatform
+  , getPtrOpts
   ) where
 
 import GHC.Prelude
+
+import GHC.Platform
+import GHC.Platform.Profile
+import GHC.Cmm.Info
 
 import Control.Monad
 
@@ -49,3 +56,18 @@ thenPD :: PD a -> (a -> PD b) -> PD b
 
 instance HasDynFlags PD where
    getDynFlags = PD $ \d s -> POk s d
+
+getProfile :: PD Profile
+getProfile = targetProfile <$> getDynFlags
+
+getPlatform :: PD Platform
+getPlatform = profilePlatform <$> getProfile
+
+getPtrOpts :: PD PtrOpts
+getPtrOpts = do
+   dflags <- getDynFlags
+   profile <- getProfile
+   pure $ PtrOpts
+      { po_profile     = profile
+      , po_align_check = gopt Opt_AlignmentSanitisation dflags
+      }

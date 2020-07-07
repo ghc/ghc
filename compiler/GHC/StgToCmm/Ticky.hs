@@ -103,6 +103,8 @@ module GHC.StgToCmm.Ticky (
 import GHC.Prelude
 
 import GHC.Platform
+import GHC.Platform.Profile
+
 import GHC.StgToCmm.ArgRep    ( slowCallPattern , toArgRep , argRepString )
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Utils
@@ -340,20 +342,20 @@ registerTickyCtr :: CLabel -> FCode ()
 --          ticky_entry_ctrs = & (f_ct);        /* mark it as "registered" */
 --          f_ct.registeredp = 1 }
 registerTickyCtr ctr_lbl = do
-  dflags <- getDynFlags
   platform <- getPlatform
   let
+    constants = platformConstants platform
     -- krc: code generator doesn't handle Not, so we test for Eq 0 instead
     test = CmmMachOp (MO_Eq (wordWidth platform))
               [CmmLoad (CmmLit (cmmLabelOffB ctr_lbl
-                                (oFFSET_StgEntCounter_registeredp dflags))) (bWord platform),
+                                (pc_OFFSET_StgEntCounter_registeredp constants))) (bWord platform),
                zeroExpr platform]
     register_stmts
-      = [ mkStore (CmmLit (cmmLabelOffB ctr_lbl (oFFSET_StgEntCounter_link dflags)))
+      = [ mkStore (CmmLit (cmmLabelOffB ctr_lbl (pc_OFFSET_StgEntCounter_link constants)))
                    (CmmLoad ticky_entry_ctrs (bWord platform))
         , mkStore ticky_entry_ctrs (mkLblExpr ctr_lbl)
         , mkStore (CmmLit (cmmLabelOffB ctr_lbl
-                                (oFFSET_StgEntCounter_registeredp dflags)))
+                                (pc_OFFSET_StgEntCounter_registeredp constants)))
                    (mkIntExpr platform 1) ]
     ticky_entry_ctrs = mkLblExpr (mkRtsCmmDataLabel (fsLit "ticky_entry_ctrs"))
   emit =<< mkCmmIfThen test (catAGraphs register_stmts)
@@ -440,9 +442,9 @@ tickyDynAlloc :: Maybe Id -> SMRep -> LambdaFormInfo -> FCode ()
 --
 -- TODO what else to count while we're here?
 tickyDynAlloc mb_id rep lf = ifTicky $ do
-  dflags <- getDynFlags
-  let platform = targetPlatform dflags
-      bytes = platformWordSizeInBytes platform * heapClosureSizeW dflags rep
+  profile <- getProfile
+  let platform = profilePlatform profile
+      bytes = platformWordSizeInBytes platform * heapClosureSizeW profile rep
 
       countGlobal tot ctr = do
         bumpTickyCounterBy tot bytes
@@ -482,8 +484,7 @@ tickyAllocHeap ::
 -- Must be lazy in the amount of allocation!
 tickyAllocHeap genuine hp
   = ifTicky $
-    do  { dflags <- getDynFlags
-        ; platform <- getPlatform
+    do  { platform <- getPlatform
         ; ticky_ctr <- getTickyCtrLabel
         ; emit $ catAGraphs $
             -- only test hp from within the emit so that the monadic
@@ -492,8 +493,8 @@ tickyAllocHeap genuine hp
           if hp == 0 then []
           else let !bytes = platformWordSizeInBytes platform * hp in [
             -- Bump the allocation total in the closure's StgEntCounter
-            addToMem (rEP_StgEntCounter_allocs dflags)
-                     (CmmLit (cmmLabelOffB ticky_ctr (oFFSET_StgEntCounter_allocs dflags)))
+            addToMem (rEP_StgEntCounter_allocs platform)
+                     (CmmLit (cmmLabelOffB ticky_ctr (pc_OFFSET_StgEntCounter_allocs (platformConstants platform))))
                      bytes,
             -- Bump the global allocation total ALLOC_HEAP_tot
             addToMemLbl (bWord platform)
@@ -576,13 +577,13 @@ bumpTickyCounterByE lbl = bumpTickyLblByE (mkRtsCmmDataLabel lbl)
 
 bumpTickyEntryCount :: CLabel -> FCode ()
 bumpTickyEntryCount lbl = do
-  dflags <- getDynFlags
-  bumpTickyLit (cmmLabelOffB lbl (oFFSET_StgEntCounter_entry_count dflags))
+  platform <- getPlatform
+  bumpTickyLit (cmmLabelOffB lbl (pc_OFFSET_StgEntCounter_entry_count (platformConstants platform)))
 
 bumpTickyAllocd :: CLabel -> Int -> FCode ()
 bumpTickyAllocd lbl bytes = do
-  dflags <- getDynFlags
-  bumpTickyLitBy (cmmLabelOffB lbl (oFFSET_StgEntCounter_allocd dflags)) bytes
+  platform <- getPlatform
+  bumpTickyLitBy (cmmLabelOffB lbl (pc_OFFSET_StgEntCounter_allocd (platformConstants platform))) bytes
 
 bumpTickyLbl :: CLabel -> FCode ()
 bumpTickyLbl lhs = bumpTickyLitBy (cmmLabelOffB lhs 0) 1
@@ -608,9 +609,8 @@ bumpTickyLitByE lhs e = do
 
 bumpHistogram :: FastString -> Int -> FCode ()
 bumpHistogram lbl n = do
-    dflags <- getDynFlags
     platform <- getPlatform
-    let offset = n `min` (tICKY_BIN_COUNT dflags - 1)
+    let offset = n `min` (pc_TICKY_BIN_COUNT (platformConstants platform) - 1)
     emit (addToMem (bWord platform)
            (cmmIndexExpr platform
                 (wordWidth platform)

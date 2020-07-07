@@ -22,8 +22,9 @@ module GHC.StgToCmm.Monad (
         emitOutOfLine, emitAssign, emitStore,
         emitComment, emitTick, emitUnwind,
 
-        getCmm, aGraphToGraph, getPlatform,
+        getCmm, aGraphToGraph, getPlatform, getProfile,
         getCodeR, getCode, getCodeScoped, getHeapUsage,
+        getCallOpts, getPtrOpts,
 
         mkCmmIfThenElse, mkCmmIfThen, mkCmmIfGoto,
         mkCmmIfThenElse', mkCmmIfThen', mkCmmIfGoto',
@@ -62,6 +63,7 @@ module GHC.StgToCmm.Monad (
 import GHC.Prelude hiding( sequence, succ )
 
 import GHC.Platform
+import GHC.Platform.Profile
 import GHC.Cmm
 import GHC.StgToCmm.Closure
 import GHC.Driver.Session
@@ -69,6 +71,7 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Graph as CmmGraph
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
+import GHC.Cmm.Info
 import GHC.Runtime.Heap.Layout
 import GHC.Unit
 import GHC.Types.Id
@@ -471,8 +474,31 @@ withSelfLoop self_loop code = do
 instance HasDynFlags FCode where
     getDynFlags = liftM cgd_dflags getInfoDown
 
+getProfile :: FCode Profile
+getProfile = targetProfile <$> getDynFlags
+
 getPlatform :: FCode Platform
-getPlatform = targetPlatform <$> getDynFlags
+getPlatform = profilePlatform <$> getProfile
+
+getCallOpts :: FCode CallOpts
+getCallOpts = do
+   dflags <- getDynFlags
+   profile <- getProfile
+   pure $ CallOpts
+    { co_profile       = profile
+    , co_loopification = gopt Opt_Loopification dflags
+    , co_ticky         = gopt Opt_Ticky dflags
+    }
+
+getPtrOpts :: FCode PtrOpts
+getPtrOpts = do
+   dflags <- getDynFlags
+   profile <- getProfile
+   pure $ PtrOpts
+      { po_profile     = profile
+      , po_align_check = gopt Opt_AlignmentSanitisation dflags
+      }
+
 
 withInfoDown :: FCode a -> CgInfoDownwards -> FCode a
 withInfoDown (FCode fcode) info_down = FCode $ \_ state -> fcode info_down state
@@ -742,8 +768,8 @@ emitProcWithStackFrame _conv mb_info lbl _stk_args [] blocks False
         }
 emitProcWithStackFrame conv mb_info lbl stk_args args (graph, tscope) True
         -- do layout
-  = do  { dflags <- getDynFlags
-        ; let (offset, live, entry) = mkCallEntry dflags conv args stk_args
+  = do  { profile <- getProfile
+        ; let (offset, live, entry) = mkCallEntry profile conv args stk_args
               graph' = entry CmmGraph.<*> graph
         ; emitProc mb_info lbl live (graph', tscope) offset True
         }
@@ -837,12 +863,12 @@ mkCmmIfThen' e tbranch l = do
 mkCall :: CmmExpr -> (Convention, Convention) -> [CmmFormal] -> [CmmExpr]
        -> UpdFrameOffset -> [CmmExpr] -> FCode CmmAGraph
 mkCall f (callConv, retConv) results actuals updfr_off extra_stack = do
-  dflags <- getDynFlags
-  k      <- newBlockId
-  tscp   <- getTickScope
+  profile <- getProfile
+  k       <- newBlockId
+  tscp    <- getTickScope
   let area = Young k
-      (off, _, copyin) = copyInOflow dflags retConv area results []
-      copyout = mkCallReturnsTo dflags f callConv actuals k off updfr_off extra_stack
+      (off, _, copyin) = copyInOflow profile retConv area results []
+      copyout = mkCallReturnsTo profile f callConv actuals k off updfr_off extra_stack
   return $ catAGraphs [copyout, mkLabel k tscp, copyin]
 
 mkCmmCall :: CmmExpr -> [CmmFormal] -> [CmmExpr] -> UpdFrameOffset

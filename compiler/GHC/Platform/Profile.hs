@@ -2,6 +2,9 @@
 module GHC.Platform.Profile
    ( Profile (..)
    , profileBuildTag
+   , profileConstants
+   , profileIsProfiling
+   , profileWordSizeInBytes
    )
 where
 
@@ -22,6 +25,21 @@ data Profile = Profile
    { profilePlatform :: !Platform  -- ^ Platform
    , profileWays     :: !(Set Way) -- ^ Ways
    }
+
+-- | Get platform constants
+profileConstants :: Profile -> PlatformConstants
+{-# INLINE profileConstants #-}
+profileConstants profile = platformConstants (profilePlatform profile)
+
+-- | Is profiling enabled
+profileIsProfiling :: Profile -> Bool
+{-# INLINE profileIsProfiling #-}
+profileIsProfiling profile = profileWays profile `hasWay` WayProf
+
+-- | Word size in bytes
+profileWordSizeInBytes :: Profile -> Int
+{-# INLINE profileWordSizeInBytes #-}
+profileWordSizeInBytes profile = platformWordSizeInBytes (profilePlatform profile)
 
 -- | Unique build tag for the profile
 profileBuildTag :: Profile -> String

@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE BangPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -19,82 +20,84 @@ module GHC.StgToCmm.CgUtils (
 import GHC.Prelude
 
 import GHC.Platform.Regs
+import GHC.Platform
 import GHC.Cmm
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
-import GHC.Driver.Session
 import GHC.Utils.Outputable
 
 -- -----------------------------------------------------------------------------
 -- Information about global registers
 
-baseRegOffset :: DynFlags -> GlobalReg -> Int
-
-baseRegOffset dflags (VanillaReg 1 _)    = oFFSET_StgRegTable_rR1 dflags
-baseRegOffset dflags (VanillaReg 2 _)    = oFFSET_StgRegTable_rR2 dflags
-baseRegOffset dflags (VanillaReg 3 _)    = oFFSET_StgRegTable_rR3 dflags
-baseRegOffset dflags (VanillaReg 4 _)    = oFFSET_StgRegTable_rR4 dflags
-baseRegOffset dflags (VanillaReg 5 _)    = oFFSET_StgRegTable_rR5 dflags
-baseRegOffset dflags (VanillaReg 6 _)    = oFFSET_StgRegTable_rR6 dflags
-baseRegOffset dflags (VanillaReg 7 _)    = oFFSET_StgRegTable_rR7 dflags
-baseRegOffset dflags (VanillaReg 8 _)    = oFFSET_StgRegTable_rR8 dflags
-baseRegOffset dflags (VanillaReg 9 _)    = oFFSET_StgRegTable_rR9 dflags
-baseRegOffset dflags (VanillaReg 10 _)   = oFFSET_StgRegTable_rR10 dflags
-baseRegOffset _      (VanillaReg n _)    = panic ("Registers above R10 are not supported (tried to use R" ++ show n ++ ")")
-baseRegOffset dflags (FloatReg  1)       = oFFSET_StgRegTable_rF1 dflags
-baseRegOffset dflags (FloatReg  2)       = oFFSET_StgRegTable_rF2 dflags
-baseRegOffset dflags (FloatReg  3)       = oFFSET_StgRegTable_rF3 dflags
-baseRegOffset dflags (FloatReg  4)       = oFFSET_StgRegTable_rF4 dflags
-baseRegOffset dflags (FloatReg  5)       = oFFSET_StgRegTable_rF5 dflags
-baseRegOffset dflags (FloatReg  6)       = oFFSET_StgRegTable_rF6 dflags
-baseRegOffset _      (FloatReg  n)       = panic ("Registers above F6 are not supported (tried to use F" ++ show n ++ ")")
-baseRegOffset dflags (DoubleReg 1)       = oFFSET_StgRegTable_rD1 dflags
-baseRegOffset dflags (DoubleReg 2)       = oFFSET_StgRegTable_rD2 dflags
-baseRegOffset dflags (DoubleReg 3)       = oFFSET_StgRegTable_rD3 dflags
-baseRegOffset dflags (DoubleReg 4)       = oFFSET_StgRegTable_rD4 dflags
-baseRegOffset dflags (DoubleReg 5)       = oFFSET_StgRegTable_rD5 dflags
-baseRegOffset dflags (DoubleReg 6)       = oFFSET_StgRegTable_rD6 dflags
-baseRegOffset _      (DoubleReg n)       = panic ("Registers above D6 are not supported (tried to use D" ++ show n ++ ")")
-baseRegOffset dflags (XmmReg 1)          = oFFSET_StgRegTable_rXMM1 dflags
-baseRegOffset dflags (XmmReg 2)          = oFFSET_StgRegTable_rXMM2 dflags
-baseRegOffset dflags (XmmReg 3)          = oFFSET_StgRegTable_rXMM3 dflags
-baseRegOffset dflags (XmmReg 4)          = oFFSET_StgRegTable_rXMM4 dflags
-baseRegOffset dflags (XmmReg 5)          = oFFSET_StgRegTable_rXMM5 dflags
-baseRegOffset dflags (XmmReg 6)          = oFFSET_StgRegTable_rXMM6 dflags
-baseRegOffset _      (XmmReg n)          = panic ("Registers above XMM6 are not supported (tried to use XMM" ++ show n ++ ")")
-baseRegOffset dflags (YmmReg 1)          = oFFSET_StgRegTable_rYMM1 dflags
-baseRegOffset dflags (YmmReg 2)          = oFFSET_StgRegTable_rYMM2 dflags
-baseRegOffset dflags (YmmReg 3)          = oFFSET_StgRegTable_rYMM3 dflags
-baseRegOffset dflags (YmmReg 4)          = oFFSET_StgRegTable_rYMM4 dflags
-baseRegOffset dflags (YmmReg 5)          = oFFSET_StgRegTable_rYMM5 dflags
-baseRegOffset dflags (YmmReg 6)          = oFFSET_StgRegTable_rYMM6 dflags
-baseRegOffset _      (YmmReg n)          = panic ("Registers above YMM6 are not supported (tried to use YMM" ++ show n ++ ")")
-baseRegOffset dflags (ZmmReg 1)          = oFFSET_StgRegTable_rZMM1 dflags
-baseRegOffset dflags (ZmmReg 2)          = oFFSET_StgRegTable_rZMM2 dflags
-baseRegOffset dflags (ZmmReg 3)          = oFFSET_StgRegTable_rZMM3 dflags
-baseRegOffset dflags (ZmmReg 4)          = oFFSET_StgRegTable_rZMM4 dflags
-baseRegOffset dflags (ZmmReg 5)          = oFFSET_StgRegTable_rZMM5 dflags
-baseRegOffset dflags (ZmmReg 6)          = oFFSET_StgRegTable_rZMM6 dflags
-baseRegOffset _      (ZmmReg n)          = panic ("Registers above ZMM6 are not supported (tried to use ZMM" ++ show n ++ ")")
-baseRegOffset dflags Sp                  = oFFSET_StgRegTable_rSp dflags
-baseRegOffset dflags SpLim               = oFFSET_StgRegTable_rSpLim dflags
-baseRegOffset dflags (LongReg 1)         = oFFSET_StgRegTable_rL1 dflags
-baseRegOffset _      (LongReg n)         = panic ("Registers above L1 are not supported (tried to use L" ++ show n ++ ")")
-baseRegOffset dflags Hp                  = oFFSET_StgRegTable_rHp dflags
-baseRegOffset dflags HpLim               = oFFSET_StgRegTable_rHpLim dflags
-baseRegOffset dflags CCCS                = oFFSET_StgRegTable_rCCCS dflags
-baseRegOffset dflags CurrentTSO          = oFFSET_StgRegTable_rCurrentTSO dflags
-baseRegOffset dflags CurrentNursery      = oFFSET_StgRegTable_rCurrentNursery dflags
-baseRegOffset dflags HpAlloc             = oFFSET_StgRegTable_rHpAlloc dflags
-baseRegOffset dflags EagerBlackholeInfo  = oFFSET_stgEagerBlackholeInfo dflags
-baseRegOffset dflags GCEnter1            = oFFSET_stgGCEnter1 dflags
-baseRegOffset dflags GCFun               = oFFSET_stgGCFun dflags
-baseRegOffset _      BaseReg             = panic "CgUtils.baseRegOffset:BaseReg"
-baseRegOffset _      PicBaseReg          = panic "CgUtils.baseRegOffset:PicBaseReg"
-baseRegOffset _      MachSp              = panic "CgUtils.baseRegOffset:MachSp"
-baseRegOffset _      UnwindReturnReg     = panic "CgUtils.baseRegOffset:UnwindReturnReg"
+baseRegOffset :: Platform -> GlobalReg -> Int
+baseRegOffset platform reg = case reg of
+   VanillaReg 1 _       -> pc_OFFSET_StgRegTable_rR1  constants
+   VanillaReg 2 _       -> pc_OFFSET_StgRegTable_rR2  constants
+   VanillaReg 3 _       -> pc_OFFSET_StgRegTable_rR3  constants
+   VanillaReg 4 _       -> pc_OFFSET_StgRegTable_rR4  constants
+   VanillaReg 5 _       -> pc_OFFSET_StgRegTable_rR5  constants
+   VanillaReg 6 _       -> pc_OFFSET_StgRegTable_rR6  constants
+   VanillaReg 7 _       -> pc_OFFSET_StgRegTable_rR7  constants
+   VanillaReg 8 _       -> pc_OFFSET_StgRegTable_rR8  constants
+   VanillaReg 9 _       -> pc_OFFSET_StgRegTable_rR9  constants
+   VanillaReg 10 _      -> pc_OFFSET_StgRegTable_rR10 constants
+   VanillaReg n _       -> panic ("Registers above R10 are not supported (tried to use R" ++ show n ++ ")")
+   FloatReg  1          -> pc_OFFSET_StgRegTable_rF1 constants
+   FloatReg  2          -> pc_OFFSET_StgRegTable_rF2 constants
+   FloatReg  3          -> pc_OFFSET_StgRegTable_rF3 constants
+   FloatReg  4          -> pc_OFFSET_StgRegTable_rF4 constants
+   FloatReg  5          -> pc_OFFSET_StgRegTable_rF5 constants
+   FloatReg  6          -> pc_OFFSET_StgRegTable_rF6 constants
+   FloatReg  n          -> panic ("Registers above F6 are not supported (tried to use F" ++ show n ++ ")")
+   DoubleReg 1          -> pc_OFFSET_StgRegTable_rD1 constants
+   DoubleReg 2          -> pc_OFFSET_StgRegTable_rD2 constants
+   DoubleReg 3          -> pc_OFFSET_StgRegTable_rD3 constants
+   DoubleReg 4          -> pc_OFFSET_StgRegTable_rD4 constants
+   DoubleReg 5          -> pc_OFFSET_StgRegTable_rD5 constants
+   DoubleReg 6          -> pc_OFFSET_StgRegTable_rD6 constants
+   DoubleReg n          -> panic ("Registers above D6 are not supported (tried to use D" ++ show n ++ ")")
+   XmmReg 1             -> pc_OFFSET_StgRegTable_rXMM1 constants
+   XmmReg 2             -> pc_OFFSET_StgRegTable_rXMM2 constants
+   XmmReg 3             -> pc_OFFSET_StgRegTable_rXMM3 constants
+   XmmReg 4             -> pc_OFFSET_StgRegTable_rXMM4 constants
+   XmmReg 5             -> pc_OFFSET_StgRegTable_rXMM5 constants
+   XmmReg 6             -> pc_OFFSET_StgRegTable_rXMM6 constants
+   XmmReg n             -> panic ("Registers above XMM6 are not supported (tried to use XMM" ++ show n ++ ")")
+   YmmReg 1             -> pc_OFFSET_StgRegTable_rYMM1 constants
+   YmmReg 2             -> pc_OFFSET_StgRegTable_rYMM2 constants
+   YmmReg 3             -> pc_OFFSET_StgRegTable_rYMM3 constants
+   YmmReg 4             -> pc_OFFSET_StgRegTable_rYMM4 constants
+   YmmReg 5             -> pc_OFFSET_StgRegTable_rYMM5 constants
+   YmmReg 6             -> pc_OFFSET_StgRegTable_rYMM6 constants
+   YmmReg n             -> panic ("Registers above YMM6 are not supported (tried to use YMM" ++ show n ++ ")")
+   ZmmReg 1             -> pc_OFFSET_StgRegTable_rZMM1 constants
+   ZmmReg 2             -> pc_OFFSET_StgRegTable_rZMM2 constants
+   ZmmReg 3             -> pc_OFFSET_StgRegTable_rZMM3 constants
+   ZmmReg 4             -> pc_OFFSET_StgRegTable_rZMM4 constants
+   ZmmReg 5             -> pc_OFFSET_StgRegTable_rZMM5 constants
+   ZmmReg 6             -> pc_OFFSET_StgRegTable_rZMM6 constants
+   ZmmReg n             -> panic ("Registers above ZMM6 are not supported (tried to use ZMM" ++ show n ++ ")")
+   Sp                   -> pc_OFFSET_StgRegTable_rSp    constants
+   SpLim                -> pc_OFFSET_StgRegTable_rSpLim constants
+   LongReg 1            -> pc_OFFSET_StgRegTable_rL1    constants
+   LongReg n            -> panic ("Registers above L1 are not supported (tried to use L" ++ show n ++ ")")
+   Hp                   -> pc_OFFSET_StgRegTable_rHp             constants
+   HpLim                -> pc_OFFSET_StgRegTable_rHpLim          constants
+   CCCS                 -> pc_OFFSET_StgRegTable_rCCCS           constants
+   CurrentTSO           -> pc_OFFSET_StgRegTable_rCurrentTSO     constants
+   CurrentNursery       -> pc_OFFSET_StgRegTable_rCurrentNursery constants
+   HpAlloc              -> pc_OFFSET_StgRegTable_rHpAlloc        constants
+   EagerBlackholeInfo   -> pc_OFFSET_stgEagerBlackholeInfo       constants
+   GCEnter1             -> pc_OFFSET_stgGCEnter1                 constants
+   GCFun                -> pc_OFFSET_stgGCFun                    constants
+   BaseReg              -> panic "GHC.StgToCmm.CgUtils.baseRegOffset:BaseReg"
+   PicBaseReg           -> panic "GHC.StgToCmm.CgUtils.baseRegOffset:PicBaseReg"
+   MachSp               -> panic "GHC.StgToCmm.CgUtils.baseRegOffset:MachSp"
+   UnwindReturnReg      -> panic "GHC.StgToCmm.CgUtils.baseRegOffset:UnwindReturnReg"
+ where
+   !constants = platformConstants platform
 
 
 -- -----------------------------------------------------------------------------
@@ -107,40 +110,38 @@ baseRegOffset _      UnwindReturnReg     = panic "CgUtils.baseRegOffset:UnwindRe
 -- to real machine registers or stored as offsets from BaseReg.  Given
 -- a GlobalReg, get_GlobalReg_addr always produces the
 -- register table address for it.
-get_GlobalReg_addr :: DynFlags -> GlobalReg -> CmmExpr
-get_GlobalReg_addr dflags BaseReg = regTableOffset dflags 0
-get_GlobalReg_addr dflags mid
-    = get_Regtable_addr_from_offset dflags (baseRegOffset dflags mid)
+get_GlobalReg_addr :: Platform -> GlobalReg -> CmmExpr
+get_GlobalReg_addr platform BaseReg = regTableOffset platform 0
+get_GlobalReg_addr platform mid
+    = get_Regtable_addr_from_offset platform (baseRegOffset platform mid)
 
 -- Calculate a literal representing an offset into the register table.
 -- Used when we don't have an actual BaseReg to offset from.
-regTableOffset :: DynFlags -> Int -> CmmExpr
-regTableOffset dflags n =
-  CmmLit (CmmLabelOff mkMainCapabilityLabel (oFFSET_Capability_r dflags + n))
+regTableOffset :: Platform -> Int -> CmmExpr
+regTableOffset platform n =
+  CmmLit (CmmLabelOff mkMainCapabilityLabel (pc_OFFSET_Capability_r (platformConstants platform) + n))
 
-get_Regtable_addr_from_offset :: DynFlags -> Int -> CmmExpr
-get_Regtable_addr_from_offset dflags offset =
-    if haveRegBase (targetPlatform dflags)
+get_Regtable_addr_from_offset :: Platform -> Int -> CmmExpr
+get_Regtable_addr_from_offset platform offset =
+    if haveRegBase platform
     then cmmRegOff baseReg offset
-    else regTableOffset dflags offset
+    else regTableOffset platform offset
 
 -- | Fixup global registers so that they assign to locations within the
 -- RegTable if they aren't pinned for the current target.
-fixStgRegisters :: DynFlags -> RawCmmDecl -> RawCmmDecl
+fixStgRegisters :: Platform -> RawCmmDecl -> RawCmmDecl
 fixStgRegisters _ top@(CmmData _ _) = top
 
-fixStgRegisters dflags (CmmProc info lbl live graph) =
-  let graph' = modifyGraph (mapGraphBlocks (fixStgRegBlock dflags)) graph
+fixStgRegisters platform (CmmProc info lbl live graph) =
+  let graph' = modifyGraph (mapGraphBlocks (fixStgRegBlock platform)) graph
   in CmmProc info lbl live graph'
 
-fixStgRegBlock :: DynFlags -> Block CmmNode e x -> Block CmmNode e x
-fixStgRegBlock dflags block = mapBlock (fixStgRegStmt dflags) block
+fixStgRegBlock :: Platform -> Block CmmNode e x -> Block CmmNode e x
+fixStgRegBlock platform block = mapBlock (fixStgRegStmt platform) block
 
-fixStgRegStmt :: DynFlags -> CmmNode e x -> CmmNode e x
-fixStgRegStmt dflags stmt = fixAssign $ mapExpDeep fixExpr stmt
+fixStgRegStmt :: Platform -> CmmNode e x -> CmmNode e x
+fixStgRegStmt platform stmt = fixAssign $ mapExpDeep fixExpr stmt
   where
-    platform = targetPlatform dflags
-
     fixAssign stmt =
       case stmt of
         CmmAssign (CmmGlobal reg) src
@@ -148,7 +149,7 @@ fixStgRegStmt dflags stmt = fixAssign $ mapExpDeep fixExpr stmt
           -- information
           | reg == MachSp -> stmt
           | otherwise ->
-            let baseAddr = get_GlobalReg_addr dflags reg
+            let baseAddr = get_GlobalReg_addr platform reg
             in case reg `elem` activeStgRegs platform of
                 True  -> CmmAssign (CmmGlobal reg) src
                 False -> CmmStore baseAddr src
@@ -167,7 +168,7 @@ fixStgRegStmt dflags stmt = fixAssign $ mapExpDeep fixExpr stmt
             case reg `elem` activeStgRegs platform of
                 True  -> expr
                 False ->
-                    let baseAddr = get_GlobalReg_addr dflags reg
+                    let baseAddr = get_GlobalReg_addr platform reg
                     in case reg of
                         BaseReg -> baseAddr
                         _other  -> CmmLoad baseAddr (globalRegType platform reg)

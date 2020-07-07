@@ -159,8 +159,8 @@ cmmLlvmGen ::RawCmmDecl -> LlvmM ()
 cmmLlvmGen cmm@CmmProc{} = do
 
     -- rewrite assignments to global regs
-    dflags <- getDynFlags
-    let fixed_cmm = {-# SCC "llvm_fix_regs" #-} fixStgRegisters dflags cmm
+    platform <- getPlatform
+    let fixed_cmm = {-# SCC "llvm_fix_regs" #-} fixStgRegisters platform cmm
 
     dumpIfSetLlvm Opt_D_dump_opt_cmm "Optimised Cmm"
       FormatCMM (pprCmmGroup [fixed_cmm])
