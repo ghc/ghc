@@ -19,13 +19,15 @@ import GHC.ByteCode.Instr
 import GHC.ByteCode.Asm
 import GHC.ByteCode.Types
 
+import GHC.Platform
+import GHC.Platform.Profile
+
 import GHC.Runtime.Interpreter
 import GHCi.FFI
 import GHCi.RemoteTypes
 import GHC.Types.Basic
 import GHC.Driver.Session
 import GHC.Utils.Outputable
-import GHC.Platform
 import GHC.Types.Name
 import GHC.Types.Id.Make
 import GHC.Types.Id
@@ -240,7 +242,7 @@ ppBCEnv p
 -- Create a BCO and do a spot of peephole optimisation on the insns
 -- at the same time.
 mkProtoBCO
-   :: DynFlags
+   :: Platform
    -> name
    -> BCInstrList
    -> Either  [AnnAlt Id DVarSet] (AnnExpr Id DVarSet)
@@ -251,7 +253,7 @@ mkProtoBCO
    -> Bool      -- True <=> is a return point, rather than a function
    -> [FFIInfo]
    -> ProtoBCO name
-mkProtoBCO dflags nm instrs_ordlist origin arity bitmap_size bitmap is_ret ffis
+mkProtoBCO platform nm instrs_ordlist origin arity bitmap_size bitmap is_ret ffis
    = ProtoBCO {
         protoBCOName = nm,
         protoBCOInstrs = maybe_with_stack_check,
@@ -270,7 +272,7 @@ mkProtoBCO dflags nm instrs_ordlist origin arity bitmap_size bitmap is_ret ffis
         -- (hopefully rare) cases when the (overestimated) stack use
         -- exceeds iNTERP_STACK_CHECK_THRESH.
         maybe_with_stack_check
-           | is_ret && stack_usage < fromIntegral (aP_STACK_SPLIM dflags) = peep_d
+           | is_ret && stack_usage < fromIntegral (pc_AP_STACK_SPLIM (platformConstants platform)) = peep_d
                 -- don't do stack checks at return points,
                 -- everything is aggregated up to the top BCO
                 -- (which must be a function).
@@ -311,7 +313,7 @@ schemeTopBind :: (Id, AnnExpr Id DVarSet) -> BcM (ProtoBCO Name)
 schemeTopBind (id, rhs)
   | Just data_con <- isDataConWorkId_maybe id,
     isNullaryRepDataCon data_con = do
-    dflags <- getDynFlags
+    platform <- profilePlatform <$> getProfile
         -- Special case for the worker of a nullary data con.
         -- It'll look like this:        Nil = /\a -> Nil a
         -- If we feed it into schemeR, we'll get
@@ -320,7 +322,7 @@ schemeTopBind (id, rhs)
         -- by just re-using the single top-level definition.  So
         -- for the worker itself, we must allocate it directly.
     -- ioToBc (putStrLn $ "top level BCO")
-    emitBc (mkProtoBCO dflags (getName id) (toOL [PACK data_con 0, ENTER])
+    emitBc (mkProtoBCO platform (getName id) (toOL [PACK data_con 0, ENTER])
                        (Right rhs) 0 0 [{-no bitmap-}] False{-not alts-})
 
   | otherwise
@@ -379,9 +381,9 @@ schemeR_wrk
     -> BcM (ProtoBCO Name)
 schemeR_wrk fvs nm original_body (args, body)
    = do
-     dflags <- getDynFlags
+     profile <- getProfile
      let
-         platform  = targetPlatform dflags
+         platform  = profilePlatform profile
          all_args  = reverse args ++ fvs
          arity     = length all_args
          -- all_args are the args in reverse order.  We're compiling a function
@@ -400,7 +402,7 @@ schemeR_wrk fvs nm original_body (args, body)
          bitmap = mkBitmap platform bits
      body_code <- schemeER_wrk sum_szsb_args p_init body
 
-     emitBc (mkProtoBCO dflags nm body_code (Right original_body)
+     emitBc (mkProtoBCO platform nm body_code (Right original_body)
                  arity bitmap_size bitmap False{-not alts-})
 
 -- introduce break instructions for ticked expressions
@@ -410,8 +412,7 @@ schemeER_wrk d p rhs
   = do  code <- schemeE d 0 p newRhs
         cc_arr <- getCCArray
         this_mod <- moduleName <$> getCurrentModule
-        dflags <- getDynFlags
-        let platform = targetPlatform dflags
+        platform <- profilePlatform <$> getProfile
         let idOffSets = getVarOffSets platform d p fvs
         let breakInfo = CgBreakInfo
                         { cgb_vars = idOffSets
@@ -878,8 +879,8 @@ mkConAppCode orig_d _ p con args_r_to_l =
     ASSERT( args_r_to_l `lengthIs` dataConRepArity con ) app_code
   where
     app_code = do
-        dflags <- getDynFlags
-        let platform = targetPlatform dflags
+        profile <- getProfile
+        let platform = profilePlatform profile
 
         -- The args are initially in reverse order, but mkVirtHeapOffsets
         -- expects them to be left-to-right.
@@ -890,7 +891,7 @@ mkConAppCode orig_d _ p con args_r_to_l =
                 , not (isVoidRep prim_rep)
                 ]
             (_, _, args_offsets) =
-                mkVirtHeapOffsetsWithPadding dflags StdHeader non_voids
+                mkVirtHeapOffsetsWithPadding profile StdHeader non_voids
 
             do_pushery !d (arg : args) = do
                 (push, arg_bytes) <- case arg of
@@ -999,10 +1000,11 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
 
   | otherwise
   = do
-     dflags <- getDynFlags
+     profile <- getProfile
      hsc_env <- getHscEnv
      let
-        platform = targetPlatform dflags
+        platform = profilePlatform profile
+
         profiling
           | Just interp <- hsc_interp hsc_env
           = interpreterProfiled interp
@@ -1063,7 +1065,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
            -- algebraic alt with some binders
            | otherwise =
              let (tot_wds, _ptrs_wds, args_offsets) =
-                     mkVirtHeapOffsets dflags NoHeader
+                     mkVirtHeapOffsets profile NoHeader
                          [ NonVoid (bcIdPrimRep id, id)
                          | NonVoid id <- nonVoidIds real_bndrs
                          ]
@@ -1138,7 +1140,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
 
      let
          alt_bco_name = getName bndr
-         alt_bco = mkProtoBCO dflags alt_bco_name alt_final (Left alts)
+         alt_bco = mkProtoBCO platform alt_bco_name alt_final (Left alts)
                        0{-no arity-} bitmap_size bitmap True{-is alts-}
 --     trace ("case: bndr = " ++ showSDocDebug (ppr bndr) ++ "\ndepth = " ++ show d ++ "\nenv = \n" ++ showSDocDebug (ppBCEnv p) ++
 --            "\n      bitmap = " ++ show bitmap) $ do
@@ -1172,10 +1174,10 @@ generateCCall
     -> BcM BCInstrList
 generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
  = do
-     dflags <- getDynFlags
+     profile <- getProfile
 
      let
-         platform = targetPlatform dflags
+         platform = profilePlatform profile
          -- useful constants
          addr_size_b :: ByteOff
          addr_size_b = wordSize platform
@@ -1197,17 +1199,17 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
                     Just t
                      | t == arrayPrimTyCon || t == mutableArrayPrimTyCon
                        -> do rest <- pargs (d + addr_size_b) az
-                             code <- parg_ArrayishRep (fromIntegral (arrPtrsHdrSize dflags)) d p a
+                             code <- parg_ArrayishRep (fromIntegral (arrPtrsHdrSize profile)) d p a
                              return ((code,AddrRep):rest)
 
                      | t == smallArrayPrimTyCon || t == smallMutableArrayPrimTyCon
                        -> do rest <- pargs (d + addr_size_b) az
-                             code <- parg_ArrayishRep (fromIntegral (smallArrPtrsHdrSize dflags)) d p a
+                             code <- parg_ArrayishRep (fromIntegral (smallArrPtrsHdrSize profile)) d p a
                              return ((code,AddrRep):rest)
 
                      | t == byteArrayPrimTyCon || t == mutableByteArrayPrimTyCon
                        -> do rest <- pargs (d + addr_size_b) az
-                             code <- parg_ArrayishRep (fromIntegral (arrWordsHdrSize dflags)) d p a
+                             code <- parg_ArrayishRep (fromIntegral (arrWordsHdrSize profile)) d p a
                              return ((code,AddrRep):rest)
 
                     -- Default case: push taggedly, but otherwise intact.
@@ -2014,6 +2016,9 @@ instance HasDynFlags BcM where
 
 getHscEnv :: BcM HscEnv
 getHscEnv = BcM $ \st -> return (st, bcm_hsc_env st)
+
+getProfile :: BcM Profile
+getProfile = targetProfile <$> getDynFlags
 
 emitBc :: ([FFIInfo] -> ProtoBCO Name) -> BcM (ProtoBCO Name)
 emitBc bco
