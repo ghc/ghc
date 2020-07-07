@@ -353,8 +353,7 @@ by saying ``-fno-wombat``.
     Make dictionaries strict.
 
 .. ghc-flag:: -fdmd-tx-dict-sel
-    :shortdesc: Use a special demand transformer for dictionary selectors.
-        Always enabled by default.
+    :shortdesc: *(deprecated)* Use a special demand transformer for dictionary selectors.
     :type: dynamic
     :reverse: -fno-dmd-tx-dict-sel
     :category:
@@ -362,6 +361,7 @@ by saying ``-fno-wombat``.
     :default: on
 
     Use a special demand transformer for dictionary selectors.
+    Behaviour is unconditionally enabled starting with 8.14
 
 .. ghc-flag:: -fdo-eta-reduction
     :shortdesc: Enable eta-reduction. Implied by :ghc-flag:`-O`.
