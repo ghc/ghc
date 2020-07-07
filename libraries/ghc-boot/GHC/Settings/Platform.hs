@@ -26,8 +26,11 @@ import qualified Data.Map as Map
 -- parts of settings file
 
 getTargetPlatform
-  :: FilePath -> RawSettings -> Either String Platform
-getTargetPlatform settingsFile mySettings = do
+  :: FilePath     -- ^ Settings filepath (for error messages)
+  -> RawSettings  -- ^ Raw settings file contents
+  -> PlatformConstants -- ^ Platform constants
+  -> Either String Platform
+getTargetPlatform settingsFile mySettings constants = do
   let
     getBooleanSetting = getBooleanSetting0 settingsFile mySettings
     readSetting :: (Show a, Read a) => String -> Either String a
@@ -59,6 +62,7 @@ getTargetPlatform settingsFile mySettings = do
     , platformIsCrossCompiling = crossCompiling
     , platformLeadingUnderscore = targetLeadingUnderscore
     , platformTablesNextToCode  = tablesNextToCode
+    , platformConstants = constants
     }
 
 -----------------------------------------------------------------------------
