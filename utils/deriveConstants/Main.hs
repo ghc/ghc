@@ -873,8 +873,10 @@ getWanted verbose os tmpdir gccProgram gccFlags nmProgram mobjdumpProgram
 writeHaskellType :: FilePath -> [What Fst] -> IO ()
 writeHaskellType fn ws = writeFile fn xs
     where xs = unlines [header, body, footer]
-          header = "data PlatformConstants = PlatformConstants {"
-          footer = "  } deriving Read"
+          header = "module GHC.Platform.Constants where\n\n\
+                   \import Prelude\n\n\
+                   \data PlatformConstants = PlatformConstants {"
+          footer = "  } deriving (Show,Read,Eq)"
           body = intercalate ",\n" (concatMap doWhat ws)
 
           doWhat (GetClosureSize name _) = ["      pc_" ++ name ++ " :: Int"]
@@ -909,16 +911,17 @@ writeHaskellWrappers :: FilePath -> [What Fst] -> IO ()
 writeHaskellWrappers fn ws = writeFile fn xs
     where xs = unlines body
           body = concatMap doWhat ws
+          constants = " (platformConstants (targetPlatform dflags))"
           doWhat (GetFieldType {}) = []
           doWhat (GetClosureSize {}) = []
           doWhat (GetWord name _) = [haskellise name ++ " :: DynFlags -> Int",
-                                    haskellise name ++ " dflags = pc_" ++ name ++ " (platformConstants dflags)"]
+                                    haskellise name ++ " dflags = pc_" ++ name ++ constants]
           doWhat (GetInt name _) = [haskellise name ++ " :: DynFlags -> Int",
-                                   haskellise name ++ " dflags = pc_" ++ name ++ " (platformConstants dflags)"]
+                                   haskellise name ++ " dflags = pc_" ++ name ++ constants]
           doWhat (GetNatural name _) = [haskellise name ++ " :: DynFlags -> Integer",
-                                        haskellise name ++ " dflags = pc_" ++ name ++ " (platformConstants dflags)"]
+                                        haskellise name ++ " dflags = pc_" ++ name ++ constants]
           doWhat (GetBool name _) = [haskellise name ++ " :: DynFlags -> Bool",
-                                     haskellise name ++ " dflags = pc_" ++ name ++ " (platformConstants dflags)"]
+                                     haskellise name ++ " dflags = pc_" ++ name ++ constants]
           doWhat (StructFieldMacro {}) = []
           doWhat (ClosureFieldMacro {}) = []
           doWhat (ClosurePayloadMacro {}) = []

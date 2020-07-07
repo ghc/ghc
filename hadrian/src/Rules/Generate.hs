@@ -119,6 +119,7 @@ generatePackageCode context@(Context stage pkg _) = do
         when (pkg == ghcBoot) $ do
             root -/- "**" -/- dir -/- "GHC/Version.hs" %> go generateVersionHs
             root -/- "**" -/- dir -/- "GHC/Platform/Host.hs" %> go generatePlatformHostHs
+            root -/- "**" -/- dir -/- "GHC/Platform/Constants.hs" %> genPlatformConstantsType context
 
     when (pkg == compiler) $ do
         root -/- primopsTxt stage %> \file -> do
@@ -144,6 +145,11 @@ genPrimopCode context@(Context stage _pkg _) file = do
     root <- buildRoot
     need [root -/- primopsTxt stage]
     build $ target context GenPrimopCode [root -/- primopsTxt stage] [file]
+
+genPlatformConstantsType :: Context -> FilePath -> Action ()
+genPlatformConstantsType context file = do
+    withTempDir $ \tmpdir ->
+      build $ target context DeriveConstants [] [file,"--gen-haskell-type",tmpdir]
 
 copyRules :: Rules ()
 copyRules = do
