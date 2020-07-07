@@ -464,7 +464,6 @@ data DynFlags = DynFlags {
   targetPlatform    :: Platform,       -- Filled in by SysTools
   toolSettings      :: {-# UNPACK #-} !ToolSettings,
   platformMisc      :: {-# UNPACK #-} !PlatformMisc,
-  platformConstants :: PlatformConstants,
   rawSettings       :: [(String, String)],
 
   llvmConfig            :: LlvmConfig,
@@ -911,7 +910,7 @@ settings dflags = Settings
   , sTargetPlatform = targetPlatform dflags
   , sToolSettings = toolSettings dflags
   , sPlatformMisc = platformMisc dflags
-  , sPlatformConstants = platformConstants dflags
+  , sPlatformConstants = platformConstants (targetPlatform dflags)
   , sRawSettings = rawSettings dflags
   }
 
@@ -1331,7 +1330,6 @@ defaultDynFlags mySettings llvmConfig =
         toolSettings = sToolSettings mySettings,
         targetPlatform = sTargetPlatform mySettings,
         platformMisc = sPlatformMisc mySettings,
-        platformConstants = sPlatformConstants mySettings,
         rawSettings = sRawSettings mySettings,
 
         -- See Note [LLVM configuration].

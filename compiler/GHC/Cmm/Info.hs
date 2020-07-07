@@ -551,7 +551,7 @@ funInfoArity dflags iptr
     | otherwise        = ( pc_REP_StgFunInfoExtraFwd_arity pc
                          , oFFSET_StgFunInfoExtraFwd_arity dflags )
 
-   pc = platformConstants dflags
+   pc = platformConstants platform
 
 -----------------------------------------------------------------------------
 --

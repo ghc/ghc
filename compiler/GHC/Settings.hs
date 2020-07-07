@@ -6,7 +6,6 @@ module GHC.Settings
   , ToolSettings (..)
   , FileSettings (..)
   , GhcNameVersion (..)
-  , PlatformConstants (..)
   , Platform (..)
   , PlatformMisc (..)
   , PlatformMini (..)
@@ -157,10 +156,6 @@ data GhcNameVersion = GhcNameVersion
   { ghcNameVersion_programName    :: String
   , ghcNameVersion_projectVersion :: String
   }
-
--- Produced by deriveConstants
--- Provides PlatformConstants datatype
-#include "GHCConstantsHaskellType.hs"
 
 -----------------------------------------------------------------------------
 -- Accessessors from 'Settings'

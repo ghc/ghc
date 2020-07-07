@@ -5,6 +5,7 @@
 module GHC.Platform
    ( PlatformMini(..)
    , PlatformWordSize(..)
+   , PlatformConstants(..)
    , Platform(..)
    , platformArch
    , platformOS
@@ -39,6 +40,7 @@ where
 import Prelude -- See Note [Why do we import Prelude here?]
 import GHC.Read
 import GHC.ByteOrder (ByteOrder(..))
+import GHC.Platform.Constants
 import Data.Word
 import Data.Int
 
@@ -68,6 +70,8 @@ data Platform = Platform
       -- ^ Determines whether we will be compiling info tables that reside just
       --   before the entry code, or with an indirection to the entry code. See
       --   TABLES_NEXT_TO_CODE in includes/rts/storage/InfoTables.h.
+   , platformConstants                :: !PlatformConstants
+      -- ^ Constants such as structure offsets, type sizes, etc.
    }
    deriving (Read, Show, Eq)
 
