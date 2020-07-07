@@ -24,7 +24,7 @@ import GHC.Types.Unique.Supply ( mkSplitUniqSupply )
 
 import GHC.Driver.Finder    ( mkStubPaths )
 import GHC.Driver.Backend
-import GHC.CmmToC           ( writeC )
+import GHC.CmmToC           ( cmmToC )
 import GHC.Cmm.Lint         ( cmmLint )
 import GHC.Cmm              ( RawCmmGroup )
 import GHC.Cmm.CLabel
@@ -146,7 +146,9 @@ outputC dflags filenm cmm_stream packages
          doOutput filenm $ \ h -> do
             hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
             hPutStr h cc_injects
-            Stream.consume cmm_stream (writeC dflags h)
+            let platform = targetPlatform dflags
+                writeC = printForC dflags h . cmmToC platform
+            Stream.consume cmm_stream writeC
 
 {-
 ************************************************************************

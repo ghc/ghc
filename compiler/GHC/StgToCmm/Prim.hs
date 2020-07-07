@@ -27,6 +27,9 @@ module GHC.StgToCmm.Prim (
 
 import GHC.Prelude hiding ((<*>))
 
+import GHC.Platform
+import GHC.Platform.Profile
+
 import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Foreign
 import GHC.StgToCmm.Env
@@ -38,7 +41,6 @@ import GHC.StgToCmm.Prof ( costCentreFrom )
 
 import GHC.Driver.Session
 import GHC.Driver.Backend
-import GHC.Platform
 import GHC.Types.Basic
 import GHC.Cmm.BlockId
 import GHC.Cmm.Graph
@@ -165,11 +167,11 @@ emitPrimOp dflags primop = case primop of
   NewArrayOp -> \case
     [(CmmLit (CmmInt n w)), init]
       | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
-      -> opIntoRegs $ \[res] -> doNewArrayOp res (arrPtrsRep dflags (fromInteger n)) mkMAP_DIRTY_infoLabel
+      -> opIntoRegs $ \[res] -> doNewArrayOp res (arrPtrsRep platform (fromInteger n)) mkMAP_DIRTY_infoLabel
         [ (mkIntExpr platform (fromInteger n),
-           fixedHdrSize dflags + oFFSET_StgMutArrPtrs_ptrs dflags)
-        , (mkIntExpr platform (nonHdrSizeW (arrPtrsRep dflags (fromInteger n))),
-           fixedHdrSize dflags + oFFSET_StgMutArrPtrs_size dflags)
+           fixedHdrSize profile + pc_OFFSET_StgMutArrPtrs_ptrs (platformConstants platform))
+        , (mkIntExpr platform (nonHdrSizeW (arrPtrsRep platform (fromInteger n))),
+           fixedHdrSize profile + pc_OFFSET_StgMutArrPtrs_size (platformConstants platform))
         ]
         (fromInteger n) init
     _ -> PrimopCmmEmit_External
@@ -224,7 +226,7 @@ emitPrimOp dflags primop = case primop of
       -> opIntoRegs $ \ [res] ->
         doNewArrayOp res (smallArrPtrsRep (fromInteger n)) mkSMAP_DIRTY_infoLabel
         [ (mkIntExpr platform (fromInteger n),
-           fixedHdrSize dflags + oFFSET_StgSmallMutArrPtrs_ptrs dflags)
+           fixedHdrSize profile + pc_OFFSET_StgSmallMutArrPtrs_ptrs (platformConstants platform))
         ]
         (fromInteger n) init
     _ -> PrimopCmmEmit_External
@@ -288,7 +290,7 @@ emitPrimOp dflags primop = case primop of
   GetCCSOfOp -> \[arg] -> opIntoRegs $ \[res] -> do
     let
       val
-       | sccProfilingEnabled dflags = costCentreFrom dflags (cmmUntag dflags arg)
+       | profileIsProfiling profile = costCentreFrom platform (cmmUntag platform arg)
        | otherwise                  = CmmLit (zeroCLit platform)
     emitAssign (CmmLocal res) val
 
@@ -299,11 +301,11 @@ emitPrimOp dflags primop = case primop of
     emitAssign (CmmLocal res) currentTSOExpr
 
   ReadMutVarOp -> \[mutv] -> opIntoRegs $ \[res] -> do
-    emitAssign (CmmLocal res) (cmmLoadIndexW platform mutv (fixedHdrSizeW dflags) (gcWord platform))
+    emitAssign (CmmLocal res) (cmmLoadIndexW platform mutv (fixedHdrSizeW profile) (gcWord platform))
 
   WriteMutVarOp -> \[mutv, var] -> opIntoRegs $ \res@[] -> do
     old_val <- CmmLocal <$> newTemp (cmmExprType platform var)
-    emitAssign old_val (cmmLoadIndexW platform mutv (fixedHdrSizeW dflags) (gcWord platform))
+    emitAssign old_val (cmmLoadIndexW platform mutv (fixedHdrSizeW profile) (gcWord platform))
 
     -- Without this write barrier, other CPUs may see this pointer before
     -- the writes for the closure it points to have occurred.
@@ -311,7 +313,7 @@ emitPrimOp dflags primop = case primop of
     -- that the read of old_val comes before another core's write to the
     -- MutVar's value.
     emitPrimCall res MO_WriteBarrier []
-    emitStore (cmmOffsetW platform mutv (fixedHdrSizeW dflags)) var
+    emitStore (cmmOffsetW platform mutv (fixedHdrSizeW profile)) var
     emitCCall
             [{-no results-}]
             (CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
@@ -320,7 +322,7 @@ emitPrimOp dflags primop = case primop of
 --  #define sizzeofByteArrayzh(r,a) \
 --     r = ((StgArrBytes *)(a))->bytes
   SizeofByteArrayOp -> \[arg] -> opIntoRegs $ \[res] -> do
-    emit $ mkAssign (CmmLocal res) (cmmLoadIndexW platform arg (fixedHdrSizeW dflags) (bWord platform))
+    emit $ mkAssign (CmmLocal res) (cmmLoadIndexW platform arg (fixedHdrSizeW profile) (bWord platform))
 
 --  #define sizzeofMutableByteArrayzh(r,a) \
 --      r = ((StgArrBytes *)(a))->bytes
@@ -329,7 +331,7 @@ emitPrimOp dflags primop = case primop of
 --  #define getSizzeofMutableByteArrayzh(r,a) \
 --      r = ((StgArrBytes *)(a))->bytes
   GetSizeofMutableByteArrayOp -> \[arg] -> opIntoRegs $ \[res] -> do
-    emitAssign (CmmLocal res) (cmmLoadIndexW platform arg (fixedHdrSizeW dflags) (bWord platform))
+    emitAssign (CmmLocal res) (cmmLoadIndexW platform arg (fixedHdrSizeW profile) (bWord platform))
 
 
 --  #define touchzh(o)                  /* nothing */
@@ -338,11 +340,11 @@ emitPrimOp dflags primop = case primop of
 
 --  #define byteArrayContentszh(r,a) r = BYTE_ARR_CTS(a)
   ByteArrayContents_Char -> \[arg] -> opIntoRegs $ \[res] -> do
-    emitAssign (CmmLocal res) (cmmOffsetB platform arg (arrWordsHdrSize dflags))
+    emitAssign (CmmLocal res) (cmmOffsetB platform arg (arrWordsHdrSize profile))
 
 --  #define stableNameToIntzh(r,s)   (r = ((StgStableName *)s)->sn)
   StableNameToIntOp -> \[arg] -> opIntoRegs $ \[res] -> do
-    emitAssign (CmmLocal res) (cmmLoadIndexW platform arg (fixedHdrSizeW dflags) (bWord platform))
+    emitAssign (CmmLocal res) (cmmLoadIndexW platform arg (fixedHdrSizeW profile) (bWord platform))
 
   ReallyUnsafePtrEqualityOp -> \[arg1, arg2] -> opIntoRegs $ \[res] -> do
     emitAssign (CmmLocal res) (CmmMachOp (mo_wordEq platform) [arg1,arg2])
@@ -423,7 +425,7 @@ emitPrimOp dflags primop = case primop of
 
   SizeofArrayOp -> \[arg] -> opIntoRegs $ \[res] -> do
     emit $ mkAssign (CmmLocal res) (cmmLoadIndexW platform arg
-      (fixedHdrSizeW dflags + bytesToWordsRoundUp platform (oFFSET_StgMutArrPtrs_ptrs dflags))
+      (fixedHdrSizeW profile + bytesToWordsRoundUp platform (pc_OFFSET_StgMutArrPtrs_ptrs (platformConstants platform)))
         (bWord platform))
   SizeofMutableArrayOp -> emitPrimOp dflags SizeofArrayOp
   SizeofArrayArrayOp -> emitPrimOp dflags SizeofArrayOp
@@ -431,7 +433,7 @@ emitPrimOp dflags primop = case primop of
   SizeofSmallArrayOp -> \[arg] -> opIntoRegs $ \[res] -> do
     emit $ mkAssign (CmmLocal res)
      (cmmLoadIndexW platform arg
-     (fixedHdrSizeW dflags + bytesToWordsRoundUp platform (oFFSET_StgSmallMutArrPtrs_ptrs dflags))
+     (fixedHdrSizeW profile + bytesToWordsRoundUp platform (pc_OFFSET_StgSmallMutArrPtrs_ptrs (platformConstants platform)))
         (bWord platform))
 
   SizeofSmallMutableArrayOp -> emitPrimOp dflags SizeofSmallArrayOp
@@ -1518,7 +1520,8 @@ emitPrimOp dflags primop = case primop of
   SetThreadAllocationCounter -> alwaysExternal
 
  where
-  platform = targetPlatform dflags
+  profile = targetProfile dflags
+  platform = profilePlatform profile
   result_info = getPrimOpResultInfo primop
 
   opNop :: [CmmExpr] -> PrimopCmmEmit
@@ -1963,8 +1966,8 @@ doIndexByteArrayOp :: Maybe MachOp
                    -> [CmmExpr]
                    -> FCode ()
 doIndexByteArrayOp maybe_post_read_cast rep [res] [addr,idx]
-   = do dflags <- getDynFlags
-        mkBasicIndexedRead (arrWordsHdrSize dflags) maybe_post_read_cast rep res addr rep idx
+   = do profile <- getProfile
+        mkBasicIndexedRead (arrWordsHdrSize profile) maybe_post_read_cast rep res addr rep idx
 doIndexByteArrayOp _ _ _ _
    = panic "GHC.StgToCmm.Prim: doIndexByteArrayOp"
 
@@ -1975,8 +1978,8 @@ doIndexByteArrayOpAs :: Maybe MachOp
                     -> [CmmExpr]
                     -> FCode ()
 doIndexByteArrayOpAs maybe_post_read_cast rep idx_rep [res] [addr,idx]
-   = do dflags <- getDynFlags
-        mkBasicIndexedRead (arrWordsHdrSize dflags) maybe_post_read_cast rep res addr idx_rep idx
+   = do profile <- getProfile
+        mkBasicIndexedRead (arrWordsHdrSize profile) maybe_post_read_cast rep res addr idx_rep idx
 doIndexByteArrayOpAs _ _ _ _ _
    = panic "GHC.StgToCmm.Prim: doIndexByteArrayOpAs"
 
@@ -1985,9 +1988,9 @@ doReadPtrArrayOp :: LocalReg
                  -> CmmExpr
                  -> FCode ()
 doReadPtrArrayOp res addr idx
-   = do dflags <- getDynFlags
+   = do profile <- getProfile
         platform <- getPlatform
-        mkBasicIndexedRead (arrPtrsHdrSize dflags) Nothing (gcWord platform) res addr (gcWord platform) idx
+        mkBasicIndexedRead (arrPtrsHdrSize profile) Nothing (gcWord platform) res addr (gcWord platform) idx
 
 doWriteOffAddrOp :: Maybe MachOp
                  -> CmmType
@@ -2005,8 +2008,8 @@ doWriteByteArrayOp :: Maybe MachOp
                    -> [CmmExpr]
                    -> FCode ()
 doWriteByteArrayOp maybe_pre_write_cast idx_ty [] [addr,idx,val]
-   = do dflags <- getDynFlags
-        mkBasicIndexedWrite (arrWordsHdrSize dflags) maybe_pre_write_cast addr idx_ty idx val
+   = do profile <- getProfile
+        mkBasicIndexedWrite (arrWordsHdrSize profile) maybe_pre_write_cast addr idx_ty idx val
 doWriteByteArrayOp _ _ _ _
    = panic "GHC.StgToCmm.Prim: doWriteByteArrayOp"
 
@@ -2015,10 +2018,10 @@ doWritePtrArrayOp :: CmmExpr
                   -> CmmExpr
                   -> FCode ()
 doWritePtrArrayOp addr idx val
-  = do dflags <- getDynFlags
+  = do profile  <- getProfile
        platform <- getPlatform
        let ty = cmmExprType platform val
-           hdr_size = arrPtrsHdrSize dflags
+           hdr_size = arrPtrsHdrSize profile
        -- Update remembered set for non-moving collector
        whenUpdRemSetEnabled
            $ emitUpdRemSetPush (cmmLoadIndexOffExpr platform hdr_size ty addr ty idx)
@@ -2033,15 +2036,15 @@ doWritePtrArrayOp addr idx val
        emit $ mkStore (
          cmmOffsetExpr platform
           (cmmOffsetExprW platform (cmmOffsetB platform addr hdr_size)
-                         (loadArrPtrsSize dflags addr))
+                         (loadArrPtrsSize profile addr))
           (CmmMachOp (mo_wordUShr platform) [idx,
-                                           mkIntExpr platform (mUT_ARR_PTRS_CARD_BITS dflags)])
+                                           mkIntExpr platform (pc_MUT_ARR_PTRS_CARD_BITS (platformConstants platform))])
          ) (CmmLit (CmmInt 1 W8))
 
-loadArrPtrsSize :: DynFlags -> CmmExpr -> CmmExpr
-loadArrPtrsSize dflags addr = CmmLoad (cmmOffsetB platform addr off) (bWord platform)
- where off = fixedHdrSize dflags + oFFSET_StgMutArrPtrs_ptrs dflags
-       platform = targetPlatform dflags
+loadArrPtrsSize :: Profile -> CmmExpr -> CmmExpr
+loadArrPtrsSize profile addr = CmmLoad (cmmOffsetB platform addr off) (bWord platform)
+ where off = fixedHdrSize profile + pc_OFFSET_StgMutArrPtrs_ptrs (profileConstants profile)
+       platform = profilePlatform profile
 
 mkBasicIndexedRead :: ByteOff      -- Initial offset in bytes
                    -> Maybe MachOp -- Optional result cast
@@ -2171,11 +2174,12 @@ checkVecCompatibility dflags vcat l w = do
                          ,"Please use -fllvm."]
     check vecWidth vcat l w
   where
+    platform = targetPlatform dflags
     check :: Width -> PrimOpVecCat -> Length -> Width -> FCode ()
-    check W128 FloatVec 4 W32 | not (isSseEnabled dflags) =
+    check W128 FloatVec 4 W32 | not (isSseEnabled platform) =
         sorry $ "128-bit wide single-precision floating point " ++
                 "SIMD vector instructions require at least -msse."
-    check W128 _ _ _ | not (isSse2Enabled dflags) =
+    check W128 _ _ _ | not (isSse2Enabled platform) =
         sorry $ "128-bit wide integer and double precision " ++
                 "SIMD vector instructions require at least -msse2."
     check W256 FloatVec _ _ | not (isAvxEnabled dflags) =
@@ -2302,8 +2306,8 @@ doPrefetchByteArrayOp :: Int
                       -> [CmmExpr]
                       -> FCode ()
 doPrefetchByteArrayOp locality  [addr,idx]
-   = do dflags <- getDynFlags
-        mkBasicPrefetch locality (arrWordsHdrSize dflags)  addr idx
+   = do profile <- getProfile
+        mkBasicPrefetch locality (arrWordsHdrSize profile)  addr idx
 doPrefetchByteArrayOp _ _
    = panic "GHC.StgToCmm.Prim: doPrefetchByteArrayOp"
 
@@ -2312,8 +2316,8 @@ doPrefetchMutableByteArrayOp :: Int
                       -> [CmmExpr]
                       -> FCode ()
 doPrefetchMutableByteArrayOp locality  [addr,idx]
-   = do dflags <- getDynFlags
-        mkBasicPrefetch locality (arrWordsHdrSize dflags)  addr idx
+   = do profile <- getProfile
+        mkBasicPrefetch locality (arrWordsHdrSize profile)  addr idx
 doPrefetchMutableByteArrayOp _ _
    = panic "GHC.StgToCmm.Prim: doPrefetchByteArrayOp"
 
@@ -2355,21 +2359,21 @@ mkBasicPrefetch locality off base idx
 -- 'MutableByteArray#'.
 doNewByteArrayOp :: CmmFormal -> ByteOff -> FCode ()
 doNewByteArrayOp res_r n = do
-    dflags <- getDynFlags
+    profile <- getProfile
     platform <- getPlatform
 
     let info_ptr = mkLblExpr mkArrWords_infoLabel
         rep = arrWordsRep platform n
 
-    tickyAllocPrim (mkIntExpr platform (arrWordsHdrSize dflags))
+    tickyAllocPrim (mkIntExpr platform (arrWordsHdrSize profile))
         (mkIntExpr platform (nonHdrSize platform rep))
         (zeroExpr platform)
 
-    let hdr_size = fixedHdrSize dflags
+    let hdr_size = fixedHdrSize profile
 
     base <- allocHeapClosure rep info_ptr cccsExpr
                      [ (mkIntExpr platform n,
-                        hdr_size + oFFSET_StgArrBytes_bytes dflags)
+                        hdr_size + pc_OFFSET_StgArrBytes_bytes (platformConstants platform))
                      ]
 
     emit $ mkAssign (CmmLocal res_r) base
@@ -2380,10 +2384,10 @@ doNewByteArrayOp res_r n = do
 doCompareByteArraysOp :: LocalReg -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                      -> FCode ()
 doCompareByteArraysOp res ba1 ba1_off ba2 ba2_off n = do
-    dflags <- getDynFlags
+    profile <- getProfile
     platform <- getPlatform
-    ba1_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform ba1 (arrWordsHdrSize dflags)) ba1_off
-    ba2_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform ba2 (arrWordsHdrSize dflags)) ba2_off
+    ba1_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform ba1 (arrWordsHdrSize profile)) ba1_off
+    ba2_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform ba2 (arrWordsHdrSize profile)) ba2_off
 
     -- short-cut in case of equal pointers avoiding a costly
     -- subroutine call to the memcmp(3) routine; the Cmm logic below
@@ -2469,14 +2473,14 @@ emitCopyByteArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                   -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                   -> FCode ()
 emitCopyByteArray copy src src_off dst dst_off n = do
-    dflags <- getDynFlags
+    profile <- getProfile
     platform <- getPlatform
     let byteArrayAlignment = wordAlignment platform
         srcOffAlignment = cmmExprAlignment src_off
         dstOffAlignment = cmmExprAlignment dst_off
         align = minimum [byteArrayAlignment, srcOffAlignment, dstOffAlignment]
-    dst_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform dst (arrWordsHdrSize dflags)) dst_off
-    src_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform src (arrWordsHdrSize dflags)) src_off
+    dst_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform dst (arrWordsHdrSize profile)) dst_off
+    src_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform src (arrWordsHdrSize profile)) src_off
     copy src dst dst_p src_p n align
 
 -- | Takes a source 'ByteArray#', an offset in the source array, a
@@ -2485,9 +2489,9 @@ emitCopyByteArray copy src src_off dst dst_off n = do
 doCopyByteArrayToAddrOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
 doCopyByteArrayToAddrOp src src_off dst_p bytes = do
     -- Use memcpy (we are allowed to assume the arrays aren't overlapping)
-    dflags <- getDynFlags
+    profile <- getProfile
     platform <- getPlatform
-    src_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform src (arrWordsHdrSize dflags)) src_off
+    src_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform src (arrWordsHdrSize profile)) src_off
     emitMemcpyCall dst_p src_p bytes (mkAlignment 1)
 
 -- | Takes a source 'MutableByteArray#', an offset in the source array, a
@@ -2503,9 +2507,9 @@ doCopyMutableByteArrayToAddrOp = doCopyByteArrayToAddrOp
 doCopyAddrToByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
 doCopyAddrToByteArrayOp src_p dst dst_off bytes = do
     -- Use memcpy (we are allowed to assume the arrays aren't overlapping)
-    dflags <- getDynFlags
+    profile <- getProfile
     platform <- getPlatform
-    dst_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform dst (arrWordsHdrSize dflags)) dst_off
+    dst_p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform dst (arrWordsHdrSize profile)) dst_off
     emitMemcpyCall dst_p src_p bytes (mkAlignment 1)
 
 
@@ -2518,14 +2522,14 @@ doCopyAddrToByteArrayOp src_p dst dst_off bytes = do
 doSetByteArrayOp :: CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                  -> FCode ()
 doSetByteArrayOp ba off len c = do
-    dflags <- getDynFlags
+    profile <- getProfile
     platform <- getPlatform
 
     let byteArrayAlignment = wordAlignment platform -- known since BA is allocated on heap
         offsetAlignment = cmmExprAlignment off
         align = min byteArrayAlignment offsetAlignment
 
-    p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform ba (arrWordsHdrSize dflags)) off
+    p <- assignTempE $ cmmOffsetExpr platform (cmmOffsetB platform ba (arrWordsHdrSize profile)) off
     emitMemsetCall p c len align
 
 -- ----------------------------------------------------------------------------
@@ -2540,12 +2544,12 @@ doNewArrayOp :: CmmFormal             -- ^ return register
              -> CmmExpr               -- ^ initial element
              -> FCode ()
 doNewArrayOp res_r rep info payload n init = do
-    dflags <- getDynFlags
+    profile <- getProfile
     platform <- getPlatform
 
     let info_ptr = mkLblExpr info
 
-    tickyAllocPrim (mkIntExpr platform (hdrSize dflags rep))
+    tickyAllocPrim (mkIntExpr platform (hdrSize profile rep))
         (mkIntExpr platform (nonHdrSize platform rep))
         (zeroExpr platform)
 
@@ -2555,7 +2559,7 @@ doNewArrayOp res_r rep info payload n init = do
     emit $ mkAssign arr base
 
     -- Initialise all elements of the array
-    let mkOff off = cmmOffsetW platform (CmmReg arr) (hdrSizeW dflags rep + off)
+    let mkOff off = cmmOffsetW platform (CmmReg arr) (hdrSizeW profile rep + off)
         initialization = [ mkStore (mkOff off) init | off <- [0.. n - 1] ]
     emit (catAGraphs initialization)
 
@@ -2624,7 +2628,7 @@ emitCopyArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> ByteOff
               -> FCode ()
 emitCopyArray copy src0 src_off dst0 dst_off0 n =
     when (n /= 0) $ do
-        dflags <- getDynFlags
+        profile <- getProfile
         platform <- getPlatform
 
         -- Passed as arguments (be careful)
@@ -2633,23 +2637,23 @@ emitCopyArray copy src0 src_off dst0 dst_off0 n =
         dst_off <- assignTempE dst_off0
 
         -- Nonmoving collector write barrier
-        emitCopyUpdRemSetPush platform (arrPtrsHdrSizeW dflags) dst dst_off n
+        emitCopyUpdRemSetPush platform (arrPtrsHdrSizeW profile) dst dst_off n
 
         -- Set the dirty bit in the header.
         emit (setInfo dst (CmmLit (CmmLabel mkMAP_DIRTY_infoLabel)))
 
         dst_elems_p <- assignTempE $ cmmOffsetB platform dst
-                       (arrPtrsHdrSize dflags)
+                       (arrPtrsHdrSize profile)
         dst_p <- assignTempE $ cmmOffsetExprW platform dst_elems_p dst_off
         src_p <- assignTempE $ cmmOffsetExprW platform
-                 (cmmOffsetB platform src (arrPtrsHdrSize dflags)) src_off
+                 (cmmOffsetB platform src (arrPtrsHdrSize profile)) src_off
         let bytes = wordsToBytes platform n
 
         copy src dst dst_p src_p bytes
 
         -- The base address of the destination card table
         dst_cards_p <- assignTempE $ cmmOffsetExprW platform dst_elems_p
-                       (loadArrPtrsSize dflags dst)
+                       (loadArrPtrsSize profile dst)
 
         emitSetCards dst_off dst_cards_p n
 
@@ -2691,7 +2695,7 @@ emitCopySmallArray :: (CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> ByteOff
                    -> FCode ()
 emitCopySmallArray copy src0 src_off dst0 dst_off n =
     when (n /= 0) $ do
-        dflags <- getDynFlags
+        profile <- getProfile
         platform <- getPlatform
 
         -- Passed as arguments (be careful)
@@ -2699,15 +2703,15 @@ emitCopySmallArray copy src0 src_off dst0 dst_off n =
         dst     <- assignTempE dst0
 
         -- Nonmoving collector write barrier
-        emitCopyUpdRemSetPush platform (smallArrPtrsHdrSizeW dflags) dst dst_off n
+        emitCopyUpdRemSetPush platform (smallArrPtrsHdrSizeW profile) dst dst_off n
 
         -- Set the dirty bit in the header.
         emit (setInfo dst (CmmLit (CmmLabel mkSMAP_DIRTY_infoLabel)))
 
         dst_p <- assignTempE $ cmmOffsetExprW platform
-                 (cmmOffsetB platform dst (smallArrPtrsHdrSize dflags)) dst_off
+                 (cmmOffsetB platform dst (smallArrPtrsHdrSize profile)) dst_off
         src_p <- assignTempE $ cmmOffsetExprW platform
-                 (cmmOffsetB platform src (smallArrPtrsHdrSize dflags)) src_off
+                 (cmmOffsetB platform src (smallArrPtrsHdrSize profile)) src_off
         let bytes = wordsToBytes platform n
 
         copy src dst dst_p src_p bytes
@@ -2719,33 +2723,34 @@ emitCopySmallArray copy src0 src_off dst0 dst_off n =
 emitCloneArray :: CLabel -> CmmFormal -> CmmExpr -> CmmExpr -> WordOff
                -> FCode ()
 emitCloneArray info_p res_r src src_off n = do
-    dflags <- getDynFlags
+    profile <- getProfile
     platform <- getPlatform
 
     let info_ptr = mkLblExpr info_p
-        rep = arrPtrsRep dflags n
+        rep = arrPtrsRep platform n
 
-    tickyAllocPrim (mkIntExpr platform (arrPtrsHdrSize dflags))
+    tickyAllocPrim (mkIntExpr platform (arrPtrsHdrSize profile))
         (mkIntExpr platform (nonHdrSize platform rep))
         (zeroExpr platform)
 
-    let hdr_size = fixedHdrSize dflags
+    let hdr_size = fixedHdrSize profile
+        constants = platformConstants platform
 
     base <- allocHeapClosure rep info_ptr cccsExpr
                      [ (mkIntExpr platform n,
-                        hdr_size + oFFSET_StgMutArrPtrs_ptrs dflags)
+                        hdr_size + pc_OFFSET_StgMutArrPtrs_ptrs constants)
                      , (mkIntExpr platform (nonHdrSizeW rep),
-                        hdr_size + oFFSET_StgMutArrPtrs_size dflags)
+                        hdr_size + pc_OFFSET_StgMutArrPtrs_size constants)
                      ]
 
     arr <- CmmLocal `fmap` newTemp (bWord platform)
     emit $ mkAssign arr base
 
     dst_p <- assignTempE $ cmmOffsetB platform (CmmReg arr)
-             (arrPtrsHdrSize dflags)
+             (arrPtrsHdrSize profile)
     src_p <- assignTempE $ cmmOffsetExprW platform src
              (cmmAddWord platform
-              (mkIntExpr platform (arrPtrsHdrSizeW dflags)) src_off)
+              (mkIntExpr platform (arrPtrsHdrSizeW profile)) src_off)
 
     emitMemcpyCall dst_p src_p (mkIntExpr platform (wordsToBytes platform n))
         (wordAlignment platform)
@@ -2759,31 +2764,31 @@ emitCloneArray info_p res_r src src_off n = do
 emitCloneSmallArray :: CLabel -> CmmFormal -> CmmExpr -> CmmExpr -> WordOff
                     -> FCode ()
 emitCloneSmallArray info_p res_r src src_off n = do
-    dflags <- getDynFlags
+    profile  <- getProfile
     platform <- getPlatform
 
     let info_ptr = mkLblExpr info_p
         rep = smallArrPtrsRep n
 
-    tickyAllocPrim (mkIntExpr platform (smallArrPtrsHdrSize dflags))
+    tickyAllocPrim (mkIntExpr platform (smallArrPtrsHdrSize profile))
         (mkIntExpr platform (nonHdrSize platform rep))
         (zeroExpr platform)
 
-    let hdr_size = fixedHdrSize dflags
+    let hdr_size = fixedHdrSize profile
 
     base <- allocHeapClosure rep info_ptr cccsExpr
                      [ (mkIntExpr platform n,
-                        hdr_size + oFFSET_StgSmallMutArrPtrs_ptrs dflags)
+                        hdr_size + pc_OFFSET_StgSmallMutArrPtrs_ptrs (platformConstants platform))
                      ]
 
     arr <- CmmLocal `fmap` newTemp (bWord platform)
     emit $ mkAssign arr base
 
     dst_p <- assignTempE $ cmmOffsetB platform (CmmReg arr)
-             (smallArrPtrsHdrSize dflags)
+             (smallArrPtrsHdrSize profile)
     src_p <- assignTempE $ cmmOffsetExprW platform src
              (cmmAddWord platform
-              (mkIntExpr platform (smallArrPtrsHdrSizeW dflags)) src_off)
+              (mkIntExpr platform (smallArrPtrsHdrSizeW profile)) src_off)
 
     emitMemcpyCall dst_p src_p (mkIntExpr platform (wordsToBytes platform n))
         (wordAlignment platform)
@@ -2796,10 +2801,9 @@ emitCloneSmallArray info_p res_r src src_off n = do
 -- Marks the relevant cards as dirty.
 emitSetCards :: CmmExpr -> CmmExpr -> WordOff -> FCode ()
 emitSetCards dst_start dst_cards_start n = do
-    dflags <- getDynFlags
     platform <- getPlatform
-    start_card <- assignTempE $ cardCmm dflags dst_start
-    let end_card = cardCmm dflags
+    start_card <- assignTempE $ cardCmm platform dst_start
+    let end_card = cardCmm platform
                    (cmmSubWord platform
                     (cmmAddWord platform dst_start (mkIntExpr platform n))
                     (mkIntExpr platform 1))
@@ -2809,10 +2813,9 @@ emitSetCards dst_start dst_cards_start n = do
         (mkAlignment 1) -- no alignment (1 byte)
 
 -- Convert an element index to a card index
-cardCmm :: DynFlags -> CmmExpr -> CmmExpr
-cardCmm dflags i =
-    cmmUShrWord platform i (mkIntExpr platform (mUT_ARR_PTRS_CARD_BITS dflags))
-    where platform = targetPlatform dflags
+cardCmm :: Platform -> CmmExpr -> CmmExpr
+cardCmm platform i =
+    cmmUShrWord platform i (mkIntExpr platform (pc_MUT_ARR_PTRS_CARD_BITS (platformConstants platform)))
 
 ------------------------------------------------------------------------------
 -- SmallArray PrimOp implementations
@@ -2822,9 +2825,9 @@ doReadSmallPtrArrayOp :: LocalReg
                       -> CmmExpr
                       -> FCode ()
 doReadSmallPtrArrayOp res addr idx = do
-    dflags <- getDynFlags
+    profile <- getProfile
     platform <- getPlatform
-    mkBasicIndexedRead (smallArrPtrsHdrSize dflags) Nothing (gcWord platform) res addr
+    mkBasicIndexedRead (smallArrPtrsHdrSize profile) Nothing (gcWord platform) res addr
         (gcWord platform) idx
 
 doWriteSmallPtrArrayOp :: CmmExpr
@@ -2832,17 +2835,17 @@ doWriteSmallPtrArrayOp :: CmmExpr
                        -> CmmExpr
                        -> FCode ()
 doWriteSmallPtrArrayOp addr idx val = do
-    dflags <- getDynFlags
+    profile <- getProfile
     platform <- getPlatform
     let ty = cmmExprType platform val
 
     -- Update remembered set for non-moving collector
     tmp <- newTemp ty
-    mkBasicIndexedRead (smallArrPtrsHdrSize dflags) Nothing ty tmp addr ty idx
+    mkBasicIndexedRead (smallArrPtrsHdrSize profile) Nothing ty tmp addr ty idx
     whenUpdRemSetEnabled $ emitUpdRemSetPush (CmmReg (CmmLocal tmp))
 
     emitPrimCall [] MO_WriteBarrier [] -- #12469
-    mkBasicIndexedWrite (smallArrPtrsHdrSize dflags) Nothing addr ty idx val
+    mkBasicIndexedWrite (smallArrPtrsHdrSize profile) Nothing addr ty idx val
     emit (setInfo addr (CmmLit (CmmLabel mkSMAP_DIRTY_infoLabel)))
 
 ------------------------------------------------------------------------------
@@ -2859,10 +2862,10 @@ doAtomicRMW :: LocalReg      -- ^ Result reg
             -> CmmExpr       -- ^ Op argument (e.g. amount to add)
             -> FCode ()
 doAtomicRMW res amop mba idx idx_ty n = do
-    dflags <- getDynFlags
+    profile <- getProfile
     platform <- getPlatform
     let width = typeWidth idx_ty
-        addr  = cmmIndexOffExpr platform (arrWordsHdrSize dflags)
+        addr  = cmmIndexOffExpr platform (arrWordsHdrSize profile)
                 width mba idx
     emitPrimCall
         [ res ]
@@ -2877,10 +2880,10 @@ doAtomicReadByteArray
     -> CmmType   -- ^ Type of element by which we are indexing
     -> FCode ()
 doAtomicReadByteArray res mba idx idx_ty = do
-    dflags <- getDynFlags
+    profile <- getProfile
     platform <- getPlatform
     let width = typeWidth idx_ty
-        addr  = cmmIndexOffExpr platform (arrWordsHdrSize dflags)
+        addr  = cmmIndexOffExpr platform (arrWordsHdrSize profile)
                 width mba idx
     emitPrimCall
         [ res ]
@@ -2895,10 +2898,10 @@ doAtomicWriteByteArray
     -> CmmExpr   -- ^ Value to write
     -> FCode ()
 doAtomicWriteByteArray mba idx idx_ty val = do
-    dflags <- getDynFlags
+    profile <- getProfile
     platform <- getPlatform
     let width = typeWidth idx_ty
-        addr  = cmmIndexOffExpr platform (arrWordsHdrSize dflags)
+        addr  = cmmIndexOffExpr platform (arrWordsHdrSize profile)
                 width mba idx
     emitPrimCall
         [ {- no results -} ]
@@ -2914,10 +2917,10 @@ doCasByteArray
     -> CmmExpr   -- ^ New value
     -> FCode ()
 doCasByteArray res mba idx idx_ty old new = do
-    dflags <- getDynFlags
+    profile <- getProfile
     platform <- getPlatform
     let width = (typeWidth idx_ty)
-        addr = cmmIndexOffExpr platform (arrWordsHdrSize dflags)
+        addr = cmmIndexOffExpr platform (arrWordsHdrSize profile)
                width mba idx
     emitPrimCall
         [ res ]

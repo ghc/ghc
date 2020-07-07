@@ -14,6 +14,7 @@ import GHC.Cmm.Ppr () -- For Outputable instances
 
 import GHC.Driver.Session
 import GHC.Platform
+import GHC.Platform.Profile
 import GHC.Utils.Outputable
 
 -- Calculate the 'GlobalReg' or stack locations for function call
@@ -31,7 +32,7 @@ instance Outputable ParamLocation where
 -- Given a list of arguments, and a function that tells their types,
 -- return a list showing where each argument is passed
 --
-assignArgumentsPos :: DynFlags
+assignArgumentsPos :: Profile
                    -> ByteOff           -- stack offset to start with
                    -> Convention
                    -> (a -> CmmType)    -- how to get a type from an arg
@@ -41,16 +42,16 @@ assignArgumentsPos :: DynFlags
                       , [(a, ParamLocation)] -- args and locations
                       )
 
-assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
+assignArgumentsPos profile off conv arg_ty reps = (stk_off, assignments)
     where
-      platform = targetPlatform dflags
+      platform = profilePlatform profile
       regs = case (reps, conv) of
-               (_,   NativeNodeCall)   -> getRegsWithNode dflags
-               (_,   NativeDirectCall) -> getRegsWithoutNode dflags
-               ([_], NativeReturn)     -> allRegs dflags
-               (_,   NativeReturn)     -> getRegsWithNode dflags
+               (_,   NativeNodeCall)   -> getRegsWithNode platform
+               (_,   NativeDirectCall) -> getRegsWithoutNode platform
+               ([_], NativeReturn)     -> allRegs platform
+               (_,   NativeReturn)     -> getRegsWithNode platform
                -- GC calling convention *must* put values in registers
-               (_,   GC)               -> allRegs dflags
+               (_,   GC)               -> allRegs platform
                (_,   Slow)             -> nodeOnly
       -- The calling conventions first assign arguments to registers,
       -- then switch to the stack when we first run out of registers
@@ -67,11 +68,11 @@ assignArgumentsPos dflags off conv arg_ty reps = (stk_off, assignments)
                                     | otherwise      = int
         where vec = case (w, regs) of
                       (W128, (vs, fs, ds, ls, s:ss))
-                          | passVectorInReg W128 dflags -> k (RegisterParam (XmmReg s), (vs, fs, ds, ls, ss))
+                          | passVectorInReg W128 profile -> k (RegisterParam (XmmReg s), (vs, fs, ds, ls, ss))
                       (W256, (vs, fs, ds, ls, s:ss))
-                          | passVectorInReg W256 dflags -> k (RegisterParam (YmmReg s), (vs, fs, ds, ls, ss))
+                          | passVectorInReg W256 profile -> k (RegisterParam (YmmReg s), (vs, fs, ds, ls, ss))
                       (W512, (vs, fs, ds, ls, s:ss))
-                          | passVectorInReg W512 dflags -> k (RegisterParam (ZmmReg s), (vs, fs, ds, ls, ss))
+                          | passVectorInReg W512 profile -> k (RegisterParam (ZmmReg s), (vs, fs, ds, ls, ss))
                       _ -> (assts, (r:rs))
               float = case (w, regs) of
                         (W32, (vs, fs, ds, ls, s:ss))
@@ -107,7 +108,7 @@ passFloatArgsInXmm platform = case platformArch platform of
 -- support vector registers in its calling convention. However, this has now
 -- been fixed. This function remains only as a convenient way to re-enable
 -- spilling when debugging code generation.
-passVectorInReg :: Width -> DynFlags -> Bool
+passVectorInReg :: Width -> Profile -> Bool
 passVectorInReg _ _ = True
 
 assignStack :: Platform -> ByteOff -> (a -> CmmType) -> [a]
@@ -142,56 +143,57 @@ type AvailRegs = ( [VGcPtr -> GlobalReg]   -- available vanilla regs.
 -- We take these register supplies from the *real* registers, i.e. those
 -- that are guaranteed to map to machine registers.
 
-getRegsWithoutNode, getRegsWithNode :: DynFlags -> AvailRegs
-getRegsWithoutNode dflags =
-  ( filter (\r -> r VGcPtr /= node) (realVanillaRegs dflags)
-  , realFloatRegs dflags
-  , realDoubleRegs dflags
-  , realLongRegs dflags
-  , realXmmRegNos dflags)
+getRegsWithoutNode, getRegsWithNode :: Platform -> AvailRegs
+getRegsWithoutNode platform =
+  ( filter (\r -> r VGcPtr /= node) (realVanillaRegs platform)
+  , realFloatRegs platform
+  , realDoubleRegs platform
+  , realLongRegs platform
+  , realXmmRegNos platform)
 
 -- getRegsWithNode uses R1/node even if it isn't a register
-getRegsWithNode dflags =
-  ( if null (realVanillaRegs dflags)
+getRegsWithNode platform =
+  ( if null (realVanillaRegs platform)
     then [VanillaReg 1]
-    else realVanillaRegs dflags
-  , realFloatRegs dflags
-  , realDoubleRegs dflags
-  , realLongRegs dflags
-  , realXmmRegNos dflags)
+    else realVanillaRegs platform
+  , realFloatRegs platform
+  , realDoubleRegs platform
+  , realLongRegs platform
+  , realXmmRegNos platform)
 
-allFloatRegs, allDoubleRegs, allLongRegs :: DynFlags -> [GlobalReg]
-allVanillaRegs :: DynFlags -> [VGcPtr -> GlobalReg]
-allXmmRegs :: DynFlags -> [Int]
+allFloatRegs, allDoubleRegs, allLongRegs :: Platform -> [GlobalReg]
+allVanillaRegs :: Platform -> [VGcPtr -> GlobalReg]
+allXmmRegs :: Platform -> [Int]
 
-allVanillaRegs dflags = map VanillaReg $ regList (mAX_Vanilla_REG dflags)
-allFloatRegs   dflags = map FloatReg   $ regList (mAX_Float_REG   dflags)
-allDoubleRegs  dflags = map DoubleReg  $ regList (mAX_Double_REG  dflags)
-allLongRegs    dflags = map LongReg    $ regList (mAX_Long_REG    dflags)
-allXmmRegs     dflags =                  regList (mAX_XMM_REG     dflags)
+allVanillaRegs platform = map VanillaReg $ regList (pc_MAX_Vanilla_REG (platformConstants platform))
+allFloatRegs   platform = map FloatReg   $ regList (pc_MAX_Float_REG   (platformConstants platform))
+allDoubleRegs  platform = map DoubleReg  $ regList (pc_MAX_Double_REG  (platformConstants platform))
+allLongRegs    platform = map LongReg    $ regList (pc_MAX_Long_REG    (platformConstants platform))
+allXmmRegs     platform =                  regList (pc_MAX_XMM_REG     (platformConstants platform))
 
-realFloatRegs, realDoubleRegs, realLongRegs :: DynFlags -> [GlobalReg]
-realVanillaRegs :: DynFlags -> [VGcPtr -> GlobalReg]
-realXmmRegNos :: DynFlags -> [Int]
+realFloatRegs, realDoubleRegs, realLongRegs :: Platform -> [GlobalReg]
+realVanillaRegs :: Platform -> [VGcPtr -> GlobalReg]
 
-realVanillaRegs dflags = map VanillaReg $ regList (mAX_Real_Vanilla_REG dflags)
-realFloatRegs   dflags = map FloatReg   $ regList (mAX_Real_Float_REG   dflags)
-realDoubleRegs  dflags = map DoubleReg  $ regList (mAX_Real_Double_REG  dflags)
-realLongRegs    dflags = map LongReg    $ regList (mAX_Real_Long_REG    dflags)
+realVanillaRegs platform = map VanillaReg $ regList (pc_MAX_Real_Vanilla_REG (platformConstants platform))
+realFloatRegs   platform = map FloatReg   $ regList (pc_MAX_Real_Float_REG   (platformConstants platform))
+realDoubleRegs  platform = map DoubleReg  $ regList (pc_MAX_Real_Double_REG  (platformConstants platform))
+realLongRegs    platform = map LongReg    $ regList (pc_MAX_Real_Long_REG    (platformConstants platform))
 
-realXmmRegNos dflags
-    | isSse2Enabled dflags = regList (mAX_Real_XMM_REG     dflags)
-    | otherwise            = []
+realXmmRegNos :: Platform -> [Int]
+realXmmRegNos platform
+    | isSse2Enabled platform = regList (pc_MAX_Real_XMM_REG (platformConstants platform))
+    | otherwise              = []
 
 regList :: Int -> [Int]
 regList n = [1 .. n]
 
-allRegs :: DynFlags -> AvailRegs
-allRegs dflags = (allVanillaRegs dflags,
-                  allFloatRegs dflags,
-                  allDoubleRegs dflags,
-                  allLongRegs dflags,
-                  allXmmRegs dflags)
+allRegs :: Platform -> AvailRegs
+allRegs platform = ( allVanillaRegs platform
+                   , allFloatRegs   platform
+                   , allDoubleRegs  platform
+                   , allLongRegs    platform
+                   , allXmmRegs     platform
+                   )
 
 nodeOnly :: AvailRegs
 nodeOnly = ([VanillaReg 1], [], [], [], [])
@@ -201,18 +203,18 @@ nodeOnly = ([VanillaReg 1], [], [], [], [])
 -- now just x86-64, where Float and Double registers overlap---passing this set
 -- of registers is guaranteed to preserve the contents of all live registers. We
 -- only use this functionality in hand-written C-- code in the RTS.
-realArgRegsCover :: DynFlags -> [GlobalReg]
-realArgRegsCover dflags
-    | passFloatArgsInXmm (targetPlatform dflags)
-    = map ($VGcPtr) (realVanillaRegs dflags) ++
-      realLongRegs dflags ++
-      realDoubleRegs dflags -- we only need to save the low Double part of XMM registers.
-                            -- Moreover, the NCG can't load/store full XMM
-                            -- registers for now...
+realArgRegsCover :: Platform -> [GlobalReg]
+realArgRegsCover platform
+    | passFloatArgsInXmm platform
+    = map ($VGcPtr) (realVanillaRegs platform) ++
+      realLongRegs platform ++
+      realDoubleRegs platform -- we only need to save the low Double part of XMM registers.
+                              -- Moreover, the NCG can't load/store full XMM
+                              -- registers for now...
 
     | otherwise
-    = map ($VGcPtr) (realVanillaRegs dflags) ++
-      realFloatRegs dflags ++
-      realDoubleRegs dflags ++
-      realLongRegs dflags
+    = map ($VGcPtr) (realVanillaRegs platform) ++
+      realFloatRegs  platform ++
+      realDoubleRegs platform ++
+      realLongRegs   platform
       -- we don't save XMM registers if they are not used for parameter passing
