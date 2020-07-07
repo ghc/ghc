@@ -43,9 +43,7 @@ ghcPrimDependencies = do
 derivedConstantsFiles :: [FilePath]
 derivedConstantsFiles =
     [ "DerivedConstants.h"
-    , "GHCConstantsHaskellExports.hs"
-    , "GHCConstantsHaskellType.hs"
-    , "GHCConstantsHaskellWrappers.hs" ]
+    ]
 
 compilerDependencies :: Expr [FilePath]
 compilerDependencies = do
