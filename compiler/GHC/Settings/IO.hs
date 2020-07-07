@@ -92,7 +92,7 @@ initSettings top_dir = do
   cpp_prog <- getToolSetting "Haskell CPP command"
   cpp_args_str <- getSetting "Haskell CPP flags"
 
-  platform <- either pgmError pure $ getTargetPlatform settingsFile mySettings
+  platform <- either pgmError pure $ getTargetPlatform settingsFile mySettings platformConstants
 
   let unreg_cc_args = if platformUnregisterised platform
                       then ["-DNO_REGS", "-DUSE_MINIINTERPRETER"]
