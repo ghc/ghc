@@ -73,6 +73,7 @@ class TestConfig:
         self.no_print_summary = False
 
         # What platform are we running on?
+        self.platform = '' # XXX This needs to die eventually once all access to `platform` has been relinquished from the test-suite
         self.targetPlatform = ''
         self.hostPlatform = ''
         self.os = ''
