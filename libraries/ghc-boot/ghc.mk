@@ -40,7 +40,7 @@ libraries/ghc-boot/dist-install/build/GHC/Platform/Host.hs: mk/project.mk | $$(d
 	$(call removeFiles,$@)
 	@echo "module GHC.Platform.Host where"                              >> $@
 	@echo                                                               >> $@
-	@echo 'import GHC.Platform'                                         >> $@
+	@echo 'import GHC.Platform.ArchOS'                                  >> $@
 	@echo                                                               >> $@
 	@echo 'hostPlatformArch   :: Arch'                                  >> $@
 	@echo 'hostPlatformArch   = $(HaskellHostArch)'                     >> $@

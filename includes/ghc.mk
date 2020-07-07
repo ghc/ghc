@@ -271,8 +271,6 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 includes_DERIVEDCONSTANTS = includes/dist-derivedconstants/header/DerivedConstants.h
 includes_GHCCONSTANTS_HASKELL_TYPE = includes/dist-derivedconstants/header/GHCConstantsHaskellType.hs
 includes_GHCCONSTANTS_HASKELL_VALUE = includes/dist-derivedconstants/header/platformConstants
-includes_GHCCONSTANTS_HASKELL_WRAPPERS = includes/dist-derivedconstants/header/GHCConstantsHaskellWrappers.hs
-includes_GHCCONSTANTS_HASKELL_EXPORTS = includes/dist-derivedconstants/header/GHCConstantsHaskellExports.hs
 
 INSTALL_LIBS += $(includes_GHCCONSTANTS_HASKELL_VALUE)
 
@@ -296,12 +294,6 @@ $(includes_GHCCONSTANTS_HASKELL_TYPE): $(deriveConstants_INPLACE) | $$(dir $$@)/
 
 $(includes_GHCCONSTANTS_HASKELL_VALUE): $(deriveConstants_INPLACE) | $$(dir $$@)/.
 	$< --gen-haskell-value -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
-
-$(includes_GHCCONSTANTS_HASKELL_WRAPPERS): $(deriveConstants_INPLACE) | $$(dir $$@)/.
-	$< --gen-haskell-wrappers -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
-
-$(includes_GHCCONSTANTS_HASKELL_EXPORTS): $(deriveConstants_INPLACE) | $$(dir $$@)/.
-	$< --gen-haskell-exports -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
 endif
 
 # ---------------------------------------------------------------------------
@@ -316,8 +308,6 @@ $(eval $(call all-target,includes,\
   $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) $(includes_1_H_VERSION) \
   $(includes_GHCCONSTANTS_HASKELL_TYPE) \
   $(includes_GHCCONSTANTS_HASKELL_VALUE) \
-  $(includes_GHCCONSTANTS_HASKELL_WRAPPERS) \
-  $(includes_GHCCONSTANTS_HASKELL_EXPORTS) \
   $(includes_DERIVEDCONSTANTS)))
 
 install: install_includes
