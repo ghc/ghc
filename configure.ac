@@ -1425,6 +1425,7 @@ fi
 # Create the configuration for the Hadrian build system if it is present
 if test -e hadrian/cfg/system.config.in; then
     AC_CONFIG_FILES([hadrian/cfg/system.config])
+    AC_CONFIG_FILES([hadrian/ghci-cabal hadrian/ghci-stack])
 fi
 
 # We got caught by

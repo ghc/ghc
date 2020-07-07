@@ -103,7 +103,7 @@ import Data.Bifunctor
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS.Char8
 
-import {-# SOURCE #-} GHC.Unit.State (displayUnitId)
+import {-# SOURCE #-} GHC.Unit.State (UnitState,displayUnitId)
 import {-# SOURCE #-} GHC.Driver.Session (unitState)
 
 ---------------------------------------------------------------------
@@ -508,12 +508,19 @@ instance Uniquable UnitId where
     getUnique = getUnique . unitIdFS
 
 instance Outputable UnitId where
-    ppr uid@(UnitId fs) =
-        getPprDebug $ \debug ->
-        sdocWithDynFlags $ \dflags ->
-          case displayUnitId (unitState dflags) uid of
-            Just str | not debug -> text str
-            _ -> ftext fs
+    ppr uid = sdocWithDynFlags $ \dflags -> pprUnitId (unitState dflags) uid
+
+-- | Pretty-print a UnitId
+--
+-- In non-debug mode, query the given database to try to print
+-- "package-version:component" instead of the raw UnitId
+pprUnitId :: UnitState -> UnitId -> SDoc
+pprUnitId state uid@(UnitId fs) = getPprDebug $ \debug ->
+   if debug
+      then ftext fs
+      else case displayUnitId state uid of
+            Just str -> text str
+            _        -> ftext fs
 
 -- | A 'DefUnitId' is an 'UnitId' with the invariant that
 -- it only refers to a definite library; i.e., one we have generated

@@ -15,4 +15,4 @@ foo2 = case raiseDivZero of
    I# _ -> print "NOPE"
 
 foo :: IO ()
-foo = print (W# (bigNatRemWord# (bigNatOne void#) 0##))
+foo = print (W# (bigNatRemWord# (bigNatOne# void#) 0##))
