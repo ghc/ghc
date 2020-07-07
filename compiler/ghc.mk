@@ -47,9 +47,6 @@ $(foreach n,1 2 3, \
 
 $(foreach n,1 2 3, \
     $(eval compiler/stage$n/package-data.mk : compiler/stage$n/build/GHC/Settings/Config.hs) \
-    $(eval compiler/stage$n/build/PlatformConstants.o : $(includes_GHCCONSTANTS_HASKELL_TYPE)) \
-    $(eval compiler/stage$n/build/GHC/Driver/Session.o: $(includes_GHCCONSTANTS_HASKELL_EXPORTS)) \
-    $(eval compiler/stage$n/build/GHC/Driver/Session.o: $(includes_GHCCONSTANTS_HASKELL_WRAPPERS)) \
   )
 endif
 
@@ -356,9 +353,6 @@ $(compiler_stage2_depfile_haskell) : $(includes_1_H_CONFIG) $(includes_1_H_PLATF
 $(compiler_stage3_depfile_haskell) : $(includes_2_H_CONFIG) $(includes_2_H_PLATFORM)
 
 COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS)
-COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS_HASKELL_TYPE)
-COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS_HASKELL_WRAPPERS)
-COMPILER_INCLUDES_DEPS += $(includes_GHCCONSTANTS_HASKELL_EXPORTS)
 COMPILER_INCLUDES_DEPS += $(includes_DERIVEDCONSTANTS)
 
 $(compiler_stage1_depfile_haskell) : $(COMPILER_INCLUDES_DEPS) $(PRIMOP_BITS_STAGE1)
