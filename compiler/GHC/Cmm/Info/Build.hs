@@ -10,6 +10,9 @@ module GHC.Cmm.Info.Build
 
 import GHC.Prelude hiding (succ)
 
+import GHC.Platform
+import GHC.Platform.Profile
+
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Cmm.BlockId
@@ -19,7 +22,6 @@ import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow
 import GHC.Unit.Module
-import GHC.Platform
 import GHC.Data.Graph.Directed
 import GHC.Cmm.CLabel
 import GHC.Cmm
@@ -32,7 +34,6 @@ import GHC.Types.Unique.Supply
 import GHC.Types.CostCentre
 import GHC.StgToCmm.Heap
 import GHC.CmmToAsm.Monad
-import GHC.CmmToAsm.Config
 
 import Control.Monad
 import Data.Map.Strict (Map)
@@ -765,6 +766,8 @@ doSRTs
 doSRTs dflags moduleSRTInfo procs data_ = do
   us <- mkSplitUniqSupply 'u'
 
+  let profile = targetProfile dflags
+
   -- Ignore the original grouping of decls, and combine all the
   -- CAFEnvs into a single CAFEnv.
   let static_data_env :: Map CLabel CAFSet
@@ -834,7 +837,7 @@ doSRTs dflags moduleSRTInfo procs data_ = do
     funSRTMap = mapFromList (concat funSRTs)
     has_caf_refs' = or has_caf_refs
     decls' =
-      concatMap (updInfoSRTs dflags srtFieldMap funSRTMap has_caf_refs') decls
+      concatMap (updInfoSRTs profile srtFieldMap funSRTMap has_caf_refs') decls
 
   -- Finally update CafInfos for raw static literals (CmmStaticsRaw). Those are
   -- not analysed in oneSRT so we never add entries for them to the SRTMap.
@@ -929,6 +932,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
 
   let
     config = initConfig dflags
+    profile = targetProfile dflags
     srtMap = moduleSRTMap topSRT
 
     blockids = getBlockLabels lbls
@@ -1032,7 +1036,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
 
           -- MachO relocations can't express offsets between compilation units at
           -- all, so we are always forced to build a singleton SRT in this case.
-            && (not (osMachOTarget $ platformOS $ ncgPlatform config)
+            && (not (osMachOTarget $ platformOS $ profilePlatform profile)
                || isLocalCLabel this_mod lbl) -> do
 
           -- If we have a static function closure, then it becomes the
@@ -1070,7 +1074,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
                 Just (fun,block) ->
                   return ( [], [(block, cafList)], SRTEntry fun )
                 Nothing -> do
-                  (decls, entry) <- lift $ buildSRTChain dflags cafList
+                  (decls, entry) <- lift $ buildSRTChain profile cafList
                   return (decls, [], entry)
             updateSRTMap (Just srtEntry)
             let allBelowThis = Set.union allBelow filtered
@@ -1089,38 +1093,38 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
             return (decls, map (,lbl) blockids, funSRTs, True)
 
 
--- | build a static SRT object (or a chain of objects) from a list of
+-- | Build a static SRT object (or a chain of objects) from a list of
 -- SRTEntries.
 buildSRTChain
-   :: DynFlags
+   :: Profile
    -> [SRTEntry]
    -> UniqSM
         ( [CmmDeclSRTs] -- The SRT object(s)
         , SRTEntry      -- label to use in the info table
         )
 buildSRTChain _ [] = panic "buildSRT: empty"
-buildSRTChain dflags cafSet =
+buildSRTChain profile cafSet =
   case splitAt mAX_SRT_SIZE cafSet of
     (these, []) -> do
-      (decl,lbl) <- buildSRT dflags these
+      (decl,lbl) <- buildSRT profile these
       return ([decl], lbl)
     (these,those) -> do
-      (rest, rest_lbl) <- buildSRTChain dflags (head these : those)
-      (decl,lbl) <- buildSRT dflags (rest_lbl : tail these)
+      (rest, rest_lbl) <- buildSRTChain profile (head these : those)
+      (decl,lbl) <- buildSRT profile (rest_lbl : tail these)
       return (decl:rest, lbl)
   where
     mAX_SRT_SIZE = 16
 
 
-buildSRT :: DynFlags -> [SRTEntry] -> UniqSM (CmmDeclSRTs, SRTEntry)
-buildSRT dflags refs = do
+buildSRT :: Profile -> [SRTEntry] -> UniqSM (CmmDeclSRTs, SRTEntry)
+buildSRT profile refs = do
   id <- getUniqueM
   let
     lbl = mkSRTLabel id
-    platform = targetPlatform dflags
+    platform = profilePlatform profile
     srt_n_info = mkSRTInfoLabel (length refs)
     fields =
-      mkStaticClosure dflags srt_n_info dontCareCCS
+      mkStaticClosure profile srt_n_info dontCareCCS
         [ CmmLabel lbl | SRTEntry lbl <- refs ]
         [] -- no padding
         [mkIntCLit platform 0] -- link field
@@ -1130,7 +1134,7 @@ buildSRT dflags refs = do
 -- | Update info tables with references to their SRTs. Also generate
 -- static closures, splicing in SRT fields as necessary.
 updInfoSRTs
-  :: DynFlags
+  :: Profile
   -> LabelMap CLabel               -- SRT labels for each block
   -> LabelMap [SRTEntry]           -- SRTs to merge into FUN_STATIC closures
   -> Bool                          -- Whether the CmmDecl's group has CAF references
@@ -1140,13 +1144,13 @@ updInfoSRTs
 updInfoSRTs _ _ _ _ (CmmData s (CmmStaticsRaw lbl statics))
   = [CmmData s (CmmStaticsRaw lbl statics)]
 
-updInfoSRTs dflags _ _ caffy (CmmData s (CmmStatics lbl itbl ccs payload))
+updInfoSRTs profile _ _ caffy (CmmData s (CmmStatics lbl itbl ccs payload))
   = [CmmData s (CmmStaticsRaw lbl (map CmmStaticLit field_lits))]
   where
     caf_info = if caffy then MayHaveCafRefs else NoCafRefs
-    field_lits = mkStaticClosureFields dflags itbl ccs caf_info payload
+    field_lits = mkStaticClosureFields profile itbl ccs caf_info payload
 
-updInfoSRTs dflags srt_env funSRTEnv caffy (CmmProc top_info top_l live g)
+updInfoSRTs profile srt_env funSRTEnv caffy (CmmProc top_info top_l live g)
   | Just (_,closure) <- maybeStaticClosure = [ proc, closure ]
   | otherwise = [ proc ]
   where
@@ -1175,7 +1179,7 @@ updInfoSRTs dflags srt_env funSRTEnv caffy (CmmProc top_info top_l live g)
             Just srtEntries -> srtTrace "maybeStaticFun" (ppr res)
               (info_tbl { cit_rep = new_rep }, res)
               where res = [ CmmLabel lbl | SRTEntry lbl <- srtEntries ]
-          fields = mkStaticClosureFields dflags info_tbl ccs caf_info srtEntries
+          fields = mkStaticClosureFields profile info_tbl ccs caf_info srtEntries
           new_rep = case cit_rep of
              HeapRep sta ptrs nptrs ty ->
                HeapRep sta (ptrs + length srtEntries) nptrs ty

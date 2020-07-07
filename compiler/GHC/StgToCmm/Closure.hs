@@ -31,7 +31,8 @@ module GHC.StgToCmm.Closure (
 
         -- * Used by other modules
         CgLoc(..), SelfLoopInfo, CallMethod(..),
-        nodeMustPointToIt, isKnownFun, funTag, tagForArity, getCallMethod,
+        nodeMustPointToIt, isKnownFun, funTag, tagForArity,
+        CallOpts(..), getCallMethod,
 
         -- * ClosureInfo
         ClosureInfo,
@@ -66,10 +67,12 @@ module GHC.StgToCmm.Closure (
 
 import GHC.Prelude
 import GHC.Platform
+import GHC.Platform.Profile
 
 import GHC.Stg.Syntax
 import GHC.Runtime.Heap.Layout
 import GHC.Cmm
+import GHC.Cmm.Utils
 import GHC.Cmm.Ppr.Expr() -- For Outputable instances
 import GHC.StgToCmm.Types
 
@@ -87,7 +90,6 @@ import GHC.Core.TyCon
 import GHC.Types.RepType
 import GHC.Types.Basic
 import GHC.Utils.Outputable
-import GHC.Driver.Session
 import GHC.Utils.Misc
 
 import Data.Coerce (coerce)
@@ -308,24 +310,25 @@ type DynTag = Int       -- The tag on a *pointer*
 --
 -- Also see Note [Tagging big families] in GHC.StgToCmm.Expr
 
-isSmallFamily :: DynFlags -> Int -> Bool
-isSmallFamily dflags fam_size = fam_size <= mAX_PTR_TAG dflags
+isSmallFamily :: Platform -> Int -> Bool
+isSmallFamily platform fam_size = fam_size <= mAX_PTR_TAG platform
 
-tagForCon :: DynFlags -> DataCon -> DynTag
-tagForCon dflags con = min (dataConTag con) (mAX_PTR_TAG dflags)
+tagForCon :: Platform -> DataCon -> DynTag
+tagForCon platform con = min (dataConTag con) (mAX_PTR_TAG platform)
 -- NB: 1-indexed
 
-tagForArity :: DynFlags -> RepArity -> DynTag
-tagForArity dflags arity
- | isSmallFamily dflags arity = arity
- | otherwise                  = 0
+tagForArity :: Platform -> RepArity -> DynTag
+tagForArity platform arity
+ | isSmallFamily platform arity = arity
+ | otherwise                    = 0
 
-lfDynTag :: DynFlags -> LambdaFormInfo -> DynTag
--- Return the tag in the low order bits of a variable bound
+-- | Return the tag in the low order bits of a variable bound
 -- to this LambdaForm
-lfDynTag dflags (LFCon con)               = tagForCon dflags con
-lfDynTag dflags (LFReEntrant _ arity _ _) = tagForArity dflags arity
-lfDynTag _      _other                    = 0
+lfDynTag :: Platform -> LambdaFormInfo -> DynTag
+lfDynTag platform lf = case lf of
+   LFCon con               -> tagForCon   platform con
+   LFReEntrant _ arity _ _ -> tagForArity platform arity
+   _other                  -> 0
 
 
 -----------------------------------------------------------------------------
@@ -365,7 +368,7 @@ thunkClosureType _                   = Thunk
 --                nodeMustPointToIt
 -----------------------------------------------------------------------------
 
-nodeMustPointToIt :: DynFlags -> LambdaFormInfo -> Bool
+nodeMustPointToIt :: Profile -> LambdaFormInfo -> Bool
 -- If nodeMustPointToIt is true, then the entry convention for
 -- this closure has R1 (the "Node" register) pointing to the
 -- closure itself --- the "self" argument
@@ -377,11 +380,11 @@ nodeMustPointToIt _ (LFReEntrant top _ no_fvs _)
         -- non-inherited (i.e. non-top-level) function.
         -- The isNotTopLevel test above ensures this is ok.
 
-nodeMustPointToIt dflags (LFThunk top no_fvs updatable NonStandardThunk _)
+nodeMustPointToIt profile (LFThunk top no_fvs updatable NonStandardThunk _)
   =  not no_fvs            -- Self parameter
   || isNotTopLevel top     -- Note [GC recovery]
   || updatable             -- Need to push update frame
-  || sccProfilingEnabled dflags
+  || profileIsProfiling profile
           -- For the non-updatable (single-entry case):
           --
           -- True if has fvs (in which case we need access to them, and we
@@ -476,7 +479,13 @@ data CallMethod
         CLabel          --   The code label
         RepArity        --   Its arity
 
-getCallMethod :: DynFlags
+data CallOpts = CallOpts
+   { co_profile       :: !Profile   -- ^ Platform profile
+   , co_loopification :: !Bool      -- ^ Loopification enabled (cf @-floopification@)
+   , co_ticky         :: !Bool      -- ^ Ticky profiling enabled (cf @-ticky@)
+   }
+
+getCallMethod :: CallOpts
               -> Name           -- Function being applied
               -> Id             -- Function Id used to chech if it can refer to
                                 -- CAF's and whether the function is tail-calling
@@ -492,9 +501,9 @@ getCallMethod :: DynFlags
               -> Maybe SelfLoopInfo -- can we perform a self-recursive tail call?
               -> CallMethod
 
-getCallMethod dflags _ id _ n_args v_args _cg_loc
+getCallMethod opts _ id _ n_args v_args _cg_loc
               (Just (self_loop_id, block_id, args))
-  | gopt Opt_Loopification dflags
+  | co_loopification opts
   , id == self_loop_id
   , args `lengthIs` (n_args - v_args)
   -- If these patterns match then we know that:
@@ -505,14 +514,14 @@ getCallMethod dflags _ id _ n_args v_args _cg_loc
   -- self-recursive tail calls] in GHC.StgToCmm.Expr for more details
   = JumpToIt block_id args
 
-getCallMethod dflags name id (LFReEntrant _ arity _ _) n_args _v_args _cg_loc
+getCallMethod opts name id (LFReEntrant _ arity _ _) n_args _v_args _cg_loc
               _self_loop_info
   | n_args == 0 -- No args at all
-  && not (sccProfilingEnabled dflags)
+  && not (profileIsProfiling (co_profile opts))
      -- See Note [Evaluating functions with profiling] in rts/Apply.cmm
   = ASSERT( arity /= 0 ) ReturnIt
   | n_args < arity = SlowCall        -- Not enough args
-  | otherwise      = DirectEntry (enterIdLabel (targetPlatform dflags) name (idCafInfo id)) arity
+  | otherwise      = DirectEntry (enterIdLabel (profilePlatform (co_profile opts)) name (idCafInfo id)) arity
 
 getCallMethod _ _name _ LFUnlifted n_args _v_args _cg_loc _self_loop_info
   = ASSERT( n_args == 0 ) ReturnIt
@@ -522,14 +531,14 @@ getCallMethod _ _name _ (LFCon _) n_args _v_args _cg_loc _self_loop_info
     -- n_args=0 because it'd be ill-typed to apply a saturated
     --          constructor application to anything
 
-getCallMethod dflags name id (LFThunk _ _ updatable std_form_info is_fun)
+getCallMethod opts name id (LFThunk _ _ updatable std_form_info is_fun)
               n_args _v_args _cg_loc _self_loop_info
   | is_fun      -- it *might* be a function, so we must "call" it (which is always safe)
   = SlowCall    -- We cannot just enter it [in eval/apply, the entry code
                 -- is the fast-entry code]
 
   -- Since is_fun is False, we are *definitely* looking at a data value
-  | updatable || gopt Opt_Ticky dflags -- to catch double entry
+  | updatable || co_ticky opts -- to catch double entry
       {- OLD: || opt_SMP
          I decided to remove this, because in SMP mode it doesn't matter
          if we enter the same thunk multiple times, so the optimisation
@@ -551,7 +560,7 @@ getCallMethod dflags name id (LFThunk _ _ updatable std_form_info is_fun)
 
   | otherwise        -- Jump direct to code for single-entry thunks
   = ASSERT( n_args == 0 )
-    DirectEntry (thunkEntryLabel dflags name (idCafInfo id) std_form_info
+    DirectEntry (thunkEntryLabel (profilePlatform (co_profile opts)) name (idCafInfo id) std_form_info
                 updatable) 0
 
 getCallMethod _ _name _ (LFUnknown True) _n_arg _v_args _cg_locs _self_loop_info
@@ -619,14 +628,14 @@ mkCmmInfo ClosureInfo {..} id ccs
 --        Building ClosureInfos
 --------------------------------------
 
-mkClosureInfo :: DynFlags
+mkClosureInfo :: Profile
               -> Bool                -- Is static
               -> Id
               -> LambdaFormInfo
               -> Int -> Int        -- Total and pointer words
               -> String         -- String descriptor
               -> ClosureInfo
-mkClosureInfo dflags is_static id lf_info tot_wds ptr_wds val_descr
+mkClosureInfo profile is_static id lf_info tot_wds ptr_wds val_descr
   = ClosureInfo { closureName      = name
                 , closureLFInfo    = lf_info
                 , closureInfoLabel = info_lbl   -- These three fields are
@@ -634,11 +643,11 @@ mkClosureInfo dflags is_static id lf_info tot_wds ptr_wds val_descr
                 , closureProf      = prof }     -- (we don't have an SRT yet)
   where
     name       = idName id
-    sm_rep     = mkHeapRep dflags is_static ptr_wds nonptr_wds (lfClosureType lf_info)
-    prof       = mkProfilingInfo dflags id val_descr
+    sm_rep     = mkHeapRep profile is_static ptr_wds nonptr_wds (lfClosureType lf_info)
+    prof       = mkProfilingInfo profile id val_descr
     nonptr_wds = tot_wds - ptr_wds
 
-    info_lbl = mkClosureInfoTableLabel dflags id lf_info
+    info_lbl = mkClosureInfoTableLabel (profilePlatform profile) id lf_info
 
 --------------------------------------
 --   Other functions over ClosureInfo
@@ -761,9 +770,9 @@ lfFunInfo :: LambdaFormInfo ->  Maybe (RepArity, ArgDescr)
 lfFunInfo (LFReEntrant _ arity _ arg_desc)  = Just (arity, arg_desc)
 lfFunInfo _                                 = Nothing
 
-funTag :: DynFlags -> ClosureInfo -> DynTag
-funTag dflags (ClosureInfo { closureLFInfo = lf_info })
-    = lfDynTag dflags lf_info
+funTag :: Platform -> ClosureInfo -> DynTag
+funTag platform (ClosureInfo { closureLFInfo = lf_info })
+    = lfDynTag platform lf_info
 
 isToplevClosure :: ClosureInfo -> Bool
 isToplevClosure (ClosureInfo { closureLFInfo = lf_info })
@@ -787,14 +796,14 @@ closureLocalEntryLabel platform
   | platformTablesNextToCode platform = toInfoLbl  . closureInfoLabel
   | otherwise                         = toEntryLbl . closureInfoLabel
 
-mkClosureInfoTableLabel :: DynFlags -> Id -> LambdaFormInfo -> CLabel
-mkClosureInfoTableLabel dflags id lf_info
+mkClosureInfoTableLabel :: Platform -> Id -> LambdaFormInfo -> CLabel
+mkClosureInfoTableLabel platform id lf_info
   = case lf_info of
         LFThunk _ _ upd_flag (SelectorThunk offset) _
-                      -> mkSelectorInfoLabel dflags upd_flag offset
+                      -> mkSelectorInfoLabel platform upd_flag offset
 
         LFThunk _ _ upd_flag (ApThunk arity) _
-                      -> mkApInfoTableLabel dflags upd_flag arity
+                      -> mkApInfoTableLabel platform upd_flag arity
 
         LFThunk{}     -> std_mk_lbl name cafs
         LFReEntrant{} -> std_mk_lbl name cafs
@@ -814,29 +823,23 @@ mkClosureInfoTableLabel dflags id lf_info
        -- invariants in "GHC.CoreToStg.Prep" anything else gets eta expanded.
 
 
-thunkEntryLabel :: DynFlags -> Name -> CafInfo -> StandardFormInfo -> Bool -> CLabel
--- thunkEntryLabel is a local help function, not exported.  It's used from
+-- | thunkEntryLabel is a local help function, not exported.  It's used from
 -- getCallMethod.
-thunkEntryLabel dflags _thunk_id _ (ApThunk arity) upd_flag
-  = enterApLabel dflags upd_flag arity
-thunkEntryLabel dflags _thunk_id _ (SelectorThunk offset) upd_flag
-  = enterSelectorLabel dflags upd_flag offset
-thunkEntryLabel dflags thunk_id c _ _
-  = enterIdLabel (targetPlatform dflags) thunk_id c
+thunkEntryLabel :: Platform -> Name -> CafInfo -> StandardFormInfo -> Bool -> CLabel
+thunkEntryLabel platform thunk_id caf_info sfi upd_flag = case sfi of
+   ApThunk arity        -> enterApLabel       platform upd_flag arity
+   SelectorThunk offset -> enterSelectorLabel platform upd_flag offset
+   _                    -> enterIdLabel       platform thunk_id caf_info
 
-enterApLabel :: DynFlags -> Bool -> Arity -> CLabel
-enterApLabel dflags is_updatable arity
-  | platformTablesNextToCode platform = mkApInfoTableLabel dflags is_updatable arity
-  | otherwise                         = mkApEntryLabel     dflags is_updatable arity
-  where
-   platform = targetPlatform dflags
+enterApLabel :: Platform -> Bool -> Arity -> CLabel
+enterApLabel platform is_updatable arity
+  | platformTablesNextToCode platform = mkApInfoTableLabel platform is_updatable arity
+  | otherwise                         = mkApEntryLabel     platform is_updatable arity
 
-enterSelectorLabel :: DynFlags -> Bool -> WordOff -> CLabel
-enterSelectorLabel dflags upd_flag offset
-  | platformTablesNextToCode platform = mkSelectorInfoLabel  dflags upd_flag offset
-  | otherwise                         = mkSelectorEntryLabel dflags upd_flag offset
-  where
-   platform = targetPlatform dflags
+enterSelectorLabel :: Platform -> Bool -> WordOff -> CLabel
+enterSelectorLabel platform upd_flag offset
+  | platformTablesNextToCode platform = mkSelectorInfoLabel  platform upd_flag offset
+  | otherwise                         = mkSelectorEntryLabel platform upd_flag offset
 
 enterIdLabel :: Platform -> Name -> CafInfo -> CLabel
 enterIdLabel platform id c
@@ -857,10 +860,10 @@ enterIdLabel platform id c
 -- The type is determined from the type information stored with the @Id@
 -- in the closure info using @closureTypeDescr@.
 
-mkProfilingInfo :: DynFlags -> Id -> String -> ProfilingInfo
-mkProfilingInfo dflags id val_descr
-  | not (sccProfilingEnabled dflags) = NoProfilingInfo
-  | otherwise = ProfilingInfo ty_descr_w8 (BS8.pack val_descr)
+mkProfilingInfo :: Profile -> Id -> String -> ProfilingInfo
+mkProfilingInfo profile id val_descr
+  | not (profileIsProfiling profile) = NoProfilingInfo
+  | otherwise                        = ProfilingInfo ty_descr_w8 (BS8.pack val_descr)
   where
     ty_descr_w8  = BS8.pack (getTyDescription (idType id))
 
@@ -891,8 +894,8 @@ getTyLitDescription l =
 --   CmmInfoTable-related things
 --------------------------------------
 
-mkDataConInfoTable :: DynFlags -> DataCon -> Bool -> Int -> Int -> CmmInfoTable
-mkDataConInfoTable dflags data_con is_static ptr_wds nonptr_wds
+mkDataConInfoTable :: Profile -> DataCon -> Bool -> Int -> Int -> CmmInfoTable
+mkDataConInfoTable profile data_con is_static ptr_wds nonptr_wds
  = CmmInfoTable { cit_lbl  = info_lbl
                 , cit_rep  = sm_rep
                 , cit_prof = prof
@@ -901,12 +904,12 @@ mkDataConInfoTable dflags data_con is_static ptr_wds nonptr_wds
  where
    name = dataConName data_con
    info_lbl = mkConInfoTableLabel name NoCafRefs
-   sm_rep = mkHeapRep dflags is_static ptr_wds nonptr_wds cl_type
+   sm_rep = mkHeapRep profile is_static ptr_wds nonptr_wds cl_type
    cl_type = Constr (dataConTagZ data_con) (dataConIdentity data_con)
                   -- We keep the *zero-indexed* tag in the srt_len field
                   -- of the info table of a data constructor.
 
-   prof | not (sccProfilingEnabled dflags) = NoProfilingInfo
+   prof | not (profileIsProfiling profile) = NoProfilingInfo
         | otherwise                        = ProfilingInfo ty_descr val_descr
 
    ty_descr  = BS8.pack $ occNameString $ getOccName $ dataConTyCon data_con

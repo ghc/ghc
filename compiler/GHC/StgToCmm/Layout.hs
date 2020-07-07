@@ -54,6 +54,7 @@ import GHC.Core.TyCon    ( PrimRep(..), primRepSizeB )
 import GHC.Types.Basic   ( RepArity )
 import GHC.Driver.Session
 import GHC.Platform
+import GHC.Platform.Profile
 import GHC.Unit
 
 import GHC.Utils.Misc
@@ -78,7 +79,7 @@ import Control.Monad
 --
 emitReturn :: [CmmExpr] -> FCode ReturnKind
 emitReturn results
-  = do { dflags    <- getDynFlags
+  = do { profile   <- getProfile
        ; platform  <- getPlatform
        ; sequel    <- getSequel
        ; updfr_off <- getUpdFrameOff
@@ -86,7 +87,7 @@ emitReturn results
            Return ->
              do { adjustHpBackwards
                 ; let e = CmmLoad (CmmStackSlot Old updfr_off) (gcWord platform)
-                ; emit (mkReturn dflags (entryCode platform e) results updfr_off)
+                ; emit (mkReturn profile (entryCode platform e) results updfr_off)
                 }
            AssignTo regs adjust ->
              do { when adjust adjustHpBackwards
@@ -113,19 +114,19 @@ emitCallWithExtraStack
    :: (Convention, Convention) -> CmmExpr -> [CmmExpr]
    -> [CmmExpr] -> FCode ReturnKind
 emitCallWithExtraStack (callConv, retConv) fun args extra_stack
-  = do  { dflags <- getDynFlags
+  = do  { profile <- getProfile
         ; adjustHpBackwards
         ; sequel <- getSequel
         ; updfr_off <- getUpdFrameOff
         ; case sequel of
             Return -> do
-              emit $ mkJumpExtra dflags callConv fun args updfr_off extra_stack
+              emit $ mkJumpExtra profile callConv fun args updfr_off extra_stack
               return AssignedDirectly
             AssignTo res_regs _ -> do
               k <- newBlockId
               let area = Young k
-                  (off, _, copyin) = copyInOflow dflags retConv area res_regs []
-                  copyout = mkCallReturnsTo dflags fun callConv args k off updfr_off
+                  (off, _, copyin) = copyInOflow profile retConv area res_regs []
+                  copyout = mkCallReturnsTo profile fun callConv args k off updfr_off
                                    extra_stack
               tscope <- getTickScope
               emit (copyout <*> mkLabel k tscope <*> copyin)
@@ -191,7 +192,8 @@ slowCall :: CmmExpr -> [StgArg] -> FCode ReturnKind
 -- (slowCall fun args) applies fun to args, returning the results to Sequel
 slowCall fun stg_args
   = do  dflags <- getDynFlags
-        platform <- getPlatform
+        profile <- getProfile
+        let platform = profilePlatform profile
         argsreps <- getArgRepsAmodes stg_args
         let (rts_fun, arity) = slowCallPattern (map fst argsreps)
 
@@ -207,9 +209,10 @@ slowCall fun stg_args
         let n_args = length stg_args
         if n_args > arity && optLevel dflags >= 2
            then do
+             ptr_opts <- getPtrOpts
              funv <- (CmmReg . CmmLocal) `fmap` assignTemp fun
              fun_iptr <- (CmmReg . CmmLocal) `fmap`
-                    assignTemp (closureInfoPtr dflags (cmmUntag dflags funv))
+                    assignTemp (closureInfoPtr ptr_opts (cmmUntag platform funv))
 
              -- ToDo: we could do slightly better here by reusing the
              -- continuation from the slow call, which we have in r.
@@ -230,11 +233,11 @@ slowCall fun stg_args
              is_tagged_lbl <- newBlockId
              end_lbl <- newBlockId
 
-             let correct_arity = cmmEqWord platform (funInfoArity dflags fun_iptr)
+             let correct_arity = cmmEqWord platform (funInfoArity profile fun_iptr)
                                                     (mkIntExpr platform n_args)
 
              tscope <- getTickScope
-             emit (mkCbranch (cmmIsTagged dflags funv)
+             emit (mkCbranch (cmmIsTagged platform funv)
                              is_tagged_lbl slow_lbl (Just True)
                    <*> mkLabel is_tagged_lbl tscope
                    <*> mkCbranch correct_arity fast_lbl slow_lbl (Just True)
@@ -411,7 +414,7 @@ data ClosureHeader
   | ThunkHeader
 
 mkVirtHeapOffsetsWithPadding
-  :: DynFlags
+  :: Profile
   -> ClosureHeader            -- What kind of header to account for
   -> [NonVoid (PrimRep, a)]   -- Things to make offsets for
   -> ( WordOff                -- Total number of words allocated
@@ -426,18 +429,18 @@ mkVirtHeapOffsetsWithPadding
 -- mkVirtHeapOffsetsWithPadding always returns boxed things with smaller offsets
 -- than the unboxed things
 
-mkVirtHeapOffsetsWithPadding dflags header things =
+mkVirtHeapOffsetsWithPadding profile header things =
     ASSERT(not (any (isVoidRep . fst . fromNonVoid) things))
     ( tot_wds
     , bytesToWordsRoundUp platform bytes_of_ptrs
     , concat (ptrs_w_offsets ++ non_ptrs_w_offsets) ++ final_pad
     )
   where
-    platform = targetPlatform dflags
+    platform = profilePlatform profile
     hdr_words = case header of
       NoHeader -> 0
-      StdHeader -> fixedHdrSizeW dflags
-      ThunkHeader -> thunkHdrSize dflags
+      StdHeader -> fixedHdrSizeW profile
+      ThunkHeader -> thunkHdrSize profile
     hdr_bytes = wordsToBytes platform hdr_words
 
     (ptrs, non_ptrs) = partition (isGcPtrRep . fst . fromNonVoid) things
@@ -485,36 +488,36 @@ mkVirtHeapOffsetsWithPadding dflags header things =
 
 
 mkVirtHeapOffsets
-  :: DynFlags
+  :: Profile
   -> ClosureHeader            -- What kind of header to account for
   -> [NonVoid (PrimRep,a)]    -- Things to make offsets for
   -> (WordOff,                -- _Total_ number of words allocated
       WordOff,                -- Number of words allocated for *pointers*
       [(NonVoid a, ByteOff)])
-mkVirtHeapOffsets dflags header things =
+mkVirtHeapOffsets profile header things =
     ( tot_wds
     , ptr_wds
     , [ (field, offset) | (FieldOff field offset) <- things_offsets ]
     )
   where
    (tot_wds, ptr_wds, things_offsets) =
-       mkVirtHeapOffsetsWithPadding dflags header things
+       mkVirtHeapOffsetsWithPadding profile header things
 
 -- | Just like mkVirtHeapOffsets, but for constructors
 mkVirtConstrOffsets
-  :: DynFlags -> [NonVoid (PrimRep, a)]
+  :: Profile -> [NonVoid (PrimRep, a)]
   -> (WordOff, WordOff, [(NonVoid a, ByteOff)])
-mkVirtConstrOffsets dflags = mkVirtHeapOffsets dflags StdHeader
+mkVirtConstrOffsets profile = mkVirtHeapOffsets profile StdHeader
 
 -- | Just like mkVirtConstrOffsets, but used when we don't have the actual
 -- arguments. Useful when e.g. generating info tables; we just need to know
 -- sizes of pointer and non-pointer fields.
-mkVirtConstrSizes :: DynFlags -> [NonVoid PrimRep] -> (WordOff, WordOff)
-mkVirtConstrSizes dflags field_reps
+mkVirtConstrSizes :: Profile -> [NonVoid PrimRep] -> (WordOff, WordOff)
+mkVirtConstrSizes profile field_reps
   = (tot_wds, ptr_wds)
   where
     (tot_wds, ptr_wds, _) =
-       mkVirtConstrOffsets dflags
+       mkVirtConstrOffsets profile
          (map (\nv_rep -> NonVoid (fromNonVoid nv_rep, ())) field_reps)
 
 -------------------------------------------------------------------------
@@ -601,19 +604,19 @@ emitClosureProcAndInfoTable :: Bool                    -- top-level?
                             -> ((Int, LocalReg, [LocalReg]) -> FCode ()) -- function body
                             -> FCode ()
 emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl args body
- = do   { dflags <- getDynFlags
+ = do   { profile <- getProfile
         ; platform <- getPlatform
         -- Bind the binder itself, but only if it's not a top-level
         -- binding. We need non-top let-bindings to refer to the
         -- top-level binding, which this binding would incorrectly shadow.
         ; node <- if top_lvl then return $ idToReg platform (NonVoid bndr)
                   else bindToReg (NonVoid bndr) lf_info
-        ; let node_points = nodeMustPointToIt dflags lf_info
+        ; let node_points = nodeMustPointToIt profile lf_info
         ; arg_regs <- bindArgsToRegs args
         ; let args' = if node_points then (node : arg_regs) else arg_regs
-              conv  = if nodeMustPointToIt dflags lf_info then NativeNodeCall
+              conv  = if nodeMustPointToIt profile lf_info then NativeNodeCall
                                                           else NativeDirectCall
-              (offset, _, _) = mkCallEntry dflags conv args' []
+              (offset, _, _) = mkCallEntry profile conv args' []
         ; emitClosureAndInfoTable info_tbl conv args' $ body (offset, node, arg_regs)
         }
 

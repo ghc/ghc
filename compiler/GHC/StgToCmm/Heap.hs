@@ -47,6 +47,7 @@ import GHC.Types.Id ( Id )
 import GHC.Unit
 import GHC.Driver.Session
 import GHC.Platform
+import GHC.Platform.Profile
 import GHC.Data.FastString( mkFastString, fsLit )
 import GHC.Utils.Panic( sorry )
 
@@ -135,20 +136,19 @@ allocHeapClosure rep info_ptr use_cc payload = do
   hpStore base payload
 
   -- Bump the virtual heap pointer
-  dflags <- getDynFlags
-  setVirtHp (virt_hp + heapClosureSizeW dflags rep)
+  profile <- getProfile
+  setVirtHp (virt_hp + heapClosureSizeW profile rep)
 
   return base
 
 
 emitSetDynHdr :: CmmExpr -> CmmExpr -> CmmExpr -> FCode ()
 emitSetDynHdr base info_ptr ccs
-  = do dflags <- getDynFlags
-       let platform = targetPlatform dflags
-       hpStore base (zip (header dflags) [0, platformWordSizeInBytes platform ..])
+  = do profile <- getProfile
+       hpStore base (zip (header profile) [0, profileWordSizeInBytes profile ..])
   where
-    header :: DynFlags -> [CmmExpr]
-    header dflags = [info_ptr] ++ dynProfHdr dflags ccs
+    header :: Profile -> [CmmExpr]
+    header profile = [info_ptr] ++ dynProfHdr profile ccs
         -- ToDo: Parallel stuff
         -- No ticky header
 
@@ -167,17 +167,17 @@ hpStore base vals = do
 -- and adding a static link field if necessary.
 
 mkStaticClosureFields
-        :: DynFlags
+        :: Profile
         -> CmmInfoTable
         -> CostCentreStack
         -> CafInfo
         -> [CmmLit]             -- Payload
         -> [CmmLit]             -- The full closure
-mkStaticClosureFields dflags info_tbl ccs caf_refs payload
-  = mkStaticClosure dflags info_lbl ccs payload padding
+mkStaticClosureFields profile info_tbl ccs caf_refs payload
+  = mkStaticClosure profile info_lbl ccs payload padding
         static_link_field saved_info_field
   where
-    platform = targetPlatform dflags
+    platform = profilePlatform profile
     info_lbl = cit_lbl info_tbl
 
     -- CAFs must have consistent layout, regardless of whether they
@@ -219,11 +219,11 @@ mkStaticClosureFields dflags info_tbl ccs caf_refs payload
                                       -- See Note [STATIC_LINK fields]
                                       -- in rts/sm/Storage.h
 
-mkStaticClosure :: DynFlags -> CLabel -> CostCentreStack -> [CmmLit]
+mkStaticClosure :: Profile -> CLabel -> CostCentreStack -> [CmmLit]
   -> [CmmLit] -> [CmmLit] -> [CmmLit] -> [CmmLit]
-mkStaticClosure dflags info_lbl ccs payload padding static_link_field saved_info_field
+mkStaticClosure profile info_lbl ccs payload padding static_link_field saved_info_field
   =  [CmmLabel info_lbl]
-  ++ staticProfHdr dflags ccs
+  ++ staticProfHdr profile ccs
   ++ payload
   ++ padding
   ++ static_link_field
@@ -352,7 +352,7 @@ entryHeapCheck' :: Bool           -- is a known function pattern
                 -> FCode ()
                 -> FCode ()
 entryHeapCheck' is_fastf node arity args code
-  = do dflags <- getDynFlags
+  = do profile <- getProfile
        let is_thunk = arity == 0
 
            args' = map (CmmReg . CmmLocal) args
@@ -367,13 +367,13 @@ entryHeapCheck' is_fastf node arity args code
            -}
            gc_call upd
                | is_thunk
-                 = mkJump dflags NativeNodeCall stg_gc_enter1 [node] upd
+                 = mkJump profile NativeNodeCall stg_gc_enter1 [node] upd
 
                | is_fastf
-                 = mkJump dflags NativeNodeCall stg_gc_fun (node : args') upd
+                 = mkJump profile NativeNodeCall stg_gc_fun (node : args') upd
 
                | otherwise
-                 = mkJump dflags Slow stg_gc_fun (node : args') upd
+                 = mkJump profile Slow stg_gc_fun (node : args') upd
 
        updfr_sz <- getUpdFrameOff
 
@@ -404,13 +404,13 @@ altHeapCheck regs code = altOrNoEscapeHeapCheck False regs code
 
 altOrNoEscapeHeapCheck :: Bool -> [LocalReg] -> FCode a -> FCode a
 altOrNoEscapeHeapCheck checkYield regs code = do
-    dflags <- getDynFlags
+    profile <- getProfile
     platform <- getPlatform
     case cannedGCEntryPoint platform regs of
       Nothing -> genericGC checkYield code
       Just gc -> do
         lret <- newBlockId
-        let (off, _, copyin) = copyInOflow dflags NativeReturn (Young lret) regs []
+        let (off, _, copyin) = copyInOflow profile NativeReturn (Young lret) regs []
         lcont <- newBlockId
         tscope <- getTickScope
         emitOutOfLine lret (copyin <*> mkBranch lcont, tscope)
@@ -434,9 +434,9 @@ cannedGCReturnsTo :: Bool -> Bool -> CmmExpr -> [LocalReg] -> Label -> ByteOff
                   -> FCode a
                   -> FCode a
 cannedGCReturnsTo checkYield cont_on_stack gc regs lret off code
-  = do dflags <- getDynFlags
+  = do profile <- getProfile
        updfr_sz <- getUpdFrameOff
-       heapCheck False checkYield (gc_call dflags gc updfr_sz) code
+       heapCheck False checkYield (gc_call profile gc updfr_sz) code
   where
     reg_exprs = map (CmmReg . CmmLocal) regs
       -- Note [stg_gc arguments]
@@ -445,11 +445,11 @@ cannedGCReturnsTo checkYield cont_on_stack gc regs lret off code
       -- to the canned heap-check routines, because we are in a case
       -- alternative and hence the [LocalReg] was passed to us in the
       -- NativeReturn convention.
-    gc_call dflags label sp
+    gc_call profile label sp
       | cont_on_stack
-      = mkJumpReturnsTo dflags label NativeReturn reg_exprs lret off sp
+      = mkJumpReturnsTo profile label NativeReturn reg_exprs lret off sp
       | otherwise
-      = mkCallReturnsTo dflags label NativeReturn reg_exprs lret off sp []
+      = mkCallReturnsTo profile label NativeReturn reg_exprs lret off sp []
 
 genericGC :: Bool -> FCode a -> FCode a
 genericGC checkYield code
@@ -521,8 +521,7 @@ heapCheck checkStack checkYield do_gc code
   = getHeapUsage $ \ hpHw ->
     -- Emit heap checks, but be sure to do it lazily so
     -- that the conditionals on hpHw don't cause a black hole
-    do  { dflags <- getDynFlags
-        ; platform <- getPlatform
+    do  { platform <- getPlatform
         ; let mb_alloc_bytes
                  | hpHw > mBLOCK_SIZE = sorry $ unlines
                     [" Trying to allocate more than "++show mBLOCK_SIZE++" bytes.",
@@ -533,7 +532,10 @@ heapCheck checkStack checkYield do_gc code
                      "structures in code."]
                  | hpHw > 0  = Just (mkIntExpr platform (hpHw * (platformWordSizeInBytes platform)))
                  | otherwise = Nothing
-                 where mBLOCK_SIZE = bLOCKS_PER_MBLOCK dflags * bLOCK_SIZE_W dflags
+                 where
+                  constants = platformConstants platform
+                  bLOCK_SIZE_W = pc_BLOCK_SIZE (platformConstants platform) `quot` platformWordSizeInBytes platform
+                  mBLOCK_SIZE = pc_BLOCKS_PER_MBLOCK constants * bLOCK_SIZE_W
               stk_hwm | checkStack = Just (CmmLit CmmHighStackMark)
                       | otherwise  = Nothing
         ; codeOnly $ do_checks stk_hwm checkYield mb_alloc_bytes do_gc
