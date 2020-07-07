@@ -156,7 +156,6 @@ initConfig dflags = NCGConfig
    , ncgInlineThresholdMemcpy = fromIntegral $ maxInlineMemcpyInsns dflags
    , ncgInlineThresholdMemset = fromIntegral $ maxInlineMemsetInsns dflags
    , ncgSplitSections         = gopt Opt_SplitSections dflags
-   , ncgSpillPreallocSize     = rESERVED_C_STACK_BYTES dflags
    , ncgRegsIterative         = gopt Opt_RegsIterative dflags
    , ncgAsmLinting            = gopt Opt_DoAsmLinting dflags
 
@@ -188,7 +187,6 @@ initConfig dflags = NCGConfig
             ArchX86    -> v
             _          -> Nothing
    }
-
 
 initNat :: NatM_State -> NatM a -> (a, NatM_State)
 initNat init_st m

@@ -197,9 +197,9 @@ emitRtsCallGen
    -> Bool -- True <=> CmmSafe call
    -> FCode ()
 emitRtsCallGen res lbl args safe
-  = do { dflags <- getDynFlags
+  = do { platform <- targetPlatform <$> getDynFlags
        ; updfr_off <- getUpdFrameOff
-       ; let (caller_save, caller_load) = callerSaveVolatileRegs dflags
+       ; let (caller_save, caller_load) = callerSaveVolatileRegs platform
        ; emit caller_save
        ; call updfr_off
        ; emit caller_load }
@@ -245,13 +245,11 @@ emitRtsCallGen res lbl args safe
 -- "GHC.Cmm.Node".  Right now the workaround is to avoid inlining across
 -- unsafe foreign calls in rewriteAssignments, but this is strictly
 -- temporary.
-callerSaveVolatileRegs :: DynFlags -> (CmmAGraph, CmmAGraph)
-callerSaveVolatileRegs dflags = (caller_save, caller_load)
+callerSaveVolatileRegs :: Platform -> (CmmAGraph, CmmAGraph)
+callerSaveVolatileRegs platform = (caller_save, caller_load)
   where
-    platform = targetPlatform dflags
-
-    caller_save = catAGraphs (map (callerSaveGlobalReg    dflags) regs_to_save)
-    caller_load = catAGraphs (map (callerRestoreGlobalReg dflags) regs_to_save)
+    caller_save = catAGraphs (map (callerSaveGlobalReg    platform) regs_to_save)
+    caller_load = catAGraphs (map (callerRestoreGlobalReg platform) regs_to_save)
 
     system_regs = [ Sp,SpLim,Hp,HpLim,CCCS,CurrentTSO,CurrentNursery
                     {- ,SparkHd,SparkTl,SparkBase,SparkLim -}
@@ -259,14 +257,14 @@ callerSaveVolatileRegs dflags = (caller_save, caller_load)
 
     regs_to_save = filter (callerSaves platform) system_regs
 
-callerSaveGlobalReg :: DynFlags -> GlobalReg -> CmmAGraph
-callerSaveGlobalReg dflags reg
-    = mkStore (get_GlobalReg_addr dflags reg) (CmmReg (CmmGlobal reg))
+callerSaveGlobalReg :: Platform -> GlobalReg -> CmmAGraph
+callerSaveGlobalReg platform reg
+    = mkStore (get_GlobalReg_addr platform reg) (CmmReg (CmmGlobal reg))
 
-callerRestoreGlobalReg :: DynFlags -> GlobalReg -> CmmAGraph
-callerRestoreGlobalReg dflags reg
+callerRestoreGlobalReg :: Platform -> GlobalReg -> CmmAGraph
+callerRestoreGlobalReg platform reg
     = mkAssign (CmmGlobal reg)
-               (CmmLoad (get_GlobalReg_addr dflags reg) (globalRegType (targetPlatform dflags) reg))
+               (CmmLoad (get_GlobalReg_addr platform reg) (globalRegType platform reg))
 
 
 -------------------------------------------------------------------------
