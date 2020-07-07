@@ -264,10 +264,12 @@ else
 RUNTEST_OPTS += -e config.local=True
 endif
 
+# XXX config.platform needs to be removed once all libraries have been updated
+# to use targetPlatform.
 RUNTEST_OPTS +=  \
 	--rootdir=. \
 	--config-file=$(CONFIG) \
-	-e 'config.platform="$(TARGETPLATFORM)"' \         # XXX This needs to be removed
+	-e 'config.platform="$(TARGETPLATFORM)"' \
 	-e 'config.targetPlatform="$(TARGETPLATFORM)"' \
 	-e 'config.hostPlatform="$(HOSTPLATFORM)"' \
 	-e 'config.os="$(TargetOS_CPP)"' \
