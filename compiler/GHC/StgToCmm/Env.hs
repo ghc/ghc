@@ -58,13 +58,12 @@ mkCgIdInfo id lf expr
   = CgIdInfo { cg_id = id, cg_lf = lf
              , cg_loc = CmmLoc expr }
 
-litIdInfo :: DynFlags -> Id -> LambdaFormInfo -> CmmLit -> CgIdInfo
-litIdInfo dflags id lf lit
+litIdInfo :: Platform -> Id -> LambdaFormInfo -> CmmLit -> CgIdInfo
+litIdInfo platform id lf lit
   = CgIdInfo { cg_id = id, cg_lf = lf
              , cg_loc = CmmLoc (addDynTag platform (CmmLit lit) tag) }
   where
-    tag = lfDynTag dflags lf
-    platform = targetPlatform dflags
+    tag = lfDynTag platform lf
 
 lneIdInfo :: Platform -> Id -> [NonVoid Id] -> CgIdInfo
 lneIdInfo platform id regs
@@ -81,10 +80,9 @@ rhsIdInfo id lf_info
        reg <- newTemp (gcWord platform)
        return (mkCgIdInfo id lf_info (CmmReg (CmmLocal reg)), reg)
 
-mkRhsInit :: DynFlags -> LocalReg -> LambdaFormInfo -> CmmExpr -> CmmAGraph
-mkRhsInit dflags reg lf_info expr
-  = mkAssign (CmmLocal reg) (addDynTag platform expr (lfDynTag dflags lf_info))
-  where platform = targetPlatform dflags
+mkRhsInit :: Platform -> LocalReg -> LambdaFormInfo -> CmmExpr -> CmmAGraph
+mkRhsInit platform reg lf_info expr
+  = mkAssign (CmmLocal reg) (addDynTag platform expr (lfDynTag platform lf_info))
 
 idInfoToAmode :: CgIdInfo -> CmmExpr
 -- Returns a CmmExpr for the *tagged* pointer
@@ -124,7 +122,7 @@ addBindsC new_bindings = do
 
 getCgIdInfo :: Id -> FCode CgIdInfo
 getCgIdInfo id
-  = do  { dflags <- getDynFlags
+  = do  { platform <- targetPlatform <$> getDynFlags
         ; local_binds <- getBinds -- Try local bindings first
         ; case lookupVarEnv local_binds id of {
             Just info -> return info ;
@@ -141,7 +139,7 @@ getCgIdInfo id
                           mkBytesLabel name
                       | otherwise = mkClosureLabel name $ idCafInfo id
               in return $
-                  litIdInfo dflags id (mkLFImported id) (CmmLabel ext_lbl)
+                  litIdInfo platform id (mkLFImported id) (CmmLabel ext_lbl)
           else
               cgLookupPanic id -- Bug
         }}}
