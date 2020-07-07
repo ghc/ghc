@@ -19,6 +19,9 @@ module GHC.StgToCmm.DataCon (
 
 import GHC.Prelude
 
+import GHC.Platform
+import GHC.Platform.Profile
+
 import GHC.Stg.Syntax
 import GHC.Core  ( AltCon(..) )
 
@@ -46,7 +49,6 @@ import GHC.Types.RepType (countConRepArgs)
 import GHC.Types.Literal
 import GHC.Builtin.Utils
 import GHC.Utils.Outputable
-import GHC.Platform
 import GHC.Utils.Misc
 import GHC.Utils.Monad (mapMaybeM)
 
@@ -79,14 +81,16 @@ cgTopRhsCon dflags id con args
   = (id_Info, gen_code)
 
   where
-   id_Info       = litIdInfo dflags id (mkConLFInfo con) (CmmLabel closure_label)
+   platform      = targetPlatform dflags
+   id_Info       = litIdInfo platform id (mkConLFInfo con) (CmmLabel closure_label)
    name          = idName id
    caffy         = idCafInfo id -- any stgArgHasCafRefs args
    closure_label = mkClosureLabel name caffy
 
    gen_code =
-     do { this_mod <- getModuleName
-        ; when (platformOS (targetPlatform dflags) == OSMinGW32) $
+     do { profile <- getProfile
+        ; this_mod <- getModuleName
+        ; when (platformOS platform == OSMinGW32) $
               -- Windows DLLs have a problem with static cross-DLL refs.
               MASSERT( not (isDllConApp dflags this_mod con (map fromNonVoid args)) )
         ; ASSERT( args `lengthIs` countConRepArgs con ) return ()
@@ -96,7 +100,7 @@ cgTopRhsCon dflags id con args
             (tot_wds, --  #ptr_wds + #nonptr_wds
              ptr_wds, --  #ptr_wds
              nv_args_w_offsets) =
-                 mkVirtHeapOffsetsWithPadding dflags StdHeader (addArgReps args)
+                 mkVirtHeapOffsetsWithPadding profile StdHeader (addArgReps args)
 
             mk_payload (Padding len _) = return (CmmInt 0 (widthFromBytes len))
             mk_payload (FieldOff arg _) = do
@@ -110,7 +114,7 @@ cgTopRhsCon dflags id con args
              -- we're not really going to emit an info table, so having
              -- to make a CmmInfoTable is a bit overkill, but mkStaticClosureFields
              -- needs to poke around inside it.
-            info_tbl = mkDataConInfoTable dflags con True ptr_wds nonptr_wds
+            info_tbl = mkDataConInfoTable profile con True ptr_wds nonptr_wds
 
 
         ; payload <- mapM mk_payload nv_args_w_offsets
@@ -165,7 +169,7 @@ buildDynCon' dflags binder _ _cc con args
   = return (cgInfo, return mkNop)
 
 -------- buildDynCon': the general case -----------
-buildDynCon' dflags binder actually_bound ccs con args
+buildDynCon' _ binder actually_bound ccs con args
   = do  { (id_info, reg) <- rhsIdInfo binder lf_info
         ; return (id_info, gen_code reg)
         }
@@ -173,17 +177,19 @@ buildDynCon' dflags binder actually_bound ccs con args
   lf_info = mkConLFInfo con
 
   gen_code reg
-    = do  { let (tot_wds, ptr_wds, args_w_offsets)
-                  = mkVirtConstrOffsets dflags (addArgReps args)
+    = do  { profile <- getProfile
+          ; let platform = profilePlatform profile
+                (tot_wds, ptr_wds, args_w_offsets)
+                  = mkVirtConstrOffsets profile (addArgReps args)
                 nonptr_wds = tot_wds - ptr_wds
-                info_tbl = mkDataConInfoTable dflags con False
+                info_tbl = mkDataConInfoTable profile con False
                                 ptr_wds nonptr_wds
           ; let ticky_name | actually_bound = Just binder
                            | otherwise = Nothing
 
           ; hp_plus_n <- allocDynClosure ticky_name info_tbl lf_info
                                           use_cc blame_cc args_w_offsets
-          ; return (mkRhsInit dflags reg lf_info hp_plus_n) }
+          ; return (mkRhsInit platform reg lf_info hp_plus_n) }
     where
       use_cc      -- cost-centre to stick in the object
         | isCurrentCCS ccs = cccsExpr
@@ -293,7 +299,7 @@ precomputedStaticConInfo_maybe :: DynFlags -> Id -> DataCon -> [NonVoid StgArg] 
 precomputedStaticConInfo_maybe dflags binder con []
 -- Nullary constructors
   | isNullaryRepDataCon con
-  = Just $ litIdInfo dflags binder (mkConLFInfo con)
+  = Just $ litIdInfo (targetPlatform dflags) binder (mkConLFInfo con)
                 (CmmLabel (mkClosureLabel (dataConName con) NoCafRefs))
 precomputedStaticConInfo_maybe dflags binder con [arg]
   -- Int/Char values with existing closures in the RTS
@@ -303,12 +309,13 @@ precomputedStaticConInfo_maybe dflags binder con [arg]
   , inRange val
   = let intlike_lbl   = mkCmmClosureLabel rtsUnitId (fsLit label)
         val_int = fromIntegral val :: Int
-        offsetW = (val_int - (fromIntegral min_static_range)) * (fixedHdrSizeW dflags + 1)
+        offsetW = (val_int - (fromIntegral min_static_range)) * (fixedHdrSizeW profile + 1)
                 -- INTLIKE/CHARLIKE closures consist of a header and one word payload
         static_amode = cmmLabelOffW platform intlike_lbl offsetW
-    in Just $ litIdInfo dflags binder (mkConLFInfo con) static_amode
+    in Just $ litIdInfo platform binder (mkConLFInfo con) static_amode
   where
-    platform = targetPlatform dflags
+    profile = targetProfile dflags
+    platform = profilePlatform profile
     intClosure = maybeIntLikeCon con
     charClosure = maybeCharLikeCon con
     getClosurePayload (NonVoid (StgLitArg (LitNumber LitNumInt val))) = Just val
@@ -319,14 +326,16 @@ precomputedStaticConInfo_maybe dflags binder con [arg]
     inRange val
       = val >= min_static_range && val <= max_static_range
 
+    constants = platformConstants platform
+
     min_static_range :: Integer
     min_static_range
-      | intClosure = fromIntegral (mIN_INTLIKE dflags)
-      | charClosure = fromIntegral (mIN_CHARLIKE dflags)
+      | intClosure = fromIntegral (pc_MIN_INTLIKE constants)
+      | charClosure = fromIntegral (pc_MIN_CHARLIKE constants)
       | otherwise = panic "precomputedStaticConInfo_maybe: Unknown closure type"
     max_static_range
-      | intClosure = fromIntegral (mAX_INTLIKE dflags)
-      | charClosure = fromIntegral (mAX_CHARLIKE dflags)
+      | intClosure = fromIntegral (pc_MAX_INTLIKE constants)
+      | charClosure = fromIntegral (pc_MAX_CHARLIKE constants)
       | otherwise = panic "precomputedStaticConInfo_maybe: Unknown closure type"
     label
       | intClosure = "stg_INTLIKE"
@@ -346,10 +355,10 @@ bindConArgs :: AltCon -> LocalReg -> [NonVoid Id] -> FCode [LocalReg]
 -- found a con
 bindConArgs (DataAlt con) base args
   = ASSERT(not (isUnboxedTupleCon con))
-    do dflags <- getDynFlags
+    do profile <- getProfile
        platform <- getPlatform
-       let (_, _, args_w_offsets) = mkVirtConstrOffsets dflags (addIdReps args)
-           tag = tagForCon dflags con
+       let (_, _, args_w_offsets) = mkVirtConstrOffsets profile (addIdReps args)
+           tag = tagForCon platform con
 
            -- The binding below forces the masking out of the tag bits
            -- when accessing the constructor field.

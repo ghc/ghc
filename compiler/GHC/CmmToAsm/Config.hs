@@ -2,6 +2,7 @@
 module GHC.CmmToAsm.Config
    ( NCGConfig(..)
    , ncgWordWidth
+   , ncgSpillPreallocSize
    , platformWordWidth
    )
 where
@@ -20,7 +21,6 @@ data NCGConfig = NCGConfig
    , ncgInlineThresholdMemcpy :: !Word            -- ^ If inlining `memcpy` produces less than this threshold (in pseudo-instruction unit), do it
    , ncgInlineThresholdMemset :: !Word            -- ^ Ditto for `memset`
    , ncgSplitSections         :: !Bool            -- ^ Split sections
-   , ncgSpillPreallocSize     :: !Int             -- ^ Size in bytes of the pre-allocated spill space on the C stack
    , ncgRegsIterative         :: !Bool
    , ncgAsmLinting            :: !Bool            -- ^ Perform ASM linting pass
    , ncgDoConstantFolding     :: !Bool            -- ^ Perform CMM constant folding
@@ -34,6 +34,10 @@ data NCGConfig = NCGConfig
 -- | Return Word size
 ncgWordWidth :: NCGConfig -> Width
 ncgWordWidth config = platformWordWidth (ncgPlatform config)
+
+-- | Size in bytes of the pre-allocated spill space on the C stack
+ncgSpillPreallocSize :: NCGConfig -> Int
+ncgSpillPreallocSize config = pc_RESERVED_C_STACK_BYTES (platformConstants (ncgPlatform config))
 
 -- | Return Word size
 platformWordWidth :: Platform -> Width
