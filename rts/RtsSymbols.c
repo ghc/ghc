@@ -1071,7 +1071,8 @@
       /* SymI_NeedsProto(__popcountti2) */ \
       /* These functions return the number of bits set in a. */\
       SymI_NeedsProto(__bswapsi2) \
-      SymI_NeedsProto(__bswapdi2) \
+      SymI_NeedsProto(__bswapdi2)
+#define RTS_LIBGCC_SYMBOLS_aarch32                     \
       /* armv6l                                      */\
       /* TODO: should check for __ARM_EABI__         */\
       SymI_NeedsProto(__aeabi_d2f) \
@@ -1142,12 +1143,12 @@
       SymI_NeedsProto(__floatsitf)                     \
       SymI_NeedsProto(__floatunsitf)
 
-#if defined(__GNUC__) && SIZEOF_VOID_P <= 4 && !defined(_ABIN32)
+#if defined(__GNUC__) && SIZEOF_VOID_P <= 4 && defined(arm_HOST_OS)
+#define RTS_LIBGCC_SYMBOLS RTS_LIBGCC_SYMBOLS_32 RTS_LIBGCC_SYMBOLS_aarch32
+#elif defined(__GNUC__) && SIZEOF_VOID_P <= 4 && !defined(_ABIN32)
 #define RTS_LIBGCC_SYMBOLS RTS_LIBGCC_SYMBOLS_32
 #elif defined(__GNUC__) && SIZEOF_VOID_P == 8 && defined(aarch64_HOST_OS)
-#define RTS_LIBGCC_SYMBOLS \
-      RTS_LIBGCC_SYMBOLS_64 \
-      RTS_LIBGCC_SYMBOLS_aarch64
+#define RTS_LIBGCC_SYMBOLS RTS_LIBGCC_SYMBOLS_64 RTS_LIBGCC_SYMBOLS_aarch64
 #elif defined(__GNUC__) && SIZEOF_VOID_P == 8
 #define RTS_LIBGCC_SYMBOLS RTS_LIBGCC_SYMBOLS_64
 #else
