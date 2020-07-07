@@ -509,20 +509,17 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
 
                       -- Check for missing associated types and build them
                       -- from their defaults (if available)
-                    ; let !atItems = classATItems clas -- make sure this always gets forced or extra allocation will happen
+                    ; let atItems = classATItems clas
                     ; tf_insts2 <- mapM (tcATDefault loc mini_subst defined_ats)
-                      -- Don't default type family instances, but rather omit,
-                      -- in hsig/hs-boot. There's no way for users to opt out of this,
-                      -- and including the defaults would induce a meaningful restriction on possible
-                      -- instantiations. Plus, any type family instances in an hs-boot file
-                      -- this breaks the current implementation.
-                      --
-                      -- We should be vigilant to also make sure term level
-                      -- defaults also don't sneak into `hsig/hs-boot`, either.
-                      -- Dependent Haskell could make them provide equalities,
-                      -- and thus influence interfaces, for example.
                                         (if is_boot then [] else atItems)
-
+                      -- Don't default type family instances, but rather omit, in hsig/hs-boot.
+                      -- Since hsig/hs-boot files are essentially large binders we want omission
+                      -- of the definition to result in no restriction, rather than for example
+                      -- attempting to "pattern match" with the invisible defaults and generate
+                      -- equalities. Without further handling, this would just result in a panic
+                      -- anyway.
+                      -- See https://github.com/ghc-proposals/ghc-proposals/pull/320 for
+                      -- additional discussion.
                     ; return (df_stuff, tf_insts1 ++ concat tf_insts2) }
 
 
