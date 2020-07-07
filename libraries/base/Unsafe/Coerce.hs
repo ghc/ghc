@@ -308,4 +308,5 @@ unsafeCoerce# = error "GHC internal error: unsafeCoerce# not unfolded"
 
 -- unsafeCoerce version of the amap/coerce rule defined in GHC.Arr
 "amap/unsafeCoerce" amap unsafeCoerce = unsafeCoerce
-#-}
+ #-}
+
