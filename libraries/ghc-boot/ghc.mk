@@ -59,3 +59,13 @@ libraries/ghc-boot/dist-boot/package-data.mk: \
 	libraries/ghc-boot/dist-boot/build/GHC/Platform/Host.hs
 libraries/ghc-boot/dist-install/package-data.mk: \
 	libraries/ghc-boot/dist-install/build/GHC/Platform/Host.hs
+
+libraries/ghc-boot/dist-boot/build/GHC/Platform/Constants.hs \
+libraries/ghc-boot/dist-install/build/GHC/Platform/Constants.hs: $(includes_GHCCONSTANTS_HASKELL_TYPE) | $$(dir $$@)/.
+	$(call removeFiles,$@)
+	"$(CP)" $< $@
+
+libraries/ghc-boot/dist-boot/package-data.mk: \
+	libraries/ghc-boot/dist-boot/build/GHC/Platform/Constants.hs
+libraries/ghc-boot/dist-install/package-data.mk: \
+	libraries/ghc-boot/dist-install/build/GHC/Platform/Constants.hs

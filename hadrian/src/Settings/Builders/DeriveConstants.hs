@@ -8,10 +8,7 @@ import Settings.Builders.Common
 deriveConstantsPairs :: [(String, String)]
 deriveConstantsPairs =
   [ ("DerivedConstants.h", "--gen-header")
-  , ("GHCConstantsHaskellType.hs", "--gen-haskell-type")
   , ("platformConstants", "--gen-haskell-value")
-  , ("GHCConstantsHaskellWrappers.hs", "--gen-haskell-wrappers")
-  , ("GHCConstantsHaskellExports.hs", "--gen-haskell-exports")
   ]
 
 -- TODO: do we need to support `includes_CC_OPTS += -DDYNAMIC_BY_DEFAULT`?
