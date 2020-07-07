@@ -43,9 +43,7 @@ ghcPrimDependencies = do
 derivedConstantsFiles :: [FilePath]
 derivedConstantsFiles =
     [ "DerivedConstants.h"
-    , "GHCConstantsHaskellExports.hs"
-    , "GHCConstantsHaskellType.hs"
-    , "GHCConstantsHaskellWrappers.hs" ]
+    ]
 
 compilerDependencies :: Expr [FilePath]
 compilerDependencies = do
@@ -112,6 +110,7 @@ generatePackageCode context@(Context stage pkg _) = do
     priority 2.0 $ do
         when (pkg == compiler) $ do
             root -/- "**" -/- dir -/- "GHC/Settings/Config.hs" %> go generateConfigHs
+            root -/- "**" -/- dir -/- "GHC/Platform/Constants.hs" %> genPlatformConstantsType context
             root -/- "**" -/- dir -/- "*.hs-incl" %> genPrimopCode context
         when (pkg == ghcPrim) $ do
             root -/- "**" -/- dir -/- "GHC/Prim.hs" %> genPrimopCode context
@@ -119,7 +118,6 @@ generatePackageCode context@(Context stage pkg _) = do
         when (pkg == ghcBoot) $ do
             root -/- "**" -/- dir -/- "GHC/Version.hs" %> go generateVersionHs
             root -/- "**" -/- dir -/- "GHC/Platform/Host.hs" %> go generatePlatformHostHs
-            root -/- "**" -/- dir -/- "GHC/Platform/Constants.hs" %> genPlatformConstantsType context
 
     when (pkg == compiler) $ do
         root -/- primopsTxt stage %> \file -> do

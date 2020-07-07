@@ -45,7 +45,6 @@ Library
             GHC.HandleEncoding
             GHC.Platform.ArchOS
             GHC.Platform.Host
-            GHC.Platform.Constants
             GHC.Settings.Utils
             GHC.UniqueSubdir
             GHC.Version
@@ -54,7 +53,6 @@ Library
     -- autogen-modules:
     --         GHC.Version
     --         GHC.Platform.Host
-    --         GHC.Platform.Constants
 
     build-depends: base       >= 4.7 && < 4.16,
                    binary     == 0.8.*,

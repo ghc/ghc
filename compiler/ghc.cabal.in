@@ -257,6 +257,7 @@ Library
         GHC.Cmm.Ppr.Expr
         GHC.Data.Bitmap
         GHC.Platform
+        GHC.Platform.Constants
         GHC.Platform.Ways
         GHC.Platform.Profile
         GHC.Platform.Regs
@@ -568,8 +569,8 @@ Library
         GHC.Cmm.Dataflow.Label
 
     reexported-modules:
-        GHC.Platform.ArchOS
-        GHC.Platform.Host
+          GHC.Platform.ArchOS
+        , GHC.Platform.Host
 
     Exposed-Modules:
             GHC.CmmToAsm
