@@ -9,5 +9,5 @@ main = if textualVersion == majMinRev
        else "[!]" <> textualVersion <> "should be equal to " <> majMinRev
   where
     macroVersion = __GLASGOW_HASKELL_FULL_VERSION__
-    textualversion = show fullCompilerVersion
+    textualVersion = show fullCompilerVersion
     majMinRev = reverse $ tail $ dropWhile (/= '.') $ reverse macroVersion
