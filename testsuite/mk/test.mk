@@ -29,6 +29,7 @@ CONFIG       = $(TOP)/config/$(COMPILER)
 
 # if no TEST_WRAPPER is set, use exec
 TEST_WRAPPER ?= exec
+export TEST_WRAPPER
 
 ifeq "$(GhcUnregisterised)" "YES"
     # Otherwise C backend generates many warnings about
