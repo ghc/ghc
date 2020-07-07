@@ -80,6 +80,22 @@ import Control.DeepSeq -- hiding (deepseq)
 import System.IO.Unsafe
 
 {-
+
+    Note [Debugging Taggedness]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    In practice bugs happen. So I added a few ways to make issues with this code easier to debug.
+
+    * There is a flag to dump the result of this analysis (ddump-stg-tag-nodes).
+    I found this immensely helpful during developement.
+    * There is a flag to emit runtime checks to confirm the results of taggedness (dtag-inference-checks).
+    If we case on a value we expect to be tagged it adds a runtime check for the tag. If there is no tag
+    your program will terminate immediately which makes it a lot easier to find the root cause.
+    * The data flow graph can be extended with a description making it easier to work with.
+    This is disabled by default, enabled by -DDEBUG, and easily changed by defining (or not)
+    WITH_NODE_DESC.
+
+
     Note [Useless Bangs]
     ~~~~~~~~~~~~~~~~~~~~
 
@@ -95,146 +111,173 @@ import System.IO.Unsafe
     Note [Tag Inferrence - The basic idea]
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-This code has two goals:
+    This code has two goals:
+
     * Ensure constructors with strict fields are only
-      allocated with tagged pointers in the strict fields.
+        allocated with tagged pointers in the strict fields.
     * Infer if a given use site of an id is guaranteed to
-      refer to a tagged pointer.
+        refer to a tagged pointer.
 
-Id's represent by a tagged pointer do not have to be entered
-when used in an case expression like `case id of ...` which
-can have massive performance benefits for traversals of strict
-data structures.
+    Id's refered to by a tagged pointer do not have to be entered
+    when used in an case expression like `case v of ...` which
+    can have massive performance benefits for traversals of strict
+    data structures.
 
-This Module contains the code for the actual inference and upholding
-the strict field invariant. See Note [The strict field invariant]
-Once computed the infered taggedness is stored in the extension
-point of StgApp. This is then used in StgCmmExpr to determine if we
-need to enter an expression.
+    This Module contains the code for the actual inference and upholding
+    the strict field invariant. See Note [The strict field invariant]
+    Once computed the infered tag information is stored in the extension
+    point of StgApp. This is then used in StgCmmExpr to determine if we
+    need to enter an expression.
 
+    We essentially use a 0CFA analysis approach.
+    * We label relevant parts of the AST.
+      Implementation wise we build a data flow graph which represents
+      only the relevant nodes of the AST.
+    * For each data flow node we have a constraint generation(update)
+      function. Which looks at existing constraints and updates our
+      known constraints based on this information.
+    - Both of the above steps are implemented in the  the node* functions.
+      (e.g. nodeRhs)
+    * We run the analysis by iterating on the constraints in solveConstraints.
+    * Once that's done we extract relevant information from the constraints in
+      the rewrite* (e.g. rewriteRhs) functions. This:
+      + Updates the extension points where appropriate.
+      + Inserts seq where required to uphold the strict field invariant.
+        See Note [The strict field invariant].
 
-The inference code has three major parts.
+    I found that commonly 0CFA is represented as having distinct maps
+    for variables and labels. We simply assign all occurences refering
+    to a variable the same label instead.
 
-* Building an data flow graph based on the STG AST. This is done by the
-  node* family of functions.
-* Running the analysis on the data flow graph.
-    + The driver of this is solveConstraints.
-    + The actual update function for each node type is defined
-      in it's respective node* function.
-* Updating the AST based on the computed information. This is implemented
-    by the rewrite* functions.
-    + We update the extension points.
-    + We also wrap allocations for constructors in
-      seq statements if required to uphold the taggedness of strict
-      fields.
+    All node* functions have explicit documentation describing both how
+    data flows between their inputs and outputs, as well as how new
+    constraints are generated. But it's fairly informal.
 
 
     Note [The strict field invariant]
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The code in this module transforms the STG AST such
-that all strict fields will only contain tagged values
-with the exception of functions and absentError values.
+    The code in this module transforms the STG AST such
+    that all strict fields will only contain tagged values.
 
-This is done by adding seq's where required around allocation
-of constructors with strict fields.
+    We do allow two exceptions to this invariant.
+    * Functions.
+    * Values representing an absentError.
 
-The purpose of this invariant is that it allows us to eliminate
-the tag check when casing on values coming out of strict fields.
+    See also Note [Taggedness of absentError] for more information on
+    the later.
 
-In particular when traversing the strict spine of a data structure
-this eliminates a significant amount of code being executed leading
-to significant speedups. (10% and up for the traversal!)
+    We uphold this invariant by inserting code for evaluation around
+    constructor allocation where needed. In practice this means sometimes
+    we will turn this RHS:
 
-    Note [Absent error in strict fields]
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        StrictTuple foo bar
 
-Note [Taggedness of absentError]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    into something like:
 
-WW under certain circumstances will determine that a strict
-field is not used and allocate a temporary constructor with
-an absentError inside the field.
+        case foo of taggedFoo ->
+        case bar of taggedBar ->
+            StrictTuple taggedFoo taggedBar
 
-So we have to take great care to avoid reentering them when
-upholding the strict field invariant.
+    The purpose of this invariant is that it allows us to eliminate
+    the tag check when casing on values coming out of strict fields.
 
-For this purpose we treat bindings binding such an expression
-as being tagged in all cases.
+    In particular when traversing the strict spine of a data structure
+    this eliminates a significant amount of code being executed leading
+    to significant speedups. (10% and up for the traversal!)
 
-This happens because when GHC reboxes a constructor, sometimes we
-don't need to recreate the full value and can stub out fields
-which are known to be unused.
+    This, on it's own, would *not* be a performance improvement.
+    However since for most strict constructor arguments we can infer
+    if a tag is present or not in practice we do not add a lot of evaluation
+    so the overhead is far lower than the payoff.
 
-For lifted types GHC places an absentError thunk in those fields
-so if anything goes wrong we will get a runtime error instead of
-unpredictable behaviour.
+    Note [Taggedness of absentError]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-See Note [Absent errors] for the details on why we do this.
+    WorkerWrapper -  under certain circumstances - will determine
+    that a strict field in a constructor is not used and put a bottom
+    expression in there as placeholder which is not supposed to be
+    evaluated. See Note [Absent errors] in the WW code for why we do this.
 
-The bad news is this means that technically speaking the strict
-field invariant is a lie. To avoid disaster striking when we
-evaluate such values we check for these explicitly.
+    We have to take great care to avoid evaluating these absentError
+    expresions when upholding the strict field invariant. Because
+    evaluating them would trigger a panic in the runtime.
 
-After all in the absence of bugs in the rest of GHC any such value
-should never be evaluated, and therefore can be treated as already
-evaluated without affecting correctness.
+    For this purpose we treat bindings representing an absentError value
+    as being tagged. We do this with the help of strictness analysis which
+    will assign a special kind of divergence value to such bindings.
 
-This means we might end up with code like this:
+    This is similar to the simplifier treating absentError as a constructor.
+    See Note [aBSENT_ERROR_ID] for a description of the simplifier case.
 
-    $wf :: a -> b -> Result
-    $wf a b = let c = absentError "ww_absent"
-            in  g (MkT a b c)
+    This is alright, because in the absence of bugs in the rest of GHC any such value
+    should never be evaluated, and therefore can be treated as already
+    evaluated without affecting correctness.
 
-Where we known g will not use the field c.
+    This means we might end up with code like this:
 
-Since STG is in ANF any such binding will be a function application
-of the known `absentError` id. Which makes it easy to check for this.
+        data T a b c = MkT a b !c
 
-We then treat any binding of an absentError application as already evaluated.
-Again this is safe as these bindings can't be evaluated in the absence of bugs
-in the rest of GHC.
+        $wf :: a -> b -> Result
+        $wf a b = let c = absentError "ww_absent"
+                in  g (MkT a b c)
 
-In the presence of bugs in the rest of GHC a debug build will still catch these
-error when confirming validity of predicated taggedness. So this seems reasonable.
+    Where we known g will not use the strict field c.
 
-One issue arises with imported worker functions. What if we inline $wf
-into a module B, but don't do so for c we have to ensure  that c
-is still treated as tagged.
+    We catch this kind of situation in two ways:
+    * Checking the RHS for absentError applications in the current module.
+    * Inspecting the strictness of imported ids.
 
-This might seem tricky, as we really want to expose this information from/to
-optimized builds. But we do not want to force it on unoptimized ones.
+    If we come across a let binding of absentError we simply treat the binding as
+    if it's represented by a tagged pointer.
+    Again this is safe as these bindings can't be evaluated in the absence of bugs
+    in the rest of GHC.
 
-Consider c to be defined in module A, and $wf to be inlined into B.
-This gives us four cases to consider:
+    Checking the strictness properties for imported ids is important.
+    What if we inline $wf into a module B, but don't do so for `c` which
+    binds the absentError expression? We have to ensure  that c
+    is still treated as tagged.
 
-A & B not optimized:
-    Since ww will not run on either, there is no way for this kind of reboxing to happen.
-A & B optimized:
-    A will be analyzed, and export taggedness info about c, B will import this info and
-    treat c accordingly.
-A optimized, B not optimized:
-    If B is not optimized then the body of $wf can't end up in B, so this works out.
-A not optimized, B not optimized:
-    Since A is not optimised GHC won't expose any unfoldings, so again $wf and c can't
-    end up in different modules and things work out.
+    This can't lead to issues in practice:
+    * Consider c to be defined in module A
+    * $wf to be inlined into module B from module A.
+
+    This gives us four cases to consider:
+
+    A & B not optimized:
+        Since ww will not run on either, c will never be generated by the compiler.
+    A & B optimized:
+        A will be analyzed, the demand analyzer will recognise c as an absent error
+        which allows us to treat `c` as tagged inside module B.
+    A optimized, B not optimized:
+        If B is not optimized then the body of $wf can't end up in B, so this works out.
+    A not optimized, B not optimized:
+        Since A is not optimised GHC won't expose any unfoldings, so again $wf and c can't
+        end up in different modules and things work out.
 
 -}
 
 
+-- #if defined(DEBUG)
 #define WITH_NODE_DESC
+-- #endif
 
 -- Shortcut comparisons if two things reference the same object.
 maybeEq :: a -> a -> Bool
 maybeEq x1 x2 = isTrue# (reallyUnsafePtrEquality# x1 x2)
 
--- Grow them trees:
+-- | Can we guarantee this RhsCon binding will remain a RhsCon?
+data IsRhsCon
+    = RhsCon        -- ^ Local bindings, nullary constructors.
+    | MaybeClosure  -- ^ Top level bindings.
+    deriving Eq
 
--- Once all is said and done, will this still be a RhsCon?
-data IsRhsCon = RhsCon | MaybeClosure deriving Eq
+-- Grow them trees:
 
 type instance BinderP       'InferTags = Id
 type instance XRhsClosure   'InferTags = NoExtFieldSilent
+-- Putting IsRhsCon into XRhsCon instead of the data flow node
+-- is done for performance reasons.
 type instance XRhsCon       'InferTags = (NodeId,IsRhsCon)
 type instance XLet          'InferTags = NoExtFieldSilent
 type instance XLetNoEscape  'InferTags = NoExtFieldSilent
@@ -260,8 +303,8 @@ data RecursionKind
 
 # The EnterInfo Lattice
 
-We use a lattice for the tag analysis, with each update of a node
-being monotonic towards the top of the lattice.
+We use a lattice for the tag analysis.
+The transfer function for nodes is monotonic (towards bot)
 
 Lattice elements are cross products of two values.
 Both of which are lattices themselves.
@@ -270,18 +313,20 @@ One lattice encodes if we have to enter an object when
 we case on it in the form of `case id of ...` and looks
 like this:
 
-               NoValue
+
+            UndetEnterInfo
                   |
+              MaybeEnter
                /  |  \
               /   |   \
       AlwaysEnter |  NeverEnter
                \  |  /
                 \ | /
-              MaybeEnter
                   |
-            UndetEnterInfo
+          NoValue (Bottom)
 
-It is also called the "outer" infor about a binding in places.
+
+It is also called the "outer" info in some places.
 
 What these values represent is the requirement of needing
 to evaluate a binding 'val' in a context like
@@ -297,38 +342,35 @@ as they can not be entered only called. However we try to assign
 functions a value of NeverEnter, as it makes certain things more
 consistent in the code.
 
-NoValue is a special value assigned to expressions assigned to
-expressions which can't be scrutinised at runtime.
+NoValue is a special value assigned to expressions which can't be
+scrutinised at runtime. This is different from the values themselves
+being bottom. Rather the expression producing them is bottom!
+
 A common example is the tail recursive branch in a recursive function.
 See Note [Recursive Functions] for why we need this.
 If we end up assigning NoValue to a *bindings* enterInfo then
 this binding represents a computation which won't return as it
 will tail call itself forever.
-This happens for example for `f x = f x`.
-
-NoValue is also a fixpoint in the lattice. Once a data flow node
-has been assigned enterInfo NoValue it's enterInfo won't change
-anymore, as the only way to arrive at this value in practice is
-through nodes representing tail recursion, or by having a node
-which only depends on such nodes.
+This happens for example in `f x = f x`.
 
 NeverEnter means the object referenced by the binding won't ever be
 entered as a *value*. It might be called as a function when applied
 to arguments.
 
 AlwaysEnter implies something is a thunk of some form. However since GC
-can also evaluate certain forms of thunks we do currently not utilize it.
+can also evaluate certain forms of thunks we do currently not utilize it
+as the benefits are marginal.
 
-MaybeEnter represents the union of things where:
+MaybeEnter represents the set of things for which one of these is true:
 * We don't care about the enter behaviour
-* We know we can't know the enter behaviour - function arguments
+* We know we can't know the enter behaviour - e.g. function arguments
 * We know it could be either enter or no-enter depending on
   branches taken at runtime.
 
 # The FieldInfo Lattice
 
-The second lattice represents information about bindings which are
-bound to the fields of an id.
+The second lattice represents information about values which are
+in the fields of an id.
 This is a mouthful so here is an example:
 
     let x = foo
@@ -336,7 +378,7 @@ This is a mouthful so here is an example:
         MyCon a b -> case a of
             <alts>
 
-    We have determined foo has the field info lattice:
+    Assume we have determined foo has the field info lattice:
         `FieldsProd [(NeverEnter,fi1), (MaybeEnter,fi2)]
     So naturally the same is true of x.
 
@@ -346,38 +388,38 @@ This is a mouthful so here is an example:
     This is independent of weither or not x needs to be entered, or even it's
     termination. As this information can only be used if x terminates.
 
-So if we have "foo = Just bar" then this lattice will
+If we have "foo = Just bar" then this lattice will
 encode the information we have about bar, potentially also with
 nested information itself. In practice we limit to nesting to a certain depth
 for performance reasons but a few levels deep can be very useful.
 
 This lattice has this shape:
 
-          LatNoValues
-            /  |  \
-   FieldsProd  |  FieldsSum
-            \  |  /
-         FieldsUntyped
+           FieldsUndet
                |
          FieldsUnknown
                |
-           FieldsUndet
+         FieldsUntyped
+            /  |  \
+   FieldsProd  |  FieldsSum
+            \  |  /
+          LatNoValues
+
+
 
 It's very much analog to the one for enterInfo.
 
-Again we have a placeholder for lack of a value used
-for recursive tail calls.
+Again we have a placeholder for bottom values used
+for e.g. recursive tail calls.
 See Note [Recursive Functions] for details about that.
 
-Some of these constructors represent an infinite number of fields
+Some of these constructors represent semantically a infinite number of fields
 containing certain information:
-* FieldsUndet represents a infinite number of undetermined values.
-* FieldsUnknown represents a infinite number of values we can't know anything about.
-* LatNoValues represents a infinite number of non-values.
-
-* FieldsProd/FieldsSum/FieldsUntyped encode known information about fields.
-  They are represented as a determined list of information. Fields not represented
-  in the list have semantically the value noValue.
+* FieldsUndet   => each field contains a not yet determined values.
+* FieldsUnknown => each field is a real top, we can't know anything about them yet.
+* LatNoValues   => each field is the result of bottom expression returning.
+* FieldsProd/FieldsSum/FieldsUntyped encode varying information about a given
+  number of fields. Fields not explicitly present in the list are bottom.
 
 Again as example we might have
 
@@ -387,7 +429,7 @@ The FieldLattice for 'x' would semantically be:
 
     FieldsSum ((NeverEnter,LatNoValues) : repeat (noValues))
 
-However 'repeat (noValues)' is only implicitly encoded in our branch combinators.
+However 'repeat (noValues)' is only implicitly encoded.
 
 This scheme is incredible useful when combining branches of constructors with a different
 number of fields.
@@ -401,7 +443,10 @@ For field infos we combine field information pointwise.
 
 When combining results from different branches we allow
 combinations of different field counts. Usually promoting the field
-info constructor to UntypedFields
+info constructor to UntypedFields.
+
+Implementation wise we insert a special kind of node which does the joining.
+This means all other nodes can have a fixed number of inputs/outputs.
 
     Combining branches with different constructors/types.
     -----------------------------------------------------
@@ -409,14 +454,14 @@ info constructor to UntypedFields
 Eg we combine `Just False` and Nothing into the result
 tagged<tagged>.
 
-This might seem odd at a glance but is safe.
+This might seem odd at a glance but is safe and reasonable.
 
 Consider for example two constructors C1 and C2 as rhs
 in two branches alt1 and alt2.
-C1 having n1 fields, C2 having n2 fields, and
-n1 < n2.
+C1 having n fields, C2 having m fields, and
+n < m.
 
-For the first n1 fields we combine the lattices of the
+For the first n fields we combine the lattices of the
 results, which is safe. If they contradict each other
 we simply assume a safe value on the lattice (MayEnter).
 
@@ -424,22 +469,24 @@ So this can not result in an error, and is in fact the same
 behaviour as when comparing two branches consisting of the same
 outermost constructor.
 
-Now for the fields n1+1 .. n2 we assign them the value from
+Now for the fields n+1 .. m we assign them the value from
 C2's branch. This is safe.
 
 * A branch not matching on any constructor can't bind any fields.
   So this is trivially safe.
 * Any branch matching on C1 will only bind up to n1 arguments.
-  This means there is no chance of any of the values n1+1 ... n2
+  This means there is no chance of any of the values n+1 ... m,
   to be scrutinzed in this branch.
-* Any branch matching on C2 might bind the fields n+1 ... n2.
+* Any branch matching on C2 might bind the fields 1 ... m.
   But this is also safe.
   + If there are other branches with as many defined fields we would
     already have combined them to a safe element of the lattice.
   + If alt2 is the only such branch then we will always scrutinize the
     value created in this branch, so using the field results of alt for
-    n1+1 .. n2 is also safe.
-* Any other constellation can be again reduced to this case.
+    n1+1 .. m is also safe.
+
+* Any other combination can be reduced the repeated applications of
+  the above patterns.
 
     Note [Recursive Functions]
     ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -455,12 +502,12 @@ field will contain a tagged&evaluated value.
 
 We deal with this by looking for branches in a functions body
 which are recursive tail calls to the function itself.
-In our domain we can pretend these branches do not return a value.
+In our domain these branches do not return a value.
 Indeed any value eventually produced by a function must come from a
-branch NOT consisting of a recursive tail call.
+branch NOT consisting of a recursive tail call to itself.
 
-For any of these tail calls we mark the result with the special
-noValue element of the lattice. When combining these values they
+For any of these tail calls we assign the bot of the lattice.
+When combining these values they
 always "give way" to the result of the non-recursive branches.
 
 This is correct as after all we can approximate the result of the recursive
@@ -471,10 +518,9 @@ of noValue for `f x` which means if `f` is called in a branch somewhere else
 that branch too will give way to the terminating branches.
 
 Beyond this we are cautios when combining the result of branches.
-bot/top combined with any other value will result in bot or top so
-the result of multiple branches will only be inferred once all the
-branches have been analyzed. As otherwise the not yet analyzed branches
-will pull the result down to undetermined as well.
+Since undetermined is the bottom of the lattice and we use glb
+a combination of any number of branches will be undetermined until
+we have approximated a more precise result for *all* branches.
 
 Implementation wise we check for tail calls by looking at the syntactic
 context of function applications. This is implemented in `isRecTail`
@@ -491,13 +537,13 @@ TODO: Can we simply assign noValue here as well?
 
 If we use glb to combine the two branches the following
 happens:
-* We initialize all nodes to bot.
+* We initialize all nodes to top.
 * We compute the info tagged<tagged> for the non-recursive branch.
 * We compute the info noValue for the tail recursive branch.
 * Combining that with tagged from the other branch will result
   in the value tagged<tagged>.
 
-We have reached the fixpoint bot at this point.
+We have reached the fixpoint top at this point.
 
 If we process the nodes in a different order then it might take
 multiple iterations. But we make an effort to process nodes in
@@ -517,11 +563,17 @@ To handle these cases we do three things:
   analysis is safe.
 
 Intermediate results (before a fixpoint is reached) might
-be less precise than our analysis allows for. But any state
-will result in a correct program transformation as we never
-overestimate enter behaviour.
-That is we never predict we don't have to enter a binding if
-we do.
+be less precise than our analysis allows for. But any intermediate
+result of the analysis will result in a safe approximation for the
+program, as long as we have done at least one pass over each RHS.
+
+Why one pass? If absentError is used as a constructor argument somewhere
+we must be sure to infer it as tagged. Which takes exactly one pass if we
+update nodes in dependency order.
+
+This way we never predict we don't have to enter a binding if it actually
+requires evaluation. Which means even if we can't find a fixpoint it's safe
+to use the result of this analysis.
 
 
     Note [Infering recursive tail calls]
@@ -546,7 +598,6 @@ It is a tail call if it's none of the above and in a tail call position in
     * the definition of a let-no-escape
     * a case alternative
     * a closure
-
 -}
 
 ---------------------------------
@@ -554,10 +605,10 @@ It is a tail call if it's none of the above and in a tail call position in
 ---------------------------------
 
 
-bot :: EnterLattice
-bot = EnterLattice UndetEnterInfo FieldsUndet
 top :: EnterLattice
-top = EnterLattice MaybeEnter FieldsUnknown
+top = EnterLattice UndetEnterInfo FieldsUndet
+bot :: EnterLattice
+bot = EnterLattice MaybeEnter FieldsUnknown
 noValue :: EnterLattice
 noValue = EnterLattice NoValue FieldsNone
 
@@ -649,7 +700,7 @@ instance Outputable EnterLattice where
         = ppr enterInfo <> text " x " <> ppr fieldInfo
 
 instance Outputable FieldInfo where
-    ppr FieldsUnknown           = text "top"
+    ppr FieldsUnknown           = text "bot"
     ppr (FieldsUntyped fields)  = text "any" <> ppr fields
     ppr (FieldsProd fields)     = text "prod" <> ppr fields
     ppr (FieldsSum con fields)  = text "sum" <> char '<' <> ppr con <> char '>' <> ppr fields
@@ -688,17 +739,18 @@ instance Binary FieldInfo where
             5 -> pure FieldsUndet
             _ -> panic "get:FieldInfo - invalid byte"
 
+-- lub
 combineEnterInfo :: EnterInfo -> EnterInfo -> EnterInfo
 combineEnterInfo UndetEnterInfo _       = UndetEnterInfo
 combineEnterInfo _ UndetEnterInfo       = UndetEnterInfo
 combineEnterInfo MaybeEnter _           = MaybeEnter
 combineEnterInfo _ MaybeEnter           = MaybeEnter
-combineEnterInfo NoValue x              = x
-combineEnterInfo x NoValue              = x
 combineEnterInfo NeverEnter AlwaysEnter = MaybeEnter
 combineEnterInfo AlwaysEnter NeverEnter = MaybeEnter
 combineEnterInfo AlwaysEnter AlwaysEnter= AlwaysEnter
 combineEnterInfo NeverEnter NeverEnter  = NeverEnter
+combineEnterInfo NoValue x              = x
+combineEnterInfo x NoValue              = x
 
 combineFieldsUntyped :: [EnterLattice] -> [EnterLattice] -> [EnterLattice]
 combineFieldsUntyped fields1 fields2 =
@@ -764,13 +816,13 @@ setEnterInfo lat@(EnterLattice enter fields) newEnter
     | otherwise = EnterLattice newEnter fields
 
 -- Lookup field of the returned valued.
--- Defaulting towards bot
+-- Defaulting towards top
 -- Zero indexed
 indexField :: EnterLattice -> Int -> EnterLattice
 indexField lat n =
     case fieldInfo lat of
-        FieldsUndet -> bot
-        FieldsUnknown -> top
+        FieldsUndet -> top
+        FieldsUnknown -> bot
         FieldsNone -> noValue
         FieldsSum  _ fields -> getField fields
         FieldsProd fields   -> getField fields
@@ -778,28 +830,27 @@ indexField lat n =
   where
     getField fields =
         case drop n fields of
-            -- We treat [] equal to [bot, bot, bot, ...]
-            [] -> bot
+            -- We treat [] equal to [top, top, top, ...]
+            [] -> top
             (x:_xs) -> x
 
 hasOuterTag :: EnterLattice -> Bool
 hasOuterTag lat = enterInfo lat == NeverEnter
 
--- We use these to stop iterating on nodes which are already at the top of the lattice.
+-- We use these to stop iterating on nodes which are already at the bot of the lattice.
 
-hasTopFields :: EnterLattice -> Bool
-hasTopFields lat = areTopFields $ fieldInfo lat
+hasFinalFields :: EnterLattice -> Bool
+hasFinalFields lat =
+    case (fieldInfo lat) of
+        (FieldsUnknown )        -> True
+        (FieldsNone  )          -> False
+        (FieldsUndet)           -> False
+        (FieldsProd fields)     -> all isFinalValue fields
+        (FieldsSum  _ fields)   -> all isFinalValue fields
+        (FieldsUntyped fields)  -> all isFinalValue fields
 
-areTopFields :: FieldInfo -> Bool
-areTopFields (FieldsUnknown ) = True
-areTopFields (FieldsNone  )    = False
-areTopFields (FieldsUndet)    = False
-areTopFields (FieldsProd fields)  = all isTopValue fields
-areTopFields (FieldsSum  _ fields) = all isTopValue fields
-areTopFields (FieldsUntyped fields) = all isTopValue fields
-
-isTopValue :: EnterLattice -> Bool
-isTopValue lat = enterInfo lat == MaybeEnter && hasTopFields lat
+isFinalValue :: EnterLattice -> Bool
+isFinalValue lat = enterInfo lat == MaybeEnter && hasFinalFields lat
 
 nestingLevelOver :: EnterLattice -> Int -> Bool
 nestingLevelOver _ 0 = True
@@ -811,17 +862,18 @@ nestingLevelOver (EnterLattice _  (FieldsUntyped fields)) n
     = any (`nestingLevelOver` (n-1)) fields
 nestingLevelOver _ _ = False
 
-capAtLevel :: Int -> EnterLattice -> EnterLattice
-capAtLevel _ l@(EnterLattice _ FieldsUnknown ) = l
-capAtLevel _ l@(EnterLattice _ FieldsNone     ) = l
-capAtLevel _ l@(EnterLattice _ FieldsUndet   ) = l
-capAtLevel 0 _ = top
-capAtLevel n (EnterLattice e (FieldsProd fields)) =
-    EnterLattice e (FieldsProd (map (capAtLevel (n-1)) fields))
-capAtLevel n (EnterLattice e (FieldsSum c fields)) =
-    EnterLattice e (FieldsSum c $ map (capAtLevel (n-1)) fields)
-capAtLevel n (EnterLattice e (FieldsUntyped fields)) =
-    EnterLattice e (FieldsUntyped $ map (capAtLevel (n-1)) fields)
+
+widenToNestingLevel :: Int -> EnterLattice -> EnterLattice
+widenToNestingLevel _ l@(EnterLattice _ FieldsUnknown ) = l
+widenToNestingLevel _ l@(EnterLattice _ FieldsNone     ) = l
+widenToNestingLevel _ l@(EnterLattice _ FieldsUndet   ) = l
+widenToNestingLevel 0 _ = bot
+widenToNestingLevel n (EnterLattice e (FieldsProd fields)) =
+    EnterLattice e (FieldsProd (map (widenToNestingLevel (n-1)) fields))
+widenToNestingLevel n (EnterLattice e (FieldsSum c fields)) =
+    EnterLattice e (FieldsSum c $ map (widenToNestingLevel (n-1)) fields)
+widenToNestingLevel n (EnterLattice e (FieldsUntyped fields)) =
+    EnterLattice e (FieldsUntyped $ map (widenToNestingLevel (n-1)) fields)
 
 
 {-
@@ -937,7 +989,7 @@ lookupNodeResult node_id = do
                 lookupUFM (fs_doneNodes s) node_id)
     case node of
         Nothing -> -- pprTraceM ("loopupNodeResult: Nothing\n" ++ prettyCallStack callStack) (ppr node_id) >>
-                   return bot
+                   return top
         Just n  -> return $! node_result n
 
 {-
@@ -968,7 +1020,7 @@ If we keep the field information of f when stored inside a constructor then
 we can eventually figure out that f' == f, so all branches have the same return taggedness info
 which is the same as the one of f. So we could infer as the taggedness of g's result:
     tagged< -- (,)
-        tagged<tagged<top>>, -- Just (I# lit)
+        tagged<tagged<bot>>, -- Just (I# lit)
         unknown -- a
     >
 
@@ -1079,6 +1131,8 @@ getCtxtIdMap (CTopLevel m) = Just m
 getCtxtIdMap (CNone) = Nothing
 
 -- | isSingleMapOf v env == fromList [(v',_)] && v == v'
+--
+-- Used to determine recursive calls.
 isSingleMapOf :: Id -> VarEnv NodeId -> Bool
 isSingleMapOf v env =
     sizeUFM env == 1 && elemVarEnv v env
@@ -1107,7 +1161,7 @@ idMappedInCtxt id ctxt
     go (_:todo) = go todo
     go [] = Nothing
 
--- | Lub like operator between all input node
+-- | Lub like operator between all input nodes
 -- See Note [The lattice element combinators]
 mkJoinNode :: [NodeId] -> AM NodeId
 mkJoinNode []     = return unknownNodeId
@@ -1117,14 +1171,14 @@ mkJoinNode inputs = do
     let updater = do
             input_results <- mapM lookupNodeResult inputs
             let result = foldl1' combineLattices input_results
-            if isTopValue result
+            if isFinalValue result
                 then do
                     node <- getNode node_id
                     markDone $ node { node_result = result }
                 else updateNodeResult node_id result
             return $! result
 
-    addNode notDone $ FlowNode { node_id = node_id, node_result = bot
+    addNode notDone $ FlowNode { node_id = node_id, node_result = top
                        , node_inputs = inputs -- , node_done = False
                        , node_update = updater
 #if defined(WITH_NODE_DESC)
@@ -1133,8 +1187,8 @@ mkJoinNode inputs = do
                        }
     return $! node_id
 
--- Gives the lattice for evaluating con with arguments of the given taggedness.
--- | Take a lattice argument per constructor argument to simplify things.
+-- | Apply the constructor to the given argument (lattices) respecting
+-- the strict field invariant.
 mkOutConLattice :: DataCon -> EnterInfo -> [EnterLattice] -> EnterLattice
 mkOutConLattice con outer fields
     | null fields   = EnterLattice outer $ FieldsNone
@@ -1178,7 +1232,7 @@ findTags this_mod us binds =
 -- passBinds (StgNonRec v rhs) = StgNonRec v (passRhs rhs)
 -- passBinds (StgRec pairs)    = StgRec $ map (\(v,rhs) -> (v, passRhs rhs)) pairs
 
--- -- For top level lets we have to turn lets into closures.
+-- -- For bot level lets we have to turn lets into closures.
 -- passRhs :: StgRhs -> TgStgRhs
 -- passRhs (StgRhsCon node_id ccs con args) = (StgRhsCon noExtFieldSilent ccs con args)
 -- passRhs (StgRhsClosure ext ccs flag args body) =
@@ -1203,8 +1257,8 @@ findTags this_mod us binds =
 addConstantNodes :: AM ()
 addConstantNodes = do
     markDone litNode
-    markDone $ mkConstNode undetNodeId bot
-    markDone $ mkConstNode unknownNodeId top
+    markDone $ mkConstNode undetNodeId top
+    markDone $ mkConstNode unknownNodeId bot
     markDone $ mkConstNode neverNodeId (flatLattice NeverEnter)
     markDone $ mkConstNode maybeNodeId (flatLattice MaybeEnter)
     markDone $ mkConstNode alwaysNodeId (flatLattice AlwaysEnter)
@@ -1227,7 +1281,7 @@ mkConstNode id !val =
 -- Some nodes we can reuse.
 litNodeId, undetNodeId, unknownNodeId, neverNodeId, maybeNodeId, alwaysNodeId :: NodeId
 litNodeId       = NodeId $ mkUnique 'c' 2
-undetNodeId     = NodeId $ mkUnique 'c' 3 -- Always returns bot
+undetNodeId     = NodeId $ mkUnique 'c' 3 -- Always returns top
 unknownNodeId   = NodeId $ mkUnique 'c' 4
 neverNodeId     = NodeId $ mkUnique 'c' 5
 maybeNodeId     = NodeId $ mkUnique 'c' 6
@@ -1248,8 +1302,9 @@ litNode =
 
 We want to keep our Ids a simple newtype around Unique.
 This is "easy" for things brought into scope by AST nodes,
-we put a mapping from the Id to the NodeId into SynContext
-which we can use to look up the actual node.
+we put a mapping from the Id to the NodeId into SynContext.
+We can then map ids to their data flow nodes based on the SynContext
+we are in.
 
 However imported Id's can show up in any place in the AST.
 We solve this by creating a Node and NodeId for each imported
@@ -1273,10 +1328,11 @@ The rules are simply:
     Enterinfo is:
     * NeverEnter for functions with known Arity
     * NeverEnter for nullarry constructors
+    * NeverEnter for ids with Absent divergence. (absentError expressions)
     * MaybeEnter otherwise.
 
-TODO: Once we can export taggedness in the Interface file we
-will want to use the imported tag info instead of these rules.
+TODO: LFInfo contains the tags and is exported in Interface files.
+      We should make use of this information to improve results.
 
 
     Note [Shadowing and NodeIds]
@@ -1409,16 +1465,16 @@ nodesTop this_mod ctxt (StgTopLifted bind)  = do
 -- nodesBind creates the nodeIds for the bound rhs, the actual nodes are created in
 -- nodeRhs. Returns the context including the let
 nodesBind :: Module -> [SynContext] -> TopLevelFlag -> IsLNE -> StgBinding -> AM (InferStgBinding, [SynContext])
-nodesBind this_mod ctxt top lne (StgNonRec v rhs) = do
+nodesBind this_mod ctxt bot lne (StgNonRec v rhs) = do
     boundId <- uncurry unitVarEnv <$> mkCtxtEntry ctxt v
     let ctxt' = ((CLet boundId lne):ctxt)
-    rhs' <- (nodeRhs this_mod ctxt' top v rhs)
+    rhs' <- (nodeRhs this_mod ctxt' bot v rhs)
     return $! (StgNonRec v rhs', (CLetBody boundId lne):ctxt)
-nodesBind this_mod ctxt top lne (StgRec binds) = do
+nodesBind this_mod ctxt bot lne (StgRec binds) = do
     let ids = map fst binds
     boundIds <- mkVarEnv <$> mapM (mkCtxtEntry ctxt) ids :: AM (VarEnv NodeId)
     let ctxt' = (CLetRec boundIds lne) : ctxt
-    rhss' <- mapM (uncurry (nodeRhs this_mod ctxt' top )) binds
+    rhss' <- mapM (uncurry (nodeRhs this_mod ctxt' bot )) binds
     return $! (StgRec $ zip ids rhss', CLetRecBody boundIds lne: ctxt)
 
 
@@ -1477,11 +1533,11 @@ The main drivers are:
 The enterInfo of the result is determined by checking these conditions
 in order:
 
-a.1) If the binding is not defined at the top level
+a.1) If the binding is not defined at the bot level
    and is a non recursive binding:
 ->  NeverEnter, we can just wrap the expression in a Case.
 
-a.2) If the binding is not defined at the top level
+a.2) If the binding is not defined at the bot level
    and is in a recursive binding, but all strict args
    are defined outside of the recursive group:
 ->  NeverEnter, we can just wrap the expression in a Case.
@@ -1537,7 +1593,7 @@ nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ ccs con args)
                         { node_id = node_id
                         , node_inputs = node_inputs
                         --, node_done   = False
-                        , node_result = bot
+                        , node_result = top
                         , node_update = node_update node_id node_inputs
 #if defined(WITH_NODE_DESC)
                         , _node_desc = (ppr binding <-> text "rhsCon")
@@ -1589,7 +1645,7 @@ nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ ccs con args)
         -- Strict fields need to marked as neverEnter here, even if their inputs are not.
         -- This is because once we scrutinise the result of this rhs they will have been tagged.
         let result = mkOutConLattice con outerTag fieldResults
-        let cappedResult = capAtLevel 10 result
+        let cappedResult = widenToNestingLevel 10 result
         updateNodeResult this_id cappedResult
         return $! cappedResult
 
@@ -1600,7 +1656,7 @@ nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ ccs con args)
     Is it worth to instantiate local thunks with their actual arguments
     or an approximation (lub) of them?
 
-    This would require a notion of "internal" ideas beyond the concept of top level bindings.
+    This would require a notion of "internal" ideas beyond the concept of bot level bindings.
 
 TODO: Partial applications
 
@@ -1675,8 +1731,8 @@ nodeRhs this_mod ctxt _topFlag binding (StgRhsClosure _ext _ccs _flag args body)
     node_update this_id body_id = do
         bodyInfo <- lookupNodeResult body_id
         let result = setEnterInfo bodyInfo enterInfo
-        let cappedResult = capAtLevel 10 result
-        if hasTopFields cappedResult
+        let cappedResult = widenToNestingLevel 10 result
+        if hasFinalFields cappedResult
             then do
                 node <- getNode this_id
                 markDone $ node { node_result = cappedResult }
@@ -1767,7 +1823,7 @@ nodeCaseBndr scrutNodeId _bndr = do
     !bndrNodeId <- mkUniqueId
     addNode notDone $ FlowNode  { node_id = bndrNodeId
                         , node_inputs = [scrutNodeId] --, node_done = False
-                        , node_result = bot, node_update = updater bndrNodeId
+                        , node_result = top, node_update = updater bndrNodeId
 #if defined(WITH_NODE_DESC)
                         , _node_desc = text "caseBndr" <-> parens (ppr scrutNodeId) <-> ppr _bndr
 #endif
@@ -1777,7 +1833,7 @@ nodeCaseBndr scrutNodeId _bndr = do
         updater bndrNodeId = do
             scrutResult <- lookupNodeResult scrutNodeId
             let result = setEnterInfo scrutResult NeverEnter
-            if hasTopFields result
+            if hasFinalFields result
                 then do
                     node <- getNode bndrNodeId
                     markDone $ node { node_result = result }
@@ -1825,8 +1881,8 @@ nodeAlt this_mod ctxt scrutNodeId (altCon, bndrs, rhs)
                         --         text "Input:" <+> ppr scrutNodeId $$
                         --         text "scrut_res" <+> ppr scrut_res $$
                         --         text "bndr_res" <+> ppr bndr_res )
-                        let topFields = hasTopFields result
-                        if (is_strict_field && topFields) || (topFields && enterInfo result == MaybeEnter)
+                        let finalFields = hasFinalFields result
+                        if (is_strict_field && finalFields) || (finalFields && enterInfo result == MaybeEnter)
                             then do
                                 node <- getNode node_id
                                 markDone $ node { node_result = result }
@@ -1835,7 +1891,7 @@ nodeAlt this_mod ctxt scrutNodeId (altCon, bndrs, rhs)
                         return $! result
                 addNode notDone FlowNode
                     { node_id = node_id
-                    , node_result = bot
+                    , node_result = top
                     -- , node_done = False
                     , node_inputs = [scrutNodeId]
                     , node_update = updater
@@ -1911,7 +1967,7 @@ nodeLetNoEscape _ _ _ = panic "Impossible"
 {-  Note [ConApp Data Flow]
     ~~~~~~~~~~~~~~~~~~~~~~~
 
-Information from the constructor used (strict fields)
+Information from the constructor (strict fields)
 and arguments is used to determine the result.
 
 +-----+       +------+
@@ -1957,7 +2013,7 @@ nodeConApp this_mod ctxt (StgConApp _ext con args tys) = do
 
     addNode notDone FlowNode
         { node_id = node_id
-        , node_result = bot
+        , node_result = top
         , node_inputs = inputs
         -- , node_done = False
         , node_update = updater
@@ -2038,7 +2094,7 @@ nodeApp this_mod ctxt expr@(StgApp _ f args) = do
                         --     text "inputs:" <+> ppr inputs $$
                         --     ppr input_nodes
                         --     )
-                        if (null inputs || isTopValue result )
+                        if (null inputs || isFinalValue result )
                             -- We have collected the final result
                             then do
                                 -- pprTraceM "Limiting nesting for " (ppr node_id)
@@ -2050,7 +2106,7 @@ nodeApp this_mod ctxt expr@(StgApp _ f args) = do
                                 return $! result
 
                 addNode notDone $ FlowNode
-                    { node_id = node_id, node_result = bot
+                    { node_id = node_id, node_result = top
                     , node_inputs = inputs
                     -- , node_done = False
                     , node_update = updater
@@ -2108,7 +2164,7 @@ nodeApp this_mod ctxt expr@(StgApp _ f args) = do
             -- pprTrace "Absent:" (ppr f) $
             return $! flatLattice NeverEnter
 
-        | isFun && (not isSat) = return $! top
+        | isFun && (not isSat) = return $! bot
 
         -- App in a direct self-recursive tail call context, returns nothing
         | recTail = return $! EnterLattice NoValue FieldsNone
@@ -2137,7 +2193,7 @@ nodeApp this_mod ctxt expr@(StgApp _ f args) = do
 
         | otherwise
         =   -- pprTrace "Unsat?" (ppr (f,args)) $
-            return $! top
+            return $! bot
 
     recTail = recursionKind == NoMutRecursion && isRecTail ctxt
     isFun = isFunTy (unwrapType $ idType f)
@@ -2240,7 +2296,7 @@ rewriteTop (StgTopStringLit v s) = return $! (StgTopStringLit v s)
 rewriteTop      (StgTopLifted bind)  = do
     (StgTopLifted . fst) <$!> (rewriteBinds bind)
 
--- For top level binds, the wrapper is guaranteed to be `id`
+-- For bot level binds, the wrapper is guaranteed to be `id`
 rewriteBinds :: InferStgBinding -> AM (TgStgBinding, TgStgExpr -> TgStgExpr)
 rewriteBinds (StgNonRec v rhs) = do
         (!rhs, wrapper) <-  rewriteRhs v rhs
@@ -2411,7 +2467,7 @@ exportTaggedness xs = mapMaybeM export xs
 
 --     (StgTopLifted . fst) <$!> (rewriteBinds bind)
 
--- -- For top level binds, the wrapper is guaranteed to be `id`
+-- -- For bot level binds, the wrapper is guaranteed to be `id`
 -- rewriteBinds :: InferStgBinding -> AM (TgStgBinding, TgStgExpr -> TgStgExpr)
 -- rewriteBinds (StgNonRec v rhs) = do
 --         (!rhs, wrapper) <-  rewriteRhs v rhs
