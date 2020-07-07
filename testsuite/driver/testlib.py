@@ -508,6 +508,10 @@ def ghc_dynamic() -> bool:
 def fast() -> bool:
     return config.speed == 2
 
+# XXX: This needs to be removed once no remnants of platform are left.
+def platform( plat: str ) -> bool:
+    return targetPlatform( plat )
+
 def targetPlatform( plat: str ) -> bool:
     return config.targetPlatform == plat
 

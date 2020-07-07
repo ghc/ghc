@@ -267,6 +267,7 @@ endif
 RUNTEST_OPTS +=  \
 	--rootdir=. \
 	--config-file=$(CONFIG) \
+	-e 'config.platform="$(TARGETPLATFORM)"' \         # XXX This needs to be removed
 	-e 'config.targetPlatform="$(TARGETPLATFORM)"' \
 	-e 'config.hostPlatform="$(HOSTPLATFORM)"' \
 	-e 'config.os="$(TargetOS_CPP)"' \
