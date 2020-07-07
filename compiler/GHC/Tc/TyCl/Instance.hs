@@ -515,7 +515,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
                       -- Don't default type family instances, but rather omit,
                       -- in hsig/hs-boot. There's no way for users to opt out of this,
                       -- and including the defaults would induce a meaningful restriction on possible
-                      -- instantiations. Plus, type families sneaking in like
+                      -- instantiations. Plus, any type family instances in an hs-boot file
                       -- this breaks the current implementation.
                       --
                       -- We should be vigilant to also make sure term level
