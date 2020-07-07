@@ -27,6 +27,9 @@ RUNTESTS     = $(TOP)/driver/runtests.py
 COMPILER     = ghc
 CONFIG       = $(TOP)/config/$(COMPILER)
 
+# if no TEST_WRAPPER is set, use exec
+TEST_WRAPPER ?= exec
+
 ifeq "$(GhcUnregisterised)" "YES"
     # Otherwise C backend generates many warnings about
     # imcompatible proto casts for GCC's buitins:
