@@ -3513,7 +3513,8 @@ fFlagsDeps = [
   flagSpec "diagnostics-show-caret"           Opt_DiagnosticsShowCaret,
   flagSpec "dicts-cheap"                      Opt_DictsCheap,
   flagSpec "dicts-strict"                     Opt_DictsStrict,
-  flagSpec "dmd-tx-dict-sel"                  Opt_DmdTxDictSel,
+  depFlagSpec "dmd-tx-dict-sel"
+      Opt_DmdTxDictSel "effect is now unconditionally enabled",
   flagSpec "do-eta-reduction"                 Opt_DoEtaReduction,
   flagSpec "do-lambda-eta-expansion"          Opt_DoLambdaEtaExpansion,
   flagSpec "eager-blackholing"                Opt_EagerBlackHoling,
@@ -4045,7 +4046,6 @@ optLevelFlags :: [([Int], GeneralFlag)]
 optLevelFlags -- see Note [Documenting optimisation flags]
   = [ ([0,1,2], Opt_DoLambdaEtaExpansion)
     , ([0,1,2], Opt_DoEtaReduction)       -- See Note [Eta-reduction in -O0]
-    , ([0,1,2], Opt_DmdTxDictSel)
     , ([0,1,2], Opt_LlvmTBAA)
 
     , ([0],     Opt_IgnoreInterfacePragmas)
