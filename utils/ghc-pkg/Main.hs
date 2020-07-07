@@ -643,6 +643,7 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
         Right appdir -> do
           -- See Note [Settings File] about this file, and why we need GHC to share it with us.
           let settingsFile = top_dir </> "settings"
+          let constantsFile = top_dir </> "platformConstants"
           exists_settings_file <- doesFileExist settingsFile
           targetPlatformMini <- case exists_settings_file of
             False -> do
@@ -656,7 +657,11 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
                 -- It's excusable to not have a settings file (for now at
                 -- least) but completely inexcusable to have a malformed one.
                 Nothing -> die $ "Can't parse settings file " ++ show settingsFile
-              case getTargetPlatform settingsFile mySettings of
+              constantsStr <- readFile constantsFile
+              constants <- case maybeReadFuzzy constantsStr of
+                Just s  -> pure s
+                Nothing -> die $ "Can't parse platform constants file " ++ show constantsFile
+              case getTargetPlatform settingsFile mySettings constants of
                 Right platform -> pure $ platformMini platform
                 Left e -> die e
           let subdir = uniqueSubdir targetPlatformMini
