@@ -66,7 +66,6 @@ stage0Packages = do
              , genapply
              , genprimopcode
              , ghc
-             , ghcBignum
              , ghcBoot
              , ghcBootTh
              , ghcHeap

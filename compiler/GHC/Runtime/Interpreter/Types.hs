@@ -15,6 +15,7 @@ import GHC.Prelude
 import GHCi.RemoteTypes
 import GHCi.Message         ( Pipe )
 import GHC.Types.Unique.FM
+import GHC.Data.FastString ( FastString )
 import Foreign
 
 import Control.Concurrent
@@ -53,7 +54,7 @@ data IServConfig = IServConfig
 data IServInstance = IServInstance
   { iservPipe              :: !Pipe
   , iservProcess           :: !ProcessHandle
-  , iservLookupSymbolCache :: !(UniqFM (Ptr ()))
+  , iservLookupSymbolCache :: !(UniqFM FastString (Ptr ()))
   , iservPendingFrees      :: ![HValueRef]
       -- ^ Values that need to be freed before the next command is sent.
       -- Threads can append values to this list asynchronously (by modifying the
