@@ -258,9 +258,9 @@ import System.IO.Unsafe
 -}
 
 
--- #if defined(DEBUG)
+#if defined(DEBUG)
 #define WITH_NODE_DESC
--- #endif
+#endif
 
 -- Shortcut comparisons if two things reference the same object.
 maybeEq :: a -> a -> Bool
