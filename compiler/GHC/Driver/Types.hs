@@ -155,6 +155,7 @@ module GHC.Driver.Types (
         readField, readIfaceField, readIfaceFieldWith,
         writeField, writeIfaceField, writeIfaceFieldWith,
         deleteField, deleteIfaceField,
+        registerInterfaceData, registerInterfaceDataWith,
     ) where
 
 #include "HsVersions.h"
@@ -474,6 +475,10 @@ data HscEnv
 
         hsc_FC   :: {-# UNPACK #-} !(IORef FinderCache),
                 -- ^ The cached result of performing finding in the file system
+
+        hsc_ext_fields :: {-# UNPACK #-} !(IORef ExtensibleFields),
+                -- ^ Extensible interface field data stored by plugins to be later
+                -- output in the `.hi` file.
 
         hsc_type_env_var :: Maybe (Module, IORef TypeEnv)
                 -- ^ Used for one-shot compilation only, to initialise
@@ -3404,3 +3409,12 @@ deleteField name (ExtensibleFields fs) = ExtensibleFields $ Map.delete name fs
 
 deleteIfaceField :: FieldName -> ModIface -> ModIface
 deleteIfaceField name iface = iface { mi_ext_fields = deleteField name (mi_ext_fields iface) }
+
+registerInterfaceData :: Binary a => FieldName -> HscEnv -> a -> IO ()
+registerInterfaceData name env x = registerInterfaceDataWith name env (`put_` x)
+
+registerInterfaceDataWith :: FieldName -> HscEnv -> (BinHandle -> IO ()) -> IO ()
+registerInterfaceDataWith name env write = do
+  ext_fs  <- readIORef (hsc_ext_fields env)
+  ext_fs' <- writeFieldWith name write ext_fs
+  writeIORef (hsc_ext_fields env) ext_fs'
