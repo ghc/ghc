@@ -353,7 +353,7 @@ genCall (PrimTarget (MO_U_Mul2 w)) [dstH, dstL] [lhs, rhs] = runStmtsDecls $ do
     statement $ Store retL dstRegL
     statement $ Store retH dstRegH
 
-genCall (PrimTarget (MO_S_Mul2 w)) [dstH, dstL] [lhs, rhs] = runStmtsDecls $ do
+genCall (PrimTarget (MO_S_Mul2 w)) [dstC, dstH, dstL] [lhs, rhs] = runStmtsDecls $ do
     let width = widthToLlvmInt w
         bitWidth = widthInBits w
         width2x = LMInt (bitWidth * 2)
@@ -373,10 +373,18 @@ genCall (PrimTarget (MO_S_Mul2 w)) [dstH, dstL] [lhs, rhs] = runStmtsDecls $ do
     retShifted <- doExprW width2x $ LlvmOp LM_MO_AShr retV widthLlvmLit
     -- And extract them into retH.
     retH <- doExprW width $ Cast LM_Trunc retShifted width
+    -- Check if the carry is useful by doing a full arithmetic right shift on
+    -- retL and comparing the result with retH
+    let widthLlvmLitm1 = LMLitVar $ LMIntLit (fromIntegral bitWidth - 1) width
+    retH' <- doExprW width $ LlvmOp LM_MO_AShr retL widthLlvmLitm1
+    retC1  <- doExprW i1 $ Compare LM_CMP_Ne retH retH' -- Compare op returns a 1-bit value (i1)
+    retC   <- doExprW width $ Cast LM_Zext retC1 width  -- so we zero-extend it
     dstRegL <- getCmmRegW (CmmLocal dstL)
     dstRegH <- getCmmRegW (CmmLocal dstH)
+    dstRegC <- getCmmRegW (CmmLocal dstC)
     statement $ Store retL dstRegL
     statement $ Store retH dstRegH
+    statement $ Store retC dstRegC
 
 -- MO_U_QuotRem2 is another case we handle by widening the registers to double
 -- the width and use normal LLVM instructions (similarly to the MO_U_Mul2). The
