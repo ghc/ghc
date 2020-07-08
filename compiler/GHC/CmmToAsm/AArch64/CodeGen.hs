@@ -813,10 +813,10 @@ genCondJump bid expr
           MO_F_Eq w -> fbcond w EQ
           MO_F_Ne w -> fbcond w NE
 
-          MO_F_Gt w -> fbcond w SGT
-          MO_F_Ge w -> fbcond w SGE
-          MO_F_Lt w -> fbcond w SLT
-          MO_F_Le w -> fbcond w SLE
+          MO_F_Gt w -> fbcond w OGT
+          MO_F_Ge w -> fbcond w OGE
+          MO_F_Lt w -> fbcond w OLT
+          MO_F_Le w -> fbcond w OLE
 
           MO_Eq w   -> bcond w EQ
           MO_Ne w   -> bcond w NE
