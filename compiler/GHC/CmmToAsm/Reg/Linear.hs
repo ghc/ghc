@@ -357,7 +357,7 @@ processBlock block_live (BasicBlock id instrs)
 
 -- | Load the freeregs and current reg assignment into the RegM state
 --      for the basic block with this BlockId.
-initBlock :: (HasCallStack, FR freeRegs)
+initBlock :: FR freeRegs
           => BlockId -> BlockMap RegSet -> RegM freeRegs ()
 initBlock id block_live
  = do   platform    <- getPlatform
@@ -521,33 +521,27 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
     let real_read       = nub [ rr      | (RegReal rr) <- read]
     let virt_read       = nub [ vr      | (RegVirtual vr) <- read ] :: [VirtualReg]
 
-    config <- getConfig
-    when (ncgVerbosity config > 1) $ do
-        freeregs <- getFreeRegsR
-        assig    <- getAssigR
+--     do
+--         freeregs <- getFreeRegsR
+--         assig    <- getAssigR
 
-        pprTraceM "genRaInsn"
-                (          text "block        = " <+> ppr block_id
-                        $$ text "instruction  = " <+> ppr instr
-                        $$ text "r_dying      = " <+> ppr r_dying
-                        $$ text "w_dying      = " <+> ppr w_dying
-                        $$ text "read         = " <+> ppr real_read    <+> ppr virt_read
-                        $$ text "written      = " <+> ppr real_written <+> ppr virt_written
-                        $$ text "freeregs     = " <+> ppr freeregs
-                        $$ text "assign       = " <+> ppr assig)
-{-
-        $ do
--}
+--         pprTraceM "genRaInsn"
+--                 (          text "block        = " <+> ppr block_id
+--                         $$ text "instruction  = " <+> ppr instr
+--                         $$ text "r_dying      = " <+> ppr r_dying
+--                         $$ text "w_dying      = " <+> ppr w_dying
+--                         $$ text "read         = " <+> ppr real_read    <+> ppr virt_read
+--                         $$ text "written      = " <+> ppr real_written <+> ppr virt_written
+--                         $$ text "freeregs     = " <+> ppr freeregs
+--                         $$ text "assign       = " <+> ppr assig)
 
     -- (a), (b) allocate real regs for all regs read by this instruction.
     (r_spills, r_allocd) <-
         allocateRegsAndSpill True{-reading-} virt_read [] [] virt_read
 
-    when (ncgVerbosity config > 1) $ do pprTraceM "ganRaInsn" (text "(c)")
     -- (c) save any temporaries which will be clobbered by this instruction
     clobber_saves <- saveClobberedTemps real_written r_dying
 
-    when (ncgVerbosity config > 1) $ do pprTraceM "ganRaInsn" (text "(d)")
     -- (d) Update block map for new destinations
     -- NB. do this before removing dead regs from the assignment, because
     -- these dead regs might in fact be live in the jump targets (they're
@@ -562,26 +556,21 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
     -- when (not $ null fixup_blocks) $
     --    pprTrace "fixup_blocks" (ppr fixup_blocks) (return ())
 
-    when (ncgVerbosity config > 1) $ pprTraceM "ganRaInsn" (text "(e)")
     -- (e) Delete all register assignments for temps which are read
     --     (only) and die here.  Update the free register list.
     releaseRegs r_dying
 
-    when (ncgVerbosity config > 1) $ pprTraceM "ganRaInsn" (text "(f)")
     -- (f) Mark regs which are clobbered as unallocatable
     clobberRegs real_written
 
-    when (ncgVerbosity config > 1) $ pprTraceM "ganRaInsn" (text "(g)")
     -- (g) Allocate registers for temporaries *written* (only)
     (w_spills, w_allocd) <-
         allocateRegsAndSpill False{-writing-} virt_written [] [] virt_written
 
-    when (ncgVerbosity config > 1) $ pprTraceM "ganRaInsn" (text "(h)")
     -- (h) Release registers for temps which are written here and not
     -- used again.
     releaseRegs w_dying
 
-    when (ncgVerbosity config > 1) $ pprTraceM "ganRaInsn" (text "(i)")
     let
         -- (i) Patch the instruction
         patch_map :: UniqFM Reg Reg
@@ -603,7 +592,6 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
                         Nothing -> x
                         Just y  -> y
 
-    when (ncgVerbosity config > 1) $ do pprTraceM "ganRaInsn" (text "(j)")
     -- (j) free up stack slots for dead spilled regs
     -- TODO (can't be bothered right now)
 
@@ -628,7 +616,7 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
 -- -----------------------------------------------------------------------------
 -- releaseRegs
 
-releaseRegs :: (HasCallStack, FR freeRegs) => [Reg] -> RegM freeRegs ()
+releaseRegs :: FR freeRegs => [Reg] -> RegM freeRegs ()
 releaseRegs regs = do
   platform <- getPlatform
   assig <- getAssigR
@@ -639,7 +627,6 @@ releaseRegs regs = do
 --       fltRegs = frGetFreeRegs platform RcFloat   free :: [RealReg]
 --       dblRegs = frGetFreeRegs platform RcDouble  free :: [RealReg]
 --       allFreeRegs = gpRegs ++ fltRegs ++ dblRegs
---   when (ncgVerbosity config > 1) $ do pprTraceM "releaseRegs" (text "allFreeRegs =" <+> ppr allFreeRegs)
 
   let loop assig !free [] = do setAssigR assig; setFreeRegsR free; return ()
 --      loop assig !free (RegReal rr : rs) | rr `elem` allFreeRegs = loop assig free rs
@@ -740,7 +727,7 @@ saveClobberedTemps clobbered dying
 -- | Mark all these real regs as allocated,
 --      and kick out their vreg assignments.
 --
-clobberRegs :: (HasCallStack, FR freeRegs) => [RealReg] -> RegM freeRegs ()
+clobberRegs :: FR freeRegs => [RealReg] -> RegM freeRegs ()
 clobberRegs []
         = return ()
 
@@ -749,8 +736,6 @@ clobberRegs clobbered
         freeregs <- getFreeRegsR
 
         config <- getConfig
-        when (ncgVerbosity config > 1) $ do pprTraceM "clobberRegs" (ppr $ text "freeregs  =" <+> text (show freeregs)
-                                                                        $$ text "clobbered =" <+> ppr clobbered)
 
         let gpRegs  = frGetFreeRegs platform RcInteger freeregs :: [RealReg]
             fltRegs = frGetFreeRegs platform RcFloat   freeregs :: [RealReg]
@@ -758,11 +743,6 @@ clobberRegs clobbered
 
         let extra_clobbered = [ r | r <- clobbered
                                   , r `elem` (gpRegs ++ fltRegs ++ dblRegs) ]
-
-        when (ncgVerbosity config > 1) $ do pprTraceM "clobberRegs" (ppr $ text "gpRegs  =" <+> ppr gpRegs
-                                                                        $$ text "fltRegs =" <+> ppr fltRegs
-                                                                        $$ text "dblRegs =" <+> ppr dblRegs
-                                                                        $$ text "filterd =" <+> ppr extra_clobbered)
 
         setFreeRegsR $! foldl' (flip $ frAllocateReg platform) freeregs extra_clobbered
 
