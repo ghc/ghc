@@ -20,7 +20,9 @@ module GHC.IfaceToCore (
         tcIfaceAnnotations, tcIfaceCompleteSigs,
         tcIfaceExpr,    -- Desired by HERMIT (#7683)
         tcIfaceGlobal,
-        tcIfaceOneShot
+        tcIfaceOneShot,
+        tcIfaceType,
+        tcJoinInfo,
  ) where
 
 #include "HsVersions.h"

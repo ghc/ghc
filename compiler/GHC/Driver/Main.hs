@@ -198,6 +198,7 @@ newHscEnv dflags = do
     us      <- mkSplitUniqSupply 'r'
     nc_var  <- newIORef (initNameCache us knownKeyNames)
     fc_var  <- newIORef emptyInstalledModuleEnv
+    ext_fs  <- newIORef emptyExtensibleFields
     emptyDynLinker <- uninitializedLinker
     return HscEnv {  hsc_dflags       = dflags
                   ,  hsc_targets      = []
@@ -207,6 +208,7 @@ newHscEnv dflags = do
                   ,  hsc_EPS          = eps_var
                   ,  hsc_NC           = nc_var
                   ,  hsc_FC           = fc_var
+                  ,  hsc_ext_fields   = ext_fs
                   ,  hsc_type_env_var = Nothing
                   ,  hsc_interp       = Nothing
                   ,  hsc_dynLinker    = emptyDynLinker
@@ -810,11 +812,10 @@ finish summary tc_result mb_old_hash = do
           (cg_guts, details) <- {-# SCC "CoreTidy" #-}
               liftIO $ tidyProgram hsc_env simplified_guts
 
-          let !partial_iface =
-                {-# SCC "GHC.Driver.Main.mkPartialIface" #-}
+          !partial_iface <- {-# SCC "GHC.Driver.Main.mkPartialIface" #-}
                 -- This `force` saves 2M residency in test T10370
                 -- See Note [Avoiding space leaks in toIface*] for details.
-                force (mkPartialIface hsc_env details simplified_guts)
+                liftIO $ force <$> (mkPartialIface hsc_env details simplified_guts)
 
           return HscRecomp { hscs_guts = cg_guts,
                              hscs_mod_location = ms_location summary,
