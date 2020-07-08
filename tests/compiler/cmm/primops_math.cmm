@@ -104,5 +104,8 @@ main () {
     R3 = R1 `shra` R2;
     foreign "C" printf("%d shra %d => %d", R1, R2, R3);
 
+
+
+
     foreign "C" exit(0::I64);
 }
