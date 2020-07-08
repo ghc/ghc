@@ -75,13 +75,16 @@ testRules = do
 
             bindir <- getBinaryDirectory testGhc
             debugged <- ghcDebugged <$> flavour
+            dynPrograms <- dynamicGhcPrograms =<< flavour
             cmd [bindir </> "ghc" <.> exe] $
                 concatMap (\p -> ["-package", pkgName p]) depsPkgs ++
                 ["-o", top -/- path, top -/- sourcePath] ++
                 -- If GHC is build with debug options, then build check-ppr
                 -- also with debug options.  This allows, e.g., to print debug
                 -- messages of various RTS subsystems while using check-ppr.
-                if debugged then ["-debug"] else []
+                if debugged then ["-debug"] else [] ++
+                -- If GHC is build dynamic, then build check-ppr also dynamic.
+                if dynPrograms then ["-dynamic"] else []
 
     root -/- ghcConfigPath %> \_ -> do
         args <- userSetting defaultTestArgs
