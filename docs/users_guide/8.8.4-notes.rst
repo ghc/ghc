@@ -13,6 +13,14 @@ Highlights
 
 - Workaround a Linux kernel bug in the implementation of ``timerfd``\s (:ghc-ticket:`18033`).
 
+- Fix a few linking issues affecting ARM
+
+- Fix "missing interface file" error triggered by some uses of ``Ordering`` (:ghc-ticket:`18185`)
+
+- Fix an integer overflow in the compact-normal-form import implementation (:ghc-ticket:`16992`)
+
+- ``configure`` now accepts  ``--enable-numa`` flag to enable/disable ``numactl`` support on Linux.
+
 
 Known issues
 ------------
