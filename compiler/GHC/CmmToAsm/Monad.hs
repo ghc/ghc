@@ -151,7 +151,6 @@ initConfig dflags = NCGConfig
    { ncgPlatform              = targetPlatform dflags
    , ncgProcAlignment         = cmmProcAlignment dflags
    , ncgDebugLevel            = debugLevel dflags
-   , ncgVerbosity             = verbosity dflags
    , ncgExternalDynamicRefs   = gopt Opt_ExternalDynamicRefs dflags
    , ncgPIC                   = positionIndependent dflags
    , ncgInlineThresholdMemcpy = fromIntegral $ maxInlineMemcpyInsns dflags
