@@ -669,10 +669,15 @@ getRegister' config plat expr
         MO_F_Eq w    -> floatCond w (\d x y -> toOL [ CMP x y, CSET d EQ ])
         MO_F_Ne w    -> floatCond w (\d x y -> toOL [ CMP x y, CSET d NE ])
 
-        MO_F_Ge w    -> floatCond w (\d x y -> toOL [ CMP x y, CSET d SGE ])
-        MO_F_Le w    -> floatCond w (\d x y -> toOL [ CMP x y, CSET d SLE ])
-        MO_F_Gt w    -> floatCond w (\d x y -> toOL [ CMP x y, CSET d SGT ])
-        MO_F_Lt w    -> floatCond w (\d x y -> toOL [ CMP x y, CSET d SLT ])
+        -- careful with the floating point operations.
+        -- SLE is effectively LE or unordered (NaN)
+        -- SLT is the same. ULE, and ULT will not return true for NaN.
+        -- This is a bit counter intutive. Don't let yourself be fooled by
+        -- the S/U prefix for floats, it's only meaningful for integers.
+        MO_F_Ge w    -> floatCond w (\d x y -> toOL [ CMP x y, CSET d OGE ])
+        MO_F_Le w    -> floatCond w (\d x y -> toOL [ CMP x y, CSET d OLE ]) -- x <= y <=> y > x
+        MO_F_Gt w    -> floatCond w (\d x y -> toOL [ CMP x y, CSET d OGT ])
+        MO_F_Lt w    -> floatCond w (\d x y -> toOL [ CMP x y, CSET d OLT ]) -- x < y <=> y >= x
 
         -- Bitwise operations
         MO_And   w -> intOp w (\d x y -> unitOL $ AND d x y)

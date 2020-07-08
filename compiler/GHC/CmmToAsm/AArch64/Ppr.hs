@@ -471,20 +471,26 @@ pprBcond c = text "b." <> pprCond c
 
 pprCond :: Cond -> SDoc
 pprCond c = case c of
-  ALWAYS -> text "al"
-  EQ     -> text "eq"
-  NE     -> text "ne"
+  ALWAYS -> text "al" -- Always
+  EQ     -> text "eq" -- Equal
+  NE     -> text "ne" -- Not Equal
 
-  SLT    -> text "lt"
-  SLE    -> text "le"
-  SGE    -> text "ge"
-  SGT    -> text "gt"
+  SLT    -> text "lt" -- Signed less than                  ; Less than, or unordered
+  SLE    -> text "le" -- Signed less than or equal         ; Less than or equal, or unordered
+  SGE    -> text "ge" -- Signed greater than or equal      ; Greater than or equal
+  SGT    -> text "gt" -- Signed greater than               ; Greater than
 
-  ULT    -> text "lo"
-  ULE    -> text "ls"
-  UGE    -> text "hs"
-  UGT    -> text "hi"
+  ULT    -> text "lo" -- Carry clear/ unsigned lower       ; less than
+  ULE    -> text "ls" -- Unsigned lower or same            ; Less than or equal
+  UGE    -> text "hs" -- Carry set/unsigned higher or same ; Greater than or equal, or unordered
+  UGT    -> text "hi" -- Unsigned higher                   ; Greater than, or unordered
 
-  NEVER  -> text "ne"
-  VS     -> text "vs"
-  VC     -> text "vc"
+  NEVER  -> text "ne" -- Never
+  VS     -> text "vs" -- Overflow                          ; Unordered (at least one NaN operand)
+  VC     -> text "vc" -- No overflow                       ; Not unordered
+
+  -- Orderd variants.  Respecting NaN.
+  OLT    -> text "mi"
+  OLE    -> text "ls"
+  OGE    -> text "ge"
+  OGT    -> text "gt"
