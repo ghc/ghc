@@ -82,7 +82,7 @@ import GHC.Driver.Plugins (LoadedPlugin(..))
 mkPartialIface :: HscEnv
                -> ModDetails
                -> ModGuts
-               -> PartialModIface
+               -> IO PartialModIface
 mkPartialIface hsc_env mod_details
   ModGuts{ mg_module       = this_mod
          , mg_hsc_src      = hsc_src
@@ -99,8 +99,11 @@ mkPartialIface hsc_env mod_details
          , mg_decl_docs    = decl_docs
          , mg_arg_docs     = arg_docs
          }
-  = mkIface_ hsc_env this_mod hsc_src used_th deps rdr_env fix_env warns hpc_info self_trust
-             safe_mode usages doc_hdr decl_docs arg_docs mod_details
+  = do ext_fs <- readIORef $ hsc_ext_fields hsc_env
+       return iface{mi_ext_fields = ext_fs}
+    where
+      iface = mkIface_ hsc_env this_mod hsc_src used_th deps rdr_env fix_env warns hpc_info self_trust
+                       safe_mode usages doc_hdr decl_docs arg_docs mod_details
 
 -- | Fully instantiate an interface. Adds fingerprints and potentially code
 -- generator produced information.
