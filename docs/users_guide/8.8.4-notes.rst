@@ -6,13 +6,27 @@ Release notes for version 8.8.4
 GHC 8.8.4 is a minor release intended to fix regressions and minor bugs in the
 8.8.1, 8.8.2 and 8.8.3 releases.
 
+Like previous releases in the 8.8 series, the :ghc-flag:`LLVM backend <-fllvm>`
+of this release is to be used with LLVM 7.
+
 Highlights
 ----------
 
-- Fix a bug in process creation on Windows (:ghc-ticket:`17926`).
+- Fixes a bug in process creation on Windows (:ghc-ticket:`17926`).
 
-- Workaround a Linux kernel bug in the implementation of ``timerfd``\s (:ghc-ticket:`18033`).
+- Works around a Linux kernel bug in the implementation of ``timerfd``\s (:ghc-ticket:`18033`).
 
+- Fixes a few linking issues affecting ARM
+
+- Fixes "missing interface file" error triggered by some uses of ``Ordering`` (:ghc-ticket:`18185`)
+
+- Fixes an integer overflow in the compact-normal-form import implementation (:ghc-ticket:`16992`)
+
+- ``configure`` now accepts  ``--enable-numa`` flag to enable/disable ``numactl`` support on Linux.
+
+- Fixes potentially lost sharing due to the desugaring of left operator sections (:ghc-ticket:`18151`).
+
+- Fixes a build-system bug resulting in potential miscompilation by unregisteised compilers (:ghc-ticket:`18024`)
 
 Known issues
 ------------
