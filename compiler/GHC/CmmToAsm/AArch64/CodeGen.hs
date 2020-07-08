@@ -106,9 +106,9 @@ cmmTopCodeGen
 -- Thus we'll have to deal with either CmmProc ...
 cmmTopCodeGen cmm@(CmmProc info lab live graph) = do
   config <- getConfig
-  when (ncgVerbosity config > 1) $ do
-    traceM $ "-- -------------------------- cmmTopGen (CmmProc) -------------------------- --\n"
-          ++ showSDocUnsafe (ppr cmm)
+  -- do
+  --   traceM $ "-- -------------------------- cmmTopGen (CmmProc) -------------------------- --\n"
+  --         ++ showSDocUnsafe (ppr cmm)
 
   let blocks = toBlockListEntryFirst graph
   (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
@@ -129,9 +129,9 @@ cmmTopCodeGen cmm@(CmmProc info lab live graph) = do
 -- ... or CmmData. Do we want to align this?
 cmmTopCodeGen cmm@(CmmData sec dat) = do
   config <- getConfig
-  when (ncgVerbosity config > 1) $ do
-    traceM $ "-- -------------------------- cmmTopGen (CmmData) -------------------------- --\n"
-          ++ showSDocUnsafe (ppr cmm)
+  -- do
+  --   traceM $ "-- -------------------------- cmmTopGen (CmmData) -------------------------- --\n"
+  --         ++ showSDocUnsafe (ppr cmm)
   return [CmmData sec dat] -- no translation, we just use CmmStatic
 
 -- So we need BasicBlockCodeGen
@@ -142,9 +142,9 @@ basicBlockCodeGen
 
 basicBlockCodeGen block = do
   config <- getConfig
-  when (ncgVerbosity config > 1) $ do
-    traceM $ "-- --------------------------- basicBlockCodeGen --------------------------- --\n"
-          ++ showSDocUnsafe (ppr block)
+  -- do
+  --   traceM $ "-- --------------------------- basicBlockCodeGen --------------------------- --\n"
+  --         ++ showSDocUnsafe (ppr block)
   let (_, nodes, tail)  = blockSplit block
       id = entryLabel block
       stmts = blockToList nodes

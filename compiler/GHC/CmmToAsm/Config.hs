@@ -15,7 +15,6 @@ data NCGConfig = NCGConfig
    { ncgPlatform              :: !Platform        -- ^ Target platform
    , ncgProcAlignment         :: !(Maybe Int)     -- ^ Mandatory proc alignment
    , ncgDebugLevel            :: !Int             -- ^ Debug level
-   , ncgVerbosity             :: !Int             -- ^ Verbosity level
    , ncgExternalDynamicRefs   :: !Bool            -- ^ Generate code to link against dynamic libraries
    , ncgPIC                   :: !Bool            -- ^ Enable Position-Independent Code
    , ncgInlineThresholdMemcpy :: !Word            -- ^ If inlining `memcpy` produces less than this threshold (in pseudo-instruction unit), do it
