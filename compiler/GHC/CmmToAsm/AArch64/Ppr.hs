@@ -320,7 +320,10 @@ pprReg w r = case r of
 
   where
     ppr_reg_no :: Width -> Int -> SDoc
-    ppr_reg_no _ 31 = text "sp"
+    ppr_reg_no w 31
+         | w == W64 = text "sp"
+         | w == W32 = test "wsp"
+
     ppr_reg_no w i
          | i < 0, w == W32 = text "wzr"
          | i < 0, w == W64 = text "xzr"
