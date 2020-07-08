@@ -157,6 +157,7 @@ test('T4059', [], makefile_test, ['T4059'])
 # Test for #4274
 test('exec_signals',
      [when(opsys('mingw32'), skip),
+      when(cross(), skip),
       pre_cmd('$MAKE -s --no-print-directory exec_signals-prep'),
       cmd_prefix('./exec_signals_prepare')],
      compile_and_run, [''])
