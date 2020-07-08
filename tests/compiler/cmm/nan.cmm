@@ -1,0 +1,51 @@
+// RUN: "$HC" -cpp -dcmm-lint -keep-s-file -c "$1" && cat "${1%%.*}.s" | FileCheck "$1" -check-prefix=CHECK-A64
+// RUN: "$HC" -no-hs-main "${1%%.*}.o" -o "${1%%.*}.exe"
+// RUN: "$EXEC" "${1%%.cmm}.exe" | FileCheck "$1" -check-prefix=CHECK-RUN-A64
+
+#include "Cmm.h"
+#include "Types.h"
+
+// CHECK-A64: .globl main
+// CHECK-A64: main:
+
+main () {
+    F64 y;
+    I64 z;
+
+    D1 = 0.0 - 7.0;
+
+    (y) = foreign "C" sqrt(D1);
+
+    (z) = foreign "C" isDoubleNaN(y);
+
+    // CHECK-RUN-A64: sqrt(-7.000000) = nan
+    // CHECK-RUN-A64: isDoubleNaN(nan) = 1
+    foreign "C" printf("sqrt(%f) = %f\n", D1, y);
+    foreign "C" printf("isDoubleNaN(%f) = %d\n", y, z);
+
+    // CHECK-RUN-A64: nan < 0 = 0
+    foreign "C" printf("%f < 0 = %d\n", y, y `flt` 0.0);
+    // CHECK-RUN-A64: nan > 0 = 0
+    foreign "C" printf("%f > 0 = %d\n", y, y `fgt` 0.0);
+    // CHECK-RUN-A64: nan <= 0 = 0
+    foreign "C" printf("%f <= 0 = %d\n", y, y `fle` 0.0);
+    // CHECK-RUN-A64: nan >= 0 = 0
+    foreign "C" printf("%f >= 0 = %d\n", y, y `fge` 0.0);
+    // CHECK-RUN-A64: nan == 0 = 0
+    foreign "C" printf("%f == 0 = %d\n", y, y `feq` 0.0);
+    // CHECK-RUN-A64: nan /= 0 = 1
+    foreign "C" printf("%f /= 0 = %d\n", y, y `fne` 0.0);
+
+    F64 x;
+    x = 0.0; y = 0.0;
+    foreign "C" printf("%f / %f = %d\n", x, y, x `fquot` y);
+
+    // CHECK-RUN-A64: nan >= 0
+    if((x `fquot` y) < x) {
+        foreign "C" printf("%f < %f\n", x `fquot` y, x);
+    } else {
+        foreign "C" printf("%f >= %f\n", x `fquot` y, x);
+    }
+
+    foreign "C" exit(0::I64);
+}
