@@ -43,11 +43,11 @@ import GHC.Types.RepType
 import GHC.Stg.Syntax as StgSyn hiding (AlwaysEnter)
 import GHC.Stg.Utils
 
+import GHC.StgToCmm.Types ( LambdaFormInfo(..) )
 import GHC.Types.Name
 import GHC.Builtin.Names
 
 import GHC.Types.Demand ( Divergence ( Absent ), splitStrictSig )
-
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
@@ -1402,6 +1402,32 @@ addImportedNode this_mod id
                     = (mkConstNode node_id (flatLattice NeverEnter))
                                 `set_desc` (text "ext_absent_error" <-> ppr id)
 
+                    | Just lf_info <- idLFInfo_maybe id
+                    =   case lf_info of
+                            LFReEntrant {}
+                                -> (mkConstNode node_id (flatLattice NeverEnter))
+                                    `set_desc` (text "ext_lf_func" <-> ppr id)
+                            LFThunk {}
+                                -> (mkConstNode node_id (flatLattice AlwaysEnter))
+                                    `set_desc` (text "ext_lf_thunk" <-> ppr id)
+                            LFCon {}
+                                -- If we ever bind the fields we can infer the tags
+                                -- based on the fields strictness. So a flat lattice
+                                -- is fine.
+                                -> (mkConstNode node_id (flatLattice NeverEnter))
+                                    `set_desc` (text "ext_lf_con" <-> ppr id)
+                            LFUnknown {}
+                                -> (mkConstNode node_id (flatLattice MaybeEnter))
+                                    `set_desc` (text "ext_lf_unknown" <-> ppr id)
+                            LFUnlifted {}
+                                -> (mkConstNode node_id (flatLattice NeverEnter))
+                                    `set_desc` (text "ext_lf_unlifted" <-> ppr id)
+                            LFLetNoEscape {}
+                                -- Shouldn't be possible. I don't think we can export
+                                -- letNoEscap bindings.
+                                -> (mkConstNode node_id (flatLattice MaybeEnter))
+                                    `set_desc` (text "ext_lf_lne" <-> ppr id)
+
                     -- General case, a potentially unevaluated imported id.
                     | not isFun
                     = (mkConstNode node_id (flatLattice MaybeEnter))
@@ -1418,8 +1444,8 @@ addImportedNode this_mod id
     isFun = isFunTy (unwrapType $ idType id)
 
 -- | Returns the nodeId for a given imported Id.
-importedFuncNode :: Module -> Id -> AM (Maybe NodeId)
-importedFuncNode this_mod var_id
+importedFuncNode_Maybe :: Module -> Id -> AM (Maybe NodeId)
+importedFuncNode_Maybe this_mod var_id
     -- Not an imported function
     | nameIsLocalOrFrom this_mod (idName var_id)
     = return Nothing
@@ -1821,7 +1847,8 @@ nodeCase _ _ _ = panic "Impossible: nodeCase"
 nodeCaseBndr :: NodeId -> Id -> AM NodeId
 nodeCaseBndr scrutNodeId _bndr = do
     !bndrNodeId <- mkUniqueId
-    addNode notDone $ FlowNode  { node_id = bndrNodeId
+    addNode notDone $ FlowNode
+                        { node_id = bndrNodeId
                         , node_inputs = [scrutNodeId] --, node_done = False
                         , node_result = top, node_update = updater bndrNodeId
 #if defined(WITH_NODE_DESC)
@@ -1850,13 +1877,14 @@ nodeAlt this_mod ctxt scrutNodeId (altCon, bndrs, rhs)
     return $! ((altCon, bndrs, rhs'), rhs_id)
 
     where
+        strictBnds :: [Id]
         strictBnds
           | DataAlt con <- altCon
           = getStrictConArgs con bndrs
           | otherwise = []
 
         -- Result for ONE of the bindings bound by the alt.
-        -- Eg for (Just, foo, expr) we call mkAltBndrNode 0 foo
+        -- Eg for an StgAlt of (Just, [foo], expr) we call mkAltBndrNode 0 foo
         mkAltBndrNode :: Int -> Id -> AM (Id,NodeId)
         mkAltBndrNode n bndr
           | isUnliftedType bndrTy
@@ -2076,7 +2104,7 @@ In any other case:
 nodeApp :: HasDebugCallStack => Module -> [SynContext] -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeApp this_mod ctxt expr@(StgApp _ f args) = do
     mapM_ (addImportedNode this_mod) (f:[v | StgVarArg v <- args])
-    maybeImportedFunc <- importedFuncNode this_mod f
+    maybeImportedFunc <- importedFuncNode_Maybe this_mod f
     case () of
         _
             | Just node_id <- maybeImportedFunc
@@ -2201,7 +2229,7 @@ nodeApp this_mod ctxt expr@(StgApp _ f args) = do
     isSat = arity > 0 && (length args == arity)
     isAbsent = isAbsentExpr expr
 
-    -- We check if f is imported using importedFuncNode so this
+    -- We check if f is imported using importedFuncNode_Maybe so this
     -- is guarantedd to be not imported when demanded.
     f_node_id = mkLocalIdNodeId ctxt f
 
