@@ -341,14 +341,11 @@ Library
         cbits/PrelIOUtils.c
         cbits/SetEnv.c
         cbits/WCsubst.c
-        cbits/Win32Utils.c
-        cbits/consUtils.c
         cbits/iconv.c
         cbits/inputReady.c
         cbits/md5.c
         cbits/primFloat.c
         cbits/sysconf.c
-        cbits/IOutils.c
         cbits/fs.c
 
     cmm-sources:
@@ -411,6 +408,11 @@ Library
             GHC.Event.PSQ
             GHC.Event.Unique
             System.CPUTime.Windows
+        c-sources:
+            cbits/Win32Utils.c
+            cbits/consUtils.c
+            cbits/IOutils.c
+
     else
         exposed-modules:
             GHC.Event
