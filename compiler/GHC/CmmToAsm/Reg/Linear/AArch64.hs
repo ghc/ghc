@@ -14,11 +14,35 @@ import Data.Bits
 
 import Debug.Trace
 import GHC.Stack
--- AArch64 has 32 64bit general purpose register x0..x31
--- AArch64 has 32 128bit floating point registers v0..v31
+-- AArch64 has 32 64bit general purpose register r0..r30, and zr/sp
+-- AArch64 has 32 128bit floating point registers v0..v31 as part of the NEON
+-- extension in Armv8-A.
+--
+-- Armv8-A is a fundamental change to the Arm architecture. It supports the
+-- 64-bit Execution state called “AArch64”, and a new 64-bit instruction set
+-- “A64”. To provide compatibility with the Armv7-A (32-bit architecture)
+-- instruction set, a 32-bit variant of Armv8-A “AArch32” is provided. Most of
+-- existing Armv7-A code can be run in the AArch32 execution state of Armv8-A.
+--
 -- these can be addresses as q/d/s/h/b 0..31, or v.f<size>[idx]
 -- where size is 64, 32, 16, 8, ... and the index i allows us
 -- to access the given part.
+--
+-- History of Arm Adv SIMD
+-- .---------------------------------------------------------------------------.
+-- | Armv6                  | Armv7-A                | Armv8-A AArch64         |
+-- | SIMD extension         | NEON                   | NEON                    |
+-- |===========================================================================|
+-- | - Operates on 32-bit   | - Separate reg. bank,  | - Separate reg. bank,   |
+-- |   GP ARM registers     |    32x64-bit NEON regs |   32x128-bit NEON regs  |
+-- | - 8-bit/16-bit integer | - 8/16/32/64-bit int   | - 8/16/32/64-bit int    |
+-- |                        | - Single percision fp  | - Single percision fp   |
+-- |                        |                        | - Double precision fp   |
+-- |                        |                        | - Single/Double fp are  |
+-- |                        |                        |   IEEE compliant        |
+-- | - 2x16-bit/4x8-bit ops | - Up to 16x8-bit ops   | - Up to 16x8-bit ops    |
+-- |   per instruction      |   per instruction      |   per instruction       |
+-- '---------------------------------------------------------------------------'
 
 data FreeRegs = FreeRegs !Word32 !Word32
 
