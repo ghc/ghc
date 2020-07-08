@@ -17,7 +17,6 @@ import GHC.Platform.Reg.Class
 import GHC.CmmToAsm.Config
 import GHC.Utils.Panic
 import GHC.Platform
-import GHC.Stack
 
 -- -----------------------------------------------------------------------------
 -- The free register set
@@ -43,10 +42,10 @@ import qualified GHC.CmmToAsm.X86.Instr     as X86.Instr
 import qualified GHC.CmmToAsm.AArch64.Instr as AArch64.Instr
 
 class Show freeRegs => FR freeRegs where
-    frAllocateReg :: HasCallStack => Platform -> RealReg -> freeRegs -> freeRegs
-    frGetFreeRegs :: HasCallStack => Platform -> RegClass -> freeRegs -> [RealReg]
-    frInitFreeRegs :: HasCallStack => Platform -> freeRegs
-    frReleaseReg :: HasCallStack => Platform -> RealReg -> freeRegs -> freeRegs
+    frAllocateReg :: Platform -> RealReg -> freeRegs -> freeRegs
+    frGetFreeRegs :: Platform -> RegClass -> freeRegs -> [RealReg]
+    frInitFreeRegs :: Platform -> freeRegs
+    frReleaseReg :: Platform -> RealReg -> freeRegs -> freeRegs
 
 instance FR X86.FreeRegs where
     frAllocateReg  = \_ -> X86.allocateReg
