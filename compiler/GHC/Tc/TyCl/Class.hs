@@ -31,11 +31,12 @@ where
 import GHC.Prelude
 
 import GHC.Hs
-import GHC.Tc.Utils.Env
 import GHC.Tc.Gen.Sig
 import GHC.Tc.Types.Evidence ( idHsWrapper )
 import GHC.Tc.Gen.Bind
+import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Unify
+import GHC.Tc.Utils.Instantiate( tcSuperSkolTyVars )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Utils.TcMType
 import GHC.Core.Type     ( piResultTys )

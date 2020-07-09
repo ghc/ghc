@@ -220,8 +220,9 @@ tcPatBndr penv@(PE { pe_ctxt = LetPat { pc_lvl    = bind_lvl
   = do { (co, bndr_ty) <- case scaledThing exp_pat_ty of
              Check pat_ty    -> promoteTcType bind_lvl pat_ty
              Infer infer_res -> ASSERT( bind_lvl == ir_lvl infer_res )
-                                -- If we were under a constructor that bumped
-                                -- the level, we'd be in checking mode
+                                -- If we were under a constructor that bumped the
+                                -- level, we'd be in checking mode (see tcConArg)
+                                -- hence this assertion
                                 do { bndr_ty <- inferResultToType infer_res
                                    ; return (mkTcNomReflCo bndr_ty, bndr_ty) }
        ; let bndr_mult = scaledMult exp_pat_ty
@@ -629,10 +630,9 @@ There are two bits of rebindable syntax:
 lit1_ty and lit2_ty could conceivably be different.
 var_ty is the type inferred for x, the variable in the pattern.
 
-If the pushed-down pattern type isn't a tau-type, the two pat_ty's above
-could conceivably be different specializations. But this is very much
-like the situation in Note [Case branches must be taus] in GHC.Tc.Gen.Match.
-So we tauify the pat_ty before proceeding.
+If the pushed-down pattern type isn't a tau-type, the two pat_ty's
+above could conceivably be different specializations.  So we use
+expTypeToType on pat_ty before proceeding.
 
 Note that we need to type-check the literal twice, because it is used
 twice, and may be used at different types. The second HsOverLit stored in the

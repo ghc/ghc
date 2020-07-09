@@ -599,22 +599,13 @@ tcExpr (HsCase x scrut matches) res_ty
 
 tcExpr (HsIf x pred b1 b2) res_ty
   = do { pred' <- tcLExpr pred (mkCheckExpType boolTy)
-       ; res_ty <- tauifyExpType res_ty
-           -- Just like Note [Case branches must never infer a non-tau type]
-           -- in GHC.Tc.Gen.Match (See #10619)
        ; (u1,b1') <- tcCollectingUsage $ tcLExpr b1 res_ty
        ; (u2,b2') <- tcCollectingUsage $ tcLExpr b2 res_ty
        ; tcEmitBindingUsage (supUE u1 u2)
        ; return (HsIf x pred' b1' b2') }
 
 tcExpr (HsMultiIf _ alts) res_ty
-  = do { res_ty <- if isSingleton alts
-                   then return res_ty
-                   else tauifyExpType res_ty
-             -- Just like GHC.Tc.Gen.Match
-             -- Note [Case branches must never infer a non-tau type]
-
-       ; alts' <- mapM (wrapLocM $ tcGRHS match_ctxt res_ty) alts
+  = do { alts' <- mapM (wrapLocM $ tcGRHS match_ctxt res_ty) alts
        ; res_ty <- readExpType res_ty
        ; return (HsMultiIf res_ty alts') }
   where match_ctxt = MC { mc_what = IfAlt, mc_body = tcBody }

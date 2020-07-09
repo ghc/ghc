@@ -61,7 +61,6 @@ import GHC.Types.Name( isSystemName )
 import GHC.Tc.Utils.Instantiate
 import GHC.Core.TyCon
 import GHC.Builtin.Types
-import GHC.Builtin.Types.Prim( tYPE )
 import GHC.Types.Var as Var
 import GHC.Types.Var.Set
 import GHC.Types.Var.Env
@@ -571,9 +570,50 @@ tcSubTypeNC :: CtOrigin       -- Used when instantiating
             -> TcM HsWrapper
 tcSubTypeNC inst_orig ctxt m_thing ty_actual res_ty
   = case res_ty of
-      Infer inf_res     -> instantiateAndFillInferResult inst_orig ty_actual inf_res
       Check ty_expected -> tc_sub_type (unifyType m_thing) inst_orig ctxt
                                        ty_actual ty_expected
+
+      Infer inf_res -> do { (wrap, rho) <- topInstantiate inst_orig ty_actual
+                                   -- See Note [Instantiation of InferResult]
+                          ; co <- fillInferResult rho inf_res
+                          ; return (mkWpCastN co <.> wrap) }
+
+{- Note [Instantiation of InferResult]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We now always instantiate before filling in InferResult, so that
+the result is a TcRhoType: see #17173 for discussion.
+
+For example:
+
+1. Consider
+    f x = (*)
+   We want to instantiate the type of (*) before returning, else we
+   will infer the type
+     f :: forall {a}. a -> forall b. Num b => b -> b -> b
+   This is surely confusing for users.
+
+   And worse, the monomorphism restriction won't work properly. The MR is
+   dealt with in simplifyInfer, and simplifyInfer has no way of
+   instantiating. This could perhaps be worked around, but it may be
+   hard to know even when instantiation should happen.
+
+2. Another reason.  Consider
+       f :: (?x :: Int) => a -> a
+       g y = let ?x = 3::Int in f
+   Here want to instantiate f's type so that the ?x::Int constraint
+   gets discharged by the enclosing implicit-parameter binding.
+
+3. Suppose one defines plus = (+). If we instantiate lazily, we will
+   infer plus :: forall a. Num a => a -> a -> a. However, the monomorphism
+   restriction compels us to infer
+      plus :: Integer -> Integer -> Integer
+   (or similar monotype). Indeed, the only way to know whether to apply
+   the monomorphism restriction at all is to instantiate
+
+There is one place where we don't want to instantiate eagerly,
+namely in GHC.Tc.Module.tcRnExpr, which implements GHCi's :type
+command. See Note [Implementing :type] in GHC.Tc.Module.
+-}
 
 ---------------
 tcSubTypeSigma :: UserTypeCtxt -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
@@ -768,213 +808,6 @@ tcEqMult origin w_actual w_expected = do
   ; coercion <- uType TypeLevel origin w_actual w_expected
   ; return $ if isReflCo coercion then WpHole else WpMultCoercion coercion }
 
-{- **********************************************************************
-%*                                                                      *
-            ExpType functions: tcInfer, instantiateAndFillInferResult
-%*                                                                      *
-%********************************************************************* -}
-
--- | Infer a type using a fresh ExpType
--- See also Note [ExpType] in "GHC.Tc.Utils.TcMType"
-tcInfer :: (ExpSigmaType -> TcM a) -> TcM (a, TcSigmaType)
-tcInfer tc_check
-  = do { res_ty <- newInferExpType
-       ; result <- tc_check res_ty
-       ; res_ty <- readExpType res_ty
-       ; return (result, res_ty) }
-
-instantiateAndFillInferResult :: CtOrigin -> TcType -> InferResult -> TcM HsWrapper
--- If wrap = instantiateAndFillInferResult t1 t2
---    => wrap :: t1 ~> t2
--- See Note [Instantiation of InferResult]
-instantiateAndFillInferResult orig ty inf_res
-  = do { (wrap, rho) <- topInstantiate orig ty
-       ; co <- fillInferResult rho inf_res
-       ; return (mkWpCastN co <.> wrap) }
-
-fillInferResult :: TcType -> InferResult -> TcM TcCoercionN
--- If wrap = fillInferResult t1 t2
---    => wrap :: t1 ~> t2
-fillInferResult orig_ty (IR { ir_uniq = u, ir_lvl = res_lvl
-                            , ir_ref = ref })
-  = do { (ty_co, ty_to_fill_with) <- promoteTcType res_lvl orig_ty
-
-       ; traceTc "Filling ExpType" $
-         ppr u <+> text ":=" <+> ppr ty_to_fill_with
-
-       ; when debugIsOn (check_hole ty_to_fill_with)
-
-       ; writeTcRef ref (Just ty_to_fill_with)
-
-       ; return ty_co }
-  where
-    check_hole ty   -- Debug check only
-      = do { let ty_lvl = tcTypeLevel ty
-           ; MASSERT2( not (ty_lvl `strictlyDeeperThan` res_lvl),
-                       ppr u $$ ppr res_lvl $$ ppr ty_lvl $$
-                       ppr ty <+> dcolon <+> ppr (tcTypeKind ty) $$ ppr orig_ty )
-           ; cts <- readTcRef ref
-           ; case cts of
-               Just already_there -> pprPanic "writeExpType"
-                                       (vcat [ ppr u
-                                             , ppr ty
-                                             , ppr already_there ])
-               Nothing -> return () }
-
-{- Note [Instantiation of InferResult]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We now always instantiate before filling in InferResult, so that
-the result is a TcRhoType: see #17173 for discussion.
-
-For example:
-
-1. Consider
-    f x = (*)
-   We want to instantiate the type of (*) before returning, else we
-   will infer the type
-     f :: forall {a}. a -> forall b. Num b => b -> b -> b
-   This is surely confusing for users.
-
-   And worse, the monomorphism restriction won't work properly. The MR is
-   dealt with in simplifyInfer, and simplifyInfer has no way of
-   instantiating. This could perhaps be worked around, but it may be
-   hard to know even when instantiation should happen.
-
-2. Another reason.  Consider
-       f :: (?x :: Int) => a -> a
-       g y = let ?x = 3::Int in f
-   Here want to instantiate f's type so that the ?x::Int constraint
-   gets discharged by the enclosing implicit-parameter binding.
-
-3. Suppose one defines plus = (+). If we instantiate lazily, we will
-   infer plus :: forall a. Num a => a -> a -> a. However, the monomorphism
-   restriction compels us to infer
-      plus :: Integer -> Integer -> Integer
-   (or similar monotype). Indeed, the only way to know whether to apply
-   the monomorphism restriction at all is to instantiate
-
-There is one place where we don't want to instantiate eagerly,
-namely in GHC.Tc.Module.tcRnExpr, which implements GHCi's :type
-command. See Note [Implementing :type] in GHC.Tc.Module.
-
--}
-
-{- *********************************************************************
-*                                                                      *
-              Promoting types
-*                                                                      *
-********************************************************************* -}
-
-promoteTcType :: TcLevel -> TcType -> TcM (TcCoercion, TcType)
--- See Note [Promoting a type]
--- promoteTcType level ty = (co, ty')
---   * Returns ty'  whose max level is just 'level'
---             and  whose kind is ~# to the kind of 'ty'
---             and  whose kind has form TYPE rr
---   * and co :: ty ~ ty'
---   * and emits constraints to justify the coercion
-promoteTcType dest_lvl ty
-  = do { cur_lvl <- getTcLevel
-       ; if (cur_lvl `sameDepthAs` dest_lvl)
-         then dont_promote_it
-         else promote_it }
-  where
-    promote_it :: TcM (TcCoercion, TcType)
-    promote_it  -- Emit a constraint  (alpha :: TYPE rr) ~ ty
-                -- where alpha and rr are fresh and from level dest_lvl
-      = do { rr      <- newMetaTyVarTyAtLevel dest_lvl runtimeRepTy
-           ; prom_ty <- newMetaTyVarTyAtLevel dest_lvl (tYPE rr)
-           ; let eq_orig = TypeEqOrigin { uo_actual   = ty
-                                        , uo_expected = prom_ty
-                                        , uo_thing    = Nothing
-                                        , uo_visible  = False }
-
-           ; co <- emitWantedEq eq_orig TypeLevel Nominal ty prom_ty
-           ; return (co, prom_ty) }
-
-    dont_promote_it :: TcM (TcCoercion, TcType)
-    dont_promote_it  -- Check that ty :: TYPE rr, for some (fresh) rr
-      = do { res_kind <- newOpenTypeKind
-           ; let ty_kind = tcTypeKind ty
-                 kind_orig = TypeEqOrigin { uo_actual   = ty_kind
-                                          , uo_expected = res_kind
-                                          , uo_thing    = Nothing
-                                          , uo_visible  = False }
-           ; ki_co <- uType KindLevel kind_orig (tcTypeKind ty) res_kind
-           ; let co = mkTcGReflRightCo Nominal ty ki_co
-           ; return (co, ty `mkCastTy` ki_co) }
-
-{- Note [Promoting a type]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (#12427)
-
-  data T where
-    MkT :: (Int -> Int) -> a -> T
-
-  h y = case y of MkT v w -> v
-
-We'll infer the RHS type with an expected type ExpType of
-  (IR { ir_lvl = l, ir_ref = ref, ... )
-where 'l' is the TcLevel of the RHS of 'h'.  Then the MkT pattern
-match will increase the level, so we'll end up in tcSubType, trying to
-unify the type of v,
-  v :: Int -> Int
-with the expected type.  But this attempt takes place at level (l+1),
-rightly so, since v's type could have mentioned existential variables,
-(like w's does) and we want to catch that.
-
-So we
-  - create a new meta-var alpha[l+1]
-  - fill in the InferRes ref cell 'ref' with alpha
-  - emit an equality constraint, thus
-        [W] alpha[l+1] ~ (Int -> Int)
-
-That constraint will float outwards, as it should, unless v's
-type mentions a skolem-captured variable.
-
-This approach fails if v has a higher rank type; see
-Note [Promotion and higher rank types]
-
-
-Note [Promotion and higher rank types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If v had a higher-rank type, say v :: (forall a. a->a) -> Int,
-then we'd emit an equality
-        [W] alpha[l+1] ~ ((forall a. a->a) -> Int)
-which will sadly fail because we can't unify a unification variable
-with a polytype.  But there is nothing really wrong with the program
-here.
-
-We could just about solve this by "promote the type" of v, to expose
-its polymorphic "shape" while still leaving constraints that will
-prevent existential escape.  But we must be careful!  Exposing
-the "shape" of the type is precisely what we must NOT do under
-a GADT pattern match!  So in this case we might promote the type
-to
-        (forall a. a->a) -> alpha[l+1]
-and emit the constraint
-        [W] alpha[l+1] ~ Int
-Now the promoted type can fill the ref cell, while the emitted
-equality can float or not, according to the usual rules.
-
-But that's not quite right!  We are exposing the arrow! We could
-deal with that too:
-        (forall a. mu[l+1] a a) -> alpha[l+1]
-with constraints
-        [W] alpha[l+1] ~ Int
-        [W] mu[l+1] ~ (->)
-Here we abstract over the '->' inside the forall, in case that
-is subject to an equality constraint from a GADT match.
-
-Note that we kept the outer (->) because that's part of
-the polymorphic "shape".  And because of impredicativity,
-GADT matches can't give equalities that affect polymorphic
-shape.
-
-This reasoning just seems too complicated, so I decided not
-to do it.  These higher-rank notes are just here to record
-the thinking.
--}
 
 {- *********************************************************************
 *                                                                      *

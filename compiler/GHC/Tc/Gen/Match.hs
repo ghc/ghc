@@ -164,80 +164,47 @@ tcGRHSsPat grhss res_ty = tcGRHSs match_ctxt grhss (mkCheckExpType res_ty)
     match_ctxt = MC { mc_what = PatBindRhs,
                       mc_body = tcBody }
 
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-\subsection{tcMatch}
+                tcMatch
 *                                                                      *
-************************************************************************
+********************************************************************* -}
 
-Note [Case branches must never infer a non-tau type]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-
-  case ... of
-    ... -> \(x :: forall a. a -> a) -> x
-    ... -> \y -> y
-
-Should that type-check? The problem is that, if we check the second branch
-first, then we'll get a type (b -> b) for the branches, which won't unify
-with the polytype in the first branch. If we check the first branch first,
-then everything is OK. This order-dependency is terrible. So we want only
-proper tau-types in branches (unless a sigma-type is pushed down).
-This is what expTypeToType ensures: it replaces an Infer with a fresh
-tau-type.
-
-An even trickier case looks like
-
-  f x True  = x undefined
-  f x False = x ()
-
-Here, we see that the arguments must also be non-Infer. Thus, we must
-use expTypeToType on the output of matchExpectedFunTys, not the input.
-
-But we make a special case for a one-branch case. This is so that
-
-  f = \(x :: forall a. a -> a) -> x
-
-still gets assigned a polytype.
--}
-
--- | When the MatchGroup has multiple RHSs, convert an Infer ExpType in the
--- expected type into TauTvs.
--- See Note [Case branches must never infer a non-tau type]
-tauifyMultipleMatches :: [LMatch id body]
-                      -> [Scaled ExpType] -> TcM [Scaled ExpType]
-tauifyMultipleMatches group exp_tys
-  | isSingletonMatchGroup group = return exp_tys
-  | otherwise                   = mapM (\(Scaled m t) ->
-                                       fmap (Scaled m) (tauifyExpType t)) exp_tys
-  -- NB: In the empty-match case, this ensures we fill in the ExpType
+data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
+  = MC { mc_what :: HsMatchContext GhcRn,  -- What kind of thing this is
+         mc_body :: Located (body GhcRn)   -- Type checker for a body of
+                                           -- an alternative
+                 -> ExpRhoType
+                 -> TcM (Located (body GhcTc)) }
 
 -- | Type-check a MatchGroup.
 tcMatches :: (Outputable (body GhcRn)) => TcMatchCtxt body
           -> [Scaled ExpSigmaType]      -- Expected pattern types
-          -> ExpRhoType          -- Expected result-type of the Match.
+          -> ExpRhoType                 -- Expected result-type of the Match.
           -> MatchGroup GhcRn (Located (body GhcRn))
           -> TcM (MatchGroup GhcTc (Located (body GhcTc)))
 
-data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
-  = MC { mc_what :: HsMatchContext GhcRn,  -- What kind of thing this is
-         mc_body :: Located (body GhcRn)         -- Type checker for a body of
-                                                -- an alternative
-                 -> ExpRhoType
-                 -> TcM (Located (body GhcTc)) }
 tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
                                   , mg_origin = origin })
-  = do { (Scaled _ rhs_ty):pat_tys <- tauifyMultipleMatches matches ((Scaled One rhs_ty):pat_tys) -- return type has implicitly multiplicity 1, it doesn't matter all that much in this case since it isn't used and is eliminated immediately.
-            -- See Note [Case branches must never infer a non-tau type]
+  | null matches  -- Deal with case e of {}
+    -- Since there are no branches, no one else will fill in rhs_ty
+    -- when in inference mode, so we must do it ourselves,
+    -- here, using expTypeToType
+  = do { tcEmitBindingUsage bottomUE
+       ; pat_tys <- mapM scaledExpTypeToType pat_tys
+       ; rhs_ty  <- expTypeToType rhs_ty
+       ; return (MG { mg_alts = L l []
+                    , mg_ext = MatchGroupTc pat_tys rhs_ty
+                    , mg_origin = origin }) }
 
-       ; umatches <- mapM (tcCollectingUsage . tcMatch ctxt pat_tys rhs_ty) matches
+  | otherwise
+  = do { umatches <- mapM (tcCollectingUsage . tcMatch ctxt pat_tys rhs_ty) matches
        ; let (usages,matches') = unzip umatches
        ; tcEmitBindingUsage $ supUEs usages
-       ; pat_tys  <- mapM (\(Scaled m t) -> fmap (Scaled m) (readExpType t)) pat_tys
+       ; pat_tys  <- mapM readScaledExpType pat_tys
        ; rhs_ty   <- readExpType rhs_ty
-       ; return (MG { mg_alts = L l matches'
-                    , mg_ext = MatchGroupTc pat_tys rhs_ty
+       ; return (MG { mg_alts   = L l matches'
+                    , mg_ext    = MatchGroupTc pat_tys rhs_ty
                     , mg_origin = origin }) }
 
 -------------

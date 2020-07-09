@@ -36,7 +36,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity ( checkValidType )
 import GHC.Tc.Utils.Unify( tcSkolemise, unifyType )
-import GHC.Tc.Utils.Instantiate( topInstantiate )
+import GHC.Tc.Utils.Instantiate( topInstantiate, tcInstTypeBndrs )
 import GHC.Tc.Utils.Env( tcLookupId )
 import GHC.Tc.Types.Evidence( HsWrapper, (<.>) )
 import GHC.Core.Type ( mkTyVarBinders )
@@ -488,7 +488,7 @@ tcInstSig :: TcIdSigInfo -> TcM TcIdSigInst
 -- Instantiate a type signature; only used with plan InferGen
 tcInstSig sig@(CompleteSig { sig_bndr = poly_id, sig_loc = loc })
   = setSrcSpan loc $  -- Set the binding site of the tyvars
-    do { (tv_prs, theta, tau) <- tcInstTypeBndrs newMetaTyVarTyVars poly_id
+    do { (tv_prs, theta, tau) <- tcInstTypeBndrs poly_id
               -- See Note [Pattern bindings and complete signatures]
 
        ; return (TISI { sig_inst_sig   = sig
