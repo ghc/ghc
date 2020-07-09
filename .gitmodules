@@ -60,11 +60,11 @@
 	ignore = untracked
 [submodule "libraries/hpc"]
 	path = libraries/hpc
-	url = https://gitlab.haskell.org/Haskell-mouse/hpc.git
+	url = https://gitlab.haskell.org/ghc/packages/hpc.git
 	ignore = untracked
 [submodule "libraries/parsec"]
 	path = libraries/parsec
-	url = https://gitlab.haskell.org/Haskell-mouse/parsec.git
+	url = https://gitlab.haskell.org/ghc/packages/parsec.git
 	ignore = untracked
 [submodule "libraries/text"]
 	path = libraries/text
@@ -85,7 +85,7 @@
 	branch = 2.7
 [submodule "libraries/stm"]
 	path = libraries/stm
-	url = https://gitlab.haskell.org/Haskell-mouse/stm.git
+	url = https://gitlab.haskell.org/ghc/packages/stm.git
 	ignore = untracked
 [submodule "utils/haddock"]
 	path = utils/haddock
