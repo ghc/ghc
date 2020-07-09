@@ -256,7 +256,7 @@ asmMultilineComment c = whenPprDebug $ text "/*" $+$ c $+$ text "*/"
 pprIm :: Imm -> SDoc
 pprIm im = case im of
   ImmInt i     -> char '#' <> int i
-  ImmInteger i -> char '#' <> text (show i)
+  ImmInteger i -> char '#' <> integer i
 
   -- XXX: This will only work for
   -- The floating point value must be expressable as ±n ÷ 16 × 2^r,
