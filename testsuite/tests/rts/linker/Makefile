@@ -58,6 +58,23 @@ linker_unload:
 	# -rtsopts causes a warning
 	"$(TEST_HC)" LinkerUnload.hs -package ghc $(filter-out -rtsopts, $(TEST_HC_OPTS)) linker_unload.c -o linker_unload -no-hs-main -optc-Werror
 	./linker_unload "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
+ 
+.PHONY: linker_unload_native
+linker_unload_native:
+	$(RM) Test.o Test.hi Test.a Test.so Test2.so
+	"$(TEST_HC)" $(TEST_HC_OPTS) -c Test.hs -v0 -dynamic -fPIC -o Test.a
+	# only libraries without DT_NEEDED are supported
+	"$(CC)" -shared -Wl,-Bsymbolic -nostdlib -o Test.so -Wl,-nostdlib \
+		-Wl,--whole-archive Test.a
+	cp Test.so Test2.so
+
+	# -rtsopts causes a warning
+	"$(TEST_HC)" LinkerUnload.hs -optl-Wl,--export-dynamic -package ghc \
+		$(filter-out -rtsopts, $(TEST_HC_OPTS)) linker_unload_native.c \
+		-o linker_unload_native -no-hs-main -optc-Werror
+	./linker_unload_native \
+		"`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" 
+
 
 # -----------------------------------------------------------------------------
 # Testing failures in the RTS linker.  We should be able to repeatedly
