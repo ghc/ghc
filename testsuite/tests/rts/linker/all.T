@@ -84,6 +84,11 @@ test('T5435_dyn_gcc', extra_files(['T5435.hs', 'T5435_gcc.c']) , makefile_test, 
 test('linker_unload',
      [extra_files(['LinkerUnload.hs', 'Test.hs']), req_rts_linker],
      makefile_test, ['linker_unload'])
+ 
+test('linker_unload_native',
+     [extra_files(['LinkerUnload.hs', 'Test.hs']), req_rts_linker],
+     makefile_test, ['linker_unload_native'])
+
 
 ######################################
 test('linker_error1', [extra_files(['linker_error.c']),

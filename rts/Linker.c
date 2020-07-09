@@ -63,6 +63,7 @@
 #  include "linker/Elf.h"
 #  include <regex.h>    // regex is already used by dlopen() so this is OK
                         // to use here without requiring an additional lib
+#  include <link.h>
 #elif defined(OBJFORMAT_PEi386)
 #  include "linker/PEi386.h"
 #  include <windows.h>
@@ -168,6 +169,8 @@ Mutex linker_mutex;
 
 /* Generic wrapper function to try and Resolve and RunInit oc files */
 int ocTryLoad( ObjectCode* oc );
+
+static void freeNativeCode_ELF (ObjectCode *nc);
 
 /* Link objects into the lower 2Gb on x86_64 and AArch64.  GHC assumes the
  * small memory model on this architecture (see gcc docs,
@@ -980,7 +983,9 @@ SymbolAddr* lookupSymbol( SymbolName* lbl )
    again in unloadObj().
    -------------------------------------------------------------------------- */
 
-static ObjectCode *loading_obj = NULL;
+// volatile works around
+// https://sourceware.org/ml/libc-alpha/2013-08/msg00465.html
+static ForeignExportStablePtr ** volatile loading_fe_stable_ptr = NULL;
 
 StgStablePtr foreignExportStablePtr (StgPtr p)
 {
@@ -989,12 +994,12 @@ StgStablePtr foreignExportStablePtr (StgPtr p)
 
     sptr = getStablePtr(p);
 
-    if (loading_obj != NULL) {
+    if (loading_fe_stable_ptr != NULL) {
         fe_sptr = stgMallocBytes(sizeof(ForeignExportStablePtr),
                                  "foreignExportStablePtr");
         fe_sptr->stable_ptr = sptr;
-        fe_sptr->next = loading_obj->stable_ptrs;
-        loading_obj->stable_ptrs = fe_sptr;
+        fe_sptr->next = *loading_fe_stable_ptr;
+        *loading_fe_stable_ptr = fe_sptr;
     }
 
     return sptr;
@@ -1267,18 +1272,18 @@ static void removeOcSymbols (ObjectCode *oc)
  * Release StablePtrs and free oc->stable_ptrs.
  * This operation is idempotent.
  */
-static void freeOcStablePtrs (ObjectCode *oc)
+static void freeFEStablePtrs (ForeignExportStablePtr **code_stable_ptrs)
 {
     // Release any StablePtrs that were created when this
     // object module was initialized.
     ForeignExportStablePtr *fe_ptr, *next;
 
-    for (fe_ptr = oc->stable_ptrs; fe_ptr != NULL; fe_ptr = next) {
+    for (fe_ptr = *code_stable_ptrs; fe_ptr != NULL; fe_ptr = next) {
         next = fe_ptr->next;
         freeStablePtr(fe_ptr->stable_ptr);
         stgFree(fe_ptr);
     }
-    oc->stable_ptrs = NULL;
+    *code_stable_ptrs = NULL;
 }
 
 static void
@@ -1308,6 +1313,16 @@ freePreloadObjectFile (ObjectCode *oc)
  */
 void freeObjectCode (ObjectCode *oc)
 {
+    if (oc->type == DYNAMIC_OBJECT) {
+#if defined(OBJFORMAT_ELF)
+        ACQUIRE_LOCK(&dl_mutex);
+        freeNativeCode_ELF(oc);
+        RELEASE_LOCK(&dl_mutex);
+#else
+        barf("freeObjectCode: This shouldn't happen");
+#endif
+    }
+
     freePreloadObjectFile(oc);
 
     if (oc->symbols != NULL) {
@@ -1390,7 +1405,7 @@ void freeObjectCode (ObjectCode *oc)
 }
 
 ObjectCode*
-mkOc( pathchar *path, char *image, int imageSize,
+mkOc( ObjectType type, pathchar *path, char *image, int imageSize,
       bool mapped, pathchar *archiveMemberName, int misalignment ) {
    ObjectCode* oc;
 
@@ -1398,6 +1413,7 @@ mkOc( pathchar *path, char *image, int imageSize,
    oc = stgMallocBytes(sizeof(ObjectCode), "mkOc(oc)");
 
    oc->info = NULL;
+   oc->type = type;
 
 #  if defined(OBJFORMAT_ELF)
    oc->formatName = "ELF";
@@ -1457,6 +1473,10 @@ mkOc( pathchar *path, char *image, int imageSize,
    oc->rw_m32 = m32_allocator_new(false);
    oc->rx_m32 = m32_allocator_new(true);
 #endif
+
+   oc->l_addr = NULL;
+   oc->nc_ranges = NULL;
+   oc->dlopen_handle = NULL;
 
    IF_DEBUG(linker, debugBelch("mkOc: done\n"));
    return oc;
@@ -1585,7 +1605,7 @@ preloadObjectFile (pathchar *path)
    IF_DEBUG(linker, debugBelch("loadObj: preloaded image at %p\n", (void *) image));
 
    /* FIXME (AP): =mapped= parameter unconditionally set to true */
-   oc = mkOc(path, image, fileSize, true, NULL, misalignment);
+   oc = mkOc(STATIC_OBJECT, path, image, fileSize, true, NULL, misalignment);
 
 #if defined(OBJFORMAT_MACHO)
    if (ocVerifyImage_MachO( oc ))
@@ -1620,7 +1640,7 @@ static HsInt loadObj_ (pathchar *path)
    if (! loadOc(oc)) {
        // failed; free everything we've allocated
        removeOcSymbols(oc);
-       // no need to freeOcStablePtrs, they aren't created until resolveObjs()
+       // no need to freeFEStablePtrs, they aren't created until resolveObjs()
        freeObjectCode(oc);
        return 0;
    }
@@ -1794,7 +1814,8 @@ int ocTryLoad (ObjectCode* oc) {
 
     IF_DEBUG(linker, debugBelch("ocTryLoad: ocRunInit start\n"));
 
-    loading_obj = oc; // tells foreignExportStablePtr what to do
+    loading_fe_stable_ptr = &oc->stable_ptrs;
+    // tells foreignExportStablePtr what to do
 #if defined(OBJFORMAT_ELF)
     r = ocRunInit_ELF ( oc );
 #elif defined(OBJFORMAT_PEi386)
@@ -1804,7 +1825,7 @@ int ocTryLoad (ObjectCode* oc) {
 #else
     barf("ocTryLoad: initializers not implemented on this platform");
 #endif
-    loading_obj = NULL;
+    loading_fe_stable_ptr = NULL;
 
     if (!r) { return r; }
 
@@ -1871,7 +1892,7 @@ static HsInt unloadObj_ (pathchar *path, bool just_purge)
             // These are both idempotent, so in just_purge mode we can later
             // call unloadObj() to really unload the object.
             removeOcSymbols(oc);
-            freeOcStablePtrs(oc);
+            freeFEStablePtrs(&oc->stable_ptrs);
 
             unloadedAnyObj = true;
 
@@ -2001,6 +2022,185 @@ addSection (Section *s, SectionKind kind, SectionAlloc alloc,
             debugBelch("addSection: %p-%p (size %" FMT_Word "), kind %d\n",
                        start, (void*)((StgWord)start + size),
                        size, kind ));
+}
+
+
+#  if defined(OBJFORMAT_ELF)
+static int loadNativeObjCb_(struct dl_phdr_info *info,
+    size_t _size GNUC3_ATTRIBUTE(__unused__), void *data) {
+  ObjectCode* nc = (ObjectCode*) data;
+
+  // This logic mimicks _dl_addr_inside_object from glibc
+  // For reference:
+  // int
+  // internal_function
+  // _dl_addr_inside_object (struct link_map *l, const ElfW(Addr) addr)
+  // {
+  //   int n = l->l_phnum;
+  //   const ElfW(Addr) reladdr = addr - l->l_addr;
+  //
+  //   while (--n >= 0)
+  //     if (l->l_phdr[n].p_type == PT_LOAD
+  //         && reladdr - l->l_phdr[n].p_vaddr >= 0
+  //         && reladdr - l->l_phdr[n].p_vaddr < l->l_phdr[n].p_memsz)
+  //       return 1;
+  //   return 0;
+  // }
+
+  if ((void*) info->dlpi_addr == nc->l_addr) {
+    int n = info->dlpi_phnum;
+    while (--n >= 0) {
+      if (info->dlpi_phdr[n].p_type == PT_LOAD) {
+        NativeCodeRange* ncr =
+          stgMallocBytes(sizeof(NativeCodeRange), "loadNativeObjCb_");
+        ncr->start = (void*) ((char*) nc->l_addr + info->dlpi_phdr[n].p_vaddr);
+        ncr->end = (void*) ((char*) ncr->start + info->dlpi_phdr[n].p_memsz);
+
+        ncr->next = nc->nc_ranges;
+        nc->nc_ranges = ncr;
+      }
+    }
+  }
+  return 0;
+}
+
+static void copyErrmsg(char** errmsg_dest, char* errmsg) {
+  if (errmsg == NULL) errmsg = "loadNativeObj_ELF: unknown error";
+  *errmsg_dest = stgMallocBytes(strlen(errmsg)+1, "loadNativeObj_ELF");
+  strcpy(*errmsg_dest, errmsg);
+}
+
+// need dl_mutex
+static void freeNativeCode_ELF (ObjectCode *nc) {
+  dlclose(nc->dlopen_handle);
+
+  NativeCodeRange *ncr = nc->nc_ranges;
+  while (ncr) {
+    NativeCodeRange* last_ncr = ncr;
+    ncr = ncr->next;
+    stgFree(last_ncr);
+  }
+}
+
+static void * loadNativeObj_ELF (pathchar *path, char **errmsg)
+{
+   ObjectCode* nc;
+   void *hdl, *retval;
+
+   IF_DEBUG(linker, debugBelch("loadNativeObj_ELF %" PATH_FMT "\n", path));
+
+   retval = NULL;
+   ACQUIRE_LOCK(&dl_mutex);
+
+   ForeignExportStablePtr *fe_sptr = NULL;
+   loading_fe_stable_ptr = &fe_sptr;
+   // dlopen will run foreignExportStablePtr adding StablePtrs from this DLL
+   // to fe_sptr
+   hdl = dlopen(path, RTLD_NOW|RTLD_LOCAL);
+   loading_fe_stable_ptr = NULL;
+   if (hdl == NULL) {
+     /* dlopen failed; save the message in errmsg */
+     copyErrmsg(errmsg, dlerror());
+     goto dlopen_fail;
+   }
+
+   struct link_map *map;
+   if (dlinfo(hdl, RTLD_DI_LINKMAP, &map) == -1) {
+     /* dlinfo failed; save the message in errmsg */
+     copyErrmsg(errmsg, dlerror());
+     goto dlinfo_fail;
+   }
+
+   nc = mkOc(DYNAMIC_OBJECT, path, NULL, 0, true, NULL, 0);
+   nc->l_addr = (void*) map->l_addr;
+   nc->dlopen_handle = hdl;
+   hdl = NULL; // pass handle ownership to nc
+   nc->stable_ptrs = fe_sptr;
+   fe_sptr = NULL; // pass the ownership to nc
+
+   dl_iterate_phdr(loadNativeObjCb_, nc);
+   if (!nc->nc_ranges) {
+     copyErrmsg(errmsg, "dl_iterate_phdr failed to find obj");
+     goto dl_iterate_phdr_fail;
+   }
+
+   insertOCSectionIndices(nc);
+
+   nc->next_loaded_object = loaded_objects;
+   loaded_objects = nc;
+
+   retval = nc->dlopen_handle;
+   goto success;
+
+dl_iterate_phdr_fail:
+   // already have dl_mutex
+   freeNativeCode_ELF(nc);
+dlinfo_fail:
+   if (hdl) dlclose(hdl);
+dlopen_fail:
+   freeFEStablePtrs(&fe_sptr);
+success:
+
+   RELEASE_LOCK(&dl_mutex);
+   IF_DEBUG(linker, debugBelch("loadNativeObj_ELF result=%p\n", retval));
+
+   return retval;
+}
+
+#  endif
+
+#define UNUSED(x) (void)(x)
+
+void * loadNativeObj (pathchar *path, char **errmsg)
+{
+#if defined(OBJFORMAT_ELF)
+   ACQUIRE_LOCK(&linker_mutex);
+   void *r = loadNativeObj_ELF(path, errmsg);
+   RELEASE_LOCK(&linker_mutex);
+   return r;
+#else
+   UNUSED(path);
+   UNUSED(errmsg);
+   barf("loadNativeObj: not implemented on this platform");
+#endif
+}
+
+HsInt unloadNativeObj (void *handle)
+{
+    bool unloadedAnyObj = false;
+
+    IF_DEBUG(linker, debugBelch("unloadNativeObj: %p\n", handle));
+
+    ObjectCode *prev = NULL, *next;
+    for (ObjectCode *nc = loaded_objects; nc; nc = next) {
+        next = nc->next_loaded_object; // we might move nc
+
+        if (nc->type == DYNAMIC_OBJECT && nc->dlopen_handle == handle) {
+            nc->status = OBJECT_UNLOADED;
+            n_unloaded_objects += 1;
+
+            // dynamic objects have no symbols
+            ASSERT(nc->symbols == NULL);
+            freeFEStablePtrs(&nc->stable_ptrs);
+
+            // Remove object code from root set
+            if (prev == NULL) {
+              loaded_objects = nc->next_loaded_object;
+            } else {
+              prev->next_loaded_object = nc->next_loaded_object;
+            }
+            unloadedAnyObj = true;
+        } else {
+            prev = nc;
+        }
+    }
+
+    if (unloadedAnyObj) {
+        return 1;
+    } else {
+        errorBelch("unloadObjNativeObj_ELF: can't find `%p' to unload", handle);
+        return 0;
+    }
 }
 
 /* -----------------------------------------------------------------------------

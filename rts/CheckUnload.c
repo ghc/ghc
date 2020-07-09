@@ -238,21 +238,45 @@ static void reserveOCSectionIndices(OCSectionIndices *s_indices, int len)
 // state.
 void insertOCSectionIndices(ObjectCode *oc)
 {
-    reserveOCSectionIndices(global_s_indices, oc->n_sections);
+    // after we finish the section table will no longer be sorted.
     global_s_indices->sorted = false;
 
-    int s_i = global_s_indices->n_sections;
-    for (int i = 0; i < oc->n_sections; i++) {
-        if (oc->sections[i].kind != SECTIONKIND_OTHER) {
-            global_s_indices->indices[s_i].start = (W_)oc->sections[i].start;
-            global_s_indices->indices[s_i].end = (W_)oc->sections[i].start
-                + oc->sections[i].size;
-            global_s_indices->indices[s_i].oc = oc;
+    if (oc->type == DYNAMIC_OBJECT) {
+        // First count the ranges
+        int n_ranges = 0;
+        for (NativeCodeRange *ncr = oc->nc_ranges; ncr != NULL; ncr = ncr->next) {
+            n_ranges++;
+        }
+
+        // Next reserve the appropriate number of table entries...
+        reserveOCSectionIndices(global_s_indices, n_ranges);
+
+        // Now insert the new ranges...
+        int s_i = global_s_indices->n_sections;
+        for (NativeCodeRange *ncr = oc->nc_ranges; ncr != NULL; ncr = ncr->next) {
+            OCSectionIndex *ent = &global_s_indices->indices[s_i];
+            ent->start = (W_)ncr->start;
+            ent->end = (W_)ncr->end;
+            ent->oc = oc;
             s_i++;
         }
-    }
 
-    global_s_indices->n_sections = s_i;
+        global_s_indices->n_sections = s_i;
+    } else {
+        reserveOCSectionIndices(global_s_indices, oc->n_sections);
+        int s_i = global_s_indices->n_sections;
+        for (int i = 0; i < oc->n_sections; i++) {
+            if (oc->sections[i].kind != SECTIONKIND_OTHER) {
+                OCSectionIndex *ent = &global_s_indices->indices[s_i];
+                ent->start = (W_)oc->sections[i].start;
+                ent->end = (W_)oc->sections[i].start + oc->sections[i].size;
+                ent->oc = oc;
+                s_i++;
+            }
+        }
+
+        global_s_indices->n_sections = s_i;
+    }
 
     // Add object to 'objects' list
     if (objects != NULL) {
@@ -443,6 +467,7 @@ void checkUnload()
     ObjectCode *next = NULL;
     for (ObjectCode *oc = old_objects; oc != NULL; oc = next) {
         next = oc->next;
+        ASSERT(oc->status == OBJECT_UNLOADED);
 
         removeOCSectionIndices(s_indices, oc);
 
