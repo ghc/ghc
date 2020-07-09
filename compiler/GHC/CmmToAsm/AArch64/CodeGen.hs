@@ -327,6 +327,7 @@ getRegisterReg :: Platform -> CmmReg -> Reg
 getRegisterReg _ (CmmLocal (LocalReg u pk))
   = RegVirtual $ mkVirtualReg u (cmmTypeFormat pk)
 
+-- XXX: this crashes for PicBaseReg
 getRegisterReg platform (CmmGlobal mid)
   = case globalRegMaybe platform mid of
         Just reg -> RegReal reg
@@ -403,11 +404,32 @@ getRegister e = do
   config <- getConfig
   getRegister' config (ncgPlatform config) e
 
+-- Handling PIC on AArch64.  AArch64 does not have a special PIC register, the
+-- general approach is to simply go through the GOT, and there is assembly
+-- support for this:
+--
+--   // Load the address of 'sym' from the GOT using ADRP and LDR (used for
+--   // position-independent code on AArch64):
+--   adrp x0, #:got:sym
+--   ldr x0, [x0, #:got_lo12:sym]
+--
+-- See also: https://developer.arm.com/documentation/dui0774/i/armclang-integrated-assembler-directives/assembly-expressions
+--
+-- CmmGlobal @PicBaseReg@'s are generated in @GHC.CmmToAsm.PIC@ in the
+-- @cmmMakePicReference@.  This is in turn called from @cmmMakeDynamicReference@
+-- also in @Cmm.CmmToAsm.PIC@ from where it is also exported.  There are two
+-- callsites for this. One is in this module to produce the @target@ in @genCCall@
+-- the other is in @GHC.CmmToAsm@ in @cmmExprNative@.
+--
+-- Conceptually we do not want any special PicBaseReg to be used on AArch64. If
+-- we want to distinguish between symbol loading, we need to address this through
+-- the way we load it, not through a register.
+--
 getRegister' :: NCGConfig -> Platform -> CmmExpr -> NatM Register
 getRegister' config plat expr
   = case expr of
-    -- CmmReg (CmmGlobal PicBaseReg)
-    --   -> return (Fixed II64 toc nilOL)
+    CmmReg (CmmGlobal PicBaseReg)
+      -> pprPanic "getRegisterReg-memory" (ppr $ PicBaseReg)
     CmmLit lit
       -> case lit of
 
@@ -868,6 +890,58 @@ genCondBranch _ true false expr = do
 --
 -- We need to make sure we preserve x9-x15, don't want to touch x16, x17.
 
+-- Note [PLT vs GOT relocations]
+-- When linking objects together, we may need to lookup foreign references. That
+-- is symbolic references to functions or values in other objects. When
+-- compiling the object, we can not know where those elements will end up in
+-- memory (relative to the current location). Thus the use of symbols. There
+-- are two types of items we are interested, code segments we want to jump to
+-- and continue execution there (functions, ...), and data items we want to look
+-- up (strings, numbers, ...). For functions we can use the fact that we can use
+-- an intermediate jump without visibility to the programs execution.  If we
+-- want to jump to a function that is simply too far away to reach for the B/BL
+-- instruction, we can create a small piece of code that loads the full target
+-- address and jumps to that on demand. Say f wants to call g, however g is out
+-- of range for a direct jump, we can create a function h in range for f, that
+-- will load the address of g, and jump there. The area where we construct h
+-- is called the Procedure Linking Table (PLT), we have essentially replaced
+-- f -> g with f -> h -> g.  This is fine for function calls.  However if we
+-- want to lookup values, this trick doesn't work, so we need something else.
+-- We will instead reserve a slot in memory, and have a symbol pointing to that
+-- slot. Now what we essentially do is, we reference that slot, and expect that
+-- slot to hold the final resting address of the data we are interested in.
+-- Thus what that symbol really points to is the location of the final data.
+-- The block of memory where we hold all those slots is the Global Offset Table
+-- (GOT).  Instead of x <- $foo, we now do y <- $fooPtr, and x <- [$y].
+--
+-- For JUMP/CALLs we have 26bits (+/- 128MB), for conditional branches we only
+-- have 19bits (+/- 1MB).  Symbol lookups are also within +/- 1MB, thus for most
+-- of the LOAD/STOREs we'd want to use adrp, and add to compute a value within
+-- 4GB of the PC, and load that.  For anything outside of that range, we'd have
+-- to go through the GOT.
+--
+--  adrp x0, <symbol>
+--  add x0, :lo:<symbol>
+--
+-- will compute the address of <symbol> int x0 if <symbol> is within 4GB of the
+-- PC.
+--
+-- If we want to get the slot in the global offset table (GOT), we can do this:
+--
+--   adrp x0, #:got:<symbol>
+--   ldr x0, [x0, #:got_lo12:<symbol>]
+--
+-- this will compute the address anywhere in the addressable 64bit space into
+-- x0, by loading the address from the GOT slot.
+--
+-- To actually get the value of <symbol>, we'd need to ldr x0, x0 still, which
+-- for the first case can be optimized to use ldr x0, [x0, #:lo12:<symbol>]
+-- instaed of the add instruction.
+--
+-- As the memory model for AArch64 for PIC is considered to be +/- 4GB, we do
+-- not need to go through the GOT, unless we want to address the full address
+-- range within 64bit.
+
 genCCall
     :: ForeignTarget      -- function to call
     -> [CmmFormal]        -- where to put the result
@@ -887,7 +961,14 @@ genCCall target dest_regs arg_regs bid = do
     -- be a foreign procedure with an address expr
     -- and a calling convention.
     ForeignTarget expr _cconv -> do
-      (reg, _format, reg_code) <- getSomeReg expr
+      (call_target, call_target_code) <- case expr of
+        -- if this is a label, let's just directly to it.  This will produce the
+        -- correct CALL relocation for BL...
+        (CmmLit (CmmLabel lbl)) -> pure (TLabel lbl, nilOL)
+        -- ... if it's not a label--well--let's compute the expression into a
+        -- register and jump to that. See Note [PLT vs GOT relocations]
+        _ -> do (reg, _format, reg_code) <- getSomeReg expr
+                pure (TReg reg, reg_code)
       -- compute the code and register logic for all arg_regs.
       -- this will give us the format information to match on.
       arg_regs' <- mapM getSomeReg arg_regs
@@ -907,46 +988,12 @@ genCCall target dest_regs arg_regs bid = do
           moveStackUp i = toOL [ ADD (OpReg W64 (regSingle 31)) (OpReg W64 (regSingle 31)) (OpImm (ImmInt (8 * i)))
                                , POP_STACK_FRAME
                                , DELTA 0 ]
-      -- XXX: Maybe PUSH_STACK_FRAME + POP_STACK_FRAME would work if we injected DELTAs?
-      --
-      -- otherwise we end up with something like this:
-      -- stp x29,  x30,  [sp, #-16]!          // sp <- sp - 16 ------------. <--+- push stack frame
-      -- mov x29, sp                          // x29 <- sp                 | <--'
-      -- adrp x16, cx_str                     // x16 <- &cx_str            |
-      -- add x16, x16, :lo12:cx_str           // ...                       |
-      -- mov x0, x16                          // x0 <- &cx_str             |
-      -- mov x1, x22                          // x1 <- x22                 |
-      -- str x18, [ sp, 64 ]                  // *(sp+64) <- x18           | <-- !!!
-      -- blr x17                              // printf(&cx_str, x22)      |
-      -- ldp x29,  x30,  [sp], #16            // sp <- sp + 16 ------------' <-- pop stack frame
-      -- adrp x18, printf                     // x18 <- &printf
-      -- add x18, x18, :lo12:printf           // ...
-      -- stp x29,  x30,  [sp, #-16]!          // sp <- sp - 16 ------------.
-      -- mov x29, sp                          // x29 <- sp                 |
-      -- adrp x17, cC_str                     // x17 <- &cC_str            |
-      -- add x17, x17, :lo12:cC_str           // ...                       |
-      -- mov x0, x17                          // x0 <- x17                 |
-      -- blr x18                              // printf(&cStr)             |
-      -- ldp x29,  x30,  [sp], #16            // sp <- sp + 16 ------------'
-      -- adrp x18, printf                     // x18 <- &printf
-      -- add x18, x18, :lo12:printf           // ...
-      -- stp x29,  x30,  [sp, #-16]!          // sp <- sp - 16 ------------.
-      -- mov x29, sp                          // x29 <- sp                 |
-      -- adrp x17, cF_str                     // x17 <- &cF_str            |
-      -- add x17, x17, :lo12:cF_str           // ...                       |
-      -- mov x0, x17                          // x0 <- x17                 |
-      -- blr x18                              // printf(&cF_str)           |
-      -- ldp x29,  x30,  [sp], #16            // sp <- sp + 16 ------------'
-      -- mov w18, #8                          // x18 <- 8
-      -- ldr x17, [ sp, 64 ]                  // x17 <- *(sp + 64)           <-- !!!
-      --
-      -- where the spill slot and the reload slot do not match, as the SP changed
-      -- inbetween.
-      let code =    reg_code                -- compute the label into a register
+
+      let code =    call_target_code          -- compute the label (possibly into a register)
             `appOL` moveStackDown stackArgs
-            `appOL` passArgumentsCode       -- put the arguments into x0, ...
-            `appOL` (unitOL $ BL (TReg reg))-- branch and link.
-            `appOL` readResultsCode         -- parse the results into registers
+            `appOL` passArgumentsCode         -- put the arguments into x0, ...
+            `appOL` (unitOL $ BL call_target) -- branch and link.
+            `appOL` readResultsCode           -- parse the results into registers
             `appOL` moveStackUp stackArgs
       return (code, Nothing)
 
