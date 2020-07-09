@@ -93,6 +93,12 @@ else
 RUNTEST_OPTS += -e ghc_with_native_codegen=False
 endif
 
+ifeq "$(GhcLeadingUnderscore)" "YES"
+RUNTEST_OPTS += -e "config.leading_underscore=True"
+else
+RUNTEST_OPTS += -e "config.leading_underscore=False"
+endif
+
 GHC_PRIM_LIBDIR := $(subst library-dirs: ,,$(shell "$(GHC_PKG)" field ghc-prim library-dirs --simple-output))
 HAVE_VANILLA := $(shell if [ -f $(subst \,/,$(GHC_PRIM_LIBDIR))/GHC/PrimopWrappers.hi ]; then echo YES; else echo NO; fi)
 HAVE_DYNAMIC := $(shell if [ -f $(subst \,/,$(GHC_PRIM_LIBDIR))/GHC/PrimopWrappers.dyn_hi ]; then echo YES; else echo NO; fi)
