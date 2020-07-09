@@ -16,6 +16,12 @@ module GHC.Tc.Utils.Instantiate (
        instCall, instDFunType, instStupidTheta, instTyVarsWith,
        newWanted, newWanteds,
 
+       tcInstType, tcInstTypeBndrs,
+       tcInstSkolTyVars, tcInstSkolTyVarsX, tcInstSkolTyVarsAt,
+       tcSkolDFunType, tcSuperSkolTyVars, tcInstSuperSkolTyVarsX,
+
+       freshenTyVarBndrs, freshenCoVarBndrsX,
+
        tcInstInvisibleTyBindersN, tcInstInvisibleTyBinders, tcInstInvisibleTyBinder,
 
        newOverloadedLit, mkOverLit,
@@ -63,7 +69,7 @@ import GHC.Types.Id.Make( mkDictFunId )
 import GHC.Core( Expr(..) )  -- For the Coercion constructor
 import GHC.Types.Id
 import GHC.Types.Name
-import GHC.Types.Var ( EvVar, tyVarName, VarBndr(..) )
+import GHC.Types.Var
 import GHC.Core.DataCon
 import GHC.Types.Var.Env
 import GHC.Builtin.Names
@@ -74,7 +80,7 @@ import GHC.Utils.Outputable
 import GHC.Types.Basic ( TypeOrKind(..) )
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.List ( sortBy )
+import Data.List ( sortBy, mapAccumL )
 import Control.Monad( unless )
 import Data.Function ( on )
 
@@ -451,14 +457,191 @@ mkEqBoxTy co ty1 ty2
     mkTyConApp (promoteDataCon eqDataCon) [k, ty1, ty2, mkCoercionTy co]
   where k = tcTypeKind ty1
 
-{-
-************************************************************************
+{- *********************************************************************
+*                                                                      *
+        SkolemTvs (immutable)
+*                                                                      *
+********************************************************************* -}
+
+tcInstType :: ([TyVar] -> TcM (TCvSubst, [TcTyVar]))
+                   -- ^ How to instantiate the type variables
+           -> Id                                           -- ^ Type to instantiate
+           -> TcM ([(Name, TcTyVar)], TcThetaType, TcType) -- ^ Result
+                -- (type vars, preds (incl equalities), rho)
+tcInstType inst_tyvars id
+  | null tyvars   -- There may be overloading despite no type variables;
+                  --      (?x :: Int) => Int -> Int
+  = return ([], theta, tau)
+  | otherwise
+  = do { (subst, tyvars') <- inst_tyvars tyvars
+       ; let tv_prs  = map tyVarName tyvars `zip` tyvars'
+             subst'  = extendTCvInScopeSet subst (tyCoVarsOfType rho)
+       ; return (tv_prs, substTheta subst' theta, substTy subst' tau) }
+  where
+    (tyvars, rho) = tcSplitForAllTys (idType id)
+    (theta, tau)  = tcSplitPhiTy rho
+
+tcInstTypeBndrs :: Id -> TcM ([(Name, InvisTVBinder)], TcThetaType, TcType)
+                     -- (type vars, preds (incl equalities), rho)
+-- Instantiate the binders of a type signature with TyVarTvs
+tcInstTypeBndrs id
+  | null tyvars   -- There may be overloading despite no type variables;
+                  --      (?x :: Int) => Int -> Int
+  = return ([], theta, tau)
+  | otherwise
+  = do { (subst, tyvars') <- mapAccumLM inst_invis_bndr emptyTCvSubst tyvars
+       ; let tv_prs  = map (tyVarName . binderVar) tyvars `zip` tyvars'
+             subst'  = extendTCvInScopeSet subst (tyCoVarsOfType rho)
+       ; return (tv_prs, substTheta subst' theta, substTy subst' tau) }
+  where
+    (tyvars, rho) = splitForAllTysInvis (idType id)
+    (theta, tau)  = tcSplitPhiTy rho
+
+    inst_invis_bndr :: TCvSubst -> InvisTVBinder
+                    -> TcM (TCvSubst, InvisTVBinder)
+    inst_invis_bndr subst (Bndr tv spec)
+      = do { (subst', tv') <- newMetaTyVarTyVarX subst tv
+           ; return (subst', Bndr tv' spec) }
+
+tcSkolDFunType :: DFunId -> TcM ([TcTyVar], TcThetaType, TcType)
+-- Instantiate a type signature with skolem constants.
+-- We could give them fresh names, but no need to do so
+tcSkolDFunType dfun
+  = do { (tv_prs, theta, tau) <- tcInstType tcInstSuperSkolTyVars dfun
+       ; return (map snd tv_prs, theta, tau) }
+
+tcSuperSkolTyVars :: [TyVar] -> (TCvSubst, [TcTyVar])
+-- Make skolem constants, but do *not* give them new names, as above
+-- Moreover, make them "super skolems"; see comments with superSkolemTv
+-- see Note [Kind substitution when instantiating]
+-- Precondition: tyvars should be ordered by scoping
+tcSuperSkolTyVars = mapAccumL tcSuperSkolTyVar emptyTCvSubst
+
+tcSuperSkolTyVar :: TCvSubst -> TyVar -> (TCvSubst, TcTyVar)
+tcSuperSkolTyVar subst tv
+  = (extendTvSubstWithClone subst tv new_tv, new_tv)
+  where
+    kind   = substTyUnchecked subst (tyVarKind tv)
+    new_tv = mkTcTyVar (tyVarName tv) kind superSkolemTv
+
+-- | Given a list of @['TyVar']@, skolemize the type variables,
+-- returning a substitution mapping the original tyvars to the
+-- skolems, and the list of newly bound skolems.
+tcInstSkolTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
+-- See Note [Skolemising type variables]
+tcInstSkolTyVars = tcInstSkolTyVarsX emptyTCvSubst
+
+tcInstSkolTyVarsX :: TCvSubst -> [TyVar] -> TcM (TCvSubst, [TcTyVar])
+-- See Note [Skolemising type variables]
+tcInstSkolTyVarsX = tcInstSkolTyVarsPushLevel False
+
+tcInstSuperSkolTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
+-- See Note [Skolemising type variables]
+tcInstSuperSkolTyVars = tcInstSuperSkolTyVarsX emptyTCvSubst
+
+tcInstSuperSkolTyVarsX :: TCvSubst -> [TyVar] -> TcM (TCvSubst, [TcTyVar])
+-- See Note [Skolemising type variables]
+tcInstSuperSkolTyVarsX subst = tcInstSkolTyVarsPushLevel True subst
+
+tcInstSkolTyVarsPushLevel :: Bool -> TCvSubst -> [TyVar]
+                          -> TcM (TCvSubst, [TcTyVar])
+-- Skolemise one level deeper, hence pushTcLevel
+-- See Note [Skolemising type variables]
+tcInstSkolTyVarsPushLevel overlappable subst tvs
+  = do { tc_lvl <- getTcLevel
+       ; let pushed_lvl = pushTcLevel tc_lvl
+       ; tcInstSkolTyVarsAt pushed_lvl overlappable subst tvs }
+
+tcInstSkolTyVarsAt :: TcLevel -> Bool
+                   -> TCvSubst -> [TyVar]
+                   -> TcM (TCvSubst, [TcTyVar])
+tcInstSkolTyVarsAt lvl overlappable subst tvs
+  = freshenTyCoVarsX new_skol_tv subst tvs
+  where
+    details = SkolemTv lvl overlappable
+    new_skol_tv name kind = mkTcTyVar name kind details
+
+------------------
+freshenTyVarBndrs :: [TyVar] -> TcM (TCvSubst, [TyVar])
+-- ^ Give fresh uniques to a bunch of TyVars, but they stay
+--   as TyVars, rather than becoming TcTyVars
+-- Used in 'GHC.Tc.Instance.Family.newFamInst', and 'GHC.Tc.Utils.Instantiate.newClsInst'
+freshenTyVarBndrs = freshenTyCoVars mkTyVar
+
+freshenCoVarBndrsX :: TCvSubst -> [CoVar] -> TcM (TCvSubst, [CoVar])
+-- ^ Give fresh uniques to a bunch of CoVars
+-- Used in "GHC.Tc.Instance.Family.newFamInst"
+freshenCoVarBndrsX subst = freshenTyCoVarsX mkCoVar subst
+
+------------------
+freshenTyCoVars :: (Name -> Kind -> TyCoVar)
+                -> [TyVar] -> TcM (TCvSubst, [TyCoVar])
+freshenTyCoVars mk_tcv = freshenTyCoVarsX mk_tcv emptyTCvSubst
+
+freshenTyCoVarsX :: (Name -> Kind -> TyCoVar)
+                 -> TCvSubst -> [TyCoVar]
+                 -> TcM (TCvSubst, [TyCoVar])
+freshenTyCoVarsX mk_tcv = mapAccumLM (freshenTyCoVarX mk_tcv)
+
+freshenTyCoVarX :: (Name -> Kind -> TyCoVar)
+                -> TCvSubst -> TyCoVar -> TcM (TCvSubst, TyCoVar)
+-- This a complete freshening operation:
+-- the skolems have a fresh unique, and a location from the monad
+-- See Note [Skolemising type variables]
+freshenTyCoVarX mk_tcv subst tycovar
+  = do { loc  <- getSrcSpanM
+       ; uniq <- newUnique
+       ; let old_name = tyVarName tycovar
+             new_name = mkInternalName uniq (getOccName old_name) loc
+             new_kind = substTyUnchecked subst (tyVarKind tycovar)
+             new_tcv  = mk_tcv new_name new_kind
+             subst1   = extendTCvSubstWithClone subst tycovar new_tcv
+       ; return (subst1, new_tcv) }
+
+{- Note [Skolemising type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The tcInstSkolTyVars family of functions instantiate a list of TyVars
+to fresh skolem TcTyVars. Important notes:
+
+a) Level allocation. We generally skolemise /before/ calling
+   pushLevelAndCaptureConstraints.  So we want their level to the level
+   of the soon-to-be-created implication, which has a level ONE HIGHER
+   than the current level.  Hence the pushTcLevel.  It feels like a
+   slight hack.
+
+b) The [TyVar] should be ordered (kind vars first)
+   See Note [Kind substitution when instantiating]
+
+c) It's a complete freshening operation: the skolems have a fresh
+   unique, and a location from the monad
+
+d) The resulting skolems are
+        non-overlappable for tcInstSkolTyVars,
+   but overlappable for tcInstSuperSkolTyVars
+   See GHC.Tc.Deriv.Infer Note [Overlap and deriving] for an example
+   of where this matters.
+
+Note [Kind substitution when instantiating]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we instantiate a bunch of kind and type variables, first we
+expect them to be topologically sorted.
+Then we have to instantiate the kind variables, build a substitution
+from old variables to the new variables, then instantiate the type
+variables substituting the original kind.
+
+Exemple: If we want to instantiate
+  [(k1 :: *), (k2 :: *), (a :: k1 -> k2), (b :: k1)]
+we want
+  [(?k1 :: *), (?k2 :: *), (?a :: ?k1 -> ?k2), (?b :: ?k1)]
+instead of the bogus
+  [(?k1 :: *), (?k2 :: *), (?a :: k1 -> k2), (?b :: k1)]
+-}
+
+{- *********************************************************************
 *                                                                      *
                 Literals
 *                                                                      *
-************************************************************************
-
--}
+********************************************************************* -}
 
 {-
 In newOverloadedLit we convert directly to an Int or Integer if we
@@ -474,8 +657,6 @@ newOverloadedLit :: HsOverLit GhcRn
 newOverloadedLit
   lit@(OverLit { ol_val = val, ol_ext = rebindable }) res_ty
   | not rebindable
-    -- all built-in overloaded lits are tau-types, so we can just
-    -- tauify the ExpType
   = do { res_ty <- expTypeToType res_ty
        ; dflags <- getDynFlags
        ; let platform = targetPlatform dflags
