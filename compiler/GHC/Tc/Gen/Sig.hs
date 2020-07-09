@@ -36,7 +36,7 @@ import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity ( checkValidType )
 import GHC.Tc.Utils.Unify( tcSkolemise, unifyType )
-import GHC.Tc.Utils.Instantiate( topInstantiate )
+import GHC.Tc.Utils.Instantiate( topInstantiate, tcInstTypeBndrs )
 import GHC.Tc.Utils.Env( tcLookupId )
 import GHC.Tc.Types.Evidence( HsWrapper, (<.>) )
 import GHC.Core.Type ( mkTyVarBinders )
