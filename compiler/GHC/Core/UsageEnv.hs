@@ -1,7 +1,7 @@
 {-# LANGUAGE ViewPatterns #-}
 module GHC.Core.UsageEnv (UsageEnv, addUsage, scaleUsage, zeroUE,
                           lookupUE, scaleUE, deleteUE, addUE, Usage(..), unitUE,
-                          supUE, supUEs) where
+                          bottomUE, supUE, supUEs) where
 
 import Data.Foldable
 import GHC.Prelude
