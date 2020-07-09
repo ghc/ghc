@@ -36,9 +36,10 @@ module GHC.Tc.Utils.TcMType (
   ExpType(..), ExpSigmaType, ExpRhoType,
   mkCheckExpType,
   newInferExpType,
-  readExpType, readExpType_maybe,
-  expTypeToType, checkingExpType_maybe, checkingExpType,
-  tauifyExpType, inferResultToType,
+  readExpType, readExpType_maybe, readScaledExpType,
+  expTypeToType, scaledExpTypeToType,
+  checkingExpType_maybe, checkingExpType,
+  inferResultToType,
 
   --------------------------------
   -- Creating new evidence variables
@@ -396,7 +397,6 @@ checkCoercionHole cv co
 
 Note [ExpType]
 ~~~~~~~~~~~~~~
-
 An ExpType is used as the "expected type" when type-checking an expression.
 An ExpType can hold a "hole" that can be filled in by the type-checker.
 This allows us to have one tcExpr that works in both checking mode and
@@ -426,14 +426,13 @@ Consider
 
 This is a classic untouchable-variable / ambiguous GADT return type
 scenario. But, with ExpTypes, we'll be inferring the type of the RHS.
-And, because there is only one branch of the case, we won't trigger
-Note [Case branches must never infer a non-tau type] of GHC.Tc.Gen.Match.
 We thus must track a TcLevel in an Inferring ExpType. If we try to
-fill the ExpType and find that the TcLevels don't work out, we
-fill the ExpType with a tau-tv at the low TcLevel, hopefully to
-be worked out later by some means. This is triggered in
-test gadt/gadt-escape1.
+fill the ExpType and find that the TcLevels don't work out, we fill
+the ExpType with a tau-tv at the low TcLevel, hopefully to be worked
+out later by some means -- see GHC.Tc.Utils.Unify.fillInferResult,
+and Note [fillInferResult] in that module.
 
+This behaviour triggered in test gadt/gadt-escape1.
 -}
 
 -- actual data definition is in GHC.Tc.Utils.TcType
@@ -452,6 +451,12 @@ newInferExpType
 readExpType_maybe :: ExpType -> TcM (Maybe TcType)
 readExpType_maybe (Check ty)                   = return (Just ty)
 readExpType_maybe (Infer (IR { ir_ref = ref})) = readMutVar ref
+
+-- | Same as readExpType, but for Scaled ExpTypes
+readScaledExpType :: Scaled ExpType -> TcM (Scaled Type)
+readScaledExpType (Scaled m exp_ty)
+  = do { ty <- readExpType exp_ty
+       ; return (Scaled m ty) }
 
 -- | Extract a type out of an ExpType. Otherwise, panics.
 readExpType :: ExpType -> TcM TcType
@@ -472,12 +477,10 @@ checkingExpType :: String -> ExpType -> TcType
 checkingExpType _   (Check ty) = ty
 checkingExpType err et         = pprPanic "checkingExpType" (text err $$ ppr et)
 
-tauifyExpType :: ExpType -> TcM ExpType
--- ^ Turn a (Infer hole) type into a (Check alpha),
--- where alpha is a fresh unification variable
-tauifyExpType (Check ty)      = return (Check ty)  -- No-op for (Check ty)
-tauifyExpType (Infer inf_res) = do { ty <- inferResultToType inf_res
-                                   ; return (Check ty) }
+scaledExpTypeToType :: Scaled ExpType -> TcM (Scaled TcType)
+scaledExpTypeToType (Scaled m exp_ty)
+  = do { ty <- expTypeToType exp_ty
+       ; return (Scaled m ty) }
 
 -- | Extracts the expected type if there is one, or generates a new
 -- TauTv if there isn't.
@@ -488,13 +491,17 @@ expTypeToType (Infer inf_res) = inferResultToType inf_res
 inferResultToType :: InferResult -> TcM Type
 inferResultToType (IR { ir_uniq = u, ir_lvl = tc_lvl
                       , ir_ref = ref })
-  = do { rr  <- newMetaTyVarTyAtLevel tc_lvl runtimeRepTy
+  = do { mb_inferred_ty <- readTcRef ref
+       ; case mb_inferred_ty of {
+            Just ty -> return ty ;
+            Nothing ->
+    do { rr  <- newMetaTyVarTyAtLevel tc_lvl runtimeRepTy
        ; tau <- newMetaTyVarTyAtLevel tc_lvl (tYPE rr)
              -- See Note [TcLevel of ExpType]
        ; writeMutVar ref (Just tau)
        ; traceTc "Forcing ExpType to be monomorphic:"
                  (ppr u <+> text ":=" <+> ppr tau)
-       ; return tau }
+       ; return tau } } }
 
 
 {- *********************************************************************

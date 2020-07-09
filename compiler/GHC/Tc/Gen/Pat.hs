@@ -629,10 +629,9 @@ There are two bits of rebindable syntax:
 lit1_ty and lit2_ty could conceivably be different.
 var_ty is the type inferred for x, the variable in the pattern.
 
-If the pushed-down pattern type isn't a tau-type, the two pat_ty's above
-could conceivably be different specializations. But this is very much
-like the situation in Note [Case branches must be taus] in GHC.Tc.Gen.Match.
-So we tauify the pat_ty before proceeding.
+If the pushed-down pattern type isn't a tau-type, the two pat_ty's
+above could conceivably be different specializations.  So we use
+expTypeToType on pat_ty before proceeding.
 
 Note that we need to type-check the literal twice, because it is used
 twice, and may be used at different types. The second HsOverLit stored in the
