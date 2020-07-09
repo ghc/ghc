@@ -16,6 +16,7 @@ find, unsurprisingly, a Core expression.
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -612,7 +613,7 @@ sizeExpr :: DynFlags
 
 -- Note [Computing the size of an expression]
 
-sizeExpr dflags bOMB_OUT_SIZE top_args expr
+sizeExpr dflags !bOMB_OUT_SIZE top_args expr
   = size_up expr
   where
     size_up (Cast e _) = size_up e
