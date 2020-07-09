@@ -148,6 +148,9 @@ class TestConfig:
         # Is the compiler dynamically linked?
         self.ghc_dynamic = False
 
+        # Do symbols use leading underscores?
+        self.leading_underscore = False
+
         # the timeout program
         self.timeout_prog = ''
         self.timeout = 300

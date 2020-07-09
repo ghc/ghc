@@ -501,6 +501,11 @@ def doing_ghci() -> bool:
 def ghc_dynamic() -> bool:
     return config.ghc_dynamic
 
+# Symbols have a leading underscore
+def leading_underscore() -> bool:
+    return config.leading_underscore
+
+
 def fast() -> bool:
     return config.speed == 2
 

@@ -66,3 +66,12 @@ test('T16012', just_ghci, ghci_script, ['T16012.script'])
 test('T16096', just_ghci, ghci_script, ['T16096.script'])
 test('T507', just_ghci, ghci_script, ['T507.script'])
 test('T18027', just_ghci, ghci_script, ['T18027.script'])
+test('T18064',
+   [just_ghci,
+    when(leading_underscore(),skip)
+    # we need to skip otherwise the test fails on platforms prepending leading
+    # underscores to symbols (we get "Could not load '_blah'" instead of "Could
+    # not load 'blah').
+    ],
+   ghci_script,
+   ['T18064.script'])
