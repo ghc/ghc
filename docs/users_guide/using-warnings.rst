@@ -548,7 +548,7 @@ of ``-W(no-)*``.
     Being part of the :ghc-flag:`-Wcompat` option group, this warning is off by
     default, but will be switched on in a future GHC release, as part of
     the `MonadFail Proposal (MFP)
-    <https://prime.haskell.org/wiki/Libraries/Proposals/MonadFail>`__.
+    <https://gitlab.haskell.org/haskell/prime/-/wikis/libraries/proposals/monad-fail>`__.
 
 .. ghc-flag:: -Wsemigroup
     :shortdesc: warn when a ``Monoid`` is not ``Semigroup``, and on non-

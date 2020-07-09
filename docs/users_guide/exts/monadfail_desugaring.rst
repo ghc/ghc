@@ -16,7 +16,7 @@ The ``-XMonadFailDesugaring`` extension switches the desugaring of
 
 This extension is enabled by default since GHC 8.6.1, under the
 `MonadFail Proposal (MFP)
-<https://prime.haskell.org/wiki/Libraries/Proposals/MonadFail>`__.
+<https://gitlab.haskell.org/haskell/prime/-/wikis/libraries/proposals/monad-fail>`__.
 
 This extension is temporary, and will be deprecated in a future release.
 
