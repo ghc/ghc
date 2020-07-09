@@ -467,7 +467,7 @@ assembleI platform i = case i of
 
     litlabel fs = lit [BCONPtrLbl fs]
     addr (RemotePtr a) = words [fromIntegral a]
-    float = words . mkLitF
+    float = words . mkLitF platform
     double = words . mkLitD platform
     int = words . mkLitI
     int64 = words . mkLitI64 platform
@@ -503,14 +503,23 @@ return_ubx V64 = error "return_ubx: vector"
 -- words are placed in memory at increasing addresses, the
 -- bit pattern is correct for the host's word size and endianness.
 mkLitI   ::             Int    -> [Word]
-mkLitF   ::             Float  -> [Word]
+mkLitF   :: Platform -> Float  -> [Word]
 mkLitD   :: Platform -> Double -> [Word]
 mkLitI64 :: Platform -> Int64  -> [Word]
 
-mkLitF f
-   = runST (do
+mkLitF platform f = case platformWordSize platform of
+   PW4 -> runST (do
         arr <- newArray_ ((0::Int),0)
         writeArray arr 0 f
+        f_arr <- castSTUArray arr
+        w0 <- readArray f_arr 0
+        return [w0 :: Word]
+     )
+   PW8 -> runST (do
+        arr <- newArray_ ((0::Int),1)
+        case platformByteOrder platform of
+          BigEndian    -> writeArray arr 1 f
+          LittleEndian -> writeArray arr 0 f
         f_arr <- castSTUArray arr
         w0 <- readArray f_arr 0
         return [w0 :: Word]
