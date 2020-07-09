@@ -595,7 +595,7 @@ loop:
       if (!major_gc) return;
 
       // Note [Object unloading] in CheckUnload.c
-      if (n_unloaded_objects != 0) {
+      if (RTS_UNLIKELY(n_unloaded_objects != 0)) {
           markObjectCode(q);
       }
 
