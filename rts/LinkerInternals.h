@@ -32,6 +32,13 @@ typedef struct _Symbol
     SymbolAddr *addr;
 } Symbol_t;
 
+typedef struct NativeCodeRange_ {
+  void *start, *end;
+
+  /* Allow a chain of these things */
+  struct NativeCodeRange_ *next;
+} NativeCodeRange;
+
 /* Indication of section kinds for loaded objects.  Needed by
    the GC for deciding whether or not a pointer on the stack
    is a code pointer.
@@ -158,6 +165,13 @@ typedef struct {
 #endif
 } SymbolExtra;
 
+typedef enum {
+    /* Objects that were loaded by this linker */
+    STATIC_OBJECT,
+
+    /* Objects that were loaded by dlopen */
+    DYNAMIC_OBJECT,
+} ObjectType;
 
 /* Top-level structure for an object module.  One of these is allocated
  * for each object file in use.
@@ -166,7 +180,8 @@ typedef struct _ObjectCode {
     OStatus    status;
     pathchar  *fileName;
     int        fileSize;     /* also mapped image size when using mmap() */
-    char*      formatName;            /* eg "ELF32", "DLL", "COFF", etc. */
+    char*      formatName;   /* e.g. "ELF32", "DLL", "COFF", etc. */
+    ObjectType type;         /* who loaded this object? */
 
     /* If this object is a member of an archive, archiveMemberName is
      * like "libarchive.a(object.o)". Otherwise it's NULL.
@@ -268,6 +283,19 @@ typedef struct _ObjectCode {
      * (read-only/executable) code. */
     m32_allocator *rw_m32, *rx_m32;
 #endif
+
+    /*
+     * The following are only valid if .type == DYNAMIC_OBJECT
+     */
+
+    /* handle returned from dlopen */
+    void *dlopen_handle;
+
+    /* base virtual address of the loaded code */
+    void *l_addr;
+
+    /* virtual memory ranges of loaded code */
+    NativeCodeRange *nc_ranges;
 } ObjectCode;
 
 #define OC_INFORMATIVE_FILENAME(OC)             \
@@ -275,6 +303,7 @@ typedef struct _ObjectCode {
       (OC)->archiveMemberName :                 \
       (OC)->fileName                            \
     )
+
 
 #if defined(THREADED_RTS)
 extern Mutex linker_mutex;
@@ -361,7 +390,7 @@ resolveSymbolAddr (pathchar* buffer, int size,
 
 HsInt isAlreadyLoaded( pathchar *path );
 HsInt loadOc( ObjectCode* oc );
-ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
+ObjectCode* mkOc( ObjectType type, pathchar *path, char *image, int imageSize,
                   bool mapped, pathchar *archiveMemberName,
                   int misalignment
                   );
