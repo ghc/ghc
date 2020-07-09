@@ -793,33 +793,25 @@ instantiateAndFillInferResult orig ty inf_res
        ; return (mkWpCastN co <.> wrap) }
 
 fillInferResult :: TcType -> InferResult -> TcM TcCoercionN
--- If wrap = fillInferResult t1 t2
---    => wrap :: t1 ~> t2
-fillInferResult orig_ty (IR { ir_uniq = u, ir_lvl = res_lvl
-                            , ir_ref = ref })
-  = do { (ty_co, ty_to_fill_with) <- promoteTcType res_lvl orig_ty
-
-       ; traceTc "Filling ExpType" $
-         ppr u <+> text ":=" <+> ppr ty_to_fill_with
-
-       ; when debugIsOn (check_hole ty_to_fill_with)
-
-       ; writeTcRef ref (Just ty_to_fill_with)
-
-       ; return ty_co }
-  where
-    check_hole ty   -- Debug check only
-      = do { let ty_lvl = tcTypeLevel ty
-           ; MASSERT2( not (ty_lvl `strictlyDeeperThan` res_lvl),
-                       ppr u $$ ppr res_lvl $$ ppr ty_lvl $$
-                       ppr ty <+> dcolon <+> ppr (tcTypeKind ty) $$ ppr orig_ty )
-           ; cts <- readTcRef ref
-           ; case cts of
-               Just already_there -> pprPanic "writeExpType"
-                                       (vcat [ ppr u
-                                             , ppr ty
-                                             , ppr already_there ])
-               Nothing -> return () }
+-- If co = fillInferResult t1 t2
+--    => co :: t1 ~ t2
+-- See Note [fillInferResult]
+fillInferResult act_res_ty (IR { ir_uniq = u, ir_lvl = res_lvl
+                               , ir_ref = ref })
+  = do { mb_exp_res_ty <- readTcRef ref
+       ; case mb_exp_res_ty of
+            Just exp_res_ty
+               -> do { traceTc "Joining inferred ExpType" $
+                       ppr u <> colon <+> ppr act_res_ty <+> char '~' <+> ppr exp_res_ty
+                     ; ensureMonoType res_lvl act_res_ty
+                     ; unifyType Nothing act_res_ty exp_res_ty }
+            Nothing
+               -> do { traceTc "Filling inferred ExpType" $
+                       ppr u <+> text ":=" <+> ppr act_res_ty
+                     ; (prom_co, act_res_ty) <- promoteTcType res_lvl act_res_ty
+                     ; writeTcRef ref (Just act_res_ty)
+                     ; return prom_co }
+     }
 
 {- Note [Instantiation of InferResult]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -857,6 +849,73 @@ There is one place where we don't want to instantiate eagerly,
 namely in GHC.Tc.Module.tcRnExpr, which implements GHCi's :type
 command. See Note [Implementing :type] in GHC.Tc.Module.
 
+Note [fillInferResult]
+~~~~~~~~~~~~~~~~~~~~~~
+When inferring, we use fillInferResult to "fill in" the hole in InferResult
+   data InferResult = IR { ir_uniq :: Unique
+                         , ir_lvl  :: TcLevel
+                         , ir_ref  :: IORef (Maybe TcType) }
+
+There are two things to worry about:
+
+1. What if it is under a GADT or existential pattern match?
+   - GADTs: a unification variable (and Infer's hole is similar) is untouchable
+   - Existentials: be careful about skolem-escape
+
+2. What if it is filled in more than once?  E.g. multiple branches of a case
+     case e of
+        T1 -> e1
+        T2 -> e2
+
+Our typing rules are:
+
+* The RHS of a existential or GADT alternative must always be a
+  monotype, regardless of the number of alternatives.
+
+* Multiple non-existential/GADT branches can have (the same)
+  higher rank type (#18412).  E.g. this is OK:
+      case e of
+        True  -> hr
+        False -> hr
+  where hr:: (forall a. a->a) -> Int
+  c.f. Section 7.1 of "Practical type inference for arbitrary-rank types"
+       We use choice (2) in that Section.
+       (GHC 8.10 and earlier used choice (1).)
+
+For (1) we can detect the GADT/existential situation by seeing that
+the current TcLevel is greater than that stored in ir_lvl of the Infer
+ExpType.  We bump the level whenever we go past a GADT/existential match.
+
+Then, before filling the hole use promoteTcType to promote the type
+to the outer ir_lvl.  promoteTcType does this
+  - create a fresh unification variable alpha at level ir_lvl
+  - emits an equality alpha[ir_lvl] ~ ty
+  - fills the hole with alpha
+That forces the type to be a monotype (since unification variables can
+only unify with monotypes); and catches skolem-escapes because the
+alpha is untouchable until the equality floats out.
+
+For (2), we simply look to see if the hole is filled already.
+  - if not, we promote (as above) and fill the hole
+  - if it is filled, we simply unify with the type that is
+    already there
+
+There is one wrinkle.  Suppose we have
+   case e of
+      T1 -> e1 :: (forall a. a->a) -> Int
+      G2 -> e2
+where T1 is not GADT or existential, but G2 is a GADT.  Then supppose the
+T1 alternative fills the hole with (forall a. a->a) -> Int, which is fine.
+But now the G2 alternative must not *just* unify with that else we'd risk
+allowing through (e2 :: (forall a. a->a) -> Int).  If we'd checked G2 first
+we'd have filled the hole with a unification variable, which enforces a
+monotype.
+
+So if we check G2 second, we still want to emit a constraint that restricts
+the RHS to be a monotype. This is done by ensureMonoType, and it works
+by simply generating a constraint (alpha ~ ty), where alpha is a fresh
+unification variable.  We discard the evidence.
+
 -}
 
 {- *********************************************************************
@@ -865,8 +924,22 @@ command. See Note [Implementing :type] in GHC.Tc.Module.
 *                                                                      *
 ********************************************************************* -}
 
+ensureMonoType :: TcLevel -> TcType -> TcM ()
+ensureMonoType dest_lvl res_ty
+  = do { cur_lvl <- getTcLevel
+       ; unless (cur_lvl `sameDepthAs` dest_lvl) $
+         do { mono_ty <- newOpenFlexiTyVarTy
+            ; let eq_orig = TypeEqOrigin { uo_actual   = res_ty
+                                         , uo_expected = mono_ty
+                                         , uo_thing    = Nothing
+                                         , uo_visible  = False }
+
+            ; _co <- emitWantedEq eq_orig TypeLevel Nominal res_ty mono_ty
+            ; return () } }
+
 promoteTcType :: TcLevel -> TcType -> TcM (TcCoercion, TcType)
 -- See Note [Promoting a type]
+-- See also Note [fillInferResult]
 -- promoteTcType level ty = (co, ty')
 --   * Returns ty'  whose max level is just 'level'
 --             and  whose kind is ~# to the kind of 'ty'

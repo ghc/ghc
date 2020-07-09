@@ -202,42 +202,37 @@ But we make a special case for a one-branch case. This is so that
 still gets assigned a polytype.
 -}
 
--- | When the MatchGroup has multiple RHSs, convert an Infer ExpType in the
--- expected type into TauTvs.
--- See Note [Case branches must never infer a non-tau type]
-tauifyMultipleMatches :: [LMatch id body]
-                      -> [Scaled ExpType] -> TcM [Scaled ExpType]
-tauifyMultipleMatches group exp_tys
-  | isSingletonMatchGroup group = return exp_tys
-  | otherwise                   = mapM (\(Scaled m t) ->
-                                       fmap (Scaled m) (tauifyExpType t)) exp_tys
-  -- NB: In the empty-match case, this ensures we fill in the ExpType
+data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
+  = MC { mc_what :: HsMatchContext GhcRn,  -- What kind of thing this is
+         mc_body :: Located (body GhcRn)   -- Type checker for a body of
+                                           -- an alternative
+                 -> ExpRhoType
+                 -> TcM (Located (body GhcTc)) }
 
 -- | Type-check a MatchGroup.
 tcMatches :: (Outputable (body GhcRn)) => TcMatchCtxt body
           -> [Scaled ExpSigmaType]      -- Expected pattern types
-          -> ExpRhoType          -- Expected result-type of the Match.
+          -> ExpRhoType                 -- Expected result-type of the Match.
           -> MatchGroup GhcRn (Located (body GhcRn))
           -> TcM (MatchGroup GhcTc (Located (body GhcTc)))
 
-data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
-  = MC { mc_what :: HsMatchContext GhcRn,  -- What kind of thing this is
-         mc_body :: Located (body GhcRn)         -- Type checker for a body of
-                                                -- an alternative
-                 -> ExpRhoType
-                 -> TcM (Located (body GhcTc)) }
 tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
                                   , mg_origin = origin })
-  = do { (Scaled _ rhs_ty):pat_tys <- tauifyMultipleMatches matches ((Scaled One rhs_ty):pat_tys) -- return type has implicitly multiplicity 1, it doesn't matter all that much in this case since it isn't used and is eliminated immediately.
-            -- See Note [Case branches must never infer a non-tau type]
+  | null matches  -- Deal with case e of {}
+  = do { pat_tys <- mapM scaledExpTypeToType pat_tys
+       ; rhs_ty  <- expTypeToType rhs_ty
+       ; return (MG { mg_alts = L l []
+                    , mg_ext = MatchGroupTc pat_tys rhs_ty
+                    , mg_origin = origin }) }
 
-       ; umatches <- mapM (tcCollectingUsage . tcMatch ctxt pat_tys rhs_ty) matches
+  | otherwise
+  = do { umatches <- mapM (tcCollectingUsage . tcMatch ctxt pat_tys rhs_ty) matches
        ; let (usages,matches') = unzip umatches
        ; tcEmitBindingUsage $ supUEs usages
-       ; pat_tys  <- mapM (\(Scaled m t) -> fmap (Scaled m) (readExpType t)) pat_tys
+       ; pat_tys  <- mapM readScaledExpType pat_tys
        ; rhs_ty   <- readExpType rhs_ty
-       ; return (MG { mg_alts = L l matches'
-                    , mg_ext = MatchGroupTc pat_tys rhs_ty
+       ; return (MG { mg_alts   = L l matches'
+                    , mg_ext    = MatchGroupTc pat_tys rhs_ty
                     , mg_origin = origin }) }
 
 -------------

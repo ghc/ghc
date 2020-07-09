@@ -474,8 +474,6 @@ newOverloadedLit :: HsOverLit GhcRn
 newOverloadedLit
   lit@(OverLit { ol_val = val, ol_ext = rebindable }) res_ty
   | not rebindable
-    -- all built-in overloaded lits are tau-types, so we can just
-    -- tauify the ExpType
   = do { res_ty <- expTypeToType res_ty
        ; dflags <- getDynFlags
        ; let platform = targetPlatform dflags

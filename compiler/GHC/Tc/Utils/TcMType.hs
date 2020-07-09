@@ -36,9 +36,10 @@ module GHC.Tc.Utils.TcMType (
   ExpType(..), ExpSigmaType, ExpRhoType,
   mkCheckExpType,
   newInferExpType,
-  readExpType, readExpType_maybe,
-  expTypeToType, checkingExpType_maybe, checkingExpType,
-  tauifyExpType, inferResultToType,
+  readExpType, readExpType_maybe, readScaledExpType,
+  expTypeToType, scaledExpTypeToType,
+  checkingExpType_maybe, checkingExpType,
+  inferResultToType,
 
   --------------------------------
   -- Creating new evidence variables
@@ -453,6 +454,10 @@ readExpType_maybe :: ExpType -> TcM (Maybe TcType)
 readExpType_maybe (Check ty)                   = return (Just ty)
 readExpType_maybe (Infer (IR { ir_ref = ref})) = readMutVar ref
 
+-- | Same as readExpType, but for Scaled ExpTypes
+readScaledExpType :: Scaled ExpType -> TcM (Scaled Type)
+readScaledExpType = traverse readExpType
+
 -- | Extract a type out of an ExpType. Otherwise, panics.
 readExpType :: ExpType -> TcM TcType
 readExpType exp_ty
@@ -472,12 +477,8 @@ checkingExpType :: String -> ExpType -> TcType
 checkingExpType _   (Check ty) = ty
 checkingExpType err et         = pprPanic "checkingExpType" (text err $$ ppr et)
 
-tauifyExpType :: ExpType -> TcM ExpType
--- ^ Turn a (Infer hole) type into a (Check alpha),
--- where alpha is a fresh unification variable
-tauifyExpType (Check ty)      = return (Check ty)  -- No-op for (Check ty)
-tauifyExpType (Infer inf_res) = do { ty <- inferResultToType inf_res
-                                   ; return (Check ty) }
+scaledExpTypeToType :: Scaled ExpType -> TcM (Scaled TcType)
+scaledExpTypeToType = traverse expTypeToType
 
 -- | Extracts the expected type if there is one, or generates a new
 -- TauTv if there isn't.
@@ -488,13 +489,17 @@ expTypeToType (Infer inf_res) = inferResultToType inf_res
 inferResultToType :: InferResult -> TcM Type
 inferResultToType (IR { ir_uniq = u, ir_lvl = tc_lvl
                       , ir_ref = ref })
-  = do { rr  <- newMetaTyVarTyAtLevel tc_lvl runtimeRepTy
+  = do { mb_inferred_ty <- readTcRef ref
+       ; case mb_inferred_ty of {
+            Just ty -> return ty ;
+            Nothing ->
+    do { rr  <- newMetaTyVarTyAtLevel tc_lvl runtimeRepTy
        ; tau <- newMetaTyVarTyAtLevel tc_lvl (tYPE rr)
              -- See Note [TcLevel of ExpType]
        ; writeMutVar ref (Just tau)
        ; traceTc "Forcing ExpType to be monomorphic:"
                  (ppr u <+> text ":=" <+> ppr tau)
-       ; return tau }
+       ; return tau } } }
 
 
 {- *********************************************************************

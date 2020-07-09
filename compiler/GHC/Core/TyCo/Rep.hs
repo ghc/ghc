@@ -19,7 +19,8 @@ Note [The Type-related module hierarchy]
 
 -- We expose the relevant stuff from this module via the Type module
 {-# OPTIONS_HADDOCK not-home #-}
-{-# LANGUAGE CPP, DeriveDataTypeable, MultiWayIf, PatternSynonyms, BangPatterns #-}
+{-# LANGUAGE CPP, MultiWayIf, PatternSynonyms, BangPatterns #-}
+{-# LANGUAGE DeriveDataTypeable, DeriveFunctor, DeriveTraversable, DeriveFoldable #-}
 
 module GHC.Core.TyCo.Rep (
         TyThing(..), tyThingCategory, pprTyThingCategory, pprShortTyThing,
@@ -2024,7 +2025,7 @@ GHC.Core.Multiplicity above this module.
 
 -- | A shorthand for data with an attached 'Mult' element (the multiplicity).
 data Scaled a = Scaled Mult a
-  deriving (Data.Data)
+  deriving (Data.Data, Functor, Foldable, Traversable)
 
 instance (Outputable a) => Outputable (Scaled a) where
    ppr (Scaled _cnt t) = ppr t
