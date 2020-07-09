@@ -48,7 +48,7 @@ module GHC.Core.Type (
         mkSpecForAllTy, mkSpecForAllTys,
         mkVisForAllTys, mkTyCoInvForAllTy,
         mkInfForAllTy, mkInfForAllTys,
-        splitForAllTys, splitSomeForAllTys,
+        splitForAllTys,
         splitForAllTysReq, splitForAllTysInvis,
         splitForAllVarBndrs,
         splitForAllTy_maybe, splitForAllTy,
@@ -284,7 +284,7 @@ import GHC.Data.List.SetOps
 import GHC.Types.Unique ( nonDetCmpUnique )
 
 import GHC.Data.Maybe   ( orElse, expectJust )
-import Data.Maybe       ( isJust, mapMaybe )
+import Data.Maybe       ( isJust )
 import Control.Monad    ( guard )
 
 -- $type_classification
@@ -1526,46 +1526,34 @@ splitForAllTys ty = split ty ty []
     split orig_ty ty tvs | Just ty' <- coreView ty = split orig_ty ty' tvs
     split orig_ty _                            tvs = (reverse tvs, orig_ty)
 
--- | Like 'splitForAllTys', but only splits a 'ForAllTy' if @argf_pred argf@
--- is 'True', where @argf@ is the visibility of the @ForAllTy@'s binder and
--- @argf_pred@ is a predicate over visibilities provided as an argument to this
--- function. Furthermore, each returned tyvar is annotated with its @argf@.
-splitSomeForAllTys :: (ArgFlag -> Bool) -> Type -> ([TyCoVarBinder], Type)
+-- | Splits the longest initial sequence of ForAllTys' that satisfy
+-- @argf_pred@, returning the binders transformed by @argf_pred@
+splitSomeForAllTys :: (ArgFlag -> Maybe af) -> Type -> ([VarBndr TyCoVar af], Type)
 splitSomeForAllTys argf_pred ty = split ty ty []
   where
-    split _       (ForAllTy tvb@(Bndr _ argf) ty) tvs
-      | argf_pred argf                             = split ty ty (tvb:tvs)
+    split _ (ForAllTy (Bndr tcv argf) ty) tvs
+      | Just argf' <- argf_pred argf               = split ty ty (Bndr tcv argf' : tvs)
     split orig_ty ty tvs | Just ty' <- coreView ty = split orig_ty ty' tvs
     split orig_ty _                            tvs = (reverse tvs, orig_ty)
 
 -- | Like 'splitForAllTys', but only splits 'ForAllTy's with 'Required' type
 -- variable binders. Furthermore, each returned tyvar is annotated with '()'.
 splitForAllTysReq :: Type -> ([ReqTVBinder], Type)
-splitForAllTysReq ty =
-  let (all_bndrs, body) = splitSomeForAllTys isVisibleArgFlag ty
-      req_bndrs         = mapMaybe mk_req_bndr_maybe all_bndrs in
-  ASSERT( req_bndrs `equalLength` all_bndrs )
-  (req_bndrs, body)
+splitForAllTysReq ty = splitSomeForAllTys argf_pred ty
   where
-    mk_req_bndr_maybe :: TyCoVarBinder -> Maybe ReqTVBinder
-    mk_req_bndr_maybe (Bndr tv argf) = case argf of
-      Required    -> Just $ Bndr tv ()
-      Invisible _ -> Nothing
+    argf_pred :: ArgFlag -> Maybe ()
+    argf_pred Required       = Just ()
+    argf_pred (Invisible {}) = Nothing
 
 -- | Like 'splitForAllTys', but only splits 'ForAllTy's with 'Invisible' type
 -- variable binders. Furthermore, each returned tyvar is annotated with its
 -- 'Specificity'.
 splitForAllTysInvis :: Type -> ([InvisTVBinder], Type)
-splitForAllTysInvis ty =
-  let (all_bndrs, body) = splitSomeForAllTys isInvisibleArgFlag ty
-      inv_bndrs         = mapMaybe mk_inv_bndr_maybe all_bndrs in
-  ASSERT( inv_bndrs `equalLength` all_bndrs )
-  (inv_bndrs, body)
+splitForAllTysInvis ty = splitSomeForAllTys argf_pred ty
   where
-    mk_inv_bndr_maybe :: TyCoVarBinder -> Maybe InvisTVBinder
-    mk_inv_bndr_maybe (Bndr tv argf) = case argf of
-      Invisible s -> Just $ Bndr tv s
-      Required    -> Nothing
+    argf_pred :: ArgFlag -> Maybe Specificity
+    argf_pred Required         = Nothing
+    argf_pred (Invisible spec) = Just spec
 
 -- | Like splitForAllTys, but split only for tyvars.
 -- This always succeeds, even if it returns only an empty list. Note that the

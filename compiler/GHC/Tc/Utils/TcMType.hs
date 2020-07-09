@@ -32,15 +32,6 @@ module GHC.Tc.Utils.TcMType (
   isFilledMetaTyVar_maybe, isFilledMetaTyVar, isUnfilledMetaTyVar,
 
   --------------------------------
-  -- Expected types
-  ExpType(..), ExpSigmaType, ExpRhoType,
-  mkCheckExpType,
-  newInferExpType,
-  readExpType, readExpType_maybe,
-  expTypeToType, checkingExpType_maybe, checkingExpType,
-  tauifyExpType, inferResultToType,
-
-  --------------------------------
   -- Creating new evidence variables
   newEvVar, newEvVars, newDict,
   newWanted, newWanteds, cloneWanted, cloneWC,
@@ -58,14 +49,18 @@ module GHC.Tc.Utils.TcMType (
   --------------------------------
   -- Instantiation
   newMetaTyVars, newMetaTyVarX, newMetaTyVarsX,
-  newMetaTyVarTyVars, newMetaTyVarTyVarX,
+  newMetaTyVarTyVarX,
   newTyVarTyVar, cloneTyVarTyVar,
   newPatSigTyVar, newSkolemTyVar, newWildCardX,
-  tcInstType, tcInstTypeBndrs,
-  tcInstSkolTyVars, tcInstSkolTyVarsX, tcInstSkolTyVarsAt,
-  tcSkolDFunType, tcSuperSkolTyVars, tcInstSuperSkolTyVarsX,
 
-  freshenTyVarBndrs, freshenCoVarBndrsX,
+  --------------------------------
+  -- Expected types
+  ExpType(..), ExpSigmaType, ExpRhoType,
+  mkCheckExpType, newInferExpType, tcInfer,
+  readExpType, readExpType_maybe, readScaledExpType,
+  expTypeToType, scaledExpTypeToType,
+  checkingExpType_maybe, checkingExpType,
+  inferResultToType, fillInferResult, promoteTcType,
 
   --------------------------------
   -- Zonking and tidying
@@ -98,6 +93,8 @@ module GHC.Tc.Utils.TcMType (
 
 -- friends:
 import GHC.Prelude
+
+import {-# SOURCE #-}   GHC.Tc.Utils.Unify( unifyType {- , unifyKind -} )
 
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
@@ -133,7 +130,6 @@ import GHC.Types.Basic ( TypeOrKind(..) )
 
 import Control.Monad
 import GHC.Data.Maybe
-import Data.List        ( mapAccumL )
 import Control.Arrow    ( second )
 import qualified Data.Semigroup as Semi
 
@@ -387,16 +383,14 @@ checkCoercionHole cv co
              | otherwise
              = False
 
-{-
-************************************************************************
+{- **********************************************************************
 *
-    Expected types
+                      ExpType functions
 *
-************************************************************************
+********************************************************************** -}
 
-Note [ExpType]
-~~~~~~~~~~~~~~
-
+{- Note [ExpType]
+~~~~~~~~~~~~~~~~~
 An ExpType is used as the "expected type" when type-checking an expression.
 An ExpType can hold a "hole" that can be filled in by the type-checker.
 This allows us to have one tcExpr that works in both checking mode and
@@ -426,14 +420,12 @@ Consider
 
 This is a classic untouchable-variable / ambiguous GADT return type
 scenario. But, with ExpTypes, we'll be inferring the type of the RHS.
-And, because there is only one branch of the case, we won't trigger
-Note [Case branches must never infer a non-tau type] of GHC.Tc.Gen.Match.
 We thus must track a TcLevel in an Inferring ExpType. If we try to
-fill the ExpType and find that the TcLevels don't work out, we
-fill the ExpType with a tau-tv at the low TcLevel, hopefully to
-be worked out later by some means. This is triggered in
-test gadt/gadt-escape1.
+fill the ExpType and find that the TcLevels don't work out, we fill
+the ExpType with a tau-tv at the low TcLevel, hopefully to be worked
+out later by some means -- see fillInferResult, and Note [fillInferResult]
 
+This behaviour triggered in test gadt/gadt-escape1.
 -}
 
 -- actual data definition is in GHC.Tc.Utils.TcType
@@ -452,6 +444,12 @@ newInferExpType
 readExpType_maybe :: ExpType -> TcM (Maybe TcType)
 readExpType_maybe (Check ty)                   = return (Just ty)
 readExpType_maybe (Infer (IR { ir_ref = ref})) = readMutVar ref
+
+-- | Same as readExpType, but for Scaled ExpTypes
+readScaledExpType :: Scaled ExpType -> TcM (Scaled Type)
+readScaledExpType (Scaled m exp_ty)
+  = do { ty <- readExpType exp_ty
+       ; return (Scaled m ty) }
 
 -- | Extract a type out of an ExpType. Otherwise, panics.
 readExpType :: ExpType -> TcM TcType
@@ -472,12 +470,10 @@ checkingExpType :: String -> ExpType -> TcType
 checkingExpType _   (Check ty) = ty
 checkingExpType err et         = pprPanic "checkingExpType" (text err $$ ppr et)
 
-tauifyExpType :: ExpType -> TcM ExpType
--- ^ Turn a (Infer hole) type into a (Check alpha),
--- where alpha is a fresh unification variable
-tauifyExpType (Check ty)      = return (Check ty)  -- No-op for (Check ty)
-tauifyExpType (Infer inf_res) = do { ty <- inferResultToType inf_res
-                                   ; return (Check ty) }
+scaledExpTypeToType :: Scaled ExpType -> TcM (Scaled TcType)
+scaledExpTypeToType (Scaled m exp_ty)
+  = do { ty <- expTypeToType exp_ty
+       ; return (Scaled m ty) }
 
 -- | Extracts the expected type if there is one, or generates a new
 -- TauTv if there isn't.
@@ -488,209 +484,279 @@ expTypeToType (Infer inf_res) = inferResultToType inf_res
 inferResultToType :: InferResult -> TcM Type
 inferResultToType (IR { ir_uniq = u, ir_lvl = tc_lvl
                       , ir_ref = ref })
-  = do { rr  <- newMetaTyVarTyAtLevel tc_lvl runtimeRepTy
-       ; tau <- newMetaTyVarTyAtLevel tc_lvl (tYPE rr)
-             -- See Note [TcLevel of ExpType]
-       ; writeMutVar ref (Just tau)
+  = do { mb_inferred_ty <- readTcRef ref
+       ; tau <- case mb_inferred_ty of
+            Just ty -> do { ensureMonoType ty
+                            -- See Note [inferResultToType]
+                          ; return ty }
+            Nothing -> do { rr  <- newMetaTyVarTyAtLevel tc_lvl runtimeRepTy
+                          ; tau <- newMetaTyVarTyAtLevel tc_lvl (tYPE rr)
+                            -- See Note [TcLevel of ExpType]
+                          ; writeMutVar ref (Just tau)
+                          ; return tau }
        ; traceTc "Forcing ExpType to be monomorphic:"
                  (ppr u <+> text ":=" <+> ppr tau)
        ; return tau }
 
+{- Note [inferResultToType]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+expTypeToType and inferResultType convert an InferResult to a monotype.
+It must be a monotype because if the InferResult isn't already filled in,
+we fill it in with a unification variable (hence monotype).  So to preserve
+order-independence we check for mono-type-ness even if it *is* filled in
+already.
+
+See also Note [TcLevel of ExpType] above, and
+Note [fillInferResult].
+-}
+
+-- | Infer a type using a fresh ExpType
+-- See also Note [ExpType] in "GHC.Tc.Utils.TcMType"
+tcInfer :: (ExpSigmaType -> TcM a) -> TcM (a, TcSigmaType)
+tcInfer tc_check
+  = do { res_ty <- newInferExpType
+       ; result <- tc_check res_ty
+       ; res_ty <- readExpType res_ty
+       ; return (result, res_ty) }
+
+fillInferResult :: TcType -> InferResult -> TcM TcCoercionN
+-- If co = fillInferResult t1 t2
+--    => co :: t1 ~ t2
+-- See Note [fillInferResult]
+fillInferResult act_res_ty (IR { ir_uniq = u, ir_lvl = res_lvl
+                               , ir_ref = ref })
+  = do { mb_exp_res_ty <- readTcRef ref
+       ; case mb_exp_res_ty of
+            Just exp_res_ty
+               -> do { traceTc "Joining inferred ExpType" $
+                       ppr u <> colon <+> ppr act_res_ty <+> char '~' <+> ppr exp_res_ty
+                     ; cur_lvl <- getTcLevel
+                     ; unless (cur_lvl `sameDepthAs` res_lvl) $
+                       ensureMonoType act_res_ty
+                     ; unifyType Nothing act_res_ty exp_res_ty }
+            Nothing
+               -> do { traceTc "Filling inferred ExpType" $
+                       ppr u <+> text ":=" <+> ppr act_res_ty
+                     ; (prom_co, act_res_ty) <- promoteTcType res_lvl act_res_ty
+                     ; writeTcRef ref (Just act_res_ty)
+                     ; return prom_co }
+     }
+
+
+{- Note [fillInferResult]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+When inferring, we use fillInferResult to "fill in" the hole in InferResult
+   data InferResult = IR { ir_uniq :: Unique
+                         , ir_lvl  :: TcLevel
+                         , ir_ref  :: IORef (Maybe TcType) }
+
+There are two things to worry about:
+
+1. What if it is under a GADT or existential pattern match?
+   - GADTs: a unification variable (and Infer's hole is similar) is untouchable
+   - Existentials: be careful about skolem-escape
+
+2. What if it is filled in more than once?  E.g. multiple branches of a case
+     case e of
+        T1 -> e1
+        T2 -> e2
+
+Our typing rules are:
+
+* The RHS of a existential or GADT alternative must always be a
+  monotype, regardless of the number of alternatives.
+
+* Multiple non-existential/GADT branches can have (the same)
+  higher rank type (#18412).  E.g. this is OK:
+      case e of
+        True  -> hr
+        False -> hr
+  where hr:: (forall a. a->a) -> Int
+  c.f. Section 7.1 of "Practical type inference for arbitrary-rank types"
+       We use choice (2) in that Section.
+       (GHC 8.10 and earlier used choice (1).)
+
+  But note that
+      case e of
+        True  -> hr
+        False -> \x -> hr x
+  will fail, because we still /infer/ both branches, so the \x will get
+  a (monotype) unification variable, which will fail to unify with
+  (forall a. a->a)
+
+For (1) we can detect the GADT/existential situation by seeing that
+the current TcLevel is greater than that stored in ir_lvl of the Infer
+ExpType.  We bump the level whenever we go past a GADT/existential match.
+
+Then, before filling the hole use promoteTcType to promote the type
+to the outer ir_lvl.  promoteTcType does this
+  - create a fresh unification variable alpha at level ir_lvl
+  - emits an equality alpha[ir_lvl] ~ ty
+  - fills the hole with alpha
+That forces the type to be a monotype (since unification variables can
+only unify with monotypes); and catches skolem-escapes because the
+alpha is untouchable until the equality floats out.
+
+For (2), we simply look to see if the hole is filled already.
+  - if not, we promote (as above) and fill the hole
+  - if it is filled, we simply unify with the type that is
+    already there
+
+There is one wrinkle.  Suppose we have
+   case e of
+      T1 -> e1 :: (forall a. a->a) -> Int
+      G2 -> e2
+where T1 is not GADT or existential, but G2 is a GADT.  Then supppose the
+T1 alternative fills the hole with (forall a. a->a) -> Int, which is fine.
+But now the G2 alternative must not *just* unify with that else we'd risk
+allowing through (e2 :: (forall a. a->a) -> Int).  If we'd checked G2 first
+we'd have filled the hole with a unification variable, which enforces a
+monotype.
+
+So if we check G2 second, we still want to emit a constraint that restricts
+the RHS to be a monotype. This is done by ensureMonoType, and it works
+by simply generating a constraint (alpha ~ ty), where alpha is a fresh
+unification variable.  We discard the evidence.
+
+-}
 
 {- *********************************************************************
 *                                                                      *
-        SkolemTvs (immutable)
+              Promoting types
 *                                                                      *
 ********************************************************************* -}
 
-tc_inst_internal :: ([VarBndr TyVar flag] -> TcM (TCvSubst, [VarBndr TcTyVar flag]))
-                        -- ^ How to instantiate the type variables
-                 -> [VarBndr TyVar flag] -- ^ Type variable to instantiate
-                 -> Type                 -- ^ rho
-                 -> TcM ([(Name, VarBndr TcTyVar flag)], TcThetaType, TcType) -- ^ Result
-                       -- (type vars, preds (incl equalities), rho)
-tc_inst_internal _inst_tyvars []     rho =
-  let -- There may be overloading despite no type variables;
-      --      (?x :: Int) => Int -> Int
-    (theta, tau) = tcSplitPhiTy rho
-  in
-    return ([], theta, tau)
-tc_inst_internal  inst_tyvars tyvars rho =
-  do { (subst, tyvars') <- inst_tyvars tyvars
-     ; let (theta, tau) = tcSplitPhiTy (substTyAddInScope subst rho)
-           tv_prs       = map (tyVarName . binderVar) tyvars `zip` tyvars'
-     ; return (tv_prs, theta, tau) }
+ensureMonoType :: TcType -> TcM ()
+-- Assuming that the argument type is of kind (TYPE r),
+-- ensure that it is a /monotype/
+-- If it is not a monotype we can see right away (since unification
+-- varibles and type-function applications stand for monotypes), but
+-- we emit a Wanted equality just to delay the error message until later
+ensureMonoType res_ty
+  | isTauTy res_ty   -- isTauTy doesn't need zonking or anything
+  = return ()
+  | otherwise
+  = do { mono_ty <- newOpenFlexiTyVarTy
+       ; let eq_orig = TypeEqOrigin { uo_actual   = res_ty
+                                    , uo_expected = mono_ty
+                                    , uo_thing    = Nothing
+                                    , uo_visible  = False }
 
-tcInstType :: ([TyVar] -> TcM (TCvSubst, [TcTyVar]))
-                   -- ^ How to instantiate the type variables
-           -> Id                                           -- ^ Type to instantiate
-           -> TcM ([(Name, TcTyVar)], TcThetaType, TcType) -- ^ Result
-                -- (type vars, preds (incl equalities), rho)
-tcInstType inst_tyvars id =
-  do { let (tyvars, rho)    = splitForAllTys (idType id)
-           tyvars'          = mkTyVarBinders () tyvars
-     ;     (tv_prs, preds, rho) <- tc_inst_internal inst_tyvar_bndrs tyvars' rho
-     ; let tv_prs'          = map (\(name, bndr) -> (name, binderVar bndr)) tv_prs
-     ; return (tv_prs', preds, rho) }
+       ; _co <- emitWantedEq eq_orig TypeLevel Nominal res_ty mono_ty
+       ; return () }
+
+promoteTcType :: TcLevel -> TcType -> TcM (TcCoercionN, TcType)
+-- See Note [Promoting a type]
+-- See also Note [fillInferResult]
+-- promoteTcType level ty = (co, ty')
+--   * Returns ty'  whose max level is just 'level'
+--             and  whose kind is ~# to the kind of 'ty'
+--             and  whose kind has form TYPE rr
+--   * and co :: ty ~ ty'
+--   * and emits constraints to justify the coercion
+--
+-- NB: we expect that 'ty' has already kind (TYPE rr) for
+--     some rr::RuntimeRep.  It is, after all, the type of a term.
+promoteTcType dest_lvl ty
+  = do { cur_lvl <- getTcLevel
+       ; if (cur_lvl `sameDepthAs` dest_lvl)
+         then return (mkTcNomReflCo ty, ty)
+         else promote_it }
   where
-    inst_tyvar_bndrs :: [VarBndr TyVar ()] -> TcM (TCvSubst, [VarBndr TcTyVar ()])
-    inst_tyvar_bndrs bndrs = do { (subst, tvs) <- inst_tyvars $ binderVars bndrs
-                                ; let tvbnds = map (\tv -> Bndr tv ()) tvs
-                                ; return (subst, tvbnds) }
+    promote_it :: TcM (TcCoercion, TcType)
+    promote_it  -- Emit a constraint  (alpha :: TYPE rr) ~ ty
+                -- where alpha and rr are fresh and from level dest_lvl
+      = do { rr      <- newMetaTyVarTyAtLevel dest_lvl runtimeRepTy
+           ; prom_ty <- newMetaTyVarTyAtLevel dest_lvl (tYPE rr)
+           ; let eq_orig = TypeEqOrigin { uo_actual   = ty
+                                        , uo_expected = prom_ty
+                                        , uo_thing    = Nothing
+                                        , uo_visible  = False }
 
-tcInstTypeBndrs :: ([VarBndr TyVar Specificity] -> TcM (TCvSubst, [VarBndr TcTyVar Specificity]))
-                        -- ^ How to instantiate the type variables
-                -> Id                                                               -- ^ Type to instantiate
-                -> TcM ([(Name, VarBndr TcTyVar Specificity)], TcThetaType, TcType) -- ^ Result
-                     -- (type vars, preds (incl equalities), rho)
-tcInstTypeBndrs inst_tyvars id =
-  let (tyvars, rho) = splitForAllTysInvis (idType id)
-  in tc_inst_internal inst_tyvars tyvars rho
+           ; co <- emitWantedEq eq_orig TypeLevel Nominal ty prom_ty
+           ; return (co, prom_ty) }
 
-tcSkolDFunType :: DFunId -> TcM ([TcTyVar], TcThetaType, TcType)
--- Instantiate a type signature with skolem constants.
--- We could give them fresh names, but no need to do so
-tcSkolDFunType dfun
-  = do { (tv_prs, theta, tau) <- tcInstType tcInstSuperSkolTyVars dfun
-       ; return (map snd tv_prs, theta, tau) }
+{- Note [Promoting a type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (#12427)
 
-tcSuperSkolTyVars :: [TyVar] -> (TCvSubst, [TcTyVar])
--- Make skolem constants, but do *not* give them new names, as above
--- Moreover, make them "super skolems"; see comments with superSkolemTv
--- see Note [Kind substitution when instantiating]
--- Precondition: tyvars should be ordered by scoping
-tcSuperSkolTyVars = mapAccumL tcSuperSkolTyVar emptyTCvSubst
+  data T where
+    MkT :: (Int -> Int) -> a -> T
 
-tcSuperSkolTyVar :: TCvSubst -> TyVar -> (TCvSubst, TcTyVar)
-tcSuperSkolTyVar subst tv
-  = (extendTvSubstWithClone subst tv new_tv, new_tv)
-  where
-    kind   = substTyUnchecked subst (tyVarKind tv)
-    new_tv = mkTcTyVar (tyVarName tv) kind superSkolemTv
+  h y = case y of MkT v w -> v
 
--- | Given a list of @['TyVar']@, skolemize the type variables,
--- returning a substitution mapping the original tyvars to the
--- skolems, and the list of newly bound skolems.
-tcInstSkolTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
--- See Note [Skolemising type variables]
-tcInstSkolTyVars = tcInstSkolTyVarsX emptyTCvSubst
+We'll infer the RHS type with an expected type ExpType of
+  (IR { ir_lvl = l, ir_ref = ref, ... )
+where 'l' is the TcLevel of the RHS of 'h'.  Then the MkT pattern
+match will increase the level, so we'll end up in tcSubType, trying to
+unify the type of v,
+  v :: Int -> Int
+with the expected type.  But this attempt takes place at level (l+1),
+rightly so, since v's type could have mentioned existential variables,
+(like w's does) and we want to catch that.
 
-tcInstSkolTyVarsX :: TCvSubst -> [TyVar] -> TcM (TCvSubst, [TcTyVar])
--- See Note [Skolemising type variables]
-tcInstSkolTyVarsX = tcInstSkolTyVarsPushLevel False
+So we
+  - create a new meta-var alpha[l+1]
+  - fill in the InferRes ref cell 'ref' with alpha
+  - emit an equality constraint, thus
+        [W] alpha[l+1] ~ (Int -> Int)
 
-tcInstSuperSkolTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
--- See Note [Skolemising type variables]
-tcInstSuperSkolTyVars = tcInstSuperSkolTyVarsX emptyTCvSubst
+That constraint will float outwards, as it should, unless v's
+type mentions a skolem-captured variable.
 
-tcInstSuperSkolTyVarsX :: TCvSubst -> [TyVar] -> TcM (TCvSubst, [TcTyVar])
--- See Note [Skolemising type variables]
-tcInstSuperSkolTyVarsX subst = tcInstSkolTyVarsPushLevel True subst
-
-tcInstSkolTyVarsPushLevel :: Bool -> TCvSubst -> [TyVar]
-                          -> TcM (TCvSubst, [TcTyVar])
--- Skolemise one level deeper, hence pushTcLevel
--- See Note [Skolemising type variables]
-tcInstSkolTyVarsPushLevel overlappable subst tvs
-  = do { tc_lvl <- getTcLevel
-       ; let pushed_lvl = pushTcLevel tc_lvl
-       ; tcInstSkolTyVarsAt pushed_lvl overlappable subst tvs }
-
-tcInstSkolTyVarsAt :: TcLevel -> Bool
-                   -> TCvSubst -> [TyVar]
-                   -> TcM (TCvSubst, [TcTyVar])
-tcInstSkolTyVarsAt lvl overlappable subst tvs
-  = freshenTyCoVarsX new_skol_tv subst tvs
-  where
-    details = SkolemTv lvl overlappable
-    new_skol_tv name kind = mkTcTyVar name kind details
-
-------------------
-freshenTyVarBndrs :: [TyVar] -> TcM (TCvSubst, [TyVar])
--- ^ Give fresh uniques to a bunch of TyVars, but they stay
---   as TyVars, rather than becoming TcTyVars
--- Used in 'GHC.Tc.Instance.Family.newFamInst', and 'GHC.Tc.Utils.Instantiate.newClsInst'
-freshenTyVarBndrs = freshenTyCoVars mkTyVar
-
-freshenCoVarBndrsX :: TCvSubst -> [CoVar] -> TcM (TCvSubst, [CoVar])
--- ^ Give fresh uniques to a bunch of CoVars
--- Used in "GHC.Tc.Instance.Family.newFamInst"
-freshenCoVarBndrsX subst = freshenTyCoVarsX mkCoVar subst
-
-------------------
-freshenTyCoVars :: (Name -> Kind -> TyCoVar)
-                -> [TyVar] -> TcM (TCvSubst, [TyCoVar])
-freshenTyCoVars mk_tcv = freshenTyCoVarsX mk_tcv emptyTCvSubst
-
-freshenTyCoVarsX :: (Name -> Kind -> TyCoVar)
-                 -> TCvSubst -> [TyCoVar]
-                 -> TcM (TCvSubst, [TyCoVar])
-freshenTyCoVarsX mk_tcv = mapAccumLM (freshenTyCoVarX mk_tcv)
-
-freshenTyCoVarX :: (Name -> Kind -> TyCoVar)
-                -> TCvSubst -> TyCoVar -> TcM (TCvSubst, TyCoVar)
--- This a complete freshening operation:
--- the skolems have a fresh unique, and a location from the monad
--- See Note [Skolemising type variables]
-freshenTyCoVarX mk_tcv subst tycovar
-  = do { loc  <- getSrcSpanM
-       ; uniq <- newUnique
-       ; let old_name = tyVarName tycovar
-             new_name = mkInternalName uniq (getOccName old_name) loc
-             new_kind = substTyUnchecked subst (tyVarKind tycovar)
-             new_tcv  = mk_tcv new_name new_kind
-             subst1   = extendTCvSubstWithClone subst tycovar new_tcv
-       ; return (subst1, new_tcv) }
-
-{- Note [Skolemising type variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The tcInstSkolTyVars family of functions instantiate a list of TyVars
-to fresh skolem TcTyVars. Important notes:
-
-a) Level allocation. We generally skolemise /before/ calling
-   pushLevelAndCaptureConstraints.  So we want their level to the level
-   of the soon-to-be-created implication, which has a level ONE HIGHER
-   than the current level.  Hence the pushTcLevel.  It feels like a
-   slight hack.
-
-b) The [TyVar] should be ordered (kind vars first)
-   See Note [Kind substitution when instantiating]
-
-c) It's a complete freshening operation: the skolems have a fresh
-   unique, and a location from the monad
-
-d) The resulting skolems are
-        non-overlappable for tcInstSkolTyVars,
-   but overlappable for tcInstSuperSkolTyVars
-   See GHC.Tc.Deriv.Infer Note [Overlap and deriving] for an example
-   of where this matters.
-
-Note [Kind substitution when instantiating]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When we instantiate a bunch of kind and type variables, first we
-expect them to be topologically sorted.
-Then we have to instantiate the kind variables, build a substitution
-from old variables to the new variables, then instantiate the type
-variables substituting the original kind.
-
-Exemple: If we want to instantiate
-  [(k1 :: *), (k2 :: *), (a :: k1 -> k2), (b :: k1)]
-we want
-  [(?k1 :: *), (?k2 :: *), (?a :: ?k1 -> ?k2), (?b :: ?k1)]
-instead of the buggous
-  [(?k1 :: *), (?k2 :: *), (?a :: k1 -> k2), (?b :: k1)]
+This approach fails if v has a higher rank type; see
+Note [Promotion and higher rank types]
 
 
-************************************************************************
+Note [Promotion and higher rank types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If v had a higher-rank type, say v :: (forall a. a->a) -> Int,
+then we'd emit an equality
+        [W] alpha[l+1] ~ ((forall a. a->a) -> Int)
+which will sadly fail because we can't unify a unification variable
+with a polytype.  But there is nothing really wrong with the program
+here.
+
+We could just about solve this by "promote the type" of v, to expose
+its polymorphic "shape" while still leaving constraints that will
+prevent existential escape.  But we must be careful!  Exposing
+the "shape" of the type is precisely what we must NOT do under
+a GADT pattern match!  So in this case we might promote the type
+to
+        (forall a. a->a) -> alpha[l+1]
+and emit the constraint
+        [W] alpha[l+1] ~ Int
+Now the promoted type can fill the ref cell, while the emitted
+equality can float or not, according to the usual rules.
+
+But that's not quite right!  We are exposing the arrow! We could
+deal with that too:
+        (forall a. mu[l+1] a a) -> alpha[l+1]
+with constraints
+        [W] alpha[l+1] ~ Int
+        [W] mu[l+1] ~ (->)
+Here we abstract over the '->' inside the forall, in case that
+is subject to an equality constraint from a GADT match.
+
+Note that we kept the outer (->) because that's part of
+the polymorphic "shape".  And because of impredicativity,
+GADT matches can't give equalities that affect polymorphic
+shape.
+
+This reasoning just seems too complicated, so I decided not
+to do it.  These higher-rank notes are just here to record
+the thinking.
+-}
+
+
+{- *********************************************************************
 *                                                                      *
         MetaTvs (meta type variables; mutable)
 *                                                                      *
-************************************************************************
--}
+********************************************************************* -}
 
-{-
-Note [TyVarTv]
-~~~~~~~~~~~~
+{- Note [TyVarTv]
+~~~~~~~~~~~~~~~~~
 
 A TyVarTv can unify with type *variables* only, including other TyVarTvs and
 skolems. Sometimes, they can unify with type variables that the user would
@@ -1031,18 +1097,11 @@ newMetaTyVarsX subst = mapAccumLM newMetaTyVarX subst
 newMetaTyVarX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
 -- Make a new unification variable tyvar whose Name and Kind come from
 -- an existing TyVar. We substitute kind variables in the kind.
-newMetaTyVarX subst tyvar = new_meta_tv_x TauTv subst tyvar
+newMetaTyVarX = new_meta_tv_x TauTv
 
-newMetaTyVarTyVars :: [VarBndr TyVar Specificity]
-                   -> TcM (TCvSubst, [VarBndr TcTyVar Specificity])
-newMetaTyVarTyVars = mapAccumLM newMetaTyVarTyVarX emptyTCvSubst
-
-newMetaTyVarTyVarX :: TCvSubst -> (VarBndr TyVar Specificity)
-                   -> TcM (TCvSubst, VarBndr TcTyVar Specificity)
+newMetaTyVarTyVarX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
 -- Just like newMetaTyVarX, but make a TyVarTv
-newMetaTyVarTyVarX subst (Bndr tv spec) =
-  do { (subst', tv') <- new_meta_tv_x TyVarTv subst tv
-     ; return (subst', (Bndr tv' spec)) }
+newMetaTyVarTyVarX = new_meta_tv_x TyVarTv
 
 newWildCardX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
 newWildCardX subst tv
