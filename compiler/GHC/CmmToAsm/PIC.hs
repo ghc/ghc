@@ -150,6 +150,11 @@ cmmMakePicReference config lbl
   | OSMinGW32 <- platformOS platform
   = CmmLit $ CmmLabel lbl
 
+  -- no pic base reg on AArch64, however indicate this symbol should go through
+  -- the global offset table (GOT).
+  | ArchAArch64 <- platformArch platform
+  = CmmLit $ CmmLabel lbl
+
   | OSAIX <- platformOS platform
   = CmmMachOp (MO_Add W32)
           [ CmmReg (CmmGlobal PicBaseReg)
@@ -240,6 +245,16 @@ howToAccessLabel config _arch OSMinGW32 _kind lbl
         -- Target symbol is in the same PE as the caller, so just access it directly.
         | otherwise
         = AccessDirectly
+
+-- On AArch64, relocations for JUMP and CALL will be emitted with 26bits, this
+-- is enough for ~64MB of range. Anything else will need to go through a veneer,
+-- which is the job of the linker to build.  We might only want to lookup
+-- Data References through the GOT.
+howToAccessLabel _config ArchAArch64 _os _this_mod kind _lbl
+        = case kind of
+            DataReference -> AccessDirectly -- AccessViaSymbolPtr
+            CallReference -> AccessDirectly
+            JumpReference -> AccessDirectly
 
 
 -- Mach-O (Darwin, Mac OS X)
