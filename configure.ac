@@ -127,6 +127,9 @@ dnl CC_STAGE0 is like the "previous" variable CC (inherited by CC_STAGE[123])
 dnl but instead used by stage0 for bootstrapping stage1
 AC_ARG_VAR(CC_STAGE0, [C compiler command (bootstrap)])
 
+dnl RTS ways supplied by the bootstrapping compiler.
+AC_ARG_VAR(RTS_WAYS_STAGE0, [RTS ways])
+
 if test "$WithGhc" != ""; then
   FPTOOLS_GHC_VERSION([GhcVersion], [GhcMajVersion], [GhcMinVersion], [GhcPatchLevel])dnl
 
@@ -150,6 +153,17 @@ if test "$WithGhc" != ""; then
   BOOTSTRAPPING_GHC_INFO_FIELD([AR_STAGE0],[ar command])
   BOOTSTRAPPING_GHC_INFO_FIELD([AR_OPTS_STAGE0],[ar flags])
   BOOTSTRAPPING_GHC_INFO_FIELD([ArSupportsAtFile_STAGE0],[ar supports at file])
+  BOOTSTRAPPING_GHC_INFO_FIELD([RTS_WAYS_STAGE0],[RTS ways])
+
+  dnl Check whether or not the bootstrapping GHC has a threaded RTS. This
+  dnl determines whether or not we can have a threaded stage 1.
+  dnl See Note [Linking ghc-bin against threaded stage0 RTS] in
+  dnl hadrian/src/Settings/Packages.hs for details.
+  if echo ${RTS_WAYS_STAGE0} | grep '.*thr.*' 2>&1 >/dev/null; then
+      AC_SUBST(GhcThreadedRts, YES)
+  else
+      AC_SUBST(GhcThreadedRts, NO)
+  fi
 fi
 
 dnl ** Must have GHC to build GHC
@@ -1372,6 +1386,7 @@ Configure completed successfully.
 echo "\
    Bootstrapping using   : $WithGhc
       which is version   : $GhcVersion
+      with threaded RTS? : $GhcThreadedRts
 "
 
 if test "x$CC_LLVM_BACKEND" = "x1"; then

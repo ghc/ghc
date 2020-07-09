@@ -326,6 +326,12 @@ ifeq "$(GhcThreaded)" "YES"
 compiler_stage2_CONFIGURE_OPTS += --ghc-option=-optc-DTHREADED_RTS
 endif
 
+# If the bootstrapping GHC supplies the threaded RTS, then we can have a
+# threaded stage 1 too.
+ifeq "$(GhcThreadedRts)" "YES"
+compiler_stage1_CONFIGURE_OPTS += --ghc-option=-optc-DTHREADED_RTS
+endif
+
 ifeq "$(GhcWithNativeCodeGen)" "YES"
 compiler_stage1_CONFIGURE_OPTS += --flags=ncg
 compiler_stage2_CONFIGURE_OPTS += --flags=ncg

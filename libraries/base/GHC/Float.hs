@@ -141,6 +141,14 @@ class  (Fractional a) => Floating a  where
     log1pexp x = log1p (exp x)
     log1mexp x = log1p (negate (exp x))
 
+-- | Default implementation for @'log1mexp'@ requiring @'Ord'@ to test
+-- against a threshold to decide which implementation variant to use.
+log1mexpOrd :: (Ord a, Floating a) => a -> a
+{-# INLINE log1mexpOrd #-}
+log1mexpOrd a
+    | a > -(log 2) = log (negate (expm1 a))
+    | otherwise  = log1p (negate (exp a))
+
 -- | Efficient, machine-independent access to the components of a
 -- floating-point number.
 class  (RealFrac a, Floating a) => RealFloat a  where
@@ -398,9 +406,7 @@ instance  Floating Float  where
     log1p = log1pFloat
     expm1 = expm1Float
 
-    log1mexp a
-      | a <= log 2 = log (negate (expm1Float a))
-      | otherwise  = log1pFloat (negate (exp a))
+    log1mexp x = log1mexpOrd x
     {-# INLINE log1mexp #-}
     log1pexp a
       | a <= 18   = log1pFloat (exp a)
@@ -539,9 +545,7 @@ instance  Floating Double  where
     log1p = log1pDouble
     expm1 = expm1Double
 
-    log1mexp a
-      | a <= log 2 = log (negate (expm1Double a))
-      | otherwise  = log1pDouble (negate (exp a))
+    log1mexp x = log1mexpOrd x
     {-# INLINE log1mexp #-}
     log1pexp a
       | a <= 18   = log1pDouble (exp a)
