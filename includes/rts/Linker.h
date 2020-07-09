@@ -76,6 +76,19 @@ HsInt loadArchive( pathchar *path );
 /* resolve all the currently unlinked objects in memory */
 HsInt resolveObjs( void );
 
+/* Load an .so using the system linker.
+   Returns a handle that can be passed to dlsym() or NULL on error.
+
+   In the case of error, stores the error message in errmsg. The caller
+   is responsible for freeing it. */
+void *loadNativeObj( pathchar *path, char **errmsg );
+
+/* Mark the .so loaded with the system linker for unloading.
+   The RTS will unload it when all the references to the .so disappear from
+   the heap.
+   Takes the handle returned from loadNativeObj() as an argument. */
+HsInt unloadNativeObj( void *handle );
+
 /* load a dynamic library */
 const char *addDLL( pathchar* dll_name );
 
