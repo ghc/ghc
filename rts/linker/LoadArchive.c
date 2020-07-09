@@ -519,7 +519,7 @@ static HsInt loadArchive_ (pathchar *path)
             sprintf(archiveMemberName, "%" PATH_FMT "(%.*s)",
                     path, (int)thisFileNameSize, fileName);
 
-            ObjectCode *oc = mkOc(path, image, memberSize, false, archiveMemberName,
+            ObjectCode *oc = mkOc(STATIC_OBJECT, path, image, memberSize, false, archiveMemberName,
                                   misalignment);
 #if defined(OBJFORMAT_MACHO)
             ocInit_MachO( oc );
