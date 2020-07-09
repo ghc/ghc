@@ -452,6 +452,15 @@ getRegister' config plat expr
                                                   , MOV (OpReg W32 dst) (OpImm (ImmInt half0))
                                                   , MOVK (OpReg W32 dst) (OpImmShift (ImmInt half1) SLSL 16)
                                                   ]))
+        -- fallback for W32
+        CmmInt i W32 -> do
+          let  half0 = fromIntegral (fromIntegral i :: Word16)
+               half1 = fromIntegral (fromIntegral (i `shiftR` 16) :: Word16)
+          return (Any (intFormat W32) (\dst -> toOL [ COMMENT (ppr expr)
+                                                    , MOV (OpReg W32 dst) (OpImm (ImmInt half0))
+                                                    , MOVK (OpReg W32 dst) (OpImmShift (ImmInt half1) SLSL 16)
+                                                    ]))
+        -- anything else
         CmmInt i W64 -> do
           let  half0 = fromIntegral (fromIntegral i :: Word16)
                half1 = fromIntegral (fromIntegral (i `shiftR` 16) :: Word16)
@@ -761,11 +770,11 @@ assignMem_IntCode rep addrE srcE
     (src_reg, _format, code) <- getSomeReg srcE
     Amode addr addr_code <- getAmode addrE
     let AddrReg r1 = addr
-    return $ unitOL (COMMENT (ppr srcE))
+    return $ unitOL (COMMENT $ text "RHS:" <+> ppr srcE)
             `appOL` code
-            `appOL` unitOL (COMMENT (ppr addrE))
+            `appOL` unitOL (COMMENT $ text "LHS:" <+> ppr addrE)
             `appOL` addr_code
-            `snocOL` COMMENT (ppr src_reg <> text " -> " <> ppr r1)
+            `snocOL` COMMENT (text "Store:" <+> ppr r1 <+> text "<-" <+> ppr src_reg)
             `snocOL` STR rep (OpReg (formatToWidth rep) src_reg) (OpAddr addr)
 
 assignReg_IntCode _ reg src
