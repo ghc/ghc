@@ -21,6 +21,7 @@ import GHC.Core.Coercion
 import GHC.Tc.Types.Evidence
 import GHC.Iface.Load
 import GHC.Tc.Utils.Monad
+import GHC.Tc.Utils.Instantiate( freshenTyVarBndrs, freshenCoVarBndrsX )
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Core.TyCon
 import GHC.Tc.Utils.TcType
@@ -35,7 +36,6 @@ import GHC.Data.Maybe
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.FVs
 import GHC.Core.TyCo.Ppr ( pprWithExplicitKindsWhen )
-import GHC.Tc.Utils.TcMType
 import GHC.Types.Name
 import GHC.Utils.Panic
 import GHC.Types.Var.Set
