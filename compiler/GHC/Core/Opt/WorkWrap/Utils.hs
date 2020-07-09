@@ -1266,8 +1266,7 @@ mk_absent_let dflags fam_envs arg
                    `orElse` (mkRepReflCo arg_ty, arg_ty)
 
     abs_rhs      = mkAbsentErrorApp arg_ty msg
-    -- TODO: Reenable surpression
-    msg          = showSDoc dflags --(gopt_set dflags Opt_SuppressUniques)
+    msg          = showSDoc (gopt_set dflags Opt_SuppressUniques)
                             (ppr arg <+> ppr (idType arg) <+> file_msg)
     file_msg     = case outputFile dflags of
                      Nothing -> empty
