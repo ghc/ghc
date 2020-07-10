@@ -9,8 +9,6 @@
 -----------------------------------------------------------------------------
 
 module GHC.CmmToAsm.Ppr (
-        castFloatToWord8Array,
-        castDoubleToWord8Array,
         floatToBytes,
         doubleToBytes,
         pprASCII,
@@ -42,8 +40,6 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import GHC.Exts
 import GHC.Word
-
-
 
 -- -----------------------------------------------------------------------------
 -- Converting floating-point literals to integrals for printing
@@ -91,6 +87,7 @@ doubleToBytes d
         i7 <- readArray arr 7
         return (map fromIntegral [i0,i1,i2,i3,i4,i5,i6,i7])
      )
+
 
 -- ---------------------------------------------------------------------------
 -- Printing ASCII strings.
