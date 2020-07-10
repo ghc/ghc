@@ -1,0 +1,2 @@
+#! /usr/bin/env bash
+"$TEST_WRAPPER" "$(dirname $(dirname $TEST_HC))/lib/bin/ghc-iserv" "$@"
