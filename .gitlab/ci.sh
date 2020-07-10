@@ -285,7 +285,7 @@ function prepare_build_mk() {
   if [[ -z "$BUILD_FLAVOUR" ]]; then fail "BUILD_FLAVOUR is not set"; fi
   if [[ -z ${BUILD_SPHINX_HTML:-} ]]; then BUILD_SPHINX_HTML=YES; fi
   if [[ -z ${BUILD_SPHINX_PDF:-} ]]; then BUILD_SPHINX_PDF=YES; fi
-  if [[ -z ${INTEGER_LIBRARY:-} ]]; then INTEGER_LIBRARY=integer-gmp; fi
+  if [[ -z ${BIGNUM_BACKEND:-} ]]; then BIGNUM_BACKEND=gmp; fi
 
   cat > mk/build.mk <<EOF
 V=1
@@ -295,7 +295,7 @@ HSCOLOUR_SRCS=YES
 BUILD_SPHINX_HTML=$BUILD_SPHINX_HTML
 BUILD_SPHINX_PDF=$BUILD_SPHINX_PDF
 BeConservative=YES
-INTEGER_LIBRARY=$INTEGER_LIBRARY
+BIGNUM_BACKEND=$BIGNUM_BACKEND
 XZ_CMD=$XZ
 
 BuildFlavour=$BUILD_FLAVOUR

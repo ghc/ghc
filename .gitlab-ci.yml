@@ -603,7 +603,7 @@ validate-x86_64-linux-deb9-integer-simple:
   stage: full-build
   variables:
     BUILD_FLAVOUR: validate
-    INTEGER_LIBRARY: integer-simple
+    BIGNUM_BACKEND: native
     TEST_ENV: "x86_64-linux-deb9-integer-simple-validate"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb9-linux-integer-simple.tar.xz"
 
@@ -612,7 +612,7 @@ nightly-x86_64-linux-deb9-integer-simple:
   extends: .build-x86_64-linux-deb9
   stage: full-build
   variables:
-    INTEGER_LIBRARY: integer-simple
+    BIGNUM_BACKEND: native
     TEST_ENV: "x86_64-linux-deb9-integer-simple"
     TEST_TYPE: slowtest
 
@@ -879,7 +879,7 @@ release-x86_64-windows-integer-simple:
   <<: *release
   extends: validate-x86_64-windows
   variables:
-    INTEGER_LIBRARY: integer-simple
+    BIGNUM_BACKEND: native
     BUILD_FLAVOUR: "perf"
 
 
