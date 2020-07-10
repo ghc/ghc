@@ -22,7 +22,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 
 {-# OPTIONS_GHC -O2 -ddump-simpl -ddump-to-file -ddump-stg -ddump-cmm -ddump-asm #-}
-{-# OPTIONS_GHC -dsuppress-all -dno-suppress-type-signatures #-}
+{-# OPTIONS_GHC -dsuppress-all -dno-suppress-type-signatures -dno-suppress-module-prefixes #-}
 
 module GHC.Stg.InferTags (findTags, EnterLattice) where
 
@@ -1154,8 +1154,10 @@ instance Outputable IsLNE where
     ppr NotLNE = empty
     ppr LNE = text "-LNE"
 
--- Syntactic context of a node, potentially including a mapping
+-- Syntactic context of a node, usually including a mapping
 -- of in-scope ids to their data flow nodes.
+--
+-- We use CCaseScrut to help detecting tail recursive calls.
 data SynContext
     = CTopLevel     !(VarEnv NodeId)
     | CLetRec       !(VarEnv NodeId) !IsLNE
@@ -1166,7 +1168,6 @@ data SynContext
     | CCaseScrut
     | CCaseBndr     !(VarEnv NodeId)
     | CAlt          !(VarEnv NodeId)
-    | CNone
     deriving Eq
 
 getCtxtIdMap :: SynContext -> Maybe (VarEnv NodeId)
@@ -1179,7 +1180,6 @@ getCtxtIdMap (CLetRecBody m _) = Just m
 getCtxtIdMap (CLet m _) = Just m
 getCtxtIdMap (CLetBody m _) = Just m
 getCtxtIdMap (CTopLevel m) = Just m
-getCtxtIdMap (CNone) = Nothing
 
 -- | isSingleMapOf v env == fromList [(v',_)] && v == v'
 --
@@ -1189,7 +1189,6 @@ isSingleMapOf v env =
     sizeUFM env == 1 && elemVarEnv v env
 
 instance Outputable SynContext where
-    ppr CNone                 = text "CNone"
     ppr (CTopLevel map)       = text "CTop"        <> ppr map
     ppr (CAlt map)            = text "CAlt"        <> ppr map
     ppr CCaseScrut            = text "CCaseScrut"
@@ -1253,7 +1252,7 @@ mkOutConLattice con outer fields
 {-# NOINLINE findTags #-}
 findTags :: Module -> UniqSupply -> [StgTopBinding] -> ([TgStgTopBinding], [(Id,EnterLattice)])
 -- findTags this_mod us binds = passTopBinds binds
-findTags this_mod us binds =
+findTags this_mod _us binds =
     pprTrace "findTags" (ppr this_mod) $
     let state = FlowState {
             -- fs_us = 0,
@@ -1264,7 +1263,7 @@ findTags this_mod us binds =
         analysis :: AM ([TgStgTopBinding], [(Id, EnterLattice)])
         analysis = do
             addConstantNodes
-            (binds',mapping) <- {-# SCC "mkFlowNodes" #-}
+            (binds',_mapping) <- {-# SCC "mkFlowNodes" #-}
                                 nodesTopBinds this_mod binds
             {-# SCC "solveConstraints" #-}            solveConstraints
             -- exports <- exportTaggedness mapping
@@ -1521,13 +1520,15 @@ mkCtxtEntry ctxt v
         return $! (v, node_id)
 
 {-# NOINLINE nodesTopBinds #-}
+-- Note: We could expose the computed information about top level bindings
+-- via interface files (or otherwise). But currently it's unused.
 nodesTopBinds :: Module -> [StgTopBinding] -> AM ([InferStgTopBinding], [(Id,NodeId)])
 nodesTopBinds this_mod binds = do
     let top_level_binds = mkVarSet (bindersOfTopBinds binds) :: IdSet
     -- We preallocate node ids for the case where we must reference an node by id
     -- before we traversed the defining binding.
     let bind_ids = (nonDetEltsUniqSet top_level_binds)
-    mappings <- mapM (mkCtxtEntry [CNone]) bind_ids :: AM [(Id,NodeId)]
+    mappings <- mapM (mkCtxtEntry []) bind_ids :: AM [(Id,NodeId)]
     let topCtxt = CTopLevel $ mkVarEnv mappings
     binds' <- mapM (nodesTop this_mod topCtxt) binds
     return (binds', mappings)
@@ -2231,7 +2232,6 @@ nodeApp this_mod ctxt expr@(StgApp _ f args) = do
     isRecTail (CAlt bnds : ctxt)
         | f `elemVarEnv` bnds = False
         | otherwise = isRecTail ctxt
-    isRecTail (CNone : _) = panic "impossible"
     isRecTail x = pprPanic "Incomplete" $ ppr x
 
     inputs
