@@ -18,8 +18,11 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 {-# OPTIONS_GHC -O2 -ddump-simpl -ddump-to-file -ddump-stg -ddump-cmm -ddump-asm #-}
+{-# OPTIONS_GHC -dsuppress-all -dno-suppress-type-signatures #-}
 
 module GHC.Stg.InferTags (findTags, EnterLattice) where
 
@@ -52,7 +55,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 import GHC.Utils.Misc
-import GHC.Utils.Monad.State -- See Note [Useless Bangs]
+-- import GHC.Utils.Monad.State -- See Note [Useless Bangs]
 import GHC.Data.Maybe
 
 import GHC.Utils.Monad
@@ -79,6 +82,18 @@ import Control.Monad
 import Control.DeepSeq -- hiding (deepseq)
 import System.IO.Unsafe
 
+-- import Control.Monad.Trans.State.Strict
+
+-- import GHC.Utils.IO.Unsafe (inlinePerformIO)
+import GHC.Exts (State#, RealWorld, runRW# )
+import GHC.IO (IO(..))
+
+-- import System.Mem (getAllocationCounter)
+
+-- import Data.Array.IArray as U
+import Data.Array.MArray as M
+import Data.Array.IO as IOA
+import Data.IORef
 {-
 
     Note [Debugging Taggedness]
@@ -147,7 +162,8 @@ import System.IO.Unsafe
 
     I found that commonly 0CFA is represented as having distinct maps
     for variables and labels. We simply assign all occurences refering
-    to a variable the same label instead.
+    to a local variable the same "label" instead. Imported ids are still
+    referenced by the id's unique as these can't be shadowed.
 
     All node* functions have explicit documentation describing both how
     data flows between their inputs and outputs, as well as how new
@@ -920,25 +936,56 @@ instance Uniquable FlowNode where
 --       so could be pulled out if performance becomes an issue.
 data FlowState
     = FlowState
-    { fs_us :: !UniqSupply
-    , fs_idNodeMap :: !(UniqFM NodeId) -- ^ Map of imported id nodes (indexed by `Id`).
+    -- { fs_us :: !Int
+    { fs_idNodeMap :: !(UniqFM NodeId) -- ^ Map of imported id nodes (indexed by `Id`).
     , fs_uqNodeMap :: !(UniqFM FlowNode) -- ^ Transient results, index by `NodeId`
     , fs_doneNodes :: !(UniqFM FlowNode) -- ^ We can be sure these will no longer change, index by `NodeId`
     }
 
-type AM = State FlowState
+-- type AM = StateT FlowState IO
+
+newtype AM a = AM { runAM :: FlowState -> State# RealWorld
+                          -> (# a, FlowState, State# RealWorld #)
+                  } deriving Functor
+
+instance Applicative AM where
+   pure x   = AM $ \env s -> (# x, env, s #)
+   m <*> n  = AM $ \env s -> case runAM m env s of
+                            (# f, env', s' #) -> case runAM n env' s' of
+                                           (# x, env'', s'' #) -> (# f x, env'', s'' #)
+
+instance Monad AM where
+    m >>= n  = AM $ \env s -> case runAM m env s of
+                             (# r, env', s' #) -> runAM (n r) env' s'
+
+get :: AM FlowState
+get = AM $ \env s -> (# env, env, s #)
+
+put :: FlowState -> AM ()
+put !env = AM $ \_ s -> (# (), env, s #)
+
+evalAM :: FlowState -> AM a -> a
+evalAM env (AM f) = runRW# $ \s ->
+    case f env s of
+        (# x, _env', _s' #) -> x
+
+instance MonadIO AM where
+    liftIO (IO f) =
+        AM $ \env s ->
+            case f s of
+                (# s', !x #) -> (# x, env, s' #)
+
+
+-- TODO: Add to list in UniqSupply
+uniqueKey :: Char
+uniqueKey = 't'
 
 instance MonadUnique AM where
     getUniqueSupplyM = do
-        s <- get
-        let (us1,us2) = splitUniqSupply $ fs_us s
-        put $! s {fs_us = us1}
-        return us2
+        liftIO $! mkSplitUniqSupply uniqueKey
+
     getUniqueM = do
-        s <- get
-        let (!u,!us) = takeUniqFromSupply $! fs_us s
-        put $! s {fs_us = us}
-        return $ u
+        liftIO $! uniqFromMask uniqueKey
 
 isDone :: Bool
 isDone = True
@@ -988,7 +1035,7 @@ lookupNodeResult node_id = do
     let node = (lookupUFM (fs_uqNodeMap s) node_id <|>
                 lookupUFM (fs_doneNodes s) node_id)
     case node of
-        Nothing -> -- pprTraceM ("loopupNodeResult: Nothing\n" ++ prettyCallStack callStack) (ppr node_id) >>
+        Nothing -> pprTraceM ("lookpupNodeResult: Nothing\n" ++ prettyCallStack callStack) (ppr node_id) >>
                    return top
         Just n  -> return $! node_result n
 
@@ -1045,6 +1092,10 @@ getConArgNodeId ctxt (StgVarArg v )
 -- TODO: We could put the result into it's own map of NodeId -> EnterLattice
 --       or even an array. But that complicates the code somewhat and performance
 --       doesn't seem to be an issue currently.
+--
+-- TODO: We could remove the node_id field completely as well but an additional unused
+--       field seems to only increase allocations for *findTags* by ~0,3% allocations.
+--       So really just noice overall.
 data FlowNode
     = FlowNode
     { node_id :: {-# UNPACK  #-} !NodeId    -- ^ Node id
@@ -1205,18 +1256,23 @@ findTags :: Module -> UniqSupply -> [StgTopBinding] -> ([TgStgTopBinding], [(Id,
 findTags this_mod us binds =
     pprTrace "findTags" (ppr this_mod) $
     let state = FlowState {
-            fs_us = us,
+            -- fs_us = 0,
             fs_idNodeMap = mempty,
             fs_uqNodeMap = emptyUFM,
             fs_doneNodes = emptyUFM }
     -- Run the analysis
-        (!binds', exports) = (flip evalState) state $ do
+        analysis :: AM ([TgStgTopBinding], [(Id, EnterLattice)])
+        analysis = do
             addConstantNodes
-            (binds',mapping) <- nodesTopBinds this_mod binds
-            solveConstraints
-            exports <- exportTaggedness mapping
-            !finalBinds <- rewriteTopBinds binds'
+            (binds',mapping) <- {-# SCC "mkFlowNodes" #-}
+                                nodesTopBinds this_mod binds
+            {-# SCC "solveConstraints" #-}            solveConstraints
+            -- exports <- exportTaggedness mapping
+            exports <- return mempty -- Should probably remove this
+            !finalBinds <- {-# SCC "rewriteAST" #-}
+                           rewriteTopBinds binds'
             return (finalBinds, exports)
+        (!binds', exports) = evalAM state $ analysis
     in  (seqTopBinds binds') `seq`
             -- pprTrace "foundBinds" (ppr this_mod)
                 (binds',exports)
@@ -2241,13 +2297,44 @@ nodeApp this_mod ctxt expr@(StgApp _ f args) = do
     getRecursionKind (_ : todo) = getRecursionKind todo
 nodeApp _ _ _ = panic "Impossible"
 
-sccNodes :: [FlowNode] -> [FlowNode]
--- sccNodes in_nodes = in_nodes
-sccNodes in_nodes = reverse . map node_payload . topologicalSortG $ graphFromEdgedVerticesUniq vertices
+-- Dep-sorting nodes is good for performance.
+depSortNodes :: [FlowNode] -> [FlowNode]
+depSortNodes in_nodes = reverse . map node_payload . topologicalSortG $ graphFromEdgedVerticesUniq vertices
   where
     vertices = map mkVertex in_nodes :: [Node NodeId FlowNode]
     mkVertex :: FlowNode -> Node NodeId FlowNode
     mkVertex n = DigraphNode (n) (node_id n) (node_inputs n)
+
+type NodeArray = IOArray Int FlowNode
+type FlagArray = IOUArray Int Bool
+-- Dep-sorting nodes is good for performance.
+depSortNodesA :: [FlowNode] -> IO (IOArray Int FlowNode, IOUArray Int Bool)
+depSortNodesA in_nodes = mkArray
+  where
+    vertices = map mkVertex in_nodes :: [Node NodeId FlowNode]
+    mkVertex :: FlowNode -> Node NodeId FlowNode
+    mkVertex n = DigraphNode (n) (node_id n) (node_inputs n)
+
+    in_list = topologicalSortG $ graphFromEdgedVerticesUniq vertices
+    nodeCount = length in_nodes
+
+    mkArray = do
+        -- Sorted the wrong way around
+
+        arr <- newArray_ (0, nodeCount-1) :: IO (IOArray Int FlowNode)
+        revFillArray arr 0 in_list
+        -- Map indicating is the given node done?
+        flags <- newArray (0, nodeCount-1) False :: IO (IOUArray Int Bool)
+        return (arr, flags)
+
+    revFillArray arr i [] = return ()
+    revFillArray arr !i (x:xs) = do
+        -- TODO: Unsafe
+        writeArray arr (nodeCount - i) (node_payload x)
+        revFillArray arr (i+1) xs
+
+
+
 
 solveConstraints :: HasDebugCallStack => AM ()
 solveConstraints = do
@@ -2255,12 +2342,17 @@ solveConstraints = do
         -- doneCount <- sizeUFM . fs_doneNodes <$> get
 
         -- idList <- map snd . nonDetUFMToList . fs_idNodeMap <$> get
-        -- uqList <- map snd . nonDetUFMToList . fs_uqNodeMap <$> get
+        -- uqList <- map snd . nonDetUFMToList . fs_uqNodeMap <$> get :: AM [FlowNode]
         -- doneList <- map snd . nonDetUFMToList . fs_doneNodes <$> get
         -- -- mapM_ (pprTraceM "node:" . ppr) (idList ++ uqList ++ doneList)
         -- pprTraceM "Initial: (uqList, doneList)" (ppr (uqCount, doneCount))
         -- pprTraceM "IterateStart" empty
-        iterate 1
+
+        -- nodeArrs <- liftIO $ depSortNodesA uqList
+        todos <- fs_uqNodeMap <$> get
+        let !dep_sorted_nodes = {-# SCC "nodeSorting" #-}
+                                (depSortNodes . nonDetEltsUFM $ todos)
+        iterate dep_sorted_nodes (undefined,undefined) 1
         -- iterate (-11)
 
         -- uqCount <- sizeUFM . fs_uqNodeMap <$> get
@@ -2280,22 +2372,48 @@ solveConstraints = do
         -- mapM_ (pprTraceM "node:" . ppr) resultNodes
         return ()
   where
-    iterate :: Int -> AM ()
-    iterate n = do
+    iterate :: [FlowNode] -> (NodeArray,FlagArray) -> Int -> AM ()
+    iterate xs (arr, doneFlags) n = do
         -- pprTraceM "iterate - pass " (ppr n)
-        uqNodes <- fs_uqNodeMap <$> get
+        -- uqNodes <- fs_uqNodeMap <$> get
         -- return $! seqEltsUFM rnf uqNodes
         -- pprTraceM "IterateUndone:" $ ppr (sizeUFM uqNodes)
+        -- !a1 <- liftIO getAllocationCounter
+        -- let !dep_sorted_nodes = {-# SCC "nodeSorting" #-}
+        --                        (depSortNodes . nonDetEltsUFM $ uqNodes)
+        -- !a2 <- liftIO getAllocationCounter
+        -- pprTraceM "Sorting allocations:" (ppr $ (a2 - a1, a1))
 
-        progress <- or <$> (mapM update (sccNodes . nonDetEltsUFM $ uqNodes)) :: AM Bool
+        -- progress <- or <$> (mapM update dep_sorted_nodes) :: AM Bool
+
+        !change <- liftIO $ newIORef False
+        !xs' <- updates change False xs
+        progress <- liftIO $ readIORef change
+
         if (not progress)
             then return ()
             --max iterations
             else if (n > 5)
                 then -- pprTraceM "Warning:" (text "Aborting at" <+> ppr n <+> text "iterations") >>
                      return ()
-                else iterate (n+1)
+                else iterate xs' (arr,doneFlags) (n+1)
 
+    updates :: IORef Bool -> Bool -> [FlowNode] -> AM [FlowNode]
+    updates !_change _some_change [] = return []
+    updates change some_change (node:nodes) = do
+        !node_changed <- update node
+        -- Avoid a write if we can
+        when (not some_change && node_changed) $ do
+            liftIO $ writeIORef change True
+
+        node_done <- isMarkedDone (node_id node)
+        if node_done
+            then updates change (some_change || node_changed) nodes
+            else do
+                pure (node:) <*> updates change (some_change || node_changed) nodes
+
+
+    -- True <=> something changed.
     update :: FlowNode -> AM Bool
     update node = do
         let old_result = node_result node
