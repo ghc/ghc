@@ -24,7 +24,8 @@ bool isLoadStore(addr_t p);
 bool isAddSub(addr_t p);
 bool isVectorOp(addr_t p);
 int64_t decodeAddendAarch64(Section * section, Elf_Rel * rel) GNU_ATTRIBUTE(__noreturn__);
-bool encodeAddendAarch64(Section * section, Elf_Rel * rel, int64_t addend);
+bool encodeAddendAarch64(Section * section, Elf_Rel * rel, int64_t addend,
+                         ObjectCode * oc, ElfSymbol * symbol);
 
 bool isBranch(addr_t p) {
     return (*(addr_t*)p & 0xFC000000) == 0x14000000;
@@ -59,7 +60,8 @@ decodeAddendAarch64(Section * section __attribute__((unused)),
 }
 
 bool
-encodeAddendAarch64(Section * section, Elf_Rel * rel, int64_t addend) {
+encodeAddendAarch64(Section * section, Elf_Rel * rel, int64_t addend,
+                    ObjectCode * oc, ElfSymbol * symbol) {
     /* instructions are 32bit! */
     addr_t P = (addr_t)((uint8_t*)section->start + rel->r_offset);
     int exp_shift = -1;
@@ -95,7 +97,12 @@ encodeAddendAarch64(Section * section, Elf_Rel * rel, int64_t addend) {
             // imm64 = SignExtend(hi:lo:0x000,64)
             // Range is 21 bits + the 12 page relative bits
             // known to be 0. -2^32 <= X < 2^32
-            assert(isInt64(21+12, addend));
+            // assert(isInt64(21+12, addend));
+            if(!isInt64(21+12, addend)) {
+                barf("encodeAddendAarch64: %s (%s) can not be relocated.\n",
+                     OC_INFORMATIVE_FILENAME(oc), symbol->name);
+                assert(isInt64(21+12, addend));
+            }
             assert((addend & 0xfff) == 0); /* page relative */
 
             *(inst_t *)P = (*(inst_t *)P & 0x9f00001f)
@@ -303,7 +310,7 @@ relocateObjectCodeAarch64(ObjectCode * oc) {
             int64_t addend = decodeAddendAarch64(targetSection, rel);
 
             addend = computeAddend(targetSection, rel, symbol, addend);
-            encodeAddendAarch64(targetSection, rel, addend);
+            encodeAddendAarch64(targetSection, rel, addend, oc, symbol);
         }
     }
     for(ElfRelocationATable *relaTab = oc->info->relaTable;
@@ -330,7 +337,7 @@ relocateObjectCodeAarch64(ObjectCode * oc) {
 
             addend = computeAddend(targetSection, (Elf_Rel*)rel,
                                    symbol, addend);
-            encodeAddendAarch64(targetSection, (Elf_Rel*)rel, addend);
+            encodeAddendAarch64(targetSection, (Elf_Rel*)rel, addend, oc, symbol);
         }
     }
     return EXIT_SUCCESS;
