@@ -51,9 +51,9 @@ default ()
 --
 -- Invariant: 'IP' and 'IN' are used iff value doesn't fit in 'IS'
 data Integer
-   = IS !Int#    -- ^ iff value in @[minBound::'Int', maxBound::'Int']@ range
-   | IP !BigNat# -- ^ iff value in @]maxBound::'Int', +inf[@ range
-   | IN !BigNat# -- ^ iff value in @]-inf, minBound::'Int'[@ range
+   = IS !Int#   -- ^ iff value in @[minBound::'Int', maxBound::'Int']@ range
+   | IP !BigNat -- ^ iff value in @]maxBound::'Int', +inf[@ range
+   | IN !BigNat -- ^ iff value in @]-inf, minBound::'Int'[@ range
 
 
 -- | Check Integer invariants
@@ -79,8 +79,8 @@ integerOne = IS 1#
 ---------------------------------------------------------------------
 
 -- | Create a positive Integer from a BigNat
-integerFromBigNat# :: BigNat# -> Integer
-integerFromBigNat# !bn
+integerFromBigNat :: BigNat -> Integer
+integerFromBigNat !bn
    | bigNatIsZero bn
    = integerZero
 
@@ -91,8 +91,8 @@ integerFromBigNat# !bn
    = IP bn
 
 -- | Create a negative Integer from a BigNat
-integerFromBigNatNeg# :: BigNat# -> Integer
-integerFromBigNatNeg# !bn
+integerFromBigNatNeg :: BigNat -> Integer
+integerFromBigNatNeg !bn
    | bigNatIsZero bn
    = integerZero
 
@@ -105,22 +105,22 @@ integerFromBigNatNeg# !bn
    = IN bn
 
 -- | Create an Integer from a sign-bit and a BigNat
-integerFromBigNatSign# :: Int# -> BigNat# -> Integer
-integerFromBigNatSign# !sign !bn
+integerFromBigNatSign :: Int# -> BigNat -> Integer
+integerFromBigNatSign !sign !bn
    | 0# <- sign
-   = integerFromBigNat# bn
+   = integerFromBigNat bn
 
    | True
-   = integerFromBigNatNeg# bn
+   = integerFromBigNatNeg bn
 
 -- | Convert an Integer into a BigNat.
 --
 -- Return 0 for negative Integers.
-integerToBigNatClamp# :: Integer -> BigNat#
-integerToBigNatClamp# (IP x) = x
-integerToBigNatClamp# (IS x)
+integerToBigNatClamp :: Integer -> BigNat
+integerToBigNatClamp (IP x) = x
+integerToBigNatClamp (IS x)
    | isTrue# (x >=# 0#)     = bigNatFromWord# (int2Word# x)
-integerToBigNatClamp# _     = bigNatZero# void#
+integerToBigNatClamp _      = bigNatZero void#
 
 -- | Create an Integer from an Int#
 integerFromInt# :: Int# -> Integer
@@ -185,12 +185,12 @@ integerToWord !i = W# (integerToWord# i)
 integerFromNatural :: Natural -> Integer
 {-# NOINLINE integerFromNatural #-}
 integerFromNatural (NS x) = integerFromWord# x
-integerFromNatural (NB x) = integerFromBigNat# x
+integerFromNatural (NB x) = integerFromBigNat x
 
 -- | Convert a list of Word into an Integer
 integerFromWordList :: Bool -> [Word] -> Integer
-integerFromWordList True  ws = integerFromBigNatNeg# (bigNatFromWordList ws)
-integerFromWordList False ws = integerFromBigNat#    (bigNatFromWordList ws)
+integerFromWordList True  ws = integerFromBigNatNeg (bigNatFromWordList ws)
+integerFromWordList False ws = integerFromBigNat    (bigNatFromWordList ws)
 
 -- | Convert a Integer into a Natural
 --
@@ -200,7 +200,7 @@ integerToNaturalClamp :: Integer -> Natural
 integerToNaturalClamp (IS x)
    | isTrue# (x <# 0#) = naturalZero
    | True              = naturalFromWord# (int2Word# x)
-integerToNaturalClamp (IP x) = naturalFromBigNat# x
+integerToNaturalClamp (IP x) = naturalFromBigNat x
 integerToNaturalClamp (IN _) = naturalZero
 
 -- | Convert a Integer into a Natural
@@ -209,8 +209,8 @@ integerToNaturalClamp (IN _) = naturalZero
 integerToNatural :: Integer -> Natural
 {-# NOINLINE integerToNatural #-}
 integerToNatural (IS x) = naturalFromWord# (wordFromAbsInt# x)
-integerToNatural (IP x) = naturalFromBigNat# x
-integerToNatural (IN x) = naturalFromBigNat# x
+integerToNatural (IP x) = naturalFromBigNat x
+integerToNatural (IN x) = naturalFromBigNat x
 
 ---------------------------------------------------------------------
 -- Predicates
@@ -338,36 +338,36 @@ integerSub (IS x#) (IS y#)
       -> IP (bigNatFromWord# ( (int2Word# z#)))
 integerSub (IS x#) (IP y)
   | isTrue# (x# >=# 0#)
-  = integerFromBigNatNeg# (bigNatSubWordUnsafe# y (int2Word# x#))
+  = integerFromBigNatNeg (bigNatSubWordUnsafe# y (int2Word# x#))
   | True
   = IN (bigNatAddWord# y (int2Word# (negateInt# x#)))
 integerSub (IS x#) (IN y)
   | isTrue# (x# >=# 0#)
   = IP (bigNatAddWord# y (int2Word# x#))
   | True
-  = integerFromBigNat# (bigNatSubWordUnsafe# y (int2Word# (negateInt# x#)))
+  = integerFromBigNat (bigNatSubWordUnsafe# y (int2Word# (negateInt# x#)))
 integerSub (IP x) (IP y)
   = case bigNatCompare x y of
-    LT -> integerFromBigNatNeg# (bigNatSubUnsafe y x)
+    LT -> integerFromBigNatNeg (bigNatSubUnsafe y x)
     EQ -> IS 0#
-    GT -> integerFromBigNat# (bigNatSubUnsafe x y)
+    GT -> integerFromBigNat (bigNatSubUnsafe x y)
 integerSub (IP x) (IN y) = IP (bigNatAdd x y)
 integerSub (IN x) (IP y) = IN (bigNatAdd x y)
 integerSub (IN x) (IN y)
   = case bigNatCompare x y of
-    LT -> integerFromBigNat# (bigNatSubUnsafe y x)
+    LT -> integerFromBigNat (bigNatSubUnsafe y x)
     EQ -> IS 0#
-    GT -> integerFromBigNatNeg# (bigNatSubUnsafe x y)
+    GT -> integerFromBigNatNeg (bigNatSubUnsafe x y)
 integerSub (IP x) (IS y#)
   | isTrue# (y# >=# 0#)
-  = integerFromBigNat# (bigNatSubWordUnsafe# x (int2Word# y#))
+  = integerFromBigNat (bigNatSubWordUnsafe# x (int2Word# y#))
   | True
   = IP (bigNatAddWord# x (int2Word# (negateInt# y#)))
 integerSub (IN x) (IS y#)
   | isTrue# (y# >=# 0#)
   = IN (bigNatAddWord# x (int2Word# y#))
   | True
-  = integerFromBigNatNeg# (bigNatSubWordUnsafe# x (int2Word# (negateInt# y#)))
+  = integerFromBigNatNeg (bigNatSubWordUnsafe# x (int2Word# (negateInt# y#)))
 
 -- | Add two 'Integer's
 integerAdd :: Integer -> Integer -> Integer
@@ -386,17 +386,17 @@ integerAdd (IP x) (IP y) = IP (bigNatAdd x y)
 integerAdd (IN x) (IN y) = IN (bigNatAdd x y)
 integerAdd (IP x) (IS y#) -- edge-case: @(maxBound+1) + minBound == 0@
   | isTrue# (y# >=# 0#) = IP (bigNatAddWord# x (int2Word# y#))
-  | True                = integerFromBigNat# (bigNatSubWordUnsafe# x (int2Word#
+  | True                = integerFromBigNat (bigNatSubWordUnsafe# x (int2Word#
                                                               (negateInt# y#)))
 integerAdd (IN x) (IS y#) -- edge-case: @(minBound-1) + maxBound == -2@
-  | isTrue# (y# >=# 0#) = integerFromBigNatNeg# (bigNatSubWordUnsafe# x (int2Word# y#))
+  | isTrue# (y# >=# 0#) = integerFromBigNatNeg (bigNatSubWordUnsafe# x (int2Word# y#))
   | True                = IN (bigNatAddWord# x (int2Word# (negateInt# y#)))
 integerAdd y@(IN _) x@(IP _) = integerAdd x y
 integerAdd (IP x) (IN y)
     = case bigNatCompare x y of
-      LT -> integerFromBigNatNeg# (bigNatSubUnsafe y x)
+      LT -> integerFromBigNatNeg (bigNatSubUnsafe y x)
       EQ -> IS 0#
-      GT -> integerFromBigNat# (bigNatSubUnsafe x y)
+      GT -> integerFromBigNat (bigNatSubUnsafe x y)
 
 -- | Multiply two 'Integer's
 integerMul :: Integer -> Integer -> Integer
@@ -569,9 +569,9 @@ integerShiftR# (IS i)  n   = IS (iShiftRA# i (word2Int# n))
     iShiftRA# a b
       | isTrue# (b >=# WORD_SIZE_IN_BITS#) = (a <# 0#) *# (-1#)
       | True                               = a `uncheckedIShiftRA#` b
-integerShiftR# (IP bn) n   = integerFromBigNat# (bigNatShiftR# bn n)
+integerShiftR# (IP bn) n   = integerFromBigNat (bigNatShiftR# bn n)
 integerShiftR# (IN bn) n   =
-   case integerFromBigNatNeg# (bigNatShiftRNeg# bn n) of
+   case integerFromBigNatNeg (bigNatShiftRNeg# bn n) of
       IS 0# -> IS -1#
       r     -> r
 
@@ -588,8 +588,8 @@ integerShiftL# !x      0## = x
 integerShiftL# (IS 0#) _   = IS 0#
 integerShiftL# (IS 1#) n   = integerBit# n
 integerShiftL# (IS i)  n
-  | isTrue# (i >=# 0#) = integerFromBigNat#    (bigNatShiftL# (bigNatFromWord# (int2Word# i)) n)
-  | True               = integerFromBigNatNeg# (bigNatShiftL# (bigNatFromWord# (int2Word# (negateInt# i))) n)
+  | isTrue# (i >=# 0#) = integerFromBigNat    (bigNatShiftL# (bigNatFromWord# (int2Word# i)) n)
+  | True               = integerFromBigNatNeg (bigNatShiftL# (bigNatFromWord# (int2Word# (negateInt# i))) n)
 integerShiftL# (IP bn) n   = IP (bigNatShiftL# bn n)
 integerShiftL# (IN bn) n   = IN (bigNatShiftL# bn n)
 
@@ -613,8 +613,8 @@ integerOr a b = case a of
                IS -1# -> IS -1#
                IS  y  -> IS (orI# x y)
                IP  y
-                  | isTrue# (x >=# 0#) -> integerFromBigNat# (bigNatOrWord# y (int2Word# x))
-                  | True               -> integerFromBigNatNeg#
+                  | isTrue# (x >=# 0#) -> integerFromBigNat (bigNatOrWord# y (int2Word# x))
+                  | True               -> integerFromBigNatNeg
                                              (bigNatAddWord#
                                                 (bigNatAndNot -- use De Morgan's laws
                                                    (bigNatFromWord#
@@ -622,13 +622,13 @@ integerOr a b = case a of
                                                    y)
                                                 1##)
                IN y
-                  | isTrue# (x >=# 0#) -> integerFromBigNatNeg#
+                  | isTrue# (x >=# 0#) -> integerFromBigNatNeg
                                              (bigNatAddWord#
                                                 (bigNatAndNotWord# -- use De Morgan's laws
                                                    (bigNatSubWordUnsafe# y 1##)
                                                    (int2Word# x))
                                                 1##)
-                  | True               -> integerFromBigNatNeg#
+                  | True               -> integerFromBigNatNeg
                                              (bigNatAddWord#
                                                 (bigNatAndWord#  -- use De Morgan's laws
                                                    (bigNatSubWordUnsafe# y 1##)
@@ -636,8 +636,8 @@ integerOr a b = case a of
                                                 1##)
    IP  x  -> case b of
                IS _ -> integerOr b a
-               IP y -> integerFromBigNat# (bigNatOr x y)
-               IN y -> integerFromBigNatNeg#
+               IP y -> integerFromBigNat (bigNatOr x y)
+               IN y -> integerFromBigNatNeg
                         (bigNatAddWord#
                            (bigNatAndNot -- use De Morgan's laws
                               (bigNatSubWordUnsafe# y 1##)
@@ -645,13 +645,13 @@ integerOr a b = case a of
                            1##)
    IN  x  -> case b of
                IS _ -> integerOr b a
-               IN y -> integerFromBigNatNeg#
+               IN y -> integerFromBigNatNeg
                         (bigNatAddWord#
                            (bigNatAnd  -- use De Morgan's laws
                               (bigNatSubWordUnsafe# x 1##)
                               (bigNatSubWordUnsafe# y 1##))
                            1##)
-               IP y -> integerFromBigNatNeg#
+               IP y -> integerFromBigNatNeg
                         (bigNatAddWord#
                            (bigNatAndNot -- use De Morgan's laws
                               (bigNatSubWordUnsafe# x 1##)
@@ -672,28 +672,28 @@ integerXor a b = case a of
                IS -1# -> integerComplement a
                IS y   -> IS (xorI# x y)
                IP y
-                  | isTrue# (x >=# 0#) -> integerFromBigNat# (bigNatXorWord# y (int2Word# x))
-                  | True               -> integerFromBigNatNeg#
+                  | isTrue# (x >=# 0#) -> integerFromBigNat (bigNatXorWord# y (int2Word# x))
+                  | True               -> integerFromBigNatNeg
                                              (bigNatAddWord#
                                                 (bigNatXorWord#
                                                    y
                                                    (int2Word# (negateInt# x) `minusWord#` 1##))
                                                 1##)
                IN y
-                  | isTrue# (x >=# 0#) -> integerFromBigNatNeg#
+                  | isTrue# (x >=# 0#) -> integerFromBigNatNeg
                                              (bigNatAddWord#
                                                 (bigNatXorWord#
                                                    (bigNatSubWordUnsafe# y 1##)
                                                    (int2Word# x))
                                                 1##)
-                  | True               -> integerFromBigNat#
+                  | True               -> integerFromBigNat
                                              (bigNatXorWord# -- xor (not x) (not y) = xor x y
                                                 (bigNatSubWordUnsafe# y 1##)
                                                 (int2Word# (negateInt# x) `minusWord#` 1##))
    IP x   -> case b of
                IS _ -> integerXor b a
-               IP y -> integerFromBigNat# (bigNatXor x y)
-               IN y -> integerFromBigNatNeg#
+               IP y -> integerFromBigNat (bigNatXor x y)
+               IN y -> integerFromBigNatNeg
                         (bigNatAddWord#
                            (bigNatXor
                               x
@@ -701,11 +701,11 @@ integerXor a b = case a of
                            1##)
    IN x   -> case b of
                IS _ -> integerXor b a
-               IN y -> integerFromBigNat#
+               IN y -> integerFromBigNat
                         (bigNatXor -- xor (not x) (not y) = xor x y
                            (bigNatSubWordUnsafe# x 1##)
                            (bigNatSubWordUnsafe# y 1##))
-               IP y -> integerFromBigNatNeg#
+               IP y -> integerFromBigNatNeg
                         (bigNatAddWord#
                            (bigNatXor
                               y
@@ -726,10 +726,10 @@ integerAnd a b = case a of
                IS  0# -> IS 0#
                IS -1# -> a
                IS y   -> IS (andI# x y)
-               IP y   -> integerFromBigNat# (bigNatAndInt# y x)
+               IP y   -> integerFromBigNat (bigNatAndInt# y x)
                IN y
                   | isTrue# (x >=# 0#) -> integerFromWord# (int2Word# x `andNot#` (indexWordArray# y 0# `minusWord#` 1##))
-                  | True               -> integerFromBigNatNeg#
+                  | True               -> integerFromBigNatNeg
                                              (bigNatAddWord#
                                                 (bigNatOrWord#  -- use De Morgan's laws
                                                    (bigNatSubWordUnsafe# y 1##)
@@ -737,17 +737,17 @@ integerAnd a b = case a of
                                                 1##)
    IP x   -> case b of
                IS _ -> integerAnd b a
-               IP y -> integerFromBigNat# (bigNatAnd x y)
-               IN y -> integerFromBigNat# (bigNatAndNot x (bigNatSubWordUnsafe# y 1##))
+               IP y -> integerFromBigNat (bigNatAnd x y)
+               IN y -> integerFromBigNat (bigNatAndNot x (bigNatSubWordUnsafe# y 1##))
    IN x   -> case b of
                IS _ -> integerAnd b a
-               IN y -> integerFromBigNatNeg#
+               IN y -> integerFromBigNatNeg
                         (bigNatAddWord#
                            (bigNatOr  -- use De Morgan's laws
                               (bigNatSubWordUnsafe# x 1##)
                               (bigNatSubWordUnsafe# y 1##))
                            1##)
-               IP y -> integerFromBigNat# (bigNatAndNot y (bigNatSubWordUnsafe# x 1##))
+               IP y -> integerFromBigNat (bigNatAndNot y (bigNatSubWordUnsafe# x 1##))
 
 
 
@@ -774,23 +774,23 @@ integerQuotRem# (IS 0#) _       = (# IS 0#, IS 0# #)
 integerQuotRem# (IS n#) (IS d#) = case quotRemInt# n# d# of
     (# q#, r# #) -> (# IS q#, IS r# #)
 integerQuotRem# (IP n)  (IP d)  = case bigNatQuotRem# n d of
-    (# q, r #) -> (# integerFromBigNat# q, integerFromBigNat# r #)
+    (# q, r #) -> (# integerFromBigNat q, integerFromBigNat r #)
 integerQuotRem# (IP n)  (IN d)  = case bigNatQuotRem# n d of
-    (# q, r #) -> (# integerFromBigNatNeg# q, integerFromBigNat# r #)
+    (# q, r #) -> (# integerFromBigNatNeg q, integerFromBigNat r #)
 integerQuotRem# (IN n)  (IN d)  = case bigNatQuotRem# n d of
-    (# q, r #) -> (# integerFromBigNat# q, integerFromBigNatNeg# r #)
+    (# q, r #) -> (# integerFromBigNat q, integerFromBigNatNeg r #)
 integerQuotRem# (IN n)  (IP d)  = case bigNatQuotRem# n d of
-    (# q, r #) -> (# integerFromBigNatNeg# q, integerFromBigNatNeg# r #)
+    (# q, r #) -> (# integerFromBigNatNeg q, integerFromBigNatNeg r #)
 integerQuotRem# (IP n)  (IS d#)
   | isTrue# (d# >=# 0#) = case bigNatQuotRemWord# n (int2Word# d#) of
-      (# q, r# #) -> (# integerFromBigNat# q, integerFromWord# r# #)
+      (# q, r# #) -> (# integerFromBigNat q, integerFromWord# r# #)
   | True                = case bigNatQuotRemWord# n (int2Word# (negateInt# d#)) of
-      (# q, r# #) -> (# integerFromBigNatNeg# q, integerFromWord# r# #)
+      (# q, r# #) -> (# integerFromBigNatNeg q, integerFromWord# r# #)
 integerQuotRem# (IN n)  (IS d#)
   | isTrue# (d# >=# 0#) = case bigNatQuotRemWord# n (int2Word# d#) of
-      (# q, r# #) -> (# integerFromBigNatNeg# q, integerFromWordNeg# r# #)
+      (# q, r# #) -> (# integerFromBigNatNeg q, integerFromWordNeg# r# #)
   | True                = case bigNatQuotRemWord# n (int2Word# (negateInt# d#)) of
-      (# q, r# #) -> (# integerFromBigNat# q, integerFromWordNeg# r# #)
+      (# q, r# #) -> (# integerFromBigNat q, integerFromWordNeg# r# #)
 integerQuotRem# n@(IS _) (IN _) = (# IS 0#, n #) -- since @n < d@
 integerQuotRem# n@(IS n#) (IP d) -- need to account for (IS minBound)
     | isTrue# (n# ># 0#)                                    = (# IS 0#, n #)
@@ -814,17 +814,17 @@ integerQuot !_      (IS 0#)  = raiseDivZero
 integerQuot (IS 0#) _        = IS 0#
 integerQuot (IS n#) (IS d#)  = IS (quotInt# n# d#)
 integerQuot (IP n)  (IS d#)
-  | isTrue# (d# >=# 0#) = integerFromBigNat#    (bigNatQuotWord# n (int2Word# d#))
-  | True                = integerFromBigNatNeg# (bigNatQuotWord# n
+  | isTrue# (d# >=# 0#) = integerFromBigNat    (bigNatQuotWord# n (int2Word# d#))
+  | True                = integerFromBigNatNeg (bigNatQuotWord# n
                                               (int2Word# (negateInt# d#)))
 integerQuot (IN n)   (IS d#)
-  | isTrue# (d# >=# 0#) = integerFromBigNatNeg# (bigNatQuotWord# n (int2Word# d#))
-  | True                = integerFromBigNat#    (bigNatQuotWord# n
+  | isTrue# (d# >=# 0#) = integerFromBigNatNeg (bigNatQuotWord# n (int2Word# d#))
+  | True                = integerFromBigNat    (bigNatQuotWord# n
                                               (int2Word# (negateInt# d#)))
-integerQuot (IP n) (IP d) = integerFromBigNat#    (bigNatQuot n d)
-integerQuot (IP n) (IN d) = integerFromBigNatNeg# (bigNatQuot n d)
-integerQuot (IN n) (IP d) = integerFromBigNatNeg# (bigNatQuot n d)
-integerQuot (IN n) (IN d) = integerFromBigNat#    (bigNatQuot n d)
+integerQuot (IP n) (IP d) = integerFromBigNat    (bigNatQuot n d)
+integerQuot (IP n) (IN d) = integerFromBigNatNeg (bigNatQuot n d)
+integerQuot (IN n) (IP d) = integerFromBigNatNeg (bigNatQuot n d)
+integerQuot (IN n) (IN d) = integerFromBigNat    (bigNatQuot n d)
 integerQuot n d = case integerQuotRem# n d of (# q, _ #) -> q
 
 integerRem :: Integer -> Integer -> Integer
@@ -838,10 +838,10 @@ integerRem (IP n)  (IS d#)
     = integerFromWord#    (bigNatRemWord# n (int2Word# (absI# d#)))
 integerRem (IN n)  (IS d#)
     = integerFromWordNeg# (bigNatRemWord# n (int2Word# (absI# d#)))
-integerRem (IP n)  (IP d)  = integerFromBigNat#    (bigNatRem n d)
-integerRem (IP n)  (IN d)  = integerFromBigNat#    (bigNatRem n d)
-integerRem (IN n)  (IP d)  = integerFromBigNatNeg# (bigNatRem n d)
-integerRem (IN n)  (IN d)  = integerFromBigNatNeg# (bigNatRem n d)
+integerRem (IP n)  (IP d)  = integerFromBigNat    (bigNatRem n d)
+integerRem (IP n)  (IN d)  = integerFromBigNat    (bigNatRem n d)
+integerRem (IN n)  (IP d)  = integerFromBigNatNeg (bigNatRem n d)
+integerRem (IN n)  (IN d)  = integerFromBigNatNeg (bigNatRem n d)
 integerRem n d = case integerQuotRem# n d of (# _, r #) -> r
 
 
@@ -898,8 +898,8 @@ integerGcd (IS a)   (IS b)   = integerFromWord# (gcdWord#
                                  (int2Word# (absI# b)))
 integerGcd a@(IS _) b        = integerGcd b a
 integerGcd (IN a)   b        = integerGcd (IP a) b
-integerGcd (IP a)   (IP b)   = integerFromBigNat# (bigNatGcd a b)
-integerGcd (IP a)   (IN b)   = integerFromBigNat# (bigNatGcd a b)
+integerGcd (IP a)   (IP b)   = integerFromBigNat (bigNatGcd a b)
+integerGcd (IP a)   (IN b)   = integerFromBigNat (bigNatGcd a b)
 integerGcd (IP a)   (IS b)   = integerFromWord# (bigNatGcdWord# a (int2Word# (absI# b)))
 
 -- | Compute least common multiple.
@@ -1107,7 +1107,7 @@ integerToAddr a addr e = IO \s -> case integerToAddr# a addr e s of
 integerFromAddr# :: Word# -> Addr# -> Bool# -> State# s -> (# State# s, Integer #)
 integerFromAddr# sz addr e s =
    case bigNatFromAddr# sz addr e s of
-      (# s', n #) -> (# s', integerFromBigNat# n #)
+      (# s', n #) -> (# s', integerFromBigNat n #)
 
 -- | Read an 'Integer' (without sign) in base-256 representation from an Addr#.
 --
@@ -1155,7 +1155,7 @@ integerToMutableByteArray i mba w e = IO \s -> case integerToMutableByteArray# i
 -- Null higher limbs are automatically trimed.
 integerFromByteArray# :: Word# -> ByteArray# -> Word# -> Bool# -> State# s -> (# State# s, Integer #)
 integerFromByteArray# sz ba off e s = case bigNatFromByteArray# sz ba off e s of
-   (# s', a #) -> (# s', integerFromBigNat# a #)
+   (# s', a #) -> (# s', integerFromBigNat a #)
 
 -- | Read an 'Integer' (without sign) in base-256 representation from a ByteArray#.
 --
