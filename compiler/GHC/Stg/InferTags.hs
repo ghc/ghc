@@ -18,8 +18,6 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE DeriveFunctor #-}
 
 {-# OPTIONS_GHC -O2 -ddump-simpl -ddump-to-file -ddump-stg -ddump-cmm -ddump-asm #-}
 
@@ -54,7 +52,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set (nonDetEltsUniqSet)
 import GHC.Utils.Misc
--- import GHC.Utils.Monad.State -- See Note [Useless Bangs]
+import GHC.Utils.Monad.State -- See Note [Useless Bangs]
 import GHC.Data.Maybe
 
 import GHC.Utils.Monad
@@ -67,13 +65,7 @@ import GHC.Data.Graph.Directed
 import GHC.Types.Var.Env
 
 -- Fast comparisons
-import GHC.Exts (reallyUnsafePtrEquality#, isTrue#, State#(..), runRW#, RealWorld )
-
-import GHC.IO (IO(..))
-import GHC.Utils.IO.Unsafe
--- Stateful IO Monad
--- import GHC.Types (IO(..))
--- import GHC.Prim (State#(..))
+import GHC.Exts (reallyUnsafePtrEquality#, isTrue#)
 
 -- Used for dumping nodes with -ddump-stg-tag-nodes
 import GHC.Driver.Session
@@ -921,54 +913,22 @@ instance NFData NodeId where
 instance Uniquable NodeId where
     getUnique = nid_unique
 
-instance Uniquable (FlowNode s) where
+instance Uniquable FlowNode where
     getUnique = getUnique . node_id
 
 -- TODO: The UniqSupply is only used during creation of the data flow nodes
 --       so could be pulled out if performance becomes an issue.
-data FlowState s
+data FlowState
     = FlowState
     { fs_us :: !UniqSupply
     , fs_idNodeMap :: !(UniqFM NodeId) -- ^ Map of imported id nodes (indexed by `Id`).
-    , fs_uqNodeMap :: !(UniqFM (FlowNode s)) -- ^ Transient results, index by `NodeId`
-    , fs_doneNodes :: !(UniqFM (FlowNode s)) -- ^ We can be sure these will no longer change, index by `NodeId`
+    , fs_uqNodeMap :: !(UniqFM FlowNode) -- ^ Transient results, index by `NodeId`
+    , fs_doneNodes :: !(UniqFM FlowNode) -- ^ We can be sure these will no longer change, index by `NodeId`
     }
 
--- type AM = State FlowState
+type AM = State FlowState
 
-newtype AM s a = AM { runAM :: FlowState s
-                            -> State# s
-                            -> (# a, FlowState s, State# s #)
-                    } deriving (Functor)
-
-finishAM :: AM s a -> a
-finishAM (AM f) =
-    case (f (FlowState undefined mempty mempty mempty)) (State# RealWorld) of
-        (# x, _, _ #) -> x
-
-
-instance Applicative (AM s) where
-    pure !x = AM $ \env s -> (# x, env, s #)
-    AM m <*> AM n =
-        AM $ \env s -> case m env s of
-            (# f, env', s' #) -> case n env' s' of
-                (# x, env'', s'' #) ->
-                    let !x' = f x in (# x', env'', s'' #)
-
-instance Monad (AM s) where
-    m >>= f =
-        AM $ \env s ->
-            case (runAM m) env s of
-                (# !x, !env', s' #) -> runAM (f x) env' s'
-
-get :: AM s (FlowState s)
-get = AM $ \env s -> (# env, env, s #)
-
-put env = AM $ \env s -> (# (), env, s #)
-
-set = undefined
-
-instance MonadUnique (AM s) where
+instance MonadUnique AM where
     getUniqueSupplyM = do
         s <- get
         let (us1,us2) = splitUniqSupply $ fs_us s
@@ -986,7 +946,7 @@ notDone :: Bool
 notDone = False
 
 -- | Add new node, maybe mark it done.
-addNode :: Bool -> FlowNode s -> AM s ()
+addNode :: Bool -> FlowNode -> AM ()
 addNode done node = do
     s <- get
     if done
@@ -997,23 +957,23 @@ addNode done node = do
             put $! s { fs_uqNodeMap = addToUFM (fs_uqNodeMap s) node node }
 
 -- | Move the node from the updateable to the finished set
-markDone :: FlowNode s -> AM s ()
+markDone :: FlowNode -> AM ()
 markDone node = do
     addNode isDone node
 
 -- | Pessimistic check, defaulting to False when it's not clear.
-isMarkedDone :: HasDebugCallStack => NodeId -> AM s Bool
+isMarkedDone :: HasDebugCallStack => NodeId -> AM Bool
 isMarkedDone id = do
     s <- get
     return $! elemUFM id (fs_doneNodes s)
 
-updateNodeResult :: NodeId -> EnterLattice -> AM s ()
+updateNodeResult :: NodeId -> EnterLattice -> AM ()
 updateNodeResult id result = do
     node <- (getNode id)
     addNode notDone (node {node_result = result})
 
 
-getNode :: HasDebugCallStack => NodeId -> AM s (FlowNode s)
+getNode :: HasDebugCallStack => NodeId -> AM FlowNode
 getNode node_id = do
     s <- get
     return $! fromMaybe
@@ -1022,7 +982,7 @@ getNode node_id = do
 
 
 -- TODO: Can we make sure we never try to query non-existing nodes?
-lookupNodeResult :: HasDebugCallStack => NodeId -> AM s EnterLattice
+lookupNodeResult :: HasDebugCallStack => NodeId -> AM EnterLattice
 lookupNodeResult node_id = do
     s <- get
     let node = (lookupUFM (fs_uqNodeMap s) node_id <|>
@@ -1074,7 +1034,7 @@ TODO: This could be done, at the expense of compile time. Figure out of it's wor
 -- | If we use a *function* as an unapplied argument to a constructor we throw
 -- away nested information and make do with NeverEnter Top for now.
 -- See Note [Field information of function ids]
-getConArgNodeId :: HasDebugCallStack => [SynContext] -> StgArg -> AM s NodeId
+getConArgNodeId :: HasDebugCallStack => [SynContext] -> StgArg -> AM NodeId
 getConArgNodeId _    (StgLitArg _ ) = return litNodeId
 getConArgNodeId ctxt (StgVarArg v )
     | isFunTy (unwrapType $ idType v)
@@ -1085,33 +1045,33 @@ getConArgNodeId ctxt (StgVarArg v )
 -- TODO: We could put the result into it's own map of NodeId -> EnterLattice
 --       or even an array. But that complicates the code somewhat and performance
 --       doesn't seem to be an issue currently.
-data FlowNode s
+data FlowNode
     = FlowNode
     { node_id :: {-# UNPACK  #-} !NodeId    -- ^ Node id
     , node_inputs :: [NodeId]               -- ^ Input dependencies
     , node_result :: !(EnterLattice)        -- ^ Cached result
-    , node_update :: (AM s EnterLattice)      -- ^ Calculates a new value for the node
+    , node_update :: (AM EnterLattice)      -- ^ Calculates a new value for the node
                                             -- AND updates the value in the environment.
 #if defined(WITH_NODE_DESC)
     , _node_desc :: SDoc -- ^ Debugging purposes
 #endif
     }
 
-set_desc :: FlowNode s -> SDoc -> FlowNode s
+set_desc :: FlowNode -> SDoc -> FlowNode
 #if defined(WITH_NODE_DESC)
 set_desc n desc = n { _node_desc = desc}
 #else
 set_desc n _ = n
 #endif
 
-node_desc :: FlowNode s -> SDoc
+node_desc :: FlowNode -> SDoc
 #if defined(WITH_NODE_DESC)
 node_desc n = _node_desc n
 #else
 node_desc _n = empty
 #endif
 
-instance NFData (FlowNode s) where
+instance NFData FlowNode where
     rnf (   FlowNode
                 { node_id = _
                 , node_inputs = node_inputs
@@ -1123,7 +1083,7 @@ instance NFData (FlowNode s) where
 #endif
                 })  = deepseq (node_inputs,node_result) ()
 
-instance Outputable (FlowNode s) where
+instance Outputable FlowNode where
     ppr node =
         hang
             (text "node_" <> pprId node <-> pprDone node <-> (node_desc node) )
@@ -1190,10 +1150,6 @@ instance Outputable SynContext where
     ppr (CLetBody id lne)     = text "CLetBody"    <> ppr lne <> ppr id
 
 -- | Is the given id mapped to a data flow node by it's context?
---
--- Ideally we could just have a map from Id -> NodeId.
--- Sadly there might be shadowing at this point so instead
--- we are stuck doing this dance.
 idMappedInCtxt :: Id -> [SynContext] -> Maybe NodeId
 idMappedInCtxt id ctxt
     = go ctxt
@@ -1207,13 +1163,12 @@ idMappedInCtxt id ctxt
 
 -- | Lub like operator between all input nodes
 -- See Note [The lattice element combinators]
-mkJoinNode :: forall s. [NodeId] -> AM s NodeId
+mkJoinNode :: [NodeId] -> AM NodeId
 mkJoinNode []     = return unknownNodeId
 mkJoinNode [node] = return node
 mkJoinNode inputs = do
     node_id <- mkUniqueId
-    let updater :: AM s EnterLattice
-        updater = do
+    let updater = do
             input_results <- mapM lookupNodeResult inputs
             let result = foldl1' combineLattices input_results
             if isFinalValue result
@@ -1223,7 +1178,7 @@ mkJoinNode inputs = do
                 else updateNodeResult node_id result
             return $! result
 
-    addNode notDone $ FlowNode s { node_id = node_id, node_result = top
+    addNode notDone $ FlowNode { node_id = node_id, node_result = top
                        , node_inputs = inputs -- , node_done = False
                        , node_update = updater
 #if defined(WITH_NODE_DESC)
@@ -1257,12 +1212,12 @@ findTags this_mod us binds =
     -- Run the analysis
         (!binds', exports) = (flip evalState) state $ do
             addConstantNodes
-            (binds',mapping) <- {-# SCC "MkFlowGraph" #-} nodesTopBinds this_mod binds
-            {-# SCC "SolveConstraints" #-} solveConstraints
-            exports <- return mempty -- exportTaggedness mapping
-            !finalBinds <- {-# SCC "RewriteAST" #-} rewriteTopBinds binds'
+            (binds',mapping) <- nodesTopBinds this_mod binds
+            solveConstraints
+            exports <- exportTaggedness mapping
+            !finalBinds <- rewriteTopBinds binds'
             return (finalBinds, exports)
-    in  {-# SCC "SeqResult" #-} (seqTopBinds binds') `seq`
+    in  (seqTopBinds binds') `seq`
             -- pprTrace "foundBinds" (ppr this_mod)
                 (binds',exports)
 
@@ -1299,7 +1254,7 @@ findTags this_mod us binds =
 -- passAlt (altCon, bndrs, rhs) = (altCon, bndrs, passExpr rhs)
 
 -- Constant mappings
-addConstantNodes :: AM s ()
+addConstantNodes :: AM ()
 addConstantNodes = do
     markDone litNode
     markDone $ mkConstNode undetNodeId top
@@ -1309,9 +1264,9 @@ addConstantNodes = do
     markDone $ mkConstNode alwaysNodeId (flatLattice AlwaysEnter)
 
 
-mkConstNode :: NodeId -> EnterLattice -> FlowNode s
+mkConstNode :: NodeId -> EnterLattice -> FlowNode
 mkConstNode id !val =
-    FlowNode s
+    FlowNode
     { node_id = id
     , node_inputs = []
     --, node_done = True
@@ -1333,7 +1288,7 @@ maybeNodeId     = NodeId $ mkUnique 'c' 6
 alwaysNodeId    = NodeId $ mkUnique 'c' 7
 
 
-litNode :: FlowNode s
+litNode :: FlowNode
 litNode =
     (mkConstNode litNodeId (flatLattice NeverEnter))
 #if defined(WITH_NODE_DESC)
@@ -1396,7 +1351,7 @@ monad and adds it to a map of ids which maps Id -> NodeId.
 -}
 
 -- See Note [Shadowing and NodeIds]
-mkIdNodeId :: HasDebugCallStack => [SynContext] -> Id -> AM s NodeId
+mkIdNodeId :: HasDebugCallStack => [SynContext] -> Id -> AM NodeId
 mkIdNodeId ctxt id
     | Just node <- idMappedInCtxt id ctxt
     = return $! node
@@ -1412,7 +1367,7 @@ mkLocalIdNodeId ctxt id
     = node
     | otherwise = pprPanic "Local id not mapped:" (ppr id)
 
-mkUniqueId :: AM s NodeId
+mkUniqueId :: AM NodeId
 mkUniqueId = NodeId <$> getUniqueM
 
 
@@ -1421,7 +1376,7 @@ mkUniqueId = NodeId <$> getUniqueM
 -- | This adds nodes with information we can figure out about imported ids into the env.
 --   Mimics somewhat what we do in StgCmmClosure.hs:mkLFImported
 --   See also Note [Imported Ids]
-addImportedNode :: Module -> Id -> AM s ()
+addImportedNode :: Module -> Id -> AM ()
 addImportedNode this_mod id
     -- Local id, it has to be mapped to an id via SynContext
     | nameIsLocalOrFrom this_mod (idName id) = return ()
@@ -1489,7 +1444,7 @@ addImportedNode this_mod id
     isFun = isFunTy (unwrapType $ idType id)
 
 -- | Returns the nodeId for a given imported Id.
-importedFuncNode_Maybe :: Module -> Id -> AM s (Maybe NodeId)
+importedFuncNode_Maybe :: Module -> Id -> AM (Maybe NodeId)
 importedFuncNode_Maybe this_mod var_id
     -- Not an imported function
     | nameIsLocalOrFrom this_mod (idName var_id)
@@ -1500,7 +1455,7 @@ importedFuncNode_Maybe this_mod var_id
             Just node_id -> return $! Just node_id
             Nothing -> pprPanic "Imported id not mapped" (ppr var_id)
 
-mkCtxtEntry :: [SynContext] -> Id -> AM s (Id,NodeId)
+mkCtxtEntry :: [SynContext] -> Id -> AM (Id,NodeId)
 mkCtxtEntry ctxt v
     | Just nodeId <- idMappedInCtxt v ctxt
     = return $! (v,nodeId)
@@ -1510,18 +1465,18 @@ mkCtxtEntry ctxt v
         return $! (v, node_id)
 
 {-# NOINLINE nodesTopBinds #-}
-nodesTopBinds :: Module -> [StgTopBinding] -> AM s ([InferStgTopBinding], [(Id,NodeId)])
+nodesTopBinds :: Module -> [StgTopBinding] -> AM ([InferStgTopBinding], [(Id,NodeId)])
 nodesTopBinds this_mod binds = do
     let top_level_binds = mkVarSet (bindersOfTopBinds binds) :: IdSet
     -- We preallocate node ids for the case where we must reference an node by id
     -- before we traversed the defining binding.
     let bind_ids = (nonDetEltsUniqSet top_level_binds)
-    mappings <- mapM (mkCtxtEntry [CNone]) bind_ids :: AM s [(Id,NodeId)]
+    mappings <- mapM (mkCtxtEntry [CNone]) bind_ids :: AM [(Id,NodeId)]
     let topCtxt = CTopLevel $ mkVarEnv mappings
     binds' <- mapM (nodesTop this_mod topCtxt) binds
     return (binds', mappings)
 
-nodesTop :: Module -> SynContext -> StgTopBinding -> AM s InferStgTopBinding
+nodesTop :: Module -> SynContext -> StgTopBinding -> AM InferStgTopBinding
 nodesTop _this_mod ctxt (StgTopStringLit v str) = do
     -- String literals are never entered.
     let node_id = mkLocalIdNodeId [ctxt] v
@@ -1530,12 +1485,12 @@ nodesTop _this_mod ctxt (StgTopStringLit v str) = do
     markDone node
     return $! (StgTopStringLit v str)
 nodesTop this_mod ctxt (StgTopLifted bind)  = do
-    bind' <- fst <$> nodesBind this_mod [ctxt] TopLevel NotLNE bind :: AM s InferStgBinding
+    bind' <- fst <$> nodesBind this_mod [ctxt] TopLevel NotLNE bind :: AM InferStgBinding
     return $! (StgTopLifted bind')
 
 -- nodesBind creates the nodeIds for the bound rhs, the actual nodes are created in
 -- nodeRhs. Returns the context including the let
-nodesBind :: Module -> [SynContext] -> TopLevelFlag -> IsLNE -> StgBinding -> AM s (InferStgBinding, [SynContext])
+nodesBind :: Module -> [SynContext] -> TopLevelFlag -> IsLNE -> StgBinding -> AM (InferStgBinding, [SynContext])
 nodesBind this_mod ctxt bot lne (StgNonRec v rhs) = do
     boundId <- uncurry unitVarEnv <$> mkCtxtEntry ctxt v
     let ctxt' = ((CLet boundId lne):ctxt)
@@ -1543,7 +1498,7 @@ nodesBind this_mod ctxt bot lne (StgNonRec v rhs) = do
     return $! (StgNonRec v rhs', (CLetBody boundId lne):ctxt)
 nodesBind this_mod ctxt bot lne (StgRec binds) = do
     let ids = map fst binds
-    boundIds <- mkVarEnv <$> mapM (mkCtxtEntry ctxt) ids :: AM s (VarEnv NodeId)
+    boundIds <- mkVarEnv <$> mapM (mkCtxtEntry ctxt) ids :: AM (VarEnv NodeId)
     let ctxt' = (CLetRec boundIds lne) : ctxt
     rhss' <- mapM (uncurry (nodeRhs this_mod ctxt' bot )) binds
     return $! (StgRec $ zip ids rhss', CLetRecBody boundIds lne: ctxt)
@@ -1648,7 +1603,7 @@ wrappting it in a seq is of little consequence.
 --  the rule for the rhs tag to flow to the id
 nodeRhs :: HasDebugCallStack => Module -> [SynContext] -> TopLevelFlag
         -> Id -> StgRhs
-        -> AM s (InferStgRhs)
+        -> AM (InferStgRhs)
 nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ ccs con args)
   | null args = do
         -- pprTraceM "RhsConNullary" (ppr con <+> ppr node_id <+> ppr ctxt)
@@ -1658,9 +1613,9 @@ nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ ccs con args)
   | otherwise = do
 
         mapM_ (addImportedNode this_mod ) [v | StgVarArg v <- args]
-        node_inputs <- mapM (getConArgNodeId ctxt) args :: AM s [NodeId]
+        node_inputs <- mapM (getConArgNodeId ctxt) args :: AM [NodeId]
         -- pprTraceM "RhsCon" (ppr con <+> ppr node_id <+> ppr args <+> ppr node_inputs <+> ppr ctxt)
-        let node =  FlowNode s
+        let node =  FlowNode
                         { node_id = node_id
                         , node_inputs = node_inputs
                         --, node_done   = False
@@ -1770,7 +1725,7 @@ Something currently not tracked by GHC.
 
 nodeRhs this_mod ctxt _topFlag binding (StgRhsClosure _ext _ccs _flag args body) = do
     (body', body_id) <- nodeExpr this_mod ctxt' body
-    let node = FlowNode s { node_id = node_id
+    let node = FlowNode { node_id = node_id
                         , node_inputs = [body_id]
                         -- ^ We might infer things about nested fields once evaluated.
                         -- , node_done   = False
@@ -1810,7 +1765,7 @@ nodeRhs this_mod ctxt _topFlag binding (StgRhsClosure _ext _ccs _flag args body)
             else updateNodeResult this_id cappedResult
         return $! cappedResult
 
-nodeExpr :: Module -> [SynContext] -> StgExpr -> AM s (InferStgExpr, NodeId)
+nodeExpr :: Module -> [SynContext] -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeExpr this_mod ctxt (e@StgCase {})          = nodeCase this_mod ctxt e
 nodeExpr this_mod ctxt (e@StgLet {})           = nodeLet this_mod ctxt e
 nodeExpr this_mod ctxt (e@StgLetNoEscape {})   = nodeLetNoEscape this_mod ctxt e
@@ -1876,7 +1831,7 @@ How branches are combined is explained in Note [The lattice element combinators]
 -}
 
 -- See Note [Case Data Flow Node]
-nodeCase :: Module -> [SynContext] -> StgExpr -> AM s (InferStgExpr, NodeId)
+nodeCase :: Module -> [SynContext] -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeCase this_mod ctxt (StgCase scrut bndr alt_type alts) = do
     (scrut',scrutNodeId) <- nodeExpr this_mod (CCaseScrut:ctxt) scrut
     bndrNodeId <- nodeCaseBndr scrutNodeId bndr
@@ -1889,10 +1844,10 @@ nodeCase _ _ _ = panic "Impossible: nodeCase"
 
 
 -- Take the result of the scrutinee and mark it as tagged.
-nodeCaseBndr :: NodeId -> Id -> AM s NodeId
+nodeCaseBndr :: NodeId -> Id -> AM NodeId
 nodeCaseBndr scrutNodeId _bndr = do
     !bndrNodeId <- mkUniqueId
-    addNode notDone $ FlowNode s
+    addNode notDone $ FlowNode
                         { node_id = bndrNodeId
                         , node_inputs = [scrutNodeId] --, node_done = False
                         , node_result = top, node_update = updater bndrNodeId
@@ -1913,7 +1868,7 @@ nodeCaseBndr scrutNodeId _bndr = do
                     updateNodeResult bndrNodeId result
             return $! result
 
-nodeAlt :: HasDebugCallStack => Module -> [SynContext] -> NodeId -> StgAlt -> AM s (InferStgAlt, NodeId)
+nodeAlt :: HasDebugCallStack => Module -> [SynContext] -> NodeId -> StgAlt -> AM (InferStgAlt, NodeId)
 nodeAlt this_mod ctxt scrutNodeId (altCon, bndrs, rhs)
   | otherwise = do
     bndrMappings <- mkVarEnv <$> zipWithM mkAltBndrNode [0..] bndrs
@@ -1930,7 +1885,7 @@ nodeAlt this_mod ctxt scrutNodeId (altCon, bndrs, rhs)
 
         -- Result for ONE of the bindings bound by the alt.
         -- Eg for an StgAlt of (Just, [foo], expr) we call mkAltBndrNode 0 foo
-        mkAltBndrNode :: Int -> Id -> AM s (Id,NodeId)
+        mkAltBndrNode :: Int -> Id -> AM (Id,NodeId)
         mkAltBndrNode n bndr
           | isUnliftedType bndrTy
           , not (isUnboxedTupleType bndrTy)
@@ -1942,7 +1897,7 @@ nodeAlt this_mod ctxt scrutNodeId (altCon, bndrs, rhs)
           | otherwise = do
                 node_id <- mkUniqueId --Shadows existing binds
                 let updater = do
-                        scrut_res <- lookupNodeResult scrutNodeId :: AM s EnterLattice
+                        scrut_res <- lookupNodeResult scrutNodeId :: AM EnterLattice
                         let bndr_res = (indexField scrut_res n)
                         let is_strict_field = elem bndr strictBnds
                         let result
@@ -1962,7 +1917,7 @@ nodeAlt this_mod ctxt scrutNodeId (altCon, bndrs, rhs)
                             else
                                 updateNodeResult node_id result
                         return $! result
-                addNode notDone FlowNode s
+                addNode notDone FlowNode
                     { node_id = node_id
                     , node_result = top
                     -- , node_done = False
@@ -2023,14 +1978,14 @@ The interesting things happen inside the rhs.
 -}
 
 
-nodeLet :: Module -> [SynContext] -> StgExpr -> AM s (InferStgExpr, NodeId)
+nodeLet :: Module -> [SynContext] -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeLet this_mod ctxt (StgLet ext bind expr) = do
     (bind',ctxt') <- nodesBind this_mod ctxt NotTopLevel NotLNE bind
     (expr',node) <- nodeExpr this_mod ctxt' expr
     return $! (StgLet ext bind' expr', node)
 nodeLet _ _ _ = panic "Impossible"
 
-nodeLetNoEscape :: Module -> [SynContext] -> StgExpr -> AM s (InferStgExpr, NodeId)
+nodeLetNoEscape :: Module -> [SynContext] -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeLetNoEscape this_mod ctxt (StgLetNoEscape ext bind expr) = do
     (bind',ctxt') <- nodesBind this_mod ctxt NotTopLevel LNE bind
     (expr',node) <- nodeExpr this_mod ctxt' expr
@@ -2072,19 +2027,19 @@ Doing this is implemented in mkOutConLattice.
 
 
 -}
-nodeConApp :: HasDebugCallStack => Module -> [SynContext] -> StgExpr -> AM s (InferStgExpr, NodeId)
+nodeConApp :: HasDebugCallStack => Module -> [SynContext] -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeConApp this_mod ctxt (StgConApp _ext con args tys) = do
     node_id <- mkUniqueId
     mapM_ (addImportedNode this_mod) [v | StgVarArg v <- args]
-    inputs <- mapM (getConArgNodeId ctxt) args :: AM s [NodeId]
+    inputs <- mapM (getConArgNodeId ctxt) args :: AM [NodeId]
     let updater = do
-            fieldResults <- mapM lookupNodeResult inputs :: AM s [EnterLattice]
+            fieldResults <- mapM lookupNodeResult inputs :: AM [EnterLattice]
             let result = mkOutConLattice con MaybeEnter fieldResults
             -- pprTraceM "UpdateConApp:" $ ppr (node_id,result) <+> text "inputs:" <> ppr inputs
             updateNodeResult node_id result
             return $! result
 
-    addNode notDone FlowNode s
+    addNode notDone FlowNode
         { node_id = node_id
         , node_result = top
         , node_inputs = inputs
@@ -2146,7 +2101,7 @@ In any other case:
 
 -}
 
-nodeApp :: HasDebugCallStack => Module -> [SynContext] -> StgExpr -> AM s (InferStgExpr, NodeId)
+nodeApp :: HasDebugCallStack => Module -> [SynContext] -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeApp this_mod ctxt expr@(StgApp _ f args) = do
     mapM_ (addImportedNode this_mod) (f:[v | StgVarArg v <- args])
     maybeImportedFunc <- importedFuncNode_Maybe this_mod f
@@ -2178,7 +2133,7 @@ nodeApp this_mod ctxt expr@(StgApp _ f args) = do
                                 updateNodeResult node_id result
                                 return $! result
 
-                addNode notDone $ FlowNode s
+                addNode notDone $ FlowNode
                     { node_id = node_id, node_result = top
                     , node_inputs = inputs
                     -- , node_done = False
@@ -2231,7 +2186,7 @@ nodeApp this_mod ctxt expr@(StgApp _ f args) = do
         | otherwise = [f_node_id]
 
     -- See Note [App Data Flow]
-    mkResult :: AM s EnterLattice
+    mkResult :: AM EnterLattice
     mkResult
         | isAbsent =
             -- pprTrace "Absent:" (ppr f) $
@@ -2286,18 +2241,15 @@ nodeApp this_mod ctxt expr@(StgApp _ f args) = do
     getRecursionKind (_ : todo) = getRecursionKind todo
 nodeApp _ _ _ = panic "Impossible"
 
--- | Put the data flow nodes in dependency order.
---
--- This improves performance massively.
-sccNodes :: [FlowNode s] -> [FlowNode s]
+sccNodes :: [FlowNode] -> [FlowNode]
 -- sccNodes in_nodes = in_nodes
 sccNodes in_nodes = reverse . map node_payload . topologicalSortG $ graphFromEdgedVerticesUniq vertices
   where
-    vertices = map mkVertex in_nodes :: [Node NodeId FlowNode s]
-    mkVertex :: FlowNode s -> Node NodeId FlowNode s
+    vertices = map mkVertex in_nodes :: [Node NodeId FlowNode]
+    mkVertex :: FlowNode -> Node NodeId FlowNode
     mkVertex n = DigraphNode (n) (node_id n) (node_inputs n)
 
-solveConstraints :: HasDebugCallStack => AM s ()
+solveConstraints :: HasDebugCallStack => AM ()
 solveConstraints = do
         -- uqCount <- sizeUFM . fs_uqNodeMap <$> get
         -- doneCount <- sizeUFM . fs_doneNodes <$> get
@@ -2328,14 +2280,14 @@ solveConstraints = do
         -- mapM_ (pprTraceM "node:" . ppr) resultNodes
         return ()
   where
-    iterate :: Int -> AM s ()
+    iterate :: Int -> AM ()
     iterate n = do
         -- pprTraceM "iterate - pass " (ppr n)
         uqNodes <- fs_uqNodeMap <$> get
         -- return $! seqEltsUFM rnf uqNodes
         -- pprTraceM "IterateUndone:" $ ppr (sizeUFM uqNodes)
 
-        progress <- or <$> (mapM update (sccNodes . nonDetEltsUFM $ uqNodes)) :: AM s Bool
+        progress <- or <$> (mapM update (sccNodes . nonDetEltsUFM $ uqNodes)) :: AM Bool
         if (not progress)
             then return ()
             --max iterations
@@ -2344,7 +2296,7 @@ solveConstraints = do
                      return ()
                 else iterate (n+1)
 
-    update :: FlowNode s -> AM s Bool
+    update :: FlowNode -> AM Bool
     update node = do
         let old_result = node_result node
         result <- node_update node
@@ -2364,16 +2316,16 @@ solveConstraints = do
 ------------------------------------------------------------
 -}
 
-rewriteTopBinds :: [InferStgTopBinding] -> AM s [TgStgTopBinding]
+rewriteTopBinds :: [InferStgTopBinding] -> AM [TgStgTopBinding]
 rewriteTopBinds binds = mapM (rewriteTop) binds
 
-rewriteTop :: InferStgTopBinding -> AM s TgStgTopBinding
+rewriteTop :: InferStgTopBinding -> AM TgStgTopBinding
 rewriteTop (StgTopStringLit v s) = return $! (StgTopStringLit v s)
 rewriteTop      (StgTopLifted bind)  = do
     (StgTopLifted . fst) <$!> (rewriteBinds bind)
 
 -- For bot level binds, the wrapper is guaranteed to be `id`
-rewriteBinds :: InferStgBinding -> AM s (TgStgBinding, TgStgExpr -> TgStgExpr)
+rewriteBinds :: InferStgBinding -> AM (TgStgBinding, TgStgExpr -> TgStgExpr)
 rewriteBinds (StgNonRec v rhs) = do
         (!rhs, wrapper) <-  rewriteRhs v rhs
         return $! (StgNonRec v rhs, wrapper)
@@ -2387,7 +2339,7 @@ rewriteBinds (StgRec binds) =do
 
 -- | When dealing with a let bound rhs passing the id in allows us the shortcut the
 --  the rule for the rhs tag to flow to the id
-rewriteRhs :: Id -> InferStgRhs -> AM s (TgStgRhs, TgStgExpr -> TgStgExpr)
+rewriteRhs :: Id -> InferStgRhs -> AM (TgStgRhs, TgStgExpr -> TgStgExpr)
 rewriteRhs _binding (StgRhsCon (node_id,rewriteFlag) ccs con args) = do
     node <- getNode node_id
     fieldInfos <- mapM lookupNodeResult (node_inputs node)
@@ -2438,7 +2390,7 @@ rewriteRhs _binding (StgRhsClosure ext ccs flag args body) = do
 
 type IsScrut = Bool
 
-rewriteExpr :: IsScrut -> InferStgExpr -> AM s TgStgExpr
+rewriteExpr :: IsScrut -> InferStgExpr -> AM TgStgExpr
 rewriteExpr _ (e@StgCase {})          = rewriteCase e
 rewriteExpr _ (e@StgLet {})           = rewriteLet e
 rewriteExpr _ (e@StgLetNoEscape {})   = rewriteLetNoEscape e
@@ -2450,7 +2402,7 @@ rewriteExpr _ (StgLit lit)           = return $! (StgLit lit)
 rewriteExpr _ (StgOpApp op args res_ty) = return $! (StgOpApp op args res_ty)
 rewriteExpr _ (StgLam {}) = error "Invariant violated: No lambdas in STG representation."
 
-rewriteCase :: InferStgExpr -> AM s TgStgExpr
+rewriteCase :: InferStgExpr -> AM TgStgExpr
 rewriteCase (StgCase scrut bndr alt_type alts) =
     pure StgCase <*>
         rewriteExpr True scrut <*>
@@ -2460,26 +2412,26 @@ rewriteCase (StgCase scrut bndr alt_type alts) =
 
 rewriteCase _ = panic "Impossible: nodeCase"
 
-rewriteAlt :: InferStgAlt -> AM s TgStgAlt
+rewriteAlt :: InferStgAlt -> AM TgStgAlt
 rewriteAlt (altCon, bndrs, rhs) = do
     !rhs' <- rewriteExpr False rhs
     return $! (altCon, bndrs, rhs')
 
-rewriteLet :: InferStgExpr -> AM s TgStgExpr
+rewriteLet :: InferStgExpr -> AM TgStgExpr
 rewriteLet (StgLet xt bind expr) = do
     (!bind', !wrapper) <- rewriteBinds bind
     !expr' <- rewriteExpr False expr
     return $! wrapper (StgLet xt bind' expr')
 rewriteLet _ = panic "Impossible"
 
-rewriteLetNoEscape :: InferStgExpr -> AM s TgStgExpr
+rewriteLetNoEscape :: InferStgExpr -> AM TgStgExpr
 rewriteLetNoEscape (StgLetNoEscape xt bind expr) = do
     (!bind', wrapper) <- rewriteBinds bind
     !expr' <- rewriteExpr False expr
     return $! wrapper (StgLetNoEscape xt bind' expr')
 rewriteLetNoEscape _ = panic "Impossible"
 
-rewriteConApp :: InferStgExpr -> AM s TgStgExpr
+rewriteConApp :: InferStgExpr -> AM TgStgExpr
 rewriteConApp (StgConApp nodeId con args tys) = do
     node <- getNode nodeId
     -- We look at the INPUT because the output of this node will always have tagged
@@ -2496,7 +2448,7 @@ rewriteConApp (StgConApp nodeId con args tys) = do
 
 rewriteConApp _ = panic "Impossible"
 
-rewriteApp :: IsScrut -> InferStgExpr -> AM s TgStgExpr
+rewriteApp :: IsScrut -> InferStgExpr -> AM TgStgExpr
 rewriteApp True (StgApp nodeId f args)
     | null args = do
     tagInfo <- lookupNodeResult nodeId
@@ -2518,7 +2470,7 @@ rewriteApp _ _ = panic "Impossible"
 ----------------------------------------------
 -- Deal with exporting tagging information
 
-exportTaggedness :: [(Id,NodeId)] -> AM s [(Id, EnterLattice)]
+exportTaggedness :: [(Id,NodeId)] -> AM [(Id, EnterLattice)]
 exportTaggedness xs = mapMaybeM export xs
     where
         export (v,nid)
@@ -2531,10 +2483,10 @@ exportTaggedness xs = mapMaybeM export xs
                 !res <- lookupNodeResult nid
                 return $ Just (v,res)
 
--- rewriteTopBinds :: [InferStgTopBinding] -> AM s [TgStgTopBinding]
+-- rewriteTopBinds :: [InferStgTopBinding] -> AM [TgStgTopBinding]
 -- rewriteTopBinds binds = mapM (rewriteTop) binds
 
--- rewriteTop :: InferStgTopBinding -> AM s TgStgTopBinding
+-- rewriteTop :: InferStgTopBinding -> AM TgStgTopBinding
 -- rewriteTop (StgTopStringLit v s) = return $! (StgTopStringLit v s)
 -- rewriteTop (StgTopLifted bind)  = do
 --     let ids = stgBindIds bind
@@ -2544,7 +2496,7 @@ exportTaggedness xs = mapMaybeM export xs
 --     (StgTopLifted . fst) <$!> (rewriteBinds bind)
 
 -- -- For bot level binds, the wrapper is guaranteed to be `id`
--- rewriteBinds :: InferStgBinding -> AM s (TgStgBinding, TgStgExpr -> TgStgExpr)
+-- rewriteBinds :: InferStgBinding -> AM (TgStgBinding, TgStgExpr -> TgStgExpr)
 -- rewriteBinds (StgNonRec v rhs) = do
 --         (!rhs, wrapper) <-  rewriteRhs v rhs
 --         return $! (StgNonRec v rhs, wrapper)
@@ -2570,9 +2522,9 @@ mkSeq id bndr !expr =
     StgCase (StgApp MayEnter id []) bndr altTy [(DEFAULT, [], expr)]
 
 -- Create a ConApp which is guaranteed to evaluate the given ids.
-mkSeqs :: [Id] -> DataCon -> [StgArg] -> [Type] -> AM s TgStgExpr
+mkSeqs :: [Id] -> DataCon -> [StgArg] -> [Type] -> AM TgStgExpr
 mkSeqs untaggedIds con args tys = do
-    argMap <- mapM (\arg -> (arg,) <$> mkLocalArgId arg ) untaggedIds :: AM s [(InId, OutId)]
+    argMap <- mapM (\arg -> (arg,) <$> mkLocalArgId arg ) untaggedIds :: AM [(InId, OutId)]
     -- mapM_ (pprTraceM "Forcing strict args before allocation:" . ppr) argMap
     let taggedArgs
             = map   (\v -> case v of
@@ -2584,7 +2536,7 @@ mkSeqs untaggedIds con args tys = do
     let body = foldr (\(v,bndr) expr -> mkSeq v bndr expr) conBody argMap
     return $! body
 
-mkLocalArgId :: Id -> AM s Id
+mkLocalArgId :: Id -> AM Id
 mkLocalArgId id = do
     u <- getUniqueM
     return $! setIdUnique (localiseId id) u
