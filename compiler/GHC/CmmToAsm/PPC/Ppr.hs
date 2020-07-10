@@ -237,9 +237,8 @@ pprImm (ImmInteger i) = integer i
 pprImm (ImmCLbl l)    = ppr l
 pprImm (ImmIndex l i) = ppr l <> char '+' <> int i
 pprImm (ImmLit s)     = s
-
-pprImm (ImmFloat _)  = text "naughty float immediate"
-pprImm (ImmDouble _) = text "naughty double immediate"
+pprImm (ImmFloat f)   = float $ fromRational f
+pprImm (ImmDouble d)  = double $ fromRational d
 
 pprImm (ImmConstantSum a b) = pprImm a <> char '+' <> pprImm b
 pprImm (ImmConstantDiff a b) = pprImm a <> char '-'
@@ -337,13 +336,8 @@ pprDataItem platform lit
                     <> int (fromIntegral (fromIntegral x :: Word32))]
 
 
-        ppr_item FF32 (CmmFloat r _)
-           = let bs = floatToBytes (fromRational r)
-             in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
-
-        ppr_item FF64 (CmmFloat r _)
-           = let bs = doubleToBytes (fromRational r)
-             in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
+        ppr_item FF32 _ = [text "\t.float\t" <> pprImm imm]
+        ppr_item FF64 _ = [text "\t.double\t" <> pprImm imm]
 
         ppr_item _ _
                 = panic "PPC.Ppr.pprDataItem: no match"
