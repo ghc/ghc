@@ -2776,7 +2776,8 @@ checkTyConTelescope tc
               2 (pprTyVars sorted_tvs) ]
 
   | otherwise
-  = return ()
+  = traceTc "checkTyConTelescope" (pprTyVars tvs) >>
+    return ()
   where
     tcbs = tyConBinders tc
     tvs  = binderVars tcbs

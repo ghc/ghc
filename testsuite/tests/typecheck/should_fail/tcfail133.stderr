@@ -14,7 +14,8 @@ tcfail133.hs:68:7: error:
         ...plus 25 others
         ...plus 12 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
-    • In the expression: show $ add (One :@ Zero) (One :@ One)
+    • In the first argument of ‘($)’, namely ‘show’
+      In the expression: show $ add (One :@ Zero) (One :@ One)
       In an equation for ‘foo’:
           foo = show $ add (One :@ Zero) (One :@ One)
 

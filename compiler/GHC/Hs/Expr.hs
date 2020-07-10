@@ -260,7 +260,6 @@ data HsExpr p
 
   | HsRecFld  (XRecFld p)
               (AmbiguousFieldOcc p) -- ^ Variable pointing to record selector
-                                    -- Not in use after typechecking
 
   | HsOverLabel (XOverLabel p)
                 (Maybe (IdP p)) FastString

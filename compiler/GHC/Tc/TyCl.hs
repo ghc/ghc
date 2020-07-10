@@ -30,7 +30,8 @@ import GHC.Prelude
 import GHC.Hs
 import GHC.Driver.Types
 import GHC.Tc.TyCl.Build
-import GHC.Tc.Solver( solveLocalEqualitiesX, reportUnsolvedEqualities )
+import GHC.Tc.Solver( pushLevelAndSolveEqualities, pushLevelAndSolveEqualitiesX
+                    , reportUnsolvedEqualities )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Env
 import GHC.Tc.Validity
@@ -39,7 +40,6 @@ import GHC.Tc.TyCl.Utils
 import GHC.Tc.TyCl.Class
 import {-# SOURCE #-} GHC.Tc.TyCl.Instance( tcInstDecls1 )
 import GHC.Tc.Deriv (DerivInfo(..))
-import GHC.Tc.Utils.Unify ( checkTvConstraints )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Instance.Class( AssocInstInfo(..) )
 import GHC.Tc.Utils.TcMType
@@ -647,13 +647,18 @@ kcTyClGroup kisig_env decls
 
                 | otherwise = Left d
 
-        ; checked_tcs <- checkInitialKinds kinded_decls
+        ; checked_tcs <- checkNoErrs $
+                         checkInitialKinds kinded_decls
+                         -- checkNoErrs because we are about to extend
+                         -- the envt with these tycons, and we get
+                         -- knock-on errors if we have tycons with
+                         -- malformed kinds
+
         ; inferred_tcs
-            <- tcExtendKindEnvWithTyCons checked_tcs $
-               pushTcLevelM_   $  -- We are going to kind-generalise, so
-                                  -- unification variables in here must
-                                  -- be one level in
-               solveEqualities $
+            <- tcExtendKindEnvWithTyCons checked_tcs  $
+               pushLevelAndSolveEqualities UnkSkol [] $
+                     -- We are going to kind-generalise, so unificaiton
+                     -- variables in here must be one level in
                do {  -- Step 1: Bind kind variables for all decls
                     mono_tcs <- inferInitialKinds kindless_decls
 
@@ -2036,10 +2041,8 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
              roles = roles_info tycon_name  -- for TyCon and Class
 
        ; (ctxt, fds, sig_stuff, at_stuff)
-            <- pushTcLevelM_   $
-               solveEqualities $
-               checkTvConstraints skol_info (binderVars binders) $
-               -- The checkTvConstraints is needed bring into scope the
+            <- pushLevelAndSolveEqualities skol_info (binderVars binders) $
+               -- The (binderVars binders) is needed bring into scope the
                -- skolems bound by the class decl header (#17841)
                do { ctxt <- tcHsContext hs_ctxt
                   ; fds  <- mapM (addLocM tc_fundep) fundeps
@@ -2047,7 +2050,8 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
                   ; at_stuff  <- tcClassATs class_name clas ats at_defs
                   ; return (ctxt, fds, sig_stuff, at_stuff) }
 
-       -- The solveEqualities will report errors for any
+
+       -- The reportUnsolvedEqualities will report errors for any
        -- unsolved equalities, so these zonks should not encounter
        -- any unfilled coercion variables unless there is such an error
        -- The zonk also squeeze out the TcTyCons, and converts
@@ -2632,13 +2636,13 @@ tcTySynRhs roles_info tc_name hs_ty
   = bindTyClTyVars tc_name $ \ _ binders res_kind ->
     do { env <- getLclEnv
        ; traceTc "tc-syn" (ppr tc_name $$ ppr (tcl_env env))
-       ; rhs_ty <- pushTcLevelM_   $
-                   solveEqualities $
+       ; rhs_ty <- pushLevelAndSolveEqualities skol_info (binderVars binders) $
                    tcCheckLHsType hs_ty (TheKind res_kind)
        ; rhs_ty <- zonkTcTypeToType rhs_ty
        ; let roles = roles_info tc_name
-             tycon = buildSynTyCon tc_name binders res_kind roles rhs_ty
-       ; return tycon }
+       ; return (buildSynTyCon tc_name binders res_kind roles rhs_ty) }
+  where
+    skol_info = TyConSkol TypeSynonymFlavour tc_name
 
 tcDataDefn :: SDoc -> RolesInfo -> Name
            -> HsDataDefn GhcRn -> TcM (TyCon, [DerivInfo])
@@ -2668,7 +2672,9 @@ tcDataDefn err_ctxt roles_info tc_name
        ; unless (mk_permissive_kind hsc_src cons) $
          checkDataKindSig (DataDeclSort new_or_data) final_res_kind
 
-       ; stupid_tc_theta <- pushTcLevelM_ $ solveEqualities $ tcHsContext ctxt
+       ; let skol_tvs = binderVars tycon_binders
+       ; stupid_tc_theta <- pushLevelAndSolveEqualities skol_info skol_tvs $
+                            tcHsContext ctxt
        ; stupid_theta    <- zonkTcTypesToTypes stupid_tc_theta
        ; kind_signatures <- xoptM LangExt.KindSignatures
 
@@ -2704,6 +2710,10 @@ tcDataDefn err_ctxt roles_info tc_name
        ; traceTc "tcDataDefn" (ppr tc_name $$ ppr tycon_binders $$ ppr extra_bndrs)
        ; return (tycon, [deriv_info]) }
   where
+    skol_info = TyConSkol flav tc_name
+    flav = case new_or_data of { NewType  -> NewtypeFlavour
+                               ; DataType -> DataTypeFlavour }
+
     -- Abstract data types in hsig files can have arbitrary kinds,
     -- because they may be implemented by type synonyms
     -- (which themselves can have arbitrary kinds, not just *). See #13955.
@@ -2832,40 +2842,38 @@ or (Type -> Type) for the equations above) and the instantiated kind.
 Note [Generalising in tcTyFamInstEqnGuts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have something like
-  type instance forall (a::k) b. F t1 t2 = rhs
+  type instance forall (a::k) b. F (Proxy t1) _ = rhs
 
 Then  imp_vars = [k], exp_bndrs = [a::k, b]
 
-We want to quantify over
-  * k, a, and b  (all user-specified)
-  * and any inferred free kind vars from
-      - the kinds of k, a, b
-      - the types t1, t2
+We want to quantify over all the free vars of the LHS including
+  * any invisible kind variables arising from instantiating tycons,
+    such as Proxy
+  * wildcards such as '_' above
 
-However, unlike a type signature like
+So, the simple thing is
+   - Gather candidates from the LHS
+   - Include any user-specified forall'd variables, so that we get an
+     error from Validity.checkFamPatBinders if a forall'd variable is
+     not bound on the LHS
+   - Quantify over them
+
+Note that, unlike a type signature like
   f :: forall (a::k). blah
-
 we do /not/ care about the Inferred/Specified designation
 or order for the final quantified tyvars.  Type-family
 instances are not invoked directly in Haskell source code,
 so visible type application etc plays no role.
 
-So, the simple thing is
-   - gather candidates from [k, a, b] and pats
-   - quantify over them
+See also Note [Re-quantify type variables in rules] in
+GHC.Tc.Gen.Rule, which explains a /very/ similar design when
+generalising over the type of a rewrite rule.
 
-Hence the slightly mysterious call:
-    candidateQTyVarsOfTypes (pats ++ mkTyVarTys scoped_tvs)
-
-Simple, neat, but a little non-obvious!
-
-See also Note [Re-quantify type variables in rules] in GHC.Tc.Gen.Rule, which explains
-a very similar design when generalising over the type of a rewrite rule.
 -}
 
 --------------------------
 tcTyFamInstEqnGuts :: TyCon -> AssocInstInfo
-                   -> [Name] -> [LHsTyVarBndr () GhcRn] -- Implicit and explicicit binder
+                   -> [Name] -> [LHsTyVarBndr () GhcRn] -- Implicit and explicit binder
                    -> HsTyPats GhcRn                    -- Patterns
                    -> LHsType GhcRn                     -- RHS
                    -> TcM ([TyVar], [TcType], TcType)   -- (tyvars, pats, rhs)
@@ -2878,11 +2886,10 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
 
        -- This code is closely related to the code
        -- in GHC.Tc.Gen.HsType.kcCheckDeclHeader_cusk
-       ; (imp_tvs, (exp_tvs, (lhs_ty, rhs_ty)))
-               <- pushTcLevelM_                                $
-                  solveEqualities                              $
-                  bindImplicitTKBndrs_Q_Skol imp_vars          $
-                  bindExplicitTKBndrs_Q_Skol AnyKind exp_bndrs $
+       ; (tclvl, wanted, (imp_tvs, (exp_tvs, (lhs_ty, rhs_ty))))
+               <- pushLevelAndSolveEqualitiesX "tcTyFamInstEqnGuts" $
+                  bindImplicitTKBndrs_Q_Skol imp_vars               $
+                  bindExplicitTKBndrs_Q_Skol AnyKind exp_bndrs      $
                   do { (lhs_ty, rhs_kind) <- tcFamTyPats fam_tc hs_pats
                        -- Ensure that the instance is consistent with its
                        -- parent class (#16008)
@@ -2890,21 +2897,22 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
                      ; rhs_ty <- tcCheckLHsType hs_rhs_ty (TheKind rhs_kind)
                      ; return (lhs_ty, rhs_ty) }
 
-       -- See Note [Generalising in tcTyFamInstEqnGuts]
        -- This code (and the stuff immediately above) is very similar
        -- to that in tcDataFamInstHeader.  Maybe we should abstract the
        -- common code; but for the moment I concluded that it's
        -- clearer to duplicate it.  Still, if you fix a bug here,
        -- check there too!
-       ; let scoped_tvs = imp_tvs ++ exp_tvs
-       ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys scoped_tvs)
+
+       -- See Note [Generalising in tcTyFamInstEqnGuts]
+       ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys (imp_tvs ++ exp_tvs))
+       ; let (kvs,tvs) = candidateKiTyVars dvs
+       ; reportUnsolvedEqualities FamInstSkol (kvs++tvs) tclvl wanted
        ; qtvs <- quantifyTyVars dvs
+
 
        ; traceTc "tcTyFamInstEqnGuts 2" $
          vcat [ ppr fam_tc
-              , text "scoped_tvs" <+> pprTyVars scoped_tvs
               , text "lhs_ty"     <+> ppr lhs_ty
-              , text "dvs"        <+> ppr dvs
               , text "qtvs"       <+> pprTyVars qtvs ]
 
        ; (ze, qtvs) <- zonkTyBndrs qtvs
@@ -3102,10 +3110,9 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
 
        ; traceTc "tcConDecl 1" (vcat [ ppr name, ppr explicit_tkv_nms ])
 
-       ; (tclvl, (wanted, (exp_tvbndrs, (ctxt, arg_tys, field_lbls, stricts))))
-           <- pushTcLevelM                              $
-              solveLocalEqualitiesX "tcConDecl:H98"     $
-              bindExplicitTKBndrs_Skol explicit_tkv_nms $
+       ; (tclvl, wanted, (exp_tvbndrs, (ctxt, arg_tys, field_lbls, stricts)))
+           <- pushLevelAndSolveEqualitiesX "tcConDecl:H98" $
+              bindExplicitTKBndrs_Skol explicit_tkv_nms    $
               do { ctxt <- tcHsMbContext hs_ctxt
                  ; let exp_kind = getArgExpKind new_or_data res_kind
                  ; btys <- tcConArgs exp_kind hs_args
@@ -3114,26 +3121,29 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
                  ; return (ctxt, arg_tys, field_lbls, stricts)
                  }
 
+
        ; let tmpl_tvs = binderVars tmpl_bndrs
+             exp_tvs  = binderVars exp_tvbndrs
+             skol_tvs = tmpl_tvs ++ exp_tvs
+       ; reportUnsolvedEqualities skol_info skol_tvs tclvl wanted
+
+       ; let fake_ty  = mkSpecForAllTys tmpl_tvs $
+                        mkInvisForAllTys exp_tvbndrs $
+                        mkPhiTy ctxt $
+                        mkVisFunTys arg_tys $
+                        unitTy
+             -- That type is a lie, of course. (It shouldn't end in ()!)
+             -- And we could construct a proper result type from the info
+             -- at hand. But the result would mention only the tmpl_tvs,
+             -- and so it just creates more work to do it right. Really,
+             -- we're only doing this to find the right kind variables to
+             -- quantify over, and this type is fine for that purpose.
 
          -- exp_tvs have explicit, user-written binding sites
          -- the kvs below are those kind variables entirely unmentioned by the user
          --   and discovered only by generalization
 
-       ; kvs <- kindGeneralizeAll (mkSpecForAllTys tmpl_tvs $
-                                   mkInvisForAllTys exp_tvbndrs $
-                                   mkPhiTy ctxt $
-                                   mkVisFunTys arg_tys $
-                                   unitTy)
-                 -- That type is a lie, of course. (It shouldn't end in ()!)
-                 -- And we could construct a proper result type from the info
-                 -- at hand. But the result would mention only the tmpl_tvs,
-                 -- and so it just creates more work to do it right. Really,
-                 -- we're only doing this to find the right kind variables to
-                 -- quantify over, and this type is fine for that purpose.
-
-       ; let skol_tvs = kvs ++ tmpl_tvs ++ binderVars exp_tvbndrs
-       ; reportUnsolvedEqualities (DataConSkol name) skol_tvs tclvl wanted
+       ; kvs <- kindGeneralizeAll fake_ty
 
              -- Zonk to Types
        ; (ze, qkvs)          <- zonkTyBndrs kvs
@@ -3165,7 +3175,10 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
                   -- NB:  we put data_tc, the type constructor gotten from the
                   --      constructor type signature into the data constructor;
                   --      that way checkValidDataCon can complain if it's wrong.
+
        ; return [dc] }
+  where
+    skol_info = DataConSkol name
 
 tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
   -- NB: don't use res_kind here, as it's ill-scoped. Instead, we get
@@ -3179,11 +3192,10 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
     do { traceTc "tcConDecl 1 gadt" (ppr names)
        ; let (L _ name : _) = names
 
-       ; (tclvl, (wanted, (imp_tvs, (exp_tvbndrs, (ctxt, arg_tys, res_ty, field_lbls, stricts)))))
-           <- pushTcLevelM                              $
-              solveLocalEqualitiesX "tcConDecl:GADT"    $
-              bindImplicitTKBndrs_Skol implicit_tkv_nms $
-              bindExplicitTKBndrs_Skol explicit_tkv_nms $
+       ; (tclvl, wanted, (imp_tvs, (exp_tvbndrs, (ctxt, arg_tys, res_ty, field_lbls, stricts))))
+           <- pushLevelAndSolveEqualitiesX "tcConDecl:GADT" $
+              bindImplicitTKBndrs_Skol implicit_tkv_nms     $
+              bindExplicitTKBndrs_Skol explicit_tkv_nms     $
               do { ctxt <- tcHsMbContext cxt
                  ; casted_res_ty <- tcHsOpenType hs_res_ty
                  ; res_ty <- if not debugIsOn then return $ discardCast casted_res_ty
@@ -3201,18 +3213,18 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
                  ; return (ctxt, arg_tys, res_ty, field_lbls, stricts)
                  }
        ; imp_tvs <- zonkAndScopedSort imp_tvs
+       ; let skol_tvs = imp_tvs ++ binderVars exp_tvbndrs
+       ; reportUnsolvedEqualities skol_info skol_tvs tclvl wanted
 
-       ; tkvs <- kindGeneralizeAll (mkSpecForAllTys imp_tvs $
-                                    mkInvisForAllTys exp_tvbndrs $
-                                    mkPhiTy ctxt $
-                                    mkVisFunTys arg_tys $
-                                    res_ty)
+       ; let fake_ty = mkSpecForAllTys imp_tvs      $
+                       mkInvisForAllTys exp_tvbndrs $
+                       mkPhiTy ctxt                 $
+                       mkVisFunTys arg_tys          $
+                       res_ty
+       ; tkvs <- kindGeneralizeAll fake_ty
 
-       ; let skol_tvs = tkvs ++ imp_tvs ++ binderVars exp_tvbndrs
-       ; reportUnsolvedEqualities (DataConSkol name) skol_tvs tclvl wanted
-
-       ; let tvbndrs =  (mkTyVarBinders InferredSpec tkvs)
-                     ++ (mkTyVarBinders SpecifiedSpec imp_tvs)
+       ; let tvbndrs =  mkTyVarBinders InferredSpec  tkvs
+                     ++ mkTyVarBinders SpecifiedSpec imp_tvs
                      ++ exp_tvbndrs
 
              -- Zonk to Types
@@ -3229,11 +3241,9 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
              arg_tys'   = substScaledTys arg_subst arg_tys
              res_ty'    = substTy  arg_subst res_ty
 
-
-       ; fam_envs <- tcGetFamInstEnvs
-
        -- Can't print univ_tvs, arg_tys etc, because we are inside the knot here
        ; traceTc "tcConDecl 2" (ppr names $$ ppr field_lbls)
+       ; fam_envs <- tcGetFamInstEnvs
        ; let
            buildOneDataCon (L _ name) = do
              { is_infix <- tcConIsInfixGADT name hs_args
@@ -3248,9 +3258,9 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
                   --      constructor type signature into the data constructor;
                   --      that way checkValidDataCon can complain if it's wrong.
              }
-       ; traceTc "tcConDecl 2" (ppr names)
-       ; mapM buildOneDataCon names
-       }
+       ; mapM buildOneDataCon names }
+  where
+    skol_info = DataConSkol (unLoc (head names))
 
 -- | Produce an "expected kind" for the arguments of a data/newtype.
 -- If the declaration is indeed for a newtype,

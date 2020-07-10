@@ -426,23 +426,11 @@ tcInferAppHead_maybe fun args
   = case fun of
       HsVar _ (L _ nm)          -> Just <$> tcInferId nm
       HsUnboundVar _ occ        -> Just <$> tcInferUnboundId occ
-      HsRecFld _ f              -> Just <$> go_rec_fld f
+      HsRecFld _ f              -> Just <$> tcInferRecSelId f args
       ExprWithTySig _ e hs_ty
         | isCompleteHsSig hs_ty -> addErrCtxt (exprCtxt fun) $
                                    Just <$> tcExprWithSig e hs_ty
       _                         -> return Nothing
-  where
-    -- Disgusting special case for ambiguous record selectors
-    go_rec_fld (Ambiguous _ lbl)
-      | arg1 : _ <- filterOut isArgPar args -- A value arg is first
-      , EValArg { eva_arg = ValArg (L _ arg) } <- arg1
-      , Just sig_ty <- obviousSig arg  -- A type sig on the arg disambiguates
-      = do { sig_tc_ty <- tcHsSigWcType ExprSigCtxt sig_ty
-           ; sel_name  <- disambiguateSelector lbl sig_tc_ty
-           ; tcInferRecSelId (Unambiguous sel_name lbl) }
-
-    go_rec_fld fld = tcInferRecSelId fld
-
 
 ----------------
 tcValArgs :: Bool                    -- Quick-look on?
@@ -1102,25 +1090,64 @@ non-obvious ways.
 See also Note [HsRecField and HsRecUpdField] in GHC.Hs.Pat.
 -}
 
-tcCheckRecSelId :: HsExpr GhcRn -> AmbiguousFieldOcc GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
-tcCheckRecSelId rn_expr f@(Unambiguous {}) res_ty
-  = do { (expr, actual_res_ty) <- tcInferRecSelId f
-       ; tcWrapResult rn_expr expr actual_res_ty res_ty }
+tcCheckRecSelId :: HsExpr GhcRn -> AmbiguousFieldOcc GhcRn
+                -> ExpRhoType -> TcM (HsExpr GhcTc)
+tcCheckRecSelId rn_expr (Unambiguous sel_name lbl) res_ty
+  = do { sel_id <- tc_rec_sel_id lbl sel_name
+       ; let expr = HsRecFld noExtField (Unambiguous sel_id lbl)
+       ; tcWrapResult rn_expr expr (idType sel_id) res_ty }
 tcCheckRecSelId rn_expr (Ambiguous _ lbl) res_ty
   = case tcSplitFunTy_maybe =<< checkingExpType_maybe res_ty of
       Nothing       -> ambiguousSelector lbl
       Just (arg, _) -> do { sel_name <- disambiguateSelector lbl (scaledThing arg)
-                          ; tcCheckRecSelId rn_expr (Unambiguous sel_name lbl)
-                                                    res_ty }
+                          ; sel_id <- tc_rec_sel_id lbl sel_name
+                          ; let expr = HsRecFld noExtField (Ambiguous sel_id lbl)
+                          ; tcWrapResult rn_expr expr (idType sel_id) res_ty }
 
-------------------------
-tcInferRecSelId :: AmbiguousFieldOcc GhcRn -> TcM (HsExpr GhcTc, TcRhoType)
-tcInferRecSelId (Unambiguous sel (L _ lbl))
-  = do { (expr', ty) <- tc_infer_id lbl sel
-       ; return (expr', ty) }
-tcInferRecSelId (Ambiguous _ lbl)
+tcInferRecSelId :: AmbiguousFieldOcc GhcRn -> [HsExprArg 'TcpRn]
+                -> TcM (HsExpr GhcTc, TcSigmaType)
+-- Disgusting special case for ambiguous record selectors
+tcInferRecSelId (Ambiguous _ lbl) args
+  | arg1 : _ <- filterOut isArgPar args -- A value arg is first
+  , EValArg { eva_arg = ValArg (L _ arg) } <- arg1
+  , Just sig_ty <- obviousSig arg  -- A type sig on the arg disambiguates
+  = do { sig_tc_ty <- tcHsSigWcType ExprSigCtxt sig_ty
+       ; sel_name  <- disambiguateSelector lbl sig_tc_ty
+       ; sel_id <- tc_rec_sel_id lbl sel_name
+       ; let expr = HsRecFld noExtField (Ambiguous sel_id lbl)
+       ; return (expr, idType sel_id) }
+  | otherwise
   = ambiguousSelector lbl
 
+tcInferRecSelId (Unambiguous sel_name lbl) _args
+   = do { sel_id <- tc_rec_sel_id lbl sel_name
+        ; let expr = HsRecFld noExtField (Unambiguous sel_id lbl)
+        ; return (expr, idType sel_id) }
+
+------------------------
+tc_rec_sel_id :: Located RdrName -> Name -> TcM TcId
+tc_rec_sel_id lbl sel_name
+  = do { thing <- tcLookup sel_name
+       ; case thing of
+             ATcId { tct_id = id }
+               -> do { check_naughty id        -- Note [Local record selectors]
+                     ; checkThLocalId id
+                     ; tcEmitBindingUsage $ unitUE sel_name One
+                     ; return id }
+
+             AGlobal (AnId id)
+               -> do { check_naughty id
+                     ; return id }
+                    -- A global cannot possibly be ill-staged
+                    -- nor does it need the 'lifting' treatment
+                    -- hence no checkTh stuff here
+
+             _ -> failWithTc $
+                  ppr thing <+> text "used where a value identifier was expected" }
+  where
+    check_naughty id
+      | isNaughtyRecordSelector id = failWithTc (naughtyRecordSel lbl)
+      | otherwise                  = return ()
 
 ------------------------
 -- Given a RdrName that refers to multiple record fields, and the type
@@ -1201,7 +1228,7 @@ notSelector :: Name -> SDoc
 notSelector field
   = hsep [quotes (ppr field), text "is not a record selector"]
 
-naughtyRecordSel :: RdrName -> SDoc
+naughtyRecordSel :: Located RdrName -> SDoc
 naughtyRecordSel sel_id
   = text "Cannot use record selector" <+> quotes (ppr sel_id) <+>
     text "as a function due to escaped type variables" $$
@@ -1249,11 +1276,11 @@ tcInferId id_name
   | id_name `hasKey` assertIdKey
   = do { dflags <- getDynFlags
        ; if gopt Opt_IgnoreAsserts dflags
-         then tc_infer_id (nameRdrName id_name) id_name
+         then tc_infer_id id_name
          else tc_infer_assert id_name }
 
   | otherwise
-  = do { (expr, ty) <- tc_infer_id (nameRdrName id_name) id_name
+  = do { (expr, ty) <- tc_infer_id id_name
        ; traceTc "tcInferId" (ppr id_name <+> dcolon <+> ppr ty)
        ; return (expr, ty) }
 
@@ -1267,19 +1294,17 @@ tc_infer_assert assert_name
        ; return (mkHsWrap wrap (HsVar noExtField (noLoc assert_error_id)), id_rho)
        }
 
-tc_infer_id :: RdrName -> Name -> TcM (HsExpr GhcTc, TcSigmaType)
-tc_infer_id lbl id_name
+tc_infer_id :: Name -> TcM (HsExpr GhcTc, TcSigmaType)
+tc_infer_id id_name
  = do { thing <- tcLookup id_name
       ; case thing of
              ATcId { tct_id = id }
-               -> do { check_naughty id        -- Note [Local record selectors]
-                     ; checkThLocalId id
+               -> do { checkThLocalId id
                      ; tcEmitBindingUsage $ unitUE id_name One
                      ; return_id id }
 
              AGlobal (AnId id)
-               -> do { check_naughty id
-                     ; return_id id }
+               -> return_id id
                     -- A global cannot possibly be ill-staged
                     -- nor does it need the 'lifting' treatment
                     -- hence no checkTh stuff here
@@ -1339,10 +1364,6 @@ tc_infer_id lbl id_name
                                              (HsConLikeOut noExtField (RealDataCon con))
                                   , mkInvisForAllTys tvs $ mkInvisFunTysMany theta $ mkVisFunTys scaled_arg_tys res)
            }
-
-    check_naughty id
-      | isNaughtyRecordSelector id = failWithTc (naughtyRecordSel lbl)
-      | otherwise                  = return ()
 
 
 nonBidirectionalErr :: Outputable name => name -> TcM a

@@ -73,6 +73,7 @@ import GHC.Builtin.Utils
 import GHC.Types.Name.Reader
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Gen.Expr
+import GHC.Tc.Errors( reportAllUnsolved )
 import GHC.Tc.Gen.App( tcInferSigma )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Gen.Export
@@ -2582,18 +2583,18 @@ tcRnType hsc_env flexi normalise rdr_type
         -- It can have any rank or kind
         -- First bring into scope any wildcards
        ; traceTc "tcRnType" (vcat [ppr wcs, ppr rn_type])
-       ; (ty, kind) <- pushTcLevelM_         $
-                        -- must push level to satisfy level precondition of
-                        -- kindGeneralize, below
-                       solveEqualities       $
-                       tcNamedWildCardBinders wcs $ \ wcs' ->
-                       do { mapM_ emitNamedTypeHole wcs'
-                          ; tcInferLHsTypeUnsaturated rn_type }
+       ; (_tclvl, wanted, (ty, kind))
+               <- pushLevelAndSolveEqualitiesX "tcRnType"  $
+                  tcNamedWildCardBinders wcs $ \ wcs' ->
+                  do { mapM_ emitNamedTypeHole wcs'
+                     ; tcInferLHsTypeUnsaturated rn_type }
+
+       ; checkNoErrs (reportAllUnsolved wanted)
 
        -- Do kind generalisation; see Note [Kind-generalise in tcRnType]
        ; kvs <- kindGeneralizeAll kind
-       ; e <- mkEmptyZonkEnv flexi
 
+       ; e <- mkEmptyZonkEnv flexi
        ; ty  <- zonkTcTypeToTypeX e ty
 
        -- Do validity checking on type
@@ -2607,6 +2608,7 @@ tcRnType hsc_env flexi normalise rdr_type
                 else return ty ;
 
        ; return (ty', mkInfForAllTys kvs (tcTypeKind ty')) }
+
 
 {- Note [TcRnExprMode]
 ~~~~~~~~~~~~~~~~~~~~~~

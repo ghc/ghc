@@ -4,7 +4,7 @@
 
 -}
 
-{-# LANGUAGE CPP, TupleSections, MultiWayIf, PatternSynonyms #-}
+{-# LANGUAGE CPP, TupleSections, MultiWayIf, PatternSynonyms, BangPatterns #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -75,19 +75,23 @@ module GHC.Tc.Utils.TcMType (
   zonkTcTyVarToTyVar, zonkInvisTVBinder,
   zonkTyCoVarsAndFV, zonkTcTypeAndFV, zonkDTyCoVarSetAndFV,
   zonkTyCoVarsAndFVList,
-  candidateQTyVarsOfType,  candidateQTyVarsOfKind,
-  candidateQTyVarsOfTypes, candidateQTyVarsOfKinds,
-  CandidatesQTvs(..), delCandidates, candidateKindVars, partitionCandidates,
-  zonkAndSkolemise, skolemiseQuantifiedTyVar,
-  defaultTyVar, quantifyTyVars, isQuantifiableTv,
+
   zonkTcType, zonkTcTypes, zonkCo,
   zonkTyCoVarKind, zonkTyCoVarKindBinder,
-
   zonkEvVar, zonkWC, zonkImplication, zonkSimples,
   zonkId, zonkCoVar,
   zonkCt, zonkSkolemInfo,
 
-  skolemiseUnboundMetaTyVar,
+  ---------------------------------
+  -- Promotion, defaulting, skolemisation
+  defaultTyVar, promoteTyVar, promoteTyVarSet,
+  quantifyTyVars, isQuantifiableTv,
+  skolemiseUnboundMetaTyVar, zonkAndSkolemise, skolemiseQuantifiedTyVar,
+
+  candidateQTyVarsOfType,  candidateQTyVarsOfKind,
+  candidateQTyVarsOfTypes, candidateQTyVarsOfKinds,
+  CandidatesQTvs(..), delCandidates,
+  candidateKindVars, candidateKiTyVars, partitionCandidates,
 
   ------------------------------
   -- Levity polymorphism
@@ -1256,6 +1260,25 @@ instance Outputable CandidatesQTvs where
 candidateKindVars :: CandidatesQTvs -> TyVarSet
 candidateKindVars dvs = dVarSetToVarSet (dv_kvs dvs)
 
+candidateKiTyVars :: CandidatesQTvs -> ([TyVar], [TyVar])
+-- Returns the kind and type variables, in correctly scoped order
+-- Precondition: all tyvars are zonked
+candidateKiTyVars (DV { dv_kvs = kvs, dv_tvs = tvs })
+  = (dep_kvs, nondep_tvs)
+  where
+    dep_kvs = scopedSort $ dVarSetElems kvs
+              -- scopedSort: put the kind variables into
+              --    well-scoped order.
+              --    E.g.  [k, (a::k)] not the other way round
+
+    nondep_tvs = dVarSetElems (tvs `minusDVarSet` kvs)
+                 -- See Note [Dependent type variables]
+                 -- The `minus` dep_tkvs removes any kind-level vars
+                 --    e.g. T k (a::k)   Since k appear in a kind it'll
+                 --    be in dv_kvs, and is dependent. So remove it from
+                 --    dv_tvs which will also contain k
+                 -- NB kinds of tvs are zonked by zonkTyCoVarsAndFV
+
 partitionCandidates :: CandidatesQTvs -> (TyVar -> Bool) -> (TyVarSet, CandidatesQTvs)
 -- The selected TyVars are returned as a non-deterministic TyVarSet
 partitionCandidates dvs@(DV { dv_kvs = kvs, dv_tvs = tvs }) pred
@@ -1564,7 +1587,7 @@ we leave it alone.
 Note that not *every* variable with a higher level will get generalised,
 either due to the monomorphism restriction or other quirks. See, for
 example, the code in GHC.Tc.Solver.decideMonoTyVars and in
-GHC.Tc.Gen.HsType.kindGeneralizeSome, both of which exclude certain otherwise-eligible
+GHC.Tc.Gen.HsType.kindGeneralize, both of which exclude certain otherwise-eligible
 variables from being generalised.
 
 Using level numbers for quantification is implemented in the candidateQTyVars...
@@ -1585,10 +1608,9 @@ For more information about deterministic sets see
 Note [Deterministic UniqFM] in GHC.Types.Unique.DFM.
 -}
 
-quantifyTyVars
-  :: CandidatesQTvs   -- See Note [Dependent type variables]
-                      -- Already zonked
-  -> TcM [TcTyVar]
+quantifyTyVars :: CandidatesQTvs   -- See Note [Dependent type variables]
+                                   -- Already zonked
+               -> TcM [TcTyVar]
 -- See Note [quantifyTyVars]
 -- Can be given a mixture of TcTyVars and TyVars, in the case of
 --   associated type declarations. Also accepts covars, but *never* returns any.
@@ -1604,20 +1626,9 @@ quantifyTyVars dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
        ; return [] }
 
   | otherwise
-  = do { traceTc "quantifyTyVars 1" (ppr dvs)
+  = do { traceTc "quantifyTyVars {" (ppr dvs)
 
-       ; let dep_kvs     = scopedSort $ dVarSetElems dep_tkvs
-                       -- scopedSort: put the kind variables into
-                       --    well-scoped order.
-                       --    E.g.  [k, (a::k)] not the other way round
-
-             nondep_tvs  = dVarSetElems (nondep_tkvs `minusDVarSet` dep_tkvs)
-                 -- See Note [Dependent type variables]
-                 -- The `minus` dep_tkvs removes any kind-level vars
-                 --    e.g. T k (a::k)   Since k appear in a kind it'll
-                 --    be in dv_kvs, and is dependent. So remove it from
-                 --    dv_tvs which will also contain k
-                 -- NB kinds of tvs are zonked by zonkTyCoVarsAndFV
+       ; let !(dep_kvs, nondep_tvs) = candidateKiTyVars dvs
 
              -- In the non-PolyKinds case, default the kind variables
              -- to *, and zonk the tyvars as usual.  Notice that this
@@ -1631,7 +1642,7 @@ quantifyTyVars dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
            -- mentioned in the kinds of the nondep_tvs'
            -- now refer to the dep_kvs'
 
-       ; traceTc "quantifyTyVars 2"
+       ; traceTc "quantifyTyVars }"
            (vcat [ text "nondep:"     <+> pprTyVars nondep_tvs
                  , text "dep:"        <+> pprTyVars dep_kvs
                  , text "dep_kvs'"    <+> pprTyVars dep_kvs'
@@ -1960,14 +1971,45 @@ Consider this:
 
 All very silly.   I think its harmless to ignore the problem.  We'll end up with
 a \/\a in the final result but all the occurrences of a will be zonked to ()
+-}
 
-************************************************************************
+{- *********************************************************************
+*                                                                      *
+              Promotion
+*                                                                      *
+********************************************************************* -}
+
+promoteTyVar :: TcTyVar -> TcM Bool
+-- When we float a constraint out of an implication we must restore
+-- invariant (WantedInv) in Note [TcLevel and untouchable type variables] in GHC.Tc.Utils.TcType
+-- Return True <=> we did some promotion
+-- Also returns either the original tyvar (no promotion) or the new one
+-- See Note [Promoting unification variables]
+promoteTyVar tv
+  = do { tclvl <- getTcLevel
+       ; if (isFloatedTouchableMetaTyVar tclvl tv)
+         then do { cloned_tv <- cloneMetaTyVar tv
+                 ; let rhs_tv = setMetaTyVarTcLevel cloned_tv tclvl
+                 ; writeMetaTyVar tv (mkTyVarTy rhs_tv)
+                 ; traceTc "promoteTyVar" (ppr tv <+> text "-->" <+> ppr rhs_tv)
+                 ; return True }
+         else do { traceTc "promoteTyVar: no" (ppr tv)
+                 ; return False } }
+
+-- Returns whether or not *any* tyvar is defaulted
+promoteTyVarSet :: TcTyVarSet -> TcM Bool
+promoteTyVarSet tvs
+  = do { bools <- mapM promoteTyVar (nonDetEltsUniqSet tvs)
+         -- Non-determinism is OK because order of promotion doesn't matter
+
+       ; return (or bools) }
+
+
+{- *********************************************************************
 *                                                                      *
               Zonking types
 *                                                                      *
-************************************************************************
-
--}
+********************************************************************* -}
 
 zonkTcTypeAndFV :: TcType -> TcM DTyCoVarSet
 -- Zonk a type and take its free variables

@@ -1367,7 +1367,7 @@ getFixedTyVars upd_fld_occs univ_tvs cons
 
 
 -- Disambiguate the fields in a record update.
--- See Note [Disambiguating record fields]
+-- See Note [Disambiguating record fields] in GHC.Tc.Gen.App
 disambiguateRecordBinds :: LHsExpr GhcRn -> TcRhoType
                  -> [LHsRecUpdField GhcRn] -> ExpRhoType
                  -> TcM [LHsRecField' (AmbiguousFieldOcc GhcTc) (LHsExpr GhcRn)]

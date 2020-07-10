@@ -67,7 +67,7 @@ import GHC.Utils.FV ( fvVarList, unionFV )
 
 import Control.Monad    ( when )
 import Data.Foldable    ( toList )
-import Data.List        ( partition, mapAccumL, nub, sortBy, unfoldr )
+import Data.List        ( partition, mapAccumL, sortBy, unfoldr )
 
 import {-# SOURCE #-} GHC.Tc.Errors.Hole ( findValidHoleFits )
 
@@ -213,7 +213,13 @@ report_unsolved type_errors expr_holes
             -- If we are deferring we are going to need /all/ evidence around,
             -- including the evidence produced by unflattening (zonkWC)
        ; let tidy_env = tidyFreeTyCoVars emptyTidyEnv free_tvs
-             free_tvs = tyCoVarsOfWCList wanted
+             free_tvs = filterOut isCoVar $
+                        tyCoVarsOfWCList wanted
+                        -- tyCoVarsOfWC returns free coercion *holes*, even though
+                        -- they are "bound" by other wanted constraints. They in
+                        -- turn may mention variables bound further in, which makes
+                        -- no sense. Really we should not return those holes at all;
+                        -- for now we just filter them out.
 
        ; traceTc "reportUnsolved (after zonking):" $
          vcat [ text "Free tyvars:" <+> pprTyVars free_tvs
@@ -834,7 +840,7 @@ cmp_loc ct1 ct2 = get ct1 `compare` get ct2
   where
     get ct = realSrcSpanStart (ctLocSpan (ctLoc ct))
              -- Reduce duplication by reporting only one error from each
-             -- *starting* location even if the end location differs
+             -- /starting/ location even if the end location differs
 
 reportGroup :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg) -> Reporter
 reportGroup mk_err ctxt cts =
@@ -1461,6 +1467,7 @@ mkTyVarEqErr' dflags ctxt report ct tv1 ty2
   = mkErrorMsgFromCt ctxt ct $ mconcat
         [ headline_msg
         , extraTyVarEqInfo ctxt tv1 ty2
+        , suggestAddSig ctxt ty1 ty2
         , report
         ]
 
@@ -1728,21 +1735,20 @@ extraTyVarInfo ctxt tv
 
 suggestAddSig :: ReportErrCtxt -> TcType -> TcType -> Report
 -- See Note [Suggest adding a type signature]
-suggestAddSig ctxt ty1 ty2
-  | null inferred_bndrs
+suggestAddSig ctxt ty1 _ty2
+  | null inferred_bndrs   -- No let-bound inferred binders in context
   = mempty
   | [bndr] <- inferred_bndrs
   = important $ text "Possible fix: add a type signature for" <+> quotes (ppr bndr)
   | otherwise
   = important $ text "Possible fix: add type signatures for some or all of" <+> (ppr inferred_bndrs)
   where
-    inferred_bndrs = nub (get_inf ty1 ++ get_inf ty2)
-    get_inf ty | Just tv <- tcGetTyVar_maybe ty
-               , isSkolemTyVar tv
-               , ((InferSkol prs, _) : _) <- getSkolemInfo (cec_encl ctxt) [tv]
-               = map fst prs
-               | otherwise
-               = []
+    inferred_bndrs | Just tv <- tcGetTyVar_maybe ty1
+                   , isSkolemTyVar tv
+                   , ((InferSkol prs, _) : _) <- getSkolemInfo (cec_encl ctxt) [tv]
+                   = map fst prs
+                   | otherwise
+                   = []
 
 --------------------
 misMatchMsg :: ReportErrCtxt -> Ct -> TcType -> TcType -> Report
@@ -2187,9 +2193,8 @@ sameOccExtra ty1 ty2
          mod = nameModule nm
          loc = nameSrcSpan nm
 
-{-
-Note [Suggest adding a type signature]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Suggest adding a type signature]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The OutsideIn algorithm rejects GADT programs that don't have a principal
 type, and indeed some that do.  Example:
    data T a where
@@ -2202,6 +2207,15 @@ The error that shows up tends to be an attempt to unify an
 untouchable type variable.  So suggestAddSig sees if the offending
 type variable is bound by an *inferred* signature, and suggests
 adding a declared signature instead.
+
+More specifically, we suggest adding a type sig if we have p ~ ty, and
+p is a skolem bound by an InferSkol.  Those skolems were created from
+unification variables in simplifyInfer.  Why didn't we unify?  It must
+have been because of an intervening GADT or existential, making it
+untouchable. Either way, a type signature would help.  For GADTs, it
+might make it typeable; for existentials the attempt to write a
+signature will fail -- or at least will produce a better error message
+next time
 
 This initially came up in #8968, concerning pattern synonyms.
 

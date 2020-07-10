@@ -30,6 +30,7 @@ import GHC.Tc.TyCl.Utils ( addTyConsToGblEnv )
 import GHC.Tc.TyCl.Class ( tcClassDecl2, tcATDefault,
                            HsSigFun, mkHsSigFun, badMethodErr,
                            findMethodBind, instantiateMethod )
+import GHC.Tc.Solver( pushLevelAndSolveEqualitiesX, reportUnsolvedEqualities )
 import GHC.Tc.Gen.Sig
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Validity
@@ -851,11 +852,10 @@ tcDataFamInstHeader
 tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
                     hs_ctxt hs_pats m_ksig hs_cons new_or_data
   = do { traceTc "tcDataFamInstHeader {" (ppr fam_tc <+> ppr hs_pats)
-       ; (imp_tvs, (exp_tvs, (stupid_theta, lhs_ty, res_kind)))
-            <- pushTcLevelM_                                $
-               solveEqualities                              $
-               bindImplicitTKBndrs_Q_Skol imp_vars          $
-               bindExplicitTKBndrs_Q_Skol AnyKind exp_bndrs $
+       ; (tclvl, wanted, (imp_tvs, (exp_tvs, (stupid_theta, lhs_ty, res_kind))))
+            <- pushLevelAndSolveEqualitiesX "tcDataFamInstHeader" $
+               bindImplicitTKBndrs_Q_Skol imp_vars                $
+               bindExplicitTKBndrs_Q_Skol AnyKind exp_bndrs       $
                do { stupid_theta <- tcHsContext hs_ctxt
                   ; (lhs_ty, lhs_kind) <- tcFamTyPats fam_tc hs_pats
 
@@ -886,21 +886,23 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
                            , lhs_applied_ty
                            , res_kind ) }
 
-       -- See GHC.Tc.TyCl Note [Generalising in tcFamTyPatsGuts]
        -- This code (and the stuff immediately above) is very similar
        -- to that in tcTyFamInstEqnGuts.  Maybe we should abstract the
        -- common code; but for the moment I concluded that it's
        -- clearer to duplicate it.  Still, if you fix a bug here,
        -- check there too!
-       ; let scoped_tvs = imp_tvs ++ exp_tvs
-       ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys scoped_tvs)
+
+       -- See GHC.Tc.TyCl Note [Generalising in tcFamTyPatsGuts]
+       ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys (imp_tvs ++ exp_tvs))
+       ; let (kvs,tvs) = candidateKiTyVars dvs
+       ; reportUnsolvedEqualities FamInstSkol (kvs++tvs) tclvl wanted
        ; qtvs <- quantifyTyVars dvs
 
        -- Zonk the patterns etc into the Type world
        ; (ze, qtvs)   <- zonkTyBndrs qtvs
-       ; lhs_ty       <- zonkTcTypeToTypeX ze lhs_ty
+       ; lhs_ty       <- zonkTcTypeToTypeX   ze lhs_ty
        ; stupid_theta <- zonkTcTypesToTypesX ze stupid_theta
-       ; res_kind     <- zonkTcTypeToTypeX ze res_kind
+       ; res_kind     <- zonkTcTypeToTypeX   ze res_kind
 
        -- We check that res_kind is OK with checkDataKindSig in
        -- tcDataFamInstDecl, after eta-expansion.  We need to check that
@@ -916,9 +918,9 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
 
        ; return (qtvs, pats, res_kind, stupid_theta) }
   where
-    fam_name  = tyConName fam_tc
-    data_ctxt = DataKindCtxt fam_name
-    exp_bndrs = mb_bndrs `orElse` []
+    fam_name   = tyConName fam_tc
+    data_ctxt  = DataKindCtxt fam_name
+    exp_bndrs  = mb_bndrs `orElse` []
 
     -- See Note [Implementation of UnliftedNewtypes] in GHC.Tc.TyCl, wrinkle (2).
     tc_kind_sig Nothing

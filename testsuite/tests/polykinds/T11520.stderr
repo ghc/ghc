@@ -1,6 +1,6 @@
 
 T11520.hs:15:77: error:
-    • Expected kind ‘k2 -> k1’, but ‘g’ has kind ‘k’
+    • Expected kind ‘k20 -> k10’, but ‘g’ has kind ‘k’
       ‘k’ is a rigid type variable bound by
         the instance declaration
         at T11520.hs:(15,1)-(16,23)

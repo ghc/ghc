@@ -42,7 +42,7 @@ import Data.List        ( partition, sort, sortOn, nubBy )
 import Data.Graph       ( graphFromEdges, topSort )
 
 
-import GHC.Tc.Solver    ( simpl_top, runTcSDeriveds )
+import GHC.Tc.Solver    ( simplifyTopWanteds, runTcSDeriveds )
 import GHC.Tc.Utils.Unify ( tcSubTypeSigma )
 
 import GHC.HsToCore.Docs ( extractDocs )
@@ -953,7 +953,7 @@ tcCheckHoleFit (TypedHole {..}) hole_ty ty = discardErrs $
                      w_rel_cts = addSimples wanted cloned_relevants
                      final_wc  = foldr (setWCAndBinds fresh_binds) w_rel_cts outermost_first
                ; traceTc "final_wc is: " $ ppr final_wc
-               ; rem <- runTcSDeriveds $ simpl_top final_wc
+               ; rem <- runTcSDeriveds $ simplifyTopWanteds final_wc
                -- We don't want any insoluble or simple constraints left, but
                -- solved implications are ok (and necessary for e.g. undefined)
                ; traceTc "rems was:" $ ppr rem
