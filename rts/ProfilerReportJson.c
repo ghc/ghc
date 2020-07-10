@@ -15,23 +15,35 @@
 #include "ProfilerReportJson.h"
 #include "Profiling.h"
 
-// This only handles characters that you might see in a Haskell cost-centre
-// name.
-static void escapeString(char const* str, char *out, int len)
+#include <string.h>
+
+// I don't think this code is all that perf critical.
+// So we just allocate a new buffer each time around.
+static void escapeString(char const* str, char **buf)
 {
-    len--; // reserve character in output for terminating NUL
-    for (; *str != '\0' && len > 0; str++) {
+    char *out;
+    size_t req_size; //Max required size for decoding.
+    size_t in_size;  //Input size, including zero.
+
+    in_size = strlen(str) + 1;
+    // The strings are generally small and short
+    // lived so should be ok to just double the size.
+    req_size = in_size * 2;
+    out = stgMallocBytes(req_size, "writeCCSReportJson");
+    *buf = out;
+    // We provide an outputbuffer twice the size of the input,
+    // and at worse double the output size. So we can skip
+    // length checks.
+    for (; *str != '\0'; str++) {
         char c = *str;
         if (c == '\\') {
-            if (len < 2) break;
-            *out = '\\'; out++; len--;
-            *out = '\\'; out++; len--;
+            *out = '\\'; out++;
+            *out = '\\'; out++;
         } else if (c == '\n') {
-            if (len < 2) break;
-            *out = '\\'; out++; len--;
-            *out = 'n';  out++; len--;
+            *out = '\\'; out++;
+            *out = 'n';  out++;
         } else {
-            *out = c; out++; len--;
+            *out = c; out++;
         }
     }
     *out = '\0';
@@ -40,11 +52,13 @@ static void escapeString(char const* str, char *out, int len)
 static void
 logCostCentres(FILE *prof_file)
 {
-    char tmp[256];
+    char* lbl;
+    char* src_loc;
     bool needs_comma = false;
     fprintf(prof_file, "[\n");
     for (CostCentre *cc = CC_LIST; cc != NULL; cc = cc->link) {
-        escapeString(cc->label, tmp, sizeof(tmp));
+        escapeString(cc->label, &lbl);
+        escapeString(cc->srcloc, &src_loc);
         fprintf(prof_file,
                 "%s"
                 "{\"id\": %" FMT_Int ", "
@@ -53,11 +67,13 @@ logCostCentres(FILE *prof_file)
                 "\"src_loc\": \"%s\", "
                 "\"is_caf\": %s}",
                 needs_comma ? ", " : "",
-                cc->ccID, tmp, cc->module, cc->srcloc,
+                cc->ccID, lbl, cc->module, src_loc,
                 cc->is_caf ? "true" : "false");
         needs_comma = true;
     }
     fprintf(prof_file, "]\n");
+    stgFree(lbl);
+    stgFree(src_loc);
 }
 
 static void
@@ -92,15 +108,24 @@ writeCCSReportJson(FILE *prof_file,
                    CostCentreStack const *stack,
                    ProfilerTotals totals)
 {
+
     fprintf(prof_file, "{\n\"program\": \"%s\",\n", prog_name);
     fprintf(prof_file, "\"arguments\": [");
-    for (int count = 0; prog_argv[count]; count++)
+    for (int count = 0; prog_argv[count]; count++) {
+        char* arg;
+        escapeString(prog_argv[count], &arg);
         fprintf(prof_file, "%s\"%s\"",
-                count == 0 ? "" : ", ", prog_argv[count]);
+                count == 0 ? "" : ", ", arg);
+        stgFree(arg);
+    }
     fprintf(prof_file, "],\n\"rts_arguments\": [");
-    for (int count = 0; rts_argv[count]; count++)
+    for (int count = 0; rts_argv[count]; count++) {
+        char* arg;
+        escapeString(rts_argv[count], &arg);
         fprintf(prof_file, "%s\"%s\"",
-                count == 0 ? "" : ", ", rts_argv[count]);
+                count == 0 ? "" : ", ", arg);
+        stgFree(arg);
+    }
     fprintf(prof_file, "],\n");
 
     fprintf(prof_file, "\"end_time\": \"%s\",\n", time_str());
@@ -121,6 +146,7 @@ writeCCSReportJson(FILE *prof_file,
     fprintf(prof_file, ",\n\"profile\": ");
     logCostCentreStack(prof_file, stack);
     fprintf(prof_file, "}\n");
+
 }
 
 
