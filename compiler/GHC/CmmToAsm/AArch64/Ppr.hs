@@ -250,6 +250,9 @@ pprImm (ImmConstantDiff a b) = pprImm a <> char '-'
 asmComment :: SDoc -> SDoc
 asmComment c = whenPprDebug $ text "#" <+> c
 
+asmDoubleslashComment :: SDoc -> SDoc
+asmDoubleslashComment c = whenPprDebug $ text "//" <+> c
+
 asmMultilineComment :: SDoc -> SDoc
 asmMultilineComment c = whenPprDebug $ text "/*" $+$ c $+$ text "*/"
 
@@ -353,7 +356,7 @@ pprInstr platform instr = case instr of
   -- Meta Instructions ---------------------------------------------------------
   COMMENT s  -> asmComment s
   MULTILINE_COMMENT s -> asmMultilineComment s
-  ANN d i -> pprInstr platform i <+> asmComment d
+  ANN d i -> pprInstr platform i <+> asmDoubleslashComment d
   LOCATION file line col _name
     -> text "\t.loc" <+> ppr file <+> ppr line <+> ppr col
   DELTA d    -> asmComment $ text ("\tdelta = " ++ show d)
