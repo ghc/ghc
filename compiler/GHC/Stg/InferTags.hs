@@ -20,6 +20,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 {-# OPTIONS_GHC -O2 -ddump-simpl -ddump-to-file -ddump-stg -ddump-cmm -ddump-asm #-}
 {-# OPTIONS_GHC -dsuppress-all -dno-suppress-type-signatures -dno-suppress-module-prefixes #-}
@@ -94,6 +95,8 @@ import GHC.IO (IO(..))
 import Data.Array.MArray as M
 import Data.Array.IO as IOA
 import Data.IORef
+
+import GHC.Exts (oneShot, dataToTag#)
 {-
 
     Note [Debugging Taggedness]
@@ -706,7 +709,30 @@ data FieldInfo
 
     -- | We might find out more about the fields
     | FieldsUndet
-    deriving (Eq,Generic)
+    deriving (Generic)
+
+instance Eq FieldInfo where
+    -- x == y
+    --     | maybeEq x y == True
+    FieldsNone == FieldsNone = True
+    FieldsUnknown == FieldsUnknown = True
+    FieldsUndet == FieldsUndet = True
+    (FieldsSum mb_con1 flds1) == (FieldsSum mb_con2 flds2)
+        = mb_con1 == mb_con2 && eqEnterLattices flds1 flds2
+    (FieldsUntyped flds1) == (FieldsUntyped flds2)
+        = eqEnterLattices flds1 flds2
+    (FieldsProd flds1) == (FieldsProd flds2)
+        = eqEnterLattices flds1 flds2
+    _ == _ = False
+
+-- Relying on Eq [a] ends up not specializing which is quite
+-- bad for performance :( So I handwrote this after the obvious
+-- attempts failed.
+eqEnterLattices :: [EnterLattice] -> [EnterLattice] -> Bool
+eqEnterLattices [] [] = True
+eqEnterLattices (x:xs) (y:ys) =
+    x == y && eqEnterLattices xs ys
+eqEnterLattices _ _ = False
 
 instance NFData FieldInfo where
     rnf x = seq x ()
@@ -949,20 +975,20 @@ newtype AM a = AM { runAM :: FlowState -> State# RealWorld
                   } deriving Functor
 
 instance Applicative AM where
-   pure x   = AM $ \env s -> (# x, env, s #)
-   m <*> n  = AM $ \env s -> case runAM m env s of
-                            (# f, env', s' #) -> case runAM n env' s' of
-                                           (# x, env'', s'' #) -> (# f x, env'', s'' #)
+   pure x   = AM $ oneShot $ \env s -> (# x, env, s #)
+   m <*> n  = AM $ oneShot $ \env s -> case runAM m env s of
+                                (# f, env', s' #) -> case runAM n env' s' of
+                                            (# x, env'', s'' #) -> (# f x, env'', s'' #)
 
 instance Monad AM where
-    m >>= n  = AM $ \env s -> case runAM m env s of
-                             (# r, env', s' #) -> runAM (n r) env' s'
+    m >>= n  = AM $ oneShot $ \env s -> case runAM m env s of
+                                (# r, env', s' #) -> runAM (n r) env' s'
 
 get :: AM FlowState
-get = AM $ \env s -> (# env, env, s #)
+get = AM $ oneShot $ \env s -> (# env, env, s #)
 
 put :: FlowState -> AM ()
-put !env = AM $ \_ s -> (# (), env, s #)
+put !env = AM $ oneShot $ \_ s -> (# (), env, s #)
 
 evalAM :: FlowState -> AM a -> a
 evalAM env (AM f) = runRW# $ \s ->
@@ -971,9 +997,9 @@ evalAM env (AM f) = runRW# $ \s ->
 
 instance MonadIO AM where
     liftIO (IO f) =
-        AM $ \env s ->
-            case f s of
-                (# s', !x #) -> (# x, env, s' #)
+        AM $ oneShot $ \env s ->
+                case f s of
+                    (# s', !x #) -> (# x, env, s' #)
 
 
 -- TODO: Add to list in UniqSupply
@@ -1087,7 +1113,7 @@ getConArgNodeId ctxt (StgVarArg v )
     | isFunTy (unwrapType $ idType v)
     = return neverNodeId
     | otherwise
-    = mkIdNodeId ctxt v
+    = getIdNodeId ctxt v
 
 -- TODO: We could put the result into it's own map of NodeId -> EnterLattice
 --       or even an array. But that complicates the code somewhat and performance
@@ -1365,7 +1391,7 @@ However imported Id's can show up in any place in the AST.
 We solve this by creating a Node and NodeId for each imported
 id when we come across the id the first time.
 
-The next time we come across the same id mkIdNodeId will check
+The next time we come across the same id getIdNodeId will check
 fs_idNodeMap, find the node we created earlier and return the
 same node.
 
@@ -1396,18 +1422,22 @@ TODO: LFInfo contains the tags and is exported in Interface files.
 Shadowing makes things slightly more complex.
 
 For constructs potentially introducing a shadowing id like
-case binders, or the binders of case alternatives we create
-a new NodeId when traversing the AST. When we want to get the
-nodeId for a particular id given a context we use mkLocalIdNodeId.
+case binders, or the binders of case alternatives we have to
+create a new NodeId while traversing the AST.
 
-We use mkIdNodeId if the id might be imported, which runs in our
+When we want to get the nodeId for a particular id which is
+already present in a context we use getKnownIdNodeId instead.
+This essentially ist just the case if we are looking at a RHS
+and want to look up the node to which it is bound.
+
+We use getIdNodeId if the id might be imported, which runs in our
 monad and adds it to a map of ids which maps Id -> NodeId.
 
 -}
 
 -- See Note [Shadowing and NodeIds]
-mkIdNodeId :: HasDebugCallStack => [SynContext] -> Id -> AM NodeId
-mkIdNodeId ctxt id
+getIdNodeId :: HasDebugCallStack => [SynContext] -> Id -> AM NodeId
+getIdNodeId ctxt id
     | Just node <- idMappedInCtxt id ctxt
     = return $! node
     | otherwise = do
@@ -1416,8 +1446,8 @@ mkIdNodeId ctxt id
             lookupUFM (fs_idNodeMap s) id
 
 -- See Note [Shadowing and NodeIds]
-mkLocalIdNodeId :: HasDebugCallStack => [SynContext] -> Id -> NodeId
-mkLocalIdNodeId ctxt id
+getKnownIdNodeId :: HasDebugCallStack => [SynContext] -> Id -> NodeId
+getKnownIdNodeId ctxt id
     | Just node <- idMappedInCtxt id ctxt
     = node
     | otherwise = pprPanic "Local id not mapped:" (ppr id)
@@ -1527,7 +1557,7 @@ nodesTopBinds this_mod binds = do
     let top_level_binds = mkVarSet (bindersOfTopBinds binds) :: IdSet
     -- We preallocate node ids for the case where we must reference an node by id
     -- before we traversed the defining binding.
-    let bind_ids = (nonDetEltsUniqSet top_level_binds)
+    let bind_ids = (nonDetEltsUniqSet top_level_binds) :: [Id]
     mappings <- mapM (mkCtxtEntry []) bind_ids :: AM [(Id,NodeId)]
     let topCtxt = CTopLevel $ mkVarEnv mappings
     binds' <- mapM (nodesTop this_mod topCtxt) binds
@@ -1536,7 +1566,7 @@ nodesTopBinds this_mod binds = do
 nodesTop :: Module -> SynContext -> StgTopBinding -> AM InferStgTopBinding
 nodesTop _this_mod ctxt (StgTopStringLit v str) = do
     -- String literals are never entered.
-    let node_id = mkLocalIdNodeId [ctxt] v
+    let node_id = getKnownIdNodeId [ctxt] v
     let node = mkConstNode node_id (flatLattice NeverEnter)
                     `set_desc` text "c_str"
     markDone node
@@ -1686,7 +1716,7 @@ nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ ccs con args)
 
         return $! (StgRhsCon (node_id,remainsConRhs) ccs con args)
   where
-    node_id = mkLocalIdNodeId ctxt binding
+    node_id = getKnownIdNodeId ctxt binding
     !remainsConRhs
         | isTopLevel topFlag            = MaybeClosure
         -- a.1)
@@ -1796,7 +1826,7 @@ nodeRhs this_mod ctxt _topFlag binding (StgRhsClosure _ext _ccs _flag args body)
     return $! (StgRhsClosure _ext _ccs _flag args body')
 
   where
-    node_id = mkLocalIdNodeId ctxt binding
+    node_id = getKnownIdNodeId ctxt binding
 #if defined(WITH_NODE_DESC)
     node_desc
         | null args = text "rhsThunk:" <> (ppr binding)
@@ -2287,7 +2317,7 @@ nodeApp this_mod ctxt expr@(StgApp _ f args) = do
 
     -- We check if f is imported using importedFuncNode_Maybe so this
     -- is guarantedd to be not imported when demanded.
-    f_node_id = mkLocalIdNodeId ctxt f
+    f_node_id = getKnownIdNodeId ctxt f
 
     recursionKind = getRecursionKind ctxt
 
@@ -2660,11 +2690,13 @@ mkLocalArgId id = do
     return $! setIdUnique (localiseId id) u
 
 -- These are inserted by the WW transformation and we treat them semantically as tagged.
--- This avoids us seqing them again.
+-- This avoids us seqing them when we shouldn't.
+-- We only have to look at the strictness for imported ids so we don't check it here
+-- for performance reasons.
 isAbsentExpr :: GenStgExpr p -> Bool
 isAbsentExpr (StgTick _t e) = isAbsentExpr e
 isAbsentExpr (StgApp _ f _)
-  | (_, Absent) <- splitStrictSig (idStrictness f)
-  = pprTrace "isAbsentViaImpossible:" (ppr f) True
+--   | (_, Absent) <- splitStrictSig (idStrictness f)
+--   = pprTrace "isAbsentViaImpossible:" (ppr f) True
   | idUnique f == absentErrorIdKey = True
 isAbsentExpr _ = False
