@@ -121,7 +121,7 @@ regTableOffset dflags n =
 get_Regtable_addr_from_offset :: DynFlags -> Int -> CmmExpr
 get_Regtable_addr_from_offset dflags offset =
     if haveRegBase (targetPlatform dflags)
-    then CmmRegOff baseReg offset
+    then cmmRegOff baseReg offset
     else regTableOffset dflags offset
 
 -- | Fixup global registers so that they assign to locations within the
