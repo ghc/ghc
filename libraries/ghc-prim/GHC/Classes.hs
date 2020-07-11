@@ -395,6 +395,7 @@ instance (Ord a) => Ord [a] where
     {-# SPECIALISE instance Ord [[Char]] #-}
     {-# SPECIALISE instance Ord [Char] #-}
     {-# SPECIALISE instance Ord [Int] #-}
+    {-# INLINEABLE compare #-}
     compare []     []     = EQ
     compare []     (_:_)  = LT
     compare (_:_)  []     = GT
