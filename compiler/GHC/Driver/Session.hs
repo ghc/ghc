@@ -3487,6 +3487,11 @@ fFlagsDeps = [
 -- See Note [Supporting CLI completion]
 -- Please keep the list of flags below sorted alphabetically
   flagSpec "asm-shortcutting"                 Opt_AsmShortcutting,
+  flagSpec "asm-jumptables"                   Opt_AsmJumpTables,
+  flagSpec "asm-regoffsets"                   Opt_AsmRegOffsets,
+  flagSpec "asm-usezeroreg"                   Opt_AsmUseZeroReg,
+  flagSpec "asm-immload"                      Opt_AsmImmLoad,
+  flagSpec "asm-negoffset"                    Opt_AsmNegOffset,
   flagGhciSpec "break-on-error"               Opt_BreakOnError,
   flagGhciSpec "break-on-exception"           Opt_BreakOnException,
   flagSpec "building-cabal-package"           Opt_BuildingCabalPackage,
@@ -4052,6 +4057,12 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_CaseFolding)
     , ([1,2],   Opt_CmmElimCommonBlocks)
     , ([2],     Opt_AsmShortcutting)
+    , ([0,1,2], Opt_AsmJumpTables)
+    , ([0,1,2], Opt_AsmRegOffsets)
+    , ([0,1,2], Opt_AsmUseZeroReg)
+    , ([0,1,2], Opt_AsmZeroCmp)
+    , ([0,1,2], Opt_AsmImmLoad)
+    , ([0,1,2], Opt_AsmNegOffset)
     , ([1,2],   Opt_CmmSink)
     , ([1,2],   Opt_CmmStaticPred)
     , ([1,2],   Opt_CSE)

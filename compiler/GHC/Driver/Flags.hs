@@ -185,13 +185,19 @@ data GeneralFlag
    | Opt_CmmStaticPred
    | Opt_CmmElimCommonBlocks
    | Opt_AsmShortcutting
+   | Opt_AsmJumpTables                  -- Emit jumptables instead of a sequence of inline jumps.
+   | Opt_AsmRegOffsets                  -- Destructure Register Offsets.
+   | Opt_AsmUseZeroReg                  -- Try to use Zero Registers where appropriate
+   | Opt_AsmZeroCmp                     -- Use zero compare where possible
+   | Opt_AsmImmLoad                     -- Load Immediates in as few instructions as possible
+   | Opt_AsmNegOffset                   -- Use SUB $n instead of ADD -$n.
    | Opt_OmitYields
-   | Opt_FunToThunk               -- allow GHC.Core.Opt.WorkWrap.Utils.mkWorkerArgs to remove all value lambdas
-   | Opt_DictsStrict                     -- be strict in argument dictionaries
-   | Opt_DmdTxDictSel              -- use a special demand transformer for dictionary selectors
+   | Opt_FunToThunk                     -- allow GHC.Core.Opt.WorkWrap.Utils.mkWorkerArgs to remove all value lambdas
+   | Opt_DictsStrict                    -- be strict in argument dictionaries
+   | Opt_DmdTxDictSel                   -- use a special demand transformer for dictionary selectors
    | Opt_Loopification                  -- See Note [Self-recursive tail calls]
-   | Opt_CfgBlocklayout             -- ^ Use the cfg based block layout algorithm.
-   | Opt_WeightlessBlocklayout         -- ^ Layout based on last instruction per block.
+   | Opt_CfgBlocklayout                 -- ^ Use the cfg based block layout algorithm.
+   | Opt_WeightlessBlocklayout          -- ^ Layout based on last instruction per block.
    | Opt_CprAnal
    | Opt_WorkerWrapper
    | Opt_SolveConstantDicts
