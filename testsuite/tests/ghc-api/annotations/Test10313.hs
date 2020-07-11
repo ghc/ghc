@@ -28,8 +28,7 @@ foreign import prim unsafe "a\x62" a :: IO Int
 
 {-# INLINE strictStream #-}
 strictStream (Bitstream l v)
-    = {-# CORE "Strict Bitstream stre\x61m" #-}
-      S.concatMap stream (GV.stream v)
+    = S.concatMap stream (GV.stream v)
       `S.sized`
       Exact l
 
