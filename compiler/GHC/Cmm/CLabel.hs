@@ -280,6 +280,9 @@ data CLabel
 
   deriving Eq
 
+instance Show CLabel where
+  show = showSDocUnsafe . ppr
+
 isIdLabel :: CLabel -> Bool
 isIdLabel IdLabel{} = True
 isIdLabel _ = False
