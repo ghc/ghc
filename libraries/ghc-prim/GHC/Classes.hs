@@ -184,6 +184,7 @@ instance (Eq a) => Eq [a] where
     {-# SPECIALISE instance Eq [[Char]] #-}
     {-# SPECIALISE instance Eq [Char] #-}
     {-# SPECIALISE instance Eq [Int] #-}
+    {-# INLINEABLE (==) #-}
     []     == []     = True
     (x:xs) == (y:ys) = x == y && xs == ys
     _xs    == _ys    = False
