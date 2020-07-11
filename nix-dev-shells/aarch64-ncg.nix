@@ -60,6 +60,14 @@ pkgs.mkShell {
         echo "WARN: not in ghc-test, not running!"
       fi
     }
+    function generic-build () {
+      case "$(basename $PWD)" in
+        ghc) build-ghc && make install ;;
+        ghc-ncg) PATH=\$HOME/opt/bin:\$PATH build-ncg ;;
+        ghc-llvm) PATH=\$HOME/opt/bin:\$PATH build-llvm ;;
+        *) echo "unknown path $PWD" ;;
+      esac
+    }
     echo "=== active worktrees ==="
     git worktree list
     echo "=== the following fuctions are available ==="
@@ -67,10 +75,15 @@ pkgs.mkShell {
     echo "  use this to build the stage2 ghc to use for the llvm and ncg builds"
     echo "build-llvm -- build the llvm ghc"
     echo "  e.g. time PATH=\$HOME/opt/bin:\$PATH build-llvm"
-    echo "build-ghc -- build the ncg ghc"
+    echo "build-ncg -- build the ncg ghc"
     echo "  e.g. time PATH=\$HOME/opt/bin:\$PATH build-ncg"
     echo "run-test <arg> -- run the test-suite."
     echo "  run-test ghc-llvm, or run-test ghc-ncg"
+
+    alias tn="time run-test ghc-ncg"
+    alias tl="time run-test ghc-llvm"
+    alias b="time generic-build"
+
   '';
   hardeningDisable = [ "format" "fortify" ];
   buildInputs = with pkgs; [
