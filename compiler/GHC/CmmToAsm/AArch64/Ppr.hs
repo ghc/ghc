@@ -353,6 +353,7 @@ pprInstr platform instr = case instr of
   -- Meta Instructions ---------------------------------------------------------
   COMMENT s  -> asmComment s
   MULTILINE_COMMENT s -> asmMultilineComment s
+  ANN d i -> pprInstr platform i <+> asmComment d
   LOCATION file line col _name
     -> text "\t.loc" <+> ppr file <+> ppr line <+> ppr col
   DELTA d    -> asmComment $ text ("\tdelta = " ++ show d)
