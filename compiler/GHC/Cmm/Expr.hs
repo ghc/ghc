@@ -64,6 +64,7 @@ data CmmExpr
         --        ** is shorthand only, meaning **
         -- CmmMachOp (MO_Add rep) [x, CmmLit (CmmInt (fromIntegral i) rep)]
         --      where rep = typeWidth (cmmRegType reg)
+  deriving Show
 
 instance Eq CmmExpr where       -- Equality ignores the types
   CmmLit l1          == CmmLit l2          = l1==l2
@@ -77,7 +78,7 @@ instance Eq CmmExpr where       -- Equality ignores the types
 data CmmReg
   = CmmLocal  {-# UNPACK #-} !LocalReg
   | CmmGlobal GlobalReg
-  deriving( Eq, Ord )
+  deriving( Eq, Ord, Show )
 
 -- | A stack area is either the stack slot where a variable is spilled
 -- or the stack space where function arguments and results are passed.
@@ -85,7 +86,7 @@ data Area
   = Old            -- See Note [Old Area]
   | Young {-# UNPACK #-} !BlockId  -- Invariant: must be a continuation BlockId
                    -- See Note [Continuation BlockId] in GHC.Cmm.Node.
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Show)
 
 {- Note [Old Area]
 ~~~~~~~~~~~~~~~~~~
@@ -208,7 +209,7 @@ data CmmLit
                      -- During the stack-layout pass, CmmHighStackMark
                      -- is replaced by a CmmInt for the actual number
                      -- of bytes used
-  deriving Eq
+  deriving (Eq, Show)
 
 cmmExprType :: Platform -> CmmExpr -> CmmType
 cmmExprType platform = \case
@@ -268,6 +269,7 @@ data LocalReg
     -- ^ Parameters:
     --   1. Identifier
     --   2. Type
+  deriving Show
 
 instance Eq LocalReg where
   (LocalReg u1 _) == (LocalReg u2 _) = u1 == u2
