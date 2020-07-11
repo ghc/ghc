@@ -626,6 +626,7 @@ Library
             GHC.CmmToAsm.Reg.Linear.X86_64
             GHC.CmmToAsm.Reg.Linear.PPC
             GHC.CmmToAsm.Reg.Linear.SPARC
+            GHC.CmmToAsm.Reg.Utils
             GHC.CmmToAsm.Dwarf
             GHC.CmmToAsm.Dwarf.Types
             GHC.CmmToAsm.Dwarf.Constants

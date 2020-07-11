@@ -46,14 +46,16 @@ findNameBndr target b
 mainPass :: ModGuts -> CoreM ModGuts
 mainPass guts = do
     putMsgS "Simple Plugin Pass Run"
-    (_, anns) <- getAnnotations deserializeWithData guts
-    bindsOnlyPass (mapM (changeBind anns Nothing)) guts
+    (_, anns) <- getAnnotations deserializeWithData guts :: CoreM (ModuleEnv [ReplaceWith], NameEnv [ReplaceWith])
+    -- Var's have the same uniques as their names. Making a cast from NameEnv to VarEnv safe.
+    let anns' = unsafeCastUFMKey anns :: VarEnv [ReplaceWith]
+    bindsOnlyPass (mapM (changeBind anns' Nothing)) guts
 
-changeBind :: UniqFM [ReplaceWith] -> Maybe String -> CoreBind -> CoreM CoreBind
+changeBind :: VarEnv [ReplaceWith] -> Maybe String -> CoreBind -> CoreM CoreBind
 changeBind anns mb_replacement (NonRec b e) = changeBindPr anns mb_replacement b e >>= (return . uncurry NonRec)
 changeBind anns mb_replacement (Rec bes) = liftM Rec $ mapM (uncurry (changeBindPr anns mb_replacement)) bes
 
-changeBindPr :: UniqFM [ReplaceWith] -> Maybe String -> CoreBndr -> CoreExpr -> CoreM (CoreBndr, CoreExpr)
+changeBindPr :: VarEnv [ReplaceWith] -> Maybe String -> CoreBndr -> CoreExpr -> CoreM (CoreBndr, CoreExpr)
 changeBindPr anns mb_replacement b e = do
     case lookupWithDefaultUFM anns [] b of
         [] -> do
@@ -65,7 +67,7 @@ changeBindPr anns mb_replacement b e = do
         _ -> do dflags <- getDynFlags
                 error ("Too many change_anns on one binder:" ++ showPpr dflags b)
 
-changeExpr :: UniqFM [ReplaceWith] -> Maybe String -> CoreExpr -> CoreM CoreExpr
+changeExpr :: VarEnv [ReplaceWith] -> Maybe String -> CoreExpr -> CoreM CoreExpr
 changeExpr anns mb_replacement e = let go = changeExpr anns mb_replacement in case e of
         Lit (LitString _) -> case mb_replacement of
                 Nothing -> return e
@@ -80,5 +82,5 @@ changeExpr anns mb_replacement e = let go = changeExpr anns mb_replacement in ca
         Tick t e -> liftM (Tick t) (go e)
         _ -> return e
 
-changeAlt :: UniqFM [ReplaceWith] -> Maybe String -> CoreAlt -> CoreM CoreAlt
+changeAlt :: VarEnv [ReplaceWith] -> Maybe String -> CoreAlt -> CoreM CoreAlt
 changeAlt anns mb_replacement (con, bs, e) = liftM (\e' -> (con, bs, e')) (changeExpr anns mb_replacement e)

@@ -66,9 +66,14 @@ import Data.IntSet              (IntSet)
 -----------------------------------------------------------------------------
 type RegSet = UniqSet Reg
 
-type RegMap a = UniqFM a
+-- | Map from some kind of register to a.
+--
+-- While we give the type for keys as Reg which is the common case
+-- sometimes we end up using VirtualReq or naked Uniques.
+-- See Note [UniqFM and the register allocator]
+type RegMap a = UniqFM Reg a
 
-emptyRegMap :: UniqFM a
+emptyRegMap :: RegMap a
 emptyRegMap = emptyUFM
 
 emptyRegSet :: RegSet
@@ -76,6 +81,9 @@ emptyRegSet = emptyUniqSet
 
 type BlockMap a = LabelMap a
 
+type SlotMap a = UniqFM Slot a
+
+type Slot = Int
 
 -- | A top level thing which carries liveness information.
 type LiveCmmDecl statics instr
@@ -400,7 +408,7 @@ slurpReloadCoalesce live
            in   unionManyBags (cs : moveBags)
 
         slurpCompM :: [LiveBasicBlock instr]
-                   -> State (UniqFM [UniqFM Reg]) [Bag (Reg, Reg)]
+                   -> State (UniqFM BlockId [UniqFM Slot Reg]) [Bag (Reg, Reg)]
         slurpCompM blocks
          = do   -- run the analysis once to record the mapping across jumps.
                 mapM_   (slurpBlock False) blocks
@@ -412,7 +420,7 @@ slurpReloadCoalesce live
                 mapM    (slurpBlock True) blocks
 
         slurpBlock :: Bool -> LiveBasicBlock instr
-                   -> State (UniqFM [UniqFM Reg]) (Bag (Reg, Reg))
+                   -> State (UniqFM BlockId [UniqFM Slot Reg]) (Bag (Reg, Reg))
         slurpBlock propagate (BasicBlock blockId instrs)
          = do   -- grab the slot map for entry to this block
                 slotMap         <- if propagate
@@ -422,12 +430,12 @@ slurpReloadCoalesce live
                 (_, mMoves)     <- mapAccumLM slurpLI slotMap instrs
                 return $ listToBag $ catMaybes mMoves
 
-        slurpLI :: UniqFM Reg                           -- current slotMap
+        slurpLI :: SlotMap Reg                           -- current slotMap
                 -> LiveInstr instr
-                -> State (UniqFM [UniqFM Reg])          -- blockId -> [slot -> reg]
+                -> State (UniqFM BlockId [SlotMap Reg])  -- blockId -> [slot -> reg]
                                                         --      for tracking slotMaps across jumps
 
-                         ( UniqFM Reg                   -- new slotMap
+                         ( SlotMap Reg           -- new slotMap
                          , Maybe (Reg, Reg))            -- maybe a new coalesce edge
 
         slurpLI slotMap li
@@ -467,15 +475,18 @@ slurpReloadCoalesce live
                 let slotMaps    = fromMaybe [] (lookupUFM map blockId)
                 return          $ foldr mergeSlotMaps emptyUFM slotMaps
 
-        mergeSlotMaps :: UniqFM Reg -> UniqFM Reg -> UniqFM Reg
+        mergeSlotMaps :: SlotMap Reg -> SlotMap Reg -> SlotMap Reg
         mergeSlotMaps map1 map2
-                = listToUFM
+                -- toList sadly means we have to use the _Directly style
+                -- functions.
+                -- TODO: We shouldn't need to go through a list here.
+                = listToUFM_Directly
                 $ [ (k, r1)
                   | (k, r1) <- nonDetUFMToList map1
                   -- This is non-deterministic but we do not
                   -- currently support deterministic code-generation.
                   -- See Note [Unique Determinism and code generation]
-                  , case lookupUFM map2 k of
+                  , case lookupUFM_Directly map2 k of
                           Nothing -> False
                           Just r2 -> r1 == r2 ]
 
