@@ -424,6 +424,17 @@ getRegister e = do
 -- the way we load it, not through a register.
 --
 getRegister' :: NCGConfig -> Platform -> CmmExpr -> NatM Register
+-- OPTIMIZATION WARNING: CmmExpr rewrites
+-- 1. Rewrite: Reg + (-n) => Reg - n
+--    XXX: this expression souldn't even be generated to begin with.
+getRegister' config plat (CmmMachOp (MO_Add w0) [x, CmmLit (CmmInt i w1)]) | i < 0
+  = getRegister' config plat (CmmMachOp (MO_Sub w0) [x, CmmLit (CmmInt (-i) w1)])
+
+getRegister' config plat (CmmMachOp (MO_Sub w0) [x, CmmLit (CmmInt i w1)]) | i < 0
+  = getRegister' config plat (CmmMachOp (MO_Add w0) [x, CmmLit (CmmInt (-i) w1)])
+
+
+-- Generic case.
 getRegister' config plat expr
   = case expr of
     CmmReg (CmmGlobal PicBaseReg)
@@ -589,6 +600,22 @@ getRegister' config plat expr
     --
     -- XXX: for now we'll only implement the 64bit versions. And rely on the
     --      fallthrough to alert us if things go wrong!
+    -- OPTIMIZATION WARNING: Dyadic CmmMachOp destructuring
+    -- 1. Compute Reg +/- n directly.
+    --    For Add/Sub we can directly encode 12bits, or 12bits lsl #12.
+    CmmMachOp (MO_Add _) [(CmmReg (CmmGlobal r)), CmmLit (CmmInt 0 _)] -> pprPanic "getRegister:CmmMachOp:Add:Imm is 0" (ppr expr)
+    CmmMachOp (MO_Add w) [(CmmReg reg@(CmmGlobal _)), CmmLit (CmmInt n _)]
+      | n > 0 && n < 4096 -> return $ Any (intFormat w) (\d -> unitOL $ ANN (text $ show expr) (ADD (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
+      -- OPTIMIZATION WARNING: This only works because reg is CmmGlobal
+      where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
+            r' = getRegisterReg plat reg
+    CmmMachOp (MO_Sub w) [(CmmReg reg@(CmmGlobal _)), CmmLit (CmmInt n _)]
+      | n > 0 && n < 4096 -> return $ Any (intFormat w) (\d -> unitOL $ ANN (text $ show expr) (SUB (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
+      -- OPTIMIZATION WARNING: This only works because reg is CmmGlobal
+      where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
+            r' = getRegisterReg plat reg
+
+    -- Generic case.
     CmmMachOp op [x, y] -> do
       -- alright, so we have an operation, and two expressions. And we want to essentially do
       -- ensure we get float regs
@@ -620,8 +647,8 @@ getRegister' config plat expr
         -- Add/Sub should only be Interger Options.
         -- But our Cmm parser doesn't care about types
         -- and thus we end up with <float> + <float> => MO_Add <float> <float>
-        MO_Add w -> genOp w (\d x y -> unitOL $ ADD d x y)
-        MO_Sub w -> genOp w (\d x y -> unitOL $ SUB d x y)
+        MO_Add w -> genOp w (\d x y -> unitOL $ ANN (text $ show expr) (ADD d x y))
+        MO_Sub w -> genOp w (\d x y -> unitOL $ ANN (text $ show expr) (SUB d x y))
         --    31  30  29  28
         --  .---+---+---+---+-- - -
         --  | N | Z | C | V |
