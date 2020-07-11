@@ -72,9 +72,6 @@ data Imm
   | ImmConstantDiff Imm Imm
   deriving Show
 
-instance Show CLabel where
-  show = showSDocUnsafe . ppr
-
 instance Show SDoc where
   show = showSDocUnsafe
 
