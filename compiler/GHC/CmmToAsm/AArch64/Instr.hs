@@ -93,6 +93,7 @@ instance Outputable RegUsage where
 
 aarch64_regUsageOfInstr :: Platform -> Instr -> RegUsage
 aarch64_regUsageOfInstr platform instr = case instr of
+  ANN _ i                  -> aarch64_regUsageOfInstr platform i
   -- 1. Arithmetic Instructions ------------------------------------------------
   ADD dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   ADDS dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -213,6 +214,8 @@ callerSavedRegisters
 -- instruction.
 aarch64_patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
 aarch64_patchRegsOfInstr instr env = case instr of
+    -- 0. Meta Instructions
+    ANN d i        -> ANN d (aarch64_patchRegsOfInstr i env)
     -- 1. Arithmetic Instructions ----------------------------------------------
     ADD o1 o2 o3   -> ADD (patchOp o1) (patchOp o2) (patchOp o3)
     ADDS o1 o2 o3  -> ADDS (patchOp o1) (patchOp o2) (patchOp o3)
@@ -289,6 +292,7 @@ aarch64_patchRegsOfInstr instr env = case instr of
 -- register allocator needs to worry about.
 aarch64_isJumpishInstr :: Instr -> Bool
 aarch64_isJumpishInstr instr = case instr of
+    ANN _ i -> aarch64_isJumpishInstr i
     B{} -> True
     BL{} -> True
     BCOND{} -> True
@@ -298,6 +302,7 @@ aarch64_isJumpishInstr instr = case instr of
 -- One that can change the flow of control in a way that the
 -- register allocator needs to worry about.
 aarch64_jumpDestsOfInstr :: Instr -> [BlockId]
+aarch64_jumpDestsOfInstr (ANN _ i) = aarch64_jumpDestsOfInstr i
 aarch64_jumpDestsOfInstr (B t) = [id | TBlock id <- [t]]
 aarch64_jumpDestsOfInstr (BL t) = [ id | TBlock id <- [t]]
 aarch64_jumpDestsOfInstr (BCOND _ t) = [ id | TBlock id <- [t]]
@@ -309,6 +314,7 @@ aarch64_jumpDestsOfInstr _ = []
 aarch64_patchJumpInstr :: Instr -> (BlockId -> BlockId) -> Instr
 aarch64_patchJumpInstr instr patchF
     = case instr of
+        ANN d i -> ANN d (aarch64_patchJumpInstr i patchF)
         B (TBlock bid) -> B (TBlock (patchF bid))
         BL (TBlock bid) -> BL (TBlock (patchF bid))
         BCOND c (TBlock bid) -> BCOND c (TBlock (patchF bid))
@@ -350,6 +356,7 @@ aarch64_mkLoadInstr config reg delta slot
 --------------------------------------------------------------------------------
 -- | See if this instruction is telling us the current C stack delta
 aarch64_takeDeltaInstr :: Instr -> Maybe Int
+aarch64_takeDeltaInstr (ANN _ i) = aarch64_takeDeltaInstr i
 aarch64_takeDeltaInstr (DELTA i) = Just i
 aarch64_takeDeltaInstr _         = Nothing
 
@@ -357,6 +364,7 @@ aarch64_takeDeltaInstr _         = Nothing
 aarch64_isMetaInstr :: Instr -> Bool
 aarch64_isMetaInstr instr
  = case instr of
+    ANN _ i     -> aarch64_isMetaInstr i
     COMMENT{}   -> True
     MULTILINE_COMMENT{} -> True
     LOCATION{}  -> True
@@ -416,6 +424,9 @@ data Instr
     -- comment pseudo-op
     = COMMENT SDoc
     | MULTILINE_COMMENT SDoc
+
+    -- Annotated instruction. Should print <instr> # <doc>
+    | ANN SDoc Instr
 
     -- location pseudo-op (file, line, col, name)
     | LOCATION Int Int Int String
