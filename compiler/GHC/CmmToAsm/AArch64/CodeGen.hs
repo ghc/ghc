@@ -267,14 +267,12 @@ stmtToInstrs bid stmt = do
 
       CmmAssign reg src
         | isFloatType ty         -> assignReg_FltCode format reg src
---        | is32Bit && isWord64 ty -> assignReg_I64Code        reg src
         | otherwise              -> assignReg_IntCode format reg src
           where ty = cmmRegType platform reg
                 format = cmmTypeFormat ty
 
       CmmStore addr src
         | isFloatType ty         -> assignMem_FltCode format addr src
---        | is32Bit && isWord64 ty -> assignMem_I64Code        addr src
         | otherwise              -> assignMem_IntCode format addr src
           where ty = cmmExprType platform src
                 format = cmmTypeFormat ty
