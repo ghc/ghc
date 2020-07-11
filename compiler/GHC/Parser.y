@@ -521,7 +521,6 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '{-# SPECIALISE_INLINE'  { L _ (ITspec_inline_prag _ _) }
  '{-# SOURCE'             { L _ (ITsource_prag _) }
  '{-# RULES'              { L _ (ITrules_prag _) }
- '{-# CORE'               { L _ (ITcore_prag _) }      -- hdaume: annotated core
  '{-# SCC'                { L _ (ITscc_prag _)}
  '{-# GENERATED'          { L _ (ITgenerated_prag _) }
  '{-# DEPRECATED'         { L _ (ITdeprecated_prag _) }
@@ -2695,7 +2694,7 @@ optSemi :: { ([Located Token],Bool) }
 
 {- Note [Pragmas and operator fixity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-'prag_e' is an expression pragma, such as {-# SCC ... #-}, {-# CORE ... #-}, or
+'prag_e' is an expression pragma, such as {-# SCC ... #-} or
 {-# GENERATED ... #-}.
 
 It must be used with care, or else #15730 happens. Consider this infix
@@ -2764,11 +2763,6 @@ prag_e :: { Located ([AddAnn], HsPragE GhcPs) }
                                                  (getINT $7, getINT $9))
                                                 ((getINTEGERs $3, getINTEGERs $5),
                                                  (getINTEGERs $7, getINTEGERs $9) )) }
-      | '{-# CORE' STRING '#-}'
-        { sLL $1 $> $
-            ([mo $1,mj AnnVal $2,mc $3],
-             HsPragCore noExtField (getCORE_PRAGs $1) (getStringLiteral $2)) }
-
 fexp    :: { ECP }
         : fexp aexp                  { ECP $
                                           superFunArg $
@@ -3915,7 +3909,6 @@ getWARNING_PRAGs      (L _ (ITwarning_prag      src)) = src
 getDEPRECATED_PRAGs   (L _ (ITdeprecated_prag   src)) = src
 getSCC_PRAGs          (L _ (ITscc_prag          src)) = src
 getGENERATED_PRAGs    (L _ (ITgenerated_prag    src)) = src
-getCORE_PRAGs         (L _ (ITcore_prag         src)) = src
 getUNPACK_PRAGs       (L _ (ITunpack_prag       src)) = src
 getNOUNPACK_PRAGs     (L _ (ITnounpack_prag     src)) = src
 getANN_PRAGs          (L _ (ITann_prag          src)) = src

@@ -10,8 +10,5 @@
  ([c], [(SourceText "foo\x63", fooc), (SourceText "b\x61r", bar)]),
  ([r], [(SourceText "foo1\x67", foo1g)]),
  ([s, t], [(SourceText "a\x62", ab)]),
- ([c, o],
-  [(SourceText "Strict Bitstream stre\x61m",
-    Strict Bitstream stream)]),
  ([s, c], [(SourceText "foo\x64", food)]),
  ([t, p], [(SourceText "foob\x61r", foobar)])]

@@ -829,14 +829,6 @@ data HsPragE p
                 SourceText            -- Note [Pragma source text] in GHC.Types.Basic
                 StringLiteral         -- "set cost centre" SCC pragma
 
-  -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen' @'{-\# CORE'@,
-  --             'GHC.Parser.Annotation.AnnVal', 'GHC.Parser.Annotation.AnnClose' @'\#-}'@
-
-  -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | HsPragCore  (XCoreAnn p)
-                SourceText            -- Note [Pragma source text] in GHC.Types.Basic
-                StringLiteral         -- hdaume: core annotation
-
   -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
   --       'GHC.Parser.Annotation.AnnOpen' @'{-\# GENERATED'@,
   --       'GHC.Parser.Annotation.AnnVal','GHC.Parser.Annotation.AnnVal',
@@ -1399,9 +1391,6 @@ isAtomicHsExpr (XExpr x)
 isAtomicHsExpr _                 = False
 
 instance Outputable (HsPragE (GhcPass p)) where
-  ppr (HsPragCore _ stc (StringLiteral sta s)) =
-    pprWithSourceText stc (text "{-# CORE")
-    <+> pprWithSourceText sta (doubleQuotes $ ftext s) <+> text "#-}"
   ppr (HsPragSCC _ st (StringLiteral stl lbl)) =
     pprWithSourceText st (text "{-# SCC")
      -- no doublequotes if stl empty, for the case where the SCC was written
