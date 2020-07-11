@@ -84,7 +84,6 @@ testOneFile libdir fileName = do
      doHsExpr _ = []
 
      doPragE :: HsPragE GhcPs -> [(String,[Located (SourceText,FastString)])]
-     doPragE (HsPragCore _ src ss) = [("co",[conv (noLoc ss)])]
      doPragE (HsPragSCC  _ src ss) = [("sc",[conv (noLoc ss)])]
      doPragE (HsPragTick _ src (ss,_,_) _ss2) = [("tp",[conv (noLoc ss)])]
 
