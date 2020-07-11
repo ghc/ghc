@@ -16,6 +16,12 @@
 
 ## Intro
 
+The AArch64 architecture by Arm, is part of Armv8, the ISA is called A64.  This
+is the best ressource on the arm website: https://developer.arm.com/architectures/cpu-architecture/a-profile/exploration-tools
+The HTML view has an instruction lookup, the xml file is also good.
+
+### Cmm
+
 @GHC.CmmToAsm@ contains the top-level netry point @nativeCodeGen@,
 which will be called from @GHC.Driver.CodeOutput.outputAsm@, which
 is triggert via the @-fasm@ flag.
