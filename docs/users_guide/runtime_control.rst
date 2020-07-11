@@ -418,7 +418,7 @@ performance.
 
 .. rts-flag:: -A ⟨size⟩
 
-    :default: 1MB
+    :default: 4MB
 
     .. index::
        single: allocation area, size
@@ -427,14 +427,21 @@ performance.
     collector. The allocation area (actually generation 0 step 0) is
     fixed and is never resized (unless you use :rts-flag:`-H [⟨size⟩]`, below).
 
-    Increasing the allocation area size may or may not give better
-    performance (a bigger allocation area means worse cache behaviour
-    but fewer garbage collections and less promotion).
+    Optimal settings depend on the actual machine, program, and other RTS options.
+    Increasing the allocation area size means worse cache behaviour
+    but fewer garbage collections and less promotion.
+
+    In general settings >= 4MB can reduce performance in some cases, in particular for single
+    threaded operation. However in a parallel setting increasing the allocation area
+    to ``16MB``, or even ``64MB`` can increase gc throughput significantly.
 
     With only 1 generation (e.g. ``-G1``, see :rts-flag:`-G ⟨generations⟩`) the
     ``-A`` option specifies the minimum allocation area, since the actual size
     of the allocation area will be resized according to the amount of data in
     the heap (see :rts-flag:`-F ⟨factor⟩`, below).
+
+    When heap profiling using a smaller allocation area can increase accuracy as more frequent
+    major garbage collections also results in more frequent heap snapshots
 
 .. rts-flag:: -AL ⟨size⟩
 
