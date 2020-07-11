@@ -153,10 +153,11 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.stkChunkSize       = (32 * 1024) / sizeof(W_);
     RtsFlags.GcFlags.stkChunkBufferSize = (1 * 1024) / sizeof(W_);
 
-    RtsFlags.GcFlags.minAllocAreaSize   = (1024 * 1024)       / BLOCK_SIZE;
+    /* -A default. See #16499 for a discussion about the tradeoffs */
+    RtsFlags.GcFlags.minAllocAreaSize   = (4 * 1024 * 1024)       / BLOCK_SIZE;
     RtsFlags.GcFlags.largeAllocLim      = 0; /* defaults to minAllocAreasize */
     RtsFlags.GcFlags.nurseryChunkSize   = 0;
-    RtsFlags.GcFlags.minOldGenSize      = (1024 * 1024)       / BLOCK_SIZE;
+    RtsFlags.GcFlags.minOldGenSize      = (1024 * 1024)       / BLOCK_SIZE; /* -O default */
     RtsFlags.GcFlags.maxHeapSize        = 0;    /* off by default */
     RtsFlags.GcFlags.heapLimitGrace     = (1024 * 1024);
     RtsFlags.GcFlags.heapSizeSuggestion = 0;    /* none */
