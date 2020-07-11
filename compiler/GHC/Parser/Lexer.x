@@ -743,7 +743,6 @@ data Token
   | ITcolumn_prag       SourceText  -- not usually produced, see 'UsePosPragsBit'
   | ITscc_prag          SourceText
   | ITgenerated_prag    SourceText
-  | ITcore_prag         SourceText         -- hdaume: core annotations
   | ITunpack_prag       SourceText
   | ITnounpack_prag     SourceText
   | ITann_prag          SourceText
@@ -3230,7 +3229,6 @@ oneWordPrags = Map.fromList [
      ("deprecated", strtoken (\s -> ITdeprecated_prag (SourceText s))),
      ("scc", strtoken (\s -> ITscc_prag (SourceText s))),
      ("generated", strtoken (\s -> ITgenerated_prag (SourceText s))),
-     ("core", strtoken (\s -> ITcore_prag (SourceText s))),
      ("unpack", strtoken (\s -> ITunpack_prag (SourceText s))),
      ("nounpack", strtoken (\s -> ITnounpack_prag (SourceText s))),
      ("ann", strtoken (\s -> ITann_prag (SourceText s))),

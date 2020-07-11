@@ -1081,7 +1081,6 @@ tcExpr other _ = pprPanic "tcLExpr" (ppr other)
 
 tcExprPrag :: HsPragE GhcRn -> HsPragE GhcTc
 tcExprPrag (HsPragSCC x1 src ann) = HsPragSCC x1 src ann
-tcExprPrag (HsPragCore x1 src lbl) = HsPragCore x1 src lbl
 tcExprPrag (HsPragTick x1 src info srcInfo) = HsPragTick x1 src info srcInfo
 
 
