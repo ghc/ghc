@@ -80,7 +80,7 @@ disInstr ( StgBCO *bco, int pc )
                          instrs[pc], (signed int)instrs[pc+1]);
          pc += 2; break;
       case bci_CCALL:
-         debugBelch("CCALL    marshaller at 0x%" FMT_Word "\n",
+         debugBelch("CCALL    marshaller at 0x%" FMT_HexWord "\n",
                          literals[instrs[pc]] );
          pc += 1; break;
      case bci_STKCHECK:  {
@@ -159,26 +159,23 @@ disInstr ( StgBCO *bco, int pc )
          pc += 1; break;
       case bci_PUSH_UBX8:
          debugBelch(
-             "PUSH_UBX8 0x%" FMT_Word8 " ",
+             "PUSH_UBX8 0x%" FMT_HexWord8 "\n",
              (StgWord8) literals[instrs[pc]] );
-         debugBelch("\n");
          pc += 1; break;
       case bci_PUSH_UBX16:
          debugBelch(
-             "PUSH_UBX16 0x%" FMT_Word16 " ",
+             "PUSH_UBX16 0x%" FMT_HexWord16 "\n",
              (StgWord16) literals[instrs[pc]] );
-         debugBelch("\n");
          pc += 1; break;
       case bci_PUSH_UBX32:
          debugBelch(
-             "PUSH_UBX32 0x%" FMT_Word32 " ",
+             "PUSH_UBX32 0x%" FMT_HexWord32 "\n",
              (StgWord32) literals[instrs[pc]] );
-         debugBelch("\n");
          pc += 1; break;
       case bci_PUSH_UBX:
          debugBelch("PUSH_UBX ");
          for (i = 0; i < instrs[pc+1]; i++)
-            debugBelch("0x%" FMT_Word " ", literals[i + instrs[pc]] );
+            debugBelch("0x%" FMT_HexWord " ", literals[i + instrs[pc]] );
          debugBelch("\n");
          pc += 2; break;
       case bci_PUSH_APPLY_N:
