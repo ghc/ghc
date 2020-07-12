@@ -102,6 +102,7 @@ extern void hs_exit     (void);
 extern void hs_exit_nowait(void);
 extern void hs_set_argv (int argc, char *argv[]);
 extern void hs_thread_done (void);
+extern void hs_restoreConsoleCP (void);
 
 extern void hs_perform_gc (void);
 
