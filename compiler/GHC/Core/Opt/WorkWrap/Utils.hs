@@ -28,8 +28,7 @@ import GHC.Types.Cpr
 import GHC.Core.Make    ( mkAbsentErrorApp, mkCoreUbxTup
                         , mkCoreApp, mkCoreLet )
 import GHC.Types.Id.Make ( voidArgId, voidPrimId )
-import GHC.Builtin.Types      ( tupleDataCon )
-import GHC.Builtin.Types.Prim ( voidPrimTy )
+import GHC.Builtin.Types      ( tupleDataCon, unboxedUnitTy )
 import GHC.Types.Literal ( absentLiteralOf, rubbishLit )
 import GHC.Types.Var.Env ( mkInScopeSet )
 import GHC.Types.Var.Set ( VarSet )
@@ -1256,7 +1255,7 @@ mk_absent_let dflags fam_envs arg
   | Just tc <- tyConAppTyCon_maybe nty
   , Just lit <- absentLiteralOf tc
   = Just (Let (NonRec arg (Lit lit `mkCast` mkSymCo co)))
-  | nty `eqType` voidPrimTy
+  | nty `eqType` unboxedUnitTy
   = Just (Let (NonRec arg (Var voidPrimId `mkCast` mkSymCo co)))
   | otherwise
   = WARN( True, text "No absent value for" <+> ppr arg_ty )
