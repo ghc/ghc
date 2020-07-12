@@ -571,6 +571,14 @@ release-x86_64-linux-fedora27-dwarf:
   allow_failure: true
   variables:
     GHC_VERSION: "8.8.3"
+  before_script:
+    - python3 .gitlab/fix-submodules.py
+    - git submodule sync --recursive
+    - git submodule update --init --recursive
+    - git checkout .gitmodules
+      # N.B. Drop bash syntax on Windows since this is interpreted by
+      # PowerShell.
+    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf"
   script:
     - |
       python boot
