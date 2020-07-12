@@ -22,7 +22,10 @@ if [ ! -e $toolchain/bin/ghc ]; then
         exit 1
         ;;
     esac
-    curl https://downloads.haskell.org/~ghc/$GHC_VERSION/ghc-$GHC_VERSION-$triple.tar.xz | tar -xJ
+    if [ -z "$GHC_TARBALL_URL" ]; then
+      GHC_TARBALL_URL="https://downloads.haskell.org/~ghc/$GHC_VERSION/ghc-$GHC_VERSION-$triple.tar.xz"
+    fi
+    curl "$GHC_TARBALL_URL" | tar -xJ
     mv ghc-$GHC_VERSION toolchain
 fi
 
