@@ -4,6 +4,8 @@ import GHC.Prelude
 
 import GHC.Utils.Panic
 
+-- https://developer.arm.com/documentation/den0024/a/the-a64-instruction-set/data-processing-instructions/conditional-instructions
+
 -- XXX: This appears to go a bit overboard? Maybe we should stick with what LLVM
 -- settled on for fcmp?
 -- false: always yields false, regardless of operands.
@@ -60,7 +62,7 @@ data Cond
     | UOGE   -- b.pl
     | UOGT   -- b.hi
     -- others
-    | NEVER  -- ne
+    | NEVER  -- b.nv
     | VS     -- oVerflow set
     | VC     -- oVerflow clear
     deriving Eq
