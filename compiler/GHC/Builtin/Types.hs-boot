@@ -54,5 +54,6 @@ unrestrictedFunTyCon :: TyCon
 multMulTyCon :: TyCon
 
 tupleTyConName :: TupleSort -> Arity -> Name
+unboxedUnitTyCon :: TyCon
 
 integerTy, naturalTy :: Type
