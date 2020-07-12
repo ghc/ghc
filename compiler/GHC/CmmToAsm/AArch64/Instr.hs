@@ -208,7 +208,7 @@ callerSavedRegisters :: [Reg]
 callerSavedRegisters
     = map regSingle [0..18]
     ++ map regSingle [32..39]
-    ++ map regSingle [48..62]
+    ++ map regSingle [48..63]
 
 -- | Apply a given mapping to all the register references in this
 -- instruction.
@@ -514,7 +514,7 @@ data Instr
     | MOVK Operand Operand
     -- | MOVN Operand Operand
     -- | MOVZ Operand Operand
-    | MVN Operand Operand -- rd = -rn
+    | MVN Operand Operand -- rd = ~rn
     | ORN Operand Operand Operand -- rd = rn | ∼op2
     | ORR Operand Operand Operand -- rd = rn | op2
     | ROR Operand Operand Operand -- rd = rn ≫ rm  or  rd = rn ≫ #i, i is 6 bits

@@ -489,7 +489,7 @@ pprCond c = case c of
   UGE    -> text "hs" -- Carry set/unsigned higher or same ; Greater than or equal, or unordered
   UGT    -> text "hi" -- Unsigned higher                   ; Greater than, or unordered
 
-  NEVER  -> text "ne" -- Never
+  NEVER  -> text "nv" -- Never
   VS     -> text "vs" -- Overflow                          ; Unordered (at least one NaN operand)
   VC     -> text "vc" -- No overflow                       ; Not unordered
 
