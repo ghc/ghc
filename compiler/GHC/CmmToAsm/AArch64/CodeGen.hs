@@ -806,12 +806,10 @@ assignMem_IntCode rep addrE srcE
     (src_reg, _format, code) <- getSomeReg srcE
     Amode addr addr_code <- getAmode addrE
     let AddrReg r1 = addr
-    return $ unitOL (COMMENT $ text "RHS:" <+> ppr srcE)
-            `appOL` code
-            `appOL` unitOL (COMMENT $ text "LHS:" <+> ppr addrE)
+    return $ COMMENT (text "CmmStore" <+> parens (text (show addrE)) <+> parens (text (show srcE)))
+            `consOL` (code
             `appOL` addr_code
-            `snocOL` COMMENT (text "Store:" <+> ppr r1 <+> text "<-" <+> ppr src_reg)
-            `snocOL` STR rep (OpReg (formatToWidth rep) src_reg) (OpAddr addr)
+            `snocOL` STR rep (OpReg (formatToWidth rep) src_reg) (OpAddr addr))
 
 assignReg_IntCode _ reg src
   = do
@@ -821,8 +819,8 @@ assignReg_IntCode _ reg src
         p = showSDocUnsafe . ppr
     r <- getRegister src
     return $ case r of
-      Any _ code         -> code dst
-      Fixed format freg fcode -> fcode `snocOL` MOV (OpReg (formatToWidth format) dst) (OpReg (formatToWidth format) freg)
+      Any _ code              -> COMMENT (text "CmmAssign" <+> parens (text (show reg)) <+> parens (text (show src))) `consOL` code dst
+      Fixed format freg fcode -> COMMENT (text "CmmAssign" <+> parens (text (show reg)) <+> parens (text (show src))) `consOL` (fcode `snocOL` MOV (OpReg (formatToWidth format) dst) (OpReg (formatToWidth format) freg))
 
 -- Let's treat Floating point stuff
 -- as integer code for now. Opaque.
