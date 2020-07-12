@@ -629,6 +629,9 @@ getRegister' config plat expr
             when ((isFloatFormat format_x && isIntFormat format_y) || (isIntFormat format_x && isFloatFormat format_y)) $ pprPanic "getRegister:genOp" (text "formats don't match:" <+> text (show format_x) <+> text "/=" <+> text (show format_y))
             return $ Any format_x (\dst -> code_x `appOL` code_y `appOL` op (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y))
 
+          withTempIntReg w op = OpReg w <$> getNewRegNat (intFormat w) >>= op
+          withTempFloatReg w op = OpReg w <$> getNewRegNat (floatFormat w) >>= op
+
           intOp w op = do
             -- compute x<m> <- x
             -- compute x<o> <- y
@@ -694,18 +697,20 @@ getRegister' config plat expr
         MO_S_Quot w -> intOp w (\d x y -> unitOL $ SDIV d x y)
 
         -- No native rem instruction. So we'll compute the following
-        -- Rd <- Rx / Ry             | 2 <- 7 / 3      -- SDIV Rd Rx Ry
-        -- Rd <- Rx - Rd * Ry        | 1 <- 7 - 2 * 3  -- MSUB Rd Rd Ry Rx
-        --       |     '---|----------------|---'   |
-        --       |         '----------------|-------'
-        --       '--------------------------'
+        -- Rd  <- Rx / Ry             | 2 <- 7 / 3      -- SDIV Rd Rx Ry
+        -- Rd' <- Rx - Rd * Ry        | 1 <- 7 - 2 * 3  -- MSUB Rd' Rd Ry Rx
+        --        |     '---|----------------|---'   |
+        --        |         '----------------|-------'
+        --        '--------------------------'
         -- Note the swap in Rx and Ry.
-        MO_S_Rem w -> intOp w (\d x y -> toOL [ SDIV d x y, MSUB d d y x ])
+        MO_S_Rem w -> withTempIntReg w $ \t ->
+          intOp w (\d x y -> toOL [ SDIV t x y, MSUB d t y x ])
 
         -- Unsigned multiply/divide
         MO_U_MulMayOflo _w -> unsupported expr
         MO_U_Quot w -> intOp w (\d x y -> unitOL $ UDIV d x y)
-        MO_U_Rem w  -> intOp w (\d x y -> toOL [ UDIV d x y, MSUB d d y x ])
+        MO_U_Rem w  -> withTempIntReg w $ \t ->
+          intOp w (\d x y -> toOL [ UDIV t x y, MSUB d t y x ])
 
         -- Signed comparisons -- see above for the CSET discussion
         MO_S_Ge w -> intOp w (\d x y -> toOL [ CMP x y, CSET d SGE ])
