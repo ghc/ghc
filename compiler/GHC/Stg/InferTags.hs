@@ -24,6 +24,7 @@
 
 {-# OPTIONS_GHC -O2 -ddump-simpl -ddump-to-file -ddump-stg -ddump-cmm -ddump-asm #-}
 {-# OPTIONS_GHC -dsuppress-all -dno-suppress-type-signatures -dno-suppress-module-prefixes #-}
+{-# OPTIONS_GHC -fprof-auto #-}
 
 module GHC.Stg.InferTags (findTags, EnterLattice) where
 
@@ -95,6 +96,8 @@ import GHC.IO (IO(..))
 import Data.Array.MArray as M
 import Data.Array.IO as IOA
 import Data.IORef
+
+import GHC.Core.FamInstEnv (FamInstEnv)
 
 import GHC.Exts (oneShot, dataToTag#)
 {-
@@ -280,6 +283,9 @@ import GHC.Exts (oneShot, dataToTag#)
 #if defined(DEBUG)
 #define WITH_NODE_DESC
 #endif
+
+nestingLimit :: Int
+nestingLimit = 30
 
 -- Shortcut comparisons if two things reference the same object.
 maybeEq :: a -> a -> Bool
@@ -904,18 +910,23 @@ nestingLevelOver (EnterLattice _  (FieldsUntyped fields)) n
     = any (`nestingLevelOver` (n-1)) fields
 nestingLevelOver _ _ = False
 
+widenToNestingLevel n l
+    | nestingLevelOver l n = -- pprTrace "capping" (ppr l) $
+                             widenToNestingLevel' n l
+    | otherwise = l
 
-widenToNestingLevel :: Int -> EnterLattice -> EnterLattice
-widenToNestingLevel _ l@(EnterLattice _ FieldsUnknown ) = l
-widenToNestingLevel _ l@(EnterLattice _ FieldsNone     ) = l
-widenToNestingLevel _ l@(EnterLattice _ FieldsUndet   ) = l
-widenToNestingLevel 0 _ = bot
-widenToNestingLevel n (EnterLattice e (FieldsProd fields)) =
-    EnterLattice e (FieldsProd (map (widenToNestingLevel (n-1)) fields))
-widenToNestingLevel n (EnterLattice e (FieldsSum c fields)) =
-    EnterLattice e (FieldsSum c $ map (widenToNestingLevel (n-1)) fields)
-widenToNestingLevel n (EnterLattice e (FieldsUntyped fields)) =
-    EnterLattice e (FieldsUntyped $ map (widenToNestingLevel (n-1)) fields)
+widenToNestingLevel' :: Int -> EnterLattice -> EnterLattice
+widenToNestingLevel' _ l@(EnterLattice _ FieldsUnknown ) = l
+widenToNestingLevel' _ l@(EnterLattice _ FieldsNone     ) = l
+widenToNestingLevel' _ l@(EnterLattice _ FieldsUndet   ) = l
+widenToNestingLevel' 0 _ = bot
+widenToNestingLevel' n (EnterLattice e (FieldsProd fields)) =
+    EnterLattice e (FieldsProd (map (widenToNestingLevel' (n-1)) fields))
+widenToNestingLevel' n (EnterLattice e (FieldsSum c fields)) =
+    EnterLattice e (FieldsSum c $ map (widenToNestingLevel' (n-1)) fields)
+widenToNestingLevel' n (EnterLattice e (FieldsUntyped fields)) =
+    EnterLattice e (FieldsUntyped $ map (widenToNestingLevel' (n-1)) fields)
+
 
 
 {-
@@ -975,14 +986,17 @@ newtype AM a = AM { runAM :: FlowState -> State# RealWorld
                   } deriving Functor
 
 instance Applicative AM where
-   pure x   = AM $ oneShot $ \env s -> (# x, env, s #)
-   m <*> n  = AM $ oneShot $ \env s -> case runAM m env s of
+    -- {-# INLINE pure #-}
+    pure x   = AM $ oneShot $ \env s -> (# x, env, s #)
+    -- {-# INLINE (<*>) #-}
+    m <*> n  = AM $ oneShot $ \env s -> case runAM m env s of
                                 (# f, env', s' #) -> case runAM n env' s' of
                                             (# x, env'', s'' #) -> (# f x, env'', s'' #)
 
 instance Monad AM where
+    -- {-# INLINE (>>=) #-}
     m >>= n  = AM $ oneShot $ \env s -> case runAM m env s of
-                                (# r, env', s' #) -> runAM (n r) env' s'
+                                (# !x, env', s' #) -> runAM (n x) env' s'
 
 get :: AM FlowState
 get = AM $ oneShot $ \env s -> (# env, env, s #)
@@ -1029,10 +1043,16 @@ addNode done node = do
             ASSERTM( not <$> isMarkedDone (node_id node))
             put $! s { fs_uqNodeMap = addToUFM (fs_uqNodeMap s) node node }
 
+-- Update existing node
+-- Kept separate in case we want to refactor later.
+updateNode :: Bool -> FlowNode -> AM ()
+updateNode done node = do
+    addNode done node
+
 -- | Move the node from the updateable to the finished set
 markDone :: FlowNode -> AM ()
 markDone node = do
-    addNode isDone node
+    updateNode isDone node
 
 -- | Pessimistic check, defaulting to False when it's not clear.
 isMarkedDone :: HasDebugCallStack => NodeId -> AM Bool
@@ -1043,7 +1063,7 @@ isMarkedDone id = do
 updateNodeResult :: NodeId -> EnterLattice -> AM ()
 updateNodeResult id result = do
     node <- (getNode id)
-    addNode notDone (node {node_result = result})
+    updateNode notDone (node {node_result = result})
 
 
 getNode :: HasDebugCallStack => NodeId -> AM FlowNode
@@ -1276,10 +1296,9 @@ mkOutConLattice con outer fields
     conCount = length (tyConDataCons $ dataConTyCon con)
 
 {-# NOINLINE findTags #-}
-findTags :: Module -> UniqSupply -> [StgTopBinding] -> ([TgStgTopBinding], [(Id,EnterLattice)])
+findTags :: Module -> FamInstEnv -> [StgTopBinding] -> ([TgStgTopBinding], [(Id,EnterLattice)])
 -- findTags this_mod us binds = passTopBinds binds
 findTags this_mod _us binds =
-    pprTrace "findTags" (ppr this_mod) $
     let state = FlowState {
             -- fs_us = 0,
             fs_idNodeMap = mempty,
@@ -1471,6 +1490,9 @@ addImportedNode this_mod id
         let idNodes = fs_idNodeMap s
         -- Check if it is already cached.
         when (not $ elemUFM id idNodes) $ do
+
+
+
             let node
                     -- Functions tagged with arity are never entered as atoms.
                     | idFunRepArity id > 0
@@ -1758,7 +1780,7 @@ nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ ccs con args)
         -- Strict fields need to marked as neverEnter here, even if their inputs are not.
         -- This is because once we scrutinise the result of this rhs they will have been tagged.
         let result = mkOutConLattice con outerTag fieldResults
-        let cappedResult = widenToNestingLevel 10 result
+        let cappedResult = widenToNestingLevel nestingLimit result
         updateNodeResult this_id cappedResult
         return $! cappedResult
 
@@ -1844,7 +1866,7 @@ nodeRhs this_mod ctxt _topFlag binding (StgRhsClosure _ext _ccs _flag args body)
     node_update this_id body_id = do
         bodyInfo <- lookupNodeResult body_id
         let result = setEnterInfo bodyInfo enterInfo
-        let cappedResult = widenToNestingLevel 10 result
+        let cappedResult = widenToNestingLevel nestingLimit result
         if hasFinalFields cappedResult
             then do
                 node <- getNode this_id
@@ -2329,11 +2351,19 @@ nodeApp _ _ _ = panic "Impossible"
 
 -- Dep-sorting nodes is good for performance.
 depSortNodes :: [FlowNode] -> [FlowNode]
-depSortNodes in_nodes = reverse . map node_payload . topologicalSortG $ graphFromEdgedVerticesUniq vertices
+depSortNodes in_nodes = reversePayload [] . topologicalSortG $ graphFromEdgedVerticesUniq vertices
   where
     vertices = map mkVertex in_nodes :: [Node NodeId FlowNode]
     mkVertex :: FlowNode -> Node NodeId FlowNode
     mkVertex n = DigraphNode (n) (node_id n) (node_inputs n)
+
+    -- reverse . map node_payload but fast
+    reversePayload :: [FlowNode] -> [Node NodeId FlowNode] -> [FlowNode]
+    reversePayload acc []       =  acc
+    reversePayload acc (x:xs)   =
+        let !x' = node_payload x
+        in reversePayload (x':acc) xs
+
 
 type NodeArray = IOArray Int FlowNode
 type FlagArray = IOUArray Int Bool
