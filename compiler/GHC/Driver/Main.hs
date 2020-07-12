@@ -1555,13 +1555,17 @@ doCodeGen   :: HscEnv -> Module -> [TyCon]
 doCodeGen hsc_env this_mod data_tycons
               cost_centre_info stg_binds hpc_info = do
     let dflags = hsc_dflags hsc_env
-    us <- mkSplitUniqSupply 't'
     return $! seqTopBinds stg_binds
     -- let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
 
     !start <- getTime
+
+    eps <- hscEPS hsc_env
+    eps_fam_inst_env eps
+
+
     let (!stg_binds_w_tags, _exports) = {-# SCC "StgTagFields" #-}
-                                        findTags this_mod us stg_binds
+                                        findTags this_mod (eps_fam_inst_env eps) stg_binds
     !end <- getTime
     putStrLn $! "Time(ms) taken by findTags:" ++ (show $ end - start)
     let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds_w_tags
