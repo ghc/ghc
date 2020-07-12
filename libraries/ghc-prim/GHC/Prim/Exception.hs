@@ -28,9 +28,9 @@ default () -- Double and Integer aren't available yet
 -- raise exceptions in a normal way because it would create a dependency
 -- cycle (base <-> bignum package). See #14664
 
-foreign import prim "stg_raiseOverflowzh" raiseOverflow# :: State# RealWorld -> (# State# RealWorld, Void# #)
-foreign import prim "stg_raiseUnderflowzh" raiseUnderflow# :: State# RealWorld -> (# State# RealWorld, Void# #)
-foreign import prim "stg_raiseDivZZerozh" raiseDivZero# :: State# RealWorld -> (# State# RealWorld, Void# #)
+foreign import prim "stg_raiseOverflowzh" raiseOverflow# :: State# RealWorld -> (# State# RealWorld, (# #) #)
+foreign import prim "stg_raiseUnderflowzh" raiseUnderflow# :: State# RealWorld -> (# State# RealWorld, (# #) #)
+foreign import prim "stg_raiseDivZZerozh" raiseDivZero# :: State# RealWorld -> (# State# RealWorld, (# #) #)
 
 -- We give a bottoming demand signature to 'raiseOverflow', 'raiseUnderflow' and
 -- 'raiseDivZero' in "GHC.Core.Make". NOINLINE pragmas are necessary because if
