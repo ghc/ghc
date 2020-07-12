@@ -18,8 +18,8 @@ import GHC.Magic
 default () -- Double and Integer aren't available yet
 
 -- `stg_panic#` never returns but it can't just return `State# RealWorld` so we
--- indicate that it returns `Void#` too to make the compiler happy.
-foreign import prim "stg_paniczh" panic# :: Addr# -> State# RealWorld -> (# State# RealWorld, Void# #)
+-- indicate that it returns `(# #)` too to make the compiler happy.
+foreign import prim "stg_paniczh" panic# :: Addr# -> State# RealWorld -> (# State# RealWorld, (# #) #)
 
 -- | Display the CString whose address is given as an argument and exit.
 panicError :: Addr# -> a
