@@ -30,6 +30,11 @@ module GHC.Event.Windows.FFI (
     postQueuedCompletionStatus,
     getOverlappedResult,
 
+    -- * Completion Data
+    CompletionData(..),
+    CompletionCallback,
+    withRequest,
+
     -- * Overlapped
     OVERLAPPED,
     LPOVERLAPPED,
@@ -216,6 +221,51 @@ postQueuedCompletionStatus iocp numBytes completionKey lpol =
     c_PostQueuedCompletionStatus iocp numBytes completionKey lpol
 
 ------------------------------------------------------------------------
+-- Completion Data
+
+-- | Called when the completion is delivered.
+type CompletionCallback a = ErrCode   -- ^ 0 indicates success
+                          -> DWORD     -- ^ Number of bytes transferred
+                          -> IO a
+
+-- | Callback type that will be called when an I/O operation completes.
+type IOCallback = CompletionCallback ()
+
+-- | Wrap the IOCallback type into a FunPtr.
+foreign import ccall "wrapper"
+  wrapIOCallback :: IOCallback -> IO (FunPtr IOCallback)
+
+-- | Unwrap a FunPtr IOCallback to a normal Haskell function.
+foreign import ccall "dynamic"
+  mkIOCallback :: FunPtr IOCallback -> IOCallback
+
+-- | Structure that the I/O manager uses to associate callbacks with
+-- additional payload such as their OVERLAPPED structure and Win32 handle
+-- etc.  *Must* be kept in sync with that in `winio_structs.h` or horrible things
+-- happen.
+--
+-- We keep the handle around for the benefit of ghc-external libraries making
+-- use of the manager.
+data CompletionData = CompletionData { cdHandle   :: !HANDLE
+                                     , cdCallback :: !IOCallback
+                                     }
+
+instance Storable CompletionData where
+    sizeOf _    = #{size CompletionData}
+    alignment _ = #{alignment CompletionData}
+
+    peek ptr = do
+      cdCallback <- mkIOCallback `fmap` #{peek CompletionData, cdCallback} ptr
+      cdHandle   <- #{peek CompletionData, cdHandle} ptr
+      let !cd = CompletionData{..}
+      return cd
+
+    poke ptr CompletionData{..} = do
+      cb <- wrapIOCallback cdCallback
+      #{poke CompletionData, cdCallback} ptr cb
+      #{poke CompletionData, cdHandle} ptr cdHandle
+
+------------------------------------------------------------------------
 -- Overlapped
 
 -- | Tag type for @LPOVERLAPPED@.
@@ -292,6 +342,30 @@ pokeOffsetOverlapped lpol offset = do
   #{poke OVERLAPPED, Offset} lpol offsetLow
   #{poke OVERLAPPED, OffsetHigh} lpol offsetHigh
 {-# INLINE pokeOffsetOverlapped #-}
+
+------------------------------------------------------------------------
+-- Request management
+
+withRequest :: Word64 -> CompletionData
+            -> (Ptr HASKELL_OVERLAPPED -> Ptr CompletionData -> IO a)
+            -> IO a
+withRequest offset cbData f =
+    -- Create the completion record and store it.
+    -- We only need the record when we enqueue a request, however if we
+    -- delay creating it then we will run into a race condition where the
+    -- driver may have finished servicing the request before we were ready
+    -- and so the request won't have the book keeping information to know
+    -- what to do.  So because of that we always create the payload,  If we
+    -- need it ok, if we don't that's no problem.  This approach prevents
+    -- expensive lookups in hash-tables.
+    --
+    -- Todo: Use a memory pool for this so we don't have to hit malloc every
+    --       time.  This would allow us to scale better.
+    allocaBytes #{size HASKELL_OVERLAPPED} $ \hs_lpol ->
+      with cbData $ \cdData -> do
+        zeroOverlapped hs_lpol
+        pokeOffsetOverlapped (castPtr hs_lpol) offset
+        f hs_lpol cdData
 
 ------------------------------------------------------------------------
 -- Cancel pending I/O
