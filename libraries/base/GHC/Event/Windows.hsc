@@ -86,7 +86,9 @@ import Data.Foldable (mapM_, length, forM_)
 import Data.Maybe (isJust, maybe)
 
 import GHC.Event.Windows.Clock   (Clock, Seconds, getClock, getTime)
-import GHC.Event.Windows.FFI     (LPOVERLAPPED, OVERLAPPED_ENTRY(..))
+import GHC.Event.Windows.FFI     (LPOVERLAPPED, OVERLAPPED_ENTRY(..),
+                                  CompletionData(..), CompletionCallback,
+                                  withRequest)
 import GHC.Event.Windows.ManagedThreadPool
 import GHC.Event.Internal.Types
 import GHC.Event.Unique
@@ -300,43 +302,6 @@ foreign import ccall safe "completeSynchronousRequest"
 ------------------------------------------------------------------------
 -- Manager structures
 
--- | Callback type that will be called when an I/O operation completes.
-type IOCallback = CompletionCallback ()
-
--- | Wrap the IOCallback type into a FunPtr.
-foreign import ccall "wrapper"
-  wrapIOCallback :: IOCallback -> IO (FunPtr IOCallback)
-
--- | Unwrap a FunPtr IOCallback to a normal Haskell function.
-foreign import ccall "dynamic"
-  mkIOCallback :: FunPtr IOCallback -> IOCallback
-
--- | Structure that the I/O manager uses to associate callbacks with
--- additional payload such as their OVERLAPPED structure and Win32 handle
--- etc.  *Must* be kept in sync with that in `winio_structs.h` or horrible things
--- happen.
---
--- We keep the handle around for the benefit of ghc-external libraries making
--- use of the manager.
-data CompletionData = CompletionData { cdHandle   :: !HANDLE
-                                     , cdCallback :: !IOCallback
-                                     }
-
-instance Storable CompletionData where
-    sizeOf _    = #{size CompletionData}
-    alignment _ = #{alignment CompletionData}
-
-    peek ptr = do
-      cdCallback <- mkIOCallback `fmap` #{peek CompletionData, cdCallback} ptr
-      cdHandle   <- #{peek CompletionData, cdHandle} ptr
-      let !cd = CompletionData{..}
-      return cd
-
-    poke ptr CompletionData{..} = do
-      cb <- wrapIOCallback cdCallback
-      #{poke CompletionData, cdCallback} ptr cb
-      #{poke CompletionData, cdHandle} ptr cdHandle
-
 -- | Pointer offset in bytes to the location of hoData in HASKELL_OVERLAPPPED
 cdOffset :: Int
 cdOffset = #{const __builtin_offsetof (HASKELL_OVERLAPPED, hoData)}
@@ -507,11 +472,6 @@ data CbResult a
                          --   manager will perform additional checks.
     deriving Show
 
--- | Called when the completion is delivered.
-type CompletionCallback a = ErrCode   -- ^ 0 indicates success
-                          -> DWORD     -- ^ Number of bytes transferred
-                          -> IO a
-
 -- | Associate a 'HANDLE' with the current I/O manager's completion port.
 -- This must be done before using the handle with 'withOverlapped'.
 associateHandle' :: HANDLE -> IO ()
@@ -581,23 +541,18 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
         signalThrow ex = failIfFalse_ (dbgMsg "signalThrow") $
                             writeIOPort signal (IOFailed ex)
     mask_ $ do
-        let completionCB' e b = completionCB e b >>= \result ->
-                                  case result of
-                                    IOSuccess val -> signalReturn val
-                                    IOFailed  err -> signalThrow err
-        hs_lpol <- FFI.allocOverlapped offset
-        -- Create the completion record and store it.
-        -- We only need the record when we enqueue a request, however if we
-        -- delay creating it then we will run into a race condition where the
-        -- driver may have finished servicing the request before we were ready
-        -- and so the request won't have the book keeping information to know
-        -- what to do.  So because of that we always create the payload,  If we
-        -- need it ok, if we don't that's no problem.  This approach prevents
-        -- expensive lookups in hash-tables.
-        --
-        -- Todo: Use a memory pool for this so we don't have to hit malloc every
-        --       time.  This would allow us to scale better.
-        cdData <- new (CompletionData h completionCB') :: IO (Ptr CompletionData)
+      let completionCB' e b = completionCB e b >>= \result ->
+                                case result of
+                                  IOSuccess val -> signalReturn val
+                                  IOFailed  err -> signalThrow err
+      let callbackData = CompletionData h completionCB'
+      -- Note [Memory Management]
+      -- These callback data and especially the overlapped structs have to keep
+      -- alive throughout the entire lifetime of the requests.   Since this
+      -- function will block until done so it can call completionCB at the end
+      -- we can safely use dynamic memory management here and so reduce the
+      -- possibility of memory errors.
+      withRequest offset callbackData $ \hs_lpol cdData -> do
         let ptr_lpol = hs_lpol `plusPtr` cdOffset
         let lpol = castPtr hs_lpol
         debugIO $ "hs_lpol:" ++ show hs_lpol
@@ -713,11 +668,8 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                         debugIO $ "## Waiting for cancellation record... "
                         _ <- FFI.getOverlappedResult h lpol True
                         oldDataPtr <- exchangePtr ptr_lpol nullReq
-                        -- Check if we have to free and cleanup pointer
                         when (oldDataPtr == cdData) $
-                          do free oldDataPtr
-                             free hs_lpol
-                             reqs <- removeRequest
+                          do reqs <- removeRequest
                              debugIO $ "-1.. " ++ show reqs ++ " requests queued after error."
                              status <- fmap fromIntegral getLastError
                              completionCB' status 0
@@ -741,7 +693,6 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
         case startCBResult of
           CbPending    -> runner
           CbDone rdata -> do
-            free cdData
             debugIO $ dbgMsg $ ":: done " ++ show lpol ++ " - " ++ show rdata
             bytes <- if isJust rdata
                         then return rdata
@@ -749,23 +700,18 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                         else FFI.getOverlappedResult h lpol False
             debugIO $ dbgMsg $ ":: done bytes: " ++ show bytes
             case bytes of
-              Just res -> free hs_lpol >> completionCB 0 res
+              Just res -> completionCB 0 res
               Nothing  -> do err <- FFI.overlappedIOStatus lpol
                              numBytes <- FFI.overlappedIONumBytes lpol
                              -- TODO: Remap between STATUS_ and ERROR_ instead
                              -- of re-interpret here. But for now, don't care.
                              let err' = fromIntegral err
-                             free hs_lpol
                              debugIO $ dbgMsg $ ":: done callback: " ++ show err' ++ " - " ++ show numBytes
                              completionCB err' (fromIntegral numBytes)
           CbError err  -> do
-            free cdData
-            free hs_lpol
             let err' = fromIntegral err
             completionCB err' 0
           _            -> do
-            free cdData
-            free hs_lpol
             error "unexpected case in `startCBResult'"
       where dbgMsg s = s ++ " (" ++ show h ++ ":" ++ show offset ++ ")"
             -- Wait for .25ms (threaded) and 1ms (non-threaded)
@@ -1099,15 +1045,17 @@ processCompletion Manager{..} n delay = do
             do debugIO $ "exchanged: " ++ show oldDataPtr
                payload <- peek oldDataPtr :: IO CompletionData
                let !cb = cdCallback payload
-               free oldDataPtr
                reqs <- removeRequest
                debugIO $ "-1.. " ++ show reqs ++ " requests queued."
                status <- FFI.overlappedIOStatus (lpOverlapped oe)
                -- TODO: Remap between STATUS_ and ERROR_ instead
                -- of re-interpret here. But for now, don't care.
                let status' = fromIntegral status
+               -- We no longer explicitly free the memory, this is because we
+               -- now require the callback to free the memory since the
+               -- callback allocated it.  This allows us to simplify memory
+               -- management and reduce bugs.  See Note [Memory Management].
                cb status' (dwNumberOfBytesTransferred oe)
-               free hs_lpol
 
       -- clear the array so we don't erroneously interpret the output, in
       -- certain circumstances like lockFileEx the code could return 1 entry
