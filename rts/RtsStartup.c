@@ -68,6 +68,11 @@
 static int hs_init_count = 0;
 static bool rts_shutdown = false;
 
+#if defined(mingw32_HOST_OS)
+/* Indicates CodePage to set program to after exit.  */
+static int64_t __codePage = 0;
+#endif
+
 static void flushStdHandles(void);
 
 /* -----------------------------------------------------------------------------
@@ -128,13 +133,38 @@ void fpreset(void) {
 static void
 initConsoleCP (void)
 {
+    /* Set the initial codepage to automatic.  */
+    __codePage = -1;
+
     /* Check if the codepage is still the system default ANSI codepage.  */
-    if (GetConsoleCP () == GetOEMCP ()) {
-      if (! SetConsoleCP (CP_UTF8))
+    if (GetConsoleCP () == GetOEMCP ()
+        && GetConsoleOutputCP () == GetOEMCP ()) {
+      if (!SetConsoleCP (CP_UTF8) || !SetConsoleOutputCP (CP_UTF8))
         errorBelch ("Unable to set console CodePage, Unicode output may be "
                     "garbled.\n");
       else
         IF_DEBUG (scheduler, debugBelch ("Codepage set to UTF-8.\n"));
+
+      /* Assign the codepage so we can restore it on exit.  */
+      __codePage = (int64_t)GetOEMCP ();
+    }
+}
+
+/* Restore the CodePage to what it was before we started.  If the CodePage was
+   already set then this call is a no-op.  */
+void
+hs_restoreConsoleCP (void)
+{
+    /* If we set the CP at startup, we should set it on exit.  */
+    if (__codePage == -1)
+      return;
+
+    UINT cp = (UINT)__codePage;
+    __codePage = -1;
+    if (SetConsoleCP (cp) && SetConsoleOutputCP (cp)) {
+      IF_DEBUG (scheduler, debugBelch ("Codepage restored to OEM.\n"));
+    } else {
+      IF_DEBUG (scheduler, debugBelch ("Unable to restore CodePage to OEM.\n"));
     }
 }
 #endif
@@ -533,6 +563,11 @@ hs_exit_(bool wait_foreign)
       shutdownAsyncIO(wait_foreign);
 #endif
 
+    /* Restore the console Codepage.  */
+#if defined(mingw32_HOST_OS)
+   if (is_io_mng_native_p())
+      hs_restoreConsoleCP();
+#endif
     /* free hash table storage */
     exitHashTable();
 
