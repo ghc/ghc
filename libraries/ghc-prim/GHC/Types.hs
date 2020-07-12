@@ -38,6 +38,7 @@ module GHC.Types (
           -- `type *`, without the parentheses. But that's a true
           -- pain to parse, and for little gain.
         VecCount(..), VecElem(..),
+        Void#,
 
         -- * Runtime type representation
         Module(..), TrName(..), TyCon(..), TypeLitSort(..),
@@ -461,6 +462,9 @@ data VecElem = Int8ElemRep
              | FloatElemRep
              | DoubleElemRep
 -- Enum, Bounded instances in GHC.Enum
+
+{-# DEPRECATED Void# "Void# is now an alias for the unboxed tuple (# #)." #-}
+type Void# = (# #)
 
 {- *********************************************************************
 *                                                                      *

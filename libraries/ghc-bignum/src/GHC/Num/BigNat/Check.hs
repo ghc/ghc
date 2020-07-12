@@ -42,7 +42,7 @@ bignat_compare a b =
       gr = Other.bignat_compare a b
       nr = Native.bignat_compare a b
    in case gr ==# nr of
-         0# -> unexpectedValue_Int# void#
+         0# -> unexpectedValue_Int# (# #)
          _  -> gr
 
 mwaCompare
@@ -380,7 +380,7 @@ bignat_rem_word wa b =
       nr = Native.bignat_rem_word wa b
    in case gr `eqWord#` nr of
        1# -> gr
-       _  -> unexpectedValue_Word# void#
+       _  -> unexpectedValue_Word# (# #)
 
 bignat_gcd
    :: MutableWordArray# RealWorld
@@ -403,7 +403,7 @@ bignat_gcd_word wa b =
       nr = Native.bignat_gcd_word wa b
    in case gr `eqWord#` nr of
        1# -> gr
-       _  -> unexpectedValue_Word# void#
+       _  -> unexpectedValue_Word# (# #)
 
 bignat_gcd_word_word
    :: Word#
@@ -415,7 +415,7 @@ bignat_gcd_word_word a b =
       nr = Native.bignat_gcd_word_word a b
    in case gr `eqWord#` nr of
        1# -> gr
-       _  -> unexpectedValue_Word# void#
+       _  -> unexpectedValue_Word# (# #)
 
 bignat_encode_double :: WordArray# -> Int# -> Double#
 bignat_encode_double a e =
@@ -435,7 +435,7 @@ bignat_powmod_word b e m =
       nr = Native.bignat_powmod_word b e m
    in case gr `eqWord#` nr of
        1# -> gr
-       _  -> unexpectedValue_Word# void#
+       _  -> unexpectedValue_Word# (# #)
 
 bignat_powmod
    :: MutableWordArray# RealWorld
@@ -460,4 +460,4 @@ bignat_powmod_words b e m =
       nr = Native.bignat_powmod_words b e m
    in case gr `eqWord#` nr of
        1# -> gr
-       _  -> unexpectedValue_Word# void#
+       _  -> unexpectedValue_Word# (# #)

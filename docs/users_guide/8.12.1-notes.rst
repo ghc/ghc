@@ -336,6 +336,9 @@ Haddock
 - Add a known-key ``cstringLength#`` to ``GHC.CString`` that is eligible
   for constant folding by a built-in rule.
 
+- ``Void#`` is now a type synonym for the unboxed tuple ``(# #)``.
+  Code using ``Void#`` now has to enable :extension:`UnboxedTuples`.
+
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
