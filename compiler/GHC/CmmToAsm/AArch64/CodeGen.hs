@@ -427,10 +427,12 @@ getRegister' :: NCGConfig -> Platform -> CmmExpr -> NatM Register
 -- OPTIMIZATION WARNING: CmmExpr rewrites
 -- 1. Rewrite: Reg + (-n) => Reg - n
 --    XXX: this expression souldn't even be generated to begin with.
-getRegister' config plat (CmmMachOp (MO_Add w0) [x, CmmLit (CmmInt i w1)]) | i < 0
+--    NOTE: i /= (minBound::Int) is for overflow checking. As negating woudl case
+--          an overflow.
+getRegister' config plat (CmmMachOp (MO_Add w0) [x, CmmLit (CmmInt i w1)]) | i < 0 && i /= (minBound::Int)
   = getRegister' config plat (CmmMachOp (MO_Sub w0) [x, CmmLit (CmmInt (-i) w1)])
 
-getRegister' config plat (CmmMachOp (MO_Sub w0) [x, CmmLit (CmmInt i w1)]) | i < 0
+getRegister' config plat (CmmMachOp (MO_Sub w0) [x, CmmLit (CmmInt i w1)]) | i < 0 && i /= (minBound::Int)
   = getRegister' config plat (CmmMachOp (MO_Add w0) [x, CmmLit (CmmInt (-i) w1)])
 
 
