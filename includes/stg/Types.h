@@ -76,6 +76,7 @@ typedef uint8_t                  StgWord8;
 #define STG_WORD8_MAX            UINT8_MAX
 
 #define FMT_Word8                PRIu8
+#define FMT_HexWord8             PRIx8
 
 typedef int16_t                  StgInt16;
 typedef uint16_t                 StgWord16;
@@ -85,6 +86,7 @@ typedef uint16_t                 StgWord16;
 #define STG_WORD16_MAX           UINT16_MAX
 
 #define FMT_Word16               PRIu16
+#define FMT_HexWord16            PRIx16
 
 typedef int32_t                  StgInt32;
 typedef uint32_t                 StgWord32;
