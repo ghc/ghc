@@ -153,6 +153,7 @@ long WINAPI __hs_exception_handler(struct _EXCEPTION_POINTERS *exception_data)
         if (EXCEPTION_CONTINUE_EXECUTION == action)
         {
             fflush(stderr);
+            hs_restoreConsoleCP ();
             generateStack (exception_data);
             generateDump (exception_data);
             stg_exit(exit_code);
