@@ -121,7 +121,7 @@ The ghcPrimIds
     but have perfectly reasonable unfoldings in Core
 
   * Either have a CompulsoryUnfolding (hence always inlined), or
-        of an EvaldUnfolding and void representation (e.g. void#)
+        of an EvaldUnfolding and void representation (e.g. realWorldPrimId)
 
   * Are (or should be) defined in primops.txt.pp as 'pseudoop'
     Reason: that's how we generate documentation for them
@@ -1760,12 +1760,19 @@ realWorldPrimId = pcMiscPrelId realWorldName realWorldStatePrimTy
                                   `setNeverLevPoly`  realWorldStatePrimTy)
 
 voidPrimId :: Id     -- Global constant :: Void#
-voidPrimId  = pcMiscPrelId voidPrimIdName voidPrimTy
-                (noCafIdInfo `setUnfoldingInfo` evaldUnfolding     -- Note [evaldUnfoldings]
-                             `setNeverLevPoly`  voidPrimTy)
+                     -- The type Void# is now the same as (# #) (ticket #18441),
+                     -- this identifier just signifies the (# #) datacon
+                     -- and is kept for backwards compatibility.
+                     -- We cannot define it in normal Haskell, since it's
+                     -- a top-level unlifted value.
+voidPrimId  = pcMiscPrelId voidPrimIdName unboxedUnitTy
+                (noCafIdInfo `setUnfoldingInfo` mkCompulsoryUnfolding rhs
+                             `setNeverLevPoly`  unboxedUnitTy)
+    where rhs = Var (dataConWorkId unboxedUnitDataCon)
+
 
 voidArgId :: Id       -- Local lambda-bound :: Void#
-voidArgId = mkSysLocal (fsLit "void") voidArgIdKey Many voidPrimTy
+voidArgId = mkSysLocal (fsLit "void") voidArgIdKey Many unboxedUnitTy
 
 coercionTokenId :: Id         -- :: () ~ ()
 coercionTokenId -- See Note [Coercion tokens] in "GHC.CoreToStg"

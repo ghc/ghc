@@ -37,6 +37,7 @@ module GHC.Exts
         uncheckedShiftL64#, uncheckedShiftRL64#,
         uncheckedIShiftL64#, uncheckedIShiftRA64#,
         isTrue#,
+        Void#,  -- Previously exported by GHC.Prim
 
         -- * Compat wrapper
         atomicModifyMutVar#,

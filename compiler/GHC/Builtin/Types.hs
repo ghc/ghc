@@ -75,6 +75,7 @@ module GHC.Builtin.Types (
         promotedTupleDataCon,
         unitTyCon, unitDataCon, unitDataConId, unitTy, unitTyConKey,
         pairTyCon,
+        unboxedUnitTy,
         unboxedUnitTyCon, unboxedUnitDataCon,
         unboxedTupleKind, unboxedSumKind,
 
@@ -1052,6 +1053,9 @@ unitDataConId = dataConWorkId unitDataCon
 
 pairTyCon :: TyCon
 pairTyCon = tupleTyCon Boxed 2
+
+unboxedUnitTy :: Type
+unboxedUnitTy = mkTyConApp unboxedUnitTyCon []
 
 unboxedUnitTyCon :: TyCon
 unboxedUnitTyCon = tupleTyCon Unboxed 0

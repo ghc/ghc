@@ -43,6 +43,7 @@ import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Utils.Misc
 import GHC.Types.Var.Set
+import GHC.Builtin.Types ( unboxedUnitTy )
 import GHC.Builtin.Types.Prim
 import GHC.Core.TyCo.Ppr ( pprType )
 import GHC.Utils.Error
@@ -673,7 +674,7 @@ schemeE d s p (AnnCase scrut bndr _ alt@[(DEFAULT, [], _)])
    | isUnboxedTupleType (idType bndr)
    , Just ty <- case typePrimRep (idType bndr) of
        [_]  -> Just (unwrapType (idType bndr))
-       []   -> Just voidPrimTy
+       []   -> Just unboxedUnitTy
        _    -> Nothing
        -- handles any pattern with a single non-void binder; in particular I/O
        -- monad returns (# RealWorld#, a #)
@@ -708,7 +709,7 @@ protectNNLJoinPointBind x rhs@(fvs, _)
 protectNNLJoinPointId :: Id -> Id
 protectNNLJoinPointId x
   = ASSERT( isNNLJoinPoint x )
-    updateIdTypeButNotMult (voidPrimTy `mkVisFunTyMany`) x
+    updateIdTypeButNotMult (unboxedUnitTy `mkVisFunTyMany`) x
 
 {-
    Ticked Expressions
@@ -743,8 +744,8 @@ isUnliftedType check in the AnnVar case of schemeE.) Here is the strategy:
 
 1. Detect NNLJPs. This is done in isNNLJoinPoint.
 
-2. When binding an NNLJP, add a `\ (_ :: Void#) ->` to its RHS, and modify the
-   type to tack on a `Void# ->`. (Void# is written voidPrimTy within GHC.)
+2. When binding an NNLJP, add a `\ (_ :: (# #)) ->` to its RHS, and modify the
+   type to tack on a `(# #) ->`.
    Note that functions are never levity-polymorphic, so this transformation
    changes an NNLJP to a non-levity-polymorphic join point. This is done
    in protectNNLJoinPointBind, called from the AnnLet case of schemeE.

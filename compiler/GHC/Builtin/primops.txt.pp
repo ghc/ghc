@@ -3355,8 +3355,6 @@ section "Misc"
         {These aren't nearly as wired in as Etc...}
 ------------------------------------------------------------------------
 
-primtype Void#
-
 primop  GetCCSOfOp "getCCSOf#" GenPrimOp
    a -> State# s -> (# State# s, Addr# #)
 

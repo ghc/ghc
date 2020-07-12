@@ -120,7 +120,7 @@ integerToBigNatClamp# :: Integer -> BigNat#
 integerToBigNatClamp# (IP x) = x
 integerToBigNatClamp# (IS x)
    | isTrue# (x >=# 0#)     = bigNatFromWord# (int2Word# x)
-integerToBigNatClamp# _     = bigNatZero# void#
+integerToBigNatClamp# _     = bigNatZero# (# #)
 
 -- | Create an Integer from an Int#
 integerFromInt# :: Int# -> Integer

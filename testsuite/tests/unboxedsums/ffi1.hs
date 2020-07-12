@@ -2,7 +2,7 @@
 
 module Lib where
 
-import GHC.Prim
+import GHC.Exts
 
 -- Can't unboxed tuples and sums to FFI, we should fail appropriately.
 

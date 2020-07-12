@@ -698,12 +698,12 @@ tcPatSynMatcher (L loc name) lpat
              res_ty = mkTyVarTy res_tv
              is_unlifted = null args && null prov_dicts
              (cont_args, cont_arg_tys)
-               | is_unlifted = ([nlHsVar voidPrimId], [voidPrimTy])
+               | is_unlifted = ([nlHsVar voidPrimId], [unboxedUnitTy])
                | otherwise   = (args,                 arg_tys)
              cont_ty = mkInfSigmaTy ex_tvs prov_theta $
                        mkVisFunTysMany cont_arg_tys res_ty
 
-             fail_ty  = mkVisFunTyMany voidPrimTy res_ty
+             fail_ty  = mkVisFunTyMany unboxedUnitTy res_ty
 
        ; matcher_name <- newImplicitBinder name mkMatcherOcc
        ; scrutinee    <- newSysLocalId (fsLit "scrut") Many pat_ty
@@ -905,7 +905,7 @@ tcPatSynBuilderOcc ps
 
 add_void :: Bool -> Type -> Type
 add_void need_dummy_arg ty
-  | need_dummy_arg = mkVisFunTyMany voidPrimTy ty
+  | need_dummy_arg = mkVisFunTyMany unboxedUnitTy ty
   | otherwise      = ty
 
 tcPatToExpr :: Name -> [Located Name] -> LPat GhcRn

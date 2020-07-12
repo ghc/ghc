@@ -39,7 +39,7 @@ import GHC.Core.Opt.Arity     ( etaExpandToJoinPointRule )
 import GHC.Types.Unique.Supply
 import GHC.Types.Name
 import GHC.Types.Id.Make  ( voidArgId, voidPrimId )
-import GHC.Builtin.Types.Prim ( voidPrimTy )
+import GHC.Builtin.Types  ( unboxedUnitTy )
 import GHC.Data.Maybe     ( mapMaybe, maybeToList, isJust )
 import GHC.Utils.Monad    ( foldlM )
 import GHC.Types.Basic
@@ -1427,7 +1427,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                  (spec_bndrs, spec_rhs, spec_fn_ty)
                    | add_void_arg = ( voidPrimId : spec_bndrs1
                                     , Lam        voidArgId  spec_rhs1
-                                    , mkVisFunTyMany voidPrimTy spec_fn_ty1)
+                                    , mkVisFunTyMany unboxedUnitTy spec_fn_ty1)
                    | otherwise   = (spec_bndrs1, spec_rhs1, spec_fn_ty1)
 
                  join_arity_decr = length rule_lhs_args - length spec_bndrs

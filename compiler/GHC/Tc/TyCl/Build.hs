@@ -21,8 +21,7 @@ import GHC.Prelude
 
 import GHC.Iface.Env
 import GHC.Core.FamInstEnv( FamInstEnvs, mkNewTypeCoAxiom )
-import GHC.Builtin.Types( isCTupleTyConName )
-import GHC.Builtin.Types.Prim ( voidPrimTy )
+import GHC.Builtin.Types( isCTupleTyConName, unboxedUnitTy )
 import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Types.Var
@@ -209,11 +208,11 @@ buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
     subst = zipTvSubst (univ_tvs1 ++ ex_tvs1)
                        (mkTyVarTys (binderVars (univ_tvs ++ ex_tvs)))
 
-    -- For a nullary pattern synonym we add a single void argument to the
+    -- For a nullary pattern synonym we add a single (# #) argument to the
     -- matcher to preserve laziness in the case of unlifted types.
     -- See #12746
     compareArgTys :: [Type] -> [Type] -> Bool
-    compareArgTys [] [x] = x `eqType` voidPrimTy
+    compareArgTys [] [x] = x `eqType` unboxedUnitTy
     compareArgTys arg_tys matcher_arg_tys = arg_tys `eqTypes` matcher_arg_tys
 
 
