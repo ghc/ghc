@@ -69,7 +69,7 @@ import GHC.Core.DataCon
 import GHC.Core.TyCon
 import GHC.Utils.Error  ( MsgDoc )
 import GHC.Builtin.Names( rOOT_MAIN )
-import GHC.Types.Basic  ( pprWarningTxtForMsg, TopLevelFlag(..), TupleSort(..) )
+import GHC.Types.Basic  ( pprWarningTxtForMsg, TupleSort(..) )
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Utils.Outputable as Outputable
 import GHC.Types.Unique.Set ( uniqSetAny )

@@ -194,6 +194,7 @@
                 (Unqual
                  {OccName: k}))))))))])
        (Prefix)
+       (TopLevel)
        ({ DumpParsedAst.hs:9:32-39 }
         (KindSig
          (NoExtField)
@@ -406,6 +407,7 @@
                 (Unqual
                  {OccName: Type}))))))))])
        (Prefix)
+       (TopLevel)
        ({ DumpParsedAst.hs:16:42-48 }
         (KindSig
          (NoExtField)

@@ -104,7 +104,6 @@ import GHC.Types.Var.Env
 import GHC.Driver.Types
 import GHC.Driver.Session
 import GHC.Types.SrcLoc
-import GHC.Types.Basic hiding( SuccessFlag(..) )
 import GHC.Unit.Module
 import GHC.Utils.Outputable
 import GHC.Utils.Encoding

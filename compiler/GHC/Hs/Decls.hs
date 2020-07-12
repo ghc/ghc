@@ -776,7 +776,7 @@ instance (OutputableBndrId p) => Outputable (TyClDecl (GhcPass p)) where
 
       | otherwise       -- Laid out
       = vcat [ top_matter <+> text "where"
-             , nest 2 $ pprDeclList (map (pprFamilyDecl NotTopLevel . unLoc) ats ++
+             , nest 2 $ pprDeclList (map (pprFamilyDecl . unLoc) ats ++
                                      map (pprTyFamDefltDecl . unLoc) at_defs ++
                                      pprLHsBindsForUser methods sigs) ]
       where
@@ -1085,6 +1085,7 @@ data FamilyDecl pass = FamilyDecl
   , fdTyVars         :: LHsQTyVars pass              -- type variables
                        -- See Note [TyVar binders for associated declarations]
   , fdFixity         :: LexicalFixity                -- Fixity used in the declaration
+  , fdTopLevel       :: TopLevelFlag                 -- Not top level in class decl
   , fdResultSig      :: LFamilyResultSig pass        -- result signature
   , fdInjectivityAnn :: Maybe (LInjectivityAnn pass) -- optional injectivity ann
   }
@@ -1153,15 +1154,16 @@ resultVariableName _                = Nothing
 
 instance OutputableBndrId p
        => Outputable (FamilyDecl (GhcPass p)) where
-  ppr = pprFamilyDecl TopLevel
+  ppr = pprFamilyDecl
 
 pprFamilyDecl :: (OutputableBndrId p)
-              => TopLevelFlag -> FamilyDecl (GhcPass p) -> SDoc
-pprFamilyDecl top_level (FamilyDecl { fdInfo = info, fdLName = ltycon
-                                    , fdTyVars = tyvars
-                                    , fdFixity = fixity
-                                    , fdResultSig = L _ result
-                                    , fdInjectivityAnn = mb_inj })
+              => FamilyDecl (GhcPass p) -> SDoc
+pprFamilyDecl (FamilyDecl { fdInfo = info, fdLName = ltycon
+                          , fdTyVars = tyvars
+                          , fdFixity = fixity
+                          , fdTopLevel = top_level
+                          , fdResultSig = L _ result
+                          , fdInjectivityAnn = mb_inj })
   = vcat [ pprFlavour info <+> pp_top_level <+>
            pp_vanilla_decl_head ltycon tyvars fixity noLHsContext <+>
            pp_kind <+> pp_inj <+> pp_where

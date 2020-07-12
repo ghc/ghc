@@ -1136,7 +1136,7 @@ ty_decl :: { LTyClDecl GhcPs }
                           where_type_family
                 -- Note the use of type for the head; this allows
                 -- infix type constructors to be declared
-                {% amms (mkFamDecl (comb4 $1 $3 $4 $5) (snd $ unLoc $6) $3
+                {% amms (mkFamDecl (comb4 $1 $3 $4 $5) TopLevel (snd $ unLoc $6) $3
                                    (snd $ unLoc $4) (snd $ unLoc $5))
                         (mj AnnType $1:mj AnnFamily $2:(fst $ unLoc $4)
                            ++ (fst $ unLoc $5) ++ (fst $ unLoc $6)) }
@@ -1163,7 +1163,7 @@ ty_decl :: { LTyClDecl GhcPs }
 
           -- data/newtype family
         | 'data' 'family' type opt_datafam_kind_sig
-                {% amms (mkFamDecl (comb3 $1 $2 $4) DataFamily $3
+                {% amms (mkFamDecl (comb3 $1 $2 $4) TopLevel DataFamily $3
                                    (snd $ unLoc $4) Nothing)
                         (mj AnnData $1:mj AnnFamily $2:(fst $ unLoc $4)) }
 
@@ -1321,7 +1321,7 @@ ty_fam_inst_eqn :: { Located ([AddAnn],TyFamInstEqn GhcPs) }
 at_decl_cls :: { LHsDecl GhcPs }
         :  -- data family declarations, with optional 'family' keyword
           'data' opt_family type opt_datafam_kind_sig
-                {% amms (liftM mkTyClD (mkFamDecl (comb3 $1 $3 $4) DataFamily $3
+                {% amms (liftM mkTyClD (mkFamDecl (comb3 $1 $3 $4) NotTopLevel DataFamily $3
                                                   (snd $ unLoc $4) Nothing))
                         (mj AnnData $1:$2++(fst $ unLoc $4)) }
 
@@ -1329,13 +1329,13 @@ at_decl_cls :: { LHsDecl GhcPs }
            -- (can't use opt_instance because you get shift/reduce errors
         | 'type' type opt_at_kind_inj_sig
                {% amms (liftM mkTyClD
-                        (mkFamDecl (comb3 $1 $2 $3) OpenTypeFamily $2
+                        (mkFamDecl (comb3 $1 $2 $3) NotTopLevel OpenTypeFamily $2
                                    (fst . snd $ unLoc $3)
                                    (snd . snd $ unLoc $3)))
                        (mj AnnType $1:(fst $ unLoc $3)) }
         | 'type' 'family' type opt_at_kind_inj_sig
                {% amms (liftM mkTyClD
-                        (mkFamDecl (comb3 $1 $3 $4) OpenTypeFamily $3
+                        (mkFamDecl (comb3 $1 $3 $4) NotTopLevel OpenTypeFamily $3
                                    (fst . snd $ unLoc $4)
                                    (snd . snd $ unLoc $4)))
                        (mj AnnType $1:mj AnnFamily $2:(fst $ unLoc $4)) }

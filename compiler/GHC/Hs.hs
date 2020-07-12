@@ -30,6 +30,7 @@ module GHC.Hs (
         module GHC.Hs.Doc,
         module GHC.Hs.Extension,
         Fixity,
+        TopLevelFlag(..),
 
         HsModule(..),
 ) where
@@ -45,7 +46,7 @@ import GHC.Hs.Lit
 import GHC.Hs.Extension
 import GHC.Hs.Pat
 import GHC.Hs.Type
-import GHC.Types.Basic ( Fixity, WarningTxt )
+import GHC.Types.Basic ( Fixity, WarningTxt, TopLevelFlag(..) )
 import GHC.Hs.Utils
 import GHC.Hs.Doc
 import GHC.Hs.Instances () -- For Data instances

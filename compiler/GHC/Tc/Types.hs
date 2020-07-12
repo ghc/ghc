@@ -120,7 +120,6 @@ import GHC.Types.SrcLoc
 import GHC.Types.Var.Set
 import GHC.Utils.Error
 import GHC.Types.Unique.FM
-import GHC.Types.Basic
 import GHC.Data.Bag
 import GHC.Driver.Session
 import GHC.Utils.Outputable

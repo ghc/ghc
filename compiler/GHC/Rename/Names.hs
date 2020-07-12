@@ -56,7 +56,7 @@ import GHC.Parser.PostProcess ( setRdrNameSpace )
 import GHC.Utils.Outputable as Outputable
 import GHC.Data.Maybe
 import GHC.Types.SrcLoc as SrcLoc
-import GHC.Types.Basic  ( TopLevelFlag(..), StringLiteral(..) )
+import GHC.Types.Basic  ( StringLiteral(..) )
 import GHC.Utils.Misc
 import GHC.Data.FastString
 import GHC.Data.FastString.Env

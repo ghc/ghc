@@ -184,7 +184,7 @@ import GHC.Data.FastString
 import GHC.Utils.Panic
 import GHC.Utils.Misc
 import GHC.Types.Annotations
-import GHC.Types.Basic( TopLevelFlag, TypeOrKind(..) )
+import GHC.Types.Basic( TypeOrKind(..) )
 import GHC.Data.Maybe
 import GHC.Types.CostCentre.State
 
