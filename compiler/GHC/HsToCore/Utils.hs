@@ -67,7 +67,6 @@ import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Core.Type
 import GHC.Core.Coercion
-import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
 import GHC.Types.Basic
 import GHC.Core.ConLike
@@ -853,8 +852,8 @@ mkFailurePair :: CoreExpr       -- Result type of the whole case expression
                       CoreExpr) -- Fail variable applied to realWorld#
 -- See Note [Failure thunks and CPR]
 mkFailurePair expr
-  = do { fail_fun_var <- newFailLocalDs Many (voidPrimTy `mkVisFunTyMany` ty)
-       ; fail_fun_arg <- newSysLocalDs Many voidPrimTy
+  = do { fail_fun_var <- newFailLocalDs Many (unboxedUnitTy `mkVisFunTyMany` ty)
+       ; fail_fun_arg <- newSysLocalDs Many unboxedUnitTy
        ; let real_arg = setOneShotLambda fail_fun_arg
        ; return (NonRec fail_fun_var (Lam real_arg expr),
                  App (Var fail_fun_var) (Var voidPrimId)) }

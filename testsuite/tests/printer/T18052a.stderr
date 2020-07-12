@@ -25,7 +25,7 @@ T18052a.$b:||: = \ (@a) (@b) (x :: a) (y :: b) -> (x, y)
 -- RHS size: {terms: 13, types: 20, coercions: 0, joins: 0/0}
 T18052a.$m:||:
   :: forall {rep :: GHC.Types.RuntimeRep} {r :: TYPE rep} {a} {b}.
-     (a, b) -> (a -> b -> r) -> (GHC.Prim.Void# -> r) -> r
+     (a, b) -> (a -> b -> r) -> ((# #) -> r) -> r
 [GblId, Arity=3, Unf=OtherCon []]
 T18052a.$m:||:
   = \ (@(rep :: GHC.Types.RuntimeRep))

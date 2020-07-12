@@ -1802,7 +1802,7 @@ statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     liftedConKey, unliftedConKey, anyBoxConKey, kindConKey, boxityConKey,
     typeConKey, threadIdPrimTyConKey, bcoPrimTyConKey, ptrTyConKey,
     funPtrTyConKey, tVarPrimTyConKey, eqPrimTyConKey,
-    eqReprPrimTyConKey, eqPhantPrimTyConKey, voidPrimTyConKey,
+    eqReprPrimTyConKey, eqPhantPrimTyConKey,
     compactPrimTyConKey :: Unique
 statePrimTyConKey                       = mkPreludeTyConUnique 50
 stableNamePrimTyConKey                  = mkPreludeTyConUnique 51
@@ -1812,7 +1812,6 @@ eqReprPrimTyConKey                      = mkPreludeTyConUnique 54
 eqPhantPrimTyConKey                     = mkPreludeTyConUnique 55
 mutVarPrimTyConKey                      = mkPreludeTyConUnique 56
 ioTyConKey                              = mkPreludeTyConUnique 57
-voidPrimTyConKey                        = mkPreludeTyConUnique 58
 wordPrimTyConKey                        = mkPreludeTyConUnique 59
 wordTyConKey                            = mkPreludeTyConUnique 60
 word8PrimTyConKey                       = mkPreludeTyConUnique 61
