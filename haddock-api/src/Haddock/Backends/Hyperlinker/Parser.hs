@@ -240,7 +240,6 @@ classify tok =
     ITcolumn_prag       {} -> TkPragma
     ITscc_prag          {} -> TkPragma
     ITgenerated_prag    {} -> TkPragma
-    ITcore_prag         {} -> TkPragma
     ITunpack_prag       {} -> TkPragma
     ITnounpack_prag     {} -> TkPragma
     ITann_prag          {} -> TkPragma
@@ -381,7 +380,6 @@ inPragma False tok =
     ITcolumn_prag       {} -> True
     ITscc_prag          {} -> True
     ITgenerated_prag    {} -> True
-    ITcore_prag         {} -> True
     ITunpack_prag       {} -> True
     ITnounpack_prag     {} -> True
     ITann_prag          {} -> True
