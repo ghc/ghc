@@ -447,28 +447,28 @@ getRegister' config plat expr
         -- XXX hand CmmInt 0 special, use wzr or xzr.
 
         CmmInt i W8  -> do
-          return (Any (intFormat W8) (\dst -> unitOL $ MOV (OpReg W8 dst) (OpImm (ImmInteger (narrowS W8 i)))))
+          return (Any (intFormat W8) (\dst -> unitOL $ ANN (text $ show expr) (MOV (OpReg W8 dst) (OpImm (ImmInteger (narrowS W8 i))))))
         CmmInt i W16 -> do
-          return (Any (intFormat W16) (\dst -> unitOL $ MOV (OpReg W16 dst) (OpImm (ImmInteger (narrowS W16 i)))))
+          return (Any (intFormat W16) (\dst -> unitOL $ ANN (text $ show expr) (MOV (OpReg W16 dst) (OpImm (ImmInteger (narrowS W16 i))))))
 
         -- We need to be careful to not shorten this for negative literals.
         -- Those need the upper bits set. We'd either have to explicitly sign
         -- or figure out something smarter. MNV dst XZR
         CmmInt i w | is16bit i, i >= 0 -> do
-          return (Any (intFormat w) (\dst -> unitOL $ MOV (OpReg W16 dst) (OpImm (ImmInteger i))))
+          return (Any (intFormat w) (\dst -> unitOL $ ANN (text $ show expr) (MOV (OpReg W16 dst) (OpImm (ImmInteger i)))))
         CmmInt i w | is32bit i, i >= 0 -> do
           let  half0 = fromIntegral (fromIntegral i :: Word16)
                half1 = fromIntegral (fromIntegral (i `shiftR` 16) :: Word16)
-          return (Any (intFormat w) (\dst -> toOL [ COMMENT (text "CmmInt" <+> integer i <+> text (show w))
-                                                  , MOV (OpReg W32 dst) (OpImm (ImmInt half0))
+          return (Any (intFormat w) (\dst -> toOL [ ANN (text $ show expr)
+                                                  $ MOV (OpReg W32 dst) (OpImm (ImmInt half0))
                                                   , MOVK (OpReg W32 dst) (OpImmShift (ImmInt half1) SLSL 16)
                                                   ]))
         -- fallback for W32
         CmmInt i W32 -> do
           let  half0 = fromIntegral (fromIntegral i :: Word16)
                half1 = fromIntegral (fromIntegral (i `shiftR` 16) :: Word16)
-          return (Any (intFormat W32) (\dst -> toOL [ COMMENT (ppr expr)
-                                                    , MOV (OpReg W32 dst) (OpImm (ImmInt half0))
+          return (Any (intFormat W32) (\dst -> toOL [ ANN (text $ show expr)
+                                                    $ MOV (OpReg W32 dst) (OpImm (ImmInt half0))
                                                     , MOVK (OpReg W32 dst) (OpImmShift (ImmInt half1) SLSL 16)
                                                     ]))
         -- anything else
@@ -477,20 +477,20 @@ getRegister' config plat expr
                half1 = fromIntegral (fromIntegral (i `shiftR` 16) :: Word16)
                half2 = fromIntegral (fromIntegral (i `shiftR` 32) :: Word16)
                half3 = fromIntegral (fromIntegral (i `shiftR` 48) :: Word16)
-          return (Any (intFormat W64) (\dst -> toOL [ COMMENT (ppr expr)
-                                                    , MOV (OpReg W64 dst) (OpImm (ImmInt half0))
+          return (Any (intFormat W64) (\dst -> toOL [ ANN (text $ show expr)
+                                                    $ MOV (OpReg W64 dst) (OpImm (ImmInt half0))
                                                     , MOVK (OpReg W64 dst) (OpImmShift (ImmInt half1) SLSL 16)
                                                     , MOVK (OpReg W64 dst) (OpImmShift (ImmInt half2) SLSL 32)
                                                     , MOVK (OpReg W64 dst) (OpImmShift (ImmInt half3) SLSL 48)
                                                     ]))
         CmmInt i rep -> do
           (op, imm_code) <- litToImm' lit
-          return (Any (intFormat rep) (\dst -> imm_code `snocOL` MOV (OpReg rep dst) op))
+          return (Any (intFormat rep) (\dst -> imm_code `snocOL` ANN (text $ show expr) (MOV (OpReg rep dst) op)))
 
         -- floatToBytes (fromRational f)
         CmmFloat 0 w   -> do
           (op, imm_code) <- litToImm' lit
-          return (Any (floatFormat w) (\dst -> imm_code `snocOL` MOV (OpReg w dst) op))
+          return (Any (floatFormat w) (\dst -> imm_code `snocOL` ANN (text $ show expr) (MOV (OpReg w dst) op)))
 
         CmmFloat f W8  -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for bytes" (ppr expr)
         CmmFloat f W16 -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for halfs" (ppr expr)
@@ -499,7 +499,8 @@ getRegister' config plat expr
               half0 = fromIntegral (fromIntegral word :: Word16)
               half1 = fromIntegral (fromIntegral (word `shiftR` 16) :: Word16)
           tmp <- getNewRegNat (intFormat W32)
-          return (Any (floatFormat W32) (\dst -> toOL [ MOV (OpReg W32 tmp) (OpImm (ImmInt half0))
+          return (Any (floatFormat W32) (\dst -> toOL [ ANN (text $ show expr)
+                                                      $ MOV (OpReg W32 tmp) (OpImm (ImmInt half0))
                                                       , MOVK (OpReg W32 tmp) (OpImmShift (ImmInt half1) SLSL 16)
                                                       , MOV (OpReg W32 dst) (OpReg W32 tmp)
                                                       ]))
@@ -510,7 +511,8 @@ getRegister' config plat expr
               half2 = fromIntegral (fromIntegral (word `shiftR` 32) :: Word16)
               half3 = fromIntegral (fromIntegral (word `shiftR` 48) :: Word16)
           tmp <- getNewRegNat (intFormat W64)
-          return (Any (floatFormat W64) (\dst -> toOL [ MOV (OpReg W64 tmp) (OpImm (ImmInt half0))
+          return (Any (floatFormat W64) (\dst -> toOL [ ANN (text $ show expr)
+                                                      $ MOV (OpReg W64 tmp) (OpImm (ImmInt half0))
                                                       , MOVK (OpReg W64 tmp) (OpImmShift (ImmInt half1) SLSL 16)
                                                       , MOVK (OpReg W64 tmp) (OpImmShift (ImmInt half2) SLSL 32)
                                                       , MOVK (OpReg W64 tmp) (OpImmShift (ImmInt half3) SLSL 48)

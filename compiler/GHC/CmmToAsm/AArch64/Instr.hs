@@ -331,7 +331,7 @@ aarch64_mkSpillInstr
    -> Instr
 
 aarch64_mkSpillInstr config reg delta slot
-    = STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt $ off - delta)))
+    = ANN (text "Spill") $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt $ off - delta)))
     where
         fmt = case reg of
             RegReal (RealRegSingle n) | n < 32 -> II64
@@ -346,7 +346,7 @@ aarch64_mkLoadInstr
    -> Instr
 
 aarch64_mkLoadInstr config reg delta slot
-    = LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt $ off - delta)))
+    = ANN (text "Reload") $ LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt $ off - delta)))
     where
         fmt = case reg of
             RegReal (RealRegSingle n) | n < 32 -> II64
