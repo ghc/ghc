@@ -247,7 +247,7 @@ wordLog2# w   = (WORD_SIZE_IN_BITS## `minusWord#` 1##) `minusWord#` (clz# w)
 wordLogBase# :: Word# -> Word# -> Word#
 wordLogBase# base a
    | isTrue# (base `leWord#` 1##)
-   = unexpectedValue_Word# void#
+   = unexpectedValue_Word# (# #)
 
    | 2## <- base
    = wordLog2# a
@@ -616,19 +616,19 @@ ioBool (IO io) s = case io s of
 --                          -- 0## is a dummy value (unreachable code)
 --
 
-unexpectedValue_Int# :: Void# -> Int#
+unexpectedValue_Int# :: (# #) -> Int#
 unexpectedValue_Int# _ = case unexpectedValue of
    !_ -> 0# -- see Note [ghc-bignum exceptions]
 
-unexpectedValue_Word# :: Void# -> Word#
+unexpectedValue_Word# :: (# #) -> Word#
 unexpectedValue_Word# _ = case unexpectedValue of
    !_ -> 0## -- see Note [ghc-bignum exceptions]
 
-raiseDivZero_Word# :: Void# -> Word#
+raiseDivZero_Word# :: (# #) -> Word#
 raiseDivZero_Word# _ = case raiseDivZero of
    !_ -> 0## -- see Note [ghc-bignum exceptions]
 
-raiseUnderflow_Word# :: Void# -> Word#
+raiseUnderflow_Word# :: (# #) -> Word#
 raiseUnderflow_Word# _ = case raiseUnderflow of
    !_ -> 0## -- see Note [ghc-bignum exceptions]
 

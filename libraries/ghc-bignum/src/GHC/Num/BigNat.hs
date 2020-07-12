@@ -68,11 +68,11 @@ type BigNat# = WordArray#
 -- As a consequence, zero is represented with a WordArray# whose size is 0.
 data BigNat = BN# { unBigNat :: BigNat# }
 
--- Note [Why Void#?]
+-- Note [Why (# #)?]
 -- ~~~~~~~~~~~~~~~~~
 --
 -- We can't have top-level BigNat# for now because they are unlifted ByteArray#
--- (see #17521). So we use functions that take an empty argument Void# that
+-- (see #17521). So we use functions that take an empty argument (# #) that
 -- will be discarded at compile time.
 
 
@@ -104,18 +104,18 @@ bigNatOne :: BigNat
 bigNatOne = BN# (bigNatFromWord# 1##)
 
 -- | BigNat Zero
-bigNatZero# :: Void# -> BigNat# -- cf Note [Why Void#?]
+bigNatZero# :: (# #) -> BigNat# -- cf Note [Why (# #)?]
 bigNatZero# _ = case bigNatZero of
    BN# w -> w
 
 -- | BigNat one
-bigNatOne# :: Void# -> BigNat# -- cf Note [Why Void#?]
+bigNatOne# :: (# #) -> BigNat# -- cf Note [Why (# #)?]
 bigNatOne# _ = case bigNatOne of
    BN# w -> w
 
-raiseDivZero_BigNat :: Void# -> BigNat#
+raiseDivZero_BigNat :: (# #) -> BigNat#
 raiseDivZero_BigNat _ = case raiseDivZero of
-   !_ -> bigNatZero# void#
+   !_ -> bigNatZero# (# #)
    -- see Note [ghc-bignum exceptions] in GHC.Num.Primitives
 
 -- | Indicate if a bigNat is zero
@@ -184,7 +184,7 @@ bigNatFromWord (W# w) = bigNatFromWord# w
 
 -- | Create a BigNat from a Word
 bigNatFromWord# :: Word# -> BigNat#
-bigNatFromWord# 0## = bigNatZero# void#
+bigNatFromWord# 0## = bigNatZero# (# #)
 bigNatFromWord# w   = wordArrayFromWord# w
 
 -- | Convert a list of non-zero Words (most-significant first) into a BigNat
@@ -204,7 +204,7 @@ bigNatFromAbsInt# i = bigNatFromWord# (wordFromAbsInt# i)
 -- | Convert a list of non-zero Words (most-significant first) into a BigNat.
 -- Don't remove most-significant zero words
 bigNatFromWordListUnsafe :: [Word] -> BigNat#
-bigNatFromWordListUnsafe [] = bigNatZero# void#
+bigNatFromWordListUnsafe [] = bigNatZero# (# #)
 bigNatFromWordListUnsafe xs =
    let
       length i []     = i
@@ -227,7 +227,7 @@ bigNatToWordList bn = go (bigNatSize# bn)
 
 -- | Convert two Word# (most-significant first) into a BigNat
 bigNatFromWord2# :: Word# -> Word# -> BigNat#
-bigNatFromWord2# 0## 0## = bigNatZero# void#
+bigNatFromWord2# 0## 0## = bigNatZero# (# #)
 bigNatFromWord2# 0## n   = bigNatFromWord# n
 bigNatFromWord2# w1 w2   = wordArrayFromWord2# w1 w2
 
@@ -415,9 +415,9 @@ bigNatAdd a b
 -- | Multiply a BigNat by a Word#
 bigNatMulWord# :: BigNat# -> Word# -> BigNat#
 bigNatMulWord# a w
-   | 0## <- w       = bigNatZero# void#
+   | 0## <- w       = bigNatZero# (# #)
    | 1## <- w       = a
-   | bigNatIsZero a = bigNatZero# void#
+   | bigNatIsZero a = bigNatZero# (# #)
    | bigNatIsOne  a = bigNatFromWord# w
    | isTrue# (bigNatSize# a ==# 1#)
    = case timesWord2# (bigNatIndex# a 0#) w of
@@ -531,7 +531,7 @@ bigNatSub a b
 bigNatQuotWord# :: BigNat# -> Word# -> BigNat#
 bigNatQuotWord# a b
    | 1## <- b = a
-   | 0## <- b = raiseDivZero_BigNat void#
+   | 0## <- b = raiseDivZero_BigNat (# #)
    | True =
    let
       sz = wordArraySize# a
@@ -551,7 +551,7 @@ bigNatQuotWord a (W# b) = bigNatQuotWord# a b
 --    b /= 0
 bigNatRemWord# :: BigNat# -> Word# -> Word#
 bigNatRemWord# a b
-   | 0## <- b       = raiseDivZero_Word# void#
+   | 0## <- b       = raiseDivZero_Word# (# #)
    | 1## <- b       = 0##
    | bigNatIsZero a = 0##
    | True           = inline bignat_rem_word a b
@@ -570,14 +570,14 @@ bigNatRemWord a (W# b) = W# (bigNatRemWord# a b)
 bigNatQuotRemWord# :: BigNat# -> Word# -> (# BigNat#, Word# #)
 bigNatQuotRemWord# a b
    | 0## <- b = case raiseDivZero of
-                  !_ -> (# bigNatZero# void#, 0## #)
+                  !_ -> (# bigNatZero# (# #), 0## #)
                   -- see Note [ghc-bignum exceptions] in GHC.Num.Primitives
    | 1## <- b = (# a, 0## #)
    | isTrue# (bigNatSize# a ==# 1#)
    , a0 <- indexWordArray# a 0#
    = case compareWord# a0 b of
-      LT -> (# bigNatZero# void#, a0  #)
-      EQ -> (# bigNatOne#  void#, 0## #)
+      LT -> (# bigNatZero# (# #), a0  #)
+      EQ -> (# bigNatOne#  (# #), 0## #)
       GT -> case quotRemWord# a0 b of
                (# q, r #) -> (# bigNatFromWord# q, r #)
    | True =
@@ -598,12 +598,12 @@ bigNatQuotRemWord# a b
 bigNatQuotRem# :: BigNat# -> BigNat# -> (# BigNat#, BigNat# #)
 bigNatQuotRem# a b
    | bigNatIsZero b          = case raiseDivZero of
-                                 !_ -> (# bigNatZero# void#, bigNatZero# void# #)
+                                 !_ -> (# bigNatZero# (# #), bigNatZero# (# #) #)
                                  -- see Note [ghc-bignum exceptions] in GHC.Num.Primitives
-   | bigNatIsZero a          = (# bigNatZero# void#, bigNatZero# void# #)
-   | bigNatIsOne b           = (# a                , bigNatZero# void# #)
-   | LT <- cmp               = (# bigNatZero# void#, a #)
-   | EQ <- cmp               = (# bigNatOne#  void#, bigNatZero# void# #)
+   | bigNatIsZero a          = (# bigNatZero# (# #), bigNatZero# (# #) #)
+   | bigNatIsOne b           = (# a                , bigNatZero# (# #) #)
+   | LT <- cmp               = (# bigNatZero# (# #), a #)
+   | EQ <- cmp               = (# bigNatOne#  (# #), bigNatZero# (# #) #)
    | isTrue# (szB ==# 1#)    = case bigNatQuotRemWord# a (bigNatIndex# b 0#) of
                                  (# q, r #) -> (# q, bigNatFromWord# r #)
 
@@ -620,11 +620,11 @@ bigNatQuotRem# a b
 -- | BigNat division returning quotient
 bigNatQuot :: BigNat# -> BigNat# -> BigNat#
 bigNatQuot a b
-   | bigNatIsZero b          = raiseDivZero_BigNat void#
-   | bigNatIsZero a          = bigNatZero# void#
+   | bigNatIsZero b          = raiseDivZero_BigNat (# #)
+   | bigNatIsZero a          = bigNatZero# (# #)
    | bigNatIsOne b           = a
-   | LT <- cmp               = bigNatZero# void#
-   | EQ <- cmp               = bigNatOne# void#
+   | LT <- cmp               = bigNatZero# (# #)
+   | EQ <- cmp               = bigNatOne# (# #)
    | isTrue# (szB ==# 1#)    = bigNatQuotWord# a (bigNatIndex# b 0#)
    | True                    = withNewWordArrayTrimed# szQ \mwq s ->
                                  inline bignat_quot mwq a b s
@@ -637,11 +637,11 @@ bigNatQuot a b
 -- | BigNat division returning remainder
 bigNatRem :: BigNat# -> BigNat# -> BigNat#
 bigNatRem a b
-   | bigNatIsZero b          = raiseDivZero_BigNat void#
-   | bigNatIsZero a          = bigNatZero# void#
-   | bigNatIsOne b           = bigNatZero# void#
+   | bigNatIsZero b          = raiseDivZero_BigNat (# #)
+   | bigNatIsZero a          = bigNatZero# (# #)
+   | bigNatIsOne b           = bigNatZero# (# #)
    | LT <- cmp               = a
-   | EQ <- cmp               = bigNatZero# void#
+   | EQ <- cmp               = bigNatZero# (# #)
    | isTrue# (szB ==# 1#)    = case bigNatRemWord# a (bigNatIndex# b 0#) of
                                  r -> bigNatFromWord# r
    | True                    = withNewWordArrayTrimed# szR \mwr s ->
@@ -719,8 +719,8 @@ bigNatGcdWord# a b
 -- | Least common multiple
 bigNatLcm :: BigNat# -> BigNat# -> BigNat#
 bigNatLcm a b
-   | bigNatIsZero a = bigNatZero# void#
-   | bigNatIsZero b = bigNatZero# void#
+   | bigNatIsZero a = bigNatZero# (# #)
+   | bigNatIsZero b = bigNatZero# (# #)
    | bigNatIsOne  a = b
    | bigNatIsOne  b = a
    | True
@@ -734,8 +734,8 @@ bigNatLcm a b
 -- | Least common multiple with a Word#
 bigNatLcmWord# :: BigNat# -> Word# -> BigNat#
 bigNatLcmWord# a b
-   | bigNatIsZero a      = bigNatZero# void#
-   | 0## <- b            = bigNatZero# void#
+   | bigNatIsZero a      = bigNatZero# (# #)
+   | 0## <- b            = bigNatZero# (# #)
    | bigNatIsOne  a      = bigNatFromWord# b
    | 1## <- b            = a
    | 1# <- bigNatSize# a = bigNatLcmWordWord# (bigNatIndex# a 0#) b
@@ -746,8 +746,8 @@ bigNatLcmWord# a b
 -- | Least common multiple between two Word#
 bigNatLcmWordWord# :: Word# -> Word# -> BigNat#
 bigNatLcmWordWord# a b
-   | 0## <- a = bigNatZero# void#
-   | 0## <- b = bigNatZero# void#
+   | 0## <- a = bigNatZero# (# #)
+   | 0## <- b = bigNatZero# (# #)
    | 1## <- a = bigNatFromWord# b
    | 1## <- b = bigNatFromWord# a
    | True     = case (a `quotWord#` (a `gcdWord#` b)) `timesWord2#` b of
@@ -879,7 +879,7 @@ bigNatShiftR# a n
 
    | nw <- word2Int# (n `uncheckedShiftRL#` WORD_SIZE_BITS_SHIFT#)
    , isTrue# (nw >=# wordArraySize# a)
-   = bigNatZero# void#
+   = bigNatZero# (# #)
 
    | True
    = let
@@ -900,7 +900,7 @@ bigNatShiftRNeg# a n
 
    | nw <- word2Int# (n `uncheckedShiftRL#` WORD_SIZE_BITS_SHIFT#)
    , isTrue# (nw >=# wordArraySize# a)
-   = bigNatZero# void#
+   = bigNatZero# (# #)
 
    | True
    = let
@@ -961,7 +961,7 @@ bigNatTestBit a (W# n) = isTrue# (bigNatTestBit# a n)
 --
 bigNatBit# :: Word# -> BigNat#
 bigNatBit# i
-   | 0## <- i = bigNatOne# void#
+   | 0## <- i = bigNatOne# (# #)
    | True =
    let
       !nw = word2Int# (i `uncheckedShiftRL#` WORD_SIZE_BITS_SHIFT#)
@@ -1000,7 +1000,7 @@ bigNatClearBit# a n
       | 0## <- nv
       , isTrue# (nw +# 1# ==# sz)
       -> case sz -# (waClzAt a (sz -# 2#) +# 1#) of
-            0#  -> bigNatZero# void#
+            0#  -> bigNatZero# (# #)
             nsz -> withNewWordArray# nsz \mwa s ->
                      mwaArrayCopy# mwa 0# a 0# nsz s
 
@@ -1060,7 +1060,7 @@ bigNatLog2 a = W# (bigNatLog2# a)
 bigNatLogBase# :: BigNat# -> BigNat# -> Word#
 bigNatLogBase# base a
    | bigNatIsZero base || bigNatIsOne base
-   = unexpectedValue_Word# void#
+   = unexpectedValue_Word# (# #)
 
    | 1# <- bigNatSize# base
    , 2## <- bigNatIndex# base 0#
@@ -1086,8 +1086,8 @@ bigNatLogBase base a = W# (bigNatLogBase# base a)
 -- | Logarithm for an arbitrary base
 bigNatLogBaseWord# :: Word# -> BigNat# -> Word#
 bigNatLogBaseWord# base a
-   | 0## <- base = unexpectedValue_Word# void#
-   | 1## <- base = unexpectedValue_Word# void#
+   | 0## <- base = unexpectedValue_Word# (# #)
+   | 1## <- base = unexpectedValue_Word# (# #)
    | 2## <- base = bigNatLog2# a
    -- TODO: optimize log base power of 2 (256, etc.)
    | True = bigNatLogBase# (bigNatFromWord# base) a
@@ -1106,7 +1106,7 @@ bigNatLogBaseWord (W# base) a = W# (bigNatLogBaseWord# base a)
 bigNatSizeInBase# :: Word# -> BigNat# -> Word#
 bigNatSizeInBase# base a
    | isTrue# (base `leWord#` 1##)
-   = unexpectedValue_Word# void#
+   = unexpectedValue_Word# (# #)
 
    | bigNatIsZero a
    = 0##
@@ -1135,7 +1135,7 @@ powModWord# = bignat_powmod_words
 -- | \"@'bigNatPowModWord#' /b/ /e/ /m/@\" computes base @/b/@ raised to
 -- exponent @/e/@ modulo @/m/@.
 bigNatPowModWord# :: BigNat# -> BigNat# -> Word# -> Word#
-bigNatPowModWord# !_ !_ 0## = raiseDivZero_Word# void#
+bigNatPowModWord# !_ !_ 0## = raiseDivZero_Word# (# #)
 bigNatPowModWord# _  _  1## = 0##
 bigNatPowModWord# b  e  m
    | bigNatIsZero e         = 1##
@@ -1149,7 +1149,7 @@ bigNatPowMod :: BigNat# -> BigNat# -> BigNat# -> BigNat#
 bigNatPowMod !b !e !m
    | (# m' | #) <- bigNatToWordMaybe# m
    = bigNatFromWord# (bigNatPowModWord# b e m')
-   | bigNatIsZero m = raiseDivZero_BigNat void#
+   | bigNatIsZero m = raiseDivZero_BigNat (# #)
    | bigNatIsOne  m = bigNatFromWord# 0##
    | bigNatIsZero e = bigNatFromWord# 1##
    | bigNatIsZero b = bigNatFromWord# 0##
@@ -1293,7 +1293,7 @@ bigNatToAddr a addr e = IO \s -> case bigNatToAddr# a addr e s of
 --
 -- Higher limbs equal to 0 are automatically trimed.
 bigNatFromAddrLE# :: Word# -> Addr# -> State# s -> (# State# s, BigNat# #)
-bigNatFromAddrLE# 0## _    s = (# s, bigNatZero# void# #)
+bigNatFromAddrLE# 0## _    s = (# s, bigNatZero# (# #) #)
 bigNatFromAddrLE# sz  addr s =
    let
       !nw = sz `uncheckedShiftRL#` WORD_SIZE_BYTES_SHIFT#
@@ -1328,7 +1328,7 @@ bigNatFromAddrLE# sz  addr s =
 --
 -- Null higher limbs are automatically trimed.
 bigNatFromAddrBE# :: Word# -> Addr# -> State# s -> (# State# s, BigNat# #)
-bigNatFromAddrBE# 0## _    s = (# s, bigNatZero# void# #)
+bigNatFromAddrBE# 0## _    s = (# s, bigNatZero# (# #) #)
 bigNatFromAddrBE# sz  addr s =
    let
       !nw = word2Int# (sz `uncheckedShiftRL#` WORD_SIZE_BYTES_SHIFT#)
@@ -1454,7 +1454,7 @@ bigNatToMutableByteArray# a mba off _  s = bigNatToMutableByteArrayBE# a mba off
 --
 -- Null higher limbs are automatically trimed.
 bigNatFromByteArrayLE# :: Word# -> ByteArray# -> Word# -> State# s -> (# State# s, BigNat# #)
-bigNatFromByteArrayLE# 0## _  _    s = (# s, bigNatZero# void# #)
+bigNatFromByteArrayLE# 0## _  _    s = (# s, bigNatZero# (# #) #)
 bigNatFromByteArrayLE# sz  ba moff s =
    let
       !nw = sz `uncheckedShiftRL#` WORD_SIZE_BYTES_SHIFT#
@@ -1489,7 +1489,7 @@ bigNatFromByteArrayLE# sz  ba moff s =
 --
 -- Null higher limbs are automatically trimed.
 bigNatFromByteArrayBE# :: Word# -> ByteArray# -> Word# -> State# s -> (# State# s, BigNat# #)
-bigNatFromByteArrayBE# 0## _  _    s = (# s, bigNatZero# void# #)
+bigNatFromByteArrayBE# 0## _  _    s = (# s, bigNatZero# (# #) #)
 bigNatFromByteArrayBE# sz  ba moff s =
    let
       !nw = sz `uncheckedShiftRL#` WORD_SIZE_BYTES_SHIFT#
