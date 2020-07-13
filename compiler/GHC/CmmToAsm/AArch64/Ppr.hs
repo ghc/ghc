@@ -435,6 +435,14 @@ pprInstr platform instr = case instr of
   -- 6. Conditional Instructions -----------------------------------------------
   CSET o c  -> text "\tcset" <+> pprOp o <> comma <+> pprCond c
 
+  CBZ o (TBlock bid) -> text "\tcbz" <+> pprOp o <> comma <+> ppr (mkLocalBlockLabel (getUnique bid))
+  CBZ o (TLabel lbl) -> text "\tcbz" <+> pprOp o <> comma <+> ppr lbl
+  CBZ c (TReg r)     -> panic "AArch64.ppr: No conditional (cbz) branching to registers!"
+
+  CBNZ o (TBlock bid) -> text "\tcbnz" <+> pprOp o <> comma <+> ppr (mkLocalBlockLabel (getUnique bid))
+  CBNZ o (TLabel lbl) -> text "\tcbnz" <+> pprOp o <> comma <+> ppr lbl
+  CBNZ c (TReg r)     -> panic "AArch64.ppr: No conditional (cbz) branching to registers!"
+
   -- 7. Load and Store Instructions --------------------------------------------
   -- NOTE: GHC may do whacky things where it only load the lower part of an
   --       address. Not observing the correct size when loading will lead
