@@ -859,6 +859,10 @@ combineFieldInfos (FieldsUntyped fs1) (FieldsProd fs2) =
 flatLattice :: EnterInfo -> EnterLattice
 flatLattice x = EnterLattice x FieldsUnknown
 
+-- Lattice where we know there are no inner values.
+nullaryLattice :: EnterInfo -> EnterLattice
+nullaryLattice enterInfo = EnterLattice enterInfo FieldsNone
+
 setEnterInfo :: HasDebugCallStack => EnterLattice -> EnterInfo -> EnterLattice
 setEnterInfo lat@(EnterLattice enter fields) newEnter
     | enter == newEnter
@@ -1089,16 +1093,18 @@ getNode node_id = do
                    (lookupUFM (fs_doneNodes s) node_id <|> lookupUFM (fs_uqNodeMap s) node_id)
 
 
--- We should never try to query non-existing nodes.
--- TODO: Assert the fact.
+-- We will never query non-existing nodes unless bugs
+-- are introduced.
 lookupNodeResult :: HasDebugCallStack => NodeId -> AM EnterLattice
 lookupNodeResult node_id = do
     s <- get
     let node = (lookupUFM (fs_uqNodeMap s) node_id <|>
                 lookupUFM (fs_doneNodes s) node_id)
     case node of
-        Nothing -> -- pprTraceM ("lookpupNodeResult: Nothing\n" ++ prettyCallStack callStack) (ppr node_id) >>
-                   return top
+        Nothing -> do
+            when debugIsOn $
+                pprTraceM ("lookpupNodeResult: Nothing\n" ++ prettyCallStack callStack) (ppr node_id)
+            return top
         Just n  -> return $! node_result n
 
 {-
@@ -1452,9 +1458,9 @@ alwaysEnterNode, maybeEnterNode, neverEnterNode, litNode, addrNode, nullaryConNo
 alwaysEnterNode = mkConstNode alwaysNodeId  (flatLattice AlwaysEnter) (text "always")
 maybeEnterNode  = mkConstNode maybeNodeId   (flatLattice MaybeEnter) (text "maybe")
 neverEnterNode  = mkConstNode neverNodeId   (flatLattice NeverEnter) (text "never")
-litNode         = mkConstNode litNodeId     (flatLattice NeverEnter) (text "lit")
-addrNode        = mkConstNode addrNodeId    (flatLattice NeverEnter) (text "c_str")
-nullaryConNode  = mkConstNode nullaryConNodeId (EnterLattice NeverEnter FieldsNone) (text "nullCon")
+litNode         = mkConstNode litNodeId     (nullaryLattice NeverEnter) (text "lit")
+addrNode        = mkConstNode addrNodeId    (nullaryLattice NeverEnter) (text "c_str")
+nullaryConNode  = mkConstNode nullaryConNodeId (nullaryLattice NeverEnter) (text "nullCon")
 
 {-  Note [Imported Ids]
     ~~~~~~~~~~~~~~~~~~~
@@ -2334,12 +2340,12 @@ nodeApp this_mod ctxt expr@(StgApp _ f args) = do
     mkResult
         | isAbsent =
             -- pprTrace "Absent:" (ppr f) $
-            return $! flatLattice NeverEnter
+            return $! nullaryLattice NeverEnter
 
         | isFun && (not isSat) = return $! bot
 
         -- App in a direct self-recursive tail call context, returns nothing
-        | recTail = return $! EnterLattice NoValue FieldsNone
+        | recTail = return $! nullaryLattice NoValue
 
         | OtherRecursion <- recursionKind
         =   lookupNodeResult f_node_id
