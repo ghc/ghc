@@ -543,7 +543,7 @@ getRegister' config plat expr
         CmmBlock _ -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (ppr expr)
         CmmHighStackMark -> pprPanic "getRegister' (CmmLit:CmmLabelOff): " (ppr expr)
     CmmLoad mem rep -> do
-      Amode addr addr_code <- getAmode mem
+      Amode addr addr_code <- getAmode plat mem
       let format = cmmTypeFormat rep
       return (Any format (\dst -> addr_code `snocOL` LDR format (OpReg (formatToWidth format) dst) (OpAddr addr)))
     CmmStackSlot _ _
@@ -776,24 +776,30 @@ getRegister' config plat expr
 --  The 'Amode' type: Memory addressing modes passed up the tree.
 data Amode = Amode AddrMode InstrBlock
 
-getAmode :: CmmExpr -> NatM Amode
+getAmode :: Platform -> CmmExpr -> NatM Amode
 -- XXX: Specialize stuff we can destructure here.
 
 -- OPTIMIZATION WARNING: Addressing modes.
 -- Addressing options:
 -- LDUR/STUR: imm9: -256 - 255
-getAmode (CmmRegOff reg off) | -256 <= off && off <= 255
-  = do platform <- getPlatform
-       let reg' = getRegisterReg platform reg
+getAmode platform (CmmRegOff reg off) | -256 <= off, off <= 255
+  = return $ Amode (AddrRegImm reg' off') nilOL
+    where reg' = getRegisterReg platform reg
            off' = ImmInt off
-       return $ Amode (AddrRegImm reg' off') nilOL
 -- LDR/STR: imm12: if reg is 32bit: 0 -- 16380 in multiples of 4
--- XXX: Todo
+getAmode platform (CmmRegOff reg off)
+  | typeWidth (cmmRegType platform reg) == W32, 0 <= off, off <= 16380, off `mod` 4 == 0
+  = return $ Amode (AddrRegImm reg' off') nilOL
+    where reg' = getRegisterReg platform reg
+          off' = ImmInt off
 -- LDR/STR: imm12: if reg is 64bit: 0 -- 32760 in multiples of 8
--- XXX: todo
-
+getAmode platform (CmmRegOff reg off)
+  | typeWidth (cmmRegType platform reg) == W64, 0 <= off, off <= 32760, off `mod` 8 == 0
+  = return $ Amode (AddrRegImm reg' off') nilOL
+    where reg' = getRegisterReg platform reg
+          off' = ImmInt off
 -- Generic case
-getAmode expr
+getAmode _plat expr
   = do (reg, _format, code) <- getSomeReg expr
        return $ Amode (AddrReg reg) code
 
@@ -818,7 +824,8 @@ assignReg_FltCode :: Format -> CmmReg  -> CmmExpr -> NatM InstrBlock
 assignMem_IntCode rep addrE srcE
   = do
     (src_reg, _format, code) <- getSomeReg srcE
-    Amode addr addr_code <- getAmode addrE
+    platform <- getPlatform
+    Amode addr addr_code <- getAmode platform addrE
     let AddrReg r1 = addr
     return $ COMMENT (text "CmmStore" <+> parens (text (show addrE)) <+> parens (text (show srcE)))
             `consOL` (code
