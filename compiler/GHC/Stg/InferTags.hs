@@ -287,7 +287,7 @@ import GHC.Exts (oneShot, dataToTag#)
 #endif
 
 nestingLimit :: Int
-nestingLimit = 30
+nestingLimit = 5
 
 -- Shortcut comparisons if two things reference the same object.
 maybeEq :: a -> a -> Bool
