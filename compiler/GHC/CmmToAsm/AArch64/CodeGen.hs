@@ -884,7 +884,7 @@ genJump (CmmLit (CmmLabel lbl)) regs
   --               , DELTA 0] )
 genJump expr regs = do
     (target, _format, code) <- getSomeReg expr
-    return (code `appOL` unitOL (B (TReg target))
+    return (code `appOL` unitOL (ANN (text $ show expr) (B (TReg target)))
                         --  toOL [ PUSH_STACK_FRAME
                         --       , DELTA (-16)
                         --       , B (TReg target)
@@ -912,12 +912,12 @@ genCondJump bid expr
               -- compute both sides.
               (reg_x, _format_x, code_x) <- getSomeReg x
               (reg_y, _format_y, code_y) <- getSomeReg y
-              return $ code_x `appOL` code_y `snocOL` CMP (OpReg w reg_x) (OpReg w reg_y) `snocOL` BCOND cmp (TBlock bid)
+              return $ code_x `appOL` code_y `snocOL` CMP (OpReg w reg_x) (OpReg w reg_y) `snocOL` (ANN (text $ show expr) (BCOND cmp (TBlock bid)))
             fbcond w cmp = do
               -- ensure we get float regs
               (reg_fx, _format_fx, code_fx) <- getFloatReg x
               (reg_fy, _format_fy, code_fy) <- getFloatReg y
-              return $ code_fx `appOL` code_fy `snocOL` CMP (OpReg w reg_fx) (OpReg w reg_fy) `snocOL` BCOND cmp (TBlock bid)
+              return $ code_fx `appOL` code_fy `snocOL` CMP (OpReg w reg_fx) (OpReg w reg_fy) `snocOL` (ANN (text $ show expr) (BCOND cmp (TBlock bid)))
 
         case mop of
           MO_F_Eq w -> fbcond w EQ
