@@ -31,6 +31,10 @@ CONFIG       = $(TOP)/config/$(COMPILER)
 TEST_WRAPPER ?= exec
 export TEST_WRAPPER
 
+# if no STRIP is set, use `strip`
+STRIP ?= strip
+export STRIP
+
 ifeq "$(GhcUnregisterised)" "YES"
     # Otherwise C backend generates many warnings about
     # imcompatible proto casts for GCC's buitins:
