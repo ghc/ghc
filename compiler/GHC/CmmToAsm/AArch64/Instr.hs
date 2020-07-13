@@ -134,6 +134,8 @@ aarch64_regUsageOfInstr platform instr = case instr of
   -- 5. Atomic Instructions ----------------------------------------------------
   -- 6. Conditional Instructions -----------------------------------------------
   CSET dst _               -> usage ([], regOp dst)
+  CBZ src _                -> usage (regOp src, [])
+  CBNZ src _               -> usage (regOp src, [])
   -- 7. Load and Store Instructions --------------------------------------------
   STR _ src dst            -> usage (regOp src ++ regOp dst, [])
   LDR _ dst src            -> usage (regOp src, regOp dst)
@@ -257,7 +259,8 @@ aarch64_patchRegsOfInstr instr env = case instr of
     -- 5. Atomic Instructions --------------------------------------------------
     -- 6. Conditional Instructions ---------------------------------------------
     CSET o c       -> CSET (patchOp o) c
-
+    CBZ o l        -> CBZ (patchOp o) l
+    CBNZ o l       -> CBNZ (patchOp o) l
     -- 7. Load and Store Instructions ------------------------------------------
     STR f o1 o2    -> STR f (patchOp o1) (patchOp o2)
     LDR f o1 o2    -> LDR f (patchOp o1) (patchOp o2)
@@ -293,6 +296,8 @@ aarch64_patchRegsOfInstr instr env = case instr of
 aarch64_isJumpishInstr :: Instr -> Bool
 aarch64_isJumpishInstr instr = case instr of
     ANN _ i -> aarch64_isJumpishInstr i
+    CBZ{} -> True
+    CBNZ{} -> True
     B{} -> True
     BL{} -> True
     BCOND{} -> True
@@ -303,6 +308,8 @@ aarch64_isJumpishInstr instr = case instr of
 -- register allocator needs to worry about.
 aarch64_jumpDestsOfInstr :: Instr -> [BlockId]
 aarch64_jumpDestsOfInstr (ANN _ i) = aarch64_jumpDestsOfInstr i
+aarch64_jumpDestsOfInstr (CBZ _ t) = [ id | TBlock id <- [t]]
+aarch64_jumpDestsOfInstr (CBNZ _ t) = [ id | TBlock id <- [t]]
 aarch64_jumpDestsOfInstr (B t) = [id | TBlock id <- [t]]
 aarch64_jumpDestsOfInstr (BL t) = [ id | TBlock id <- [t]]
 aarch64_jumpDestsOfInstr (BCOND _ t) = [ id | TBlock id <- [t]]
@@ -315,6 +322,8 @@ aarch64_patchJumpInstr :: Instr -> (BlockId -> BlockId) -> Instr
 aarch64_patchJumpInstr instr patchF
     = case instr of
         ANN d i -> ANN d (aarch64_patchJumpInstr i patchF)
+        CBZ r (TBlock bid) -> CBZ r (TBlock (patchF bid))
+        CBNZ r (TBlock bid) -> CBNZ r (TBlock (patchF bid))
         B (TBlock bid) -> B (TBlock (patchF bid))
         BL (TBlock bid) -> BL (TBlock (patchF bid))
         BCOND c (TBlock bid) -> BCOND c (TBlock (patchF bid))
@@ -527,12 +536,14 @@ data Instr
     | LDP Format Operand Operand Operand -- stp Xn, Xm, address-mode // Xn <- *addr, Xm <- *(addr + 8)
 
     -- Conditional instructions
-    | CSET Operand Cond  -- if(cond) op <- 1 else op <- 0
+    | CSET Operand Cond   -- if(cond) op <- 1 else op <- 0
 
+    | CBZ Operand Target  -- if op == 0, then branch.
+    | CBNZ Operand Target -- if op /= 0, then branch.
     -- Branching.
-    | B Target           -- unconditional branching b/br. (To a blockid, label or register)
-    | BL Target          -- branch and link (e.g. set x30 to next pc, and branch)
-    | BCOND Cond Target  -- branch with condition. b.<cond>
+    | B Target            -- unconditional branching b/br. (To a blockid, label or register)
+    | BL Target           -- branch and link (e.g. set x30 to next pc, and branch)
+    | BCOND Cond Target   -- branch with condition. b.<cond>
 
     -- 8. Synchronization Instructions -----------------------------------------
     | DMBSY
