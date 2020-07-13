@@ -778,6 +778,20 @@ data Amode = Amode AddrMode InstrBlock
 
 getAmode :: CmmExpr -> NatM Amode
 -- XXX: Specialize stuff we can destructure here.
+
+-- OPTIMIZATION WARNING: Addressing modes.
+-- Addressing options:
+-- LDUR/STUR: imm9: -256 - 255
+getAmode (CmmRegOff reg off) | -256 <= off && off <= 255
+  = do platform <- getPlatform
+       let reg' = getRegisterReg platform reg
+           off' = ImmInt off
+       return $ Amode (AddrRegImm reg' off') nilOL
+-- LDR/STR: imm12: if reg is 32bit: 0 -- 16380 in multiples of 4
+-- XXX: Todo
+-- LDR/STR: imm12: if reg is 64bit: 0 -- 32760 in multiples of 8
+-- XXX: todo
+
 -- Generic case
 getAmode expr
   = do (reg, _format, code) <- getSomeReg expr
