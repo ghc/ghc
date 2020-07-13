@@ -619,6 +619,21 @@ getRegister' config plat expr
       where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
             r' = getRegisterReg plat reg
 
+    -- 2. Shifts. x << n, x >> r.
+    CmmMachOp (MO_Shl w) [x, (CmmLit (CmmInt n _))] | w == W32, 0 <= n, n < 32 -> do
+      (reg_x, _format_x, code_x) <- getSomeReg x
+      return $ Any (intFormat w) (\dst -> code_x `snocOL` ANN (text $ show expr) (LSL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
+    CmmMachOp (MO_Shl w) [x, (CmmLit (CmmInt n _))] | w == W64, 0 <= n, n < 64 -> do
+      (reg_x, _format_x, code_x) <- getSomeReg x
+      return $ Any (intFormat w) (\dst -> code_x `snocOL` ANN (text $ show expr) (LSL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
+
+    CmmMachOp (MO_U_Shr w) [x, (CmmLit (CmmInt n _))] | w == W32, 0 <= n, n < 32 -> do
+      (reg_x, _format_x, code_x) <- getSomeReg x
+      return $ Any (intFormat w) (\dst -> code_x `snocOL` ANN (text $ show expr) (LSR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
+    CmmMachOp (MO_U_Shr w) [x, (CmmLit (CmmInt n _))] | w == W64, 0 <= n, n < 64 -> do
+      (reg_x, _format_x, code_x) <- getSomeReg x
+      return $ Any (intFormat w) (\dst -> code_x `snocOL` ANN (text $ show expr) (LSR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
+
     -- Generic case.
     CmmMachOp op [x, y] -> do
       -- alright, so we have an operation, and two expressions. And we want to essentially do
