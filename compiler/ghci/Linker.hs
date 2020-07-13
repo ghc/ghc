@@ -1689,16 +1689,23 @@ loadFramework hsc_env extraPaths rootname
                                   Left _ -> []
                                   Right dir -> [dir </> "Library/Frameworks"]
               ps = extraPaths ++ homeFrameworkPath ++ defaultFrameworkPaths
-        ; mb_fwk <- findFile ps fwk_file
-        ; case mb_fwk of
-            Just fwk_path -> loadDLL hsc_env fwk_path
-            Nothing       -> return (Just "not found") }
-                -- Tried all our known library paths, but dlopen()
-                -- has no built-in paths for frameworks: give up
+        ; findLoadDLL ps }
    where
      fwk_file = rootname <.> "framework" </> rootname
-        -- sorry for the hardcoded paths, I hope they won't change anytime soon:
+
+     -- sorry for the hardcoded paths, I hope they won't change anytime soon:
      defaultFrameworkPaths = ["/Library/Frameworks", "/System/Library/Frameworks"]
+
+     findLoadDLL [] =
+       -- Tried all our known library paths, but dlopen()
+       -- has no built-in paths for frameworks: give up
+       return (Just "not found")
+     findLoadDLL (p:ps) =
+       do { dll <- loadDLL hsc_env (p </> fwk_file)
+          ; case dll of
+              Nothing -> return Nothing
+              Just _  -> findLoadDLL ps
+          }
 
 {- **********************************************************************
 
