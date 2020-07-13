@@ -619,7 +619,7 @@ getRegister' config plat expr
       where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
             r' = getRegisterReg plat reg
 
-    -- 2. Shifts. x << n, x >> r.
+    -- 2. Shifts. x << n, x >> n.
     CmmMachOp (MO_Shl w) [x, (CmmLit (CmmInt n _))] | w == W32, 0 <= n, n < 32 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       return $ Any (intFormat w) (\dst -> code_x `snocOL` ANN (text $ show expr) (LSL (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
@@ -633,6 +633,17 @@ getRegister' config plat expr
     CmmMachOp (MO_U_Shr w) [x, (CmmLit (CmmInt n _))] | w == W64, 0 <= n, n < 64 -> do
       (reg_x, _format_x, code_x) <- getSomeReg x
       return $ Any (intFormat w) (\dst -> code_x `snocOL` ANN (text $ show expr) (LSR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
+
+    -- 3. Logic &&, ||
+    CmmMachOp (MO_And w) [(CmmReg reg), CmmLit (CmmInt n _)] | is12bit (fromIntegral n) ->
+      return $ Any (intFormat w) (\d -> unitOL $ ANN (text $ show expr) (AND (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
+      where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
+            r' = getRegisterReg plat reg
+
+    CmmMachOp (MO_Or w) [(CmmReg reg), CmmLit (CmmInt n _)] | is12bit (fromIntegral n) ->
+      return $ Any (intFormat w) (\d -> unitOL $ ANN (text $ show expr) (ORR (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
+      where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
+            r' = getRegisterReg plat reg
 
     -- Generic case.
     CmmMachOp op [x, y] -> do
