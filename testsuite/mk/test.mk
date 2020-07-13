@@ -34,11 +34,6 @@ ifeq "$(GhcUnregisterised)" "YES"
     EXTRA_HC_OPTS += -optc-fno-builtin
 endif
 
-# These flags are for testing the native I/O of Windows's new base.  We can't
-# realistically run both as this would require two the amount of time to go
-# through the testsuite. So for now just rely on one.
-EXTRA_HC_OPTS += -with-rtsopts="--io-manager=native" # +RTS --io-manager=native -RTS
-
 # TEST_HC_OPTS is passed to every invocation of TEST_HC
 # in nested Makefiles
 TEST_HC_OPTS = -dcore-lint -dstg-lint -dcmm-lint \

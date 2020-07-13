@@ -1,1 +1,1 @@
- ,("Flag -with-rtsopts", "--io-manager=native")
+ ,("Flag -with-rtsopts", "")
