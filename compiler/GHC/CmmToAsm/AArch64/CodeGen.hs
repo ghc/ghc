@@ -908,8 +908,20 @@ genCondJump
     :: BlockId
     -> CmmExpr
     -> NatM InstrBlock
-genCondJump bid expr
-  = case expr of
+genCondJump bid expr = do
+    platform <- getPlatform
+    case expr of
+      -- Optimized == 0 case.
+      CmmMachOp (MO_Eq w) [CmmReg reg, CmmLit (CmmInt 0 _)] ->
+        return $ unitOL (ANN (text $ show expr) (CBZ (OpReg w' r') (TBlock bid)))
+        where w' = formatToWidth (cmmTypeFormat (cmmRegType platform reg))
+              r' = getRegisterReg platform reg
+      -- Optimized /= 0 case.
+      CmmMachOp (MO_Ne w) [CmmReg reg, CmmLit (CmmInt 0 _)] ->
+        return $ unitOL (ANN (text $ show expr) (CBNZ (OpReg w' r') (TBlock bid)))
+        where w' = formatToWidth (cmmTypeFormat (cmmRegType platform reg))
+              r' = getRegisterReg platform reg
+      -- Generic case.
       CmmMachOp mop [x, y] -> do
 
         let bcond w cmp = do
