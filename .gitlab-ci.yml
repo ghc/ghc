@@ -517,7 +517,7 @@ release-x86_64-linux-fedora27:
   <<: *release
   extends: .build-x86_64-linux-fedora27
 
-release-x86_64-linux-fedora27-dwarf:
+.release-x86_64-linux-fedora27-dwarf:
   <<: *release
   extends: .build-x86_64-linux-fedora27
   variables:
