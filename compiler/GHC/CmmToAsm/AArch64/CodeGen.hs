@@ -608,16 +608,14 @@ getRegister' config plat expr
     CmmMachOp (MO_Sub _) [expr'@(CmmReg (CmmGlobal r)), CmmLit (CmmInt 0 _)] -> getRegister' config plat expr'
     -- 1. Compute Reg +/- n directly.
     --    For Add/Sub we can directly encode 12bits, or 12bits lsl #12.
-    CmmMachOp (MO_Add w) [(CmmReg reg@(CmmGlobal _)), CmmLit (CmmInt n _)]
+    CmmMachOp (MO_Add w) [(CmmReg reg), CmmLit (CmmInt n _)]
       | n > 0 && n < 4096 -> return $ Any (intFormat w) (\d -> unitOL $ ANN (text $ show expr) (ADD (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
       -- XXX: 12bits lsl #12; e.g. lower 12 bits of n are 0; shift n >> 12, and set lsl to #12.
-      -- OPTIMIZATION WARNING: This only works because reg is CmmGlobal
       where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
             r' = getRegisterReg plat reg
-    CmmMachOp (MO_Sub w) [(CmmReg reg@(CmmGlobal _)), CmmLit (CmmInt n _)]
+    CmmMachOp (MO_Sub w) [(CmmReg reg), CmmLit (CmmInt n _)]
       | n > 0 && n < 4096 -> return $ Any (intFormat w) (\d -> unitOL $ ANN (text $ show expr) (SUB (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
       -- XXX: 12bits lsl #12; e.g. lower 12 bits of n are 0; shift n >> 12, and set lsl to #12.
-      -- OPTIMIZATION WARNING: This only works because reg is CmmGlobal
       where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
             r' = getRegisterReg plat reg
 
@@ -785,7 +783,7 @@ getAmode :: Platform -> CmmExpr -> NatM Amode
 getAmode platform (CmmRegOff reg off) | -256 <= off, off <= 255
   = return $ Amode (AddrRegImm reg' off') nilOL
     where reg' = getRegisterReg platform reg
-           off' = ImmInt off
+          off' = ImmInt off
 -- LDR/STR: imm12: if reg is 32bit: 0 -- 16380 in multiples of 4
 getAmode platform (CmmRegOff reg off)
   | typeWidth (cmmRegType platform reg) == W32, 0 <= off, off <= 16380, off `mod` 4 == 0
