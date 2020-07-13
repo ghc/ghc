@@ -956,10 +956,10 @@ mkLongErrAt loc msg extra
          return $ mkLongErrMsg dflags loc printer msg extra }
 
 mkErrDocAt :: SrcSpan -> TcRnError -> TcRn (ErrMsg TcRnError)
-mkErrDocAt loc errDoc
+mkErrDocAt loc err
   = do { dflags <- getDynFlags ;
          printer <- getPrintUnqualified dflags ;
-         return $ mkErrDoc dflags loc printer errDoc }
+         return $ mkErr dflags loc printer err }
 
 addLongErrAt :: SrcSpan -> MsgDoc -> MsgDoc -> TcRn ()
 addLongErrAt loc msg extra = mkLongErrAt loc msg extra >>= reportError . fmap TcRnErrorDoc

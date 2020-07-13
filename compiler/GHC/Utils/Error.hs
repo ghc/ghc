@@ -34,7 +34,7 @@ module GHC.Utils.Error (
 
         -- ** Construction
         emptyMessages, mkLocMessage, mkLocMessageAnn, makeIntoWarning,
-        mkErrMsg, mkPlainErrMsg, mkErrDoc, mkLongErrMsg, mkWarnMsg,
+        mkErrMsg, mkPlainErrMsg, mkErr, mkLongErrMsg, mkWarnMsg,
         mkPlainWarnMsg,
         mkLongWarnMsg,
 
@@ -350,8 +350,8 @@ mk_err_msg dflags sev locn print_unqual err
           , errMsgSeverity = sev
           , errMsgReason = NoReason }
 
-mkErrDoc :: RenderableError e => DynFlags -> SrcSpan -> PrintUnqualified -> e -> ErrMsg e
-mkErrDoc dflags = mk_err_msg dflags SevError
+mkErr :: RenderableError e => DynFlags -> SrcSpan -> PrintUnqualified -> e -> ErrMsg e
+mkErr dflags = mk_err_msg dflags SevError
 
 mkLongErrMsg, mkLongWarnMsg   :: DynFlags -> SrcSpan -> PrintUnqualified -> MsgDoc -> MsgDoc -> ErrMsg ErrDoc
 -- ^ A long (multi-line) error message

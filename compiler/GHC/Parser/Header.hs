@@ -84,7 +84,7 @@ getImports dflags buf filename source_filename = do
           ms = (emptyBag, errs)
       -- logWarnings warns
       if errorsFound dflags ms
-        then throwIO $ mkSrcErr (mapBag (fmap (ghcErrorRawErrDoc . psErrorDoc)) errs)
+        then throwIO $ mkSrcErr (mapBag (fmap GhcErrorPs) errs)
         else
           let   hsmod = unLoc rdr_module
                 mb_mod = hsmodName hsmod
@@ -300,11 +300,9 @@ getOptions' dflags toks
 checkProcessArgsResult :: MonadIO m => DynFlags -> [Located String] -> m ()
 checkProcessArgsResult dflags flags
   = when (notNull flags) $
-      liftIO $ throwIO $ mkSrcErr $ listToBag $ map (fmap ghcErrorRawErrDoc . mkMsg) flags
-    where mkMsg (L loc flag)
-              = mkPlainErrMsg dflags loc $
-                  (text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+>
-                   text flag)
+      liftIO $ throwIO $ mkSrcErr $ listToBag $ map mkMsg flags
+    where mkMsg (L loc flag) = fmap GhcErrorPs $
+            mkErr dflags loc alwaysQualify (PsUnknownOptionsFlag flag)
 
 -----------------------------------------------------------------------------
 
@@ -321,17 +319,11 @@ checkExtension dflags (L l ext)
 
 languagePragParseError :: DynFlags -> SrcSpan -> a
 languagePragParseError dflags loc =
-    throwErr dflags loc $
-       vcat [ text "Cannot parse LANGUAGE pragma"
-            , text "Expecting comma-separated list of language options,"
-            , text "each starting with a capital letter"
-            , nest 2 (text "E.g. {-# LANGUAGE TemplateHaskell, GADTs #-}") ]
+  throwPsError dflags loc PsLanguagePragmaParseError
 
 unsupportedExtnError :: DynFlags -> SrcSpan -> String -> a
 unsupportedExtnError dflags loc unsup =
-    throwErr dflags loc $
-        text "Unsupported extension: " <> text unsup $$
-        if null suggestions then Outputable.empty else text "Perhaps you meant" <+> quotedListWithOr (map text suggestions)
+    throwPsError dflags loc (PsUnsupportedExtension unsup suggestions)
   where
      supported = supportedLanguagesAndExtensions $ platformMini $ targetPlatform dflags
      suggestions = fuzzyMatch unsup supported
@@ -339,24 +331,20 @@ unsupportedExtnError dflags loc unsup =
 
 optionsErrorMsgs :: DynFlags -> [String] -> [Located String] -> FilePath -> Messages PsError
 optionsErrorMsgs dflags unhandled_flags flags_lines _filename
-  = (emptyBag, listToBag (map (fmap PsErrorDoc . mkMsg) unhandled_flags_lines))
+  = (emptyBag, listToBag (map mkMsg unhandled_flags_lines))
   where unhandled_flags_lines :: [Located String]
         unhandled_flags_lines = [ L l f
                                 | f <- unhandled_flags
                                 , L l f' <- flags_lines
                                 , f == f' ]
         mkMsg (L flagSpan flag) =
-            GHC.Utils.Error.mkPlainErrMsg dflags flagSpan $
-                    text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+> text flag
+            GHC.Utils.Error.mkErr dflags flagSpan alwaysQualify
+                                  (PsUnknownOptionsFlag flag)
 
 optionsParseError :: String -> DynFlags -> SrcSpan -> a     -- #15053
 optionsParseError str dflags loc =
-  throwErr dflags loc $
-      vcat [ text "Error while parsing OPTIONS_GHC pragma."
-           , text "Expecting whitespace-separated list of GHC options."
-           , text "  E.g. {-# OPTIONS_GHC -Wall -O2 #-}"
-           , text ("Input was: " ++ show str) ]
+  throwPsError dflags loc (PsOptionsGhcParseError str)
 
-throwErr :: DynFlags -> SrcSpan -> SDoc -> a                -- #15053
-throwErr dflags loc doc =
-  throw $ mkSrcErr $ unitBag . fmap ghcErrorRawErrDoc $ mkPlainErrMsg dflags loc doc
+throwPsError :: DynFlags -> SrcSpan -> PsError -> a                -- #15053
+throwPsError dflags loc e =
+  throw $ mkSrcErr $ unitBag . fmap GhcErrorPs $ mkErr dflags loc alwaysQualify e
