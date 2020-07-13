@@ -1142,7 +1142,7 @@ TODO: This could be done, at the expense of compile time. Figure out of it's wor
 -- | If we use a *function* as an unapplied argument to a constructor we throw
 -- away nested information and make do with NeverEnter Top for now.
 -- See Note [Field information of function ids]
-getConArgNodeId :: HasDebugCallStack => [SynContext] -> StgArg -> AM NodeId
+getConArgNodeId :: HasDebugCallStack => ContextStack -> StgArg -> AM NodeId
 getConArgNodeId _    (StgLitArg _ ) = return litNodeId
 getConArgNodeId ctxt (StgVarArg v )
     | isFunTy (unwrapType $ idType v)
@@ -1233,6 +1233,8 @@ data SynContext
     | CAlt          !(VarEnv NodeId)
     deriving Eq
 
+type ContextStack = [SynContext]
+
 getCtxtIdMap :: SynContext -> Maybe (VarEnv NodeId)
 getCtxtIdMap (CClosureBody m) = Just m
 getCtxtIdMap (CCaseBndr m) = Just $ m
@@ -1243,6 +1245,9 @@ getCtxtIdMap (CLetRecBody m _) = Just m
 getCtxtIdMap (CLet m _) = Just m
 getCtxtIdMap (CLetBody m _) = Just m
 getCtxtIdMap (CTopLevel m) = Just m
+
+extendCtxt :: SynContext -> ContextStack -> ContextStack
+extendCtxt c ctxt = c : ctxt
 
 instance Outputable SynContext where
     ppr (CTopLevel map)       = text "CTop"        <> ppr map
@@ -1256,7 +1261,7 @@ instance Outputable SynContext where
     ppr (CLetBody id lne)     = text "CLetBody"    <> ppr lne <> ppr id
 
 -- | Is the given id mapped to a data flow node by it's context?
-idMappedInCtxt :: Id -> [SynContext] -> Maybe NodeId
+idMappedInCtxt :: Id -> ContextStack -> Maybe NodeId
 idMappedInCtxt id ctxt
     = go ctxt
   where
@@ -1270,7 +1275,7 @@ idMappedInCtxt id ctxt
 -- Determine if f in this position is a recursive tail call
 -- and as such safe to set to NoValue
 -- See Note [Recursive Functions]
-isRecTail :: Id -> [SynContext] -> Bool
+isRecTail :: Id -> ContextStack -> Bool
 isRecTail f (CTopLevel _ : _) = False
 isRecTail f (CLetRec bnds _: _)
     | isSingleMapOf f bnds
@@ -1505,7 +1510,7 @@ monad and adds it to a map of ids which maps Id -> NodeId.
 -}
 
 -- See Note [Shadowing and NodeIds]
-getIdNodeId :: HasDebugCallStack => [SynContext] -> Id -> AM NodeId
+getIdNodeId :: HasDebugCallStack => ContextStack -> Id -> AM NodeId
 getIdNodeId ctxt id
     | Just node <- idMappedInCtxt id ctxt
     = return $! node
@@ -1515,7 +1520,7 @@ getIdNodeId ctxt id
             lookupUFM (fs_idNodeMap s) id
 
 -- See Note [Shadowing and NodeIds]
-getKnownIdNodeId :: HasDebugCallStack => [SynContext] -> Id -> NodeId
+getKnownIdNodeId :: HasDebugCallStack => ContextStack -> Id -> NodeId
 getKnownIdNodeId ctxt id
     | Just node <- idMappedInCtxt id ctxt
     = node
@@ -1612,7 +1617,7 @@ importedFuncNode_Maybe this_mod var_id
             Just node_id -> return $! Just node_id
             Nothing -> pprPanic "Imported id not mapped" (ppr var_id)
 
-mkCtxtEntry :: [SynContext] -> Id -> AM (Id,NodeId)
+mkCtxtEntry :: ContextStack -> Id -> AM (Id,NodeId)
 mkCtxtEntry ctxt v
     | Just nodeId <- idMappedInCtxt v ctxt
     = return $! (v,nodeId)
@@ -1649,18 +1654,18 @@ nodesTop this_mod ctxt (StgTopLifted bind)  = do
 
 -- nodesBind creates the nodeIds for the bound rhs, the actual nodes are created in
 -- nodeRhs. Returns the context including the let
-nodesBind :: Module -> [SynContext] -> TopLevelFlag -> IsLNE -> StgBinding -> AM (InferStgBinding, [SynContext])
+nodesBind :: Module -> ContextStack -> TopLevelFlag -> IsLNE -> StgBinding -> AM (InferStgBinding, ContextStack)
 nodesBind this_mod ctxt bot lne (StgNonRec v rhs) = do
     boundId <- uncurry unitVarEnv <$> mkCtxtEntry ctxt v
-    let ctxt' = ((CLet boundId lne):ctxt)
+    let ctxt' = ((CLet boundId lne) `extendCtxt` ctxt)
     rhs' <- (nodeRhs this_mod ctxt' bot v rhs)
-    return $! (StgNonRec v rhs', (CLetBody boundId lne):ctxt)
+    return $! (StgNonRec v rhs', (CLetBody boundId lne) `extendCtxt` ctxt)
 nodesBind this_mod ctxt bot lne (StgRec binds) = do
     let ids = map fst binds
     boundIds <- mkVarEnv <$> mapM (mkCtxtEntry ctxt) ids :: AM (VarEnv NodeId)
-    let ctxt' = (CLetRec boundIds lne) : ctxt
+    let ctxt' = (CLetRec boundIds lne) `extendCtxt` ctxt
     rhss' <- mapM (uncurry (nodeRhs this_mod ctxt' bot )) binds
-    return $! (StgRec $ zip ids rhss', (CLetRecBody boundIds lne) : ctxt)
+    return $! (StgRec $ zip ids rhss', (CLetRecBody boundIds lne) `extendCtxt` ctxt)
 
 
 
@@ -1760,7 +1765,7 @@ wrappting it in a seq is of little consequence.
 
 -- | When dealing with a let bound rhs passing the id in allows us the shortcut the
 --  the rule for the rhs tag to flow to the id
-nodeRhs :: HasDebugCallStack => Module -> [SynContext] -> TopLevelFlag
+nodeRhs :: HasDebugCallStack => Module -> ContextStack -> TopLevelFlag
         -> Id -> StgRhs
         -> AM (InferStgRhs)
 nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ ccs con args)
@@ -1906,7 +1911,7 @@ nodeRhs this_mod ctxt _topFlag binding (StgRhsClosure _ext _ccs _flag args body)
 #endif
     -- We know nothing about the arguments.
     varMap = mkVarEnv (zip args (replicate arity unknownNodeId))
-    ctxt' = (CClosureBody varMap :ctxt)
+    ctxt' = (CClosureBody varMap `extendCtxt` ctxt)
     arity = length args
     enterInfo
         | isAbsentExpr body = NeverEnter
@@ -1924,7 +1929,7 @@ nodeRhs this_mod ctxt _topFlag binding (StgRhsClosure _ext _ccs _flag args body)
             else updateNodeResult this_id cappedResult
         return $! cappedResult
 
-nodeExpr :: Module -> [SynContext] -> StgExpr -> AM (InferStgExpr, NodeId)
+nodeExpr :: Module -> ContextStack -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeExpr this_mod ctxt (e@StgCase {})          = nodeCase this_mod ctxt e
 nodeExpr this_mod ctxt (e@StgLet {})           = nodeLet this_mod ctxt e
 nodeExpr this_mod ctxt (e@StgLetNoEscape {})   = nodeLetNoEscape this_mod ctxt e
@@ -1990,11 +1995,11 @@ How branches are combined is explained in Note [The lattice element combinators]
 -}
 
 -- See Note [Case Data Flow Node]
-nodeCase :: Module -> [SynContext] -> StgExpr -> AM (InferStgExpr, NodeId)
+nodeCase :: Module -> ContextStack -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeCase this_mod ctxt (StgCase scrut bndr alt_type alts) = do
-    (scrut',scrutNodeId) <- nodeExpr this_mod (CCaseScrut:ctxt) scrut
+    (scrut',scrutNodeId) <- nodeExpr this_mod (CCaseScrut `extendCtxt` ctxt) scrut
     bndrNodeId <- nodeCaseBndr scrutNodeId bndr
-    let ctxt' = CCaseBndr (unitVarEnv bndr bndrNodeId) : ctxt
+    let ctxt' = CCaseBndr (unitVarEnv bndr bndrNodeId) `extendCtxt` ctxt
     (alts', altNodeIds) <- unzip <$> mapM (nodeAlt this_mod ctxt' scrutNodeId) alts
     !caseNodeId <- mkJoinNode altNodeIds
     -- pprTraceM "Scrut, alts, rhss" $ ppr (scrut, scrutNodeId, altNodeIds, altsId)
@@ -2027,11 +2032,11 @@ nodeCaseBndr scrutNodeId _bndr = do
                     updateNodeResult bndrNodeId result
             return $! result
 
-nodeAlt :: HasDebugCallStack => Module -> [SynContext] -> NodeId -> StgAlt -> AM (InferStgAlt, NodeId)
+nodeAlt :: HasDebugCallStack => Module -> ContextStack -> NodeId -> StgAlt -> AM (InferStgAlt, NodeId)
 nodeAlt this_mod ctxt scrutNodeId (altCon, bndrs, rhs)
   | otherwise = do
     bndrMappings <- mkVarEnv <$> zipWithM mkAltBndrNode [0..] bndrs
-    let ctxt' = (CAlt bndrMappings):ctxt
+    let ctxt' = (CAlt bndrMappings) `extendCtxt` ctxt
     (!rhs', !rhs_id) <- nodeExpr this_mod ctxt' rhs
     return $! ((altCon, bndrs, rhs'), rhs_id)
 
@@ -2137,14 +2142,14 @@ The interesting things happen inside the rhs.
 -}
 
 
-nodeLet :: Module -> [SynContext] -> StgExpr -> AM (InferStgExpr, NodeId)
+nodeLet :: Module -> ContextStack -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeLet this_mod ctxt (StgLet ext bind expr) = do
     (bind',ctxt') <- nodesBind this_mod ctxt NotTopLevel NotLNE bind
     (expr',node) <- nodeExpr this_mod ctxt' expr
     return $! (StgLet ext bind' expr', node)
 nodeLet _ _ _ = panic "Impossible"
 
-nodeLetNoEscape :: Module -> [SynContext] -> StgExpr -> AM (InferStgExpr, NodeId)
+nodeLetNoEscape :: Module -> ContextStack -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeLetNoEscape this_mod ctxt (StgLetNoEscape ext bind expr) = do
     (bind',ctxt') <- nodesBind this_mod ctxt NotTopLevel LNE bind
     (expr',node) <- nodeExpr this_mod ctxt' expr
@@ -2186,7 +2191,7 @@ Doing this is implemented in mkOutConLattice.
 
 
 -}
-nodeConApp :: HasDebugCallStack => Module -> [SynContext] -> StgExpr -> AM (InferStgExpr, NodeId)
+nodeConApp :: HasDebugCallStack => Module -> ContextStack -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeConApp this_mod ctxt (StgConApp _ext con args tys) = do
     node_id <- mkUniqueId
     mapM_ (addImportedNode this_mod) [v | StgVarArg v <- args]
@@ -2260,7 +2265,7 @@ In any other case:
 
 -}
 
-nodeApp :: HasDebugCallStack => Module -> [SynContext] -> StgExpr -> AM (InferStgExpr, NodeId)
+nodeApp :: HasDebugCallStack => Module -> ContextStack -> StgExpr -> AM (InferStgExpr, NodeId)
 nodeApp this_mod ctxt expr@(StgApp _ f args) = do
     mapM_ (addImportedNode this_mod) (f:[v | StgVarArg v <- args])
     maybeImportedFunc <- importedFuncNode_Maybe this_mod f
