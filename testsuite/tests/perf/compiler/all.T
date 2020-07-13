@@ -106,7 +106,7 @@ test('T5642',
 
 test('T5837',
      [ only_ways(['normal']),
-      collect_compiler_stats('bytes allocated',2)
+      collect_compiler_stats('bytes allocated',5)
       ],
       compile, ['-freduction-depth=50'])
 
