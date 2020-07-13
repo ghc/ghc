@@ -22,9 +22,10 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-{-# OPTIONS_GHC -O2 -ddump-simpl -ddump-to-file -ddump-stg -ddump-cmm -ddump-asm #-}
-{-# OPTIONS_GHC -dsuppress-all -dno-suppress-type-signatures -dno-suppress-module-prefixes #-}
-{-# OPTIONS_GHC -fprof-auto #-}
+{-# OPTIONS_GHC -O2 -ddump-simpl -ddump-to-file -ddump-stg -ddump-cmm -ddump-asm -ddump-stg-final #-}
+{-# OPTIONS_GHC -dsuppress-coercions -dno-suppress-type-signatures -dno-suppress-module-prefixes #-}
+-- {-# OPTIONS_GHC -fprof-auto -ticky -ticky-allocd -ticky-dyn-thunk #-}
+{-# OPTIONS_GHC -ticky -ticky-allocd -ticky-dyn-thunk #-}
 
 module GHC.Stg.InferTags (findTags, EnterLattice) where
 
@@ -916,16 +917,16 @@ widenToNestingLevel n l
     | otherwise = l
 
 widenToNestingLevel' :: Int -> EnterLattice -> EnterLattice
-widenToNestingLevel' _ l@(EnterLattice _ FieldsUnknown ) = l
+widenToNestingLevel' _ l@(EnterLattice _ FieldsUnknown )  = l
 widenToNestingLevel' _ l@(EnterLattice _ FieldsNone     ) = l
-widenToNestingLevel' _ l@(EnterLattice _ FieldsUndet   ) = l
+widenToNestingLevel' _ l@(EnterLattice _ FieldsUndet   )  = l
 widenToNestingLevel' 0 _ = bot
 widenToNestingLevel' n (EnterLattice e (FieldsProd fields)) =
-    EnterLattice e (FieldsProd (map (widenToNestingLevel' (n-1)) fields))
+    EnterLattice e (FieldsProd $! (map (widenToNestingLevel' (n-1)) fields))
 widenToNestingLevel' n (EnterLattice e (FieldsSum c fields)) =
-    EnterLattice e (FieldsSum c $ map (widenToNestingLevel' (n-1)) fields)
+    EnterLattice e (FieldsSum c $! map (widenToNestingLevel' (n-1)) fields)
 widenToNestingLevel' n (EnterLattice e (FieldsUntyped fields)) =
-    EnterLattice e (FieldsUntyped $ map (widenToNestingLevel' (n-1)) fields)
+    EnterLattice e (FieldsUntyped $! map (widenToNestingLevel' (n-1)) fields)
 
 
 
@@ -986,17 +987,19 @@ newtype AM a = AM { runAM :: FlowState -> State# RealWorld
                   } deriving Functor
 
 instance Applicative AM where
-    -- {-# INLINE pure #-}
+    {-# INLINE pure #-}
     pure x   = AM $ oneShot $ \env s -> (# x, env, s #)
-    -- {-# INLINE (<*>) #-}
+    {-# INLINE (<*>) #-}
     m <*> n  = AM $ oneShot $ \env s -> case runAM m env s of
                                 (# f, env', s' #) -> case runAM n env' s' of
                                             (# x, env'', s'' #) -> (# f x, env'', s'' #)
 
 instance Monad AM where
-    -- {-# INLINE (>>=) #-}
+    {-# INLINE (>>=) #-}
     m >>= n  = AM $ oneShot $ \env s -> case runAM m env s of
                                 (# !x, env', s' #) -> runAM (n x) env' s'
+    {-# INLINE return #-}
+    return = pure
 
 get :: AM FlowState
 get = AM $ oneShot $ \env s -> (# env, env, s #)
@@ -1074,14 +1077,15 @@ getNode node_id = do
                    (lookupUFM (fs_doneNodes s) node_id <|> lookupUFM (fs_uqNodeMap s) node_id)
 
 
--- TODO: Can we make sure we never try to query non-existing nodes?
+-- We should never try to query non-existing nodes.
+-- TODO: Assert the fact.
 lookupNodeResult :: HasDebugCallStack => NodeId -> AM EnterLattice
 lookupNodeResult node_id = do
     s <- get
     let node = (lookupUFM (fs_uqNodeMap s) node_id <|>
                 lookupUFM (fs_doneNodes s) node_id)
     case node of
-        Nothing -> pprTraceM ("lookpupNodeResult: Nothing\n" ++ prettyCallStack callStack) (ppr node_id) >>
+        Nothing -> -- pprTraceM ("lookpupNodeResult: Nothing\n" ++ prettyCallStack callStack) (ppr node_id) >>
                    return top
         Just n  -> return $! node_result n
 
@@ -1298,9 +1302,8 @@ mkOutConLattice con outer fields
 {-# NOINLINE findTags #-}
 findTags :: Module -> FamInstEnv -> [StgTopBinding] -> ([TgStgTopBinding], [(Id,EnterLattice)])
 -- findTags this_mod us binds = passTopBinds binds
-findTags this_mod _us binds =
+findTags this_mod inst_env binds =
     let state = FlowState {
-            -- fs_us = 0,
             fs_idNodeMap = mempty,
             fs_uqNodeMap = emptyUFM,
             fs_doneNodes = emptyUFM }
@@ -2355,7 +2358,7 @@ depSortNodes in_nodes = reversePayload [] . topologicalSortG $ graphFromEdgedVer
   where
     vertices = map mkVertex in_nodes :: [Node NodeId FlowNode]
     mkVertex :: FlowNode -> Node NodeId FlowNode
-    mkVertex n = DigraphNode (n) (node_id n) (node_inputs n)
+    mkVertex n = DigraphNode n (node_id n) (node_inputs n)
 
     -- reverse . map node_payload but fast
     reversePayload :: [FlowNode] -> [Node NodeId FlowNode] -> [FlowNode]
@@ -2368,60 +2371,44 @@ depSortNodes in_nodes = reversePayload [] . topologicalSortG $ graphFromEdgedVer
 type NodeArray = IOArray Int FlowNode
 type FlagArray = IOUArray Int Bool
 -- Dep-sorting nodes is good for performance.
-depSortNodesA :: [FlowNode] -> IO (IOArray Int FlowNode, IOUArray Int Bool)
-depSortNodesA in_nodes = mkArray
-  where
-    vertices = map mkVertex in_nodes :: [Node NodeId FlowNode]
-    mkVertex :: FlowNode -> Node NodeId FlowNode
-    mkVertex n = DigraphNode (n) (node_id n) (node_inputs n)
+-- So is using arrays but we don't do so currently
+-- depSortNodesA :: [FlowNode] -> IO (IOArray Int FlowNode, IOUArray Int Bool)
+-- depSortNodesA in_nodes = mkArray
+--   where
+--     vertices = map mkVertex in_nodes :: [Node NodeId FlowNode]
+--     mkVertex :: FlowNode -> Node NodeId FlowNode
+--     mkVertex n = DigraphNode (n) (node_id n) (node_inputs n)
 
-    in_list = topologicalSortG $ graphFromEdgedVerticesUniq vertices
-    nodeCount = length in_nodes
+--     in_list = topologicalSortG $ graphFromEdgedVerticesUniq vertices
+--     nodeCount = length in_nodes
 
-    mkArray = do
-        -- Sorted the wrong way around
+--     mkArray = do
+--         -- Sorted the wrong way around
 
-        arr <- newArray_ (0, nodeCount-1) :: IO (IOArray Int FlowNode)
-        revFillArray arr 0 in_list
-        -- Map indicating is the given node done?
-        flags <- newArray (0, nodeCount-1) False :: IO (IOUArray Int Bool)
-        return (arr, flags)
+--         arr <- newArray_ (0, nodeCount-1) :: IO (IOArray Int FlowNode)
+--         revFillArray arr 0 in_list
+--         -- Map indicating is the given node done?
+--         flags <- newArray (0, nodeCount-1) False :: IO (IOUArray Int Bool)
+--         return (arr, flags)
 
-    revFillArray arr i [] = return ()
-    revFillArray arr !i (x:xs) = do
-        -- TODO: Unsafe
-        writeArray arr (nodeCount - i) (node_payload x)
-        revFillArray arr (i+1) xs
+--     revFillArray arr i [] = return ()
+--     revFillArray arr !i (x:xs) = do
+--         -- TODO: Unsafe
+--         writeArray arr (nodeCount - i) (node_payload x)
+--         revFillArray arr (i+1) xs
 
 
 
 
 solveConstraints :: HasDebugCallStack => AM ()
 solveConstraints = do
-        -- uqCount <- sizeUFM . fs_uqNodeMap <$> get
-        -- doneCount <- sizeUFM . fs_doneNodes <$> get
-
-        -- idList <- map snd . nonDetUFMToList . fs_idNodeMap <$> get
-        -- uqList <- map snd . nonDetUFMToList . fs_uqNodeMap <$> get :: AM [FlowNode]
-        -- doneList <- map snd . nonDetUFMToList . fs_doneNodes <$> get
-        -- -- mapM_ (pprTraceM "node:" . ppr) (idList ++ uqList ++ doneList)
-        -- pprTraceM "Initial: (uqList, doneList)" (ppr (uqCount, doneCount))
-        -- pprTraceM "IterateStart" empty
-
-        -- nodeArrs <- liftIO $ depSortNodesA uqList
         todos <- fs_uqNodeMap <$> get
+        -- pprTraceM "sortSize" (ppr $ sizeUFM todos)
+        -- let dep_sorted_nodes = nonDetEltsUFM todos
         let !dep_sorted_nodes = {-# SCC "nodeSorting" #-}
-                                (depSortNodes . nonDetEltsUFM $ todos)
+                                (depSortNodes . nonDetEltsUFM $ todos) :: [FlowNode]
         iterate dep_sorted_nodes (undefined,undefined) 1
         -- iterate (-11)
-
-        -- uqCount <- sizeUFM . fs_uqNodeMap <$> get
-        -- doneCount <- sizeUFM . fs_doneNodes <$> get
-        -- pprTraceM "ListLengthsFinal" $ ppr (uqCount, doneCount)
-
-        -- remainingNodes <- nonDetEltsUFM . fs_uqNodeMap <$> get
-        -- mapM_ (pprTraceM "UnfinishedNodes:" . ppr) $ remainingNodes
-
 
         uqList <- map snd . nonDetUFMToList . fs_uqNodeMap <$> get
         doneList <- map snd . nonDetUFMToList . fs_doneNodes <$> get
@@ -2437,7 +2424,7 @@ solveConstraints = do
         -- pprTraceM "iterate - pass " (ppr n)
         -- uqNodes <- fs_uqNodeMap <$> get
         -- return $! seqEltsUFM rnf uqNodes
-        -- pprTraceM "IterateUndone:" $ ppr (sizeUFM uqNodes)
+        pprTraceM "Iterate - Remaining:" $ ppr (length xs)
         -- !a1 <- liftIO getAllocationCounter
         -- let !dep_sorted_nodes = {-# SCC "nodeSorting" #-}
         --                        (depSortNodes . nonDetEltsUFM $ uqNodes)
@@ -2447,7 +2434,7 @@ solveConstraints = do
         -- progress <- or <$> (mapM update dep_sorted_nodes) :: AM Bool
 
         !change <- liftIO $ newIORef False
-        !xs' <- updates change False xs
+        !xs' <- runUpdates change False xs
         progress <- liftIO $ readIORef change
 
         if (not progress)
@@ -2458,34 +2445,36 @@ solveConstraints = do
                      return ()
                 else iterate xs' (arr,doneFlags) (n+1)
 
-    updates :: IORef Bool -> Bool -> [FlowNode] -> AM [FlowNode]
-    updates !_change _some_change [] = return []
-    updates change some_change (node:nodes) = do
-        !node_changed <- update node
-        -- Avoid a write if we can
-        when (not some_change && node_changed) $ do
-            liftIO $ writeIORef change True
+runUpdates :: IORef Bool -> Bool -> [FlowNode] -> AM [FlowNode]
+runUpdates !_change _some_change [] = return []
+runUpdates change some_change (node:nodes) = do
+    -- !_ <- get
+    !node_changed <- update node
+    -- Avoid a write if we can
+    when (not some_change && node_changed) $ do
+        liftIO $ writeIORef change True
 
-        node_done <- isMarkedDone (node_id node)
-        if node_done
-            then updates change (some_change || node_changed) nodes
-            else do
-                pure (node:) <*> updates change (some_change || node_changed) nodes
+    node_done <- isMarkedDone (node_id node)
+    if node_done
+        then runUpdates change (some_change || node_changed) nodes
+        else do
+            pure (node:) <*> runUpdates change (some_change || node_changed) nodes
 
+    where
+        -- True <=> something changed.
+        update :: FlowNode -> AM Bool
+        update node = do
+            let old_result = node_result node
+            result <- node_update node
+            done <- and <$> (mapM isMarkedDone (node_inputs node))
+            let node' = node { node_result = result }
+            when (done || result `nestingLevelOver` 12) (markDone node')
+            if (result == old_result)
+                -- Nothing to do this round
+                then return False
+                else do
+                    return True
 
-    -- True <=> something changed.
-    update :: FlowNode -> AM Bool
-    update node = do
-        let old_result = node_result node
-        result <- node_update node
-        done <- and <$> (mapM isMarkedDone (node_inputs node))
-        let node' = node { node_result = result }
-        when (done || result `nestingLevelOver` 12) (markDone node')
-        if (result == old_result)
-            -- Nothing to do this round
-            then return False
-            else do
-                return True
 
 
 {-
