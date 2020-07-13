@@ -1,2 +1,0 @@
-Warning: -rtsopts and -with-rtsopts have no effect with -no-hs-main.
-    Call hs_init_ghc() from your main() function to set these options.
