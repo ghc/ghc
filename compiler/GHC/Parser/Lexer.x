@@ -2130,7 +2130,7 @@ psErrorDoc (PsOptionsGhcParseError inp) =
 
   where m = vcat [ text "Error while parsing OPTIONS_GHC pragma."
                  , text "Expecting whitespace-separated list of GHC options."
-                 , text "  E.g {-# OPTIONS_GHC -Wall -O2 #-}"
+                 , text "  E.g. {-# OPTIONS_GHC -Wall -O2 #-}"
                  , text ("Input was: " ++ show inp) ]
 
 instance RenderableError PsError where

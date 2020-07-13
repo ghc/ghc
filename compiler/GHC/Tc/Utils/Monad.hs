@@ -62,7 +62,7 @@ module GHC.Tc.Utils.Monad(
   getSrcSpanM, setSrcSpan, addLocM,
   wrapLocM, wrapLocFstM, wrapLocSndM,wrapLocM_,
   getErrsVar, setErrsVar,
-  addErr,
+  addErr, addTcRnErr,
   failWith, failAt,
   addErrAt, addErrs,
   checkErr,
@@ -901,6 +901,14 @@ failWith msg = addErr msg >> failM
 
 failAt :: SrcSpan -> MsgDoc -> TcRn a
 failAt loc msg = addErrAt loc msg >> failM
+
+addTcRnErr :: SrcSpan -> (SDoc -> TcRnError) -> TcRn ()
+addTcRnErr loc err = do { ctxt <- getErrCtxt
+                        ; tidy_env <- tcInitTidyEnv
+                        ; err_info <- mkErrInfo tidy_env ctxt
+                        ; dflags <- getDynFlags
+                        ; printer <- getPrintUnqualified dflags
+                        ; reportError $ mkErr dflags loc printer (err err_info) }
 
 addErrAt :: SrcSpan -> MsgDoc -> TcRn ()
 -- addErrAt is mainly (exclusively?) used by the renamer, where

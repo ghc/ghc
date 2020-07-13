@@ -501,13 +501,11 @@ warnRedundantConstraints ctxt env info ev_vars
 
 reportBadTelescope :: ReportErrCtxt -> TcLclEnv -> SkolemInfo -> [TcTyVar] -> TcM ()
 reportBadTelescope ctxt env (ForAllSkol _ telescope) skols
-  = do { msg <- mkErrorReport ctxt env (important doc)
+  = do { context <- mkErrInfo (cec_tidy ctxt) (tcl_ctxt env)
+       ; msg <- mkErrDocAt loc (TcRnBadTelescope telescope sorted_tvs context)
        ; reportError msg }
   where
-    doc = hang (text "These kind and type variables:" <+> telescope $$
-                text "are out of dependency order. Perhaps try this ordering:")
-             2 (pprTyVars sorted_tvs)
-
+    loc = RealSrcSpan (tcl_loc env) Nothing
     sorted_tvs = scopedSort skols
 
 reportBadTelescope _ _ skol_info skols
@@ -1147,21 +1145,14 @@ mkHoleError _tidy_simples _ctxt hole@(Hole { hole_occ = occ
        ; imp_info <- getImports
        ; curr_mod <- getModule
        ; hpt <- getHpt
-       ; mkErrDocAt (RealSrcSpan (tcl_loc lcl_env) Nothing) .
-                    TcRnErrorDoc $
-                    errDoc [out_of_scope_msg] []
-                           [unknownNameSuggestions dflags hpt curr_mod rdr_env
-                            (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ)] }
+       ; let suggestions = unknownNameSuggestions dflags hpt curr_mod rdr_env (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ)
+       ; mkErrDocAt (RealSrcSpan (tcl_loc lcl_env) Nothing) $
+           TcRnOutOfScopeHole
+             occ
+             hole_ty
+             suggestions }
   where
-    herald | isDataOcc occ = text "Data constructor not in scope:"
-           | otherwise     = text "Variable not in scope:"
-
-    out_of_scope_msg -- Print v :: ty only if the type has structure
-      | boring_type = hang herald 2 (ppr occ)
-      | otherwise   = hang herald 2 (pp_occ_with_type occ hole_ty)
-
     lcl_env     = ctLocEnv ct_loc
-    boring_type = isTyVarTy hole_ty
 
  -- general case: not an out-of-scope error
 mkHoleError tidy_simples ctxt hole@(Hole { hole_occ = occ
