@@ -762,29 +762,29 @@ to a UserTypeCtxt of GenSigCtxt.  Why?
   ambiguity check, but we don't need one for each level within it,
   and GHC.Tc.Utils.Unify.alwaysBuildImplication checks the UserTypeCtxt.
   See Note [When to build an implication]
+
+Note [Wrapper returned from tcSubMult]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There is no notion of multiplicity coercion in Core, therefore the wrapper
+returned by tcSubMult (and derived functions such as tcCheckUsage and
+checkManyPattern) is quite unlike any other wrapper: it checks whether the
+coercion produced by the constraint solver is trivial, producing a type error
+is it is not. This is implemented via the WpMultCoercion wrapper, as desugared
+by GHC.HsToCore.Binds.dsHsWrapper, which does the reflexivity check.
+
+This wrapper needs to be placed in the term; otherwise, checking of the
+eventual coercion won't be triggered during desugaring. But it can be put
+anywhere, since it doesn't affect the desugared code.
+
+Why do we check this in the desugarer? It's a convenient place, since it's
+right after all the constraints are solved. We need the constraints to be
+solved to check whether they are trivial or not. Plus there is precedent for
+type errors during desuraging (such as the levity polymorphism
+restriction). An alternative would be to have a kind of constraint which can
+only produce trivial evidence, then this check would happen in the constraint
+solver.
 -}
 
-
--- Note [tcSubMult's wrapper]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~
--- There is no notion of multiplicity coercion in Core, therefore the wrapper
--- returned by tcSubMult (and derived function such as tcCheckUsage and
--- checkManyPattern) is quite unlike any other wrapper: it checks whether the
--- coercion produced by the constraint solver is trivial and disappears (it
--- produces a type error is the constraint is not trivial). See [Checking
--- multiplicity coercions] in TcEvidence.
---
--- This wrapper need to be placed in the term, otherwise checking of the
--- eventual coercion won't be triggered during desuraging. But it can be put
--- anywhere, since it doesn't affect the desugared code.
---
--- Why do we check this in the desugarer? It's a convenient place, since it's
--- right after all the constraints are solved. We need the constraints to be
--- solved to check whether they are trivial or not. Plus there are precedent for
--- type errors during desuraging (such as the levity polymorphism
--- restriction). An alternative would be to have a kind of constraints which can
--- only produce trivial evidence, then this check would happen in the constraint
--- solver.
 tcSubMult :: CtOrigin -> Mult -> Mult -> TcM HsWrapper
 tcSubMult origin w_actual w_expected
   | Just (w1, w2) <- isMultMul w_actual =
