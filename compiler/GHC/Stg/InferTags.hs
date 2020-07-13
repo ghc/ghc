@@ -52,6 +52,7 @@ import GHC.Stg.Utils
 import GHC.StgToCmm.Types ( LambdaFormInfo(..) )
 import GHC.Types.Name
 import GHC.Builtin.Names
+import GHC.Builtin.Types.Prim (addrPrimTy)
 
 import GHC.Types.Demand ( Divergence ( Absent ), splitStrictSig )
 import GHC.Types.Unique
@@ -1176,6 +1177,7 @@ set_desc n desc = n { _node_desc = desc}
 set_desc n _ = n
 #endif
 
+
 node_desc :: FlowNode -> SDoc
 #if defined(WITH_NODE_DESC)
 node_desc n = _node_desc n
@@ -1276,26 +1278,26 @@ idMappedInCtxt id ctxt
 -- and as such safe to set to NoValue
 -- See Note [Recursive Functions]
 isRecTail :: Id -> ContextStack -> Bool
-isRecTail f (CTopLevel _ : _) = False
-isRecTail f (CLetRec bnds _: _)
+isRecTail _f (CTopLevel _ : _) = False
+isRecTail  f (CLetRec bnds _: _)
     | isSingleMapOf f bnds
     = True
 isRecTail f (CLetRec _ LNE    : ctxt) = isRecTail f ctxt
-isRecTail f (CLetRec _ NotLNE : _   ) = False
+isRecTail _f (CLetRec _ NotLNE : _   ) = False
 isRecTail f (CLetRecBody bnds _ :ctxt)
     -- `let x = e in .. -> x`
     -- is not a recursive tail call
     | f `elemVarEnv` bnds = False
     | otherwise = isRecTail f ctxt
 isRecTail f (CLet _ LNE    : ctxt) = isRecTail f ctxt
-isRecTail f (CLet _ NotLNE : _) = False
+isRecTail _f (CLet _ NotLNE : _) = False
 isRecTail f (CLetBody bnds _ : ctxt)
     | elemVarEnv f bnds = False
     | otherwise = isRecTail f ctxt
 isRecTail f (CClosureBody args : ctxt)
     | f `elemVarEnv` args = False
     | otherwise = isRecTail f ctxt
-isRecTail f (CCaseScrut : _) = False
+isRecTail _f (CCaseScrut : _) = False
 isRecTail f (CCaseBndr bnd : ctxt )
     | elemVarEnv f bnd
     = False
@@ -1412,15 +1414,16 @@ findTags this_mod inst_env binds =
 addConstantNodes :: AM ()
 addConstantNodes = do
     markDone litNode
-    markDone $ mkConstNode undetNodeId top
-    markDone $ mkConstNode unknownNodeId bot
-    markDone $ mkConstNode neverNodeId (flatLattice NeverEnter)
-    markDone $ mkConstNode maybeNodeId (flatLattice MaybeEnter)
-    markDone $ mkConstNode alwaysNodeId (flatLattice AlwaysEnter)
+    markDone addrNode
+    markDone $ mkConstNode undetNodeId top (text "undet")
+    markDone $ mkConstNode unknownNodeId bot (text "bot")
+    markDone $ neverEnterNode
+    markDone $ maybeEnterNode
+    markDone $ alwaysEnterNode
 
 
-mkConstNode :: NodeId -> EnterLattice -> FlowNode
-mkConstNode id !val =
+mkConstNode :: NodeId -> EnterLattice -> SDoc -> FlowNode
+mkConstNode id !val desc =
     FlowNode
     { node_id = id
     , node_inputs = []
@@ -1428,27 +1431,30 @@ mkConstNode id !val =
     , node_result = val
     , node_update = (return $! val)
 #if defined(WITH_NODE_DESC)
-    , _node_desc = (text "const")
+    , _node_desc = desc
 #endif
 
     }
 
 -- Some nodes we can reuse.
-litNodeId, undetNodeId, unknownNodeId, neverNodeId, maybeNodeId, alwaysNodeId :: NodeId
+litNodeId, undetNodeId, unknownNodeId, neverNodeId, maybeNodeId,
+    alwaysNodeId, nullaryConNodeId :: NodeId
 litNodeId       = NodeId $ mkUnique 'c' 2
 undetNodeId     = NodeId $ mkUnique 'c' 3 -- Always returns top
 unknownNodeId   = NodeId $ mkUnique 'c' 4
 neverNodeId     = NodeId $ mkUnique 'c' 5
 maybeNodeId     = NodeId $ mkUnique 'c' 6
 alwaysNodeId    = NodeId $ mkUnique 'c' 7
+addrNodeId      = NodeId $ mkUnique 'c' 8
+nullaryConNodeId = NodeId $ mkUnique 'c' 9
 
-
-litNode :: FlowNode
-litNode =
-    (mkConstNode litNodeId (flatLattice NeverEnter))
-#if defined(WITH_NODE_DESC)
-        { _node_desc = text "lit" }
-#endif
+alwaysEnterNode, maybeEnterNode, neverEnterNode, litNode, addrNode, nullaryConNode :: FlowNode
+alwaysEnterNode = mkConstNode alwaysNodeId  (flatLattice AlwaysEnter) (text "always")
+maybeEnterNode  = mkConstNode maybeNodeId   (flatLattice MaybeEnter) (text "maybe")
+neverEnterNode  = mkConstNode neverNodeId   (flatLattice NeverEnter) (text "never")
+litNode         = mkConstNode litNodeId     (flatLattice NeverEnter) (text "lit")
+addrNode        = mkConstNode addrNodeId    (flatLattice NeverEnter) (text "c_str")
+nullaryConNode  = mkConstNode nullaryConNodeId (EnterLattice NeverEnter FieldsNone) (text "nullCon")
 
 {-  Note [Imported Ids]
     ~~~~~~~~~~~~~~~~~~~
@@ -1540,7 +1546,8 @@ addImportedNode this_mod id
     -- Local id, it has to be mapped to an id via SynContext
     | nameIsLocalOrFrom this_mod (idName id) = return ()
     | otherwise = do
-        node_id <- mkUniqueId
+        -- If we can reuse a existing node this isn't reused
+        new_node_id <- mkUniqueId
         s <- get
         let idNodes = fs_idNodeMap s
         -- Check if it is already cached.
@@ -1551,59 +1558,58 @@ addImportedNode this_mod id
             let node
                     -- Functions tagged with arity are never entered as atoms.
                     | idFunRepArity id > 0
-                    = (mkConstNode node_id (flatLattice NeverEnter))
-                                `set_desc` (text "ext_func" <-> ppr id)
+                    = set_if_desc neverEnterNode new_node_id (text "ext_func" <-> ppr id)
 
                     -- Known Nullarry constructors are also never entered
+                    -- but for them it's important to preserve the information
+                    -- of no fields.
                     | Just con <- (isDataConWorkId_maybe id)
                     , isNullaryRepDataCon con
-                    = (mkConstNode node_id (EnterLattice NeverEnter FieldsNone))
-                                `set_desc` (text "ext_nullCon" <-> ppr id)
+                    = set_if_desc nullaryConNode new_node_id (text "ext_nullCon" <-> ppr id)
 
                     | (_, Absent) <- splitStrictSig (idStrictness id)
-                    = (mkConstNode node_id (flatLattice NeverEnter))
-                                `set_desc` (text "ext_absent_error" <-> ppr id)
+                    = set_if_desc neverEnterNode new_node_id (text "ext_absent_error" <-> ppr id)
 
                     | Just lf_info <- idLFInfo_maybe id
                     =   case lf_info of
                             LFReEntrant {}
-                                -> (mkConstNode node_id (flatLattice NeverEnter))
-                                    `set_desc` (text "ext_lf_func" <-> ppr id)
+                                -> set_if_desc neverEnterNode new_node_id (text "ext_lf_func" <-> ppr id)
                             LFThunk {}
-                                -> (mkConstNode node_id (flatLattice AlwaysEnter))
-                                    `set_desc` (text "ext_lf_thunk" <-> ppr id)
+                                -> set_if_desc alwaysEnterNode new_node_id (text "ext_lf_thunk" <-> ppr id)
                             LFCon {}
                                 -- If we ever bind the fields we can infer the tags
                                 -- based on the fields strictness. So a flat lattice
                                 -- is fine.
-                                -> (mkConstNode node_id (flatLattice NeverEnter))
-                                    `set_desc` (text "ext_lf_con" <-> ppr id)
+                                -> set_if_desc neverEnterNode new_node_id (text "ext_lf_con" <-> ppr id)
                             LFUnknown {}
-                                -> (mkConstNode node_id (flatLattice MaybeEnter))
-                                    `set_desc` (text "ext_lf_unknown" <-> ppr id)
+                                -> set_if_desc maybeEnterNode new_node_id (text "ext_lf_unknown" <-> ppr id)
                             LFUnlifted {}
-                                -> (mkConstNode node_id (flatLattice NeverEnter))
-                                    `set_desc` (text "ext_lf_unlifted" <-> ppr id)
+                                -> set_if_desc neverEnterNode new_node_id (text "ext_lf_unlifted" <-> ppr id)
+                            -- Shouldn't be possible. I don't think we can export letNoEscapes
                             LFLetNoEscape {}
-                                -- Shouldn't be possible. I don't think we can export
-                                -- letNoEscap bindings.
-                                -> (mkConstNode node_id (flatLattice MaybeEnter))
-                                    `set_desc` (text "ext_lf_lne" <-> ppr id)
+                                -> set_if_desc maybeEnterNode new_node_id (text "ext_lf_lne" <-> ppr id)
 
                     -- General case, a potentially unevaluated imported id.
                     | not isFun
-                    = (mkConstNode node_id (flatLattice MaybeEnter))
-                                `set_desc` (text "ext_unknown_enter" <-> ppr id)
+                    = set_if_desc maybeEnterNode new_node_id (text "ext_unknown_enter" <-> ppr id)
 
                     -- May or may not be entered.
                     | otherwise
-                    = (mkConstNode node_id (flatLattice MaybeEnter))
-                                `set_desc` (text "ext_unknown" <-> ppr id)
+                    = set_if_desc maybeEnterNode new_node_id (text "ext_unknown" <-> ppr id)
             put $!
-                s { fs_idNodeMap = addToUFM (fs_idNodeMap s) id node_id
-                , fs_doneNodes = addToUFM (fs_doneNodes s) node node }
+                s { fs_idNodeMap = addToUFM (fs_idNodeMap s) id new_node_id
+                , fs_doneNodes = addToUFM (fs_doneNodes s) new_node_id node }
   where
     isFun = isFunTy (unwrapType $ idType id)
+    -- | When we don't use descriptions we can avoid creating
+    --  a new node for e.g. each literal string. So we set the
+    --  id only if descriptions are enabled.
+    set_if_desc :: FlowNode -> NodeId -> SDoc -> FlowNode
+#if defined(WITH_NODE_DESC)
+    set_if_desc node node_id desc = node { _node_desc = desc, node_id = node_id}
+#else
+    set_if_desc node _id _desc    = node
+#endif
 
 -- | Returns the nodeId for a given imported Id.
 importedFuncNode_Maybe :: Module -> Id -> AM (Maybe NodeId)
@@ -1629,25 +1635,31 @@ mkCtxtEntry ctxt v
 {-# NOINLINE nodesTopBinds #-}
 -- Note: We could expose the computed information about top level bindings
 -- via interface files (or otherwise). But currently it's unused.
-nodesTopBinds :: Module -> [StgTopBinding] -> AM ([InferStgTopBinding], [(Id,NodeId)])
+nodesTopBinds :: Module -> [StgTopBinding] -> AM ([InferStgTopBinding], (VarEnv NodeId))
 nodesTopBinds this_mod binds = do
-    let top_level_binds = mkVarSet (bindersOfTopBinds binds) :: IdSet
     -- We preallocate node ids for the case where we must reference an node by id
     -- before we traversed the defining binding.
-    let bind_ids = (nonDetEltsUniqSet top_level_binds) :: [Id]
-    mappings <- mapM (mkCtxtEntry []) bind_ids :: AM [(Id,NodeId)]
-    let topCtxt = CTopLevel $ mkVarEnv mappings
+
+    -- TODO: bindersOfTopBinds allocates an intermediate list, but we really
+    -- shouldn't need to.
+    let bind_ids = bindersOfTopBinds binds :: [Id]
+    mappings <- foldM insertIdMapping mempty bind_ids :: AM (VarEnv NodeId)
+    let topCtxt = CTopLevel mappings
     binds' <- mapM (nodesTop this_mod topCtxt) binds
     return (binds', mappings)
+  where
+    insertIdMapping :: VarEnv NodeId -> Id -> AM (VarEnv NodeId)
+    insertIdMapping env v
+        | idType v `eqType` addrPrimTy
+        = return $! extendVarEnv env v addrNodeId
+        | otherwise
+        = extendVarEnv env v <$!> mkUniqueId
 
 nodesTop :: Module -> SynContext -> StgTopBinding -> AM InferStgTopBinding
-nodesTop _this_mod ctxt (StgTopStringLit v str) = do
-    -- String literals are never entered.
-    let node_id = getKnownIdNodeId [ctxt] v
-    let node = mkConstNode node_id (flatLattice NeverEnter)
-                    `set_desc` text "c_str"
-    markDone node
-    return $! (StgTopStringLit v str)
+nodesTop _this_mod ctxt (StgTopStringLit v str) = return (StgTopStringLit v str)
+    -- String literals are never entered and all are repesented by the
+    -- same preallocated node. So really there is nothing to do for them.
+
 nodesTop this_mod ctxt (StgTopLifted bind)  = do
     bind' <- fst <$> nodesBind this_mod [ctxt] TopLevel NotLNE bind :: AM InferStgBinding
     return $! (StgTopLifted bind')
@@ -1772,7 +1784,8 @@ nodeRhs this_mod ctxt topFlag binding (StgRhsCon _ ccs con args)
   | null args = do
         -- pprTraceM "RhsConNullary" (ppr con <+> ppr node_id <+> ppr ctxt)
         let node = mkConstNode node_id (EnterLattice NeverEnter FieldsNone)
-        markDone $ node `set_desc` (ppr binding <-> text "rhsConNullary")
+                                       (ppr binding <-> text "rhsConNullary")
+        markDone $ node
         return $! (StgRhsCon (node_id,RhsCon) ccs con args)
   | otherwise = do
 
