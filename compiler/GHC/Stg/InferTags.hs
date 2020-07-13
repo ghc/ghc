@@ -980,10 +980,21 @@ data FlowState
     , fs_doneNodes :: !(UniqFM FlowNode) -- ^ We can be sure these will no longer change, index by `NodeId`
     }
 
+fromUEnv :: UFlowState -> FlowState
+fromUEnv (# id_map, uq_map, done_map #) =
+    FlowState {
+        fs_idNodeMap = id_map,
+        fs_uqNodeMap = uq_map,
+        fs_doneNodes = done_map }
+
+toUEnv :: FlowState -> UFlowState
+toUEnv !env = (# fs_idNodeMap env, fs_uqNodeMap env, fs_doneNodes env #)
+
+type UFlowState = (# (UniqFM NodeId), (UniqFM FlowNode), (UniqFM FlowNode) #)
 -- type AM = StateT FlowState IO
 
-newtype AM a = AM { runAM :: FlowState -> State# RealWorld
-                          -> (# a, FlowState, State# RealWorld #)
+newtype AM a = AM { runAM :: UFlowState -> State# RealWorld
+                          -> (# a, UFlowState, State# RealWorld #)
                   } deriving Functor
 
 instance Applicative AM where
@@ -1002,14 +1013,14 @@ instance Monad AM where
     return = pure
 
 get :: AM FlowState
-get = AM $ oneShot $ \env s -> (# env, env, s #)
+get = AM $ oneShot $ \env s -> (# fromUEnv env, env, s #)
 
 put :: FlowState -> AM ()
-put !env = AM $ oneShot $ \_ s -> (# (), env, s #)
+put !env = AM $ oneShot $ \_ s -> (# (), toUEnv env, s #)
 
 evalAM :: FlowState -> AM a -> a
 evalAM env (AM f) = runRW# $ \s ->
-    case f env s of
+    case f (toUEnv env) s of
         (# x, _env', _s' #) -> x
 
 instance MonadIO AM where
@@ -1210,7 +1221,9 @@ instance Outputable IsLNE where
 -- We use CCaseScrut to help detecting tail recursive calls.
 data SynContext
     = CTopLevel     !(VarEnv NodeId)
+    -- | letrec x = <here> in body
     | CLetRec       !(VarEnv NodeId) !IsLNE
+    -- | letrec x = e in <here>
     | CLetRecBody   !(VarEnv NodeId) !IsLNE
     | CLet          !(VarEnv NodeId) !IsLNE
     | CLetBody      !(VarEnv NodeId) !IsLNE
@@ -1230,13 +1243,6 @@ getCtxtIdMap (CLetRecBody m _) = Just m
 getCtxtIdMap (CLet m _) = Just m
 getCtxtIdMap (CLetBody m _) = Just m
 getCtxtIdMap (CTopLevel m) = Just m
-
--- | isSingleMapOf v env == fromList [(v',_)] && v == v'
---
--- Used to determine recursive calls.
-isSingleMapOf :: Id -> VarEnv NodeId -> Bool
-isSingleMapOf v env =
-    sizeUFM env == 1 && elemVarEnv v env
 
 instance Outputable SynContext where
     ppr (CTopLevel map)       = text "CTop"        <> ppr map
@@ -1260,6 +1266,47 @@ idMappedInCtxt id ctxt
         = Just $! node
     go (_:todo) = go todo
     go [] = Nothing
+
+-- Determine if f in this position is a recursive tail call
+-- and as such safe to set to NoValue
+-- See Note [Recursive Functions]
+isRecTail :: Id -> [SynContext] -> Bool
+isRecTail f (CTopLevel _ : _) = False
+isRecTail f (CLetRec bnds _: _)
+    | isSingleMapOf f bnds
+    = True
+isRecTail f (CLetRec _ LNE    : ctxt) = isRecTail f ctxt
+isRecTail f (CLetRec _ NotLNE : _   ) = False
+isRecTail f (CLetRecBody bnds _ :ctxt)
+    -- `let x = e in .. -> x`
+    -- is not a recursive tail call
+    | f `elemVarEnv` bnds = False
+    | otherwise = isRecTail f ctxt
+isRecTail f (CLet _ LNE    : ctxt) = isRecTail f ctxt
+isRecTail f (CLet _ NotLNE : _) = False
+isRecTail f (CLetBody bnds _ : ctxt)
+    | elemVarEnv f bnds = False
+    | otherwise = isRecTail f ctxt
+isRecTail f (CClosureBody args : ctxt)
+    | f `elemVarEnv` args = False
+    | otherwise = isRecTail f ctxt
+isRecTail f (CCaseScrut : _) = False
+isRecTail f (CCaseBndr bnd : ctxt )
+    | elemVarEnv f bnd
+    = False
+    | otherwise
+    = isRecTail f ctxt
+isRecTail f (CAlt bnds : ctxt)
+    | f `elemVarEnv` bnds = False
+    | otherwise = isRecTail f ctxt
+isRecTail f x = pprPanic "Incomplete" $ ppr (f,x)
+
+-- | isSingleMapOf v env == fromList [(v',_)] && v == v'
+--
+-- Used to determine recursive calls.
+isSingleMapOf :: Id -> VarEnv NodeId -> Bool
+isSingleMapOf v env =
+    sizeUFM env == 1 && elemVarEnv v env
 
 -- | Lub like operator between all input nodes
 -- See Note [The lattice element combinators]
@@ -1613,7 +1660,7 @@ nodesBind this_mod ctxt bot lne (StgRec binds) = do
     boundIds <- mkVarEnv <$> mapM (mkCtxtEntry ctxt) ids :: AM (VarEnv NodeId)
     let ctxt' = (CLetRec boundIds lne) : ctxt
     rhss' <- mapM (uncurry (nodeRhs this_mod ctxt' bot )) binds
-    return $! (StgRec $ zip ids rhss', CLetRecBody boundIds lne: ctxt)
+    return $! (StgRec $ zip ids rhss', (CLetRecBody boundIds lne) : ctxt)
 
 
 
@@ -2257,38 +2304,6 @@ nodeApp this_mod ctxt expr@(StgApp _ f args) = do
 
                 return $! (StgApp node_id f args, node_id)
   where
-    -- Determine if f in this position is a recursive tail call
-    -- and as such safe to set to NoValue
-    -- See Note [Recursive Functions]
-    isRecTail :: [SynContext] -> Bool
-    isRecTail (CTopLevel _ : _) = False
-    isRecTail (CLetRec bnds _: _)
-        | isSingleMapOf f bnds
-        = True
-    isRecTail (CLetRec _ LNE    : ctxt) = isRecTail ctxt
-    isRecTail (CLetRec _ NotLNE : _   ) = False
-    isRecTail (CLetRecBody bnds _ :ctxt)
-        | f `elemVarEnv` bnds = False
-        | otherwise = isRecTail ctxt
-    isRecTail (CLet _ LNE    : ctxt) = isRecTail ctxt
-    isRecTail (CLet _ NotLNE : _) = False
-    isRecTail (CLetBody bnds _ : ctxt)
-        | elemVarEnv f bnds = False
-        | otherwise = isRecTail ctxt
-    isRecTail (CClosureBody args : ctxt)
-        | f `elemVarEnv` args = False
-        | otherwise = isRecTail ctxt
-    isRecTail (CCaseScrut : _) = False
-    isRecTail (CCaseBndr bnd : ctxt )
-        | elemVarEnv f bnd
-        = False
-        | otherwise
-        = isRecTail ctxt
-    isRecTail (CAlt bnds : ctxt)
-        | f `elemVarEnv` bnds = False
-        | otherwise = isRecTail ctxt
-    isRecTail x = pprPanic "Incomplete" $ ppr x
-
     inputs
         | isAbsentExpr expr = []
         | isFun && (not isSat) = []
@@ -2334,7 +2349,7 @@ nodeApp this_mod ctxt expr@(StgApp _ f args) = do
         =   -- pprTrace "Unsat?" (ppr (f,args)) $
             return $! bot
 
-    recTail = recursionKind == NoMutRecursion && isRecTail ctxt
+    recTail = recursionKind == NoMutRecursion && isRecTail f ctxt
     isFun = isFunTy (unwrapType $ idType f)
     arity = idFunRepArity f
     isSat = arity > 0 && (length args == arity)
