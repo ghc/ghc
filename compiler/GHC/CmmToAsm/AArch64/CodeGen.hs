@@ -635,15 +635,19 @@ getRegister' config plat expr
       return $ Any (intFormat w) (\dst -> code_x `snocOL` ANN (text $ show expr) (LSR (OpReg w dst) (OpReg w reg_x) (OpImm (ImmInteger n))))
 
     -- 3. Logic &&, ||
-    CmmMachOp (MO_And w) [(CmmReg reg), CmmLit (CmmInt n _)] | is12bit (fromIntegral n) ->
-      return $ Any (intFormat w) (\d -> unitOL $ ANN (text $ show expr) (AND (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
-      where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
-            r' = getRegisterReg plat reg
+    -- This needs to check if n can be encoded as a bitmask immediate:
+    --
+    -- See https://stackoverflow.com/questions/30904718/range-of-immediate-values-in-armv8-a64-assembly
+    --
+    -- CmmMachOp (MO_And w) [(CmmReg reg), CmmLit (CmmInt n _)] | is12bit (fromIntegral n) ->
+    --   return $ Any (intFormat w) (\d -> unitOL $ ANN (text $ show expr) (AND (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
+    --   where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
+    --         r' = getRegisterReg plat reg
 
-    CmmMachOp (MO_Or w) [(CmmReg reg), CmmLit (CmmInt n _)] | is12bit (fromIntegral n) ->
-      return $ Any (intFormat w) (\d -> unitOL $ ANN (text $ show expr) (ORR (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
-      where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
-            r' = getRegisterReg plat reg
+    -- CmmMachOp (MO_Or w) [(CmmReg reg), CmmLit (CmmInt n _)] | is12bit (fromIntegral n) ->
+    --   return $ Any (intFormat w) (\d -> unitOL $ ANN (text $ show expr) (ORR (OpReg w d) (OpReg w' r') (OpImm (ImmInteger n))))
+    --   where w' = formatToWidth (cmmTypeFormat (cmmRegType plat reg))
+    --         r' = getRegisterReg plat reg
 
     -- Generic case.
     CmmMachOp op [x, y] -> do
