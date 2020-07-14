@@ -15,10 +15,10 @@ clean:
 T3007:
 	$(MAKE) -s --no-print-directory clean
 	'$(GHC_PKG)' init package.conf
-	cd A && '$(TEST_HC)' $(TEST_HC_OPTS) --make Setup
+	cd A && '$(TEST_HC)' $(TEST_HC_OPTS) --make Setup -v0
 	cd A && $(SETUP) configure --with-compiler='$(TEST_HC)' --ghc-pkg-option=--global-package-db=../package.conf --ghc-pkg-option=--no-user-package-db --ghc-option=-package-db../package.conf
 	cd A && $(SETUP) build
 	cd A && $(SETUP) register --inplace
-	cd B && '$(TEST_HC)' $(TEST_HC_OPTS) --make Setup
+	cd B && '$(TEST_HC)' $(TEST_HC_OPTS) --make Setup -v0
 	cd B && $(SETUP) configure --with-compiler='$(TEST_HC)' --ghc-pkg-option=--global-package-db=../package.conf --ghc-pkg-option=--no-user-package-db --ghc-option=-package-db../package.conf
 	cd B && $(SETUP) build
