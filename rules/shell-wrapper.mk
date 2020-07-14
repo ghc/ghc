@@ -74,23 +74,28 @@ BINDIST_WRAPPERS += $$($1_$2_SHELL_WRAPPER_NAME)
 
 install: install_$1_$2_wrapper
 
+# FB Note: the changes here make the scripts relocatable; directories
+# are computed relative to the base of the GHC installation.  We can't
+# upstream these changes, because `realpath` may not be available on some
+# platforms and the use of `..` may be problematic.
+
 .PHONY: install_$1_$2_wrapper
 install_$1_$2_wrapper: WRAPPER=$$(DESTDIR)$$(bindir)/$(CrossCompilePrefix)$$($1_$2_INSTALL_SHELL_WRAPPER_NAME)
 install_$1_$2_wrapper:
 	$$(INSTALL_DIR) "$$(DESTDIR)$$(bindir)"
-	$$(call removeFiles,                                        "$$(WRAPPER)")
-	$$(CREATE_SCRIPT)                                           "$$(WRAPPER)"
-	echo '#!/bin/sh'                                         >> "$$(WRAPPER)"
-	echo 'exedir="$$(ghclibexecdir)/bin"'                    >> "$$(WRAPPER)"
-	echo 'exeprog="$$($1_$2_PROG)"'                          >> "$$(WRAPPER)"
-	echo 'executablename="$$$$exedir/$$$$exeprog"'           >> "$$(WRAPPER)"
-	echo 'datadir="$$(datadir)"'                             >> "$$(WRAPPER)"
-	echo 'bindir="$$(bindir)"'                               >> "$$(WRAPPER)"
-	echo 'topdir="$$(topdir)"'                               >> "$$(WRAPPER)"
+	$$(call removeFiles,                                                                                  "$$(WRAPPER)")
+	$$(CREATE_SCRIPT)                                                                                     "$$(WRAPPER)"
+	echo '#!/bin/sh'                                                                                   >> "$$(WRAPPER)"
+	echo 'bindir="$$$$(dirname "$$$$(realpath "$$$$0")")"'                                             >> "$$(WRAPPER)"
+	echo "datadir=\"\$$$$bindir/$$$$(realpath -m --relative-to "$$(bindir)" "$$(datadir)")\""          >> "$$(WRAPPER)"
+	echo "topdir=\"\$$$$bindir/$$$$(realpath -m --relative-to "$$(bindir)" "$$(topdir)")\""            >> "$$(WRAPPER)"
+	echo "exedir=\"\$$$$bindir/$$$$(realpath -m --relative-to "$$(bindir)" "$$(ghclibexecdir)/bin")\"" >> "$$(WRAPPER)"
+	echo 'exeprog="$$($1_$2_PROG)"'                                                                    >> "$$(WRAPPER)"
+	echo 'executablename="$$$$exedir/$$$$exeprog"'                                                     >> "$$(WRAPPER)"
 	$$($1_$2_SHELL_WRAPPER_EXTRA)
 	$$($1_$2_INSTALL_SHELL_WRAPPER_EXTRA)
-	cat $$($1_$2_SHELL_WRAPPER_NAME)                         >> "$$(WRAPPER)"
-	$$(EXECUTABLE_FILE)                                         "$$(WRAPPER)"
+	cat $$($1_$2_SHELL_WRAPPER_NAME)                                                                   >> "$$(WRAPPER)"
+	$$(EXECUTABLE_FILE)                                                                                   "$$(WRAPPER)"
 
 endif # $1_$2_WANT_INSTALLED_WRAPPER
 
