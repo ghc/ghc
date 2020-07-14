@@ -6,4 +6,4 @@
 #
 # Therefore this backup identity test-wrapper is the default for native builds.
 #
-"$@"
+"$*"
