@@ -308,9 +308,8 @@ retry:
 
         MessageBlackHole_tso(msg) = CurrentTSO;
         MessageBlackHole_bh(msg) = node;
+        prim_write_barrier;
         SET_HDR(msg, stg_MSG_BLACKHOLE_info, CCS_SYSTEM);
-        // messageBlackHole has appropriate memory barriers when this object is exposed.
-        // See Note [Heap memory barriers].
 
         (r) = ccall messageBlackHole(MyCapability() "ptr", msg "ptr");
 
@@ -370,6 +369,7 @@ INFO_TABLE(stg_WHITEHOLE, 0,0, WHITEHOLE, "WHITEHOLE", "WHITEHOLE")
 loop:
     // spin until the WHITEHOLE is updated
     info = StgHeader_info(node);
+    prim_read_barrier;
     if (info == stg_WHITEHOLE_info) {
 #if defined(PROF_SPIN)
         W_[whitehole_lockClosure_spin] =

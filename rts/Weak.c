@@ -42,6 +42,7 @@ void
 runAllCFinalizers(StgWeak *list)
 {
     StgWeak *w;
+    const StgInfoTable *winfo;
     Task *task;
 
     task = myTask();
@@ -138,6 +139,7 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
         // there's a later call to finalizeWeak# on this weak pointer,
         // we don't run the finalizer again.
         SET_HDR(w, &stg_DEAD_WEAK_info, w->header.prof.ccs);
+        write_barrier();
     }
 
     n_finalizers += i;
@@ -150,8 +152,6 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
     size = n + mutArrPtrsCardTableSize(n);
     arr = (StgMutArrPtrs *)allocate(cap, sizeofW(StgMutArrPtrs) + size);
     TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), n, 0);
-    // No write barrier needed here; this array is only going to referred to by this core.
-    SET_HDR(arr, &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info, CCS_SYSTEM);
     arr->ptrs = n;
     arr->size = size;
 
@@ -166,6 +166,9 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
     for (i = n; i < size; i++) {
         arr->payload[i] = (StgClosure *)(W_)(-1);
     }
+
+    write_barrier();
+    SET_HDR(arr, &stg_MUT_ARR_PTRS_FROZEN_CLEAN_info, CCS_SYSTEM);
 
     t = createIOThread(cap,
                        RtsFlags.GcFlags.initialStkSize,

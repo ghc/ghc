@@ -376,7 +376,6 @@ compactNew (Capability *cap, StgWord size)
                                          ALLOCATE_NEW);
 
     self = firstBlockGetCompact(block);
-    SET_HDR((StgClosure*)self, &stg_COMPACT_NFDATA_CLEAN_info, CCS_SYSTEM);
     self->autoBlockW = aligned_size / sizeof(StgWord);
     self->nursery = block;
     self->last = block;
@@ -393,6 +392,9 @@ compactNew (Capability *cap, StgWord size)
     self->totalW = bd->blocks * BLOCK_SIZE_W;
 
     debugTrace(DEBUG_compact, "compactNew: size %" FMT_Word, size);
+
+    write_barrier();
+    SET_HDR((StgClosure*)self, &stg_COMPACT_NFDATA_CLEAN_info, CCS_SYSTEM);
 
     return self;
 }
@@ -546,6 +548,7 @@ insertCompactHash (Capability *cap,
 {
     insertHashTable(str->hash, (StgWord)p, (const void*)to);
     const StgInfoTable **strinfo = &str->header.info;
+    load_load_barrier();
     if (*strinfo == &stg_COMPACT_NFDATA_CLEAN_info) {
         *strinfo = &stg_COMPACT_NFDATA_DIRTY_info;
         recordClosureMutated(cap, (StgClosure*)str);
@@ -690,6 +693,7 @@ verify_consistency_block (StgCompactNFData *str, StgCompactNFDataBlock *block)
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
 
         info = get_itbl(q);
+        load_load_barrier();
         switch (info->type) {
         case CONSTR_1_0:
             check_object_in_compact(str, UNTAG_CLOSURE(q->payload[0]));
@@ -929,6 +933,7 @@ fixup_block(StgCompactNFDataBlock *block, StgWord *fixup_table, uint32_t count)
     while (p < bd->free) {
         ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
         info = get_itbl((StgClosure*)p);
+        load_load_barrier();
 
         switch (info->type) {
         case CONSTR_1_0:
