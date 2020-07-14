@@ -20,6 +20,8 @@ test('rebindable7', normal, compile_and_run, [''])
 test('rebindable8', normal, compile, [''])
 test('rebindable9', normal, compile, [''])
 test('rebindable10', normal, compile_and_run, [''])
+test('rebindable11', normal, compile_fail, [''])
+test('rebindable12', normal, compile_fail, [''])
 test('RebindableFailA', exit_code(1), compile_and_run, [''])
 test('RebindableFailB', normal, compile_and_run, [''])
 

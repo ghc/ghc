@@ -542,6 +542,30 @@ Run :file:`main` and here is your output:
     $ ./main
     Hello
 
+.. _th-rs:
+
+Template Haskell quotes and Rebindable Syntax
+---------------------------------------------
+
+Rebindable syntax does not play well with untyped TH quotes:
+applying the rebindable syntax rules would go against the lax
+nature of untyped quotes that are accepted even in the presence of
+unbound identifiers (see :ghc-ticket:`18102`). Applying the rebindable syntax
+rules to them would force the code that defines the said quotes to have all
+the necessary functions (e.g ``ifThenElse`` or ``fromInteger``) in scope,
+instead of delaying the resolution of those symbols to the code that splices
+the quoted Haskell syntax, as is usually done with untyped TH. For this reason,
+even if a module has untyped TH quotes with ``RebindableSyntax`` enabled, GHC
+turns off rebindable syntax while processing the quotes. The code that splices
+the quotes is however free to turn on ``RebindableSyntax`` to have the usual
+rules applied to the resulting code.
+
+Typed TH quotes on the other hand are perfectly compatible with the eager
+application of rebindable syntax rules, and GHC will therefore process any
+such quotes according to the rebindable syntax rules whenever the
+``RebindableSyntax`` extension is turned on in the modules where such quotes
+appear.
+
 .. _th-profiling:
 
 Using Template Haskell with Profiling

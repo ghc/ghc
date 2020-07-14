@@ -123,11 +123,19 @@ tcPolyExpr expr res_ty
        ; tcPolyExprNC expr res_ty }
 
 tcPolyExprNC (L loc expr) res_ty
-  = setSrcSpan loc $
+  = set_loc_and_ctxt loc expr $
     do { traceTc "tcPolyExprNC" (ppr res_ty)
        ; (wrap, expr') <- tcSkolemiseET GenSigCtxt res_ty $ \ res_ty ->
                           tcExpr expr res_ty
        ; return $ L loc (mkHsWrap wrap expr') }
+
+  where -- See Note [Rebindable syntax and HsExpansion), which describes
+        -- the logic behind this location/context tweaking.
+        set_loc_and_ctxt l e m = do
+          inGenCode <- inGeneratedCode
+          if inGenCode && not (isGeneratedSrcSpan l)
+            then setSrcSpan l $ addExprCtxt (L l e) m
+            else setSrcSpan l m
 
 ---------------
 tcInferSigma :: LHsExpr GhcRn -> TcM (LHsExpr GhcTc, TcSigmaType)
@@ -188,7 +196,7 @@ tcLExpr, tcLExprNC
     -> TcM (LHsExpr GhcTc)
 
 tcLExpr expr res_ty
-  = addExprCtxt expr (tcLExprNC expr res_ty)
+  = setSrcSpan (getLoc expr) $ addExprCtxt expr (tcLExprNC expr res_ty)
 
 tcLExprNC (L loc expr) res_ty
   = setSrcSpan loc $
@@ -589,26 +597,15 @@ tcExpr (HsCase x scrut matches) res_ty
     match_ctxt = MC { mc_what = CaseAlt,
                       mc_body = tcBody }
 
-tcExpr (HsIf x NoSyntaxExprRn pred b1 b2) res_ty    -- Ordinary 'if'
+tcExpr (HsIf x pred b1 b2) res_ty
   = do { pred' <- tcLExpr pred (mkCheckExpType boolTy)
        ; res_ty <- tauifyExpType res_ty
            -- Just like Note [Case branches must never infer a non-tau type]
            -- in GHC.Tc.Gen.Match (See #10619)
-
        ; (u1,b1') <- tcCollectingUsage $ tcLExpr b1 res_ty
        ; (u2,b2') <- tcCollectingUsage $ tcLExpr b2 res_ty
        ; tcEmitBindingUsage (supUE u1 u2)
-       ; return (HsIf x NoSyntaxExprTc pred' b1' b2') }
-
-tcExpr (HsIf x fun@(SyntaxExprRn {}) pred b1 b2) res_ty
-  = do { ((pred', b1', b2'), fun')
-           <- tcSyntaxOp IfOrigin fun [SynAny, SynAny, SynAny] res_ty $
-              \ [pred_ty, b1_ty, b2_ty] [pred_mult, b1_mult, b2_mult] ->
-              do { pred' <- tcScalingUsage pred_mult $ tcCheckPolyExpr pred pred_ty
-                 ; b1'   <- tcScalingUsage b1_mult   $ tcCheckPolyExpr b1   b1_ty
-                 ; b2'   <- tcScalingUsage b2_mult   $ tcCheckPolyExpr b2   b2_ty
-                 ; return (pred', b1', b2') }
-       ; return (HsIf x fun' pred' b1' b2') }
+       ; return (HsIf x pred' b1' b2') }
 
 tcExpr (HsMultiIf _ alts) res_ty
   = do { res_ty <- if isSingleton alts
@@ -1059,6 +1056,19 @@ tcExpr (HsSpliceE _ (HsSpliced _ mod_finalizers (HsSplicedExpr expr)))
 tcExpr (HsSpliceE _ splice)          res_ty = tcSpliceExpr splice res_ty
 tcExpr e@(HsBracket _ brack)         res_ty = tcTypedBracket e brack res_ty
 tcExpr e@(HsRnBracketOut _ brack ps) res_ty = tcUntypedBracket e brack ps res_ty
+
+{-
+************************************************************************
+*                                                                      *
+                Rebindable syntax
+*                                                                      *
+************************************************************************
+-}
+
+-- See Note [Rebindable syntax and HsExpansion].
+tcExpr (XExpr (HsExpanded a b)) t
+  = fmap (XExpr . ExpansionExpr . HsExpanded a) $
+      setSrcSpan generatedSrcSpan (tcExpr b t)
 
 {-
 ************************************************************************

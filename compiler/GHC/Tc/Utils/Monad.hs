@@ -59,7 +59,7 @@ module GHC.Tc.Utils.Monad(
   addDependentFiles,
 
   -- * Error management
-  getSrcSpanM, setSrcSpan, addLocM,
+  getSrcSpanM, setSrcSpan, addLocM, inGeneratedCode,
   wrapLocM, wrapLocFstM, wrapLocSndM,wrapLocM_,
   getErrsVar, setErrsVar,
   addErr,
@@ -82,7 +82,7 @@ module GHC.Tc.Utils.Monad(
 
   -- * Context management for the type checker
   getErrCtxt, setErrCtxt, addErrCtxt, addErrCtxtM, addLandmarkErrCtxt,
-  addLandmarkErrCtxtM, updCtxt, popErrCtxt, getCtLocM, setCtLocM,
+  addLandmarkErrCtxtM, popErrCtxt, getCtLocM, setCtLocM,
 
   -- * Error message generation (type checker)
   addErrTc,
@@ -341,7 +341,9 @@ initTcWithGbl hsc_env gbl_env loc do_this
       ; usage_var    <- newIORef zeroUE
       ; let lcl_env = TcLclEnv {
                 tcl_errs       = errs_var,
-                tcl_loc        = loc,     -- Should be over-ridden very soon!
+                tcl_loc        = loc,
+                -- tcl_loc should be over-ridden very soon!
+                tcl_in_gen_code = False,
                 tcl_ctxt       = [],
                 tcl_rdr        = emptyLocalRdrEnv,
                 tcl_th_ctxt    = topStage,
@@ -866,11 +868,19 @@ getSrcSpanM :: TcRn SrcSpan
         -- Avoid clash with Name.getSrcLoc
 getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (tcl_loc env) Nothing) }
 
+-- See Note [Rebindable syntax and HsExpansion].
+inGeneratedCode :: TcRn Bool
+inGeneratedCode = tcl_in_gen_code <$> getLclEnv
+
 setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
-setSrcSpan (RealSrcSpan real_loc _) thing_inside
-    = updLclEnv (\env -> env { tcl_loc = real_loc }) thing_inside
--- Don't overwrite useful info with useless:
-setSrcSpan (UnhelpfulSpan _) thing_inside = thing_inside
+setSrcSpan (RealSrcSpan loc _) thing_inside =
+  updLclEnv (\env -> env { tcl_loc = loc, tcl_in_gen_code = False })
+            thing_inside
+setSrcSpan loc@(UnhelpfulSpan _) thing_inside
+  -- See Note [Rebindable syntax and HsExpansion].
+  | isGeneratedSrcSpan loc =
+      updLclEnv (\env -> env { tcl_in_gen_code = True }) thing_inside
+  | otherwise = thing_inside
 
 addLocM :: (a -> TcM b) -> Located a -> TcM b
 addLocM fn (L loc a) = setSrcSpan loc $ fn a
@@ -1037,40 +1047,71 @@ failIfErrsM = ifErrsM failM (return ())
 ************************************************************************
 -}
 
+{- Note [Inlining addErrCtxt]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+You will notice a bunch of INLINE pragamas on addErrCtxt and friends.
+The reason is to promote better eta-expansion in client modules.
+Consider
+    \e s. addErrCtxt c (tc_foo x) e s
+It looks as if tc_foo is applied to only two arguments, but if we
+inline addErrCtxt it'll turn into something more like
+    \e s. tc_foo x (munge c e) s
+This is much better because Called Arity analysis can see that tc_foo
+is applied to four arguments.  See #18379 for a concrete example.
+
+This reliance on delicate inlining and Called Arity is not good.
+See #18202 for a more general approach.  But meanwhile, these
+ininings seem unobjectional, and they solve the immediate
+problem. -}
+
 getErrCtxt :: TcM [ErrCtxt]
 getErrCtxt = do { env <- getLclEnv; return (tcl_ctxt env) }
 
 setErrCtxt :: [ErrCtxt] -> TcM a -> TcM a
+{-# INLINE setErrCtxt #-}   -- Note [Inlining addErrCtxt]
 setErrCtxt ctxt = updLclEnv (\ env -> env { tcl_ctxt = ctxt })
 
 -- | Add a fixed message to the error context. This message should not
 -- do any tidying.
 addErrCtxt :: MsgDoc -> TcM a -> TcM a
+{-# INLINE addErrCtxt #-}   -- Note [Inlining addErrCtxt]
 addErrCtxt msg = addErrCtxtM (\env -> return (env, msg))
 
 -- | Add a message to the error context. This message may do tidying.
 addErrCtxtM :: (TidyEnv -> TcM (TidyEnv, MsgDoc)) -> TcM a -> TcM a
-addErrCtxtM ctxt = updCtxt (\ ctxts -> (False, ctxt) : ctxts)
+{-# INLINE addErrCtxtM #-}  -- Note [Inlining addErrCtxt]
+addErrCtxtM ctxt m = updCtxt (push_ctxt (False, ctxt)) m
 
 -- | Add a fixed landmark message to the error context. A landmark
 -- message is always sure to be reported, even if there is a lot of
 -- context. It also doesn't count toward the maximum number of contexts
 -- reported.
 addLandmarkErrCtxt :: MsgDoc -> TcM a -> TcM a
+{-# INLINE addLandmarkErrCtxt #-}  -- Note [Inlining addErrCtxt]
 addLandmarkErrCtxt msg = addLandmarkErrCtxtM (\env -> return (env, msg))
 
 -- | Variant of 'addLandmarkErrCtxt' that allows for monadic operations
 -- and tidying.
 addLandmarkErrCtxtM :: (TidyEnv -> TcM (TidyEnv, MsgDoc)) -> TcM a -> TcM a
-addLandmarkErrCtxtM ctxt = updCtxt (\ctxts -> (True, ctxt) : ctxts)
+{-# INLINE addLandmarkErrCtxtM #-}  -- Note [Inlining addErrCtxt]
+addLandmarkErrCtxtM ctxt m = updCtxt (push_ctxt (True, ctxt)) m
 
+push_ctxt :: (Bool, TidyEnv -> TcM (TidyEnv, MsgDoc))
+          -> Bool -> [ErrCtxt] -> [ErrCtxt]
+push_ctxt ctxt in_gen ctxts
+  | in_gen    = ctxts
+  | otherwise = ctxt : ctxts
+
+updCtxt :: (Bool -> [ErrCtxt] -> [ErrCtxt]) -> TcM a -> TcM a
+{-# INLINE updCtxt #-} -- Note [Inlining addErrCtxt]
 -- Helper function for the above
-updCtxt :: ([ErrCtxt] -> [ErrCtxt]) -> TcM a -> TcM a
-updCtxt upd = updLclEnv (\ env@(TcLclEnv { tcl_ctxt = ctxt }) ->
-                           env { tcl_ctxt = upd ctxt })
+-- The Bool is true if we are in generated code
+updCtxt upd = updLclEnv (\ env@(TcLclEnv { tcl_ctxt = ctxt
+                                         , tcl_in_gen_code = in_gen }) ->
+                           env { tcl_ctxt = upd in_gen ctxt })
 
 popErrCtxt :: TcM a -> TcM a
-popErrCtxt = updCtxt (\ msgs -> case msgs of { [] -> []; (_ : ms) -> ms })
+popErrCtxt = updCtxt (\ _ msgs -> case msgs of { [] -> []; (_ : ms) -> ms })
 
 getCtLocM :: CtOrigin -> Maybe TypeOrKind -> TcM CtLoc
 getCtLocM origin t_or_k
