@@ -343,7 +343,7 @@ tc_lpats tys penv pats
                (zipEqual "tc_lpats" pats tys)
 
 --------------------
--- See Note [tcSubMult's wrapper] in TcUnify.
+-- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
 checkManyPattern :: Scaled a -> TcM HsWrapper
 checkManyPattern pat_ty = tcSubMult NonLinearPatternOrigin Many (scaledMult pat_ty)
 
@@ -358,7 +358,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
         { (wrap, id) <- tcPatBndr penv name pat_ty
         ; (res, mult_wrap) <- tcCheckUsage name (scaledMult pat_ty) $
                               tcExtendIdEnv1 name id thing_inside
-            -- See Note [tcSubMult's wrapper] in TcUnify.
+            -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
         ; pat_ty <- readExpType (scaledThing pat_ty)
         ; return (mkHsWrapPat (wrap <.> mult_wrap) (VarPat x (L l id)) pat_ty, res) }
 
@@ -372,7 +372,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
 
   LazyPat x pat -> do
         { mult_wrap <- checkManyPattern pat_ty
-            -- See Note [tcSubMult's wrapper] in TcUnify.
+            -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
         ; (pat', (res, pat_ct))
                 <- tc_lpat pat_ty (makeLazy penv) pat $
                    captureConstraints thing_inside
@@ -390,14 +390,14 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
 
   WildPat _ -> do
         { mult_wrap <- checkManyPattern pat_ty
-            -- See Note [tcSubMult's wrapper] in TcUnify.
+            -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
         ; res <- thing_inside
         ; pat_ty <- expTypeToType (scaledThing pat_ty)
         ; return (mkHsWrapPat mult_wrap (WildPat pat_ty) pat_ty, res) }
 
   AsPat x (L nm_loc name) pat -> do
         { mult_wrap <- checkManyPattern pat_ty
-            -- See Note [tcSubMult's wrapper] in TcUnify.
+            -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
         ; (wrap, bndr_id) <- setSrcSpan nm_loc (tcPatBndr penv name pat_ty)
         ; (pat', res) <- tcExtendIdEnv1 name bndr_id $
                          tc_lpat (pat_ty `scaledSet`(mkCheckExpType $ idType bndr_id))
@@ -414,7 +414,7 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
 
   ViewPat _ expr pat -> do
         { mult_wrap <- checkManyPattern pat_ty
-         -- See Note [tcSubMult's wrapper] in TcUnify.
+         -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
          --
          -- It should be possible to have view patterns at linear (or otherwise
          -- non-Many) multiplicity. But it is not clear at the moment what
@@ -586,7 +586,7 @@ Fortunately that's what matchExpectedFunTySigma returns anyway.
 -- When there is no negation, neg_lit_ty and lit_ty are the same
   NPat _ (L l over_lit) mb_neg eq -> do
         { mult_wrap <- checkManyPattern pat_ty
-          -- See Note [tcSubMult's wrapper] in TcUnify.
+          -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
           --
           -- It may be possible to refine linear pattern so that they work in
           -- linear environments. But it is not clear how useful this is.
@@ -630,10 +630,6 @@ There are two bits of rebindable syntax:
 lit1_ty and lit2_ty could conceivably be different.
 var_ty is the type inferred for x, the variable in the pattern.
 
-If the pushed-down pattern type isn't a tau-type, the two pat_ty's
-above could conceivably be different specializations.  So we use
-expTypeToType on pat_ty before proceeding.
-
 Note that we need to type-check the literal twice, because it is used
 twice, and may be used at different types. The second HsOverLit stored in the
 AST is used for the subtraction operation.
@@ -643,16 +639,16 @@ AST is used for the subtraction operation.
   NPlusKPat _ (L nm_loc name)
                (L loc lit) _ ge minus -> do
         { mult_wrap <- checkManyPattern pat_ty
-            -- See Note [tcSubMult's wrapper] in TcUnify.
-        ; pat_ty <- expTypeToType (scaledThing pat_ty)
-        ; let orig = LiteralOrigin lit
+            -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
+        ; let pat_exp_ty = scaledThing pat_ty
+              orig = LiteralOrigin lit
         ; (lit1', ge')
-            <- tcSyntaxOp orig ge [synKnownType pat_ty, SynRho]
+            <- tcSyntaxOp orig ge [SynType pat_exp_ty, SynRho]
                                   (mkCheckExpType boolTy) $
                \ [lit1_ty] _ ->
                newOverloadedLit lit (mkCheckExpType lit1_ty)
         ; ((lit2', minus_wrap, bndr_id), minus')
-            <- tcSyntaxOpGen orig minus [synKnownType pat_ty, SynRho] SynAny $
+            <- tcSyntaxOpGen orig minus [SynType pat_exp_ty, SynRho] SynAny $
                \ [lit2_ty, var_ty] _ ->
                do { lit2' <- newOverloadedLit lit (mkCheckExpType lit2_ty)
                   ; (wrap, bndr_id) <- setSrcSpan nm_loc $
@@ -662,6 +658,7 @@ AST is used for the subtraction operation.
                            -- minus_wrap is applicable to minus'
                   ; return (lit2', wrap, bndr_id) }
 
+        ; pat_ty <- readExpType pat_exp_ty
         -- The Report says that n+k patterns must be in Integral
         -- but it's silly to insist on this in the RebindableSyntax case
         ; unlessM (xoptM LangExt.RebindableSyntax) $
@@ -984,7 +981,7 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
               req_theta'  = substTheta tenv req_theta
 
         ; mult_wrap <- checkManyPattern pat_ty
-            -- See Note [tcSubMult's wrapper] in TcUnify.
+            -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
 
         ; wrap <- tc_sub_type penv (scaledThing pat_ty) ty'
         ; traceTc "tcPatSynPat" (ppr pat_syn $$

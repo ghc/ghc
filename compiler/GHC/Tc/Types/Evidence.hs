@@ -229,18 +229,10 @@ data HsWrapper
 
   | WpLet TcEvBinds             -- Non-empty (or possibly non-empty) evidence bindings,
                                 -- so that the identity coercion is always exactly WpHole
-  | WpMultCoercion Coercion
-  -- Note [Checking multiplicity coercions]
-  -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  -- This wrapper can be returned from tcSubMult.
-  -- It is used in case a variable is used with multiplicity m1,
-  -- we need it with multiplicity m2 and we have a coercion c :: m1 ~ m2.
-  -- Compiling such code would require multiplicity coercions in Core,
-  -- which we don't have. If the desugarer sees WpMultCoercion
-  -- with a non-reflexive coercion, it gives an error.
-  -- This is a temporary measure, as we don't really know yet exactly
-  -- what multiplicity coercions should be. But it serves as a good
-  -- approximation for the first iteration for the first iteration of linear types.
+
+  | WpMultCoercion Coercion     -- Require that a Coercion be reflexive; otherwise,
+                                -- error in the desugarer. See GHC.Tc.Utils.Unify
+                                -- Note [Wrapper returned from tcSubMult]
 
 -- Cannot derive Data instance because SDoc is not Data (it stores a function).
 -- So we do it manually:
