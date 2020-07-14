@@ -373,7 +373,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
            matchActualFunTysRho doc orig1 (Just (unLoc arg1)) 1 arg1_ty
 
        ; mult_wrap <- tcSubMult AppOrigin Many (scaledMult arg2_sigma)
-         -- See Note [tcSubMult's wrapper] in TcUnify.
+         -- See Note [Wrapper returned from tcSubMult] in GHC.Tc.Utils.Unify.
          --
          -- When ($) becomes multiplicity-polymorphic, then the above check will
          -- need to go. But in the meantime, it would produce ill-typed
