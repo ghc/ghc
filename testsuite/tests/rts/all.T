@@ -50,6 +50,9 @@ test('divbyzero',
       # behavior on division-by-zero (#10332).
       omit_ways(llvm_ways),
       when(not(have_ncg()), skip),
+      # This test is so flaky, and with test-wrappers, and cross compilers there
+      # is almost no way to make this test pass consistently.
+      when(cross(), skip),
       # Apparently the output can be different on different
       # Linux setups, so just ignore it. As long as we get
       # the right exit code we're OK.
