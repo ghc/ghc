@@ -4,11 +4,11 @@ include $(TOP)/mk/test.mk
 
 LOCAL_PKGCONF=local.package.conf
 
-SETUP='$(TEST_WRAPPER)' '$(PWD)/Setup' -v0
+SETUP='$(TEST_WRAPPER)' './Setup' -v0
 
 clean:
-	rm -f p1/setup p1/Setup.o p1/Setup.hi
-	rm -f p2/setup p2/Setup.o p2/Setup.hi
+	rm -f p1/Setup p1/Setup.o p1/Setup.hi
+	rm -f p2/Setup p2/Setup.o p2/Setup.hi
 	rm -rf p1/dist p2/dist
 	rm -f *.o *.hi
 	rm -f clean.out prep.out
