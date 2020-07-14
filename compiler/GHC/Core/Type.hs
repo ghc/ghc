@@ -83,8 +83,6 @@ module GHC.Core.Type (
         tyConArgFlags, appTyArgFlags,
         synTyConResKind,
 
-        modifyJoinResTy, setJoinResTy,
-
         -- ** Analyzing types
         TyCoMapper(..), mapTyCo, mapTyCoX,
         TyCoFolder(..), foldTyCo,
@@ -2847,29 +2845,6 @@ splitVisVarsOfType orig_ty = Pair invis_vars vis_vars
 
 splitVisVarsOfTypes :: [Type] -> Pair TyCoVarSet
 splitVisVarsOfTypes = foldMap splitVisVarsOfType
-
-modifyJoinResTy :: Int            -- Number of binders to skip
-                -> (Type -> Type) -- Function to apply to result type
-                -> Type           -- Type of join point
-                -> Type           -- New type
--- INVARIANT: If any of the first n binders are foralls, those tyvars cannot
--- appear in the original result type. See isValidJoinPointType.
-modifyJoinResTy orig_ar f orig_ty
-  = go orig_ar orig_ty
-  where
-    go 0 ty = f ty
-    go n ty | Just (arg_bndr, res_ty) <- splitPiTy_maybe ty
-            = mkPiTy arg_bndr (go (n-1) res_ty)
-            | otherwise
-            = pprPanic "modifyJoinResTy" (ppr orig_ar <+> ppr orig_ty)
-
-setJoinResTy :: Int  -- Number of binders to skip
-             -> Type -- New result type
-             -> Type -- Type of join point
-             -> Type -- New type
--- INVARIANT: Same as for modifyJoinResTy
-setJoinResTy ar new_res_ty ty
-  = modifyJoinResTy ar (const new_res_ty) ty
 
 {-
 ************************************************************************
