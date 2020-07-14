@@ -548,7 +548,7 @@ release-x86_64-linux-fedora27:
     - git submodule sync --recursive
     - git submodule update --init --recursive
     - git checkout .gitmodules
-    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
+    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf"
     - bash .gitlab/win32-init.sh
   after_script:
     - rd /s /q tmp
