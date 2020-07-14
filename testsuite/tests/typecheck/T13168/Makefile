@@ -2,7 +2,7 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-SETUP='$(TEST_WRAPPER)' ../Setup -v0
+SETUP='$(TEST_WRAPPER)' $(PWD)/Setup -v0
 CONFIGURE=$(SETUP) configure --with-ghc='$(TEST_HC)' --with-strip='$(STRIP)' --ghc-options='$(TEST_HC_OPTS)' --package-db='$(PWD)/tmp.d' --prefix='$(PWD)/inst'
 
 T13168: clean
