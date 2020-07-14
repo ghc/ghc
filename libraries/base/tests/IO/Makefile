@@ -6,13 +6,14 @@ TOP=../../../../testsuite
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
+# NB. sleep for 3s. When we use TEST_WRAPPERs they might have a delay to come up.
 test.concio001:
 	"$(TEST_HC)" $(TEST_HC_OPTS) --make -fforce-recomp -v0 concio001 -o concio001
-	(sleep 1; echo x) | '$(TEST_WRAPPER)' ./concio001
+	(sleep 3; echo x) | '$(TEST_WRAPPER)' ./concio001
 
 test.concio001.thr:
 	"$(TEST_HC)" $(TEST_HC_OPTS) --make -fforce-recomp -v0 -threaded concio001 -o concio001
-	(sleep 1; echo x) | '$(TEST_WRAPPER)' ./concio001
+	(sleep 3; echo x) | '$(TEST_WRAPPER)' ./concio001
 
 # NB. utf8-test should *not* have a final newline.  The last char should be 'X'.
 utf16-test: utf8-test
