@@ -657,7 +657,7 @@ release-x86_64-windows:
   extends: validate-x86_64-windows
   variables:
     MSYSTEM: MINGW64
-    GHC_VERSION: 8.8.4-rc1
+    GHC_VERSION: "8.8.3.20200710"
     GHC_TARBALL_URL: "http://home.smart-cactus.org/~ben/ghc/release-prep/8.8.4-rc1/ghc-8.8.3.20200710-x86_64-unknown-mingw32.tar.xz"
     BUILD_FLAVOUR: "perf"
     CONFIGURE_ARGS: "--target=x86_64-unknown-mingw32"
