@@ -844,12 +844,12 @@ getAmode platform (CmmRegOff reg off)
 getAmode platform (CmmMachOp (MO_Add _w) [expr, CmmLit (CmmInt off _w')])
   | -256 <= off, off <= 255
   = do (reg, _format, code) <- getSomeReg expr
-       return $ Amode (AddrRegImm reg (ImmInt off)) code
+       return $ Amode (AddrRegImm reg (ImmInteger off)) code
 
 getAmode platform (CmmMachOp (MO_Sub _w) [expr, CmmLit (CmmInt off _w')])
   | -256 <= -off, -off <= 255
   = do (reg, _format, code) <- getSomeReg expr
-       return $ Amode (AddrRegImm reg (ImmInt -off)) code
+       return $ Amode (AddrRegImm reg (ImmInteger (-off))) code
 
 -- Generic case
 getAmode _plat expr
