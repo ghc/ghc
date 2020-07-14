@@ -836,6 +836,21 @@ getAmode platform (CmmRegOff reg off)
   = return $ Amode (AddrRegImm reg' off') nilOL
     where reg' = getRegisterReg platform reg
           off' = ImmInt off
+
+-- For Stores we often see something like this:
+-- CmmStore (CmmMachOp (MO_Add w) [CmmLoad expr, CmmLit (CmmInt n w')]) (expr2)
+-- E.g. a CmmStoreOff really. This can be translated to `str $expr2, [$expr, #n ]
+-- for `n` in range.
+getAmode platform (CmmMachOp (MO_Add _w) [expr, CmmLit (CmmInt off _w')])
+  | -256 <= off, off <= 255
+  = do (reg, _format, code) <- getSomeReg expr
+       return $ Amode (AddrRegImm reg (ImmInt off)) code
+
+getAmode platform (CmmMachOp (MO_Sub _w) [expr, CmmLit (CmmInt off _w')])
+  | -256 <= -off, -off <= 255
+  = do (reg, _format, code) <- getSomeReg expr
+       return $ Amode (AddrRegImm reg (ImmInt -off)) code
+
 -- Generic case
 getAmode _plat expr
   = do (reg, _format, code) <- getSomeReg expr
