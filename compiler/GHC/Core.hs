@@ -798,15 +798,18 @@ and case-of-case] in GHC.Core.Opt.Simplify):
   in
     jump j z w
 
-The body of the join point now returns a Bool, so the label `j` has to have its
-type updated accordingly. Inconvenient though this may be, it has the advantage
-that 'GHC.Core.Utils.exprType' can still return a type for any expression, including
-a jump.
+The body of the join point now returns a Bool, so the label `j` has to
+have its type updated accordingly, which is done by
+GHC.Core.Opt.Simplify.Env.adjustJoinPointType. Inconvenient though
+this may be, it has the advantage that 'GHC.Core.Utils.exprType' can
+still return a type for any expression, including a jump.
 
-This differs from the paper (see Note [Invariants on join points]). In the
-paper, we instead give j the type `Int -> Bool -> forall a. a`. Then each jump
-carries the "return type" as a parameter, exactly the way other non-returning
-functions like `error` work:
+Relationship to the paper
+
+This plan differs from the paper (see Note [Invariants on join
+points]). In the paper, we instead give j the type `Int -> Bool ->
+forall a. a`. Then each jump carries the "return type" as a parameter,
+exactly the way other non-returning functions like `error` work:
 
   case (join
           j :: Int -> Bool -> forall a. a
