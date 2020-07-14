@@ -918,7 +918,7 @@ genCondJump bid expr = do
       -- Optimized /= 0 case.
       CmmMachOp (MO_Ne w) [x, CmmLit (CmmInt 0 _)] -> do
         (reg_x, _format_x, code_x) <- getSomeReg x
-        return $ code_x `snocOL`  (ANN (text $ show expr) (CBNZ (OpReg w x) (TBlock bid)))
+        return $ code_x `snocOL`  (ANN (text $ show expr) (CBNZ (OpReg w reg_x) (TBlock bid)))
 
       -- Generic case.
       CmmMachOp mop [x, y] -> do
