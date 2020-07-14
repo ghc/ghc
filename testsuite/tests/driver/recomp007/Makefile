@@ -4,7 +4,7 @@ include $(TOP)/mk/test.mk
 
 LOCAL_PKGCONF=local.package.conf
 
-SETUP='$(TEST_WRAPPER)' ../Setup -v0
+SETUP='$(TEST_WRAPPER)' ../Setup
 
 clean:
 	rm -f Setup$(exeext)
