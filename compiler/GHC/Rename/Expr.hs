@@ -322,14 +322,21 @@ rnExpr (ExprWithTySig _ expr pty)
         ; (expr', fvExpr) <- bindSigTyVarsFV (hsWcScopedTvs pty') $
                              rnLExpr expr
         ; return (ExprWithTySig noExtField expr' pty', fvExpr `plusFV` fvTy) }
-
-rnExpr (HsIf might_use_rebindable_syntax _ p b1 b2)
+rnExpr (HsIf _ p b1 b2)
   = do { (p', fvP) <- rnLExpr p
        ; (b1', fvB1) <- rnLExpr b1
        ; (b2', fvB2) <- rnLExpr b2
-       ; (mb_ite, fvITE) <- lookupIfThenElse might_use_rebindable_syntax
-       ; return (HsIf noExtField mb_ite p' b1' b2', plusFVs [fvITE, fvP, fvB1, fvB2]) }
-
+       ; mifteName <- lookupReboundIf
+       ; let subFVs = plusFVs [fvP, fvB1, fvB2]
+       ; return $ case mifteName of
+           -- RS is off, we keep an 'HsIf' node around
+           Nothing ->
+             (HsIf noExtField  p' b1' b2', subFVs)
+           -- See Note [Rebindable syntax and HsExpansion].
+           Just ifteName ->
+             let ifteExpr = rebindIf ifteName p' b1' b2'
+             in (ifteExpr, plusFVs [unitFV (unLoc ifteName), subFVs])
+       }
 rnExpr (HsMultiIf x alts)
   = do { (alts', fvs) <- mapFvRn (rnGRHS IfAlt rnLExpr) alts
        -- ; return (HsMultiIf ty alts', fvs) }
@@ -2224,3 +2231,26 @@ getMonadFailOp ctxt
               mkSyntaxExpr failAfterFromStringExpr
         return (failAfterFromStringSynExpr, failFvs `plusFV` fromStringFvs)
       | otherwise = lookupQualifiedDo ctxt failMName
+
+-- Rebinding 'if's to 'ifThenElse' applications.
+--
+-- See Note [Rebindable syntax and HsExpansion]
+rebindIf
+  :: Located Name  -- 'Name' for the 'ifThenElse' function we will rebind to
+  -> LHsExpr GhcRn -- renamed condition
+  -> LHsExpr GhcRn -- renamed true branch
+  -> LHsExpr GhcRn -- renamed false branch
+  -> HsExpr GhcRn  -- rebound if expression
+rebindIf ifteName p b1 b2 =
+  let ifteOrig = HsIf noExtField p b1 b2
+      ifteFun  = L generatedSrcSpan (HsVar noExtField ifteName)
+                 -- ifThenElse var
+      ifteApp  = mkHsAppsWith (\_ _ e -> L generatedSrcSpan e)
+                              ifteFun
+                              [p, b1, b2]
+                 -- desugared_if_expr =
+                 --   ifThenElse desugared_predicate
+                 --              desugared_true_branch
+                 --              desugared_false_branch
+  in mkExpanded XExpr ifteOrig (unLoc ifteApp)
+     -- (source_if_expr, desugared_if_expr)

@@ -14,8 +14,8 @@ data Natural
 
 naturalToWord# :: Natural -> Word#
 naturalFromWord# :: Word# -> Natural
-naturalToBigNat :: Natural -> BigNat
-naturalFromBigNat :: BigNat -> Natural
+naturalFromBigNat# :: BigNat# -> Natural
+naturalToBigNat# :: Natural -> BigNat#
 naturalMul :: Natural -> Natural -> Natural
 naturalRem :: Natural -> Natural -> Natural
 naturalIsZero :: Natural -> Bool
