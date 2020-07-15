@@ -236,8 +236,7 @@ endif
 # This way we cache the results for different values of $(TEST_HC)
 
 $(TOP)/mk/ghc-config : $(TOP)/mk/ghc-config.hs
-#	"$(TEST_HC)" --make -o $@ $<
-	ghc --make -o $@ $<
+	"$(TEST_HC)" --make -o $@ $<
 
 empty=
 space=$(empty) $(empty)
@@ -245,7 +244,7 @@ ifeq "$(ghc_config_mk)" ""
 ghc_config_mk = $(TOP)/mk/ghcconfig$(subst $(space),_,$(subst :,_,$(subst /,_,$(subst \,_,$(TEST_HC))))).mk
 
 $(ghc_config_mk) : $(TOP)/mk/ghc-config
-	$(TOP)/mk/ghc-config "$(TEST_HC)" >"$@"; if [ $$? != 0 ]; then $(RM) "$@"; exit 1; fi
+	'$(TEST_WRAPPER)' $(TOP)/mk/ghc-config "$(TEST_HC)" >"$@"; if [ $$? != 0 ]; then $(RM) "$@"; exit 1; fi
 # If the ghc-config fails, remove $@, and fail
 endif
 
