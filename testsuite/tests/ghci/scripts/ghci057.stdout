@@ -14,7 +14,6 @@ other dynamic, non-language, flag settings:
   -fshow-warning-groups
 warning settings:
   -Wsemigroup
-  -Wnoncanonical-monoid-instances
   -Wstar-is-type
   -Wcompat-unqualified-imports
 Should fail, GADTs is not enabled
@@ -37,7 +36,6 @@ other dynamic, non-language, flag settings:
   -fshow-warning-groups
 warning settings:
   -Wsemigroup
-  -Wnoncanonical-monoid-instances
   -Wstar-is-type
   -Wcompat-unqualified-imports
 Should work, GADTs is in force from :set
@@ -59,7 +57,6 @@ other dynamic, non-language, flag settings:
   -fshow-warning-groups
 warning settings:
   -Wsemigroup
-  -Wnoncanonical-monoid-instances
   -Wstar-is-type
   -Wcompat-unqualified-imports
 Should fail, GADTs is now disabled
@@ -83,7 +80,6 @@ other dynamic, non-language, flag settings:
   -fshow-warning-groups
 warning settings:
   -Wsemigroup
-  -Wnoncanonical-monoid-instances
   -Wstar-is-type
   -Wcompat-unqualified-imports
 Should fail, GADTs is only enabled at the prompt

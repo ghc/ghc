@@ -1,7 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
 {-# LANGUAGE ScopedTypeVariables, FlexibleInstances  #-}
 
--- This test has a deep nest of join points, which led to 
+-- This test has a deep nest of join points, which led to
 -- an exponential blow-up in GHC.Core.Opt.SpecConstr
 
 module T3831(setAttributes)  where
@@ -24,11 +24,10 @@ instance Functor Capability where
     fmap = liftM
 
 instance Applicative Capability where
-    pure = return
+    pure = Capability . const . return . Just
     (<*>) = ap
 
 instance Monad Capability where
-    return = Capability . const . return . Just
     Capability f >>= g = Capability $ \t -> do
         mx <- f t
         case mx of

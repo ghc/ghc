@@ -30,28 +30,26 @@ instance Functor (M s) where
     fmap = liftM
 
 instance Applicative (M s) where
-    pure = return
+    pure x = M (return (Ok x))
     (<*>) = ap
 
-instance Monad (M s) where  
+instance Monad (M s) where
 
-  return x = M (return (Ok x))
-  
   {- this one gives a type error in 6.4.1 -}
   M m >>= k = M (do res <- m
-                    case res of 
+                    case res of
                          Ok x -> unM (k x)
                          Fail -> return Fail
-                     )                    
+                     )
 
-  {- while this one works -}  
+  {- while this one works -}
   -- M m >>= k = M (f m (unM . k))
-  --   where 
+  --   where
   --     f :: IO (Result s a) -> (a -> IO (Result s b)) -> IO (Result s b)
   --     f m k = do res <- m
   --                case res of
   --                     Ok x -> k x
   --                     Fail -> return Fail
- 
-  
+
+
 

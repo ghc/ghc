@@ -25,7 +25,6 @@ instance Monad m => Applicative (CondT a m) where
     (<*>) = undefined
 
 instance Monad m => Monad (CondT a m) where
-    return = undefined
     (>>=) = undefined
 
 -- liftM   :: (Monad m) => (a1 -> r) -> m a1 -> m r

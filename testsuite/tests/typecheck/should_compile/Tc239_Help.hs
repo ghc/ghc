@@ -11,11 +11,10 @@ instance Functor (WrapIO e) where
     fmap = liftM
 
 instance Applicative (WrapIO e) where
-    pure = return
+    pure x = MkWrapIO (return x)
     (<*>) = ap
 
 instance Monad (WrapIO e) where
-  return x = MkWrapIO (return x)
 
   m >>= f  = MkWrapIO (do x <- unwrap m
                           unwrap (f x) )

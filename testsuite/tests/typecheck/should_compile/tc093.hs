@@ -13,19 +13,18 @@ unitState a = State (\s0 -> (a,s0))
 
 bindState :: State c a -> (a -> State c b) -> State c b
 bindState m k = State (\s0 -> let (a,s1) = (unState m) s0
-                                  (b,s2) = (unState (k a)) s1 
+                                  (b,s2) = (unState (k a)) s1
                               in (b,s2))
 
 instance Eq c => Functor (State c) where
     fmap = liftM
 
 instance Eq c => Applicative (State c) where
-    pure = return
+    pure = unitState
     (<*>) = ap
 
 instance Eq c => Monad (State c) where
-    return = unitState 
-    (>>=)  = bindState 
+    (>>=)  = bindState
 
 data TS = TS { vs::Int } deriving (Show,Eq)
 

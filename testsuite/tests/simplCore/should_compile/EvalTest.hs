@@ -20,11 +20,10 @@ instance Functor Eval where
     fmap = liftM
 
 instance Applicative Eval where
-    pure = return
+    pure = Done
     (<*>) = ap
 
 instance Monad Eval where
-  return x = Done x
   Done x >>= k = k x   -- Note: pattern 'Done x' makes '>>=' strict
 
 rpar :: a -> Eval a

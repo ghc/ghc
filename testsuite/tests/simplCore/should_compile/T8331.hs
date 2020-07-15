@@ -19,7 +19,6 @@ instance (Functor m) => Functor (ReaderT r m) where
     fmap f  = mapReaderT (fmap f)
 
 instance (Monad m) => Monad (ReaderT r m) where
-    return x  = ReaderT (\_ -> return x)
     m >>= k  = ReaderT $ \ r -> do
         a <- runReaderT m r
         runReaderT (k a) r

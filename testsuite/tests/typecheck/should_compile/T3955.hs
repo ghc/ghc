@@ -8,19 +8,18 @@ module T3955 where
 import Control.Applicative (Applicative(..))
 import Control.Monad (liftM, ap)
 
-class (Monad m) => MonadReader r m 
+class (Monad m) => MonadReader r m
 newtype Reader r a = Reader { runReader :: r -> a }
 
 instance Functor (Reader r) where
     fmap = liftM
 
 instance Applicative (Reader r) where
-    pure = return
+    pure = error "urk"
     (<*>) = ap
 
 instance Monad (Reader r) where
   (>>=)  = error "urk"
-  return = error "urk"
 
 instance MonadReader r (Reader r)
 

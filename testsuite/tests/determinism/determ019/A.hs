@@ -40,7 +40,6 @@ newtype StateT s m a = StateT
   { runStateT :: s -> m (a, s) }
 
 instance MonadFix m => Monad (StateT s m) where
-  return x = StateT $ \s -> pure (x, s)
   m >>= f = StateT $ \s -> do
     rec
       (x, s'') <- runStateT m s'
@@ -49,7 +48,7 @@ instance MonadFix m => Monad (StateT s m) where
 
 instance MonadFix m => Applicative (StateT s m) where
   (<*>) = ap
-  pure = return
+  pure x = StateT $ \s -> pure (x, s)
 
 instance Functor m => Functor (StateT s m) where
   -- this instance is hand-written

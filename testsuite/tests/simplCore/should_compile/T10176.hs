@@ -13,11 +13,10 @@ instance Functor (ReaderT r) where
 instance Applicative (ReaderT r) where
     pure    = liftReaderT . pure
     f <*> v = undefined
+    m *> k  = ReaderT $ \r -> do runReaderT m r; runReaderT k r
 
 instance Monad (ReaderT r) where
-    return   = liftReaderT . return
     m >>= k  = undefined
-    m >> k  = ReaderT $ \r -> do runReaderT m r; runReaderT k r
 
 liftReaderT :: IO a -> ReaderT r a
 liftReaderT m = ReaderT (const m)
