@@ -2965,37 +2965,20 @@ commonly used commands.
 
 .. ghci-cmd:: :type; ⟨expression⟩
 
-    Infers and prints the type of ⟨expression⟩, including explicit
-    forall quantifiers for polymorphic types.
-    The type reported is the type that would be inferred
-    for a variable assigned to the expression, but without the
-    monomorphism restriction applied.
+    Infers and prints the type of ⟨expression⟩.  For polymorphic types
+    it instantiates the 'inferred' forall quantifiers (but not the
+    'specified' ones; see :ref:`inferred-vs-specified`), solves constraints, and re-generalises.
 
     .. code-block:: none
 
 	*X> :type length
 	length :: Foldable t => t a -> Int
 
-.. ghci-cmd:: :type +v; ⟨expression⟩
-
-    Infers and prints the type of ⟨expression⟩, but without fiddling
-    with type variables or class constraints. This is useful when you
-    are using :extension:`TypeApplications` and care about the distinction
-    between specified type variables (available for type application)
-    and inferred type variables (not available). This mode sometimes prints
-    constraints (such as ``Show Int``) that could readily be solved, but
-    solving these constraints may affect the type variables, so GHC refrains.
-
-    .. code-block:: none
-
-	*X> :set -fprint-explicit-foralls
-	*X> :type +v length
-	length :: forall (t :: * -> *). Foldable t => forall a. t a -> Int
-
 .. ghci-cmd:: :type +d; ⟨expression⟩
 
-    Infers and prints the type of ⟨expression⟩, defaulting type variables
-    if possible. In this mode, if the inferred type is constrained by
+    Infers and prints the type of ⟨expression⟩, instantiating *all* the forall
+    quantifiers, solving constraints, defaulting, and generalising.
+    In this mode, if the inferred type is constrained by
     any interactive class (``Num``, ``Show``, ``Eq``, ``Ord``, ``Foldable``,
     or ``Traversable``), the constrained type variable(s) are defaulted
     according to the rules described under :extension:`ExtendedDefaultRules`.
