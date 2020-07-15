@@ -454,8 +454,8 @@ data IdLabelInfo
 
 
 data RtsLabelInfo
-  = RtsSelectorInfoTable Bool{-updatable-} Int{-offset-}  -- ^ Selector thunks
-  | RtsSelectorEntry     Bool{-updatable-} Int{-offset-}
+  = RtsSelectorInfoTable Bool{-updatable-} (Maybe Int){-offset-}  -- ^ Selector thunks
+  | RtsSelectorEntry     Bool{-updatable-} (Maybe Int){-offset-}
 
   | RtsApInfoTable       Bool{-updatable-} Int{-arity-}    -- ^ AP thunks
   | RtsApEntry           Bool{-updatable-} Int{-arity-}
@@ -610,13 +610,21 @@ mkRtsPrimOpLabel primop = RtsLabel (RtsPrimOp primop)
 
 mkSelectorInfoLabel :: Platform -> Bool -> Int -> CLabel
 mkSelectorInfoLabel platform upd offset =
-   ASSERT(offset >= 0 && offset <= pc_MAX_SPEC_SELECTEE_SIZE (platformConstants platform))
-   RtsLabel (RtsSelectorInfoTable upd offset)
+   ASSERT(offset >= 0)
+   let moff =
+        if offset <= pc_MAX_SPEC_SELECTEE_SIZE (platformConstants platform)
+        then Just offset
+        else Nothing
+   in RtsLabel (RtsSelectorInfoTable upd moff)
 
 mkSelectorEntryLabel :: Platform -> Bool -> Int -> CLabel
 mkSelectorEntryLabel platform upd offset =
-   ASSERT(offset >= 0 && offset <= pc_MAX_SPEC_SELECTEE_SIZE (platformConstants platform))
-   RtsLabel (RtsSelectorEntry upd offset)
+   ASSERT(offset >= 0)
+   let moff =
+        if offset <= pc_MAX_SPEC_SELECTEE_SIZE (platformConstants platform)
+        then Just offset
+        else Nothing
+   in RtsLabel (RtsSelectorEntry upd offset)
 
 mkApInfoTableLabel :: Platform -> Bool -> Int -> CLabel
 mkApInfoTableLabel platform upd arity =
@@ -1359,6 +1367,116 @@ pprCLabel platform sty lbl =
    CmmLabel _ _ fs CmmRet      -> maybe_underscore $ ftext fs <> text "_ret"
    CmmLabel _ _ fs CmmClosure  -> maybe_underscore $ ftext fs <> text "_closure"
 
+<<<<<<< HEAD
+=======
+   lbl -> getPprStyle $ \sty ->
+            if useNCG && asmStyle sty
+            then maybe_underscore $ pprAsmCLbl lbl
+            else pprCLbl platform lbl
+
+  where
+    platform = targetPlatform dflags
+    useNCG   = platformMisc_ghcWithNativeCodeGen (platformMisc dflags)
+
+    maybe_underscore :: SDoc -> SDoc
+    maybe_underscore doc =
+      if platformLeadingUnderscore platform
+      then pp_cSEP <> doc
+      else doc
+
+    pprAsmCLbl (ForeignLabel fs (Just sz) _ _)
+     | platformOS platform == OSMinGW32
+        -- In asm mode, we need to put the suffix on a stdcall ForeignLabel.
+        -- (The C compiler does this itself).
+        = ftext fs <> char '@' <> int sz
+    pprAsmCLbl lbl = pprCLbl platform lbl
+
+pprCLbl :: Platform -> CLabel -> SDoc
+pprCLbl platform = \case
+   (StringLitLabel u)   -> pprUniqueAlways u <> text "_str"
+   (SRTLabel u)         -> tempLabelPrefixOrUnderscore platform <> pprUniqueAlways u <> pp_cSEP <> text "srt"
+   (LargeBitmapLabel u) -> tempLabelPrefixOrUnderscore platform
+                           <> char 'b' <> pprUniqueAlways u <> pp_cSEP <> text "btm"
+                           -- Some bitmaps for tuple constructors have a numeric tag (e.g. '7')
+                           -- until that gets resolved we'll just force them to start
+                           -- with a letter so the label will be legal assembly code.
+
+   (CmmLabel _ _ str CmmCode)     -> ftext str
+   (CmmLabel _ _ str CmmData)     -> ftext str
+   (CmmLabel _ _ str CmmPrimCall) -> ftext str
+
+   (LocalBlockLabel u) -> tempLabelPrefixOrUnderscore platform <> text "blk_" <> pprUniqueAlways u
+
+   (RtsLabel (RtsApFast str)) -> ftext str <> text "_fast"
+
+   (RtsLabel (RtsSelectorInfoTable upd_reqd (Just offset))) ->
+   -- ASSERT(offset >= 0 && offset <= mAX_SPEC_SELECTEE_SIZE dflags)
+    hcat [text "stg_sel_", text (show offset),
+          ptext (if upd_reqd
+                 then (sLit "_upd_info")
+                 else (sLit "_noupd_info"))
+        ]
+
+   (RtsLabel (RtsSelectorInfoTable upd_reqd Nothing)) ->
+   -- ASSERT(offset >= 0 && offset <= mAX_SPEC_SELECTEE_SIZE dflags)
+    hcat [text "stg_sel_n",
+          ptext (if upd_reqd
+                 then (sLit "_upd_info")
+                 else (sLit "_noupd_info"))
+        ]
+
+   (RtsLabel (RtsSelectorEntry upd_reqd (Just offset))) ->
+    hcat [text "stg_sel_", text (show offset),
+                ptext (if upd_reqd
+                        then (sLit "_upd_entry")
+                        else (sLit "_noupd_entry"))
+        ]
+
+   (RtsLabel (RtsSelectorEntry upd_reqd Nothing)) ->
+    hcat [text "stg_sel_n",
+                ptext (if upd_reqd
+                        then (sLit "_upd_entry")
+                        else (sLit "_noupd_entry"))
+        ]
+
+   (RtsLabel (RtsApInfoTable upd_reqd arity)) ->
+    hcat [text "stg_ap_", text (show arity),
+                ptext (if upd_reqd
+                        then (sLit "_upd_info")
+                        else (sLit "_noupd_info"))
+        ]
+
+   (RtsLabel (RtsApEntry upd_reqd arity)) ->
+    hcat [text "stg_ap_", text (show arity),
+                ptext (if upd_reqd
+                        then (sLit "_upd_entry")
+                        else (sLit "_noupd_entry"))
+        ]
+
+   (CmmLabel _ _ fs CmmInfo)    -> ftext fs <> text "_info"
+   (CmmLabel _ _ fs CmmEntry)   -> ftext fs <> text "_entry"
+   (CmmLabel _ _ fs CmmRetInfo) -> ftext fs <> text "_info"
+   (CmmLabel _ _ fs CmmRet)     -> ftext fs <> text "_ret"
+   (CmmLabel _ _ fs CmmClosure) -> ftext fs <> text "_closure"
+
+   (RtsLabel (RtsPrimOp primop)) -> text "stg_" <> ppr primop
+   (RtsLabel (RtsSlowFastTickyCtr pat)) ->
+      text "SLOW_CALL_fast_" <> text pat <> ptext (sLit "_ctr")
+
+   (ForeignLabel str _ _ _) -> ftext str
+
+   (IdLabel name _cafs flavor) -> internalNamePrefix platform name <> ppr name <> ppIdFlavor flavor
+
+   (CC_Label cc)       -> ppr cc
+   (CCS_Label ccs)     -> ppr ccs
+   (HpcTicksLabel mod) -> text "_hpc_tickboxes_"  <> ppr mod <> ptext (sLit "_hpc")
+
+   (AsmTempLabel {})        -> panic "pprCLbl AsmTempLabel"
+   (AsmTempDerivedLabel {}) -> panic "pprCLbl AsmTempDerivedLabel"
+   (DynamicLinkerLabel {})  -> panic "pprCLbl DynamicLinkerLabel"
+   (PicBaseLabel {})        -> panic "pprCLbl PicBaseLabel"
+   (DeadStripPreventer {})  -> panic "pprCLbl DeadStripPreventer"
+>>>>>>> WIP: generic selector thunk #17991
 
 ppIdFlavor :: IdLabelInfo -> SDoc
 ppIdFlavor x = pp_cSEP <> case x of

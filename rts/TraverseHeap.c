@@ -411,7 +411,8 @@ traversePushChildren(traverseState *ts, StgClosure *c, stackData data, StgClosur
         *first_child = ((StgMutVar *)c)->var;
         return;
     case THUNK_SELECTOR:
-        *first_child = ((StgSelector *)c)->selectee;
+    case THUNK_SELECTOR_N:
+        *first_child = ((StgSelector *)c)->payload[0];
         return;
     case BLACKHOLE:
         *first_child = ((StgInd *)c)->indirectee;

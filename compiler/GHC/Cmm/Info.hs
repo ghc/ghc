@@ -237,7 +237,7 @@ mkInfoTableContents dflags
 
     mk_pieces (ThunkSelector offset) _no_srt
       = return (Just (CmmInt 0 (halfWordWidth platform)),
-                Just (mkWordCLit platform (fromIntegral offset)), [], [])
+                fmap (mkWordCLit platform . fromIntegral) offset, [], [])
          -- Layout known (one free var); we use the layout field for offset
 
     mk_pieces (Fun arity (ArgSpec fun_type)) srt_label

@@ -80,6 +80,7 @@ data ClosureType
     | SMALL_MUT_ARR_PTRS_FROZEN_DIRTY
     | SMALL_MUT_ARR_PTRS_FROZEN_CLEAN
     | COMPACT_NFDATA
+    | THUNK_SELECTOR_N
     | N_CLOSURE_TYPES
  deriving (Enum, Eq, Ord, Show, Generic)
 
@@ -89,6 +90,7 @@ closureTypeHeaderSize closType =
     case closType of
         ct | THUNK <= ct && ct <= THUNK_0_2 -> thunkHeader
         ct | ct == THUNK_SELECTOR -> thunkHeader
+        ct | ct == THUNK_SELECTOR_N -> thunkHeader
         ct | ct == AP -> thunkHeader
         ct | ct == AP_STACK -> thunkHeader
         _ -> header
