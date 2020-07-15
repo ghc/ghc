@@ -1,7 +1,7 @@
 
 T11355.hs:5:7: error:
     • Illegal polymorphic type: forall a. a
-      GHC doesn't yet support impredicative polymorphism
+      Perhaps you intended to use ImpredicativeTypes
     • In the expression:
         const @_ @((forall a. a) -> forall a. a) () (id @(forall a. a))
       In an equation for ‘foo’:
