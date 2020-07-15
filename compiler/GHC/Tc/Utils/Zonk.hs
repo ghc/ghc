@@ -722,6 +722,14 @@ zonkExpr env (HsVar x (L l id))
   = ASSERT2( isNothing (isDataConId_maybe id), ppr id )
     return (HsVar x (L l (zonkIdOcc env id)))
 
+zonkExpr env (HsUnboundVar v occ)
+  = return (HsUnboundVar (zonkIdOcc env v) occ)
+
+zonkExpr env (HsRecFld _ (Ambiguous v occ))
+  = return (HsRecFld noExtField (Ambiguous (zonkIdOcc env v) occ))
+zonkExpr env (HsRecFld _ (Unambiguous v occ))
+  = return (HsRecFld noExtField (Unambiguous (zonkIdOcc env v) occ))
+
 zonkExpr _ e@(HsConLikeOut {}) = return e
 
 zonkExpr _ (HsIPVar x id)
@@ -913,9 +921,6 @@ zonkExpr env (XExpr (WrapExpr (HsWrap co_fn expr)))
 
 zonkExpr env (XExpr (ExpansionExpr (HsExpanded a b)))
   = XExpr . ExpansionExpr . HsExpanded a <$> zonkExpr env b
-
-zonkExpr _ e@(HsUnboundVar {})
-  = return e
 
 zonkExpr _ expr = pprPanic "zonkExpr" (ppr expr)
 
