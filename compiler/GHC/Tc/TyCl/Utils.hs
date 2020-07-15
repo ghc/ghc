@@ -1094,9 +1094,4 @@ Therefore, when used in the right-hand side of `unT`, GHC attempts to
 instantiate `a` with `(forall b. b -> b) -> Int`, which is impredicative.
 To make sure that GHC is OK with this, we enable ImpredicativeTypes interally
 when typechecking these HsBinds so that the user does not have to.
-
-Although ImpredicativeTypes is somewhat fragile and unpredictable in GHC right
-now, it will become robust when Quick Look impredicativity is implemented. In
-the meantime, using ImpredicativeTypes to instantiate the `a` type variable in
-recSelError's type does actually work, so its use here is benign.
 -}

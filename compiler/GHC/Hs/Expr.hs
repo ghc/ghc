@@ -40,6 +40,7 @@ import GHC.Hs.Binds
 -- others:
 import GHC.Tc.Types.Evidence
 import GHC.Core
+import GHC.Types.Id( Id )
 import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Basic
@@ -251,8 +252,8 @@ data HsExpr p
                              -- Turned from HsVar to HsUnboundVar by the
                              --   renamer, when it finds an out-of-scope
                              --   variable or hole.
-                             -- Turned into HsVar by type checker, to support
-                             --   deferred type errors.
+                             -- The (XUnboundVar p) field becomes Id
+                             --   after typechecking
 
   | HsConLikeOut (XConLikeOut p)
                  ConLike     -- ^ After typechecker only; must be different
@@ -260,7 +261,9 @@ data HsExpr p
 
   | HsRecFld  (XRecFld p)
               (AmbiguousFieldOcc p) -- ^ Variable pointing to record selector
-                                    -- Not in use after typechecking
+              -- The parser produces HsVars
+              -- The renamer renames record-field selectors to HsRecFld
+              -- The typechecker preserves HsRecFld
 
   | HsOverLabel (XOverLabel p)
                 (Maybe (IdP p)) FastString
@@ -592,7 +595,6 @@ deriving instance (Data (hs_syn GhcTc), Typeable hs_syn) => Data (HsWrap hs_syn)
 -- ---------------------------------------------------------------------
 
 type instance XVar           (GhcPass _) = NoExtField
-type instance XUnboundVar    (GhcPass _) = NoExtField
 type instance XConLikeOut    (GhcPass _) = NoExtField
 type instance XRecFld        (GhcPass _) = NoExtField
 type instance XOverLabel     (GhcPass _) = NoExtField
@@ -602,6 +604,10 @@ type instance XLitE          (GhcPass _) = NoExtField
 type instance XLam           (GhcPass _) = NoExtField
 type instance XLamCase       (GhcPass _) = NoExtField
 type instance XApp           (GhcPass _) = NoExtField
+
+type instance XUnboundVar    GhcPs = NoExtField
+type instance XUnboundVar    GhcRn = NoExtField
+type instance XUnboundVar    GhcTc = Id
 
 type instance XAppTypeE      GhcPs = NoExtField
 type instance XAppTypeE      GhcRn = NoExtField
@@ -1069,14 +1075,15 @@ ppr_lexpr e = ppr_expr (unLoc e)
 
 ppr_expr :: forall p. (OutputableBndrId p)
          => HsExpr (GhcPass p) -> SDoc
-ppr_expr (HsVar _ (L _ v))  = pprPrefixOcc v
-ppr_expr (HsUnboundVar _ uv)= pprPrefixOcc uv
-ppr_expr (HsConLikeOut _ c) = pprPrefixOcc c
-ppr_expr (HsIPVar _ v)      = ppr v
-ppr_expr (HsOverLabel _ _ l)= char '#' <> ppr l
-ppr_expr (HsLit _ lit)      = ppr lit
-ppr_expr (HsOverLit _ lit)  = ppr lit
-ppr_expr (HsPar _ e)        = parens (ppr_lexpr e)
+ppr_expr (HsVar _ (L _ v))   = pprPrefixOcc v
+ppr_expr (HsUnboundVar _ uv) = pprPrefixOcc uv
+ppr_expr (HsConLikeOut _ c)  = pprPrefixOcc c
+ppr_expr (HsRecFld _ f)      = pprPrefixOcc f
+ppr_expr (HsIPVar _ v)       = ppr v
+ppr_expr (HsOverLabel _ _ l) = char '#' <> ppr l
+ppr_expr (HsLit _ lit)       = ppr lit
+ppr_expr (HsOverLit _ lit)   = ppr lit
+ppr_expr (HsPar _ e)         = parens (ppr_lexpr e)
 
 ppr_expr (HsPragE _ prag e) = sep [ppr prag, ppr_lexpr e]
 
@@ -1232,7 +1239,6 @@ ppr_expr (HsBinTick _ tickIdTrue tickIdFalse exp)
           text ">(",
           ppr exp, text ")"]
 
-ppr_expr (HsRecFld _ f) = ppr f
 ppr_expr (XExpr x) = case ghcPass @p of
 #if __GLASGOW_HASKELL__ < 811
   GhcPs -> ppr x
@@ -1388,7 +1394,6 @@ isAtomicHsExpr (HsOverLit {})    = True
 isAtomicHsExpr (HsIPVar {})      = True
 isAtomicHsExpr (HsOverLabel {})  = True
 isAtomicHsExpr (HsUnboundVar {}) = True
-isAtomicHsExpr (HsPar _ e)       = isAtomicHsExpr (unLoc e)
 isAtomicHsExpr (HsRecFld{})      = True
 isAtomicHsExpr (XExpr x)
   | GhcTc <- ghcPass @p          = case x of
