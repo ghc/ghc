@@ -1,0 +1,115 @@
+.. _release-8-10-2:
+
+Release notes for version 8.10.2
+================================
+
+The significant changes to the various parts of the compiler are listed in the
+following sections.
+
+
+Highlights
+----------
+
+- A few important correctness fixes for the low-latency garbage collector.
+
+Full details
+------------
+
+Language
+~~~~~~~~
+
+
+Compiler
+~~~~~~~~
+
+ - A simplifier panic manifesting when DWARF debug information is enabled has
+   been fixed (:ghc-ticket:`18162`, :ghc-ticket:`17619`)
+
+GHC API
+~~~~~~~
+
+
+GHCi
+~~~~
+
+
+Runtime system
+~~~~~~~~~~~~~~
+
+- The RTS now allows the user to specify a minimum time between idle GCs with
+  the :rts-flag:`-Iw ⟨seconds⟩` flag. 8.10.1 contained a users guide reference
+  to this flag but did not include the associated implementation.
+
+ - A memory leak in the cost-center profiler has been fixed
+   (:ghc-ticket:`18348`)
+
+ - A potential integer overflow in the compact normal form import logic has
+   been fixed (:ghc-ticket:`16992`)
+
+ - We now workaround a Linux kernel bug in the implementation of timerfd which
+   could previously result in program crashes (:ghc-ticket:`18033`)
+
+Template Haskell
+~~~~~~~~~~~~~~~~
+
+
+
+``ghc-prim`` library
+~~~~~~~~~~~~~~~~~~~~
+
+
+
+``ghc`` library
+~~~~~~~~~~~~~~~
+
+``base`` library
+~~~~~~~~~~~~~~~~
+
+Build system
+~~~~~~~~~~~~
+
+
+
+Included libraries
+------------------
+
+The package database provided with this distribution also contains a number of
+packages other than GHC itself. See the changelogs provided with these packages
+for further change information.
+
+.. ghc-package-list::
+
+    libraries/array/array.cabal:             Dependency of ``ghc`` library
+    libraries/base/base.cabal:               Core library
+    libraries/binary/binary.cabal:           Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:   Dependency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers/containers.cabal:   Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:     Dependency of ``ghc`` library
+    libraries/exceptions/exceptions.cabal:   Dependency of ``haskeline`` library
+    libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
+    compiler/ghc.cabal:                      The compiler itself
+    libraries/ghci/ghci.cabal:               The REPL interface
+    libraries/ghc-boot/ghc-boot.cabal:       Internal compiler library
+    libraries/ghc-boot-th/ghc-boot-th.cabal: Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal: Core library
+    libraries/ghc-heap/ghc-heap.cabal:       GHC heap-walking library
+    libraries/ghc-prim/ghc-prim.cabal:       Core library
+    libraries/haskeline/haskeline.cabal:     Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                 Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal: Core library
+    libraries/libiserv/libiserv.cabal:       Internal compiler library
+    libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
+    libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
+    libraries/pretty/pretty.cabal:           Dependency of ``ghc`` library
+    libraries/process/process.cabal:         Dependency of ``ghc`` library
+    libraries/stm/stm.cabal:                 Dependency of ``haskeline`` library
+    libraries/template-haskell/template-haskell.cabal:     Core library
+    libraries/terminfo/terminfo.cabal:       Dependency of ``haskeline`` library
+    libraries/text/text.cabal:               Dependency of ``Cabal`` library
+    libraries/time/time.cabal:               Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal: Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:               Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable
