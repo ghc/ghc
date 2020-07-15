@@ -19,7 +19,7 @@ module GHC.Core.TyCo.Subst
         getTvSubstEnv,
         getCvSubstEnv, getTCvInScope, getTCvSubstRangeFVs,
         isInScope, notElemTCvSubst,
-        setTvSubstEnv, setCvSubstEnv, zapTCvSubst,
+        setTvSubstEnv, setCvSubstEnv, zapTCvSubst, delTCvSubst,
         extendTCvInScope, extendTCvInScopeList, extendTCvInScopeSet,
         extendTCvSubst, extendTCvSubstWithClone,
         extendCvSubst, extendCvSubstWithClone,
@@ -307,6 +307,23 @@ setCvSubstEnv (TCvSubst in_scope tenv _) cenv = TCvSubst in_scope tenv cenv
 
 zapTCvSubst :: TCvSubst -> TCvSubst
 zapTCvSubst (TCvSubst in_scope _ _) = TCvSubst in_scope emptyVarEnv emptyVarEnv
+
+delTCvSubst :: TCvSubst -> Var -> TCvSubst
+delTCvSubst subst v
+  | isTyVar v
+  = delTvSubst subst v
+  | isCoVar v
+  = delCvSubst subst v
+  | otherwise
+  = pprPanic "delTCvSubst" (ppr v)
+
+delTvSubst :: TCvSubst -> TyVar -> TCvSubst
+delTvSubst (TCvSubst in_scope tenv cenv) tv
+  = TCvSubst in_scope (delVarEnv tenv tv) cenv
+
+delCvSubst :: TCvSubst -> CoVar -> TCvSubst
+delCvSubst (TCvSubst in_scope tenv cenv) cv
+  = TCvSubst in_scope tenv (delVarEnv cenv cv)
 
 extendTCvInScope :: TCvSubst -> Var -> TCvSubst
 extendTCvInScope (TCvSubst in_scope tenv cenv) var

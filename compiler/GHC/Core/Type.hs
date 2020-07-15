@@ -193,7 +193,7 @@ module GHC.Core.Type (
         zipTCvSubst,
         notElemTCvSubst,
         getTvSubstEnv, setTvSubstEnv,
-        zapTCvSubst, getTCvInScope, getTCvSubstRangeFVs,
+        zapTCvSubst, delTCvSubst, getTCvInScope, getTCvSubstRangeFVs,
         extendTCvInScope, extendTCvInScopeList, extendTCvInScopeSet,
         extendTCvSubst, extendCvSubst,
         extendTvSubst, extendTvSubstBinderAndInScope,
