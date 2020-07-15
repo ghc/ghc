@@ -1,4 +1,2 @@
 
-T7892.hs:5:4: error:
-    • Expected kind ‘* -> *’, but ‘f’ has kind ‘*’
-    • In the associated type family declaration for ‘F’
+T7892.hs:5:4: error: Expected kind ‘* -> *’, but ‘f’ has kind ‘*’

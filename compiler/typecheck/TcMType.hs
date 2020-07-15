@@ -54,7 +54,8 @@ module TcMType (
   -- Instantiation
   newMetaTyVars, newMetaTyVarX, newMetaTyVarsX,
   newMetaTyVarTyVars, newMetaTyVarTyVarX,
-  newTyVarTyVar, newPatSigTyVar, newSkolemTyVar, newWildCardX,
+  newTyVarTyVar, cloneTyVarTyVar,
+  newPatSigTyVar, newSkolemTyVar, newWildCardX,
   tcInstType,
   tcInstSkolTyVars, tcInstSkolTyVarsX, tcInstSkolTyVarsAt,
   tcSkolDFunType, tcSuperSkolTyVars, tcInstSuperSkolTyVarsX,
@@ -703,30 +704,6 @@ cloneMetaTyVarName name
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 At the moment we give a unification variable a System Name, which
 influences the way it is tidied; see TypeRep.tidyTyVarBndr.
-
-Note [Unification variables need fresh Names]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Whenever we allocate a unification variable (MetaTyVar) we give
-it a fresh name.   #16221 is a very tricky case that illustrates
-why this is important:
-
-   data SameKind :: k -> k -> *
-   data T0 a = forall k2 (b :: k2). MkT0 (SameKind a b) !Int
-
-When kind-checking T0, we give (a :: kappa1). Then, in kcConDecl
-we allocate a unification variable kappa2 for k2, and then we
-end up unifying kappa1 := kappa2 (because of the (SameKind a b).
-
-Now we generalise over kappa2; but if kappa2's Name is k2,
-we'll end up giving T0 the kind forall k2. k2 -> *.  Nothing
-directly wrong with that but when we typecheck the data constrautor
-we end up giving it the type
-  MkT0 :: forall k1 (a :: k1) k2 (b :: k2).
-          SameKind @k2 a b -> Int -> T0 @{k2} a
-which is bogus.  The result type should be T0 @{k1} a.
-
-And there no reason /not/ to clone the Name when making a
-unification variable.  So that's what we do.
 -}
 
 newAnonMetaTyVar :: MetaInfo -> Kind -> TcM TcTyVar
@@ -751,8 +728,17 @@ newSkolemTyVar name kind
 
 newTyVarTyVar :: Name -> Kind -> TcM TcTyVar
 -- See Note [TyVarTv]
--- See Note [Unification variables need fresh Names]
+-- Does not clone a fresh unique
 newTyVarTyVar name kind
+  = do { details <- newMetaDetails TyVarTv
+       ; let tyvar = mkTcTyVar name kind details
+       ; traceTc "newTyVarTyVar" (ppr tyvar)
+       ; return tyvar }
+
+cloneTyVarTyVar :: Name -> Kind -> TcM TcTyVar
+-- See Note [TyVarTv]
+-- Clones a fresh unique
+cloneTyVarTyVar name kind
   = do { details <- newMetaDetails TyVarTv
        ; uniq <- newUnique
        ; let name' = name `setNameUnique` uniq
@@ -761,7 +747,7 @@ newTyVarTyVar name kind
          -- We want to keep the original more user-friendly Name
          -- In practical terms that means that in error messages,
          -- when the Name is tidied we get 'a' rather than 'a0'
-       ; traceTc "newTyVarTyVar" (ppr tyvar)
+       ; traceTc "cloneTyVarTyVar" (ppr tyvar)
        ; return tyvar }
 
 newPatSigTyVar :: Name -> Kind -> TcM TcTyVar
@@ -1295,11 +1281,11 @@ collect_cand_qtvs is_dep bound dvs ty
     go dv (CoercionTy co)   = collect_cand_qtvs_co bound dv co
 
     go dv (TyVarTy tv)
-      | is_bound tv      = return dv
-      | otherwise        = do { m_contents <- isFilledMetaTyVar_maybe tv
-                              ; case m_contents of
-                                  Just ind_ty -> go dv ind_ty
-                                  Nothing     -> go_tv dv tv }
+      | is_bound tv = return dv
+      | otherwise   = do { m_contents <- isFilledMetaTyVar_maybe tv
+                         ; case m_contents of
+                             Just ind_ty -> go dv ind_ty
+                             Nothing     -> go_tv dv tv }
 
     go dv (ForAllTy (Bndr tv _) ty)
       = do { dv1 <- collect_cand_qtvs True bound dv (tyVarKind tv)
@@ -1734,16 +1720,17 @@ skolemiseUnboundMetaTyVar :: TcTyVar -> TcM TyVar
 skolemiseUnboundMetaTyVar tv
   = ASSERT2( isMetaTyVar tv, ppr tv )
     do  { when debugIsOn (check_empty tv)
-        ; span <- getSrcSpanM    -- Get the location from "here"
+        ; here <- getSrcSpanM    -- Get the location from "here"
                                  -- ie where we are generalising
         ; kind <- zonkTcType (tyVarKind tv)
-        ; let uniq        = getUnique tv
-                -- NB: Use same Unique as original tyvar. This is
-                -- convenient in reading dumps, but is otherwise inessential.
-
-              tv_name     = getOccName tv
-              final_name  = mkInternalName uniq tv_name span
-              final_tv    = mkTcTyVar final_name kind details
+        ; let tv_name     = tyVarName tv
+              -- See Note [Skolemising and identity]
+              final_name | isSystemName tv_name
+                         = mkInternalName (nameUnique tv_name)
+                                          (nameOccName tv_name) here
+                         | otherwise
+                         = tv_name
+              final_tv = mkTcTyVar final_name kind details
 
         ; traceTc "Skolemising" (ppr tv <+> text ":=" <+> ppr final_tv)
         ; writeMetaTyVar tv (mkTyVarTy final_tv)
@@ -1856,9 +1843,29 @@ If we zonk `a' with a regular type variable, we will have this regular type
 variable now floating around in the simplifier, which in many places assumes to
 only see proper TcTyVars.
 
-We can avoid this problem by zonking with a skolem.  The skolem is rigid
-(which we require for a quantified variable), but is still a TcTyVar that the
-simplifier knows how to deal with.
+We can avoid this problem by zonking with a skolem TcTyVar.  The
+skolem is rigid (which we require for a quantified variable), but is
+still a TcTyVar that the simplifier knows how to deal with.
+
+Note [Skolemising and identity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In some places, we make a TyVarTv for a binder. E.g.
+    class C a where ...
+As Note [Inferring kinds for type declarations] discusses,
+we make a TyVarTv for 'a'.  Later we skolemise it, and we'd
+like to retain its identity, location info etc.  (If we don't
+retain its identity we'll have to do some pointless swizzling;
+see TcTyClsDecls.swizzleTcTyConBndrs.  If we retain its identity
+but not its location we'll lose the detailed binding site info.
+
+Conclusion: use the Name of the TyVarTv.  But we don't want
+to do that when skolemising random unification variables;
+there the location we want is the skolemisation site.
+
+Fortunately we can tell the difference: random unification
+variables have System Names.  That's why final_name is
+set based on the isSystemName test.
+
 
 Note [Silly Type Synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

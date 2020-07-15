@@ -1,0 +1,4 @@
+
+T17566b.hs:7:17: error:
+    • Different names for the same type variable: ‘k1’ and ‘k2’
+    • In the class declaration for ‘C’

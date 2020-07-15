@@ -58,6 +58,7 @@ import PrelRules
 import Avail
 import PrimOp
 import DataCon
+import BasicTypes
 import Id
 import Name
 import NameEnv
@@ -121,14 +122,17 @@ knownKeyNames
   = all_names
   where
     all_names =
+      -- We exclude most tuples from this list—see
+      -- Note [Infinite families of known-key names] in GHC.Builtin.Names.
+      -- We make an exception for Unit (i.e., the boxed 1-tuple), since it does
+      -- not use special syntax like other tuples.
+      -- See Note [One-tuples] (Wrinkle: Make boxed one-tuple names have known keys)
+      -- in GHC.Builtin.Types.
+      tupleTyConName BoxedTuple 1 : tupleDataConName Boxed 1 :
       concat [ wired_tycon_kk_names funTyCon
              , concatMap wired_tycon_kk_names primTyCons
-
              , concatMap wired_tycon_kk_names wiredInTyCons
-               -- Does not include tuples
-
              , concatMap wired_tycon_kk_names typeNatTyCons
-
              , map idName wiredInIds
              , map (idName . primOpId) allThePrimOps
              , map (idName . primOpWrapperId) allThePrimOps
