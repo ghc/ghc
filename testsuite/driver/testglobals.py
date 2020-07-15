@@ -188,6 +188,10 @@ class TestConfig:
         # I have no idea what this does
         self.package_conf_cache_file = None # type: Optional[Path]
 
+        # test-wrapper, a program to run the executable through.
+        # the driver/id program is the identity test-wrapper.
+        self.test_wrapper = None
+
 
 global config
 config = TestConfig()
