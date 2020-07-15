@@ -21,9 +21,9 @@ import GHCi.BinaryArray
 
 isLittleEndian :: Bool
 #if defined(WORDS_BIGENDIAN)
-isLittleEndian = True
-#else
 isLittleEndian = False
+#else
+isLittleEndian = True
 #endif
 
 -- -----------------------------------------------------------------------------
