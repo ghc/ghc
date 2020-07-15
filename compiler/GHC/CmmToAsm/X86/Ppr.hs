@@ -252,6 +252,7 @@ pprLabel platform lbl =
    pprGloblDecl lbl
    $$ pprTypeDecl platform lbl
    $$ (ppr lbl <> char ':')
+   <> asmComment (pprDebugCLabel lbl)
 
 pprAlign :: Platform -> Alignment -> SDoc
 pprAlign platform alignment

@@ -400,8 +400,14 @@ data ForeignLabelSource
 pprDebugCLabel :: CLabel -> SDoc
 pprDebugCLabel lbl
  = case lbl of
-        IdLabel _ _ info-> ppr lbl <> (parens $ text "IdLabel"
-                                       <> whenPprDebug (text ":" <> text (show info)))
+        IdLabel nm _ info-> ppr lbl <> (parens $ text "IdLabel"
+                                       <> whenPprDebug (text ":"
+                                                          <> text (show info)
+                                                          <> text ", " <> (ppr nm)
+                                                          <> text ", FS: " <> (text $ show $ occNameFS (occName nm))
+                                                          <> text ", Name: " <> (ppr $ occName nm)
+                                                        )
+                                        )
         CmmLabel pkg _ext _name _info
          -> ppr lbl <> (parens $ text "CmmLabel" <+> ppr pkg)
 
