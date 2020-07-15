@@ -51,7 +51,7 @@ module GHC.IO.Handle.Internals (
 
   HandleFinalizer, handleFinalizer,
 
-  debugIO,
+  debugIO, traceIO
  ) where
 
 import GHC.IO
@@ -62,7 +62,8 @@ import GHC.IO.Handle.Types
 import GHC.IO.Buffer
 import GHC.IO.BufferedIO (BufferedIO)
 import GHC.IO.Exception
-import GHC.IO.Device (IODevice, SeekMode(..))
+import GHC.IO.Device (IODevice, RawIO, SeekMode(..))
+import GHC.IO.SubSystem ((<!>), isWindowsNativeIO)
 import qualified GHC.IO.Device as IODevice
 import qualified GHC.IO.BufferedIO as Buffered
 
@@ -93,8 +94,10 @@ newFileHandle :: FilePath -> Maybe HandleFinalizer -> Handle__ -> IO Handle
 newFileHandle filepath mb_finalizer hc = do
   m <- newMVar hc
   case mb_finalizer of
-    Just finalizer -> addMVarFinalizer m (finalizer filepath m)
-    Nothing        -> return ()
+    Just finalizer -> do debugIO $ "Registering finalizer: " ++ show filepath
+                         addMVarFinalizer m (finalizer filepath m)
+    Nothing        -> do debugIO $ "No finalizer: " ++ show filepath
+                         return ()
   return (FileHandle filepath m)
 
 -- ---------------------------------------------------------------------------
@@ -222,6 +225,11 @@ augmentIOError ioe@IOError{ ioe_filename = fp } fun h
 -- ---------------------------------------------------------------------------
 -- Wrapper for write operations.
 
+-- If we already have a writeable handle just run the action.
+-- If we have a read only handle we throw an exception.
+-- If we have a read/write handle in read mode we:
+-- * Seek to the unread (from the users PoV) position and
+--   change the handles buffer to a write buffer.
 wantWritableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantWritableHandle fun h@(FileHandle _ m) act
   = wantWritableHandle' fun h m act
@@ -253,13 +261,15 @@ checkWritableHandle act h_@Handle__{..}
            buf' <- Buffered.emptyWriteBuffer haDevice buf
            writeIORef haByteBuffer buf'
         act h_
-      _other               -> act h_
+      AppendHandle         -> act h_
+      WriteHandle          -> act h_
 
 -- ---------------------------------------------------------------------------
 -- Wrapper for read operations.
 
 wantReadableHandle :: String -> Handle -> (Handle__ -> IO (Handle__,a)) -> IO a
-wantReadableHandle fun h act = withHandle fun h (checkReadableHandle act)
+wantReadableHandle fun h act =
+  withHandle fun h (checkReadableHandle act)
 
 wantReadableHandle_ :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantReadableHandle_ fun h@(FileHandle  _ m)   act
@@ -504,11 +514,13 @@ flushByteWriteBuffer h_@Handle__{..} = do
   bbuf <- readIORef haByteBuffer
   when (not (isEmptyBuffer bbuf)) $ do
     bbuf' <- Buffered.flushWriteBuffer haDevice bbuf
+    debugIO ("flushByteWriteBuffer: bbuf=" ++ summaryBuffer bbuf')
     writeIORef haByteBuffer bbuf'
 
 -- write the contents of the CharBuffer to the Handle__.
 -- The data will be encoded and pushed to the byte buffer,
 -- flushing if the buffer becomes full.
+-- Data is written to the handles current buffer offset.
 writeCharBuffer :: Handle__ -> CharBuffer -> IO ()
 writeCharBuffer h_@Handle__{..} !cbuf = do
   --
@@ -536,6 +548,7 @@ writeCharBuffer h_@Handle__{..} !cbuf = do
     then do
       bbuf'' <- Buffered.flushWriteBuffer haDevice bbuf'
       writeIORef haByteBuffer bbuf''
+      debugIO ("writeCharBuffer after flushing: cbuf=" ++ summaryBuffer bbuf'')
     else
       writeIORef haByteBuffer bbuf'
 
@@ -583,8 +596,12 @@ flushCharReadBuffer Handle__{..} = do
       (bbuf1,cbuf1) <- (streamEncode decoder) bbuf0
                                cbuf0{ bufL=0, bufR=0, bufSize = bufL cbuf0 }
 
-      debugIO ("finished, bbuf=" ++ summaryBuffer bbuf1 ++
-               " cbuf=" ++ summaryBuffer cbuf1)
+      -- We should not need to update the offset here. The bytebuffer contains the
+      -- offset for the next read after it's used up. But this function only flushes
+      -- the char buffer.
+      -- let bbuf2 = bbuf1 -- {bufOffset = bufOffset bbuf1 - fromIntegral (bufL bbuf1)}
+      -- debugIO ("finished, bbuf=" ++ summaryBuffer bbuf2 ++
+      --          " cbuf=" ++ summaryBuffer cbuf1)
 
       writeIORef haByteBuffer bbuf1
 
@@ -604,30 +621,51 @@ flushByteReadBuffer h_@Handle__{..} = do
   when (not seekable) $ ioe_cannotFlushNotSeekable
 
   let seek = negate (bufR bbuf - bufL bbuf)
+  let offset = bufOffset bbuf - fromIntegral (bufR bbuf - bufL bbuf)
 
   debugIO ("flushByteReadBuffer: new file offset = " ++ show seek)
-  IODevice.seek haDevice RelativeSeek (fromIntegral seek)
+  debugIO ("flushByteReadBuffer: " ++ summaryBuffer bbuf)
 
-  writeIORef haByteBuffer bbuf{ bufL=0, bufR=0 }
+  let mIOSeek   = IODevice.seek haDevice RelativeSeek (fromIntegral seek)
+  -- win-io doesn't need this, but it allows us to error out on invalid offsets
+  let winIOSeek = IODevice.seek haDevice AbsoluteSeek (fromIntegral offset)
+
+  _ <- mIOSeek <!> winIOSeek  -- execute one of these two seek functions
+
+  writeIORef haByteBuffer bbuf{ bufL=0, bufR=0, bufOffset=offset }
 
 -- ----------------------------------------------------------------------------
 -- Making Handles
 
-mkHandle :: (IODevice dev, BufferedIO dev, Typeable dev) => dev
-            -> FilePath
-            -> HandleType
-            -> Bool                     -- buffered?
-            -> Maybe TextEncoding
-            -> NewlineMode
-            -> Maybe HandleFinalizer
-            -> Maybe (MVar Handle__)
-            -> IO Handle
+{- Note [Making offsets for append]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-mkHandle dev filepath ha_type buffered mb_codec nl finalizer other_side = do
+  The WINIO subysstem keeps track of offsets for handles
+  on the Haskell side of things instead of letting the OS
+  handle it. This requires us to establish the correct offset
+  for a handle on creation. This is usually zero but slightly
+  more tedious for append modes. There we fall back on IODevice
+  functionality to establish the size of the file and then set
+  the offset accordingly. This is only required for WINIO.
+-}
+
+mkHandle :: (RawIO dev, IODevice dev, BufferedIO dev, Typeable dev) => dev
+         -> FilePath
+         -> HandleType
+         -> Bool                     -- buffered?
+         -> Maybe TextEncoding
+         -> NewlineMode
+         -> Maybe HandleFinalizer
+         -> Maybe (MVar Handle__)
+         -> IO Handle
+mkHandle dev filepath ha_type buffered mb_codec nl finalizer other_side =
    openTextEncoding mb_codec ha_type $ \ mb_encoder mb_decoder -> do
 
-   let buf_state = initBufferState ha_type
-   bbuf <- Buffered.newBuffer dev buf_state
+   let !buf_state = initBufferState ha_type
+   !bbuf_no_offset <- (Buffered.newBuffer dev buf_state)
+   !buf_offset <- initHandleOffset
+   let !bbuf = bbuf_no_offset { bufOffset = buf_offset}
+
    bbufref <- newIORef bbuf
    last_decode <- newIORef (errorWithoutStackTrace "codec_state", bbuf)
 
@@ -636,6 +674,7 @@ mkHandle dev filepath ha_type buffered mb_codec nl finalizer other_side = do
                      else mkUnBuffer buf_state
 
    spares <- newIORef BufferListNil
+   debugIO $ "making handle for " ++ filepath
    newFileHandle filepath finalizer
             (Handle__ { haDevice = dev,
                         haType = ha_type,
@@ -651,9 +690,17 @@ mkHandle dev filepath ha_type buffered mb_codec nl finalizer other_side = do
                         haOutputNL = outputNL nl,
                         haOtherSide = other_side
                       })
+  where
+    -- See Note [Making offsets for append]
+    initHandleOffset
+      | isAppendHandleType ha_type
+      , isWindowsNativeIO = do
+          size <- IODevice.getSize dev
+          return (fromIntegral size :: Word64)
+      | otherwise = return 0
 
 -- | makes a new 'Handle'
-mkFileHandle :: (IODevice dev, BufferedIO dev, Typeable dev)
+mkFileHandle :: (RawIO dev, IODevice dev, BufferedIO dev, Typeable dev)
              => dev -- ^ the underlying IO device, which must support
                     -- 'IODevice', 'BufferedIO' and 'Typeable'
              -> FilePath
@@ -674,7 +721,7 @@ mkFileHandle dev filepath iomode mb_codec tr_newlines = do
 -- | like 'mkFileHandle', except that a 'Handle' is created with two
 -- independent buffers, one for reading and one for writing.  Used for
 -- full-duplex streams, such as network sockets.
-mkDuplexHandle :: (IODevice dev, BufferedIO dev, Typeable dev) => dev
+mkDuplexHandle :: (RawIO dev, IODevice dev, BufferedIO dev, Typeable dev) => dev
                -> FilePath -> Maybe TextEncoding -> NewlineMode -> IO Handle
 mkDuplexHandle dev filepath mb_codec tr_newlines = do
 
@@ -806,12 +853,20 @@ hLookAhead_ handle_@Handle__{..} = do
 -- debugging
 
 debugIO :: String -> IO ()
+-- debugIO s = traceEventIO s
 debugIO s
  | c_DEBUG_DUMP
     = do _ <- withCStringLen (s ++ "\n") $
                   \(p, len) -> c_write 1 (castPtr p) (fromIntegral len)
          return ()
  | otherwise = return ()
+
+-- For development, like debugIO but always on.
+traceIO :: String -> IO ()
+traceIO s = do
+         _ <- withCStringLen (s ++ "\n") $
+                  \(p, len) -> c_write 1 (castPtr p) (fromIntegral len)
+         return ()
 
 -- ----------------------------------------------------------------------------
 -- Text input/output
@@ -840,7 +895,9 @@ readTextDevice h_@Handle__{..} cbuf = do
   bbuf1 <- if not (isEmptyBuffer bbuf0)
               then return bbuf0
               else do
+                   debugIO $ "readBuf at " ++ show (bufferOffset bbuf0)
                    (r,bbuf1) <- Buffered.fillReadBuffer haDevice bbuf0
+                   debugIO $ "readBuf after " ++ show (bufferOffset bbuf1)
                    if r == 0 then ioe_EOF else do  -- raise EOF
                    return bbuf1
 

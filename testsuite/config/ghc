@@ -68,6 +68,14 @@ if (ghc_with_llvm and not config.unregisterised):
     config.compile_ways.append('optllvm')
     config.run_ways.append('optllvm')
 
+# WinIO I/O manager for Windows
+if windows:
+    winio_ways = ['winio', 'winio_threaded']
+    if config.speed == 0:
+        config.run_ways += winio_ways
+    else:
+        config.other_ways += winio_ways
+
 config.way_flags = {
     'normal'       : [],
     'normal_h'     : [],
@@ -108,6 +116,8 @@ config.way_flags = {
     'nonmoving_thr': ['-threaded'],
     'nonmoving_thr_ghc': ['+RTS', '-xn', '-N2', '-RTS', '-threaded'],
     'compacting_gc': [],
+    'winio': [],
+    'winio_threaded': ['-threaded'],
    }
 
 config.way_rts_flags = {
@@ -150,6 +160,8 @@ config.way_rts_flags = {
     'nonmoving_thr'    : ['-xn', '-N2'],
     'nonmoving_thr_ghc': ['-xn', '-N2'],
     'compacting_gc': ['-c'],
+    'winio': ['--io-manager=native'],
+    'winio_threaded': ['--io-manager=native'],
    }
 
 # Useful classes of ways that can be used with only_ways(), omit_ways() and

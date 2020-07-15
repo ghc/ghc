@@ -1,3 +1,4 @@
+Cabal-Version: 2.2
 Name: test
 Version: 1.0
 Exposed-Modules: A

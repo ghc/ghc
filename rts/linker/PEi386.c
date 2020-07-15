@@ -2060,7 +2060,6 @@ SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl)
         sym = lookupSymbolInDLLs(lbl);
         return sym; // might be NULL if not found
     } else {
-#if defined(mingw32_HOST_OS)
         // If Windows, perform initialization of uninitialized
         // Symbols from the C runtime which was loaded above.
         // We do this on lookup to prevent the hit when
@@ -2093,7 +2092,6 @@ SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl)
             clearImportSymbol (pinfo->owner, lbl);
             return pinfo->value;
         }
-#endif
         return loadSymbol(lbl, pinfo);
     }
 }

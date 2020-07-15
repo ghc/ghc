@@ -46,15 +46,21 @@ remaining (BSIODevice bs mPos)
 sizeBS :: BSIODevice -> Int
 sizeBS (BSIODevice bs _) = B.length bs
 
-seekBS :: BSIODevice -> SeekMode -> Int -> IO ()
-seekBS dev AbsoluteSeek pos
+seekBS :: BSIODevice -> SeekMode -> Int -> IO Integer
+seekBS dev@(BSIODevice _ mPos) mode pos
+    = do seekBS' dev mode pos
+         maybe 0 fromIntegral <$> tryReadMVar mPos
+
+
+seekBS' :: BSIODevice -> SeekMode -> Int -> IO ()
+seekBS' dev AbsoluteSeek pos
     | pos < 0 = error "Cannot seek to a negative position!"
     | pos > sizeBS dev = error "Cannot seek past end of handle!"
     | otherwise = case dev of
                     BSIODevice _ mPos
                         -> modifyMVar_ mPos $ \_ -> return pos
-seekBS dev SeekFromEnd pos = seekBS dev AbsoluteSeek (sizeBS dev - pos)
-seekBS dev RelativeSeek pos
+seekBS' dev SeekFromEnd pos = seekBS' dev AbsoluteSeek (sizeBS dev - pos)
+seekBS' dev RelativeSeek pos
     = case dev of
         BSIODevice _bs mPos
             -> modifyMVar_ mPos $ \curPos ->
@@ -69,12 +75,12 @@ tellBS (BSIODevice _ mPos) = readMVar mPos
 dupBS :: BSIODevice -> IO BSIODevice
 dupBS (BSIODevice bs mPos) = BSIODevice bs <$> (readMVar mPos >>= newMVar)
 
-readBS :: BSIODevice -> Ptr Word8 -> Int -> IO Int
-readBS dev@(BSIODevice bs mPos) buff amount
+readBS :: BSIODevice -> Ptr Word8 -> Word64 -> Int -> IO Int
+readBS dev@(BSIODevice bs mPos) buff offset amount
     = do
   rem <- remaining dev
   if amount > rem
-   then readBS dev buff rem
+   then readBS dev buff offset rem
    else B.unsafeUseAsCString bs $ \ptr ->
        do
          memcpy buff (castPtr ptr) (fromIntegral amount)
@@ -91,7 +97,7 @@ instance BufferedIO BSIODevice where
 
 instance RawIO BSIODevice where
     read = readBS
-    readNonBlocking dev buff n = Just `liftM` readBS dev buff n
+    readNonBlocking dev buff offset n = Just `liftM` readBS dev buff offset n
 
 instance IODevice BSIODevice where
     ready _ True _ = return False -- read only
@@ -112,3 +118,4 @@ instance IODevice BSIODevice where
 
 
 main = bsHandle "test" "<fake file>" >>= Data.ByteString.Char8.hGetContents >>= print
+

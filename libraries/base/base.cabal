@@ -37,6 +37,7 @@ extra-source-files:
     include/ieee-flpt.h
     include/md5.h
     include/fs.h
+    include/winio_structs.h
     install-sh
 
 source-repository head
@@ -200,6 +201,7 @@ Library
         GHC.Enum
         GHC.Environment
         GHC.Err
+        GHC.Event.TimeOut
         GHC.Exception
         GHC.Exception.Type
         GHC.ExecutionStack
@@ -238,6 +240,8 @@ Library
         GHC.IO.Handle.Types
         GHC.IO.IOMode
         GHC.IO.Unsafe
+        GHC.IO.StdHandles
+        GHC.IO.SubSystem
         GHC.IOArray
         GHC.IORef
         GHC.Int
@@ -304,6 +308,8 @@ Library
         Type.Reflection
         Type.Reflection.Unsafe
         Unsafe.Coerce
+        -- TODO: remove
+        GHC.IOPort
 
     reexported-modules:
           GHC.Num.Integer
@@ -324,6 +330,8 @@ Library
         GHC.IO.Handle.Lock.NoOp
         GHC.IO.Handle.Lock.Windows
         GHC.StaticPtr.Internal
+        GHC.Event.Internal.Types
+        -- GHC.IOPort -- TODO: hide again after debug
         System.Environment.ExecutablePath
         System.CPUTime.Utils
 
@@ -332,8 +340,6 @@ Library
         cbits/PrelIOUtils.c
         cbits/SetEnv.c
         cbits/WCsubst.c
-        cbits/Win32Utils.c
-        cbits/consUtils.c
         cbits/iconv.c
         cbits/inputReady.c
         cbits/md5.c
@@ -363,14 +369,50 @@ Library
         --          mingwex and mingw32. the __math_err symbol is defined in
         --          mingw32 which is required by mingwex.
         -- shlwapi: provides PathFileExistsW
-        extra-libraries: wsock32, user32, shell32, msvcrt, mingw32, mingwex, shlwapi
+        -- ws2_32: provides access to socket types and functions
+        -- ole32: provides UUID functionality.
+        -- rpcrt4: provides RPC UUID creation.
+        -- ntdll: provides access to functions to inspect window handles
+        extra-libraries: wsock32, user32, shell32, msvcrt, mingw32,
+                         mingwex, ws2_32, shlwapi, ole32, rpcrt4, ntdll
+        -- Minimum supported Windows version.
+        -- These numbers can be found at:
+        --  https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx
+        -- If we're compiling on windows, enforce that we only support Windows 7+
+        -- Adding this here means it doesn't have to be done in individual .c files
+        -- and also centralizes the versioning.
+        cpp-options: -D_WIN32_WINNT=0x06010000
+        cc-options: -D_WIN32_WINNT=0x06010000
         exposed-modules:
             GHC.IO.Encoding.CodePage.API
             GHC.IO.Encoding.CodePage.Table
             GHC.Conc.Windows
+            GHC.Conc.WinIO
+            GHC.Conc.POSIX
+            GHC.Conc.POSIX.Const
             GHC.Windows
+            GHC.Event.Windows
+            GHC.Event.Windows.Clock
+            GHC.Event.Windows.ConsoleEvent
+            GHC.Event.Windows.FFI
+            GHC.Event.Windows.ManagedThreadPool
+            GHC.Event.Windows.Thread
+            GHC.IO.Handle.Windows
+            GHC.IO.Windows.Handle
+            GHC.IO.Windows.Encoding
+            GHC.IO.Windows.Paths
         other-modules:
+            GHC.Event.Arr
+            GHC.Event.Array
+            GHC.Event.IntTable
+            GHC.Event.PSQ
+            GHC.Event.Unique
             System.CPUTime.Windows
+        c-sources:
+            cbits/Win32Utils.c
+            cbits/consUtils.c
+            cbits/IOutils.c
+
     else
         exposed-modules:
             GHC.Event
