@@ -2113,13 +2113,16 @@ exceptT = ExceptT . pure
 -- | @:type@ command. See also Note [TcRnExprMode] in GHC.Tc.Module.
 
 typeOfExpr :: GHC.GhcMonad m => String -> m ()
-typeOfExpr str = handleSourceError GHC.printException $ do
-    let (mode, expr_str) = case break isSpace str of
-          ("+d", rest) -> (GHC.TM_Default, dropWhile isSpace rest)
-          ("+v", rest) -> (GHC.TM_NoInst,  dropWhile isSpace rest)
-          _            -> (GHC.TM_Inst,    str)
-    ty <- GHC.exprType mode expr_str
-    printForUser $ sep [text expr_str, nest 2 (dcolon <+> pprTypeForUser ty)]
+typeOfExpr str = handleSourceError GHC.printException $
+    case break isSpace str of
+      ("+v", _)    -> printForUser (text "`:type +v' has gone; use `:type' instead")
+      ("+d", rest) -> do_it GHC.TM_Default (dropWhile isSpace rest)
+      _            -> do_it GHC.TM_Inst    str
+  where
+    do_it mode expr_str
+      = do { ty <- GHC.exprType mode expr_str
+           ;    printForUser $ sep [ text expr_str
+                                   , nest 2 (dcolon <+> pprTypeForUser ty)] }
 
 -----------------------------------------------------------------------------
 -- | @:type-at@ command
