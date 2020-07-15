@@ -22,11 +22,10 @@ instance Functor (State s) where
     fmap = liftM
 
 instance Applicative (State s) where
-    pure = return
+    pure a = State $ \s -> (a, s)
     (<*>) = ap
 
 instance Monad (State s) where
-        return a = State $ \s -> (a, s)
         m >>= k  = State $ \s -> let
                 (a, s') = runState m s
                 in runState (k a) s'

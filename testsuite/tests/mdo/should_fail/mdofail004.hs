@@ -19,11 +19,10 @@ instance Functor X where
     fmap = liftM
 
 instance Applicative X where
-    pure = return
+    pure = X
     (<*>) = ap
 
 instance Monad X where
-  return      = X
   (X a) >>= f = f a
 
 z :: X [Int]

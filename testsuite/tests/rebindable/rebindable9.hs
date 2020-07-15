@@ -16,19 +16,18 @@ instance Prelude.Functor Identity where
     fmap = liftM
 
 instance Applicative Identity where
-    pure = Prelude.return
+    pure = Identity
     (<*>) = ap
 
 instance Prelude.Monad Identity where
-    return a = Identity a
     m >>= k  = k (runIdentity m)
 
-class Bind m1 m2 m3 | m1 m2 -> m3 where 
+class Bind m1 m2 m3 | m1 m2 -> m3 where
   (>>=) :: m1 a -> (a -> m2 b) -> m3 b
 
 class Return m where
   returnM :: a -> m a
-  fail   :: String -> m a 
+  fail   :: String -> m a
 
 instance Bind Maybe [] [] where
   Just x  >>= f = f x
@@ -39,15 +38,15 @@ instance Functor a => Bind a Identity a   where m >>= f = fmap (runIdentity . f)
 
 instance Prelude.Monad m => Bind m m m where (>>=) = (Prelude.>>=)
 
-instance Return [] where 
+instance Return [] where
   returnM x = [x]
-  fail _   = [] 
+  fail _   = []
 
 return :: a -> Identity a
 return = Prelude.return
 
 should_compile :: [Int]
-should_compile = do 
+should_compile = do
   a <- Just 1
   b <- [a*1,a*2]
   return (b+1)
