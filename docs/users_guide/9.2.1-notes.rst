@@ -3,6 +3,17 @@
 Version 9.2.1
 ==============
 
+Language
+~~~~~~~~
+
+* :extension:`ImpredicativeTypes`: Finally, polymorphic types have become first class!
+  GHC 9.2 includes a full implementation of the Quick Look approach to type inference for
+  impredicative types, as described in in the paper
+  `A quick look at impredicativity
+  <https://www.microsoft.com/en-us/research/publication/a-quick-look-at-impredicativity/>`__
+ (Serrano et al, ICFP 2020).  More information here: :ref:`impredicative-polymorphism`.
+ This replaces the old (undefined, flaky) behaviour of the :extension:`ImpredicativeTypes` extension.
+
 Compiler
 ~~~~~~~~
 

@@ -456,7 +456,7 @@ instance Outputable Rank where
 
 rankZeroMonoType, tyConArgMonoType, synArgMonoType, constraintMonoType :: Rank
 rankZeroMonoType   = MonoType (text "Perhaps you intended to use RankNTypes")
-tyConArgMonoType   = MonoType (text "GHC doesn't yet support impredicative polymorphism")
+tyConArgMonoType   = MonoType (text "Perhaps you intended to use ImpredicativeTypes")
 synArgMonoType     = MonoType (text "Perhaps you intended to use LiberalTypeSynonyms")
 constraintMonoType = MonoType (vcat [ text "A constraint must be a monotype"
                                     , text "Perhaps you intended to use QuantifiedConstraints" ])

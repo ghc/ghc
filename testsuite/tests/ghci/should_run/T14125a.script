@@ -4,5 +4,4 @@ data instance Foo Int = FooInt Int
 :kind! Foo Int
 let f (FooInt i) = i
 :info    f
-:type +v f
 :type    f
