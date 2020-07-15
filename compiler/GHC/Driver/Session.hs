@@ -4082,7 +4082,9 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnSimplifiableClassConstraints,
         Opt_WarnStarBinder,
         Opt_WarnInaccessibleCode,
-        Opt_WarnSpaceAfterBang
+        Opt_WarnSpaceAfterBang,
+        Opt_WarnNonCanonicalMonadInstances,
+        Opt_WarnNonCanonicalMonoidInstances
       ]
 
 -- | Things you get with -W

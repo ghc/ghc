@@ -94,11 +94,10 @@ instance Functor Tree where
     fmap = liftM
 
 instance Applicative Tree where
-    pure = return
+    pure = Val
     (<*>) = ap
 
 instance Monad Tree where
-  return x = Val x
   (Val a) >>= f = f a
   (Choice l r) >>= f = Choice (l >>= f) (r >>= f)
 
