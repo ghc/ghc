@@ -32,11 +32,10 @@ instance Functor Gen where
     fmap = liftM
 
 instance Applicative Gen where
-    pure = return
+    pure = Gen
     (<*>) = ap
 
 instance Monad Gen where
-  return a    = Gen a
   Gen m >>= k = Gen (let Gen m' = k m in m')
 
 class Arbitrary a where

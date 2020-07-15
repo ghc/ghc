@@ -3,15 +3,18 @@ Template.hs:7:1: warning: [-Wsemigroup (in -Wcompat)]
     Local definition of ‘<>’ clashes with a future Prelude name.
     This will become an error in a future release.
 
-Template.hs:13:3: warning: [-Wnoncanonical-monoid-instances (in -Wcompat)]
+Template.hs:13:3: warning: [-Wnoncanonical-monoid-instances (in -Wdefault, -Wcompat)]
     Noncanonical ‘(<>) = mappend’ definition detected
     in the instance declaration for ‘Semigroup S’.
     Move definition from ‘mappend’ to ‘(<>)’
+    See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/semigroup-monoid
 
-Template.hs:16:3: warning: [-Wnoncanonical-monoid-instances (in -Wcompat)]
+Template.hs:16:3: warning: [-Wnoncanonical-monoid-instances (in -Wdefault, -Wcompat)]
     Noncanonical ‘mappend’ definition detected
     in the instance declaration for ‘Monoid S’.
-    Define as ‘mappend = (<>)’
+    ‘mappend’ will eventually be removed in favour of ‘(<>)’
+    Either remove definition for ‘mappend’ (recommended) or define as ‘mappend = (<>)’
+    See also: https://gitlab.haskell.org/ghc/ghc/-/wikis/proposal/semigroup-monoid
 
 Template.hs:20:15: warning: [-Wstar-is-type (in -Wall, -Wcompat)]
     Using ‘*’ (or its Unicode variant) to mean ‘Data.Kind.Type’

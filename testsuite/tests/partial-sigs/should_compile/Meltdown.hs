@@ -13,7 +13,6 @@ instance Applicative (NukeMonad a b) where
   (<*>) = undefined
 
 instance Monad (NukeMonad a b) where
-  return = undefined
   (>>=) = undefined
 
 
