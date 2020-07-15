@@ -478,7 +478,7 @@ data HsRecField' id arg = HsRecField {
 --
 --     hsRecFieldLbl = Unambiguous "x" $sel:x:MkS  :: AmbiguousFieldOcc Id
 --
--- See also Note [Disambiguating record fields] in GHC.Tc.Gen.Expr.
+-- See also Note [Disambiguating record fields] in GHC.Tc.Gen.App.
 
 hsRecFields :: HsRecFields p arg -> [XCFieldOcc p]
 hsRecFields rbinds = map (unLoc . hsRecFieldSel . unLoc) (rec_flds rbinds)

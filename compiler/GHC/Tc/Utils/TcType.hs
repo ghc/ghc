@@ -560,6 +560,9 @@ data MetaInfo
                    -- It is filled in /only/ by unflattenGivens
                    -- See Note [The flattening story] in GHC.Tc.Solver.Flatten
 
+   | RuntimeUnkTv  -- A unification variable used in the GHCi debugger.
+                   -- It /is/ allowed to unify with a polytype, unlike TauTv
+
 instance Outputable MetaDetails where
   ppr Flexi         = text "Flexi"
   ppr (Indirect ty) = text "Indirect" <+> ppr ty
@@ -569,6 +572,7 @@ instance Outputable MetaInfo where
   ppr TyVarTv       = text "tyv"
   ppr FlatMetaTv    = text "fmv"
   ppr FlatSkolTv    = text "fsk"
+  ppr RuntimeUnkTv  = text "rutv"
 
 {- *********************************************************************
 *                                                                      *
@@ -1224,10 +1228,15 @@ tcSplitForAllTys ty
 -- | Like 'tcSplitForAllTys', but only splits a 'ForAllTy' if @argf_pred argf@
 -- is 'True', where @argf@ is the visibility of the @ForAllTy@'s binder and
 -- @argf_pred@ is a predicate over visibilities provided as an argument to this
--- function. All split tyvars are annotated with their @argf@.
-tcSplitSomeForAllTys :: (ArgFlag -> Bool) -> Type -> ([TyCoVarBinder], Type)
-tcSplitSomeForAllTys argf_pred ty = ASSERT( all (isTyVar . binderVar) (fst sty) ) sty
-  where sty = splitSomeForAllTys argf_pred ty
+-- function.
+tcSplitSomeForAllTys :: (ArgFlag -> Bool) -> Type -> ([TyVar], Type)
+tcSplitSomeForAllTys argf_pred ty
+  = split ty ty []
+  where
+    split _ (ForAllTy (Bndr tv argf) ty) tvs
+      | argf_pred argf                             = split ty ty (tv:tvs)
+    split orig_ty ty tvs | Just ty' <- coreView ty = split orig_ty ty' tvs
+    split orig_ty _                            tvs = (reverse tvs, orig_ty)
 
 -- | Like 'tcSplitForAllTys', but only splits 'ForAllTy's with 'Required' type
 -- variable binders. All split tyvars are annotated with '()'.

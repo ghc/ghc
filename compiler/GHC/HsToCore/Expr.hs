@@ -261,10 +261,14 @@ dsLExprNoLP (L loc e)
        ; return e' }
 
 dsExpr :: HsExpr GhcTc -> DsM CoreExpr
+dsExpr (HsVar    _ (L _ id))           = dsHsVar id
+dsExpr (HsRecFld _ (Unambiguous id _)) = dsHsVar id
+dsExpr (HsRecFld _ (Ambiguous   id _)) = dsHsVar id
+dsExpr (HsUnboundVar id _)             = dsHsVar id
+
 dsExpr (HsPar _ e)            = dsLExpr e
 dsExpr (ExprWithTySig _ e _)  = dsLExpr e
-dsExpr (HsVar _ (L _ var))    = dsHsVar var
-dsExpr (HsUnboundVar {})      = panic "dsExpr: HsUnboundVar" -- Typechecker eliminates them
+
 dsExpr (HsConLikeOut _ con)   = dsConLike con
 dsExpr (HsIPVar {})           = panic "dsExpr: HsIPVar"
 dsExpr (HsOverLabel{})        = panic "dsExpr: HsOverLabel"
@@ -806,7 +810,6 @@ dsExpr (HsBinTick _ ixT ixF e) = do
 -- HsSyn constructs that just shouldn't be here:
 dsExpr (HsBracket     {})  = panic "dsExpr:HsBracket"
 dsExpr (HsDo          {})  = panic "dsExpr:HsDo"
-dsExpr (HsRecFld      {})  = panic "dsExpr:HsRecFld"
 
 ds_prag_expr :: HsPragE GhcTc -> LHsExpr GhcTc -> DsM CoreExpr
 ds_prag_expr (HsPragSCC _ _ cc) expr = do
