@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XImpredicativeTypes -fno-warn-deprecated-flags #-}
+{-# LANGUAGE ImpredicativeTypes #-}
 
 -- Sept 16: now failing, because I've further reduced the scop
 --          of impredicative types
