@@ -560,6 +560,9 @@ data MetaInfo
                    -- It is filled in /only/ by unflattenGivens
                    -- See Note [The flattening story] in GHC.Tc.Solver.Flatten
 
+   | RuntimeUnkTv  -- A unification variable used in the GHCi debugger.
+                   -- It /is/ allowed to unify with a polytype, unlike TauTv
+
 instance Outputable MetaDetails where
   ppr Flexi         = text "Flexi"
   ppr (Indirect ty) = text "Indirect" <+> ppr ty
@@ -569,6 +572,7 @@ instance Outputable MetaInfo where
   ppr TyVarTv       = text "tyv"
   ppr FlatMetaTv    = text "fmv"
   ppr FlatSkolTv    = text "fsk"
+  ppr RuntimeUnkTv  = text "rutv"
 
 {- *********************************************************************
 *                                                                      *

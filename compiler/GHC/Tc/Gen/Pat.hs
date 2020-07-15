@@ -424,10 +424,9 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
                -- Note [View patterns and polymorphism]
 
          -- Expression must be a function
-        ; let expr_orig = lexprCtOrigin expr
-              herald    = text "A view pattern expression expects"
+        ; let herald = text "A view pattern expression expects"
         ; (expr_wrap1, Scaled _mult inf_arg_ty, inf_res_sigma)
-            <- matchActualFunTySigma herald expr_orig (Just (unLoc expr)) (1,[]) expr_ty
+            <- matchActualFunTySigma herald (Just (ppr expr)) (1,[]) expr_ty
                -- See Note [View patterns and polymorphism]
                -- expr_wrap1 :: expr_ty "->" (inf_arg_ty -> inf_res_sigma)
 

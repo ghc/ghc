@@ -733,10 +733,11 @@ influences the way it is tidied; see TypeRep.tidyTyVarBndr.
 metaInfoToTyVarName :: MetaInfo -> FastString
 metaInfoToTyVarName  meta_info =
   case meta_info of
-       TauTv       -> fsLit "t"
-       FlatMetaTv  -> fsLit "fmv"
-       FlatSkolTv  -> fsLit "fsk"
-       TyVarTv     -> fsLit "a"
+       TauTv        -> fsLit "t"
+       FlatMetaTv   -> fsLit "fmv"
+       FlatSkolTv   -> fsLit "fsk"
+       TyVarTv      -> fsLit "a"
+       RuntimeUnkTv -> fsLit "r"
 
 newAnonMetaTyVar :: MetaInfo -> Kind -> TcM TcTyVar
 newAnonMetaTyVar mi = newNamedAnonMetaTyVar (metaInfoToTyVarName mi) mi
