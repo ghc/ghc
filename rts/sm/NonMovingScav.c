@@ -207,7 +207,7 @@ nonmovingScavengeOne (StgClosure *q)
     case THUNK_SELECTOR:
     {
         StgSelector *s = (StgSelector *)p;
-        evacuate(&s->selectee);
+        evacuate(&s->payload[0]);
         break;
     }
 

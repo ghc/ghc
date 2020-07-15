@@ -142,7 +142,7 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
             break;
 
         case THUNK_SELECTOR:
-            ptrs[nptrs++] = ((StgSelector *)closure)->selectee;
+            ptrs[nptrs++] = ((StgSelector *)closure)->payload[0];
             break;
 
         case AP:

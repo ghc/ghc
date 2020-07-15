@@ -185,7 +185,7 @@ printClosure( const StgClosure *obj )
 
     case THUNK_SELECTOR:
         printStdObjHdr(obj, "THUNK_SELECTOR");
-        debugBelch(", %p)\n", ((StgSelector *)obj)->selectee);
+        debugBelch(", %p)\n", ((StgSelector *)obj)->payload[0]);
         break;
 
     case BCO:
