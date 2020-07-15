@@ -518,7 +518,7 @@ info    :: { CmmParse (CLabel, Maybe CmmInfoTable, [LocalReg]) }
                 {% liftP . withHomeUnitId $ \pkg ->
                    do dflags <- getDynFlags
                       let prof = profilingInfo dflags $9 $11
-                          ty  = ThunkSelector (fromIntegral $5)
+                          ty  = ThunkSelector (Just (fromIntegral $5))
                           rep = mkRTSRep (fromIntegral $7) $
                                    mkHeapRep dflags False 0 0 ty
                       return (mkCmmEntryLabel pkg $3,
