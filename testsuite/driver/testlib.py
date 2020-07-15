@@ -1649,7 +1649,14 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
     if opts.cmd_wrapper is not None:
         cmd = opts.cmd_wrapper(cmd)
 
-    cmd = 'cd "{opts.testdir}" && {cmd}'.format(**locals())
+    # The test wrapper. Default to $TOP / driver / id
+    # for the identity test-wrapper.
+    if config.test_wrapper is None:
+        test_wrapper = config.top / "driver" / "id"
+    else:
+        test_wrapper = config.test_wrapper
+
+    cmd = 'cd "{opts.testdir}" && TEST_WRAPPER="{test_wrapper}" {cmd}'.format(**locals())
 
     # run the command
     exit_code = runCmd(cmd, stdin_arg, stdout_arg, stderr_arg, opts.run_timeout_multiplier)
