@@ -135,7 +135,13 @@ selector_changed:
     //
 
     uint32_t field = selector_info_tbl->layout.selector_offset;
-    StgClosure *selectee = UNTAG_CLOSURE(((StgSelector*)p)->selectee);
+
+    if (MAX_SPEC_SELECTEE_SIZE <= field) {
+      // Assume this is the generic selector thunk
+      field = (uint32_t)(p->payload[1]);
+    }
+
+    StgClosure *selectee = UNTAG_CLOSURE(((StgSelector*)p)->payload[0]);
 
     // Variables to update: selectee
 selectee_changed:

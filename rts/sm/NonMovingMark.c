@@ -1517,7 +1517,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
         if (RtsFlags.GcFlags.nonmovingSelectorOpt) {
             nonmoving_eval_thunk_selector(queue, (StgSelector*)p, origin);
         } else {
-            PUSH_FIELD((StgSelector *) p, selectee);
+            PUSH_FIELD((StgSelector *) p, payload[0]);
         }
         break;
 

@@ -1213,9 +1213,14 @@ selector_chain:
 
     field = INFO_PTR_TO_STRUCT((StgInfoTable *)info_ptr)->layout.selector_offset;
 
+    if (MAX_SPEC_SELECTEE_SIZE <= field) {
+      // Assume this is the generic selector thunk
+      field = (uint32_t)(p->payload[1]);
+    }
+
     // The selectee might be a constructor closure,
     // so we untag the pointer.
-    selectee = UNTAG_CLOSURE(p->selectee);
+    selectee = UNTAG_CLOSURE(p->payload[0]);
 
 selector_loop:
     // selectee now points to the closure that we're trying to select
