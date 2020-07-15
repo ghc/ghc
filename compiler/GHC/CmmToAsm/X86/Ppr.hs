@@ -118,6 +118,14 @@ pprSizeDecl platform lbl
    then text "\t.size" <+> ppr lbl <> ptext (sLit ", .-") <> ppr lbl
    else empty
 
+-- | Output a region represented by label
+withinLabel :: Platform -> CLabel -> SDoc -> SDoc
+withinLabel platform lbl body =
+   pprLabel platform lbl $$
+   body $$
+   pprSizeDecl platform lbl
+
+
 pprBasicBlock :: NCGConfig -> LabelMap RawCmmStatics -> NatBasicBlock Instr -> SDoc
 pprBasicBlock config info_env (BasicBlock blockid instrs)
   = maybe_infotable $
@@ -162,7 +170,10 @@ pprDatas _config (_, CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStatic
     $$ text ".equiv" <+> ppr alias <> comma <> ppr (CmmLabel ind')
 
 pprDatas config (align, (CmmStaticsRaw lbl dats))
- = vcat (pprAlign platform align : pprLabel platform lbl : map (pprData config) dats)
+ = pprAlign platform align $$
+   withinLabel platform lbl (
+      vcat ( map (pprData config) dats )
+   )
    where
       platform = ncgPlatform config
 
