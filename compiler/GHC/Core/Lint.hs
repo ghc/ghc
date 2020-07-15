@@ -168,7 +168,7 @@ Note [Linting type lets]
 In the desugarer, it's very very convenient to be able to say (in effect)
         let a = Type Bool in
         let x::a = True in <body>
-That is, use a type let.   See Note [Type let] in "GHC.Core".
+That is, use a type let.  See Note [Core type and coercion invariant] in "GHC.Core".
 One place it is used is in mkWwArgs; see Note [Join points and beta-redexes]
 in GHC.Core.Opt.WorkWrap.Utils.  (Maybe there are other "clients" of this feature; I'm not sure).
 
