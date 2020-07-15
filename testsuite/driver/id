@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env bash
 #
 # This is the identity test-wrapper.  For native tests we do not need to run
 # executables through a wrapper, as we would need for cross compiled binaries.
@@ -6,10 +6,4 @@
 #
 # Therefore this backup identity test-wrapper is the default for native builds.
 #
-import sys
-import subprocess
-
-if __name__ == "__main__":
-  if len(sys.argv) < 2:
-    exit(1)
-  exit(subprocess.run(sys.argv[1:]).returncode)
+"$@"
