@@ -19,7 +19,6 @@ instance Applicative (L m) where
 
 instance Monad m => Monad (L m) where
   (>>=)  = undefined
-  return = undefined
 
 zork :: (Monad m) => a -> L m ()
 zork = undefined

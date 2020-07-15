@@ -173,12 +173,12 @@ instance Functor HappyIdentity where
     fmap = liftM
 
 instance Applicative HappyIdentity where
-    pure = return
+    pure = HappyIdentity
     (<*>) = ap
 
 instance Monad HappyIdentity where
-    return = HappyIdentity
     (HappyIdentity p) >>= q = q p
+
 
 happyThen :: () => HappyIdentity a -> (a -> HappyIdentity b) -> HappyIdentity b
 happyThen = (>>=)

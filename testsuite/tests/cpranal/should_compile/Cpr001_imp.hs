@@ -25,7 +25,7 @@ instance Functor (StateTrans s) where
     fmap = liftM
 
 instance Applicative (StateTrans s) where
-    pure = return
+    pure v= ST (\s -> (s, Just v))
     (<*>) = ap
 
 instance Monad (StateTrans s) where
@@ -40,8 +40,6 @@ instance Monad (StateTrans s) where
                                q s1
                      Nothing -> (s1, Nothing)
              )
-    return v
-        = ST (\s -> (s, Just v))
 
 
 -- machine state transitions

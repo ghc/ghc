@@ -3,7 +3,7 @@
 -- Helper for simpl009.hs (see comments there)
 
 module Simpl009Help where
-  
+
 import Control.Applicative (Applicative(..), Alternative(empty, (<|>)))
 import Control.Monad
 
@@ -19,12 +19,12 @@ instance Functor (Parser s) where
     fmap = liftM
 
 instance Applicative (Parser s) where
-    pure = return
+    pure a = Parser (\fut -> fut a)
     (<*>) = ap
 
 instance Monad (Parser s) where
-  return a = Parser (\fut -> fut a)
-  
+
+
   Parser f >>= k =
     Parser (\fut -> f (\a -> let Parser g = k a in g fut))
 
