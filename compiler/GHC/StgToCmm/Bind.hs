@@ -42,6 +42,7 @@ import GHC.Types.CostCentre
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Types.Name
+import GHC.Types.Literal
 import GHC.Unit.Module
 import GHC.Data.List.SetOps
 import GHC.Utils.Misc
@@ -278,7 +279,7 @@ mkRhsClosure    dflags bndr _cc
 
   , let offset_into_int = bytesToWordsRoundUp (targetPlatform dflags) the_offset
                           - fixedHdrSizeW dflags
-  , offset_into_int <= mAX_SPEC_SELECTEE_SIZE dflags -- Offset is small enough
+  -- , offset_into_int <= mAX_SPEC_SELECTEE_SIZE dflags -- Offset is small enough
   = -- NOT TRUE: ASSERT(is_single_constructor)
     -- The simplifier may have statically determined that the single alternative
     -- is the only possible case and eliminated the others, even if there are
@@ -288,7 +289,15 @@ mkRhsClosure    dflags bndr _cc
     --
     -- srt is discarded; it must be empty
     let lf_info = mkSelectorLFInfo bndr offset_into_int (isUpdatable upd_flag)
-    in cgRhsStdThunk bndr lf_info [StgVarArg the_fv]
+    in cgRhsStdThunk bndr lf_info $
+        [StgVarArg the_fv] ++
+        (if offset_into_int <= mAX_SPEC_SELECTEE_SIZE dflags
+         -- Offset is small enough, uses a specific selector thunk, no need to
+         -- add the offset into the closure
+         then []
+         -- Offset is big, uses generic selector which requires the offset in
+         -- the closure
+         else [StgLitArg (mkLitWord (targetPlatform dflags) (fromIntegral offset_into_int))])
 
 ---------- Note [Ap thunks] ------------------
 mkRhsClosure    dflags bndr _cc

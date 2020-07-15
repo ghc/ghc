@@ -644,7 +644,7 @@ scavenge_block (bdescr *bd)
     case THUNK_SELECTOR:
     {
         StgSelector *s = (StgSelector *)p;
-        evacuate(&s->selectee);
+        evacuate(&s->payload[0]);
         p += THUNK_SELECTOR_sizeW();
         break;
     }
@@ -1042,7 +1042,7 @@ scavenge_mark_stack(void)
         case THUNK_SELECTOR:
         {
             StgSelector *s = (StgSelector *)p;
-            evacuate(&s->selectee);
+            evacuate(&s->payload[0]);
             break;
         }
 
@@ -1359,7 +1359,7 @@ scavenge_one(StgPtr p)
     case THUNK_SELECTOR:
     {
         StgSelector *s = (StgSelector *)p;
-        evacuate(&s->selectee);
+        evacuate(&s->payload[0]);
         break;
     }
 

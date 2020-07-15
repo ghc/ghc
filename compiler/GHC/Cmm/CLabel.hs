@@ -442,8 +442,8 @@ data IdLabelInfo
 
 
 data RtsLabelInfo
-  = RtsSelectorInfoTable Bool{-updatable-} Int{-offset-}  -- ^ Selector thunks
-  | RtsSelectorEntry     Bool{-updatable-} Int{-offset-}
+  = RtsSelectorInfoTable Bool{-updatable-} (Maybe Int){-offset-}  -- ^ Selector thunks
+  | RtsSelectorEntry     Bool{-updatable-} (Maybe Int){-offset-}
 
   | RtsApInfoTable       Bool{-updatable-} Int{-arity-}    -- ^ AP thunks
   | RtsApEntry           Bool{-updatable-} Int{-arity-}
@@ -600,13 +600,21 @@ mkRtsPrimOpLabel primop = RtsLabel (RtsPrimOp primop)
 
 mkSelectorInfoLabel :: DynFlags -> Bool -> Int -> CLabel
 mkSelectorInfoLabel dflags upd offset =
-   ASSERT(offset >= 0 && offset <= mAX_SPEC_SELECTEE_SIZE dflags)
-   RtsLabel (RtsSelectorInfoTable upd offset)
+   ASSERT(offset >= 0) -- &&
+   let moff =
+        if offset <= mAX_SPEC_SELECTEE_SIZE dflags
+        then Just offset
+        else Nothing
+   in RtsLabel (RtsSelectorInfoTable upd moff)
 
 mkSelectorEntryLabel :: DynFlags -> Bool -> Int -> CLabel
 mkSelectorEntryLabel dflags upd offset =
-   ASSERT(offset >= 0 && offset <= mAX_SPEC_SELECTEE_SIZE dflags)
-   RtsLabel (RtsSelectorEntry upd offset)
+   ASSERT(offset >= 0) -- && offset <= mAX_SPEC_SELECTEE_SIZE dflags)
+   let moff =
+        if offset <= mAX_SPEC_SELECTEE_SIZE dflags
+        then Just offset
+        else Nothing
+   in RtsLabel (RtsSelectorEntry upd moff)
 
 mkApInfoTableLabel :: DynFlags -> Bool -> Int -> CLabel
 mkApInfoTableLabel dflags upd arity =
@@ -1288,15 +1296,31 @@ pprCLbl platform = \case
 
    (RtsLabel (RtsApFast str)) -> ftext str <> text "_fast"
 
-   (RtsLabel (RtsSelectorInfoTable upd_reqd offset)) ->
+   (RtsLabel (RtsSelectorInfoTable upd_reqd (Just offset))) ->
+   -- ASSERT(offset >= 0 && offset <= mAX_SPEC_SELECTEE_SIZE dflags)
     hcat [text "stg_sel_", text (show offset),
           ptext (if upd_reqd
                  then (sLit "_upd_info")
                  else (sLit "_noupd_info"))
         ]
 
-   (RtsLabel (RtsSelectorEntry upd_reqd offset)) ->
+   (RtsLabel (RtsSelectorInfoTable upd_reqd Nothing)) ->
+   -- ASSERT(offset >= 0 && offset <= mAX_SPEC_SELECTEE_SIZE dflags)
+    hcat [text "stg_sel_n",
+          ptext (if upd_reqd
+                 then (sLit "_upd_info")
+                 else (sLit "_noupd_info"))
+        ]
+
+   (RtsLabel (RtsSelectorEntry upd_reqd (Just offset))) ->
     hcat [text "stg_sel_", text (show offset),
+                ptext (if upd_reqd
+                        then (sLit "_upd_entry")
+                        else (sLit "_noupd_entry"))
+        ]
+
+   (RtsLabel (RtsSelectorEntry upd_reqd Nothing)) ->
+    hcat [text "stg_sel_n",
                 ptext (if upd_reqd
                         then (sLit "_upd_entry")
                         else (sLit "_noupd_entry"))
