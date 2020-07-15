@@ -95,8 +95,8 @@ canonicalize (CNonCanonical { cc_ev = ev })
                                   canEqNC    ev eq_rel ty1 ty2
       IrredPred {}          -> do traceTcS "canEvNC:irred" (ppr pred)
                                   canIrred OtherCIS ev
-      ForAllPred tvs theta p -> do traceTcS "canEvNC:forall" (ppr pred)
-                                   canForAllNC ev tvs theta p
+      ForAllPred tvs th p   -> do traceTcS "canEvNC:forall" (ppr pred)
+                                  canForAllNC ev tvs th p
   where
     pred = ctEvPred ev
 
@@ -707,11 +707,16 @@ canIrred status ev
        ; traceTcS "can_pred" (text "IrredPred = " <+> ppr pred)
        ; (xi,co) <- flatten FM_FlattenAll ev pred -- co :: xi ~ pred
        ; rewriteEvidence ev xi co `andWhenContinue` \ new_ev ->
+
     do { -- Re-classify, in case flattening has improved its shape
+         -- Code is like the CNonCanonical case of canonicalize, except
+         -- that the IrredPred branch stops work
        ; case classifyPredType (ctEvPred new_ev) of
            ClassPred cls tys     -> canClassNC new_ev cls tys
            EqPred eq_rel ty1 ty2 -> canEqNC new_ev eq_rel ty1 ty2
-           _                     -> continueWith $
+           ForAllPred tvs th p   -> do traceTcS "canEvNC:forall" (ppr pred)
+                                       canForAllNC ev tvs th p
+           IrredPred {}          -> continueWith $
                                     mkIrredCt status new_ev } }
 
 {- *********************************************************************
@@ -2105,6 +2110,10 @@ canEqTyVar2 dflags ev eq_rel swapped tv1 rhs
        ; continueWith (mkIrredCt status new_ev) }
   where
     mtvu = metaTyVarUpdateOK dflags tv1 rhs
+           -- Despite the name of the function, tv1 may not be a
+           -- unification variable; we are really checking that this
+           -- equality is ok to be used to rewrite others, i.e.  that
+           -- it satisfies the conditions for CTyEqCan
 
     role = eqRelRole eq_rel
 
