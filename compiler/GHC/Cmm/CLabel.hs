@@ -1333,8 +1333,34 @@ pprCLbl platform = \case
       text "SLOW_CALL_fast_" <> text pat <> ptext (sLit "_ctr")
 
    (ForeignLabel str _ _ _) -> ftext str
+   (IdLabel name _cafs flavor) -> (if isExternalName name then -- external names should be ppred as is
+                                    ppr name
+                                  else if isTopLevel flavor then
+                                    -- Theoretically every top level binding should have a unique OCC after TidyCore
+                                    -- but this is not true because of `sat` and maybe others
+                                    -- TODO: can we run TidyCore again as the last trasformation?
+                                    -- Because the name is not external we expect that the correspoding label will be hidden from linking at the asm ppr stage
+                                    -- so we do not care with providing module part of the name
+                                    (ztext $ zEncodeFS $ getOccFS name) <> (char '_') <> ppr name
+                                  else
+                                    hiddenPrefix <> ppr name
+                                  )
+                                  -- always add flavor
+                                  <> ppIdFlavor flavor
+                                  where
+                                    isTopLevel InfoTable  = True
+                                    isTopLevel Entry      = True
+                                    isTopLevel Slow       = True -- XXX: Is it always true? Not critical
+                                    isTopLevel _          = False
 
-   (IdLabel name _cafs flavor) -> internalNamePrefix platform name <> ppr name <> ppIdFlavor flavor
+                                    -- hide from the symbol table
+                                    hiddenPrefix = getPprStyle $ \ sty ->
+                                      if asmStyle sty then
+                                          ptext (asmTempLabelPrefix platform)
+                                      else
+                                        empty
+
+
 
    (CC_Label cc)       -> ppr cc
    (CCS_Label ccs)     -> ppr ccs
@@ -1375,14 +1401,6 @@ instance Outputable ForeignLabelSource where
         ForeignLabelInThisPackage       -> parens $ text "this package"
         ForeignLabelInExternalPackage   -> parens $ text "external package"
 
-internalNamePrefix :: Platform -> Name -> SDoc
-internalNamePrefix platform name = getPprStyle $ \ sty ->
-  if asmStyle sty && isRandomGenerated then
-      ptext (asmTempLabelPrefix platform)
-  else
-    empty
-  where
-    isRandomGenerated = not $ isExternalName name
 
 tempLabelPrefixOrUnderscore :: Platform -> SDoc
 tempLabelPrefixOrUnderscore platform =
