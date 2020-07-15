@@ -831,10 +831,14 @@ Now we can move the case inward and we only have to change the jump:
 (Core Lint would still check that the body of the join point has the right type;
 that type would simply not be reflected in the join id.)
 
-Note [The polymorphism rule of join points]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Invariant 4 of Note [Invariants on join points] forbids a join point to be
-polymorphic in its return type. That is, if its type is
+Historic Note [The polymorphism rule of join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Before we had Note [Join point worker/wrapper], we used to have as Invariant 4
+of Note [Invariants on join points]
+
+  4. The binding's type must not be polymorphic in its return type.
+
+That is, if its type is
 
   forall a1 ... ak. t1 -> ... -> tn -> r
 

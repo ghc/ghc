@@ -2984,9 +2984,6 @@ decideJoinPointHood NotTopLevel usage bndrs
         -- Invariant 2a: stable unfoldings
         -- See Note [Join points and INLINE pragmas]
       , ok_unfolding arity (realIdUnfolding bndr)
-
-        -- Invariant 4: Satisfies polymorphism rule
-      , isValidJoinPointType arity (idType bndr)
       = True
 
       | otherwise

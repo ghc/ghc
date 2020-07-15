@@ -15,6 +15,7 @@ module GHC.Driver.Ppr
    , pprTraceWithFlags
    , pprTraceM
    , pprTraceDebug
+   , pprTraceWith
    , pprTraceIt
    , pprSTrace
    , pprTraceException

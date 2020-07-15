@@ -276,7 +276,7 @@ applyTypeToArgs e op_ty args
     go op_ty (Coercion co : args) = go_ty_args op_ty [mkCoercionTy co] args
     go op_ty (_ : args)           | Just (_, _, res_ty) <- splitFunTy_maybe op_ty
                                   = go res_ty args
-    go _ args = pprPanic "applyTypeToArgs" (panic_msg args)
+    go op_ty args = pprPanic "applyTypeToArgs" (panic_msg op_ty args)
 
     -- go_ty_args: accumulate type arguments so we can
     -- instantiate all at once with piResultTys
@@ -287,8 +287,9 @@ applyTypeToArgs e op_ty args
     go_ty_args op_ty rev_tys args
        = go (piResultTys op_ty (reverse rev_tys)) args
 
-    panic_msg as = vcat [ text "Expression:" <+> pprCoreExpr e
+    panic_msg ot as = vcat [ text "Expression:" <+> pprCoreExpr e
                      , text "Type:" <+> ppr op_ty
+                     , text "Type':" <+> ppr ot
                      , text "Args:" <+> ppr args
                      , text "Args':" <+> ppr as ]
 
@@ -2622,4 +2623,3 @@ isUnsafeEqualityProof e
   = idName v == unsafeEqualityProofName
   | otherwise
   = False
-

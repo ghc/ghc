@@ -53,7 +53,7 @@ import GHC.Core.Utils
 import GHC.Core.Opt.Arity ( ArityType(..), arityTypeArity, isBotArityType
                           , pushCoTyArg, pushCoValArg
                           , idArityType, etaExpandAT )
-import GHC.Core.SimpleOpt ( joinPointBinding_maybe, joinPointBindings_maybe )
+import GHC.Core.SimpleOpt ( tryJoinPointWW, tryJoinPointWWs )
 import GHC.Core.FVs     ( mkRuleInfo )
 import GHC.Core.Rules   ( lookupRule, getRules, initRuleOpts )
 import GHC.Types.Basic
@@ -1052,8 +1052,9 @@ simplExprF1 env (Case scrut bndr _ alts) cont
                                  , sc_env = env, sc_cont = cont })
 
 simplExprF1 env (Let (Rec pairs) body) cont
-  | Just pairs' <- joinPointBindings_maybe pairs
-  = {-#SCC "simplRecJoinPoin" #-} simplRecJoinPoint env pairs' body cont
+  | Just (pairs', wrappers) <- tryJoinPointWWs (getInScope env) (exprType body) pairs
+  -- , null wrappers ||  pprTrace "simple join Rec" (ppr pairs'<+> ppr (exprType body)) True
+  = {-#SCC "simplRecJoinPoin" #-} simplRecJoinPoint env pairs' wrappers body cont
 
   | otherwise
   = {-#SCC "simplRecE" #-} simplRecE env pairs body cont
@@ -1065,8 +1066,9 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
     do { ty' <- simplType env ty
        ; simplExprF (extendTvSubst env bndr ty') body cont }
 
-  | Just (bndr', rhs') <- joinPointBinding_maybe bndr rhs
-  = {-#SCC "simplNonRecJoinPoint" #-} simplNonRecJoinPoint env bndr' rhs' body cont
+  | Just (bndr', rhs', wrappers) <- tryJoinPointWW (getInScope env) (exprType body) bndr rhs
+  -- , null wrappers || pprTrace "simple join NonRec" (ppr bndr' $$ ppr (idType bndr') $$ ppr (exprType body) $$ ppr (isJoinId bndr) $$ ppr wrappers) True
+  = {-#SCC "simplNonRecJoinPoint" #-} simplNonRecJoinPoint env bndr' rhs' wrappers body cont
 
   | otherwise
   = {-#SCC "simplNonRecE" #-} simplNonRecE env bndr (rhs, env) ([], body) cont
@@ -1684,33 +1686,41 @@ type MaybeJoinCont = Maybe SimplCont
   -- Just k  => This is a join binding with continuation k
   -- See Note [Rules and unfolding for join points]
 
-simplNonRecJoinPoint :: SimplEnv -> InId -> InExpr
-                     -> InExpr -> SimplCont
-                     -> SimplM (SimplFloats, OutExpr)
-simplNonRecJoinPoint env bndr rhs body cont
+preInlineJoinWrappers :: SimplEnv -> [(InId, InExpr)] -> SimplEnv
+preInlineJoinWrappers env binds
+  = foldl' (\env (b,r) -> extendIdSubst env b (mkContEx env r)) env' binds
+  where
+    env' = addNewInScopeIds env (map fst binds)
+
+simplNonRecJoinPoint
+  :: SimplEnv -> InId -> InExpr -> [(InId, InExpr)] -> InExpr -> SimplCont
+  -> SimplM (SimplFloats, OutExpr)
+simplNonRecJoinPoint env bndr rhs wrappers body cont
   | ASSERT( isJoinId bndr ) True
-  , Just env' <- preInlineUnconditionally env NotTopLevel bndr rhs env
+  , ASSERT( wrappers `lengthAtMost` 1 ) True
+  , Just env1 <- preInlineUnconditionally env NotTopLevel bndr rhs env
   = do { tick (PreInlineUnconditionally bndr)
-       ; simplExprF env' body cont }
+       ; let env2 = preInlineJoinWrappers env1 wrappers
+       ; simplExprF env2 body cont }
 
-   | otherwise
-   = wrapJoinCont env cont $ \ env cont ->
-     do { -- We push join_cont into the join RHS and the body;
-          -- and wrap wrap_cont around the whole thing
-        ; let mult   = contHoleScaling cont
-              res_ty = contResultType cont
-        ; (env1, bndr1)    <- simplNonRecJoinBndr env bndr mult res_ty
-        ; (env2, bndr2)    <- addBndrRules env1 bndr bndr1 (Just cont)
-        ; (floats1, env3)  <- simplJoinBind env2 cont bndr bndr2 rhs env
-        ; (floats2, body') <- simplExprF env3 body cont
-        ; return (floats1 `addFloats` floats2, body') }
-
+  | otherwise
+  = wrapJoinCont env cont $ \ env cont ->
+    do { -- We push join_cont into the join RHS and the body;
+         -- and wrap wrap_cont around the whole thing
+       ; let mult   = contHoleScaling cont
+             res_ty = contResultType cont
+       ; (env1, bndr1)    <- simplNonRecJoinBndr env bndr mult res_ty
+       ; (env2, bndr2)    <- addBndrRules env1 bndr bndr1 (Just cont)
+       ; (floats1, env3)  <- simplJoinBind env2 cont bndr bndr2 rhs env
+       ; let env4   = preInlineJoinWrappers env3 wrappers
+       ; (floats2, body') <- simplExprF env4 body cont
+       ; return (floats1 `addFloats` floats2, body') }
 
 ------------------
-simplRecJoinPoint :: SimplEnv -> [(InId, InExpr)]
-                  -> InExpr -> SimplCont
-                  -> SimplM (SimplFloats, OutExpr)
-simplRecJoinPoint env pairs body cont
+simplRecJoinPoint
+  :: SimplEnv -> [(InId, InExpr)] -> [(InId, InExpr)] -> InExpr -> SimplCont
+  -> SimplM (SimplFloats, OutExpr)
+simplRecJoinPoint env pairs wrappers body cont
   = wrapJoinCont env cont $ \ env cont ->
     do { let bndrs  = map fst pairs
              mult   = contHoleScaling cont
@@ -1718,8 +1728,9 @@ simplRecJoinPoint env pairs body cont
        ; env1 <- simplRecJoinBndrs env bndrs mult res_ty
                -- NB: bndrs' don't have unfoldings or rules
                -- We add them as we go down
-       ; (floats1, env2)  <- simplRecBind env1 NotTopLevel (Just cont) pairs
-       ; (floats2, body') <- simplExprF env2 body cont
+       ; let env2   = preInlineJoinWrappers env1 wrappers
+       ; (floats1, env3)  <- simplRecBind env2 NotTopLevel (Just cont) pairs
+       ; (floats2, body') <- simplExprF env3 body cont
        ; return (floats1 `addFloats` floats2, body') }
 
 --------------------
