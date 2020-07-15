@@ -785,6 +785,7 @@ class ( IsPass p
       , Data (HsTupArg (GhcPass p))
       , Data (IPBind (GhcPass p))
       , ToHie (Context (Located (IdGhcP p)))
+      , ToHie (Context (Located (XUnboundVar (GhcPass p))))
       , ToHie (RFContext (Located (AmbiguousFieldOcc (GhcPass p))))
       , ToHie (RFContext (Located (FieldOcc (GhcPass p))))
       , ToHie (TScoped (LHsWcType (GhcPass (NoGhcTcPass p))))
@@ -798,6 +799,9 @@ instance HiePass 'Renamed where
   hiePass = HieRn
 instance HiePass 'Typechecked where
   hiePass = HieTc
+
+instance ToHie (Context (Located NoExtField)) where
+  toHie _ = pure []
 
 instance HiePass p => ToHie (BindContext (Located (HsBind (GhcPass p)))) where
   toHie (BC context scope b@(L span bind)) =
@@ -1042,8 +1046,8 @@ instance HiePass p => ToHie (Located (HsExpr (GhcPass p))) where
         [ toHie $ C Use (L mspan var)
              -- Patch up var location since typechecker removes it
         ]
-      HsUnboundVar _ _ ->
-        []
+      HsUnboundVar var _ ->
+        [ toHie $ C Use (L mspan var) ]
       HsConLikeOut _ con ->
         [ toHie $ C Use $ L mspan $ conLikeName con
         ]

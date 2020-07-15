@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XImpredicativeTypes -fno-warn-deprecated-flags #-}
+{-# LANGUAGE ImpredicativeTypes  #-}
 
 -- Sept 16: now scraping through with -XImpredicateTypes
 
