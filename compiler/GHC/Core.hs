@@ -209,8 +209,8 @@ These data types are the heart of the compiler
 --    This is used to implement @newtype@s (a @newtype@ constructor or
 --    destructor just becomes a 'Cast' in Core) and GADTs.
 --
--- *  Notes. These allow general information to be added to expressions
---    in the syntax tree
+-- *  Ticks. These are used to represent all the source annotation we
+--    support: profiling SCCs, HPC ticks, and GHCi breakpoints.
 --
 -- *  A type: this should only show up at the top level of an Arg
 --
@@ -573,10 +573,6 @@ Note [Core let goal]
 * The simplifier tries to ensure that if the RHS of a let is a constructor
   application, its arguments are trivial, so that the constructor can be
   inlined vigorously.
-
-Note [Type let]
-~~~~~~~~~~~~~~~
-See #type_let#
 
 Note [Empty case alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2058,12 +2054,14 @@ mkLetRec :: [(b, Expr b)] -> Expr b -> Expr b
 mkLetRec [] body = body
 mkLetRec bs body = Let (Rec bs) body
 
--- | Create a binding group where a type variable is bound to a type. Per "GHC.Core#type_let",
+-- | Create a binding group where a type variable is bound to a type.
+-- Per Note [Core type and coercion invariant],
 -- this can only be used to bind something in a non-recursive @let@ expression
 mkTyBind :: TyVar -> Type -> CoreBind
 mkTyBind tv ty      = NonRec tv (Type ty)
 
--- | Create a binding group where a type variable is bound to a type. Per "GHC.Core#type_let",
+-- | Create a binding group where a type variable is bound to a type.
+-- Per Note [Core type and coercion invariant],
 -- this can only be used to bind something in a non-recursive @let@ expression
 mkCoBind :: CoVar -> Coercion -> CoreBind
 mkCoBind cv co      = NonRec cv (Coercion co)
