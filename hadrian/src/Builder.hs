@@ -30,6 +30,7 @@ import Hadrian.Utilities
 import Base
 import Context
 import Oracles.Flag
+import Oracles.Setting (setting, Setting(..))
 import Packages
 
 -- | C compiler can be used in two different modes:
@@ -179,7 +180,10 @@ instance H.Builder Builder where
         Autoreconf dir -> return [dir -/- "configure.ac"]
         Configure  dir -> return [dir -/- "configure"]
 
-        Ghc _ Stage0 -> includesDependencies Stage0
+        Ghc _ Stage0 -> do
+          _bootGhcVersion <- setting GhcVersion
+          _bootGhc <- setting SystemGhc
+          includesDependencies Stage0
         Ghc _ stage -> do
             root <- buildRoot
             touchyPath <- programPath (vanillaContext Stage0 touchy)
