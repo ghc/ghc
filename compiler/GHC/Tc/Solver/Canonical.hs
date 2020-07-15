@@ -2105,6 +2105,10 @@ canEqTyVar2 dflags ev eq_rel swapped tv1 rhs
        ; continueWith (mkIrredCt status new_ev) }
   where
     mtvu = metaTyVarUpdateOK dflags tv1 rhs
+           -- Despite the name of the function, tv1 may not be a
+           -- unification variable; we are really checking that this
+           -- equality is ok to be used to rewrite others, i.e.  that
+           -- it satisfies the conditions for CTyEqCan
 
     role = eqRelRole eq_rel
 

@@ -557,11 +557,51 @@ trIO = liftTcM . liftIO
 liftTcM :: TcM a -> TR a
 liftTcM = id
 
+-- When we make new unification variables in the GHCi debugger,
+-- we use RuntimeUnkTvs.   See Note [RuntimeUnkTv].
 newVar :: Kind -> TR TcType
-newVar = liftTcM . newFlexiTyVarTy
+newVar kind = liftTcM (do { tv <- newAnonMetaTyVar RuntimeUnkTv kind
+                          ; return (mkTyVarTy tv) })
 
 newOpenVar :: TR TcType
-newOpenVar = liftTcM newOpenFlexiTyVarTy
+newOpenVar = liftTcM (do { kind <- newOpenTypeKind
+                         ; newVar kind })
+
+{- Note [RuntimeUnkTv]
+~~~~~~~~~~~~~~~~~~~~~~
+In the GHCi debugger we use unification varaibles whose MetaInfo is
+RuntimeUnkTv.  The special property of a RuntimeUnkTv is that it can
+unify with a polytype (see GHC.Tc.Utils.Unify.metaTyVarUpdateOK).
+If we don't do this `:print <term>` will fail if the type of <term>
+has nested `forall`s or `=>`s.
+
+This is because the GHCi debugger's internals will attempt to unify a
+metavariable with the type of <term> and then display the result, but
+if the type has nested `forall`s or `=>`s, then unification will fail
+unless we do something special.  As a result, `:print` will bail out
+and the unhelpful result will be `<term> = (_t1::t1)` (where `t1` is a
+metavariable).
+
+Beware: <term> can have nested `forall`s even if its definition doesn't use
+RankNTypes! Here is an example from #14828:
+
+  class Functor f where
+    fmap :: (a -> b) -> f a -> f b
+
+Somewhat surprisingly, `:print fmap` considers the type of fmap to have
+nested foralls. This is because the GHCi debugger sees the type
+`fmap :: forall f. Functor f => forall a b. (a -> b) -> f a -> f b`.
+We could envision deeply instantiating this type to get the type
+`forall f a b. Functor f => (a -> b) -> f a -> f b`,
+but this trick wouldn't work for higher-rank types.
+
+Instead, we adopt a simpler fix: allow RuntimeUnkTv to unify with a
+polytype..  This allows metavariables to unify with types that have
+nested (or higher-rank) `forall`s/`=>`s, which makes `:print fmap`
+display as
+`fmap = (_t1::forall a b. Functor f => (a -> b) -> f a -> f b)`, as expected.
+-}
+
 
 instTyVars :: [TyVar] -> TR (TCvSubst, [TcTyVar])
 -- Instantiate fresh mutable type variables from some TyVars
@@ -576,6 +616,10 @@ type RttiInstantiation = [(TcTyVar, TyVar)]
    -- If the TcTyVar has not been refined by the runtime type
    -- elaboration, then we want to turn it back into the
    -- original RuntimeUnk
+   --
+   -- July 20: I'm not convinced that the little dance from
+   -- RuntimeUnkTv unification variables to RuntimeUnk skolems
+   -- is buying us anything.  ToDo: get rid of it.
 
 -- | Returns the instantiated type scheme ty', and the
 --   mapping from new (instantiated) -to- old (skolem) type variables
@@ -583,6 +627,7 @@ instScheme :: QuantifiedType -> TR (TcType, RttiInstantiation)
 instScheme (tvs, ty)
   = do { (subst, tvs') <- instTyVars tvs
        ; let rtti_inst = [(tv',tv) | (tv',tv) <- tvs' `zip` tvs]
+       ; traceTR (text "instScheme" <+> (ppr tvs $$ ppr ty $$ ppr tvs'))
        ; return (substTy subst ty, rtti_inst) }
 
 applyRevSubst :: RttiInstantiation -> TR ()

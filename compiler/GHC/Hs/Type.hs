@@ -349,7 +349,7 @@ data HsForAllTelescope pass
     { hsf_xvis      :: XHsForAllVis pass
     , hsf_vis_bndrs :: [LHsTyVarBndr () pass]
     }
-  | HsForAllInvis -- ^ An invisible @forall@ (e.g., @forall a {b} c -> {...}@),
+  | HsForAllInvis -- ^ An invisible @forall@ (e.g., @forall a {b} c. {...}@),
                   --   where each binder has a 'Specificity'.
     { hsf_xinvis       :: XHsForAllInvis pass
     , hsf_invis_bndrs  :: [LHsTyVarBndr Specificity pass]
@@ -1710,7 +1710,7 @@ mkFieldOcc rdr = FieldOcc noExtField rdr
 -- occurrences).
 --
 -- See Note [HsRecField and HsRecUpdField] in "GHC.Hs.Pat" and
--- Note [Disambiguating record fields] in "GHC.Tc.Gen.Expr".
+-- Note [Disambiguating record fields] in "GHC.Tc.Gen.App".
 -- See Note [Located RdrNames] in "GHC.Hs.Expr"
 data AmbiguousFieldOcc pass
   = Unambiguous (XUnambiguous pass) (Located RdrName)
