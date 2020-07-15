@@ -86,6 +86,10 @@ module Control.Exception (
         try,
         tryJust,
 
+        -- ** The @retryN@ functions
+        retryN,
+        retryNWith,
+
         -- ** The @evaluate@ function
         evaluate,
 

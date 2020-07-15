@@ -64,6 +64,10 @@ module Control.Exception.Base (
         tryJust,
         onException,
 
+        -- ** The @retryN@ functions
+        retryN,
+        retryNWith,
+
         -- ** The @evaluate@ function
         evaluate,
 
@@ -106,6 +110,7 @@ import GHC.Exception
 import GHC.Show
 -- import GHC.Exception hiding ( Exception )
 import GHC.Conc.Sync
+import GHC.Num
 
 import Data.Either
 
@@ -191,6 +196,40 @@ tryJust p a = do
 onException :: IO a -> IO b -> IO a
 onException io what = io `catch` \e -> do _ <- what
                                           throwIO (e :: SomeException)
+
+-----------------------------------------------------------------------------
+-- Retrying after an exception
+
+-- | Retry computation at most \n\ times for selected exceptions. If \n\ is zero
+-- or less, the computation is performed without any exception-handling.
+retryN :: Exception e
+       => (e -> Maybe b) -- ^ Exception predicate
+       -> Int            -- ^ Maximum number of retries
+       -> IO a           -- ^ Action to retry
+       -> IO a
+retryN predicate = retryNWith predicate (\_ -> return ())
+
+-- | A variant of 'retryN' that performs an action (such as a cleanup 
+-- or delay) after every exception, at most \n\ times. If \n\ is zero
+-- or less, the computation is performed without any exception-handling.
+-- For example:
+--
+-- > retryNWith
+-- >     (\e -> if isPermissionError (ioeGetErrorType e) then Just () else Nothing)
+-- >     (\_ -> threadDelay 100)
+-- >     3
+-- >     removeDirectoryRecursive "my/dir/"
+-- >     
+retryNWith :: Exception e
+           => (e -> Maybe b) -- ^ Exception predicate
+           -> (b -> IO ())   -- ^ Action to perform after an exception
+           -> Int            -- ^ Maximum number of retries
+           -> IO a           -- ^ Action to retry
+           -> IO a
+retryNWith p c i f
+  | i <= 0    = f
+  | otherwise = catchJust p f $ 
+                \x -> c x >> retryNWith p c (i-1) f
 
 -----------------------------------------------------------------------------
 -- Some Useful Functions
