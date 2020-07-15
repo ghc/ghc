@@ -74,6 +74,8 @@ import GHC.Builtin.Utils
 import GHC.Types.Name.Reader
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Gen.Expr
+import GHC.Tc.Errors( reportAllUnsolved )
+import GHC.Tc.Gen.App( tcInferSigma )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Gen.Export
 import GHC.Tc.Types.Evidence
@@ -99,6 +101,7 @@ import GHC.Tc.TyCl.Instance
 import GHC.IfaceToCore
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.TcType
+import GHC.Tc.Utils.Instantiate (tcGetInsts)
 import GHC.Tc.Solver
 import GHC.Tc.TyCl
 import GHC.Tc.Instance.Typeable ( mkTypeableBinds )
@@ -136,7 +139,6 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Utils.Misc
 import GHC.Data.Bag
-import GHC.Tc.Utils.Instantiate (tcGetInsts)
 import qualified GHC.LanguageExtensions as LangExt
 import Data.Data ( Data )
 import GHC.Hs.Dump
@@ -2478,9 +2480,9 @@ isGHCiMonad hsc_env ty
             Nothing -> failWithTc $ text ("Can't find type:" ++ ty)
 
 -- | How should we infer a type? See Note [TcRnExprMode]
-data TcRnExprMode = TM_Inst    -- ^ Instantiate the type fully (:type)
-                  | TM_NoInst  -- ^ Do not instantiate the type (:type +v)
-                  | TM_Default -- ^ Default the type eagerly (:type +d)
+data TcRnExprMode = TM_Inst     -- ^ Instantiate inferred quantifiers only (:type)
+                  | TM_Default  -- ^ Instantiate all quantifiers,
+                                --   and do eager defaulting (:type +d)
 
 -- | tcRnExpr just finds the type of an expression
 --   for :type
@@ -2495,16 +2497,15 @@ tcRnExpr hsc_env mode rdr_expr
     (rn_expr, _fvs) <- rnLExpr rdr_expr ;
     failIfErrsM ;
 
-        -- Now typecheck the expression, and generalise its type
-        -- it might have a rank-2 type (e.g. :t runST)
-    uniq <- newUnique ;
-    let { fresh_it  = itName uniq (getLoc rdr_expr) } ;
-    ((tclvl, (_tc_expr, res_ty)), lie)
+    -- Typecheck the expression
+    ((tclvl, res_ty), lie)
           <- captureTopConstraints $
              pushTcLevelM          $
-             tc_infer rn_expr ;
+             tcInferSigma inst rn_expr ;
 
     -- Generalise
+    uniq <- newUnique ;
+    let { fresh_it = itName uniq (getLoc rdr_expr) } ;
     (qtvs, dicts, _, residual, _)
          <- simplifyInfer tclvl infer_mode
                           []    {- No sig vars -}
@@ -2528,14 +2529,10 @@ tcRnExpr hsc_env mode rdr_expr
     return (snd (normaliseType fam_envs Nominal ty))
     }
   where
-    tc_infer expr | inst      = tcInferRho expr
-                  | otherwise = tcInferSigma expr
-                  -- tcInferSigma: see Note [Implementing :type]
-
+    -- Optionally instantiate the type of the expression
     -- See Note [TcRnExprMode]
     (inst, infer_mode, perhaps_disable_default_warnings) = case mode of
-      TM_Inst    -> (True,  NoRestrictions, id)
-      TM_NoInst  -> (False, NoRestrictions, id)
+      TM_Inst    -> (False, NoRestrictions,  id)
       TM_Default -> (True,  EagerDefaulting, unsetWOptM Opt_WarnTypeDefaults)
 
 {- Note [Implementing :type]
@@ -2621,32 +2618,20 @@ tcRnType hsc_env flexi normalise rdr_type
 {- Note [TcRnExprMode]
 ~~~~~~~~~~~~~~~~~~~~~~
 How should we infer a type when a user asks for the type of an expression e
-at the GHCi prompt? We offer 3 different possibilities, described below. Each
-considers this example, with -fprint-explicit-foralls enabled:
-
-  foo :: forall a f b. (Show a, Num b, Foldable f) => a -> f b -> String
-  :type{,-spec,-def} foo @Int
+at the GHCi prompt? We offer 2 different possibilities, described below. Each
+considers this example, with -fprint-explicit-foralls enabled.  See also
+https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0179-printing-foralls.rst
 
 :type / TM_Inst
 
-  In this mode, we report the type that would be inferred if a variable
-  were assigned to expression e, without applying the monomorphism restriction.
-  This means we instantiate the type and then regeneralize, as discussed
-  in #11376.
+  In this mode, we report the type obained by instantiating only the
+  /inferred/ quantifiers of e's type, solving constraints, and
+  re-generalising, as discussed in #11376.
 
-  > :type foo @Int
-  forall {b} {f :: * -> *}. (Foldable f, Num b) => Int -> f b -> String
+  > :type reverse
+  reverse :: forall a. [a] -> [a]
 
-  Note that the variables and constraints are reordered here, because this
-  is possible during regeneralization. Also note that the variables are
-  reported as Inferred instead of Specified.
-
-:type +v / TM_NoInst
-
-  This mode is for the benefit of users using TypeApplications. It does no
-  instantiation whatsoever, sometimes meaning that class constraints are not
-  solved.
-
+  -- foo :: forall a f b. (Show a, Num b, Foldable f) => a -> f b -> String
   > :type +v foo @Int
   forall f b. (Show Int, Num b, Foldable f) => Int -> f b -> String
 
@@ -2655,12 +2640,17 @@ considers this example, with -fprint-explicit-foralls enabled:
 
 :type +d / TM_Default
 
-  This mode is for the benefit of users who wish to see instantiations of
-  generalized types, and in particular to instantiate Foldable and Traversable.
-  In this mode, any type variable that can be defaulted is defaulted. Because
-  GHCi uses -XExtendedDefaultRules, this means that Foldable and Traversable are
+  This mode is for the benefit of users who wish to see instantiations
+  of generalized types, and in particular to instantiate Foldable and
+  Traversable.  In this mode, all type variables (inferred or
+  specified) are instantiated.  Because GHCi uses
+  -XExtendedDefaultRules, this means that Foldable and Traversable are
   defaulted.
 
+  > :type +d reverse
+  reverse :: forall {a}. [a] -> [a]
+
+  -- foo :: forall a f b. (Show a, Num b, Foldable f) => a -> f b -> String
   > :type +d foo @Int
   Int -> [Integer] -> String
 
@@ -2675,6 +2665,10 @@ considers this example, with -fprint-explicit-foralls enabled:
   type in the defaulting list that is both Num and Monoid. (If this list is
   modified to include an element that is both Num and Monoid, the defaulting
   would succeed, of course.)
+
+  Note that the variables and constraints are reordered here, because this
+  is possible during regeneralization. Also note that the variables are
+  reported as Inferred instead of Specified.
 
 Note [Kind-generalise in tcRnType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
