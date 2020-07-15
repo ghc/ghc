@@ -502,23 +502,25 @@ addBinTickLHsExpr boxLabel (L pos e0)
 -- in the addTickLHsExpr family of functions.)
 
 addTickHsExpr :: HsExpr GhcTc -> TM (HsExpr GhcTc)
-addTickHsExpr e@(HsVar _ (L _ id)) = do freeVar id; return e
-addTickHsExpr (HsUnboundVar {})    = panic "addTickHsExpr.HsUnboundVar"
+addTickHsExpr e@(HsVar _ (L _ id))  = do freeVar id; return e
+addTickHsExpr e@(HsUnboundVar id _) = do freeVar id; return e
+addTickHsExpr e@(HsRecFld _ (Ambiguous id _))   = do freeVar id; return e
+addTickHsExpr e@(HsRecFld _ (Unambiguous id _)) = do freeVar id; return e
 addTickHsExpr e@(HsConLikeOut _ con)
   | Just id <- conLikeWrapId_maybe con = do freeVar id; return e
-addTickHsExpr e@(HsIPVar {})       = return e
-addTickHsExpr e@(HsOverLit {})     = return e
-addTickHsExpr e@(HsOverLabel{})    = return e
-addTickHsExpr e@(HsLit {})         = return e
-addTickHsExpr (HsLam x matchgroup) = liftM (HsLam x)
-                                           (addTickMatchGroup True matchgroup)
-addTickHsExpr (HsLamCase x mgs)    = liftM (HsLamCase x)
-                                           (addTickMatchGroup True mgs)
-addTickHsExpr (HsApp x e1 e2)      = liftM2 (HsApp x) (addTickLHsExprNever e1)
-                                                      (addTickLHsExpr      e2)
-addTickHsExpr (HsAppType x e ty)   = liftM3 HsAppType (return x)
-                                                      (addTickLHsExprNever e)
-                                                      (return ty)
+addTickHsExpr e@(HsIPVar {})     = return e
+addTickHsExpr e@(HsOverLit {})   = return e
+addTickHsExpr e@(HsOverLabel{})  = return e
+addTickHsExpr e@(HsLit {})       = return e
+addTickHsExpr (HsLam x mg)       = liftM (HsLam x)
+                                         (addTickMatchGroup True mg)
+addTickHsExpr (HsLamCase x mgs)  = liftM (HsLamCase x)
+                                         (addTickMatchGroup True mgs)
+addTickHsExpr (HsApp x e1 e2)    = liftM2 (HsApp x) (addTickLHsExprNever e1)
+                                                    (addTickLHsExpr      e2)
+addTickHsExpr (HsAppType x e ty) = liftM3 HsAppType (return x)
+                                                    (addTickLHsExprNever e)
+                                                    (return ty)
 
 addTickHsExpr (OpApp fix e1 e2 e3) =
         liftM4 OpApp
