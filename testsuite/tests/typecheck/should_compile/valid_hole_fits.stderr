@@ -11,12 +11,16 @@ valid_hole_fits.hs:9:6: warning: [-Wdeferred-out-of-scope-variables (in -Wdefaul
 
 valid_hole_fits.hs:17:17: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int -> IO Int
-    • In the expression: _
-      In a stmt of a 'do' block: y <- _ x
+    • In a stmt of a 'do' block: y <- _ x
       In the expression:
         do x <- a 0
            y <- _ x
            return y
+      In an equation for ‘c’:
+          c _
+            = do x <- a 0
+                 y <- _ x
+                 return y
     • Relevant bindings include
         x :: Int (bound at valid_hole_fits.hs:16:12)
         c :: Int -> IO Int (bound at valid_hole_fits.hs:16:1)
@@ -39,8 +43,7 @@ valid_hole_fits.hs:21:8: warning: [-Wtyped-holes (in -Wdefault)]
                the type signature for:
                  test :: forall a. [Maybe a] -> [a]
                at valid_hole_fits.hs:20:1-24
-    • In the expression: _
-      In an equation for ‘test’: test = _
+    • In an equation for ‘test’: test = _
     • Relevant bindings include
         test :: [Maybe a] -> [a] (bound at valid_hole_fits.hs:21:1)
       Valid hole fits include
@@ -55,8 +58,7 @@ valid_hole_fits.hs:21:8: warning: [-Wtyped-holes (in -Wdefault)]
 
 valid_hole_fits.hs:24:9: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Integer -> ValidHoleFits.Moo
-    • In the expression: _
-      In an equation for ‘test2’: test2 = _
+    • In an equation for ‘test2’: test2 = _
     • Relevant bindings include
         test2 :: Integer -> ValidHoleFits.Moo
           (bound at valid_hole_fits.hs:24:1)
@@ -70,8 +72,7 @@ valid_hole_fits.hs:24:9: warning: [-Wtyped-holes (in -Wdefault)]
 valid_hole_fits.hs:27:5: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: t0 -> Maybe Integer
       Where: ‘t0’ is an ambiguous type variable
-    • In the expression: _
-      In the expression: _ 2
+    • In the expression: _ 2
       In an equation for ‘k’: k = _ 2
     • Relevant bindings include
         k :: Maybe Integer (bound at valid_hole_fits.hs:27:1)
@@ -128,9 +129,9 @@ valid_hole_fits.hs:30:10: warning: [-Wtyped-holes (in -Wdefault)]
 valid_hole_fits.hs:34:11: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Bool -> a0
       Where: ‘a0’ is an ambiguous type variable
-    • In the expression: _
-      In the first argument of ‘show’, namely ‘(_ (_ :: Bool))’
+    • In the first argument of ‘show’, namely ‘(_ (_ :: Bool))’
       In the expression: show (_ (_ :: Bool))
+      In an equation for ‘h’: h = show (_ (_ :: Bool))
     • Relevant bindings include
         h :: String (bound at valid_hole_fits.hs:34:1)
       Valid hole fits include
@@ -202,8 +203,7 @@ valid_hole_fits.hs:38:10: warning: [-Wtyped-holes (in -Wdefault)]
                the type signature for:
                  myCons :: forall a. a -> [a] -> [a]
                at valid_hole_fits.hs:37:1-25
-    • In the expression: _
-      In an equation for ‘myCons’: myCons = _
+    • In an equation for ‘myCons’: myCons = _
     • Relevant bindings include
         myCons :: a -> [a] -> [a] (bound at valid_hole_fits.hs:38:1)
       Valid hole fits include
@@ -226,8 +226,7 @@ valid_hole_fits.hs:38:10: warning: [-Wtyped-holes (in -Wdefault)]
 
 valid_hole_fits.hs:41:8: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: String -> IO ()
-    • In the expression: _
-      In the expression: _ "hello, world"
+    • In the expression: _ "hello, world"
       In an equation for ‘main’: main = _ "hello, world"
     • Relevant bindings include
         main :: IO () (bound at valid_hole_fits.hs:41:1)

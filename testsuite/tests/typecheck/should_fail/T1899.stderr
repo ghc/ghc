@@ -1,5 +1,5 @@
 
-T1899.hs:14:36: error:
+T1899.hs:15:36: error:
     • Couldn't match type ‘a’ with ‘Proposition a0’
       Expected: [Proposition a0]
         Actual: [a]
