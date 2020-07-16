@@ -398,8 +398,6 @@ keep GHC's renamer and typechecker happy enough for what Haddock
 needs.  Our main plan is to say
         foo :: <type>
         foo = foo
-We have to silence GHC's complaints about unboxed-top-level declarations
-with an ad-hoc fix in GHC.Tc.Gen.Bind: see Note [Compiling GHC.Prim] in GHC.Tc.Gen.Bind.
 
 That works for all the primitive functions except tagToEnum#.
 If we generate the binding

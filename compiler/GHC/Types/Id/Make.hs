@@ -115,7 +115,7 @@ Note [ghcPrimIds (aka pseudoops)]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The ghcPrimIds
 
-  * Are exported from GHC.Prim
+  * Are exported from GHC.Prim (see ghcPrimExports, used in ghcPrimInterface)
 
   * Can't be defined in Haskell, and hence no Haskell binding site,
     but have perfectly reasonable unfoldings in Core
@@ -1399,12 +1399,11 @@ These Ids can't be defined in Haskell.  They could be defined in
 unfoldings in the wired-in GHC.Prim interface file, but we'd have to
 ensure that they were definitely, definitely inlined, because there is
 no curried identifier for them.  That's what mkCompulsoryUnfolding
-does.  If we had a way to get a compulsory unfolding from an interface
-file, we could do that, but we don't right now.
+does. Alternatively, we could add the definitions to mi_decls of ghcPrimIface
+but it's not clear if this would be simpler.
 
-The type variables we use here are "open" type variables: this means
-they can unify with both unlifted and lifted types.  Hence we provide
-another gun with which to shoot yourself in the foot.
+coercionToken# is not listed in ghcPrimIds, since it is a coercion
+and exposing it would let users violate the expression/coercion separation.
 -}
 
 nullAddrName, seqName,
@@ -1774,7 +1773,7 @@ voidPrimId  = pcMiscPrelId voidPrimIdName unboxedUnitTy
 voidArgId :: Id       -- Local lambda-bound :: Void#
 voidArgId = mkSysLocal (fsLit "void") voidArgIdKey Many unboxedUnitTy
 
-coercionTokenId :: Id         -- :: () ~ ()
+coercionTokenId :: Id         -- :: () ~# ()
 coercionTokenId -- See Note [Coercion tokens] in "GHC.CoreToStg"
   = pcMiscPrelId coercionTokenName
                  (mkTyConApp eqPrimTyCon [liftedTypeKind, liftedTypeKind, unitTy, unitTy])
