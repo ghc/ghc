@@ -1,7 +1,8 @@
 
 T14904a.hs:9:6: error:
-    • Expected kind ‘forall (a :: k1). g a’, but ‘f’ has kind ‘k0’
-      Cannot instantiate unification variable ‘k0’
-      with a kind involving polytypes: forall (a :: k1). g a
+    • Expected kind ‘forall (a :: k). g a’, but ‘f’ has kind ‘k1’
+      ‘k1’ is a rigid type variable bound by
+        a family instance declaration
+        at T14904a.hs:9:3-30
     • In the first argument of ‘F’, namely ‘(f :: forall a. g a)’
       In the type family declaration for ‘F’

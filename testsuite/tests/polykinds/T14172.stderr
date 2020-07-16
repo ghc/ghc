@@ -15,6 +15,10 @@ T14172.hs:7:19: error:
       Expected: (f'0 a -> f (f'0 b)) -> Compose f'0 g'0 a -> f (h a')
         Actual: (Unwrapped (Compose f'0 g'0 a) -> f (Unwrapped (h a')))
                 -> Compose f'0 g'0 a -> f (h a')
+      ‘a’ is a rigid type variable bound by
+        the inferred type of
+          traverseCompose :: (a -> f b) -> g a -> f (h a')
+        at T14172.hs:6:1-47
     • In the first argument of ‘(.)’, namely ‘_Wrapping Compose’
       In the expression: _Wrapping Compose . traverse
       In an equation for ‘traverseCompose’:
