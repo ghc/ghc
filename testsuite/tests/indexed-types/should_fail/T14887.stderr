@@ -5,12 +5,3 @@ T14887.hs:13:1: error:
       NB: Specified variables (namely: (a :: k)) always come first
       Perhaps try this order instead: k (a :: k) (e :: a :~: a)
     • In the type family declaration for ‘Foo2’
-
-T14887.hs:14:11: error:
-    • Couldn't match kind ‘k1’ with ‘k’
-      When matching kinds
-        a0 :: k
-        a :: k1
-      Expected kind ‘a0 :~: a0’, but ‘e :: a :~: a’ has kind ‘a :~: a’
-    • In the second argument of ‘Foo2’, namely ‘(e :: a :~: a)’
-      In the type family declaration for ‘Foo2’
