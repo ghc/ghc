@@ -14,7 +14,7 @@ module GHC.Tc.Gen.Sig(
        TcSigFun,
 
        isPartialSig, hasCompleteSig, tcIdSigName, tcSigInfoName,
-       completeSigPolyId_maybe,
+       completeSigPolyId_maybe, isCompleteHsSig,
 
        tcTySigs, tcUserTypeSig, completeSigFromId,
        tcInstSig,
@@ -30,6 +30,7 @@ import GHC.Prelude
 import GHC.Hs
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Types
+import GHC.Tc.Solver( pushLevelAndSolveEqualitiesX, reportUnsolvedEqualities )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
@@ -360,23 +361,18 @@ Once we get to type checking, we decompose it into its parts, in tcPatSynSig.
 
 * After we kind-check the pieces and convert to Types, we do kind generalisation.
 
-Note [solveEqualities in tcPatSynSig]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Report unsolved equalities in tcPatSynSig]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's important that we solve /all/ the equalities in a pattern
 synonym signature, because we are going to zonk the signature to
 a Type (not a TcType), in GHC.Tc.TyCl.PatSyn.tc_patsyn_finish, and that
 fails if there are un-filled-in coercion variables mentioned
 in the type (#15694).
 
-The best thing is simply to use solveEqualities to solve all the
-equalites, rather than leaving them in the ambient constraints
-to be solved later.  Pattern synonyms are top-level, so there's
-no problem with completely solving them.
-
-(NB: this solveEqualities wraps newImplicitTKBndrs, which itself
-does a solveLocalEqualities; so solveEqualities isn't going to
-make any further progress; it'll just report any unsolved ones,
-and fail, as it should.)
+So we solve all the equalities we can, and report any unsolved ones,
+rather than leaving them in the ambient constraints to be solved
+later.  Pattern synonyms are top-level, so there's no problem with
+completely solving them.
 -}
 
 tcPatSynSig :: Name -> LHsSigType GhcRn -> TcM TcPatSynInfo
@@ -388,12 +384,11 @@ tcPatSynSig name sig_ty
   , (univ_hs_tvbndrs, hs_req,  hs_ty1)     <- splitLHsSigmaTyInvis hs_ty
   , (ex_hs_tvbndrs,   hs_prov, hs_body_ty) <- splitLHsSigmaTyInvis hs_ty1
   = do {  traceTc "tcPatSynSig 1" (ppr sig_ty)
-       ; (implicit_tvs, (univ_tvbndrs, (ex_tvbndrs, (req, prov, body_ty))))
-           <- pushTcLevelM_   $
-              solveEqualities $ -- See Note [solveEqualities in tcPatSynSig]
-              bindImplicitTKBndrs_Skol implicit_hs_tvs $
-              bindExplicitTKBndrs_Skol univ_hs_tvbndrs $
-              bindExplicitTKBndrs_Skol ex_hs_tvbndrs   $
+       ; (tclvl, wanted, (implicit_tvs, (univ_tvbndrs, (ex_tvbndrs, (req, prov, body_ty)))))
+           <- pushLevelAndSolveEqualitiesX "tcPatSynSig" $
+              bindImplicitTKBndrs_Skol implicit_hs_tvs   $
+              bindExplicitTKBndrs_Skol univ_hs_tvbndrs   $
+              bindExplicitTKBndrs_Skol ex_hs_tvbndrs     $
               do { req     <- tcHsContext hs_req
                  ; prov    <- tcHsContext hs_prov
                  ; body_ty <- tcHsOpenType hs_body_ty
@@ -401,6 +396,7 @@ tcPatSynSig name sig_ty
                      -- e.g. pattern Zero <- 0#   (#12094)
                  ; return (req, prov, body_ty) }
 
+       ; implicit_tvs <- zonkAndScopedSort implicit_tvs
        ; let ungen_patsyn_ty = build_patsyn_type [] implicit_tvs univ_tvbndrs
                                                  req ex_tvbndrs prov body_ty
 
@@ -408,61 +404,46 @@ tcPatSynSig name sig_ty
        ; kvs <- kindGeneralizeAll ungen_patsyn_ty
        ; traceTc "tcPatSynSig" (ppr ungen_patsyn_ty)
 
+       ; let skol_tvs  = kvs ++ implicit_tvs ++ binderVars (univ_tvbndrs ++ ex_tvbndrs)
+             skol_info = DataConSkol name
+       ; reportUnsolvedEqualities skol_info skol_tvs tclvl wanted
+               -- See Note [Report unsolved equalities in tcPatSynSig]
+
        -- These are /signatures/ so we zonk to squeeze out any kind
-       -- unification variables.  Do this after kindGeneralize which may
+       -- unification variables.  Do this after kindGeneralizeAll which may
        -- default kind variables to *.
-       ; implicit_tvs <- zonkAndScopedSort implicit_tvs
+       ; implicit_tvs <- mapM zonkTcTyVarToTyVar    implicit_tvs
        ; univ_tvbndrs <- mapM zonkTyCoVarKindBinder univ_tvbndrs
        ; ex_tvbndrs   <- mapM zonkTyCoVarKindBinder ex_tvbndrs
        ; req          <- zonkTcTypes req
        ; prov         <- zonkTcTypes prov
        ; body_ty      <- zonkTcType  body_ty
 
-       -- Skolems have TcLevels too, though they're used only for debugging.
-       -- If you don't do this, the debugging checks fail in GHC.Tc.TyCl.PatSyn.
-       -- Test case: patsyn/should_compile/T13441
-{-
-       ; tclvl <- getTcLevel
-       ; let env0                  = mkEmptyTCvSubst $ mkInScopeSet $ mkVarSet kvs
-             (env1, implicit_tvs') = promoteSkolemsX tclvl env0 implicit_tvs
-             (env2, univ_tvs')     = promoteSkolemsX tclvl env1 univ_tvs
-             (env3, ex_tvs')       = promoteSkolemsX tclvl env2 ex_tvs
-             req'                  = substTys env3 req
-             prov'                 = substTys env3 prov
-             body_ty'              = substTy  env3 body_ty
--}
-      ; let implicit_tvs' = implicit_tvs
-            univ_tvbndrs' = univ_tvbndrs
-            ex_tvbndrs'   = ex_tvbndrs
-            req'          = req
-            prov'         = prov
-            body_ty'      = body_ty
-
        -- Now do validity checking
        ; checkValidType ctxt $
-         build_patsyn_type kvs implicit_tvs' univ_tvbndrs' req' ex_tvbndrs' prov' body_ty'
+         build_patsyn_type kvs implicit_tvs univ_tvbndrs req ex_tvbndrs prov body_ty
 
        -- arguments become the types of binders. We thus cannot allow
        -- levity polymorphism here
-       ; let (arg_tys, _) = tcSplitFunTys body_ty'
+       ; let (arg_tys, _) = tcSplitFunTys body_ty
        ; mapM_ (checkForLevPoly empty . scaledThing) arg_tys
 
        ; traceTc "tcTySig }" $
-         vcat [ text "implicit_tvs" <+> ppr_tvs implicit_tvs'
+         vcat [ text "implicit_tvs" <+> ppr_tvs implicit_tvs
               , text "kvs" <+> ppr_tvs kvs
-              , text "univ_tvs" <+> ppr_tvs (binderVars univ_tvbndrs')
-              , text "req" <+> ppr req'
-              , text "ex_tvs" <+> ppr_tvs (binderVars ex_tvbndrs')
-              , text "prov" <+> ppr prov'
-              , text "body_ty" <+> ppr body_ty' ]
+              , text "univ_tvs" <+> ppr_tvs (binderVars univ_tvbndrs)
+              , text "req" <+> ppr req
+              , text "ex_tvs" <+> ppr_tvs (binderVars ex_tvbndrs)
+              , text "prov" <+> ppr prov
+              , text "body_ty" <+> ppr body_ty ]
        ; return (TPSI { patsig_name = name
                       , patsig_implicit_bndrs = mkTyVarBinders InferredSpec kvs ++
-                                                mkTyVarBinders SpecifiedSpec implicit_tvs'
-                      , patsig_univ_bndrs     = univ_tvbndrs'
-                      , patsig_req            = req'
-                      , patsig_ex_bndrs       = ex_tvbndrs'
-                      , patsig_prov           = prov'
-                      , patsig_body_ty        = body_ty' }) }
+                                                mkTyVarBinders SpecifiedSpec implicit_tvs
+                      , patsig_univ_bndrs     = univ_tvbndrs
+                      , patsig_req            = req
+                      , patsig_ex_bndrs       = ex_tvbndrs
+                      , patsig_prov           = prov
+                      , patsig_body_ty        = body_ty }) }
   where
     ctxt = PatSynCtxt name
 

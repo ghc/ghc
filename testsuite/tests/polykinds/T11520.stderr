@@ -1,6 +1,9 @@
 
 T11520.hs:15:77: error:
     • Expected kind ‘k20 -> k10’, but ‘g’ has kind ‘k’
+      ‘k’ is a rigid type variable bound by
+        the instance declaration
+        at T11520.hs:(15,1)-(16,23)
     • In the second argument of ‘Compose’, namely ‘g’
       In the first argument of ‘Typeable’, namely ‘(Compose f g)’
       In the instance declaration for ‘Typeable (Compose f g)’
