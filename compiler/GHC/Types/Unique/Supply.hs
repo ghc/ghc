@@ -180,7 +180,7 @@ The magic `inline` function does two things
 
 * It helps ensure that 'm' really does inline.
 
-Note that 'inline' evaporates in phase 0.  See Note [inlineIdMagic]
+Note that 'inline' evaporates in phase 0.  See Note [inlineId magic]
 in GHC.Core.Opt.ConstantFold.match_inline.
 
 The INLINE pragma on multiShotIO is very important, else the

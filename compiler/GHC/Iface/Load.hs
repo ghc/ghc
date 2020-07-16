@@ -915,6 +915,7 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
                      nest 4 (text "reason:" <+> doc_str)])
 
        -- Check for GHC.Prim, and return its static interface
+       -- See Note [GHC.Prim] in primops.txt.pp.
        -- TODO: make this check a function
        if mod `installedModuleEq` gHC_PRIM
            then do
@@ -1059,6 +1060,7 @@ initExternalPackageState home_unit
 *********************************************************
 -}
 
+-- See Note [GHC.Prim] in primops.txt.pp.
 ghcPrimIface :: ModIface
 ghcPrimIface
   = empty_iface {
@@ -1071,7 +1073,7 @@ ghcPrimIface
   where
     empty_iface = emptyFullModIface gHC_PRIM
 
-    -- The fixities listed here for @`seq`@ or @->@ should match
+    -- The fixity listed here for @`seq`@ should match
     -- those in primops.txt.pp (from which Haddock docs are generated).
     fixities = (getOccName seqId, Fixity NoSourceText 0 InfixR)
              : mapMaybe mkFixity allThePrimOps

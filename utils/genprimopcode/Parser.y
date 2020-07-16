@@ -163,6 +163,7 @@ paT : pTycon ppTs     { TyApp $1 $2 }
 
 pUnboxedTupleTy :: { Ty }
 pUnboxedTupleTy : '(#' pCommaTypes '#)' { TyUTup $2 }
+                | '(#' '#)' { TyUTup [] }
 
 pCommaTypes :: { [Ty] }
 pCommaTypes : pType ',' pCommaTypes { $1 : $3 }
