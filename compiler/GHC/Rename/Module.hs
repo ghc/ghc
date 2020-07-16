@@ -34,7 +34,8 @@ import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, bindLocalNames
                         , checkDupRdrNames, bindLocalNamesFV
                         , checkShadowedRdrNames, warnUnusedTypePatterns
                         , extendTyVarEnvFVRn, newLocalBndrsRn
-                        , withHsDocContext )
+                        , withHsDocContext, noNestedForallsContextsErr
+                        , addNoNestedForallsContextsErr, checkInferredVars )
 import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr )
 import GHC.Rename.Names
 import GHC.Rename.Doc   ( rnHsDoc, rnMbLHsDoc )
@@ -65,7 +66,6 @@ import GHC.Data.List.SetOps ( findDupsEq, removeDups, equivClasses )
 import GHC.Data.Graph.Directed ( SCC, flattenSCC, flattenSCCs, Node(..)
                                , stronglyConnCompFromEdgedVerticesUniq )
 import GHC.Types.Unique.Set
-import GHC.Data.Maybe ( whenIsJust )
 import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -371,7 +371,7 @@ rnHsForeignDecl :: ForeignDecl GhcPs -> RnM (ForeignDecl GhcRn, FreeVars)
 rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
   = do { topEnv :: HscEnv <- getTopEnv
        ; name' <- lookupLocatedTopBndrRn name
-       ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel Nothing ty
+       ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel ty
 
         -- Mark any PackageTarget style imports as coming from the current package
        ; let unitId = homeUnit $ hsc_dflags topEnv
@@ -383,7 +383,7 @@ rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
 
 rnHsForeignDecl (ForeignExport { fd_name = name, fd_sig_ty = ty, fd_fe = spec })
   = do { name' <- lookupLocatedOccRn name
-       ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel Nothing ty
+       ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel ty
        ; return (ForeignExport { fd_e_ext = noExtField
                                , fd_name = name', fd_sig_ty = ty'
                                , fd_fe = spec }
@@ -602,13 +602,14 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
                            , cid_sigs = uprags, cid_tyfam_insts = ats
                            , cid_overlap_mode = oflag
                            , cid_datafam_insts = adts })
-  = do { (inst_ty', inst_fvs) <- rnHsSigType ctxt TypeLevel inf_err inst_ty
+  = do { checkInferredVars ctxt inf_err inst_ty
+       ; (inst_ty', inst_fvs) <- rnHsSigType ctxt TypeLevel inst_ty
        ; let (ktv_names, _, head_ty') = splitLHsInstDeclTy inst_ty'
              -- Check if there are any nested `forall`s or contexts, which are
              -- illegal in the type of an instance declaration (see
              -- Note [No nested foralls or contexts in instance types] in
              -- GHC.Hs.Type)...
-             mb_nested_msg = no_nested_foralls_contexts_err
+             mb_nested_msg = noNestedForallsContextsErr
                                (text "Instance head") head_ty'
              -- ...then check if the instance head is actually headed by a
              -- class type constructor...
@@ -1010,22 +1011,22 @@ rnSrcDerivDecl :: DerivDecl GhcPs -> RnM (DerivDecl GhcRn, FreeVars)
 rnSrcDerivDecl (DerivDecl _ ty mds overlap)
   = do { standalone_deriv_ok <- xoptM LangExt.StandaloneDeriving
        ; unless standalone_deriv_ok (addErr standaloneDerivErr)
-       ; (mds', ty', fvs)
-           <- rnLDerivStrategy ctxt mds $ rnHsSigWcType ctxt inf_err ty
+       ; checkInferredVars ctxt inf_err nowc_ty
+       ; (mds', ty', fvs) <- rnLDerivStrategy ctxt mds $ rnHsSigWcType ctxt ty
          -- Check if there are any nested `forall`s or contexts, which are
          -- illegal in the type of an instance declaration (see
          -- Note [No nested foralls or contexts in instance types] in
          -- GHC.Hs.Type).
-       ; whenIsJust (no_nested_foralls_contexts_err
-                       (text "Standalone-derived instance head")
-                       (getLHsInstDeclHead $ dropWildCards ty')) $ \(l, err_msg) ->
-           addErrAt l $ withHsDocContext ctxt err_msg
+       ; addNoNestedForallsContextsErr ctxt
+           (text "Standalone-derived instance head")
+           (getLHsInstDeclHead $ dropWildCards ty')
        ; warnNoDerivStrat mds' loc
        ; return (DerivDecl noExtField ty' mds' overlap, fvs) }
   where
     ctxt    = DerivDeclCtx
     inf_err = Just (text "Inferred type variables are not allowed")
-    loc = getLoc $ hsib_body $ hswc_body ty
+    loc = getLoc $ hsib_body nowc_ty
+    nowc_ty = dropWildCards ty
 
 standaloneDerivErr :: SDoc
 standaloneDerivErr
@@ -1091,7 +1092,7 @@ bindRuleTmVars doc tyvs vars names thing_inside
 
     go ((L l (RuleBndrSig _ (L loc _) bsig)) : vars)
        (n : ns) thing_inside
-      = rnHsPatSigType bind_free_tvs doc Nothing bsig $ \ bsig' ->
+      = rnHsPatSigType bind_free_tvs doc bsig $ \ bsig' ->
         go vars ns $ \ vars' ->
         thing_inside (L l (RuleBndrSig noExtField (L loc n) bsig') : vars')
 
@@ -1431,7 +1432,7 @@ rnStandaloneKindSignature tc_names (StandaloneKindSig _ v ki)
         ; unless standalone_ki_sig_ok $ addErr standaloneKiSigErr
         ; new_v <- lookupSigCtxtOccRn (TopSigCtxt tc_names) (text "standalone kind signature") v
         ; let doc = StandaloneKindSigCtx (ppr v)
-        ; (new_ki, fvs) <- rnHsSigType doc KindLevel Nothing ki
+        ; (new_ki, fvs) <- rnHsSigType doc KindLevel ki
         ; return (StandaloneKindSig noExtField new_v new_ki, fvs)
         }
   where
@@ -1841,15 +1842,14 @@ rnLHsDerivingClause doc
     rn_clause_pred :: LHsSigType GhcPs -> RnM (LHsSigType GhcRn, FreeVars)
     rn_clause_pred pred_ty = do
       let inf_err = Just (text "Inferred type variables are not allowed")
-      ret@(pred_ty', _) <- rnHsSigType doc TypeLevel inf_err pred_ty
+      checkInferredVars doc inf_err pred_ty
+      ret@(pred_ty', _) <- rnHsSigType doc TypeLevel pred_ty
       -- Check if there are any nested `forall`s, which are illegal in a
       -- `deriving` clause.
       -- See Note [No nested foralls or contexts in instance types]
       -- (Wrinkle: Derived instances) in GHC.Hs.Type.
-      whenIsJust (no_nested_foralls_contexts_err
-                    (text "Derived class type")
-                    (getLHsInstDeclHead pred_ty')) $ \(l, err_msg) ->
-            addErrAt l $ withHsDocContext doc err_msg
+      addNoNestedForallsContextsErr doc (text "Derived class type")
+        (getLHsInstDeclHead pred_ty')
       pure ret
 
 rnLDerivStrategy :: forall a.
@@ -1883,7 +1883,8 @@ rnLDerivStrategy doc mds thing_inside
         AnyclassStrategy -> boring_case AnyclassStrategy
         NewtypeStrategy  -> boring_case NewtypeStrategy
         ViaStrategy via_ty ->
-          do (via_ty', fvs1) <- rnHsSigType doc TypeLevel inf_err via_ty
+          do checkInferredVars doc inf_err via_ty
+             (via_ty', fvs1) <- rnHsSigType doc TypeLevel via_ty
              let HsIB { hsib_ext  = via_imp_tvs
                       , hsib_body = via_body } = via_ty'
                  (via_exp_tv_bndrs, via_rho) = splitLHsForAllTyInvis_KP via_body
@@ -1893,10 +1894,8 @@ rnLDerivStrategy doc mds thing_inside
              -- `via` type.
              -- See Note [No nested foralls or contexts in instance types]
              -- (Wrinkle: Derived instances) in GHC.Hs.Type.
-             whenIsJust (no_nested_foralls_contexts_err
-                           (quotes (text "via") <+> text "type")
-                           via_rho) $ \(l, err_msg) ->
-               addErrAt l $ withHsDocContext doc err_msg
+             addNoNestedForallsContextsErr doc
+               (quotes (text "via") <+> text "type") via_rho
              (thing, fvs2) <- extendTyVarEnvFVRn via_tvs thing_inside
              pure (ViaStrategy via_ty', thing, fvs1 `plusFV` fvs2)
 
@@ -2211,7 +2210,7 @@ rnConDecl (XConDecl (ConDeclGADTPrefixPs { con_gp_names = names, con_gp_ty = ty
        ; mb_doc'   <- rnMbLHsDoc mb_doc
 
        ; let ctxt = ConDeclCtx new_names
-       ; (ty', fvs) <- rnHsSigType ctxt TypeLevel Nothing ty
+       ; (ty', fvs) <- rnHsSigType ctxt TypeLevel ty
        ; linearTypes <- xopt LangExt.LinearTypes <$> getDynFlags
 
          -- Now that operator precedence has been resolved, we can split the
@@ -2230,10 +2229,8 @@ rnConDecl (XConDecl (ConDeclGADTPrefixPs { con_gp_names = names, con_gp_ty = ty
          -- Ensure that there are no nested `forall`s or contexts, per
          -- Note [GADT abstract syntax] (Wrinkle: No nested foralls or contexts)
          -- in GHC.Hs.Type.
-       ; whenIsJust (no_nested_foralls_contexts_err
-                       (text "GADT constructor type signature")
-                       res_ty) $ \(l, err_msg) ->
-           addErrAt l $ withHsDocContext ctxt err_msg
+       ; addNoNestedForallsContextsErr ctxt
+           (text "GADT constructor type signature") res_ty
 
        ; traceRn "rnConDecl (ConDeclGADTPrefixPs)"
            (ppr names $$ ppr implicit_tkvs $$ ppr explicit_tkvs)
@@ -2270,41 +2267,6 @@ rnConDeclDetails con doc (RecCon (L l fields))
                 -- No need to check for duplicate fields
                 -- since that is done by GHC.Rename.Names.extendGlobalRdrEnvRn
         ; return (RecCon (L l new_fields), fvs) }
-
--- | Examines a non-outermost type for @forall@s or contexts, which are assumed
--- to be nested. Returns @'Just' err_msg@ if such a @forall@ or context is
--- found, and returns @Nothing@ otherwise.
---
--- This is currently used in two places:
---
--- * In GADT constructor types (in 'rnConDecl').
---   See @Note [GADT abstract syntax] (Wrinkle: No nested foralls or contexts)@
---   in "GHC.Hs.Type".
---
--- * In instance declaration types (in 'rnClsIntDecl' and 'rnSrcDerivDecl').
---   See @Note [No nested foralls or contexts in instance types]@ in
---   "GHC.Hs.Type".
-no_nested_foralls_contexts_err :: SDoc -> LHsType GhcRn -> Maybe (SrcSpan, SDoc)
-no_nested_foralls_contexts_err what lty =
-  case ignoreParens lty of
-    L l (HsForAllTy { hst_tele = tele })
-      |  HsForAllVis{} <- tele
-         -- The only two places where this function is called correspond to
-         -- types of terms, so we give a slightly more descriptive error
-         -- message in the event that they contain visible dependent
-         -- quantification (currently only allowed in kinds).
-      -> Just (l, vcat [ text "Illegal visible, dependent quantification" <+>
-                         text "in the type of a term"
-                       , text "(GHC does not yet support this)" ])
-      |  HsForAllInvis{} <- tele
-      -> Just (l, nested_foralls_contexts_err)
-    L l (HsQualTy {})
-      -> Just (l, nested_foralls_contexts_err)
-    _ -> Nothing
-  where
-    nested_foralls_contexts_err =
-      what <+> text "cannot contain nested"
-      <+> quotes forAllLit <> text "s or contexts"
 
 -------------------------------------------------
 
