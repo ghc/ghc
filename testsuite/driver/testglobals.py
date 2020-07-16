@@ -371,6 +371,9 @@ class TestOptions:
        # Command to run before the test
        self.pre_cmd = None
 
+       # Command prefix: a function to add a prefix to the command before running it
+       self.cmd_prefix = None
+
        # Command wrapper: a function to apply to the command before running it
        self.cmd_wrapper = None
 

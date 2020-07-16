@@ -678,7 +678,7 @@ def cmd_prefix( prefix ):
     return lambda name, opts, p=prefix: _cmd_prefix(name, opts, prefix)
 
 def _cmd_prefix( name, opts, prefix ):
-    opts.cmd_wrapper = lambda cmd, p=prefix: p + ' ' + cmd;
+    opts.cmd_prefix = lambda cmd, p=prefix: p + ' ' + cmd;
 
 # ----
 
@@ -1647,7 +1647,13 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
     # Put extra_run_opts last: extra_run_opts('+RTS foo') should work.
     cmd = ' '.join([prog, stats_args, my_rts_flags, extra_run_opts])
 
-    # 2. prefix with TEST_WRAPPER
+    # 2. Apply the command prefix. This needs to happen before we apply
+    #    the test-wrapper.
+
+    if opts.cmd_prefix is not None:
+        cmd = opts.cmd_prefix(cmd)
+
+    # 3. prefix with TEST_WRAPPER
     # The test wrapper. Default to $TOP / driver / id
     # for the identity test-wrapper.
     if config.test_wrapper is None:
@@ -1657,13 +1663,13 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
 
     cmd = 'TEST_WRAPPER="{test_wrapper}" && {cmd}'.format(**locals())
 
-    # 3. Apply cmd_wrapper if set.
+    # 4. Apply cmd_wrapper if set.
     if opts.cmd_wrapper is not None:
         cmd = opts.cmd_wrapper(cmd)
 
     cmd = 'cd "{opts.testdir}" && {cmd}'.format(**locals())
 
-    # 4. Finally, run the command
+    # 5. Finally, run the command
     exit_code = runCmd(cmd, stdin_arg, stdout_arg, stderr_arg, opts.run_timeout_multiplier)
 
     # check the exit code
@@ -1750,6 +1756,9 @@ def interpreter_run(name: TestName,
 
     cmd = ('{{compiler}} {srcname} {flags} {extra_hc_opts}'
           ).format(**locals())
+
+    if opts.cmd_prefix is not None:
+        cmd = opts.cmd_prefix(cmd);
 
     if opts.cmd_wrapper is not None:
         cmd = opts.cmd_wrapper(cmd);
