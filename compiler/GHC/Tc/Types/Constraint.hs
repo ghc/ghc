@@ -969,17 +969,23 @@ addHoles wc holes
 dropMisleading :: WantedConstraints -> WantedConstraints
 -- Drop misleading constraints; really just class constraints
 -- See Note [Constraints and errors] in GHC.Tc.Utils.Monad
+--   for why this function is so strange, treating the 'simples'
+--   and the implications differently.  Sigh.
 dropMisleading (WC { wc_simple = simples, wc_impl = implics, wc_holes = holes })
-  = WC { wc_simple = filterBag keep_ct simples
+  = WC { wc_simple = filterBag insolubleCt simples
        , wc_impl   = mapBag drop_implic implics
        , wc_holes  = filterBag isOutOfScopeHole holes }
   where
     drop_implic implic
-      = implic { ic_wanted = dropMisleading (ic_wanted implic) }
-    keep_ct ct
-      = case classifyPredType (ctPred ct) of
-          ClassPred {} -> False
-          _ -> True
+      = implic { ic_wanted = drop_wanted (ic_wanted implic) }
+    drop_wanted (WC { wc_simple = simples, wc_impl = implics, wc_holes = holes })
+      = WC { wc_simple = filterBag keep_ct simples
+           , wc_impl   = mapBag drop_implic implics
+           , wc_holes  = filterBag isOutOfScopeHole holes }
+
+    keep_ct ct = case classifyPredType (ctPred ct) of
+                    ClassPred {} -> False
+                    _ -> True
 
 isSolvedStatus :: ImplicStatus -> Bool
 isSolvedStatus (IC_Solved {}) = True
