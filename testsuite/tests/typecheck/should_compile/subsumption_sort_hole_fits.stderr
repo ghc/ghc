@@ -1,8 +1,7 @@
 
 subsumption_sort_hole_fits.hs:2:5: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: String -> [String]
-    • In the expression: _
-      In the expression: _ "hello, world"
+    • In the expression: _ "hello, world"
       In an equation for ‘f’: f = _ "hello, world"
     • Relevant bindings include
         f :: [String] (bound at subsumption_sort_hole_fits.hs:2:1)
