@@ -4,15 +4,13 @@ holes.hs:3:5: warning: [-Wtyped-holes (in -Wdefault)]
       Where: ‘t’ is a rigid type variable bound by
                the inferred type of f :: t
                at holes.hs:3:1-5
-    • In the expression: _
-      In an equation for ‘f’: f = _
+    • In an equation for ‘f’: f = _
     • Relevant bindings include f :: t (bound at holes.hs:3:1)
       Valid hole fits include f :: forall {t}. t
 
 holes.hs:6:7: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Char
-    • In the expression: _
-      In an equation for ‘g’: g x = _
+    • In an equation for ‘g’: g x = _
     • Relevant bindings include
         x :: Int (bound at holes.hs:6:3)
         g :: Int -> Char (bound at holes.hs:6:1)

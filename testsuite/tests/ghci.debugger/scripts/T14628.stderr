@@ -3,10 +3,6 @@
     • Couldn't match type ‘m’ with ‘(,) a0’
       Expected: (a0, ((), Int))
         Actual: m ((), Int)
-        ‘m’ is untouchable
-          inside the constraints: ()
-          bound by the inferred type of it :: ((), Int)
-          at <interactive>:4:1-25
       ‘m’ is an interactive-debugger skolem
     • In the second argument of ‘($)’, namely ‘runStateT _result 0’
       In the expression: snd $ runStateT _result 0
