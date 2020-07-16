@@ -1652,16 +1652,20 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
 
     if opts.cmd_prefix is not None:
         cmd = opts.cmd_prefix(cmd)
-
-    # 3. prefix with TEST_WRAPPER
-    # The test wrapper. Default to $TOP / driver / id
-    # for the identity test-wrapper.
-    if config.test_wrapper is None:
-        test_wrapper = Path(config.top) / "driver" / "id"
     else:
-        test_wrapper = config.test_wrapper
+        # (optional) 3. prefix with TEST_WRAPPER
+        #
+        # The test wrapper. Default to $TOP / driver / id
+        # for the identity test-wrapper.
+        #
+        # We won't do this if command prefix is set, as the
+        # set prefix and the test-wrapper might interfere.
+        if config.test_wrapper is None:
+            test_wrapper = Path(config.top) / "driver" / "id"
+        else:
+            test_wrapper = config.test_wrapper
 
-    cmd = 'TEST_WRAPPER="{test_wrapper}" && {cmd}'.format(**locals())
+        cmd = 'TEST_WRAPPER="{test_wrapper}" && {cmd}'.format(**locals())
 
     # 4. Apply cmd_wrapper if set.
     if opts.cmd_wrapper is not None:
