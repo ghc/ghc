@@ -76,7 +76,8 @@ module GHC.Types.Var (
         binderVar, binderVars, binderArgFlag, binderType,
         mkTyCoVarBinder, mkTyCoVarBinders,
         mkTyVarBinder, mkTyVarBinders,
-        isTyVarBinder, tyVarSpecToBinder, tyVarSpecToBinders,
+        isTyVarBinder,
+        tyVarSpecToBinder, tyVarSpecToBinders, tyVarReqToBinder, tyVarReqToBinders,
         mapVarBndr, mapVarBndrs, lookupVarBndr,
 
         -- ** Constructing TyVar's
@@ -595,20 +596,40 @@ Note [Types for coercions, predicates, and evidence]
 *                                                                      *
 ********************************************************************* -}
 
--- Variable Binder
---
--- VarBndr is polymorphic in both var and visibility fields.
--- Currently there are nine different uses of 'VarBndr':
---   * Var.TyVarBinder               = VarBndr TyVar ArgFlag
---   * Var.TyCoVarBinder             = VarBndr TyCoVar ArgFlag
---   * Var.InvisTVBinder             = VarBndr TyVar Specificity
---   * Var.ReqTVBinder               = VarBndr TyVar ()
---   * TyCon.TyConBinder             = VarBndr TyVar TyConBndrVis
---   * TyCon.TyConTyCoBinder         = VarBndr TyCoVar TyConBndrVis
---   * IfaceType.IfaceForAllBndr     = VarBndr IfaceBndr ArgFlag
---   * IfaceType.IfaceTyConBinder    = VarBndr IfaceBndr TyConBndrVis
---   * IfaceType.IfaceForAllSpecBndr = VarBndr IfaceBndr Specificity
+{- Note [The VarBndr type and its uses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+varBndr is polymorphic in both var and visibility fields.
+Currently there are nine different uses of 'VarBndr':
+
+* Var.TyCoVarBinder = VarBndr TyCoVar ArgFlag
+  Binder of a forall-type; see ForAllTy in GHC.Core.TyCo.Rep
+
+* Var.TyVarBinder = VarBndr TyVar ArgFlag
+  Subset of TyCoVarBinder when we are sure the binder is a TyVar
+
+* Var.InvisTVBinder = VarBndr TyVar Specificity
+  Specialised form of TyVarBinder, when ArgFlag = Invisible s
+  See GHC.Core.Type.splitForAllTysInvis
+
+* Var.ReqTVBinder = VarBndr TyVar ()
+  Specialised form of TyVarBinder, when ArgFlag = Required
+  See GHC.Core.Type.splitForAllTysReq
+  This one is barely used
+
+* TyCon.TyConBinder = VarBndr TyVar TyConBndrVis
+  Binders of a TyCon; see TyCon in GHC.Core.TyCon
+
+* TyCon.TyConTyCoBinder = VarBndr TyCoVar TyConBndrVis
+  Binders of a PromotedDataCon
+  See Note [Promoted GADT data construtors] in GHC.Core.TyCon
+
+* IfaceType.IfaceForAllBndr     = VarBndr IfaceBndr ArgFlag
+* IfaceType.IfaceForAllSpecBndr = VarBndr IfaceBndr Specificity
+* IfaceType.IfaceTyConBinder    = VarBndr IfaceBndr TyConBndrVis
+-}
+
 data VarBndr var argf = Bndr var argf
+  -- See Note [The VarBndr type and its uses]
   deriving( Data )
 
 -- | Variable Binder
@@ -626,8 +647,14 @@ type ReqTVBinder       = VarBndr TyVar   ()
 tyVarSpecToBinders :: [VarBndr a Specificity] -> [VarBndr a ArgFlag]
 tyVarSpecToBinders = map tyVarSpecToBinder
 
-tyVarSpecToBinder :: (VarBndr a Specificity) -> (VarBndr a ArgFlag)
+tyVarSpecToBinder :: VarBndr a Specificity -> (VarBndr a ArgFlag)
 tyVarSpecToBinder (Bndr tv vis) = Bndr tv (Invisible vis)
+
+tyVarReqToBinders :: [VarBndr a ()] -> [VarBndr a ArgFlag]
+tyVarReqToBinders = map tyVarReqToBinder
+
+tyVarReqToBinder :: VarBndr a () -> VarBndr a ArgFlag
+tyVarReqToBinder (Bndr tv _) = Bndr tv Required
 
 binderVar :: VarBndr tv argf -> tv
 binderVar (Bndr v _) = v
@@ -642,12 +669,12 @@ binderType :: VarBndr TyCoVar argf -> Type
 binderType (Bndr tv _) = varType tv
 
 -- | Make a named binder
-mkTyCoVarBinder :: vis -> TyCoVar -> (VarBndr TyCoVar vis)
+mkTyCoVarBinder :: vis -> TyCoVar -> VarBndr TyCoVar vis
 mkTyCoVarBinder vis var = Bndr var vis
 
 -- | Make a named binder
 -- 'var' should be a type variable
-mkTyVarBinder :: vis -> TyVar -> (VarBndr TyVar vis)
+mkTyVarBinder :: vis -> TyVar -> VarBndr TyVar vis
 mkTyVarBinder vis var
   = ASSERT( isTyVar var )
     Bndr var vis
