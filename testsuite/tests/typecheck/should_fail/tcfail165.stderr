@@ -1,12 +1,17 @@
 
-tcfail165.hs:19:23: error:
-    • Couldn't match expected type: forall a. Show a => a -> String
-                  with actual type: b0 -> String
-    • In the second argument of ‘putMVar’, namely
-        ‘(show :: forall b. Show b => b -> String)’
-      In a stmt of a 'do' block:
-        putMVar var (show :: forall b. Show b => b -> String)
+tcfail165.hs:18:17: error:
+    • Couldn't match type: forall a. Show a => a -> String
+                     with: b0 -> String
+      Expected: IO (MVar (b0 -> String))
+        Actual: IO (MVar (forall a. Show a => a -> String))
+    • In a stmt of a 'do' block:
+        var <- newEmptyMVar :: IO (MVar (forall a. Show a => a -> String))
       In the expression:
         do var <- newEmptyMVar ::
                     IO (MVar (forall a. Show a => a -> String))
            putMVar var (show :: forall b. Show b => b -> String)
+      In an equation for ‘foo’:
+          foo
+            = do var <- newEmptyMVar ::
+                          IO (MVar (forall a. Show a => a -> String))
+                 putMVar var (show :: forall b. Show b => b -> String)

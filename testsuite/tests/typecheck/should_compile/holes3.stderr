@@ -4,16 +4,14 @@ holes3.hs:3:5: error:
       Where: ‘t’ is a rigid type variable bound by
                the inferred type of f :: t
                at holes3.hs:3:1-5
-    • In the expression: _
-      In an equation for ‘f’: f = _
+    • In an equation for ‘f’: f = _
     • Relevant bindings include f :: t (bound at holes3.hs:3:1)
       Valid hole fits include f :: forall {t}. t
 
 holes3.hs:6:7: error:
     • Found hole: _gr :: Char
       Or perhaps ‘_gr’ is mis-spelled, or not in scope
-    • In the expression: _gr
-      In an equation for ‘g’: g x = _gr
+    • In an equation for ‘g’: g x = _gr
     • Relevant bindings include
         x :: Int (bound at holes3.hs:6:3)
         g :: Int -> Char (bound at holes3.hs:6:1)

@@ -1,10 +1,10 @@
 
 T17963.hs:15:23: error:
-    • Couldn't match kind ‘rep1’ with ‘'LiftedRep’
+    • Couldn't match kind ‘rep’ with ‘'LiftedRep’
       When matching kinds
         k0 :: *
-        ob :: TYPE rep1
-      ‘rep1’ is a rigid type variable bound by
+        ob :: TYPE rep
+      ‘rep’ is a rigid type variable bound by
         the class declaration for ‘Category'’
         at T17963.hs:13:27-29
     • In the first argument of ‘cat’, namely ‘a’

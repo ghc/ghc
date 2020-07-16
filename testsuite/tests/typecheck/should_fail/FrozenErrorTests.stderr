@@ -1,6 +1,9 @@
 
 FrozenErrorTests.hs:26:9: error:
     • Couldn't match type ‘a’ with ‘[a]’ arising from a use of ‘goo1’
+      ‘a’ is a rigid type variable bound by
+        the inferred type of test1 :: a
+        at FrozenErrorTests.hs:26:1-28
     • In the expression: goo1 False undefined
       In an equation for ‘test1’: test1 = goo1 False undefined
     • Relevant bindings include

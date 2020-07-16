@@ -2,6 +2,12 @@
 readFail003.hs:4:27: error:
     • Couldn't match expected type ‘(a, [a1], [a2])’
                   with actual type ‘a’
+      ‘a’ is a rigid type variable bound by
+        the inferred types of
+          a :: a
+          b :: [a1]
+          c :: [a2]
+        at readFail003.hs:(4,1)-(8,26)
     • In the expression: a
       In a pattern binding:
         ~(a, b, c)

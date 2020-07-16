@@ -1,0 +1,6 @@
+
+T15859a.hs:19:5: error:
+    • Cannot apply expression of type ‘KindOf A’
+      to a visible type argument ‘Int’
+    • In the expression: (undefined :: KindOf A) @Int
+      In an equation for ‘a’: a = (undefined :: KindOf A) @Int

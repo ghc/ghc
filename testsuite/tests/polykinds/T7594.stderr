@@ -1,13 +1,12 @@
 
 T7594.hs:37:12: error:
-    • Couldn't match type ‘b’ with ‘IO ()’
+    • Could not deduce: b ~ IO ()
+      from the context: (:&:) c0 Real a
+        bound by a type expected by the context:
+                   forall a. (:&:) c0 Real a => a -> b
+        at T7594.hs:37:12-16
       Expected: a -> b
         Actual: a -> IO ()
-        ‘b’ is untouchable
-          inside the constraints: (:&:) c0 Real a
-          bound by a type expected by the context:
-                     forall a. (:&:) c0 Real a => a -> b
-          at T7594.hs:37:12-16
       ‘b’ is a rigid type variable bound by
         the inferred type of bar2 :: b
         at T7594.hs:37:1-19
