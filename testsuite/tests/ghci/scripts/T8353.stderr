@@ -6,8 +6,7 @@ Defer03.hs:4:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
 
 Defer03.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
-    • In the expression: _
-      In an equation for ‘f’: f = _
+    • In an equation for ‘f’: f = _
     • Relevant bindings include f :: Int (bound at Defer03.hs:7:1)
       Valid hole fits include
         f :: Int (bound at Defer03.hs:7:1)
@@ -28,8 +27,7 @@ Defer03.hs:4:5: error:
 
 Defer03.hs:7:5: error:
     • Found hole: _ :: Int
-    • In the expression: _
-      In an equation for ‘f’: f = _
+    • In an equation for ‘f’: f = _
     • Relevant bindings include f :: Int (bound at Defer03.hs:7:1)
       Valid hole fits include
         f :: Int (bound at Defer03.hs:7:1)
@@ -50,8 +48,7 @@ Defer03.hs:4:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
 
 Defer03.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
-    • In the expression: _
-      In an equation for ‘f’: f = _
+    • In an equation for ‘f’: f = _
     • Relevant bindings include f :: Int (bound at Defer03.hs:7:1)
       Valid hole fits include
         f :: Int (bound at Defer03.hs:7:1)
@@ -72,8 +69,7 @@ Defer03.hs:4:5: error:
 
 Defer03.hs:7:5: error:
     • Found hole: _ :: Int
-    • In the expression: _
-      In an equation for ‘f’: f = _
+    • In an equation for ‘f’: f = _
     • Relevant bindings include f :: Int (bound at Defer03.hs:7:1)
       Valid hole fits include
         f :: Int (bound at Defer03.hs:7:1)
@@ -94,8 +90,7 @@ Defer03.hs:4:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
 
 Defer03.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int
-    • In the expression: _
-      In an equation for ‘f’: f = _
+    • In an equation for ‘f’: f = _
     • Relevant bindings include f :: Int (bound at Defer03.hs:7:1)
       Valid hole fits include
         f :: Int (bound at Defer03.hs:7:1)
