@@ -39,7 +39,6 @@ import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Rename.Splice( rnSpliceType )
 
-import GHC.Core.Type
 import GHC.Driver.Session
 import GHC.Hs
 import GHC.Rename.Doc    ( rnLHsDoc, rnMbLHsDoc )
@@ -68,7 +67,7 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.List          ( nubBy, partition, find )
+import Data.List          ( nubBy, partition )
 import Control.Monad      ( unless, when )
 
 #include "HsVersions.h"
@@ -124,19 +123,16 @@ data HsSigWcTypeScoping
     -- "GHC.Hs.Type".
 
 rnHsSigWcType :: HsDocContext
-              -> Maybe SDoc
-              -- ^ The error msg if the signature is not allowed to contain
-              --   manually written inferred variables.
               -> LHsSigWcType GhcPs
               -> RnM (LHsSigWcType GhcRn, FreeVars)
-rnHsSigWcType doc inf_err (HsWC { hswc_body = HsIB { hsib_body = hs_ty }})
-  = rn_hs_sig_wc_type BindUnlessForall doc inf_err hs_ty $ \nwcs imp_tvs body ->
+rnHsSigWcType doc (HsWC { hswc_body = HsIB { hsib_body = hs_ty }})
+  = rn_hs_sig_wc_type BindUnlessForall doc hs_ty $ \nwcs imp_tvs body ->
     let ib_ty = HsIB { hsib_ext = imp_tvs, hsib_body = body  }
         wc_ty = HsWC { hswc_ext = nwcs,    hswc_body = ib_ty } in
     pure (wc_ty, emptyFVs)
 
 rnHsPatSigType :: HsSigWcTypeScoping
-               -> HsDocContext -> Maybe SDoc
+               -> HsDocContext
                -> HsPatSigType GhcPs
                -> (HsPatSigType GhcRn -> RnM (a, FreeVars))
                -> RnM (a, FreeVars)
@@ -147,10 +143,10 @@ rnHsPatSigType :: HsSigWcTypeScoping
 -- Wildcards are allowed
 --
 -- See Note [Pattern signature binders and scoping] in GHC.Hs.Type
-rnHsPatSigType scoping ctx inf_err sig_ty thing_inside
+rnHsPatSigType scoping ctx sig_ty thing_inside
   = do { ty_sig_okay <- xoptM LangExt.ScopedTypeVariables
        ; checkErr ty_sig_okay (unexpectedPatSigTypeErr sig_ty)
-       ; rn_hs_sig_wc_type scoping ctx inf_err (hsPatSigType sig_ty) $
+       ; rn_hs_sig_wc_type scoping ctx (hsPatSigType sig_ty) $
          \nwcs imp_tvs body ->
     do { let sig_names = HsPSRn { hsps_nwcs = nwcs, hsps_imp_tvs = imp_tvs }
              sig_ty'   = HsPS { hsps_ext = sig_names, hsps_body = body }
@@ -158,16 +154,15 @@ rnHsPatSigType scoping ctx inf_err sig_ty thing_inside
        } }
 
 -- The workhorse for rnHsSigWcType and rnHsPatSigType.
-rn_hs_sig_wc_type :: HsSigWcTypeScoping -> HsDocContext -> Maybe SDoc
+rn_hs_sig_wc_type :: HsSigWcTypeScoping -> HsDocContext
                   -> LHsType GhcPs
                   -> ([Name]    -- Wildcard names
                       -> [Name] -- Implicitly bound type variable names
                       -> LHsType GhcRn
                       -> RnM (a, FreeVars))
                   -> RnM (a, FreeVars)
-rn_hs_sig_wc_type scoping ctxt inf_err hs_ty thing_inside
-  = do { check_inferred_vars ctxt inf_err hs_ty
-       ; free_vars <- filterInScopeM (extractHsTyRdrTyVars hs_ty)
+rn_hs_sig_wc_type scoping ctxt hs_ty thing_inside
+  = do { free_vars <- filterInScopeM (extractHsTyRdrTyVars hs_ty)
        ; (nwc_rdrs', tv_rdrs) <- partition_nwcs free_vars
        ; let nwc_rdrs = nubL nwc_rdrs'
        ; implicit_bndrs <- case scoping of
@@ -318,17 +313,13 @@ of the HsWildCardBndrs structure, and we are done.
 
 rnHsSigType :: HsDocContext
             -> TypeOrKind
-            -> Maybe SDoc
-            -- ^ The error msg if the signature is not allowed to contain
-            --   manually written inferred variables.
             -> LHsSigType GhcPs
             -> RnM (LHsSigType GhcRn, FreeVars)
 -- Used for source-language type signatures
 -- that cannot have wildcards
-rnHsSigType ctx level inf_err (HsIB { hsib_body = hs_ty })
+rnHsSigType ctx level (HsIB { hsib_body = hs_ty })
   = do { traceRn "rnHsSigType" (ppr hs_ty)
        ; rdr_env <- getLocalRdrEnv
-       ; check_inferred_vars ctx inf_err hs_ty
        ; vars0 <- forAllOrNothing (isLHsForAllTy hs_ty)
            $ filterInScope rdr_env
            $ extractHsTyRdrTyVars hs_ty
@@ -414,26 +405,6 @@ As a result, we make the `SrcSpan`s for `a` and `b` span the entirety of the
 type signature, since the type signature implicitly carries their binding
 sites. This is less precise, but more accurate.
 -}
-
-check_inferred_vars :: HsDocContext
-                    -> Maybe SDoc
-                    -- ^ The error msg if the signature is not allowed to contain
-                    --   manually written inferred variables.
-                    -> LHsType GhcPs
-                    -> RnM ()
-check_inferred_vars _    Nothing    _  = return ()
-check_inferred_vars ctxt (Just msg) ty =
-  let bndrs = forallty_bndrs ty
-  in case find ((==) InferredSpec . hsTyVarBndrFlag) bndrs of
-    Nothing -> return ()
-    Just _  -> addErr $ withHsDocContext ctxt msg
-  where
-    forallty_bndrs :: LHsType GhcPs -> [HsTyVarBndr Specificity GhcPs]
-    forallty_bndrs (L _ ty) = case ty of
-      HsParTy _ ty' -> forallty_bndrs ty'
-      HsForAllTy { hst_tele = HsForAllInvis { hsf_invis_bndrs = tvs }}
-                    -> map unLoc tvs
-      _             -> []
 
 {- ******************************************************
 *                                                       *

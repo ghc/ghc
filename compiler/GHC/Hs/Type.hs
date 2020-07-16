@@ -1628,6 +1628,12 @@ instance types, which makes things like the instance above become illegal.
 For the sake of consistency, we also disallow nested contexts, even though they
 don't have the same strange interaction with ScopedTypeVariables.
 
+Just as we forbid nested `forall`s and contexts in normal instance
+declarations, we also forbid them in SPECIALISE instance pragmas (#18455).
+Unlike normal instance declarations, ScopedTypeVariables don't have any impact
+on SPECIALISE instance pragmas, but we use the same validity checks for
+SPECIALISE instance pragmas anyway to be consistent.
+
 -----
 -- Wrinkle: Derived instances
 -----
