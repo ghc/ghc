@@ -1,5 +1,7 @@
 ------------------------------------------------------------------
 -- A primop-table mangling program                              --
+--
+-- See Note [GHC.Prim] in primops.txt.pp for details.
 ------------------------------------------------------------------
 
 module Main where
@@ -293,8 +295,6 @@ gen_hs_source (Info defaults entries) =
            hdr (PrimOpSpec { name = n })                         = wrapOp n ++ ","
            hdr (PrimVecOpSpec { name = n })                      = wrapOp n ++ ","
            hdr (PseudoOpSpec { name = n })                       = wrapOp n ++ ","
-           hdr (PrimTypeSpec { ty = TyApp (TyCon "->") _ })      = ""
-                  -- GHC lacks the syntax to explicitly export "->"
            hdr (PrimTypeSpec { ty = TyApp (TyCon n) _ })         = wrapOp n ++ ","
            hdr (PrimTypeSpec {})                                 = error $ "Illegal type spec"
            hdr (PrimVecTypeSpec { ty = TyApp (VecTyCon n _) _ }) = wrapOp n ++ ","
@@ -398,8 +398,6 @@ keep GHC's renamer and typechecker happy enough for what Haddock
 needs.  Our main plan is to say
         foo :: <type>
         foo = foo
-We have to silence GHC's complaints about unboxed-top-level declarations
-with an ad-hoc fix in GHC.Tc.Gen.Bind: see Note [Compiling GHC.Prim] in GHC.Tc.Gen.Bind.
 
 That works for all the primitive functions except tagToEnum#.
 If we generate the binding
