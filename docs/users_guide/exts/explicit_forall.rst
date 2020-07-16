@@ -37,7 +37,7 @@ Notes:
 
       instance forall a. Eq a => Eq [a] where ...
 
-  Note that the use of ``forall``s in instance declarations is somewhat
+  Note that the use of ``forall``\ s in instance declarations is somewhat
   restricted in comparison to other types. For example, instance declarations
   are not allowed to contain nested ``forall``s. See
   :ref:`formal-instance-syntax` for more information.

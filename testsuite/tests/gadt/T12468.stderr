@@ -1,8 +1,7 @@
 
 T12468.hs:9:7: error:
     • Found hole: _ :: Int
-    • In the expression: _
-      In an equation for ‘f’: f I = _
+    • In an equation for ‘f’: f I = _
     • Relevant bindings include f :: T a -> a (bound at T12468.hs:9:1)
       Constraints include a ~ Int (from T12468.hs:9:3)
       Valid hole fits include
