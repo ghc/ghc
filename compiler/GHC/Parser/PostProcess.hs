@@ -310,12 +310,13 @@ mkTyFamInst loc eqn
   = return (L loc (TyFamInstD noExtField (TyFamInstDecl eqn)))
 
 mkFamDecl :: SrcSpan
+          -> TopLevelFlag
           -> FamilyInfo GhcPs
           -> LHsType GhcPs                   -- LHS
           -> Located (FamilyResultSig GhcPs) -- Optional result signature
           -> Maybe (LInjectivityAnn GhcPs)   -- Injectivity annotation
           -> P (LTyClDecl GhcPs)
-mkFamDecl loc info lhs ksig injAnn
+mkFamDecl loc top_lvl info lhs ksig injAnn
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False lhs
        ; addAnnsAt loc ann -- Add any API Annotations to the top SrcSpan
        ; (tyvars, anns) <- checkTyVars (ppr info) equals_or_where tc tparams
@@ -325,6 +326,7 @@ mkFamDecl loc info lhs ksig injAnn
                                            , fdInfo      = info, fdLName = tc
                                            , fdTyVars    = tyvars
                                            , fdFixity    = fixity
+                                           , fdTopLevel  = top_lvl
                                            , fdResultSig = ksig
                                            , fdInjectivityAnn = injAnn }))) }
   where

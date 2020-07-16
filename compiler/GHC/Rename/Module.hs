@@ -1937,6 +1937,7 @@ rnFamDecl :: Maybe Name -- Just cls => this FamilyDecl is nested
           -> RnM (FamilyDecl GhcRn, FreeVars)
 rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
                              , fdFixity = fixity
+                             , fdTopLevel = top_lvl
                              , fdInfo = info, fdResultSig = res_sig
                              , fdInjectivityAnn = injectivity })
   = do { tycon' <- lookupLocatedTopBndrRn tycon
@@ -1951,6 +1952,7 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
        ; return (FamilyDecl { fdExt = noExtField
                             , fdLName = tycon', fdTyVars = tyvars'
                             , fdFixity = fixity
+                            , fdTopLevel = top_lvl
                             , fdInfo = info', fdResultSig = res_sig'
                             , fdInjectivityAnn = injectivity' }
                 , fv1 `plusFV` fv2) }

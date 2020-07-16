@@ -221,6 +221,7 @@
                  ({ DumpRenamedAst.hs:11:28 }
                   {Name: k})))))))])
          (Prefix)
+         (TopLevel)
          ({ DumpRenamedAst.hs:11:32-39 }
           (KindSig
            (NoExtField)
@@ -248,6 +249,7 @@
           [{Name: k}]
           [])
          (Prefix)
+         (TopLevel)
          ({ DumpRenamedAst.hs:15:17-33 }
           (KindSig
            (NoExtField)
@@ -634,6 +636,7 @@
                  ({ DumpRenamedAst.hs:23:36-39 }
                   {Name: GHC.Types.Type})))))))])
          (Prefix)
+         (TopLevel)
          ({ DumpRenamedAst.hs:23:42-48 }
           (KindSig
            (NoExtField)

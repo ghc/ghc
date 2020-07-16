@@ -311,7 +311,7 @@ cvtDec (DataFamilyD tc tvs kind)
   = do { (_, tc', tvs') <- cvt_tycl_hdr [] tc tvs
        ; result <- cvtMaybeKindToFamilyResultSig kind
        ; returnJustL $ TyClD noExtField $ FamDecl noExtField $
-         FamilyDecl noExtField DataFamily tc' tvs' Prefix result Nothing }
+         FamilyDecl noExtField DataFamily tc' tvs' Prefix TopLevel result Nothing }
 
 cvtDec (DataInstD ctxt bndrs tys ksig constrs derivs)
   = do { (ctxt', tc', bndrs', typats') <- cvt_datainst_hdr ctxt bndrs tys
@@ -363,7 +363,7 @@ cvtDec (TySynInstD eqn)
 cvtDec (OpenTypeFamilyD head)
   = do { (tc', tyvars', result', injectivity') <- cvt_tyfam_head head
        ; returnJustL $ TyClD noExtField $ FamDecl noExtField $
-         FamilyDecl noExtField OpenTypeFamily tc' tyvars' Prefix result' injectivity'
+         FamilyDecl noExtField OpenTypeFamily tc' tyvars' Prefix TopLevel result' injectivity'
        }
 
 cvtDec (ClosedTypeFamilyD head eqns)
@@ -371,7 +371,7 @@ cvtDec (ClosedTypeFamilyD head eqns)
        ; eqns' <- mapM cvtTySynEqn eqns
        ; returnJustL $ TyClD noExtField $ FamDecl noExtField $
          FamilyDecl noExtField (ClosedTypeFamily (Just eqns')) tc' tyvars' Prefix
-                           result' injectivity' }
+                           TopLevel result' injectivity' }
 
 cvtDec (TH.RoleAnnotD tc roles)
   = do { tc' <- tconNameL tc
