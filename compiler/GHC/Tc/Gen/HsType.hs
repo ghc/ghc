@@ -49,8 +49,6 @@ module GHC.Tc.Gen.HsType (
         tcInferLHsTypeKind, tcInferLHsType, tcInferLHsTypeUnsaturated,
         tcCheckLHsType,
         tcHsMbContext, tcHsContext, tcLHsPredType,
-        failIfEmitsConstraints,
-        solveEqualities, -- useful re-export
 
         kindGeneralizeAll, kindGeneralizeSome, kindGeneralizeNone,
 
@@ -87,7 +85,6 @@ import GHC.Tc.Solver
 import GHC.Tc.Utils.Zonk
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
-import GHC.Tc.Errors      ( reportAllUnsolved )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Instantiate ( tcInstInvisibleTyBindersN, tcInstInvisibleTyBinder )
 import GHC.Core.Type
@@ -186,43 +183,123 @@ these variables.
 
 Note [Recipe for checking a signature]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Checking a user-written signature requires several steps:
+Kind-checking a user-written signature requires several steps:
 
- 1. Generate constraints.
- 2. Solve constraints.
- 3. Promote tyvars and/or kind-generalize.
- 4. Zonk.
- 5. Check validity.
+ 0. Bump the TcLevel
+ 1.   Bind any lexically-scoped type variables.
+ 2.   Generate constraints.
+ 3. Solve constraints.
+ 4. Sort any implicitly-bound variables into dependency order
+ 5. Promote tyvars and/or kind-generalize.
+ 6. Zonk.
+ 7. Check validity.
 
-There may be some surprises in here:
+Very similar steps also apply when kind-checking a type or class
+declaration.
 
-Step 2 is necessary for two reasons: most signatures also bring
-implicitly quantified variables into scope, and solving is necessary
-to get these in the right order (see Note [Keeping implicitly
-quantified variables in order]). Additionally, solving is necessary in
-order to kind-generalize correctly: otherwise, we do not know which
-metavariables are left unsolved.
+The general pattern looks something like this.  (But NB every
+specific instance varies in one way or another!)
 
-Step 3 is done by a call to candidateQTyVarsOfType, followed by a call to
-kindGeneralize{All,Some,None}. Here, we have to deal with the fact that
-metatyvars generated in the type may have a bumped TcLevel, because explicit
-foralls raise the TcLevel. To avoid these variables from ever being visible in
-the surrounding context, we must obey the following dictum:
+    do { (tclvl, wanted, (spec_tkvs, ty))
+              <- pushLevelAndSolveEqualitiesX "tc_top_lhs_type" $
+                 bindImplicitTKBndrs_Skol sig_vars              $
+                 <kind-check the type>
+
+       ; spec_tkvs <- zonkAndScopedSort spec_tkvs
+
+       ; reportUnsolvedEqualities skol_info spec_tkvs tclvl wanted
+
+       ; let ty1 = mkSpecForAllTys spec_tkvs ty
+       ; kvs <- kindGeneralizeAll ty1
+
+       ; final_ty <- zonkTcTypeToType (mkInfForAllTys kvs ty1)
+
+       ; checkValidType final_ty
+
+This pattern is repeated many times in GHC.Tc.Gen.HsType,
+GHC.Tc.Gen.Sig, and GHC.Tc.TyCl, with variations.  In more detail:
+
+* pushLevelAndSolveEqualitiesX (Step 0, step 3) bumps the TcLevel,
+  calls the thing inside to generate constraints, solves those
+  constraints as much as possible, returning the residual unsolved
+  constraints in 'wanted'.
+
+* bindImplictTKBndrs_Skol (Step 1) binds the user-specified type
+  variables E.g.  when kind-checking f :: forall a. F a -> a we must
+  bring 'a' into scope before kind-checking (F a -> a)
+
+* zonkAndScopedSort (Step 4) puts those user-specified variables in
+  the dependency order.  (For "implicit" variables the order is no
+  user-specified.  E.g.  forall (a::k1) (b::k2). blah k1 and k2 are
+  implicitly brought into scope.
+
+* reportUnsolvedEqualities (Step 3 continued) reports any unsolved
+  equalities, carefully wrapping them in an implication that binds the
+  skolems.  We can't do that in pushLevelAndSolveEqualitiesX because
+  that function doesn't have access to the skolems.
+
+* kindGeneralize (Step 5). See Note [Kind generalisation]
+
+* The final zonkTcTypeToType must happen after promoting/generalizing,
+  because promoting and generalizing fill in metavariables.
+
+
+Doing Step 3 (constraint solving) eagerly (rather than building an
+implication constraint and solving later) is necessary for several
+reasons:
+
+* Exactly as for Solver.simplifyInfer: when generalising, we solve all
+  the constraints we can so that we don't have to quantify over them
+  or, since we don't quantify over constraints in kinds, float them
+  and inhibit generalisation.
+
+* Most signatures also bring implicitly quantified variables into
+  scope, and solving is necessary to get these in the right order
+  (Step 4) see Note [Keeping implicitly quantified variables in
+  order]).
+
+Note [Kind generalisation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Step 5 of Note [Recipe for checking a signature], namely
+kind-generalisation, is done by
+    kindGeneraliseAll
+    kindGeneraliseSome
+    kindGeneraliseNone
+
+perform kind generalisation.  Here, we have to deal with the fact that
+metatyvars generated in the type will have a bumped TcLevel, because
+explicit foralls raise the TcLevel. To avoid these variables from ever
+being visible in the surrounding context, we must obey the following
+dictum:
 
   Every metavariable in a type must either be
     (A) generalized, or
     (B) promoted, or        See Note [Promotion in signatures]
-    (C) a cause to error    See Note [Naughty quantification candidates] in GHC.Tc.Utils.TcMType
+    (C) a cause to error    See Note [Naughty quantification candidates]
+                            in GHC.Tc.Utils.TcMType
+
+There are three steps (look at kindGeneraliseSome):
+
+1. candidateQTyVarsOfType finds the free variables of the type or kind,
+   to generalise
+
+2. filterConstrainedCandidates filters out candidates that appear
+   in the unsolved 'wanteds', and promotes the ones that get filtered out
+   thereby.
+
+3. quantifyTyVars quantifies the remaining type variables
 
 The kindGeneralize functions do not require pre-zonking; they zonk as they
 go.
 
-If you are actually doing kind-generalization, you need to bump the level
-before generating constraints, as we will only generalize variables with
-a TcLevel higher than the ambient one.
+kindGeneraliseAll specialises for the case where step (2) is vacuous.
+kindGeneraliseNone specialises for the case where we do no quantification,
+but we must still promote.
 
-After promoting/generalizing, we need to zonk again because both
-promoting and generalizing fill in metavariables.
+If you are actually doing kind-generalization, you need to bump the
+level before generating constraints, as we will only generalize
+variables with a TcLevel higher than the ambient one.
+Hence the "pushLevel" in pushLevelAndSolveEqualities.
 
 Note [Promotion in signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -300,10 +377,9 @@ kcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM ()
 kcClassSigType skol_info names (HsIB { hsib_ext  = sig_vars
                                      , hsib_body = hs_ty })
   = addSigCtxt (funsSigCtxt names) hs_ty $
-    do { (tc_lvl, (wanted, (spec_tkvs, _)))
-           <- pushTcLevelM                           $
-              solveLocalEqualitiesX "kcClassSigType" $
-              bindImplicitTKBndrs_Skol sig_vars      $
+    do { (tc_lvl, wanted, (spec_tkvs, _))
+           <- pushLevelAndSolveEqualitiesX "kcClassSigType" $
+              bindImplicitTKBndrs_Skol sig_vars            $
               tcLHsType hs_ty liftedTypeKind
 
        ; emitResidualTvConstraint skol_info spec_tkvs tc_lvl wanted }
@@ -363,27 +439,19 @@ tc_hs_sig_type :: SkolemInfo -> LHsSigType GhcRn
 -- Returns also an implication for the unsolved constraints
 tc_hs_sig_type skol_info hs_sig_type ctxt_kind
   | HsIB { hsib_ext = sig_vars, hsib_body = hs_ty } <- hs_sig_type
-  = do { (tc_lvl, (wanted, (spec_tkvs, ty)))
-              <- pushTcLevelM                           $
-                 solveLocalEqualitiesX "tc_hs_sig_type" $
+  = do { (tc_lvl, wanted, (spec_tkvs, ty))
+              <- pushLevelAndSolveEqualitiesX "tc_hs_sig_type" $
                  -- See Note [Failure in local type signatures]
                  bindImplicitTKBndrs_Skol sig_vars      $
                  do { kind <- newExpectedKind ctxt_kind
                     ; tcLHsType hs_ty kind }
-       -- Any remaining variables (unsolved in the solveLocalEqualities)
+       -- Any remaining variables (unsolved in the solveEqualities)
        -- should be in the global tyvars, and therefore won't be quantified
 
        ; spec_tkvs <- zonkAndScopedSort spec_tkvs
        ; let ty1 = mkSpecForAllTys spec_tkvs ty
 
-       -- This bit is very much like decideMonoTyVars in GHC.Tc.Solver,
-       -- but constraints are so much simpler in kinds, it is much
-       -- easier here. (In particular, we never quantify over a
-       -- constraint in a type.)
-       ; constrained <- zonkTyCoVarsAndFV (tyCoVarsOfWC wanted)
-       ; let should_gen = not . (`elemVarSet` constrained)
-
-       ; kvs <- kindGeneralizeSome should_gen ty1
+       ; kvs <- kindGeneralizeSome wanted ty1
 
        -- Build an implication for any as-yet-unsolved kind equalities
        -- See Note [Skolem escape in type signatures]
@@ -447,16 +515,18 @@ tc_top_lhs_type :: TcTyMode -> LHsSigType GhcRn -> ContextKind -> TcM Type
 tc_top_lhs_type mode hs_sig_type ctxt_kind
   | HsIB { hsib_ext = sig_vars, hsib_body = hs_ty } <- hs_sig_type
   = do { traceTc "tcTopLHsType {" (ppr hs_ty)
-       ; (spec_tkvs, ty)
-              <- pushTcLevelM_                     $
-                 solveEqualities                   $
-                 bindImplicitTKBndrs_Skol sig_vars $
+       ; (tclvl, wanted, (spec_tkvs, ty))
+              <- pushLevelAndSolveEqualitiesX "tc_top_lhs_type" $
+                 bindImplicitTKBndrs_Skol sig_vars              $
                  do { kind <- newExpectedKind ctxt_kind
                     ; tc_lhs_type mode hs_ty kind }
 
        ; spec_tkvs <- zonkAndScopedSort spec_tkvs
+       ; reportUnsolvedEqualities InstSkol spec_tkvs tclvl wanted
+
        ; let ty1 = mkSpecForAllTys spec_tkvs ty
-       ; kvs <- kindGeneralizeAll ty1  -- "All" because it's a top-level type
+       ; kvs <- kindGeneralizeAll ty1
+
        ; final_ty <- zonkTcTypeToType (mkInfForAllTys kvs ty1)
        ; traceTc "End tcTopLHsType }" (vcat [ppr hs_ty, ppr final_ty])
        ; return final_ty}
@@ -984,8 +1054,9 @@ tc_hs_type mode (HsOpTy _ ty1 (L _ op) ty2) exp_kind
 --------- Foralls
 tc_hs_type mode forall@(HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
   = do { (tclvl, wanted, (tv_bndrs, ty'))
-            <- pushLevelAndCaptureConstraints      $
-               bindExplicitTKTele_Skol_M mode tele $
+            <- pushLevelAndCaptureConstraints $
+                 -- No need to solve equalities here; we will do that later
+               bindExplicitTKTele mode tele   $
                  -- The _M variant passes on the mode from the type, to
                  -- any wildards in kind signatures on the forall'd variables
                  -- e.g.      f :: _ -> Int -> forall (a :: _). blah
@@ -999,22 +1070,15 @@ tc_hs_type mode forall@(HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
                              map ppr hs_tvs
                            HsForAllInvis { hsf_invis_bndrs = hs_tvs } ->
                              map ppr hs_tvs
-             tv_bndrs' = construct_bndrs tv_bndrs
-             skol_tvs  = binderVars tv_bndrs'
+             skol_tvs  = binderVars tv_bndrs
+
        ; implic <- buildTvImplication skol_info skol_tvs tclvl wanted
        ; emitImplication implic
              -- /Always/ emit this implication even if wanted is empty
              -- We need the implication so that we check for a bad telescope
              -- See Note [Skolem escape and forall-types]
 
-       ; return (mkForAllTys tv_bndrs' ty') }
-  where
-    construct_bndrs :: Either [TcReqTVBinder] [TcInvisTVBinder]
-                    -> [TcTyVarBinder]
-    construct_bndrs (Left req_tv_bndrs) =
-      map (mkTyVarBinder Required . binderVar) req_tv_bndrs
-    construct_bndrs (Right inv_tv_bndrs) =
-      map tyVarSpecToBinder inv_tv_bndrs
+       ; return (mkForAllTys tv_bndrs ty') }
 
 tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = rn_ty }) exp_kind
   | null (unLoc ctxt)
@@ -2184,17 +2248,18 @@ kcCheckDeclHeader_cusk name flav
   -- CUSK case
   -- See note [Required, Specified, and Inferred for types] in GHC.Tc.TyCl
   = addTyConFlavCtxt name flav $
-    do { (scoped_kvs, (tc_tvs, res_kind))
-           <- pushTcLevelM_                               $
-              solveEqualities                             $
-              bindImplicitTKBndrs_Q_Skol kv_ns            $
-              bindExplicitTKBndrs_Q_Skol ctxt_kind hs_tvs $
+    do { (tclvl, wanted, (scoped_kvs, (tc_tvs, res_kind)))
+           <- pushLevelAndSolveEqualitiesX "kcCheckDeclHeader_cusk" $
+              bindImplicitTKBndrs_Q_Skol kv_ns                      $
+              bindExplicitTKBndrs_Q_Skol ctxt_kind hs_tvs           $
               newExpectedKind =<< kc_res_ki
 
            -- Now, because we're in a CUSK,
            -- we quantify over the mentioned kind vars
        ; let spec_req_tkvs = scoped_kvs ++ tc_tvs
              all_kinds     = res_kind : map tyVarKind spec_req_tkvs
+
+       ; reportUnsolvedEqualities skol_info spec_req_tkvs tclvl wanted
 
        ; candidates' <- candidateQTyVarsOfKinds all_kinds
              -- 'candidates' are all the variables that we are going to
@@ -2224,6 +2289,7 @@ kcCheckDeclHeader_cusk name flav
              tycon = mkTcTyCon name final_tc_binders res_kind all_tv_prs
                                True -- it is generalised
                                flav
+
          -- If the ordering from
          -- Note [Required, Specified, and Inferred for types] in GHC.Tc.TyCl
          -- doesn't work, we catch it here, before an error cascade
@@ -2246,6 +2312,7 @@ kcCheckDeclHeader_cusk name flav
 
        ; return tycon }
   where
+    skol_info = TyConSkol flav name
     ctxt_kind | tcFlavourIsOpen flav = TheKind liftedTypeKind
               | otherwise            = AnyKind
 
@@ -2348,11 +2415,10 @@ kcCheckDeclHeader_sig kisig name flav
           --                       and to [(Name, TcTyVar)]  for  tcTyConScopedTyVars
         ; (vis_tcbs, concat -> explicit_tv_prs) <- mapAndUnzipM zipped_to_tcb zipped_binders
 
-        ; (implicit_tvs, (invis_binders, r_ki))
-             <- pushTcLevelM_ $
-                solveEqualities $  -- #16687
-                bindImplicitTKBndrs_Tv implicit_nms $
-                tcExtendNameTyVarEnv explicit_tv_prs  $
+        ; (tclvl, wanted, (implicit_tvs, (invis_binders, r_ki)))
+             <- pushLevelAndSolveEqualitiesX "kcCheckDeclHeader_sig" $  -- #16687
+                bindImplicitTKBndrs_Tv implicit_nms                  $
+                tcExtendNameTyVarEnv explicit_tv_prs                 $
                 do { -- Check that inline kind annotations on binders are valid.
                      -- For example:
                      --
@@ -2406,7 +2472,11 @@ kcCheckDeclHeader_sig kisig name flav
         ; let tcbs            = vis_tcbs ++ invis_tcbs
               implicit_tv_prs = implicit_nms `zip` implicit_tvs
               all_tv_prs      = implicit_tv_prs ++ explicit_tv_prs
-              tc = mkTcTyCon name tcbs r_ki all_tv_prs True flav
+              tc              = mkTcTyCon name tcbs r_ki all_tv_prs True flav
+              skol_info       = TyConSkol flav name
+
+        -- Check that there are no unsolved equalities
+        ; reportUnsolvedEqualities skol_info (binderVars tcbs) tclvl wanted
 
         ; traceTc "kcCheckDeclHeader_sig done:" $ vcat
           [ text "tyConName = " <+> ppr (tyConName tc)
@@ -2496,7 +2566,7 @@ kcCheckDeclHeader_sig kisig name flav
         KindedTyVar _ _ v v_hs_ki -> do
           v_ki <- tcLHsKindSig (TyVarBndrKindCtxt (unLoc v)) v_hs_ki
           discardResult $ -- See Note [discardResult in kcCheckDeclHeader_sig]
-            unifyKind (Just (HsTyVar noExtField NotPromoted v))
+            unifyKind (Just (ppr v))
                       (tyBinderType tb)
                       v_ki
 
@@ -2952,18 +3022,22 @@ cloneFlexiKindedTyVarTyVar = newFlexiKindedTyVar cloneTyVarTyVar
 
 -- | Skolemise the 'HsTyVarBndr's in an 'LHsForAllTelescope.
 -- Returns 'Left' for visible @forall@s and 'Right' for invisible @forall@s.
-bindExplicitTKTele_Skol_M
+bindExplicitTKTele
     :: TcTyMode
     -> HsForAllTelescope GhcRn
     -> TcM a
-    -> TcM (Either [TcReqTVBinder] [TcInvisTVBinder], a)
-bindExplicitTKTele_Skol_M mode tele thing_inside = case tele of
-  HsForAllVis { hsf_vis_bndrs = bndrs } -> do
-    (req_tv_bndrs, thing) <- bindExplicitTKBndrs_Skol_M mode bndrs thing_inside
-    pure (Left req_tv_bndrs, thing)
-  HsForAllInvis { hsf_invis_bndrs = bndrs } -> do
-    (inv_tv_bndrs, thing) <- bindExplicitTKBndrs_Skol_M mode bndrs thing_inside
-    pure (Right inv_tv_bndrs, thing)
+    -> TcM ([TcTyVarBinder], a)
+bindExplicitTKTele mode tele thing_inside = case tele of
+  HsForAllVis { hsf_vis_bndrs = bndrs }
+    -> do { (req_tv_bndrs, thing) <- bindExplicitTKBndrs_Skol_M mode bndrs thing_inside
+            -- req_tv_bndrs :: [VarBndr TyVar ()],
+            -- but we want [VarBndr TyVar ArgFlag]
+          ; return (tyVarReqToBinders req_tv_bndrs, thing) }
+  HsForAllInvis { hsf_invis_bndrs = bndrs }
+    -> do { (inv_tv_bndrs, thing) <- bindExplicitTKBndrs_Skol_M mode bndrs thing_inside
+            -- inv_tv_bndrs :: [VarBndr TyVar Specificity],
+            -- but we want [VarBndr TyVar ArgFlag]
+          ; return (tyVarSpecToBinders inv_tv_bndrs, thing) }
 
 bindExplicitTKBndrs_Skol, bindExplicitTKBndrs_Tv
     :: (OutputableBndrFlag flag)
@@ -3003,10 +3077,10 @@ bindExplicitTKBndrsX_Q
                            -- with the passed-in [LHsTyVarBndr]
 bindExplicitTKBndrsX_Q tc_tv hs_tvs thing_inside
   = do { (tv_bndrs,res) <- bindExplicitTKBndrsX tc_tv hs_tvs thing_inside
-       ; return ((binderVars tv_bndrs),res) }
+       ; return (binderVars tv_bndrs,res) }
 
 bindExplicitTKBndrsX :: (OutputableBndrFlag flag)
-    => (HsTyVarBndr flag GhcRn -> TcM TcTyVar)
+    => (HsTyVarBndr flag GhcRn -> TcM TyVar)
     -> [LHsTyVarBndr flag GhcRn]
     -> TcM a
     -> TcM ([VarBndr TyVar flag], a)  -- Returned [TcTyVar] are in 1-1 correspondence
@@ -3026,7 +3100,7 @@ bindExplicitTKBndrsX tc_tv hs_tvs thing_inside
             -- See GHC.Tc.Utils.TcMType Note [Cloning for tyvar binders]
             ; (tvs,res) <- tcExtendNameTyVarEnv [(hsTyVarName hs_tv, tv)] $
                            go hs_tvs
-            ; return ((Bndr tv (hsTyVarBndrFlag hs_tv)):tvs, res) }
+            ; return (Bndr tv (hsTyVarBndrFlag hs_tv):tvs, res) }
 
 -----------------
 tcHsTyVarBndr :: TcTyMode -> (Name -> Kind -> TcM TyVar)
@@ -3057,7 +3131,7 @@ tcHsQTyVarBndr _ new_tv (KindedTyVar _ _ (L _ tv_nm) lhs_kind)
        ; mb_tv <- tcLookupLcl_maybe tv_nm
        ; case mb_tv of
            Just (ATyVar _ tv)
-             -> do { discardResult $ unifyKind (Just hs_tv)
+             -> do { discardResult $ unifyKind (Just (ppr tv_nm))
                                         kind (tyVarKind tv)
                        -- This unify rejects:
                        --    class C (m :: * -> *) where
@@ -3065,9 +3139,6 @@ tcHsQTyVarBndr _ new_tv (KindedTyVar _ _ (L _ tv_nm) lhs_kind)
                    ; return tv }
 
            _ -> new_tv tv_nm kind }
-  where
-    hs_tv = HsTyVar noExtField NotPromoted (noLoc tv_nm)
-            -- Used for error messages only
 
 --------------------------------------
 -- Binding type/class variables in the
@@ -3107,56 +3178,63 @@ zonkAndScopedSort spec_tkvs
 -- | Generalize some of the free variables in the given type.
 -- All such variables should be *kind* variables; any type variables
 -- should be explicitly quantified (with a `forall`) before now.
--- The supplied predicate says which free variables to quantify.
--- But in all cases,
--- generalize only those variables whose TcLevel is strictly greater
--- than the ambient level. This "strictly greater than" means that
--- you likely need to push the level before creating whatever type
--- gets passed here. Any variable whose level is greater than the
--- ambient level but is not selected to be generalized will be
--- promoted. (See [Promoting unification variables] in "GHC.Tc.Solver"
--- and Note [Recipe for checking a signature].)
--- The resulting KindVar are the variables to
--- quantify over, in the correct, well-scoped order. They should
--- generally be Inferred, not Specified, but that's really up to
--- the caller of this function.
-kindGeneralizeSome :: (TcTyVar -> Bool)
+--
+-- The WantedConstraints are un-solved kind constraints. Generally
+-- they'll be reported as errors later, but meanwhile we refrain
+-- from quantifying over any variable free in these unsolved
+-- constraints. See Note [Failure in local type signatures].
+--
+-- But in all cases, generalize only those variables whose TcLevel is
+-- strictly greater than the ambient level. This "strictly greater
+-- than" means that you likely need to push the level before creating
+-- whatever type gets passed here.
+--
+-- Any variable whose level is greater than the ambient level but is
+-- not selected to be generalized will be promoted. (See [Promoting
+-- unification variables] in "GHC.Tc.Solver" and Note [Recipe for
+-- checking a signature].)
+--
+-- The resulting KindVar are the variables to quantify over, in the
+-- correct, well-scoped order. They should generally be Inferred, not
+-- Specified, but that's really up to the caller of this function.
+kindGeneralizeSome :: WantedConstraints
                    -> TcType    -- ^ needn't be zonked
                    -> TcM [KindVar]
-kindGeneralizeSome should_gen kind_or_type
-  = do { traceTc "kindGeneralizeSome {" (ppr kind_or_type)
-
-         -- use the "Kind" variant here, as any types we see
+kindGeneralizeSome wanted kind_or_type
+  = do { -- Use the "Kind" variant here, as any types we see
          -- here will already have all type variables quantified;
          -- thus, every free variable is really a kv, never a tv.
        ; dvs <- candidateQTyVarsOfKind kind_or_type
+       ; dvs <- filterConstrainedCandidates wanted dvs
+       ; quantifyTyVars dvs }
 
-       -- So 'dvs' are the variables free in kind_or_type, with a level greater
-       -- than the ambient level, hence candidates for quantification
-       -- Next: filter out the ones we don't want to generalize (specified by should_gen)
-       -- and promote them instead
-
-       ; let (to_promote, dvs') = partitionCandidates dvs (not . should_gen)
-
+filterConstrainedCandidates
+  :: WantedConstraints    -- Don't quantify over variables free in these
+                          --   Not necessarily fully zonked
+  -> CandidatesQTvs       -- Candidates for quantification
+  -> TcM CandidatesQTvs
+-- filterConstrainedCandidates removes any candidates that are free in
+-- 'wanted'; instead, it promotes them.  This bit is very much like
+-- decideMonoTyVars in GHC.Tc.Solver, but constraints are so much
+-- simpler in kinds, it is much easier here. (In particular, we never
+-- quantify over a constraint in a type.)
+filterConstrainedCandidates wanted dvs
+  | isEmptyWC wanted   -- Fast path for a common case
+  = return dvs
+  | otherwise
+  = do { wc_tvs <- zonkTyCoVarsAndFV (tyCoVarsOfWC wanted)
+       ; let (to_promote, dvs') = partitionCandidates dvs (`elemVarSet` wc_tvs)
        ; _ <- promoteTyVarSet to_promote
-       ; qkvs <- quantifyTyVars dvs'
+       ; return dvs' }
 
-       ; traceTc "kindGeneralizeSome }" $
-         vcat [ text "Kind or type:" <+> ppr kind_or_type
-              , text "dvs:" <+> ppr dvs
-              , text "dvs':" <+> ppr dvs'
-              , text "to_promote:" <+> ppr to_promote
-              , text "qkvs:" <+> pprTyVars qkvs ]
-
-       ; return qkvs }
-
--- | Specialized version of 'kindGeneralizeSome', but where all variables
--- can be generalized. Use this variant when you can be sure that no more
--- constraints on the type's metavariables will arise or be solved.
-kindGeneralizeAll :: TcType  -- needn't be zonked
-                  -> TcM [KindVar]
-kindGeneralizeAll ty = do { traceTc "kindGeneralizeAll" empty
-                          ; kindGeneralizeSome (const True) ty }
+-- |- Specialised verison of 'kindGeneralizeSome', but with empty
+-- WantedConstraints, so no filtering is needed
+-- i.e.   kindGeneraliseAll = kindGeneralizeSome emptyWC
+kindGeneralizeAll :: TcType -> TcM [KindVar]
+kindGeneralizeAll kind_or_type
+  = do { traceTc "kindGeneralizeAll" (ppr kind_or_type)
+       ; dvs <- candidateQTyVarsOfKind kind_or_type
+       ; quantifyTyVars dvs }
 
 -- | Specialized version of 'kindGeneralizeSome', but where no variables
 -- can be generalized, but perhaps some may neeed to be promoted.
@@ -3168,11 +3246,11 @@ kindGeneralizeAll ty = do { traceTc "kindGeneralizeAll" empty
 -- Note [Promotion in signatures].
 kindGeneralizeNone :: TcType  -- needn't be zonked
                    -> TcM ()
-kindGeneralizeNone ty
-  = do { traceTc "kindGeneralizeNone" empty
-       ; kvs <- kindGeneralizeSome (const False) ty
-       ; MASSERT( null kvs )
-       }
+kindGeneralizeNone kind_or_type
+  = do { traceTc "kindGeneralizeNone" (ppr kind_or_type)
+       ; dvs <- candidateQTyVarsOfKind kind_or_type
+       ; _ <- promoteTyVarSet (candidateKindVars dvs)
+       ; return () }
 
 {- Note [Levels and generalisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3499,10 +3577,10 @@ tcHsPartialSigType ctxt sig_ty
   = addSigCtxt ctxt hs_ty $
     do { mode <- mkHoleMode TypeLevel HM_Sig
        ; (implicit_tvs, (explicit_tvbndrs, (wcs, wcx, theta, tau)))
-            <- solveLocalEqualities "tcHsPartialSigType"    $
+            <- solveLocalEqualities "tcHsPartialSigType"     $
                -- See Note [Failure in local type signatures]
-               tcNamedWildCardBinders sig_wcs $ \ wcs ->
-               bindImplicitTKBndrs_Tv implicit_hs_tvs           $
+               tcNamedWildCardBinders sig_wcs                $ \ wcs ->
+               bindImplicitTKBndrs_Tv implicit_hs_tvs        $
                bindExplicitTKBndrs_Tv_M mode explicit_hs_tvs $
                do {   -- Instantiate the type-class context; but if there
                       -- is an extra-constraints wildcard, just discard it here
@@ -3709,11 +3787,11 @@ tcHsPatSigType ctxt
     do { sig_tkv_prs <- mapM new_implicit_tv sig_ns
        ; mode <- mkHoleMode TypeLevel HM_Sig
        ; (wcs, sig_ty)
-            <- addTypeCtxt hs_ty $
+            <- addTypeCtxt hs_ty                     $
                solveLocalEqualities "tcHsPatSigType" $
                  -- See Note [Failure in local type signatures]
                  -- and c.f #16033
-               tcNamedWildCardBinders sig_wcs        $ \ wcs ->
+               tcNamedWildCardBinders sig_wcs   $ \ wcs ->
                tcExtendNameTyVarEnv sig_tkv_prs $
                do { ek     <- newOpenTypeKind
                   ; sig_ty <- tc_lhs_type mode hs_ty ek
@@ -3759,7 +3837,7 @@ Here
    It must be a skolem so that it retains its identity, and
    GHC.Tc.Errors.getSkolemInfo can thereby find the binding site for the skolem.
 
- * The type signature pattern (f :: b -> c) makes freshs meta-tyvars
+ * The type signature pattern (f :: b -> c) makes fresh meta-tyvars
    beta and gamma (TauTvs), and binds "b" :-> beta, "c" :-> gamma in the
    environment
 
@@ -3787,7 +3865,7 @@ For RULE binders, though, things are a bit different (yuk).
   RULE "foo" forall (x::a) (y::[a]).  f x y = ...
 Here this really is the binding site of the type variable so we'd like
 to use a skolem, so that we get a complaint if we unify two of them
-together.  Hence the new_tv function in tcHsPatSigType.
+together.  Hence the new_implicit_tv function in tcHsPatSigType.
 
 
 ************************************************************************
@@ -3866,19 +3944,6 @@ promotionErr name err
 ************************************************************************
 -}
 
-
--- | If the inner action emits constraints, report them as errors and fail;
--- otherwise, propagates the return value. Useful as a wrapper around
--- 'tcImplicitTKBndrs', which uses solveLocalEqualities, when there won't be
--- another chance to solve constraints
-failIfEmitsConstraints :: TcM a -> TcM a
-failIfEmitsConstraints thing_inside
-  = checkNoErrs $  -- We say that we fail if there are constraints!
-                   -- c.f same checkNoErrs in solveEqualities
-    do { (res, lie) <- captureConstraints thing_inside
-       ; reportAllUnsolved lie
-       ; return res
-       }
 
 -- | Make an appropriate message for an error in a function argument.
 -- Used for both expressions and types.
