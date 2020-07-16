@@ -424,11 +424,10 @@ See also:
 ************************************************************************
 -}
 
-type TyConBinder = VarBndr TyVar TyConBndrVis
-
--- In the whole definition of @data TyCon@, only @PromotedDataCon@ will really
--- contain CoVar.
+type TyConBinder     = VarBndr TyVar   TyConBndrVis
 type TyConTyCoBinder = VarBndr TyCoVar TyConBndrVis
+     -- Only PromotedDataCon has TyConTyCoBinders
+     -- See Note [Promoted GADT data construtors]
 
 data TyConBndrVis
   = NamedTCB ArgFlag
@@ -896,6 +895,7 @@ data TyCon
 
         -- See Note [The binders/kind/arity fields of a TyCon]
         tyConBinders :: [TyConTyCoBinder], -- ^ Full binders
+           -- TyConTyConBinder: see Note [Promoted GADT data construtors]
         tyConResKind :: Kind,             -- ^ Result kind
         tyConKind    :: Kind,             -- ^ Kind of this TyCon
         tyConArity   :: Arity,            -- ^ Arity
@@ -934,7 +934,6 @@ data TyCon
                            -- ^ What sort of 'TyCon' this represents.
       }
 {- Note [Scoped tyvars in a TcTyCon]
-
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The tcTyConScopedTyVars field records the lexicial-binding connection
 between the original, user-specified Name (i.e. thing in scope) and
@@ -949,6 +948,19 @@ where
    * tyConArity = length required_tvs
 
 See also Note [How TcTyCons work] in GHC.Tc.TyCl
+
+Note [Promoted GADT data constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Any promoted GADT data constructor will have a type with equality
+constraints in its type; e.g.
+    K :: forall a b. (a ~# [b]) => a -> b -> T a
+
+So, when promoted to become a type constructor, the tyConBinders
+will include CoVars.  That is why we use [TyConTyCoBinder] for the
+tyconBinders field.  TyConTyCoBinder is a synonym for TyConBinder,
+but with the clue that the bidner can be a CoVar not just a TyVar.
+
+
 -}
 
 -- | Represents right-hand-sides of 'TyCon's for algebraic types

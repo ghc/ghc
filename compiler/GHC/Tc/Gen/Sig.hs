@@ -14,7 +14,7 @@ module GHC.Tc.Gen.Sig(
        TcSigFun,
 
        isPartialSig, hasCompleteSig, tcIdSigName, tcSigInfoName,
-       completeSigPolyId_maybe,
+       completeSigPolyId_maybe, isCompleteHsSig,
 
        tcTySigs, tcUserTypeSig, completeSigFromId,
        tcInstSig,
@@ -30,12 +30,13 @@ import GHC.Prelude
 import GHC.Hs
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Types
+import GHC.Tc.Solver( pushLevelAndSolveEqualitiesX, reportUnsolvedEqualities )
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity ( checkValidType )
-import GHC.Tc.Utils.Unify( tcSkolemise, unifyType )
+import GHC.Tc.Utils.Unify( tcSkolemise, unifyType,  )
 import GHC.Tc.Utils.Instantiate( topInstantiate )
 import GHC.Tc.Utils.Env( tcLookupId )
 import GHC.Tc.Types.Evidence( HsWrapper, (<.>) )
@@ -357,23 +358,18 @@ Once we get to type checking, we decompose it into its parts, in tcPatSynSig.
 
 * After we kind-check the pieces and convert to Types, we do kind generalisation.
 
-Note [solveEqualities in tcPatSynSig]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Report unsolved equalities in tcPatSynSig]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's important that we solve /all/ the equalities in a pattern
 synonym signature, because we are going to zonk the signature to
 a Type (not a TcType), in GHC.Tc.TyCl.PatSyn.tc_patsyn_finish, and that
 fails if there are un-filled-in coercion variables mentioned
 in the type (#15694).
 
-The best thing is simply to use solveEqualities to solve all the
-equalites, rather than leaving them in the ambient constraints
-to be solved later.  Pattern synonyms are top-level, so there's
-no problem with completely solving them.
-
-(NB: this solveEqualities wraps newImplicitTKBndrs, which itself
-does a solveLocalEqualities; so solveEqualities isn't going to
-make any further progress; it'll just report any unsolved ones,
-and fail, as it should.)
+So we solve all the equalities we can, and report any unsolved ones,
+rather than leaving them in the ambient constraints to be solved
+later.  Pattern synonyms are top-level, so there's no problem with
+completely solving them.
 -}
 
 tcPatSynSig :: Name -> LHsSigType GhcRn -> TcM TcPatSynInfo
@@ -385,18 +381,23 @@ tcPatSynSig name sig_ty
   , (univ_hs_tvbndrs, hs_req,  hs_ty1)     <- splitLHsSigmaTyInvis hs_ty
   , (ex_hs_tvbndrs,   hs_prov, hs_body_ty) <- splitLHsSigmaTyInvis hs_ty1
   = do {  traceTc "tcPatSynSig 1" (ppr sig_ty)
-       ; (implicit_tvs, (univ_tvbndrs, (ex_tvbndrs, (req, prov, body_ty))))
-           <- pushTcLevelM_   $
-              solveEqualities $ -- See Note [solveEqualities in tcPatSynSig]
-              bindImplicitTKBndrs_Skol implicit_hs_tvs $
-              bindExplicitTKBndrs_Skol univ_hs_tvbndrs $
-              bindExplicitTKBndrs_Skol ex_hs_tvbndrs   $
+       ; (tclvl, wanted, (implicit_tvs, (univ_tvbndrs, (ex_tvbndrs, (req, prov, body_ty)))))
+           <- pushLevelAndSolveEqualitiesX "tcPatSynSig" $
+              bindImplicitTKBndrs_Skol implicit_hs_tvs   $
+              bindExplicitTKBndrs_Skol univ_hs_tvbndrs   $
+              bindExplicitTKBndrs_Skol ex_hs_tvbndrs     $
               do { req     <- tcHsContext hs_req
                  ; prov    <- tcHsContext hs_prov
                  ; body_ty <- tcHsOpenType hs_body_ty
                      -- A (literal) pattern can be unlifted;
                      -- e.g. pattern Zero <- 0#   (#12094)
                  ; return (req, prov, body_ty) }
+
+       ; implicit_tvs <- zonkAndScopedSort implicit_tvs
+       ; let skol_tvs  = implicit_tvs ++ binderVars (univ_tvbndrs ++ ex_tvbndrs)
+             skol_info = DataConSkol name
+       ; reportUnsolvedEqualities skol_info skol_tvs tclvl wanted
+               -- See Note [Report unsolved equalities in tcPatSynSig]
 
        ; let ungen_patsyn_ty = build_patsyn_type [] implicit_tvs univ_tvbndrs
                                                  req ex_tvbndrs prov body_ty
@@ -406,9 +407,9 @@ tcPatSynSig name sig_ty
        ; traceTc "tcPatSynSig" (ppr ungen_patsyn_ty)
 
        -- These are /signatures/ so we zonk to squeeze out any kind
-       -- unification variables.  Do this after kindGeneralize which may
+       -- unification variables.  Do this after kindGeneralizeAll which may
        -- default kind variables to *.
-       ; implicit_tvs <- zonkAndScopedSort implicit_tvs
+       ; implicit_tvs <- mapM zonkTcTyVarToTyVar    implicit_tvs
        ; univ_tvbndrs <- mapM zonkTyCoVarKindBinder univ_tvbndrs
        ; ex_tvbndrs   <- mapM zonkTyCoVarKindBinder ex_tvbndrs
        ; req          <- zonkTcTypes req

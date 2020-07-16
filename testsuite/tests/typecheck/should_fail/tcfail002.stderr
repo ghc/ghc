@@ -1,6 +1,9 @@
 
 tcfail002.hs:4:7: error:
     • Couldn't match expected type ‘p’ with actual type ‘[p]’
+      ‘p’ is a rigid type variable bound by
+        the inferred type of c :: [p] -> p
+        at tcfail002.hs:(3,1)-(4,7)
     • In the expression: z
       In an equation for ‘c’: c z = z
     • Relevant bindings include
