@@ -259,6 +259,49 @@ primOpId op = primOpIds ! primOpTag op
 
 GHC.Prim "exports" all the primops and primitive types, some
 wired-in Ids.
+
+Note [GHC.Prim]
+~~~~~~~~~~~~~~~
+GHC.Prim is a special module:
+* It provides primitives:
+  - primops such as Int64, MutableByteArray#, (+#)
+  - pseudoops such as realWorld#, null#
+
+* The primitives cannot be defined in source Haskell.
+  There is no GHC/Prim.hs file with definitions.
+  Instead, we support importing GHC.Prim by manually defining its
+  ModIface (see Iface.Load.ghcPrimIface).
+
+* The primitives are listed in the primops.txt.pp file.
+  This file goes through CPP and the resulting primops.txt
+  is processed by the utility program genprimopcode.
+
+  This program generates a file primop-data-decl.hs containing an ADT
+  with primops:
+    data PrimOp
+     = CharGtOp
+     | CharGeOp
+     | CharEqOp
+     | CharNeOp
+     | CharLtOp
+     | ...
+  which we pattern match on when generating Cmm in GHC/StgToCmm/Prim.hs.
+
+* The pseudoops are described in Note [ghcPrimIds (aka pseudoops)].
+
+* For documentation, genprimopcode generates a dummy Prim.hs file
+  for Haddock. It contains descriptions taken from primops.txt.pp
+  and all definitions are replaced by placeholders.
+  See Note [GHC.Prim docs] in genprimopcode.
+
+* For GHCi, we generate a module GHC.PrimopWrappers which wraps every
+  call; see Note [Primop wrappers] in GHC.Builtin.Primops for details.
+
+* We might change which functions are primitives and which are defined
+  in Haskell.
+  Users should import GHC.Exts, which reexports GHC.Prim and is more stable.
+  In particular, we might move some of the primops to 'foreign import prim'
+  (see ticket #16929 and Note [When do out-of-line primops go] in primops.txt.pp)
 -}
 
 ghcPrimExports :: [IfaceExport]
