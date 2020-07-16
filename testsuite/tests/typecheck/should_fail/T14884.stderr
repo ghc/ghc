@@ -2,8 +2,7 @@
 T14884.hs:4:5: error:
     • Found hole: _ :: (a0 -> IO ()) -> String -> IO ()
       Where: ‘a0’ is an ambiguous type variable
-    • In the expression: _
-      In the expression: _ print "abc"
+    • In the expression: _ print "abc"
       In an equation for ‘x’: x = _ print "abc"
     • Relevant bindings include x :: IO () (bound at T14884.hs:4:1)
       Valid hole fits include

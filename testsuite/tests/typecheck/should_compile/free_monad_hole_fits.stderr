@@ -10,9 +10,9 @@ free_monad_hole_fits.hs:14:28: warning: [-Wtyped-holes (in -Wdefault)]
                the instance declaration
                at free_monad_hole_fits.hs:10:10-38
       Or perhaps ‘_a’ is mis-spelled, or not in scope
-    • In the expression: _a
-      In the first argument of ‘Free’, namely ‘(_a go fa)’
+    • In the first argument of ‘Free’, namely ‘(_a go fa)’
       In the expression: Free (_a go fa)
+      In an equation for ‘go’: go (Free fa) = Free (_a go fa)
     • Relevant bindings include
         fa :: f (Free f a) (bound at free_monad_hole_fits.hs:14:16)
         go :: Free f a -> Free f b (bound at free_monad_hole_fits.hs:12:7)
