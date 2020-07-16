@@ -1,6 +1,9 @@
 
 tcfail014.hs:5:33: error:
     • Couldn't match expected type ‘t4’ with actual type ‘t4 -> t5’
+      ‘t4’ is a rigid type variable bound by
+        the inferred type of h :: (t4 -> t5) -> t5
+        at tcfail014.hs:5:25-33
     • In the first argument of ‘z’, namely ‘z’
       In the expression: z z
       In an equation for ‘h’: h z = z z
