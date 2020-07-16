@@ -15,14 +15,86 @@
 --
 -- It should first be preprocessed.
 --
+-- Note in particular that Haskell block-style comments are not recognized
+-- here, so stick to '--' (even for Notes spanning multiple lines).
+
+-- Note [GHC.Prim]
+-- ~~~~~~~~~~~~~~~
+-- GHC.Prim is a special module:
+--
+-- * It can be imported by any module (import GHC.Prim).
+--   However, in the future we might change which functions are primitives
+--   and which are defined in Haskell.
+--   Users should import GHC.Exts, which reexports GHC.Prim and is more stable.
+--   In particular, we might move some of the primops to 'foreign import prim'
+--   (see ticket #16929 and Note [When do out-of-line primops go in primops.txt.pp])
+--
+-- * It provides primitives of three sorts:
+--   - primitive types such as Int64#, MutableByteArray#
+--   - primops such as (+#), newTVar#, touch#
+--   - pseudoops such as realWorld#, nullAddr#
+--
+-- * The pseudoops are described in Note [ghcPrimIds (aka pseudoops)]
+--   in GHC.Types.Id.Make.
+--
+-- * The primitives (primtypes, primops, pseudoops) cannot be defined in
+--   source Haskell.
+--   There is no GHC/Prim.hs file with definitions.
+--   Instead, we support importing GHC.Prim by manually defining its
+--   ModIface (see Iface.Load.ghcPrimIface).
+--
+-- * The primitives are listed in this file, primops.txt.pp.
+--   It goes through CPP, which creates primops.txt.
+--   It is then consumed by the utility program genprimopcode, which produces
+--   the following three types of files.
+--
+--   1. The files with extension .hs-incl.
+--      They can be found by grepping for hs-incl.
+--      They are #included in compiler sources.
+--
+--      One of them, primop-data-decl.hs-incl, defines the PrimOp type:
+--        data PrimOp
+--         = IntAddOp
+--         | IntSubOp
+--         | CharGtOp
+--         | CharGeOp
+--         | ...
+--
+--      The remaining files define properties of the primops
+--      by pattern matching, for example:
+--        primOpFixity IntAddOp = Just (Fixity NoSourceText 6 InfixL)
+--        primOpFixity IntSubOp = Just (Fixity NoSourceText 6 InfixL)
+--        ...
+--      This includes fixity, has-side-effects, commutability,
+--      IDs used to generate Uniques etc.
+--
+--      Additionally, we pattern match on PrimOp when generating Cmm in
+--      GHC/StgToCmm/Prim.hs.
+--
+--   2. The dummy Prim.hs file, which is used for Haddock and
+--      contains descriptions taken from primops.txt.pp.
+--      All definitions are replaced by placeholders.
+--      See Note [GHC.Prim Docs] in genprimopcode.
+--
+--   3. The module PrimopWrappers.hs, which wraps every call for GHCi;
+--      see Note [Primop wrappers] in GHC.Builtin.Primops for details.
+--
+-- * This file does not list internal-only equality types
+--   (GHC.Builtin.Types.Prim.unexposedPrimTyCons and coercionToken#
+--   in GHC.Types.Id.Make) which are defined but not exported from GHC.Prim.
+--   Every export of GHC.Prim should be in listed in this file.
+--
+-- * The primitive types should be listed in primTyCons in Builtin.Types.Prim
+--   in addition to primops.txt.pp.
+--   (This task should be delegated to genprimopcode in the future.)
+--
+--
+--
 -- Information on how PrimOps are implemented and the steps necessary to
 -- add a new one can be found in the Commentary:
 --
 --  https://gitlab.haskell.org/ghc/ghc/wikis/commentary/prim-ops
 --
--- Note in particular that Haskell block-style comments are not recognized
--- here, so stick to '--' (even for Notes spanning multiple lines).
-
 -- This file is divided into named sections, each containing or more
 -- primop entries. Section headers have the format:
 --
@@ -75,7 +147,6 @@ defaults
    llvm_only        = False
    vector           = []
    deprecated_msg   = {}      -- A non-empty message indicates deprecation
-
 
 -- Note [When do out-of-line primops go in primops.txt.pp]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -188,19 +259,6 @@ section "The word size story."
 #define INT64 Int#
 #define WORD64 Word#
 #endif
-
--- This type won't be exported directly (since there is no concrete
--- syntax for this sort of export) so we'll have to manually patch
--- export lists in both GHC and Haddock.
-primtype FUN m a b
-  {The builtin function type, written in infix form as {\tt a # m -> b}.
-   Values of this type are functions taking inputs of type {\tt a} and
-   producing outputs of type {\tt b}. The multiplicity of the input is
-   {\tt m}.
-
-   Note that {\tt FUN m a b} permits levity-polymorphism in both {\tt a} and
-   {\tt b}, so that types like {\tt Int\# -> Int\#} can still be well-kinded.
-  }
 
 ------------------------------------------------------------------------
 section "Char#"
@@ -3376,6 +3434,37 @@ primop  ClearCCSOp "clearCCS#" GenPrimOp
 section "Etc"
         {Miscellaneous built-ins}
 ------------------------------------------------------------------------
+
+primtype FUN m a b
+  {The builtin function type, written in infix form as {\tt a # m -> b}.
+   Values of this type are functions taking inputs of type {\tt a} and
+   producing outputs of type {\tt b}. The multiplicity of the input is
+   {\tt m}.
+
+   Note that {\tt FUN m a b} permits levity-polymorphism in both {\tt a} and
+   {\tt b}, so that types like {\tt Int\# -> Int\#} can still be well-kinded.
+  }
+
+pseudoop "realWorld#"
+   State# RealWorld
+   { The token used in the implementation of the IO monad as a state monad.
+     It does not pass any information at runtime.
+     See also {\tt GHC.Magic.runRW\#}. }
+
+pseudoop "void#"
+   (# #)
+   { This is an alias for the unboxed unit tuple constructor.
+     In earlier versions of GHC, {\tt void\#} was a value
+     of the primitive type {\tt Void\#}, which is now defined to be {\tt (\# \#)}.
+   }
+   with deprecated_msg = { Use an unboxed unit tuple instead }
+
+pseudoop "magicDict"
+   a
+   { {\tt magicDict} is a special-purpose placeholder value.
+     It is used internally by modules such as {\tt GHC.TypeNats} to cast a typeclass
+     dictionary with a single method. It is eliminated by a rule during compilation.
+     For the details, see Note [magicDictId magic] in GHC. }
 
 primtype Proxy# a
    { The type constructor {\tt Proxy#} is used to bear witness to some
