@@ -22,6 +22,7 @@
 #include "Threads.h"
 #include "Printer.h"
 #include "RtsFlags.h"
+#include "ThreadLabels.h"
 
 #if defined(HAVE_UNISTD_H)
 #include <unistd.h>
@@ -164,6 +165,7 @@ static char *thread_stop_reasons[] = {
     [6 + BlockedOnSTM]          = "blocked on STM",
     [6 + BlockedOnDoProc]       = "blocked on asyncDoProc",
     [6 + BlockedOnCCall]        = "blocked on a foreign call",
+    [6 + BlockedOnIOCompletion] = "blocked on I/O Completion port",
     [6 + BlockedOnCCall_Interruptible] = "blocked on a foreign call (interruptible)",
     [6 + BlockedOnMsgThrowTo]   =  "blocked on throwTo",
     [6 + ThreadMigrating]       =  "migrating"
@@ -179,45 +181,50 @@ static void traceSchedEvent_stderr (Capability *cap, EventTypeNum tag,
     ACQUIRE_LOCK(&trace_utx);
 
     tracePreface();
+    char *threadLabel = (char *)lookupThreadLabel(tso->id);
+    if(!threadLabel)
+    {
+        threadLabel = "";
+    }
     switch (tag) {
     case EVENT_CREATE_THREAD:   // (cap, thread)
-        debugBelch("cap %d: created thread %" FMT_Word "\n",
-                   cap->no, (W_)tso->id);
+        debugBelch("cap %d: created thread %" FMT_Word "[\"%s\"]" "\n",
+                   cap->no, (W_)tso->id, threadLabel);
         break;
     case EVENT_RUN_THREAD:      //  (cap, thread)
-        debugBelch("cap %d: running thread %" FMT_Word " (%s)\n",
-                   cap->no, (W_)tso->id, what_next_strs[tso->what_next]);
+        debugBelch("cap %d: running thread %" FMT_Word "[\"%s\"]"" (%s)\n",
+                   cap->no, (W_)tso->id, threadLabel, what_next_strs[tso->what_next]);
         break;
     case EVENT_THREAD_RUNNABLE: // (cap, thread)
-        debugBelch("cap %d: thread %" FMT_Word " appended to run queue\n",
-                   cap->no, (W_)tso->id);
+        debugBelch("cap %d: thread %" FMT_Word "[\"%s\"]"" appended to run queue\n",
+                   cap->no, (W_)tso->id, threadLabel);
         break;
     case EVENT_MIGRATE_THREAD:  // (cap, thread, new_cap)
-        debugBelch("cap %d: thread %" FMT_Word " migrating to cap %d\n",
-                   cap->no, (W_)tso->id, (int)info1);
+        debugBelch("cap %d: thread %" FMT_Word "[\"%s\"]" " migrating to cap %d\n",
+                   cap->no, (W_)tso->id, threadLabel, (int)info1);
         break;
     case EVENT_THREAD_WAKEUP:   // (cap, thread, info1_cap)
-        debugBelch("cap %d: waking up thread %" FMT_Word " on cap %d\n",
-                   cap->no, (W_)tso->id, (int)info1);
+        debugBelch("cap %d: waking up thread %" FMT_Word "[\"%s\"]" " on cap %d\n",
+                   cap->no, (W_)tso->id, threadLabel, (int)info1);
         break;
 
     case EVENT_STOP_THREAD:     // (cap, thread, status)
         if (info1 == 6 + BlockedOnBlackHole) {
-            debugBelch("cap %d: thread %" FMT_Word " stopped (blocked on black hole owned by thread %lu)\n",
-                       cap->no, (W_)tso->id, (long)info2);
+            debugBelch("cap %d: thread %" FMT_Word "[\"%s\"]" " stopped (blocked on black hole owned by thread %lu)\n",
+                       cap->no, (W_)tso->id, threadLabel, (long)info2);
         } else if (info1 == StackOverflow) {
-            debugBelch("cap %d: thead %" FMT_Word
+            debugBelch("cap %d: thead %" FMT_Word "[\"%s\"]"
                        " stopped (stack overflow, size %lu)\n",
-                      cap->no, (W_)tso->id, (long)info2);
+                      cap->no, (W_)tso->id, threadLabel, (long)info2);
 
         } else {
-            debugBelch("cap %d: thread %" FMT_Word " stopped (%s)\n",
-                       cap->no, (W_)tso->id, thread_stop_reasons[info1]);
+            debugBelch("cap %d: thread %" FMT_Word "[\"%s\"]" " stopped (%s)\n",
+                       cap->no, (W_)tso->id, threadLabel, thread_stop_reasons[info1]);
         }
         break;
     default:
-        debugBelch("cap %d: thread %" FMT_Word ": event %d\n\n",
-                   cap->no, (W_)tso->id, tag);
+        debugBelch("cap %d: thread %" FMT_Word "[\"%s\"]" ": event %d\n\n",
+                   cap->no, (W_)tso->id, threadLabel, tag);
         break;
     }
 

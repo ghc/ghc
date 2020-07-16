@@ -4,7 +4,6 @@
            , MagicHash
            , UnboxedTuples
   #-}
-{-# OPTIONS_GHC -Wno-missing-signatures #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -29,6 +28,7 @@
 module GHC.Conc.IO
         ( ensureIOManagerIsRunning
         , ioManagerCapabilitiesChanged
+        , interruptIOManager
 
         -- * Waiting
         , threadDelay
@@ -61,6 +61,7 @@ import System.Posix.Types
 
 #if defined(mingw32_HOST_OS)
 import qualified GHC.Conc.Windows as Windows
+import GHC.IO.SubSystem
 import GHC.Conc.Windows (asyncRead, asyncWrite, asyncDoProc, asyncReadBA,
                          asyncWriteBA, ConsoleEvent(..), win32ConsoleHandler,
                          toWin32ConsoleEvent)
@@ -73,6 +74,17 @@ ensureIOManagerIsRunning :: IO ()
 ensureIOManagerIsRunning = Event.ensureIOManagerIsRunning
 #else
 ensureIOManagerIsRunning = Windows.ensureIOManagerIsRunning
+#endif
+
+-- | Interrupts the current wait of the I/O manager if it is currently blocked.
+-- This instructs it to re-read how much it should wait and to process any
+-- pending events.
+-- @since 4.15
+interruptIOManager :: IO ()
+#if !defined(mingw32_HOST_OS)
+interruptIOManager = return ()
+#else
+interruptIOManager = Windows.interruptIOManager
 #endif
 
 ioManagerCapabilitiesChanged :: IO ()
@@ -179,11 +191,12 @@ closeFdWith close fd
 threadDelay :: Int -> IO ()
 threadDelay time
 #if defined(mingw32_HOST_OS)
-  | threaded  = Windows.threadDelay time
+  | isWindowsNativeIO = Windows.threadDelay time
+  | threaded          = Windows.threadDelay time
 #else
-  | threaded  = Event.threadDelay time
+  | threaded          = Event.threadDelay time
 #endif
-  | otherwise = IO $ \s ->
+  | otherwise         = IO $ \s ->
         case time of { I# time# ->
         case delay# time# s of { s' -> (# s', () #)
         }}
@@ -195,10 +208,11 @@ threadDelay time
 registerDelay :: Int -> IO (TVar Bool)
 registerDelay usecs
 #if defined(mingw32_HOST_OS)
-  | threaded = Windows.registerDelay usecs
+  | isWindowsNativeIO = Windows.registerDelay usecs
+  | threaded          = Windows.registerDelay usecs
 #else
-  | threaded = Event.registerDelay usecs
+  | threaded          = Event.registerDelay usecs
 #endif
-  | otherwise = errorWithoutStackTrace "registerDelay: requires -threaded"
+  | otherwise         = errorWithoutStackTrace "registerDelay: requires -threaded"
 
 foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool

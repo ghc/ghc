@@ -143,3 +143,4 @@ updateWith f k (IntTable ref) = do
         size <- peek ptr
         poke ptr (size - 1)
   return oldVal
+

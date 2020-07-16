@@ -6,7 +6,6 @@
            , NondecreasingIndentation
            , MagicHash
   #-}
-{-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-# OPTIONS_GHC -Wno-unused-matches #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -32,7 +31,6 @@ module GHC.IO.Handle.Text (
     ) where
 
 import GHC.IO
-import GHC.IO.FD
 import GHC.IO.Buffer
 import qualified GHC.IO.BufferedIO as Buffered
 import GHC.IO.Exception
@@ -46,7 +44,6 @@ import Foreign
 import Foreign.C
 
 import qualified Control.Exception as Exception
-import Data.Typeable
 import System.IO.Error
 import Data.Either (Either(..))
 import Data.Maybe
@@ -578,9 +575,9 @@ hPutcBuffered handle_@Handle__{..} c = do
                 LineBuffering -> True
                 _             -> False
 
-    putc buf@Buffer{ bufRaw=raw, bufR=w } c = do
+    putc buf@Buffer{ bufRaw=raw, bufR=w } c' = do
        debugIO ("putc: " ++ summaryBuffer buf)
-       w'  <- writeCharBuf raw w c
+       w'  <- writeCharBuf raw w c'
        return buf{ bufR = w' }
 
 -- ---------------------------------------------------------------------------
@@ -644,6 +641,7 @@ hPutChars :: Handle -> [Char] -> IO ()
 hPutChars _      [] = return ()
 hPutChars handle (c:cs) = hPutChar handle c >> hPutChars handle cs
 
+-- Buffer offset is always zero.
 getSpareBuffer :: Handle__ -> IO (BufferMode, CharBuffer)
 getSpareBuffer Handle__{haCharBuffer=ref,
                         haBuffers=spare_ref,
@@ -703,7 +701,6 @@ writeBlocks hdl line_buffered add_nl nl
 --
 -- Write the contents of the buffer 'buf' ('sz' bytes long, containing
 -- 'count' bytes of data) to handle (handle must be block or line buffered).
-
 commitBuffer
         :: Handle                       -- handle to commit to
         -> RawCharBuffer -> Int         -- address and size (in bytes) of buffer
@@ -715,9 +712,10 @@ commitBuffer
 commitBuffer hdl !raw !sz !count flush release =
   wantWritableHandle "commitBuffer" hdl $ \h_@Handle__{..} -> do
       debugIO ("commitBuffer: sz=" ++ show sz ++ ", count=" ++ show count
-            ++ ", flush=" ++ show flush ++ ", release=" ++ show release)
+            ++ ", flush=" ++ show flush ++ ", release=" ++ show release ++ ", handle=" ++ show hdl)
 
-      writeCharBuffer h_ Buffer{ bufRaw=raw, bufState=WriteBuffer,
+      -- Offset taken from handle
+      writeCharBuffer h_ Buffer{ bufRaw=raw, bufState=WriteBuffer, bufOffset=0,
                                  bufL=0, bufR=count, bufSize=sz }
 
       when flush $ flushByteWriteBuffer h_
@@ -730,6 +728,8 @@ commitBuffer hdl !raw !sz !count flush release =
                spare_bufs <- readIORef haBuffers
                writeIORef haBuffers (BufferListCons raw spare_bufs)
 
+      -- bb <- readIORef haByteBuffer
+      -- debugIO ("commitBuffer: buffer=" ++ summaryBuffer bb ++ ", handle=" ++ show hdl)
       return ()
 
 -- backwards compatibility; the text package uses this
@@ -741,7 +741,7 @@ commitBuffer' raw sz@(I# _) count@(I# _) flush release h_@Handle__{..}
             ++ ", flush=" ++ show flush ++ ", release=" ++ show release)
 
       let this_buf = Buffer{ bufRaw=raw, bufState=WriteBuffer,
-                             bufL=0, bufR=count, bufSize=sz }
+                             bufL=0, bufR=count, bufSize=sz, bufOffset=0 }
 
       writeCharBuffer h_ this_buf
 
@@ -816,63 +816,80 @@ hPutBuf' handle ptr count can_block
              _line_or_no_buffering -> do flushWriteBuffer h_
           return r
 
+-- TODO: Possible optimisation:
+--       If we know that `w + count > size`, we should write both the
+--       handle buffer and the `ptr` in a single `writev()` syscall.
 bufWrite :: Handle__-> Ptr Word8 -> Int -> Bool -> IO Int
-bufWrite h_@Handle__{..} ptr count can_block =
-  seq count $ do  -- strictness hack
-  old_buf@Buffer{ bufRaw=old_raw, bufR=w, bufSize=size }
-     <- readIORef haByteBuffer
+bufWrite h_@Handle__{..} ptr !count can_block = do
+  -- Get buffer to determine size and free space in buffer
+  old_buf@Buffer{ bufR=w, bufSize=size }
+      <- readIORef haByteBuffer
 
-  -- TODO: Possible optimisation:
-  --       If we know that `w + count > size`, we should write both the
-  --       handle buffer and the `ptr` in a single `writev()` syscall.
-
-  -- Need to buffer and enough room in handle buffer?
-  -- There's no need to buffer if the data to be written is larger than
+  -- There's no need to buffer if the incoming data is larger than
   -- the handle buffer (`count >= size`).
-  if (count < size && count <= size - w)
-        -- We need to buffer and there's enough room in the buffer:
-        -- just copy the data in and update bufR.
-        then do debugIO ("hPutBuf: copying to buffer, w=" ++ show w)
-                copyToRawBuffer old_raw w ptr count
-                let copied_buf = old_buf{ bufR = w + count }
-                -- If the write filled the buffer completely, we need to flush,
-                -- to maintain the "INVARIANTS on Buffers" from
-                -- GHC.IO.Buffer.checkBuffer: "a write buffer is never full".
-                if (count == size - w)
-                  then do
-                    debugIO "hPutBuf: flushing full buffer after writing"
-                    flushed_buf <- Buffered.flushWriteBuffer haDevice copied_buf
-                            -- TODO: we should do a non-blocking flush here
-                    writeIORef haByteBuffer flushed_buf
-                  else do
-                    writeIORef haByteBuffer copied_buf
-                return count
+  -- Check if we can try to buffer the given chunk of data.
+  b <- if (count < size && count <= size - w)
+        then bufferChunk h_ old_buf ptr count
+        else do
+          -- The given data does not fit into the buffer.
+          -- Either because it's too large for the buffer
+          -- or the buffer is too full. Either way we need
+          -- to flush the buffered data first.
+          flushed_buf <- flushByteWriteBufferGiven h_ old_buf
+          if count < size
+              -- The data is small enough to be buffered.
+              then bufferChunk h_ flushed_buf ptr count
+              else do
+                let offset = bufOffset flushed_buf
+                !bytes <- if can_block
+                            then do writeChunk         h_ (castPtr ptr) offset count
+                            else writeChunkNonBlocking h_ (castPtr ptr) offset count
+                -- Update buffer with actual bytes written.
+                writeIORef haByteBuffer $! bufferAddOffset bytes flushed_buf
+                return bytes
+  debugIO "hPutBuf: done"
+  return b
 
-        -- else, we have to flush any existing handle buffer data
-        -- and can then write out the data in `ptr` directly.
-        else do -- No point flushing when there's nothing in the buffer.
-                when (w > 0) $ do
-                  debugIO "hPutBuf: flushing first"
-                  flushed_buf <- Buffered.flushWriteBuffer haDevice old_buf
-                          -- TODO: we should do a non-blocking flush here
-                  writeIORef haByteBuffer flushed_buf
-                -- if we can fit in the buffer, then just loop
-                if count < size
-                   then bufWrite h_ ptr count can_block
-                   else if can_block
-                           then do writeChunk h_ (castPtr ptr) count
-                                   return count
-                           else writeChunkNonBlocking h_ (castPtr ptr) count
+-- Flush the given buffer via the handle, return the flushed buffer
+flushByteWriteBufferGiven :: Handle__ -> Buffer Word8 -> IO (Buffer Word8)
+flushByteWriteBufferGiven h_@Handle__{..} bbuf = do
+  if (not (isEmptyBuffer bbuf))
+    then do
+      bbuf' <- Buffered.flushWriteBuffer haDevice bbuf
+      debugIO ("flushByteWriteBufferGiven: bbuf=" ++ summaryBuffer bbuf')
+      writeIORef haByteBuffer bbuf'
+      return bbuf'
+    else
+      return bbuf
 
-writeChunk :: Handle__ -> Ptr Word8 -> Int -> IO ()
-writeChunk h_@Handle__{..} ptr bytes
-  | Just fd <- cast haDevice  =  RawIO.write (fd::FD) ptr bytes
-  | otherwise = error "Todo: hPutBuf"
+-- Fill buffer and return bytes buffered/written.
+-- Flushes buffer if it's full after adding the data.
+bufferChunk :: Handle__ -> Buffer Word8 -> Ptr Word8 -> Int -> IO Int
+bufferChunk h_@Handle__{..} old_buf@Buffer{ bufRaw=raw, bufR=w, bufSize=size } ptr !count = do
+    debugIO ("hPutBuf: copying to buffer, w=" ++ show w)
+    copyToRawBuffer raw w ptr count
+    let copied_buf = old_buf{ bufR = w + count }
+    -- If the write filled the buffer completely, we need to flush,
+    -- to maintain the "INVARIANTS on Buffers" from
+    -- GHC.IO.Buffer.checkBuffer: "a write buffer is never full".
+    if isFullBuffer copied_buf
+      then do
+        -- TODO: we should do a non-blocking flush here
+        debugIO "hPutBuf: flushing full buffer after writing"
+        _ <- flushByteWriteBufferGiven h_ copied_buf
+        return ()
+      else do
+        writeIORef haByteBuffer copied_buf
+    return count
 
-writeChunkNonBlocking :: Handle__ -> Ptr Word8 -> Int -> IO Int
-writeChunkNonBlocking h_@Handle__{..} ptr bytes
-  | Just fd <- cast haDevice  =  RawIO.writeNonBlocking (fd::FD) ptr bytes
-  | otherwise = error "Todo: hPutBuf"
+writeChunk :: Handle__ -> Ptr Word8 -> Word64 -> Int -> IO Int
+writeChunk h_@Handle__{..} ptr offset bytes
+  = do RawIO.write haDevice ptr offset bytes
+       return bytes
+
+writeChunkNonBlocking :: Handle__ -> Ptr Word8 -> Word64 -> Int -> IO Int
+writeChunkNonBlocking h_@Handle__{..} ptr offset bytes
+  = RawIO.writeNonBlocking haDevice ptr offset bytes
 
 -- ---------------------------------------------------------------------------
 -- hGetBuf
@@ -898,12 +915,16 @@ hGetBuf h !ptr count
   | count <  0 = illegalBufferSize h "hGetBuf" count
   | otherwise =
       wantReadableHandle_ "hGetBuf" h $ \ h_@Handle__{..} -> do
-         flushCharReadBuffer h_
-         buf@Buffer{ bufRaw=raw, bufR=w, bufL=r, bufSize=sz }
+          debugIO $ ":: hGetBuf - " ++ show h ++ " - " ++ show count
+          flushCharReadBuffer h_
+          buf@Buffer{ bufRaw=raw, bufR=w, bufL=r, bufSize=sz }
             <- readIORef haByteBuffer
-         if isEmptyBuffer buf
-            then bufReadEmpty    h_ buf (castPtr ptr) 0 count
-            else bufReadNonEmpty h_ buf (castPtr ptr) 0 count
+          debugIO ("hGetBuf: " ++ summaryBuffer buf)
+          res <- if isEmptyBuffer buf
+                    then bufReadEmpty    h_ buf (castPtr ptr) 0 count
+                    else bufReadNonEmpty h_ buf (castPtr ptr) 0 count
+          debugIO "** hGetBuf done."
+          return res
 
 -- small reads go through the buffer, large reads are satisfied by
 -- taking data first from the buffer and then direct from the file
@@ -911,9 +932,14 @@ hGetBuf h !ptr count
 
 bufReadNonEmpty :: Handle__ -> Buffer Word8 -> Ptr Word8 -> Int -> Int -> IO Int
 bufReadNonEmpty h_@Handle__{..}
+                -- w for width, r for ... read ptr?
                 buf@Buffer{ bufRaw=raw, bufR=w, bufL=r, bufSize=sz }
                 ptr !so_far !count
  = do
+        debugIO ":: bufReadNonEmpty"
+        -- We use < instead of <= because for count == avail
+        -- we need to reset bufL and bufR to zero.
+        -- See also: INVARIANTS on Buffers
         let avail = w - r
         if (count < avail)
            then do
@@ -929,30 +955,47 @@ bufReadNonEmpty h_@Handle__{..}
             so_far' = so_far + avail
             ptr' = ptr `plusPtr` avail
 
-        if remaining == 0
+        debugIO ("bufReadNonEmpty: " ++ summaryBuffer buf' ++ " s:" ++ show so_far' ++ " r:" ++ show remaining)
+        b <- if remaining == 0
            then return so_far'
            else bufReadEmpty h_ buf' ptr' so_far' remaining
+        debugIO ":: bufReadNonEmpty - done"
+        return b
 
-
+-- We want to read more data, but the buffer is empty. (buffL == buffR == 0)
+-- See also Note [INVARIANTS on Buffers] in Buffer.hs
 bufReadEmpty :: Handle__ -> Buffer Word8 -> Ptr Word8 -> Int -> Int -> IO Int
 bufReadEmpty h_@Handle__{..}
-             buf@Buffer{ bufRaw=raw, bufR=w, bufL=r, bufSize=sz }
+             buf@Buffer{ bufRaw=raw, bufR=w, bufL=_r, bufSize=sz, bufOffset=bff }
              ptr so_far count
- | count > sz, Just fd <- cast haDevice = loop fd 0 count
+ | count > sz
+ = do
+        bytes_read <- loop haDevice 0 bff count
+        -- bytes_read includes so_far (content that was in the buffer)
+        -- but that is already accounted for in the old offset, so don't
+        -- count it twice.
+        let buf1 = bufferAddOffset (fromIntegral $ bytes_read - so_far) buf
+        writeIORef haByteBuffer buf1
+        debugIO ("bufReadEmpty1.1: " ++ summaryBuffer buf1 ++ " read:" ++ show bytes_read)
+        return bytes_read
  | otherwise = do
-     (r,buf') <- Buffered.fillReadBuffer haDevice buf
-     if r == 0
-        then return so_far
-        else do writeIORef haByteBuffer buf'
-                bufReadNonEmpty h_ buf' ptr so_far count
+        (r,buf') <- Buffered.fillReadBuffer haDevice buf
+        writeIORef haByteBuffer buf'
+        if r == 0 -- end of file reached
+            then return so_far
+            else bufReadNonEmpty h_ buf' ptr so_far count
  where
-  loop :: FD -> Int -> Int -> IO Int
-  loop fd off bytes | bytes <= 0 = return (so_far + off)
-  loop fd off bytes = do
-    r <- RawIO.read (fd::FD) (ptr `plusPtr` off) bytes
+  -- Read @bytes@ byte into ptr. Repeating the read until either zero
+  -- bytes where read, or we are done reading.
+  loop :: RawIO.RawIO dev => dev -> Int -> Word64 -> Int -> IO Int
+  loop dev delta off bytes | bytes <= 0 = return (so_far + delta)
+  loop dev delta off bytes = do
+    r <- RawIO.read dev (ptr `plusPtr` delta) off bytes
+    debugIO $ show ptr ++ " - loop read@" ++ show delta ++ ": " ++ show r
+    debugIO $ "next:" ++ show (delta + r) ++ " - left:" ++ show (bytes - r)
     if r == 0
-        then return (so_far + off)
-        else loop fd (off + r) (bytes - r)
+        then return (so_far + delta)
+        else loop dev (delta + r) (off + fromIntegral r) (bytes - r)
 
 -- ---------------------------------------------------------------------------
 -- hGetBufSome
@@ -984,7 +1027,7 @@ hGetBufSome h !ptr count
          buf@Buffer{ bufSize=sz } <- readIORef haByteBuffer
          if isEmptyBuffer buf
             then case count > sz of  -- large read? optimize it with a little special case:
-                    True | Just fd <- haFD h_ -> do RawIO.read fd (castPtr ptr) count
+                    True -> RawIO.read haDevice (castPtr ptr) 0 count
                     _ -> do (r,buf') <- Buffered.fillReadBuffer haDevice buf
                             if r == 0
                                then return 0
@@ -996,9 +1039,6 @@ hGetBufSome h !ptr count
             else
               let count' = min count (bufferElems buf)
               in bufReadNBNonEmpty h_ buf (castPtr ptr) 0 count'
-
-haFD :: Handle__ -> Maybe FD
-haFD h_@Handle__{..} = cast haDevice
 
 -- | 'hGetBufNonBlocking' @hdl buf count@ reads data from the handle @hdl@
 -- into the buffer @buf@ until either EOF is reached, or
@@ -1034,25 +1074,25 @@ hGetBufNonBlocking h !ptr count
 
 bufReadNBEmpty :: Handle__ -> Buffer Word8 -> Ptr Word8 -> Int -> Int -> IO Int
 bufReadNBEmpty   h_@Handle__{..}
-                 buf@Buffer{ bufRaw=raw, bufR=w, bufL=r, bufSize=sz }
+                 buf@Buffer{ bufRaw=raw, bufR=w, bufL=_r, bufSize=sz
+                           , bufOffset=offset }
                  ptr so_far count
-  | count > sz,
-    Just fd <- cast haDevice = do
-       m <- RawIO.readNonBlocking (fd::FD) ptr count
+  | count > sz = do
+       m <- RawIO.readNonBlocking haDevice ptr offset count
        case m of
          Nothing -> return so_far
          Just n  -> return (so_far + n)
 
  | otherwise = do
-     buf <- readIORef haByteBuffer
+    --  buf <- readIORef haByteBuffer
      (r,buf') <- Buffered.fillReadBuffer0 haDevice buf
      case r of
        Nothing -> return so_far
        Just 0  -> return so_far
-       Just r  -> do
+       Just r'  -> do
          writeIORef haByteBuffer buf'
-         bufReadNBNonEmpty h_ buf' ptr so_far (min count r)
-                          -- NOTE: new count is    min count r
+         bufReadNBNonEmpty h_ buf' ptr so_far (min count r')
+                          -- NOTE: new count is    min count r'
                           -- so we will just copy the contents of the
                           -- buffer in the recursive call, and not
                           -- loop again.
@@ -1064,6 +1104,9 @@ bufReadNBNonEmpty h_@Handle__{..}
                   ptr so_far count
   = do
         let avail = w - r
+        -- We use < instead of <= because for count == avail
+        -- we need to reset bufL and bufR to zero.
+        -- See also [INVARIANTS on Buffers] in Buffer.hs
         if (count < avail)
            then do
                 copyFromRawBuffer ptr raw r count

@@ -22,7 +22,7 @@ rts_VERSION = 1.0
 # Minimum supported Windows version.
 # These numbers can be found at:
 #  https://msdn.microsoft.com/en-us/library/windows/desktop/aa383745(v=vs.85).aspx
-# If we're compiling on windows, enforce that we only support Vista SP1+
+# If we're compiling on windows, enforce that we only support Windows 7+
 # Adding this here means it doesn't have to be done in individual .c files
 # and also centralizes the versioning.
 rts_WINVER = 0x06010000
@@ -205,7 +205,7 @@ rts_dist_$1_CC_OPTS += -DRtsWay=\"rts_$1\"
 # Adding this here means it doesn't have to be done in individual .c files
 # and also centralizes the versioning.
 ifeq "$$(TargetOS_CPP)" "mingw32"
-rts_dist_$1_CC_OPTS += -DWINVER=$(rts_WINVER)
+rts_dist_$1_CC_OPTS += -D_WIN32_WINNT=$(rts_WINVER)
 endif
 
 ifneq "$$(UseSystemLibFFI)" "YES"

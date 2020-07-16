@@ -3,6 +3,9 @@
  * Integrating Win32 asynchronous I/O with the GHC RTS.
  *
  * (c) sof, 2002-2003.
+ *
+ * NOTE: This is the MIO manager, only used for --io-manager=posix.
+ *       For the WINIO manager see base in the GHC.Event modules.
  */
 
 #if !defined(THREADED_RTS)
@@ -13,7 +16,7 @@
 #include <stdio.h>
 #include "Schedule.h"
 #include "Capability.h"
-#include "win32/AsyncIO.h"
+#include "win32/AsyncMIO.h"
 #include "win32/IOManager.h"
 
 /*
@@ -46,7 +49,7 @@ typedef struct CompletedReq {
 
 #define MAX_REQUESTS 200
 
-static CRITICAL_SECTION queue_lock;
+static Mutex            queue_lock;
 static HANDLE           completed_req_event = INVALID_HANDLE_VALUE;
 static HANDLE           abandon_req_wait = INVALID_HANDLE_VALUE;
 static HANDLE           wait_handles[2];
@@ -67,17 +70,16 @@ onIOComplete(unsigned int reqID,
     dwRes = WaitForSingleObject(completed_table_sema, INFINITE);
     switch (dwRes) {
     case WAIT_OBJECT_0:
-    case WAIT_ABANDONED:
         break;
     default:
         /* Not likely */
         fprintf(stderr,
-                "onIOComplete: failed to grab table semaphore (res=%d, err=%d), "
-                "dropping request 0x%x\n", reqID, dwRes, GetLastError());
+                "onIOComplete: failed to grab table semaphore (res=%d, err=%ld), "
+                "dropping request 0x%lx\n", reqID, dwRes, GetLastError());
         fflush(stderr);
         return;
     }
-    EnterCriticalSection(&queue_lock);
+    OS_ACQUIRE_LOCK(&queue_lock);
     if (completed_hw == MAX_REQUESTS) {
         /* Shouldn't happen */
         fprintf(stderr, "onIOComplete: ERROR -- Request table overflow (%d); "
@@ -102,7 +104,7 @@ onIOComplete(unsigned int reqID,
             SetEvent(completed_req_event);
         }
     }
-    LeaveCriticalSection(&queue_lock);
+    OS_RELEASE_LOCK(&queue_lock);
 }
 
 unsigned int
@@ -112,9 +114,9 @@ addIORequest(int   fd,
              HsInt len,
              char* buf)
 {
-    EnterCriticalSection(&queue_lock);
+    OS_ACQUIRE_LOCK(&queue_lock);
     issued_reqs++;
-    LeaveCriticalSection(&queue_lock);
+    OS_RELEASE_LOCK(&queue_lock);
 #if 0
     fprintf(stderr, "addIOReq: %d %d %d\n", fd, forWriting, len);
     fflush(stderr);
@@ -125,9 +127,9 @@ addIORequest(int   fd,
 unsigned int
 addDelayRequest(HsInt usecs)
 {
-    EnterCriticalSection(&queue_lock);
+    OS_ACQUIRE_LOCK(&queue_lock);
     issued_reqs++;
-    LeaveCriticalSection(&queue_lock);
+    OS_RELEASE_LOCK(&queue_lock);
 #if 0
     fprintf(stderr, "addDelayReq: %d\n", usecs); fflush(stderr);
 #endif
@@ -137,9 +139,9 @@ addDelayRequest(HsInt usecs)
 unsigned int
 addDoProcRequest(void* proc, void* param)
 {
-    EnterCriticalSection(&queue_lock);
+    OS_ACQUIRE_LOCK(&queue_lock);
     issued_reqs++;
-    LeaveCriticalSection(&queue_lock);
+    OS_RELEASE_LOCK(&queue_lock);
 #if 0
     fprintf(stderr, "addProcReq: %p %p\n", proc, param); fflush(stderr);
 #endif
@@ -153,7 +155,7 @@ startupAsyncIO()
     if (!StartIOManager()) {
         return 0;
     }
-    InitializeCriticalSection(&queue_lock);
+    OS_INIT_LOCK(&queue_lock);
     /* Create a pair of events:
      *
      *    - completed_req_event -- signals the deposit of request result;
@@ -197,7 +199,7 @@ shutdownAsyncIO(bool wait_threads)
         CloseHandle(completed_table_sema);
         completed_table_sema = NULL;
     }
-    DeleteCriticalSection(&queue_lock);
+    OS_CLOSE_LOCK(&queue_lock);
 }
 
 /*
@@ -228,7 +230,7 @@ start:
             issued_reqs, completed_hw, wait);
     fflush(stderr);
 #endif
-    EnterCriticalSection(&queue_lock);
+    OS_ACQUIRE_LOCK(&queue_lock);
     // Nothing immediately available & we won't wait
     if ((!wait && completed_hw == 0)
 #if 0
@@ -237,12 +239,12 @@ start:
         (issued_reqs == 0 && completed_hw == 0)
 #endif
         ) {
-        LeaveCriticalSection(&queue_lock);
+        OS_RELEASE_LOCK(&queue_lock);
         return 0;
     }
     if (completed_hw == 0) {
         // empty table, drop lock and wait
-        LeaveCriticalSection(&queue_lock);
+        OS_RELEASE_LOCK(&queue_lock);
         if ( wait && sched_state == SCHED_RUNNING ) {
             DWORD dwRes = WaitForMultipleObjects(2, wait_handles,
                                                  FALSE, INFINITE);
@@ -344,7 +346,7 @@ start:
         }
         completed_hw = 0;
         ResetEvent(completed_req_event);
-        LeaveCriticalSection(&queue_lock);
+        OS_RELEASE_LOCK(&queue_lock);
         return 1;
     }
 #endif /* !THREADED_RTS */
@@ -373,6 +375,7 @@ abandonRequestWait( void )
      * properly serviced (see resetAbandon() below).  --SDM 18/12/2003
      */
     SetEvent(abandon_req_wait);
+    interruptIOManagerEvent ();
 }
 
 void

@@ -27,9 +27,9 @@ import GHC.Base ()  -- dummy dependency
         ( Handler(..)
         , installHandler
         , ConsoleEvent(..)
-        , flushConsole
         ) where
 
+#include <windows.h>
 {-
 #include "rts/Signals.h"
 
@@ -44,13 +44,8 @@ Note: this #include is inside a Haskell comment
 import GHC.Base
 import Foreign
 import Foreign.C
-import GHC.IO.FD
-import GHC.IO.Exception
-import GHC.IO.Handle.Types
-import GHC.IO.Handle.Internals
 import GHC.Conc
 import Control.Concurrent.MVar
-import Data.Typeable
 
 data Handler
  = Default
@@ -122,11 +117,11 @@ installHandler handler
   where
    fromConsoleEvent ev =
      case ev of
-       ControlC -> 0 {- CTRL_C_EVENT-}
-       Break    -> 1 {- CTRL_BREAK_EVENT-}
-       Close    -> 2 {- CTRL_CLOSE_EVENT-}
-       Logoff   -> 5 {- CTRL_LOGOFF_EVENT-}
-       Shutdown -> 6 {- CTRL_SHUTDOWN_EVENT-}
+       ControlC -> #{const CTRL_C_EVENT       }
+       Break    -> #{const CTRL_BREAK_EVENT   }
+       Close    -> #{const CTRL_CLOSE_EVENT   }
+       Logoff   -> #{const CTRL_LOGOFF_EVENT  }
+       Shutdown -> #{const CTRL_SHUTDOWN_EVENT}
 
    toHandler hdlr ev = do
       case toWin32ConsoleEvent ev of
@@ -143,20 +138,5 @@ foreign import ccall unsafe "RtsExternal.h rts_InstallConsoleEvent"
   rts_installHandler :: CInt -> Ptr (StablePtr (CInt -> IO ())) -> IO CInt
 foreign import ccall unsafe "RtsExternal.h rts_ConsoleHandlerDone"
   rts_ConsoleHandlerDone :: CInt -> IO ()
-
-
-flushConsole :: Handle -> IO ()
-flushConsole h =
-  wantReadableHandle_ "flushConsole" h $ \ Handle__{haDevice=dev} ->
-    case cast dev of
-      Nothing -> ioException $
-                    IOError (Just h) IllegalOperation "flushConsole"
-                        "handle is not a file descriptor" Nothing Nothing
-      Just fd -> do
-        throwErrnoIfMinus1Retry_ "flushConsole" $
-           flush_console_fd (fdFD fd)
-
-foreign import ccall unsafe "consUtils.h flush_input_console__"
-        flush_console_fd :: CInt -> IO CInt
 
 #endif /* mingw32_HOST_OS */

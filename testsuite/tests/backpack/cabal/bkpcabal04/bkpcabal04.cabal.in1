@@ -1,10 +1,10 @@
+cabal-version:       2.2
 name:                bkpcabal04
 version:             0.1.0.0
-license:             BSD3
+license:             BSD-3-Clause
 author:              Edward Z. Yang
 maintainer:          ezyang@cs.stanford.edu
 build-type:          Simple
-cabal-version:       >=1.25
 
 library p
   signatures: A

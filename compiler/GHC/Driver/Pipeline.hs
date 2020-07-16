@@ -1980,6 +1980,7 @@ doCpp dflags raw input_fn output_fn = do
 
     let targetArch = stringEncodeArch $ platformArch $ targetPlatform dflags
         targetOS = stringEncodeOS $ platformOS $ targetPlatform dflags
+        isWindows = (platformOS $ targetPlatform dflags) == OSMinGW32
     let target_defs =
           [ "-D" ++ HOST_OS     ++ "_BUILD_OS",
             "-D" ++ HOST_ARCH   ++ "_BUILD_ARCH",
@@ -1987,6 +1988,10 @@ doCpp dflags raw input_fn output_fn = do
             "-D" ++ targetArch  ++ "_HOST_ARCH" ]
         -- remember, in code we *compile*, the HOST is the same our TARGET,
         -- and BUILD is the same as our HOST.
+
+    let io_manager_defs =
+          [ "-D__IO_MANAGER_WINIO__=1" | isWindows ] ++
+          [ "-D__IO_MANAGER_MIO__=1"               ]
 
     let sse_defs =
           [ "-D__SSE__"      | isSseEnabled      dflags ] ++
@@ -2033,6 +2038,7 @@ doCpp dflags raw input_fn output_fn = do
                     ++ map GHC.SysTools.Option hscpp_opts
                     ++ map GHC.SysTools.Option sse_defs
                     ++ map GHC.SysTools.Option avx_defs
+                    ++ map GHC.SysTools.Option io_manager_defs
                     ++ mb_macro_include
         -- Set the language mode to assembler-with-cpp when preprocessing. This
         -- alleviates some of the C99 macro rules relating to whitespace and the hash

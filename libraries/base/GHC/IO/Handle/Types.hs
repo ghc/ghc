@@ -26,6 +26,7 @@ module GHC.IO.Handle.Types (
       BufferList(..),
       HandleType(..),
       isReadableHandleType, isWritableHandleType, isReadWriteHandleType,
+      isAppendHandleType,
       BufferMode(..),
       BufferCodec(..),
       NewlineMode(..), Newline(..), nativeNewline,
@@ -119,13 +120,14 @@ instance Eq Handle where
  _ == _ = False
 
 data Handle__
-  = forall dev enc_state dec_state . (IODevice dev, BufferedIO dev, Typeable dev) =>
+  = forall dev enc_state dec_state . (RawIO dev, IODevice dev, BufferedIO dev, Typeable dev) =>
     Handle__ {
       haDevice      :: !dev,
       haType        :: HandleType,           -- type (read/write/append etc.)
       haByteBuffer  :: !(IORef (Buffer Word8)), -- See [note Buffering Implementation]
       haBufferMode  :: BufferMode,
       haLastDecode  :: !(IORef (dec_state, Buffer Word8)),
+      -- ^ The byte buffer just  before we did our last batch of decoding.
       haCharBuffer  :: !(IORef (Buffer CharBufElem)), -- See [note Buffering Implementation]
       haBuffers     :: !(IORef (BufferList CharBufElem)),  -- spare buffers
       haEncoder     :: Maybe (TextEncoder enc_state),
@@ -169,6 +171,11 @@ isWritableHandleType _               = False
 isReadWriteHandleType :: HandleType -> Bool
 isReadWriteHandleType ReadWriteHandle{} = True
 isReadWriteHandleType _                 = False
+
+isAppendHandleType :: HandleType -> Bool
+isAppendHandleType AppendHandle = True
+isAppendHandleType _            = False
+
 
 -- INVARIANTS on Handles:
 --

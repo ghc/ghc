@@ -46,11 +46,13 @@
 #endif
 
 #if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
-#include "win32/AsyncIO.h"
+#include "win32/AsyncMIO.h"
+#include "win32/AsyncWinIO.h"
 #endif
 
 #if defined(mingw32_HOST_OS)
 #include <fenv.h>
+#include <windows.h>
 #else
 #include "posix/TTY.h"
 #endif
@@ -120,6 +122,21 @@ void fpreset(void) {
     _fpreset();
 }
 #endif
+
+/* Set the console's CodePage to UTF-8 if using the new I/O manager and the CP
+   is still the default one.  */
+static void
+initConsoleCP (void)
+{
+    /* Check if the codepage is still the system default ANSI codepage.  */
+    if (GetConsoleCP () == GetOEMCP ()) {
+      if (! SetConsoleCP (CP_UTF8))
+        errorBelch ("Unable to set console CodePage, Unicode output may be "
+                    "garbled.\n");
+      else
+        IF_DEBUG (scheduler, debugBelch ("Codepage set to UTF-8.\n"));
+    }
+}
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -220,6 +237,12 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 #endif /* DEBUG */
     }
 
+    /* Initialize console Codepage.  */
+#if defined(mingw32_HOST_OS)
+   if (is_io_mng_native_p())
+      initConsoleCP();
+#endif
+
     /* Initialise the stats department, phase 1 */
     initStats1();
 
@@ -277,10 +300,13 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     getStablePtr((StgPtr)nestedAtomically_closure);
     getStablePtr((StgPtr)runSparks_closure);
     getStablePtr((StgPtr)ensureIOManagerIsRunning_closure);
+    getStablePtr((StgPtr)interruptIOManager_closure);
     getStablePtr((StgPtr)ioManagerCapabilitiesChanged_closure);
 #if !defined(mingw32_HOST_OS)
     getStablePtr((StgPtr)blockedOnBadFD_closure);
     getStablePtr((StgPtr)runHandlersPtr_closure);
+#else
+    getStablePtr((StgPtr)processRemoteCompletion_closure);
 #endif
 
     // Initialize the top-level handler system
@@ -316,7 +342,10 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
 #endif
 
 #if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
-    startupAsyncIO();
+   if (is_io_mng_native_p())
+      startupAsyncWinIO();
+    else
+      startupAsyncIO();
 #endif
 
     x86_init_fpu();
@@ -498,7 +527,10 @@ hs_exit_(bool wait_foreign)
 #endif
 
 #if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
-    shutdownAsyncIO(wait_foreign);
+    if (is_io_mng_native_p())
+      shutdownAsyncWinIO(wait_foreign);
+    else
+      shutdownAsyncIO(wait_foreign);
 #endif
 
     /* free hash table storage */

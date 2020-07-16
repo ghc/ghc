@@ -19,6 +19,7 @@ module GHC.Event.Array
     , removeAt
     , snoc
     , unsafeLoad
+    , unsafeCopyFromBuffer
     , unsafeRead
     , unsafeWrite
     , useAsPtr
@@ -138,6 +139,16 @@ unsafeLoad (Array ref) load = do
     len' <- withForeignPtr es $ \p -> load p cap
     writeIORef ref (AC es len' cap)
     return len'
+
+-- | Reads n elements from the pointer and copies them
+-- into the array.
+unsafeCopyFromBuffer :: Array a -> Ptr a -> Int -> IO ()
+unsafeCopyFromBuffer (Array ref) sptr n =
+    readIORef ref >>= \(AC es _ cap) ->
+    CHECK_BOUNDS("unsafeCopyFromBuffer", cap, n-1)
+    withForeignPtr es $ \pdest -> do
+      _ <- memcpy pdest sptr (fromIntegral n)
+      writeIORef ref (AC es n cap)
 
 ensureCapacity :: Storable a => Array a -> Int -> IO ()
 ensureCapacity (Array ref) c = do

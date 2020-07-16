@@ -241,7 +241,7 @@ getCompilerInfo' dflags = do
         | any ("Apple clang version" `isPrefixOf`) stde =
           return AppleClang
          -- Unknown linker.
-        | otherwise = fail "invalid -v output, or compiler is unsupported"
+        | otherwise = fail $ "invalid -v output, or compiler is unsupported: " ++ unlines stde
 
   -- Process the executable call
   info <- catchIO (do

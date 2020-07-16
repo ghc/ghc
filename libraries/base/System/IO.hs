@@ -232,6 +232,12 @@ import Foreign.C.String
 import Foreign.Ptr
 import Foreign.Marshal.Alloc
 import Foreign.Storable
+import GHC.IO.SubSystem
+import GHC.IO.Windows.Handle (openFileAsTemp)
+import GHC.IO.Handle.Windows (mkHandleFromHANDLE)
+import GHC.IO.Device as IODevice
+import GHC.Real (fromIntegral)
+import Foreign.Marshal.Utils (new)
 #endif
 import Foreign.C.Types
 import System.Posix.Internals
@@ -245,13 +251,14 @@ import GHC.IORef
 import GHC.Num
 import GHC.IO hiding ( bracket, onException )
 import GHC.IO.IOMode
-import GHC.IO.Handle.FD
 import qualified GHC.IO.FD as FD
 import GHC.IO.Handle
+import qualified GHC.IO.Handle.FD as POSIX
 import GHC.IO.Handle.Text ( hGetBufSome, hPutStrLn )
 import GHC.IO.Exception ( userError )
 import GHC.IO.Encoding
 import Text.Read
+import GHC.IO.StdHandles
 import GHC.Show
 import GHC.MVar
 
@@ -529,13 +536,29 @@ openTempFile' loc tmp_dir template binary mode
          -- beginning with '.' as the second component.
          _                      -> errorWithoutStackTrace "bug in System.IO.openTempFile"
 #if defined(mingw32_HOST_OS)
-    findTempName = do
+    findTempName = findTempNamePosix <!> findTempNameWinIO
+
+    findTempNameWinIO = do
+      let label = if null prefix then "ghc" else prefix
+      withCWString tmp_dir $ \c_tmp_dir ->
+        withCWString label $ \c_template ->
+          withCWString suffix $ \c_suffix -> do
+            c_ptr <- new nullPtr
+            res <- c_createUUIDTempFileErrNo c_tmp_dir c_template c_suffix
+                                             c_ptr
+            if not res
+               then do errno <- getErrno
+                       ioError (errnoToIOError loc errno Nothing (Just tmp_dir))
+               else do c_p <- peek c_ptr
+                       filename <- peekCWString c_p
+                       free c_p
+                       handleResultsWinIO filename ((fromIntegral mode .&. o_EXCL) == o_EXCL)
+
+    findTempNamePosix = do
       let label = if null prefix then "ghc" else prefix
       withCWString tmp_dir $ \c_tmp_dir ->
         withCWString label $ \c_template ->
           withCWString suffix $ \c_suffix ->
-            -- NOTE: revisit this when new I/O manager in place and use a UUID
-            --       based one when we are no longer MAX_PATH bound.
             allocaBytes (sizeOf (undefined :: CWchar) * 260) $ \c_str -> do
             res <- c_getTempFileNameErrorNo c_tmp_dir c_template c_suffix 0
                                             c_str
@@ -543,9 +566,9 @@ openTempFile' loc tmp_dir template binary mode
                then do errno <- getErrno
                        ioError (errnoToIOError loc errno Nothing (Just tmp_dir))
                else do filename <- peekCWString c_str
-                       handleResults filename
+                       handleResultsPosix filename
 
-    handleResults filename = do
+    handleResultsPosix filename = do
       let oflags1 = rw_flags .|. o_EXCL
           binary_flags
               | binary    = o_BINARY
@@ -561,13 +584,25 @@ openTempFile' loc tmp_dir template binary mode
                                      True{-is_nonblock-}
 
              enc <- getLocaleEncoding
-             h <- mkHandleFromFD fD fd_type filename ReadWriteMode
+             h <- POSIX.mkHandleFromFD fD fd_type filename ReadWriteMode
                                  False{-set non-block-} (Just enc)
 
              return (filename, h)
 
+    handleResultsWinIO filename excl = do
+      (hwnd, hwnd_type) <- openFileAsTemp filename True excl
+      mb_codec <- if binary then return Nothing else fmap Just getLocaleEncoding
+
+      -- then use it to make a Handle
+      h <- mkHandleFromHANDLE hwnd hwnd_type filename ReadWriteMode mb_codec
+                `onException` IODevice.close hwnd
+      return (filename, h)
+
 foreign import ccall "getTempFileNameErrorNo" c_getTempFileNameErrorNo
   :: CWString -> CWString -> CWString -> CUInt -> Ptr CWchar -> IO Bool
+
+foreign import ccall "__createUUIDTempFileErrNo" c_createUUIDTempFileErrNo
+  :: CWString -> CWString -> CWString -> Ptr CWString -> IO Bool
 
 pathSeparator :: String -> Bool
 pathSeparator template = any (\x-> x == '/' || x == '\\') template
@@ -588,7 +623,7 @@ output_flags = std_flags
                                True{-is_nonblock-}
 
           enc <- getLocaleEncoding
-          h <- mkHandleFromFD fD fd_type filepath ReadWriteMode False{-set non-block-} (Just enc)
+          h <- POSIX.mkHandleFromFD fD fd_type filepath ReadWriteMode False{-set non-block-} (Just enc)
 
           return (filepath, h)
 
