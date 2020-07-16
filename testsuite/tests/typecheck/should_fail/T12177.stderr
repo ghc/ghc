@@ -4,9 +4,9 @@ T12177.hs:3:19: error:
       Where: ‘t’ is a rigid type variable bound by
                the inferred type of bar :: p -> p1 -> t
                at T12177.hs:3:1-19
-    • In the expression: _
-      In the expression: \ x -> _
+    • In the expression: \ x -> _
       In the expression: \ x -> \ x -> _
+      In an equation for ‘bar’: bar = \ x -> \ x -> _
     • Relevant bindings include
         x :: p1 (bound at T12177.hs:3:14)
         bar :: p -> p1 -> t (bound at T12177.hs:3:1)
@@ -16,9 +16,9 @@ T12177.hs:5:37: error:
       Where: ‘t’ is a rigid type variable bound by
                the inferred type of baz :: p -> p1 -> p2 -> p3 -> p4 -> t
                at T12177.hs:5:1-37
-    • In the expression: _
-      In the expression: \ z -> _
+    • In the expression: \ z -> _
       In the expression: \ x -> \ z -> _
+      In the expression: \ z -> \ x -> \ z -> ...
     • Relevant bindings include
         z :: p4 (bound at T12177.hs:5:32)
         x :: p3 (bound at T12177.hs:5:26)
