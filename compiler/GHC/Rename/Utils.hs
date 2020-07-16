@@ -26,8 +26,9 @@ module GHC.Rename.Utils (
 
         bindLocalNames, bindLocalNamesFV,
 
-        addNameClashErrRn, extendTyVarEnvFVRn
+        addNameClashErrRn, extendTyVarEnvFVRn,
 
+        noNestedForallsContextsErr, addNoNestedForallsContextsErr
 )
 
 where
@@ -49,6 +50,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Misc
 import GHC.Types.Basic  ( TopLevelFlag(..) )
 import GHC.Data.List.SetOps ( removeDups )
+import GHC.Data.Maybe ( whenIsJust )
 import GHC.Driver.Session
 import GHC.Data.FastString
 import Control.Monad
@@ -176,6 +178,48 @@ checkShadowedOccs (global_env,local_env) get_loc_occ ns
                              || xopt LangExt.RecordWildCards dflags) }
     is_shadowed_gre _other = return True
 
+-------------------------------------
+-- | Examines a non-outermost type for @forall@s or contexts, which are assumed
+-- to be nested. Returns @'Just' err_msg@ if such a @forall@ or context is
+-- found, and returns @Nothing@ otherwise.
+--
+-- This is currently used in two places:
+--
+-- * In GADT constructor types (in 'rnConDecl').
+--   See @Note [GADT abstract syntax] (Wrinkle: No nested foralls or contexts)@
+--   in "GHC.Hs.Type".
+--
+-- * In instance declaration types (in 'rnClsIntDecl' and 'rnSrcDerivDecl' in
+--   "GHC.Rename.Module" and 'renameSig' in "GHC.Rename.Bind").
+--   See @Note [No nested foralls or contexts in instance types]@ in
+--   "GHC.Hs.Type".
+noNestedForallsContextsErr :: SDoc -> LHsType GhcRn -> Maybe (SrcSpan, SDoc)
+noNestedForallsContextsErr what lty =
+  case ignoreParens lty of
+    L l (HsForAllTy { hst_tele = tele })
+      |  HsForAllVis{} <- tele
+         -- The only two places where this function is called correspond to
+         -- types of terms, so we give a slightly more descriptive error
+         -- message in the event that they contain visible dependent
+         -- quantification (currently only allowed in kinds).
+      -> Just (l, vcat [ text "Illegal visible, dependent quantification" <+>
+                         text "in the type of a term"
+                       , text "(GHC does not yet support this)" ])
+      |  HsForAllInvis{} <- tele
+      -> Just (l, nested_foralls_contexts_err)
+    L l (HsQualTy {})
+      -> Just (l, nested_foralls_contexts_err)
+    _ -> Nothing
+  where
+    nested_foralls_contexts_err =
+      what <+> text "cannot contain nested"
+      <+> quotes forAllLit <> text "s or contexts"
+
+-- | A common way to invoke 'noNestedForallsContextsErr'.
+addNoNestedForallsContextsErr :: HsDocContext -> SDoc -> LHsType GhcRn -> RnM ()
+addNoNestedForallsContextsErr ctxt what lty =
+  whenIsJust (noNestedForallsContextsErr what lty) $ \(l, err_msg) ->
+    addErrAt l $ withHsDocContext ctxt err_msg
 
 {-
 ************************************************************************

@@ -43,7 +43,8 @@ import GHC.Rename.Fixity
 import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, extendTyVarEnvFVRn
                         , checkDupRdrNames, warnUnusedLocalBinds
                         , checkUnusedRecordWildcard
-                        , checkDupAndShadowedNames, bindLocalNamesFV )
+                        , checkDupAndShadowedNames, bindLocalNamesFV
+                        , addNoNestedForallsContextsErr )
 import GHC.Driver.Session
 import GHC.Unit.Module
 import GHC.Types.Name
@@ -963,20 +964,24 @@ renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
         ; when (is_deflt && not defaultSigs_on) $
           addErr (defaultSigErr sig)
         ; new_v <- mapM (lookupSigOccRn ctxt sig) vs
-        ; (new_ty, fvs) <- rnHsSigType ty_ctxt TypeLevel inf_msg ty
+        ; (new_ty, fvs) <- rnHsSigType ty_ctxt TypeLevel Nothing ty
         ; return (ClassOpSig noExtField is_deflt new_v new_ty, fvs) }
   where
     (v1:_) = vs
     ty_ctxt = GenericCtx (text "a class method signature for"
                           <+> quotes (ppr v1))
-    inf_msg = if is_deflt
-      then Just (text "A default type signature cannot contain inferred type variables")
-      else Nothing
 
 renameSig _ (SpecInstSig _ src ty)
-  = do  { (new_ty, fvs) <- rnHsSigType SpecInstSigCtx TypeLevel inf_msg ty
+  = do  { (new_ty, fvs) <- rnHsSigType doc TypeLevel inf_msg ty
+          -- Check if there are any nested `forall`s or contexts, which are
+          -- illegal in the type of an instance declaration (see
+          -- Note [No nested foralls or contexts in instance types] in
+          -- GHC.Hs.Type).
+        ; addNoNestedForallsContextsErr doc (text "SPECIALISE instance type")
+            (getLHsInstDeclHead new_ty)
         ; return (SpecInstSig noExtField src new_ty,fvs) }
   where
+    doc = SpecInstSigCtx
     inf_msg = Just (text "Inferred type variables are not allowed")
 
 -- {-# SPECIALISE #-} pragmas can refer to imported Ids

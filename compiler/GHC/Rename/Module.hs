@@ -34,7 +34,8 @@ import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, bindLocalNames
                         , checkDupRdrNames, bindLocalNamesFV
                         , checkShadowedRdrNames, warnUnusedTypePatterns
                         , extendTyVarEnvFVRn, newLocalBndrsRn
-                        , withHsDocContext )
+                        , withHsDocContext, noNestedForallsContextsErr
+                        , addNoNestedForallsContextsErr )
 import GHC.Rename.Unbound ( mkUnboundName, notInScopeErr )
 import GHC.Rename.Names
 import GHC.Rename.Doc   ( rnHsDoc, rnMbLHsDoc )
@@ -65,7 +66,6 @@ import GHC.Data.List.SetOps ( findDupsEq, removeDups, equivClasses )
 import GHC.Data.Graph.Directed ( SCC, flattenSCC, flattenSCCs, Node(..)
                                , stronglyConnCompFromEdgedVerticesUniq )
 import GHC.Types.Unique.Set
-import GHC.Data.Maybe ( whenIsJust )
 import GHC.Data.OrdList
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -608,7 +608,7 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
              -- illegal in the type of an instance declaration (see
              -- Note [No nested foralls or contexts in instance types] in
              -- GHC.Hs.Type)...
-             mb_nested_msg = no_nested_foralls_contexts_err
+             mb_nested_msg = noNestedForallsContextsErr
                                (text "Instance head") head_ty'
              -- ...then check if the instance head is actually headed by a
              -- class type constructor...
@@ -1016,10 +1016,9 @@ rnSrcDerivDecl (DerivDecl _ ty mds overlap)
          -- illegal in the type of an instance declaration (see
          -- Note [No nested foralls or contexts in instance types] in
          -- GHC.Hs.Type).
-       ; whenIsJust (no_nested_foralls_contexts_err
-                       (text "Standalone-derived instance head")
-                       (getLHsInstDeclHead $ dropWildCards ty')) $ \(l, err_msg) ->
-           addErrAt l $ withHsDocContext ctxt err_msg
+       ; addNoNestedForallsContextsErr ctxt
+           (text "Standalone-derived instance head")
+           (getLHsInstDeclHead $ dropWildCards ty')
        ; warnNoDerivStrat mds' loc
        ; return (DerivDecl noExtField ty' mds' overlap, fvs) }
   where
@@ -1846,10 +1845,8 @@ rnLHsDerivingClause doc
       -- `deriving` clause.
       -- See Note [No nested foralls or contexts in instance types]
       -- (Wrinkle: Derived instances) in GHC.Hs.Type.
-      whenIsJust (no_nested_foralls_contexts_err
-                    (text "Derived class type")
-                    (getLHsInstDeclHead pred_ty')) $ \(l, err_msg) ->
-            addErrAt l $ withHsDocContext doc err_msg
+      addNoNestedForallsContextsErr doc (text "Derived class type")
+        (getLHsInstDeclHead pred_ty')
       pure ret
 
 rnLDerivStrategy :: forall a.
@@ -1893,10 +1890,8 @@ rnLDerivStrategy doc mds thing_inside
              -- `via` type.
              -- See Note [No nested foralls or contexts in instance types]
              -- (Wrinkle: Derived instances) in GHC.Hs.Type.
-             whenIsJust (no_nested_foralls_contexts_err
-                           (quotes (text "via") <+> text "type")
-                           via_rho) $ \(l, err_msg) ->
-               addErrAt l $ withHsDocContext doc err_msg
+             addNoNestedForallsContextsErr doc
+               (quotes (text "via") <+> text "type") via_rho
              (thing, fvs2) <- extendTyVarEnvFVRn via_tvs thing_inside
              pure (ViaStrategy via_ty', thing, fvs1 `plusFV` fvs2)
 
@@ -2230,10 +2225,8 @@ rnConDecl (XConDecl (ConDeclGADTPrefixPs { con_gp_names = names, con_gp_ty = ty
          -- Ensure that there are no nested `forall`s or contexts, per
          -- Note [GADT abstract syntax] (Wrinkle: No nested foralls or contexts)
          -- in GHC.Hs.Type.
-       ; whenIsJust (no_nested_foralls_contexts_err
-                       (text "GADT constructor type signature")
-                       res_ty) $ \(l, err_msg) ->
-           addErrAt l $ withHsDocContext ctxt err_msg
+       ; addNoNestedForallsContextsErr ctxt
+           (text "GADT constructor type signature") res_ty
 
        ; traceRn "rnConDecl (ConDeclGADTPrefixPs)"
            (ppr names $$ ppr implicit_tkvs $$ ppr explicit_tkvs)
@@ -2270,41 +2263,6 @@ rnConDeclDetails con doc (RecCon (L l fields))
                 -- No need to check for duplicate fields
                 -- since that is done by GHC.Rename.Names.extendGlobalRdrEnvRn
         ; return (RecCon (L l new_fields), fvs) }
-
--- | Examines a non-outermost type for @forall@s or contexts, which are assumed
--- to be nested. Returns @'Just' err_msg@ if such a @forall@ or context is
--- found, and returns @Nothing@ otherwise.
---
--- This is currently used in two places:
---
--- * In GADT constructor types (in 'rnConDecl').
---   See @Note [GADT abstract syntax] (Wrinkle: No nested foralls or contexts)@
---   in "GHC.Hs.Type".
---
--- * In instance declaration types (in 'rnClsIntDecl' and 'rnSrcDerivDecl').
---   See @Note [No nested foralls or contexts in instance types]@ in
---   "GHC.Hs.Type".
-no_nested_foralls_contexts_err :: SDoc -> LHsType GhcRn -> Maybe (SrcSpan, SDoc)
-no_nested_foralls_contexts_err what lty =
-  case ignoreParens lty of
-    L l (HsForAllTy { hst_tele = tele })
-      |  HsForAllVis{} <- tele
-         -- The only two places where this function is called correspond to
-         -- types of terms, so we give a slightly more descriptive error
-         -- message in the event that they contain visible dependent
-         -- quantification (currently only allowed in kinds).
-      -> Just (l, vcat [ text "Illegal visible, dependent quantification" <+>
-                         text "in the type of a term"
-                       , text "(GHC does not yet support this)" ])
-      |  HsForAllInvis{} <- tele
-      -> Just (l, nested_foralls_contexts_err)
-    L l (HsQualTy {})
-      -> Just (l, nested_foralls_contexts_err)
-    _ -> Nothing
-  where
-    nested_foralls_contexts_err =
-      what <+> text "cannot contain nested"
-      <+> quotes forAllLit <> text "s or contexts"
 
 -------------------------------------------------
 

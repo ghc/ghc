@@ -415,6 +415,9 @@ type signature, since the type signature implicitly carries their binding
 sites. This is less precise, but more accurate.
 -}
 
+-- | Throw an error message if a user attempts to quantify an inferred type
+-- variable in a place where specificity cannot be observed.
+-- See @Note [Unobservably inferred type variables]@.
 check_inferred_vars :: HsDocContext
                     -> Maybe SDoc
                     -- ^ The error msg if the signature is not allowed to contain
@@ -434,6 +437,63 @@ check_inferred_vars ctxt (Just msg) ty =
       HsForAllTy { hst_tele = HsForAllInvis { hsf_invis_bndrs = tvs }}
                     -> map unLoc tvs
       _             -> []
+
+{-
+Note [Unobservably inferred type variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+While GHC's parser allows the use of inferred type variables
+(e.g., `forall {a}. <...>`) just about anywhere that type variable binders can
+appear, there are some situations where the distinction between inferred and
+specified type variables cannot be observed. For example, consider this
+instance declaration:
+
+  instance forall {a}. Eq (T a) where ...
+
+Making {a} inferred is essentially pointless, as there is no way for user code
+to "apply" an instance declaration in a way where the inferred/specified
+distinction would make a difference. Anyone who writes such code is likely
+confused, so in an attempt to be helpful, we throw an error message if a user
+writes code like this. The check_inferred_vars function is responsible for
+implementing this restriction.
+
+It turns out to be somewhat cumbersome to enforce this restriction in certain
+cases. Ultimately, nothing goes wrong if this restriction is *not* enforced (as
+it is simply a suggestion to the user to think twice about how they quantify
+their type variables), so we only use check_inferred_vars in places where it is
+feasible to do so. Two examples of places where it is *not* feasible are:
+
+* Quantified constraints. In the type `f :: (forall {a}. C a) => Proxy Int`,
+  there is no way to observe that {a} is inferred. Nevertheless, actually
+  rejecting this code would be tricky, as we would need to reject
+  `forall {a}. <...>` as a constraint but *accept* other uses of
+  `forall {a}. <...>` as a type (e.g., `g :: (forall {a}. a -> a) -> b -> b`).
+  This is quite tedious to do in practice, so we don't bother.
+* Default method type signatures (#18432). These are tricky because inferred
+  type variables can appear nested, e.g.,
+
+    class C a where
+      m         :: forall b. a -> b -> forall c.   c -> c
+      default m :: forall b. a -> b -> forall {c}. c -> c
+      m _ _ = id
+
+  Robustly checking for nested, inferred type variables ends up being a pain,
+  so we don't try to do this.
+
+Since nested type variables are a pain, one might wonder if they end up being
+painful for other places where we *do* enforce this restriction. The answer is
+"no", as it turns out. This is because in every other place where the
+restriction is enforced, GHC bans the use of nested `forall`s already. For
+example, GHC would not accept the following:
+
+  instance forall a. forall {b}. Eq (Either a b) where ...
+
+The fact that GHC does not permit nested `forall`s there is a bit of a
+coincidence (see Note [No nested foralls or contexts in instance types] in
+GHC.Hs.Type). But is sure is a useful coincidence, and one that we take
+advantage of. Because nested `forall`s are banned, checking for inferred
+type variables in instance declarations is as simple as peeling off the
+outer `forall`s and checking if any of them are inferred.
+-}
 
 {- ******************************************************
 *                                                       *
