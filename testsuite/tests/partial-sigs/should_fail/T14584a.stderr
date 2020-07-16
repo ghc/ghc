@@ -5,10 +5,10 @@ T14584a.hs:12:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
       In an equation for ‘f’: f = id @m :: _
 
 T14584a.hs:12:9: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    • Expected a type, but ‘m’ has kind ‘k2’
-      ‘k2’ is a rigid type variable bound by
+    • Expected a type, but ‘m’ has kind ‘k’
+      ‘k’ is a rigid type variable bound by
         the type signature for:
-          f :: forall {k2} (m :: k2). ()
+          f :: forall {k} (m :: k). ()
         at T14584a.hs:11:1-17
     • In the type ‘m’
       In the expression: id @m :: _
@@ -18,7 +18,7 @@ T14584a.hs:12:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘m -> m’
       Where: ‘m’, ‘k’ are rigid type variables bound by
                the type signature for:
-                 f :: forall {k2} (m :: k2). ()
+                 f :: forall {k} (m :: k). ()
                at T14584a.hs:11:1-17
     • In an expression type signature: _
       In the expression: id @m :: _
@@ -26,10 +26,10 @@ T14584a.hs:12:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Relevant bindings include f :: () (bound at T14584a.hs:12:1)
 
 T14584a.hs:15:17: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    • Expected a type, but ‘m’ has kind ‘k2’
-      ‘k2’ is a rigid type variable bound by
+    • Expected a type, but ‘m’ has kind ‘k’
+      ‘k’ is a rigid type variable bound by
         the type signature for:
-          g :: forall {k2} (m :: k2). ()
+          g :: forall {k} (m :: k). ()
         at T14584a.hs:14:1-17
     • In the type ‘m’
       In the expression: id @m

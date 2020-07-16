@@ -461,7 +461,7 @@ use CoEvBindsVar (see newCoTcEvBinds) to signal that no term-level
 evidence bindings are allowed.  Notebly ():
 
   - Places in types where we are solving kind constraints (all of which
-    are equalities); see solveEqualities, solveLocalEqualities
+    are equalities); see solveEqualities
 
   - When unifying forall-types
 -}
@@ -763,7 +763,7 @@ important) are solved in three steps:
 
      EvCsEmpty
 
-   (see GHC.Tc.Solver.simpl_top and GHC.Tc.Solver.defaultCallStacks)
+   (see GHC.Tc.Solver.simplifyTopWanteds and GHC.Tc.Solver.defaultCallStacks)
 
 This provides a lightweight mechanism for building up call-stacks
 explicitly, but is notably limited by the fact that the stack will

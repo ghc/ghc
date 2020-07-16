@@ -579,3 +579,8 @@ test('T18357a', normal, compile_fail, [''])
 test('T18357b', normal, compile_fail, [''])
 test('T18455', normal, compile_fail, [''])
 test('T18534', normal, compile_fail, [''])
+test('too-many', normal, compile_fail, [''])
+test('T18640a', normal, compile_fail, [''])
+test('T18640b', normal, compile_fail, [''])
+test('T18640c', normal, compile_fail, [''])
+
