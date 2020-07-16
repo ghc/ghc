@@ -118,7 +118,8 @@ Note [ghcPrimIds (aka pseudoops)]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The ghcPrimIds
 
-  * Are exported from GHC.Prim
+  * Are exported from GHC.Prim (see ghcPrimExports, used in ghcPrimInterface)
+    See Note [GHC.Prim] in primops.txt.pp for the remaining items in GHC.Prim.
 
   * Can't be defined in Haskell, and hence no Haskell binding site,
     but have perfectly reasonable unfoldings in Core
@@ -141,7 +142,17 @@ The magicIds
   * May or may not have a CompulsoryUnfolding.
 
   * But have some special behaviour that can't be done via an
-    unfolding from an interface file
+    unfolding from an interface file.
+
+  * May have IdInfo that differs from what would be imported from GHC.Magic.hi.
+    For example, 'lazy' gets a lazy strictness signature, per Note [lazyId magic].
+
+  The two remaining identifiers in GHC.Magic, runRW# and inline, are not listed
+  in magicIds: they have special behavior but they can be known-key and
+  not wired-in.
+  runRW#: see Note [Simplification of runRW#] in Prep, runRW# code in
+  Simplifier, Note [Linting of runRW#].
+  inline: see Note [inlineId magic]
 -}
 
 wiredInIds :: [Id]
@@ -1402,12 +1413,12 @@ These Ids can't be defined in Haskell.  They could be defined in
 unfoldings in the wired-in GHC.Prim interface file, but we'd have to
 ensure that they were definitely, definitely inlined, because there is
 no curried identifier for them.  That's what mkCompulsoryUnfolding
-does.  If we had a way to get a compulsory unfolding from an interface
-file, we could do that, but we don't right now.
+does. Alternatively, we could add the definitions to mi_decls of ghcPrimIface
+but it's not clear if this would be simpler.
 
-The type variables we use here are "open" type variables: this means
-they can unify with both unlifted and lifted types.  Hence we provide
-another gun with which to shoot yourself in the foot.
+coercionToken# is not listed in ghcPrimIds, since its type uses (~#)
+which is not supposed to be used in expressions (GHC throws an assertion
+failure when trying.)
 -}
 
 nullAddrName, seqName,
@@ -1422,6 +1433,7 @@ magicDictName     = mkWiredInIdName gHC_PRIM  (fsLit "magicDict")      magicDict
 coerceName        = mkWiredInIdName gHC_PRIM  (fsLit "coerce")         coerceKey          coerceId
 proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHashKey       proxyHashId
 
+-- Names listed in magicIds; see Note [magicIds]
 lazyIdName, oneShotName, noinlineIdName :: Name
 lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey          lazyId
 oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
@@ -1598,7 +1610,7 @@ See also: Note [User-defined RULES for seq] in GHC.Core.Opt.Simplify.
 
 Note [lazyId magic]
 ~~~~~~~~~~~~~~~~~~~
-lazy :: forall a?. a? -> a?   (i.e. works for unboxed types too)
+lazy :: forall a. a -> a
 
 'lazy' is used to make sure that a sub-expression, and its free variables,
 are truly used call-by-need, with no code motion.  Key examples:
@@ -1616,7 +1628,7 @@ are truly used call-by-need, with no code motion.  Key examples:
 Implementing 'lazy' is a bit tricky:
 
 * It must not have a strictness signature: by being a built-in Id,
-  all the info about lazyId comes from here, not from GHC.Base.hi.
+  all the info about lazyId comes from here, not from GHC.Magic.hi.
   This is important, because the strictness analyser will spot it as
   strict!
 
@@ -1777,7 +1789,7 @@ voidPrimId  = pcMiscPrelId voidPrimIdName unboxedUnitTy
 voidArgId :: Id       -- Local lambda-bound :: Void#
 voidArgId = mkSysLocal (fsLit "void") voidArgIdKey Many unboxedUnitTy
 
-coercionTokenId :: Id         -- :: () ~ ()
+coercionTokenId :: Id         -- :: () ~# ()
 coercionTokenId -- See Note [Coercion tokens] in "GHC.CoreToStg"
   = pcMiscPrelId coercionTokenName
                  (mkTyConApp eqPrimTyCon [liftedTypeKind, liftedTypeKind, unitTy, unitTy])
@@ -1786,8 +1798,3 @@ coercionTokenId -- See Note [Coercion tokens] in "GHC.CoreToStg"
 pcMiscPrelId :: Name -> Type -> IdInfo -> Id
 pcMiscPrelId name ty info
   = mkVanillaGlobalWithInfo name ty info
-    -- We lie and say the thing is imported; otherwise, we get into
-    -- a mess with dependency analysis; e.g., core2stg may heave in
-    -- random calls to GHCbase.unpackPS__.  If GHCbase is the module
-    -- being compiled, then it's just a matter of luck if the definition
-    -- will be in "the right place" to be in scope.
