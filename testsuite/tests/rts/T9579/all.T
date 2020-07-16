@@ -9,7 +9,6 @@ def T9579_run_test(binName, expExitCode):
     # 3. capture exitcode using echo
     # 4. replace actual number with NUM
     testCommandTemplate = """
-          echo "TEST_WRAPPER=$TEST_WRAPPER"
           $MAKE -s --no-print-directory T9579_{binName} \
         && ( ( "$TEST_WRAPPER" ./T9579_{binName} 2>&1; echo $?) \
            | sed -e 's/[0-9]* bytes/NUM bytes/g' ) \
