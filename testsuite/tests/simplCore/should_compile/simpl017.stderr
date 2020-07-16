@@ -1,22 +1,46 @@
 
-simpl017.hs:50:15: error:
+simpl017.hs:55:5: error:
     • Couldn't match type: [E m i] -> E' v0 m a
                      with: forall v. [E m i] -> E' v m a
-      Expected: E m (forall v. [E m i] -> E' v m a)
-        Actual: E' RValue m ([E m i] -> E' v0 m a)
-    • In the expression:
+      Expected: m (forall v. [E m i] -> E' v m a)
+        Actual: m ([E m i] -> E' v0 m a)
+    • In a stmt of a 'do' block: return f
+      In the first argument of ‘E’, namely
+        ‘(do let ix :: [E m i] -> m i
+                 ix [i] = runE i
+                 {-# INLINE f #-}
+                 ....
+             return f)’
+      In the expression:
         E (do let ix :: [E m i] -> m i
                   ix [i] = runE i
                   {-# INLINE f #-}
                   ....
               return f)
-      In an equation for ‘liftArray’:
-          liftArray a
-            = E (do let ix :: [E m i] -> m i
-                        ix [i] = runE i
-                        ....
-                    return f)
     • Relevant bindings include
+        f :: [E m i] -> E' v0 m a (bound at simpl017.hs:54:9)
+        ix :: [E m i] -> m i (bound at simpl017.hs:52:9)
         a :: arr i a (bound at simpl017.hs:50:11)
         liftArray :: arr i a -> E m (forall v. [E m i] -> E' v m a)
           (bound at simpl017.hs:50:1)
+
+simpl017.hs:71:10: error:
+    • Couldn't match type: forall v. [E (ST s) Int] -> E' v (ST s) Int
+                     with: [E (ST t0) Int] -> E (ST s) Int
+      Expected: E' RValue (ST s) ([E (ST t0) Int] -> E (ST s) Int)
+        Actual: E (ST s) (forall v. [E (ST s) Int] -> E' v (ST s) Int)
+    • In a stmt of a 'do' block: a <- liftArray ma
+      In the second argument of ‘($)’, namely
+        ‘do a <- liftArray ma
+            let one :: E (ST t) Int
+                one = return 1
+            a [one] `plus` a [one]’
+      In the expression:
+        runE
+          $ do a <- liftArray ma
+               let one :: E (ST t) Int
+                   one = return 1
+               a [one] `plus` a [one]
+    • Relevant bindings include
+        ma :: STArray s Int Int (bound at simpl017.hs:70:5)
+        foo :: STArray s Int Int -> ST s Int (bound at simpl017.hs:70:1)

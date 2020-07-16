@@ -5,8 +5,7 @@ constraint_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
                the type signature for:
                  g :: forall a. Ord a => [a] -> a
                at constraint_hole_fits.hs:3:1-22
-    • In the expression: _
-      In an equation for ‘g’: g = _
+    • In an equation for ‘g’: g = _
     • Relevant bindings include
         g :: [a] -> a (bound at constraint_hole_fits.hs:4:1)
       Constraints include Ord a (from constraint_hole_fits.hs:3:1-22)

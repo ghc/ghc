@@ -36,8 +36,8 @@ T10403.hs:22:15: warning: [-Wdeferred-type-errors (in -Wdefault)]
         ...plus two instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the second argument of ‘(.)’, namely ‘fmap (const ())’
-      In the expression: H . fmap (const ())
       In the expression: (H . fmap (const ())) (fmap f b)
+      In an equation for ‘h2’: h2 f b = (H . fmap (const ())) (fmap f b)
 
 T10403.hs:28:8: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘f0’ with ‘B t’

@@ -29,6 +29,9 @@ t2 = sing id
 t3 :: forall a. a -> a
 t3 = head ids
 
+t4 :: forall b. (forall a. a->a, b->b)
+t4 = (id, id)
+
 {--------------- Examples from QMLF paper -------------------}
 
 qF :: (forall a. a -> a -> a) -> (Bool, Char)
@@ -46,8 +49,11 @@ choose x y = x
 impred1 :: (Bool, Char)
 impred1 = ($) qF choose  --- impredicative instantiation for $
 
-impred2 :: (forall a. a -> a -> a) -> (Bool, Char)
-impred2 = id qF
+impred2 :: (Bool, Char)
+impred2 = qF $ choose  --- impredicative instantiation for $
+
+impred3 :: (forall a. a -> a -> a) -> (Bool, Char)
+impred3 = id qF
 
 {------ Examples for Garrique/Remy paper -------}
 

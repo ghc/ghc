@@ -5,8 +5,7 @@ T10267.hs:8:1: error:
                the type signature for:
                  j :: forall a. a -> a
                at T10267.hs:(8,1)-(12,14)
-    • In the expression: _
-      In an equation for ‘j’: j x = _
+    • In an equation for ‘j’: j x = _
     • Relevant bindings include
         x :: a (bound at T10267.hs:8:1)
         j :: a -> a (bound at T10267.hs:8:1)
@@ -19,8 +18,7 @@ T10267.hs:8:1: error:
                  i :: forall a. a -> a
                at T10267.hs:(8,1)-(12,14)
       Or perhaps ‘_foo’ is mis-spelled, or not in scope
-    • In the expression: _foo
-      In an equation for ‘i’: i = _foo
+    • In an equation for ‘i’: i = _foo
     • Relevant bindings include i :: a -> a (bound at T10267.hs:8:1)
       Valid hole fits include
         i :: a -> a (bound at T10267.hs:8:1)

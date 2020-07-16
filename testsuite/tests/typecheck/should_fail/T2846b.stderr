@@ -1,7 +1,10 @@
 
-T2846b.hs:5:5: error:
-    • No instance for (Show (Num a0 => a0))
-        arising from a use of ‘show’
-        (maybe you haven't applied a function to enough arguments?)
-    • In the expression: show ([1, 2, 3] :: [Num a => a])
+T2846b.hs:5:11: error:
+    • Couldn't match expected type ‘a1’
+                  with actual type ‘[Num a0 => a0]’
+      Cannot instantiate unification variable ‘a1’
+      with a type involving polytypes: [Num a0 => a0]
+    • In the first argument of ‘show’, namely
+        ‘([1, 2, 3] :: [Num a => a])’
+      In the expression: show ([1, 2, 3] :: [Num a => a])
       In an equation for ‘f’: f = show ([1, 2, 3] :: [Num a => a])

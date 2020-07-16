@@ -1,6 +1,9 @@
 
 tcfail033.hs:4:12: error:
     • Couldn't match expected type ‘(a, b)’ with actual type ‘a’
+      ‘a’ is a rigid type variable bound by
+        the inferred type of buglet :: [(a, b)]
+        at tcfail033.hs:4:1-32
     • In the expression: x
       In the expression: [x | (x, y) <- buglet]
       In an equation for ‘buglet’: buglet = [x | (x, y) <- buglet]

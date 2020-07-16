@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -XImpredicativeTypes -fno-warn-deprecated-flags -XScopedTypeVariables -XGADTs #-}
+{-# LANGUAGE ImpredicativeTypes, ScopedTypeVariables, GADTs #-}
 
 -- Nov 2014: impredicative types are very dodgy so I am
 --           FAR from confident that these tests give the right errors

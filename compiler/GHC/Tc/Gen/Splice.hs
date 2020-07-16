@@ -1435,11 +1435,17 @@ reifyInstances th_nm th_tys
                rnImplicitBndrs Nothing tv_rdrs $ \ tv_names ->
                do { (rn_ty, fvs) <- rnLHsType doc rdr_ty
                   ; return ((tv_names, rn_ty), fvs) }
-        ; (_tvs, ty)
-            <- pushTcLevelM_   $
-               solveEqualities $ -- Avoid error cascade if there are unsolved
-               bindImplicitTKBndrs_Skol tv_names $
+
+        ; (tclvl, wanted, (tvs, ty))
+            <- pushLevelAndSolveEqualitiesX "reifyInstances"  $
+               bindImplicitTKBndrs_Skol tv_names              $
                tcInferLHsType rn_ty
+
+        ; tvs <- zonkAndScopedSort tvs
+
+        -- Avoid error cascade if there are unsolved
+        ; reportUnsolvedEqualities ReifySkol tvs tclvl wanted
+
         ; ty <- zonkTcTypeToType ty
                 -- Substitute out the meta type variables
                 -- In particular, the type might have kind

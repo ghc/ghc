@@ -11,5 +11,5 @@ bar _ = ()
 myconst :: ((forall r. ListTF r -> Int) -> ()) -> x -> (forall r. ListTF r -> Int) -> ()
 myconst x _ = x
 
-foo = (bar `myconst` ()) $ length
+foo  = (bar `myconst` ()) $ length
 foo2 = (myconst bar ()) $ length
