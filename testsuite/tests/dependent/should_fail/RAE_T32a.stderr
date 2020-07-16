@@ -1,7 +1,6 @@
 
 RAE_T32a.hs:29:1: error:
-    • Expected kind ‘k0 -> *’,
-        but ‘Sing Sigma (Sigma p r)’ has kind ‘*’
+    • Expected kind ‘k -> *’, but ‘Sing Sigma (Sigma p r)’ has kind ‘*’
     • In the data instance declaration for ‘Sing’
 
 RAE_T32a.hs:29:20: error:
