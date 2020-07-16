@@ -220,7 +220,7 @@ Compiler
   shared libraries.
 
 - The :ghc-flag:`-Wnoncanonical-monad-instances` and
-  :ghc-flag:`Wnoncanonical-monoid-instances` warnings are now enabled by
+  :ghc-flag:`-Wnoncanonical-monoid-instances` warnings are now enabled by
   default, as proposed in `GHC proposal #314
   <https://github.com/ghc-proposals/ghc-proposals/pull/314>`_
 
