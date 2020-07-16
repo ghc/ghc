@@ -1065,7 +1065,7 @@ ghcPrimIface
   where
     empty_iface = emptyFullModIface gHC_PRIM
 
-    -- The fixities listed here for @`seq`@ or @->@ should match
+    -- The fixity listed here for @`seq`@ should match
     -- those in primops.txt.pp (from which Haddock docs are generated).
     fixities = (getOccName seqId, Fixity NoSourceText 0 InfixR)
              : mapMaybe mkFixity allThePrimOps
