@@ -258,8 +258,70 @@ primOpId op = primOpIds ! primOpTag op
 *                                                                      *
 ************************************************************************
 
-GHC.Prim "exports" all the primops and primitive types, some
-wired-in Ids.
+Note [GHC.Prim]
+~~~~~~~~~~~~~~~
+GHC.Prim is a special module:
+* It can be imported by any module (import GHC.Prim).
+
+* It provides primitives of three sorts:
+  - primitive types such as Int64#, MutableByteArray#
+  - primops such as (+#), newTVar#, touch#
+  - pseudoops such as realWorld#, nullAddr#
+
+* The pseudoops are described in Note [ghcPrimIds (aka pseudoops)].
+
+* The primitives (primtypes, primops, pseudoops) cannot be defined in
+  source Haskell.
+  There is no GHC/Prim.hs file with definitions.
+  Instead, we support importing GHC.Prim by manually defining its
+  ModIface (see Iface.Load.ghcPrimIface).
+  The ModIface exports all primitives except for internal-only equality types
+  (see unexposedPrimTyCons and coercionToken#).
+
+* The primitives are listed in the primops.txt.pp file.
+  This file goes through CPP, which creates primops.txt.
+  It is then consumed by the utility program genprimopcode, which produces
+  the following three types of files.
+
+  1. The files with extension .hs-incl.
+     They can be found by grepping for hs-incl.
+     They are #included in compiler sources.
+
+     One of them, primop-data-decl.hs-incl, defines the PrimOp type:
+       data PrimOp
+        = IntAddOp
+        | IntSubOp
+        | CharGtOp
+        | CharGeOp
+        | ...
+
+     The remaining files define properties of the primops
+     by pattern matching, for example:
+       primOpFixity IntAddOp = Just (Fixity NoSourceText 6 InfixL)
+       primOpFixity IntSubOp = Just (Fixity NoSourceText 6 InfixL)
+       ...
+     This includes fixity, has-side-effects, commutability,
+     IDs used to generate Uniques etc.
+
+     Additionally, we pattern match on PrimOp when generating Cmm in
+     GHC/StgToCmm/Prim.hs.
+
+  2. The dummy Prim.hs file, which is used for Haddock and
+     contains descriptions taken from primops.txt.pp.
+     All definitions are replaced by placeholders.
+     See Note [GHC.Prim Docs] in genprimopcode.
+
+  3. The module PrimopWrappers.hs, which wraps every call for GHCi;
+     see Note [Primop wrappers] in GHC.Builtin.Primops for details.
+
+* The primitive types should be listed in primTyCons in Builtin.Types.Prim
+  in addition to primops.txt.pp.
+
+* We might change which functions are primitives and which are defined
+  in Haskell.
+  Users should import GHC.Exts, which reexports GHC.Prim and is more stable.
+  In particular, we might move some of the primops to 'foreign import prim'
+  (see ticket #16929 and Note [When do out-of-line primops go in primops.txt.pp])
 -}
 
 ghcPrimExports :: [IfaceExport]
