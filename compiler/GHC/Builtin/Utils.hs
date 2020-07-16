@@ -257,9 +257,6 @@ primOpId op = primOpIds ! primOpTag op
             Export lists for pseudo-modules (GHC.Prim)
 *                                                                      *
 ************************************************************************
-
-GHC.Prim "exports" all the primops and primitive types, some
-wired-in Ids.
 -}
 
 ghcPrimExports :: [IfaceExport]
