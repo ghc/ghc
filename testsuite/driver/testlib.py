@@ -1652,7 +1652,7 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
     # The test wrapper. Default to $TOP / driver / id
     # for the identity test-wrapper.
     if config.test_wrapper is None:
-        test_wrapper = config.top / "driver" / "id"
+        test_wrapper = Path(config.top) / "driver" / "id"
     else:
         test_wrapper = config.test_wrapper
 
@@ -2370,7 +2370,7 @@ def does_ghostscript_work() -> bool:
         return False
 
     try:
-        if runCmd(genGSCmd(config.top / 'config' / 'good.ps')) != 0:
+        if runCmd(genGSCmd(Path(config.top) / 'config' / 'good.ps')) != 0:
             gsNotWorking("gs can't process good input")
             return False
     except Exception as e:
@@ -2378,7 +2378,7 @@ def does_ghostscript_work() -> bool:
         return False
 
     try:
-        cmd = genGSCmd(config.top / 'config' / 'bad.ps') + ' >/dev/null 2>&1'
+        cmd = genGSCmd(Path(config.top) / 'config' / 'bad.ps') + ' >/dev/null 2>&1'
         if runCmd(cmd) == 0:
             gsNotWorking('gs accepts bad input')
             return False
