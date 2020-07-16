@@ -1,8 +1,7 @@
 
 T13050.hs:4:9: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Int -> Int -> Int
-    • In the expression: _
-      In the expression: _ x y
+    • In the expression: _ x y
       In an equation for ‘f’: f x y = _ x y
     • Relevant bindings include
         y :: Int (bound at T13050.hs:4:5)
