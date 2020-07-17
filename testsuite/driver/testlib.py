@@ -1652,8 +1652,8 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
 
     if opts.cmd_prefix is not None:
         cmd = opts.cmd_prefix(cmd)
-    elif not cmd.startswith("$MAKE"):
-        # (optional) 3. prefix with TEST_WRAPPER, unless it's a $MAKE call.
+    else:
+        # (optional) 3. Add TEST_WRAPPER environment variable.
         #
         # The test wrapper. Default to $TOP / driver / id
         # for the identity test-wrapper.
@@ -1665,7 +1665,15 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
         else:
             test_wrapper = config.test_wrapper
 
-        cmd = 'TEST_WRAPPER="{test_wrapper}" && $TEST_WRAPPER {cmd}'.format(**locals())
+        # if cmd looks like we want to execute something, run it through
+        # the command wrapper.
+        if cmd.startswith("./"):
+            # we don't need to prefix cmd with anything if there is no
+            # test wrapper.
+            if config.test_wrapper is not None:
+                cmd = "{test_wrapper} {cmd}".format(**locals())
+        else:
+            cmd = 'TEST_WRAPPER="{test_wrapper}" && {cmd}'.format(**locals())
 
     # 4. Apply cmd_wrapper if set.
     if opts.cmd_wrapper is not None:
