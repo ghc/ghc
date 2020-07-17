@@ -1403,7 +1403,7 @@ def compile_and_run__(name: TestName,
         if badResult(result):
             return result
 
-        cmd = '$TEST_WRAPPER ./' + name;
+        cmd = './' + name;
 
         # we don't check the compiler's stderr for a compile-and-run test
         return simple_run( name, way, cmd, getTestOpts().extra_run_opts )
@@ -1652,8 +1652,8 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
 
     if opts.cmd_prefix is not None:
         cmd = opts.cmd_prefix(cmd)
-    else:
-        # (optional) 3. prefix with TEST_WRAPPER
+    elif not cmd.startswith("$MAKE"):
+        # (optional) 3. prefix with TEST_WRAPPER, unless it's a $MAKE call.
         #
         # The test wrapper. Default to $TOP / driver / id
         # for the identity test-wrapper.
@@ -1665,7 +1665,7 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
         else:
             test_wrapper = config.test_wrapper
 
-        cmd = 'TEST_WRAPPER="{test_wrapper}" && {cmd}'.format(**locals())
+        cmd = 'TEST_WRAPPER="{test_wrapper}" && $TEST_WRAPPER {cmd}'.format(**locals())
 
     # 4. Apply cmd_wrapper if set.
     if opts.cmd_wrapper is not None:
