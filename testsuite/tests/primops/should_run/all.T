@@ -19,6 +19,7 @@ test('ArithWord8', omit_ways(['ghci']), compile_and_run, [''])
 test('CmpInt8', normal, compile_and_run, [''])
 test('CmpWord8', normal, compile_and_run, [''])
 test('ShowPrim', normal, compile_and_run, [''])
+test('T12492', normal, compile_and_run, [''])
 
 # These two tests use unboxed tuples, which GHCi doesn't support
 test('ArithInt16', omit_ways(['ghci']), compile_and_run, [''])
