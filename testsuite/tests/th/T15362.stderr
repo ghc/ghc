@@ -1,10 +1,6 @@
 
-T15362.hs:8:10: error:
+T15362.hs:7:2: error:
     • Mismatched type name in type family instance.
         Expected: +
           Actual: Maybe
-      In the declaration for type family ‘+’
-    • In the Template Haskell quotation
-        [d| type family a + b where
-              Maybe Zero b = b
-              Succ a + b = Succ (a + b) |]
+    • In the type family declaration for ‘+’
