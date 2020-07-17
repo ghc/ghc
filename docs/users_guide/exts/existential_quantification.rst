@@ -173,7 +173,7 @@ For example: ::
 
     data G a b where { G1 { g1::a, g2::c } :: G a [c] }
     upd3 g x = g { g1=x }   -- OK:   upd3 :: G a b -> c -> G c b
-    upd4 g x = g { g2=x }   -- BAD (f2's type mentions c, which is not a simple
+    upd4 g x = g { g2=x }   -- BAD (g2's type mentions c, which is not a simple
                             --      type-variable argument in G1's result type)
 
 Restrictions
