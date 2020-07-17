@@ -1563,7 +1563,7 @@ decls, and simply trim their import lists.  NB that
 -}
 
 getMinimalImports :: [ImportDeclUsage] -> RnM [LImportDecl GhcRn]
-getMinimalImports = mapM mk_minimal
+getMinimalImports = fold_imports . mapM mk_minimal
   where
     mk_minimal (L l decl, used_gres, unused)
       | null unused
@@ -1615,6 +1615,24 @@ getMinimalImports = mapM mk_minimal
                     && all (`elem` fld_lbls) (map flLabel avail_flds)
 
           all_non_overloaded = all (not . flIsOverloaded)
+    fold_imports = remove_empties . consolidate_imports
+    consolidate_imports = fmap (foldl consolidate_import [])
+    consolidate_import [] d = d : []
+    consolidate_import (l_d@(L _ d):ds) l_decl@(L _ decl)
+      | eqLocated (ideclName d) (ideclName decl)
+      = (mapLoc (combine_names decl) l_d) : ds
+      | otherwise
+      = l_decl : l_d : ds
+    combine_names from_decl to_decl
+      | Just (_, l_ns) <- ideclHiding from_decl
+      , Just (t, l_ns') <- ideclHiding to_decl
+      = to_decl { ideclHiding = Just (t, L (getLoc l_ns) ((unLoc l_ns) ++ (unLoc l_ns'))) }
+    remove_empties = fmap (foldl remove_empty [])
+    remove_empty out_list l_decl@(L _ decl)
+      | Just (_, L _ []) <- ideclHiding decl
+      = out_list
+      | otherwise
+      = l_decl : out_list
 
 printMinimalImports :: [ImportDeclUsage] -> RnM ()
 -- See Note [Printing minimal imports]

@@ -56,3 +56,9 @@ T7969:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T7969a.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T7969.hs -ddump-minimal-imports
 	cat T7969.imports
+
+T18264:
+	$(RM) T18264.hi T18264.o T18264.imports
+	'$(TEST_HC)' $(TEST_HC_OPTS) -ddump-minimal-imports -c T18264.hs
+	cat T18264.imports
+

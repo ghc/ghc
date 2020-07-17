@@ -1,0 +1,3 @@
+import Data.Char ( isLetter, isDigit )
+import Data.Maybe ( fromJust, isJust )
+import qualified Data.Char as C ( isLetter, isDigit )
