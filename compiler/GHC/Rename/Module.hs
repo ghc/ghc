@@ -424,11 +424,11 @@ patchCCallTarget unit callTarget =
 
 rnSrcInstDecl :: InstDecl GhcPs -> RnM (InstDecl GhcRn, FreeVars)
 rnSrcInstDecl (TyFamInstD { tfid_inst = tfi })
-  = do { (tfi', fvs) <- rnTyFamInstDecl NonAssocTyFamEqn tfi
+  = do { (tfi', fvs) <- rnTyFamInstDecl (NonAssocTyFamEqn NotClosedTyFam) tfi
        ; return (TyFamInstD { tfid_ext = noExtField, tfid_inst = tfi' }, fvs) }
 
 rnSrcInstDecl (DataFamInstD { dfid_inst = dfi })
-  = do { (dfi', fvs) <- rnDataFamInstDecl NonAssocTyFamEqn dfi
+  = do { (dfi', fvs) <- rnDataFamInstDecl (NonAssocTyFamEqn NotClosedTyFam) dfi
        ; return (DataFamInstD { dfid_ext = noExtField, dfid_inst = dfi' }, fvs) }
 
 rnSrcInstDecl (ClsInstD { cid_inst = cid })
@@ -763,8 +763,12 @@ rnFamInstEqn doc atfi rhs_kvars
              all_nms = all_imp_var_names ++ hsLTyVarNames bndrs'
        ; warnUnusedTypePatterns all_nms nms_used
 
-       ; let all_fvs = (rhs_fvs `plusFV` pat_fvs) `addOneFV` unLoc tycon'
-            -- type instance => use, hence addOneFV
+       ; let eqn_fvs = rhs_fvs `plusFV` pat_fvs
+             -- See Note [Type family equations and occurrences]
+             all_fvs = case atfi of
+                         NonAssocTyFamEqn ClosedTyFam
+                           -> eqn_fvs
+                         _ -> eqn_fvs `addOneFV` unLoc tycon'
 
        ; return (HsIB { hsib_ext = all_imp_var_names -- Note [Wildcards in family instances]
                       , hsib_body
@@ -779,14 +783,14 @@ rnFamInstEqn doc atfi rhs_kvars
     -- The parent class, if we are dealing with an associated type family
     -- instance.
     mb_cls = case atfi of
-      NonAssocTyFamEqn     -> Nothing
+      NonAssocTyFamEqn _   -> Nothing
       AssocTyFamDeflt cls  -> Just cls
       AssocTyFamInst cls _ -> Just cls
 
     -- The type variables from the instance head, if we are dealing with an
     -- associated type family instance.
     inst_tvs = case atfi of
-      NonAssocTyFamEqn          -> []
+      NonAssocTyFamEqn _        -> []
       AssocTyFamDeflt _         -> []
       AssocTyFamInst _ inst_tvs -> inst_tvs
 
@@ -809,48 +813,62 @@ rnTyFamInstDecl :: AssocTyFamInfo
                 -> TyFamInstDecl GhcPs
                 -> RnM (TyFamInstDecl GhcRn, FreeVars)
 rnTyFamInstDecl atfi (TyFamInstDecl { tfid_eqn = eqn })
-  = do { (eqn', fvs) <- rnTyFamInstEqn atfi NotClosedTyFam eqn
+  = do { (eqn', fvs) <- rnTyFamInstEqn atfi eqn
        ; return (TyFamInstDecl { tfid_eqn = eqn' }, fvs) }
 
 -- | Tracks whether we are renaming:
 --
 -- 1. A type family equation that is not associated
---    with a parent type class ('NonAssocTyFamEqn')
+--    with a parent type class ('NonAssocTyFamEqn'). Examples:
 --
--- 2. An associated type family default declaration ('AssocTyFamDeflt')
+--    @
+--    type family F a
+--    type instance F Int = Bool  -- NonAssocTyFamEqn NotClosed
 --
--- 3. An associated type family instance declaration ('AssocTyFamInst')
+--    type family G a where
+--       G Int = Bool             -- NonAssocTyFamEqn Closed
+--    @
+--
+-- 2. An associated type family default declaration ('AssocTyFamDeflt').
+--    Example:
+--
+--    @
+--    class C a where
+--      type A a
+--      type instance A a = a -> a  -- AssocTyFamDeflt C
+--    @
+--
+-- 3. An associated type family instance declaration ('AssocTyFamInst').
+--    Example:
+--
+--    @
+--    instance C a => C [a] where
+--      type A [a] = Bool  -- AssocTyFamInst C [a]
+--    @
 data AssocTyFamInfo
   = NonAssocTyFamEqn
-  | AssocTyFamDeflt Name   -- Name of the parent class
-  | AssocTyFamInst  Name   -- Name of the parent class
-                    [Name] -- Names of the tyvars of the parent instance decl
+      ClosedTyFamInfo -- Is this a closed type family?
+  | AssocTyFamDeflt
+      Name            -- Name of the parent class
+  | AssocTyFamInst
+      Name            -- Name of the parent class
+      [Name]          -- Names of the tyvars of the parent instance decl
 
 -- | Tracks whether we are renaming an equation in a closed type family
 -- equation ('ClosedTyFam') or not ('NotClosedTyFam').
 data ClosedTyFamInfo
   = NotClosedTyFam
-  | ClosedTyFam (Located RdrName) Name
-                -- The names (RdrName and Name) of the closed type family
+  | ClosedTyFam
 
 rnTyFamInstEqn :: AssocTyFamInfo
-               -> ClosedTyFamInfo
                -> TyFamInstEqn GhcPs
                -> RnM (TyFamInstEqn GhcRn, FreeVars)
-rnTyFamInstEqn atfi ctf_info
+rnTyFamInstEqn atfi
     eqn@(HsIB { hsib_body = FamEqn { feqn_tycon = tycon
                                    , feqn_rhs   = rhs }})
-  = do { let rhs_kvs = extractHsTyRdrTyVarsKindVars rhs
-       ; (eqn'@(HsIB { hsib_body =
-                       FamEqn { feqn_tycon = L _ tycon' }}), fvs)
-           <- rnFamInstEqn (TySynCtx tycon) atfi rhs_kvs eqn rnTySyn
-       ; case ctf_info of
-           NotClosedTyFam -> pure ()
-           ClosedTyFam fam_rdr_name fam_name ->
-             checkTc (fam_name == tycon') $
-             withHsDocContext (TyFamilyCtx fam_rdr_name) $
-             wrongTyFamName fam_name tycon'
-       ; pure (eqn', fvs) }
+  = rnFamInstEqn (TySynCtx tycon) atfi rhs_kvs eqn rnTySyn
+  where
+    rhs_kvs = extractHsTyRdrTyVarsKindVars rhs
 
 rnTyFamDefltDecl :: Name
                  -> TyFamDefltDecl GhcPs
@@ -998,6 +1016,51 @@ was previously bound by the `instance C (Maybe a)` part. (see #16116).
 
 In each case, the function which detects improperly bound variables on the RHS
 is GHC.Tc.Validity.checkValidFamPats.
+
+Note [Type family equations and occurrences]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In most data/type family equations, the type family name used in the equation
+is treated as an occurrence. For example:
+
+  module A where
+    type family F a
+
+  module B () where
+    import B (F)
+    type instance F Int = Bool
+
+We do not want to warn about `F` being unused in the module `B`, as the
+instance constitutes a use site for `F`. The exception to this rule is closed
+type families, whose equations constitute a definition, not occurrences. For
+example:
+
+  module C () where
+    type family CF a where
+      CF Char = Float
+
+Here, we /do/ want to warn that `CF` is unused in the module `C`, as it is
+defined but not used (#18470).
+
+GHC accomplishes this in rnFamInstEqn when determining the set of free
+variables to return at the end. If renaming a data family or open type family
+equation, we add the name of the type family constructor to the set of returned
+free variables to ensure that the name is marked as an occurrence. If renaming
+a closed type family equation, we avoid adding the type family constructor name
+to the free variables. This is quite simple, but it is not a perfect solution.
+Consider this example:
+
+  module X () where
+    type family F a where
+      F Int = Bool
+      F Double = F Int
+
+At present, GHC will treat any use of a type family constructor on the RHS of a
+type family equation as an occurrence. Since `F` is used on the RHS of the
+second equation of `F`, it is treated as an occurrence, causing `F` not to be
+warned about. This is not ideal, since `F` isn't exported—it really /should/
+cause a warning to be emitted. There is some discussion in #10089/#12920 about
+how this limitation might be overcome, but until then, we stick to the
+simplistic solution above, as it fixes the egregious bug in #18470.
 -}
 
 
@@ -1948,7 +2011,7 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
                ; injectivity' <- traverse (rnInjectivityAnn tyvars' res_sig')
                                           injectivity
                ; return ( (tyvars', res_sig', injectivity') , fv_kind ) }
-       ; (info', fv2) <- rn_info tycon' info
+       ; (info', fv2) <- rn_info info
        ; return (FamilyDecl { fdExt = noExtField
                             , fdLName = tycon', fdTyVars = tyvars'
                             , fdFixity = fixity
@@ -1960,18 +2023,16 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
      kvs = extractRdrKindSigVars res_sig
 
      ----------------------
-     rn_info :: Located Name
-             -> FamilyInfo GhcPs -> RnM (FamilyInfo GhcRn, FreeVars)
-     rn_info (L _ fam_name) (ClosedTypeFamily (Just eqns))
+     rn_info :: FamilyInfo GhcPs -> RnM (FamilyInfo GhcRn, FreeVars)
+     rn_info (ClosedTypeFamily (Just eqns))
        = do { (eqns', fvs)
-                <- rnList (rnTyFamInstEqn NonAssocTyFamEqn (ClosedTyFam tycon fam_name))
+                <- rnList (rnTyFamInstEqn (NonAssocTyFamEqn ClosedTyFam)) eqns
                                           -- no class context
-                          eqns
             ; return (ClosedTypeFamily (Just eqns'), fvs) }
-     rn_info _ (ClosedTypeFamily Nothing)
+     rn_info (ClosedTypeFamily Nothing)
        = return (ClosedTypeFamily Nothing, emptyFVs)
-     rn_info _ OpenTypeFamily = return (OpenTypeFamily, emptyFVs)
-     rn_info _ DataFamily     = return (DataFamily, emptyFVs)
+     rn_info OpenTypeFamily = return (OpenTypeFamily, emptyFVs)
+     rn_info DataFamily     = return (DataFamily, emptyFVs)
 
 rnFamResultSig :: HsDocContext
                -> FamilyResultSig GhcPs
@@ -2114,13 +2175,6 @@ are no data constructors we allow h98_style = True
      Support code for type/data declarations
 *                                                      *
 ***************************************************** -}
-
----------------
-wrongTyFamName :: Name -> Name -> SDoc
-wrongTyFamName fam_tc_name eqn_tc_name
-  = hang (text "Mismatched type name in type family instance.")
-       2 (vcat [ text "Expected:" <+> ppr fam_tc_name
-               , text "  Actual:" <+> ppr eqn_tc_name ])
 
 -----------------
 rnConDecls :: [LConDecl GhcPs] -> RnM ([LConDecl GhcRn], FreeVars)
