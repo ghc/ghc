@@ -209,8 +209,8 @@ These data types are the heart of the compiler
 --    This is used to implement @newtype@s (a @newtype@ constructor or
 --    destructor just becomes a 'Cast' in Core) and GADTs.
 --
--- *  Notes. These allow general information to be added to expressions
---    in the syntax tree
+-- *  Ticks. These are used to represent all the source annotation we
+--    support: profiling SCCs, HPC ticks, and GHCi breakpoints.
 --
 -- *  A type: this should only show up at the top level of an Arg
 --
@@ -574,10 +574,6 @@ Note [Core let goal]
   application, its arguments are trivial, so that the constructor can be
   inlined vigorously.
 
-Note [Type let]
-~~~~~~~~~~~~~~~
-See #type_let#
-
 Note [Empty case alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The alternatives of a case expression should be exhaustive.  But
@@ -798,15 +794,18 @@ and case-of-case] in GHC.Core.Opt.Simplify):
   in
     jump j z w
 
-The body of the join point now returns a Bool, so the label `j` has to have its
-type updated accordingly. Inconvenient though this may be, it has the advantage
-that 'GHC.Core.Utils.exprType' can still return a type for any expression, including
-a jump.
+The body of the join point now returns a Bool, so the label `j` has to
+have its type updated accordingly, which is done by
+GHC.Core.Opt.Simplify.Env.adjustJoinPointType. Inconvenient though
+this may be, it has the advantage that 'GHC.Core.Utils.exprType' can
+still return a type for any expression, including a jump.
 
-This differs from the paper (see Note [Invariants on join points]). In the
-paper, we instead give j the type `Int -> Bool -> forall a. a`. Then each jump
-carries the "return type" as a parameter, exactly the way other non-returning
-functions like `error` work:
+Relationship to the paper
+
+This plan differs from the paper (see Note [Invariants on join
+points]). In the paper, we instead give j the type `Int -> Bool ->
+forall a. a`. Then each jump carries the "return type" as a parameter,
+exactly the way other non-returning functions like `error` work:
 
   case (join
           j :: Int -> Bool -> forall a. a
@@ -2055,12 +2054,14 @@ mkLetRec :: [(b, Expr b)] -> Expr b -> Expr b
 mkLetRec [] body = body
 mkLetRec bs body = Let (Rec bs) body
 
--- | Create a binding group where a type variable is bound to a type. Per "GHC.Core#type_let",
+-- | Create a binding group where a type variable is bound to a type.
+-- Per Note [Core type and coercion invariant],
 -- this can only be used to bind something in a non-recursive @let@ expression
 mkTyBind :: TyVar -> Type -> CoreBind
 mkTyBind tv ty      = NonRec tv (Type ty)
 
--- | Create a binding group where a type variable is bound to a type. Per "GHC.Core#type_let",
+-- | Create a binding group where a type variable is bound to a type.
+-- Per Note [Core type and coercion invariant],
 -- this can only be used to bind something in a non-recursive @let@ expression
 mkCoBind :: CoVar -> Coercion -> CoreBind
 mkCoBind cv co      = NonRec cv (Coercion co)
