@@ -4057,8 +4057,8 @@ hintExplicitForall tok = do
     rulePrag <- getBit InRulePragBit
     unless (forall || rulePrag) $ addError (getLoc tok) $ vcat
       [ text "Illegal symbol" <+> quotes forallSymDoc <+> text "in type"
-      , text "Perhaps you intended to use RankNTypes or a similar language"
-      , text "extension to enable explicit-forall syntax:" <+>
+      , text "Perhaps you intended to use ScopedTypeVariables, RankNTypes"
+      , text "or a similar language extension to enable explicit-forall syntax:" <+>
         forallSymDoc <+> text "<tvs>. <type>"
       ]
   where
