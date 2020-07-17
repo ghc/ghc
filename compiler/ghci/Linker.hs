@@ -1676,6 +1676,38 @@ addEnvPaths name list
 -- ----------------------------------------------------------------------------
 -- Loading a dynamic library (dlopen()-ish on Unix, LoadLibrary-ish on Win32)
 
+{-
+Note [macOS Big Sur dynamic libraries]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+macOS Big Sur makes the following change to how frameworks are shipped
+with the OS:
+
+> New in macOS Big Sur 11 beta, the system ships with a built-in
+> dynamic linker cache of all system-provided libraries.  As part of
+> this change, copies of dynamic libraries are no longer present on
+> the filesystem.  Code that attempts to check for dynamic library
+> presence by looking for a file at a path or enumerating a directory
+> will fail.  Instead, check for library presence by attempting to
+> dlopen() the path, which will correctly check for the library in the
+> cache. (62986286)
+
+(https://developer.apple.com/documentation/macos-release-notes/macos-big-sur-11-beta-release-notes/)
+
+Therefore, the previous method of checking whether a library exists
+before attempting to load it makes GHC.Runtime.Linker.loadFramework
+fail to find frameworks installed at /System/Library/Frameworks.
+Instead, any attempt to load a framework at runtime, such as by
+passing -framework OpenGL to runghc or running code loading such a
+framework with GHCi, fails with a 'not found' message.
+
+GHC.Runtime.Linker.loadFramework now opportunistically loads the
+framework libraries without checking for their existence first,
+failing only if all attempts to load a given framework from any of the
+various possible locations fail.  See also #18446, which this change
+addresses.
+-}
+
 -- Darwin / MacOS X only: load a framework
 -- a framework is a dynamic library packaged inside a directory of the same
 -- name. They are searched for in different paths than normal libraries.
@@ -1695,6 +1727,9 @@ loadFramework hsc_env extraPaths rootname
      -- sorry for the hardcoded paths, I hope they won't change anytime soon:
      defaultFrameworkPaths = ["/Library/Frameworks", "/System/Library/Frameworks"]
 
+     -- Try to call loadDLL for each candidate path.
+     --
+     -- See Note [macOS Big Sur dynamic libraries]
      findLoadDLL [] errs =
        -- Tried all our known library paths, but dlopen()
        -- has no built-in paths for frameworks: give up
