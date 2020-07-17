@@ -67,8 +67,8 @@ data AssocInstInfo
     }
 
 isNotAssociated :: AssocInstInfo -> Bool
-isNotAssociated NotAssociated  = True
-isNotAssociated (InClsInst {}) = False
+isNotAssociated (NotAssociated {}) = True
+isNotAssociated (InClsInst {})     = False
 
 
 {- *******************************************************************

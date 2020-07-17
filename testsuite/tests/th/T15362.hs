@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, TypeOperators, DataKinds #-}
+{-# LANGUAGE TemplateHaskell, TypeOperators, DataKinds, TypeFamilies #-}
 
 module T15362 where
 
