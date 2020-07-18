@@ -1,12 +1,12 @@
+{-# LANGUAGE CPP  #-}
 {-# LANGUAGE Safe #-}
-{-# LANGUAGE CPP #-}
 
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  System.Info
 -- Copyright   :  (c) The University of Glasgow 2001
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  portable
@@ -19,24 +19,40 @@
 -----------------------------------------------------------------------------
 
 module System.Info
-   (
-       os,
-       arch,
-       compilerName,
-       compilerVersion
-   ) where
+  ( os
+  , arch
+  , compilerName
+  , compilerVersion
+  , fullCompilerVersion
+  ) where
 
-import Data.Version
+import           Data.Version (Version (..))
 
 -- | The version of 'compilerName' with which the program was compiled
 -- or is being interpreted.
--- 
+--
 -- ==== __Example__
 -- > ghci> compilerVersion
 -- > Version {versionBranch = [8,8], versionTags = []}
 compilerVersion :: Version
 compilerVersion = Version [major, minor] []
   where (major, minor) = compilerVersionRaw `divMod` 100
+
+-- | The full version of 'compilerName' with which the program was compiled
+-- or is being interpreted. It includes the major, minor, revision and an additional
+-- identifier, generally in the form "<year><month><day>".
+fullCompilerVersion :: Version
+fullCompilerVersion = Version version []
+  where
+    version :: [Int]
+    version = fmap read $ splitVersion __GLASGOW_HASKELL_FULL_VERSION__
+
+splitVersion :: String -> [String]
+splitVersion s =
+  case dropWhile (== '.') s of
+    "" -> []
+    s' -> let (w, s'') = break (== '.') s'
+           in w : splitVersion s''
 
 #include "ghcplatform.h"
 

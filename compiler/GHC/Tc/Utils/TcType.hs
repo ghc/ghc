@@ -57,7 +57,7 @@ module GHC.Tc.Utils.TcType (
   -- These are important because they do not look through newtypes
   getTyVar,
   tcSplitForAllTy_maybe,
-  tcSplitForAllTys, tcSplitSomeForAllTys,
+  tcSplitForAllTys,
   tcSplitForAllTysReq, tcSplitForAllTysInvis,
   tcSplitPiTys, tcSplitPiTy_maybe, tcSplitForAllVarBndrs,
   tcSplitPhiTy, tcSplitPredFunTy_maybe,
@@ -1220,14 +1220,6 @@ tcSplitForAllTys :: Type -> ([TyVar], Type)
 tcSplitForAllTys ty
   = ASSERT( all isTyVar (fst sty) ) sty
   where sty = splitForAllTys ty
-
--- | Like 'tcSplitForAllTys', but only splits a 'ForAllTy' if @argf_pred argf@
--- is 'True', where @argf@ is the visibility of the @ForAllTy@'s binder and
--- @argf_pred@ is a predicate over visibilities provided as an argument to this
--- function. All split tyvars are annotated with their @argf@.
-tcSplitSomeForAllTys :: (ArgFlag -> Bool) -> Type -> ([TyCoVarBinder], Type)
-tcSplitSomeForAllTys argf_pred ty = ASSERT( all (isTyVar . binderVar) (fst sty) ) sty
-  where sty = splitSomeForAllTys argf_pred ty
 
 -- | Like 'tcSplitForAllTys', but only splits 'ForAllTy's with 'Required' type
 -- variable binders. All split tyvars are annotated with '()'.
