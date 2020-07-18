@@ -44,6 +44,7 @@ StgWord16 closure_flags[] = {
  [THUNK_0_2]            =  (              _THU|        _SRT       ),
  [THUNK_STATIC]         =  (              _THU|        _SRT       ),
  [THUNK_SELECTOR]       =  (              _THU|        _SRT       ),
+ [THUNK_SELECTOR_N]     =  (              _THU|        _SRT       ),
  [BCO]                  =  (_HNF|     _NS                         ),
  [AP]                   =  (              _THU                    ),
  [PAP]                  =  (_HNF|     _NS                         ),
@@ -87,6 +88,6 @@ StgWord16 closure_flags[] = {
  [COMPACT_NFDATA]       =  (_HNF|     _NS                              ),
 };
 
-#if N_CLOSURE_TYPES != 64
+#if N_CLOSURE_TYPES != 65
 #error Closure types changed: update ClosureFlags.c!
 #endif

@@ -145,6 +145,7 @@ isRetainer( const StgClosure *c )
     case THUNK_1_1:
     case THUNK_0_2:
     case THUNK_SELECTOR:
+    case THUNK_SELECTOR_N:
     case AP:
     case AP_STACK:
 
