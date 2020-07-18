@@ -368,8 +368,8 @@ import qualified Data.ByteString.Char8 as BS8
 
 %%
 
-optional(p) : p { Just $1 }
-            | { Nothing }
+optional(p) : p           { Just $1 }
+            | {- empty -} { Nothing }
 
 cmm     :: { CmmParse () }
         : {- empty -}                   { return () }
