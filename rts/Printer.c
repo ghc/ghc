@@ -188,6 +188,11 @@ printClosure( const StgClosure *obj )
         debugBelch(", %p)\n", ((StgSelector *)obj)->payload[0]);
         break;
 
+    case THUNK_SELECTOR_N:
+        printStdObjHdr(obj, "THUNK_SELECTOR_N");
+        debugBelch(", %p, %"FMT_Word")\n", ((StgSelector *)obj)->payload[0], (StgWord)(((StgSelector *)obj)->payload[1]));
+        break;
+
     case BCO:
             disassemble( (StgBCO*)obj );
             break;
@@ -697,7 +702,7 @@ void printLargeAndPinnedObjects()
     for (uint32_t cap_idx = 0; cap_idx < n_capabilities; ++cap_idx) {
         Capability *cap = capabilities[cap_idx];
 
-        debugBelch("Capability %d: Current pinned object block: %p\n", 
+        debugBelch("Capability %d: Current pinned object block: %p\n",
                    cap_idx, (void*)cap->pinned_object_block);
         for (bdescr *bd = cap->pinned_object_blocks; bd; bd = bd->link) {
             debugBelch("%p\n", (void*)bd);
@@ -987,6 +992,7 @@ const char *closure_type_names[] = {
  [THUNK_0_2]             = "THUNK_0_2",
  [THUNK_STATIC]          = "THUNK_STATIC",
  [THUNK_SELECTOR]        = "THUNK_SELECTOR",
+ [THUNK_SELECTOR_N]      = "THUNK_SELECTOR_N",
  [BCO]                   = "BCO",
  [AP]                    = "AP",
  [PAP]                   = "PAP",
@@ -1030,7 +1036,7 @@ const char *closure_type_names[] = {
  [COMPACT_NFDATA]        = "COMPACT_NFDATA"
 };
 
-#if N_CLOSURE_TYPES != 64
+#if N_CLOSURE_TYPES != 65
 #error Closure types changed: update Printer.c!
 #endif
 

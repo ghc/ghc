@@ -862,6 +862,7 @@ loop:
       copy(p,info,q,bco_sizeW((StgBCO *)q),gen_no);
       return;
 
+  case THUNK_SELECTOR_N:
   case THUNK_SELECTOR:
       eval_thunk_selector(p, (StgSelector *)q, true);
       return;
@@ -1121,7 +1122,7 @@ static void
 eval_thunk_selector (StgClosure **q, StgSelector *p, bool evac)
                  // NB. for legacy reasons, p & q are swapped around :(
 {
-    uint32_t field;
+    StgWord field;
     StgInfoTable *info;
     StgWord info_ptr;
     StgClosure *selectee;
@@ -1168,6 +1169,7 @@ selector_chain:
         }
     }
 
+    StgInfoTable* selector_info_tbl; // = INFO_PTR_TO_STRUCT((StgInfoTable *)info_ptr);
 
     // WHITEHOLE the selector thunk, since it is now under evaluation.
     // This is important to stop us going into an infinite loop if
@@ -1185,9 +1187,12 @@ selector_chain:
             busy_wait_nop();
         }
 
+        selector_info_tbl = INFO_PTR_TO_STRUCT((StgInfoTable *)info_ptr);
+
         // make sure someone else didn't get here first...
         if (IS_FORWARDING_PTR(info_ptr) ||
-            INFO_PTR_TO_STRUCT((StgInfoTable *)info_ptr)->type != THUNK_SELECTOR) {
+            selector_info_tbl->type != THUNK_SELECTOR ||
+            selector_info_tbl->type != THUNK_SELECTOR_N) {
             // v. tricky now.  The THUNK_SELECTOR has been evacuated
             // by another thread, and is now either a forwarding ptr or IND.
             // We need to extract ourselves from the current situation
@@ -1208,14 +1213,15 @@ selector_chain:
 #else
     // Save the real info pointer (NOTE: not the same as get_itbl()).
     info_ptr = (StgWord)p->header.info;
+    selector_info_tbl = INFO_PTR_TO_STRUCT((StgInfoTable *)info_ptr);
     SET_INFO((StgClosure *)p,&stg_WHITEHOLE_info);
 #endif /* THREADED_RTS */
 
-    field = INFO_PTR_TO_STRUCT((StgInfoTable *)info_ptr)->layout.selector_offset;
-
-    if (MAX_SPEC_SELECTEE_SIZE <= field) {
-      // Assume this is the generic selector thunk
-      field = (uint32_t)(p->payload[1]);
+    // There are two types of selector closures
+    if (selector_info_tbl ->type == THUNK_SELECTOR_N) {
+      field = (StgWord)(p->payload[1]);
+    } else {
+      field = selector_info_tbl->layout.selector_offset;
     }
 
     // The selectee might be a constructor closure,

@@ -160,7 +160,8 @@ again:
              THUNK_1_1,
              THUNK_0_2,
              THUNK_STATIC,
-             THUNK_SELECTOR:
+             THUNK_SELECTOR,
+             THUNK_SELECTOR_N:
         {
             // We have a thunk of some kind, so evaluate it.
 

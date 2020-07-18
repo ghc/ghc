@@ -1158,6 +1158,7 @@ heapCensusChain( Census *census, bdescr *bd )
             case THUNK_1_1:
             case THUNK_0_2:
             case THUNK_2_0:
+            case THUNK_SELECTOR_N:
                 size = sizeofW(StgThunkHeader) + 2;
                 break;
 
