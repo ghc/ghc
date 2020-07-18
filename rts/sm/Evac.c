@@ -862,8 +862,8 @@ loop:
       copy(p,info,q,bco_sizeW((StgBCO *)q),gen_no);
       return;
 
-  case THUNK_SELECTOR_N:
   case THUNK_SELECTOR:
+  case THUNK_SELECTOR_N:
       eval_thunk_selector(p, (StgSelector *)q, true);
       return;
 
@@ -1169,7 +1169,7 @@ selector_chain:
         }
     }
 
-    StgInfoTable* selector_info_tbl; // = INFO_PTR_TO_STRUCT((StgInfoTable *)info_ptr);
+    StgInfoTable* selector_info_tbl;
 
     // WHITEHOLE the selector thunk, since it is now under evaluation.
     // This is important to stop us going into an infinite loop if
@@ -1191,8 +1191,8 @@ selector_chain:
 
         // make sure someone else didn't get here first...
         if (IS_FORWARDING_PTR(info_ptr) ||
-            selector_info_tbl->type != THUNK_SELECTOR ||
-            selector_info_tbl->type != THUNK_SELECTOR_N) {
+            (selector_info_tbl->type != THUNK_SELECTOR &&
+             selector_info_tbl->type != THUNK_SELECTOR_N)) {
             // v. tricky now.  The THUNK_SELECTOR has been evacuated
             // by another thread, and is now either a forwarding ptr or IND.
             // We need to extract ourselves from the current situation
@@ -1362,6 +1362,7 @@ selector_loop:
       }
 
       case THUNK_SELECTOR:
+      case THUNK_SELECTOR_N:
       {
           StgClosure *val;
 
