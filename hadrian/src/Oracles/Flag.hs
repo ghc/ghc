@@ -80,7 +80,7 @@ targetSupportsSMP = do
 
 ghcWithNativeCodeGen :: Action Bool
 ghcWithNativeCodeGen = do
-    goodArch <- anyTargetArch ["i386", "x86_64", "sparc", "powerpc"]
-    badOs    <- anyTargetOs ["ios", "aix"]
+    goodArch <- anyTargetArch ["i386", "x86_64", "sparc", "powerpc", "aarch64"]
+    badOs    <- anyTargetOs ["aix"]
     ghcUnreg <- flag GhcUnregisterised
     return $ goodArch && not badOs && not ghcUnreg
