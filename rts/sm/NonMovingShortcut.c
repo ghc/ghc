@@ -108,7 +108,7 @@ selector_changed:
     const StgInfoTable *selector_info_ptr = lockClosure((StgClosure*)p);
     StgInfoTable *selector_info_tbl = INFO_PTR_TO_STRUCT(selector_info_ptr);
 
-    if (selector_info_tbl->type != THUNK_SELECTOR ||
+    if (selector_info_tbl->type != THUNK_SELECTOR &&
         selector_info_tbl->type != THUNK_SELECTOR_N) {
         // Selector updated in the meantime, or we reached to a value. Update
         // the chain.
