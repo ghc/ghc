@@ -118,8 +118,8 @@ def CC_AArch64_GHC : CallingConv<[
 
 getFreeRegs :: RegClass -> FreeRegs -> [RealReg]
 getFreeRegs cls (FreeRegs g f)
-  | RcFloat   <- cls = [] -- go 32 f 3]
-  | RcDouble  <- cls = go 32 f 32
+  | RcFloat   <- cls = [] -- go 32 f 31
+  | RcDouble  <- cls = go 32 f 31
   | RcInteger <- cls = go  0 g 18
     where
         go off _ i | i < 0 = []

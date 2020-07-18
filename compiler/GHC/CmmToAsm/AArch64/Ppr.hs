@@ -470,7 +470,7 @@ pprInstr platform instr = case instr of
 
   CBNZ o (TBlock bid) -> text "\tcbnz" <+> pprOp o <> comma <+> ppr (mkLocalBlockLabel (getUnique bid))
   CBNZ o (TLabel lbl) -> text "\tcbnz" <+> pprOp o <> comma <+> ppr lbl
-  CBNZ c (TReg r)     -> panic "AArch64.ppr: No conditional (cbz) branching to registers!"
+  CBNZ c (TReg r)     -> panic "AArch64.ppr: No conditional (cbnz) branching to registers!"
 
   -- 7. Load and Store Instructions --------------------------------------------
   -- NOTE: GHC may do whacky things where it only load the lower part of an
