@@ -377,6 +377,8 @@ closure_sizeW_ (const StgClosure *p, const StgInfoTable *info)
         return thunk_sizeW_fromITBL(info);
     case THUNK_SELECTOR:
         return THUNK_SELECTOR_sizeW();
+    case THUNK_SELECTOR_N:
+        return THUNK_SELECTOR_N_sizeW();
     case AP_STACK:
         return ap_stack_sizeW((StgAP_STACK *)p);
     case AP:
