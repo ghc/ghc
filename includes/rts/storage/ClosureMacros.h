@@ -277,7 +277,11 @@ EXTERN_INLINE StgOffset CONSTR_sizeW( uint32_t p, uint32_t np )
 
 EXTERN_INLINE StgOffset THUNK_SELECTOR_sizeW ( void );
 EXTERN_INLINE StgOffset THUNK_SELECTOR_sizeW ( void )
-{ return sizeofW(StgSelector); }
+{ return sizeofW(StgSelector) + 1; }
+
+EXTERN_INLINE StgOffset THUNK_SELECTOR_N_sizeW ( void );
+EXTERN_INLINE StgOffset THUNK_SELECTOR_N_sizeW ( void )
+{ return sizeofW(StgSelector) + 2; }
 
 EXTERN_INLINE StgOffset BLACKHOLE_sizeW ( void );
 EXTERN_INLINE StgOffset BLACKHOLE_sizeW ( void )
