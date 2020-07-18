@@ -46,7 +46,8 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
     Nothing ->
         -- special case for code without info table:
         pprSectionAlign config (Section Text lbl) $$
-        pprProcAlignment config $$
+        -- do not
+        -- pprProcAlignment config $$
         pprLabel platform lbl $$ -- blocks guaranteed not null, so label needed
         vcat (map (pprBasicBlock config top_info) blocks) $$
         (if ncgDebugLevel config > 0
@@ -55,7 +56,7 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
 
     Just (CmmStaticsRaw info_lbl _) ->
       pprSectionAlign config (Section Text info_lbl) $$
-      pprProcAlignment config $$
+      -- pprProcAlignment config $$
       (if platformHasSubsectionsViaSymbols platform
           then ppr (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
@@ -81,37 +82,31 @@ pprLabel platform lbl =
 
 pprAlign :: Platform -> Alignment -> SDoc
 pprAlign platform alignment
-        = text ".align " <> int (alignmentOn platform)
-  where
-        bytes = alignmentBytes alignment
-        alignmentOn platform = if platformOS platform == OSDarwin
-                               then log2 bytes
-                               else      bytes
-
-        log2 :: Int -> Int  -- cache the common ones
-        log2 1 = 0
-        log2 2 = 1
-        log2 4 = 2
-        log2 8 = 3
-        log2 n = 1 + log2 (n `quot` 2)
+        = text "\t.balign " <> int (alignmentBytes alignment)
 
 -- | Print appropriate alignment for the given section type.
 pprAlignForSection :: Platform -> SectionType -> SDoc
 pprAlignForSection _platform _seg
     -- .balign is stable, whereas .align is platform dependent.
-    = text ".balign 8" --  always 8
+    = text "\t.balign 8" --  always 8
 
 instance Outputable Instr where
     ppr instr = sdocWithDynFlags $ \dflags ->
                        pprInstr (targetPlatform dflags) instr
 
 -- | Print section header and appropriate alignment for that section.
+--
+-- This one will emit the header:
+--
+--     .section .text
+--     .balign 8
+--
 pprSectionAlign :: NCGConfig -> Section -> SDoc
 pprSectionAlign _config (Section (OtherSection _) _) =
      panic "AArch64.Ppr.pprSectionAlign: unknown section"
 pprSectionAlign config sec@(Section seg _) =
-    pprSectionHeader config sec $$
-    pprAlignForSection (ncgPlatform config) seg
+    pprSectionHeader config sec
+    $$ pprAlignForSection (ncgPlatform config) seg
 
 -- | Output the ELF .size directive.
 pprSizeDecl :: Platform -> CLabel -> SDoc
@@ -168,7 +163,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
     maybe_infotable c = case mapLookup blockid info_env of
        Nothing   -> c
        Just (CmmStaticsRaw info_lbl info) ->
-           pprAlignForSection platform Text $$
+          --  pprAlignForSection platform Text $$
            infoTableLoc $$
            vcat (map (pprData config) info) $$
            pprLabel platform info_lbl $$
@@ -214,7 +209,7 @@ pprData config (CmmStaticLit lit) = pprDataItem config lit
 pprGloblDecl :: CLabel -> SDoc
 pprGloblDecl lbl
   | not (externallyVisibleCLabel lbl) = empty
-  | otherwise = text ".globl " <> ppr lbl
+  | otherwise = text "\t.globl " <> ppr lbl
 
 -- See discussion in X86.Ppr
 -- for why this is necessary.  Essentially we need to ensure that we never
