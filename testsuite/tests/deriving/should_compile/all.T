@@ -118,6 +118,7 @@ test('T15398', normal, compile, [''])
 test('T15637', normal, compile, [''])
 test('T15831', normal, compile, [''])
 test('T16179', normal, compile, [''])
+test('T16341', normal, compile, [''])
 test('T16518', normal, compile, [''])
 test('T17324', normal, compile, [''])
 test('T17339', normal, compile,
