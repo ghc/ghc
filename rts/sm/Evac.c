@@ -1218,7 +1218,7 @@ selector_chain:
 #endif /* THREADED_RTS */
 
     // There are two types of selector closures
-    if (selector_info_tbl ->type == THUNK_SELECTOR_N) {
+    if (selector_info_tbl->type == THUNK_SELECTOR_N) {
       field = (StgWord)(p->payload[1]);
     } else {
       field = selector_info_tbl->layout.selector_offset;
@@ -1409,12 +1409,18 @@ bale_out:
     // We didn't manage to evaluate this thunk; restore the old info
     // pointer.  But don't forget: we still need to evacuate the thunk itself.
     SET_INFO((StgClosure *)p, (const StgInfoTable *)info_ptr);
+    selector_info_tbl = INFO_PTR_TO_STRUCT((StgInfoTable *)info_ptr);
+
     // THREADED_RTS: we just unlocked the thunk, so another thread
     // might get in and update it.  copy() will lock it again and
     // check whether it was updated in the meantime.
     *q = (StgClosure *)p;
     if (evac) {
-        copy(q,(const StgInfoTable *)info_ptr,(StgClosure *)p,THUNK_SELECTOR_sizeW(),bd->dest_no);
+        if (selector_info_tbl->type == THUNK_SELECTOR_N) {
+          copy(q,(const StgInfoTable *)info_ptr,(StgClosure *)p,THUNK_SELECTOR_N_sizeW(),bd->dest_no);
+        } else {
+          copy(q,(const StgInfoTable *)info_ptr,(StgClosure *)p,THUNK_SELECTOR_sizeW(),bd->dest_no);
+        }
     }
     unchain_thunk_selectors(prev_thunk_selector, *q);
 }
