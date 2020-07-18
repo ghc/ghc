@@ -55,7 +55,7 @@ data AddrMode
         = AddrRegReg    Reg Reg
         | AddrRegImm    Reg Imm
         | AddrReg       Reg
-        deriving Show
+        deriving (Eq, Show)
 
 -- -----------------------------------------------------------------------------
 -- Immediates
@@ -70,10 +70,13 @@ data Imm
   | ImmDouble   Rational
   | ImmConstantSum Imm Imm
   | ImmConstantDiff Imm Imm
-  deriving Show
+  deriving (Eq, Show)
 
 instance Show SDoc where
   show = showSDocUnsafe
+
+instance Eq SDoc where
+  lhs == rhs = show lhs == show rhs
 
 strImmLit :: String -> Imm
 strImmLit s = ImmLit (text s)
