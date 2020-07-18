@@ -575,7 +575,7 @@ getRegister' config plat expr
         MO_S_Neg w -> return $ Any (intFormat w) (\dst -> code `snocOL` NEG (OpReg w dst) (OpReg w reg))
         MO_F_Neg w -> return $ Any (floatFormat w) (\dst -> code `snocOL` NEG (OpReg w dst) (OpReg w reg))
 
-        MO_SF_Conv from to -> return $ Any (intFormat to) (\dst -> code `snocOL` SCVTF (OpReg to dst) (OpReg from reg))  -- (Signed ConVerT Float)
+        MO_SF_Conv from to -> return $ Any (floatFormat to) (\dst -> code `snocOL` SCVTF (OpReg to dst) (OpReg from reg))  -- (Signed ConVerT Float)
         MO_FS_Conv from to -> return $ Any (intFormat to) (\dst -> code `snocOL` FCVTZS (OpReg to dst) (OpReg from reg)) -- (float convert (-> zero) signed)
 
         -- XXX this is very hacky
