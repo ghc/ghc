@@ -153,9 +153,16 @@ getClosure x = do
             pure $ ThunkClosure itbl pts npts
 
         THUNK_SELECTOR -> do
-            unless (length pts >= 1) $
-                fail "Expected at least 1 ptr argument to THUNK_SELECTOR"
-            pure $ SelectorClosure itbl (head pts)
+            unless (length pts == 1) $
+                fail "Expected 1 ptr argument to THUNK_SELECTOR"
+            pure $ SelectorClosure itbl (head pts) Nothing
+
+        THUNK_SELECTOR_N -> do
+            unless (length pts == 1) $
+                fail "Expected 1 ptr argument to THUNK_SELECTOR_N"
+            unless (length wds == 2) $
+                fail "Expected in total 2 arguments to THUNK_SELECTOR_N"
+            pure $ SelectorClosure itbl (head pts) (Just (wds !! 1))
 
         t | t >= FUN && t <= FUN_STATIC -> do
             pure $ FunClosure itbl pts npts
