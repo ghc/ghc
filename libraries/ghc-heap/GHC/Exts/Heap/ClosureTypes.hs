@@ -15,8 +15,6 @@ import GHC.Generics
 -- includes/rts/storage/ClosureTypes.h
 -- ---------------------------------------------}
 
-#include "rts/storage/ClosureTypes.h"
-
 data ClosureType
     = INVALID_OBJECT
     | CONSTR
@@ -85,10 +83,6 @@ data ClosureType
     | THUNK_SELECTOR_N
     | N_CLOSURE_TYPES
  deriving (Enum, Eq, Ord, Show, Generic)
-
-#if N_CLOSURE_TYPES != 65
-#error Closure types changed: update libraries/ghc-heap/GHC/Exts/Heap/ClosureTypes.hs!
-#endif
 
 -- | Return the size of the closures header in words
 closureTypeHeaderSize :: ClosureType -> Int
