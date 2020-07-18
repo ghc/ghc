@@ -571,11 +571,11 @@ data Target
 data ExtMode
     = EUXTB | EUXTH | EUXTW | EUXTX
     | ESXTB | ESXTH | ESXTW | ESXTX
-    deriving Show
+    deriving (Eq, Show)
 
 data ShiftMode
     = SLSL | SLSR | SASR | SROR
-    deriving Show
+    deriving (Eq, Show)
 
 
 -- We can also add ExtShift to Extension.
@@ -591,7 +591,7 @@ data Operand
         | OpImm Imm            -- immediate value
         | OpImmShift Imm ShiftMode RegShift
         | OpAddr AddrMode       -- memory reference
-        deriving Show
+        deriving (Eq, Show)
 
 -- Smart constructors
 opReg :: Width -> Reg -> Operand
