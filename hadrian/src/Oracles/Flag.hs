@@ -79,3 +79,10 @@ targetSupportsSMP = do
      , ver < ARMv7          -> return False
      | goodArch             -> return True
      | otherwise            -> return False
+
+ghcWithNativeCodeGen :: Action Bool
+ghcWithNativeCodeGen = do
+    goodArch <- anyTargetArch ["i386", "x86_64", "sparc", "powerpc", "aarch64"]
+    badOs    <- anyTargetOs ["aix"]
+    ghcUnreg <- flag GhcUnregisterised
+    return $ goodArch && not badOs && not ghcUnreg
