@@ -120,7 +120,7 @@ module GHC.Core.Type (
 
         -- *** Levity and boxity
         isLiftedType_maybe,
-        isLiftedTypeKind, isUnliftedTypeKind,
+        isLiftedTypeKind, isUnliftedTypeKind, pickyIsLiftedTypeKind,
         isLiftedRuntimeRep, isUnliftedRuntimeRep,
         isUnliftedType, mightBeUnliftedType, isUnboxedTupleType, isUnboxedSumType,
         isAlgType, isDataFamilyAppType,
@@ -553,6 +553,23 @@ isLiftedTypeKind kind
   = case kindRep_maybe kind of
       Just rep -> isLiftedRuntimeRep rep
       Nothing  -> False
+
+pickyIsLiftedTypeKind :: Kind -> Bool
+-- Checks whether the kind is literally
+--      TYPE LiftedRep
+-- or   Type
+-- without expanding type synonyms or anything
+-- Used only when deciding whether to suppress the ":: *" in
+-- (a :: *) when printing kinded type variables
+-- See Note [Suppressing * kinds] in GHC.Core.TyCo.Ppr
+pickyIsLiftedTypeKind kind
+  | TyConApp tc [arg] <- kind
+  , tc `hasKey` tYPETyConKey
+  , TyConApp rr_tc [] <- arg
+  , rr_tc `hasKey` liftedRepDataConKey = True
+  | TyConApp tc [] <- kind
+  , tc `hasKey` liftedTypeKindTyConKey = True
+  | otherwise                          = False
 
 isLiftedRuntimeRep :: Type -> Bool
 -- isLiftedRuntimeRep is true of LiftedRep :: RuntimeRep
@@ -2619,6 +2636,46 @@ prefer doing inner expansions first.  For example,
 We have
   occCheckExpand b (F (G b)) = Just (F Char)
 even though we could also expand F to get rid of b.
+
+Note [Occurrence checking: look inside kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we are considering unifying
+   (alpha :: *)  ~  Int -> (beta :: alpha -> alpha)
+This may be an error (what is that alpha doing inside beta's kind?),
+but we must not make the mistake of actually unifying or we'll
+build an infinite data structure.  So when looking for occurrences
+of alpha in the rhs, we must look in the kinds of type variables
+that occur there.
+
+occCheckExpand tries to expand type synonyms to remove
+unnecessary occurrences of a variable, and thereby get past an
+occurs-check failure.  This is good; but
+     we can't do it in the /kind/ of a variable /occurrence/
+
+For example #18451 built an infinite type:
+    type Const a b = a
+    data SameKind :: k -> k -> Type
+    type T (k :: Const Type a) = forall (b :: k). SameKind a b
+
+We have
+  b :: k
+  k :: Const Type a
+  a :: k   (must be same as b)
+
+So if we aren't careful, a's kind mentions a, which is bad.
+And expanding an /occurrence/ of 'a' doesn't help, because the
+/binding site/ is the master copy and all the occurrences should
+match it.
+
+Here's a related example:
+   f :: forall a b (c :: Const Type b). Proxy '[a, c]
+
+The list means that 'a' gets the same kind as 'c'; but that
+kind mentions 'b', so the binders are out of order.
+
+Bottom line: in occCheckExpand, do not expand inside the kinds
+of occurrences.  See bad_var_occ in occCheckExpand.  And
+see #18451 for more debate.
 -}
 
 occCheckExpand :: [Var] -> Type -> Maybe Type
@@ -2639,11 +2696,10 @@ occCheckExpand vs_to_avoid ty
           -- The VarSet is the set of variables we are trying to avoid
           -- The VarEnv carries mappings necessary
           -- because of kind expansion
-    go cxt@(as, env) (TyVarTy tv')
-      | tv' `elemVarSet` as               = Nothing
-      | Just tv'' <- lookupVarEnv env tv' = return (mkTyVarTy tv'')
-      | otherwise                         = do { tv'' <- go_var cxt tv'
-                                               ; return (mkTyVarTy tv'') }
+    go (as, env) ty@(TyVarTy tv)
+      | Just tv' <- lookupVarEnv env tv = return (mkTyVarTy tv')
+      | bad_var_occ as tv               = Nothing
+      | otherwise                       = return ty
 
     go _   ty@(LitTy {}) = return ty
     go cxt (AppTy ty1 ty2) = do { ty1' <- go cxt ty1
@@ -2656,7 +2712,7 @@ occCheckExpand vs_to_avoid ty
             ; return (ty { ft_mult = w', ft_arg = ty1', ft_res = ty2' }) }
     go cxt@(as, env) (ForAllTy (Bndr tv vis) body_ty)
        = do { ki' <- go cxt (varType tv)
-            ; let tv' = setVarType tv ki'
+            ; let tv'  = setVarType tv ki'
                   env' = extendVarEnv env tv tv'
                   as'  = as `delVarSet` tv
             ; body' <- go (as', env') body_ty
@@ -2680,9 +2736,12 @@ occCheckExpand vs_to_avoid ty
                                 ; return (mkCoercionTy co') }
 
     ------------------
-    go_var cxt v = updateVarTypeM (go cxt) v
-           -- Works for TyVar and CoVar
-           -- See Note [Occurrence checking: look inside kinds]
+    bad_var_occ :: VarSet -> Var -> Bool
+    -- Works for TyVar and CoVar
+    -- See Note [Occurrence checking: look inside kinds]
+    bad_var_occ vs_to_avoid v
+       =  v                          `elemVarSet`       vs_to_avoid
+       || tyCoVarsOfType (varType v) `intersectsVarSet` vs_to_avoid
 
     ------------------
     go_mco _   MRefl = return MRefl
@@ -2712,13 +2771,15 @@ occCheckExpand vs_to_avoid ty
                                              ; co2' <- go_co cxt co2
                                              ; w' <- go_co cxt w
                                              ; return (mkFunCo r w' co1' co2') }
-    go_co cxt@(as,env) (CoVarCo c)
-      | c `elemVarSet` as               = Nothing
+    go_co (as,env) co@(CoVarCo c)
       | Just c' <- lookupVarEnv env c   = return (mkCoVarCo c')
-      | otherwise                       = do { c' <- go_var cxt c
-                                             ; return (mkCoVarCo c') }
-    go_co cxt (HoleCo h)                = do { c' <- go_var cxt (ch_co_var h)
-                                             ; return (HoleCo (h { ch_co_var = c' })) }
+      | bad_var_occ as c                = Nothing
+      | otherwise                       = return co
+
+    go_co (as,_) co@(HoleCo h)
+      | bad_var_occ as (ch_co_var h)    = Nothing
+      | otherwise                       = return co
+
     go_co cxt (AxiomInstCo ax ind args) = do { args' <- mapM (go_co cxt) args
                                              ; return (mkAxiomInstCo ax ind args') }
     go_co cxt (UnivCo p r ty1 ty2)      = do { p' <- go_prov cxt p

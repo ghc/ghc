@@ -1879,21 +1879,8 @@ matchExpectedFunKind hs_ty n k = go n k
 ********************************************************************* -}
 
 
-{-  Note [Occurrence checking: look inside kinds]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we are considering unifying
-   (alpha :: *)  ~  Int -> (beta :: alpha -> alpha)
-This may be an error (what is that alpha doing inside beta's kind?),
-but we must not make the mistake of actually unifying or we'll
-build an infinite data structure.  So when looking for occurrences
-of alpha in the rhs, we must look in the kinds of type variables
-that occur there.
-
-NB: we may be able to remove the problem via expansion; see
-    Note [Occurs check expansion].  So we have to try that.
-
-Note [Checking for foralls]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{-  Note [Checking for foralls]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Unless we have -XImpredicativeTypes (which is a totally unsupported
 feature), we do not want to unify
     alpha ~ (forall a. a->a) -> Int
@@ -1906,10 +1893,10 @@ Consider
    (alpha :: forall k. k->*)  ~  (beta :: forall k. k->*)
 This is legal; e.g. dependent/should_compile/T11635.
 
-We don't want to reject it because of the forall in beta's kind,
-but (see Note [Occurrence checking: look inside kinds]) we do
-need to look in beta's kind.  So we carry a flag saying if a 'forall'
-is OK, and switch the flag on when stepping inside a kind.
+We don't want to reject it because of the forall in beta's kind, but
+(see Note [Occurrence checking: look inside kinds] in GHC.Core.Type)
+we do need to look in beta's kind.  So we carry a flag saying if a
+'forall' is OK, and switch the flag on when stepping inside a kind.
 
 Why is it OK?  Why does it not count as impredicative polymorphism?
 The reason foralls are bad is because we reply on "seeing" foralls
@@ -2030,6 +2017,7 @@ preCheck dflags ty_fam_ok tv ty
       | tv == tv' = MTVU_Occurs
       | otherwise = fast_check_occ (tyVarKind tv')
            -- See Note [Occurrence checking: look inside kinds]
+           -- in GHC.Core.Type
 
     fast_check (TyConApp tc tys)
       | bad_tc tc              = MTVU_Bad
