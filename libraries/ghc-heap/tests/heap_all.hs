@@ -60,6 +60,7 @@ exSelectClosure :: Closure
 exSelectClosure = SelectorClosure
     { info = exItbl
     , selectee = asBox exData
+    , offset = Nothing
     }
 
 exPAPClosure :: Closure
