@@ -108,7 +108,7 @@ SELECTOR_CODE_UPD(14)
 SELECTOR_CODE_UPD(15)
 
 /* The generic selector */
-INFO_TABLE_SELECTOR(stg_sel_n_upd, 100 /* todo: this is a bit hacky */, THUNK_SELECTOR_N, "stg_sel_upd", "stg_sel_upd")
+INFO_TABLE_SELECTOR(stg_sel_n_upd, /* no hardcoded offset */, THUNK_SELECTOR_N, "stg_sel_upd", "stg_sel_upd")
     (P_ node)
 {
     P_ selectee, field, dest;
@@ -175,7 +175,7 @@ SELECTOR_CODE_NOUPD(14)
 SELECTOR_CODE_NOUPD(15)
 
 
-INFO_TABLE_SELECTOR(stg_sel_n_noupd, 100, THUNK_SELECTOR_N, "stg_sel_noupd", "stg_sel_noupd")
+INFO_TABLE_SELECTOR(stg_sel_n_noupd, /* no hardcoded offset */, THUNK_SELECTOR_N, "stg_sel_noupd", "stg_sel_noupd")
     (P_ node)
 {
     P_ selectee, field, dest;
