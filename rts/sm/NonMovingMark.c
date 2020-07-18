@@ -633,6 +633,7 @@ void updateRemembSetPushThunkEager(Capability *cap,
         break;
     }
     case THUNK_SELECTOR:
+    case THUNK_SELECTOR_N:
     case BLACKHOLE:
         // TODO: This is right, right?
         break;
@@ -1514,6 +1515,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
     }
 
     case THUNK_SELECTOR:
+    case THUNK_SELECTOR_N:
         if (RtsFlags.GcFlags.nonmovingSelectorOpt) {
             nonmoving_eval_thunk_selector(queue, (StgSelector*)p, origin);
         } else {

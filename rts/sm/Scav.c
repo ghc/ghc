@@ -649,6 +649,14 @@ scavenge_block (bdescr *bd)
         break;
     }
 
+    case THUNK_SELECTOR_N:
+    {
+        StgSelector *s = (StgSelector *)p;
+        evacuate(&s->payload[0]);
+        p += THUNK_SELECTOR_N_sizeW();
+        break;
+    }
+
     // A chunk of stack saved in a heap object
     case AP_STACK:
     {
@@ -1040,6 +1048,7 @@ scavenge_mark_stack(void)
             break;
 
         case THUNK_SELECTOR:
+        case THUNK_SELECTOR_N:
         {
             StgSelector *s = (StgSelector *)p;
             evacuate(&s->payload[0]);
@@ -1357,6 +1366,7 @@ scavenge_one(StgPtr p)
     }
 
     case THUNK_SELECTOR:
+    case THUNK_SELECTOR_N:
     {
         StgSelector *s = (StgSelector *)p;
         evacuate(&s->payload[0]);

@@ -733,6 +733,13 @@ thread_obj (const StgInfoTable *info, P_ p)
         return p + THUNK_SELECTOR_sizeW();
     }
 
+    case THUNK_SELECTOR_N:
+    {
+        StgSelector *s = (StgSelector *)p;
+        thread(&s->payload[0]);
+        return p + THUNK_SELECTOR_N_sizeW();
+    }
+
     case AP_STACK:
         return thread_AP_STACK((StgAP_STACK *)p);
 

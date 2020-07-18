@@ -108,7 +108,8 @@ selector_changed:
     const StgInfoTable *selector_info_ptr = lockClosure((StgClosure*)p);
     StgInfoTable *selector_info_tbl = INFO_PTR_TO_STRUCT(selector_info_ptr);
 
-    if (selector_info_tbl->type != THUNK_SELECTOR) {
+    if (selector_info_tbl->type != THUNK_SELECTOR ||
+        selector_info_tbl->type != THUNK_SELECTOR_N) {
         // Selector updated in the meantime, or we reached to a value. Update
         // the chain.
         unlockClosure(p, selector_info_ptr);
@@ -134,11 +135,13 @@ selector_changed:
     // Do the selection
     //
 
-    uint32_t field = selector_info_tbl->layout.selector_offset;
+    uint32_t field;
 
-    if (MAX_SPEC_SELECTEE_SIZE <= field) {
-      // Assume this is the generic selector thunk
+    // There are two types of selector closures
+    if (selector_info_tbl->type == THUNK_SELECTOR_N) {
       field = (uint32_t)(p->payload[1]);
+    } else {
+      field = selector_info_tbl->layout.selector_offset;
     }
 
     StgClosure *selectee = UNTAG_CLOSURE(((StgSelector*)p)->payload[0]);
@@ -220,6 +223,7 @@ selectee_changed:
                     return p;
                 }
             case THUNK_SELECTOR:
+            case THUNK_SELECTOR_N:
                 // Value of the selector thunk is again a selector thunk in the
                 // non-moving heap. Add the current selector to the chain and
                 // loop.
@@ -294,7 +298,8 @@ selectee_changed:
             return (StgClosure*)p;
         }
 
-        case THUNK_SELECTOR: {
+        case THUNK_SELECTOR:
+        case THUNK_SELECTOR_N: {
             // Selectee is a selector thunk. Evaluate it if we haven't reached
             // the recursion limit yet.
             if (depth < MAX_THUNK_SELECTOR_DEPTH) {
