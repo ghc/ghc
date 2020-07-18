@@ -135,11 +135,11 @@ selector_changed:
     // Do the selection
     //
 
-    uint32_t field;
+    StgWord field;
 
     // There are two types of selector closures
     if (selector_info_tbl->type == THUNK_SELECTOR_N) {
-      field = (uint32_t)(p->payload[1]);
+      field = (StgWord)(p->payload[1]);
     } else {
       field = selector_info_tbl->layout.selector_offset;
     }
