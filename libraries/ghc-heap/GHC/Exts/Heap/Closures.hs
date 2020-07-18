@@ -141,7 +141,7 @@ data GenClosure b
         { info       :: !StgInfoTable
         , selectee   :: !b              -- ^ Pointer to the object being
                                         --   selected from
-				, offset     :: !(Maybe Word)   -- ^ Offset for 'THUNK_SELECTOR_N'
+        , offset     :: !(Maybe Word)   -- ^ Offset for 'THUNK_SELECTOR_N'
         }
 
     -- | An unsaturated function application
