@@ -28,6 +28,7 @@ library
 
   ghc-options:      -Wall
   cmm-sources:      cbits/HeapPrim.cmm
+  c-sources:        cbits/utils.c
 
   default-extensions: NoImplicitPrelude
 
@@ -40,3 +41,6 @@ library
                     GHC.Exts.Heap.InfoTableProf
                     GHC.Exts.Heap.Utils
                     GHC.Exts.Heap.FFIClosures
+                    GHC.Exts.Heap.ProfInfo.Types
+                    GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled
+                    GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingDisabled
