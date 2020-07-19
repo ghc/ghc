@@ -423,11 +423,66 @@ aarch64_mkJumpInstr :: BlockId -> [Instr]
 aarch64_mkJumpInstr id = [B (TBlock id)]
 
 aarch64_mkStackAllocInstr :: Platform -> Int -> [Instr]
-aarch64_mkStackAllocInstr platform amount = pprPanic "mkStackAllocInstr" (ppr amount)
+aarch64_mkStackAllocInstr platform n
+    | n == 0 = []
+    | n > 0 && n < 4096 = [ SUB sp sp (OpImm (ImmInt n)) ]
+    | n > 0 = SUB sp sp (OpImm (ImmInt 4095)) : aarch64_mkStackAllocInstr platform (n - 4095)
+aarch64_mkStackAllocInstr platform n = pprPanic "aarch64_mkStackAllocInstr" (int n)
 
 aarch64_mkStackDeallocInstr :: Platform -> Int -> [Instr]
-aarch64_mkStackDeallocInstr platform amount = pprPanic "mkStackDeallocInstr" (ppr amount)
+aarch64_mkStackDeallocInstr platform n
+    | n == 0 = []
+    | n > 0 && n < 4096 = [ ADD sp sp (OpImm (ImmInt n)) ]
+    | n > 0 = ADD sp sp (OpImm (ImmInt 4095)) : aarch64_mkStackAllocInstr platform (n - 4095)
+aarch64_mkStackDeallocInstr platform n = pprPanic "aarch64_mkStackAllocInstr" (int n)
 
+--
+-- See note [extra spill slots] in X86/Instr.hs
+--
+allocMoreStack
+  :: Platform
+  -> Int
+  -> NatCmmDecl statics GHC.CmmToAsm.AArch64.Instr.Instr
+  -> UniqSM (NatCmmDecl statics GHC.CmmToAsm.AArch64.Instr.Instr, [(BlockId,BlockId)])
+
+allocMoreStack _ _ top@(CmmData _ _) = return (top,[])
+allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
+    let entries = entryBlocks proc
+
+    uniqs <- replicateM (length entries) getUniqueM
+
+    let
+      delta = ((x + stackAlign - 1) `quot` stackAlign) * stackAlign -- round up
+        where x = slots * spillSlotSize -- sp delta
+
+      alloc   = mkStackAllocInstr   platform delta
+      dealloc = mkStackDeallocInstr platform delta
+
+      retargetList = (zip entries (map mkBlockId uniqs))
+
+      new_blockmap :: LabelMap BlockId
+      new_blockmap = mapFromList retargetList
+
+      insert_stack_insn (BasicBlock id insns)
+        | Just new_blockid <- mapLookup id new_blockmap
+        = [ BasicBlock id $ alloc ++ [ B (TBlock new_blockid) ]
+          , BasicBlock new_blockid block' ]
+        | otherwise
+        = [ BasicBlock id block' ]
+        where
+          block' = foldr insert_dealloc [] insns
+
+      insert_dealloc insn r = case insn of
+        J _ -> dealloc ++ (insn : r)
+        _other | aarch64_jumpDestsOfInstr insn /= []
+            -> aarch64_patchJumpInstr insn retarget : r
+        _other -> insn : r
+
+        where retarget b = fromMaybe b (mapLookup b new_blockmap)
+
+      new_code = concatMap insert_stack_insn code
+    -- in
+    return (CmmProc info lbl live (ListGraph new_code), retargetList)
 -- -----------------------------------------------------------------------------
 -- Machine's assembly language
 
