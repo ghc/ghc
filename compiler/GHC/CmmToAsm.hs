@@ -192,7 +192,7 @@ aarch64NcgImpl config
        ,pprNatCmmDecl             = AArch64.Ppr.pprNatCmmDecl config
        ,maxSpillSlots             = AArch64.Instr.maxSpillSlots config
        ,allocatableRegs           = AArch64.Regs.allocatableRegs platform
-       ,ncgAllocMoreStack         = noAllocMoreStack
+       ,ncgAllocMoreStack         = AArch64.Instr.noAllocMoreStack
        ,ncgExpandTop              = id
        ,ncgMakeFarBranches        = const id
        ,extractUnwindPoints       = const []
