@@ -9,6 +9,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ExplicitForAll #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE UnliftedFFITypes #-}
 
 {-|
 Module      :  GHC.Exts.Heap
@@ -38,6 +39,12 @@ module GHC.Exts.Heap (
     , peekItbl
     , pokeItbl
 
+    -- * Cost Centre (profiling) types
+    , StgTSOProfInfo(..)
+    , IndexTable(..)
+    , CostCentre(..)
+    , CostCentreStack(..)
+
      -- * Closure inspection
     , getBoxedClosureData
     , allClosures
@@ -52,9 +59,19 @@ import Prelude
 import GHC.Exts.Heap.Closures
 import GHC.Exts.Heap.ClosureTypes
 import GHC.Exts.Heap.Constants
+import GHC.Exts.Heap.ProfInfo.Types
 #if defined(PROFILING)
+import GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled
 import GHC.Exts.Heap.InfoTableProf
 #else
+-- This import makes PeekProfInfo_ProfilingEnabled available in make-based
+-- builds. See #15197 for details (even though the related patch didn't
+-- seem to fix the issue).
+-- GHC.Exts.Heap.Closures uses the same trick to include
+-- GHC.Exts.Heap.InfoTableProf into make-based builds.
+import GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled ()
+
+import GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingDisabled
 import GHC.Exts.Heap.InfoTable
 #endif
 import GHC.Exts.Heap.Utils
@@ -71,13 +88,17 @@ import Foreign
 
 #include "ghcconfig.h"
 
+foreign import ccall "isEndTsoQueue" isEndTsoQueue_c :: Addr# -> Bool
+
 class HasHeapRep (a :: TYPE rep) where
 
     -- | Decode a closure to it's heap representation ('GenClosure').
     -- Inside a GHC context 'b' is usually a 'GHC.Exts.Heap.Closures.Box'
     -- containing a thunk or an evaluated heap object. Outside it can be a
     -- 'Word' for "raw" usage of pointers.
-    getClosureDataX ::
+
+-- TODO: Remove Show constraint
+    getClosureDataX :: Show b =>
         (forall c . c -> IO (Ptr StgInfoTable, [Word], [b]))
         -- ^ Helper function to get info table, memory and pointers of the
         -- closure. The order of @[b]@ is significant and determined by
@@ -166,7 +187,9 @@ getClosureData = getClosureDataX getClosureRaw
 -- @collect_pointers()@ in @rts/Heap.c@.
 --
 -- For most use cases 'getClosureData' is an easier to use alternative.
-getClosureX :: forall a b.
+
+-- TODO: Remove Show constraint
+getClosureX :: forall a b. Show b =>
             (forall c . c -> IO (Ptr StgInfoTable, [Word], [b]))
             -- ^ Helper function to get info table, memory and pointers of the
             -- closure
@@ -324,26 +347,34 @@ getClosureX get_closure_raw x = do
 
             allocaArray (length wds) (\ptr -> do
                 pokeArray ptr wds
+-- TODO: remove prints
+                print $ "tso ptr : " ++ show ptr
+                print $ "tso pts : " ++ show pts
+                print $ "tso info table : " ++ show itbl
+-- TODO: Does this work? I.e. do we emit EndTSOQueues?
+                if isEndTsoQueue_c (unpackPtr ptr) then
+                    pure $ EndTSOQueue { info = itbl }
+                else do
+                    fields <- FFIClosures.peekTSOFields peekStgTSOProfInfo ptr
 
-                fields <- FFIClosures.peekTSOFields ptr
-
-                pure $ TSOClosure
-                    { info = itbl
-                    , _link = (pts !! 0)
-                    , global_link = (pts !! 1)
-                    , tsoStack = (pts !! 2)
-                    , trec = (pts !! 3)
-                    , blocked_exceptions = (pts !! 4)
-                    , bq = (pts !! 5)
-                    , what_next = FFIClosures.tso_what_next fields
-                    , why_blocked = FFIClosures.tso_why_blocked fields
-                    , flags = FFIClosures.tso_flags fields
-                    , threadId = FFIClosures.tso_threadId fields
-                    , saved_errno = FFIClosures.tso_saved_errno fields
-                    , tso_dirty = FFIClosures.tso_dirty fields
-                    , alloc_limit = FFIClosures.tso_alloc_limit fields
-                    , tot_stack_size = FFIClosures.tso_tot_stack_size fields
-                    }
+                    pure $ TSOClosure
+                        { info = itbl
+                        , _link = (pts !! 0)
+                        , global_link = (pts !! 1)
+                        , tsoStack = (pts !! 2)
+                        , trec = (pts !! 3)
+                        , blocked_exceptions = (pts !! 4)
+                        , bq = (pts !! 5)
+                        , what_next = FFIClosures.tso_what_next fields
+                        , why_blocked = FFIClosures.tso_why_blocked fields
+                        , flags = FFIClosures.tso_flags fields
+                        , threadId = FFIClosures.tso_threadId fields
+                        , saved_errno = FFIClosures.tso_saved_errno fields
+                        , tso_dirty = FFIClosures.tso_dirty fields
+                        , alloc_limit = FFIClosures.tso_alloc_limit fields
+                        , tot_stack_size = FFIClosures.tso_tot_stack_size fields
+                        , prof = FFIClosures.tso_prof fields
+                        }
                 )
         STACK -> do
             unless (length pts == 1) $
@@ -372,3 +403,6 @@ getClosureX get_closure_raw x = do
 -- | Like 'getClosureDataX', but taking a 'Box', so it is easier to work with.
 getBoxedClosureData :: Box -> IO Closure
 getBoxedClosureData (Box a) = getClosureData a
+
+unpackPtr :: Ptr a -> Addr#
+unpackPtr (Ptr addr) = addr

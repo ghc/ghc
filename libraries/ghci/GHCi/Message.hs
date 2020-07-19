@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs, DeriveGeneric, StandaloneDeriving, ScopedTypeVariables,
-    GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards #-}
+    GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards,
+    CPP #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-orphans #-}
 
 -- |
@@ -29,7 +30,7 @@ import GHCi.TH.Binary () -- For Binary instances
 import GHCi.BreakArray
 
 import GHC.LanguageExtensions
-import GHC.Exts.Heap
+import qualified GHC.Exts.Heap as Heap
 import GHC.ForeignSrcLang
 import GHC.Fingerprint
 import Control.Concurrent
@@ -110,7 +111,7 @@ data Message a where
    -> Int     -- constr tag
    -> Int     -- pointer tag
    -> ByteString -- constructor desccription
-   -> Message (RemotePtr StgInfoTable)
+   -> Message (RemotePtr Heap.StgInfoTable)
 
   -- | Evaluate a statement
   EvalStmt
@@ -211,7 +212,7 @@ data Message a where
   -- type reconstruction.
   GetClosure
     :: HValueRef
-    -> Message (GenClosure HValueRef)
+    -> Message (Heap.GenClosure HValueRef)
 
   -- | Evaluate something. This is used to support :force in GHCi.
   Seq
@@ -449,10 +450,17 @@ instance Binary (FunPtr a) where
   get = castPtrToFunPtr <$> get
 
 -- Binary instances to support the GetClosure message
-instance Binary StgInfoTable
-instance Binary ClosureType
-instance Binary PrimType
-instance Binary a => Binary (GenClosure a)
+#if MIN_VERSION_ghc_heap(8,11,0)
+instance Binary Heap.StgTSOProfInfo
+instance Binary Heap.CostCentreStack
+instance Binary Heap.CostCentre
+instance Binary Heap.IndexTable
+#endif
+
+instance Binary Heap.StgInfoTable
+instance Binary Heap.ClosureType
+instance Binary Heap.PrimType
+instance Binary a => Binary (Heap.GenClosure a)
 
 data Msg = forall a . (Binary a, Show a) => Msg (Message a)
 
