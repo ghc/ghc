@@ -43,8 +43,8 @@ module GHC.TypeLits
   , N.SomeNat(..), SomeSymbol(..)
   , someNatVal, someSymbolVal
   , N.sameNat, sameSymbol
-  , Compare, LitOrdering(..)
-  , cmpNat, cmpSymbol
+  , TypeOrdering(..)
+  , N.cmpNat, cmpSymbol
 
 
     -- * Functions on type literals
@@ -70,6 +70,7 @@ import GHC.Prim(magicDict, Proxy#)
 import Data.Maybe(Maybe(..))
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality((:~:)(Refl))
+import Data.Type.Ord(Compare, TypeOrdering)
 import Unsafe.Coerce(unsafeCoerce)
 
 import GHC.TypeNats (KnownNat)
@@ -212,45 +213,19 @@ sameSymbol x y
   | symbolVal x == symbolVal y  = Just (unsafeCoerce Refl)
   | otherwise                   = Nothing
 
--- | 'Compare' branches on the kind of its arguments to either compare by
--- 'Symbol' or 'Nat'.
--- type family Compare (a :: k) (b :: k) :: Ordering where
---   Compare (a :: Symbol) b = CmpSymbol a b
---   Compare (a :: Nat)    b = N.CmpNat  a b
-type family Compare (a :: k) (b :: k) :: Ordering
+
 type instance Compare (a :: Symbol) b = CmpSymbol a b
-type instance Compare (a :: Nat)    b = N.CmpNat  a b
-
--- | Ordering data type for type literals that provides proof of their ordering.
-data LitOrdering a b where
-  LitLt :: Compare a b ~ 'LT => LitOrdering a b
-  LitEq :: LitOrdering a a
-  LitGt :: Compare a b ~ 'GT => LitOrdering a b
-
-deriving instance Show (LitOrdering a b)
-deriving instance Eq   (LitOrdering a b)
-
--- | Like 'sameNat', but if the numbers aren't equal, this additionally
--- provides proof of LT or GT.
-cmpNat :: forall a b proxy1 proxy2. (KnownNat a, KnownNat b)
-       => proxy1 a -> proxy2 b -> LitOrdering a b
-cmpNat x y = case compare (natVal x) (natVal y) of
-  EQ -> unsafeCoerce LitEq
-  LT -> case unsafeCoerce Refl :: (N.CmpNat a b :~: 'LT) of
-    Refl -> LitLt
-  GT -> case unsafeCoerce Refl :: (N.CmpNat a b :~: 'GT) of
-    Refl -> LitGt
 
 -- | Like 'sameSymbol', but if the symbols aren't equal, this additionally
 -- provides proof of LT or GT.
 cmpSymbol :: forall a b proxy1 proxy2. (KnownSymbol a, KnownSymbol b)
-          => proxy1 a -> proxy2 b -> LitOrdering a b
+          => proxy1 a -> proxy2 b -> TypeOrdering a b
 cmpSymbol x y = case compare (symbolVal x) (symbolVal y) of
-  EQ -> unsafeCoerce LitEq
+  EQ -> unsafeCoerce TypeEq
   LT -> case unsafeCoerce Refl :: (CmpSymbol a b :~: 'LT) of
-    Refl -> LitLt
+    Refl -> TypeLt
   GT -> case unsafeCoerce Refl :: (CmpSymbol a b :~: 'GT) of
-    Refl -> LitGt
+    Refl -> TypeGt
 
 --------------------------------------------------------------------------------
 -- PRIVATE:

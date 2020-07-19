@@ -34,6 +34,7 @@ module GHC.TypeNats
     -- * Functions on type literals
   , type (<=), type (<=?), type (+), type (*), type (^), type (-)
   , CmpNat
+  , cmpNat
   , Div, Mod, Log2
 
   ) where
@@ -47,6 +48,7 @@ import GHC.Prim(magicDict, Proxy#)
 import Data.Maybe(Maybe(..))
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality((:~:)(Refl))
+import Data.Type.Ord(Compare, TypeOrdering, (<=), (<=?))
 import Unsafe.Coerce(unsafeCoerce)
 
 --------------------------------------------------------------------------------
@@ -157,7 +159,6 @@ instance Read SomeNat where
 
 --------------------------------------------------------------------------------
 
-infix  4 <=?, <=
 infixl 6 +, -
 infixl 7 *, `Div`, `Mod`
 infixr 8 ^
@@ -227,6 +228,21 @@ sameNat :: (KnownNat a, KnownNat b) =>
 sameNat x y
   | natVal x == natVal y = Just (unsafeCoerce Refl)
   | otherwise            = Nothing
+
+type instance Compare (a :: Nat) b = N.CmpNat  a b
+
+-- | Like 'sameNat', but if the numbers aren't equal, this additionally
+-- provides proof of LT or GT.
+cmpNat :: forall a b proxy1 proxy2. (KnownNat a, KnownNat b)
+       => proxy1 a -> proxy2 b -> TypeOrdering a b
+cmpNat x y = case compare (natVal x) (natVal y) of
+  EQ -> unsafeCoerce TypeEq
+  LT -> case unsafeCoerce Refl :: (CmpNat a b :~: 'LT) of
+    Refl -> TypeLt
+  GT -> case unsafeCoerce Refl :: (CmpNat a b :~: 'GT) of
+    Refl -> TypeGt
+
+
 
 --------------------------------------------------------------------------------
 -- PRIVATE:
