@@ -905,7 +905,7 @@ assignReg_FltCode = assignReg_IntCode
 -- Jumps
 genJump :: CmmExpr{-the branch target-} -> [Reg] -> NatM InstrBlock
 genJump (CmmLit (CmmLabel lbl)) regs
-  = return $ unitOL (B (TLabel lbl))
+  = return $ unitOL (J (TLabel lbl))
   -- = return (toOL [ PUSH_STACK_FRAME
   --               , DELTA (-16)
   --               , B (TLabel lbl)
@@ -913,7 +913,7 @@ genJump (CmmLit (CmmLabel lbl)) regs
   --               , DELTA 0] )
 genJump expr regs = do
     (target, _format, code) <- getSomeReg expr
-    return (code `appOL` unitOL (ANN (text $ show expr) (B (TReg target)))
+    return (code `appOL` unitOL (ANN (text $ show expr) (J (TReg target)))
                         --  toOL [ PUSH_STACK_FRAME
                         --       , DELTA (-16)
                         --       , B (TReg target)
