@@ -33,10 +33,11 @@ import GHC.Exts.Heap.Ptr.Utils
 type AddressSet = IntSet
 type AddressMap = IntMap
 
--- TODO: Remove cache? Looks like it's not needed anymore due to loop breakers
 data Cache = Cache {
     ccCache :: AddressMap CostCentre,
+-- TODO: Remove ccsCache? Looks like it's not needed anymore due to loop breakers
     ccsCache :: AddressMap CostCentreStack,
+-- TODO: Remove indexTableCache? Looks like it's not needed anymore due to loop breakers
     indexTableCache :: AddressMap IndexTable
 }
 type DecoderMonad a = StateT Cache IO a
@@ -63,7 +64,7 @@ peekCostCentreStack loopBreakers ptr | IntSet.member (ptrToInt ptr) loopBreakers
 peekCostCentreStack loopBreakers ptr = do
     cache <- get
     case IntMap.lookup ptrAsInt (ccsCache cache) of
-        found@(Just a) -> do
+        found@(Just _) -> do
                             liftIO $ print $ "CCS Cache hit : " ++ show ptr
                             return found
         Nothing -> do
@@ -111,73 +112,77 @@ peekCostCentreStack loopBreakers ptr = do
 peekCostCentre :: Ptr costCentre -> DecoderMonad CostCentre
 peekCostCentre ptr = do
     cache <- get
-    let ptrAsInt = ptrToInt ptr
-    if IntMap.member ptrAsInt (ccCache cache) then do
-        liftIO $ print $ "CC Cache hit : " ++ show ptr
-        return $ (ccCache cache) IntMap.! ptrAsInt
-    else do
-        cc_ccID' <- liftIO $ (#peek struct CostCentre_, ccID) ptr
-        cc_label_ptr <- liftIO $ (#peek struct CostCentre_, label) ptr
-        cc_label' <- liftIO $ peekCString cc_label_ptr
-        cc_module_ptr <- liftIO $ (#peek struct CostCentre_, module) ptr
-        cc_module' <- liftIO $ peekCString cc_module_ptr
-        cc_srcloc_ptr <- liftIO $ (#peek struct CostCentre_, srcloc) ptr
-        cc_srcloc' <- liftIO $ do
-            if cc_srcloc_ptr == nullPtr then
-                return Nothing
-            else
-                fmap Just (peekCString cc_srcloc_ptr)
-        cc_mem_alloc' <- liftIO $ (#peek struct CostCentre_, mem_alloc) ptr
-        cc_time_ticks' <- liftIO $ (#peek struct CostCentre_, time_ticks) ptr
-        cc_is_caf' <- liftIO $ (#peek struct CostCentre_, is_caf) ptr
-        cc_link_ptr <- liftIO $ (#peek struct CostCentre_, link) ptr
-        cc_link' <- if cc_link_ptr == nullPtr then
-            return Nothing
-        else
-            fmap Just (peekCostCentre cc_link_ptr)
+    case IntMap.lookup ptrAsInt (ccCache cache) of
+        (Just a) -> do
+                        liftIO $ print $ "CC Cache hit : " ++ show ptr
+                        return a
+        Nothing -> do
+                    cc_ccID' <- liftIO $ (#peek struct CostCentre_, ccID) ptr
+                    cc_label_ptr <- liftIO $ (#peek struct CostCentre_, label) ptr
+                    cc_label' <- liftIO $ peekCString cc_label_ptr
+                    cc_module_ptr <- liftIO $ (#peek struct CostCentre_, module) ptr
+                    cc_module' <- liftIO $ peekCString cc_module_ptr
+                    cc_srcloc_ptr <- liftIO $ (#peek struct CostCentre_, srcloc) ptr
+                    cc_srcloc' <- liftIO $ do
+                        if cc_srcloc_ptr == nullPtr then
+                            return Nothing
+                        else
+                            fmap Just (peekCString cc_srcloc_ptr)
+                    cc_mem_alloc' <- liftIO $ (#peek struct CostCentre_, mem_alloc) ptr
+                    cc_time_ticks' <- liftIO $ (#peek struct CostCentre_, time_ticks) ptr
+                    cc_is_caf' <- liftIO $ (#peek struct CostCentre_, is_caf) ptr
+                    cc_link_ptr <- liftIO $ (#peek struct CostCentre_, link) ptr
+                    cc_link' <- if cc_link_ptr == nullPtr then
+                        return Nothing
+                    else
+                        fmap Just (peekCostCentre cc_link_ptr)
 
-        let result = CostCentre {
-            cc_ccID = cc_ccID',
-            cc_label = cc_label',
-            cc_module = cc_module',
-            cc_srcloc = cc_srcloc',
-            cc_mem_alloc = cc_mem_alloc',
-            cc_time_ticks = cc_time_ticks',
-            cc_is_caf = cc_is_caf',
-            cc_link = cc_link'
-        }
+                    let result = CostCentre {
+                        cc_ccID = cc_ccID',
+                        cc_label = cc_label',
+                        cc_module = cc_module',
+                        cc_srcloc = cc_srcloc',
+                        cc_mem_alloc = cc_mem_alloc',
+                        cc_time_ticks = cc_time_ticks',
+                        cc_is_caf = cc_is_caf',
+                        cc_link = cc_link'
+                    }
 
-        let updatedCCCache = IntMap.insert ptrAsInt result (ccCache cache)
-        put $ cache { ccCache = updatedCCCache }
+                    let updatedCCCache = IntMap.insert ptrAsInt result (ccCache cache)
+                    put $ cache { ccCache = updatedCCCache }
 
-        return result
+                    return result
+    where
+        ptrAsInt = ptrToInt ptr
 
 peekIndexTable :: AddressSet -> Ptr indexTable -> DecoderMonad (Maybe IndexTable)
 peekIndexTable _ ptr | ptr == nullPtr = return Nothing
 peekIndexTable loopBreakers ptr = do
     cache <- get
-    let ptrAsInt = ptrToInt ptr
-    if IntMap.member ptrAsInt (indexTableCache cache) then do
-        liftIO $ print $ "IndexTable Cache hit : " ++ show ptr
-        return $ Just $ (indexTableCache cache) IntMap.! ptrAsInt
-    else do
-        it_cc_ptr <- liftIO $ (#peek struct IndexTable_, cc) ptr
-        it_cc' <- peekCostCentre it_cc_ptr
-        it_ccs_ptr <- liftIO $ (#peek struct IndexTable_, ccs) ptr
-        it_ccs' <- peekCostCentreStack loopBreakers it_ccs_ptr
-        it_next_ptr <- liftIO $ (#peek struct IndexTable_, next) ptr
-        it_next' <- peekIndexTable loopBreakers it_next_ptr
-        it_back_edge' <- liftIO $ (#peek struct IndexTable_, back_edge) ptr
+    case IntMap.lookup ptrAsInt (indexTableCache cache) of
+        found@(Just _) -> do
+                            liftIO $ print $ "IndexTable Cache hit : " ++ show ptr
+                            return found
+        Nothing -> do
+                    it_cc_ptr <- liftIO $ (#peek struct IndexTable_, cc) ptr
+                    it_cc' <- peekCostCentre it_cc_ptr
+                    it_ccs_ptr <- liftIO $ (#peek struct IndexTable_, ccs) ptr
+                    it_ccs' <- peekCostCentreStack loopBreakers it_ccs_ptr
+                    it_next_ptr <- liftIO $ (#peek struct IndexTable_, next) ptr
+                    it_next' <- peekIndexTable loopBreakers it_next_ptr
+                    it_back_edge' <- liftIO $ (#peek struct IndexTable_, back_edge) ptr
 
-        let result = IndexTable {
-            it_cc = it_cc',
-            it_ccs = it_ccs',
-            it_next = it_next',
-            it_back_edge = it_back_edge'
-        }
+                    let result = IndexTable {
+                        it_cc = it_cc',
+                        it_ccs = it_ccs',
+                        it_next = it_next',
+                        it_back_edge = it_back_edge'
+                    }
 
-        let updatedIndexTableCache = IntMap.insert ptrAsInt result (indexTableCache cache)
-        put $ cache { indexTableCache = updatedIndexTableCache }
+                    let updatedIndexTableCache = IntMap.insert ptrAsInt result (indexTableCache cache)
+                    put $ cache { indexTableCache = updatedIndexTableCache }
 
-        return $ Just result
+                    return $ Just result
+    where
+        ptrAsInt = ptrToInt ptr
 #endif
