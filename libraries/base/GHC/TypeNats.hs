@@ -34,6 +34,7 @@ module GHC.TypeNats
     -- * Functions on type literals
   , type (<=), type (<=?), type (+), type (*), type (^), type (-)
   , CmpNat
+  , cmpNat
   , Div, Mod, Log2
 
   ) where
@@ -47,6 +48,7 @@ import GHC.Prim(magicDict, Proxy#)
 import Data.Maybe(Maybe(..))
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality((:~:)(Refl))
+import Data.Type.Ord(Compare, TypeOrdering, type (<=), type (<=?))
 import Unsafe.Coerce(unsafeCoerce)
 
 --------------------------------------------------------------------------------
@@ -157,26 +159,14 @@ instance Read SomeNat where
 
 --------------------------------------------------------------------------------
 
-infix  4 <=?, <=
 infixl 6 +, -
 infixl 7 *, `Div`, `Mod`
 infixr 8 ^
-
--- | Comparison of type-level naturals, as a constraint.
---
--- @since 4.7.0.0
-type x <= y = (x <=? y) ~ 'True
 
 -- | Comparison of type-level naturals, as a function.
 --
 -- @since 4.7.0.0
 type family CmpNat    (m :: Nat)    (n :: Nat)    :: Ordering
-
-{- | Comparison of type-level naturals, as a function.
-NOTE: The functionality for this function should be subsumed
-by 'CmpNat', so this might go away in the future.
-Please let us know, if you encounter discrepancies between the two. -}
-type family (m :: Nat) <=? (n :: Nat) :: Bool
 
 -- | Addition of type-level naturals.
 --
@@ -227,6 +217,21 @@ sameNat :: (KnownNat a, KnownNat b) =>
 sameNat x y
   | natVal x == natVal y = Just (unsafeCoerce Refl)
   | otherwise            = Nothing
+
+type instance Compare (a :: Nat) b = N.CmpNat  a b
+
+-- | Like 'sameNat', but if the numbers aren't equal, this additionally
+-- provides proof of LT or GT.
+cmpNat :: forall a b proxy1 proxy2. (KnownNat a, KnownNat b)
+       => proxy1 a -> proxy2 b -> TypeOrdering a b
+cmpNat x y = case compare (natVal x) (natVal y) of
+  EQ -> unsafeCoerce TypeEq
+  LT -> case unsafeCoerce Refl :: (CmpNat a b :~: 'LT) of
+    Refl -> TypeLt
+  GT -> case unsafeCoerce Refl :: (CmpNat a b :~: 'GT) of
+    Refl -> TypeGt
+
+
 
 --------------------------------------------------------------------------------
 -- PRIVATE:
