@@ -46,8 +46,9 @@ allFpArgRegs = map regSingle [32..39]
 -- 22-27: R1-R6
 -- 28: SpLim
 
-sp :: Reg
-sp = regSingle 20
+-- This is the STG Sp reg.
+-- sp :: Reg
+-- sp = regSingle 20
 
 -- addressing modes ------------------------------------------------------------
 
