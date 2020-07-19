@@ -656,7 +656,9 @@ BUILD_DIRS += $(patsubst %, libraries/%, $(PACKAGES_STAGE1))
 BUILD_DIRS += $(patsubst %, libraries/%, $(filter-out $(PACKAGES_STAGE1),$(PACKAGES_STAGE0)))
 endif
 
+ifeq "$(BIGNUM_BACKEND)" "gmp"
 BUILD_DIRS += libraries/ghc-bignum/gmp
+endif
 BUILD_DIRS += utils/haddock
 BUILD_DIRS += utils/haddock/doc
 BUILD_DIRS += compiler
