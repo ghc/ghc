@@ -49,3 +49,12 @@ test('list_threads_and_misc_roots',
       ignore_stderr
      ],
      multi_compile_and_run, ['list_threads_and_misc_roots', [('list_threads_and_misc_roots_c.c','')], '-threaded'])
+
+test('prof_info',
+     [extra_files(['create_tso.c','create_tso.h']),
+      ignore_stdout,
+      ignore_stderr,
+      when(have_profiling(), extra_ways(['prof'])),
+      only_ways(prof_ways)
+     ],
+     multi_compile_and_run, ['prof_info', [('create_tso.c','')], '-prof'])

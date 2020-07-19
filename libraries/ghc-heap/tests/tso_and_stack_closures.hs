@@ -28,8 +28,6 @@ main = do
     assertEqual (why_blocked tso) NotBlocked
     assertEqual (saved_errno tso) 0
 
-    print $ "tso : "++ show tso
-
     -- The newly created TSO should be on the end of the run queue.
     let !_linkBox = _link tso
     _linkClosure <- getBoxedClosureData _linkBox

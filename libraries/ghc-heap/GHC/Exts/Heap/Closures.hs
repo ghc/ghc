@@ -40,6 +40,8 @@ import GHC.Exts.Heap.InfoTable
 import GHC.Exts.Heap.InfoTableProf ()
 #endif
 
+import GHC.Exts.Heap.ProfInfo.Types
+
 import Data.Bits
 import Data.Int
 import Data.Word
@@ -289,7 +291,12 @@ data GenClosure b
       , tso_dirty:: Word32 -- ^ non-zero => dirty
       , alloc_limit :: Int64
       , tot_stack_size :: Word32
+      , prof :: Maybe StgTSOProfInfo
       }
+  -- | Marker for the end of TSO queues
+  -- Technically it has the same structure as an StgTSO, but most data isn't initialized.
+  | EndTSOQueue
+     { info :: !StgInfoTable }
   -- Representation of StgStack: The 'tsoStack' of a 'TSOClosure'.
   | StackClosure
      { info :: !StgInfoTable
