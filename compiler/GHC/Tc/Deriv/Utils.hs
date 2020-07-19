@@ -595,13 +595,23 @@ hasStockDeriving clas
     -- do is allocate new Uniques, which are used for generating the names of
     -- auxiliary bindings.
     -- See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate.
-    simpleM gen_fn loc tc _
-      = do { (binds, deriv_stuff) <- gen_fn loc tc
+    simpleM gen_fn loc tc inst_tys
+      = do { let inst_ty = case inst_tys of
+                   [ty] -> ty
+                   -- should not happen, since simpleM is only derived for
+                   -- classes with a single type parameter
+                   _ -> pprPanic "hasStockDeriving.simpleM" (ppr inst_tys)
+           ; (binds, deriv_stuff) <- gen_fn loc tc inst_ty
            ; return (binds, deriv_stuff, []) }
 
-    read_or_show gen_fn loc tc _
-      = do { fix_env <- getDataConFixityFun tc
-           ; let (binds, deriv_stuff) = gen_fn fix_env loc tc
+    read_or_show gen_fn loc tc inst_tys
+      = do { let inst_ty = case inst_tys of
+                   [ty] -> ty
+                   -- should not happen, since Read and Show only have a
+                   -- single type parameter
+                   _ -> pprPanic "hasStockDeriving.read_or_show" (ppr inst_tys)
+           ; fix_env <- getDataConFixityFun tc
+           ; let (binds, deriv_stuff) = gen_fn fix_env loc tc inst_ty
                  field_names          = all_field_names tc
            ; return (binds, deriv_stuff, field_names) }
 
