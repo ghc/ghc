@@ -20,20 +20,24 @@ import GHC.Exts.Heap.ProfInfo.Types
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
 
--- TODO: Use IntSet for better performance?
-import Data.Set (Set)
-import qualified Data.Set as Set
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 
 import Control.Monad.Trans.State
 import Control.Monad.IO.Class
 
 import GHC.Exts.Heap.Ptr.Utils
 
+-- Use Int based containers for pointers (addresses) for better performance.
+-- These will be queried a lot!
+type AddressSet = IntSet
+type AddressMap = IntMap
+
 -- TODO: Remove cache? Looks like it's not needed anymore due to loop breakers
 data Cache = Cache {
-    ccCache :: IntMap CostCentre,
-    ccsCache :: IntMap CostCentreStack,
-    indexTableCache :: IntMap IndexTable
+    ccCache :: AddressMap CostCentre,
+    ccsCache :: AddressMap CostCentreStack,
+    indexTableCache :: AddressMap IndexTable
 }
 type DecoderMonad a = StateT Cache IO a
 
@@ -42,10 +46,9 @@ peekStgTSOProfInfo :: Ptr a -> IO (Maybe StgTSOProfInfo)
 peekStgTSOProfInfo _ = return Nothing
 #else
 peekStgTSOProfInfo tsoPtr = do
--- TODO: Use getCurrentCCS# ? Or GHC.Stack.CCS.getCurrentCCS ?
     print $ "peekStgTSOProfInfo - tsoPtr : " ++ show tsoPtr
     cccs_ptr <- peekByteOff tsoPtr cccsOffset
-    cccs' <- evalStateT (peekCostCentreStack Set.empty cccs_ptr) $ Cache IntMap.empty IntMap.empty IntMap.empty
+    cccs' <- evalStateT (peekCostCentreStack IntSet.empty cccs_ptr) $ Cache IntMap.empty IntMap.empty IntMap.empty
 
     return $ Just StgTSOProfInfo {
         cccs = cccs'
@@ -54,58 +57,58 @@ peekStgTSOProfInfo tsoPtr = do
 cccsOffset :: Int
 cccsOffset = (#const OFFSET_StgTSO_cccs) + (#size StgHeader)
 
-peekCostCentreStack :: Set (Ptr a) -> Ptr a -> DecoderMonad (Maybe CostCentreStack)
+peekCostCentreStack :: AddressSet -> Ptr costCentreStack -> DecoderMonad (Maybe CostCentreStack)
 peekCostCentreStack _ ptr | ptr == nullPtr = return Nothing
-peekCostCentreStack loopBreakers ptr | Set.member ptr loopBreakers = return Nothing
+peekCostCentreStack loopBreakers ptr | IntSet.member (ptrToInt ptr) loopBreakers = return Nothing
 peekCostCentreStack loopBreakers ptr = do
     cache <- get
-    let ptrAsInt = ptrToInt ptr
-    if IntMap.member ptrAsInt (ccsCache cache) then do
-        liftIO $ print $ "CCS Cache hit : " ++ show ptr
-        -- TODO: There's a IntMap function that returns a Maybe
-        return $ Just $ (ccsCache cache) IntMap.! ptrAsInt
-    else do
-        liftIO $ print $ "peekCostCentreStack - ptr : " ++ show ptr
-        ccs_ccsID' <- liftIO $ (#peek struct CostCentreStack_, ccsID) ptr
-        ccs_cc_ptr <- liftIO $ (#peek struct CostCentreStack_, cc) ptr
-        ccs_cc' <- peekCostCentre ccs_cc_ptr
-        ccs_prevStack_ptr <- liftIO $ (#peek struct CostCentreStack_, prevStack) ptr
-        -- TODO: Extract loopBreakers' to remove duplication
-        ccs_prevStack' <- peekCostCentreStack (Set.insert ptr loopBreakers) ccs_prevStack_ptr
-        -- TODO: Decide about index tables
-        ccs_indexTable_ptr <- liftIO $ (#peek struct CostCentreStack_, indexTable) ptr
-        ccs_indexTable' <- peekIndexTable (Set.insert ptr loopBreakers) ccs_indexTable_ptr
-        ccs_root_ptr <- liftIO $ (#peek struct CostCentreStack_, root) ptr
-        ccs_root' <- peekCostCentreStack (Set.insert ptr loopBreakers) ccs_root_ptr
-        ccs_depth' <- liftIO $ (#peek struct CostCentreStack_, depth) ptr
-        ccs_scc_count' <- liftIO $ (#peek struct CostCentreStack_, scc_count) ptr
-        ccs_selected' <- liftIO $ (#peek struct CostCentreStack_, selected) ptr
-        ccs_time_ticks' <- liftIO $ (#peek struct CostCentreStack_, time_ticks) ptr
-        ccs_mem_alloc' <- liftIO $ (#peek struct CostCentreStack_, mem_alloc) ptr
-        ccs_inherited_alloc' <- liftIO $ (#peek struct CostCentreStack_, inherited_alloc) ptr
-        ccs_inherited_ticks' <- liftIO $ (#peek struct CostCentreStack_, inherited_ticks) ptr
+    case IntMap.lookup ptrAsInt (ccsCache cache) of
+        found@(Just a) -> do
+                            liftIO $ print $ "CCS Cache hit : " ++ show ptr
+                            return found
+        Nothing -> do
+                    liftIO $ print $ "peekCostCentreStack - ptr : " ++ show ptr
+                    ccs_ccsID' <- liftIO $ (#peek struct CostCentreStack_, ccsID) ptr
+                    ccs_cc_ptr <- liftIO $ (#peek struct CostCentreStack_, cc) ptr
+                    ccs_cc' <- peekCostCentre ccs_cc_ptr
+                    ccs_prevStack_ptr <- liftIO $ (#peek struct CostCentreStack_, prevStack) ptr
+                    let loopBreakers' = (IntSet.insert ptrAsInt loopBreakers)
+                    ccs_prevStack' <- peekCostCentreStack loopBreakers' ccs_prevStack_ptr
+                    ccs_indexTable_ptr <- liftIO $ (#peek struct CostCentreStack_, indexTable) ptr
+                    ccs_indexTable' <- peekIndexTable loopBreakers' ccs_indexTable_ptr
+                    ccs_root_ptr <- liftIO $ (#peek struct CostCentreStack_, root) ptr
+                    ccs_root' <- peekCostCentreStack loopBreakers' ccs_root_ptr
+                    ccs_depth' <- liftIO $ (#peek struct CostCentreStack_, depth) ptr
+                    ccs_scc_count' <- liftIO $ (#peek struct CostCentreStack_, scc_count) ptr
+                    ccs_selected' <- liftIO $ (#peek struct CostCentreStack_, selected) ptr
+                    ccs_time_ticks' <- liftIO $ (#peek struct CostCentreStack_, time_ticks) ptr
+                    ccs_mem_alloc' <- liftIO $ (#peek struct CostCentreStack_, mem_alloc) ptr
+                    ccs_inherited_alloc' <- liftIO $ (#peek struct CostCentreStack_, inherited_alloc) ptr
+                    ccs_inherited_ticks' <- liftIO $ (#peek struct CostCentreStack_, inherited_ticks) ptr
 
-        let result = CostCentreStack {
-            ccs_ccsID = ccs_ccsID',
-            ccs_cc = ccs_cc',
-            ccs_prevStack = ccs_prevStack',
-            ccs_indexTable = ccs_indexTable',
-            ccs_root = ccs_root',
-            ccs_depth = ccs_depth',
-            ccs_scc_count = ccs_scc_count',
-            ccs_selected = ccs_selected',
-            ccs_time_ticks = ccs_time_ticks',
-            ccs_mem_alloc = ccs_mem_alloc',
-            ccs_inherited_alloc = ccs_inherited_alloc',
-            ccs_inherited_ticks = ccs_inherited_ticks'
-        }
+                    let result = CostCentreStack {
+                        ccs_ccsID = ccs_ccsID',
+                        ccs_cc = ccs_cc',
+                        ccs_prevStack = ccs_prevStack',
+                        ccs_indexTable = ccs_indexTable',
+                        ccs_root = ccs_root',
+                        ccs_depth = ccs_depth',
+                        ccs_scc_count = ccs_scc_count',
+                        ccs_selected = ccs_selected',
+                        ccs_time_ticks = ccs_time_ticks',
+                        ccs_mem_alloc = ccs_mem_alloc',
+                        ccs_inherited_alloc = ccs_inherited_alloc',
+                        ccs_inherited_ticks = ccs_inherited_ticks'
+                    }
 
-        let updatedCCSCache = IntMap.insert ptrAsInt result (ccsCache cache)
-        put $ cache { ccsCache = updatedCCSCache }
+                    let updatedCCSCache = IntMap.insert ptrAsInt result (ccsCache cache)
+                    put $ cache { ccsCache = updatedCCSCache }
 
-        return $ Just result
+                    return $ Just result
+    where
+        ptrAsInt = ptrToInt ptr
 
-peekCostCentre :: Ptr a -> DecoderMonad CostCentre
+peekCostCentre :: Ptr costCentre -> DecoderMonad CostCentre
 peekCostCentre ptr = do
     cache <- get
     let ptrAsInt = ptrToInt ptr
@@ -149,7 +152,7 @@ peekCostCentre ptr = do
 
         return result
 
-peekIndexTable :: Set (Ptr costCentreStack) -> Ptr a -> DecoderMonad (Maybe IndexTable)
+peekIndexTable :: AddressSet -> Ptr indexTable -> DecoderMonad (Maybe IndexTable)
 peekIndexTable _ ptr | ptr == nullPtr = return Nothing
 peekIndexTable loopBreakers ptr = do
     cache <- get
