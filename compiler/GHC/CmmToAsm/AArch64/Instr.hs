@@ -127,6 +127,7 @@ aarch64_regUsageOfInstr platform instr = case instr of
   ROR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   TST src1 src2            -> usage (regOp src1 ++ regOp src2, [])
   -- 4. Branch Instructions ----------------------------------------------------
+  J t                      -> usage (regTarget t, [])
   B t                      -> usage (regTarget t, [])
   BCOND _ t                -> usage (regTarget t, [])
   BL t                     -> usage (regTarget t, callerSavedRegisters)
@@ -252,6 +253,7 @@ aarch64_patchRegsOfInstr instr env = case instr of
     TST o1 o2      -> TST  (patchOp o1) (patchOp o2)
 
     -- 4. Branch Instructions --------------------------------------------------
+    J t            -> J (patchTarget t)
     B t            -> B (patchTarget t)
     BL t           -> BL (patchTarget t)
     BCOND c t      -> BCOND c (patchTarget t)
@@ -298,6 +300,7 @@ aarch64_isJumpishInstr instr = case instr of
     ANN _ i -> aarch64_isJumpishInstr i
     CBZ{} -> True
     CBNZ{} -> True
+    J{} -> True
     B{} -> True
     BL{} -> True
     BCOND{} -> True
@@ -310,6 +313,7 @@ aarch64_jumpDestsOfInstr :: Instr -> [BlockId]
 aarch64_jumpDestsOfInstr (ANN _ i) = aarch64_jumpDestsOfInstr i
 aarch64_jumpDestsOfInstr (CBZ _ t) = [ id | TBlock id <- [t]]
 aarch64_jumpDestsOfInstr (CBNZ _ t) = [ id | TBlock id <- [t]]
+aarch64_jumpDestsOfInstr (J t) = [id | TBlock id <- [t]]
 aarch64_jumpDestsOfInstr (B t) = [id | TBlock id <- [t]]
 aarch64_jumpDestsOfInstr (BL t) = [ id | TBlock id <- [t]]
 aarch64_jumpDestsOfInstr (BCOND _ t) = [ id | TBlock id <- [t]]
@@ -324,10 +328,11 @@ aarch64_patchJumpInstr instr patchF
         ANN d i -> ANN d (aarch64_patchJumpInstr i patchF)
         CBZ r (TBlock bid) -> CBZ r (TBlock (patchF bid))
         CBNZ r (TBlock bid) -> CBNZ r (TBlock (patchF bid))
+        J (TBlock bid) -> J (TBlock (patchF bid))
         B (TBlock bid) -> B (TBlock (patchF bid))
         BL (TBlock bid) -> BL (TBlock (patchF bid))
         BCOND c (TBlock bid) -> BCOND c (TBlock (patchF bid))
-        _ -> pprPanic "patchJumpInstr" (text "<instr>")
+        _ -> pprPanic "patchJumpInstr" (text $ show instr)
 
 -- -----------------------------------------------------------------------------
 
@@ -541,6 +546,7 @@ data Instr
     | CBZ Operand Target  -- if op == 0, then branch.
     | CBNZ Operand Target -- if op /= 0, then branch.
     -- Branching.
+    | J Target            -- like B, but only generated from genJump. Used to distinguish genJumps from others.
     | B Target            -- unconditional branching b/br. (To a blockid, label or register)
     | BL Target           -- branch and link (e.g. set x30 to next pc, and branch)
     | BCOND Cond Target   -- branch with condition. b.<cond>
