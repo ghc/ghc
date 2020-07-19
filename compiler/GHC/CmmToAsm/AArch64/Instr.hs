@@ -603,9 +603,10 @@ data Operand
 opReg :: Width -> Reg -> Operand
 opReg = OpReg
 
-xzr, wzr :: Operand
+xzr, wzr, sp :: Operand
 xzr = OpReg W64 (RegReal (RealRegSingle (-1)))
 wzr = OpReg W32 (RegReal (RealRegSingle (-1)))
+sp  = OpReg W64 (RegReal (RealRegSingle 31))
 
 _x :: Int -> Operand
 _x i = OpReg W64 (RegReal (RealRegSingle i))
