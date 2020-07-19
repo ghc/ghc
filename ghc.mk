@@ -456,7 +456,9 @@ PACKAGES_STAGE1 += parsec
 PACKAGES_STAGE1 += Cabal/Cabal
 PACKAGES_STAGE1 += ghc-compact
 PACKAGES_STAGE1 += ghc-heap
+ifeq "$(BIGNUM_BACKEND)" "gmp"
 PACKAGES_STAGE1 += integer-gmp # compat library
+endif
 
 ifeq "$(HADDOCK_DOCS)" "YES"
 PACKAGES_STAGE1 += xhtml
@@ -656,7 +658,9 @@ BUILD_DIRS += $(patsubst %, libraries/%, $(PACKAGES_STAGE1))
 BUILD_DIRS += $(patsubst %, libraries/%, $(filter-out $(PACKAGES_STAGE1),$(PACKAGES_STAGE0)))
 endif
 
+ifeq "$(BIGNUM_BACKEND)" "gmp"
 BUILD_DIRS += libraries/ghc-bignum/gmp
+endif
 BUILD_DIRS += utils/haddock
 BUILD_DIRS += utils/haddock/doc
 BUILD_DIRS += compiler
