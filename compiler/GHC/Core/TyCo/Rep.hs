@@ -19,7 +19,7 @@ Note [The Type-related module hierarchy]
 
 -- We expose the relevant stuff from this module via the Type module
 {-# OPTIONS_HADDOCK not-home #-}
-{-# LANGUAGE CPP, DeriveDataTypeable, MultiWayIf, PatternSynonyms, BangPatterns #-}
+{-# LANGUAGE CPP, MultiWayIf, PatternSynonyms, BangPatterns, DeriveDataTypeable #-}
 
 module GHC.Core.TyCo.Rep (
         TyThing(..), tyThingCategory, pprTyThingCategory, pprShortTyThing,
@@ -2025,6 +2025,12 @@ GHC.Core.Multiplicity above this module.
 -- | A shorthand for data with an attached 'Mult' element (the multiplicity).
 data Scaled a = Scaled Mult a
   deriving (Data.Data)
+  -- You might think that this would be a natural candiate for
+  -- Functor, Traversable but Krzysztof says (!3674) "it was too easy
+  -- to accidentally lift functions (substitutions, zonking etc.) from
+  -- Type -> Type to Scaled Type -> Scaled Type, ignoring
+  -- multiplicities and causing bugs".  So we don't.
+
 
 instance (Outputable a) => Outputable (Scaled a) where
    ppr (Scaled _cnt t) = ppr t

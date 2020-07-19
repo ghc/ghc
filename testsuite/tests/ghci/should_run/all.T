@@ -1,7 +1,7 @@
 
 # We only want to run these tests with GHCi
-def just_ghci( name, opts ):
-  opts.only_ways = ['ghci']
+# N.B. ghci is slightly broken under unregisterised compilers.
+just_ghci = [ only_ways(['ghci']), when(unregisterised(), fragile(18463)) ]
 
 test('ghcirun001', just_ghci, compile_and_run, [''])
 test('ghcirun002', just_ghci, compile_and_run, [''])

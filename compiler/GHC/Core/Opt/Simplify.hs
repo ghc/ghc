@@ -55,7 +55,7 @@ import GHC.Core.Rules   ( lookupRule, getRules, initRuleOpts )
 import GHC.Types.Basic
 import GHC.Utils.Monad  ( mapAccumLM, liftIO )
 import GHC.Types.Var    ( isTyCoVar )
-import GHC.Data.Maybe   ( orElse, fromMaybe )
+import GHC.Data.Maybe   ( orElse )
 import Control.Monad
 import GHC.Utils.Outputable
 import GHC.Data.FastString
@@ -63,7 +63,6 @@ import GHC.Utils.Misc
 import GHC.Utils.Error
 import GHC.Unit.Module ( moduleName, pprModuleName )
 import GHC.Core.Multiplicity
-import GHC.Core.TyCo.Rep  ( TyCoBinder(..) )
 import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
 
 
@@ -361,44 +360,8 @@ simplJoinBind :: SimplEnv
 simplJoinBind env cont old_bndr new_bndr rhs rhs_se
   = do  { let rhs_env = rhs_se `setInScopeFromE` env
         ; rhs' <- simplJoinRhs rhs_env old_bndr rhs cont
-        ; let mult = contHoleScaling cont
-              arity = fromMaybe (pprPanic "simplJoinBind" (ppr new_bndr)) $
-                       isJoinIdDetails_maybe (idDetails new_bndr)
-              new_type = scaleJoinPointType mult arity (varType new_bndr)
-              new_bndr' = setIdType new_bndr new_type
-        ; completeBind env NotTopLevel (Just cont) old_bndr new_bndr' rhs' }
+        ; completeBind env NotTopLevel (Just cont) old_bndr new_bndr rhs' }
 
-{-
-Note [Scaling join point arguments]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider a join point which is linear in its variable, in some context E:
-
-E[join j :: a #-> a
-       j x = x
-  in case v of
-       A -> j 'x'
-       B -> <blah>]
-
-The simplifier changes to:
-
-join j :: a #-> a
-     j x = E[x]
-in case v of
-     A -> j 'x'
-     B -> E[<blah>]
-
-If E uses its argument in a nonlinear way (e.g. a case['Many]), then
-this is wrong: the join point has to change its type to a -> a.
-Otherwise, we'd get a linearity error.
-
-See also Note [Return type for join points] and Note [Join points and case-of-case].
--}
-scaleJoinPointType :: Mult -> Int -> Type -> Type
-scaleJoinPointType mult arity ty | arity == 0 = ty
-                                 | otherwise  = case splitPiTy ty of
-  (binder, ty') -> mkPiTy (scaleBinder binder) (scaleJoinPointType mult (arity-1) ty')
-  where scaleBinder   (Anon af t) = Anon af (scaleScaled mult t)
-        scaleBinder b@(Named _)   = b
 --------------------------
 simplNonRecX :: SimplEnv
              -> InId            -- Old binder; not a JoinId
@@ -1726,8 +1689,9 @@ simplNonRecJoinPoint env bndr rhs body cont
    = wrapJoinCont env cont $ \ env cont ->
      do { -- We push join_cont into the join RHS and the body;
           -- and wrap wrap_cont around the whole thing
-        ; let res_ty = contResultType cont
-        ; (env1, bndr1)    <- simplNonRecJoinBndr env res_ty bndr
+        ; let mult   = contHoleScaling cont
+              res_ty = contResultType cont
+        ; (env1, bndr1)    <- simplNonRecJoinBndr env bndr mult res_ty
         ; (env2, bndr2)    <- addBndrRules env1 bndr bndr1 (Just cont)
         ; (floats1, env3)  <- simplJoinBind env2 cont bndr bndr2 rhs env
         ; (floats2, body') <- simplExprF env3 body cont
@@ -1740,9 +1704,10 @@ simplRecJoinPoint :: SimplEnv -> [(InId, InExpr)]
                   -> SimplM (SimplFloats, OutExpr)
 simplRecJoinPoint env pairs body cont
   = wrapJoinCont env cont $ \ env cont ->
-    do { let bndrs = map fst pairs
+    do { let bndrs  = map fst pairs
+             mult   = contHoleScaling cont
              res_ty = contResultType cont
-       ; env1 <- simplRecJoinBndrs env res_ty bndrs
+       ; env1 <- simplRecJoinBndrs env bndrs mult res_ty
                -- NB: bndrs' don't have unfoldings or rules
                -- We add them as we go down
        ; (floats1, env2)  <- simplRecBind env1 NotTopLevel (Just cont) pairs
