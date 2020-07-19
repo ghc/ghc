@@ -373,9 +373,9 @@ sparc_mkSpillInstr
     -> Reg      -- ^ register to spill
     -> Int      -- ^ current stack delta
     -> Int      -- ^ spill slot to use
-    -> Instr
+    -> (Int, [Instr])
 
-sparc_mkSpillInstr config reg _ slot
+sparc_mkSpillInstr config reg delta slot
  = let  platform = ncgPlatform config
         off      = spillSlotToOffset config slot
         off_w    = 1 + (off `div` 4)
@@ -384,7 +384,7 @@ sparc_mkSpillInstr config reg _ slot
                         RcFloat   -> FF32
                         RcDouble  -> FF64
 
-    in ST fmt reg (fpRel (negate off_w))
+    in (delta, [ST fmt reg (fpRel (negate off_w))])
 
 
 -- | Make a spill reload instruction.
@@ -393,9 +393,9 @@ sparc_mkLoadInstr
     -> Reg      -- ^ register to load into
     -> Int      -- ^ current stack delta
     -> Int      -- ^ spill slot to use
-    -> Instr
+    -> (Int, [Instr])
 
-sparc_mkLoadInstr config reg _ slot
+sparc_mkLoadInstr config reg delta slot
   = let platform = ncgPlatform config
         off      = spillSlotToOffset config slot
         off_w    = 1 + (off `div` 4)
@@ -404,7 +404,7 @@ sparc_mkLoadInstr config reg _ slot
                         RcFloat   -> FF32
                         RcDouble  -> FF64
 
-        in LD fmt (fpRel (- off_w)) reg
+        in (delta, [LD fmt (fpRel (- off_w)) reg])
 
 
 --------------------------------------------------------------------------------
