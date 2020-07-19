@@ -938,7 +938,9 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
       = do { sig_kind <- tcLHsKindSig data_ctxt hs_kind
            ; let (tvs, inner_kind) = tcSplitForAllTys sig_kind
            ; lvl <- getTcLevel
-           ; (subst, _tvs') <- tcInstSkolTyVarsAt lvl False emptyTCvSubst tvs
+           ; (subst, _tvs') <- mapAccumLM
+               (freshenTyCoVarX $ newSkolemTyVarLvlOverlappable lvl False)
+               emptyTCvSubst tvs
              -- Perhaps surprisingly, we don't need the skolemised tvs themselves
            ; return (substTy subst inner_kind) }
 

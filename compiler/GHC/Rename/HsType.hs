@@ -3,17 +3,18 @@
 
 -}
 
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module GHC.Rename.HsType (
         -- Type related stuff
         rnHsType, rnLHsType, rnLHsTypes, rnContext,
         rnHsKind, rnLHsKind, rnLHsTypeArgs,
-        rnHsSigType, rnHsWcType,
-        HsSigWcTypeScoping(..), rnHsSigWcType, rnHsPatSigType,
+        rnHsSigType, rnHsWcType, rnHsSigWcTypeBindingVars,
+        HsSigWcTypeScoping(..), rnHsSigWcType, rnHsPatSigType, rnHsSigWcTypeScoped,
         newTyVarNameRn,
         rnConDeclFields,
         rnLTyVar,
@@ -187,6 +188,34 @@ rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
        ; (wcs, hs_ty', fvs) <- rnWcBody ctxt nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = hs_ty' }
        ; return (sig_ty', fvs) }
+
+-- Similar to rnHsWcType, but rather than requiring free variables in the type to
+-- already be in scope, we are going to require them not to be in scope,
+-- and we bind them.
+rnHsSigWcTypeBindingVars :: HsDocContext
+                         -> LHsSigWcType GhcPs
+                         -> (LHsSigWcType GhcRn -> RnM (r, FreeVars))
+                         -> RnM (r, FreeVars)
+rnHsSigWcTypeBindingVars ctxt sigType thing_inside = case sigType of
+  (HsWC { hswc_body = HsIB { hsib_body = hs_ty' } }) -> do
+    rdr_env <- getLocalRdrEnv
+    let (varsInScope, varsNotInScope) =
+          partition (inScope rdr_env . unLoc) (extractHsTyRdrTyVars hs_ty')
+    when (not (null varsInScope)) $
+      addErr . withHsDocContext ctxt $
+        text ("Type variable" ++ ['s' | not (null (drop 1 varsInScope))])
+        <+> hcat (punctuate (text ",") (map (quotes . ppr) varsInScope))
+        <+> text "would be inappropriately shadowed."
+    (wcVars', ibVars') <- partition_nwcs varsNotInScope
+    rnImplicitBndrs True ibVars' $ \ ibVars -> do
+      (wcVars, hs_ty, fvs) <- rnWcBody ctxt wcVars' hs_ty'
+      let sig_ty = HsWC
+            { hswc_ext = wcVars
+            , hswc_body = HsIB
+              { hsib_ext = ibVars
+              , hsib_body = hs_ty } }
+      (res, fvs') <- thing_inside sig_ty
+      return (res, fvs `plusFV` fvs')
 
 rnWcBody :: HsDocContext -> [Located RdrName] -> LHsType GhcPs
          -> RnM ([Name], LHsType GhcRn, FreeVars)
@@ -1385,7 +1414,7 @@ mkOpFormRn arg1 op fix arg2                     -- Default case, no rearrangment
 mkConOpPatRn :: Located Name -> Fixity -> LPat GhcRn -> LPat GhcRn
              -> RnM (Pat GhcRn)
 
-mkConOpPatRn op2 fix2 p1@(L loc (ConPat NoExtField op1 (InfixCon p11 p12))) p2
+mkConOpPatRn op2 fix2 p1@(L loc (ConPat NoExtField op1 ts (InfixCon p11 p12))) p2
   = do  { fix1 <- lookupFixityRn (unLoc op1)
         ; let (nofix_error, associate_right) = compareFixity fix1 fix2
 
@@ -1395,6 +1424,7 @@ mkConOpPatRn op2 fix2 p1@(L loc (ConPat NoExtField op1 (InfixCon p11 p12))) p2
                 ; return $ ConPat
                     { pat_con_ext = noExtField
                     , pat_con = op2
+                    , pat_ty_args = ts
                     , pat_args = InfixCon p1 p2
                     }
                 }
@@ -1404,6 +1434,7 @@ mkConOpPatRn op2 fix2 p1@(L loc (ConPat NoExtField op1 (InfixCon p11 p12))) p2
                 ; return $ ConPat
                     { pat_con_ext = noExtField
                     , pat_con = op1
+                    , pat_ty_args = ts
                     , pat_args = InfixCon p11 (L loc new_p)
                     }
                 }
@@ -1411,6 +1442,7 @@ mkConOpPatRn op2 fix2 p1@(L loc (ConPat NoExtField op1 (InfixCon p11 p12))) p2
           else return $ ConPat
                  { pat_con_ext = noExtField
                  , pat_con = op2
+                 , pat_ty_args = ts
                  , pat_args = InfixCon p1 p2
                  }
         }
@@ -1420,12 +1452,13 @@ mkConOpPatRn op _ p1 p2                         -- Default case, no rearrangment
     return $ ConPat
       { pat_con_ext = noExtField
       , pat_con = op
+      , pat_ty_args = []
       , pat_args = InfixCon p1 p2
       }
 
 not_op_pat :: Pat GhcRn -> Bool
-not_op_pat (ConPat NoExtField _ (InfixCon _ _)) = False
-not_op_pat _                                    = True
+not_op_pat (ConPat NoExtField _ _ (InfixCon _ _)) = False
+not_op_pat _                                      = True
 
 --------------------------------------
 checkPrecMatch :: Name -> MatchGroup GhcRn body -> RnM ()
@@ -1453,7 +1486,7 @@ checkPrecMatch op (MG { mg_alts = (L _ ms) })
         -- second eqn.
 
 checkPrec :: Name -> Pat GhcRn -> Bool -> IOEnv (Env TcGblEnv TcLclEnv) ()
-checkPrec op (ConPat NoExtField op1 (InfixCon _ _)) right = do
+checkPrec op (ConPat NoExtField op1 _ (InfixCon _ _)) right = do
     op_fix@(Fixity _ op_prec  op_dir) <- lookupFixityRn op
     op1_fix@(Fixity _ op1_prec op1_dir) <- lookupFixityRn (unLoc op1)
     let

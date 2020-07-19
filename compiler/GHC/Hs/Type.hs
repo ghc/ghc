@@ -6,6 +6,7 @@
 GHC.Hs.Type: Abstract syntax: user-defined types
 -}
 
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -411,27 +412,30 @@ emptyLHsQTvs = HsQTvs { hsq_ext = [], hsq_explicit = [] }
 
 -- | Haskell Implicit Binders
 data HsImplicitBndrs pass thing   -- See Note [HsType binders]
-  = HsIB { hsib_ext  :: XHsIB pass thing -- after renamer: [Name]
-                                         -- Implicitly-bound kind & type vars
-                                         -- Order is important; see
-                                         -- Note [Ordering of implicit variables]
-                                         -- in GHC.Rename.HsType
+  = HsIB
+      { hsib_ext  :: XHsIB pass
+        -- ^ after renamer: [Name]
+        -- Implicitly-bound kind & type vars
+        -- Order is important; see
+        -- Note [Ordering of implicit variables]
+        -- in GHC.Rename.HsType
+      , hsib_body :: thing
+        -- ^ Main payload (type or list of types)
+      }
+  | XHsImplicitBndrs !(XXHsImplicitBndrs pass)
+  deriving (Functor)
 
-         , hsib_body :: thing            -- Main payload (type or list of types)
-    }
-  | XHsImplicitBndrs !(XXHsImplicitBndrs pass thing)
+type instance XHsIB              GhcPs = NoExtField
+type instance XHsIB              GhcRn = [Name]
+type instance XHsIB              GhcTc = [Name]
 
-type instance XHsIB              GhcPs _ = NoExtField
-type instance XHsIB              GhcRn _ = [Name]
-type instance XHsIB              GhcTc _ = [Name]
-
-type instance XXHsImplicitBndrs  (GhcPass _) _ = NoExtCon
+type instance XXHsImplicitBndrs  (GhcPass _) = NoExtCon
 
 -- | Haskell Wildcard Binders
 data HsWildCardBndrs pass thing
     -- See Note [HsType binders]
     -- See Note [The wildcard story for types]
-  = HsWC { hswc_ext :: XHsWC pass thing
+  = HsWC { hswc_ext :: XHsWC pass
                 -- after the renamer
                 -- Wild cards, only named
                 -- See Note [Wildcards in visible kind application]
@@ -441,13 +445,15 @@ data HsWildCardBndrs pass thing
                 -- If there is an extra-constraints wildcard,
                 -- it's still there in the hsc_body.
     }
-  | XHsWildCardBndrs !(XXHsWildCardBndrs pass thing)
+  | XHsWildCardBndrs !(XXHsWildCardBndrs pass)
+  deriving (Functor)
 
-type instance XHsWC              GhcPs b = NoExtField
-type instance XHsWC              GhcRn b = [Name]
-type instance XHsWC              GhcTc b = [Name]
 
-type instance XXHsWildCardBndrs  (GhcPass _) b = NoExtCon
+type instance XHsWC              GhcPs = NoExtField
+type instance XHsWC              GhcRn = [Name]
+type instance XHsWC              GhcTc = [Name]
+
+type instance XXHsWildCardBndrs  (GhcPass _) = NoExtCon
 
 -- | Types that can appear in pattern signatures, as well as the signatures for
 -- term-level binders in RULES.
