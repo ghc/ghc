@@ -541,7 +541,7 @@ ppc_mkSpillInstr
    -> Reg       -- register to spill
    -> Int       -- current stack delta
    -> Int       -- spill slot to use
-   -> Instr
+   -> (Int, [Instr])
 
 ppc_mkSpillInstr config reg delta slot
   = let platform = ncgPlatform config
@@ -558,7 +558,7 @@ ppc_mkSpillInstr config reg delta slot
                 Just _  -> ST
                 Nothing -> STFAR -- pseudo instruction: 32 bit offsets
 
-    in instr fmt reg (AddrRegImm sp (ImmInt (off-delta)))
+    in (delta, [instr fmt reg (AddrRegImm sp (ImmInt (off-delta)))])
 
 
 ppc_mkLoadInstr
@@ -566,7 +566,7 @@ ppc_mkLoadInstr
    -> Reg       -- register to load
    -> Int       -- current stack delta
    -> Int       -- spill slot to use
-   -> Instr
+   -> (Int, [Instr])
 
 ppc_mkLoadInstr config reg delta slot
   = let platform = ncgPlatform config
@@ -583,7 +583,7 @@ ppc_mkLoadInstr config reg delta slot
                 Just _  -> LD
                 Nothing -> LDFAR -- pseudo instruction: 32 bit offsets
 
-    in instr fmt reg (AddrRegImm sp (ImmInt (off-delta)))
+    in (delta, [instr fmt reg (AddrRegImm sp (ImmInt (off-delta)))])
 
 
 -- | The size of a minimal stackframe header including minimal
