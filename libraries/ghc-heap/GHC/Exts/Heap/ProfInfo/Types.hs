@@ -7,7 +7,7 @@ import Data.Word
 import GHC.Generics
 
 data StgTSOProfInfo = StgTSOProfInfo {
-    cccs :: CostCentreStack
+    cccs :: Maybe CostCentreStack
 } deriving (Show, Generic)
 
 data CostCentreStack = CostCentreStack {
@@ -15,7 +15,7 @@ data CostCentreStack = CostCentreStack {
     ccs_cc :: CostCentre,
     ccs_prevStack :: Maybe CostCentreStack,
     ccs_indexTable :: Maybe IndexTable,
-    ccs_root ::CostCentreStack,
+    ccs_root :: Maybe CostCentreStack,
     ccs_depth :: Word,
     ccs_scc_count :: Word64,
     ccs_selected :: Word,
@@ -38,7 +38,7 @@ data CostCentre = CostCentre {
 
 data IndexTable = IndexTable {
     it_cc :: CostCentre,
-    it_ccs :: CostCentreStack,
-    it_next :: IndexTable,
+    it_ccs :: Maybe CostCentreStack,
+    it_next :: Maybe IndexTable,
     it_back_edge :: Bool
 } deriving (Show, Generic)
