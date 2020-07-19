@@ -448,6 +448,7 @@ pprInstr platform instr = case instr of
   TST o1 o2     -> text "\ttst" <+> pprOp o1 <> comma <+> pprOp o2
 
   -- 4. Branch Instructions ----------------------------------------------------
+  J t            -> pprInstr platform (B t)
   B (TBlock bid) -> text "\tb" <+> ppr (mkLocalBlockLabel (getUnique bid))
   B (TLabel lbl) -> text "\tb" <+> ppr lbl
   B (TReg r)     -> text "\tbr" <+> pprReg W64 r
