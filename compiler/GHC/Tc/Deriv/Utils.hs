@@ -595,13 +595,13 @@ hasStockDeriving clas
     -- do is allocate new Uniques, which are used for generating the names of
     -- auxiliary bindings.
     -- See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate.
-    simpleM gen_fn loc tc _
-      = do { (binds, deriv_stuff) <- gen_fn loc tc
+    simpleM gen_fn loc tc inst_tys
+      = do { (binds, deriv_stuff) <- gen_fn loc tc inst_tys
            ; return (binds, deriv_stuff, []) }
 
-    read_or_show gen_fn loc tc _
+    read_or_show gen_fn loc tc inst_tys
       = do { fix_env <- getDataConFixityFun tc
-           ; let (binds, deriv_stuff) = gen_fn fix_env loc tc
+           ; let (binds, deriv_stuff) = gen_fn fix_env loc tc inst_tys
                  field_names          = all_field_names tc
            ; return (binds, deriv_stuff, field_names) }
 
