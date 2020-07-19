@@ -662,7 +662,7 @@ translateLGRHS fam_insts match_loc pats (L _loc (GRHS _ gs _)) =
 translateGuard :: FamInstEnvs -> GuardStmt GhcTc -> DsM GrdVec
 translateGuard fam_insts guard = case guard of
   BodyStmt _   e _ _ -> translateBoolGuard e
-  LetStmt  _   binds -> translateLet (unLoc binds)
+  LetStmt  _   binds -> translateLet binds
   BindStmt _ p e     -> translateBind fam_insts p e
   LastStmt        {} -> panic "translateGuard LastStmt"
   ParStmt         {} -> panic "translateGuard ParStmt"

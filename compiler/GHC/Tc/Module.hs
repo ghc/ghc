@@ -2188,7 +2188,7 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
         ; interPrintName <- getInteractivePrintName
         ; let fresh_it  = itName uniq (locA loc)
               matches   = [mkMatch (mkPrefixFunRhs (L loc' fresh_it)) [] rn_expr
-                                   (noLocA emptyLocalBinds)]
+                                   emptyLocalBinds]
               -- [it = expr]
               the_bind  = L loc $ (mkTopFunBind FromSource
                                      (L loc' fresh_it) matches)
@@ -2198,7 +2198,7 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
               -- (if we are at a breakpoint, say).  We must put those free vars
 
               -- [let it = expr]
-              let_stmt  = L loc $ LetStmt noAnn $ noLocA $ HsValBinds noAnn
+              let_stmt  = L loc $ LetStmt noAnn $ HsValBinds noAnn
                            $ XValBindsLR
                                (NValBinds [(NonRecursive,unitBag the_bind)] [])
 

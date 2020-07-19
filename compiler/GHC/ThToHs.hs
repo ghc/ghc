@@ -187,7 +187,7 @@ cvtDec (TH.ValD pat body ds)
         ; ds' <- cvtLocalDecs (text "a where clause") ds
         ; returnJustLA $ Hs.ValD noExtField $
           PatBind { pat_lhs = pat'
-                  , pat_rhs = GRHSs noAnn body' (noLocA ds')
+                  , pat_rhs = GRHSs noAnn body' ds'
                   , pat_ext = noAnn
                   , pat_ticks = ([],[]) } }
 
@@ -890,7 +890,7 @@ cvtLocalDecs doc ds
         return (HsValBinds noAnn (ValBinds NoAnnSortKey (listToBag binds) sigs))
       (ip_binds, []) -> do
         binds <- mapM (uncurry cvtImplicitParamBind) ip_binds
-        return (HsIPBinds noExtField (IPBinds noExtField binds))
+        return (HsIPBinds noAnn (IPBinds noExtField binds))
       ((_:_), (_:_)) ->
         failWith (text "Implicit parameters mixed with other bindings")
 
@@ -901,7 +901,7 @@ cvtClause ctxt (Clause ps body wheres)
         ; let pps = map (parenthesizePat appPrec) ps'
         ; g'  <- cvtGuard body
         ; ds' <- cvtLocalDecs (text "a where clause") wheres
-        ; returnLA $ Hs.Match noAnn ctxt pps (GRHSs noAnn g' (noLocA ds')) }
+        ; returnLA $ Hs.Match noAnn ctxt pps (GRHSs noAnn g' ds') }
 
 cvtImplicitParamBind :: String -> TH.Exp -> CvtM (LIPBind GhcPs)
 cvtImplicitParamBind n e = do
@@ -971,7 +971,7 @@ cvtl e = wrapLA (cvt e)
       | otherwise      = do { alts' <- mapM cvtpair alts
                             ; return $ HsMultiIf noAnn alts' }
     cvt (LetE ds e)    = do { ds' <- cvtLocalDecs (text "a let expression") ds
-                            ; e' <- cvtl e; return $ HsLet noAnn (noLocA ds') e'}
+                            ; e' <- cvtl e; return $ HsLet noAnn ds' e'}
     cvt (CaseE e ms)   = do { e' <- cvtl e; ms' <- mapM (cvtMatch CaseAlt) ms
                             ; th_origin <- getOrigin
                             ; return $ HsCase noAnn e'
@@ -1196,7 +1196,7 @@ cvtStmt :: TH.Stmt -> CvtM (Hs.LStmt GhcPs (LHsExpr GhcPs))
 cvtStmt (NoBindS e)    = do { e' <- cvtl e; returnLA $ mkBodyStmt e' }
 cvtStmt (TH.BindS p e) = do { p' <- cvtPat p; e' <- cvtl e; returnLA $ mkPsBindStmt noAnn p' e' }
 cvtStmt (TH.LetS ds)   = do { ds' <- cvtLocalDecs (text "a let binding") ds
-                            ; returnLA $ LetStmt noAnn (noLocA ds') }
+                            ; returnLA $ LetStmt noAnn ds' }
 cvtStmt (TH.ParS dss)  = do { dss' <- mapM cvt_one dss
                             ; returnLA $ ParStmt noExtField dss' noExpr noSyntaxExpr }
   where
@@ -1213,7 +1213,7 @@ cvtMatch ctxt (TH.Match p body decs)
                      _                -> p'
         ; g' <- cvtGuard body
         ; decs' <- cvtLocalDecs (text "a where clause") decs
-        ; returnLA $ Hs.Match noAnn ctxt [lp] (GRHSs noAnn g' (noLocA decs')) }
+        ; returnLA $ Hs.Match noAnn ctxt [lp] (GRHSs noAnn g' decs') }
 
 cvtGuard :: TH.Body -> CvtM [LGRHS GhcPs (LHsExpr GhcPs)]
 cvtGuard (GuardedB pairs) = mapM cvtpair pairs

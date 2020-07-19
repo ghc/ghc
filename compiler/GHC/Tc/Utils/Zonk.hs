@@ -693,7 +693,7 @@ zonkGRHSs :: ZonkEnv
           -> GRHSs GhcTc (LocatedA (body GhcTc))
           -> TcM (GRHSs GhcTc (LocatedA (body GhcTc)))
 
-zonkGRHSs env zBody (GRHSs x grhss (L l binds)) = do
+zonkGRHSs env zBody (GRHSs x grhss binds) = do
     (new_env, new_binds) <- zonkLocalBinds env binds
     let
         zonk_grhs (GRHS xx guarded rhs)
@@ -701,7 +701,7 @@ zonkGRHSs env zBody (GRHSs x grhss (L l binds)) = do
                new_rhs <- zBody env2 rhs
                return (GRHS xx new_guarded new_rhs)
     new_grhss <- mapM (wrapLocM zonk_grhs) grhss
-    return (GRHSs x new_grhss (L l new_binds))
+    return (GRHSs x new_grhss new_binds)
 
 {-
 ************************************************************************
@@ -841,10 +841,10 @@ zonkExpr env (HsMultiIf ty alts)
                ; expr'          <- zonkLExpr env' expr
                ; return $ GRHS x guard' expr' }
 
-zonkExpr env (HsLet x (L l binds) expr)
+zonkExpr env (HsLet x binds expr)
   = do (new_env, new_binds) <- zonkLocalBinds env binds
        new_expr <- zonkLExpr new_env expr
-       return (HsLet x (L l new_binds) new_expr)
+       return (HsLet x new_binds new_expr)
 
 zonkExpr env (HsDo ty do_or_lc (L l stmts))
   = do (_, new_stmts) <- zonkStmts env zonkLExpr stmts
@@ -1003,10 +1003,10 @@ zonkCmd env (HsCmdIf x eCond ePred cThen cElse)
        ; new_cElse <- zonkLCmd env1 cElse
        ; return (HsCmdIf x new_eCond new_ePred new_cThen new_cElse) }
 
-zonkCmd env (HsCmdLet x (L l binds) cmd)
+zonkCmd env (HsCmdLet x binds cmd)
   = do (new_env, new_binds) <- zonkLocalBinds env binds
        new_cmd <- zonkLCmd new_env cmd
-       return (HsCmdLet x (L l new_binds) new_cmd)
+       return (HsCmdLet x new_binds new_cmd)
 
 zonkCmd env (HsCmdDo ty (L l stmts))
   = do (_, new_stmts) <- zonkStmts env zonkLCmd stmts
@@ -1194,9 +1194,9 @@ zonkStmt env _ (TransStmt { trS_stmts = stmts, trS_bndrs = binderMap
         newBinder' <- zonkIdBndr env newBinder
         return (oldBinder', newBinder')
 
-zonkStmt env _ (LetStmt x (L l binds))
+zonkStmt env _ (LetStmt x binds)
   = do (env1, new_binds) <- zonkLocalBinds env binds
-       return (env1, LetStmt x (L l new_binds))
+       return (env1, LetStmt x new_binds)
 
 zonkStmt env zBody (BindStmt xbs pat body)
   = do  { (env1, new_bind) <- zonkSyntaxExpr env (xbstc_bindOp xbs)

@@ -174,7 +174,7 @@ mkSimpleMatch ctxt pats rhs
 unguardedGRHSs :: LocatedA (body (GhcPass p)) -> ApiAnn' AddApiAnn
                -> GRHSs (GhcPass p) (LocatedA (body (GhcPass p)))
 unguardedGRHSs rhs@(L loc _) ann
-  = GRHSs ann (unguardedRHS noAnn (locA loc) rhs) (noLocA emptyLocalBinds)
+  = GRHSs ann (unguardedRHS noAnn (locA loc) rhs) emptyLocalBinds
 
 unguardedRHS :: ApiAnn' GrhsAnn -> SrcSpan -> LocatedA (body (GhcPass p))
              -> [LGRHS (GhcPass p) (LocatedA (body (GhcPass p)))]
@@ -377,7 +377,7 @@ emptyRecStmtId   = emptyRecStmt' unitRecStmtTc
                                         -- a panic might trigger during zonking
 mkRecStmt anns stmts  = (emptyRecStmt' anns) { recS_stmts = stmts }
 
-mkLetStmt :: ApiAnn -> LHsLocalBinds GhcPs -> StmtLR GhcPs GhcPs (LocatedA b)
+mkLetStmt :: ApiAnn -> HsLocalBinds GhcPs -> StmtLR GhcPs GhcPs (LocatedA b)
 mkLetStmt anns binds = LetStmt anns binds
 
 -------------------------------
@@ -809,7 +809,7 @@ mkSimpleGeneratedFunBind :: SrcSpan -> RdrName -> [LPat GhcPs]
 mkSimpleGeneratedFunBind loc fun pats expr
   = L (noAnnSrcSpan loc) $ mkFunBind Generated (L (noAnnSrcSpan loc) fun)
               [mkMatch (mkPrefixFunRhs (L (noAnnSrcSpan loc) fun)) pats expr
-                       (noLocA emptyLocalBinds)]
+                       emptyLocalBinds]
 
 -- | Make a prefix, non-strict function 'HsMatchContext'
 mkPrefixFunRhs :: LocatedN id -> HsMatchContext id
@@ -822,13 +822,13 @@ mkMatch :: forall p. IsPass p
         => HsMatchContext (IdGhcP (NoGhcTcPass p))
         -> [LPat (GhcPass p)]
         -> LHsExpr (GhcPass p)
-        -> LHsLocalBinds (GhcPass p)
+        -> HsLocalBinds (GhcPass p)
         -> LMatch (GhcPass p) (LHsExpr (GhcPass p))
-mkMatch ctxt pats expr lbinds
+mkMatch ctxt pats expr binds
   = noLocA (Match { m_ext   = noAnn
                   , m_ctxt  = ctxt
                   , m_pats  = map paren pats
-                  , m_grhss = GRHSs noAnn (unguardedRHS noAnn noSrcSpan expr) lbinds })
+                  , m_grhss = GRHSs noAnn (unguardedRHS noAnn noSrcSpan expr) binds })
   where
     paren :: LPat (GhcPass p) -> LPat (GhcPass p)
     paren lp@(L l p)
@@ -1026,7 +1026,7 @@ collectStmtBinders :: (CollectPass (GhcPass idL))
                    -> [IdP (GhcPass idL)]
   -- Id Binders for a Stmt... [but what about pattern-sig type vars]?
 collectStmtBinders (BindStmt _ pat _)      = collectPatBinders pat
-collectStmtBinders (LetStmt _  binds)      = collectLocalBinders (unLoc binds)
+collectStmtBinders (LetStmt _  binds)      = collectLocalBinders binds
 collectStmtBinders (BodyStmt {})           = []
 collectStmtBinders (LastStmt {})           = []
 collectStmtBinders (ParStmt _ xs _ _)      = collectLStmtsBinders
@@ -1354,7 +1354,7 @@ lStmtsImplicits = hs_lstmts
     hs_stmt (ApplicativeStmt _ args _) = concatMap do_arg args
       where do_arg (_, ApplicativeArgOne { app_arg_pattern = pat }) = lPatImplicits pat
             do_arg (_, ApplicativeArgMany { app_stmts = stmts }) = hs_lstmts stmts
-    hs_stmt (LetStmt _ binds)     = hs_local_binds (unLoc binds)
+    hs_stmt (LetStmt _ binds)     = hs_local_binds binds
     hs_stmt (BodyStmt {})         = []
     hs_stmt (LastStmt {})         = []
     hs_stmt (ParStmt _ xs _ _)    = hs_lstmts [s | ParStmtBlock _ ss _ _ <- xs

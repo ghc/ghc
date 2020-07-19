@@ -97,8 +97,8 @@ data HsLocalBindsLR idL idR
   | XHsLocalBindsLR
         !(XXHsLocalBindsLR idL idR)
 
-type instance XHsValBinds      (GhcPass pL) (GhcPass pR) = ApiAnnCO
-type instance XHsIPBinds       (GhcPass pL) (GhcPass pR) = NoExtField
+type instance XHsValBinds      (GhcPass pL) (GhcPass pR) = ApiAnn' AnnList
+type instance XHsIPBinds       (GhcPass pL) (GhcPass pR) = ApiAnn' AnnList
 type instance XEmptyLocalBinds (GhcPass pL) (GhcPass pR) = NoExtField
 type instance XXHsLocalBindsLR (GhcPass pL) (GhcPass pR) = NoExtCon
 

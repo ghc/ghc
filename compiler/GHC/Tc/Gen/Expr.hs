@@ -557,10 +557,10 @@ tcExpr (ExplicitList _ witness exprs) res_ty
 ************************************************************************
 -}
 
-tcExpr (HsLet x (L l binds) expr) res_ty
+tcExpr (HsLet x binds expr) res_ty
   = do  { (binds', expr') <- tcLocalBinds binds $
                              tcLExpr expr res_ty
-        ; return (HsLet x (L l binds') expr') }
+        ; return (HsLet x binds' expr') }
 
 tcExpr (HsCase x scrut matches) res_ty
   = do  {  -- We used to typecheck the case alternatives first.

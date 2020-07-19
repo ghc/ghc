@@ -611,8 +611,7 @@ dsCmd ids local_vars stack_ty res_ty
 --
 --              ---> premap (\ ((xs),stk) -> let binds in ((ys),stk)) c
 
-dsCmd ids local_vars stack_ty res_ty (HsCmdLet _ lbinds@(L _ binds) body)
-                                                                    env_ids = do
+dsCmd ids local_vars stack_ty res_ty (HsCmdLet _ lbinds@binds body) env_ids = do
     let
         defined_vars = mkVarSet (collectLocalBinders binds)
         local_vars' = defined_vars `unionVarSet` local_vars
@@ -1164,7 +1163,7 @@ matchSimplys _ _ _ _ _ = panic "matchSimplys"
 leavesMatch :: LMatch GhcTc (LocatedA (body GhcTc))
             -> [(LocatedA (body GhcTc), IdSet)]
 leavesMatch (L _ (Match { m_pats = pats
-                        , m_grhss = GRHSs _ grhss (L _ binds) }))
+                        , m_grhss = GRHSs _ grhss binds }))
   = let
         defined_vars = mkVarSet (collectPatsBinders pats)
                         `unionVarSet`

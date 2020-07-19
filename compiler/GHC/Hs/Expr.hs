@@ -407,7 +407,7 @@ data HsExpr p
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | HsLet       (XLet p)
-                (LHsLocalBinds p)
+                (HsLocalBinds p)
                 (LHsExpr  p)
 
   -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDo',
@@ -1068,11 +1068,11 @@ ppr_expr (HsMultiIf _ alts)
         ppr_alt (L _ (XGRHS x)) = ppr x
 
 -- special case: let ... in let ...
-ppr_expr (HsLet _ (L _ binds) expr@(L _ (HsLet _ _ _)))
+ppr_expr (HsLet _ binds expr@(L _ (HsLet _ _ _)))
   = sep [hang (text "let") 2 (hsep [pprBinds binds, ptext (sLit "in")]),
          ppr_lexpr expr]
 
-ppr_expr (HsLet _ (L _ binds) expr)
+ppr_expr (HsLet _ binds expr)
   = sep [hang (text "let") 2 (pprBinds binds),
          hang (text "in")  2 (ppr expr)]
 
@@ -1384,7 +1384,7 @@ data HsCmd id
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsCmdLet    (XCmdLet id)
-                (LHsLocalBinds id)      -- let(rec)
+                (HsLocalBinds id)      -- let(rec)
                 (LHsCmd  id)
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnLet',
     --       'GHC.Parser.Annotation.AnnOpen' @'{'@,
@@ -1525,11 +1525,11 @@ ppr_cmd (HsCmdIf _ _ e ct ce)
          nest 4 (ppr ce)]
 
 -- special case: let ... in let ...
-ppr_cmd (HsCmdLet _ (L _ binds) cmd@(L _ (HsCmdLet {})))
+ppr_cmd (HsCmdLet _ binds cmd@(L _ (HsCmdLet {})))
   = sep [hang (text "let") 2 (hsep [pprBinds binds, ptext (sLit "in")]),
          ppr_lcmd cmd]
 
-ppr_cmd (HsCmdLet _ (L _ binds) cmd)
+ppr_cmd (HsCmdLet _ binds cmd)
   = sep [hang (text "let") 2 (pprBinds binds),
          hang (text "in")  2 (ppr cmd)]
 
@@ -1733,7 +1733,7 @@ data GRHSs p body
   = GRHSs {
       grhssExt :: XCGRHSs p body,
       grhssGRHSs :: [LGRHS p body],      -- ^ Guarded RHSs
-      grhssLocalBinds :: LHsLocalBinds p -- ^ The where clause
+      grhssLocalBinds :: HsLocalBinds p -- ^ The where clause
     }
   | XGRHSs !(XXGRHSs p body)
 
@@ -1822,7 +1822,7 @@ pprMatch (Match { m_pats = pats, m_ctxt = ctxt, m_grhss = grhss })
 
 pprGRHSs :: (OutputableBndrId idR, Outputable body)
          => HsMatchContext passL -> GRHSs (GhcPass idR) body -> SDoc
-pprGRHSs ctxt (GRHSs _ grhss (L _ binds))
+pprGRHSs ctxt (GRHSs _ grhss binds)
   = vcat (map (pprGRHS ctxt . unLoc) grhss)
   -- Print the "where" even if the contents of the binds is empty. Only
   -- EmptyLocalBinds means no "where" keyword
@@ -1945,7 +1945,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
   --          'GHC.Parser.Annotation.AnnOpen' @'{'@,'GHC.Parser.Annotation.AnnClose' @'}'@,
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | LetStmt  (XLetStmt idL idR body) (LHsLocalBindsLR idL idR)
+  | LetStmt  (XLetStmt idL idR body) (HsLocalBindsLR idL idR)
 
   -- ParStmts only occur in a list/monad comprehension
   | ParStmt  (XParStmt idL idR body)    -- Post typecheck,
@@ -2328,10 +2328,10 @@ pprStmt (LastStmt _ expr m_dollar_stripped _)
         Just False -> text "return"
         Nothing -> empty) <+>
       ppr expr
-pprStmt (BindStmt _ pat expr) = hsep [ppr pat, larrow, ppr expr]
-pprStmt (LetStmt _ (L _ binds))   = hsep [text "let", pprBinds binds]
-pprStmt (BodyStmt _ expr _ _)     = ppr expr
-pprStmt (ParStmt _ stmtss _ _)   = sep (punctuate (text " | ") (map ppr stmtss))
+pprStmt (BindStmt _ pat expr)  = hsep [ppr pat, larrow, ppr expr]
+pprStmt (LetStmt _ binds)      = hsep [text "let", pprBinds binds]
+pprStmt (BodyStmt _ expr _ _)  = ppr expr
+pprStmt (ParStmt _ stmtss _ _) = sep (punctuate (text " | ") (map ppr stmtss))
 
 pprStmt (TransStmt { trS_stmts = stmts, trS_by = by
                    , trS_using = using, trS_form = form })

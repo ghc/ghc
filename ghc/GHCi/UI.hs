@@ -1257,7 +1257,7 @@ runStmt input step = do
     mk_stmt loc bind =
       let l  = L loc
           la = L (noAnnSrcSpan loc)
-      in la (LetStmt noAnn (la (HsValBinds noAnn (ValBinds NoAnnSortKey (unitBag (la bind)) []))))
+      in la (LetStmt noAnn (HsValBinds noAnn (ValBinds NoAnnSortKey (unitBag (la bind)) [])))
 
 -- | Clean up the GHCi environment after a statement has run
 afterRunStmt :: GhciMonad m

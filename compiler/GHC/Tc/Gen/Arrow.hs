@@ -145,11 +145,11 @@ tc_cmd env (HsCmdPar x cmd) res_ty
   = do  { cmd' <- tcCmd env cmd res_ty
         ; return (HsCmdPar x cmd') }
 
-tc_cmd env (HsCmdLet x (L l binds) (L body_loc body)) res_ty
+tc_cmd env (HsCmdLet x binds (L body_loc body)) res_ty
   = do  { (binds', body') <- tcLocalBinds binds         $
                              setSrcSpan (locA body_loc) $
                              tc_cmd env body res_ty
-        ; return (HsCmdLet x (L l binds') (L body_loc body')) }
+        ; return (HsCmdLet x binds' (L body_loc body')) }
 
 tc_cmd env in_cmd@(HsCmdCase x scrut matches) (stk, res_ty)
   = addErrCtxt (cmdCtxt in_cmd) $ do
@@ -272,10 +272,10 @@ tc_cmd env
     match_ctxt = (LambdaExpr :: HsMatchContext Name)    -- Maybe KappaExpr?
     pg_ctxt    = PatGuard match_ctxt
 
-    tc_grhss (GRHSs x grhss (L l binds)) stk_ty res_ty
+    tc_grhss (GRHSs x grhss binds) stk_ty res_ty
         = do { (binds', grhss') <- tcLocalBinds binds $
                                    mapM (wrapLocM (tc_grhs stk_ty res_ty)) grhss
-             ; return (GRHSs x grhss' (L l binds')) }
+             ; return (GRHSs x grhss' binds') }
 
     tc_grhs stk_ty res_ty (GRHS x guards body)
         = do { (guards', rhs') <- tcStmtsAndThen pg_ctxt tcGuardStmt guards res_ty $

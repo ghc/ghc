@@ -552,7 +552,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
     isAliasMG MG {mg_alts = (L _ [L _ (Match { m_pats = []
                                              , m_grhss = grhss })])}
         | GRHSs _ [L _ (GRHS _ [] body)] lbinds <- grhss
-        , EmptyLocalBinds _ <- unLoc lbinds
+        , EmptyLocalBinds _ <- lbinds
         , HsVar _ lrhsName  <- unLoc body  = Just (unLoc lrhsName)
     isAliasMG _ = Nothing
 

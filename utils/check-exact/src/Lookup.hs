@@ -135,4 +135,3 @@ keywordToString kw =
       (G AnnrarrowtailU) -> "⤚"
       AnnTypeApp             -> "@"
       (G AnnVia) -> "via"
-

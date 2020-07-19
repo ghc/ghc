@@ -394,7 +394,8 @@ getRealSpan (RealSrcSpan sp _) = Just sp
 getRealSpan _ = Nothing
 
 grhss_span :: GRHSs p body -> SrcSpan
-grhss_span (GRHSs _ xs bs) = foldl' combineSrcSpans (getLocA bs) (map getLoc xs)
+-- AZ:TODO: we have not span for bs. Is this a problem?
+grhss_span (GRHSs _ xs _bs) = foldl1 combineSrcSpans  (map getLoc xs)
 grhss_span (XGRHSs _) = panic "XGRHS has no span"
 
 bindingsOnly :: [Context Name] -> HieM [HieAST a]
@@ -1048,23 +1049,46 @@ instance ToHie (TScoped (HsPatSigType GhcRn)) where
       ]
   -- See Note [Scoping Rules for SigPat]
 
-instance ( ToHie (LocatedA body)
+-- instance ( ToHie (LocatedA body)
+--          , HiePass p
+--          , Data body
+--          ) => ToHie (GRHSs (GhcPass p) (LocatedA body)) where
+--   toHie grhs = concatM $ case grhs of
+--     GRHSs _ grhss binds ->
+--      [ toHie grhss
+--      , toHie $ RS (mkScope $ grhss_span grhs) binds
+--      ]
+instance ( ToHie body
          , HiePass p
          , Data body
-         ) => ToHie (GRHSs (GhcPass p) (LocatedA body)) where
+         ) => ToHie (GRHSs (GhcPass p) body) where
   toHie grhs = concatM $ case grhs of
     GRHSs _ grhss binds ->
      [ toHie grhss
-     , toHie $ RS (mkScope $ grhss_span grhs) binds
+     , toHie $ RS NoScope binds
      ]
 
-instance ( ToHie (LocatedA body)
+-- instance ( ToHie (LocatedA body)
+--          , HiePass a
+--          , Data body
+--          ) => ToHie (LGRHS (GhcPass a) (LocatedA body)) where
+--   toHie (L span g) = concatM $ node : case g of
+--     GRHS _ guards body ->
+--       [ toHie $ listScopesA (mkLScopeA body) guards
+--       , toHie body
+--       ]
+--     where
+--       node = case hiePass @a of
+--         HieRn -> makeNode g span
+--         HieTc -> makeNode g span
+
+instance ( ToHie body
          , HiePass a
          , Data body
-         ) => ToHie (LGRHS (GhcPass a) (LocatedA body)) where
+         ) => ToHie (LGRHS (GhcPass a) body) where
   toHie (L span g) = concatM $ node : case g of
     GRHS _ guards body ->
-      [ toHie $ listScopesA (mkLScopeA body) guards
+      [ toHie $ listScopesA NoScope guards
       , toHie body
       ]
     where
@@ -1266,6 +1290,48 @@ instance HiePass p => ToHie (RScoped (LHsLocalBinds (GhcPass p))) where
         [ toHie $ RS (combineScopes scope $ mkScopeA sp)
                       valBinds
         ]
+
+instance HiePass p => ToHie (RScoped (HsLocalBinds (GhcPass p))) where
+  toHie (RS scope binds) = concatM $ (pure []) : case binds of
+      EmptyLocalBinds _ -> []
+      HsIPBinds _ ipbinds -> case ipbinds of
+        IPBinds evbinds xs -> let sc = scopeHsLocaLBinds binds
+                                  sp = spanHsLocaLBinds binds in
+          [
+            case hiePass @p of
+              HieTc -> toHie $ EvBindContext sc (getRealSpan sp) $ L sp evbinds
+              HieRn -> pure []
+          , toHie $ map (RS sc) xs
+          ]
+      HsValBinds _ valBinds ->
+        [
+          toHie $ RS (scopeHsLocaLBinds binds)
+                      valBinds
+        ]
+
+
+spanHsLocaLBinds :: HsLocalBinds (GhcPass p) -> SrcSpan
+spanHsLocaLBinds (HsValBinds _ (ValBinds _ bs sigs))
+  = foldr1 combineSrcSpans (bsSpans ++ sigsSpans)
+  where
+    bsSpans :: [SrcSpan]
+    bsSpans = map getLocA $ bagToList bs
+    sigsSpans :: [SrcSpan]
+    sigsSpans = map getLoc sigs
+
+scopeHsLocaLBinds :: HsLocalBinds (GhcPass p) -> Scope
+scopeHsLocaLBinds (HsValBinds _ (ValBinds _ bs sigs))
+  = foldr combineScopes NoScope (bsScope ++ sigsScope)
+  where
+    bsScope :: [Scope]
+    bsScope = map (mkScopeA . getLoc) $ bagToList bs
+    sigsScope :: [Scope]
+    sigsScope = map (mkScope . getLoc) sigs
+
+scopeHsLocaLBinds (HsIPBinds _ (IPBinds _ bs))
+  = foldr combineScopes NoScope (map (mkScopeA . getLoc) bs)
+scopeHsLocaLBinds (EmptyLocalBinds _) = NoScope
+
 
 instance HiePass p => ToHie (RScoped (LIPBind (GhcPass p))) where
   toHie (RS scope (L sp bind)) = concatM $ makeNodeA bind sp : case bind of

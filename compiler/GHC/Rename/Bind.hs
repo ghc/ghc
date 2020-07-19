@@ -1209,10 +1209,10 @@ rnGRHSs :: HsMatchContext Name
         -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
         -> GRHSs GhcPs (LocatedA (body GhcPs))
         -> RnM (GRHSs GhcRn (LocatedA (body GhcRn)), FreeVars)
-rnGRHSs ctxt rnBody (GRHSs _ grhss (L l binds))
+rnGRHSs ctxt rnBody (GRHSs _ grhss binds)
   = rnLocalBindsAndThen binds   $ \ binds' _ -> do
     (grhss', fvGRHSs) <- mapFvRn (rnGRHS ctxt rnBody) grhss
-    return (GRHSs noAnn grhss' (L l binds'), fvGRHSs)
+    return (GRHSs noAnn grhss' binds', fvGRHSs)
 
 rnGRHS :: HsMatchContext Name
        -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))

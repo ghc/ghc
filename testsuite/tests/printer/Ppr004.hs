@@ -8,11 +8,13 @@ import qualified Data.IntMap
 import Prelude hiding (lookup)
 import Data.Char (ord)
 
+{-
 class GMapKey k where
-  data GMap k :: * -> *
-  empty       :: GMap k v
+  data  GMap  k  ::  *  ->  *
+  empty       ::  GMap   k  v
   lookup      :: k -> GMap k v -> Maybe v
   insert      :: k -> v -> GMap k v -> GMap k v
+-}
 
 -- An Int instance
 instance GMapKey Int where
@@ -21,6 +23,7 @@ instance GMapKey Int where
   lookup k   (GMapInt m) = Data.IntMap.lookup k m
   insert k v (GMapInt m) = GMapInt (Data.IntMap.insert k v m)
 
+{-
 -- A Char instance
 instance GMapKey Char where
   data GMap Char v        = GMapChar (GMap Int v)
@@ -80,3 +83,4 @@ data family G a b
 data instance G [a] b where
    G1 :: c -> G [Int] b
    G2 :: G [a] Bool
+-}
