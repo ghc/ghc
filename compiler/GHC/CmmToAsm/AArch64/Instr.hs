@@ -342,10 +342,28 @@ aarch64_mkSpillInstr
    -> Reg       -- register to spill
    -> Int       -- current stack delta
    -> Int       -- spill slot to use
-   -> Instr
+   -> (Int, [Instr])
+-- XXX this is stupid. We essentially do sp <- sp - 4095; str xN, [sp - ...] ; sp <- sp + 4095
+aarch64_mkSpillInstr config reg delta slot | (spillSlotToOffset config slot) - delta > 4095
+    = let (d, isns) = aarch64_mkSpillInstr config reg (delta + 4095) slot
+      in (d, SUB sp sp (OpImm (ImmInt 4095)) : isns ++ [ADD sp sp (OpImm (ImmInt 4095))])
+
+aarch64_mkSpillInstr config reg delta slot | (spillSlotToOffset config slot) - delta > 255
+    = let (d, isns) = aarch64_mkSpillInstr config reg (delta + delta') slot
+      in (d, SUB sp sp (OpImm (ImmInt delta')) : isns ++ [ADD sp sp (OpImm (ImmInt delta'))])
+      where delta' = (spillSlotToOffset config slot) - delta
+
+aarch64_mkSpillInstr config reg delta slot | (spillSlotToOffset config slot) - delta < -4095
+    = let (d, isns) = aarch64_mkSpillInstr config reg (delta - 4095) slot
+      in (d, ADD sp sp (OpImm (ImmInt 4095)) : isns ++ [SUB sp sp (OpImm (ImmInt 4095))])
+
+aarch64_mkSpillInstr config reg delta slot | (spillSlotToOffset config slot) - delta < -256
+    = let (d, isns) = aarch64_mkSpillInstr config reg (delta + delta') slot
+      in (d, SUB sp sp (OpImm (ImmInt delta')) : isns ++ [ADD sp sp (OpImm (ImmInt delta'))])
+      where delta' = (spillSlotToOffset config slot) - delta
 
 aarch64_mkSpillInstr config reg delta slot
-    = ANN (text "Spill") $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt $ off - delta)))
+    = (delta, [ANN (text "Spill") $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt $ off - delta)))])
     where
         fmt = case reg of
             RegReal (RealRegSingle n) | n < 32 -> II64
@@ -357,10 +375,29 @@ aarch64_mkLoadInstr
    -> Reg       -- register to load
    -> Int       -- current stack delta
    -> Int       -- spill slot to use
-   -> Instr
+   -> (Int, [Instr])
+-- XXX this is stupid. We essentially do sp <- sp - 4095; str xN, [sp - ...] ; sp <- sp + 4095
+aarch64_mkLoadInstr config reg delta slot | (spillSlotToOffset config slot) - delta > 4095
+    = let (d, isns) = aarch64_mkLoadInstr config reg (delta + 4095) slot
+      in (d, SUB sp sp (OpImm (ImmInt 4095)) : isns ++ [ADD sp sp (OpImm (ImmInt 4095))])
+
+aarch64_mkLoadInstr config reg delta slot | (spillSlotToOffset config slot) - delta > 255
+    = let (d, isns) = aarch64_mkLoadInstr config reg (delta + delta') slot
+      in (d, SUB sp sp (OpImm (ImmInt delta')) : isns ++ [ADD sp sp (OpImm (ImmInt delta'))])
+      where delta' = (spillSlotToOffset config slot) - delta
+
+aarch64_mkLoadInstr config reg delta slot | (spillSlotToOffset config slot) - delta < -4095
+    = let (d, isns) = aarch64_mkLoadInstr config reg (delta - 4096) slot
+      in (d, ADD sp sp (OpImm (ImmInt 4095)) : isns ++ [SUB sp sp (OpImm (ImmInt 4095))])
+
+aarch64_mkLoadInstr config reg delta slot | (spillSlotToOffset config slot) - delta < -256
+    = let (d, isns) = aarch64_mkLoadInstr config reg (delta + delta') slot
+      in (d, SUB sp sp (OpImm (ImmInt delta')) : isns ++ [ADD sp sp (OpImm (ImmInt delta'))])
+      where delta' = (spillSlotToOffset config slot) - delta
+
 
 aarch64_mkLoadInstr config reg delta slot
-    = ANN (text "Reload") $ LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt $ off - delta)))
+    = (delta, [ANN (text "Reload") $ LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt $ off - delta)))])
     where
         fmt = case reg of
             RegReal (RealRegSingle n) | n < 32 -> II64

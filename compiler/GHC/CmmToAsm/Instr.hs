@@ -91,7 +91,7 @@ class Instruction instr where
                 -> Reg          -- ^ the reg to spill
                 -> Int          -- ^ the current stack delta
                 -> Int          -- ^ spill slot to use
-                -> instr
+                -> (Int, [instr]) -- ^ (new stack delta, instruction)
 
 
         -- | An instruction to reload a register from a spill slot.
@@ -100,7 +100,7 @@ class Instruction instr where
                 -> Reg          -- ^ the reg to reload.
                 -> Int          -- ^ the current stack delta
                 -> Int          -- ^ the spill slot to use
-                -> instr
+                -> (Int, [instr]) -- ^ (new stack delta, instruction)
 
         -- | See if this instruction is telling us the current C stack delta
         takeDeltaInstr
