@@ -5,6 +5,7 @@ module GHC.Exts.Heap.FFIClosures where
 
 import Prelude
 import Foreign
+import GHC.Exts.Heap.ProfInfo.Types
 
 -- TODO use sum type for what_next, why_blocked, flags?
 
@@ -18,13 +19,15 @@ data TSOFields = TSOFields {
     tso_saved_errno :: Word32,
     tso_dirty:: Word32,
     tso_alloc_limit :: Int64,
-    tso_tot_stack_size :: Word32
--- TODO StgTSOProfInfo prof is optionally included, but looks very interesting.
+    tso_tot_stack_size :: Word32,
+    tso_prof :: Maybe StgTSOProfInfo
 }
 
 -- | Get non-pointer fields from @StgTSO_@ (@TSO.h@)
-peekTSOFields :: Ptr a -> IO TSOFields
-peekTSOFields ptr = do
+peekTSOFields :: (Ptr tsoPtr -> IO (Maybe StgTSOProfInfo))
+                -> Ptr tsoPtr
+                -> IO TSOFields
+peekTSOFields peekProfInfo ptr = do
     what_next' <- (#peek struct StgTSO_, what_next) ptr
     why_blocked' <- (#peek struct StgTSO_, why_blocked) ptr
     flags' <- (#peek struct StgTSO_, flags) ptr
@@ -33,6 +36,7 @@ peekTSOFields ptr = do
     dirty' <- (#peek struct StgTSO_, dirty) ptr
     alloc_limit' <- (#peek struct StgTSO_, alloc_limit) ptr
     tot_stack_size' <- (#peek struct StgTSO_, tot_stack_size) ptr
+    tso_prof' <- peekProfInfo ptr
 
     return TSOFields {
         tso_what_next = what_next',
@@ -42,7 +46,8 @@ peekTSOFields ptr = do
         tso_saved_errno = saved_errno',
         tso_dirty= dirty',
         tso_alloc_limit = alloc_limit',
-        tso_tot_stack_size = tot_stack_size'
+        tso_tot_stack_size = tot_stack_size',
+        tso_prof = tso_prof'
     }
 
 data StackFields = StackFields {
