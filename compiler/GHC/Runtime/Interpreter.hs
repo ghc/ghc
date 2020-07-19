@@ -94,7 +94,7 @@ import qualified Data.ByteString.Lazy as LB
 import Data.Array ((!))
 import Data.IORef
 import Foreign hiding (void)
-import GHC.Exts.Heap
+import qualified GHC.Exts.Heap as Heap
 import GHC.Stack.CCS (CostCentre,CostCentreStack)
 import System.Exit
 import GHC.IO.Handle.Types (Handle)
@@ -386,7 +386,7 @@ getBreakpointVar hsc_env ref ix =
     mb <- iservCmd hsc_env (GetBreakpointVar apStack ix)
     mapM (mkFinalizedHValue hsc_env) mb
 
-getClosure :: HscEnv -> ForeignHValue -> IO (GenClosure ForeignHValue)
+getClosure :: HscEnv -> ForeignHValue -> IO (Heap.GenClosure ForeignHValue)
 getClosure hsc_env ref =
   withForeignRef ref $ \hval -> do
     mb <- iservCmd hsc_env (GetClosure hval)
