@@ -387,7 +387,7 @@ aarch64_mkLoadInstr config reg delta slot | (spillSlotToOffset config slot) - de
       where delta' = (spillSlotToOffset config slot) - delta
 
 aarch64_mkLoadInstr config reg delta slot | (spillSlotToOffset config slot) - delta < -4095
-    = let (d, isns) = aarch64_mkLoadInstr config reg (delta - 4096) slot
+    = let (d, isns) = aarch64_mkLoadInstr config reg (delta - 4095) slot
       in (d, ADD sp sp (OpImm (ImmInt 4095)) : isns ++ [SUB sp sp (OpImm (ImmInt 4095))])
 
 aarch64_mkLoadInstr config reg delta slot | (spillSlotToOffset config slot) - delta < -256
@@ -470,8 +470,8 @@ aarch64_mkStackDeallocInstr :: Platform -> Int -> [Instr]
 aarch64_mkStackDeallocInstr platform n
     | n == 0 = []
     | n > 0 && n < 4096 = [ ADD sp sp (OpImm (ImmInt n)) ]
-    | n > 0 = ADD sp sp (OpImm (ImmInt 4095)) : aarch64_mkStackAllocInstr platform (n - 4095)
-aarch64_mkStackDeallocInstr platform n = pprPanic "aarch64_mkStackAllocInstr" (int n)
+    | n > 0 = ADD sp sp (OpImm (ImmInt 4095)) : aarch64_mkStackDeallocInstr platform (n + 4095)
+aarch64_mkStackDeallocInstr platform n = pprPanic "aarch64_mkStackDeallocInstr" (int n)
 
 --
 -- See note [extra spill slots] in X86/Instr.hs
