@@ -24,7 +24,7 @@ else
 CFLAGS = -fPIC
 endif
 
-MY_TEST_HC_OPTS = $(TEST_HC_OPTS) $(CFLAGS)
+MY_TEST_HC_OPTS = $(filter-out -rtsopts,$(TEST_HC_OPTS)) $(CFLAGS)
 
 # --------------------------------------------------------------
 # Note: libAS.def is not used directly in these tests but is
