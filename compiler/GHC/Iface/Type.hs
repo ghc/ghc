@@ -418,24 +418,14 @@ isIfaceLiftedTypeKind (IfaceTyConApp tc
 isIfaceLiftedTypeKind _ = False
 
 splitIfaceSigmaTy :: IfaceType -> ([IfaceForAllBndr], [IfacePredType], IfaceType)
--- Mainly for printing purposes
+-- Splits (forall tv1 .. tvn. (c1, ..., cn) => tau)
+-- into ([tv1,..,tvn], [c1, .., cm], tau)
 --
--- Here we split nested IfaceSigmaTy properly.
---
--- @
--- forall t. T t => forall m a b. M m => (a -> m b) -> t a -> m (t b)
--- @
---
--- If you called @splitIfaceSigmaTy@ on this type:
---
--- @
--- ([t, m, a, b], [T t, M m], (a -> m b) -> t a -> m (t b))
--- @
+-- Historical note: this function used to split multiple levels
+-- and put all the foralls at the top; but that is plain confusing,
+-- so we made it do the simple thing.  See #18458
 splitIfaceSigmaTy ty
-  = case (bndrs, theta) of
-      ([], []) -> (bndrs, theta, tau)
-      _        -> let (bndrs', theta', tau') = splitIfaceSigmaTy tau
-                   in (bndrs ++ bndrs', theta ++ theta', tau')
+  = (bndrs, theta, tau)
   where
     (bndrs, rho)   = split_foralls ty
     (theta, tau)   = split_rho rho

@@ -183,13 +183,13 @@ holes3.hs:11:15: error:
         scanr :: forall a b. (a -> b -> b) -> b -> [a] -> [b]
         unzip :: forall a b. [(a, b)] -> ([a], [b])
         (^^) :: forall a b. (Fractional a, Integral b) => a -> b -> a
-        ceiling :: forall a b. (RealFrac a, Integral b) => a -> b
-        floor :: forall a b. (RealFrac a, Integral b) => a -> b
-        properFraction :: forall a b.
-                          (RealFrac a, Integral b) =>
-                          a -> (b, a)
-        round :: forall a b. (RealFrac a, Integral b) => a -> b
-        truncate :: forall a b. (RealFrac a, Integral b) => a -> b
+        ceiling :: forall a. RealFrac a => forall b. Integral b => a -> b
+        floor :: forall a. RealFrac a => forall b. Integral b => a -> b
+        properFraction :: forall a.
+                          RealFrac a =>
+                          forall b. Integral b => a -> (b, a)
+        round :: forall a. RealFrac a => forall b. Integral b => a -> b
+        truncate :: forall a. RealFrac a => forall b. Integral b => a -> b
         seq :: forall a b. a -> b -> b
         ($) :: forall a b. (a -> b) -> a -> b
         either :: forall a c b. (a -> c) -> (b -> c) -> Either a b -> c
