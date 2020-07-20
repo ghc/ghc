@@ -583,7 +583,7 @@ getRegister' config plat expr
         -- UBFM will set the high bits to 0. SBFM will copy the sign (sign extend).
         MO_UU_Conv from to -> return $ Any (intFormat to) (\dst -> code `snocOL` UBFM (OpReg (max from to) dst) (OpReg (max from to) reg) (OpImm (ImmInt 0)) (toImm (min from to)))
         MO_SS_Conv from to -> return $ Any (intFormat to) (\dst -> code `snocOL` SBFM (OpReg (max from to) dst) (OpReg (max from to) reg) (OpImm (ImmInt 0)) (toImm (min from to)))
-        MO_FF_Conv from to -> return $ Any (intFormat to) (\dst -> code `snocOL` FCVT (OpReg to dst) (OpReg from reg))
+        MO_FF_Conv from to -> return $ Any (floatFormat to) (\dst -> code `snocOL` FCVT (OpReg to dst) (OpReg from reg))
 
         -- Conversions
         MO_XX_Conv from to -> swizzleRegisterRep (intFormat to) <$> getRegister e
