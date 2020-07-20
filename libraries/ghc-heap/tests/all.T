@@ -54,7 +54,7 @@ test('prof_info',
      [extra_files(['create_tso.c','create_tso.h']),
       ignore_stdout,
       ignore_stderr,
-# TODO: What about this?
-#      only_ways(prof_ways)
+      extra_ways(['prof']),
+      only_ways(prof_ways)
      ],
-     multi_compile_and_run, ['prof_info', [('create_tso.c','-optc=-g -opta=-g')], '-prof -debug -fprof-auto'])
+     multi_compile_and_run, ['prof_info', [('create_tso.c','-optc=-g -opta=-g')], '-prof'])
