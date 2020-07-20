@@ -581,6 +581,7 @@ mkCastWrapperInlinePrag :: InlinePragma -> InlinePragma
 mkCastWrapperInlinePrag (InlinePragma { inl_act = act, inl_rule = rule_info })
   = InlinePragma { inl_src    = SourceText "{-# INLINE"
                  , inl_inline = NoUserInline -- See Note [Wrapper NoUserInline]
+                 , inl_spec   = NoUserSpecializable -- TODO
                  , inl_sat    = Nothing      --     in GHC.Core.Opt.WorkWrap
                  , inl_act    = wrap_act     -- See Note [Wrapper activation]
                  , inl_rule   = rule_info }  --     in GHC.Core.Opt.WorkWrap

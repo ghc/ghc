@@ -754,6 +754,7 @@ cvtPragmaD (InlineP nm inline rm phases)
              src TH.Inlinable = "{-# INLINABLE"
        ; let ip   = InlinePragma { inl_src    = SourceText $ src inline
                                  , inl_inline = cvtInline inline
+                                 , inl_spec   = NoUserSpecializable -- TODO
                                  , inl_rule   = cvtRuleMatch rm
                                  , inl_act    = cvtPhases phases dflt
                                  , inl_sat    = Nothing }
@@ -772,6 +773,7 @@ cvtPragmaD (SpecialiseP nm ty inline phases)
                                 "{-# SPECIALISE")
        ; let ip = InlinePragma { inl_src    = SourceText srcText
                                , inl_inline = inline'
+                               , inl_spec   = NoUserSpecializable -- TODO
                                , inl_rule   = Hs.FunLike
                                , inl_act    = cvtPhases phases dflt
                                , inl_sat    = Nothing }

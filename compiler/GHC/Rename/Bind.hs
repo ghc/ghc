@@ -52,7 +52,9 @@ import GHC.Types.Name.Set
 import GHC.Types.Name.Reader ( RdrName, rdrNameOcc )
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Data.List.SetOps    ( findDupsEq )
-import GHC.Types.Basic         ( RecFlag(..), TypeOrKind(..) )
+import GHC.Types.Basic         ( RecFlag(..), TypeOrKind(..)
+                               , InlineSpec(..), SpecializableSpec(..)
+                               , inlinePragmaSpec, specializablePragmaSpec )
 import GHC.Data.Graph.Directed ( SCC(..) )
 import GHC.Data.Bag
 import GHC.Utils.Misc
@@ -1128,7 +1130,13 @@ findDupSigs sigs
 
     matching_sig (L _ n1,sig1) (L _ n2,sig2)       = n1 == n2 && mtch sig1 sig2
     mtch (FixSig {})           (FixSig {})         = True
-    mtch (InlineSig {})        (InlineSig {})      = True
+    -- Inline pragmas together with specializable ones are allowed
+    mtch (InlineSig _ _ prg1) (InlineSig _ _ prg2) =
+      (inlinePragmaSpec prg1 /= NoUserInline
+      && inlinePragmaSpec prg2 /= NoUserInline)
+      ||
+      (specializablePragmaSpec prg1 /= NoUserSpecializable
+      && specializablePragmaSpec prg2 /= NoUserSpecializable)
     mtch (TypeSig {})          (TypeSig {})        = True
     mtch (ClassOpSig _ d1 _ _) (ClassOpSig _ d2 _ _) = d1 == d2
     mtch (PatSynSig _ _ _)     (PatSynSig _ _ _)   = True

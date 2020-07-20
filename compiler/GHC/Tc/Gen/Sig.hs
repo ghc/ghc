@@ -593,14 +593,25 @@ lhsBindArity _ env = env        -- PatBind/VarBind
 -----------------
 addInlinePrags :: TcId -> [LSig GhcRn] -> TcM TcId
 addInlinePrags poly_id prags_for_me
-  | inl@(L _ prag) : inls <- inl_prags
-  = do { traceTc "addInlinePrag" (ppr poly_id $$ ppr prag)
-       ; unless (null inls) (warn_multiple_inlines inl inls)
-       ; return (poly_id `setInlinePragma` prag) }
+  | null inl_prags = return poly_id
   | otherwise
-  = return poly_id
+       -- TODO clean a bit
+  = do { mapM_ (traceTc "addInlinePrag"        (ppr poly_id $$ ppr prag)) $ take 1 inl_inl
+       ; mapM_ (traceTc "addSpecializablePrag" (ppr poly_id $$ ppr prag)) $ take 1 inl_spec
+       -- TODO avoid head
+       ; when (multiple inl_inl) (warn_multiple_inlines (head inl_inl) inl_inl)
+       ; when (multiple inl_spec) (warn_multiple_inlines (head inl_spec) inl_spec)
+       -- TODO merge them properly
+       ; return (poly_id `setInlinePragma` prag) }
   where
     inl_prags = [L loc prag | L loc (InlineSig _ _ prag) <- prags_for_me]
+    inl_inl = [L loc prag | L loc prag <- inl_prags,
+              inlinePragmaSpec prag /= NoUserInline]
+    inl_spec = [L loc prag | L loc prag <- inl_prags,
+               specializablePragmaSpec prag /= NoUserSpecializable]
+
+    multiple (_:_:_) = True
+    multiple _ = False
 
     warn_multiple_inlines _ [] = return ()
 

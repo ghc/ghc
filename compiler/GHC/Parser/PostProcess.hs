@@ -2601,13 +2601,14 @@ mk_rec_upd_field :: HsRecField GhcPs (LHsExpr GhcPs) -> HsRecUpdField GhcPs
 mk_rec_upd_field (HsRecField (L loc (FieldOcc _ rdr)) arg pun)
   = HsRecField (L loc (Unambiguous noExtField rdr)) arg pun
 
-mkInlinePragma :: SourceText -> (InlineSpec, RuleMatchInfo) -> Maybe Activation
+mkInlinePragma :: SourceText -> (InlineSpec, SpecializableSpec, RuleMatchInfo) -> Maybe Activation
                -> InlinePragma
 -- The (Maybe Activation) is because the user can omit
 -- the activation spec (and usually does)
-mkInlinePragma src (inl, match_info) mb_act
+mkInlinePragma src (inl, spec, match_info) mb_act
   = InlinePragma { inl_src = src -- Note [Pragma source text] in GHC.Types.Basic
                  , inl_inline = inl
+                 , inl_spec   = spec
                  , inl_sat    = Nothing
                  , inl_act    = act
                  , inl_rule   = match_info }

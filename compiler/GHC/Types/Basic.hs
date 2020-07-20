@@ -86,6 +86,7 @@ module GHC.Types.Basic (
 
         RuleMatchInfo(..), isConLike, isFunLike,
         InlineSpec(..), noUserInlineSpec,
+        SpecializableSpec(..),
         InlinePragma(..), defaultInlinePragma, alwaysInlinePragma,
         neverInlinePragma, dfunInlinePragma,
         isDefaultInlinePragma,
@@ -94,6 +95,7 @@ module GHC.Types.Basic (
         inlinePragmaActivation, inlinePragmaRuleMatchInfo,
         setInlinePragmaActivation, setInlinePragmaRuleMatchInfo,
         pprInline, pprInlineDebug,
+        specializablePragmaSpec,
 
         SuccessFlag(..), succeeded, failed, successIf,
 
@@ -1437,6 +1439,7 @@ data InlinePragma            -- Note [InlinePragma]
   = InlinePragma
       { inl_src    :: SourceText -- Note [Pragma source text]
       , inl_inline :: InlineSpec -- See Note [inl_inline and inl_act]
+      , inl_spec   :: SpecializableSpec
 
       , inl_sat    :: Maybe Arity    -- Just n <=> Inline only when applied to n
                                      --            explicit (non-type, non-dictionary) args
@@ -1466,6 +1469,11 @@ data InlineSpec   -- What the user's INLINE pragma looked like
                  -- e.g. in `defaultInlinePragma` or when created by CSE
   deriving( Eq, Data, Show )
         -- Show needed for GHC.Parser.Lexer
+
+data SpecializableSpec
+  = Specializable
+  | NoUserSpecializable
+  deriving( Eq, Data, Show )
 
 {- Note [InlinePragma]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -1556,6 +1564,7 @@ defaultInlinePragma = InlinePragma { inl_src = SourceText "{-# INLINE"
                                    , inl_act = AlwaysActive
                                    , inl_rule = FunLike
                                    , inl_inline = NoUserInline
+                                   , inl_spec = NoUserSpecializable
                                    , inl_sat = Nothing }
 
 alwaysInlinePragma = defaultInlinePragma { inl_inline = Inline }
@@ -1563,6 +1572,9 @@ neverInlinePragma  = defaultInlinePragma { inl_act    = NeverActive }
 
 inlinePragmaSpec :: InlinePragma -> InlineSpec
 inlinePragmaSpec = inl_inline
+
+specializablePragmaSpec :: InlinePragma -> SpecializableSpec
+specializablePragmaSpec = inl_spec
 
 -- A DFun has an always-active inline activation so that
 -- exprIsConApp_maybe can "see" its unfolding
