@@ -293,8 +293,8 @@ data GenClosure b
       , tot_stack_size :: Word32
       , prof :: Maybe StgTSOProfInfo
       }
--- | Marker for the end of TSO queues
--- Technically it has the same structure as an StgTSO, but most data isn't initialized.
+  -- | Marker for the end of TSO queues
+  -- Technically it has the same structure as an StgTSO, but most data isn't initialized.
   | EndTSOQueue
      { info :: !StgInfoTable }
   -- Representation of StgStack: The 'tsoStack' of a 'TSOClosure'.
