@@ -508,7 +508,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  'signature'    { L _ ITsignature }
  'dependency'   { L _ ITdependency }
 
- '{-# INLINE'             { L _ (ITinline_prag _ _ _) } -- INLINE or INLINABLE
+ '{-# INLINE'             { L _ (ITinline_prag _ _ _ _) } -- INLINE or INLINABLE
  '{-# SPECIALISE'         { L _ (ITspec_prag _) }
  '{-# SPECIALISE_INLINE'  { L _ (ITspec_inline_prag _ _) }
  '{-# SOURCE'             { L _ (ITsource_prag _) }
@@ -2382,7 +2382,7 @@ sigdecl :: { LHsDecl GhcPs }
                          (SigD noExtField (CompleteMatchSig noExtField (getCOMPLETE_PRAGs $1) $2 tc)))
                     ([ mo $1 ] ++ dcolon ++ [mc $4]) }
 
-        -- This rule is for both INLINE and INLINABLE pragmas
+        -- This rule is for INLINE, NOINLINE, INLINABLE, and SPECIALIZABLE pragmas
         | '{-# INLINE' activation qvar '#-}'
                 {% ams ((sLL $1 $> $ SigD noExtField (InlineSig noExtField $3
                             (mkInlinePragma (getINLINE_PRAGs $1) (getINLINE $1)
@@ -2402,7 +2402,7 @@ sigdecl :: { LHsDecl GhcPs }
         | '{-# SPECIALISE' activation qvar '::' sigtypes1 '#-}'
              {% ams (
                  let inl_prag = mkInlinePragma (getSPEC_PRAGs $1)
-                                             (NoUserInline, FunLike) (snd $2)
+                                             (NoUserInline, NoUserSpecializable, FunLike) (snd $2)
                   in sLL $1 $> $ SigD noExtField (SpecSig noExtField $3 (fromOL $5) inl_prag))
                     (mo $1:mu AnnDcolon $4:mc $6:(fst $2)) }
 
@@ -3669,9 +3669,9 @@ getPRIMINTEGER  (L _ (ITprimint  _ x)) = x
 getPRIMWORD     (L _ (ITprimword _ x)) = x
 getPRIMFLOAT    (L _ (ITprimfloat x)) = x
 getPRIMDOUBLE   (L _ (ITprimdouble x)) = x
-getINLINE       (L _ (ITinline_prag _ inl conl)) = (inl,conl)
-getSPEC_INLINE  (L _ (ITspec_inline_prag _ True))  = (Inline,  FunLike)
-getSPEC_INLINE  (L _ (ITspec_inline_prag _ False)) = (NoInline,FunLike)
+getINLINE       (L _ (ITinline_prag _ inl spec conl)) = (inl,spec,conl)
+getSPEC_INLINE  (L _ (ITspec_inline_prag _ True))  = (Inline, NoUserSpecializable, FunLike)
+getSPEC_INLINE  (L _ (ITspec_inline_prag _ False)) = (NoInline, NoUserSpecializable, FunLike)
 getCOMPLETE_PRAGs (L _ (ITcomplete_prag x)) = x
 getVOCURLY      (L (RealSrcSpan l _) ITvocurly) = srcSpanStartCol l
 
@@ -3684,7 +3684,7 @@ getPRIMINTEGERs (L _ (ITprimint    src _)) = src
 getPRIMWORDs    (L _ (ITprimword   src _)) = src
 
 -- See Note [Pragma source text] in "GHC.Types.Basic" for the following
-getINLINE_PRAGs       (L _ (ITinline_prag       src _ _)) = src
+getINLINE_PRAGs       (L _ (ITinline_prag       src _ _ _)) = src
 getSPEC_PRAGs         (L _ (ITspec_prag         src))     = src
 getSPEC_INLINE_PRAGs  (L _ (ITspec_inline_prag  src _))   = src
 getSOURCE_PRAGs       (L _ (ITsource_prag       src)) = src

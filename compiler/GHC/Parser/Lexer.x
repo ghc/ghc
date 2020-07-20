@@ -109,7 +109,8 @@ import GHC.Driver.Session as DynFlags
 -- compiler/basicTypes
 import GHC.Types.SrcLoc
 import GHC.Unit
-import GHC.Types.Basic ( InlineSpec(..), RuleMatchInfo(..),
+import GHC.Types.Basic ( InlineSpec(..), SpecializableSpec(..),
+                         RuleMatchInfo(..),
                          IntegralLit(..), FractionalLit(..),
                          SourceText(..) )
 import GHC.Hs.Doc
@@ -736,7 +737,7 @@ data Token
   | ITrequires
 
   -- Pragmas, see  note [Pragma source text] in "GHC.Types.Basic"
-  | ITinline_prag       SourceText InlineSpec RuleMatchInfo
+  | ITinline_prag       SourceText InlineSpec SpecializableSpec RuleMatchInfo
   | ITspec_prag         SourceText                -- SPECIALISE
   | ITspec_inline_prag  SourceText Bool    -- SPECIALISE INLINE (or NOINLINE)
   | ITsource_prag       SourceText
@@ -3277,14 +3278,15 @@ ignoredPrags = Map.fromList (map ignored pragmas)
 oneWordPrags = Map.fromList [
      ("rules", rulePrag),
      ("inline",
-         strtoken (\s -> (ITinline_prag (SourceText s) Inline FunLike))),
+         strtoken (\s -> (ITinline_prag (SourceText s) Inline NoUserSpecializable FunLike))),
      ("inlinable",
-         strtoken (\s -> (ITinline_prag (SourceText s) Inlinable FunLike))),
+         strtoken (\s -> (ITinline_prag (SourceText s) Inlinable NoUserSpecializable FunLike))),
      ("inlineable",
-         strtoken (\s -> (ITinline_prag (SourceText s) Inlinable FunLike))),
+         strtoken (\s -> (ITinline_prag (SourceText s) Inlinable NoUserSpecializable FunLike))),
                                     -- Spelling variant
      ("notinline",
-         strtoken (\s -> (ITinline_prag (SourceText s) NoInline FunLike))),
+         strtoken (\s -> (ITinline_prag (SourceText s) NoInline NoUserSpecializable FunLike))),
+     ("specializable", strtoken (\s -> ITinline_prag (SourceText s) NoUserInline Specializable FunLike)),
      ("specialize", strtoken (\s -> ITspec_prag (SourceText s))),
      ("source", strtoken (\s -> ITsource_prag (SourceText s))),
      ("warning", strtoken (\s -> ITwarning_prag (SourceText s))),
@@ -3306,9 +3308,9 @@ oneWordPrags = Map.fromList [
 
 twoWordPrags = Map.fromList [
      ("inline conlike",
-         strtoken (\s -> (ITinline_prag (SourceText s) Inline ConLike))),
+         strtoken (\s -> (ITinline_prag (SourceText s) Inline NoUserSpecializable ConLike))),
      ("notinline conlike",
-         strtoken (\s -> (ITinline_prag (SourceText s) NoInline ConLike))),
+         strtoken (\s -> (ITinline_prag (SourceText s) NoInline NoUserSpecializable ConLike))),
      ("specialize inline",
          strtoken (\s -> (ITspec_inline_prag (SourceText s) True))),
      ("specialize notinline",
@@ -3335,6 +3337,7 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
                           canonical prag' = case prag' of
                                               "noinline" -> "notinline"
                                               "specialise" -> "specialize"
+                                              "specialisable" -> "specializable"
                                               "constructorlike" -> "conlike"
                                               _ -> prag'
                           canon_ws s = unwords (map canonical (words s))

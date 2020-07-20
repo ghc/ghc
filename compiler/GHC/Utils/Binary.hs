@@ -1282,12 +1282,13 @@ instance Binary Activation where
                       return (ActiveAfter src ab)
 
 instance Binary InlinePragma where
-    put_ bh (InlinePragma s a b c d) = do
+    put_ bh (InlinePragma s a b c d e) = do
             put_ bh s
             put_ bh a
             put_ bh b
             put_ bh c
             put_ bh d
+            put_ bh e
 
     get bh = do
            s <- get bh
@@ -1295,7 +1296,8 @@ instance Binary InlinePragma where
            b <- get bh
            c <- get bh
            d <- get bh
-           return (InlinePragma s a b c d)
+           e <- get bh
+           return (InlinePragma s a b c d e)
 
 instance Binary RuleMatchInfo where
     put_ bh FunLike = putByte bh 0
@@ -1317,6 +1319,15 @@ instance Binary InlineSpec where
                   1 -> return Inline
                   2 -> return Inlinable
                   _ -> return NoInline
+
+instance Binary SpecializableSpec where
+    put_ bh NoUserSpecializable = putByte bh 0
+    put_ bh Specializable = putByte bh 1
+
+    get bh = do h <- getByte bh
+                case h of
+                  0 -> return NoUserSpecializable
+                  _ -> return Specializable
 
 instance Binary RecFlag where
     put_ bh Recursive = do

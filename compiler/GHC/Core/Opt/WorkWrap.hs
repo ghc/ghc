@@ -588,6 +588,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
 
             work_prag = InlinePragma { inl_src = SourceText "{-# INLINE"
                                      , inl_inline = fn_inline_spec
+                                     , inl_spec   = NoUserSpecializable -- TODO
                                      , inl_sat    = Nothing
                                      , inl_act    = work_act
                                      , inl_rule   = FunLike }
@@ -672,6 +673,7 @@ mkStrWrapperInlinePrag :: InlinePragma -> InlinePragma
 mkStrWrapperInlinePrag (InlinePragma { inl_act = act, inl_rule = rule_info })
   = InlinePragma { inl_src    = SourceText "{-# INLINE"
                  , inl_inline = NoUserInline -- See Note [Wrapper NoUserInline]
+                 , inl_spec   = NoUserSpecializable -- TODO
                  , inl_sat    = Nothing
                  , inl_act    = wrap_act
                  , inl_rule   = rule_info }  -- RuleMatchInfo is (and must be) unaffected
