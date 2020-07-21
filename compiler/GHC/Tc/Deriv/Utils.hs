@@ -218,8 +218,9 @@ data DerivSpecMechanism
       -- instance, including what type constructor the last argument is
       -- headed by. See @Note [DerivEnv and DerivSpecMechanism]@.
     , dsm_stock_gen_fn ::
-        SrcSpan -> TyCon
-                -> [Type]
+        SrcSpan -> TyCon  -- dit_rep_tc
+                -> [Type] -- dit_rep_tc_args
+                -> [Type] -- inst_tys
                 -> TcM (LHsBinds GhcPs, BagDerivStuff, [Name])
       -- ^ This function returns three things:
       --
@@ -424,7 +425,7 @@ instance Outputable DerivContext where
 -- See @Note [Deriving strategies]@ in "GHC.Tc.Deriv".
 data OriginativeDerivStatus
   = CanDeriveStock            -- Stock class, can derive
-      (SrcSpan -> TyCon -> [Type]
+      (SrcSpan -> TyCon -> [Type] -> [Type]
                -> TcM (LHsBinds GhcPs, BagDerivStuff, [Name]))
   | StockClassError SDoc      -- Stock class, but can't do it
   | CanDeriveAnyClass         -- See Note [Deriving any class]
@@ -563,6 +564,7 @@ hasStockDeriving
   :: Class -> Maybe (SrcSpan
                      -> TyCon
                      -> [Type]
+                     -> [Type]
                      -> TcM (LHsBinds GhcPs, BagDerivStuff, [Name]))
 hasStockDeriving clas
   = assocMaybe gen_list (getUnique clas)
@@ -570,6 +572,7 @@ hasStockDeriving clas
     gen_list
       :: [(Unique, SrcSpan
                    -> TyCon
+                   -> [Type]
                    -> [Type]
                    -> TcM (LHsBinds GhcPs, BagDerivStuff, [Name]))]
     gen_list = [ (eqClassKey,          simpleM gen_Eq_binds)
@@ -587,7 +590,7 @@ hasStockDeriving clas
                , (genClassKey,         generic (gen_Generic_binds Gen0))
                , (gen1ClassKey,        generic (gen_Generic_binds Gen1)) ]
 
-    simple gen_fn loc tc _
+    simple gen_fn loc tc _ _
       = let (binds, deriv_stuff) = gen_fn loc tc
         in return (binds, deriv_stuff, [])
 
@@ -595,17 +598,17 @@ hasStockDeriving clas
     -- do is allocate new Uniques, which are used for generating the names of
     -- auxiliary bindings.
     -- See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate.
-    simpleM gen_fn loc tc _
+    simpleM gen_fn loc tc _ _
       = do { (binds, deriv_stuff) <- gen_fn loc tc
            ; return (binds, deriv_stuff, []) }
 
-    read_or_show gen_fn loc tc _
+    read_or_show gen_fn loc tc _ _
       = do { fix_env <- getDataConFixityFun tc
            ; let (binds, deriv_stuff) = gen_fn fix_env loc tc
                  field_names          = all_field_names tc
            ; return (binds, deriv_stuff, field_names) }
 
-    generic gen_fn _ tc inst_tys
+    generic gen_fn _ tc _ inst_tys
       = do { (binds, faminst) <- gen_fn tc inst_tys
            ; let field_names = all_field_names tc
            ; return (binds, unitBag (DerivFamInst faminst), field_names) }
