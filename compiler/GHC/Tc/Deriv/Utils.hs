@@ -590,21 +590,21 @@ hasStockDeriving clas
                , (genClassKey,         generic (gen_Generic_binds Gen0))
                , (gen1ClassKey,        generic (gen_Generic_binds Gen1)) ]
 
-    simple gen_fn loc tc _ _
-      = let (binds, deriv_stuff) = gen_fn loc tc
+    simple gen_fn loc tc tc_args _
+      = let (binds, deriv_stuff) = gen_fn loc tc tc_args
         in return (binds, deriv_stuff, [])
 
     -- Like `simple`, but monadic. The only monadic thing that these functions
     -- do is allocate new Uniques, which are used for generating the names of
     -- auxiliary bindings.
     -- See Note [Auxiliary binders] in GHC.Tc.Deriv.Generate.
-    simpleM gen_fn loc tc _ _
-      = do { (binds, deriv_stuff) <- gen_fn loc tc
+    simpleM gen_fn loc tc tc_args _
+      = do { (binds, deriv_stuff) <- gen_fn loc tc tc_args
            ; return (binds, deriv_stuff, []) }
 
-    read_or_show gen_fn loc tc _ _
+    read_or_show gen_fn loc tc tc_args _
       = do { fix_env <- getDataConFixityFun tc
-           ; let (binds, deriv_stuff) = gen_fn fix_env loc tc
+           ; let (binds, deriv_stuff) = gen_fn fix_env loc tc tc_args
                  field_names          = all_field_names tc
            ; return (binds, deriv_stuff, field_names) }
 

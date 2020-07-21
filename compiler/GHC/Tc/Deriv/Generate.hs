@@ -212,8 +212,8 @@ for the instance decl, which it probably wasn't, so the decls
 produced don't get through the typechecker.
 -}
 
-gen_Eq_binds :: SrcSpan -> TyCon -> TcM (LHsBinds GhcPs, BagDerivStuff)
-gen_Eq_binds loc tycon = do
+gen_Eq_binds :: SrcSpan -> TyCon -> [Type] -> TcM (LHsBinds GhcPs, BagDerivStuff)
+gen_Eq_binds loc tycon _ = do
     -- See Note [Auxiliary binders]
     con2tag_RDR <- new_con2tag_rdr_name loc tycon
 
@@ -396,8 +396,8 @@ gtResult OrdGE      = true_Expr
 gtResult OrdGT      = true_Expr
 
 ------------
-gen_Ord_binds :: SrcSpan -> TyCon -> TcM (LHsBinds GhcPs, BagDerivStuff)
-gen_Ord_binds loc tycon = do
+gen_Ord_binds :: SrcSpan -> TyCon -> [Type] -> TcM (LHsBinds GhcPs, BagDerivStuff)
+gen_Ord_binds loc tycon _ = do
     -- See Note [Auxiliary binders]
     con2tag_RDR <- new_con2tag_rdr_name loc tycon
 
@@ -646,8 +646,8 @@ instance ... Enum (Foo ...) where
 For @enumFromTo@ and @enumFromThenTo@, we use the default methods.
 -}
 
-gen_Enum_binds :: SrcSpan -> TyCon -> TcM (LHsBinds GhcPs, BagDerivStuff)
-gen_Enum_binds loc tycon = do
+gen_Enum_binds :: SrcSpan -> TyCon -> [Type] -> TcM (LHsBinds GhcPs, BagDerivStuff)
+gen_Enum_binds loc tycon _ = do
     -- See Note [Auxiliary binders]
     con2tag_RDR <- new_con2tag_rdr_name loc tycon
     tag2con_RDR <- new_tag2con_rdr_name loc tycon
@@ -738,8 +738,8 @@ gen_Enum_binds loc tycon = do
 ************************************************************************
 -}
 
-gen_Bounded_binds :: SrcSpan -> TyCon -> (LHsBinds GhcPs, BagDerivStuff)
-gen_Bounded_binds loc tycon
+gen_Bounded_binds :: SrcSpan -> TyCon -> [Type] -> (LHsBinds GhcPs, BagDerivStuff)
+gen_Bounded_binds loc tycon _
   | isEnumerationTyCon tycon
   = (listToBag [ min_bound_enum, max_bound_enum ], emptyBag)
   | otherwise
@@ -825,9 +825,9 @@ we follow the scheme given in Figure~19 of the Haskell~1.2 report
 (p.~147).
 -}
 
-gen_Ix_binds :: SrcSpan -> TyCon -> TcM (LHsBinds GhcPs, BagDerivStuff)
+gen_Ix_binds :: SrcSpan -> TyCon -> [Type] -> TcM (LHsBinds GhcPs, BagDerivStuff)
 
-gen_Ix_binds loc tycon = do
+gen_Ix_binds loc tycon _ = do
     -- See Note [Auxiliary binders]
     con2tag_RDR <- new_con2tag_rdr_name loc tycon
     tag2con_RDR <- new_tag2con_rdr_name loc tycon
@@ -1028,10 +1028,10 @@ These instances are also useful for Read (Either Int Emp), where
 we want to be able to parse (Left 3) just fine.
 -}
 
-gen_Read_binds :: (Name -> Fixity) -> SrcSpan -> TyCon
+gen_Read_binds :: (Name -> Fixity) -> SrcSpan -> TyCon -> [Type]
                -> (LHsBinds GhcPs, BagDerivStuff)
 
-gen_Read_binds get_fixity loc tycon
+gen_Read_binds get_fixity loc tycon _
   = (listToBag [read_prec, default_readlist, default_readlistprec], emptyBag)
   where
     -----------------------------------------------------------------------
@@ -1212,10 +1212,10 @@ Example
                     -- the most tightly-binding operator
 -}
 
-gen_Show_binds :: (Name -> Fixity) -> SrcSpan -> TyCon
+gen_Show_binds :: (Name -> Fixity) -> SrcSpan -> TyCon -> [Type]
                -> (LHsBinds GhcPs, BagDerivStuff)
 
-gen_Show_binds get_fixity loc tycon
+gen_Show_binds get_fixity loc tycon _
   = (unitBag shows_prec, emptyBag)
   where
     data_cons = tyConDataCons tycon
@@ -1385,9 +1385,10 @@ we generate
 gen_Data_binds :: SrcSpan
                -> TyCon                 -- For data families, this is the
                                         --  *representation* TyCon
+               -> [Type]
                -> TcM (LHsBinds GhcPs,  -- The method bindings
                        BagDerivStuff)   -- Auxiliary bindings
-gen_Data_binds loc rep_tc
+gen_Data_binds loc rep_tc _
   = do { -- See Note [Auxiliary binders]
          dataT_RDR  <- new_dataT_rdr_name loc rep_tc
        ; dataC_RDRs <- traverse (new_dataC_rdr_name loc) data_cons
@@ -1616,8 +1617,8 @@ Example:
 -}
 
 
-gen_Lift_binds :: SrcSpan -> TyCon -> (LHsBinds GhcPs, BagDerivStuff)
-gen_Lift_binds loc tycon = (listToBag [lift_bind, liftTyped_bind], emptyBag)
+gen_Lift_binds :: SrcSpan -> TyCon -> [Type] -> (LHsBinds GhcPs, BagDerivStuff)
+gen_Lift_binds loc tycon _ = (listToBag [lift_bind, liftTyped_bind], emptyBag)
   where
     lift_bind      = mkFunBindEC 1 loc lift_RDR (nlHsApp pure_Expr)
                                  (map (pats_etc mk_exp) data_cons)
