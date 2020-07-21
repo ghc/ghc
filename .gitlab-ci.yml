@@ -817,15 +817,6 @@ validate-x86_64-windows-hadrian:
   cache:
     key: "x86_64-windows-hadrian-$WINDOWS_TOOLCHAIN_VERSION"
 
-nightly-i386-windows-hadrian:
-  <<: *nightly
-  extends: .build-windows-hadrian
-  variables:
-    MSYSTEM: MINGW32
-    TEST_ENV: "i386-windows-hadrian"
-  cache:
-    key: "i386-windows-hadrian-$WINDOWS_TOOLCHAIN_VERSION"
-
 .build-windows-make:
   extends: .build-windows
   stage: full-build
@@ -881,34 +872,6 @@ release-x86_64-windows-integer-simple:
   variables:
     BIGNUM_BACKEND: native
     BUILD_FLAVOUR: "perf"
-
-
-.build-i386-windows-make:
-  extends: .build-windows-make
-  variables:
-    MSYSTEM: MINGW32
-    # Due to #15934
-    BUILD_PROF_LIBS: "NO"
-    TEST_ENV: "i386-windows"
-  # Due to #17736
-  allow_failure: true
-  cache:
-    key: "i386-windows-$WINDOWS_TOOLCHAIN_VERSION"
-
-validate-i386-windows:
-  extends: .build-i386-windows-make
-  variables:
-    BUILD_FLAVOUR: "perf"
-
-release-i386-windows:
-  <<: *release
-  extends: .build-i386-windows-make
-  variables:
-    BUILD_FLAVOUR: "perf"
-
-nightly-i386-windows:
-  <<: *nightly
-  extends: .build-i386-windows-make
 
 ############################################################
 # Cleanup
