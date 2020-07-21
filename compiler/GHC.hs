@@ -1683,11 +1683,11 @@ interpretPackageEnv dflags = do
   where
     -- Loading environments (by name or by location)
 
-    platformArchOs = platformMini (targetPlatform dflags)
+    archOS = platformArchOS (targetPlatform dflags)
 
     namedEnvPath :: String -> MaybeT IO FilePath
     namedEnvPath name = do
-     appdir <- versionedAppDir (programName dflags) platformArchOs
+     appdir <- versionedAppDir (programName dflags) archOS
      return $ appdir </> "environments" </> name
 
     probeEnvName :: String -> MaybeT IO FilePath
@@ -1724,7 +1724,7 @@ interpretPackageEnv dflags = do
 
     -- e.g. .ghc.environment.x86_64-linux-7.6.3
     localEnvFileName :: FilePath
-    localEnvFileName = ".ghc.environment" <.> versionedFilePath platformArchOs
+    localEnvFileName = ".ghc.environment" <.> versionedFilePath archOS
 
     -- Search for an env file, starting in the current dir and looking upwards.
     -- Fail if we get to the users home dir or the filesystem root. That is,

@@ -43,10 +43,9 @@ Library
             GHC.Serialized
             GHC.ForeignSrcLang
             GHC.HandleEncoding
-            GHC.Platform
+            GHC.Platform.ArchOS
             GHC.Platform.Host
             GHC.Platform.Constants
-            GHC.Settings.Platform
             GHC.Settings.Utils
             GHC.UniqueSubdir
             GHC.Version
