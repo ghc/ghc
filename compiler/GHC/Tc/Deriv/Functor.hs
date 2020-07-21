@@ -165,10 +165,10 @@ gen_Functor_binds loc tycon _
                                coerce_Expr]
     fmap_match_ctxt = mkPrefixFunRhs fmap_name
 
-gen_Functor_binds loc tycon _
+gen_Functor_binds loc tycon tycon_args
   = (listToBag [fmap_bind, replace_bind], emptyBag)
   where
-    data_cons = tyConDataCons tycon
+    data_cons = getPossibleDataCons tycon tycon_args
     fmap_name = L loc fmap_RDR
 
     -- See Note [EmptyDataDecls with Functor, Foldable, and Traversable]
@@ -801,7 +801,7 @@ gen_Foldable_binds loc tycon _
                                   mempty_Expr]
     foldMap_match_ctxt = mkPrefixFunRhs foldMap_name
 
-gen_Foldable_binds loc tycon _
+gen_Foldable_binds loc tycon tycon_args
   | null data_cons  -- There's no real point producing anything but
                     -- foldMap for a type with no constructors.
   = (unitBag foldMap_bind, emptyBag)
@@ -809,7 +809,7 @@ gen_Foldable_binds loc tycon _
   | otherwise
   = (listToBag [foldr_bind, foldMap_bind, null_bind], emptyBag)
   where
-    data_cons = tyConDataCons tycon
+    data_cons = getPossibleDataCons tycon tycon_args
 
     foldr_bind = mkRdrFunBind (L loc foldable_foldr_RDR) eqns
     eqns = map foldr_eqn data_cons
@@ -1031,10 +1031,10 @@ gen_Traversable_binds loc tycon _
                        (nlHsApps pure_RDR [nlHsApp coerce_Expr z_Expr])]
     traverse_match_ctxt = mkPrefixFunRhs traverse_name
 
-gen_Traversable_binds loc tycon _
+gen_Traversable_binds loc tycon tycon_args
   = (unitBag traverse_bind, emptyBag)
   where
-    data_cons = tyConDataCons tycon
+    data_cons = getPossibleDataCons tycon tycon_args
 
     traverse_name = L loc traverse_RDR
 
