@@ -27,7 +27,6 @@ needing to run the program, by inspecting the object file using 'nm'.
 
 import Control.Monad (when, unless)
 import Data.Bits (shiftL)
-import Data.Char (toLower)
 import Data.List (stripPrefix, intercalate)
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -53,8 +52,6 @@ main = do opts <- parseArgs
 
           case mode of
               Gen_Haskell_Type     -> writeHaskellType     fn haskellWanteds
-              Gen_Haskell_Wrappers -> writeHaskellWrappers fn haskellWanteds
-              Gen_Haskell_Exports  -> writeHaskellExports  fn haskellWanteds
               Gen_Computed cm ->
                   do tmpdir  <- getOption "tmpdir"      o_tmpdir
                      gccProg <- getOption "gcc program" o_gccProg
@@ -107,10 +104,6 @@ parseArgs = do args <- getArgs
               = f (opts {o_mode = Just Gen_Haskell_Type}) args'
           f opts ("--gen-haskell-value" : args')
               = f (opts {o_mode = Just (Gen_Computed ComputeHaskell)}) args'
-          f opts ("--gen-haskell-wrappers" : args')
-              = f (opts {o_mode = Just Gen_Haskell_Wrappers}) args'
-          f opts ("--gen-haskell-exports" : args')
-              = f (opts {o_mode = Just Gen_Haskell_Exports}) args'
           f opts ("--gen-header" : args')
               = f (opts {o_mode = Just (Gen_Computed ComputeHeader)}) args'
           f opts ("--tmpdir" : dir : args')
@@ -130,8 +123,6 @@ parseArgs = do args <- getArgs
           f _ (flag : _) = die ("Unrecognised flag: " ++ show flag)
 
 data Mode = Gen_Haskell_Type
-          | Gen_Haskell_Wrappers
-          | Gen_Haskell_Exports
           | Gen_Computed ComputeMode
 
 data ComputeMode = ComputeHaskell | ComputeHeader
@@ -289,10 +280,6 @@ defSize w nameBase cExpr = [(w, GetWord ("SIZEOF_" ++ nameBase) (Fst cExpr))]
 
 defClosureSize :: Where -> Name -> CExpr -> Wanteds
 defClosureSize w nameBase cExpr = [(w, GetClosureSize ("SIZEOF_" ++ nameBase) (Fst cExpr))]
-
-haskellise :: Name -> Name
-haskellise (c : cs) = toLower c : cs
-haskellise "" = ""
 
 wanteds :: String -> Wanteds
 wanteds os = concat
@@ -902,41 +889,6 @@ writeHaskellValue fn rs = writeFile fn xs
           doWhat (GetInt         name (Snd v)) = ["      pc_" ++ name ++ " = " ++ show v]
           doWhat (GetNatural     name (Snd v)) = ["      pc_" ++ name ++ " = " ++ show v]
           doWhat (GetBool        name (Snd v)) = ["      pc_" ++ name ++ " = " ++ show v]
-          doWhat (StructFieldMacro {}) = []
-          doWhat (ClosureFieldMacro {}) = []
-          doWhat (ClosurePayloadMacro {}) = []
-          doWhat (FieldTypeGcptrMacro {}) = []
-
-writeHaskellWrappers :: FilePath -> [What Fst] -> IO ()
-writeHaskellWrappers fn ws = writeFile fn xs
-    where xs = unlines body
-          body = concatMap doWhat ws
-          constants = " (platformConstants (targetPlatform dflags))"
-          doWhat (GetFieldType {}) = []
-          doWhat (GetClosureSize {}) = []
-          doWhat (GetWord name _) = [haskellise name ++ " :: DynFlags -> Int",
-                                    haskellise name ++ " dflags = pc_" ++ name ++ constants]
-          doWhat (GetInt name _) = [haskellise name ++ " :: DynFlags -> Int",
-                                   haskellise name ++ " dflags = pc_" ++ name ++ constants]
-          doWhat (GetNatural name _) = [haskellise name ++ " :: DynFlags -> Integer",
-                                        haskellise name ++ " dflags = pc_" ++ name ++ constants]
-          doWhat (GetBool name _) = [haskellise name ++ " :: DynFlags -> Bool",
-                                     haskellise name ++ " dflags = pc_" ++ name ++ constants]
-          doWhat (StructFieldMacro {}) = []
-          doWhat (ClosureFieldMacro {}) = []
-          doWhat (ClosurePayloadMacro {}) = []
-          doWhat (FieldTypeGcptrMacro {}) = []
-
-writeHaskellExports :: FilePath -> [What Fst] -> IO ()
-writeHaskellExports fn ws = writeFile fn xs
-    where xs = unlines body
-          body = concatMap doWhat ws
-          doWhat (GetFieldType {}) = []
-          doWhat (GetClosureSize {}) = []
-          doWhat (GetWord    name _) = ["    " ++ haskellise name ++ ","]
-          doWhat (GetInt     name _) = ["    " ++ haskellise name ++ ","]
-          doWhat (GetNatural name _) = ["    " ++ haskellise name ++ ","]
-          doWhat (GetBool    name _) = ["    " ++ haskellise name ++ ","]
           doWhat (StructFieldMacro {}) = []
           doWhat (ClosureFieldMacro {}) = []
           doWhat (ClosurePayloadMacro {}) = []
