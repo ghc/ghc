@@ -23,7 +23,10 @@ test('T10955',
       extra_hc_opts('-L. -L./bin_dep')],
      ghci_script, ['T10955.script'])
 
-test('T10955dyn', [extra_files(['A.c', 'B.c'])], makefile_test, ['compile_libAB_dyn'])
+test('T10955dyn',
+     [when(cross(), skip), # can't get this to work properly without sacrificing darwin tests.
+      extra_files(['A.c', 'B.c'])],
+     makefile_test, ['compile_libAB_dyn'])
 
 test('T10458',
      [extra_files(['A.c']),
