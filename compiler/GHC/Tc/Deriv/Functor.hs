@@ -151,10 +151,10 @@ is a similar algorithm for generating `p <$ x` (for some constant `p`):
   $(coreplace 'a '(tb -> tc) x) = \(y:tb[b/a]) -> $(coreplace 'a' 'tc' (x $(replace 'a 'tb y)))
 -}
 
-gen_Functor_binds :: SrcSpan -> TyCon -> (LHsBinds GhcPs, BagDerivStuff)
+gen_Functor_binds :: SrcSpan -> TyCon -> [Type] -> (LHsBinds GhcPs, BagDerivStuff)
 -- When the argument is phantom, we can use  fmap _ = coerce
 -- See Note [Phantom types with Functor, Foldable, and Traversable]
-gen_Functor_binds loc tycon
+gen_Functor_binds loc tycon _
   | Phantom <- last (tyConRoles tycon)
   = (unitBag fmap_bind, emptyBag)
   where
@@ -165,7 +165,7 @@ gen_Functor_binds loc tycon
                                coerce_Expr]
     fmap_match_ctxt = mkPrefixFunRhs fmap_name
 
-gen_Functor_binds loc tycon
+gen_Functor_binds loc tycon _
   = (listToBag [fmap_bind, replace_bind], emptyBag)
   where
     data_cons = tyConDataCons tycon
@@ -787,10 +787,10 @@ could surprise users if they switch to other types, but Ryan Scott seems to
 think it's okay to do it for now.
 -}
 
-gen_Foldable_binds :: SrcSpan -> TyCon -> (LHsBinds GhcPs, BagDerivStuff)
+gen_Foldable_binds :: SrcSpan -> TyCon -> [Type] -> (LHsBinds GhcPs, BagDerivStuff)
 -- When the parameter is phantom, we can use foldMap _ _ = mempty
 -- See Note [Phantom types with Functor, Foldable, and Traversable]
-gen_Foldable_binds loc tycon
+gen_Foldable_binds loc tycon _
   | Phantom <- last (tyConRoles tycon)
   = (unitBag foldMap_bind, emptyBag)
   where
@@ -801,7 +801,7 @@ gen_Foldable_binds loc tycon
                                   mempty_Expr]
     foldMap_match_ctxt = mkPrefixFunRhs foldMap_name
 
-gen_Foldable_binds loc tycon
+gen_Foldable_binds loc tycon _
   | null data_cons  -- There's no real point producing anything but
                     -- foldMap for a type with no constructors.
   = (unitBag foldMap_bind, emptyBag)
@@ -1016,10 +1016,10 @@ removes all such types from consideration.
 See Note [Generated code for DeriveFoldable and DeriveTraversable].
 -}
 
-gen_Traversable_binds :: SrcSpan -> TyCon -> (LHsBinds GhcPs, BagDerivStuff)
+gen_Traversable_binds :: SrcSpan -> TyCon -> [Type] -> (LHsBinds GhcPs, BagDerivStuff)
 -- When the argument is phantom, we can use traverse = pure . coerce
 -- See Note [Phantom types with Functor, Foldable, and Traversable]
-gen_Traversable_binds loc tycon
+gen_Traversable_binds loc tycon _
   | Phantom <- last (tyConRoles tycon)
   = (unitBag traverse_bind, emptyBag)
   where
@@ -1031,7 +1031,7 @@ gen_Traversable_binds loc tycon
                        (nlHsApps pure_RDR [nlHsApp coerce_Expr z_Expr])]
     traverse_match_ctxt = mkPrefixFunRhs traverse_name
 
-gen_Traversable_binds loc tycon
+gen_Traversable_binds loc tycon _
   = (unitBag traverse_bind, emptyBag)
   where
     data_cons = tyConDataCons tycon
