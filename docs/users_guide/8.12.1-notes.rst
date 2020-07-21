@@ -79,6 +79,11 @@ Highlights
       $(return [])
       instance C Bool where foo = True
 
+ * Support for 32-bit Windows has officially been dropped as Microsoft has
+   formally discontinued new 32-bit Windows 10 releases in 2020. See
+   :ghc-ticket:`18487` for details.
+
+
 Full details
 ------------
 
