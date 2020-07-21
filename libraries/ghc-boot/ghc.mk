@@ -42,17 +42,14 @@ libraries/ghc-boot/dist-install/build/GHC/Platform/Host.hs: mk/project.mk | $$(d
 	@echo                                                               >> $@
 	@echo 'import GHC.Platform'                                         >> $@
 	@echo                                                               >> $@
-	@echo 'cHostPlatformArch   :: Arch'                                 >> $@
-	@echo 'cHostPlatformArch   = $(HaskellHostArch)'                    >> $@
+	@echo 'hostPlatformArch   :: Arch'                                  >> $@
+	@echo 'hostPlatformArch   = $(HaskellHostArch)'                     >> $@
 	@echo                                                               >> $@
-	@echo 'cHostPlatformOS     :: OS'                                   >> $@
-	@echo 'cHostPlatformOS     = $(HaskellHostOs)'                      >> $@
+	@echo 'hostPlatformOS     :: OS'                                    >> $@
+	@echo 'hostPlatformOS     = $(HaskellHostOs)'                       >> $@
 	@echo                                                               >> $@
-	@echo 'cHostPlatformMini :: PlatformMini'                           >> $@
-	@echo 'cHostPlatformMini = PlatformMini'                            >> $@
-	@echo '  { platformMini_arch = cHostPlatformArch'                   >> $@
-	@echo '  , platformMini_os = cHostPlatformOS'                       >> $@
-	@echo '  }'                                                         >> $@
+	@echo 'hostPlatformArchOS :: ArchOS'                                >> $@
+	@echo 'hostPlatformArchOS = ArchOS hostPlatformArch hostPlatformOS' >> $@
 	@echo done.
 
 libraries/ghc-boot/dist-boot/package-data.mk: \
