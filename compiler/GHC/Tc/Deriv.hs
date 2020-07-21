@@ -2038,9 +2038,12 @@ genDerivStuff mechanism loc clas inst_tys tyvars
         -> gen_newtype_or_via rhs_ty
 
       -- Try a stock deriver
-      DerivSpecStock { dsm_stock_dit    = DerivInstTys{dit_rep_tc = rep_tc}
+      DerivSpecStock { dsm_stock_dit    = DerivInstTys
+                        { dit_rep_tc = rep_tc
+                        , dit_rep_tc_args = rep_tc_args
+                        }
                      , dsm_stock_gen_fn = gen_fn }
-        -> do (binds, faminsts, field_names) <- gen_fn loc rep_tc inst_tys
+        -> do (binds, faminsts, field_names) <- gen_fn loc rep_tc rep_tc_args inst_tys
               pure (binds, [], faminsts, field_names)
 
       -- Try DeriveAnyClass
