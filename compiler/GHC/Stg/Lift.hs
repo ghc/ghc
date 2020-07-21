@@ -199,7 +199,7 @@ liftRhs
   -> LlStgRhs
   -> LiftM OutStgRhs
 liftRhs mb_former_fvs rhs@(StgRhsCon ccs con args)
-  = ASSERT2(isNothing mb_former_fvs, text "Should never lift a constructor" $$ ppr rhs)
+  = ASSERT2(isNothing mb_former_fvs, text "Should never lift a constructor" $$ pprStgRhs panicStgPprOpts rhs)
     StgRhsCon ccs con <$> traverse liftArgs args
 liftRhs Nothing (StgRhsClosure _ ccs upd infos body) = do
   -- This RHS wasn't lifted.

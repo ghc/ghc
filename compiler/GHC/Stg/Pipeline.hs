@@ -103,13 +103,14 @@ stg2stg dflags this_mod binds
             liftIO (stg_linter True "Unarise" binds')
             return binds'
 
+    opts = initStgPprOpts dflags
     dump_when flag header binds
-      = dumpIfSet_dyn dflags flag header FormatSTG (pprStgTopBindings binds)
+      = dumpIfSet_dyn dflags flag header FormatSTG (pprStgTopBindings opts binds)
 
     end_pass what binds2
       = liftIO $ do -- report verbosely, if required
           dumpIfSet_dyn dflags Opt_D_verbose_stg2stg what
-            FormatSTG (vcat (map ppr binds2))
+            FormatSTG (vcat (map (pprStgTopBinding opts) binds2))
           stg_linter False what binds2
           return binds2
 
