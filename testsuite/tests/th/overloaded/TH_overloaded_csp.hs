@@ -14,5 +14,5 @@ instance Quote Identity where
 
 main = do
   print $ runIdentity ((\x -> [| x |]) ())
-  print $ unType $ runIdentity ((\x -> [|| x ||]) ())
+  print $ runIdentity $ unTypeCode ((\x -> [|| x ||]) ())
 

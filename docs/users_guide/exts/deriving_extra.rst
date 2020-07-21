@@ -528,7 +528,7 @@ Deriving ``Lift`` instances
 The class ``Lift``, unlike other derivable classes, lives in
 ``template-haskell`` instead of ``base``. Having a data type be an instance of
 ``Lift`` permits its values to be promoted to Template Haskell expressions (of
-type ``ExpQ`` and ``TExpQ a``), which can then be spliced into Haskell source
+type ``ExpQ`` and ``Code Q a``), which can then be spliced into Haskell source
 code.
 
 Here is an example of how one can derive ``Lift``:
