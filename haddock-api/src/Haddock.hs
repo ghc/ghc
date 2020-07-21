@@ -67,6 +67,7 @@ import Text.ParserCombinators.ReadP (readP_to_S)
 import GHC hiding (verbosity)
 import GHC.Settings.Config
 import GHC.Driver.Session hiding (projectVersion, verbosity)
+import GHC.Driver.Backend
 import GHC.Utils.Error
 import GHC.Unit
 import GHC.Utils.Panic (handleGhcException)
@@ -495,9 +496,9 @@ withGhc' libDir needHieFiles flags ghcActs = runGhc (Just libDir) $ do
       let extra_opts | needHieFiles = [Opt_WriteHie, Opt_Haddock]
                      | otherwise = [Opt_Haddock]
           dynflags' = (foldl' gopt_set dynflags extra_opts)
-                        { hscTarget = HscNothing
-                        , ghcMode   = CompManager
-                        , ghcLink   = NoLink
+                        { backend = NoBackend
+                        , ghcMode = CompManager
+                        , ghcLink = NoLink
                         }
           flags' = filterRtsFlags flags
 
