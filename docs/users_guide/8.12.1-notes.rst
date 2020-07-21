@@ -68,6 +68,17 @@ Highlights
   - For now GHC still doesn't allow dynamic selection of the ghc-bignum backend
     to use.
 
+* Breaking change: Template Haskell splices now act as separation points
+  between constraint solving passes. It is no longer possible to use
+  an instance of a class before a splice and define that instance after a splice.
+  For example, this code now reports a missing instance for ``C Bool``: ::
+
+      class C a where foo :: a
+      bar :: Bool
+      bar = foo
+      $(return [])
+      instance C Bool where foo = True
+
 Full details
 ------------
 
