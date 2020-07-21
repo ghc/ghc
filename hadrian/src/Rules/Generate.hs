@@ -474,17 +474,14 @@ generatePlatformHostHs = do
     return $ unlines
         [ "module GHC.Platform.Host where"
         , ""
-        , "import GHC.Platform"
+        , "import GHC.Platform.ArchOS"
         , ""
-        , "cHostPlatformArch :: Arch"
-        , "cHostPlatformArch = " ++ cHostPlatformArch
+        , "hostPlatformArch :: Arch"
+        , "hostPlatformArch = " ++ cHostPlatformArch
         , ""
-        , "cHostPlatformOS   :: OS"
-        , "cHostPlatformOS   = " ++ cHostPlatformOS
+        , "hostPlatformOS   :: OS"
+        , "hostPlatformOS   = " ++ cHostPlatformOS
         , ""
-        , "cHostPlatformMini :: PlatformMini"
-        , "cHostPlatformMini = PlatformMini"
-        , "  { platformMini_arch = cHostPlatformArch"
-        , "  , platformMini_os = cHostPlatformOS"
-        , "  }"
+        , "hostPlatformArchOS :: ArchOS"
+        , "hostPlatformArchOS = ArchOS hostPlatformArch hostPlatformOS"
         ]

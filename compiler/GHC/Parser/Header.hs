@@ -316,7 +316,7 @@ checkExtension dflags (L l ext)
     else unsupportedExtnError dflags l ext'
   where
     ext' = unpackFS ext
-    supported = supportedLanguagesAndExtensions $ platformMini $ targetPlatform dflags
+    supported = supportedLanguagesAndExtensions $ platformArchOS $ targetPlatform dflags
 
 languagePragParseError :: DynFlags -> SrcSpan -> a
 languagePragParseError dflags loc =
@@ -332,7 +332,7 @@ unsupportedExtnError dflags loc unsup =
         text "Unsupported extension: " <> text unsup $$
         if null suggestions then Outputable.empty else text "Perhaps you meant" <+> quotedListWithOr (map text suggestions)
   where
-     supported = supportedLanguagesAndExtensions $ platformMini $ targetPlatform dflags
+     supported = supportedLanguagesAndExtensions $ platformArchOS $ targetPlatform dflags
      suggestions = fuzzyMatch unsup supported
 
 

@@ -1000,13 +1000,13 @@ opt_i dflags= toolSettings_opt_i $ toolSettings dflags
 -- | The directory for this version of ghc in the user's app directory
 -- (typically something like @~/.ghc/x86_64-linux-7.6.3@)
 --
-versionedAppDir :: String -> PlatformMini -> MaybeT IO FilePath
+versionedAppDir :: String -> ArchOS -> MaybeT IO FilePath
 versionedAppDir appname platform = do
   -- Make sure we handle the case the HOME isn't set (see #11678)
   appdir <- tryMaybeT $ getAppUserDataDirectory appname
   return $ appdir </> versionedFilePath platform
 
-versionedFilePath :: PlatformMini -> FilePath
+versionedFilePath :: ArchOS -> FilePath
 versionedFilePath platform = uniqueSubdir platform
 
 -- | The 'GhcMode' tells us whether we're doing multi-module
@@ -3633,8 +3633,8 @@ supportedLanguages = map (flagSpecName . snd) languageFlagsDeps
 supportedLanguageOverlays :: [String]
 supportedLanguageOverlays = map (flagSpecName . snd) safeHaskellFlagsDeps
 
-supportedExtensions :: PlatformMini -> [String]
-supportedExtensions targetPlatformMini = concatMap toFlagSpecNamePair xFlags
+supportedExtensions :: ArchOS -> [String]
+supportedExtensions (ArchOS _ os) = concatMap toFlagSpecNamePair xFlags
   where
     toFlagSpecNamePair flg
       -- IMPORTANT! Make sure that `ghc --supported-extensions` omits
@@ -3645,13 +3645,13 @@ supportedExtensions targetPlatformMini = concatMap toFlagSpecNamePair xFlags
       | isAIX, flagSpecFlag flg == LangExt.QuasiQuotes      = [noName]
       | otherwise = [name, noName]
       where
-        isAIX = platformMini_os targetPlatformMini == OSAIX
+        isAIX = os == OSAIX
         noName = "No" ++ name
         name = flagSpecName flg
 
-supportedLanguagesAndExtensions :: PlatformMini -> [String]
-supportedLanguagesAndExtensions targetPlatformMini =
-    supportedLanguages ++ supportedLanguageOverlays ++ supportedExtensions targetPlatformMini
+supportedLanguagesAndExtensions :: ArchOS -> [String]
+supportedLanguagesAndExtensions arch_os =
+    supportedLanguages ++ supportedLanguageOverlays ++ supportedExtensions arch_os
 
 -- | These -X<blah> flags cannot be reversed with -XNo<blah>
 languageFlagsDeps :: [(Deprecation, FlagSpec Language)]

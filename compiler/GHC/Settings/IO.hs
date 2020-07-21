@@ -11,7 +11,6 @@ module GHC.Settings.IO
 
 import GHC.Prelude
 
-import GHC.Settings.Platform
 import GHC.Settings.Utils
 
 import GHC.Settings.Config
@@ -71,12 +70,12 @@ initSettings top_dir = do
   -- just partially applying those functions and throwing 'Left's; they're
   -- written in a very portable style to keep ghc-boot light.
   let getSetting key = either pgmError pure $
-        getFilePathSetting0 top_dir settingsFile mySettings key
+        getRawFilePathSetting top_dir settingsFile mySettings key
       getToolSetting :: String -> ExceptT SettingsError m String
       getToolSetting key = expandToolDir mtool_dir <$> getSetting key
       getBooleanSetting :: String -> ExceptT SettingsError m Bool
       getBooleanSetting key = either pgmError pure $
-        getBooleanSetting0 settingsFile mySettings key
+        getRawBooleanSetting settingsFile mySettings key
   targetPlatformString <- getSetting "target platform string"
   myExtraGccViaCFlags <- getSetting "GCC extra via C opts"
   -- On Windows, mingw is distributed with GHC,
@@ -227,4 +226,40 @@ initSettings top_dir = do
     , sPlatformConstants = platformConstants
 
     , sRawSettings    = settingsList
+    }
+
+getTargetPlatform
+  :: FilePath     -- ^ Settings filepath (for error messages)
+  -> RawSettings  -- ^ Raw settings file contents
+  -> PlatformConstants -- ^ Platform constants
+  -> Either String Platform
+getTargetPlatform settingsFile settings constants = do
+  let
+    getBooleanSetting = getRawBooleanSetting settingsFile settings
+    readSetting :: (Show a, Read a) => String -> Either String a
+    readSetting = readRawSetting settingsFile settings
+
+  targetArchOS <- getTargetArchOS settingsFile settings
+  targetWordSize <- readSetting "target word size"
+  targetWordBigEndian <- getBooleanSetting "target word big endian"
+  targetLeadingUnderscore <- getBooleanSetting "Leading underscore"
+  targetUnregisterised <- getBooleanSetting "Unregisterised"
+  targetHasGnuNonexecStack <- getBooleanSetting "target has GNU nonexec stack"
+  targetHasIdentDirective <- getBooleanSetting "target has .ident directive"
+  targetHasSubsectionsViaSymbols <- getBooleanSetting "target has subsections via symbols"
+  crossCompiling <- getBooleanSetting "cross compiling"
+  tablesNextToCode <- getBooleanSetting "Tables next to code"
+
+  pure $ Platform
+    { platformArchOS    = targetArchOS
+    , platformWordSize  = targetWordSize
+    , platformByteOrder = if targetWordBigEndian then BigEndian else LittleEndian
+    , platformUnregisterised = targetUnregisterised
+    , platformHasGnuNonexecStack = targetHasGnuNonexecStack
+    , platformHasIdentDirective = targetHasIdentDirective
+    , platformHasSubsectionsViaSymbols = targetHasSubsectionsViaSymbols
+    , platformIsCrossCompiling = crossCompiling
+    , platformLeadingUnderscore = targetLeadingUnderscore
+    , platformTablesNextToCode  = tablesNextToCode
+    , platformConstants = constants
     }

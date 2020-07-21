@@ -8,7 +8,6 @@ module GHC.Settings
   , GhcNameVersion (..)
   , Platform (..)
   , PlatformMisc (..)
-  , PlatformMini (..)
   -- * Accessors
   , sProgramName
   , sProjectVersion
