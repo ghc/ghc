@@ -181,8 +181,6 @@ Library
         GHC.Driver.Monad
         GHC.Driver.Hooks
         GHC.Driver.Flags
-        GHC.Platform.Ways
-        GHC.Platform.Profile
         GHC.Types.Id
         GHC.Types.Id.Info
         GHC.Core.Predicate
@@ -258,6 +256,9 @@ Library
         GHC.Cmm.Ppr.Decl
         GHC.Cmm.Ppr.Expr
         GHC.Data.Bitmap
+        GHC.Platform
+        GHC.Platform.Ways
+        GHC.Platform.Profile
         GHC.Platform.Regs
         GHC.Platform.ARM
         GHC.Platform.ARM64
@@ -565,6 +566,10 @@ Library
         GHC.Cmm.Dataflow.Collections
         GHC.Cmm.Dataflow.Graph
         GHC.Cmm.Dataflow.Label
+
+    reexported-modules:
+        GHC.Platform.ArchOS
+        GHC.Platform.Host
 
     Exposed-Modules:
             GHC.CmmToAsm

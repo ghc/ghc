@@ -314,7 +314,7 @@ instance Monoid UnitVisibility where
 
 -- | Unit configuration
 data UnitConfig = UnitConfig
-   { unitConfigPlatformArchOs :: !PlatformMini  -- ^ Platform
+   { unitConfigPlatformArchOS :: !ArchOS        -- ^ Platform arch and OS
    , unitConfigWays           :: !(Set Way)     -- ^ Ways to use
    , unitConfigProgramName    :: !String
       -- ^ Name of the compiler (e.g. "GHC", "GHCJS"). Used to fetch environment
@@ -356,7 +356,7 @@ initUnitConfig dflags =
          | otherwise = filter (/= homeUnitId dflags) [baseUnitId, rtsUnitId]
 
    in UnitConfig
-      { unitConfigPlatformArchOs = platformMini (targetPlatform dflags)
+      { unitConfigPlatformArchOS = platformArchOS (targetPlatform dflags)
       , unitConfigProgramName    = programName dflags
       , unitConfigWays           = ways dflags
 
@@ -646,7 +646,7 @@ getUnitDbRefs cfg = do
 resolveUnitDatabase :: UnitConfig -> PkgDbRef -> IO (Maybe FilePath)
 resolveUnitDatabase cfg GlobalPkgDb = return $ Just (unitConfigGlobalDB cfg)
 resolveUnitDatabase cfg UserPkgDb = runMaybeT $ do
-  dir <- versionedAppDir (unitConfigProgramName cfg) (unitConfigPlatformArchOs cfg)
+  dir <- versionedAppDir (unitConfigProgramName cfg) (unitConfigPlatformArchOS cfg)
   let pkgconf = dir </> unitConfigDBName cfg
   exist <- tryMaybeT $ doesDirectoryExist pkgconf
   if exist then return pkgconf else mzero
