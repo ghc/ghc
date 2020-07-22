@@ -2375,9 +2375,10 @@ stg_unpackClosurezh ( P_ closure )
     (len) = foreign "C" heap_view_closureSize(clos "ptr");
 
     W_ ptrs_arr_sz, ptrs_arr_cards, dat_arr_sz;
-    dat_arr_sz = SIZEOF_StgArrBytes + WDS(len);
 
-    ("ptr" dat_arr) = ccall allocate(MyCapability() "ptr", BYTES_TO_WDS(dat_arr_sz));
+    again: MAYBE_GC(again);
+    dat_arr_sz = SIZEOF_StgArrBytes + WDS(len);
+    ("ptr" dat_arr) = ccall allocateMightFail(MyCapability() "ptr", BYTES_TO_WDS(dat_arr_sz));
 
     SET_HDR(dat_arr, stg_ARR_WORDS_info, CCCS);
     StgArrBytes_bytes(dat_arr) = WDS(len);
