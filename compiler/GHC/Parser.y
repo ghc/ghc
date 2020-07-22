@@ -1966,22 +1966,28 @@ type :: { LHsType GhcPs }
 mult :: { LHsType GhcPs }
         : btype                  { $1 }
 
-
 btype :: { LHsType GhcPs }
-        : tyapps                        {% mergeOps (unLoc $1) }
+        : infixtype                     {% runPV $1 }
 
-tyapps :: { Located [Located TyEl] } -- NB: This list is reversed
-        : tyapp                         { sL1 $1 [$1] }
-        | tyapps tyapp                  { sLL $1 $> $ $2 : unLoc $1 }
+infixtype :: { forall b. DisambTD b => PV (Located b) }
+        : ftype                         { $1 }
+        | ftype tyop infixtype          { $1 >>= \ $1 ->
+                                          $3 >>= \ $3 ->
+                                          mkInfixTyAppPV $1 $2 $3 }
+        | unpackedness infixtype        { $2 >>= \ $2 ->
+                                          mkInfixTyUnpackednessPV $1 $2 }
 
-tyapp :: { Located TyEl }
-        : atype                         { sL1 $1 $ TyElOpd (unLoc $1) }
+ftype :: { forall b. DisambTD b => PV (Located b) }
+        : atype                         { mkAppTyHeadPV $1 }
+        | tyop                          { failOpFewArgs $1 }
+        | ftype tyarg                   { $1 >>= \ $1 ->
+                                          mkAppTyAppPV $1 $2 }
+        | ftype PREFIX_AT tyarg         { $1 >>= \ $1 ->
+                                          mkAppTyKindAppPV $1 (getLoc $2) $3 }
 
-        -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
-        | PREFIX_AT atype               { sLL $1 $> $ (TyElKindApp (comb2 $1 $2) $2) }
-
-        | tyop                          { mapLoc TyElOpr $1 }
-        | unpackedness                  { sL1 $1 $ TyElUnpackedness (unLoc $1) }
+tyarg :: { LHsType GhcPs }
+        : atype                         { $1 }
+        | unpackedness atype            {% addUnpackednessP $1 $2 }
 
 tyop :: { Located RdrName }
         : qtyconop                      { $1 }
@@ -2202,14 +2208,14 @@ constrs1 :: { Located [LConDecl GhcPs] }
 
 constr :: { LConDecl GhcPs }
         : forall context '=>' constr_stuff
-                {% ams (let (con,details) = unLoc $4 in
+                {% ams (let DataConDef con details = unLoc $4 in
                   (L (comb4 $1 $2 $3 $4) (mkConDeclH98 con
                                              (snd $ unLoc $1)
                                              (Just $2)
                                              details)))
                         (mu AnnDarrow $3:(fst $ unLoc $1)) }
         | forall constr_stuff
-                {% ams (let (con,details) = unLoc $2 in
+                {% ams (let DataConDef con details = unLoc $2 in
                   (L (comb2 $1 $2) (mkConDeclH98 con
                                             (snd $ unLoc $1)
                                             Nothing   -- No context
@@ -2220,9 +2226,9 @@ forall :: { Located ([AddAnn], Maybe [LHsTyVarBndr Specificity GhcPs]) }
         : 'forall' tv_bndrs '.'       { sLL $1 $> ([mu AnnForall $1,mj AnnDot $3], Just $2) }
         | {- empty -}                 { noLoc ([], Nothing) }
 
-constr_stuff :: { Located (Located RdrName, HsConDeclDetails GhcPs) }
-        : tyapps                           {% do { c <- mergeDataCon (unLoc $1)
-                                                 ; return $ sL1 $1 c } }
+constr_stuff :: { Located DataConDef }
+        : infixtype       {% fmap (mapLoc finalizeDataConBuilder)
+                                  (runPV $1) }
 
 fielddecls :: { [LConDeclField GhcPs] }
         : {- empty -}     { [] }
