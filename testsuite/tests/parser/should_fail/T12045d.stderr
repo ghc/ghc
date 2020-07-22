@@ -1,4 +1,3 @@
 
 T12045d.hs:11:16: error:
-    Unexpected kind application in a data/newtype declaration:
-      MkD @Nat Bool
+    Unexpected kind application in a data/newtype declaration: MkD @Nat
