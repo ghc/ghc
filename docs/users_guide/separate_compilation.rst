@@ -758,7 +758,7 @@ There are several points to note here:
       the same machine-generated binary format as any other
       GHC-generated interface file (e.g. ``B.hi``). You can display its
       contents with ``ghc --show-iface``. If you specify a directory for
-      interface files, the ``-ohidir`` flag, then that affects ``hi-boot`` files
+      interface files, the ``-hidir`` flag, then that affects ``hi-boot`` files
       too.
 
 -  If hs-boot files are considered distinct from their parent source
