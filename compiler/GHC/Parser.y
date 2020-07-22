@@ -1884,9 +1884,9 @@ sigtypes1 :: { (OrdList (LHsSigType GhcPs)) }
 -----------------------------------------------------------------------------
 -- Types
 
-unpackedness :: { Located ([AddAnn], SourceText, SrcUnpackedness) }
-        : '{-# UNPACK' '#-}'   { sLL $1 $> ([mo $1, mc $2], getUNPACK_PRAGs $1, SrcUnpack) }
-        | '{-# NOUNPACK' '#-}' { sLL $1 $> ([mo $1, mc $2], getNOUNPACK_PRAGs $1, SrcNoUnpack) }
+unpackedness :: { Located UnpackednessPragma }
+        : '{-# UNPACK' '#-}'   { sLL $1 $> (UnpackednessPragma [mo $1, mc $2] (getUNPACK_PRAGs $1) SrcUnpack) }
+        | '{-# NOUNPACK' '#-}' { sLL $1 $> (UnpackednessPragma [mo $1, mc $2] (getNOUNPACK_PRAGs $1) SrcNoUnpack) }
 
 forall_telescope :: { Located ([AddAnn], HsForAllTelescope GhcPs) }
         : 'forall' tv_bndrs '.'  {% do { hintExplicitForall $1
@@ -1980,13 +1980,16 @@ tyapp :: { Located TyEl }
         -- See Note [Whitespace-sensitive operator parsing] in GHC.Parser.Lexer
         | PREFIX_AT atype               { sLL $1 $> $ (TyElKindApp (comb2 $1 $2) $2) }
 
-        | qtyconop                      { sL1 $1 $ TyElOpr (unLoc $1) }
-        | tyvarop                       { sL1 $1 $ TyElOpr (unLoc $1) }
-        | SIMPLEQUOTE qconop            {% ams (sLL $1 $> $ TyElOpr (unLoc $2))
-                                               [mj AnnSimpleQuote $1,mj AnnVal $2] }
-        | SIMPLEQUOTE varop             {% ams (sLL $1 $> $ TyElOpr (unLoc $2))
-                                               [mj AnnSimpleQuote $1,mj AnnVal $2] }
+        | tyop                          { mapLoc TyElOpr $1 }
         | unpackedness                  { sL1 $1 $ TyElUnpackedness (unLoc $1) }
+
+tyop :: { Located RdrName }
+        : qtyconop                      { $1 }
+        | tyvarop                       { $1 }
+        | SIMPLEQUOTE qconop            {% ams (sLL $1 $> (unLoc $2))
+                                               [mj AnnSimpleQuote $1,mj AnnVal $2] }
+        | SIMPLEQUOTE varop             {% ams (sLL $1 $> (unLoc $2))
+                                               [mj AnnSimpleQuote $1,mj AnnVal $2] }
 
 atype :: { LHsType GhcPs }
         : ntgtycon                       { sL1 $1 (HsTyVar noExtField NotPromoted $1) }      -- Not including unit tuples

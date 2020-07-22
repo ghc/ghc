@@ -70,6 +70,7 @@ module GHC.Parser.PostProcess (
         addFatalError, hintBangPat,
         TyEl(..), mergeOps, mergeDataCon,
         mkBangTy,
+        UnpackednessPragma(..),
 
         -- Help with processing exports
         ImpExpSubSpec(..),
@@ -558,25 +559,6 @@ context, so (C t1 t2) is a constraint and 'C' is a type constructor.
 As the result, in order to determine whether (C t1 t2) declares a data
 constructor, a type, or a context, we would need unlimited lookahead which
 'happy' is not so happy with.
-
-To further complicate matters, the interpretation of (!) and (~) is different
-in constructors and types:
-
-  (b1)   type T = C ! D
-  (b2)   data T = C ! D
-  (b3)   data T = C ! D => E
-
-In (b1) and (b3), (!) is a type operator with two arguments: 'C' and 'D'. At
-the same time, in (b2) it is a strictness annotation: 'C' is a data constructor
-with a single strict argument 'D'. For the programmer, these cases are usually
-easy to tell apart due to whitespace conventions:
-
-  (b2)   data T = C !D         -- no space after the bang hints that
-                               -- it is a strictness annotation
-
-For the parser, on the other hand, this whitespace does not matter. We cannot
-tell apart (b2) from (b3) until we encounter (=>), so it requires unlimited
-lookahead.
 
 The solution that accounts for all of these issues is to initially parse data
 declarations and types as a reversed list of TyEl:
@@ -1324,7 +1306,7 @@ isFunLhs e = go e [] []
 data TyEl = TyElOpr RdrName | TyElOpd (HsType GhcPs)
           | TyElKindApp SrcSpan (LHsType GhcPs)
           -- See Note [TyElKindApp SrcSpan interpretation]
-          | TyElUnpackedness ([AddAnn], SourceText, SrcUnpackedness)
+          | TyElUnpackedness UnpackednessPragma
 
 
 {- Note [TyElKindApp SrcSpan interpretation]
@@ -1345,20 +1327,15 @@ instance Outputable TyEl where
   ppr (TyElOpr name) = ppr name
   ppr (TyElOpd ty) = ppr ty
   ppr (TyElKindApp _ ki) = text "@" <> ppr ki
-  ppr (TyElUnpackedness (_, _, unpk)) = ppr unpk
+  ppr (TyElUnpackedness (UnpackednessPragma _ _ unpk)) = ppr unpk
 
 -- | Extract a strictness/unpackedness annotation from the front of a reversed
 -- 'TyEl' list.
 pUnpackedness
   :: [Located TyEl] -- reversed TyEl
-  -> Maybe ( SrcSpan
-           , [AddAnn]
-           , SourceText
-           , SrcUnpackedness
-           , [Located TyEl] {- remaining TyEl -})
-pUnpackedness (L l x1 : xs)
-  | TyElUnpackedness (anns, prag, unpk) <- x1
-  = Just (l, anns, prag, unpk, xs)
+  -> Maybe (SrcSpan, UnpackednessPragma,
+            [Located TyEl] {- remaining TyEl -})
+pUnpackedness (L l x1 : xs) | TyElUnpackedness up <- x1 = Just (l, up, xs)
 pUnpackedness _ = Nothing
 
 pBangTy
@@ -1371,7 +1348,7 @@ pBangTy
 pBangTy lt@(L l1 _) xs =
   case pUnpackedness xs of
     Nothing -> (False, lt, pure (), xs)
-    Just (l2, anns, prag, unpk, xs') ->
+    Just (l2, UnpackednessPragma anns prag unpk, xs') ->
       let bl = combineSrcSpans l1 l2
           bt = addUnpackedness (prag, unpk) lt
       in (True, L bl bt, addAnnsAt bl anns, xs')
@@ -1379,6 +1356,10 @@ pBangTy lt@(L l1 _) xs =
 mkBangTy :: SrcStrictness -> LHsType GhcPs -> HsType GhcPs
 mkBangTy strictness =
   HsBangTy noExtField (HsSrcBang NoSourceText NoSrcUnpack strictness)
+
+-- Result of parsing {-# UNPACK #-} or {-# NOUNPACK #-}
+data UnpackednessPragma =
+  UnpackednessPragma [AddAnn] SourceText SrcUnpackedness
 
 addUnpackedness :: (SourceText, SrcUnpackedness) -> LHsType GhcPs -> HsType GhcPs
 addUnpackedness (prag, unpk) (L _ (HsBangTy x bang t))
@@ -1411,7 +1392,7 @@ mergeOps all_xs = go (0 :: Int) [] id all_xs
 
     -- clause [unpk]:
     -- handle (NO)UNPACK pragmas
-    go k acc ops_acc ((L l (TyElUnpackedness (anns, unpkSrc, unpk))):xs) =
+    go k acc ops_acc ((L l (TyElUnpackedness (UnpackednessPragma anns unpkSrc unpk))):xs) =
       if not (null acc) && null xs
       then do { acc' <- eitherToP $ mergeOpsAcc acc
               ; let a = ops_acc acc'
