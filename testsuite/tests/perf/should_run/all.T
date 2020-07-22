@@ -328,7 +328,7 @@ test('T13623',
     ['-O2'])
 
 test('T14052',
-     [collect_compiler_stats('bytes allocated',15)],
+     [collect_stats('bytes allocated',15)],
      ghci_script,
      ['T14052.script'])
 
