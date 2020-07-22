@@ -56,7 +56,8 @@ import HsImpExp
 import HsSyn
 import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
                   setInteractivePrintName, hsc_dflags, msObjFilePath, hsc_HPT,
-                  runInteractiveHsc, hm_linkable, hm_iface, mi_globals, linkableTime )
+                  runInteractiveHsc, hm_linkable, hm_iface, mi_globals,
+                  linkableTime, throwOneError )
 import Module
 import Name
 import Packages ( trusted, getPackageDetails, getInstalledPackageDetails,
@@ -86,7 +87,7 @@ import NameSet
 import Panic hiding ( showException )
 import Util
 import qualified GHC.LanguageExtensions as LangExt
-import Bag (unitBag)
+import Bag (unitBag, bagToList)
 
 -- Haskell Libraries
 import System.Console.Haskeline as Haskeline
@@ -1816,10 +1817,8 @@ markTargetsForRecompilation targets = do
   where
     beginningOfTime = UTCTime (ModifiedJulianDay 0) (secondsToDiffTime 0)
     makeTargetStale dflags hpt (Target tid _ _) = do
-      eitherModName <- liftIO $ findTargetModuleName dflags tid
-      return $ case eitherModName of
-        (Right modName) -> adjustUDFM makeHomeModStale hpt modName
-        Left _err -> hpt
+      modName <- liftIO $ findTargetModuleName dflags tid
+      return $ adjustUDFM makeHomeModStale hpt modName
     makeHomeModStale hmi =
       -- If mi_globals is Nothing, we don't have all bindings of this module
       -- so, we mark it as stale to trigger recompilation
@@ -1830,13 +1829,13 @@ markTargetsForRecompilation targets = do
             let newLinkable = linkable { linkableTime = beginningOfTime }
             in hmi { hm_linkable = Just newLinkable }
           _ -> hmi
-    findTargetModuleName _ (TargetModule name) = return $ Right name
+    findTargetModuleName _ (TargetModule name) = return name
     findTargetModuleName dflags (TargetFile fp _) = do
       buf <- hGetStringBuffer fp
       imports <- getImports dflags buf fp fp
-      return $ case imports of
-        (Right (_, _, GHC.L _ mname)) -> Right mname
-        Left err -> Left err
+      case imports of
+        (Right (_, _, GHC.L _ mname)) -> return mname
+        Left (bagToList -> err) -> throwOneError $ head err
 
 -- | @:add@ command
 addModule :: [FilePath] -> InputT GHCi ()
