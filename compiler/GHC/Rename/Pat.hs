@@ -236,19 +236,30 @@ newPatName (LetMk is_top fix_env) rdr_name
         do { name <- case is_top of
                        NotTopLevel -> newLocalBndrRn rdr_name
                        TopLevel    -> newTopSrcBinder rdr_name
-           ; bindLocalNames [name] $       -- Do *not* use bindLocalNameFV here
-                                        -- See Note [View pattern usage]
+           ; bindLocalNames [name] $
+                 -- Do *not* use bindLocalNameFV here;
+                 --   see Note [View pattern usage]
+                 -- For the TopLevel case
+                 --   see Note [bindLocalNames for an External name]
              addLocalFixities fix_env [name] $
              thing_inside name })
 
-    -- Note: the bindLocalNames is somewhat suspicious
-    --       because it binds a top-level name as a local name.
-    --       however, this binding seems to work, and it only exists for
-    --       the duration of the patterns and the continuation;
-    --       then the top-level name is added to the global env
-    --       before going on to the RHSes (see GHC.Rename.Module).
+{- Note [bindLocalNames for an External name]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the TopLevel case, the use of bindLocalNames here is somewhat
+suspicious because it binds a top-level External name in the
+LocalRdrEnv.  c.f. Note [LocalRdrEnv] in GHC.Types.Name.Reader.
 
-{-
+However, this only happens when renaming the LHS (only) of a top-level
+pattern binding.  Even though this only the LHS, we need to bring the
+binder into scope in the pattern itself in case the binder is used in
+subsequent view patterns.  A bit bizarre, something like
+  (x, Just y <- f x) = e
+
+Anyway, bindLocalNames does work, and the binding only exists for the
+duration of the pattern; then the top-level name is added to the
+global env before going on to the RHSes (see GHC.Rename.Module).
+
 Note [View pattern usage]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
