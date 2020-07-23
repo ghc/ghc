@@ -88,3 +88,5 @@ case $1 in
   pull) pull ;;
   *) fail "Invalid mode $1" ;;
 esac
+
+ssh-agent -k
