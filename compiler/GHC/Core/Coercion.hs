@@ -1891,7 +1891,7 @@ substForAllCoBndrUsingLC sym sco (LC subst lc_env) tv co
 --
 --   For the inverse operation, see 'liftCoMatch'
 ty_co_subst :: LiftingContext -> Role -> Type -> Coercion
-ty_co_subst lc role ty
+ty_co_subst !lc role ty
   = go role ty
   where
     go :: Role -> Type -> Coercion
@@ -2865,8 +2865,8 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
          --
          -- The bangs here have been observed to improve performance
          -- significantly in optimized builds.
-         let kind_co = mkSymCo $
-               liftCoSubst Nominal lc (tyCoBinderType binder)
+         let !kind_co = mkSymCo $
+                        liftCoSubst Nominal lc (tyCoBinderType binder)
              !casted_xi = xi `mkCastTy` kind_co
              casted_co =  mkCoherenceLeftCo role xi kind_co co
 

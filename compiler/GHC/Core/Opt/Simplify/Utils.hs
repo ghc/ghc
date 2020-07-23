@@ -153,7 +153,9 @@ data SimplCont
   | StrictArg           -- (StrictArg (f e1 ..en) K)[e] = K[ f e1 .. en e ]
       { sc_dup  :: DupFlag     -- Always Simplified or OkToDup
       , sc_fun  :: ArgInfo     -- Specifies f, e1..en, Whether f has rules, etc
-                               --     plus strictness flags for *further* args
+                               --     plus demands and discount flags for *this* arg
+                               --          and further args
+                               --     So ai_dmds and ai_discs are never empty
       , sc_cci  :: CallCtxt    -- Whether *this* argument position is interesting
       , sc_fun_ty :: OutType   -- Type of the function (f e1 .. en),
                                -- presumably (arg_ty -> res_ty)
@@ -269,7 +271,7 @@ data ArgInfo
                                 -- or an enclosing one has rules (recursively)
                                 --      True => be keener to inline in all args
 
-        ai_strs :: [Bool],      -- Strictness of remaining arguments
+        ai_dmds :: [Demand],    -- Demands on remaining arguments
                                 --   Usually infinite, but if it is finite it guarantees
                                 --   that the function diverges after being given
                                 --   that number of args
@@ -279,11 +281,21 @@ data ArgInfo
 
 data ArgSpec
   = ValArg { as_mult :: Mult
-           , as_arg :: OutExpr        -- Apply to this (coercion or value); c.f. ApplyToVal
+           , as_dmd  :: Demand        -- Demand placed on this argument
+           , as_arg  :: OutExpr       -- Apply to this (coercion or value); c.f. ApplyToVal
            , as_hole_ty :: OutType }  -- Type of the function (presumably t1 -> t2)
+
   | TyArg { as_arg_ty  :: OutType     -- Apply to this type; c.f. ApplyToTy
           , as_hole_ty :: OutType }   -- Type of the function (presumably forall a. blah)
+
   | CastBy OutCoercion                -- Cast by this; c.f. CastIt
+
+instance Outputable ArgInfo where
+  ppr (ArgInfo { ai_fun = fun, ai_args = args, ai_dmds = dmds })
+    = text "ArgInfo" <+> braces
+         (sep [ text "fun =" <+> ppr fun
+              , text "dmds =" <+> ppr dmds
+              , text "args =" <+> ppr args ])
 
 instance Outputable ArgSpec where
   ppr (ValArg { as_mult = mult, as_arg = arg })  = text "ValArg" <+> ppr mult <+> ppr arg
@@ -291,10 +303,18 @@ instance Outputable ArgSpec where
   ppr (CastBy c)                 = text "CastBy" <+> ppr c
 
 addValArgTo :: ArgInfo -> (Mult, OutExpr) -> OutType -> ArgInfo
-addValArgTo ai (w, arg) hole_ty = ai { ai_args = arg_spec : ai_args ai
-                                     , ai_rules = decRules (ai_rules ai) }
-  where
-    arg_spec = ValArg { as_arg = arg, as_hole_ty = hole_ty, as_mult = w }
+addValArgTo ai (w, arg) hole_ty
+  | ArgInfo { ai_dmds = dmd:dmds, ai_discs = _:discs, ai_rules = rules } <- ai
+      -- Pop the top demand and and discounts off
+  , let arg_spec = ValArg { as_arg = arg, as_hole_ty = hole_ty
+                          , as_mult = w, as_dmd = dmd }
+  = ai { ai_args  = arg_spec : ai_args ai
+       , ai_dmds  = dmds
+       , ai_discs = discs
+       , ai_rules = decRules rules }
+  | otherwise
+  = pprPanic "addValArgTo" (ppr ai $$ ppr arg)
+    -- There should always be enough demands and discounts
 
 addTyArgTo :: ArgInfo -> OutType -> OutType -> ArgInfo
 addTyArgTo ai arg_ty hole_ty = ai { ai_args = arg_spec : ai_args ai
@@ -461,8 +481,8 @@ contArgs cont
   | otherwise = go [] cont
   where
     lone (ApplyToTy  {}) = False  -- See Note [Lone variables] in GHC.Core.Unfold
-    lone (ApplyToVal {}) = False
-    lone (CastIt {})     = False
+    lone (ApplyToVal {}) = False  -- NB: even a type application or cast
+    lone (CastIt {})     = False  --     stops it being "lone"
     lone _               = True
 
     go args (ApplyToVal { sc_arg = arg, sc_env = se, sc_cont = k })
@@ -489,17 +509,15 @@ mkArgInfo env fun rules n_val_args call_cont
   = ArgInfo { ai_fun = fun, ai_args = []
             , ai_rules = fun_rules
             , ai_encl = False
-            , ai_strs = vanilla_stricts
+            , ai_dmds = vanilla_dmds
             , ai_discs = vanilla_discounts }
   | otherwise
   = ArgInfo { ai_fun = fun, ai_args = []
             , ai_rules = fun_rules
             , ai_encl  = interestingArgContext rules call_cont
-            , ai_strs  = arg_stricts
+            , ai_dmds  = arg_dmds
             , ai_discs = arg_discounts }
   where
-    fun_ty = idType fun
-
     fun_rules = mkFunRules rules
 
     vanilla_discounts, arg_discounts :: [Int]
@@ -509,14 +527,14 @@ mkArgInfo env fun rules n_val_args call_cont
                               -> discounts ++ vanilla_discounts
                         _     -> vanilla_discounts
 
-    vanilla_stricts, arg_stricts :: [Bool]
-    vanilla_stricts  = repeat False
+    vanilla_dmds, arg_dmds :: [Demand]
+    vanilla_dmds  = repeat topDmd
 
-    arg_stricts
+    arg_dmds
       | not (sm_inline (seMode env))
-      = vanilla_stricts -- See Note [Do not expose strictness if sm_inline=False]
+      = vanilla_dmds -- See Note [Do not expose strictness if sm_inline=False]
       | otherwise
-      = add_type_str fun_ty $
+      = -- add_type_str fun_ty $
         case splitStrictSig (idStrictness fun) of
           (demands, result_info)
                 | not (demands `lengthExceeds` n_val_args)
@@ -529,14 +547,15 @@ mkArgInfo env fun rules n_val_args call_cont
                         -- inlining lone variables, so its ok
                         -- (see GHC.Core.Op.Simplify.Utils.analyseCont)
                    if isDeadEndDiv result_info then
-                        map isStrictDmd demands         -- Finite => result is bottom
+                        demands  -- Finite => result is bottom
                    else
-                        map isStrictDmd demands ++ vanilla_stricts
+                        demands ++ vanilla_dmds
                | otherwise
                -> WARN( True, text "More demands than arity" <+> ppr fun <+> ppr (idArity fun)
                                 <+> ppr n_val_args <+> ppr demands )
-                   vanilla_stricts      -- Not enough args, or no strictness
+                  vanilla_dmds      -- Not enough args, or no strictness
 
+{-
     add_type_str :: Type -> [Bool] -> [Bool]
     -- If the function arg types are strict, record that in the 'strictness bits'
     -- No need to instantiate because unboxed types (which dominate the strict
@@ -559,6 +578,7 @@ mkArgInfo env fun rules n_val_args call_cont
 
       | otherwise
       = all_strs
+-}
 
 {- Note [Unsaturated functions]
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
