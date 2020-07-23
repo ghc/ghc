@@ -600,7 +600,7 @@ mkApEntryLabel       upd off    = RtsLabel (RtsApEntry           upd off)
 -- A call to some primitive hand written Cmm code
 mkPrimCallLabel :: PrimCall -> CLabel
 mkPrimCallLabel (PrimCall str pkg)
-        = CmmLabel (toUnitId pkg) (NeedExternDecl True) str CmmPrimCall
+        = CmmLabel pkg (NeedExternDecl True) str CmmPrimCall
 
 
 -- Constructing ForeignLabels
