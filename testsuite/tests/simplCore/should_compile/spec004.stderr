@@ -5,18 +5,20 @@ Result size of Specialise
 
 -- RHS size: {terms: 14, types: 12, coercions: 0, joins: 0/0}
 $sfoo [InlPrag=NOINLINE[0]] :: Int -> [Char]
-[LclId]
+[LclId, Arity=1]
 $sfoo
   = \ (y :: Int) ->
       GHC.Base.build
-        @Char
-        (\ (@b) (c [OS=OneShot] :: Char -> b -> b) (n [OS=OneShot] :: b) ->
+        @ Char
+        (\ (@ b)
+           (c [OS=OneShot] :: Char -> b -> b)
+           (n [OS=OneShot] :: b) ->
            GHC.Base.foldr
-             @Char
-             @b
+             @ Char
+             @ b
              c
-             (GHC.CString.unpackFoldrCString# @b "!"# c n)
-             (show @Int GHC.Show.$fShowInt y))
+             (GHC.CString.unpackFoldrCString# @ b "!"# c n)
+             (show @ Int GHC.Show.$fShowInt y))
 
 -- RHS size: {terms: 17, types: 17, coercions: 0, joins: 0/0}
 foo [InlPrag=NOINLINE[0]] :: forall a. () -> Show a => a -> String
@@ -24,19 +26,23 @@ foo [InlPrag=NOINLINE[0]] :: forall a. () -> Show a => a -> String
  Arity=3,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 30 0] 150 40},
- RULES: "SPEC foo @Int" [0]
-            forall (dk :: ()) ($dShow :: Show Int). foo @Int dk $dShow = $sfoo]
+ RULES: "SPEC foo @ Int" [0]
+            forall (dk :: ()) ($dShow :: Show Int).
+              foo @ Int dk $dShow
+              = $sfoo]
 foo
-  = \ (@a) _ [Occ=Dead] ($dShow :: Show a) (y :: a) ->
+  = \ (@ a) _ [Occ=Dead] ($dShow :: Show a) (y :: a) ->
       GHC.Base.build
-        @Char
-        (\ (@b) (c [OS=OneShot] :: Char -> b -> b) (n [OS=OneShot] :: b) ->
+        @ Char
+        (\ (@ b)
+           (c [OS=OneShot] :: Char -> b -> b)
+           (n [OS=OneShot] :: b) ->
            GHC.Base.foldr
-             @Char
-             @b
+             @ Char
+             @ b
              c
-             (GHC.CString.unpackFoldrCString# @b "!"# c n)
-             (show @a $dShow y))
+             (GHC.CString.unpackFoldrCString# @ b "!"# c n)
+             (show @ a $dShow y))
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $trModule :: GHC.Prim.Addr#
@@ -78,7 +84,7 @@ bar :: String
 [LclIdX,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
          WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 50 0}]
-bar = foo @Int GHC.Tuple.() GHC.Show.$fShowInt (GHC.Types.I# 42#)
+bar = foo @ Int GHC.Tuple.() GHC.Show.$fShowInt (GHC.Types.I# 42#)
 
 
 
