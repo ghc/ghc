@@ -2379,6 +2379,9 @@ stg_unpackClosurezh ( P_ closure )
     again: MAYBE_GC(again);
     dat_arr_sz = SIZEOF_StgArrBytes + WDS(len);
     ("ptr" dat_arr) = ccall allocateMightFail(MyCapability() "ptr", BYTES_TO_WDS(dat_arr_sz));
+    if (dat_arr == NULL) (likely: False) {
+        jump stg_raisezh(base_GHCziIOziException_heapOverflow_closure);
+    }
 
     SET_HDR(dat_arr, stg_ARR_WORDS_info, CCCS);
     StgArrBytes_bytes(dat_arr) = WDS(len);
