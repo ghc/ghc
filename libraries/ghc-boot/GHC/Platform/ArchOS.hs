@@ -20,7 +20,10 @@ import Prelude -- See Note [Why do we import Prelude here?]
 
 -- | Platform architecture and OS.
 data ArchOS
-   = ArchOS Arch OS
+   = ArchOS
+      { archOS_arch :: Arch
+      , archOS_OS   :: OS
+      }
    deriving (Read, Show, Eq)
 
 -- | Architectures
