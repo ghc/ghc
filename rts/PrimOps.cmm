@@ -2382,6 +2382,7 @@ stg_unpackClosurezh ( P_ closure )
     if (dat_arr == NULL) (likely: False) {
         jump stg_raisezh(base_GHCziIOziException_heapOverflow_closure);
     }
+    TICK_ALLOC_PRIM(SIZEOF_StgArrBytes, WDS(len), 0);
 
     SET_HDR(dat_arr, stg_ARR_WORDS_info, CCCS);
     StgArrBytes_bytes(dat_arr) = WDS(len);
