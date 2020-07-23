@@ -34,7 +34,6 @@ import qualified Data.Map as M
 import Data.Map (Map)
 import Data.List
 import Data.Maybe
-import Control.Applicative
 import Control.Monad
 import Data.Traversable
 
@@ -49,15 +48,12 @@ import GHC.Types.Name
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Unit.State
-import GHC.Data.Bag
 import GHC.Types.Name.Reader
 import GHC.Tc.Types
 import GHC.Data.FastString ( unpackFS, bytesFS )
 import GHC.Types.Basic ( StringLiteral(..), SourceText(..), PromotionFlag(..) )
 import qualified GHC.Utils.Outputable as O
 import GHC.HsToCore.Docs hiding (mkMaps)
-
-import GHC.Core.Multiplicity
 
 
 -- | Use a 'TypecheckedModule' to produce an 'Interface'.
@@ -240,7 +236,7 @@ mkAliasMap state mRenamedSource =
 --
 -- With our mapping we know that we can display exported modules M1 and M2.
 --
-unrestrictedModuleImports :: [ImportDecl name] -> M.Map ModuleName [ModuleName]
+unrestrictedModuleImports :: [ImportDecl GhcRn] -> M.Map ModuleName [ModuleName]
 unrestrictedModuleImports idecls =
   M.map (map (unLoc . ideclName))
   $ M.filter (all isInteresting) impModMap
@@ -958,7 +954,7 @@ extractPatternSyn nm t tvs cons =
         typ'' = noLoc (HsQualTy noExtField (noLoc []) typ')
     in PatSynSig noExtField [noLoc nm] (mkEmptyImplicitBndrs typ'')
 
-  longArrow :: (XFunTy name ~ NoExtField) => [LHsType name] -> LHsType name -> LHsType name
+  longArrow :: [LHsType GhcRn] -> LHsType GhcRn -> LHsType GhcRn
   longArrow inputs output = foldr (\x y -> noLoc (HsFunTy noExtField HsUnrestrictedArrow x y)) output inputs
 
   data_ty con

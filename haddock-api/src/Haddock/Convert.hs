@@ -35,7 +35,6 @@ import GHC.Types.Name
 import GHC.Types.Name.Set    ( emptyNameSet )
 import GHC.Types.Name.Reader ( mkVarUnqual )
 import GHC.Core.PatSyn
-import GHC.Types.SrcLoc ( Located, noLoc, unLoc, GenLocated(..), srcLocSpan )
 import GHC.Tc.Utils.TcType
 import GHC.Core.TyCon
 import GHC.Core.Type
@@ -57,7 +56,6 @@ import Haddock.Types
 import Haddock.Interface.Specialize
 import Haddock.GhcUtils                      ( orderedFVs, defaultRuntimeRepVars )
 
-import GHC.Core.Multiplicity
 
 import Data.Maybe                            ( catMaybes, mapMaybe, maybeToList )
 

@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Utils
@@ -89,8 +90,6 @@ import qualified System.Posix.Internals
 #endif
 
 import GHC.Utils.Monad ( MonadIO(..) )
-
-import GHC.Core.Multiplicity
 
 
 --------------------------------------------------------------------------------

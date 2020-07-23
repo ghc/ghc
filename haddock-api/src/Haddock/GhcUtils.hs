@@ -1,5 +1,8 @@
 {-# LANGUAGE BangPatterns, StandaloneDeriving, FlexibleInstances, ViewPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_HADDOCK hide #-}
@@ -23,17 +26,14 @@ import Data.Char ( isSpace )
 
 import Haddock.Types( DocName, DocNameI )
 
-import GHC.Utils.Exception
 import GHC.Utils.FV as FV
 import GHC.Utils.Outputable ( Outputable, panic, showPpr )
 import GHC.Types.Name
-import GHC.Types.Name.Set
 import GHC.Unit.Module
 import GHC.Driver.Types
 import GHC
 import GHC.Core.Class
 import GHC.Driver.Session
-import GHC.Core.Multiplicity
 import GHC.Types.SrcLoc  ( advanceSrcLoc )
 import GHC.Types.Var     ( Specificity, VarBndr(..), TyVarBinder
                          , tyVarKind, updateTyVarKind, isInvisibleArgFlag )
@@ -49,6 +49,8 @@ import qualified GHC.Data.StringBuffer             as S
 import           Data.ByteString ( ByteString )
 import qualified Data.ByteString          as BS
 import qualified Data.ByteString.Internal as BS
+
+import GHC.HsToCore.Docs
 
 moduleString :: Module -> String
 moduleString = moduleNameString . moduleName
@@ -89,25 +91,12 @@ ifTrueJust :: Bool -> name -> Maybe name
 ifTrueJust True  = Just
 ifTrueJust False = const Nothing
 
-sigName :: LSig name -> [IdP name]
+sigName :: LSig GhcRn -> [IdP GhcRn]
 sigName (L _ sig) = sigNameNoLoc sig
 
-sigNameNoLoc :: Sig name -> [IdP name]
-sigNameNoLoc (TypeSig    _   ns _)         = map unLoc ns
-sigNameNoLoc (ClassOpSig _ _ ns _)         = map unLoc ns
-sigNameNoLoc (PatSynSig  _   ns _)         = map unLoc ns
-sigNameNoLoc (SpecSig    _   n _ _)        = [unLoc n]
-sigNameNoLoc (InlineSig  _   n _)          = [unLoc n]
-sigNameNoLoc (FixSig _ (FixitySig _ ns _)) = map unLoc ns
-sigNameNoLoc _                             = []
-
 -- | Was this signature given by the user?
-isUserLSig :: LSig name -> Bool
-isUserLSig (L _ (TypeSig {}))    = True
-isUserLSig (L _ (ClassOpSig {})) = True
-isUserLSig (L _ (PatSynSig {}))  = True
-isUserLSig _                     = False
-
+isUserLSig :: forall p. UnXRec p => LSig p -> Bool
+isUserLSig = isUserSig . unXRec @p
 
 isClassD :: HsDecl a -> Bool
 isClassD (TyClD _ d) = isClassDecl d
@@ -258,18 +247,18 @@ data Precedence
 --
 -- We cannot add parens that may be required by fixities because we do not have
 -- any fixity information to work with in the first place :(.
-reparenTypePrec :: (XParTy a ~ NoExtField) => Precedence -> HsType a -> HsType a
+reparenTypePrec :: forall a. (XParTy a ~ NoExtField, MapXRec a, UnXRec a, WrapXRec a) => Precedence -> HsType a -> HsType a
 reparenTypePrec = go
   where
 
   -- Shorter name for 'reparenType'
-  go :: (XParTy a ~ NoExtField) => Precedence -> HsType a -> HsType a
+  go :: Precedence -> HsType a -> HsType a
   go _ (HsBangTy x b ty)     = HsBangTy x b (reparenLType ty)
   go _ (HsTupleTy x con tys) = HsTupleTy x con (map reparenLType tys)
   go _ (HsSumTy x tys)       = HsSumTy x (map reparenLType tys)
   go _ (HsKindSig x ty kind) = HsKindSig x (reparenLType ty) (reparenLType kind)
   go _ (HsListTy x ty)       = HsListTy x (reparenLType ty)
-  go _ (HsRecTy x flds)      = HsRecTy x (map (fmap reparenConDeclField) flds)
+  go _ (HsRecTy x flds)      = HsRecTy x (map (mapXRec @a reparenConDeclField) flds)
   go p (HsDocTy x ty d)      = HsDocTy x (goL p ty) d
   go _ (HsExplicitListTy x p tys) = HsExplicitListTy x p (map reparenLType tys)
   go _ (HsExplicitTupleTy x tys) = HsExplicitTupleTy x (map reparenLType tys)
@@ -278,7 +267,7 @@ reparenTypePrec = go
   go p (HsForAllTy x tele ty)
     = paren p PREC_CTX $ HsForAllTy x (reparenHsForAllTelescope tele) (reparenLType ty)
   go p (HsQualTy x ctxt ty)
-    = paren p PREC_FUN $ HsQualTy x (fmap (map reparenLType) ctxt) (reparenLType ty)
+    = paren p PREC_FUN $ HsQualTy x (mapXRec @a (map reparenLType) ctxt) (reparenLType ty)
   go p (HsFunTy x w ty1 ty2)
     = paren p PREC_FUN $ HsFunTy x w (goL PREC_FUN ty1) (goL PREC_TOP ty2)
   go p (HsAppTy x fun_ty arg_ty)
@@ -287,7 +276,7 @@ reparenTypePrec = go
     = paren p PREC_CON $ HsAppKindTy x (goL PREC_FUN fun_ty) (goL PREC_CON arg_ki)
   go p (HsOpTy x ty1 op ty2)
     = paren p PREC_FUN $ HsOpTy x (goL PREC_OP ty1) op (goL PREC_OP ty2)
-  go p (HsParTy _ t) = unLoc $ goL p t -- pretend the paren doesn't exist - it will be added back if needed
+  go p (HsParTy _ t) = unXRec @a $ goL p t -- pretend the paren doesn't exist - it will be added back if needed
   go _ t@HsTyVar{} = t
   go _ t@HsStarTy{} = t
   go _ t@HsSpliceTy{} = t
@@ -296,43 +285,42 @@ reparenTypePrec = go
   go _ t@XHsType{} = t
 
   -- Located variant of 'go'
-  goL :: (XParTy a ~ NoExtField) => Precedence -> LHsType a -> LHsType a
-  goL ctxt_prec = fmap (go ctxt_prec)
+  goL :: Precedence -> LHsType a -> LHsType a
+  goL ctxt_prec = mapXRec @a (go ctxt_prec)
 
   -- Optionally wrap a type in parens
-  paren :: (XParTy a ~ NoExtField)
-        => Precedence            -- Precedence of context
+  paren :: Precedence            -- Precedence of context
         -> Precedence            -- Precedence of top-level operator
         -> HsType a -> HsType a  -- Wrap in parens if (ctxt >= op)
-  paren ctxt_prec op_prec | ctxt_prec >= op_prec = HsParTy noExtField . noLoc
+  paren ctxt_prec op_prec | ctxt_prec >= op_prec = HsParTy noExtField . wrapXRec @a
                           | otherwise            = id
 
 
 -- | Add parenthesis around the types in a 'HsType' (see 'reparenTypePrec')
-reparenType :: (XParTy a ~ NoExtField) => HsType a -> HsType a
+reparenType :: (XParTy a ~ NoExtField, MapXRec a, UnXRec a, WrapXRec a) => HsType a -> HsType a
 reparenType = reparenTypePrec PREC_TOP
 
 -- | Add parenthesis around the types in a 'LHsType' (see 'reparenTypePrec')
-reparenLType :: (XParTy a ~ NoExtField) => LHsType a -> LHsType a
-reparenLType = fmap reparenType
+reparenLType :: forall a. (XParTy a ~ NoExtField, MapXRec a, UnXRec a, WrapXRec a) => LHsType a -> LHsType a
+reparenLType = mapXRec @a reparenType
 
 -- | Add parentheses around the types in an 'HsForAllTelescope' (see 'reparenTypePrec')
-reparenHsForAllTelescope :: (XParTy a ~ NoExtField)
+reparenHsForAllTelescope :: forall a. (XParTy a ~ NoExtField, MapXRec a, UnXRec a, WrapXRec a)
                          => HsForAllTelescope a -> HsForAllTelescope a
 reparenHsForAllTelescope (HsForAllVis x bndrs) =
-  HsForAllVis x (map (fmap reparenTyVar) bndrs)
+  HsForAllVis x (map (mapXRec @a reparenTyVar) bndrs)
 reparenHsForAllTelescope (HsForAllInvis x bndrs) =
-  HsForAllInvis x (map (fmap reparenTyVar) bndrs)
+  HsForAllInvis x (map (mapXRec @a reparenTyVar) bndrs)
 reparenHsForAllTelescope v@XHsForAllTelescope{} = v
 
 -- | Add parenthesis around the types in a 'HsTyVarBndr' (see 'reparenTypePrec')
-reparenTyVar :: (XParTy a ~ NoExtField) => HsTyVarBndr flag a -> HsTyVarBndr flag a
+reparenTyVar :: (XParTy a ~ NoExtField, MapXRec a, UnXRec a, WrapXRec a) => HsTyVarBndr flag a -> HsTyVarBndr flag a
 reparenTyVar (UserTyVar x flag n) = UserTyVar x flag n
 reparenTyVar (KindedTyVar x flag n kind) = KindedTyVar x flag n (reparenLType kind)
 reparenTyVar v@XTyVarBndr{} = v
 
 -- | Add parenthesis around the types in a 'ConDeclField' (see 'reparenTypePrec')
-reparenConDeclField :: (XParTy a ~ NoExtField) => ConDeclField a -> ConDeclField a
+reparenConDeclField :: (XParTy a ~ NoExtField, MapXRec a, UnXRec a, WrapXRec a) => ConDeclField a -> ConDeclField a
 reparenConDeclField (ConDeclField x n t d) = ConDeclField x n (reparenLType t) d
 reparenConDeclField c@XConDeclField{} = c
 

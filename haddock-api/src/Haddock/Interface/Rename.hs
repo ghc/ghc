@@ -474,7 +474,8 @@ renameDataDefn (HsDataDefn { dd_ND = nd, dd_ctxt = lcontext, dd_cType = cType
 renameCon :: ConDecl GhcRn -> RnM (ConDecl DocNameI)
 renameCon decl@(ConDeclH98 { con_name = lname, con_ex_tvs = ltyvars
                            , con_mb_cxt = lcontext, con_args = details
-                           , con_doc = mbldoc }) = do
+                           , con_doc = mbldoc
+                           , con_forall = forall }) = do
       lname'    <- renameL lname
       ltyvars'  <- mapM renameLTyVarBndr ltyvars
       lcontext' <- traverse renameLContext lcontext
@@ -482,21 +483,24 @@ renameCon decl@(ConDeclH98 { con_name = lname, con_ex_tvs = ltyvars
       mbldoc'   <- mapM renameLDocHsSyn mbldoc
       return (decl { con_ext = noExtField, con_name = lname', con_ex_tvs = ltyvars'
                    , con_mb_cxt = lcontext'
+                   , con_forall = forall -- Remove when #18311 is fixed
                    , con_args = details', con_doc = mbldoc' })
 
-renameCon decl@(ConDeclGADT { con_names = lnames, con_qvars = ltyvars
+renameCon ConDeclGADT { con_names = lnames, con_qvars = ltyvars
                             , con_mb_cxt = lcontext, con_args = details
-                            , con_res_ty = res_ty
-                            , con_doc = mbldoc }) = do
+                            , con_res_ty = res_ty, con_forall = forall
+                            , con_doc = mbldoc } = do
       lnames'   <- mapM renameL lnames
       ltyvars'  <- mapM renameLTyVarBndr ltyvars
       lcontext' <- traverse renameLContext lcontext
       details'  <- renameDetails details
       res_ty'   <- renameLType res_ty
       mbldoc'   <- mapM renameLDocHsSyn mbldoc
-      return (decl { con_g_ext = noExtField, con_names = lnames', con_qvars = ltyvars'
+      return (ConDeclGADT
+                   { con_g_ext = noExtField, con_names = lnames', con_qvars = ltyvars'
                    , con_mb_cxt = lcontext', con_args = details'
-                   , con_res_ty = res_ty', con_doc = mbldoc' })
+                   , con_res_ty = res_ty', con_doc = mbldoc'
+                   , con_forall = forall}) -- Remove when #18311 is fixed
 
 renameHsScaled :: HsScaled GhcRn (LHsType GhcRn)
                -> RnM (HsScaled DocNameI (LHsType DocNameI))
