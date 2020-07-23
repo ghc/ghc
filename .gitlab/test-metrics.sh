@@ -81,6 +81,10 @@ function push() {
     echo ""
     echo "Failed to push git notes. Fetching, appending, and retrying... $MAX_RETRY retries left."
   done
+
+  # Be sure to kill agent before we terminate since otherwise the Windows CI
+  # job won't finish.
+  ssh-agent -k
 }
 
 case $1 in
@@ -88,3 +92,4 @@ case $1 in
   pull) pull ;;
   *) fail "Invalid mode $1" ;;
 esac
+
