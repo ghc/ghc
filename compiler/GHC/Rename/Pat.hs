@@ -236,14 +236,18 @@ newPatName (LetMk is_top fix_env) rdr_name
         do { name <- case is_top of
                        NotTopLevel -> newLocalBndrRn rdr_name
                        TopLevel    -> newTopSrcBinder rdr_name
-           ; bindLocalNames [name] $       -- Do *not* use bindLocalNameFV here
+           ; bindLocalNames [name] $    -- Do *not* use bindLocalNameFV here
                                         -- See Note [View pattern usage]
              addLocalFixities fix_env [name] $
              thing_inside name })
 
-    -- Note: the bindLocalNames is somewhat suspicious
-    --       because it binds a top-level name as a local name.
-    --       however, this binding seems to work, and it only exists for
+    -- Note [bindLocalNames for an External name]
+    -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    -- The use of bindLocalNames is somewhat suspicious
+    --       because it binds a top-level External name in the LocalRdrEnv.
+    --       c.f. Note [LocalRdrEnv] in GHC.Types.Name.Reader.
+    --
+    --       However, this odd binding seems to work, and it only exists for
     --       the duration of the patterns and the continuation;
     --       then the top-level name is added to the global env
     --       before going on to the RHSes (see GHC.Rename.Module).
