@@ -1868,7 +1868,7 @@ funEpilogue live = do
     --  As Fn, Dn and XMMn use the same register (XMMn) to be passed, we don't
     --  want to pass F2 before D1 for example, otherwise we could get F2 -> XMM1
     --  and D1 -> XMM2.
-    let allRegs = activeStgRegs platform
+    let allRegs = activeStgRegs (targetPlatform dflags)
     loads <- forM allRegs $ \r -> if
       -- load live registers
       | r `elem` alwaysLive  -> loadExpr r

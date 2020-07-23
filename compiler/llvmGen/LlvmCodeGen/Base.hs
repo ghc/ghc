@@ -33,7 +33,9 @@ module LlvmCodeGen.Base (
         strCLabel_llvm, strDisplayName_llvm, strProcedureName_llvm,
         getGlobalPtr, generateExternDecls,
 
-        aliasify, llvmDefLabel
+        aliasify, llvmDefLabel,
+
+        padLiveArgs, isFPR
     ) where
 
 #include "HsVersions.h"
@@ -45,12 +47,13 @@ import Llvm
 import LlvmCodeGen.Regs
 import Panic
 
-import PprCmm
+import PprCmm ()
 import CLabel
 import GHC.Platform.Regs ( activeStgRegs, globalRegMaybe )
 import DynFlags
 import FastString
 import Cmm              hiding ( succ )
+import CmmUtils (regsOverlap)
 import Outputable as Outp
 import GHC.Platform
 import UniqFM
@@ -154,10 +157,10 @@ llvmFunSection dflags lbl
 
 -- | A Function's arguments
 llvmFunArgs :: DynFlags -> LiveGlobalRegs -> [LlvmVar]
-llvmFunArgs platform live =
-    map (lmGlobalRegArg platform) (filter isPassed allRegs)
-    where allRegs = activeStgRegs platform
-          paddingRegs = padLiveArgs platform live
+llvmFunArgs dflags live =
+    map (lmGlobalRegArg dflags) (filter isPassed allRegs)
+    where allRegs = activeStgRegs (targetPlatform dflags)
+          paddingRegs = padLiveArgs dflags live
           isLive r = r `elem` alwaysLive
                      || r `elem` live
                      || r `elem` paddingRegs
@@ -184,11 +187,13 @@ isFPR _             = False
 -- "n" If the calling convention uses registers in a different order or if the
 -- invariant doesn't hold, this code probably won't be correct.
 padLiveArgs :: DynFlags -> LiveGlobalRegs -> LiveGlobalRegs
-padLiveArgs platform live =
+padLiveArgs dflags live =
       if platformUnregisterised platform
         then [] -- not using GHC's register convention for platform.
         else padded
   where
+    platform = targetPlatform dflags
+
     ----------------------------------
     -- handle floating-point registers (FPR)
 
@@ -199,7 +204,7 @@ padLiveArgs platform live =
     -- all use the same real regs on X86-64 (XMM registers).
     --
     classes         = groupBy sharesClass fprLive
-    sharesClass a b = regsOverlap platform (norm a) (norm b) -- check if mapped to overlapping registers
+    sharesClass a b = regsOverlap dflags (norm a) (norm b) -- check if mapped to overlapping registers
     norm x          = CmmGlobal ((fpr_ctor x) 1)             -- get the first register of the family
 
     -- For each class, we just have to fill missing registers numbers. We use
