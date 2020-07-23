@@ -738,6 +738,30 @@ def normalise_whitespace_fun(f):
 def _normalise_whitespace_fun(name, opts, f):
     opts.whitespace_normaliser = f
 
+def normalise_win32_io_errors(name, opts):
+    """
+    On Windows we currently have two IO manager implementations: both WinIO IO
+    manager and the old POSIX-emulated implementation. These currently differ
+    slightly in the error messages that they provide. Normalise these
+    differences away, preferring the new WinIO errors.
+
+    This can be dropped when the old IO manager is removed.
+    """
+
+    SUBS = [
+        ('Bad file descriptor', 'The handle is invalid'),
+        ('Permission denied', 'Access is denied.'),
+        ('No such file or directory', 'The system cannot find the file specified.'),
+    ]
+
+    def f(s: str):
+        for old,new in SUBS:
+            s = s.replace(old, new)
+
+        return s
+
+    return when(opsys('mingw32'), normalise_fun(f))
+
 def normalise_version_( *pkgs ):
     def normalise_version__( str ):
         return re.sub('(' + '|'.join(map(re.escape,pkgs)) + ')-[0-9.]+',
