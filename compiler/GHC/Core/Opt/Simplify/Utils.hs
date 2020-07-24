@@ -125,8 +125,7 @@ data SimplCont
                                 -- See Note [The hole type in ApplyToTy/Val]
       , sc_arg  :: InExpr       -- The argument,
       , sc_env  :: StaticEnv    -- see Note [StaticEnv invariant]
-      , sc_cont :: SimplCont
-      , sc_mult :: Mult }
+      , sc_cont :: SimplCont }
 
   | ApplyToTy          -- (ApplyToTy ty K)[e] = K[ e ty ]
       { sc_arg_ty  :: OutType     -- Argument type
@@ -160,8 +159,7 @@ data SimplCont
       , sc_fun_ty :: OutType   -- Type of the function (f e1 .. en),
                                -- presumably (arg_ty -> res_ty)
                                -- where res_ty is expected by sc_cont
-      , sc_cont :: SimplCont
-      , sc_mult :: Mult }
+      , sc_cont :: SimplCont }
 
   | TickIt              -- (TickIt t K)[e] = K[ tick t e ]
         (Tickish Id)    -- Tick tickish <hole>
@@ -282,8 +280,7 @@ data ArgInfo
     }
 
 data ArgSpec
-  = ValArg { as_mult :: Mult
-           , as_dmd  :: Demand        -- Demand placed on this argument
+  = ValArg { as_dmd  :: Demand        -- Demand placed on this argument
            , as_arg  :: OutExpr       -- Apply to this (coercion or value); c.f. ApplyToVal
            , as_hole_ty :: OutType }  -- Type of the function (presumably t1 -> t2)
 
@@ -300,16 +297,15 @@ instance Outputable ArgInfo where
               , text "args =" <+> ppr args ])
 
 instance Outputable ArgSpec where
-  ppr (ValArg { as_mult = mult, as_arg = arg })  = text "ValArg" <+> ppr mult <+> ppr arg
+  ppr (ValArg { as_arg = arg })  = text "ValArg" <+> ppr arg
   ppr (TyArg { as_arg_ty = ty }) = text "TyArg" <+> ppr ty
   ppr (CastBy c)                 = text "CastBy" <+> ppr c
 
-addValArgTo :: ArgInfo -> (Mult, OutExpr) -> OutType -> ArgInfo
-addValArgTo ai (w, arg) hole_ty
+addValArgTo :: ArgInfo ->  OutExpr -> OutType -> ArgInfo
+addValArgTo ai arg hole_ty
   | ArgInfo { ai_dmds = dmd:dmds, ai_discs = _:discs, ai_rules = rules } <- ai
       -- Pop the top demand and and discounts off
-  , let arg_spec = ValArg { as_arg = arg, as_hole_ty = hole_ty
-                          , as_mult = w, as_dmd = dmd }
+  , let arg_spec = ValArg { as_arg = arg, as_hole_ty = hole_ty, as_dmd = dmd }
   = ai { ai_args  = arg_spec : ai_args ai
        , ai_dmds  = dmds
        , ai_discs = discs
@@ -345,9 +341,9 @@ pushSimplifiedArgs env  (arg : args) k
   = case arg of
       TyArg { as_arg_ty = arg_ty, as_hole_ty = hole_ty }
                -> ApplyToTy  { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = rest }
-      ValArg { as_arg = arg, as_hole_ty = hole_ty, as_mult = w }
+      ValArg { as_arg = arg, as_hole_ty = hole_ty }
              -> ApplyToVal { sc_arg = arg, sc_env = env, sc_dup = Simplified
-                           , sc_hole_ty = hole_ty, sc_cont = rest, sc_mult = w }
+                           , sc_hole_ty = hole_ty, sc_cont = rest }
       CastBy c -> CastIt c rest
   where
     rest = pushSimplifiedArgs env args k
@@ -446,7 +442,7 @@ contHoleType (TickIt _ k)                     = contHoleType k
 contHoleType (CastIt co _)                    = coercionLKind co
 contHoleType (StrictBind { sc_bndr = b, sc_dup = dup, sc_env = se })
   = perhapsSubstTy dup se (idType b)
-contHoleType (StrictArg  { sc_fun_ty = ty, sc_mult = _m })  = funArgTy ty
+contHoleType (StrictArg  { sc_fun_ty = ty })  = funArgTy ty
 contHoleType (ApplyToTy  { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy]
 contHoleType (ApplyToVal { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy/Val]
 contHoleType (Select { sc_dup = d, sc_bndr =  b, sc_env = se })
@@ -464,12 +460,14 @@ contHoleType (Select { sc_dup = d, sc_bndr =  b, sc_env = se })
 contHoleScaling :: SimplCont -> Mult
 contHoleScaling (Stop _ _) = One
 contHoleScaling (CastIt _ k) = contHoleScaling k
-contHoleScaling (StrictBind { sc_bndr = id, sc_cont = k }) =
-  (idMult id) `mkMultMul` contHoleScaling k
-contHoleScaling (StrictArg { sc_mult = w, sc_cont = k }) =
-  w `mkMultMul` contHoleScaling k
-contHoleScaling (Select { sc_bndr = id, sc_cont = k }) =
-  (idMult id) `mkMultMul` contHoleScaling k
+contHoleScaling (StrictBind { sc_bndr = id, sc_cont = k })
+  = idMult id `mkMultMul` contHoleScaling k
+contHoleScaling (Select { sc_bndr = id, sc_cont = k })
+  = idMult id `mkMultMul` contHoleScaling k
+contHoleScaling (StrictArg { sc_fun_ty = fun_ty, sc_cont = k })
+  = w `mkMultMul` contHoleScaling k
+  where
+    (w, _, _) = splitFunTy fun_ty
 contHoleScaling (ApplyToTy { sc_cont = k }) = contHoleScaling k
 contHoleScaling (ApplyToVal { sc_cont = k }) = contHoleScaling k
 contHoleScaling (TickIt _ k) = contHoleScaling k
