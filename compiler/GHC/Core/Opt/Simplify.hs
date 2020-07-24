@@ -1002,7 +1002,7 @@ simplExprF1 env (App fun arg) cont
                                 , sc_hole_ty = hole'
                                 , sc_cont    = cont } }
       _       ->
-          -- crucially, these are /lazy/ bindings. They will
+          -- Crucially, sc_hole_ty is a /lazy/ binding.  It will
           -- be forced only if we need to run contHoleType.
           -- When these are forced, we might get quadratic behavior;
           -- this quadratic blowup could be avoided by drilling down
@@ -1010,13 +1010,10 @@ simplExprF1 env (App fun arg) cont
           -- (instead of one-at-a-time). But in practice, we have not
           -- observed the quadratic behavior, so this extra entanglement
           -- seems not worthwhile.
-        let fun_ty = exprType fun
-            (m, _, _) = splitFunTy fun_ty
-        in
                 simplExprF env fun $
                  ApplyToVal { sc_arg = arg, sc_env = env
                             , sc_hole_ty = substTy env (exprType fun)
-                            , sc_dup = NoDup, sc_cont = cont, sc_mult = m }
+                            , sc_dup = NoDup, sc_cont = cont }
 
 simplExprF1 env expr@(Lam {}) cont
   = {-#SCC "simplExprF1-Lam" #-}
@@ -1321,8 +1318,8 @@ rebuild env expr cont
       Select { sc_bndr = bndr, sc_alts = alts, sc_env = se, sc_cont = cont }
         -> rebuildCase (se `setInScopeFromE` env) expr bndr alts cont
 
-      StrictArg { sc_fun = fun, sc_cont = cont, sc_fun_ty = fun_ty, sc_mult = m }
-        -> rebuildCall env (addValArgTo fun (m, expr) fun_ty ) cont
+      StrictArg { sc_fun = fun, sc_cont = cont, sc_fun_ty = fun_ty }
+        -> rebuildCall env (addValArgTo fun expr fun_ty ) cont
       StrictBind { sc_bndr = b, sc_bndrs = bs, sc_body = body
                  , sc_env = se, sc_cont = cont }
         -> do { (floats1, env') <- simplNonRecX (se `setInScopeFromE` env) b expr
@@ -1414,7 +1411,7 @@ simplCast env body co0 cont0
         --         co1 :: t1 ~ s1
         --         co2 :: s2 ~ t2
         addCoerce co cont@(ApplyToVal { sc_arg = arg, sc_env = arg_se
-                                      , sc_dup = dup, sc_cont = tail, sc_mult = m })
+                                      , sc_dup = dup, sc_cont = tail })
           | Just (co1, m_co2) <- pushCoValArg co
           , let new_ty = coercionRKind co1
           , not (isTypeLevPoly new_ty)  -- Without this check, we get a lev-poly arg
@@ -1438,8 +1435,7 @@ simplCast env body co0 cont0
                                     , sc_env  = arg_se'
                                     , sc_dup  = dup'
                                     , sc_cont = tail'
-                                    , sc_hole_ty = coercionLKind co
-                                    , sc_mult = m }) } }
+                                    , sc_hole_ty = coercionLKind co }) } }
 
         addCoerce co cont
           | isReflexiveCo co = return cont  -- Having this at the end makes a huge
@@ -1975,17 +1971,18 @@ rebuildCall env info (ApplyToTy { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_c
 -- runRW# :: forall (r :: RuntimeRep) (o :: TYPE r). (State# RealWorld -> o) -> o
 -- K[ runRW# rr ty body ]  -->  runRW rr' ty' (\s. K[ body s ])
 rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args })
-            (ApplyToVal { sc_arg = arg, sc_env = arg_se, sc_cont = cont, sc_mult = m })
+            (ApplyToVal { sc_arg = arg, sc_env = arg_se
+                        , sc_cont = cont, sc_hole_ty = fun_ty })
   | fun `hasKey` runRWKey
   , not (contIsStop cont)  -- Don't fiddle around if the continuation is boring
   , [ TyArg {}, TyArg {} ] <- rev_args
   = do { s <- newId (fsLit "s") Many realWorldStatePrimTy
-       ; let env'  = (arg_se `setInScopeFromE` env) `addNewInScopeIds` [s]
+       ; let (m,_,_) = splitFunTy fun_ty
+             env'  = (arg_se `setInScopeFromE` env) `addNewInScopeIds` [s]
              ty'   = contResultType cont
              cont' = ApplyToVal { sc_dup = Simplified, sc_arg = Var s
                                 , sc_env = env', sc_cont = cont
-                                , sc_hole_ty = mkVisFunTy m realWorldStatePrimTy ty'
-                                , sc_mult = m }
+                                , sc_hole_ty = mkVisFunTy m realWorldStatePrimTy ty' }
                      -- cont' applies to s, then K
        ; body' <- simplExprC env' arg cont'
        ; let arg'  = Lam s body'
@@ -1997,10 +1994,10 @@ rebuildCall env info@(ArgInfo { ai_encl = encl_rules
                               , ai_strs = str:strs, ai_discs = disc:discs })
             (ApplyToVal { sc_arg = arg, sc_env = arg_se
                         , sc_dup = dup_flag, sc_hole_ty = fun_ty
-                        , sc_cont = cont, sc_mult = m })
+                        , sc_cont = cont })
   -- Argument is already simplified
   | isSimplified dup_flag     -- See Note [Avoid redundant simplification]
-  = rebuildCall env (addValArgTo info' (m, arg) fun_ty) cont
+  = rebuildCall env (addValArgTo info' arg fun_ty) cont
 
   -- Strict arguments
   | str
@@ -2009,7 +2006,7 @@ rebuildCall env info@(ArgInfo { ai_encl = encl_rules
     simplExprF (arg_se `setInScopeFromE` env) arg
                (StrictArg { sc_fun = info', sc_cci = cci_strict
                           , sc_dup = Simplified, sc_fun_ty = fun_ty
-                          , sc_cont = cont, sc_mult = m })
+                          , sc_cont = cont })
                 -- Note [Shadowing]
 
   -- Lazy arguments
@@ -2020,7 +2017,7 @@ rebuildCall env info@(ArgInfo { ai_encl = encl_rules
         -- floating a demanded let.
   = do  { arg' <- simplExprC (arg_se `setInScopeFromE` env) arg
                              (mkLazyArgStop arg_ty cci_lazy)
-        ; rebuildCall env (addValArgTo info' (m, arg') fun_ty) cont }
+        ; rebuildCall env (addValArgTo info' arg' fun_ty) cont }
   where
     info'  = info { ai_strs = strs, ai_discs = discs }
     arg_ty = funArgTy fun_ty
@@ -2243,24 +2240,10 @@ trySeqRules in_env scrut rhs cont
                 , TyArg { as_arg_ty  = rhs_ty
                         , as_hole_ty = res2_ty }
                 , ValArg { as_arg = no_cast_scrut
-                         , as_hole_ty = res3_ty
-                         , as_mult = Many } ]
-                -- The multiplicity of the scrutiny above is Many because the type
-                -- of seq requires that its first argument is unrestricted. The
-                -- typing rule of case also guarantees it though. In a more
-                -- general world, where the first argument of seq would have
-                -- affine multiplicity, then we could use the multiplicity of
-                -- the case (held in the case binder) instead.
+                         , as_hole_ty = res3_ty } ]
     rule_cont = ApplyToVal { sc_dup = NoDup, sc_arg = rhs
                            , sc_env = in_env, sc_cont = cont
-                           , sc_hole_ty = res4_ty, sc_mult = Many }
-                           -- The multiplicity in sc_mult above is the
-                           -- multiplicity of the second argument of seq. Since
-                           -- seq's type, as it stands, imposes that its second
-                           -- argument be unrestricted, so is
-                           -- sc_mult. However, a more precise typing rule,
-                           -- for seq, would be to have it be linear. In which
-                           -- case, sc_mult should be 1.
+                           , sc_hole_ty = res4_ty }
 
     -- Lazily evaluated, so we don't do most of this
 
@@ -3318,7 +3301,7 @@ mkDupableCont env (StrictBind { sc_bndr = bndr, sc_bndrs = bndrs
                              , sc_cont = mkBoringStop res_ty } ) }
 
 mkDupableCont env (StrictArg { sc_fun = info, sc_cci = cci
-                             , sc_cont = cont, sc_fun_ty = fun_ty, sc_mult = m })
+                             , sc_cont = cont, sc_fun_ty = fun_ty })
         -- See Note [Duplicating StrictArg]
         -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
   = do { (floats1, cont') <- mkDupableCont env cont
@@ -3329,7 +3312,6 @@ mkDupableCont env (StrictArg { sc_fun = info, sc_cci = cci
                             , sc_cont = cont'
                             , sc_cci = cci
                             , sc_fun_ty = fun_ty
-                            , sc_mult = m
                             , sc_dup = OkToDup} ) }
 
 mkDupableCont env (ApplyToTy { sc_cont = cont
@@ -3340,7 +3322,7 @@ mkDupableCont env (ApplyToTy { sc_cont = cont
 
 mkDupableCont env (ApplyToVal { sc_arg = arg, sc_dup = dup
                               , sc_env = se, sc_cont = cont
-                              , sc_hole_ty = hole_ty, sc_mult = mult })
+                              , sc_hole_ty = hole_ty })
   =     -- e.g.         [...hole...] (...arg...)
         --      ==>
         --              let a = ...arg...
@@ -3359,7 +3341,7 @@ mkDupableCont env (ApplyToVal { sc_arg = arg, sc_dup = dup
                                          -- has turned arg'' into a fresh variable
                                          -- See Note [StaticEnv invariant] in GHC.Core.Opt.Simplify.Utils
                               , sc_dup = OkToDup, sc_cont = cont'
-                              , sc_hole_ty = hole_ty, sc_mult = mult }) }
+                              , sc_hole_ty = hole_ty }) }
 
 mkDupableCont env (Select { sc_bndr = case_bndr, sc_alts = alts
                           , sc_env = se, sc_cont = cont })
