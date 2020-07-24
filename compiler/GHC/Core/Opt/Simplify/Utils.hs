@@ -1350,13 +1350,14 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs
         -- This is very important in practice; e.g. wheel-seive1 doubles
         -- in allocation if you miss this out
 
-      OneOcc { occ_in_lam = in_lam, occ_int_cxt = int_cxt, occ_n_br = n_br }
+      OneOcc { occ_in_lam = in_lam, occ_int_cxt = int_cxt }
+             -- occ_n_br = n_br
         ->  -- See Note [Suppress exponential blowup]
-            n_br < (case int_cxt of
+            {- n_br < (case int_cxt of
                         IsInteresting  -> 16
                         NotInteresting -> 4)
 
-           && smallEnoughToInline dflags unfolding     -- Small enough to dup
+           && -} smallEnoughToInline dflags unfolding     -- Small enough to dup
                         -- ToDo: consider discount on smallEnoughToInline if int_cxt is true
                         --
                         -- NB: Do NOT inline arbitrarily big things, even if occ_n_br=1
