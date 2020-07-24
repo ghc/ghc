@@ -12,6 +12,9 @@ module GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled(
 #define PROFILING
 
 #include "Rts.h"
+#undef BLOCK_SIZE
+#undef MBLOCK_SIZE
+#undef BLOCKS_PER_MBLOCK
 #include "DerivedConstants.h"
 
 import Prelude
