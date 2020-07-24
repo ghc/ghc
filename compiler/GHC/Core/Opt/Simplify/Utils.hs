@@ -29,6 +29,7 @@ module GHC.Core.Opt.Simplify.Utils (
         ArgInfo(..), ArgSpec(..), mkArgInfo,
         addValArgTo, addCastTo, addTyArgTo,
         argInfoExpr, argInfoAppArgs, pushSimplifiedArgs,
+        isStrictArgInfo, lazyArgContext,
 
         abstractFloats,
 
@@ -156,7 +157,6 @@ data SimplCont
                                --     plus demands and discount flags for *this* arg
                                --          and further args
                                --     So ai_dmds and ai_discs are never empty
-      , sc_cci  :: CallCtxt    -- Whether *this* argument position is interesting
       , sc_fun_ty :: OutType   -- Type of the function (f e1 .. en),
                                -- presumably (arg_ty -> res_ty)
                                -- where res_ty is expected by sc_cont
@@ -324,6 +324,12 @@ addTyArgTo ai arg_ty hole_ty = ai { ai_args = arg_spec : ai_args ai
 
 addCastTo :: ArgInfo -> OutCoercion -> ArgInfo
 addCastTo ai co = ai { ai_args = CastBy co : ai_args ai }
+
+isStrictArgInfo :: ArgInfo -> Bool
+-- True if the function is strict in the next argument
+isStrictArgInfo (ArgInfo { ai_dmds = dmds })
+  | dmd:_ <- dmds = isStrictDmd dmd
+  | otherwise     = False
 
 argInfoAppArgs :: [ArgSpec] -> [OutExpr]
 argInfoAppArgs []                              = []
@@ -512,10 +518,11 @@ mkArgInfo env fun rules n_val_args call_cont
             , ai_dmds = vanilla_dmds
             , ai_discs = vanilla_discounts }
   | otherwise
-  = ArgInfo { ai_fun = fun, ai_args = []
+  = ArgInfo { ai_fun   = fun
+            , ai_args = []
             , ai_rules = fun_rules
             , ai_encl  = interestingArgContext rules call_cont
-            , ai_dmds  = arg_dmds
+            , ai_dmds  = add_type_strictness (idType fun) arg_dmds
             , ai_discs = arg_discounts }
   where
     fun_rules = mkFunRules rules
@@ -555,30 +562,32 @@ mkArgInfo env fun rules n_val_args call_cont
                                 <+> ppr n_val_args <+> ppr demands )
                   vanilla_dmds      -- Not enough args, or no strictness
 
-{-
-    add_type_str :: Type -> [Bool] -> [Bool]
+    add_type_strictness :: Type -> [Demand] -> [Demand]
     -- If the function arg types are strict, record that in the 'strictness bits'
     -- No need to instantiate because unboxed types (which dominate the strict
     --   types) can't instantiate type variables.
-    -- add_type_str is done repeatedly (for each call);
+    -- add_type_strictness is done repeatedly (for each call);
     --   might be better once-for-all in the function
     -- But beware primops/datacons with no strictness
 
-    add_type_str _ [] = []
-    add_type_str fun_ty all_strs@(str:strs)
+    add_type_strictness fun_ty dmds
+      | null dmds = []
+
+      | Just (_, fun_ty') <- splitForAllTy_maybe fun_ty
+      = add_type_strictness fun_ty' dmds     -- Look through foralls
+
       | Just (_, arg_ty, fun_ty') <- splitFunTy_maybe fun_ty        -- Add strict-type info
-      = (str || Just False == isLiftedType_maybe arg_ty)
-        : add_type_str fun_ty' strs
+      , dmd : rest_dmds <- dmds
+      , let dmd' = case isLiftedType_maybe arg_ty of
+                       Just False -> strictenDmd dmd
+                       _          -> dmd
+      = dmd' : add_type_strictness fun_ty' rest_dmds
           -- If the type is levity-polymorphic, we can't know whether it's
           -- strict. isLiftedType_maybe will return Just False only when
           -- we're sure the type is unlifted.
 
-      | Just (_, fun_ty') <- splitForAllTy_maybe fun_ty
-      = add_type_str fun_ty' all_strs     -- Look through foralls
-
       | otherwise
-      = all_strs
--}
+      = dmds
 
 {- Note [Unsaturated functions]
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -667,6 +676,26 @@ This made a small compile-time perf improvement in perf/compiler/T6048,
 and it looks plausible to me.
 -}
 
+lazyArgContext :: ArgInfo -> CallCtxt
+-- Use this for lazy arguments
+lazyArgContext (ArgInfo { ai_encl = encl_rules, ai_discs = discs })
+  | encl_rules                = RuleArgCtxt
+  | disc:_ <- discs, disc > 0 = DiscArgCtxt  -- Be keener here
+  | otherwise                 = BoringCtxt   -- Nothing interesting
+
+strictArgContext :: ArgInfo -> CallCtxt
+strictArgContext (ArgInfo { ai_encl = encl_rules, ai_discs = discs })
+-- Use this for strict arguments
+  | encl_rules                = RuleArgCtxt
+  | disc:_ <- discs, disc > 0 = DiscArgCtxt  -- Be keener here
+  | otherwise                 = RhsCtxt
+      -- Why RhsCtxt?  if we see f (g x) (h x), and f is strict, we
+      -- want to be a bit more eager to inline g, because it may
+      -- expose an eval (on x perhaps) that can be eliminated or
+      -- shared. I saw this in nofib 'boyer2', RewriteFuns.onewayunify1
+      -- It's worth an 18% improvement in allocation for this
+      -- particular benchmark; 5% on 'mate' and 1.3% on 'multiplier'
+
 interestingCallContext :: SimplEnv -> SimplCont -> CallCtxt
 -- See Note [Interesting call context]
 interestingCallContext env cont
@@ -683,7 +712,7 @@ interestingCallContext env cont
         -- motivation to inline. See Note [Cast then apply]
         -- in GHC.Core.Unfold
 
-    interesting (StrictArg { sc_cci = cci }) = cci
+    interesting (StrictArg { sc_fun = fun }) = strictArgContext fun
     interesting (StrictBind {})              = BoringCtxt
     interesting (Stop _ cci)                 = cci
     interesting (TickIt _ k)                 = interesting k
@@ -733,15 +762,12 @@ interestingArgContext rules call_cont
     go (Select {})                  = False
     go (ApplyToVal {})              = False  -- Shouldn't really happen
     go (ApplyToTy  {})              = False  -- Ditto
-    go (StrictArg { sc_cci = cci }) = interesting cci
+    go (StrictArg { sc_fun = fun }) = ai_encl fun
     go (StrictBind {})              = False      -- ??
     go (CastIt _ c)                 = go c
-    go (Stop _ cci)                 = interesting cci
+    go (Stop _ RuleArgCtxt)         = True
+    go (Stop _ _)                   = False
     go (TickIt _ c)                 = go c
-
-    interesting RuleArgCtxt = True
-    interesting _           = False
-
 
 {- Note [Interesting arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

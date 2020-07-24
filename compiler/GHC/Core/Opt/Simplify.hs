@@ -1011,12 +1011,16 @@ simplExprF1 env (App fun arg) cont
           -- (instead of one-at-a-time). But in practice, we have not
           -- observed the quadratic behavior, so this extra entanglement
           -- seems not worthwhile.
+          --
+          -- But the (exprType fun) is repeated, to push it into two
+          -- separate, rarely used, thunks; rather than always alloating
+          -- a shared thunk.  Makes a small efficiency difference
         let fun_ty = exprType fun
             (m, _, _) = splitFunTy fun_ty
         in
         simplExprF env fun $
         ApplyToVal { sc_arg = arg, sc_env = env
-                   , sc_hole_ty = substTy env fun_ty
+                   , sc_hole_ty = substTy env (exprType fun)
                    , sc_dup = NoDup, sc_cont = cont, sc_mult = m }
 
 simplExprF1 env expr@(Lam {}) cont
@@ -1975,9 +1979,9 @@ rebuildCall env info (ApplyToTy { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_c
 ---------- The runRW# rule. Do this after absorbing all arguments ------
 -- runRW# :: forall (r :: RuntimeRep) (o :: TYPE r). (State# RealWorld -> o) -> o
 -- K[ runRW# rr ty body ]  -->  runRW rr' ty' (\s. K[ body s ])
-rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args })
+rebuildCall env (ArgInfo { ai_fun = fun_id, ai_args = rev_args })
             (ApplyToVal { sc_arg = arg, sc_env = arg_se, sc_cont = cont, sc_mult = m })
-  | fun `hasKey` runRWKey
+  | fun_id `hasKey` runRWKey
   , not (contIsStop cont)  -- Don't fiddle around if the continuation is boring
   , [ TyArg {}, TyArg {} ] <- rev_args
   = do { s <- newId (fsLit "s") Many realWorldStatePrimTy
@@ -1991,25 +1995,24 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args })
        ; body' <- simplExprC env' arg cont'
        ; let arg'  = Lam s body'
              rr'   = getRuntimeRep ty'
-             call' = mkApps (Var fun) [mkTyArg rr', mkTyArg ty', arg']
+             call' = mkApps (Var fun_id) [mkTyArg rr', mkTyArg ty', arg']
        ; return (emptyFloats env, call') }
 
-rebuildCall env info@(ArgInfo { ai_encl = encl_rules
-                              , ai_dmds = dmd:_, ai_discs = disc:_ })
+rebuildCall env fun_info
             (ApplyToVal { sc_arg = arg, sc_env = arg_se
                         , sc_dup = dup_flag, sc_hole_ty = fun_ty
                         , sc_cont = cont, sc_mult = m })
   -- Argument is already simplified
   | isSimplified dup_flag     -- See Note [Avoid redundant simplification]
-  = rebuildCall env (addValArgTo info (m, arg) fun_ty) cont
+  = rebuildCall env (addValArgTo fun_info (m, arg) fun_ty) cont
 
   -- Strict arguments
-  | isStrictDmd dmd || isUnliftedType arg_ty
+  | isStrictArgInfo fun_info
   , sm_case_case (getMode env)
   = -- pprTrace "Strict Arg" (ppr arg $$ ppr (seIdSubst env) $$ ppr (seInScope env)) $
     simplExprF (arg_se `setInScopeFromE` env) arg
-               (StrictArg { sc_fun = info, sc_cci = cci_strict
-                          , sc_dup = Simplified, sc_fun_ty = fun_ty
+               (StrictArg { sc_fun = fun_info, sc_fun_ty = fun_ty
+                          , sc_dup = Simplified
                           , sc_cont = cont, sc_mult = m })
                 -- Note [Shadowing]
 
@@ -2020,26 +2023,11 @@ rebuildCall env info@(ArgInfo { ai_encl = encl_rules
         -- have to be very careful about bogus strictness through
         -- floating a demanded let.
   = do  { arg' <- simplExprC (arg_se `setInScopeFromE` env) arg
-                             (mkLazyArgStop arg_ty cci_lazy)
-        ; rebuildCall env (addValArgTo info (m, arg') fun_ty) cont }
+                             (mkLazyArgStop arg_ty (lazyArgContext fun_info))
+        ; rebuildCall env (addValArgTo fun_info (m, arg') fun_ty) cont }
   where
     arg_ty = funArgTy fun_ty
 
-    -- Use this for lazy arguments
-    cci_lazy | encl_rules = RuleArgCtxt
-             | disc > 0   = DiscArgCtxt  -- Be keener here
-             | otherwise  = BoringCtxt   -- Nothing interesting
-
-    -- ..and this for strict arguments
-    cci_strict | encl_rules = RuleArgCtxt
-               | disc > 0   = DiscArgCtxt
-               | otherwise  = RhsCtxt
-      -- Why RhsCtxt?  if we see f (g x) (h x), and f is strict, we
-      -- want to be a bit more eager to inline g, because it may
-      -- expose an eval (on x perhaps) that can be eliminated or
-      -- shared. I saw this in nofib 'boyer2', RewriteFuns.onewayunify1
-      -- It's worth an 18% improvement in allocation for this
-      -- particular benchmark; 5% on 'mate' and 1.3% on 'multiplier'
 
 ---------- No further useful info, revert to generic rebuild ------------
 rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
@@ -3311,10 +3299,10 @@ mkDupableContWithDmds env _
        ; let join_body = wrapFloats floats1 join_inner
              res_ty    = contResultType cont
 
-       ; mkDupableStrictBind env RhsCtxt bndr' join_body res_ty }
+       ; mkDupableStrictBind env bndr' join_body res_ty }
 
 mkDupableContWithDmds env _
-    (StrictArg { sc_fun = fun, sc_cci = cci, sc_cont = cont
+    (StrictArg { sc_fun = fun, sc_cont = cont
                , sc_fun_ty = fun_ty, sc_mult = m })
 -- See Note [Duplicating StrictArg]
 -- NB: sc_dup /= OkToDup; that is caught earlier by contIsDupable
@@ -3328,7 +3316,6 @@ mkDupableContWithDmds env _
        ; return ( foldl' addLetFloats floats1 floats_s
                 , StrictArg { sc_fun = fun { ai_args = args' }
                             , sc_cont = cont'
-                            , sc_cci = cci
                             , sc_fun_ty = fun_ty
                             , sc_mult = m
                             , sc_dup = OkToDup} ) }
@@ -3341,7 +3328,7 @@ mkDupableContWithDmds env _
        ; arg_bndr <- newId (fsLit "arg") m arg_ty   -- ToDo: check this linearity argument
        ; let env' = env `addNewInScopeIds` [arg_bndr]
        ; (floats, join_rhs) <- rebuildCall env' (addValArgTo fun (m, Var arg_bndr) fun_ty) cont
-       ; mkDupableStrictBind env' cci arg_bndr (wrapFloats floats join_rhs) rhs_ty }
+       ; mkDupableStrictBind env' arg_bndr (wrapFloats floats join_rhs) rhs_ty }
   where
     ok_cont (StrictArg {}) = False
     ok_cont (CastIt _ k)   = ok_cont k
@@ -3425,9 +3412,9 @@ mkDupableContWithDmds env _
                                       -- See Note [StaticEnv invariant] in GHC.Core.Opt.Simplify.Utils
                           , sc_cont = mkBoringStop (contResultType cont) } ) }
 
-mkDupableStrictBind :: SimplEnv -> CallCtxt -> OutId -> OutExpr -> OutType
+mkDupableStrictBind :: SimplEnv -> OutId -> OutExpr -> OutType
                     -> SimplM (SimplFloats, SimplCont)
-mkDupableStrictBind env cci arg_bndr join_rhs res_ty
+mkDupableStrictBind env arg_bndr join_rhs res_ty
   | exprIsDupable (targetPlatform (seDynFlags env)) join_rhs
   = return (emptyFloats env
            , StrictBind { sc_bndr = arg_bndr, sc_bndrs = []
@@ -3451,7 +3438,7 @@ mkDupableStrictBind env cci arg_bndr join_rhs res_ty
                             , sc_fun_ty = idType join_bndr
                             , sc_cont   = mkBoringStop res_ty
                             , sc_mult   = Many   -- ToDo: check this!
-                            , sc_cci    = cci } ) }
+                            } ) }
 
 mkDupableAlt :: Platform -> OutId
              -> JoinFloats -> OutAlt

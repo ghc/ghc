@@ -1285,14 +1285,14 @@ splitDmdTy ty@(DmdType _ [] res_ty)       = (defaultArgDmd res_ty, ty)
 deferAfterPreciseException :: DmdType -> DmdType
 deferAfterPreciseException = lubDmdType exnDmdType
 
-strictenDmd :: Demand -> CleanDemand
+strictenDmd :: Demand -> Demand
 strictenDmd (JD { sd = s, ud = u})
   = JD { sd = poke_s s, ud = poke_u u }
   where
-    poke_s Lazy      = HeadStr
-    poke_s (Str s)   = s
-    poke_u Abs       = UHead
-    poke_u (Use _ u) = u
+    poke_s Lazy      = Str HeadStr
+    poke_s s         = s
+    poke_u Abs       = useTop
+    poke_u u         = u
 
 -- Deferring and peeling
 
