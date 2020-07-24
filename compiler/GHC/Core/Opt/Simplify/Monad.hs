@@ -43,6 +43,7 @@ import GHC.Utils.Panic     (throwGhcExceptionIO, GhcException (..))
 import GHC.Types.Basic     ( IntWithInf, treatZeroAsInf, mkIntWithInf )
 import Control.Monad       ( ap )
 import GHC.Core.Multiplicity        ( pattern Many )
+import GHC.Exts( oneShot )
 
 {-
 ************************************************************************
@@ -56,13 +57,22 @@ For the simplifier monad, we want to {\em thread} a unique supply and a counter.
 -}
 
 newtype SimplM result
-  =  SM  { unSM :: SimplTopEnv  -- Envt that does not change much
-                -> UniqSupply   -- We thread the unique supply because
-                                -- constantly splitting it is rather expensive
-                -> SimplCount
-                -> IO (result, UniqSupply, SimplCount)}
+  =  SM'  { unSM :: SimplTopEnv  -- Envt that does not change much
+                 -> UniqSupply   -- We thread the unique supply because
+                                 -- constantly splitting it is rather expensive
+                 -> SimplCount
+                 -> IO (result, UniqSupply, SimplCount)}
   -- we only need IO here for dump output
     deriving (Functor)
+
+pattern SM :: (SimplTopEnv -> UniqSupply -> SimplCount
+               -> IO (result, UniqSupply, SimplCount))
+          -> SimplM result
+
+-- See Note [The one-shot state monad trick]
+pattern SM m <- SM' m
+  where
+    SM m = SM' (oneShot m)
 
 data SimplTopEnv
   = STE { st_flags     :: DynFlags
