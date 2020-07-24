@@ -3,6 +3,8 @@ module GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled(
     peekStgTSOProfInfo
 ) where
 
+#if __GLASGOW_HASKELL__ >= 811
+
 -- Manually defining PROFILING gives the #peek and #poke macros an accurate
 -- representation of the C structures when hsc2hs runs. This is valid because
 -- a non-profiling build would use
@@ -14,6 +16,7 @@ module GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled(
 
 import Prelude
 import Foreign
+
 import Foreign.C.String
 import GHC.Exts.Heap.ProfInfo.Types
 
@@ -43,9 +46,6 @@ data Cache = Cache {
 type DecoderMonad a = StateT Cache IO a
 
 peekStgTSOProfInfo :: Ptr a -> IO (Maybe StgTSOProfInfo)
-#if __GLASGOW_HASKELL__ < 811
-peekStgTSOProfInfo _ = return Nothing
-#else
 peekStgTSOProfInfo tsoPtr = do
     print $ "peekStgTSOProfInfo - tsoPtr : " ++ show tsoPtr
     cccs_ptr <- peekByteOff tsoPtr cccsOffset
@@ -185,4 +185,13 @@ peekIndexTable loopBreakers ptr = do
                     return $ Just result
     where
         ptrAsInt = ptrToInt ptr
+
+#else
+import Prelude
+import Foreign
+
+import GHC.Exts.Heap.ProfInfo.Types
+
+peekStgTSOProfInfo :: Ptr a -> IO (Maybe StgTSOProfInfo)
+peekStgTSOProfInfo _ = return Nothing
 #endif
