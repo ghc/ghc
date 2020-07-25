@@ -8,14 +8,23 @@ module T16341 where
 import Data.Data (Data)
 
 data Foo a where
-  X :: Foo Int
-  Y :: (Bool -> Bool) -> Foo Bool
+  Foo1 :: Foo Int
+  Foo2 :: (Bool -> Bool) -> Foo Bool
 
--- These instances should work whether or not `Y` is a constructor in
--- `Foo`, because the `Foo Int` designation precludes `Y` from being
+-- These instances should work whether or not `Foo2` is a constructor in
+-- `Foo`, because the `Foo Int` designation precludes `Foo2` from being
 -- a reachable constructor
 deriving instance Show (Foo Int)
 deriving instance Read (Foo Int)
 deriving instance Eq (Foo Int)
 deriving instance Ord (Foo Int)
 deriving instance Data (Foo Int)
+deriving instance Lift (Foo Int)
+
+data Bar a b where
+  Bar1 :: b -> Bar Int b
+  Bar2 :: (Bool -> Bool) -> b -> Bar Bool b
+
+deriving instance Functor (Bar Int)
+deriving instance Foldable (Bar Int)
+deriving instance Traversable (Bar Int)

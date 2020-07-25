@@ -590,8 +590,8 @@ hasStockDeriving clas
                , (genClassKey,         generic (gen_Generic_binds Gen0))
                , (gen1ClassKey,        generic (gen_Generic_binds Gen1)) ]
 
-    simple gen_fn loc tc _ _
-      = let (binds, deriv_stuff) = gen_fn loc tc
+    simple gen_fn loc tc tc_args _
+      = let (binds, deriv_stuff) = gen_fn loc tc tc_args
         in return (binds, deriv_stuff, [])
 
     -- Like `simple`, but monadic. The only monadic thing that these functions

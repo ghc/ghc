@@ -33,7 +33,9 @@ module GHC.Tc.Deriv.Generate (
         mkCoerceClassMethEqn,
         genAuxBinds,
         ordOpTbl, boxConTbl, litConTbl,
-        mkRdrFunBind, mkRdrFunBindEC, mkRdrFunBindSE, error_Expr
+        mkRdrFunBind, mkRdrFunBindEC, mkRdrFunBindSE, error_Expr,
+
+        getPossibleDataCons
     ) where
 
 #include "HsVersions.h"
@@ -738,8 +740,8 @@ gen_Enum_binds loc tycon _ = do
 ************************************************************************
 -}
 
-gen_Bounded_binds :: SrcSpan -> TyCon -> (LHsBinds GhcPs, BagDerivStuff)
-gen_Bounded_binds loc tycon
+gen_Bounded_binds :: SrcSpan -> TyCon -> [Type] -> (LHsBinds GhcPs, BagDerivStuff)
+gen_Bounded_binds loc tycon _
   | isEnumerationTyCon tycon
   = (listToBag [ min_bound_enum, max_bound_enum ], emptyBag)
   | otherwise
@@ -1617,8 +1619,8 @@ Example:
 -}
 
 
-gen_Lift_binds :: SrcSpan -> TyCon -> (LHsBinds GhcPs, BagDerivStuff)
-gen_Lift_binds loc tycon = (listToBag [lift_bind, liftTyped_bind], emptyBag)
+gen_Lift_binds :: SrcSpan -> TyCon -> [Type] -> (LHsBinds GhcPs, BagDerivStuff)
+gen_Lift_binds loc tycon tycon_args = (listToBag [lift_bind, liftTyped_bind], emptyBag)
   where
     lift_bind      = mkFunBindEC 1 loc lift_RDR (nlHsApp pure_Expr)
                                  (map (pats_etc mk_exp) data_cons)
@@ -1627,7 +1629,7 @@ gen_Lift_binds loc tycon = (listToBag [lift_bind, liftTyped_bind], emptyBag)
 
     mk_exp = ExpBr noExtField
     mk_texp = TExpBr noExtField
-    data_cons = tyConDataCons tycon
+    data_cons = getPossibleDataCons tycon tycon_args
 
     pats_etc mk_bracket data_con
       = ([con_pat], lift_Expr)
