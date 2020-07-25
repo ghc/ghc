@@ -209,8 +209,8 @@ __is_console(HANDLE hFile)
     DWORD handleType = GetFileType (hFile);
 
     /* TTY must be a character device */
-    if (handleType == FILE_TYPE_CHAR)
-        return true;
+    if (handleType != FILE_TYPE_CHAR)
+        return false;
 
     DWORD st;
     /* GetConsoleMode appears to fail when it's not a TTY.  In
