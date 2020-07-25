@@ -49,3 +49,18 @@
 /utils/gen-dll/                   @Phyx
 /utils/fs/                        @Phyx
 
+# WinIO related code
+/libraries/base/GHC/Event/Windows/                   @Phyx
+/libraries/base/GHC/IO/Windows/                      @Phyx
+/rts/win32/                                          @Phyx
+/libraries/base/GHC/IO/Handle/Lock/Windows.hsc       @Phyx
+/libraries/base/GHC/Event/Windows.hsc                @Phyx
+/libraries/base/GHC/Conc/WinIO.hs                    @Phyx
+/libraries/base/GHC/Conc/Windows.hs                  @Phyx
+/libraries/base/GHC/IO/Handle/Windows.hs             @Phyx
+/libraries/base/GHC/IO/StdHandles.hs                 @Phyx
+/libraries/base/GHC/Windows.hs                       @Phyx
+/libraries/base/cbits/IOutils.c                      @Phyx
+/libraries/base/cbits/Win32Utils.c                   @Phyx
+/libraries/base/cbits/consUtils.c                    @Phyx
+/libraries/base/include/winio_structs.h              @Phyx
