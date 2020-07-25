@@ -8,16 +8,8 @@ import {-# SOURCE #-} Settings.Default
 staticFlavour :: Flavour
 staticFlavour = defaultFlavour
     { name = "static"
-    , args = defaultBuilderArgs <> perfArgs <> defaultPackageArgs <> staticExec
+    , args = defaultBuilderArgs <> perfArgs <> defaultPackageArgs
     , dynamicGhcPrograms = return False }
-
-
-staticExec :: Args
-staticExec = mconcat
-    [ builder (Ghc CompileHs) ? pure [ "-fPIC", "-static" ]
-    , builder (Ghc CompileCWithGhc) ? pure [ "-fPIC", "-optc", "-static"]
-    , builder (Ghc LinkHs) ? notM libraryPackage ? pure [ "-optl", "-static" ]
-    ]
 
 {-
  Same as in the performance flavour
