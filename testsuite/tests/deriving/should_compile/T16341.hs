@@ -18,7 +18,6 @@ deriving instance Show (Foo Int)
 deriving instance Read (Foo Int)
 deriving instance Eq (Foo Int)
 deriving instance Ord (Foo Int)
-deriving instance Data (Foo Int)
 deriving instance Lift (Foo Int)
 
 data Bar a b where

@@ -1390,7 +1390,7 @@ gen_Data_binds :: SrcSpan
                -> [Type]
                -> TcM (LHsBinds GhcPs,  -- The method bindings
                        BagDerivStuff)   -- Auxiliary bindings
-gen_Data_binds loc rep_tc rep_tc_args
+gen_Data_binds loc rep_tc _
   = do { -- See Note [Auxiliary binders]
          dataT_RDR  <- new_dataT_rdr_name loc rep_tc
        ; dataC_RDRs <- traverse (new_dataC_rdr_name loc) data_cons
@@ -1406,7 +1406,7 @@ gen_Data_binds loc rep_tc rep_tc_args
                             data_cons dataC_RDRs )
               ) }
   where
-    data_cons = getPossibleDataCons rep_tc rep_tc_args
+    data_cons = tyConDataCons rep_tc
     n_cons     = length data_cons
     one_constr = n_cons == 1
 
