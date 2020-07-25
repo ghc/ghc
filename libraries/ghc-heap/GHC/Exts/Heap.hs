@@ -64,6 +64,13 @@ import GHC.Exts.Heap.ProfInfo.Types
 import GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled
 import GHC.Exts.Heap.InfoTableProf
 #else
+-- This import makes PeekProfInfo_ProfilingEnabled available in make-based
+-- builds. See #15197 for details (even though the related patch didn't
+-- seem to fix the issue).
+-- GHC.Exts.Heap.Closures uses the same trick to include
+-- GHC.Exts.Heap.InfoTableProf into make-based builds.
+import GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingEnabled ()
+
 import GHC.Exts.Heap.ProfInfo.PeekProfInfo_ProfilingDisabled
 import GHC.Exts.Heap.InfoTable
 #endif
