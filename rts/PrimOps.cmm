@@ -2221,7 +2221,7 @@ loop:
    IOPort primitives
    -------------------------------------------------------------------------- */
 
-stg_newIOPortzh ( gcptr init )
+stg_newIOPortzh ()
 {
     W_ ioport;
 
