@@ -5,6 +5,7 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE Safe #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -20,7 +21,6 @@
 --
 -- Basic operations on type-level Orderings.
 --
--- @since 4.7.0.0
 -----------------------------------------------------------------------------
 
 module Data.Type.Ord (
@@ -40,7 +40,8 @@ import Data.Eq
 
 -- | 'Compare' branches on the kind of its arguments to either compare by
 -- 'Symbol' or 'Nat'.
-type family Compare (a :: k) (b :: k) :: Ordering
+type Compare :: k -> k -> Ordering
+type family Compare a b
 
 -- | Ordering data type for type literals that provides proof of their ordering.
 data TypeOrdering a b where
@@ -54,30 +55,53 @@ deriving instance Eq   (TypeOrdering a b)
 
 infix 4 <=?, <=, >=?, >=, <?, <, >?, >
 
+-- | Comparison (<=) of comparable types, as a constraint.
 type x <= y = (x <=? y) ~ 'True
-type family (m :: k) <=? (n :: k) :: Bool
+
+-- | Comparison (>=) of comparable types, as a constraint.
+type x >= y = (x >=? y) ~ 'True
+
+-- | Comparison (<) of comparable types, as a constraint.
+type x < y = (x >? y) ~ 'True
+
+-- | Comparison (>) of comparable types, as a constraint.
+type x > y = (x >? y) ~ 'True
+
+
+-- | Comparison (<=) of comparable types, as a function.
+type (<=?) :: k -> k -> Bool
+type family m <=? n
 type instance m <=? n = OrdCond (Compare m n) 'True 'True 'False
 
-type x >= y = (x >=? y) ~ 'True
-type family (m :: k) >=? (n :: k) :: Bool where
-  m >=? n = OrdCond (Compare m n) 'False 'True 'True
+-- | Comparison (>=) of comparable types, as a function.
+type (>=?) :: k -> k -> Bool
+type family m >=? n
+type instance m >=? n = OrdCond (Compare m n) 'False 'True 'True
 
-type x > y = (x >? y) ~ 'True
-type family (m :: k) >? (n :: k) :: Bool where
-  m >? n = OrdCond (Compare m n) 'False 'False 'True
+-- | Comparison (<) of comparable types, as a function.
+type (<?) :: k -> k -> Bool
+type family m <? n
+type instance m <? n = OrdCond (Compare m n) 'True 'False 'False
 
-type x < y = (x >? y) ~ 'True
-type family (m :: k) <? (n :: k) :: Bool where
-  m <? n = OrdCond (Compare m n) 'True 'False 'False
-
-type family Max (m :: k) (n :: k) :: Bool where
-  Max m n = OrdCond (Compare m n) n n m
-
-type family Min (m :: k) (n :: k) :: Bool where
-  Min m n = OrdCond (Compare m n) m m n
+-- | Comparison (>) of comparable types, as a function.
+type (>?) :: k -> k -> Bool
+type family m >? n
+type instance m >? n = OrdCond (Compare m n) 'False 'False 'True
 
 
-type family OrdCond (o :: Ordering) (lt :: k) (eq :: k) (gt :: k) where
+-- | Maximum between two comparable types.
+type Max :: k -> k -> k
+type family Max m n
+type instance Max m n = OrdCond (Compare m n) n n m
+
+-- | Minimum between two comparable types.
+type Min :: k -> k -> k
+type family Min m n
+type instance Min m n = OrdCond (Compare m n) m m n
+
+
+type OrdCond :: Ordering -> k -> k -> k -> k
+type family OrdCond o lt eq gt where
   OrdCond 'LT lt eq gt = lt
   OrdCond 'EQ lt eq gt = eq
   OrdCond 'GT lt eq gt = gt
