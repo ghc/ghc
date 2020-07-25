@@ -16,7 +16,7 @@ staticExec :: Args
 staticExec = mconcat
     [ builder (Ghc CompileHs) ? pure [ "-fPIC", "-static" ]
     , builder (Ghc CompileCWithGhc) ? pure [ "-fPIC", "-optc", "-static"]
-    , builder (Ghc LinkHs) ? pure [ "-optl", "-static" ]
+    , builder (Ghc LinkHs) ? notM libraryPackage ? pure [ "-optl", "-static" ]
     ]
 
 {-
