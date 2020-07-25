@@ -2360,6 +2360,7 @@ stg_mkApUpd0zh ( P_ bco )
 stg_unpackClosurezh ( P_ closure )
 {
     W_ info, ptrs, nptrs, p, ptrs_arr, dat_arr;
+    MAYBE_GC_P(stg_unpackClosurezh, closure);
     info  = %GET_STD_INFO(UNTAG(closure));
     prim_read_barrier;
 
@@ -2376,7 +2377,6 @@ stg_unpackClosurezh ( P_ closure )
 
     W_ ptrs_arr_sz, ptrs_arr_cards, dat_arr_sz;
 
-    again: MAYBE_GC(again);
     dat_arr_sz = SIZEOF_StgArrBytes + WDS(len);
     ("ptr" dat_arr) = ccall allocateMightFail(MyCapability() "ptr", BYTES_TO_WDS(dat_arr_sz));
     if (dat_arr == NULL) (likely: False) {
