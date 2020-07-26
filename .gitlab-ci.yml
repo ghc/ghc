@@ -709,10 +709,14 @@ release-x86_64-linux-deb8:
 
 release-x86_64-linux-alpine:
   <<: *release
+  variables:
+    FLAVOUR: "static"
   extends: .build-x86_64-linux-alpine-hadrian
 
 nightly-x86_64-linux-alpine:
   <<: *nightly
+  variables:
+    FLAVOUR: "static"
   extends: .build-x86_64-linux-alpine-hadrian
 
 #################################
