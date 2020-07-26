@@ -474,6 +474,24 @@ Mutex concurrent_coll_finished_lock;
  * remembered set during the preparatory GC. This allows us to safely skip the
  * non-moving write barrier without jeopardizing the snapshot invariant.
  *
+ *
+ * Note [Allocating pinned objects into the non-moving heap]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * Under the moving collector small, pinned ByteArray#s are allocated by
+ * Storage.c:allocatePinned() into a per-capability accumulator block which is
+ * filled in a bump-pointer fashion. While this scheme is simple, it can lead
+ * to very poor fragmentation behavior as objects become unreachable: a single
+ * live ByteArray# can keep an entire block of memory alive.
+ *
+ * When the non-moving collector is in use we can do better by allocating small
+ * pinned objects directly into the non-moving heap.
+ *
+ * One wrinkle here is that pinned ByteArrays may have alignment requirements
+ * which requires that we insert padding zero-words before the beginning of the
+ * object. We must be certain to account for this padding when inspecting the
+ * object.
+ *
  */
 
 memcount nonmoving_live_words = 0;
