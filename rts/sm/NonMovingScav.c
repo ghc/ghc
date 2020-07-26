@@ -84,9 +84,18 @@
  */
 
 void
-nonmovingScavengeOne (StgClosure *q)
+nonmovingScavengeOne (StgClosure *q0)
 {
+    StgClosure *q = q0;
+
+    // N.B. There may be a gap before the first word of the closure in the case
+    // of an aligned ByteArray# as allocated by allocatePinned().
+    // See Note [Allocating pinned objects into the non-moving heap].
+    while (*(StgPtr*) q == NULL)
+        q = (StgClosure *) ((StgPtr*) q + 1);
+
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
+
     StgPtr p = (StgPtr)q;
     const StgInfoTable *info = get_itbl(q);
     const bool saved_eager_promotion = gct->eager_promotion;

@@ -124,6 +124,11 @@ extern uint8_t nonmoving_alloca_dense_cnt;
 // NONMOVING_SEGMENT_SIZE (in bytes)
 extern uint8_t nonmoving_alloca_cnt;
 
+// Largest block size serviced by the non-moving allocator.  Keep this in
+// sync with the sizes initialised in nonmovingInitAllocators; the final sparse
+// allocator tops out at half a segment.
+#define NONMOVING_MAX_BLOCK_SZ (NONMOVING_SEGMENT_SIZE / 2)
+
 struct NonmovingHeap {
     struct NonmovingAllocator *allocators;
     // free segment list. This is a cache where we keep segments
