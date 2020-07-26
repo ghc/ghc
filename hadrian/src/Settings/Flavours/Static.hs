@@ -13,15 +13,13 @@ staticFlavour = defaultFlavour
 
 
 staticExec :: Args
-staticExec = mconcat
+staticExec = not . wayUnit Dynamic <$> getWay ? mconcat
     [ builder (Ghc CompileHs) ? pure [ "-fPIC", "-static" ]
     , builder (Ghc CompileCWithGhc) ? pure [ "-fPIC", "-optc", "-static"]
-    , builder (Ghc LinkHs) ? notM libraryPackage ? pure [ "-optl", "-static" ]
+    , builder (Ghc LinkHs) ? pure [ "-optl", "-static" ]
     ]
 
-{-
- Same as in the performance flavour
--}
+-- Same as in the performance flavour
 perfArgs :: Args
 perfArgs = sourceArgs SourceArgs
     { hsDefault  = pure ["-O", "-H64m"]
