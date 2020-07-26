@@ -215,18 +215,18 @@ lint-release-changelogs:
   tags:
     - x86_64-linux
 
-.validate-x86_64-linux-deb9-hadrian:
+validate-x86_64-linux-deb9-hadrian:
   extends: .validate-linux-hadrian
   stage: build
 
-.validate-x86_64-linux-deb9-unreg-hadrian:
+validate-x86_64-linux-deb9-unreg-hadrian:
   extends: .validate-linux-hadrian
   stage: full-build
   variables:
     CONFIGURE_ARGS: --enable-unregisterised
     TEST_ENV: "x86_64-linux-deb9-unreg-hadrian"
 
-.hadrian-ghc-in-ghci:
+hadrian-ghc-in-ghci:
   stage: quick-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   before_script:
@@ -310,13 +310,13 @@ lint-release-changelogs:
       - toolchain
 
 # Conditional due to lack of builder capacity
-.validate-x86_64-freebsd:
+validate-x86_64-freebsd:
   extends: .build-x86_64-freebsd
   stage: full-build
   rules:
     - if: '$CI_MERGE_REQUEST_LABELS =~ /.*FreeBSD.*/'
 
-.nightly-x86_64-freebsd:
+nightly-x86_64-freebsd:
   <<: *nightly
   extends: .build-x86_64-freebsd
   stage: full-build
@@ -361,7 +361,7 @@ release-x86_64-freebsd:
 # x86_64-darwin
 #################################
 
-.validate-x86_64-darwin:
+validate-x86_64-darwin:
   extends: .validate
   stage: full-build
   tags:
@@ -459,7 +459,7 @@ release-x86_64-freebsd:
   tags:
     - aarch64-linux
 
-.validate-aarch64-linux-deb9:
+validate-aarch64-linux-deb9:
   extends: .build-aarch64-linux-deb9
   artifacts:
     when: always
@@ -494,7 +494,7 @@ nightly-aarch64-linux-deb9:
   tags:
     - armv7-linux
 
-.validate-armv7-linux-deb9:
+validate-armv7-linux-deb9:
   extends: .build-armv7-linux-deb9
   artifacts:
     when: always
@@ -520,7 +520,7 @@ nightly-armv7-linux-deb9:
   cache:
     key: linux-i386-deb9
 
-.validate-i386-linux-deb9:
+validate-i386-linux-deb9:
   extends: .build-i386-linux-deb9
   artifacts:
     when: always
@@ -566,7 +566,7 @@ nightly-x86_64-linux-deb9:
     TEST_TYPE: slowtest
 
 # N.B. Has DEBUG assertions enabled in stage2
-.validate-x86_64-linux-deb9-debug:
+validate-x86_64-linux-deb9-debug:
   extends: .build-x86_64-linux-deb9
   stage: full-build
   variables:
@@ -598,7 +598,7 @@ nightly-x86_64-linux-deb9-llvm:
     BUILD_FLAVOUR: perf-llvm
     TEST_ENV: "x86_64-linux-deb9-llvm"
 
-.validate-x86_64-linux-deb9-integer-simple:
+validate-x86_64-linux-deb9-integer-simple:
   extends: .build-x86_64-linux-deb9
   stage: full-build
   variables:
@@ -616,7 +616,7 @@ nightly-x86_64-linux-deb9-integer-simple:
     TEST_ENV: "x86_64-linux-deb9-integer-simple"
     TEST_TYPE: slowtest
 
-.validate-x86_64-linux-deb9-dwarf:
+validate-x86_64-linux-deb9-dwarf:
   extends: .build-x86_64-linux-deb9
   stage: full-build
   variables:
@@ -684,7 +684,7 @@ release-x86_64-linux-deb8:
 # x86_64-linux-alpine
 #################################
 
-build-x86_64-linux-alpine-hadrian:
+.build-x86_64-linux-alpine-hadrian:
   extends: .validate-linux-hadrian
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine:2e59067d7371d19c7c829e803ecfe4c07aa76245"
@@ -709,11 +709,11 @@ build-x86_64-linux-alpine-hadrian:
 
 release-x86_64-linux-alpine:
   <<: *release
-  extends: build-x86_64-linux-alpine-hadrian
+  extends: .build-x86_64-linux-alpine-hadrian
 
 nightly-x86_64-linux-alpine:
   <<: *nightly
-  extends: build-x86_64-linux-alpine-hadrian
+  extends: .build-x86_64-linux-alpine-hadrian
 
 #################################
 # x86_64-linux-centos7
@@ -742,7 +742,7 @@ release-x86_64-linux-centos7:
 # x86_64-linux-fedora27
 #################################
 
-.validate-x86_64-linux-fedora27:
+validate-x86_64-linux-fedora27:
   extends: .validate-linux
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora27:$DOCKER_REV"
@@ -811,7 +811,7 @@ release-x86_64-linux-centos7:
       - ghc.tar.xz
       - junit.xml
 
-.validate-x86_64-windows-hadrian:
+validate-x86_64-windows-hadrian:
   extends: .build-windows-hadrian
   variables:
     MSYSTEM: MINGW64
@@ -860,7 +860,7 @@ nightly-i386-windows-hadrian:
   cache:
     key: "x86_64-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
-.validate-x86_64-windows:
+validate-x86_64-windows:
   extends: .build-x86_64-windows-make
 
 nightly-x86_64-windows:
@@ -873,13 +873,13 @@ nightly-x86_64-windows:
 # Normal Windows validate builds are profiled; that won't do for releases.
 release-x86_64-windows:
   <<: *release
-  extends: .validate-x86_64-windows
+  extends: validate-x86_64-windows
   variables:
     BUILD_FLAVOUR: "perf"
     #
 release-x86_64-windows-integer-simple:
   <<: *release
-  extends: .validate-x86_64-windows
+  extends: validate-x86_64-windows
   variables:
     INTEGER_LIBRARY: integer-simple
     BUILD_FLAVOUR: "perf"
@@ -897,7 +897,7 @@ release-x86_64-windows-integer-simple:
   cache:
     key: "i386-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
-.validate-i386-windows:
+validate-i386-windows:
   extends: .build-i386-windows-make
   variables:
     BUILD_FLAVOUR: "perf"
@@ -955,14 +955,14 @@ cleanup-darwin:
 # Packaging
 ############################################################
 
-.doc-tarball:
+doc-tarball:
   stage: packaging
   tags:
     - x86_64-linux
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   dependencies:
-    - .validate-x86_64-linux-deb9-debug
-    - .validate-x86_64-windows
+    - validate-x86_64-linux-deb9-debug
+    - validate-x86_64-windows
   variables:
     LINUX_BINDIST: "ghc-x86_64-deb9-linux-debug.tar.xz"
     WINDOWS_BINDIST: "ghc-x86_64-mingw32.tar.xz"
@@ -1052,10 +1052,10 @@ nightly-hackage:
 # Nofib testing
 ############################################################
 
-.perf-nofib:
+perf-nofib:
   stage: testing
   dependencies:
-    - .validate-x86_64-linux-deb9-dwarf
+    - validate-x86_64-linux-deb9-dwarf
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   rules:
     - if: $CI_MERGE_REQUEST_ID
@@ -1088,10 +1088,10 @@ nightly-hackage:
 # Documentation deployment via GitLab Pages
 ############################################################
 
-.pages:
+pages:
   stage: deploy
   dependencies:
-    - .doc-tarball
+    - doc-tarball
   image: ghcci/x86_64-linux-deb9:0.2
   # Due to Windows allow_failure
   allow_failure: true
