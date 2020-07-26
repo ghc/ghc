@@ -2521,7 +2521,7 @@ newAuxBinderRdrName loc parent occ_fun = do
 -- | If we're deriving an instance for a GADT, e.g. `Eq (Foo Int)`, we should treat any constructors
 -- for which it's impossible to match `Foo Int` as not being there at all.
 --
--- See #16341 and the T16341.hs test case.
+-- See Note [Filter out impossible GADT data constructors]
 getPossibleDataCons :: TyCon -> [Type] -> [DataCon]
 getPossibleDataCons tycon tycon_args = filter (not . dataConCannotMatch tycon_args) $ tyConDataCons tycon
 
@@ -2742,4 +2742,34 @@ derived instances within the same module, not separated by any TH splices.
 (This is the case described in "Wrinkle: Reducing code duplication".) In
 situation (1), we can at least fall back on GHC's simplifier to pick up
 genAuxBinds' slack.
+
+Note [Filter out impossible GADT data constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Some stock-derivable classes will filter out impossible GADT data constructors,
+to rule out problematic constructors when deriving instances. Classes that
+filter constructors:
+
+* Eq
+* Ord
+* Show
+* Lift
+* Functor
+* Foldable
+* Traversable
+
+Classes that do not filter constructors:
+
+* Enum: doesn't make sense for GADTs in the first place
+* Bounded: only makes sense for GADTs with a single constructor
+* Ix: only makes sense for GADTs with a single constructor
+* Read: `Read a` returns `a` instead of consumes `a`, so filtering data
+  constructors would make this function _more_ partial instead of less
+* Data: uses `tagToEnum` to pick the constructor, which could reference
+  the incorrect constructors if we filter out constructors
+
+Classes that do not currently filter constructors may do so in the future, if
+there is a valid use-case and we have requirements for how they should work.
+
+See #16341 and the T16341.hs test case.
 -}
