@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, GADTs #-}
+{-# LANGUAGE CPP, GADTs, MultiWayIf #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 -- ----------------------------------------------------------------------------
 -- | Handle conversion of CmmProc to LLVM code.
@@ -37,6 +37,7 @@ import Util
 
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
+import Control.Monad
 
 import qualified Data.Semigroup as Semigroup
 import Data.List ( nub )
@@ -1821,7 +1822,7 @@ funPrologue live cmmBlocks = do
       isLive r     = r `elem` alwaysLive || r `elem` live
 
   dflags <- getDynFlags
-  stmtss <- flip mapM assignedRegs $ \reg ->
+  stmtss <- forM assignedRegs $ \reg ->
     case reg of
       CmmLocal (LocalReg un _) -> do
         let (newv, stmts) = allocReg reg
@@ -1846,30 +1847,37 @@ funPrologue live cmmBlocks = do
 -- STG Liveness optimisation done here.
 funEpilogue :: LiveGlobalRegs -> LlvmM ([LlvmVar], LlvmStatements)
 funEpilogue live = do
+    dflags <- getDynFlags
 
-    -- Have information and liveness optimisation is enabled?
-    let liveRegs = alwaysLive ++ live
-        isSSE (FloatReg _)  = True
-        isSSE (DoubleReg _) = True
-        isSSE (XmmReg _)    = True
-        isSSE (YmmReg _)    = True
-        isSSE (ZmmReg _)    = True
-        isSSE _             = False
+    let paddingRegs = padLiveArgs dflags live
 
     -- Set to value or "undef" depending on whether the register is
     -- actually live
-    dflags <- getDynFlags
     let loadExpr r = do
           (v, _, s) <- getCmmRegVal (CmmGlobal r)
           return (Just $ v, s)
         loadUndef r = do
           let ty = (pLower . getVarType $ lmGlobalRegVar dflags r)
           return (Just $ LMLitVar $ LMUndefLit ty, nilOL)
-    platform <- getDynFlag targetPlatform
-    loads <- flip mapM (activeStgRegs platform) $ \r -> case () of
-      _ | r `elem` liveRegs  -> loadExpr r
-        | not (isSSE r)      -> loadUndef r
-        | otherwise          -> return (Nothing, nilOL)
+
+    -- Note that floating-point registers in `activeStgRegs` must be sorted
+    -- according to the calling convention.
+    --  E.g. for X86:
+    --     GOOD: F1,D1,XMM1,F2,D2,XMM2,...
+    --     BAD : F1,F2,F3,D1,D2,D3,XMM1,XMM2,XMM3,...
+    --  As Fn, Dn and XMMn use the same register (XMMn) to be passed, we don't
+    --  want to pass F2 before D1 for example, otherwise we could get F2 -> XMM1
+    --  and D1 -> XMM2.
+    let allRegs = activeStgRegs (targetPlatform dflags)
+    loads <- forM allRegs $ \r -> if
+      -- load live registers
+      | r `elem` alwaysLive  -> loadExpr r
+      | r `elem` live        -> loadExpr r
+      -- load all non Floating-Point Registers
+      | not (isFPR r)        -> loadUndef r
+      -- load padding Floating-Point Registers
+      | r `elem` paddingRegs -> loadUndef r
+      | otherwise            -> return (Nothing, nilOL)
 
     let (vars, stmts) = unzip loads
     return (catMaybes vars, concatOL stmts)

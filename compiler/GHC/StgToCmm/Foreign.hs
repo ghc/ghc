@@ -13,6 +13,8 @@ module GHC.StgToCmm.Foreign (
   emitSaveThreadState,
   saveThreadState,
   emitLoadThreadState,
+  emitSaveRegs,
+  emitRestoreRegs,
   loadThreadState,
   emitOpenNursery,
   emitCloseNursery,
@@ -31,6 +33,7 @@ import GHC.StgToCmm.Layout
 import BlockId (newBlockId)
 import Cmm
 import CmmUtils
+import CmmCallConv
 import MkGraph
 import Type
 import RepType
@@ -303,6 +306,32 @@ saveThreadState dflags = do
         mkStore (cmmOffset dflags (CmmReg (CmmLocal tso)) (tso_CCCS dflags)) cccsExpr
       else mkNop
     ]
+
+
+
+-- | Save STG registers
+--
+-- STG registers must be saved around a C call, just in case the STG
+-- register is mapped to a caller-saves machine register.  Normally we
+-- don't need to worry about this the code generator has already
+-- loaded any live STG registers into variables for us, but in
+-- hand-written low-level Cmm code where we don't know which registers
+-- are live, we might have to save them all.
+emitSaveRegs :: FCode ()
+emitSaveRegs = do
+   dflags <- getDynFlags
+   let regs = realArgRegsCover dflags
+       save = catAGraphs (map (callerSaveGlobalReg dflags) regs)
+   emit save
+
+-- | Restore STG registers (see 'emitSaveRegs')
+emitRestoreRegs :: FCode ()
+emitRestoreRegs = do
+   dflags <- getDynFlags
+   let regs = realArgRegsCover dflags
+       save = catAGraphs (map (callerRestoreGlobalReg dflags) regs)
+   emit save
+
 
 emitCloseNursery :: FCode ()
 emitCloseNursery = do

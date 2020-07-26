@@ -33,7 +33,9 @@ module LlvmCodeGen.Base (
         strCLabel_llvm, strDisplayName_llvm, strProcedureName_llvm,
         getGlobalPtr, generateExternDecls,
 
-        aliasify, llvmDefLabel
+        aliasify, llvmDefLabel,
+
+        padLiveArgs, isFPR
     ) where
 
 #include "HsVersions.h"
@@ -43,12 +45,15 @@ import GhcPrelude
 
 import Llvm
 import LlvmCodeGen.Regs
+import Panic
 
+import PprCmm ()
 import CLabel
-import GHC.Platform.Regs ( activeStgRegs )
+import GHC.Platform.Regs ( activeStgRegs, globalRegMaybe )
 import DynFlags
 import FastString
 import Cmm              hiding ( succ )
+import CmmUtils (regsOverlap)
 import Outputable as Outp
 import GHC.Platform
 import UniqFM
@@ -62,7 +67,8 @@ import qualified Stream
 import Data.Maybe (fromJust)
 import Control.Monad (ap)
 import Data.Char (isDigit)
-import Data.List (intercalate)
+import Data.List (sortBy, groupBy, intercalate)
+import Data.Ord (comparing)
 import qualified Data.List.NonEmpty as NE
 
 -- ----------------------------------------------------------------------------
@@ -152,16 +158,96 @@ llvmFunSection dflags lbl
 -- | A Function's arguments
 llvmFunArgs :: DynFlags -> LiveGlobalRegs -> [LlvmVar]
 llvmFunArgs dflags live =
-    map (lmGlobalRegArg dflags) (filter isPassed (activeStgRegs platform))
-    where platform = targetPlatform dflags
-          isLive r = not (isSSE r) || r `elem` alwaysLive || r `elem` live
-          isPassed r = not (isSSE r) || isLive r
-          isSSE (FloatReg _)  = True
-          isSSE (DoubleReg _) = True
-          isSSE (XmmReg _)    = True
-          isSSE (YmmReg _)    = True
-          isSSE (ZmmReg _)    = True
-          isSSE _             = False
+    map (lmGlobalRegArg dflags) (filter isPassed allRegs)
+    where allRegs = activeStgRegs (targetPlatform dflags)
+          paddingRegs = padLiveArgs dflags live
+          isLive r = r `elem` alwaysLive
+                     || r `elem` live
+                     || r `elem` paddingRegs
+          isPassed r = not (isFPR r) || isLive r
+
+
+isFPR :: GlobalReg -> Bool
+isFPR (FloatReg _)  = True
+isFPR (DoubleReg _) = True
+isFPR (XmmReg _)    = True
+isFPR (YmmReg _)    = True
+isFPR (ZmmReg _)    = True
+isFPR _             = False
+
+-- | Return a list of "padding" registers for LLVM function calls.
+--
+-- When we generate LLVM function signatures, we can't just make any register
+-- alive on function entry. Instead, we need to insert fake arguments of the
+-- same register class until we are sure that one of them is mapped to the
+-- register we want alive. E.g. to ensure that F5 is alive, we may need to
+-- insert fake arguments mapped to F1, F2, F3 and F4.
+--
+-- Invariant: Cmm FPR regs with number "n" maps to real registers with number
+-- "n" If the calling convention uses registers in a different order or if the
+-- invariant doesn't hold, this code probably won't be correct.
+padLiveArgs :: DynFlags -> LiveGlobalRegs -> LiveGlobalRegs
+padLiveArgs dflags live =
+      if platformUnregisterised platform
+        then [] -- not using GHC's register convention for platform.
+        else padded
+  where
+    platform = targetPlatform dflags
+
+    ----------------------------------
+    -- handle floating-point registers (FPR)
+
+    fprLive = filter isFPR live  -- real live FPR registers
+
+    -- we group live registers sharing the same classes, i.e. that use the same
+    -- set of real registers to be passed. E.g. FloatReg, DoubleReg and XmmReg
+    -- all use the same real regs on X86-64 (XMM registers).
+    --
+    classes         = groupBy sharesClass fprLive
+    sharesClass a b = regsOverlap dflags (norm a) (norm b) -- check if mapped to overlapping registers
+    norm x          = CmmGlobal ((fpr_ctor x) 1)             -- get the first register of the family
+
+    -- For each class, we just have to fill missing registers numbers. We use
+    -- the constructor of the greatest register to build padding registers.
+    --
+    -- E.g. sortedRs = [   F2,   XMM4, D5]
+    --      output   = [D1,   D3]
+    padded      = concatMap padClass classes
+    padClass rs = go sortedRs [1..]
+      where
+         sortedRs = sortBy (comparing fpr_num) rs
+         maxr     = last sortedRs
+         ctor     = fpr_ctor maxr
+
+         go [] _ = []
+         go (c1:c2:_) _   -- detect bogus case (see #17920)
+            | fpr_num c1 == fpr_num c2
+            , Just real <- globalRegMaybe platform c1
+            = sorryDoc "LLVM code generator" $
+               text "Found two different Cmm registers (" <> ppr c1 <> text "," <> ppr c2 <>
+               text ") both alive AND mapped to the same real register: " <> ppr real <>
+               text ". This isn't currently supported by the LLVM backend."
+         go (c:cs) (f:fs)
+            | fpr_num c == f = go cs fs              -- already covered by a real register
+            | otherwise      = ctor f : go (c:cs) fs -- add padding register
+         go _ _ = undefined -- unreachable
+
+    fpr_ctor :: GlobalReg -> Int -> GlobalReg
+    fpr_ctor (FloatReg _)  = FloatReg
+    fpr_ctor (DoubleReg _) = DoubleReg
+    fpr_ctor (XmmReg _)    = XmmReg
+    fpr_ctor (YmmReg _)    = YmmReg
+    fpr_ctor (ZmmReg _)    = ZmmReg
+    fpr_ctor _ = error "fpr_ctor expected only FPR regs"
+
+    fpr_num :: GlobalReg -> Int
+    fpr_num (FloatReg i)  = i
+    fpr_num (DoubleReg i) = i
+    fpr_num (XmmReg i)    = i
+    fpr_num (YmmReg i)    = i
+    fpr_num (ZmmReg i)    = i
+    fpr_num _ = error "fpr_num expected only FPR regs"
+
 
 -- | Llvm standard fun attributes
 llvmStdFunAttrs :: [LlvmFuncAttr]

@@ -199,6 +199,9 @@ endif
 # `GhcUnregisterised` mode doesn't allow that.
 GhcWithSMP := $(strip $(if $(filter YESNO, $(ArchSupportsSMP)$(GhcUnregisterised)),YES,NO))
 
+# Whether or not the bootstrapping GHC supplies a threaded RTS.
+GhcThreadedRts = @GhcThreadedRts@
+
 # Whether to include GHCi in the compiler.  Depends on whether the RTS linker
 # has support for this OS/ARCH combination.
 

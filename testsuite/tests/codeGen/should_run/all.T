@@ -74,8 +74,7 @@ test('cgrun066', normal, compile_and_run, [''])
 test('cgrun067', [extra_files(['Cgrun067A.hs'])], compile_and_run, [''])
 test('cgrun068', reqlib('random'), compile_and_run, [''])
 test('cgrun069',
-     [when(unregisterised(), expect_broken(15467)),
-      omit_ways(['ghci'])],
+     [ omit_ways(['ghci'])],
      multi_compile_and_run,
      ['cgrun069', [('cgrun069_cmm.cmm', '')], ''])
 test('cgrun070', normal, compile_and_run, [''])
@@ -204,3 +203,5 @@ test('T15892',
 test('T16617', normal, compile_and_run, [''])
 test('T16449_2', exit_code(0), compile_and_run, [''])
 test('T16846', [only_ways(['optasm']), exit_code(1)], compile_and_run, [''])
+
+test('T17920', cmm_src, compile_and_run, [''])
