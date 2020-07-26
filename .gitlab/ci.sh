@@ -388,10 +388,8 @@ function test_hadrian() {
       if ldd "${binary}" &> /dev/null
       then
         echo "${binary} is not static!"
-        #ldd "${binary}"
-        #exit 1
-      else
-        echo "${binary} is static!"
+        ldd "${binary}"
+        exit 1
       fi
     done
   fi
