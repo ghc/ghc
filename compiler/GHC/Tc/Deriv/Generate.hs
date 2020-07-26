@@ -1033,7 +1033,7 @@ we want to be able to parse (Left 3) just fine.
 gen_Read_binds :: (Name -> Fixity) -> SrcSpan -> TyCon -> [Type]
                -> (LHsBinds GhcPs, BagDerivStuff)
 
-gen_Read_binds get_fixity loc tycon tycon_args
+gen_Read_binds get_fixity loc tycon _
   = (listToBag [read_prec, default_readlist, default_readlistprec], emptyBag)
   where
     -----------------------------------------------------------------------
@@ -1044,7 +1044,7 @@ gen_Read_binds get_fixity loc tycon tycon_args
         = mkHsVarBind loc readListPrec_RDR (nlHsVar readListPrecDefault_RDR)
     -----------------------------------------------------------------------
 
-    data_cons = getPossibleDataCons tycon tycon_args
+    data_cons = tyConDataCons tycon
     (nullary_cons, non_nullary_cons) = partition isNullarySrcDataCon data_cons
 
     read_prec = mkHsVarBind loc readPrec_RDR rhs
@@ -1406,7 +1406,7 @@ gen_Data_binds loc rep_tc _
                             data_cons dataC_RDRs )
               ) }
   where
-    data_cons = tyConDataCons rep_tc
+    data_cons  = tyConDataCons rep_tc
     n_cons     = length data_cons
     one_constr = n_cons == 1
 

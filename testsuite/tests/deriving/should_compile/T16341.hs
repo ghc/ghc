@@ -1,11 +1,12 @@
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveLift #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
 module T16341 where
-
-import Data.Data (Data)
 
 data Foo a where
   Foo1 :: Foo Int
@@ -15,7 +16,6 @@ data Foo a where
 -- `Foo`, because the `Foo Int` designation precludes `Foo2` from being
 -- a reachable constructor
 deriving instance Show (Foo Int)
-deriving instance Read (Foo Int)
 deriving instance Eq (Foo Int)
 deriving instance Ord (Foo Int)
 deriving instance Lift (Foo Int)
