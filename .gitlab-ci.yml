@@ -190,6 +190,7 @@ lint-release-changelogs:
     key: hadrian
     paths:
       - cabal-cache
+  dependencies: []
   artifacts:
     reports:
       junit: junit.xml
