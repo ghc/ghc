@@ -1171,6 +1171,25 @@ allocatePinned (Capability *cap, W_ n /*words*/, W_ alignment /*bytes*/, W_ alig
 
     const StgWord alignment_w = alignment / sizeof(W_);
 
+    // If the non-moving collector is enabled then we can allocate small,
+    // pinned allocations directly into the non-moving heap. This is a bit more
+    // expensive up-front but reduces fragmentation and is worthwhile since
+    // pinned allocations are often long-lived..
+    //
+    // See Note [Allocating pinned objects into the non-moving heap].
+    if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving)
+        && (n + alignment_w) * sizeof(W_) < NONMOVING_MAX_BLOCK_SZ)
+    {
+        ACQUIRE_SM_LOCK;
+        p = nonmovingAllocate(cap, n + alignment_w);
+        RELEASE_SM_LOCK;
+        W_ off_w = ALIGN_WITH_OFF_W(p, alignment, align_off);
+        memset(p, 0, off_w * sizeof(W_));
+        p += off_w;
+        MEMSET_IF_PROFILING_W(p + n, 0, alignment_w - off_w - 1);
+        return p;
+    }
+
     // If the request is for a large object, then allocate()
     // will give us a pinned object anyway.
     if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {

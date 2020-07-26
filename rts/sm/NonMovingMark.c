@@ -1359,6 +1359,11 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
     // Trace pointers
     /////////////////////////////////////////////////////
 
+    // Find beginning of object.
+    // See Note [Allocating pinned objects into the non-moving heap].
+    while (*(StgPtr*) p == NULL)
+        p = (StgClosure *) ((StgPtr*) p + 1);
+
     const StgInfoTable *info = get_itbl(p);
     switch (info->type) {
 
