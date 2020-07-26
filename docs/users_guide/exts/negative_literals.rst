@@ -24,9 +24,11 @@ will elicit an unexpected integer-literal-overflow message.
 Whitespace can be inserted, as in ``- 123``, to force interpretation
 as two tokens.
 
-One pitfall is that with :extension:`NegativeLiterals`, ``x-1`` will
-be parsed as ``x`` applied to the argument ``-1``, which is usually
-not what you want.  ``x - 1`` or even ``x- 1`` can be used instead
-for subtraction. To avoid this, consider using :extension:`LexicalNegation`
-instead.
+In 8.12, the behavior of this extension changed, and now we require that a negative literal must not be preceded by a closing token (see
+`GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
+for the definition of a closing token). In other words, we parse ``f -123`` as ``f (-123)``, but ``x-123`` as ``(-) x
+123``. Before this amendment, :extension:`NegativeLiterals` caused ``x-123`` to be parsed as ``x(-123)``.
 
+:extension:`NegativeLiterals` is a subset of :extension:`LexicalNegation`. That
+is, enabling both of those extensions has the same effect as enabling
+:extension:`LexicalNegation` alone.
