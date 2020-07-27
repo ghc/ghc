@@ -338,12 +338,6 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
 
     dnl *** check for GNU non-executable stack note support (ELF only)
     dnl     (.section .note.GNU-stack,"",@progbits)
-
-    dnl This test doesn't work with "gcc -g" in gcc 4.4 (GHC trac #3889:
-    dnl     Error: can't resolve `.note.GNU-stack' {.note.GNU-stack section} - `.Ltext0' {.text section}
-    dnl so we empty CFLAGS while running this test
-    CFLAGS2="$CFLAGS"
-    CFLAGS=
     case $TargetArch in
       arm)
         dnl See #13937.
@@ -367,7 +361,6 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
          TargetHasGnuNonexecStack=YES],
         [AC_MSG_RESULT(no)
          TargetHasGnuNonexecStack=NO])
-    CFLAGS="$CFLAGS2"
 
     checkArch "$BuildArch" "HaskellBuildArch"
     checkVendor "$BuildVendor"
@@ -1919,7 +1912,7 @@ AC_MSG_CHECKING(for path to top of build tree)
 # GHC_CONVERT_CPU(cpu, target_var)
 # --------------------------------
 # Converts cpu from gnu to ghc naming, and assigns the result to $target_var.
-# Should you modify this list, you are invited to reflect the changes in 
+# Should you modify this list, you are invited to reflect the changes in
 # `libraries/base/System/Info.hs`'s documentation.
 AC_DEFUN([GHC_CONVERT_CPU],[
 case "$1" in
