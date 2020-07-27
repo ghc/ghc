@@ -364,8 +364,11 @@ function push_perf_notes() {
 }
 
 function test_make() {
+  if [[ -z "$TEST_TYPE" ]]; then
+    TEST_TYPE="test"
+  fi
   run "$MAKE" test_bindist TEST_PREP=YES
-  run "$MAKE" V=0 test \
+  run "$MAKE" V=0 $TEST_TYPE \
     THREADS="$cores" \
     JUNIT_FILE=../../junit.xml
 }
