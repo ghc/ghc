@@ -132,14 +132,20 @@ outputC dflags filenm cmm_stream packages
          --   * -#include options from the cmdline and OPTIONS pragmas
          --   * the _stub.h file, if there is one.
          --
-         let rts = unsafeLookupUnitId (unitState dflags) rtsUnitId
+         let
+           cc_injects :: String
+           cc_injects =
+             -- Ugh, usually we would like to use unitIncludes of the rts package
+             -- but when during bootstrapping we try to generates rts's CMM we
+             -- don't have rts in our packagedb yet!
+             unlines (map mk_include [ "Stg.h" ])
 
-         let cc_injects = unlines (map mk_include (unitIncludes rts))
-             mk_include h_file =
-              case h_file of
-                 '"':_{-"-} -> "#include "++h_file
-                 '<':_      -> "#include "++h_file
-                 _          -> "#include \""++h_file++"\""
+           mk_include :: String -> String
+           mk_include h_file =
+            case h_file of
+               '"':_{-"-} -> "#include "++h_file
+               '<':_      -> "#include "++h_file
+               _          -> "#include \""++h_file++"\""
 
          let pkg_names = map unitIdString packages
 
