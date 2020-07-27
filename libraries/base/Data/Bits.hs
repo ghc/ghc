@@ -537,8 +537,14 @@ instance Bits Integer where
    (.|.)      = integerOr
    xor        = integerXor
    complement = integerComplement
-   shiftR x i = integerShiftR x (fromIntegral i)
-   shiftL x i = integerShiftL x (fromIntegral i)
+   unsafeShiftR x i = integerShiftR x (fromIntegral i)
+   unsafeShiftL x i = integerShiftL x (fromIntegral i)
+   shiftR x i@(I# i#)
+      | isTrue# (i# >=# 0#) = unsafeShiftR x i
+      | otherwise           = overflowError
+   shiftL x i@(I# i#)
+      | isTrue# (i# >=# 0#) = unsafeShiftL x i
+      | otherwise           = overflowError
    shift x i | i >= 0    = integerShiftL x (fromIntegral i)
              | otherwise = integerShiftR x (fromIntegral (negate i))
    testBit x i = integerTestBit x (fromIntegral i)
@@ -560,8 +566,14 @@ instance Bits Natural where
    xor           = naturalXor
    complement _  = errorWithoutStackTrace
                     "Bits.complement: Natural complement undefined"
-   shiftR x i    = naturalShiftR x (fromIntegral i)
-   shiftL x i    = naturalShiftL x (fromIntegral i)
+   unsafeShiftR x i = naturalShiftR x (fromIntegral i)
+   unsafeShiftL x i = naturalShiftL x (fromIntegral i)
+   shiftR x i@(I# i#)
+      | isTrue# (i# >=# 0#) = unsafeShiftR x i
+      | otherwise           = overflowError
+   shiftL x i@(I# i#)
+      | isTrue# (i# >=# 0#) = unsafeShiftL x i
+      | otherwise           = overflowError
    shift x i
      | i >= 0    = naturalShiftL x (fromIntegral i)
      | otherwise = naturalShiftR x (fromIntegral (negate i))
