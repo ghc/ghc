@@ -213,7 +213,7 @@ dsUnliftedBind (FunBind { fun_id = L l fun
        ; return (bindNonRec fun rhs' body) }
 
 dsUnliftedBind (PatBind {pat_lhs = pat, pat_rhs = grhss
-                        , pat_ext = NPatBindTc _ ty }) body
+                        , pat_ext = ty }) body
   =     -- let C x# y# = rhs in body
         -- ==> case rhs of C x# y# -> body
     do { rhs_deltas <- checkGuardMatches PatBindGuards grhss

@@ -22,8 +22,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE DataKinds #-}
 
 module GHC.Hs.Pat (
+    Pat, LPat, pprPat
+{-
         Pat(..), LPat,
         ConPatTc (..),
         CoPat (..),
@@ -48,6 +51,7 @@ module GHC.Hs.Pat (
         collectEvVarsPat, collectEvVarsPats,
 
         pprParendLPat, pprConArgs
+-}
     ) where
 
 import GHC.Prelude
@@ -78,8 +82,23 @@ import GHC.Types.Name (Name)
 -- libraries:
 import Data.Data hiding (TyCon,Fixity)
 
+type instance XXPat (GhcPass 'Typechecked) = CoPat
+
+data Pat p = XPat !(XXPat p)
+
+data CoPat = CoPat Int Int Int
+
+instance OutputableBndrId p => Outputable (Pat (GhcPass p)) where
+    ppr = pprPat
+
+pprPat :: forall p. IsPass p => Pat (GhcPass p) -> SDoc
+pprPat (XPat ext) = case ghcPass @p of
+                       GhcTc -> empty
+                             where CoPat _ _ _ = ext
+
 type LPat p = XRec p (Pat p)
 
+{-
 -- | Pattern
 --
 -- - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnBang'
@@ -914,3 +933,4 @@ collectEvVarsPat pat =
     SigPat  _ p _    -> collectEvVarsLPat p
     XPat (CoPat _ p _) -> collectEvVarsPat  p
     _other_pat       -> emptyBag
+-}
