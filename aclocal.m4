@@ -190,10 +190,10 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
             test -z "[$]2" || eval "[$]2=ArchPPC"
             ;;
         powerpc64)
-            test -z "[$]2" || eval "[$]2=\"ArchPPC_64 {ppc_64ABI = ELF_V1}\""
+            test -z "[$]2" || eval "[$]2=\"ArchPPC_64 ELF_V1\""
             ;;
         powerpc64le)
-            test -z "[$]2" || eval "[$]2=\"ArchPPC_64 {ppc_64ABI = ELF_V2}\""
+            test -z "[$]2" || eval "[$]2=\"ArchPPC_64 ELF_V2\""
             ;;
         s390x)
             test -z "[$]2" || eval "[$]2=ArchS390X"
@@ -206,7 +206,7 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
             ;;
         arm)
             GET_ARM_ISA()
-            test -z "[$]2" || eval "[$]2=\"ArchARM {armISA = \$ARM_ISA, armISAExt = \$ARM_ISA_EXT, armABI = \$ARM_ABI}\""
+            test -z "[$]2" || eval "[$]2=\"ArchARM \$ARM_ISA \$ARM_ISA_EXT \$ARM_ABI}\""
             ;;
         aarch64)
             test -z "[$]2" || eval "[$]2=ArchARM64"
@@ -1919,7 +1919,7 @@ AC_MSG_CHECKING(for path to top of build tree)
 # GHC_CONVERT_CPU(cpu, target_var)
 # --------------------------------
 # Converts cpu from gnu to ghc naming, and assigns the result to $target_var.
-# Should you modify this list, you are invited to reflect the changes in 
+# Should you modify this list, you are invited to reflect the changes in
 # `libraries/base/System/Info.hs`'s documentation.
 AC_DEFUN([GHC_CONVERT_CPU],[
 case "$1" in
