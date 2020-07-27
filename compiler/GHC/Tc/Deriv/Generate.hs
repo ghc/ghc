@@ -2747,8 +2747,18 @@ Note [Filter out impossible GADT data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Some stock-derivable classes will filter out impossible GADT data constructors,
-to rule out problematic constructors when deriving instances. Classes that
-filter constructors:
+to rule out problematic constructors when deriving instances. e.g.
+
+```
+data Foo a where
+  X :: Foo Int
+  Y :: (Bool -> Bool) -> Foo Bool
+```
+
+when deriving an instance on `Foo Int`, `Y` should be treated as if it didn't
+exist in the first place.
+
+Classes that filter constructors:
 
 * Eq
 * Ord
@@ -2765,8 +2775,9 @@ Classes that do not filter constructors:
 * Ix: only makes sense for GADTs with a single constructor
 * Read: `Read a` returns `a` instead of consumes `a`, so filtering data
   constructors would make this function _more_ partial instead of less
-* Data: uses `tagToEnum` to pick the constructor, which could reference
-  the incorrect constructors if we filter out constructors
+* Data: derived implementations of gunfold rely on a constructor-indexing
+  scheme that wouldn't work if certain constructors were filtered out
+* Generic/Generic1: doesn't make sense for GADTs
 
 Classes that do not currently filter constructors may do so in the future, if
 there is a valid use-case and we have requirements for how they should work.
