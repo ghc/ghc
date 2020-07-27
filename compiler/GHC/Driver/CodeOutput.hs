@@ -132,14 +132,30 @@ outputC dflags filenm cmm_stream packages
          --   * -#include options from the cmdline and OPTIONS pragmas
          --   * the _stub.h file, if there is one.
          --
+         -- N.B. this needs to be lazy, see below.
          let rts = unsafeLookupUnitId (unitState dflags) rtsUnitId
 
-         let cc_injects = unlines (map mk_include (unitIncludes rts))
-             mk_include h_file =
-              case h_file of
-                 '"':_{-"-} -> "#include "++h_file
-                 '<':_      -> "#include "++h_file
-                 _          -> "#include \""++h_file++"\""
+         let
+           cc_includes :: [String]
+           cc_includes =
+             -- Careful: beware of chicken-and-egg problem. We are looking up
+             -- the rts package to get to relevant includes. This is going to
+             -- fail if we are bootstrapping and don't have an rts in our
+             -- packagedb yet. Instead, ensure that CMM files in rts include the
+             -- relevant files themselves.
+             | homeUnitId dflags /= rtsUnitId = unitIncludes rts
+             | otherwise = []
+
+           cc_injects :: String
+           cc_injects =
+             unlines (map mk_include cc_includes)
+
+           mk_include :: String -> String
+           mk_include h_file =
+            case h_file of
+               '"':_{-"-} -> "#include "++h_file
+               '<':_      -> "#include "++h_file
+               _          -> "#include \""++h_file++"\""
 
          let pkg_names = map unitIdString packages
 
