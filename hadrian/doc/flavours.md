@@ -142,6 +142,17 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td>-O</td>
     <td>-O</td>
   </tr>
+  <tr>
+    <th>static</td>
+    <td>-O<br>-H64m<br>-fPIC -static</td>
+    <td>-O<br>-H64m<br>-fPIC -static</td>
+    <td></td>
+    <td>-O2</td>
+    <td>-O2</td>
+    <td>-O2</td>
+    <td>-O<br>-optl -static</td>
+    <td>-O2<br>-optl -static</td>
+  </tr>
 </table>
 
 ### LLVM variants
@@ -151,6 +162,13 @@ In addition to the above, there are LLVM variants for the flavours `quick`,
 `quick-llvm` for the LLVM variant of `quick`). These differ only in that there
 is an additional `-fllvm` flag in `hsDefault` when the stage0 compiler is GHC.
 See `src/Settings/Flavours/Llvm.hs` for details.
+
+### Static
+
+The `static` flavour does not strictly follow the groupings in the table
+above because it links all the executables statically, not just GHC
+itself, and because it passes `-optc -static` when delegating to a C
+compiler.  It also only adds static flags when building in a non-dynamic _way_.
 
 ## Ways
 
@@ -173,7 +191,7 @@ information. The following table lists ways that are built in different flavours
         <th>stage1+</th>
     </tr>
     <tr>
-    <th>default<br>perf<br>prof<br>devel1<br>devel2<br>perf-llvm<br>prof-llvm</td>
+    <th>default<br>perf<br>prof<br>devel1<br>devel2<br>perf-llvm<br>prof-llvm<br>static</td>
     <td>vanilla</td>
     <td>vanilla<br>profiling<br>dynamic</td>
     <td>logging<br>debug<br>threaded<br>threadedDebug<br>threadedLogging
