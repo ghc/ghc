@@ -35,7 +35,7 @@ module GHC.Tc.Deriv.Generate (
         ordOpTbl, boxConTbl, litConTbl,
         mkRdrFunBind, mkRdrFunBindEC, mkRdrFunBindSE, error_Expr,
 
-        getPossibleDataCons
+        getPossibleDataCons, getTyConArgs
     ) where
 
 #include "HsVersions.h"
@@ -2523,7 +2523,17 @@ newAuxBinderRdrName loc parent occ_fun = do
 --
 -- See Note [Filter out impossible GADT data constructors]
 getPossibleDataCons :: TyCon -> [Type] -> [DataCon]
-getPossibleDataCons tycon tycon_args = filter (not . dataConCannotMatch tycon_args) $ tyConDataCons tycon
+getPossibleDataCons tycon tycon_args = filter isPossible $ tyConDataCons tycon
+  where
+    isPossible = not . dataConCannotMatch (getTyConArgs tycon tycon_args)
+
+-- | Get the full list of TyCon args, given a partial instantiation.
+--
+-- e.g. Given 'tycon: Foo a b' and 'tycon_args: [Int]', return '[Int, b]'.
+getTyConArgs :: TyCon -> [Type] -> [Type]
+getTyConArgs tycon tycon_args = tycon_args ++ map mkTyVarTy tycon_args_suffix
+  where
+    tycon_args_suffix = drop (length tycon_args) $ tyConTyVars tycon
 
 {-
 Note [Auxiliary binders]
