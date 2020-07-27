@@ -8,6 +8,8 @@
 
 module T16341 where
 
+import Language.Haskell.TH.Syntax (Lift)
+
 data Foo a where
   Foo1 :: Foo Int
   Foo2 :: (Bool -> Bool) -> Foo Bool
