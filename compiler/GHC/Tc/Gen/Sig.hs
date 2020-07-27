@@ -56,7 +56,8 @@ import GHC.Types.SrcLoc
 import GHC.Utils.Misc( singleton )
 import GHC.Data.Maybe( orElse )
 import Data.Maybe( mapMaybe )
-import Control.Monad( unless )
+import Control.Monad( unless, when )
+import Data.Function ( on )
 
 
 {- -------------------------------------------------------------
@@ -596,13 +597,11 @@ addInlinePrags :: TcId -> [LSig GhcRn] -> TcM TcId
 addInlinePrags poly_id prags_for_me
   | null inl_prags = return poly_id
   | otherwise
-       -- TODO clean a bit
-  = do { mapM_ (traceTc "addInlinePrag"        (ppr poly_id $$ ppr prag)) $ take 1 inl_inl
-       ; mapM_ (traceTc "addSpecializablePrag" (ppr poly_id $$ ppr prag)) $ take 1 inl_spec
-       -- TODO avoid head
+  = do { mapM_ (\(L _ p) -> traceTc "addInlinePrag"        (ppr poly_id $$ ppr p)) $ take 1 inl_inl
+       ; mapM_ (\(L _ p) -> traceTc "addSpecializablePrag" (ppr poly_id $$ ppr p)) $ take 1 inl_spec
+       -- TODO avoid head and clean the mapM_ stuff
        ; when (multiple inl_inl) (warn_multiple_inlines (head inl_inl) inl_inl)
        ; when (multiple inl_spec) (warn_multiple_inlines (head inl_spec) inl_spec)
-       -- TODO merge them properly
        ; return (poly_id `setInlinePragma` prag) }
   where
     inl_prags = [L loc prag | L loc (InlineSig _ _ prag) <- prags_for_me]
@@ -610,6 +609,21 @@ addInlinePrags poly_id prags_for_me
               inlinePragmaSpec prag /= NoUserInline]
     inl_spec = [L loc prag | L loc prag <- inl_prags,
                specializablePragmaSpec prag /= NoUserSpecializable]
+    prag = case (inl_inl, inl_spec) of
+      ((L _ p1):_, []        ) -> p1
+      ([],         (L _ p2):_) -> p2
+      ((L _ p1):_, (L _ p2):_) -> mergePrags p1 p2
+      ([],[]) -> die ["No pragmas to merge"] -- TODO
+
+    mergePrags p1 p2 = p1
+      { inl_inline = ((<>) `on` inlinePragmaSpec       ) p1 p2
+      , inl_spec   = ((<>) `on` specializablePragmaSpec) p1 p2
+      --, inl_act = AlwaysActive -- XXX activation must be taken from spec when inline is noinline!
+      } -- TODO take sat, act, rule from the inline one. FIXME can't merge src!
+    mergeInlineSpec NoUserInline spec = spec
+    mergeInlineSpec spec         _    = spec
+    mergeSpecializableSpec NoUserSpecializable spec = spec
+    mergeSpecializableSpec spec                _    = spec
 
     multiple (_:_:_) = True
     multiple _ = False

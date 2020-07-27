@@ -377,21 +377,25 @@ dsAbsBinds dflags tyvars dicts exports
 makeCorePair :: DynFlags -> Id -> Bool -> Arity -> CoreExpr
              -> (Id, CoreExpr)
 makeCorePair dflags gbl_id is_default_method dict_arity rhs
-  | specializablePragmaSpec inline_prag == Specializable = error "yay!"
   | is_default_method    -- Default methods are *always* inlined
                          -- See Note [INLINE and default methods] in GHC.Tc.TyCl.Instance
   = (gbl_id `setIdUnfolding` mkCompulsoryUnfolding rhs, rhs)
 
   | otherwise
   = case inlinePragmaSpec inline_prag of
-          NoUserInline -> (gbl_id, rhs)
-          NoInline     -> (gbl_id, rhs)
+          NoUserInline -> case specializablePragmaSpec inline_prag of
+            NoUserSpecializable -> (gbl_id, rhs)
+            Specializable       -> (gbl_id `setIdUnfolding` inlinable_unf, rhs) -- TODO review it
+          NoInline     -> case specializablePragmaSpec inline_prag of
+            NoUserSpecializable -> (gbl_id, rhs)
+            Specializable       -> (gbl_id `setIdUnfolding` specializable_noinline_unf, rhs)
           Inlinable    -> (gbl_id `setIdUnfolding` inlinable_unf, rhs)
           Inline       -> inline_pair
 
   where
     inline_prag   = idInlinePragma gbl_id
     inlinable_unf = mkInlinableUnfolding dflags rhs
+    specializable_noinline_unf = mkSpecializableNoinlineUnfolding dflags rhs
     inline_pair
        | Just arity <- inlinePragmaSat inline_prag
         -- Add an Unfolding for an INLINE (but not for NOINLINE)

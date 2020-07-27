@@ -1470,10 +1470,18 @@ data InlineSpec   -- What the user's INLINE pragma looked like
   deriving( Eq, Data, Show )
         -- Show needed for GHC.Parser.Lexer
 
+instance Semigroup InlineSpec where
+  NoUserInline <> spec = spec
+  spec         <> _    = spec
+
 data SpecializableSpec
   = Specializable
   | NoUserSpecializable
   deriving( Eq, Data, Show )
+
+instance Semigroup SpecializableSpec where
+  NoUserSpecializable <> spec = spec
+  spec                <> _    = spec
 
 {- Note [InlinePragma]
 ~~~~~~~~~~~~~~~~~~~~~~
