@@ -156,6 +156,7 @@ module GHC.Driver.Types (
         writeField, writeIfaceField, writeIfaceFieldWith,
         deleteField, deleteIfaceField,
         registerInterfaceData, registerInterfaceDataWith,
+        unregisterInterfaceData,
     ) where
 
 #include "HsVersions.h"
@@ -3418,3 +3419,8 @@ registerInterfaceDataWith name env write = do
   ext_fs  <- readIORef (hsc_ext_fields env)
   ext_fs' <- writeFieldWith name write ext_fs
   writeIORef (hsc_ext_fields env) ext_fs'
+
+unregisterInterfaceData :: FieldName -> HscEnv -> IO ()
+unregisterInterfaceData name env = do
+  ext_fs <- readIORef (hsc_ext_fields env)
+  writeIORef (hsc_ext_fields env) (deleteField name ext_fs)
