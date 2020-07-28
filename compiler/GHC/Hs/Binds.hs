@@ -317,18 +317,13 @@ data HsBindLR idL idR
 
   | XHsBindsLR !(XXHsBindsLR idL idR)
 
-data NPatBindTc = NPatBindTc {
-     pat_fvs :: NameSet, -- ^ Free variables
-     pat_rhs_ty :: Type  -- ^ Type of the GRHSs
-     } deriving Data
-
 type instance XFunBind    (GhcPass pL) GhcPs = NoExtField
 type instance XFunBind    (GhcPass pL) GhcRn = NameSet    -- Free variables
 type instance XFunBind    (GhcPass pL) GhcTc = HsWrapper  -- See comments on FunBind.fun_ext
 
 type instance XPatBind    GhcPs (GhcPass pR) = NoExtField
 type instance XPatBind    GhcRn (GhcPass pR) = NameSet -- Free variables
-type instance XPatBind    GhcTc (GhcPass pR) = NPatBindTc
+type instance XPatBind    GhcTc (GhcPass pR) = Type    -- Type of the GRHSs
 
 type instance XVarBind    (GhcPass pL) (GhcPass pR) = NoExtField
 type instance XAbsBinds   (GhcPass pL) (GhcPass pR) = NoExtField
