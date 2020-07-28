@@ -45,7 +45,7 @@ library
   -- this package typically supports only single major versions
   build-depends: base            ^>= 4.15.0
                , Cabal           ^>= 2.4.0
-               , ghc             ^>= 8.11
+               , ghc             ^>= 9.0
                , ghc-paths       ^>= 0.1.0.9
                , haddock-library ^>= 1.8.0
                , xhtml           ^>= 3000.2.2

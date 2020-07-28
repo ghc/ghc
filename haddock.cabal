@@ -33,7 +33,7 @@ bug-reports:          https://github.com/haskell/haddock/issues
 copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
-tested-with:          GHC==8.12.*, GHC==8.10.*, GHC==8.8.1
+tested-with:          GHC==9.0.*, GHC==8.10.*
 
 extra-source-files:
   CHANGES.md
@@ -80,7 +80,7 @@ executable haddock
       Cabal >= 1.10,
       ghc-boot,
       ghc-boot-th,
-      ghc == 8.11.*,
+      ghc == 9.0.*,
       bytestring,
       parsec,
       text,
