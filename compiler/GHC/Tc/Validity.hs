@@ -2271,7 +2271,7 @@ checkConsistentFamInst :: AssocInstInfo
                        -> TcM ()
 -- See Note [Checking consistent instantiation]
 
-checkConsistentFamInst NotAssociated _ _
+checkConsistentFamInst (NotAssociated {}) _ _
   = return ()
 
 checkConsistentFamInst (InClsInst { ai_class = clas

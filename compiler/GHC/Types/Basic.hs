@@ -108,7 +108,9 @@ module GHC.Types.Basic (
 
         SpliceExplicitFlag(..),
 
-        TypeOrKind(..), isTypeLevel, isKindLevel
+        TypeOrKind(..), isTypeLevel, isKindLevel,
+
+        ClosedTyFamInfo(..)
    ) where
 
 import GHC.Prelude
@@ -1843,3 +1845,16 @@ isTypeLevel KindLevel = False
 isKindLevel :: TypeOrKind -> Bool
 isKindLevel TypeLevel = False
 isKindLevel KindLevel = True
+
+{-
+************************************************************************
+*                                                                      *
+                ClosedTyFamInfo
+*                                                                      *
+************************************************************************
+-}
+
+-- | Is a type family closed ('ClosedTyFam') or not ('NotClosedTyFam')?
+data ClosedTyFamInfo
+  = NotClosedTyFam
+  | ClosedTyFam
