@@ -228,8 +228,8 @@ bigNatToWordList bn = go (bigNatSize# bn)
 -- | Convert two Word# (most-significant first) into a BigNat
 bigNatFromWord2# :: Word# -> Word# -> BigNat#
 bigNatFromWord2# 0## 0## = bigNatZero# void#
-bigNatFromWord2# 0## n   = bigNatFromWord# n
-bigNatFromWord2# w1 w2   = wordArrayFromWord2# w1 w2
+bigNatFromWord2# 0## l   = bigNatFromWord# l
+bigNatFromWord2# h   l   = wordArrayFromWord2# h l
 
 -- | Convert a BigNat into a Word#
 bigNatToWord# :: BigNat# -> Word#
