@@ -121,12 +121,14 @@ withNewWordArrayTrimedMaybe# sz act = case runRW# io of (# _, a #) -> a
 
 -- | Create a WordArray# from two Word#
 --
--- `byteArrayFromWord2# msw lsw = lsw:msw`
+-- `wordArrayFromWord2# h l
+--    where h is the most significant word
+--          l is the least significant word
 wordArrayFromWord2# :: Word# -> Word# -> WordArray#
-wordArrayFromWord2# msw lsw   =
+wordArrayFromWord2# h l   =
    withNewWordArray# 2# \mwa s ->
-      case mwaWrite# mwa 0# lsw s of
-         s -> mwaWrite# mwa 1# msw s
+      case mwaWrite# mwa 0# l s of
+         s -> mwaWrite# mwa 1# h s
 
 -- | Create a WordArray# from one Word#
 wordArrayFromWord# :: Word# -> WordArray#
