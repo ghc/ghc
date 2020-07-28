@@ -1,5 +1,5 @@
 
-tcfail012.hs:3:8: error:
-    • Couldn't match expected type ‘Bool’ with actual type ‘[a0]’
-    • In the expression: []
+tcfail012.hs:3:1: error:
+    • Couldn't match expected type ‘[a0]’ with actual type ‘Bool’
+    • In the pattern: True
       In a pattern binding: True = []
