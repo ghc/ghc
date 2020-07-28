@@ -97,8 +97,16 @@ class  Num a  where
 subtract :: (Num a) => a -> a -> a
 subtract x y = y - x
 
+instance Num () where
+    () + ()        = ()
+    () * ()        = ()
+    () - ()        = ()
+    abs ()         = ()
+    fromInteger _n = ()
+    signum _n      = ()
+
 -- | @since 2.01
-instance  Num Int  where
+instance Num Int  where
     I# x + I# y = I# (x +# y)
     I# x - I# y = I# (x -# y)
     negate (I# x) = I# (negateInt# x)
@@ -124,7 +132,7 @@ instance Num Word where
     fromInteger i          = integerToWord i
 
 -- | @since 2.01
-instance  Num Integer  where
+instance Num Integer  where
     (+) = integerAdd
     (-) = integerSub
     (*) = integerMul
@@ -138,7 +146,7 @@ instance  Num Integer  where
 -- additive inverse. It is a semiring though.
 --
 -- @since 4.8.0.0
-instance  Num Natural  where
+instance Num Natural  where
     (+) = naturalAdd
     (-) x y = case compare x y of
       EQ -> naturalZero
