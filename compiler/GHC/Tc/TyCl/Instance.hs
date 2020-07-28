@@ -458,11 +458,11 @@ tcLocalInstDecl :: LInstDecl GhcRn
         --
         -- We check for respectable instance type, and context
 tcLocalInstDecl (L loc (TyFamInstD { tfid_inst = decl }))
-  = do { fam_inst <- tcTyFamInstDecl NotAssociated (L loc decl)
+  = do { fam_inst <- tcTyFamInstDecl (NotAssociated NotClosedTyFam) (L loc decl)
        ; return ([], [fam_inst], []) }
 
 tcLocalInstDecl (L loc (DataFamInstD { dfid_inst = decl }))
-  = do { (fam_inst, m_deriv_info) <- tcDataFamInstDecl NotAssociated emptyVarEnv (L loc decl)
+  = do { (fam_inst, m_deriv_info) <- tcDataFamInstDecl (NotAssociated NotClosedTyFam) emptyVarEnv (L loc decl)
        ; return ([], [fam_inst], maybeToList m_deriv_info) }
 
 tcLocalInstDecl (L loc (ClsInstD { cid_inst = decl }))

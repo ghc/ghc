@@ -2432,7 +2432,7 @@ tcDefaultAssocDecl fam_tc
        -- at an associated type. But this would be wrong, because an associated
        -- type default LHS can mention *different* type variables than the
        -- enclosing class. So it's treated more as a freestanding beast.
-       ; (qtvs, pats, rhs_ty) <- tcTyFamInstEqnGuts fam_tc NotAssociated
+       ; (qtvs, pats, rhs_ty) <- tcTyFamInstEqnGuts fam_tc (NotAssociated NotClosedTyFam)
                                                     imp_vars (mb_expl_bndrs `orElse` [])
                                                     hs_pats hs_rhs_ty
 
@@ -2639,7 +2639,7 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
                                    False {- this doesn't matter here -}
                                    ClosedTypeFamilyFlavour
 
-       ; branches <- mapAndReportM (tcTyFamInstEqn tc_fam_tc NotAssociated) eqns
+       ; branches <- mapAndReportM (tcTyFamInstEqn tc_fam_tc (NotAssociated ClosedTyFam)) eqns
          -- Do not attempt to drop equations dominated by earlier
          -- ones here; in the case of mutual recursion with a data
          -- type, we get a knot-tying failure.  Instead we check
@@ -2862,16 +2862,25 @@ tcTyFamInstEqn fam_tc mb_clsinfo
                                       , feqn_bndrs  = mb_expl_bndrs
                                       , feqn_pats   = hs_pats
                                       , feqn_rhs    = hs_rhs_ty }}))
-  = ASSERT( getName fam_tc == eqn_tc_name )
-    setSrcSpan loc $
+  = setSrcSpan loc $
     do { traceTc "tcTyFamInstEqn" $
          vcat [ ppr fam_tc <+> ppr hs_pats
               , text "fam tc bndrs" <+> pprTyVars (tyConTyVars fam_tc)
               , case mb_clsinfo of
-                  NotAssociated -> empty
+                  NotAssociated {} -> empty
                   InClsInst { ai_class = cls } -> text "class" <+> ppr cls <+> pprTyVars (classTyVars cls) ]
 
-       -- First, check the arity of visible arguments
+       -- First, check if we're dealing with a closed type family equation, and
+       -- if so, ensure that each equation's type constructor is for the right
+       -- type family.  E.g. barf on
+       --    type family F a where { G Int = Bool }
+       ; case mb_clsinfo of
+           NotAssociated ClosedTyFam
+             -> checkTc (fam_tc_name == eqn_tc_name) $
+                wrongTyFamName fam_tc_name eqn_tc_name
+           _ -> pure ()
+
+       -- Next, check the arity of visible arguments
        -- If we wait until validity checking, we'll get kind errors
        -- below when an arity error will be much easier to understand.
        ; let vis_arity = length (tyConVisibleTyVars fam_tc)
@@ -2886,6 +2895,8 @@ tcTyFamInstEqn fam_tc mb_clsinfo
        ; return (mkCoAxBranch qtvs [] [] pats rhs_ty
                               (map (const Nominal) qtvs)
                               loc) }
+  where
+    fam_tc_name = getName fam_tc
 
 {-
 Kind check type patterns and kind annotate the embedded type variables.
@@ -4918,6 +4929,12 @@ incoherentRoles :: SDoc
 incoherentRoles = (text "Roles other than" <+> quotes (text "nominal") <+>
                    text "for class parameters can lead to incoherence.") $$
                   (text "Use IncoherentInstances to allow this; bad role found")
+
+wrongTyFamName :: Name -> Name -> SDoc
+wrongTyFamName fam_tc_name eqn_tc_name
+  = hang (text "Mismatched type name in type family instance.")
+       2 (vcat [ text "Expected:" <+> ppr fam_tc_name
+               , text "  Actual:" <+> ppr eqn_tc_name ])
 
 addTyConCtxt :: TyCon -> TcM a -> TcM a
 addTyConCtxt tc = addTyConFlavCtxt name flav

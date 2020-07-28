@@ -55,7 +55,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Avail
 import GHC.Utils.Outputable
 import GHC.Data.Bag
-import GHC.Types.Basic  ( pprRuleName, TypeOrKind(..) )
+import GHC.Types.Basic  ( pprRuleName, TypeOrKind(..), ClosedTyFamInfo(..) )
 import GHC.Data.FastString
 import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.Session
@@ -763,7 +763,7 @@ rnFamInstEqn doc atfi rhs_kvars
        ; let eqn_fvs = rhs_fvs `plusFV` pat_fvs
              -- See Note [Type family equations and occurrences]
              all_fvs = case atfi of
-                         NonAssocTyFamEqn (ClosedTyFam{})
+                         NonAssocTyFamEqn ClosedTyFam
                            -> eqn_fvs
                          _ -> eqn_fvs `addOneFV` unLoc tycon'
 
@@ -851,13 +851,6 @@ data AssocTyFamInfo
       Name            -- Name of the parent class
       [Name]          -- Names of the tyvars of the parent instance decl
 
--- | Tracks whether we are renaming an equation in a closed type family
--- equation ('ClosedTyFam') or not ('NotClosedTyFam').
-data ClosedTyFamInfo
-  = NotClosedTyFam
-  | ClosedTyFam (Located RdrName) Name
-                -- The names (RdrName and Name) of the closed type family
-
 rnTyFamInstEqn :: AssocTyFamInfo
                -> TyFamInstEqn GhcPs
                -> RnM (TyFamInstEqn GhcRn, FreeVars)
@@ -865,19 +858,8 @@ rnTyFamInstEqn atfi
     eqn@(HsIB { hsib_body = FamEqn { feqn_tycon = tycon
                                    , feqn_rhs   = rhs }})
   = do { let rhs_kvs = extractHsTyRdrTyVarsKindVars rhs
-       ; (eqn'@(HsIB { hsib_body =
-                       FamEqn { feqn_tycon = L _ tycon' }}), fvs)
+       ; (eqn', fvs)
            <- rnFamInstEqn (TySynCtx tycon) atfi rhs_kvs eqn rnTySyn
-
-         -- For closed type families, check that each equation is for the
-         -- right type family.  E.g. barf on
-         --    type family F a where { G Int = Bool }
-       ; case atfi of
-           NonAssocTyFamEqn (ClosedTyFam fam_rdr_name fam_name) ->
-             checkTc (fam_name == tycon') $
-             withHsDocContext (TyFamilyCtx fam_rdr_name) $
-             wrongTyFamName fam_name tycon'
-           _ -> pure ()
        ; pure (eqn', fvs) }
 
 rnTyFamDefltDecl :: Name
@@ -2023,7 +2005,7 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
                ; injectivity' <- traverse (rnInjectivityAnn tyvars' res_sig')
                                           injectivity
                ; return ( (tyvars', res_sig', injectivity') , fv_kind ) }
-       ; (info', fv2) <- rn_info tycon' info
+       ; (info', fv2) <- rn_info info
        ; return (FamilyDecl { fdExt = noExtField
                             , fdLName = tycon', fdTyVars = tyvars'
                             , fdFixity = fixity
@@ -2035,18 +2017,16 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
      kvs = extractRdrKindSigVars res_sig
 
      ----------------------
-     rn_info :: Located Name
-             -> FamilyInfo GhcPs -> RnM (FamilyInfo GhcRn, FreeVars)
-     rn_info (L _ fam_name) (ClosedTypeFamily (Just eqns))
+     rn_info :: FamilyInfo GhcPs -> RnM (FamilyInfo GhcRn, FreeVars)
+     rn_info (ClosedTypeFamily (Just eqns))
        = do { (eqns', fvs)
-                <- rnList (rnTyFamInstEqn (NonAssocTyFamEqn (ClosedTyFam tycon fam_name)))
+                <- rnList (rnTyFamInstEqn (NonAssocTyFamEqn ClosedTyFam)) eqns
                                           -- no class context
-                          eqns
             ; return (ClosedTypeFamily (Just eqns'), fvs) }
-     rn_info _ (ClosedTypeFamily Nothing)
+     rn_info (ClosedTypeFamily Nothing)
        = return (ClosedTypeFamily Nothing, emptyFVs)
-     rn_info _ OpenTypeFamily = return (OpenTypeFamily, emptyFVs)
-     rn_info _ DataFamily     = return (DataFamily, emptyFVs)
+     rn_info OpenTypeFamily = return (OpenTypeFamily, emptyFVs)
+     rn_info DataFamily     = return (DataFamily, emptyFVs)
 
 rnFamResultSig :: HsDocContext
                -> FamilyResultSig GhcPs
@@ -2189,13 +2169,6 @@ are no data constructors we allow h98_style = True
      Support code for type/data declarations
 *                                                      *
 ***************************************************** -}
-
----------------
-wrongTyFamName :: Name -> Name -> SDoc
-wrongTyFamName fam_tc_name eqn_tc_name
-  = hang (text "Mismatched type name in type family instance.")
-       2 (vcat [ text "Expected:" <+> ppr fam_tc_name
-               , text "  Actual:" <+> ppr eqn_tc_name ])
 
 -----------------
 rnConDecls :: [LConDecl GhcPs] -> RnM ([LConDecl GhcRn], FreeVars)

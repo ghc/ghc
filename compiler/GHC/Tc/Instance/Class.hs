@@ -31,6 +31,7 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim( eqPrimTyCon, eqReprPrimTyCon )
 import GHC.Builtin.Names
 
+import GHC.Types.Basic ( ClosedTyFamInfo(..) )
 import GHC.Types.Id
 import GHC.Core.Type
 import GHC.Core.Make ( mkStringExprFS, mkNaturalExpr )
@@ -58,6 +59,7 @@ import Data.Maybe
 -- The @VarEnv Type@ maps class variables to their instance types.
 data AssocInstInfo
   = NotAssociated
+      ClosedTyFamInfo                       -- Is this a closed type family?
   | InClsInst { ai_class    :: Class
               , ai_tyvars   :: [TyVar]      -- ^ The /scoped/ tyvars of the instance
                                             -- Why scoped?  See bind_me in
@@ -67,8 +69,8 @@ data AssocInstInfo
     }
 
 isNotAssociated :: AssocInstInfo -> Bool
-isNotAssociated NotAssociated  = True
-isNotAssociated (InClsInst {}) = False
+isNotAssociated (NotAssociated {}) = True
+isNotAssociated (InClsInst {})     = False
 
 
 {- *******************************************************************
