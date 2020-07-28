@@ -86,8 +86,8 @@ naturalFromWord# x = NS x
 -- | Convert two Word# (most-significant first) into a Natural
 naturalFromWord2# :: Word# -> Word# -> Natural
 naturalFromWord2# 0## 0## = naturalZero
-naturalFromWord2# 0## n   = NS n
-naturalFromWord2# w1 w2   = NB (bigNatFromWord2# w2 w1)
+naturalFromWord2# 0## l   = NS l
+naturalFromWord2# h   l   = NB (bigNatFromWord2# h l)
 
 -- | Create a Natural from a Word
 naturalFromWord :: Word -> Natural
