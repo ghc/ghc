@@ -533,12 +533,12 @@ zonk_lbind env = wrapLocM (zonk_bind env)
 
 zonk_bind :: ZonkEnv -> HsBind GhcTc -> TcM (HsBind GhcTc)
 zonk_bind env bind@(PatBind { pat_lhs = pat, pat_rhs = grhss
-                            , pat_ext = NPatBindTc fvs ty})
+                            , pat_ext = ty})
   = do  { (_env, new_pat) <- zonkPat env pat            -- Env already extended
         ; new_grhss <- zonkGRHSs env zonkLExpr grhss
         ; new_ty    <- zonkTcTypeToTypeX env ty
         ; return (bind { pat_lhs = new_pat, pat_rhs = new_grhss
-                       , pat_ext = NPatBindTc fvs new_ty }) }
+                       , pat_ext = new_ty }) }
 
 zonk_bind env (VarBind { var_ext = x
                        , var_id = var, var_rhs = expr })

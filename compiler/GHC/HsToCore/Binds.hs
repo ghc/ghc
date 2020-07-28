@@ -182,7 +182,7 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
           return (force_var, [core_binds]) }
 
 dsHsBind dflags (PatBind { pat_lhs = pat, pat_rhs = grhss
-                         , pat_ext = NPatBindTc _ ty
+                         , pat_ext = ty
                          , pat_ticks = (rhs_tick, var_ticks) })
   = do  { rhss_deltas <- checkGRHSs PatBindGuards grhss
         ; body_expr <- dsGuarded grhss ty rhss_deltas

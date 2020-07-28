@@ -1274,20 +1274,15 @@ tcMonoBinds :: RecFlag  -- Whether the binding is recursive for typechecking pur
             -> TcSigFun -> LetBndrSpec
             -> [LHsBind GhcRn]
             -> TcM (LHsBinds GhcTc, [MonoBindInfo])
+
+-- SPECIAL CASE 1: see Note [Inference for non-recursive function bindings]
 tcMonoBinds is_rec sig_fn no_gen
            [ L b_loc (FunBind { fun_id = L nm_loc name
                               , fun_matches = matches })]
                              -- Single function binding,
   | NonRecursive <- is_rec   -- ...binder isn't mentioned in RHS
   , Nothing <- sig_fn name   -- ...with no type signature
-  =     -- Note [Single function non-recursive binding special-case]
-        -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        -- In this very special case we infer the type of the
-        -- right hand side first (it may have a higher-rank type)
-        -- and *then* make the monomorphic Id for the LHS
-        -- e.g.         f = \(x::forall a. a->a) -> <body>
-        --      We want to infer a higher-rank type for f
-    setSrcSpan b_loc    $
+  = setSrcSpan b_loc    $
     do  { ((co_fn, matches'), rhs_ty)
             <- tcInfer $ \ exp_ty ->
                tcExtendBinderStack [TcIdBndr_ExpType name exp_ty NotTopLevel] $
@@ -1305,6 +1300,29 @@ tcMonoBinds is_rec sig_fn no_gen
                        , mbi_sig       = Nothing
                        , mbi_mono_id   = mono_id }]) }
 
+-- SPECIAL CASE 2: see Note [Inference for non-recursive pattern bindings]
+tcMonoBinds is_rec sig_fn no_gen
+           [L b_loc (PatBind { pat_lhs = pat, pat_rhs = grhss })]
+  | NonRecursive <- is_rec   -- ...binder isn't mentioned in RHS
+  , all (isNothing . sig_fn) bndrs
+  = addErrCtxt (patMonoBindsCtxt pat grhss) $
+    do { (grhss', pat_ty) <- tcInfer $ \ exp_ty ->
+                             tcGRHSsPat grhss exp_ty
+
+       ; let exp_pat_ty :: Scaled ExpSigmaType
+             exp_pat_ty = unrestricted (mkCheckExpType pat_ty)
+       ; (pat', mbis) <- tcLetPat (const Nothing) no_gen pat exp_pat_ty $
+                         mapM lookupMBI bndrs
+
+       ; return ( unitBag $ L b_loc $
+                     PatBind { pat_lhs = pat', pat_rhs = grhss'
+                             , pat_ext = pat_ty, pat_ticks = ([],[]) }
+
+                , mbis ) }
+  where
+    bndrs = collectPatBinders pat
+
+-- GENERAL CASE
 tcMonoBinds _ sig_fn no_gen binds
   = do  { tc_binds <- mapM (wrapLocM (tcLhs sig_fn no_gen)) binds
 
@@ -1326,6 +1344,66 @@ tcMonoBinds _ sig_fn no_gen binds
                     mapM (wrapLocM tcRhs) tc_binds
 
         ; return (listToBag binds', mono_infos) }
+
+{- Note [Special case for non-recursive function bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the special case of
+* A non-recursive FunBind
+* With no type signature
+we infer the type of the right hand side first (it may have a
+higher-rank type) and *then* make the monomorphic Id for the LHS e.g.
+   f = \(x::forall a. a->a) -> <body>
+
+We want to infer a higher-rank type for f
+
+Note [Special case for non-recursive pattern bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the special case of
+* A pattern binding
+* With no type signature for any of the binders
+we can /infer/ the type of the RHS, and /check/ the pattern
+against that type.  For example (#18323)
+
+  ids :: [forall a. a -> a]
+  combine :: (forall a . [a] -> a) -> [forall a. a -> a]
+          -> ((forall a . [a] -> a), [forall a. a -> a])
+
+  (x,y) = combine head ids
+
+with -XImpredicativeTypes we can infer a good type for
+(combine head ids), and use that to tell us the polymorphic
+types of x and y.
+
+We don't need to check -XImpredicativeTypes beucase without it
+these types like [forall a. a->a] are illegal anyway, so this
+special case code only really has an effect if -XImpredicativeTypes
+is on.  Small exception:
+  (x) = e
+is currently treated as a pattern binding so, even absent
+-XImpredicativeTypes, we will get a small improvement in behaviour.
+But I don't think it's worth an extension flag.
+
+Why do we require no type signatures on /any/ of the binders?
+Consider
+   x :: forall a. a->a
+   y :: forall a. a->a
+   (x,y) = (id,id)
+
+Here we should /check/ the RHS with expected type
+  (forall a. a->a, forall a. a->a).
+
+If we have no signatures, we can the approach of this Note
+to /infer/ the type of the RHS.
+
+But what if we have some signatures, but not all? Say this:
+  p :: forall a. a->a
+  (p,q) = (id,  (\(x::forall b. b->b). x True))
+
+Here we want to push p's signature inwards, i.e. /checking/, to
+correctly elaborate 'id'. But we want to /infer/ q's higher rank
+type.  There seems to be no way to do this.  So currently we only
+switch to inference when we have no signature for any of the binders.
+-}
 
 
 ------------------------
@@ -1394,7 +1472,7 @@ tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
                  -- The above inferred type get an unrestricted multiplicity. It may be
                  -- worth it to try and find a finer-grained multiplicity here
                  -- if examples warrant it.
-               mapM lookup_info nosig_names
+               mapM lookupMBI nosig_names
 
         ; let mbis = sig_mbis ++ nosig_mbis
 
@@ -1412,18 +1490,18 @@ tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
                       Just (TcIdSig sig) -> Right (name, sig)
                       _                  -> Left name
 
-      -- After typechecking the pattern, look up the binder
-      -- names that lack a signature, which the pattern has brought
-      -- into scope.
-    lookup_info :: Name -> TcM MonoBindInfo
-    lookup_info name
-      = do { mono_id <- tcLookupId name
-           ; return (MBI { mbi_poly_name = name
-                         , mbi_sig       = Nothing
-                         , mbi_mono_id   = mono_id }) }
-
 tcLhs _ _ other_bind = pprPanic "tcLhs" (ppr other_bind)
         -- AbsBind, VarBind impossible
+
+lookupMBI :: Name -> TcM MonoBindInfo
+-- After typechecking the pattern, look up the binder
+-- names that lack a signature, which the pattern has brought
+-- into scope.
+lookupMBI name
+  = do { mono_id <- tcLookupId name
+       ; return (MBI { mbi_poly_name = name
+                     , mbi_sig       = Nothing
+                     , mbi_mono_id   = mono_id }) }
 
 -------------------
 tcLhsSigId :: LetBndrSpec -> (Name, TcIdSigInfo) -> TcM MonoBindInfo
@@ -1467,15 +1545,9 @@ tcRhs (TcPatBind infos pat' grhss pat_ty)
     tcExtendIdBinderStackForRhs infos        $
     do  { traceTc "tcRhs: pat bind" (ppr pat' $$ ppr pat_ty)
         ; grhss' <- addErrCtxt (patMonoBindsCtxt pat' grhss) $
-                    tcScalingUsage Many $
-                    -- Like in tcMatchesFun, this scaling happens because all
-                    -- let bindings are unrestricted. A difference, here, is
-                    -- that when this is not the case, any more, we will have to
-                    -- make sure that the pattern is strict, otherwise this will
-                    -- be desugar to incorrect code.
-                    tcGRHSsPat grhss pat_ty
+                    tcGRHSsPat grhss (mkCheckExpType pat_ty)
         ; return ( PatBind { pat_lhs = pat', pat_rhs = grhss'
-                           , pat_ext = NPatBindTc emptyNameSet pat_ty
+                           , pat_ext = pat_ty
                            , pat_ticks = ([],[]) } )}
 
 tcExtendTyVarEnvForRhs :: Maybe TcIdSigInst -> TcM a -> TcM a
