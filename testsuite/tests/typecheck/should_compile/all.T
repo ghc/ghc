@@ -719,3 +719,5 @@ test('T17775-viewpats-c', normal, compile_fail, [''])
 test('T17775-viewpats-d', normal, compile_fail, [''])
 test('T18412', normal, compile, [''])
 test('T18470', normal, compile, [''])
+test('T18323', normal, compile, [''])
+
