@@ -113,6 +113,7 @@ import GHC.Core.Coercion.Axiom ( Role, fsFromRole )
 import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Types.Basic
+import GHC.Parser.Error
 import GHC.Parser.Lexer
 import GHC.Utils.Lexeme ( isLexCon )
 import GHC.Core.Type    ( TyThing(..), funTyCon, Specificity(..) )

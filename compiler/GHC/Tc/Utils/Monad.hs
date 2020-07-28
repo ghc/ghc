@@ -159,6 +159,7 @@ import GHC.Types.Name.Reader
 import GHC.Types.Name
 import GHC.Core.Type
 
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.TcType
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv

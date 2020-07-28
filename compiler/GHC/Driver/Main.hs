@@ -248,7 +248,7 @@ handleWarningsThrowErrors (warns, errs) = do
     dflags <- getDynFlags
     (wWarns, wErrs) <- warningsToMessages dflags <$> getWarnings
     liftIO $ printBagOfErrors dflags wWarns
-    throwErrors (unionBags errs $ mapBag (fmap ghcErrorFromWarn) wErrs)
+    throwErrors (unionBags errs $ mapBag (fmap ghcErrorRawErrDoc) wErrs)
 
 -- | Deal with errors and warnings returned by a compilation step
 --
@@ -1141,10 +1141,9 @@ hscCheckSafe' m l = do
         iface <- lookup' m
         case iface of
             -- can't load iface to check trust!
-            Nothing -> throwOneError . fmap ghcErrorRawErrDoc $
-              mkPlainErrMsg dflags l
-                $ text "Can't load the interface file for" <+> ppr m
-               <> text ", to check that it can be safely imported"
+            Nothing -> throwOneError $
+              mkErr dflags l alwaysQualify
+                    (GhcErrorDriver $ DriverCantLoadIfaceForSafe m)
 
             -- got iface, check trust
             Just iface' ->
@@ -1227,7 +1226,7 @@ hscCheckSafe' m l = do
     isHomePkg :: DynFlags -> Module -> Bool
     isHomePkg dflags m
         | thisPackage dflags == moduleUnit m = True
-        | otherwise                               = False
+        | otherwise                          = False
 
 -- | Check the list of packages are trusted.
 checkPkgTrust :: Set UnitId -> Hsc ()
@@ -1238,10 +1237,9 @@ checkPkgTrust pkgs = do
             | unitIsTrusted $ getInstalledPackageDetails (pkgState dflags) pkg
             = acc
             | otherwise
-            = (:acc) . fmap ghcErrorRawErrDoc
-              $ mkErrMsg dflags noSrcSpan (pkgQual dflags)
-              $ text "The package (" <> ppr pkg <> text ") is required" <>
-                text " to be trusted but it isn't!"
+            = (:acc)
+              $ mkErr dflags noSrcSpan (pkgQual dflags)
+                      (GhcErrorDriver $ DriverPkgRequiredTrusted pkg)
     case errors of
         [] -> return ()
         _  -> (liftIO . throwIO . mkSrcErr . listToBag) errors
@@ -1816,9 +1814,9 @@ hscImport hsc_env str = runInteractiveHsc hsc_env $ do
        hscParseThing parseModule str
     case is of
         [L _ i] -> return i
-        _ -> liftIO $ throwOneError . fmap ghcErrorRawErrDoc $
-                 mkPlainErrMsg (hsc_dflags hsc_env) noSrcSpan $
-                     text "parse error in import declaration"
+        _ -> liftIO $ throwOneError $
+                 mkErr (hsc_dflags hsc_env) noSrcSpan alwaysQualify $
+                       (GhcErrorDriver DriverParseErrorImport)
 
 -- | Typecheck an expression (but don't run it)
 hscTcExpr :: HscEnv
@@ -1848,9 +1846,9 @@ hscParseExpr expr = do
   maybe_stmt <- hscParseStmt expr
   case maybe_stmt of
     Just (L _ (BodyStmt _ expr _ _)) -> return expr
-    _ -> throwOneError . fmap ghcErrorRawErrDoc $
-      mkPlainErrMsg (hsc_dflags hsc_env) noSrcSpan
-                    (text "not an expression:" <+> quotes (text expr))
+    _ -> throwOneError $
+      mkErr (hsc_dflags hsc_env) noSrcSpan alwaysQualify
+            (GhcErrorDriver $ DriverNotAnExpression expr)
 
 hscParseStmt :: String -> Hsc (Maybe (GhciLStmt GhcPs))
 hscParseStmt = hscParseThing parseStmt

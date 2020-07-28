@@ -276,9 +276,9 @@ findDependency hsc_env srcloc pkg imp is_boot include_pkg_deps
 
             fail ->
                 let dflags = hsc_dflags hsc_env
-                in throwOneError . fmap ghcErrorRawErrDoc $
-                     mkPlainErrMsg dflags srcloc $
-                       cannotFindModule dflags imp fail
+                    e = mkErr dflags srcloc alwaysQualify $
+                      (GhcErrorDriver $ DriverCannotFindModule imp fail)
+                in throwOneError e
         }
 
 -----------------------------

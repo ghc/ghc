@@ -308,6 +308,7 @@ import GHC.Driver.Hooks
 import GHC.Driver.Pipeline   ( compileOne' )
 import GHC.Driver.Error
 import GHC.Driver.Monad
+import GHC.Tc.Errors.Types   ( TcRnError )
 import GHC.Tc.Utils.Monad    ( finalSafeMode, fixSafeInstances, initIfaceTcRn )
 import GHC.Iface.Load        ( loadSysInterface )
 import GHC.Tc.Types
@@ -353,6 +354,7 @@ import GHC.Utils.Outputable
 import GHC.Types.Basic
 import GHC.Data.FastString
 import qualified GHC.Parser as Parser
+import GHC.Parser.Error
 import GHC.Parser.Lexer
 import GHC.Parser.Annotation
 import qualified GHC.LanguageExtensions as LangExt

@@ -399,6 +399,7 @@ Library
         GHC.SysTools.Elf
         GHC.Iface.Tidy
         GHC.Parser.CharClass
+        GHC.Parser.Error
         GHC.Parser.Lexer
         GHC.Core.Coercion.Opt
         GHC.Parser
@@ -501,6 +502,7 @@ Library
         GHC.Tc.Errors.Hole
         GHC.Tc.Errors.Hole.FitTypes
         GHC.Tc.Errors
+        GHC.Tc.Errors.Types
         GHC.Tc.TyCl
         GHC.Tc.TyCl.Utils
         GHC.Tc.Instance.Typeable

@@ -385,7 +385,7 @@ printOrThrowWarnings dflags warns = do
                            }))
           False warns
   if make_error
-    then throwIO (mkSrcErr $ mapBag (fmap ghcErrorFromWarn) warns')
+    then throwIO (mkSrcErr $ mapBag (fmap ghcErrorRawErrDoc) warns')
     else printBagOfErrors dflags warns
 
 handleFlagWarnings :: DynFlags -> [Warn] -> IO ()

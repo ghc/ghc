@@ -57,6 +57,8 @@ module GHC.HsToCore.Monad (
 
 import GHC.Prelude
 
+
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Core.FamInstEnv
 import GHC.Core

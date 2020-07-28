@@ -26,6 +26,7 @@ import GHC.Tc.Gen.Export
 import GHC.Driver.Session
 import GHC.Hs
 import GHC.Types.Name.Reader
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.TyCl.Utils
 import GHC.Core.InstEnv

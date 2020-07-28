@@ -1285,7 +1285,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags mHscMessage cleanup 
         old_hpt <- readIORef old_hpt_var
 
         let logger err = printBagOfErrors lcl_dflags $
-              mapBag (fmap renderError) (srcErrorMessages err)
+              mapBag (fmap (renderError lcl_dflags)) (srcErrorMessages err)
 
         -- Limit the number of parallel compiles.
         let withSem sem = MC.bracket_ (waitQSem sem) (signalQSem sem)

@@ -909,7 +909,7 @@ tc_hs_type mode forall@(HsForAllTy { hst_fvf = fvf, hst_bndrs = hs_tvs
 
        -- Do not kind-generalise here!  See Note [Kind generalisation]
 
-       ; let skol_info = ForAllSkol (ppr forall) (sep (map ppr hs_tvs))
+       ; let skol_info = ForAllSkol forall hs_tvs
              skol_tvs  = binderVars inv_tv_bndrs
        ; implic <- buildTvImplication skol_info skol_tvs tclvl wanted
        ; emitImplication implic

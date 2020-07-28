@@ -180,7 +180,7 @@ printException :: GhcMonad m => SourceError -> m ()
 printException err = do
   dflags <- getSessionDynFlags
   liftIO $ printBagOfErrors dflags $
-    mapBag (fmap renderError) (srcErrorMessages err)
+    mapBag (fmap (renderError dflags)) (srcErrorMessages err)
 
 -- | A function called to log warnings and errors.
 type WarnErrLogger = forall m. GhcMonad m => Maybe SourceError -> m ()

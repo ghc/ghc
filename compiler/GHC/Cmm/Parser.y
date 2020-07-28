@@ -232,6 +232,7 @@ import GHC.Cmm.Lexer
 import GHC.Cmm.CLabel
 import GHC.Cmm.Monad
 import GHC.Runtime.Heap.Layout
+import GHC.Parser.Error
 import GHC.Parser.Lexer
 
 import GHC.Types.CostCentre

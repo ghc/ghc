@@ -21,6 +21,7 @@ import GHC.Prelude
 
 import GHC.Types.Name.Reader
 import GHC.Driver.Types
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Types.Name
 import GHC.Unit.Module

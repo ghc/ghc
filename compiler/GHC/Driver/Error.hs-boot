@@ -4,4 +4,4 @@ import GHC.Utils.Error
 
 data GhcError
 instance RenderableError GhcError
-ghcErrorFromWarn :: ErrDoc -> GhcError
+ghcErrorRawErrDoc :: ErrDoc -> GhcError

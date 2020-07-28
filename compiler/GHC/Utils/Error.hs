@@ -196,10 +196,10 @@ instance Show (ErrMsg e) where
   show em = errMsgShortString em
 
 class RenderableError e where
-  renderError :: e -> ErrDoc
+  renderError :: DynFlags -> e -> ErrDoc
 
 instance RenderableError ErrDoc where
-  renderError = id
+  renderError _ = id
 
 pprMessageBag :: Bag MsgDoc -> SDoc
 pprMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))
@@ -346,7 +346,7 @@ mk_err_msg dflags sev locn print_unqual err
  = ErrMsg { errMsgSpan = locn
           , errMsgContext = print_unqual
           , errMsgDoc = err
-          , errMsgShortString = showSDoc dflags (vcat (errDocImportant $ renderError err))
+          , errMsgShortString = showSDoc dflags (vcat (errDocImportant $ renderError dflags err))
           , errMsgSeverity = sev
           , errMsgReason = NoReason }
 
@@ -416,8 +416,8 @@ pprLocErrMsg (ErrMsg { errMsgSpan      = s
                      , errMsgDoc       = e
                      , errMsgSeverity  = sev
                      , errMsgContext   = unqual })
-  = sdocWithContext $ \ctx ->
-    withErrStyle unqual $ mkLocMessage sev s (formatErrDoc ctx $ renderError e)
+  = sdocWithContext $ \ctx -> sdocWithDynFlags $ \dflags ->
+    withErrStyle unqual $ mkLocMessage sev s (formatErrDoc ctx $ renderError dflags e)
 
 sortMsgBag :: Maybe DynFlags -> Bag (ErrMsg e) -> [ErrMsg e]
 sortMsgBag dflags = maybeLimit . sortBy (cmp `on` errMsgSpan) . bagToList

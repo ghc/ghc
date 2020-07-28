@@ -73,6 +73,7 @@ import GHC.Builtin.Utils
 import GHC.Types.Name.Reader
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Gen.Expr
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Gen.Export
 import GHC.Tc.Types.Evidence

@@ -31,6 +31,7 @@ import GHC.Types.Var
 import GHC.Utils.Error
 
 import GHC.Types.Name
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Utils.Misc
 import GHC.Utils.Fingerprint

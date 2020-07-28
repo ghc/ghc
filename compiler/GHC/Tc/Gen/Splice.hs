@@ -42,6 +42,7 @@ import GHC.Hs
 import GHC.Types.Annotations
 import GHC.Driver.Finder
 import GHC.Types.Name
+import GHC.Tc.Errors.Types
 import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.TcType
 

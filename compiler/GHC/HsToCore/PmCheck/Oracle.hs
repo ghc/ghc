@@ -510,11 +510,13 @@ tyOracle (TySt inert) cts
   = do { evs <- traverse nameTyCt cts
        ; let new_inert = inert `unionBags` evs
        ; tracePm "tyOracle" (ppr cts)
+       ; dflags <- getDynFlags
        ; ((_warns, errs), res) <- initTcDsForSolver $ tcCheckSatisfiability new_inert
        ; case res of
             Just True  -> return (Just (TySt new_inert))
             Just False -> return Nothing
-            Nothing    -> pprPanic "tyOracle" (vcat $ pprErrMsgBagWithLoc $ mapBag (fmap renderError) errs) }
+            Nothing    -> pprPanic "tyOracle"
+              (vcat $ pprErrMsgBagWithLoc $ mapBag (fmap (renderError dflags)) errs) }
 
 -- | A 'SatisfiabilityCheck' based on new type-level constraints.
 -- Returns a new 'Delta' if the new constraints are compatible with existing

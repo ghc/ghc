@@ -29,6 +29,7 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.Driver.Types
 import GHC.Parser           ( parseHeader )
+import GHC.Parser.Error
 import GHC.Parser.Lexer
 import GHC.Data.FastString
 import GHC.Hs
