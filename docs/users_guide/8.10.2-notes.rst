@@ -11,13 +11,26 @@ Highlights
 ----------
 
 - A few important correctness fixes for the low-latency garbage collector.
+  Users of :rts-flag:`--nonmoving-gc` are strongly encouraged to upgrade
+  promptly.
+
+- Fixes a bug in process creation on Windows (:ghc-ticket:`17926`).
+
+- Works around a Linux kernel bug in the implementation of ``timerfd``\s
+  (:ghc-ticket:`18033`).
+
+- Fixes a few specialiser regressions (:ghc-ticket:`17810`,
+  :ghc-ticket:`18120`) as well introduces a variety of miscellaneous
+  specialiser improvements (:ghc-ticket:`16473`, :ghc-ticket:`17930`,
+  :ghc-ticket:`17966`)
+
+- Fixes a potential loss of sharing due to left operator sections
+  (:ghc-ticket:`18151`).
+
+- Fix bootstrapping of GHC with the LLVM backend on x86-64 (:ghc-ticket:`17920`).
 
 Full details
 ------------
-
-Language
-~~~~~~~~
-
 
 Compiler
 ~~~~~~~~
@@ -25,20 +38,16 @@ Compiler
  - A simplifier panic manifesting when DWARF debug information is enabled has
    been fixed (:ghc-ticket:`18162`, :ghc-ticket:`17619`)
 
-GHC API
-~~~~~~~
-
-
-GHCi
-~~~~
-
 
 Runtime system
 ~~~~~~~~~~~~~~
 
-- The RTS now allows the user to specify a minimum time between idle GCs with
-  the :rts-flag:`-Iw ⟨seconds⟩` flag. 8.10.1 contained a users guide reference
-  to this flag but did not include the associated implementation.
+ - The RTS now supports a flag, :rts-flag:`--copying-gc`, to counter-act the
+   effect of :rts-flag:`--nonmoving-gc`.
+
+ - The RTS now allows the user to specify a minimum time between idle GCs with
+   the :rts-flag:`-Iw ⟨seconds⟩` flag. 8.10.1 contained a users guide reference
+   to this flag but did not include the associated implementation.
 
  - A memory leak in the cost-center profiler has been fixed
    (:ghc-ticket:`18348`)
@@ -49,26 +58,40 @@ Runtime system
  - We now workaround a Linux kernel bug in the implementation of timerfd which
    could previously result in program crashes (:ghc-ticket:`18033`)
 
-Template Haskell
-~~~~~~~~~~~~~~~~
+ - The cost center profiler's JSON output backend now escapes backslashes
+   correctly (:ghc-ticket:`18438`)
 
+ - A variety of linker issues on ARM platforms have been fixed.
 
-
-``ghc-prim`` library
-~~~~~~~~~~~~~~~~~~~~
-
-
-
-``ghc`` library
-~~~~~~~~~~~~~~~
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
 
+- Fix a precision issue in the implementation of ``log1mexp``
+  (:ghc-ticket:`17125`)
+
+
 Build system
 ~~~~~~~~~~~~
 
+ - Fix a bug wherein GHC would link against the non-thread-safe unique supply
+   implementation when bootstrapping with an unregisterised compiler
+   (:ghc-ticket:`18024`)
 
+Known issues
+------------
+
+- A long-standing bug (:ghc-ticket:`16893`) which can cause some applications
+  of ``unsafeCoerce`` to segmentation fault is only partially fixed in this
+  release. This release only avoids this issue in the uses of ``unsafeCoerce``
+  in ``Data.Typeable.Internal``, which was the proximate cause of
+  :ghc-ticket:`16893`.
+
+  However, it is possible that this bug could manifest in user-code using
+  ``unsafeCoerce`` to perform dynamic type checks. See the :ghc-ticket:`ticket
+  <16893>` for details.
+
+  We expect that this issue will be fixed in the next major release of GHC.
 
 Included libraries
 ------------------
