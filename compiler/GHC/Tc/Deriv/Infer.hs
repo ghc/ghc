@@ -260,7 +260,7 @@ inferConstraintsStock (DerivInstTys { dit_cls_tys     = cls_tys
            -- substitute each type variable with its counterpart in the derived
            -- instance. rep_tc_args lists each of these counterpart types in
            -- the same order as the type variables.
-           all_rep_tc_args = getTyConArgs rep_tc rep_tc_args
+           all_rep_tc_args = tyConInstArgTys rep_tc rep_tc_args
 
                -- Stupid constraints
            stupid_constraints

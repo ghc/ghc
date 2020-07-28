@@ -35,7 +35,7 @@ module GHC.Tc.Deriv.Generate (
         ordOpTbl, boxConTbl, litConTbl,
         mkRdrFunBind, mkRdrFunBindEC, mkRdrFunBindSE, error_Expr,
 
-        getPossibleDataCons, getTyConArgs
+        getPossibleDataCons, tyConInstArgTys
     ) where
 
 #include "HsVersions.h"
@@ -2518,20 +2518,37 @@ newAuxBinderRdrName loc parent occ_fun = do
   uniq <- newUnique
   pure $ Exact $ mkSystemNameAt uniq (occ_fun (nameOccName parent)) loc
 
--- | If we're deriving an instance for a GADT, e.g. `Eq (Foo Int)`, we should treat any constructors
--- for which it's impossible to match `Foo Int` as not being there at all.
+-- | @getPossibleDataCons tycon tycon_args@ returns the constructors of @tycon@
+-- whose return types match when checked against @tycon_args@.
 --
 -- See Note [Filter out impossible GADT data constructors]
 getPossibleDataCons :: TyCon -> [Type] -> [DataCon]
 getPossibleDataCons tycon tycon_args = filter isPossible $ tyConDataCons tycon
   where
-    isPossible = not . dataConCannotMatch (getTyConArgs tycon tycon_args)
+    isPossible = not . dataConCannotMatch (tyConInstArgTys tycon tycon_args)
 
--- | Get the full list of TyCon args, given a partial instantiation.
+-- | Given a type constructor @tycon@ of arity /n/ and a list of argument types
+-- @tycon_args@ of length /m/,
 --
--- e.g. Given 'tycon: Foo a b' and 'tycon_args: [Int]', return '[Int, b]'.
-getTyConArgs :: TyCon -> [Type] -> [Type]
-getTyConArgs tycon tycon_args = tycon_args ++ map mkTyVarTy tycon_args_suffix
+-- @
+-- tyConInstArgTys tycon tycon_args
+-- @
+--
+-- returns
+--
+-- @
+-- [tycon_arg_{1}, tycon_arg_{2}, ..., tycon_arg_{m}, extra_arg_{m+1}, ..., extra_arg_{n}]
+-- @
+--
+-- where @extra_args@ are distinct type variables.
+--
+-- Examples:
+--
+-- * Given @tycon: Foo a b@ and @tycon_args: [Int, Bool]@, return @[Int, Bool]@.
+--
+-- * Given @tycon: Foo a b@ and @tycon_args: [Int]@, return @[Int, b]@.
+tyConInstArgTys :: TyCon -> [Type] -> [Type]
+tyConInstArgTys tycon tycon_args = chkAppend tycon_args $ map mkTyVarTy tycon_args_suffix
   where
     tycon_args_suffix = drop (length tycon_args) $ tyConTyVars tycon
 
@@ -2766,7 +2783,18 @@ data Foo a where
 ```
 
 when deriving an instance on `Foo Int`, `Y` should be treated as if it didn't
-exist in the first place.
+exist in the first place. For instance, if we write
+
+```
+deriving instance Eq (Foo Int)
+```
+
+it should generate:
+
+```
+instance Eq (Foo Int) where
+  X == X = True
+```
 
 Classes that filter constructors:
 
