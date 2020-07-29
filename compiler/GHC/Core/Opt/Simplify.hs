@@ -3783,7 +3783,9 @@ simplStableUnfolding env top_lvl mb_cont id rhs_ty id_arity unf
                         in return (mkCoreUnfolding src is_top_lvl expr' guide')
                             -- See Note [Top-level flag on inline rules] in GHC.Core.Unfold
 
-                  _other              -- Happens for INLINABLE things
+                  UnfNever -- Happens for SPECIALIZABLE NOINLINE
+                     -> pure $ mkCoreUnfolding InlineStable True expr' UnfNever -- MAYBE dedup
+                  UnfIfGoodArgs {} -- Happens for INLINABLE things
                      -> mkLetUnfolding dflags top_lvl src id expr' }
                 -- If the guidance is UnfIfGoodArgs, this is an INLINABLE
                 -- unfolding, and we need to make sure the guidance is kept up
