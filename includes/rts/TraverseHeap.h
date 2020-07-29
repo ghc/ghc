@@ -13,50 +13,57 @@
 
 #include <rts/Types.h>
 
-typedef enum {
-    // Object with fixed layout. Keeps an information about that
-    // element was processed. (stackPos.next.step)
-    posTypeStep,
-    // Description of the pointers-first heap object. Keeps information
-    // about layout. (stackPos.next.ptrs)
-    posTypePtrs,
-    // Keeps SRT bitmap (stackPos.next.srt)
-    posTypeSRT,
-    // Keeps a new object that was not inspected yet. Keeps a parent
-    // element (stackPos.next.parent)
-    posTypeFresh,
-    // This stackElement is empty
-    posTypeEmpty
-} nextPosType;
-
-typedef union {
-    // fixed layout or layout specified by a field in the closure
-    StgWord step;
-
-    // layout.payload
-    struct {
-        // See StgClosureInfo in InfoTables.h
-        StgHalfWord pos;
-        StgHalfWord ptrs;
-        StgPtr payload;
-    } ptrs;
-
-    // SRT
-    struct {
-        StgClosure *srt;
-    } srt;
-
-    // parent of the current closure, used only when posTypeFresh is set
-    StgClosure *cp;
-} nextPos;
-
 /**
- * Position pointer into a closure. Determines what the next element to return
- * for a stackElement is.
+ * Tagged-union representing a position pointer into a stackElement's closure.
+ *
+ * For some closure types we want to have a single stackElement represent
+ * multiple objects to save space on the stack, to do this we remember which of
+ * a stackElement's closure's children is the next one we want to be returned by
+ * traversePop().
+ *
+ * Overall traverseGetChildren() initializes a stackElement's stackPos, and
+ * traversePop() then uses stackPos to determine which of a closure's children
+ * to return in this case.
  */
 typedef struct stackPos_ {
-    nextPosType type;
-    nextPos next;
+    enum {
+        posTypeStep,
+        /*< Object with fixed layout. Keeps a counter to keep track of which
+         * object should be returned next. (uses stackPos.next.step) */
+
+        posTypePtrs,
+        /*< Description of the pointers-first heap object. Keeps information
+         * about layout. (uses stackPos.next.ptrs) */
+
+        posTypeSRT,
+        /*< Keeps SRT bitmap (uses stackPos.next.srt) */
+
+        posTypeFresh,
+        /*< Keeps a new object that was not inspected yet. Keeps a parent
+         * element (uses stackPos.next.cp) */
+
+        posTypeEmpty
+        /*< This stackElement is empty and doesn't represent any closure, we
+         *  just keep it around so we can call returnClosure_cb. */
+    } type;
+    union {
+        // fixed layout or layout specified by a field in the closure
+        StgWord step;
+
+        // layout.payload
+        struct {
+            // See StgClosureInfo in InfoTables.h
+            StgHalfWord pos;
+            StgHalfWord ptrs;
+            StgPtr payload;
+        } ptrs;
+
+        // SRT
+        StgClosure *srt;
+
+        // parent of the current closure, used only when posTypeFresh is set
+        StgClosure *cp;
+    } next;
 } stackPos;
 
 typedef union stackData_ {
