@@ -28,6 +28,7 @@ import GHC.Iface.Recomp
 import GHC.Iface.Load
 import GHC.CoreToIface
 
+import qualified GHC.LanguageExtensions as LangExt
 import GHC.HsToCore.Usage ( mkUsageInfo, mkUsedNames, mkDependencies )
 import GHC.Types.Id
 import GHC.Types.Annotations
@@ -225,7 +226,8 @@ mkIface_ hsc_env
   = do
     let semantic_mod = canonicalizeHomeModule (hsc_dflags hsc_env) (moduleName this_mod)
         entities = typeEnvElts type_env
-        decls  = [ tyThingToIfaceDecl (hsc_dflags hsc_env) entity
+        show_linear_types = xopt LangExt.LinearTypes (hsc_dflags hsc_env)
+        decls  = [ tyThingToIfaceDecl show_linear_types entity
                  | entity <- entities,
                    let name = getName entity,
                    not (isImplicitTyThing entity),
@@ -376,12 +378,12 @@ so we may need to split up a single Avail into multiple ones.
 ************************************************************************
 -}
 
-tyThingToIfaceDecl :: DynFlags -> TyThing -> IfaceDecl
+tyThingToIfaceDecl :: Bool -> TyThing -> IfaceDecl
 tyThingToIfaceDecl _ (AnId id)      = idToIfaceDecl id
 tyThingToIfaceDecl _ (ATyCon tycon) = snd (tyConToIfaceDecl emptyTidyEnv tycon)
 tyThingToIfaceDecl _ (ACoAxiom ax)  = coAxiomToIfaceDecl ax
-tyThingToIfaceDecl dflags (AConLike cl)  = case cl of
-    RealDataCon dc -> dataConToIfaceDecl dflags dc -- for ppr purposes only
+tyThingToIfaceDecl show_linear_types (AConLike cl)  = case cl of
+    RealDataCon dc -> dataConToIfaceDecl show_linear_types dc -- for ppr purposes only
     PatSynCon ps   -> patSynToIfaceDecl ps
 
 --------------------------
@@ -397,10 +399,10 @@ idToIfaceDecl id
               ifIdInfo    = toIfaceIdInfo (idInfo id) }
 
 --------------------------
-dataConToIfaceDecl :: DynFlags -> DataCon -> IfaceDecl
-dataConToIfaceDecl dflags dataCon
+dataConToIfaceDecl :: Bool -> DataCon -> IfaceDecl
+dataConToIfaceDecl show_linear_types dataCon
   = IfaceId { ifName      = getName dataCon,
-              ifType      = toIfaceType (dataConDisplayType dflags dataCon),
+              ifType      = toIfaceType (dataConDisplayType show_linear_types dataCon),
               ifIdDetails = IfVanillaId,
               ifIdInfo    = [] }
 
