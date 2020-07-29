@@ -87,9 +87,6 @@ import GHC.Utils.Binary
 import GHC.Types.Unique.Set
 import GHC.Types.Unique( mkAlphaTyVarUnique )
 
-import GHC.Driver.Session
-import GHC.LanguageExtensions as LangExt
-
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Builder as BSB
 import qualified Data.ByteString.Lazy    as LBS
@@ -1337,7 +1334,7 @@ The type of the constructor, with linear arrows replaced by unrestricted ones.
 Used when we don't want to introduce linear types to user (in holes
 and in types in hie used by haddock).
 
-3. dataConDisplayType (depends on DynFlags):
+3. dataConDisplayType (take a boolean indicating if -XLinearTypes is enabled):
 The type we'd like to show in error messages, :info and -ddump-types.
 Ideally, it should reflect the type written by the user;
 the function returns a type with arrows that would be required
@@ -1384,9 +1381,9 @@ dataConNonlinearType (MkData { dcUserTyVarBinders = user_tvbs,
        mkVisFunTys arg_tys' $
        res_ty
 
-dataConDisplayType :: DynFlags -> DataCon -> Type
-dataConDisplayType dflags dc
-  = if xopt LangExt.LinearTypes dflags
+dataConDisplayType :: Bool -> DataCon -> Type
+dataConDisplayType show_linear_types dc
+  = if show_linear_types
     then dataConWrapperType dc
     else dataConNonlinearType dc
 

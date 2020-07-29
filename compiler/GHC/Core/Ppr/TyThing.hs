@@ -166,7 +166,8 @@ pprTyThing :: ShowSub -> TyThing -> SDoc
 -- We pretty-print 'TyThing' via 'IfaceDecl'
 -- See Note [Pretty-printing TyThings]
 pprTyThing ss ty_thing
-  = sdocWithDynFlags (\dflags -> pprIfaceDecl ss' (tyThingToIfaceDecl dflags ty_thing))
+  = sdocOption sdocLinearTypes $ \show_linear_types ->
+      pprIfaceDecl ss' (tyThingToIfaceDecl show_linear_types ty_thing)
   where
     ss' = case ss_how_much ss of
       ShowHeader (AltPpr Nothing)  -> ss { ss_how_much = ShowHeader ppr' }

@@ -286,10 +286,10 @@ pprSigSkolInfo ctxt ty
 
 pprPatSkolInfo :: ConLike -> SDoc
 pprPatSkolInfo (RealDataCon dc)
-  = sdocWithDynFlags (\dflags ->
+  = sdocOption sdocLinearTypes (\show_linear_types ->
       sep [ text "a pattern with constructor:"
           , nest 2 $ ppr dc <+> dcolon
-            <+> pprType (dataConDisplayType dflags dc) <> comma ])
+            <+> pprType (dataConDisplayType show_linear_types dc) <> comma ])
             -- pprType prints forall's regardless of -fprint-explicit-foralls
             -- which is what we want here, since we might be saying
             -- type variable 't' is bound by ...
