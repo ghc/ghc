@@ -929,7 +929,7 @@ traverseSmallBitmap (traverseState *ts, StgPtr p, uint32_t size, StgWord bitmap,
 /**
  *  traversePushStack(ts, cp, data, stackStart, stackEnd) pushes all the objects
  *  in the STG stack-chunk from stackStart to stackEnd onto the traversal
- *  work-stack with 'c' and 'data' being their parent and associated data,
+ *  work-stack with 'cp' and 'data' being their parent and associated data,
  *  respectively.
  *
  *  Invariants:
