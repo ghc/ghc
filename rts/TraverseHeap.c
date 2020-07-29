@@ -200,9 +200,9 @@ init_srt_fun( stackPos *info, const StgFunInfoTable *infoTable )
 {
     info->type = posTypeSRT;
     if (infoTable->i.srt) {
-        info->next.srt.srt = (StgClosure*)GET_FUN_SRT(infoTable);
+        info->next.srt = (StgClosure*)GET_FUN_SRT(infoTable);
     } else {
-        info->next.srt.srt = NULL;
+        info->next.srt = NULL;
     }
 }
 
@@ -211,9 +211,9 @@ init_srt_thunk( stackPos *info, const StgThunkInfoTable *infoTable )
 {
     info->type = posTypeSRT;
     if (infoTable->i.srt) {
-        info->next.srt.srt = (StgClosure*)GET_SRT(infoTable);
+        info->next.srt = (StgClosure*)GET_SRT(infoTable);
     } else {
-        info->next.srt.srt = NULL;
+        info->next.srt = NULL;
     }
 }
 
@@ -225,8 +225,8 @@ find_srt( stackPos *info )
 {
     StgClosure *c;
     if (info->type == posTypeSRT) {
-        c = info->next.srt.srt;
-        info->next.srt.srt = NULL;
+        c = info->next.srt;
+        info->next.srt = NULL;
         return c;
     }
 
@@ -704,6 +704,7 @@ traversePop(traverseState *ts, returnClosure_cb return_cb,
             // need to push a stackElement
         case MVAR_CLEAN:
         case MVAR_DIRTY:
+            ASSERT(se->info.type == posTypeStep);
             if (se->info.next.step == 2) {
                 *c = (StgClosure *)((StgMVar *)se->c)->tail;
                 se->info.next.step++;             // move to the next step
@@ -716,6 +717,7 @@ traversePop(traverseState *ts, returnClosure_cb return_cb,
 
             // three children (fixed), no SRT
         case WEAK:
+            ASSERT(se->info.type == posTypeStep);
             if (se->info.next.step == 2) {
                 *c = ((StgWeak *)se->c)->value;
                 se->info.next.step++;
@@ -727,6 +729,8 @@ traversePop(traverseState *ts, returnClosure_cb return_cb,
             goto out;
 
         case TREC_CHUNK: {
+            ASSERT(se->info.type == posTypeStep);
+
             // These are pretty complicated: we have N entries, each
             // of which contains 3 fields that we want to follow.  So
             // we divide the step counter: the 2 low bits indicate
