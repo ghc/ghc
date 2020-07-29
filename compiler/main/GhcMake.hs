@@ -424,8 +424,8 @@ load' how_much mHscMessage mod_graph = do
                    | otherwise  = upsweep
 
     setSession hsc_env{ hsc_HPT = emptyHomePackageTable }
-    (upsweep_ok, modsUpswept)
-       <- upsweep_fn mHscMessage pruned_hpt stable_mods cleanup mg
+    (upsweep_ok, modsUpswept) <- withDeferredDiagnostics $
+      upsweep_fn mHscMessage pruned_hpt stable_mods cleanup mg
 
     -- Make modsDone be the summaries for each home module now
     -- available; this should equal the domain of hpt3.
@@ -764,8 +764,10 @@ checkStability hpt sccs all_home_mods =
 
         object_ok ms
           | gopt Opt_ForceRecomp (ms_hspp_opts ms) = False
-          | Just t <- ms_obj_date ms  =  t >= ms_hs_date ms
-                                         && same_as_prev t
+          | Just t <- ms_obj_date ms  =
+            validTimestamp (ms_hs_date ms) &&
+            t >= ms_hs_date ms &&
+            same_as_prev t
           | otherwise = False
           where
              same_as_prev t = case lookupHpt hpt (ms_mod_name ms) of
@@ -789,6 +791,22 @@ checkStability hpt sccs all_home_mods =
                         not (isObjectLinkable l) &&
                         linkableTime l >= ms_hs_date ms
                 _other  -> False
+
+
+-- Ignore a source timestamp if it is older than 2000. Certain
+-- build systems don't retain timestamps on generated source
+-- files retrieved from cache; the right way to fix this would
+-- be to use hashed file contents rather than a timestamp, but
+-- for now this heuristic suffices to ignore these bogus
+-- timestamps.
+validTimestamp :: UTCTime -> Bool
+validTimestamp t = t >= ancientTime
+  where
+  ancientTime = UTCTime
+    { utctDay = fromGregorian 2000 1 1
+    , utctDayTime = 0
+    }
+
 
 {- Parallel Upsweep
  -
@@ -1544,6 +1562,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
             Just l <- hm_linkable hmi,
             not (isObjectLinkable l),
             (target /= HscNothing) `implies` not is_fake_linkable,
+            validTimestamp hs_date,
             linkableTime l >= ms_hs_date summary -> do
                 liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
                            (text "compiling non-stable BCO mod:" <+> ppr this_mod_name)
@@ -1562,6 +1581,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
           --
           | isObjectTarget target,
             Just obj_date <- mb_obj_date,
+            validTimestamp hs_date,
             obj_date >= hs_date -> do
                 case old_hmi of
                   Just hmi
@@ -1579,6 +1599,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
           -- See Note [Recompilation checking in -fno-code mode]
           | writeInterfaceOnlyMode dflags,
             Just if_date <- mb_if_date,
+            validTimestamp hs_date,
             if_date >= hs_date -> do
                 liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
                            (text "skipping tc'd mod:" <+> ppr this_mod_name)
@@ -2188,28 +2209,6 @@ msDeps s =
     concat [ [(m,IsBoot), (m,NotBoot)] | m <- ms_home_srcimps s ]
         ++ [ (m,NotBoot) | m <- ms_home_imps s ]
 
-home_imps :: [(Maybe FastString, Located ModuleName)] -> [Located ModuleName]
-home_imps imps = [ lmodname |  (mb_pkg, lmodname) <- imps,
-                                  isLocal mb_pkg ]
-  where isLocal Nothing = True
-        isLocal (Just pkg) | pkg == fsLit "this" = True -- "this" is special
-        isLocal _ = False
-
-ms_home_allimps :: ModSummary -> [ModuleName]
-ms_home_allimps ms = map unLoc (ms_home_srcimps ms ++ ms_home_imps ms)
-
--- | Like 'ms_home_imps', but for SOURCE imports.
-ms_home_srcimps :: ModSummary -> [Located ModuleName]
-ms_home_srcimps = home_imps . ms_srcimps
-
--- | All of the (possibly) home module imports from a
--- 'ModSummary'; that is to say, each of these module names
--- could be a home import if an appropriately named file
--- existed.  (This is in contrast to package qualified
--- imports, which are guaranteed not to be home imports.)
-ms_home_imps :: ModSummary -> [Located ModuleName]
-ms_home_imps = home_imps . ms_imps
-
 -----------------------------------------------------------------------------
 -- Summarising modules
 
@@ -2544,6 +2543,41 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
 -----------------------------------------------------------------------------
 --                      Error messages
 -----------------------------------------------------------------------------
+
+-- Defer and group warning, error and fatal messages so they will not get lost
+-- in the regular output.
+withDeferredDiagnostics :: GhcMonad m => m a -> m a
+withDeferredDiagnostics f = do
+  dflags <- getDynFlags
+  if not $ gopt Opt_DeferDiagnostics dflags
+  then f
+  else do
+    warnings <- liftIO $ newIORef []
+    errors <- liftIO $ newIORef []
+    fatals <- liftIO $ newIORef []
+
+    let deferDiagnostics _dflags !reason !severity !srcSpan !style !msg = do
+          let action = putLogMsg dflags reason severity srcSpan style msg
+          case severity of
+            SevWarning -> atomicModifyIORef' warnings $ \i -> (action: i, ())
+            SevError -> atomicModifyIORef' errors $ \i -> (action: i, ())
+            SevFatal -> atomicModifyIORef' fatals $ \i -> (action: i, ())
+            _ -> action
+
+        printDeferredDiagnostics = liftIO $
+          forM_ [warnings, errors, fatals] $ \ref -> do
+            -- This IORef can leak when the dflags leaks, so let us always
+            -- reset the content.
+            actions <- atomicModifyIORef' ref $ \i -> ([], i)
+            sequence_ $ reverse actions
+
+        setLogAction action = modifySession $ \hsc_env ->
+          hsc_env{ hsc_dflags = (hsc_dflags hsc_env){ log_action = action } }
+
+    gbracket
+      (setLogAction deferDiagnostics)
+      (\_ -> setLogAction (log_action dflags) >> printDeferredDiagnostics)
+      (\_ -> f)
 
 noModError :: DynFlags -> SrcSpan -> ModuleName -> FindResult -> ErrMsg
 -- ToDo: we don't have a proper line number for this error

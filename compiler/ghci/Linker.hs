@@ -54,6 +54,7 @@ import FileCleanup
 
 -- Standard libraries
 import Control.Monad
+import Control.DeepSeq (force)
 
 import Data.Char (isSpace)
 import Data.IORef
@@ -885,6 +886,12 @@ findModuleLinkable_maybe lis mod
         [li] -> Just li
         _    -> pprPanic "findModuleLinkable" (ppr mod)
 
+linkableInSet' :: Linkable -> ModuleEnv Linkable -> Bool
+linkableInSet' l objs_loaded =
+  case lookupModuleEnv objs_loaded (linkableModule l) of
+        Nothing -> False
+        Just m  -> linkableTime l == linkableTime m
+
 linkableInSet :: Linkable -> [Linkable] -> Bool
 linkableInSet l objs_loaded =
   case findModuleLinkable_maybe objs_loaded (linkableModule l) of
@@ -1125,12 +1132,17 @@ unload_wkr hsc_env keep_linkables pls@PersistentLinkerState{..}  = do
 
   let (objs_to_keep, bcos_to_keep) = partition isObjectLinkable keep_linkables
 
-      discard keep l = not (linkableInSet l keep)
+      discard keep l = not (linkableInSet' l keep)
+
+      mkModuleEnvForLinkables linkables =
+        mkModuleEnv $ map (\lnk -> (linkableModule lnk, lnk)) linkables
+      objs_to_keep_env = mkModuleEnvForLinkables objs_to_keep
+      bcos_to_keep_env = mkModuleEnvForLinkables bcos_to_keep
 
       (objs_to_unload, remaining_objs_loaded) =
-         partition (discard objs_to_keep) objs_loaded
+         partition (discard objs_to_keep_env) objs_loaded
       (bcos_to_unload, remaining_bcos_loaded) =
-         partition (discard bcos_to_keep) bcos_loaded
+         partition (discard bcos_to_keep_env) bcos_loaded
 
   mapM_ unloadObjs objs_to_unload
   mapM_ unloadObjs bcos_to_unload
@@ -1149,13 +1161,17 @@ unload_wkr hsc_env keep_linkables pls@PersistentLinkerState{..}  = do
       keep_name (n,_) = isExternalName n &&
                         nameModule n `elemModuleSet` bcos_retained
 
-      itbl_env'     = filterNameEnv keep_name itbl_env
-      closure_env'  = filterNameEnv keep_name closure_env
+  -- On unload, if we don't strictly evaluate the environments, it may keep
+  -- pointers to BCOs alive. Ideally, this is not an issue, but due to a bug
+  -- where GHC incorrectly free unloaded object code. We may have crashes when
+  -- these BCOs still hold references into freed object code (see #16525)
+  itbl_env'     <- evaluate $ force $ filterNameEnv keep_name itbl_env
+  closure_env'  <- evaluate $ force $ filterNameEnv keep_name closure_env
 
-      !new_pls = pls { itbl_env = itbl_env',
-                       closure_env = closure_env',
-                       bcos_loaded = remaining_bcos_loaded,
-                       objs_loaded = remaining_objs_loaded }
+  let new_pls = pls { itbl_env = itbl_env',
+                      closure_env = closure_env',
+                      bcos_loaded = remaining_bcos_loaded,
+                      objs_loaded = remaining_objs_loaded }
 
   return new_pls
   where
