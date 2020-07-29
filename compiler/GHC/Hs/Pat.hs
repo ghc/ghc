@@ -177,7 +177,7 @@ data Pat p
   | ConPat {
         pat_con_ext :: XConPat p,
         pat_con     :: XRec p (ConLikeP p),
-        pat_ty_args :: [LHsSigWcType (NoGhcTc p)],
+        pat_ty_args :: [HsPatSigType (NoGhcTc p)],
         pat_args    :: HsConPatDetails p
     }
     -- ^ Constructor Pattern
@@ -615,11 +615,11 @@ pprPat (XPat ext) = case ghcPass @p of
     where CoPat co pat _ = ext
 
 pprUserCon :: (OutputableBndr con, OutputableBndrId p)
-           => con -> [LHsSigWcType (NoGhcTc (GhcPass p))] -> HsConPatDetails (GhcPass p) -> SDoc
+           => con -> [HsPatSigType (NoGhcTc (GhcPass p))] -> HsConPatDetails (GhcPass p) -> SDoc
 pprUserCon c _ (InfixCon p1 p2) = ppr p1 <+> pprInfixOcc c <+> ppr p2
 pprUserCon c tyargs details     = pprPrefixOcc c <+> pprTyArgs tyargs <+> pprConArgs details
 
-pprTyArgs :: (OutputableBndrId p) => [LHsSigWcType (GhcPass p)] -> SDoc
+pprTyArgs :: (OutputableBndrId p) => [HsPatSigType (GhcPass p)] -> SDoc
 pprTyArgs tyargs = fsep (map (\ty -> char '@' <> ppr ty) tyargs)
 
 pprConArgs :: (OutputableBndrId p)

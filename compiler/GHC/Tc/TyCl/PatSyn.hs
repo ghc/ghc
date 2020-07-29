@@ -924,16 +924,18 @@ tcPatToExpr name args pat = go pat
 
     -- Make a prefix con for prefix and infix patterns for simplicity
     mkPrefixConExpr :: Located Name
-                    -> [LHsSigWcType GhcRn]
+                    -> [HsPatSigType GhcRn]
                     -> [LPat GhcRn]
                     -> Either MsgDoc (HsExpr GhcRn)
     mkPrefixConExpr lcon@(L loc _) tyargs pats = do
       exprs <- mapM go pats
-      let con = foldl' (\x t -> HsAppType noExtField (L loc x) (fmap hsib_body t)) (HsVar noExtField lcon) tyargs
+      let psToWc :: HsPatSigType GhcRn -> LHsWcType GhcRn
+          psToWc ps = HsWC (hsps_nwcs (hsps_ext ps)) (hsps_body ps)
+          con = foldl' (\x t -> HsAppType noExtField (L loc x) (psToWc t)) (HsVar noExtField lcon) tyargs
       return (foldl' (\x y -> HsApp noExtField (L loc x) y) con exprs)
 
     mkRecordConExpr :: Located Name
-                    -> [LHsSigWcType GhcRn]
+                    -> [HsPatSigType GhcRn]
                     -> HsRecFields GhcRn (LPat GhcRn)
                     -> Either MsgDoc (HsExpr GhcRn)
     mkRecordConExpr con [] fields = do
