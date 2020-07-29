@@ -1983,23 +1983,22 @@ summaryNodeKey = node_key
 summaryNodeSummary :: SummaryNode -> ModSummary
 summaryNodeSummary = node_payload
 
+-- | Collect the immediate dependencies of a module from its ModSummary,
+-- optionally avoiding hs-boot dependencies.
+-- If the drop_hs_boot_nodes flag is False, and if this is a .hs and there is
+-- an equivalent .hs-boot, add a link from the former to the latter.  This
+-- has the effect of detecting bogus cases where the .hs-boot depends on the
+-- .hs, by introducing a cycle.  Additionally, it ensures that we will always
+-- process the .hs-boot before the .hs, and so the HomePackageTable will always
+-- have the most up to date information.
 unfilteredEdges :: Bool -> ModSummary -> [ModuleNameWithIsBoot]
 unfilteredEdges drop_hs_boot_nodes ms =
     (flip GWIB hs_boot_key . unLoc <$> ms_home_srcimps ms) ++
     (flip GWIB NotBoot     . unLoc <$> ms_home_imps ms) ++
     [ GWIB (ms_mod_name ms) IsBoot
     | not $ drop_hs_boot_nodes || ms_hsc_src ms == HsBootFile
-      -- see [boot-edges] below
     ]
   where
-    -- [boot-edges] if this is a .hs and there is an equivalent
-    -- .hs-boot, add a link from the former to the latter.  This
-    -- has the effect of detecting bogus cases where the .hs-boot
-    -- depends on the .hs, by introducing a cycle.  Additionally,
-    -- it ensures that we will always process the .hs-boot before
-    -- the .hs, and so the HomePackageTable will always have the
-    -- most up to date information.
-
     -- Drop hs-boot nodes by using HsSrcFile as the key
     hs_boot_key | drop_hs_boot_nodes = NotBoot -- is regular mod or signature
                 | otherwise          = IsBoot
