@@ -13,8 +13,8 @@ module GHC.Rename.HsType (
         -- Type related stuff
         rnHsType, rnLHsType, rnLHsTypes, rnContext,
         rnHsKind, rnLHsKind, rnLHsTypeArgs,
-        rnHsSigType, rnHsWcType, rnHsSigWcTypeBindingVars,
-        HsSigWcTypeScoping(..), rnHsSigWcType, rnHsPatSigType, rnHsSigWcTypeScoped,
+        rnHsSigType, rnHsWcType, rnHsPatSigTypeBindingVars,
+        HsSigWcTypeScoping(..), rnHsSigWcType, rnHsPatSigType,
         newTyVarNameRn,
         rnConDeclFields,
         rnLTyVar,
@@ -192,12 +192,12 @@ rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
 -- Similar to rnHsWcType, but rather than requiring free variables in the type to
 -- already be in scope, we are going to require them not to be in scope,
 -- and we bind them.
-rnHsSigWcTypeBindingVars :: HsDocContext
-                         -> LHsSigWcType GhcPs
-                         -> (LHsSigWcType GhcRn -> RnM (r, FreeVars))
-                         -> RnM (r, FreeVars)
-rnHsSigWcTypeBindingVars ctxt sigType thing_inside = case sigType of
-  (HsWC { hswc_body = HsIB { hsib_body = hs_ty' } }) -> do
+rnHsPatSigTypeBindingVars :: HsDocContext
+                          -> HsPatSigType GhcPs
+                          -> (HsPatSigType GhcRn -> RnM (r, FreeVars))
+                          -> RnM (r, FreeVars)
+rnHsPatSigTypeBindingVars ctxt sigType thing_inside = case sigType of
+  (HsPS { hsps_body = hs_ty' }) -> do
     rdr_env <- getLocalRdrEnv
     let (varsInScope, varsNotInScope) =
           partition (inScope rdr_env . unLoc) (extractHsTyRdrTyVars hs_ty')
@@ -207,13 +207,15 @@ rnHsSigWcTypeBindingVars ctxt sigType thing_inside = case sigType of
         <+> hcat (punctuate (text ",") (map (quotes . ppr) varsInScope))
         <+> text "would be inappropriately shadowed."
     (wcVars', ibVars') <- partition_nwcs varsNotInScope
-    rnImplicitBndrs True ibVars' $ \ ibVars -> do
+    rnImplicitBndrs Nothing ibVars' $ \ ibVars -> do
       (wcVars, hs_ty, fvs) <- rnWcBody ctxt wcVars' hs_ty'
-      let sig_ty = HsWC
-            { hswc_ext = wcVars
-            , hswc_body = HsIB
-              { hsib_ext = ibVars
-              , hsib_body = hs_ty } }
+      let sig_ty = HsPS
+            { hsps_body = hs_ty
+            , hsps_ext = HsPSRn
+              { hsps_nwcs    = wcVars
+              , hsps_imp_tvs = ibVars
+              }
+            }
       (res, fvs') <- thing_inside sig_ty
       return (res, fvs `plusFV` fvs')
 
