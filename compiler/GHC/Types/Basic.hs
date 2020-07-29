@@ -1474,6 +1474,9 @@ instance Semigroup InlineSpec where
   NoUserInline <> spec = spec
   spec         <> _    = spec
 
+instance Monoid InlineSpec where
+  mempty = NoUserInline
+
 data SpecializableSpec
   = Specializable
   | NoUserSpecializable
@@ -1482,6 +1485,9 @@ data SpecializableSpec
 instance Semigroup SpecializableSpec where
   NoUserSpecializable <> spec = spec
   spec                <> _    = spec
+
+instance Monoid SpecializableSpec where
+  mempty = NoUserSpecializable
 
 {- Note [InlinePragma]
 ~~~~~~~~~~~~~~~~~~~~~~

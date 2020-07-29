@@ -613,17 +613,13 @@ addInlinePrags poly_id prags_for_me
       ((L _ p1):_, []        ) -> p1
       ([],         (L _ p2):_) -> p2
       ((L _ p1):_, (L _ p2):_) -> mergePrags p1 p2
-      ([],[]) -> die ["No pragmas to merge"] -- TODO
+      ([],[]) -> error "No pragmas to merge" -- TODO
 
     mergePrags p1 p2 = p1
-      { inl_inline = ((<>) `on` inlinePragmaSpec       ) p1 p2
-      , inl_spec   = ((<>) `on` specializablePragmaSpec) p1 p2
-      --, inl_act = AlwaysActive -- XXX activation must be taken from spec when inline is noinline!
+      { inl_inline = (mappend `on` inlinePragmaSpec       ) p1 p2
+      , inl_spec   = (mappend `on` specializablePragmaSpec) p1 p2
+      , inl_act = AlwaysActive -- XXX activation must be taken from spec when inline is noinline!
       } -- TODO take sat, act, rule from the inline one. FIXME can't merge src!
-    mergeInlineSpec NoUserInline spec = spec
-    mergeInlineSpec spec         _    = spec
-    mergeSpecializableSpec NoUserSpecializable spec = spec
-    mergeSpecializableSpec spec                _    = spec
 
     multiple (_:_:_) = True
     multiple _ = False
