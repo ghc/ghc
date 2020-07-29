@@ -5,7 +5,9 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -67,6 +69,9 @@ import GHC.Data.List.SetOps ( getNth )
 
 import Control.Arrow  ( second )
 import Control.Monad  ( when )
+
+import Data.Map (Map)
+import qualified Data.Map as Map
 
 {-
 ************************************************************************
@@ -829,6 +834,7 @@ data TelescopeState = TelState
   { telState_subst :: TCvSubst
   , telState_forall :: [TyVar] -> [TyVar]
   , telState_exists :: [TyVar] -> [TyVar]
+  , telState_theta :: [Type] -> [Type]
   }
 
 emptyTelState :: TelescopeState
@@ -836,7 +842,38 @@ emptyTelState = TelState
   { telState_subst = emptyTCvSubst
   , telState_forall = id
   , telState_exists = id
+  , telState_theta = id
   }
+
+data ArgPattern p =
+    TypeArgPattern (LHsSigWcType p)
+      -- ^ provided by visible type application
+  | OrdinaryArgPattern (LPat p)
+      -- ^ provided either by arguments to a prefix/infix constructor or by record field matches
+  | NoArgPattern
+      -- ^ argument that was left out of a record pattern match
+
+instance Outputable (ArgPattern (GhcPass 'Renamed)) where
+  ppr x = case x of
+    TypeArgPattern t -> text "TypeArgPattern" <+> ppr t
+    OrdinaryArgPattern p -> text "OrdinaryArgPattern" <+> ppr p
+    NoArgPattern -> text "NoArgPattern"
+
+buildArgPatterns :: DataCon -> HsConPatDetails p -> [ArgPattern p]
+buildArgPatterns datacon details = case details of
+  PrefixCon args    -> map OrdinaryArgPattern args
+  RecCon rfs        -> 
+    let fieldMap = Map.fromList
+          [ ( occNameFS . rdrNameOcc . unLoc . rdrNameFieldOcc
+                . unLoc . hsRecFieldLbl $ rf
+            , hsRecFieldArg rf
+            )
+          | rf <- map unLoc (rec_flds rfs) ]
+        lookupLabel label = case Map.lookup (flLabel label) fieldMap of
+          Nothing -> NoArgPattern
+          Just pat -> OrdinaryArgPattern pat
+    in map lookupLabel (dataConFieldLabels datacon)
+  InfixCon arg1 arg2 -> [OrdinaryArgPattern arg1, OrdinaryArgPattern arg2]
 
 tcDataConPat :: PatEnv
              -> Located Name
@@ -851,7 +888,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty type_arg_pats arg_pats t
   (nonUserVarWrapper, remaining_user_data_con_ty0) <-
     topInstantiateInferred PatOrigin $ dataConUserType data_con
 
-  (nonInferredTyVarBinders, remaining_user_data_con_ty1, telState) <- do
+  (nonInferredTyVarBinders, data_con_user_ret_ty, telState) <- do
     let -- Split out the Pi telescope for the user-provided type of the data
         -- constructor, getting a collection of binders (both foralls and
         -- ordinary arguments to the data constructor), along with the result
@@ -891,25 +928,32 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty type_arg_pats arg_pats t
                         }
             return (telState', Named varbndr')
           Anon flag ty ->
-            pure (telState, Anon flag $ substTy (telState_subst telState) ty)
+            let ty' = substTy (telState_subst telState) ty
+                telState' = case flag of
+                  InvisArg -> telState { telState_theta = telState_theta telState . (ty':) }
+                  _ -> telState
+            in return (telState', Anon flag ty')
       )
       emptyTelState
       bndrs
-    pure (nonInferredTyVarBinders, substTy (telState_subst telState) res_ty, telState)
+    return (nonInferredTyVarBinders, substTy (telState_subst telState) res_ty, telState)
 
-  let (theta, data_con_subst_user_ret_ty)   = tcSplitPhiTy remaining_user_data_con_ty1
-
-  wrap <- tc_sub_type penv pat_ty data_con_subst_user_ret_ty
+  traceTc "tcConPat:dataConUserTyVarBinders" $ ppr (dataConUserTyVarBinders data_con)
+  traceTc "tcConPat:pat_ty" $ ppr pat_ty
+  traceTc "tcConPat:data_con_user_ret_ty" $ ppr data_con_user_ret_ty
+  traceTc "tcConPat:dataConEqSpec" $ ppr (dataConEqSpec data_con)
+  let eq_spec = dataConEqSpec data_con
+  let theta = substTheta (telState_subst telState) (eqSpecPreds eq_spec)
+              ++ telState_theta telState []
 
   let -- zip through invisible argument patterns, extending the name environment
       -- with variables bound by each one in turn.
       --
       -- TODO(@Ericson2314) teach the arity error thing about visibility so we
       -- can abstract over this and have nicer messages.
-      zipInvisPats :: Outputable x
-                   => [Either (LHsSigWcType (NoGhcTc GhcRn)) x]
+      zipInvisPats :: [ArgPattern (NoGhcTc GhcRn)]
                    -> [TyBinder]
-                   -> TcM [( Either (LHsSigWcType (NoGhcTc GhcRn)) x
+                   -> TcM [( ArgPattern (NoGhcTc GhcRn)
                            , TyBinder
                            )]
       zipInvisPats [] [] = pure []
@@ -917,55 +961,57 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty type_arg_pats arg_pats t
         text "forall -> not yet implemented for data constructors"
       zipInvisPats _ (Named (Bndr _ Inferred) : _) = failWithTc $
         text "Inferred variables should have already been removed"
-      zipInvisPats _ (Anon InvisArg _ : _) = failWithTc $
-        text "Shouldn't be constraint in the middle of constructor type"
+      zipInvisPats args (Anon InvisArg _ : vars) = zipInvisPats args vars
       zipInvisPats [] (Anon VisArg _ : _) = failWithTc $
         text "Too few regular argument patterns to data constructor"
-      zipInvisPats (Left pat : _) (Anon VisArg _ : _) = failWithTc $
+      zipInvisPats (NoArgPattern : _) [] = failWithTc $
+        text "Strange, there were more unmentioned fields than the type of the data constructor would suggest. This is almost certainly a compiler bug."
+      zipInvisPats (TypeArgPattern pat : _) (Anon VisArg _ : _) = failWithTc $
         text "Extra optional argument pattern" <+> ppr pat <+> text "when next required arg needs matching"
-      zipInvisPats (Left pat : _) [] = failWithTc $
+      zipInvisPats (TypeArgPattern pat : _) [] = failWithTc $
         text "Extra optional argument pattern" <+> ppr pat <+> text "when no args left to match"
-      zipInvisPats (Right pat : _) [] = failWithTc $
+      zipInvisPats (OrdinaryArgPattern pat : _) [] = failWithTc $
         text "Extra required argument pattern" <+> ppr pat <+> text "when no args left to match"
-      zipInvisPats (Right req_arg_ty : args) (Anon VisArg ty : vars) =
-        ((Right req_arg_ty, Anon VisArg ty) :) <$> zipInvisPats args vars
+      zipInvisPats (OrdinaryArgPattern req_arg_ty : args) (Anon VisArg ty : vars) =
+        ((OrdinaryArgPattern req_arg_ty, Anon VisArg ty) :) <$> zipInvisPats args vars
       zipInvisPats [] (Named (Bndr _ Specified) : vars) =
         -- OK to skip @ arg in middle of arg pats
         zipInvisPats [] vars
-      zipInvisPats args@(Right _ : _) (Named (Bndr _ Specified) : vars) =
+      zipInvisPats args@(OrdinaryArgPattern _ : _) (Named (Bndr _ Specified) : vars) =
         -- OK to skip @ arg at end of arg pats
         zipInvisPats args vars
-      zipInvisPats (Left spec_arg : args) (Named var@(Bndr _ Specified) : vars) =
-        ((Left spec_arg, Named var) :) <$> zipInvisPats args vars
+      zipInvisPats (TypeArgPattern spec_arg : args) (Named var@(Bndr _ Specified) : vars) =
+        ((TypeArgPattern spec_arg, Named var) :) <$> zipInvisPats args vars
+      zipInvisPats (NoArgPattern : args) (v : vars) = ((NoArgPattern, v) :) <$> zipInvisPats args vars
 
   -- When required and specified args are intermixed, we'll just put in the list
   -- of both. For now, we concat them in order.
   invisPairs <- zipInvisPats
-    (fmap Left type_arg_pats ++ fmap Right (hsConPatArgs arg_pats))
+    (fmap TypeArgPattern type_arg_pats ++ buildArgPatterns data_con arg_pats)
     nonInferredTyVarBinders
 
-  traceTc "tcConPat_0" $ ppr $ invisPairs
+  traceTc "tcConPat:invisPairs" $ ppr $ invisPairs
 
   let -- Iterate through the visible type arguments, extending the name environment
       -- with variables bound by each one in turn.
       extendNamesByTyApp :: Checker
-        (Either (LHsSigWcType (NoGhcTc GhcRn)) x, TyBinder)
+        (ArgPattern (NoGhcTc GhcRn), TyBinder)
         HsWrapper
       extendNamesByTyApp _penv (x, data_con_quantifer_step) thing_inside' = do
         ty <- TyVarTy <$> case data_con_quantifer_step of
               Named (Bndr var _) -> pure var
               Anon _ ty          -> newFlexiTyVar ty
         case x of
-          Right _ -> do
-            -- will be checked below, we don't do interleaved visible and invisible yet
-            v <- thing_inside'
-            return (mempty, v)
-          Left arg -> do
+          TypeArgPattern arg -> do
             (sig_wcs, sig_ibs, arg_ty) <- tcHsPatSigType TypeAppCtxt arg
             tcExtendNameTyVarEnv sig_wcs . tcExtendNameTyVarEnv sig_ibs $ do
               c <- unifyType Nothing arg_ty ty
               v <- thing_inside'
               return (mkWpCastN c, v)
+          _ -> do
+            -- will be checked below, we don't do interleaved visible and invisible yet
+            v <- thing_inside'
+            return (mempty, v)
 
   traceTc "tcConPat" (vcat [ ppr con_name
                            , ppr invisPairs
@@ -1026,7 +1072,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty type_arg_pats arg_pats t
             }
         }
   pat_ty_ty <- readExpType pat_ty
-  return (mkHsWrapPat (wrap <.> bodyWrap) res_pat pat_ty_ty, res)
+  return (mkHsWrapPat bodyWrap res_pat pat_ty_ty, res)
 
 tcPatSynPat :: PatEnv -> Located Name -> PatSyn
             -> ExpSigmaType                -- Type of the pattern
