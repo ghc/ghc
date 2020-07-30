@@ -1288,12 +1288,14 @@ cvtp (UnboxedSumP p alt arity)
                        = do { p' <- cvtPat p
                             ; unboxedSumChecks alt arity
                             ; return $ SumPat noExtField p' alt arity }
-cvtp (ConP s ps)       = do { s' <- cNameL s; ps' <- cvtPats ps
+cvtp (ConP s ts ps)    = do { s' <- cNameL s
+                            ; ps' <- cvtPats ps
+                            ; ts' <- mapM cvtType ts
                             ; let pps = map (parenthesizePat appPrec) ps'
                             ; return $ ConPat
                                 { pat_con_ext = noExtField
                                 , pat_con = s'
-                                , pat_ty_args = []
+                                , pat_ty_args = map mkHsPatSigType ts'
                                 , pat_args = PrefixCon pps
                                 }
                             }

@@ -1,0 +1,12 @@
+
+TyAppPat_NonlinearMultiPat.hs:9:19: error:
+    Type variable ‘a’ would be inappropriately shadowed.
+
+TyAppPat_NonlinearMultiPat.hs:10:18: error:
+    Type variable ‘a’ would be inappropriately shadowed.
+
+TyAppPat_NonlinearMultiPat.hs:11:19: error:
+    Type variable ‘a’ would be inappropriately shadowed.
+
+TyAppPat_NonlinearMultiPat.hs:12:18: error:
+    Type variable ‘a’ would be inappropriately shadowed.

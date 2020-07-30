@@ -5,7 +5,7 @@
 module Main where
 
 data Foo b where
-  MkFoo :: forall a. a -> (b -> a -> String) -> Foo b
+  MkFoo :: forall b a. a -> (b -> a -> String) -> Foo b
 
 foo :: Foo b -> b -> String
 foo (MkFoo @b @a x f) u = f (u :: b) (x :: a)

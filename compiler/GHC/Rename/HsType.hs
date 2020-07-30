@@ -202,7 +202,7 @@ rnHsPatSigTypeBindingVars ctxt sigType thing_inside = case sigType of
     let (varsInScope, varsNotInScope) =
           partition (inScope rdr_env . unLoc) (extractHsTyRdrTyVars hs_ty')
     when (not (null varsInScope)) $
-      addErr . withHsDocContext ctxt $
+      addErr $
         text ("Type variable" ++ ['s' | not (null (drop 1 varsInScope))])
         <+> hcat (punctuate (text ",") (map (quotes . ppr) varsInScope))
         <+> text "would be inappropriately shadowed."

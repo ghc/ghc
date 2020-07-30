@@ -1,10 +1,11 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE KindSignatures #-}
 
 module Main where
 
-data Foo :: * -> * -> * where
+data Foo a b where
   MkFoo :: forall b a. a -> (a -> b -> String) -> Foo a b
 
 foo :: Foo a b -> b -> String
