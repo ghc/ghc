@@ -573,9 +573,9 @@ mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
         do { unless (name == patsyn_name) $
                wrongNameBindingErr loc decl
            ; match <- case details of
-               PrefixCon pats -> return $ Match { m_ext = noExtField
-                                                , m_ctxt = ctxt, m_pats = pats
-                                                , m_grhss = rhs }
+               PrefixCon _ pats -> return $ Match { m_ext = noExtField
+                                                  , m_ctxt = ctxt, m_pats = pats
+                                                  , m_grhss = rhs }
                    where
                      ctxt = FunRhs { mc_fun = ln
                                    , mc_fixity = Prefix
@@ -636,8 +636,7 @@ mkGadtDecl names ty = do
         = (RecCon (L loc rf), res_ty, [])
         | otherwise
         = let (arg_types, res_type, anns) = splitHsFunType body_ty
-          in (PrefixCon arg_types, res_type, anns)
-
+          in (PrefixCon noTypeArgs arg_types, res_type, anns)
   pure ( ConDeclGADT { con_g_ext  = noExtField
                      , con_names  = names
                      , con_forall = L (getLoc ty) $ isJust mtvs
@@ -966,27 +965,31 @@ checkPattern_hints :: [Hint] -> PV (Located (PatBuilder GhcPs)) -> P (LPat GhcPs
 checkPattern_hints hints pp = runPV_hints hints (pp >>= checkLPat)
 
 checkLPat :: Located (PatBuilder GhcPs) -> PV (LPat GhcPs)
-checkLPat e@(L l _) = checkPat l e []
+checkLPat e@(L l _) = checkPat l e [] []
 
-checkPat :: SrcSpan -> Located (PatBuilder GhcPs) -> [LPat GhcPs]
+checkPat :: SrcSpan -> Located (PatBuilder GhcPs) -> [HsPatSigType GhcPs] -> [LPat GhcPs]
          -> PV (LPat GhcPs)
-checkPat loc (L l e@(PatBuilderVar (L _ c))) args
+checkPat loc (L l e@(PatBuilderVar (L _ c))) tyargs args
   | isRdrDataCon c = return . L loc $ ConPat
       { pat_con_ext = noExtField
       , pat_con = L l c
-      , pat_args = PrefixCon args
+      , pat_args = PrefixCon tyargs args
       }
+  | not (null tyargs) =
+      add_hint TypeApplicationsInPatternsOnlyDataCons $
+      patFail l (ppr e <+> hsep [text "@" <> ppr t | t <- tyargs])
   | not (null args) && patIsRec c =
       add_hint SuggestRecursiveDo $
       patFail l (ppr e)
-checkPat loc (L _ (PatBuilderApp f e)) args
-  = do p <- checkLPat e
-       checkPat loc f (p : args)
-checkPat loc (L _ e) []
-  = do p <- checkAPat loc e
-       return (L loc p)
-checkPat loc e _
-  = patFail loc (ppr e)
+checkPat loc (L _ (PatBuilderAppType f t)) tyargs args = do
+  checkPat loc f (t : tyargs) args
+checkPat loc (L _ (PatBuilderApp f e)) [] args = do
+  p <- checkLPat e
+  checkPat loc f [] (p : args)
+checkPat loc (L _ e) [] [] = do
+  p <- checkAPat loc e
+  return (L loc p)
+checkPat loc e _ _ = patFail loc (ppr e)
 
 checkAPat :: SrcSpan -> PatBuilder GhcPs -> PV (Pat GhcPs)
 checkAPat loc e0 = do
@@ -1517,7 +1520,7 @@ instance DisambECP (PatBuilder GhcPs) where
   type FunArg (PatBuilder GhcPs) = PatBuilder GhcPs
   superFunArg m = m
   mkHsAppPV l p1 p2     = return $ L l (PatBuilderApp p1 p2)
-  mkHsAppTypePV l _ _   = addFatalError $ Error ErrTypeAppInPat [] l
+  mkHsAppTypePV l p t   = return $ L l (PatBuilderAppType p (mkHsPatSigType t))
   mkHsIfPV l _ _ _ _ _  = addFatalError $ Error ErrIfTheElseInPat [] l
   mkHsDoPV l _ _        = addFatalError $ Error ErrDoNotationInPat [] l
   mkHsParPV l p         = return $ L l (PatBuilderPar p)
@@ -1625,7 +1628,7 @@ dataConBuilderDetails (PrefixDataConBuilder flds _)
 
 -- Normal prefix constructor, e.g.  data T = MkT A B C
 dataConBuilderDetails (PrefixDataConBuilder flds _)
-  = PrefixCon (map hsLinear (toList flds))
+  = PrefixCon noTypeArgs (map hsLinear (toList flds))
 
 -- Infix constructor, e.g. data T = Int :! Bool
 dataConBuilderDetails (InfixDataConBuilder lhs _ rhs)

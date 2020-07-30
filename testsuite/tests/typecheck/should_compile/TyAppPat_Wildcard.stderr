@@ -1,0 +1,14 @@
+
+TyAppPat_Wildcard.hs:9:10: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘Int’
+    • In a type argument: _
+      In the pattern: Just @_ x
+      In an equation for ‘f’: f (Just @_ x) = x
+    • Relevant bindings include
+        f :: Maybe Int -> Int (bound at TyAppPat_Wildcard.hs:9:1)
+
+TyAppPat_Wildcard.hs:12:7: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    • Found type wildcard ‘_’ standing for ‘String’
+    • In a type argument: _
+      In the pattern: Just @_ x
+      In a pattern binding: Just @_ x = Just "hello"

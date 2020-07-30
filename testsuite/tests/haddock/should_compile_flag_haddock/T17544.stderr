@@ -382,6 +382,7 @@
                 []
                 (Nothing)
                 (PrefixCon
+                 []
                  [])
                 ({ T17544.hs:25:13-18 }
                  (HsAppTy
@@ -518,6 +519,7 @@
                 []
                 (Nothing)
                 (PrefixCon
+                 []
                  [])
                 ({ T17544.hs:31:13-18 }
                  (HsAppTy
@@ -654,6 +656,7 @@
                 []
                 (Nothing)
                 (PrefixCon
+                 []
                  [])
                 ({ T17544.hs:37:13-18 }
                  (HsAppTy
@@ -790,6 +793,7 @@
                 []
                 (Nothing)
                 (PrefixCon
+                 []
                  [])
                 ({ T17544.hs:43:13-18 }
                  (HsAppTy
@@ -926,6 +930,7 @@
                 []
                 (Nothing)
                 (PrefixCon
+                 []
                  [])
                 ({ T17544.hs:49:13-18 }
                  (HsAppTy
@@ -1062,6 +1067,7 @@
                 []
                 (Nothing)
                 (PrefixCon
+                 []
                  [])
                 ({ T17544.hs:55:14-20 }
                  (HsAppTy
