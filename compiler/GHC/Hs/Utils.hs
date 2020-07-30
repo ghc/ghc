@@ -465,6 +465,7 @@ nlConVarPatName con vars = nlConPatName con (map nlVarPat vars)
 nlInfixConPat :: RdrName -> LPat GhcPs -> LPat GhcPs -> LPat GhcPs
 nlInfixConPat con l r = noLoc $ ConPat
   { pat_con = noLoc con
+  , pat_ty_args = []
   , pat_args = InfixCon (parenthesizePat opPrec l)
                         (parenthesizePat opPrec r)
   , pat_con_ext = noExtField
@@ -474,6 +475,7 @@ nlConPat :: RdrName -> [LPat GhcPs] -> LPat GhcPs
 nlConPat con pats = noLoc $ ConPat
   { pat_con_ext = noExtField
   , pat_con = noLoc con
+  , pat_ty_args = []
   , pat_args = PrefixCon (map (parenthesizePat appPrec) pats)
   }
 
@@ -481,6 +483,7 @@ nlConPatName :: Name -> [LPat GhcRn] -> LPat GhcRn
 nlConPatName con pats = noLoc $ ConPat
   { pat_con_ext = noExtField
   , pat_con = noLoc con
+  , pat_ty_args = []
   , pat_args = PrefixCon (map (parenthesizePat appPrec) pats)
   }
 
@@ -488,6 +491,7 @@ nlNullaryConPat :: RdrName -> LPat GhcPs
 nlNullaryConPat con = noLoc $ ConPat
   { pat_con_ext = noExtField
   , pat_con = noLoc con
+  , pat_ty_args = []
   , pat_args = PrefixCon []
   }
 
@@ -495,6 +499,7 @@ nlWildConPat :: DataCon -> LPat GhcPs
 nlWildConPat con = noLoc $ ConPat
   { pat_con_ext = noExtField
   , pat_con = noLoc $ getRdrName con
+  , pat_ty_args = []
   , pat_args = PrefixCon $
      replicate (dataConSourceArity con)
                nlWildPat

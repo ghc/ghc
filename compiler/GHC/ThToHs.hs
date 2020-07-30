@@ -1280,11 +1280,14 @@ cvtp (UnboxedSumP p alt arity)
                        = do { p' <- cvtPat p
                             ; unboxedSumChecks alt arity
                             ; return $ SumPat noExtField p' alt arity }
-cvtp (ConP s ps)       = do { s' <- cNameL s; ps' <- cvtPats ps
+cvtp (ConP s ts ps)    = do { s' <- cNameL s
+                            ; ps' <- cvtPats ps
+                            ; ts' <- mapM cvtType ts
                             ; let pps = map (parenthesizePat appPrec) ps'
                             ; return $ ConPat
                                 { pat_con_ext = noExtField
                                 , pat_con = s'
+                                , pat_ty_args = map mkHsPatSigType ts'
                                 , pat_args = PrefixCon pps
                                 }
                             }
@@ -1293,6 +1296,7 @@ cvtp (InfixP p1 s p2)  = do { s' <- cNameL s; p1' <- cvtPat p1; p2' <- cvtPat p2
                               ConPat
                                 { pat_con_ext = NoExtField
                                 , pat_con = s'
+                                , pat_ty_args = []
                                 , pat_args = InfixCon
                                     (parenthesizePat opPrec p1')
                                     (parenthesizePat opPrec p2')
@@ -1313,6 +1317,7 @@ cvtp (RecP c fs)       = do { c' <- cNameL c; fs' <- mapM cvtPatFld fs
                             ; return $ ConPat
                                 { pat_con_ext = noExtField
                                 , pat_con = c'
+                                , pat_ty_args = []
                                 , pat_args = Hs.RecCon $ HsRecFields fs' Nothing
                                 }
                             }
@@ -1348,6 +1353,7 @@ cvtOpAppP x op y
        ; return $ ConPat
           { pat_con_ext = noExtField
           , pat_con = op'
+          , pat_ty_args = []
           , pat_args = InfixCon x y'
           }
        }
