@@ -110,6 +110,9 @@ import GHC.Utils.Misc
 import GHC.Utils.Binary
 import GHC.Utils.Outputable
 
+import Data.Bifunctor
+import Data.Bifoldable
+import Data.Bitraversable
 import Data.Data
 
 {-
@@ -610,6 +613,16 @@ Note [Types for coercions, predicates, and evidence]
 --   * IfaceType.IfaceForAllSpecBndr = VarBndr IfaceBndr Specificity
 data VarBndr var argf = Bndr var argf
   deriving( Data )
+
+instance Bifunctor VarBndr where
+  bimap f g (Bndr x y) = Bndr (f x) (g y)
+
+instance Bifoldable VarBndr where
+  bifoldMap = bifoldMapDefault
+
+instance Bitraversable VarBndr where
+  bitraverse f g (Bndr x y) = Bndr <$> f x <*> g y
+
 
 -- | Variable Binder
 --
