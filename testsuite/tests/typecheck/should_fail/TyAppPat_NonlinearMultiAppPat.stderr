@@ -1,0 +1,3 @@
+
+TyAppPat_NonlinearMultiAppPat.hs:12:6: error:
+    Type variable ‘a’ would be inappropriately shadowed.

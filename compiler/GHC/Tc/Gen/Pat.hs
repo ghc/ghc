@@ -65,7 +65,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import qualified GHC.LanguageExtensions as LangExt
 import Control.Arrow  ( second )
-import Control.Monad  ( when )
+import Control.Monad
 import GHC.Data.List.SetOps ( getNth )
 import qualified Data.Map as Map
 import Control.Monad.Trans.Cont (ContT(..), runContT)
@@ -856,12 +856,12 @@ tcConPat penv con_lname@(L _ con_name) pat_ty ty_arg_pats arg_pats thing_inside
   = do  { con_like <- tcLookupConLike con_name
         ; case con_like of
             RealDataCon data_con ->
-              withTypecheckedTyArgPats ty_arg_pats $ \ty_arg_pats' ->
+              withTypecheckedTyArgPats ty_arg_pats $ \ty_arg_types ->
                 tcDataConPat penv con_lname data_con
-                  pat_ty ty_arg_pats' arg_pats thing_inside
+                  pat_ty ty_arg_types ty_arg_pats arg_pats thing_inside
             PatSynCon pat_syn ->
               tcPatSynPat penv con_lname pat_syn
-                pat_ty arg_pats thing_inside
+                pat_ty ty_arg_pats arg_pats thing_inside
         }
 
 withTypecheckedTyArgPat :: HsPatSigType (NoGhcTc GhcRn)
@@ -880,11 +880,12 @@ tcDataConPat :: PatEnv
              -> Located Name
              -> DataCon
              -> Scaled ExpSigmaType -- Type of the pattern
-             -> [TcType]            -- Type applications
+             -> [TcType]            -- Type applications (types)
+             -> [HsPatSigType (NoGhcTc GhcRn)] -- Type applications (syntax)
              -> HsConPatDetails GhcRn
              -> TcM a
              -> TcM (Pat GhcTc, a)
-tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled ty_arg_pats arg_pats thing_inside
+tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled ty_arg_types ty_arg_pats arg_pats thing_inside
   = do  { let tycon = dataConTyCon data_con
                   -- For data families this is the representation tycon
               (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _)
@@ -894,7 +895,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled ty_arg_pats arg_p
           -- Instantiate the constructor type variables [a->ty]
           -- This may involve doing a family-instance coercion,
           -- and building a wrapper
-        ; (wrap, ctxt_res_tys) <- matchExpectedConTy penv tycon pat_ty_scaled
+        ; (wrap', ctxt_res_tys) <- matchExpectedConTy penv tycon pat_ty_scaled
         ; pat_ty <- readExpType (scaledThing pat_ty_scaled)
 
           -- Add the stupid theta
@@ -910,6 +911,17 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled ty_arg_pats arg_p
 
         ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX tenv' ex_tvs
                      -- Get location from monad, not from ex_tvs
+
+        ; let varMap = Map.fromList $ [(v, Left v') | (v, v') <- zip ex_tvs ex_tvs']
+                                   ++ [(v, Right v') | (v, v') <- zip univ_tvs ctxt_res_tys]
+              userBinders = dataConUserTyVarBinders data_con
+        ; wraps <- forM (zip userBinders ty_arg_types) $ \(Bndr tv _, tyArg) -> do
+            c <- case Map.lookup tv varMap of
+              Nothing -> pprPanic "tcDataConPat" $ text "Invariant broken: dcUserTyVarBinders contained a binder for a variable that was not amongst the universal or existential type variables for the data constructor."
+              Just (Left exVar) -> unifyType Nothing tyArg (mkTyVarTy exVar)
+              Just (Right univVarType) -> unifyType Nothing tyArg univVarType
+            return (mkWpCastN c)
+        ; let wrap = mconcat wraps <.> wrap'
 
         ; let -- pat_ty' = mkTyConApp tycon ctxt_res_tys
               -- pat_ty' is type of the actual constructor application
@@ -934,6 +946,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled ty_arg_pats arg_p
                     (arg_pats', res) <- tcConArgs (RealDataCon data_con) arg_tys_scaled
                                                   penv arg_pats thing_inside
                   ; let res_pat = ConPat { pat_con = header
+                                         , pat_ty_args = ty_arg_pats
                                          , pat_args = arg_pats'
                                          , pat_con_ext = ConPatTc
                                            { cpt_tvs = [], cpt_dicts = []
@@ -972,6 +985,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled ty_arg_pats arg_p
 
         ; let res_pat = ConPat
                 { pat_con   = header
+                , pat_ty_args = ty_arg_pats
                 , pat_args  = arg_pats'
                 , pat_con_ext = ConPatTc
                   { cpt_tvs   = ex_tvs'
@@ -986,9 +1000,10 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled ty_arg_pats arg_p
 
 tcPatSynPat :: PatEnv -> Located Name -> PatSyn
             -> Scaled ExpSigmaType         -- Type of the pattern
+            -> [HsPatSigType (NoGhcTc GhcRn)]
             -> HsConPatDetails GhcRn -> TcM a
             -> TcM (Pat GhcTc, a)
-tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
+tcPatSynPat penv (L con_span _) pat_syn pat_ty ty_arg_pats arg_pats thing_inside
   = do  { let (univ_tvs, req_theta, ex_tvs, prov_theta, arg_tys, ty) = patSynSig pat_syn
 
         ; (subst, univ_tvs') <- newMetaTyVars univ_tvs
@@ -1031,6 +1046,7 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
 
         ; traceTc "checkConstraints }" (ppr ev_binds)
         ; let res_pat = ConPat { pat_con   = L con_span $ PatSynCon pat_syn
+                               , pat_ty_args = ty_arg_pats
                                , pat_args  = arg_pats'
                                , pat_con_ext = ConPatTc
                                  { cpt_tvs   = ex_tvs'
