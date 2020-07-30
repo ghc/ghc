@@ -42,12 +42,20 @@ module GHC.Integer.GMP.Internals
     , GmpLimb, GmpLimb#
     , GmpSize, GmpSize#
 
+      -- **
+
+    , isValidBigNat#
+    , sizeofBigNat#
+    , zeroBigNat
+    , oneBigNat
+
     ) where
 
 import GHC.Integer
 import GHC.Natural
 import GHC.Num.Integer (Integer(..))
 import qualified GHC.Num.Integer as I
+import qualified GHC.Num.BigNat as B
 import GHC.Types
 import GHC.Prim
 
@@ -112,3 +120,19 @@ type GmpLimb = Word
 type GmpLimb# = Word#
 type GmpSize = Int
 type GmpSize# = Int#
+
+{-# DEPRECATED sizeofBigNat# "Use bigNatSize# instead" #-}
+sizeofBigNat# :: BigNat -> GmpSize#
+sizeofBigNat# (BN# i) = B.bigNatSize# i
+
+{-# DEPRECATED isValidBigNat# "Use bigNatCheck# instead" #-}
+isValidBigNat# :: BigNat -> Int#
+isValidBigNat# (BN# i) = B.bigNatCheck# i
+
+{-# DEPRECATED zeroBigNat "Use bigNatZero instead" #-}
+zeroBigNat :: BigNat
+zeroBigNat = B.bigNatZero
+
+{-# DEPRECATED oneBigNat "Use bigNatOne instead" #-}
+oneBigNat :: BigNat
+oneBigNat = B.bigNatOne
