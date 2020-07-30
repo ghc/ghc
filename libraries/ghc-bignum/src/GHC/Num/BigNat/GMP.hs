@@ -349,7 +349,8 @@ bignat_powmod
    -> State# RealWorld
    -> State# RealWorld
 bignat_powmod r b e m s =
-   ioVoid (integer_gmp_powm# r b (wordArraySize# b) e (wordArraySize# e) m (wordArraySize# m)) s
+   case ioInt# (integer_gmp_powm# r b (wordArraySize# b) e (wordArraySize# e) m (wordArraySize# m)) s of
+      (# s', n #) -> mwaSetSize# r (narrowGmpSize# n) s'
 
 
 ----------------------------------------------------------------------

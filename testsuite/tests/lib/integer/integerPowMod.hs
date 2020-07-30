@@ -7,19 +7,12 @@ import Control.Monad
 
 import GHC.Word
 import GHC.Base
-import qualified GHC.Integer.GMP.Internals as I
-
-powModSecInteger :: Integer -> Integer -> Integer -> Integer
-powModSecInteger = I.powModSecInteger
-
-powModInteger :: Integer -> Integer -> Integer -> Integer
-powModInteger = I.powModInteger
+import GHC.Natural
 
 main :: IO ()
 main = do
-    print $ powModInteger b e m
-    print $ powModInteger b e (m-1)
-    print $ powModSecInteger b e (m-1)
+    print $ powModNatural b e m
+    print $ powModNatural b e (m-1)
 
   where
     b = 2988348162058574136915891421498819466320163312926952423791023078876139
