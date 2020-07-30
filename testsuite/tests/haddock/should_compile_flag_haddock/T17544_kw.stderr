@@ -40,6 +40,7 @@
           []
           (Nothing)
           (PrefixCon
+           []
            [])
           ({ T17544_kw.hs:16:18-20 }
            (HsTyVar
@@ -84,6 +85,7 @@
           []
           (Nothing)
           (PrefixCon
+           []
            [(HsScaled
              (HsUnrestrictedArrow)
              ({ T17544_kw.hs:19:18-19 }
