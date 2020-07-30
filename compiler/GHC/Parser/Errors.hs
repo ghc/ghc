@@ -393,6 +393,8 @@ data Hint
    | SuggestLetInDo
    | SuggestPatternSynonyms
    | SuggestInfixBindMaybeAtPat !RdrName
+   | TypeApplicationsInPatternsOnlyDataCons -- ^ Type applications in patterns are only allowed on data constructors
+
 
 data LexErrKind
    = LexErrKind_EOF        -- ^ End of input

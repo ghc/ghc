@@ -1850,7 +1850,7 @@ rep_bind (L loc (PatSynBind _ (PSB { psb_id   = syn
     -- their pattern-only bound right hand sides have different names,
     -- we want to treat them the same in TH. This is the reason why we
     -- need an adjusted mkGenArgSyms in the `RecCon` case below.
-    mkGenArgSyms (PrefixCon args)     = mkGenSyms (map unLoc args)
+    mkGenArgSyms (PrefixCon _ args)   = mkGenSyms (map unLoc args)
     mkGenArgSyms (InfixCon arg1 arg2) = mkGenSyms [unLoc arg1, unLoc arg2]
     mkGenArgSyms (RecCon fields)
       = do { let pats = map (unLoc . recordPatSynPatVar) fields
@@ -1876,7 +1876,7 @@ repPatSynD (MkC syn) (MkC args) (MkC dir) (MkC pat)
   = rep2 patSynDName [syn, args, dir, pat]
 
 repPatSynArgs :: HsPatSynDetails GhcRn -> MetaM (Core (M TH.PatSynArgs))
-repPatSynArgs (PrefixCon args)
+repPatSynArgs (PrefixCon _ args)
   = do { args' <- repList nameTyConName lookupLOcc args
        ; repPrefixPatSynArgs args' }
 repPatSynArgs (InfixCon arg1 arg2)
@@ -1982,7 +1982,9 @@ repP (SumPat _ p alt arity) = do { p1 <- repLP p
 repP (ConPat NoExtField dc details)
  = do { con_str <- lookupLOcc dc
       ; case details of
-         PrefixCon ps -> do { qs <- repLPs ps; repPcon con_str qs }
+         PrefixCon tyargs ps -> do { qs <- repLPs ps
+                                   ; ts <- repListM typeTyConName (repTy . unLoc . hsps_body) tyargs
+                                   ; repPcon con_str ts qs }
          RecCon rec   -> do { fps <- repListM fieldPatTyConName rep_fld (rec_flds rec)
                             ; repPrec con_str fps }
          InfixCon p1 p2 -> do { p1' <- repLP p1;
@@ -1994,7 +1996,6 @@ repP (ConPat NoExtField dc details)
    rep_fld (L _ fld) = do { MkC v <- lookupLOcc (hsRecFieldSel fld)
                           ; MkC p <- repLP (hsRecFieldArg fld)
                           ; rep2 fieldPatName [v,p] }
-
 repP (NPat _ (L _ l) Nothing _) = do { a <- repOverloadedLiteral l
                                      ; repPlit a }
 repP (ViewPat _ e p) = do { e' <- repLE e; p' <- repLP p; repPview e' p' }
@@ -2215,8 +2216,8 @@ repPunboxedSum (MkC p) alt arity
                              , mkIntExprInt platform alt
                              , mkIntExprInt platform arity ] }
 
-repPcon   :: Core TH.Name -> Core [(M TH.Pat)] -> MetaM (Core (M TH.Pat))
-repPcon (MkC s) (MkC ps) = rep2 conPName [s, ps]
+repPcon   :: Core TH.Name -> Core [(M TH.Type)] -> Core [(M TH.Pat)] -> MetaM (Core (M TH.Pat))
+repPcon (MkC s) (MkC ts) (MkC ps) = rep2 conPName [s, ts, ps]
 
 repPrec   :: Core TH.Name -> Core [M (TH.Name, TH.Pat)] -> MetaM (Core (M TH.Pat))
 repPrec (MkC c) (MkC rps) = rep2 recPName [c,rps]
@@ -2605,11 +2606,11 @@ repConstr :: HsConDeclDetails GhcRn
           -> Maybe (LHsType GhcRn)
           -> [Core TH.Name]
           -> MetaM (Core (M TH.Con))
-repConstr (PrefixCon ps) Nothing [con]
+repConstr (PrefixCon _ ps) Nothing [con]
     = do arg_tys  <- repListM bangTypeTyConName repBangTy (map hsScaledThing ps)
          rep2 normalCName [unC con, unC arg_tys]
 
-repConstr (PrefixCon ps) (Just res_ty) cons
+repConstr (PrefixCon _ ps) (Just res_ty) cons
     = do arg_tys     <- repListM bangTypeTyConName repBangTy (map hsScaledThing ps)
          res_ty' <- repLTy res_ty
          rep2 gadtCName [ unC (nonEmptyCoreList cons), unC arg_tys, unC res_ty']

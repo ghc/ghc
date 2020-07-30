@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP                 #-}
 {-# LANGUAGE DeriveFunctor       #-}
 {-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE LambdaCase          #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
@@ -32,7 +33,7 @@ module GHC.Rename.Pat (-- main entry points
               rnHsRecUpdFields,
 
               -- CpsRn monad
-              CpsRn, liftCps,
+              CpsRn, liftCps, liftCpsWithCont,
 
               -- Literals
               rnLit, rnOverLit,
@@ -76,7 +77,7 @@ import GHC.Builtin.Types   ( nilDataCon )
 import GHC.Core.DataCon
 import qualified GHC.LanguageExtensions as LangExt
 
-import Control.Monad       ( when, ap, guard )
+import Control.Monad       ( when, ap, guard, forM )
 import qualified Data.List.NonEmpty as NE
 import Data.Ratio
 
@@ -131,6 +132,9 @@ liftCpsFV :: RnM (a, FreeVars) -> CpsRn a
 liftCpsFV rn_thing = CpsRn (\k -> do { (v,fvs1) <- rn_thing
                                      ; (r,fvs2) <- k v
                                      ; return (r, fvs1 `plusFV` fvs2) })
+
+liftCpsWithCont :: (forall r. (b -> RnM (r, FreeVars)) -> RnM (r, FreeVars)) -> CpsRn b
+liftCpsWithCont = CpsRn
 
 wrapSrcSpanCps :: (a -> CpsRn b) -> Located a -> CpsRn (Located b)
 -- Set the location, and also wrap it around the value returned
@@ -522,32 +526,34 @@ rnConPatAndThen :: NameMaker
                 -> HsConPatDetails GhcPs
                 -> CpsRn (Pat GhcRn)
 
-rnConPatAndThen mk con (PrefixCon pats)
-  = do  { con' <- lookupConCps con
-        ; pats' <- rnLPatsAndThen mk pats
-        ; return $ ConPat
-            { pat_con_ext = noExtField
-            , pat_con = con'
-            , pat_args = PrefixCon pats'
-            }
-        }
-
-rnConPatAndThen mk con (InfixCon pat1 pat2)
-  = do  { con' <- lookupConCps con
-        ; pat1' <- rnLPatAndThen mk pat1
-        ; pat2' <- rnLPatAndThen mk pat2
-        ; fixity <- liftCps $ lookupFixityRn (unLoc con')
-        ; liftCps $ mkConOpPatRn con' fixity pat1' pat2' }
-
-rnConPatAndThen mk con (RecCon rpats)
-  = do  { con' <- lookupConCps con
-        ; rpats' <- rnHsRecPatsAndThen mk con' rpats
-        ; return $ ConPat
-            { pat_con_ext = noExtField
-            , pat_con = con'
-            , pat_args = RecCon rpats'
-            }
-        }
+rnConPatAndThen mk con = \case
+  PrefixCon tyargs pats -> do
+    { con' <- lookupConCps con
+    ; tyargs' <- forM tyargs $ \t ->
+        liftCpsWithCont $ rnHsPatSigTypeBindingVars HsTypeCtx t
+    ; pats' <- rnLPatsAndThen mk pats
+    ; return $ ConPat
+      { pat_con_ext = noExtField
+      , pat_con = con'
+      , pat_args = PrefixCon tyargs' pats'
+      }
+    }
+  InfixCon pat1 pat2 -> do
+    { con' <- lookupConCps con
+    ; pat1' <- rnLPatAndThen mk pat1
+    ; pat2' <- rnLPatAndThen mk pat2
+    ; fixity <- liftCps $ lookupFixityRn (unLoc con')
+    ; liftCps $ mkConOpPatRn con' fixity pat1' pat2'
+    }
+  RecCon rpats -> do
+    { con' <- lookupConCps con
+    ; rpats' <- rnHsRecPatsAndThen mk con' rpats
+    ; return $ ConPat
+      { pat_con_ext = noExtField
+      , pat_con = con'
+      , pat_args = RecCon rpats'
+      }
+    }
 
 checkUnusedRecordWildcardCps :: SrcSpan -> Maybe [Name] -> CpsRn ()
 checkUnusedRecordWildcardCps loc dotdot_names =
