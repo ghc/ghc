@@ -4136,7 +4136,8 @@ checkValidDataCon dflags existential_ok tc con
       = hang herald 2 (text "on the" <+> speakNth n
                        <+> text "argument of" <+> quotes (ppr con))
 
-    data_con_display_type = dataConDisplayType dflags con
+    show_linear_types     = xopt LangExt.LinearTypes dflags
+    data_con_display_type = dataConDisplayType show_linear_types con
 
 -------------------------------
 checkNewDataCon :: DataCon -> TcM ()
@@ -4152,10 +4153,10 @@ checkNewDataCon con
           [ text "A newtype cannot have an unlifted argument type"
           , text "Perhaps you intended to use UnliftedNewtypes"
           ]
-        ; dflags <- getDynFlags
+        ; show_linear_types <- xopt LangExt.LinearTypes <$> getDynFlags
 
         ; let check_con what msg =
-               checkTc what (msg $$ ppr con <+> dcolon <+> ppr (dataConDisplayType dflags con))
+               checkTc what (msg $$ ppr con <+> dcolon <+> ppr (dataConDisplayType show_linear_types con))
 
         ; checkTc (ok_mult (scaledMult arg_ty1)) $
           text "A newtype constructor must be linear"
@@ -4843,10 +4844,10 @@ badGadtDecl tc_name
 
 badExistential :: DataCon -> SDoc
 badExistential con
-  = sdocWithDynFlags (\dflags ->
+  = sdocOption sdocLinearTypes (\show_linear_types ->
       hang (text "Data constructor" <+> quotes (ppr con) <+>
                   text "has existential type variables, a context, or a specialised result type")
-         2 (vcat [ ppr con <+> dcolon <+> ppr (dataConDisplayType dflags con)
+         2 (vcat [ ppr con <+> dcolon <+> ppr (dataConDisplayType show_linear_types con)
                  , parens $ text "Enable ExistentialQuantification or GADTs to allow this" ]))
 
 badStupidTheta :: Name -> SDoc
