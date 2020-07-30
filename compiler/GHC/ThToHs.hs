@@ -611,14 +611,6 @@ cvtConstr (ForallC tvs ctxt con)
       where
         all_tvs = tvs' ++ ex_tvs
 
-    -- The GadtC and RecGadtC cases of cvtConstr will always return a
-    -- ConDeclGADT, not a ConDeclGADTPrefixPs, so this case is unreachable.
-    -- See Note [GADT abstract syntax] in GHC.Hs.Decls for more on the
-    -- distinction between ConDeclGADT and ConDeclGADTPrefixPs.
-    add_forall _ _ con@(XConDecl (ConDeclGADTPrefixPs {})) =
-      pprPanic "cvtConstr.add_forall: Unexpected ConDeclGADTPrefixPs"
-               (Outputable.ppr con)
-
 cvtConstr (GadtC [] _strtys _ty)
   = failWith (text "GadtC must have at least one constructor name")
 
