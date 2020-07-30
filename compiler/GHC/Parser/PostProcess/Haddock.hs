@@ -716,15 +716,6 @@ instance HasHaddock (Located (ConDecl GhcPs)) where
               ConDeclH98 { con_ext, con_name, con_forall, con_ex_tvs, con_mb_cxt,
                            con_doc = con_doc',
                            con_args = RecCon (L l_rec flds') }
-      XConDecl (ConDeclGADTPrefixPs { con_gp_names, con_gp_ty }) -> do
-        -- discardHasInnerDocs is ok because we don't need this info for GADTs.
-        con_gp_doc' <- discardHasInnerDocs $ getConDoc (getLoc (head con_gp_names))
-        con_gp_ty' <- addHaddock con_gp_ty
-        pure $ L l_con_decl $
-          XConDecl (ConDeclGADTPrefixPs
-            { con_gp_names,
-              con_gp_ty = con_gp_ty',
-              con_gp_doc = con_gp_doc' })
 
 -- Keep track of documentation comments on the data constructor or any of its
 -- fields.
