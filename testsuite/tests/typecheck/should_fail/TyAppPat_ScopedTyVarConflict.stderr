@@ -1,0 +1,6 @@
+
+TyAppPat_ScopedTyVarConflict.hs:10:6: error:
+    Type variable ‘a’ would be inappropriately shadowed.
+
+TyAppPat_ScopedTyVarConflict.hs:11:6: error:
+    Type variable ‘a’ would be inappropriately shadowed.
