@@ -8,4 +8,4 @@ apat :: Q Pat
 apat = [p| Just @[a] xs |]
 
 main = do
-  print () 
+  print ()
