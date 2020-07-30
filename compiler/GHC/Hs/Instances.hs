@@ -168,8 +168,6 @@ deriving instance Data (ConDecl GhcPs)
 deriving instance Data (ConDecl GhcRn)
 deriving instance Data (ConDecl GhcTc)
 
-deriving instance Data ConDeclGADTPrefixPs
-
 -- deriving instance DataIdLR p p   => Data (TyFamInstDecl p)
 deriving instance Data (TyFamInstDecl GhcPs)
 deriving instance Data (TyFamInstDecl GhcRn)

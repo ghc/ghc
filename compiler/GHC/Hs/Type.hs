@@ -68,7 +68,7 @@ module GHC.Hs.Type (
         splitLHsInstDeclTy, getLHsInstDeclHead, getLHsInstDeclClass_maybe,
         splitLHsPatSynTy,
         splitLHsForAllTyInvis, splitLHsForAllTyInvis_KP, splitLHsQualTy,
-        splitLHsSigmaTyInvis, splitLHsGADTPrefixTy,
+        splitLHsSigmaTyInvis, splitLHsGadtTy,
         splitHsFunType, hsTyGetAppHead_maybe,
         mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
         ignoreParens, hsSigType, hsSigWcType, hsPatSigType,
@@ -1331,7 +1331,9 @@ mkHsAppKindTy ext ty k
 -- splitHsFunType decomposes a type (t1 -> t2 ... -> tn)
 -- Breaks up any parens in the result type:
 --      splitHsFunType (a -> (b -> c)) = ([a,b], c)
-splitHsFunType :: LHsType GhcRn -> ([HsScaled GhcRn (LHsType GhcRn)], LHsType GhcRn)
+splitHsFunType ::
+     LHsType (GhcPass p)
+  -> ([HsScaled (GhcPass p) (LHsType (GhcPass p))], LHsType (GhcPass p))
 splitHsFunType (L _ (HsParTy _ ty))
   = splitHsFunType ty
 
@@ -1460,7 +1462,7 @@ splitLHsSigmaTyInvis_KP ty
   , (mb_ctxt, ty2) <- splitLHsQualTy_KP ty1
   = (mb_tvbs, mb_ctxt, ty2)
 
--- | Decompose a prefix GADT type into its constituent parts.
+-- | Decompose a GADT type into its constituent parts.
 -- Returns @(mb_tvbs, mb_ctxt, body)@, where:
 --
 -- * @mb_tvbs@ are @Just@ the leading @forall@s, if they are provided.
@@ -1474,10 +1476,10 @@ splitLHsSigmaTyInvis_KP ty
 -- This function is careful not to look through parentheses.
 -- See @Note [GADT abstract syntax] (Wrinkle: No nested foralls or contexts)@
 -- "GHC.Hs.Decls" for why this is important.
-splitLHsGADTPrefixTy ::
+splitLHsGadtTy ::
      LHsType (GhcPass pass)
   -> (Maybe [LHsTyVarBndr Specificity (GhcPass pass)], Maybe (LHsContext (GhcPass pass)), LHsType (GhcPass pass))
-splitLHsGADTPrefixTy = splitLHsSigmaTyInvis_KP
+splitLHsGadtTy = splitLHsSigmaTyInvis_KP
 
 -- | Decompose a type of the form @forall <tvs>. body@ into its constituent
 -- parts. Only splits type variable binders that
