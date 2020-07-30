@@ -546,7 +546,6 @@ rnConPatAndThen mk con = \case
     liftCps $ mkConOpPatRn con' fixity pat1' pat2'
   RecCon rpats -> do
     con' <- lookupConCps con
-    -- NB: The tyargs list should be empty here, but we'll rename it anyway.
     rpats' <- rnHsRecPatsAndThen mk con' rpats
     return $ ConPat
       { pat_con_ext = noExtField
