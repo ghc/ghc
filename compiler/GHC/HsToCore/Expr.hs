@@ -745,6 +745,7 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
 
                  pat = noLoc $ ConPat { pat_con = noLoc con
                                       , pat_args = PrefixCon $ map nlVarPat arg_ids
+                                      , pat_ty_args = []
                                       , pat_con_ext = ConPatTc
                                         { cpt_tvs = ex_tvs
                                         , cpt_dicts = eqs_vars ++ theta_vars
