@@ -845,7 +845,7 @@ ppShortConstrParts summary dataInst con unicode qual
                      in case det of
 
         -- Prefix constructor, e.g. 'Just a'
-        PrefixCon args ->
+        PrefixCon _ args ->
           ( header_ +++
               hsep (ppOcc : map ((ppLParendType unicode qual HideEmptyContexts) . hsScaledThing) args)
           , noHtml
@@ -918,7 +918,7 @@ ppSideBySideConstr subdocs fixities unicode pkg qual (L _ con)
                          header_ = ppConstrHdr forall_ tyVars context unicode qual
                      in case det of
         -- Prefix constructor, e.g. 'Just a'
-        PrefixCon args
+        PrefixCon _ args
           | hasArgDocs -> header_ +++ ppOcc <+> fixity
           | otherwise -> hsep [ header_ +++ ppOcc
                               , hsep (map ((ppLParendType unicode qual HideEmptyContexts) . hsScaledThing) args)
@@ -959,7 +959,7 @@ ppSideBySideConstr subdocs fixities unicode pkg qual (L _ con)
           -- H98 record declarations
           RecCon (L _ fields)             -> [ doRecordFields fields ]
           -- H98 prefix data constructors
-          PrefixCon args | hasArgDocs     -> [ doConstrArgsWithDocs args ]
+          PrefixCon _ args | hasArgDocs   -> [ doConstrArgsWithDocs args ]
           -- H98 infix data constructor
           InfixCon arg1 arg2 | hasArgDocs -> [ doConstrArgsWithDocs [arg1,arg2] ]
           _                               -> []

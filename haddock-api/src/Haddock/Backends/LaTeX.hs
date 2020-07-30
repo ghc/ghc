@@ -784,7 +784,7 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
                          header_ = ppConstrHdr forall_ tyVars context unicode
                      in case det of
         -- Prefix constructor, e.g. 'Just a'
-        PrefixCon args
+        PrefixCon _ args
           | hasArgDocs -> header_ <+> ppOcc
           | otherwise -> hsep [ header_
                               , ppOcc
@@ -823,7 +823,7 @@ ppSideBySideConstr subdocs unicode leader (L _ con) =
           -- H98 record declarations
           RecCon (L _ fields)             -> doRecordFields fields
           -- H98 prefix data constructors
-          PrefixCon args | hasArgDocs     -> doConstrArgsWithDocs (map hsScaledThing args)
+          PrefixCon _ args | hasArgDocs   -> doConstrArgsWithDocs (map hsScaledThing args)
           -- H98 infix data constructor
           InfixCon arg1 arg2 | hasArgDocs -> doConstrArgsWithDocs (map hsScaledThing [arg1,arg2])
           _                               -> empty

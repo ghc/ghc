@@ -210,10 +210,10 @@ restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
         ConDeclGADT { con_g_args = args } -> restrict_gadt_args args
       where
         restrict_h98_args :: HsConDeclH98Details GhcRn -> Maybe (ConDecl GhcRn)
-        restrict_h98_args (PrefixCon _) = Just d
+        restrict_h98_args (PrefixCon _ _) = Just d
         restrict_h98_args (RecCon (L _ fields))
           | all field_avail fields = Just d
-          | otherwise = Just (d { con_args = PrefixCon (field_types fields) })
+          | otherwise = Just (d { con_args = PrefixCon noTypeArgs (field_types fields) })
           -- if we have *all* the field names available, then
           -- keep the record declaration.  Otherwise degrade to
           -- a constructor declaration.  This isn't quite right, but
