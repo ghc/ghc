@@ -173,6 +173,7 @@ data Pat p
   | ConPat {
         pat_con_ext :: XConPat p,
         pat_con     :: XRec p (ConLikeP p),
+        pat_ty_args :: [HsPatSigType (NoGhcTc p)],
         pat_args    :: HsConPatDetails p
     }
     -- ^ Constructor Pattern
@@ -574,15 +575,16 @@ pprPat (TuplePat _ pats bx)
   = tupleParens (boxityTupleSort bx) (pprWithCommas ppr pats)
 pprPat (SumPat _ pat alt arity) = sumParens (pprAlternative ppr pat alt arity)
 pprPat (ConPat { pat_con = con
+               , pat_ty_args = tyargs
                , pat_args = details
                , pat_con_ext = ext
                }
        )
   = case ghcPass @p of
-      GhcPs -> pprUserCon (unLoc con) details
-      GhcRn -> pprUserCon (unLoc con) details
+      GhcPs -> regular
+      GhcRn -> regular
       GhcTc -> sdocOption sdocPrintTypecheckerElaboration $ \case
-        False -> pprUserCon (unLoc con) details
+        False -> regular
         True  ->
           -- Tiresome; in 'GHC.Tc.Gen.Bind.tcRhs' we print out a typechecked Pat in an
           -- error message, and we want to make sure it prints nicely
@@ -594,6 +596,9 @@ pprPat (ConPat { pat_con = con
                        , cpt_dicts = dicts
                        , cpt_binds = binds
                        } = ext
+  where
+    regular :: OutputableBndr (ConLikeP (GhcPass p)) => SDoc
+    regular = pprUserCon (unLoc con) tyargs details
 pprPat (XPat ext) = case ghcPass @p of
 #if __GLASGOW_HASKELL__ < 811
   GhcPs -> noExtCon ext
@@ -606,9 +611,12 @@ pprPat (XPat ext) = case ghcPass @p of
     where CoPat co pat _ = ext
 
 pprUserCon :: (OutputableBndr con, OutputableBndrId p)
-           => con -> HsConPatDetails (GhcPass p) -> SDoc
-pprUserCon c (InfixCon p1 p2) = ppr p1 <+> pprInfixOcc c <+> ppr p2
-pprUserCon c details          = pprPrefixOcc c <+> pprConArgs details
+           => con -> [HsPatSigType (NoGhcTc (GhcPass p))] -> HsConPatDetails (GhcPass p) -> SDoc
+pprUserCon c _ (InfixCon p1 p2) = ppr p1 <+> pprInfixOcc c <+> ppr p2
+pprUserCon c tyargs details     = pprPrefixOcc c <+> pprTyArgs tyargs <+> pprConArgs details
+
+pprTyArgs :: (OutputableBndrId p) => [HsPatSigType (GhcPass p)] -> SDoc
+pprTyArgs tyargs = fsep (map (\ty -> char '@' <> ppr ty) tyargs)
 
 pprConArgs :: (OutputableBndrId p)
            => HsConPatDetails (GhcPass p) -> SDoc
@@ -646,6 +654,7 @@ mkPrefixConPat :: DataCon ->
 -- Make a vanilla Prefix constructor pattern
 mkPrefixConPat dc pats tys
   = noLoc $ ConPat { pat_con = noLoc (RealDataCon dc)
+                   , pat_ty_args = []
                    , pat_args = PrefixCon pats
                    , pat_con_ext = ConPatTc
                      { cpt_tvs = []
@@ -836,8 +845,8 @@ patNeedsParens p = go
     go :: Pat (GhcPass p) -> Bool
     go (NPlusKPat {})    = p > opPrec
     go (SplicePat {})    = False
-    go (ConPat { pat_args = ds})
-                         = conPatNeedsParens p ds
+    go (ConPat { pat_ty_args = ts, pat_args = ds})
+                         = conPatNeedsParens p ts ds
     go (SigPat {})       = p >= sigPrec
     go (ViewPat {})      = True
     go (XPat ext)        = case ghcPass @p of
@@ -866,12 +875,12 @@ patNeedsParens p = go
 
 -- | @'conPatNeedsParens' p cp@ returns 'True' if the constructor patterns @cp@
 -- needs parentheses under precedence @p@.
-conPatNeedsParens :: PprPrec -> HsConDetails a b -> Bool
+conPatNeedsParens :: PprPrec -> [t] -> HsConDetails a b -> Bool
 conPatNeedsParens p = go
   where
-    go (PrefixCon args) = p >= appPrec && not (null args)
-    go (InfixCon {})    = p >= opPrec
-    go (RecCon {})      = False
+    go ts (PrefixCon args) = p >= appPrec && (not (null args) || not (null ts))
+    go _  (InfixCon {})    = p >= opPrec -- type args should be empty in this case
+    go _  (RecCon {})      = False
 
 -- | @'parenthesizePat' p pat@ checks if @'patNeedsParens' p pat@ is true, and
 -- if so, surrounds @pat@ with a 'ParPat'. Otherwise, it simply returns @pat@.

@@ -568,7 +568,7 @@ mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
        ; return $ mkMatchGroup FromSource matches }
   where
     fromDecl (L loc decl@(ValD _ (PatBind _
-                         pat@(L _ (ConPat NoExtField ln@(L _ name) details))
+                         pat@(L _ (ConPat NoExtField ln@(L _ name) [] details))
                                rhs _))) =
         do { unless (name == patsyn_name) $
                wrongNameBindingErr loc decl
@@ -966,27 +966,29 @@ checkPattern_hints :: [Hint] -> PV (Located (PatBuilder GhcPs)) -> P (LPat GhcPs
 checkPattern_hints hints pp = runPV_hints hints (pp >>= checkLPat)
 
 checkLPat :: Located (PatBuilder GhcPs) -> PV (LPat GhcPs)
-checkLPat e@(L l _) = checkPat l e []
+checkLPat e@(L l _) = checkPat l e [] []
 
-checkPat :: SrcSpan -> Located (PatBuilder GhcPs) -> [LPat GhcPs]
+checkPat :: SrcSpan -> Located (PatBuilder GhcPs) -> [HsPatSigType GhcPs] -> [LPat GhcPs]
          -> PV (LPat GhcPs)
-checkPat loc (L l e@(PatBuilderVar (L _ c))) args
+checkPat loc (L l e@(PatBuilderVar (L _ c))) tyargs args
   | isRdrDataCon c = return . L loc $ ConPat
       { pat_con_ext = noExtField
       , pat_con = L l c
+      , pat_ty_args = tyargs
       , pat_args = PrefixCon args
       }
   | not (null args) && patIsRec c =
       add_hint SuggestRecursiveDo $
       patFail l (ppr e)
-checkPat loc (L _ (PatBuilderApp f e)) args
-  = do p <- checkLPat e
-       checkPat loc f (p : args)
-checkPat loc (L _ e) []
-  = do p <- checkAPat loc e
-       return (L loc p)
-checkPat loc e _
-  = patFail loc (ppr e)
+checkPat loc (L _ (PatBuilderAppType f t)) tyargs args = do
+  checkPat loc f (t : tyargs) args
+checkPat loc (L _ (PatBuilderApp f e)) [] args = do
+  p <- checkLPat e
+  checkPat loc f [] (p : args)
+checkPat loc (L _ e) [] [] = do
+  p <- checkAPat loc e
+  return (L loc p)
+checkPat loc e _ _ = patFail loc (ppr e)
 
 checkAPat :: SrcSpan -> PatBuilder GhcPs -> PV (Pat GhcPs)
 checkAPat loc e0 = do
@@ -1020,6 +1022,7 @@ checkAPat loc e0 = do
          return $ ConPat
            { pat_con_ext = noExtField
            , pat_con = L cl c
+           , pat_ty_args = []
            , pat_args = InfixCon l r
            }
 
@@ -1517,7 +1520,7 @@ instance DisambECP (PatBuilder GhcPs) where
   type FunArg (PatBuilder GhcPs) = PatBuilder GhcPs
   superFunArg m = m
   mkHsAppPV l p1 p2     = return $ L l (PatBuilderApp p1 p2)
-  mkHsAppTypePV l _ _   = addFatalError $ Error ErrTypeAppInPat [] l
+  mkHsAppTypePV l p t   = return $ L l (PatBuilderAppType p (mkHsPatSigType t))
   mkHsIfPV l _ _ _ _ _  = addFatalError $ Error ErrIfTheElseInPat [] l
   mkHsDoPV l _ _        = addFatalError $ Error ErrDoNotationInPat [] l
   mkHsParPV l p         = return $ L l (PatBuilderPar p)
@@ -1577,6 +1580,7 @@ mkPatRec (unLoc -> PatBuilderVar c) (HsRecFields fs dd)
        return $ PatBuilderPat $ ConPat
          { pat_con_ext = noExtField
          , pat_con = c
+         , pat_ty_args = []
          , pat_args = RecCon (HsRecFields fs dd)
          }
 mkPatRec p _ =

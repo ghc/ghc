@@ -943,10 +943,14 @@ instance HiePass p => ToHie (PScoped (Located (Pat (GhcPass p)))) where
       SumPat _ pat _ _ ->
         [ toHie $ PS rsp scope pscope pat
         ]
-      ConPat {pat_con = con, pat_args = dets, pat_con_ext = ext} ->
+      ConPat {pat_con = con, pat_ty_args = tyargs, pat_args = dets, pat_con_ext = ext} ->
         case hiePass @p of
           HieTc ->
             [ toHie $ C Use $ fmap conLikeName con
+            , concatM
+                [ toHie $ TS (ResolvedScopes [scope, pscope]) sig
+                | sig <- tyargs
+                ]
             , toHie $ contextify dets
             , let ev_binds = cpt_binds ext
                   ev_vars = cpt_dicts ext
@@ -956,7 +960,7 @@ instance HiePass p => ToHie (PScoped (Located (Pat (GhcPass p)))) where
                             , toHie $ L ospan wrap
                             , toHie $ map (C (EvidenceVarBind EvPatternBind evscope rsp)
                                           . L ospan) ev_vars
-                          ]
+                            ]
             ]
           HieRn ->
             [ toHie $ C Use con
