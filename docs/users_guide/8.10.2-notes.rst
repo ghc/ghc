@@ -6,6 +6,8 @@ Release notes for version 8.10.2
 The significant changes to the various parts of the compiler are listed in the
 following sections.
 
+Like previous releases in the 8.10 series, the :ghc-flag:`LLVM backend <-fllvm>`
+of this release is to be used with LLVM 9.
 
 Highlights
 ----------
