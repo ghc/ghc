@@ -670,34 +670,41 @@ mkConDeclH98 name mb_forall mb_cxt args
                , con_doc    = Nothing }
 
 -- | Construct a GADT-style data constructor from the constructor names and
--- their type. This will return different AST forms for record syntax
--- constructors and prefix constructors, as the latter must be handled
--- specially in the renamer. See @Note [GADT abstract syntax]@ in
--- "GHC.Hs.Decls" for the full story.
+-- their type. Some interesting aspects of this function:
+--
+-- * This splits up the constructor type into its quantified type variables (if
+--   provided), context (if provided), argument types, and result type, and
+--   records whether this is a prefix or record GADT constructor. See
+--   Note [GADT abstract syntax] in "GHC.Hs.Decls" for more details.
+--
+-- * If -XLinearTypes is not enabled, the function arrows in a prefix GADT
+--   constructor are always interpreted as linear. If -XLinearTypes is enabled,
+--   we faithfully record whether -> or #-> was used.
 mkGadtDecl :: [Located RdrName]
            -> LHsType GhcPs
-           -> ConDecl GhcPs
-mkGadtDecl names ty
-  | Just (mtvs, mcxt, args, res_ty) <- mb_record_gadt ty
-  = ConDeclGADT { con_g_ext  = noExtField
-                , con_names  = names
-                , con_forall = L (getLoc ty) $ isJust mtvs
-                , con_qvars  = fromMaybe [] mtvs
-                , con_mb_cxt = mcxt
-                , con_args   = args
-                , con_res_ty = res_ty
-                , con_doc    = Nothing }
-  | otherwise
-  = XConDecl $ ConDeclGADTPrefixPs { con_gp_names = names
-                                   , con_gp_ty    = mkLHsSigType ty
-                                   , con_gp_doc   = Nothing }
+           -> P (ConDecl GhcPs)
+mkGadtDecl names ty = do
+  linearEnabled <- getBit LinearTypesBit
+
+  let (args, res_ty)
+        | L _ (HsFunTy _ _w (L loc (HsRecTy _ rf)) res_ty) <- body_ty
+        = (RecCon (L loc rf), res_ty)
+        | otherwise
+        = let (arg_types, res_type) = splitHsFunType body_ty
+              arg_types' | linearEnabled = arg_types
+                         | otherwise     = map (hsLinear . hsScaledThing) arg_types
+          in (PrefixCon arg_types', res_type)
+
+  pure $ ConDeclGADT { con_g_ext  = noExtField
+                     , con_names  = names
+                     , con_forall = L (getLoc ty) $ isJust mtvs
+                     , con_qvars  = fromMaybe [] mtvs
+                     , con_mb_cxt = mcxt
+                     , con_args   = args
+                     , con_res_ty = res_ty
+                     , con_doc    = Nothing }
   where
-    mb_record_gadt ty
-      | (mtvs, mcxt, body_ty) <- splitLHsGADTPrefixTy ty
-      , L _ (HsFunTy _ _w (L loc (HsRecTy _ rf)) res_ty) <- body_ty
-      = Just (mtvs, mcxt, RecCon (L loc rf), res_ty)
-      | otherwise
-      = Nothing
+    (mtvs, mcxt, body_ty) = splitLHsGadtTy ty
 
 setRdrNameSpace :: RdrName -> NameSpace -> RdrName
 -- ^ This rather gruesome function is used mainly by the parser.
