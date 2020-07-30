@@ -38,6 +38,7 @@ module GHC.Integer.GMP.Internals
 
       -- * The 'BigNat' type
     , BigNat(..)
+    , sizeofBigNat#
 
     , GmpLimb, GmpLimb#
     , GmpSize, GmpSize#
@@ -48,6 +49,7 @@ import GHC.Integer
 import GHC.Natural
 import GHC.Num.Integer (Integer(..))
 import qualified GHC.Num.Integer as I
+import qualified GHC.Num.BigNat as B
 import GHC.Types
 import GHC.Prim
 
@@ -107,6 +109,10 @@ bigNatToInteger (BN# i) = I.integerFromBigNat# i
 {-# DEPRECATED bigNatToNegInteger "Use integerFromBigNatNeg# instead" #-}
 bigNatToNegInteger :: BigNat -> Integer
 bigNatToNegInteger (BN# i) = I.integerFromBigNatNeg# i
+
+{-# DEPRECATED sizeofBigNat# "Use bigNatSize# instead" #-}
+sizeofBigNat# :: BigNat -> GmpSize#
+sizeofBigNat# (BN# i) = B.bigNatSize# i
 
 type GmpLimb = Word
 type GmpLimb# = Word#
