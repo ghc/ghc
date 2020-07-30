@@ -3,16 +3,17 @@
 
 -}
 
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module GHC.Rename.HsType (
         -- Type related stuff
         rnHsType, rnLHsType, rnLHsTypes, rnContext,
         rnHsKind, rnLHsKind, rnLHsTypeArgs,
-        rnHsSigType, rnHsWcType,
+        rnHsSigType, rnHsWcType, rnHsPatSigTypeBindingVars,
         HsSigWcTypeScoping(..), rnHsSigWcType, rnHsPatSigType,
         newTyVarNameRn,
         rnConDeclFields,
@@ -68,8 +69,8 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.List          ( nubBy, partition )
-import Control.Monad      ( unless, when )
+import Data.List
+import Control.Monad
 
 #include "HsVersions.h"
 
@@ -183,6 +184,39 @@ rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
        ; (wcs, hs_ty', fvs) <- rnWcBody ctxt nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = hs_ty' }
        ; return (sig_ty', fvs) }
+
+-- Similar to rnHsWcType, but rather than requiring free variables in the type to
+-- already be in scope, we are going to require them not to be in scope,
+-- and we bind them.
+rnHsPatSigTypeBindingVars :: HsDocContext
+                          -> HsPatSigType GhcPs
+                          -> (HsPatSigType GhcRn -> RnM (r, FreeVars))
+                          -> RnM (r, FreeVars)
+rnHsPatSigTypeBindingVars ctxt sigType thing_inside = case sigType of
+  (HsPS { hsps_body = hs_ty' }) -> do
+    rdr_env <- getLocalRdrEnv
+    let (varsInScope, varsNotInScope) =
+          partition (inScope rdr_env . unLoc) (extractHsTyRdrTyVars hs_ty')
+    when (not (null varsInScope)) $
+      addErr $
+        vcat
+          [ text "Type variable" <> plural varsInScope
+            <+> hcat (punctuate (text ",") (map (quotes . ppr) varsInScope))
+            <+> text "are already in scope."
+          , text "Type applications in patterns must bind fresh variables, without shadowing."
+          ]
+    (wcVars', ibVars') <- partition_nwcs varsNotInScope
+    rnImplicitBndrsNoDups ctxt Nothing ibVars' $ \ ibVars -> do
+      (wcVars, hs_ty, fvs) <- rnWcBody ctxt wcVars' hs_ty'
+      let sig_ty = HsPS
+            { hsps_body = hs_ty
+            , hsps_ext = HsPSRn
+              { hsps_nwcs    = wcVars
+              , hsps_imp_tvs = ibVars
+              }
+            }
+      (res, fvs') <- thing_inside sig_ty
+      return (res, fvs `plusFV` fvs')
 
 rnWcBody :: HsDocContext -> [Located RdrName] -> LHsType GhcPs
          -> RnM ([Name], LHsType GhcRn, FreeVars)
@@ -410,6 +444,31 @@ rnImplicitBndrs mb_assoc implicit_vs_with_dups thing_inside
        ; bindLocalNamesFV vars $
          thing_inside vars }
 
+rnImplicitBndrsNoDups :: HsDocContext
+                      -> Maybe assoc
+                      -- ^ @'Just' _@ => an associated type decl
+                      -> FreeKiTyVars
+                      -- ^ Surface-syntax free vars that we will implicitly bind.
+                      -- May have duplicates, which are removed here.
+                      -> ([Name] -> RnM (a, FreeVars))
+                      -> RnM (a, FreeVars)
+rnImplicitBndrsNoDups ctx mb_assoc implicit_vs_with_dups thing_inside
+  = do { implicit_vs <- forM (groupBy eqLocated $ sortBy cmpLocated implicit_vs_with_dups) $ \case
+           [x] -> return x
+           (x:_) -> do addErr $ text "Variable" <+> text "`" <> ppr x <> text "'" <+> text "would be bound multiple times by" <+> pprHsDocContext ctx <> text "."
+                       return x
+           [] -> pprPanic "rnImplicitBndrsNoDups" $ text "Data.List.group somehow managed to produce an empty group."
+
+       ; traceRn "rnImplicitBndrsNoDups" $
+         vcat [ ppr implicit_vs_with_dups, ppr implicit_vs ]
+
+         -- Use the currently set SrcSpan as the new source location for each Name.
+         -- See Note [Source locations for implicitly bound type variables].
+       ; loc <- getSrcSpanM
+       ; vars <- mapM (newTyVarNameRn mb_assoc . L loc . unLoc) implicit_vs
+
+       ; bindLocalNamesFV vars $
+         thing_inside vars }
 {-
 Note [Source locations for implicitly bound type variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1383,7 +1442,7 @@ mkOpFormRn arg1 op fix arg2                     -- Default case, no rearrangment
 mkConOpPatRn :: Located Name -> Fixity -> LPat GhcRn -> LPat GhcRn
              -> RnM (Pat GhcRn)
 
-mkConOpPatRn op2 fix2 p1@(L loc (ConPat NoExtField op1 (InfixCon p11 p12))) p2
+mkConOpPatRn op2 fix2 p1@(L loc (ConPat NoExtField op1 ts (InfixCon p11 p12))) p2
   = do  { fix1 <- lookupFixityRn (unLoc op1)
         ; let (nofix_error, associate_right) = compareFixity fix1 fix2
 
@@ -1393,6 +1452,7 @@ mkConOpPatRn op2 fix2 p1@(L loc (ConPat NoExtField op1 (InfixCon p11 p12))) p2
                 ; return $ ConPat
                     { pat_con_ext = noExtField
                     , pat_con = op2
+                    , pat_ty_args = ts
                     , pat_args = InfixCon p1 p2
                     }
                 }
@@ -1402,6 +1462,7 @@ mkConOpPatRn op2 fix2 p1@(L loc (ConPat NoExtField op1 (InfixCon p11 p12))) p2
                 ; return $ ConPat
                     { pat_con_ext = noExtField
                     , pat_con = op1
+                    , pat_ty_args = ts
                     , pat_args = InfixCon p11 (L loc new_p)
                     }
                 }
@@ -1409,6 +1470,7 @@ mkConOpPatRn op2 fix2 p1@(L loc (ConPat NoExtField op1 (InfixCon p11 p12))) p2
           else return $ ConPat
                  { pat_con_ext = noExtField
                  , pat_con = op2
+                 , pat_ty_args = ts
                  , pat_args = InfixCon p1 p2
                  }
         }
@@ -1418,12 +1480,13 @@ mkConOpPatRn op _ p1 p2                         -- Default case, no rearrangment
     return $ ConPat
       { pat_con_ext = noExtField
       , pat_con = op
+      , pat_ty_args = []
       , pat_args = InfixCon p1 p2
       }
 
 not_op_pat :: Pat GhcRn -> Bool
-not_op_pat (ConPat NoExtField _ (InfixCon _ _)) = False
-not_op_pat _                                    = True
+not_op_pat (ConPat NoExtField _ _ (InfixCon _ _)) = False
+not_op_pat _                                      = True
 
 --------------------------------------
 checkPrecMatch :: Name -> MatchGroup GhcRn body -> RnM ()
@@ -1451,7 +1514,7 @@ checkPrecMatch op (MG { mg_alts = (L _ ms) })
         -- second eqn.
 
 checkPrec :: Name -> Pat GhcRn -> Bool -> IOEnv (Env TcGblEnv TcLclEnv) ()
-checkPrec op (ConPat NoExtField op1 (InfixCon _ _)) right = do
+checkPrec op (ConPat NoExtField op1 _ (InfixCon _ _)) right = do
     op_fix@(Fixity _ op_prec  op_dir) <- lookupFixityRn op
     op1_fix@(Fixity _ op1_prec op1_dir) <- lookupFixityRn (unLoc op1)
     let

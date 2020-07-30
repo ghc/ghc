@@ -1980,10 +1980,12 @@ repP (TuplePat _ ps boxed)
   | otherwise           = do { qs <- repLPs ps; repPunboxedTup qs }
 repP (SumPat _ p alt arity) = do { p1 <- repLP p
                                  ; repPunboxedSum p1 alt arity }
-repP (ConPat NoExtField dc details)
+repP (ConPat NoExtField dc tyargs details)
  = do { con_str <- lookupLOcc dc
       ; case details of
-         PrefixCon ps -> do { qs <- repLPs ps; repPcon con_str qs }
+         PrefixCon ps -> do { qs <- repLPs ps
+                            ; ts <- repListM typeTyConName (repTy . unLoc . hsps_body) tyargs
+                            ; repPcon con_str ts qs }
          RecCon rec   -> do { fps <- repListM fieldPatTyConName rep_fld (rec_flds rec)
                             ; repPrec con_str fps }
          InfixCon p1 p2 -> do { p1' <- repLP p1;
@@ -1995,7 +1997,6 @@ repP (ConPat NoExtField dc details)
    rep_fld (L _ fld) = do { MkC v <- lookupLOcc (hsRecFieldSel fld)
                           ; MkC p <- repLP (hsRecFieldArg fld)
                           ; rep2 fieldPatName [v,p] }
-
 repP (NPat _ (L _ l) Nothing _) = do { a <- repOverloadedLiteral l
                                      ; repPlit a }
 repP (ViewPat _ e p) = do { e' <- repLE e; p' <- repLP p; repPview e' p' }
@@ -2216,8 +2217,8 @@ repPunboxedSum (MkC p) alt arity
                              , mkIntExprInt platform alt
                              , mkIntExprInt platform arity ] }
 
-repPcon   :: Core TH.Name -> Core [(M TH.Pat)] -> MetaM (Core (M TH.Pat))
-repPcon (MkC s) (MkC ps) = rep2 conPName [s, ps]
+repPcon   :: Core TH.Name -> Core [(M TH.Type)] -> Core [(M TH.Pat)] -> MetaM (Core (M TH.Pat))
+repPcon (MkC s) (MkC ts) (MkC ps) = rep2 conPName [s, ts, ps]
 
 repPrec   :: Core TH.Name -> Core [M (TH.Name, TH.Pat)] -> MetaM (Core (M TH.Pat))
 repPrec (MkC c) (MkC rps) = rep2 recPName [c,rps]
