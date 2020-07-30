@@ -36,67 +36,62 @@
        (Nothing)
        (Nothing)
        [({ T15323.hs:6:5-54 }
-         (XConDecl
-          (ConDeclGADTPrefixPs
-           [({ T15323.hs:6:5-14 }
-             (Unqual
-              {OccName: TestParens}))]
-           (HsIB
-            (NoExtField)
-            ({ T15323.hs:6:20-54 }
-             (HsForAllTy
-              (NoExtField)
-              (HsForAllInvis
+         (ConDeclGADT
+          (NoExtField)
+          [({ T15323.hs:6:5-14 }
+            (Unqual
+             {OccName: TestParens}))]
+          ({ T15323.hs:6:20-54 }
+           (True))
+          [({ T15323.hs:6:27 }
+            (UserTyVar
+             (NoExtField)
+             (SpecifiedSpec)
+             ({ T15323.hs:6:27 }
+              (Unqual
+               {OccName: v}))))]
+          (Just
+           ({ T15323.hs:6:31-36 }
+            [({ T15323.hs:6:31-36 }
+              (HsParTy
                (NoExtField)
-               [({ T15323.hs:6:27 }
-                 (UserTyVar
-                  (NoExtField)
-                  (SpecifiedSpec)
-                  ({ T15323.hs:6:27 }
-                   (Unqual
-                    {OccName: v}))))])
-              ({ T15323.hs:6:31-54 }
-               (HsQualTy
-                (NoExtField)
-                ({ T15323.hs:6:31-36 }
-                 [({ T15323.hs:6:31-36 }
-                   (HsParTy
-                    (NoExtField)
-                    ({ T15323.hs:6:32-35 }
-                     (HsAppTy
-                      (NoExtField)
-                      ({ T15323.hs:6:32-33 }
-                       (HsTyVar
-                        (NoExtField)
-                        (NotPromoted)
-                        ({ T15323.hs:6:32-33 }
-                         (Unqual
-                          {OccName: Eq}))))
-                      ({ T15323.hs:6:35 }
-                       (HsTyVar
-                        (NoExtField)
-                        (NotPromoted)
-                        ({ T15323.hs:6:35 }
-                         (Unqual
-                          {OccName: v}))))))))])
-                ({ T15323.hs:6:41-54 }
-                 (HsAppTy
-                  (NoExtField)
-                  ({ T15323.hs:6:41-52 }
-                   (HsTyVar
-                    (NoExtField)
-                    (NotPromoted)
-                    ({ T15323.hs:6:41-52 }
-                     (Unqual
-                      {OccName: MaybeDefault}))))
-                  ({ T15323.hs:6:54 }
-                   (HsTyVar
-                    (NoExtField)
-                    (NotPromoted)
-                    ({ T15323.hs:6:54 }
-                     (Unqual
-                      {OccName: v})))))))))))
-           (Nothing))))]
+               ({ T15323.hs:6:32-35 }
+                (HsAppTy
+                 (NoExtField)
+                 ({ T15323.hs:6:32-33 }
+                  (HsTyVar
+                   (NoExtField)
+                   (NotPromoted)
+                   ({ T15323.hs:6:32-33 }
+                    (Unqual
+                     {OccName: Eq}))))
+                 ({ T15323.hs:6:35 }
+                  (HsTyVar
+                   (NoExtField)
+                   (NotPromoted)
+                   ({ T15323.hs:6:35 }
+                    (Unqual
+                     {OccName: v}))))))))]))
+          (PrefixCon
+           [])
+          ({ T15323.hs:6:41-54 }
+           (HsAppTy
+            (NoExtField)
+            ({ T15323.hs:6:41-52 }
+             (HsTyVar
+              (NoExtField)
+              (NotPromoted)
+              ({ T15323.hs:6:41-52 }
+               (Unqual
+                {OccName: MaybeDefault}))))
+            ({ T15323.hs:6:54 }
+             (HsTyVar
+              (NoExtField)
+              (NotPromoted)
+              ({ T15323.hs:6:54 }
+               (Unqual
+                {OccName: v}))))))
+          (Nothing)))]
        ({ <no location info> }
         [])))))]
   (Nothing)

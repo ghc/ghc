@@ -372,31 +372,35 @@
              (Nothing)
              (Nothing)
              [({ T17544.hs:25:5-18 }
-               (XConDecl
-                (ConDeclGADTPrefixPs
-                 [({ T17544.hs:25:5-8 }
-                   (Unqual
-                    {OccName: MkD5}))]
-                 (HsIB
+               (ConDeclGADT
+                (NoExtField)
+                [({ T17544.hs:25:5-8 }
+                  (Unqual
+                   {OccName: MkD5}))]
+                ({ T17544.hs:25:13-18 }
+                 (False))
+                []
+                (Nothing)
+                (PrefixCon
+                 [])
+                ({ T17544.hs:25:13-18 }
+                 (HsAppTy
                   (NoExtField)
-                  ({ T17544.hs:25:13-18 }
-                   (HsAppTy
+                  ({ T17544.hs:25:13-14 }
+                   (HsTyVar
                     (NoExtField)
+                    (NotPromoted)
                     ({ T17544.hs:25:13-14 }
-                     (HsTyVar
-                      (NoExtField)
-                      (NotPromoted)
-                      ({ T17544.hs:25:13-14 }
-                       (Unqual
-                        {OccName: D5}))))
+                     (Unqual
+                      {OccName: D5}))))
+                  ({ T17544.hs:25:16-18 }
+                   (HsTyVar
+                    (NoExtField)
+                    (NotPromoted)
                     ({ T17544.hs:25:16-18 }
-                     (HsTyVar
-                      (NoExtField)
-                      (NotPromoted)
-                      ({ T17544.hs:25:16-18 }
-                       (Unqual
-                        {OccName: Int})))))))
-                 (Nothing))))]
+                     (Unqual
+                      {OccName: Int}))))))
+                (Nothing)))]
              ({ <no location info> }
               []))))))]
        (Nothing)))))
@@ -504,31 +508,35 @@
              (Nothing)
              (Nothing)
              [({ T17544.hs:31:5-18 }
-               (XConDecl
-                (ConDeclGADTPrefixPs
-                 [({ T17544.hs:31:5-8 }
-                   (Unqual
-                    {OccName: MkD6}))]
-                 (HsIB
+               (ConDeclGADT
+                (NoExtField)
+                [({ T17544.hs:31:5-8 }
+                  (Unqual
+                   {OccName: MkD6}))]
+                ({ T17544.hs:31:13-18 }
+                 (False))
+                []
+                (Nothing)
+                (PrefixCon
+                 [])
+                ({ T17544.hs:31:13-18 }
+                 (HsAppTy
                   (NoExtField)
-                  ({ T17544.hs:31:13-18 }
-                   (HsAppTy
+                  ({ T17544.hs:31:13-14 }
+                   (HsTyVar
                     (NoExtField)
+                    (NotPromoted)
                     ({ T17544.hs:31:13-14 }
-                     (HsTyVar
-                      (NoExtField)
-                      (NotPromoted)
-                      ({ T17544.hs:31:13-14 }
-                       (Unqual
-                        {OccName: D6}))))
+                     (Unqual
+                      {OccName: D6}))))
+                  ({ T17544.hs:31:16-18 }
+                   (HsTyVar
+                    (NoExtField)
+                    (NotPromoted)
                     ({ T17544.hs:31:16-18 }
-                     (HsTyVar
-                      (NoExtField)
-                      (NotPromoted)
-                      ({ T17544.hs:31:16-18 }
-                       (Unqual
-                        {OccName: Int})))))))
-                 (Nothing))))]
+                     (Unqual
+                      {OccName: Int}))))))
+                (Nothing)))]
              ({ <no location info> }
               []))))))]
        (Nothing)))))
@@ -636,31 +644,35 @@
              (Nothing)
              (Nothing)
              [({ T17544.hs:37:5-18 }
-               (XConDecl
-                (ConDeclGADTPrefixPs
-                 [({ T17544.hs:37:5-8 }
-                   (Unqual
-                    {OccName: MkD7}))]
-                 (HsIB
+               (ConDeclGADT
+                (NoExtField)
+                [({ T17544.hs:37:5-8 }
+                  (Unqual
+                   {OccName: MkD7}))]
+                ({ T17544.hs:37:13-18 }
+                 (False))
+                []
+                (Nothing)
+                (PrefixCon
+                 [])
+                ({ T17544.hs:37:13-18 }
+                 (HsAppTy
                   (NoExtField)
-                  ({ T17544.hs:37:13-18 }
-                   (HsAppTy
+                  ({ T17544.hs:37:13-14 }
+                   (HsTyVar
                     (NoExtField)
+                    (NotPromoted)
                     ({ T17544.hs:37:13-14 }
-                     (HsTyVar
-                      (NoExtField)
-                      (NotPromoted)
-                      ({ T17544.hs:37:13-14 }
-                       (Unqual
-                        {OccName: D7}))))
+                     (Unqual
+                      {OccName: D7}))))
+                  ({ T17544.hs:37:16-18 }
+                   (HsTyVar
+                    (NoExtField)
+                    (NotPromoted)
                     ({ T17544.hs:37:16-18 }
-                     (HsTyVar
-                      (NoExtField)
-                      (NotPromoted)
-                      ({ T17544.hs:37:16-18 }
-                       (Unqual
-                        {OccName: Int})))))))
-                 (Nothing))))]
+                     (Unqual
+                      {OccName: Int}))))))
+                (Nothing)))]
              ({ <no location info> }
               []))))))]
        (Nothing)))))
@@ -768,31 +780,35 @@
              (Nothing)
              (Nothing)
              [({ T17544.hs:43:5-18 }
-               (XConDecl
-                (ConDeclGADTPrefixPs
-                 [({ T17544.hs:43:5-8 }
-                   (Unqual
-                    {OccName: MkD8}))]
-                 (HsIB
+               (ConDeclGADT
+                (NoExtField)
+                [({ T17544.hs:43:5-8 }
+                  (Unqual
+                   {OccName: MkD8}))]
+                ({ T17544.hs:43:13-18 }
+                 (False))
+                []
+                (Nothing)
+                (PrefixCon
+                 [])
+                ({ T17544.hs:43:13-18 }
+                 (HsAppTy
                   (NoExtField)
-                  ({ T17544.hs:43:13-18 }
-                   (HsAppTy
+                  ({ T17544.hs:43:13-14 }
+                   (HsTyVar
                     (NoExtField)
+                    (NotPromoted)
                     ({ T17544.hs:43:13-14 }
-                     (HsTyVar
-                      (NoExtField)
-                      (NotPromoted)
-                      ({ T17544.hs:43:13-14 }
-                       (Unqual
-                        {OccName: D8}))))
+                     (Unqual
+                      {OccName: D8}))))
+                  ({ T17544.hs:43:16-18 }
+                   (HsTyVar
+                    (NoExtField)
+                    (NotPromoted)
                     ({ T17544.hs:43:16-18 }
-                     (HsTyVar
-                      (NoExtField)
-                      (NotPromoted)
-                      ({ T17544.hs:43:16-18 }
-                       (Unqual
-                        {OccName: Int})))))))
-                 (Nothing))))]
+                     (Unqual
+                      {OccName: Int}))))))
+                (Nothing)))]
              ({ <no location info> }
               []))))))]
        (Nothing)))))
@@ -900,31 +916,35 @@
              (Nothing)
              (Nothing)
              [({ T17544.hs:49:5-18 }
-               (XConDecl
-                (ConDeclGADTPrefixPs
-                 [({ T17544.hs:49:5-8 }
-                   (Unqual
-                    {OccName: MkD9}))]
-                 (HsIB
+               (ConDeclGADT
+                (NoExtField)
+                [({ T17544.hs:49:5-8 }
+                  (Unqual
+                   {OccName: MkD9}))]
+                ({ T17544.hs:49:13-18 }
+                 (False))
+                []
+                (Nothing)
+                (PrefixCon
+                 [])
+                ({ T17544.hs:49:13-18 }
+                 (HsAppTy
                   (NoExtField)
-                  ({ T17544.hs:49:13-18 }
-                   (HsAppTy
+                  ({ T17544.hs:49:13-14 }
+                   (HsTyVar
                     (NoExtField)
+                    (NotPromoted)
                     ({ T17544.hs:49:13-14 }
-                     (HsTyVar
-                      (NoExtField)
-                      (NotPromoted)
-                      ({ T17544.hs:49:13-14 }
-                       (Unqual
-                        {OccName: D9}))))
+                     (Unqual
+                      {OccName: D9}))))
+                  ({ T17544.hs:49:16-18 }
+                   (HsTyVar
+                    (NoExtField)
+                    (NotPromoted)
                     ({ T17544.hs:49:16-18 }
-                     (HsTyVar
-                      (NoExtField)
-                      (NotPromoted)
-                      ({ T17544.hs:49:16-18 }
-                       (Unqual
-                        {OccName: Int})))))))
-                 (Nothing))))]
+                     (Unqual
+                      {OccName: Int}))))))
+                (Nothing)))]
              ({ <no location info> }
               []))))))]
        (Nothing)))))
@@ -1032,31 +1052,35 @@
              (Nothing)
              (Nothing)
              [({ T17544.hs:55:5-20 }
-               (XConDecl
-                (ConDeclGADTPrefixPs
-                 [({ T17544.hs:55:5-9 }
-                   (Unqual
-                    {OccName: MkD10}))]
-                 (HsIB
+               (ConDeclGADT
+                (NoExtField)
+                [({ T17544.hs:55:5-9 }
+                  (Unqual
+                   {OccName: MkD10}))]
+                ({ T17544.hs:55:14-20 }
+                 (False))
+                []
+                (Nothing)
+                (PrefixCon
+                 [])
+                ({ T17544.hs:55:14-20 }
+                 (HsAppTy
                   (NoExtField)
-                  ({ T17544.hs:55:14-20 }
-                   (HsAppTy
+                  ({ T17544.hs:55:14-16 }
+                   (HsTyVar
                     (NoExtField)
+                    (NotPromoted)
                     ({ T17544.hs:55:14-16 }
-                     (HsTyVar
-                      (NoExtField)
-                      (NotPromoted)
-                      ({ T17544.hs:55:14-16 }
-                       (Unqual
-                        {OccName: D10}))))
+                     (Unqual
+                      {OccName: D10}))))
+                  ({ T17544.hs:55:18-20 }
+                   (HsTyVar
+                    (NoExtField)
+                    (NotPromoted)
                     ({ T17544.hs:55:18-20 }
-                     (HsTyVar
-                      (NoExtField)
-                      (NotPromoted)
-                      ({ T17544.hs:55:18-20 }
-                       (Unqual
-                        {OccName: Int})))))))
-                 (Nothing))))]
+                     (Unqual
+                      {OccName: Int}))))))
+                (Nothing)))]
              ({ <no location info> }
               []))))))]
        (Nothing)))))
