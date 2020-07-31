@@ -156,6 +156,13 @@ pprDwarfInfo platform haveSrc d
         pprDwarfInfoClose
     noChildren = pprDwarfInfoOpen platform haveSrc d
 
+-- | Print a CLabel name in a ".stringz \"LABEL\""
+pprLabelString :: Platform -> CLabel -> SDoc
+pprLabelString platform label =
+   pprString' -- we don't need to escape the string as labels don't contain exotic characters
+    $ withPprStyle (mkCodeStyle CStyle) -- force CStyle (foreign labels may be printed differently in AsmStyle)
+    $ pprCLabel_NCG platform label
+
 -- | Prints assembler data corresponding to DWARF info records. Note
 -- that the binary format of this is parameterized in @abbrevDecls@ and
 -- has to be kept in synch.
@@ -172,12 +179,11 @@ pprDwarfInfoOpen platform haveSrc (DwarfCompileUnit _ name producer compDir lowL
   $$ if haveSrc
      then sectionOffset platform (ptext lineLbl) (ptext dwarfLineLabel)
      else empty
-pprDwarfInfoOpen platform _ (DwarfSubprogram _ name label
-                                    parent) = sdocWithDynFlags $ \df ->
+pprDwarfInfoOpen platform _ (DwarfSubprogram _ name label parent) =
   ppr (mkAsmTempDieLabel label) <> colon
   $$ pprAbbrev abbrev
   $$ pprString name
-  $$ pprString (renderWithStyle (initSDocContext df (mkCodeStyle CStyle)) (ppr label))
+  $$ pprLabelString platform label
   $$ pprFlag (externallyVisibleCLabel label)
   $$ pprWord platform (ppr label)
   $$ pprWord platform (ppr $ mkAsmTempEndLabel label)
@@ -189,14 +195,14 @@ pprDwarfInfoOpen platform _ (DwarfSubprogram _ name label
                             Just _  -> DwAbbrSubprogramWithParent
     parentValue = maybe empty pprParentDie parent
     pprParentDie sym = sectionOffset platform (ppr sym) (ptext dwarfInfoLabel)
-pprDwarfInfoOpen _ _ (DwarfBlock _ label Nothing) = sdocWithDynFlags $ \df ->
+pprDwarfInfoOpen platform _ (DwarfBlock _ label Nothing) =
   ppr (mkAsmTempDieLabel label) <> colon
   $$ pprAbbrev DwAbbrBlockWithoutCode
-  $$ pprString (renderWithStyle (initSDocContext df (mkCodeStyle CStyle)) (ppr label))
-pprDwarfInfoOpen platform _ (DwarfBlock _ label (Just marker)) = sdocWithDynFlags $ \df ->
+  $$ pprLabelString platform label
+pprDwarfInfoOpen platform _ (DwarfBlock _ label (Just marker)) =
   ppr (mkAsmTempDieLabel label) <> colon
   $$ pprAbbrev DwAbbrBlock
-  $$ pprString (renderWithStyle (initSDocContext df (mkCodeStyle CStyle)) (ppr label))
+  $$ pprLabelString platform label
   $$ pprWord platform (ppr marker)
   $$ pprWord platform (ppr $ mkAsmTempEndLabel marker)
 pprDwarfInfoOpen _ _ (DwarfSrcNote ss) =

@@ -2,7 +2,7 @@
   This module handles generation of position independent code and
   dynamic-linking related issues for the native code generator.
 
-  This depends both the architecture and OS, so we define it here
+  This depends on both the architecture and OS, so we define it here
   instead of in one of the architecture specific modules.
 
   Things outside this module which are related to this:
@@ -62,20 +62,13 @@ import GHC.CmmToAsm.Config
 
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm
-import GHC.Cmm.CLabel           ( CLabel, ForeignLabelSource(..), pprCLabel,
-                          mkDynamicLinkerLabel, DynamicLinkerLabelInfo(..),
-                          dynamicLinkerLabelInfo, mkPicBaseLabel,
-                          labelDynamic, externallyVisibleCLabel )
-
-import GHC.Cmm.CLabel           ( mkForeignLabel )
-
+import GHC.Cmm.CLabel
 
 import GHC.Types.Basic
 import GHC.Unit.Module
 
 import GHC.Utils.Outputable
 
-import GHC.Driver.Session
 import GHC.Data.FastString
 
 
@@ -573,21 +566,21 @@ pprGotDeclaration config = case (arch,os) of
 -- and one for non-PIC.
 --
 
-pprImportedSymbol :: DynFlags -> NCGConfig -> CLabel -> SDoc
-pprImportedSymbol dflags config importedLbl = case (arch,os) of
+pprImportedSymbol :: NCGConfig -> CLabel -> SDoc
+pprImportedSymbol config importedLbl = case (arch,os) of
    (ArchX86, OSDarwin)
         | Just (CodeStub, lbl) <- dynamicLinkerLabelInfo importedLbl
         -> if not pic
              then
               vcat [
                   text ".symbol_stub",
-                  text "L" <> pprCLabel dflags lbl <> ptext (sLit "$stub:"),
-                      text "\t.indirect_symbol" <+> pprCLabel dflags lbl,
-                      text "\tjmp *L" <> pprCLabel dflags lbl
+                  text "L" <> ppr_lbl lbl <> ptext (sLit "$stub:"),
+                      text "\t.indirect_symbol" <+> ppr_lbl lbl,
+                      text "\tjmp *L" <> ppr_lbl lbl
                           <> text "$lazy_ptr",
-                  text "L" <> pprCLabel dflags lbl
+                  text "L" <> ppr_lbl lbl
                       <> text "$stub_binder:",
-                      text "\tpushl $L" <> pprCLabel dflags lbl
+                      text "\tpushl $L" <> ppr_lbl lbl
                           <> text "$lazy_ptr",
                       text "\tjmp dyld_stub_binding_helper"
               ]
@@ -595,16 +588,16 @@ pprImportedSymbol dflags config importedLbl = case (arch,os) of
               vcat [
                   text ".section __TEXT,__picsymbolstub2,"
                       <> text "symbol_stubs,pure_instructions,25",
-                  text "L" <> pprCLabel dflags lbl <> ptext (sLit "$stub:"),
-                      text "\t.indirect_symbol" <+> pprCLabel dflags lbl,
+                  text "L" <> ppr_lbl lbl <> ptext (sLit "$stub:"),
+                      text "\t.indirect_symbol" <+> ppr_lbl lbl,
                       text "\tcall ___i686.get_pc_thunk.ax",
                   text "1:",
-                      text "\tmovl L" <> pprCLabel dflags lbl
+                      text "\tmovl L" <> ppr_lbl lbl
                           <> text "$lazy_ptr-1b(%eax),%edx",
                       text "\tjmp *%edx",
-                  text "L" <> pprCLabel dflags lbl
+                  text "L" <> ppr_lbl lbl
                       <> text "$stub_binder:",
-                      text "\tlea L" <> pprCLabel dflags lbl
+                      text "\tlea L" <> ppr_lbl lbl
                           <> text "$lazy_ptr-1b(%eax),%eax",
                       text "\tpushl %eax",
                       text "\tjmp dyld_stub_binding_helper"
@@ -612,16 +605,16 @@ pprImportedSymbol dflags config importedLbl = case (arch,os) of
            $+$ vcat [        text ".section __DATA, __la_sym_ptr"
                     <> (if pic then int 2 else int 3)
                     <> text ",lazy_symbol_pointers",
-                text "L" <> pprCLabel dflags lbl <> ptext (sLit "$lazy_ptr:"),
-                    text "\t.indirect_symbol" <+> pprCLabel dflags lbl,
-                    text "\t.long L" <> pprCLabel dflags lbl
+                text "L" <> ppr_lbl lbl <> ptext (sLit "$lazy_ptr:"),
+                    text "\t.indirect_symbol" <+> ppr_lbl lbl,
+                    text "\t.long L" <> ppr_lbl lbl
                     <> text "$stub_binder"]
 
         | Just (SymbolPtr, lbl) <- dynamicLinkerLabelInfo importedLbl
         -> vcat [
                 text ".non_lazy_symbol_pointer",
-                char 'L' <> pprCLabel dflags lbl <> text "$non_lazy_ptr:",
-                text "\t.indirect_symbol" <+> pprCLabel dflags lbl,
+                char 'L' <> ppr_lbl lbl <> text "$non_lazy_ptr:",
+                text "\t.indirect_symbol" <+> ppr_lbl lbl,
                 text "\t.long\t0"]
 
         | otherwise
@@ -644,8 +637,8 @@ pprImportedSymbol dflags config importedLbl = case (arch,os) of
    (_, OSAIX) -> case dynamicLinkerLabelInfo importedLbl of
             Just (SymbolPtr, lbl)
               -> vcat [
-                   text "LC.." <> pprCLabel dflags lbl <> char ':',
-                   text "\t.long" <+> pprCLabel dflags lbl ]
+                   text "LC.." <> ppr_lbl lbl <> char ':',
+                   text "\t.long" <+> ppr_lbl lbl ]
             _ -> empty
 
    -- ELF / Linux
@@ -682,8 +675,8 @@ pprImportedSymbol dflags config importedLbl = case (arch,os) of
         -> case dynamicLinkerLabelInfo importedLbl of
             Just (SymbolPtr, lbl)
               -> vcat [
-                   text ".LC_" <> pprCLabel dflags lbl <> char ':',
-                   text "\t.quad" <+> pprCLabel dflags lbl ]
+                   text ".LC_" <> ppr_lbl lbl <> char ':',
+                   text "\t.quad" <+> ppr_lbl lbl ]
             _ -> empty
 
    _ | osElfTarget os
@@ -696,8 +689,8 @@ pprImportedSymbol dflags config importedLbl = case (arch,os) of
 
                  in vcat [
                       text ".section \".got2\", \"aw\"",
-                      text ".LC_" <> pprCLabel dflags lbl <> char ':',
-                      ptext symbolSize <+> pprCLabel dflags lbl ]
+                      text ".LC_" <> ppr_lbl lbl <> char ':',
+                      ptext symbolSize <+> ppr_lbl lbl ]
 
             -- PLT code stubs are generated automatically by the dynamic linker.
             _ -> empty
@@ -705,8 +698,9 @@ pprImportedSymbol dflags config importedLbl = case (arch,os) of
    _ -> panic "PIC.pprImportedSymbol: no match"
  where
    platform = ncgPlatform config
-   arch     = platformArch platform
-   os       = platformOS   platform
+   ppr_lbl  = pprCLabel_NCG platform
+   arch     = platformArch  platform
+   os       = platformOS    platform
    pic      = ncgPIC config
 
 --------------------------------------------------------------------------------

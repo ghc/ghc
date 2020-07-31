@@ -617,15 +617,15 @@ emitClosureProcAndInfoTable top_lvl bndr lf_info info_tbl args body
               conv  = if nodeMustPointToIt profile lf_info then NativeNodeCall
                                                           else NativeDirectCall
               (offset, _, _) = mkCallEntry profile conv args' []
-        ; emitClosureAndInfoTable info_tbl conv args' $ body (offset, node, arg_regs)
+        ; emitClosureAndInfoTable (profilePlatform profile) info_tbl conv args' $ body (offset, node, arg_regs)
         }
 
 -- Data constructors need closures, but not with all the argument handling
 -- needed for functions. The shared part goes here.
-emitClosureAndInfoTable ::
-  CmmInfoTable -> Convention -> [LocalReg] -> FCode () -> FCode ()
-emitClosureAndInfoTable info_tbl conv args body
+emitClosureAndInfoTable
+   :: Platform -> CmmInfoTable -> Convention -> [LocalReg] -> FCode () -> FCode ()
+emitClosureAndInfoTable platform info_tbl conv args body
   = do { (_, blks) <- getCodeScoped body
-       ; let entry_lbl = toEntryLbl (cit_lbl info_tbl)
+       ; let entry_lbl = toEntryLbl platform (cit_lbl info_tbl)
        ; emitProcWithConvention conv (Just info_tbl) entry_lbl args blks
        }
