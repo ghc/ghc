@@ -297,7 +297,7 @@ sqeSize = #{size struct io_uring_sqe}
 --       , showIt @Word32 "other"   #{peek struct io_uring_sqe, fsync_flags}
 --       , showIt @Word64 "userd"   #{peek struct io_uring_sqe, user_data}
 --       ]
--- 
+--
 --     showIt :: forall a. (Show a, Storable a)
 --            => String -> (Ptr Sqe -> IO a) -> IO String
 --     showIt name peekField = do

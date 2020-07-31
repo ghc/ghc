@@ -122,7 +122,7 @@ popAndCallbackAllCQEs state callback !poppedSoFar = do
 -- evtWrite = Event 2
 -- | Another thread closed the file descriptor.
 -- evtClose = Event 4
--- Events can be combined as binary flags, so eg evtRead <> evtClose would be Event 5 
+-- Events can be combined as binary flags, so eg evtRead <> evtClose would be Event 5
 -- as 0x1 .&. 0x4 == 0b001 .&. 0b100 == 0b101 == 0x5
 
 -- Meanwhile, io_uring poll event follow the event numberings from the poll(2) syscall
@@ -137,7 +137,7 @@ popAndCallbackAllCQEs state callback !poppedSoFar = do
 -- POLLRDBAND: 128
 -- POLLWRNORM: 256
 -- POLLWRBAND: 512
--- This means that we need to convert more fancily than just casting between numbers 
+-- This means that we need to convert more fancily than just casting between numbers
 
 convertEvent ::  EI.Event -> PollEvent.Event --naming is hard yo
 convertEvent e = remap EI.evtRead  PollEvent.pollIn .|.
