@@ -26,7 +26,9 @@ import GHC.Core.TyCo.FVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
 import GHC.Types.Name hiding (varName)
 import GHC.Types.Var
 import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import GHC.Utils.Misc (seqList)
+import GHC.Data.Maybe( orElse )
 
 import Data.List (mapAccumL)
 
@@ -209,16 +211,14 @@ tidyCo env@(_, subst) co
             -- the case above duplicates a bit of work in tidying h and the kind
             -- of tv. But the alternative is to use coercionKind, which seems worse.
     go (FunCo r w co1 co2)   = ((FunCo r $! go w) $! go co1) $! go co2
-    go (CoVarCo cv)          = case lookupVarEnv subst cv of
-                                 Nothing  -> CoVarCo cv
-                                 Just cv' -> CoVarCo cv'
+    go (CoVarCo cv)          = CoVarCo $! go_cv cv
     go (HoleCo h)            = HoleCo h
     go (AxiomInstCo con ind cos) = let args = map go cos
                                in  args `seqList` AxiomInstCo con ind args
     go (UnivCo p r t1 t2)    = (((UnivCo $! (go_prov p)) $! r) $!
                                 tidyType env t1) $! tidyType env t2
     go (SymCo co)            = SymCo $! go co
-    go (TransCo co1 co2)     = (TransCo $! go co1) $! go co2
+    go (TransCo c1 c2)       = (TransCo $! go c1) $! go c2
     go (NthCo r d co)        = NthCo r d $! go co
     go (LRCo lr co)          = LRCo lr $! go co
     go (InstCo co ty)        = (InstCo $! go co) $! go ty
@@ -227,9 +227,12 @@ tidyCo env@(_, subst) co
     go (AxiomRuleCo ax cos)  = let cos1 = tidyCos env cos
                                in cos1 `seqList` AxiomRuleCo ax cos1
 
+    go_cv cv = lookupVarEnv subst cv `orElse` cv
+
     go_prov (PhantomProv co)    = PhantomProv (go co)
     go_prov (ProofIrrelProv co) = ProofIrrelProv (go co)
     go_prov p@(PluginProv _)    = p
+    go_prov (ZapCoProv cvs)     =ZapCoProv $! mapDVarSet go_cv cvs
 
 tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
 tidyCos env = map (tidyCo env)

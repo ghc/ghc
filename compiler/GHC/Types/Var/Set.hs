@@ -26,7 +26,7 @@ module GHC.Types.Var.Set (
         nonDetStrictFoldVarSet,
 
         -- * Deterministic Var set types
-        DVarSet, DIdSet, DTyVarSet, DTyCoVarSet,
+        DVarSet, DIdSet, DCoVarSet, DTyVarSet, DTyCoVarSet,
 
         -- ** Manipulating these sets
         emptyDVarSet, unitDVarSet, mkDVarSet,
@@ -38,7 +38,7 @@ module GHC.Types.Var.Set (
         isEmptyDVarSet, delDVarSet, delDVarSetList,
         minusDVarSet,
         nonDetStrictFoldDVarSet,
-        filterDVarSet, mapDVarSet,
+        filterDVarSet, mapDVarSet, strictFoldDVarSet,
         dVarSetMinusVarSet, anyDVarSet, allDVarSet,
         transCloDVarSet,
         sizeDVarSet, seqDVarSet,
@@ -237,6 +237,9 @@ type DTyVarSet   = UniqDSet TyVar
 -- | Deterministic Type or Coercion Variable Set
 type DTyCoVarSet = UniqDSet TyCoVar
 
+-- | Deterministic Coercion Variable Set
+type DCoVarSet   = UniqDSet CoVar
+
 emptyDVarSet :: DVarSet
 emptyDVarSet = emptyUniqDSet
 
@@ -309,6 +312,9 @@ allDVarSet p = allUDFM p . getUniqDSet
 
 mapDVarSet :: Uniquable b => (a -> b) -> UniqDSet a -> UniqDSet b
 mapDVarSet = mapUniqDSet
+
+strictFoldDVarSet :: (a -> r -> r) -> r -> UniqDSet a -> r
+strictFoldDVarSet = strictFoldUniqDSet
 
 filterDVarSet :: (Var -> Bool) -> DVarSet -> DVarSet
 filterDVarSet = filterUniqDSet
