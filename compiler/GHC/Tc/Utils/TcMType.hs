@@ -1491,6 +1491,10 @@ collect_cand_qtvs_co orig_ty bound = go_co
     go_prov dv (PhantomProv co)    = go_co dv co
     go_prov dv (ProofIrrelProv co) = go_co dv co
     go_prov dv (PluginProv _)      = return dv
+    go_prov dv (ZapCoProv cvs)     = strictFoldDVarSet zt_cv (return dv) cvs
+
+    zt_cv :: CoVar -> TcM CandidatesQTvs -> TcM CandidatesQTvs
+    zt_cv cv mdvs = do { dvs <- mdvs; go_cv dvs cv }
 
     go_cv :: CandidatesQTvs -> CoVar -> TcM CandidatesQTvs
     go_cv dv@(DV { dv_cvs = cvs }) cv
@@ -2224,9 +2228,9 @@ zonkCo      :: Coercion -> TcM Coercion
 -- before all metavars are filled in.
 zonkTcTypeMapper :: TyCoMapper () TcM
 zonkTcTypeMapper = TyCoMapper
-  { tcm_tyvar = const zonkTcTyVar
-  , tcm_covar = const (\cv -> mkCoVarCo <$> zonkTyCoVarKind cv)
-  , tcm_hole  = hole
+  { tcm_tyvar      = const zonkTcTyVar
+  , tcm_covar      = const (\cv -> mkCoVarCo <$> zonkTyCoVarKind cv)
+  , tcm_hole       = hole
   , tcm_tycobinder = \_env tv _vis -> ((), ) <$> zonkTyCoVarKind tv
   , tcm_tycon      = zonkTcTyCon }
   where

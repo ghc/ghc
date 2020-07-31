@@ -64,7 +64,7 @@ module GHC.Core.TyCo.Rep (
         pickLR,
 
         -- ** Analyzing types
-        TyCoFolder(..), foldTyCo,
+        TyCoFolder(..), foldTyCo, noView,
 
         -- * Sizes
         typeSize, coercionSize, provSize,
@@ -1190,11 +1190,9 @@ data Coercion
     -- The number coercions should match exactly the expectations
     -- of the CoAxiomRule (i.e., the rule is fully saturated).
 
-  | UnivCo UnivCoProvenance Role Type Type
-      -- :: _ -> "e" -> _ -> _ -> e
+  | SymCo Coercion                   -- :: e -> e
 
-  | SymCo Coercion             -- :: e -> e
-  | TransCo Coercion Coercion  -- :: e -> e -> e
+  | TransCo    Coercion           Coercion  -- :: e -> e -> e
 
   | NthCo  Role Int Coercion     -- Zero-indexed; decomposes (T t0 ... tn)
     -- :: "e" -> _ -> e0 -> e (inverse of TyConAppCo, see Note [TyConAppCo roles])
@@ -1221,6 +1219,11 @@ data Coercion
 
   | HoleCo CoercionHole              -- ^ See Note [Coercion holes]
                                      -- Only present during typechecking
+
+
+  | UnivCo UnivCoProvenance Role Type Type
+      -- :: _ -> "e" -> _ -> _ -> e
+
   deriving Data.Data
 
 type CoercionN = Coercion       -- always nominal
@@ -1630,9 +1633,11 @@ data UnivCoProvenance
   | PluginProv String  -- ^ From a plugin, which asserts that this coercion
                        --   is sound. The string is for the use of the plugin.
 
+  | ZapCoProv DCoVarSet  -- ^ A zapped coercion
   deriving Data.Data
 
 instance Outputable UnivCoProvenance where
+  ppr (ZapCoProv cvs)    = parens (text "zap" <+> ppr cvs)
   ppr (PhantomProv _)    = text "(phantom)"
   ppr (ProofIrrelProv _) = text "(proof irrel.)"
   ppr (PluginProv str)   = parens (text "plugin" <+> brackets (text str))
@@ -1893,15 +1898,22 @@ data TyCoFolder env a
           -- ^ The returned env is used in the extended scope
       }
 
+noView :: Type -> Maybe Type  -- Simplest form of tcf_view
+{-# INLINE noView #-}
+noView _ = Nothing
+
 {-# INLINE foldTyCo  #-}  -- See Note [Specialising foldType]
-foldTyCo :: Monoid a => TyCoFolder env a -> env
-         -> (Type -> a, [Type] -> a, Coercion -> a, [Coercion] -> a)
+foldTyCo :: Monoid a => TyCoFolder env a
+         -> ( env -> Type       -> a
+            , env -> [Type]     -> a
+            , env -> Coercion   -> a
+            , env -> [Coercion] -> a )
 foldTyCo (TyCoFolder { tcf_view       = view
                      , tcf_tyvar      = tyvar
                      , tcf_tycobinder = tycobinder
                      , tcf_covar      = covar
-                     , tcf_hole       = cohole }) env
-  = (go_ty env, go_tys env, go_co env, go_cos env)
+                     , tcf_hole       = cohole })
+  = (go_ty, go_tys, go_co, go_cos)
   where
     go_ty env ty | Just ty' <- view ty = go_ty env ty'
     go_ty env (TyVarTy tv)      = tyvar env tv
@@ -1951,6 +1963,8 @@ foldTyCo (TyCoFolder { tcf_view       = view
       where
         env' = tycobinder env tv Inferred
 
+    go_prov env (ZapCoProv cvs)     = strictFoldDVarSet (mappend . covar env)
+                                                        mempty cvs
     go_prov env (PhantomProv co)    = go_co env co
     go_prov env (ProofIrrelProv co) = go_co env co
     go_prov _   (PluginProv _)      = mempty
@@ -1998,7 +2012,7 @@ coercionSize (HoleCo _)          = 1
 coercionSize (AxiomInstCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (UnivCo p _ t1 t2)  = 1 + provSize p + typeSize t1 + typeSize t2
 coercionSize (SymCo co)          = 1 + coercionSize co
-coercionSize (TransCo co1 co2)   = 1 + coercionSize co1 + coercionSize co2
+coercionSize (TransCo c1 c2)      = 1 + coercionSize c1 + coercionSize c2
 coercionSize (NthCo _ _ co)      = 1 + coercionSize co
 coercionSize (LRCo  _ co)        = 1 + coercionSize co
 coercionSize (InstCo co arg)     = 1 + coercionSize co + coercionSize arg
@@ -2010,6 +2024,7 @@ provSize :: UnivCoProvenance -> Int
 provSize (PhantomProv co)    = 1 + coercionSize co
 provSize (ProofIrrelProv co) = 1 + coercionSize co
 provSize (PluginProv _)      = 1
+provSize (ZapCoProv {})      = 1
 
 {-
 ************************************************************************

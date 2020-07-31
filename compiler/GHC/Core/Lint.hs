@@ -1602,9 +1602,17 @@ lintValueType ty
              2 (text "has kind:" <+> ppr sk)
         ; return ty' }
 
+-------------------
 checkTyCon :: TyCon -> LintM ()
 checkTyCon tc
   = checkL (not (isTcTyCon tc)) (text "Found TcTyCon:" <+> ppr tc)
+
+-------------------
+checkTyCoVarInScope :: TCvSubst -> TyCoVar -> LintM ()
+checkTyCoVarInScope subst tcv
+  = checkL (tcv `isInScope` subst) $
+    hang (text "The type or coercion variable" <+> pprBndr LetBind tcv)
+       2 (text "is out of scope")
 
 -------------------
 lintType :: Type -> LintM LintedType
@@ -1623,12 +1631,8 @@ lintType (TyVarTy tv)
            -- In GHCi we may lint an expression with a free
            -- type variable.  Then it won't be in the
            -- substitution, but it should be in scope
-           Nothing | tv `isInScope` subst
-                   -> return (TyVarTy tv)
-                   | otherwise
-                   -> failWithL $
-                      hang (text "The type variable" <+> pprBndr LetBind tv)
-                         2 (text "is out of scope")
+           Nothing -> do { checkTyCoVarInScope subst tv
+                         ; return (TyVarTy tv) }
      }
 
 lintType ty@(AppTy t1 t2)
@@ -1980,17 +1984,9 @@ lintCoercion (CoVarCo cv)
   = do { subst <- getTCvSubst
        ; case lookupCoVar subst cv of
            Just linted_co -> return linted_co ;
-           Nothing
-              | cv `isInScope` subst
-                   -> return (CoVarCo cv)
-              | otherwise
-                   ->
-                      -- lintCoBndr always extends the substitition
-                      failWithL $
-                      hang (text "The coercion variable" <+> pprBndr LetBind cv)
-                         2 (text "is out of scope")
+           Nothing        -> do { checkTyCoVarInScope subst cv
+                                ; return (CoVarCo cv) }
      }
-
 
 lintCoercion (Refl ty)
   = do { ty' <- lintType ty
@@ -2169,6 +2165,13 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
 
      lint_prov _ _ prov@(PluginProv _) = return prov
 
+     lint_prov _ _ (ZapCoProv cvs)
+        = do { subst <- getTCvSubst
+             ; mapM_ (checkTyCoVarInScope subst) (dVarSetElems cvs)
+               -- Don't bother to return substituted fvs;
+               -- they don't matter to Lint
+             ; return (ZapCoProv cvs) }
+
      check_kinds kco k1 k2
        = do { let Pair k1' k2' = coercionKind kco
             ; ensureEqTys k1 k1' (mkBadUnivCoMsg CLeft  co)
@@ -2180,14 +2183,7 @@ lintCoercion (SymCo co)
        ; return (SymCo co') }
 
 lintCoercion co@(TransCo co1 co2)
-  = do { co1' <- lintCoercion co1
-       ; co2' <- lintCoercion co2
-       ; let ty1b = coercionRKind co1'
-             ty2a = coercionLKind co2'
-       ; ensureEqTys ty1b ty2a
-               (hang (text "Trans coercion mis-match:" <+> ppr co)
-                   2 (vcat [ppr (coercionKind co1'), ppr (coercionKind co2')]))
-       ; lintRole co (coercionRole co1) (coercionRole co2)
+  = do { (co1', co2') <- lintTransCo co co1 co2
        ; return (TransCo co1' co2') }
 
 lintCoercion the_co@(NthCo r0 n co)
@@ -2331,6 +2327,19 @@ lintCoercion this@(AxiomRuleCo ax cos)
 lintCoercion (HoleCo h)
   = do { addErrL $ text "Unfilled coercion hole:" <+> ppr h
        ; lintCoercion (CoVarCo (coHoleCoVar h)) }
+
+lintTransCo :: InCoercion -> InCoercion -> InCoercion
+            -> LintM (LintedCoercion, LintedCoercion)
+lintTransCo co co1 co2
+  = do { co1' <- lintCoercion co1
+       ; co2' <- lintCoercion co2
+       ; let ty1b = coercionRKind co1'
+             ty2a = coercionLKind co2'
+       ; ensureEqTys ty1b ty2a
+               (hang (text "Trans coercion mis-match:" <+> ppr co)
+                   2 (vcat [ppr (coercionKind co1'), ppr (coercionKind co2')]))
+       ; lintRole co (coercionRole co1) (coercionRole co2)
+       ; return (co1', co2') }
 
 {-
 ************************************************************************

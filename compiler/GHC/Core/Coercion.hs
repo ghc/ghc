@@ -976,10 +976,12 @@ mkSymCo :: Coercion -> Coercion
 
 -- Do a few simple optimizations, but don't bother pushing occurrences
 -- of symmetry to the leaves; the optimizer will take care of that.
-mkSymCo co | isReflCo co          = co
-mkSymCo    (SymCo co)             = co
-mkSymCo    (SubCo (SymCo co))     = SubCo co
-mkSymCo co                        = SymCo co
+mkSymCo co | isReflCo co                     = co
+mkSymCo    (SymCo co)                        = co
+mkSymCo    (SubCo (SymCo co))                = SubCo co
+mkSymCo    (UnivCo z@(ZapCoProv {}) r t1 t2) = UnivCo z r t2 t1
+           -- ToDo: Other UnivCos?
+mkSymCo co = SymCo co
 
 -- | Create a new 'Coercion' by composing the two given 'Coercion's transitively.
 --   (co1 ; co2)
@@ -990,7 +992,6 @@ mkTransCo (GRefl r t1 (MCo co1)) (GRefl _ _ (MCo co2))
   = GRefl r t1 (MCo $ mkTransCo co1 co2)
 mkTransCo co1 co2                 = TransCo co1 co2
 
--- | Compose two MCoercions via transitivity
 mkTransMCo :: MCoercion -> MCoercion -> MCoercion
 mkTransMCo MRefl     co2       = co2
 mkTransMCo co1       MRefl     = co1
@@ -1196,8 +1197,9 @@ mkKindCo co
 mkSubCo :: Coercion -> Coercion
 -- Input coercion is Nominal, result is Representational
 -- see also Note [Role twiddling functions]
-mkSubCo (Refl ty) = GRefl Representational ty MRefl
-mkSubCo (GRefl Nominal ty co) = GRefl Representational ty co
+mkSubCo (Refl ty)                = GRefl Representational ty MRefl
+mkSubCo (GRefl Nominal ty co)    = GRefl Representational ty co
+mkSubCo (UnivCo p Nominal t1 t2) = UnivCo p Representational t1 t2
 mkSubCo (TyConAppCo Nominal tc cos)
   = TyConAppCo Representational tc (applyRoles tc cos)
 mkSubCo (FunCo Nominal w arg res)
@@ -1296,6 +1298,7 @@ setNominalRole_maybe r co
       | case prov of PhantomProv _    -> False  -- should always be phantom
                      ProofIrrelProv _ -> True   -- it's always safe
                      PluginProv _     -> False  -- who knows? This choice is conservative.
+                     ZapCoProv {}     -> False  -- Again, conservative
       = Just $ UnivCo prov Nominal co1 co2
     setNominalRole_maybe_helper _ = Nothing
 
@@ -1399,12 +1402,12 @@ promoteCoercion co = case co of
     AxiomInstCo {} -> mkKindCo co
     AxiomRuleCo {} -> mkKindCo co
 
-    UnivCo (PhantomProv kco) _ _ _    -> kco
-    UnivCo (ProofIrrelProv kco) _ _ _ -> kco
-    UnivCo (PluginProv _) _ _ _       -> mkKindCo co
+    UnivCo (PhantomProv kco) _ _ _     -> kco
+    UnivCo (ProofIrrelProv kco) _ _ _  -> kco
+    UnivCo (PluginProv {}) _ _ _       -> mkKindCo co
+    UnivCo (ZapCoProv {}) _ _ _        -> mkKindCo co
 
-    SymCo g
-      -> mkSymCo (promoteCoercion g)
+    SymCo g -> mkSymCo (promoteCoercion g)
 
     TransCo co1 co2
       -> mkTransCo (promoteCoercion co1) (promoteCoercion co2)
@@ -2162,6 +2165,7 @@ seqProv :: UnivCoProvenance -> ()
 seqProv (PhantomProv co)    = seqCo co
 seqProv (ProofIrrelProv co) = seqCo co
 seqProv (PluginProv _)      = ()
+seqProv (ZapCoProv cvs)     = seqDVarSet cvs
 
 seqCos :: [Coercion] -> ()
 seqCos []       = ()
@@ -2372,7 +2376,7 @@ coercionRole = go
     go (AxiomInstCo ax _ _) = coAxiomRole ax
     go (UnivCo _ r _ _)  = r
     go (SymCo co) = go co
-    go (TransCo co1 _co2) = go co1
+    go (TransCo co1 _)      = go co1
     go (NthCo r _d _co) = r
     go (LRCo {}) = Nominal
     go (InstCo co _) = go co
@@ -2940,11 +2944,12 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
 %************************************************************************
 -}
 
-bad_co_hole_ty :: Type -> Monoid.Any
-bad_co_hole_co :: Coercion -> Monoid.Any
+bad_co_hole_ty :: () -> Type -> Monoid.Any
+bad_co_hole_co :: () -> Coercion -> Monoid.Any
 (bad_co_hole_ty, _, bad_co_hole_co, _)
-  = foldTyCo folder ()
+  = foldTyCo folder
   where
+    folder :: TyCoFolder () Monoid.Any
     folder = TyCoFolder { tcf_view  = const Nothing
                         , tcf_tyvar = const2 (Monoid.Any False)
                         , tcf_covar = const2 (Monoid.Any False)
@@ -2962,9 +2967,9 @@ bad_co_hole_co :: Coercion -> Monoid.Any
 -- | Is there a blocking coercion hole in this type? See
 -- "GHC.Tc.Solver.Canonical" Note [Equalities with incompatible kinds]
 badCoercionHole :: Type -> Bool
-badCoercionHole = Monoid.getAny . bad_co_hole_ty
+badCoercionHole = Monoid.getAny . bad_co_hole_ty ()
 
 -- | Is there a blocking coercion hole in this coercion? See
 -- GHC.Tc.Solver.Canonical Note [Equalities with incompatible kinds]
 badCoercionHoleCo :: Coercion -> Bool
-badCoercionHoleCo = Monoid.getAny . bad_co_hole_co
+badCoercionHoleCo = Monoid.getAny . bad_co_hole_co ()

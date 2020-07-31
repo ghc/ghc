@@ -386,6 +386,9 @@ data IfaceUnivCoProv
   = IfacePhantomProv IfaceCoercion
   | IfaceProofIrrelProv IfaceCoercion
   | IfacePluginProv String
+  | IfaceZapCoProv [IfLclName] [Var]
+    -- Local covars and open (free) covars resp
+    -- See Note [Free tyvars in IfaceType]
 
 {- Note [Holes in IfaceCoercion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -565,7 +568,8 @@ substIfaceType env ty
 
     go_prov (IfacePhantomProv co)    = IfacePhantomProv (go_co co)
     go_prov (IfaceProofIrrelProv co) = IfaceProofIrrelProv (go_co co)
-    go_prov (IfacePluginProv str)    = IfacePluginProv str
+    go_prov co@(IfacePluginProv {})  = co
+    go_prov co@(IfaceZapCoProv {})   = co
 
 substIfaceAppArgs :: IfaceTySubst -> IfaceAppArgs -> IfaceAppArgs
 substIfaceAppArgs env args
@@ -1692,6 +1696,8 @@ pprIfaceUnivCoProv (IfaceProofIrrelProv co)
   = text "irrel" <+> pprParendIfaceCoercion co
 pprIfaceUnivCoProv (IfacePluginProv s)
   = text "plugin" <+> doubleQuotes (text s)
+pprIfaceUnivCoProv (IfaceZapCoProv cvs fcvs)
+  = hang (text "zap") 2 (sep [ppr cvs, ppr fcvs])
 
 -------------------
 instance Outputable IfaceTyCon where
@@ -2046,6 +2052,9 @@ instance Binary IfaceUnivCoProv where
   put_ bh (IfacePluginProv a) = do
           putByte bh 3
           put_ bh a
+  put_ bh (IfaceZapCoProv cvs fcvs)
+    = ASSERT2( null cvs, ppr cvs $$ ppr fcvs )
+      do { putByte bh 4; put_ bh cvs }
 
   get bh = do
       tag <- getByte bh
@@ -2056,8 +2065,8 @@ instance Binary IfaceUnivCoProv where
                    return $ IfaceProofIrrelProv a
            3 -> do a <- get bh
                    return $ IfacePluginProv a
-           _ -> panic ("get IfaceUnivCoProv " ++ show tag)
-
+           _ -> do cvs <- get bh
+                   return (IfaceZapCoProv cvs [])
 
 instance Binary (DefMethSpec IfaceType) where
     put_ bh VanillaDM     = putByte bh 0

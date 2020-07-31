@@ -54,12 +54,15 @@ import GHC.Types.Id.Info
 import GHC.Core.Predicate
 import GHC.Tc.Utils.Monad
 import GHC.Builtin.Names
+import GHC.Driver.Session( getDynFlags, zapCoercions )
 import GHC.Tc.TyCl.Build ( TcMethInfo, MethInfo )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Utils.Env   ( tcLookupGlobalOnly )
 import GHC.Tc.Types.Evidence
+import GHC.Core.TyCo.FVs as FVs
 import GHC.Core.TyCo.Ppr ( pprTyVar )
+import GHC.Core.TyCo.Rep ( Coercion(..), UnivCoProvenance(..) )
 import GHC.Builtin.Types.Prim
 import GHC.Core.TyCon
 import GHC.Builtin.Types
@@ -72,9 +75,11 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Var
 import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import GHC.Platform
 import GHC.Types.Basic
 import GHC.Data.Maybe
+import GHC.Data.Pair
 import GHC.Types.SrcLoc
 import GHC.Data.Bag
 import GHC.Utils.Outputable
@@ -87,6 +92,7 @@ import GHC.Core
 import {-# SOURCE #-} GHC.Tc.Gen.Splice (runTopSplice)
 
 import Control.Monad
+import Data.Semigroup as Semigroup
 import Data.List  ( partition )
 import Control.Arrow ( second )
 
@@ -209,7 +215,8 @@ data ZonkEnv  -- See Note [The ZonkEnv]
   = ZonkEnv { ze_flexi  :: ZonkFlexi
             , ze_tv_env :: TyCoVarEnv TyCoVar
             , ze_id_env :: IdEnv      Id
-            , ze_meta_tv_env :: TcRef (TyVarEnv Type) }
+            , ze_meta_tv_env :: TcRef (TyVarEnv Type)
+            , ze_zap_co :: Bool }
 
 {- Note [The ZonkEnv]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -297,10 +304,12 @@ emptyZonkEnv = mkEmptyZonkEnv DefaultFlexi
 mkEmptyZonkEnv :: ZonkFlexi -> TcM ZonkEnv
 mkEmptyZonkEnv flexi
   = do { mtv_env_ref <- newTcRef emptyVarEnv
+       ; dflags <- getDynFlags
        ; return (ZonkEnv { ze_flexi = flexi
                          , ze_tv_env = emptyVarEnv
                          , ze_id_env = emptyVarEnv
-                         , ze_meta_tv_env = mtv_env_ref }) }
+                         , ze_meta_tv_env = mtv_env_ref
+                         , ze_zap_co = zapCoercions dflags }) }
 
 initZonkEnv :: (ZonkEnv -> TcM b) -> TcM b
 initZonkEnv thing_inside = do { ze <- mkEmptyZonkEnv DefaultFlexi
@@ -1045,7 +1054,7 @@ zonkCoFn env (WpFun c1 c2 t1 d) = do { (env1, c1') <- zonkCoFn env c1
                                      ; (env2, c2') <- zonkCoFn env1 c2
                                      ; t1'         <- zonkScaledTcTypeToTypeX env2 t1
                                      ; return (env2, WpFun c1' c2' t1' d) }
-zonkCoFn env (WpCast co) = do { co' <- zonkCoToCo env co
+zonkCoFn env (WpCast co) = do { co' <- zonkCoercion env co
                               ; return (env, WpCast co') }
 zonkCoFn env (WpEvLam ev)   = do { (env', ev') <- zonkEvBndrX env ev
                                  ; return (env', WpEvLam ev') }
@@ -1058,7 +1067,7 @@ zonkCoFn env (WpTyApp ty)   = do { ty' <- zonkTcTypeToTypeX env ty
                                  ; return (env, WpTyApp ty') }
 zonkCoFn env (WpLet bs)     = do { (env1, bs') <- zonkTcEvBinds env bs
                                  ; return (env1, WpLet bs') }
-zonkCoFn env (WpMultCoercion co) = do { co' <- zonkCoToCo env co
+zonkCoFn env (WpMultCoercion co) = do { co' <- zonkCoercion env co
                                       ; return (env, WpMultCoercion co') }
 
 -------------------------------------------------------------------------
@@ -1564,12 +1573,12 @@ zonkCoreExpr env (Var v)
 zonkCoreExpr _ (Lit l)
     = return $ Lit l
 zonkCoreExpr env (Coercion co)
-    = Coercion <$> zonkCoToCo env co
+    = Coercion <$> zonkCoercion env co
 zonkCoreExpr env (Type ty)
     = Type <$> zonkTcTypeToTypeX env ty
 
 zonkCoreExpr env (Cast e co)
-    = Cast <$> zonkCoreExpr env e <*> zonkCoToCo env co
+    = Cast <$> zonkCoreExpr env e <*> zonkCoercion env co
 zonkCoreExpr env (Tick t e)
     = Tick t <$> zonkCoreExpr env e -- Do we need to zonk in ticks?
 
@@ -1838,7 +1847,7 @@ zonkCoHole :: ZonkEnv -> CoercionHole -> TcM Coercion
 zonkCoHole env hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
   = do { contents <- readTcRef ref
        ; case contents of
-           Just co -> do { co' <- zonkCoToCo env co
+           Just co -> do { co' <- zonkCoercion env co
                          ; checkCoercionHole cv co' }
 
               -- This next case should happen only in the presence of
@@ -1882,6 +1891,83 @@ zonkTcTypesToTypes tys = initZonkEnv $ \ ze -> zonkTcTypesToTypesX ze tys
 zonkScaledTcTypeToTypeX :: ZonkEnv -> Scaled TcType -> TcM (Scaled TcType)
 zonkScaledTcTypeToTypeX env (Scaled m ty) = Scaled <$> zonkTcTypeToTypeX env m
                                                    <*> zonkTcTypeToTypeX env ty
+
+zonkCoercion :: ZonkEnv -> TcCoercion -> TcM Coercion
+zonkCoercion ze co
+  | ze_zap_co ze = zapCoercion ze co
+  | otherwise    = zonkCoToCo ze co
+
+zapCoercion :: ZonkEnv -> TcCoercion -> TcM Coercion
+-- Zonk a coercion, perhpas zapping it
+zapCoercion ze co@(CoVarCo {})      = zonkCoToCo ze co
+zapCoercion ze co@(Refl {})         = zonkCoToCo ze co
+zapCoercion ze co@(GRefl _ _ MRefl) = zonkCoToCo ze co
+zapCoercion ze (GRefl r t (MCo co)) = do { co <- zapCoercion ze co
+                                         ; return (GRefl r t (MCo co)) }
+zapCoercion ze (AxiomInstCo ax br cos) = do { cos <- mapM (zapCoercion ze) cos
+                                            ; return (AxiomInstCo ax br cos) }
+zapCoercion ze (SymCo co) = mkSymCo <$> zapCoercion ze co
+
+-- The default case: make a zapped coercion
+-- This is where zapped coercions are born
+zapCoercion ze co = do { t1 <- zonkTcTypeToTypeX ze t1
+                       ; t2 <- zonkTcTypeToTypeX ze t2
+                       ; cvs <- coVarsOfCoM co
+                       ; return (mkUnivCo (ZapCoProv cvs) r t1 t2) }
+  where
+     (Pair t1 t2, r) = coercionKindRole co
+
+---------------
+coVarsOfCoM :: TcCoercion -> TcM DCoVarSet
+-- Find the free CoVars of an un-zonked TcCoercion -- but without
+-- zonking it and returning a perhaps large new coercion
+coVarsOfCoM co = runEndoM (co_vars_of_co FVs.emptyInScope co) emptyDVarSet
+
+co_vars_of_co :: FVs.InScopeBndrs -> TcCoercion -> EndoM TcM DCoVarSet
+co_vars_of_ty :: FVs.InScopeBndrs -> TcType     -> EndoM TcM DCoVarSet
+(co_vars_of_ty, _, co_vars_of_co, _) = foldTyCo co_vars_folder
+
+co_vars_folder :: TyCoFolder FVs.InScopeBndrs (EndoM TcM DCoVarSet)
+co_vars_folder = TyCoFolder { tcf_view = noView
+                            , tcf_tyvar = do_tyvar, tcf_covar = do_covar
+                            , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
+  where
+    do_tyvar _ _  = mempty
+    do_covar is v = EndoM do_it
+      where
+        do_it :: DCoVarSet -> TcM DCoVarSet
+        do_it acc | v `elemVarSet`  is  = return acc
+                  | v `elemDVarSet` acc = return acc
+                  | otherwise           = runEndoM (co_vars_of_ty is (varType v)) $
+                                          acc `extendDVarSet` v
+    do_bndr is tcv _ = extendVarSet is tcv
+
+    do_hole :: FVs.InScopeBndrs -> CoercionHole -> EndoM TcM DCoVarSet
+    do_hole is hole@(CoercionHole { ch_ref = ref })
+       = EndoM $ \ acc ->
+         do { contents <- readTcRef ref
+            ; case contents of
+                 Just co -> runEndoM (co_vars_of_co is co) acc
+                 Nothing -> do { traceTc "Zonking unfilled coercion hole (zap)" (ppr hole)
+                               ; return acc } }
+
+--------------------------------------
+-- EndoM is copied from package 'foldl', but I don't want
+-- to add a new dependency to GHC for 6 lines of code
+newtype EndoM m a = EndoM { runEndoM :: a -> m a }
+
+instance Monad m => Semigroup (EndoM m a) where
+    (EndoM f) <> (EndoM g) = EndoM (f <=< g)
+    {-# INLINE (<>) #-}
+
+instance Monad m => Monoid (EndoM m a) where
+    mempty = EndoM return
+    {-# INLINE mempty #-}
+    mappend = (Semigroup.<>)
+    {-# INLINE mappend #-}
+-- End of copy
+--------------------------------------
+
 
 zonkTcTypeToTypeX   :: ZonkEnv -> TcType   -> TcM Type
 zonkTcTypesToTypesX :: ZonkEnv -> [TcType] -> TcM [Type]

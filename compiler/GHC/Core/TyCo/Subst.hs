@@ -44,7 +44,7 @@ module GHC.Core.TyCo.Subst
         cloneTyVarBndr, cloneTyVarBndrs,
         substVarBndr, substVarBndrs,
         substTyVarBndr, substTyVarBndrs,
-        substCoVarBndr,
+        substCoVarBndr, substDCoVarSet,
         substTyVar, substTyVars, substTyCoVars,
         substForAllCoBndr,
         substVarBndrUsing, substForAllCoBndrUsing,
@@ -846,10 +846,18 @@ subst_co subst co
     go_prov (PhantomProv kco)    = PhantomProv (go kco)
     go_prov (ProofIrrelProv kco) = ProofIrrelProv (go kco)
     go_prov p@(PluginProv _)     = p
+    go_prov (ZapCoProv cvs)      = ZapCoProv $! substDCoVarSet subst cvs
 
     -- See Note [Substituting in a coercion hole]
     go_hole h@(CoercionHole { ch_co_var = cv })
       = h { ch_co_var = updateVarType go_ty cv }
+
+-- | Perform a substitution within a 'DVarSet' of free variables.
+substDCoVarSet :: TCvSubst -> DCoVarSet -> DCoVarSet
+substDCoVarSet subst = strictFoldDVarSet do_one emptyDVarSet
+  where
+    do_one :: CoVar -> DCoVarSet -> DCoVarSet
+    do_one = unionDVarSet . coVarsOfCoDSet . substCoVar subst
 
 substForAllCoBndr :: TCvSubst -> TyCoVar -> KindCoercion
                   -> (TCvSubst, TyCoVar, Coercion)

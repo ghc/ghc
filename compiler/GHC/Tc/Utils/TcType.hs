@@ -935,12 +935,12 @@ exactTyCoVarsOfTypes :: [Type] -> TyCoVarSet
 -- Find the free type variables (of any kind)
 -- but *expand* type synonyms.  See Note [Silly type synonym] above.
 
-exactTyCoVarsOfType  ty  = runTyCoVars (exact_ty ty)
-exactTyCoVarsOfTypes tys = runTyCoVars (exact_tys tys)
+exactTyCoVarsOfType  = runTyCoVars exact_ty
+exactTyCoVarsOfTypes = runTyCoVars exact_tys
 
-exact_ty  :: Type       -> Endo TyCoVarSet
-exact_tys :: [Type]     -> Endo TyCoVarSet
-(exact_ty, exact_tys, _, _) = foldTyCo exactTcvFolder emptyVarSet
+exact_ty  :: TyCoFvFun Type   TyCoVarSet
+exact_tys :: TyCoFvFun [Type] TyCoVarSet
+(exact_ty, exact_tys, _, _) = foldTyCo exactTcvFolder
 
 exactTcvFolder :: TyCoFolder TyCoVarSet (Endo TyCoVarSet)
 exactTcvFolder = deepTcvFolder { tcf_view = tcView }

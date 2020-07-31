@@ -178,7 +178,7 @@ module GHC.Core.Type (
         seqType, seqTypes,
 
         -- * Other views onto Types
-        coreView, tcView,
+        coreView, tcView, noView,
 
         tyConsOfType,
 
@@ -520,6 +520,7 @@ expandTypeSynonyms ty
     go_prov subst (PhantomProv co)    = PhantomProv (go_co subst co)
     go_prov subst (ProofIrrelProv co) = ProofIrrelProv (go_co subst co)
     go_prov _     p@(PluginProv _)    = p
+    go_prov _     p@(ZapCoProv _)     = p
 
       -- the "False" and "const" are to accommodate the type of
       -- substForAllCoBndrUsing, which is general enough to
@@ -671,9 +672,10 @@ idiom.
 -- | This describes how a "map" operation over a type/coercion should behave
 data TyCoMapper env m
   = TyCoMapper
-      { tcm_tyvar :: env -> TyVar -> m Type
-      , tcm_covar :: env -> CoVar -> m Coercion
-      , tcm_hole  :: env -> CoercionHole -> m Coercion
+      { tcm_tyvar   :: env -> TyVar -> m Type
+      , tcm_covar   :: env -> CoVar -> m Coercion
+
+      , tcm_hole    :: env -> CoercionHole -> m Coercion
           -- ^ What to do with coercion holes.
           -- See Note [Coercion holes] in "GHC.Core.TyCo.Rep".
 
@@ -700,11 +702,12 @@ mapTyCo mapper
         -> (go_ty (), go_tys (), go_co (), go_cos ())
 
 {-# INLINE mapTyCoX #-}  -- See Note [Specialising mappers]
-mapTyCoX :: Monad m => TyCoMapper env m
+mapTyCoX :: forall m env. Monad m
+         => TyCoMapper env m
          -> ( env -> Type       -> m Type
             , env -> [Type]     -> m [Type]
             , env -> Coercion   -> m Coercion
-            , env -> [Coercion] -> m[Coercion])
+            , env -> [Coercion] -> m [Coercion])
 mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
                      , tcm_tycobinder = tycobinder
                      , tcm_tycon = tycon
@@ -748,6 +751,7 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
     go_mco _   MRefl    = return MRefl
     go_mco env (MCo co) = MCo <$> (go_co env co)
 
+    go_co :: env -> Coercion -> m Coercion
     go_co env (Refl ty)           = Refl <$> go_ty env ty
     go_co env (GRefl r ty mco)    = mkGReflCo r <$> go_ty env ty <*> go_mco env mco
     go_co env (AppCo c1 c2)       = mkAppCo <$> go_co env c1 <*> go_co env c2
@@ -757,7 +761,6 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
     go_co env (UnivCo p r t1 t2)  = mkUnivCo <$> go_prov env p <*> pure r
                                     <*> go_ty env t1 <*> go_ty env t2
     go_co env (SymCo co)          = mkSymCo <$> go_co env co
-    go_co env (TransCo c1 c2)     = mkTransCo <$> go_co env c1 <*> go_co env c2
     go_co env (AxiomRuleCo r cos) = AxiomRuleCo r <$> go_cos env cos
     go_co env (NthCo r i co)      = mkNthCo r i <$> go_co env co
     go_co env (LRCo lr co)        = mkLRCo lr <$> go_co env co
@@ -765,6 +768,7 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
     go_co env (KindCo co)         = mkKindCo <$> go_co env co
     go_co env (SubCo co)          = mkSubCo <$> go_co env co
     go_co env (AxiomInstCo ax i cos) = mkAxiomInstCo ax i <$> go_cos env cos
+    go_co env (TransCo c1 c2)        = mkTransCo <$> go_co env c1 <*> go_co env c2
     go_co env co@(TyConAppCo r tc cos)
       | isTcTyCon tc
       = do { tc' <- tycon tc
@@ -786,7 +790,13 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
     go_prov env (PhantomProv co)    = PhantomProv <$> go_co env co
     go_prov env (ProofIrrelProv co) = ProofIrrelProv <$> go_co env co
     go_prov _   p@(PluginProv _)    = return p
+    go_prov env (ZapCoProv cvs)     = ZapCoProv <$> strictFoldDVarSet (do_cv env)
+                                                        (return emptyDVarSet) cvs
 
+    do_cv :: env -> CoVar -> m DTyCoVarSet -> m DTyCoVarSet
+    do_cv env v mfvs = do { fvs <- mfvs
+                          ; co  <- covar env v
+                          ; return (tyCoVarsOfCoDSet   co `unionDVarSet` fvs) }
 
 {-
 ************************************************************************
@@ -2810,6 +2820,7 @@ occCheckExpand vs_to_avoid ty
     go_prov cxt (PhantomProv co)    = PhantomProv <$> go_co cxt co
     go_prov cxt (ProofIrrelProv co) = ProofIrrelProv <$> go_co cxt co
     go_prov _   p@(PluginProv _)    = return p
+    go_prov _   p@(ZapCoProv _)     = return p
 
 
 {-
@@ -2863,6 +2874,7 @@ tyConsOfType ty
 
      go_prov (PhantomProv co)    = go_co co
      go_prov (ProofIrrelProv co) = go_co co
+     go_prov (ZapCoProv _)       = emptyUniqSet
      go_prov (PluginProv _)      = emptyUniqSet
         -- this last case can happen from the tyConsOfType used from
         -- checkTauTvUpdate

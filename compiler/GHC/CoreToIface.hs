@@ -79,6 +79,7 @@ import GHC.Types.Demand ( isTopSig )
 import GHC.Types.Cpr ( topCprSig )
 
 import Data.Maybe ( catMaybes )
+import Data.List( partition )
 
 {- Note [Avoiding space leaks in toIface*]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -164,7 +165,7 @@ toIfaceTypeX :: VarSet -> Type -> IfaceType
 --    translates the tyvars in 'free' as IfaceFreeTyVars
 --
 -- Synonyms are retained in the interface type
-toIfaceTypeX fr (TyVarTy tv)   -- See Note [TcTyVars in IfaceType] in GHC.Iface.Type
+toIfaceTypeX fr (TyVarTy tv)   -- See Note [Free tyvars in IfaceType] in GHC.Iface.Type
   | tv `elemVarSet` fr         = IfaceFreeTyVar tv
   | otherwise                  = IfaceTyVar (toIfaceTyVar tv)
 toIfaceTypeX fr ty@(AppTy {})  =
@@ -276,7 +277,7 @@ toIfaceCoercionX fr co
     go (Refl ty)            = IfaceReflCo (toIfaceTypeX fr ty)
     go (GRefl r ty mco)     = IfaceGReflCo r (toIfaceTypeX fr ty) (go_mco mco)
     go (CoVarCo cv)
-      -- See [TcTyVars in IfaceType] in GHC.Iface.Type
+      -- See [Free tyvars in IfaceType] in GHC.Iface.Type
       | cv `elemVarSet` fr  = IfaceFreeCoVar cv
       | otherwise           = IfaceCoVarCo (toIfaceCoVar cv)
     go (HoleCo h)           = IfaceHoleCo  (coHoleCoVar h)
@@ -311,6 +312,9 @@ toIfaceCoercionX fr co
     go_prov (PhantomProv co)    = IfacePhantomProv (go co)
     go_prov (ProofIrrelProv co) = IfaceProofIrrelProv (go co)
     go_prov (PluginProv str)    = IfacePluginProv str
+    go_prov (ZapCoProv cvs)     = IfaceZapCoProv (map toIfaceCoVar bound_cvs) free_cvs
+      where
+        (free_cvs, bound_cvs) = partition (`elemVarSet` fr) (dVarSetElems cvs)
 
 toIfaceTcArgs :: TyCon -> [Type] -> IfaceAppArgs
 toIfaceTcArgs = toIfaceTcArgsX emptyVarSet
