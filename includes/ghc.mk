@@ -70,6 +70,8 @@ $$(includes_$1_H_VERSION) : mk/project.mk | $$$$(dir $$$$@)/.
 	@echo "#if !defined(__GHCVERSION_H__)"                                   > $$@
 	@echo "#define __GHCVERSION_H__"                                        >> $$@
 	@echo                                                                   >> $$@
+	@echo "#define __FACEBOOK_HASKELL__"                                    >> $@@
+	@echo                                                                   >> $$@
 	@echo "#define __GLASGOW_HASKELL__ $$(ProjectVersionInt)"               >> $$@
 	@echo "#define __GLASGOW_HASKELL_FULL_VERSION__ \"$$(ProjectVersion)\"" >> $$@
 	@echo                                                                   >> $$@
