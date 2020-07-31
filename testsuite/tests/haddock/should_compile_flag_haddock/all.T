@@ -62,3 +62,4 @@ test('T17544_kw', normal, compile, ['-haddock -Winvalid-haddock -ddump-parsed-as
 test('haddockExtraDocs', normal, compile, ['-haddock -Winvalid-haddock'])
 test('haddockTySyn', normal, compile, ['-haddock -Winvalid-haddock -ddump-parsed'])
 test('T8944', normal, compile, ['-haddock -Winvalid-haddock -ddump-parsed'])
+test('T17652', normal, compile, ['-haddock -Winvalid-haddock -ddump-parsed'])
