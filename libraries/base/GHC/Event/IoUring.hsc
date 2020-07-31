@@ -24,14 +24,12 @@ available = False
 
 import GHC.Base
 import GHC.Enum
-import qualified GHC.Event.Internal as EI
+import qualified GHC.Event.Internal as EI ()
 import GHC.Num
 import GHC.Real
 import GHC.Word (Word64)
-import GHC.Show
 import System.Linux.IO.URing
 import System.Linux.IO.URing.Cqe
-import System.Linux.IO.URing.Ring
 import System.Linux.IO.URing.PollEvent as PollEvent
 import System.Posix.Types (Fd(..))
 import Control.Concurrent.MVar
@@ -40,7 +38,6 @@ import Data.Functor
 import Data.Int
 import Foreign.Marshal.Utils (with)
 
-type UserData = Int
 data UringState = UringState { ringLock :: MVar URing }
 
 -- public interface:
@@ -50,8 +47,8 @@ available = True
 new :: IO EI.Backend
 new = do
   ring <- newURing 512 -- why 512? Ideally we'd allow people to override this with a compilation flag and/or envvar
-  ringLock <- newMVar ring
-  let !be = EI.backend poll modifyFd modifyFdOnce delete (UringState ringLock)
+  lock <- newMVar ring
+  let !be = EI.backend poll modifyFd modifyFdOnce delete (UringState lock)
   return be
 
 -- The runtime will only ever request infinite or zero length timeout AFAICT. Only if this is used as a timer manager
@@ -60,12 +57,11 @@ poll :: UringState -> Maybe EI.Timeout -> (Fd -> EI.Event -> IO ()) -> IO Int
 poll state maybeTimeout callback = do
   cqesProcessed <- popAndCallbackAllCQEs state callback 0
   case cqesProcessed of
-    n -> return n -- Blocking is never required in this case
     0 -> case maybeTimeout of
       Nothing -> return 0
       Just EI.Forever -> do
         -- blocking wait in "safe" call for at least 1 event
-        EI.throwErrnoIfMinus1NoRetry "io_uring_enter submitAndWait" $ readMVar (ringLock state) >>= \ring -> submitAndWait ring (0 :: Int) (1 :: Int)
+        void $ EI.throwErrnoIfMinus1NoRetry "io_uring_enter submitAndWait" $ readMVar (ringLock state) >>= \ring -> submitAndWait ring (0 :: Int) (1 :: Int)
         popAndCallbackAllCQEs state callback 0
       -- As far as I can tell, the event manager will only ever request infinite or zero length timeouts, but
       -- the data constructor for finite timeouts exists so we might as well implement it.
@@ -79,10 +75,11 @@ poll state maybeTimeout callback = do
           case maybeSqeIndexTuple of
             Nothing -> return () -- SQE ring is full. Should never happen as we always submit immediately whenever we push an event onto the ring
             Just (sqeIdx, _) -> do
-              EI.throwErrnoIfMinus1NoRetry "io_uring_enter submit" $ submit ring 1 Nothing
+              void $ EI.throwErrnoIfMinus1NoRetry "io_uring_enter submit" $ submit ring 1 Nothing
               freeSqe ring sqeIdx
-        EI.throwErrnoIfMinus1NoRetry "io_uring_enter submitAndWait" $ readMVar (ringLock state) >>= \ring -> submitAndWait ring (0 :: Int) (1 :: Int)
+        void $ EI.throwErrnoIfMinus1NoRetry "io_uring_enter submitAndWait" $ readMVar (ringLock state) >>= \ring -> submitAndWait ring (0 :: Int) (1 :: Int)
         popAndCallbackAllCQEs state callback 0
+    n -> return n -- Blocking is never required in this case
 
 modifyFdOnce :: UringState -> Fd -> EI.Event -> IO Bool
 modifyFdOnce state fd evt = registerAndPostPollRequest state fd evt False
@@ -92,14 +89,14 @@ modifyFd state fd oldevts nextevts
   | oldevts == mempty  = registerAndPostPollRequest state fd nextevts True
   | nextevts == mempty = cancelPollRequest state fd oldevts
   | otherwise = do
-      cancelPollRequest state fd oldevts
+      void $ cancelPollRequest state fd oldevts
       registerAndPostPollRequest state fd nextevts True
 
 -- Clean up and terminate the backend
 -- It's not necessary to manually free the Uring structures in C land, they will be cleaned up by
 -- the GC when the Uring is collected.
 delete :: UringState -> IO ()
-delete state = return ()
+delete _ = return ()
 
 --internal calls:
 
@@ -173,7 +170,7 @@ registerAndPostPollRequest state fd evt isMultishot = withMVar (ringLock state) 
   maybeSqeIndexTuple <- postSqe ring (pollAdd fd (convertEvent evt) (fromIntegral userdata))
   case maybeSqeIndexTuple of
     Just (sqeIdx, _) -> do
-      n <- EI.throwErrnoIfMinus1NoRetry "io_uring_enter submit" $ submit ring 1 Nothing
+      _ <- EI.throwErrnoIfMinus1NoRetry "io_uring_enter submit" $ submit ring 1 Nothing
       freeSqe ring sqeIdx
       return True
     Nothing -> do
@@ -190,7 +187,7 @@ cancelPollRequest state fd evt = withMVar (ringLock state) $ \ring -> do
   maybeSqeIndexTuple2 <- postSqe ring (pollRemove (constructUserdata fd evt True True) (constructUserdata 0 (EI.evtNothing) False False))
   case (maybeSqeIndexTuple1, maybeSqeIndexTuple2) of
     (Just (sqeIdx1, _), Just (sqeIdx2, _)) -> do
-      EI.throwErrnoIfMinus1NoRetry "io_uring_enter submit" $ submit ring 2 Nothing
+      void $ EI.throwErrnoIfMinus1NoRetry "io_uring_enter submit" $ submit ring 2 Nothing
       freeSqe ring sqeIdx1
       freeSqe ring sqeIdx2
       return True
