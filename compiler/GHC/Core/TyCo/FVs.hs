@@ -14,11 +14,12 @@ module GHC.Core.TyCo.FVs
 
         shallowTyCoVarsOfCo, shallowTyCoVarsOfCos,
         tyCoVarsOfCo,        tyCoVarsOfCos,
-        coVarsOfType, coVarsOfTypes,
-        coVarsOfCo, coVarsOfCos,
         tyCoVarsOfCoDSet,
         tyCoFVsOfCo, tyCoFVsOfCos,
         tyCoVarsOfCoList,
+
+        coVarsOfType, coVarsOfTypes,
+        coVarsOfCo, coVarsOfCos, coVarsOfCoDSet,
 
         almostDevoidCoVarOfCo,
 
@@ -38,7 +39,7 @@ module GHC.Core.TyCo.FVs
         closeOverKinds,
 
         -- * Raw materials
-        Endo(..), runTyCoVars
+        Endo(..), TyCoFvFun, InScopeBndrs, emptyInScope, runTyCoVars
   ) where
 
 #include "HsVersions.h"
@@ -262,12 +263,16 @@ done by the Call Arity pass.
 TL;DR: check this regularly!
 -}
 
-runTyCoVars :: Endo TyCoVarSet -> TyCoVarSet
-{-# INLINE runTyCoVars #-}
-runTyCoVars f = appEndo f emptyVarSet
+type InScopeBndrs  = TyCoVarSet
+type TyCoFvFun a s = InScopeBndrs -> a -> Endo s
 
-noView :: Type -> Maybe Type
-noView _ = Nothing
+emptyInScope :: InScopeBndrs
+emptyInScope = emptyVarSet
+
+runTyCoVars :: TyCoFvFun a TyCoVarSet -> a -> TyCoVarSet
+{-# INLINE runTyCoVars #-}
+runTyCoVars f x = appEndo (f emptyInScope x) emptyVarSet
+
 
 {- *********************************************************************
 *                                                                      *
@@ -277,29 +282,29 @@ noView _ = Nothing
 ********************************************************************* -}
 
 tyCoVarsOfType :: Type -> TyCoVarSet
-tyCoVarsOfType ty = runTyCoVars (deep_ty ty)
+tyCoVarsOfType ty = runTyCoVars deep_ty ty
 -- Alternative:
 --   tyCoVarsOfType ty = closeOverKinds (shallowTyCoVarsOfType ty)
 
 tyCoVarsOfTypes :: [Type] -> TyCoVarSet
-tyCoVarsOfTypes tys = runTyCoVars (deep_tys tys)
+tyCoVarsOfTypes tys = runTyCoVars deep_tys tys
 -- Alternative:
 --   tyCoVarsOfTypes tys = closeOverKinds (shallowTyCoVarsOfTypes tys)
 
 tyCoVarsOfCo :: Coercion -> TyCoVarSet
 -- See Note [Free variables of Coercions]
-tyCoVarsOfCo co = runTyCoVars (deep_co co)
+tyCoVarsOfCo co = runTyCoVars deep_co co
 
 tyCoVarsOfCos :: [Coercion] -> TyCoVarSet
-tyCoVarsOfCos cos = runTyCoVars (deep_cos cos)
+tyCoVarsOfCos cos = runTyCoVars deep_cos cos
 
-deep_ty  :: Type       -> Endo TyCoVarSet
-deep_tys :: [Type]     -> Endo TyCoVarSet
-deep_co  :: Coercion   -> Endo TyCoVarSet
-deep_cos :: [Coercion] -> Endo TyCoVarSet
-(deep_ty, deep_tys, deep_co, deep_cos) = foldTyCo deepTcvFolder emptyVarSet
+deep_ty  :: TyCoFvFun Type       TyCoVarSet
+deep_tys :: TyCoFvFun [Type]     TyCoVarSet
+deep_co  :: TyCoFvFun Coercion   TyCoVarSet
+deep_cos :: TyCoFvFun [Coercion] TyCoVarSet
+(deep_ty, deep_tys, deep_co, deep_cos) = foldTyCo deepTcvFolder
 
-deepTcvFolder :: TyCoFolder TyCoVarSet (Endo TyCoVarSet)
+deepTcvFolder :: TyCoFolder InScopeBndrs (Endo TyCoVarSet)
 deepTcvFolder = TyCoFolder { tcf_view = noView
                            , tcf_tyvar = do_tcv, tcf_covar = do_tcv
                            , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
@@ -308,8 +313,9 @@ deepTcvFolder = TyCoFolder { tcf_view = noView
       where
         do_it acc | v `elemVarSet` is  = acc
                   | v `elemVarSet` acc = acc
-                  | otherwise          = appEndo (deep_ty (varType v)) $
+                  | otherwise          = appEndo (deep_ty emptyInScope (varType v)) $
                                          acc `extendVarSet` v
+                  -- emptyInScope: see Note [Closing over free variable kinds]
 
     do_bndr is tcv _ = extendVarSet is tcv
     do_hole is hole  = do_tcv is (coHoleCoVar hole)
@@ -326,16 +332,16 @@ deepTcvFolder = TyCoFolder { tcf_view = noView
 
 shallowTyCoVarsOfType :: Type -> TyCoVarSet
 -- See Note [Free variables of types]
-shallowTyCoVarsOfType ty = runTyCoVars (shallow_ty ty)
+shallowTyCoVarsOfType = runTyCoVars shallow_ty
 
 shallowTyCoVarsOfTypes :: [Type] -> TyCoVarSet
-shallowTyCoVarsOfTypes tys = runTyCoVars (shallow_tys tys)
+shallowTyCoVarsOfTypes = runTyCoVars shallow_tys
 
 shallowTyCoVarsOfCo :: Coercion -> TyCoVarSet
-shallowTyCoVarsOfCo co = runTyCoVars (shallow_co co)
+shallowTyCoVarsOfCo = runTyCoVars shallow_co
 
 shallowTyCoVarsOfCos :: [Coercion] -> TyCoVarSet
-shallowTyCoVarsOfCos cos = runTyCoVars (shallow_cos cos)
+shallowTyCoVarsOfCos = runTyCoVars shallow_cos
 
 -- | Returns free variables of types, including kind variables as
 -- a non-deterministic set. For type synonyms it does /not/ expand the
@@ -351,13 +357,13 @@ shallowTyCoVarsOfCoVarEnv cos = shallowTyCoVarsOfCos (nonDetEltsUFM cos)
   -- It's OK to use nonDetEltsUFM here because we immediately
   -- forget the ordering by returning a set
 
-shallow_ty  :: Type       -> Endo TyCoVarSet
-shallow_tys :: [Type]     -> Endo TyCoVarSet
-shallow_co  :: Coercion   -> Endo TyCoVarSet
-shallow_cos :: [Coercion] -> Endo TyCoVarSet
-(shallow_ty, shallow_tys, shallow_co, shallow_cos) = foldTyCo shallowTcvFolder emptyVarSet
+shallow_ty  :: TyCoFvFun Type       TyCoVarSet
+shallow_tys :: TyCoFvFun [Type]     TyCoVarSet
+shallow_co  :: TyCoFvFun Coercion   TyCoVarSet
+shallow_cos :: TyCoFvFun [Coercion] TyCoVarSet
+(shallow_ty, shallow_tys, shallow_co, shallow_cos) = foldTyCo shallowTcvFolder
 
-shallowTcvFolder :: TyCoFolder TyCoVarSet (Endo TyCoVarSet)
+shallowTcvFolder :: TyCoFolder InScopeBndrs (Endo TyCoVarSet)
 shallowTcvFolder = TyCoFolder { tcf_view = noView
                               , tcf_tyvar = do_tcv, tcf_covar = do_tcv
                               , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
@@ -379,10 +385,10 @@ shallowTcvFolder = TyCoFolder { tcf_view = noView
 ********************************************************************* -}
 
 
-{- Note [Finding free coercion varibles]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Finding free coercion variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Here we are only interested in the free /coercion/ variables.
-We can achieve this through a slightly differnet TyCo folder.
+We can achieve this through a slightly different TyCo folder.
 
 Notice that we look deeply, into kinds.
 
@@ -394,18 +400,18 @@ coVarsOfTypes :: [Type]     -> CoVarSet
 coVarsOfCo    :: Coercion   -> CoVarSet
 coVarsOfCos   :: [Coercion] -> CoVarSet
 
-coVarsOfType  ty  = runTyCoVars (deep_cv_ty ty)
-coVarsOfTypes tys = runTyCoVars (deep_cv_tys tys)
-coVarsOfCo    co  = runTyCoVars (deep_cv_co co)
-coVarsOfCos   cos = runTyCoVars (deep_cv_cos cos)
+coVarsOfType  = runTyCoVars deep_cv_ty
+coVarsOfTypes = runTyCoVars deep_cv_tys
+coVarsOfCo    = runTyCoVars deep_cv_co
+coVarsOfCos   = runTyCoVars deep_cv_cos
 
-deep_cv_ty  :: Type       -> Endo CoVarSet
-deep_cv_tys :: [Type]     -> Endo CoVarSet
-deep_cv_co  :: Coercion   -> Endo CoVarSet
-deep_cv_cos :: [Coercion] -> Endo CoVarSet
-(deep_cv_ty, deep_cv_tys, deep_cv_co, deep_cv_cos) = foldTyCo deepCoVarFolder emptyVarSet
+deep_cv_ty  :: TyCoFvFun Type       TyCoVarSet
+deep_cv_tys :: TyCoFvFun [Type]     TyCoVarSet
+deep_cv_co  :: TyCoFvFun Coercion   TyCoVarSet
+deep_cv_cos :: TyCoFvFun [Coercion] TyCoVarSet
+(deep_cv_ty, deep_cv_tys, deep_cv_co, deep_cv_cos) = foldTyCo deepCoVarFolder
 
-deepCoVarFolder :: TyCoFolder TyCoVarSet (Endo CoVarSet)
+deepCoVarFolder :: TyCoFolder InScopeBndrs (Endo CoVarSet)
 deepCoVarFolder = TyCoFolder { tcf_view = noView
                              , tcf_tyvar = do_tyvar, tcf_covar = do_covar
                              , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
@@ -421,14 +427,39 @@ deepCoVarFolder = TyCoFolder { tcf_view = noView
       where
         do_it acc | v `elemVarSet` is  = acc
                   | v `elemVarSet` acc = acc
-                  | otherwise          = appEndo (deep_cv_ty (varType v)) $
+                  | otherwise          = appEndo (deep_cv_ty emptyInScope (varType v)) $
                                          acc `extendVarSet` v
+                  -- emptyInScope: see Note [Closing over free variable kinds]
 
     do_bndr is tcv _ = extendVarSet is tcv
     do_hole is hole  = do_covar is (coHoleCoVar hole)
                        -- See Note [CoercionHoles and coercion free variables]
                        -- in GHC.Core.TyCo.Rep
 
+------- Same again, but for DCoVarSet ----------
+
+coVarsOfCoDSet :: Coercion -> DCoVarSet
+coVarsOfCoDSet co = appEndo (deep_dcv_co emptyInScope co) emptyDVarSet
+
+deep_dcv_ty  :: TyCoFvFun Type     DCoVarSet
+deep_dcv_co  :: TyCoFvFun Coercion DCoVarSet
+(deep_dcv_ty, _, deep_dcv_co, _) = foldTyCo deepCoVarDSetFolder
+
+deepCoVarDSetFolder :: TyCoFolder InScopeBndrs (Endo DCoVarSet)
+deepCoVarDSetFolder = TyCoFolder { tcf_view = noView
+                                 , tcf_tyvar = do_tyvar, tcf_covar = do_covar
+                                 , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
+  where
+    do_tyvar _ _  = mempty
+    do_covar is v = Endo do_it
+      where
+        do_it :: DCoVarSet -> DCoVarSet
+        do_it acc | v `elemVarSet`  is  = acc
+                  | v `elemDVarSet` acc = acc
+                  | otherwise           = appEndo (deep_dcv_ty emptyInScope (varType v)) $
+                                          acc `extendDVarSet` v
+    do_bndr is tcv _ = extendVarSet is tcv
+    do_hole is hole  = do_covar is (coHoleCoVar hole)
 
 {- *********************************************************************
 *                                                                      *
@@ -443,7 +474,7 @@ closeOverKinds :: TyCoVarSet -> TyCoVarSet
 -- add the deep free variables of its kind
 closeOverKinds vs = nonDetStrictFoldVarSet do_one vs vs
   where
-    do_one v acc = appEndo (deep_ty (varType v)) acc
+    do_one v acc = appEndo (deep_ty emptyVarSet (varType v)) acc
 
 {- --------------- Alternative version 1 (using FV) ------------
 closeOverKinds = fvVarSet . closeOverKindsFV . nonDetEltsUniqSet
@@ -645,6 +676,7 @@ tyCoFVsOfProv :: UnivCoProvenance -> FV
 tyCoFVsOfProv (PhantomProv co)    fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfProv (ProofIrrelProv co) fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfProv (PluginProv _)      fv_cand in_scope acc = emptyFV fv_cand in_scope acc
+tyCoFVsOfProv (ZapCoProv cvs)     fv_cand in_scope acc = mkFVs (dVarSetElems cvs) fv_cand in_scope acc
 
 tyCoFVsOfCos :: [Coercion] -> FV
 tyCoFVsOfCos []       fv_cand in_scope acc = emptyFV fv_cand in_scope acc
@@ -715,6 +747,8 @@ almost_devoid_co_var_of_prov (PhantomProv co) cv
 almost_devoid_co_var_of_prov (ProofIrrelProv co) cv
   = almost_devoid_co_var_of_co co cv
 almost_devoid_co_var_of_prov (PluginProv _) _ = True
+almost_devoid_co_var_of_prov (ZapCoProv cvs) cv
+  = not (cv `elemDVarSet` cvs)
 
 almost_devoid_co_var_of_type :: Type -> CoVar -> Bool
 almost_devoid_co_var_of_type (TyVarTy _) _ = True
@@ -859,7 +893,7 @@ invisibleVarsOfTypes = mapUnionFV invisibleVarsOfType
 *                                                                      *
 ********************************************************************* -}
 
-nfvFolder :: TyCoFolder TyCoVarSet DM.All
+nfvFolder :: TyCoFolder InScopeBndrs DM.All
 nfvFolder = TyCoFolder { tcf_view = noView
                        , tcf_tyvar = do_tcv, tcf_covar = do_tcv
                        , tcf_hole = do_hole, tcf_tycobinder = do_bndr }
@@ -868,19 +902,19 @@ nfvFolder = TyCoFolder { tcf_view = noView
     do_hole _ _  = All True    -- I'm unsure; probably never happens
     do_bndr is tv _ = is `extendVarSet` tv
 
-nfv_ty  :: Type       -> DM.All
-nfv_tys :: [Type]     -> DM.All
-nfv_co  :: Coercion   -> DM.All
-(nfv_ty, nfv_tys, nfv_co, _) = foldTyCo nfvFolder emptyVarSet
+nfv_ty  :: InScopeBndrs -> Type       -> DM.All
+nfv_tys :: InScopeBndrs -> [Type]     -> DM.All
+nfv_co  :: InScopeBndrs -> Coercion   -> DM.All
+(nfv_ty, nfv_tys, nfv_co, _) = foldTyCo nfvFolder
 
 noFreeVarsOfType :: Type -> Bool
-noFreeVarsOfType ty = DM.getAll (nfv_ty ty)
+noFreeVarsOfType ty = DM.getAll (nfv_ty emptyInScope ty)
 
 noFreeVarsOfTypes :: [Type] -> Bool
-noFreeVarsOfTypes tys = DM.getAll (nfv_tys tys)
+noFreeVarsOfTypes tys = DM.getAll (nfv_tys emptyInScope tys)
 
 noFreeVarsOfCo :: Coercion -> Bool
-noFreeVarsOfCo co = getAll (nfv_co co)
+noFreeVarsOfCo co = DM.getAll (nfv_co emptyInScope co)
 
 
 {- *********************************************************************

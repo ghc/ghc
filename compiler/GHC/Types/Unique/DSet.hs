@@ -34,7 +34,7 @@ module GHC.Types.Unique.DSet (
         lookupUniqDSet,
         uniqDSetToList,
         partitionUniqDSet,
-        mapUniqDSet
+        mapUniqDSet, strictFoldUniqDSet
     ) where
 
 import GHC.Prelude
@@ -127,7 +127,12 @@ partitionUniqDSet p = coerce . partitionUDFM p . getUniqDSet
 
 -- See Note [UniqSet invariant] in GHC.Types.Unique.Set
 mapUniqDSet :: Uniquable b => (a -> b) -> UniqDSet a -> UniqDSet b
-mapUniqDSet f = mkUniqDSet . map f . uniqDSetToList
+mapUniqDSet f s = foldl' (\s e -> addOneToUniqDSet s (f e)) emptyUniqDSet $
+                  uniqDSetToList s
+
+strictFoldUniqDSet :: (a -> r -> r) -> r -> UniqDSet a -> r
+strictFoldUniqDSet k r s = foldl' (\r e -> k e r) r $
+                           uniqDSetToList s
 
 -- Two 'UniqDSet's are considered equal if they contain the same
 -- uniques.
