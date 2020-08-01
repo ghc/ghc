@@ -4,7 +4,7 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE PatternSynonyms #-}
+
 {-# LANGUAGE TypeOperators #-}
 
 -----------------------------------------------------------------------------

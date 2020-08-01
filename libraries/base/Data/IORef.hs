@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples #-}
-{-# LANGUAGE BangPatterns #-}
+
 
 -----------------------------------------------------------------------------
 -- |
@@ -17,7 +17,7 @@
 -----------------------------------------------------------------------------
 
 module Data.IORef
-  ( 
+  (
         -- * IORefs
         IORef,                -- abstract, instance of: Eq, Typeable
         newIORef,

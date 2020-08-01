@@ -1,13 +1,5 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE CPP
-           , NoImplicitPrelude
-           , BangPatterns
-           , MagicHash
-           , UnboxedTuples
-           , UnliftedFFITypes
-           , StandaloneDeriving
-           , RankNTypes
-  #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnboxedTuples, UnliftedFFITypes, RankNTypes #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -30,6 +22,14 @@
 -- higher level modules be the home.  Hence:
 
 -- #not-home
+
+
+
+
+
+
+
+
 module GHC.Conc.Sync
         ( ThreadId(..)
         , showThreadId

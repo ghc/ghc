@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 
 import Control.Monad
 import Control.Monad.Fix

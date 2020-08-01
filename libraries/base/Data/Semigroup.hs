@@ -1,13 +1,13 @@
 {-# LANGUAGE CPP                        #-}
-{-# LANGUAGE DefaultSignatures          #-}
+
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 {-# LANGUAGE PolyKinds                  #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE Trustworthy                #-}
-{-# LANGUAGE TypeOperators              #-}
+
 
 -----------------------------------------------------------------------------
 -- |

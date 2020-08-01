@@ -5,7 +5,7 @@
            , UnboxedTuples
   #-}
 {-# OPTIONS_HADDOCK not-home #-}
-{-# LANGUAGE StandaloneDeriving #-}
+
 
 -----------------------------------------------------------------------------
 -- |

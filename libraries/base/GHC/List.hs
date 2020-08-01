@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, ScopedTypeVariables, MagicHash #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, ScopedTypeVariables #-}
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 

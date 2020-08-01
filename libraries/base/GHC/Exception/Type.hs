@@ -1,10 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude
-           , ExistentialQuantification
-           , MagicHash
-           , RecordWildCards
-           , PatternSynonyms
-  #-}
+{-# LANGUAGE NoImplicitPrelude, ExistentialQuantification #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -20,6 +15,11 @@
 -- Exceptions and exception-handling functions.
 --
 -----------------------------------------------------------------------------
+
+
+
+
+
 
 module GHC.Exception.Type
        ( Exception(..)    -- Class

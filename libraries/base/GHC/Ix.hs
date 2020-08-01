@@ -1,4 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE NoImplicitPrelude, MagicHash #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------

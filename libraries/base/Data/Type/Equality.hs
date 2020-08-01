@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric          #-}
+
 {-# LANGUAGE TypeOperators          #-}
 {-# LANGUAGE GADTs                  #-}
 {-# LANGUAGE FlexibleInstances      #-}
@@ -7,9 +7,9 @@
 {-# LANGUAGE RankNTypes             #-}
 {-# LANGUAGE TypeFamilies           #-}
 {-# LANGUAGE UndecidableInstances   #-}
-{-# LANGUAGE ExplicitNamespaces     #-}
+
 {-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE FunctionalDependencies #-}
+
 {-# LANGUAGE DataKinds              #-}
 {-# LANGUAGE PolyKinds              #-}
 {-# LANGUAGE StandaloneKindSignatures #-}

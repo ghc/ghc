@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns #-}
+
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}

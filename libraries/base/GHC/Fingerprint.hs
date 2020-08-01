@@ -1,8 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP
-           , NoImplicitPrelude
-           , BangPatterns
-  #-}
+{-# LANGUAGE CPP, NoImplicitPrelude #-}
 
 -- ----------------------------------------------------------------------------
 --
@@ -12,6 +9,9 @@
 -- implementing fast comparison of Typeable.
 --
 -- ----------------------------------------------------------------------------
+
+
+
 
 module GHC.Fingerprint (
         Fingerprint(..), fingerprint0,
@@ -49,7 +49,7 @@ fingerprintFingerprints fs = unsafeDupablePerformIO $
 
 fingerprintData :: Ptr Word8 -> Int -> IO Fingerprint
 fingerprintData buf len = do
-  allocaBytes SIZEOF_STRUCT_MD5CONTEXT $ \pctxt -> do
+  allocaBytes 88SIZEOF_STRUCT_MD5CONTEXT \pctxt -> do        $ \pctxt -> do
     c_MD5Init pctxt
     c_MD5Update pctxt buf (fromIntegral len)
     allocaBytes 16 $ \pdigest -> do
@@ -74,7 +74,7 @@ fingerprintString str = unsafeDupablePerformIO $
 -- @since 4.7.0.0
 getFileHash :: FilePath -> IO Fingerprint
 getFileHash path = withBinaryFile path ReadMode $ \h -> do
-  allocaBytes SIZEOF_STRUCT_MD5CONTEXT $ \pctxt -> do
+  allocaBytes 88SIZEOF_STRUCT_MD5CONTEXT \pctxt -> do        $ \pctxt -> do
     c_MD5Init pctxt
 
     processChunks h (\buf size -> c_MD5Update pctxt buf (fromIntegral size))

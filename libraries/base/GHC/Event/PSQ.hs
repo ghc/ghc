@@ -1,9 +1,9 @@
 {-# LANGUAGE Trustworthy       #-}
-{-# LANGUAGE BangPatterns      #-}
+
 {-# LANGUAGE CPP               #-}
-{-# LANGUAGE DeriveFoldable    #-}
-{-# LANGUAGE DeriveFunctor     #-}
-{-# LANGUAGE DeriveTraversable #-}
+
+
+
 {-# LANGUAGE MagicHash         #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE UnboxedTuples     #-}
@@ -59,8 +59,9 @@ import GHC.Real (fromIntegral)
 -- STRICT_x_OF_y denotes a y-ary function strict in the x-th parameter.
 -- We do not use BangPatterns, because they are not in any standard and we
 -- want the compilers to be compiled by as many compilers as possible.
-#define STRICT_1_OF_2(fn) fn arg _ | arg `seq` False = undefined
+
 -}
+
 
 
 ------------------------------------------------------------------------------
@@ -149,7 +150,7 @@ branchMask k1' k2' =
 
 highestBitMask :: Nat -> Nat
 highestBitMask (W# x) =
-    W# (uncheckedShiftL# 1## (word2Int# (WORD_SIZE_IN_BITS## `minusWord#` 1## `minusWord#` clz# x)))
+    W# (uncheckedShiftL# 1## (word2Int# (64##WORD_SIZE_IN_BITS##minusWord#` 1##`minusWord#minusWord#``1##`minusWord#)))    ` clz# x)))
 {-# INLINE highestBitMask #-}
 
 ------------------------------------------------------------------------------
