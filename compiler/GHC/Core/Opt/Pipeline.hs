@@ -6,7 +6,7 @@
 
 {-# LANGUAGE CPP #-}
 
-module GHC.Core.Opt.Driver ( core2core, simplifyExpr ) where
+module GHC.Core.Opt.Pipeline ( core2core, simplifyExpr ) where
 
 #include "HsVersions.h"
 
