@@ -68,7 +68,7 @@ import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
 
 {-
 The guts of the simplifier is in this module, but the driver loop for
-the simplifier is in GHC.Core.Opt.Driver
+the simplifier is in GHC.Core.Opt.Pipeline
 
 Note [The big picture]
 ~~~~~~~~~~~~~~~~~~~~~~
