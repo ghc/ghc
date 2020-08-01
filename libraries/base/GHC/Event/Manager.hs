@@ -1,5 +1,9 @@
-{-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE BangPatterns, CPP, ExistentialQuantification, NoImplicitPrelude, RecordWildCards, FlexibleInstances #-}
+{-# LANGUAGE CPP                       #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances         #-}
+{-# LANGUAGE NoImplicitPrelude         #-}
+{-# LANGUAGE RecordWildCards           #-}
+{-# LANGUAGE Trustworthy               #-}
 
 -- |
 -- The event manager supports event notification on fds. Each fd may
@@ -10,13 +14,6 @@
 --
 -- If an fd has only one-shot registrations then we use one-shot
 -- polling if available. Otherwise we use multi-shot polling.
-
-
-
-
-
-
-
 
 module GHC.Event.Manager
     ( -- * Types

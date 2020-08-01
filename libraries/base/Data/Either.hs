@@ -1,8 +1,10 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-
-{-# LANGUAGE PolyKinds, DataKinds, TypeFamilies, UndecidableInstances #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -----------------------------------------------------------------------------
 -- |

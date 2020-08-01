@@ -1,7 +1,6 @@
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Coerce

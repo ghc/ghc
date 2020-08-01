@@ -1,7 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude, MagicHash #-}
 
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Exception.Base

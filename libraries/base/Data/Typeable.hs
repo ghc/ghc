@@ -1,10 +1,9 @@
-{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE ConstraintKinds #-}
-
+{-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeOperators #-}
 
 -----------------------------------------------------------------------------

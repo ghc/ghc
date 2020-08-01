@@ -1,5 +1,7 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude #-}
+
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------

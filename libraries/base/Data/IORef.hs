@@ -1,7 +1,7 @@
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude, MagicHash, UnboxedTuples #-}
-
-
+{-# LANGUAGE UnboxedTuples #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.IORef

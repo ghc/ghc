@@ -4,7 +4,6 @@
 {-# LANGUAGE EmptyDataDeriving #-}
 {-# LANGUAGE Safe #-}
 
-
 -----------------------------------------------------------------------------
 -- |
 -- Copyright   :  (C) 2008-2014 Edward Kmett
