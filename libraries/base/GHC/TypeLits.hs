@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE KindSignatures #-}
+
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleInstances #-}

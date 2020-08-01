@@ -1,9 +1,4 @@
-{-# LANGUAGE AllowAmbiguousTypes
-           , FunctionalDependencies
-           , KindSignatures
-           , MultiParamTypeClasses
-           , PolyKinds
-  #-}
+{-# LANGUAGE AllowAmbiguousTypes, FunctionalDependencies, PolyKinds #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -21,6 +16,11 @@
 -- wiki page> for more details.
 --
 -----------------------------------------------------------------------------
+
+
+
+
+
 
 module GHC.Records
        ( HasField(..)

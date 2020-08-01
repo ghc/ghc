@@ -1,10 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP
-           , NoImplicitPrelude
-           , MagicHash
-           , UnboxedTuples
-           , UnliftedFFITypes
-  #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnliftedFFITypes #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -21,6 +16,11 @@
 -- (e.g. @Main.main@, 'Control.Concurrent.forkIO', and foreign exports)
 --
 -----------------------------------------------------------------------------
+
+
+
+
+
 
 module GHC.TopHandler (
         runMainIO, runIO, runIOFastExit, runNonIO,
@@ -109,17 +109,17 @@ install_interrupt_handler handler = do
 -- specialised version of System.Posix.Signals.installHandler, which
 -- isn't available here.
 install_interrupt_handler handler = do
-   let sig = CONST_SIGINT :: CInt
+   let sig = 2CONST_SIGINT:: CInt    :: CInt
    _ <- setHandler sig (Just (const handler, toDyn handler))
-   _ <- stg_sig_install sig STG_SIG_RST nullPtr
-     -- STG_SIG_RST: the second ^C kills us for real, just in case the
+   _ <- stg_sig_install sig (STG_SIG_RST-5) nullPtrnullPtr
+     -- (-5): the second ^C kills us for real, just in case the-- STG_SIG_RST: the second ^C kills us for real, just in case the
      -- RTS or program is unresponsive.
    return ()
 
 foreign import ccall unsafe
   stg_sig_install
         :: CInt                         -- sig no.
-        -> CInt                         -- action code (STG_SIG_HAN etc.)
+        -> CInt                         -- action code ((-4) etc.)-- action code (STG_SIG_HAN etc.)
         -> Ptr ()                       -- (in, out) blocked
         -> IO CInt                      -- (ret) old action code
 #endif
@@ -271,7 +271,7 @@ exitInterrupted =
 #else
   -- we must exit via the default action for SIGINT, so that the
   -- parent of this process can take appropriate action (see #2301)
-  safeExit (-CONST_SIGINT)
+  safeExit (-2CONST_SIGINT)          )
 #endif
 
 -- NOTE: shutdownHaskellAndExit must be called "safe", because it *can*

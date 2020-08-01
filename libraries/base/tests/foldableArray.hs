@@ -1,5 +1,5 @@
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE DeriveDataTypeable #-}
+
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE CPP #-}
 module Main where

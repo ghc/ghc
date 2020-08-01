@@ -1,10 +1,5 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE NoImplicitPrelude
-           , BangPatterns
-           , MagicHash
-           , UnboxedTuples
-           , StandaloneDeriving
-  #-}
+{-# LANGUAGE NoImplicitPrelude, BangPatterns, MagicHash, UnboxedTuples #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -20,6 +15,11 @@
 -- Weak pointers.
 --
 -----------------------------------------------------------------------------
+
+
+
+
+
 
 module GHC.Weak (
         Weak(..),

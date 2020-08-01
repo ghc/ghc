@@ -1,11 +1,9 @@
-{-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE BangPatterns
-           , CPP
-           , ExistentialQuantification
-           , NoImplicitPrelude
-           , TypeSynonymInstances
-           , FlexibleInstances
-  #-}
+{-# LANGUAGE CPP                       #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances         #-}
+{-# LANGUAGE NoImplicitPrelude         #-}
+{-# LANGUAGE Trustworthy               #-}
+
 -- TODO: use the new Windows IO manager
 module GHC.Event.TimerManager
     ( -- * Types

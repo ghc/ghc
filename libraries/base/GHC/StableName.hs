@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE StandaloneDeriving #-}
+
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
 

@@ -1,6 +1,5 @@
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE MagicHash, UnboxedTuples, TypeFamilies, DeriveDataTypeable,
-             MultiParamTypeClasses, FlexibleInstances, NoImplicitPrelude #-}
+{-# LANGUAGE MagicHash, UnboxedTuples, TypeFamilies, MultiParamTypeClasses, FlexibleInstances, NoImplicitPrelude #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -18,6 +17,7 @@
 --
 -- Note: no other base module should import this module.
 -----------------------------------------------------------------------------
+
 
 module GHC.Exts
        (

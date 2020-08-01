@@ -1,11 +1,4 @@
-{-# LANGUAGE AllowAmbiguousTypes
-           , DataKinds
-           , FlexibleInstances
-           , KindSignatures
-           , MultiParamTypeClasses
-           , ScopedTypeVariables
-           , TypeApplications
-  #-}
+{-# LANGUAGE AllowAmbiguousTypes, DataKinds, FlexibleInstances, KindSignatures, MultiParamTypeClasses, ScopedTypeVariables #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -43,6 +36,13 @@
 -- RebindableSyntax is enabled) .  The type-checker transforms it into
 -- a call to 'fromLabel'.  See Note [Type-checking overloaded labels]
 -- in GHC.Tc.Gen.Expr for more details in how type-checking works.
+
+
+
+
+
+
+
 
 module GHC.OverloadedLabels
        ( IsLabel(..)
