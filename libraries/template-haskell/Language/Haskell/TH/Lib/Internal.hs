@@ -1,4 +1,5 @@
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE Trustworthy #-}
 
 -- |
 -- Language.Haskell.TH.Lib.Internal exposes some additional functionality that
@@ -19,19 +20,31 @@ module Language.Haskell.TH.Lib.Internal where
 import Language.Haskell.TH.Syntax hiding (Role, InjectivityAnn)
 import qualified Language.Haskell.TH.Syntax as TH
 import Control.Applicative(liftA, liftA2)
+import qualified Data.Kind as Kind (Type)
 import Data.Word( Word8 )
+import GHC.Exts (TYPE)
 import Prelude
 
 ----------------------------------------------------------
 -- * Type synonyms
 ----------------------------------------------------------
 
+-- Since GHC 8.8 is currently the minimum boot compiler version that we must
+-- support, we must use inline kind signatures to make TExpQ and CodeQ
+-- levity polymorphic. When we drop support for GHC 8.8, we can instead use
+-- standalone kind signatures, which are provided as comments.
+
+-- | Levity-polymorphic since /template-haskell-2.17.0.0/.
+-- type TExpQ :: TYPE r -> Kind.Type
+type TExpQ (a :: TYPE r) = Q (TExp a)
+
+-- type CodeQ :: TYPE r -> Kind.Type
+type CodeQ = Code Q :: (TYPE r -> Kind.Type)
+
 type InfoQ               = Q Info
 type PatQ                = Q Pat
 type FieldPatQ           = Q FieldPat
 type ExpQ                = Q Exp
-type TExpQ a             = Q (TExp a)
-type CodeQ               = Code Q
 type DecQ                = Q Dec
 type DecsQ               = Q [Dec]
 type Decs                = [Dec] -- Defined as it is more convenient to wire-in
