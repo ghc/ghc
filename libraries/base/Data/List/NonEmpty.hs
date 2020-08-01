@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE Trustworthy #-} -- can't use Safe due to IsList instance
 {-# LANGUAGE TypeFamilies #-}
 
