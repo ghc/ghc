@@ -101,7 +101,7 @@ buildGhciLibO root ghcilibPath = do
     let context = libGhciContext l
     objs <- allObjects context
     need objs
-    build $ target context (Ld stage) objs [ghcilibPath]
+    build $ target context (MergeObjects stage) objs [ghcilibPath]
 
 -- * Helpers
 
