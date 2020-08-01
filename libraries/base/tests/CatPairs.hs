@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, DataKinds, KindSignatures #-}
+{-# LANGUAGE PolyKinds, DataKinds #-}
 {-# LANGUAGE MultiParamTypeClasses, TypeFamilies #-}
 module CatPairs where
 
