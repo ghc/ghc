@@ -25,6 +25,7 @@ data ToolSettings = ToolSettings
   , toolSettings_pgm_c       :: String
   , toolSettings_pgm_a       :: (String, [Option])
   , toolSettings_pgm_l       :: (String, [Option])
+  , toolSettings_pgm_lm      :: (String, [Option])
   , toolSettings_pgm_dll     :: (String, [Option])
   , toolSettings_pgm_T       :: String
   , toolSettings_pgm_windres :: String
@@ -50,6 +51,7 @@ data ToolSettings = ToolSettings
   , toolSettings_opt_cxx           :: [String]
   , toolSettings_opt_a             :: [String]
   , toolSettings_opt_l             :: [String]
+  , toolSettings_opt_lm            :: [String]
   , toolSettings_opt_windres       :: [String]
   , -- | LLVM: llvm optimiser
     toolSettings_opt_lo            :: [String]

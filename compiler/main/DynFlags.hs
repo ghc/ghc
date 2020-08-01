@@ -106,6 +106,7 @@ module DynFlags (
         sPgm_c,
         sPgm_a,
         sPgm_l,
+        sPgm_lm,
         sPgm_dll,
         sPgm_T,
         sPgm_windres,
@@ -124,6 +125,7 @@ module DynFlags (
         sOpt_cxx,
         sOpt_a,
         sOpt_l,
+        sOpt_lm,
         sOpt_windres,
         sOpt_lo,
         sOpt_lc,
@@ -152,10 +154,10 @@ module DynFlags (
         ghcUsagePath, ghciUsagePath, topDir, tmpDir,
         versionedAppDir, versionedFilePath,
         extraGccViaCFlags, systemPackageConfig,
-        pgm_L, pgm_P, pgm_F, pgm_c, pgm_a, pgm_l, pgm_dll, pgm_T,
+        pgm_L, pgm_P, pgm_F, pgm_c, pgm_a, pgm_l, pgm_lm, pgm_dll, pgm_T,
         pgm_windres, pgm_libtool, pgm_ar, pgm_ranlib, pgm_lo, pgm_lc,
         pgm_lcc, pgm_i,
-        opt_L, opt_P, opt_F, opt_c, opt_cxx, opt_a, opt_l, opt_i,
+        opt_L, opt_P, opt_F, opt_c, opt_cxx, opt_a, opt_l, opt_lm, opt_i,
         opt_P_signature,
         opt_windres, opt_lo, opt_lc, opt_lcc,
         tablesNextToCode,
@@ -1447,6 +1449,8 @@ pgm_a                 :: DynFlags -> (String,[Option])
 pgm_a dflags = toolSettings_pgm_a $ toolSettings dflags
 pgm_l                 :: DynFlags -> (String,[Option])
 pgm_l dflags = toolSettings_pgm_l $ toolSettings dflags
+pgm_lm                 :: DynFlags -> (String,[Option])
+pgm_lm dflags = toolSettings_pgm_lm $ toolSettings dflags
 pgm_dll               :: DynFlags -> (String,[Option])
 pgm_dll dflags = toolSettings_pgm_dll $ toolSettings dflags
 pgm_T                 :: DynFlags -> String
@@ -1493,6 +1497,8 @@ opt_a dflags= toolSettings_opt_a $ toolSettings dflags
 opt_l                 :: DynFlags -> [String]
 opt_l dflags = concatMap (wayOptl (targetPlatform dflags)) (ways dflags)
             ++ toolSettings_opt_l (toolSettings dflags)
+opt_lm                :: DynFlags -> [String]
+opt_lm dflags= toolSettings_opt_lm $ toolSettings dflags
 opt_windres           :: DynFlags -> [String]
 opt_windres dflags= toolSettings_opt_windres $ toolSettings dflags
 opt_lcc                :: DynFlags -> [String]
