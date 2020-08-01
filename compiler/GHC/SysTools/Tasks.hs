@@ -299,6 +299,13 @@ ld: warning: symbol referencing errors
     ld_postfix = tail . snd . ld_warn_break
     ld_warning_found = not . null . snd . ld_warn_break
 
+runMergeObjects :: DynFlags -> [Option] -> IO ()
+runMergeObjects dflags args = traceToolCommand dflags "merge-objects" $ do
+  let (p,args0) = pgm_lm dflags
+      optl_args = map Option (getObts dflags opt_lm)
+      args2     = args0 ++ args ++ optl_args
+  mb_env <- getGccEnv args2
+  runSomethingResponseFile dflags id "Merge objects" p args2 mb_env
 
 runLibtool :: DynFlags -> [Option] -> IO ()
 runLibtool dflags args = traceToolCommand dflags "libtool" $ do

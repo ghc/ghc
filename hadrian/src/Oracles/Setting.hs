@@ -109,6 +109,8 @@ data SettingsFileSetting
     | SettingsFileSetting_CCompilerSupportsNoPie
     | SettingsFileSetting_LdCommand
     | SettingsFileSetting_LdFlags
+    | SettingsFileSetting_MergeObjectsCommand
+    | SettingsFileSetting_MergeObjectsFlags
     | SettingsFileSetting_ArCommand
     | SettingsFileSetting_RanlibCommand
     | SettingsFileSetting_DllWrapCommand
@@ -191,6 +193,8 @@ settingsFileSetting key = lookupValueOrError configFile $ case key of
     SettingsFileSetting_CCompilerSupportsNoPie -> "settings-c-compiler-supports-no-pie"
     SettingsFileSetting_LdCommand -> "settings-ld-command"
     SettingsFileSetting_LdFlags -> "settings-ld-flags"
+    SettingsFileSetting_MergeObjectsCommand -> "settings-merge-objects-command"
+    SettingsFileSetting_MergeObjectsFlags -> "settings-merge-objects-flags"
     SettingsFileSetting_ArCommand -> "settings-ar-command"
     SettingsFileSetting_RanlibCommand -> "settings-ranlib-command"
     SettingsFileSetting_DllWrapCommand -> "settings-dll-wrap-command"
