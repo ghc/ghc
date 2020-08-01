@@ -1,5 +1,10 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NegativeLiterals #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, MagicHash, UnboxedTuples, NegativeLiterals #-}
+{-# LANGUAGE UnboxedTuples #-}
+
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -17,7 +22,6 @@
 -----------------------------------------------------------------------------
 
 #include "MachDeps.h"
-
 
 module GHC.Int (
         Int(..), Int8(..), Int16(..), Int32(..), Int64(..),
