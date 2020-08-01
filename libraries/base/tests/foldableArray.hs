@@ -1,8 +1,9 @@
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Main where
+
 import Prelude hiding (foldr, foldl, foldl', foldr1, foldl1, length, null, sum,
                        product, all, any, and, or)
 import Data.Foldable
