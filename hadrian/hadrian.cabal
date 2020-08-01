@@ -99,6 +99,7 @@ executable hadrian
                        , Settings.Builders.HsCpp
                        , Settings.Builders.Ld
                        , Settings.Builders.Make
+                       , Settings.Builders.MergeObjects
                        , Settings.Builders.RunTest
                        , Settings.Builders.Xelatex
                        , Settings.Default

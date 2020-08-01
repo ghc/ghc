@@ -2133,6 +2133,23 @@ We must enable bigobj output in a few places:
 
 Unfortunately the big object format is not supported on 32-bit targets so
 none of this can be used in that case.
+
+
+Note [Merging object files for GHCi]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHCi can usually loads standard linkable object files using GHC's linker
+implementation. However, most users build their projects with -split-sections,
+meaning that such object files can have an extremely high number of sections.
+As the linker must map each of these sections individually, loading such object
+files is very inefficient.
+
+To avoid this inefficiency, we use the linker's `-r` flag and a linker script
+to produce a merged relocatable object file. This file will contain a singe
+text section section and can consequently be mapped far more efficiently. As
+gcc tends to do unpredictable things to our linker command line, we opt to
+invoke ld directly in this case, in contrast to our usual strategy of linking
+via gcc.
+
 -}
 
 joinObjectFiles :: DynFlags -> [FilePath] -> FilePath -> IO ()
@@ -2140,34 +2157,13 @@ joinObjectFiles dflags o_files output_fn = do
   let toolSettings' = toolSettings dflags
       ldIsGnuLd = toolSettings_ldIsGnuLd toolSettings'
       osInfo = platformOS (targetPlatform dflags)
-      ld_r args cc = GHC.SysTools.runLink dflags ([
-                       GHC.SysTools.Option "-nostdlib",
-                       GHC.SysTools.Option "-Wl,-r"
-                     ]
-                        -- See Note [No PIE while linking] in GHC.Driver.Session
-                     ++ (if toolSettings_ccSupportsNoPie toolSettings'
-                          then [GHC.SysTools.Option "-no-pie"]
-                          else [])
-
-                     ++ (if any (cc ==) [Clang, AppleClang, AppleClang51]
-                          then []
-                          else [GHC.SysTools.Option "-nodefaultlibs"])
-                     ++ (if osInfo == OSFreeBSD
-                          then [GHC.SysTools.Option "-L/usr/lib"]
-                          else [])
-                        -- gcc on sparc sets -Wl,--relax implicitly, but
-                        -- -r and --relax are incompatible for ld, so
-                        -- disable --relax explicitly.
-                     ++ (if platformArch (targetPlatform dflags)
-                                `elem` [ArchSPARC, ArchSPARC64]
-                         && ldIsGnuLd
-                            then [GHC.SysTools.Option "-Wl,-no-relax"]
-                            else [])
+      ld_r args = GHC.SysTools.runMergeObjects dflags (
                         -- See Note [Produce big objects on Windows]
-                     ++ [ GHC.SysTools.Option "-Wl,--oformat,pe-bigobj-x86-64"
-                        | OSMinGW32 == osInfo
-                        , not $ target32Bit (targetPlatform dflags)
-                        ]
+                        concat
+                          [ [GHC.SysTools.Option "--oformat", GHC.SysTools.Option "pe-bigobj-x86-64"]
+                          | OSMinGW32 == osInfo
+                          , not $ target32Bit (targetPlatform dflags)
+                          ]
                      ++ map GHC.SysTools.Option ld_build_id
                      ++ [ GHC.SysTools.Option "-o",
                           GHC.SysTools.FileOption "" output_fn ]
@@ -2176,25 +2172,24 @@ joinObjectFiles dflags o_files output_fn = do
       -- suppress the generation of the .note.gnu.build-id section,
       -- which we don't need and sometimes causes ld to emit a
       -- warning:
-      ld_build_id | toolSettings_ldSupportsBuildId toolSettings' = ["-Wl,--build-id=none"]
+      ld_build_id | toolSettings_ldSupportsBuildId toolSettings' = ["--build-id=none"]
                   | otherwise                     = []
 
-  ccInfo <- getCompilerInfo dflags
   if ldIsGnuLd
      then do
           script <- newTempName dflags TFL_CurrentModule "ldscript"
           cwd <- getCurrentDirectory
           let o_files_abs = map (\x -> "\"" ++ (cwd </> x) ++ "\"") o_files
           writeFile script $ "INPUT(" ++ unwords o_files_abs ++ ")"
-          ld_r [GHC.SysTools.FileOption "" script] ccInfo
+          ld_r [GHC.SysTools.FileOption "" script]
      else if toolSettings_ldSupportsFilelist toolSettings'
      then do
           filelist <- newTempName dflags TFL_CurrentModule "filelist"
           writeFile filelist $ unlines o_files
-          ld_r [GHC.SysTools.Option "-Wl,-filelist",
-                GHC.SysTools.FileOption "-Wl," filelist] ccInfo
+          ld_r [GHC.SysTools.Option "-filelist",
+                GHC.SysTools.FileOption "" filelist]
      else do
-          ld_r (map (GHC.SysTools.FileOption "") o_files) ccInfo
+          ld_r (map (GHC.SysTools.FileOption "") o_files)
 
 -- -----------------------------------------------------------------------------
 -- Misc.
