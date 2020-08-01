@@ -1,8 +1,6 @@
-{-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP
-           , NoImplicitPrelude
-           , BangPatterns
-  #-}
+{-# LANGUAGE CPP               #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE Trustworthy       #-}
 
 -- ----------------------------------------------------------------------------
 --

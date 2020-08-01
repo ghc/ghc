@@ -1,9 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE Trustworthy #-}
 {-# OPTIONS_GHC -Wno-unused-binds #-}
 -- XXX -Wno-unused-binds stops us warning about unused constructors,

@@ -1,6 +1,5 @@
-{-# LANGUAGE Safe #-}
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE Safe #-}
 
 -------------------------------------------------------------------------------
 -- |

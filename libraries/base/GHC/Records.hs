@@ -1,9 +1,6 @@
-{-# LANGUAGE AllowAmbiguousTypes
-           , FunctionalDependencies
-           , KindSignatures
-           , MultiParamTypeClasses
-           , PolyKinds
-  #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE PolyKinds #-}
 
 -----------------------------------------------------------------------------
 -- |

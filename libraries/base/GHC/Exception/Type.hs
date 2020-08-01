@@ -1,10 +1,7 @@
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude
-           , ExistentialQuantification
-           , MagicHash
-           , RecordWildCards
-           , PatternSynonyms
-  #-}
+
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------

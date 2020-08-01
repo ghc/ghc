@@ -1,11 +1,9 @@
-{-# LANGUAGE AllowAmbiguousTypes
-           , DataKinds
-           , FlexibleInstances
-           , KindSignatures
-           , MultiParamTypeClasses
-           , ScopedTypeVariables
-           , TypeApplications
-  #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -----------------------------------------------------------------------------
 -- |

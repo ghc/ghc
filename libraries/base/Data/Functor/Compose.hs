@@ -4,7 +4,7 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE TypeOperators #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Functor.Compose

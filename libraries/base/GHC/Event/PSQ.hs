@@ -1,11 +1,7 @@
-{-# LANGUAGE Trustworthy       #-}
-{-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE CPP               #-}
-{-# LANGUAGE DeriveFoldable    #-}
-{-# LANGUAGE DeriveFunctor     #-}
-{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE MagicHash         #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE Trustworthy       #-}
 {-# LANGUAGE UnboxedTuples     #-}
 
 module GHC.Event.PSQ

@@ -1,12 +1,10 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE BangPatterns
-           , CPP
-           , ExistentialQuantification
-           , NoImplicitPrelude
-           , RecordWildCards
-           , TypeSynonymInstances
-           , FlexibleInstances
-  #-}
 
 -- |
 -- The event manager supports event notification on fds. Each fd may

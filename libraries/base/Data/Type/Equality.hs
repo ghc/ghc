@@ -1,19 +1,16 @@
-{-# LANGUAGE DeriveGeneric          #-}
-{-# LANGUAGE TypeOperators          #-}
-{-# LANGUAGE GADTs                  #-}
-{-# LANGUAGE FlexibleInstances      #-}
-{-# LANGUAGE StandaloneDeriving     #-}
-{-# LANGUAGE NoImplicitPrelude      #-}
-{-# LANGUAGE RankNTypes             #-}
-{-# LANGUAGE TypeFamilies           #-}
-{-# LANGUAGE UndecidableInstances   #-}
-{-# LANGUAGE ExplicitNamespaces     #-}
-{-# LANGUAGE MultiParamTypeClasses  #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE DataKinds              #-}
-{-# LANGUAGE PolyKinds              #-}
+{-# LANGUAGE DataKinds                #-}
+{-# LANGUAGE FlexibleInstances        #-}
+{-# LANGUAGE GADTs                    #-}
+{-# LANGUAGE MultiParamTypeClasses    #-}
+{-# LANGUAGE NoImplicitPrelude        #-}
+{-# LANGUAGE PolyKinds                #-}
+{-# LANGUAGE RankNTypes               #-}
+{-# LANGUAGE StandaloneDeriving       #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
-{-# LANGUAGE Trustworthy            #-}
+{-# LANGUAGE Trustworthy              #-}
+{-# LANGUAGE TypeFamilies             #-}
+{-# LANGUAGE TypeOperators            #-}
+{-# LANGUAGE UndecidableInstances     #-}
 
 -----------------------------------------------------------------------------
 -- |
