@@ -1,5 +1,8 @@
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE NoImplicitPrelude, BangPatterns, MagicHash, UnboxedTuples #-}
+
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -15,11 +18,6 @@
 -- Weak pointers.
 --
 -----------------------------------------------------------------------------
-
-
-
-
-
 
 module GHC.Weak (
         Weak(..),

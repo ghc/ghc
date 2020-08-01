@@ -118,7 +118,7 @@ install_interrupt_handler handler = do
 foreign import ccall unsafe
   stg_sig_install
         :: CInt                         -- sig no.
-        -> CInt                         -- action code ((-4) etc.)-- action code (STG_SIG_HAN etc.)
+        -> CInt                         -- action code (STG_SIG_HAN etc.)
         -> Ptr ()                       -- (in, out) blocked
         -> IO CInt                      -- (ret) old action code
 #endif
@@ -270,7 +270,7 @@ exitInterrupted =
 #else
   -- we must exit via the default action for SIGINT, so that the
   -- parent of this process can take appropriate action (see #2301)
-  safeExit (-2CONST_SIGINT)          )
+  safeExit (-CONST_SIGINT)
 #endif
 
 -- NOTE: shutdownHaskellAndExit must be called "safe", because it *can*
