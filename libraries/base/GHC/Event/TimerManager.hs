@@ -1,8 +1,8 @@
-{-# LANGUAGE CPP                       #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE FlexibleInstances         #-}
-{-# LANGUAGE NoImplicitPrelude         #-}
-{-# LANGUAGE Trustworthy               #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE Trustworthy #-}
 
 -- TODO: use the new Windows IO manager
 module GHC.Event.TimerManager
