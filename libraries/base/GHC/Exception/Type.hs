@@ -1,5 +1,7 @@
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude, ExistentialQuantification #-}
+
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -15,11 +17,6 @@
 -- Exceptions and exception-handling functions.
 --
 -----------------------------------------------------------------------------
-
-
-
-
-
 
 module GHC.Exception.Type
        ( Exception(..)    -- Class
