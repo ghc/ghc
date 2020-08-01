@@ -148,7 +148,7 @@ cppArgs = do
 withBuilderKey :: Builder -> String
 withBuilderKey b = case b of
     Ar _ _     -> "--with-ar="
-    Ld _       -> "--with-ld="
+    MergeObjects _ -> "--with-ld="
     Cc  _ _    -> "--with-gcc="
     Ghc _ _    -> "--with-ghc="
     Alex       -> "--with-alex="
