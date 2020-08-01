@@ -73,6 +73,14 @@ given compilation phase:
 
     Use ⟨cmd⟩ as the linker.
 
+.. ghc-flag:: -pgmlm ⟨cmd⟩
+    :shortdesc: Use ⟨cmd⟩ as the linker when merging object files
+    :type: dynamic
+    :category: phase-programs
+
+    Use ⟨cmd⟩ as the linker when merging object files (e.g. when generating
+    joined objects for loading into GHCi).
+
 .. ghc-flag:: -pgmdll ⟨cmd⟩
     :shortdesc: Use ⟨cmd⟩ as the DLL generator
     :type: dynamic
@@ -188,6 +196,14 @@ the following flags:
     :category: phase-options
 
     Pass ⟨option⟩ to the linker.
+
+.. ghc-flag:: -optlm ⟨option⟩
+    :shortdesc: pass ⟨option⟩ to the linker when merging object files.
+    :type: dynamic
+    :category: phase-options
+
+    Pass ⟨option⟩ to the linker when merging object files. In the case of a
+    standard ``ld``-style linker this should generally include the ``-r`` flag.
 
 .. ghc-flag:: -optdll ⟨option⟩
     :shortdesc: pass ⟨option⟩ to the DLL generator

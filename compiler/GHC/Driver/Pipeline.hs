@@ -2140,29 +2140,7 @@ joinObjectFiles dflags o_files output_fn = do
   let toolSettings' = toolSettings dflags
       ldIsGnuLd = toolSettings_ldIsGnuLd toolSettings'
       osInfo = platformOS (targetPlatform dflags)
-      ld_r args cc = GHC.SysTools.runLink dflags ([
-                       GHC.SysTools.Option "-nostdlib",
-                       GHC.SysTools.Option "-Wl,-r"
-                     ]
-                        -- See Note [No PIE while linking] in GHC.Driver.Session
-                     ++ (if toolSettings_ccSupportsNoPie toolSettings'
-                          then [GHC.SysTools.Option "-no-pie"]
-                          else [])
-
-                     ++ (if any (cc ==) [Clang, AppleClang, AppleClang51]
-                          then []
-                          else [GHC.SysTools.Option "-nodefaultlibs"])
-                     ++ (if osInfo == OSFreeBSD
-                          then [GHC.SysTools.Option "-L/usr/lib"]
-                          else [])
-                        -- gcc on sparc sets -Wl,--relax implicitly, but
-                        -- -r and --relax are incompatible for ld, so
-                        -- disable --relax explicitly.
-                     ++ (if platformArch (targetPlatform dflags)
-                                `elem` [ArchSPARC, ArchSPARC64]
-                         && ldIsGnuLd
-                            then [GHC.SysTools.Option "-Wl,-no-relax"]
-                            else [])
+      ld_r args cc = GHC.SysTools.runMergeObjects dflags (
                         -- See Note [Produce big objects on Windows]
                      ++ [ GHC.SysTools.Option "-Wl,--oformat,pe-bigobj-x86-64"
                         | OSMinGW32 == osInfo
@@ -2176,7 +2154,7 @@ joinObjectFiles dflags o_files output_fn = do
       -- suppress the generation of the .note.gnu.build-id section,
       -- which we don't need and sometimes causes ld to emit a
       -- warning:
-      ld_build_id | toolSettings_ldSupportsBuildId toolSettings' = ["-Wl,--build-id=none"]
+      ld_build_id | toolSettings_ldSupportsBuildId toolSettings' = ["--build-id=none"]
                   | otherwise                     = []
 
   ccInfo <- getCompilerInfo dflags
