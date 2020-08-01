@@ -1,5 +1,9 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, MagicHash, UnliftedFFITypes #-}
+{-# LANGUAGE UnliftedFFITypes #-}
+
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------
@@ -16,11 +20,6 @@
 -- (e.g. @Main.main@, 'Control.Concurrent.forkIO', and foreign exports)
 --
 -----------------------------------------------------------------------------
-
-
-
-
-
 
 module GHC.TopHandler (
         runMainIO, runIO, runIOFastExit, runNonIO,
@@ -109,10 +108,10 @@ install_interrupt_handler handler = do
 -- specialised version of System.Posix.Signals.installHandler, which
 -- isn't available here.
 install_interrupt_handler handler = do
-   let sig = 2CONST_SIGINT:: CInt    :: CInt
+   let sig = CONST_SIGINT :: CInt
    _ <- setHandler sig (Just (const handler, toDyn handler))
-   _ <- stg_sig_install sig (STG_SIG_RST-5) nullPtrnullPtr
-     -- (-5): the second ^C kills us for real, just in case the-- STG_SIG_RST: the second ^C kills us for real, just in case the
+   _ <- stg_sig_install sig STG_SIG_RST nullPtr
+     -- STG_SIG_RST: the second ^C kills us for real, just in case the
      -- RTS or program is unresponsive.
    return ()
 
