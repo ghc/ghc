@@ -341,6 +341,8 @@ newtype TExp (a :: TYPE (r :: RuntimeRep)) = TExp
 --     • In the Template Haskell quotation [|| "foo" ||]
 --       In the expression: [|| "foo" ||]
 --       In the Template Haskell splice $$([|| "foo" ||])
+--
+-- Levity-polymorphic since /template-haskell-2.16.0.0/.
 
 -- | Discard the type annotation and produce a plain Template Haskell
 -- expression
