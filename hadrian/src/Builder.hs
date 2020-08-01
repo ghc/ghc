@@ -127,9 +127,10 @@ data Builder = Alex
              | Hpc
              | HsCpp
              | Hsc2Hs Stage
-             | Ld Stage
+             | Ld Stage --- ^ linker
              | Make FilePath
              | Makeinfo
+             | MergeObjects Stage -- ^ linker to be used to merge object files.
              | Nm
              | Objdump
              | Patch
@@ -311,6 +312,7 @@ systemBuilderPath builder = case builder of
     Happy           -> fromKey "happy"
     HsCpp           -> fromKey "hs-cpp"
     Ld _            -> fromKey "ld"
+    MergeObjects _  -> fromKey "settings-merge-objects-command"
     Make _          -> fromKey "make"
     Makeinfo        -> fromKey "makeinfo"
     Nm              -> fromKey "nm"
