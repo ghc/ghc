@@ -298,6 +298,8 @@ generateSettings = do
         , ("ld supports build-id", expr $ lookupValueOrError configFile "ld-has-build-id")
         , ("ld supports filelist", expr $ lookupValueOrError configFile "ld-has-filelist")
         , ("ld is GNU ld", expr $ lookupValueOrError configFile "ld-is-gnu-ld")
+        , ("Merge objects command", expr $ settingsFileSetting SettingsFileSetting_MergeObjectsCommand)
+        , ("Merge objects flags", expr $ settingsFileSetting SettingsFileSetting_MergeObjectsFlags)
         , ("ar command", expr $ settingsFileSetting SettingsFileSetting_ArCommand)
         , ("ar flags", expr $ lookupValueOrError configFile "ar-args")
         , ("ar supports at file", expr $ yesNo <$> flag ArSupportsAtFile)
