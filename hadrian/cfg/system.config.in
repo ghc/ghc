@@ -115,6 +115,12 @@ conf-ld-linker-args-stage1  = @CONF_LD_LINKER_OPTS_STAGE1@
 conf-ld-linker-args-stage2  = @CONF_LD_LINKER_OPTS_STAGE2@
 conf-ld-linker-args-stage3  = @CONF_LD_LINKER_OPTS_STAGE3@
 
+conf-merge-objects-args-stage0  = @SettingsMergeObjectsFlags@
+conf-merge-objects-args-stage1  = @SettingsMergeObjectsFlags@
+conf-merge-objects-args-stage2  = @SettingsMergeObjectsFlags@
+conf-merge-objects-args-stage3  = @SettingsMergeObjectsFlags@
+
+
 # Settings:
 #==========
 
@@ -138,6 +144,8 @@ settings-c-compiler-link-flags = @SettingsCCompilerLinkFlags@
 settings-c-compiler-supports-no-pie = @SettingsCCompilerSupportsNoPie@
 settings-ld-command = @SettingsLdCommand@
 settings-ld-flags = @SettingsLdFlags@
+settings-merge-objects-command = @SettingsMergeObjectsCommand@
+settings-merge-objects-flags = @SettingsMergeObjectsFlags@
 settings-ar-command = @SettingsArCommand@
 settings-ranlib-command = @SettingsRanlibCommand@
 settings-dll-wrap-command = @SettingsDllWrapCommand@

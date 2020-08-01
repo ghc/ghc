@@ -602,13 +602,12 @@ dnl ** Which ld to use
 dnl --------------------------------------------------------------
 AC_ARG_VAR(LD,[Use as the path to ld. See also --disable-ld-override.])
 FIND_LD([$target],[GccUseLdOpt])
+FIND_MERGE_OBJECTS()
 CONF_GCC_LINKER_OPTS_STAGE1="$CONF_GCC_LINKER_OPTS_STAGE1 $GccUseLdOpt"
 CONF_GCC_LINKER_OPTS_STAGE2="$CONF_GCC_LINKER_OPTS_STAGE2 $GccUseLdOpt"
 LdCmd="$LD"
-LdNoGoldCmd="$LD_NO_GOLD"
 CFLAGS="$CFLAGS $GccUseLdOpt"
 AC_SUBST([LdCmd])
-AC_SUBST([LdNoGoldCmd])
 
 FP_PROG_LD_IS_GNU
 FP_PROG_LD_BUILD_ID

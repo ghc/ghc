@@ -3,6 +3,15 @@
 # To be a good autoconf citizen, names of local macros have prefixed with FP_ to
 # ensure we don't clash with any pre-supplied autoconf ones.
 
+# FPTOOLS_WRITE_FILE
+# ------------------
+# Write $2 to the file named $1.
+AC_DEFUN([FPTOOLS_WRITE_FILE],
+[
+cat >$1 <<ACEOF
+$2
+ACEOF
+])
 
 AC_DEFUN([GHC_SELECT_FILE_EXTENSIONS],
 [
@@ -2471,7 +2480,6 @@ AC_DEFUN([FIND_LD],[
         # Make sure the user didn't specify LD manually.
         if test "z$LD" != "z"; then
             AC_CHECK_TARGET_TOOL([LD], [ld])
-            LD_NO_GOLD=$LD
             return
         fi
 
@@ -2484,7 +2492,6 @@ AC_DEFUN([FIND_LD],[
             if test "x$TmpLd" = "x"; then continue; fi
 
             out=`$TmpLd --version`
-            LD_NO_GOLD=$TmpLd
             case $out in
               "GNU ld"*)
                    FP_CC_LINKER_FLAG_TRY(bfd, $2) ;;
@@ -2492,8 +2499,6 @@ AC_DEFUN([FIND_LD],[
                    FP_CC_LINKER_FLAG_TRY(gold, $2)
                    if test "$cross_compiling" = "yes"; then
                        AC_MSG_NOTICE([Using ld.gold and assuming that it is not affected by binutils issue 22266]);
-                   else
-                       LD_NO_GOLD=ld;
                    fi
                    ;;
               "LLD"*)
@@ -2514,19 +2519,139 @@ AC_DEFUN([FIND_LD],[
 
         # Fallback
         AC_CHECK_TARGET_TOOL([LD], [ld])
-        # This isn't entirely safe since $LD may have been discovered to be
-        # ld.gold, but what else can we do?
-        if test "x$LD_NO_GOLD" = "x"; then LD_NO_GOLD=$LD; fi
     }
 
     if test "x$enable_ld_override" = "xyes"; then
         find_ld
     else
         AC_CHECK_TARGET_TOOL([LD], [ld])
-        if test "x$LD_NO_GOLD" = "x"; then LD_NO_GOLD=$LD; fi
     fi
 
     CHECK_LD_COPY_BUG([$1])
+])
+
+
+# CHECK_FOR_GOLD_T22266
+# ----------------------
+#
+# Test for binutils #22266. This bug manifested as GHC bug #14328 (see also:
+# #14675, #14291).
+# Uses test from
+# https://sourceware.org/git/gitweb.cgi?p=binutils-gdb.git;h=033bfb739b525703bfe23f151d09e9beee3a2afe
+#
+# $1 = linker to test
+# Sets $result to 0 if not affected, 1 otherwise
+AC_DEFUN([CHECK_FOR_GOLD_T22266],[
+    AC_MSG_CHECKING([for ld.gold object merging bug (binutils 22266)])
+    if ! $1 --version | grep -v -q "GNU gold"; then
+        # Not gold
+        result=0
+    elif test "$cross_compiling" = "yes"; then
+        AC_MSG_RESULT([cross-compiling, assuming LD can merge objects correctly.])
+        result=0
+    else
+        FPTOOLS_WRITE_FILE([conftest.a.c], [
+          __attribute__((section(".data.a")))
+          static int int_from_a_1 = 0x11223344;
+
+          __attribute__((section(".data.rel.ro.a")))
+          int *p_int_from_a_2 = &int_from_a_1;
+
+          const char *hello (void);
+
+          const char *
+          hello (void)
+          {
+            return "XXXHello, world!" + 3;
+          }
+        ])
+
+        FPTOOLS_WRITE_FILE([conftest.main.c], [
+          #include <stdlib.h>
+          #include <string.h>
+
+          extern int *p_int_from_a_2;
+          extern const char *hello (void);
+
+          int main (void) {
+            if (*p_int_from_a_2 != 0x11223344)
+              abort ();
+            if (strcmp(hello(), "Hello, world!") != 0)
+              abort ();
+            return 0;
+          }
+        ])
+
+        FPTOOLS_WRITE_FILE([conftest.t], [
+          SECTIONS
+          {
+              .text : {
+                  *(.text*)
+              }
+              .rodata :
+              {
+                  *(.rodata .rodata.* .gnu.linkonce.r.*)
+              }
+              .data.rel.ro : {
+                  *(.data.rel.ro*)
+              }
+              .data : {
+                  *(.data*)
+              }
+              .bss : {
+                  *(.bss*)
+              }
+          }
+        ])
+
+        $CC -c -o conftest.a.o conftest.a.c || AC_MSG_ERROR([Failed to compile test])
+        $SettingsMergeObjectsCommand $SettingsMergeObjectsFlags -T conftest.t conftest.a.o -o conftest.ar.o || AC_MSG_ERROR([Failed to merge test object])
+
+        $CC -c -o conftest.main.o conftest.main.c || AC_MSG_ERROR([Failed to compile test driver])
+        $CC conftest.ar.o conftest.main.o -o conftest || AC_MSG_ERROR([Failed to link test driver])
+
+        if ./conftest; then
+            AC_MSG_RESULT([not affected])
+            result=0
+        else
+            AC_MSG_RESULT([affected])
+            result=1
+        fi
+        rm -f conftest.a.o conftest.a.c  conttest.ar.o conftest.main.c conftest.main.o conftest
+    fi
+])
+
+# FIND_MERGE_OBJECTS
+# ------------------
+# Find which linker to use to merge object files.
+#
+AC_DEFUN([FIND_MERGE_OBJECTS],[
+    AC_REQUIRE([FIND_LD])
+
+    if test -z "$SettingsMergeObjectsCommand"; then
+        SettingsMergeObjectsCommand="$LD"
+    fi
+    if test -z "$SettingsMergeObjectsFlags"; then
+        SettingsMergeObjectsFlags="-r"
+    fi
+
+    CHECK_FOR_GOLD_T22266($SettingsMergeObjectsCommand)
+    if test "$result" = "1"; then
+        AC_MSG_NOTICE([$SettingsMergeObjectsCommand is broken due to binutils 22266, looking for another linker...])
+        SettingsMergeObjectsCommand=""
+        AC_CHECK_TARGET_TOOL([SettingsMergeObjectsCommand], [ld])
+        CHECK_FOR_GOLD_T22266($SettingsMergeObjectsCommand)
+        if test "$result" = "1"; then
+            AC_MSG_ERROR([Linker is affected by binutils 22266 but couldn't find another unaffected linker. Please set the SettingsMergeObjectsCommand variable to a functional linker.])
+        fi
+    fi
+
+    if test "$windows" = YES -a "$EnableDistroToolchain" = "NO" -a "$WORD_SIZE" = 64; then
+        SettingsMergeObjectsFlags="$SettingsMergeObjectsFlags --oformat=pe-bigobj-x86-64"
+    fi
+
+    AC_SUBST(SettingsMergeObjectsCommand)
+    AC_SUBST(SettingsMergeObjectsFlags)
 ])
 
 # FIND_PYTHON

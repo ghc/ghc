@@ -37,6 +37,7 @@ import Settings.Builders.Hsc2Hs
 import Settings.Builders.HsCpp
 import Settings.Builders.Ld
 import Settings.Builders.Make
+import Settings.Builders.MergeObjects
 import Settings.Builders.RunTest
 import Settings.Builders.Xelatex
 import Settings.Packages
@@ -244,6 +245,7 @@ defaultBuilderArgs = mconcat
     , hsCppBuilderArgs
     , ldBuilderArgs
     , makeBuilderArgs
+    , mergeObjectsBuilderArgs
     , runTestBuilderArgs
     , validateBuilderArgs
     , xelatexBuilderArgs

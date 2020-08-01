@@ -223,6 +223,8 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 	@echo ',("ld supports build-id", "$(LdHasBuildId)")' >> $@
 	@echo ',("ld supports filelist", "$(LdHasFilelist)")' >> $@
 	@echo ',("ld is GNU ld", "$(LdIsGNULd)")' >> $@
+	@echo ',("Merge objects command", "$(SettingsMergeObjectsCommand)")' >> $@
+	@echo ',("Merge objects flags", "$(SettingsMergeObjectsFlags)")' >> $@
 	@echo ',("ar command", "$(SettingsArCommand)")' >> $@
 	@echo ',("ar flags", "$(ArArgs)")' >> $@
 	@echo ',("ar supports at file", "$(ArSupportsAtFile)")' >> $@
