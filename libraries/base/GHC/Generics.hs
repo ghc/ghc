@@ -7,7 +7,6 @@
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 {-# LANGUAGE MagicHash                  #-}
 {-# LANGUAGE NoImplicitPrelude          #-}
 {-# LANGUAGE PolyKinds                  #-}
@@ -16,7 +15,6 @@
 {-# LANGUAGE Trustworthy                #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
-
 {-# LANGUAGE UndecidableInstances       #-}
 
 -----------------------------------------------------------------------------
