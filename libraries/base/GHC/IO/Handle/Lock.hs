@@ -1,7 +1,5 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE InterruptibleFFI #-}
-
-
 {-# LANGUAGE NoImplicitPrelude #-}
 
 module GHC.IO.Handle.Lock (
