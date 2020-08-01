@@ -1,6 +1,5 @@
 {-# LANGUAGE Unsafe #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE MagicHash #-}
 
 -----------------------------------------------------------------------------
 -- |

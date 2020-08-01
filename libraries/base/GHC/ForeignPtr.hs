@@ -1,11 +1,10 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE NoImplicitPrelude
-           , BangPatterns
-           , MagicHash
-           , UnboxedTuples
-  #-}
+
 {-# OPTIONS_HADDOCK not-home #-}
-{-# LANGUAGE StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
 -- |

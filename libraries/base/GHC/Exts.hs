@@ -1,6 +1,10 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE Unsafe #-}
-{-# LANGUAGE MagicHash, UnboxedTuples, TypeFamilies, DeriveDataTypeable,
-             MultiParamTypeClasses, FlexibleInstances, NoImplicitPrelude #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
 
