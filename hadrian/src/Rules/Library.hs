@@ -92,6 +92,7 @@ buildDynamicLibUnix root suffix dynlibpath = do
 
 -- | Build a "GHCi library" ('LibGhci') under the given build root, with the
 -- complete path of the file to build is given as the second argument.
+-- See Note [Merging object files for GHCi] in GHC.Driver.Pipeline.
 buildGhciLibO :: FilePath -> FilePath -> Action ()
 buildGhciLibO root ghcilibPath = do
     l@(BuildPath _ stage _ (LibGhci _ _ _))
@@ -101,7 +102,7 @@ buildGhciLibO root ghcilibPath = do
     let context = libGhciContext l
     objs <- allObjects context
     need objs
-    build $ target context (Ld stage) objs [ghcilibPath]
+    build $ target context (MergeObjects stage) objs [ghcilibPath]
 
 -- * Helpers
 
