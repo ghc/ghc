@@ -1,10 +1,10 @@
-{-# LANGUAGE CPP               #-}
-{-# LANGUAGE MagicHash         #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE RankNTypes        #-}
-{-# LANGUAGE UnboxedTuples     #-}
-{-# LANGUAGE UnliftedFFITypes  #-}
-{-# LANGUAGE Unsafe            #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE UnliftedFFITypes #-}
+{-# LANGUAGE Unsafe #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -28,7 +28,6 @@
 -- higher level modules be the home.  Hence:
 
 -- #not-home
-
 module GHC.Conc.Sync
         ( ThreadId(..)
         , showThreadId

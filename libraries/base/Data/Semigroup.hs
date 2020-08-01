@@ -6,7 +6,6 @@
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE Trustworthy                #-}
 
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Semigroup

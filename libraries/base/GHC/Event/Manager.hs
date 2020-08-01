@@ -1,9 +1,9 @@
-{-# LANGUAGE CPP                       #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE FlexibleInstances         #-}
-{-# LANGUAGE NoImplicitPrelude         #-}
-{-# LANGUAGE RecordWildCards           #-}
-{-# LANGUAGE Trustworthy               #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE Trustworthy #-}
 
 -- |
 -- The event manager supports event notification on fds. Each fd may
