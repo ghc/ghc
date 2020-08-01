@@ -1,8 +1,8 @@
-{-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE CPP               #-}
+{-# LANGUAGE MagicHash         #-}
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE Trustworthy       #-}
+{-# LANGUAGE UnboxedTuples     #-}
 
 module GHC.Event.PSQ
     (
