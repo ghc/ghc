@@ -1,6 +1,8 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, BangPatterns, NoImplicitPrelude,
-             NondecreasingIndentation, MagicHash #-}
+{-# LANGUAGE BangPatterns #-}
 
 module GHC.IO.Encoding.CodePage(
 #if defined(mingw32_HOST_OS)

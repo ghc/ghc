@@ -1,6 +1,6 @@
-{-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude, MagicHash #-}
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE MagicHash         #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE Trustworthy       #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -99,15 +99,15 @@ module Control.Exception.Base (
         nonTermination, nestedAtomically,
   ) where
 
-import GHC.Base
-import GHC.IO hiding (bracket,finally,onException)
-import GHC.IO.Exception
-import GHC.Exception
-import GHC.Show
+import           GHC.Base
+import           GHC.Exception
+import           GHC.IO           hiding (bracket, finally, onException)
+import           GHC.IO.Exception
+import           GHC.Show
 -- import GHC.Exception hiding ( Exception )
-import GHC.Conc.Sync
+import           GHC.Conc.Sync
 
-import Data.Either
+import           Data.Either
 
 -----------------------------------------------------------------------------
 -- Catching exceptions
