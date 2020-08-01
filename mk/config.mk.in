@@ -500,6 +500,8 @@ SettingsCCompilerLinkFlags = @SettingsCCompilerLinkFlags@
 SettingsCCompilerSupportsNoPie = @SettingsCCompilerSupportsNoPie@
 SettingsLdCommand = @SettingsLdCommand@
 SettingsLdFlags = @SettingsLdFlags@
+SettingsMergeObjectsCommand = @SettingsMergeObjectsCommand@
+SettingsMergeObjectsFlags = @SettingsMergeObjectsFlags@
 SettingsArCommand = @SettingsArCommand@
 SettingsRanlibCommand = @SettingsRanlibCommand@
 SettingsDllWrapCommand = @SettingsDllWrapCommand@
@@ -733,7 +735,6 @@ HaveDtrace		= @HaveDtrace@
 USE_DTRACE = $(HaveDtrace)
 DTRACE			= @DtraceCmd@
 
-LD_NO_GOLD = @LdNoGoldCmd@
 LD = @LdCmd@
 NM = @NmCmd@
 AR = @ArCmd@
