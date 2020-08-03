@@ -36,7 +36,8 @@ import {-# SOURCE #-} GHC.CoreToIface
 import {-# SOURCE #-} GHC.Core.DataCon
    ( dataConFullSig , dataConUserTyVarBinders, DataCon )
 
-import GHC.Core.Type ( pickyIsLiftedTypeKind, pattern One, pattern Many )
+import GHC.Core.Type ( pickyIsLiftedTypeKind, pattern One, pattern Many,
+                       splitForAllTysReq, splitForAllTysInvis )
 
 import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
@@ -268,19 +269,34 @@ debug_ppr_ty prec (CastTy ty co)
 debug_ppr_ty _ (CoercionTy co)
   = parens (text "CO" <+> ppr co)
 
-debug_ppr_ty prec ty@(ForAllTy {})
-  | (tvs, body) <- split ty
+-- Invisible forall:  forall {k} (a :: k). t
+debug_ppr_ty prec t
+  | (bndrs, body) <- splitForAllTysInvis t
+  , not (null bndrs)
   = maybeParen prec funPrec $
-    hang (text "forall" <+> fsep (map ppr tvs) <> dot)
-         -- The (map ppr tvs) will print kind-annotated
-         -- tvs, because we are (usually) in debug-style
-       2 (ppr body)
+    sep [ text "forall" <+> fsep (map ppr_bndr bndrs) <> dot,
+          ppr body ]
   where
-    split ty | ForAllTy tv ty' <- ty
-             , (tvs, body) <- split ty'
-             = (tv:tvs, body)
-             | otherwise
-             = ([], ty)
+    -- (ppr tv) will print the binder kind-annotated
+    -- when in debug-style
+    ppr_bndr (Bndr tv InferredSpec)  = braces (ppr tv)
+    ppr_bndr (Bndr tv SpecifiedSpec) = ppr tv
+
+-- Visible forall:  forall x y -> t
+debug_ppr_ty prec t
+  | (bndrs, body) <- splitForAllTysReq t
+  , not (null bndrs)
+  = maybeParen prec funPrec $
+    sep [ text "forall" <+> fsep (map ppr_bndr bndrs) <+> arrow,
+          ppr body ]
+  where
+    -- (ppr tv) will print the binder kind-annotated
+    -- when in debug-style
+    ppr_bndr (Bndr tv ()) = ppr tv
+
+-- Impossible case: neither visible nor invisible forall.
+debug_ppr_ty _ ForAllTy{}
+  = panic "debug_ppr_ty: neither splitForAllTysInvis nor splitForAllTysReq returned any binders"
 
 {-
 Note [Infix type variables]
