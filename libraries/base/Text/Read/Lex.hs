@@ -498,21 +498,27 @@ lexDecNumber =
      return (Number (MkDecimal xs mFrac mExp))
 
 lexFrac :: Int -> ReadP (Maybe Digits)
--- Read the fractional part; fail if it doesn't
--- start ".d" where d is a digit
-lexFrac base = do _ <- char '.'
-                  fraction <- lexDigits base
-                  return (Just fraction)
+-- Lex the fractional part
+-- Returns Nothing if there is no decimal point or the fractional part is elided
+-- Consumes the decimal point if the fractional part is elided
+lexFrac base = dotAndDigits <++ return Nothing
+ where
+   dotAndDigits = do char '.'
+                     (fmap Just (lexDigits base)) <++ return Nothing
 
 lexExp :: [Char] -> ReadP (Maybe Integer)
-lexExp expChars = do _ <- choice (map char expChars)
-                     exp <- signedExp +++ lexInteger 10
-                     return (Just exp)
+-- Lex a base indicator character followed by a non-empty sequence of decimal
+-- digits
+lexExp expChars = expCharAndDigits <++ return Nothing
  where
    signedExp
      = do c <- char '-' +++ char '+'
           n <- lexInteger 10
           return (if c == '-' then -n else n)
+
+   expCharAndDigits = do _ <- choice (map char expChars)
+                         exp <- signedExp +++ lexInteger 10
+                         return (Just exp)
 
 lexDigits :: Int -> ReadP Digits
 -- Lex a non-empty sequence of digits in specified base
