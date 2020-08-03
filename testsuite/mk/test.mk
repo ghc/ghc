@@ -37,7 +37,7 @@ endif
 # TEST_HC_OPTS is passed to every invocation of TEST_HC
 # in nested Makefiles
 TEST_HC_OPTS = -dcore-lint -dstg-lint -dcmm-lint \
-			   -no-user-$(GhcPackageDbFlag) -rtsopts $(EXTRA_HC_OPTS)
+		-no-user-$(GhcPackageDbFlag) -rtsopts $(EXTRA_HC_OPTS) -ddrop-coercions
 
 ifeq "$(MinGhcVersion711)" "YES"
 # Don't warn about missing specialisations. They can only occur with `-O`, but
