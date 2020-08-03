@@ -120,12 +120,21 @@ fixedParts p base iPart fPart =
 -- /necessarily/ return Nothing, but it is good enough to fix the
 -- space problems in #5688
 -- Ways this is conservative:
--- * The floatRange is in base 2, but we pretend it is in base 10
--- * We pad the floatRange a bit, just in case it is very small
---   and we would otherwise hit an edge case
+-- * The floatRange is in base 2, but for decimal literals we scale it down to
+--   base 8 (2^3) while we could technically scale it down by log2(10).
+-- * Per digit we raise the binary power by 4, this is exact in the hexadecimal
+--   case and slightly generous in the decimal case.
+-- * We pad the floatRange a bit on the left, just in case it is very small
+--   and we would otherwise hit an edge case, for numbers with a power smaller
+--   than (emin + (1 - p)) (the magnitude of the smallest subnormal) that still
+--   round up to the smallest subnormal number.
 -- * We only worry about numbers that have an exponent. If they don't
 --   have an exponent then the Rational won't be much larger than the
 --   Number, so there is no problem
+-- Note that bounding literals to a certain range changes the interpretation of
+-- literals in the presence of rounding modes which may indiscriminately round
+-- away from an infinity. This is the case for rounding towards positive or
+-- negative infinity and rounding towards zero.
 -- | @since 4.5.1.0
 numberToRangedRational :: (Int, Int) -> Number
                        -> Maybe Rational -- Nothing = Inf
@@ -134,12 +143,6 @@ numberToRangedRational bounds n@(MkDecimal iPart mFPart (Just exp))
     where a `divUp` b | (q, r) <- a `quotRem` b = q + r
           shrink (l, r) = (l `divUp` 3, r `divUp` 3)
 numberToRangedRational bounds n@(MkHexadecimal iPart mFPart (Just exp))
-  -- TODO: I have no idea whether the +/- 3 padding makes
-  --       sense for hexadecimal numbers too.
-  --       I think firstDigit does have to be brought down
-  --       to powers of 2 rather than 16 though.
-  --       On the plus side we'd no longer be pretending
-  --       that the base 2 bounds are base 10.
   = exponentedToRangedRational bounds n iPart mFPart exp
 numberToRangedRational _ n = Just (numberToRational n)
 
@@ -155,7 +158,7 @@ exponentedToRangedRational (neg, pos) n iPart mFPart exp
   = Just 0
   | otherwise
   = let mFirstDigit = case dropWhile (0 ==) iPart of
-                      iPart'@(_ : _) -> Just (length iPart')
+                      (_ : iPart') -> Just (length iPart')
                       [] -> case mFPart of
                             Nothing -> Nothing
                             Just fPart ->
@@ -166,10 +169,15 @@ exponentedToRangedRational (neg, pos) n iPart mFPart exp
     in case mFirstDigit of
        Nothing -> Just 0
        Just firstDigit ->
-           let firstDigit' = firstDigit + fromInteger exp
-           in if firstDigit' > (pos + 3)
+           let firstDigit' = 4 * firstDigit + fromInteger exp
+           in if firstDigit' > pos -- b^emax * (2 - 1/2 * b^(1-p)) and greater
+                                   -- (the factor is less than 2 so the bound
+                                   -- is strictly smaller than b^(emax + 1),
+                                   -- pos = emax + 1) round to infinity with
+                                   -- the default "round to nearest, ties to
+                                   -- even" strategy
               then Nothing
-              else if firstDigit' < (neg - 3) -- Padding hides the edge case
+              else if firstDigit' < (neg - 1) -- Padding hides the edge case
                                               -- where the number is closer to
                                               -- the smallest (de)norm than 0
               then Just 0
