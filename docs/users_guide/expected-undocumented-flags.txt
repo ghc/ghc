@@ -169,3 +169,4 @@
 -ticky-LNE
 -ticky-allocd
 -ticky-dyn-thunk
+-ddrop-coercions
