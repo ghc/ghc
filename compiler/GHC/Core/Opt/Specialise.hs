@@ -1338,8 +1338,9 @@ type SpecInfo = ( [CoreRule]       -- Specialisation rules
 specCalls mb_mod env existing_rules calls_for_me fn rhs
         -- The first case is the interesting one
   |  notNull calls_for_me               -- And there are some calls to specialise
-  && not (isNeverActive (idInlineActivation fn))
-        -- Don't specialise NOINLINE things
+  && not (isNeverActive (idInlineActivation fn) &&
+          specializablePragmaSpec (idInlinePragma fn) == NoUserSpecializable)
+        -- Don't specialise NOINLINE things that aren't also SPECIALIZABLE
         -- See Note [Auto-specialisation and RULES]
 
 --   && not (certainlyWillInline (idUnfolding fn))      -- And it's not small
@@ -1486,6 +1487,9 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
 
                   | InlinePragma { inl_inline = Inlinable } <- inl_prag
                   = (inl_prag { inl_inline = NoUserInline }, noUnfolding)
+
+                  | InlinePragma { inl_inline = NoInline } <- inl_prag
+                  = (neverInlinePragma, noUnfolding)
 
                   | otherwise
                   = (inl_prag, specUnfolding dflags spec_bndrs (`mkApps` spec_args)
