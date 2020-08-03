@@ -374,6 +374,7 @@ but there are several things that can be tweaked for maximum
 performance.
 
 .. rts-flag:: --copying-gc
+
     :default: on
     :since: 8.10.2
     :reverse: --nonmoving-gc

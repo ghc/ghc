@@ -28,7 +28,6 @@ module GHC.Unit.State (
         lookupPackageName,
         improveUnit,
         searchPackageId,
-        displayUnitId,
         listVisibleModuleNames,
         lookupModuleInAllUnits,
         lookupModuleWithSuggestions,
@@ -61,14 +60,18 @@ module GHC.Unit.State (
         instUnitToUnit,
         instModuleToModule,
 
+        -- * Pretty-printing
+        pprFlag,
+        pprUnits,
+        pprUnitsSimple,
+        pprUnitIdForUser,
+        pprUnitInfoForUser,
+        pprModuleMap,
+
         -- * Utils
         mkIndefUnitId,
         updateIndefUnitId,
         unwireUnit,
-        pprFlag,
-        pprUnits,
-        pprUnitsSimple,
-        pprModuleMap,
         homeUnitIsIndefinite,
         homeUnitIsDefinite,
     )
@@ -81,10 +84,11 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.Unit.Database
 import GHC.Unit.Info
+import GHC.Unit.Ppr
 import GHC.Unit.Types
 import GHC.Unit.Module
 import GHC.Driver.Session
-import GHC.Driver.Ways
+import GHC.Platform.Ways
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Types.Unique.Set
@@ -310,7 +314,7 @@ instance Monoid UnitVisibility where
 
 -- | Unit configuration
 data UnitConfig = UnitConfig
-   { unitConfigPlatformArchOs :: !PlatformMini  -- ^ Platform
+   { unitConfigPlatformArchOS :: !ArchOS        -- ^ Platform arch and OS
    , unitConfigWays           :: !(Set Way)     -- ^ Ways to use
    , unitConfigProgramName    :: !String
       -- ^ Name of the compiler (e.g. "GHC", "GHCJS"). Used to fetch environment
@@ -352,7 +356,7 @@ initUnitConfig dflags =
          | otherwise = filter (/= homeUnitId dflags) [baseUnitId, rtsUnitId]
 
    in UnitConfig
-      { unitConfigPlatformArchOs = platformMini (targetPlatform dflags)
+      { unitConfigPlatformArchOS = platformArchOS (targetPlatform dflags)
       , unitConfigProgramName    = programName dflags
       , unitConfigWays           = ways dflags
 
@@ -642,7 +646,7 @@ getUnitDbRefs cfg = do
 resolveUnitDatabase :: UnitConfig -> PkgDbRef -> IO (Maybe FilePath)
 resolveUnitDatabase cfg GlobalPkgDb = return $ Just (unitConfigGlobalDB cfg)
 resolveUnitDatabase cfg UserPkgDb = runMaybeT $ do
-  dir <- versionedAppDir (unitConfigProgramName cfg) (unitConfigPlatformArchOs cfg)
+  dir <- versionedAppDir (unitConfigProgramName cfg) (unitConfigPlatformArchOS cfg)
   let pkgconf = dir </> unitConfigDBName cfg
   exist <- tryMaybeT $ doesDirectoryExist pkgconf
   if exist then return pkgconf else mzero
@@ -887,7 +891,7 @@ findPackages prec_map pkg_map closure arg pkgs unusable
         else Right (sortByPreference prec_map ps)
   where
     finder (PackageArg str) p
-      = if str == unitPackageIdString p || str == unitPackageNameString p
+      = if matchingStr str p
           then Just p
           else Nothing
     finder (UnitIdArg uid) p
@@ -2100,6 +2104,8 @@ add_unit pkg_map ps (p, mb_parent)
 
 -- -----------------------------------------------------------------------------
 
+-- | Pretty-print a UnitId for the user.
+--
 -- Cabal packages may contain several components (programs, libraries, etc.).
 -- As far as GHC is concerned, installed package components ("units") are
 -- identified by an opaque IndefUnitId string provided by Cabal. As the string
@@ -2111,25 +2117,29 @@ add_unit pkg_map ps (p, mb_parent)
 --
 -- Component name is only displayed if it isn't the default library
 --
--- To do this we need to query the database (cached in DynFlags). We cache
--- these details in the IndefUnitId itself because we don't want to query
--- DynFlags each time we pretty-print the IndefUnitId
---
+-- To do this we need to query a unit database.
+pprUnitIdForUser :: UnitState -> UnitId -> SDoc
+pprUnitIdForUser state uid@(UnitId fs) =
+   case lookupUnitPprInfo state uid of
+      Nothing -> ftext fs -- we didn't find the unit at all
+      Just i  -> ppr i
+
+pprUnitInfoForUser :: UnitInfo -> SDoc
+pprUnitInfoForUser info = ppr (mkUnitPprInfo unitIdFS info)
+
+lookupUnitPprInfo :: UnitState -> UnitId -> Maybe UnitPprInfo
+lookupUnitPprInfo state uid = fmap (mkUnitPprInfo unitIdFS) (lookupUnitId state uid)
+
+-- | Create a IndefUnitId.
 mkIndefUnitId :: UnitState -> FastString -> IndefUnitId
-mkIndefUnitId pkgstate raw =
+mkIndefUnitId state raw =
     let uid = UnitId raw
-    in case lookupUnitId pkgstate uid of
-         Nothing -> Indefinite uid Nothing -- we didn't find the unit at all
-         Just c  -> Indefinite uid $ Just $ mkUnitPprInfo c
+    in Indefinite uid $! lookupUnitPprInfo state uid
 
 -- | Update component ID details from the database
 updateIndefUnitId :: UnitState -> IndefUnitId -> IndefUnitId
 updateIndefUnitId pkgstate uid = mkIndefUnitId pkgstate (unitIdFS (indefUnit uid))
 
-
-displayUnitId :: UnitState -> UnitId -> Maybe String
-displayUnitId pkgstate uid =
-    fmap unitPackageIdString (lookupUnitId pkgstate uid)
 
 -- -----------------------------------------------------------------------------
 -- Displaying packages

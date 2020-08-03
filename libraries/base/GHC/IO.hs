@@ -173,7 +173,7 @@ catchException !io handler = catch io handler
 -- @IO Int -> (ArithException -> IO Int) -> IO Int@ then the handler may
 -- get run with @DivideByZero@ as an argument, or an @ErrorCall \"urk\"@
 -- exception may be propagated further up. If you call it again, you
--- might get a the opposite behaviour. This is ok, because 'catch' is an
+-- might get the opposite behaviour. This is ok, because 'catch' is an
 -- 'IO' computation.
 --
 catch   :: Exception e

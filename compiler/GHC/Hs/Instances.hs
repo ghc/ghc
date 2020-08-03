@@ -33,6 +33,8 @@ import GHC.Hs.Type
 import GHC.Hs.Pat
 import GHC.Hs.ImpExp
 
+import GHC.Types.SrcLoc ( Located )
+
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs-----------------------------------------
 
@@ -165,8 +167,6 @@ deriving instance Data (HsDerivingClause GhcTc)
 deriving instance Data (ConDecl GhcPs)
 deriving instance Data (ConDecl GhcRn)
 deriving instance Data (ConDecl GhcTc)
-
-deriving instance Data ConDeclGADTPrefixPs
 
 -- deriving instance DataIdLR p p   => Data (TyFamInstDecl p)
 deriving instance Data (TyFamInstDecl GhcPs)
@@ -433,9 +433,9 @@ deriving instance Data thing => Data (HsScaled GhcPs thing)
 deriving instance Data thing => Data (HsScaled GhcRn thing)
 deriving instance Data thing => Data (HsScaled GhcTc thing)
 
-deriving instance Data (LHsTypeArg GhcPs)
-deriving instance Data (LHsTypeArg GhcRn)
-deriving instance Data (LHsTypeArg GhcTc)
+deriving instance Data (HsArg (Located (HsType GhcPs)) (Located (HsKind GhcPs)))
+deriving instance Data (HsArg (Located (HsType GhcRn)) (Located (HsKind GhcRn)))
+deriving instance Data (HsArg (Located (HsType GhcTc)) (Located (HsKind GhcTc)))
 
 -- deriving instance (DataIdLR p p) => Data (ConDeclField p)
 deriving instance Data (ConDeclField GhcPs)

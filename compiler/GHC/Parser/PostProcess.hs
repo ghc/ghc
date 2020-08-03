@@ -70,6 +70,7 @@ module GHC.Parser.PostProcess (
         addFatalError, hintBangPat,
         TyEl(..), mergeOps, mergeDataCon,
         mkBangTy,
+        UnpackednessPragma(..),
 
         -- Help with processing exports
         ImpExpSubSpec(..),
@@ -126,7 +127,6 @@ import GHC.Builtin.Names ( allNameStrings )
 import GHC.Types.SrcLoc
 import GHC.Types.Unique ( hasKey )
 import GHC.Data.OrdList ( OrdList, fromOL )
-import GHC.Data.Bag     ( emptyBag, consBag )
 import GHC.Utils.Outputable as Outputable
 import GHC.Data.FastString
 import GHC.Data.Maybe
@@ -172,16 +172,18 @@ mkClassDecl :: SrcSpan
             -> Located (Maybe (LHsContext GhcPs), LHsType GhcPs)
             -> Located (a,[LHsFunDep GhcPs])
             -> OrdList (LHsDecl GhcPs)
+            -> LayoutInfo
             -> P (LTyClDecl GhcPs)
 
-mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
+mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls layoutInfo
   = do { (binds, sigs, ats, at_defs, _, docs) <- cvBindsAndSigs where_cls
        ; let cxt = fromMaybe (noLoc []) mcxt
        ; (cls, tparams, fixity, ann) <- checkTyClHdr True tycl_hdr
        ; addAnnsAt loc ann -- Add any API Annotations to the top SrcSpan
        ; (tyvars,annst) <- checkTyVars (text "class") whereDots cls tparams
        ; addAnnsAt loc annst -- Add any API Annotations to the top SrcSpan
-       ; return (L loc (ClassDecl { tcdCExt = noExtField, tcdCtxt = cxt
+       ; return (L loc (ClassDecl { tcdCExt = layoutInfo
+                                  , tcdCtxt = cxt
                                   , tcdLName = cls, tcdTyVars = tyvars
                                   , tcdFixity = fixity
                                   , tcdFDs = snd (unLoc fds)
@@ -418,14 +420,7 @@ fromSpecTyVarBndr bndr = case bndr of
 
 --  | Groups together bindings for a single function
 cvTopDecls :: OrdList (LHsDecl GhcPs) -> [LHsDecl GhcPs]
-cvTopDecls decls = go (fromOL decls)
-  where
-    go :: [LHsDecl GhcPs] -> [LHsDecl GhcPs]
-    go []                     = []
-    go ((L l (ValD x b)) : ds)
-      = L l' (ValD x b') : go ds'
-        where (L l' b', ds') = getMonoBind (L l b) ds
-    go (d : ds)                    = d : go ds
+cvTopDecls decls = getMonoBindAll (fromOL decls)
 
 -- Declaration list may only contain value bindings and signatures.
 cvBindGroup :: OrdList (LHsDecl GhcPs) -> P (HsValBinds GhcPs)
@@ -441,33 +436,32 @@ cvBindsAndSigs :: OrdList (LHsDecl GhcPs)
 -- Input decls contain just value bindings and signatures
 -- and in case of class or instance declarations also
 -- associated type declarations. They might also contain Haddock comments.
-cvBindsAndSigs fb = go (fromOL fb)
+cvBindsAndSigs fb = do
+  fb' <- drop_bad_decls (fromOL fb)
+  return (partitionBindsAndSigs (getMonoBindAll fb'))
   where
-    go []              = return (emptyBag, [], [], [], [], [])
-    go ((L l (ValD _ b)) : ds)
-      = do { (bs, ss, ts, tfis, dfis, docs) <- go ds'
-           ; return (b' `consBag` bs, ss, ts, tfis, dfis, docs) }
-      where
-        (b', ds') = getMonoBind (L l b) ds
-    go ((L l decl) : ds)
-      = do { (bs, ss, ts, tfis, dfis, docs) <- go ds
-           ; case decl of
-               SigD _ s
-                 -> return (bs, L l s : ss, ts, tfis, dfis, docs)
-               TyClD _ (FamDecl _ t)
-                 -> return (bs, ss, L l t : ts, tfis, dfis, docs)
-               InstD _ (TyFamInstD { tfid_inst = tfi })
-                 -> return (bs, ss, ts, L l tfi : tfis, dfis, docs)
-               InstD _ (DataFamInstD { dfid_inst = dfi })
-                 -> return (bs, ss, ts, tfis, L l dfi : dfis, docs)
-               DocD _ d
-                 -> return (bs, ss, ts, tfis, dfis, L l d : docs)
-               SpliceD _ d
-                 -> addFatalError l $
-                    hang (text "Declaration splices are allowed only" <+>
-                          text "at the top level:")
-                       2 (ppr d)
-               _ -> pprPanic "cvBindsAndSigs" (ppr decl) }
+    -- cvBindsAndSigs is called in several places in the parser,
+    -- and its items can be produced by various productions:
+    --
+    --    * decl       (when parsing a where clause or a let-expression)
+    --    * decl_inst  (when parsing an instance declaration)
+    --    * decl_cls   (when parsing a class declaration)
+    --
+    -- partitionBindsAndSigs can handle almost all declaration forms produced
+    -- by the aforementioned productions, except for SpliceD, which we filter
+    -- out here (in drop_bad_decls).
+    --
+    -- We're not concerned with every declaration form possible, such as those
+    -- produced by the topdecl parser production, because cvBindsAndSigs is not
+    -- called on top-level declarations.
+    drop_bad_decls [] = return []
+    drop_bad_decls (L l (SpliceD _ d) : ds) = do
+      addError l $
+        hang (text "Declaration splices are allowed only" <+>
+              text "at the top level:")
+           2 (ppr d)
+      drop_bad_decls ds
+    drop_bad_decls (d:ds) = (d:) <$> drop_bad_decls ds
 
 -----------------------------------------------------------------------------
 -- Group function bindings into equation groups
@@ -511,6 +505,14 @@ getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1)
         -- Do the same thing with the trailing doc comments
 
 getMonoBind bind binds = (bind, binds)
+
+-- Group together adjacent FunBinds for every function.
+getMonoBindAll :: [LHsDecl GhcPs] -> [LHsDecl GhcPs]
+getMonoBindAll [] = []
+getMonoBindAll (L l (ValD _ b) : ds) =
+  let (L l' b', ds') = getMonoBind (L l b) ds
+  in L l' (ValD noExtField b') : getMonoBindAll ds'
+getMonoBindAll (d : ds) = d : getMonoBindAll ds
 
 has_args :: [LMatch GhcPs (LHsExpr GhcPs)] -> Bool
 has_args []                                  = panic "GHC.Parser.PostProcess.has_args"
@@ -557,25 +559,6 @@ context, so (C t1 t2) is a constraint and 'C' is a type constructor.
 As the result, in order to determine whether (C t1 t2) declares a data
 constructor, a type, or a context, we would need unlimited lookahead which
 'happy' is not so happy with.
-
-To further complicate matters, the interpretation of (!) and (~) is different
-in constructors and types:
-
-  (b1)   type T = C ! D
-  (b2)   data T = C ! D
-  (b3)   data T = C ! D => E
-
-In (b1) and (b3), (!) is a type operator with two arguments: 'C' and 'D'. At
-the same time, in (b2) it is a strictness annotation: 'C' is a data constructor
-with a single strict argument 'D'. For the programmer, these cases are usually
-easy to tell apart due to whitespace conventions:
-
-  (b2)   data T = C !D         -- no space after the bang hints that
-                               -- it is a strictness annotation
-
-For the parser, on the other hand, this whitespace does not matter. We cannot
-tell apart (b2) from (b3) until we encounter (=>), so it requires unlimited
-lookahead.
 
 The solution that accounts for all of these issues is to initially parse data
 declarations and types as a reversed list of TyEl:
@@ -687,34 +670,41 @@ mkConDeclH98 name mb_forall mb_cxt args
                , con_doc    = Nothing }
 
 -- | Construct a GADT-style data constructor from the constructor names and
--- their type. This will return different AST forms for record syntax
--- constructors and prefix constructors, as the latter must be handled
--- specially in the renamer. See @Note [GADT abstract syntax]@ in
--- "GHC.Hs.Decls" for the full story.
+-- their type. Some interesting aspects of this function:
+--
+-- * This splits up the constructor type into its quantified type variables (if
+--   provided), context (if provided), argument types, and result type, and
+--   records whether this is a prefix or record GADT constructor. See
+--   Note [GADT abstract syntax] in "GHC.Hs.Decls" for more details.
+--
+-- * If -XLinearTypes is not enabled, the function arrows in a prefix GADT
+--   constructor are always interpreted as linear. If -XLinearTypes is enabled,
+--   we faithfully record whether -> or #-> was used.
 mkGadtDecl :: [Located RdrName]
            -> LHsType GhcPs
-           -> ConDecl GhcPs
-mkGadtDecl names ty
-  | Just (mtvs, mcxt, args, res_ty) <- mb_record_gadt ty
-  = ConDeclGADT { con_g_ext  = noExtField
-                , con_names  = names
-                , con_forall = L (getLoc ty) $ isJust mtvs
-                , con_qvars  = fromMaybe [] mtvs
-                , con_mb_cxt = mcxt
-                , con_args   = args
-                , con_res_ty = res_ty
-                , con_doc    = Nothing }
-  | otherwise
-  = XConDecl $ ConDeclGADTPrefixPs { con_gp_names = names
-                                   , con_gp_ty    = mkLHsSigType ty
-                                   , con_gp_doc   = Nothing }
+           -> P (ConDecl GhcPs)
+mkGadtDecl names ty = do
+  linearEnabled <- getBit LinearTypesBit
+
+  let (args, res_ty)
+        | L _ (HsFunTy _ _w (L loc (HsRecTy _ rf)) res_ty) <- body_ty
+        = (RecCon (L loc rf), res_ty)
+        | otherwise
+        = let (arg_types, res_type) = splitHsFunType body_ty
+              arg_types' | linearEnabled = arg_types
+                         | otherwise     = map (hsLinear . hsScaledThing) arg_types
+          in (PrefixCon arg_types', res_type)
+
+  pure $ ConDeclGADT { con_g_ext  = noExtField
+                     , con_names  = names
+                     , con_forall = L (getLoc ty) $ isJust mtvs
+                     , con_qvars  = fromMaybe [] mtvs
+                     , con_mb_cxt = mcxt
+                     , con_args   = args
+                     , con_res_ty = res_ty
+                     , con_doc    = Nothing }
   where
-    mb_record_gadt ty
-      | (mtvs, mcxt, body_ty) <- splitLHsGADTPrefixTy ty
-      , L _ (HsFunTy _ _w (L loc (HsRecTy _ rf)) res_ty) <- body_ty
-      = Just (mtvs, mcxt, RecCon (L loc rf), res_ty)
-      | otherwise
-      = Nothing
+    (mtvs, mcxt, body_ty) = splitLHsGadtTy ty
 
 setRdrNameSpace :: RdrName -> NameSpace -> RdrName
 -- ^ This rather gruesome function is used mainly by the parser.
@@ -1035,21 +1025,7 @@ checkContext (L l orig_t)
                                    else (anns ++ mkParensApiAnn lp1)
 
   -- no need for anns, returning original
-  check _anns t = checkNoDocs msg t *> return ([],L l [L l orig_t])
-
-  msg = text "data constructor context"
-
--- | Check recursively if there are any 'HsDocTy's in the given type.
--- This only works on a subset of types produced by 'btype_no_ops'
-checkNoDocs :: SDoc -> LHsType GhcPs -> P ()
-checkNoDocs msg ty = go ty
-  where
-    go (L _ (HsAppKindTy _ ty ki)) = go ty *> go ki
-    go (L _ (HsAppTy _ t1 t2)) = go t1 *> go t2
-    go (L l (HsDocTy _ t ds)) = addError l $ hsep
-                                  [ text "Unexpected haddock", quotes (ppr ds)
-                                  , text "on", msg, quotes (ppr t) ]
-    go _ = pure ()
+  check _anns _t = return ([],L l [L l orig_t])
 
 checkImportDecl :: Maybe (Located Token)
                 -> Maybe (Located Token)
@@ -1337,8 +1313,7 @@ isFunLhs e = go e [] []
 data TyEl = TyElOpr RdrName | TyElOpd (HsType GhcPs)
           | TyElKindApp SrcSpan (LHsType GhcPs)
           -- See Note [TyElKindApp SrcSpan interpretation]
-          | TyElUnpackedness ([AddAnn], SourceText, SrcUnpackedness)
-          | TyElDocPrev HsDocString
+          | TyElUnpackedness UnpackednessPragma
 
 
 {- Note [TyElKindApp SrcSpan interpretation]
@@ -1359,21 +1334,15 @@ instance Outputable TyEl where
   ppr (TyElOpr name) = ppr name
   ppr (TyElOpd ty) = ppr ty
   ppr (TyElKindApp _ ki) = text "@" <> ppr ki
-  ppr (TyElUnpackedness (_, _, unpk)) = ppr unpk
-  ppr (TyElDocPrev doc) = ppr doc
+  ppr (TyElUnpackedness (UnpackednessPragma _ _ unpk)) = ppr unpk
 
 -- | Extract a strictness/unpackedness annotation from the front of a reversed
 -- 'TyEl' list.
 pUnpackedness
   :: [Located TyEl] -- reversed TyEl
-  -> Maybe ( SrcSpan
-           , [AddAnn]
-           , SourceText
-           , SrcUnpackedness
-           , [Located TyEl] {- remaining TyEl -})
-pUnpackedness (L l x1 : xs)
-  | TyElUnpackedness (anns, prag, unpk) <- x1
-  = Just (l, anns, prag, unpk, xs)
+  -> Maybe (SrcSpan, UnpackednessPragma,
+            [Located TyEl] {- remaining TyEl -})
+pUnpackedness (L l x1 : xs) | TyElUnpackedness up <- x1 = Just (l, up, xs)
 pUnpackedness _ = Nothing
 
 pBangTy
@@ -1386,7 +1355,7 @@ pBangTy
 pBangTy lt@(L l1 _) xs =
   case pUnpackedness xs of
     Nothing -> (False, lt, pure (), xs)
-    Just (l2, anns, prag, unpk, xs') ->
+    Just (l2, UnpackednessPragma anns prag unpk, xs') ->
       let bl = combineSrcSpans l1 l2
           bt = addUnpackedness (prag, unpk) lt
       in (True, L bl bt, addAnnsAt bl anns, xs')
@@ -1394,6 +1363,10 @@ pBangTy lt@(L l1 _) xs =
 mkBangTy :: SrcStrictness -> LHsType GhcPs -> HsType GhcPs
 mkBangTy strictness =
   HsBangTy noExtField (HsSrcBang NoSourceText NoSrcUnpack strictness)
+
+-- Result of parsing {-# UNPACK #-} or {-# NOUNPACK #-}
+data UnpackednessPragma =
+  UnpackednessPragma [AddAnn] SourceText SrcUnpackedness
 
 addUnpackedness :: (SourceText, SrcUnpackedness) -> LHsType GhcPs -> HsType GhcPs
 addUnpackedness (prag, unpk) (L _ (HsBangTy x bang t))
@@ -1426,7 +1399,7 @@ mergeOps all_xs = go (0 :: Int) [] id all_xs
 
     -- clause [unpk]:
     -- handle (NO)UNPACK pragmas
-    go k acc ops_acc ((L l (TyElUnpackedness (anns, unpkSrc, unpk))):xs) =
+    go k acc ops_acc ((L l (TyElUnpackedness (UnpackednessPragma anns unpkSrc unpk))):xs) =
       if not (null acc) && null xs
       then do { acc' <- eitherToP $ mergeOpsAcc acc
               ; let a = ops_acc acc'
@@ -1446,11 +1419,6 @@ mergeOps all_xs = go (0 :: Int) [] id all_xs
           | otherwise =
               -- See Note [Impossible case in mergeOps clause [unpk]]
               panic "mergeOps.UNPACK: impossible position"
-
-    -- clause [doc]:
-    -- we do not expect to encounter any docs
-    go _ _ _ ((L l (TyElDocPrev _)):_) =
-      failOpDocPrev l
 
     -- clause [opr]:
     -- when we encounter an operator, we must have accumulated
@@ -1571,13 +1539,6 @@ pLHsTypeArg (L l (TyElOpd a)) = Just (HsValArg (L l a))
 pLHsTypeArg (L _ (TyElKindApp l a)) = Just (HsTypeArg l a)
 pLHsTypeArg _ = Nothing
 
-pDocPrev :: [Located TyEl] -> (Maybe LHsDocString, [Located TyEl])
-pDocPrev = go Nothing
-  where
-    go mTrailingDoc ((L l (TyElDocPrev doc)):xs) =
-      go (mTrailingDoc `mplus` Just (L l doc)) xs
-    go mTrailingDoc xs = (mTrailingDoc, xs)
-
 orErr :: Maybe a -> b -> Either b a
 orErr (Just a) _ = Right a
 orErr Nothing b = Left b
@@ -1594,123 +1555,77 @@ mergeDataCon
       :: [Located TyEl]
       -> P ( Located RdrName         -- constructor name
            , HsConDeclDetails GhcPs  -- constructor field information
-           , Maybe LHsDocString      -- docstring to go on the constructor
            )
 mergeDataCon all_xs =
   do { (addAnns, a) <- eitherToP res
      ; addAnns
      ; return a }
   where
-    -- We start by splitting off the trailing documentation comment,
-    -- if any exists.
-    (mTrailingDoc, all_xs') = pDocPrev all_xs
-
-    -- Determine whether the trailing documentation comment exists and is the
-    -- only docstring in this constructor declaration.
-    --
-    -- When true, it means that it applies to the constructor itself:
-    --    data T = C
-    --             A
-    --             B -- ^ Comment on C (singleDoc == True)
-    --
-    -- When false, it means that it applies to the last field:
-    --    data T = C -- ^ Comment on C
-    --             A -- ^ Comment on A
-    --             B -- ^ Comment on B (singleDoc == False)
-    singleDoc = isJust mTrailingDoc &&
-                null [ () | (L _ (TyElDocPrev _)) <- all_xs' ]
-
     -- The result of merging the list of reversed TyEl into a
     -- data constructor, along with [AddAnn].
-    res = goFirst all_xs'
-
-    -- Take the trailing docstring into account when interpreting
-    -- the docstring near the constructor.
-    --
-    --    data T = C -- ^ docstring right after C
-    --             A
-    --             B -- ^ trailing docstring
-    --
-    -- 'mkConDoc' must be applied to the docstring right after C, so that it
-    -- falls back to the trailing docstring when appropriate (see singleDoc).
-    mkConDoc mDoc | singleDoc = mDoc `mplus` mTrailingDoc
-                  | otherwise = mDoc
-
-    -- The docstring for the last field of a data constructor.
-    trailingFieldDoc | singleDoc = Nothing
-                     | otherwise = mTrailingDoc
+    res = goFirst all_xs
 
     goFirst [ L l (TyElOpd (HsTyVar _ _ (L _ tc))) ]
       = do { data_con <- tyConToDataCon l tc
-           ; return (pure (), (data_con, PrefixCon [], mTrailingDoc)) }
+           ; return (pure (), (data_con, PrefixCon [])) }
     goFirst ((L l (TyElOpd (HsRecTy _ fields))):xs)
-      | (mConDoc, xs') <- pDocPrev xs
-      , [ L l' (TyElOpd (HsTyVar _ _ (L _ tc))) ] <- xs'
+      | [ L l' (TyElOpd (HsTyVar _ _ (L _ tc))) ] <- xs
       = do { data_con <- tyConToDataCon l' tc
-           ; let mDoc = mTrailingDoc `mplus` mConDoc
-           ; return (pure (), (data_con, RecCon (L l fields), mDoc)) }
+           ; return (pure (), (data_con, RecCon (L l fields))) }
     goFirst [L l (TyElOpd (HsTupleTy _ HsBoxedOrConstraintTuple ts))]
       = return ( pure ()
                , ( L l (getRdrName (tupleDataCon Boxed (length ts)))
-                 , PrefixCon (map hsLinear ts)
-                 , mTrailingDoc ) )
+                 , PrefixCon (map hsLinear ts) ) )
     goFirst ((L l (TyElOpd t)):xs)
       | (_, t', addAnns, xs') <- pBangTy (L l t) xs
-      = go addAnns Nothing [mkLHsDocTyMaybe t' trailingFieldDoc] xs'
+      = go addAnns [t'] xs'
     goFirst (L l (TyElKindApp _ _):_)
       = goInfix Monoid.<> Left (l, kindAppErr)
     goFirst xs
-      = go (pure ()) mTrailingDoc [] xs
+      = go (pure ()) [] xs
 
-    go addAnns mLastDoc ts [ L l (TyElOpd (HsTyVar _ _ (L _ tc))) ]
+    go addAnns ts [ L l (TyElOpd (HsTyVar _ _ (L _ tc))) ]
       = do { data_con <- tyConToDataCon l tc
-           ; return (addAnns, (data_con, PrefixCon (map hsLinear ts), mkConDoc mLastDoc)) }
-    go addAnns mLastDoc ts ((L l (TyElDocPrev doc)):xs) =
-      go addAnns (mLastDoc `mplus` Just (L l doc)) ts xs
-    go addAnns mLastDoc ts ((L l (TyElOpd t)):xs)
+           ; return (addAnns, (data_con, PrefixCon (map hsLinear ts))) }
+    go addAnns ts ((L l (TyElOpd t)):xs)
       | (_, t', addAnns', xs') <- pBangTy (L l t) xs
-      , t'' <- mkLHsDocTyMaybe t' mLastDoc
-      = go (addAnns >> addAnns') Nothing (t'':ts) xs'
-    go _ _ _ ((L _ (TyElOpr _)):_) =
+      = go (addAnns >> addAnns') (t':ts) xs'
+    go _ _ ((L _ (TyElOpr _)):_) =
       -- Encountered an operator: backtrack to the beginning and attempt
       -- to parse as an infix definition.
       goInfix
-    go _ _ _ (L l (TyElKindApp _ _):_) =  goInfix Monoid.<> Left (l, kindAppErr)
-    go _ _ _ _ = Left malformedErr
+    go _ _ (L l (TyElKindApp _ _):_) =  goInfix Monoid.<> Left (l, kindAppErr)
+    go _ _ _ = Left malformedErr
       where
         malformedErr =
-          ( foldr combineSrcSpans noSrcSpan (map getLoc all_xs')
+          ( foldr combineSrcSpans noSrcSpan (map getLoc all_xs)
           , text "Cannot parse data constructor" <+>
             text "in a data/newtype declaration:" $$
-            nest 2 (hsep . reverse $ map ppr all_xs'))
+            nest 2 (hsep . reverse $ map ppr all_xs))
 
     goInfix =
-      do { let xs0 = all_xs'
-         ; (rhs_t, rhs_addAnns, xs1) <- pInfixSide xs0 `orErr` malformedErr
-         ; let (mOpDoc, xs2) = pDocPrev xs1
-         ; (op, xs3) <- case xs2 of
+      do { let xs0 = all_xs
+         ; (rhs, rhs_addAnns, xs1) <- pInfixSide xs0 `orErr` malformedErr
+         ; (op, xs3) <- case xs1 of
               (L l (TyElOpr op)) : xs3 ->
                 do { data_con <- tyConToDataCon l op
                    ; return (data_con, xs3) }
               _ -> Left malformedErr
-         ; let (mLhsDoc, xs4) = pDocPrev xs3
-         ; (lhs_t, lhs_addAnns, xs5) <- pInfixSide xs4 `orErr` malformedErr
+         ; (lhs, lhs_addAnns, xs5) <- pInfixSide xs3 `orErr` malformedErr
          ; unless (null xs5) (Left malformedErr)
-         ; let rhs = mkLHsDocTyMaybe rhs_t trailingFieldDoc
-               lhs = mkLHsDocTyMaybe lhs_t mLhsDoc
-               addAnns = lhs_addAnns >> rhs_addAnns
-         ; return (addAnns, (op, InfixCon (hsLinear lhs) (hsLinear rhs), mkConDoc mOpDoc)) }
+         ; let addAnns = lhs_addAnns >> rhs_addAnns
+         ; return (addAnns, (op, InfixCon (hsLinear lhs) (hsLinear rhs))) }
       where
         malformedErr =
-          ( foldr combineSrcSpans noSrcSpan (map getLoc all_xs')
+          ( foldr combineSrcSpans noSrcSpan (map getLoc all_xs)
           , text "Cannot parse an infix data constructor" <+>
             text "in a data/newtype declaration:" $$
-            nest 2 (hsep . reverse $ map ppr all_xs'))
+            nest 2 (hsep . reverse $ map ppr all_xs))
 
     kindAppErr =
       text "Unexpected kind application" <+>
       text "in a data/newtype declaration:" $$
-      nest 2 (hsep . reverse $ map ppr all_xs')
+      nest 2 (hsep . reverse $ map ppr all_xs)
 
 ---------------------------------------------------------------------------
 -- | Check for monad comprehensions
@@ -2602,7 +2517,7 @@ mkRdrRecordCon :: Located RdrName -> HsRecordBinds GhcPs -> HsExpr GhcPs
 mkRdrRecordCon con flds
   = RecordCon { rcon_ext = noExtField, rcon_con_name = con, rcon_flds = flds }
 
-mk_rec_fields :: [LHsRecField id arg] -> Maybe SrcSpan -> HsRecFields id arg
+mk_rec_fields :: [Located (HsRecField (GhcPass p) arg)] -> Maybe SrcSpan -> HsRecFields (GhcPass p) arg
 mk_rec_fields fs Nothing = HsRecFields { rec_flds = fs, rec_dotdot = Nothing }
 mk_rec_fields fs (Just s)  = HsRecFields { rec_flds = fs
                                      , rec_dotdot = Just (L s (length fs)) }
@@ -2902,11 +2817,6 @@ failOpFewArgs (L loc op) =
   where
     too_few = text "Operator applied to too few arguments:" <+> ppr op
 
-failOpDocPrev :: SrcSpan -> P a
-failOpDocPrev loc = addFatalError loc msg
-  where
-    msg = text "Unexpected documentation comment."
-
 -----------------------------------------------------------------------------
 -- Misc utils
 
@@ -3139,14 +3049,6 @@ mkLHsOpTy :: LHsType GhcPs -> Located RdrName -> LHsType GhcPs -> LHsType GhcPs
 mkLHsOpTy x op y =
   let loc = getLoc x `combineSrcSpans` getLoc op `combineSrcSpans` getLoc y
   in L loc (mkHsOpTy x op y)
-
-mkLHsDocTy :: LHsType GhcPs -> LHsDocString -> LHsType GhcPs
-mkLHsDocTy t doc =
-  let loc = getLoc t `combineSrcSpans` getLoc doc
-  in L loc (HsDocTy noExtField t doc)
-
-mkLHsDocTyMaybe :: LHsType GhcPs -> Maybe LHsDocString -> LHsType GhcPs
-mkLHsDocTyMaybe t = maybe t (mkLHsDocTy t)
 
 -----------------------------------------------------------------------------
 -- Token symbols

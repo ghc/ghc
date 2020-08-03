@@ -338,13 +338,24 @@ instance Ord RdrName where
 ************************************************************************
 -}
 
+{- Note [LocalRdrEnv]
+~~~~~~~~~~~~~~~~~~~~~
+The LocalRdrEnv is used to store local bindings (let, where, lambda, case).
+
+* It is keyed by OccName, because we never use it for qualified names.
+
+* It maps the OccName to a Name.  That Name is almost always an
+  Internal Name, but (hackily) it can be External too for top-level
+  pattern bindings.  See Note [bindLocalNames for an External name]
+  in GHC.Rename.Pat
+
+* We keep the current mapping (lre_env), *and* the set of all Names in
+  scope (lre_in_scope).  Reason: see Note [Splicing Exact names] in
+  GHC.Rename.Env.
+-}
+
 -- | Local Reader Environment
---
--- This environment is used to store local bindings
--- (@let@, @where@, lambda, @case@).
--- It is keyed by OccName, because we never use it for qualified names
--- We keep the current mapping, *and* the set of all Names in scope
--- Reason: see Note [Splicing Exact names] in "GHC.Rename.Env"
+-- See Note [LocalRdrEnv]
 data LocalRdrEnv = LRE { lre_env      :: OccEnv Name
                        , lre_in_scope :: NameSet }
 
@@ -364,16 +375,15 @@ emptyLocalRdrEnv = LRE { lre_env = emptyOccEnv
                        , lre_in_scope = emptyNameSet }
 
 extendLocalRdrEnv :: LocalRdrEnv -> Name -> LocalRdrEnv
--- The Name should be a non-top-level thing
+-- See Note [LocalRdrEnv]
 extendLocalRdrEnv lre@(LRE { lre_env = env, lre_in_scope = ns }) name
-  = WARN( isExternalName name, ppr name )
-    lre { lre_env      = extendOccEnv env (nameOccName name) name
+  = lre { lre_env      = extendOccEnv env (nameOccName name) name
         , lre_in_scope = extendNameSet ns name }
 
 extendLocalRdrEnvList :: LocalRdrEnv -> [Name] -> LocalRdrEnv
+-- See Note [LocalRdrEnv]
 extendLocalRdrEnvList lre@(LRE { lre_env = env, lre_in_scope = ns }) names
-  = WARN( any isExternalName names, ppr names )
-    lre { lre_env = extendOccEnvList env [(nameOccName n, n) | n <- names]
+  = lre { lre_env = extendOccEnvList env [(nameOccName n, n) | n <- names]
         , lre_in_scope = extendNameSetList ns names }
 
 lookupLocalRdrEnv :: LocalRdrEnv -> RdrName -> Maybe Name

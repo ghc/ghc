@@ -37,6 +37,7 @@ import GHC.Driver.Session
 import GHC.Utils.Error
 
 import GHC.Driver.Types
+import GHC.Driver.Backend
 import GHC.Types.CostCentre
 import GHC.Types.Id
 import GHC.Types.Id.Info
@@ -165,7 +166,7 @@ cgTopBinding dflags (StgTopStringLit id str) = do
   -- emit either a CmmString literal or dump the string in a file and emit a
   -- CmmFileEmbed literal.
   -- See Note [Embedding large binary blobs] in GHC.CmmToAsm.Ppr
-  let isNCG    = platformMisc_ghcWithNativeCodeGen $ platformMisc dflags
+  let isNCG    = backend dflags == NCG
       isSmall  = fromIntegral (BS.length str) <= binBlobThreshold dflags
       asString = binBlobThreshold dflags == 0 || isSmall
 
@@ -176,7 +177,7 @@ cgTopBinding dflags (StgTopStringLit id str) = do
                BS.writeFile bFile str
                return bFile
   emitDecl decl
-  addBindC (litIdInfo dflags id mkLFStringLit lit)
+  addBindC (litIdInfo (targetPlatform dflags) id mkLFStringLit lit)
 
 
 cgTopRhs :: DynFlags -> RecFlag -> Id -> CgStgRhs -> (CgIdInfo, FCode ())
@@ -189,7 +190,7 @@ cgTopRhs dflags _rec bndr (StgRhsCon _cc con args)
 
 cgTopRhs dflags rec bndr (StgRhsClosure fvs cc upd_flag args body)
   = ASSERT(isEmptyDVarSet fvs)    -- There should be no free variables
-    cgTopRhsClosure dflags rec bndr cc upd_flag args body
+    cgTopRhsClosure (targetPlatform dflags) rec bndr cc upd_flag args body
 
 
 ---------------------------------------------------------------
@@ -215,28 +216,28 @@ mkModuleInit cost_centre_info this_mod hpc_info
 
 cgEnumerationTyCon :: TyCon -> FCode ()
 cgEnumerationTyCon tycon
-  = do dflags <- getDynFlags
+  = do platform <- getPlatform
        emitRODataLits (mkLocalClosureTableLabel (tyConName tycon) NoCafRefs)
              [ CmmLabelOff (mkLocalClosureLabel (dataConName con) NoCafRefs)
-                           (tagForCon dflags con)
+                           (tagForCon platform con)
              | con <- tyConDataCons tycon]
 
 
-cgDataCon :: DataCon -> FCode ()
--- Generate the entry code, info tables, and (for niladic constructor)
+-- | Generate the entry code, info tables, and (for niladic constructor)
 -- the static closure, for a constructor.
+cgDataCon :: DataCon -> FCode ()
 cgDataCon data_con
-  = do  { dflags <- getDynFlags
+  = do  { profile <- getProfile
         ; platform <- getPlatform
         ; let
             (tot_wds, --  #ptr_wds + #nonptr_wds
              ptr_wds) --  #ptr_wds
-              = mkVirtConstrSizes dflags arg_reps
+              = mkVirtConstrSizes profile arg_reps
 
             nonptr_wds   = tot_wds - ptr_wds
 
             dyn_info_tbl =
-              mkDataConInfoTable dflags data_con False ptr_wds nonptr_wds
+              mkDataConInfoTable profile data_con False ptr_wds nonptr_wds
 
             -- We're generating info tables, so we don't know and care about
             -- what the actual arguments are. Using () here as the place holder.
@@ -246,7 +247,7 @@ cgDataCon data_con
                        , rep_ty <- typePrimRep (scaledThing ty)
                        , not (isVoidRep rep_ty) ]
 
-        ; emitClosureAndInfoTable dyn_info_tbl NativeDirectCall [] $
+        ; emitClosureAndInfoTable platform dyn_info_tbl NativeDirectCall [] $
             -- NB: the closure pointer is assumed *untagged* on
             -- entry to a constructor.  If the pointer is tagged,
             -- then we should not be entering it.  This assumption
@@ -256,7 +257,7 @@ cgDataCon data_con
             do { tickyEnterDynCon
                ; ldvEnter (CmmReg nodeReg)
                ; tickyReturnOldCon (length arg_reps)
-               ; void $ emitReturn [cmmOffsetB platform (CmmReg nodeReg) (tagForCon dflags data_con)]
+               ; void $ emitReturn [cmmOffsetB platform (CmmReg nodeReg) (tagForCon platform data_con)]
                }
                     -- The case continuation code expects a tagged pointer
         }

@@ -40,6 +40,7 @@ import qualified GHC.Runtime.Linker as Linker
 import GHC.Driver.Phases
 import GHC.Driver.Pipeline
 import GHC.Driver.Session
+import GHC.Driver.Backend
 import GHC.Utils.Error
 import GHC.Driver.Finder
 import GHC.Driver.Monad
@@ -274,7 +275,7 @@ data LoadHowMuch
 --
 -- This function implements the core of GHC's @--make@ mode.  It preprocesses,
 -- compiles and loads the specified modules, avoiding re-compilation wherever
--- possible.  Depending on the target (see 'GHC.Driver.Session.hscTarget') compiling
+-- possible.  Depending on the backend (see 'DynFlags.backend' field) compiling
 -- and loading may result in files being created on disk.
 --
 -- Calls the 'defaultWarnErrLogger' after each compiling each module, whether
@@ -952,6 +953,12 @@ mkBuildModule ms = GWIB
   , gwib_isBoot = isBootSummary ms
   }
 
+mkHomeBuildModule :: ModSummary -> ModuleNameWithIsBoot
+mkHomeBuildModule ms = GWIB
+  { gwib_mod = moduleName $ ms_mod ms
+  , gwib_isBoot = isBootSummary ms
+  }
+
 -- | The entry point to the parallel upsweep.
 --
 -- See also the simpler, sequential 'upsweep'.
@@ -1390,20 +1397,20 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
 
   keep_going this_mods old_hpt done mods mod_index nmods uids_to_check done_holes = do
     let sum_deps ms (AcyclicSCC mod) =
-          if any (flip elem . map (unLoc . snd) $ ms_imps mod) ms
-            then ms_mod_name mod:ms
+          if any (flip elem $ unfilteredEdges False mod) ms
+            then mkHomeBuildModule mod:ms
             else ms
         sum_deps ms _ = ms
         dep_closure = foldl' sum_deps this_mods mods
         dropped_ms = drop (length this_mods) (reverse dep_closure)
-        prunable (AcyclicSCC mod) = elem (ms_mod_name mod) dep_closure
+        prunable (AcyclicSCC mod) = elem (mkHomeBuildModule mod) dep_closure
         prunable _ = False
         mods' = filter (not . prunable) mods
         nmods' = nmods - length dropped_ms
 
     when (not $ null dropped_ms) $ do
         dflags <- getSessionDynFlags
-        liftIO $ fatalErrorMsg dflags (keepGoingPruneErr dropped_ms)
+        liftIO $ fatalErrorMsg dflags (keepGoingPruneErr $ gwib_mod <$> dropped_ms)
     (_, done') <- upsweep' old_hpt done mods' (mod_index+1) nmods' uids_to_check done_holes
     return (Failed, done')
 
@@ -1428,7 +1435,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
    = do dflags <- getSessionDynFlags
         liftIO $ fatalErrorMsg dflags (cyclicModuleErr ms)
         if gopt Opt_KeepGoing dflags
-          then keep_going (map ms_mod_name ms) old_hpt done mods mod_index nmods
+          then keep_going (mkHomeBuildModule <$> ms) old_hpt done mods mod_index nmods
                           uids_to_check done_holes
           else return (Failed, done)
 
@@ -1482,7 +1489,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
           Nothing -> do
                 dflags <- getSessionDynFlags
                 if gopt Opt_KeepGoing dflags
-                  then keep_going [ms_mod_name mod] old_hpt done mods mod_index nmods
+                  then keep_going [mkHomeBuildModule mod] old_hpt done mods mod_index nmods
                                   uids_to_check done_holes
                   else return (Failed, done)
           Just mod_info -> do
@@ -1516,7 +1523,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
                         -- Add any necessary entries to the static pointer
                         -- table. See Note [Grand plan for static forms] in
                         -- GHC.Iface.Tidy.StaticPtrTable.
-                when (hscTarget (hsc_dflags hsc_env4) == HscInterpreted) $
+                when (backend (hsc_dflags hsc_env4) == Interpreter) $
                     liftIO $ hscAddSptEntries hsc_env4
                                  [ spt
                                  | Just linkable <- pure $ hm_linkable mod_info
@@ -1575,24 +1582,25 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
             -- We're using the dflags for this module now, obtained by
             -- applying any options in its LANGUAGE & OPTIONS_GHC pragmas.
             dflags = ms_hspp_opts summary
-            prevailing_target = hscTarget (hsc_dflags hsc_env)
-            local_target      = hscTarget dflags
+            prevailing_backend = backend (hsc_dflags hsc_env)
+            local_backend      = backend dflags
 
             -- If OPTIONS_GHC contains -fasm or -fllvm, be careful that
             -- we don't do anything dodgy: these should only work to change
             -- from -fllvm to -fasm and vice-versa, or away from -fno-code,
             -- otherwise we could end up trying to link object code to byte
             -- code.
-            target = if prevailing_target /= local_target
-                        && (not (isObjectTarget prevailing_target)
-                            || not (isObjectTarget local_target))
-                        && not (prevailing_target == HscNothing)
-                        && not (prevailing_target == HscInterpreted)
-                        then prevailing_target
-                        else local_target
+            bcknd = case (prevailing_backend,local_backend) of
+               (LLVM,NCG) -> NCG
+               (NCG,LLVM) -> LLVM
+               (NoBackend,b)
+                  | backendProducesObject b -> b
+               (Interpreter,b)
+                  | backendProducesObject b -> b
+               _ -> prevailing_backend
 
-            -- store the corrected hscTarget into the summary
-            summary' = summary{ ms_hspp_opts = dflags { hscTarget = target } }
+            -- store the corrected backend into the summary
+            summary' = summary{ ms_hspp_opts = dflags { backend = bcknd } }
 
             -- The old interface is ok if
             --  a) we're compiling a source file, and the old HPT
@@ -1623,9 +1631,9 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
                   compileOne' Nothing mHscMessage hsc_env summary' mod_index nmods
                              Nothing mb_linkable src_modified
 
-            -- With the HscNothing target we create empty linkables to avoid
-            -- recompilation.  We have to detect these to recompile anyway if
-            -- the target changed since the last compile.
+            -- With NoBackend we create empty linkables to avoid recompilation.
+            -- We have to detect these to recompile anyway if the backend changed
+            -- since the last compile.
             is_fake_linkable
                | Just hmi <- old_hmi, Just l <- hm_linkable hmi =
                   null (linkableUnlinked l)
@@ -1658,8 +1666,8 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
                 -- object is stable, but we need to load the interface
                 -- off disk to make a HMI.
 
-          | not (isObjectTarget target), is_stable_bco,
-            (target /= HscNothing) `implies` not is_fake_linkable ->
+          | not (backendProducesObject bcknd), is_stable_bco,
+            (bcknd /= NoBackend) `implies` not is_fake_linkable ->
                 ASSERT(isJust old_hmi) -- must be in the old_hpt
                 let Just hmi = old_hmi in do
                 liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
@@ -1667,11 +1675,11 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
                 return hmi
                 -- BCO is stable: nothing to do
 
-          | not (isObjectTarget target),
+          | not (backendProducesObject bcknd),
             Just hmi <- old_hmi,
             Just l <- hm_linkable hmi,
             not (isObjectLinkable l),
-            (target /= HscNothing) `implies` not is_fake_linkable,
+            (bcknd /= NoBackend) `implies` not is_fake_linkable,
             linkableTime l >= ms_hs_date summary -> do
                 liftIO $ debugTraceMsg (hsc_dflags hsc_env) 5
                            (text "compiling non-stable BCO mod:" <+> ppr this_mod_name)
@@ -1688,7 +1696,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
           -- separately and generated a new interface, that we must
           -- read from the disk.
           --
-          | isObjectTarget target,
+          | backendProducesObject bcknd,
             Just obj_date <- mb_obj_date,
             obj_date >= hs_date -> do
                 case old_hmi of
@@ -1728,7 +1736,7 @@ possible.
 When GHC is invoked with -fno-code no object files or linked output will be
 generated. As many errors and warnings as possible will be generated, as if
 -fno-code had not been passed. The session DynFlags will have
-hscTarget == HscNothing.
+backend == NoBackend.
 
 -fwrite-interface
 ~~~~~~~~~~~~~~~~
@@ -1917,7 +1925,7 @@ reachableBackwards mod summaries
   = [ node_payload node | node <- reachableG (transposeG graph) root ]
   where -- the rest just sets up the graph:
         (graph, lookup_node) = moduleGraphNodes False summaries
-        root  = expectJust "reachableBackwards" (lookup_node IsBoot mod)
+        root  = expectJust "reachableBackwards" (lookup_node $ GWIB mod IsBoot)
 
 -- ---------------------------------------------------------------------------
 --
@@ -1960,7 +1968,7 @@ topSortModuleGraph drop_hs_boot_nodes module_graph mb_root_mod
             -- the specified module.  We do this by building a graph with
             -- the full set of nodes, and determining the reachable set from
             -- the specified node.
-            let root | Just node <- lookup_node NotBoot root_mod
+            let root | Just node <- lookup_node $ GWIB root_mod NotBoot
                      , graph `hasVertexG` node
                      = node
                      | otherwise
@@ -1975,60 +1983,55 @@ summaryNodeKey = node_key
 summaryNodeSummary :: SummaryNode -> ModSummary
 summaryNodeSummary = node_payload
 
+-- | Collect the immediate dependencies of a module from its ModSummary,
+-- optionally avoiding hs-boot dependencies.
+-- If the drop_hs_boot_nodes flag is False, and if this is a .hs and there is
+-- an equivalent .hs-boot, add a link from the former to the latter.  This
+-- has the effect of detecting bogus cases where the .hs-boot depends on the
+-- .hs, by introducing a cycle.  Additionally, it ensures that we will always
+-- process the .hs-boot before the .hs, and so the HomePackageTable will always
+-- have the most up to date information.
+unfilteredEdges :: Bool -> ModSummary -> [ModuleNameWithIsBoot]
+unfilteredEdges drop_hs_boot_nodes ms =
+    (flip GWIB hs_boot_key . unLoc <$> ms_home_srcimps ms) ++
+    (flip GWIB NotBoot     . unLoc <$> ms_home_imps ms) ++
+    [ GWIB (ms_mod_name ms) IsBoot
+    | not $ drop_hs_boot_nodes || ms_hsc_src ms == HsBootFile
+    ]
+  where
+    -- Drop hs-boot nodes by using HsSrcFile as the key
+    hs_boot_key | drop_hs_boot_nodes = NotBoot -- is regular mod or signature
+                | otherwise          = IsBoot
+
 moduleGraphNodes :: Bool -> [ModSummary]
-  -> (Graph SummaryNode, IsBootInterface -> ModuleName -> Maybe SummaryNode)
+  -> (Graph SummaryNode, ModuleNameWithIsBoot -> Maybe SummaryNode)
 moduleGraphNodes drop_hs_boot_nodes summaries =
   (graphFromEdgedVerticesUniq nodes, lookup_node)
   where
     numbered_summaries = zip summaries [1..]
 
-    lookup_node :: IsBootInterface -> ModuleName -> Maybe SummaryNode
-    lookup_node hs_src mod = Map.lookup
-      (GWIB { gwib_mod = mod, gwib_isBoot = hs_src })
-      node_map
+    lookup_node :: ModuleNameWithIsBoot -> Maybe SummaryNode
+    lookup_node mnwib = Map.lookup mnwib node_map
 
-    lookup_key :: IsBootInterface -> ModuleName -> Maybe Int
-    lookup_key hs_src mod = fmap summaryNodeKey (lookup_node hs_src mod)
+    lookup_key :: ModuleNameWithIsBoot -> Maybe Int
+    lookup_key = fmap summaryNodeKey . lookup_node
 
     node_map :: NodeMap SummaryNode
-    node_map = Map.fromList [ ( GWIB
-                                  { gwib_mod = moduleName $ ms_mod s
-                                  , gwib_isBoot = hscSourceToIsBoot $ ms_hsc_src s
-                                  }
-                              , node
-                              )
+    node_map = Map.fromList [ (mkHomeBuildModule s, node)
                             | node <- nodes
-                            , let s = summaryNodeSummary node ]
+                            , let s = summaryNodeSummary node
+                            ]
 
     -- We use integers as the keys for the SCC algorithm
     nodes :: [SummaryNode]
-    nodes = [ DigraphNode s key out_keys
+    nodes = [ DigraphNode s key $ out_edge_keys $ unfilteredEdges drop_hs_boot_nodes s
             | (s, key) <- numbered_summaries
              -- Drop the hi-boot ones if told to do so
             , not (isBootSummary s == IsBoot && drop_hs_boot_nodes)
-            , let out_keys = out_edge_keys hs_boot_key (map unLoc (ms_home_srcimps s)) ++
-                             out_edge_keys NotBoot     (map unLoc (ms_home_imps s)) ++
-                             (-- see [boot-edges] below
-                              if drop_hs_boot_nodes || ms_hsc_src s == HsBootFile
-                              then []
-                              else case lookup_key IsBoot (ms_mod_name s) of
-                                    Nothing -> []
-                                    Just k  -> [k]) ]
+            ]
 
-    -- [boot-edges] if this is a .hs and there is an equivalent
-    -- .hs-boot, add a link from the former to the latter.  This
-    -- has the effect of detecting bogus cases where the .hs-boot
-    -- depends on the .hs, by introducing a cycle.  Additionally,
-    -- it ensures that we will always process the .hs-boot before
-    -- the .hs, and so the HomePackageTable will always have the
-    -- most up to date information.
-
-    -- Drop hs-boot nodes by using HsSrcFile as the key
-    hs_boot_key | drop_hs_boot_nodes = NotBoot -- is regular mod or signature
-                | otherwise          = IsBoot
-
-    out_edge_keys :: IsBootInterface -> [ModuleName] -> [Int]
-    out_edge_keys hi_boot ms = mapMaybe (lookup_key hi_boot) ms
+    out_edge_keys :: [ModuleNameWithIsBoot] -> [Int]
+    out_edge_keys = mapMaybe lookup_key
         -- If we want keep_hi_boot_nodes, then we do lookup_key with
         -- IsBoot; else False
 
@@ -2109,15 +2112,11 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
        -- for dependencies of modules that have -XTemplateHaskell,
        -- otherwise those modules will fail to compile.
        -- See Note [-fno-code mode] #8025
-       map1 <- if hscTarget dflags == HscNothing
-         then enableCodeGenForTH
-           (defaultObjectTarget dflags)
-           map0
-         else if hscTarget dflags == HscInterpreted
-           then enableCodeGenForUnboxedTuplesOrSums
-             (defaultObjectTarget dflags)
-             map0
-           else return map0
+       let default_backend = platformDefaultBackend (targetPlatform dflags)
+       map1 <- case backend dflags of
+         NoBackend   -> enableCodeGenForTH default_backend map0
+         Interpreter -> enableCodeGenForUnboxedTuplesOrSums default_backend map0
+         _           -> return map0
        if null errs
          then pure $ concat $ nodeMapElts map1
          else pure $ map Left errs
@@ -2200,7 +2199,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
 -- the specified target, disable optimization and change the .hi
 -- and .o file locations to be temporary files.
 -- See Note [-fno-code mode]
-enableCodeGenForTH :: HscTarget
+enableCodeGenForTH :: Backend
   -> NodeMap [Either ErrorMessages ModSummary]
   -> IO (NodeMap [Either ErrorMessages ModSummary])
 enableCodeGenForTH =
@@ -2208,7 +2207,7 @@ enableCodeGenForTH =
   where
     condition = isTemplateHaskellOrQQNonBoot
     should_modify (ModSummary { ms_hspp_opts = dflags }) =
-      hscTarget dflags == HscNothing &&
+      backend dflags == NoBackend &&
       -- Don't enable codegen for TH on indefinite packages; we
       -- can't compile anything anyway! See #16219.
       homeUnitIsDefinite dflags
@@ -2220,7 +2219,7 @@ enableCodeGenForTH =
 --
 -- This is used in order to load code that uses unboxed tuples
 -- or sums into GHCi while still allowing some code to be interpreted.
-enableCodeGenForUnboxedTuplesOrSums :: HscTarget
+enableCodeGenForUnboxedTuplesOrSums :: Backend
   -> NodeMap [Either ErrorMessages ModSummary]
   -> IO (NodeMap [Either ErrorMessages ModSummary])
 enableCodeGenForUnboxedTuplesOrSums =
@@ -2233,7 +2232,7 @@ enableCodeGenForUnboxedTuplesOrSums =
     unboxed_tuples_or_sums d =
       xopt LangExt.UnboxedTuples d || xopt LangExt.UnboxedSums d
     should_modify (ModSummary { ms_hspp_opts = dflags }) =
-      hscTarget dflags == HscInterpreted
+      backend dflags == Interpreter
 
 -- | Helper used to implement 'enableCodeGenForTH' and
 -- 'enableCodeGenForUnboxedTuples'. In particular, this enables
@@ -2246,10 +2245,10 @@ enableCodeGenWhen
   -> (ModSummary -> Bool)
   -> TempFileLifetime
   -> TempFileLifetime
-  -> HscTarget
+  -> Backend
   -> NodeMap [Either ErrorMessages ModSummary]
   -> IO (NodeMap [Either ErrorMessages ModSummary])
-enableCodeGenWhen condition should_modify staticLife dynLife target nodemap =
+enableCodeGenWhen condition should_modify staticLife dynLife bcknd nodemap =
   traverse (traverse (traverse enable_code_gen)) nodemap
   where
     enable_code_gen ms
@@ -2282,7 +2281,7 @@ enableCodeGenWhen condition should_modify staticLife dynLife target nodemap =
           ms
           { ms_location =
               ms_location {ml_hi_file = hi_file, ml_obj_file = o_file}
-          , ms_hspp_opts = updOptLevel 0 $ dflags {hscTarget = target}
+          , ms_hspp_opts = updOptLevel 0 $ dflags {backend = bcknd}
           }
       | otherwise = return ms
 
@@ -2433,7 +2432,7 @@ checkSummaryTimestamp
       not (gopt Opt_ForceRecomp (hsc_dflags hsc_env)) = do
            -- update the object-file timestamp
            obj_timestamp <-
-             if isObjectTarget (hscTarget (hsc_dflags hsc_env))
+             if backendProducesObject (backend (hsc_dflags hsc_env))
                  || obj_allowed -- bug #1205
                  then liftIO $ getObjTimestamp location is_boot
                  else return Nothing
@@ -2609,7 +2608,7 @@ makeNewModSummary hsc_env MakeNewModSummary{..} = do
   -- when the user asks to load a source file by name, we only
   -- use an object file if -fobject-code is on.  See #1205.
   obj_timestamp <- liftIO $
-      if isObjectTarget (hscTarget dflags)
+      if backendProducesObject (backend dflags)
          || nms_obj_allowed -- bug #1205
           then getObjTimestamp nms_location nms_is_boot
           else return Nothing

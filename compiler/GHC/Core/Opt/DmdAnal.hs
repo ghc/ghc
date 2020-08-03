@@ -486,8 +486,9 @@ dmdTransform env var dmd
   | isDataConWorkId var
   = dmdTransformDataConSig (idArity var) dmd
   -- Dictionary component selectors
-  | gopt Opt_DmdTxDictSel (ae_dflags env),
-    Just _ <- isClassOpId_maybe var
+  -- Used to be controlled by a flag.
+  -- See #18429 for some perf measurements.
+  | Just _ <- isClassOpId_maybe var
   = dmdTransformDictSelSig (idStrictness var) dmd
   -- Imported functions
   | isGlobalId var

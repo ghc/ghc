@@ -190,6 +190,7 @@ lint-release-changelogs:
     key: hadrian
     paths:
       - cabal-cache
+  dependencies: []
   artifacts:
     reports:
       junit: junit.xml
@@ -292,8 +293,8 @@ hadrian-ghc-in-ghci:
     # porting guide [1].
     # [1] https://www.freebsd.org/doc/en/books/porters-handbook/using-iconv.html)
     CONFIGURE_ARGS: "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib"
-    GHC_VERSION: 8.10.1
-    CABAL_INSTALL_VERSION: 3.2.0.0
+    GHC_VERSION: "8.10.1"
+    CABAL_INSTALL_VERSION: "3.2.0.0"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-portbld-freebsd.tar.xz"
     TEST_ENV: "x86_64-freebsd"
     BUILD_FLAVOUR: "validate"
@@ -367,7 +368,7 @@ validate-x86_64-darwin:
   tags:
     - x86_64-darwin
   variables:
-    GHC_VERSION: 8.8.3
+    GHC_VERSION: 8.8.4
     CABAL_INSTALL_VERSION: 3.0.0.0
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-apple-darwin.tar.xz"
     MACOSX_DEPLOYMENT_TARGET: "10.7"
@@ -395,7 +396,7 @@ validate-x86_64-darwin:
   tags:
     - x86_64-darwin
   variables:
-    GHC_VERSION: 8.8.3
+    GHC_VERSION: 8.8.4
     MACOSX_DEPLOYMENT_TARGET: "10.7"
     ac_cv_func_clock_gettime: "no"
     LANG: "en_US.UTF-8"
@@ -776,8 +777,8 @@ validate-x86_64-linux-fedora27:
     #FORCE_SYMLINKS: 1
     LANG: "en_US.UTF-8"
     SPHINXBUILD: "/mingw64/bin/sphinx-build.exe"
-    CABAL_INSTALL_VERSION: 3.0.0.0
-    GHC_VERSION: "8.8.3"
+    CABAL_INSTALL_VERSION: "3.0.0.0"
+    GHC_VERSION: "8.8.4"
   cache:
     paths:
       - cabal-cache
@@ -816,15 +817,6 @@ validate-x86_64-windows-hadrian:
     TEST_ENV: "x86_64-windows-hadrian"
   cache:
     key: "x86_64-windows-hadrian-$WINDOWS_TOOLCHAIN_VERSION"
-
-nightly-i386-windows-hadrian:
-  <<: *nightly
-  extends: .build-windows-hadrian
-  variables:
-    MSYSTEM: MINGW32
-    TEST_ENV: "i386-windows-hadrian"
-  cache:
-    key: "i386-windows-hadrian-$WINDOWS_TOOLCHAIN_VERSION"
 
 .build-windows-make:
   extends: .build-windows
@@ -881,34 +873,6 @@ release-x86_64-windows-integer-simple:
   variables:
     BIGNUM_BACKEND: native
     BUILD_FLAVOUR: "perf"
-
-
-.build-i386-windows-make:
-  extends: .build-windows-make
-  variables:
-    MSYSTEM: MINGW32
-    # Due to #15934
-    BUILD_PROF_LIBS: "NO"
-    TEST_ENV: "i386-windows"
-  # Due to #17736
-  allow_failure: true
-  cache:
-    key: "i386-windows-$WINDOWS_TOOLCHAIN_VERSION"
-
-validate-i386-windows:
-  extends: .build-i386-windows-make
-  variables:
-    BUILD_FLAVOUR: "perf"
-
-release-i386-windows:
-  <<: *release
-  extends: .build-i386-windows-make
-  variables:
-    BUILD_FLAVOUR: "perf"
-
-nightly-i386-windows:
-  <<: *nightly
-  extends: .build-i386-windows-make
 
 ############################################################
 # Cleanup

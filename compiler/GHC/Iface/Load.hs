@@ -41,6 +41,7 @@ import {-# SOURCE #-} GHC.IfaceToCore
    , tcIfaceAnnotations, tcIfaceCompleteSigs )
 
 import GHC.Driver.Session
+import GHC.Driver.Backend
 import GHC.Iface.Syntax
 import GHC.Iface.Env
 import GHC.Driver.Types
@@ -592,12 +593,12 @@ dontLeakTheHPT thing_inside = do
          -- instantiation of a signature might reside in the HPT, so
          -- this case breaks the assumption that EPS interfaces only
          -- refer to other EPS interfaces. We can detect when we're in
-         -- typechecking-only mode by using hscTarget==HscNothing, and
+         -- typechecking-only mode by using backend==NoBackend, and
          -- in that case we don't empty the HPT.  (admittedly this is
          -- a bit of a hack, better suggestions welcome). A number of
          -- tests in testsuite/tests/backpack break without this
          -- tweak.
-         !hpt | hscTarget hsc_dflags == HscNothing = hsc_HPT
+         !hpt | backend hsc_dflags == NoBackend = hsc_HPT
               | otherwise = emptyHomePackageTable
        in
        HscEnv {  hsc_targets      = panic "cleanTopEnv: hsc_targets"
@@ -982,7 +983,9 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
 writeIface :: DynFlags -> FilePath -> ModIface -> IO ()
 writeIface dflags hi_file_path new_iface
     = do createDirectoryIfMissing True (takeDirectory hi_file_path)
-         writeBinIface dflags hi_file_path new_iface
+         let printer = TraceBinIFace (debugTraceMsg dflags 3)
+             profile = targetProfile dflags
+         writeBinIface profile printer hi_file_path new_iface
 
 -- @readIface@ tries just the one file.
 readIface :: Module -> FilePath
@@ -992,7 +995,7 @@ readIface :: Module -> FilePath
 
 readIface wanted_mod file_path
   = do  { res <- tryMostM $
-                 readBinIface CheckHiWay QuietBinIFaceReading file_path
+                 readBinIface CheckHiWay QuietBinIFace file_path
         ; case res of
             Right iface
                 -- NB: This check is NOT just a sanity check, it is
@@ -1111,12 +1114,15 @@ For some background on this choice see trac #15269.
 -- | Read binary interface, and print it out
 showIface :: HscEnv -> FilePath -> IO ()
 showIface hsc_env filename = do
+   let dflags  = hsc_dflags hsc_env
+       printer = putLogMsg dflags NoReason SevOutput noSrcSpan . withPprStyle defaultDumpStyle
+
    -- skip the hi way check; we don't want to worry about profiled vs.
    -- non-profiled interfaces, for example.
    iface <- initTcRnIf 's' hsc_env () () $
-       readBinIface IgnoreHiWay TraceBinIFaceReading filename
-   let dflags = hsc_dflags hsc_env
-       -- See Note [Name qualification with --show-iface]
+       readBinIface IgnoreHiWay (TraceBinIFace printer) filename
+
+   let -- See Note [Name qualification with --show-iface]
        qualifyImportedNames mod _
            | mod == mi_module iface = NameUnqual
            | otherwise              = NameNotInScope1

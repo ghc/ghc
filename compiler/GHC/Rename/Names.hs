@@ -385,7 +385,9 @@ rnImportDecl this_mod
     warnUnqualifiedImport decl iface
 
     let new_imp_decl = L loc (decl { ideclExt = noExtField, ideclSafe = mod_safe'
-                                   , ideclHiding = new_imp_details })
+                                   , ideclHiding = new_imp_details
+                                   , ideclName = ideclName decl
+                                   , ideclAs = ideclAs decl })
 
     return (new_imp_decl, gbl_env, imports, mi_hpc iface)
 
@@ -1232,11 +1234,11 @@ lookupChildren all_kids rdr_items
 *********************************************************
 -}
 
-reportUnusedNames :: TcGblEnv -> RnM ()
-reportUnusedNames gbl_env
+reportUnusedNames :: TcGblEnv -> HscSource -> RnM ()
+reportUnusedNames gbl_env hsc_src
   = do  { keep <- readTcRef (tcg_keep gbl_env)
         ; traceRn "RUN" (ppr (tcg_dus gbl_env))
-        ; warnUnusedImportDecls gbl_env
+        ; warnUnusedImportDecls gbl_env hsc_src
         ; warnUnusedTopBinds $ unused_locals keep
         ; warnMissingSignatures gbl_env }
   where
@@ -1358,8 +1360,8 @@ type ImportDeclUsage
      , [GlobalRdrElt]      -- What *is* used (normalised)
      , [Name] )            -- What is imported but *not* used
 
-warnUnusedImportDecls :: TcGblEnv -> RnM ()
-warnUnusedImportDecls gbl_env
+warnUnusedImportDecls :: TcGblEnv -> HscSource -> RnM ()
+warnUnusedImportDecls gbl_env hsc_src
   = do { uses <- readMutVar (tcg_used_gres gbl_env)
        ; let user_imports = filterOut
                               (ideclImplicit . unLoc)
@@ -1381,7 +1383,7 @@ warnUnusedImportDecls gbl_env
          mapM_ (warnUnusedImport Opt_WarnUnusedImports fld_env) usage
 
        ; whenGOptM Opt_D_dump_minimal_imports $
-         printMinimalImports usage }
+         printMinimalImports hsc_src usage }
 
 findImportUsage :: [LImportDecl GhcRn]
                 -> [GlobalRdrElt]
@@ -1393,6 +1395,7 @@ findImportUsage imports used_gres
     import_usage :: ImportMap
     import_usage = mkImportMap used_gres
 
+    unused_decl :: LImportDecl GhcRn -> (LImportDecl GhcRn, [GlobalRdrElt], [Name])
     unused_decl decl@(L loc (ImportDecl { ideclHiding = imps }))
       = (decl, used_gres, nameSetElemsStable unused_imps)
       where
@@ -1616,9 +1619,9 @@ getMinimalImports = mapM mk_minimal
 
           all_non_overloaded = all (not . flIsOverloaded)
 
-printMinimalImports :: [ImportDeclUsage] -> RnM ()
+printMinimalImports :: HscSource -> [ImportDeclUsage] -> RnM ()
 -- See Note [Printing minimal imports]
-printMinimalImports imports_w_usage
+printMinimalImports hsc_src imports_w_usage
   = do { imports' <- getMinimalImports imports_w_usage
        ; this_mod <- getModule
        ; dflags   <- getDynFlags
@@ -1635,7 +1638,11 @@ printMinimalImports imports_w_usage
       | Just d <- dumpDir dflags = d </> basefn
       | otherwise                = basefn
       where
-        basefn = moduleNameString (moduleName this_mod) ++ ".imports"
+        suffix = case hsc_src of
+                     HsBootFile -> ".imports-boot"
+                     HsSrcFile  -> ".imports"
+                     HsigFile   -> ".imports"
+        basefn = moduleNameString (moduleName this_mod) ++ suffix
 
 
 to_ie_post_rn_var :: (HasOccName name) => Located name -> LIEWrappedName name

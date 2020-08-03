@@ -548,7 +548,7 @@ of ``-W(no-)*``.
     Being part of the :ghc-flag:`-Wcompat` option group, this warning is off by
     default, but will be switched on in a future GHC release, as part of
     the `MonadFail Proposal (MFP)
-    <https://prime.haskell.org/wiki/Libraries/Proposals/MonadFail>`__.
+    <https://gitlab.haskell.org/haskell/prime/-/wikis/libraries/proposals/monad-fail>`__.
 
 .. ghc-flag:: -Wsemigroup
     :shortdesc: warn when a ``Monoid`` is not ``Semigroup``, and on non-
@@ -1761,6 +1761,25 @@ of ``-W(no-)*``.
 
     You may want to enable this warning on a clean build or enable :ghc-flag:`-fforce-recomp`
     in order to get reliable results.
+
+.. ghc-flag:: -Winvalid-haddock
+    :shortdesc: warn when a Haddock comment occurs in an invalid position
+    :type: dynamic
+    :category:
+
+    :since: 8.12
+
+    When the ``-haddock`` option is enabled, GHC collects documentation
+    comments and associates them with declarations, function arguments, data
+    constructors, and other syntactic elements. Documentation comments in
+    invalid positions are discarded::
+
+        myValue =
+          -- | Invalid (discarded) comment in an expression
+          2 + 2
+
+    This warning informs you about discarded documentation comments.
+    It has no effect when :ghc-flag:`-haddock` is disabled.
 
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's

@@ -97,7 +97,6 @@ Library
         CPP-Options: -DCAN_LOAD_DLL
 
     Other-Extensions:
-        BangPatterns
         CPP
         DataKinds
         DeriveDataTypeable
@@ -116,7 +115,6 @@ Library
         NondecreasingIndentation
         RankNTypes
         RecordWildCards
-        ScopedTypeVariables
         StandaloneDeriving
         Trustworthy
         TupleSections
@@ -153,6 +151,8 @@ Library
     -- we use an explicit Prelude
     Default-Extensions:
         NoImplicitPrelude
+       ,BangPatterns
+       ,ScopedTypeVariables
 
     Exposed-Modules:
         GHC.Iface.Ext.Types
@@ -162,6 +162,7 @@ Library
         GHC.Iface.Ext.Ast
         GHC.SysTools.Ar
         GHC.SysTools.FileCleanup
+        GHC.Driver.Backend
         GHC.Driver.Backpack
         GHC.Driver.Backpack.Syntax
         GHC.Types.Name.Shape
@@ -180,7 +181,6 @@ Library
         GHC.Driver.Monad
         GHC.Driver.Hooks
         GHC.Driver.Flags
-        GHC.Driver.Ways
         GHC.Types.Id
         GHC.Types.Id.Info
         GHC.Core.Predicate
@@ -256,6 +256,10 @@ Library
         GHC.Cmm.Ppr.Decl
         GHC.Cmm.Ppr.Expr
         GHC.Data.Bitmap
+        GHC.Platform
+        GHC.Platform.Constants
+        GHC.Platform.Ways
+        GHC.Platform.Profile
         GHC.Platform.Regs
         GHC.Platform.ARM
         GHC.Platform.ARM64
@@ -563,6 +567,10 @@ Library
         GHC.Cmm.Dataflow.Collections
         GHC.Cmm.Dataflow.Graph
         GHC.Cmm.Dataflow.Label
+
+    reexported-modules:
+          GHC.Platform.ArchOS
+        , GHC.Platform.Host
 
     Exposed-Modules:
             GHC.CmmToAsm

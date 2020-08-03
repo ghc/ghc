@@ -28,6 +28,7 @@ import GHC.Iface.Recomp
 import GHC.Iface.Load
 import GHC.CoreToIface
 
+import qualified GHC.LanguageExtensions as LangExt
 import GHC.HsToCore.Usage ( mkUsageInfo, mkUsedNames, mkDependencies )
 import GHC.Types.Id
 import GHC.Types.Annotations
@@ -46,6 +47,7 @@ import GHC.Core.FamInstEnv
 import GHC.Tc.Utils.Monad
 import GHC.Hs
 import GHC.Driver.Types
+import GHC.Driver.Backend
 import GHC.Driver.Session
 import GHC.Types.Var.Env
 import GHC.Types.Var
@@ -144,7 +146,7 @@ updateDecl decls (Just CgInfos{ cgNonCafs = NonCaffySet non_cafs, cgLFInfos = lf
 
 -- | Make an interface from the results of typechecking only.  Useful
 -- for non-optimising compilation, or where we aren't generating any
--- object code at all ('HscNothing').
+-- object code at all ('NoBackend').
 mkIfaceTc :: HscEnv
           -> SafeHaskellMode    -- The safe haskell mode
           -> ModDetails         -- gotten from mkBootModDetails, probably
@@ -224,7 +226,8 @@ mkIface_ hsc_env
   = do
     let semantic_mod = canonicalizeHomeModule (hsc_dflags hsc_env) (moduleName this_mod)
         entities = typeEnvElts type_env
-        decls  = [ tyThingToIfaceDecl (hsc_dflags hsc_env) entity
+        show_linear_types = xopt LangExt.LinearTypes (hsc_dflags hsc_env)
+        decls  = [ tyThingToIfaceDecl show_linear_types entity
                  | entity <- entities,
                    let name = getName entity,
                    not (isImplicitTyThing entity),
@@ -301,8 +304,8 @@ mkIface_ hsc_env
      -- scope available. (#5534)
      maybeGlobalRdrEnv :: GlobalRdrEnv -> Maybe GlobalRdrEnv
      maybeGlobalRdrEnv rdr_env
-         | targetRetainsAllBindings (hscTarget dflags) = Just rdr_env
-         | otherwise                                   = Nothing
+         | backendRetainsAllBindings (backend dflags) = Just rdr_env
+         | otherwise                                  = Nothing
 
      ifFamInstTcName = ifFamInstFam
 
@@ -375,12 +378,12 @@ so we may need to split up a single Avail into multiple ones.
 ************************************************************************
 -}
 
-tyThingToIfaceDecl :: DynFlags -> TyThing -> IfaceDecl
+tyThingToIfaceDecl :: Bool -> TyThing -> IfaceDecl
 tyThingToIfaceDecl _ (AnId id)      = idToIfaceDecl id
 tyThingToIfaceDecl _ (ATyCon tycon) = snd (tyConToIfaceDecl emptyTidyEnv tycon)
 tyThingToIfaceDecl _ (ACoAxiom ax)  = coAxiomToIfaceDecl ax
-tyThingToIfaceDecl dflags (AConLike cl)  = case cl of
-    RealDataCon dc -> dataConToIfaceDecl dflags dc -- for ppr purposes only
+tyThingToIfaceDecl show_linear_types (AConLike cl)  = case cl of
+    RealDataCon dc -> dataConToIfaceDecl show_linear_types dc -- for ppr purposes only
     PatSynCon ps   -> patSynToIfaceDecl ps
 
 --------------------------
@@ -396,10 +399,10 @@ idToIfaceDecl id
               ifIdInfo    = toIfaceIdInfo (idInfo id) }
 
 --------------------------
-dataConToIfaceDecl :: DynFlags -> DataCon -> IfaceDecl
-dataConToIfaceDecl dflags dataCon
+dataConToIfaceDecl :: Bool -> DataCon -> IfaceDecl
+dataConToIfaceDecl show_linear_types dataCon
   = IfaceId { ifName      = getName dataCon,
-              ifType      = toIfaceType (dataConDisplayType dflags dataCon),
+              ifType      = toIfaceType (dataConDisplayType show_linear_types dataCon),
               ifIdDetails = IfVanillaId,
               ifIdInfo    = [] }
 

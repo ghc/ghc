@@ -68,6 +68,22 @@ Highlights
   - For now GHC still doesn't allow dynamic selection of the ghc-bignum backend
     to use.
 
+* Breaking change: Template Haskell splices now act as separation points
+  between constraint solving passes. It is no longer possible to use
+  an instance of a class before a splice and define that instance after a splice.
+  For example, this code now reports a missing instance for ``C Bool``: ::
+
+      class C a where foo :: a
+      bar :: Bool
+      bar = foo
+      $(return [])
+      instance C Bool where foo = True
+
+ * Support for 32-bit Windows has officially been dropped as Microsoft has
+   formally discontinued new 32-bit Windows 10 releases in 2020. See
+   :ghc-ticket:`18487` for details.
+
+
 Full details
 ------------
 
@@ -213,6 +229,13 @@ Language
     f = (- x)  -- operator section
     c = (-x)   -- negation
 
+* The behavior of :extension:`NegativeLiterals` changed, and now we require
+  that a negative literal must not be preceded by a closing token (see
+  `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
+  for the definition of a closing token). In other words, we parse ``f -123``
+  as ``f (-123)``, but ``x-123`` as ``(-) x 123``. Before this amendment,
+  :extension:`NegativeLiterals` caused ``x-123`` to be parsed as ``x(-123)``.
+
 Compiler
 ~~~~~~~~
 
@@ -279,11 +302,54 @@ Arrow notation
          within 0.5 -< x
          ... |)
 
+Haddock
+~~~~~~~
+
+- Parsing is now more robust to insufficiently indented Haddock comments::
+
+    class C a where
+      f :: a -> a
+    -- ^ This comment used to trigger a parse error
+      g :: a -> a
+
+- :ghc-flag:`-Winvalid-haddock` is a new warning that reports discarded Haddock
+  comments that cannot be associated with AST elements::
+
+    myValue =
+      -- | Invalid (discarded) comment in an expression
+      2 + 2
+
+- When faced with several comments for a data constructor or a data constructor
+  field, Haddock now picks the first one instead of the last one.  The
+  extraneous comment is reported as invalid when :ghc-flag:`-Winvalid-haddock`
+  is enabled::
+
+    data T
+      -- | First comment
+      = MkT
+      -- ^ Second comment (rejected)
+
+
+- Haddock is now more relaxed about the placement of comments in types relative
+  to the function arrow ``->``, allowing more formatting styles::
+
+    f :: Int ->   -- ^ comment on Int (no longer a parse error)
+         Bool     -- ^ comment on Bool
+
+- Haddock can now parse the documentation comment for the first declaration in
+  a module without a module header (:ghc-ticket:`17561`)::
+
+    -- | This comment used to trigger a parse error
+    main = putStrLn "Hello"
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
 - Add a known-key ``cstringLength#`` to ``GHC.CString`` that is eligible
   for constant folding by a built-in rule.
+
+- ``Void#`` is now a type synonym for the unboxed tuple ``(# #)``.
+  Code using ``Void#`` now has to enable :extension:`UnboxedTuples`.
 
 ``ghc`` library
 ~~~~~~~~~~~~~~~
@@ -318,6 +384,10 @@ Arrow notation
   All of ``g*``-functions from the module (``gtry``, ``gcatch``, etc.) are
   erased, and their ``exceptions``-alternatives are meant to be used in the
   GHC code instead.
+
+- ``parseModule`` is now the only parser entry point that deals with Haddock
+  comments. The other entry points (``parseDeclaration``, ``parseExpression``,
+  etc) do not insert the Haddock comments into the AST.
 
 ``base`` library
 ~~~~~~~~~~~~~~~~

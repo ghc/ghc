@@ -2833,8 +2833,17 @@ kcTyFamInstEqn tc_fam_tc
            , text "feqn_pats ="  <+> ppr hs_pats ])
           -- this check reports an arity error instead of a kind error; easier for user
        ; let vis_pats = numVisibleArgs hs_pats
+
+       -- First, check if we're dealing with a closed type family equation, and
+       -- if so, ensure that each equation's type constructor is for the right
+       -- type family.  E.g. barf on
+       --    type family F a where { G Int = Bool }
+       ; checkTc (tc_fam_tc_name == eqn_tc_name) $
+         wrongTyFamName tc_fam_tc_name eqn_tc_name
+
        ; checkTc (vis_pats == vis_arity) $
                   wrongNumberOfParmsErr vis_arity
+
        ; discardResult $
          bindImplicitTKBndrs_Q_Tv imp_vars $
          bindExplicitTKBndrs_Q_Tv AnyKind (mb_expl_bndrs `orElse` []) $
@@ -2848,7 +2857,7 @@ kcTyFamInstEqn tc_fam_tc
     }
   where
     vis_arity = length (tyConVisibleTyVars tc_fam_tc)
-
+    tc_fam_tc_name = getName tc_fam_tc
 
 --------------------------
 tcTyFamInstEqn :: TcTyCon -> AssocInstInfo -> LTyFamInstEqn GhcRn
@@ -2858,22 +2867,22 @@ tcTyFamInstEqn :: TcTyCon -> AssocInstInfo -> LTyFamInstEqn GhcRn
 
 tcTyFamInstEqn fam_tc mb_clsinfo
     (L loc (HsIB { hsib_ext = imp_vars
-                 , hsib_body = FamEqn { feqn_tycon  = L _ eqn_tc_name
-                                      , feqn_bndrs  = mb_expl_bndrs
+                 , hsib_body = FamEqn { feqn_bndrs  = mb_expl_bndrs
                                       , feqn_pats   = hs_pats
                                       , feqn_rhs    = hs_rhs_ty }}))
-  = ASSERT( getName fam_tc == eqn_tc_name )
-    setSrcSpan loc $
+  = setSrcSpan loc $
     do { traceTc "tcTyFamInstEqn" $
          vcat [ ppr fam_tc <+> ppr hs_pats
               , text "fam tc bndrs" <+> pprTyVars (tyConTyVars fam_tc)
               , case mb_clsinfo of
-                  NotAssociated -> empty
+                  NotAssociated {} -> empty
                   InClsInst { ai_class = cls } -> text "class" <+> ppr cls <+> pprTyVars (classTyVars cls) ]
 
        -- First, check the arity of visible arguments
        -- If we wait until validity checking, we'll get kind errors
        -- below when an arity error will be much easier to understand.
+       -- Note that for closed type families, kcTyFamInstEqn has already
+       -- checked the arity previously.
        ; let vis_arity = length (tyConVisibleTyVars fam_tc)
              vis_pats  = numVisibleArgs hs_pats
        ; checkTc (vis_pats == vis_arity) $
@@ -4127,7 +4136,8 @@ checkValidDataCon dflags existential_ok tc con
       = hang herald 2 (text "on the" <+> speakNth n
                        <+> text "argument of" <+> quotes (ppr con))
 
-    data_con_display_type = dataConDisplayType dflags con
+    show_linear_types     = xopt LangExt.LinearTypes dflags
+    data_con_display_type = dataConDisplayType show_linear_types con
 
 -------------------------------
 checkNewDataCon :: DataCon -> TcM ()
@@ -4143,10 +4153,10 @@ checkNewDataCon con
           [ text "A newtype cannot have an unlifted argument type"
           , text "Perhaps you intended to use UnliftedNewtypes"
           ]
-        ; dflags <- getDynFlags
+        ; show_linear_types <- xopt LangExt.LinearTypes <$> getDynFlags
 
         ; let check_con what msg =
-               checkTc what (msg $$ ppr con <+> dcolon <+> ppr (dataConDisplayType dflags con))
+               checkTc what (msg $$ ppr con <+> dcolon <+> ppr (dataConDisplayType show_linear_types con))
 
         ; checkTc (ok_mult (scaledMult arg_ty1)) $
           text "A newtype constructor must be linear"
@@ -4834,10 +4844,10 @@ badGadtDecl tc_name
 
 badExistential :: DataCon -> SDoc
 badExistential con
-  = sdocWithDynFlags (\dflags ->
+  = sdocOption sdocLinearTypes (\show_linear_types ->
       hang (text "Data constructor" <+> quotes (ppr con) <+>
                   text "has existential type variables, a context, or a specialised result type")
-         2 (vcat [ ppr con <+> dcolon <+> ppr (dataConDisplayType dflags con)
+         2 (vcat [ ppr con <+> dcolon <+> ppr (dataConDisplayType show_linear_types con)
                  , parens $ text "Enable ExistentialQuantification or GADTs to allow this" ]))
 
 badStupidTheta :: Name -> SDoc
@@ -4918,6 +4928,12 @@ incoherentRoles :: SDoc
 incoherentRoles = (text "Roles other than" <+> quotes (text "nominal") <+>
                    text "for class parameters can lead to incoherence.") $$
                   (text "Use IncoherentInstances to allow this; bad role found")
+
+wrongTyFamName :: Name -> Name -> SDoc
+wrongTyFamName fam_tc_name eqn_tc_name
+  = hang (text "Mismatched type name in type family instance.")
+       2 (vcat [ text "Expected:" <+> ppr fam_tc_name
+               , text "  Actual:" <+> ppr eqn_tc_name ])
 
 addTyConCtxt :: TyCon -> TcM a -> TcM a
 addTyConCtxt tc = addTyConFlavCtxt name flav

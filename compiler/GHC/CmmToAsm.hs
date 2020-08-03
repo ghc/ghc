@@ -559,7 +559,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
         -- rewrite assignments to global regs
         let fixed_cmm =
                 {-# SCC "fixStgRegisters" #-}
-                fixStgRegisters dflags cmm
+                fixStgRegisters platform cmm
 
         -- cmm to cmm optimisations
         let (opt_cmm, imports) =
@@ -891,7 +891,7 @@ makeImportsDoc dflags imports
                 | needImportedSymbols config
                 = vcat $
                         (pprGotDeclaration config :) $
-                        map ( pprImportedSymbol dflags config . fst . head) $
+                        map ( pprImportedSymbol config . fst . head) $
                         groupBy (\(_,a) (_,b) -> a == b) $
                         sortBy (\(_,a) (_,b) -> compare a b) $
                         map doPpr $
@@ -901,7 +901,7 @@ makeImportsDoc dflags imports
 
         doPpr lbl = (lbl, renderWithStyle
                               (initSDocContext dflags astyle)
-                              (pprCLabel dflags lbl))
+                              (pprCLabel_NCG platform lbl))
         astyle = mkCodeStyle AsmStyle
 
 -- -----------------------------------------------------------------------------

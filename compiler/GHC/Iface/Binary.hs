@@ -17,7 +17,7 @@ module GHC.Iface.Binary (
         getSymtabName,
         getDictFastString,
         CheckHiWay(..),
-        TraceBinIFaceReading(..),
+        TraceBinIFace(..),
         getWithUserData,
         putWithUserData,
 
@@ -43,13 +43,12 @@ import GHC.Driver.Types
 import GHC.Unit
 import GHC.Types.Name
 import GHC.Driver.Session
-import GHC.Driver.Ways
+import GHC.Platform.Profile
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
 import GHC.Utils.Panic
 import GHC.Utils.Binary as Binary
 import GHC.Types.SrcLoc
-import GHC.Utils.Error
 import GHC.Data.FastMutInt
 import GHC.Types.Unique
 import GHC.Utils.Outputable
@@ -59,7 +58,6 @@ import GHC.Data.FastString
 import GHC.Settings.Constants
 import GHC.Utils.Misc
 
-import Data.Set (Set)
 import Data.Array
 import Data.Array.ST
 import Data.Array.Unsafe
@@ -80,39 +78,34 @@ import qualified Control.Monad.Trans.State.Strict as State
 data CheckHiWay = CheckHiWay | IgnoreHiWay
     deriving Eq
 
-data TraceBinIFaceReading = TraceBinIFaceReading | QuietBinIFaceReading
-    deriving Eq
+data TraceBinIFace
+   = TraceBinIFace (SDoc -> IO ())
+   | QuietBinIFace
 
 -- | Read an interface file
-readBinIface :: CheckHiWay -> TraceBinIFaceReading -> FilePath
+readBinIface :: CheckHiWay -> TraceBinIFace -> FilePath
              -> TcRnIf a b ModIface
 readBinIface checkHiWay traceBinIFaceReading hi_path = do
     ncu <- mkNameCacheUpdater
     dflags <- getDynFlags
-    liftIO $ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu
+    let profile = targetProfile dflags
+    liftIO $ readBinIface_ profile checkHiWay traceBinIFaceReading hi_path ncu
 
 -- | Read an interface file in 'IO'.
-readBinIface_ :: DynFlags -> CheckHiWay -> TraceBinIFaceReading -> FilePath
+readBinIface_ :: Profile -> CheckHiWay -> TraceBinIFace -> FilePath
               -> NameCacheUpdater
               -> IO ModIface
-readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
-    let platform = targetPlatform dflags
-
-        printer :: SDoc -> IO ()
-        printer = case traceBinIFaceReading of
-                      TraceBinIFaceReading -> \sd ->
-                          putLogMsg dflags
-                                    NoReason
-                                    SevOutput
-                                    noSrcSpan
-                                    $ withPprStyle defaultDumpStyle sd
-                      QuietBinIFaceReading -> \_ -> return ()
+readBinIface_ profile checkHiWay traceBinIFace hi_path ncu = do
+    let platform = profilePlatform profile
 
         wantedGot :: String -> a -> a -> (a -> SDoc) -> IO ()
         wantedGot what wanted got ppr' =
-            printer (text what <> text ": " <>
+            case traceBinIFace of
+               QuietBinIFace         -> return ()
+               TraceBinIFace printer -> printer $
+                     text what <> text ": " <>
                      vcat [text "Wanted " <> ppr' wanted <> text ",",
-                           text "got    " <> ppr' got])
+                           text "got    " <> ppr' got]
 
         errorOnMismatch :: (Eq a, Show a) => String -> a -> a -> IO ()
         errorOnMismatch what wanted got =
@@ -131,17 +124,17 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
     errorOnMismatch "magic number mismatch: old/corrupt interface file?"
         (unFixedLength $ binaryInterfaceMagic platform) (unFixedLength magic)
 
-    -- Check the interface file version and ways.
+    -- Check the interface file version and profile tag.
     check_ver  <- get bh
     let our_ver = show hiVersion
     wantedGot "Version" our_ver check_ver text
     errorOnMismatch "mismatched interface file versions" our_ver check_ver
 
-    check_way <- get bh
-    let way_descr = getWayDescr platform (ways dflags)
-    wantedGot "Way" way_descr check_way ppr
+    check_tag <- get bh
+    let tag = profileBuildTag profile
+    wantedGot "Way" tag check_tag ppr
     when (checkHiWay == CheckHiWay) $
-        errorOnMismatch "mismatched interface file ways" way_descr check_way
+        errorOnMismatch "mismatched interface file profile tag" tag check_tag
 
     extFields_p <- get bh
 
@@ -185,21 +178,21 @@ getWithUserData ncu bh = do
     get bh
 
 -- | Write an interface file
-writeBinIface :: DynFlags -> FilePath -> ModIface -> IO ()
-writeBinIface dflags hi_path mod_iface = do
+writeBinIface :: Profile -> TraceBinIFace -> FilePath -> ModIface -> IO ()
+writeBinIface profile traceBinIface hi_path mod_iface = do
     bh <- openBinMem initBinMemSize
-    let platform = targetPlatform dflags
+    let platform = profilePlatform profile
     put_ bh (binaryInterfaceMagic platform)
 
-    -- The version and way descriptor go next
+    -- The version and profile tag go next
     put_ bh (show hiVersion)
-    let way_descr = getWayDescr platform (ways dflags)
-    put_  bh way_descr
+    let tag = profileBuildTag profile
+    put_  bh tag
 
     extFields_p_p <- tellBin bh
     put_ bh extFields_p_p
 
-    putWithUserData (debugTraceMsg dflags 3) bh mod_iface
+    putWithUserData traceBinIface bh mod_iface
 
     extFields_p <- tellBin bh
     putAt bh extFields_p_p extFields_p
@@ -213,8 +206,8 @@ writeBinIface dflags hi_path mod_iface = do
 -- is necessary if you want to serialise Names or FastStrings.
 -- It also writes a symbol table and the dictionary.
 -- This segment should be read using `getWithUserData`.
-putWithUserData :: Binary a => (SDoc -> IO ()) -> BinHandle -> a -> IO ()
-putWithUserData log_action bh payload = do
+putWithUserData :: Binary a => TraceBinIFace -> BinHandle -> a -> IO ()
+putWithUserData traceBinIface bh payload = do
     -- Remember where the dictionary pointer will go
     dict_p_p <- tellBin bh
     -- Placeholder for ptr to dictionary
@@ -252,8 +245,11 @@ putWithUserData log_action bh payload = do
     symtab_next <- readFastMutInt symtab_next
     symtab_map  <- readIORef symtab_map
     putSymbolTable bh symtab_next symtab_map
-    log_action (text "writeBinIface:" <+> int symtab_next
-                                <+> text "Names")
+    case traceBinIface of
+      QuietBinIFace         -> return ()
+      TraceBinIFace printer ->
+         printer (text "writeBinIface:" <+> int symtab_next
+                                        <+> text "Names")
 
     -- NB. write the dictionary after the symbol table, because
     -- writing the symbol table may create more dictionary entries.
@@ -267,8 +263,11 @@ putWithUserData log_action bh payload = do
     dict_next <- readFastMutInt dict_next_ref
     dict_map  <- readIORef dict_map_ref
     putDictionary bh dict_next dict_map
-    log_action (text "writeBinIface:" <+> int dict_next
-                                <+> text "dict entries")
+    case traceBinIface of
+      QuietBinIFace         -> return ()
+      TraceBinIFace printer ->
+         printer (text "writeBinIface:" <+> int dict_next
+                                        <+> text "dict entries")
 
 
 
@@ -430,10 +429,3 @@ data BinDictionary = BinDictionary {
                                 -- indexed by FastString
   }
 
-getWayDescr :: Platform -> Set Way -> String
-getWayDescr platform ws
-  | platformUnregisterised platform = 'u':tag
-  | otherwise                       =     tag
-  where tag = waysBuildTag ws
-        -- if this is an unregisterised build, make sure our interfaces
-        -- can't be used by a registerised build.

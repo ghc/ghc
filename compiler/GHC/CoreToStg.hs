@@ -42,7 +42,7 @@ import GHC.Utils.Monad
 import GHC.Data.FastString
 import GHC.Utils.Misc
 import GHC.Driver.Session
-import GHC.Driver.Ways
+import GHC.Platform.Ways
 import GHC.Types.ForeignCall
 import GHC.Types.Demand    ( isUsedOnce )
 import GHC.Builtin.PrimOps ( PrimCall(..) )
@@ -445,7 +445,7 @@ coreToStgExpr e0@(Case scrut bndr _ alts) = do
           _ ->
             pprPanic "coreToStgExpr" $
               text "Unexpected unsafe equality case expression:" $$ ppr e0 $$
-              text "STG:" $$ ppr stg
+              text "STG:" $$ pprStgExpr panicStgPprOpts stg
       _ -> return stg
   where
     vars_alt :: (AltCon, [Var], CoreExpr) -> CtsM (AltCon, [Var], StgExpr)

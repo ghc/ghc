@@ -24,6 +24,7 @@ import GHC.Hs
 import GHC.Unit
 import GHC.Utils.Outputable as Outputable
 import GHC.Driver.Session
+import GHC.Driver.Backend
 import GHC.Core.ConLike
 import Control.Monad
 import GHC.Types.SrcLoc
@@ -1050,7 +1051,7 @@ coveragePasses dflags =
 
 -- | Should we produce 'Breakpoint' ticks?
 breakpointsEnabled :: DynFlags -> Bool
-breakpointsEnabled dflags = hscTarget dflags == HscInterpreted
+breakpointsEnabled dflags = backend dflags == Interpreter
 
 -- | Tickishs that only make sense when their source code location
 -- refers to the current file. This might not always be true due to
@@ -1314,9 +1315,9 @@ static void hpc_init_Main(void)
  hs_hpc_module("Main",8,1150288664,_hpc_tickboxes_Main_hpc);}
 -}
 
-hpcInitCode :: Module -> HpcInfo -> SDoc
-hpcInitCode _ (NoHpcInfo {}) = Outputable.empty
-hpcInitCode this_mod (HpcInfo tickCount hashNo)
+hpcInitCode :: DynFlags -> Module -> HpcInfo -> SDoc
+hpcInitCode _ _ (NoHpcInfo {}) = Outputable.empty
+hpcInitCode dflags this_mod (HpcInfo tickCount hashNo)
  = vcat
     [ text "static void hpc_init_" <> ppr this_mod
          <> text "(void) __attribute__((constructor));"
@@ -1334,7 +1335,9 @@ hpcInitCode this_mod (HpcInfo tickCount hashNo)
        ])
     ]
   where
-    tickboxes = ppr (mkHpcTicksLabel $ this_mod)
+    platform  = targetPlatform dflags
+    bcknd     = backend dflags
+    tickboxes = pprCLabel bcknd platform (mkHpcTicksLabel $ this_mod)
 
     module_name  = hcat (map (text.charToC) $ BS.unpack $
                          bytesFS (moduleNameFS (moduleName this_mod)))

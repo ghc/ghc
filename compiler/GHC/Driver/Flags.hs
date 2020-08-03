@@ -188,7 +188,8 @@ data GeneralFlag
    | Opt_OmitYields
    | Opt_FunToThunk               -- allow GHC.Core.Opt.WorkWrap.Utils.mkWorkerArgs to remove all value lambdas
    | Opt_DictsStrict                     -- be strict in argument dictionaries
-   | Opt_DmdTxDictSel              -- use a special demand transformer for dictionary selectors
+   | Opt_DmdTxDictSel              -- ^ deprecated, no effect and behaviour is now default.
+                                   -- Allowed switching of a special demand transformer for dictionary selectors
    | Opt_Loopification                  -- See Note [Self-recursive tail calls]
    | Opt_CfgBlocklayout             -- ^ Use the cfg based block layout algorithm.
    | Opt_WeightlessBlocklayout         -- ^ Layout based on last instruction per block.
@@ -496,6 +497,7 @@ data WarningFlag =
    | Opt_WarnMissingSafeHaskellMode       -- Since 8.10
    | Opt_WarnCompatUnqualifiedImports     -- Since 8.10
    | Opt_WarnDerivingDefaults
+   | Opt_WarnInvalidHaddock               -- Since 8.12
    deriving (Eq, Show, Enum)
 
 -- | Used when outputting warnings: if a reason is given, it is

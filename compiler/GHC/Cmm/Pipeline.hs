@@ -24,6 +24,7 @@ import GHC.Cmm.Dataflow.Collections
 
 import GHC.Types.Unique.Supply
 import GHC.Driver.Session
+import GHC.Driver.Backend
 import GHC.Utils.Error
 import GHC.Driver.Types
 import Control.Monad
@@ -45,7 +46,7 @@ cmmPipeline
 cmmPipeline hsc_env srtInfo prog = withTimingSilent dflags (text "Cmm pipeline") forceRes $
   do let dflags = hsc_dflags hsc_env
 
-     tops <- {-# SCC "tops" #-} mapM (cpsTop hsc_env) prog
+     tops <- {-# SCC "tops" #-} mapM (cpsTop dflags) prog
 
      let (procs, data_) = partitionEithers tops
      (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs dflags srtInfo procs data_
@@ -58,9 +59,9 @@ cmmPipeline hsc_env srtInfo prog = withTimingSilent dflags (text "Cmm pipeline")
 
         dflags = hsc_dflags hsc_env
 
-cpsTop :: HscEnv -> CmmDecl -> IO (Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDecl))
-cpsTop _ p@(CmmData _ statics) = return (Right (cafAnalData statics, p))
-cpsTop hsc_env proc =
+cpsTop :: DynFlags -> CmmDecl -> IO (Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDecl))
+cpsTop dflags p@(CmmData _ statics) = return (Right (cafAnalData (targetPlatform dflags) statics, p))
+cpsTop dflags proc =
     do
        ----------- Control-flow optimisations ----------------------------------
 
@@ -117,7 +118,7 @@ cpsTop hsc_env proc =
                      Opt_D_dump_cmm_sink "Sink assignments"
 
        ------------- CAF analysis ----------------------------------------------
-       let cafEnv = {-# SCC "cafAnal" #-} cafAnal call_pps l g
+       let cafEnv = {-# SCC "cafAnal" #-} cafAnal platform call_pps l g
        dumpWith dflags Opt_D_dump_cmm_caf "CAFEnv" FormatText (ppr cafEnv)
 
        g <- if splitting_proc_points
@@ -152,8 +153,7 @@ cpsTop hsc_env proc =
 
        return (Left (cafEnv, g))
 
-  where dflags = hsc_dflags hsc_env
-        platform = targetPlatform dflags
+  where platform = targetPlatform dflags
         dump = dumpGraph dflags
 
         dumps flag name
@@ -171,7 +171,7 @@ cpsTop hsc_env proc =
         -- tablesNextToCode is off.  The latter is because we have no
         -- label to put on info tables for basic blocks that are not
         -- the entry point.
-        splitting_proc_points = hscTarget dflags /= HscAsm
+        splitting_proc_points = backend dflags /= NCG
                              || not (platformTablesNextToCode platform)
                              || -- Note [inconsistent-pic-reg]
                                 usingInconsistentPicReg

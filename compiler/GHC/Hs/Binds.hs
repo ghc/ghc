@@ -20,6 +20,7 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module GHC.Hs.Binds where
 
@@ -68,7 +69,7 @@ Global bindings (where clauses)
 type HsLocalBinds id = HsLocalBindsLR id id
 
 -- | Located Haskell local bindings
-type LHsLocalBinds id = Located (HsLocalBinds id)
+type LHsLocalBinds id = XRec id (HsLocalBinds id)
 
 -- | Haskell Local Bindings with separate Left and Right identifier types
 --
@@ -101,7 +102,7 @@ type instance XHsIPBinds       (GhcPass pL) (GhcPass pR) = NoExtField
 type instance XEmptyLocalBinds (GhcPass pL) (GhcPass pR) = NoExtField
 type instance XXHsLocalBindsLR (GhcPass pL) (GhcPass pR) = NoExtCon
 
-type LHsLocalBindsLR idL idR = Located (HsLocalBindsLR idL idR)
+type LHsLocalBindsLR idL idR = XRec idL (HsLocalBindsLR idL idR)
 
 
 -- | Haskell Value Bindings
@@ -156,7 +157,7 @@ type HsBind   id = HsBindLR   id id
 type LHsBindsLR idL idR = Bag (LHsBindLR idL idR)
 
 -- | Located Haskell Binding with separate Left and Right identifier types
-type LHsBindLR  idL idR = Located (HsBindLR idL idR)
+type LHsBindLR  idL idR = XRec idL (HsBindLR idL idR)
 
 {- Note [FunBind vs PatBind]
    ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -240,7 +241,7 @@ data HsBindLR idL idR
           -- type         Int -> forall a'. a' -> a'
           -- Notice that the coercion captures the free a'.
 
-        fun_id :: Located (IdP idL), -- Note [fun_id in Match] in GHC.Hs.Expr
+        fun_id :: XRec idL (IdP idL), -- Note [fun_id in Match] in GHC.Hs.Expr
 
         fun_matches :: MatchGroup idR (LHsExpr idR),  -- ^ The payload
 
@@ -371,8 +372,8 @@ type instance XXABExport (GhcPass p) = NoExtCon
 data PatSynBind idL idR
   = PSB { psb_ext  :: XPSB idL idR,            -- ^ Post renaming, FVs.
                                                -- See Note [Bind free vars]
-          psb_id   :: Located (IdP idL),       -- ^ Name of the pattern synonym
-          psb_args :: HsPatSynDetails (Located (IdP idR)),
+          psb_id   :: XRec idL (IdP idL),       -- ^ Name of the pattern synonym
+          psb_args :: HsPatSynDetails (XRec idR (IdP idR)),
                                                -- ^ Formal parameter names
           psb_def  :: LPat idR,                -- ^ Right-hand side
           psb_dir  :: HsPatSynDir idR          -- ^ Directionality
@@ -692,10 +693,10 @@ emptyValBindsIn, emptyValBindsOut :: HsValBindsLR (GhcPass a) (GhcPass b)
 emptyValBindsIn  = ValBinds noExtField emptyBag []
 emptyValBindsOut = XValBindsLR (NValBinds [] [])
 
-emptyLHsBinds :: LHsBindsLR idL idR
+emptyLHsBinds :: LHsBindsLR (GhcPass idL) idR
 emptyLHsBinds = emptyBag
 
-isEmptyLHsBinds :: LHsBindsLR idL idR -> Bool
+isEmptyLHsBinds :: LHsBindsLR (GhcPass idL) idR -> Bool
 isEmptyLHsBinds = isEmptyBag
 
 ------------
@@ -822,7 +823,7 @@ isEmptyIPBindsTc :: HsIPBinds GhcTc -> Bool
 isEmptyIPBindsTc (IPBinds ds is) = null is && isEmptyTcEvBinds ds
 
 -- | Located Implicit Parameter Binding
-type LIPBind id = Located (IPBind id)
+type LIPBind id = XRec id (IPBind id)
 -- ^ May have 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnSemi' when in a
 --   list
 
@@ -841,7 +842,7 @@ type LIPBind id = Located (IPBind id)
 data IPBind id
   = IPBind
         (XCIPBind id)
-        (Either (Located HsIPName) (IdP id))
+        (Either (XRec id HsIPName) (IdP id))
         (LHsExpr id)
   | XIPBind !(XXIPBind id)
 
@@ -873,7 +874,7 @@ serves for both.
 -}
 
 -- | Located Signature
-type LSig pass = Located (Sig pass)
+type LSig pass = XRec pass (Sig pass)
 
 -- | Signatures and pragmas
 data Sig pass
@@ -895,7 +896,7 @@ data Sig pass
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
     TypeSig
        (XTypeSig pass)
-       [Located (IdP pass)]  -- LHS of the signature; e.g.  f,g,h :: blah
+       [XRec pass (IdP pass)]  -- LHS of the signature; e.g.  f,g,h :: blah
        (LHsSigWcType pass)   -- RHS of the signature; can have wildcards
 
       -- | A pattern synonym type signature
@@ -907,7 +908,7 @@ data Sig pass
       --           'GHC.Parser.Annotation.AnnDot','GHC.Parser.Annotation.AnnDarrow'
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | PatSynSig (XPatSynSig pass) [Located (IdP pass)] (LHsSigType pass)
+  | PatSynSig (XPatSynSig pass) [XRec pass (IdP pass)] (LHsSigType pass)
       -- P :: forall a b. Req => Prov => ty
 
       -- | A signature for a class method
@@ -920,7 +921,7 @@ data Sig pass
       --
       --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnDefault',
       --           'GHC.Parser.Annotation.AnnDcolon'
-  | ClassOpSig (XClassOpSig pass) Bool [Located (IdP pass)] (LHsSigType pass)
+  | ClassOpSig (XClassOpSig pass) Bool [XRec pass (IdP pass)] (LHsSigType pass)
 
         -- | A type signature in generated code, notably the code
         -- generated for record selectors.  We simply record
@@ -952,7 +953,7 @@ data Sig pass
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | InlineSig   (XInlineSig pass)
-                (Located (IdP pass)) -- Function name
+                (XRec pass (IdP pass)) -- Function name
                 InlinePragma         -- Never defaultInlinePragma
 
         -- | A specialisation pragma
@@ -968,7 +969,7 @@ data Sig pass
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | SpecSig     (XSpecSig pass)
-                (Located (IdP pass)) -- Specialise a function or datatype  ...
+                (XRec pass (IdP pass)) -- Specialise a function or datatype  ...
                 [LHsSigType pass]  -- ... to these types
                 InlinePragma       -- The pragma on SPECIALISE_INLINE form.
                                    -- If it's just defaultInlinePragma, then we said
@@ -998,7 +999,7 @@ data Sig pass
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | MinimalSig (XMinimalSig pass)
-               SourceText (LBooleanFormula (Located (IdP pass)))
+               SourceText (LBooleanFormula (XRec pass (IdP pass)))
                -- Note [Pragma source text] in GHC.Types.Basic
 
         -- | A "set cost centre" pragma for declarations
@@ -1010,9 +1011,9 @@ data Sig pass
         -- > {-# SCC funName "cost_centre_name" #-}
 
   | SCCFunSig  (XSCCFunSig pass)
-               SourceText      -- Note [Pragma source text] in GHC.Types.Basic
-               (Located (IdP pass))  -- Function name
-               (Maybe (Located StringLiteral))
+               SourceText              -- Note [Pragma source text] in GHC.Types.Basic
+               (XRec pass (IdP pass))  -- Function name
+               (Maybe (XRec pass StringLiteral))
        -- | A complete match pragma
        --
        -- > {-# COMPLETE C, D [:: T] #-}
@@ -1022,8 +1023,8 @@ data Sig pass
        -- synonym definitions.
   | CompleteMatchSig (XCompleteMatchSig pass)
                      SourceText
-                     (Located [Located (IdP pass)])
-                     (Maybe (Located (IdP pass)))
+                     (XRec pass [XRec pass (IdP pass)])
+                     (Maybe (XRec pass (IdP pass)))
   | XSig !(XXSig pass)
 
 type instance XTypeSig          (GhcPass p) = NoExtField
@@ -1040,10 +1041,10 @@ type instance XCompleteMatchSig (GhcPass p) = NoExtField
 type instance XXSig             (GhcPass p) = NoExtCon
 
 -- | Located Fixity Signature
-type LFixitySig pass = Located (FixitySig pass)
+type LFixitySig pass = XRec pass (FixitySig pass)
 
 -- | Fixity Signature
-data FixitySig pass = FixitySig (XFixitySig pass) [Located (IdP pass)] Fixity
+data FixitySig pass = FixitySig (XFixitySig pass) [XRec pass (IdP pass)] Fixity
                     | XFixitySig !(XXFixitySig pass)
 
 type instance XFixitySig  (GhcPass p) = NoExtField
@@ -1082,48 +1083,47 @@ isDefaultMethod :: TcSpecPrags -> Bool
 isDefaultMethod IsDefaultMethod = True
 isDefaultMethod (SpecPrags {})  = False
 
-
-isFixityLSig :: LSig name -> Bool
-isFixityLSig (L _ (FixSig {})) = True
+isFixityLSig :: forall p. UnXRec p => LSig p -> Bool
+isFixityLSig (unXRec @p -> FixSig {}) = True
 isFixityLSig _                 = False
 
-isTypeLSig :: LSig name -> Bool  -- Type signatures
-isTypeLSig (L _(TypeSig {}))    = True
-isTypeLSig (L _(ClassOpSig {})) = True
-isTypeLSig (L _(IdSig {}))      = True
+isTypeLSig :: forall p. UnXRec p => LSig p -> Bool  -- Type signatures
+isTypeLSig (unXRec @p -> TypeSig {})    = True
+isTypeLSig (unXRec @p -> ClassOpSig {}) = True
+isTypeLSig (unXRec @p -> IdSig {})      = True
 isTypeLSig _                    = False
 
-isSpecLSig :: LSig name -> Bool
-isSpecLSig (L _(SpecSig {})) = True
+isSpecLSig :: forall p. UnXRec p => LSig p -> Bool
+isSpecLSig (unXRec @p -> SpecSig {}) = True
 isSpecLSig _                 = False
 
-isSpecInstLSig :: LSig name -> Bool
-isSpecInstLSig (L _ (SpecInstSig {})) = True
+isSpecInstLSig :: forall p. UnXRec p => LSig p -> Bool
+isSpecInstLSig (unXRec @p -> SpecInstSig {}) = True
 isSpecInstLSig _                      = False
 
-isPragLSig :: LSig name -> Bool
+isPragLSig :: forall p. UnXRec p => LSig p -> Bool
 -- Identifies pragmas
-isPragLSig (L _ (SpecSig {}))   = True
-isPragLSig (L _ (InlineSig {})) = True
-isPragLSig (L _ (SCCFunSig {})) = True
-isPragLSig (L _ (CompleteMatchSig {})) = True
+isPragLSig (unXRec @p -> SpecSig {})   = True
+isPragLSig (unXRec @p -> InlineSig {}) = True
+isPragLSig (unXRec @p -> SCCFunSig {}) = True
+isPragLSig (unXRec @p -> CompleteMatchSig {}) = True
 isPragLSig _                    = False
 
-isInlineLSig :: LSig name -> Bool
+isInlineLSig :: forall p. UnXRec p => LSig p -> Bool
 -- Identifies inline pragmas
-isInlineLSig (L _ (InlineSig {})) = True
+isInlineLSig (unXRec @p -> InlineSig {}) = True
 isInlineLSig _                    = False
 
-isMinimalLSig :: LSig name -> Bool
-isMinimalLSig (L _ (MinimalSig {})) = True
-isMinimalLSig _                     = False
+isMinimalLSig :: forall p. UnXRec p => LSig p -> Bool
+isMinimalLSig (unXRec @p -> MinimalSig {}) = True
+isMinimalLSig _                               = False
 
-isSCCFunSig :: LSig name -> Bool
-isSCCFunSig (L _ (SCCFunSig {})) = True
+isSCCFunSig :: forall p. UnXRec p => LSig p -> Bool
+isSCCFunSig (unXRec @p -> SCCFunSig {}) = True
 isSCCFunSig _                    = False
 
-isCompleteMatchSig :: LSig name -> Bool
-isCompleteMatchSig (L _ (CompleteMatchSig {} )) = True
+isCompleteMatchSig :: forall p. UnXRec p => LSig p -> Bool
+isCompleteMatchSig (unXRec @p -> CompleteMatchSig {} ) = True
 isCompleteMatchSig _                            = False
 
 hsSigDoc :: Sig name -> SDoc

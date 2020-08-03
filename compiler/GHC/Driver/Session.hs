@@ -47,8 +47,6 @@ module GHC.Driver.Session (
         FlagSpec(..),
         HasDynFlags(..), ContainsDynFlags(..),
         RtsOptsEnabled(..),
-        HscTarget(..), isObjectTarget, defaultObjectTarget,
-        targetRetainsAllBindings,
         GhcMode(..), isOneShot,
         GhcLink(..), isNoLink,
         PackageFlag(..), PackageArg(..), ModRenaming(..),
@@ -65,7 +63,7 @@ module GHC.Driver.Session (
         optimisationFlags,
         setFlagsFromEnvFile,
 
-        addWay',
+        addWay', targetProfile,
 
         homeUnit, mkHomeModule, isHomeModule,
 
@@ -130,7 +128,6 @@ module GHC.Driver.Session (
         sExtraGccViaCFlags,
         sTargetPlatformString,
         sGhcWithInterpreter,
-        sGhcWithNativeCodeGen,
         sGhcWithSMP,
         sGhcRTSWays,
         sLibFFI,
@@ -200,11 +197,7 @@ module GHC.Driver.Session (
         -- * Compiler configuration suitable for display to the user
         compilerInfo,
 
-#include "GHCConstantsHaskellExports.hs"
-        bLOCK_SIZE_W,
         wordAlignment,
-        tAG_MASK,
-        mAX_PTR_TAG,
 
         unsafeGlobalDynFlags, setUnsafeGlobalDynFlags,
 
@@ -243,6 +236,8 @@ module GHC.Driver.Session (
 import GHC.Prelude
 
 import GHC.Platform
+import GHC.Platform.Ways
+import GHC.Platform.Profile
 import GHC.UniqueSubdir (uniqueSubdir)
 import GHC.Unit.Types
 import GHC.Unit.Parser
@@ -253,7 +248,7 @@ import GHC.Builtin.Names ( mAIN )
 import {-# SOURCE #-} GHC.Unit.State (UnitState, emptyUnitState, UnitDatabase, updateIndefUnitId)
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Flags
-import GHC.Driver.Ways
+import GHC.Driver.Backend
 import GHC.Settings.Config
 import GHC.Utils.CliOption
 import GHC.Driver.CmdLine hiding (WarnReason(..))
@@ -290,7 +285,6 @@ import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Except
 
 import Data.Ord
-import Data.Bits
 import Data.Char
 import Data.List
 import Data.Map (Map)
@@ -445,7 +439,20 @@ instance Outputable SafeHaskellMode where
 data DynFlags = DynFlags {
   ghcMode               :: GhcMode,
   ghcLink               :: GhcLink,
-  hscTarget             :: HscTarget,
+  backend               :: !Backend,
+   -- ^ The backend to use (if any).
+   --
+   -- Whenever you change the backend, also make sure to set 'ghcLink' to
+   -- something sensible.
+   --
+   -- 'NoBackend' can be used to avoid generating any output, however, note that:
+   --
+   --  * If a program uses Template Haskell the typechecker may need to run code
+   --    from an imported module.  To facilitate this, code generation is enabled
+   --    for modules imported by modules that use template haskell, using the
+   --    default backend for the platform.
+   --    See Note [-fno-code mode].
+
 
   -- formerly Settings
   ghcNameVersion    :: {-# UNPACK #-} !GhcNameVersion,
@@ -453,7 +460,6 @@ data DynFlags = DynFlags {
   targetPlatform    :: Platform,       -- Filled in by SysTools
   toolSettings      :: {-# UNPACK #-} !ToolSettings,
   platformMisc      :: {-# UNPACK #-} !PlatformMisc,
-  platformConstants :: PlatformConstants,
   rawSettings       :: [(String, String)],
 
   llvmConfig            :: LlvmConfig,
@@ -900,7 +906,7 @@ settings dflags = Settings
   , sTargetPlatform = targetPlatform dflags
   , sToolSettings = toolSettings dflags
   , sPlatformMisc = platformMisc dflags
-  , sPlatformConstants = platformConstants dflags
+  , sPlatformConstants = platformConstants (targetPlatform dflags)
   , sRawSettings = rawSettings dflags
   }
 
@@ -994,53 +1000,14 @@ opt_i dflags= toolSettings_opt_i $ toolSettings dflags
 -- | The directory for this version of ghc in the user's app directory
 -- (typically something like @~/.ghc/x86_64-linux-7.6.3@)
 --
-versionedAppDir :: String -> PlatformMini -> MaybeT IO FilePath
+versionedAppDir :: String -> ArchOS -> MaybeT IO FilePath
 versionedAppDir appname platform = do
   -- Make sure we handle the case the HOME isn't set (see #11678)
   appdir <- tryMaybeT $ getAppUserDataDirectory appname
   return $ appdir </> versionedFilePath platform
 
-versionedFilePath :: PlatformMini -> FilePath
+versionedFilePath :: ArchOS -> FilePath
 versionedFilePath platform = uniqueSubdir platform
-
--- | The target code type of the compilation (if any).
---
--- Whenever you change the target, also make sure to set 'ghcLink' to
--- something sensible.
---
--- 'HscNothing' can be used to avoid generating any output, however, note
--- that:
---
---  * If a program uses Template Haskell the typechecker may need to run code
---    from an imported module.  To facilitate this, code generation is enabled
---    for modules imported by modules that use template haskell.
---    See Note [-fno-code mode].
---
-data HscTarget
-  = HscC           -- ^ Generate C code.
-  | HscAsm         -- ^ Generate assembly using the native code generator.
-  | HscLlvm        -- ^ Generate assembly using the llvm code generator.
-  | HscInterpreted -- ^ Generate bytecode.  (Requires 'LinkInMemory')
-  | HscNothing     -- ^ Don't generate any code.  See notes above.
-  deriving (Eq, Show)
-
--- | Will this target result in an object file on the disk?
-isObjectTarget :: HscTarget -> Bool
-isObjectTarget HscC     = True
-isObjectTarget HscAsm   = True
-isObjectTarget HscLlvm  = True
-isObjectTarget _        = False
-
--- | Does this target retain *all* top-level bindings for a module,
--- rather than just the exported bindings, in the TypeEnv and compiled
--- code (if any)?  In interpreted mode we do this, so that GHCi can
--- call functions inside a module.  In HscNothing mode we also do it,
--- so that Haddock can get access to the GlobalRdrEnv for a module
--- after typechecking it.
-targetRetainsAllBindings :: HscTarget -> Bool
-targetRetainsAllBindings HscInterpreted = True
-targetRetainsAllBindings HscNothing     = True
-targetRetainsAllBindings _              = False
 
 -- | The 'GhcMode' tells us whether we're doing multi-module
 -- compilation (controlled via the "GHC" API) or one-shot
@@ -1148,20 +1115,6 @@ packageFlagsChanged idflags1 idflags0 =
 instance Outputable PackageFlag where
     ppr (ExposePackage n arg rn) = text n <> braces (ppr arg <+> ppr rn)
     ppr (HidePackage str) = text "-hide-package" <+> text str
-
--- | The 'HscTarget' value corresponding to the default way to create
--- object files on the current platform.
-
-defaultHscTarget :: Platform -> PlatformMisc -> HscTarget
-defaultHscTarget platform pMisc
-  | platformUnregisterised platform = HscC
-  | platformMisc_ghcWithNativeCodeGen pMisc = HscAsm
-  | otherwise = HscLlvm
-
-defaultObjectTarget :: DynFlags -> HscTarget
-defaultObjectTarget dflags = defaultHscTarget
-  (targetPlatform dflags)
-  (platformMisc dflags)
 
 data DynLibLoader
   = Deployable
@@ -1273,7 +1226,7 @@ defaultDynFlags mySettings llvmConfig =
      DynFlags {
         ghcMode                 = CompManager,
         ghcLink                 = LinkBinary,
-        hscTarget               = defaultHscTarget (sTargetPlatform mySettings) (sPlatformMisc mySettings),
+        backend                 = platformDefaultBackend (sTargetPlatform mySettings),
         verbosity               = 0,
         optLevel                = 0,
         debugLevel              = 0,
@@ -1373,7 +1326,6 @@ defaultDynFlags mySettings llvmConfig =
         toolSettings = sToolSettings mySettings,
         targetPlatform = sTargetPlatform mySettings,
         platformMisc = sPlatformMisc mySettings,
-        platformConstants = sPlatformConstants mySettings,
         rawSettings = sRawSettings mySettings,
 
         -- See Note [LLVM configuration].
@@ -2493,9 +2445,9 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "keep-s-files"
         (NoArg (setGeneralFlag Opt_KeepSFiles))
   , make_ord_flag defGhcFlag "keep-llvm-file"
-        (NoArg $ setObjTarget HscLlvm >> setGeneralFlag Opt_KeepLlvmFiles)
+        (NoArg $ setObjBackend LLVM >> setGeneralFlag Opt_KeepLlvmFiles)
   , make_ord_flag defGhcFlag "keep-llvm-files"
-        (NoArg $ setObjTarget HscLlvm >> setGeneralFlag Opt_KeepLlvmFiles)
+        (NoArg $ setObjBackend LLVM >> setGeneralFlag Opt_KeepLlvmFiles)
      -- This only makes sense as plural
   , make_ord_flag defGhcFlag "keep-tmp-files"
         (NoArg (setGeneralFlag Opt_KeepTmpFiles))
@@ -2668,7 +2620,7 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "ddump-asm-expanded"
         (setDumpFlag Opt_D_dump_asm_expanded)
   , make_ord_flag defGhcFlag "ddump-llvm"
-        (NoArg $ setObjTarget HscLlvm >> setDumpFlag' Opt_D_dump_llvm)
+        (NoArg $ setObjBackend LLVM >> setDumpFlag' Opt_D_dump_llvm)
   , make_ord_flag defGhcFlag "ddump-deriv"
         (setDumpFlag Opt_D_dump_deriv)
   , make_ord_flag defGhcFlag "ddump-ds"
@@ -3061,24 +3013,24 @@ dynamic_flags_deps = [
 
         ------ Compiler flags -----------------------------------------------
 
-  , make_ord_flag defGhcFlag "fasm"             (NoArg (setObjTarget HscAsm))
+  , make_ord_flag defGhcFlag "fasm"             (NoArg (setObjBackend NCG))
   , make_ord_flag defGhcFlag "fvia-c"           (NoArg
          (deprecate $ "The -fvia-c flag does nothing; " ++
                       "it will be removed in a future GHC release"))
   , make_ord_flag defGhcFlag "fvia-C"           (NoArg
          (deprecate $ "The -fvia-C flag does nothing; " ++
                       "it will be removed in a future GHC release"))
-  , make_ord_flag defGhcFlag "fllvm"            (NoArg (setObjTarget HscLlvm))
+  , make_ord_flag defGhcFlag "fllvm"            (NoArg (setObjBackend LLVM))
 
   , make_ord_flag defFlag "fno-code"         (NoArg ((upd $ \d ->
-                  d { ghcLink=NoLink }) >> setTarget HscNothing))
+                  d { ghcLink=NoLink }) >> setBackend NoBackend))
   , make_ord_flag defFlag "fbyte-code"
       (noArgM $ \dflags -> do
-        setTarget HscInterpreted
+        setBackend Interpreter
         pure $ gopt_set dflags Opt_ByteCode)
   , make_ord_flag defFlag "fobject-code"     $ NoArg $ do
       dflags <- liftEwM getCmdLineState
-      setTarget $ defaultObjectTarget dflags
+      setBackend $ platformDefaultBackend (targetPlatform dflags)
 
   , make_dep_flag defFlag "fglasgow-exts"
       (NoArg enableGlasgowExts) "Use individual extensions instead"
@@ -3450,7 +3402,8 @@ wWarningFlagsDeps = [
   flagSpec "prepositive-qualified-module"
                                          Opt_WarnPrepositiveQualifiedModule,
   flagSpec "unused-packages"             Opt_WarnUnusedPackages,
-  flagSpec "compat-unqualified-imports"  Opt_WarnCompatUnqualifiedImports
+  flagSpec "compat-unqualified-imports"  Opt_WarnCompatUnqualifiedImports,
+  flagSpec "invalid-haddock"             Opt_WarnInvalidHaddock
  ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
@@ -3513,7 +3466,8 @@ fFlagsDeps = [
   flagSpec "diagnostics-show-caret"           Opt_DiagnosticsShowCaret,
   flagSpec "dicts-cheap"                      Opt_DictsCheap,
   flagSpec "dicts-strict"                     Opt_DictsStrict,
-  flagSpec "dmd-tx-dict-sel"                  Opt_DmdTxDictSel,
+  depFlagSpec "dmd-tx-dict-sel"
+      Opt_DmdTxDictSel "effect is now unconditionally enabled",
   flagSpec "do-eta-reduction"                 Opt_DoEtaReduction,
   flagSpec "do-lambda-eta-expansion"          Opt_DoLambdaEtaExpansion,
   flagSpec "eager-blackholing"                Opt_EagerBlackHoling,
@@ -3679,8 +3633,8 @@ supportedLanguages = map (flagSpecName . snd) languageFlagsDeps
 supportedLanguageOverlays :: [String]
 supportedLanguageOverlays = map (flagSpecName . snd) safeHaskellFlagsDeps
 
-supportedExtensions :: PlatformMini -> [String]
-supportedExtensions targetPlatformMini = concatMap toFlagSpecNamePair xFlags
+supportedExtensions :: ArchOS -> [String]
+supportedExtensions (ArchOS _ os) = concatMap toFlagSpecNamePair xFlags
   where
     toFlagSpecNamePair flg
       -- IMPORTANT! Make sure that `ghc --supported-extensions` omits
@@ -3691,13 +3645,13 @@ supportedExtensions targetPlatformMini = concatMap toFlagSpecNamePair xFlags
       | isAIX, flagSpecFlag flg == LangExt.QuasiQuotes      = [noName]
       | otherwise = [name, noName]
       where
-        isAIX = platformMini_os targetPlatformMini == OSAIX
+        isAIX = os == OSAIX
         noName = "No" ++ name
         name = flagSpecName flg
 
-supportedLanguagesAndExtensions :: PlatformMini -> [String]
-supportedLanguagesAndExtensions targetPlatformMini =
-    supportedLanguages ++ supportedLanguageOverlays ++ supportedExtensions targetPlatformMini
+supportedLanguagesAndExtensions :: ArchOS -> [String]
+supportedLanguagesAndExtensions arch_os =
+    supportedLanguages ++ supportedLanguageOverlays ++ supportedExtensions arch_os
 
 -- | These -X<blah> flags cannot be reversed with -XNo<blah>
 languageFlagsDeps :: [(Deprecation, FlagSpec Language)]
@@ -4045,7 +3999,6 @@ optLevelFlags :: [([Int], GeneralFlag)]
 optLevelFlags -- see Note [Documenting optimisation flags]
   = [ ([0,1,2], Opt_DoLambdaEtaExpansion)
     , ([0,1,2], Opt_DoEtaReduction)       -- See Note [Eta-reduction in -O0]
-    , ([0,1,2], Opt_DmdTxDictSel)
     , ([0,1,2], Opt_LlvmTBAA)
 
     , ([0],     Opt_IgnoreInterfacePragmas)
@@ -4590,24 +4543,24 @@ canonicalizeModuleIfHome dflags mod
                       then canonicalizeHomeModule dflags (moduleName mod)
                       else mod
 
--- If we're linking a binary, then only targets that produce object
+-- If we're linking a binary, then only backends that produce object
 -- code are allowed (requests for other target types are ignored).
-setTarget :: HscTarget -> DynP ()
-setTarget l = upd $ \ dfs ->
-  if ghcLink dfs /= LinkBinary || isObjectTarget l
-  then dfs{ hscTarget = l }
+setBackend :: Backend -> DynP ()
+setBackend l = upd $ \ dfs ->
+  if ghcLink dfs /= LinkBinary || backendProducesObject l
+  then dfs{ backend = l }
   else dfs
 
 -- Changes the target only if we're compiling object code.  This is
 -- used by -fasm and -fllvm, which switch from one to the other, but
 -- not from bytecode to object-code.  The idea is that -fasm/-fllvm
 -- can be safely used in an OPTIONS_GHC pragma.
-setObjTarget :: HscTarget -> DynP ()
-setObjTarget l = updM set
+setObjBackend :: Backend -> DynP ()
+setObjBackend l = updM set
   where
    set dflags
-     | isObjectTarget (hscTarget dflags)
-       = return $ dflags { hscTarget = l }
+     | backendProducesObject (backend dflags)
+       = return $ dflags { backend = l }
      | otherwise = return dflags
 
 setOptLevel :: Int -> DynFlags -> DynP DynFlags
@@ -4615,7 +4568,7 @@ setOptLevel n dflags = return (updOptLevel n dflags)
 
 checkOptLevel :: Int -> DynFlags -> Either String DynFlags
 checkOptLevel n dflags
-   | hscTarget dflags == HscInterpreted && n > 0
+   | backend dflags == Interpreter && n > 0
      = Left "-O conflicts with --interactive; -O ignored."
    | otherwise
      = Right dflags
@@ -4856,7 +4809,8 @@ compilerInfo dflags
        ("Target platform",             platformMisc_targetPlatformString $ platformMisc dflags),
        ("Have interpreter",            showBool $ platformMisc_ghcWithInterpreter $ platformMisc dflags),
        ("Object splitting supported",  showBool False),
-       ("Have native code generator",  showBool $ platformMisc_ghcWithNativeCodeGen $ platformMisc dflags),
+       ("Have native code generator",  showBool $ platformNcgSupported (targetPlatform dflags)),
+       ("Target default backend",      show $ platformDefaultBackend (targetPlatform dflags)),
        -- Whether or not we support @-dynamic-too@
        ("Support dynamic-too",         showBool $ not isWindows),
        -- Whether or not we support the @-j@ flag with @--make@.
@@ -4879,7 +4833,7 @@ compilerInfo dflags
        -- Whether or not we support the @-this-unit-id@ flag
        ("Uses unit IDs",               "YES"),
        -- Whether or not GHC compiles libraries as dynamic by default
-       ("Dynamic by default",          showBool $ dYNAMIC_BY_DEFAULT dflags),
+       ("Dynamic by default",          showBool $ pc_DYNAMIC_BY_DEFAULT constants),
        -- Whether or not GHC was compiled using -dynamic
        ("GHC Dynamic",                 showBool hostIsDynamic),
        -- Whether or not GHC was compiled using -prof
@@ -4892,25 +4846,19 @@ compilerInfo dflags
   where
     showBool True  = "YES"
     showBool False = "NO"
-    isWindows = platformOS (targetPlatform dflags) == OSMinGW32
+    platform  = targetPlatform dflags
+    constants = platformConstants platform
+    isWindows = platformOS platform == OSMinGW32
     expandDirectories :: FilePath -> Maybe FilePath -> String -> String
     expandDirectories topd mtoold = expandToolDir mtoold . expandTopDir topd
 
--- Produced by deriveConstants
-#include "GHCConstantsHaskellWrappers.hs"
-
-bLOCK_SIZE_W :: DynFlags -> Int
-bLOCK_SIZE_W dflags = bLOCK_SIZE dflags `quot` platformWordSizeInBytes platform
-   where platform = targetPlatform dflags
 
 wordAlignment :: Platform -> Alignment
 wordAlignment platform = alignmentOf (platformWordSizeInBytes platform)
 
-tAG_MASK :: DynFlags -> Int
-tAG_MASK dflags = (1 `shiftL` tAG_BITS dflags) - 1
-
-mAX_PTR_TAG :: DynFlags -> Int
-mAX_PTR_TAG = tAG_MASK
+-- | Get target profile
+targetProfile :: DynFlags -> Profile
+targetProfile dflags = Profile (targetPlatform dflags) (ways dflags)
 
 {- -----------------------------------------------------------------------------
 Note [DynFlags consistency]
@@ -4951,28 +4899,36 @@ makeDynFlagsConsistent dflags
     = let dflags' = gopt_unset dflags Opt_BuildDynamicToo
           warn    = "-dynamic-too is not supported on Windows"
       in loop dflags' warn
- | hscTarget dflags == HscC &&
+
+   -- Via-C backend only supports unregisterised ABI. Switch to a backend
+   -- supporting it if possible.
+ | backend dflags == ViaC &&
    not (platformUnregisterised (targetPlatform dflags))
-    = if platformMisc_ghcWithNativeCodeGen $ platformMisc dflags
-      then let dflags' = dflags { hscTarget = HscAsm }
-               warn = "Compiler not unregisterised, so using native code generator rather than compiling via C"
-           in loop dflags' warn
-      else let dflags' = dflags { hscTarget = HscLlvm }
-               warn = "Compiler not unregisterised, so using LLVM rather than compiling via C"
-           in loop dflags' warn
- | gopt Opt_Hpc dflags && hscTarget dflags == HscInterpreted
+    = case platformDefaultBackend (targetPlatform dflags) of
+         NCG ->  let dflags' = dflags { backend = NCG }
+                     warn = "Target platform doesn't use unregisterised ABI, so using native code generator rather than compiling via C"
+                 in loop dflags' warn
+         LLVM -> let dflags' = dflags { backend = LLVM }
+                     warn = "Target platform doesn't use unregisterised ABI, so using LLVM rather than compiling via C"
+                 in loop dflags' warn
+         _    -> pgmError "Compiling via C only supports unregisterised ABI but target platform doesn't use it."
+
+ | gopt Opt_Hpc dflags && backend dflags == Interpreter
     = let dflags' = gopt_unset dflags Opt_Hpc
           warn = "Hpc can't be used with byte-code interpreter. Ignoring -fhpc."
       in loop dflags' warn
- | hscTarget dflags `elem` [HscAsm, HscLlvm] &&
+
+ | backend dflags `elem` [NCG, LLVM] &&
    platformUnregisterised (targetPlatform dflags)
-    = loop (dflags { hscTarget = HscC })
-           "Compiler unregisterised, so compiling via C"
- | hscTarget dflags == HscAsm &&
-   not (platformMisc_ghcWithNativeCodeGen $ platformMisc dflags)
-      = let dflags' = dflags { hscTarget = HscLlvm }
-            warn = "No native code generator, so using LLVM"
+    = loop (dflags { backend = ViaC })
+           "Target platform uses unregisterised ABI, so compiling via C"
+
+ | backend dflags == NCG &&
+   not (platformNcgSupported $ targetPlatform dflags)
+      = let dflags' = dflags { backend = LLVM }
+            warn = "Native code generator doesn't support target platform, so using LLVM"
         in loop dflags' warn
+
  | not (osElfTarget os) && gopt Opt_PIE dflags
     = loop (gopt_unset dflags Opt_PIE)
            "Position-independent only supported on ELF platforms"
@@ -4987,7 +4943,7 @@ makeDynFlagsConsistent dflags
  | LinkInMemory <- ghcLink dflags
  , not (gopt Opt_ExternalInterpreter dflags)
  , hostIsProfiled
- , isObjectTarget (hscTarget dflags)
+ , backendProducesObject (backend dflags)
  , WayProf `Set.notMember` ways dflags
     = loop dflags{ways = Set.insert WayProf (ways dflags)}
          "Enabling -prof, because -fobject-code is enabled and GHCi is profiled"
@@ -5044,14 +5000,14 @@ setUnsafeGlobalDynFlags = writeIORef v_unsafeGlobalDynFlags
 -- check if SSE is enabled, we might have x86-64 imply the -msse2
 -- flag.
 
-isSseEnabled :: DynFlags -> Bool
-isSseEnabled dflags = case platformArch (targetPlatform dflags) of
+isSseEnabled :: Platform -> Bool
+isSseEnabled platform = case platformArch platform of
     ArchX86_64 -> True
     ArchX86    -> True
     _          -> False
 
-isSse2Enabled :: DynFlags -> Bool
-isSse2Enabled dflags = case platformArch (targetPlatform dflags) of
+isSse2Enabled :: Platform -> Bool
+isSse2Enabled platform = case platformArch platform of
   -- We Assume  SSE1 and SSE2 operations are available on both
   -- x86 and x86_64. Historically we didn't default to SSE2 and
   -- SSE1 on x86, which results in defacto nondeterminism for how
@@ -5103,7 +5059,7 @@ isBmi2Enabled dflags = case platformArch (targetPlatform dflags) of
 
 -- | Indicate if cost-centre profiling is enabled
 sccProfilingEnabled :: DynFlags -> Bool
-sccProfilingEnabled dflags = ways dflags `hasWay` WayProf
+sccProfilingEnabled dflags = profileIsProfiling (targetProfile dflags)
 
 -- -----------------------------------------------------------------------------
 -- Linker/compiler information

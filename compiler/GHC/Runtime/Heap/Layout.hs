@@ -50,6 +50,7 @@ import GHC.Types.Basic( ConTagZ )
 import GHC.Driver.Session
 import GHC.Utils.Outputable
 import GHC.Platform
+import GHC.Platform.Profile
 import GHC.Data.FastString
 import GHC.StgToCmm.Types
 
@@ -197,9 +198,9 @@ type SelectorOffset    = Int
 -----------------------------------------------------------------------------
 -- Construction
 
-mkHeapRep :: DynFlags -> IsStatic -> WordOff -> WordOff -> ClosureTypeInfo
+mkHeapRep :: Profile -> IsStatic -> WordOff -> WordOff -> ClosureTypeInfo
           -> SMRep
-mkHeapRep dflags is_static ptr_wds nonptr_wds cl_type_info
+mkHeapRep profile is_static ptr_wds nonptr_wds cl_type_info
   = HeapRep is_static
             ptr_wds
             (nonptr_wds + slop_wds)
@@ -207,9 +208,9 @@ mkHeapRep dflags is_static ptr_wds nonptr_wds cl_type_info
   where
      slop_wds
       | is_static = 0
-      | otherwise = max 0 (minClosureSize dflags - (hdr_size + payload_size))
+      | otherwise = max 0 (minClosureSize profile - (hdr_size + payload_size))
 
-     hdr_size     = closureTypeHdrSize dflags cl_type_info
+     hdr_size     = closureTypeHdrSize profile cl_type_info
      payload_size = ptr_wds + nonptr_wds
 
 mkRTSRep :: Int -> SMRep -> SMRep
@@ -224,8 +225,8 @@ blackHoleRep = HeapRep False 0 0 BlackHole
 indStaticRep :: SMRep
 indStaticRep = HeapRep True 1 0 IndStatic
 
-arrPtrsRep :: DynFlags -> WordOff -> SMRep
-arrPtrsRep dflags elems = ArrayPtrsRep elems (cardTableSizeW dflags elems)
+arrPtrsRep :: Platform -> WordOff -> SMRep
+arrPtrsRep platform elems = ArrayPtrsRep elems (cardTableSizeW platform elems)
 
 smallArrPtrsRep :: WordOff -> SMRep
 smallArrPtrsRep elems = SmallArrayPtrsRep elems
@@ -271,71 +272,79 @@ isStaticNoCafCon _                        = False
 -----------------------------------------------------------------------------
 -- Size-related things
 
-fixedHdrSize :: DynFlags -> ByteOff
-fixedHdrSize dflags = wordsToBytes (targetPlatform dflags) (fixedHdrSizeW dflags)
+fixedHdrSize :: Profile -> ByteOff
+fixedHdrSize profile = wordsToBytes (profilePlatform profile) (fixedHdrSizeW profile)
 
 -- | Size of a closure header (StgHeader in includes\/rts\/storage\/Closures.h)
-fixedHdrSizeW :: DynFlags -> WordOff
-fixedHdrSizeW dflags = sTD_HDR_SIZE dflags + profHdrSize dflags
+fixedHdrSizeW :: Profile -> WordOff
+fixedHdrSizeW profile = pc_STD_HDR_SIZE (profileConstants profile) + profHdrSize profile
 
 -- | Size of the profiling part of a closure header
 -- (StgProfHeader in includes\/rts\/storage\/Closures.h)
-profHdrSize  :: DynFlags -> WordOff
-profHdrSize dflags
- | sccProfilingEnabled dflags = pROF_HDR_SIZE dflags
- | otherwise                  = 0
+profHdrSize :: Profile -> WordOff
+profHdrSize profile =
+   if profileIsProfiling profile
+      then pc_PROF_HDR_SIZE (profileConstants profile)
+      else 0
 
 -- | The garbage collector requires that every closure is at least as
 --   big as this.
-minClosureSize :: DynFlags -> WordOff
-minClosureSize dflags = fixedHdrSizeW dflags + mIN_PAYLOAD_SIZE dflags
+minClosureSize :: Profile -> WordOff
+minClosureSize profile
+ = fixedHdrSizeW profile
+   + pc_MIN_PAYLOAD_SIZE (profileConstants profile)
 
-arrWordsHdrSize :: DynFlags -> ByteOff
-arrWordsHdrSize dflags
- = fixedHdrSize dflags + sIZEOF_StgArrBytes_NoHdr dflags
+arrWordsHdrSize :: Profile -> ByteOff
+arrWordsHdrSize profile
+ = fixedHdrSize profile
+   + pc_SIZEOF_StgArrBytes_NoHdr (profileConstants profile)
 
-arrWordsHdrSizeW :: DynFlags -> WordOff
-arrWordsHdrSizeW dflags =
-    fixedHdrSizeW dflags +
-    (sIZEOF_StgArrBytes_NoHdr dflags `quot`
-      platformWordSizeInBytes (targetPlatform dflags))
+arrWordsHdrSizeW :: Profile -> WordOff
+arrWordsHdrSizeW profile
+ = fixedHdrSizeW profile
+   + (pc_SIZEOF_StgArrBytes_NoHdr (profileConstants profile) `quot`
+      platformWordSizeInBytes (profilePlatform profile))
 
-arrPtrsHdrSize :: DynFlags -> ByteOff
-arrPtrsHdrSize dflags
- = fixedHdrSize dflags + sIZEOF_StgMutArrPtrs_NoHdr dflags
+arrPtrsHdrSize :: Profile -> ByteOff
+arrPtrsHdrSize profile
+ = fixedHdrSize profile
+   + pc_SIZEOF_StgMutArrPtrs_NoHdr (profileConstants profile)
 
-arrPtrsHdrSizeW :: DynFlags -> WordOff
-arrPtrsHdrSizeW dflags =
-    fixedHdrSizeW dflags +
-    (sIZEOF_StgMutArrPtrs_NoHdr dflags `quot`
-      platformWordSizeInBytes (targetPlatform dflags))
+arrPtrsHdrSizeW :: Profile -> WordOff
+arrPtrsHdrSizeW profile
+ = fixedHdrSizeW profile
+   + (pc_SIZEOF_StgMutArrPtrs_NoHdr (profileConstants profile) `quot`
+      platformWordSizeInBytes (profilePlatform profile))
 
-smallArrPtrsHdrSize :: DynFlags -> ByteOff
-smallArrPtrsHdrSize dflags
- = fixedHdrSize dflags + sIZEOF_StgSmallMutArrPtrs_NoHdr dflags
+smallArrPtrsHdrSize :: Profile -> ByteOff
+smallArrPtrsHdrSize profile
+ = fixedHdrSize profile
+   + pc_SIZEOF_StgSmallMutArrPtrs_NoHdr (profileConstants profile)
 
-smallArrPtrsHdrSizeW :: DynFlags -> WordOff
-smallArrPtrsHdrSizeW dflags =
-    fixedHdrSizeW dflags +
-    (sIZEOF_StgSmallMutArrPtrs_NoHdr dflags `quot`
-      platformWordSizeInBytes (targetPlatform dflags))
+smallArrPtrsHdrSizeW :: Profile -> WordOff
+smallArrPtrsHdrSizeW profile
+ = fixedHdrSizeW profile
+   + (pc_SIZEOF_StgSmallMutArrPtrs_NoHdr (profileConstants profile) `quot`
+      platformWordSizeInBytes (profilePlatform profile))
 
 -- Thunks have an extra header word on SMP, so the update doesn't
 -- splat the payload.
-thunkHdrSize :: DynFlags -> WordOff
-thunkHdrSize dflags = fixedHdrSizeW dflags + smp_hdr
-        where smp_hdr = sIZEOF_StgSMPThunkHeader dflags `quot`
-                         platformWordSizeInBytes (targetPlatform dflags)
+thunkHdrSize :: Profile -> WordOff
+thunkHdrSize profile = fixedHdrSizeW profile + smp_hdr
+        where
+         platform = profilePlatform profile
+         smp_hdr  = pc_SIZEOF_StgSMPThunkHeader (platformConstants platform) `quot`
+                         platformWordSizeInBytes platform
 
-hdrSize :: DynFlags -> SMRep -> ByteOff
-hdrSize dflags rep = wordsToBytes (targetPlatform dflags) (hdrSizeW dflags rep)
+hdrSize :: Profile -> SMRep -> ByteOff
+hdrSize profile rep = wordsToBytes (profilePlatform profile) (hdrSizeW profile rep)
 
-hdrSizeW :: DynFlags -> SMRep -> WordOff
-hdrSizeW dflags (HeapRep _ _ _ ty)    = closureTypeHdrSize dflags ty
-hdrSizeW dflags (ArrayPtrsRep _ _)    = arrPtrsHdrSizeW dflags
-hdrSizeW dflags (SmallArrayPtrsRep _) = smallArrPtrsHdrSizeW dflags
-hdrSizeW dflags (ArrayWordsRep _)     = arrWordsHdrSizeW dflags
-hdrSizeW _ _                          = panic "SMRep.hdrSizeW"
+hdrSizeW :: Profile -> SMRep -> WordOff
+hdrSizeW profile (HeapRep _ _ _ ty)    = closureTypeHdrSize profile ty
+hdrSizeW profile (ArrayPtrsRep _ _)    = arrPtrsHdrSizeW profile
+hdrSizeW profile (SmallArrayPtrsRep _) = smallArrPtrsHdrSizeW profile
+hdrSizeW profile (ArrayWordsRep _)     = arrWordsHdrSizeW profile
+hdrSizeW _ _                           = panic "GHC.Runtime.Heap.Layout.hdrSizeW"
 
 nonHdrSize :: Platform -> SMRep -> ByteOff
 nonHdrSize platform rep = wordsToBytes platform (nonHdrSizeW rep)
@@ -349,24 +358,21 @@ nonHdrSizeW (StackRep bs)      = length bs
 nonHdrSizeW (RTSRep _ rep)     = nonHdrSizeW rep
 
 -- | The total size of the closure, in words.
-heapClosureSizeW :: DynFlags -> SMRep -> WordOff
-heapClosureSizeW dflags (HeapRep _ p np ty)
- = closureTypeHdrSize dflags ty + p + np
-heapClosureSizeW dflags (ArrayPtrsRep elems ct)
- = arrPtrsHdrSizeW dflags + elems + ct
-heapClosureSizeW dflags (SmallArrayPtrsRep elems)
- = smallArrPtrsHdrSizeW dflags + elems
-heapClosureSizeW dflags (ArrayWordsRep words)
- = arrWordsHdrSizeW dflags + words
-heapClosureSizeW _ _ = panic "SMRep.heapClosureSize"
+heapClosureSizeW :: Profile -> SMRep -> WordOff
+heapClosureSizeW profile rep = case rep of
+   HeapRep _ p np ty       -> closureTypeHdrSize profile ty + p + np
+   ArrayPtrsRep elems ct   -> arrPtrsHdrSizeW profile + elems + ct
+   SmallArrayPtrsRep elems -> smallArrPtrsHdrSizeW profile + elems
+   ArrayWordsRep words     -> arrWordsHdrSizeW profile + words
+   _                       -> panic "GHC.Runtime.Heap.Layout.heapClosureSize"
 
-closureTypeHdrSize :: DynFlags -> ClosureTypeInfo -> WordOff
-closureTypeHdrSize dflags ty = case ty of
-                  Thunk           -> thunkHdrSize dflags
-                  ThunkSelector{} -> thunkHdrSize dflags
-                  BlackHole       -> thunkHdrSize dflags
-                  IndStatic       -> thunkHdrSize dflags
-                  _               -> fixedHdrSizeW dflags
+closureTypeHdrSize :: Profile -> ClosureTypeInfo -> WordOff
+closureTypeHdrSize profile ty = case ty of
+                  Thunk           -> thunkHdrSize profile
+                  ThunkSelector{} -> thunkHdrSize profile
+                  BlackHole       -> thunkHdrSize profile
+                  IndStatic       -> thunkHdrSize profile
+                  _               -> fixedHdrSizeW profile
         -- All thunks use thunkHdrSize, even if they are non-updatable.
         -- this is because we don't have separate closure types for
         -- updatable vs. non-updatable thunks, so the GC can't tell the
@@ -377,23 +383,22 @@ closureTypeHdrSize dflags ty = case ty of
 -- Arrays
 
 -- | The byte offset into the card table of the card for a given element
-card :: DynFlags -> Int -> Int
-card dflags i = i `shiftR` mUT_ARR_PTRS_CARD_BITS dflags
+card :: Platform -> Int -> Int
+card platform i = i `shiftR` pc_MUT_ARR_PTRS_CARD_BITS (platformConstants platform)
 
 -- | Convert a number of elements to a number of cards, rounding up
-cardRoundUp :: DynFlags -> Int -> Int
-cardRoundUp dflags i =
-  card dflags (i + ((1 `shiftL` mUT_ARR_PTRS_CARD_BITS dflags) - 1))
+cardRoundUp :: Platform -> Int -> Int
+cardRoundUp platform i =
+  card platform (i + ((1 `shiftL` pc_MUT_ARR_PTRS_CARD_BITS (platformConstants platform)) - 1))
 
 -- | The size of a card table, in bytes
-cardTableSizeB :: DynFlags -> Int -> ByteOff
-cardTableSizeB dflags elems = cardRoundUp dflags elems
+cardTableSizeB :: Platform -> Int -> ByteOff
+cardTableSizeB platform elems = cardRoundUp platform elems
 
 -- | The size of a card table, in words
-cardTableSizeW :: DynFlags -> Int -> WordOff
-cardTableSizeW dflags elems =
-  bytesToWordsRoundUp (targetPlatform dflags)
-                      (cardTableSizeB dflags elems)
+cardTableSizeW :: Platform -> Int -> WordOff
+cardTableSizeW platform elems =
+  bytesToWordsRoundUp platform (cardTableSizeB platform elems)
 
 -----------------------------------------------------------------------------
 -- deriving the RTS closure type from an SMRep

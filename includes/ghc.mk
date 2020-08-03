@@ -163,7 +163,7 @@ $$(includes_$1_H_PLATFORM) : includes/ghc.mk includes/Makefile | $$$$(dir $$$$@)
 	@echo "#if !defined(__GHCPLATFORM_H__)"                      > $$@
 	@echo "#define __GHCPLATFORM_H__"                           >> $$@
 	@echo                                                       >> $$@
-	@echo "#define GHC_STAGE $1"                                >> $$@
+	@echo "#define GHC_STAGE ($1 + 1)"                          >> $$@
 	@echo                                                       >> $$@
 	@echo "#define BuildPlatform_TYPE  $(BuildPlatform_$1_CPP)" >> $$@
 	@echo "#define HostPlatform_TYPE   $(HostPlatform_$1_CPP)"  >> $$@
@@ -250,7 +250,6 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 	@echo
 	@echo ',("bignum backend", "$(BIGNUM_BACKEND)")' >> $@
 	@echo ',("Use interpreter", "$(GhcWithInterpreter)")' >> $@
-	@echo ',("Use native code generator", "$(GhcWithNativeCodeGen)")' >> $@
 	@echo ',("Support SMP", "$(GhcWithSMP)")' >> $@
 	@echo ',("RTS ways", "$(GhcRTSWays)")' >> $@
 	@echo ',("Tables next to code", "$(TablesNextToCode)")' >> $@
@@ -272,8 +271,6 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 includes_DERIVEDCONSTANTS = includes/dist-derivedconstants/header/DerivedConstants.h
 includes_GHCCONSTANTS_HASKELL_TYPE = includes/dist-derivedconstants/header/GHCConstantsHaskellType.hs
 includes_GHCCONSTANTS_HASKELL_VALUE = includes/dist-derivedconstants/header/platformConstants
-includes_GHCCONSTANTS_HASKELL_WRAPPERS = includes/dist-derivedconstants/header/GHCConstantsHaskellWrappers.hs
-includes_GHCCONSTANTS_HASKELL_EXPORTS = includes/dist-derivedconstants/header/GHCConstantsHaskellExports.hs
 
 INSTALL_LIBS += $(includes_GHCCONSTANTS_HASKELL_VALUE)
 
@@ -297,12 +294,6 @@ $(includes_GHCCONSTANTS_HASKELL_TYPE): $(deriveConstants_INPLACE) | $$(dir $$@)/
 
 $(includes_GHCCONSTANTS_HASKELL_VALUE): $(deriveConstants_INPLACE) | $$(dir $$@)/.
 	$< --gen-haskell-value -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
-
-$(includes_GHCCONSTANTS_HASKELL_WRAPPERS): $(deriveConstants_INPLACE) | $$(dir $$@)/.
-	$< --gen-haskell-wrappers -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
-
-$(includes_GHCCONSTANTS_HASKELL_EXPORTS): $(deriveConstants_INPLACE) | $$(dir $$@)/.
-	$< --gen-haskell-exports -o $@ --tmpdir $(dir $@) $(DERIVE_CONSTANTS_FLAGS)
 endif
 
 # ---------------------------------------------------------------------------
@@ -317,8 +308,6 @@ $(eval $(call all-target,includes,\
   $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) $(includes_1_H_VERSION) \
   $(includes_GHCCONSTANTS_HASKELL_TYPE) \
   $(includes_GHCCONSTANTS_HASKELL_VALUE) \
-  $(includes_GHCCONSTANTS_HASKELL_WRAPPERS) \
-  $(includes_GHCCONSTANTS_HASKELL_EXPORTS) \
   $(includes_DERIVEDCONSTANTS)))
 
 install: install_includes

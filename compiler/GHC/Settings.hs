@@ -6,10 +6,8 @@ module GHC.Settings
   , ToolSettings (..)
   , FileSettings (..)
   , GhcNameVersion (..)
-  , PlatformConstants (..)
   , Platform (..)
   , PlatformMisc (..)
-  , PlatformMini (..)
   -- * Accessors
   , sProgramName
   , sProjectVersion
@@ -56,7 +54,6 @@ module GHC.Settings
   , sExtraGccViaCFlags
   , sTargetPlatformString
   , sGhcWithInterpreter
-  , sGhcWithNativeCodeGen
   , sGhcWithSMP
   , sGhcRTSWays
   , sLibFFI
@@ -159,10 +156,6 @@ data GhcNameVersion = GhcNameVersion
   , ghcNameVersion_projectVersion :: String
   }
 
--- Produced by deriveConstants
--- Provides PlatformConstants datatype
-#include "GHCConstantsHaskellType.hs"
-
 -----------------------------------------------------------------------------
 -- Accessessors from 'Settings'
 
@@ -261,8 +254,6 @@ sTargetPlatformString :: Settings -> String
 sTargetPlatformString = platformMisc_targetPlatformString . sPlatformMisc
 sGhcWithInterpreter :: Settings -> Bool
 sGhcWithInterpreter = platformMisc_ghcWithInterpreter . sPlatformMisc
-sGhcWithNativeCodeGen :: Settings -> Bool
-sGhcWithNativeCodeGen = platformMisc_ghcWithNativeCodeGen . sPlatformMisc
 sGhcWithSMP :: Settings -> Bool
 sGhcWithSMP = platformMisc_ghcWithSMP . sPlatformMisc
 sGhcRTSWays :: Settings -> String

@@ -23,7 +23,8 @@ import GHC.CmmToLlvm    ( llvmCodeGen )
 import GHC.Types.Unique.Supply ( mkSplitUniqSupply )
 
 import GHC.Driver.Finder    ( mkStubPaths )
-import GHC.CmmToC           ( writeC )
+import GHC.Driver.Backend
+import GHC.CmmToC           ( cmmToC )
 import GHC.Cmm.Lint         ( cmmLint )
 import GHC.Cmm              ( RawCmmGroup )
 import GHC.Cmm.CLabel
@@ -94,13 +95,13 @@ codeOutput dflags this_mod filenm location foreign_stubs foreign_fps pkg_deps
                 }
 
         ; stubs_exist <- outputForeignStubs dflags this_mod location foreign_stubs
-        ; a <- case hscTarget dflags of
-                 HscAsm         -> outputAsm dflags this_mod location filenm
-                                             linted_cmm_stream
-                 HscC           -> outputC dflags filenm linted_cmm_stream pkg_deps
-                 HscLlvm        -> outputLlvm dflags filenm linted_cmm_stream
-                 HscInterpreted -> panic "codeOutput: HscInterpreted"
-                 HscNothing     -> panic "codeOutput: HscNothing"
+        ; a <- case backend dflags of
+                 NCG         -> outputAsm dflags this_mod location filenm
+                                          linted_cmm_stream
+                 ViaC        -> outputC dflags filenm linted_cmm_stream pkg_deps
+                 LLVM        -> outputLlvm dflags filenm linted_cmm_stream
+                 Interpreter -> panic "codeOutput: Interpreter"
+                 NoBackend   -> panic "codeOutput: NoBackend"
         ; return (filenm, stubs_exist, foreign_fps, a)
         }
 
@@ -145,7 +146,9 @@ outputC dflags filenm cmm_stream packages
          doOutput filenm $ \ h -> do
             hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
             hPutStr h cc_injects
-            Stream.consume cmm_stream (writeC dflags h)
+            let platform = targetPlatform dflags
+                writeC = printForC dflags h . cmmToC platform
+            Stream.consume cmm_stream writeC
 
 {-
 ************************************************************************
@@ -159,7 +162,6 @@ outputAsm :: DynFlags -> Module -> ModLocation -> FilePath
           -> Stream IO RawCmmGroup a
           -> IO a
 outputAsm dflags this_mod location filenm cmm_stream
- | platformMisc_ghcWithNativeCodeGen $ platformMisc dflags
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
 
        debugTraceMsg dflags 4 (text "Outputing asm to" <+> text filenm)
@@ -167,9 +169,6 @@ outputAsm dflags this_mod location filenm cmm_stream
        {-# SCC "OutputAsm" #-} doOutput filenm $
            \h -> {-# SCC "NativeCodeGen" #-}
                  nativeCodeGen dflags this_mod location h ncg_uniqs cmm_stream
-
- | otherwise
-  = panic "This compiler was built without a native code generator"
 
 {-
 ************************************************************************

@@ -27,8 +27,8 @@ module GHC (
         needsTemplateHaskellOrQQ,
 
         -- * Flags and settings
-        DynFlags(..), GeneralFlag(..), Severity(..), HscTarget(..), gopt,
-        GhcMode(..), GhcLink(..), defaultObjectTarget,
+        DynFlags(..), GeneralFlag(..), Severity(..), Backend(..), gopt,
+        GhcMode(..), GhcLink(..),
         parseDynamicFlags,
         getSessionDynFlags, setSessionDynFlags,
         getProgramDynFlags, setProgramDynFlags, setLogAction,
@@ -302,6 +302,7 @@ import GHC.Runtime.Interpreter.Types
 import GHCi.RemoteTypes
 
 import GHC.Core.Ppr.TyThing  ( pprFamInst )
+import GHC.Driver.Backend
 import GHC.Driver.Main
 import GHC.Driver.Make
 import GHC.Driver.Hooks
@@ -336,7 +337,7 @@ import GHC.Driver.Finder
 import GHC.Driver.Types
 import GHC.Driver.CmdLine
 import GHC.Driver.Session hiding (WarnReason(..))
-import GHC.Driver.Ways
+import GHC.Platform.Ways
 import GHC.SysTools
 import GHC.SysTools.BaseDir
 import GHC.Types.Annotations
@@ -1012,7 +1013,7 @@ desugarModule tcm = do
 --
 -- A module must be loaded before dependent modules can be typechecked.  This
 -- always includes generating a 'ModIface' and, depending on the
--- @DynFlags@\'s 'GHC.Driver.Session.hscTarget', may also include code generation.
+-- @DynFlags@\'s 'GHC.Driver.Session.backend', may also include code generation.
 --
 -- This function will always cause recompilation and will always overwrite
 -- previous compilation results (potentially files on disk).
@@ -1682,11 +1683,11 @@ interpretPackageEnv dflags = do
   where
     -- Loading environments (by name or by location)
 
-    platformArchOs = platformMini (targetPlatform dflags)
+    archOS = platformArchOS (targetPlatform dflags)
 
     namedEnvPath :: String -> MaybeT IO FilePath
     namedEnvPath name = do
-     appdir <- versionedAppDir (programName dflags) platformArchOs
+     appdir <- versionedAppDir (programName dflags) archOS
      return $ appdir </> "environments" </> name
 
     probeEnvName :: String -> MaybeT IO FilePath
@@ -1723,7 +1724,7 @@ interpretPackageEnv dflags = do
 
     -- e.g. .ghc.environment.x86_64-linux-7.6.3
     localEnvFileName :: FilePath
-    localEnvFileName = ".ghc.environment" <.> versionedFilePath platformArchOs
+    localEnvFileName = ".ghc.environment" <.> versionedFilePath archOS
 
     -- Search for an env file, starting in the current dir and looking upwards.
     -- Fail if we get to the users home dir or the filesystem root. That is,

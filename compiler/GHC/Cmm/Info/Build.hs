@@ -10,6 +10,9 @@ module GHC.Cmm.Info.Build
 
 import GHC.Prelude hiding (succ)
 
+import GHC.Platform
+import GHC.Platform.Profile
+
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import GHC.Cmm.BlockId
@@ -19,7 +22,6 @@ import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow
 import GHC.Unit.Module
-import GHC.Platform
 import GHC.Data.Graph.Directed
 import GHC.Cmm.CLabel
 import GHC.Cmm
@@ -32,7 +34,6 @@ import GHC.Types.Unique.Supply
 import GHC.Types.CostCentre
 import GHC.StgToCmm.Heap
 import GHC.CmmToAsm.Monad
-import GHC.CmmToAsm.Config
 
 import Control.Monad
 import Data.Map.Strict (Map)
@@ -458,8 +459,8 @@ newtype CAFLabel = CAFLabel CLabel
 type CAFSet = Set CAFLabel
 type CAFEnv = LabelMap CAFSet
 
-mkCAFLabel :: CLabel -> CAFLabel
-mkCAFLabel lbl = CAFLabel (toClosureLbl lbl)
+mkCAFLabel :: Platform -> CLabel -> CAFLabel
+mkCAFLabel platform lbl = CAFLabel (toClosureLbl platform lbl)
 
 -- This is a label that we can put in an SRT.  It *must* be a closure label,
 -- pointing to either a FUN_STATIC, THUNK_STATIC, or CONSTR.
@@ -469,10 +470,10 @@ newtype SRTEntry = SRTEntry CLabel
 -- ---------------------------------------------------------------------
 -- CAF analysis
 
-addCafLabel :: CLabel -> CAFSet -> CAFSet
-addCafLabel l s
+addCafLabel :: Platform -> CLabel -> CAFSet -> CAFSet
+addCafLabel platform l s
   | Just _ <- hasHaskellName l
-  , let caf_label = mkCAFLabel l
+  , let caf_label = mkCAFLabel platform l
     -- For imported Ids hasCAF will have accurate CafInfo
     -- Locals are initialized as CAFFY. We turn labels with empty SRTs into
     -- non-CAFFYs in doSRTs
@@ -482,21 +483,20 @@ addCafLabel l s
   = s
 
 cafAnalData
-  :: CmmStatics
+  :: Platform
+  -> CmmStatics
   -> CAFSet
-
-cafAnalData (CmmStaticsRaw _lbl _data) =
-    Set.empty
-
-cafAnalData (CmmStatics _lbl _itbl _ccs payload) =
-    foldl' analyzeStatic Set.empty payload
-  where
-    analyzeStatic s lit =
-      case lit of
-        CmmLabel c -> addCafLabel c s
-        CmmLabelOff c _ -> addCafLabel c s
-        CmmLabelDiffOff c1 c2 _ _ -> addCafLabel c1 $! addCafLabel c2 s
-        _ -> s
+cafAnalData platform st = case st of
+   CmmStaticsRaw _lbl _data           -> Set.empty
+   CmmStatics _lbl _itbl _ccs payload ->
+       foldl' analyzeStatic Set.empty payload
+     where
+       analyzeStatic s lit =
+         case lit of
+           CmmLabel c -> addCafLabel platform c s
+           CmmLabelOff c _ -> addCafLabel platform c s
+           CmmLabelDiffOff c1 c2 _ _ -> addCafLabel platform c1 $! addCafLabel platform c2 s
+           _ -> s
 
 -- |
 -- For each code block:
@@ -506,16 +506,17 @@ cafAnalData (CmmStatics _lbl _itbl _ccs payload) =
 -- This gives us a `CAFEnv`: a mapping from code block to sets of labels
 --
 cafAnal
-  :: LabelSet   -- The blocks representing continuations, ie. those
+  :: Platform
+  -> LabelSet   -- The blocks representing continuations, ie. those
                 -- that will get RET info tables.  These labels will
                 -- get their own SRTs, so we don't aggregate CAFs from
                 -- references to these labels, we just use the label.
   -> CLabel     -- The top label of the proc
   -> CmmGraph
   -> CAFEnv
-cafAnal contLbls topLbl cmmGraph =
+cafAnal platform contLbls topLbl cmmGraph =
   analyzeCmmBwd cafLattice
-    (cafTransfers contLbls (g_entry cmmGraph) topLbl) cmmGraph mapEmpty
+    (cafTransfers platform contLbls (g_entry cmmGraph) topLbl) cmmGraph mapEmpty
 
 
 cafLattice :: DataflowLattice CAFSet
@@ -526,8 +527,8 @@ cafLattice = DataflowLattice Set.empty add
         in changedIf (Set.size new' > Set.size old) new'
 
 
-cafTransfers :: LabelSet -> Label -> CLabel -> TransferFun CAFSet
-cafTransfers contLbls entry topLbl
+cafTransfers :: Platform -> LabelSet -> Label -> CLabel -> TransferFun CAFSet
+cafTransfers platform contLbls entry topLbl
   block@(BlockCC eNode middle xNode) fBase =
     let joined :: CAFSet
         joined = cafsInNode xNode $! live'
@@ -545,11 +546,11 @@ cafTransfers contLbls entry topLbl
         successorFact s
           -- If this is a loop back to the entry, we can refer to the
           -- entry label.
-          | s == entry = Just (addCafLabel topLbl Set.empty)
+          | s == entry = Just (addCafLabel platform topLbl Set.empty)
           -- If this is a continuation, we want to refer to the
           -- SRT for the continuation's info table
           | s `setMember` contLbls
-          = Just (Set.singleton (mkCAFLabel (infoTblLbl s)))
+          = Just (Set.singleton (mkCAFLabel platform (infoTblLbl s)))
           -- Otherwise, takes the CAF references from the destination
           | otherwise
           = lookupFact s fBase
@@ -561,11 +562,11 @@ cafTransfers contLbls entry topLbl
         addCafExpr expr !set =
           case expr of
             CmmLit (CmmLabel c) ->
-              addCafLabel c set
+              addCafLabel platform c set
             CmmLit (CmmLabelOff c _) ->
-              addCafLabel c set
+              addCafLabel platform c set
             CmmLit (CmmLabelDiffOff c1 c2 _ _) ->
-              addCafLabel c1 $! addCafLabel c2 set
+              addCafLabel platform c1 $! addCafLabel platform c2 set
             _ ->
               set
     in
@@ -648,35 +649,34 @@ getBlockLabels = mapMaybe getBlockLabel
 --   where the label is
 --   - the info label for a continuation or dynamic closure
 --   - the closure label for a top-level function (not a CAF)
-getLabelledBlocks :: CmmDecl -> [(SomeLabel, CAFLabel)]
-getLabelledBlocks (CmmData _ (CmmStaticsRaw _ _)) =
-  []
-getLabelledBlocks (CmmData _ (CmmStatics lbl _ _ _)) =
-  [ (DeclLabel lbl, mkCAFLabel lbl) ]
-getLabelledBlocks (CmmProc top_info _ _ _) =
-  [ (BlockLabel blockId, caf_lbl)
-  | (blockId, info) <- mapToList (info_tbls top_info)
-  , let rep = cit_rep info
-  , not (isStaticRep rep) || not (isThunkRep rep)
-  , let !caf_lbl = mkCAFLabel (cit_lbl info)
-  ]
+getLabelledBlocks :: Platform -> CmmDecl -> [(SomeLabel, CAFLabel)]
+getLabelledBlocks platform decl = case decl of
+   CmmData _ (CmmStaticsRaw _ _)    -> []
+   CmmData _ (CmmStatics lbl _ _ _) -> [ (DeclLabel lbl, mkCAFLabel platform lbl) ]
+   CmmProc top_info _ _ _           -> [ (BlockLabel blockId, caf_lbl)
+                                       | (blockId, info) <- mapToList (info_tbls top_info)
+                                       , let rep = cit_rep info
+                                       , not (isStaticRep rep) || not (isThunkRep rep)
+                                       , let !caf_lbl = mkCAFLabel platform (cit_lbl info)
+                                       ]
 
 -- | Put the labelled blocks that we will be annotating with SRTs into
 -- dependency order.  This is so that we can process them one at a
 -- time, resolving references to earlier blocks to point to their
 -- SRTs. CAFs themselves are not included here; see getCAFs below.
 depAnalSRTs
-  :: CAFEnv
+  :: Platform
+  -> CAFEnv
   -> Map CLabel CAFSet -- CAFEnv for statics
   -> [CmmDecl]
   -> [SCC (SomeLabel, CAFLabel, Set CAFLabel)]
-depAnalSRTs cafEnv cafEnv_static decls =
+depAnalSRTs platform cafEnv cafEnv_static decls =
   srtTrace "depAnalSRTs" (text "decls:" <+> ppr decls $$
                            text "nodes:" <+> ppr (map node_payload nodes) $$
                            text "graph:" <+> ppr graph) graph
  where
   labelledBlocks :: [(SomeLabel, CAFLabel)]
-  labelledBlocks = concatMap getLabelledBlocks decls
+  labelledBlocks = concatMap (getLabelledBlocks platform) decls
   labelToBlock :: Map CAFLabel SomeLabel
   labelToBlock = foldl' (\m (v,k) -> Map.insert k v m) Map.empty labelledBlocks
 
@@ -700,9 +700,9 @@ depAnalSRTs cafEnv cafEnv_static decls =
 --    SRT, since the point of SRTs is to keep CAFs alive.
 --  - CAFs therefore don't take part in the dependency analysis in depAnalSRTs.
 --    instead we generate their SRTs after everything else.
-getCAFs :: CAFEnv -> [CmmDecl] -> [(Label, CAFLabel, Set CAFLabel)]
-getCAFs cafEnv decls =
-  [ (g_entry g, mkCAFLabel topLbl, cafs)
+getCAFs :: Platform -> CAFEnv -> [CmmDecl] -> [(Label, CAFLabel, Set CAFLabel)]
+getCAFs platform cafEnv decls =
+  [ (g_entry g, mkCAFLabel platform topLbl, cafs)
   | CmmProc top_info topLbl _ g <- decls
   , Just info <- [mapLookup (g_entry g) (info_tbls top_info)]
   , let rep = cit_rep info
@@ -746,11 +746,11 @@ srtMapNonCAFs srtMap =
     get_name (_l, Just _srt_entry) = Nothing
 
 -- | resolve a CAFLabel to its SRTEntry using the SRTMap
-resolveCAF :: SRTMap -> CAFLabel -> Maybe SRTEntry
-resolveCAF srtMap lbl@(CAFLabel l) =
+resolveCAF :: Platform -> SRTMap -> CAFLabel -> Maybe SRTEntry
+resolveCAF platform srtMap lbl@(CAFLabel l) =
     srtTrace "resolveCAF" ("l:" <+> ppr l <+> "resolved:" <+> ppr ret) ret
   where
-    ret = Map.findWithDefault (Just (SRTEntry (toClosureLbl l))) lbl srtMap
+    ret = Map.findWithDefault (Just (SRTEntry (toClosureLbl platform l))) lbl srtMap
 
 -- | Attach SRTs to all info tables in the CmmDecls, and add SRT
 -- declarations to the ModuleSRTInfo.
@@ -764,6 +764,8 @@ doSRTs
 
 doSRTs dflags moduleSRTInfo procs data_ = do
   us <- mkSplitUniqSupply 'u'
+
+  let profile = targetProfile dflags
 
   -- Ignore the original grouping of decls, and combine all the
   -- CAFEnvs into a single CAFEnv.
@@ -788,6 +790,8 @@ doSRTs dflags moduleSRTInfo procs data_ = do
       decls = map snd data_ ++ concat procss
       staticFuns = mapFromList (getStaticFuns decls)
 
+      platform = targetPlatform dflags
+
   -- Put the decls in dependency order. Why? So that we can implement
   -- [Inline] and [Filter].  If we need to refer to an SRT that has
   -- a single entry, we use the entry itself, which means that we
@@ -796,10 +800,10 @@ doSRTs dflags moduleSRTInfo procs data_ = do
   -- them.
   let
     sccs :: [SCC (SomeLabel, CAFLabel, Set CAFLabel)]
-    sccs = {-# SCC depAnalSRTs #-} depAnalSRTs cafEnv static_data_env decls
+    sccs = {-# SCC depAnalSRTs #-} depAnalSRTs platform cafEnv static_data_env decls
 
     cafsWithSRTs :: [(Label, CAFLabel, Set CAFLabel)]
-    cafsWithSRTs = getCAFs cafEnv decls
+    cafsWithSRTs = getCAFs platform cafEnv decls
 
   srtTraceM "doSRTs" (text "data:" <+> ppr data_ $$
                       text "procs:" <+> ppr procs $$
@@ -834,7 +838,7 @@ doSRTs dflags moduleSRTInfo procs data_ = do
     funSRTMap = mapFromList (concat funSRTs)
     has_caf_refs' = or has_caf_refs
     decls' =
-      concatMap (updInfoSRTs dflags srtFieldMap funSRTMap has_caf_refs') decls
+      concatMap (updInfoSRTs profile srtFieldMap funSRTMap has_caf_refs') decls
 
   -- Finally update CafInfos for raw static literals (CmmStaticsRaw). Those are
   -- not analysed in oneSRT so we never add entries for them to the SRTMap.
@@ -850,7 +854,7 @@ doSRTs dflags moduleSRTInfo procs data_ = do
                           -- be CAFFY.
                           -- See Note [Ticky labels in SRT analysis] above for
                           -- why we exclude ticky labels here.
-                          Map.insert (mkCAFLabel lbl) Nothing srtMap
+                          Map.insert (mkCAFLabel platform lbl) Nothing srtMap
                       | otherwise ->
                           -- Not an IdLabel, ignore
                           srtMap
@@ -929,6 +933,8 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
 
   let
     config = initConfig dflags
+    profile = targetProfile dflags
+    platform = profilePlatform profile
     srtMap = moduleSRTMap topSRT
 
     blockids = getBlockLabels lbls
@@ -947,7 +953,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
 
     -- Resolve references to their SRT entries
     resolved :: [SRTEntry]
-    resolved = mapMaybe (resolveCAF srtMap) (Set.toList nonRec)
+    resolved = mapMaybe (resolveCAF platform srtMap) (Set.toList nonRec)
 
     -- The set of all SRTEntries in SRTs that we refer to from here.
     allBelow =
@@ -1012,7 +1018,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
     -- We're going to build an SRT for this group, which should include function
     -- references in the group. See Note [recursive SRTs].
     let allBelow_funs =
-          Set.fromList (map (SRTEntry . toClosureLbl) otherFunLabels)
+          Set.fromList (map (SRTEntry . toClosureLbl platform) otherFunLabels)
     let filtered = filtered0 `Set.union` allBelow_funs
     srtTraceM "oneSRT" (text "filtered:" <+> ppr filtered $$
                         text "allBelow_funs:" <+> ppr allBelow_funs)
@@ -1032,7 +1038,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
 
           -- MachO relocations can't express offsets between compilation units at
           -- all, so we are always forced to build a singleton SRT in this case.
-            && (not (osMachOTarget $ platformOS $ ncgPlatform config)
+            && (not (osMachOTarget $ platformOS $ profilePlatform profile)
                || isLocalCLabel this_mod lbl) -> do
 
           -- If we have a static function closure, then it becomes the
@@ -1070,7 +1076,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
                 Just (fun,block) ->
                   return ( [], [(block, cafList)], SRTEntry fun )
                 Nothing -> do
-                  (decls, entry) <- lift $ buildSRTChain dflags cafList
+                  (decls, entry) <- lift $ buildSRTChain profile cafList
                   return (decls, [], entry)
             updateSRTMap (Just srtEntry)
             let allBelowThis = Set.union allBelow filtered
@@ -1089,38 +1095,38 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
             return (decls, map (,lbl) blockids, funSRTs, True)
 
 
--- | build a static SRT object (or a chain of objects) from a list of
+-- | Build a static SRT object (or a chain of objects) from a list of
 -- SRTEntries.
 buildSRTChain
-   :: DynFlags
+   :: Profile
    -> [SRTEntry]
    -> UniqSM
         ( [CmmDeclSRTs] -- The SRT object(s)
         , SRTEntry      -- label to use in the info table
         )
 buildSRTChain _ [] = panic "buildSRT: empty"
-buildSRTChain dflags cafSet =
+buildSRTChain profile cafSet =
   case splitAt mAX_SRT_SIZE cafSet of
     (these, []) -> do
-      (decl,lbl) <- buildSRT dflags these
+      (decl,lbl) <- buildSRT profile these
       return ([decl], lbl)
     (these,those) -> do
-      (rest, rest_lbl) <- buildSRTChain dflags (head these : those)
-      (decl,lbl) <- buildSRT dflags (rest_lbl : tail these)
+      (rest, rest_lbl) <- buildSRTChain profile (head these : those)
+      (decl,lbl) <- buildSRT profile (rest_lbl : tail these)
       return (decl:rest, lbl)
   where
     mAX_SRT_SIZE = 16
 
 
-buildSRT :: DynFlags -> [SRTEntry] -> UniqSM (CmmDeclSRTs, SRTEntry)
-buildSRT dflags refs = do
+buildSRT :: Profile -> [SRTEntry] -> UniqSM (CmmDeclSRTs, SRTEntry)
+buildSRT profile refs = do
   id <- getUniqueM
   let
     lbl = mkSRTLabel id
-    platform = targetPlatform dflags
+    platform = profilePlatform profile
     srt_n_info = mkSRTInfoLabel (length refs)
     fields =
-      mkStaticClosure dflags srt_n_info dontCareCCS
+      mkStaticClosure profile srt_n_info dontCareCCS
         [ CmmLabel lbl | SRTEntry lbl <- refs ]
         [] -- no padding
         [mkIntCLit platform 0] -- link field
@@ -1130,7 +1136,7 @@ buildSRT dflags refs = do
 -- | Update info tables with references to their SRTs. Also generate
 -- static closures, splicing in SRT fields as necessary.
 updInfoSRTs
-  :: DynFlags
+  :: Profile
   -> LabelMap CLabel               -- SRT labels for each block
   -> LabelMap [SRTEntry]           -- SRTs to merge into FUN_STATIC closures
   -> Bool                          -- Whether the CmmDecl's group has CAF references
@@ -1140,13 +1146,13 @@ updInfoSRTs
 updInfoSRTs _ _ _ _ (CmmData s (CmmStaticsRaw lbl statics))
   = [CmmData s (CmmStaticsRaw lbl statics)]
 
-updInfoSRTs dflags _ _ caffy (CmmData s (CmmStatics lbl itbl ccs payload))
+updInfoSRTs profile _ _ caffy (CmmData s (CmmStatics lbl itbl ccs payload))
   = [CmmData s (CmmStaticsRaw lbl (map CmmStaticLit field_lits))]
   where
     caf_info = if caffy then MayHaveCafRefs else NoCafRefs
-    field_lits = mkStaticClosureFields dflags itbl ccs caf_info payload
+    field_lits = mkStaticClosureFields profile itbl ccs caf_info payload
 
-updInfoSRTs dflags srt_env funSRTEnv caffy (CmmProc top_info top_l live g)
+updInfoSRTs profile srt_env funSRTEnv caffy (CmmProc top_info top_l live g)
   | Just (_,closure) <- maybeStaticClosure = [ proc, closure ]
   | otherwise = [ proc ]
   where
@@ -1175,7 +1181,7 @@ updInfoSRTs dflags srt_env funSRTEnv caffy (CmmProc top_info top_l live g)
             Just srtEntries -> srtTrace "maybeStaticFun" (ppr res)
               (info_tbl { cit_rep = new_rep }, res)
               where res = [ CmmLabel lbl | SRTEntry lbl <- srtEntries ]
-          fields = mkStaticClosureFields dflags info_tbl ccs caf_info srtEntries
+          fields = mkStaticClosureFields profile info_tbl ccs caf_info srtEntries
           new_rep = case cit_rep of
              HeapRep sta ptrs nptrs ty ->
                HeapRep sta (ptrs + length srtEntries) nptrs ty

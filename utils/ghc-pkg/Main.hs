@@ -34,10 +34,8 @@ import qualified GHC.Unit.Database as GhcPkg
 import GHC.Unit.Database
 import GHC.HandleEncoding
 import GHC.BaseDir (getBaseDir)
-import GHC.Settings.Platform (getTargetPlatform)
-import GHC.Settings.Utils (maybeReadFuzzy)
-import GHC.Platform (platformMini)
-import GHC.Platform.Host (cHostPlatformMini)
+import GHC.Settings.Utils (getTargetArchOS, maybeReadFuzzy)
+import GHC.Platform.Host (hostPlatformArchOS)
 import GHC.UniqueSubdir (uniqueSubdir)
 import GHC.Version ( cProjectVersion )
 import qualified Distribution.Simple.PackageIndex as PackageIndex
@@ -644,11 +642,11 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
           -- See Note [Settings File] about this file, and why we need GHC to share it with us.
           let settingsFile = top_dir </> "settings"
           exists_settings_file <- doesFileExist settingsFile
-          targetPlatformMini <- case exists_settings_file of
+          targetArchOS <- case exists_settings_file of
             False -> do
               warn $ "WARNING: settings file doesn't exist " ++ show settingsFile
               warn "cannot know target platform so guessing target == host (native compiler)."
-              pure cHostPlatformMini
+              pure hostPlatformArchOS
             True -> do
               settingsStr <- readFile settingsFile
               mySettings <- case maybeReadFuzzy settingsStr of
@@ -656,10 +654,10 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
                 -- It's excusable to not have a settings file (for now at
                 -- least) but completely inexcusable to have a malformed one.
                 Nothing -> die $ "Can't parse settings file " ++ show settingsFile
-              case getTargetPlatform settingsFile mySettings of
-                Right platform -> pure $ platformMini platform
+              case getTargetArchOS settingsFile mySettings of
+                Right archOS -> pure archOS
                 Left e -> die e
-          let subdir = uniqueSubdir targetPlatformMini
+          let subdir = uniqueSubdir targetArchOS
               dir = appdir </> subdir
           r <- lookForPackageDBIn dir
           case r of

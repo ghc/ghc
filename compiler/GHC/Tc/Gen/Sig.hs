@@ -43,6 +43,7 @@ import GHC.Core.Type ( mkTyVarBinders )
 import GHC.Core.Multiplicity
 
 import GHC.Driver.Session
+import GHC.Driver.Backend
 import GHC.Types.Var ( TyVar, Specificity(..), tyVarKind, binderVars )
 import GHC.Types.Id  ( Id, idName, idType, idInlinePragma, setInlinePragma, mkLocalId )
 import GHC.Builtin.Names( mkUnboundName )
@@ -817,10 +818,10 @@ tcImpPrags prags
     -- we don't want complaints about lack of INLINABLE pragmas
     not_specialising dflags
       | not (gopt Opt_Specialise dflags) = True
-      | otherwise = case hscTarget dflags of
-                      HscNothing -> True
-                      HscInterpreted -> True
-                      _other         -> False
+      | otherwise = case backend dflags of
+                      NoBackend   -> True
+                      Interpreter -> True
+                      _other      -> False
 
 tcImpSpec :: (Name, Sig GhcRn) -> TcM [TcSpecPrag]
 tcImpSpec (name, prag)

@@ -1,0 +1,6 @@
+
+==================== Parser ====================
+module T17652 where
+data X = B !Int " x" String " y"
+
+

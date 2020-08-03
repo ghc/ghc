@@ -656,7 +656,9 @@ BUILD_DIRS += $(patsubst %, libraries/%, $(PACKAGES_STAGE1))
 BUILD_DIRS += $(patsubst %, libraries/%, $(filter-out $(PACKAGES_STAGE1),$(PACKAGES_STAGE0)))
 endif
 
+ifeq "$(BIGNUM_BACKEND)" "gmp"
 BUILD_DIRS += libraries/ghc-bignum/gmp
+endif
 BUILD_DIRS += utils/haddock
 BUILD_DIRS += utils/haddock/doc
 BUILD_DIRS += compiler
@@ -1543,7 +1545,7 @@ phase_0_builds: $(utils/hsc2hs_dist_depfile_c_asm)
 phase_0_builds: $(utils/genprimopcode_dist_depfile_haskell)
 phase_0_builds: $(utils/genprimopcode_dist_depfile_c_asm)
 # deriveConstants is used to create header files included in the
-# ghc package.
+# ghc-boot package.
 phase_0_builds: $(utils/deriveConstants_dist_depfile_haskell)
 phase_0_builds: $(utils/deriveConstants_dist_depfile_c_asm)
 

@@ -317,7 +317,7 @@ rnExpr (RecordUpd { rupd_expr = expr, rupd_flds = rbinds })
                  , fvExpr `plusFV` fvRbinds) }
 
 rnExpr (ExprWithTySig _ expr pty)
-  = do  { (pty', fvTy)    <- rnHsSigWcType ExprWithTySigCtx Nothing pty
+  = do  { (pty', fvTy)    <- rnHsSigWcType ExprWithTySigCtx pty
         ; (expr', fvExpr) <- bindSigTyVarsFV (hsWcScopedTvs pty') $
                              rnLExpr expr
         ; return (ExprWithTySig noExtField expr' pty', fvExpr `plusFV` fvTy) }
@@ -439,6 +439,7 @@ rnCmdArgs (arg:args)
 rnCmdTop :: LHsCmdTop GhcPs -> RnM (LHsCmdTop GhcRn, FreeVars)
 rnCmdTop = wrapLocFstM rnCmdTop'
  where
+  rnCmdTop' :: HsCmdTop GhcPs -> RnM (HsCmdTop GhcRn, FreeVars)
   rnCmdTop' (HsCmdTop _ cmd)
    = do { (cmd', fvCmd) <- rnLCmd cmd
         ; let cmd_names = [arrAName, composeAName, firstAName] ++
@@ -1871,7 +1872,7 @@ hasRefutablePattern (ApplicativeArgOne { app_arg_pattern = pat
                                        , is_body_stmt = False}) = not (isIrrefutableHsPat pat)
 hasRefutablePattern _ = False
 
-isLetStmt :: LStmt a b -> Bool
+isLetStmt :: LStmt (GhcPass a) b -> Bool
 isLetStmt (L _ LetStmt{}) = True
 isLetStmt _ = False
 

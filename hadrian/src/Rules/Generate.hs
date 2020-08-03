@@ -43,9 +43,7 @@ ghcPrimDependencies = do
 derivedConstantsFiles :: [FilePath]
 derivedConstantsFiles =
     [ "DerivedConstants.h"
-    , "GHCConstantsHaskellExports.hs"
-    , "GHCConstantsHaskellType.hs"
-    , "GHCConstantsHaskellWrappers.hs" ]
+    ]
 
 compilerDependencies :: Expr [FilePath]
 compilerDependencies = do
@@ -71,7 +69,9 @@ compilerDependencies = do
                   , "primop-vector-tys-exports.hs-incl"
                   , "primop-vector-tys.hs-incl"
                   , "primop-vector-uniques.hs-incl"
-                  , "primop-docs.hs-incl" ] ]
+                  , "primop-docs.hs-incl"
+                  , "GHC/Platform/Constants.hs"
+                  ] ]
 
 generatedDependencies :: Expr [FilePath]
 generatedDependencies = do
@@ -111,6 +111,7 @@ generatePackageCode context@(Context stage pkg _) = do
 
     priority 2.0 $ do
         when (pkg == compiler) $ do
+            root -/- "**" -/- dir -/- "GHC/Platform/Constants.hs" %> genPlatformConstantsType context
             root -/- "**" -/- dir -/- "GHC/Settings/Config.hs" %> go generateConfigHs
             root -/- "**" -/- dir -/- "*.hs-incl" %> genPrimopCode context
         when (pkg == ghcPrim) $ do
@@ -144,6 +145,11 @@ genPrimopCode context@(Context stage _pkg _) file = do
     root <- buildRoot
     need [root -/- primopsTxt stage]
     build $ target context GenPrimopCode [root -/- primopsTxt stage] [file]
+
+genPlatformConstantsType :: Context -> FilePath -> Action ()
+genPlatformConstantsType context file = do
+    withTempDir $ \tmpdir ->
+      build $ target context DeriveConstants [] [file,"--gen-haskell-type",tmpdir]
 
 copyRules :: Rules ()
 copyRules = do
@@ -315,7 +321,6 @@ generateSettings = do
 
         , ("BigNum backend", getBignumBackend)
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter)
-        , ("Use native code generator", expr $ yesNo <$> ghcWithNativeCodeGen)
         , ("Support SMP", expr $ yesNo <$> targetSupportsSMP)
         , ("RTS ways", unwords . map show <$> getRtsWays)
         , ("Tables next to code", expr $ yesNo <$> flag TablesNextToCode)
@@ -469,17 +474,14 @@ generatePlatformHostHs = do
     return $ unlines
         [ "module GHC.Platform.Host where"
         , ""
-        , "import GHC.Platform"
+        , "import GHC.Platform.ArchOS"
         , ""
-        , "cHostPlatformArch :: Arch"
-        , "cHostPlatformArch = " ++ cHostPlatformArch
+        , "hostPlatformArch :: Arch"
+        , "hostPlatformArch = " ++ cHostPlatformArch
         , ""
-        , "cHostPlatformOS   :: OS"
-        , "cHostPlatformOS   = " ++ cHostPlatformOS
+        , "hostPlatformOS   :: OS"
+        , "hostPlatformOS   = " ++ cHostPlatformOS
         , ""
-        , "cHostPlatformMini :: PlatformMini"
-        , "cHostPlatformMini = PlatformMini"
-        , "  { platformMini_arch = cHostPlatformArch"
-        , "  , platformMini_os = cHostPlatformOS"
-        , "  }"
+        , "hostPlatformArchOS :: ArchOS"
+        , "hostPlatformArchOS = ArchOS hostPlatformArch hostPlatformOS"
         ]
