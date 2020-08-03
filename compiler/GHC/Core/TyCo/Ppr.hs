@@ -268,19 +268,14 @@ debug_ppr_ty prec (CastTy ty co)
 debug_ppr_ty _ (CoercionTy co)
   = parens (text "CO" <+> ppr co)
 
-debug_ppr_ty prec ty@(ForAllTy {})
-  | (tvs, body) <- split ty
+debug_ppr_ty prec (ForAllTy (Bndr tv argf) body)
   = maybeParen prec funPrec $
-    hang (text "forall" <+> fsep (map ppr tvs) <> dot)
-         -- The (map ppr tvs) will print kind-annotated
-         -- tvs, because we are (usually) in debug-style
-       2 (ppr body)
+    sep [text "forall" <+> ppr_b, ppr body]
   where
-    split ty | ForAllTy tv ty' <- ty
-             , (tvs, body) <- split ty'
-             = (tv:tvs, body)
-             | otherwise
-             = ([], ty)
+    ppr_b = case argf of
+      Specified -> ppr tv <> dot
+      Inferred -> braces (ppr tv) <> dot
+      Required -> ppr tv <+> arrow
 
 {-
 Note [Infix type variables]

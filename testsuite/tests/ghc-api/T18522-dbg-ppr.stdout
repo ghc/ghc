@@ -1,0 +1,7 @@
+forall (k{tv} Nothing [tv] :: TYPE{(w) tc} 'LiftedRep{(w) d}).
+forall {(j{tv} Nothing [tv] :: TYPE{(w) tc} 'LiftedRep{(w) d})}.
+forall (a{tv} Nothing [tv] :: (k{tv} Nothing [tv] :: TYPE{(w) tc}
+                                                       'LiftedRep{(w) d})) ->
+forall (b{tv} Nothing [tv] :: (j{tv} Nothing [tv] :: TYPE{(w) tc}
+                                                       'LiftedRep{(w) d})) ->
+(){(w) tc}
