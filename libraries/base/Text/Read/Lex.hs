@@ -479,23 +479,39 @@ lexOctNumber =
      digits <- lexDigits 8
      return (Number (MkOctal digits))
 
+
+lexFloat :: Int
+         -> [Char]
+         -> (Digits -> Maybe Digits -> Maybe Integer -> Number)
+         -> ReadP Lexeme
+-- Lex a floating point literal (without the appropriate base prefix)
+-- Either of the integral and fractional parts may be elided but not both
+-- The decimal point does not have to be preceded or followed by any digits
+lexFloat base expChars constructor =
+  do xs    <- lexDigitsUnlessDot base
+     mFrac <- lexFrac base
+     integralOrFractionalPresent xs mFrac
+     mExp  <- lexExp expChars
+     return (Number (constructor xs mFrac mExp))
+  where
+    lexDigitsUnlessDot :: Int -> ReadP Digits
+    -- Lex a sequence of digits in a specified base which may be empty if a dot
+    -- is encountered
+    lexDigitsUnlessDot base = lexDigits base <++ do ('.':_) <- look
+                                                    return []
+
+    integralOrFractionalPresent :: Digits -> Maybe Digits -> ReadP ()
+    integralOrFractionalPresent [] Nothing = pfail
+    integralOrFractionalPresent _ _ = return ()
+
 lexHexNumber :: ReadP Lexeme
--- TODO: MkHexadecimal [] Nothing Nothing is nonsensical
 lexHexNumber =
   do _ <- char '0'
      _ <- char 'x' +++ char 'X'
-     xs <- lexDigits 16 <++ do (point:_) <- look
-                               if point == '.' then return [] else pfail
-     mFrac  <- lexFrac 16 <++ return Nothing
-     mExp   <- lexExp ['p', 'P']  <++ return Nothing
-     return (Number (MkHexadecimal xs mFrac mExp))
+     lexFloat 16 ['p', 'P'] MkHexadecimal
 
 lexDecNumber :: ReadP Lexeme
-lexDecNumber =
-  do xs    <- lexDigits 10
-     mFrac <- lexFrac 10 <++ return Nothing
-     mExp  <- lexExp ['e', 'E'] <++ return Nothing
-     return (Number (MkDecimal xs mFrac mExp))
+lexDecNumber = lexFloat 10 ['e', 'E'] MkDecimal
 
 lexFrac :: Int -> ReadP (Maybe Digits)
 -- Lex the fractional part
