@@ -1,0 +1,4 @@
+:set -XPolyKinds -XDataKinds -XRankNTypes -XTypeFamilies
+import Data.Kind (Type)
+type family T :: forall k -> (k ~ k) => forall j -> k -> j -> Type
+:k T
