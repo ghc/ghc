@@ -441,12 +441,19 @@ splitIfaceSigmaTy ty
     (theta, tau)   = split_rho rho
 
     split_foralls (IfaceForAllTy bndr ty)
+        | isInvisibleArgFlag (binderArgFlag bndr)
         = case split_foralls ty of { (bndrs, rho) -> (bndr:bndrs, rho) }
     split_foralls rho = ([], rho)
 
     split_rho (IfaceFunTy InvisArg _ ty1 ty2)
         = case split_rho ty2 of { (ps, tau) -> (ty1:ps, tau) }
     split_rho tau = ([], tau)
+
+splitIfaceReqForallTy :: IfaceType -> ([IfaceForAllBndr], IfaceType)
+splitIfaceReqForallTy (IfaceForAllTy bndr ty)
+  | isVisibleArgFlag (binderArgFlag bndr)
+  = case splitIfaceReqForallTy ty of { (bndrs, rho) -> (bndr:bndrs, rho) }
+splitIfaceReqForallTy rho = ([], rho)
 
 suppressIfaceInvisibles :: PrintExplicitKinds -> [IfaceTyConBinder] -> [a] -> [a]
 suppressIfaceInvisibles (PrintExplicitKinds True) _tys xs = xs
@@ -1184,8 +1191,10 @@ pprIfaceSigmaType show_forall ty
   = hideNonStandardTypes ppr_fn ty
   where
     ppr_fn iface_ty =
-      let (tvs, theta, tau) = splitIfaceSigmaTy iface_ty
-       in ppr_iface_forall_part show_forall tvs theta (ppr tau)
+      let (invis_tvs, theta, tau) = splitIfaceSigmaTy iface_ty
+          (req_tvs, tau') = splitIfaceReqForallTy tau
+       in ppr_iface_forall_part show_forall invis_tvs theta $
+          sep [pprIfaceForAll req_tvs, ppr tau']
 
 pprUserIfaceForAll :: [IfaceForAllBndr] -> SDoc
 pprUserIfaceForAll tvs
