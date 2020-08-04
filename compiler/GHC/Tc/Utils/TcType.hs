@@ -938,11 +938,11 @@ exactTyCoVarsOfTypes :: [Type] -> TyCoVarSet
 exactTyCoVarsOfType  = runTyCoVars exact_ty
 exactTyCoVarsOfTypes = runTyCoVars exact_tys
 
-exact_ty  :: TyCoFvFun Type   TyCoVarSet
-exact_tys :: TyCoFvFun [Type] TyCoVarSet
+exact_ty  :: Type   -> TyCoAcc TyCoVarSet
+exact_tys :: [Type] -> TyCoAcc TyCoVarSet
 (exact_ty, exact_tys, _, _) = foldTyCo exactTcvFolder
 
-exactTcvFolder :: TyCoFolder TyCoVarSet (Endo TyCoVarSet)
+exactTcvFolder :: TyCoFolder (TyCoAcc TyCoVarSet)
 exactTcvFolder = deepTcvFolder { tcf_view = tcView }
                  -- This is the key line
 

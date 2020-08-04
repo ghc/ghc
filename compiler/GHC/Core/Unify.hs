@@ -1245,6 +1245,7 @@ newtype UM a
 
 pattern UM :: (UMState -> UnifyResultM (UMState, a)) -> UM a
 -- See Note [The one-shot state monad trick] in GHC.Utils.Monad
+{-# COMPLETE UM #-}
 pattern UM m <- UM' m
   where
     UM m = UM' (oneShot m)

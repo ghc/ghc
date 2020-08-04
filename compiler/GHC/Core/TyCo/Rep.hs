@@ -1884,18 +1884,17 @@ TyCoFolder data constructor for deep_tcf as a loop breaker, so the
 record selections still cancel.  And eta expansion still happens too.
 -}
 
-data TyCoFolder env a
+data TyCoFolder a
   = TyCoFolder
       { tcf_view  :: Type -> Maybe Type   -- Optional "view" function
                                           -- E.g. expand synonyms
-      , tcf_tyvar :: env -> TyVar -> a
-      , tcf_covar :: env -> CoVar -> a
-      , tcf_hole  :: env -> CoercionHole -> a
+      , tcf_tyvar :: TyVar -> a
+      , tcf_covar :: CoVar -> a
+      , tcf_hole  :: CoercionHole -> a
           -- ^ What to do with coercion holes.
           -- See Note [Coercion holes] in "GHC.Core.TyCo.Rep".
 
-      , tcf_tycobinder :: env -> TyCoVar -> ArgFlag -> env
-          -- ^ The returned env is used in the extended scope
+      , tcf_tycobinder :: TyCoVar -> ArgFlag -> a -> a
       }
 
 noView :: Type -> Maybe Type  -- Simplest form of tcf_view
@@ -1903,11 +1902,11 @@ noView :: Type -> Maybe Type  -- Simplest form of tcf_view
 noView _ = Nothing
 
 {-# INLINE foldTyCo  #-}  -- See Note [Specialising foldType]
-foldTyCo :: Monoid a => TyCoFolder env a
-         -> ( env -> Type       -> a
-            , env -> [Type]     -> a
-            , env -> Coercion   -> a
-            , env -> [Coercion] -> a )
+foldTyCo :: Monoid a => TyCoFolder a
+         -> ( Type       -> a
+            , [Type]     -> a
+            , Coercion   -> a
+            , [Coercion] -> a )
 foldTyCo (TyCoFolder { tcf_view       = view
                      , tcf_tyvar      = tyvar
                      , tcf_tycobinder = tycobinder
@@ -1915,61 +1914,58 @@ foldTyCo (TyCoFolder { tcf_view       = view
                      , tcf_hole       = cohole })
   = (go_ty, go_tys, go_co, go_cos)
   where
-    go_ty env ty | Just ty' <- view ty = go_ty env ty'
-    go_ty env (TyVarTy tv)      = tyvar env tv
-    go_ty env (AppTy t1 t2)     = go_ty env t1 `mappend` go_ty env t2
-    go_ty _   (LitTy {})        = mempty
-    go_ty env (CastTy ty co)    = go_ty env ty `mappend` go_co env co
-    go_ty env (CoercionTy co)   = go_co env co
-    go_ty env (FunTy _ w arg res) = go_ty env w `mappend` go_ty env arg `mappend` go_ty env res
-    go_ty env (TyConApp _ tys)  = go_tys env tys
-    go_ty env (ForAllTy (Bndr tv vis) inner)
-      = let !env' = tycobinder env tv vis  -- Avoid building a thunk here
-        in go_ty env (varType tv) `mappend` go_ty env' inner
+    go_ty ty | Just ty' <- view ty = go_ty ty'
+    go_ty (TyVarTy tv)        = tyvar tv
+    go_ty (AppTy t1 t2)       = go_ty t1 `mappend` go_ty t2
+    go_ty (LitTy {})          = mempty
+    go_ty (CastTy ty co)      = go_ty ty `mappend` go_co co
+    go_ty (CoercionTy co)     = go_co co
+    go_ty (FunTy _ w arg res) = go_ty w `mappend` go_ty arg `mappend` go_ty res
+    go_ty (TyConApp _ tys)    = go_tys tys
+    go_ty (ForAllTy (Bndr tv vis) inner)
+      = go_ty (varType tv) `mappend` tycobinder tv vis (go_ty inner)
 
     -- Explicit recursion becuase using foldr builds a local
-    -- loop (with env free) and I'm not confident it'll be
+    -- loop (with free) and I'm not confident it'll be
     -- lambda lifted in the end
-    go_tys _   []     = mempty
-    go_tys env (t:ts) = go_ty env t `mappend` go_tys env ts
+    go_tys []     = mempty
+    go_tys (t:ts) = go_ty t `mappend` go_tys ts
 
-    go_cos _   []     = mempty
-    go_cos env (c:cs) = go_co env c `mappend` go_cos env cs
+    go_cos []     = mempty
+    go_cos (c:cs) = go_co c `mappend` go_cos cs
 
-    go_co env (Refl ty)               = go_ty env ty
-    go_co env (GRefl _ ty MRefl)      = go_ty env ty
-    go_co env (GRefl _ ty (MCo co))   = go_ty env ty `mappend` go_co env co
-    go_co env (TyConAppCo _ _ args)   = go_cos env args
-    go_co env (AppCo c1 c2)           = go_co env c1 `mappend` go_co env c2
-    go_co env (FunCo _ cw c1 c2)      = go_co env cw `mappend`
-                                        go_co env c1 `mappend`
-                                        go_co env c2
-    go_co env (CoVarCo cv)            = covar env cv
-    go_co env (AxiomInstCo _ _ args)  = go_cos env args
-    go_co env (HoleCo hole)           = cohole env hole
-    go_co env (UnivCo p _ t1 t2)      = go_prov env p `mappend` go_ty env t1
-                                                      `mappend` go_ty env t2
-    go_co env (SymCo co)              = go_co env co
-    go_co env (TransCo c1 c2)         = go_co env c1 `mappend` go_co env c2
-    go_co env (AxiomRuleCo _ cos)     = go_cos env cos
-    go_co env (NthCo _ _ co)          = go_co env co
-    go_co env (LRCo _ co)             = go_co env co
-    go_co env (InstCo co arg)         = go_co env co `mappend` go_co env arg
-    go_co env (KindCo co)             = go_co env co
-    go_co env (SubCo co)              = go_co env co
-    go_co env (ForAllCo tv kind_co co)
-      = go_co env kind_co `mappend` go_ty env (varType tv)
-                          `mappend` go_co env' co
-      where
-        env' = tycobinder env tv Inferred
+    go_co (Refl ty)               = go_ty ty
+    go_co (GRefl _ ty MRefl)      = go_ty ty
+    go_co (GRefl _ ty (MCo co))   = go_ty ty `mappend` go_co co
+    go_co (TyConAppCo _ _ args)   = go_cos args
+    go_co (AppCo c1 c2)           = go_co c1 `mappend` go_co c2
+    go_co (FunCo _ cw c1 c2)      = go_co cw `mappend`
+                                    go_co c1 `mappend`
+                                    go_co c2
+    go_co (CoVarCo cv)            = covar cv
+    go_co (AxiomInstCo _ _ args)  = go_cos args
+    go_co (HoleCo hole)           = cohole hole
+    go_co (UnivCo p _ t1 t2)      = go_prov p `mappend` go_ty t1
+                                    `mappend` go_ty t2
+    go_co (SymCo co)              = go_co co
+    go_co (TransCo c1 c2)         = go_co c1 `mappend` go_co c2
+    go_co (AxiomRuleCo _ cos)     = go_cos cos
+    go_co (NthCo _ _ co)          = go_co co
+    go_co (LRCo _ co)             = go_co co
+    go_co (InstCo co arg)         = go_co co `mappend` go_co arg
+    go_co (KindCo co)             = go_co co
+    go_co (SubCo co)              = go_co co
+    go_co (ForAllCo tv kind_co co)
+      = go_co kind_co `mappend` go_ty (varType tv)
+        `mappend` tycobinder tv Inferred (go_co co)
 
-    go_prov env (ZapCoProv cvs)     = go_cvs env (dVarSetElems cvs)
-    go_prov env (PhantomProv co)    = go_co env co
-    go_prov env (ProofIrrelProv co) = go_co env co
-    go_prov _   (PluginProv _)      = mempty
+    go_prov (ZapCoProv cvs)     = go_cvs (dVarSetElems cvs)
+    go_prov (PhantomProv co)    = go_co co
+    go_prov (ProofIrrelProv co) = go_co co
+    go_prov (PluginProv _)      = mempty
 
-    go_cvs _   []       = mempty
-    go_cvs env (cv:cvs) = covar env cv `mappend` go_cvs env cvs
+    go_cvs []       = mempty
+    go_cvs (cv:cvs) = covar cv `mappend` go_cvs cvs
 
 {- *********************************************************************
 *                                                                      *

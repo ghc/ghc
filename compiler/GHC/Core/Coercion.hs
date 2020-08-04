@@ -2944,21 +2944,18 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
 %************************************************************************
 -}
 
-bad_co_hole_ty :: () -> Type -> Monoid.Any
-bad_co_hole_co :: () -> Coercion -> Monoid.Any
+bad_co_hole_ty :: Type -> Monoid.Any
+bad_co_hole_co :: Coercion -> Monoid.Any
 (bad_co_hole_ty, _, bad_co_hole_co, _)
   = foldTyCo folder
   where
-    folder :: TyCoFolder () Monoid.Any
+    folder :: TyCoFolder Monoid.Any
     folder = TyCoFolder { tcf_view  = const Nothing
-                        , tcf_tyvar = const2 (Monoid.Any False)
-                        , tcf_covar = const2 (Monoid.Any False)
-                        , tcf_hole  = const hole
-                        , tcf_tycobinder = const2
+                        , tcf_tyvar = const (Monoid.Any False)
+                        , tcf_covar = const (Monoid.Any False)
+                        , tcf_hole  = hole
+                        , tcf_tycobinder = \_ _ acc -> acc
                         }
-
-    const2 :: a -> b -> c -> a
-    const2 x _ _ = x
 
     hole :: CoercionHole -> Monoid.Any
     hole (CoercionHole { ch_blocker = YesBlockSubst }) = Monoid.Any True
@@ -2967,9 +2964,9 @@ bad_co_hole_co :: () -> Coercion -> Monoid.Any
 -- | Is there a blocking coercion hole in this type? See
 -- "GHC.Tc.Solver.Canonical" Note [Equalities with incompatible kinds]
 badCoercionHole :: Type -> Bool
-badCoercionHole = Monoid.getAny . bad_co_hole_ty ()
+badCoercionHole = Monoid.getAny . bad_co_hole_ty
 
 -- | Is there a blocking coercion hole in this coercion? See
 -- GHC.Tc.Solver.Canonical Note [Equalities with incompatible kinds]
 badCoercionHoleCo :: Coercion -> Bool
-badCoercionHoleCo = Monoid.getAny . bad_co_hole_co ()
+badCoercionHoleCo = Monoid.getAny . bad_co_hole_co

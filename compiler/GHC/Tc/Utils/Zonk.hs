@@ -4,7 +4,7 @@
 
 -}
 
-{-# LANGUAGE CPP, TupleSections #-}
+{-# LANGUAGE CPP, TupleSections, PatternSynonyms #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -95,6 +95,7 @@ import Control.Monad
 import Data.Semigroup as Semigroup
 import Data.List  ( partition )
 import Control.Arrow ( second )
+import GHC.Exts ( oneShot )
 
 {-
 ************************************************************************
@@ -1921,54 +1922,63 @@ zapCoercion ze co = do { t1 <- zonkTcTypeToTypeX ze t1
 coVarsOfCoM :: TcCoercion -> TcM DCoVarSet
 -- Find the free CoVars of an un-zonked TcCoercion -- but without
 -- zonking it and returning a perhaps large new coercion
-coVarsOfCoM co = runEndoM (co_vars_of_co FVs.emptyInScope co) emptyDVarSet
+coVarsOfCoM co = runTCAM (co_vars_of_co co) FVs.emptyInScope emptyDVarSet
 
-co_vars_of_co :: FVs.InScopeBndrs -> TcCoercion -> EndoM TcM DCoVarSet
-co_vars_of_ty :: FVs.InScopeBndrs -> TcType     -> EndoM TcM DCoVarSet
+co_vars_of_co :: TcCoercion -> TyCoAccM TcM DCoVarSet
+co_vars_of_ty :: TcType     -> TyCoAccM TcM DCoVarSet
 (co_vars_of_ty, _, co_vars_of_co, _) = foldTyCo co_vars_folder
 
-co_vars_folder :: TyCoFolder FVs.InScopeBndrs (EndoM TcM DCoVarSet)
+co_vars_folder :: TyCoFolder (TyCoAccM TcM DCoVarSet)
 co_vars_folder = TyCoFolder { tcf_view = noView
                             , tcf_tyvar = do_tyvar, tcf_covar = do_covar
                             , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
   where
-    do_tyvar _ _  = mempty
-    do_covar is v = EndoM do_it
+    do_tyvar _ = mempty
+    do_covar v = TCAM do_it
       where
-        do_it :: DCoVarSet -> TcM DCoVarSet
-        do_it acc | v `elemVarSet`  is  = return acc
-                  | v `elemDVarSet` acc = return acc
-                  | otherwise           = runEndoM (co_vars_of_ty is (varType v)) $
-                                          acc `extendDVarSet` v
-    do_bndr is tcv _ = extendVarSet is tcv
+        do_it :: InScopeBndrs -> DCoVarSet -> TcM DCoVarSet
+        do_it is acc | v `elemVarSet`  is  = return acc
+                     | v `elemDVarSet` acc = return acc
+                     | otherwise           = runTCAM (co_vars_of_ty (varType v)) emptyInScope $
+                                             acc `extendDVarSet` v
+    do_bndr tcv _vis fvs = extendInScopeM tcv fvs
 
-    do_hole :: FVs.InScopeBndrs -> CoercionHole -> EndoM TcM DCoVarSet
-    do_hole is hole@(CoercionHole { ch_ref = ref })
-       = EndoM $ \ acc ->
+    do_hole :: CoercionHole -> TyCoAccM TcM DCoVarSet
+    do_hole hole@(CoercionHole { ch_ref = ref })
+       = TCAM $ \ is acc ->
          do { contents <- readTcRef ref
             ; case contents of
-                 Just co -> runEndoM (co_vars_of_co is co) acc
+                 Just co -> runTCAM (co_vars_of_co co) is acc
                  Nothing -> do { traceTc "Zonking unfilled coercion hole (zap)" (ppr hole)
                                ; return acc } }
 
 --------------------------------------
--- EndoM is copied from package 'foldl', but I don't want
--- to add a new dependency to GHC for 6 lines of code
-newtype EndoM m a = EndoM { runEndoM :: a -> m a }
+-- Based on EndoM in package 'foldl', but with added InScopeBndrs
+-- c.f. TyCoAcc in GHC.Core.TyCo.FVs
+newtype TyCoAccM m acc = TCAM' { runTCAM :: FVs.InScopeBndrs -> acc -> m acc }
 
-instance Monad m => Semigroup (EndoM m a) where
-    (EndoM f) <> (EndoM g) = EndoM (f <=< g)
+pattern TCAM :: forall m acc. (InScopeBndrs -> acc -> m acc) -> TyCoAccM m acc
+{-# COMPLETE TCAM #-}
+pattern TCAM f <- TCAM' f
+  where
+    TCAM f = TCAM' (oneShot f)
+
+extendInScopeM :: TyCoVar -> TyCoAccM m acc -> TyCoAccM m acc
+-- Gather the argument free vars in an empty in-scope set
+extendInScopeM tcv (TCAM f) = TCAM (\is acc -> f (is `extendVarSet` tcv) acc)
+
+instance Monad m => Semigroup (TyCoAccM m a) where
+    (TCAM f) <> (TCAM g) = TCAM (\is acc -> do { acc <- f is acc
+                                               ; g is acc })
     {-# INLINE (<>) #-}
 
-instance Monad m => Monoid (EndoM m a) where
-    mempty = EndoM return
+instance Monad m => Monoid (TyCoAccM m a) where
+    mempty = TCAM (\_ acc -> return acc)
     {-# INLINE mempty #-}
     mappend = (Semigroup.<>)
     {-# INLINE mappend #-}
--- End of copy
+
 --------------------------------------
-
-
 zonkTcTypeToTypeX   :: ZonkEnv -> TcType   -> TcM Type
 zonkTcTypesToTypesX :: ZonkEnv -> [TcType] -> TcM [Type]
 zonkCoToCo          :: ZonkEnv -> Coercion -> TcM Coercion
