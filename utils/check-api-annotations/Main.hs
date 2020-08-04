@@ -5,7 +5,6 @@ import Data.List
 import GHC
 import GHC.Driver.Session
 import GHC.Utils.Outputable
-import GHC.Parser.Annotation
 import GHC.Types.SrcLoc
 import System.Environment( getArgs )
 import System.Exit
