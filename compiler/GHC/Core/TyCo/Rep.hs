@@ -1963,11 +1963,13 @@ foldTyCo (TyCoFolder { tcf_view       = view
       where
         env' = tycobinder env tv Inferred
 
-    go_prov env (ZapCoProv cvs)     = strictFoldDVarSet (mappend . covar env)
-                                                        mempty cvs
+    go_prov env (ZapCoProv cvs)     = go_cvs env (dVarSetElems cvs)
     go_prov env (PhantomProv co)    = go_co env co
     go_prov env (ProofIrrelProv co) = go_co env co
     go_prov _   (PluginProv _)      = mempty
+
+    go_cvs _   []       = mempty
+    go_cvs env (cv:cvs) = covar env cv `mappend` go_cvs env cvs
 
 {- *********************************************************************
 *                                                                      *
