@@ -505,8 +505,8 @@ lexFloat base expChars constructor =
     lexDigitsUnlessDot :: Int -> ReadP Digits
     -- Lex a sequence of digits in a specified base which may be empty if a dot
     -- is encountered
-    lexDigitsUnlessDot base = lexDigits base <++ do ('.':_) <- look
-                                                    return []
+    lexDigitsUnlessDot base_ = lexDigits base_ <++ do ('.':_) <- look
+                                                      return []
 
     integralOrFractionalPresent :: Digits -> Maybe Digits -> ReadP ()
     integralOrFractionalPresent [] Nothing = pfail
