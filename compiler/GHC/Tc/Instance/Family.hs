@@ -918,7 +918,7 @@ unusedInjTvsInRHS dflags tycon@(tyConInjectivityInfo -> Injective inj_list) lhs 
 
       any_bad = not $ isEmptyVarSet bad_vars
 
-      invis_vars = fvVarSet $ invisibleVarsOfTypes [mkTyConApp tycon lhs, rhs]
+      invis_vars = invisibleVarsOfTypes [mkTyConApp tycon lhs, rhs]
 
       any_invisible = any_bad && (bad_vars `intersectsVarSet` invis_vars)
       suggest_undec = any_bad &&
