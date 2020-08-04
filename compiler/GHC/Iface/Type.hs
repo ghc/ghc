@@ -441,6 +441,7 @@ splitIfaceSigmaTy ty
     (theta, tau)   = split_rho rho
 
     split_foralls (IfaceForAllTy bndr ty)
+        | isInvisibleArgFlag (binderArgFlag bndr)
         = case split_foralls ty of { (bndrs, rho) -> (bndr:bndrs, rho) }
     split_foralls rho = ([], rho)
 
@@ -868,7 +869,10 @@ ppr_sigma ctxt_prec ty
   = maybeParen ctxt_prec funPrec (pprIfaceSigmaType ShowForAllMust ty)
 
 ppr_ty :: PprPrec -> IfaceType -> SDoc
-ppr_ty ctxt_prec ty@(IfaceForAllTy {})          = ppr_sigma ctxt_prec ty
+ppr_ty ctxt_prec ty@(IfaceForAllTy bndr body) =
+  case binderArgFlag bndr of
+    Invisible _ -> ppr_sigma ctxt_prec ty
+    Required -> ppr_visible_forall ctxt_prec [bndr] body
 ppr_ty ctxt_prec ty@(IfaceFunTy InvisArg _ _ _) = ppr_sigma ctxt_prec ty
 
 ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reason for IfaceFreeTyVar!
@@ -921,6 +925,19 @@ ppr_ty ctxt_prec (IfaceCoercionTy co)
   = if_print_coercions
       (ppr_co ctxt_prec co)
       (text "<>")
+
+ppr_visible_forall :: PprPrec -> [IfaceForAllBndr] -> IfaceType -> SDoc
+ppr_visible_forall ctxt_prec rev_bndrs (IfaceForAllTy bndr body)
+  | Required <- binderArgFlag bndr
+  = ppr_visible_forall ctxt_prec (bndr : rev_bndrs) body
+ppr_visible_forall ctxt_prec rev_bndrs body =
+    maybeParen ctxt_prec funPrec $
+    sep [forall_part_doc, ppr body]
+  where
+    forall_part_doc =
+      forAllLit <+> fsep (map pprIfaceForAllBndr bndrs)
+                <+> arrow
+    bndrs = reverse rev_bndrs
 
 {- Note [Defaulting RuntimeRep variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
