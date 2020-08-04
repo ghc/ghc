@@ -772,6 +772,7 @@ regAddr _      _ _ _ = AnyMem
 
 {-
 Note [Inline GlobalRegs?]
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Should we freely inline GlobalRegs?
 

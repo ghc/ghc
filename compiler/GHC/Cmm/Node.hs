@@ -93,7 +93,7 @@ data CmmNode e x where
       --
       -- Invariant: the arguments and the ForeignTarget must not
       -- mention any registers for which GHC.Platform.callerSaves
-      -- is True.  See Note [Register Parameter Passing].
+      -- is True.  See Note [Register parameter passing].
 
   CmmBranch :: ULabel -> CmmNode O C
                                    -- Goto another block in the same procedure
@@ -223,11 +223,12 @@ convention, rdi, rsi, rdx and rcx (as well as r8 and r9) may be used for
 argument passing.  These are registers R3-R6, which our generated
 code may also be using; as a result, it's necessary to save these
 values before doing a foreign call.  This is done during initial
-code generation in callerSaveVolatileRegs in GHC.StgToCmm.Utils.  However,
-one result of doing this is that the contents of these registers
-may mysteriously change if referenced inside the arguments.  This
-is dangerous, so you'll need to disable inlining much in the same
-way is done in GHC.Cmm.Opt currently.  We should fix this!
+code generation in callerSaveVolatileRegs in GHC.StgToCmm.Utils.
+
+However, one result of doing this is that the contents of these registers may
+mysteriously change if referenced inside the arguments.  This is dangerous, so
+you'll need to disable inlining much in the same way is done in GHC.Cmm.Sink
+currently.  We should fix this!
 -}
 
 ---------------------------------------------
