@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, PatternSynonyms #-}
 
 module GHC.Core.TyCo.FVs
   (     shallowTyCoVarsOfType, shallowTyCoVarsOfTypes,
@@ -39,7 +39,7 @@ module GHC.Core.TyCo.FVs
         closeOverKinds,
 
         -- * Raw materials
-        Endo(..), TyCoFvFun, InScopeBndrs, emptyInScope, runTyCoVars
+        TyCoAcc(..), InScopeBndrs, emptyInScope, extendInScope, runTyCoVars
   ) where
 
 #include "HsVersions.h"
@@ -48,7 +48,6 @@ import GHC.Prelude
 
 import {-# SOURCE #-} GHC.Core.Type (coreView, partitionInvisibleTypes)
 
-import Data.Monoid as DM ( Endo(..), All(..) )
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCon
 import GHC.Types.Var
@@ -59,7 +58,8 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Utils.Misc
 import GHC.Utils.Panic
-
+import Data.Semigroup as Semigroup
+import GHC.Exts( oneShot )
 {-
 %************************************************************************
 %*                                                                      *
@@ -264,14 +264,54 @@ TL;DR: check this regularly!
 -}
 
 type InScopeBndrs  = TyCoVarSet
-type TyCoFvFun a s = InScopeBndrs -> a -> Endo s
+newtype TyCoAcc acc = TCA' { runTCA :: InScopeBndrs -> acc -> acc }
+
+pattern TCA :: forall acc. (InScopeBndrs -> acc -> acc) -> TyCoAcc acc
+{-# COMPLETE TCA #-}
+pattern TCA f <- TCA' f
+  where
+    TCA f = TCA' (oneShot f)
+
+instance Semigroup (TyCoAcc acc) where
+    (TCA f1) <> (TCA f2) = TCA (\is acc -> f2 is (f1 is acc))
+    {-# INLINE (<>) #-}
+
+instance Monoid (TyCoAcc acc) where
+    mempty = TCA (\_ acc -> acc)
+    {-# INLINE mempty #-}
+    mappend = (Semigroup.<>)
+    {-# INLINE mappend #-}
 
 emptyInScope :: InScopeBndrs
 emptyInScope = emptyVarSet
 
-runTyCoVars :: TyCoFvFun a TyCoVarSet -> a -> TyCoVarSet
+addTyCoVar :: TyCoVar -> TyCoAcc TyCoVarSet -> TyCoAcc TyCoVarSet
+-- Add a variable tcv, and the extras, to the free vars unless
+-- tcv is in the in-scope
+--  or is already in the in-scope set-
+-- The 'extras' start from an empty in-scope set;
+--    see Note [Closing over free variable kinds]
+addTyCoVar tcv (TCA add_extras) = TCA add_it
+  where
+    add_it is acc
+      | tcv `elemVarSet` is  = acc
+      | tcv `elemVarSet` acc = acc
+      | otherwise            = add_extras emptyVarSet (acc `extendVarSet` tcv)
+
+extendInScope :: TyCoVar -> TyCoAcc acc -> TyCoAcc acc
+-- Gather the argument free vars in an empty in-scope set
+extendInScope tcv (TCA f) = TCA (\is acc -> f (is `extendVarSet` tcv) acc)
+
+whenNotInScope :: TyCoVar -> TyCoAcc acc -> TyCoAcc acc
+-- If tcv is not in the in-scope set, compute
+-- the 'extras' in an empty in-scope set
+whenNotInScope tcv (TCA f) = TCA (\is acc -> if tcv `elemVarSet` is
+                                             then acc
+                                             else f emptyInScope acc)
+
+runTyCoVars :: (a -> TyCoAcc TyCoVarSet) -> a -> TyCoVarSet
 {-# INLINE runTyCoVars #-}
-runTyCoVars f = \x -> appEndo (f emptyInScope x) emptyVarSet
+runTyCoVars f = \x -> runTCA (f x) emptyInScope emptyVarSet
   -- It's very important that the \x is to the right of the '=', so
   -- runTyCoVars has arity 1.  It is often applied to just one arg e.g.
   --    tyCoVarsOfType  = runTyCoVars deep_ty
@@ -292,9 +332,9 @@ runTyCoVars f = \x -> appEndo (f emptyInScope x) emptyVarSet
 
 -- See Note [Free variables of Coercions]
 
-tyCoVarsOfType  :: Type -> TyCoVarSet
-tyCoVarsOfTypes :: [Type] -> TyCoVarSet
-tyCoVarsOfCo    :: Coercion -> TyCoVarSet
+tyCoVarsOfType  :: Type       -> TyCoVarSet
+tyCoVarsOfTypes :: [Type]     -> TyCoVarSet
+tyCoVarsOfCo    :: Coercion   -> TyCoVarSet
 tyCoVarsOfCos   :: [Coercion] -> TyCoVarSet
 
 tyCoVarsOfType  = runTyCoVars deep_ty
@@ -305,27 +345,21 @@ tyCoVarsOfCos   = runTyCoVars deep_cos
 -- Alternative for tyCoVarsOfType
 --   tyCoVarsOfType ty = closeOverKinds (shallowTyCoVarsOfType ty)
 
-deep_ty  :: TyCoFvFun Type       TyCoVarSet
-deep_tys :: TyCoFvFun [Type]     TyCoVarSet
-deep_co  :: TyCoFvFun Coercion   TyCoVarSet
-deep_cos :: TyCoFvFun [Coercion] TyCoVarSet
+deep_ty  :: Type       -> TyCoAcc TyCoVarSet
+deep_tys :: [Type]     -> TyCoAcc TyCoVarSet
+deep_co  :: Coercion   -> TyCoAcc TyCoVarSet
+deep_cos :: [Coercion] -> TyCoAcc TyCoVarSet
 (deep_ty, deep_tys, deep_co, deep_cos) = foldTyCo deepTcvFolder
 
-deepTcvFolder :: TyCoFolder InScopeBndrs (Endo TyCoVarSet)
+deepTcvFolder :: TyCoFolder (TyCoAcc TyCoVarSet)
 deepTcvFolder = TyCoFolder { tcf_view = noView
                            , tcf_tyvar = do_tcv, tcf_covar = do_tcv
                            , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
   where
-    do_tcv is v = Endo do_it
-      where
-        do_it acc | v `elemVarSet` is  = acc
-                  | v `elemVarSet` acc = acc
-                  | otherwise          = appEndo (deep_ty emptyInScope (varType v)) $
-                                         acc `extendVarSet` v
-                  -- emptyInScope: see Note [Closing over free variable kinds]
+    do_tcv v = addTyCoVar v (deep_ty (varType v))
 
-    do_bndr is tcv _ = extendVarSet is tcv
-    do_hole is hole  = do_tcv is (coHoleCoVar hole)
+    do_bndr tcv _vis fvs = extendInScope tcv fvs
+    do_hole hole  = do_tcv (coHoleCoVar hole)
                        -- See Note [CoercionHoles and coercion free variables]
                        -- in GHC.Core.TyCo.Rep
 
@@ -337,18 +371,16 @@ deepTcvFolder = TyCoFolder { tcf_view = noView
 ********************************************************************* -}
 
 
-shallowTyCoVarsOfType :: Type -> TyCoVarSet
 -- See Note [Free variables of types]
-shallowTyCoVarsOfType = runTyCoVars shallow_ty
+shallowTyCoVarsOfType  :: Type       -> TyCoVarSet
+shallowTyCoVarsOfTypes :: [Type]     -> TyCoVarSet
+shallowTyCoVarsOfCo    :: Coercion   -> TyCoVarSet
+shallowTyCoVarsOfCos   :: [Coercion] -> TyCoVarSet
 
-shallowTyCoVarsOfTypes :: [Type] -> TyCoVarSet
+shallowTyCoVarsOfType  = runTyCoVars shallow_ty
 shallowTyCoVarsOfTypes = runTyCoVars shallow_tys
-
-shallowTyCoVarsOfCo :: Coercion -> TyCoVarSet
-shallowTyCoVarsOfCo = runTyCoVars shallow_co
-
-shallowTyCoVarsOfCos :: [Coercion] -> TyCoVarSet
-shallowTyCoVarsOfCos = runTyCoVars shallow_cos
+shallowTyCoVarsOfCo    = runTyCoVars shallow_co
+shallowTyCoVarsOfCos   = runTyCoVars shallow_cos
 
 -- | Returns free variables of types, including kind variables as
 -- a non-deterministic set. For type synonyms it does /not/ expand the
@@ -364,25 +396,21 @@ shallowTyCoVarsOfCoVarEnv cos = shallowTyCoVarsOfCos (nonDetEltsUFM cos)
   -- It's OK to use nonDetEltsUFM here because we immediately
   -- forget the ordering by returning a set
 
-shallow_ty  :: TyCoFvFun Type       TyCoVarSet
-shallow_tys :: TyCoFvFun [Type]     TyCoVarSet
-shallow_co  :: TyCoFvFun Coercion   TyCoVarSet
-shallow_cos :: TyCoFvFun [Coercion] TyCoVarSet
+shallow_ty  :: Type       -> TyCoAcc TyCoVarSet
+shallow_tys :: [Type]     -> TyCoAcc TyCoVarSet
+shallow_co  :: Coercion   -> TyCoAcc TyCoVarSet
+shallow_cos :: [Coercion] -> TyCoAcc TyCoVarSet
+
 (shallow_ty, shallow_tys, shallow_co, shallow_cos) = foldTyCo shallowTcvFolder
 
-shallowTcvFolder :: TyCoFolder InScopeBndrs (Endo TyCoVarSet)
+shallowTcvFolder :: TyCoFolder (TyCoAcc TyCoVarSet)
 shallowTcvFolder = TyCoFolder { tcf_view = noView
                               , tcf_tyvar = do_tcv, tcf_covar = do_tcv
                               , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
   where
-    do_tcv is v = Endo do_it
-      where
-        do_it acc | v `elemVarSet` is  = acc
-                  | v `elemVarSet` acc = acc
-                  | otherwise          = acc `extendVarSet` v
-
-    do_bndr is tcv _ = extendVarSet is tcv
-    do_hole _ _  = mempty   -- Ignore coercion holes
+    do_hole _  = mempty   -- Ignore coercion holes
+    do_tcv v = addTyCoVar v mempty
+    do_bndr tcv _vis fvs = extendInScope tcv fvs
 
 
 {- *********************************************************************
@@ -412,61 +440,63 @@ coVarsOfTypes = runTyCoVars deep_cv_tys
 coVarsOfCo    = runTyCoVars deep_cv_co
 coVarsOfCos   = runTyCoVars deep_cv_cos
 
-deep_cv_ty  :: TyCoFvFun Type       TyCoVarSet
-deep_cv_tys :: TyCoFvFun [Type]     TyCoVarSet
-deep_cv_co  :: TyCoFvFun Coercion   TyCoVarSet
-deep_cv_cos :: TyCoFvFun [Coercion] TyCoVarSet
+deep_cv_ty  :: Type       -> TyCoAcc TyCoVarSet
+deep_cv_tys :: [Type]     -> TyCoAcc TyCoVarSet
+deep_cv_co  :: Coercion   -> TyCoAcc TyCoVarSet
+deep_cv_cos :: [Coercion] -> TyCoAcc TyCoVarSet
 (deep_cv_ty, deep_cv_tys, deep_cv_co, deep_cv_cos) = foldTyCo deepCoVarFolder
 
-deepCoVarFolder :: TyCoFolder InScopeBndrs (Endo CoVarSet)
+deepCoVarFolder :: TyCoFolder (TyCoAcc TyCoVarSet)
 deepCoVarFolder = TyCoFolder { tcf_view = noView
                              , tcf_tyvar = do_tyvar, tcf_covar = do_covar
                              , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
   where
-    do_tyvar _ _  = mempty
+    do_tyvar _  = mempty
       -- This do_tyvar means we won't see any CoVars in this
       -- TyVar's kind.   This may be wrong; but it's the way it's
       -- always been.  And its awkward to change, because
       -- the tyvar won't end up in the accumulator, so
       -- we'd look repeatedly.  Blargh.
 
-    do_covar is v = Endo do_it
-      where
-        do_it acc | v `elemVarSet` is  = acc
-                  | v `elemVarSet` acc = acc
-                  | otherwise          = appEndo (deep_cv_ty emptyInScope (varType v)) $
-                                         acc `extendVarSet` v
-                  -- emptyInScope: see Note [Closing over free variable kinds]
+    do_covar cv = addTyCoVar cv (deep_ty (varType cv))
 
-    do_bndr is tcv _ = extendVarSet is tcv
-    do_hole is hole  = do_covar is (coHoleCoVar hole)
+    do_bndr tcv _vis fvs = extendInScope tcv fvs
+    do_hole hole  = do_covar (coHoleCoVar hole)
                        -- See Note [CoercionHoles and coercion free variables]
                        -- in GHC.Core.TyCo.Rep
 
 ------- Same again, but for DCoVarSet ----------
 
 coVarsOfCoDSet :: Coercion -> DCoVarSet
-coVarsOfCoDSet co = appEndo (deep_dcv_co emptyInScope co) emptyDVarSet
+coVarsOfCoDSet co = runTCA (deep_dcv_co co) emptyVarSet emptyDVarSet
 
-deep_dcv_ty  :: TyCoFvFun Type     DCoVarSet
-deep_dcv_co  :: TyCoFvFun Coercion DCoVarSet
+deep_dcv_ty  :: Type     -> TyCoAcc DCoVarSet
+deep_dcv_co  :: Coercion -> TyCoAcc DCoVarSet
 (deep_dcv_ty, _, deep_dcv_co, _) = foldTyCo deepCoVarDSetFolder
 
-deepCoVarDSetFolder :: TyCoFolder InScopeBndrs (Endo DCoVarSet)
+deepCoVarDSetFolder :: TyCoFolder (TyCoAcc DCoVarSet)
 deepCoVarDSetFolder = TyCoFolder { tcf_view = noView
                                  , tcf_tyvar = do_tyvar, tcf_covar = do_covar
                                  , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
   where
-    do_tyvar _ _  = mempty
-    do_covar is v = Endo do_it
-      where
-        do_it :: DCoVarSet -> DCoVarSet
-        do_it acc | v `elemVarSet`  is  = acc
-                  | v `elemDVarSet` acc = acc
-                  | otherwise           = appEndo (deep_dcv_ty emptyInScope (varType v)) $
-                                          acc `extendDVarSet` v
-    do_bndr is tcv _ = extendVarSet is tcv
-    do_hole is hole  = do_covar is (coHoleCoVar hole)
+    do_tyvar _  = mempty
+    do_covar cv = addCoVarDSet cv (deep_dcv_ty (varType cv))
+
+
+    do_bndr tcv _vis fvs = extendInScope tcv fvs
+    do_hole hole  = do_covar (coHoleCoVar hole)
+
+addCoVarDSet :: CoVar -> TyCoAcc DCoVarSet -> TyCoAcc DCoVarSet
+-- Add a variable to the free vars unless it is in the in-scope
+-- or is already in the in-scope set-
+addCoVarDSet cv (TCA add_extras) = TCA add_it
+  where
+    add_it is acc | cv `elemVarSet`  is  = acc
+                  | cv `elemDVarSet` acc = acc
+                  | otherwise            = add_extras emptyInScope $
+                                           acc `extendDVarSet` cv
+       -- emptyInScopeSet: see Note [Closing over free variable kinds]
+
 
 {- *********************************************************************
 *                                                                      *
@@ -481,7 +511,7 @@ closeOverKinds :: TyCoVarSet -> TyCoVarSet
 -- add the deep free variables of its kind
 closeOverKinds vs = nonDetStrictFoldVarSet do_one vs vs
   where
-    do_one v acc = appEndo (deep_ty emptyVarSet (varType v)) acc
+    do_one v acc = runTCA (deep_ty (varType v)) emptyInScope acc
 
 {- --------------- Alternative version 1 (using FV) ------------
 closeOverKinds = fvVarSet . closeOverKindsFV . nonDetEltsUniqSet
@@ -876,29 +906,27 @@ injectiveVarsOfTypes look_under_tfs = mapUnionFV (injectiveVarsOfType look_under
 invisibleVarsOfTypes :: [Type] -> VarSet
 invisibleVarsOfTypes = runTyCoVars invis_tys
 
-invis_tys :: TyCoFvFun [Type] TyCoVarSet
-invis_tys _  []       = mempty
-invis_tys is (ty:tys) = invis_ty is ty `mappend` invis_tys is tys
+invis_tys :: [Type] -> TyCoAcc TyCoVarSet
+invis_tys []       = mempty
+invis_tys (ty:tys) = invis_ty ty `mappend` invis_tys tys
 
-invis_ty :: TyCoFvFun Type TyCoVarSet
-invis_ty is ty | Just ty' <- coreView ty
-               = invis_ty is ty'
+invis_ty :: Type -> TyCoAcc TyCoVarSet
+invis_ty ty | Just ty' <- coreView ty
+            = invis_ty ty'
 
-invis_ty is (TyVarTy v)
-  | v `elemVarSet` is           = mempty
-  | otherwise                   = deep_ty emptyVarSet (tyVarKind v)
-invis_ty is (AppTy f a)         = invis_ty is f `mappend` invis_ty is a
-invis_ty is (FunTy _ w ty1 ty2) = invis_ty is w `mappend` invis_ty is ty1 `mappend` invis_ty is ty2
-invis_ty is (TyConApp tc tys)   = deep_tys  is invisibles `mappend`
-                                  invis_tys is visibles
+invis_ty (TyVarTy v) = whenNotInScope v $
+                       deep_ty (tyVarKind v)
+invis_ty (AppTy f a)         = invis_ty f `mappend` invis_ty a
+invis_ty (FunTy _ w ty1 ty2) = invis_ty w `mappend` invis_ty ty1 `mappend` invis_ty ty2
+invis_ty (TyConApp tc tys)   = deep_tys  invisibles `mappend`
+                               invis_tys visibles
    where (invisibles, visibles) = partitionInvisibleTypes tc tys
-invis_ty is (ForAllTy tvb ty)   = invis_ty is (tyVarKind tv) `mappend`
-                                  invis_ty (is `extendVarSet` tv) ty
-                                where
-                                  tv = binderVar tvb
-invis_ty _ LitTy{}          = mempty
-invis_ty is (CastTy ty co)  = deep_co is co `mappend` invis_ty is ty
-invis_ty is (CoercionTy co) = deep_co is co
+invis_ty (ForAllTy (Bndr tv _) ty) = invis_ty (tyVarKind tv) `mappend`
+                                     extendInScope tv (invis_ty ty)
+invis_ty (LitTy {})      = mempty
+invis_ty (CastTy ty co)  = deep_co co `mappend` invis_ty ty
+invis_ty (CoercionTy co) = deep_co co
+
 
 {- *********************************************************************
 *                                                                      *
@@ -906,28 +934,31 @@ invis_ty is (CoercionTy co) = deep_co is co
 *                                                                      *
 ********************************************************************* -}
 
-nfvFolder :: TyCoFolder InScopeBndrs DM.All
+nfvFolder :: TyCoFolder (TyCoAcc Bool)
 nfvFolder = TyCoFolder { tcf_view = noView
                        , tcf_tyvar = do_tcv, tcf_covar = do_tcv
                        , tcf_hole = do_hole, tcf_tycobinder = do_bndr }
   where
-    do_tcv is tv = All (tv `elemVarSet` is)
-    do_hole _ _  = All True    -- I'm unsure; probably never happens
-    do_bndr is tv _ = is `extendVarSet` tv
+    do_tcv tv = TCA (\is acc -> acc && tv `elemVarSet` is)
+    do_hole _  = mempty    -- I'm unsure; probably never happens
+    do_bndr tv _vis fvs = extendInScope tv fvs
 
-nfv_ty  :: InScopeBndrs -> Type       -> DM.All
-nfv_tys :: InScopeBndrs -> [Type]     -> DM.All
-nfv_co  :: InScopeBndrs -> Coercion   -> DM.All
+nfv_ty  :: Type       -> TyCoAcc Bool
+nfv_tys :: [Type]     -> TyCoAcc Bool
+nfv_co  :: Coercion   -> TyCoAcc Bool
 (nfv_ty, nfv_tys, nfv_co, _) = foldTyCo nfvFolder
 
-noFreeVarsOfType :: Type -> Bool
-noFreeVarsOfType ty = DM.getAll (nfv_ty emptyInScope ty)
+runAll :: TyCoAcc Bool -> Bool
+runAll (TCA f) = f emptyInScope True
 
+noFreeVarsOfType  :: Type -> Bool
 noFreeVarsOfTypes :: [Type] -> Bool
-noFreeVarsOfTypes tys = DM.getAll (nfv_tys emptyInScope tys)
+noFreeVarsOfCo    :: Coercion -> Bool
 
-noFreeVarsOfCo :: Coercion -> Bool
-noFreeVarsOfCo co = DM.getAll (nfv_co emptyInScope co)
+noFreeVarsOfType  ty  = runAll (nfv_ty ty)
+noFreeVarsOfTypes tys = runAll (nfv_tys tys)
+noFreeVarsOfCo    co  = runAll (nfv_co co)
+
 
 
 {- *********************************************************************
