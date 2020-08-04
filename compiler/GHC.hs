@@ -248,7 +248,7 @@ module GHC (
         srcSpanStartCol, srcSpanEndCol,
 
         -- ** Located
-        GenLocated(..), Located,
+        GenLocated(..), Located, RealLocated,
 
         -- *** Constructing Located
         noLoc, mkGeneralLocated,
@@ -274,7 +274,7 @@ module GHC (
         parser,
 
         -- * API Annotations
-        ApiAnns(..),AnnKeywordId(..),AnnotationComment(..),
+        ApiAnns(..),AnnKeywordId(..),AnnotationComment(..), ApiAnnKey,
         getAnnotation, getAndRemoveAnnotation,
         getAnnotationComments, getAndRemoveAnnotationComments,
         unicodeAnn,
