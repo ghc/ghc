@@ -1316,6 +1316,7 @@ newtype UM a
 
 pattern UM :: (UMState -> UnifyResultM (UMState, a)) -> UM a
 -- See Note [The one-shot state monad trick]
+{-# COMPLETE UM #-}
 pattern UM m <- UM' m
   where
     UM m = UM' (oneShot m)
