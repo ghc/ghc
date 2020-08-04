@@ -54,7 +54,7 @@ import GHC.Types.Id.Info
 import GHC.Core.Predicate
 import GHC.Tc.Utils.Monad
 import GHC.Builtin.Names
-import GHC.Driver.Session( getDynFlags, zapCoercions )
+import GHC.Driver.Flags( GeneralFlag( Opt_DropCoercions ) )
 import GHC.Tc.TyCl.Build ( TcMethInfo, MethInfo )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.TcMType
@@ -305,12 +305,12 @@ emptyZonkEnv = mkEmptyZonkEnv DefaultFlexi
 mkEmptyZonkEnv :: ZonkFlexi -> TcM ZonkEnv
 mkEmptyZonkEnv flexi
   = do { mtv_env_ref <- newTcRef emptyVarEnv
-       ; dflags <- getDynFlags
+       ; zap_coercions <- goptM Opt_DropCoercions
        ; return (ZonkEnv { ze_flexi = flexi
                          , ze_tv_env = emptyVarEnv
                          , ze_id_env = emptyVarEnv
                          , ze_meta_tv_env = mtv_env_ref
-                         , ze_zap_co = zapCoercions dflags }) }
+                         , ze_zap_co = zap_coercions }) }
 
 initZonkEnv :: (ZonkEnv -> TcM b) -> TcM b
 initZonkEnv thing_inside = do { ze <- mkEmptyZonkEnv DefaultFlexi
@@ -414,15 +414,6 @@ zonkEvBndr :: ZonkEnv -> EvVar -> TcM EvVar
 -- Does not extend the ZonkEnv
 zonkEvBndr env var
   = updateIdTypeAndMultM ({-# SCC "zonkEvBndr_zonkTcTypeToType" #-} zonkTcTypeToTypeX env) var
-
-{-
-zonkEvVarOcc :: ZonkEnv -> EvVar -> TcM EvTerm
-zonkEvVarOcc env v
-  | isCoVar v
-  = EvCoercion <$> zonkCoVarOcc env v
-  | otherwise
-  = return (EvId $ zonkIdOcc env v)
--}
 
 zonkCoreBndrX :: ZonkEnv -> Var -> TcM (ZonkEnv, Var)
 zonkCoreBndrX env v
@@ -1899,15 +1890,22 @@ zonkCoercion ze co
   | otherwise    = zonkCoToCo ze co
 
 zapCoercion :: ZonkEnv -> TcCoercion -> TcM Coercion
--- Zonk a coercion, perhpas zapping it
+-- Zonk a coercion, perhaps zapping it
+-- It's always safe to zap, or not to; zapping is only about
+-- reducing the size of coercions.
+-- See Note [Zapping coercions] in GHC.Core.TyCo.Rep
 zapCoercion ze co@(CoVarCo {})      = zonkCoToCo ze co
 zapCoercion ze co@(Refl {})         = zonkCoToCo ze co
 zapCoercion ze co@(GRefl _ _ MRefl) = zonkCoToCo ze co
+zapCoercion ze co@(UnivCo {})       = zonkCoToCo ze co
 zapCoercion ze (GRefl r t (MCo co)) = do { co <- zapCoercion ze co
                                          ; return (GRefl r t (MCo co)) }
 zapCoercion ze (AxiomInstCo ax br cos) = do { cos <- mapM (zapCoercion ze) cos
                                             ; return (AxiomInstCo ax br cos) }
+zapCoercion ze (AxiomRuleCo ax cos)    = do { cos <- mapM (zapCoercion ze) cos
+                                            ; return (AxiomRuleCo ax cos) }
 zapCoercion ze (SymCo co) = mkSymCo <$> zapCoercion ze co
+zapCoercion ze (SubCo co) = mkSubCo <$> zapCoercion ze co
 
 -- The default case: make a zapped coercion
 -- This is where zapped coercions are born
@@ -1920,13 +1918,12 @@ zapCoercion ze co = do { t1 <- zonkTcTypeToTypeX ze t1
 
 ---------------
 coVarsOfCoM :: TcCoercion -> TcM DCoVarSet
--- Find the free CoVars of an un-zonked TcCoercion -- but without
--- zonking it and returning a perhaps large new coercion
+-- Find the /shallow/ free CoVars of an un-zonked TcCoercion --
+-- but without zonking it and returning a perhaps-large new coercion
 coVarsOfCoM co = runTCAM (co_vars_of_co co) FVs.emptyInScope emptyDVarSet
 
 co_vars_of_co :: TcCoercion -> TyCoAccM TcM DCoVarSet
-co_vars_of_ty :: TcType     -> TyCoAccM TcM DCoVarSet
-(co_vars_of_ty, _, co_vars_of_co, _) = foldTyCo co_vars_folder
+(_, _, co_vars_of_co, _) = foldTyCo co_vars_folder
 
 co_vars_folder :: TyCoFolder (TyCoAccM TcM DCoVarSet)
 co_vars_folder = TyCoFolder { tcf_view = noView
@@ -1939,8 +1936,7 @@ co_vars_folder = TyCoFolder { tcf_view = noView
         do_it :: InScopeBndrs -> DCoVarSet -> TcM DCoVarSet
         do_it is acc | v `elemVarSet`  is  = return acc
                      | v `elemDVarSet` acc = return acc
-                     | otherwise           = runTCAM (co_vars_of_ty (varType v)) emptyInScope $
-                                             acc `extendDVarSet` v
+                     | otherwise           = return (acc `extendDVarSet` v)
     do_bndr tcv _vis fvs = extendInScopeM tcv fvs
 
     do_hole :: CoercionHole -> TyCoAccM TcM DCoVarSet

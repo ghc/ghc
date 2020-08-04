@@ -761,6 +761,7 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
     go_co env (UnivCo p r t1 t2)  = mkUnivCo <$> go_prov env p <*> pure r
                                     <*> go_ty env t1 <*> go_ty env t2
     go_co env (SymCo co)          = mkSymCo <$> go_co env co
+    go_co env (TransCo c1 c2)     = mkTransCo <$> go_co env c1 <*> go_co env c2
     go_co env (AxiomRuleCo r cos) = AxiomRuleCo r <$> go_cos env cos
     go_co env (NthCo r i co)      = mkNthCo r i <$> go_co env co
     go_co env (LRCo lr co)        = mkLRCo lr <$> go_co env co
@@ -768,7 +769,6 @@ mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
     go_co env (KindCo co)         = mkKindCo <$> go_co env co
     go_co env (SubCo co)          = mkSubCo <$> go_co env co
     go_co env (AxiomInstCo ax i cos) = mkAxiomInstCo ax i <$> go_cos env cos
-    go_co env (TransCo c1 c2)        = mkTransCo <$> go_co env c1 <*> go_co env c2
     go_co env co@(TyConAppCo r tc cos)
       | isTcTyCon tc
       = do { tc' <- tycon tc

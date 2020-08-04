@@ -1190,9 +1190,9 @@ data Coercion
     -- The number coercions should match exactly the expectations
     -- of the CoAxiomRule (i.e., the rule is fully saturated).
 
-  | SymCo Coercion                   -- :: e -> e
+  | SymCo Coercion             -- :: e -> e
 
-  | TransCo    Coercion           Coercion  -- :: e -> e -> e
+  | TransCo Coercion Coercion  -- :: e -> e -> e
 
   | NthCo  Role Int Coercion     -- Zero-indexed; decomposes (T t0 ... tn)
     -- :: "e" -> _ -> e0 -> e (inverse of TyConAppCo, see Note [TyConAppCo roles])
@@ -1634,6 +1634,7 @@ data UnivCoProvenance
                        --   is sound. The string is for the use of the plugin.
 
   | ZapCoProv DCoVarSet  -- ^ A zapped coercion
+                         -- See Note [Zapping coercions]
   deriving Data.Data
 
 instance Outputable UnivCoProvenance where
@@ -1793,7 +1794,189 @@ Here,
   where
     co5 :: (a1 ~ Bool) ~ (a2 ~ Bool)
     co5 = TyConAppCo Nominal (~#) [<*>, <*>, co4, <Bool>]
+
+
+Note [Zapping coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Coercions for even small programs can grow to be quite large (e.g. #8095),
+especially when type families are involved. For instance, the case of addition
+of inductive natural numbers can build coercions quadratic in size of the
+summands.  For instance, consider the type-level addition operation defined on
+Peano naturals,
+
+    data Nat = Z | Succ Nat
+
+    type family (+) (a :: Nat) (b :: Nat)
+    type instance (+) Z        a   = a                -- CoAx1
+    type instance (+) (Succ a) b   = Succ (a + b)     -- CoAx2
+
+Now consider what is necessary to reduce (S (S (S Z)) + S Z). This
+reduction will produce two results: the reduced (i.e. flattened) type, and a
+coercion witnessing the reduction. The reduction will proceed as follows:
+
+       S (S (S Z)) + S Z       |>              Refl
+    ~> S (S (S Z) + S Z)       |>              CoAx2 Refl
+    ~> S (S (S Z + S Z))       |>              CoAx2 (CoAx2 Refl)
+    ~> S (S (S (Z + S Z)))     |>              CoAx2 (CoAx2 (CoAx2 Refl))
+    ~> S (S (S (S (S Z))))     |>              CoAx1 (CoAx2 (CoAx2 (CoAx2 Refl)))
+
+Moreover, coercions are really only useful when validating core transformations
+(i.e. by the Core Linter). To avoid burdening users who aren't linting with the
+cost of maintaining these structures, we replace coercions with placeholders
+("zap" them) them unless -dcore-lint is enabled. These placeholders are
+represented by UnivCo with ZappedProv provenance. Concretely, a coercion
+
+    co :: t1 ~r t2
+
+is replaced by
+
+    UnivCo (ZapCoProv fcvs) r t1 t2 :: t1 ~r t2
+
+where fcvs = free-coercion-variables( co ).  Why fcvs?  See
+"The importance of tracking free coercion variables", next.
+
+NB: coercion zapping is *only* to improve compile-time performance.
+It's always safe to zap or not to zap.
+
+The importance of tracking free coercion variables
+--------------------------------------------------
+It is vital that zapped coercions track their free coercion variables.
+To see why, consider this program:
+
+    data T a where
+      T1 :: Bool -> T Bool
+      T2 :: T Int
+
+    f :: T a -> a -> Bool
+    f = /\a (x:T a) (y:a).
+        case x of
+              T1 (c : a~Bool) (z : Bool) -> not (y |> c)
+              T2 -> True
+
+Now imagine that we zap the coercion `c`, replacing it with a generic UnivCo
+between `a` and Bool. If we didn't record the fact that this coercion was
+previously free in `c`, we may incorrectly float the expression `not (y |> c)`
+out of the case alternative which brings proof of `c` into scope. If this
+happened then `f T2 (I# 5)` would try to interpret `y` as a Bool, at
+which point we aren't far from a segmentation fault or much worse.
+
+Note that we don't need to track
+* the coercion's free *type* variables
+* coercion variables free in kinds (we only need the "shallow" free covars)
+
+This means that we may float past type variables which the original
+proof had as free variables. While surprising, this doesn't jeopardise
+the validity of the coercion, which only depends upon the scoping
+relative to the free coercion variables.
+
+(The free coercion variables are kept as a DCoVarSet in ZapCoProv,
+since these sets are included in interface files.)
+
+Where and how zapping happens
+-----------------------------
+Currently we zap coercions in one place only:
+  * In GHC.Tc.Utils.Zonk, when zonking a TcCoercion to a Coercion, after
+    typechecking, we zap it when Opt_DropCoercions is on
+
+The zapping is done by GHC.Tc.Utils.Zonk.zapCoercion.  It usually
+builds a UnivCo, but has special cases for situations where the
+original coercion may be smaller than the zapped coercion
+* Refl, GRefl, CoVarCo
+* UnivCo (already zapped)
+* SymCo, SubCo (recursively zap)
+* AxiomInstCo, AxiomRuleCo (result types may be big)
+
+-------------------------------------------------------------------
+------  These next notes are not yet implemented, but may be ------
+
+Zapping during type family reduction
+------------------------------------
+To avoid the quadratic blow-up in coercion size during type family reduction
+described above, we zap on every type family reduction step taken by
+TcFlatten.flatten_exact_fam_app_fully. When zapping we take care to avoid
+looking at the constructed coercion and instead build up a zapped coercion
+directly from type being reduced, its free variables, and the result of the
+reduction. This allows us to reduce recursive type families in time linear to
+the size of the type at the expense of Core Lint's ability to validate the
+reduction.
+
+Note that the free variable set of the zapped coercion is taken to be the free
+variable set of the unreduced family application, which is computed once at the
+beginning of reduction. This is an important optimisation as it allows us to
+avoid recomputing the free variable set (which requires linear work in the size
+of the coercion) with every reduction step. Moreover, this gives us the same
+result as naively computing the free variables of every reduction:
+
+  * The FV set of the unreduced type cannot be smaller than that of the reduced type
+    because there is nowhere for extra FVs to come from. Type family equations
+    are essentially function reduction, which can never introduce new fvs.
+
+  * The FV set of the unreducecd type cannot be larger than that of the reduced
+    type because the zapped coercion's kind must mention the types these fvs come
+    from, so the FVs of the zapped coercion must be at least those in the
+    starting types.
+
+Thus, the two sets are subsets of each other and are equal.
+
+Other places where we zap
+-------------------------
+Besides during type family reduction, we also zap coercions in a number of other
+places (again, only when DynFlags.shouldBuildCoercions is False). This zapping
+occurs in zapCoercion, which maps a coercion to its zapped form. However, there
+are a few optimisations which we implement:
+
+  * We don't zap coercions which are already zapping; this avoids an unnecessary
+    free variable computation.
+
+  * We don't zap Refl coercions. This is because Refls are actually far more
+    compact than zapped coercions: the coercion (Refl T) holds only one
+    reference to T, whereas its zapped equivalent would hold two. While this
+    makes little difference directly after construction due to sharing, this
+    sharing will be lost when we substitute or otherwise manipulate the zapped
+    coercion, resulting in a doubling of the coercions representation size.
+
+zapCoercion is called in a few places:
+
+  * CoreOpt.pushCoTyArg zaps the coercions it produces to avoid pile-up during
+    simplification [TODO]
+
+  * TcIface.tcIfaceCo
+
+  * Type.mapCoercion (which is used by zonking) can optionally zap coercions,
+    although this is currently disabled since it causes compiler allocations to
+    regress in a few cases.
+
+  * We considered zapping as well in optCoercion, although this too caused
+    significant allocation regressions.
+
+Differences between zapped and unzapped coercions
+-------------------------------------------------
+Alas, sometimes zapped coercions will behave slightly differently from their
+unzapped counterparts. Specifically, we are a bit lax in tracking external names
+that are present in the unzapped coercion but not its kind. This manifests in a
+few places (these are labelled in the source with the [ZappedCoDifference]
+keyword):
+
+ * IfaceSyn.freeNamesIfCoercion will fail to report top-level names present in
+   the unzapped proof but not its kind.
+
+ * TcTyDecls.synonymTyConsOfType will fail to report type synonyms present in
+   in the unzapped proof but not its kind.
+
+ * The result of TcValidity.fvCo will contain each free variable of a ZappedCo
+   only once, even if it would have reported multiple occurrences in the
+   unzapped coercion.
+
+ * Type.tyConsOfType does not report TyCons which appear only in the unzapped
+   proof and not its kind.
+
+ * Zapped coercions are represented in interface files as IfaceZappedProv. This
+   representation only includes local free variables, since these are sufficient
+   to avoid unsound floating. This means that the free variable lists of zapped
+   coercions loaded from interface files will lack top-level things (e.g. type
+   constructors) that appear only in the unzapped proof.
 -}
+
 
 
 {- *********************************************************************
@@ -1959,10 +2142,14 @@ foldTyCo (TyCoFolder { tcf_view       = view
       = go_co kind_co `mappend` go_ty (varType tv)
         `mappend` tycobinder tv Inferred (go_co co)
 
-    go_prov (ZapCoProv cvs)     = go_cvs (dVarSetElems cvs)
     go_prov (PhantomProv co)    = go_co co
     go_prov (ProofIrrelProv co) = go_co co
     go_prov (PluginProv _)      = mempty
+    go_prov (ZapCoProv cvs)     = go_cvs (dVarSetElems cvs)
+      -- This use of dVarSetElems does a sort, which seems very
+      -- inefficient.  But it seems required for determinism, alas.
+      -- Unless the 'a' is instantiated with a non-deterministic kind
+      -- of thing...could we exploit that somehow?  ToDo.
 
     go_cvs []       = mempty
     go_cvs (cv:cvs) = covar cv `mappend` go_cvs cvs
@@ -2010,7 +2197,7 @@ coercionSize (HoleCo _)          = 1
 coercionSize (AxiomInstCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (UnivCo p _ t1 t2)  = 1 + provSize p + typeSize t1 + typeSize t2
 coercionSize (SymCo co)          = 1 + coercionSize co
-coercionSize (TransCo c1 c2)      = 1 + coercionSize c1 + coercionSize c2
+coercionSize (TransCo c1 c2)     = 1 + coercionSize c1 + coercionSize c2
 coercionSize (NthCo _ _ co)      = 1 + coercionSize co
 coercionSize (LRCo  _ co)        = 1 + coercionSize co
 coercionSize (InstCo co arg)     = 1 + coercionSize co + coercionSize arg

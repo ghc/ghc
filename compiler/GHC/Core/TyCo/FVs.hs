@@ -19,7 +19,8 @@ module GHC.Core.TyCo.FVs
         tyCoVarsOfCoList,
 
         coVarsOfType, coVarsOfTypes,
-        coVarsOfCo, coVarsOfCos, coVarsOfCoDSet,
+        coVarsOfCo, coVarsOfCos,
+        shallowCoVarsOfCosDSet,
 
         almostDevoidCoVarOfCo,
 
@@ -466,36 +467,32 @@ deepCoVarFolder = TyCoFolder { tcf_view = noView
                        -- in GHC.Core.TyCo.Rep
 
 ------- Same again, but for DCoVarSet ----------
+--    But this time the free vars are shallow
+shallowCoVarsOfCosDSet :: [Coercion] -> DCoVarSet
+shallowCoVarsOfCosDSet cos = runTCA (shallow_dcv_cos cos) emptyVarSet emptyDVarSet
 
-coVarsOfCoDSet :: Coercion -> DCoVarSet
-coVarsOfCoDSet co = runTCA (deep_dcv_co co) emptyVarSet emptyDVarSet
+shallow_dcv_cos  :: [Coercion] -> TyCoAcc DCoVarSet
+(_, _, _, shallow_dcv_cos) = foldTyCo shallowCoVarDSetFolder
 
-deep_dcv_ty  :: Type     -> TyCoAcc DCoVarSet
-deep_dcv_co  :: Coercion -> TyCoAcc DCoVarSet
-(deep_dcv_ty, _, deep_dcv_co, _) = foldTyCo deepCoVarDSetFolder
-
-deepCoVarDSetFolder :: TyCoFolder (TyCoAcc DCoVarSet)
-deepCoVarDSetFolder = TyCoFolder { tcf_view = noView
-                                 , tcf_tyvar = do_tyvar, tcf_covar = do_covar
-                                 , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
+shallowCoVarDSetFolder :: TyCoFolder (TyCoAcc DCoVarSet)
+shallowCoVarDSetFolder = TyCoFolder { tcf_view = noView
+                                    , tcf_tyvar = do_tyvar, tcf_covar = do_covar
+                                    , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
   where
     do_tyvar _  = mempty
-    do_covar cv = addCoVarDSet cv (deep_dcv_ty (varType cv))
-
+    do_covar cv = shallowAddCoVarDSet cv
 
     do_bndr tcv _vis fvs = extendInScope tcv fvs
-    do_hole hole  = do_covar (coHoleCoVar hole)
+    do_hole hole = do_covar (coHoleCoVar hole)
 
-addCoVarDSet :: CoVar -> TyCoAcc DCoVarSet -> TyCoAcc DCoVarSet
+shallowAddCoVarDSet :: CoVar -> TyCoAcc DCoVarSet
 -- Add a variable to the free vars unless it is in the in-scope
 -- or is already in the in-scope set-
-addCoVarDSet cv (TCA add_extras) = TCA add_it
+shallowAddCoVarDSet cv = TCA add_it
   where
     add_it is acc | cv `elemVarSet`  is  = acc
                   | cv `elemDVarSet` acc = acc
-                  | otherwise            = add_extras emptyInScope $
-                                           acc `extendDVarSet` cv
-       -- emptyInScopeSet: see Note [Closing over free variable kinds]
+                  | otherwise            = acc `extendDVarSet` cv
 
 
 {- *********************************************************************

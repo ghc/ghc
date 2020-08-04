@@ -853,11 +853,10 @@ subst_co subst co
       = h { ch_co_var = updateVarType go_ty cv }
 
 -- | Perform a substitution within a 'DVarSet' of free variables.
+-- returning the shallow free coercion variables
 substDCoVarSet :: TCvSubst -> DCoVarSet -> DCoVarSet
-substDCoVarSet subst = strictFoldDVarSet do_one emptyDVarSet
-  where
-    do_one :: CoVar -> DCoVarSet -> DCoVarSet
-    do_one = unionDVarSet . coVarsOfCoDSet . substCoVar subst
+substDCoVarSet subst cvs = shallowCoVarsOfCosDSet $ map (substCoVar subst) $
+                           dVarSetElems cvs
 
 substForAllCoBndr :: TCvSubst -> TyCoVar -> KindCoercion
                   -> (TCvSubst, TyCoVar, Coercion)

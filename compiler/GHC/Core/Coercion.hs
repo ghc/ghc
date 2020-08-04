@@ -976,11 +976,10 @@ mkSymCo :: Coercion -> Coercion
 
 -- Do a few simple optimizations, but don't bother pushing occurrences
 -- of symmetry to the leaves; the optimizer will take care of that.
-mkSymCo co | isReflCo co                     = co
-mkSymCo    (SymCo co)                        = co
-mkSymCo    (SubCo (SymCo co))                = SubCo co
-mkSymCo    (UnivCo z@(ZapCoProv {}) r t1 t2) = UnivCo z r t2 t1
-           -- ToDo: Other UnivCos?
+mkSymCo co | isReflCo co      = co
+mkSymCo    (SymCo co)         = co
+mkSymCo    (SubCo (SymCo co)) = SubCo co
+mkSymCo    (UnivCo p r t1 t2) = UnivCo p r t2 t1
 mkSymCo co = SymCo co
 
 -- | Create a new 'Coercion' by composing the two given 'Coercion's transitively.

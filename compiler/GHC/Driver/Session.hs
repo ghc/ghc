@@ -40,7 +40,6 @@ module GHC.Driver.Session (
         lang_set,
         whenGeneratingDynamicToo, ifGeneratingDynamicToo,
         whenCannotGenerateDynamicToo,
-        zapCoercions,
         dynamicTooMkDynamicDynFlags,
         dynamicOutputFile,
         sccProfilingEnabled,
@@ -1133,14 +1132,6 @@ data RtsOptsEnabled
   = RtsOptsNone | RtsOptsIgnore | RtsOptsIgnoreAll | RtsOptsSafeOnly
   | RtsOptsAll
   deriving (Show)
-
--- | Should we generate coercions?
---
--- See Note [Zapping coercions] for details.
-zapCoercions :: DynFlags -> Bool
-zapCoercions dflags =
-    gopt Opt_DropCoercions dflags -- && gopt Opt_DoCoreLinting dflags
-    -- TODO: Add flag to explicitly enable coercion generation without linting?
 
 -- | Are we building with @-fPIE@ or @-fPIC@ enabled?
 positionIndependent :: DynFlags -> Bool
