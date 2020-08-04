@@ -6,6 +6,7 @@
 --
 -----------------------------------------------------------------------------
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 module GHC.Cmm.Lint (
     cmmLint, cmmLintGraph
@@ -14,6 +15,7 @@ module GHC.Cmm.Lint (
 import GHC.Prelude
 
 import GHC.Platform
+import GHC.Platform.Regs (callerSaves)
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Graph
@@ -26,7 +28,7 @@ import GHC.Cmm.Ppr () -- For Outputable instances
 import GHC.Utils.Outputable
 import GHC.Driver.Session
 
-import Control.Monad (ap)
+import Control.Monad (ap, unless)
 
 -- Things to check:
 --     - invariant on CmmBlock in GHC.Cmm.Expr (see comment there)
@@ -160,7 +162,13 @@ lintCmmMiddle node = case node of
 
   CmmUnsafeForeignCall target _formals actuals -> do
             lintTarget target
-            mapM_ lintCmmExpr actuals
+            let lintArg expr = do
+                  -- Arguments can't mention caller-saved
+                  -- registers. See Note [Register parameter passing].
+                  mayNotMentionCallerSavedRegs (text "foreign call argument") expr
+                  lintCmmExpr expr
+
+            mapM_ lintArg actuals
 
 
 lintCmmLast :: LabelSet -> CmmNode O C -> CmmLint ()
@@ -188,18 +196,40 @@ lintCmmLast labels node = case node of
 
   CmmForeignCall tgt _ args succ _ _ _ -> do
           lintTarget tgt
-          mapM_ lintCmmExpr args
+          let lintArg expr = do
+                -- Arguments can't mention caller-saved
+                -- registers. See Note [Register
+                -- parameter passing].
+                -- N.B. This won't catch local registers
+                -- which the NCG's register allocator later
+                -- places in caller-saved registers.
+                mayNotMentionCallerSavedRegs (text "foreign call argument") expr
+                lintCmmExpr expr
+          mapM_ lintArg args
           checkTarget succ
  where
   checkTarget id
      | setMember id labels = return ()
      | otherwise = cmmLintErr (text "Branch to nonexistent id" <+> ppr id)
 
-
 lintTarget :: ForeignTarget -> CmmLint ()
-lintTarget (ForeignTarget e _) = lintCmmExpr e >> return ()
+lintTarget (ForeignTarget e _) = do
+    mayNotMentionCallerSavedRegs (text "foreign target") e
+    _ <- lintCmmExpr e
+    return ()
 lintTarget (PrimTarget {})     = return ()
 
+-- | As noted in Note [Register parameter passing], the arguments and
+-- 'ForeignTarget' of a foreign call mustn't mention
+-- caller-saved registers.
+mayNotMentionCallerSavedRegs :: (UserOfRegs GlobalReg a, Outputable a)
+                             => SDoc -> a -> CmmLint ()
+mayNotMentionCallerSavedRegs what thing = do
+    dflags <- getDynFlags
+    let badRegs = filter (callerSaves (targetPlatform dflags))
+                  $ foldRegsUsed dflags (flip (:)) [] thing
+    unless (null badRegs)
+      $ cmmLintErr (what <+> text "mentions caller-saved registers: " <> ppr badRegs $$ ppr thing)
 
 checkCond :: Platform -> CmmExpr -> CmmLint ()
 checkCond _ (CmmMachOp mop _) | isComparisonMachOp mop = return ()
