@@ -427,7 +427,7 @@ Library
         GHC.Core.Opt.OccurAnal
         GHC.Core.Opt.StaticArgs
         GHC.Core.Opt.SetLevels
-        GHC.Core.Opt.Driver
+        GHC.Core.Opt.Pipeline
         GHC.Core.Opt.Simplify.Env
         GHC.Core.Opt.Simplify.Monad
         GHC.Core.Opt.Simplify.Utils

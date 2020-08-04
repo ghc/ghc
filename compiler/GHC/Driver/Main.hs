@@ -117,7 +117,7 @@ import GHC.Tc.Utils.Monad
 import GHC.Tc.Utils.Zonk    ( ZonkFlexi (DefaultFlexi) )
 import GHC.Types.Name.Cache ( initNameCache )
 import GHC.Builtin.Utils
-import GHC.Core.Opt.Driver
+import GHC.Core.Opt.Pipeline
 import GHC.HsToCore
 import GHC.Iface.Load   ( ifaceStats, initExternalPackageState, writeIface )
 import GHC.Iface.Make

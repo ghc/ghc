@@ -80,6 +80,10 @@ data BigNat = BN# { unBigNat :: BigNat# }
 bigNatCheck# :: BigNat# -> Bool#
 bigNatCheck# bn
    | 0#  <- bigNatSize# bn                         = 1#
+   -- check that size is a multiple of Word size
+   | r <- remInt# (sizeofByteArray# bn) WORD_SIZE_IN_BYTES#
+   , isTrue# (r /=# 0#)                            = 0#
+   -- check that most-significant limb isn't zero
    | 0## <- bigNatIndex# bn (bigNatSize# bn -# 1#) = 0#
    | True                                          = 1#
 

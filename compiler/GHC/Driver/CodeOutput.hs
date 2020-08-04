@@ -125,27 +125,10 @@ outputC :: DynFlags
 outputC dflags filenm cmm_stream packages
   = do
        withTiming dflags (text "C codegen") (\a -> seq a () {- FIXME -}) $ do
-
-         -- figure out which header files to #include in the generated .hc file:
-         --
-         --   * extra_includes from packages
-         --   * -#include options from the cmdline and OPTIONS pragmas
-         --   * the _stub.h file, if there is one.
-         --
-         let rts = unsafeLookupUnitId (unitState dflags) rtsUnitId
-
-         let cc_injects = unlines (map mk_include (unitIncludes rts))
-             mk_include h_file =
-              case h_file of
-                 '"':_{-"-} -> "#include "++h_file
-                 '<':_      -> "#include "++h_file
-                 _          -> "#include \""++h_file++"\""
-
          let pkg_names = map unitIdString packages
-
          doOutput filenm $ \ h -> do
             hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
-            hPutStr h cc_injects
+            hPutStr h "#include \"Stg.h\"\n"
             let platform = targetPlatform dflags
                 writeC = printForC dflags h . cmmToC platform
             Stream.consume cmm_stream writeC

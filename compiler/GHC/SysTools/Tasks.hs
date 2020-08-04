@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 --
 -- Tasks running external programs for SysTools
@@ -299,6 +300,20 @@ ld: warning: symbol referencing errors
     ld_postfix = tail . snd . ld_warn_break
     ld_warning_found = not . null . snd . ld_warn_break
 
+-- See Note [Merging object files for GHCi] in GHC.Driver.Pipeline.
+runMergeObjects :: DynFlags -> [Option] -> IO ()
+runMergeObjects dflags args = traceToolCommand dflags "merge-objects" $ do
+  let (p,args0) = pgm_lm dflags
+      optl_args = map Option (getOpts dflags opt_lm)
+      args2     = args0 ++ args ++ optl_args
+  -- N.B. Darwin's ld64 doesn't support response files. Consequently we only
+  -- use them on Windows where they are truly necessary.
+#if defined(mingw32_HOST_OS)
+  mb_env <- getGccEnv args2
+  runSomethingResponseFile dflags id "Merge objects" p args2 mb_env
+#else
+  runSomething dflags "Merge objects" p args2
+#endif
 
 runLibtool :: DynFlags -> [Option] -> IO ()
 runLibtool dflags args = traceToolCommand dflags "libtool" $ do
