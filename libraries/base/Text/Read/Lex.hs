@@ -527,7 +527,7 @@ lexFrac :: Int -> ReadP (Maybe Digits)
 -- Consumes the decimal point if the fractional part is elided
 lexFrac base = dotAndDigits <++ return Nothing
  where
-   dotAndDigits = do char '.'
+   dotAndDigits = do _ <- char '.'
                      (fmap Just (lexDigits base)) <++ return Nothing
 
 lexExp :: [Char] -> ReadP (Maybe Integer)
