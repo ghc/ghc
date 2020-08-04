@@ -25,7 +25,7 @@ module GHC.Core.TyCo.FVs
 
         -- Injective free vars
         injectiveVarsOfType, injectiveVarsOfTypes,
-        invisibleVarsOfType, invisibleVarsOfTypes,
+        invisibleVarsOfTypes,
 
         -- No Free vars
         noFreeVarsOfType, noFreeVarsOfTypes, noFreeVarsOfCo,
@@ -221,7 +221,7 @@ kind are free.
 *                                                                      *
 ********************************************************************* -}
 
-{- Note [Acumulating parameter free variables]
+{- Note [Accumulating parameter free variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We can use foldType to build an accumulating-parameter version of a
 free-var finder, thus:
@@ -271,7 +271,16 @@ emptyInScope = emptyVarSet
 
 runTyCoVars :: TyCoFvFun a TyCoVarSet -> a -> TyCoVarSet
 {-# INLINE runTyCoVars #-}
-runTyCoVars f x = appEndo (f emptyInScope x) emptyVarSet
+runTyCoVars f = \x -> appEndo (f emptyInScope x) emptyVarSet
+  -- It's very important that the \x is to the right of the '=', so
+  -- runTyCoVars has arity 1.  It is often applied to just one arg e.g.
+  --    tyCoVarsOfType  = runTyCoVars deep_ty
+  -- We want runTyCoVars to inline, so that deep_ty is applied to two args,
+  -- which in turn makes deep_ty eta-expand. Without that eta-expansion,
+  -- deep_ty is dreadfully inefficient.
+  --
+  -- If we put the \x to the left of the '=', runTyCoVars would only
+  -- inline when applied to /two/ arguments.
 
 
 {- *********************************************************************
@@ -281,22 +290,20 @@ runTyCoVars f x = appEndo (f emptyInScope x) emptyVarSet
 *                                                                      *
 ********************************************************************* -}
 
-tyCoVarsOfType :: Type -> TyCoVarSet
-tyCoVarsOfType ty = runTyCoVars deep_ty ty
--- Alternative:
---   tyCoVarsOfType ty = closeOverKinds (shallowTyCoVarsOfType ty)
-
-tyCoVarsOfTypes :: [Type] -> TyCoVarSet
-tyCoVarsOfTypes tys = runTyCoVars deep_tys tys
--- Alternative:
---   tyCoVarsOfTypes tys = closeOverKinds (shallowTyCoVarsOfTypes tys)
-
-tyCoVarsOfCo :: Coercion -> TyCoVarSet
 -- See Note [Free variables of Coercions]
-tyCoVarsOfCo co = runTyCoVars deep_co co
 
-tyCoVarsOfCos :: [Coercion] -> TyCoVarSet
-tyCoVarsOfCos cos = runTyCoVars deep_cos cos
+tyCoVarsOfType  :: Type -> TyCoVarSet
+tyCoVarsOfTypes :: [Type] -> TyCoVarSet
+tyCoVarsOfCo    :: Coercion -> TyCoVarSet
+tyCoVarsOfCos   :: [Coercion] -> TyCoVarSet
+
+tyCoVarsOfType  = runTyCoVars deep_ty
+tyCoVarsOfTypes = runTyCoVars deep_tys
+tyCoVarsOfCo    = runTyCoVars deep_co
+tyCoVarsOfCos   = runTyCoVars deep_cos
+
+-- Alternative for tyCoVarsOfType
+--   tyCoVarsOfType ty = closeOverKinds (shallowTyCoVarsOfType ty)
 
 deep_ty  :: TyCoFvFun Type       TyCoVarSet
 deep_tys :: TyCoFvFun [Type]     TyCoVarSet
@@ -866,26 +873,32 @@ injectiveVarsOfTypes look_under_tfs = mapUnionFV (injectiveVarsOfType look_under
 --   * In a coercion
 --   * In a Specified or Inferred argument to a function
 -- See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in "GHC.Core.TyCo.Rep"
-invisibleVarsOfType :: Type -> FV
-invisibleVarsOfType = go
-  where
-    go ty                 | Just ty' <- coreView ty
-                          = go ty'
-    go (TyVarTy v)        = go (tyVarKind v)
-    go (AppTy f a)        = go f `unionFV` go a
-    go (FunTy _ w ty1 ty2) = go w `unionFV` go ty1 `unionFV` go ty2
-    go (TyConApp tc tys)  = tyCoFVsOfTypes invisibles `unionFV`
-                            invisibleVarsOfTypes visibles
-      where (invisibles, visibles) = partitionInvisibleTypes tc tys
-    go (ForAllTy tvb ty)  = tyCoFVsBndr tvb $ go ty
-    go LitTy{}            = emptyFV
-    go (CastTy ty co)     = tyCoFVsOfCo co `unionFV` go ty
-    go (CoercionTy co)    = tyCoFVsOfCo co
+invisibleVarsOfTypes :: [Type] -> VarSet
+invisibleVarsOfTypes = runTyCoVars invis_tys
 
--- | Like 'invisibleVarsOfType', but for many types.
-invisibleVarsOfTypes :: [Type] -> FV
-invisibleVarsOfTypes = mapUnionFV invisibleVarsOfType
+invis_tys :: TyCoFvFun [Type] TyCoVarSet
+invis_tys _  []       = mempty
+invis_tys is (ty:tys) = invis_ty is ty `mappend` invis_tys is tys
 
+invis_ty :: TyCoFvFun Type TyCoVarSet
+invis_ty is ty | Just ty' <- coreView ty
+               = invis_ty is ty'
+
+invis_ty is (TyVarTy v)
+  | v `elemVarSet` is           = mempty
+  | otherwise                   = deep_ty emptyVarSet (tyVarKind v)
+invis_ty is (AppTy f a)         = invis_ty is f `mappend` invis_ty is a
+invis_ty is (FunTy _ w ty1 ty2) = invis_ty is w `mappend` invis_ty is ty1 `mappend` invis_ty is ty2
+invis_ty is (TyConApp tc tys)   = deep_tys  is invisibles `mappend`
+                                  invis_tys is visibles
+   where (invisibles, visibles) = partitionInvisibleTypes tc tys
+invis_ty is (ForAllTy tvb ty)   = invis_ty is (tyVarKind tv) `mappend`
+                                  invis_ty (is `extendVarSet` tv) ty
+                                where
+                                  tv = binderVar tvb
+invis_ty _ LitTy{}          = mempty
+invis_ty is (CastTy ty co)  = deep_co is co `mappend` invis_ty is ty
+invis_ty is (CoercionTy co) = deep_co is co
 
 {- *********************************************************************
 *                                                                      *
