@@ -95,8 +95,7 @@ module GHC.Parser.PostProcess (
         -- Expression/command/pattern ambiguity resolution
         PV,
         runPV,
-        ECP(ECP, runECP_PV),
-        runECP_P,
+        ECP(ECP, unECP),
         DisambInfixOp(..),
         DisambECP(..),
         ecpFromExp,
@@ -1335,7 +1334,6 @@ checkMonadComp = do
 -- See Note [Ambiguous syntactic categories]
 --
 
--- See Note [Parser-Validator]
 -- See Note [Ambiguous syntactic categories]
 --
 -- This newtype is required to avoid impredicative types in monadic
@@ -1349,10 +1347,7 @@ checkMonadComp = do
 --    P (forall b. DisambECP b => PV (Located b))
 --
 newtype ECP =
-  ECP { runECP_PV :: forall b. DisambECP b => PV (Located b) }
-
-runECP_P :: DisambECP b => ECP -> P (Located b)
-runECP_P p = runPV (runECP_PV p)
+  ECP { unECP :: forall b. DisambECP b => PV (Located b) }
 
 ecpFromExp :: LHsExpr GhcPs -> ECP
 ecpFromExp a = ECP (ecpFromExp' a)
@@ -1882,7 +1877,6 @@ tyToDataConBuilder t =
 
 {- Note [Ambiguous syntactic categories]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 There are places in the grammar where we do not know whether we are parsing an
 expression or a pattern without unlimited lookahead (which we do not have in
 'happy'):
@@ -1977,6 +1971,21 @@ position and shadows the previous $1. We can do this because internally
 is to be able to write (sLL $1 $>) later on. The alternative would be to
 write this as ($1 >>= \ fresh_name -> ...), but then we couldn't refer
 to the last fresh name as $>.
+
+Finally, we instantiate the polymorphic type to a concrete one, and run the
+parser-validator, for example:
+
+    stmt   :: { forall b. DisambECP b => PV (LStmt GhcPs (Located b)) }
+    e_stmt :: { LStmt GhcPs (LHsExpr GhcPs) }
+            : stmt {% runPV $1 }
+
+In e_stmt, three things happen:
+
+  1. we instantiate: b ~ HsExpr GhcPs
+  2. we embed the PV computation into P by using runPV
+  3. we run validation by using a monadic production, {% ... }
+
+At this point the ambiguity is resolved.
 -}
 
 
@@ -2133,7 +2142,6 @@ Alternative VII, a product type
 We could avoid the intermediate representation of Alternative VI by parsing
 into a product of interpretations directly:
 
-    -- See Note [Parser-Validator]
     type ExpCmdPat = ( PV (LHsExpr GhcPs)
                      , PV (LHsCmd GhcPs)
                      , PV (LHsPat GhcPs) )
@@ -2153,7 +2161,6 @@ We can easily define ambiguities between arbitrary subsets of interpretations.
 For example, when we know ahead of type that only an expression or a command is
 possible, but not a pattern, we can use a smaller type:
 
-    -- See Note [Parser-Validator]
     type ExpCmd = (PV (LHsExpr GhcPs), PV (LHsCmd GhcPs))
 
     checkExpOf2 (e, _) = e  -- interpret as an expression
@@ -2663,7 +2670,25 @@ data PV_Accum =
 
 data PV_Result a = PV_Ok PV_Accum a | PV_Failed PV_Accum
 
--- See Note [Parser-Validator]
+-- During parsing, we make use of several monadic effects: reporting parse errors,
+-- accumulating warnings, adding API annotations, and checking for extensions. These
+-- effects are captured by the 'MonadP' type class.
+--
+-- Sometimes we need to postpone some of these effects to a later stage due to
+-- ambiguities described in Note [Ambiguous syntactic categories].
+-- We could use two layers of the P monad, one for each stage:
+--
+--   abParser :: forall x. DisambAB x => P (P x)
+--
+-- The outer layer of P consumes the input and builds the inner layer, which
+-- validates the input. But this type is not particularly helpful, as it obscures
+-- the fact that the inner layer of P never consumes any input.
+--
+-- For clarity, we introduce the notion of a parser-validator: a parser that does
+-- not consume any input, but may fail or use other effects. Thus we have:
+--
+--   abParser :: forall x. DisambAB x => P (PV x)
+--
 newtype PV a = PV { unPV :: PV_Context -> PV_Accum -> PV_Result a }
 
 instance Functor PV where
@@ -2736,36 +2761,6 @@ instance MonadP PV where
       in
         PV_Ok acc' ()
   addAnnotation _ _ _ = return ()
-
-{- Note [Parser-Validator]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-When resolving ambiguities, we need to postpone failure to make a choice later.
-For example, if we have ambiguity between some A and B, our parser could be
-
-  abParser :: P (Maybe A, Maybe B)
-
-This way we can represent four possible outcomes of parsing:
-
-    (Just a, Nothing)       -- definitely A
-    (Nothing, Just b)       -- definitely B
-    (Just a, Just b)        -- either A or B
-    (Nothing, Nothing)      -- neither A nor B
-
-However, if we want to report informative parse errors, accumulate warnings,
-and add API annotations, we are better off using 'P' instead of 'Maybe':
-
-  abParser :: P (P A, P B)
-
-So we have an outer layer of P that consumes the input and builds the inner
-layer, which validates the input.
-
-For clarity, we introduce the notion of a parser-validator: a parser that does
-not consume any input, but may fail or use other effects. Thus we have:
-
-  abParser :: P (PV A, PV B)
-
--}
 
 {- Note [Parser-Validator Hint]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
