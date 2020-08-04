@@ -863,17 +863,17 @@ header_top_importdecls :: { [LImportDecl GhcPs] }
 -- The Export List
 
 maybeexports :: { (Maybe (Located [LIE GhcPs])) }
-        :  '(' exportlist ')'       {% amsL (comb2 $1 $>) [mop $1,mcp $3] >>
-                                       return (Just (sLL $1 $> (fromOL $2))) }
+        :  '(' exportlist ')'       {% amsL (comb2 $1 $>) ([mop $1,mcp $3] ++ (fst $2)) >>
+                                       return (Just (sLL $1 $> (fromOL $ snd $2))) }
         |  {- empty -}              { Nothing }
 
-exportlist :: { OrdList (LIE GhcPs) }
-        : exportlist1     { $1 }
-        | {- empty -}     { nilOL }
+exportlist :: { ([AddAnn], OrdList (LIE GhcPs)) }
+        : exportlist1     { ([], $1) }
+        | {- empty -}     { ([], nilOL) }
 
         -- trailing comma:
-        | exportlist1 ',' { $1 }
-        | ','             { nilOL }
+        | exportlist1 ',' { ([mj AnnComma $2], $1) }
+        | ','             { ([mj AnnComma $1], nilOL) }
 
 exportlist1 :: { OrdList (LIE GhcPs) }
         : exportlist1 ',' export
@@ -1019,11 +1019,11 @@ maybeimpspec :: { Located (Maybe (Bool, Located [LIE GhcPs])) }
 
 impspec :: { Located (Bool, Located [LIE GhcPs]) }
         :  '(' exportlist ')'               {% ams (sLL $1 $> (False,
-                                                      sLL $1 $> $ fromOL $2))
-                                                   [mop $1,mcp $3] }
+                                                      sLL $1 $> $ fromOL (snd $2)))
+                                                   ([mop $1,mcp $3] ++ (fst $2)) }
         |  'hiding' '(' exportlist ')'      {% ams (sLL $1 $> (True,
-                                                      sLL $1 $> $ fromOL $3))
-                                               [mj AnnHiding $1,mop $2,mcp $4] }
+                                                      sLL $1 $> $ fromOL (snd $3)))
+                                               ([mj AnnHiding $1,mop $2,mcp $4] ++ (fst $3)) }
 
 -----------------------------------------------------------------------------
 -- Fixity Declarations
