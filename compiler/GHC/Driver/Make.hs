@@ -202,8 +202,8 @@ depanalPartial excluded_mods allow_dup_roots = do
              (uncurry ModuleNode <$> mod_summaries) ++ instantiationNodes dflags
     return (unionManyBags errs, mod_graph)
 
--- | Collect the instantiations of dependencies to create 'ModuleGraph' 'Left
--- iuid' nodes. These are used to represent the type checking that is done after
+-- | Collect the instantiations of dependencies to create 'InstantiationNode' work graph nodes.
+-- These are used to represent the type checking that is done after
 -- all the free holes (sigs in current package) relevant to that instantiation
 -- are compiled. This is necessary to catch some instantiation errors.
 --
@@ -2136,6 +2136,10 @@ mkNodeKey = \case
   InstantiationNode x -> Left x
   ModuleNode x _ -> Right $ mkHomeBuildModule0 x
 
+pprNodeKey :: NodeKey -> SDoc
+pprNodeKey (Left iu) = ppr iu
+pprNodeKey (Right mk) = ppr mk
+
 mkNodeMap :: [ExtendedModSummary] -> ModNodeMap ExtendedModSummary
 mkNodeMap summaries = Map.fromList
   [ (msKey $ fst s, s) | s <- summaries]
@@ -2854,7 +2858,7 @@ keepGoingPruneErr :: [NodeKey] -> SDoc
 keepGoingPruneErr ms
   = vcat (( text "-fkeep-going in use, removing the following" <+>
             text "dependencies and continuing:"):
-          map (nest 6 . ppr) ms )
+          map (nest 6 . pprNodeKey) ms )
 
 cyclicModuleErr :: [WorkGraphNode] -> SDoc
 -- From a strongly connected component we find
