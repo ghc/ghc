@@ -1,3 +1,2 @@
 
-strictnessDataCon_B.hs:1:27: error:
-    {-# UNPACK #-} cannot appear inside a type.
+strictnessDataCon_B.hs:1:42: error: parse error on input ‘}’

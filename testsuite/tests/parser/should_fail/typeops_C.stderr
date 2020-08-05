@@ -1,2 +1,2 @@
 
-typeops_C.hs:1:12: error: Operator applied to too few arguments: +
+typeops_C.hs:1:14: error: Operator applied to too few arguments: +
