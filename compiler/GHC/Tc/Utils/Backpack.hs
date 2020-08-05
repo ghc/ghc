@@ -239,7 +239,7 @@ check_inst sig_inst = do
 --      unit p where
 --          signature X
 --          signature Y
---              import Y
+--              import X
 --
 --      unit q where
 --          dependency p[X=\<A>,Y=\<B>]
