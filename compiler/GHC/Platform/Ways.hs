@@ -20,6 +20,7 @@
 -- this compilation.
 module GHC.Platform.Ways
    ( Way(..)
+   , Ways
    , hasWay
    , allowed_combination
    , wayGeneralFlags
@@ -61,12 +62,14 @@ data Way
   | WayDyn           -- ^ Dynamic linking
   deriving (Eq, Ord, Show)
 
+type Ways = Set Way
+
 -- | Test if a ways is enabled
-hasWay :: Set Way -> Way -> Bool
+hasWay :: Ways -> Way -> Bool
 hasWay ws w = Set.member w ws
 
 -- | Check if a combination of ways is allowed
-allowed_combination :: Set Way -> Bool
+allowed_combination :: Ways -> Bool
 allowed_combination ways = not disallowed
   where
    disallowed = or [ hasWay ways x && hasWay ways y
@@ -76,13 +79,13 @@ allowed_combination ways = not disallowed
    couples = [] -- we don't have any disallowed combination of ways nowadays
 
 -- | Unique tag associated to a list of ways
-waysTag :: Set Way -> String
+waysTag :: Ways -> String
 waysTag = concat . intersperse "_" . map wayTag . Set.toAscList
 
 -- | Unique build-tag associated to a list of ways
 --
 -- RTS only ways are filtered out because they have no impact on the build.
-waysBuildTag :: Set Way -> String
+waysBuildTag :: Ways -> String
 waysBuildTag ws = waysTag (Set.filter (not . wayRTSOnly) ws)
 
 
@@ -195,7 +198,7 @@ foreign import ccall unsafe "rts_isDynamic" rtsIsDynamicIO :: IO Int
 -- | Return host "full" ways (i.e. ways that have an impact on the compilation,
 -- not RTS only ways). These ways must be used when compiling codes targeting
 -- the internal interpreter.
-hostFullWays :: Set Way
+hostFullWays :: Ways
 hostFullWays = Set.unions
    [ if hostIsDynamic  then Set.singleton WayDyn  else Set.empty
    , if hostIsProfiled then Set.singleton WayProf else Set.empty

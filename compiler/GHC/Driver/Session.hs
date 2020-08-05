@@ -534,7 +534,7 @@ data DynFlags = DynFlags {
   homeUnitInstantiations:: [(ModuleName, Module)], -- ^ How to instantiate `homeUnitInstanceOfId` unit
 
   -- ways
-  ways                  :: Set Way,     -- ^ Way flags from the command line
+  ways                  :: Ways,         -- ^ Way flags from the command line
 
   -- For object splitting
   splitInfo             :: Maybe (String,Int),
@@ -1433,7 +1433,7 @@ defaultDynFlags mySettings llvmConfig =
         cfgWeightInfo = defaultCfgWeights
       }
 
-defaultWays :: Settings -> Set Way
+defaultWays :: Settings -> Ways
 defaultWays settings = if pc_DYNAMIC_BY_DEFAULT (sPlatformConstants settings)
                        then Set.singleton WayDyn
                        else Set.empty
