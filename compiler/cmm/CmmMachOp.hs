@@ -43,6 +43,9 @@ native code generators to handle.
 Most operations are parameterised by the 'Width' that they operate on.
 Some operations have separate signed and unsigned versions, and float
 and integer versions.
+
+Note that there are variety of places in the native code generator where we
+assume that the code produced for a MachOp does not introduce new blocks.
 -}
 
 data MachOp
