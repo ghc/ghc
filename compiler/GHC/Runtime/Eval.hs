@@ -85,7 +85,7 @@ import GHC.LanguageExtensions
 import GHC.Types.Unique
 import GHC.Types.Unique.Supply
 import GHC.Utils.Monad
-import GHC.Unit.Module
+import GHC.Unit
 import GHC.Builtin.Names ( toDynName, pretendNameIsInScope )
 import GHC.Builtin.Types ( isCTupleTyConName )
 import GHC.Utils.Panic
@@ -812,7 +812,7 @@ getContext = withSession $ \HscEnv{ hsc_IC=ic } ->
 -- its full top-level scope available.
 moduleIsInterpreted :: GhcMonad m => Module -> m Bool
 moduleIsInterpreted modl = withSession $ \h ->
- if not (isHomeModule (hsc_dflags h) modl)
+ if notHomeModule (mkHomeUnitFromFlags (hsc_dflags h)) modl
         then return False
         else case lookupHpt (hsc_HPT h) (moduleName modl) of
                 Just details       -> return (isJust (mi_globals (hm_iface details)))

@@ -50,7 +50,7 @@ import GHC.Core.Coercion
 import GHC.Builtin.Types
 import GHC.Core.DataCon ( dataConWrapId )
 import GHC.Core.Make
-import GHC.Unit.Module
+import GHC.Unit
 import GHC.Types.Name.Set
 import GHC.Types.Name.Env
 import GHC.Core.Rules
@@ -119,7 +119,11 @@ deSugar hsc_env
                             })
 
   = do { let dflags = hsc_dflags hsc_env
-             print_unqual = mkPrintUnqualified dflags rdr_env
+             home_unit = mkHomeUnitFromFlags dflags
+             print_unqual = mkPrintUnqualified
+                              (unitState dflags)
+                              home_unit
+                              rdr_env
         ; withTiming dflags
                      (text "Desugar"<+>brackets (ppr mod))
                      (const ()) $
@@ -174,9 +178,9 @@ deSugar hsc_env
         ; endPassIO hsc_env print_unqual CoreDesugarOpt ds_binds ds_rules_for_imps
 
         ; let used_names = mkUsedNames tcg_env
-              pluginModules =
-                map lpModule (cachedPlugins (hsc_dflags hsc_env))
-        ; deps <- mkDependencies (homeUnitId (hsc_dflags hsc_env))
+              pluginModules = map lpModule (cachedPlugins (hsc_dflags hsc_env))
+              home_unit = mkHomeUnitFromFlags (hsc_dflags hsc_env)
+        ; deps <- mkDependencies (homeUnitId home_unit)
                                  (map mi_module pluginModules) tcg_env
 
         ; used_th <- readIORef tc_splice_used

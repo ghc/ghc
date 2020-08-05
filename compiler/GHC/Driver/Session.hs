@@ -65,7 +65,7 @@ module GHC.Driver.Session (
 
         addWay', targetProfile,
 
-        homeUnit, mkHomeModule, isHomeModule,
+        mkHomeUnitFromFlags,
 
         -- ** Log output
         putLogMsg,
@@ -168,8 +168,6 @@ module GHC.Driver.Session (
         updOptLevel,
         setTmpDir,
         setUnitId,
-        canonicalizeHomeModule,
-        canonicalizeModuleIfHome,
 
         TurnOnFlag,
         turnOn,
@@ -241,6 +239,7 @@ import GHC.Platform
 import GHC.Platform.Ways
 import GHC.Platform.Profile
 import GHC.UniqueSubdir (uniqueSubdir)
+import GHC.Unit.Home
 import GHC.Unit.Types
 import GHC.Unit.Parser
 import GHC.Unit.Module
@@ -248,7 +247,7 @@ import GHC.Driver.Ppr
 import {-# SOURCE #-} GHC.Driver.Plugins
 import {-# SOURCE #-} GHC.Driver.Hooks
 import GHC.Builtin.Names ( mAIN )
-import {-# SOURCE #-} GHC.Unit.State (UnitState, emptyUnitState, UnitDatabase, updateIndefUnitId)
+import {-# SOURCE #-} GHC.Unit.State (UnitState, emptyUnitState, UnitDatabase)
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Flags
 import GHC.Driver.Backend
@@ -530,9 +529,9 @@ data DynFlags = DynFlags {
   solverIterations      :: IntWithInf,   -- ^ Number of iterations in the constraints solver
                                          --   Typically only 1 is needed
 
-  homeUnitId            :: UnitId,                 -- ^ Target home unit-id
-  homeUnitInstanceOfId  :: Maybe IndefUnitId,      -- ^ Unit-id to instantiate
-  homeUnitInstantiations:: [(ModuleName, Module)], -- ^ How to instantiate `homeUnitInstanceOfId` unit
+  homeUnitId_             :: UnitId,                 -- ^ Target home unit-id
+  homeUnitInstanceOf_     :: Maybe UnitId,           -- ^ Id of the unit to instantiate
+  homeUnitInstantiations_ :: [(ModuleName, Module)], -- ^ Module instantiations
 
   -- ways
   ways                  :: Ways,         -- ^ Way flags from the command line
@@ -1273,9 +1272,9 @@ defaultDynFlags mySettings llvmConfig =
         reductionDepth          = treatZeroAsInf mAX_REDUCTION_DEPTH,
         solverIterations        = treatZeroAsInf mAX_SOLVER_ITERATIONS,
 
-        homeUnitId              = mainUnitId,
-        homeUnitInstanceOfId    = Nothing,
-        homeUnitInstantiations  = [],
+        homeUnitId_             = mainUnitId,
+        homeUnitInstanceOf_     = Nothing,
+        homeUnitInstantiations_ = [],
 
         objectDir               = Nothing,
         dylibInstallName        = Nothing,
@@ -1908,31 +1907,27 @@ setOutputHi   f d = d { outputHi   = f}
 setJsonLogAction :: DynFlags -> DynFlags
 setJsonLogAction d = d { log_action = jsonLogAction }
 
--- | Make a module in home unit
-mkHomeModule :: DynFlags -> ModuleName -> Module
-mkHomeModule dflags = mkModule (homeUnit dflags)
-
--- | Test if the module comes from the home unit
-isHomeModule :: DynFlags -> Module -> Bool
-isHomeModule dflags m = moduleUnit m == homeUnit dflags
-
 -- | Get home unit
-homeUnit :: DynFlags -> Unit
-homeUnit dflags =
-   case (homeUnitInstanceOfId dflags, homeUnitInstantiations dflags) of
-      (Nothing,[]) -> RealUnit (Definite (homeUnitId dflags))
+mkHomeUnitFromFlags :: DynFlags -> HomeUnit
+mkHomeUnitFromFlags dflags =
+   let !hu_id             = homeUnitId_ dflags
+       !hu_instanceof     = homeUnitInstanceOf_ dflags
+       !hu_instantiations = homeUnitInstantiations_ dflags
+   in case (hu_instanceof, hu_instantiations) of
+      (Nothing,[]) -> DefiniteHomeUnit hu_id Nothing
       (Nothing, _) -> throwGhcException $ CmdLineError ("Use of -instantiated-with requires -this-component-id")
       (Just _, []) -> throwGhcException $ CmdLineError ("Use of -this-component-id requires -instantiated-with")
       (Just u, is)
          -- detect fully indefinite units: all their instantiations are hole
          -- modules and the home unit id is the same as the instantiating unit
          -- id (see Note [About units] in GHC.Unit)
-         | all (isHoleModule . snd) is && indefUnit u == homeUnitId dflags
-         -> mkVirtUnit (updateIndefUnitId (unitState dflags) u) is
-         -- otherwise it must be that we compile a fully definite units
+         | all (isHoleModule . snd) is && u == hu_id
+         -> IndefiniteHomeUnit u is
+         -- otherwise it must be that we (fully) instantiate an indefinite unit
+         -- to make it definite.
          -- TODO: error when the unit is partially instantiated??
          | otherwise
-         -> RealUnit (Definite (homeUnitId dflags))
+         -> DefiniteHomeUnit hu_id (Just (u, is))
 
 parseUnitInsts :: String -> Instantiations
 parseUnitInsts str = case filter ((=="").snd) (readP_to_S parse str) of
@@ -1947,11 +1942,11 @@ parseUnitInsts str = case filter ((=="").snd) (readP_to_S parse str) of
 
 setUnitInstantiations :: String -> DynFlags -> DynFlags
 setUnitInstantiations s d =
-    d { homeUnitInstantiations = parseUnitInsts s }
+    d { homeUnitInstantiations_ = parseUnitInsts s }
 
 setUnitInstanceOf :: String -> DynFlags -> DynFlags
 setUnitInstanceOf s d =
-    d { homeUnitInstanceOfId = Just (Indefinite (UnitId (fsLit s)) Nothing) }
+    d { homeUnitInstanceOf_ = Just (UnitId (fsLit s)) }
 
 addPluginModuleName :: String -> DynFlags -> DynFlags
 addPluginModuleName name d = d { pluginModNames = (mkModuleName name) : (pluginModNames d) }
@@ -4533,22 +4528,7 @@ parseUnitArg =
     fmap UnitIdArg parseUnit
 
 setUnitId :: String -> DynFlags -> DynFlags
-setUnitId p d = d { homeUnitId = stringToUnitId p }
-
--- | Given a 'ModuleName' of a signature in the home library, find
--- out how it is instantiated.  E.g., the canonical form of
--- A in @p[A=q[]:A]@ is @q[]:A@.
-canonicalizeHomeModule :: DynFlags -> ModuleName -> Module
-canonicalizeHomeModule dflags mod_name =
-    case lookup mod_name (homeUnitInstantiations dflags) of
-        Nothing  -> mkHomeModule dflags mod_name
-        Just mod -> mod
-
-canonicalizeModuleIfHome :: DynFlags -> Module -> Module
-canonicalizeModuleIfHome dflags mod
-    = if homeUnit dflags == moduleUnit mod
-                      then canonicalizeHomeModule dflags (moduleName mod)
-                      else mod
+setUnitId p d = d { homeUnitId_ = stringToUnitId p }
 
 -- If we're linking a binary, then only backends that produce object
 -- code are allowed (requests for other target types are ignored).
