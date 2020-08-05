@@ -13,8 +13,6 @@ import GHC.Prelude
 import GHC.Platform
 import GHC.Platform.Ways
 
-import Data.Set
-
 -- | A platform profile fully describes the kind of objects that are generated
 -- for a platform.
 --
@@ -22,8 +20,8 @@ import Data.Set
 -- (profiling, debug, dynamic) also modify the ABI.
 --
 data Profile = Profile
-   { profilePlatform :: !Platform  -- ^ Platform
-   , profileWays     :: !(Set Way) -- ^ Ways
+   { profilePlatform :: !Platform -- ^ Platform
+   , profileWays     :: !Ways     -- ^ Ways
    }
 
 -- | Get platform constants
