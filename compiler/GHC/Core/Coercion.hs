@@ -32,7 +32,7 @@ module GHC.Core.Coercion (
         mkAxInstLHS, mkUnbranchedAxInstLHS,
         mkPiCo, mkPiCos, mkCoCast,
         mkSymCo, mkTransCo,
-        mkNthCo, nthCoRole, mkLRCo,
+        mkNthCo, mkNthCoFunCo, nthCoRole, mkLRCo,
         mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo, mkFunCo,
         mkForAllCo, mkForAllCos, mkHomoForAllCos,
         mkPhantomCo,
@@ -1052,23 +1052,8 @@ mkNthCo r n co
       -- If co :: (forall a1:t1 ~ t2. t1) ~ (forall a2:t3 ~ t4. t2)
       -- then (nth 0 co :: (t1 ~ t2) ~N (t3 ~ t4))
 
-    go r n co@(FunCo r0 w arg res)
-      -- See Note [Function coercions]
-      -- If FunCo _ mult arg_co res_co ::   (s1:TYPE sk1 :mult-> s2:TYPE sk2)
-      --                                  ~ (t1:TYPE tk1 :mult-> t2:TYPE tk2)
-      -- Then we want to behave as if co was
-      --    TyConAppCo mult argk_co resk_co arg_co res_co
-      -- where
-      --    argk_co :: sk1 ~ tk1  =  mkNthCo 0 (mkKindCo arg_co)
-      --    resk_co :: sk2 ~ tk2  =  mkNthCo 0 (mkKindCo res_co)
-      --                             i.e. mkRuntimeRepCo
-      = case n of
-          0 -> ASSERT( r == Nominal ) w
-          1 -> ASSERT( r == Nominal ) mkRuntimeRepCo arg
-          2 -> ASSERT( r == Nominal ) mkRuntimeRepCo res
-          3 -> ASSERT( r == r0 )      arg
-          4 -> ASSERT( r == r0 )      res
-          _ -> pprPanic "mkNthCo(FunCo)" (ppr n $$ ppr co)
+    go _ n (FunCo _ w arg res)
+      = mkNthCoFunCo n w arg res
 
     go r n (TyConAppCo r0 tc arg_cos) = ASSERT2( r == nthRole r0 tc n
                                                     , (vcat [ ppr tc
@@ -1120,7 +1105,28 @@ mkNthCo r n co
       | otherwise
       = True
 
-
+-- | Extract the nth field of a FunCo
+mkNthCoFunCo :: Int         -- ^ "n"
+             -> CoercionN   -- ^ multiplicity coercion
+             -> Coercion    -- ^ argument coercion
+             -> Coercion    -- ^ result coercion
+             -> Coercion    -- ^ nth coercion from a FunCo
+-- See Note [Function coercions]
+-- If FunCo _ mult arg_co res_co ::   (s1:TYPE sk1 :mult-> s2:TYPE sk2)
+--                                  ~ (t1:TYPE tk1 :mult-> t2:TYPE tk2)
+-- Then we want to behave as if co was
+--    TyConAppCo mult argk_co resk_co arg_co res_co
+-- where
+--    argk_co :: sk1 ~ tk1  =  mkNthCo 0 (mkKindCo arg_co)
+--    resk_co :: sk2 ~ tk2  =  mkNthCo 0 (mkKindCo res_co)
+--                             i.e. mkRuntimeRepCo
+mkNthCoFunCo n w co1 co2 = case n of
+  0 -> w
+  1 -> mkRuntimeRepCo co1
+  2 -> mkRuntimeRepCo co2
+  3 -> co1
+  4 -> co2
+  _ -> pprPanic "mkNthCo(FunCo)" (ppr n $$ ppr w $$ ppr co1 $$ ppr co2)
 
 -- | If you're about to call @mkNthCo r n co@, then @r@ should be
 -- whatever @nthCoRole n co@ returns.
