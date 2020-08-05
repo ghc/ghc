@@ -211,7 +211,6 @@ reduceNodesIntoVerticesUniq = reduceNodesIntoVertices listToUFM (flip lookupUFM)
 ************************************************************************
 -}
 
--- TODO upstream to witherable package
 mapMaybeSCC :: (a -> Maybe b) -> SCC a -> Maybe (SCC b)
 mapMaybeSCC f = \case
   AcyclicSCC a -> AcyclicSCC <$> f a

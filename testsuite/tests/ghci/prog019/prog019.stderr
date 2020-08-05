@@ -3,9 +3,9 @@ B2.hs:3:1: error:
     Parse error: module header, import declaration
     or top-level declaration expected.
 -fkeep-going in use, removing the following dependencies and continuing:
-      Right B1 {-# SOURCE #-}
-      Right B {-# SOURCE #-}
-      Right A {-# SOURCE #-}
+      B1 {-# SOURCE #-}
+      B {-# SOURCE #-}
+      A {-# SOURCE #-}
 
 D.hs:3:1: error:
     Parse error: module header, import declaration
