@@ -75,10 +75,9 @@ flushFinderCaches :: HscEnv -> IO ()
 flushFinderCaches hsc_env =
   atomicModifyIORef' fc_ref $ \fm -> (filterInstalledModuleEnv is_ext fm, ())
  where
-        this_pkg = homeUnit (hsc_dflags hsc_env)
-        fc_ref = hsc_FC hsc_env
-        is_ext mod _ | not (moduleUnit mod `unitIdEq` this_pkg) = True
-                     | otherwise = False
+        fc_ref       = hsc_FC hsc_env
+        home_unit    = getHomeUnit (hsc_dflags hsc_env)
+        is_ext mod _ = not (isHomeInstalledModule home_unit mod)
 
 addToFinderCache :: IORef FinderCache -> InstalledModule -> InstalledFindResult -> IO ()
 addToFinderCache ref key val =
@@ -135,8 +134,8 @@ findPluginModule hsc_env mod_name =
 
 findExactModule :: HscEnv -> InstalledModule -> IO InstalledFindResult
 findExactModule hsc_env mod =
-    let dflags = hsc_dflags hsc_env
-    in if moduleUnit mod `unitIdEq` homeUnit dflags
+    let home_unit = getHomeUnit (hsc_dflags hsc_env)
+    in if isHomeInstalledModule home_unit mod
        then findInstalledHomeModule hsc_env (moduleName mod)
        else findPackageModule hsc_env mod
 
@@ -175,7 +174,8 @@ orIfNotFound this or_this = do
 -- was successful.)
 homeSearchCache :: HscEnv -> ModuleName -> IO InstalledFindResult -> IO InstalledFindResult
 homeSearchCache hsc_env mod_name do_this = do
-  let mod = mkHomeInstalledModule (hsc_dflags hsc_env) mod_name
+  let home_unit = getHomeUnit (hsc_dflags hsc_env)
+      mod = mkHomeInstalledModule home_unit mod_name
   modLocationCache hsc_env mod do_this
 
 findExposedPackageModule :: HscEnv -> ModuleName -> Maybe FastString
@@ -247,21 +247,18 @@ modLocationCache hsc_env mod do_this = do
         addToFinderCache (hsc_FC hsc_env) mod result
         return result
 
-mkHomeInstalledModule :: DynFlags -> ModuleName -> InstalledModule
-mkHomeInstalledModule dflags mod_name =
-  let iuid = homeUnitId dflags
-  in Module iuid mod_name
-
 -- This returns a module because it's more convenient for users
 addHomeModuleToFinder :: HscEnv -> ModuleName -> ModLocation -> IO Module
 addHomeModuleToFinder hsc_env mod_name loc = do
-  let mod = mkHomeInstalledModule (hsc_dflags hsc_env) mod_name
+  let home_unit = getHomeUnit (hsc_dflags hsc_env)
+      mod = mkHomeInstalledModule home_unit mod_name
   addToFinderCache (hsc_FC hsc_env) mod (InstalledFound loc mod)
-  return (mkHomeModule (hsc_dflags hsc_env) mod_name)
+  return (mkHomeModule home_unit mod_name)
 
 uncacheModule :: HscEnv -> ModuleName -> IO ()
 uncacheModule hsc_env mod_name = do
-  let mod = mkHomeInstalledModule (hsc_dflags hsc_env) mod_name
+  let home_unit = getHomeUnit (hsc_dflags hsc_env)
+      mod = mkHomeInstalledModule home_unit mod_name
   removeFromFinderCache (hsc_FC hsc_env) mod
 
 -- -----------------------------------------------------------------------------
@@ -271,7 +268,7 @@ findHomeModule :: HscEnv -> ModuleName -> IO FindResult
 findHomeModule hsc_env mod_name = do
   r <- findInstalledHomeModule hsc_env mod_name
   return $ case r of
-    InstalledFound loc _ -> Found loc (mkModule uid mod_name)
+    InstalledFound loc _ -> Found loc (mkHomeModule home_unit mod_name)
     InstalledNoPackage _ -> NoPackage uid -- impossible
     InstalledNotFound fps _ -> NotFound {
         fr_paths = fps,
@@ -282,8 +279,9 @@ findHomeModule hsc_env mod_name = do
         fr_suggestions = []
       }
  where
-  dflags = hsc_dflags hsc_env
-  uid    = homeUnit dflags
+  dflags    = hsc_dflags hsc_env
+  home_unit = getHomeUnit dflags
+  uid       = homeUnitAsUnit (getHomeUnit dflags)
 
 -- | Implements the search for a module name in the home package only.  Calling
 -- this function directly is usually *not* what you want; currently, it's used
@@ -306,9 +304,10 @@ findInstalledHomeModule hsc_env mod_name =
    homeSearchCache hsc_env mod_name $
    let
      dflags = hsc_dflags hsc_env
+     home_unit = getHomeUnit dflags
      home_path = importPaths dflags
      hisuf = hiSuf dflags
-     mod = mkHomeInstalledModule dflags mod_name
+     mod = mkHomeInstalledModule home_unit mod_name
 
      source_exts =
       [ ("hs",   mkHomeModLocationSearched dflags mod_name "hs")
@@ -674,6 +673,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
     $$ more_info
   where
     pkgs = unitState dflags
+    home_unit = getHomeUnit dflags
     more_info
       = case find_result of
             NoPackage pkg
@@ -683,7 +683,7 @@ cantFindErr cannot_find _ dflags mod_name find_result
             NotFound { fr_paths = files, fr_pkg = mb_pkg
                      , fr_mods_hidden = mod_hiddens, fr_pkgs_hidden = pkg_hiddens
                      , fr_unusables = unusables, fr_suggestions = suggest }
-                | Just pkg <- mb_pkg, pkg /= homeUnit dflags
+                | Just pkg <- mb_pkg, not (isHomeUnit home_unit pkg)
                 -> not_found_in_package pkg files
 
                 | not (null suggest)
@@ -792,6 +792,10 @@ cantFindInstalledErr cannot_find _ dflags mod_name find_result
   = ptext cannot_find <+> quotes (ppr mod_name)
     $$ more_info
   where
+    home_unit  = getHomeUnit dflags
+    unit_state = unitState dflags
+    build_tag = waysBuildTag (ways dflags)
+
     more_info
       = case find_result of
             InstalledNoPackage pkg
@@ -799,7 +803,7 @@ cantFindInstalledErr cannot_find _ dflags mod_name find_result
                    text "was found" $$ looks_like_srcpkgid pkg
 
             InstalledNotFound files mb_pkg
-                | Just pkg <- mb_pkg, not (pkg `unitIdEq` homeUnit dflags)
+                | Just pkg <- mb_pkg, not (isHomeUnitId home_unit pkg)
                 -> not_found_in_package pkg files
 
                 | null files
@@ -810,14 +814,11 @@ cantFindInstalledErr cannot_find _ dflags mod_name find_result
 
             _ -> panic "cantFindInstalledErr"
 
-    build_tag = waysBuildTag (ways dflags)
-    pkgstate = unitState dflags
-
     looks_like_srcpkgid :: UnitId -> SDoc
     looks_like_srcpkgid pk
      -- Unsafely coerce a unit id (i.e. an installed package component
      -- identifier) into a PackageId and see if it means anything.
-     | (pkg:pkgs) <- searchPackageId pkgstate (PackageId (unitIdFS pk))
+     | (pkg:pkgs) <- searchPackageId unit_state (PackageId (unitIdFS pk))
      = parens (text "This unit ID looks like the source package ID;" $$
        text "the real unit ID is" <+> quotes (ftext (unitIdFS (unitId pkg))) $$
        (if null pkgs then Outputable.empty

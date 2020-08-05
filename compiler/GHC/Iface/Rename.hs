@@ -298,6 +298,7 @@ rnIfaceGlobal :: Name -> ShIfM Name
 rnIfaceGlobal n = do
     hsc_env <- getTopEnv
     let dflags = hsc_dflags hsc_env
+        home_unit = getHomeUnit dflags
     iface_semantic_mod <- fmap sh_if_semantic_module getGblEnv
     mb_nsubst <- fmap sh_if_shape getGblEnv
     hmap <- getHoleSubst
@@ -341,7 +342,7 @@ rnIfaceGlobal n = do
             -- went from <A> to <B>.
             let m'' = if isHoleModule m'
                         -- Pull out the local guy!!
-                        then mkHomeModule dflags (moduleName m')
+                        then mkHomeModule home_unit (moduleName m')
                         else m'
             iface <- liftIO . initIfaceCheck (text "rnIfaceGlobal") hsc_env
                             $ loadSysInterface (text "rnIfaceGlobal") m''
