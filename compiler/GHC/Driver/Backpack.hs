@@ -664,17 +664,17 @@ hsunitModuleGraph dflags unit = do
     --  requirement.
     let node_map = Map.fromList
           [ ((ms_mod_name ms, ms_hsc_src ms == HsigFile), n)
-          | n@(ms, _) <- nodes
+          | n@(EMS { emsModSummary = ms }) <- nodes
           ]
     req_nodes <- fmap catMaybes . forM (homeUnitInstantiations dflags) $ \(mod_name, _) ->
         let has_local = Map.member (mod_name, True) node_map
         in if has_local
             then return Nothing
-            else fmap (Just . flip (,) []) $ summariseRequirement pn mod_name
+            else fmap (Just . toExtendedModSummary) $ summariseRequirement pn mod_name
 
     -- 3. Return the kaboodle
     return $ mkModuleGraph' $
-      (uncurry ModuleNode <$> (nodes ++ req_nodes)) ++ instantiationNodes dflags
+      (emsModuleNode <$> (nodes ++ req_nodes)) ++ instantiationNodes dflags
 
 summariseRequirement :: PackageName -> ModuleName -> BkpM ModSummary
 summariseRequirement pn mod_name = do
@@ -808,8 +808,9 @@ hsModuleToModSummary pn hsc_src modname
 
     -- So that Finder can find it, even though it doesn't exist...
     this_mod <- liftIO $ addHomeModuleToFinder hsc_env modname location
-    return
-      ( ModSummary {
+    return $ EMS
+      { emsModSummary =
+          ModSummary {
             ms_mod = this_mod,
             ms_hsc_src = hsc_src,
             ms_location = location,
@@ -835,9 +836,9 @@ hsModuleToModSummary pn hsc_src modname
             ms_obj_date = Nothing, -- TODO do this, but problem: hi_timestamp is BOGUS
             ms_iface_date = hi_timestamp,
             ms_hie_date = hie_timestamp
-        }
-      , inst_deps
-      )
+          }
+      , emsInstantiatedUnits = inst_deps
+      }
 
 -- | Create a new, externally provided hashed unit id from
 -- a hash.
