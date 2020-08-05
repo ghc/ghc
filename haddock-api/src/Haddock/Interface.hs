@@ -51,6 +51,7 @@ import Distribution.Verbosity
 import Text.Printf
 
 import GHC.Unit.Module.Env (mkModuleSet, emptyModuleSet, unionModuleSet, ModuleSet)
+import GHC.Unit.Types
 import GHC.Data.Graph.Directed
 import GHC.Driver.Session hiding (verbosity)
 import GHC hiding (verbosity)
@@ -168,11 +169,11 @@ processModule verbosity modsum flags modMap instIfaceMap = do
       -- See https://github.com/haskell/haddock/issues/469.
       hsc_env <- getSession
       let new_rdr_env = tcg_rdr_env . fst . GHC.tm_internals_ $ tm
-          this_pkg = homeUnit (hsc_dflags hsc_env)
+          home_unit = mkHomeUnitFromFlags (hsc_dflags hsc_env)
           !mods = mkModuleSet [ nameModule name
                               | gre <- globalRdrEnvElts new_rdr_env
                               , let name = gre_name gre
-                              , nameIsFromExternalPackage this_pkg name
+                              , nameIsFromExternalPackage home_unit name
                               , isTcOcc (nameOccName name)   -- Types and classes only
                               , unQualOK gre ]               -- In scope unqualified
 

@@ -22,6 +22,7 @@ import GHC.Utils.Panic      ( panic )
 import GHC.Driver.Ppr       ( showSDoc )
 import GHC.Types.SrcLoc
 import GHC.Data.StringBuffer ( StringBuffer, atEnd )
+import GHC.Unit              ( homeUnitId )
 
 import Haddock.Backends.Hyperlinker.Types as T
 import Haddock.GhcUtils
@@ -48,7 +49,7 @@ parse dflags fpath bs = case unP (go False []) initState of
     start = mkRealSrcLoc (mkFastString fpath) 1 1
     pflags = mkParserFlags' (warningFlags dflags)
                             (extensionFlags dflags)
-                            (homeUnitId dflags)
+                            (homeUnitId (mkHomeUnitFromFlags dflags))
                             (safeImportsOn dflags)
                             False -- lex Haddocks as comment tokens
                             True  -- produce comment tokens
