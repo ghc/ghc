@@ -1278,7 +1278,7 @@ and voila!  In summary:
   described here is applicable on a monad-by-monad basis under
   programmer control.
 
-* Beware: itt changes the behaviour of
+* Beware: it changes the behaviour of
      map (foo 3) xs
   ToDo: explain what to do if you want to do this
 -}
