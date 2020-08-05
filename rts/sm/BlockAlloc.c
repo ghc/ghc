@@ -383,6 +383,7 @@ alloc_mega_group (uint32_t node, StgWord mblocks)
 
     n = MBLOCK_GROUP_BLOCKS(mblocks);
 
+    // Find the "best" (smallest fit) free mega block group.
     best = NULL;
     prev = NULL;
     for (bd = free_mblock_list[node]; bd != NULL; prev = bd, bd = bd->link)
@@ -462,6 +463,8 @@ allocGroupOnNode (uint32_t node, W_ n)
         ln++;
     }
 
+    // If no free blocks exist then allocate a new megablock and keep just a
+    // chunk of it.
     if (ln == NUM_FREE_LISTS) {
 #if 0  /* useful for debugging fragmentation */
         if ((W_)mblocks_allocated * BLOCKS_PER_MBLOCK * BLOCK_SIZE_W
@@ -849,6 +852,9 @@ freeGroup(bdescr *p)
   }
 
   // coalesce backwards
+  // Note that p is not a megablock/megagroup, so there are still live blocks on
+  // this megablock. Hence we can't coalesce backwards past the first block
+  // descriptor of this megablock.
   if (p != FIRST_BDESCR(MBLOCK_ROUND_DOWN(p)))
   {
       bdescr *prev;
