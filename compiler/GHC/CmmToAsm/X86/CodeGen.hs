@@ -2667,9 +2667,12 @@ genCCall' _ is32Bit target dest_regs args bid = do
                return code
         _ -> panic "genCCall: Wrong number of arguments/results for imul2"
 
-    _ -> if is32Bit
-         then genCCall32' target dest_regs args
-         else genCCall64' target dest_regs args
+    _ -> do
+        (instrs0, args') <- evalArgs bid args
+        instrs1 <- if is32Bit
+          then genCCall32' target dest_regs args'
+          else genCCall64' target dest_regs args'
+        return (instrs0 `appOL` instrs1)
 
   where divOp1 platform signed width results [arg_x, arg_y]
             = divOp platform signed width results Nothing arg_x arg_y
@@ -2731,6 +2734,29 @@ genCCall' _ is32Bit target dest_regs args bid = do
                  return code
         addSubIntC _ _ _ _ _ _ _ _
             = panic "genCCall: Wrong number of arguments/results for addSubIntC"
+
+evalArgs :: BlockId -> [CmmActual] -> NatM (InstrBlock, [CmmActual])
+evalArgs bid actuals
+  | any mightContainMachOp actuals = do
+      regs_blks <- mapM evalArg actuals
+      return (concatOL $ map fst regs_blks, map snd regs_blks)
+  | otherwise = return (nilOL, actuals)
+  where
+    mightContainMachOp (CmmReg _)      = False
+    mightContainMachOp (CmmRegOff _ _) = False
+    mightContainMachOp (CmmLit _)      = False
+    mightContainMachOp _               = True
+
+    evalArg :: CmmActual -> NatM (InstrBlock, CmmExpr)
+    evalArg actual = do
+        platform <- getPlatform
+        lreg <- newLocalReg $ cmmExprType platform actual
+        (instrs, bid') <- stmtToInstrs bid $ CmmAssign (CmmLocal lreg) actual
+        when (not $ isNothing bid') $ error "uh oh"
+        return (instrs, CmmReg $ CmmLocal lreg)
+
+    newLocalReg :: CmmType -> NatM LocalReg
+    newLocalReg ty = LocalReg <$> getUniqueM <*> pure ty
 
 -- Note [DIV/IDIV for bytes]
 --
