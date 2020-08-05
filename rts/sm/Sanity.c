@@ -1146,7 +1146,8 @@ memInventory (bool show)
                + retainer_blocks + arena_blocks + exec_blocks + gc_free_blocks
                + upd_rem_set_blocks;
 
-#define MB(n) (((double)(n) * BLOCK_SIZE_W) / ((1024*1024)/sizeof(W_)))
+// MB converts number of blocks to megabytes (1 megabyte = 1000000 bytes).
+#define MB(n) (((double)(n) * BLOCK_SIZE) / 1000000)
 
   leak = live_blocks + free_blocks != mblocks_allocated * BLOCKS_PER_MBLOCK;
 
