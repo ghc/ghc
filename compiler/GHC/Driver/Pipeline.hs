@@ -40,7 +40,7 @@ module GHC.Driver.Pipeline (
 import GHC.Prelude
 
 import GHC.Driver.Pipeline.Monad
-import GHC.Unit.State
+import GHC.Unit
 import GHC.Platform.Ways
 import GHC.Platform.ArchOS
 import GHC.Parser.Header
@@ -51,7 +51,6 @@ import GHC.Driver.Main
 import GHC.Driver.Finder
 import GHC.Driver.Types hiding ( Hsc )
 import GHC.Utils.Outputable
-import GHC.Unit.Module
 import GHC.Utils.Error
 import GHC.Driver.Session
 import GHC.Driver.Backend
@@ -382,7 +381,8 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
   -- https://gitlab.haskell.org/ghc/ghc/issues/12673
   -- and https://github.com/haskell/cabal/issues/2257
   empty_stub <- newTempName dflags TFL_CurrentModule "c"
-  let src = text "int" <+> ppr (mkHomeModule dflags mod_name) <+> text "= 0;"
+  let home_unit = mkHomeUnitFromFlags dflags
+      src = text "int" <+> ppr (mkHomeModule home_unit mod_name) <+> text "= 0;"
   writeFile empty_stub (showSDoc dflags (pprCode CStyle src))
   _ <- runPipeline StopLn hsc_env
                   (empty_stub, Nothing, Nothing)
@@ -516,9 +516,9 @@ linkingNeeded dflags staticLink linkables pkg_deps = do
 
         -- next, check libraries. XXX this only checks Haskell libraries,
         -- not extra_libraries or -l things from the command line.
-        let pkgstate = unitState dflags
-        let pkg_hslibs  = [ (collectLibraryPaths dflags [c], lib)
-                          | Just c <- map (lookupUnitId pkgstate) pkg_deps,
+        let unit_state = unitState dflags
+        let pkg_hslibs  = [ (collectLibraryPaths (ways dflags) [c], lib)
+                          | Just c <- map (lookupUnitId unit_state) pkg_deps,
                             lib <- packageHsLibs dflags c ]
 
         pkg_libfiles <- mapM (uncurry (findHSLib dflags)) pkg_hslibs
@@ -1227,6 +1227,7 @@ runPhase (RealPhase cc_phase) input_fn dflags
    = do
         let platform = targetPlatform dflags
             hcc = cc_phase `eqPhase` HCc
+            home_unit = mkHomeUnitFromFlags dflags
 
         let cmdline_include_paths = includePaths dflags
 
@@ -1236,7 +1237,11 @@ runPhase (RealPhase cc_phase) input_fn dflags
         -- add package include paths even if we're just compiling .c
         -- files; this is the Value Add(TM) that using ghc instead of
         -- gcc gives you :)
-        pkg_include_dirs <- liftIO $ getUnitIncludePath dflags pkgs
+        pkg_include_dirs <- liftIO $ getUnitIncludePath
+                                       (initSDocContext dflags defaultUserStyle)
+                                       (unitState dflags)
+                                       (mkHomeUnitFromFlags dflags)
+                                       pkgs
         let include_paths_global = foldr (\ x xs -> ("-I" ++ x) : xs) []
               (includePathsGlobal cmdline_include_paths ++ pkg_include_dirs)
         let include_paths_quote = foldr (\ x xs -> ("-iquote" ++ x) : xs) []
@@ -1264,11 +1269,19 @@ runPhase (RealPhase cc_phase) input_fn dflags
         pkg_extra_cc_opts <- liftIO $
           if hcc
              then return []
-             else getUnitExtraCcOpts dflags pkgs
+             else getUnitExtraCcOpts
+                     (initSDocContext dflags defaultUserStyle)
+                     (unitState dflags)
+                     (mkHomeUnitFromFlags dflags)
+                     pkgs
 
         framework_paths <-
             if platformUsesFrameworks platform
-            then do pkgFrameworkPaths <- liftIO $ getUnitFrameworkPath dflags pkgs
+            then do pkgFrameworkPaths <- liftIO $ getUnitFrameworkPath
+                                                   (initSDocContext dflags defaultUserStyle)
+                                                   (unitState dflags)
+                                                   (mkHomeUnitFromFlags dflags)
+                                                   pkgs
                     let cmdlineFrameworkPaths = frameworkPaths dflags
                     return $ map ("-F"++)
                                  (cmdlineFrameworkPaths ++ pkgFrameworkPaths)
@@ -1315,7 +1328,7 @@ runPhase (RealPhase cc_phase) input_fn dflags
                 -- way we do the import depends on whether we're currently compiling
                 -- the base package or not.
                        ++ (if platformOS platform == OSMinGW32 &&
-                              homeUnitId dflags == baseUnitId
+                              isHomeUnitId home_unit baseUnitId
                                 then [ "-DCOMPILING_BASE_PACKAGE" ]
                                 else [])
 
@@ -1671,7 +1684,12 @@ linkBinary' staticLink dflags o_files dep_units = do
                       then return output_fn
                       else do d <- getCurrentDirectory
                               return $ normalise (d </> output_fn)
-    pkg_lib_paths <- getUnitLibraryPath dflags dep_units
+    pkg_lib_paths <- getUnitLibraryPath
+                        (initSDocContext dflags defaultUserStyle)
+                        (unitState dflags)
+                        (mkHomeUnitFromFlags dflags)
+                        (ways dflags)
+                        dep_units
     let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
         get_pkg_lib_path_opts l
          | osElfTarget (platformOS platform) &&
@@ -1940,7 +1958,11 @@ linkStaticLib dflags o_files dep_units = do
   output_exists <- doesFileExist full_output_fn
   (when output_exists) $ removeFile full_output_fn
 
-  pkg_cfgs_init <- getPreloadUnitsAnd dflags dep_units
+  pkg_cfgs_init <- getPreloadUnitsAnd
+                     (initSDocContext dflags defaultUserStyle)
+                     (unitState dflags)
+                     (mkHomeUnitFromFlags dflags)
+                     dep_units
 
   let pkg_cfgs
         | gopt Opt_LinkRts dflags
@@ -1969,7 +1991,11 @@ doCpp dflags raw input_fn output_fn = do
     let hscpp_opts = picPOpts dflags
     let cmdline_include_paths = includePaths dflags
 
-    pkg_include_dirs <- getUnitIncludePath dflags []
+    pkg_include_dirs <- getUnitIncludePath
+                           (initSDocContext dflags defaultUserStyle)
+                           (unitState dflags)
+                           (mkHomeUnitFromFlags dflags)
+                           []
     let include_paths_global = foldr (\ x xs -> ("-I" ++ x) : xs) []
           (includePathsGlobal cmdline_include_paths ++ pkg_include_dirs)
     let include_paths_quote = foldr (\ x xs -> ("-iquote" ++ x) : xs) []
@@ -2235,7 +2261,11 @@ getGhcVersionPathName dflags = do
   candidates <- case ghcVersionFile dflags of
     Just path -> return [path]
     Nothing -> (map (</> "ghcversion.h")) <$>
-               (getUnitIncludePath dflags [rtsUnitId])
+               (getUnitIncludePath
+                  (initSDocContext dflags defaultUserStyle)
+                  (unitState dflags)
+                  (mkHomeUnitFromFlags dflags)
+                  [rtsUnitId])
 
   found <- filterM doesFileExist candidates
   case found of

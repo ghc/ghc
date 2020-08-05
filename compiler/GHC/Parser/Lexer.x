@@ -2213,7 +2213,8 @@ warnopt f options = f `EnumSet.member` pWarningFlags options
 -- See 'mkParserFlags' or 'mkParserFlags'' for ways to construct this.
 data ParserFlags = ParserFlags {
     pWarningFlags   :: EnumSet WarningFlag
-  , pHomeUnitId     :: UnitId      -- ^ unit currently being compiled
+  , pHomeUnitId     :: UnitId      -- ^ id of the unit currently being compiled
+                                   -- (only used in Cmm parser)
   , pExtsBitmap     :: !ExtsBitmap -- ^ bitmap of permitted extensions
   }
 
@@ -2644,6 +2645,7 @@ mkParserFlags'
   :: EnumSet WarningFlag        -- ^ warnings flags enabled
   -> EnumSet LangExt.Extension  -- ^ permitted language extensions enabled
   -> UnitId                     -- ^ id of the unit currently being compiled
+                                -- (used in Cmm parser)
   -> Bool                       -- ^ are safe imports on?
   -> Bool                       -- ^ keeping Haddock comment tokens
   -> Bool                       -- ^ keep regular comment tokens
@@ -2725,7 +2727,7 @@ mkParserFlags =
   mkParserFlags'
     <$> DynFlags.warningFlags
     <*> DynFlags.extensionFlags
-    <*> DynFlags.homeUnitId
+    <*> DynFlags.homeUnitId_
     <*> safeImportsOn
     <*> gopt Opt_Haddock
     <*> gopt Opt_KeepRawTokenStream

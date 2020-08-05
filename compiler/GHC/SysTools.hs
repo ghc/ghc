@@ -45,6 +45,7 @@ import GHC.Settings.Utils
 import GHC.Unit
 import GHC.Utils.Error
 import GHC.Utils.Panic
+import GHC.Utils.Outputable
 import GHC.Platform
 import GHC.Driver.Session
 import GHC.Platform.Ways
@@ -246,9 +247,13 @@ linkDynLib dflags0 o_files dep_packages
         verbFlags = getVerbFlags dflags
         o_file = outputFile dflags
 
-    pkgs <- getPreloadUnitsAnd dflags dep_packages
+    pkgs <- getPreloadUnitsAnd
+               (initSDocContext dflags defaultUserStyle)
+               (unitState dflags)
+               (mkHomeUnitFromFlags dflags)
+               dep_packages
 
-    let pkg_lib_paths = collectLibraryPaths dflags pkgs
+    let pkg_lib_paths = collectLibraryPaths (ways dflags) pkgs
     let pkg_lib_path_opts = concatMap get_pkg_lib_path_opts pkg_lib_paths
         get_pkg_lib_path_opts l
          | ( osElfTarget (platformOS (targetPlatform dflags)) ||
@@ -426,11 +431,19 @@ getUnitFrameworkOpts :: DynFlags -> Platform -> [UnitId] -> IO [String]
 getUnitFrameworkOpts dflags platform dep_packages
   | platformUsesFrameworks platform = do
     pkg_framework_path_opts <- do
-        pkg_framework_paths <- getUnitFrameworkPath dflags dep_packages
+        pkg_framework_paths <- getUnitFrameworkPath
+                                 (initSDocContext dflags defaultUserStyle)
+                                 (unitState dflags)
+                                 (mkHomeUnitFromFlags dflags)
+                                 dep_packages
         return $ map ("-F" ++) pkg_framework_paths
 
     pkg_framework_opts <- do
-        pkg_frameworks <- getUnitFrameworks dflags dep_packages
+        pkg_frameworks <- getUnitFrameworks
+                              (initSDocContext dflags defaultUserStyle)
+                              (unitState dflags)
+                              (mkHomeUnitFromFlags dflags)
+                              dep_packages
         return $ concat [ ["-framework", fw] | fw <- pkg_frameworks ]
 
     return (pkg_framework_path_opts ++ pkg_framework_opts)

@@ -45,7 +45,7 @@ import GHC.Rename.Utils ( warnUnusedTopBinds, mkFieldEnv )
 import GHC.Iface.Load   ( loadSrcInterface )
 import GHC.Tc.Utils.Monad
 import GHC.Builtin.Names
-import GHC.Unit.Module
+import GHC.Unit
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
@@ -451,8 +451,10 @@ calculateAvails dflags iface mod_safe' want_boot imported_by =
       -- to be trusted? See Note [Trust Own Package]
       ptrust = trust == Sf_Trustworthy || trust_pkg
 
+      home_unit = mkHomeUnitFromFlags dflags
+
       (dependent_mods, dependent_pkgs, pkg_trust_req)
-         | pkg == homeUnit dflags =
+         | isHomeUnit home_unit pkg =
             -- Imported module is from the home package
             -- Take its dependent modules and add imp_mod itself
             -- Take its dependent packages unchanged

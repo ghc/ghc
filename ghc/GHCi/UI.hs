@@ -57,10 +57,8 @@ import GHC.Hs
 import GHC.Driver.Types ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
                   setInteractivePrintName, hsc_dflags, msObjFilePath, runInteractiveHsc,
                   hsc_dynLinker, hsc_interp, emptyModBreaks )
-import GHC.Unit.Module
+import GHC.Unit
 import GHC.Types.Name
-import GHC.Unit.State   ( unitIsTrusted, unsafeLookupUnit, unsafeLookupUnitId,
-                          listVisibleModuleNames, pprFlag, preloadUnits )
 import GHC.Iface.Syntax ( showToHeader )
 import GHC.Core.Ppr.TyThing
 import GHC.Builtin.Names
@@ -2363,13 +2361,13 @@ isSafeModule m = do
     mname = GHC.moduleNameString $ GHC.moduleName m
 
     packageTrusted dflags md
-        | isHomeModule dflags md = True
+        | isHomeModule (mkHomeUnitFromFlags dflags) md = True
         | otherwise = unitIsTrusted $ unsafeLookupUnit (unitState dflags) (moduleUnit md)
 
     tallyPkgs dflags deps | not (packageTrustOn dflags) = (S.empty, S.empty)
                           | otherwise = S.partition part deps
-        where part pkg = unitIsTrusted $ unsafeLookupUnitId pkgstate pkg
-              pkgstate = unitState dflags
+        where part pkg   = unitIsTrusted $ unsafeLookupUnitId unit_state pkg
+              unit_state = unitState dflags
 
 -----------------------------------------------------------------------------
 -- :browse
@@ -4316,8 +4314,8 @@ wantInterpretedModuleName :: GHC.GhcMonad m => ModuleName -> m Module
 wantInterpretedModuleName modname = do
    modl <- lookupModuleName modname
    let str = moduleNameString modname
-   dflags <- getDynFlags
-   unless (isHomeModule dflags modl) $
+   home_unit <- mkHomeUnitFromFlags <$> getDynFlags
+   unless (isHomeModule home_unit modl) $
       throwGhcException (CmdLineError ("module '" ++ str ++ "' is from another package;\nthis command requires an interpreted module"))
    is_interpreted <- GHC.moduleIsInterpreted modl
    when (not is_interpreted) $

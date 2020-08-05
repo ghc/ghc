@@ -46,7 +46,7 @@ import GHC.Driver.Finder
 import GHC.Driver.Monad
 import GHC.Parser.Header
 import GHC.Driver.Types
-import GHC.Unit.Module
+import GHC.Unit
 import GHC.IfaceToCore     ( typecheckIface )
 import GHC.Tc.Utils.Monad  ( initIfaceCheck )
 import GHC.Driver.Main
@@ -66,7 +66,6 @@ import GHC.Data.StringBuffer
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DSet
 import GHC.Tc.Utils.Backpack
-import GHC.Unit.State
 import GHC.Types.Unique.Set
 import GHC.Utils.Misc
 import qualified GHC.LanguageExtensions as LangExt
@@ -655,10 +654,10 @@ discardIC hsc_env
   old_ic = hsc_IC hsc_env
   empty_ic = emptyInteractiveContext dflags
   keep_external_name ic_name
-    | nameIsFromExternalPackage this_pkg old_name = old_name
+    | nameIsFromExternalPackage home_unit old_name = old_name
     | otherwise = ic_name empty_ic
     where
-    this_pkg = homeUnit dflags
+    home_unit = mkHomeUnitFromFlags dflags
     old_name = ic_name old_ic
 
 -- | If there is no -o option, guess the name of target executable
@@ -1202,13 +1201,14 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags mHscMessage cleanup 
 
     let home_imps     = map unLoc $ ms_home_imps mod
     let home_src_imps = map unLoc $ ms_home_srcimps mod
+    let home_unit     = mkHomeUnitFromFlags lcl_dflags
 
     -- All the textual imports of this module.
     let textual_deps = Set.fromList $
             zipWith f home_imps     (repeat NotBoot) ++
             zipWith f home_src_imps (repeat IsBoot)
           where f mn isBoot = GWIB
-                  { gwib_mod = mkHomeModule lcl_dflags mn
+                  { gwib_mod = mkHomeModule home_unit mn
                   , gwib_isBoot = isBoot
                   }
 
@@ -2210,7 +2210,7 @@ enableCodeGenForTH =
       backend dflags == NoBackend &&
       -- Don't enable codegen for TH on indefinite packages; we
       -- can't compile anything anyway! See #16219.
-      homeUnitIsDefinite dflags
+      isHomeUnitDefinite (mkHomeUnitFromFlags dflags)
 
 -- | Update the every ModSummary that is depended on
 -- by a module that needs unboxed tuples. We enable codegen to
@@ -2499,6 +2499,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
   | otherwise  = find_it
   where
     dflags = hsc_dflags hsc_env
+    home_unit = mkHomeUnitFromFlags dflags
 
     check_timestamp old_summary location src_fn =
         checkSummaryTimestamp
@@ -2557,12 +2558,12 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                               $$ text "Saw:" <+> quotes (ppr pi_mod_name)
                               $$ text "Expected:" <+> quotes (ppr wanted_mod)
 
-        when (hsc_src == HsigFile && isNothing (lookup pi_mod_name (homeUnitInstantiations dflags))) $
+        when (hsc_src == HsigFile && isNothing (lookup pi_mod_name (homeUnitInstantiations home_unit))) $
             let suggested_instantiated_with =
                     hcat (punctuate comma $
                         [ ppr k <> text "=" <> ppr v
                         | (k,v) <- ((pi_mod_name, mkHoleModule pi_mod_name)
-                                : homeUnitInstantiations dflags)
+                                : homeUnitInstantiations home_unit)
                         ])
             in throwE $ unitBag $ mkPlainErrMsg pi_local_dflags pi_mod_name_loc $
                 text "Unexpected signature:" <+> quotes (ppr pi_mod_name)

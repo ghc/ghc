@@ -368,7 +368,10 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                    (const ()) $
     do  { let { omit_prags = gopt Opt_OmitInterfacePragmas dflags
               ; expose_all = gopt Opt_ExposeAllUnfoldings  dflags
-              ; print_unqual = mkPrintUnqualified dflags rdr_env
+              ; print_unqual = mkPrintUnqualified
+                                 (unitState dflags)
+                                 (mkHomeUnitFromFlags dflags)
+                                 rdr_env
               ; implicit_binds = concatMap getImplicitBinds tcs
               }
 

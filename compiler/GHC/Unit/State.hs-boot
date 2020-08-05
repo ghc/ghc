@@ -7,5 +7,6 @@ data UnitState
 data UnitDatabase unit
 
 emptyUnitState :: UnitState
+mkIndefUnitId :: UnitState -> UnitId -> IndefUnitId
 pprUnitIdForUser :: UnitState -> UnitId -> SDoc
 updateIndefUnitId :: UnitState -> IndefUnitId -> IndefUnitId

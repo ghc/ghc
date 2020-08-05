@@ -241,6 +241,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         th_remote_state_var  <- newIORef Nothing ;
         let {
              dflags = hsc_dflags hsc_env ;
+             home_unit = mkHomeUnitFromFlags dflags ;
 
              maybe_rn_syntax :: forall a. a -> Maybe a ;
              maybe_rn_syntax empty_val
@@ -266,8 +267,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_th_remote_state  = th_remote_state_var,
 
                 tcg_mod            = mod,
-                tcg_semantic_mod   =
-                    canonicalizeModuleIfHome dflags mod,
+                tcg_semantic_mod   = homeModuleInstantiation home_unit mod,
                 tcg_src            = hsc_src,
                 tcg_rdr_env        = emptyGlobalRdrEnv,
                 tcg_fix_env        = emptyNameEnv,
@@ -773,7 +773,9 @@ wrapDocLoc doc = do
 getPrintUnqualified :: DynFlags -> TcRn PrintUnqualified
 getPrintUnqualified dflags
   = do { rdr_env <- getGlobalRdrEnv
-       ; return $ mkPrintUnqualified dflags rdr_env }
+       ; let unit_state = unitState dflags
+       ; let home_unit  = mkHomeUnitFromFlags dflags
+       ; return $ mkPrintUnqualified unit_state home_unit rdr_env }
 
 -- | Like logInfoTcRn, but for user consumption
 printForUserTcRn :: SDoc -> TcRn ()
@@ -1937,10 +1939,10 @@ initIfaceTcRn thing_inside
   = do  { tcg_env <- getGblEnv
         ; dflags <- getDynFlags
         ; let !mod = tcg_semantic_mod tcg_env
+              home_unit = mkHomeUnitFromFlags dflags
               -- When we are instantiating a signature, we DEFINITELY
               -- do not want to knot tie.
-              is_instantiate = homeUnitIsDefinite dflags &&
-                               not (null (homeUnitInstantiations dflags))
+              is_instantiate = isHomeUnitInstantiating home_unit
         ; let { if_env = IfGblEnv {
                             if_doc = text "initIfaceTcRn",
                             if_rec_types =

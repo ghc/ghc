@@ -101,8 +101,7 @@ import GHC.Utils.Panic
 import GHC.Core.ConLike
 
 import GHC.Parser.Annotation
-import GHC.Unit.Module
-import GHC.Unit.State
+import GHC.Unit
 import GHC.Types.Name.Reader
 import GHC.Hs
 import GHC.Hs.Dump
@@ -194,7 +193,8 @@ import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
 
 newHscEnv :: DynFlags -> IO HscEnv
 newHscEnv dflags = do
-    eps_var <- newIORef (initExternalPackageState dflags)
+    let home_unit = mkHomeUnitFromFlags dflags
+    eps_var <- newIORef (initExternalPackageState home_unit)
     us      <- mkSplitUniqSupply 'r'
     nc_var  <- newIORef (initNameCache us knownKeyNames)
     fc_var  <- newIORef emptyInstalledModuleEnv
@@ -469,14 +469,15 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
     hsc_env <- getHscEnv
     let hsc_src = ms_hsc_src mod_summary
         dflags = hsc_dflags hsc_env
+        home_unit = mkHomeUnitFromFlags dflags
         outer_mod = ms_mod mod_summary
         mod_name = moduleName outer_mod
-        outer_mod' = mkHomeModule dflags mod_name
-        inner_mod = canonicalizeHomeModule dflags mod_name
+        outer_mod' = mkHomeModule home_unit mod_name
+        inner_mod = homeModuleNameInstantiation home_unit mod_name
         src_filename  = ms_hspp_file mod_summary
         real_loc = realSrcLocSpan $ mkRealSrcLoc (mkFastString src_filename) 1 1
         keep_rn' = gopt Opt_WriteHie dflags || keep_rn
-    MASSERT( isHomeModule dflags outer_mod )
+    MASSERT( isHomeModule home_unit outer_mod )
     tc_result <- if hsc_src == HsigFile && not (isHoleModule inner_mod)
         then ioMsgMaybe $ tcRnInstantiateSignature hsc_env outer_mod' real_loc
         else
@@ -1115,10 +1116,11 @@ hscCheckSafe' :: Module -> SrcSpan
   -> Hsc (Maybe UnitId, Set UnitId)
 hscCheckSafe' m l = do
     dflags <- getDynFlags
+    let home_unit = mkHomeUnitFromFlags dflags
     (tw, pkgs) <- isModSafe m l
     case tw of
-        False                        -> return (Nothing, pkgs)
-        True | isHomeModule dflags m -> return (Nothing, pkgs)
+        False                           -> return (Nothing, pkgs)
+        True | isHomeModule home_unit m -> return (Nothing, pkgs)
              -- TODO: do we also have to check the trust of the instantiation?
              -- Not necessary if that is reflected in dependencies
              | otherwise   -> return (Just $ toUnitId (moduleUnit m), pkgs)
@@ -1193,7 +1195,7 @@ hscCheckSafe' m l = do
     packageTrusted _ Sf_Safe  False _ = True
     packageTrusted _ Sf_SafeInferred False _ = True
     packageTrusted dflags _ _ m
-        | isHomeModule dflags m = True
+        | isHomeModule (mkHomeUnitFromFlags dflags) m = True
         | otherwise = unitIsTrusted $ unsafeLookupUnit (unitState dflags) (moduleUnit m)
 
     lookup' :: Module -> Hsc (Maybe ModIface)
@@ -1486,14 +1488,15 @@ hscInteractive hsc_env cgguts location = do
 
 hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> IO ()
 hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
-    let dflags = hsc_dflags hsc_env
+    let dflags   = hsc_dflags hsc_env
+        home_unit = mkHomeUnitFromFlags dflags
     cmm <- ioMsgMaybe $ parseCmmFile dflags filename
     liftIO $ do
         dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose_by_proc "Parsed Cmm" FormatCMM (ppr cmm)
         let -- Make up a module name to give the NCG. We can't pass bottom here
             -- lest we reproduce #11784.
             mod_name = mkModuleName $ "Cmm$" ++ FilePath.takeFileName filename
-            cmm_mod = mkHomeModule dflags mod_name
+            cmm_mod = mkHomeModule home_unit mod_name
 
         -- Compile decls in Cmm files one decl at a time, to avoid re-ordering
         -- them in SRT analysis.

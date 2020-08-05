@@ -60,7 +60,7 @@ its dep_orphs. This was the cause of #14128.
 -- | Extract information from the rename and typecheck phases to produce
 -- a dependencies information for the module being compiled.
 --
--- The first argument is additional dependencies from plugins
+-- The second argument is additional dependencies from plugins
 mkDependencies :: UnitId -> [Module] -> TcGblEnv -> IO Dependencies
 mkDependencies iuid pluginModules
           (TcGblEnv{ tcg_mod = mod,
@@ -174,7 +174,7 @@ mkPluginUsage hsc_env pluginModule
     LookupFound _ pkg -> do
     -- The plugin is from an external package:
     -- search for the library files containing the plugin.
-      let searchPaths = collectLibraryPaths dflags [pkg]
+      let searchPaths = collectLibraryPaths (ways dflags) [pkg]
           useDyn = WayDyn `elem` ways dflags
           suffix = if useDyn then soExt platform else "a"
           libLocs = [ searchPath </> "lib" ++ libLoc <.> suffix
@@ -252,7 +252,7 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
   where
     hpt = hsc_HPT hsc_env
     dflags = hsc_dflags hsc_env
-    this_pkg = homeUnit dflags
+    home_unit = mkHomeUnitFromFlags dflags
 
     used_mods    = moduleEnvKeys ent_map
     dir_imp_mods = moduleEnvKeys direct_imports
@@ -278,7 +278,7 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
              Just mod ->
                 -- See Note [Identity versus semantic module]
                 let mod' = if isHoleModule mod
-                            then mkModule this_pkg (moduleName mod)
+                            then mkHomeModule home_unit (moduleName mod)
                             else mod
                 -- This lambda function is really just a
                 -- specialised (++); originally came about to
@@ -298,7 +298,7 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
                                         -- things in *this* module
       = Nothing
 
-      | moduleUnit mod /= this_pkg
+      | not (isHomeModule home_unit mod)
       = Just UsagePackageModule{ usg_mod      = mod,
                                  usg_mod_hash = mod_hash,
                                  usg_safe     = imp_safe }

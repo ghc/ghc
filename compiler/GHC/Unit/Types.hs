@@ -1,4 +1,3 @@
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveTraversable #-}
@@ -20,21 +19,22 @@ module GHC.Unit.Types
    , moduleFreeHoles
 
      -- * Units
+   , IsUnitId
    , GenUnit (..)
    , Unit
    , UnitId (..)
+   , UnitKey (..)
    , GenInstantiatedUnit (..)
    , InstantiatedUnit
    , IndefUnitId
    , DefUnitId
    , Instantiations
    , GenInstantiations
-   , mkGenInstantiatedUnit
    , mkInstantiatedUnit
    , mkInstantiatedUnitHash
-   , mkGenVirtUnit
    , mkVirtUnit
    , mapGenUnit
+   , mapInstantiations
    , unitFreeModuleHoles
    , fsToUnit
    , unitFS
@@ -44,6 +44,7 @@ module GHC.Unit.Types
    , stringToUnit
    , stableUnitCmp
    , unitIsDefinite
+   , isHoleUnit
 
      -- * Unit Ids
    , unitIdString
@@ -166,6 +167,30 @@ instance Outputable InstantiatedUnit where
       cid   = instUnitInstanceOf uid
       insts = instUnitInsts uid
 
+-- | Class for types that are used as unit identifiers (UnitKey, UnitId, Unit)
+--
+-- We need this class because we create new unit ids for virtual units (see
+-- VirtUnit) and they have to to be made from units with different kinds of
+-- identifiers.
+class IsUnitId u where
+   unitFS :: u -> FastString
+
+instance IsUnitId UnitKey where
+   unitFS (UnitKey fs) = fs
+
+instance IsUnitId UnitId where
+   unitFS (UnitId fs) = fs
+
+instance IsUnitId u => IsUnitId (GenUnit u) where
+   unitFS (VirtUnit x)            = instUnitFS x
+   unitFS (RealUnit (Definite x)) = unitFS x
+   unitFS HoleUnit                = holeFS
+
+instance IsUnitId u => IsUnitId (Definite u) where
+   unitFS (Definite x) = unitFS x
+
+instance IsUnitId u => IsUnitId (Indefinite u) where
+   unitFS (Indefinite x _) = unitFS x
 
 pprModule :: Module -> SDoc
 pprModule mod@(Module p n)  = getPprStyle doc
@@ -191,6 +216,9 @@ pprInstantiatedModule (Module uid m) =
 ---------------------------------------------------------------------
 -- UNITS
 ---------------------------------------------------------------------
+
+-- | A unit key in the database
+newtype UnitKey = UnitKey FastString
 
 -- | A unit identifier identifies a (possibly partially) instantiated library.
 -- It is primarily used as part of 'Module', which in turn is used in 'Name',
@@ -261,6 +289,10 @@ holeUnique = getUnique holeFS
 holeFS :: FastString
 holeFS = fsLit "<hole>"
 
+isHoleUnit :: GenUnit u -> Bool
+isHoleUnit HoleUnit = True
+isHoleUnit _        = False
+
 
 instance Eq (GenInstantiatedUnit unit) where
   u1 == u2 = instUnitKey u1 == instUnitKey u2
@@ -284,10 +316,10 @@ instance Binary InstantiatedUnit where
             instUnitKey = getUnique fs
            }
 
-instance Eq Unit where
+instance IsUnitId u => Eq (GenUnit u) where
   uid1 == uid2 = unitUnique uid1 == unitUnique uid2
 
-instance Uniquable Unit where
+instance IsUnitId u => Uniquable (GenUnit u) where
   getUnique = unitUnique
 
 instance Ord Unit where
@@ -357,8 +389,8 @@ moduleFreeHoles (Module u        _   ) = unitFreeModuleHoles u
 
 
 -- | Create a new 'GenInstantiatedUnit' given an explicit module substitution.
-mkGenInstantiatedUnit :: (unit -> FastString) -> Indefinite unit -> GenInstantiations unit -> GenInstantiatedUnit unit
-mkGenInstantiatedUnit gunitFS cid insts =
+mkInstantiatedUnit :: IsUnitId u => Indefinite u -> GenInstantiations u -> GenInstantiatedUnit u
+mkInstantiatedUnit cid insts =
     InstantiatedUnit {
         instUnitInstanceOf = cid,
         instUnitInsts = sorted_insts,
@@ -367,22 +399,14 @@ mkGenInstantiatedUnit gunitFS cid insts =
         instUnitKey = getUnique fs
     }
   where
-     fs = mkGenInstantiatedUnitHash gunitFS cid sorted_insts
+     fs           = mkInstantiatedUnitHash cid sorted_insts
      sorted_insts = sortBy (stableModuleNameCmp `on` fst) insts
-
--- | Create a new 'InstantiatedUnit' given an explicit module substitution.
-mkInstantiatedUnit :: IndefUnitId -> Instantiations -> InstantiatedUnit
-mkInstantiatedUnit = mkGenInstantiatedUnit unitIdFS
 
 
 -- | Smart constructor for instantiated GenUnit
-mkGenVirtUnit :: (unit -> FastString) -> Indefinite unit -> [(ModuleName, GenModule (GenUnit unit))] -> GenUnit unit
-mkGenVirtUnit _gunitFS uid []    = RealUnit $ Definite (indefUnit uid) -- huh? indefinite unit without any instantiation/hole?
-mkGenVirtUnit gunitFS  uid insts = VirtUnit $ mkGenInstantiatedUnit gunitFS uid insts
-
--- | Smart constructor for VirtUnit
-mkVirtUnit :: IndefUnitId -> Instantiations -> Unit
-mkVirtUnit = mkGenVirtUnit unitIdFS
+mkVirtUnit :: IsUnitId u => Indefinite u -> [(ModuleName, GenModule (GenUnit u))] -> GenUnit u
+mkVirtUnit uid []    = RealUnit $ Definite (indefUnit uid) -- huh? indefinite unit without any instantiation/hole?
+mkVirtUnit uid insts = VirtUnit $ mkInstantiatedUnit uid insts
 
 -- | Generate a uniquely identifying hash (internal unit-id) for an instantiated
 -- unit.
@@ -392,24 +416,21 @@ mkVirtUnit = mkGenVirtUnit unitIdFS
 -- This hash is completely internal to GHC and is not used for symbol names or
 -- file paths. It is different from the hash Cabal would produce for the same
 -- instantiated unit.
-mkGenInstantiatedUnitHash :: (unit -> FastString) -> Indefinite unit -> [(ModuleName, GenModule (GenUnit unit))] -> FastString
-mkGenInstantiatedUnitHash gunitFS cid sorted_holes =
+mkInstantiatedUnitHash :: IsUnitId u => Indefinite u -> [(ModuleName, GenModule (GenUnit u))] -> FastString
+mkInstantiatedUnitHash cid sorted_holes =
     mkFastStringByteString
-  . fingerprintUnitId (bytesFS (gunitFS (indefUnit cid)))
-  $ hashInstantiations gunitFS sorted_holes
-
-mkInstantiatedUnitHash :: IndefUnitId -> Instantiations -> FastString
-mkInstantiatedUnitHash = mkGenInstantiatedUnitHash unitIdFS
+  . fingerprintUnitId (bytesFS (unitFS cid))
+  $ hashInstantiations sorted_holes
 
 -- | Generate a hash for a sorted module instantiation.
-hashInstantiations :: (unit -> FastString) -> [(ModuleName, GenModule (GenUnit unit))] -> Fingerprint
-hashInstantiations gunitFS sorted_holes =
+hashInstantiations :: IsUnitId u => [(ModuleName, GenModule (GenUnit u))] -> Fingerprint
+hashInstantiations sorted_holes =
     fingerprintByteString
   . BS.concat $ do
         (m, b) <- sorted_holes
-        [ bytesFS (moduleNameFS m),                   BS.Char8.singleton ' ',
-          bytesFS (genUnitFS gunitFS (moduleUnit b)), BS.Char8.singleton ':',
-          bytesFS (moduleNameFS (moduleName b)),      BS.Char8.singleton '\n']
+        [ bytesFS (moduleNameFS m),              BS.Char8.singleton ' ',
+          bytesFS (unitFS (moduleUnit b)),       BS.Char8.singleton ':',
+          bytesFS (moduleNameFS (moduleName b)), BS.Char8.singleton '\n']
 
 fingerprintUnitId :: BS.ByteString -> Fingerprint -> BS.ByteString
 fingerprintUnitId prefix (Fingerprint a b)
@@ -419,42 +440,37 @@ fingerprintUnitId prefix (Fingerprint a b)
       , BS.Char8.pack (toBase62Padded a)
       , BS.Char8.pack (toBase62Padded b) ]
 
-unitUnique :: Unit -> Unique
+unitUnique :: IsUnitId u => GenUnit u -> Unique
 unitUnique (VirtUnit x)            = instUnitKey x
-unitUnique (RealUnit (Definite x)) = getUnique x
+unitUnique (RealUnit (Definite x)) = getUnique (unitFS x)
 unitUnique HoleUnit                = holeUnique
-
-unitFS :: Unit -> FastString
-unitFS = genUnitFS unitIdFS
-
-genUnitFS :: (unit -> FastString) -> GenUnit unit -> FastString
-genUnitFS _gunitFS (VirtUnit x)            = instUnitFS x
-genUnitFS gunitFS  (RealUnit (Definite x)) = gunitFS x
-genUnitFS _gunitFS HoleUnit                = holeFS
 
 -- | Create a new simple unit identifier from a 'FastString'.  Internally,
 -- this is primarily used to specify wired-in unit identifiers.
 fsToUnit :: FastString -> Unit
 fsToUnit = RealUnit . Definite . UnitId
 
-unitString :: Unit -> String
+unitString :: IsUnitId u => u  -> String
 unitString = unpackFS . unitFS
 
 stringToUnit :: String -> Unit
 stringToUnit = fsToUnit . mkFastString
 
 -- | Map over the unit type of a 'GenUnit'
-mapGenUnit :: (u -> v) -> (v -> FastString) -> GenUnit u -> GenUnit v
-mapGenUnit f gunitFS = go
+mapGenUnit :: IsUnitId v => (u -> v) -> GenUnit u -> GenUnit v
+mapGenUnit f = go
    where
       go gu = case gu of
                HoleUnit   -> HoleUnit
                RealUnit d -> RealUnit (fmap f d)
                VirtUnit i ->
-                  VirtUnit $ mkGenInstantiatedUnit gunitFS
+                  VirtUnit $ mkInstantiatedUnit
                      (fmap f (instUnitInstanceOf i))
                      (fmap (second (fmap go)) (instUnitInsts i))
 
+-- | Map over the unit identifier of unit instantiations.
+mapInstantiations :: IsUnitId v => (u -> v) -> GenInstantiations u -> GenInstantiations v
+mapInstantiations f = map (second (fmap (mapGenUnit f)))
 
 -- | Return the UnitId of the Unit. For on-the-fly instantiated units, return
 -- the UnitId of the indefinite unit this unit is an instance of.

@@ -21,7 +21,7 @@ module GHC.Tc.Utils.Backpack (
 import GHC.Prelude
 
 import GHC.Types.Basic (defaultFixity, TypeOrKind(..))
-import GHC.Unit.State
+import GHC.Unit
 import GHC.Tc.Gen.Export
 import GHC.Driver.Session
 import GHC.Driver.Ppr
@@ -42,7 +42,6 @@ import GHC.Iface.Load
 import GHC.Rename.Names
 import GHC.Utils.Error
 import GHC.Types.Id
-import GHC.Unit.Module
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
@@ -312,10 +311,11 @@ implicitRequirements' hsc_env normal_imports
     forM normal_imports $ \(mb_pkg, L _ imp) -> do
         found <- findImportedModule hsc_env imp mb_pkg
         case found of
-            Found _ mod | not (isHomeModule dflags mod) ->
+            Found _ mod | not (isHomeModule home_unit mod) ->
                 return (uniqDSetToList (moduleFreeHoles mod))
             _ -> return []
   where dflags = hsc_dflags hsc_env
+        home_unit = mkHomeUnitFromFlags dflags
 
 -- | Given a 'Unit', make sure it is well typed.  This is because
 -- unit IDs come from Cabal, which does not know if things are well-typed or
@@ -539,6 +539,7 @@ mergeSignatures
         inner_mod = tcg_semantic_mod tcg_env
         mod_name = moduleName (tcg_mod tcg_env)
         pkgstate = unitState dflags
+        home_unit = mkHomeUnitFromFlags dflags
 
     -- STEP 1: Figure out all of the external signature interfaces
     -- we are going to merge in.
@@ -734,7 +735,7 @@ mergeSignatures
     -- STEP 4: Rename the interfaces
     ext_ifaces <- forM thinned_ifaces $ \((Module iuid _), ireq_iface) ->
         tcRnModIface (instUnitInsts iuid) (Just nsubst) ireq_iface
-    lcl_iface <- tcRnModIface (homeUnitInstantiations dflags) (Just nsubst) lcl_iface0
+    lcl_iface <- tcRnModIface (homeUnitInstantiations home_unit) (Just nsubst) lcl_iface0
     let ifaces = lcl_iface : ext_ifaces
 
     -- STEP 4.1: Merge fixities (we'll verify shortly) tcg_fix_env
@@ -756,7 +757,7 @@ mergeSignatures
     let infos = zip ifaces detailss
 
     -- Test for cycles
-    checkSynCycles (homeUnit dflags) (typeEnvTyCons type_env) []
+    checkSynCycles (homeUnitAsUnit home_unit) (typeEnvTyCons type_env) []
 
     -- NB on type_env: it contains NO dfuns.  DFuns are recorded inside
     -- detailss, and given a Name that doesn't correspond to anything real.  See
@@ -1000,16 +1001,17 @@ instantiateSignature = do
     dflags <- getDynFlags
     let outer_mod = tcg_mod tcg_env
         inner_mod = tcg_semantic_mod tcg_env
+        home_unit = mkHomeUnitFromFlags dflags
+        unit_state = unitState dflags
     -- TODO: setup the local RdrEnv so the error messages look a little better.
     -- But this information isn't stored anywhere. Should we RETYPECHECK
     -- the local one just to get the information?  Hmm...
-    MASSERT( isHomeModule dflags outer_mod )
-    MASSERT( isJust (homeUnitInstanceOfId dflags) )
-    let uid  = fromJust (homeUnitInstanceOfId dflags)
+    MASSERT( isHomeModule home_unit outer_mod )
+    MASSERT( isHomeUnitInstantiating home_unit)
         -- we need to fetch the most recent ppr infos from the unit
         -- database because we might have modified it
-        uid' = updateIndefUnitId (unitState dflags) uid
+    let uid = mkIndefUnitId unit_state (homeUnitInstanceOf home_unit)
     inner_mod `checkImplements`
         Module
-            (mkInstantiatedUnit uid' (homeUnitInstantiations dflags))
+            (mkInstantiatedUnit uid (homeUnitInstantiations home_unit))
             (moduleName outer_mod)

@@ -82,6 +82,7 @@ import GHC.Types.FieldLabel
 import GHC.Iface.Rename
 import GHC.Types.Unique.DSet
 import GHC.Driver.Plugins
+import GHC.Unit.Home
 
 import Control.Monad
 import Control.Exception
@@ -402,8 +403,9 @@ loadInterface doc_str mod from
   | isHoleModule mod
   -- Hole modules get special treatment
   = do dflags <- getDynFlags
+       let home_unit = mkHomeUnitFromFlags dflags
        -- Redo search for our local hole module
-       loadInterface doc_str (mkHomeModule dflags (moduleName mod)) from
+       loadInterface doc_str (mkHomeModule home_unit (moduleName mod)) from
   | otherwise
   = withTimingSilentD (text "loading interface") (pure ()) $
     do  {       -- Read the state
@@ -414,6 +416,7 @@ loadInterface doc_str mod from
 
                 -- Check whether we have the interface already
         ; dflags <- getDynFlags
+        ; let home_unit = mkHomeUnitFromFlags dflags
         ; case lookupIfaceByModule hpt (eps_PIT eps) mod of {
             Just iface
                 -> return (Succeeded iface) ;   -- Already loaded
@@ -423,7 +426,7 @@ loadInterface doc_str mod from
             _ -> do {
 
         -- READ THE MODULE IN
-        ; read_result <- case (wantHiBootFile dflags eps mod from) of
+        ; read_result <- case (wantHiBootFile home_unit eps mod from) of
                            Failed err             -> return (Failed err)
                            Succeeded hi_boot_file -> computeInterface doc_str hi_boot_file mod
         ; case read_result of {
@@ -494,7 +497,7 @@ loadInterface doc_str mod from
 
         ; WARN( bad_boot, ppr mod )
           updateEps_  $ \ eps ->
-           if elemModuleEnv mod (eps_PIT eps) || is_external_sig dflags iface
+           if elemModuleEnv mod (eps_PIT eps) || is_external_sig home_unit iface
                 then eps
            else if bad_boot
                 -- See Note [Loading your own hi-boot file]
@@ -616,12 +619,12 @@ dontLeakTheHPT thing_inside = do
 -- | Returns @True@ if a 'ModIface' comes from an external package.
 -- In this case, we should NOT load it into the EPS; the entities
 -- should instead come from the local merged signature interface.
-is_external_sig :: DynFlags -> ModIface -> Bool
-is_external_sig dflags iface =
+is_external_sig :: HomeUnit -> ModIface -> Bool
+is_external_sig home_unit iface =
     -- It's a signature iface...
     mi_semantic_module iface /= mi_module iface &&
     -- and it's not from the local package
-    moduleUnit (mi_module iface) /= homeUnit dflags
+    not (isHomeModule home_unit (mi_module iface))
 
 -- | This is an improved version of 'findAndReadIface' which can also
 -- handle the case when a user requests @p[A=<B>]:M@ but we only
@@ -643,8 +646,9 @@ computeInterface ::
 computeInterface doc_str hi_boot_file mod0 = do
     MASSERT( not (isHoleModule mod0) )
     dflags <- getDynFlags
+    let home_unit = mkHomeUnitFromFlags dflags
     case getModuleInstantiation mod0 of
-        (imod, Just indef) | homeUnitIsIndefinite dflags -> do
+        (imod, Just indef) | isHomeUnitIndefinite home_unit -> do
             r <- findAndReadIface doc_str imod mod0 hi_boot_file
             case r of
                 Succeeded (iface0, path) -> do
@@ -702,13 +706,13 @@ moduleFreeHolesPrecise doc_str mod
                 return (Succeeded (renameFreeHoles ifhs insts))
             Failed err -> return (Failed err)
 
-wantHiBootFile :: DynFlags -> ExternalPackageState -> Module -> WhereFrom
+wantHiBootFile :: HomeUnit -> ExternalPackageState -> Module -> WhereFrom
                -> MaybeErr MsgDoc IsBootInterface
 -- Figure out whether we want Foo.hi or Foo.hi-boot
-wantHiBootFile dflags eps mod from
+wantHiBootFile home_unit eps mod from
   = case from of
        ImportByUser usr_boot
-          | usr_boot == IsBoot && not this_package
+          | usr_boot == IsBoot && notHomeModule home_unit mod
           -> Failed (badSourceImport mod)
           | otherwise -> Succeeded usr_boot
 
@@ -716,10 +720,12 @@ wantHiBootFile dflags eps mod from
           -> Succeeded NotBoot
 
        ImportBySystem
-          | not this_package   -- If the module to be imported is not from this package
-          -> Succeeded NotBoot -- don't look it up in eps_is_boot, because that is keyed
-                               -- on the ModuleName of *home-package* modules only.
-                               -- We never import boot modules from other packages!
+          | notHomeModule home_unit mod
+          -> Succeeded NotBoot
+             -- If the module to be imported is not from this package
+             -- don't look it up in eps_is_boot, because that is keyed
+             -- on the ModuleName of *home-package* modules only.
+             -- We never import boot modules from other packages!
 
           | otherwise
           -> case lookupUFM (eps_is_boot eps) (moduleName mod) of
@@ -729,8 +735,6 @@ wantHiBootFile dflags eps mod from
                   Succeeded NotBoot
                      -- The boot-ness of the requested interface,
                      -- based on the dependencies in directly-imported modules
-  where
-    this_package = homeUnit dflags == moduleUnit mod
 
 badSourceImport :: Module -> SDoc
 badSourceImport mod
@@ -922,6 +926,7 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
                -- Look for the file
                hsc_env <- getTopEnv
                mb_found <- liftIO (findExactModule hsc_env mod)
+               let home_unit = mkHomeUnitFromFlags dflags
                case mb_found of
                    InstalledFound loc mod -> do
                        -- Found file, so read it
@@ -929,7 +934,7 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
                                                            (ml_hi_file loc)
 
                        -- See Note [Home module load error]
-                       if moduleUnit mod `unitIdEq` homeUnit dflags &&
+                       if isHomeInstalledModule home_unit mod &&
                           not (isOneShot (ghcMode dflags))
                            then return (Failed (homeModError mod loc))
                            else do r <- read_file file_path
@@ -1020,8 +1025,8 @@ readIface wanted_mod file_path
 *********************************************************
 -}
 
-initExternalPackageState :: DynFlags -> ExternalPackageState
-initExternalPackageState dflags
+initExternalPackageState :: HomeUnit -> ExternalPackageState
+initExternalPackageState home_unit
   = EPS {
       eps_is_boot          = emptyUFM,
       eps_PIT              = emptyPackageIfaceTable,
@@ -1041,9 +1046,9 @@ initExternalPackageState dflags
     }
     where
       enableBignumRules
-         | homeUnitId dflags == primUnitId   = EnableBignumRules False
-         | homeUnitId dflags == bignumUnitId = EnableBignumRules False
-         | otherwise                         = EnableBignumRules True
+         | isHomeUnitInstanceOf home_unit primUnitId   = EnableBignumRules False
+         | isHomeUnitInstanceOf home_unit bignumUnitId = EnableBignumRules False
+         | otherwise                                   = EnableBignumRules True
       builtinRules' = builtinRules enableBignumRules
 
 {-
