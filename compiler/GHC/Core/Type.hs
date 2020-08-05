@@ -357,9 +357,27 @@ But in Core these two are treated as identical.
 
 We implement this by making 'coreView' convert 'Constraint' to 'TYPE
 LiftedRep' on the fly.  The function tcView (used in the type checker)
-does not do this.
+does not do this. Accordingly, tcView is used in type-checker-oriented
+functions (including the pure unifier, used in instance resolution),
+while coreView is used during e.g. optimisation passes.
 
 See also #11715, which tracks removing this inconsistency.
+
+The inconsistency actually leads to a potential soundness bug, in that
+Constraint and Type are considered *apart* by the type family engine.
+To wit, we can write
+
+  type family F a
+  type instance F Type = Bool
+  type instance F Constraint = Int
+
+and (because Type ~# Constraint in Core), thus build a coercion between
+Int and Bool. I (Richard E) conjecture that this never happens in practice,
+but it's very uncomfortable. This, essentially, is the root problem
+underneath #11715, which is quite resistant to an easy fix. The best
+idea is to have roles in kind coercions, but that has yet to be implemented.
+See also "A Role for Dependent Types in Haskell", ICFP 2019, which describes
+how roles in kinds might work out.
 
 -}
 

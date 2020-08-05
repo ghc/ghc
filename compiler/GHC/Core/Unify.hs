@@ -957,7 +957,7 @@ unify_ty :: UMEnv
 -- Respects newtypes, PredTypes
 
 unify_ty env ty1 ty2 kco
-    -- TODO: More commentary needed here
+    -- Use tcView, not coreView. See Note [coreView vs tcView] in GHC.Core.Type.
   | Just ty1' <- tcView ty1   = unify_ty env ty1' ty2 kco
   | Just ty2' <- tcView ty2   = unify_ty env ty1 ty2' kco
   | CastTy ty1' co <- ty1     = if um_unif env
@@ -1121,7 +1121,8 @@ uUnrefined :: UMEnv
 -- We know that tv1 isn't refined
 
 uUnrefined env tv1' ty2 ty2' kco
-  | Just ty2'' <- coreView ty2'
+    -- Use tcView, not coreView. See Note [coreView vs tcView] in GHC.Core.Type.
+  | Just ty2'' <- tcView ty2'
   = uUnrefined env tv1' ty2 ty2'' kco    -- Unwrap synonyms
                 -- This is essential, in case we have
                 --      type Foo a = a
@@ -1483,6 +1484,8 @@ ty_co_match :: MatchEnv   -- ^ ambient helpful info
             -> Maybe LiftCoEnv
 ty_co_match menv subst ty co lkco rkco
   | Just ty' <- coreView ty = ty_co_match menv subst ty' co lkco rkco
+     -- why coreView here, not tcView? Because we're firmly after type-checking.
+     -- This function is used only during coercion optimisation.
 
   -- handle Refl case:
   | tyCoVarsOfType ty `isNotInDomainOf` subst
