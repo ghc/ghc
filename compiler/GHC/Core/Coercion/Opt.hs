@@ -332,6 +332,7 @@ opt_co4 env _sym rep r (NthCo _r n co)
   , Just (_tc, args) <- ASSERT( r == _r )
                         splitTyConApp_maybe ty
   = liftCoSubst (chooseRole rep r) env (args `getNth` n)
+
   | Just (ty, _) <- isReflCo_maybe co
   , n == 0
   , Just (tv, _) <- splitForAllTy_maybe ty
@@ -342,6 +343,11 @@ opt_co4 env sym rep r (NthCo r1 n (TyConAppCo _ _ cos))
   = ASSERT( r == r1 )
     opt_co4_wrap env sym rep r (cos `getNth` n)
 
+-- see the definition of GHC.Builtin.Types.Prim.funTyCon
+opt_co4 env sym rep r (NthCo r1 n (FunCo _r2 w co1 co2))
+  = ASSERT( r == r1 )
+    opt_co4_wrap env sym rep r (mkNthCoFunCo n w co1 co2)
+
 opt_co4 env sym rep r (NthCo _r n (ForAllCo _ eta _))
       -- works for both tyvar and covar
   = ASSERT( r == _r )
@@ -349,17 +355,15 @@ opt_co4 env sym rep r (NthCo _r n (ForAllCo _ eta _))
     opt_co4_wrap env sym rep Nominal eta
 
 opt_co4 env sym rep r (NthCo _r n co)
-  | TyConAppCo _ _ cos <- co'
-  , let nth_co = cos `getNth` n
+  | Just nth_co <- case co' of
+      TyConAppCo _ _ cos -> Just (cos `getNth` n)
+      FunCo _ w co1 co2  -> Just (mkNthCoFunCo n w co1 co2)
+      ForAllCo _ eta _   -> Just eta
+      _                  -> Nothing
   = if rep && (r == Nominal)
       -- keep propagating the SubCo
     then opt_co4_wrap (zapLiftingContext env) False True Nominal nth_co
     else nth_co
-
-  | ForAllCo _ eta _ <- co'
-  = if rep
-    then opt_co4_wrap (zapLiftingContext env) False True Nominal eta
-    else eta
 
   | otherwise
   = wrapRole rep r $ NthCo r n co'
