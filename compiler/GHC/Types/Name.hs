@@ -87,6 +87,7 @@ import {-# SOURCE #-} GHC.Core.TyCo.Rep( TyThing )
 import GHC.Platform
 import GHC.Types.Name.Occurrence
 import GHC.Unit.Module
+import GHC.Unit.Home
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
 import GHC.Utils.Misc
@@ -338,10 +339,10 @@ nameIsHomePackageImport this_mod
 
 -- | Returns True if the Name comes from some other package: neither this
 -- package nor the interactive package.
-nameIsFromExternalPackage :: Unit -> Name -> Bool
-nameIsFromExternalPackage this_unit name
+nameIsFromExternalPackage :: HomeUnit -> Name -> Bool
+nameIsFromExternalPackage home_unit name
   | Just mod <- nameModule_maybe name
-  , moduleUnit mod /= this_unit   -- Not the current unit
+  , notHomeModule home_unit mod   -- Not the current unit
   , not (isInteractiveModule mod) -- Not the 'interactive' package
   = True
   | otherwise

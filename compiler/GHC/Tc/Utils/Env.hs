@@ -106,6 +106,7 @@ import GHC.Driver.Session
 import GHC.Types.SrcLoc
 import GHC.Types.Basic hiding( SuccessFlag(..) )
 import GHC.Unit.Module
+import GHC.Unit.Home
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Encoding
@@ -146,7 +147,8 @@ lookupGlobal_maybe hsc_env name
   = do  {    -- Try local envt
           let mod = icInteractiveModule (hsc_IC hsc_env)
               dflags = hsc_dflags hsc_env
-              tcg_semantic_mod = canonicalizeModuleIfHome dflags mod
+              home_unit = mkHomeUnitFromFlags dflags
+              tcg_semantic_mod = homeModuleInstantiation home_unit mod
 
         ; if nameIsLocalOrFrom tcg_semantic_mod name
               then (return

@@ -172,8 +172,11 @@ mkNoteObjsToLinkIntoBinary dflags dep_packages = do
 getLinkInfo :: DynFlags -> [UnitId] -> IO String
 getLinkInfo dflags dep_packages = do
    package_link_opts <- getUnitLinkOpts dflags dep_packages
+   let unit_state = unitState dflags
+       home_unit  = mkHomeUnitFromFlags dflags
+       ctx        = initSDocContext dflags defaultUserStyle
    pkg_frameworks <- if platformUsesFrameworks (targetPlatform dflags)
-                     then getUnitFrameworks dflags dep_packages
+                     then getUnitFrameworks ctx unit_state home_unit dep_packages
                      else return []
    let extra_ld_inputs = ldInputs dflags
    let

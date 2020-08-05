@@ -43,7 +43,6 @@ module GHC.Unit.Module
     , moduleIsDefinite
     , HasModule(..)
     , ContainsModule(..)
-    , unitIdEq
     , installedModuleEq
     ) where
 
@@ -89,10 +88,6 @@ installedModuleEq :: InstalledModule -> Module -> Bool
 installedModuleEq imod mod =
     fst (getModuleInstantiation mod) == imod
 
--- | Test if a 'Unit' corresponds to a given 'UnitId',
--- modulo instantiation.
-unitIdEq :: UnitId -> Unit -> Bool
-unitIdEq iuid uid = toUnitId uid == iuid
 
 {-
 ************************************************************************
