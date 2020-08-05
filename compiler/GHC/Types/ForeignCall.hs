@@ -206,24 +206,26 @@ instance Outputable CExportSpec where
 
 instance Outputable CCallSpec where
   ppr (CCallSpec fun cconv safety)
-    = hcat [ whenPprDebug callconv, ppr_fun fun ]
+    = hcat [ whenPprDebug callconv, ppr_fun fun, text " ::" ]
     where
       callconv = text "{-" <> ppr cconv <> text "-}"
 
-      gc_suf | playSafe safety = text "_GC"
-             | otherwise       = empty
+      gc_suf | playSafe safety = text "_safe"
+             | otherwise       = text "_unsafe"
 
-      ppr_fun (StaticTarget st _fn mPkgId isFun)
-        = text (if isFun then "__pkg_ccall"
-                         else "__pkg_ccall_value")
+      ppr_fun (StaticTarget st lbl mPkgId isFun)
+        = text (if isFun then "__ffi_static_ccall"
+                         else "__ffi_static_ccall_value")
        <> gc_suf
        <+> (case mPkgId of
             Nothing -> empty
             Just pkgId -> ppr pkgId)
+       <> text ":"
+       <> ppr lbl
        <+> (pprWithSourceText st empty)
 
       ppr_fun DynamicTarget
-        = text "__dyn_ccall" <> gc_suf <+> text "\"\""
+        = text "__ffi_dyn_ccall" <> gc_suf <+> text "\"\""
 
 -- The filename for a C header file
 -- Note [Pragma source text] in GHC.Types.SourceText
