@@ -8,4 +8,4 @@ test('T7881', normal, compile, [''])
 # desugaring, so we don't get the warning we expect.
 test('T8542', omit_ways(['hpc']), compile, [''])
 test('T10929', normal, compile, [''])
-test('T16402', [ grep_errmsg(r'and') ], compile, [''])
+test('T16402', [ grep_errmsg(r'and'), when(wordsize(32), expect_broken(19024)) ], compile, [''])
