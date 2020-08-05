@@ -95,6 +95,10 @@ typedef struct free_list {
 } free_list;
 
 static free_list *free_list_head;
+
+// The address in `mblock_address_space` just after the highest MBlock. This
+// will be the address of the next new MBlock committed when the free list is
+// empty.
 static W_ mblock_high_watermark;
 /*
  * it is quite important that these are in the same cache line as they
@@ -103,22 +107,47 @@ static W_ mblock_high_watermark;
  */
 struct mblock_address_range mblock_address_space = { 0, 0, {} };
 
+// Search for the first committed MBlock at or after startingAt.
+//
+// start_iter [in/out]: The free_list or a subset of it. Must contain all
+// entries for MBlocks at or after startingAt. On return this is set to the
+// free_list entry just after the returned MBlock. If no MBlock was found, This
+// is set to NULL (the search will have reached the end of the free list).
+//
+// startingAt [in]: address from which to start searching. This must be to the
+// start of an MBlock.
+//
+// return: The address of the committed MBlock. NULL if no committed MBLock was
+// found.
+//
 static void *getAllocatedMBlock(free_list **start_iter, W_ startingAt)
 {
+    // We simultaneously travere the free list and the mblock_address_space.
     free_list *iter;
     W_ p = startingAt;
 
     for (iter = *start_iter; iter != NULL; iter = iter->next)
     {
+        // The current free MBlock, `iter`, is past the current MBlock, `p`.
+        // This means that `p` is committed (if it was free, then we would have
+        // found it on the free list). Stop searching.
         if (p < iter->address)
             break;
 
+        // Note that if `p > iter->address`, then we don't bump `p`. This just
+        // means we are skipping entries in the free list that correspond to
+        // MBlocks before `startingAt`.
         if (p == iter->address)
+            // Move to the next MBlock. The MBlock may be committed,
+            // uncommitted, or even past mblock_high_watermark.
             p += iter->size;
     }
 
+    // Output current free list entry.
     *start_iter = iter;
 
+    // If we reached mblock_high_watermark, then we didn't find any committed
+    // MBlocks.
     if (p >= mblock_high_watermark)
         return NULL;
 
@@ -152,6 +181,11 @@ void * getNextMBlock(void **state STG_UNUSED, void *mblock)
     return getAllocatedMBlock(casted_state, (W_)mblock + MBLOCK_SIZE);
 }
 
+// Used to implement getCommittedMBlocks. Search the free list for n contiguous
+// free MBlocks, and commit those MBlocks, updating the free_list. Returns the
+// address of the start of those MBlocks. Returns NULL if no n contiguous
+// MBlocks were found in the free list. Unlike getFreshMBlocks, this doesn't
+// attempt to allocate new MBlocks past mblock_high_watermark.
 static void *getReusableMBlocks(uint32_t n)
 {
     struct free_list *iter;
@@ -163,7 +197,10 @@ static void *getReusableMBlocks(uint32_t n)
         if (iter->size < size)
             continue;
 
+        // We've found a large enough group of MBlocks.
         addr = (void*)iter->address;
+
+        // Update the free list.
         iter->address += size;
         iter->size -= size;
         if (iter->size == 0) {
@@ -190,6 +227,9 @@ static void *getReusableMBlocks(uint32_t n)
     return NULL;
 }
 
+// Used to implement getCommittedMBlocks. Commit n new MBlocks starting at
+// mblock_high_watermark. May exit with an out of memory error if we've passed
+// mblock_address_space.end (this is unlikely).
 static void *getFreshMBlocks(uint32_t n)
 {
     W_ size = MBLOCK_SIZE * (W_)n;
@@ -207,6 +247,8 @@ static void *getFreshMBlocks(uint32_t n)
     return addr;
 }
 
+// Commit n new MBlocks. Tries to reuse freed MBlocks, else commits new
+// MBlock(s) at mblock_high_watermark.
 static void *getCommittedMBlocks(uint32_t n)
 {
     void *p;
@@ -220,6 +262,11 @@ static void *getCommittedMBlocks(uint32_t n)
     return p;
 }
 
+// Decommit n contiguous MBlocks starting at the given address.
+//
+// addr [in]: address of the start of the n MBlocks (in mblock_address_space).
+//
+// n [in]: number of contiguous MBlocks to decommit.
 static void decommitMBlocks(char *addr, uint32_t n)
 {
     struct free_list *iter, *prev;
@@ -228,17 +275,24 @@ static void decommitMBlocks(char *addr, uint32_t n)
 
     osDecommitMemory(addr, size);
 
+    // Update the free list.
     prev = NULL;
     for (iter = free_list_head; iter != NULL; iter = iter->next)
     {
         prev = iter;
 
+        // iter is still entirely behind and not contiguous with the MBlocks so
+        // continue traversing free_list.
         if (iter->address + iter->size < address)
             continue;
 
+        // The MBlocks are after and contiguous to iter. Simply modify the
+        // current entry to include n more MBlocks and possibly coalesce.
         if (iter->address + iter->size == address) {
             iter->size += size;
 
+            // If the current free_list entry now reaches mblock_high_watermark,
+            // remove the entry and decrement mblock_high_watermark.
             if (address + size == mblock_high_watermark) {
                 mblock_high_watermark -= iter->size;
                 if (iter->prev) {
@@ -251,6 +305,8 @@ static void decommitMBlocks(char *addr, uint32_t n)
                 return;
             }
 
+            // If the current free_list entry now reaches the next free_list
+            // entry, coalesce them.
             if (iter->next &&
                 iter->next->address == iter->address + iter->size) {
                 struct free_list *next;
@@ -269,6 +325,8 @@ static void decommitMBlocks(char *addr, uint32_t n)
                 stgFree(next);
             }
             return;
+
+        // The MBlocks are before and contiguous to iter.
         } else if (address + size == iter->address) {
             iter->address = address;
             iter->size += size;
@@ -280,6 +338,9 @@ static void decommitMBlocks(char *addr, uint32_t n)
                 ASSERT(iter->prev->address + iter->prev->size < iter->address);
             }
             return;
+
+        // The MBlock are before and not contiguous to iter. Insert a new entry just
+        // before iter.
         } else {
             struct free_list *new_iter;
 
@@ -311,6 +372,7 @@ static void decommitMBlocks(char *addr, uint32_t n)
     if (address + size == mblock_high_watermark) {
         mblock_high_watermark -= size;
     } else {
+        // Add a new entry to the end of the free list.
         struct free_list *new_iter;
 
         new_iter = stgMallocBytes(sizeof(struct free_list), "freeMBlocks");
