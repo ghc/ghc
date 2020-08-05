@@ -47,7 +47,7 @@ import GHC.Types.Id.Info
 import GHC.Builtin.Types
 import GHC.Core.DataCon
 import GHC.Types.Basic
-import GHC.Unit.Module
+import GHC.Unit
 import GHC.Types.Unique.Supply
 import GHC.Data.Maybe
 import GHC.Data.OrdList
@@ -1494,10 +1494,11 @@ mkConvertNumLiteral hsc_env = do
    let
       dflags   = hsc_dflags hsc_env
       platform = targetPlatform dflags
+      home_unit = getHomeUnit dflags
       guardBignum act
-         | homeUnitId dflags == primUnitId
+         | isHomeUnitInstanceOf home_unit primUnitId
          = return $ panic "Bignum literals are not supported in ghc-prim"
-         | homeUnitId dflags == bignumUnitId
+         | isHomeUnitInstanceOf home_unit bignumUnitId
          = return $ panic "Bignum literals are not supported in ghc-bignum"
          | otherwise = act
 
