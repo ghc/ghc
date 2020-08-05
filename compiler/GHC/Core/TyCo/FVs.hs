@@ -274,7 +274,10 @@ pattern TCA f <- TCA' f
     TCA f = TCA' (oneShot f)
 
 instance Semigroup (TyCoAcc acc) where
-    (TCA f1) <> (TCA f2) = TCA (\is acc -> f2 is (f1 is acc))
+    (TCA f1) <> (TCA f2) = TCA (\is acc -> f1 is (f2 is acc))
+       -- It makes a perf difference going f1 (f2 acc), rather
+       -- than f2 (f1 acc).  In a short-cutting situation (e.g.
+       -- a boolean accumulator, people put the short-cut first.
     {-# INLINE (<>) #-}
 
 instance Monoid (TyCoAcc acc) where
@@ -301,7 +304,11 @@ addTyCoVar tcv (TCA add_extras) = TCA add_it
 
 extendInScope :: TyCoVar -> TyCoAcc acc -> TyCoAcc acc
 -- Gather the argument free vars in an empty in-scope set
-extendInScope tcv (TCA f) = TCA (\is acc -> f (is `extendVarSet` tcv) acc)
+extendInScope tcv (TCA f) = TCA (\is acc -> let !is' = is `extendVarSet` tcv
+                                            in f is' acc)
+      -- Making this strict removes a thunk, which reduces
+      -- allocation slightly; and the in-scope set is consulted
+      -- at every variable occurrence anyway
 
 whenNotInScope :: TyCoVar -> TyCoAcc acc -> TyCoAcc acc
 -- If tcv is not in the in-scope set, compute
