@@ -1146,7 +1146,8 @@ memInventory (bool show)
                + retainer_blocks + arena_blocks + exec_blocks + gc_free_blocks
                + upd_rem_set_blocks;
 
-#define MB(n) (((double)(n) * BLOCK_SIZE_W) / ((1024*1024)/sizeof(W_)))
+// MiB converts number of blocks to mebibytes (1 mebibytes = 1048576 bytes).
+#define MiB(n) (((double)(n) * BLOCK_SIZE) / 1048576)
 
   leak = live_blocks + free_blocks != mblocks_allocated * BLOCKS_PER_MBLOCK;
 
@@ -1158,27 +1159,27 @@ memInventory (bool show)
           debugBelch("Memory inventory:\n");
       }
       for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-          debugBelch("  gen %d blocks : %5" FMT_Word " blocks (%6.1lf MB)\n", g,
-                     gen_blocks[g], MB(gen_blocks[g]));
+          debugBelch("  gen %d blocks : %5" FMT_Word " blocks (%6.1lf MiB)\n", g,
+                     gen_blocks[g], MiB(gen_blocks[g]));
       }
-      debugBelch("  nursery      : %5" FMT_Word " blocks (%6.1lf MB)\n",
-                 nursery_blocks, MB(nursery_blocks));
-      debugBelch("  retainer     : %5" FMT_Word " blocks (%6.1lf MB)\n",
-                 retainer_blocks, MB(retainer_blocks));
-      debugBelch("  arena blocks : %5" FMT_Word " blocks (%6.1lf MB)\n",
-                 arena_blocks, MB(arena_blocks));
-      debugBelch("  exec         : %5" FMT_Word " blocks (%6.1lf MB)\n",
-                 exec_blocks, MB(exec_blocks));
-      debugBelch("  GC free pool : %5" FMT_Word " blocks (%6.1lf MB)\n",
-                 gc_free_blocks, MB(gc_free_blocks));
-      debugBelch("  free         : %5" FMT_Word " blocks (%6.1lf MB)\n",
-                 free_blocks, MB(free_blocks));
-      debugBelch("  UpdRemSet    : %5" FMT_Word " blocks (%6.1lf MB)\n",
-                 upd_rem_set_blocks, MB(upd_rem_set_blocks));
-      debugBelch("  total        : %5" FMT_Word " blocks (%6.1lf MB)\n",
-                 live_blocks + free_blocks, MB(live_blocks+free_blocks));
+      debugBelch("  nursery      : %5" FMT_Word " blocks (%6.1lf MiB)\n",
+                 nursery_blocks, MiB(nursery_blocks));
+      debugBelch("  retainer     : %5" FMT_Word " blocks (%6.1lf MiB)\n",
+                 retainer_blocks, MiB(retainer_blocks));
+      debugBelch("  arena blocks : %5" FMT_Word " blocks (%6.1lf MiB)\n",
+                 arena_blocks, MiB(arena_blocks));
+      debugBelch("  exec         : %5" FMT_Word " blocks (%6.1lf MiB)\n",
+                 exec_blocks, MiB(exec_blocks));
+      debugBelch("  GC free pool : %5" FMT_Word " blocks (%6.1lf MiB)\n",
+                 gc_free_blocks, MiB(gc_free_blocks));
+      debugBelch("  free         : %5" FMT_Word " blocks (%6.1lf MiB)\n",
+                 free_blocks, MiB(free_blocks));
+      debugBelch("  UpdRemSet    : %5" FMT_Word " blocks (%6.1lf MiB)\n",
+                 upd_rem_set_blocks, MiB(upd_rem_set_blocks));
+      debugBelch("  total        : %5" FMT_Word " blocks (%6.1lf MiB)\n",
+                 live_blocks + free_blocks, MiB(live_blocks+free_blocks));
       if (leak) {
-          debugBelch("\n  in system    : %5" FMT_Word " blocks (%" FMT_Word " MB)\n",
+          debugBelch("\n  in system    : %5" FMT_Word " blocks (%" FMT_Word " MiB)\n",
                      (W_)(mblocks_allocated * BLOCKS_PER_MBLOCK), mblocks_allocated);
       }
   }
