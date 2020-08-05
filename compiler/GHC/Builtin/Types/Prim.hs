@@ -407,8 +407,9 @@ funTyConName = mkPrimTyConName (fsLit "FUN") funTyConKey funTyCon
 -- | The @FUN@ type constructor.
 --
 -- @
--- FUN :: forall {m :: Multiplicity} {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
---         TYPE rep1 -> TYPE rep2 -> *
+-- FUN :: forall (m :: Multiplicity) ->
+--        forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}.
+--        TYPE rep1 -> TYPE rep2 -> *
 -- @
 --
 -- The runtime representations quantification is left inferred. This
