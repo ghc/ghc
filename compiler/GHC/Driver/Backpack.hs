@@ -670,7 +670,7 @@ hsunitModuleGraph dflags unit = do
         let has_local = Map.member (mod_name, True) node_map
         in if has_local
             then return Nothing
-            else fmap (Just . flip (,) []) $ summariseRequirement pn mod_name
+            else fmap (Just . toExtendedModSummary) $ summariseRequirement pn mod_name
 
     -- 3. Return the kaboodle
     return $ mkModuleGraph' $
