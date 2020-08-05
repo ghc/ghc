@@ -268,6 +268,7 @@ type InScopeBndrs  = TyCoVarSet
 newtype TyCoAcc acc = TCA' { runTCA :: InScopeBndrs -> acc -> acc }
 
 pattern TCA :: forall acc. (InScopeBndrs -> acc -> acc) -> TyCoAcc acc
+-- See GHC.Core.Unify Note [The one-shot state monad trick]
 {-# COMPLETE TCA #-}
 pattern TCA f <- TCA' f
   where
@@ -290,17 +291,17 @@ emptyInScope :: InScopeBndrs
 emptyInScope = emptyVarSet
 
 addTyCoVar :: TyCoVar -> TyCoAcc TyCoVarSet -> TyCoAcc TyCoVarSet
--- Add a variable tcv, and the extras, to the free vars unless
--- tcv is in the in-scope
---  or is already in the in-scope set-
--- The 'extras' start from an empty in-scope set;
---    see Note [Closing over free variable kinds]
-addTyCoVar tcv (TCA add_extras) = TCA add_it
+-- If 'tcv' is (a) in scope or (b) in the accumulator, then do nothing
+-- Otherwise:
+--   - Add 'tcv' to the accumulator, and
+--   - Run 'add_kind_fvs' starting from an empty in-scope set;
+--     see Note [Closing over free variable kinds]
+addTyCoVar tcv (TCA add_kind_fvs) = TCA add_it
   where
     add_it is acc
       | tcv `elemVarSet` is  = acc
       | tcv `elemVarSet` acc = acc
-      | otherwise            = add_extras emptyVarSet (acc `extendVarSet` tcv)
+      | otherwise            = add_kind_fvs emptyVarSet (acc `extendVarSet` tcv)
 
 extendInScope :: TyCoVar -> TyCoAcc acc -> TyCoAcc acc
 -- Gather the argument free vars in an empty in-scope set

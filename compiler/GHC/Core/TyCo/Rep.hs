@@ -1820,11 +1820,15 @@ coercion witnessing the reduction. The reduction will proceed as follows:
     ~> S (S (S (Z + S Z)))     |>              CoAx2 (CoAx2 (CoAx2 Refl))
     ~> S (S (S (S (S Z))))     |>              CoAx1 (CoAx2 (CoAx2 (CoAx2 Refl)))
 
-Moreover, coercions are really only useful when validating core transformations
-(i.e. by the Core Linter). To avoid burdening users who aren't linting with the
-cost of maintaining these structures, we replace coercions with placeholders
-("zap" them) them unless -dcore-lint is enabled. These placeholders are
-represented by UnivCo with ZappedProv provenance. Concretely, a coercion
+This looks linear, but the type arguments to CoAx2 are of size N, N-1
+etc; hence quadratic.
+
+Moreover, coercions are really only useful when validating core
+transformations (i.e. by the Core Linter). To avoid burdening users
+who aren't linting with the cost of maintaining these structures, we
+replace coercions with placeholders ("zap" them) them (under control
+of -ddrop-coercions).  These placeholders are represented by UnivCo
+with ZappedProv provenance. Concretely, a coercion
 
     co :: t1 ~r t2
 
@@ -1975,6 +1979,8 @@ keyword):
    to avoid unsound floating. This means that the free variable lists of zapped
    coercions loaded from interface files will lack top-level things (e.g. type
    constructors) that appear only in the unzapped proof.
+
+* coercionSize gives a smaller size, of course.
 -}
 
 
@@ -2078,6 +2084,7 @@ data TyCoFolder a
           -- See Note [Coercion holes] in "GHC.Core.TyCo.Rep".
 
       , tcf_tycobinder :: TyCoVar -> ArgFlag -> a -> a
+          -- ^ Modify the result of folding over the body of the forall
       }
 
 noView :: Type -> Maybe Type  -- Simplest form of tcf_view
@@ -2108,7 +2115,7 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_ty (ForAllTy (Bndr tv vis) inner)
       = go_ty (varType tv) `mappend` tycobinder tv vis (go_ty inner)
 
-    -- Explicit recursion becuase using foldr builds a local
+    -- Explicit recursion because using foldr builds a local
     -- loop (with free) and I'm not confident it'll be
     -- lambda lifted in the end
     go_tys []     = mempty
@@ -2148,8 +2155,9 @@ foldTyCo (TyCoFolder { tcf_view       = view
     go_prov (ZapCoProv cvs)     = go_cvs (dVarSetElems cvs)
       -- This use of dVarSetElems does a sort, which seems very
       -- inefficient.  But it seems required for determinism, alas.
-      -- Unless the 'a' is instantiated with a non-deterministic kind
-      -- of thing...could we exploit that somehow?  ToDo.
+      -- Unless the 'a' is instantiated with a commutative monoid,
+      -- such as (VarSet -> VarSet) ...could we exploit that somehow?
+      -- ToDo.
 
     go_cvs []       = mempty
     go_cvs (cv:cvs) = covar cv `mappend` go_cvs cvs
