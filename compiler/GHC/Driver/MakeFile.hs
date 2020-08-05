@@ -401,7 +401,7 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
           loop_breaker = head boot_only
           all_others   = tail boot_only ++ others
           groups = filterToposortToModules $
-            GHC.topSortModuleGraph True (mkModuleGraph $ flip (,) [] <$> all_others) Nothing
+            GHC.topSortModuleGraph True (mkModuleGraph $ toExtendedModSummary <$> all_others) Nothing
 
     pp_ms summary = text mod_str <> text (take (20 - length mod_str) (repeat ' '))
                        <+> (pp_imps empty (map snd (ms_imps summary)) $$
