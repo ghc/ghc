@@ -110,7 +110,7 @@ import GHC.Utils.Error
 import GHC.Types.Id as Id
 import GHC.Types.Id.Info( IdDetails(..) )
 import GHC.Types.Var.Env
-import GHC.Unit.Module
+import GHC.Unit
 import GHC.Types.Unique.FM
 import GHC.Types.Name
 import GHC.Types.Name.Env
@@ -181,15 +181,14 @@ tcRnModule hsc_env mod_sum save_rn_syntax
   where
     hsc_src = ms_hsc_src mod_sum
     dflags = hsc_dflags hsc_env
-    err_msg = mkPlainErrMsg (hsc_dflags hsc_env) loc $
+    home_unit = mkHomeUnitFromFlags dflags
+    err_msg = mkPlainErrMsg dflags loc $
               text "Module does not have a RealSrcSpan:" <+> ppr this_mod
-
-    this_pkg = homeUnit (hsc_dflags hsc_env)
 
     pair :: (Module, SrcSpan)
     pair@(this_mod,_)
       | Just (L mod_loc mod) <- hsmodName this_module
-      = (mkModule this_pkg mod, mod_loc)
+      = (mkHomeModule home_unit mod, mod_loc)
 
       | otherwise   -- 'module M where' is omitted
       = (mAIN, srcLocSpan (srcSpanStart loc))
@@ -2839,12 +2838,12 @@ loadUnqualIfaces hsc_env ictxt
   = initIfaceTcRn $ do
     mapM_ (loadSysInterface doc) (moduleSetElts (mkModuleSet unqual_mods))
   where
-    this_pkg = homeUnit (hsc_dflags hsc_env)
+    home_unit = mkHomeUnitFromFlags (hsc_dflags hsc_env)
 
     unqual_mods = [ nameModule name
                   | gre <- globalRdrEnvElts (ic_rn_gbl_env ictxt)
                   , let name = gre_name gre
-                  , nameIsFromExternalPackage this_pkg name
+                  , nameIsFromExternalPackage home_unit name
                   , isTcOcc (nameOccName name)   -- Types and classes only
                   , unQualOK gre ]               -- In scope unqualified
     doc = text "Need interface for module whose export(s) are in scope unqualified"
