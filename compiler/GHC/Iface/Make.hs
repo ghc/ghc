@@ -56,7 +56,7 @@ import GHC.Types.Avail
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
-import GHC.Unit.Module
+import GHC.Unit
 import GHC.Utils.Error
 import GHC.Utils.Outputable
 import GHC.Types.Basic hiding ( SuccessFlag(..) )
@@ -166,10 +166,9 @@ mkIfaceTc hsc_env safe_mode mod_details
                     }
   = do
           let used_names = mkUsedNames tc_result
-          let pluginModules =
-                map lpModule (cachedPlugins (hsc_dflags hsc_env))
-          deps <- mkDependencies
-                    (homeUnitId (hsc_dflags hsc_env))
+          let pluginModules = map lpModule (cachedPlugins (hsc_dflags hsc_env))
+          let home_unit = getHomeUnit (hsc_dflags hsc_env)
+          deps <- mkDependencies (homeUnitId home_unit)
                     (map mi_module pluginModules) tc_result
           let hpc_info = emptyHpcInfo other_hpc_info
           used_th <- readIORef tc_splice_used
@@ -224,7 +223,8 @@ mkIface_ hsc_env
 --      to expose in the interface
 
   = do
-    let semantic_mod = canonicalizeHomeModule (hsc_dflags hsc_env) (moduleName this_mod)
+    let home_unit    = getHomeUnit (hsc_dflags hsc_env)
+        semantic_mod = homeModuleNameInstantiation home_unit (moduleName this_mod)
         entities = typeEnvElts type_env
         show_linear_types = xopt LangExt.LinearTypes (hsc_dflags hsc_env)
         decls  = [ tyThingToIfaceDecl show_linear_types entity
