@@ -430,8 +430,8 @@ instance Semigroup a => Monoid (Maybe a) where
 -- @since 2.01
 instance Monoid a => Applicative ((,) a) where
     pure x = (mempty, x)
-    (u, f) <*> (v, x) = (u <> v, f x)
-    liftA2 f (u, x) (v, y) = (u <> v, f x y)
+    ~(u, f) <*> ~(v, x) = (u <> v, f x)
+    liftA2 f ~(u, x) ~(v, y) = (u <> v, f x y)
 
 -- | @since 4.9.0.0
 instance Monoid a => Monad ((,) a) where
