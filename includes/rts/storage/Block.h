@@ -24,6 +24,7 @@
 #error "Size of pointer is suspicious."
 #endif
 
+// BLOCK_SIZE is bytes per block.
 #if defined(CMINUSMINUS)
 #define BLOCK_SIZE   (1<<BLOCK_SHIFT)
 #else
@@ -39,6 +40,7 @@
 
 /* Megablock related constants (MBLOCK_SHIFT is defined in Constants.h) */
 
+// MBLOCK_SIZE is bytes per megablock.
 #if defined(CMINUSMINUS)
 #define MBLOCK_SIZE    (1<<MBLOCK_SHIFT)
 #else
