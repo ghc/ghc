@@ -26,7 +26,7 @@ module GHC.Driver.Types (
         HscStatus(..),
 
         -- * ModuleGraph
-        ModuleGraph, WorkGraphNode(..), emptyMG, mapMG,
+        ModuleGraph, ModuleGraphNode(..), emptyMG, mapMG,
         mkModuleGraph, mkModuleGraph', extendMG, extendMGInst, extendMG',
         filterToposortToModules,
         mgModSummaries, mgModSummaries', mgExtendedModSummaries,
@@ -2824,43 +2824,25 @@ soExt platform
 ************************************************************************
 -}
 
--- | A '@WorkGraphNode@' is a node in the '@ModuleGraph@'.
-data WorkGraphNode
-  -- | Instantiation nodes track the instantiation of other units with the
-  -- holes (signatures) of the current package.
-  --
-  -- Longer term, I (@Ericson2314) hope to track more work this way. We could
-  -- also track the instantiation of other units with already-built (EPS not
-  -- HPT) modules. If we support recursive backpack linking (even if just
-  -- limited cyclic unit instantiations which resolve to acyclic module\/sig
-  -- instantiations). we could track those instantiations too. At some point, we
-  -- may even wish to deduplicate the implementation for hs-boot and backpack
-  -- some more, and track the "instantation" of hs-boot with real modules a
-  -- similar way.
-  --
-  -- See Note [Identity versus semantic module]. I don't yet know the specifics,
-  -- but I suspect that the invariants discussed there interplay with this plan
-  -- for more explicit instantiations.
+-- | A '@ModuleGraphNode@' is a node in the '@ModuleGraph@'.
+data ModuleGraphNode
+  -- | Instantiation nodes track the instantiation of other units
+  -- (backpack dependencies) with the holes (signatures) of the current package.
   = InstantiationNode InstantiatedUnit
   -- | There is a module summary node for each module, signature, and boot module being built.
   | ModuleNode
       ModSummary
       [InstantiatedUnit] -- ^ Extra backpack deps
 
--- TODO use in ModuleNode and make real data type
 type ExtendedModSummary = (ModSummary, [InstantiatedUnit])
 
--- TODO what do we want here?
-instance Outputable WorkGraphNode where
+instance Outputable ModuleGraphNode where
   ppr = \case
     InstantiationNode iuid -> ppr iuid
     ModuleNode ms bds -> ppr ms <+> ppr bds
 
--- TODO deprecate and remove this.
-type ModuleGraph = WorkGraph
-
--- | A '@WorkGraph@' contains all the nodes from the home package (only). See
--- '@WorkGraphNode@' for information about the nodes.
+-- | A '@ModuleGraph@' contains all the nodes from the home package (only). See
+-- '@ModuleGraphNode@' for information about the nodes.
 --
 -- Modules need to be compiled. hs-boots need to be typechecked before
 -- the associated "real" module so modules with {-# SOURCE #-} imports can be
@@ -2870,8 +2852,8 @@ type ModuleGraph = WorkGraph
 --
 -- The graph is not necessarily stored in topologically-sorted order.  Use
 -- 'GHC.topSortModuleGraph' and 'GHC.Data.Graph.Directed.flattenSCC' to achieve this.
-data WorkGraph = ModuleGraph
-  { mg_mss :: [WorkGraphNode]
+data ModuleGraph = ModuleGraph
+  { mg_mss :: [ModuleGraphNode]
   , mg_non_boot :: ModuleEnv ModSummary
     -- a map of all non-boot ModSummaries keyed by Modules
   , mg_boot :: ModuleSet
@@ -2909,7 +2891,7 @@ mgModSummaries mg = [ m | ModuleNode m _ <- mgModSummaries' mg ]
 mgExtendedModSummaries :: ModuleGraph -> [ExtendedModSummary]
 mgExtendedModSummaries mg = [ (m, bds) | ModuleNode m bds <- mgModSummaries' mg ]
 
-mgModSummaries' :: ModuleGraph -> [WorkGraphNode]
+mgModSummaries' :: ModuleGraph -> [ModuleGraphNode]
 mgModSummaries' = mg_mss
 
 mgElemModule :: ModuleGraph -> Module -> Bool
@@ -2947,7 +2929,7 @@ extendMGInst mg depUnitId = mg
   { mg_mss = InstantiationNode depUnitId : mg_mss mg
   }
 
-extendMG' :: ModuleGraph -> WorkGraphNode -> ModuleGraph
+extendMG' :: ModuleGraph -> ModuleGraphNode -> ModuleGraph
 extendMG' mg = \case
   InstantiationNode depUnitId -> extendMGInst mg depUnitId
   ModuleNode ms bds -> extendMG mg ms bds
@@ -2955,18 +2937,18 @@ extendMG' mg = \case
 mkModuleGraph :: [(ModSummary, [InstantiatedUnit])] -> ModuleGraph
 mkModuleGraph = foldr (\(ms, bds) mg -> extendMG mg ms bds) emptyMG
 
-mkModuleGraph' :: [WorkGraphNode] -> ModuleGraph
+mkModuleGraph' :: [ModuleGraphNode] -> ModuleGraph
 mkModuleGraph' = foldr (flip extendMG') emptyMG
 
 -- | This function filters out all the instantiation nodes from a "step" of a
--- topological sort. It's use is somewhat dubious: when '@WorkGraphNode@' was
+-- topological sort. It's use is somewhat dubious: when '@ModuleGraphNode@' was
 -- created, replacing '@ModSummary@' as the node type, it was easy to get some
 -- uses of the work graph outside of '@GhcMake@' to typecheck again by just
 -- filtering out the new nodes. But going forward, as '@InstantiationNodes@'
 -- hopefully become more useful, those use sites should be reevaluated as to
 -- whether ignoring non-module nodes is really the correct things to do.
 filterToposortToModules
-  :: [SCC WorkGraphNode] -> [SCC ModSummary]
+  :: [SCC ModuleGraphNode] -> [SCC ModSummary]
 filterToposortToModules = mapMaybe $ mapMaybeSCC $ \case
   InstantiationNode _ -> Nothing
   ModuleNode node _ -> Just node
@@ -3079,7 +3061,7 @@ instance Outputable ModSummary where
              char '}'
             ]
 
-showModMsg :: DynFlags -> Bool -> WorkGraphNode -> String
+showModMsg :: DynFlags -> Bool -> ModuleGraphNode -> String
 showModMsg dflags _ (InstantiationNode indef_unit) = showSDoc dflags $
   ppr $ instUnitInstanceOf indef_unit
 showModMsg dflags recomp (ModuleNode mod_summary _) = showSDoc dflags $

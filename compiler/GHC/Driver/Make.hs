@@ -210,7 +210,7 @@ depanalPartial excluded_mods allow_dup_roots = do
 -- In the future, perhaps more of the work of instantiation could be moved here,
 -- instead of shoved in with the module compilation nodes. That could simplify
 -- backpack, and maybe hs-boot too.
-instantiationNodes :: DynFlags -> [WorkGraphNode]
+instantiationNodes :: DynFlags -> [ModuleGraphNode]
 instantiationNodes dflags = InstantiationNode <$> iuids_to_check
   where
     iuids_to_check :: [InstantiatedUnit]
@@ -495,7 +495,7 @@ load' how_much mHscMessage mod_graph = do
     -- This graph should be cycle-free.
     -- If we're restricting the upsweep to a portion of the graph, we
     -- also want to retain everything that is still stable.
-    let full_mg, partial_mg0, partial_mg, unstable_mg :: [SCC WorkGraphNode]
+    let full_mg, partial_mg0, partial_mg, unstable_mg :: [SCC ModuleGraphNode]
         stable_mg :: [SCC ExtendedModSummary]
         full_mg    = topSortModuleGraph False mod_graph Nothing
 
@@ -653,7 +653,7 @@ load' how_much mHscMessage mod_graph = do
           loadFinish Failed linkresult
 
 partitionNodes
-  :: [WorkGraphNode]
+  :: [ModuleGraphNode]
   -> ( [InstantiatedUnit]
      , [ExtendedModSummary]
      )
@@ -959,11 +959,11 @@ data LogQueue = LogQueue !(IORef [Maybe (WarnReason, Severity, SrcSpan, MsgDoc)]
 
 -- | The graph of modules to compile and their corresponding result 'MVar' and
 -- 'LogQueue'.
-type CompilationGraph = [(WorkGraphNode, MVar SuccessFlag, LogQueue)]
+type CompilationGraph = [(ModuleGraphNode, MVar SuccessFlag, LogQueue)]
 
 -- | Build a 'CompilationGraph' out of a list of strongly-connected modules,
 -- also returning the first, if any, encountered module cycle.
-buildCompGraph :: [SCC WorkGraphNode] -> IO (CompilationGraph, Maybe [WorkGraphNode])
+buildCompGraph :: [SCC ModuleGraphNode] -> IO (CompilationGraph, Maybe [ModuleGraphNode])
 buildCompGraph [] = return ([], Nothing)
 buildCompGraph (scc:sccs) = case scc of
     AcyclicSCC ms -> do
@@ -991,12 +991,12 @@ hscSourceToIsBoot :: HscSource -> IsBootInterface
 hscSourceToIsBoot HsBootFile = IsBoot
 hscSourceToIsBoot _ = NotBoot
 
-mkBuildModule :: WorkGraphNode -> BuildModule
+mkBuildModule :: ModuleGraphNode -> BuildModule
 mkBuildModule = \case
   InstantiationNode x -> Left x
   ModuleNode x _ -> Right $ mkBuildModule0 x
 
-mkHomeBuildModule :: WorkGraphNode -> NodeKey
+mkHomeBuildModule :: ModuleGraphNode -> NodeKey
 mkHomeBuildModule = \case
   InstantiationNode x -> Left x
   ModuleNode x _ -> Right $ mkHomeBuildModule0 x
@@ -1024,9 +1024,9 @@ parUpsweep
     -> HomePackageTable
     -> StableModules
     -> (HscEnv -> IO ())
-    -> [SCC WorkGraphNode]
+    -> [SCC ModuleGraphNode]
     -> m (SuccessFlag,
-          [WorkGraphNode])
+          [ModuleGraphNode])
 parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
     hsc_env <- getSession
     let dflags = hsc_dflags hsc_env
@@ -1455,9 +1455,9 @@ upsweep
     -> HomePackageTable            -- ^ HPT from last time round (pruned)
     -> StableModules               -- ^ stable modules (see checkStability)
     -> (HscEnv -> IO ())           -- ^ How to clean up unwanted tmp files
-    -> [SCC WorkGraphNode]       -- ^ Mods to do (the worklist)
+    -> [SCC ModuleGraphNode]       -- ^ Mods to do (the worklist)
     -> m (SuccessFlag,
-          [WorkGraphNode])
+          [ModuleGraphNode])
        -- ^ Returns:
        --
        --  1. A flag whether the complete upsweep was successful.
@@ -1472,7 +1472,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
     :: [NodeKey]
     -> HomePackageTable
     -> ModuleGraph
-    -> [SCC WorkGraphNode]
+    -> [SCC ModuleGraphNode]
     -> Int
     -> Int
     -> m (SuccessFlag, ModuleGraph)
@@ -1499,7 +1499,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
     :: GhcMonad m
     => HomePackageTable
     -> ModuleGraph
-    -> [SCC WorkGraphNode]
+    -> [SCC ModuleGraphNode]
     -> Int
     -> Int
     -> m (SuccessFlag, ModuleGraph)
@@ -1961,9 +1961,9 @@ reTypecheckLoop hsc_env ms graph
 --
 getModLoop
   :: ModSummary
-  -> [WorkGraphNode]
+  -> [ModuleGraphNode]
   -> (Module -> Bool) -- check if a module appears as a boot module in 'graph'
-  -> Maybe [WorkGraphNode]
+  -> Maybe [ModuleGraphNode]
 getModLoop ms graph appearsAsBoot
   | isBootSummary ms == NotBoot
   , appearsAsBoot this_mod
@@ -1994,7 +1994,7 @@ typecheckLoop dflags hsc_env mods = do
     old_hpt = hsc_HPT hsc_env
     hmis    = map (expectJust "typecheckLoop" . lookupHpt old_hpt) mods
 
-reachableBackwards :: ModuleName -> [WorkGraphNode] -> [WorkGraphNode]
+reachableBackwards :: ModuleName -> [ModuleGraphNode] -> [ModuleGraphNode]
 reachableBackwards mod summaries
   = [ node_payload node | node <- reachableG (transposeG graph) root ]
   where -- the rest just sets up the graph:
@@ -2010,7 +2010,7 @@ topSortModuleGraph
           -> ModuleGraph
           -> Maybe ModuleName
              -- ^ Root module name.  If @Nothing@, use the full graph.
-          -> [SCC WorkGraphNode]
+          -> [SCC ModuleGraphNode]
 -- ^ Calculate SCCs of the module graph, possibly dropping the hi-boot nodes
 -- The resulting list of strongly-connected-components is in topologically
 -- sorted order, starting with the module(s) at the bottom of the
@@ -2049,15 +2049,15 @@ topSortModuleGraph drop_hs_boot_nodes module_graph mb_root_mod
                      = throwGhcException (ProgramError "module does not exist")
             in graphFromEdgedVerticesUniq (seq root (reachableG graph root))
 
-type SummaryNode = Node Int WorkGraphNode
+type SummaryNode = Node Int ModuleGraphNode
 
 summaryNodeKey :: SummaryNode -> Int
 summaryNodeKey = node_key
 
-summaryNodeSummary :: SummaryNode -> WorkGraphNode
+summaryNodeSummary :: SummaryNode -> ModuleGraphNode
 summaryNodeSummary = node_payload
 
--- | Collect the immediate dependencies of a WorkGraphNode,
+-- | Collect the immediate dependencies of a ModuleGraphNode,
 -- optionally avoiding hs-boot dependencies.
 -- If the drop_hs_boot_nodes flag is False, and if this is a .hs and there is
 -- an equivalent .hs-boot, add a link from the former to the latter.  This
@@ -2065,7 +2065,7 @@ summaryNodeSummary = node_payload
 -- .hs, by introducing a cycle.  Additionally, it ensures that we will always
 -- process the .hs-boot before the .hs, and so the HomePackageTable will always
 -- have the most up to date information.
-unfilteredEdges :: Bool -> WorkGraphNode -> [NodeKey]
+unfilteredEdges :: Bool -> ModuleGraphNode -> [NodeKey]
 unfilteredEdges drop_hs_boot_nodes = \case
     InstantiationNode iuid ->
       Right . flip GWIB NotBoot <$> uniqDSetToList (instUnitHoles iuid)
@@ -2083,7 +2083,7 @@ unfilteredEdges drop_hs_boot_nodes = \case
     hs_boot_key | drop_hs_boot_nodes = NotBoot -- is regular mod or signature
                 | otherwise          = IsBoot
 
-moduleGraphNodes :: Bool -> [WorkGraphNode]
+moduleGraphNodes :: Bool -> [ModuleGraphNode]
   -> (Graph SummaryNode, NodeKey -> Maybe SummaryNode)
 moduleGraphNodes drop_hs_boot_nodes summaries =
   (graphFromEdgedVerticesUniq nodes, lookup_node)
@@ -2131,7 +2131,7 @@ type NodeMap a = Map.Map NodeKey a
 msKey :: ModSummary -> ModNodeKey
 msKey = mkHomeBuildModule0
 
-mkNodeKey :: WorkGraphNode -> NodeKey
+mkNodeKey :: ModuleGraphNode -> NodeKey
 mkNodeKey = \case
   InstantiationNode x -> Left x
   ModuleNode x _ -> Right $ mkHomeBuildModule0 x
@@ -2860,7 +2860,7 @@ keepGoingPruneErr ms
             text "dependencies and continuing:"):
           map (nest 6 . pprNodeKey) ms )
 
-cyclicModuleErr :: [WorkGraphNode] -> SDoc
+cyclicModuleErr :: [ModuleGraphNode] -> SDoc
 -- From a strongly connected component we find
 -- a single cycle to report
 cyclicModuleErr mss
@@ -2874,7 +2874,7 @@ cyclicModuleErr mss
             _ -> text "Module imports and instantiations form a cycle:"
         , nest 2 (show_path path0)]
   where
-    graph :: [Node NodeKey WorkGraphNode]
+    graph :: [Node NodeKey ModuleGraphNode]
     graph =
       [ DigraphNode
         { node_payload = ms
@@ -2884,7 +2884,7 @@ cyclicModuleErr mss
       | ms <- mss
       ]
 
-    get_deps :: WorkGraphNode -> [NodeKey]
+    get_deps :: ModuleGraphNode -> [NodeKey]
     get_deps = \case
       InstantiationNode iuid ->
         [ Right $ GWIB { gwib_mod = hole, gwib_isBoot = NotBoot }
@@ -2899,7 +2899,7 @@ cyclicModuleErr mss
         | inst_unit <- bsd
         ]
 
-    show_path :: [WorkGraphNode] -> SDoc
+    show_path :: [ModuleGraphNode] -> SDoc
     show_path []  = panic "show_path"
     show_path [m] = ppr_node m <+> text "imports itself"
     show_path (m1:m2:ms) = vcat ( nest 6 (ppr_node m1)
@@ -2909,7 +2909,7 @@ cyclicModuleErr mss
          go []     = [text "which imports" <+> ppr_node m1]
          go (m:ms) = (text "which imports" <+> ppr_node m) : go ms
 
-    ppr_node :: WorkGraphNode -> SDoc
+    ppr_node :: ModuleGraphNode -> SDoc
     ppr_node (ModuleNode m _) = text "module" <+> ppr_ms m
     ppr_node (InstantiationNode u) = text "instantiated unit" <+> ppr u
 
