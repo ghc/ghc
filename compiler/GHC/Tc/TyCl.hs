@@ -74,7 +74,6 @@ import GHC.Types.SrcLoc
 import GHC.Data.List.SetOps
 import GHC.Driver.Session
 import GHC.Types.Unique
-import GHC.Core.ConLike( ConLike(..) )
 import GHC.Types.Basic
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -3819,15 +3818,14 @@ checkValidTyCl tc
   where
     recovery_code -- See Note [Recover from validity error]
       = do { traceTc "Aborted validity for tycon" (ppr tc)
-           ; return (concatMap mk_fake_tc $
-                     ATyCon tc : implicitTyConThings tc) }
+           ; return (map mk_fake_tc $
+                     tc : child_tycons tc) }
 
-    mk_fake_tc (ATyCon tc)
-      | isClassTyCon tc = [tc]   -- Ugh! Note [Recover from validity error]
-      | otherwise       = [makeRecoveryTyCon tc]
-    mk_fake_tc (AConLike (RealDataCon dc))
-                        = [makeRecoveryTyCon (promoteDataCon dc)]
-    mk_fake_tc _        = []
+    mk_fake_tc tc
+      | isClassTyCon tc = tc   -- Ugh! Note [Recover from validity error]
+      | otherwise       = makeRecoveryTyCon tc
+
+    child_tycons tc = tyConATs tc ++ map promoteDataCon (tyConDataCons tc)
 
 {- Note [Recover from validity error]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3852,6 +3850,8 @@ Some notes:
   and so there was an internal error when we met 'MkT' in the body of
   'S'.
 
+  Similarly for associated types.
+
 * Painfully, we *don't* want to do this for classes.
   Consider tcfail041:
      class (?x::Int) => C a where ...
@@ -3864,6 +3864,14 @@ Some notes:
   This is really bogus; now we have in scope a Class that is invalid
   in some way, with unknown downstream consequences.  A better
   alternative might be to make a fake class TyCon.  A job for another day.
+
+* Previously, we used implicitTyConThings to snaffle out the parts
+  to add to the context. The problem is that this also grabs data con
+  wrapper Ids. These could be filtered out. But, painfully, getting
+  the wrapper Ids checks the DataConRep, and forcing the DataConRep
+  can panic if there is a levity-polymorphic argument. This is #18534.
+  We don't need the wrapper Ids here anyway. So the code just takes what
+  it needs, via child_tycons.
 -}
 
 -------------------------
@@ -4050,8 +4058,13 @@ checkValidDataCon dflags existential_ok tc con
           -- regardless of whether or not UnliftedNewtypes is enabled. A
           -- later check in checkNewDataCon handles this, producing a
           -- better error message than checkForLevPoly would.
-        ; unless (isNewTyCon tc)
-            (mapM_ (checkForLevPoly empty) (map scaledThing $ dataConOrigArgTys con))
+        ; unless (isNewTyCon tc) $
+            checkNoErrs $
+            mapM_ (checkForLevPoly empty) (map scaledThing $ dataConOrigArgTys con)
+            -- the checkNoErrs is to prevent a panic in isVanillaDataCon
+            -- (called a a few lines down), which can fall over if there is a
+            -- bang on a levity-polymorphic argument. This is #18534,
+            -- typecheck/should_fail/T18534
 
           -- Extra checks for newtype data constructors. Importantly, these
           -- checks /must/ come before the call to checkValidType below. This

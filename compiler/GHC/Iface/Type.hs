@@ -441,12 +441,19 @@ splitIfaceSigmaTy ty
     (theta, tau)   = split_rho rho
 
     split_foralls (IfaceForAllTy bndr ty)
+        | isInvisibleArgFlag (binderArgFlag bndr)
         = case split_foralls ty of { (bndrs, rho) -> (bndr:bndrs, rho) }
     split_foralls rho = ([], rho)
 
     split_rho (IfaceFunTy InvisArg _ ty1 ty2)
         = case split_rho ty2 of { (ps, tau) -> (ty1:ps, tau) }
     split_rho tau = ([], tau)
+
+splitIfaceReqForallTy :: IfaceType -> ([IfaceForAllBndr], IfaceType)
+splitIfaceReqForallTy (IfaceForAllTy bndr ty)
+  | isVisibleArgFlag (binderArgFlag bndr)
+  = case splitIfaceReqForallTy ty of { (bndrs, rho) -> (bndr:bndrs, rho) }
+splitIfaceReqForallTy rho = ([], rho)
 
 suppressIfaceInvisibles :: PrintExplicitKinds -> [IfaceTyConBinder] -> [a] -> [a]
 suppressIfaceInvisibles (PrintExplicitKinds True) _tys xs = xs
@@ -1184,8 +1191,23 @@ pprIfaceSigmaType show_forall ty
   = hideNonStandardTypes ppr_fn ty
   where
     ppr_fn iface_ty =
-      let (tvs, theta, tau) = splitIfaceSigmaTy iface_ty
-       in ppr_iface_forall_part show_forall tvs theta (ppr tau)
+      let (invis_tvs, theta, tau) = splitIfaceSigmaTy iface_ty
+          (req_tvs, tau') = splitIfaceReqForallTy tau
+          -- splitIfaceSigmaTy is recursive, so it will gather the binders after
+          -- the theta, i.e.  forall a. theta => forall b. tau
+          -- will give you    ([a,b], theta, tau).
+          --
+          -- This isn't right when it comes to visible forall (see
+          --  testsuite/tests/polykinds/T18522-ppr),
+          -- so we split off required binders separately,
+          -- using splitIfaceReqForallTy.
+          --
+          -- An alternative solution would be to make splitIfaceSigmaTy
+          -- non-recursive (see #18458).
+          -- Then it could handle both invisible and required binders, and
+          -- splitIfaceReqForallTy wouldn't be necessary here.
+       in ppr_iface_forall_part show_forall invis_tvs theta $
+          sep [pprIfaceForAll req_tvs, ppr tau']
 
 pprUserIfaceForAll :: [IfaceForAllBndr] -> SDoc
 pprUserIfaceForAll tvs
