@@ -60,7 +60,7 @@ TEST_HC_OPTS += -Werror=compat
 # removing this line.
 TEST_HC_OPTS += -dno-debug-output
 
-TEST_HC_OPTS_INTERACTIVE = $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci -fno-ghci-history +RTS --io-manager=native -RTS
+TEST_HC_OPTS_INTERACTIVE = $(TEST_HC_OPTS) --interactive -v0 -ignore-dot-ghci -fno-ghci-history
 
 
 RUNTEST_OPTS =
