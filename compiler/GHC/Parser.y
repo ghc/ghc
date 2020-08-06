@@ -2614,7 +2614,7 @@ aexp    :: { ECP }
                                    amms (mkHsLazyPatPV (comb2 $1 $>) $2) [mj AnnTilde $1] }
         | PREFIX_BANG aexp      { ECP $
                                    runECP_PV $2 >>= \ $2 ->
-                                   amms (mkHsBangPatPV (comb2 $1 $>) $2) [mj AnnBang $1] }
+                                   amms (mkHsBangPatPV (comb2 $1 $>) $2) [mj AnnBang $1,mj AnnVal $2] }
         | PREFIX_MINUS aexp     { ECP $
                                    runECP_PV $2 >>= \ $2 ->
                                    amms (mkHsNegAppPV (comb2 $1 $>) $2) [mj AnnMinus $1] }
