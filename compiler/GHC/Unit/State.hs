@@ -315,7 +315,7 @@ instance Monoid UnitVisibility where
 -- | Unit configuration
 data UnitConfig = UnitConfig
    { unitConfigPlatformArchOS :: !ArchOS        -- ^ Platform arch and OS
-   , unitConfigWays           :: !(Set Way)     -- ^ Ways to use
+   , unitConfigWays           :: !Ways          -- ^ Ways to use
    , unitConfigProgramName    :: !String
       -- ^ Name of the compiler (e.g. "GHC", "GHCJS"). Used to fetch environment
       -- variables such as "GHC[JS]_PACKAGE_PATH".
