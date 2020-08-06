@@ -24,7 +24,7 @@ will elicit an unexpected integer-literal-overflow message.
 Whitespace can be inserted, as in ``- 123``, to force interpretation
 as two tokens.
 
-In 8.12, the behavior of this extension changed, and now we require that a negative literal must not be preceded by a closing token (see
+In 9.0, the behavior of this extension changed, and now we require that a negative literal must not be preceded by a closing token (see
 `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
 for the definition of a closing token). In other words, we parse ``f -123`` as ``f (-123)``, but ``x-123`` as ``(-) x
 123``. Before this amendment, :extension:`NegativeLiterals` caused ``x-123`` to be parsed as ``x(-123)``.

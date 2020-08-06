@@ -1,6 +1,6 @@
-.. _release-8-12-1:
+.. _release-9-0-1:
 
-Version 8.12.1
+Version 9.0.1
 ==============
 
 The significant changes to the various parts of the compiler are listed in the

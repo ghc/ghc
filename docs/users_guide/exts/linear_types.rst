@@ -4,7 +4,7 @@ Linear types
 .. extension:: LinearTypes
     :shortdesc: Enable linear types.
 
-    :since: 8.12.1
+    :since: 9.0.1
 
     Enable the linear arrow ``a #-> b`` and the multiplicity-polymorphic arrow
     ``a # m -> b``.

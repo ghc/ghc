@@ -1767,7 +1767,7 @@ of ``-W(no-)*``.
     :type: dynamic
     :category:
 
-    :since: 8.12
+    :since: 9.0
 
     When the ``-haddock`` option is enabled, GHC collects documentation
     comments and associates them with declarations, function arguments, data

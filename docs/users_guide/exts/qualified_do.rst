@@ -10,7 +10,7 @@ Qualified do-notation
 .. extension:: QualifiedDo
     :shortdesc: Enable qualified do-notation desugaring.
 
-    :since: 8.12.1
+    :since: 9.0.1
 
     Allow the use of qualified ``do`` notation.
 
