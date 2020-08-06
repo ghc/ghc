@@ -7,7 +7,7 @@ Lexical negation
     :shortdesc: Use whitespace to determine whether the minus sign stands for
                 negation or subtraction.
 
-    :since: 8.12.1
+    :since: 9.0.1
 
     Detect if the minus sign stands for negation during lexical analysis by
     checking for the surrounding whitespace.
