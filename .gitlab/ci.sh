@@ -395,6 +395,34 @@ function test_hadrian() {
     --test-compiler="$TOP"/_build/install/bin/ghc
 }
 
+function cabal_test() {
+  if [ -z "$OUT" ]; then
+    fail "OUT not set"
+  fi
+
+  start_section "Cabal test: $OUT"
+  mkdir -p "$OUT"
+  run "$HC" \
+    -hidir tmp -odir tmp -fforce-recomp \
+    -ddump-to-file -dumpdir "$OUT/dumps" -ddump-timings \
+    +RTS --machine-readable "-t$OUT/rts.log" -RTS \
+    -package mtl -ilibraries/Cabal/Cabal libraries/Cabal/Cabal/Setup.hs \
+    $@
+  rm -Rf tmp
+  end_section "Cabal test: $OUT"
+}
+
+function run_perf_test() {
+  if [ -z "$HC" ]; then
+    fail "HC not set"
+  fi
+
+  mkdir -p out
+  OUT=out/Cabal-O0 cabal_test -O0
+  OUT=out/Cabal-O1 cabal_test -O1
+  OUT=out/Cabal-O2 cabal_test -O2
+}
+
 function clean() {
   rm -R tmp
   run "$MAKE" --quiet clean || true
@@ -465,6 +493,7 @@ case $1 in
     push_perf_notes
     exit $res ;;
   run_hadrian) run_hadrian $@ ;;
+  perf_test) run_perf_test ;;
   clean) clean ;;
   shell) shell $@ ;;
   *) fail "unknown mode $1" ;;
