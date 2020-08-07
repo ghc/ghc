@@ -1693,7 +1693,7 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
         if config.test_wrapper is None:
             test_wrapper = ""
         else:
-            test_wrapper = "{config.test_wrapper} ".format(**locals)
+            test_wrapper = "{config.test_wrapper} ".format(**locals())
 
         # if cmd looks like we want to execute something, run it through
         # the command wrapper.
