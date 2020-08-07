@@ -36,7 +36,7 @@ integerConstantFolding:
 	$(call CHECK,\<200135.0\>,floatFromInteger)
 	$(call CHECK,\<400276.0\>,encodeIntegerDouble)
 	$(call CHECK,\<400280.0\>,encodeIntegerFloat)
-	'$(TEST_WRAPPER)' ./integerConstantFolding
+	$(_TEST_WRAPPER)./integerConstantFolding
 
 .PHONY: fromToInteger
 fromToInteger:

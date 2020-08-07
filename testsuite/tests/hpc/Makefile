@@ -10,7 +10,7 @@ T11798:
 
 T17073:
 	LANG=ASCII "$(TEST_HC)" $(TEST_HC_ARGS) T17073.hs -fhpc -v0
-	'$(TEST_WRAPPER)' ./T17073
+	$(_TEST_WRAPPER)./T17073
 	"$(HPC)" report T17073
 	"$(HPC)" version
 	LANG=ASCII "$(HPC)" markup T17073

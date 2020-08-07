@@ -25,10 +25,10 @@ mkPackageDatabase.%:
 # we get a warning if dynlibs are enabled by default that:
 #     Warning: -rtsopts and -with-rtsopts have no effect with -shared.
 # so we filter the flag out
-	'$(TEST_WRAPPER)' pdb.$*/Setup -v0 configure --dist pdb.$*/dist --prefix='$(HERE)/pdb.$*/install' --with-compiler='$(TEST_HC)' --with-strip='$(STRIP)' --ghc-options='$(filter-out -rtsopts,$(TEST_HC_OPTS)) -trust base -trust bytestring' --with-hc-pkg='$(GHC_PKG)' --package-db='pdb.$*/local.db' $(VANILLA) $(PROF) $(DYN)
-	'$(TEST_WRAPPER)' pdb.$*/Setup -v0 build     --dist pdb.$*/dist
-	'$(TEST_WRAPPER)' pdb.$*/Setup -v0 copy      --dist pdb.$*/dist
-	'$(TEST_WRAPPER)' pdb.$*/Setup -v0 register  --dist pdb.$*/dist --inplace
+	$(_TEST_WRAPPER)pdb.$*/Setup -v0 configure --dist pdb.$*/dist --prefix='$(HERE)/pdb.$*/install' --with-compiler='$(TEST_HC)' --with-strip='$(STRIP)' --ghc-options='$(filter-out -rtsopts,$(TEST_HC_OPTS)) -trust base -trust bytestring' --with-hc-pkg='$(GHC_PKG)' --package-db='pdb.$*/local.db' $(VANILLA) $(PROF) $(DYN)
+	$(_TEST_WRAPPER)pdb.$*/Setup -v0 build     --dist pdb.$*/dist
+	$(_TEST_WRAPPER)pdb.$*/Setup -v0 copy      --dist pdb.$*/dist
+	$(_TEST_WRAPPER)pdb.$*/Setup -v0 register  --dist pdb.$*/dist --inplace
 
 # We use the global package database as there's no easy way to tell
 # ghc-pkg (via Cabal) to use one in ., and the global one at least

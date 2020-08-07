@@ -13,19 +13,19 @@ clean:
 annotations:
 	rm -f annotations.o annotations.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc annotations
-	'$(TEST_WRAPPER)' ./annotations "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
+	$(_TEST_WRAPPER)./annotations "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
 
 .PHONY: parseTree
 parseTree:
 	rm -f parseTree.o parseTree.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc parseTree
-	'$(TEST_WRAPPER)' ./parseTree "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
+	$(_TEST_WRAPPER)./parseTree "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
 
 .PHONY: comments
 comments:
 	rm -f comments.o comments.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc comments
-	'$(TEST_WRAPPER)' ./comments "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
+	$(_TEST_WRAPPER)./comments "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
 
 .PHONY: exampleTest
 exampleTest:
@@ -35,7 +35,7 @@ exampleTest:
 listcomps:
 	rm -f listcomps.o listcomps.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc listcomps
-	'$(TEST_WRAPPER)' ./listcomps "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
+	$(_TEST_WRAPPER)./listcomps "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
 
 .PHONY: T10358
 T10358:
@@ -102,7 +102,7 @@ bundle-export:
 T10313:
 	rm -f stringSource.o stringSource.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc stringSource
-	'$(TEST_WRAPPER)' ./stringSource "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Test10313
+	$(_TEST_WRAPPER)./stringSource "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Test10313
 
 .PHONY: T11018
 T11018:
@@ -128,7 +128,7 @@ T11332:
 T11430:
 	rm -f t11430.o t11430.hi t11430
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc t11430
-	'$(TEST_WRAPPER)' ./t11430 "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Test11430
+	$(_TEST_WRAPPER)./t11430 "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Test11430
 
 .PHONY: load-main
 load-main:

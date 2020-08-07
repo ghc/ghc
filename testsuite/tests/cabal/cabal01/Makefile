@@ -19,7 +19,7 @@ clean:
 PREFIX := $(abspath install)
 $(eval $(call canonicalise,PREFIX))
 
-SETUP='$(TEST_WRAPPER)' '$(PWD)/Setup' -v0
+SETUP=$(_TEST_WRAPPER)'$(PWD)/Setup' -v0
 
 cabal01:
 	$(MAKE) -s --no-print-directory clean

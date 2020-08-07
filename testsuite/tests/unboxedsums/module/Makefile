@@ -13,4 +13,4 @@ main:
 	rm -f Main
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c Lib.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) Main.hs
-	'$(TEST_WRAPPER)' ./Main
+	$(_TEST_WRAPPER)./Main

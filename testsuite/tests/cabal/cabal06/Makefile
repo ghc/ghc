@@ -2,7 +2,7 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-SETUP='$(TEST_WRAPPER)' ../Setup -v0
+SETUP=$(_TEST_WRAPPER)../Setup -v0
 
 # This test is for packages whose package IDs overlap, but whose IPIDs
 # do not.
@@ -57,8 +57,8 @@ cabal06: clean
 	cd r && $(SETUP) configure $(CABAL_MINIMAL_BUILD) --with-ghc='$(TEST_HC)' --with-strip='$(STRIP)' --ghc-options='$(TEST_HC_OPTS)' --package-db=../tmp.d --dependency="q=`cat ../tmp_second_q`" --constraint="p==1.1" --prefix='$(PWD)/inst-f' --ghc-pkg-options='--enable-multi-instance'
 	cd r && $(SETUP) build
 	cd r && $(SETUP) copy
-	'$(TEST_WRAPPER)' inst-e/bin/cabal06
-	'$(TEST_WRAPPER)' inst-f/bin/cabal06
+	$(_TEST_WRAPPER)inst-e/bin/cabal06
+	$(_TEST_WRAPPER)inst-f/bin/cabal06
 ifneq "$(CLEANUP)" ""
 	$(MAKE) -s --no-print-directory clean
 endif

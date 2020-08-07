@@ -7,6 +7,6 @@ clean:
 
 T7478: clean
 	'$(TEST_HC)' $(TEST_HC_OPTS) --make -v0 -package ghc T7478.hs
-	'$(TEST_WRAPPER)' ./T7478 "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
+	$(_TEST_WRAPPER)./T7478 "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`"
 
 .PHONY: clean T7478

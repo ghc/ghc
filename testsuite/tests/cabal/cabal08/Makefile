@@ -2,7 +2,7 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-SETUP='$(TEST_WRAPPER)' ../Setup -v0
+SETUP=$(_TEST_WRAPPER)../Setup -v0
 
 # in both cases, p2 should be preferred
 cabal08: clean
@@ -21,13 +21,13 @@ cabal08: clean
 	cd p2 && $(SETUP) copy
 	cd p2 && $(SETUP) register
 	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db tmp1.d -package-db tmp2.d Main.hs
-	'$(TEST_WRAPPER)' ./Main
+	$(_TEST_WRAPPER)./Main
 	'$(TEST_HC)' $(TEST_HC_OPTS) -fforce-recomp -package-db tmp2.d -package-db tmp1.d Main.hs
-	'$(TEST_WRAPPER)' ./Main
+	$(_TEST_WRAPPER)./Main
 	'$(TEST_HC)' $(TEST_HC_OPTS) -fforce-recomp -package-db tmp1.d -package-db tmp2.d -hide-all-packages -package base -package p Main.hs
-	'$(TEST_WRAPPER)' ./Main
+	$(_TEST_WRAPPER)./Main
 	'$(TEST_HC)' $(TEST_HC_OPTS) -fforce-recomp -package-db tmp2.d -package-db tmp1.d -hide-all-packages -package base -package p Main.hs
-	'$(TEST_WRAPPER)' ./Main
+	$(_TEST_WRAPPER)./Main
 ifneq "$(CLEANUP)" ""
 	$(MAKE) -s --no-print-directory clean
 endif

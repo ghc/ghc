@@ -6,7 +6,7 @@ checkExists = [ -f $1 ] || echo $1 missing
 
 LOCAL_PKGCONF=local.package.conf
 
-SETUP='$(TEST_WRAPPER)' ../Setup -v0
+SETUP=$(_TEST_WRAPPER)../Setup -v0
 
 .PHONY: clean
 clean:
@@ -51,6 +51,6 @@ dynamicToo004:
 
 # Both should run, giving their respective outputs
 	echo static
-	'$(TEST_WRAPPER)' ./progstatic
+	$(_TEST_WRAPPER)./progstatic
 	echo dynamic
-	'$(TEST_WRAPPER)' ./progdynamic
+	$(_TEST_WRAPPER)./progdynamic

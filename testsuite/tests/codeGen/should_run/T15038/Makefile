@@ -12,4 +12,4 @@ T15038:
 	  ./src/Packed/Bytes.hs \
 	  ./common/Data/Trie/Naive.hs \
 		-package containers -package ghc-prim -package primitive
-	'$(TEST_WRAPPER)' ./Main
+	$(_TEST_WRAPPER)./Main

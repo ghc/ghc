@@ -2,7 +2,7 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-SETUP='$(TEST_WRAPPER)' ../Setup -v0
+SETUP=$(_TEST_WRAPPER)../Setup -v0
 
 # This test is for a Cabal package with holes
 

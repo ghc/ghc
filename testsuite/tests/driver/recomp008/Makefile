@@ -21,8 +21,8 @@ recomp008 :
 	$(MAKE) -s --no-print-directory clean
 	cp A1.hs A.hs
 	$(MAKE) -s --no-print-directory prog
-	'$(TEST_WRAPPER)' ./prog
+	$(_TEST_WRAPPER)./prog
 	sleep 1
 	cp A2.hs A.hs
 	$(MAKE) -s --no-print-directory prog
-	'$(TEST_WRAPPER)' ./prog
+	$(_TEST_WRAPPER)./prog

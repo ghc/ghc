@@ -16,7 +16,7 @@ TIMEOUT_PROGRAM = install-inplace/bin/timeout$(exeext)
 PREFIX := $(abspath install-inplace)
 $(eval $(call canonicalise,PREFIX))
 
-SETUP='$(TEST_WRAPPER)' ./Setup -v0
+SETUP=$(_TEST_WRAPPER)./Setup -v0
 
 ifneq "$(GCC)" ""
 WITH_GCC = --with-gcc='$(GCC)'

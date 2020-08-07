@@ -1688,15 +1688,12 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
     else:
         # (optional) 3. Add TEST_WRAPPER environment variable.
         #
-        # The test wrapper. Default to $TOP / driver / id
-        # for the identity test-wrapper.
-        #
         # We won't do this if command prefix is set, as the
         # set prefix and the test-wrapper might interfere.
         if config.test_wrapper is None:
-            test_wrapper = Path(config.top) / "driver" / "id"
+            test_wrapper = ""
         else:
-            test_wrapper = config.test_wrapper
+            test_wrapper = "{config.test_wrapper} ".format(**locals)
 
         # if cmd looks like we want to execute something, run it through
         # the command wrapper.

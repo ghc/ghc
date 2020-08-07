@@ -6,7 +6,7 @@ LOCAL_PKGCONF=local.package.conf
 
 PKG=bug1465
 
-SETUP='$(TEST_WRAPPER)' ./Setup -v0
+SETUP=$(_TEST_WRAPPER)./Setup -v0
 
 clean:
 	rm -f v1/setup v1/Setup.o v1/Setup.hi

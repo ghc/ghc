@@ -27,9 +27,13 @@ RUNTESTS     = $(TOP)/driver/runtests.py
 COMPILER     = ghc
 CONFIG       = $(TOP)/config/$(COMPILER)
 
-# if no TEST_WRAPPER is set, use an identity wrapper.
-TEST_WRAPPER ?= $(TOP_ABS)/driver/id
-export TEST_WRAPPER
+# We'll use a quoted '$(TEST_WRAPPER)', if supplied. If
+# not we'll have an empty _TEST_WRAPPER.
+ifneq "$(TEST_WRAPPER)" ""
+  export _TEST_WRAPPER="'$(TEST_WRAPPER)' "
+else
+  export _TEST_WRAPPER=
+endif
 
 # if no STRIP is set, use `strip`
 STRIP ?= strip

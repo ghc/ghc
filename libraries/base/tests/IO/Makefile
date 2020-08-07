@@ -9,11 +9,11 @@ include $(TOP)/mk/test.mk
 # NB. sleep for 3s. When we use TEST_WRAPPERs they might have a delay to come up.
 test.concio001:
 	"$(TEST_HC)" $(TEST_HC_OPTS) --make -fforce-recomp -v0 concio001 -o concio001
-	(sleep 3; echo x) | '$(TEST_WRAPPER)' ./concio001
+	(sleep 3; echo x) | $(_TEST_WRAPPER)./concio001
 
 test.concio001.thr:
 	"$(TEST_HC)" $(TEST_HC_OPTS) --make -fforce-recomp -v0 -threaded concio001 -o concio001
-	(sleep 3; echo x) | '$(TEST_WRAPPER)' ./concio001
+	(sleep 3; echo x) | $(_TEST_WRAPPER)./concio001
 
 # NB. utf8-test should *not* have a final newline.  The last char should be 'X'.
 utf16-test: utf8-test
@@ -42,7 +42,7 @@ hSetEncoding001.in : latin1 utf8-test utf16le-test utf16be-test utf16-test utf32
 
 environment001-test:
 	"$(TEST_HC)" --make -fforce-recomp -v0 environment001.hs -o environment001
-	GHC_TEST=马克斯 '$(TEST_WRAPPER)' ./environment001 说
+	GHC_TEST=马克斯 $(_TEST_WRAPPER)./environment001 说
 
 T3307-test:
 	"$(TEST_HC)" --make -fforce-recomp -v0 T3307.hs -o T3307
@@ -50,4 +50,4 @@ T3307-test:
 	echo chinese-file-小说 > chinese-name
 	# The tests are run in whatever the default locale is. This is almost always UTF-8,
 	# but in cmd on Windows it will be the non-Unicode CP850 locale.
-	'$(TEST_WRAPPER)' ./T3307 chinese-file-小说
+	$(_TEST_WRAPPER)./T3307 chinese-file-小说

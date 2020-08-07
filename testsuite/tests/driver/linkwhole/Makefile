@@ -17,4 +17,4 @@ linkwhole:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c MyCode.hs
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c Handles.hs
 	'$(LD)' -r -o lib.so MyCode.o Handles.o
-	'$(TEST_WRAPPER)' ./host lib.so
+	$(_TEST_WRAPPER)./host lib.so

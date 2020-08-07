@@ -14,5 +14,5 @@ mod175:
 	$(MAKE) -s --no-print-directory clean
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make -main-is Test.main  Test.hs  -o test
 	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make -main-is Test2.main Test2.hs -o test2
-	'$(TEST_WRAPPER)' ./test
-	'$(TEST_WRAPPER)' ./test2
+	$(_TEST_WRAPPER)./test
+	$(_TEST_WRAPPER)./test2

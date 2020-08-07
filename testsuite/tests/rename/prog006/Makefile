@@ -34,7 +34,7 @@ rn.prog006:
 	echo "version: 1.0" >>pkg.conf
 	echo "id: test-1.0-XXX" >>pkg.conf
 	echo "key: test-1.0-XXX" >>pkg.conf
-	echo "import-dirs: \"`'$(TEST_WRAPPER)' ./pwd`\"" >>pkg.conf
+	echo "import-dirs: \"`$(_TEST_WRAPPER)./pwd`\"" >>pkg.conf
 	echo "exposed-modules: B.C" >>pkg.conf
 	rm -rf $(LOCAL_PKGCONF)
 	'$(GHC_PKG)' init $(LOCAL_PKGCONF)

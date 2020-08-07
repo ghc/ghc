@@ -4,7 +4,7 @@ include $(TOP)/mk/test.mk
 
 LOCAL_PKGCONF=local.package.conf
 
-SETUP='$(TEST_WRAPPER)' Setup -v0
+SETUP=$(_TEST_WRAPPER)Setup -v0
 
 T13102:
 	"$(GHC_PKG)" init $(LOCAL_PKGCONF)

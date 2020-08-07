@@ -3,7 +3,7 @@ include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
 # SETUP=../Setup
-SETUP='$(TEST_WRAPPER)' ../Setup -v0
+SETUP=$(_TEST_WRAPPER)../Setup -v0
 
 # This test is for overlapping/shadowing packages with Cabal.  We
 #   1. install p-1.0
