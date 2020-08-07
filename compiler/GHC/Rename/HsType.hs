@@ -423,13 +423,13 @@ rnImplicitBndrsNoDups :: HsDocContext
                       -> ([Name] -> RnM (a, FreeVars))
                       -> RnM (a, FreeVars)
 rnImplicitBndrsNoDups ctx mb_assoc implicit_vs_with_dups thing_inside
-  = do { implicit_vs <- forM (group $ sortBy cmpLocated implicit_vs_with_dups) $ \case
+  = do { implicit_vs <- forM (groupBy eqLocated $ sortBy cmpLocated implicit_vs_with_dups) $ \case
            [x] -> return x
-           (x:_) -> do addErr $ text "Variable" <+> ppr x <+> text "in" <+> pprHsDocContext ctx <+> text "occurs more than once."
+           (x:_) -> do addErr $ text "Variable" <+> text "`" <> ppr x <> text "'" <+> text "would be bound multiple times by" <+> pprHsDocContext ctx <> text "."
                        return x
            [] -> pprPanic "rnImplicitBndrsNoDups" $ text "Data.List.group somehow managed to produce an empty group."
 
-       ; traceRn "rnImplicitBndrs" $
+       ; traceRn "rnImplicitBndrsNoDups" $
          vcat [ ppr implicit_vs_with_dups, ppr implicit_vs ]
 
          -- Use the currently set SrcSpan as the new source location for each Name.
@@ -439,7 +439,6 @@ rnImplicitBndrsNoDups ctx mb_assoc implicit_vs_with_dups thing_inside
 
        ; bindLocalNamesFV vars $
          thing_inside vars }
-
 {-
 Note [Source locations for implicitly bound type variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
