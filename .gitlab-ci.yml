@@ -1096,6 +1096,41 @@ perf-nofib:
       - nofib.log
 
 ############################################################
+# Ad-hoc performance testing
+############################################################
+
+perf:
+  stage: testing
+  dependencies:
+    - validate-x86_64-linux-deb9-dwarf
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  rules:
+    - if: $CI_MERGE_REQUEST_ID
+    - if: '$CI_COMMIT_BRANCH == "master"'
+    - if: '$CI_COMMIT_BRANCH =~ /ghc-[0.9]+\.[0-9]+/'
+  tags:
+    - x86_64-linux-perf
+  script:
+    - root=$(pwd)/ghc
+    - |
+      mkdir tmp
+      tar -xf ghc-x86_64-deb9-linux-dwarf.tar.xz -C tmp
+      pushd tmp/ghc-*/
+      ./configure --prefix=$root
+      make install
+      popd
+      rm -Rf tmp
+    - export BOOT_HC=$(which ghc)
+    - export HC=$root/bin/ghc
+    - .gitlab/ci.sh perf_test
+  artifacts:
+    expire_in: 12 week
+    when: always
+    paths:
+      - out
+
+
+############################################################
 # Documentation deployment via GitLab Pages
 ############################################################
 
