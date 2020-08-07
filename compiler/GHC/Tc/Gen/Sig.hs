@@ -826,9 +826,13 @@ tcImpPrags prags
 tcImpSpec :: (Name, Sig GhcRn) -> TcM [TcSpecPrag]
 tcImpSpec (name, prag)
  = do { id <- tcLookupId name
-      ; unless (isAnyInlinePragma (idInlinePragma id))
-               (addWarnTc NoReason (impSpecErr name))
-      ; tcSpecPrag id prag }
+      ; if isAnyInlinePragma (idInlinePragma id)
+        then tcSpecPrag id prag
+        else do { addWarnTc NoReason (impSpecErr name)
+                ; return [] } }
+      -- If there is no INLINE/INLINABLE pragma there will be no unfolding. In
+      -- that case, just delete the SPECIALISE pragma altogether, lest the
+      -- desugarer fall over because it can't find the unfolding. See #18118.
 
 impSpecErr :: Name -> SDoc
 impSpecErr name
