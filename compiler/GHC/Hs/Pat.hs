@@ -877,7 +877,7 @@ conPatNeedsParens p = go
   where
     go ts (PrefixCon args) = p >= appPrec && (not (null args) || not (null ts))
     go _  (InfixCon {})    = p >= opPrec -- type args should be empty in this case
-    go _  (RecCon {})      = p >= appPrec -- type args should be empty in this case
+    go _  (RecCon {})      = False
 
 -- | @'parenthesizePat' p pat@ checks if @'patNeedsParens' p pat@ is true, and
 -- if so, surrounds @pat@ with a 'ParPat'. Otherwise, it simply returns @pat@.
