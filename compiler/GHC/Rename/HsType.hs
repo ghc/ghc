@@ -68,8 +68,8 @@ import GHC.Data.FastString
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.List          ( nubBy, partition )
-import Control.Monad      ( unless, when )
+import Data.List
+import Control.Monad
 
 #include "HsVersions.h"
 
@@ -202,7 +202,7 @@ rnHsPatSigTypeBindingVars ctxt sigType thing_inside = case sigType of
         <+> hcat (punctuate (text ",") (map (quotes . ppr) varsInScope))
         <+> text "would be inappropriately shadowed."
     (wcVars', ibVars') <- partition_nwcs varsNotInScope
-    rnImplicitBndrs Nothing ibVars' $ \ ibVars -> do
+    rnImplicitBndrsNoDups ctxt Nothing ibVars' $ \ ibVars -> do
       (wcVars, hs_ty, fvs) <- rnWcBody ctxt wcVars' hs_ty'
       let sig_ty = HsPS
             { hsps_body = hs_ty
@@ -402,6 +402,32 @@ rnImplicitBndrs :: Maybe assoc
                 -> RnM (a, FreeVars)
 rnImplicitBndrs mb_assoc implicit_vs_with_dups thing_inside
   = do { let implicit_vs = nubL implicit_vs_with_dups
+
+       ; traceRn "rnImplicitBndrs" $
+         vcat [ ppr implicit_vs_with_dups, ppr implicit_vs ]
+
+         -- Use the currently set SrcSpan as the new source location for each Name.
+         -- See Note [Source locations for implicitly bound type variables].
+       ; loc <- getSrcSpanM
+       ; vars <- mapM (newTyVarNameRn mb_assoc . L loc . unLoc) implicit_vs
+
+       ; bindLocalNamesFV vars $
+         thing_inside vars }
+
+rnImplicitBndrsNoDups :: HsDocContext
+                      -> Maybe assoc
+                      -- ^ @'Just' _@ => an associated type decl
+                      -> FreeKiTyVars
+                      -- ^ Surface-syntax free vars that we will implicitly bind.
+                      -- May have duplicates, which are removed here.
+                      -> ([Name] -> RnM (a, FreeVars))
+                      -> RnM (a, FreeVars)
+rnImplicitBndrsNoDups ctx mb_assoc implicit_vs_with_dups thing_inside
+  = do { implicit_vs <- forM (group $ sortBy cmpLocated implicit_vs_with_dups) $ \case
+           [x] -> return x
+           (x:_) -> do addErr $ text "Variable" <+> ppr x <+> text "in" <+> pprHsDocContext ctx <+> text "occurs more than once."
+                       return x
+           [] -> pprPanic "rnImplicitBndrsNoDups" $ text "Data.List.group somehow managed to produce an empty group."
 
        ; traceRn "rnImplicitBndrs" $
          vcat [ ppr implicit_vs_with_dups, ppr implicit_vs ]
