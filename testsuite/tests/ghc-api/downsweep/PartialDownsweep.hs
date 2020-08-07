@@ -170,7 +170,7 @@ go label mods cnd =
     -- liftIO $ hPutStrLn stderr $ showSDocUnsafe $ ppr $ rights emss
     -- liftIO $ hPrint stderr $ bagToList $ unionManyBags $ lefts emss
 
-    it label $ cnd (map fst (rights emss))
+    it label $ cnd (map emsModSummary (rights emss))
 
 
 writeMod :: [String] -> IO ()
