@@ -1201,13 +1201,14 @@ makeFunBind fn ms
 checkPatBind :: LPat GhcPs
              -> Located (a,GRHSs GhcPs (LHsExpr GhcPs))
              -> P ([AddAnn],HsBind GhcPs)
-checkPatBind lhs (L match_span (_,grhss))
+checkPatBind lhs (L rhs_span (_,grhss))
     | BangPat _ p <- unLoc lhs
     , VarPat _ v <- unLoc p
     = return ([], makeFunBind v [L match_span (m v)])
   where
+    match_span = combineSrcSpans (getLoc lhs) rhs_span
     m v = Match { m_ext = noExtField
-                , m_ctxt = FunRhs { mc_fun    = L (getLoc lhs) (unLoc v)
+                , m_ctxt = FunRhs { mc_fun    = v
                                   , mc_fixity = Prefix
                                   , mc_strictness = SrcStrict }
                 , m_pats = []

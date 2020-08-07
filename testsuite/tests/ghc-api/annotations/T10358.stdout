@@ -1,5 +1,5 @@
 ---Unattached Annotation Problems (should be empty list)---
-[]
+[(AnnBang, Test10358.hs:5:19)]
 ---Ann before enclosing span problem (should be empty list)---
 [
 
