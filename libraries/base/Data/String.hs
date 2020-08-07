@@ -1,6 +1,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -86,8 +88,9 @@ instance (a ~ Char) => IsString [a] where
          -- See Note [IsString String]
     fromString xs = xs
 
--- | @since 4.9.0.0
-deriving instance IsString a => IsString (Const a b)
+-- TODO: Verify release version
+-- | @since 4.15.0.0
+deriving instance IsString a => IsString (Const a (b :: k))
 
 -- | @since 4.9.0.0
 deriving instance IsString a => IsString (Identity a)
