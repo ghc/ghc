@@ -515,15 +515,19 @@ def fast() -> bool:
 
 # XXX: This needs to be removed once no remnants of platform are left.
 def platform( plat: str ) -> bool:
+    "The platform this GHC targets. Deprecated: Use targetPlatform."
     return targetPlatform( plat )
 
 def targetPlatform( plat: str ) -> bool:
+    "The platform GHC targets. This does not need to be the platform that GHC runs on."
     return config.targetPlatform == plat
 
 def hostPlatform( plat: str ) -> bool:
+    "The platform GHC runs on. Does not need to be identical with the one for which GHC produces code."
     return config.hostPlatform == plat
 
 def cross() -> bool:
+    "Is this a cross compiler?"
     return config.hostPlatform != config.targetPlatform
 
 KNOWN_OPERATING_SYSTEMS = set([
