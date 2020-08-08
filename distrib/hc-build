@@ -31,7 +31,6 @@ case "$configopts" in
 cat >>mk/build.mk <<END
 GhcUnregisterised=YES
 GhcWithInterpreter=NO
-GhcWithNativeCodeGen=NO
 GhcLibWays=
 GhcWithSMP=NO
 END
