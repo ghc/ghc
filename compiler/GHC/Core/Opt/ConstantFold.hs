@@ -807,16 +807,44 @@ subsumedByPrimOp primop = do
 -- e.g.  narrow16 (x .&. 0xFFFF)
 --       ==> narrow16 x
 --
+-- Additionally, it detects casts from Word64/Int64 such as
+--
+--       narrow16Word (word64ToWord (x .&. 0xFFFF))
+--       ==> narrow16 (word64ToWord x)
+--
+--       narrow16Int (int64ToInt (word64ToInt64 (x .&. 0xFFFF)))
+--       ==> narrow16 (int64ToInt (word64ToInt64 x))
+--
+-- These rules have been introduced to avoid breaking #16402 when Int64#/Word64#
+-- primitives types and primops were added. They are quite ad-hoc but it is
+-- expected that in the near future we will revisit them when we'll add support
+-- for Int8#/Int16#/Int32# and Word8#/Word16#/Word32#.
+--
 narrowSubsumesAnd :: PrimOp -> PrimOp -> Int -> RuleM CoreExpr
-narrowSubsumesAnd and_primop narrw n = do
-  [Var primop_id `App` x `App` y] <- getArgs
-  matchPrimOpId and_primop primop_id
-  let mask = bit n -1
+narrowSubsumesAnd and_primop narrw n = msum
+   [ do [Var primop_id `App` x `App` y] <- getArgs
+        matchPrimOpId and_primop primop_id
+        g x y <|> g y x
+
+   , do [Var w64tow `App` (Var primop_id `App` x `App` y)] <- getArgs
+        matchPrimOpId Word64ToWord w64tow
+        matchPrimOpId Word64AndOp  primop_id
+        let f k = Var w64tow `App` k
+        g (f x) y <|> g (f y) x
+
+   , do [Var i64toi `App` (Var w64toi64 `App` (Var primop_id `App` x `App` y))] <- getArgs
+        matchPrimOpId Int64ToInt      i64toi
+        matchPrimOpId Word64ToInt64Op w64toi64
+        matchPrimOpId Word64AndOp     primop_id
+        let f k = Var i64toi `App` (Var w64toi64 `App` k)
+        g (f x) y <|> g (f y) x
+   ]
+   where
+      mask = bit n - 1
       g v (Lit (LitNumber _ m)) = do
          guard (m .&. mask == mask)
          return (Var (mkPrimOpId narrw) `App` v)
       g _ _ = mzero
-  g x y <|> g y x
 
 idempotent :: RuleM CoreExpr
 idempotent = do [e1, e2] <- getArgs
