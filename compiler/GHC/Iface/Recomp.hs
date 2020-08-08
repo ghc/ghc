@@ -114,7 +114,7 @@ recompileRequired (NeedsRecompile _) = True
 -- If the same, we can avoid recompilation.
 --
 -- We return on the outside whether the interface file is up to date, providing
--- evidence that is with a mod iface. In the case that it isn't way may also
+-- evidence that is with a mod iface. In the case that it isn't, we may also
 -- return a found or provided mod iface. Why don't always return the old one, if
 -- it exists, is unclear to me, except that I tried it and some tests failed.
 checkOldIface
