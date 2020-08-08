@@ -321,12 +321,14 @@ direct_call caller call_conv lbl arity args
 -- using zeroCLit or even undefined would work, but would be ugly).
 --
 getArgRepsAmodes :: [StgArg] -> FCode [(ArgRep, Maybe CmmExpr)]
-getArgRepsAmodes = mapM getArgRepAmode
-  where getArgRepAmode arg
+getArgRepsAmodes args = do
+   platform <- profilePlatform <$> getProfile
+   mapM (getArgRepAmode platform) args
+  where getArgRepAmode platform arg
            | V <- rep  = return (V, Nothing)
            | otherwise = do expr <- getArgAmode (NonVoid arg)
                             return (rep, Just expr)
-           where rep = toArgRep (argPrimRep arg)
+           where rep = toArgRep platform (argPrimRep arg)
 
 nonVArgs :: [(ArgRep, Maybe CmmExpr)] -> [CmmExpr]
 nonVArgs [] = []
@@ -542,7 +544,7 @@ mkVirtConstrSizes profile field_reps
 mkArgDescr :: Platform -> [Id] -> ArgDescr
 mkArgDescr platform args
   = let arg_bits = argBits platform arg_reps
-        arg_reps = filter isNonV (map idArgRep args)
+        arg_reps = filter isNonV (map (idArgRep platform) args)
            -- Getting rid of voids eases matching of standard patterns
     in case stdPattern arg_reps of
          Just spec_id -> ArgSpec spec_id

@@ -409,10 +409,11 @@ tickySlowCall lf_info args = do
  tickySlowCallPat (map argPrimRep args)
 
 tickySlowCallPat :: [PrimRep] -> FCode ()
-tickySlowCallPat args = ifTicky $
-  let argReps = map toArgRep args
+tickySlowCallPat args = ifTicky $ do
+  platform <- profilePlatform <$> getProfile
+  let argReps = map (toArgRep platform) args
       (_, n_matched) = slowCallPattern argReps
-  in if n_matched > 0 && args `lengthIs` n_matched
+  if n_matched > 0 && args `lengthIs` n_matched
      then bumpTickyLbl $ mkRtsSlowFastTickyCtrLabel $ concatMap (map Data.Char.toLower . argRepString) argReps
      else bumpTickyCounter $ fsLit "VERY_SLOW_CALL_ctr"
 
