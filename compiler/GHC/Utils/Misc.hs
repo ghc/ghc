@@ -774,12 +774,15 @@ dropList _  xs@[] = xs
 dropList (_:xs) (_:ys) = dropList xs ys
 
 
+-- | Given two lists xs=x0..xn and ys=y0..ym, return `splitAt n ys`.
 splitAtList :: [b] -> [a] -> ([a], [a])
-splitAtList [] xs     = ([], xs)
-splitAtList _ xs@[]   = (xs, xs)
-splitAtList (_:xs) (y:ys) = (y:ys', ys'')
-    where
-      (ys', ys'') = splitAtList xs ys
+splitAtList xs ys = go 0 xs ys
+   where
+      -- we are careful to avoid allocating when there are no leftover
+      -- arguments: in this case we can return "ys" directly (cf #18535)
+      go _ _      []     = (ys, [])        -- len(ys) <= len(xs)
+      go n []     bs     = (take n ys, bs) -- = splitAt n ys
+      go n (_:as) (_:bs) = go (n+1) as bs
 
 -- drop from the end of a list
 dropTail :: Int -> [a] -> [a]
