@@ -508,7 +508,7 @@ closureSize profile ids = words + pc_STD_HDR_SIZE (platformConstants (profilePla
 idClosureFootprint:: Platform -> Id -> WordOff
 idClosureFootprint platform
   = StgToCmm.ArgRep.argRepSizeW platform
-  . StgToCmm.ArgRep.idArgRep
+  . StgToCmm.ArgRep.idArgRep platform
 
 -- | @closureGrowth expander sizer f fvs@ computes the closure growth in words
 -- as a result of lifting @f@ to top-level. If there was any growing closure
