@@ -29,16 +29,8 @@ smallInt_bar
       I64# (intToInt64# (int16ToInt# (intToInt16# (int64ToInt# x1))))
       }
 
-smallInt_foo
-  = \ x ->
-      case x of { I64# x# ->
-      I64#
-        (intToInt64#
-           (int16ToInt#
-              (intToInt16#
-                 (int64ToInt#
-                    (word64ToInt64# (and64# (int64ToWord64# x#) 0x0012ffff##64))))))
-      }
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+smallInt_foo = smallInt_bar
 
 
 
