@@ -399,7 +399,7 @@ schemeR_wrk fvs nm original_body (args, body)
          p_init    = Map.fromList (zip all_args (mkStackOffsets 0 szsb_args))
 
          -- make the arg bitmap
-         bits = argBits platform (reverse (map bcIdArgRep all_args))
+         bits = argBits platform (reverse (map (bcIdArgRep platform) all_args))
          bitmap_size = genericLength bits
          bitmap = mkBitmap platform bits
      body_code <- schemeER_wrk sum_szsb_args p_init body
@@ -504,13 +504,17 @@ schemeE d s p e
 -- Delegate tail-calls to schemeT.
 schemeE d s p e@(AnnApp _ _) = schemeT d s p e
 
-schemeE d s p e@(AnnLit lit)     = returnUnboxedAtom d s p e (typeArgRep (literalType lit))
+schemeE d s p e@(AnnLit lit)     = do
+                                   platform <- profilePlatform <$> getProfile
+                                   returnUnboxedAtom d s p e (typeArgRep platform (literalType lit))
 schemeE d s p e@(AnnCoercion {}) = returnUnboxedAtom d s p e V
 
 schemeE d s p e@(AnnVar v)
       -- See Note [Not-necessarily-lifted join points], step 3.
     | isNNLJoinPoint v          = doTailCall d s p (protectNNLJoinPointId v) [AnnVar voidPrimId]
-    | isUnliftedType (idType v) = returnUnboxedAtom d s p e (bcIdArgRep v)
+    | isUnliftedType (idType v) = do
+                                  platform <- profilePlatform <$> getProfile
+                                  returnUnboxedAtom d s p e (bcIdArgRep platform v)
     | otherwise                 = schemeT d s p e
 
 schemeE d s p (AnnLet (AnnNonRec x (_,rhs)) (_,body))
@@ -826,18 +830,19 @@ schemeT d s p app
    -- Case 2: Constructor application
    | Just con <- maybe_saturated_dcon
    , isUnboxedTupleDataCon con
-   = case args_r_to_l of
-        [arg1,arg2] | isVAtom arg1 ->
+   = do
+     platform <- profilePlatform <$> getProfile
+     case args_r_to_l of
+        [arg1,arg2] | isVAtom platform arg1 ->
                   unboxedTupleReturn d s p arg2
-        [arg1,arg2] | isVAtom arg2 ->
+        [arg1,arg2] | isVAtom platform arg2 ->
                   unboxedTupleReturn d s p arg1
         _other -> multiValException
 
    -- Case 3: Ordinary data constructor
    | Just con <- maybe_saturated_dcon
    = do alloc_con <- mkConAppCode d s p con args_r_to_l
-        dflags <- getDynFlags
-        let platform = targetPlatform dflags
+        platform <- profilePlatform <$> getProfile
         return (alloc_con         `appOL`
                 mkSlideW 1 (bytesToWords platform $ d - s) `snocOL`
                 ENTER)
@@ -918,7 +923,9 @@ mkConAppCode orig_d _ p con args_r_to_l =
 
 unboxedTupleReturn
     :: StackDepth -> Sequel -> BCEnv -> AnnExpr' Id DVarSet -> BcM BCInstrList
-unboxedTupleReturn d s p arg = returnUnboxedAtom d s p arg (atomRep arg)
+unboxedTupleReturn d s p arg = do
+   platform <- profilePlatform <$> getProfile
+   returnUnboxedAtom d s p arg (atomRep platform arg)
 
 -- -----------------------------------------------------------------------------
 -- Generate code for a tail-call
@@ -930,13 +937,14 @@ doTailCall
     -> Id
     -> [AnnExpr' Id DVarSet]
     -> BcM BCInstrList
-doTailCall init_d s p fn args = do_pushes init_d args (map atomRep args)
+doTailCall init_d s p fn args =do
+   platform <- profilePlatform <$> getProfile
+   do_pushes init_d args (map (atomRep platform) args)
   where
   do_pushes !d [] reps = do
         ASSERT( null reps ) return ()
         (push_fn, sz) <- pushAtom d p (AnnVar fn)
-        dflags <- getDynFlags
-        let platform = targetPlatform dflags
+        platform <- profilePlatform <$> getProfile
         ASSERT( sz == wordSize platform ) return ()
         let slide = mkSlideB platform (d - init_d + wordSize platform) (init_d - s)
         return (push_fn `appOL` (slide `appOL` unitOL ENTER))
@@ -944,8 +952,7 @@ doTailCall init_d s p fn args = do_pushes init_d args (map atomRep args)
       let (push_apply, n, rest_of_reps) = findPushSeq reps
           (these_args, rest_of_args) = splitAt n args
       (next_d, push_code) <- push_seq d these_args
-      dflags <- getDynFlags
-      let platform = targetPlatform dflags
+      platform <- profilePlatform <$> getProfile
       instrs <- do_pushes (next_d + wordSize platform) rest_of_args rest_of_reps
       --                          ^^^ for the PUSH_APPLY_ instruction
       return (push_code `appOL` (push_apply `consOL` instrs))
@@ -1133,8 +1140,8 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
           -- NB: unboxed tuple cases bind the scrut binder to the same offset
           -- as one of the alt binders, so we have to remove any duplicates here:
           rel_slots = nub $ map fromIntegral $ concatMap spread binds
-          spread (id, offset) | isFollowableArg (bcIdArgRep id) = [ rel_offset ]
-                              | otherwise                      = []
+          spread (id, offset) | isFollowableArg (bcIdArgRep platform id) = [ rel_offset ]
+                              | otherwise                                = []
                 where rel_offset = trunc16W $ bytesToWords platform (d - offset)
 
      alt_stuff <- mapM codeAlt alts
@@ -1153,7 +1160,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
      alt_bco' <- emitBc alt_bco
      let push_alts
             | isAlgCase = PUSH_ALTS alt_bco'
-            | otherwise = PUSH_ALTS_UNLIFTED alt_bco' (typeArgRep bndr_ty)
+            | otherwise = PUSH_ALTS_UNLIFTED alt_bco' (typeArgRep platform bndr_ty)
      return (push_alts `consOL` scrut_code)
 
 
@@ -1370,7 +1377,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
          -- slide and return
          d_after_r_min_s = bytesToWords platform (d_after_r - s)
          wrapup       = mkSlideW (trunc16W r_sizeW) (d_after_r_min_s - r_sizeW)
-                        `snocOL` RETURN_UBX (toArgRep r_rep)
+                        `snocOL` RETURN_UBX (toArgRep platform r_rep)
          --trace (show (arg1_offW, args_offW  ,  (map argRepSizeW a_reps) )) $
      return (
          push_args `appOL`
@@ -1823,13 +1830,13 @@ lookupBCEnv_maybe :: Id -> BCEnv -> Maybe ByteOff
 lookupBCEnv_maybe = Map.lookup
 
 idSizeW :: Platform -> Id -> WordOff
-idSizeW platform = WordOff . argRepSizeW platform . bcIdArgRep
+idSizeW platform = WordOff . argRepSizeW platform . bcIdArgRep platform
 
 idSizeCon :: Platform -> Id -> ByteOff
 idSizeCon platform = ByteOff . primRepSizeB platform . bcIdPrimRep
 
-bcIdArgRep :: Id -> ArgRep
-bcIdArgRep = toArgRep . bcIdPrimRep
+bcIdArgRep :: Platform -> Id -> ArgRep
+bcIdArgRep platform = toArgRep platform . bcIdPrimRep
 
 bcIdPrimRep :: Id -> PrimRep
 bcIdPrimRep id
@@ -1839,7 +1846,7 @@ bcIdPrimRep id
   = pprPanic "bcIdPrimRep" (ppr id <+> dcolon <+> ppr (idType id))
 
 repSizeWords :: Platform -> PrimRep -> WordOff
-repSizeWords platform rep = WordOff $ argRepSizeW platform (toArgRep rep)
+repSizeWords platform rep = WordOff $ argRepSizeW platform (toArgRep platform rep)
 
 isFollowableArg :: ArgRep -> Bool
 isFollowableArg P = True
@@ -1926,11 +1933,12 @@ bcViewLoop e =
       Nothing -> e
       Just e' -> bcViewLoop e'
 
-isVAtom :: AnnExpr' Var ann -> Bool
-isVAtom e | Just e' <- bcView e = isVAtom e'
-isVAtom (AnnVar v)              = isVoidArg (bcIdArgRep v)
-isVAtom (AnnCoercion {})        = True
-isVAtom _                     = False
+isVAtom :: Platform -> AnnExpr' Var ann -> Bool
+isVAtom platform expr = case expr of
+   e | Just e' <- bcView e -> isVAtom platform e'
+   (AnnVar v)              -> isVoidArg (bcIdArgRep platform v)
+   (AnnCoercion {})        -> True
+   _                       -> False
 
 atomPrimRep :: AnnExpr' Id ann -> PrimRep
 atomPrimRep e | Just e' <- bcView e = atomPrimRep e'
@@ -1945,8 +1953,8 @@ atomPrimRep (AnnCase _ _ ty _)      =
 atomPrimRep (AnnCoercion {})        = VoidRep
 atomPrimRep other = pprPanic "atomPrimRep" (ppr (deAnnotate' other))
 
-atomRep :: AnnExpr' Id ann -> ArgRep
-atomRep e = toArgRep (atomPrimRep e)
+atomRep :: Platform -> AnnExpr' Id ann -> ArgRep
+atomRep platform e = toArgRep platform (atomPrimRep e)
 
 -- | Let szsw be the sizes in bytes of some items pushed onto the stack, which
 -- has initial depth @original_depth@.  Return the values which the stack
@@ -1954,8 +1962,8 @@ atomRep e = toArgRep (atomPrimRep e)
 mkStackOffsets :: ByteOff -> [ByteOff] -> [ByteOff]
 mkStackOffsets original_depth szsb = tail (scanl' (+) original_depth szsb)
 
-typeArgRep :: Type -> ArgRep
-typeArgRep = toArgRep . typePrimRep1
+typeArgRep :: Platform -> Type -> ArgRep
+typeArgRep platform = toArgRep platform . typePrimRep1
 
 -- -----------------------------------------------------------------------------
 -- The bytecode generator's monad

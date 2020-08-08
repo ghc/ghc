@@ -1433,12 +1433,12 @@ data PrimRep
   | Int8Rep       -- ^ Signed, 8-bit value
   | Int16Rep      -- ^ Signed, 16-bit value
   | Int32Rep      -- ^ Signed, 32-bit value
-  | Int64Rep      -- ^ Signed, 64 bit value (with 32-bit words only)
+  | Int64Rep      -- ^ Signed, 64 bit value
   | IntRep        -- ^ Signed, word-sized value
   | Word8Rep      -- ^ Unsigned, 8 bit value
   | Word16Rep     -- ^ Unsigned, 16 bit value
   | Word32Rep     -- ^ Unsigned, 32 bit value
-  | Word64Rep     -- ^ Unsigned, 64 bit value (with 32-bit words only)
+  | Word64Rep     -- ^ Unsigned, 64 bit value
   | WordRep       -- ^ Unsigned, word-sized value
   | AddrRep       -- ^ A pointer, but /not/ to a Haskell value (use '(Un)liftedRep')
   | FloatRep
