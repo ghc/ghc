@@ -61,7 +61,7 @@ endif
 $(eval $(call build-prog,utils/ghc-pkg,dist,0))
 
 # ghc-pkg uses `settings` to figure out the target platform to figure out a
-# subdirectory for the user pkg db. So make sure `settings` exists (alterative
+# subdirectory for the user pkg db. So make sure `settings` exists (alternative
 # is to specify global package db only.
 $(ghc-pkg_INPLACE) : | $(INPLACE_PACKAGE_CONF)/. $(INPLACE_LIB)/settings
 
