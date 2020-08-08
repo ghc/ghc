@@ -65,24 +65,29 @@ argRepString V16 = "V16"
 argRepString V32 = "V32"
 argRepString V64 = "V64"
 
-toArgRep :: PrimRep -> ArgRep
-toArgRep VoidRep           = V
-toArgRep LiftedRep         = P
-toArgRep UnliftedRep       = P
-toArgRep IntRep            = N
-toArgRep WordRep           = N
-toArgRep Int8Rep           = N  -- Gets widened to native word width for calls
-toArgRep Word8Rep          = N  -- Gets widened to native word width for calls
-toArgRep Int16Rep          = N  -- Gets widened to native word width for calls
-toArgRep Word16Rep         = N  -- Gets widened to native word width for calls
-toArgRep Int32Rep          = N  -- Gets widened to native word width for calls
-toArgRep Word32Rep         = N  -- Gets widened to native word width for calls
-toArgRep AddrRep           = N
-toArgRep Int64Rep          = L
-toArgRep Word64Rep         = L
-toArgRep FloatRep          = F
-toArgRep DoubleRep         = D
-toArgRep (VecRep len elem) = case len*primElemRepSizeB elem of
+toArgRep :: Platform -> PrimRep -> ArgRep
+toArgRep platform rep = case rep of
+   VoidRep           -> V
+   LiftedRep         -> P
+   UnliftedRep       -> P
+   IntRep            -> N
+   WordRep           -> N
+   Int8Rep           -> N  -- Gets widened to native word width for calls
+   Word8Rep          -> N  -- Gets widened to native word width for calls
+   Int16Rep          -> N  -- Gets widened to native word width for calls
+   Word16Rep         -> N  -- Gets widened to native word width for calls
+   Int32Rep          -> N  -- Gets widened to native word width for calls
+   Word32Rep         -> N  -- Gets widened to native word width for calls
+   AddrRep           -> N
+   Int64Rep          -> case platformWordSize platform of
+                           PW4 -> L
+                           PW8 -> N
+   Word64Rep         -> case platformWordSize platform of
+                           PW4 -> L
+                           PW8 -> N
+   FloatRep          -> F
+   DoubleRep         -> D
+   (VecRep len elem) -> case len*primElemRepSizeB elem of
                                16 -> V16
                                32 -> V32
                                64 -> V64
@@ -106,8 +111,8 @@ argRepSizeW platform = \case
   where
    ws       = platformWordSizeInBytes platform
 
-idArgRep :: Id -> ArgRep
-idArgRep = toArgRep . idPrimRep
+idArgRep :: Platform -> Id -> ArgRep
+idArgRep platform = toArgRep platform . idPrimRep
 
 -- This list of argument patterns should be kept in sync with at least
 -- the following:
