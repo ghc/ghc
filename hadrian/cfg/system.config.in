@@ -14,6 +14,7 @@ hs-cpp         = @HaskellCPPCmd@
 ld             = @LdCmd@
 make           = @MakeCmd@
 nm             = @NmCmd@
+merge-objects  = @MergeObjsCmd@
 objdump        = @ObjdumpCmd@
 ranlib         = @REAL_RANLIB_CMD@
 sphinx-build   = @SPHINXBUILD@
@@ -114,10 +115,10 @@ conf-ld-linker-args-stage1  = @CONF_LD_LINKER_OPTS_STAGE1@
 conf-ld-linker-args-stage2  = @CONF_LD_LINKER_OPTS_STAGE2@
 conf-ld-linker-args-stage3  = @CONF_LD_LINKER_OPTS_STAGE3@
 
-conf-merge-objects-args-stage0  = @SettingsMergeObjectsFlags@
-conf-merge-objects-args-stage1  = @SettingsMergeObjectsFlags@
-conf-merge-objects-args-stage2  = @SettingsMergeObjectsFlags@
-conf-merge-objects-args-stage3  = @SettingsMergeObjectsFlags@
+conf-merge-objects-args-stage0  = @MergeObjsArgs@
+conf-merge-objects-args-stage1  = @MergeObjsArgs@
+conf-merge-objects-args-stage2  = @MergeObjsArgs@
+conf-merge-objects-args-stage3  = @MergeObjsArgs@
 
 
 # Settings:

@@ -141,7 +141,7 @@ initSettings top_dir = do
         as_args  = map Option cc_args
         ld_prog  = cc_prog
         ld_args  = map Option (cc_args ++ words cc_link_args_str)
-  ld_r_prog <- getSetting "Merge objects command"
+  ld_r_prog <- getToolSetting "Merge objects command"
   ld_r_args <- getSetting "Merge objects flags"
 
   llvmTarget <- getSetting "LLVM target"
