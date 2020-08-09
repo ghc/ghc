@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE PatternSynonyms #-}
 --
 -- (c) The University of Glasgow 2002-2006
 --
@@ -48,15 +49,24 @@ import Control.Monad.Trans.Reader
 import Control.Monad.Catch (MonadCatch, MonadMask, MonadThrow)
 import GHC.Utils.Monad
 import Control.Applicative (Alternative(..))
+import GHC.Exts( oneShot )
 
 ----------------------------------------------------------------------
 -- Defining the monad type
 ----------------------------------------------------------------------
 
 
-newtype IOEnv env a = IOEnv (env -> IO a)
+newtype IOEnv env a = IOEnv' (env -> IO a)
   deriving (Functor)
   deriving (MonadThrow, MonadCatch, MonadMask, MonadIO) via (ReaderT env IO)
+
+-- See Note [The one-shot state monad trick] in GHC.Utils.Monad
+pattern IOEnv :: forall env a. (env -> IO a) -> IOEnv env a
+pattern IOEnv m <- IOEnv' m
+  where
+    IOEnv m = IOEnv' (oneShot m)
+
+{-# COMPLETE IOEnv #-}
 
 unIOEnv :: IOEnv env a -> (env -> IO a)
 unIOEnv (IOEnv m) = m
