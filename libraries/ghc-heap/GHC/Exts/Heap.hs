@@ -97,8 +97,7 @@ class HasHeapRep (a :: TYPE rep) where
     -- containing a thunk or an evaluated heap object. Outside it can be a
     -- 'Word' for "raw" usage of pointers.
 
--- TODO: Remove Show constraint
-    getClosureDataX :: Show b =>
+    getClosureDataX ::
         (forall c . c -> IO (Ptr StgInfoTable, [Word], [b]))
         -- ^ Helper function to get info table, memory and pointers of the
         -- closure. The order of @[b]@ is significant and determined by
@@ -188,8 +187,7 @@ getClosureData = getClosureDataX getClosureRaw
 --
 -- For most use cases 'getClosureData' is an easier to use alternative.
 
--- TODO: Remove Show constraint
-getClosureX :: forall a b. Show b =>
+getClosureX :: forall a b.
             (forall c . c -> IO (Ptr StgInfoTable, [Word], [b]))
             -- ^ Helper function to get info table, memory and pointers of the
             -- closure
@@ -347,10 +345,6 @@ getClosureX get_closure_raw x = do
 
             allocaArray (length wds) (\ptr -> do
                 pokeArray ptr wds
--- TODO: remove prints
-                print $ "tso ptr : " ++ show ptr
-                print $ "tso pts : " ++ show pts
-                print $ "tso info table : " ++ show itbl
 -- TODO: Does this work? I.e. do we emit EndTSOQueues?
                 if isEndTsoQueue_c (unpackPtr ptr) then
                     pure $ EndTSOQueue { info = itbl }
