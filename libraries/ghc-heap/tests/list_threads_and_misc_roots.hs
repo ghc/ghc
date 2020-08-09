@@ -7,12 +7,6 @@ import Control.Concurrent
 import GHC.Exts.Heap
 import GHC.Exts
 
-
--- Invent a type to bypass the type constraints of getClosureData.
--- Infact this will be a Word#, that is directly given to unpackClosure#
--- (which is a primop that expects a pointer to a closure).
-data FoolClosure
-
 foreign import ccall safe "list_threads_and_misc_roots_c.h listThreadsAndMiscRoots"
     listThreadsAndMiscRoots_c :: IO ()
 
@@ -53,7 +47,7 @@ main = do
 createClosure :: Ptr () -> IO (GenClosure Box)
 createClosure tsoPtr = do
     let addr = unpackAddr# tsoPtr
-    getClosureData ((unsafeCoerce# addr) :: FoolClosure)
+    getClosureData ((unsafeCoerce# addr) :: LiftedClosure)
 
 unpackAddr# :: Ptr () -> Addr#
 unpackAddr# (Ptr addr) = addr

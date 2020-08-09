@@ -24,6 +24,7 @@ values, i.e. to investigate sharing and lazy evaluation.
 module GHC.Exts.Heap (
     -- * Closure types
       Closure
+    , LiftedClosure
     , GenClosure(..)
     , ClosureType(..)
     , PrimType(..)
@@ -89,6 +90,12 @@ import Foreign
 #include "ghcconfig.h"
 
 foreign import ccall "isEndTsoQueue" isEndTsoQueue_c :: Addr# -> Bool
+
+-- | Some closures (e.g.TSOs) don't have corresponding types to represent them in Haskell.
+-- So when we have a pointer to such closure that we want to inspect, we `unsafeCoerce` it
+-- into the following `LiftedClosure` lifted type (could be any lifted type) so that the
+-- appropriate `instance HasHeapRep (a :: TYPE 'LiftedRep)` is used to decode the closure.
+data LiftedClosure
 
 class HasHeapRep (a :: TYPE rep) where
 
