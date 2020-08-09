@@ -313,7 +313,7 @@ systemBuilderPath builder = case builder of
     Happy           -> fromKey "happy"
     HsCpp           -> fromKey "hs-cpp"
     Ld _            -> fromKey "ld"
-    MergeObjects _  -> fromKey "settings-merge-objects-command"
+    MergeObjects _  -> fromKey "merge-objects"
     Make _          -> fromKey "make"
     Makeinfo        -> fromKey "makeinfo"
     Nm              -> fromKey "nm"
