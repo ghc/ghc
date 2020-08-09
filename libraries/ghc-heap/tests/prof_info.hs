@@ -14,7 +14,7 @@ import Data.List (find)
 #include "rts/Constants.h"
 
 foreign import ccall unsafe "create_tso.h create_tso"
-    c_create_tso:: IO Word
+    c_create_tso:: IO (Ptr ())
 
 -- Invent a type to bypass the type constraints of getClosureData.
 -- Infact this will be a Word#, that is directly given to unpackClosure#
@@ -24,8 +24,8 @@ data FoolStgTSO
 createTSOClosure :: IO (GenClosure Box)
 createTSOClosure = do
     ptr <- {-# SCC "MyCostCentre" #-} c_create_tso
-    let wPtr = unpackWord# ptr
-    getClosureData ((unsafeCoerce# wPtr) :: FoolStgTSO)
+    let addr = unpackAddr# ptr
+    getClosureData ((unsafeCoerce# addr) :: FoolStgTSO)
 
 -- We can make some assumptions about the - otherwise dynamic - properties of
 -- StgTSO and StgStack, because a new, non-running TSO is created with
@@ -50,8 +50,8 @@ main = do
                         assertEqual (cc_link myCostCentre) Nothing
                     Nothing -> error "MyCostCentre not found!"
 
-unpackWord# :: Word -> Word#
-unpackWord# (W# w#) = w#
+unpackAddr# :: Ptr () -> Addr#
+unpackAddr# (Ptr addr) = addr
 
 linkedCostCentres :: Maybe CostCentre -> [CostCentre]
 linkedCostCentres Nothing = []

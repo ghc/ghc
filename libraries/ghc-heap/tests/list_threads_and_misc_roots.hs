@@ -20,13 +20,13 @@ foreign import ccall safe "list_threads_and_misc_roots_c.h getTSOCount"
     getTSOCount_c :: IO Int
 
 foreign import ccall safe "list_threads_and_misc_roots_c.h getTSOs"
-    getTSOs_c :: IO (Ptr Word)
+    getTSOs_c :: IO (Ptr (Ptr ()))
 
 foreign import ccall safe "list_threads_and_misc_roots_c.h getMiscRootsCount"
     getMiscRootsCount_c :: IO Int
 
 foreign import ccall safe "list_threads_and_misc_roots_c.h getMiscRoots"
-    getMiscRoots_c :: IO (Ptr Word)
+    getMiscRoots_c :: IO (Ptr (Ptr ()))
 
 main :: IO ()
 main = do
@@ -50,13 +50,13 @@ main = do
 
     return ()
 
-createClosure :: Word -> IO (GenClosure Box)
+createClosure :: Ptr () -> IO (GenClosure Box)
 createClosure tsoPtr = do
-    let wPtr = unpackWord# tsoPtr
-    getClosureData ((unsafeCoerce# wPtr) :: FoolClosure)
+    let addr = unpackAddr# tsoPtr
+    getClosureData ((unsafeCoerce# addr) :: FoolClosure)
 
-unpackWord# :: Word -> Word#
-unpackWord# (W# w#) = w#
+unpackAddr# :: Ptr () -> Addr#
+unpackAddr# (Ptr addr) = addr
 
 assertEqual :: (Show a, Eq a) => a -> a -> IO ()
 assertEqual a b

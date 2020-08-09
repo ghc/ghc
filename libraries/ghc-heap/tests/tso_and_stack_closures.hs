@@ -11,7 +11,7 @@ import GHC.Word
 #include "rts/Constants.h"
 
 foreign import ccall unsafe "create_tso.h create_tso"
-    c_create_tso:: IO Word
+    c_create_tso:: IO (Ptr ())
 
 -- Invent a type to bypass the type constraints of getClosureData.
 -- Infact this will be a Word#, that is directly given to unpackClosure#
@@ -60,11 +60,11 @@ main = do
 createTSOClosure :: IO (GenClosure Box)
 createTSOClosure = do
     ptr <- c_create_tso
-    let wPtr = unpackWord# ptr
-    getClosureData ((unsafeCoerce# wPtr) :: FoolStgTSO)
+    let addr = unpackAddr# ptr
+    getClosureData ((unsafeCoerce# addr) :: FoolStgTSO)
 
-unpackWord# :: Word -> Word#
-unpackWord# (W# w#) = w#
+unpackAddr# :: Ptr () -> Addr#
+unpackAddr# (Ptr addr) = addr
 
 assertEqual :: (Show a, Eq a) => a -> a -> IO ()
 assertEqual a b
