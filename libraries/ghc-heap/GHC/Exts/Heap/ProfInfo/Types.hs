@@ -23,7 +23,7 @@ data CostCentreStack = CostCentreStack {
     ccs_mem_alloc :: Word64,
     ccs_inherited_alloc :: Word64,
     ccs_inherited_ticks :: Word
-} deriving (Show, Generic)
+} deriving (Show, Generic, Eq)
 
 data CostCentre = CostCentre {
     cc_ccID :: Int,
@@ -34,11 +34,11 @@ data CostCentre = CostCentre {
     cc_time_ticks :: Word,
     cc_is_caf :: Bool,
     cc_link :: Maybe CostCentre
-} deriving (Show, Generic)
+} deriving (Show, Generic, Eq)
 
 data IndexTable = IndexTable {
     it_cc :: CostCentre,
     it_ccs :: Maybe CostCentreStack,
     it_next :: Maybe IndexTable,
     it_back_edge :: Bool
-} deriving (Show, Generic)
+} deriving (Show, Generic, Eq)
