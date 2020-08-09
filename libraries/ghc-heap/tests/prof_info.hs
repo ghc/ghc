@@ -16,16 +16,11 @@ import Data.List (find)
 foreign import ccall unsafe "create_tso.h create_tso"
     c_create_tso:: IO (Ptr ())
 
--- Invent a type to bypass the type constraints of getClosureData.
--- Infact this will be a Word#, that is directly given to unpackClosure#
--- (which is a primop that expects a pointer to a closure).
-data FoolStgTSO
-
 createTSOClosure :: IO (GenClosure Box)
 createTSOClosure = do
     ptr <- {-# SCC "MyCostCentre" #-} c_create_tso
     let addr = unpackAddr# ptr
-    getClosureData ((unsafeCoerce# addr) :: FoolStgTSO)
+    getClosureData ((unsafeCoerce# addr) :: LiftedClosure)
 
 -- We can make some assumptions about the - otherwise dynamic - properties of
 -- StgTSO and StgStack, because a new, non-running TSO is created with
@@ -43,7 +38,7 @@ main = do
                         assertEqual (cc_ccID myCostCentre) 1
                         assertEqual (cc_label myCostCentre) "MyCostCentre"
                         assertEqual (cc_module myCostCentre) "Main"
-                        assertEqual (cc_srcloc myCostCentre) (Just "prof_info.hs:26:39-50")
+                        assertEqual (cc_srcloc myCostCentre) (Just "prof_info.hs:21:39-50")
                         assertEqual (cc_mem_alloc myCostCentre) 0
                         assertEqual (cc_time_ticks myCostCentre) 0
                         assertEqual (cc_is_caf myCostCentre) False
