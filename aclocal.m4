@@ -516,6 +516,10 @@ AC_DEFUN([FP_SETTINGS],
         SettingsHaskellCPPCommand="${mingw_bin_prefix}gcc.exe"
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
         SettingsLdCommand="${mingw_bin_prefix}ld.exe"
+        # Overrides FIND_MERGE_OBJECTS in order to avoid hard-coding linker
+        # path on Windows (#18550).
+        SettingsMergeObjectsCommand="${SettingsLdCommand}"
+        SettingsMergeObjectsFlags="-r --oformat=pe-bigobj-x86-64"
         SettingsArCommand="${mingw_bin_prefix}ar.exe"
         SettingsRanlibCommand="${mingw_bin_prefix}ranlib.exe"
         SettingsDllWrapCommand="${mingw_bin_prefix}dllwrap.exe"
@@ -529,6 +533,8 @@ AC_DEFUN([FP_SETTINGS],
         SettingsHaskellCPPCommand="$(basename $HaskellCPPCmd)"
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
         SettingsLdCommand="$(basename $LdCmd)"
+        SettingsMergeObjectsCommand="$(basename $MergeObjsCmd)"
+        SettingsMergeObjectsFlags="$MergeObjsArgs"
         SettingsArCommand="$(basename $ArCmd)"
         SettingsDllWrapCommand="$(basename $DllWrapCmd)"
         SettingsWindresCommand="$(basename $WindresCmd)"
@@ -538,6 +544,8 @@ AC_DEFUN([FP_SETTINGS],
         SettingsHaskellCPPCommand="$HaskellCPPCmd"
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
         SettingsLdCommand="$LdCmd"
+        SettingsMergeObjectsCommand="$MergeObjsCmd"
+        SettingsMergeObjectsFlags="$MergeObjsArgs"
         SettingsArCommand="$ArCmd"
         SettingsRanlibCommand="$RanlibCmd"
         if test -z "$DllWrapCmd"
@@ -592,6 +600,8 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsCCompilerSupportsNoPie)
     AC_SUBST(SettingsLdCommand)
     AC_SUBST(SettingsLdFlags)
+    AC_SUBST(SettingsMergeObjectsCommand)
+    AC_SUBST(SettingsMergeObjectsFlags)
     AC_SUBST(SettingsArCommand)
     AC_SUBST(SettingsRanlibCommand)
     AC_SUBST(SettingsDllWrapCommand)
@@ -2589,7 +2599,7 @@ AC_DEFUN([CHECK_FOR_GOLD_T22266],[
         ])
 
         $CC -c -o conftest.a.o conftest.a.c || AC_MSG_ERROR([Failed to compile test])
-        $SettingsMergeObjectsCommand $SettingsMergeObjectsFlags -T conftest.t conftest.a.o -o conftest.ar.o || AC_MSG_ERROR([Failed to merge test object])
+        $MergeObjsCmd $MergeObjsArgs -T conftest.t conftest.a.o -o conftest.ar.o || AC_MSG_ERROR([Failed to merge test object])
 
         $CC -c -o conftest.main.o conftest.main.c || AC_MSG_ERROR([Failed to compile test driver])
         $CC conftest.ar.o conftest.main.o -o conftest || AC_MSG_ERROR([Failed to link test driver])
@@ -2609,33 +2619,30 @@ AC_DEFUN([CHECK_FOR_GOLD_T22266],[
 # ------------------
 # Find which linker to use to merge object files.
 #
+# See Note [Merging object files for GHCi] in GHC.Driver.Pipeline.
 AC_DEFUN([FIND_MERGE_OBJECTS],[
     AC_REQUIRE([FIND_LD])
 
-    if test -z "$SettingsMergeObjectsCommand"; then
-        SettingsMergeObjectsCommand="$LD"
+    if test -z "$MergeObjsCmd"; then
+        MergeObjsCmd="$LD"
     fi
-    if test -z "$SettingsMergeObjectsFlags"; then
-        SettingsMergeObjectsFlags="-r"
+    if test -z "$MergeObjsArgs"; then
+        MergeObjsArgs="-r"
     fi
 
-    CHECK_FOR_GOLD_T22266($SettingsMergeObjectsCommand)
+    CHECK_FOR_GOLD_T22266($MergeObjsCmd)
     if test "$result" = "1"; then
-        AC_MSG_NOTICE([$SettingsMergeObjectsCommand is broken due to binutils 22266, looking for another linker...])
-        SettingsMergeObjectsCommand=""
-        AC_CHECK_TARGET_TOOL([SettingsMergeObjectsCommand], [ld])
-        CHECK_FOR_GOLD_T22266($SettingsMergeObjectsCommand)
+        AC_MSG_NOTICE([$MergeObjsCmd is broken due to binutils 22266, looking for another linker...])
+        MergeObjsCmd=""
+        AC_CHECK_TARGET_TOOL([MergeObjsCmd], [ld])
+        CHECK_FOR_GOLD_T22266($MergeObjsCmd)
         if test "$result" = "1"; then
-            AC_MSG_ERROR([Linker is affected by binutils 22266 but couldn't find another unaffected linker. Please set the SettingsMergeObjectsCommand variable to a functional linker.])
+            AC_MSG_ERROR([Linker is affected by binutils 22266 but couldn't find another unaffected linker. Please set the MergeObjsCmd variable to a functional linker.])
         fi
     fi
 
-    if test "$windows" = YES -a "$EnableDistroToolchain" = "NO" -a "$WORD_SIZE" = 64; then
-        SettingsMergeObjectsFlags="$SettingsMergeObjectsFlags --oformat=pe-bigobj-x86-64"
-    fi
-
-    AC_SUBST(SettingsMergeObjectsCommand)
-    AC_SUBST(SettingsMergeObjectsFlags)
+    AC_SUBST([MergeObjsCmd])
+    AC_SUBST([MergeObjsArgs])
 ])
 
 # FIND_PYTHON
