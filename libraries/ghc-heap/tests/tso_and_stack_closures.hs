@@ -60,8 +60,8 @@ main = do
 createTSOClosure :: IO (GenClosure Box)
 createTSOClosure = do
     ptr <- c_create_tso
-    let wPtr = unpackAddr# ptr
-    getClosureData ((unsafeCoerce# wPtr) :: FoolStgTSO)
+    let addr = unpackAddr# ptr
+    getClosureData ((unsafeCoerce# addr) :: FoolStgTSO)
 
 unpackAddr# :: Ptr () -> Addr#
 unpackAddr# (Ptr addr) = addr

@@ -52,8 +52,8 @@ main = do
 
 createClosure :: Ptr () -> IO (GenClosure Box)
 createClosure tsoPtr = do
-    let wPtr = unpackAddr# tsoPtr
-    getClosureData ((unsafeCoerce# wPtr) :: FoolClosure)
+    let addr = unpackAddr# tsoPtr
+    getClosureData ((unsafeCoerce# addr) :: FoolClosure)
 
 unpackAddr# :: Ptr () -> Addr#
 unpackAddr# (Ptr addr) = addr

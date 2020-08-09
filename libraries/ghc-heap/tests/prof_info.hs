@@ -24,8 +24,8 @@ data FoolStgTSO
 createTSOClosure :: IO (GenClosure Box)
 createTSOClosure = do
     ptr <- {-# SCC "MyCostCentre" #-} c_create_tso
-    let wPtr = unpackAddr# ptr
-    getClosureData ((unsafeCoerce# wPtr) :: FoolStgTSO)
+    let addr = unpackAddr# ptr
+    getClosureData ((unsafeCoerce# addr) :: FoolStgTSO)
 
 -- We can make some assumptions about the - otherwise dynamic - properties of
 -- StgTSO and StgStack, because a new, non-running TSO is created with
