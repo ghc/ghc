@@ -588,7 +588,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
 
             work_prag = InlinePragma { inl_src = SourceText "{-# INLINE"
                                      , inl_inline = fn_inline_spec
-                                     , inl_spec   = NoUserSpecializable -- TODO
+                                     , inl_spec   = fn_specializable_spec
                                      , inl_sat    = Nothing
                                      , inl_act    = work_act
                                      , inl_rule   = FunLike }
@@ -652,6 +652,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
     rhs_fvs         = exprFreeVars rhs
     fn_inl_prag     = inlinePragInfo fn_info
     fn_inline_spec  = inl_inline fn_inl_prag
+    fn_specializable_spec = inl_spec fn_inl_prag
     fn_unfolding    = unfoldingInfo fn_info
     arity           = arityInfo fn_info
                     -- The arity is set by the simplifier using exprEtaExpandArity
