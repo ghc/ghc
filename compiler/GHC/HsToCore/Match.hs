@@ -766,14 +766,15 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
         -- Pattern match check warnings for /this match-group/.
         -- @rhss_deltas@ is a flat list of covered Deltas for each RHS.
         -- Each Match will split off one Deltas for its RHSs from this.
-        ; rhss_deltas <- if isMatchContextPmChecked dflags origin ctxt
+        ; matches_deltas <- if isMatchContextPmChecked dflags origin ctxt
             then addScrutTmCs mb_scr new_vars $
               -- See Note [Type and Term Equality Propagation]
-              checkMatches (DsMatchContext ctxt locn) new_vars matches
-            else pure [] -- Ultimately this will result in passing Nothing
-                         -- to dsGRHSs as match_deltas
+              map Just <$> checkMatches (DsMatchContext ctxt locn) new_vars matches
+            else pure (replicate (length matches) Nothing)
+                    -- Ultimately this will result in passing Nothing to
+                    -- updPmDeltas, which is a no-op
 
-        ; eqns_info   <- mk_eqn_infos matches rhss_deltas
+        ; eqns_info   <- mk_eqn_infos matches matches_deltas
 
         ; result_expr <- handleWarnings $
                          matchEquations ctxt new_vars eqns_info rhs_ty
@@ -782,28 +783,22 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
     -- rhss_deltas is a flat list, whereas there are multiple GRHSs per match.
     -- mk_eqn_infos will thread rhss_deltas as state through calls to
     -- mk_eqn_info, distributing each rhss_deltas to a GRHS.
-    mk_eqn_infos (L _ match : matches) rhss_deltas
-      = do { (info, rhss_deltas') <- mk_eqn_info  match   rhss_deltas
-           ; infos                <- mk_eqn_infos matches rhss_deltas'
+    mk_eqn_infos (L _ match : matches) (mb_match_deltas : matches_deltas)
+      = do { info  <- mk_eqn_info  match   mb_match_deltas
+           ; infos <- mk_eqn_infos matches matches_deltas
            ; return (info:infos) }
-    mk_eqn_infos [] _ = return []
+    mk_eqn_infos [] [] = return []
+    mk_eqn_infos matches matches_deltas =
+      pprPanic "mk_eqn_infos" (ppr (length matches) <+> ppr (length matches_deltas))
     -- Called once per equation in the match, or alternative in the case
-    mk_eqn_info (Match { m_pats = pats, m_grhss = grhss }) rhss_deltas
-      | GRHSs _ grhss' _  <- grhss, let n_grhss = length grhss'
+    mk_eqn_info (Match { m_pats = pats, m_grhss = grhss }) mb_match_deltas
       = do { dflags <- getDynFlags
            ; let upats = map (unLoc . decideBangHood dflags) pats
-           -- Split off one Deltas for each GRHS of the current Match from the
-           -- flat list of GRHS Deltas *for all matches* (see the call to
-           -- checkMatches above).
-           ; let (match_deltas, rhss_deltas') = splitAt n_grhss rhss_deltas
-           -- The list of Deltas is empty iff we don't perform any coverage
-           -- checking, in which case nonEmpty does the right thing by passing
-           -- Nothing.
-           ; match_result <- dsGRHSs ctxt grhss rhs_ty (NEL.nonEmpty match_deltas)
-           ; return ( EqnInfo { eqn_pats = upats
-                              , eqn_orig = FromSource
-                              , eqn_rhs = match_result }
-                    , rhss_deltas' ) }
+           ; match_result <- updPmDeltas (fst <$> mb_match_deltas) $
+                             dsGRHSs ctxt grhss rhs_ty (snd <$> mb_match_deltas)
+           ; return EqnInfo { eqn_pats = upats
+                            , eqn_orig = FromSource
+                            , eqn_rhs  = match_result } }
 
     handleWarnings = if isGenerated origin
                      then discardWarningsDs

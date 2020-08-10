@@ -404,8 +404,9 @@ getPmDeltas = do { env <- getLclEnv; return (dsl_deltas env) }
 
 -- | Set the pattern match oracle state within the scope of the given action.
 -- See 'dsl_deltas'.
-updPmDeltas :: Deltas -> DsM a -> DsM a
-updPmDeltas delta = updLclEnv (\env -> env { dsl_deltas = delta })
+updPmDeltas :: Maybe Deltas -> DsM a -> DsM a
+updPmDeltas Nothing       = id
+updPmDeltas (Just deltas) = updLclEnv (\env -> env { dsl_deltas = deltas })
 
 getSrcSpanDs :: DsM SrcSpan
 getSrcSpanDs = do { env <- getLclEnv

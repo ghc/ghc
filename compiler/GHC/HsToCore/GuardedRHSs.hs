@@ -25,7 +25,7 @@ import GHC.Core.Utils (bindNonRec)
 
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Utils
-import GHC.HsToCore.PmCheck.Types ( Deltas, initDeltas )
+import GHC.HsToCore.PmCheck.Types ( Deltas )
 import GHC.Core.Type ( Type )
 import GHC.Utils.Misc
 import GHC.Types.SrcLoc
@@ -59,24 +59,29 @@ dsGRHSs :: HsMatchContext GhcRn
         -> GRHSs GhcTc (LHsExpr GhcTc) -- ^ Guarded RHSs
         -> Type                        -- ^ Type of RHS
         -> Maybe (NonEmpty Deltas)     -- ^ Refined pattern match checking
-                                       --   models, one for each GRHS. Defaults
-                                       --   to 'initDeltas' if 'Nothing'.
+                                       --   models, one for the pattern part and
+                                       --   one for each GRHS.
         -> DsM (MatchResult CoreExpr)
 dsGRHSs hs_ctx (GRHSs _ grhss binds) rhs_ty mb_rhss_deltas
   = ASSERT( notNull grhss )
     do { match_results <- case toList <$> mb_rhss_deltas of
-           Nothing          -> mapM     (dsGRHS hs_ctx rhs_ty initDeltas) grhss
+           Nothing          -> mapM     (dsGRHS hs_ctx rhs_ty Nothing) grhss
            Just rhss_deltas -> ASSERT( length grhss == length rhss_deltas )
-                               zipWithM (dsGRHS hs_ctx rhs_ty) rhss_deltas grhss
-       ; let match_result1 = foldr1 combineMatchResults match_results
-             match_result2 = adjustMatchResultDs (dsLocalBinds binds) match_result1
+                               zipWithM (dsGRHS hs_ctx rhs_ty) (Just <$> rhss_deltas) grhss
+       ; deltas <- getPmDeltas
+       -- We need to remember the Deltas from the particular match context we
+       -- are in, which might be different to when dsLocalBinds is actually
+       -- called.
+       ; let ds_binds      = updPmDeltas (Just deltas) . dsLocalBinds binds
+             match_result1 = foldr1 combineMatchResults match_results
+             match_result2 = adjustMatchResultDs ds_binds match_result1
                              -- NB: nested dsLet inside matchResult
        ; return match_result2 }
 
-dsGRHS :: HsMatchContext GhcRn -> Type -> Deltas -> LGRHS GhcTc (LHsExpr GhcTc)
+dsGRHS :: HsMatchContext GhcRn -> Type -> Maybe Deltas -> LGRHS GhcTc (LHsExpr GhcTc)
        -> DsM (MatchResult CoreExpr)
-dsGRHS hs_ctx rhs_ty rhs_deltas (L _ (GRHS _ guards rhs))
-  = updPmDeltas rhs_deltas (matchGuards (map unLoc guards) (PatGuard hs_ctx) rhs rhs_ty)
+dsGRHS hs_ctx rhs_ty mb_rhs_deltas (L _ (GRHS _ guards rhs))
+  = updPmDeltas mb_rhs_deltas (matchGuards (map unLoc guards) (PatGuard hs_ctx) rhs rhs_ty)
 
 {-
 ************************************************************************
