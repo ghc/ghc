@@ -3354,7 +3354,7 @@ getArgExpKind NewType res_ki = TheKind res_ki
 getArgExpKind DataType _     = OpenKind
 
 tcConIsInfixH98 :: Name
-             -> HsConDetails a b
+             -> HsConDetails t a b
              -> TcM Bool
 tcConIsInfixH98 _   details
   = case details of
@@ -3362,13 +3362,13 @@ tcConIsInfixH98 _   details
            _            -> return False
 
 tcConIsInfixGADT :: Name
-             -> HsConDetails (HsScaled GhcRn (LHsType GhcRn)) r
+             -> HsConDetails t (HsScaled GhcRn (LHsType GhcRn)) r
              -> TcM Bool
 tcConIsInfixGADT con details
   = case details of
            InfixCon {}  -> return True
            RecCon {}    -> return False
-           PrefixCon arg_tys           -- See Note [Infix GADT constructors]
+           PrefixCon _ arg_tys           -- See Note [Infix GADT constructors]
                | isSymOcc (getOccName con)
                , [_ty1,_ty2] <- map hsScaledThing arg_tys
                   -> do { fix_env <- getFixityEnv
@@ -3380,7 +3380,7 @@ tcConArgs :: ContextKind  -- expected kind of arguments
                           -- might have a specific kind
           -> HsConDeclDetails GhcRn
           -> TcM [(Scaled TcType, HsSrcBang)]
-tcConArgs exp_kind (PrefixCon btys)
+tcConArgs exp_kind (PrefixCon _ btys)
   = mapM (tcConArg exp_kind) btys
 tcConArgs exp_kind (InfixCon bty1 bty2)
   = do { bty1' <- tcConArg exp_kind bty1

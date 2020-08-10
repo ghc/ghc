@@ -1109,17 +1109,17 @@ instance OutputableBndrId p
 -- HsConDetails is used for patterns/expressions *and* for data type
 -- declarations
 -- | Haskell Constructor Details
-data HsConDetails arg rec
-  = PrefixCon [arg]             -- C p1 p2 p3
+data HsConDetails tyarg arg rec
+  = PrefixCon [tyarg] [arg]     -- C @t1 @t2 p1 p2 p3
   | RecCon    rec               -- C { x = p1, y = p2 }
   | InfixCon  arg arg           -- p1 `C` p2
   deriving Data
 
-instance (Outputable arg, Outputable rec)
-         => Outputable (HsConDetails arg rec) where
-  ppr (PrefixCon args) = text "PrefixCon" <+> ppr args
-  ppr (RecCon rec)     = text "RecCon:" <+> ppr rec
-  ppr (InfixCon l r)   = text "InfixCon:" <+> ppr [l, r]
+instance (Outputable tyarg, Outputable arg, Outputable rec)
+         => Outputable (HsConDetails tyarg arg rec) where
+  ppr (PrefixCon tyargs args) = text "PrefixCon:" <+> hsep (map (\t -> text "@" <> ppr t) tyargs) <+> ppr args
+  ppr (RecCon rec)            = text "RecCon:" <+> ppr rec
+  ppr (InfixCon l r)          = text "InfixCon:" <+> ppr [l, r]
 
 {-
 Note [ConDeclField passs]
