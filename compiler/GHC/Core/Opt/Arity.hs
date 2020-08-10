@@ -1031,7 +1031,7 @@ one-shot flag from the inner \s{osf}.  By expanding with the
 ArityType gotten from analysing the RHS, we achieve this neatly.
 
 This makes a big difference to the one-shot monad trick;
-see Note [The one-shot state monad trick] in GHC.Core.Unify.
+see Note [The one-shot state monad trick] in GHC.Utils.Monad.
 -}
 
 -- | @etaExpand n e@ returns an expression with
