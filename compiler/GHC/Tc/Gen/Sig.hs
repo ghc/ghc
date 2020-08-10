@@ -618,8 +618,8 @@ addInlinePrags poly_id prags_for_me
     mergePrags p1 p2 = p1
       { inl_inline = (mappend `on` inlinePragmaSpec       ) p1 p2
       , inl_spec   = (mappend `on` specializablePragmaSpec) p1 p2
-      , inl_act = AlwaysActive -- XXX activation must be taken from spec when inline is noinline!
-      } -- TODO take sat, act, rule from the inline one. FIXME can't merge src!
+      , inl_act = inl_act $ if inl_inline p1 == NoInline then p2 else p1
+      } -- FIXME can't merge src!
 
     multiple (_:_:_) = True
     multiple _ = False
