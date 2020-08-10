@@ -226,3 +226,175 @@ unlessM condM acc = do { cond <- condM
 filterOutM :: (Applicative m) => (a -> m Bool) -> [a] -> m [a]
 filterOutM p =
   foldr (\ x -> liftA2 (\ flg -> if flg then id else (x:)) (p x)) (pure [])
+
+{- Note [The one-shot state monad trick]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Summary: many places in GHC use a state monad, and we really want those
+functions to be eta-expanded (#18202).
+
+The problem
+~~~~~~~~~~~
+Consider
+    newtype M a = MkM (State -> (State, a))
+
+    instance Monad M where
+       mf >>= k = MkM (\s -> case mf  of MkM f  ->
+                             case f s of (s',r) ->
+                             case k r of MkM g  ->
+                             g s')
+
+    fooM :: Int -> M Int
+    fooM x = g y >>= \r -> h r
+      where
+        y = expensive x
+
+Now suppose you say (repeat 20 (fooM 4)), where
+  repeat :: Int -> M Int -> M Int
+performs its argument n times.  You would expect (expensive 4) to be
+evaluated only once, not 20 times.  So foo should have arity 1 (not 2);
+it should look like this (modulo casts)
+
+  fooM x = let y = expensive x in
+           \s -> case g y of ...
+
+But creating and then repeating, a monadic computation is rare.  If you
+/aren't/ re-using (M a) value, it's /much/ more efficient to make
+foo have arity 2, thus:
+
+  fooM x s = case g (expensive x) of ...
+
+Why more efficient?  Because now foo takes its argument both at once,
+rather than one at a time, creating a heap-allocated function closure. See
+https://www.joachim-breitner.de/blog/763-Faster_Winter_5__Eta-Expanding_ReaderT
+for a very good explanation of the issue which led to these optimisations
+into GHC.
+
+The trick
+~~~~~~~~~
+With state monads like M the general case is that we *aren't* reusing
+(M a) values so it is much more efficient to avoid allocating a
+function closure for them. So the state monad trick is a way to keep
+the monadic syntax but to make GHC eta-expand functions like `fooM`.
+To do that we use the "oneShot" magic function.
+
+Here is the trick:
+  * Define a "smart constructor"
+       mkM :: (State -> (State,a)) -> M a
+       mkM f = MkM (oneShot m)
+
+  * Never call MkM directly, as a constructor.  Instead, always call mkM.
+
+And that's it!  The magic 'oneShot' function does this transformation:
+   oneShot (\s. e)  ==>   \s{os}. e
+which pins a one-shot flag {os} onto the binder 's'.  That tells GHC
+that it can assume the lambda is called only once, and thus can freely
+float computations in and out of the lambda.
+
+To be concrete, let's see what happens to fooM:
+
+ fooM = \x. g (expensive x) >>= \r -> h r
+      = \x. let mf = g (expensive x)
+                k  = \r -> h r
+            in MkM (oneShot (\s -> case mf  of MkM' f  ->
+                                   case f s of (s',r) ->
+                                   case k r of MkM' g  ->
+                                   g s'))
+      -- The MkM' are just newtype casts nt_co
+      = \x. let mf = g (expensive x)
+                k  = \r -> h r
+            in (\s{os}. case (mf |> nt_co) s of (s',r) ->
+                        (k r) |> nt_co s')
+               |> sym nt_co
+
+      -- Crucial step: float let-bindings into that \s{os}
+      = \x. (\s{os}. case (g (expensive x) |> nt_co) s of (s',r) ->
+                     h r |> nt_co s')
+            |> sym nt_co
+
+and voila! fooM has arity 2.
+
+The trick is very similar to the built-in "state hack"
+(see Note [The state-transformer hack] in "GHC.Core.Opt.Arity") but is
+applicable on a monad-by-monad basis under programmer control.
+
+Using pattern synonyms
+~~~~~~~~~~~~~~~~~~~~~~
+Using a smart constructor is fine, but there is no way to check that we
+have found *all* uses, especially if the uses escape a single module.
+A neat (but more sophisticated) alternative is to use pattern synonyms:
+
+   -- We rename the existing constructor.
+   newtype M a = MkM' (State -> (State, a))
+
+   -- The pattern has the old constructor name.
+   pattern MkM f <- MkM' f
+      where
+        MkM f = MkM' (oneShot f)
+
+Now we can simply grep to check that there are no uses of MkM'
+/anywhere/, to guarantee that we have not missed any.  (Using the
+smart constructor alone we still need the data constructor in
+patterns.)  That's the advantage of the pattern-synonym approach, but
+it is more elaborate.
+
+The pattern synonym approach is due to Sebastian Graaf (#18238)
+
+Derived instances
+~~~~~~~~~~~~~~~~~
+One caveat of both approaches is that derived instances don't use the smart
+constructor /or/ the pattern synonym. So they won't benefit from the automatic
+insertion of "oneShot".
+
+   data M a = MkM' (State -> (State,a))
+            deriving (Functor) <-- Functor implementation will use MkM'!
+
+Conclusion: don't use 'derviving' in these cases.
+
+Multi-shot actions (cf #18238)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Sometimes we really *do* want computations to be shared! Remember our
+example (repeat 20 (fooM 4)). See Note [multiShotIO] in GHC.Types.Unique.Supply
+
+We can force fooM to have arity 1 using multiShot:
+
+    fooM :: Int -> M Int
+    fooM x = multiShotM (g y >>= \r -> h r)
+      where
+        y = expensive x
+
+    multiShotM :: M a -> M a
+    {-# INLINE multiShotM #-}
+    multiShotM (MkM m) = MkM (\s -> inline m s)
+         -- Really uses the data constructor,
+         -- not the smart constructor!
+
+Now we can see how fooM optimises (ignoring casts)
+
+   multiShotM (g y >>= \r -> h r)
+   ==> {inline (>>=)}
+       multiShotM (\s{os}. case g y s of ...)
+   ==> {inline multiShotM}
+       let m = \s{os}. case g y s of ...
+       in \s. inline m s
+   ==> {inline m}
+       \s. (\s{os}. case g y s of ...) s
+   ==> \s. case g y s of ...
+
+and voila! the one-shot flag has gone.  It's possible that y has been
+replaced by (expensive x), but full laziness should pull it back out.
+(This part seems less robust.)
+
+The magic `inline` function does two things
+* It prevents eta reduction.  If we wrote just
+      multiShotIO (IO m) = IO (\s -> m s)
+  the lamda would eta-reduce to 'm' and all would be lost.
+
+* It helps ensure that 'm' really does inline.
+
+Note that 'inline' evaporates in phase 0.  See Note [inlineIdMagic]
+in GHC.Core.Opt.ConstantFold.match_inline.
+
+The INLINE pragma on multiShotM is very important, else the
+'inline' call will evaporate when compiling the module that
+defines 'multiShotM', before it is ever exported.
+-}
