@@ -857,6 +857,12 @@ checkStability hpt sccs all_home_mods =
 
         object_ok ms
           | gopt Opt_ForceRecomp (ms_hspp_opts ms) = False
+
+            -- Disable recompilation avoidance if TH has been used (#18330)
+          | Just hmi <- lookupHpt hpt (ms_mod_name ms)
+          , mi_used_th (hm_iface hmi)
+          = False
+
           | Just t <- ms_obj_date ms  =  t >= ms_hs_date ms
                                          && same_as_prev t
           | otherwise = False
@@ -877,6 +883,12 @@ checkStability hpt sccs all_home_mods =
 
         bco_ok ms
           | gopt Opt_ForceRecomp (ms_hspp_opts ms) = False
+
+            -- Disable recompilation avoidance if TH has been used (#18330)
+          | Just hmi <- lookupHpt hpt (ms_mod_name ms)
+          , mi_used_th (hm_iface hmi)
+          = False
+
           | otherwise = case lookupHpt hpt (ms_mod_name ms) of
                 Just hmi  | Just l <- hm_linkable hmi ->
                         not (isObjectLinkable l) &&
