@@ -1013,7 +1013,9 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
 
         ; prov_dicts' <- newEvVars prov_theta'
 
-        ; let skol_info = case pe_ctxt penv of
+        ; let -- Mapping from user type variables to actual types that were created for them.
+              var_map = Map.fromList $ zip ex_tvs (map mkTyVarTy ex_tvs') ++ zip univ_tvs (map mkTyVarTy univ_tvs')
+              skol_info = case pe_ctxt penv of
                             LamPat mc -> PatSkol (PatSynCon pat_syn) mc
                             LetPat {} -> UnkSkol -- Doesn't matter
 
@@ -1023,7 +1025,7 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
         ; traceTc "checkConstraints {" Outputable.empty
         ; (ev_binds, ((wrap', arg_pats'), res))
              <- checkConstraints skol_info ex_tvs' prov_dicts' $
-                tcConArgs (PatSynCon pat_syn) arg_tys_scaled (Map.empty) penv arg_pats thing_inside
+                tcConArgs (PatSynCon pat_syn) arg_tys_scaled var_map penv arg_pats thing_inside
 
         ; traceTc "checkConstraints }" (ppr ev_binds)
         ; let res_pat = ConPat { pat_con   = L con_span $ PatSynCon pat_syn
@@ -1137,24 +1139,30 @@ tcConArgs con_like arg_tys var_map penv con_args thing_inside = case con_args of
   PrefixCon type_args arg_pats -> withTypecheckedTyArgPats type_args $ \ty_arg_types -> do
         { checkTc (con_arity == no_of_args)     -- Check correct arity
                   (arityErr (text "constructor") con_like con_arity no_of_args)
+        ; failIfTc (inPatBind penv && not (null type_args)) $
+            text "Type applications on constructor patterns are not allowed in pattern bindings."
+            -- Constructor type applications are not allowed in pattern bindings. Nothing would really go wrong with this,
+            -- but the bound variables would only scope over the body of the definition unlike the rest of the variables
+            -- bound by the pattern, so we disallow it.
         ; wrap <- case con_like of
             RealDataCon data_con -> do
-              { -- Constructor type applications are not allowed in pattern bindings. Nothing would really go wrong with this,
-                -- but the bound variables would only scope over the body of the definition unlike the rest of the variables
-                -- bound by the pattern, so we disallow it.
-                failIfTc (inPatBind penv && not (null type_args)) $
-                  text "Type applications on constructor patterns are not allowed in pattern bindings."
-
-              ; let userBinders = dataConUserTyVarBinders data_con
+              { let userBinders = dataConUserTyVarBinders data_con
               ; wraps <- forM (zip userBinders ty_arg_types) $ \(Bndr tv _, tyArg) -> do
                   c <- case Map.lookup tv var_map of
-                    Nothing -> pprPanic "tcDataConPat" $ text "Invariant broken: dcUserTyVarBinders contained a binder for a variable that was not amongst the universal or existential type variables for the data constructor."
+                    Nothing -> pprPanic "tcConArgs" $ text "Invariant broken: dcUserTyVarBinders contained a binder for a variable that was not amongst the universal or existential type variables for the data constructor."
                     Just v' -> unifyType Nothing tyArg v'
                   return (mkWpCastN c)
-
               ; return (mconcat wraps)
               }
-            PatSynCon _ -> return mempty
+            PatSynCon pat_syn -> do
+              { let binders = patSynUnivTyVarBinders pat_syn ++ patSynExTyVarBinders pat_syn
+              ; wraps <- forM (zip binders ty_arg_types) $ \(Bndr tv _, tyArg) -> do
+                  c <- case Map.lookup tv var_map of
+                    Nothing -> pprPanic "tcConArgs" $ text "tcPatSynPat failed to provide the instantiation for a type variable bound by a pattern synonym."
+                    Just v' -> unifyType Nothing tyArg v'
+                  return (mkWpCastN c)
+              ; return (mconcat wraps)
+              }
         ; let pats_w_tys = zipEqual "tcConArgs" arg_pats arg_tys
         ; (arg_pats', res) <- tcMultiple tcConArg penv pats_w_tys thing_inside
         ; return ((wrap, PrefixCon type_args arg_pats'), res) }
