@@ -1070,7 +1070,8 @@ ensureAllPossibleMatchesInhabited delta@MkDelta{ delta_tm_st = TmSt env reps }
   = runMaybeT (set_tm_cs_env delta <$> traverseSDIE go env)
   where
     set_tm_cs_env delta env = delta{ delta_tm_st = TmSt env reps }
-    go vi = MaybeT (ensureInhabited delta vi)
+    go vi = MaybeT $
+      initPossibleMatches (delta_ty_st delta) vi >>= ensureInhabited delta
 
 --------------------------------------
 -- * Term oracle unification procedure
@@ -1668,7 +1669,7 @@ addCoreCt :: Delta -> Id -> CoreExpr -> MaybeT DsM Delta
 addCoreCt delta x e = do
   dflags <- getDynFlags
   let e' = simpleOptExpr dflags e
-  lift $ tracePm "addCoreCt" (ppr x $$ ppr e $$ ppr e')
+  lift $ tracePm "addCoreCt" (ppr x <+> dcolon <+> ppr (idType x) $$ ppr e $$ ppr e')
   execStateT (core_expr x e') delta
   where
     -- | Takes apart a 'CoreExpr' and tries to extract as much information about
