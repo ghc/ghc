@@ -2610,6 +2610,7 @@ warnPrepositiveQualifiedModule span =
            <+> text "in prepositive position"
        $$ text "Suggested fix: place " <+> quotes (text "qualified")
            <+> text "after the module name instead."
+       $$ text "To allow this, enable language extension 'ImportQualifiedPost'"
 
 failOpNotEnabledImportQualifiedPost :: SrcSpan -> P ()
 failOpNotEnabledImportQualifiedPost loc = addError loc msg
