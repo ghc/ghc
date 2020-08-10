@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiWayIf #-}
 
@@ -110,7 +111,9 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
               -- recover by copying ticks below.
               scp' | SubScope _ scp' <- scp      = scp'
                    | CombinedScope scp' _ <- scp = scp'
+#if __GLASGOW_HASKELL__ <= 810
                    | otherwise                   = panic "findP impossible"
+#endif
 
       scopeMap = foldr (uncurry insertMulti) Map.empty childScopes
 
