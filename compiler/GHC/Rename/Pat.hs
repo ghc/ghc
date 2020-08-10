@@ -133,6 +133,9 @@ liftCpsFV rn_thing = CpsRn (\k -> do { (v,fvs1) <- rn_thing
                                      ; (r,fvs2) <- k v
                                      ; return (r, fvs1 `plusFV` fvs2) })
 
+liftCpsWithCont :: (forall r. (b -> RnM (r, FreeVars)) -> RnM (r, FreeVars)) -> CpsRn b
+liftCpsWithCont = CpsRn
+
 wrapSrcSpanCps :: (a -> CpsRn b) -> Located a -> CpsRn (Located b)
 -- Set the location, and also wrap it around the value returned
 wrapSrcSpanCps fn (L loc a)
@@ -528,7 +531,7 @@ rnConPatAndThen mk con tyargs = \case
   PrefixCon pats -> do
     con' <- lookupConCps con
     tyargs' <- forM tyargs $ \t ->
-      CpsRn $ rnHsPatSigTypeBindingVars HsTypeCtx t
+      liftCpsWithCont $ rnHsPatSigTypeBindingVars HsTypeCtx t
     pats' <- rnLPatsAndThen mk pats
     return $ ConPat
       { pat_con_ext = noExtField
@@ -546,7 +549,7 @@ rnConPatAndThen mk con tyargs = \case
     con' <- lookupConCps con
     -- NB: The tyargs list should be empty here, but we'll rename it anyway.
     tyargs' <- forM tyargs $ \t ->
-      CpsRn (rnHsPatSigTypeBindingVars HsTypeCtx t)
+      liftCpsWithCont (rnHsPatSigTypeBindingVars HsTypeCtx t)
     rpats' <- rnHsRecPatsAndThen mk con' rpats
     return $ ConPat
       { pat_con_ext = noExtField
