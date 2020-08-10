@@ -198,9 +198,12 @@ rnHsPatSigTypeBindingVars ctxt sigType thing_inside = case sigType of
           partition (inScope rdr_env . unLoc) (extractHsTyRdrTyVars hs_ty')
     when (not (null varsInScope)) $
       addErr $
-        text "Type variable" <> plural varsInScope
-        <+> hcat (punctuate (text ",") (map (quotes . ppr) varsInScope))
-        <+> text "would be inappropriately shadowed."
+        vcat
+          [ text "Type variable" <> plural varsInScope
+            <+> hcat (punctuate (text ",") (map (quotes . ppr) varsInScope))
+            <+> text "are already in scope."
+          , text "Type applications in patterns must bind fresh variables, without shadowing."
+          ]
     (wcVars', ibVars') <- partition_nwcs varsNotInScope
     rnImplicitBndrsNoDups ctxt Nothing ibVars' $ \ ibVars -> do
       (wcVars, hs_ty, fvs) <- rnWcBody ctxt wcVars' hs_ty'
