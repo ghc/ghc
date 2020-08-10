@@ -6,6 +6,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MagicHash #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -774,15 +775,18 @@ dropList _  xs@[] = xs
 dropList (_:xs) (_:ys) = dropList xs ys
 
 
--- | Given two lists xs=x0..xn and ys=y0..ym, return `splitAt n ys`.
+-- | Given two lists xs and ys, return `splitAt (length xs) ys`.
 splitAtList :: [b] -> [a] -> ([a], [a])
-splitAtList xs ys = go 0 xs ys
+splitAtList xs ys = go 0# xs ys
    where
       -- we are careful to avoid allocating when there are no leftover
       -- arguments: in this case we can return "ys" directly (cf #18535)
-      go _ _      []     = (ys, [])        -- len(ys) <= len(xs)
-      go n []     bs     = (take n ys, bs) -- = splitAt n ys
-      go n (_:as) (_:bs) = go (n+1) as bs
+      --
+      -- We make `xs` strict because in the general case `ys` isn't `[]` so we
+      -- will have to evaluate `xs` anyway.
+      go _  !_     []     = (ys, [])             -- length ys <= length xs
+      go n  []     bs     = (take (I# n) ys, bs) -- = splitAt n ys
+      go n  (_:as) (_:bs) = go (n +# 1#) as bs
 
 -- drop from the end of a list
 dropTail :: Int -> [a] -> [a]
