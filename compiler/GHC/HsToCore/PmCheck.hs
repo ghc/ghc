@@ -576,7 +576,7 @@ translateListPat fam_insts x pats = do
 translateConPatOut :: FamInstEnvs -> Id -> ConLike -> [Type] -> [TyVar]
                    -> [EvVar] -> HsConPatDetails GhcTc -> DsM GrdVec
 translateConPatOut fam_insts x con univ_tys ex_tvs dicts = \case
-    PrefixCon ps                 -> go_field_pats (zip [0..] ps)
+    PrefixCon _ ps               -> go_field_pats (zip [0..] ps)
     InfixCon  p1 p2              -> go_field_pats (zip [0..] [p1,p2])
     RecCon    (HsRecFields fs _) -> go_field_pats (rec_field_ps fs)
   where
