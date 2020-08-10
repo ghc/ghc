@@ -27,7 +27,9 @@ import Data.Char ( isSpace )
 import Haddock.Types( DocName, DocNameI )
 
 import GHC.Utils.FV as FV
-import GHC.Utils.Outputable ( Outputable, panic, showPpr )
+import GHC.Utils.Outputable ( Outputable )
+import GHC.Utils.Panic ( panic )
+import GHC.Driver.Ppr (showPpr )
 import GHC.Types.Name
 import GHC.Unit.Module
 import GHC.Driver.Types

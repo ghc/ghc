@@ -26,7 +26,9 @@ import Haddock.Types hiding (Version)
 import Haddock.Utils hiding (out)
 
 import GHC
+import GHC.Driver.Ppr
 import GHC.Utils.Outputable as Outputable
+import GHC.Utils.Panic
 
 import Data.Char
 import Data.List
@@ -106,14 +108,14 @@ outWith p = f . unwords . map (dropWhile isSpace) . lines . p . ppr
         f [] = []
 
 out :: Outputable a => DynFlags -> a -> String
-out dflags = outWith $ showSDocUnqual dflags
+out dflags = outWith $ showSDoc dflags
 
 operator :: String -> String
 operator (x:xs) | not (isAlphaNum x) && x `notElem` "_' ([{" = '(' : x:xs ++ ")"
 operator x = x
 
 commaSeparate :: Outputable a => DynFlags -> [a] -> String
-commaSeparate dflags = showSDocUnqual dflags . interpp'SP
+commaSeparate dflags = showSDoc dflags . interpp'SP
 
 ---------------------------------------------------------------------
 -- How to print each export
@@ -173,7 +175,7 @@ ppClass dflags decl subdocs =
 
         ppTyFams
             | null $ tcdATs decl = ""
-            | otherwise = (" " ++) . showSDocUnqual dflags . whereWrapper $ concat
+            | otherwise = (" " ++) . showSDoc dflags . whereWrapper $ concat
                 [ map pprTyFam (tcdATs decl)
                 , map (pprTyFamInstDecl NotTopLevel . unLoc) (tcdATDefs decl)
                 ]

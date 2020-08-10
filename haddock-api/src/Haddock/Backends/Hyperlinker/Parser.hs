@@ -17,7 +17,9 @@ import GHC.Parser.Lexer    as Lexer
                            ( P(..), ParseResult(..), PState(..), Token(..)
                            , mkPStatePure, lexer, mkParserFlags', getErrorMessages)
 import GHC.Data.Bag         ( bagToList )
-import GHC.Utils.Outputable ( showSDoc, panic, text, ($$) )
+import GHC.Utils.Outputable ( text, ($$) )
+import GHC.Utils.Panic      ( panic )
+import GHC.Driver.Ppr       ( showSDoc )
 import GHC.Types.SrcLoc
 import GHC.Data.StringBuffer ( StringBuffer, atEnd )
 

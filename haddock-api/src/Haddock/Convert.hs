@@ -47,7 +47,7 @@ import GHC.Builtin.Names ( hasKey, eqTyConKey, ipClassKey, tYPETyConKey
 import GHC.Types.Unique ( getUnique )
 import GHC.Utils.Misc ( chkAppend, debugIsOn, dropList, equalLength
                       , filterByList, filterOut )
-import GHC.Utils.Outputable ( assertPanic )
+import GHC.Utils.Panic ( assertPanic )
 import GHC.Types.Var
 import GHC.Types.Var.Set
 import GHC.Types.SrcLoc
