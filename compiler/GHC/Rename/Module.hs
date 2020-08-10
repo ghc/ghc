@@ -77,6 +77,7 @@ import Data.List.NonEmpty ( NonEmpty(..) )
 import Data.Maybe ( isNothing, isJust, fromMaybe, mapMaybe )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 import Data.Function ( on )
+import Data.Void
 
 {- | @rnSourceDecl@ "renames" declarations.
 It simultaneously performs dependency analysis and precedence parsing.
@@ -2271,12 +2272,12 @@ rnMbContext doc (Just cxt) = do { (ctx',fvs) <- rnContext doc cxt
 rnConDeclDetails
    :: Name
    -> HsDocContext
-   -> HsConDetails (HsScaled GhcPs (LHsType GhcPs)) (Located [LConDeclField GhcPs])
-   -> RnM ((HsConDetails (HsScaled GhcRn (LHsType GhcRn))) (Located [LConDeclField GhcRn]),
+   -> HsConDetails Void (HsScaled GhcPs (LHsType GhcPs)) (Located [LConDeclField GhcPs])
+   -> RnM ((HsConDetails Void (HsScaled GhcRn (LHsType GhcRn))) (Located [LConDeclField GhcRn]),
            FreeVars)
-rnConDeclDetails _ doc (PrefixCon tys)
+rnConDeclDetails _ doc (PrefixCon _ tys)
   = do { (new_tys, fvs) <- mapFvRn (rnScaledLHsType doc) tys
-       ; return (PrefixCon new_tys, fvs) }
+       ; return (PrefixCon [] new_tys, fvs) }
 
 rnConDeclDetails _ doc (InfixCon ty1 ty2)
   = do { (new_ty1, fvs1) <- rnScaledLHsType doc ty1

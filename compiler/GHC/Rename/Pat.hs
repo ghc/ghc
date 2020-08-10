@@ -34,7 +34,7 @@ module GHC.Rename.Pat (-- main entry points
               rnHsRecUpdFields,
 
               -- CpsRn monad
-              CpsRn, liftCps,
+              CpsRn, liftCps, liftCpsWithCont,
 
               -- Literals
               rnLit, rnOverLit,
@@ -483,14 +483,14 @@ rnPatAndThen mk p@(ViewPat x expr pat)
        -- ; return (ViewPat expr' pat' ty) }
        ; return (ViewPat x expr' pat') }
 
-rnPatAndThen mk (ConPat NoExtField con tyargs args)
+rnPatAndThen mk (ConPat NoExtField con args)
    -- rnConPatAndThen takes care of reconstructing the pattern
    -- The pattern for the empty list needs to be replaced by an empty explicit list pattern when overloaded lists is turned on.
   = case unLoc con == nameRdrName (dataConName nilDataCon) of
       True    -> do { ol_flag <- liftCps $ xoptM LangExt.OverloadedLists
                     ; if ol_flag then rnPatAndThen mk (ListPat noExtField [])
-                                 else rnConPatAndThen mk con tyargs args}
-      False   -> rnConPatAndThen mk con tyargs args
+                                 else rnConPatAndThen mk con args}
+      False   -> rnConPatAndThen mk con args
 
 rnPatAndThen mk (ListPat _ pats)
   = do { opt_OverloadedLists <- liftCps $ xoptM LangExt.OverloadedLists
@@ -523,12 +523,11 @@ rnPatAndThen mk (SplicePat _ splice)
 --------------------
 rnConPatAndThen :: NameMaker
                 -> Located RdrName    -- the constructor
-                -> [HsPatSigType (NoGhcTc GhcPs)]
                 -> HsConPatDetails GhcPs
                 -> CpsRn (Pat GhcRn)
 
-rnConPatAndThen mk con tyargs = \case
-  PrefixCon pats -> do
+rnConPatAndThen mk con = \case
+  PrefixCon tyargs pats -> do
     con' <- lookupConCps con
     tyargs' <- forM tyargs $ \t ->
       liftCpsWithCont $ rnHsPatSigTypeBindingVars HsTypeCtx t
@@ -536,8 +535,7 @@ rnConPatAndThen mk con tyargs = \case
     return $ ConPat
       { pat_con_ext = noExtField
       , pat_con = con'
-      , pat_ty_args = tyargs'
-      , pat_args = PrefixCon pats'
+      , pat_args = PrefixCon tyargs' pats'
       }
   InfixCon pat1 pat2 -> do
     con' <- lookupConCps con
@@ -548,13 +546,10 @@ rnConPatAndThen mk con tyargs = \case
   RecCon rpats -> do
     con' <- lookupConCps con
     -- NB: The tyargs list should be empty here, but we'll rename it anyway.
-    tyargs' <- forM tyargs $ \t ->
-      liftCpsWithCont (rnHsPatSigTypeBindingVars HsTypeCtx t)
     rpats' <- rnHsRecPatsAndThen mk con' rpats
     return $ ConPat
       { pat_con_ext = noExtField
       , pat_con = con'
-      , pat_ty_args = tyargs'
       , pat_args = RecCon rpats'
       }
 
