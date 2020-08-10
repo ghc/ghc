@@ -35,6 +35,7 @@ import GHC.Tc.Utils.Zonk
 import GHC.Tc.Types.Evidence
 import GHC.Tc.Utils.Monad
 import GHC.HsToCore.PmCheck
+import GHC.HsToCore.PmCheck.Types ( Deltas, initDeltas )
 import GHC.Core
 import GHC.Types.Literal
 import GHC.Core.Utils
@@ -64,7 +65,7 @@ import GHC.Data.FastString
 import GHC.Types.Unique
 import GHC.Types.Unique.DFM
 
-import Control.Monad( unless )
+import Control.Monad(zipWithM,  unless )
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as Map
@@ -766,48 +767,46 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
         -- Pattern match check warnings for /this match-group/.
         -- @rhss_deltas@ is a flat list of covered Deltas for each RHS.
         -- Each Match will split off one Deltas for its RHSs from this.
-        ; rhss_deltas <- if isMatchContextPmChecked dflags origin ctxt
+        ; matches_deltas <- if isMatchContextPmChecked dflags origin ctxt
             then addScrutTmCs mb_scr new_vars $
-              -- See Note [Type and Term Equality Propagation]
-              checkMatches (DsMatchContext ctxt locn) new_vars matches
-            else pure [] -- Ultimately this will result in passing Nothing
-                         -- to dsGRHSs as match_deltas
+                 -- See Note [Type and Term Equality Propagation]
+                 checkMatches (DsMatchContext ctxt locn) new_vars matches
+            else pure (initDeltasMatches matches)
 
-        ; eqns_info   <- mk_eqn_infos matches rhss_deltas
+        ; eqns_info   <- zipWithM mk_eqn_info matches matches_deltas
 
         ; result_expr <- handleWarnings $
                          matchEquations ctxt new_vars eqns_info rhs_ty
         ; return (new_vars, result_expr) }
   where
-    -- rhss_deltas is a flat list, whereas there are multiple GRHSs per match.
-    -- mk_eqn_infos will thread rhss_deltas as state through calls to
-    -- mk_eqn_info, distributing each rhss_deltas to a GRHS.
-    mk_eqn_infos (L _ match : matches) rhss_deltas
-      = do { (info, rhss_deltas') <- mk_eqn_info  match   rhss_deltas
-           ; infos                <- mk_eqn_infos matches rhss_deltas'
-           ; return (info:infos) }
-    mk_eqn_infos [] _ = return []
     -- Called once per equation in the match, or alternative in the case
-    mk_eqn_info (Match { m_pats = pats, m_grhss = grhss }) rhss_deltas
-      | GRHSs _ grhss' _  <- grhss, let n_grhss = length grhss'
+    mk_eqn_info :: LMatch GhcTc (LHsExpr GhcTc) -> (Deltas, NonEmpty Deltas) -> DsM EquationInfo
+    mk_eqn_info (L _ (Match { m_pats = pats, m_grhss = grhss })) (pat_deltas, rhss_deltas)
       = do { dflags <- getDynFlags
            ; let upats = map (unLoc . decideBangHood dflags) pats
-           -- Split off one Deltas for each GRHS of the current Match from the
-           -- flat list of GRHS Deltas *for all matches* (see the call to
-           -- checkMatches above).
-           ; let (match_deltas, rhss_deltas') = splitAt n_grhss rhss_deltas
-           -- The list of Deltas is empty iff we don't perform any coverage
-           -- checking, in which case nonEmpty does the right thing by passing
-           -- Nothing.
-           ; match_result <- dsGRHSs ctxt grhss rhs_ty (NEL.nonEmpty match_deltas)
-           ; return ( EqnInfo { eqn_pats = upats
-                              , eqn_orig = FromSource
-                              , eqn_rhs = match_result }
-                    , rhss_deltas' ) }
+           -- pat_deltas is the covered set *after* matching the pattern, but
+           -- before any of the GRHSs. We extend the environment with pat_deltas
+           -- (via updPmDeltas) so that the where-clause of 'grhss' can profit
+           -- from that knowledge (#18533)
+           ; match_result <- updPmDeltas pat_deltas $
+                             dsGRHSs ctxt grhss rhs_ty rhss_deltas
+           ; return EqnInfo { eqn_pats = upats
+                            , eqn_orig = FromSource
+                            , eqn_rhs  = match_result } }
 
     handleWarnings = if isGenerated origin
                      then discardWarningsDs
                      else id
+
+    initDeltasMatches :: [LMatch GhcTc b] -> [(Deltas, NonEmpty Deltas)]
+    initDeltasMatches ms
+      = map (\(L _ m) -> (initDeltas, initDeltasGRHSs (m_grhss m))) ms
+
+    initDeltasGRHSs :: GRHSs GhcTc b -> NonEmpty Deltas
+    initDeltasGRHSs m = expectJust "GRHSs non-empty"
+                      $ NEL.nonEmpty
+                      $ replicate (length (grhssGRHSs m)) initDeltas
+
 
 matchEquations  :: HsMatchContext GhcRn
                 -> [MatchId] -> [EquationInfo] -> Type

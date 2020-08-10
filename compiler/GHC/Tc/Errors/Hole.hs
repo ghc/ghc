@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -778,7 +779,9 @@ tcFilterHoleFits limit typed_hole ht@(hole_ty, _) candidates =
                                            Just (dataConWrapId con, dataConNonlinearType con)
                                        _ -> Nothing }
             where name = case hfc of
+#if __GLASGOW_HASKELL__ <= 810
                            IdHFCand id -> idName id
+#endif
                            GreHFCand gre -> gre_name gre
                            NameHFCand name -> name
           discard_it = go subs seen maxleft ty elts

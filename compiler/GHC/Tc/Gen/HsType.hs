@@ -1078,7 +1078,9 @@ tc_hs_type mode rn_ty@(HsTupleTy _ hs_tup_sort tys) exp_kind
                   HsUnboxedTuple    -> UnboxedTuple
                   HsBoxedTuple      -> BoxedTuple
                   HsConstraintTuple -> ConstraintTuple
+#if __GLASGOW_HASKELL__ <= 810
                   _                 -> panic "tc_hs_type HsTupleTy"
+#endif
 
 tc_hs_type mode rn_ty@(HsSumTy _ hs_tys) exp_kind
   = do { let arity = length hs_tys

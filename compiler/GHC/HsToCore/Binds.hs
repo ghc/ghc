@@ -33,7 +33,7 @@ import {-# SOURCE #-}   GHC.HsToCore.Match ( matchWrapper )
 import GHC.HsToCore.Monad
 import GHC.HsToCore.GuardedRHSs
 import GHC.HsToCore.Utils
-import GHC.HsToCore.PmCheck ( addTyCsDs, checkGuardMatches )
+import GHC.HsToCore.PmCheck ( addTyCsDs, checkGRHSs )
 
 import GHC.Hs             -- lots of things
 import GHC.Core           -- lots of things
@@ -76,7 +76,6 @@ import GHC.Types.Unique.Set( nonDetEltsUniqSet )
 import GHC.Utils.Monad
 import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
-import Data.List.NonEmpty ( nonEmpty )
 
 {-**********************************************************************
 *                                                                      *
@@ -183,8 +182,8 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
 dsHsBind dflags (PatBind { pat_lhs = pat, pat_rhs = grhss
                          , pat_ext = NPatBindTc _ ty
                          , pat_ticks = (rhs_tick, var_ticks) })
-  = do  { rhss_deltas <- checkGuardMatches PatBindGuards grhss
-        ; body_expr <- dsGuarded grhss ty (nonEmpty rhss_deltas)
+  = do  { rhss_deltas <- checkGRHSs PatBindGuards grhss
+        ; body_expr <- dsGuarded grhss ty rhss_deltas
         ; let body' = mkOptTickBox rhs_tick body_expr
               pat'  = decideBangHood dflags pat
         ; (force_var,sel_binds) <- mkSelectorBinds var_ticks pat body'
