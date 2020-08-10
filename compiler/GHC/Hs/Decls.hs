@@ -126,6 +126,7 @@ import GHC.Core.Type
 import GHC.Data.Bag
 import GHC.Data.Maybe
 import Data.Data        hiding (TyCon,Fixity, Infix)
+import Data.Void
 
 {-
 ************************************************************************
@@ -1625,7 +1626,7 @@ or contexts in two parts:
 
 -- | Haskell data Constructor Declaration Details
 type HsConDeclDetails pass
-   = HsConDetails (HsScaled pass (LBangType pass)) (XRec pass [LConDeclField pass])
+   = HsConDetails Void (HsScaled pass (LBangType pass)) (XRec pass [LConDeclField pass])
 
 getConNames :: ConDecl GhcRn -> [Located Name]
 getConNames ConDeclH98  {con_name  = name}  = [name]
@@ -1635,7 +1636,7 @@ getConArgs :: ConDecl GhcRn -> HsConDeclDetails GhcRn
 getConArgs d = con_args d
 
 hsConDeclArgTys :: HsConDeclDetails (GhcPass p) -> [HsScaled (GhcPass p) (LBangType (GhcPass p))]
-hsConDeclArgTys (PrefixCon tys)    = tys
+hsConDeclArgTys (PrefixCon _ tys)  = tys
 hsConDeclArgTys (InfixCon ty1 ty2) = [ty1,ty2]
 hsConDeclArgTys (RecCon flds)      = map (hsLinear . cd_fld_type . unLoc) (unLoc flds)
   -- Remark: with the record syntax, constructors have all their argument
@@ -1716,8 +1717,8 @@ pprConDecl (ConDeclH98 { con_name = L _ con
     ppr_details (InfixCon t1 t2) = hsep [ppr (hsScaledThing t1),
                                          pprInfixOcc con,
                                          ppr (hsScaledThing t2)]
-    ppr_details (PrefixCon tys)  = hsep (pprPrefixOcc con
-                                   : map (pprHsType . unLoc . hsScaledThing) tys)
+    ppr_details (PrefixCon _ tys) = hsep (pprPrefixOcc con
+                                    : map (pprHsType . unLoc . hsScaledThing) tys)
     ppr_details (RecCon fields)  = pprPrefixOcc con
                                  <+> pprConDeclFields (unLoc fields)
     cxt = fromMaybe noLHsContext mcxt
@@ -1729,9 +1730,9 @@ pprConDecl (ConDeclGADT { con_names = cons, con_qvars = qvars
     <+> (sep [pprHsForAll (mkHsForAllInvisTele qvars) cxt,
               ppr_arrow_chain (get_args args ++ [ppr res_ty]) ])
   where
-    get_args (PrefixCon args) = map ppr args
-    get_args (RecCon fields)  = [pprConDeclFields (unLoc fields)]
-    get_args (InfixCon {})    = pprPanic "pprConDecl:GADT" (ppr cons)
+    get_args (PrefixCon _ args) = map ppr args
+    get_args (RecCon fields)    = [pprConDeclFields (unLoc fields)]
+    get_args (InfixCon {})      = pprPanic "pprConDecl:GADT" (ppr cons)
 
     cxt = fromMaybe noLHsContext mcxt
 

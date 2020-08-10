@@ -404,7 +404,7 @@ cvtDec (TH.PatSynD nm args dir pat)
        ; returnJustL $ Hs.ValD noExtField $ PatSynBind noExtField $
            PSB noExtField nm' args' pat' dir' }
   where
-    cvtArgs (TH.PrefixPatSyn args) = Hs.PrefixCon <$> mapM vNameL args
+    cvtArgs (TH.PrefixPatSyn args) = Hs.PrefixCon [] <$> mapM vNameL args
     cvtArgs (TH.InfixPatSyn a1 a2) = Hs.InfixCon <$> vNameL a1 <*> vNameL a2
     cvtArgs (TH.RecordPatSyn sels)
       = do { sels' <- mapM vNameL sels
@@ -571,7 +571,7 @@ cvtConstr :: TH.Con -> CvtM (LConDecl GhcPs)
 cvtConstr (NormalC c strtys)
   = do  { c'   <- cNameL c
         ; tys' <- mapM cvt_arg strtys
-        ; returnL $ mkConDeclH98 c' Nothing Nothing (PrefixCon (map hsLinear tys')) }
+        ; returnL $ mkConDeclH98 c' Nothing Nothing (PrefixCon [] (map hsLinear tys')) }
 
 cvtConstr (RecC c varstrtys)
   = do  { c'    <- cNameL c
@@ -619,7 +619,7 @@ cvtConstr (GadtC c strtys ty)
   = do  { c'      <- mapM cNameL c
         ; args    <- mapM cvt_arg strtys
         ; ty'     <- cvtType ty
-        ; returnL $ mk_gadt_decl c' (PrefixCon $ map hsLinear args) ty'}
+        ; returnL $ mk_gadt_decl c' (PrefixCon [] $ map hsLinear args) ty'}
 
 cvtConstr (RecGadtC [] _varstrtys _ty)
   = failWith (text "RecGadtC must have at least one constructor name")
@@ -1288,8 +1288,7 @@ cvtp (ConP s ts ps)    = do { s' <- cNameL s
                             ; return $ ConPat
                                 { pat_con_ext = noExtField
                                 , pat_con = s'
-                                , pat_ty_args = map mkHsPatSigType ts'
-                                , pat_args = PrefixCon pps
+                                , pat_args = PrefixCon (map mkHsPatSigType ts') pps
                                 }
                             }
 cvtp (InfixP p1 s p2)  = do { s' <- cNameL s; p1' <- cvtPat p1; p2' <- cvtPat p2
@@ -1297,7 +1296,6 @@ cvtp (InfixP p1 s p2)  = do { s' <- cNameL s; p1' <- cvtPat p1; p2' <- cvtPat p2
                               ConPat
                                 { pat_con_ext = NoExtField
                                 , pat_con = s'
-                                , pat_ty_args = []
                                 , pat_args = InfixCon
                                     (parenthesizePat opPrec p1')
                                     (parenthesizePat opPrec p2')
@@ -1318,7 +1316,6 @@ cvtp (RecP c fs)       = do { c' <- cNameL c; fs' <- mapM cvtPatFld fs
                             ; return $ ConPat
                                 { pat_con_ext = noExtField
                                 , pat_con = c'
-                                , pat_ty_args = []
                                 , pat_args = Hs.RecCon $ HsRecFields fs' Nothing
                                 }
                             }
@@ -1354,7 +1351,6 @@ cvtOpAppP x op y
        ; return $ ConPat
           { pat_con_ext = noExtField
           , pat_con = op'
-          , pat_ty_args = []
           , pat_args = InfixCon x y'
           }
        }

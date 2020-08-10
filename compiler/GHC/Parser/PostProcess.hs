@@ -568,14 +568,14 @@ mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
        ; return $ mkMatchGroup FromSource matches }
   where
     fromDecl (L loc decl@(ValD _ (PatBind _
-                         pat@(L _ (ConPat NoExtField ln@(L _ name) [] details))
+                         pat@(L _ (ConPat NoExtField ln@(L _ name) details))
                                rhs _))) =
         do { unless (name == patsyn_name) $
                wrongNameBindingErr loc decl
            ; match <- case details of
-               PrefixCon pats -> return $ Match { m_ext = noExtField
-                                                , m_ctxt = ctxt, m_pats = pats
-                                                , m_grhss = rhs }
+               PrefixCon _ pats -> return $ Match { m_ext = noExtField
+                                                  , m_ctxt = ctxt, m_pats = pats
+                                                  , m_grhss = rhs }
                    where
                      ctxt = FunRhs { mc_fun = ln
                                    , mc_fixity = Prefix
@@ -636,8 +636,7 @@ mkGadtDecl names ty = do
         = (RecCon (L loc rf), res_ty, [])
         | otherwise
         = let (arg_types, res_type, anns) = splitHsFunType body_ty
-          in (PrefixCon arg_types, res_type, anns)
-
+          in (PrefixCon [] arg_types, res_type, anns)
   pure ( ConDeclGADT { con_g_ext  = noExtField
                      , con_names  = names
                      , con_forall = L (getLoc ty) $ isJust mtvs
@@ -974,8 +973,7 @@ checkPat loc (L l e@(PatBuilderVar (L _ c))) tyargs args
   | isRdrDataCon c = return . L loc $ ConPat
       { pat_con_ext = noExtField
       , pat_con = L l c
-      , pat_ty_args = tyargs
-      , pat_args = PrefixCon args
+      , pat_args = PrefixCon tyargs args
       }
   | not (null args) && patIsRec c =
       add_hint SuggestRecursiveDo $
@@ -1022,7 +1020,6 @@ checkAPat loc e0 = do
          return $ ConPat
            { pat_con_ext = noExtField
            , pat_con = L cl c
-           , pat_ty_args = []
            , pat_args = InfixCon l r
            }
 
@@ -1580,7 +1577,6 @@ mkPatRec (unLoc -> PatBuilderVar c) (HsRecFields fs dd)
        return $ PatBuilderPat $ ConPat
          { pat_con_ext = noExtField
          , pat_con = c
-         , pat_ty_args = []
          , pat_args = RecCon (HsRecFields fs dd)
          }
 mkPatRec p _ =
@@ -1629,7 +1625,7 @@ dataConBuilderDetails (PrefixDataConBuilder flds _)
 
 -- Normal prefix constructor, e.g.  data T = MkT A B C
 dataConBuilderDetails (PrefixDataConBuilder flds _)
-  = PrefixCon (map hsLinear (toList flds))
+  = PrefixCon [] (map hsLinear (toList flds))
 
 -- Infix constructor, e.g. data T = Int :! Bool
 dataConBuilderDetails (InfixDataConBuilder lhs _ rhs)
