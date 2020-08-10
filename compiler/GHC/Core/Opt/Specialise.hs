@@ -1488,7 +1488,10 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                   | InlinePragma { inl_inline = Inlinable } <- inl_prag
                   = (inl_prag { inl_inline = NoUserInline }, noUnfolding)
 
-                  | InlinePragma { inl_inline = NoInline } <- inl_prag
+                  | InlinePragma { inl_inline = NoInline
+                                 -- Force neverInline for SPECIALIZABLE NOINLINE imported specializations
+                                 , inl_spec = Specializable
+                                 } <- inl_prag
                   = (neverInlinePragma, noUnfolding)
 
                   | otherwise
