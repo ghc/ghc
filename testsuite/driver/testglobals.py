@@ -115,6 +115,9 @@ class TestConfig:
         self.way_flags = {}  # type: Dict[WayName, List[str]]
         self.way_rts_flags = {}  # type: Dict[WayName, List[str]]
 
+        # Do we have a functional LLVM toolchain?
+        self.have_llvm = False
+
         # Do we have vanilla libraries?
         self.have_vanilla = False
 
