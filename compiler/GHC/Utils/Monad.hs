@@ -226,3 +226,113 @@ unlessM condM acc = do { cond <- condM
 filterOutM :: (Applicative m) => (a -> m Bool) -> [a] -> m [a]
 filterOutM p =
   foldr (\ x -> liftA2 (\ flg -> if flg then id else (x:)) (p x)) (pure [])
+
+{- Note [The one-shot state monad trick]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Summary: many places in GHC use a state monad, and we really want those
+functions to be eta-expanded (#18202).
+
+Consider
+
+    newtype M a = MkM (State -> R a)
+
+    instance Monad M where ...
+
+We use this kind of Monad to avoid having to explicitly pass a state. For
+example:
+
+   Instead of:    foo :: X -> State -> R a
+                  foo x state = ...
+
+   We can write:  fooM :: X -> M a
+                  fooM x = do
+                     ...
+                     state <- getState
+                     ...
+
+But using these monads has a side-effect: when we desugar "fooM" we don't get
+"foo" but something like (modulo newtype coercions):
+
+   fooM :: X -> (State -> R a)
+   fooM x = \state -> ...
+
+The arity of "foo" is 2 but the arity of "fooM" is 1! It means that the
+operational semantics is different:
+
+   foo 4    ===> partial application
+   foo 4 s  ===> call 'foo 4 s'
+
+   fooM 4   ===> call 'fooM 4' (allocate and return a function closure for (\state -> ...))
+   fooM 4 s ===> let fooM4 = call 'fooM 4'
+                 in call 'fooM4 s'
+
+"fooM" allocates a function closure! This has a cost which is only worth paying
+when the closure is expensive to build and is entered more than once. For
+example:
+
+   fooM x = let y = expensive x      -- "expensive x" is computed once (the first time "fooM x" is
+            in MkM (\s -> bar y s)   -- entered) and then shared for every invocation of the returned
+                                     -- "\s -> bar y s" closure.
+
+   foo x s = let y = expensive x     -- "expensive x" is computed every time "foo x s" is entered.
+             in bar y s              -- No closure is allocated for "bar y s".
+
+
+With state monads like M the general case is that we *aren't* reusing (M a)
+values so it is much more efficient to avoid allocating a function closure for
+them.
+
+So the state monad trick is a way to keep the monadic syntax but to make GHC
+eta-expand functions like `fooM` so that they are desugared into functions like
+`foo`. To do that we use the "oneShot" magic function.
+
+For example if we write:
+
+   fooM x = let y = expensive x
+            in MkM (oneShot (\s -> bar y s))
+
+GHC will basically desugar this into (modulo newtype coercions):
+
+   fooM x s = bar (expensive x) s
+
+
+Manually inserting `oneShot` would be an immense refactoring effort. So the
+second part of the trick is to define either a smart constructor or a pattern
+synonym.
+
+   -- smart constructor
+   mkM :: (State -> R a) -> MkM a
+   mkM f = MkM (oneShot f)
+
+   -- pattern synonym
+   data M a = MkM' (State -> R a) -- we rename the existing constructor.
+   pattern MkM f <- MkM' f        -- the pattern has the old constructor name.
+      where
+        MkM f = MkM' (oneShot f)
+
+The pattern synonym approach has the advantage of being very easy to implement,
+while the smart constructor approach may need more refactoring to replace direct
+uses of the constructor.
+
+One caveat of both approaches is that derived instances don't use the smart
+constructor or the pattern synonym. So they won't benefit from the automatic
+insertion of "oneShot".
+
+   data M a = MkM' (State -> R a)
+            deriving (Functor) <-- Functor implementation will use MkM'!
+
+Note the pattern synonym approach is very similar to the built-in "state hack"
+(see Note [The state-transformer hack] in "GHC.Core.Opt.Arity") but is
+applicable on a monad-by-monad basis under programmer control.
+
+One common caveat of all these hacks and tricks is that the default one-shot
+behaviour may be unexpected and multi-shot (shared) closures may have to be
+created explicitly. We don't provide a generic way to do this for now (cf #18238).
+
+See https://www.joachim-breitner.de/blog/763-Faster_Winter_5__Eta-Expanding_ReaderT
+for a very good explanation of the issue which led to these optimisations into GHC.
+The pattern synonym approach is due to Sebastian Graaf (#18238)
+
+-}
+
