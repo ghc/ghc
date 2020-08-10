@@ -931,8 +931,8 @@ tcPatToExpr name args pat = go pat
       exprs <- mapM go pats
       let psToWc :: HsPatSigType GhcRn -> LHsWcType GhcRn
           psToWc ps = HsWC (hsps_nwcs (hsps_ext ps)) (hsps_body ps)
-          con = foldl' (\x t -> HsAppType noExtField (L loc x) (psToWc t)) (HsVar noExtField lcon) tyargs
-      return (foldl' (\x y -> HsApp noExtField (L loc x) y) con exprs)
+          con = mkHsAppTypes (L loc (HsVar noExtField lcon)) (map psToWc tyargs)
+      return (unLoc $ mkHsApps con exprs)
 
     mkRecordConExpr :: Located Name
                     -> [HsPatSigType GhcRn]
