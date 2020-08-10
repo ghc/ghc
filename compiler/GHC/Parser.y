@@ -1961,7 +1961,7 @@ type :: { LHsType GhcPs }
 
         | btype '#->' ctype             {% hintLinear (getLoc $2) >>
                                          ams (sLL $1 $> $ HsFunTy noExtField HsLinearArrow $1 $3)
-                                             [mu AnnRarrow $2] }
+                                             [mu AnnLolly $2] }
 
 mult :: { LHsType GhcPs }
         : btype                  { $1 }
@@ -2089,10 +2089,10 @@ tv_bndrs :: { [LHsTyVarBndr Specificity GhcPs] }
 tv_bndr :: { LHsTyVarBndr Specificity GhcPs }
         : tv_bndr_no_braces             { $1 }
         | '{' tyvar '}'                 {% ams (sLL $1 $> (UserTyVar noExtField InferredSpec $2))
-                                               [mop $1, mcp $3] }
+                                               [moc $1, mcc $3] }
         | '{' tyvar '::' kind '}'       {% ams (sLL $1 $> (KindedTyVar noExtField InferredSpec $2 $4))
-                                               [mop $1,mu AnnDcolon $3
-                                               ,mcp $5] }
+                                               [moc $1,mu AnnDcolon $3
+                                               ,mcc $5] }
 
 tv_bndr_no_braces :: { LHsTyVarBndr Specificity GhcPs }
         : tyvar                         { sL1 $1 (UserTyVar noExtField SpecifiedSpec $1) }
@@ -3728,6 +3728,7 @@ isUnicode (L _ (ITcparenbar      iu)) = iu == UnicodeSyntax
 isUnicode (L _ (ITopenExpQuote _ iu)) = iu == UnicodeSyntax
 isUnicode (L _ (ITcloseQuote     iu)) = iu == UnicodeSyntax
 isUnicode (L _ (ITstar           iu)) = iu == UnicodeSyntax
+isUnicode (L _ (ITlolly          iu)) = iu == UnicodeSyntax
 isUnicode _                           = False
 
 hasE :: Located Token -> Bool
