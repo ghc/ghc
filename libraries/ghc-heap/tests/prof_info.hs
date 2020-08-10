@@ -38,7 +38,7 @@ main = do
                         assertEqual (cc_ccID myCostCentre) 1
                         assertEqual (cc_label myCostCentre) "MyCostCentre"
                         assertEqual (cc_module myCostCentre) "Main"
-                        assertEqual (cc_srcloc myCostCentre) (Just "prof_info.hs:26:39-50")
+                        assertEqual (cc_srcloc myCostCentre) (Just "prof_info.hs:21:39-50")
                         assertEqual (cc_mem_alloc myCostCentre) 0
                         assertEqual (cc_time_ticks myCostCentre) 0
                         assertEqual (cc_is_caf myCostCentre) False
