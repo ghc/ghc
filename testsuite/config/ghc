@@ -64,10 +64,6 @@ else:
 if (config.have_profiling and ghc_with_threaded_rts):
     config.run_ways.append('profthreaded')
 
-if (ghc_with_llvm and not config.unregisterised):
-    config.compile_ways.append('optllvm')
-    config.run_ways.append('optllvm')
-
 # WinIO I/O manager for Windows
 if windows:
     winio_ways = ['winio', 'winio_threaded']
@@ -194,6 +190,17 @@ def get_compiler_info():
     rtsInfoDict = dict(eval(s))
 
     config.have_ncg = compilerInfoDict.get("Have native code generator", "NO") == "YES"
+
+    # Detect whether an LLVM toolhain is available
+    llc_path = compilerInfoDict.get("LLVM llc command")
+    config.have_llvm = shutil.which(llc_path) is not None
+    if config.unregisterised:
+        print("Unregisterised build; skipping LLVM ways...")
+    elif config.have_llvm:
+        config.compile_ways.append('optllvm')
+        config.run_ways.append('optllvm')
+    else:
+        print("Failed to find `llc` command; skipping LLVM ways...")
 
     # Whether GHC itself was built using the LLVM backend. We need to know this
     # since some tests in ext-interp fail when stage2 ghc is built using
