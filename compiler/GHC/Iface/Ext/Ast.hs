@@ -69,6 +69,7 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Data                  ( Data, Typeable )
 import Data.List                  ( foldl1' )
+import Data.Void                  ( Void )
 import Control.Monad              ( forM_ )
 import Control.Monad.Trans.State.Strict
 import Control.Monad.Trans.Reader
@@ -579,6 +580,9 @@ class ToHie a where
 class HasType a where
   getTypeNode :: a -> HieM [HieAST Type]
 
+instance ToHie Void where
+  toHie _ = return []
+
 instance (ToHie a) => ToHie [a] where
   toHie = concatMapM toHie
 
@@ -863,7 +867,7 @@ instance HiePass p => ToHie (Located (PatSynBind (GhcPass p) (GhcPass p))) where
           varScope = mkLScope var
           patScope = mkScope $ getLoc pat
           detScope = case dets of
-            (PrefixCon args) -> foldr combineScopes NoScope $ map mkLScope args
+            (PrefixCon [] args) -> foldr combineScopes NoScope $ map mkLScope args
             (InfixCon a b) -> combineScopes (mkLScope a) (mkLScope b)
             (RecCon r) -> foldr go NoScope r
           go (RecordPatSynField a b) c = combineScopes c
@@ -871,7 +875,7 @@ instance HiePass p => ToHie (Located (PatSynBind (GhcPass p) (GhcPass p))) where
           detSpan = case detScope of
             LocalScope a -> Just a
             _ -> Nothing
-          toBind (PrefixCon args) = PrefixCon $ map (C Use) args
+          toBind (PrefixCon ts args) = PrefixCon ts $ map (C Use) args
           toBind (InfixCon a b) = InfixCon (C Use a) (C Use b)
           toBind (RecCon r) = RecCon $ map (PSC detSpan) r
 
@@ -940,14 +944,10 @@ instance HiePass p => ToHie (PScoped (Located (Pat (GhcPass p)))) where
       SumPat _ pat _ _ ->
         [ toHie $ PS rsp scope pscope pat
         ]
-      ConPat {pat_con = con, pat_ty_args = tyargs, pat_args = dets, pat_con_ext = ext} ->
+      ConPat {pat_con = con, pat_args = dets, pat_con_ext = ext} ->
         case hiePass @p of
           HieTc ->
             [ toHie $ C Use $ fmap conLikeName con
-            , concatM
-                [ toHie $ TS (ResolvedScopes [scope, pscope]) sig
-                | sig <- tyargs
-                ]
             , toHie $ contextify dets
             , let ev_binds = cpt_binds ext
                   ev_vars = cpt_dicts ext
@@ -997,9 +997,10 @@ instance HiePass p => ToHie (PScoped (Located (Pat (GhcPass p)))) where
           HieRn -> []
 #endif
     where
-      contextify :: a ~ LPat (GhcPass p) => HsConDetails a (HsRecFields (GhcPass p) a)
-                 -> HsConDetails (PScoped a) (RContext (HsRecFields (GhcPass p) (PScoped a)))
-      contextify (PrefixCon args) = PrefixCon $ patScopes rsp scope pscope args
+      contextify :: a ~ LPat (GhcPass p) => HsConDetails (HsPatSigType (NoGhcTc (GhcPass p))) a (HsRecFields (GhcPass p) a)
+                 -> HsConDetails (TScoped (HsPatSigType (NoGhcTc (GhcPass p)))) (PScoped a) (RContext (HsRecFields (GhcPass p) (PScoped a)))
+      contextify (PrefixCon tyargs args) = PrefixCon (map tyScope tyargs) (patScopes rsp scope pscope args)
+        where tyScope t = TS (ResolvedScopes [scope, pscope]) t
       contextify (InfixCon a b) = InfixCon a' b'
         where [a', b'] = patScopes rsp scope pscope [a,b]
       contextify (RecCon r) = RecCon $ RC RecFieldMatch $ contextify_rec r
@@ -1321,8 +1322,8 @@ instance HiePass p => ToHie (RScoped (ApplicativeArg (GhcPass p))) where
     , toHie $ PS Nothing sc NoScope pat
     ]
 
-instance (ToHie arg, ToHie rec) => ToHie (HsConDetails arg rec) where
-  toHie (PrefixCon args) = toHie args
+instance (ToHie tyarg, ToHie arg, ToHie rec) => ToHie (HsConDetails tyarg arg rec) where
+  toHie (PrefixCon tyargs args) = concatM [ toHie tyargs, toHie args ]
   toHie (RecCon rec) = toHie rec
   toHie (InfixCon a b) = concatM [ toHie a, toHie b]
 
@@ -1561,7 +1562,7 @@ instance ToHie (Located (ConDecl GhcRn)) where
           argsScope = condecl_scope dets
     where condecl_scope :: HsConDeclDetails (GhcPass p) -> Scope
           condecl_scope args = case args of
-            PrefixCon xs -> foldr combineScopes NoScope $ map (mkLScope . hsScaledThing) xs
+            PrefixCon _ xs -> foldr combineScopes NoScope $ map (mkLScope . hsScaledThing) xs
             InfixCon a b -> combineScopes (mkLScope (hsScaledThing a))
                                           (mkLScope (hsScaledThing b))
             RecCon x -> mkLScope x

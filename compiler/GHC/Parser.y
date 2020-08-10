@@ -1492,7 +1492,7 @@ pattern_synonym_decl :: { LHsDecl GhcPs }
                    }}
 
 pattern_synonym_lhs :: { (Located RdrName, HsPatSynDetails (Located RdrName), [AddAnn]) }
-        : con vars0 { ($1, PrefixCon $2, []) }
+        : con vars0 { ($1, PrefixCon [] $2, []) }
         | varid conop varid { ($2, InfixCon $1 $3, []) }
         | con '{' cvars1 '}' { ($1, RecCon $3, [moc $2, mcc $4] ) }
 
