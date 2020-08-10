@@ -891,6 +891,11 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_scaled ty_arg_types ty_a
               (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _)
                 = dataConFullSig data_con
               header = L con_span (RealDataCon data_con)
+          -- Constructor type applications are not allowed in pattern bindings. Nothing would really go wrong with this,
+          -- but the bound variables would only scope over the body of the definition unlike the rest of the variables
+          -- bound by the pattern, so we disallow it.
+        ; failIfTc (inPatBind penv && not (null ty_arg_pats)) $
+            text "Type applications on constructor patterns are not allowed in pattern bindings."
 
           -- Instantiate the constructor type variables [a->ty]
           -- This may involve doing a family-instance coercion,
