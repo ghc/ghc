@@ -212,7 +212,7 @@ subordinates instMap decl = case decl of
 -- | Extract constructor argument docs from inside constructor decls.
 conArgDocs :: ConDecl GhcRn -> Map Int (HsDocString)
 conArgDocs con = case getConArgs con of
-                   PrefixCon args -> go 0 (map (unLoc . hsScaledThing) args ++ ret)
+                   PrefixCon _ args -> go 0 (map (unLoc . hsScaledThing) args ++ ret)
                    InfixCon arg1 arg2 -> go 0 ([unLoc (hsScaledThing arg1),
                                                 unLoc (hsScaledThing arg2)] ++ ret)
                    RecCon _ -> go 1 ret
