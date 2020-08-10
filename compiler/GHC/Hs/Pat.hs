@@ -845,8 +845,10 @@ patNeedsParens p = go
     go (SigPat {})       = p >= sigPrec
     go (ViewPat {})      = True
     go (XPat ext)        = case ghcPass @p of
+#if __GLASGOW_HASKELL__ <= 810
       GhcPs -> noExtCon ext
       GhcRn -> noExtCon ext
+#endif
       GhcTc -> go inner
         where CoPat _ inner _ = ext
     go (WildPat {})      = False

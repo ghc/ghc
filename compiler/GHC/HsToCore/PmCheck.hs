@@ -13,7 +13,7 @@ Pattern Matching Coverage Checking.
 
 module GHC.HsToCore.PmCheck (
         -- Checking and printing
-        checkSingle, checkMatches, checkGuardMatches,
+        checkSingle, checkMatches, checkGRHSs,
         isMatchContextPmChecked,
 
         -- See Note [Type and Term Equality Propagation]
@@ -65,6 +65,7 @@ import GHC.Utils.Monad (concatMapM)
 import Control.Monad (when, forM_, zipWithM)
 import Data.List (elemIndex)
 import qualified Data.Semigroup as Semi
+import Data.List.NonEmpty (NonEmpty(..))
 
 {-
 This module checks pattern matches for:
@@ -149,13 +150,11 @@ data GrdTree
   -- ^ @Guard grd t@ will try to match @grd@ and on success continue to match
   -- @t@. Falls through if either match fails. Models left-to-right semantics
   -- of pattern matching.
-  | Sequence !GrdTree !GrdTree
-  -- ^ @Sequence l r@ first matches against @l@, and then matches all
-  -- fallen-through values against @r@. Models top-to-bottom semantics of
-  -- pattern matching.
-  | Empty
-  -- ^ A @GrdTree@ that always fails. Most useful for
-  -- Note [Checking EmptyCase]. A neutral element to 'Sequence'.
+  | Sequence ![GrdTree]
+  -- ^ @Sequence (t:ts)@ matches against @t@, and then matches all
+  -- fallen-through values against @Sequence ts@. Models top-to-bottom semantics
+  -- of pattern matching.
+  -- @Sequence []@ always fails; it is useful for Note [Checking EmptyCase].
 
 -- | The digest of 'checkGrdTree', representing the annotated pattern-match
 -- tree. 'redundantAndInaccessibleRhss' can figure out redundant and proper
@@ -169,10 +168,10 @@ data AnnotatedTree
   | MayDiverge !AnnotatedTree
   -- ^ Asserts that the tree may force diverging values, so not all of its
   -- clauses can be redundant.
-  | SequenceAnn !AnnotatedTree !AnnotatedTree
-  -- ^ Mirrors 'Sequence' for preserving the skeleton of a 'GrdTree's.
-  | EmptyAnn
-  -- ^ Mirrors 'Empty' for preserving the skeleton of a 'GrdTree's.
+  | SequenceAnn !Deltas ![AnnotatedTree]
+  -- ^ @SequenceAnn inc ts@ mirrors @'Sequence' ts@ for preserving the
+  -- skeleton of a 'GrdTree's @ts@. It also carries the set of incoming values
+  -- @inc@.
 
 pprRhsInfo :: RhsInfo -> SDoc
 pprRhsInfo (L (RealSrcSpan rss _) _) = ppr (srcSpanStartLine rss)
@@ -188,23 +187,15 @@ instance Outputable GrdTree where
       collect_grds t             = (t, [])
       prefix []                  = []
       prefix (s:sdocs)           = char '|' <+> s : map (comma <+>) sdocs
-  -- Format nested Sequences in blocks "{ grds1; grds2; ... }"
-  ppr t@Sequence{}    = braces (space <> fsep (punctuate semi (collect_seqs t)) <> space)
-    where
-      collect_seqs (Sequence l r) = collect_seqs l ++ collect_seqs r
-      collect_seqs t              = [ppr t]
-  ppr Empty          = text "<empty case>"
+  ppr (Sequence [])   = text "<empty case>"
+  ppr (Sequence ts)   = braces (space <> fsep (punctuate semi (map ppr ts)) <> space)
 
 instance Outputable AnnotatedTree where
-  ppr (AccessibleRhs _ info) = pprRhsInfo info
+  ppr (AccessibleRhs _delta info) = parens (ppr _delta) <+> pprRhsInfo info
   ppr (InaccessibleRhs info) = text "inaccessible" <+> pprRhsInfo info
   ppr (MayDiverge t)         = text "div" <+> ppr t
-    -- Format nested Sequences in blocks "{ grds1; grds2; ... }"
-  ppr t@SequenceAnn{}        = braces (space <> fsep (punctuate semi (collect_seqs t)) <> space)
-    where
-      collect_seqs (SequenceAnn l r) = collect_seqs l ++ collect_seqs r
-      collect_seqs t                 = [ppr t]
-  ppr EmptyAnn               = text "<empty case>"
+  ppr (SequenceAnn _ [])       = text "<empty case>"
+  ppr (SequenceAnn _ ts)       = braces (space <> fsep (punctuate semi (map ppr ts)) <> space)
 
 -- | Lift 'addPmCts' over 'Deltas'.
 addPmCtsDeltas :: Deltas -> PmCts -> DsM Deltas
@@ -263,7 +254,7 @@ checkSingle dflags ctxt@(DsMatchContext kind locn) var p = do
   -- Omitting checking this flag emits redundancy warnings twice in obscure
   -- cases like #17646.
   when (exhaustive dflags kind) $ do
-    -- TODO: This could probably call checkMatches, like checkGuardMatches.
+    -- TODO: This could probably call checkMatches, like checkGRHSs.
     missing   <- getPmDeltas
     tracePm "checkSingle: missing" (ppr missing)
     fam_insts <- dsGetFamInstEnvs
@@ -273,12 +264,12 @@ checkSingle dflags ctxt@(DsMatchContext kind locn) var p = do
 
 -- | Exhaustive for guard matches, is used for guards in pattern bindings and
 -- in @MultiIf@ expressions. Returns the 'Deltas' covered by the RHSs.
-checkGuardMatches
+checkGRHSs
   :: HsMatchContext GhcRn         -- ^ Match context, for warning messages
   -> GRHSs GhcTc (LHsExpr GhcTc)  -- ^ The GRHSs to check
-  -> DsM [Deltas]                 -- ^ Covered 'Deltas' for each RHS, for long
+  -> DsM (NonEmpty Deltas)        -- ^ Covered 'Deltas' for each RHS, for long
                                   --   distance info
-checkGuardMatches hs_ctx guards@(GRHSs _ grhss _) = do
+checkGRHSs hs_ctx guards@(GRHSs _ grhss _) = do
     let combinedLoc = foldl1 combineSrcSpans (map getLoc grhss)
         dsMatchContext = DsMatchContext hs_ctx combinedLoc
         match = L combinedLoc $
@@ -286,7 +277,8 @@ checkGuardMatches hs_ctx guards@(GRHSs _ grhss _) = do
                         , m_ctxt = hs_ctx
                         , m_pats = []
                         , m_grhss = guards }
-    checkMatches dsMatchContext [] [match]
+    [(_, deltas)] <- checkMatches dsMatchContext [] [match]
+    pure deltas
 
 -- | Check a list of syntactic /match/es (part of case, functions, etc.), each
 -- with a /pat/ and one or more /grhss/:
@@ -305,10 +297,9 @@ checkMatches
   :: DsMatchContext                  -- ^ Match context, for warnings messages
   -> [Id]                            -- ^ Match variables, i.e. x and y above
   -> [LMatch GhcTc (LHsExpr GhcTc)]  -- ^ List of matches
-  -> DsM [Deltas]                    -- ^ One covered 'Deltas' per RHS, for long
+  -> DsM [(Deltas, NonEmpty Deltas)] -- ^ One covered 'Deltas' per RHS, for long
                                      --   distance info.
 checkMatches ctxt vars matches = do
-  dflags <- getDynFlags
   tracePm "checkMatches" (hang (vcat [ppr ctxt
                                , ppr vars
                                , text "Matches:"])
@@ -321,25 +312,45 @@ checkMatches ctxt vars matches = do
     [] | [var] <- vars -> addPmCtDeltas init_deltas (PmNotBotCt var)
     _                  -> pure init_deltas
   fam_insts <- dsGetFamInstEnvs
-  grd_tree  <- mkGrdTreeMany [] <$> mapM (translateMatch fam_insts vars) matches
+  grd_tree  <- translateMatches fam_insts vars matches
   res <- checkGrdTree grd_tree missing
 
+  dflags <- getDynFlags
   dsPmWarn dflags ctxt vars res
 
-  return (extractRhsDeltas init_deltas (cr_clauses res))
+  return (extractRhsDeltas (cr_clauses res))
 
--- | Extract the 'Deltas' reaching the RHSs of the 'AnnotatedTree'.
+-- | Extract the 'Deltas' reaching the RHSs of the 'AnnotatedTree' for a match
+-- group.
 -- For 'AccessibleRhs's, this is stored in the tree node, whereas
 -- 'InaccessibleRhs's fall back to the supplied original 'Deltas'.
 -- See @Note [Recovering from unsatisfiable pattern-matching constraints]@.
-extractRhsDeltas :: Deltas -> AnnotatedTree -> [Deltas]
-extractRhsDeltas orig_deltas = fromOL . go
+extractRhsDeltas :: AnnotatedTree -> [(Deltas, NonEmpty Deltas)]
+extractRhsDeltas = go_matches
   where
-    go (AccessibleRhs deltas _) = unitOL deltas
-    go (InaccessibleRhs _)      = unitOL orig_deltas
-    go (MayDiverge t)           = go t
-    go (SequenceAnn l r)        = go l Semi.<> go r
-    go EmptyAnn                 = nilOL
+    go_matches :: AnnotatedTree -> [(Deltas, NonEmpty Deltas)]
+    go_matches (SequenceAnn def ts) = map (go_match def) ts -- -XEmptyCase handled here!
+    go_matches t                    = pprPanic "extractRhsDeltas.go_matches" (text "Matches must start with SequenceAnn. But was" $$ ppr t)
+
+    go_match :: Deltas -> AnnotatedTree -> (Deltas, NonEmpty Deltas)
+    -- There is no -XEmptyCase at this level, only at the Matches level. So @ts@
+    -- is non-empty!
+    go_match def (SequenceAnn pat ts) = (pat, foldMap1 (text "go_match: empty SequenceAnn") (go_grhss def) ts)
+    go_match def (MayDiverge t)       = go_match def t
+    -- Even if there's only a single GRHS, we wrap it in a SequenceAnn for the
+    -- Deltas covered by the pattern. So the remaining cases are impossible!
+    go_match _   t                    = pprPanic "extractRhsDeltas.go_match" (text "Single GRHS must be wrapped in SequenceAnn. But got " $$ ppr t)
+
+    go_grhss :: Deltas -> AnnotatedTree -> NonEmpty Deltas
+    -- There is no -XEmptyCase at this level, only at the Matches level. So @ts@
+    -- is non-empty!
+    go_grhss def (SequenceAnn _ ts)       = foldMap1 (text "go_grhss: empty SequenceAnn") (go_grhss def) ts
+    go_grhss def (MayDiverge t)           = go_grhss def t
+    go_grhss _   (AccessibleRhs deltas _) = deltas :| []
+    go_grhss def (InaccessibleRhs _)      = def    :| []
+
+    foldMap1 msg _ []     = pprPanic "extractRhsDeltas.foldMap1" msg
+    foldMap1 _   f (x:xs) = foldl' (\acc x -> acc Semi.<> f x) (f x) xs
 
 {- Note [Checking EmptyCase]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -628,34 +639,43 @@ translateConPatOut fam_insts x con univ_tys ex_tvs dicts = \case
       --      1.         2.           3.
       pure (con_grd : bang_grds ++ arg_grds)
 
-mkGrdTreeRhs :: Located SDoc -> GrdVec -> GrdTree
-mkGrdTreeRhs sdoc = foldr Guard (Rhs sdoc)
-
-mkGrdTreeMany :: GrdVec -> [GrdTree] -> GrdTree
-mkGrdTreeMany _    []    = Empty
-mkGrdTreeMany grds trees = foldr Guard (foldr1 Sequence trees) grds
+-- | Translate a the 'Match'es of a 'MatchGroup'
+translateMatches :: FamInstEnvs -> [Id] -> [LMatch GhcTc (LHsExpr GhcTc)]
+                 -> DsM GrdTree
+translateMatches fam_insts vars matches =
+  -- It's important that we wrap a 'Sequence' even if it only wraps a singleton.
+  -- 'extractRhsDeltas' needs this to recover 'MatchGroup' structure.
+  Sequence <$> traverse (translateMatch fam_insts vars) matches
 
 -- Translate a single match
 translateMatch :: FamInstEnvs -> [Id] -> LMatch GhcTc (LHsExpr GhcTc)
                -> DsM GrdTree
 translateMatch fam_insts vars (L match_loc (Match { m_pats = pats, m_grhss = grhss })) = do
-  pats'   <- concat <$> zipWithM (translateLPat fam_insts) vars pats
-  grhss' <- mapM (translateLGRHS fam_insts match_loc pats) (grhssGRHSs grhss)
-  -- tracePm "translateMatch" (vcat [ppr pats, ppr pats', ppr grhss, ppr grhss'])
-  return (mkGrdTreeMany pats' grhss')
+  pats'  <- concat <$> zipWithM (translateLPat fam_insts) vars pats
+  grhss' <- translateGRHSs fam_insts match_loc (sep (map ppr pats)) grhss
+  -- tracePm "translateMatch" (vcat [ppr pats, ppr pats', ppr grhss'])
+  return (foldr Guard grhss' pats')
 
--- -----------------------------------------------------------------------
--- * Transform source guards (GuardStmt Id) to simpler PmGrds
+mkGrdTreeRhs :: Located SDoc -> GrdVec -> GrdTree
+mkGrdTreeRhs sdoc = foldr Guard (Rhs sdoc)
+
+translateGRHSs :: FamInstEnvs -> SrcSpan -> SDoc -> GRHSs GhcTc (LHsExpr GhcTc) -> DsM GrdTree
+translateGRHSs fam_insts match_loc pp_pats grhss =
+  -- It's important that we wrap a 'Sequence' even if it only wraps a singleton.
+  -- 'extractRhsDeltas' needs this to recover 'GRHSs' structure.
+  Sequence <$> traverse (translateLGRHS fam_insts match_loc pp_pats) (grhssGRHSs grhss)
 
 -- | Translate a guarded right-hand side to a single 'GrdTree'
-translateLGRHS :: FamInstEnvs -> SrcSpan -> [LPat GhcTc] -> LGRHS GhcTc (LHsExpr GhcTc) -> DsM GrdTree
-translateLGRHS fam_insts match_loc pats (L _loc (GRHS _ gs _)) =
-  -- _loc apparently points to the match separator that comes after the guards..
+translateLGRHS :: FamInstEnvs -> SrcSpan -> SDoc -> LGRHS GhcTc (LHsExpr GhcTc) -> DsM GrdTree
+translateLGRHS fam_insts match_loc pp_pats (L _loc (GRHS _ gs _)) =
+  -- _loc points to the match separator (ie =, ->) that comes after the guards..
   mkGrdTreeRhs loc_sdoc <$> concatMapM (translateGuard fam_insts . unLoc) gs
     where
       loc_sdoc
-        | null gs   = L match_loc (sep (map ppr pats))
-        | otherwise = L grd_loc   (sep (map ppr pats) <+> vbar <+> interpp'SP gs)
+        -- pp_pats is the space-separated pattern of the current Match this
+        -- GRHS belongs to, so the @A B x@ part in @A B x | 0 <- x@.
+        | null gs   = L match_loc pp_pats
+        | otherwise = L grd_loc   (pp_pats <+> vbar <+> interpp'SP gs)
       L grd_loc _ = head gs
 
 -- | Translate a guard statement to a 'GrdVec'
@@ -970,6 +990,7 @@ checkGrdTree' (Guard (PmCon x con tvs dicts args) tree) deltas = do
   unc_this <- addPmCtDeltas deltas (PmNotConCt x con)
   deltas' <- addPmCtsDeltas deltas $
     listToBag (PmTyCt . evVarPred <$> dicts) `snocBag` PmConCt x con tvs args
+  -- tracePm "checkGrdTree:Con" (ppr deltas $$ ppr x $$ ppr con $$ ppr dicts $$ ppr deltas')
   CheckResult tree' unc_inner prec <- checkGrdTree' tree deltas'
   limit <- maxPmCheckModels <$> getDynFlags
   let (prec', unc') = throttle limit deltas (unc_this Semi.<> unc_inner)
@@ -978,19 +999,21 @@ checkGrdTree' (Guard (PmCon x con tvs dicts args) tree) deltas = do
     , cr_uncov = unc'
     , cr_approx = prec Semi.<> prec' }
 -- Sequence: Thread residual uncovered sets from equation to equation
-checkGrdTree' (Sequence l r) unc_0 = do
-  CheckResult l' unc_1 prec_l <- checkGrdTree' l unc_0
-  CheckResult r' unc_2 prec_r <- checkGrdTree' r unc_1
-  pure CheckResult
-    { cr_clauses = SequenceAnn l' r'
-    , cr_uncov = unc_2
-    , cr_approx = prec_l Semi.<> prec_r }
--- Empty: Fall through for all values
-checkGrdTree' Empty unc = do
-  pure CheckResult
-    { cr_clauses = EmptyAnn
-    , cr_uncov = unc
-    , cr_approx = Precise }
+checkGrdTree' (Sequence ts) init_unc = go [] init_unc Precise ts
+  where
+    -- | Accumulates a CheckResult. Its type is more like
+    -- @CheckResult -> [GrdTree] -> CheckResult@, but cr_clauses is a single
+    -- 'AnnotatedTree', not a list thereof. Hence 3 parameters to thread the
+    -- fields.
+    go :: [AnnotatedTree] -> Deltas -> Precision -> [GrdTree] -> DsM CheckResult
+    -- No cases left: Fall through for all values
+    go ts' unc prec [] = pure CheckResult
+                          { cr_clauses = SequenceAnn init_unc (reverse ts')
+                          , cr_uncov = unc
+                          , cr_approx = prec }
+    go ts' unc prec (t:ts) = do
+      CheckResult t' unc_1 prec_t <- checkGrdTree' t unc
+      go (t':ts') unc_1 (prec_t Semi.<> prec) ts
 
 -- | Print diagnostic info and actually call 'checkGrdTree''.
 checkGrdTree :: GrdTree -> Deltas -> DsM CheckResult
@@ -1116,8 +1139,7 @@ redundantAndInaccessibleRhss tree = (fromOL ol_red, fromOL ol_inacc)
       (acc, inacc, red)
         | isNilOL acc && isNilOL inacc -> (nilOL, red, nilOL)
       res                              -> res
-    go (SequenceAnn l r)      = go l Semi.<> go r
-    go EmptyAnn               = (nilOL,       nilOL, nilOL)
+    go (SequenceAnn _ ts)     = foldMap go ts
 
 {- Note [Determining inaccessible clauses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
