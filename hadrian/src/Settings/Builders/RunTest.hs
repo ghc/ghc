@@ -70,7 +70,6 @@ runTestBuilderArgs = builder RunTest ? do
     withSMP             <- getBooleanSetting TestGhcWithSMP
     debugged            <- getBooleanSetting TestGhcDebugged
     keepFiles           <- expr (testKeepFiles <$> userSetting defaultTestArgs)
-    withLlvm            <- expr (not . null <$> settingsFileSetting SettingsFileSetting_LlcCommand)
 
     accept <- expr (testAccept <$> userSetting defaultTestArgs)
     (acceptPlatform, acceptOS) <- expr . liftIO $
@@ -125,8 +124,6 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "-e", arg $ asBool "config.have_profiling=" (hasLibWay profiling)
             , arg "-e", arg $ asBool "config.have_fast_bignum=" (bignumBackend /= "native" && not bignumCheck)
             , arg "-e", arg $ asBool "ghc_with_smp=" withSMP
-            , arg "-e", arg $ asBool "ghc_with_llvm=" withLlvm
-
 
             , arg "-e", arg $ "config.ghc_dynamic_by_default=" ++ show hasDynamicByDefault
             , arg "-e", arg $ "config.ghc_dynamic=" ++ show hasDynamic
