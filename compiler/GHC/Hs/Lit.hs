@@ -223,7 +223,7 @@ instance Ord OverLitVal where
   compare (HsFractional f1)   (HsFractional f2)   = f1 `compare` f2
   compare (HsFractional _)    (HsIntegral   _)    = GT
   compare (HsFractional _)    (HsIsString _ _)    = LT
-  compare (HsIsString _ s1)   (HsIsString _ s2)   = s1 `compare` s2
+  compare (HsIsString _ s1)   (HsIsString _ s2)   = s1 `uniqCompareFS` s2
   compare (HsIsString _ _)    (HsIntegral   _)    = GT
   compare (HsIsString _ _)    (HsFractional _)    = GT
 
