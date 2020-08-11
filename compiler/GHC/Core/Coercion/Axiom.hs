@@ -568,7 +568,7 @@ instance Eq CoAxiomRule where
   x == y = coaxrName x == coaxrName y
 
 instance Ord CoAxiomRule where
-  compare x y = compare (coaxrName x) (coaxrName y)
+  compare x y = uniqCompareFS (coaxrName x) (coaxrName y)
 
 instance Outputable CoAxiomRule where
   ppr = ppr . coaxrName

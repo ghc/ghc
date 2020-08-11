@@ -150,7 +150,15 @@ data RealSrcLoc
   = SrcLoc      FastString              -- A precise location (file name)
                 {-# UNPACK #-} !Int     -- line number, begins at 1
                 {-# UNPACK #-} !Int     -- column number, begins at 1
-  deriving (Eq, Ord)
+  deriving (Eq)
+
+instance Ord RealSrcLoc where
+   compare (SrcLoc fs1 l1 c1) (SrcLoc fs2 l2 c2)
+      = mconcat
+         [ uniqCompareFS fs1 fs2 -- we compare FastStrings with their Unique
+         , compare l1 l2         -- for performance so they are not sorted
+         , compare c1 c2         -- lexicographically
+         ]
 
 -- | 0-based offset identifying the raw location in the 'StringBuffer'.
 --

@@ -342,7 +342,7 @@ enrichHie ts (hsGrp, imports, exports, _) ev_bs insts tcs =
           , exps
           ]
 
-        modulify file xs' = do
+        modulify (FilePathFS file) xs' = do
 
           top_ev_asts <-
             toHie $ EvBindContext ModuleScope Nothing
@@ -368,7 +368,7 @@ enrichHie ts (hsGrp, imports, exports, _) ev_bs insts tcs =
     asts' <- sequence
           $ M.mapWithKey modulify
           $ M.fromListWith (++)
-          $ map (\x -> (srcSpanFile (nodeSpan x),[x])) flat_asts
+          $ map (\x -> (FilePathFS (srcSpanFile (nodeSpan x)),[x])) flat_asts
 
     let asts = HieASTs $ resolveTyVarScopes asts'
     return asts

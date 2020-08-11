@@ -74,6 +74,8 @@ module GHC.Data.FastString
         consFS,
         nilFS,
         isUnderscoreFS,
+        lexicalCompareFS,
+        uniqCompareFS,
 
         -- ** Outputting
         hPutFS,
@@ -196,17 +198,12 @@ data FastString = FastString {
 instance Eq FastString where
   f1 == f2  =  uniq f1 == uniq f2
 
-instance Ord FastString where
-    -- Compares lexicographically, not by unique
-    a <= b = case cmpFS a b of { LT -> True;  EQ -> True;  GT -> False }
-    a <  b = case cmpFS a b of { LT -> True;  EQ -> False; GT -> False }
-    a >= b = case cmpFS a b of { LT -> False; EQ -> True;  GT -> True  }
-    a >  b = case cmpFS a b of { LT -> False; EQ -> False; GT -> True  }
-    max x y | x >= y    =  x
-            | otherwise =  y
-    min x y | x <= y    =  x
-            | otherwise =  y
-    compare a b = cmpFS a b
+-- We don't provide any "Ord FastString" instance to force you to think about
+-- which ordering you want: lexical or by unique (respectively lexicalCompareFS
+-- and uniqCompareFS). Ordering by Unique may not be deterministic.
+--
+-- You can still wrap FastString into a newtype to provide an Ord instance for
+-- your specific use of FastString.
 
 instance IsString FastString where
     fromString = fsLit
@@ -231,12 +228,20 @@ instance Data FastString where
 instance NFData FastString where
   rnf fs = seq fs ()
 
--- | Compare FastString lexicographically
-cmpFS :: FastString -> FastString -> Ordering
-cmpFS fs1 fs2 =
+-- | Compare FastString lexically
+--
+-- If you don't care about the lexical ordering, use `uniqCompareFS` instead.
+lexicalCompareFS :: FastString -> FastString -> Ordering
+lexicalCompareFS fs1 fs2 =
   if uniq fs1 == uniq fs2 then EQ else
   compare (unpackFS fs1) (unpackFS fs2)
   -- compare as String, not as ShortByteString (cf #18562)
+
+-- | Compare FastString by their Unique (not lexically).
+--
+-- Much cheaper than `lexicalCompareFS`.
+uniqCompareFS :: FastString -> FastString -> Ordering
+uniqCompareFS fs1 fs2 = compare (uniq fs1) (uniq fs2)
 
 -- -----------------------------------------------------------------------------
 -- Construction

@@ -96,11 +96,11 @@ mapUnitInfo f gunitFS = mapGenericUnitInfo
 --       feature, but ghc doesn't currently have convenient support for any
 --       other compact string types, e.g. plain ByteString or Text.
 
-newtype PackageId   = PackageId    FastString deriving (Eq, Ord)
+newtype PackageId   = PackageId    FastString deriving (Eq)
 newtype PackageName = PackageName
    { unPackageName :: FastString
    }
-   deriving (Eq, Ord)
+   deriving (Eq)
 
 instance Uniquable PackageId where
   getUnique (PackageId n) = getUnique n
