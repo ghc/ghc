@@ -69,7 +69,7 @@ import GHC.Data.Maybe
 import GHC.Data.Bag
 import GHC.Utils.Misc
 import Data.List
-import Data.Ord
+import Data.Function    ( on )
 import Control.Monad    ( guard )
 
 {-
@@ -271,7 +271,7 @@ pprRulesForUser :: [CoreRule] -> SDoc
 pprRulesForUser rules
   = withPprStyle defaultUserStyle $
     pprRules $
-    sortBy (comparing ruleName) $
+    sortBy (lexicalCompareFS `on` ruleName) $
     tidyRules emptyTidyEnv rules
 
 {-
