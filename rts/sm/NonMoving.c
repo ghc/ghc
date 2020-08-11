@@ -725,6 +725,7 @@ void nonmovingInit(void)
         nonmovingHeap.allocators[i] = alloc_nonmoving_allocator(n_capabilities);
     }
     nonmovingMarkInitUpdRemSet();
+    nonmovingInitMarkState();
 }
 
 // Stop any nonmoving collection in preparation for RTS shutdown.
@@ -926,9 +927,9 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
     ASSERT(nonmoving_marked_compact_objects == NULL);
     ASSERT(n_nonmoving_marked_compact_blocks == 0);
 
-    MarkQueue *mark_queue = stgMallocBytes(sizeof(MarkQueue), "mark queue");
-    initMarkQueue(mark_queue);
-    current_mark_queue = mark_queue;
+    // First initialize a MarkQueue for the leader thread:
+    startMarkThreads(1);
+    MarkQueue *mark_queue = mark_state.queues[0];
 
     // Mark roots
     trace(TRACE_nonmoving_gc, "Marking roots for nonmoving GC");
@@ -992,6 +993,8 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
                            nonmovingConcurrentMark, mark_queue) != 0) {
             barf("nonmovingCollect: failed to spawn mark thread: %s", strerror(errno));
         }
+        // Start the mark worker threads...
+        startMarkThreads(3);
     } else {
         nonmovingConcurrentMark(mark_queue);
     }
@@ -1009,7 +1012,7 @@ static void nonmovingMarkThreadsWeaks(MarkQueue *mark_queue)
 {
     while (true) {
         // Propagate marks
-        nonmovingMark(mark_queue);
+        nonmovingMarkLeader();
 
         // Tidy threads and weaks
         nonmovingTidyThreads();
@@ -1113,7 +1116,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     // Do last marking of weak pointers
     while (true) {
         // Propagate marks
-        nonmovingMark(mark_queue);
+        nonmovingMarkLeader();
 
         if (!nonmovingTidyWeaks(mark_queue))
             break;
@@ -1122,7 +1125,7 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     nonmovingMarkDeadWeaks(mark_queue, dead_weaks);
 
     // Propagate marks
-    nonmovingMark(mark_queue);
+    nonmovingMarkLeader();
 
     // Now remove all dead objects from the mut_list to ensure that a younger
     // generation collection doesn't attempt to look at them after we've swept.
@@ -1187,9 +1190,8 @@ static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO *
     nonmovingFinishFlush(task);
 #endif
 
-    current_mark_queue = NULL;
-    freeMarkQueue(mark_queue);
-    stgFree(mark_queue);
+    // tear down the mark threads' state
+    stopMarkThreads();
 
     oldest_gen->live_estimate = nonmoving_live_words;
     oldest_gen->n_old_blocks = 0;

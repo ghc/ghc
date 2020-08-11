@@ -10,6 +10,7 @@
 
 #include "Task.h"
 #include "NonMoving.h"
+#include "WSDeque.h"
 
 #include "BeginPrivate.h"
 
@@ -88,6 +89,11 @@ INLINE_HEADER bool markQueueBlockIsFull(MarkQueueBlock *b)
     return b->head == MARK_QUEUE_BLOCK_ENTRIES;
 }
 
+INLINE_HEADER bool markQueueBlockIsEmpty(MarkQueueBlock *b)
+{
+    return b->head == 0;
+}
+
 INLINE_HEADER MarkQueueBlock *markQueueBlockFromBdescr(bdescr *bd)
 {
     return (MarkQueueBlock *) bd->start;
@@ -100,6 +106,9 @@ INLINE_HEADER bdescr *markQueueBlockBdescr(MarkQueueBlock *b)
 
 // How far ahead in mark queue to prefetch?
 #define MARK_PREFETCH_QUEUE_DEPTH 5
+
+// How many blocks to keep on the deque?
+#define MARK_QUEUE_DEQUE_SIZE 32
 
 /* The mark queue is not capable of concurrent read or write.
  *
@@ -115,6 +124,12 @@ typedef struct MarkQueue_ {
     //     Bdescr(q->top)->link->start
     MarkQueueBlock *top;
 
+    // A WSDeque of MarkQueueBlock*s which mark threads can steal from. When
+    // the deque overflows we link blocks onto Bdescr(top)->link.
+    WSDeque *rest;
+
+    int mark_thread_n;
+    OSThreadId thread_id;
 
 #if MARK_PREFETCH_QUEUE_DEPTH > 0
     // A ring-buffer of entries which we will mark next
@@ -123,6 +138,25 @@ typedef struct MarkQueue_ {
     uint8_t prefetch_head;
 #endif
 } MarkQueue;
+
+struct MarkState {
+    // protects active_mark_threads and n_mark_threads.
+    Mutex lock;
+    // signalled when all marking threads have finished a round of marking.
+    Condition phase_done_cond;
+    // signalled to wake up marking threads for a new round of marking
+    // (or terminate if .n_mark_threads > thread.mark_thread_n).
+    Condition new_work_cond;
+    // how many threads are currently marking?
+    uint32_t active_mark_threads;
+    // how many threads have been created?
+    // this is currently static throughout marking.
+    uint32_t n_mark_threads;
+    // an array of MarkQueue*s, one per mark thread
+    MarkQueue **queues;
+};
+
+extern struct MarkState mark_state;
 
 /* The update remembered set.
  *
@@ -173,9 +207,10 @@ void nonmovingFinishFlush(Task *task);
 
 void markQueueAddRoot(MarkQueue* q, StgClosure** root);
 
-void initMarkQueue(MarkQueue *queue);
-void freeMarkQueue(MarkQueue *queue);
-void nonmovingMark(struct MarkQueue_ *restrict queue);
+void startMarkThreads(int n_mark_threads);
+void stopMarkThreads(void);
+void nonmovingInitMarkState(void);
+void nonmovingMarkLeader(void);
 
 bool nonmovingTidyWeaks(struct MarkQueue_ *queue);
 void nonmovingTidyThreads(void);

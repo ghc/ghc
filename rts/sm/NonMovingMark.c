@@ -24,6 +24,7 @@
 #include "Stats.h"
 #include "STM.h"
 #include "MarkWeak.h"
+#include "RtsUtils.h"
 #include "sm/Storage.h"
 #include "CNF.h"
 
@@ -116,6 +117,8 @@ StgWeak *nonmoving_weak_ptr_list = NULL;
 // TODO (osa): Document
 StgIndStatic *debug_caf_list_snapshot = (StgIndStatic*)END_OF_CAF_LIST;
 #endif
+
+struct MarkState mark_state;
 
 /* Note [Update remembered set]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -365,7 +368,6 @@ upd_rem_set_push_gc(UpdRemSet *rs, MarkQueueEnt *ent)
     markQueueBlockPush(rs->block, ent);
 }
 
-
 STATIC_INLINE void
 mark_queue_push (MarkQueue *q, const MarkQueueEnt *ent)
 {
@@ -375,7 +377,15 @@ mark_queue_push (MarkQueue *q, const MarkQueueEnt *ent)
         // Allocate a fresh block.
         ACQUIRE_SM_LOCK;
         bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
-        bd->link = markQueueBlockBdescr(q->top);
+
+        // First try pushing onto local deque...
+        if (q->rest != NULL && pushWSDeque(q->rest, q->top)) {
+            bd->link = NULL;
+        } else {
+            // deque overflowed. link onto the new block's list.
+            bd->link = markQueueBlockBdescr(q->top);
+        }
+
         q->top = (MarkQueueBlock *) bd->start;
         q->top->head = 0;
         RELEASE_SM_LOCK;
@@ -410,7 +420,7 @@ void nonmovingMarkInitUpdRemSet() {
 #if defined(THREADED_RTS) && defined(DEBUG)
 static uint32_t markQueueLength(MarkQueue *q);
 #endif
-static void init_mark_queue_(MarkQueue *queue);
+static void init_mark_queue(MarkQueue *queue);
 
 /* Transfers the given capability's update-remembered set to the global
  * remembered set. Must hold SM lock/allocation spinlock.
@@ -875,6 +885,17 @@ void markQueueAddRoot (MarkQueue* q, StgClosure** root)
  * Popping from the mark queue
  *********************************************************/
 
+static MarkQueueBlock *try_stealing(void)
+{
+    for (uint32_t i = 0; i < mark_state.n_mark_threads; i++) {
+        MarkQueueBlock *b = (MarkQueueBlock *) stealWSDeque(mark_state.queues[i]->rest);
+        if (b != NULL) {
+            return b;
+        }
+    }
+    return NULL;
+}
+
 // Returns invalid MarkQueueEnt if queue is empty.
 static MarkQueueEnt markQueuePop_ (MarkQueue *q)
 {
@@ -887,19 +908,41 @@ again:
     if (top->head == 0) {
         bdescr *old_block = markQueueBlockBdescr(q->top);
         // Is this the only block in the queue?
-        if (old_block->link == NULL) {
-            // Yes, therefore queue is empty...
-            MarkQueueEnt none = { .null_entry = { .p = NULL } };
-            return none;
-        } else {
+        if (old_block->link != NULL) {
             // No, unwind to the previous block and try popping again...
             bdescr *new_block = old_block->link;
             q->top = (MarkQueueBlock*) new_block->start;
             ACQUIRE_SM_LOCK;
-            freeGroup(old_block); // TODO: hold on to a block to avoid repeated allocation/deallocation?
+            freeGroup(old_block);
+              // TODO: hold on to a block to avoid repeated allocation/deallocation?
             RELEASE_SM_LOCK;
             goto again;
         }
+
+        // Yes, this is the only block therefore queue is empty...
+        // Next we try pulling from our own deque...
+        MarkQueueBlock *new = (MarkQueueBlock *) popWSDeque(q->rest);
+        if (new != NULL) {
+            q->top = new;
+            ACQUIRE_SM_LOCK;
+            freeGroup(old_block);
+            RELEASE_SM_LOCK;
+            goto again;
+        }
+
+        // Our deque is also empty...
+        // Now try pulling from other threads deques...
+        new = try_stealing();
+        if (new != NULL) {
+            q->top = new;
+            ACQUIRE_SM_LOCK;
+            freeGroup(old_block);
+            RELEASE_SM_LOCK;
+            goto again;
+        }
+
+        const MarkQueueEnt none = { .null_entry = { .p = NULL } };
+        return none;
     }
 
     top->head--;
@@ -961,21 +1004,18 @@ void init_upd_rem_set (UpdRemSet *queue)
 }
 
 /* Must hold sm_mutex. */
-static void init_mark_queue_ (MarkQueue *queue)
+static void init_mark_queue (MarkQueue *queue)
 {
     bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
     queue->top = (MarkQueueBlock *) bd->start;
     queue->top->head = 0;
+    queue->rest = newWSDeque(MARK_QUEUE_DEQUE_SIZE);
+    queue->mark_thread_n = -1;
+    queue->thread_id = -1;
 #if MARK_PREFETCH_QUEUE_DEPTH > 0
     memset(&queue->prefetch_queue, 0, sizeof(queue->prefetch_queue));
     queue->prefetch_head = 0;
 #endif
-}
-
-/* Must hold sm_mutex. */
-void initMarkQueue (MarkQueue *queue)
-{
-    init_mark_queue_(queue);
 }
 
 void reset_upd_rem_set (UpdRemSet *rset)
@@ -986,7 +1026,8 @@ void reset_upd_rem_set (UpdRemSet *rset)
     rset->block->head = 0;
 }
 
-void freeMarkQueue (MarkQueue *queue)
+static void
+freeMarkQueue (MarkQueue *queue)
 {
     freeChain_lock(markQueueBlockBdescr(queue->top));
 }
@@ -1759,8 +1800,8 @@ done:
  *  c. the mark queue has been seeded with a set of roots.
  *
  */
-GNUC_ATTR_HOT void
-nonmovingMark (MarkQueue *queue)
+static GNUC_ATTR_HOT void
+nonmovingMarkLoop (MarkQueue *queue)
 {
     struct MarkContext mctx = markContextInConcMark(queue);
     traceConcMarkBegin();
@@ -1792,8 +1833,9 @@ nonmovingMark (MarkQueue *queue)
         }
         case NULL_ENTRY:
             // Perhaps the update remembered set has more to mark...
+
+            ACQUIRE_LOCK(&upd_rem_set_lock);
             if (upd_rem_set_block_list) {
-                ACQUIRE_LOCK(&upd_rem_set_lock);
                 bdescr *old = markQueueBlockBdescr(queue->top);
                 queue->top = (MarkQueueBlock *) upd_rem_set_block_list->start;
                 upd_rem_set_block_list = NULL;
@@ -1803,13 +1845,137 @@ nonmovingMark (MarkQueue *queue)
                 freeGroup(old);
                 RELEASE_SM_LOCK;
             } else {
-                // Nothing more to do
+                // We are out of work...
+                RELEASE_LOCK(&upd_rem_set_lock);
                 debugTrace(DEBUG_nonmoving_gc, "Finished mark pass: %d", count);
                 traceConcMarkEnd(count);
                 return;
             }
         }
     }
+}
+
+/*
+ * This is the mark loop run by the leader thread (mark_thread_n == 0). It
+ * kicks the worker threads, starts marking itself, and waits until everyone
+ * finishes.
+ */
+void
+nonmovingMarkLeader ()
+{
+    ACQUIRE_LOCK(&mark_state.lock);
+    mark_state.active_mark_threads ++;
+    broadcastCondition(&mark_state.new_work_cond);
+    RELEASE_LOCK(&mark_state.lock);
+    nonmovingMarkLoop(mark_state.queues[0]);
+
+    ACQUIRE_LOCK(&mark_state.lock);
+    mark_state.active_mark_threads --;
+    while (mark_state.active_mark_threads > 0) {
+        waitCondition(&mark_state.phase_done_cond, &mark_state.lock);
+    }
+
+    // Sanity check
+#if defined(DEBUG)
+    for (int i=0; i < mark_state.n_mark_threads; i++) {
+        ASSERT(stealWSDeque(mark_state.queues[i]->rest) == NULL);
+        ASSERT(markQueueBlockIsEmpty(mark_state.queues[i]->top));
+    }
+#endif
+
+    RELEASE_LOCK(&mark_state.lock);
+}
+
+/*
+ * This is the loop run by the worker threads.
+ */
+static void *
+nonmoving_mark_worker (void *user)
+{
+    MarkQueue *queue = (MarkQueue *) user;
+    const uint32_t mark_thread_n = queue->mark_thread_n;
+
+    ACQUIRE_LOCK(&mark_state.lock);
+    mark_state.active_mark_threads --;
+    while (mark_thread_n < mark_state.n_mark_threads) {
+        // N.B. we hold mark_state.lock here
+        mark_state.active_mark_threads ++;
+        RELEASE_LOCK(&mark_state.lock);
+        nonmovingMarkLoop(queue);
+        ACQUIRE_LOCK(&mark_state.lock);
+
+        mark_state.active_mark_threads --;
+        if (mark_state.active_mark_threads == 0) {
+            signalCondition(&mark_state.phase_done_cond);
+        }
+        if (mark_thread_n != 0) {
+            waitCondition(&mark_state.new_work_cond, &mark_state.lock);
+        }
+    }
+    RELEASE_LOCK(&mark_state.lock);
+    return NULL;
+}
+
+void
+nonmovingInitMarkState()
+{
+    initMutex(&mark_state.lock);
+    initCondition(&mark_state.phase_done_cond);
+    initCondition(&mark_state.new_work_cond);
+    mark_state.n_mark_threads = 0;
+    mark_state.active_mark_threads = 0;
+}
+
+void
+startMarkThreads(int n_mark_threads)
+{
+    ACQUIRE_LOCK(&mark_state.lock);
+    //ASSERT(mark_state.n_mark_threads == 0);
+    ASSERT(n_mark_threads >= 1);
+
+    MarkQueue **old_queues = mark_state.queues;
+    mark_state.queues = stgMallocBytes(sizeof(MarkQueue*) * n_mark_threads, "startMarkThreads");
+    if (old_queues != NULL) {
+        memcpy(mark_state.queues, old_queues, sizeof(MarkQueue*) * mark_state.n_mark_threads);
+        stgFree(old_queues);
+    }
+
+    for (int i = mark_state.n_mark_threads; i < n_mark_threads; i++) {
+        MarkQueue *q = stgMallocBytes(sizeof(MarkQueue), "startMarkThreads");
+        mark_state.queues[i] = q;
+        init_mark_queue(q);
+
+        q->mark_thread_n = i;
+        mark_state.n_mark_threads ++;
+
+        // N.B. mark thread 0 runs in the context of the main mark thread.
+        if (i > 0) {
+            mark_state.active_mark_threads ++;
+            int res = createOSThread(&q->thread_id, "concurrent mark thread", nonmoving_mark_worker, q);
+            if (res != 0) {
+                barf("startMarkThreads");
+            }
+        }
+    }
+    RELEASE_LOCK(&mark_state.lock);
+}
+
+void
+stopMarkThreads()
+{
+    ACQUIRE_LOCK(&mark_state.lock);
+    // ensure that there are no active threads since we will be freeing
+    // the MarkQueues shortly.
+    ASSERT(mark_state.active_mark_threads == 0);
+    mark_state.n_mark_threads = 0;
+    broadcastCondition(&mark_state.new_work_cond);
+
+    for (uint32_t i = 0; i < mark_state.n_mark_threads; i++) {
+        freeMarkQueue(mark_state.queues[i]);
+    }
+    stgFree(mark_state.queues);
+    mark_state.queues = NULL;
+    RELEASE_LOCK(&mark_state.lock);
 }
 
 // A variant of `isAlive` that works for non-moving heap. Used for:
