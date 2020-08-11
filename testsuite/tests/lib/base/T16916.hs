@@ -46,4 +46,4 @@ main = do
 
   -- CPU consumption should roughly be the same when just idling vs
   -- when idling after the event been triggered
-  print $ eventTriggeredUsage / noEventUsage < 10.0
+  print $ eventTriggeredUsage / noEventUsage < 100.0
