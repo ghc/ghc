@@ -528,7 +528,7 @@ cmpEqTick :: Tick -> Tick -> Ordering
 cmpEqTick (PreInlineUnconditionally a)  (PreInlineUnconditionally b)    = a `compare` b
 cmpEqTick (PostInlineUnconditionally a) (PostInlineUnconditionally b)   = a `compare` b
 cmpEqTick (UnfoldingDone a)             (UnfoldingDone b)               = a `compare` b
-cmpEqTick (RuleFired a)                 (RuleFired b)                   = a `compare` b
+cmpEqTick (RuleFired a)                 (RuleFired b)                   = a `uniqCompareFS` b
 cmpEqTick (EtaExpansion a)              (EtaExpansion b)                = a `compare` b
 cmpEqTick (EtaReduction a)              (EtaReduction b)                = a `compare` b
 cmpEqTick (BetaReduction a)             (BetaReduction b)               = a `compare` b

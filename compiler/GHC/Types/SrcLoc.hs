@@ -147,7 +147,7 @@ this is the obvious stuff:
 --
 -- Represents a single point within a file
 data RealSrcLoc
-  = SrcLoc      FastString              -- A precise location (file name)
+  = SrcLoc      LexicalFastString       -- A precise location (file name)
                 {-# UNPACK #-} !Int     -- line number, begins at 1
                 {-# UNPACK #-} !Int     -- column number, begins at 1
   deriving (Eq, Ord)
@@ -244,7 +244,7 @@ mkSrcLoc :: FastString -> Int -> Int -> SrcLoc
 mkSrcLoc x line col = RealSrcLoc (mkRealSrcLoc x line col) Nothing
 
 mkRealSrcLoc :: FastString -> Int -> Int -> RealSrcLoc
-mkRealSrcLoc x line col = SrcLoc x line col
+mkRealSrcLoc x line col = SrcLoc (LexicalFastString x) line col
 
 getBufPos :: SrcLoc -> Maybe BufPos
 getBufPos (RealSrcLoc _ mbpos) = mbpos
@@ -262,7 +262,7 @@ mkGeneralSrcLoc = UnhelpfulLoc
 
 -- | Gives the filename of the 'RealSrcLoc'
 srcLocFile :: RealSrcLoc -> FastString
-srcLocFile (SrcLoc fname _ _) = fname
+srcLocFile (SrcLoc (LexicalFastString fname) _ _) = fname
 
 -- | Raises an error when used on a "bad" 'SrcLoc'
 srcLocLine :: RealSrcLoc -> Int
@@ -309,7 +309,7 @@ lookupSrcSpan (RealSrcSpan l _) = Map.lookup l
 lookupSrcSpan (UnhelpfulSpan _) = const Nothing
 
 instance Outputable RealSrcLoc where
-    ppr (SrcLoc src_path src_line src_col)
+    ppr (SrcLoc (LexicalFastString src_path) src_line src_col)
       = hcat [ pprFastFilePath src_path <> colon
              , int src_line <> colon
              , int src_col ]
@@ -458,7 +458,7 @@ srcLocSpan (UnhelpfulLoc str) = UnhelpfulSpan (UnhelpfulOther str)
 srcLocSpan (RealSrcLoc l mb) = RealSrcSpan (realSrcLocSpan l) (fmap (\b -> BufSpan b b) mb)
 
 realSrcLocSpan :: RealSrcLoc -> RealSrcSpan
-realSrcLocSpan (SrcLoc file line col) = RealSrcSpan' file line col line col
+realSrcLocSpan (SrcLoc (LexicalFastString file) line col) = RealSrcSpan' file line col line col
 
 -- | Create a 'SrcSpan' between two points in a file
 mkRealSrcSpan :: RealSrcLoc -> RealSrcLoc -> RealSrcSpan

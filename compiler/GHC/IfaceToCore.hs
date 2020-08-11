@@ -81,7 +81,6 @@ import GHC.Fingerprint
 import qualified GHC.Data.BooleanFormula as BF
 
 import Control.Monad
-import qualified Data.Map as Map
 
 {-
 This module takes
@@ -1752,7 +1751,7 @@ tcIfaceCoAxiomRule :: IfLclName -> IfL CoAxiomRule
 -- there are a fixed set of CoAxiomRules,
 -- currently enumerated in typeNatCoAxiomRules
 tcIfaceCoAxiomRule n
-  = case Map.lookup n typeNatCoAxiomRules of
+  = case lookupUFM typeNatCoAxiomRules n of
         Just ax -> return ax
         _  -> pprPanic "tcIfaceCoAxiomRule" (ppr n)
 

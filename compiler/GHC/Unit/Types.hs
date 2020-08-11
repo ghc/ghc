@@ -290,7 +290,7 @@ instance Eq (GenInstantiatedUnit unit) where
   u1 == u2 = instUnitKey u1 == instUnitKey u2
 
 instance Ord (GenInstantiatedUnit unit) where
-  u1 `compare` u2 = instUnitFS u1 `compare` instUnitFS u2
+  u1 `compare` u2 = instUnitFS u1 `uniqCompareFS` instUnitFS u2
 
 instance Binary InstantiatedUnit where
   put_ bh indef = do
@@ -328,7 +328,7 @@ instance NFData Unit where
 
 -- | Compares unit ids lexically, rather than by their 'Unique's
 stableUnitCmp :: Unit -> Unit -> Ordering
-stableUnitCmp p1 p2 = unitFS p1 `compare` unitFS p2
+stableUnitCmp p1 p2 = unitFS p1 `lexicalCompareFS` unitFS p2
 
 instance Outputable Unit where
    ppr pk = pprUnit pk
@@ -504,7 +504,9 @@ instance Eq UnitId where
     uid1 == uid2 = getUnique uid1 == getUnique uid2
 
 instance Ord UnitId where
-    u1 `compare` u2 = unitIdFS u1 `compare` unitIdFS u2
+    -- we compare lexically to avoid non-deterministic output when sets of
+    -- unit-ids are printed (dependencies, etc.)
+    u1 `compare` u2 = unitIdFS u1 `lexicalCompareFS` unitIdFS u2
 
 instance Uniquable UnitId where
     getUnique = getUnique . unitIdFS

@@ -415,7 +415,7 @@ data UnitState = UnitState {
 
   -- | A mapping of 'PackageName' to 'IndefUnitId'.  This is used when
   -- users refer to packages in Backpack includes.
-  packageNameMap            :: Map PackageName IndefUnitId,
+  packageNameMap            :: UniqFM PackageName IndefUnitId,
 
   -- | A mapping from database unit keys to wired in unit ids.
   wireMap :: Map UnitId UnitId,
@@ -460,7 +460,7 @@ emptyUnitState :: UnitState
 emptyUnitState = UnitState {
     unitInfoMap = Map.empty,
     preloadClosure = emptyUniqSet,
-    packageNameMap = Map.empty,
+    packageNameMap = emptyUFM,
     wireMap   = Map.empty,
     unwireMap = Map.empty,
     preloadUnits = [],
@@ -533,7 +533,7 @@ unsafeLookupUnitId state uid = case lookupUnitId state uid of
 -- | Find the unit we know about with the given package name (e.g. @foo@), if any
 -- (NB: there might be a locally defined unit name which overrides this)
 lookupPackageName :: UnitState -> PackageName -> Maybe IndefUnitId
-lookupPackageName pkgstate n = Map.lookup n (packageNameMap pkgstate)
+lookupPackageName pkgstate n = lookupUFM (packageNameMap pkgstate) n
 
 -- | Search for units with a given package ID (e.g. \"foo-0.1\")
 searchPackageId :: UnitState -> PackageId -> [UnitInfo]
@@ -1587,10 +1587,9 @@ mkUnitState ctx printer cfg = do
                 -- likely to actually happen.
                 return (updateVisibilityMap wired_map plugin_vis_map2)
 
-  let pkgname_map = foldl' add Map.empty pkgs2
-        where add pn_map p
-                = Map.insert (unitPackageName p) (unitInstanceOf p) pn_map
-
+  let pkgname_map = listToUFM [ (unitPackageName p, unitInstanceOf p)
+                              | p <- pkgs2
+                              ]
   -- The explicitUnits accurately reflects the set of units we have turned
   -- on; as such, it also is the only way one can come up with requirements.
   -- The requirement context is directly based off of this: we simply

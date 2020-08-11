@@ -292,7 +292,7 @@ mkIface_ hsc_env
           mi_final_exts  = (),
           mi_ext_fields  = emptyExtensibleFields }
   where
-     cmp_rule     = comparing ifRuleName
+     cmp_rule     = lexicalCompareFS `on` ifRuleName
      -- Compare these lexicographically by OccName, *not* by unique,
      -- because the latter is not stable across compilations:
      cmp_inst     = comparing (nameOccName . ifDFun)

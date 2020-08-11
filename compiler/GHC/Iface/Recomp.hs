@@ -39,6 +39,7 @@ import GHC.Utils.Outputable as Outputable
 import GHC.Types.Unique
 import GHC.Utils.Misc hiding ( eqListBy )
 import GHC.Data.Maybe
+import GHC.Data.FastString
 import GHC.Utils.Binary
 import GHC.Utils.Fingerprint
 import GHC.Utils.Exception
@@ -1081,11 +1082,11 @@ getOrphanHashes hsc_env mods = do
 
 sortDependencies :: Dependencies -> Dependencies
 sortDependencies d
- = Deps { dep_mods   = sortBy (compare `on` (moduleNameFS . gwib_mod)) (dep_mods d),
+ = Deps { dep_mods   = sortBy (lexicalCompareFS `on` (moduleNameFS . gwib_mod)) (dep_mods d),
           dep_pkgs   = sortBy (compare `on` fst) (dep_pkgs d),
           dep_orphs  = sortBy stableModuleCmp (dep_orphs d),
           dep_finsts = sortBy stableModuleCmp (dep_finsts d),
-          dep_plgins = sortBy (compare `on` moduleNameFS) (dep_plgins d) }
+          dep_plgins = sortBy (lexicalCompareFS `on` moduleNameFS) (dep_plgins d) }
 
 {-
 ************************************************************************

@@ -30,7 +30,6 @@ import GHC.Types.Unique
 import GHC.Utils.Outputable
 import GHC.Types.SrcLoc
 import GHC.Data.FastString
-import GHC.Utils.Misc
 import GHC.Types.CostCentre.State
 
 import Data.Data
@@ -95,7 +94,11 @@ cmpCostCentre (AllCafsCC  {cc_mod = m1}) (AllCafsCC  {cc_mod = m2})
 cmpCostCentre NormalCC {cc_flavour = f1, cc_mod =  m1, cc_name = n1}
               NormalCC {cc_flavour = f2, cc_mod =  m2, cc_name = n2}
     -- first key is module name, then centre name, then flavour
-  = (m1 `compare` m2) `thenCmp` (n1 `compare` n2) `thenCmp` (f1 `compare` f2)
+  = mconcat
+      [ m1 `compare` m2
+      , n1 `lexicalCompareFS` n2 -- compare lexically to avoid non-determinism
+      , f1 `compare` f2
+      ]
 
 cmpCostCentre other_1 other_2
   = let

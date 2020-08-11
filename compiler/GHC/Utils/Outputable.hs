@@ -1,5 +1,8 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 {-
 (c) The University of Glasgow 2006-2012
@@ -925,6 +928,9 @@ instance (Outputable a, Outputable b, Outputable c, Outputable d, Outputable e, 
 instance Outputable FastString where
     ppr fs = ftext fs           -- Prints an unadorned string,
                                 -- no double quotes or anything
+
+deriving newtype instance Outputable NonDetFastString
+deriving newtype instance Outputable LexicalFastString
 
 instance (Outputable key, Outputable elt) => Outputable (M.Map key elt) where
     ppr m = ppr (M.toList m)
