@@ -3,5 +3,3 @@
 ##########################
 
 - ignore: {}
-- warn: {name: Unused LANGUAGE pragma}
-- warn: {name: Use fewer LANGUAGE pragmas}

@@ -3,15 +3,9 @@
 -- Note [Implementing unsafeCoerce]
 {-# OPTIONS_GHC -fno-strictness #-}
 
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE MagicHash #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneKindSignatures #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE Unsafe #-}
+{-# LANGUAGE Unsafe, NoImplicitPrelude, MagicHash, GADTs, TypeApplications,
+             ScopedTypeVariables, TypeOperators, KindSignatures, PolyKinds,
+             StandaloneKindSignatures, DataKinds #-}
 
 module Unsafe.Coerce
   ( unsafeCoerce, unsafeCoerceUnlifted, unsafeCoerceAddr

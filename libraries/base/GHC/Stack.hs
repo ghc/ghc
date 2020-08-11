@@ -1,6 +1,3 @@
-{-# LANGUAGE ImplicitParams #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE Trustworthy #-}
 
 -----------------------------------------------------------------------------
@@ -18,6 +15,7 @@
 -- @since 4.5.0.0
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE MagicHash, NoImplicitPrelude, ImplicitParams, RankNTypes #-}
 module GHC.Stack (
     errorWithStackTrace,
 

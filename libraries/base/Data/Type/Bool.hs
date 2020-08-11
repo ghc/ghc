@@ -1,9 +1,5 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE Safe #-}
-{-# LANGUAGE TypeFamilyDependencies #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeFamilyDependencies, Safe, PolyKinds #-}
+{-# LANGUAGE TypeFamilies, TypeOperators, DataKinds, NoImplicitPrelude #-}
 
 -----------------------------------------------------------------------------
 -- |
