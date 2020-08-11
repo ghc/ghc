@@ -88,6 +88,9 @@ import Data.Either      ( partitionEithers )
 import Data.List        ( find, sortBy )
 import Control.Arrow    ( first )
 import Data.Function
+import GHC.Types.FieldLabel
+
+import Debug.Trace
 
 {-
 *********************************************************
@@ -142,7 +145,6 @@ This behavior might change in the future.  Consider this
 alternate module B:
 
     module B where
-        {-# DEPRECATED T, f "Don't use" #-}
         data T = T
         f T = T
 
@@ -623,17 +625,17 @@ lookupSubBndrOcc_helper must_have_parent warn_if_deprec parent rdr_name
         checkFld g@GRE{gre_name, gre_par} = do
           addUsedGRE warn_if_deprec g
           return $ case gre_par of
-            FldParent _ mfs ->
-              FoundFL  (fldParentToFieldLabel gre_name mfs)
+            FldParent _ has_sel mfs ->
+              FoundFL  (fldParentToFieldLabel gre_name has_sel mfs)
             _ -> FoundName gre_par gre_name
 
-        fldParentToFieldLabel :: Name -> Maybe FastString -> FieldLabel
-        fldParentToFieldLabel name mfs =
+        fldParentToFieldLabel :: Name -> Maybe FastString -> FieldSelectors -> FieldLabel
+        fldParentToFieldLabel name mfs has_sel =
           case mfs of
             Nothing ->
               let fs = occNameFS (nameOccName name)
-              in FieldLabel fs False name
-            Just fs -> FieldLabel fs True name
+              in FieldLabel fs NoDuplicateRecordFields has_sel name
+            Just fs -> FieldLabel fs DuplicateRecordFields has_sel name
 
         -- Called when we find no matching GREs after disambiguation but
         -- there are three situations where this happens.
@@ -1051,15 +1053,15 @@ lookupOccRnX_maybe globalLookup wrapper rdr_name
 lookupOccRn_maybe :: RdrName -> RnM (Maybe Name)
 lookupOccRn_maybe = lookupOccRnX_maybe lookupGlobalOccRn_maybe id
 
-lookupOccRn_overloaded :: Bool -> RdrName
+lookupOccRn_overloaded :: DuplicateRecordFields -> FieldSelectors -> RdrName
                        -> RnM (Maybe (Either Name [Name]))
-lookupOccRn_overloaded overload_ok
+lookupOccRn_overloaded overload_ok has_sel
   = lookupOccRnX_maybe global_lookup Left
       where
         global_lookup :: RdrName -> RnM (Maybe (Either Name [Name]))
         global_lookup n =
           runMaybeT . msum . map MaybeT $
-            [ lookupGlobalOccRn_overloaded overload_ok n
+            [ lookupGlobalOccRn_overloaded overload_ok has_sel n
             , fmap Left . listToMaybe <$> lookupQualifiedNameGHCi n ]
 
 
@@ -1124,9 +1126,9 @@ lookupInfoOccRn rdr_name =
 --                        if overload_ok was False, this list will be
 --                        a singleton.
 
-lookupGlobalOccRn_overloaded :: Bool -> RdrName
+lookupGlobalOccRn_overloaded :: DuplicateRecordFields -> FieldSelectors -> RdrName
                              -> RnM (Maybe (Either Name [Name]))
-lookupGlobalOccRn_overloaded overload_ok rdr_name =
+lookupGlobalOccRn_overloaded overload_ok has_sel rdr_name =
   lookupExactOrOrig_maybe rdr_name (fmap Left) $
      do  { res <- lookupGreRn_helper rdr_name
          ; case res of
@@ -1134,7 +1136,7 @@ lookupGlobalOccRn_overloaded overload_ok rdr_name =
                 OneNameMatch gre -> do
                   let wrapper = if isRecFldGRE gre then Right . (:[]) else Left
                   return $ Just (wrapper (gre_name gre))
-                MultipleNames gres  | all isRecFldGRE gres && overload_ok ->
+                MultipleNames gres  | all isRecFldGRE gres && (overload_ok == DuplicateRecordFields || has_sel == NoFieldSelectors) ->
                   -- Don't record usage for ambiguous selectors
                   -- until we know which is meant
                   return $ Just (Right (map gre_name gres))

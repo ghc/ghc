@@ -814,6 +814,7 @@ class Outputable a where
 
         ppr = pprPrec 0
         pprPrec _ = ppr
+        {-# MINIMAL ppr | pprPrec #-}
 
 instance Outputable Char where
     ppr c = text [c]

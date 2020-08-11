@@ -1,0 +1,4 @@
+FieldSelectors.hs:10:1:
+    Multiple declarations of ‘foo’
+    Declared at: FieldSelectors.hs:8:18
+                 FieldSelectors.hs:10:1
