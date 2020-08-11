@@ -252,9 +252,9 @@ rnAvailInfo (AvailTC n ns fs) = do
                          return (AvailTC n' ns' fs')
 
 rnFieldLabel :: Rename FieldLabel
-rnFieldLabel (FieldLabel l b sel) = do
+rnFieldLabel (FieldLabel l b has_sel sel) = do
     sel' <- rnIfaceGlobal sel
-    return (FieldLabel l b sel')
+    return (FieldLabel l b has_sel sel')
 
 
 

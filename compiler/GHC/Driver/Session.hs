@@ -1609,6 +1609,7 @@ languageExtensions (Just Haskell98)
        LangExt.NPlusKPatterns,
        LangExt.DatatypeContexts,
        LangExt.TraditionalRecordSyntax,
+       LangExt.FieldSelectors,
        LangExt.NondecreasingIndentation
            -- strictly speaking non-standard, but we always had this
            -- on implicitly before the option was added in 7.1, and
@@ -1629,6 +1630,7 @@ languageExtensions (Just Haskell2010)
        LangExt.ForeignFunctionInterface,
        LangExt.PatternGuards,
        LangExt.DoAndIfThenElse,
+       LangExt.FieldSelectors,
        LangExt.RelaxedPolyRec]
 
 hasPprDebug :: DynFlags -> Bool
@@ -3720,6 +3722,7 @@ xFlagsDeps = [
   depFlagSpec' "DoRec"                        LangExt.RecursiveDo
     (deprecatedForExtension "RecursiveDo"),
   flagSpec "DuplicateRecordFields"            LangExt.DuplicateRecordFields,
+  flagSpec "FieldSelectors"                   LangExt.FieldSelectors,
   flagSpec "EmptyCase"                        LangExt.EmptyCase,
   flagSpec "EmptyDataDecls"                   LangExt.EmptyDataDecls,
   flagSpec "EmptyDataDeriving"                LangExt.EmptyDataDeriving,
