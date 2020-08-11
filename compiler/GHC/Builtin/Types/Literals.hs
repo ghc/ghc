@@ -32,6 +32,7 @@ import GHC.Core.Coercion ( Role(..) )
 import GHC.Tc.Types.Constraint ( Xi )
 import GHC.Core.Coercion.Axiom ( CoAxiomRule(..), BuiltInSynFamily(..), TypeEqn )
 import GHC.Types.Name          ( Name, BuiltInSyntax(..) )
+import GHC.Types.Unique.FM
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim  ( mkTemplateAnonTyConBinders )
 import GHC.Builtin.Names
@@ -50,7 +51,6 @@ import GHC.Builtin.Names
                   , typeSymbolAppendFamNameKey
                   )
 import GHC.Data.FastString
-import qualified Data.Map as Map
 import Data.Maybe ( isJust )
 import Control.Monad ( guard )
 import Data.List  ( isPrefixOf, isSuffixOf )
@@ -457,8 +457,8 @@ axAppendSymbol0L  = mkAxiom1 "Concat0L"
 -- The list of built-in type family axioms that GHC uses.
 -- If you define new axioms, make sure to include them in this list.
 -- See Note [Adding built-in type families]
-typeNatCoAxiomRules :: Map.Map FastString CoAxiomRule
-typeNatCoAxiomRules = Map.fromList $ map (\x -> (coaxrName x, x))
+typeNatCoAxiomRules :: UniqFM FastString CoAxiomRule
+typeNatCoAxiomRules = listToUFM $ map (\x -> (coaxrName x, x))
   [ axAddDef
   , axMulDef
   , axExpDef
