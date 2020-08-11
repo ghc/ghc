@@ -342,7 +342,7 @@ enrichHie ts (hsGrp, imports, exports, _) ev_bs insts tcs =
           , exps
           ]
 
-        modulify file xs' = do
+        modulify (HiePath file) xs' = do
 
           top_ev_asts <-
             toHie $ EvBindContext ModuleScope Nothing
@@ -363,12 +363,12 @@ enrichHie ts (hsGrp, imports, exports, _) ev_bs insts tcs =
 
           case mergeSortAsts $ moduleNode : xs of
             [x] -> return x
-            xs -> panicDoc "enrichHie: mergeSortAsts returned more than one result" (ppr $ map nodeSpan xs)
+            xs -> panicDoc "enrichHie: mergeSortAsts retur:ed more than one result" (ppr $ map nodeSpan xs)
 
     asts' <- sequence
           $ M.mapWithKey modulify
           $ M.fromListWith (++)
-          $ map (\x -> (srcSpanFile (nodeSpan x),[x])) flat_asts
+          $ map (\x -> (HiePath (srcSpanFile (nodeSpan x)),[x])) flat_asts
 
     let asts = HieASTs $ resolveTyVarScopes asts'
     return asts
