@@ -859,6 +859,12 @@ instance Outputable FastString where
     ppr fs = ftext fs           -- Prints an unadorned string,
                                 -- no double quotes or anything
 
+instance Outputable NonDetFastString where
+    ppr (NonDetFastString fs) = ppr fs
+
+instance Outputable LexicalFastString where
+    ppr (LexicalFastString fs) = ppr fs
+
 instance (Outputable key, Outputable elt) => Outputable (M.Map key elt) where
     ppr m = ppr (M.toList m)
 instance (Outputable elt) => Outputable (IM.IntMap elt) where

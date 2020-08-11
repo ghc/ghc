@@ -92,15 +92,11 @@ mapUnitInfo f gunitFS = mapGenericUnitInfo
    id        -- module name
    (fmap (mapGenUnit f gunitFS)) -- instantiating modules
 
--- TODO: there's no need for these to be FastString, as we don't need the uniq
---       feature, but ghc doesn't currently have convenient support for any
---       other compact string types, e.g. plain ByteString or Text.
-
-newtype PackageId   = PackageId    FastString deriving (Eq, Ord)
+newtype PackageId   = PackageId    FastString deriving (Eq)
 newtype PackageName = PackageName
    { unPackageName :: FastString
    }
-   deriving (Eq, Ord)
+   deriving (Eq)
 
 instance Uniquable PackageId where
   getUnique (PackageId n) = getUnique n
