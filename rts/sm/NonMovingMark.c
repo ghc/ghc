@@ -976,7 +976,6 @@ static void init_mark_queue_ (MarkQueue *queue)
 void initMarkQueue (MarkQueue *queue)
 {
     init_mark_queue_(queue);
-    queue->is_upd_rem_set = false;
 }
 
 void reset_upd_rem_set (UpdRemSet *rset)
