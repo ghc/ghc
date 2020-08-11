@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -13,6 +14,7 @@
 {-# LANGUAGE PolyKinds #-}
 
 {-|
+
 GHC's @DataKinds@ language extension lifts data constructors, natural
 numbers, and strings to the type level. This module provides the
 primitives needed for working with type-level numbers (the 'Nat' kind)

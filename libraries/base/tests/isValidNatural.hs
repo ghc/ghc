@@ -1,5 +1,4 @@
-{-# LANGUAGE MagicHash #-}
-{-# LANGUAGE UnboxedTuples #-}
+{-# language MagicHash, UnboxedTuples #-}
 
 import GHC.Num.Natural
 import GHC.Num.BigNat

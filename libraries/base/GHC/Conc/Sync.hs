@@ -1,11 +1,13 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE MagicHash #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE UnliftedFFITypes #-}
 {-# LANGUAGE Unsafe #-}
-
+{-# LANGUAGE CPP
+           , NoImplicitPrelude
+           , BangPatterns
+           , MagicHash
+           , UnboxedTuples
+           , UnliftedFFITypes
+           , StandaloneDeriving
+           , RankNTypes
+  #-}
 {-# OPTIONS_HADDOCK not-home #-}
 
 -----------------------------------------------------------------------------

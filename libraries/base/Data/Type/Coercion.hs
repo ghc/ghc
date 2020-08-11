@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE TypeOperators       #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -7,6 +8,7 @@
 {-# LANGUAGE NoImplicitPrelude   #-}
 {-# LANGUAGE PolyKinds           #-}
 {-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE MagicHash           #-}
 
 -----------------------------------------------------------------------------
 -- |

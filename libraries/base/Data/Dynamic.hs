@@ -1,7 +1,9 @@
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE ExplicitForAll #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
 -----------------------------------------------------------------------------
