@@ -310,19 +310,19 @@ instance Ord CLabel where
   compare (CmmLabel a1 b1 c1 d1) (CmmLabel a2 b2 c2 d2) =
     compare a1 a2 `thenCmp`
     compare b1 b2 `thenCmp`
-    compare c1 c2 `thenCmp`
+    uniqCompareFS c1 c2 `thenCmp`
     compare d1 d2
   compare (RtsLabel a1) (RtsLabel a2) = compare a1 a2
   compare (LocalBlockLabel u1) (LocalBlockLabel u2) = nonDetCmpUnique u1 u2
   compare (ForeignLabel a1 b1 c1 d1) (ForeignLabel a2 b2 c2 d2) =
-    compare a1 a2 `thenCmp`
+    uniqCompareFS a1 a2 `thenCmp`
     compare b1 b2 `thenCmp`
     compare c1 c2 `thenCmp`
     compare d1 d2
   compare (AsmTempLabel u1) (AsmTempLabel u2) = nonDetCmpUnique u1 u2
   compare (AsmTempDerivedLabel a1 b1) (AsmTempDerivedLabel a2 b2) =
     compare a1 a2 `thenCmp`
-    compare b1 b2
+    uniqCompareFS b1 b2
   compare (StringLitLabel u1) (StringLitLabel u2) =
     nonDetCmpUnique u1 u2
   compare (CC_Label a1) (CC_Label a2) =
@@ -454,9 +454,23 @@ data RtsLabelInfo
   | RtsApFast     FastString    -- ^ _fast versions of generic apply
   | RtsSlowFastTickyCtr String
 
-  deriving (Eq, Ord)
-  -- NOTE: Eq on PtrString compares the pointer only, so this isn't
-  -- a real equality.
+  deriving (Eq)
+
+instance Ord RtsLabelInfo where
+   compare (RtsSelectorInfoTable b0 i0) (RtsSelectorInfoTable b1 i1) = mconcat [compare b0 b1, compare i0 i1]
+   compare (RtsSelectorInfoTable {})    _                            = LT
+   compare (RtsSelectorEntry b0 i0)     (RtsSelectorEntry b1 i1)     = mconcat [compare b0 b1, compare i0 i1]
+   compare (RtsSelectorEntry {})        _                            = LT
+   compare (RtsApInfoTable b0 i0)       (RtsApInfoTable b1 i1)       = mconcat [compare b0 b1, compare i0 i1]
+   compare (RtsApInfoTable {})          _                            = LT
+   compare (RtsApEntry b0 i0)           (RtsApEntry b1 i1)           = mconcat [compare b0 b1, compare i0 i1]
+   compare (RtsApEntry {})              _                            = LT
+   compare (RtsPrimOp p0)               (RtsPrimOp p1)               = compare p0 p1
+   compare (RtsPrimOp {})               _                            = LT
+   compare (RtsApFast fs0)              (RtsApFast fs1)              = uniqCompareFS fs0 fs1
+   compare (RtsApFast {})               _                            = LT
+   compare (RtsSlowFastTickyCtr s0)     (RtsSlowFastTickyCtr s1)     = compare s0 s1
+   compare (RtsSlowFastTickyCtr {})     _                            = LT
 
 
 -- | What type of Cmm label we're dealing with.

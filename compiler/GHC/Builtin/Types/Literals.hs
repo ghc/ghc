@@ -401,7 +401,7 @@ axCmpSymbolDef =
            s2' <- isStrLitTy s2
            t2' <- isStrLitTy t2
            return (mkTyConApp typeSymbolCmpTyCon [s1,t1] ===
-                   ordering (compare s2' t2')) }
+                   ordering (lexicalCompareFS s2' t2')) }
 
 axAppendSymbolDef = CoAxiomRule
     { coaxrName      = fsLit "AppendSymbolDef"
@@ -706,7 +706,7 @@ matchFamCmpNat _ = Nothing
 matchFamCmpSymbol :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
 matchFamCmpSymbol [s,t]
   | Just x <- mbX, Just y <- mbY =
-    Just (axCmpSymbolDef, [s,t], ordering (compare x y))
+    Just (axCmpSymbolDef, [s,t], ordering (lexicalCompareFS x y))
   | tcEqType s t = Just (axCmpSymbolRefl, [s], ordering EQ)
   where mbX = isStrLitTy s
         mbY = isStrLitTy t
