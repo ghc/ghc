@@ -68,6 +68,8 @@ module GHC.Types.FieldLabel
    , FieldLbl(..)
    , FieldLabel
    , mkFieldLabelOccs
+   , DuplicateRecordFields(..)
+   , FieldSelectors(..)
    )
 where
 
@@ -90,14 +92,47 @@ type FieldLabelString = FastString
 -- | A map from labels to all the auxiliary information
 type FieldLabelEnv = DFastStringEnv FieldLabel
 
+data DuplicateRecordFields = DuplicateRecordFields | NoDuplicateRecordFields deriving (Show, Eq, Typeable, Data)
+instance Binary DuplicateRecordFields where
+    put_ bh f =
+        case f of
+            DuplicateRecordFields -> put_ bh True
+            NoDuplicateRecordFields -> put_ bh False
+    get bh = do
+        got <- get bh
+        case got of
+            True -> pure $ DuplicateRecordFields
+            False -> pure $ NoDuplicateRecordFields
+
+instance Outputable DuplicateRecordFields where
+    ppr DuplicateRecordFields = text "+dup"
+    ppr NoDuplicateRecordFields = text "-dup"
+
+data FieldSelectors = FieldSelectors | NoFieldSelectors deriving (Show, Eq, Typeable, Data)
+instance Binary FieldSelectors where
+    put_ bh f =
+        case f of
+            FieldSelectors -> put_ bh True
+            NoFieldSelectors -> put_ bh False
+    get bh = do
+        got <- get bh
+        if got then
+            pure FieldSelectors
+        else
+            pure NoFieldSelectors
+
+instance Outputable FieldSelectors where
+    ppr FieldSelectors = text "+sel"
+    ppr NoFieldSelectors = text "-sel"
 
 type FieldLabel = FieldLbl Name
 
 -- | Fields in an algebraic record type
 data FieldLbl a = FieldLabel {
       flLabel        :: FieldLabelString, -- ^ User-visible label of the field
-      flIsOverloaded :: Bool,             -- ^ Was DuplicateRecordFields on
+      flIsOverloaded :: DuplicateRecordFields,             -- ^ Was DuplicateRecordFields on
                                           --   in the defining module for this datatype?
+      flHasFieldSelector :: FieldSelectors,
       flSelector     :: a                 -- ^ Record selector function
     }
   deriving (Eq, Functor, Foldable, Traversable)
@@ -107,26 +142,28 @@ instance Outputable a => Outputable (FieldLbl a) where
     ppr fl = ppr (flLabel fl) <> braces (ppr (flSelector fl))
 
 instance Binary a => Binary (FieldLbl a) where
-    put_ bh (FieldLabel aa ab ac) = do
+    put_ bh (FieldLabel aa ab ac ad) = do
         put_ bh aa
         put_ bh ab
         put_ bh ac
+        put_ bh ad
     get bh = do
+        aa <- get bh
         ab <- get bh
         ac <- get bh
         ad <- get bh
-        return (FieldLabel ab ac ad)
+        return (FieldLabel aa ab ac ad)
 
 
 -- | Record selector OccNames are built from the underlying field name
 -- and the name of the first data constructor of the type, to support
 -- duplicate record field names.
 -- See Note [Why selector names include data constructors].
-mkFieldLabelOccs :: FieldLabelString -> OccName -> Bool -> FieldLbl OccName
-mkFieldLabelOccs lbl dc is_overloaded
+mkFieldLabelOccs :: FieldLabelString -> OccName -> DuplicateRecordFields -> FieldSelectors -> FieldLbl OccName
+mkFieldLabelOccs lbl dc is_overloaded has_sel
   = FieldLabel { flLabel = lbl, flIsOverloaded = is_overloaded
-               , flSelector = sel_occ }
+               , flSelector = sel_occ, flHasFieldSelector = has_sel }
   where
     str     = ":" ++ unpackFS lbl ++ ":" ++ occNameString dc
-    sel_occ | is_overloaded = mkRecFldSelOcc str
+    sel_occ | is_overloaded == DuplicateRecordFields || has_sel == NoFieldSelectors = mkRecFldSelOcc str
             | otherwise     = mkVarOccFS lbl

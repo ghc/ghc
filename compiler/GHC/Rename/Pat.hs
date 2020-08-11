@@ -76,9 +76,10 @@ import GHC.Builtin.Types   ( nilDataCon )
 import GHC.Core.DataCon
 import qualified GHC.LanguageExtensions as LangExt
 
-import Control.Monad       ( when, ap, guard )
+import Control.Monad       ( when, ap )
 import qualified Data.List.NonEmpty as NE
 import Data.Ratio
+import GHC.Types.FieldLabel (DuplicateRecordFields(..), FieldSelectors(..))
 
 {-
 *********************************************************
@@ -622,9 +623,7 @@ rnHsRecFields
 
 rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
   = do { pun_ok      <- xoptM LangExt.RecordPuns
-       ; disambig_ok <- xoptM LangExt.DisambiguateRecordFields
-       ; let parent = guard disambig_ok >> mb_con
-       ; flds1  <- mapM (rn_fld pun_ok parent) flds
+       ; flds1  <- mapM (rn_fld pun_ok mb_con) flds
        ; mapM_ (addErr . dupFieldErr ctxt) dup_flds
        ; dotdot_flds <- rn_dotdot dotdot mb_con flds1
        ; let all_flds | null dotdot_flds = flds1
@@ -644,7 +643,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                   (L loc (FieldOcc _ (L ll lbl)))
                               , hsRecFieldArg = arg
                               , hsRecPun      = pun }))
-      = do { sel <- setSrcSpan loc $ lookupRecFieldOcc parent lbl
+      = do { sel <- setSrcSpan loc $ lookupRecFieldOcc parent lbl -- XXX
            ; arg' <- if pun
                      then do { checkErr pun_ok (badPun (L loc lbl))
                                -- Discard any module qualifier (#11662)
@@ -728,8 +727,9 @@ rnHsRecUpdFields
     -> RnM ([LHsRecUpdField GhcRn], FreeVars)
 rnHsRecUpdFields flds
   = do { pun_ok        <- xoptM LangExt.RecordPuns
-       ; overload_ok   <- xoptM LangExt.DuplicateRecordFields
-       ; (flds1, fvss) <- mapAndUnzipM (rn_fld pun_ok overload_ok) flds
+       ; overload_ok   <- (\x -> if x then DuplicateRecordFields else NoDuplicateRecordFields) <$> xoptM LangExt.DuplicateRecordFields
+       ; has_sel       <- (\x -> if x then FieldSelectors else NoFieldSelectors) <$> xoptM LangExt.FieldSelectors
+       ; (flds1, fvss) <- mapAndUnzipM (rn_fld pun_ok overload_ok has_sel) flds
        ; mapM_ (addErr . dupFieldErr HsRecFieldUpd) dup_flds
 
        -- Check for an empty record update  e {}
@@ -740,18 +740,19 @@ rnHsRecUpdFields flds
   where
     doc = text "constructor field name"
 
-    rn_fld :: Bool -> Bool -> LHsRecUpdField GhcPs
+    rn_fld :: Bool -> DuplicateRecordFields -> FieldSelectors -> LHsRecUpdField GhcPs
            -> RnM (LHsRecUpdField GhcRn, FreeVars)
-    rn_fld pun_ok overload_ok (L l (HsRecField { hsRecFieldLbl = L loc f
+    rn_fld pun_ok overload_ok has_sel (L l (HsRecField { hsRecFieldLbl = L loc f
                                                , hsRecFieldArg = arg
                                                , hsRecPun      = pun }))
       = do { let lbl = rdrNameAmbiguousFieldOcc f
+           ; traceRn "rnHsRecUpdFields 1" (ppr $ overload_ok == DuplicateRecordFields || has_sel == NoFieldSelectors)
            ; sel <- setSrcSpan loc $
                       -- Defer renaming of overloaded fields to the typechecker
                       -- See Note [Disambiguating record fields] in GHC.Tc.Gen.Expr
-                      if overload_ok
-                          then do { mb <- lookupGlobalOccRn_overloaded
-                                            overload_ok lbl
+                      if overload_ok == DuplicateRecordFields || has_sel == NoFieldSelectors
+                          then do { mb <- lookupGlobalOccRn_overloaded_pat lbl
+                                  ; ; traceRn "rnHsRecUpdFields 1.5" (ppr mb)
                                   ; case mb of
                                       Nothing ->
                                         do { addErr
@@ -759,12 +760,14 @@ rnHsRecUpdFields flds
                                            ; return (Right []) }
                                       Just r  -> return r }
                           else fmap Left $ lookupGlobalOccRn lbl
+           ; traceRn "rnHsRecUpdFields 2" (ppr sel)
            ; arg' <- if pun
                      then do { checkErr pun_ok (badPun (L loc lbl))
                                -- Discard any module qualifier (#11662)
                              ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
                              ; return (L loc (HsVar noExtField (L loc arg_rdr))) }
                      else return arg
+           ; traceRn "rnHsRecUpdFields 3" (ppr arg')
            ; (arg'', fvs) <- rnLExpr arg'
 
            ; let fvs' = case sel of
@@ -778,6 +781,8 @@ rnHsRecUpdFields flds
                                      L loc (Unambiguous sel_name   (L loc lbl))
                           Right _ -> L loc (Ambiguous   noExtField (L loc lbl))
 
+           ; traceRn "rnHsRecUpdFields 4" (ppr fvs')
+           ; traceRn "rnHsRecUpdFields 5" (ppr lbl')
            ; return (L l (HsRecField { hsRecFieldLbl = lbl'
                                      , hsRecFieldArg = arg''
                                      , hsRecPun      = pun }), fvs') }

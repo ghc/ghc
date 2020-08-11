@@ -10,6 +10,7 @@ module GHC.Tc.Gen.Export (tcRnExports, exports_from_avail) where
 import GHC.Prelude
 
 import GHC.Hs
+import GHC.Types.FieldLabel
 import GHC.Builtin.Names
 import GHC.Types.Name.Reader
 import GHC.Tc.Utils.Monad
@@ -31,7 +32,6 @@ import GHC.Types.SrcLoc as SrcLoc
 import GHC.Driver.Types
 import GHC.Utils.Outputable
 import GHC.Core.ConLike
-import GHC.Core.DataCon
 import GHC.Core.PatSyn
 import GHC.Data.Maybe
 import GHC.Types.Unique.Set
@@ -424,8 +424,8 @@ classifyGREs = partitionEithers . map classifyGRE
 
 classifyGRE :: GlobalRdrElt -> Either Name FieldLabel
 classifyGRE gre = case gre_par gre of
-  FldParent _ Nothing -> Right (FieldLabel (occNameFS (nameOccName n)) False n)
-  FldParent _ (Just lbl) -> Right (FieldLabel lbl True n)
+  FldParent _ Nothing has_sel -> Right (FieldLabel (occNameFS (nameOccName n)) NoDuplicateRecordFields has_sel n)
+  FldParent _ (Just lbl) has_sel -> Right (FieldLabel lbl DuplicateRecordFields has_sel n)
   _                      -> Left  n
   where
     n = gre_name gre
