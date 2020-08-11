@@ -55,6 +55,7 @@ import GHC.Utils.Panic
 
 import qualified Data.Map    as Map
 import qualified Data.IntMap as IntMap
+import GHC.Types.Unique.FM
 import GHC.Types.Var.Env
 import GHC.Types.Name.Env
 import Control.Monad( (>=>) )
@@ -605,7 +606,7 @@ fdT k m = foldTM k (tm_var m)
 
 ------------------------
 data TyLitMap a = TLM { tlm_number :: Map.Map Integer a
-                      , tlm_string :: Map.Map FastString a
+                      , tlm_string :: UniqFM  FastString a
                       }
 
 instance TrieMap TyLitMap where
@@ -617,27 +618,27 @@ instance TrieMap TyLitMap where
    mapTM    = mapTyLit
 
 emptyTyLitMap :: TyLitMap a
-emptyTyLitMap = TLM { tlm_number = Map.empty, tlm_string = Map.empty }
+emptyTyLitMap = TLM { tlm_number = Map.empty, tlm_string = emptyUFM }
 
 mapTyLit :: (a->b) -> TyLitMap a -> TyLitMap b
 mapTyLit f (TLM { tlm_number = tn, tlm_string = ts })
-  = TLM { tlm_number = Map.map f tn, tlm_string = Map.map f ts }
+  = TLM { tlm_number = Map.map f tn, tlm_string = mapUFM f ts }
 
 lkTyLit :: TyLit -> TyLitMap a -> Maybe a
 lkTyLit l =
   case l of
     NumTyLit n -> tlm_number >.> Map.lookup n
-    StrTyLit n -> tlm_string >.> Map.lookup n
+    StrTyLit n -> tlm_string >.> (`lookupUFM` n)
 
 xtTyLit :: TyLit -> XT a -> TyLitMap a -> TyLitMap a
 xtTyLit l f m =
   case l of
-    NumTyLit n -> m { tlm_number = tlm_number m |> Map.alter f n }
-    StrTyLit n -> m { tlm_string = tlm_string m |> Map.alter f n }
+    NumTyLit n -> m { tlm_number = Map.alter f n (tlm_number m) }
+    StrTyLit n -> m { tlm_string = alterUFM  f (tlm_string m) n }
 
 foldTyLit :: (a -> b -> b) -> TyLitMap a -> b -> b
-foldTyLit l m = flip (Map.foldr l) (tlm_string m)
-              . flip (Map.foldr l) (tlm_number m)
+foldTyLit l m = flip (foldUFM l) (tlm_string m)
+              . flip (Map.foldr l)   (tlm_number m)
 
 -------------------------------------------------
 -- | @TypeMap a@ is a map from 'Type' to @a@.  If you are a client, this

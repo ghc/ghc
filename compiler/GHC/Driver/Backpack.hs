@@ -560,7 +560,7 @@ msgInclude (i,n) uid = do
 -- ----------------------------------------------------------------------------
 -- Conversion from PackageName to HsComponentId
 
-type PackageNameMap a = Map PackageName a
+type PackageNameMap a = UniqFM PackageName a
 
 -- For now, something really simple, since we're not actually going
 -- to use this for anything
@@ -569,7 +569,7 @@ unitDefines (L _ HsUnit{ hsunitName = L _ pn@(PackageName fs) })
     = (pn, HsComponentId pn (Indefinite (UnitId fs)))
 
 bkpPackageNameMap :: [LHsUnit PackageName] -> PackageNameMap HsComponentId
-bkpPackageNameMap units = Map.fromList (map unitDefines units)
+bkpPackageNameMap units = listToUFM (map unitDefines units)
 
 renameHsUnits :: UnitState -> PackageNameMap HsComponentId -> [LHsUnit PackageName] -> [LHsUnit HsComponentId]
 renameHsUnits pkgstate m units = map (fmap renameHsUnit) units
@@ -577,7 +577,7 @@ renameHsUnits pkgstate m units = map (fmap renameHsUnit) units
 
     renamePackageName :: PackageName -> HsComponentId
     renamePackageName pn =
-        case Map.lookup pn m of
+        case lookupUFM m pn of
             Nothing ->
                 case lookupPackageName pkgstate pn of
                     Nothing -> error "no package name"
