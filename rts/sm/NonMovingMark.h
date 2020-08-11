@@ -115,8 +115,6 @@ typedef struct MarkQueue_ {
     //     Bdescr(q->top)->link->start
     MarkQueueBlock *top;
 
-    // Is this a mark queue or a capability-local update remembered set?
-    bool is_upd_rem_set;
 
 #if MARK_PREFETCH_QUEUE_DEPTH > 0
     // A ring-buffer of entries which we will mark next
