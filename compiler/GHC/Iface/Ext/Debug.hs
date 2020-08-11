@@ -11,7 +11,6 @@ import GHC.Prelude
 
 import GHC.Types.SrcLoc
 import GHC.Unit.Module
-import GHC.Data.FastString
 import GHC.Utils.Outputable
 
 import GHC.Iface.Ext.Types
@@ -28,7 +27,7 @@ type Diff a = a -> a -> [SDoc]
 diffFile :: Diff HieFile
 diffFile = diffAsts eqDiff `on` (getAsts . hie_asts)
 
-diffAsts :: (Outputable a, Eq a, Ord a) => Diff a -> Diff (M.Map FastString (HieAST a))
+diffAsts :: (Outputable a, Eq a, Ord a) => Diff a -> Diff (M.Map HiePath (HieAST a))
 diffAsts f = diffList (diffAst f) `on` M.elems
 
 diffAst :: (Outputable a, Eq a,Ord a) => Diff a -> Diff (HieAST a)
@@ -106,7 +105,7 @@ validAst (Node _ span children) = do
 
 -- | Look for any identifiers which occur outside of their supposed scopes.
 -- Returns a list of error messages.
-validateScopes :: Module -> M.Map FastString (HieAST a) -> [SDoc]
+validateScopes :: Module -> M.Map HiePath (HieAST a) -> [SDoc]
 validateScopes mod asts = validScopes ++ validEvs
   where
     refMap = generateReferencesMap asts

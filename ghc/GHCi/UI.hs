@@ -2464,7 +2464,7 @@ browseModule bang modl exports_only = do
             annotate mts = concatMap (\(m,ts)->labels m:ts)
                          $ sortBy cmpQualifiers $ grp mts
               where cmpQualifiers =
-                      compare `on` (map (fmap (map moduleNameFS)) . fst)
+                      compare `on` (map (fmap (map (unpackFS . moduleNameFS))) . fst)
             grp []            = []
             grp mts@((m,_):_) = (m,map snd g) : grp ng
               where (g,ng) = partition ((==m).fst) mts

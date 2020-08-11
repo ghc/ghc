@@ -61,6 +61,7 @@ import GHC.Types.Id
 import GHC.Types.Var
 import GHC.Types.Var.Env
 import GHC.Types.Var.Set
+import GHC.Data.FastString
 import GHC.Unit
 import GHC.Types.Name
 import GHC.Types.Name.Set
@@ -3947,7 +3948,7 @@ checkValidTyCon tc
     data_cons = tyConDataCons tc
 
     groups = equivClasses cmp_fld (concatMap get_fields data_cons)
-    cmp_fld (f1,_) (f2,_) = flLabel f1 `compare` flLabel f2
+    cmp_fld (f1,_) (f2,_) = flLabel f1 `uniqCompareFS` flLabel f2
     get_fields con = dataConFieldLabels con `zip` repeat con
         -- dataConFieldLabels may return the empty list, which is fine
 
