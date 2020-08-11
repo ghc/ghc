@@ -85,7 +85,7 @@ foldType f (Roll t) = f $ fmap (foldType f) t
 
 selectPoint :: HieFile -> (Int,Int) -> Maybe (HieAST Int)
 selectPoint hf (sl,sc) = getFirst $
-  flip foldMap (M.toList (getAsts $ hie_asts hf)) $ \(fs,ast) -> First $
+  flip foldMap (M.toList (getAsts $ hie_asts hf)) $ \(HiePath fs,ast) -> First $
       case selectSmallestContaining (sp fs) ast of
         Nothing -> Nothing
         Just ast' -> Just ast'
@@ -248,12 +248,12 @@ getTypeIndex t
       return $ HCastTy i
     go (CoercionTy _) = return HCoercionTy
 
-resolveTyVarScopes :: M.Map FastString (HieAST a) -> M.Map FastString (HieAST a)
+resolveTyVarScopes :: M.Map HiePath (HieAST a) -> M.Map HiePath (HieAST a)
 resolveTyVarScopes asts = M.map go asts
   where
     go ast = resolveTyVarScopeLocal ast asts
 
-resolveTyVarScopeLocal :: HieAST a -> M.Map FastString (HieAST a) -> HieAST a
+resolveTyVarScopeLocal :: HieAST a -> M.Map HiePath (HieAST a) -> HieAST a
 resolveTyVarScopeLocal ast asts = go ast
   where
     resolveNameScope dets = dets{identInfo =
@@ -278,12 +278,12 @@ resolveTyVarScopeLocal ast asts = go ast
           where
             idents = M.map resolveNameScope $ nodeIdentifiers i
 
-getNameBinding :: Name -> M.Map FastString (HieAST a) -> Maybe Span
+getNameBinding :: Name -> M.Map HiePath (HieAST a) -> Maybe Span
 getNameBinding n asts = do
   (_,msp) <- getNameScopeAndBinding n asts
   msp
 
-getNameScope :: Name -> M.Map FastString (HieAST a) -> Maybe [Scope]
+getNameScope :: Name -> M.Map HiePath (HieAST a) -> Maybe [Scope]
 getNameScope n asts = do
   (scopes,_) <- getNameScopeAndBinding n asts
   return scopes
@@ -291,10 +291,10 @@ getNameScope n asts = do
 getNameBindingInClass
   :: Name
   -> Span
-  -> M.Map FastString (HieAST a)
+  -> M.Map HiePath (HieAST a)
   -> Maybe Span
 getNameBindingInClass n sp asts = do
-  ast <- M.lookup (srcSpanFile sp) asts
+  ast <- M.lookup (HiePath (srcSpanFile sp)) asts
   getFirst $ foldMap First $ do
     child <- flattenAst ast
     dets <- maybeToList
@@ -304,11 +304,11 @@ getNameBindingInClass n sp asts = do
 
 getNameScopeAndBinding
   :: Name
-  -> M.Map FastString (HieAST a)
+  -> M.Map HiePath (HieAST a)
   -> Maybe ([Scope], Maybe Span)
 getNameScopeAndBinding n asts = case nameSrcSpan n of
   RealSrcSpan sp _ -> do -- @Maybe
-    ast <- M.lookup (srcSpanFile sp) asts
+    ast <- M.lookup (HiePath (srcSpanFile sp)) asts
     defNode <- selectLargestContainedBy sp ast
     getFirst $ foldMap First $ do -- @[]
       node <- flattenAst defNode
@@ -369,9 +369,9 @@ selectSmallestContaining sp node
   | sp `containsSpan` nodeSpan node = Nothing
   | otherwise = Nothing
 
-definedInAsts :: M.Map FastString (HieAST a) -> Name -> Bool
+definedInAsts :: M.Map HiePath (HieAST a) -> Name -> Bool
 definedInAsts asts n = case nameSrcSpan n of
-  RealSrcSpan sp _ -> srcSpanFile sp `elem` M.keys asts
+  RealSrcSpan sp _ -> M.member (HiePath (srcSpanFile sp)) asts
   _ -> False
 
 getEvidenceBindDeps :: ContextInfo -> [Name]
@@ -515,7 +515,7 @@ mergeSortAsts = go . map pure
     mergePairs (xs:ys:xss) = mergeAsts xs ys : mergePairs xss
 
 simpleNodeInfo :: FastString -> FastString -> NodeInfo a
-simpleNodeInfo cons typ = NodeInfo (S.singleton (cons, typ)) [] M.empty
+simpleNodeInfo cons typ = NodeInfo (S.singleton (NodeAnnotation cons typ)) [] M.empty
 
 locOnly :: Monad m => SrcSpan -> ReaderT NodeOrigin m [HieAST a]
 locOnly (RealSrcSpan span _) = do
@@ -568,7 +568,7 @@ makeTypeNode x spn etyp = do
   org <- ask
   pure $ case spn of
     RealSrcSpan span _ ->
-      [Node (mkSourcedNodeInfo org $ NodeInfo (S.singleton (cons,typ)) [etyp] M.empty) span []]
+      [Node (mkSourcedNodeInfo org $ NodeInfo (S.singleton (NodeAnnotation cons typ)) [etyp] M.empty) span []]
     _ -> []
   where
     cons = mkFastString . show . toConstr $ x

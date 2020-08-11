@@ -568,7 +568,9 @@ instance Eq CoAxiomRule where
   x == y = coaxrName x == coaxrName y
 
 instance Ord CoAxiomRule where
-  compare x y = compare (coaxrName x) (coaxrName y)
+  -- we compare lexically to avoid non-deterministic output when sets of rules
+  -- are printed
+  compare x y = lexicalCompareFS (coaxrName x) (coaxrName y)
 
 instance Outputable CoAxiomRule where
   ppr = ppr . coaxrName
