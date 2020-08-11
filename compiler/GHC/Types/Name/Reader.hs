@@ -57,7 +57,7 @@ module GHC.Types.Name.Reader (
         gresToAvailInfo,
 
         -- ** Global 'RdrName' mapping elements: 'GlobalRdrElt', 'Provenance', 'ImportSpec'
-        GlobalRdrElt(..), isLocalGRE, isRecFldGRE, isOverloadedRecFldGRE, greLabel,
+        GlobalRdrElt(..), isLocalGRE, isRecFldGRE, isOverloadedRecFldGRE, isNoFieldSelectorGRE, greLabel,
         unQualOK, qualSpecOK, unQualSpecOK,
         pprNameProvenance,
         Parent(..), greParent_maybe,
@@ -480,22 +480,22 @@ data GlobalRdrElt
 --   notation in export lists.  See Note [Parents]
 data Parent = NoParent
             | ParentIs  { par_is :: Name }
-            | FldParent { par_is :: Name, par_lbl :: Maybe FieldLabelString }
+            | FldParent { par_is :: Name, par_lbl :: Maybe FieldLabelString, par_hasSel :: FieldSelectors }
               -- ^ See Note [Parents for record fields]
             deriving (Eq, Data)
 
 instance Outputable Parent where
    ppr NoParent        = empty
    ppr (ParentIs n)    = text "parent:" <> ppr n
-   ppr (FldParent n f) = text "fldparent:"
-                             <> ppr n <> colon <> ppr f
+   ppr (FldParent n f sel) = text "fldparent:"
+                             <> ppr n <> colon <> ppr f <> colon <> ppr sel
 
 plusParent :: Parent -> Parent -> Parent
 -- See Note [Combining parents]
 plusParent p1@(ParentIs _)    p2 = hasParent p1 p2
-plusParent p1@(FldParent _ _) p2 = hasParent p1 p2
+plusParent p1@(FldParent {}) p2  = hasParent p1 p2
 plusParent p1 p2@(ParentIs _)    = hasParent p2 p1
-plusParent p1 p2@(FldParent _ _) = hasParent p2 p1
+plusParent p1 p2@(FldParent {})  = hasParent p2 p1
 plusParent _ _                   = NoParent
 
 hasParent :: Parent -> Parent -> Parent
@@ -646,15 +646,15 @@ gresFromAvail prov_fn avail
                          , gre_lcl = False, gre_imp = [is] }
 
     mk_fld_gre (FieldLabel { flLabel = lbl, flIsOverloaded = is_overloaded
-                           , flSelector = n })
+                           , flSelector = n, flHasFieldSelector = has_sel })
       = case prov_fn n of  -- Nothing => bound locally
                            -- Just is => imported from 'is'
-          Nothing -> GRE { gre_name = n, gre_par = FldParent (availName avail) mb_lbl
+          Nothing -> GRE { gre_name = n, gre_par = FldParent (availName avail) mb_lbl has_sel
                          , gre_lcl = True, gre_imp = [] }
-          Just is -> GRE { gre_name = n, gre_par = FldParent (availName avail) mb_lbl
+          Just is -> GRE { gre_name = n, gre_par = FldParent (availName avail) mb_lbl has_sel
                          , gre_lcl = False, gre_imp = [is] }
       where
-        mb_lbl | is_overloaded = Just lbl
+        mb_lbl | is_overloaded == DuplicateRecordFields || has_sel == NoFieldSelectors = Just lbl
                | otherwise     = Nothing
 
 
@@ -696,9 +696,9 @@ mkParent n (AvailTC m _ _) | n == m    = NoParent
 
 greParent_maybe :: GlobalRdrElt -> Maybe Name
 greParent_maybe gre = case gre_par gre of
-                        NoParent      -> Nothing
-                        ParentIs n    -> Just n
-                        FldParent n _ -> Just n
+                        NoParent        -> Nothing
+                        ParentIs n      -> Just n
+                        FldParent n _ _ -> Just n
 
 -- | Takes a list of distinct GREs and folds them
 -- into AvailInfos. This is more efficient than mapping each individual
@@ -742,7 +742,7 @@ gresToAvailInfo gres
           = case gre_par gre of
               NoParent    -> AvailTC m (name:ns) fls -- Not sure this ever happens
               ParentIs {} -> AvailTC m (insertChildIntoChildren m ns name) fls
-              FldParent _ mb_lbl -> AvailTC m ns (mkFieldLabel name mb_lbl : fls)
+              FldParent _ mb_lbl has_sel -> AvailTC m ns (mkFieldLabel name mb_lbl has_sel : fls)
 
 availFromGRE :: GlobalRdrElt -> AvailInfo
 availFromGRE (GRE { gre_name = me, gre_par = parent })
@@ -750,16 +750,18 @@ availFromGRE (GRE { gre_name = me, gre_par = parent })
       ParentIs p                  -> AvailTC p [me] []
       NoParent   | isTyConName me -> AvailTC me [me] []
                  | otherwise      -> avail   me
-      FldParent p mb_lbl -> AvailTC p [] [mkFieldLabel me mb_lbl]
+      FldParent p mb_lbl has_sel -> AvailTC p [] [mkFieldLabel me mb_lbl has_sel]
 
-mkFieldLabel :: Name -> Maybe FastString -> FieldLabel
-mkFieldLabel me mb_lbl =
+mkFieldLabel :: Name -> Maybe FastString -> FieldSelectors -> FieldLabel
+mkFieldLabel me mb_lbl has_sel =
           case mb_lbl of
                  Nothing  -> FieldLabel { flLabel = occNameFS (nameOccName me)
-                                        , flIsOverloaded = False
+                                        , flIsOverloaded = NoDuplicateRecordFields
+                                        , flHasFieldSelector = has_sel
                                         , flSelector = me }
                  Just lbl -> FieldLabel { flLabel = lbl
-                                        , flIsOverloaded = True
+                                        , flIsOverloaded = DuplicateRecordFields
+                                        , flHasFieldSelector = has_sel
                                         , flSelector = me }
 
 emptyGlobalRdrEnv :: GlobalRdrEnv
@@ -857,6 +859,10 @@ isOverloadedRecFldGRE :: GlobalRdrElt -> Bool
 -- (See Note [Parents for record fields])
 isOverloadedRecFldGRE (GRE {gre_par = FldParent{par_lbl = Just _}}) = True
 isOverloadedRecFldGRE _                                             = False
+
+isNoFieldSelectorGRE :: GlobalRdrElt -> Bool
+isNoFieldSelectorGRE (GRE {gre_par = FldParent{par_hasSel = NoFieldSelectors }}) = True
+isNoFieldSelectorGRE _ = False
 
 -- Returns the field label of this GRE, if it has one
 greLabel :: GlobalRdrElt -> Maybe FieldLabelString

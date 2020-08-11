@@ -160,7 +160,7 @@ availName (AvailTC n _ _) = n
 -- | All names made available by the availability information (excluding overloaded selectors)
 availNames :: AvailInfo -> [Name]
 availNames (Avail n)         = [n]
-availNames (AvailTC _ ns fs) = ns ++ [ flSelector f | f <- fs, not (flIsOverloaded f) ]
+availNames (AvailTC _ ns fs) = ns ++ [ flSelector f | f <- fs, flIsOverloaded f == NoDuplicateRecordFields ]
 
 -- | All names made available by the availability information (including overloaded selectors)
 availNamesWithSelectors :: AvailInfo -> [Name]

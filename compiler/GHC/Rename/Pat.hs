@@ -79,6 +79,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad       ( when, ap, guard )
 import qualified Data.List.NonEmpty as NE
 import Data.Ratio
+import GHC.Types.FieldLabel (DuplicateRecordFields(..), FieldSelectors(..))
 
 {-
 *********************************************************
@@ -728,8 +729,9 @@ rnHsRecUpdFields
     -> RnM ([LHsRecUpdField GhcRn], FreeVars)
 rnHsRecUpdFields flds
   = do { pun_ok        <- xoptM LangExt.RecordPuns
-       ; overload_ok   <- xoptM LangExt.DuplicateRecordFields
-       ; (flds1, fvss) <- mapAndUnzipM (rn_fld pun_ok overload_ok) flds
+       ; overload_ok   <- (\x -> if x then DuplicateRecordFields else NoDuplicateRecordFields) <$> xoptM LangExt.DuplicateRecordFields
+       ; has_sel       <- (\x -> if x then FieldSelectors else NoFieldSelectors) <$> xoptM LangExt.FieldSelectors
+       ; (flds1, fvss) <- mapAndUnzipM (rn_fld pun_ok overload_ok has_sel) flds
        ; mapM_ (addErr . dupFieldErr HsRecFieldUpd) dup_flds
 
        -- Check for an empty record update  e {}
@@ -740,18 +742,17 @@ rnHsRecUpdFields flds
   where
     doc = text "constructor field name"
 
-    rn_fld :: Bool -> Bool -> LHsRecUpdField GhcPs
+    rn_fld :: Bool -> DuplicateRecordFields -> FieldSelectors -> LHsRecUpdField GhcPs
            -> RnM (LHsRecUpdField GhcRn, FreeVars)
-    rn_fld pun_ok overload_ok (L l (HsRecField { hsRecFieldLbl = L loc f
+    rn_fld pun_ok overload_ok has_sel (L l (HsRecField { hsRecFieldLbl = L loc f
                                                , hsRecFieldArg = arg
                                                , hsRecPun      = pun }))
       = do { let lbl = rdrNameAmbiguousFieldOcc f
            ; sel <- setSrcSpan loc $
                       -- Defer renaming of overloaded fields to the typechecker
                       -- See Note [Disambiguating record fields] in GHC.Tc.Gen.Expr
-                      if overload_ok
-                          then do { mb <- lookupGlobalOccRn_overloaded
-                                            overload_ok lbl
+                      if overload_ok == DuplicateRecordFields || has_sel == NoFieldSelectors
+                          then do { mb <- lookupGlobalOccRn_overloaded_pat lbl
                                   ; case mb of
                                       Nothing ->
                                         do { addErr
