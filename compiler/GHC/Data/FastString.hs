@@ -231,10 +231,12 @@ instance Data FastString where
 instance NFData FastString where
   rnf fs = seq fs ()
 
+-- | Compare FastString lexicographically
 cmpFS :: FastString -> FastString -> Ordering
 cmpFS fs1 fs2 =
   if uniq fs1 == uniq fs2 then EQ else
-  compare (fs_sbs fs1) (fs_sbs fs2)
+  compare (unpackFS fs1) (unpackFS fs2)
+  -- compare as String, not as ShortByteString (cf #18562)
 
 -- -----------------------------------------------------------------------------
 -- Construction
