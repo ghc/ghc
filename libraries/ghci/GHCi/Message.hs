@@ -455,6 +455,9 @@ instance Binary Heap.StgTSOProfInfo
 instance Binary Heap.CostCentreStack
 instance Binary Heap.CostCentre
 instance Binary Heap.IndexTable
+instance Binary Heap.WhatNext
+instance Binary Heap.WhyBlocked
+instance Binary Heap.TsoFlags
 #endif
 
 instance Binary Heap.StgInfoTable

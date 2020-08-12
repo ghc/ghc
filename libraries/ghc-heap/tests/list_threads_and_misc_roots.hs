@@ -7,6 +7,8 @@ import Control.Concurrent
 import GHC.Exts.Heap
 import GHC.Exts
 
+import TestUtils
+
 foreign import ccall safe "list_threads_and_misc_roots_c.h listThreadsAndMiscRoots"
     listThreadsAndMiscRoots_c :: IO ()
 
@@ -43,19 +45,6 @@ main = do
     mapM assertIsClosureType $ map (tipe . info) heapClosures
 
     return ()
-
-createClosure :: Ptr () -> IO (GenClosure Box)
-createClosure tsoPtr = do
-    let addr = unpackAddr# tsoPtr
-    getClosureData ((unsafeCoerce# addr) :: LiftedClosure)
-
-unpackAddr# :: Ptr () -> Addr#
-unpackAddr# (Ptr addr) = addr
-
-assertEqual :: (Show a, Eq a) => a -> a -> IO ()
-assertEqual a b
-    | a /= b = error (show a ++ " /= " ++ show b)
-    | otherwise = return ()
 
 assertIsClosureType :: ClosureType -> IO ()
 assertIsClosureType t
