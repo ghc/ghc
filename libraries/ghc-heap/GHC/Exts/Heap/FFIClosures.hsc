@@ -6,13 +6,12 @@ module GHC.Exts.Heap.FFIClosures where
 import Prelude
 import Foreign
 import GHC.Exts.Heap.ProfInfo.Types
-
--- TODO use sum type for what_next, why_blocked, flags?
+import GHC.Exts.Heap.Closures(WhatNext(..), WhyBlocked(..), TsoFlags(..))
 
 data TSOFields = TSOFields {
-    tso_what_next :: Word16,
-    tso_why_blocked :: Word16,
-    tso_flags :: Word32,
+    tso_what_next :: WhatNext,
+    tso_why_blocked :: WhyBlocked,
+    tso_flags :: [TsoFlags],
 -- Unfortunately block_info is a union without clear discriminator.
 --    block_info :: TDB,
     tso_threadId :: Word64,
@@ -39,16 +38,61 @@ peekTSOFields peekProfInfo ptr = do
     tso_prof' <- peekProfInfo ptr
 
     return TSOFields {
-        tso_what_next = what_next',
-        tso_why_blocked = why_blocked',
-        tso_flags = flags',
+        tso_what_next = parseWhatNext what_next',
+        tso_why_blocked = parseWhyBlocked why_blocked',
+        tso_flags = parseTsoFlags flags',
         tso_threadId = threadId',
         tso_saved_errno = saved_errno',
-        tso_dirty= dirty',
+        tso_dirty = dirty',
         tso_alloc_limit = alloc_limit',
         tso_tot_stack_size = tot_stack_size',
         tso_prof = tso_prof'
     }
+
+parseWhatNext :: Word16 -> WhatNext
+parseWhatNext w = case w of
+                    (#const ThreadRunGHC) -> ThreadRunGHC
+                    (#const ThreadInterpret) -> ThreadInterpret
+                    (#const ThreadKilled) -> ThreadKilled
+                    (#const ThreadComplete) -> ThreadComplete
+                    _ -> WhatNextUnknownValue
+
+parseWhyBlocked :: Word16 -> WhyBlocked
+parseWhyBlocked w = case w of
+                        (#const NotBlocked) -> NotBlocked
+                        (#const BlockedOnMVar) -> BlockedOnMVar
+                        (#const BlockedOnMVarRead) -> BlockedOnMVarRead
+                        (#const BlockedOnBlackHole) -> BlockedOnBlackHole
+                        (#const BlockedOnRead) -> BlockedOnRead
+                        (#const BlockedOnWrite) -> BlockedOnWrite
+                        (#const BlockedOnDelay) -> BlockedOnDelay
+                        (#const BlockedOnSTM) -> BlockedOnSTM
+                        (#const BlockedOnDoProc) -> BlockedOnDoProc
+                        (#const BlockedOnCCall) -> BlockedOnCCall
+                        (#const BlockedOnCCall_Interruptible) -> BlockedOnCCall_Interruptible
+                        (#const BlockedOnMsgThrowTo) -> BlockedOnMsgThrowTo
+                        (#const ThreadMigrating) -> ThreadMigrating
+#if __GLASGOW_HASKELL__ >= 810
+                        (#const BlockedOnIOCompletion) -> BlockedOnIOCompletion
+#endif
+                        _ -> WhyBlockedUnknownValue
+
+parseTsoFlags :: Word32 -> [TsoFlags]
+parseTsoFlags w | isSet (#const TSO_LOCKED) w = TsoLocked : parseTsoFlags (unset (#const TSO_LOCKED) w)
+                | isSet (#const TSO_BLOCKEX) w = TsoBlockx : parseTsoFlags (unset (#const TSO_BLOCKEX) w)
+                | isSet (#const TSO_INTERRUPTIBLE) w = TsoInterruptible : parseTsoFlags (unset (#const TSO_INTERRUPTIBLE) w)
+                | isSet (#const TSO_STOPPED_ON_BREAKPOINT) w = TsoStoppedOnBreakpoint : parseTsoFlags (unset (#const TSO_STOPPED_ON_BREAKPOINT) w)
+                | isSet (#const TSO_MARKED) w = TsoMarked : parseTsoFlags (unset (#const TSO_MARKED) w)
+                | isSet (#const TSO_SQUEEZED) w = TsoSqueezed : parseTsoFlags (unset (#const TSO_SQUEEZED) w)
+                | isSet (#const TSO_ALLOC_LIMIT) w = TsoAllocLimit : parseTsoFlags (unset (#const TSO_ALLOC_LIMIT) w)
+parseTsoFlags 0 = []
+parseTsoFlags _ = [TsoFlagsUnknownValue]
+
+isSet :: Word32 -> Word32 -> Bool
+isSet bitMask w = w .&. bitMask /= 0
+
+unset :: Word32 -> Word32 -> Word32
+unset bitMask w = w `xor` bitMask
 
 data StackFields = StackFields {
     stack_size :: Word32,
