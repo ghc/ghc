@@ -40,6 +40,10 @@ Compiler
 - GHCi's ``:kind!`` command now expands through type synonyms in addition to type
   families. See :ghci-cmd:`:kind`.
 
+- GHC now supports a flag, :ghc-flag:`-fprof-callers=⟨name⟩`, for requesting
+  that the compiler automatically insert cost-centres on all call-sites of
+  the named function.
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 

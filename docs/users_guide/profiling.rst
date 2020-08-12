@@ -358,6 +358,38 @@ Automatically placing cost-centres
 GHC has a number of flags for automatically inserting cost-centres into the
 compiled program.
 
+.. ghc-flag:: -fprof-callers=⟨name⟩
+    :shortdesc: Auto-add ``SCC``\\ s to all call-sites of the named function.
+    :type: dynamic
+    :category:
+
+    Automatically enclose all occurrences of the named function in an ``SCC``.
+    Note that these cost-centres are added late in compilation (after
+    simplification) and consequently the names may be slightly different than
+    they appear in the source program (e.g. a call to ``f`` may inlined with
+    its wrapper, resulting in an occurrence of its worker, ``$wf``).
+
+    In addition to plain module-qualified names (e.g. ``Data.List.map``),
+    ⟨name⟩ also accepts a small globbing language using ``*`` as a wildcard
+    symbol:
+
+    .. code-block:: none
+
+        pattern    := <module> '.' <identifier>
+        module     := '*'
+                    | <Haskell module name>
+        identifier := <ident_char>
+        ident
+
+    For instance, the following are all valid patterns:
+
+     * ``Data.List.map``
+     * ``*.map``
+     * ``*.parse*``
+     * ``*.<\\*>``
+
+    The ``*`` character can be used literally by escaping (e.g. ``\\*``).
+
 .. ghc-flag:: -fprof-auto
     :shortdesc: Auto-add ``SCC``\\ s to all bindings not marked INLINE
     :type: dynamic
