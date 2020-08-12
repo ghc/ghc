@@ -14,11 +14,11 @@ Pattern Matching Coverage Checking.
 
 module GHC.HsToCore.PmCheck (
         -- Checking and printing
-        checkSingle, checkMatches, checkGRHSs,
+        covCheckPatBind, covCheckMatchGroup, covCheckGRHSs,
         isMatchContextPmChecked,
 
         -- See Note [Type and Term Equality Propagation]
-        addTyCsDs, addScrutTmCs
+        addTyCsDs, addCoreScrutTmCs, addHsScrutTmCs
     ) where
 
 #include "HsVersions.h"
@@ -283,37 +283,38 @@ instance Outputable CheckResult where
 {-
 %************************************************************************
 %*                                                                      *
-       Entry points to the checker: checkSingle and checkMatches
+       Entry points to the checker: covCheckPatBind and covCheckMatchGroup
 %*                                                                      *
 %************************************************************************
 -}
 
--- | Check a single pattern binding (let) for exhaustiveness.
-checkSingle :: DynFlags -> DsMatchContext -> Id -> Pat GhcTc -> DsM ()
-checkSingle dflags ctxt@(DsMatchContext kind locn) var p = do
-  tracePm "checkSingle" (vcat [ppr ctxt, ppr var, ppr p])
+-- | Check a pattern binding (let, where) for exhaustiveness.
+covCheckPatBind :: DynFlags -> DsMatchContext -> Id -> Pat GhcTc -> DsM ()
+covCheckPatBind dflags ctxt@(DsMatchContext _ locn) var p = do
   -- We only ever need to run this in a context where we need exhaustivity
   -- warnings (so not in pattern guards or comprehensions, for example, because
   -- they are perfectly fine to fail).
   -- Omitting checking this flag emits redundancy warnings twice in obscure
   -- cases like #17646.
-  when (exhaustive dflags kind) $ do
-    -- TODO: This could probably call checkMatches, like checkGRHSs.
-    missing   <- getPmDeltas
-    tracePm "checkSingle: missing" (ppr missing)
-    fam_insts <- dsGetFamInstEnvs
-    grd_tree  <- mkGrdTreeRhs (L locn $ ppr p) <$> translatePat fam_insts var p
-    res <- checkGrdTree grd_tree missing
-    dsPmWarn dflags ctxt [var] res
+  -- Given the context in which this function is called, it will only ever do
+  -- something for
+  --   * PatBindRhs, -Wincomplete-uni-patterns: @let True = False@
+  --   * PatBindGuards, -Wincomplete-patterns: @Just x | False = Just 42@
+  missing   <- getPmDeltas
+  tracePm "covCheckPatBind" (vcat [ppr ctxt, ppr var, ppr p, ppr missing])
+  fam_insts <- dsGetFamInstEnvs
+  grd_tree  <- mkGrdTreeRhs (L locn $ ppr p) <$> translatePat fam_insts var p
+  res <- checkGrdTree grd_tree missing
+  dsPmWarn dflags ctxt [var] res
 
 -- | Exhaustive for guard matches, is used for guards in pattern bindings and
 -- in @MultiIf@ expressions. Returns the 'Deltas' covered by the RHSs.
-checkGRHSs
+covCheckGRHSs
   :: HsMatchContext GhcRn         -- ^ Match context, for warning messages
   -> GRHSs GhcTc (LHsExpr GhcTc)  -- ^ The GRHSs to check
   -> DsM (NonEmpty Deltas)        -- ^ Covered 'Deltas' for each RHS, for long
                                   --   distance info
-checkGRHSs hs_ctx guards@(GRHSs _ grhss _) = do
+covCheckGRHSs hs_ctx guards@(GRHSs _ grhss _) = do
     let combinedLoc = foldl1 combineSrcSpans (map getLoc grhss)
         dsMatchContext = DsMatchContext hs_ctx combinedLoc
         match = L combinedLoc $
@@ -321,7 +322,7 @@ checkGRHSs hs_ctx guards@(GRHSs _ grhss _) = do
                         , m_ctxt = hs_ctx
                         , m_pats = []
                         , m_grhss = guards }
-    [(_, deltas)] <- checkMatches dsMatchContext [] [match]
+    [(_, deltas)] <- covCheckMatchGroup dsMatchContext [] [match]
     pure deltas
 
 -- | Check a list of syntactic /match/es (part of case, functions, etc.), each
@@ -337,14 +338,14 @@ checkGRHSs hs_ctx guards@(GRHSs _ grhss _) = do
 -- incoming uncovered 'Deltas' (from 'getPmDeltas') if the GRHS is inaccessible.
 -- Since there is at least one /grhs/ per /match/, the list of 'Deltas' is at
 -- least as long as the list of matches.
-checkMatches
+covCheckMatchGroup
   :: DsMatchContext                  -- ^ Match context, for warnings messages
   -> [Id]                            -- ^ Match variables, i.e. x and y above
   -> [LMatch GhcTc (LHsExpr GhcTc)]  -- ^ List of matches
   -> DsM [(Deltas, NonEmpty Deltas)] -- ^ One covered 'Deltas' per RHS, for long
                                      --   distance info.
-checkMatches ctxt vars matches = do
-  tracePm "checkMatches" (hang (vcat [ppr ctxt
+covCheckMatchGroup ctxt vars matches = do
+  tracePm "covCheckMatchGroup" (hang (vcat [ppr ctxt
                                , ppr vars
                                , text "Matches:"])
                                2
@@ -1112,7 +1113,7 @@ f x = case x of
              (_:_) -> True
              []    -> False -- can't happen
 
-Functions `addScrutTmCs' is responsible for generating
+Functions `add*ScrutTmCs' is responsible for generating
 these constraints.
 -}
 
@@ -1141,17 +1142,24 @@ addTyCsDs origin ev_vars m = do
             (locallyExtendPmDelta (\deltas -> addPmCtsDeltas deltas (PmTyCt . evVarPred <$> ev_vars)))
             m
 
--- | Add equalities for the scrutinee to the local 'DsM' environment when
--- checking a case expression:
+-- | Add equalities for the 'CoreExpr' scrutinee to the local 'DsM' environment
+-- when checking a case expression:
 --     case e of x { matches }
 -- When checking matches we record that (x ~ e) where x is the initial
 -- uncovered. All matches will have to satisfy this equality.
-addScrutTmCs :: Maybe (LHsExpr GhcTc) -> [Id] -> DsM a -> DsM a
-addScrutTmCs Nothing    _   k = k
-addScrutTmCs (Just scr) [x] k = do
+addCoreScrutTmCs :: Maybe CoreExpr -> [Id] -> DsM a -> DsM a
+addCoreScrutTmCs Nothing    _   k = k
+addCoreScrutTmCs (Just scr) [x] k =
+  flip locallyExtendPmDelta k $ \deltas ->
+    addPmCtsDeltas deltas (unitBag (PmCoreCt x scr))
+addCoreScrutTmCs _   _   _ = panic "addCoreScrutTmCs: scrutinee, but more than one match id"
+
+-- | 'addCoreScrutTmCs', but desugars the 'LHsExpr' first.
+addHsScrutTmCs :: Maybe (LHsExpr GhcTc) -> [Id] -> DsM a -> DsM a
+addHsScrutTmCs Nothing    _    k = k
+addHsScrutTmCs (Just scr) vars k = do
   scr_e <- dsLExpr scr
-  locallyExtendPmDelta (\deltas -> addPmCtsDeltas deltas (unitBag (PmCoreCt x scr_e))) k
-addScrutTmCs _   _   _ = panic "addScrutTmCs: HsCase with more than one case binder"
+  addCoreScrutTmCs (Just scr_e) vars k
 
 {-
 %************************************************************************
@@ -1169,7 +1177,7 @@ isMatchContextPmChecked dflags origin kind
   | isGenerated origin
   = False
   | otherwise
-  = wopt Opt_WarnOverlappingPatterns dflags || exhaustive dflags kind
+  = overlapping dflags kind || exhaustive dflags kind
 
 -- | Return True when any of the pattern match warnings ('allPmCheckWarnings')
 -- are enabled, in which case we need to run the pattern match checker.
@@ -1399,10 +1407,9 @@ exhaustiveWarningFlag RecUpd        = Just Opt_WarnIncompletePatternsRecUpd
 exhaustiveWarningFlag ThPatSplice   = Nothing
 exhaustiveWarningFlag PatSyn        = Nothing
 exhaustiveWarningFlag ThPatQuote    = Nothing
-exhaustiveWarningFlag (StmtCtxt {}) = Nothing -- Don't warn about incomplete patterns
-                                       -- in list comprehensions, pattern guards
-                                       -- etc. They are often *supposed* to be
-                                       -- incomplete
+-- Don't warn about incomplete patterns in list comprehensions, pattern guards
+-- etc. They are often *supposed* to be incomplete
+exhaustiveWarningFlag (StmtCtxt {}) = Nothing
 
 -- True <==> singular
 pprContext :: Bool -> DsMatchContext -> SDoc -> ((SDoc -> SDoc) -> SDoc) -> SDoc

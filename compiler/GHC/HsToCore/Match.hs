@@ -66,7 +66,7 @@ import GHC.Data.FastString
 import GHC.Types.Unique
 import GHC.Types.Unique.DFM
 
-import Control.Monad(zipWithM,  unless )
+import Control.Monad ( zipWithM, unless, when )
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as Map
@@ -769,9 +769,9 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
         -- @rhss_deltas@ is a flat list of covered Deltas for each RHS.
         -- Each Match will split off one Deltas for its RHSs from this.
         ; matches_deltas <- if isMatchContextPmChecked dflags origin ctxt
-            then addScrutTmCs mb_scr new_vars $
+            then addHsScrutTmCs mb_scr new_vars $
                  -- See Note [Type and Term Equality Propagation]
-                 checkMatches (DsMatchContext ctxt locn) new_vars matches
+                 covCheckMatchGroup (DsMatchContext ctxt locn) new_vars matches
             else pure (initDeltasMatches matches)
 
         ; eqns_info   <- zipWithM mk_eqn_info matches matches_deltas
@@ -820,25 +820,24 @@ matchEquations ctxt vars eqns_info rhs_ty
         ; fail_expr <- mkErrorAppDs pAT_ERROR_ID rhs_ty error_doc
         ; extractMatchResult match_result fail_expr }
 
-{-
-************************************************************************
-*                                                                      *
-\subsection[matchSimply]{@matchSimply@: match a single expression against a single pattern}
-*                                                                      *
-************************************************************************
-
-@mkSimpleMatch@ is a wrapper for @match@ which deals with the
-situation where we want to match a single expression against a single
-pattern. It returns an expression.
--}
-
+-- | @matchSimply@ is a wrapper for 'match' which deals with the
+-- situation where we want to match a single expression against a single
+-- pattern. It returns an expression.
 matchSimply :: CoreExpr                 -- ^ Scrutinee
             -> HsMatchContext GhcRn     -- ^ Match kind
             -> LPat GhcTc               -- ^ Pattern it should match
             -> CoreExpr                 -- ^ Return this if it matches
             -> CoreExpr                 -- ^ Return this if it doesn't
             -> DsM CoreExpr
--- Do not warn about incomplete patterns; see matchSinglePat comments
+-- Some reasons 'matchSimply' is not defined using 'matchWrapper' (#18572):
+--   * Some call sites like in 'deBindComp' specify a @fail_expr@ that isn't a
+--     straight @patError@
+--   * It receives an already desugared 'CoreExpr' for the scrutinee, not an
+--     'HsExpr' like 'matchWrapper' expects
+--   * Filling in all the phony fields for the 'MatchGroup' for a single pattern
+--     match is awkward
+--   * And we still export 'matchSinglePatVar', so not much is gained if we
+--     don't also implement it in terms of 'matchWrapper'
 matchSimply scrut hs_ctx pat result_expr fail_expr = do
     let
       match_result = cantFailMatchResult result_expr
@@ -858,7 +857,7 @@ matchSinglePat :: CoreExpr -> HsMatchContext GhcRn -> LPat GhcTc
 
 matchSinglePat (Var var) ctx pat ty match_result
   | not (isExternalName (idName var))
-  = matchSinglePatVar var ctx pat ty match_result
+  = matchSinglePatVar var Nothing ctx pat ty match_result
 
 matchSinglePat scrut hs_ctx pat ty match_result
   = do { var           <- selectSimpleMatchVarL Many pat
@@ -867,22 +866,22 @@ matchSinglePat scrut hs_ctx pat ty match_result
                             -- and to create field selectors. All of which only
                             -- bind unrestricted variables, hence the 'Many'
                             -- above.
-       ; match_result' <- matchSinglePatVar var hs_ctx pat ty match_result
+       ; match_result' <- matchSinglePatVar var (Just scrut) hs_ctx pat ty match_result
        ; return $ bindNonRec var scrut <$> match_result'
        }
 
 matchSinglePatVar :: Id   -- See Note [Match Ids]
+                  -> Maybe CoreExpr -- ^ The scrutinee the match id is bound to
                   -> HsMatchContext GhcRn -> LPat GhcTc
                   -> Type -> MatchResult CoreExpr -> DsM (MatchResult CoreExpr)
-matchSinglePatVar var ctx pat ty match_result
+matchSinglePatVar var mb_scrut ctx pat ty match_result
   = ASSERT2( isInternalName (idName var), ppr var )
     do { dflags <- getDynFlags
        ; locn   <- getSrcSpanDs
-
        -- Pattern match check warnings
-       ; if isMatchContextPmChecked dflags FromSource ctx
-            then checkSingle dflags (DsMatchContext ctx locn) var (unLoc pat)
-            else pure ()
+       ; when (isMatchContextPmChecked dflags FromSource ctx) $
+           addCoreScrutTmCs mb_scrut [var] $
+           covCheckPatBind dflags (DsMatchContext ctx locn) var (unLoc pat)
 
        ; let eqn_info = EqnInfo { eqn_pats = [unLoc (decideBangHood dflags pat)]
                                 , eqn_orig = FromSource

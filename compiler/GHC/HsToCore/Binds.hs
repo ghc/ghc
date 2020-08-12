@@ -33,7 +33,7 @@ import {-# SOURCE #-}   GHC.HsToCore.Match ( matchWrapper )
 import GHC.HsToCore.Monad
 import GHC.HsToCore.GuardedRHSs
 import GHC.HsToCore.Utils
-import GHC.HsToCore.PmCheck ( addTyCsDs, checkGRHSs )
+import GHC.HsToCore.PmCheck ( addTyCsDs, covCheckGRHSs )
 
 import GHC.Hs             -- lots of things
 import GHC.Core           -- lots of things
@@ -184,7 +184,7 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
 dsHsBind dflags (PatBind { pat_lhs = pat, pat_rhs = grhss
                          , pat_ext = ty
                          , pat_ticks = (rhs_tick, var_ticks) })
-  = do  { rhss_deltas <- checkGRHSs PatBindGuards grhss
+  = do  { rhss_deltas <- covCheckGRHSs PatBindGuards grhss
         ; body_expr <- dsGuarded grhss ty rhss_deltas
         ; let body' = mkOptTickBox rhs_tick body_expr
               pat'  = decideBangHood dflags pat

@@ -1265,7 +1265,7 @@ isTyConTriviallyInhabited tc = elementOfUniqSet tc triviallyInhabitedTyCons
 {- Note [Checking EmptyCase Expressions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Empty case expressions are strict on the scrutinee. That is, `case x of {}`
-will force argument `x`. Hence, `checkMatches` is not sufficient for checking
+will force argument `x`. Hence, `covCheckMatchGroup` is not sufficient for checking
 empty cases, because it assumes that the match is not strict (which is true
 for all other cases, apart from EmptyCase). This gave rise to #10746. Instead,
 we do the following:
