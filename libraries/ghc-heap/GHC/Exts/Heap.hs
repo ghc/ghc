@@ -28,6 +28,9 @@ module GHC.Exts.Heap (
     , GenClosure(..)
     , ClosureType(..)
     , PrimType(..)
+    , WhatNext(..)
+    , WhyBlocked(..)
+    , TsoFlags(..)
     , HasHeapRep(getClosureDataX)
     , getClosureData
 
