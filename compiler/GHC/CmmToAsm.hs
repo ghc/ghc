@@ -644,7 +644,6 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                 checkLayout shorted $
                 {-# SCC "sequenceBlocks" #-}
                 map (BlockLayout.sequenceTop
-                        dflags
                         ncgImpl optimizedCFG)
                     shorted
 
@@ -1151,6 +1150,8 @@ initNCGConfig dflags = NCGConfig
    , ncgRegsIterative         = gopt Opt_RegsIterative dflags
    , ncgAsmLinting            = gopt Opt_DoAsmLinting dflags
    , ncgCfgWeights            = cfgWeights dflags
+   , ncgCfgBlockLayout        = gopt Opt_CfgBlocklayout dflags
+   , ncgCfgWeightlessLayout   = gopt Opt_WeightlessBlocklayout dflags
 
      -- With -O1 and greater, the cmmSink pass does constant-folding, so
      -- we don't need to do it again in the native code generator.
