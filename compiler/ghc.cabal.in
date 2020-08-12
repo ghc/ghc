@@ -581,6 +581,7 @@ Library
             GHC.CmmToAsm.Instr
             GHC.CmmToAsm.BlockLayout
             GHC.CmmToAsm.CFG
+            GHC.CmmToAsm.CFG.Weight
             GHC.CmmToAsm.CFG.Dominators
             GHC.CmmToAsm.Format
             GHC.Platform.Reg
