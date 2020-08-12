@@ -44,6 +44,7 @@ import GHC.Core.Opt.CprAnal      ( cprAnalProgram )
 import GHC.Core.Opt.CallArity    ( callArityAnalProgram )
 import GHC.Core.Opt.Exitify      ( exitifyProgram )
 import GHC.Core.Opt.WorkWrap     ( wwTopBinds )
+import GHC.Core.Opt.CallerCC     ( addCallerCostCentres )
 import GHC.Core.Seq (seqBinds)
 import GHC.Core.FamInstEnv
 
@@ -156,6 +157,7 @@ getCoreToDo dflags
     pre_inline_on = gopt Opt_SimplPreInlining             dflags
     ww_on         = gopt Opt_WorkerWrapper                dflags
     static_ptrs   = xopt LangExt.StaticPointers           dflags
+    profiling     = gopt Opt_ProfCallerCcs                dflags
 
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
 
@@ -222,12 +224,16 @@ getCoreToDo dflags
           }
         ]
 
+    add_caller_ccs =
+        runWhen (profiling && not (null $ callerCcFilters dflags)) CoreAddCallerCcs
+
     core_todo =
      if opt_level == 0 then
        [ static_ptrs_float_outwards,
          CoreDoSimplify max_iter
              (base_mode { sm_phase = FinalPhase
                         , sm_names = ["Non-opt simplification"] })
+       , add_caller_ccs
        ]
 
      else {- opt_level >= 1 -} [
@@ -371,7 +377,9 @@ getCoreToDo dflags
         -- can become /exponentially/ more expensive. See #11731, #12996.
         runWhen (strictness || late_dmd_anal) CoreDoDemand,
 
-        maybe_rule_check FinalPhase
+        maybe_rule_check FinalPhase,
+
+        add_caller_ccs
      ]
 
     -- Remove 'CoreDoNothing' and flatten 'CoreDoPasses' for clarity.
@@ -509,6 +517,9 @@ doCorePass CoreDoSpecialising        = {-# SCC "Specialise" #-}
 
 doCorePass CoreDoSpecConstr          = {-# SCC "SpecConstr" #-}
                                        specConstrProgram
+
+doCorePass CoreAddCallerCcs          = {-# SCC "AddCallerCcs" #-}
+                                       addCallerCostCentres
 
 doCorePass CoreDoPrintCore              = observe   printCore
 doCorePass (CoreDoRuleCheck phase pat)  = ruleCheckPass phase pat
