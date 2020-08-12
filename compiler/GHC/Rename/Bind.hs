@@ -1027,6 +1027,10 @@ renameSig ctxt sig@(SCCFunSig _ st v s)
   = do  { new_v <- lookupSigOccRn ctxt sig v
         ; return (SCCFunSig noExtField st new_v s, emptyFVs) }
 
+renameSig ctxt sig@(CallerCcSig _ st v)
+  = do  { new_v <- lookupSigOccRn ctxt sig v
+        ; return (CallerCcSig noExtField st new_v, emptyFVs) }
+
 -- COMPLETE Sigs can refer to imported IDs which is why we use
 -- lookupLocatedOccRn rather than lookupSigOccRn
 renameSig _ctxt sig@(CompleteMatchSig _ s (L l bf) mty)
@@ -1108,6 +1112,9 @@ okHsSig ctxt (L _ sig)
 
      (SCCFunSig {}, HsBootCtxt {}) -> False
      (SCCFunSig {}, _)             -> True
+
+     (CallerCcSig {}, HsBootCtxt {}) -> False
+     (CallerCcSig {}, _)             -> True
 
      (CompleteMatchSig {}, TopSigCtxt {} ) -> True
      (CompleteMatchSig {}, _)              -> False

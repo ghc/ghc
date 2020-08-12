@@ -758,6 +758,7 @@ data Token
   | IToverlaps_prag     SourceText  -- instance overlap mode
   | ITincoherent_prag   SourceText  -- instance overlap mode
   | ITctype             SourceText
+  | ITcaller_cc_prag    SourceText
   | ITcomment_line_prag         -- See Note [Nested comment line pragmas]
 
   | ITdotdot                    -- reserved symbols
@@ -3298,6 +3299,7 @@ oneWordPrags = Map.fromList [
      ("incoherent", strtoken (\s -> ITincoherent_prag (SourceText s))),
      ("ctype", strtoken (\s -> ITctype (SourceText s))),
      ("complete", strtoken (\s -> ITcomplete_prag (SourceText s))),
+     ("caller_cc", strtoken (\s -> ITcaller_cc_prag (SourceText s))),
      ("column", columnPrag)
      ]
 

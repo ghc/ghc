@@ -433,6 +433,7 @@ Library
         GHC.Core.Opt.Simplify.Monad
         GHC.Core.Opt.Simplify.Utils
         GHC.Core.Opt.Simplify
+        GHC.Core.AddCallerCcs
         GHC.Stg.Pipeline
         GHC.Stg.Stats
         GHC.Stg.CSE

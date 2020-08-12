@@ -993,6 +993,7 @@ rep_sig (L loc (SpecSig _ nm tys ispec))
 rep_sig (L loc (SpecInstSig _ _ ty))  = rep_specialiseInst ty loc
 rep_sig (L _   (MinimalSig {}))       = notHandled "MINIMAL pragmas" empty
 rep_sig (L _   (SCCFunSig {}))        = notHandled "SCC pragmas" empty
+rep_sig (L _   (CallerCcSig {}))      = notHandled "CALLER_CC pragmas" empty
 rep_sig (L loc (CompleteMatchSig _ _st cls mty))
   = rep_complete_sig cls mty loc
 

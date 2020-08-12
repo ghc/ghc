@@ -527,6 +527,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '{-# OVERLAPS'           { L _ (IToverlaps_prag _) }
  '{-# INCOHERENT'         { L _ (ITincoherent_prag _) }
  '{-# COMPLETE'           { L _ (ITcomplete_prag _)   }
+ '{-# CALLER_CC'          { L _ (ITcaller_cc_prag _)  }
  '#-}'                    { L _ ITclose_prag }
 
  '..'           { L _ ITdotdot }                        -- reserved symbols
@@ -2397,6 +2398,10 @@ sigdecl :: { LHsDecl GhcPs }
                                             (snd $2)))))
                        ((mo $1:fst $2) ++ [mc $4]) }
 
+        | '{-# CALLER_CC' qvar '#-}'
+                {% ams ((sLL $1 $> $ SigD noExtField (CallerCcSig noExtField (getCALLER_CC_PRAGs $1) $2)))
+                       [mo $1, mc $3] }
+
         | '{-# SCC' qvar '#-}'
           {% ams (sLL $1 $> (SigD noExtField (SCCFunSig noExtField (getSCC_PRAGs $1) $2 Nothing)))
                  [mo $1, mc $3] }
@@ -3681,6 +3686,7 @@ getINLINE       (L _ (ITinline_prag _ inl conl)) = (inl,conl)
 getSPEC_INLINE  (L _ (ITspec_inline_prag _ True))  = (Inline,  FunLike)
 getSPEC_INLINE  (L _ (ITspec_inline_prag _ False)) = (NoInline,FunLike)
 getCOMPLETE_PRAGs (L _ (ITcomplete_prag x)) = x
+getCALLER_CC_PRAGs (L _ (ITcaller_cc_prag x)) = x
 getVOCURLY      (L (RealSrcSpan l _) ITvocurly) = srcSpanStartCol l
 
 getINTEGERs     (L _ (ITinteger (IL src _ _))) = src

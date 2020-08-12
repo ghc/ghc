@@ -46,7 +46,9 @@ import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Driver.Ppr
 import GHC.Types.Var ( TyVar, Specificity(..), tyVarKind, binderVars )
-import GHC.Types.Id  ( Id, idName, idType, idInlinePragma, setInlinePragma, mkLocalId )
+import GHC.Types.Id  ( Id, idName, idType, mkLocalId,
+                       idInlinePragma, setInlinePragma, setIdCallerCcInfo )
+import GHC.Types.Id.Info ( CallerCcInfo(..) )
 import GHC.Builtin.Names( mkUnboundName )
 import GHC.Types.Basic
 import GHC.Unit.Module( getModule )
@@ -570,6 +572,8 @@ mkPragEnv sigs binds
       = Just (nm, L l $ InlineSig x lnm    (add_arity nm inl))
     get_sig (L l (SCCFunSig x st lnm@(L _ nm) str))
       = Just (nm, L l $ SCCFunSig x st lnm str)
+    get_sig (L l (CallerCcSig x st lnm@(L _ nm)))
+      = Just (nm, L l $ CallerCcSig x st lnm)
     get_sig _ = Nothing
 
     add_arity n inl_prag   -- Adjust inl_sat field to match visible arity of function
@@ -598,12 +602,23 @@ lhsBindArity _ env = env        -- PatBind/VarBind
 -- | Attach information from pragmas to an 'Id'\'s 'IdInfo'.
 addIdPrags :: TcId -> [LSig GhcRn] -> TcM TcId
 addIdPrags poly_id prags_for_me
-  = addInlinePrags poly_id prags_for_me
+  = do poly_id' <- addCallerCcPrag poly_id prags_for_me
+       addInlinePrags poly_id' prags_for_me
 
-addInlinePrags :: TcId -> [LSig GhcRc] -> TcM TcId
+addCallerCcPrag :: TcId -> [LSig GhcRn] -> TcM TcId
+addCallerCcPrag poly_id prags_for_me
+  | _ : _ <- ccc_prags
+  = do { -- TODO: Warn on multiple pragmas
+       ; return (setIdCallerCcInfo poly_id WantsCallerCc) }
+  | otherwise
+  = return poly_id
+  where
+    ccc_prags = [loc | L loc (CallerCcSig _ _ _) <- prags_for_me]
+
+addInlinePrags :: TcId -> [LSig GhcRn] -> TcM TcId
 addInlinePrags poly_id prags_for_me
   | inl@(L _ prag) : inls <- inl_prags
-  = do { traceTc "addInlinePrag" (ppr poly_id $$ ppr prag)
+  = do { traceTc "addIdPrags" (ppr poly_id $$ ppr prag)
        ; unless (null inls) (warn_multiple_inlines inl inls)
        ; return (poly_id `setInlinePragma` prag) }
   | otherwise
@@ -751,7 +766,7 @@ tcSpecPrags poly_id prag_sigs
   where
     spec_sigs = filter isSpecLSig prag_sigs
     bad_sigs  = filter is_bad_sig prag_sigs
-    is_bad_sig s = not (isSpecLSig s || isInlineLSig s || isSCCFunSig s)
+    is_bad_sig s = not (isSpecLSig s || isInlineLSig s || isSCCFunSig s || isCallerCCSig s)
 
     warn_discarded_sigs
       = addWarnTc NoReason

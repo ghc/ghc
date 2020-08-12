@@ -1491,6 +1491,7 @@ tcIdInfo ignore_prags toplvl name ty info = do
 
     tcPrag :: IdInfo -> IfaceInfoItem -> IfL IdInfo
     tcPrag info HsNoCafRefs        = return (info `setCafInfo`   NoCafRefs)
+    tcPrag info HsWantsCallerCc    = return (info `setCallerCcInfo` WantsCallerCc)
     tcPrag info (HsArity arity)    = return (info `setArityInfo` arity)
     tcPrag info (HsStrictness str) = return (info `setStrictnessInfo` str)
     tcPrag info (HsCpr cpr)        = return (info `setCprInfo` cpr)

@@ -6,28 +6,28 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE TupleSections #-}
 
-module GHC.Opt.Core.AddCallerCcs (addCallerCcs) where
-
-import Data.Maybe
-import Data.Data
-import qualified Data.Generics as SYB
-import GHC.Generics
+module GHC.Core.AddCallerCcs (addCallerCcs) where
 
 import Control.Monad.Trans.State.Strict
-import qualified Data.ByteString.Lazy as BSL
-import qualified Data.Binary as B
-import Data.List (intercalate)
 
-import GHC
 import GHC.Prelude
-import GHC.Serialized
 import GHC.Utils.Outputable
+import GHC.Driver.Session
+import GHC.Driver.Types
 import GHC.Types.CostCentre
 import GHC.Types.CostCentre.State
+import GHC.Types.Name (nameSrcSpan)
+import GHC.Types.SrcLoc
+import GHC.Types.Var
+import GHC.Unit.Types
+import GHC.Data.FastString
+import GHC.Types.Id.Info
 import GHC.Core
+import GHC.Core.Opt.Monad
 
-addCallerCcs :: DynFlags -> ModGuts -> ModGuts
-addCallerCcs dflags guts = do
+addCallerCcs :: ModGuts -> CoreM ModGuts
+addCallerCcs guts = do
+  dflags <- getDynFlags
   let env :: Env
       env = Env
         { thisModule = mg_module guts
@@ -35,9 +35,7 @@ addCallerCcs dflags guts = do
         , dflags = dflags
         , revParents = []
         }
-  in guts { mg_binds = doCoreProgram env (mg_binds guts)
-          , mg_anns = anns'
-          }
+  return $ guts { mg_binds = doCoreProgram env (mg_binds guts) }
 
 doCoreProgram :: Env -> CoreProgram -> CoreProgram
 doCoreProgram env binds = flip evalState newCostCentreState $ do
@@ -51,7 +49,7 @@ doBind env (Rec bs) = Rec <$> mapM doPair bs
 
 doExpr :: Env -> CoreExpr -> M CoreExpr
 doExpr env e@(Var v)
-  | needsCallSiteCostCentre env v = do
+  | needsCallSiteCostCentre v = do
     let nameDoc :: SDoc
         nameDoc = fsep (punctuate dot (map ppr (parents env))) <> parens (text "calling " <> ppr v)
 
@@ -76,8 +74,8 @@ doExpr env (Case scrut b ty alts) =
     doAlt (con, bs, rhs) = (con, bs,) <$> doExpr env rhs
 doExpr env (Cast expr co)   = Cast <$> doExpr env expr <*> pure co
 doExpr env (Tick t e)       = Tick t <$> doExpr env e
-doExpr env e@(Type _)       = pure e
-doExpr env e@(Coercion _)   = pure e
+doExpr _env e@(Type _)      = pure e
+doExpr _env e@(Coercion _)  = pure e
 
 type M = State CostCentreState
 
@@ -97,8 +95,8 @@ addParent i env = env { revParents = i : revParents env }
 parents :: Env -> [Id]
 parents env = reverse (revParents env)
 
-needsCallSiteCostCentre :: Env -> Id -> Bool
-needsCallSiteCostCentre env i =
+needsCallSiteCostCentre :: Id -> Bool
+needsCallSiteCostCentre i =
   case callerCcInfo $ idInfo i of
     WantsCallerCc -> True
     NoCallerCc    -> False

@@ -3535,6 +3535,7 @@ fFlagsDeps = [
   flagSpec "print-typechecker-elaboration"    Opt_PrintTypecheckerElaboration,
   flagSpec "prof-cafs"                        Opt_AutoSccsOnIndividualCafs,
   flagSpec "prof-count-entries"               Opt_ProfCountEntries,
+  flagSpec "prof-caller-ccs"                  Opt_ProfCallerCcs,
   flagSpec "regs-graph"                       Opt_RegsGraph,
   flagSpec "regs-iterative"                   Opt_RegsIterative,
   depFlagSpec' "rewrite-rules"                Opt_EnableRewriteRules
@@ -3852,6 +3853,7 @@ defaultFlags settings
       Opt_OmitYields,
       Opt_PrintBindContents,
       Opt_ProfCountEntries,
+      Opt_ProfCallerCcs,
       Opt_RPath,
       Opt_SharedImplib,
       Opt_SimplPreInlining,

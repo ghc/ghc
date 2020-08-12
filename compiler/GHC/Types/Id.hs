@@ -100,6 +100,7 @@ module GHC.Types.Id (
         isNeverLevPolyId,
 
         -- ** Writing 'IdInfo' fields
+        setIdCallerCcInfo,
         setIdUnfolding, setCaseBndrEvald,
         setIdArity,
         setIdCallArity,
@@ -169,6 +170,7 @@ infixl  1 `setIdUnfolding`,
           `setIdCallArity`,
           `setIdOccInfo`,
           `setIdOneShotInfo`,
+          `setIdCallerCcInfo`,
 
           `setIdSpecialisation`,
           `setInlinePragma`,
@@ -644,6 +646,9 @@ asJoinId_maybe id Nothing      = zapJoinId id
 *                                                                      *
 ************************************************************************
 -}
+
+setIdCallerCcInfo :: Id -> CallerCcInfo -> Id
+setIdCallerCcInfo id ccinfo = modifyIdInfo (`setCallerCcInfo` ccinfo) id
 
         ---------------------------------
         -- ARITY

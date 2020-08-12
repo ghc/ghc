@@ -46,6 +46,10 @@ module GHC.Types.Id.Info (
         cprInfo, setCprInfo,
         demandInfo, setDemandInfo, pprStrictness,
 
+        -- ** Caller-CC Info
+        callerCcInfo, setCallerCcInfo,
+        CallerCcInfo(..),
+
         -- ** Unfolding Info
         unfoldingInfo, setUnfoldingInfo,
 
@@ -287,6 +291,7 @@ data IdInfo
 -- - Bit   0   (1):  OneShotInfo
 -- - Bit   1   (1):  CafInfo
 -- - Bit   2   (1):  LevityInfo
+-- - Bit   3   (1):  CallerCcInfo
 -- - Bits 16-32(16): Call Arity info
 -- - Bits 32-48(16): Arity info
 --
@@ -306,6 +311,10 @@ bitfieldGetCafInfo (BitField bits) =
 bitfieldGetLevityInfo :: BitField -> LevityInfo
 bitfieldGetLevityInfo (BitField bits) =
     if testBit bits 2 then NeverLevityPolymorphic else NoLevityInfo
+
+bitfieldGetCallerCcInfo :: BitField -> CallerCcInfo
+bitfieldGetCallerCcInfo (BitField bits) =
+    if testBit bits 3 then WantsCallerCc else NoCallerCc
 
 bitfieldGetCallArityInfo :: BitField -> ArityInfo
 bitfieldGetCallArityInfo bf =
@@ -332,6 +341,12 @@ bitfieldSetLevityInfo info (BitField bits) =
     case info of
       NoLevityInfo -> BitField (clearBit bits 2)
       NeverLevityPolymorphic -> BitField (setBit bits 2)
+
+bitfieldSetCallerCcInfo :: CallerCcInfo -> BitField -> BitField
+bitfieldSetCallerCcInfo info (BitField bits) =
+    case info of
+      NoCallerCc -> BitField (clearBit bits 3)
+      WantsCallerCc -> BitField (setBit bits 3)
 
 bitfieldSetCallArityInfo :: ArityInfo -> BitField -> BitField
 bitfieldSetCallArityInfo info bf =
@@ -376,6 +391,9 @@ levityInfo = bitfieldGetLevityInfo . bitfield
 oneShotInfo :: IdInfo -> OneShotInfo
 oneShotInfo = bitfieldGetOneShotInfo . bitfield
 
+callerCcInfo :: IdInfo -> CallerCcInfo
+callerCcInfo = bitfieldGetCallerCcInfo . bitfield
+
 -- | 'Id' arity, as computed by "GHC.Core.Opt.Arity". Specifies how many arguments
 -- this 'Id' has to be applied to before it doesn any meaningful work.
 arityInfo :: IdInfo -> ArityInfo
@@ -408,6 +426,10 @@ setUnfoldingInfo info uf
     -- waste of time.
     -- seqUnfolding uf `seq`
     info { unfoldingInfo = uf }
+
+setCallerCcInfo :: IdInfo -> CallerCcInfo -> IdInfo
+setCallerCcInfo info cc =
+    info { bitfield = bitfieldSetCallerCcInfo cc (bitfield info) }
 
 setArityInfo :: IdInfo -> ArityInfo -> IdInfo
 setArityInfo info ar =
@@ -453,6 +475,7 @@ vanillaIdInfo
                                   bitfieldSetCallArityInfo unknownArity $
                                   bitfieldSetOneShotInfo NoOneShotInfo $
                                   bitfieldSetLevityInfo NoLevityInfo $
+                                  bitfieldSetCallerCcInfo NoCallerCc $
                                   emptyBitField,
             lfInfo              = Nothing
            }
@@ -461,6 +484,9 @@ vanillaIdInfo
 noCafIdInfo :: IdInfo
 noCafIdInfo  = vanillaIdInfo `setCafInfo`    NoCafRefs
         -- Used for built-in type Ids in GHC.Types.Id.Make.
+
+-- | Whether an 'Id' was marked with a @CALLER_CC@ pragma.
+data CallerCcInfo = WantsCallerCc | NoCallerCc
 
 {-
 ************************************************************************

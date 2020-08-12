@@ -353,6 +353,7 @@ data IfaceInfoItem
   | HsNoCafRefs
   | HsLevity                         -- Present <=> never levity polymorphic
   | HsLFInfo        IfaceLFInfo
+  | HsWantsCallerCc
 
 -- NB: Specialisations and rules come in separately and are
 -- only later attached to the Id.  Partial reason: some are orphans.
@@ -1460,6 +1461,7 @@ instance Outputable IfaceInfoItem where
   ppr HsNoCafRefs           = text "HasNoCafRefs"
   ppr HsLevity              = text "Never levity-polymorphic"
   ppr (HsLFInfo lf_info)    = text "LambdaFormInfo:" <+> ppr lf_info
+  ppr HsWantsCallerCc       = text "WantsCallerCC"
 
 instance Outputable IfaceJoinInfo where
   ppr IfaceNotJoinPoint   = empty

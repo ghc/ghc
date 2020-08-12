@@ -1016,6 +1016,12 @@ data Sig pass
                SourceText              -- Note [Pragma source text] in GHC.Types.Basic
                (XRec pass (IdP pass))  -- Function name
                (Maybe (XRec pass StringLiteral))
+
+        -- | A @CALLER_CC@ pragma for a declaration.
+  | CallerCcSig (XCallerCcSig pass)
+                SourceText
+                (XRec pass (IdP pass))
+
        -- | A complete match pragma
        --
        -- > {-# COMPLETE C, D [:: T] #-}
@@ -1027,6 +1033,7 @@ data Sig pass
                      SourceText
                      (XRec pass [XRec pass (IdP pass)])
                      (Maybe (XRec pass (IdP pass)))
+
   | XSig !(XXSig pass)
 
 type instance XTypeSig          (GhcPass p) = NoExtField
@@ -1039,6 +1046,7 @@ type instance XSpecSig          (GhcPass p) = NoExtField
 type instance XSpecInstSig      (GhcPass p) = NoExtField
 type instance XMinimalSig       (GhcPass p) = NoExtField
 type instance XSCCFunSig        (GhcPass p) = NoExtField
+type instance XCallerCcSig      (GhcPass p) = NoExtField
 type instance XCompleteMatchSig (GhcPass p) = NoExtField
 type instance XXSig             (GhcPass p) = NoExtCon
 
@@ -1108,8 +1116,9 @@ isPragLSig :: forall p. UnXRec p => LSig p -> Bool
 isPragLSig (unXRec @p -> SpecSig {})   = True
 isPragLSig (unXRec @p -> InlineSig {}) = True
 isPragLSig (unXRec @p -> SCCFunSig {}) = True
+isPragLSig (unXRec @p -> CallerCcSig {})      = True
 isPragLSig (unXRec @p -> CompleteMatchSig {}) = True
-isPragLSig _                    = False
+isPragLSig _                                  = False
 
 isInlineLSig :: forall p. UnXRec p => LSig p -> Bool
 -- Identifies inline pragmas
@@ -1123,6 +1132,10 @@ isMinimalLSig _                               = False
 isSCCFunSig :: forall p. UnXRec p => LSig p -> Bool
 isSCCFunSig (unXRec @p -> SCCFunSig {}) = True
 isSCCFunSig _                    = False
+
+isCallerCCSig :: forall p. UnXRec p => LSig p -> Bool
+isCallerCCSig (unXRec @p -> CallerCcSig {}) = True
+isCallerCCSig _                    = False
 
 isCompleteMatchSig :: forall p. UnXRec p => LSig p -> Bool
 isCompleteMatchSig (unXRec @p -> CompleteMatchSig {} ) = True
@@ -1143,6 +1156,7 @@ hsSigDoc (SpecInstSig _ src _)
 hsSigDoc (FixSig {})            = text "fixity declaration"
 hsSigDoc (MinimalSig {})        = text "MINIMAL pragma"
 hsSigDoc (SCCFunSig {})         = text "SCC pragma"
+hsSigDoc (CallerCcSig {})       = text "CALLER_CC pragma"
 hsSigDoc (CompleteMatchSig {})  = text "COMPLETE pragma"
 hsSigDoc (XSig {})              = text "XSIG TTG extension"
 
@@ -1180,6 +1194,8 @@ ppr_sig (PatSynSig _ names sig_ty)
   = text "pattern" <+> pprVarSig (map unLoc names) (ppr sig_ty)
 ppr_sig (SCCFunSig _ src fn mlabel)
   = pragSrcBrackets src "{-# SCC" (ppr fn <+> maybe empty ppr mlabel )
+ppr_sig (CallerCcSig _ src fn)
+  = pragSrcBrackets src "{-# CALLER_CC" (ppr fn)
 ppr_sig (CompleteMatchSig _ src cs mty)
   = pragSrcBrackets src "{-# COMPLETE"
       ((hsep (punctuate comma (map ppr (unLoc cs))))

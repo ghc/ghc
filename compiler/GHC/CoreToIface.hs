@@ -450,10 +450,15 @@ toIfaceIdDetails other = pprTrace "toIfaceIdDetails" (ppr other)
 toIfaceIdInfo :: IdInfo -> IfaceIdInfo
 toIfaceIdInfo id_info
   = catMaybes [arity_hsinfo, caf_hsinfo, strict_hsinfo, cpr_hsinfo,
-               inline_hsinfo,  unfold_hsinfo, levity_hsinfo]
+               inline_hsinfo,  unfold_hsinfo, levity_hsinfo, caller_cc_hsinfo]
                -- NB: strictness and arity must appear in the list before unfolding
                -- See GHC.IfaceToCore.tcUnfolding
   where
+    ------------  CALLER_CC  --------------
+    caller_cc_hsinfo = case callerCcInfo id_info of
+                         WantsCallerCc -> Just HsWantsCallerCc
+                         _             -> Nothing
+
     ------------  Arity  --------------
     arity_info = arityInfo id_info
     arity_hsinfo | arity_info == 0 = Nothing

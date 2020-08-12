@@ -50,6 +50,7 @@ import GHC.Core.Opt.CprAnal      ( cprAnalProgram )
 import GHC.Core.Opt.CallArity    ( callArityAnalProgram )
 import GHC.Core.Opt.Exitify      ( exitifyProgram )
 import GHC.Core.Opt.WorkWrap     ( wwTopBinds )
+import GHC.Core.AddCallerCcs     ( addCallerCcs )
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc
 import GHC.Unit.Module.Env
@@ -140,6 +141,7 @@ getCoreToDo dflags
     eta_expand_on = gopt Opt_DoLambdaEtaExpansion         dflags
     ww_on         = gopt Opt_WorkerWrapper                dflags
     static_ptrs   = xopt LangExt.StaticPointers           dflags
+    profiling     = gopt Opt_ProfCallerCcs                dflags
 
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
 
@@ -347,7 +349,9 @@ getCoreToDo dflags
         -- can become /exponentially/ more expensive. See #11731, #12996.
         runWhen (strictness || late_dmd_anal) CoreDoDemand,
 
-        maybe_rule_check FinalPhase
+        maybe_rule_check FinalPhase,
+
+        runWhen profiling CoreAddCallerCcs
      ]
 
     -- Remove 'CoreDoNothing' and flatten 'CoreDoPasses' for clarity.
@@ -464,6 +468,8 @@ doCorePass CoreDoSpecialising        = {-# SCC "Specialise" #-}
 
 doCorePass CoreDoSpecConstr          = {-# SCC "SpecConstr" #-}
                                        specConstrProgram
+doCorePass CoreAddCallerCcs          = {-# SCC "AddCallerCcs" #-}
+                                       addCallerCcs
 
 doCorePass CoreDoPrintCore              = observe   printCore
 doCorePass (CoreDoRuleCheck phase pat)  = ruleCheckPass phase pat
