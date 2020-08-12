@@ -72,6 +72,7 @@ module GHC.CmmToAsm
    -- cmmNativeGen emits
    , cmmNativeGen
    , NcgImpl(..)
+   , initNCGConfig
    )
 where
 
@@ -147,7 +148,7 @@ nativeCodeGen :: forall a . DynFlags -> Module -> ModLocation -> Handle -> UniqS
               -> Stream IO RawCmmGroup a
               -> IO a
 nativeCodeGen dflags this_mod modLoc h us cmms
- = let config   = initConfig dflags
+ = let config   = initNCGConfig dflags
        platform = ncgPlatform config
        nCG' :: ( Outputable statics, Outputable jumpDest, Instruction instr)
             => NcgImpl statics instr jumpDest -> IO a
@@ -442,6 +443,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
  = do
         let config   = ncgConfig ncgImpl
         let platform = ncgPlatform config
+        let weights  = ncgCfgWeights config
 
         let proc_name = case cmm of
                 (CmmProc _ entry_label _ _) -> ppr entry_label
@@ -462,12 +464,12 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                 (pprCmmGroup [opt_cmm])
 
         let cmmCfg = {-# SCC "getCFG" #-}
-                     getCfgProc (cfgWeightInfo dflags) opt_cmm
+                     getCfgProc weights opt_cmm
 
         -- generate native code from cmm
         let ((native, lastMinuteImports, fileIds', nativeCfgWeights), usGen) =
                 {-# SCC "genMachCode" #-}
-                initUs us $ genMachCode dflags this_mod modLoc
+                initUs us $ genMachCode config this_mod modLoc
                                         (cmmTopCodeGen ncgImpl)
                                         fileIds dbgMap opt_cmm cmmCfg
 
@@ -594,11 +596,11 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
             cfgRegAllocUpdates = (concatMap Linear.ra_fixupList raStats)
 
         let cfgWithFixupBlks =
-                (\cfg -> addNodesBetween dflags cfg cfgRegAllocUpdates) <$> livenessCfg
+                (\cfg -> addNodesBetween weights cfg cfgRegAllocUpdates) <$> livenessCfg
 
         -- Insert stack update blocks
         let postRegCFG =
-                pure (foldl' (\m (from,to) -> addImmediateSuccessor dflags from to m ))
+                pure (foldl' (\m (from,to) -> addImmediateSuccessor weights from to m ))
                      <*> cfgWithFixupBlks
                      <*> pure stack_updt_blks
 
@@ -620,7 +622,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
 
         let optimizedCFG :: Maybe CFG
             optimizedCFG =
-                optimizeCFG (gopt Opt_CmmStaticPred dflags) (cfgWeightInfo dflags) cmm <$!> postShortCFG
+                optimizeCFG (gopt Opt_CmmStaticPred dflags) weights cmm <$!> postShortCFG
 
         maybeDumpCfg dflags optimizedCFG "CFG Weights - Final" proc_name
 
@@ -768,7 +770,7 @@ makeImportsDoc dflags imports
              else Outputable.empty)
 
  where
-        config   = initConfig dflags
+        config   = initNCGConfig dflags
         platform = ncgPlatform config
 
         -- Generate "symbol stubs" for all external symbols that might
@@ -904,7 +906,7 @@ apply_mapping ncgImpl ufm (CmmProc info lbl live (ListGraph blocks))
 -- Unique supply breaks abstraction.  Is that bad?
 
 genMachCode
-        :: DynFlags
+        :: NCGConfig
         -> Module -> ModLocation
         -> (RawCmmDecl -> NatM [NatCmmDecl statics instr])
         -> DwarfFiles
@@ -918,9 +920,9 @@ genMachCode
                 , CFG
                 )
 
-genMachCode dflags this_mod modLoc cmmTopCodeGen fileIds dbgMap cmm_top cmm_cfg
+genMachCode config this_mod modLoc cmmTopCodeGen fileIds dbgMap cmm_top cmm_cfg
   = do  { initial_us <- getUniqueSupplyM
-        ; let initial_st           = mkNatM_State initial_us 0 dflags this_mod
+        ; let initial_st           = mkNatM_State initial_us 0 config this_mod
                                                   modLoc fileIds dbgMap cmm_cfg
               (new_tops, final_st) = initNat initial_st (cmmTopCodeGen cmm_top)
               final_delta          = natm_delta final_st
@@ -1134,3 +1136,48 @@ cmmExprNative referenceKind expr = do
 
         other
            -> return other
+
+-- | Initialize the native code generator configuration from the DynFlags
+initNCGConfig :: DynFlags -> NCGConfig
+initNCGConfig dflags = NCGConfig
+   { ncgPlatform              = targetPlatform dflags
+   , ncgProcAlignment         = cmmProcAlignment dflags
+   , ncgDebugLevel            = debugLevel dflags
+   , ncgExternalDynamicRefs   = gopt Opt_ExternalDynamicRefs dflags
+   , ncgPIC                   = positionIndependent dflags
+   , ncgInlineThresholdMemcpy = fromIntegral $ maxInlineMemcpyInsns dflags
+   , ncgInlineThresholdMemset = fromIntegral $ maxInlineMemsetInsns dflags
+   , ncgSplitSections         = gopt Opt_SplitSections dflags
+   , ncgRegsIterative         = gopt Opt_RegsIterative dflags
+   , ncgAsmLinting            = gopt Opt_DoAsmLinting dflags
+   , ncgCfgWeights            = cfgWeights dflags
+
+     -- With -O1 and greater, the cmmSink pass does constant-folding, so
+     -- we don't need to do it again in the native code generator.
+   , ncgDoConstantFolding     = optLevel dflags < 1
+
+   , ncgDumpRegAllocStages    = dopt Opt_D_dump_asm_regalloc_stages dflags
+   , ncgDumpAsmStats          = dopt Opt_D_dump_asm_stats dflags
+   , ncgDumpAsmConflicts      = dopt Opt_D_dump_asm_conflicts dflags
+   , ncgBmiVersion            = case platformArch (targetPlatform dflags) of
+                                 ArchX86_64 -> bmiVersion dflags
+                                 ArchX86    -> bmiVersion dflags
+                                 _          -> Nothing
+
+     -- We Assume  SSE1 and SSE2 operations are available on both
+     -- x86 and x86_64. Historically we didn't default to SSE2 and
+     -- SSE1 on x86, which results in defacto nondeterminism for how
+     -- rounding behaves in the associated x87 floating point instructions
+     -- because variations in the spill/fpu stack placement of arguments for
+     -- operations would change the precision and final result of what
+     -- would otherwise be the same expressions with respect to single or
+     -- double precision IEEE floating point computations.
+   , ncgSseVersion =
+      let v | sseVersion dflags < Just SSE2 = Just SSE2
+            | otherwise                     = sseVersion dflags
+      in case platformArch (targetPlatform dflags) of
+            ArchX86_64 -> v
+            ArchX86    -> v
+            _          -> Nothing
+   }
+

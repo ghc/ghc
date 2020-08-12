@@ -34,7 +34,7 @@ import GHC.Runtime.Heap.Layout
 import GHC.Types.Unique.Supply
 import GHC.Types.CostCentre
 import GHC.StgToCmm.Heap
-import GHC.CmmToAsm.Monad
+import GHC.CmmToAsm
 
 import Control.Monad
 import Data.Map.Strict (Map)
@@ -933,7 +933,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
   topSRT <- get
 
   let
-    config = initConfig dflags
+    config = initNCGConfig dflags
     profile = targetProfile dflags
     platform = profilePlatform profile
     srtMap = moduleSRTMap topSRT
