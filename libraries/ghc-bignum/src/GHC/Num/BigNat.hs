@@ -80,6 +80,10 @@ data BigNat = BN# { unBigNat :: BigNat# }
 bigNatCheck# :: BigNat# -> Bool#
 bigNatCheck# bn
    | 0#  <- bigNatSize# bn                         = 1#
+   -- check that size is a multiple of Word size
+   | r <- remInt# (sizeofByteArray# bn) WORD_SIZE_IN_BYTES#
+   , isTrue# (r /=# 0#)                            = 0#
+   -- check that most-significant limb isn't zero
    | 0## <- bigNatIndex# bn (bigNatSize# bn -# 1#) = 0#
    | True                                          = 1#
 
@@ -228,8 +232,8 @@ bigNatToWordList bn = go (bigNatSize# bn)
 -- | Convert two Word# (most-significant first) into a BigNat
 bigNatFromWord2# :: Word# -> Word# -> BigNat#
 bigNatFromWord2# 0## 0## = bigNatZero# void#
-bigNatFromWord2# 0## n   = bigNatFromWord# n
-bigNatFromWord2# w1 w2   = wordArrayFromWord2# w1 w2
+bigNatFromWord2# 0## l   = bigNatFromWord# l
+bigNatFromWord2# h   l   = wordArrayFromWord2# h l
 
 -- | Convert a BigNat into a Word#
 bigNatToWord# :: BigNat# -> Word#
