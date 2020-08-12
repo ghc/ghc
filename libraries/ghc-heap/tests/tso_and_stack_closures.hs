@@ -1,4 +1,4 @@
-{-# LANGUAGE ForeignFunctionInterface, MagicHash, CPP, BangPatterns #-}
+{-# LANGUAGE ForeignFunctionInterface, MagicHash, BangPatterns #-}
 
 import Foreign
 import Foreign.C.Types
@@ -7,8 +7,7 @@ import GHC.Exts
 
 import GHC.Word
 
-#include "ghcconfig.h"
-#include "rts/Constants.h"
+import TestUtils
 
 foreign import ccall unsafe "create_tso.h create_tso"
     c_create_tso:: IO (Ptr ())
@@ -55,16 +54,7 @@ main = do
 createTSOClosure :: IO (GenClosure Box)
 createTSOClosure = do
     ptr <- c_create_tso
-    let addr = unpackAddr# ptr
-    getClosureData ((unsafeCoerce# addr) :: LiftedClosure)
-
-unpackAddr# :: Ptr () -> Addr#
-unpackAddr# (Ptr addr) = addr
-
-assertEqual :: (Show a, Eq a) => a -> a -> IO ()
-assertEqual a b
-  | a /= b = error (show a ++ " /= " ++ show b)
-  | otherwise = return ()
+    createClosure ptr
 
 getClosureType :: GenClosure b -> ClosureType
 getClosureType = tipe . info
