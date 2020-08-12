@@ -10,6 +10,7 @@ where
 import GHC.Prelude
 import GHC.Platform
 import GHC.Cmm.Type (Width(..))
+import GHC.CmmToAsm.CFG.Weight
 
 -- | Native code generator configuration
 data NCGConfig = NCGConfig
@@ -29,6 +30,7 @@ data NCGConfig = NCGConfig
    , ncgDumpRegAllocStages    :: !Bool
    , ncgDumpAsmStats          :: !Bool
    , ncgDumpAsmConflicts      :: !Bool
+   , ncgCfgWeights            :: !Weights         -- ^ CFG edge weights
    }
 
 -- | Return Word size
