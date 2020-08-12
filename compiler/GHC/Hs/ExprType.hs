@@ -102,7 +102,7 @@ type instance XNPlusKPat         (With a pass) = XNPlusKPat pass
 type instance XSigPat            (With a pass) = XSigPat pass
 
 type instance ConLikeP           (With a pass) = ConLikeP pass
- 
+
 -- Bind extension points
 type instance XFunBind           (With a pass) (With a pass) = XFunBind pass pass
 type instance XPatBind           (With a pass) (With a pass) = XPatBind pass pass
@@ -113,15 +113,15 @@ type instance XHsValBinds        (With a pass) (With a pass) = XHsValBinds pass 
 type instance XHsIPBinds         (With a pass) (With a pass) = XHsIPBinds pass pass
 
 type instance XPSB               (With a pass) (With a pass) = XPSB pass pass
- 
+
 type instance XEmptyLocalBinds   (With a pass) (With a pass) = XEmptyLocalBinds pass pass
 type instance XIPBinds           (With a pass)               = XIPBinds pass
- 
+
 type instance XMG                (With a pass) body = XMG pass body
 type instance XCGRHS             (With a pass) body = XCGRHS pass body
 type instance XCGRHSs            (With a pass) body = XCGRHSs pass body
 type instance XCMatch            (With a pass) body = XCMatch pass body
- 
+
 -- Stmt extension points
 type instance XApplicativeStmt   (With a pass) (With a pass) body = XApplicativeStmt pass pass body
 type instance XBindStmt          (With a pass) (With a pass) body = XBindStmt pass pass body
@@ -131,7 +131,7 @@ type instance XParStmt           (With a pass) (With a pass) body = XParStmt pas
 type instance XRecStmt           (With a pass) (With a pass) body = XRecStmt pass pass body
 type instance XTransStmt         (With a pass) (With a pass) body = XTransStmt pass pass body
 type instance XLetStmt           (With a pass) (With a pass) body = XLetStmt pass pass body
- 
+
 type instance XParStmtBlock      (With a pass) (With a pass) = XParStmtBlock pass pass
 -- Lit extension points
 type instance XHsChar            (With a pass)  = XHsChar pass
@@ -153,7 +153,7 @@ type instance XXFieldOcc         (With a pass)  = XXFieldOcc pass
 type instance XPresent           (With a pass)  = XPresent pass
 type instance XMissing           (With a pass)  = XMissing pass
 type instance XAmbiguous         (With a pass)  = XAmbiguous pass
- 
+
 -- Cmd extension point
 type instance XCmdTop      (With a pass) = XCmdTop pass
 type instance XCmdArrApp   (With a pass) = XCmdArrApp pass
@@ -170,7 +170,7 @@ type instance XCmdWrap     (With a pass) = XCmdWrap pass
 type instance XPatSynBind        (With a pass) (With a pass) = XPatSynBind pass pass
 
 type instance NoGhcTcNonGhc (With a pass) = NoGhcTc pass
- 
+
 type family HasType a where
   HasType (HsExpr _) = Type
   HasType (Pat _) = Type
@@ -242,11 +242,11 @@ hsExprType' (HsPar a x) = (ty, HsPar a x')
   where x'@(Typed ty, _) = lhsExprType x
 hsExprType' (SectionL a x f) = (ty, SectionL a x' f')
   where f'@(Typed f_ty, _) = lhsExprType f
-        x'@(Typed x_ty, _) = lhsExprType x
-        ty = funResultTy $ f_ty `mkAppTy` x_ty
+        x'@(Typed _, _) = lhsExprType x
+        ty = funResultTy f_ty
 hsExprType' (SectionR a f y) = (ty, SectionR a f' y')
   where f'@(Typed f_ty, _) = lhsExprType f
-        y'@(Typed y_ty, _) = lhsExprType y
+        y'@(Typed _y_ty, _) = lhsExprType y
         x_ty = funArgTy f_ty
         ty = mkVisFunTy Many x_ty $ funResultTy (funResultTy f_ty)
 hsExprType' (ExplicitTuple a args box) = (ty, ExplicitTuple a (map (\x -> (Typed (), snd x)) args') box)
@@ -283,6 +283,7 @@ hsExprType' (RecordUpd a x flds) = (ty, RecordUpd a x' flds')
         flds' = map (fmap $ hsRecFieldType convertAmbiguousFieldOcc lhsExprType) flds
         ty = case rupd_cons a of
           con_like:_ -> conLikeResTy con_like (rupd_out_tys a)
+          [] -> invalid
 hsExprType' (ExprWithTySig a x sig) = (ty, ExprWithTySig a x' sig)
   where x'@(Typed ty, _) = lhsExprType x
 hsExprType' (ArithSeq a op seqInfo) = (ty, ArithSeq a op' seqInfo')
@@ -291,8 +292,8 @@ hsExprType' (ArithSeq a op seqInfo) = (ty, ArithSeq a op' seqInfo')
         ty = mkListTy el_ty
 hsExprType' (HsBracket{}) = invalid
 hsExprType' (HsRnBracketOut{}) = invalid
-hsExprType' (HsTcBracketOut a wrap bracket pending) = undefined
-hsExprType' (HsSpliceE a splice) = undefined
+hsExprType' (HsTcBracketOut _a _wrap _bracket _pending) = undefined
+hsExprType' (HsSpliceE _a _splice) = invalid
 hsExprType' (HsProc a pat cmd) = (ty, HsProc a (lPatType pat) cmd')
   where cmd'@(Typed ty, _) = lhsCmdTopType cmd
 hsExprType' (HsStatic a x) = (ty, HsStatic a x')
@@ -304,7 +305,7 @@ hsExprType' (HsBinTick a n m x) = (ty, HsBinTick a n m x')
 hsExprType' (HsPragE a prag x) = (ty, HsPragE a (convertPrag prag) x')
   where x'@(Typed ty, _) = lhsExprType x
 hsExprType' (XExpr (WrapExpr (HsWrap wrap x))) = (undefined, XExpr (WrapExpr (HsWrap wrap x')))
-  where (ty, x') = hsExprType' x
+  where (_ty, x') = hsExprType' x
 hsExprType' (XExpr (ExpansionExpr (HsExpanded rn tc))) = (ty, XExpr $ ExpansionExpr $ HsExpanded rn tc')
   where (ty, tc') = hsExprType' tc
 
@@ -413,7 +414,7 @@ patType' (NPat ty (L l a) b c)     = (ty, NPat ty (Typed (), L l $ hsOverLitType
 patType' (NPlusKPat ty a (L l b) c d e)  = (ty, NPlusKPat ty (Typed aty, a) (Typed (), L l $ hsOverLitType b) (hsOverLitType c) d e)
   where aty = varType $ unLoc a
 patType' (SigPat ty p sig)         = (ty, SigPat ty (lPatType p) sig)
-patType' (SplicePat a splice)      = (undefined , undefined)
+patType' (SplicePat _a _splice)      = (undefined , undefined)
 patType' (XPat (CoPat wrap inner ty)) = (ty, XPat (CoPat wrap inner' ty))
   where inner' = patType inner
 
@@ -421,9 +422,9 @@ detsType :: HsConPatDetails GhcTc -> HsConPatDetails (With Typed GhcTc)
 detsType = convertHsConDets lPatType (hsRecFieldsType convertFieldOcc lPatType)
 
 convertHsConDets :: (a -> a') -> (b -> b') -> HsConDetails a b -> HsConDetails a' b'
-convertHsConDets f g (PrefixCon pats) = PrefixCon (map f pats)
-convertHsConDets f g (InfixCon a b) = InfixCon (f a) (f b)
-convertHsConDets f g (RecCon rec) = RecCon (g rec)
+convertHsConDets f _ (PrefixCon pats) = PrefixCon (map f pats)
+convertHsConDets f _ (InfixCon a b) = InfixCon (f a) (f b)
+convertHsConDets _ g (RecCon rec) = RecCon (g rec)
 
 matchGroupType :: (body -> body')
                -> MatchGroup GhcTc body
@@ -463,7 +464,7 @@ stmtType f (LastStmt ext body stripped returnOp) =
     LastStmt ext (f body) stripped (syntaxExprType returnOp)
 stmtType f (BindStmt ext pat body) =
     BindStmt ext (lPatType pat) (f body)
-stmtType f (ApplicativeStmt ext args joinOp) =
+stmtType _ (ApplicativeStmt ext args joinOp) =
     ApplicativeStmt ext args' (fmap syntaxExprType joinOp)
   where
     args' = [ (syntaxExprType op, applicativeArgType arg)
@@ -471,13 +472,13 @@ stmtType f (ApplicativeStmt ext args joinOp) =
             ]
 stmtType f (BodyStmt ext body thenOp guardOp) =
     BodyStmt ext (f body) (syntaxExprType thenOp) (syntaxExprType guardOp)
-stmtType f (LetStmt ext localBinds) =
+stmtType _ (LetStmt ext localBinds) =
     LetStmt ext (Typed (), fmap hsLocalBindsTypes localBinds)
-stmtType f (ParStmt ext blocks mzip bindOp) =
+stmtType _ (ParStmt ext blocks mzip bindOp) =
     ParStmt ext blocks' (hsExprType mzip) (syntaxExprType bindOp)
   where
     blocks' = map parStmtBlockType blocks
-stmtType f (TransStmt {..}) =
+stmtType _ (TransStmt {..}) =
     TransStmt { trS_stmts = map ((Typed (),) . fmap (stmtType lhsExprType)) trS_stmts
               , trS_using = lhsExprType trS_using
               , trS_by    = fmap lhsExprType trS_by
@@ -542,7 +543,7 @@ hsIPBindsTypes (IPBinds ext binds) = IPBinds ext (map (\x -> (Typed (), fmap ipB
               Right x -> Right x
 
 hsValBindsTypes :: HsValBinds GhcTc -> HsValBinds (With Typed GhcTc)
-hsValBindsTypes (ValBinds ext binds sigs) =
+hsValBindsTypes (ValBinds ext binds _sigs) =
     ValBinds ext (lhsBindsTypes binds) []
 hsValBindsTypes (XValBindsLR (NValBinds xs ys)) = XValBindsLR (NValBinds (map (fmap lhsBindsTypes) xs) ys)
 
