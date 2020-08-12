@@ -988,7 +988,7 @@ reportErrors = mapM_ reportError
 
 reportError :: ErrMsg -> TcRn ()
 reportError err
-  = do { traceTc "Adding error:" (pprLocErrMsg err) ;
+  = do { traceTc "Adding error:" (pprLocErrMsg err);
          errs_var <- getErrsVar ;
          (warns, errs) <- readTcRef errs_var ;
          writeTcRef errs_var (warns, errs `snocBag` err) }

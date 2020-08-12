@@ -612,7 +612,6 @@ extendGlobalRdrEnvRn avails new_fixities
         ; let fix_env' = foldl' extend_fix_env fix_env new_gres
               gbl_env' = gbl_env { tcg_rdr_env = rdr_env2, tcg_fix_env = fix_env' }
 
-        ; traceRn "extendGlobalRdrEnvRn 2" (pprGlobalRdrEnv True rdr_env2)
         ; return (gbl_env', lcl_env3) }
   where
     new_names = concatMap availNames avails
@@ -678,7 +677,7 @@ getLocalNonValBinders fixity_env
   = do  { -- Process all type/class decls *except* family instances
         ; let inst_decls = tycl_decls >>= group_instds
         ; overload_ok_flag <- xoptM LangExt.DuplicateRecordFields
-        ; let overload_ok = if overload_ok_flag then DuplicateRecordFields else NoDuplicateRecordFields 
+        ; let overload_ok = if overload_ok_flag then DuplicateRecordFields else NoDuplicateRecordFields
         ; has_sel_flag <- xoptM LangExt.FieldSelectors
         ; let has_sel = if has_sel_flag then FieldSelectors else NoFieldSelectors
         ; (tc_avails, tc_fldss)
