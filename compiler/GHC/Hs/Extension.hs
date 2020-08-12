@@ -35,8 +35,6 @@ import GHC.Utils.Outputable
 import GHC.Types.SrcLoc (Located, unLoc, noLoc)
 import GHC.Utils.Panic
 
-
--- | Allows passes other than GhcPass to customize the result of NoGhcTc
 import Data.Kind
 
 {-
