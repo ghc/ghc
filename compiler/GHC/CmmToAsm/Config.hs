@@ -31,6 +31,8 @@ data NCGConfig = NCGConfig
    , ncgDumpAsmStats          :: !Bool
    , ncgDumpAsmConflicts      :: !Bool
    , ncgCfgWeights            :: !Weights         -- ^ CFG edge weights
+   , ncgCfgBlockLayout        :: !Bool            -- ^ Use CFG based block layout algorithm
+   , ncgCfgWeightlessLayout   :: !Bool            -- ^ Layout based on last instruction per block.
    }
 
 -- | Return Word size
