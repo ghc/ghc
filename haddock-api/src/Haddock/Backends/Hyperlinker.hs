@@ -18,7 +18,7 @@ import Data.Maybe
 import System.Directory
 import System.FilePath
 
-import GHC.Iface.Ext.Types  ( HieFile(..), HieASTs(..) )
+import GHC.Iface.Ext.Types
 import GHC.Iface.Ext.Binary ( readHieFile, hie_file_result, NameCacheUpdater(..))
 import Data.Map as M
 import GHC.Data.FastString     ( mkFastString )
@@ -67,7 +67,7 @@ ppHyperlinkedModuleSource srcdir pretty srcs iface = case ifaceHieFile iface of
 
         -- Get the AST and tokens corresponding to the source file we want
         let mast | M.size asts == 1 = snd <$> M.lookupMin asts
-                 | otherwise        = M.lookup (mkFastString file) asts
+                 | otherwise        = M.lookup (HiePath (mkFastString file)) asts
             tokens = parse df file rawSrc
 
         -- Produce and write out the hyperlinked sources
