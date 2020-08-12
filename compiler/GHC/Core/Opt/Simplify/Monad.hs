@@ -71,7 +71,7 @@ pattern SM :: (SimplTopEnv -> UniqSupply -> SimplCount
 -- This pattern synonym makes the simplifier monad eta-expand,
 -- which as a very beneficial effect on compiler performance
 -- (worth a 1-2% reduction in bytes-allocated).  See #18202.
--- See Note [The one-shot state monad trick] in GHC.Core.Unify
+-- See Note [The one-shot state monad trick] in GHC.Utils.Monad
 pattern SM m <- SM' m
   where
     SM m = SM' (oneShot m)
