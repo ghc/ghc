@@ -29,6 +29,7 @@ matchSimply
 
 matchSinglePatVar
         :: Id
+        -> Maybe CoreExpr
         -> HsMatchContext GhcRn
         -> LPat GhcTc
         -> Type

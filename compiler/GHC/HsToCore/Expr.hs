@@ -31,7 +31,7 @@ import GHC.HsToCore.ListComp
 import GHC.HsToCore.Utils
 import GHC.HsToCore.Arrows
 import GHC.HsToCore.Monad
-import GHC.HsToCore.PmCheck ( addTyCsDs, checkGRHSs )
+import GHC.HsToCore.PmCheck ( addTyCsDs, covCheckGRHSs )
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Core.FamInstEnv( topNormaliseType )
@@ -215,7 +215,7 @@ dsUnliftedBind (PatBind {pat_lhs = pat, pat_rhs = grhss
                         , pat_ext = ty }) body
   =     -- let C x# y# = rhs in body
         -- ==> case rhs of C x# y# -> body
-    do { match_deltas <- checkGRHSs PatBindGuards grhss
+    do { match_deltas <- covCheckGRHSs PatBindGuards grhss
        ; rhs          <- dsGuarded grhss ty match_deltas
        ; let upat = unLoc pat
              eqn = EqnInfo { eqn_pats = [upat],
@@ -486,7 +486,7 @@ dsExpr (HsMultiIf res_ty alts)
 
   | otherwise
   = do { let grhss = GRHSs noExtField alts (noLoc emptyLocalBinds)
-       ; rhss_deltas  <- checkGRHSs IfAlt grhss
+       ; rhss_deltas  <- covCheckGRHSs IfAlt grhss
        ; match_result <- dsGRHSs IfAlt grhss res_ty rhss_deltas
        ; error_expr   <- mkErrorExpr
        ; extractMatchResult match_result error_expr }
@@ -986,7 +986,7 @@ dsDo ctx stmts
       = do  { body     <- goL stmts
             ; rhs'     <- dsLExpr rhs
             ; var   <- selectSimpleMatchVarL (xbstc_boundResultMult xbs) pat
-            ; match <- matchSinglePatVar var (StmtCtxt ctx) pat
+            ; match <- matchSinglePatVar var Nothing (StmtCtxt ctx) pat
                          (xbstc_boundResultType xbs) (cantFailMatchResult body)
             ; match_code <- dsHandleMonadicFailure ctx pat match (xbstc_failOp xbs)
             ; dsSyntaxExpr (xbstc_bindOp xbs) [rhs', Lam var match_code] }
@@ -1007,7 +1007,7 @@ dsDo ctx stmts
 
            ; let match_args (pat, fail_op) (vs,body)
                    = do { var   <- selectSimpleMatchVarL Many pat
-                        ; match <- matchSinglePatVar var (StmtCtxt ctx) pat
+                        ; match <- matchSinglePatVar var Nothing (StmtCtxt ctx) pat
                                    body_ty (cantFailMatchResult body)
                         ; match_code <- dsHandleMonadicFailure ctx pat match fail_op
                         ; return (var:vs, match_code)

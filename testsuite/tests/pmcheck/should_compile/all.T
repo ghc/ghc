@@ -102,6 +102,8 @@ test('T17234', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T17248', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17340', normal, compile,
+     ['-Wredundant-bang-patterns'])
 test('T17357', expect_broken(17357), compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T17376', normal, compile,
@@ -124,8 +126,8 @@ test('T18478', collect_compiler_stats('bytes allocated',10), compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T18533', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
-test('T17340', normal, compile,
-     ['-Wredundant-bang-patterns'])
+test('T18572', normal, compile,
+     ['-fwarn-incomplete-patterns -fwarn-incomplete-uni-patterns -fwarn-overlapping-patterns'])
 
 # Other tests
 test('pmc001', [], compile,
