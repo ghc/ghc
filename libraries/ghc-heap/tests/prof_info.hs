@@ -10,6 +10,8 @@ import Data.Functor
 import GHC.Word
 import Data.List (find)
 
+import TestUtils
+
 #include "ghcconfig.h"
 #include "rts/Constants.h"
 
@@ -35,18 +37,13 @@ main = do
         Nothing -> error $ "No CostCentre found in TSO: " ++ show tso
         Just _ -> case findMyCostCentre (linkedCostCentres costCentre) of
                     Just myCostCentre -> do
-                        assertEqual (cc_ccID myCostCentre) 1
                         assertEqual (cc_label myCostCentre) "MyCostCentre"
                         assertEqual (cc_module myCostCentre) "Main"
-                        assertEqual (cc_srcloc myCostCentre) (Just "prof_info.hs:21:39-50")
+                        assertEqual (cc_srcloc myCostCentre) (Just "prof_info.hs:23:39-50")
                         assertEqual (cc_mem_alloc myCostCentre) 0
                         assertEqual (cc_time_ticks myCostCentre) 0
                         assertEqual (cc_is_caf myCostCentre) False
-                        assertEqual (cc_link myCostCentre) Nothing
                     Nothing -> error "MyCostCentre not found!"
-
-unpackAddr# :: Ptr () -> Addr#
-unpackAddr# (Ptr addr) = addr
 
 linkedCostCentres :: Maybe CostCentre -> [CostCentre]
 linkedCostCentres Nothing = []
@@ -54,6 +51,3 @@ linkedCostCentres (Just cc) = cc : linkedCostCentres (cc_link cc)
 
 findMyCostCentre:: [CostCentre] -> Maybe CostCentre
 findMyCostCentre ccs = find (\cc -> cc_label cc == "MyCostCentre") ccs
-
-assertEqual :: (Eq a, Show a) => a -> a -> IO ()
-assertEqual x y = if x == y then return () else error $ "assertEqual: " ++ show x ++ " /= " ++ show y
