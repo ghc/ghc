@@ -12,6 +12,9 @@ module GHC.Exts.Heap.Closures (
       Closure
     , GenClosure(..)
     , PrimType(..)
+    , WhatNext(..)
+    , WhyBlocked(..)
+    , TsoFlags(..)
     , allClosures
 #if __GLASGOW_HASKELL__ >= 809
     -- The closureSize# primop is unsupported on earlier GHC releases but we
@@ -283,9 +286,9 @@ data GenClosure b
       , blocked_exceptions :: !b
       , bq :: !b
       -- values
-      , what_next :: Word16
-      , why_blocked :: Word16
-      , flags :: Word32
+      , what_next :: WhatNext
+      , why_blocked :: WhyBlocked
+      , flags :: [TsoFlags]
       , threadId :: Word64
       , saved_errno :: Word32
       , tso_dirty:: Word32 -- ^ non-zero => dirty
@@ -371,6 +374,43 @@ data PrimType
   | PAddr
   | PFloat
   | PDouble
+  deriving (Eq, Show, Generic)
+
+data WhatNext
+  = ThreadRunGHC
+  | ThreadInterpret
+  | ThreadKilled
+  | ThreadComplete
+  | WhatNextUnknownValue -- ^ Please report this as a bug
+  deriving (Eq, Show, Generic)
+
+data WhyBlocked
+  = NotBlocked
+  | BlockedOnMVar
+  | BlockedOnMVarRead
+  | BlockedOnBlackHole
+  | BlockedOnRead
+  | BlockedOnWrite
+  | BlockedOnDelay
+  | BlockedOnSTM
+  | BlockedOnDoProc
+  | BlockedOnCCall
+  | BlockedOnCCall_Interruptible
+  | BlockedOnMsgThrowTo
+  | ThreadMigrating
+  | BlockedOnIOCompletion
+  | WhyBlockedUnknownValue -- ^ Please report this as a bug
+  deriving (Eq, Show, Generic)
+
+data TsoFlags
+  = TsoLocked
+  | TsoBlockx
+  | TsoInterruptible
+  | TsoStoppedOnBreakpoint
+  | TsoMarked
+  | TsoSqueezed
+  | TsoAllocLimit
+  | TsoFlagsUnknownValue -- ^ Please report this as a bug
   deriving (Eq, Show, Generic)
 
 -- | For generic code, this function returns all referenced closures.
