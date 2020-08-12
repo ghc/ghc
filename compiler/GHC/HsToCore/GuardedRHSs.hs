@@ -36,7 +36,7 @@ import Control.Monad ( zipWithM )
 import Data.List.NonEmpty ( NonEmpty, toList )
 
 {-
-@dsGuarded@ is used for pattern bindings.
+@dsGuarded@ is used for GRHSs.
 It desugars:
 \begin{verbatim}
         | g1 -> e1
@@ -44,7 +44,7 @@ It desugars:
         | gn -> en
         where binds
 \end{verbatim}
-producing an expression with a runtime error in the corner if
+producing an expression with a runtime error in the corner case if
 necessary.  The type argument gives the type of the @ei@.
 -}
 
@@ -137,8 +137,8 @@ matchGuards (BindStmt _ pat bind_rhs : stmts) ctx deltas rhs rhs_ty = do
 
     match_result <- matchGuards stmts ctx deltas rhs rhs_ty
     core_rhs <- dsLExpr bind_rhs
-    match_result' <- matchSinglePatVar match_var (StmtCtxt ctx) pat rhs_ty
-                                       match_result
+    match_result' <- matchSinglePatVar match_var (Just core_rhs) (StmtCtxt ctx)
+                                       pat rhs_ty match_result
     pure $ bindNonRec match_var core_rhs <$> match_result'
 
 matchGuards (LastStmt  {} : _) _ _ _ _ = panic "matchGuards LastStmt"
