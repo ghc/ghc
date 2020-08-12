@@ -1133,6 +1133,9 @@ patIsRec e = e == mkUnqual varName (fsLit "rec")
 opIsAt :: RdrName -> Bool
 opIsAt e = e == mkUnqual varName (fsLit "@")
 
+opIsSharp :: RdrName -> Bool
+opIsSharp e = e == mkUnqual varName (fsLit "#")
+
 ---------------------------------------------------------------------------
 -- Check Equation Syntax
 
@@ -1700,7 +1703,15 @@ instance DisambECP (PatBuilder GhcPs) where
       PatBuilderOverLit pos_lit -> return (L lp pos_lit)
       _ -> patFail l (text "-" <> ppr p)
     return $ L l (PatBuilderPat (mkNPat lit (Just noSyntaxExpr)))
-  mkHsSectionR_PV l op p = patFail l (pprInfixOcc (unLoc op) <> ppr p)
+  mkHsSectionR_PV l op p
+    | opIsSharp (unLoc op) -- detect "(# x" and suggest UnboxedTuples (#18569)
+    = localPV_msg (const (vcat
+        [ text "Perhaps you meant an unboxed sum or an unboxed tuple. "
+        , text "To allow this, enable language extension 'UnboxedTuples'."
+        ]))
+      $ patFail l (pprInfixOcc (unLoc op) <+> ppr p)
+    | otherwise
+    = patFail l (pprInfixOcc (unLoc op) <+> ppr p)
   mkHsViewPatPV l a b = do
     p <- checkLPat b
     return $ L l (PatBuilderPat (ViewPat noExtField a p))

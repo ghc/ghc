@@ -1,0 +1,5 @@
+
+T18569.hs:3:5: error:
+    Parse error in pattern: # foo
+    Perhaps you meant an unboxed sum or an unboxed tuple. 
+    To allow this, enable language extension 'UnboxedTuples'.
