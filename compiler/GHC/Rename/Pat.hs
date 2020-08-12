@@ -76,7 +76,7 @@ import GHC.Builtin.Types   ( nilDataCon )
 import GHC.Core.DataCon
 import qualified GHC.LanguageExtensions as LangExt
 
-import Control.Monad       ( when, ap, guard )
+import Control.Monad       ( when, ap )
 import qualified Data.List.NonEmpty as NE
 import Data.Ratio
 import GHC.Types.FieldLabel (DuplicateRecordFields(..), FieldSelectors(..))
@@ -623,9 +623,7 @@ rnHsRecFields
 
 rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
   = do { pun_ok      <- xoptM LangExt.RecordPuns
-       ; disambig_ok <- xoptM LangExt.DisambiguateRecordFields
-       ; let parent = guard disambig_ok >> mb_con
-       ; flds1  <- mapM (rn_fld pun_ok parent) flds
+       ; flds1  <- mapM (rn_fld pun_ok mb_con) flds
        ; mapM_ (addErr . dupFieldErr ctxt) dup_flds
        ; dotdot_flds <- rn_dotdot dotdot mb_con flds1
        ; let all_flds | null dotdot_flds = flds1
@@ -645,7 +643,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                   (L loc (FieldOcc _ (L ll lbl)))
                               , hsRecFieldArg = arg
                               , hsRecPun      = pun }))
-      = do { sel <- setSrcSpan loc $ lookupRecFieldOcc parent lbl
+      = do { sel <- setSrcSpan loc $ lookupRecFieldOcc parent lbl -- XXX
            ; arg' <- if pun
                      then do { checkErr pun_ok (badPun (L loc lbl))
                                -- Discard any module qualifier (#11662)
@@ -729,7 +727,7 @@ rnHsRecUpdFields
     -> RnM ([LHsRecUpdField GhcRn], FreeVars)
 rnHsRecUpdFields flds
   = do { pun_ok        <- xoptM LangExt.RecordPuns
-       ; overload_ok   <- (\x -> if x then DuplicateRecordFields else NoDuplicateRecordFields) <$> xoptM LangExt.DuplicateRecordFields 
+       ; overload_ok   <- (\x -> if x then DuplicateRecordFields else NoDuplicateRecordFields) <$> xoptM LangExt.DuplicateRecordFields
        ; has_sel       <- (\x -> if x then FieldSelectors else NoFieldSelectors) <$> xoptM LangExt.FieldSelectors
        ; (flds1, fvss) <- mapAndUnzipM (rn_fld pun_ok overload_ok has_sel) flds
        ; mapM_ (addErr . dupFieldErr HsRecFieldUpd) dup_flds

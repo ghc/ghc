@@ -756,11 +756,11 @@ mkFieldLabel :: Name -> Maybe FastString -> FieldSelectors -> FieldLabel
 mkFieldLabel me mb_lbl has_sel =
           case mb_lbl of
                  Nothing  -> FieldLabel { flLabel = occNameFS (nameOccName me)
-                                        , flIsOverloaded = NoDuplicateRecordFields 
+                                        , flIsOverloaded = NoDuplicateRecordFields
                                         , flHasFieldSelector = has_sel
                                         , flSelector = me }
                  Just lbl -> FieldLabel { flLabel = lbl
-                                        , flIsOverloaded = DuplicateRecordFields 
+                                        , flIsOverloaded = DuplicateRecordFields
                                         , flHasFieldSelector = has_sel
                                         , flSelector = me }
 
@@ -825,8 +825,10 @@ lookupGRE_Name_OccName :: GlobalRdrEnv -> Name -> OccName -> Maybe GlobalRdrElt
 -- that might differ from that of the 'Name'.  See 'lookupGRE_FieldLabel' and
 -- Note [Parents for record fields].
 lookupGRE_Name_OccName env name occ
-  = case [ gre | gre <- lookupGlobalRdrEnv env occ
-               , gre_name gre == name ] of
+  = case [ gre | gre <- lookupGlobalRdrEnv env (nameOccName name)
+                -- XXX NoFieldSelectors: omit this check because gre_name might be mangled
+                --- , gre_name gre == name
+               ] of
       []    -> Nothing
       [gre] -> Just gre
       gres  -> pprPanic "lookupGRE_Name_OccName"
