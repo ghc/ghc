@@ -114,8 +114,8 @@ GHC.Parser.PostProcess
 GHC.Parser.PostProcess.Haddock
 GHC.Parser.Types
 GHC.Platform
+GHC.Platform.AArch64
 GHC.Platform.ARM
-GHC.Platform.ARM64
 GHC.Platform.Constants
 GHC.Platform.NoRegs
 GHC.Platform.PPC

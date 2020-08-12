@@ -17,7 +17,7 @@ import GHC.Types.Name
 import GHC.Types.SafeHaskell
 import GHC.Utils.Fingerprint
 import GHC.Iface.Recomp.Binary
--- import GHC.Utils.Outputable
+import GHC.Core.Opt.CallerCC () -- for Binary instances
 
 import GHC.Data.EnumSet as EnumSet
 import System.FilePath (normalise)
@@ -61,7 +61,7 @@ fingerprintDynFlags dflags@DynFlags{..} this_mod nameio =
         ticky =
           map (`gopt` dflags) [Opt_Ticky, Opt_Ticky_Allocd, Opt_Ticky_LNE, Opt_Ticky_Dyn_Thunk]
 
-        flags = ((mainis, safeHs, lang, cpp), (paths, prof, ticky, debugLevel))
+        flags = ((mainis, safeHs, lang, cpp), (paths, prof, ticky, debugLevel, callerCcFilters))
 
     in -- pprTrace "flags" (ppr flags) $
        computeFingerprint nameio flags
