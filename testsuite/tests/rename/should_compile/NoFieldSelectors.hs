@@ -12,4 +12,5 @@ foo = 3 -- should not conflict
 
 foo1 = Foo 3 "bar"
 foo2 = Foo { foo = 3, bar = "bar" }
--- bar = foo1 { foo = 4 } -- ‘foo’ is not a record selector
+foo3 = foo1 { foo = 4 } -- [notSelector] ‘foo’ is not a record selector
+foo4 = foo1 { bar = "baz" } -- [noPossibleParents] No type has all these fields: ‘bar’
