@@ -216,6 +216,7 @@ data GeneralFlag
    -- profiling opts
    | Opt_AutoSccsOnIndividualCafs
    | Opt_ProfCountEntries
+   | Opt_ProfCallerCcs
 
    -- misc opts
    | Opt_Pp

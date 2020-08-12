@@ -129,6 +129,7 @@ data CoreToDo           -- These are diff core-to-core passes,
 
   | CoreTidy
   | CorePrep
+  | CoreAddCallerCcs
   | CoreOccurAnal
 
 instance Outputable CoreToDo where
