@@ -8,8 +8,6 @@ import Foreign
 import GHC.Exts.Heap.ProfInfo.Types
 import GHC.Exts.Heap.Closures(WhatNext(..), WhyBlocked(..), TsoFlags(..))
 
--- TODO use sum type for what_next, why_blocked, flags?
-
 data TSOFields = TSOFields {
     tso_what_next :: WhatNext,
     tso_why_blocked :: WhyBlocked,
@@ -59,7 +57,6 @@ parseWhatNext w = case w of
                     (#const ThreadComplete) -> ThreadComplete
                     _ -> WhatNextUnknownValue
 
--- TODO: define mapping
 parseWhyBlocked :: Word16 -> WhyBlocked
 parseWhyBlocked w = case w of
                         (#const NotBlocked) -> NotBlocked
@@ -80,9 +77,22 @@ parseWhyBlocked w = case w of
 #endif
                         _ -> WhyBlockedUnknownValue
 
--- TODO: define mapping
 parseTsoFlags :: Word32 -> [TsoFlags]
-parseTsoFlags _ = []
+parseTsoFlags w | isSet (#const TSO_LOCKED) w = TsoLocked : parseTsoFlags (unset (#const TSO_LOCKED) w)
+                | isSet (#const TSO_BLOCKEX) w = TsoBlockx : parseTsoFlags (unset (#const TSO_BLOCKEX) w)
+                | isSet (#const TSO_INTERRUPTIBLE) w = TsoInterruptible : parseTsoFlags (unset (#const TSO_INTERRUPTIBLE) w)
+                | isSet (#const TSO_STOPPED_ON_BREAKPOINT) w = TsoStoppedOnBreakpoint : parseTsoFlags (unset (#const TSO_STOPPED_ON_BREAKPOINT) w)
+                | isSet (#const TSO_MARKED) w = TsoMarked : parseTsoFlags (unset (#const TSO_MARKED) w)
+                | isSet (#const TSO_SQUEEZED) w = TsoSqueezed : parseTsoFlags (unset (#const TSO_SQUEEZED) w)
+                | isSet (#const TSO_ALLOC_LIMIT) w = TsoAllocLimit : parseTsoFlags (unset (#const TSO_ALLOC_LIMIT) w)
+parseTsoFlags 0 = []
+parseTsoFlags _ = [TsoFlagsUnknownValue]
+
+isSet :: Word32 -> Word32 -> Bool
+isSet bitMask w = w .&. bitMask /= 0
+
+unset :: Word32 -> Word32 -> Word32
+unset bitMask w = w `xor` bitMask
 
 data StackFields = StackFields {
     stack_size :: Word32,
