@@ -28,6 +28,10 @@ import GHC.CmmToLlvm.Base (LlvmVersion, llvmVersionStr, supportedLlvmVersion, pa
 import GHC.SysTools.Process
 import GHC.SysTools.Info
 
+import Control.Monad (join, forM, filterM)
+import System.Directory (doesFileExist)
+import System.FilePath ((</>))
+
 {-
 ************************************************************************
 *                                                                      *
@@ -237,6 +241,32 @@ figureLlvmVersion dflags = traceToolCommand dflags "llc" $ do
                 return Nothing)
 
 
+-- | On macOS we rely on the linkers @-dead_strip_dylibs@ flag to remove unused
+-- libraries from the dynamic library.  We do this to reduce the number of load
+-- commands that end up in the dylib, and has been limited to 32K (32768) since
+-- macOS Sierra (10.14).
+--
+-- @-dead_strip_dylibs@ does not dead strip @-rpath@ entries, as such passing
+-- @-l@ and @-rpath@ to the linker will result in the unnecesasry libraries not
+-- being included int he load commands, however the @-rpath@ entries are all
+-- forced to be included.  This can lead to 100s of @-rpath@ entries being
+-- included when only a handful of liraries end up being turely linked.
+--
+-- Thus after building the library, we run a fixup phase where we inject the
+-- @-rpath@ for each found library (in the given library search paths) into the
+-- dynamic library through @-add_rpath@.
+runInjectRPaths :: DynFlags -> [FilePath] -> FilePath -> IO ()
+runInjectRPaths dflags lib_paths dylib = do
+  info <- lines <$> askOtool dflags Nothing [Option "-L", Option dylib]
+  -- filter the output for only the libraries. And then drop the @rpath prefix.
+  let libs = fmap (drop 7) $ filter (isPrefixOf "@rpath") $ fmap (head.words) $ info
+  rpaths <- nub.sort.join <$> forM libs (\f -> filterM (\l -> doesFileExist (l </> f)) lib_paths)
+  -- inject the rpaths
+  case rpaths of
+    [] -> return ()
+    _  -> runInstallNameTool dflags $ map Option $ "-add_rpath":(intersperse "-add_rpath" rpaths) ++ [dylib]
+
+
 runLink :: DynFlags -> [Option] -> IO ()
 runLink dflags args = traceToolCommand dflags "linker" $ do
   -- See Note [Run-time linker info]
@@ -328,6 +358,17 @@ runAr :: DynFlags -> Maybe FilePath -> [Option] -> IO ()
 runAr dflags cwd args = traceToolCommand dflags "ar" $ do
   let ar = pgm_ar dflags
   runSomethingFiltered dflags id "Ar" ar args cwd Nothing
+
+askOtool :: DynFlags -> Maybe FilePath -> [Option] -> IO String
+askOtool dflags mb_cwd args = do
+  let otool = pgm_otool dflags
+  runSomethingWith dflags "otool" otool args $ \real_args ->
+    readCreateProcessWithExitCode' (proc otool real_args){ cwd = mb_cwd }
+
+runInstallNameTool :: DynFlags -> [Option] -> IO ()
+runInstallNameTool dflags args = do
+  let tool = pgm_install_name_tool dflags
+  runSomethingFiltered dflags id "Install Name Tool" tool args Nothing Nothing
 
 runRanlib :: DynFlags -> [Option] -> IO ()
 runRanlib dflags args = traceToolCommand dflags "ranlib" $ do
