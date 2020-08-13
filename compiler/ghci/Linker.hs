@@ -913,20 +913,22 @@ dynLoadObjs hsc_env pls@PersistentLinkerState{..} objs = do
                       ldInputs =
                            concatMap (\l -> [ Option ("-l" ++ l) ])
                                      (nub $ snd <$> temp_sos)
-                        ++ concatMap (\lp -> [ Option ("-L" ++ lp)
-                                                    , Option "-Xlinker"
-                                                    , Option "-rpath"
-                                                    , Option "-Xlinker"
-                                                    , Option lp ])
+                        ++ concatMap (\lp -> Option ("-L" ++ lp)
+                                          : if gopt Opt_RPath dflags
+                                            then [ Option "-Xlinker"
+                                                 , Option "-rpath"
+                                                 , Option "-Xlinker"
+                                                 , Option lp ]
+                                            else [])
                                      (nub $ fst <$> temp_sos)
                         ++ concatMap
-                             (\lp ->
-                                 [ Option ("-L" ++ lp)
-                                 , Option "-Xlinker"
-                                 , Option "-rpath"
-                                 , Option "-Xlinker"
-                                 , Option lp
-                                 ])
+                             (\lp -> Option ("-L" ++ lp)
+                                  : if gopt Opt_RPath dflags
+                                    then [ Option "-Xlinker"
+                                         , Option "-rpath"
+                                         , Option "-Xlinker"
+                                         , Option lp ]
+                                    else [])
                              minus_big_ls
                         -- See Note [-Xlinker -rpath vs -Wl,-rpath]
                         ++ map (\l -> Option ("-l" ++ l)) minus_ls,
