@@ -669,6 +669,18 @@ else
 fi
 AC_SUBST([LibtoolCmd])
 
+dnl ** Which otool to use on macOS
+dnl --------------------------------------------------------------
+AC_CHECK_TARGET_TOOL([OTOOL], [otool])
+OtoolCmd="$OTOOL"
+AC_SUBST(OtoolCmd)
+
+dnl ** Which install_name_tool to use on macOS
+dnl --------------------------------------------------------------
+AC_CHECK_TARGET_TOOL([INSTALL_NAME_TOOL], [install_name_tool])
+InstallNameToolCmd="$INSTALL_NAME_TOOL"
+AC_SUBST(InstallNameToolCmd)
+
 # Here is where we re-target which specific version of the LLVM
 # tools we are looking for. In the past, GHC supported a number of
 # versions of LLVM simultaneously, but that stopped working around
@@ -1479,6 +1491,8 @@ echo "\
    libtool      : $LibtoolCmd
    objdump      : $ObjdumpCmd
    ranlib       : $RanlibCmd
+   otool        : $OtoolCmd
+   install_name_tool : $InstallNameToolCmd
    windres      : $WindresCmd
    dllwrap      : $DllWrapCmd
    genlib       : $GenlibCmd

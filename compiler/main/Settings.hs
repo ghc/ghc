@@ -25,6 +25,8 @@ module Settings
   , sPgm_windres
   , sPgm_libtool
   , sPgm_ar
+  , sPgm_otool
+  , sPgm_install_name_tool
   , sPgm_ranlib
   , sPgm_lo
   , sPgm_lc
@@ -139,6 +141,10 @@ sPgm_libtool :: Settings -> String
 sPgm_libtool = toolSettings_pgm_libtool . sToolSettings
 sPgm_ar :: Settings -> String
 sPgm_ar = toolSettings_pgm_ar . sToolSettings
+sPgm_otool :: Settings -> String
+sPgm_otool = toolSettings_pgm_otool . sToolSettings
+sPgm_install_name_tool :: Settings -> String
+sPgm_install_name_tool = toolSettings_pgm_install_name_tool . sToolSettings
 sPgm_ranlib :: Settings -> String
 sPgm_ranlib = toolSettings_pgm_ranlib . sToolSettings
 sPgm_lo :: Settings -> (String, [Option])
