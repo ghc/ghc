@@ -1787,9 +1787,12 @@ linkBinary' staticLink dflags o_files dep_units = do
 
     rc_objs <- maybeCreateManifest dflags output_fn
 
-    let link = if staticLink
-                   then GHC.SysTools.runLibtool
-                   else GHC.SysTools.runLink
+    let link dflags args | staticLink = GHC.SysTools.runLibtool dflags args
+                         | platformOS platform == OSDarwin
+                            = GHC.SysTools.runLink dflags args >> GHC.SysTools.runInjectRPaths dflags pkg_lib_paths output_fn
+                         | otherwise
+                            = GHC.SysTools.runLink dflags args
+
     link dflags (
                        map GHC.SysTools.Option verbFlags
                       ++ [ GHC.SysTools.Option "-o"
@@ -1856,7 +1859,11 @@ linkBinary' staticLink dflags o_files dep_units = do
                       ++ pkg_link_opts
                       ++ pkg_framework_opts
                       ++ (if platformOS platform == OSDarwin
-                          then [ "-Wl,-dead_strip_dylibs" ]
+                          --  dead_strip_dylibs, will remove unused dylibs, and thus save
+                          --  space in the load commands. The -headerpad is necessary so
+                          --  that we can inject more @rpath's later for the left over
+                          --  libraries in the runInjectRpaths phase below.
+                          then [ "-Wl,-dead_strip_dylibs", "-Wl,-headerpad,8000" ]
                           else [])
                     ))
 
