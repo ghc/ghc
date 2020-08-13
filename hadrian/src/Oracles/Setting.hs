@@ -114,6 +114,8 @@ data SettingsFileSetting
     | SettingsFileSetting_MergeObjectsFlags
     | SettingsFileSetting_ArCommand
     | SettingsFileSetting_RanlibCommand
+    | SettingsFileSetting_OtoolCommand
+    | SettingsFileSetting_InstallNameToolCommand
     | SettingsFileSetting_DllWrapCommand
     | SettingsFileSetting_WindresCommand
     | SettingsFileSetting_LibtoolCommand
@@ -199,6 +201,8 @@ settingsFileSetting key = lookupValueOrError configFile $ case key of
     SettingsFileSetting_MergeObjectsFlags -> "settings-merge-objects-flags"
     SettingsFileSetting_ArCommand -> "settings-ar-command"
     SettingsFileSetting_RanlibCommand -> "settings-ranlib-command"
+    SettingsFileSetting_OtoolCommand -> "settings-otool-command"
+    SettingsFileSetting_InstallNameToolCommand -> "settings-install_name_tool-command"
     SettingsFileSetting_DllWrapCommand -> "settings-dll-wrap-command"
     SettingsFileSetting_WindresCommand -> "settings-windres-command"
     SettingsFileSetting_LibtoolCommand -> "settings-libtool-command"
