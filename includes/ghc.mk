@@ -154,7 +154,7 @@ $(includes_H_PLATFORM) : includes/Makefile | $$(dir $$@)/.
 	@echo "#define $(TargetPlatform_CPP)_TARGET  1" >> $@
 	@echo "#define $(TargetArch_CPP)_TARGET_ARCH  1" >> $@
 	@echo "#define TARGET_ARCH  \"$(TargetArch_CPP)\"" >> $@
-	@echo "#define $(TargetOS_CPP)_TARGET_OS  1" >> $@  
+	@echo "#define $(TargetOS_CPP)_TARGET_OS  1" >> $@
 	@echo "#define TARGET_OS  \"$(TargetOS_CPP)\"" >> $@
 	@echo "#define $(TargetVendor_CPP)_TARGET_VENDOR  1" >> $@
 ifeq "$(GhcUnregisterised)" "YES"
@@ -229,4 +229,3 @@ install_includes :
 	    $(INSTALL_HEADER) $(INSTALL_OPTS) includes/$d/*.h "$(DESTDIR)$(ghcheaderdir)/$d/" && \
 	) true
 	$(INSTALL_HEADER) $(INSTALL_OPTS) $(includes_H_CONFIG) $(includes_H_PLATFORM) $(includes_H_VERSION) $(includes_DERIVEDCONSTANTS) "$(DESTDIR)$(ghcheaderdir)/"
-
