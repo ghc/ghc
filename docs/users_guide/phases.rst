@@ -95,6 +95,24 @@ given compilation phase:
 
     Use ⟨cmd⟩ as the pre-processor (with :ghc-flag:`-F` only).
 
+.. ghc-flag:: -pgmotool ⟨cmd⟩
+    :shortdesc: Use ⟨cmd⟩ as the program to inspect mach-o dylibs on macOS
+    :type: dynamic
+    :category: phase-programs
+
+    Use ⟨cmd⟩ as the program to inspect mach-o dynamic libraries and
+    executables to read the dynamic library dependencies.  We will compute
+    the necessary ``runpath``s to embed for the dependencies based on the
+    result of the ``otool`` call.
+
+.. ghc-flag:: -pgminstall_name_tool ⟨cmd⟩
+    :shortdesc: Use ⟨cmd⟩ as the program to inject ``runpath`` into mach-o dylibs on macOS
+    :type: dynamic
+    :category: phase-programs
+
+    Use ⟨cmd⟩ as the program to inject ``runpath``s into mach-o dynamic
+    libraries and executables.  As detected by the ``otool`` call.
+
 .. ghc-flag:: -pgmwindres ⟨cmd⟩
     :shortdesc: Use ⟨cmd⟩ as the program for embedding manifests on Windows.
     :type: dynamic
