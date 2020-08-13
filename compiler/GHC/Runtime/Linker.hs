@@ -47,6 +47,7 @@ import GHC.Platform.Ways
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Unit.Module
+import GHC.Unit.Home
 import GHC.Data.List.SetOps
 import GHC.Runtime.Linker.Types (DynLinker(..), PersistentLinkerState(..))
 import GHC.Driver.Session
@@ -656,7 +657,6 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
       ; return (lnks_needed, pkgs_needed) }
   where
     dflags = hsc_dflags hsc_env
-    this_pkg = homeUnit dflags
 
         -- The ModIface contains the transitive closure of the module dependencies
         -- within the current package, *except* for boot modules: if we encounter
@@ -682,6 +682,7 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
           let
             pkg = moduleUnit mod
             deps  = mi_deps iface
+            home_unit = mkHomeUnitFromFlags dflags
 
             pkg_deps = dep_pkgs deps
             (boot_deps, mod_deps) = flip partitionWith (dep_mods deps) $
@@ -694,9 +695,9 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
             acc_mods'  = addListToUniqDSet acc_mods (moduleName mod : mod_deps)
             acc_pkgs'  = addListToUniqDSet acc_pkgs $ map fst pkg_deps
           --
-          if pkg /= this_pkg
+          if not (isHomeUnit home_unit pkg)
              then follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toUnitId pkg))
-             else follow_deps (map (mkModule this_pkg) boot_deps' ++ mods)
+             else follow_deps (map (mkHomeModule home_unit) boot_deps' ++ mods)
                               acc_mods' acc_pkgs'
         where
             msg = text "need to link module" <+> ppr mod <+>

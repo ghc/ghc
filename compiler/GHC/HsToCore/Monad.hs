@@ -294,7 +294,10 @@ mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var cc_st_var
         gbl_env = DsGblEnv { ds_mod     = mod
                            , ds_fam_inst_env = fam_inst_env
                            , ds_if_env  = (if_genv, if_lenv)
-                           , ds_unqual  = mkPrintUnqualified dflags rdr_env
+                           , ds_unqual  = mkPrintUnqualified
+                                             (unitState dflags)
+                                             (mkHomeUnitFromFlags dflags)
+                                             rdr_env
                            , ds_msgs    = msg_var
                            , ds_complete_matches = completeMatchMap
                            , ds_cc_st   = cc_st_var

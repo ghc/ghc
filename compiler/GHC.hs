@@ -312,7 +312,7 @@ import GHC.Tc.Utils.Monad    ( finalSafeMode, fixSafeInstances, initIfaceTcRn )
 import GHC.Iface.Load        ( loadSysInterface )
 import GHC.Tc.Types
 import GHC.Core.Predicate
-import GHC.Unit.State
+import GHC.Unit
 import GHC.Types.Name.Set
 import GHC.Types.Name.Reader
 import GHC.Hs
@@ -342,7 +342,6 @@ import GHC.Driver.Ppr
 import GHC.SysTools
 import GHC.SysTools.BaseDir
 import GHC.Types.Annotations
-import GHC.Unit.Module
 import GHC.Utils.Panic
 import GHC.Platform
 import GHC.Data.Bag        ( listToBag )
@@ -1165,8 +1164,12 @@ getInsts = withSession $ \hsc_env ->
     return $ ic_instances (hsc_IC hsc_env)
 
 getPrintUnqual :: GhcMonad m => m PrintUnqualified
-getPrintUnqual = withSession $ \hsc_env ->
-  return (icPrintUnqual (hsc_dflags hsc_env) (hsc_IC hsc_env))
+getPrintUnqual = withSession $ \hsc_env -> do
+  let dflags = hsc_dflags hsc_env
+  return $ icPrintUnqual
+               (unitState dflags)
+               (mkHomeUnitFromFlags dflags)
+               (hsc_IC hsc_env)
 
 -- | Container for information about a 'Module'.
 data ModuleInfo = ModuleInfo {
@@ -1261,7 +1264,11 @@ mkPrintUnqualifiedForModule :: GhcMonad m =>
                                ModuleInfo
                             -> m (Maybe PrintUnqualified) -- XXX: returns a Maybe X
 mkPrintUnqualifiedForModule minf = withSession $ \hsc_env -> do
-  return (fmap (mkPrintUnqualified (hsc_dflags hsc_env)) (minf_rdr_env minf))
+  let dflags          = hsc_dflags hsc_env
+      mk_print_unqual = mkPrintUnqualified
+                           (unitState dflags)
+                           (mkHomeUnitFromFlags dflags)
+  return (fmap mk_print_unqual (minf_rdr_env minf))
 
 modInfoLookupName :: GhcMonad m =>
                      ModuleInfo -> Name
@@ -1494,12 +1501,10 @@ showRichTokenStream ts = go startLoc ts ""
 -- using the algorithm that is used for an @import@ declaration.
 findModule :: GhcMonad m => ModuleName -> Maybe FastString -> m Module
 findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
-  let
-    dflags   = hsc_dflags hsc_env
-    this_pkg = homeUnit dflags
-  --
+  let dflags = hsc_dflags hsc_env
+      home_unit = mkHomeUnitFromFlags dflags
   case maybe_pkg of
-    Just pkg | fsToUnit pkg /= this_pkg && pkg /= fsLit "this" -> liftIO $ do
+    Just pkg | not (isHomeUnit home_unit (fsToUnit pkg)) && pkg /= fsLit "this" -> liftIO $ do
       res <- findImportedModule hsc_env mod_name maybe_pkg
       case res of
         Found _ m -> return m
@@ -1511,7 +1516,7 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
         Nothing -> liftIO $ do
            res <- findImportedModule hsc_env mod_name maybe_pkg
            case res of
-             Found loc m | moduleUnit m /= this_pkg -> return m
+             Found loc m | not (isHomeModule home_unit m) -> return m
                          | otherwise -> modNotLoadedError dflags m loc
              err -> throwOneError $ noModError dflags noSrcSpan mod_name err
 

@@ -44,6 +44,7 @@ import GHC.Utils.Fingerprint
 import GHC.Utils.Exception
 import GHC.Types.Unique.Set
 import GHC.Unit.State
+import GHC.Unit.Home
 
 import Control.Monad
 import Data.Function
@@ -215,7 +216,7 @@ checkVersions hsc_env mod_summary iface
        -- readIface will have verified that the UnitId matches,
        -- but we ALSO must make sure the instantiation matches up.  See
        -- test case bkpcabal04!
-       ; if moduleUnit (mi_module iface) /= homeUnit (hsc_dflags hsc_env)
+       ; if not (isHomeModule home_unit (mi_module iface))
             then return (RecompBecause "-this-unit-id changed", Nothing) else do {
        ; recomp <- checkFlagHash hsc_env iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
@@ -249,11 +250,12 @@ checkVersions hsc_env mod_summary iface
        -- all the dependent modules should be in the HPT already, so it's
        -- quite redundant
        ; updateEps_ $ \eps  -> eps { eps_is_boot = mod_deps }
-       ; recomp <- checkList [checkModUsage this_pkg u | u <- mi_usages iface]
+       ; recomp <- checkList [checkModUsage (homeUnitAsUnit home_unit) u
+                             | u <- mi_usages iface]
        ; return (recomp, Just iface)
     }}}}}}}}}}
   where
-    this_pkg = homeUnit (hsc_dflags hsc_env)
+    home_unit = mkHomeUnitFromFlags (hsc_dflags hsc_env)
     -- This is a bit of a hack really
     mod_deps :: ModuleNameEnv ModuleNameWithIsBoot
     mod_deps = mkModDeps (dep_mods (mi_deps iface))
@@ -333,9 +335,10 @@ pluginRecompileToRecompileRequired old_fp new_fp pr
 checkHsig :: ModSummary -> ModIface -> IfG RecompileRequired
 checkHsig mod_summary iface = do
     dflags <- getDynFlags
-    let outer_mod = ms_mod mod_summary
-        inner_mod = canonicalizeHomeModule dflags (moduleName outer_mod)
-    MASSERT( moduleUnit outer_mod == homeUnit dflags )
+    let home_unit = mkHomeUnitFromFlags dflags
+        outer_mod = ms_mod mod_summary
+        inner_mod = homeModuleNameInstantiation home_unit (moduleName outer_mod)
+    MASSERT( isHomeModule home_unit outer_mod )
     case inner_mod == mi_semantic_module iface of
         True -> up_to_date (text "implementing module unchanged")
         False -> return (RecompBecause "implementing module changed")
@@ -449,15 +452,14 @@ checkDependencies hsc_env summary iface
    prev_dep_mods = dep_mods (mi_deps iface)
    prev_dep_plgn = dep_plgins (mi_deps iface)
    prev_dep_pkgs = dep_pkgs (mi_deps iface)
-
-   this_pkg = homeUnit (hsc_dflags hsc_env)
+   home_unit     = mkHomeUnitFromFlags (hsc_dflags hsc_env)
 
    dep_missing (mb_pkg, L _ mod) = do
      find_res <- liftIO $ findImportedModule hsc_env mod (mb_pkg)
      let reason = moduleNameString mod ++ " changed"
      case find_res of
         Found _ mod
-          | pkg == this_pkg
+          | isHomeUnit home_unit pkg
            -> if moduleName mod `notElem` map gwib_mod prev_dep_mods ++ prev_dep_plgn
                  then do traceHiDiffs $
                            text "imported module " <> quotes (ppr mod) <>
@@ -483,7 +485,8 @@ checkDependencies hsc_env summary iface
    isOldHomeDeps = flip Set.member old_deps
    checkForNewHomeDependency (L _ mname) = do
      let
-       mod = mkModule this_pkg mname
+       home_unit = mkHomeUnitFromFlags (hsc_dflags hsc_env)
+       mod = mkHomeModule home_unit mname
        str_mname = moduleNameString mname
        reason = str_mname ++ " changed"
      -- We only want to look at home modules to check if any new home dependency
@@ -1351,11 +1354,12 @@ mkHashFun
         -> (Name -> IO Fingerprint)
 mkHashFun hsc_env eps name
   | isHoleModule orig_mod
-  = lookup (mkHomeModule dflags (moduleName orig_mod))
+  = lookup (mkHomeModule home_unit (moduleName orig_mod))
   | otherwise
   = lookup orig_mod
   where
       dflags = hsc_dflags hsc_env
+      home_unit = mkHomeUnitFromFlags dflags
       hpt = hsc_HPT hsc_env
       pit = eps_PIT eps
       occ = nameOccName name

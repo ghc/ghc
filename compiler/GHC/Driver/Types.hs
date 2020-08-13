@@ -80,7 +80,7 @@ module GHC.Driver.Types (
         extendInteractiveContext, extendInteractiveContextWithIds,
         substInteractiveContext,
         setInteractivePrintName, icInteractiveModule,
-        InteractiveImport(..), setInteractivePackage,
+        InteractiveImport(..),
         mkPrintUnqualified, pprModulePrefix,
         mkQualPackage, mkQualModule, pkgQual,
 
@@ -1797,9 +1797,9 @@ icInScopeTTs :: InteractiveContext -> [TyThing]
 icInScopeTTs = ic_tythings
 
 -- | Get the PrintUnqualified function based on the flags and this InteractiveContext
-icPrintUnqual :: DynFlags -> InteractiveContext -> PrintUnqualified
-icPrintUnqual dflags InteractiveContext{ ic_rn_gbl_env = grenv } =
-    mkPrintUnqualified dflags grenv
+icPrintUnqual :: UnitState -> HomeUnit -> InteractiveContext -> PrintUnqualified
+icPrintUnqual unit_state home_unit InteractiveContext{ ic_rn_gbl_env = grenv } =
+    mkPrintUnqualified unit_state home_unit grenv
 
 -- | extendInteractiveContext is called with new TyThings recently defined to update the
 -- InteractiveContext to include them.  Ids are easily removed when shadowed,
@@ -1851,12 +1851,6 @@ shadowed_by ids = shadowed
   where
     shadowed id = getOccName id `elemOccSet` new_occs
     new_occs = mkOccSet (map getOccName ids)
-
--- | Set the 'DynFlags.homeUnitId' to 'interactive'
-setInteractivePackage :: HscEnv -> HscEnv
-setInteractivePackage hsc_env
-   = hsc_env { hsc_dflags = (hsc_dflags hsc_env)
-                { homeUnitId = interactiveUnitId } }
 
 setInteractivePrintName :: InteractiveContext -> Name -> InteractiveContext
 setInteractivePrintName ic n = ic{ic_int_print = n}
@@ -1956,12 +1950,12 @@ with some holes, we should try to give the user some more useful information.
 
 -- | Creates some functions that work out the best ways to format
 -- names for the user according to a set of heuristics.
-mkPrintUnqualified :: DynFlags -> GlobalRdrEnv -> PrintUnqualified
-mkPrintUnqualified dflags env = QueryQualify qual_name
-                                             (mkQualModule dflags)
-                                             (mkQualPackage pkgs)
+mkPrintUnqualified :: UnitState -> HomeUnit -> GlobalRdrEnv -> PrintUnqualified
+mkPrintUnqualified unit_state home_unit env
+ = QueryQualify qual_name
+      (mkQualModule unit_state home_unit)
+      (mkQualPackage unit_state)
   where
-  pkgs = unitState dflags
   qual_name mod occ
         | [gre] <- unqual_gres
         , right_name gre
@@ -2016,9 +2010,9 @@ mkPrintUnqualified dflags env = QueryQualify qual_name
 -- | Creates a function for formatting modules based on two heuristics:
 -- (1) if the module is the current module, don't qualify, and (2) if there
 -- is only one exposed package which exports this module, don't qualify.
-mkQualModule :: DynFlags -> QueryQualifyModule
-mkQualModule dflags mod
-     | isHomeModule dflags mod = False
+mkQualModule :: UnitState -> HomeUnit -> QueryQualifyModule
+mkQualModule unit_state home_unit mod
+     | isHomeModule home_unit mod = False
 
      | [(_, pkgconfig)] <- lookup,
        mkUnit pkgconfig == moduleUnit mod
@@ -2027,7 +2021,7 @@ mkQualModule dflags mod
      = False
 
      | otherwise = True
-     where lookup = lookupModuleInAllUnits (unitState dflags) (moduleName mod)
+     where lookup = lookupModuleInAllUnits unit_state (moduleName mod)
 
 -- | Creates a function for formatting packages based on two heuristics:
 -- (1) don't qualify if the package in question is "main", and (2) only qualify
@@ -2308,7 +2302,7 @@ lookupType dflags hpt pte name
   where
     mod = ASSERT2( isExternalName name, ppr name )
           if isHoleName name
-            then mkHomeModule dflags (moduleName (nameModule name))
+            then mkHomeModule (mkHomeUnitFromFlags dflags) (moduleName (nameModule name))
             else nameModule name
 
 -- | As 'lookupType', but with a marginally easier-to-use interface
