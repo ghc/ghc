@@ -147,8 +147,8 @@ module GHC.Driver.Session (
         versionedAppDir, versionedFilePath,
         extraGccViaCFlags, globalPackageDatabasePath,
         pgm_L, pgm_P, pgm_F, pgm_c, pgm_a, pgm_l, pgm_lm, pgm_dll, pgm_T,
-        pgm_windres, pgm_libtool, pgm_ar, pgm_ranlib, pgm_lo, pgm_lc,
-        pgm_lcc, pgm_i,
+        pgm_windres, pgm_libtool, pgm_ar, pgm_otool, pgm_install_name_tool,
+        pgm_ranlib, pgm_lo, pgm_lc, pgm_lcc, pgm_i,
         opt_L, opt_P, opt_F, opt_c, opt_cxx, opt_a, opt_l, opt_lm, opt_i,
         opt_P_signature,
         opt_windres, opt_lo, opt_lc, opt_lcc,
@@ -950,6 +950,10 @@ pgm_lcc               :: DynFlags -> (String,[Option])
 pgm_lcc dflags = toolSettings_pgm_lcc $ toolSettings dflags
 pgm_ar                :: DynFlags -> String
 pgm_ar dflags = toolSettings_pgm_ar $ toolSettings dflags
+pgm_otool             :: DynFlags -> String
+pgm_otool dflags = toolSettings_pgm_otool $ toolSettings dflags
+pgm_install_name_tool :: DynFlags -> String
+pgm_install_name_tool dflags = toolSettings_pgm_install_name_tool $ toolSettings dflags
 pgm_ranlib            :: DynFlags -> String
 pgm_ranlib dflags = toolSettings_pgm_ranlib $ toolSettings dflags
 pgm_lo                :: DynFlags -> (String,[Option])
@@ -2389,6 +2393,10 @@ dynamic_flags_deps = [
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_libtool = f }
   , make_ord_flag defFlag "pgmar"
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_ar = f }
+  , make_ord_flag defFlag "pgmotool"
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_otool = f}
+  , make_ord_flag defFlag "pgminstall_name_tool"
+      $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_install_name_tool = f}
   , make_ord_flag defFlag "pgmranlib"
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_ranlib = f }
 
@@ -3897,7 +3905,6 @@ defaultFlags settings
       Opt_OmitYields,
       Opt_PrintBindContents,
       Opt_ProfCountEntries,
-      Opt_RPath,
       Opt_SharedImplib,
       Opt_SimplPreInlining,
       Opt_VersionMacros
@@ -3907,6 +3914,8 @@ defaultFlags settings
              -- The default -O0 options
 
     ++ default_PIC platform
+
+    ++ default_RPath platform
 
     ++ concatMap (wayGeneralFlags platform) (defaultWays settings)
     ++ validHoleFitDefaults
@@ -3947,6 +3956,29 @@ default_PIC platform =
                                          -- #10597 for more
                                          -- information.
     _                      -> []
+
+
+-- We usually want to use RPath, except on macOS (OSDarwin).  On recent macOS
+-- versions the number of load commands we can embed in a dynamic library is
+-- restricted.  Hence since b592bd98ff2 we rely on -dead_strip_dylib to only
+-- link the needed dylibs instead of linking the full dependency closure.
+--
+-- If we split the library linking into injecting -rpath and -l @rpath/...
+-- components, we will reduce the number of libraries we link, however we will
+-- still inject one -rpath entry for each library, independent of their use.
+-- That is, we even inject -rpath values for libraries that we dead_strip in
+-- the end. As such we can run afoul of the load command size limit simply
+-- by polluting the load commands with RPATH entries.
+--
+-- Thus, we disable Opt_RPath by default on OSDarwin.  The savvy user can always
+-- enable it with -use-rpath if they so wish.
+--
+-- See Note [Dynamic linking on macOS]
+
+default_RPath :: Platform -> [GeneralFlag]
+default_RPath platform | platformOS platform == OSDarwin = []
+default_RPath _                                          = [Opt_RPath]
+
 
 -- General flags that are switched on/off when other general flags are switched
 -- on
