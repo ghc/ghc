@@ -58,3 +58,11 @@ test('prof_info',
       only_ways(prof_ways)
      ],
      multi_compile_and_run, ['prof_info', [('create_tso.c','')], '-prof'])
+
+test('parse_tso_flags',
+     [extra_files(['TestUtils.hs']),
+      only_ways(['normal']),
+      ignore_stdout,
+      ignore_stderr
+     ],
+     compile_and_run, [''])
