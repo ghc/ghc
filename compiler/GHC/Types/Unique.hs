@@ -54,6 +54,7 @@ module GHC.Types.Unique (
         mkVarOccUnique, mkDataOccUnique, mkTvOccUnique, mkTcOccUnique,
         mkRegSingleUnique, mkRegPairUnique, mkRegClassUnique, mkRegSubUnique,
         mkCostCentreUnique,
+        uniqFromMask,
 
         mkBuiltinUnique,
         mkPseudoUniqueD,
@@ -447,3 +448,9 @@ mkTcOccUnique   fs = mkUnique 'c' (uniqueOfFS fs)
 initExitJoinUnique :: Unique
 initExitJoinUnique = mkUnique 's' 0
 
+foreign import ccall unsafe "genSym" genSym :: IO Int
+
+uniqFromMask :: Char -> IO Unique
+uniqFromMask mask
+  = do { uqNum <- genSym
+       ; return $! mkUnique mask uqNum }
