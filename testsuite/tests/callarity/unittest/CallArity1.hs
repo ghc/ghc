@@ -20,6 +20,7 @@ import System.Environment( getArgs )
 import GHC.Types.Var.Set
 import GHC.Core.Ppr
 import GHC.Types.Unique
+import {-# SOURCE #-} GHC.Builtin.Uniques
 import GHC.Types.Unique.Set
 import GHC.Core.Lint
 import GHC.Data.FastString

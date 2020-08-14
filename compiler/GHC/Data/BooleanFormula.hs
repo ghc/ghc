@@ -26,6 +26,7 @@ import GHC.Utils.Outputable
 import GHC.Utils.Binary
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
+import {-# SOURCE #-} GHC.Builtin.Uniques
 import GHC.Types.Unique.Set
 
 ----------------------------------------------------------------------

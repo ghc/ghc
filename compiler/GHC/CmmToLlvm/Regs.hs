@@ -20,7 +20,6 @@ import GHC.Platform
 import GHC.Data.FastString
 import GHC.Utils.Panic ( panic )
 import GHC.Types.Unique
-
 -- | Get the LlvmVar function variable storing the real register
 lmGlobalRegVar :: Platform -> GlobalReg -> LlvmVar
 lmGlobalRegVar platform = pVarLift . lmGlobalReg platform "_Var"

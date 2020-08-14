@@ -34,6 +34,7 @@ import GHC.Prelude
 
 import GHC.Unit.Module.Name (ModuleName)
 import GHC.Types.Unique
+import {-# SOURCE #-} GHC.Builtin.Uniques
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.DFM
 import GHC.Unit.Types
