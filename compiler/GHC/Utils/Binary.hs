@@ -1282,13 +1282,14 @@ instance Binary Activation where
                       return (ActiveAfter src ab)
 
 instance Binary InlinePragma where
-    put_ bh (InlinePragma s a b c d e) = do
+    put_ bh (InlinePragma s a b c d e f) = do
             put_ bh s
             put_ bh a
             put_ bh b
             put_ bh c
             put_ bh d
             put_ bh e
+            put_ bh f
 
     get bh = do
            s <- get bh
@@ -1297,7 +1298,8 @@ instance Binary InlinePragma where
            c <- get bh
            d <- get bh
            e <- get bh
-           return (InlinePragma s a b c d e)
+           f <- get bh
+           return (InlinePragma s a b c d e f)
 
 instance Binary RuleMatchInfo where
     put_ bh FunLike = putByte bh 0

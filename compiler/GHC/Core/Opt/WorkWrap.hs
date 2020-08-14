@@ -587,6 +587,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
                           _        -> inl_act wrap_prag
 
             work_prag = InlinePragma { inl_src = SourceText "{-# INLINE"
+                                     , inl_spec_src = NoSourceText
                                      , inl_inline = fn_inline_spec
                                      , inl_spec   = fn_specializable_spec
                                      , inl_sat    = Nothing
@@ -673,6 +674,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
 mkStrWrapperInlinePrag :: InlinePragma -> InlinePragma
 mkStrWrapperInlinePrag (InlinePragma { inl_act = act, inl_rule = rule_info })
   = InlinePragma { inl_src    = SourceText "{-# INLINE"
+                 , inl_spec_src = NoSourceText
                  , inl_inline = NoUserInline -- See Note [Wrapper NoUserInline]
                  , inl_spec   = NoUserSpecializable -- TODO
                  , inl_sat    = Nothing

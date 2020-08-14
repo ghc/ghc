@@ -2525,6 +2525,7 @@ mkInlinePragma :: SourceText -> (InlineSpec, SpecializableSpec, RuleMatchInfo) -
 -- the activation spec (and usually does)
 mkInlinePragma src (inl, spec, match_info) mb_act
   = InlinePragma { inl_src = src -- Note [Pragma source text] in GHC.Types.Basic
+                 , inl_spec_src = src
                  , inl_inline = inl
                  , inl_spec   = spec
                  , inl_sat    = Nothing

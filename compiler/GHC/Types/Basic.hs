@@ -1438,6 +1438,7 @@ no harm.
 data InlinePragma            -- Note [InlinePragma]
   = InlinePragma
       { inl_src    :: SourceText -- Note [Pragma source text]
+      , inl_spec_src :: SourceText
       , inl_inline :: InlineSpec -- See Note [inl_inline and inl_act]
       , inl_spec   :: SpecializableSpec
 
@@ -1575,6 +1576,7 @@ noUserInlineSpec _            = False
 defaultInlinePragma, alwaysInlinePragma, neverInlinePragma, dfunInlinePragma
   :: InlinePragma
 defaultInlinePragma = InlinePragma { inl_src = SourceText "{-# INLINE"
+                                   , inl_spec_src = NoSourceText
                                    , inl_act = AlwaysActive
                                    , inl_rule = FunLike
                                    , inl_inline = NoUserInline
