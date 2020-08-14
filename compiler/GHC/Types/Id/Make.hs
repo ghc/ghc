@@ -69,6 +69,7 @@ import GHC.Types.Demand
 import GHC.Types.Cpr
 import GHC.Core
 import GHC.Types.Unique
+import GHC.Builtin.Uniques
 import GHC.Types.Unique.Supply
 import GHC.Builtin.Names
 import GHC.Types.Basic       hiding ( SuccessFlag(..) )

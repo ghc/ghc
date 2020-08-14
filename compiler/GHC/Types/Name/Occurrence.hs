@@ -105,6 +105,7 @@ import GHC.Prelude
 
 import GHC.Utils.Misc
 import GHC.Types.Unique
+import GHC.Builtin.Uniques
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Data.FastString

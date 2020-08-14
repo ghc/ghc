@@ -32,6 +32,7 @@ import GHC.Prelude
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Types.Unique
+import GHC.Builtin.Uniques
 import GHC.Platform.Reg.Class
 import Data.List (intersect)
 

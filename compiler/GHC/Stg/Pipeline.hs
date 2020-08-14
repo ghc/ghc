@@ -27,6 +27,7 @@ import GHC.Unit.Module ( Module )
 
 import GHC.Driver.Session
 import GHC.Utils.Error
+import GHC.Types.Unique (uniqFromMask)
 import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable
 import GHC.Utils.Panic

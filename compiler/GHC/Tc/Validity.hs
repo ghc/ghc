@@ -67,7 +67,7 @@ import GHC.Data.List.SetOps
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
-import GHC.Types.Unique  ( mkAlphaTyVarUnique )
+import GHC.Builtin.Uniques  ( mkAlphaTyVarUnique )
 import GHC.Data.Bag      ( emptyBag )
 import qualified GHC.LanguageExtensions as LangExt
 

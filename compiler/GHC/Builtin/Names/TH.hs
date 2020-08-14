@@ -14,6 +14,7 @@ import GHC.Types.Name( Name )
 import GHC.Types.Name.Occurrence( tcName, clsName, dataName, varName )
 import GHC.Types.Name.Reader( RdrName, nameRdrName )
 import GHC.Types.Unique
+import GHC.Builtin.Uniques
 import GHC.Data.FastString
 
 -- To add a name, do three things

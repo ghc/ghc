@@ -43,7 +43,7 @@ import GHC.Core.Coercion as Coercion
 import GHC.Core.Multiplicity
 import GHC.Types.Var.Set
 import GHC.Types.Basic
-import GHC.Types.Unique
+import GHC.Builtin.Uniques
 import GHC.Driver.Session ( DynFlags, GeneralFlag(..), gopt )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
