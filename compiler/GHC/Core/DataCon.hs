@@ -83,7 +83,7 @@ import GHC.Data.FastString
 import GHC.Unit
 import GHC.Utils.Binary
 import GHC.Types.Unique.Set
-import GHC.Types.Unique( mkAlphaTyVarUnique )
+import GHC.Builtin.Uniques( mkAlphaTyVarUnique )
 
 import GHC.Utils.Outputable
 import GHC.Utils.Misc

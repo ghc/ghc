@@ -153,6 +153,7 @@ import GHC.Types.ForeignCall
 import GHC.Data.Maybe
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
+import GHC.Builtin.Uniques (mkBuiltinUnique)
 import GHC.Types.Unique.Supply
 import GHC.Data.FastString
 import GHC.Core.Multiplicity
