@@ -811,6 +811,7 @@ synifyPatSynType ps =
 synifyTyLit :: TyLit -> HsTyLit
 synifyTyLit (NumTyLit n) = HsNumTy NoSourceText n
 synifyTyLit (StrTyLit s) = HsStrTy NoSourceText s
+synifyTyLit (CharTyLit c) = HsCharTy NoSourceText c
 
 synifyKindSig :: Kind -> LHsKind GhcRn
 synifyKindSig k = synifyType WithinType [] k

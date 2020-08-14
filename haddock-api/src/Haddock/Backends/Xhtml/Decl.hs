@@ -1285,3 +1285,4 @@ ppr_mono_ty (HsTyLit _ n) _ _ _ = ppr_tylit n
 ppr_tylit :: HsTyLit -> Html
 ppr_tylit (HsNumTy _ n) = toHtml (show n)
 ppr_tylit (HsStrTy _ s) = toHtml (show s)
+ppr_tylit (HsCharTy _ c) = toHtml (show c)
