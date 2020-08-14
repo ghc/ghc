@@ -4,6 +4,7 @@ module Main where
 
 import GHC.Types.Unique.Supply
 import GHC.Types.Unique
+import {-# SOURCE #-} GHC.Builtin.Uniques
 
 -- Generate a lot of uniques
 main = do
