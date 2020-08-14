@@ -103,7 +103,7 @@ import {-# SOURCE #-}   GHC.Tc.Utils.TcType( TcTyVarDetails, pprTcTyVarDetails, 
 import {-# SOURCE #-}   GHC.Types.Id.Info( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
                                            vanillaIdInfo, pprIdDetails )
 import {-# SOURCE #-}   GHC.Builtin.Types ( manyDataConTy )
-import GHC.Types.Name hiding (varName)
+import {-# SOURCE #-}   GHC.Types.Name
 import GHC.Types.Unique ( Uniquable, Unique, getKey, getUnique
                         , mkUniqueGrimily, nonDetCmpUnique )
 import GHC.Utils.Misc
