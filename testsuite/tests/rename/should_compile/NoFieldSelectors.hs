@@ -1,4 +1,6 @@
 {-# LANGUAGE NoFieldSelectors #-}
+{-# LANGUAGE RecordWildCards #-}
+
 
 module NoFieldSelectors
 where
@@ -10,6 +12,11 @@ data Foo = Foo { foo :: Int, bar :: String }
 
 foo = 3 -- should not conflict
 fooX = foo + 1
+
+rwcPatFoo Foo{..} = show (foo, bar)
+rwcConFoo = Foo{..} where
+  foo = 42
+  bar = "hello"
 
 foo1 = Foo 3 "bar"
 foo2 = Foo { foo = 3, bar = "bar" } -- disambiguate foo
