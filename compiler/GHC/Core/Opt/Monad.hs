@@ -63,6 +63,7 @@ import GHC.Types.Var
 import GHC.Utils.Outputable as Outputable
 import GHC.Data.FastString
 import GHC.Utils.Error( Severity(..), DumpFormat (..), dumpOptionsFromFlag )
+import GHC.Types.Unique (uniqFromMask)
 import GHC.Types.Unique.Supply
 import GHC.Utils.Monad
 import GHC.Types.Name.Env

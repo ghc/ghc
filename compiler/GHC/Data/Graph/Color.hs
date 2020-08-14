@@ -22,6 +22,7 @@ import GHC.Data.Graph.Ops
 import GHC.Data.Graph.Ppr
 
 import GHC.Types.Unique
+import {-# SOURCE #-} GHC.Builtin.Uniques
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 import GHC.Utils.Outputable

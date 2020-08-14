@@ -10,6 +10,7 @@ import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types
 import GHC.Types.Unique.Set
 import GHC.Types.Unique
+import {-# SOURCE #-} GHC.Builtin.Uniques
 
 import qualified Control.Exception as E
 import Control.Monad
