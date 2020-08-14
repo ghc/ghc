@@ -156,8 +156,6 @@ peekIndexTable loopBreakers ptr = do
             it_next = it_next',
             it_back_edge = it_back_edge'
         }
-    where
-        ptrAsInt = ptrToInt ptr
 
 #else
 import Prelude
