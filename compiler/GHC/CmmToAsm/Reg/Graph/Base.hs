@@ -24,9 +24,11 @@ module GHC.CmmToAsm.Reg.Graph.Base (
 
 import GHC.Prelude
 
+import {-# SOURCE #-} GHC.Builtin.Uniques
 import GHC.Types.Unique.Set
 import GHC.Types.Unique.FM
 import GHC.Types.Unique
+import {-# SOURCE #-} GHC.Builtin.Uniques
 import GHC.Utils.Monad (concatMapM)
 
 

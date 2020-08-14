@@ -49,7 +49,7 @@ module GHC.Builtin.Utils (
 
 import GHC.Prelude
 
-import GHC.Builtin.Uniques
+import {-# SOURCE #-} GHC.Builtin.Uniques
 import GHC.Types.Unique ( isValidKnownKeyUnique )
 
 import GHC.Core.ConLike ( ConLike(..) )
