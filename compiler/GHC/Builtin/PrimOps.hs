@@ -43,7 +43,8 @@ import GHC.Types.Basic   ( Arity, Fixity(..), FixityDirection(..), Boxity(..),
                            SourceText(..) )
 import GHC.Types.SrcLoc  ( wiredInSrcSpan )
 import GHC.Types.ForeignCall ( CLabelString )
-import GHC.Types.Unique  ( Unique, mkPrimOpIdUnique, mkPrimOpWrapperUnique )
+import GHC.Types.Unique  ( Unique)
+import GHC.Builtin.Uniques (mkPrimOpIdUnique, mkPrimOpWrapperUnique )
 import GHC.Unit          ( Unit )
 import GHC.Utils.Outputable
 import GHC.Data.FastString
