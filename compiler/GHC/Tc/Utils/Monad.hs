@@ -180,6 +180,7 @@ import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Data.Bag
 import GHC.Utils.Outputable as Outputable
+import GHC.Types.Unique (uniqFromMask)
 import GHC.Types.Unique.Supply
 import GHC.Driver.Session
 import GHC.Data.FastString

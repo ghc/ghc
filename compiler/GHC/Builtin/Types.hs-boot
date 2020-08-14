@@ -2,9 +2,10 @@ module GHC.Builtin.Types where
 
 import {-# SOURCE #-} GHC.Core.TyCon    ( TyCon )
 import {-# SOURCE #-} GHC.Core.TyCo.Rep (Type, Kind)
+import {-# SOURCE #-} GHC.Core.DataCon  ( DataCon )
 
-import GHC.Types.Basic (Arity, TupleSort)
-import GHC.Types.Name (Name)
+import GHC.Types.Basic (Arity, TupleSort, Boxity, ConTag)
+import {-# SOURCE #-} GHC.Types.Name (Name)
 
 listTyCon :: TyCon
 typeNatKind, typeSymbolKind :: Type
@@ -55,4 +56,16 @@ multMulTyCon :: TyCon
 
 tupleTyConName :: TupleSort -> Arity -> Name
 
+
 integerTy, naturalTy :: Type
+
+promotedTupleDataCon :: Boxity -> Arity -> TyCon
+
+tupleDataCon :: Boxity -> Arity -> DataCon
+tupleTyCon   :: Boxity -> Arity -> TyCon
+
+cTupleDataConName :: Arity -> Name
+cTupleTyConName :: Arity -> Name
+
+sumDataCon :: ConTag -> Arity -> DataCon
+sumTyCon :: Arity -> TyCon
