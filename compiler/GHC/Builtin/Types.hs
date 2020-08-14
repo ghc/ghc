@@ -178,7 +178,6 @@ import GHC.Types.Name.Set ( NameSet, mkNameSet, elemNameSet )
 import GHC.Types.Basic
 import GHC.Types.ForeignCall
 import GHC.Types.SrcLoc   ( noSrcSpan )
-import GHC.Types.Unique
 import Data.Array
 import GHC.Data.FastString
 import GHC.Data.BooleanFormula ( mkAnd )
