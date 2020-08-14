@@ -648,6 +648,7 @@ extendGlobalRdrEnvRn avails new_fixities
         -- except cases where *both* GREs are DuplicateRecordFields (#17965).
         isDupGRE gre' = isLocalGRE gre'
                 && not (isOverloadedRecFldGRE gre && isOverloadedRecFldGRE gre')
+                && not (isNoFieldSelectorGRE gre || isNoFieldSelectorGRE gre')
 
 
 {- *********************************************************************

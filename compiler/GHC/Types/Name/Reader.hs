@@ -57,7 +57,7 @@ module GHC.Types.Name.Reader (
         gresToAvailInfo,
 
         -- ** Global 'RdrName' mapping elements: 'GlobalRdrElt', 'Provenance', 'ImportSpec'
-        GlobalRdrElt(..), isLocalGRE, isRecFldGRE, isOverloadedRecFldGRE, greLabel,
+        GlobalRdrElt(..), isLocalGRE, isRecFldGRE, isOverloadedRecFldGRE, isNoFieldSelectorGRE, greLabel,
         unQualOK, qualSpecOK, unQualSpecOK,
         pprNameProvenance,
         Parent(..), greParent_maybe,
@@ -654,7 +654,7 @@ gresFromAvail prov_fn avail
           Just is -> GRE { gre_name = n, gre_par = FldParent (availName avail) mb_lbl has_sel
                          , gre_lcl = False, gre_imp = [is] }
       where
-        mb_lbl | is_overloaded == DuplicateRecordFields = Just lbl
+        mb_lbl | is_overloaded == DuplicateRecordFields || has_sel == NoFieldSelectors = Just lbl
                | otherwise     = Nothing
 
 
@@ -825,9 +825,8 @@ lookupGRE_Name_OccName :: GlobalRdrEnv -> Name -> OccName -> Maybe GlobalRdrElt
 -- that might differ from that of the 'Name'.  See 'lookupGRE_FieldLabel' and
 -- Note [Parents for record fields].
 lookupGRE_Name_OccName env name occ
-  = case [ gre | gre <- lookupGlobalRdrEnv env (nameOccName name)
-                -- XXX NoFieldSelectors: omit this check because gre_name might be mangled
-                --- , gre_name gre == name
+  = case [ gre | gre <- lookupGlobalRdrEnv env occ
+                , gre_name gre == name
                ] of
       []    -> Nothing
       [gre] -> Just gre
@@ -861,6 +860,10 @@ isOverloadedRecFldGRE :: GlobalRdrElt -> Bool
 -- (See Note [Parents for record fields])
 isOverloadedRecFldGRE (GRE {gre_par = FldParent{par_lbl = Just _}}) = True
 isOverloadedRecFldGRE _                                             = False
+
+isNoFieldSelectorGRE :: GlobalRdrElt -> Bool
+isNoFieldSelectorGRE (GRE {gre_par = FldParent{par_hasSel = NoFieldSelectors }}) = True
+isNoFieldSelectorGRE _ = False
 
 -- Returns the field label of this GRE, if it has one
 greLabel :: GlobalRdrElt -> Maybe FieldLabelString
