@@ -1132,16 +1132,11 @@ lookupGlobalOccRn_overloaded overload_ok has_sel rdr_name =
   lookupExactOrOrig_maybe rdr_name (fmap Left) $
      do  { res <- lookupGreRn_helper rdr_name
          ; case res of
-                GreNotFound | has_sel == NoFieldSelectors -> return $ Just (Right [])
                 GreNotFound  -> return Nothing
-                OneNameMatch gre | has_sel == NoFieldSelectors ->
-                  -- Don't record usage for ambiguous selectors
-                  -- until we know which is meant
-                  return $ Just (Right [gre_name gre])
                 OneNameMatch gre -> do
                   let wrapper = if isRecFldGRE gre then Right . (:[]) else Left
                   return $ Just (wrapper (gre_name gre))
-                MultipleNames gres  | all isRecFldGRE gres && (overload_ok == DuplicateRecordFields || has_sel == NoFieldSelectors) ->
+                MultipleNames gres | any isRecFldGRE gres ->
                   -- Don't record usage for ambiguous selectors
                   -- until we know which is meant
                   return $ Just (Right (map gre_name gres))
