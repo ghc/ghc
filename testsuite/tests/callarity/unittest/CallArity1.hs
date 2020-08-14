@@ -12,6 +12,7 @@ import GHC.Driver.Session
 import GHC.Utils.Error
 import GHC.Utils.Outputable as Outputable
 import GHC.Builtin.Types
+import GHC.Builtin.Uniques
 import GHC.Types.Literal
 import GHC
 import Control.Monad

@@ -22,7 +22,7 @@ module GHC.Types.Unique.Supply (
 
         -- ** Operations on supplies
         uniqFromSupply, uniqsFromSupply, -- basic ops
-        takeUniqFromSupply, uniqFromMask,
+        takeUniqFromSupply,
 
         mkSplitUniqSupply,
         splitUniqSupply, listSplitUniqSupply,
@@ -249,12 +249,6 @@ listSplitUniqSupply  (MkSplitUniqSupply _ s1 s2) = s1 : listSplitUniqSupply s2
 uniqFromSupply  (MkSplitUniqSupply n _ _)  = mkUniqueGrimily n
 uniqsFromSupply (MkSplitUniqSupply n _ s2) = mkUniqueGrimily n : uniqsFromSupply s2
 takeUniqFromSupply (MkSplitUniqSupply n s1 _) = (mkUniqueGrimily n, s1)
-
-uniqFromMask :: Char -> IO Unique
-uniqFromMask mask
-  = do { uqNum <- genSym
-       ; return $! mkUnique mask uqNum }
-
 
 {-
 ************************************************************************
