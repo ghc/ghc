@@ -149,7 +149,7 @@ import {-# SOURCE #-} GHC.Core.DataCon
    ( DataCon, dataConExTyCoVars, dataConFieldLabels
    , dataConTyCon, dataConFullSig
    , isUnboxedSumCon )
-import {-# SOURCE #-} GHC.Builtin.Uniques 
+import {-# SOURCE #-} GHC.Builtin.Uniques
   ( tyConRepNameUnique
   , dataConTyRepNameUnique )
 
