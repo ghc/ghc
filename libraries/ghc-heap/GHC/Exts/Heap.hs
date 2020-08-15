@@ -401,6 +401,3 @@ getClosureX get_closure_raw x = do
 -- | Like 'getClosureDataX', but taking a 'Box', so it is easier to work with.
 getBoxedClosureData :: Box -> IO Closure
 getBoxedClosureData (Box a) = getClosureData a
-
-unpackPtr :: Ptr a -> Addr#
-unpackPtr (Ptr addr) = addr
