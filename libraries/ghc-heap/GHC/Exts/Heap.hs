@@ -92,8 +92,6 @@ import Foreign
 
 #include "ghcconfig.h"
 
-foreign import ccall "isEndTsoQueue" isEndTsoQueue_c :: Addr# -> Bool
-
 -- | Some closures (e.g.TSOs) don't have corresponding types to represent them in Haskell.
 -- So when we have a pointer to such closure that we want to inspect, we `unsafeCoerce` it
 -- into the following `LiftedClosure` lifted type (could be any lifted type) so that the
@@ -355,30 +353,26 @@ getClosureX get_closure_raw x = do
 
             allocaArray (length wds) (\ptr -> do
                 pokeArray ptr wds
--- TODO: Does this work? I.e. do we emit EndTSOQueues?
-                if isEndTsoQueue_c (unpackPtr ptr) then
-                    pure $ EndTSOQueue { info = itbl }
-                else do
-                    fields <- FFIClosures.peekTSOFields peekStgTSOProfInfo ptr
 
-                    pure $ TSOClosure
-                        { info = itbl
-                        , _link = (pts !! 0)
-                        , global_link = (pts !! 1)
-                        , tsoStack = (pts !! 2)
-                        , trec = (pts !! 3)
-                        , blocked_exceptions = (pts !! 4)
-                        , bq = (pts !! 5)
-                        , what_next = FFIClosures.tso_what_next fields
-                        , why_blocked = FFIClosures.tso_why_blocked fields
-                        , flags = FFIClosures.tso_flags fields
-                        , threadId = FFIClosures.tso_threadId fields
-                        , saved_errno = FFIClosures.tso_saved_errno fields
-                        , tso_dirty = FFIClosures.tso_dirty fields
-                        , alloc_limit = FFIClosures.tso_alloc_limit fields
-                        , tot_stack_size = FFIClosures.tso_tot_stack_size fields
-                        , prof = FFIClosures.tso_prof fields
-                        }
+                fields <- FFIClosures.peekTSOFields peekStgTSOProfInfo ptr
+                pure $ TSOClosure
+                    { info = itbl
+                    , _link = (pts !! 0)
+                    , global_link = (pts !! 1)
+                    , tsoStack = (pts !! 2)
+                    , trec = (pts !! 3)
+                    , blocked_exceptions = (pts !! 4)
+                    , bq = (pts !! 5)
+                    , what_next = FFIClosures.tso_what_next fields
+                    , why_blocked = FFIClosures.tso_why_blocked fields
+                    , flags = FFIClosures.tso_flags fields
+                    , threadId = FFIClosures.tso_threadId fields
+                    , saved_errno = FFIClosures.tso_saved_errno fields
+                    , tso_dirty = FFIClosures.tso_dirty fields
+                    , alloc_limit = FFIClosures.tso_alloc_limit fields
+                    , tot_stack_size = FFIClosures.tso_tot_stack_size fields
+                    , prof = FFIClosures.tso_prof fields
+                    }
                 )
         STACK -> do
             unless (length pts == 1) $
@@ -407,6 +401,3 @@ getClosureX get_closure_raw x = do
 -- | Like 'getClosureDataX', but taking a 'Box', so it is easier to work with.
 getBoxedClosureData :: Box -> IO Closure
 getBoxedClosureData (Box a) = getClosureData a
-
-unpackPtr :: Ptr a -> Addr#
-unpackPtr (Ptr addr) = addr
