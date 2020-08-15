@@ -43,7 +43,7 @@ import GHC.Tc.Gen.Annotation ( annCtxt )
 import GHC.Tc.Utils.Monad
 
 import GHC.Types.ForeignCall ( CCallTarget(..) )
-import GHC.Unit.Module
+import GHC.Unit
 import GHC.Driver.Types ( Warnings(..), plusWarns )
 import GHC.Builtin.Names( applicativeClassName, pureAName, thenAName
                         , monadClassName, returnMName, thenMName
@@ -375,8 +375,8 @@ rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
        ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) TypeLevel ty
 
         -- Mark any PackageTarget style imports as coming from the current package
-       ; let unitId = homeUnit $ hsc_dflags topEnv
-             spec'  = patchForeignImport unitId spec
+       ; let home_unit = mkHomeUnitFromFlags (hsc_dflags topEnv)
+             spec'  = patchForeignImport (homeUnitAsUnit home_unit) spec
 
        ; return (ForeignImport { fd_i_ext = noExtField
                                , fd_name = name', fd_sig_ty = ty'

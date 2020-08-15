@@ -71,9 +71,7 @@ module GHC.Unit.State (
         -- * Utils
         mkIndefUnitId,
         updateIndefUnitId,
-        unwireUnit,
-        homeUnitIsIndefinite,
-        homeUnitIsDefinite,
+        unwireUnit
     )
 where
 
@@ -82,6 +80,7 @@ where
 import GHC.Prelude
 
 import GHC.Platform
+import GHC.Unit.Home
 import GHC.Unit.Database
 import GHC.Unit.Info
 import GHC.Unit.Ppr
@@ -316,6 +315,7 @@ instance Monoid UnitVisibility where
 data UnitConfig = UnitConfig
    { unitConfigPlatformArchOS :: !ArchOS        -- ^ Platform arch and OS
    , unitConfigWays           :: !Ways          -- ^ Ways to use
+   , unitConfigHomeUnit       :: !HomeUnit      -- ^ Home unit
    , unitConfigProgramName    :: !String
       -- ^ Name of the compiler (e.g. "GHC", "GHCJS"). Used to fetch environment
       -- variables such as "GHC[JS]_PACKAGE_PATH".
@@ -328,11 +328,6 @@ data UnitConfig = UnitConfig
    , unitConfigDistrustAll    :: !Bool     -- ^ Distrust all units by default
    , unitConfigHideAll        :: !Bool     -- ^ Hide all units by default
    , unitConfigHideAllPlugins :: !Bool     -- ^ Hide all plugins units by default
-
-   , unitConfigAllowVirtualUnits :: !Bool
-      -- ^ Allow the use of virtual units instantiated on-the-fly (see Note
-      -- [About units] in GHC.Unit). This should only be used when we are
-      -- type-checking an indefinite unit (not producing any code).
 
    , unitConfigDBCache      :: Maybe [UnitDatabase UnitId]
       -- ^ Cache of databases to use, in the order they were specified on the
@@ -349,16 +344,18 @@ data UnitConfig = UnitConfig
 
 initUnitConfig :: DynFlags -> UnitConfig
 initUnitConfig dflags =
-   let autoLink
+   let home_unit = mkHomeUnitFromFlags dflags
+       autoLink
          | not (gopt Opt_AutoLinkPackages dflags) = []
          -- By default we add base & rts to the preload units (when they are
          -- found in the unit database) except when we are building them
-         | otherwise = filter (/= homeUnitId dflags) [baseUnitId, rtsUnitId]
+         | otherwise = filter (not . isHomeUnitId home_unit) [baseUnitId, rtsUnitId]
 
    in UnitConfig
       { unitConfigPlatformArchOS = platformArchOS (targetPlatform dflags)
       , unitConfigProgramName    = programName dflags
       , unitConfigWays           = ways dflags
+      , unitConfigHomeUnit       = home_unit
 
       , unitConfigGlobalDB       = globalPackageDatabasePath dflags
       , unitConfigGHCDir         = topDir dflags
@@ -368,11 +365,6 @@ initUnitConfig dflags =
       , unitConfigDistrustAll    = gopt Opt_DistrustAllPackages dflags
       , unitConfigHideAll        = gopt Opt_HideAllPackages dflags
       , unitConfigHideAllPlugins = gopt Opt_HideAllPluginPackages dflags
-
-        -- when the home unit is indefinite, it means we are type-checking it
-        -- only (not producing any code). Hence we can use virtual units
-        -- instantiated on-the-fly (see Note [About units] in GHC.Unit)
-      , unitConfigAllowVirtualUnits = homeUnitIsIndefinite dflags
 
       , unitConfigDBCache      = unitDatabases dflags
       , unitConfigFlagsDB      = packageDBFlags dflags
@@ -679,7 +671,7 @@ readUnitDatabase printer cfg conf_file = do
       conf_file' = dropTrailingPathSeparator conf_file
       top_dir = unitConfigGHCDir cfg
       pkgroot = takeDirectory conf_file'
-      pkg_configs1 = map (mungeUnitInfo top_dir pkgroot . mapUnitInfo (\(UnitKey x) -> UnitId x) unitIdFS . mkUnitKeyInfo)
+      pkg_configs1 = map (mungeUnitInfo top_dir pkgroot . mapUnitInfo (\(UnitKey x) -> UnitId x) . mkUnitKeyInfo)
                          proto_pkg_configs
   --
   return $ UnitDatabase conf_file' pkg_configs1
@@ -777,16 +769,6 @@ applyTrustFlag ctx prec_map unusable pkgs flag =
        case selectPackages prec_map (PackageArg str) pkgs unusable of
          Left ps       -> trustFlagErr ctx flag ps
          Right (ps,qs) -> return (distrustAllUnits ps ++ qs)
-
--- | A little utility to tell if the home unit is indefinite
--- (if it is not, we should never use on-the-fly renaming.)
-homeUnitIsIndefinite :: DynFlags -> Bool
-homeUnitIsIndefinite dflags = not (homeUnitIsDefinite dflags)
-
--- | A little utility to tell if the home unit is definite
--- (if it is, we should never use on-the-fly renaming.)
-homeUnitIsDefinite :: DynFlags -> Bool
-homeUnitIsDefinite dflags = unitIsDefinite (homeUnit dflags)
 
 applyPackageFlag
    :: SDocContext
@@ -1128,11 +1110,11 @@ findWiredInUnits printer prec_map pkgs vis_map = do
 -- | Some wired units can be used to instantiate the home unit. We need to
 -- replace their unit keys with their wired unit ids.
 upd_wired_in_home_instantiations :: DynFlags -> DynFlags
-upd_wired_in_home_instantiations dflags = dflags { homeUnitInstantiations = wiredInsts }
+upd_wired_in_home_instantiations dflags = dflags { homeUnitInstantiations_ = wiredInsts }
    where
       state        = unitState dflags
       wiringMap    = wireMap state
-      unwiredInsts = homeUnitInstantiations dflags
+      unwiredInsts = homeUnitInstantiations_ dflags
       wiredInsts   = map (fmap (upd_wired_in_mod wiringMap)) unwiredInsts
 
 
@@ -1647,6 +1629,16 @@ mkUnitState ctx printer cfg = do
 
   return (state, raw_dbs)
 
+-- | Do we allow the use of virtual units instantiated on-the-fly (see Note
+-- [About units] in GHC.Unit). This should only be true when we are
+-- type-checking an indefinite unit (not producing any code).
+unitConfigAllowVirtualUnits :: UnitConfig -> Bool
+unitConfigAllowVirtualUnits cfg =
+   -- when the home unit is indefinite, it means we are type-checking it only
+   -- (not producing any code). Hence we can use virtual units instantiated
+   -- on-the-fly (see Note [About units] in GHC.Unit)
+   isHomeUnitIndefinite (unitConfigHomeUnit cfg)
+
 -- | Given a wired-in 'Unit', "unwire" it into the 'Unit'
 -- that it was recorded as in the package database.
 unwireUnit :: UnitState -> Unit-> Unit
@@ -1796,27 +1788,31 @@ mkModMap pkg mod = Map.singleton (mkModule pkg mod)
 -- use.
 
 -- | Find all the include directories in these and the preload packages
-getUnitIncludePath :: DynFlags -> [UnitId] -> IO [String]
-getUnitIncludePath dflags pkgs =
-  collectIncludeDirs `fmap` getPreloadUnitsAnd dflags pkgs
+getUnitIncludePath :: SDocContext -> UnitState -> HomeUnit -> [UnitId] -> IO [String]
+getUnitIncludePath ctx unit_state home_unit pkgs =
+  collectIncludeDirs `fmap` getPreloadUnitsAnd ctx unit_state home_unit pkgs
 
 collectIncludeDirs :: [UnitInfo] -> [FilePath]
 collectIncludeDirs ps = ordNub (filter notNull (concatMap unitIncludeDirs ps))
 
 -- | Find all the library paths in these and the preload packages
-getUnitLibraryPath :: DynFlags -> [UnitId] -> IO [String]
-getUnitLibraryPath dflags pkgs =
-  collectLibraryPaths dflags `fmap` getPreloadUnitsAnd dflags pkgs
+getUnitLibraryPath :: SDocContext -> UnitState -> HomeUnit -> Ways -> [UnitId] -> IO [String]
+getUnitLibraryPath ctx unit_state home_unit ws pkgs =
+  collectLibraryPaths ws `fmap` getPreloadUnitsAnd ctx unit_state home_unit pkgs
 
-collectLibraryPaths :: DynFlags -> [UnitInfo] -> [FilePath]
-collectLibraryPaths dflags = ordNub . filter notNull
-                           . concatMap (libraryDirsForWay dflags)
+collectLibraryPaths :: Ways -> [UnitInfo] -> [FilePath]
+collectLibraryPaths ws = ordNub . filter notNull
+                           . concatMap (libraryDirsForWay ws)
 
 -- | Find all the link options in these and the preload packages,
 -- returning (package hs lib options, extra library options, other flags)
 getUnitLinkOpts :: DynFlags -> [UnitId] -> IO ([String], [String], [String])
 getUnitLinkOpts dflags pkgs =
-  collectLinkOpts dflags `fmap` getPreloadUnitsAnd dflags pkgs
+  collectLinkOpts dflags `fmap` getPreloadUnitsAnd
+                                       (initSDocContext dflags defaultUserStyle)
+                                       (unitState dflags)
+                                       (mkHomeUnitFromFlags dflags)
+                                       pkgs
 
 collectLinkOpts :: DynFlags -> [UnitInfo] -> ([String], [String], [String])
 collectLinkOpts dflags ps =
@@ -1830,14 +1826,18 @@ collectArchives dflags pc =
   filterM doesFileExist [ searchPath </> ("lib" ++ lib ++ ".a")
                         | searchPath <- searchPaths
                         , lib <- libs ]
-  where searchPaths = ordNub . filter notNull . libraryDirsForWay dflags $ pc
+  where searchPaths = ordNub . filter notNull . libraryDirsForWay (ways dflags) $ pc
         libs        = packageHsLibs dflags pc ++ unitExtDepLibsSys pc
 
 getLibs :: DynFlags -> [UnitId] -> IO [(String,String)]
 getLibs dflags pkgs = do
-  ps <- getPreloadUnitsAnd dflags pkgs
+  ps <- getPreloadUnitsAnd
+            (initSDocContext dflags defaultUserStyle)
+            (unitState dflags)
+            (mkHomeUnitFromFlags dflags)
+            pkgs
   fmap concat . forM ps $ \p -> do
-    let candidates = [ (l </> f, f) | l <- collectLibraryPaths dflags [p]
+    let candidates = [ (l </> f, f) | l <- collectLibraryPaths (ways dflags) [p]
                                     , f <- (\n -> "lib" ++ n ++ ".a") <$> packageHsLibs dflags p ]
     filterM (doesFileExist . fst) candidates
 
@@ -1890,27 +1890,27 @@ packageHsLibs dflags p = map (mkDynName . addSuffix) (unitLibraries p)
                     | otherwise = '_':t
 
 -- | Either the 'unitLibraryDirs' or 'unitLibraryDynDirs' as appropriate for the way.
-libraryDirsForWay :: DynFlags -> UnitInfo -> [String]
-libraryDirsForWay dflags
-  | WayDyn `elem` ways dflags = unitLibraryDynDirs
-  | otherwise                 = unitLibraryDirs
+libraryDirsForWay :: Ways -> UnitInfo -> [String]
+libraryDirsForWay ws
+  | WayDyn `elem` ws = unitLibraryDynDirs
+  | otherwise        = unitLibraryDirs
 
 -- | Find all the C-compiler options in these and the preload packages
-getUnitExtraCcOpts :: DynFlags -> [UnitId] -> IO [String]
-getUnitExtraCcOpts dflags pkgs = do
-  ps <- getPreloadUnitsAnd dflags pkgs
+getUnitExtraCcOpts :: SDocContext -> UnitState -> HomeUnit -> [UnitId] -> IO [String]
+getUnitExtraCcOpts ctx unit_state home_unit pkgs = do
+  ps <- getPreloadUnitsAnd ctx unit_state home_unit pkgs
   return (concatMap unitCcOptions ps)
 
 -- | Find all the package framework paths in these and the preload packages
-getUnitFrameworkPath  :: DynFlags -> [UnitId] -> IO [String]
-getUnitFrameworkPath dflags pkgs = do
-  ps <- getPreloadUnitsAnd dflags pkgs
+getUnitFrameworkPath :: SDocContext -> UnitState -> HomeUnit -> [UnitId] -> IO [String]
+getUnitFrameworkPath ctx unit_state home_unit pkgs = do
+  ps <- getPreloadUnitsAnd ctx unit_state home_unit pkgs
   return (ordNub (filter notNull (concatMap unitExtDepFrameworkDirs ps)))
 
 -- | Find all the package frameworks in these and the preload packages
-getUnitFrameworks  :: DynFlags -> [UnitId] -> IO [String]
-getUnitFrameworks dflags pkgs = do
-  ps <- getPreloadUnitsAnd dflags pkgs
+getUnitFrameworks :: SDocContext -> UnitState -> HomeUnit -> [UnitId] -> IO [String]
+getUnitFrameworks ctx unit_state home_unit pkgs = do
+  ps <- getPreloadUnitsAnd ctx unit_state home_unit pkgs
   return (concatMap unitExtDepFrameworks ps)
 
 -- -----------------------------------------------------------------------------
@@ -2036,27 +2036,24 @@ listVisibleModuleNames state =
     map fst (filter visible (Map.toList (moduleNameProvidersMap state)))
   where visible (_, ms) = any originVisible (Map.elems ms)
 
--- | Lookup 'UnitInfo' for every preload unit, for every unit used to
--- instantiate the current unit, and for every unit explicitly passed in the
--- given list of UnitId.
-getPreloadUnitsAnd :: DynFlags -> [UnitId] -> IO [UnitInfo]
-getPreloadUnitsAnd dflags ids0 =
+-- | Lookup 'UnitInfo' for every preload unit from the UnitState, for every unit
+-- used to instantiate the home unit, and for every unit explicitly passed in
+-- the given list of UnitId.
+getPreloadUnitsAnd :: SDocContext -> UnitState -> HomeUnit -> [UnitId] -> IO [UnitInfo]
+getPreloadUnitsAnd ctx unit_state home_unit ids0 =
   let
-      ids  = ids0 ++
-              -- An indefinite package will have insts to HOLE,
-              -- which is not a real package. Don't look it up.
-              -- Fixes #14525
-              if homeUnitIsIndefinite dflags
-                then []
-                else map (toUnitId . moduleUnit . snd)
-                         (homeUnitInstantiations dflags)
-      state   = unitState dflags
-      pkg_map = unitInfoMap state
-      preload = preloadUnits state
-      ctx     = initSDocContext dflags defaultUserStyle
+      ids      = ids0 ++ inst_ids
+      inst_ids
+         -- An indefinite package will have insts to HOLE,
+         -- which is not a real package. Don't look it up.
+         -- Fixes #14525
+         | isHomeUnitIndefinite home_unit = []
+         | otherwise = map (toUnitId . moduleUnit . snd) (homeUnitInstantiations home_unit)
+      pkg_map = unitInfoMap unit_state
+      preload = preloadUnits unit_state
   in do
   all_pkgs <- throwErr ctx (closeUnitDeps' pkg_map preload (ids `zip` repeat Nothing))
-  return (map (unsafeLookupUnitId state) all_pkgs)
+  return (map (unsafeLookupUnitId unit_state) all_pkgs)
 
 throwErr :: SDocContext -> MaybeErr MsgDoc a -> IO a
 throwErr ctx m = case m of
@@ -2131,14 +2128,12 @@ lookupUnitPprInfo :: UnitState -> UnitId -> Maybe UnitPprInfo
 lookupUnitPprInfo state uid = fmap (mkUnitPprInfo unitIdFS) (lookupUnitId state uid)
 
 -- | Create a IndefUnitId.
-mkIndefUnitId :: UnitState -> FastString -> IndefUnitId
-mkIndefUnitId state raw =
-    let uid = UnitId raw
-    in Indefinite uid $! lookupUnitPprInfo state uid
+mkIndefUnitId :: UnitState -> UnitId -> IndefUnitId
+mkIndefUnitId state uid = Indefinite uid $! lookupUnitPprInfo state uid
 
 -- | Update component ID details from the database
 updateIndefUnitId :: UnitState -> IndefUnitId -> IndefUnitId
-updateIndefUnitId pkgstate uid = mkIndefUnitId pkgstate (unitIdFS (indefUnit uid))
+updateIndefUnitId pkgstate uid = mkIndefUnitId pkgstate (indefUnit uid)
 
 
 -- -----------------------------------------------------------------------------

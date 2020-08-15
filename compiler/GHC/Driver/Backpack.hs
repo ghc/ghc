@@ -137,7 +137,7 @@ withBkpSession :: IndefUnitId
                -> BkpM a
 withBkpSession cid insts deps session_type do_this = do
     dflags <- getDynFlags
-    let cid_fs = unitIdFS (indefUnit cid)
+    let cid_fs = unitFS (indefUnit cid)
         is_primary = False
         uid_str = unpackFS (mkInstantiatedUnitHash cid insts)
         cid_str = unpackFS cid_fs
@@ -172,12 +172,12 @@ withBkpSession cid insts deps session_type do_this = do
         backend   = case session_type of
                         TcSession -> NoBackend
                         _ -> backend dflags,
-        homeUnitInstantiations = insts,
+        homeUnitInstantiations_ = insts,
                                  -- if we don't have any instantiation, don't
                                  -- fill `homeUnitInstanceOfId` as it makes no
                                  -- sense (we're not instantiating anything)
-        homeUnitInstanceOfId   = if null insts then Nothing else Just cid,
-        homeUnitId =
+        homeUnitInstanceOf_   = if null insts then Nothing else Just (indefUnit cid),
+        homeUnitId_ =
             case session_type of
                 TcSession -> newUnitId cid Nothing
                 -- No hash passed if no instances
@@ -286,7 +286,6 @@ buildUnit session cid insts lunit = do
 
         dflags <- getDynFlags
         mod_graph <- hsunitModuleGraph dflags (unLoc lunit)
-        -- pprTrace "mod_graph" (ppr mod_graph) $ return ()
 
         msg <- mkBackpackMsg
         ok <- load' LoadAllTargets (Just msg) mod_graph
@@ -310,6 +309,7 @@ buildUnit session cid insts lunit = do
 
         let compat_fs = unitIdFS (indefUnit cid)
             compat_pn = PackageName compat_fs
+            unit_id   = homeUnitId (mkHomeUnitFromFlags (hsc_dflags hsc_env))
 
         return GenericUnitInfo {
             -- Stub data
@@ -317,7 +317,7 @@ buildUnit session cid insts lunit = do
             unitPackageId = PackageId compat_fs,
             unitPackageName = compat_pn,
             unitPackageVersion = makeVersion [],
-            unitId = toUnitId (homeUnit dflags),
+            unitId = unit_id,
             unitComponentName = Nothing,
             unitInstanceOf = cid,
             unitInstantiations = insts,
@@ -562,7 +562,7 @@ type PackageNameMap a = Map PackageName a
 -- to use this for anything
 unitDefines :: UnitState -> LHsUnit PackageName -> (PackageName, HsComponentId)
 unitDefines pkgstate (L _ HsUnit{ hsunitName = L _ pn@(PackageName fs) })
-    = (pn, HsComponentId pn (updateIndefUnitId pkgstate (Indefinite (UnitId fs) Nothing)))
+    = (pn, HsComponentId pn (mkIndefUnitId pkgstate (UnitId fs)))
 
 bkpPackageNameMap :: UnitState -> [LHsUnit PackageName] -> PackageNameMap HsComponentId
 bkpPackageNameMap pkgstate units = Map.fromList (map (unitDefines pkgstate) units)
@@ -642,6 +642,7 @@ hsunitModuleGraph :: DynFlags -> HsUnit HsComponentId -> BkpM ModuleGraph
 hsunitModuleGraph dflags unit = do
     let decls = hsunitBody unit
         pn = hsPackageName (unLoc (hsunitName unit))
+        home_unit = mkHomeUnitFromFlags dflags
 
     --  1. Create a HsSrcFile/HsigFile summary for every
     --  explicitly mentioned module/signature.
@@ -655,7 +656,7 @@ hsunitModuleGraph dflags unit = do
     --  requirement.
     let node_map = Map.fromList [ ((ms_mod_name n, ms_hsc_src n == HsigFile), n)
                                 | n <- nodes ]
-    req_nodes <- fmap catMaybes . forM (homeUnitInstantiations dflags) $ \(mod_name, _) ->
+    req_nodes <- fmap catMaybes . forM (homeUnitInstantiations home_unit) $ \(mod_name, _) ->
         let has_local = Map.member (mod_name, True) node_map
         in if has_local
             then return Nothing
