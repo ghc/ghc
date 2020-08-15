@@ -18,6 +18,7 @@ module GHC.Unit.State (
         listUnitInfo,
 
         -- * Querying the package config
+        UnitInfoMap,
         lookupUnit,
         lookupUnit',
         unsafeLookupUnit,
