@@ -46,7 +46,7 @@ import GHC.Word
 
 -- ToDo: this code is currently shared between SPARC and LLVM.
 --       Similar functions for (single precision) floats are
---       present in the SPARC backen only. We need to fix both
+--       present in the SPARC backend only. We need to fix both
 --       LLVM and SPARC.
 
 castDoubleToWord8Array :: STUArray s Int Double -> ST s (STUArray s Int Word8)
