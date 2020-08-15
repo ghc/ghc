@@ -26,6 +26,7 @@ main = do
     let !_linkBox = _link tso
     _linkClosure <- getBoxedClosureData _linkBox
     assertEqual (name _linkClosure) "END_TSO_QUEUE"
+    assertEqual (getClosureType _linkClosure) CONSTR_NOCAF
 
     let !global_linkBox = global_link tso
     globalLinkClosure <- getBoxedClosureData global_linkBox
