@@ -212,7 +212,11 @@ ghcWrapper stage  = do
     ghcPath <- expr $ (</>) <$> topDirectory
                             <*> programPath (vanillaContext (pred stage) ghc)
     return $ unwords $ map show $ [ ghcPath ]
-                               ++ [ "-package-db " ++ dbPath | stage == Stage1 ]
+                               ++ (if stage == Stage1
+                                     then ["-no-global-package-db"
+                                          , "-package-db " ++ dbPath
+                                          ]
+                                     else [])
                                ++ [ "$@" ]
 
 -- | Given a 'String' replace characters '.' and '-' by underscores ('_') so that
@@ -288,6 +292,8 @@ generateSettings = do
         , ("ld supports build-id", expr $ lookupValueOrError configFile "ld-has-build-id")
         , ("ld supports filelist", expr $ lookupValueOrError configFile "ld-has-filelist")
         , ("ld is GNU ld", expr $ lookupValueOrError configFile "ld-is-gnu-ld")
+        , ("Merge objects command", expr $ settingsFileSetting SettingsFileSetting_MergeObjectsCommand)
+        , ("Merge objects flags", expr $ settingsFileSetting SettingsFileSetting_MergeObjectsFlags)
         , ("ar command", expr $ settingsFileSetting SettingsFileSetting_ArCommand)
         , ("ar flags", expr $ lookupValueOrError configFile "ar-args")
         , ("ar supports at file", expr $ yesNo <$> flag ArSupportsAtFile)
@@ -315,7 +321,6 @@ generateSettings = do
 
         , ("BigNum backend", getBignumBackend)
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter)
-        , ("Use native code generator", expr $ yesNo <$> ghcWithNativeCodeGen)
         , ("Support SMP", expr $ yesNo <$> targetSupportsSMP)
         , ("RTS ways", unwords . map show <$> getRtsWays)
         , ("Tables next to code", expr $ yesNo <$> flag TablesNextToCode)

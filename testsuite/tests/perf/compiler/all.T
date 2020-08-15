@@ -370,7 +370,7 @@ test('T16190',
 test('T16473', normal, makefile_test, ['T16473'])
 
 test('T17516',
-      [ collect_compiler_stats(),
+      [ collect_compiler_stats('bytes allocated', 5),
         extra_clean(['T17516A.hi', 'T17516A.o'])
       ],
       multimod_compile,
@@ -384,6 +384,33 @@ test ('T18304',
       ['-v0 -O'])
 
 test ('T18282',
+      [ collect_compiler_stats('bytes allocated',2)
+      ],
+      compile,
+      ['-v0 -O'])
+test ('T18140',
+      [ collect_compiler_stats('bytes allocated',2)
+      ],
+      compile,
+      ['-v0 -O'])
+test('T10421',
+    [ only_ways(['normal']),
+      collect_compiler_stats('bytes allocated', 1)
+    ],
+    multimod_compile,
+    ['T10421', '-v0 -O'])
+test('T10421a',
+    [ only_ways(['normal']),
+      collect_compiler_stats('bytes allocated', 1)
+    ],
+    multimod_compile,
+    ['T10421a', '-v0 -O'])
+test ('T13253',
+      [ collect_compiler_stats('bytes allocated',2)
+      ],
+      compile,
+      ['-v0 -O'])
+test ('T13253-spj',
       [ collect_compiler_stats('bytes allocated',2)
       ],
       compile,

@@ -287,11 +287,11 @@ we construct as a separate data type and the actual control flow graph in the co
 Instead we now return the new basic block if a statement causes a change
 in the current block and use the block for all following statements.
 
-For this reason genCCall is also split into two parts.
-One for calls which *won't* change the basic blocks in
-which successive instructions will be placed.
-A different one for calls which *are* known to change the
-basic block.
+For this reason genCCall is also split into two parts.  One for calls which
+*won't* change the basic blocks in which successive instructions will be
+placed (since they only evaluate CmmExpr, which can only contain MachOps, which
+cannot introduce basic blocks in their lowerings).  A different one for calls
+which *are* known to change the basic block.
 
 -}
 
@@ -1028,6 +1028,9 @@ getRegister' _ is32Bit (CmmMachOp mop [x, y]) = do -- dyadic MachOps
           tmp.  This is likely to be better, because the reg alloc can
           eliminate this reg->reg move here (it won't eliminate the other one,
           because the move is into the fixed %ecx).
+      * in the case of C calls the use of ecx here can interfere with arguments.
+        We avoid this with the hack described in Note [Evaluate C-call
+        arguments before placing in destination registers]
     -}
     shift_code width instr x y{-amount-} = do
         x_code <- getAnyReg x
@@ -2022,6 +2025,7 @@ genCCall is32Bit (PrimTarget (MO_AtomicRMW width amop))
     arg <- getNewRegNat format
     arg_code <- getAnyReg n
     platform <- ncgPlatform <$> getConfig
+
     let dst_r    = getRegisterReg platform  (CmmLocal dst)
     (code, lbl) <- op_code dst_r arg amode
     return (addr_code `appOL` arg_code arg `appOL` code, Just lbl)
@@ -2667,9 +2671,12 @@ genCCall' _ is32Bit target dest_regs args bid = do
                return code
         _ -> panic "genCCall: Wrong number of arguments/results for imul2"
 
-    _ -> if is32Bit
-         then genCCall32' target dest_regs args
-         else genCCall64' target dest_regs args
+    _ -> do
+        (instrs0, args') <- evalArgs bid args
+        instrs1 <- if is32Bit
+          then genCCall32' target dest_regs args'
+          else genCCall64' target dest_regs args'
+        return (instrs0 `appOL` instrs1)
 
   where divOp1 platform signed width results [arg_x, arg_y]
             = divOp platform signed width results Nothing arg_x arg_y
@@ -2731,6 +2738,83 @@ genCCall' _ is32Bit target dest_regs args bid = do
                  return code
         addSubIntC _ _ _ _ _ _ _ _
             = panic "genCCall: Wrong number of arguments/results for addSubIntC"
+
+{-
+Note [Evaluate C-call arguments before placing in destination registers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When producing code for C calls we must take care when placing arguments
+in their final registers. Specifically, we must ensure that temporary register
+usage due to evaluation of one argument does not clobber a register in which we
+already placed a previous argument (e.g. as the code generation logic for
+MO_Shl can clobber %rcx due to x86 instruction limitations).
+
+This is precisely what happened in #18527. Consider this C--:
+
+    (result::I64) = call "ccall" doSomething(_s2hp::I64, 2244, _s2hq::I64, _s2hw::I64 | (1 << _s2hz::I64));
+
+Here we are calling the C function `doSomething` with three arguments, the last
+involving a non-trivial expression involving MO_Shl. In this case the NCG could
+naively generate the following assembly (where $tmp denotes some temporary
+register and $argN denotes the register for argument N, as dictated by the
+platform's calling convention):
+
+    mov _s2hp, $arg1   # place first argument
+    mov _s2hq, $arg2   # place second argument
+
+    # Compute 1 << _s2hz
+    mov _s2hz, %rcx
+    shl %cl, $tmp
+
+    # Compute (_s2hw | (1 << _s2hz))
+    mov _s2hw, $arg3
+    or $tmp, $arg3
+
+    # Perform the call
+    call func
+
+This code is outright broken on Windows which assigns $arg1 to %rcx. This means
+that the evaluation of the last argument clobbers the first argument.
+
+To avoid this we use a rather awful hack: when producing code for a C call with
+at least one non-trivial argument, we first evaluate all of the arguments into
+local registers before moving them into their final calling-convention-defined
+homes.  This is performed by 'evalArgs'. Here we define "non-trivial" to be an
+expression which might contain a MachOp since these are the only cases which
+might clobber registers. Furthermore, we use a conservative approximation of
+this condition (only looking at the top-level of CmmExprs) to avoid spending
+too much effort trying to decide whether we want to take the fast path.
+
+Note that this hack *also* applies to calls to out-of-line PrimTargets (which
+are lowered via a C call) since outOfLineCmmOp produces the call via
+(stmtToInstrs (CmmUnsafeForeignCall ...)), which will ultimately end up
+back in genCCall{32,64}.
+-}
+
+-- | See Note [Evaluate C-call arguments before placing in destination registers]
+evalArgs :: BlockId -> [CmmActual] -> NatM (InstrBlock, [CmmActual])
+evalArgs bid actuals
+  | any mightContainMachOp actuals = do
+      regs_blks <- mapM evalArg actuals
+      return (concatOL $ map fst regs_blks, map snd regs_blks)
+  | otherwise = return (nilOL, actuals)
+  where
+    mightContainMachOp (CmmReg _)      = False
+    mightContainMachOp (CmmRegOff _ _) = False
+    mightContainMachOp (CmmLit _)      = False
+    mightContainMachOp _               = True
+
+    evalArg :: CmmActual -> NatM (InstrBlock, CmmExpr)
+    evalArg actual = do
+        platform <- getPlatform
+        lreg <- newLocalReg $ cmmExprType platform actual
+        (instrs, bid1) <- stmtToInstrs bid $ CmmAssign (CmmLocal lreg) actual
+        -- The above assignment shouldn't change the current block
+        MASSERT(isNothing bid1)
+        return (instrs, CmmReg $ CmmLocal lreg)
+
+    newLocalReg :: CmmType -> NatM LocalReg
+    newLocalReg ty = LocalReg <$> getUniqueM <*> pure ty
 
 -- Note [DIV/IDIV for bytes]
 --

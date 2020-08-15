@@ -433,7 +433,7 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
     safe_to_inline IAmALoopBreaker{}                  = False
     safe_to_inline IAmDead                            = True
     safe_to_inline OneOcc{ occ_in_lam = NotInsideLam
-                         , occ_one_br = InOneBranch } = True
+                         , occ_n_br = 1 }             = True
     safe_to_inline OneOcc{}                           = False
     safe_to_inline ManyOccs{}                         = False
 
@@ -1212,7 +1212,7 @@ dealWithStringLiteral fun str co
   = let strFS = mkFastStringByteString str
 
         char = mkConApp charDataCon [mkCharLit (headFS strFS)]
-        charTail = bytesFS (tailFS strFS)
+        charTail = BS.tail (bytesFS strFS)
 
         -- In singleton strings, just add [] instead of unpackCstring# ""#.
         rest = if BS.null charTail

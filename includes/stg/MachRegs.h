@@ -61,6 +61,8 @@
    are the RX, FX, DX and USER registers; as a result, if you
    decide to caller save a system register (e.g. SP, HP, etc), note that
    this code path is completely untested! -- EZY
+
+   See Note [Register parameter passing] for details.
    -------------------------------------------------------------------------- */
 
 /* -----------------------------------------------------------------------------

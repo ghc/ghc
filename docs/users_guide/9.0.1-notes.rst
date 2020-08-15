@@ -1,6 +1,6 @@
-.. _release-8-12-1:
+.. _release-9-0-1:
 
-Version 8.12.1
+Version 9.0.1
 ==============
 
 The significant changes to the various parts of the compiler are listed in the
@@ -78,6 +78,11 @@ Highlights
       bar = foo
       $(return [])
       instance C Bool where foo = True
+
+ * Support for 32-bit Windows has officially been dropped as Microsoft has
+   formally discontinued new 32-bit Windows 10 releases in 2020. See
+   :ghc-ticket:`18487` for details.
+
 
 Full details
 ------------
@@ -223,6 +228,13 @@ Language
 
     f = (- x)  -- operator section
     c = (-x)   -- negation
+
+* The behavior of :extension:`NegativeLiterals` changed, and now we require
+  that a negative literal must not be preceded by a closing token (see
+  `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
+  for the definition of a closing token). In other words, we parse ``f -123``
+  as ``f (-123)``, but ``x-123`` as ``(-) x 123``. Before this amendment,
+  :extension:`NegativeLiterals` caused ``x-123`` to be parsed as ``x(-123)``.
 
 Compiler
 ~~~~~~~~

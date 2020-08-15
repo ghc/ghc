@@ -30,6 +30,7 @@ module GHC.Settings
   , sPgm_c
   , sPgm_a
   , sPgm_l
+  , sPgm_lm
   , sPgm_dll
   , sPgm_T
   , sPgm_windres
@@ -48,6 +49,7 @@ module GHC.Settings
   , sOpt_cxx
   , sOpt_a
   , sOpt_l
+  , sOpt_lm
   , sOpt_windres
   , sOpt_lo
   , sOpt_lc
@@ -56,7 +58,6 @@ module GHC.Settings
   , sExtraGccViaCFlags
   , sTargetPlatformString
   , sGhcWithInterpreter
-  , sGhcWithNativeCodeGen
   , sGhcWithSMP
   , sGhcRTSWays
   , sLibFFI
@@ -102,6 +103,7 @@ data ToolSettings = ToolSettings
   , toolSettings_pgm_c       :: String
   , toolSettings_pgm_a       :: (String, [Option])
   , toolSettings_pgm_l       :: (String, [Option])
+  , toolSettings_pgm_lm      :: (String, [Option])
   , toolSettings_pgm_dll     :: (String, [Option])
   , toolSettings_pgm_T       :: String
   , toolSettings_pgm_windres :: String
@@ -127,6 +129,7 @@ data ToolSettings = ToolSettings
   , toolSettings_opt_cxx           :: [String]
   , toolSettings_opt_a             :: [String]
   , toolSettings_opt_l             :: [String]
+  , toolSettings_opt_lm            :: [String]
   , toolSettings_opt_windres       :: [String]
   , -- | LLVM: llvm optimiser
     toolSettings_opt_lo            :: [String]
@@ -207,6 +210,8 @@ sPgm_a :: Settings -> (String, [Option])
 sPgm_a = toolSettings_pgm_a . sToolSettings
 sPgm_l :: Settings -> (String, [Option])
 sPgm_l = toolSettings_pgm_l . sToolSettings
+sPgm_lm :: Settings -> (String, [Option])
+sPgm_lm = toolSettings_pgm_lm . sToolSettings
 sPgm_dll :: Settings -> (String, [Option])
 sPgm_dll = toolSettings_pgm_dll . sToolSettings
 sPgm_T :: Settings -> String
@@ -243,6 +248,8 @@ sOpt_a :: Settings -> [String]
 sOpt_a = toolSettings_opt_a . sToolSettings
 sOpt_l :: Settings -> [String]
 sOpt_l = toolSettings_opt_l . sToolSettings
+sOpt_lm :: Settings -> [String]
+sOpt_lm = toolSettings_opt_lm . sToolSettings
 sOpt_windres :: Settings -> [String]
 sOpt_windres = toolSettings_opt_windres . sToolSettings
 sOpt_lo :: Settings -> [String]
@@ -261,8 +268,6 @@ sTargetPlatformString :: Settings -> String
 sTargetPlatformString = platformMisc_targetPlatformString . sPlatformMisc
 sGhcWithInterpreter :: Settings -> Bool
 sGhcWithInterpreter = platformMisc_ghcWithInterpreter . sPlatformMisc
-sGhcWithNativeCodeGen :: Settings -> Bool
-sGhcWithNativeCodeGen = platformMisc_ghcWithNativeCodeGen . sPlatformMisc
 sGhcWithSMP :: Settings -> Bool
 sGhcWithSMP = platformMisc_ghcWithSMP . sPlatformMisc
 sGhcRTSWays :: Settings -> String

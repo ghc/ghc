@@ -163,7 +163,7 @@ $$(includes_$1_H_PLATFORM) : includes/ghc.mk includes/Makefile | $$$$(dir $$$$@)
 	@echo "#if !defined(__GHCPLATFORM_H__)"                      > $$@
 	@echo "#define __GHCPLATFORM_H__"                           >> $$@
 	@echo                                                       >> $$@
-	@echo "#define GHC_STAGE $1"                                >> $$@
+	@echo "#define GHC_STAGE ($1 + 1)"                          >> $$@
 	@echo                                                       >> $$@
 	@echo "#define BuildPlatform_TYPE  $(BuildPlatform_$1_CPP)" >> $$@
 	@echo "#define HostPlatform_TYPE   $(HostPlatform_$1_CPP)"  >> $$@
@@ -223,6 +223,8 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 	@echo ',("ld supports build-id", "$(LdHasBuildId)")' >> $@
 	@echo ',("ld supports filelist", "$(LdHasFilelist)")' >> $@
 	@echo ',("ld is GNU ld", "$(LdIsGNULd)")' >> $@
+	@echo ',("Merge objects command", "$(SettingsMergeObjectsCommand)")' >> $@
+	@echo ',("Merge objects flags", "$(SettingsMergeObjectsFlags)")' >> $@
 	@echo ',("ar command", "$(SettingsArCommand)")' >> $@
 	@echo ',("ar flags", "$(ArArgs)")' >> $@
 	@echo ',("ar supports at file", "$(ArSupportsAtFile)")' >> $@
@@ -250,7 +252,6 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 	@echo
 	@echo ',("bignum backend", "$(BIGNUM_BACKEND)")' >> $@
 	@echo ',("Use interpreter", "$(GhcWithInterpreter)")' >> $@
-	@echo ',("Use native code generator", "$(GhcWithNativeCodeGen)")' >> $@
 	@echo ',("Support SMP", "$(GhcWithSMP)")' >> $@
 	@echo ',("RTS ways", "$(GhcRTSWays)")' >> $@
 	@echo ',("Tables next to code", "$(TablesNextToCode)")' >> $@

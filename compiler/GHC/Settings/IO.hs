@@ -138,6 +138,8 @@ initSettings top_dir = do
         as_args  = map Option cc_args
         ld_prog  = cc_prog
         ld_args  = map Option (cc_args ++ words cc_link_args_str)
+  ld_r_prog <- getSetting "Merge objects command"
+  ld_r_args <- getSetting "Merge objects flags"
 
   llvmTarget <- getSetting "LLVM target"
 
@@ -149,7 +151,6 @@ initSettings top_dir = do
   let iserv_prog = libexec "ghc-iserv"
 
   ghcWithInterpreter <- getBooleanSetting "Use interpreter"
-  ghcWithNativeCodeGen <- getBooleanSetting "Use native code generator"
   ghcWithSMP <- getBooleanSetting "Support SMP"
   ghcRTSWays <- getSetting "RTS ways"
   useLibFFI <- getBooleanSetting "Use LibFFI"
@@ -185,6 +186,7 @@ initSettings top_dir = do
       , toolSettings_pgm_c   = cc_prog
       , toolSettings_pgm_a   = (as_prog, as_args)
       , toolSettings_pgm_l   = (ld_prog, ld_args)
+      , toolSettings_pgm_lm  = (ld_r_prog, map Option $ words ld_r_args)
       , toolSettings_pgm_dll = (mkdll_prog,mkdll_args)
       , toolSettings_pgm_T   = touch_path
       , toolSettings_pgm_windres = windres_path
@@ -203,6 +205,7 @@ initSettings top_dir = do
       , toolSettings_opt_cxx     = cxx_args
       , toolSettings_opt_a       = []
       , toolSettings_opt_l       = []
+      , toolSettings_opt_lm      = []
       , toolSettings_opt_windres = []
       , toolSettings_opt_lcc     = []
       , toolSettings_opt_lo      = []
@@ -216,7 +219,6 @@ initSettings top_dir = do
     , sPlatformMisc = PlatformMisc
       { platformMisc_targetPlatformString = targetPlatformString
       , platformMisc_ghcWithInterpreter = ghcWithInterpreter
-      , platformMisc_ghcWithNativeCodeGen = ghcWithNativeCodeGen
       , platformMisc_ghcWithSMP = ghcWithSMP
       , platformMisc_ghcRTSWays = ghcRTSWays
       , platformMisc_libFFI = useLibFFI

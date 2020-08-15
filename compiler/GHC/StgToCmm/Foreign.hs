@@ -260,7 +260,7 @@ load_target_into_temp other_target@(PrimTarget _) =
 -- What we want to do here is create a new temporary for the foreign
 -- call argument if it is not safe to use the expression directly,
 -- because the expression mentions caller-saves GlobalRegs (see
--- Note [Register Parameter Passing]).
+-- Note [Register parameter passing]).
 --
 -- However, we can't pattern-match on the expression here, because
 -- this is used in a loop by GHC.Cmm.Parser, and testing the expression
