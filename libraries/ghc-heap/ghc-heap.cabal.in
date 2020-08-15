@@ -30,7 +30,6 @@ library
 
   ghc-options:      -Wall
   cmm-sources:      cbits/HeapPrim.cmm
-  c-sources:        cbits/utils.c
 
   default-extensions: NoImplicitPrelude
 
