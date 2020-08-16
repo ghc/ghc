@@ -89,12 +89,16 @@ instance Exception Timeout where
 -- Note that 'timeout' cancels the computation by throwing it the 'Timeout'
 -- exception. Consequently blanket exception handlers (e.g. catching
 -- 'SomeException') within the computation will break the timeout behavior.
+-- Moreover, 'timeout' cannot be used when in a context enclosed by
+-- by 'Control.Exception.uninterruptibleMask'.
 timeout :: Int -> IO a -> IO (Maybe a)
 timeout n f
     | n <  0    = fmap Just f
     | n == 0    = return Nothing
 #if !defined(mingw32_HOST_OS)
     | rtsSupportsBoundThreads = do
+        checkNonUninterruptibleMask
+
         -- In the threaded RTS, we use the Timer Manager to delay the
         -- (fairly expensive) 'forkIO' call until the timeout has expired.
         --
@@ -125,6 +129,7 @@ timeout n f
                             (\_ -> fmap Just f))
 #endif
     | otherwise = do
+        checkNonUninterruptibleMask
         pid <- myThreadId
         ex  <- fmap Timeout newUnique
         handleJust (\e -> if e == ex then Just () else Nothing)
@@ -134,3 +139,8 @@ timeout n f
                             (uninterruptibleMask_ . killThread)
                             (\_ -> fmap Just f))
         -- #7719 explains why we need uninterruptibleMask_ above.
+  where
+    checkNonUninterruptibleMask = do
+      maskingState <- getMaskingState
+      when (maskingState == Unmasked) $
+        error "System.Timeout.timeout called with exceptions uninterruptibly masked"
