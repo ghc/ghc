@@ -462,6 +462,7 @@ then
     # so never tried without the prefix.
     AC_PATH_PROG([CC],[gcc], [clang])
     AC_PATH_PROG([NM],[nm])
+    AC_PATH_PROG([LD],[ld])
     AC_PATH_PROG([AR],[ar])
     AC_PATH_PROG([RANLIB],[ranlib])
     AC_PATH_PROG([OBJDUMP],[objdump])
