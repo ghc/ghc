@@ -1,5 +1,11 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.16.0.0 *TBA*
+
+  * `System.Timeout.timeout` now throws an error if called in a context where
+    exceptions have been masked since its implementation relies on exceptions to
+    interrupt its sub-computation (fixes #18580).
+
 ## 4.15.0.0 *TBA*
 
   * `openFile` now calls the `open` system call with an `interruptible` FFI
