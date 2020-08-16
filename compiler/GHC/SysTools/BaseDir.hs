@@ -79,7 +79,7 @@ $topdir/../../{mingw, perl}/.
 -- | Expand occurrences of the @$tooldir@ interpolation in a string
 -- on Windows, leave the string untouched otherwise.
 expandToolDir :: Maybe FilePath -> String -> String
-#if defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS) && !defined(USE_INPLACE_MINGW_TOOLCHAIN)
 expandToolDir (Just tool_dir) s = expandPathVar "tooldir" tool_dir s
 expandToolDir Nothing         _ = panic "Could not determine $tooldir"
 #else
@@ -117,10 +117,11 @@ tryFindTopDir Nothing
 -- Returns @Nothing@ when not on Windows.
 -- When called on Windows, it either throws an error when the
 -- tooldir can't be located, or returns @Just tooldirpath@.
+-- If the distro toolchain is being used we treat Windows the same as Linux
 findToolDir
   :: FilePath -- ^ topdir
   -> IO (Maybe FilePath)
-#if defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS) && !defined(USE_INPLACE_MINGW_TOOLCHAIN)
 findToolDir top_dir = go 0 (top_dir </> "..")
   where maxDepth = 3
         go :: Int -> FilePath -> IO (Maybe FilePath)

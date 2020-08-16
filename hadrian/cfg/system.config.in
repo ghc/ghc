@@ -92,6 +92,8 @@ project-patch-level1  = @ProjectPatchLevel1@
 project-patch-level2  = @ProjectPatchLevel2@
 project-git-commit-id = @ProjectGitCommitId@
 
+system-use-distro-mingw  = @SettingsUseDistroMINGW@
+
 # Compilation and linking flags:
 #===============================
 

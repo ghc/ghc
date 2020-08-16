@@ -574,6 +574,7 @@ AC_DEFUN([FP_SETTINGS],
     SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"
     SettingsCCompilerSupportsNoPie="$CONF_GCC_SUPPORTS_NO_PIE"
     SettingsLdFlags="$CONF_LD_LINKER_OPTS_STAGE2"
+    SettingsUseDistroMINGW="$EnableDistroToolchain"
     AC_SUBST(SettingsCCompilerCommand)
     AC_SUBST(SettingsHaskellCPPCommand)
     AC_SUBST(SettingsHaskellCPPFlags)
@@ -592,6 +593,7 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsClangCommand)
     AC_SUBST(SettingsLlcCommand)
     AC_SUBST(SettingsOptCommand)
+    AC_SUBST(SettingsUseDistroMINGW)
 ])
 
 # Helper for cloning a shell variable's state
@@ -1919,7 +1921,7 @@ AC_MSG_CHECKING(for path to top of build tree)
 # GHC_CONVERT_CPU(cpu, target_var)
 # --------------------------------
 # Converts cpu from gnu to ghc naming, and assigns the result to $target_var.
-# Should you modify this list, you are invited to reflect the changes in 
+# Should you modify this list, you are invited to reflect the changes in
 # `libraries/base/System/Info.hs`'s documentation.
 AC_DEFUN([GHC_CONVERT_CPU],[
 case "$1" in

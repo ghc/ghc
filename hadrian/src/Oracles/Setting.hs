@@ -68,6 +68,7 @@ data Setting = BuildArch
              | ProjectPatchLevel1
              | ProjectPatchLevel2
              | SystemGhc
+             | SystemDistroMINGW
              | TargetArch
              | TargetOs
              | TargetPlatform
@@ -159,6 +160,7 @@ setting key = lookupValueOrError configFile $ case key of
     ProjectPatchLevel1 -> "project-patch-level1"
     ProjectPatchLevel2 -> "project-patch-level2"
     SystemGhc          -> "system-ghc"
+    SystemDistroMINGW  -> "system-use-distro-mingw"
     TargetArch         -> "target-arch"
     TargetArmVersion   -> "target-arm-version"
     TargetOs           -> "target-os"
