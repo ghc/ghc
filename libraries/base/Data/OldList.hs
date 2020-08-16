@@ -550,7 +550,13 @@ intercalate xs xss = concat (intersperse xs xss)
 transpose               :: [[a]] -> [[a]]
 transpose []             = []
 transpose ([]   : xss)   = transpose xss
-transpose ((x:xs) : xss) = (x : [h | (h:_) <- xss]) : transpose (xs : [ t | (_:t) <- xss])
+transpose ((x:xs) : xss) = (x : hds) : transpose (xs : tls)
+  where
+    -- We tie the calculations of heads and tails together
+    -- to prevent heads from leaking into tails and vice versa.
+    -- unzip makes the selector thunk arrangements we need to
+    -- ensure everything gets cleaned up properly.
+    (hds, tls) = unzip [(hd, tl) | (hd:tl) <- xss]
 
 
 -- | The 'partition' function takes a predicate a list and returns
