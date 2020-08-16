@@ -186,6 +186,9 @@ $$(includes_$1_H_PLATFORM) : includes/ghc.mk includes/Makefile | $$$$(dir $$$$@)
 	@echo "#define BUILD_VENDOR  \"$(BuildVendor_$1_CPP)\""     >> $$@
 	@echo "#define HOST_VENDOR  \"$(HostVendor_$1_CPP)\""       >> $$@
 	@echo                                                       >> $$@
+ifeq "$$(SettingsUseDistroMINGW)" "YES"
+	@echo "#define USE_INPLACE_MINGW_TOOLCHAIN 1"               >> $$@
+endif
 ifeq "$$(GhcUnregisterised)" "YES"
 	@echo "#define UnregisterisedCompiler 1"                    >> $$@
 endif
