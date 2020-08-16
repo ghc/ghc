@@ -37,25 +37,13 @@ ifneq "$(BINDIST)" "YES"
 $(ghc-cabal_INPLACE) : $(ghc-cabal_DIST_BINARY) | $$(dir $$@)/.
 	"$(CP)" $< $@
 
-# Minor hack, since we can't reuse the `hs-suffix-rules-srcdir` macro
-ifneq ($(wildcard libraries/Cabal/Cabal/Distribution/Fields/Lexer.x),)
-# Lexer.x exists so we have to call Alex ourselves
-CABAL_LEXER_DEP := bootstrapping/Cabal/Distribution/Fields/Lexer.hs
-
-bootstrapping/Cabal/Distribution/Fields/Lexer.hs: libraries/Cabal/Cabal/Distribution/Fields/Lexer.x
-	mkdir -p bootstrapping/Cabal/Distribution/Fields
-	$(call cmd,ALEX) $< -o $@
-else
-CABAL_LEXER_DEP := libraries/Cabal/Cabal/Distribution/Fields/Lexer.hs
-endif
-
-$(ghc-cabal_DIST_BINARY): $(wildcard libraries/Cabal/Cabal/Distribution/*/*/*.hs)
-$(ghc-cabal_DIST_BINARY): $(wildcard libraries/Cabal/Cabal/Distribution/*/*.hs)
-$(ghc-cabal_DIST_BINARY): $(wildcard libraries/Cabal/Cabal/Distribution/*.hs)
+$(ghc-cabal_DIST_BINARY): $(wildcard libraries/Cabal/Cabal/src/Distribution/*/*/*.hs)
+$(ghc-cabal_DIST_BINARY): $(wildcard libraries/Cabal/Cabal/src/Distribution/*/*.hs)
+$(ghc-cabal_DIST_BINARY): $(wildcard libraries/Cabal/Cabal/src/Distribution/*.hs)
 
 # N.B. Compile with -O0 since this is not a performance-critical executable
 # and the Cabal takes nearly twice as long to build with -O1. See #16817.
-$(ghc-cabal_DIST_BINARY): $(CABAL_LEXER_DEP) utils/ghc-cabal/Main.hs $(TOUCH_DEP) | $$(dir $$@)/. bootstrapping/.
+$(ghc-cabal_DIST_BINARY): utils/ghc-cabal/Main.hs $(TOUCH_DEP) | $$(dir $$@)/. bootstrapping/.
 	"$(GHC)" $(SRC_HC_OPTS) \
 	       $(addprefix -optc, $(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE0)) \
 	       $(addprefix -optl, $(SRC_LD_OPTS) $(CONF_GCC_LINKER_OPTS_STAGE0)) \
@@ -69,8 +57,7 @@ $(ghc-cabal_DIST_BINARY): $(CABAL_LEXER_DEP) utils/ghc-cabal/Main.hs $(TOUCH_DEP
 	       -DBOOTSTRAPPING \
 	       -odir  bootstrapping \
 	       -hidir bootstrapping \
-	       $(CABAL_LEXER_DEP) \
-	       -ilibraries/Cabal/Cabal \
+	       -ilibraries/Cabal/Cabal/src \
 	       -ilibraries/binary/src \
 	       -ilibraries/filepath \
 	       -ilibraries/hpc \
