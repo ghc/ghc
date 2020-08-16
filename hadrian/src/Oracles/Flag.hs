@@ -25,6 +25,7 @@ data Flag = ArSupportsAtFile
           | HaveLibMingwEx
           | UseSystemFfi
           | BootstrapThreadedRts
+          | SystemDistroMINGW
 
 -- Note, if a flag is set to empty string we treat it as set to NO. This seems
 -- fragile, but some flags do behave like this.
@@ -45,6 +46,7 @@ flag f = do
             HaveLibMingwEx       -> "have-lib-mingw-ex"
             UseSystemFfi         -> "use-system-ffi"
             BootstrapThreadedRts -> "bootstrap-threaded-rts"
+            SystemDistroMINGW    -> "system-use-distro-mingw"
     value <- lookupValueOrError configFile key
     when (value `notElem` ["YES", "NO", ""]) . error $ "Configuration flag "
         ++ quote (key ++ " = " ++ value) ++ " cannot be parsed."

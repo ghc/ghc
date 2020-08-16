@@ -245,6 +245,7 @@ generateGhcPlatformH = do
     hostOs         <- chooseSetting HostOs        TargetOs
     hostVendor     <- chooseSetting HostVendor    TargetVendor
     ghcUnreg       <- getFlag    GhcUnregisterised
+    inplaceTools   <- getFlag    SystemDistroMINGW
     return . unlines $
         [ "#if !defined(__GHCPLATFORM_H__)"
         , "#define __GHCPLATFORM_H__"
@@ -273,6 +274,8 @@ generateGhcPlatformH = do
         , "#define HOST_VENDOR "  ++ show hostVendor
         , ""
         ]
+        ++
+        [ "#define USE_INPLACE_MINGW_TOOLCHAIN 1" | inplaceTools ]
         ++
         [ "#define UnregisterisedCompiler 1" | ghcUnreg ]
         ++
