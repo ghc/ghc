@@ -150,7 +150,7 @@ typedef struct Task_ {
 
     bool    worker;          // == true if this is a worker Task
     bool    stopped;         // == true between newBoundTask and
-                                // boundTaskExiting, or in a worker Task.
+                                // exitMyTask, or in a worker Task.
 
     // So that we can detect when a finalizer illegally calls back into Haskell
     bool running_finalizers;
