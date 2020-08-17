@@ -107,6 +107,7 @@ endif
 endif
 
 # Build the GHCi library
+# See Note [Merging object files for GHCi] in GHC.Driver.Pipeline.
 ifneq "$(filter $3, v p)" ""
 $1_$2_$3_GHCI_LIB = $1/$2/build/HS$$($1_$2_COMPONENT_ID).$$($3_osuf)
 ifeq "$$($1_$2_BUILD_GHCI_LIB)" "YES"
@@ -116,7 +117,7 @@ BINDIST_LIBS += $$($1_$2_$3_GHCI_LIB)
 endif
 endif
 $$($1_$2_$3_GHCI_LIB) : $$($1_$2_$3_HS_OBJS) $$($1_$2_$3_CMM_OBJS) $$($1_$2_$3_C_OBJS) $$($1_$2_$3_S_OBJS) $$($1_$2_EXTRA_OBJS) $$($1_$2_LD_SCRIPT)
-	$$(call cmd,SettingsMergeObjectsCommand) $(SettingsMergeObjectsFlags) $$(if $$($1_$2_LD_SCRIPT),$$($1_$2_LD_SCRIPT_CMD) $$($1_$2_LD_SCRIPT)) -o $$@ $$(EXTRA_LD_LINKER_OPTS) $$($1_$2_$3_HS_OBJS) $$($1_$2_$3_CMM_OBJS) $$($1_$2_$3_C_OBJS) $$($1_$2_$3_S_OBJS) $$($1_$2_EXTRA_OBJS)
+	$$(call cmd,MERGE_OBJS_STAGE$4) $(MERGE_OBJS_STAGE$4_FLAGS) $$(if $$($1_$2_LD_SCRIPT),$$($1_$2_LD_SCRIPT_CMD) $$($1_$2_LD_SCRIPT)) -o $$@ $$(EXTRA_LD_LINKER_OPTS) $$($1_$2_$3_HS_OBJS) $$($1_$2_$3_CMM_OBJS) $$($1_$2_$3_C_OBJS) $$($1_$2_$3_S_OBJS) $$($1_$2_EXTRA_OBJS)
 ifeq "$$($1_$2_BUILD_GHCI_LIB)" "YES"
 # Don't bother making ghci libs for bootstrapping packages
 ifneq "$4" "0"
