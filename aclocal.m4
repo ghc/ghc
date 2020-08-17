@@ -2640,6 +2640,7 @@ AC_DEFUN([CHECK_FOR_GOLD_T22266],[
 # ------------------
 # Find which linker to use to merge object files.
 #
+# See Note [Merging object files for GHCi] in GHC.Driver.Pipeline.
 AC_DEFUN([FIND_MERGE_OBJECTS],[
     AC_REQUIRE([FIND_LD])
 
@@ -2660,6 +2661,9 @@ AC_DEFUN([FIND_MERGE_OBJECTS],[
             AC_MSG_ERROR([Linker is affected by binutils 22266 but couldn't find another unaffected linker. Please set the MergeObjsCmd variable to a functional linker.])
         fi
     fi
+
+    AC_SUBST([MergeObjsCmd])
+    AC_SUBST([MergeObjsArgs])
 ])
 
 # FIND_PYTHON
