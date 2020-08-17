@@ -2082,7 +2082,7 @@ forkProcess(HsStablePtr *entry
             RELEASE_LOCK(&capabilities[i]->lock);
         }
 
-        boundTaskExiting(task);
+        exitMyTask();
 
         // just return the pid
         return pid;
@@ -2762,7 +2762,7 @@ exitScheduler (bool wait_foreign USED_IF_THREADS)
     // debugBelch("n_failed_trygrab_idles = %d, n_idle_caps = %d\n",
     //            n_failed_trygrab_idles, n_idle_caps);
 
-    boundTaskExiting(task);
+    exitMyTask();
 }
 
 void
@@ -2821,7 +2821,7 @@ performGC_(bool force_major)
     waitForCapability(&cap,task);
     scheduleDoGC(&cap,task,force_major,false);
     releaseCapability(cap);
-    boundTaskExiting(task);
+    exitMyTask();
 }
 
 void
