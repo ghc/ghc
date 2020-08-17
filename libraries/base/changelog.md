@@ -30,7 +30,7 @@
 
   * Add `Ix` instances for tuples of size 6 through 15
    
-## 4.14.0.0 *TBA*
+## 4.14.0.0 *Jan 2020
   * Bundled with GHC 8.10.1
 
   * Add a `TestEquality` instance for the `Compose` newtype.
@@ -322,7 +322,7 @@
     in constant space when applied to lists. (#10830)
 
   * `mkFunTy`, `mkAppTy`, and `mkTyConApp` from `Data.Typeable` no longer exist.
-    This functionality is superseded by the interfaces provided by
+    This functionality is superceded by the interfaces provided by
     `Type.Reflection`.
 
   * `mkTyCon3` is no longer exported by `Data.Typeable`. This function is

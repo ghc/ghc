@@ -122,7 +122,7 @@ oneShot f = f
 
 runRW# :: forall (r :: RuntimeRep) (o :: TYPE r).
           (State# RealWorld -> o) -> o
--- See Note [runRW magic] in CorePrep
+-- See Note [runRW magic] in GHC.CoreToStg.Prep.
 {-# NOINLINE runRW# #-}  -- runRW# is inlined manually in CorePrep
 #if !defined(__HADDOCK_VERSION__)
 runRW# m = m realWorld#
