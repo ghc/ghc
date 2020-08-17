@@ -621,21 +621,21 @@ rts_unlock (Capability *cap)
     task = cap->running_task;
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
 
-    // Now release the Capability.  With the capability released, GC
-    // may happen.  NB. does not try to put the current Task on the
+    // Now release the Capability. With the capability released, GC
+    // may happen. NB. does not try to put the current Task on the
     // worker queue.
-    // NB. keep cap->lock held while we call boundTaskExiting().  This
+    // NB. keep cap->lock held while we call exitMyTask(). This
     // is necessary during shutdown, where we want the invariant that
     // after shutdownCapability(), all the Tasks associated with the
-    // Capability have completed their shutdown too.  Otherwise we
-    // could have boundTaskExiting()/workerTaskStop() running at some
+    // Capability have completed their shutdown too. Otherwise we
+    // could have exitMyTask()/workerTaskStop() running at some
     // random point in the future, which causes problems for
     // freeTaskManager().
     ACQUIRE_LOCK(&cap->lock);
     releaseCapability_(cap,false);
 
     // Finally, we can release the Task to the free list.
-    boundTaskExiting(task);
+    exitMyTask();
     RELEASE_LOCK(&cap->lock);
 
     if (task->incall == NULL) {
@@ -794,7 +794,7 @@ void rts_done (void)
 void hs_try_putmvar (/* in */ int capability,
                      /* in */ HsStablePtr mvar)
 {
-    Task *task = getTask();
+    Task *task = getMyTask();
     Capability *cap;
     Capability *task_old_cap USED_IF_THREADS;
 
