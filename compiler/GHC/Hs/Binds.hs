@@ -989,6 +989,11 @@ data Sig pass
   | SpecInstSig (XSpecInstSig pass) SourceText (LHsSigType pass)
                   -- Note [Pragma source text] in GHC.Types.Basic
 
+  | SpecializableSig     (XSpecializableSig pass)
+                         SourceText
+                         -- Note [Pragma source text] in GHC.Types.Basic
+                         (Located (IdP pass)) -- Function or datatype to make specializable
+
         -- | A minimal complete definition pragma
         --
         -- > {-# MINIMAL a | (b, c | (d | e)) #-}
@@ -1035,6 +1040,7 @@ type instance XFixSig           (GhcPass p) = NoExtField
 type instance XInlineSig        (GhcPass p) = NoExtField
 type instance XSpecSig          (GhcPass p) = NoExtField
 type instance XSpecInstSig      (GhcPass p) = NoExtField
+type instance XSpecializableSig (GhcPass p) = NoExtField
 type instance XMinimalSig       (GhcPass p) = NoExtField
 type instance XSCCFunSig        (GhcPass p) = NoExtField
 type instance XCompleteMatchSig (GhcPass p) = NoExtField
@@ -1101,6 +1107,10 @@ isSpecInstLSig :: forall p. UnXRec p => LSig p -> Bool
 isSpecInstLSig (unXRec @p -> SpecInstSig {}) = True
 isSpecInstLSig _                      = False
 
+isSpecializableLSig :: forall p. UnXRec p => LSig p -> Bool
+isSpecializableLSig (unXRec @p -> SpecializableSig {}) = True
+isSpecializableLSig _                                  = False
+
 isPragLSig :: forall p. UnXRec p => LSig p -> Bool
 -- Identifies pragmas
 isPragLSig (unXRec @p -> SpecSig {})   = True
@@ -1135,6 +1145,7 @@ hsSigDoc (ClassOpSig _ is_deflt _ _)
 hsSigDoc (IdSig {})             = text "id signature"
 hsSigDoc (SpecSig _ _ _ inl)
                                 = ppr inl <+> text "pragma"
+hsSigDoc (SpecializableSig {})  = text "SPECIALIZABLE pragma"
 hsSigDoc (InlineSig _ _ prag)   = ppr (inlinePragmaSpec prag) <+> text "pragma"
 hsSigDoc (SpecInstSig _ src _)
                                 = pprWithSourceText src empty <+> text "instance pragma"
@@ -1172,6 +1183,8 @@ ppr_sig (InlineSig _ var inl)
                                    <+> pprPrefixOcc (unLoc var))
 ppr_sig (SpecInstSig _ src ty)
   = pragSrcBrackets src "{-# pragma" (text "instance" <+> ppr ty)
+ppr_sig (SpecializableSig _ src var)
+  = pragSrcBrackets src "{-# SPECIALIZABLE" $ pprPrefixOcc $ unLoc var
 ppr_sig (MinimalSig _ src bf)
   = pragSrcBrackets src "{-# MINIMAL" (pprMinimalSig bf)
 ppr_sig (PatSynSig _ names sig_ty)

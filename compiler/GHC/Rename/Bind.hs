@@ -996,6 +996,10 @@ renameSig ctxt sig@(SpecSig _ v tys inl)
       = do { (new_ty, fvs_ty) <- rnHsSigType ty_ctxt TypeLevel Nothing ty
            ; return ( new_ty:tys, fvs_ty `plusFV` fvs) }
 
+renameSig ctxt sig@(SpecializableSig _ src v)
+  = do new_v <- lookupSigOccRn ctxt sig v -- XXX
+       return (SpecializableSig noExtField src new_v, emptyFVs)
+
 renameSig ctxt sig@(InlineSig _ v s)
   = do  { new_v <- lookupSigOccRn ctxt sig v
         ; return (InlineSig noExtField new_v s, emptyFVs) }
@@ -1096,6 +1100,9 @@ okHsSig ctxt (L _ sig)
      (SpecInstSig {}, InstDeclCtxt {}) -> True
      (SpecInstSig {}, _)               -> False
 
+     (SpecializableSig {}, HsBootCtxt {}) -> False -- TODO check why inline cannot be used in boot contexts
+     (SpecializableSig {}, _)             -> True
+
      (MinimalSig {}, ClsDeclCtxt {}) -> True
      (MinimalSig {}, _)              -> False
 
@@ -1133,6 +1140,7 @@ findDupSigs sigs
     mtch (ClassOpSig _ d1 _ _) (ClassOpSig _ d2 _ _) = d1 == d2
     mtch (PatSynSig _ _ _)     (PatSynSig _ _ _)   = True
     mtch (SCCFunSig{})         (SCCFunSig{})       = True
+    mtch (SpecializableSig {}) (SpecializableSig {}) = True
     mtch _ _ = False
 
 -- Warn about multiple MINIMAL signatures

@@ -45,7 +45,8 @@ import GHC.Core.Multiplicity
 import GHC.Driver.Session
 import GHC.Driver.Backend
 import GHC.Types.Var ( TyVar, Specificity(..), tyVarKind, binderVars )
-import GHC.Types.Id  ( Id, idName, idType, idInlinePragma, setInlinePragma, mkLocalId )
+import GHC.Types.Id  ( Id, idName, idType, idInlinePragma, setInlinePragma
+                     , setSpecializablePragma, mkLocalId )
 import GHC.Builtin.Names( mkUnboundName )
 import GHC.Types.Basic
 import GHC.Unit.Module( getModule )
@@ -564,6 +565,8 @@ mkPragEnv sigs binds
     get_sig :: LSig GhcRn -> Maybe (Name, LSig GhcRn)
     get_sig (L l (SpecSig x lnm@(L _ nm) ty inl))
       = Just (nm, L l $ SpecSig   x lnm ty (add_arity nm inl))
+    get_sig (L l (SpecializableSig x src lnm@(L _ nm)))
+      = Just (nm, L l $ SpecializableSig x src lnm)
     get_sig (L l (InlineSig x lnm@(L _ nm) inl))
       = Just (nm, L l $ InlineSig x lnm    (add_arity nm inl))
     get_sig (L l (SCCFunSig x st lnm@(L _ nm) str))
@@ -592,16 +595,30 @@ lhsBindArity _ env = env        -- PatBind/VarBind
 
 
 -----------------
+-- TODO find a better name
 addInlinePrags :: TcId -> [LSig GhcRn] -> TcM TcId
 addInlinePrags poly_id prags_for_me
-  | inl@(L _ prag) : inls <- inl_prags
-  = do { traceTc "addInlinePrag" (ppr poly_id $$ ppr prag)
-       ; unless (null inls) (warn_multiple_inlines inl inls)
-       ; return (poly_id `setInlinePragma` prag) }
-  | otherwise
+  | null inl_prags && null spec_prags
   = return poly_id
+  | otherwise
+  -- | inl@(L _ prag) : inls <- inl_prags
+  = do { liftIO $ putStrLn $ showSDocUnsafe $ ppr prags_for_me
+       ; poly_id <- case inl_prags of
+                      [] -> return poly_id
+                      inl@(L _ prag) : inls -> do
+                        unless (null inls) $ warn_multiple_inlines inl inls
+                        traceTc "addInlinePrag" (ppr poly_id $$ ppr prag)
+                        return $ poly_id `setInlinePragma` prag
+       ; poly_id <- case spec_prags of
+                      [] -> return poly_id
+                      spec@(L _ prag) : specs -> do
+                        unless (null specs) $ warn_multiple_specs spec specs
+                        traceTc "addInlinePrag" (ppr poly_id $$ ppr prag)
+                        return $ poly_id `setSpecializablePragma` prag
+       ; return poly_id }
   where
-    inl_prags = [L loc prag | L loc (InlineSig _ _ prag) <- prags_for_me]
+    inl_prags  = [L loc prag | L loc (InlineSig _ _ prag       ) <- prags_for_me]
+    spec_prags = [L loc Specializable | L loc (SpecializableSig _ _ _) <- prags_for_me]
 
     warn_multiple_inlines _ [] = return ()
 
@@ -619,6 +636,8 @@ addInlinePrags poly_id prags_for_me
                                 : map pp_inl (inl1:inl2:inls))))
 
     pp_inl (L loc prag) = ppr prag <+> parens (ppr loc)
+
+    warn_multiple_specs = error "multiple specializable pragmas" -- TODO
 
 
 {- *********************************************************************
@@ -730,8 +749,8 @@ Some wrinkles
 
 tcSpecPrags :: Id -> [LSig GhcRn]
             -> TcM [LTcSpecPrag]
--- Add INLINE and SPECIALSE pragmas
---    INLINE prags are added to the (polymorphic) Id directly
+-- Add INLINE, SPECILALIZABLE and SPECIALISE pragmas
+--    INLINE and SPECIALIZABLE prags are added to the (polymorphic) Id directly
 --    SPECIALISE prags are passed to the desugarer via TcSpecPrags
 -- Pre-condition: the poly_id is zonked
 -- Reason: required by tcSubExp
@@ -743,7 +762,10 @@ tcSpecPrags poly_id prag_sigs
   where
     spec_sigs = filter isSpecLSig prag_sigs
     bad_sigs  = filter is_bad_sig prag_sigs
-    is_bad_sig s = not (isSpecLSig s || isInlineLSig s || isSCCFunSig s)
+    is_bad_sig s = not ( isSpecLSig s
+                      || isInlineLSig s
+                      || isSpecializableLSig s
+                      || isSCCFunSig s )
 
     warn_discarded_sigs
       = addWarnTc NoReason

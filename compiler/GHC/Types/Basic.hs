@@ -95,6 +95,9 @@ module GHC.Types.Basic (
         setInlinePragmaActivation, setInlinePragmaRuleMatchInfo,
         pprInline, pprInlineDebug,
 
+        SpecializablePragma(..), defaultSpecializablePragma,
+        isDefaultSpecializablePragma,
+
         SuccessFlag(..), succeeded, failed, successIf,
 
         IntegralLit(..), FractionalLit(..),
@@ -1467,6 +1470,11 @@ data InlineSpec   -- What the user's INLINE pragma looked like
   deriving( Eq, Data, Show )
         -- Show needed for GHC.Parser.Lexer
 
+data SpecializablePragma
+  = Specializable
+  | NoUserSpecializable
+  deriving( Eq, Data )
+
 {- Note [InlinePragma]
 ~~~~~~~~~~~~~~~~~~~~~~
 This data type mirrors what you can write in an INLINE or NOINLINE pragma in
@@ -1609,6 +1617,13 @@ setInlinePragmaActivation prag activation = prag { inl_act = activation }
 setInlinePragmaRuleMatchInfo :: InlinePragma -> RuleMatchInfo -> InlinePragma
 setInlinePragmaRuleMatchInfo prag info = prag { inl_rule = info }
 
+defaultSpecializablePragma :: SpecializablePragma
+defaultSpecializablePragma = NoUserSpecializable
+
+isDefaultSpecializablePragma :: SpecializablePragma -> Bool
+isDefaultSpecializablePragma Specializable = False
+isDefaultSpecializablePragma NoUserSpecializable = True
+
 instance Outputable Activation where
    ppr AlwaysActive       = empty
    ppr NeverActive        = brackets (text "~")
@@ -1628,6 +1643,10 @@ instance Outputable InlineSpec where
 
 instance Outputable InlinePragma where
   ppr = pprInline
+
+instance Outputable SpecializablePragma where
+  ppr Specializable = text "SPECIALIZABLE"
+  ppr NoUserSpecializable = text "NOUSERSPECIALIZABLE"
 
 pprInline :: InlinePragma -> SDoc
 pprInline = pprInline' True

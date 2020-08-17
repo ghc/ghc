@@ -1486,6 +1486,7 @@ tcIdInfo ignore_prags toplvl name ty info = do
       -- Always read in compulsory unfoldings
       -- See Note [Always expose compulsory unfoldings] in GHC.Iface.Tidy
     need_prag (HsUnfold _ (IfCompulsory {})) = True
+    need_prag (HsUnfold _ (IfSpecializableNoinline {})) = True -- TMP
     need_prag _                              = False
 
     tcPrag :: IdInfo -> IfaceInfoItem -> IfL IdInfo
@@ -1494,6 +1495,7 @@ tcIdInfo ignore_prags toplvl name ty info = do
     tcPrag info (HsStrictness str) = return (info `setStrictnessInfo` str)
     tcPrag info (HsCpr cpr)        = return (info `setCprInfo` cpr)
     tcPrag info (HsInline prag)    = return (info `setInlinePragInfo` prag)
+    tcPrag info (HsSpecializable prag) = return (info `setSpecializablePragInfo` prag)
     tcPrag info HsLevity           = return (info `setNeverLevPoly` ty)
     tcPrag info (HsLFInfo lf_info) = do
       lf_info <- tcLFInfo lf_info
@@ -1555,6 +1557,15 @@ tcUnfolding toplvl name _ info (IfCoreUnfold stable if_expr)
   where
     -- Strictness should occur before unfolding!
     strict_sig = strictnessInfo info
+
+tcUnfolding toplvl name _ _ (IfSpecializableNoinline if_expr)
+  = do  { mb_expr <- tcPragExpr False toplvl name if_expr
+        ; return $ maybe NoUnfolding mkU mb_expr }
+  -- TODO restore case
+  where mkU e = mkCoreUnfolding InlineStable
+                    True
+                    e
+                    UnfNever
 
 tcUnfolding toplvl name _ _ (IfCompulsory if_expr)
   = do  { mb_expr <- tcPragExpr True toplvl name if_expr

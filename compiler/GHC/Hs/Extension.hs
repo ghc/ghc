@@ -367,6 +367,7 @@ type family XFixSig           x
 type family XInlineSig        x
 type family XSpecSig          x
 type family XSpecInstSig      x
+type family XSpecializableSig x
 type family XMinimalSig       x
 type family XSCCFunSig        x
 type family XCompleteMatchSig x

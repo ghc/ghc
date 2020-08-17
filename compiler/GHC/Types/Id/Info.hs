@@ -53,6 +53,10 @@ module GHC.Types.Id.Info (
         InlinePragInfo,
         inlinePragInfo, setInlinePragInfo,
 
+        -- ** The SpecializablePragInfo type
+        SpecializablePragInfo,
+        specializablePragInfo, setSpecializablePragInfo,
+
         -- ** The OccInfo type
         OccInfo(..),
         isDeadOcc, isStrongLoopBreaker, isWeakLoopBreaker,
@@ -259,6 +263,8 @@ data IdInfo
         -- ^ The 'Id's unfolding
         inlinePragInfo  :: InlinePragma,
         -- ^ Any inline pragma attached to the 'Id'
+        specializablePragInfo :: SpecializablePragma,
+        -- ^ Any specializable pragma attached to the 'Id'
         occInfo         :: OccInfo,
         -- ^ How the 'Id' occurs in the program
         strictnessInfo  :: StrictSig,
@@ -373,6 +379,8 @@ setRuleInfo :: IdInfo -> RuleInfo -> IdInfo
 setRuleInfo       info sp = sp `seq` info { ruleInfo = sp }
 setInlinePragInfo :: IdInfo -> InlinePragma -> IdInfo
 setInlinePragInfo info pr = pr `seq` info { inlinePragInfo = pr }
+setSpecializablePragInfo :: IdInfo -> SpecializablePragma -> IdInfo
+setSpecializablePragInfo info pr = pr `seq` info { specializablePragInfo = pr }
 setOccInfo :: IdInfo -> OccInfo -> IdInfo
 setOccInfo        info oc = oc `seq` info { occInfo = oc }
         -- Try to avoid space leaks by seq'ing
@@ -420,6 +428,7 @@ vanillaIdInfo
             ruleInfo            = emptyRuleInfo,
             unfoldingInfo       = noUnfolding,
             inlinePragInfo      = defaultInlinePragma,
+            specializablePragInfo = defaultSpecializablePragma,
             occInfo             = noOccInfo,
             demandInfo          = topDmd,
             strictnessInfo      = nopSig,
@@ -490,6 +499,8 @@ ppArityInfo n = hsep [text "Arity", int n]
 -- The default 'InlinePragInfo' is 'AlwaysActive', so the info serves
 -- entirely as a way to inhibit inlining until we want it
 type InlinePragInfo = InlinePragma
+
+type SpecializablePragInfo = SpecializablePragma
 
 {-
 ************************************************************************

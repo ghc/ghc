@@ -202,14 +202,16 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) id
         --
         -- Set inline-prag info so that we preserve it across
         -- separate compilation boundaries
+        -- Same for specializable-prag
         old_info = idInfo id
         new_info = vanillaIdInfo
-                    `setOccInfo`        occInfo old_info
-                    `setArityInfo`      arityInfo old_info
-                    `setStrictnessInfo` zapUsageEnvSig (strictnessInfo old_info)
-                    `setDemandInfo`     demandInfo old_info
-                    `setInlinePragInfo` inlinePragInfo old_info
-                    `setUnfoldingInfo`  new_unf
+                    `setSpecializablePragInfo` specializablePragInfo old_info
+                    `setOccInfo`               occInfo old_info
+                    `setArityInfo`             arityInfo old_info
+                    `setStrictnessInfo`        zapUsageEnvSig (strictnessInfo old_info)
+                    `setDemandInfo`            demandInfo old_info
+                    `setInlinePragInfo`        inlinePragInfo old_info
+                    `setUnfoldingInfo`         new_unf
 
         old_unf = unfoldingInfo old_info
         new_unf | isStableUnfolding old_unf = tidyUnfolding rec_tidy_env old_unf old_unf

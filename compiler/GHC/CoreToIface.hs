@@ -448,7 +448,7 @@ toIfaceIdDetails other = pprTrace "toIfaceIdDetails" (ppr other)
 toIfaceIdInfo :: IdInfo -> IfaceIdInfo
 toIfaceIdInfo id_info
   = catMaybes [arity_hsinfo, caf_hsinfo, strict_hsinfo, cpr_hsinfo,
-               inline_hsinfo,  unfold_hsinfo, levity_hsinfo]
+               inline_hsinfo, specializable_hsinfo, unfold_hsinfo, levity_hsinfo]
                -- NB: strictness and arity must appear in the list before unfolding
                -- See GHC.IfaceToCore.tcUnfolding
   where
@@ -482,6 +482,11 @@ toIfaceIdInfo id_info
     inline_hsinfo | isDefaultInlinePragma inline_prag = Nothing
                   | otherwise = Just (HsInline inline_prag)
 
+    ------------  Specializable prag  --------------
+    specializable_prag = specializablePragInfo id_info
+    specializable_hsinfo | isDefaultSpecializablePragma specializable_prag = Nothing
+                         | otherwise = Just (HsSpecializable specializable_prag)
+
     ------------  Levity polymorphism  ----------
     levity_hsinfo | isNeverLevPolyIdInfo id_info = Just HsLevity
                   | otherwise                    = Nothing
@@ -501,6 +506,7 @@ toIfUnfolding lb (CoreUnfolding { uf_tmpl = rhs
           -> case guidance of
                UnfWhen {ug_arity = arity, ug_unsat_ok = unsat_ok, ug_boring_ok =  boring_ok }
                       -> IfInlineRule arity unsat_ok boring_ok if_rhs
+               UnfNever -> IfSpecializableNoinline if_rhs
                _other -> IfCoreUnfold True if_rhs
         InlineCompulsory -> IfCompulsory if_rhs
         InlineRhs        -> IfCoreUnfold False if_rhs
@@ -508,6 +514,9 @@ toIfUnfolding lb (CoreUnfolding { uf_tmpl = rhs
         -- If we didn't want to expose the unfolding, GHC.Iface.Tidy would
         -- have stuck in NoUnfolding.  For supercompilation we want
         -- to see that unfolding!
+        -- TODO how to distinguish between supercompilation and specializable?
+        --      Is it actually necessary?
+        --      Is the new constructor ok?
   where
     if_rhs = toIfaceExpr rhs
 

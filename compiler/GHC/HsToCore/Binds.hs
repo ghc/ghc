@@ -382,15 +382,22 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
   = (gbl_id `setIdUnfolding` mkCompulsoryUnfolding rhs, rhs)
 
   | otherwise
-  = case inlinePragmaSpec inline_prag of
-          NoUserInline -> (gbl_id, rhs)
-          NoInline     -> (gbl_id, rhs)
-          Inlinable    -> (gbl_id `setIdUnfolding` inlinable_unf, rhs)
-          Inline       -> inline_pair
+  = case (inlinePragmaSpec inline_prag, specializable_prag) of
+          (NoUserInline, NoUserSpecializable) -> (gbl_id, rhs)
+          (NoUserInline, Specializable      )
+            -> (gbl_id `setIdUnfolding` inlinable_unf, rhs) -- TODO review it
+          (NoInline,     NoUserSpecializable) -> (gbl_id, rhs)
+          (NoInline,     Specializable      )
+            -> (gbl_id `setIdUnfolding` specializable_noinline_unf, rhs)
+          (Inlinable,    _                  )
+            -> (gbl_id `setIdUnfolding` inlinable_unf, rhs)
+          (Inline,       _                  ) -> inline_pair
+
 
   where
     inline_prag   = idInlinePragma gbl_id
     inlinable_unf = mkInlinableUnfolding dflags rhs
+    specializable_noinline_unf = mkSpecializableNoinlineUnfolding dflags rhs
     inline_pair
        | Just arity <- inlinePragmaSat inline_prag
         -- Add an Unfolding for an INLINE (but not for NOINLINE)
@@ -403,6 +410,7 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
        | otherwise
        = pprTrace "makeCorePair: arity missing" (ppr gbl_id) $
          (gbl_id `setIdUnfolding` mkInlineUnfolding rhs, rhs)
+    specializable_prag   = idSpecializablePragma gbl_id
 
 dictArity :: [Var] -> Arity
 -- Don't count coercion variables in arity

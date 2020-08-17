@@ -346,6 +346,7 @@ data IfaceInfoItem
   | HsStrictness    StrictSig
   | HsCpr           CprSig
   | HsInline        InlinePragma
+  | HsSpecializable SpecializablePragma
   | HsUnfold        Bool             -- True <=> isStrongLoopBreaker is true
                     IfaceUnfolding   -- See Note [Expose recursive functions]
   | HsNoCafRefs
@@ -359,6 +360,8 @@ data IfaceUnfolding
   = IfCoreUnfold Bool IfaceExpr -- True <=> INLINABLE, False <=> regular unfolding
                                 -- Possibly could eliminate the Bool here, the information
                                 -- is also in the InlinePragma.
+
+  | IfSpecializableNoinline IfaceExpr
 
   | IfCompulsory IfaceExpr      -- default methods and unsafeCoerce#
                                 -- for more about unsafeCoerce#, see
@@ -1452,6 +1455,7 @@ instance Outputable IfaceInfoItem where
                               <> ppWhen lb (text "(loop-breaker)")
                               <> colon <+> ppr unf
   ppr (HsInline prag)       = text "Inline:" <+> ppr prag
+  ppr (HsSpecializable prag)= text "Specializable:" <+> ppr prag
   ppr (HsArity arity)       = text "Arity:" <+> int arity
   ppr (HsStrictness str)    = text "Strictness:" <+> pprIfaceStrictSig str
   ppr (HsCpr cpr)           = text "CPR:" <+> ppr cpr
@@ -1469,6 +1473,7 @@ instance Outputable IfaceUnfolding where
                                 then text "<stable>"
                                 else Outputable.empty)
                               <+> parens (ppr e)
+  ppr (IfSpecializableNoinline e) = text "<specializable noinline>" <+> parens (ppr e)
   ppr (IfInlineRule a uok bok e) = sep [text "InlineRule"
                                             <+> ppr (a,uok,bok),
                                         pprParendIfaceExpr e]
@@ -1718,6 +1723,7 @@ freeNamesItem _                      = emptyNameSet
 
 freeNamesIfUnfold :: IfaceUnfolding -> NameSet
 freeNamesIfUnfold (IfCoreUnfold _ e)     = freeNamesIfExpr e
+freeNamesIfUnfold (IfSpecializableNoinline e) = freeNamesIfExpr e
 freeNamesIfUnfold (IfCompulsory e)       = freeNamesIfExpr e
 freeNamesIfUnfold (IfInlineRule _ _ _ e) = freeNamesIfExpr e
 freeNamesIfUnfold (IfDFunUnfold bs es)   = freeNamesIfBndrs bs &&& fnList freeNamesIfExpr es
@@ -2221,6 +2227,8 @@ instance Binary IfaceInfoItem where
     put_ bh HsLevity              = putByte bh 5
     put_ bh (HsCpr cpr)           = putByte bh 6 >> put_ bh cpr
     put_ bh (HsLFInfo lf_info)    = putByte bh 7 >> put_ bh lf_info
+    put_ bh (HsSpecializable Specializable) = putByte bh 8
+    put_ bh (HsSpecializable NoUserSpecializable) = putByte bh 9
 
     get bh = do
         h <- getByte bh
@@ -2234,7 +2242,9 @@ instance Binary IfaceInfoItem where
             4 -> return HsNoCafRefs
             5 -> return HsLevity
             6 -> HsCpr <$> get bh
-            _ -> HsLFInfo <$> get bh
+            7 -> HsLFInfo <$> get bh
+            8 -> return $ HsSpecializable Specializable
+            _ -> return $ HsSpecializable NoUserSpecializable
 
 instance Binary IfaceUnfolding where
     put_ bh (IfCoreUnfold s e) = do
@@ -2254,6 +2264,9 @@ instance Binary IfaceUnfolding where
     put_ bh (IfCompulsory e) = do
         putByte bh 3
         put_ bh e
+    put_ bh (IfSpecializableNoinline e) = do
+        putByte bh 4
+        put_ bh e
     get bh = do
         h <- getByte bh
         case h of
@@ -2268,8 +2281,10 @@ instance Binary IfaceUnfolding where
             2 -> do as <- get bh
                     bs <- get bh
                     return (IfDFunUnfold as bs)
-            _ -> do e <- get bh
+            3 -> do e <- get bh
                     return (IfCompulsory e)
+            _ -> do e <- get bh
+                    return (IfSpecializableNoinline e)
 
 
 instance Binary IfaceExpr where
@@ -2561,6 +2576,7 @@ instance NFData IfaceInfoItem where
     HsArity a -> rnf a
     HsStrictness str -> seqStrictSig str
     HsInline p -> p `seq` () -- TODO: seq further?
+    HsSpecializable p -> p `seq` ()
     HsUnfold b unf -> rnf b `seq` rnf unf
     HsNoCafRefs -> ()
     HsLevity -> ()
@@ -2571,6 +2587,8 @@ instance NFData IfaceUnfolding where
   rnf = \case
     IfCoreUnfold inlinable expr ->
       rnf inlinable `seq` rnf expr
+    IfSpecializableNoinline expr ->
+      rnf expr
     IfCompulsory expr ->
       rnf expr
     IfInlineRule arity b1 b2 e ->

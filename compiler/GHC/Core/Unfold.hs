@@ -28,6 +28,7 @@ module GHC.Core.Unfold (
         mkInlineUnfolding, mkInlineUnfoldingWithArity,
         mkInlinableUnfolding, mkWwInlineRule,
         mkCompulsoryUnfolding, mkDFunUnfolding,
+        mkSpecializableNoinlineUnfolding,
         specUnfolding,
 
         ArgSummary(..),
@@ -172,6 +173,15 @@ mkInlinableUnfolding dflags expr
   = mkUnfolding dflags InlineStable False False expr'
   where
     expr' = simpleOptExpr dflags expr
+
+mkSpecializableNoinlineUnfolding :: DynFlags -> CoreExpr -> Unfolding
+mkSpecializableNoinlineUnfolding dflags expr
+  = mkCoreUnfolding InlineStable
+                    True
+                    expr'
+                    UnfNever
+  where
+    expr' = simpleOptExpr dflags expr -- MAYBE remove/config?
 
 specUnfolding :: DynFlags
               -> [Var] -> (CoreExpr -> CoreExpr)
