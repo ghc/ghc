@@ -276,15 +276,18 @@ data GenClosure b
   -- | Representation of StgTSO: A Thread State Object.
   -- The values for 'what_next', 'why_blocked' and 'flags' are defined in
   -- @Constants.h@.
+  -- Fields marked as @unsafe@ are backed by dynamic pointers and should only
+  -- be accessed when the garbage collector is stopped. Otherwise segmentation
+  -- faults may happen when an invalidated pointer is accessed.
   | TSOClosure
       { info :: !StgInfoTable
       -- pointers
-      , _link :: !b
-      , global_link :: !b
+      , unsafe_link :: !b
+      , unsafe_global_link :: !b
       , tsoStack :: !b -- ^ stackobj from StgTSO
-      , trec :: !b
-      , blocked_exceptions :: !b
-      , bq :: !b
+      , unsafe_trec :: !b
+      , unsafe_blocked_exceptions :: !b
+      , unsafe_bq :: !b
       -- values
       , what_next :: WhatNext
       , why_blocked :: WhyBlocked
@@ -296,7 +299,10 @@ data GenClosure b
       , tot_stack_size :: Word32
       , prof :: Maybe StgTSOProfInfo
       }
-  -- Representation of StgStack: The 'tsoStack' of a 'TSOClosure'.
+  -- | Representation of StgStack: The 'tsoStack' of a 'TSOClosure'.
+  -- Fields marked as @unsafe@ are backed by dynamic pointers and should only
+  -- be accessed when the garbage collector is stopped. Otherwise segmentation
+  -- faults may happen when an invalidated pointer is accessed.
   | StackClosure
      { info :: !StgInfoTable
      , stack_size :: !Word32 -- ^ stack size in *words*
@@ -304,8 +310,8 @@ data GenClosure b
 #if __GLASGOW_HASKELL__ >= 810
      , stack_marking :: Word8
 #endif
-     , stackPointer :: !b -- ^ current stack pointer
-     , stack :: [Word]
+     , unsafeStackPointer :: !b -- ^ current stack pointer
+     , unsafeStack :: [Word]
      }
 
     ------------------------------------------------------------
