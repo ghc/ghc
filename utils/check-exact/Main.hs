@@ -3,6 +3,7 @@
 -- import Data.List
 -- import GHC.Types.SrcLoc
 import GHC hiding (moduleName)
+import GHC.Driver.Ppr
 import GHC.Driver.Session
 import GHC.Hs.Dump
 -- import GHC.Hs.Exact hiding (ExactPrint())
@@ -10,9 +11,9 @@ import GHC.Utils.Outputable hiding (space)
 import System.Environment( getArgs )
 import System.Exit
 import System.FilePath
--- import ExactPrint
-exactPrint = undefined
-showGhc = undefined
+import ExactPrint
+-- exactPrint = undefined
+-- showGhc = undefined
 
 -- ---------------------------------------------------------------------
 
@@ -21,7 +22,7 @@ tt = testOneFile "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib"
   -- "Test.hs"
  -- "../../testsuite/tests/printer/Ppr001.hs"
  -- "../../testsuite/tests/printer/Ppr002.hs"
- "../../testsuite/tests/printer/Ppr003.hs"
+ -- "../../testsuite/tests/printer/Ppr003.hs"
  -- "../../testsuite/tests/printer/Ppr004.hs"
  -- "../../testsuite/tests/printer/Ppr005.hs"
  -- "../../testsuite/tests/qualifieddo/should_compile/qdocompile001.hs"
@@ -29,6 +30,63 @@ tt = testOneFile "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib"
  -- "../../testsuite/tests/printer/Ppr007.hs"
  -- "../../testsuite/tests/printer/Ppr008.hs"
  -- "../../testsuite/tests/hiefile/should_compile/hie008.hs"
+ -- "../../testsuite/tests/printer/Ppr009.hs"
+ -- "../../testsuite/tests/printer/Ppr011.hs"
+ -- "../../testsuite/tests/printer/Ppr012.hs"
+ -- "../../testsuite/tests/printer/Ppr013.hs"
+ -- "../../testsuite/tests/printer/Ppr014.hs"
+ -- "../../testsuite/tests/printer/Ppr015.hs"
+ -- "../../testsuite/tests/printer/Ppr016.hs"
+ -- "../../testsuite/tests/printer/Ppr017.hs"
+ -- "../../testsuite/tests/printer/Ppr018.hs"
+ -- "../../testsuite/tests/printer/Ppr019.hs"
+ -- "../../testsuite/tests/printer/Ppr020.hs"
+ -- "../../testsuite/tests/printer/Ppr021.hs"
+ -- "../../testsuite/tests/printer/Ppr022.hs"
+ -- "../../testsuite/tests/printer/Ppr023.hs"
+ -- "../../testsuite/tests/printer/Ppr024.hs"
+ -- "../../testsuite/tests/printer/Ppr025.hs"
+ -- "../../testsuite/tests/printer/Ppr026.hs"
+ -- "../../testsuite/tests/printer/Ppr027.hs"
+ -- "../../testsuite/tests/printer/Ppr028.hs"
+ -- "../../testsuite/tests/printer/Ppr029.hs"
+ -- "../../testsuite/tests/printer/Ppr030.hs"
+ -- "../../testsuite/tests/printer/Ppr031.hs"
+ -- "../../testsuite/tests/printer/Ppr032.hs"
+ -- "../../testsuite/tests/printer/Ppr033.hs"
+ -- "../../testsuite/tests/printer/Ppr034.hs"
+ -- "../../testsuite/tests/printer/Ppr035.hs"
+ -- "../../testsuite/tests/printer/Ppr036.hs"
+ -- "../../testsuite/tests/printer/Ppr037.hs"
+ -- "../../testsuite/tests/printer/Ppr038.hs"
+ -- "../../testsuite/tests/printer/Ppr039.hs"
+ -- "../../testsuite/tests/printer/Ppr040.hs"
+ -- "../../testsuite/tests/printer/Ppr041.hs"
+ -- "../../testsuite/tests/printer/Ppr042.hs"
+ -- "../../testsuite/tests/printer/Ppr043.hs"
+ -- "../../testsuite/tests/printer/Ppr044.hs"
+ -- "../../testsuite/tests/printer/Ppr045.hs"
+ -- "../../testsuite/tests/printer/Ppr046.hs"
+ -- Not tested, the GENERATED pragma is getting removed "../../testsuite/tests/printer/Ppr047.hs"
+ -- "../../testsuite/tests/printer/Ppr048.hs"
+ -- "../../testsuite/tests/printer/Ppr049.hs"
+ -- "../../testsuite/tests/printer/T13050p.hs"
+ -- "../../testsuite/tests/printer/T13199.hs"
+ -- "../../testsuite/tests/printer/T13550.hs"
+ -- "../../testsuite/tests/printer/T13942.hs"
+ -- "../../testsuite/tests/printer/T14289b.hs"
+ -- "../../testsuite/tests/printer/T14289c.hs"
+ -- "../../testsuite/tests/printer/T14289.hs"
+ -- "../../testsuite/tests/printer/T14306.hs"
+ -- "../../testsuite/tests/printer/T14343b.hs"
+ -- "../../testsuite/tests/printer/T14343.hs"
+ -- "../../testsuite/tests/printer/T15761.hs"
+ -- "../../testsuite/tests/printer/T18052a.hs"
+ -- "../../testsuite/tests/printer/T18247a.hs"
+ -- "../../testsuite/tests/printer/Ppr050.hs"
+ -- "../../testsuite/tests/printer/Ppr051.hs"
+ -- "../../testsuite/tests/printer/Ppr052.hs"
+ "../../testsuite/tests/typecheck/should_fail/T17566c.hs"
 
 -- exact = ppr
 
@@ -52,7 +110,7 @@ main = do
 testOneFile :: FilePath -> String -> IO ()
 testOneFile libdir fileName = do
        p <- parseOneFile libdir fileName
-       putStrLn $ "\n\ngot p"
+       -- putStrLn $ "\n\ngot p"
        let
          origAst = showSDoc unsafeGlobalDynFlags
                      $ showAstData BlankSrcSpanFile NoBlankApiAnnotations
@@ -66,9 +124,9 @@ testOneFile libdir fileName = do
          astFile = fileName <.> "ast"
          newAstFile = fileName <.> "ast.new"
 
-       putStrLn $ "\n\nabout to writeFile"
+       -- putStrLn $ "\n\nabout to writeFile"
        writeFile astFile origAst
-       putStrLn $ "\n\nabout to pp"
+       -- putStrLn $ "\n\nabout to pp"
        writeFile newFile pped
 
        -- putStrLn $ "anns':" ++ showGhc (apiAnnRogueComments anns')

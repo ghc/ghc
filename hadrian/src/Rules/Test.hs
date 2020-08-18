@@ -85,17 +85,13 @@ testRules = do
                   depsPkgs
                 need (ghcPath : depsLibs)
 
-            let params = concatMap (\p -> ["-package", pkgName p]) depsPkgs ++
-                          ["-o", top -/- path, top -/- sourcePath]
-                params' = case mextra of
-                  Nothing -> params
-                  Just extra -> extra : params
             bindir <- getBinaryDirectory testGhc
             debugged <- ghcDebugged <$> flavour
             dynPrograms <- dynamicGhcPrograms =<< flavour
             cmd [bindir </> "ghc" <.> exe] $
                 concatMap (\p -> ["-package", pkgName p]) depsPkgs ++
                 ["-o", top -/- path, top -/- sourcePath] ++
+                (maybe [] (\e -> [e]) mextra) ++
                 -- If GHC is build with debug options, then build check-ppr
                 -- also with debug options.  This allows, e.g., to print debug
                 -- messages of various RTS subsystems while using check-ppr.

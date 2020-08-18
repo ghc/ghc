@@ -249,12 +249,12 @@ ext1Q :: (Data d, Typeable t)
 ext1Q def ext = unQ ((Q def) `ext1` (Q ext))
 
 
--- | Type extension of queries for type constructors
-ext2Q :: (Data d, Typeable t)
-      => (d -> q)
-      -> (forall d1 d2. (Data d1, Data d2) => t d1 d2 -> q)
-      -> d -> q
-ext2Q def ext = unQ ((Q def) `ext2` (Q ext))
+-- -- | Type extension of queries for type constructors
+-- ext2Q :: (Data d, Typeable t)
+--       => (d -> q)
+--       -> (forall d1 d2. (Data d1, Data d2) => t d1 d2 -> q)
+--       -> d -> q
+-- ext2Q def ext = unQ ((Q def) `ext2` (Q ext))
 
 -- | Flexible type extension
 ext1 :: (Data a, Typeable t)
@@ -265,9 +265,9 @@ ext1 def ext = maybe def id (dataCast1 ext)
 
 
 
--- | Flexible type extension
-ext2 :: (Data a, Typeable t)
-     => c a
-     -> (forall d1 d2. (Data d1, Data d2) => c (t d1 d2))
-     -> c a
-ext2 def ext = maybe def id (dataCast2 ext)
+-- -- | Flexible type extension
+-- ext2 :: (Data a, Typeable t)
+--      => c a
+--      -> (forall d1 d2. (Data d1, Data d2) => c (t d1 d2))
+--      -> c a
+-- ext2 def ext = maybe def id (dataCast2 ext)

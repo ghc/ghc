@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -131,7 +132,7 @@ tcMatchesFun fn@(L _ fun_name) matches exp_ty
 parser guarantees that each equation has exactly one argument.
 -}
 
-tcMatchesCase :: (Outputable (body GhcRn)) =>
+tcMatchesCase :: (AnnoBody body) =>
                 TcMatchCtxt body                         -- Case context
              -> Scaled TcSigmaType                       -- Type of scrutinee
              -> MatchGroup GhcRn (LocatedA (body GhcRn)) -- The case alternatives
@@ -186,8 +187,20 @@ data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
                  -> ExpRhoType
                  -> TcM (LocatedA (body GhcTc)) }
 
+type AnnoBody body
+  = ( Outputable (body GhcRn)
+    , Anno (Match GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
+    , Anno (Match GhcTc (LocatedA (body GhcTc))) ~ SrcSpanAnnA
+    , Anno [LocatedA (Match GhcRn (LocatedA (body GhcRn)))] ~ SrcSpanAnnL
+    , Anno [LocatedA (Match GhcTc (LocatedA (body GhcTc)))] ~ SrcSpanAnnL
+    , Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ SrcSpan
+    , Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcSpan
+    , Anno (StmtLR GhcRn GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
+    , Anno (StmtLR GhcTc GhcTc (LocatedA (body GhcTc))) ~ SrcSpanAnnA
+    )
+
 -- | Type-check a MatchGroup.
-tcMatches :: (Outputable (body GhcRn)) => TcMatchCtxt body
+tcMatches :: (AnnoBody body ) => TcMatchCtxt body
           -> [Scaled ExpSigmaType]      -- Expected pattern types
           -> ExpRhoType          -- Expected result-type of the Match.
           -> MatchGroup GhcRn (LocatedA (body GhcRn))
@@ -217,7 +230,7 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
                     , mg_origin = origin }) }
 
 -------------
-tcMatch :: (Outputable (body GhcRn)) => TcMatchCtxt body
+tcMatch :: (AnnoBody body) => TcMatchCtxt body
         -> [Scaled ExpSigmaType]        -- Expected pattern types
         -> ExpRhoType            -- Expected result-type of the Match.
         -> LMatch GhcRn (LocatedA (body GhcRn))
@@ -243,7 +256,8 @@ tcMatch ctxt pat_tys rhs_ty match
             _          -> addErrCtxt (pprMatchInCtxt match) thing_inside
 
 -------------
-tcGRHSs :: TcMatchCtxt body -> GRHSs GhcRn (LocatedA (body GhcRn)) -> ExpRhoType
+tcGRHSs :: AnnoBody body
+        => TcMatchCtxt body -> GRHSs GhcRn (LocatedA (body GhcRn)) -> ExpRhoType
         -> TcM (GRHSs GhcTc (LocatedA (body GhcTc)))
 
 -- Notice that we pass in the full res_ty, so that we get
@@ -333,7 +347,7 @@ type TcStmtChecker body rho_type
                 -> (rho_type -> TcM thing)  -- Checker for what follows the stmt
                 -> TcM (Stmt GhcTc (LocatedA (body GhcTc)), thing)
 
-tcStmts :: (Outputable (body GhcRn)) => HsStmtContext Name
+tcStmts :: (AnnoBody body) => HsStmtContext Name
         -> TcStmtChecker body rho_type   -- NB: higher-rank type
         -> [LStmt GhcRn (LocatedA (body GhcRn))]
         -> rho_type
@@ -343,7 +357,7 @@ tcStmts ctxt stmt_chk stmts res_ty
                         const (return ())
        ; return stmts' }
 
-tcStmtsAndThen :: (Outputable (body GhcRn)) => HsStmtContext Name
+tcStmtsAndThen :: (AnnoBody body) => HsStmtContext Name
                -> TcStmtChecker body rho_type    -- NB: higher-rank type
                -> [LStmt GhcRn (LocatedA (body GhcRn))]
                -> rho_type
@@ -1091,7 +1105,8 @@ the variables they bind into scope, and typecheck the thing_inside.
 number of args are used in each equation.
 -}
 
-checkArgs :: Name -> MatchGroup GhcRn body -> TcM ()
+checkArgs :: AnnoBody body
+          => Name -> MatchGroup GhcRn (LocatedA (body GhcRn)) -> TcM ()
 checkArgs _ (MG { mg_alts = L _ [] })
     = return ()
 checkArgs fun (MG { mg_alts = L _ (match1:matches) })
@@ -1106,5 +1121,5 @@ checkArgs fun (MG { mg_alts = L _ (match1:matches) })
     n_args1 = args_in_match match1
     bad_matches = [m | m <- matches, args_in_match m /= n_args1]
 
-    args_in_match :: LMatch GhcRn body -> Int
+    args_in_match :: (LocatedA (Match GhcRn body1) -> Int)
     args_in_match (L _ (Match { m_pats = pats })) = length pats

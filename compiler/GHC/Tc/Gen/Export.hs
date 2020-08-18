@@ -185,8 +185,8 @@ tcRnExports explicit_mod exports
         ; let real_exports
                  | explicit_mod = exports
                  | has_main
-                          = Just (noLocA [noLocA (IEVar noAnn
-                                     (noLoc (IEName $ noLocA default_main)))])
+                          = Just (noLocA [noLocA (IEVar noExtField
+                                     (noLocA (IEName $ noLocA default_main)))])
                         -- ToDo: the 'noLoc' here is unhelpful if 'main'
                         --       turns out to be out of scope
                  | otherwise = Nothing
@@ -382,8 +382,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
         = do name <- lookupGlobalOccRn $ ieWrappedName rdr
              (non_flds, flds) <- lookupChildrenExport name sub_rdrs
              if isUnboundName name
-                then return (L l name, [], [name], [])
-                else return (L l name, non_flds
+                then return (L (locA l) name, [], [name], [])
+                else return (L (locA l) name, non_flds
                             , map (ieWrappedName . unLoc) non_flds
                             , flds)
 
@@ -403,7 +403,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                   else -- This occurs when you export T(..), but
                        -- only import T abstractly, or T is a synonym.
                        addErr (exportItemErr ie)
-             return (L l name, non_flds, flds)
+             return (L (locA l) name, non_flds, flds)
 
     -------------
     lookup_doc_ie :: IE GhcPs -> RnM (IE GhcRn)
@@ -535,8 +535,8 @@ lookupChildrenExport spec_parent rdr_items =
           case name of
             NameNotFound -> do { ub <- reportUnboundName unboundName
                                ; let l = getLoc $ ieLWrappedName n
-                               ; return (Left (L (locA l) (IEName (L l ub))))}
-            FoundFL fls -> return $ Right (L (getLoc n) fls)
+                               ; return (Left (L (l2l l) (IEName (L l ub))))}
+            FoundFL fls -> return $ Right (L (getLocA n) fls)
             FoundName par name -> do { checkPatSynParent spec_parent par name
                                      ; return
                                        $ Left (replaceLWrappedName n name) }
