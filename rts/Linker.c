@@ -1901,6 +1901,16 @@ static void * loadNativeObj_ELF (pathchar *path, char **errmsg)
 
    IF_DEBUG(linker, debugBelch("loadNativeObj_ELF %" PATH_FMT "\n", path));
 
+   // Loading the same object multiple times will lead to chaos
+   // because we will have two NativeCodes but one underlying handle,
+   // so let's fail if this happens.
+   for (nc = loaded_objects; nc; nc = nc->next) {
+       if (!pathcmp(nc->fileName, path)) {
+           copyErrmsg(errmsg, "native object already loaded");
+           return NULL;
+       }
+   }
+
    retval = NULL;
    ACQUIRE_LOCK(&dl_mutex);
 
@@ -1969,6 +1979,12 @@ void * loadNativeObj (pathchar *path, char **errmsg)
    ACQUIRE_LOCK(&linker_mutex);
    void *r = loadNativeObj_ELF(path, errmsg);
    RELEASE_LOCK(&linker_mutex);
+
+#if defined(PROFILING)
+    // collect any new cost centres & CCSs that were defined during runInit
+   initProfiling2();
+#endif
+
    return r;
 #else
    UNUSED(path);
