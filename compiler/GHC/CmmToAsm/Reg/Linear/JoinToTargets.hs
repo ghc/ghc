@@ -30,8 +30,6 @@ import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
 
-import GHC.Utils.Monad (concatMapM)
-
 -- | For a jump instruction at the end of a block, generate fixup code so its
 --      vregs are in the correct regs for its destination.
 --
@@ -308,7 +306,7 @@ handleComponent
 --      go via a spill slot.
 --
 handleComponent delta _  (AcyclicSCC (DigraphNode vreg src dsts))
-        = concatMapM (makeMove delta vreg src) dsts
+        = mapM (makeMove delta vreg src) dsts
 
 
 -- Handle some cyclic moves.
@@ -342,7 +340,7 @@ handleComponent delta instr
 
         -- make sure to do all the reloads after all the spills,
         --      so we don't end up clobbering the source values.
-        return (instrSpill ++ concat remainingFixUps ++ instrLoad)
+        return ([instrSpill] ++ concat remainingFixUps ++ [instrLoad])
 
 handleComponent _ _ (CyclicSCC _)
  = panic "Register Allocator: handleComponent cyclic"
@@ -356,28 +354,22 @@ makeMove
     -> Unique   -- ^ unique of the vreg that we're moving.
     -> Loc      -- ^ source location.
     -> Loc      -- ^ destination location.
-    -> RegM freeRegs [instr]  -- ^ move instruction.
+    -> RegM freeRegs instr  -- ^ move instruction.
 
-makeMove _ vreg src dst
+makeMove delta vreg src dst
  = do config <- getConfig
       let platform = ncgPlatform config
 
       case (src, dst) of
           (InReg s, InReg d) ->
               do recordSpill (SpillJoinRR vreg)
-                 return $ [mkRegRegMoveInstr platform (RegReal s) (RegReal d)]
+                 return $ mkRegRegMoveInstr platform (RegReal s) (RegReal d)
           (InMem s, InReg d) ->
               do recordSpill (SpillJoinRM vreg)
-                 delta <- getDeltaR
-                 let (new_delta, instrs) = mkLoadInstr config (RegReal d) delta s
-                 setDeltaR new_delta
-                 return instrs
+                 return $ mkLoadInstr config (RegReal d) delta s
           (InReg s, InMem d) ->
               do recordSpill (SpillJoinRM vreg)
-                 delta <- getDeltaR
-                 let (new_delta, instrs) = mkSpillInstr config (RegReal s) delta d
-                 setDeltaR new_delta
-                 return instrs
+                 return $ mkSpillInstr config (RegReal s) delta d
           _ ->
               -- we don't handle memory to memory moves.
               -- they shouldn't happen because we don't share
