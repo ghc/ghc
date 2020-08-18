@@ -6,8 +6,7 @@
 #include <dlfcn.h>
 
 // poke into linker internals
-extern void *native_objects;
-extern void *unloaded_native_objects;
+extern void *objects;
 
 #define ITERATIONS 1000
 
@@ -41,6 +40,7 @@ int main (int argc, char *argv[])
 
     for (i=0; i < ITERATIONS; i++) {
         char* errmsg;
+        // load 2 libraries at once
         void* handle = loadNativeObj(OBJPATH, &errmsg);
         if (!handle) {
             errorBelch("loadNativeObj(%s) failed: %s", OBJPATH, errmsg);
@@ -48,18 +48,6 @@ int main (int argc, char *argv[])
             exit(1);
         }
 
-        // loading the same library again should fail
-        void* handle1 = loadNativeObj(OBJPATH, &errmsg);
-        if (!handle1) {
-            // don't spam the output file:
-            // errorBelch("loadNativeObj(%s) failed: %s", OBJPATH, errmsg);
-            free(errmsg);
-        } else {
-            errorBelch("loadNativeObj(%s) should have failed", OBJPATH);
-            exit(1);
-        }
-
-        // load 2 libraries at once
         void* handle2 = loadNativeObj(OBJPATH2, &errmsg);
         if (!handle2) {
             errorBelch("loadNativeObj(%s) failed: %s", OBJPATH2, errmsg);
@@ -97,8 +85,9 @@ int main (int argc, char *argv[])
         printf("%d ", i);
         fflush(stdout);
     }
-    // if we unloaded everything, these should be NULL
-    printf("\n%p %p\n", unloaded_native_objects, native_objects);
+
+    // Verify that Test.so isn't still loaded.
+    int res = getObjectLoadStatus("Test.so") != OBJECT_NOT_LOADED;
     hs_exit();
-    exit(0);
+    exit(res);
 }

@@ -28,6 +28,13 @@ typedef struct _Symbol
     SymbolAddr *addr;
 } Symbol_t;
 
+typedef struct NativeCodeRange_ {
+  void *start, *end;
+
+  /* Allow a chain of these things */
+  struct NativeCodeRange_ *next;
+} NativeCodeRange;
+
 /* Indication of section kinds for loaded objects.  Needed by
    the GC for deciding whether or not a pointer on the stack
    is a code pointer.
@@ -137,6 +144,13 @@ typedef struct {
 #endif
 } SymbolExtra;
 
+typedef enum {
+    /* Objects that were loaded by this linker */
+    STATIC_OBJECT,
+
+    /* Objects that were loaded by dlopen */
+    DYNAMIC_OBJECT,
+} ObjectType;
 
 /* Top-level structure for an object module.  One of these is allocated
  * for each object file in use.
@@ -145,7 +159,8 @@ typedef struct _ObjectCode {
     OStatus    status;
     pathchar  *fileName;
     int        fileSize;     /* also mapped image size when using mmap() */
-    char*      formatName;            /* eg "ELF32", "DLL", "COFF", etc. */
+    char*      formatName;   /* e.g. "ELF32", "DLL", "COFF", etc. */
+    ObjectType type;         /* who loaded this object? */
 
     /* If this object is a member of an archive, archiveMemberName is
      * like "libarchive.a(object.o)". Otherwise it's NULL.
@@ -170,9 +185,6 @@ typedef struct _ObjectCode {
     /* non-zero if the object file was mmap'd, otherwise malloc'd */
     int        imageMapped;
 
-    /* flag used when deciding whether to unload an object file */
-    int        referenced;
-
     /* record by how much image has been deliberately misaligned
        after allocation, so that we can use realloc */
     int        misalignment;
@@ -182,8 +194,37 @@ typedef struct _ObjectCode {
     int n_sections;
     Section* sections;
 
-    /* Allow a chain of these things */
-    struct _ObjectCode * next;
+    //
+    // Garbage collection fields
+    //
+
+    // Next object in `objects` list
+    struct _ObjectCode *next;
+
+    // Previous object in `objects` list
+    struct _ObjectCode *prev;
+
+    // Next object in `loaded_objects` list
+    struct _ObjectCode *next_loaded_object;
+
+    // Mark bit
+    uint8_t mark;
+
+    // Set of dependencies (ObjectCode*) of the object file. Traverse
+    // dependencies using `iterHashTable`.
+    //
+    // New entries are added as we resolve symbols in an object file, in
+    // `lookupDependentSymbol`. When an object file uses multiple symbols from
+    // another object file we add the dependent multiple times, so we use a
+    // `HashTable` here rather than a list/array to avoid copies.
+    //
+    // Used when unloading object files. See Note [Object unloading] in
+    // CheckUnload.c.
+    HashSet *dependencies;
+
+    //
+    // End of garbage collection fields
+    //
 
     /* SANITY CHECK ONLY: a list of the only memory regions which may
        safely be prodded during relocation.  Any attempt to prod
@@ -208,6 +249,18 @@ typedef struct _ObjectCode {
        require extra information.*/
     HashTable *extraInfos;
 
+    /*
+     * The following are only valid if .type == DYNAMIC_OBJECT
+     */
+
+    /* handle returned from dlopen */
+    void *dlopen_handle;
+
+    /* base virtual address of the loaded code */
+    void *l_addr;
+
+    /* virtual memory ranges of loaded code */
+    NativeCodeRange *nc_ranges;
 } ObjectCode;
 
 #define OC_INFORMATIVE_FILENAME(OC)             \
@@ -215,20 +268,6 @@ typedef struct _ObjectCode {
       (OC)->archiveMemberName :                 \
       (OC)->fileName                            \
     )
-
-extern ObjectCode *objects;
-extern ObjectCode *unloaded_objects;
-
-typedef struct NativeCodeRange_ {
-
-  void *start;
-
-  void *end;
-
-  /* Allow a chain of these things */
-  struct NativeCodeRange_ *next;
-
-} NativeCodeRange;
 
 typedef struct NativeCode_ {
 
@@ -258,7 +297,6 @@ extern NativeCode *unloaded_native_objects;
 
 #if defined(THREADED_RTS)
 extern Mutex linker_mutex;
-extern Mutex linker_unloaded_mutex;
 #endif
 
 /* Type of the initializer */
@@ -309,8 +347,9 @@ int ghciInsertSymbolTable(
     HsBool weak,
     ObjectCode *owner);
 
-/* lock-free version of lookupSymbol */
-SymbolAddr* lookupSymbol_ (SymbolName* lbl);
+/* Lock-free version of lookupSymbol. When 'dependent' is not NULL, adds it as a
+ * dependent to the owner of the symbol. */
+SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent);
 
 extern /*Str*/HashTable *symhash;
 
@@ -341,7 +380,7 @@ resolveSymbolAddr (pathchar* buffer, int size,
 
 HsInt isAlreadyLoaded( pathchar *path );
 HsInt loadOc( ObjectCode* oc );
-ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
+ObjectCode* mkOc( ObjectType type, pathchar *path, char *image, int imageSize,
                   bool mapped, char *archiveMemberName,
                   int misalignment
                   );

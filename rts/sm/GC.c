@@ -273,6 +273,10 @@ GarbageCollect (uint32_t collect_gen,
           static_flag == STATIC_FLAG_A ? STATIC_FLAG_B : STATIC_FLAG_A;
   }
 
+  if (major_gc) {
+      prepareUnloadCheck();
+  }
+
 #if defined(THREADED_RTS)
   work_stealing = RtsFlags.ParFlags.parGcLoadBalancingEnabled &&
                   N >= RtsFlags.ParFlags.parGcLoadBalancingGen;
@@ -732,7 +736,9 @@ GarbageCollect (uint32_t collect_gen,
 
  // mark the garbage collected CAFs as dead
 #if defined(DEBUG)
-  if (major_gc) { gcCAFs(); }
+  if (major_gc) {
+      gcCAFs();
+  }
 #endif
 
   // Update the stable name hash table
@@ -743,9 +749,10 @@ GarbageCollect (uint32_t collect_gen,
   // hs_free_stable_ptr(), both of which access the StablePtr table.
   stablePtrUnlock();
 
-  // Must be after stablePtrUnlock(), because it might free stable ptrs.
+  // Unload dynamically-loaded object code after a major GC.
+  // See Note [Object unloading] in CheckUnload.c for details.
   if (major_gc) {
-      checkUnload (gct->scavenged_static_objects);
+      checkUnload();
   }
 
 #if defined(PROFILING)

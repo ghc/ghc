@@ -31,6 +31,7 @@
 #include "linker/CacheFlush.h"
 #include "linker/SymbolExtras.h"
 #include "PathUtils.h"
+#include "CheckUnload.h" // createOCSectionIndices
 
 #if !defined(mingw32_HOST_OS)
 #include "posix/Signals.h"
@@ -161,48 +162,15 @@
  */
 /*Str*/HashTable *symhash;
 
-/* List of currently loaded objects */
-ObjectCode *objects = NULL;     /* initially empty */
-
-/* List of objects that have been unloaded via unloadObj(), but are waiting
-   to be actually freed via checkUnload() */
-ObjectCode *unloaded_objects = NULL; /* initially empty */
-
-/* List of currently loaded native objects */
-NativeCode *native_objects = NULL;     /* initially empty */
-
-/* List of objects that have been unloaded via unloadNativeObj(),
-   but are waiting to be actually freed via checkUnload() */
-NativeCode *unloaded_native_objects = NULL; /* initially empty */
-
-/* List of objects that are waiting to be freed after being checked by
- * CheckUnload() */
-NativeCode *to_free_native_objects = NULL; /* initially empty */
-
 #if defined(THREADED_RTS)
-/* This protects all the Linker's global state except unloaded_objects
- * and unloaded_native_objects */
+/* This protects all the Linker's global state */
 Mutex linker_mutex;
-/*
- * This protects unloaded_objects and unloaded_native_objects.
- * We have a separate mutex for this, because the GC needs to access
- * unloaded_objects and unloaded_native_objects. in checkUnload,
- * while the linker only needs to access unloaded_objects and
- * unloaded_native_objects in unloadObj(), so this allows most linker
- * operations proceed concurrently with the GC.
- */
-Mutex linker_unloaded_mutex;
-/*
- * This protects native code that we want to free from freeNativeCode.
- * We want a separate mutex here so that we are able to queue up freeNativeCode_
- * calls while a long dlopen is taking place, and then free them after
- * unlocking the mutex.
- */
-Mutex free_native_code_mutex;
 #endif
 
 /* Generic wrapper function to try and Resolve and RunInit oc files */
 int ocTryLoad( ObjectCode* oc );
+
+static void freeNativeCode_ELF (ObjectCode *nc);
 
 /* Link objects into the lower 2Gb on x86_64.  GHC assumes the
  * small memory model on this architecture (see gcc docs,
@@ -448,16 +416,10 @@ initLinker_ (int retain_cafs)
         linker_init_done = 1;
     }
 
-    objects = NULL;
-    unloaded_objects = NULL;
-
-    native_objects = NULL;
-    unloaded_native_objects = NULL;
+    initUnloadCheck();
 
 #if defined(THREADED_RTS)
     initMutex(&linker_mutex);
-    initMutex(&linker_unloaded_mutex);
-    initMutex(&free_native_code_mutex);
 #if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
     initMutex(&dl_mutex);
 #endif
@@ -548,6 +510,8 @@ exitLinker( void ) {
 #endif
    if (linker_init_done == 1) {
        freeHashTable(symhash, free);
+
+       exitUnloadCheck();
    }
 #if defined(THREADED_RTS)
    closeMutex(&linker_mutex);
@@ -846,18 +810,24 @@ HsInt insertSymbol(pathchar* obj_name, SymbolName* key, SymbolAddr* data)
 }
 
 /* -----------------------------------------------------------------------------
- * lookup a symbol in the hash table
+ * Lookup a symbol in the hash table
+ *
+ * When 'dependent' is not NULL, adds it as a dependent to the owner of the
+ * symbol.
  */
 #if defined(OBJFORMAT_PEi386)
-SymbolAddr* lookupSymbol_ (SymbolName* lbl)
+SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent)
 {
+    (void)dependent; // TODO
+    ASSERT_LOCK_HELD(&linker_mutex);
     return lookupSymbol_PEi386(lbl);
 }
 
 #else
 
-SymbolAddr* lookupSymbol_ (SymbolName* lbl)
+SymbolAddr* lookupDependentSymbol (SymbolName* lbl, ObjectCode *dependent)
 {
+    ASSERT_LOCK_HELD(&linker_mutex);
     IF_DEBUG(linker, debugBelch("lookupSymbol: looking up %s\n", lbl));
 
     ASSERT(symhash != NULL);
@@ -882,10 +852,18 @@ SymbolAddr* lookupSymbol_ (SymbolName* lbl)
         return internal_dlsym(lbl + 1);
 
 #       else
-        ASSERT(2+2 == 5);
+        ASSERT(false);
         return NULL;
 #       endif
     } else {
+        if (dependent) {
+            // Add dependent as symbol's owner's dependency
+            ObjectCode *owner = pinfo->owner;
+            if (owner) {
+                // TODO: what does it mean for a symbol to not have an owner?
+                insertHashSet(dependent->dependencies, (W_)owner);
+            }
+        }
         return loadSymbol(lbl, pinfo);
     }
 }
@@ -924,7 +902,9 @@ SymbolAddr* loadSymbol(SymbolName *lbl, RtsSymbolInfo *pinfo) {
 SymbolAddr* lookupSymbol( SymbolName* lbl )
 {
     ACQUIRE_LOCK(&linker_mutex);
-    SymbolAddr* r = lookupSymbol_(lbl);
+    // NULL for "don't add dependent". When adding a dependency we call
+    // lookupDependentSymbol directly.
+    SymbolAddr* r = lookupDependentSymbol(lbl, NULL);
     if (!r) {
         errorBelch("^^ Could not load '%s', dependency unresolved. "
                    "See top entry above.\n", lbl);
@@ -1182,6 +1162,16 @@ freePreloadObjectFile (ObjectCode *oc)
  */
 void freeObjectCode (ObjectCode *oc)
 {
+    if (oc->type == DYNAMIC_OBJECT) {
+#if defined(OBJFORMAT_ELF)
+        ACQUIRE_LOCK(&dl_mutex);
+        freeNativeCode_ELF(oc);
+        RELEASE_LOCK(&dl_mutex);
+#else
+        barf("freeObjectCode: This shouldn't happen");
+#endif
+    }
+
     freePreloadObjectFile(oc);
 
     if (oc->symbols != NULL) {
@@ -1205,11 +1195,7 @@ void freeObjectCode (ObjectCode *oc)
                            oc->sections[i].mapped_size);
                     break;
                 case SECTION_M32:
-                    IF_DEBUG(sanity,
-                        memset(oc->sections[i].start,
-                            0x00, oc->sections[i].size));
-                    m32_free(oc->sections[i].start,
-                             oc->sections[i].size);
+                    // Freed by m32_allocator_free
                     break;
 #endif
                 case SECTION_MALLOC:
@@ -1256,6 +1242,8 @@ void freeObjectCode (ObjectCode *oc)
     stgFree(oc->fileName);
     stgFree(oc->archiveMemberName);
 
+    freeHashSet(oc->dependencies);
+
     stgFree(oc);
 }
 
@@ -1277,7 +1265,7 @@ static void setOcInitialStatus(ObjectCode* oc) {
 }
 
 ObjectCode*
-mkOc( pathchar *path, char *image, int imageSize,
+mkOc( ObjectType type, pathchar *path, char *image, int imageSize,
       bool mapped, char *archiveMemberName, int misalignment ) {
    ObjectCode* oc;
 
@@ -1285,6 +1273,7 @@ mkOc( pathchar *path, char *image, int imageSize,
    oc = stgMallocBytes(sizeof(ObjectCode), "mkOc(oc)");
 
    oc->info = NULL;
+   oc->type = type;
 
 #  if defined(OBJFORMAT_ELF)
    oc->formatName = "ELF";
@@ -1326,6 +1315,14 @@ mkOc( pathchar *path, char *image, int imageSize,
 
    /* chain it onto the list of objects */
    oc->next              = NULL;
+   oc->prev              = NULL;
+   oc->next_loaded_object = NULL;
+   oc->mark              = object_code_mark_bit;
+   oc->dependencies      = allocHashSet();
+
+   oc->l_addr = NULL;
+   oc->nc_ranges = NULL;
+   oc->dlopen_handle = NULL;
 
    IF_DEBUG(linker, debugBelch("mkOc: done\n"));
    return oc;
@@ -1339,8 +1336,7 @@ mkOc( pathchar *path, char *image, int imageSize,
 HsInt
 isAlreadyLoaded( pathchar *path )
 {
-    ObjectCode *o;
-    for (o = objects; o; o = o->next) {
+    for (ObjectCode *o = objects; o; o = o->next) {
        if (0 == pathcmp(o->fileName, path)) {
            return 1; /* already loaded */
        }
@@ -1452,7 +1448,7 @@ preloadObjectFile (pathchar *path)
 
 #endif /* RTS_LINKER_USE_MMAP */
 
-   oc = mkOc(path, image, fileSize, true, NULL, misalignment);
+   oc = mkOc(STATIC_OBJECT, path, image, fileSize, true, NULL, misalignment);
 
 #if defined(OBJFORMAT_MACHO)
    if (ocVerifyImage_MachO( oc ))
@@ -1472,21 +1468,17 @@ preloadObjectFile (pathchar *path)
  */
 static HsInt loadObj_ (pathchar *path)
 {
-   ObjectCode* oc;
-   IF_DEBUG(linker, debugBelch("loadObj %" PATH_FMT "\n", path));
 
-   /* debugBelch("loadObj %s\n", path ); */
-
-   /* Check that we haven't already loaded this object.
-      Ignore requests to load multiple times */
+   // Check that we haven't already loaded this object.
+   // Ignore requests to load multiple times
 
    if (isAlreadyLoaded(path)) {
        IF_DEBUG(linker,
                 debugBelch("ignoring repeated load of %" PATH_FMT "\n", path));
-       return 1; /* success */
+       return 1; // success
    }
 
-   oc = preloadObjectFile(path);
+   ObjectCode *oc = preloadObjectFile(path);
    if (oc == NULL) return 0;
 
    if (! loadOc(oc)) {
@@ -1497,8 +1489,10 @@ static HsInt loadObj_ (pathchar *path)
        return 0;
    }
 
-   oc->next = objects;
-   objects = oc;
+   insertOCSectionIndices(oc);
+
+   oc->next_loaded_object = loaded_objects;
+   loaded_objects = oc;
    return 1;
 }
 
@@ -1663,13 +1657,10 @@ int ocTryLoad (ObjectCode* oc) {
  */
 static HsInt resolveObjs_ (void)
 {
-    ObjectCode *oc;
-    int r;
-
     IF_DEBUG(linker, debugBelch("resolveObjs: start\n"));
 
-    for (oc = objects; oc; oc = oc->next) {
-        r = ocTryLoad(oc);
+    for (ObjectCode *oc = objects; oc; oc = oc->next) {
+        int r = ocTryLoad(oc);
         if (!r)
         {
             return r;
@@ -1698,45 +1689,35 @@ HsInt resolveObjs (void)
  */
 static HsInt unloadObj_ (pathchar *path, bool just_purge)
 {
-    ObjectCode *oc, *prev, *next;
-    HsBool unloadedAnyObj = HS_BOOL_FALSE;
-
     ASSERT(symhash != NULL);
     ASSERT(objects != NULL);
 
     IF_DEBUG(linker, debugBelch("unloadObj: %" PATH_FMT "\n", path));
 
-    prev = NULL;
-    for (oc = objects; oc; oc = next) {
-        next = oc->next; // oc might be freed
+    bool unloadedAnyObj = false;
+    ObjectCode *prev = NULL;
+    // NOTE (osa): There may be more than one object with the same file name
+    // (happens when loading archive files) so we don't stop after unloading one
+    for (ObjectCode *oc = loaded_objects; oc; oc = oc->next_loaded_object) {
+        if (pathcmp(oc->fileName,path) == 0) {
+            oc->status = OBJECT_UNLOADED;
 
-        if (!pathcmp(oc->fileName,path)) {
-
-            // these are both idempotent, so in just_purge mode we can
-            // later call unloadObj() to really unload the object.
+            // These are both idempotent, so in just_purge mode we can later
+            // call unloadObj() to really unload the object.
             removeOcSymbols(oc);
             freeFEStablePtrs(&oc->stable_ptrs);
 
-            if (!just_purge) {
-                if (prev == NULL) {
-                    objects = oc->next;
-                } else {
-                    prev->next = oc->next;
-                }
-                ACQUIRE_LOCK(&linker_unloaded_mutex);
-                oc->next = unloaded_objects;
-                unloaded_objects = oc;
-                oc->status = OBJECT_UNLOADED;
-                RELEASE_LOCK(&linker_unloaded_mutex);
-                // We do not own oc any more; it can be released at any time by
-                // the GC in checkUnload().
-            } else {
-                prev = oc;
-            }
+            unloadedAnyObj = true;
 
-            /* This could be a member of an archive so continue
-             * unloading other members. */
-            unloadedAnyObj = HS_BOOL_TRUE;
+            if (!just_purge) {
+                n_unloaded_objects += 1;
+                // Remove object code from root set
+                if (prev == NULL) {
+                    loaded_objects = oc->next_loaded_object;
+                } else {
+                    prev->next_loaded_object = oc->next_loaded_object;
+                }
+            }
         } else {
             prev = oc;
         }
@@ -1744,8 +1725,7 @@ static HsInt unloadObj_ (pathchar *path, bool just_purge)
 
     if (unloadedAnyObj) {
         return 1;
-    }
-    else {
+    } else {
         errorBelch("unloadObj: can't find `%" PATH_FMT "' to unload", path);
         return 0;
     }
@@ -1769,13 +1749,7 @@ HsInt purgeObj (pathchar *path)
 
 static OStatus getObjectLoadStatus_ (pathchar *path)
 {
-    ObjectCode *o;
-    for (o = objects; o; o = o->next) {
-       if (0 == pathcmp(o->fileName, path)) {
-           return o->status;
-       }
-    }
-    for (o = unloaded_objects; o; o = o->next) {
+    for (ObjectCode *o = objects; o; o = o->next) {
        if (0 == pathcmp(o->fileName, path)) {
            return o->status;
        }
@@ -1863,11 +1837,10 @@ addSection (Section *s, SectionKind kind, SectionAlloc alloc,
                        size, kind ));
 }
 
-
 #  if defined(OBJFORMAT_ELF)
 static int loadNativeObjCb_(struct dl_phdr_info *info,
     size_t _size GNUC3_ATTRIBUTE(__unused__), void *data) {
-  NativeCode* nc = (NativeCode*) data;
+  ObjectCode* nc = (ObjectCode*) data;
 
   // This logic mimicks _dl_addr_inside_object from glibc
   // For reference:
@@ -1910,8 +1883,8 @@ static void copyErrmsg(char** errmsg_dest, char* errmsg) {
 }
 
 // need dl_mutex
-static void freeNativeCode_ELF (NativeCode *nc) {
-  dlclose(nc->handle);
+static void freeNativeCode_ELF (ObjectCode *nc) {
+  dlclose(nc->dlopen_handle);
 
   NativeCodeRange *ncr = nc->nc_ranges;
   while (ncr) {
@@ -1919,37 +1892,14 @@ static void freeNativeCode_ELF (NativeCode *nc) {
     ncr = ncr->next;
     stgFree(last_ncr);
   }
-  freeFEStablePtrs(&nc->stable_ptrs);
-  stgFree(nc->fileName);
-  stgFree(nc);
 }
 
 static void * loadNativeObj_ELF (pathchar *path, char **errmsg)
 {
-   NativeCode* nc;
+   ObjectCode* nc;
    void *hdl, *retval;
 
    IF_DEBUG(linker, debugBelch("loadNativeObj_ELF %" PATH_FMT "\n", path));
-
-   // Loading the same object multiple times will lead to chaos
-   // because we will have two NativeCodes but one underlying handle,
-   // so let's fail if this happens.
-   for (nc = native_objects; nc; nc = nc->next) {
-       if (!pathcmp(nc->fileName,path)) {
-           copyErrmsg(errmsg, "native object already loaded");
-           return NULL;
-       }
-   }
-
-   // We also cannot load the same object if we are in the process of
-   // unloading it. We cannot resurrect it because we've already
-   // released the StablePtrs.
-   for (nc = unloaded_native_objects; nc; nc = nc->next) {
-       if (!pathcmp(nc->fileName,path)) {
-           copyErrmsg(errmsg, "unload in progress");
-           return NULL;
-       }
-   }
 
    retval = NULL;
    ACQUIRE_LOCK(&dl_mutex);
@@ -1973,15 +1923,12 @@ static void * loadNativeObj_ELF (pathchar *path, char **errmsg)
      goto dlinfo_fail;
    }
 
-   nc = stgMallocBytes(sizeof(NativeCode), "loadNativeObj_ELF");
+   nc = mkOc(DYNAMIC_OBJECT, path, NULL, 0, true, NULL, 0);
    nc->l_addr = (void*) map->l_addr;
-   nc->nc_ranges = NULL;
-   nc->handle = hdl;
-   nc->fileName = pathdup(path);
+   nc->dlopen_handle = hdl;
    hdl = NULL; // pass handle ownership to nc
    nc->stable_ptrs = fe_sptr;
    fe_sptr = NULL; // pass the ownership to nc
-   nc->referenced = 0;
 
    dl_iterate_phdr(loadNativeObjCb_, nc);
    if (!nc->nc_ranges) {
@@ -1989,10 +1936,12 @@ static void * loadNativeObj_ELF (pathchar *path, char **errmsg)
      goto dl_iterate_phdr_fail;
    }
 
-   nc->next = native_objects;
-   native_objects = nc;
+   insertOCSectionIndices(nc);
 
-   retval = nc->handle;
+   nc->next_loaded_object = loaded_objects;
+   loaded_objects = nc;
+
+   retval = nc->dlopen_handle;
    goto success;
 
 dl_iterate_phdr_fail:
@@ -2005,39 +1954,57 @@ dlopen_fail:
 success:
 
    RELEASE_LOCK(&dl_mutex);
+   IF_DEBUG(linker, debugBelch("loadNativeObj_ELF result=%p\n", retval));
 
    return retval;
 }
 
-static HsInt unloadNativeObj_ELF (void *handle)
-{
-    NativeCode *nc, *prev, *next;
-    HsBool unloadedAnyObj = HS_BOOL_FALSE;
+#  endif
 
-    ASSERT(native_objects != NULL);
+#define UNUSED(x) (void)(x)
+
+void * loadNativeObj (pathchar *path, char **errmsg)
+{
+#if defined(OBJFORMAT_ELF)
+   ACQUIRE_LOCK(&linker_mutex);
+   void *r = loadNativeObj_ELF(path, errmsg);
+   RELEASE_LOCK(&linker_mutex);
+   return r;
+#else
+   UNUSED(path);
+   UNUSED(errmsg);
+   barf("loadNativeObj: not implemented on this platform");
+#endif
+}
+
+HsInt unloadNativeObj (void *handle)
+{
+    bool unloadedAnyObj = false;
 
     IF_DEBUG(linker, debugBelch("unloadNativeObj: %p\n", handle));
 
+    ObjectCode *prev = NULL, *next;
+    for (ObjectCode *nc = loaded_objects; nc; nc = next) {
+        next = nc->next_loaded_object; // we might move nc
 
-    prev = NULL;
-    for (nc = native_objects; nc; nc = next) {
-        next = nc->next; // we might move nc
+        if (nc->type == DYNAMIC_OBJECT && nc->dlopen_handle == handle) {
+            nc->status = OBJECT_UNLOADED;
+            n_unloaded_objects += 1;
 
-        if (nc->handle == handle) {
+            // dynamic objects have no symbols
+            ASSERT(nc->symbols == NULL);
             freeFEStablePtrs(&nc->stable_ptrs);
+
+            // Remove object code from root set
             if (prev == NULL) {
-              native_objects = nc->next;
+              loaded_objects = nc->next_loaded_object;
             } else {
-              prev->next = nc->next;
+              prev->next_loaded_object = nc->next_loaded_object;
             }
-            ACQUIRE_LOCK(&linker_unloaded_mutex);
-            nc->next = unloaded_native_objects;
-            unloaded_native_objects = nc;
-            RELEASE_LOCK(&linker_unloaded_mutex);
+            unloadedAnyObj = true;
         } else {
             prev = nc;
         }
-        unloadedAnyObj = HS_BOOL_TRUE;
     }
 
     if (unloadedAnyObj) {
@@ -2047,99 +2014,4 @@ static HsInt unloadNativeObj_ELF (void *handle)
         return 0;
     }
 }
-#  endif
 
-#define UNUSED(x) (void)(x)
-
-HsInt unloadNativeObj (void *handle)
-{
-#if defined(OBJFORMAT_ELF)
-    ACQUIRE_LOCK(&linker_mutex);
-    HsInt r = unloadNativeObj_ELF(handle);
-    RELEASE_LOCK(&linker_mutex);
-    return r;
-#else
-   UNUSED(handle);
-   barf("unloadNativeObj: not implemented on this platform");
-#endif
-}
-
-static void freeNativeCode_ ( NativeCode *nc )
-{
-  ASSERT_LOCK_HELD(&dl_mutex);
-#if defined(OBJFORMAT_ELF)
-  freeNativeCode_ELF(nc);
-#else
-  UNUSED(nc);
-  // no op
-  return;
-#endif
-}
-
-static void tryFreeNativeCode ( void )
-{
-  NativeCode *nc, *next;
-
-  while (true) {
-    ACQUIRE_LOCK(&free_native_code_mutex);
-    nc = to_free_native_objects;
-    to_free_native_objects = NULL;
-    RELEASE_LOCK(&free_native_code_mutex);
-    if (nc == NULL) {
-        return;
-    }
-  #if defined(THREADED_RTS)
-    if (TRY_ACQUIRE_LOCK(&dl_mutex) != 0) {
-        IF_DEBUG(linker, debugBelch("Unable to acquire dl lock, not pruning"
-                                    "native objs."));
-        ACQUIRE_LOCK(&free_native_code_mutex);
-        // re-add this to the list
-        nc->next = to_free_native_objects;
-        to_free_native_objects = nc;
-        RELEASE_LOCK(&free_native_code_mutex);
-        return;
-    }
-  #endif
-
-    while (nc) {
-        next = nc->next;
-        freeNativeCode_(nc);
-        nc = next;
-    }
-    RELEASE_LOCK(&dl_mutex);
-  }
-}
-
-void * loadNativeObj (pathchar *path, char **errmsg)
-{
-#if defined(OBJFORMAT_ELF)
-   ACQUIRE_LOCK(&linker_mutex);
-   void *r = loadNativeObj_ELF(path, errmsg);
-   RELEASE_LOCK(&linker_mutex);
-   return r;
-
-#if defined(PROFILING)
-    // collect any new cost centres & CCSs that were defined during runInit
-   initProfiling2();
-#endif
-
-   // If we are calling loadNativeObj a lot we may build up a queue of objects
-   // to clean up, so do that here at the very least to prevent the caller of
-   // this to grow memory unboundedly.
-   tryFreeNativeCode();
-
-#else
-   UNUSED(path);
-   UNUSED(errmsg);
-   barf("loadNativeObj: not implemented on this platform");
-#endif
-}
-
-void freeNativeCode (NativeCode *nc)
-{
-    ACQUIRE_LOCK(&free_native_code_mutex);
-    nc->next = to_free_native_objects;
-    to_free_native_objects = nc;
-    RELEASE_LOCK(&free_native_code_mutex);
-    tryFreeNativeCode();
-}
