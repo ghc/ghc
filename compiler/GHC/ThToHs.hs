@@ -419,8 +419,8 @@ cvtDec (TH.PatSynD nm args dir pat)
        ; args' <- cvtArgs args
        ; dir'  <- cvtDir nm' dir
        ; pat'  <- cvtPat pat
-       ; returnJustLA $ Hs.ValD noExtField $ PatSynBind noAnn $
-           PSB noExtField nm' args' pat' dir' }
+       ; returnJustLA $ Hs.ValD noExtField $ PatSynBind noExtField $
+           PSB noAnn nm' args' pat' dir' }
   where
     cvtArgs (TH.PrefixPatSyn args) = Hs.PrefixCon <$> mapM vNameN args
     cvtArgs (TH.InfixPatSyn a1 a2) = Hs.InfixCon <$> vNameN a1 <*> vNameN a2
@@ -553,19 +553,19 @@ is_fam_decl decl = Right decl
 
 is_tyfam_inst :: LHsDecl GhcPs -> Either (LTyFamInstDecl GhcPs) (LHsDecl GhcPs)
 is_tyfam_inst (L loc (Hs.InstD _ (TyFamInstD { tfid_inst = d })))
-  = Left (L (locA loc) d)
+  = Left (L loc d)
 is_tyfam_inst decl
   = Right decl
 
 is_datafam_inst :: LHsDecl GhcPs
                 -> Either (LDataFamInstDecl GhcPs) (LHsDecl GhcPs)
 is_datafam_inst (L loc (Hs.InstD  _ (DataFamInstD { dfid_inst = d })))
-  = Left (L (locA loc) d)
+  = Left (L loc d)
 is_datafam_inst decl
   = Right decl
 
 is_sig :: LHsDecl GhcPs -> Either (LSig GhcPs) (LHsDecl GhcPs)
-is_sig (L loc (Hs.SigD _ sig)) = Left (L (locA loc) sig)
+is_sig (L loc (Hs.SigD _ sig)) = Left (L loc sig)
 is_sig decl                    = Right decl
 
 is_bind :: LHsDecl GhcPs -> Either (LHsBind GhcPs) (LHsDecl GhcPs)
@@ -618,14 +618,14 @@ cvtConstr (ForallC tvs ctxt con)
     add_forall :: [LHsTyVarBndr Hs.Specificity GhcPs] -> LHsContext GhcPs
                -> ConDecl GhcPs -> ConDecl GhcPs
     add_forall tvs' cxt' con@(ConDeclGADT { con_qvars = qvars, con_mb_cxt = cxt })
-      = con { con_forall = noLoc $ not (null all_tvs)
+      = con { con_forall = not (null all_tvs)
             , con_qvars  = all_tvs
             , con_mb_cxt = add_cxt cxt' cxt }
       where
         all_tvs = tvs' ++ qvars
 
     add_forall tvs' cxt' con@(ConDeclH98 { con_ex_tvs = ex_tvs, con_mb_cxt = cxt })
-      = con { con_forall = noLoc $ not (null all_tvs)
+      = con { con_forall = not (null all_tvs)
             , con_ex_tvs = all_tvs
             , con_mb_cxt = add_cxt cxt' cxt }
       where
@@ -654,7 +654,7 @@ mk_gadt_decl :: [LocatedN RdrName] -> HsConDeclDetails GhcPs -> LHsType GhcPs
 mk_gadt_decl names args res_ty
   = ConDeclGADT { con_g_ext  = noAnn
                 , con_names  = names
-                , con_forall = noLoc False
+                , con_forall = False
                 , con_qvars  = []
                 , con_mb_cxt = Nothing
                 , con_args   = args
@@ -1290,7 +1290,7 @@ cvtPat pat = wrapLA (cvtp pat)
 cvtp :: TH.Pat -> CvtM (Hs.Pat GhcPs)
 cvtp (TH.LitP l)
   | overloadedLit l    = do { l' <- cvtOverLit l
-                            ; return (mkNPat (noLoc l') Nothing) }
+                            ; return (mkNPat (noLoc l') Nothing noAnn) }
                                   -- Not right for negative patterns;
                                   -- need to think about that!
   | otherwise          = do { l' <- cvtLit l; return $ Hs.LitPat noExtField l' }
@@ -1527,7 +1527,7 @@ cvtTypeKind ty_str ty
                    ; ty'  <- cvtType ty
                    ; loc <- getL
                    ; let loc' = noAnnSrcSpan loc
-                   ; let tele   = mkHsForAllInvisTele tvs'
+                   ; let tele   = mkHsForAllInvisTele noAnn tvs'
                          hs_ty  = mkHsForAllTy loc' tele rho_ty
                          rho_ty = mkHsQualTy cxt loc' cxt' ty'
 
@@ -1539,7 +1539,7 @@ cvtTypeKind ty_str ty
                    ; ty'  <- cvtType ty
                    ; loc  <- getL
                    ; let loc' = noAnnSrcSpan loc
-                   ; let tele = mkHsForAllVisTele tvs'
+                   ; let tele = mkHsForAllVisTele noAnn tvs'
                    ; pure $ mkHsForAllTy loc' tele ty' }
 
            SigT ty ki
@@ -1786,8 +1786,8 @@ cvtPatSynSigTy (ForallT univs reqs (ForallT exis provs ty))
                                ; univs' <- cvtTvs univs
                                ; ty'    <- cvtType (ForallT exis provs ty)
                                ; let forTy = HsForAllTy
-                                              { hst_tele = mkHsForAllInvisTele univs'
-                                              , hst_xforall = noAnn
+                                              { hst_tele = mkHsForAllInvisTele noAnn univs'
+                                              , hst_xforall = noExtField
                                               , hst_body = L l'' cxtTy }
                                      cxtTy = HsQualTy { hst_ctxt = Nothing
                                                       , hst_xqual = noAnn
@@ -1847,7 +1847,7 @@ mkHsForAllTy :: SrcSpanAnnA
 mkHsForAllTy loc tele rho_ty
   | no_tvs    = rho_ty
   | otherwise = L loc $ HsForAllTy { hst_tele = tele
-                                   , hst_xforall = noAnn
+                                   , hst_xforall = noExtField
                                    , hst_body = rho_ty }
   where
     no_tvs = case tele of

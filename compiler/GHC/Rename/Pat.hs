@@ -431,7 +431,7 @@ rnPatAndThen mk (LitPat x lit)
        ; if ovlStr
          then rnPatAndThen mk
                            (mkNPat (noLoc (mkHsIsString src s))
-                                      Nothing)
+                                      Nothing noAnn)
          else normal_lit }
   | otherwise = normal_lit
   where

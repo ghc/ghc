@@ -898,7 +898,8 @@ CPR-friendly.  This matters a lot: if you don't get it right, you lose
 the tail call property.  For example, see #3403.
 -}
 
-dsHandleMonadicFailure :: Outputable (IdP p) => HsStmtContext p -> LPat GhcTc -> MatchResult CoreExpr -> FailOperator GhcTc -> DsM CoreExpr
+dsHandleMonadicFailure :: Outputable id
+   => HsStmtContext id -> LPat GhcTc -> MatchResult CoreExpr -> FailOperator GhcTc -> DsM CoreExpr
     -- In a do expression, pattern-match failure just calls
     -- the monadic 'fail' rather than throwing an exception
 dsHandleMonadicFailure ctx pat match m_fail_op =
@@ -919,8 +920,9 @@ dsHandleMonadicFailure ctx pat match m_fail_op =
       fail_expr <- dsSyntaxExpr fail_op [fail_msg]
       body fail_expr
 
-mk_fail_msg :: Outputable (IdP p) => DynFlags -> HsStmtContext p -> Located e -> String
-mk_fail_msg dflags ctx pat = showPpr dflags $ text "Pattern match failure in" <+> pprStmtContext ctx <+> text "at" <+> ppr (getLoc pat)
+mk_fail_msg :: Outputable id => DynFlags -> HsStmtContext id -> LocatedA e -> String
+mk_fail_msg dflags ctx pat = showPpr dflags $ text "Pattern match failure in"
+  <+> pprStmtContext ctx <+> text "at" <+> ppr (getLoc pat)
 
 {- *********************************************************************
 *                                                                      *

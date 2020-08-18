@@ -11,26 +11,26 @@
 module Types
   where
 
-import GHC hiding (getAndRemoveAnnotation)
-import GHC.Hs.Extension
+import GHC
+-- import GHC.Hs.Extension
 -- import GHC.Parser.Lexer (AddApiAnn(..))
-import GHC.Types.Basic hiding (EP)
-import GHC.Types.Name.Reader
-import GHC.Types.SrcLoc
+-- import GHC.Types.Basic hiding (EP)
+-- import GHC.Types.Name.Reader
+-- import GHC.Types.SrcLoc
 import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Driver.Session
-import Control.Monad.Identity
-import Control.Monad.RWS
-import Data.Data (Data, Typeable, toConstr,cast)
-import Data.Foldable
-import Data.List (sortBy, elemIndex)
-import Data.Maybe (fromMaybe)
-import Data.Ord (comparing)
+-- import Control.Monad.Identity
+-- import Control.Monad.RWS
+import Data.Data (Data, toConstr,cast)
+-- import Data.Foldable
+-- import Data.List (sortBy, elemIndex)
+-- import Data.Maybe (fromMaybe)
+-- import Data.Ord (comparing)
 
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-import qualified GHC
+-- import qualified GHC
 -- import Lookup
 
 -- ---------------------------------------------------------------------

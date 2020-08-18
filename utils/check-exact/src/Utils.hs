@@ -18,17 +18,17 @@ module Utils
   -- ) where
   where
 import Control.Monad.State
-import qualified Data.ByteString as B
-import GHC.Generics hiding (Fixity)
+-- import qualified Data.ByteString as B
+-- import GHC.Generics hiding (Fixity)
 import Data.Ord (comparing)
 
 import GHC.Hs.Dump
 -- import Language.Haskell.GHC.ExactPrint.Types
 import Lookup
 
-import GHC.Data.Bag
+-- import GHC.Data.Bag
 import GHC.Driver.Session
-import GHC.Data.FastString
+-- import GHC.Data.FastString
 import GHC
 -- import qualified Name           as GHC
 -- import qualified NameSet        as GHC
@@ -36,11 +36,11 @@ import GHC.Utils.Outputable
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.SrcLoc
-import GHC.Types.Var
-import GHC.Types.Name.Occurrence
+-- import GHC.Types.Var
+-- import GHC.Types.Name.Occurrence
 
 -- import qualified OccName(OccName(..),occNameString,pprNameSpaceBrief)
-import qualified GHC.Types.Name.Occurrence as OccName (OccName(..),occNameString,pprNameSpaceBrief)
+import qualified GHC.Types.Name.Occurrence as OccName (OccName(..),pprNameSpaceBrief)
 
 import Control.Arrow
 
@@ -218,7 +218,7 @@ isListComp cts = case cts of
 
 -- ---------------------------------------------------------------------
 
-isGadt :: [LConDecl name] -> Bool
+isGadt :: [LConDecl (GhcPass p)] -> Bool
 isGadt [] = False
 isGadt ((L _ (ConDeclGADT{})):_) = True
 isGadt _ = False
@@ -260,11 +260,11 @@ rogueComments as = extractRogueComments as
   --   go :: Comment -> (Comment, DeltaPos)
   --   go c@(Comment _str loc _mo) = (c, ss2delta (1,1) loc)
 
-extractComments :: ApiAnns -> [Comment]
-extractComments anns
-  -- cm has type :: Map RealSrcSpan [RealLocated AnnotationComment]
-  -- = map tokComment . sortRealLocated . concat $ Map.elems (apiAnnComments anns)
-  = []
+-- extractComments :: ApiAnns -> [Comment]
+-- extractComments anns
+--   -- cm has type :: Map RealSrcSpan [RealLocated AnnotationComment]
+--   -- = map tokComment . sortRealLocated . concat $ Map.elems (apiAnnComments anns)
+--   = []
 
 extractRogueComments :: ApiAnns -> [Comment]
 extractRogueComments anns

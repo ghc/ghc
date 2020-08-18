@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DataKinds #-}
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
@@ -205,7 +207,7 @@ rnWcBody ctxt nwc_rdrs hs_ty
     rn_ty env (HsForAllTy { hst_tele = tele, hst_body = hs_body })
       = bindHsForAllTelescope (rtke_ctxt env) tele $ \ tele' ->
         do { (hs_body', fvs) <- rn_lty env hs_body
-           ; return (HsForAllTy { hst_xforall = noAnn
+           ; return (HsForAllTy { hst_xforall = noExtField
                                 , hst_tele = tele', hst_body = hs_body' }
                     , fvs) }
 
@@ -555,7 +557,7 @@ rnHsTyKi env ty@(HsForAllTy { hst_tele = tele, hst_body = tau })
   = do { checkPolyKinds env ty
        ; bindHsForAllTelescope (rtke_ctxt env) tele $ \ tele' ->
     do { (tau',  fvs) <- rnLHsTyKi env tau
-       ; return ( HsForAllTy { hst_xforall = noAnn
+       ; return ( HsForAllTy { hst_xforall = noExtField
                              , hst_tele = tele' , hst_body =  tau' }
                 , fvs) } }
 
@@ -1058,10 +1060,10 @@ bindHsForAllTelescope doc tele thing_inside =
   case tele of
     HsForAllVis { hsf_vis_bndrs = bndrs } ->
       bindLHsTyVarBndrs doc WarnUnusedForalls Nothing bndrs $ \bndrs' ->
-        thing_inside $ mkHsForAllVisTele bndrs'
+        thing_inside $ mkHsForAllVisTele noAnn bndrs'
     HsForAllInvis { hsf_invis_bndrs = bndrs } ->
       bindLHsTyVarBndrs doc WarnUnusedForalls Nothing bndrs $ \bndrs' ->
-        thing_inside $ mkHsForAllInvisTele bndrs'
+        thing_inside $ mkHsForAllInvisTele noAnn bndrs'
 
 -- | Should GHC warn if a quantified type variable goes unused? Usually, the
 -- answer is \"yes\", but in the particular case of binding 'LHsQTyVars', we
@@ -1076,7 +1078,7 @@ instance Outputable WarnUnusedForalls where
     WarnUnusedForalls   -> "WarnUnusedForalls"
     NoWarnUnusedForalls -> "NoWarnUnusedForalls"
 
-bindLHsTyVarBndrs :: (OutputableBndrFlag flag)
+bindLHsTyVarBndrs :: (OutputableBndrFlag flag 'Renamed)
                   => HsDocContext
                   -> WarnUnusedForalls
                   -> Maybe a               -- Just _  => an associated type decl
@@ -1088,7 +1090,7 @@ bindLHsTyVarBndrs doc wuf mb_assoc tv_bndrs thing_inside
        ; checkDupRdrNamesN tv_names_w_loc
        ; go tv_bndrs thing_inside }
   where
-    tv_names_w_loc :: [LocatedN RdrName] --AZ 
+    tv_names_w_loc :: [LocatedN RdrName] --AZ
     tv_names_w_loc = map hsLTyVarLocName tv_bndrs
 
     go []     thing_inside = thing_inside []
@@ -1542,7 +1544,7 @@ dataKindsErr env thing
     pp_what | isRnKindLevel env = text "kind"
             | otherwise          = text "type"
 
-warnUnusedForAll :: OutputableBndrFlag flag
+warnUnusedForAll :: OutputableBndrFlag flag 'Renamed
                  => HsDocContext -> LHsTyVarBndr flag GhcRn -> FreeVars -> TcM ()
 warnUnusedForAll doc (L loc tv) used_names
   = whenWOptM Opt_WarnUnusedForalls $

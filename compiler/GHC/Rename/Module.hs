@@ -199,7 +199,7 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
    (rn_deriv_decls,   src_fvs6) <- rnList rnSrcDerivDecl  deriv_decls ;
    (rn_splice_decls,  src_fvs7) <- rnList rnSpliceDecl    splice_decls ;
       -- Haddock docs; no free vars
-   rn_docs <- mapM (wrapLocM rnDocDecl) docs ;
+   rn_docs <- mapM (wrapLocMA rnDocDecl) docs ;
 
    last_tcg_env <- getGblEnv ;
    -- (I) Compute the results and return
@@ -241,11 +241,8 @@ addTcgDUs :: TcGblEnv -> DefUses -> TcGblEnv
 -- but there doesn't seem anywhere very logical to put it.
 addTcgDUs tcg_env dus = tcg_env { tcg_dus = tcg_dus tcg_env `plusDU` dus }
 
-rnList :: (a -> RnM (b, FreeVars)) -> [Located a] -> RnM ([Located b], FreeVars)
-rnList f xs = mapFvRn (wrapLocFstM f) xs
-
-rnListA :: (a -> RnM (b, FreeVars)) -> [LocatedA a] -> RnM ([LocatedA b], FreeVars)
-rnListA f xs = mapFvRn (wrapLocFstMA f) xs
+rnList :: (a -> RnM (b, FreeVars)) -> [LocatedA a] -> RnM ([LocatedA b], FreeVars)
+rnList f xs = mapFvRn (wrapLocFstMA f) xs
 
 {-
 *********************************************************
@@ -897,15 +894,15 @@ rnATDecls :: Name      -- Class
           -> [LFamilyDecl GhcPs]
           -> RnM ([LFamilyDecl GhcRn], FreeVars)
 rnATDecls cls at_decls
-  = rnListA (rnFamDecl (Just cls)) at_decls
+  = rnList (rnFamDecl (Just cls)) at_decls
 
 rnATInstDecls :: (AssocTyFamInfo ->           -- The function that renames
                   decl GhcPs ->               -- an instance. rnTyFamInstDecl
                   RnM (decl GhcRn, FreeVars)) -- or rnDataFamInstDecl
               -> Name      -- Class
               -> [Name]
-              -> [Located (decl GhcPs)]
-              -> RnM ([Located (decl GhcRn)], FreeVars)
+              -> [LocatedA (decl GhcPs)]
+              -> RnM ([LocatedA (decl GhcRn)], FreeVars)
 -- Used for data and type family defaults in a class decl
 -- and the family instance declarations in an instance
 --
@@ -1113,7 +1110,7 @@ standaloneDerivErr
 rnHsRuleDecls :: RuleDecls GhcPs -> RnM (RuleDecls GhcRn, FreeVars)
 rnHsRuleDecls (HsRules { rds_src = src
                        , rds_rules = rules })
-  = do { (rn_rules,fvs) <- rnListA rnHsRuleDecl rules
+  = do { (rn_rules,fvs) <- rnList rnHsRuleDecl rules
        ; return (HsRules { rds_ext = noExtField
                          , rds_src = src
                          , rds_rules = rn_rules }, fvs) }
@@ -1403,10 +1400,10 @@ rnTyClDecls :: [TyClGroup GhcPs]
 -- Rename the declarations and do dependency analysis on them
 rnTyClDecls tycl_ds
   = do { -- Rename the type/class, instance, and role declaraations
-       ; tycls_w_fvs <- mapM (wrapLocFstM rnTyClDecl) (tyClGroupTyClDecls tycl_ds)
+       ; tycls_w_fvs <- mapM (wrapLocFstMA rnTyClDecl) (tyClGroupTyClDecls tycl_ds)
        ; let tc_names = mkNameSet (map (tcdName . unLoc . fst) tycls_w_fvs)
        ; kisigs_w_fvs <- rnStandaloneKindSignatures tc_names (tyClGroupKindSigs tycl_ds)
-       ; instds_w_fvs <- mapM (wrapLocFstM rnSrcInstDecl) (tyClGroupInstDecls tycl_ds)
+       ; instds_w_fvs <- mapM (wrapLocFstMA rnSrcInstDecl) (tyClGroupInstDecls tycl_ds)
        ; role_annots  <- rnRoleAnnots tc_names (tyClGroupRoleDecls tycl_ds)
 
        -- Do SCC analysis on the type/class decls
@@ -1489,7 +1486,7 @@ rnStandaloneKindSignatures tc_names kisigs
   = do { let (no_dups, dup_kisigs) = removeDups (compare `on` get_name) kisigs
              get_name = standaloneKindSigName . unLoc
        ; mapM_ dupKindSig_Err dup_kisigs
-       ; mapM (wrapLocFstM (rnStandaloneKindSignature tc_names)) no_dups
+       ; mapM (wrapLocFstMA (rnStandaloneKindSignature tc_names)) no_dups
        }
 
 rnStandaloneKindSignature
@@ -1568,7 +1565,7 @@ rnRoleAnnots tc_names role_annots
          let (no_dups, dup_annots) = removeDups (compare `on` get_name) role_annots
              get_name = roleAnnotDeclName . unLoc
        ; mapM_ dupRoleAnnotErr dup_annots
-       ; mapM (wrapLocM rn_role_annot1) no_dups }
+       ; mapM (wrapLocMA rn_role_annot1) no_dups }
   where
     rn_role_annot1 (RoleAnnotDecl _ tycon roles)
       = do {  -- the name is an *occurrence*, but look it up only in the
@@ -1580,7 +1577,7 @@ rnRoleAnnots tc_names role_annots
 
 dupRoleAnnotErr :: NonEmpty (LRoleAnnotDecl GhcPs) -> RnM ()
 dupRoleAnnotErr list
-  = addErrAt loc $
+  = addErrAt (locA loc) $
     hang (text "Duplicate role annotations for" <+>
           quotes (ppr $ roleAnnotDeclName first_decl) <> colon)
        2 (vcat $ map pp_role_annot $ NE.toList sorted_list)
@@ -1589,13 +1586,13 @@ dupRoleAnnotErr list
       ((L loc first_decl) :| _) = sorted_list
 
       pp_role_annot (L loc decl) = hang (ppr decl)
-                                      4 (text "-- written at" <+> ppr loc)
+                                      4 (text "-- written at" <+> ppr (locA loc))
 
-      cmp_loc = SrcLoc.leftmost_smallest `on` getLoc
+      cmp_loc = SrcLoc.leftmost_smallest `on` getLocA
 
 dupKindSig_Err :: NonEmpty (LStandaloneKindSig GhcPs) -> RnM ()
 dupKindSig_Err list
-  = addErrAt loc $
+  = addErrAt (locA loc) $
     hang (text "Duplicate standalone kind signatures for" <+>
           quotes (ppr $ standaloneKindSigName first_decl) <> colon)
        2 (vcat $ map pp_kisig $ NE.toList sorted_list)
@@ -1604,9 +1601,9 @@ dupKindSig_Err list
       ((L loc first_decl) :| _) = sorted_list
 
       pp_kisig (L loc decl) =
-        hang (ppr decl) 4 (text "-- written at" <+> ppr loc)
+        hang (ppr decl) 4 (text "-- written at" <+> ppr (locA loc))
 
-      cmp_loc = SrcLoc.leftmost_smallest `on` getLoc
+      cmp_loc = SrcLoc.leftmost_smallest `on` getLocA
 
 {- Note [Role annotations in the renamer]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1774,7 +1771,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
                 -- and the methods are already in scope
 
   -- Haddock docs
-        ; docs' <- mapM (wrapLocM rnDocDecl) docs
+        ; docs' <- mapM (wrapLocMA rnDocDecl) docs
 
         ; let all_fvs = meth_fvs `plusFV` stuff_fvs `plusFV` fv_at_defs
         ; return (ClassDecl { tcdCtxt = context', tcdLName = lcls',
@@ -2029,7 +2026,7 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
      rn_info :: FamilyInfo GhcPs -> RnM (FamilyInfo GhcRn, FreeVars)
      rn_info (ClosedTypeFamily (Just eqns))
        = do { (eqns', fvs)
-                <- rnListA (rnTyFamInstEqn (NonAssocTyFamEqn ClosedTyFam)) eqns
+                <- rnList (rnTyFamInstEqn (NonAssocTyFamEqn ClosedTyFam)) eqns
                                           -- no class context
             ; return (ClosedTypeFamily (Just eqns'), fvs) }
      rn_info (ClosedTypeFamily Nothing)
@@ -2218,7 +2215,7 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                   all_fvs) }}
 
 rnConDecl decl@(ConDeclGADT { con_names   = names
-                            , con_forall  = forall@(L _ explicit_forall)
+                            , con_forall  = explicit_forall
                             , con_qvars   = explicit_tkvs
                             , con_mb_cxt  = mcxt
                             , con_args    = args
@@ -2263,7 +2260,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
                        , con_qvars = explicit_tkvs, con_mb_cxt = new_cxt
                        , con_args = new_args, con_res_ty = new_res_ty
                        , con_doc = mb_doc'
-                       , con_forall = forall }, -- Remove when #18311 is fixed
+                       , con_forall = explicit_forall }, -- Remove when #18311 is fixed
                   all_fvs) } }
 
 rnMbContext :: HsDocContext -> Maybe (LHsContext GhcPs)
@@ -2383,10 +2380,10 @@ addl :: HsGroup GhcPs -> [LHsDecl GhcPs]
      -> RnM (HsGroup GhcPs, Maybe (SpliceDecl GhcPs, [LHsDecl GhcPs]))
 -- This stuff reverses the declarations (again) but it doesn't matter
 addl gp []           = return (gp, Nothing)
-addl gp (L l d : ds) = add gp (locA l) d ds
+addl gp (L l d : ds) = add gp l d ds
 
 
-add :: HsGroup GhcPs -> SrcSpan -> HsDecl GhcPs -> [LHsDecl GhcPs]
+add :: HsGroup GhcPs -> SrcSpanAnnA -> HsDecl GhcPs -> [LHsDecl GhcPs]
     -> RnM (HsGroup GhcPs, Maybe (SpliceDecl GhcPs, [LHsDecl GhcPs]))
 
 -- #10047: Declaration QuasiQuoters are expanded immediately, without
@@ -2402,7 +2399,7 @@ add gp loc (SpliceD _ splice@(SpliceDecl _ _ flag)) ds
          case flag of
            ExplicitSplice -> return ()
            ImplicitSplice -> do { th_on <- xoptM LangExt.TemplateHaskell
-                                ; unless th_on $ setSrcSpan loc $
+                                ; unless th_on $ setSrcSpan (locA loc) $
                                   failWith badImplicitSplice }
 
        ; return (gp, Just (splice, ds)) }
@@ -2431,7 +2428,7 @@ add gp@(HsGroup {hs_valds = ts}) l (SigD _ d) ds
 
 -- Value declarations: use add_bind
 add gp@(HsGroup {hs_valds  = ts}) l (ValD _ d) ds
-  = addl (gp { hs_valds = add_bind (L (noAnnSrcSpan l) d) ts }) ds
+  = addl (gp { hs_valds = add_bind (L l d) ts }) ds
 
 -- Role annotations: added to the TyClGroup
 add gp@(HsGroup {hs_tyclds = ts}) l (RoleAnnotD _ d) ds
