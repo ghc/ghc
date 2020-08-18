@@ -5,6 +5,8 @@
 -}
 
 {-# LANGUAGE CPP, TupleSections, MultiWayIf, RankNTypes #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -2971,13 +2973,13 @@ bindExplicitTKTele_Skol_M mode tele thing_inside = case tele of
     pure (Right inv_tv_bndrs, thing)
 
 bindExplicitTKBndrs_Skol, bindExplicitTKBndrs_Tv
-    :: (OutputableBndrFlag flag)
+    :: (OutputableBndrFlag flag 'Renamed)
     => [LHsTyVarBndr flag GhcRn]
     -> TcM a
     -> TcM ([VarBndr TyVar flag], a)
 
 bindExplicitTKBndrs_Skol_M, bindExplicitTKBndrs_Tv_M
-    :: (OutputableBndrFlag flag)
+    :: (OutputableBndrFlag flag 'Renamed)
     => TcTyMode
     -> [LHsTyVarBndr flag GhcRn]
     -> TcM a
@@ -3010,7 +3012,7 @@ bindExplicitTKBndrsX_Q tc_tv hs_tvs thing_inside
   = do { (tv_bndrs,res) <- bindExplicitTKBndrsX tc_tv hs_tvs thing_inside
        ; return ((binderVars tv_bndrs),res) }
 
-bindExplicitTKBndrsX :: (OutputableBndrFlag flag)
+bindExplicitTKBndrsX :: (OutputableBndrFlag flag 'Renamed)
     => (HsTyVarBndr flag GhcRn -> TcM TcTyVar)
     -> [LHsTyVarBndr flag GhcRn]
     -> TcM a

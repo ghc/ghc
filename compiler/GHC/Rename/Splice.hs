@@ -175,7 +175,7 @@ rn_bracket _ (DecBrL x decls)
            ; Just (splice, rest) ->
                do { group' <- groupDecls rest
                   ; let group'' = appendGroups group group'
-                  ; return group'' { hs_splcds = noLoc splice : hs_splcds group' }
+                  ; return group'' { hs_splcds = noLocA splice : hs_splcds group' }
                   }
            }}
 

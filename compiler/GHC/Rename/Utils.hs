@@ -299,13 +299,13 @@ noNestedForallsContextsErr what lty =
          -- types of terms, so we give a slightly more descriptive error
          -- message in the event that they contain visible dependent
          -- quantification (currently only allowed in kinds).
-      -> Just (l, vcat [ text "Illegal visible, dependent quantification" <+>
-                         text "in the type of a term"
-                       , text "(GHC does not yet support this)" ])
+      -> Just (locA l, vcat [ text "Illegal visible, dependent quantification" <+>
+                              text "in the type of a term"
+                            , text "(GHC does not yet support this)" ])
       |  HsForAllInvis{} <- tele
-      -> Just (l, nested_foralls_contexts_err)
+      -> Just (locA l, nested_foralls_contexts_err)
     L l (HsQualTy {})
-      -> Just (l, nested_foralls_contexts_err)
+      -> Just (locA l, nested_foralls_contexts_err)
     _ -> Nothing
   where
     nested_foralls_contexts_err =

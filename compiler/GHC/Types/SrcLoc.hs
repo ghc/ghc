@@ -86,6 +86,7 @@ module GHC.Types.SrcLoc (
         -- ** Deconstructing Located
         getLoc, unLoc,
         unRealSrcSpan, getRealSrcSpan,
+        pprLocated,
 
         -- ** Modifying Located
         mapLoc,
@@ -109,7 +110,7 @@ module GHC.Types.SrcLoc (
         psSpanStart,
         psSpanEnd,
         mkSrcSpanPs,
-        combineRealSrcSpans
+        combineRealSrcSpans,
 
         -- * Layout information
         LayoutInfo(..),
@@ -779,8 +780,22 @@ cmpBufSpan (L l1 _) (L l2  _)
 
   | otherwise = panic "cmpBufSpan: no BufSpan"
 
-instance (Outputable l, Outputable e) => Outputable (GenLocated l e) where
-  ppr (L l e) = -- TODO: We can't do this since Located was refactored into
+-- instance (Outputable l, Outputable e) => Outputable (GenLocated l e) where
+instance (Outputable e) => Outputable (Located e) where
+  ppr (L l e) = -- GenLocated:
+                -- Print spans without the file name etc
+                whenPprDebug (braces (pprUserSpan False l))
+             $$ ppr e
+instance (Outputable e) => Outputable (GenLocated RealSrcSpan e) where
+  ppr (L l e) = -- GenLocated:
+                -- Print spans without the file name etc
+                whenPprDebug (braces (pprUserSpan False (RealSrcSpan l Nothing)))
+             $$ ppr e
+
+
+pprLocated :: (Outputable l, Outputable e) => GenLocated l e -> SDoc
+pprLocated (L l e) =
+                -- TODO: We can't do this since Located was refactored into
                 -- GenLocated:
                 -- Print spans without the file name etc
                 -- ifPprDebug (braces (pprUserSpan False l))

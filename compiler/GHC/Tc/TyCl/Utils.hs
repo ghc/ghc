@@ -837,7 +837,8 @@ tcRecSelBinds sel_bind_prs
                                      tcValBinds TopLevel binds sigs getGblEnv
        ; return (tcg_env `addTypecheckedBinds` map snd rec_sel_binds) }
   where
-    sigs = [ L loc (IdSig noExtField sel_id) | (sel_id, _) <- sel_bind_prs
+    sigs = [ L (noAnnSrcSpan loc) (IdSig noExtField sel_id)
+                                             | (sel_id, _) <- sel_bind_prs
                                              , let loc = getSrcSpan sel_id ]
     binds = [(NonRecursive, unitBag bind) | (_, bind) <- sel_bind_prs]
 

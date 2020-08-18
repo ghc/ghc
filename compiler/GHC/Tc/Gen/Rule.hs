@@ -99,7 +99,7 @@ equation.
 -}
 
 tcRules :: [LRuleDecls GhcRn] -> TcM [LRuleDecls GhcTc]
-tcRules decls = mapM (wrapLocM tcRuleDecls) decls
+tcRules decls = mapM (wrapLocMA tcRuleDecls) decls
 
 tcRuleDecls :: RuleDecls GhcRn -> TcM (RuleDecls GhcTc)
 tcRuleDecls (HsRules { rds_src = src

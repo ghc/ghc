@@ -152,9 +152,9 @@ tcClassSigs clas sigs def_methods
        ; return op_info }
   where
     vanilla_sigs :: [Located ([LocatedN Name], LHsSigType GhcRn)] -- AZ temp
-    vanilla_sigs = [L loc (nm,ty) | L loc (ClassOpSig _ False nm ty) <- sigs]
+    vanilla_sigs = [L (locA loc) (nm,ty) | L loc (ClassOpSig _ False nm ty) <- sigs]
     gen_sigs :: [Located ([LocatedN Name], LHsSigType GhcRn)] -- AZ temp
-    gen_sigs     = [L loc (nm,ty) | L loc (ClassOpSig _ True  nm ty) <- sigs]
+    gen_sigs     = [L (locA loc) (nm,ty) | L loc (ClassOpSig _ True  nm ty) <- sigs]
     dm_bind_names :: [Name] -- These ones have a value binding in the class decl
     dm_bind_names = [op | L _ (FunBind {fun_id = L _ op}) <- bagToList def_methods]
 
@@ -233,7 +233,7 @@ tcDefMeth :: Class -> [TyVar] -> EvVar -> LHsBinds GhcRn
 
 tcDefMeth _ _ _ _ _ prag_fn (sel_id, Nothing)
   = do { -- No default method
-         mapM_ (addLocM (badDmPrag sel_id))
+         mapM_ (addLocMA (badDmPrag sel_id))
                (lookupPragEnv prag_fn (idName sel_id))
        ; return emptyBag }
 

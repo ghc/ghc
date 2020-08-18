@@ -230,7 +230,7 @@ tcFImport :: LForeignDecl GhcRn
           -> TcM (Id, LForeignDecl GhcTc, Bag GlobalRdrElt)
 tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
                                     , fd_fi = imp_decl }))
-  = setSrcSpan dloc $ addErrCtxt (foreignDeclCtxt fo)  $
+  = setSrcSpanA dloc $ addErrCtxt (foreignDeclCtxt fo)  $
     do { sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
        ; (norm_co, norm_sig_ty, gres) <- normaliseFfiType sig_ty
        ; let
@@ -365,7 +365,7 @@ tcForeignExports' decls
   = foldlM combine (emptyLHsBinds, [], emptyBag) (filter isForeignExport decls)
   where
    combine (binds, fs, gres1) (L loc fe) = do
-       (b, f, gres2) <- setSrcSpan loc (tcFExport fe)
+       (b, f, gres2) <- setSrcSpanA loc (tcFExport fe)
        return (b `consBag` binds, L loc f : fs, gres1 `unionBags` gres2)
 
 tcFExport :: ForeignDecl GhcRn
