@@ -8,10 +8,10 @@ module Lookup
 
 -- import Language.Haskell.ExactPrint.Types
 import GHC (AnnKeywordId(..))
-import GHC.Utils.Outputable hiding ( (<>) )
-import Data.Data (Data)
-import GHC.Types.SrcLoc
-import GHC.Driver.Session
+-- import GHC.Utils.Outputable hiding ( (<>) )
+-- import Data.Data (Data)
+-- import GHC.Types.SrcLoc
+-- import GHC.Driver.Session
 import Types
 
 -- | Maps `AnnKeywordId` to the corresponding String representation.
@@ -119,11 +119,10 @@ keywordToString kw =
       (G Annrarrowtail ) -> ">-"
       (G AnnLarrowtail ) -> "-<<"
       (G AnnRarrowtail ) -> ">>-"
-      (G AnnSimpleQuote ) -> "'"
-      (G AnnThTyQuote   ) -> "''"
-      (G AnnThIdSplice  ) -> "$"
-      (G AnnThIdTySplice ) -> "$$"
-      -- (G AnnEofPos       ) -> ""
+      (G AnnSimpleQuote  ) -> "'"
+      (G AnnThTyQuote    ) -> "''"
+      (G AnnDollar       ) -> "$"
+      (G AnnDollarDollar ) -> "$$"
       (G AnnDarrowU) -> "⇒"
       (G AnnDcolonU) -> "∷"
       (G AnnForallU) -> "∀"

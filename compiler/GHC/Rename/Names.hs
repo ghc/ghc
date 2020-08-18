@@ -306,7 +306,7 @@ rnImportDecl this_mod
                            -- or the name of this_mod's package.  Yurgh!
                            -- c.f. GHC.findModule, and #9997
              Nothing         -> True
-             Just (StringLiteral _ pkg_fs) -> pkg_fs == fsLit "this" ||
+             Just (StringLiteral _ pkg_fs _) -> pkg_fs == fsLit "this" ||
                             fsToUnit pkg_fs == moduleUnit this_mod))
          (addErr (text "A module cannot import itself:" <+> ppr imp_mod_name))
 
@@ -725,7 +725,7 @@ getLocalNonValBinders fixity_env
 
     -- In a hs-boot file, the value binders come from the
     --  *signatures*, and there should be no foreign binders
-    hs_boot_sig_bndrs = [ L (noAnnSrcSpan decl_loc) (unLoc n)
+    hs_boot_sig_bndrs = [ L (l2l decl_loc) (unLoc n)
                         | L decl_loc (TypeSig _ ns _) <- val_sigs, n <- ns]
 
       -- the SrcSpan attached to the input should be the span of the
@@ -1216,14 +1216,14 @@ lookupChildren all_kids rdr_items
     oks   = [ ok      | Succeeded ok   <- mb_xs ]
     oks :: [Either (LocatedA Name) [Located FieldLabel]]
 
-    doOne :: Located (IEWrappedName RdrName)
+    doOne :: LocatedA (IEWrappedName RdrName)
                       -> MaybeErr
-                           (Located (IEWrappedName RdrName))
+                           (LocatedA (IEWrappedName RdrName))
                            (Either (LocatedA Name) [Located FieldLabel]) -- AZ temp
     doOne item@(L l r)
        = case (lookupFsEnv kid_env . occNameFS . rdrNameOcc . ieWrappedName) r of
-           Just [Left n]            -> Succeeded (Left (L (noAnnSrcSpan l) n))
-           Just rs | all isRight rs -> Succeeded (Right (map (L l) (rights rs)))
+           Just [Left n]            -> Succeeded (Left (L l n))
+           Just rs | all isRight rs -> Succeeded (Right (map (L (locA l)) (rights rs)))
            _                        -> Failed    item
 
     -- See Note [Children for duplicate record fields]
@@ -1644,7 +1644,7 @@ getMinimalImports = fmap combine . mapM mk_minimal
 
     merge :: [LImportDecl GhcRn] -> LImportDecl GhcRn
     merge []                     = error "getMinimalImports: unexpected empty list"
-    merge decls@((L l decl) : _) = L l (decl { ideclHiding = Just (False, L l lies) })
+    merge decls@((L l decl) : _) = L l (decl { ideclHiding = Just (False, L (noAnnSrcSpan (locA l)) lies) })
       where lies = concatMap (unLoc . snd) $ mapMaybe (ideclHiding . unLoc) decls
 
 
@@ -1676,14 +1676,14 @@ printMinimalImports hsc_src imports_w_usage
 
 to_ie_post_rn_var :: (HasOccName name) => LocatedA name -> LIEWrappedName name
 to_ie_post_rn_var (L l n)
-  | isDataOcc $ occName n = L (locA l) (IEPattern (L (la2na l) n))
-  | otherwise             = L (locA l) (IEName    (L (la2na l) n))
+  | isDataOcc $ occName n = L l (IEPattern (la2r l) (L (la2na l) n))
+  | otherwise             = L l (IEName             (L (la2na l) n))
 
 
 to_ie_post_rn :: (HasOccName name) => LocatedA name -> LIEWrappedName name
 to_ie_post_rn (L l n)
-  | isTcOcc occ && isSymOcc occ = L (locA l) (IEType (L (la2na l) n))
-  | otherwise                   = L (locA l) (IEName (L (la2na l) n))
+  | isTcOcc occ && isSymOcc occ = L l (IEType (la2r l) (L (la2na l) n))
+  | otherwise                   = L l (IEName          (L (la2na l) n))
   where occ = occName n
 
 {-
@@ -1807,7 +1807,7 @@ dodgyMsgInsert :: forall p . IdP (GhcPass p) -> IE (GhcPass p)
 dodgyMsgInsert tc = IEThingAll noAnn ii
   where
     ii :: LIEWrappedName (IdP (GhcPass p))
-    ii = noLoc (IEName $ noLocA tc)
+    ii = noLocA (IEName $ noLocA tc)
 
 
 addDupDeclErr :: [GlobalRdrElt] -> TcRn ()

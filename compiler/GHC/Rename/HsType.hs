@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DataKinds #-}
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
@@ -206,7 +208,7 @@ rnWcBody ctxt nwc_rdrs hs_ty
     rn_ty env (HsForAllTy { hst_tele = tele, hst_body = hs_body })
       = bindHsForAllTelescope (rtke_ctxt env) tele $ \ tele' ->
         do { (hs_body', fvs) <- rn_lty env hs_body
-           ; return (HsForAllTy { hst_xforall = noAnn
+           ; return (HsForAllTy { hst_xforall = noExtField
                                 , hst_tele = tele', hst_body = hs_body' }
                     , fvs) }
 
@@ -556,7 +558,7 @@ rnHsTyKi env ty@(HsForAllTy { hst_tele = tele, hst_body = tau })
   = do { checkPolyKinds env ty
        ; bindHsForAllTelescope (rtke_ctxt env) tele $ \ tele' ->
     do { (tau',  fvs) <- rnLHsTyKi env tau
-       ; return ( HsForAllTy { hst_xforall = noAnn
+       ; return ( HsForAllTy { hst_xforall = noExtField
                              , hst_tele = tele' , hst_body =  tau' }
                 , fvs) } }
 
@@ -585,7 +587,7 @@ rnHsTyKi env ty@(HsOpTy _ ty1 l_op ty2)
         ; fix   <- lookupTyFixityRn l_op'
         ; (ty1', fvs2) <- rnLHsTyKi env ty1
         ; (ty2', fvs3) <- rnLHsTyKi env ty2
-        ; res_ty <- mkHsOpTyRn (\t1 t2 -> HsOpTy noAnn t1 l_op' t2)
+        ; res_ty <- mkHsOpTyRn (\t1 t2 -> HsOpTy noExtField t1 l_op' t2)
                                (unLoc l_op') fix ty1' ty2'
         ; return (res_ty, plusFVs [fvs1, fvs2, fvs3]) }
 
@@ -924,10 +926,18 @@ bindHsQTyVars doc mb_assoc body_kv_occs hsq_bndrs thing_inside
     --
     --   class C (a :: j) (b :: k) where
     --            ^^^^^^^^^^^^^^^
-    bndrs_loc = case map getLoc hs_tv_bndrs ++ map getLocA body_kv_occs of
+    bndrs_loc = case map get_bndr_loc hs_tv_bndrs ++ map getLocA body_kv_occs of
       []         -> panic "bindHsQTyVars.bndrs_loc"
       [loc]      -> loc
       (loc:locs) -> loc `combineSrcSpans` last locs
+
+    -- The in-tree API annotations extend the LHsTyVarBndr location to
+    -- include surrounding parens. for error messages to be
+    -- compatible, we recreate the location from the contents
+    get_bndr_loc :: LHsTyVarBndr () GhcPs -> SrcSpan
+    get_bndr_loc (L _ (UserTyVar   _ _ ln)) = getLocA ln
+    get_bndr_loc (L _ (KindedTyVar _ _ ln lk))
+      = combineSrcSpans (getLocA ln) (getLocA lk)
 
 {- Note [bindHsQTyVars examples]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1059,10 +1069,10 @@ bindHsForAllTelescope doc tele thing_inside =
   case tele of
     HsForAllVis { hsf_vis_bndrs = bndrs } ->
       bindLHsTyVarBndrs doc WarnUnusedForalls Nothing bndrs $ \bndrs' ->
-        thing_inside $ mkHsForAllVisTele bndrs'
+        thing_inside $ mkHsForAllVisTele noAnn bndrs'
     HsForAllInvis { hsf_invis_bndrs = bndrs } ->
       bindLHsTyVarBndrs doc WarnUnusedForalls Nothing bndrs $ \bndrs' ->
-        thing_inside $ mkHsForAllInvisTele bndrs'
+        thing_inside $ mkHsForAllInvisTele noAnn bndrs'
 
 -- | Should GHC warn if a quantified type variable goes unused? Usually, the
 -- answer is \"yes\", but in the particular case of binding 'LHsQTyVars', we
@@ -1077,7 +1087,7 @@ instance Outputable WarnUnusedForalls where
     WarnUnusedForalls   -> "WarnUnusedForalls"
     NoWarnUnusedForalls -> "NoWarnUnusedForalls"
 
-bindLHsTyVarBndrs :: (OutputableBndrFlag flag)
+bindLHsTyVarBndrs :: (OutputableBndrFlag flag 'Renamed)
                   => HsDocContext
                   -> WarnUnusedForalls
                   -> Maybe a               -- Just _  => an associated type decl
@@ -1089,7 +1099,7 @@ bindLHsTyVarBndrs doc wuf mb_assoc tv_bndrs thing_inside
        ; checkDupRdrNamesN tv_names_w_loc
        ; go tv_bndrs thing_inside }
   where
-    tv_names_w_loc :: [LocatedN RdrName] --AZ 
+    tv_names_w_loc :: [LocatedN RdrName] --AZ
     tv_names_w_loc = map hsLTyVarLocName tv_bndrs
 
     go []     thing_inside = thing_inside []
@@ -1543,12 +1553,12 @@ dataKindsErr env thing
     pp_what | isRnKindLevel env = text "kind"
             | otherwise          = text "type"
 
-warnUnusedForAll :: OutputableBndrFlag flag
+warnUnusedForAll :: OutputableBndrFlag flag 'Renamed
                  => HsDocContext -> LHsTyVarBndr flag GhcRn -> FreeVars -> TcM ()
 warnUnusedForAll doc (L loc tv) used_names
   = whenWOptM Opt_WarnUnusedForalls $
     unless (hsTyVarName tv `elemNameSet` used_names) $
-    addWarnAt (Reason Opt_WarnUnusedForalls) loc $
+    addWarnAt (Reason Opt_WarnUnusedForalls) (locA loc) $
     vcat [ text "Unused quantified type variable" <+> quotes (ppr tv)
          , inHsDocContext doc ]
 

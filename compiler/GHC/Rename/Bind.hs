@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -430,13 +431,13 @@ rnBindLHS name_maker _ (PatSynBind x psb@PSB{ psb_id = rdrname })
   | isTopRecNameMaker name_maker
   = do { addLocMA checkConName rdrname
        ; name <- lookupLocatedTopBndrRnN rdrname -- Should be in scope already
-       ; return (PatSynBind x psb{ psb_ext = noExtField, psb_id = name }) }
+       ; return (PatSynBind x psb{ psb_ext = noAnn, psb_id = name }) }
 
   | otherwise  -- Pattern synonym, not at top level
   = do { addErr localPatternSynonymErr  -- Complain, but make up a fake
                                         -- name so that we can carry on
        ; name <- applyNameMaker name_maker rdrname
-       ; return (PatSynBind x psb{ psb_ext = noExtField, psb_id = name }) }
+       ; return (PatSynBind x psb{ psb_ext = noAnn, psb_id = name }) }
   where
     localPatternSynonymErr :: SDoc
     localPatternSynonymErr
@@ -630,7 +631,7 @@ makeMiniFixityEnv decls = foldlM add_one_sig emptyFsEnv decls
  where
    add_one_sig :: MiniFixityEnv -> LFixitySig GhcPs -> RnM MiniFixityEnv
    add_one_sig env (L loc (FixitySig _ names fixity)) =
-     foldlM add_one env [ (loc,locA name_loc,name,fixity)
+     foldlM add_one env [ (locA loc,locA name_loc,name,fixity)
                         | L name_loc name <- names ]
 
    add_one :: FastStringEnv (Located e)
@@ -938,7 +939,7 @@ renameSigs ctxt sigs
 
         ; checkDupMinimalSigs sigs
 
-        ; (sigs', sig_fvs) <- mapFvRn (wrapLocFstM (renameSig ctxt)) sigs
+        ; (sigs', sig_fvs) <- mapFvRn (wrapLocFstMA (renameSig ctxt)) sigs
 
         ; let (good_sigs, bad_sigs) = partition (okHsSig ctxt) sigs'
         ; mapM_ misplacedSigErr bad_sigs                 -- Misplaced
@@ -1164,7 +1165,17 @@ checkDupMinimalSigs sigs
 ************************************************************************
 -}
 
-rnMatchGroup :: Outputable (body GhcPs) => HsMatchContext Name
+type AnnoBody body
+  = ( Anno [LocatedA (Match GhcRn (LocatedA (body GhcRn)))] ~ SrcSpanAnnL
+    , Anno [LocatedA (Match GhcPs (LocatedA (body GhcPs)))] ~ SrcSpanAnnL
+    , Anno (Match GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
+    , Anno (Match GhcPs (LocatedA (body GhcPs))) ~ SrcSpanAnnA
+    , Anno (GRHS GhcRn (LocatedA (body GhcRn))) ~ SrcSpan
+    , Anno (GRHS GhcPs (LocatedA (body GhcPs))) ~ SrcSpan
+    , Outputable (body GhcPs)
+    )
+
+rnMatchGroup :: (Outputable (body GhcPs), AnnoBody body) => HsMatchContext Name
              -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
              -> MatchGroup GhcPs (LocatedA (body GhcPs))
              -> RnM (MatchGroup GhcRn (LocatedA (body GhcRn)), FreeVars)
@@ -1174,13 +1185,15 @@ rnMatchGroup ctxt rnBody (MG { mg_alts = L lm ms, mg_origin = origin })
        ; (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnBody) ms
        ; return (mkMatchGroup origin (L lm new_ms), ms_fvs) }
 
-rnMatch :: Outputable (body GhcPs) => HsMatchContext Name
+rnMatch :: AnnoBody body
+        => HsMatchContext Name
         -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
         -> LMatch GhcPs (LocatedA (body GhcPs))
         -> RnM (LMatch GhcRn (LocatedA (body GhcRn)), FreeVars)
 rnMatch ctxt rnBody = wrapLocFstMA (rnMatch' ctxt rnBody)
 
-rnMatch' :: Outputable (body GhcPs) => HsMatchContext Name
+rnMatch' :: (AnnoBody body)
+         => HsMatchContext Name
          -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
          -> Match GhcPs (LocatedA (body GhcPs))
          -> RnM (Match GhcRn (LocatedA (body GhcRn)), FreeVars)
@@ -1212,7 +1225,8 @@ emptyCaseErr ctxt = hang (text "Empty list of alternatives in" <+> pp_ctxt)
 ************************************************************************
 -}
 
-rnGRHSs :: HsMatchContext Name
+rnGRHSs :: AnnoBody body
+        => HsMatchContext Name
         -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
         -> GRHSs GhcPs (LocatedA (body GhcPs))
         -> RnM (GRHSs GhcRn (LocatedA (body GhcRn)), FreeVars)
@@ -1221,7 +1235,8 @@ rnGRHSs ctxt rnBody (GRHSs _ grhss binds)
     (grhss', fvGRHSs) <- mapFvRn (rnGRHS ctxt rnBody) grhss
     return (GRHSs noAnn grhss' binds', fvGRHSs)
 
-rnGRHS :: HsMatchContext Name
+rnGRHS :: AnnoBody body
+       => HsMatchContext Name
        -> (LocatedA (body GhcPs) -> RnM (LocatedA (body GhcRn), FreeVars))
        -> LGRHS GhcPs (LocatedA (body GhcPs))
        -> RnM (LGRHS GhcRn (LocatedA (body GhcRn)), FreeVars)
@@ -1302,7 +1317,7 @@ dupSigDeclErr pairs@((L loc name, sig) :| _)
 
 misplacedSigErr :: LSig GhcRn -> RnM ()
 misplacedSigErr (L loc sig)
-  = addErrAt loc $
+  = addErrAt (locA loc) $
     sep [text "Misplaced" <+> hsSigDoc sig <> colon, ppr sig]
 
 defaultSigErr :: Sig GhcPs -> SDoc
@@ -1315,7 +1330,9 @@ bindsInHsBootFile mbinds
   = hang (text "Bindings in hs-boot files are not allowed")
        2 (ppr mbinds)
 
-nonStdGuardErr :: Outputable body => [LStmtLR GhcRn GhcRn body] -> SDoc
+nonStdGuardErr :: (Outputable body,
+                   Anno (Stmt GhcRn body) ~ SrcSpanAnnA)
+               => [LStmtLR GhcRn GhcRn body] -> SDoc
 nonStdGuardErr guards
   = hang (text "accepting non-standard pattern guards (use PatternGuards to suppress this message)")
        4 (interpp'SP guards)
@@ -1327,8 +1344,8 @@ unusedPatBindWarn bind
 
 dupMinimalSigErr :: [LSig GhcPs] -> RnM ()
 dupMinimalSigErr sigs@(L loc _ : _)
-  = addErrAt loc $
+  = addErrAt (locA loc) $
     vcat [ text "Multiple minimal complete definitions"
-         , text "at" <+> vcat (map ppr $ sortBy SrcLoc.leftmost_smallest $ map getLoc sigs)
+         , text "at" <+> vcat (map ppr $ sortBy SrcLoc.leftmost_smallest $ map getLocA sigs)
          , text "Combine alternative minimal complete definitions with `|'" ]
 dupMinimalSigErr [] = panic "dupMinimalSigErr"
