@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-
 Main functions for .hie file generation
 -}
@@ -393,7 +394,8 @@ getRealSpan :: SrcSpan -> Maybe Span
 getRealSpan (RealSrcSpan sp _) = Just sp
 getRealSpan _ = Nothing
 
-grhss_span :: GRHSs (GhcPass p) body -> SrcSpan
+grhss_span :: (Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p)))) ~ SrcSpan)
+           => GRHSs (GhcPass p) (LocatedA (body (GhcPass p))) -> SrcSpan
 -- AZ:TODO: we have not span for bs. Is this a problem?
 grhss_span (GRHSs _ xs _bs) = foldl1 combineSrcSpans  (map getLoc xs)
 grhss_span (XGRHSs _) = panic "XGRHS has no span"
@@ -558,7 +560,14 @@ instance HasLoc a => HasLoc [a] where
   loc [] = noSrcSpan
   loc xs = foldl1' combineSrcSpans $ map loc xs
 
-instance HasLoc a => HasLoc (FamEqn (GhcPass s) a) where
+instance (HasLoc (LocatedA (a (GhcPass p))), Anno (IdGhcP p) ~ SrcSpanAnnName)
+   => HasLoc (FamEqn (GhcPass p) (LocatedA (a (GhcPass p)))) where
+  loc (FamEqn _ a Nothing b _ c) = foldl1' combineSrcSpans [loc a, loc b, loc c]
+  loc (FamEqn _ a (Just tvs) b _ c) = foldl1' combineSrcSpans
+                                              [loc a, loc tvs, loc b, loc c]
+
+instance (HasLoc (a (GhcPass p)), Anno (IdGhcP p) ~ SrcSpanAnnName)
+   => HasLoc (FamEqn (GhcPass p) (a (GhcPass p))) where
   loc (FamEqn _ a Nothing b _ c) = foldl1' combineSrcSpans [loc a, loc b, loc c]
   loc (FamEqn _ a (Just tvs) b _ c) = foldl1' combineSrcSpans
                                               [loc a, loc tvs, loc b, loc c]
@@ -572,6 +581,9 @@ instance HasLoc (HsDataDefn GhcRn) where
   loc def@(HsDataDefn{}) = loc $ dd_cons def
     -- Only used for data family instances, so we only need rhs
     -- Most probably the rest will be unhelpful anyway
+
+instance HasLoc (HsType GhcRn) where
+  loc _ = noSrcSpan
 
 {- Note [Real DataCon Name]
 The typechecker substitutes the conLikeWrapId for the name, but we don't want
@@ -717,7 +729,7 @@ instance ToHie (Located HsWrapper) where
           concatMapM (toHie . C EvidenceVarUse . L osp) $ evVarsOfTermList a
         _               -> pure []
 
-instance HiePass p => HasType (Located (HsBind (GhcPass p))) where
+instance HiePass p => HasType (LocatedA (HsBind (GhcPass p))) where
   getTypeNode (L spn bind) =
     case hiePass @p of
       HieRn -> makeNode bind (locA spn)
@@ -746,7 +758,7 @@ instance HiePass p => HasType (LocatedA (Pat (GhcPass p))) where
 -- expression's type is going to be expensive.
 --
 -- See #16233
-instance HiePass p => HasType (Located (HsExpr (GhcPass p))) where
+instance HiePass p => HasType (LocatedA (HsExpr (GhcPass p))) where
   getTypeNode e@(L spn e') =
     case hiePass @p of
       HieRn -> makeNodeA e' spn
@@ -807,12 +819,16 @@ data HiePassEv p where
 class ( IsPass p
       , HiePass (NoGhcTcPass p)
       , ModifyState (IdGhcP p)
-      , Data (GRHS (GhcPass p) (Located (HsExpr (GhcPass p))))
+      , Data (GRHS  (GhcPass p) (LocatedA (HsExpr (GhcPass p))))
+      , Data (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p))))
+      , Data (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p))))
+      , Data (Stmt  (GhcPass p) (LocatedA (HsExpr (GhcPass p))))
+      , Data (Stmt  (GhcPass p) (LocatedA (HsCmd  (GhcPass p))))
       , Data (HsExpr (GhcPass p))
-      , Data (HsCmd (GhcPass p))
+      , Data (HsCmd  (GhcPass p))
       , Data (AmbiguousFieldOcc (GhcPass p))
       , Data (HsCmdTop (GhcPass p))
-      , Data (GRHS (GhcPass p) (Located (HsCmd (GhcPass p))))
+      , Data (GRHS (GhcPass p) (LocatedA (HsCmd (GhcPass p))))
       , Data (HsSplice (GhcPass p))
       , Data (HsLocalBinds (GhcPass p))
       , Data (FieldOcc (GhcPass p))
@@ -824,6 +840,7 @@ class ( IsPass p
       , ToHie (TScoped (LHsWcType (GhcPass (NoGhcTcPass p))))
       , ToHie (TScoped (LHsSigWcType (GhcPass (NoGhcTcPass p))))
       , HasRealDataConName (GhcPass p)
+      , Anno (IdGhcP p) ~ SrcSpanAnnName
       )
       => HiePass p where
   hiePass :: HiePassEv p
@@ -833,7 +850,25 @@ instance HiePass 'Renamed where
 instance HiePass 'Typechecked where
   hiePass = HieTc
 
-instance HiePass p => ToHie (BindContext (Located (HsBind (GhcPass p)))) where
+type AnnoBody p body
+  = ( Anno (Match (GhcPass p) (LocatedA (body (GhcPass p))))
+                   ~ SrcSpanAnnA
+    , Anno [LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))]
+                   ~ SrcSpanAnnL
+    , Anno (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))
+                   ~ SrcSpan
+    , Anno (StmtLR (GhcPass p) (GhcPass p) (LocatedA (body (GhcPass p)))) ~ SrcSpanAnnA
+
+    , Data (body (GhcPass p))
+    , Data (Match (GhcPass p) (LocatedA (body (GhcPass p))))
+    , Data (GRHS  (GhcPass p) (LocatedA (body (GhcPass p))))
+    , Data (Stmt  (GhcPass p) (LocatedA (body (GhcPass p))))
+
+    -- , ToHie (RScoped (LocatedA (StmtLR (GhcPass p) (GhcPass p) (LocatedA (body (GhcPass p))))))
+    , IsPass p
+    )
+
+instance HiePass p => ToHie (BindContext (LocatedA (HsBind (GhcPass p)))) where
   toHie (BC context scope b@(L span bind)) =
     concatM $ getTypeNode b : case bind of
       FunBind{fun_id = name, fun_matches = matches, fun_ext = wrap} ->
@@ -870,9 +905,9 @@ instance HiePass p => ToHie (BindContext (Located (HsBind (GhcPass p)))) where
         ]
 
 instance ( HiePass p
-         , ToHie (LocatedA body)
-         , Data body
-         ) => ToHie (MatchGroup (GhcPass p) (LocatedA body)) where
+         , AnnoBody p body
+         , ToHie (LocatedA (body (GhcPass p)))
+         ) => ToHie (MatchGroup (GhcPass p) (LocatedA (body (GhcPass p)))) where
   toHie mg = case mg of
     MG{ mg_alts = (L span alts) , mg_origin = origin} ->
       local (setOrigin origin) $ concatM
@@ -915,9 +950,10 @@ instance HiePass p => ToHie (HsPatSynDir (GhcPass p)) where
     _ -> pure []
 
 instance ( HiePass p
-         , Data body
-         , ToHie (LocatedA body)
-         ) => ToHie (LMatch (GhcPass p) (LocatedA body)) where
+         , Data (body (GhcPass p))
+         , AnnoBody p body
+         , ToHie (LocatedA (body (GhcPass p)))
+         ) => ToHie (LocatedA (Match (GhcPass p) (LocatedA (body (GhcPass p))))) where
   toHie (L span m ) = concatM $ node : case m of
     Match{m_ctxt=mctx, m_pats = pats, m_grhss =  grhss } ->
       [ toHie mctx
@@ -1059,31 +1095,31 @@ instance ToHie (TScoped (HsPatSigType GhcRn)) where
 --      , toHie $ RS (mkScope $ grhss_span grhs) binds
 --      ]
 
-instance ( ToHie (LocatedA body)
+instance ( ToHie (LocatedA (body (GhcPass p)))
          , HiePass p
-         , Data body
-         ) => ToHie (GRHSs (GhcPass p) (LocatedA body)) where
+         , AnnoBody p body
+         ) => ToHie (GRHSs (GhcPass p) (LocatedA (body (GhcPass p)))) where
   toHie grhs = concatM $ case grhs of
     GRHSs _ grhss binds ->
      [ toHie grhss
      , toHie $ RS (scopeHsLocaLBinds binds) binds
      ]
 
-instance ( ToHie (LocatedA body)
-         , HiePass a
-         , Data body
-         ) => ToHie (LGRHS (GhcPass a) (LocatedA body)) where
+instance ( ToHie (LocatedA (body (GhcPass p)))
+         , HiePass p
+         , AnnoBody p body
+         ) => ToHie (Located (GRHS (GhcPass p) (LocatedA (body (GhcPass p))))) where
   toHie (L span g) = concatM $ node : case g of
     GRHS _ guards body ->
       [ toHie $ listScopesA (mkLScopeA body) guards
       , toHie body
       ]
     where
-      node = case hiePass @a of
+      node = case hiePass @p of
         HieRn -> makeNode g span
         HieTc -> makeNode g span
 
-instance HiePass p => ToHie (LHsExpr (GhcPass p)) where
+instance HiePass p => ToHie (LocatedA (HsExpr (GhcPass p))) where
   toHie e@(L mspan oexpr) = concatM $ getTypeNode e : case oexpr of
       HsVar _ (L _ var) ->
         [ toHie $ C Use (L mspan var)
@@ -1221,17 +1257,17 @@ instance HiePass p => ToHie (LHsExpr (GhcPass p)) where
            ]
         | otherwise -> []
 
-instance HiePass p => ToHie (LHsTupArg (GhcPass p)) where
+instance HiePass p => ToHie (LocatedA (HsTupArg (GhcPass p))) where
   toHie (L span arg) = concatM $ makeNodeA arg span : case arg of
     Present _ expr ->
       [ toHie expr
       ]
     Missing _ -> []
 
-instance ( ToHie (LocatedA body)
-         , Data body
+instance ( ToHie (LocatedA (body (GhcPass p)))
+         , AnnoBody p body
          , HiePass p
-         ) => ToHie (RScoped (LStmt (GhcPass p) (LocatedA body))) where
+         ) => ToHie (RScoped (LocatedA (Stmt (GhcPass p) (LocatedA (body (GhcPass p)))))) where
   toHie (RS scope (L span stmt)) = concatM $ node : case stmt of
       LastStmt _ body _ _ ->
         [ toHie body
@@ -1310,14 +1346,14 @@ spanHsLocaLBinds (HsValBinds _ (ValBinds _ bs sigs))
     bsSpans :: [SrcSpan]
     bsSpans = map getLocA $ bagToList bs
     sigsSpans :: [SrcSpan]
-    sigsSpans = map getLoc sigs
+    sigsSpans = map getLocA sigs
 spanHsLocaLBinds (HsValBinds _ (XValBindsLR (NValBinds bs sigs)))
   = foldr1 combineSrcSpans (bsSpans ++ sigsSpans)
   where
     bsSpans :: [SrcSpan]
     bsSpans = map getLocA $ concatMap (bagToList . snd) bs
     sigsSpans :: [SrcSpan]
-    sigsSpans = map getLoc sigs
+    sigsSpans = map getLocA sigs
 spanHsLocaLBinds (HsIPBinds _ (IPBinds _ bs))
   = foldr1 combineSrcSpans (map getLocA bs)
 
@@ -1328,21 +1364,21 @@ scopeHsLocaLBinds (HsValBinds _ (ValBinds _ bs sigs))
     bsScope :: [Scope]
     bsScope = map (mkScopeA . getLoc) $ bagToList bs
     sigsScope :: [Scope]
-    sigsScope = map (mkScope . getLoc) sigs
+    sigsScope = map (mkScope . getLocA) sigs
 scopeHsLocaLBinds (HsValBinds _ (XValBindsLR (NValBinds bs sigs)))
   = foldr combineScopes NoScope (bsScope ++ sigsScope)
   where
     bsScope :: [Scope]
     bsScope = map (mkScopeA . getLoc) $ concatMap (bagToList . snd) bs
     sigsScope :: [Scope]
-    sigsScope = map (mkScope . getLoc) sigs
+    sigsScope = map (mkScope . getLocA) sigs
 
 scopeHsLocaLBinds (HsIPBinds _ (IPBinds _ bs))
   = foldr combineScopes NoScope (map (mkScopeA . getLoc) bs)
 scopeHsLocaLBinds (EmptyLocalBinds _) = NoScope
 
 
-instance HiePass p => ToHie (RScoped (LIPBind (GhcPass p))) where
+instance HiePass p => ToHie (RScoped (LocatedA (IPBind (GhcPass p)))) where
   toHie (RS scope (L sp bind)) = concatM $ makeNodeA bind sp : case bind of
     IPBind _ (Left _) expr -> [toHie expr]
     IPBind _ (Right v) expr ->
@@ -1435,7 +1471,7 @@ instance HiePass p => ToHie (Located (HsCmdTop (GhcPass p))) where
       [ toHie cmd
       ]
 
-instance HiePass p => ToHie (LHsCmd (GhcPass p)) where
+instance HiePass p => ToHie (LocatedA (HsCmd (GhcPass p))) where
   toHie (L span cmd) = concatM $ makeNodeA cmd span : case cmd of
       HsCmdArrApp _ a b _ _ ->
         [ toHie a
@@ -1489,18 +1525,18 @@ instance ToHie (TyClGroup GhcRn) where
     , toHie instances
     ]
 
-instance ToHie (Located (TyClDecl GhcRn)) where
-  toHie (L span decl) = concatM $ makeNode decl span : case decl of
+instance ToHie (LocatedA (TyClDecl GhcRn)) where
+  toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
       FamDecl {tcdFam = fdecl} ->
-        [ toHie ((L (noAnnSrcSpan span) fdecl) :: LFamilyDecl GhcRn)
+        [ toHie ((L span fdecl) :: LFamilyDecl GhcRn)
         ]
       SynDecl {tcdLName = name, tcdTyVars = vars, tcdRhs = typ} ->
-        [ toHie $ C (Decl SynDec $ getRealSpan span) name
+        [ toHie $ C (Decl SynDec $ getRealSpanA span) name
         , toHie $ TS (ResolvedScopes [mkScope $ getLocA typ]) vars
         , toHie typ
         ]
       DataDecl {tcdLName = name, tcdTyVars = vars, tcdDataDefn = defn} ->
-        [ toHie $ C (Decl DataDec $ getRealSpan span) name
+        [ toHie $ C (Decl DataDec $ getRealSpanA span) name
         , toHie $ TS (ResolvedScopes [quant_scope, rhs_scope]) vars
         , toHie defn
         ]
@@ -1519,14 +1555,14 @@ instance ToHie (Located (TyClDecl GhcRn)) where
                 , tcdATs = typs
                 , tcdATDefs = deftyps
                 } ->
-        [ toHie $ C (Decl ClassDec $ getRealSpan span) name
+        [ toHie $ C (Decl ClassDec $ getRealSpanA span) name
         , toHie context
         , toHie $ TS (ResolvedScopes [context_scope, rhs_scope]) vars
         , toHie deps
-        , toHie $ map (SC $ SI ClassSig $ getRealSpan span) sigs
+        , toHie $ map (SC $ SI ClassSig $ getRealSpanA span) sigs
         , toHie $ fmap (BC InstanceBind ModuleScope) meths
         , toHie typs
-        , concatMapM (locOnly . getLoc) deftyps
+        , concatMapM (locOnly . getLocA) deftyps
         , toHie deftyps
         ]
         where
@@ -1534,7 +1570,7 @@ instance ToHie (Located (TyClDecl GhcRn)) where
           rhs_scope = foldl1' combineScopes $ map mkScope
             [ loc deps, loc sigs, loc (bagToList meths), loc typs, loc deftyps]
 
-instance ToHie (LFamilyDecl GhcRn) where
+instance ToHie (LocatedA (FamilyDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
       FamilyDecl _ info name vars _ sig inj ->
         [ toHie $ C (Decl FamDec $ getRealSpanA span) name
@@ -1548,14 +1584,25 @@ instance ToHie (LFamilyDecl GhcRn) where
           sigSpan = mkScope $ getLoc sig
           injSpan = maybe NoScope (mkScope . getLoc) inj
 
+-- instance ToHie (FamilyInfo GhcRn) where
+--   toHie (ClosedTypeFamily (Just eqns)) = concatM $
+--     [ concatMapM (locOnly . getLocA) eqns
+--     , toHie $ map go eqns
+--     ]
+--     where
+--       go (L l ib) = TS (ResolvedScopes [mkScope (locA l)]) ib
+--   toHie _ = pure []
+
 instance ToHie (FamilyInfo GhcRn) where
   toHie (ClosedTypeFamily (Just eqns)) = concatM $
     [ concatMapM (locOnly . getLocA) eqns
     , toHie $ map go eqns
     ]
     where
-      go (L l ib) = TS (ResolvedScopes [mkScope (locA l)]) ib
+      go (L l ib) = TS (ResolvedScopes [mkScopeA l]) ib
   toHie _ = pure []
+
+
 
 instance ToHie (RScoped (Located (FamilyResultSig GhcRn))) where
   toHie (RS sc (L span sig)) = concatM $ makeNode sig span : case sig of
@@ -1568,19 +1615,34 @@ instance ToHie (RScoped (Located (FamilyResultSig GhcRn))) where
         [ toHie $ TVS (ResolvedScopes [sc]) NoScope bndr
         ]
 
-instance ToHie (LHsFunDep GhcRn) where
+instance ToHie (LocatedA (FunDep GhcRn)) where
   toHie (L span fd@(FunDep _ lhs rhs)) = concatM $
     [ makeNode fd (locA span)
     , toHie $ map (C Use) lhs
     , toHie $ map (C Use) rhs
     ]
 
-instance (ToHie rhs, HasLoc rhs)
-    => ToHie (TScoped (FamEqn GhcRn rhs)) where
+instance ToHie (TScoped (FamEqn GhcRn (HsDataDefn GhcRn))) where
   toHie (TS _ f) = toHie f
 
-instance (ToHie rhs, HasLoc rhs)
-    => ToHie (FamEqn GhcRn rhs) where
+instance (ToHie (LocatedA (rhs GhcRn)), HasLoc (rhs GhcRn))
+    => ToHie (TScoped (FamEqn GhcRn (LocatedA (rhs GhcRn)))) where
+  toHie (TS _ f) = toHie f
+
+instance (ToHie (LocatedA (rhs GhcRn)), HasLoc (rhs GhcRn))
+    => ToHie (FamEqn GhcRn (LocatedA (rhs GhcRn))) where
+  toHie fe@(FamEqn _ var tybndrs pats _ rhs) = concatM $
+    [ toHie $ C (Decl InstDec $ getRealSpan $ loc fe) var
+    , toHie $ fmap (tvScopes (ResolvedScopes []) scope) tybndrs
+    , toHie pats
+    , toHie rhs
+    ]
+    where scope = combineScopes patsScope rhsScope
+          patsScope = mkScope (loc pats)
+          rhsScope = mkScope (loc rhs)
+
+instance (ToHie (rhs GhcRn), HasLoc (rhs GhcRn))
+    => ToHie (FamEqn GhcRn (rhs GhcRn)) where
   toHie fe@(FamEqn _ var tybndrs pats _ rhs) = concatM $
     [ toHie $ C (Decl InstDec $ getRealSpan $ loc fe) var
     , toHie $ fmap (tvScopes (ResolvedScopes []) scope) tybndrs
@@ -1612,7 +1674,7 @@ instance ToHie (Located [Located (HsDerivingClause GhcRn)]) where
     , toHie clauses
     ]
 
-instance ToHie (LHsDerivingClause GhcRn) where
+instance ToHie (Located (HsDerivingClause GhcRn)) where
   toHie (L span cl) = concatM $ makeNode cl span : case cl of
       HsDerivingClause _ strat (L ispan tys) ->
         [ toHie strat
@@ -1633,7 +1695,7 @@ instance ToHie (LocatedP OverlapMode) where
 instance ToHie a => ToHie (HsScaled GhcRn a) where
   toHie (HsScaled w t) = concatM [toHie (arrowToHsType w), toHie t]
 
-instance ToHie (LConDecl GhcRn) where
+instance ToHie (LocatedA (ConDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNode decl (locA span) : case decl of
       ConDeclGADT { con_names = names, con_qvars = exp_vars, con_g_ext = imp_vars
                   , con_mb_cxt = ctx, con_args = args, con_res_ty = typ } ->
@@ -1669,7 +1731,7 @@ instance ToHie (LConDecl GhcRn) where
                                           (mkLScopeA (hsScaledThing b))
             RecCon x -> mkLScopeA x
 
-instance ToHie (LocatedL [LConDeclField GhcRn]) where
+instance ToHie (LocatedL [LocatedA (ConDeclField GhcRn)]) where
   toHie (L span decls) = concatM $
     [ locOnly (locA span)
     , toHie decls
@@ -1693,8 +1755,8 @@ instance ( HasLoc thing
       ]
     where span = loc a
 
-instance ToHie (Located (StandaloneKindSig GhcRn)) where
-  toHie (L sp sig) = concatM [makeNode sig sp, toHie sig]
+instance ToHie (LocatedA (StandaloneKindSig GhcRn)) where
+  toHie (L sp sig) = concatM [makeNodeA sig sp, toHie sig]
 
 instance ToHie (StandaloneKindSig GhcRn) where
   toHie sig = concatM $ case sig of
@@ -1703,11 +1765,11 @@ instance ToHie (StandaloneKindSig GhcRn) where
       , toHie $ TS (ResolvedScopes []) typ
       ]
 
-instance HiePass p => ToHie (SigContext (Located (Sig (GhcPass p)))) where
+instance HiePass p => ToHie (SigContext (LocatedA (Sig (GhcPass p)))) where
   toHie (SC (SI styp msp) (L sp sig)) =
     case hiePass @p of
       HieTc -> pure []
-      HieRn -> concatM $ makeNode sig sp : case sig of
+      HieRn -> concatM $ makeNodeA sig sp : case sig of
         TypeSig _ names typ ->
           [ toHie $ map (C TyDecl) names
           , toHie $ TS (UnresolvedScope (map unLoc names) Nothing) typ
@@ -1718,7 +1780,7 @@ instance HiePass p => ToHie (SigContext (Located (Sig (GhcPass p)))) where
           ]
         ClassOpSig _ _ names typ ->
           [ case styp of
-              ClassSig -> toHie $ map (C $ ClassTyDecl $ getRealSpan sp) names
+              ClassSig -> toHie $ map (C $ ClassTyDecl $ getRealSpanA sp) names
               _  -> toHie $ map (C $ TyDecl) names
           , toHie $ TS (UnresolvedScope (map unLoc names) msp) typ
           ]
@@ -1749,10 +1811,10 @@ instance HiePass p => ToHie (SigContext (Located (Sig (GhcPass p)))) where
           , toHie $ fmap (C Use) typ
           ]
 
-instance ToHie (Located (HsType GhcRn)) where
+instance ToHie (LocatedA (HsType GhcRn)) where
   toHie x = toHie $ TS (ResolvedScopes []) x
 
-instance ToHie (TScoped (LHsType GhcRn)) where
+instance ToHie (TScoped (LocatedA (HsType GhcRn))) where
   toHie (TS tsc (L span t)) = concatM $ makeNodeA t span : case t of
       HsForAllTy _ tele body ->
         let scope = mkScope $ getLocA body in
@@ -1855,13 +1917,13 @@ instance ToHie (TScoped (LHsQTyVars GhcRn)) where
       varLoc = loc vars
       bindings = map (C $ TyVarBind (mkScope varLoc) sc) implicits
 
-instance ToHie (Located [Located (HsType GhcRn)]) where
+instance ToHie (LocatedC [LocatedA (HsType GhcRn)]) where
   toHie (L span tys) = concatM $
       [ locOnly (locA span)
       , toHie tys
       ]
 
-instance ToHie (LConDeclField GhcRn) where
+instance ToHie (LocatedA (ConDeclField GhcRn)) where
   toHie (L span field) = concatM $ makeNode field (locA span) : case field of
       ConDeclField _ fields typ _ ->
         [ toHie $ map (RFC RecFieldDecl (getRealSpan $ loc typ)) fields
@@ -1884,8 +1946,8 @@ instance ToHie (LHsExpr a) => ToHie (ArithSeqInfo a) where
     , toHie c
     ]
 
-instance ToHie (Located (SpliceDecl GhcRn)) where
-  toHie (L span decl) = concatM $ makeNode decl span : case decl of
+instance ToHie (LocatedA (SpliceDecl GhcRn)) where
+  toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
       SpliceDecl _ splice _ ->
         [ toHie splice
         ]
@@ -1938,15 +2000,15 @@ instance HiePass p => ToHie (Located (HsSplice (GhcPass p))) where
                      GhcTc -> case x of
                                 HsSplicedT _ -> []
 
-instance ToHie (Located (RoleAnnotDecl GhcRn)) where
-  toHie (L span annot) = concatM $ makeNode annot span : case annot of
+instance ToHie (LocatedA (RoleAnnotDecl GhcRn)) where
+  toHie (L span annot) = concatM $ makeNodeA annot span : case annot of
       RoleAnnotDecl _ var roles ->
         [ toHie $ C Use var
         , concatMapM (locOnly . getLoc) roles
         ]
 
-instance ToHie (Located (InstDecl GhcRn)) where
-  toHie (L span decl) = concatM $ makeNode decl span : case decl of
+instance ToHie (LocatedA (InstDecl GhcRn)) where
+  toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
       ClsInstD _ d ->
         [ toHie $ L span d
         ]
@@ -1957,23 +2019,23 @@ instance ToHie (Located (InstDecl GhcRn)) where
         [ toHie $ L span d
         ]
 
-instance ToHie (Located (ClsInstDecl GhcRn)) where
+instance ToHie (LocatedA (ClsInstDecl GhcRn)) where
   toHie (L span decl) = concatM
-    [ toHie $ TS (ResolvedScopes [mkScope span]) $ cid_poly_ty decl
+    [ toHie $ TS (ResolvedScopes [mkScopeA span]) $ cid_poly_ty decl
     , toHie $ fmap (BC InstanceBind ModuleScope) $ cid_binds decl
-    , toHie $ map (SC $ SI InstSig $ getRealSpan span) $ cid_sigs decl
-    , concatMapM (locOnly . getLoc) $ cid_tyfam_insts decl
+    , toHie $ map (SC $ SI InstSig $ getRealSpanA span) $ cid_sigs decl
+    , concatMapM (locOnly . getLocA) $ cid_tyfam_insts decl
     , toHie $ cid_tyfam_insts decl
-    , concatMapM (locOnly . getLoc) $ cid_datafam_insts decl
+    , concatMapM (locOnly . getLocA) $ cid_datafam_insts decl
     , toHie $ cid_datafam_insts decl
     , toHie $ cid_overlap_mode decl
     ]
 
-instance ToHie (Located (DataFamInstDecl GhcRn)) where
-  toHie (L sp (DataFamInstDecl d)) = toHie $ TS (ResolvedScopes [mkScope sp]) d
+instance ToHie (LocatedA (DataFamInstDecl GhcRn)) where
+  toHie (L sp (DataFamInstDecl d)) = toHie $ TS (ResolvedScopes [mkScopeA sp]) d
 
-instance ToHie (Located (TyFamInstDecl GhcRn)) where
-  toHie (L sp (TyFamInstDecl d)) = toHie $ TS (ResolvedScopes [mkScope sp]) d
+instance ToHie (LocatedA (TyFamInstDecl GhcRn)) where
+  toHie (L sp (TyFamInstDecl d)) = toHie $ TS (ResolvedScopes [mkScopeA sp]) d
 
 instance ToHie (Context a)
          => ToHie (PatSynFieldContext (RecordPatSynField a)) where
@@ -1982,30 +2044,30 @@ instance ToHie (Context a)
     , toHie $ C Use b
     ]
 
-instance ToHie (Located (DerivDecl GhcRn)) where
-  toHie (L span decl) = concatM $ makeNode decl span : case decl of
+instance ToHie (LocatedA (DerivDecl GhcRn)) where
+  toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
       DerivDecl _ typ strat overlap ->
         [ toHie $ TS (ResolvedScopes []) typ
         , toHie strat
         , toHie overlap
         ]
 
-instance ToHie (Located (FixitySig GhcRn)) where
-  toHie (L span sig) = concatM $ makeNode sig span : case sig of
+instance ToHie (LocatedA (FixitySig GhcRn)) where
+  toHie (L span sig) = concatM $ makeNodeA sig span : case sig of
       FixitySig _ vars _ ->
         [ toHie $ map (C Use) vars
         ]
 
-instance ToHie (Located (DefaultDecl GhcRn)) where
-  toHie (L span decl) = concatM $ makeNode decl span : case decl of
+instance ToHie (LocatedA (DefaultDecl GhcRn)) where
+  toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
       DefaultDecl _ typs ->
         [ toHie typs
         ]
 
-instance ToHie (Located (ForeignDecl GhcRn)) where
-  toHie (L span decl) = concatM $ makeNode decl span : case decl of
+instance ToHie (LocatedA (ForeignDecl GhcRn)) where
+  toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
       ForeignImport {fd_name = name, fd_sig_ty = sig, fd_fi = fi} ->
-        [ toHie $ C (ValBind RegularBind ModuleScope $ getRealSpan span) name
+        [ toHie $ C (ValBind RegularBind ModuleScope $ getRealSpanA span) name
         , toHie $ TS (ResolvedScopes []) sig
         , toHie fi
         ]
@@ -2028,20 +2090,20 @@ instance ToHie ForeignExport where
     , locOnly b
     ]
 
-instance ToHie (Located (WarnDecls GhcRn)) where
-  toHie (L span decl) = concatM $ makeNode decl span : case decl of
+instance ToHie (LocatedA (WarnDecls GhcRn)) where
+  toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
       Warnings _ _ warnings ->
         [ toHie warnings
         ]
 
-instance ToHie (LWarnDecl GhcRn) where
+instance ToHie (LocatedA (WarnDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNode decl (locA span) : case decl of
       Warning _ vars _ ->
         [ toHie $ map (C Use) vars
         ]
 
-instance ToHie (Located (AnnDecl GhcRn)) where
-  toHie (L span decl) = concatM $ makeNode decl span : case decl of
+instance ToHie (LocatedA (AnnDecl GhcRn)) where
+  toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
       HsAnnotation _ _ prov expr ->
         [ toHie prov
         , toHie expr
@@ -2052,13 +2114,13 @@ instance ToHie (Context (Located a)) => ToHie (AnnProvenance a) where
   toHie (TypeAnnProvenance a) = toHie $ C Use a
   toHie ModuleAnnProvenance = pure []
 
-instance ToHie (Located (RuleDecls GhcRn)) where
-  toHie (L span decl) = concatM $ makeNode decl span : case decl of
+instance ToHie (LocatedA (RuleDecls GhcRn)) where
+  toHie (L span decl) = concatM $ makeNodeA decl span : case decl of
       HsRules _ _ rules ->
         [ toHie rules
         ]
 
-instance ToHie (Located (RuleDecl GhcRn)) where
+instance ToHie (LocatedA (RuleDecl GhcRn)) where
   toHie (L span r@(HsRule _ rname _ tybndrs bndrs exprA exprB)) = concatM
         [ makeNodeA r span
         , locOnly $ getLoc rname
@@ -2082,7 +2144,7 @@ instance ToHie (RScoped (Located (RuleBndr GhcRn))) where
         , toHie $ TS (ResolvedScopes [sc]) typ
         ]
 
-instance ToHie (LImportDecl GhcRn) where
+instance ToHie (LocatedA (ImportDecl GhcRn)) where
   toHie (L span decl) = concatM $ makeNode decl (locA span) : case decl of
       ImportDecl { ideclName = name, ideclAs = as, ideclHiding = hidden } ->
         [ toHie $ IEC Import name
@@ -2097,7 +2159,7 @@ instance ToHie (LImportDecl GhcRn) where
         where
          c = if hiding then ImportHiding else Import
 
-instance ToHie (IEContext (LIE GhcRn)) where
+instance ToHie (IEContext (LocatedA (IE GhcRn))) where
   toHie (IEC c (L span ie)) = concatM $ makeNode ie (locA span) : case ie of
       IEVar _ n ->
         [ toHie $ IEC c n

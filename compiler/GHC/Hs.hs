@@ -122,11 +122,11 @@ deriving instance Data HsModule
 
 instance Outputable HsModule where
 
-    ppr (HsModule _ Nothing _ imports decls _ mbDoc)
+    ppr (HsModule _ _ Nothing _ imports decls _ mbDoc)
       = pp_mb mbDoc $$ pp_nonnull imports
                     $$ pp_nonnull decls
 
-    ppr (HsModule _ (Just name) exports imports decls deprec mbDoc)
+    ppr (HsModule _ _ (Just name) exports imports decls deprec mbDoc)
       = vcat [
             pp_mb mbDoc,
             case exports of

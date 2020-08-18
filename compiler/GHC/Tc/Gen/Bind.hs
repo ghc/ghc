@@ -302,14 +302,14 @@ tcCompleteSigs sigs =
   -- For some reason I haven't investigated further, the signatures come in
   -- backwards wrt. declaration order. So we reverse them here, because it makes
   -- a difference for incomplete match suggestions.
-  in  mapMaybeM (addLocM doOne) (reverse sigs) -- process in declaration order
+  in  mapMaybeM (addLocMA doOne) (reverse sigs) -- process in declaration order
 
 tcHsBootSigs :: [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn] -> TcM [Id]
 -- A hs-boot file has only one BindGroup, and it only has type
 -- signatures in it.  The renamer checked all this
 tcHsBootSigs binds sigs
   = do  { checkTc (null binds) badBootDeclErr
-        ; concatMapM (addLocM tc_boot_sig) (filter isTypeLSig sigs) }
+        ; concatMapM (addLocMA tc_boot_sig) (filter isTypeLSig sigs) }
   where
     tc_boot_sig (TypeSig _ lnames hs_ty) = mapM f lnames
       where
@@ -1771,7 +1771,7 @@ isClosedBndrGroup type_env binds
 
 -- This one is called on LHS, when pat and grhss are both Name
 -- and on RHS, when pat is TcId and grhss is still Name
-patMonoBindsCtxt :: (OutputableBndrId p, Outputable body)
-                 => LPat (GhcPass p) -> GRHSs GhcRn body -> SDoc
+patMonoBindsCtxt :: (OutputableBndrId p)
+                 => LPat (GhcPass p) -> GRHSs GhcRn (LHsExpr GhcRn) -> SDoc
 patMonoBindsCtxt pat grhss
   = hang (text "In a pattern binding:") 2 (pprPatBind pat grhss)

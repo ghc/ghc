@@ -476,7 +476,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
                                   , cid_sigs = uprags, cid_tyfam_insts = ats
                                   , cid_overlap_mode = overlap_mode
                                   , cid_datafam_insts = adts }))
-  = setSrcSpan loc                      $
+  = setSrcSpanA loc                      $
     addErrCtxt (instDeclCtxt1 hs_ty)  $
     do  { dfun_ty <- tcHsClsInstType (InstDeclCtxt False) hs_ty
         ; let (tyvars, theta, clas, inst_tys) = tcSplitDFunTy dfun_ty
@@ -507,7 +507,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
 
                       -- Check for missing associated types and build them
                       -- from their defaults (if available)
-                    ; tf_insts2 <- mapM (tcATDefault loc mini_subst defined_ats)
+                    ; tf_insts2 <- mapM (tcATDefault (locA loc) mini_subst defined_ats)
                                         (classATItems clas)
 
                     ; return (df_stuff, tf_insts1 ++ concat tf_insts2) }
@@ -565,7 +565,7 @@ tcTyFamInstDecl :: AssocInstInfo
   -- "type instance"
   -- See Note [Associated type instances]
 tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
-  = setSrcSpan loc           $
+  = setSrcSpanA loc           $
     tcAddTyFamInstCtxt decl  $
     do { let fam_lname = feqn_tycon (hsib_body eqn)
        ; fam_tc <- tcLookupLocatedTyCon fam_lname
@@ -661,7 +661,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
                                         , dd_cons    = hs_cons
                                         , dd_kindSig = m_ksig
                                         , dd_derivs  = derivs } }}}))
-  = setSrcSpan loc             $
+  = setSrcSpanA loc            $
     tcAddDataFamInstCtxt decl  $
     do { fam_tc <- tcLookupLocatedTyCon lfam_name
 
@@ -1559,7 +1559,7 @@ tcMethods :: DFunId -> Class
           -> [TcTyVar] -> [EvVar]
           -> [TcType]
           -> TcEvBinds
-          -> ([Located TcSpecPrag], TcPragEnv)
+          -> ([LTcSpecPrag], TcPragEnv)
           -> [ClassOpItem]
           -> InstBindings GhcRn
           -> TcM ([Id], LHsBinds GhcTc, Bag Implication)
@@ -1971,7 +1971,7 @@ mkDefMethBind dfun_id clas sel_id dm_name
         ; dm_id <- tcLookupId dm_name
         ; let inline_prag = idInlinePragma dm_id
               inline_prags | isAnyInlinePragma inline_prag
-                           = [noLoc (InlineSig noAnn fn inline_prag)]
+                           = [noLocA (InlineSig noAnn fn inline_prag)]
                            | otherwise
                            = []
                  -- Copy the inline pragma (if any) from the default method
@@ -2188,9 +2188,9 @@ Note that
 -}
 
 tcSpecInstPrags :: DFunId -> InstBindings GhcRn
-                -> TcM ([Located TcSpecPrag], TcPragEnv)
+                -> TcM ([LocatedA TcSpecPrag], TcPragEnv)
 tcSpecInstPrags dfun_id (InstBindings { ib_binds = binds, ib_pragmas = uprags })
-  = do { spec_inst_prags <- mapM (wrapLocM (tcSpecInst dfun_id)) $
+  = do { spec_inst_prags <- mapM (wrapLocMA (tcSpecInst dfun_id)) $
                             filter isSpecInstLSig uprags
              -- The filter removes the pragmas for methods
        ; return (spec_inst_prags, mkPragEnv uprags binds) }

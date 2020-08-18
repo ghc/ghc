@@ -10,9 +10,9 @@ import GHC.Utils.Outputable hiding (space)
 import System.Environment( getArgs )
 import System.Exit
 import System.FilePath
--- import ExactPrint
-exactPrint = undefined
-showGhc = undefined
+import ExactPrint
+-- exactPrint = undefined
+-- showGhc = undefined
 
 -- ---------------------------------------------------------------------
 
@@ -21,7 +21,7 @@ tt = testOneFile "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib"
   -- "Test.hs"
  -- "../../testsuite/tests/printer/Ppr001.hs"
  -- "../../testsuite/tests/printer/Ppr002.hs"
- "../../testsuite/tests/printer/Ppr003.hs"
+ -- "../../testsuite/tests/printer/Ppr003.hs"
  -- "../../testsuite/tests/printer/Ppr004.hs"
  -- "../../testsuite/tests/printer/Ppr005.hs"
  -- "../../testsuite/tests/qualifieddo/should_compile/qdocompile001.hs"
@@ -29,6 +29,8 @@ tt = testOneFile "/home/alanz/mysrc/git.haskell.org/ghc/_build/stage1/lib"
  -- "../../testsuite/tests/printer/Ppr007.hs"
  -- "../../testsuite/tests/printer/Ppr008.hs"
  -- "../../testsuite/tests/hiefile/should_compile/hie008.hs"
+ -- "../../testsuite/tests/printer/Ppr009.hs"
+ "../../testsuite/tests/printer/Ppr011.hs"
 
 -- exact = ppr
 

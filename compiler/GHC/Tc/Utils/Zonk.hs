@@ -663,7 +663,8 @@ zonkLTcSpecPrags env ps
 ************************************************************************
 -}
 
-zonkMatchGroup :: ZonkEnv
+zonkMatchGroup :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcSpan
+            => ZonkEnv
             -> (ZonkEnv -> LocatedA (body GhcTc) -> TcM (LocatedA (body GhcTc)))
             -> MatchGroup GhcTc (LocatedA (body GhcTc))
             -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
@@ -677,7 +678,8 @@ zonkMatchGroup env zBody (MG { mg_alts = L l ms
                      , mg_ext = MatchGroupTc arg_tys' res_ty'
                      , mg_origin = origin }) }
 
-zonkMatch :: ZonkEnv
+zonkMatch :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcSpan
+          => ZonkEnv
           -> (ZonkEnv -> LocatedA (body GhcTc) -> TcM (LocatedA (body GhcTc)))
           -> LMatch GhcTc (LocatedA (body GhcTc))
           -> TcM (LMatch GhcTc (LocatedA (body GhcTc)))
@@ -688,7 +690,8 @@ zonkMatch env zBody (L loc match@(Match { m_pats = pats
         ; return (L loc (match { m_pats = new_pats, m_grhss = new_grhss })) }
 
 -------------------------------------------------------------------------
-zonkGRHSs :: ZonkEnv
+zonkGRHSs :: Anno (GRHS GhcTc (LocatedA (body GhcTc))) ~ SrcSpan
+          => ZonkEnv
           -> (ZonkEnv -> LocatedA (body GhcTc) -> TcM (LocatedA (body GhcTc)))
           -> GRHSs GhcTc (LocatedA (body GhcTc))
           -> TcM (GRHSs GhcTc (LocatedA (body GhcTc)))
@@ -1092,7 +1095,8 @@ zonkArithSeq env (FromThenTo e1 e2 e3)
 
 
 -------------------------------------------------------------------------
-zonkStmts :: ZonkEnv
+zonkStmts :: Anno (StmtLR GhcTc GhcTc (LocatedA (body GhcTc))) ~ SrcSpanAnnA
+          => ZonkEnv
           -> (ZonkEnv -> LocatedA (body GhcTc) -> TcM (LocatedA (body GhcTc)))
           -> [LStmt GhcTc (LocatedA (body GhcTc))]
           -> TcM (ZonkEnv, [LStmt GhcTc (LocatedA (body GhcTc))])
@@ -1101,7 +1105,8 @@ zonkStmts env zBody (s:ss) = do { (env1, s')  <- wrapLocSndMA (zonkStmt env zBod
                                 ; (env2, ss') <- zonkStmts env1 zBody ss
                                 ; return (env2, s' : ss') }
 
-zonkStmt :: ZonkEnv
+zonkStmt :: Anno (StmtLR GhcTc GhcTc (LocatedA (body GhcTc))) ~ SrcSpanAnnA
+         => ZonkEnv
          -> (ZonkEnv -> LocatedA (body GhcTc) -> TcM (LocatedA (body GhcTc)))
          -> Stmt GhcTc (LocatedA (body GhcTc))
          -> TcM (ZonkEnv, Stmt GhcTc (LocatedA (body GhcTc)))
@@ -1489,7 +1494,7 @@ zonkPats env (pat:pats) = do { (env1, pat') <- zonkPat env pat
 
 zonkForeignExports :: ZonkEnv -> [LForeignDecl GhcTc]
                    -> TcM [LForeignDecl GhcTc]
-zonkForeignExports env ls = mapM (wrapLocM (zonkForeignExport env)) ls
+zonkForeignExports env ls = mapM (wrapLocMA (zonkForeignExport env)) ls
 
 zonkForeignExport :: ZonkEnv -> ForeignDecl GhcTc -> TcM (ForeignDecl GhcTc)
 zonkForeignExport env (ForeignExport { fd_name = i, fd_e_ext = co

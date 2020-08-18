@@ -1863,7 +1863,7 @@ gen_Newtype_binds :: SrcSpan
                   -> Type    -- the representation type
                   -> TcM (LHsBinds GhcPs, [LSig GhcPs], BagDerivStuff)
 -- See Note [Newtype-deriving instances]
-gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
+gen_Newtype_binds loc' cls inst_tvs inst_tys rhs_ty
   = do let ats = classATs cls
            (binds, sigs) = mapAndUnzip mk_bind_and_sig (classMethods cls)
        atf_insts <- ASSERT( all (not . isDataFamilyTyCon) ats )
@@ -1872,6 +1872,8 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
               , sigs
               , listToBag $ map DerivFamInst atf_insts )
   where
+    locn = noAnnSrcSpan loc'
+    loca = noAnnSrcSpan loc'
     -- For each class method, generate its derived binding and instance
     -- signature. Using the first example from
     -- Note [Newtype-deriving instances]:
@@ -1898,8 +1900,8 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
         , -- The derived instance signature, e.g.,
           --
           --   op :: forall c. a -> [T x] -> c -> Int
-          L loc $ ClassOpSig noAnn False [loc_meth_RDR]
-                $ mkLHsSigType $ nlHsCoreTy to_ty
+          L loca $ ClassOpSig noAnn False [loc_meth_RDR]
+                 $ mkLHsSigType $ nlHsCoreTy to_ty
         )
       where
         Pair from_ty to_ty = mkCoerceClassMethEqn cls inst_tvs inst_tys rhs_ty meth_id
@@ -1907,7 +1909,7 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
         (_, _, to_tau)   = tcSplitSigmaTy to_ty
 
         meth_RDR = getRdrName meth_id
-        loc_meth_RDR = L (noAnnSrcSpan loc) meth_RDR
+        loc_meth_RDR = L locn meth_RDR
 
         rhs_expr = nlHsVar (getRdrName coerceId)
                                       `nlHsAppType`     from_tau
@@ -1924,7 +1926,7 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
 
     mk_atf_inst :: TyCon -> TcM FamInst
     mk_atf_inst fam_tc = do
-        rep_tc_name <- newFamInstTyConName (L (noAnnSrcSpan loc) (tyConName fam_tc))
+        rep_tc_name <- newFamInstTyConName (L locn (tyConName fam_tc))
                                            rep_lhs_tys
         let axiom = mkSingleCoAxiom Nominal rep_tc_name rep_tvs' [] rep_cvs'
                                     fam_tc rep_lhs_tys rep_rhs_ty
@@ -2013,9 +2015,11 @@ genAuxBindSpecOriginal :: DynFlags -> SrcSpan -> AuxBindSpec
                        -> (LHsBind GhcPs, LSig GhcPs)
 genAuxBindSpecOriginal dflags loc spec
   = (gen_bind spec,
-     L loc (TypeSig noAnn [L (noAnnSrcSpan loc) (auxBindSpecRdrName spec)]
+     L loca (TypeSig noAnn [L locn (auxBindSpecRdrName spec)]
            (genAuxBindSpecSig loc spec)))
   where
+    loca = noAnnSrcSpan loc
+    locn = noAnnSrcSpan loc
     gen_bind :: AuxBindSpec -> LHsBind GhcPs
     gen_bind (DerivCon2Tag tycon con2tag_RDR)
       = mkFunBindSE 0 loc con2tag_RDR eqns
@@ -2081,9 +2085,11 @@ genAuxBindSpecDup :: SrcSpan -> RdrName -> AuxBindSpec
                   -> (LHsBind GhcPs, LSig GhcPs)
 genAuxBindSpecDup loc original_rdr_name dup_spec
   = (mkHsVarBind loc dup_rdr_name (nlHsVar original_rdr_name),
-     L loc (TypeSig noAnn [L (noAnnSrcSpan loc) dup_rdr_name]
+     L loca (TypeSig noAnn [L locn dup_rdr_name]
            (genAuxBindSpecSig loc dup_spec)))
   where
+    loca = noAnnSrcSpan loc
+    locn = noAnnSrcSpan loc
     dup_rdr_name = auxBindSpecRdrName dup_spec
 
 -- | Generate the type signature of an auxiliary binding.

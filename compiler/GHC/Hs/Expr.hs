@@ -84,6 +84,9 @@ type LHsExpr p = XRec p (HsExpr p)
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
+type instance Anno (HsExpr (GhcPass p)) = SrcSpanAnnA
+
+
 -------------------------
 -- | Post-Type checking Expression
 --
@@ -717,10 +720,15 @@ type instance XXExpr         GhcRn       = HsExpansion (HsExpr GhcRn)
                                                        (HsExpr GhcRn)
 type instance XXExpr         GhcTc       = XXExprGhcTc
 
+
+                -- (XRec p [ExprLStmt p])   -- "do":one or more stmts
+                -- (LocatedL [ExprLStmt p]) -- "do":one or more stmts
+type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass pr)))))] = SrcSpanAnnL
+type instance Anno [LocatedA ((StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd (GhcPass pr)))))] = SrcSpanAnnL
+
 data XXExprGhcTc
   = WrapExpr {-# UNPACK #-} !(HsWrap HsExpr)
   | ExpansionExpr {-# UNPACK #-} !(HsExpansion (HsExpr GhcRn) (HsExpr GhcTc))
-
 
 {-
 Note [Rebindable syntax and HsExpansion]
@@ -901,10 +909,11 @@ type instance XXPragE        (GhcPass _) = NoExtCon
 -- @(,a,)@ is represented by
 -- @ExplicitTuple [Missing ty1, Present a, Missing ty3]@
 -- Which in turn stands for @(\x:ty1 \y:ty2. (x,a,y))@
-type LHsTupArg id = XRec id (HsTupArg id)
+type LHsTupArg p = XRec p (HsTupArg p)
 -- type LHsTupArg id = LocatedA (HsTupArg id)
                        -- AZ: old one
 -- | - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnComma'
+type instance Anno (HsTupArg (GhcPass p)) = SrcSpanAnnA
 
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
@@ -1459,6 +1468,7 @@ We re-use HsExpr to represent these.
 type LHsCmd id = XRec id (HsCmd id)
 -- type LHsCmd id = LocatedA (HsCmd id)
                        -- AZ: old one
+type instance Anno (HsCmd (GhcPass p)) = SrcSpanAnnA
 
 -- | Haskell Command (e.g. a "statement" in an Arrow proc block)
 data HsCmd id
@@ -1595,6 +1605,12 @@ type instance XCmdWrap    (GhcPass _) = NoExtField
 type instance XXCmd       GhcPs = NoExtCon
 type instance XXCmd       GhcRn = NoExtCon
 type instance XXCmd       GhcTc = HsWrap HsCmd
+
+                -- (XRec id [CmdLStmt id])
+                -- -- (LocatedL [CmdLStmt id])
+type instance Anno [LocatedA (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd (GhcPass pr))))]
+  = SrcSpanAnnL
+
     -- If   cmd :: arg1 --> res
     --      wrap :: arg1 "->" arg2
     -- Then (XCmd (HsWrap wrap cmd)) :: arg2 --> res
@@ -1611,6 +1627,7 @@ argument of a command-forming operator.
 
 -- | Located Haskell Top-level Command
 type LHsCmdTop p = XRec p (HsCmdTop p)
+type instance Anno (HsCmdTop (GhcPass p)) = SrcSpan
 
 -- | Haskell Top-level Command
 data HsCmdTop p
@@ -1655,7 +1672,9 @@ isQuietHsCmd _ = False
 ppr_lcmd :: (OutputableBndrId p) => LHsCmd (GhcPass p) -> SDoc
 ppr_lcmd c = ppr_cmd (unLoc c)
 
-ppr_cmd :: forall p. (OutputableBndrId p) => HsCmd (GhcPass p) -> SDoc
+ppr_cmd :: forall p. (OutputableBndrId p
+                 -- Anno (StmtLR (GhcPass p) (GhcPass p) body) ~ SrcSpanAnnA
+                     ) => HsCmd (GhcPass p) -> SDoc
 ppr_cmd (HsCmdPar _ c) = parens (ppr_lcmd c)
 
 ppr_cmd (HsCmdApp _ c e)
@@ -1766,7 +1785,7 @@ patterns in each equation.
 
 data MatchGroup p body
   = MG { mg_ext     :: XMG p body -- Post-typechecker, types of args and result
-       -- , mg_alts    :: XRec p [LMatch p body]  -- The alternatives
+       , mg_alts    :: XRec p [LMatch p body]  -- The alternatives
        -- , mg_alts    :: LocatedL [LMatch p body]  -- The alternatives
                        -- AZ: old one
        --                -- TODO:AZ: need mg_alts be located? put the
@@ -1790,6 +1809,9 @@ type instance XMG         GhcTc b = MatchGroupTc
 
 type instance XXMatchGroup (GhcPass _) b = NoExtCon
 
+type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p))))] = SrcSpanAnnL
+type instance Anno [LocatedA (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p))))] = SrcSpanAnnL
+
 -- | Located Match
 type LMatch id body = XRec id (Match id body)
 -- type LMatch id body = LocatedA (Match id body)
@@ -1797,6 +1819,10 @@ type LMatch id body = XRec id (Match id body)
 --   list
 
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+
+type instance Anno (Match (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcSpanAnnA
+type instance Anno (Match (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = SrcSpanAnnA
+
 data Match p body
   = Match {
         m_ext :: XCMatch p body,
@@ -1903,6 +1929,10 @@ type instance XXGRHSs (GhcPass _) b = NoExtCon
 
 -- | Located Guarded Right-Hand Side
 type LGRHS id body = XRec id (GRHS id body)
+-- type LGRHS id body = Located (GRHS id body)
+type instance Anno (GRHS (GhcPass p) (LocatedA (HsExpr (GhcPass p)))) = SrcSpan
+type instance Anno (GRHS (GhcPass p) (LocatedA (HsCmd  (GhcPass p)))) = SrcSpan
+
 
 -- | Guarded Right Hand Side.
 data GRHS p body = GRHS (XCGRHS p body)
@@ -1931,15 +1961,20 @@ pprMatches MG { mg_alts = matches }
       -- Don't print the type; it's only a place-holder before typechecking
 
 -- Exported to GHC.Hs.Binds, which can't see the defn of HsMatchContext
-pprFunBind :: (OutputableBndrId idR, Outputable body)
-           => MatchGroup (GhcPass idR) body -> SDoc
+-- pprFunBind :: (OutputableBndrId idR, Outputable body)
+--            => MatchGroup (GhcPass idR) body -> SDoc
+pprFunBind :: (OutputableBndrId idR)
+           => MatchGroup (GhcPass idR) (LHsExpr (GhcPass idR)) -> SDoc
 pprFunBind matches = pprMatches matches
 
 -- Exported to GHC.Hs.Binds, which can't see the defn of HsMatchContext
-pprPatBind :: forall bndr p body. (OutputableBndrId bndr,
-                                   OutputableBndrId p,
-                                   Outputable body)
-           => LPat (GhcPass bndr) -> GRHSs (GhcPass p) body -> SDoc
+-- pprPatBind :: forall bndr p body. (OutputableBndrId bndr,
+--                                    OutputableBndrId p,
+--                                    Outputable body)
+--            => LPat (GhcPass bndr) -> GRHSs (GhcPass p) body -> SDoc
+pprPatBind :: forall bndr p . (OutputableBndrId bndr,
+                               OutputableBndrId p)
+           => LPat (GhcPass bndr) -> GRHSs (GhcPass p) (LHsExpr (GhcPass p)) -> SDoc
 pprPatBind pat grhss
  = sep [ppr pat,
        nest 2 (pprGRHSs (PatBindRhs :: HsMatchContext (GhcPass p)) grhss)]
@@ -2014,6 +2049,8 @@ instance Outputable GrhsAnn where
 type LStmt id body = XRec id (StmtLR id id body)
 -- type LStmt id body = LocatedA (StmtLR id id body)
                        -- AZ: old one
+type instance Anno (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsExpr (GhcPass pr)))) = SrcSpanAnnA
+type instance Anno (StmtLR (GhcPass pl) (GhcPass pr) (LocatedA (HsCmd  (GhcPass pr)))) = SrcSpanAnnA
 
 -- | Located Statement with separate Left and Right id's
 type LStmtLR idL idR body = XRec idL (StmtLR idL idR body)
@@ -2474,12 +2511,14 @@ instance (Outputable (StmtLR (GhcPass idL) (GhcPass idL) (LHsExpr (GhcPass idL))
   ppr (ParStmtBlock _ stmts _ _) = interpp'SP stmts
 
 instance (OutputableBndrId pl, OutputableBndrId pr,
+                 Anno (StmtLR (GhcPass pl) (GhcPass pr) body) ~ SrcSpanAnnA,
           Outputable body)
          => Outputable (StmtLR (GhcPass pl) (GhcPass pr) body) where
     ppr stmt = pprStmt stmt
 
 pprStmt :: forall idL idR body . (OutputableBndrId idL,
                                   OutputableBndrId idR,
+                 Anno (StmtLR (GhcPass idL) (GhcPass idR) body) ~ SrcSpanAnnA,
                                   Outputable body)
         => (StmtLR (GhcPass idL) (GhcPass idR) body) -> SDoc
 pprStmt (LastStmt _ expr m_dollar_stripped _)
@@ -2558,7 +2597,7 @@ pprArg (ApplicativeArgOne _ pat expr isBody)
 pprArg (ApplicativeArgMany _ stmts return pat ctxt) =
      ppr pat <+>
      text "<-" <+>
-     ppr (HsDo (panic "pprStmt") ctxt (noLocA
+     ppr ((HsDo (panic "pprStmt") ctxt (noLocA
                (stmts ++
                    [noLocA (LastStmt noExtField (noLocA return) Nothing noSyntaxExpr)])))
           :: HsExpr (GhcPass idL))
@@ -2581,7 +2620,9 @@ pprBy :: Outputable body => Maybe body -> SDoc
 pprBy Nothing  = empty
 pprBy (Just e) = text "by" <+> ppr e
 
-pprDo :: (OutputableBndrId p, Outputable body)
+pprDo :: (OutputableBndrId p, Outputable body,
+                 Anno (StmtLR (GhcPass p) (GhcPass p) body) ~ SrcSpanAnnA
+         )
       => HsStmtContext any -> [LStmt (GhcPass p) body] -> SDoc
 pprDo (DoExpr m)    stmts =
   ppr_module_name_prefix m <> text "do"  <+> ppr_do_stmts stmts
@@ -2599,12 +2640,14 @@ ppr_module_name_prefix = \case
   Just module_name -> ppr module_name <> char '.'
 
 ppr_do_stmts :: (OutputableBndrId idL, OutputableBndrId idR,
+                 Anno (StmtLR (GhcPass idL) (GhcPass idR) body) ~ SrcSpanAnnA,
                  Outputable body)
              => [LStmtLR (GhcPass idL) (GhcPass idR) body] -> SDoc
 -- Print a bunch of do stmts
 ppr_do_stmts stmts = pprDeeperList vcat (map ppr stmts)
 
-pprComp :: (OutputableBndrId p, Outputable body)
+pprComp :: (OutputableBndrId p, Outputable body,
+                 Anno (StmtLR (GhcPass p) (GhcPass p) body) ~ SrcSpanAnnA)
         => [LStmt (GhcPass p) body] -> SDoc
 pprComp quals     -- Prints:  body | qual1, ..., qualn
   | Just (initStmts, L _ (LastStmt _ body _ _)) <- snocView quals
@@ -2619,8 +2662,11 @@ pprComp quals     -- Prints:  body | qual1, ..., qualn
   | otherwise
   = pprPanic "pprComp" (pprQuals quals)
 
-pprQuals :: (OutputableBndrId p, Outputable body)
+pprQuals :: (OutputableBndrId p, Outputable body,
+                 Anno (StmtLR (GhcPass p) (GhcPass p) body) ~ SrcSpanAnnA)
          => [LStmt (GhcPass p) body] -> SDoc
+-- pprQuals :: (OutputableBndrId p)
+--          => [LStmt (GhcPass p) (LocatedA (HsExpr (GhcPass p)))] -> SDoc
 -- Show list comprehension qualifiers separated by commas
 pprQuals quals = interpp'SP quals
 
@@ -3171,7 +3217,8 @@ pprMatchInCtxt match  = hang (text "In" <+> pprMatchContext (m_ctxt match)
 
 pprStmtInCtxt :: (OutputableBndrId idL,
                   OutputableBndrId idR,
-                  Outputable body)
+                  Outputable body,
+                 Anno (StmtLR (GhcPass idL) (GhcPass idR) body) ~ SrcSpanAnnA)
               => HsStmtContext (IdP (GhcPass idL))
               -> StmtLR (GhcPass idL) (GhcPass idR) body
               -> SDoc

@@ -20,7 +20,6 @@ import GHC.Prelude
 
 import GHC.Unit.Module        ( ModuleName, IsBootInterface(..) )
 import GHC.Hs.Doc             ( HsDocString )
-import GHC.Types.Name.Occurrence ( HasOccName(..), isTcOcc, isSymOcc )
 import GHC.Types.Basic        ( SourceText(..), StringLiteral(..), pprWithSourceText )
 import GHC.Types.FieldLabel   ( FieldLbl(..) )
 
@@ -29,6 +28,9 @@ import GHC.Data.FastString
 import GHC.Types.SrcLoc
 import GHC.Hs.Extension
 import GHC.Parser.Annotation
+import GHC.Types.Name
+import GHC.Types.Name.Reader
+import GHC.Types.Var
 
 import Data.Data
 import Data.Maybe
@@ -52,6 +54,7 @@ type LImportDecl pass = XRec pass (ImportDecl pass)
         --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnSemi'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+type instance Anno (ImportDecl (GhcPass p)) = SrcSpanAnnA
 
 -- | If/how an import is 'qualified'.
 data ImportDeclQualifiedStyle
@@ -120,6 +123,9 @@ type instance XCImportDecl  GhcTc = NoExtField
 
 type instance XXImportDecl  (GhcPass _) = NoExtCon
 
+type instance Anno ModuleName = SrcSpan
+type instance Anno [LocatedA (IE (GhcPass p))] = SrcSpanAnnL
+
 -- ---------------------------------------------------------------------
 
 -- API Annotations types
@@ -149,7 +155,8 @@ simpleImportDecl mn = ImportDecl {
       ideclHiding    = Nothing
     }
 
-instance OutputableBndrId p
+instance (OutputableBndrId p
+         , Outputable (Anno (IE (GhcPass p))))
        => Outputable (ImportDecl (GhcPass p)) where
     ppr (ImportDecl { ideclSourceSrc = mSrcText, ideclName = mod'
                     , ideclPkgQual = pkg
@@ -184,10 +191,12 @@ instance OutputableBndrId p
                           SourceText src -> text src <+> text "#-}"
         ppr_imp NotBoot = empty
 
+        -- pp_spec :: (Maybe (Bool, LocatedL [LIE (GhcPass p)])) -> SDoc
         pp_spec Nothing             = empty
         pp_spec (Just (False, (L _ ies))) = ppr_ies ies
         pp_spec (Just (True, (L _ ies))) = text "hiding" <+> ppr_ies ies
 
+        -- ppr_ies :: [LIE (GhcPass p)] -> SDoc
         ppr_ies []  = text "()"
         ppr_ies ies = char '(' <+> interpp'SP ies <+> char ')'
 
@@ -224,6 +233,7 @@ type LIE pass = XRec pass (IE pass)
         --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnComma'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
+type instance Anno (IE (GhcPass p)) = SrcSpanAnnA
 
 -- | Imported or exported entity.
 data IE pass
@@ -256,6 +266,8 @@ data IE pass
                 IEWildcard
                 [LIEWrappedName (IdP pass)]
                 [XRec pass (FieldLbl (IdP pass))]
+                -- [Located (FieldLbl (IdP pass))]
+                  -- AZ: old
         -- ^ Imported or exported Thing With given imported or exported
         --
         -- The thing is a Class/Type and the imported or exported things are
@@ -295,6 +307,12 @@ type instance XIEGroup           (GhcPass _) = NoExtField
 type instance XIEDoc             (GhcPass _) = NoExtField
 type instance XIEDocNamed        (GhcPass _) = NoExtField
 type instance XXIE               (GhcPass _) = NoExtCon
+
+type instance Anno (LocatedA (IE (GhcPass p))) = SrcSpanAnnA
+
+type instance Anno (FieldLbl RdrName) = SrcSpan
+type instance Anno (FieldLbl Name)    = SrcSpan
+type instance Anno (FieldLbl Id)      = SrcSpan
 
 -- | Imported or Exported Wildcard
 data IEWildcard = NoIEWildcard | IEWildcard Int deriving (Eq, Data)

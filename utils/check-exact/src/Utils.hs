@@ -218,7 +218,7 @@ isListComp cts = case cts of
 
 -- ---------------------------------------------------------------------
 
-isGadt :: [LConDecl name] -> Bool
+isGadt :: [LConDecl (GhcPass p)] -> Bool
 isGadt [] = False
 isGadt ((L _ (ConDeclGADT{})):_) = True
 isGadt _ = False

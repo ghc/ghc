@@ -206,7 +206,7 @@ tcRnModuleTcRnM :: HscEnv
 tcRnModuleTcRnM hsc_env mod_sum
                 (HsParsedModule {
                    hpm_module =
-                      (L loc (HsModule _ maybe_mod export_ies
+                      (L loc (HsModule _ _ maybe_mod export_ies
                                        import_decls local_decls mod_deprec
                                        maybe_doc_hdr)),
                    hpm_src_files = src_files
@@ -645,7 +645,7 @@ tcRnHsBootDecls hsc_src decls
 
                 -- Check for illegal declarations
         ; case group_tail of
-             Just (SpliceDecl _ d _, _) -> badBootDecl hsc_src "splice" d
+             Just (SpliceDecl _ d _, _) -> badBootDecl hsc_src "splice" (reLocA d)
              Nothing                    -> return ()
         ; mapM_ (badBootDecl hsc_src "foreign") for_decls
         ; mapM_ (badBootDecl hsc_src "default") def_decls
@@ -683,9 +683,9 @@ tcRnHsBootDecls hsc_src decls
    }}}
    ; traceTc "boot" (ppr lie); return gbl_env }
 
-badBootDecl :: HscSource -> String -> Located decl -> TcM ()
+badBootDecl :: HscSource -> String -> LocatedA decl -> TcM ()
 badBootDecl hsc_src what (L loc _)
-  = addErrAt loc (char 'A' <+> text what
+  = addErrAt (locA loc) (char 'A' <+> text what
       <+> text "declaration is not (currently) allowed in a"
       <+> (case hsc_src of
             HsBootFile -> text "hs-boot"

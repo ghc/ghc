@@ -194,13 +194,13 @@ tcTySig (L _ (IdSig _ id))
        ; return [TcIdSig sig] }
 
 tcTySig (L loc (TypeSig _ names sig_ty))
-  = setSrcSpan loc $
-    do { sigs <- sequence [ tcUserTypeSig loc sig_ty (Just name)
+  = setSrcSpanA loc $
+    do { sigs <- sequence [ tcUserTypeSig (locA loc) sig_ty (Just name)
                           | L _ name <- names ]
        ; return (map TcIdSig sigs) }
 
 tcTySig (L loc (PatSynSig _ names sig_ty))
-  = setSrcSpan loc $
+  = setSrcSpanA loc $
     do { tpsigs <- sequence [ tcPatSynSig name sig_ty
                             | L _ name <- names ]
        ; return (map TcPatSynSig tpsigs) }
@@ -612,7 +612,7 @@ addInlinePrags poly_id prags_for_me
             -- and inl2 is a user NOINLINE pragma; we don't want to complain
          warn_multiple_inlines inl2 inls
        | otherwise
-       = setSrcSpan loc $
+       = setSrcSpanA loc $
          addWarnTc NoReason
                      (hang (text "Multiple INLINE pragmas for" <+> ppr poly_id)
                        2 (vcat (text "Ignoring all but the first"
@@ -738,7 +738,7 @@ tcSpecPrags :: Id -> [LSig GhcRn]
 tcSpecPrags poly_id prag_sigs
   = do { traceTc "tcSpecPrags" (ppr poly_id <+> ppr spec_sigs)
        ; unless (null bad_sigs) warn_discarded_sigs
-       ; pss <- mapAndRecoverM (wrapLocM (tcSpecPrag poly_id)) spec_sigs
+       ; pss <- mapAndRecoverM (wrapLocMA (tcSpecPrag poly_id)) spec_sigs
        ; return $ concatMap (\(L l ps) -> map (L l) ps) pss }
   where
     spec_sigs = filter isSpecLSig prag_sigs
@@ -806,7 +806,7 @@ tcImpPrags prags
        ; if (not_specialising dflags) then
             return []
          else do
-            { pss <- mapAndRecoverM (wrapLocM tcImpSpec)
+            { pss <- mapAndRecoverM (wrapLocMA tcImpSpec)
                      [L loc (name,prag)
                              | (L loc prag@(SpecSig _ (L _ name) _ _)) <- prags
                              , not (nameIsLocalOrFrom this_mod name) ]

@@ -47,7 +47,8 @@ module GHC.Hs.Pat (
 
         collectEvVarsPat, collectEvVarsPats,
 
-        pprParendLPat, pprConArgs
+        pprParendLPat, pprConArgs,
+        pprLPat
     ) where
 
 import GHC.Prelude
@@ -80,6 +81,8 @@ import GHC.Parser.Annotation
 import Data.Data hiding (TyCon,Fixity)
 
 type LPat p = XRec p (Pat p)
+
+type instance Anno (Pat (GhcPass p)) = SrcSpanAnnA
 
 -- | Pattern
 --
@@ -314,8 +317,8 @@ type instance XViewPat GhcTc = Type
 type instance XSplicePat (GhcPass _) = NoExtField
 type instance XLitPat    (GhcPass _) = NoExtField
 
-type instance XNPat GhcPs = NoExtField
-type instance XNPat GhcRn = NoExtField
+type instance XNPat GhcPs = ApiAnn
+type instance XNPat GhcRn = ApiAnn
 type instance XNPat GhcTc = Type
 
 type instance XNPlusKPat GhcPs = ApiAnn
@@ -331,11 +334,15 @@ type instance XXPat GhcRn = NoExtCon
 type instance XXPat GhcTc = CoPat
   -- After typechecking, we add one extra constructor: CoPat
 
+type instance Anno (HsOverLit (GhcPass p)) = SrcSpan
+
 type family ConLikeP x
 
 type instance ConLikeP GhcPs = RdrName -- IdP GhcPs
 type instance ConLikeP GhcRn = Name -- IdP GhcRn
 type instance ConLikeP GhcTc = ConLike
+
+type instance Anno ConLike = SrcSpanAnnName
 
 -- ---------------------------------------------------------------------
 
@@ -533,8 +540,12 @@ hsRecUpdFieldOcc = fmap unambiguousFieldOcc . hsRecFieldLbl
 ************************************************************************
 -}
 
-instance OutputableBndrId p => Outputable (Pat (GhcPass p)) where
+instance (OutputableBndrId p)
+    => Outputable (Pat (GhcPass p)) where
     ppr = pprPat
+
+pprLPat :: (OutputableBndrId p) => LPat (GhcPass p) -> SDoc
+pprLPat (L _ e) = pprPat e
 
 -- | Print with type info if -dppr-debug is on
 pprPatBndr :: OutputableBndr name => name -> SDoc
@@ -548,7 +559,7 @@ pprParendLPat :: (OutputableBndrId p)
               => PprPrec -> LPat (GhcPass p) -> SDoc
 pprParendLPat p = pprParendPat p . unLoc
 
-pprParendPat :: forall p. OutputableBndrId p
+pprParendPat :: forall p. (OutputableBndrId p)
              => PprPrec
              -> Pat (GhcPass p)
              -> SDoc
@@ -570,7 +581,8 @@ pprParendPat p pat = sdocOption sdocPrintTypecheckerElaboration $ \ print_tc_ela
       -- But otherwise the CoPat is discarded, so it
       -- is the pattern inside that matters.  Sigh.
 
-pprPat :: forall p. (OutputableBndrId p) => Pat (GhcPass p) -> SDoc
+pprPat :: forall p. (OutputableBndrId p)
+       => Pat (GhcPass p) -> SDoc
 pprPat (VarPat _ lvar)          = pprPatBndr (unLoc lvar)
 pprPat (WildPat _)              = char '_'
 pprPat (LazyPat _ pat)          = char '~' <> pprParendLPat appPrec pat
@@ -582,13 +594,13 @@ pprPat (ParPat _ pat)           = parens (ppr pat)
 pprPat (LitPat _ s)             = ppr s
 pprPat (NPat _ l Nothing  _)    = ppr l
 pprPat (NPat _ l (Just _) _)    = char '-' <> ppr l
-pprPat (NPlusKPat _ n k _ _ _)  = hcat [ppr n, char '+', ppr k]
+pprPat (NPlusKPat _ n k _ _ _)  = hcat [ppr_n, char '+', ppr k]
+  where ppr_n = case ghcPass @p of
+                  GhcPs -> ppr n
+                  GhcRn -> ppr n
+                  GhcTc -> ppr n
 pprPat (SplicePat _ splice)     = pprSplice splice
-pprPat (SigPat _ pat ty)        = ppr pat <+> dcolon <+> ppr_ty
-  where ppr_ty = case ghcPass @p of
-                   GhcPs -> ppr ty
-                   GhcRn -> ppr ty
-                   GhcTc -> ppr ty
+pprPat (SigPat _ pat ty)        = ppr pat <+> dcolon <+> ppr ty
 pprPat (ListPat _ pats)         = brackets (interpp'SP pats)
 pprPat (TuplePat _ pats bx)
     -- Special-case unary boxed tuples so that they are pretty-printed as
@@ -631,12 +643,14 @@ pprPat (XPat ext) = case ghcPass @p of
       else pprPat pat
     where CoPat co pat _ = ext
 
-pprUserCon :: (OutputableBndr con, OutputableBndrId p)
+pprUserCon :: (OutputableBndr con, OutputableBndrId p,
+                     Outputable (Anno (IdGhcP p)))
            => con -> HsConPatDetails (GhcPass p) -> SDoc
 pprUserCon c (InfixCon p1 p2) = ppr p1 <+> pprInfixOcc c <+> ppr p2
 pprUserCon c details          = pprPrefixOcc c <+> pprConArgs details
 
-pprConArgs :: (OutputableBndrId p)
+pprConArgs :: (OutputableBndrId p,
+                     Outputable (Anno (IdGhcP p)))
            => HsConPatDetails (GhcPass p) -> SDoc
 pprConArgs (PrefixCon pats) = fsep (map (pprParendLPat appPrec) pats)
 pprConArgs (InfixCon p1 p2) = sep [ pprParendLPat appPrec p1
