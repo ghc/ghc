@@ -66,7 +66,7 @@ module GHC.Parser.Lexer (
    xtest,
    lexTokenStream,
    mkParensApiAnn,
-   addAnnsAt,
+   getCommentsFor,
    commentToAnnotation,
    HdkComment(..),
   ) where
@@ -2854,11 +2854,11 @@ instance MonadP P where
        , annotations_comments = newAnns ++ (annotations_comments s)
        } (newComments newAnns)
 
-addAnnsAt :: (MonadP m) => SrcSpan -> [AddApiAnn] -> m [RealLocated AnnotationComment]
-addAnnsAt (RealSrcSpan l _) anns = do
+getCommentsFor :: (MonadP m) => SrcSpan -> m [RealLocated AnnotationComment]
+getCommentsFor (RealSrcSpan l _) = do
   cs <- allocateCommentsP l
   return cs
-addAnnsAt _ _ = return []
+getCommentsFor _ = return []
 
 addTabWarning :: RealSrcSpan -> P ()
 addTabWarning srcspan

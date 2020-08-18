@@ -491,7 +491,7 @@ translatePat fam_insts x pat = case pat of
     -- Add the bang in front of the list, because it will happen before any
     -- nested stuff.
     (PmBang x pm_loc :) <$> translateLPat fam_insts x p
-    where pm_loc = Just (L l (ppr p'))
+    where pm_loc = Just (L (locA l) (ppr p'))
 
   -- (x@pat)   ==>   Translate pat with x as match var and handle impedance
   --                 mismatch with incoming match var
@@ -724,7 +724,8 @@ translateLGRHS fam_insts match_loc pp_pats (L _loc (GRHS _ gs _)) =
         -- GRHS belongs to, so the @A B x@ part in @A B x | 0 <- x@.
         | null gs   = L match_loc pp_pats
         | otherwise = L grd_loc   (pp_pats <+> vbar <+> interpp'SP gs)
-      L grd_loc _ = head gs
+      L grd_loc' _ = head gs
+      grd_loc = locA grd_loc'
 
 -- | Translate a guard statement to a 'GrdVec'
 translateGuard :: FamInstEnvs -> GuardStmt GhcTc -> DsM GrdVec

@@ -25,7 +25,7 @@ import GHC.Core.Utils (bindNonRec)
 
 import GHC.HsToCore.Monad
 import GHC.HsToCore.Utils
-import GHC.HsToCore.PmCheck.Types ( Deltas, initDeltas )
+import GHC.HsToCore.PmCheck.Types ( Deltas )
 import GHC.Types.Name
 import GHC.Core.Type ( Type )
 import GHC.Utils.Misc

@@ -115,8 +115,8 @@ looking at GHC sources). We can assume that commented instances are
 user-written. This lets us relate Names (from ClsInsts) to comments
 (associated with InstDecls and DerivDecls).
 -}
-
-getMainDeclBinder :: CollectPass (GhcPass p) => HsDecl (GhcPass p) -> [IdP (GhcPass p)]
+getMainDeclBinder :: (Anno (IdGhcP p) ~ SrcSpanAnnName, CollectPass (GhcPass p))
+                  => HsDecl (GhcPass p) -> [IdP (GhcPass p)]
 getMainDeclBinder (TyClD _ d) = [tcdName d]
 getMainDeclBinder (ValD _ d) =
   case collectHsBindBinders d of
@@ -140,7 +140,7 @@ sigNameNoLoc _                             = []
 -- Extract the source location where an instance is defined. This is used
 -- to correlate InstDecls with their Instance/CoAxiom Names, via the
 -- instanceMap.
-getInstLoc :: InstDecl (GhcPass p) -> SrcSpan
+getInstLoc :: Anno (IdGhcP p) ~ SrcSpanAnnName => InstDecl (GhcPass p) -> SrcSpan
 getInstLoc = \case
   ClsInstD _ (ClsInstDecl { cid_poly_ty = ty }) -> getLocA (hsSigType ty)
   -- The Names of data and type family instances have their SrcSpan's attached
@@ -239,9 +239,9 @@ classDecls :: TyClDecl GhcRn -> [(LHsDecl GhcRn, [HsDocString])]
 classDecls class_ = filterDecls . collectDocs . sortLocatedA $ decls
   where
     decls = docs ++ defs ++ sigs ++ ats
-    docs  = mkDeclsA tcdDocs (DocD noExtField) class_
+    docs  = mkDecls tcdDocs (DocD noExtField) class_
     defs  = mkDecls (bagToList . tcdMeths) (ValD noExtField) class_
-    sigs  = mkDeclsA tcdSigs (SigD noExtField) class_
+    sigs  = mkDecls tcdSigs (SigD noExtField) class_
     ats   = mkDecls tcdATs (TyClD noExtField . FamDecl noExtField) class_
 
 -- | Extract function argument docs from inside top-level decls.
@@ -285,14 +285,14 @@ topDecls = filterClasses . filterDecls . collectDocs . sortLocatedA . ungroup
 -- | Take all declarations except pragmas, infix decls, rules from an 'HsGroup'.
 ungroup :: HsGroup GhcRn -> [LHsDecl GhcRn]
 ungroup group_ =
-  mkDeclsA (tyClGroupTyClDecls . hs_tyclds) (TyClD noExtField)  group_ ++
-  mkDeclsA hs_derivds             (DerivD noExtField) group_ ++
-  mkDeclsA hs_defds               (DefD noExtField)   group_ ++
-  mkDeclsA hs_fords               (ForD noExtField)   group_ ++
-  mkDeclsA hs_docs                (DocD noExtField)   group_ ++
-  mkDeclsA (tyClGroupInstDecls . hs_tyclds) (InstD noExtField)  group_ ++
-  mkDeclsA (typesigs . hs_valds)  (SigD noExtField)   group_ ++
-  mkDecls  (valbinds . hs_valds)  (ValD noExtField)   group_
+  mkDecls (tyClGroupTyClDecls . hs_tyclds) (TyClD noExtField)  group_ ++
+  mkDecls hs_derivds             (DerivD noExtField) group_ ++
+  mkDecls hs_defds               (DefD noExtField)   group_ ++
+  mkDecls hs_fords               (ForD noExtField)   group_ ++
+  mkDecls hs_docs                (DocD noExtField)   group_ ++
+  mkDecls (tyClGroupInstDecls . hs_tyclds) (InstD noExtField)  group_ ++
+  mkDecls (typesigs . hs_valds)  (SigD noExtField)   group_ ++
+  mkDecls (valbinds . hs_valds)  (ValD noExtField)   group_
   where
     typesigs :: HsValBinds GhcRn -> [LSig GhcRn]
     typesigs (XValBindsLR (NValBinds _ sig)) = filter (isUserSig . unLoc) sig
@@ -337,12 +337,12 @@ filterDecls = filter (isHandled . unXRec @p . fst)
 
 
 -- | Go through all class declarations and filter their sub-declarations
-filterClasses :: forall p doc. (UnXRec p, MapXRec p) => [(LHsDecl p, doc)] -> [(LHsDecl p, doc)]
-filterClasses = map (first (mapXRec @p filterClass))
+filterClasses :: forall p doc. (IsPass p) => [(LHsDecl (GhcPass p), doc)] -> [(LHsDecl (GhcPass p), doc)]
+filterClasses = map (first (mapLoc filterClass))
   where
     filterClass (TyClD x c@(ClassDecl {})) =
       TyClD x $ c { tcdSigs =
-        filter (liftA2 (||) (isUserSig . unXRec @p) isMinimalLSig) (tcdSigs c) }
+        filter (liftA2 (||) (isUserSig . unLoc) isMinimalLSig) (tcdSigs c) }
     filterClass d = d
 
 -- | Was this signature given by the user?

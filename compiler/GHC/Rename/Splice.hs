@@ -122,7 +122,7 @@ rnBracket e br_body
 
 rn_bracket :: ThStage -> HsBracket GhcPs -> RnM (HsBracket GhcRn, FreeVars)
 rn_bracket outer_stage br@(VarBr x flg rdr_name)
-  = do { name <- lookupOccRn rdr_name
+  = do { name <- lookupOccRn (unLoc rdr_name)
        ; this_mod <- getModule
 
        ; when (flg && nameIsLocalOrFrom this_mod name) $
@@ -143,7 +143,7 @@ rn_bracket outer_stage br@(VarBr x flg rdr_name)
                                              (quotedNameStageErr br) }
                         }
                     }
-       ; return (VarBr x flg name, unitFV name) }
+       ; return (VarBr x flg (noLocA name), unitFV name) }
 
 rn_bracket _ (ExpBr x e) = do { (e', fvs) <- rnLExpr e
                             ; return (ExpBr x e', fvs) }
@@ -176,7 +176,7 @@ rn_bracket _ (DecBrL x decls)
            ; Just (splice, rest) ->
                do { group' <- groupDecls rest
                   ; let group'' = appendGroups group group'
-                  ; return group'' { hs_splcds = noLoc splice : hs_splcds group' }
+                  ; return group'' { hs_splcds = noLocA splice : hs_splcds group' }
                   }
            }}
 

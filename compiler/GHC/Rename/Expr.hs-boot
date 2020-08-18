@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ConstraintKinds #-}
 module GHC.Rename.Expr where
 import GHC.Types.Name
 import GHC.Hs
@@ -11,8 +13,14 @@ rnExpr :: HsExpr GhcPs
 rnLExpr :: LHsExpr GhcPs
         -> RnM (LHsExpr GhcRn, FreeVars)
 
+type AnnoBody body
+  = ( Outputable (body GhcPs)
+    , Anno (StmtLR GhcPs GhcPs (LocatedA (body GhcPs))) ~ SrcSpanAnnA
+    , Anno (StmtLR GhcRn GhcPs (LocatedA (body GhcPs))) ~ SrcSpanAnnA
+    , Anno (StmtLR GhcRn GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
+    )
 rnStmts :: --forall thing body.
-           Outputable (body GhcPs) => HsStmtContext Name
+           AnnoBody body => HsStmtContext Name
         -> (body GhcPs -> RnM (body GhcRn, FreeVars))
         -> [LStmt GhcPs (LocatedA (body GhcPs))]
         -> ([Name] -> RnM (thing, FreeVars))
