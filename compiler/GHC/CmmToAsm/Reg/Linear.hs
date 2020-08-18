@@ -720,7 +720,7 @@ saveClobberedTemps clobbered dying
 
                   let new_assign  = addToUFM_Directly assig temp (InBoth reg slot)
 
-                  clobber new_assign (spill ++ instrs) rest
+                  clobber new_assign (spill : instrs) rest
 
 
 
@@ -944,7 +944,7 @@ allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
                                 (spill_insn, slot) <- spillR (RegReal my_reg) temp_to_push_out
                                 let spill_store  = (if reading then id else reverse)
                                                         -- COMMENT (fsLit "spill alloc"):
-                                                           spill_insn
+                                                           [spill_insn]
 
                                 -- record that this temp was spilled
                                 recordSpill (SpillAlloc temp_to_push_out)
@@ -994,7 +994,7 @@ loadTemp vreg (ReadMem slot) hreg spills
  = do
         insn <- loadR (RegReal hreg) slot
         recordSpill (SpillLoad $ getUnique vreg)
-        return  $  {- COMMENT (fsLit "spill load") : -} insn ++ spills
+        return  $  {- COMMENT (fsLit "spill load") : -} insn : spills
 
 loadTemp _ _ _ spills =
    return spills

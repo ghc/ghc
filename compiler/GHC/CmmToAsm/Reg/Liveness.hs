@@ -570,15 +570,11 @@ stripLiveBlock config (BasicBlock i lis)
 
         spillNat acc (LiveInstr (SPILL reg slot) _ : instrs)
          = do   delta   <- get
-                let (new_delta, instrs') = mkSpillInstr config reg delta slot
-                put new_delta
-                spillNat (instrs' ++ acc) instrs
+                spillNat (mkSpillInstr config reg delta slot : acc) instrs
 
         spillNat acc (LiveInstr (RELOAD slot reg) _ : instrs)
          = do   delta   <- get
-                let (new_delta, instrs') = mkLoadInstr config reg delta slot
-                put new_delta
-                spillNat (instrs' ++ acc) instrs
+                spillNat (mkLoadInstr config reg delta slot : acc) instrs
 
         spillNat acc (LiveInstr (Instr instr) _ : instrs)
          | Just i <- takeDeltaInstr instr
