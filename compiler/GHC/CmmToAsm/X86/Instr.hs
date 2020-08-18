@@ -674,15 +674,15 @@ mkSpillInstr
     -> Reg      -- register to spill
     -> Int      -- current stack delta
     -> Int      -- spill slot to use
-    -> (Int, [Instr])
+    -> Instr
 
 mkSpillInstr config reg delta slot
   = let off     = spillSlotToOffset platform slot - delta
     in
     case targetClassOfReg platform reg of
-           RcInteger   -> (delta, [MOV (archWordFormat is32Bit)
-                                   (OpReg reg) (OpAddr (spRel platform off))])
-           RcDouble    -> (delta, [MOV FF64 (OpReg reg) (OpAddr (spRel platform off))])
+           RcInteger   -> MOV (archWordFormat is32Bit)
+                                   (OpReg reg) (OpAddr (spRel platform off))
+           RcDouble    -> MOV FF64 (OpReg reg) (OpAddr (spRel platform off))
            _         -> panic "X86.mkSpillInstr: no match"
     where platform = ncgPlatform config
           is32Bit = target32Bit platform
@@ -693,7 +693,7 @@ mkLoadInstr
     -> Reg      -- register to load
     -> Int      -- current stack delta
     -> Int      -- spill slot to use
-    -> (Int, [Instr])
+    -> Instr
 
 mkLoadInstr config reg delta slot
   = let off     = spillSlotToOffset platform slot - delta
