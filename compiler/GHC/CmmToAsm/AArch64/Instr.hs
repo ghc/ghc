@@ -1,5 +1,4 @@
-
-{-# language CPP #-}
+{-# language CPP, BangPatterns #-}
 
 module GHC.CmmToAsm.AArch64.Instr
 
@@ -342,28 +341,47 @@ aarch64_mkSpillInstr
    -> Reg       -- register to spill
    -> Int       -- current stack delta
    -> Int       -- spill slot to use
-   -> (Int, [Instr])
+   -> Instr
 -- XXX this is stupid. We essentially do sp <- sp - 4095; str xN, [sp - ...] ; sp <- sp + 4095
+{-
 aarch64_mkSpillInstr config reg delta slot | (spillSlotToOffset config slot) - delta > 4095
-    = let (d, isns) = aarch64_mkSpillInstr config reg (delta + 4095) slot
-      in (d, SUB sp sp (OpImm (ImmInt 4095)) : isns ++ [ADD sp sp (OpImm (ImmInt 4095))])
+    = let (!d, !isns) = traceShow msg $ aarch64_mkSpillInstr config reg (delta + delta') slot
+      in traceShow "Spill(1) ret" (d, subIsn : isns ++ [addIsn])
+      where delta' = 4095
+            !addIsn = ADD sp sp (OpImm (ImmInt delta'))
+            !subIsn = SUB sp sp (OpImm (ImmInt delta'))
+            msg = "Spill(1): " ++ show (spillSlotToOffset config slot) ++ "; Delta: " ++ show delta ++ " -> " ++ show (delta + delta')
 
 aarch64_mkSpillInstr config reg delta slot | (spillSlotToOffset config slot) - delta > 255
-    = let (d, isns) = aarch64_mkSpillInstr config reg (delta + delta') slot
-      in (d, SUB sp sp (OpImm (ImmInt delta')) : isns ++ [ADD sp sp (OpImm (ImmInt delta'))])
+    = let (!d, !isns) = traceShow msg $ aarch64_mkSpillInstr config reg (delta + delta') slot
+      in traceShow "Spill(2) ret" (d, subIsn : isns ++ [addIsn])
       where delta' = (spillSlotToOffset config slot) - delta
+            !addIsn = ADD sp sp (OpImm (ImmInt delta'))
+            !subIsn = SUB sp sp (OpImm (ImmInt delta'))
+            msg = "Spill(2): " ++ show (spillSlotToOffset config slot) ++ "; Delta: " ++ show delta ++ " -> " ++ show (delta + delta')
 
 aarch64_mkSpillInstr config reg delta slot | (spillSlotToOffset config slot) - delta < -4095
-    = let (d, isns) = aarch64_mkSpillInstr config reg (delta - 4095) slot
-      in (d, ADD sp sp (OpImm (ImmInt 4095)) : isns ++ [SUB sp sp (OpImm (ImmInt 4095))])
+    = let (!d, !isns) = traceShow msg $ aarch64_mkSpillInstr config reg (delta - delta') slot
+      in traceShow "Spill(3) ret" (d, addIsn : isns ++ [subIsn])
+      where delta' = 4095
+            !addIsn = ADD sp sp (OpImm (ImmInt delta'))
+            !subIsn = SUB sp sp (OpImm (ImmInt delta'))
+            msg = "Spill(3): " ++ show (spillSlotToOffset config slot) ++ "; Delta: " ++ show delta ++ " -> " ++ show (delta + delta')
 
 aarch64_mkSpillInstr config reg delta slot | (spillSlotToOffset config slot) - delta < -256
-    = let (d, isns) = aarch64_mkSpillInstr config reg (delta + delta') slot
-      in (d, SUB sp sp (OpImm (ImmInt delta')) : isns ++ [ADD sp sp (OpImm (ImmInt delta'))])
+    = let (!d, !isns) = traceShow msg $ aarch64_mkSpillInstr config reg (delta + delta') slot
+      in traceShow "Spill(4) ret" (d, subIsn : isns ++ [addIsn])
       where delta' = (spillSlotToOffset config slot) - delta
-
+            !addIsn = ADD sp sp (OpImm (ImmInt delta'))
+            !subIsn = SUB sp sp (OpImm (ImmInt delta'))
+            msg = "Spill(4): " ++ show (spillSlotToOffset config slot) ++ "; Delta: " ++ show delta ++ " -> " ++ show (delta + delta')
+-}
 aarch64_mkSpillInstr config reg delta slot
-    = (delta, [ANN (text "Spill") $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt $ off - delta)))])
+    = --[
+      -- ANN (text "Spill") $
+      -- traceShow ("Spill: " ++ show (off - delta)) $
+      STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt $ off - delta)))
+      --]
     where
         fmt = case reg of
             RegReal (RealRegSingle n) | n < 32 -> II64
@@ -375,29 +393,40 @@ aarch64_mkLoadInstr
    -> Reg       -- register to load
    -> Int       -- current stack delta
    -> Int       -- spill slot to use
-   -> (Int, [Instr])
+   -> Instr
 -- XXX this is stupid. We essentially do sp <- sp - 4095; str xN, [sp - ...] ; sp <- sp + 4095
+{-
 aarch64_mkLoadInstr config reg delta slot | (spillSlotToOffset config slot) - delta > 4095
-    = let (d, isns) = aarch64_mkLoadInstr config reg (delta + 4095) slot
-      in (d, SUB sp sp (OpImm (ImmInt 4095)) : isns ++ [ADD sp sp (OpImm (ImmInt 4095))])
+    = let (!d, !isns) =  traceShow msg $ aarch64_mkLoadInstr config reg (delta + delta') slot
+      in traceShow "Reload(1) ret" (d, SUB sp sp (OpImm (ImmInt 4095)) : isns ++ [ADD sp sp (OpImm (ImmInt 4095))])
+      where delta' = 4095
+            msg = "Reload(1): " ++ show (spillSlotToOffset config slot) ++ "; Delta: " ++ show delta ++ " -> " ++ show (delta + delta')
 
 aarch64_mkLoadInstr config reg delta slot | (spillSlotToOffset config slot) - delta > 255
-    = let (d, isns) = aarch64_mkLoadInstr config reg (delta + delta') slot
-      in (d, SUB sp sp (OpImm (ImmInt delta')) : isns ++ [ADD sp sp (OpImm (ImmInt delta'))])
+    = let (!d, !isns) = traceShow msg $ aarch64_mkLoadInstr config reg (delta + delta') slot
+      in traceShow "Reload(2) ret" (d, SUB sp sp (OpImm (ImmInt delta')) : isns ++ [ADD sp sp (OpImm (ImmInt delta'))])
       where delta' = (spillSlotToOffset config slot) - delta
+            msg = "Reload(2): " ++ show (spillSlotToOffset config slot) ++ "; Delta: " ++ show delta ++ " -> " ++ show (delta + delta')
 
 aarch64_mkLoadInstr config reg delta slot | (spillSlotToOffset config slot) - delta < -4095
-    = let (d, isns) = aarch64_mkLoadInstr config reg (delta - 4095) slot
-      in (d, ADD sp sp (OpImm (ImmInt 4095)) : isns ++ [SUB sp sp (OpImm (ImmInt 4095))])
+    = let (!d, !isns) =  traceShow msg $ aarch64_mkLoadInstr config reg (delta + delta') slot
+      in traceShow "Reload(3) ret" (d, ADD sp sp (OpImm (ImmInt 4095)) : isns ++ [SUB sp sp (OpImm (ImmInt 4095))])
+      where delta' = -4095
+            msg = "Reload(3): " ++ show (spillSlotToOffset config slot) ++ "; Delta: " ++ show delta ++ " -> " ++ show (delta + delta')
 
 aarch64_mkLoadInstr config reg delta slot | (spillSlotToOffset config slot) - delta < -256
-    = let (d, isns) = aarch64_mkLoadInstr config reg (delta + delta') slot
-      in (d, SUB sp sp (OpImm (ImmInt delta')) : isns ++ [ADD sp sp (OpImm (ImmInt delta'))])
+    = let (!d, !isns) = traceShow msg $ aarch64_mkLoadInstr config reg (delta + delta') slot
+      in traceShow "Reload(4) ret" (d, SUB sp sp (OpImm (ImmInt delta')) : isns ++ [ADD sp sp (OpImm (ImmInt delta'))])
       where delta' = (spillSlotToOffset config slot) - delta
+            msg = "Reload(4): " ++ show (spillSlotToOffset config slot) ++ "; Delta: " ++ show delta ++ " -> " ++ show (delta + delta')
 
-
+-}
 aarch64_mkLoadInstr config reg delta slot
-    = (delta, [ANN (text "Reload") $ LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt $ off - delta)))])
+    = --[
+      -- ANN (text "Reload") $
+      -- traceShow ("Reload: " ++ show (off - delta)) $
+      LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt $ off - delta)))
+      -- ]
     where
         fmt = case reg of
             RegReal (RealRegSingle n) | n < 32 -> II64
