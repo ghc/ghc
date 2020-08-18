@@ -357,12 +357,12 @@ getClosureX get_closure_raw x = do
                 fields <- FFIClosures.peekTSOFields peekStgTSOProfInfo ptr
                 pure $ TSOClosure
                     { info = itbl
-                    , _link = (pts !! 0)
-                    , global_link = (pts !! 1)
+                    , unsafe_link = (pts !! 0)
+                    , unsafe_global_link = (pts !! 1)
                     , tsoStack = (pts !! 2)
-                    , trec = (pts !! 3)
-                    , blocked_exceptions = (pts !! 4)
-                    , bq = (pts !! 5)
+                    , unsafe_trec = (pts !! 3)
+                    , unsafe_blocked_exceptions = (pts !! 4)
+                    , unsafe_bq = (pts !! 5)
                     , what_next = FFIClosures.tso_what_next fields
                     , why_blocked = FFIClosures.tso_why_blocked fields
                     , flags = FFIClosures.tso_flags fields
@@ -388,8 +388,8 @@ getClosureX get_closure_raw x = do
                     { info = itbl
                     , stack_size = FFIClosures.stack_size fields
                     , stack_dirty = FFIClosures.stack_dirty fields
-                    , stackPointer = (pts !! 0)
-                    , stack  = FFIClosures.stack fields
+                    , unsafeStackPointer = (pts !! 0)
+                    , unsafeStack  = FFIClosures.stack fields
 #if __GLASGOW_HASKELL__ >= 811
                     , stack_marking = FFIClosures.stack_marking fields
 #endif

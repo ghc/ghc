@@ -23,12 +23,12 @@ main = do
     assertEqual (saved_errno tso) 0
 
     -- The newly created TSO should be on the end of the run queue.
-    let !_linkBox = _link tso
+    let !_linkBox = unsafe_link tso
     _linkClosure <- getBoxedClosureData _linkBox
     assertEqual (name _linkClosure) "END_TSO_QUEUE"
     assertEqual (getClosureType _linkClosure) CONSTR_NOCAF
 
-    let !global_linkBox = global_link tso
+    let !global_linkBox = unsafe_global_link tso
     globalLinkClosure <- getBoxedClosureData global_linkBox
     assertEqual (getClosureType globalLinkClosure) TSO
 
@@ -36,19 +36,19 @@ main = do
     stackClosure <- getBoxedClosureData stackBox
     assertEqual (getClosureType stackClosure) STACK
 
-    let !stackPointerBox = stackPointer stackClosure
+    let !stackPointerBox = unsafeStackPointer stackClosure
     stackPointerClosure <- getBoxedClosureData stackPointerBox
     assertEqual (getClosureType stackPointerClosure) RET_SMALL
 
-    let !trecBox = trec tso
+    let !trecBox = unsafe_trec tso
     trecClosure <- getBoxedClosureData trecBox
     assertEqual (name trecClosure) "NO_TREC"
 
-    let !blockedExceptionsBox = blocked_exceptions tso
+    let !blockedExceptionsBox = unsafe_blocked_exceptions tso
     blockedExceptionsClosure <- getBoxedClosureData blockedExceptionsBox
     assertEqual (name blockedExceptionsClosure) "END_TSO_QUEUE"
 
-    let !bqBox = bq tso
+    let !bqBox = unsafe_bq tso
     bqClosure <- getBoxedClosureData bqBox
     assertEqual (name bqClosure) "END_TSO_QUEUE"
 
