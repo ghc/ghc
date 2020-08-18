@@ -1262,7 +1262,7 @@ inferInitialKinds decls
        ; traceTc "inferInitialKinds done }" empty
        ; return tcs }
   where
-    infer_initial_kind = addLocM (getInitialKind InitialKindInfer)
+    infer_initial_kind = addLocMA (getInitialKind InitialKindInfer)
 
 -- Check type/class declarations against their standalone kind signatures or
 -- CUSKs, producing a generalized TcTyCon for each.
@@ -1274,7 +1274,7 @@ checkInitialKinds decls
        ; return tcs }
   where
     check_initial_kind (ldecl, msig) =
-      addLocM (getInitialKind (InitialKindCheck msig)) ldecl
+      addLocMA (getInitialKind (InitialKindCheck msig)) ldecl
 
 -- | Get the initial kind of a TyClDecl, either generalized or non-generalized,
 -- depending on the 'InitialKindStrategy'.
@@ -1492,7 +1492,7 @@ kcLTyClDecl :: LTyClDecl GhcRn -> TcM ()
   -- See Note [Kind checking for type and class decls]
   -- Called only for declarations without a signature (no CUSKs or SAKs here)
 kcLTyClDecl (L loc decl)
-  = setSrcSpan loc $
+  = setSrcSpanA loc $
     do { tycon <- tcLookupTcTyCon tc_name
        ; traceTc "kcTyClDecl {" (ppr tc_name)
        ; addVDQNote tycon $   -- See Note [Inferring visible dependent quantification]
@@ -1542,7 +1542,7 @@ kcTyClDecl (ClassDecl { tcdLName = L _ name
                       , tcdCtxt = ctxt, tcdSigs = sigs }) _tycon
   = bindTyClTyVars name $ \ _ _ _ ->
     do  { _ <- tcHsContext ctxt
-        ; mapM_ (wrapLocM_ kc_sig) sigs }
+        ; mapM_ (wrapLocMA_ kc_sig) sigs }
   where
     kc_sig (ClassOpSig _ _ nms op_ty) = kcClassSigType skol_info nms op_ty
     kc_sig _                          = return ()
@@ -2225,7 +2225,7 @@ tcTyClDecl roles_info (L loc decl)
       _ -> pprPanic "tcTyClDecl" (ppr thing)
 
   | otherwise
-  = setSrcSpan loc $ tcAddDeclCtxt decl $
+  = setSrcSpanA loc $ tcAddDeclCtxt decl $
     do { traceTc "---- tcTyClDecl ---- {" (ppr decl)
        ; (tc, deriv_infos) <- tcTyClDecl1 Nothing roles_info decl
        ; traceTc "---- tcTyClDecl end ---- }" (ppr tc)
@@ -2413,7 +2413,7 @@ tcDefaultAssocDecl fam_tc
                                    , feqn_pats  = hs_pats
                                    , feqn_rhs   = hs_rhs_ty }}})]
   = -- See Note [Type-checking default assoc decls]
-    setSrcSpan loc $
+    setSrcSpanA loc $
     tcAddFamInstCtxt (text "default type instance") tc_name $
     do { traceTc "tcDefaultAssocDecl 1" (ppr tc_name)
        ; let fam_tc_name = tyConName fam_tc
@@ -2450,7 +2450,7 @@ tcDefaultAssocDecl fam_tc
        ; cpt_tvs <- zipWithM (extract_tv ppr_eqn) pats pats_vis
        ; check_all_distinct_tvs ppr_eqn $ zip cpt_tvs pats_vis
        ; let subst = zipTvSubst cpt_tvs (mkTyVarTys fam_tvs)
-       ; pure $ Just (substTyUnchecked subst rhs_ty, loc)
+       ; pure $ Just (substTyUnchecked subst rhs_ty, locA loc)
            -- We also perform other checks for well-formedness and validity
            -- later, in checkValidClass
      }
@@ -4608,7 +4608,7 @@ checkValidRoleAnnots role_annots tc
       = whenIsJust role_annot_decl_maybe $
           \decl@(L loc (RoleAnnotDecl _ _ the_role_annots)) ->
           addRoleAnnotCtxt name $
-          setSrcSpan loc $ do
+          setSrcSpanA loc $ do
           { role_annots_ok <- xoptM LangExt.RoleAnnotations
           ; checkTc role_annots_ok $ needXRoleAnnotations tc
           ; checkTc (vis_vars `equalLength` the_role_annots)
@@ -4932,7 +4932,7 @@ wrongNumberOfRoles tyvars d@(L _ (RoleAnnotDecl _ _ annots))
 illegalRoleAnnotDecl :: LRoleAnnotDecl GhcRn -> TcM ()
 illegalRoleAnnotDecl (L loc (RoleAnnotDecl _ tycon _))
   = setErrCtxt [] $
-    setSrcSpan loc $
+    setSrcSpanA loc $
     addErrTc (text "Illegal role annotation for" <+> ppr tycon <> char ';' $$
               text "they are allowed only for datatypes and classes.")
 

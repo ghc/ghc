@@ -26,10 +26,10 @@ module GHC.Hs.Binds where
 
 import GHC.Prelude
 
-import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, LHsExpr,
+import {-# SOURCE #-} GHC.Hs.Expr (pprExpr, LHsExpr,
                                     MatchGroup, pprFunBind,
                                     GRHSs, pprPatBind )
-import {-# SOURCE #-} GHC.Hs.Pat  ( LPat )
+import {-# SOURCE #-} GHC.Hs.Pat  (pprLPat,  LPat )
 
 import GHC.Hs.Extension
 import GHC.Parser.Annotation
@@ -45,6 +45,8 @@ import GHC.Types.Var
 import GHC.Data.Bag
 import GHC.Data.FastString
 import GHC.Data.BooleanFormula (LBooleanFormula)
+import GHC.Types.Name.Reader
+import GHC.Types.Name
 
 import Data.Data hiding ( Fixity )
 import Data.List hiding ( foldr )
@@ -162,6 +164,8 @@ type LHsBindsLR idL idR = Bag (LHsBindLR idL idR)
 -- | Located Haskell Binding with separate Left and Right identifier types
 type LHsBindLR  idL idR = XRec idL (HsBindLR idL idR)
 -- type LHsBindLR  idL idR = LocatedA (HsBindLR idL idR) -- AZ: before
+
+type instance Anno (HsBindLR (GhcPass idL) (GhcPass idR)) = SrcSpanAnnA
 
 {- Note [FunBind vs PatBind]
    ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -670,7 +674,7 @@ pprLHsBindsForUser binds sigs
   where
 
     decls :: [(SrcSpan, SDoc)]
-    decls = [(loc, ppr sig)  | L loc sig <- sigs] ++
+    decls = [(locA loc, ppr sig)  | L loc sig <- sigs] ++
             [(locA loc, ppr bind) | L loc bind <- bagToList binds]
 
     sort_by_loc decls = sortBy (SrcLoc.leftmost_smallest `on` fst) decls
@@ -766,21 +770,35 @@ instance OutputableBndrId p => Outputable (ABExport (GhcPass p)) where
            , nest 2 (pprTcSpecPrags prags)
            , pprIfTc @p $ nest 2 (text "wrap:" <+> ppr wrap) ]
 
-instance (OutputableBndrId l, OutputableBndrId r,
-         Outputable (XXPatSynBind (GhcPass l) (GhcPass r)))
+instance (OutputableBndrId l, OutputableBndrId r)
           => Outputable (PatSynBind (GhcPass l) (GhcPass r)) where
   ppr (PSB{ psb_id = (L _ psyn), psb_args = details, psb_def = pat,
             psb_dir = dir })
       = ppr_lhs <+> ppr_rhs
     where
       ppr_lhs = text "pattern" <+> ppr_details
-      ppr_simple syntax = syntax <+> ppr pat
+      ppr_simple syntax = syntax <+> pprLPat pat
 
       ppr_details = case details of
-          InfixCon v1 v2 -> hsep [ppr v1, pprInfixOcc psyn, ppr v2]
-          PrefixCon vs   -> hsep (pprPrefixOcc psyn : map ppr vs)
+          InfixCon v1 v2 -> hsep [ppr_v v1, pprInfixOcc psyn, ppr_v  v2]
+            where
+                ppr_v v = case ghcPass @r of
+                    GhcPs -> ppr v
+                    GhcRn -> ppr v
+                    GhcTc -> ppr v
+          PrefixCon vs   -> hsep (pprPrefixOcc psyn : map ppr_v vs)
+            where
+                ppr_v v = case ghcPass @r of
+                    GhcPs -> ppr v
+                    GhcRn -> ppr v
+                    GhcTc -> ppr v
           RecCon vs      -> pprPrefixOcc psyn
-                            <> braces (sep (punctuate comma (map ppr vs)))
+                            <> braces (sep (punctuate comma (map ppr_v vs)))
+            where
+                ppr_v v = case ghcPass @r of
+                    GhcPs -> ppr v
+                    GhcRn -> ppr v
+                    GhcTc -> ppr v
 
       ppr_rhs = case dir of
           Unidirectional           -> ppr_simple (text "<-")
@@ -839,6 +857,8 @@ type LIPBind id = XRec id (IPBind id)
 
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
+type instance Anno (IPBind (GhcPass p)) = SrcSpanAnnA
+
 -- | Implicit parameter bindings.
 --
 -- These bindings start off as (Left "x") in the parser and stay
@@ -885,6 +905,8 @@ serves for both.
 
 -- | Located Signature
 type LSig pass = XRec pass (Sig pass)
+
+type instance Anno (Sig (GhcPass p)) = SrcSpanAnnA
 
 -- | Signatures and pragmas
 data Sig pass
@@ -1068,8 +1090,14 @@ type instance XSCCFunSig        (GhcPass p) = ApiAnn
 type instance XCompleteMatchSig (GhcPass p) = ApiAnn
 type instance XXSig             (GhcPass p) = NoExtCon
 
+-- For CompleteMatchSig
+type instance Anno [LocatedN RdrName] = SrcSpan
+type instance Anno [LocatedN Name]    = SrcSpan
+type instance Anno [LocatedN Id]      = SrcSpan
+
 -- | Located Fixity Signature
 type LFixitySig pass = XRec pass (FixitySig pass)
+type instance Anno (FixitySig (GhcPass p)) = SrcSpanAnnA
 
 -- | Fixity Signature
 data FixitySig pass = FixitySig (XFixitySig pass) [XRec pass (IdP pass)] Fixity
@@ -1079,6 +1107,11 @@ data FixitySig pass = FixitySig (XFixitySig pass) [XRec pass (IdP pass)] Fixity
 
 type instance XFixitySig  (GhcPass p) = NoExtField
 type instance XXFixitySig (GhcPass p) = NoExtCon
+
+type instance Anno StringLiteral = SrcSpan
+type instance Anno (LocatedN RdrName) = SrcSpan
+type instance Anno (LocatedN Name) = SrcSpan
+type instance Anno (LocatedN Id) = SrcSpan
 
 -- | Type checker Specialisation Pragmas
 --
@@ -1090,7 +1123,7 @@ data TcSpecPrags
   deriving Data
 
 -- | Located Type checker Specification Pragmas
-type LTcSpecPrag = Located TcSpecPrag
+type LTcSpecPrag = LocatedA TcSpecPrag
 
 -- | Type checker Specification Pragma
 data TcSpecPrag
@@ -1180,10 +1213,12 @@ signatures. Since some of the signatures contain a list of names, testing for
 equality is not enough -- we have to check if they overlap.
 -}
 
-instance OutputableBndrId p => Outputable (Sig (GhcPass p)) where
+instance (OutputableBndrId p)
+      => Outputable (Sig (GhcPass p)) where
     ppr sig = ppr_sig sig
 
-ppr_sig :: (OutputableBndrId p) => Sig (GhcPass p) -> SDoc
+ppr_sig :: forall p. OutputableBndrId p
+        => Sig (GhcPass p) -> SDoc
 ppr_sig (TypeSig _ vars ty)  = pprVarSig (map unLoc vars) (ppr ty)
 ppr_sig (ClassOpSig _ is_deflt vars ty)
   | is_deflt                 = text "default" <+> pprVarSig (map unLoc vars) (ppr ty)
@@ -1207,13 +1242,22 @@ ppr_sig (MinimalSig _ src bf)
 ppr_sig (PatSynSig _ names sig_ty)
   = text "pattern" <+> pprVarSig (map unLoc names) (ppr sig_ty)
 ppr_sig (SCCFunSig _ src fn mlabel)
-  = pragSrcBrackets src "{-# SCC" (ppr fn <+> maybe empty ppr mlabel )
+  = pragSrcBrackets src "{-# SCC" (ppr_fn <+> maybe empty ppr mlabel )
+      where
+        ppr_fn = case ghcPass @p of
+          GhcPs -> ppr fn
+          GhcRn -> ppr fn
+          GhcTc -> ppr fn
 ppr_sig (CompleteMatchSig _ src cs mty)
   = pragSrcBrackets src "{-# COMPLETE"
-      ((hsep (punctuate comma (map ppr (unLoc cs))))
+      ((hsep (punctuate comma (map ppr_n (unLoc cs))))
         <+> opt_sig)
   where
     opt_sig = maybe empty ((\t -> dcolon <+> ppr t) . unLoc) mty
+    ppr_n n = case ghcPass @p of
+        GhcPs -> ppr n
+        GhcRn -> ppr n
+        GhcTc -> ppr n
 
 instance OutputableBndrId p
        => Outputable (FixitySig (GhcPass p)) where
@@ -1250,7 +1294,7 @@ instance Outputable TcSpecPrag where
     = text "SPECIALIZE" <+> pprSpec var (text "<type>") inl
 
 pprMinimalSig :: (OutputableBndr name)
-              => LBooleanFormula (LocatedN name) -> SDoc
+              => LBooleanFormula (GenLocated l name) -> SDoc
 pprMinimalSig (L _ bf) = ppr (fmap unLoc bf)
 
 {-
@@ -1314,7 +1358,7 @@ instance Traversable RecordPatSynField where
 
 
 -- | Haskell Pattern Synonym Direction
-data HsPatSynDir id
+data HsPatSynDir p
   = Unidirectional
   | ImplicitBidirectional
-  | ExplicitBidirectional (MatchGroup id (LHsExpr id))
+  | ExplicitBidirectional (MatchGroup p (LHsExpr p))

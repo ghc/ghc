@@ -694,6 +694,7 @@ summariseRequirement pn mod_name = do
         ms_textual_imps = extra_sig_imports,
         ms_parsed_mod = Just (HsParsedModule {
                 hpm_module = L loc (HsModule {
+                        hsmodAnn = noAnn,
                         hsmodLayout = NoLayoutInfo,
                         hsmodName = Just (L loc mod_name),
                         hsmodExports = Nothing,

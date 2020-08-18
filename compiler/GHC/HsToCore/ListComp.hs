@@ -29,6 +29,7 @@ import GHC.HsToCore.Utils
 import GHC.Driver.Session
 import GHC.Core.Utils
 import GHC.Types.Id
+import GHC.Types.Name
 import GHC.Core.Type
 import GHC.Builtin.Types
 import GHC.HsToCore.Match
@@ -618,7 +619,7 @@ dsMcBindStmt pat rhs' bind_op fail_op res1_ty stmts
         ; var      <- selectSimpleMatchVarL Many pat
         ; match <- matchSinglePatVar var (StmtCtxt (DoExpr Nothing)) pat
                                   res1_ty (cantFailMatchResult body)
-        ; match_code <- dsHandleMonadicFailure (MonadComp :: HsStmtContext GhcRn) pat match fail_op
+        ; match_code <- dsHandleMonadicFailure (MonadComp :: HsStmtContext Name) pat match fail_op
         ; dsSyntaxExpr bind_op [rhs', Lam var match_code] }
 
 -- Desugar nested monad comprehensions, for example in `then..` constructs

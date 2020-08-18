@@ -1177,7 +1177,9 @@ leavesMatch (L _ (Match { m_pats = pats
 -- Replace the leaf commands in a match
 
 replaceLeavesMatch
-        :: Type                                 -- new result type
+        :: ( Anno (Match GhcTc (LocatedA (body' GhcTc))) ~ Anno (Match GhcTc (LocatedA (body GhcTc)))
+           , Anno (GRHS GhcTc (LocatedA (body' GhcTc))) ~ Anno (GRHS GhcTc (LocatedA (body GhcTc))))
+        => Type                                 -- new result type
         -> [LocatedA (body' GhcTc)] -- replacement leaf expressions of that type
         -> LMatch GhcTc (LocatedA (body GhcTc))  -- the matches of a case command
         -> ([LocatedA (body' GhcTc)],            -- remaining leaf expressions
@@ -1191,7 +1193,9 @@ replaceLeavesMatch _res_ty leaves
     (leaves', L loc (match { m_ext = noAnn, m_grhss = GRHSs x grhss' binds }))
 
 replaceLeavesGRHS
-        :: [LocatedA (body' GhcTc)]  -- replacement leaf expressions of that type
+        :: ( Anno (Match GhcTc (LocatedA (body' GhcTc))) ~ Anno (Match GhcTc (LocatedA (body GhcTc)))
+           , Anno (GRHS GhcTc (LocatedA (body' GhcTc))) ~ Anno (GRHS GhcTc (LocatedA (body GhcTc))))
+        => [LocatedA (body' GhcTc)]  -- replacement leaf expressions of that type
         -> LGRHS GhcTc (LocatedA (body GhcTc))     -- rhss of a case command
         -> ([LocatedA (body' GhcTc)],              -- remaining leaf expressions
             LGRHS GhcTc (LocatedA (body' GhcTc)))  -- updated GRHS

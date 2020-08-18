@@ -17,8 +17,8 @@ module GHC.Parser.Annotation (
 
   -- * In-tree Api Annotations
   LocatedA, LocatedL, LocatedC, LocatedN, LocatedAn, LocatedP,
-  SrcSpanAnnA, SrcSpanAnn'(..),
-  SrcSpanAnnName,
+
+  SrcSpanAnnA, SrcSpanAnnL, SrcSpanAnnP, SrcSpanAnnC, SrcSpanAnnName, SrcSpanAnn'(..),
   AddApiAnn(..),
   ApiAnn, ApiAnn'(..),
   ApiAnnCO, ApiAnnComments,
@@ -544,6 +544,10 @@ data SrcSpanAnn' a = SrcSpanAnn { ann :: a, locA :: SrcSpan }
 instance (Outputable a) => Outputable (SrcSpanAnn' a) where
   ppr (SrcSpanAnn a l) = text "SrcSpanAnn" <+> ppr a <+> ppr l
 
+instance (Outputable a, Outputable e)
+     => Outputable (GenLocated (SrcSpanAnn' a) e) where
+  ppr = pprLocated
+
 instance Outputable AnnListItem where
   ppr (AnnListItem ts) = text "AnnListItem" <+> ppr ts
 
@@ -562,6 +566,8 @@ instance Outputable NameAnn where
     = text "NameAnnOnly" <+> ppr a <+> ppr o <+> ppr c <+> ppr t
   ppr (NameAnnRArrow n t)
     = text "NameAnnRArrow" <+> ppr n <+> ppr t
+  ppr (NameAnnQuote q n t)
+    = text "NameAnnQuote" <+> ppr q <+> ppr n <+> ppr t
   ppr (NameAnnTrailing t)
     = text "NameAnnTrailing" <+> ppr t
 
@@ -698,6 +704,11 @@ data NameAnn
       nann_name      :: RealSrcSpan,
       nann_trailing  :: [TrailingAnn]
       }
+  | NameAnnQuote {
+      nann_quote     :: RealSrcSpan,
+      nann_name      :: RealSrcSpan,
+      nann_trailing  :: [TrailingAnn]
+      }
   | NameAnnTrailing {
       nann_trailing  :: [TrailingAnn]
       }
@@ -803,6 +814,7 @@ reAnnL :: ann -> ApiAnnComments -> Located e -> GenLocated (SrcSpanAnn' (ApiAnn'
 reAnnL anns cs (L l a) = L (SrcSpanAnn (ApiAnn (realSrcSpan l) anns cs) l) a
 
 -- noLocA :: a -> GenLocated (SrcSpanAnn' (ApiAnn' an)) a
+-- noLocA :: forall an a. a -> LocatedAn an a
 noLocA :: a -> LocatedAn an a
 noLocA = L (SrcSpanAnn ApiAnnNotUsed noSrcSpan)
 

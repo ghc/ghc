@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DataKinds #-}
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
@@ -1076,7 +1078,7 @@ instance Outputable WarnUnusedForalls where
     WarnUnusedForalls   -> "WarnUnusedForalls"
     NoWarnUnusedForalls -> "NoWarnUnusedForalls"
 
-bindLHsTyVarBndrs :: (OutputableBndrFlag flag)
+bindLHsTyVarBndrs :: (OutputableBndrFlag flag 'Renamed)
                   => HsDocContext
                   -> WarnUnusedForalls
                   -> Maybe a               -- Just _  => an associated type decl
@@ -1088,7 +1090,7 @@ bindLHsTyVarBndrs doc wuf mb_assoc tv_bndrs thing_inside
        ; checkDupRdrNamesN tv_names_w_loc
        ; go tv_bndrs thing_inside }
   where
-    tv_names_w_loc :: [LocatedN RdrName] --AZ 
+    tv_names_w_loc :: [LocatedN RdrName] --AZ
     tv_names_w_loc = map hsLTyVarLocName tv_bndrs
 
     go []     thing_inside = thing_inside []
@@ -1542,7 +1544,7 @@ dataKindsErr env thing
     pp_what | isRnKindLevel env = text "kind"
             | otherwise          = text "type"
 
-warnUnusedForAll :: OutputableBndrFlag flag
+warnUnusedForAll :: OutputableBndrFlag flag 'Renamed
                  => HsDocContext -> LHsTyVarBndr flag GhcRn -> FreeVars -> TcM ()
 warnUnusedForAll doc (L loc tv) used_names
   = whenWOptM Opt_WarnUnusedForalls $

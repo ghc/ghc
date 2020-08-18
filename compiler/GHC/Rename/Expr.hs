@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
@@ -21,7 +22,8 @@ free variables.
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
 module GHC.Rename.Expr (
-        rnLExpr, rnExpr, rnStmts
+        rnLExpr, rnExpr, rnStmts,
+        AnnoBody
    ) where
 
 #include "HsVersions.h"
@@ -665,8 +667,15 @@ To get a stable order we use nameSetElemsStable.
 See Note [Deterministic UniqFM] to learn more about nondeterminism.
 -}
 
+type AnnoBody body
+  = ( Outputable (body GhcPs)
+    , Anno (StmtLR GhcPs GhcPs (LocatedA (body GhcPs))) ~ SrcSpanAnnA
+    , Anno (StmtLR GhcRn GhcPs (LocatedA (body GhcPs))) ~ SrcSpanAnnA
+    , Anno (StmtLR GhcRn GhcRn (LocatedA (body GhcRn))) ~ SrcSpanAnnA
+    )
+
 -- | Rename some Stmts
-rnStmts :: Outputable (body GhcPs)
+rnStmts :: AnnoBody body
         => HsStmtContext Name
         -> (body GhcPs -> RnM (body GhcRn, FreeVars))
            -- ^ How to rename the body of each statement (e.g. rnLExpr)
@@ -680,7 +689,7 @@ rnStmts ctxt rnBody = rnStmtsWithPostProcessing ctxt rnBody noPostProcessStmts
 
 -- | like 'rnStmts' but applies a post-processing step to the renamed Stmts
 rnStmtsWithPostProcessing
-        :: Outputable (body GhcPs)
+        :: AnnoBody body
         => HsStmtContext Name
         -> (body GhcPs -> RnM (body GhcRn, FreeVars))
            -- ^ How to rename the body of each statement (e.g. rnLExpr)
@@ -730,7 +739,7 @@ noPostProcessStmts
 noPostProcessStmts _ stmts = return (map fst stmts, emptyNameSet)
 
 
-rnStmtsWithFreeVars :: Outputable (body GhcPs)
+rnStmtsWithFreeVars :: AnnoBody body
         => HsStmtContext Name
         -> ((body GhcPs) -> RnM ((body GhcRn), FreeVars))
         -> [LStmt GhcPs (LocatedA (body GhcPs))]
@@ -796,7 +805,7 @@ exhaustive list). How we deal with pattern match failure is context-dependent.
 At one point we failed to make this distinction, leading to #11216.
 -}
 
-rnStmt :: Outputable (body GhcPs)
+rnStmt :: AnnoBody body
        => HsStmtContext Name
        -> (body GhcPs -> RnM (body GhcRn, FreeVars))
           -- ^ How to rename the body of the statement
@@ -1054,7 +1063,7 @@ type Segment stmts = (Defs,
 
 
 -- wrapper that does both the left- and right-hand sides
-rnRecStmtsAndThen :: Outputable (body GhcPs) =>
+rnRecStmtsAndThen :: AnnoBody body =>
                      HsStmtContext Name
                   -> (body GhcPs -> RnM (body GhcRn, FreeVars))
                   -> [LStmt GhcPs (LocatedA (body GhcPs))]
@@ -1098,12 +1107,12 @@ collectRecStmtsFixities l =
 
 -- left-hand sides
 
-rn_rec_stmt_lhs :: Outputable body => MiniFixityEnv
-                -> LStmt GhcPs body
+rn_rec_stmt_lhs :: AnnoBody body => MiniFixityEnv
+                -> LStmt GhcPs (LocatedA (body GhcPs))
                    -- rename LHS, and return its FVs
                    -- Warning: we will only need the FreeVars below in the case of a BindStmt,
                    -- so we don't bother to compute it accurately in the other cases
-                -> RnM [(LStmtLR GhcRn GhcPs body, FreeVars)]
+                -> RnM [(LStmtLR GhcRn GhcPs (LocatedA (body GhcPs)), FreeVars)]
 
 rn_rec_stmt_lhs _ (L loc (BodyStmt _ body a b))
   = return [(L loc (BodyStmt noExtField body a b), emptyFVs)]
@@ -1143,9 +1152,9 @@ rn_rec_stmt_lhs _ stmt@(L _ (ApplicativeStmt {})) -- Shouldn't appear yet
 rn_rec_stmt_lhs _ (L _ (LetStmt _ (EmptyLocalBinds _)))
   = panic "rn_rec_stmt LetStmt EmptyLocalBinds"
 
-rn_rec_stmts_lhs :: Outputable body => MiniFixityEnv
-                 -> [LStmt GhcPs body]
-                 -> RnM [(LStmtLR GhcRn GhcPs body, FreeVars)]
+rn_rec_stmts_lhs :: AnnoBody body => MiniFixityEnv
+                 -> [LStmt GhcPs (LocatedA (body GhcPs))]
+                 -> RnM [(LStmtLR GhcRn GhcPs (LocatedA (body GhcPs)), FreeVars)]
 rn_rec_stmts_lhs fix_env stmts
   = do { ls <- concatMapM (rn_rec_stmt_lhs fix_env) stmts
        ; let boundNames = collectLStmtsBinders (map fst ls)
@@ -1158,7 +1167,7 @@ rn_rec_stmts_lhs fix_env stmts
 
 -- right-hand-sides
 
-rn_rec_stmt :: (Outputable (body GhcPs)) =>
+rn_rec_stmt :: AnnoBody body =>
                HsStmtContext Name
             -> (body GhcPs -> RnM (body GhcRn, FreeVars))
             -> [Name]
@@ -1217,7 +1226,7 @@ rn_rec_stmt _ _ _ (L _ (LetStmt _ (EmptyLocalBinds _)), _)
 rn_rec_stmt _ _ _ stmt@(L _ (ApplicativeStmt {}), _)
   = pprPanic "rn_rec_stmt: ApplicativeStmt" (ppr stmt)
 
-rn_rec_stmts :: Outputable (body GhcPs) =>
+rn_rec_stmts :: AnnoBody body =>
                 HsStmtContext Name
              -> (body GhcPs -> RnM (body GhcRn, FreeVars))
              -> [Name]
@@ -1228,10 +1237,11 @@ rn_rec_stmts ctxt rnBody bndrs stmts
        ; return (concat segs_s) }
 
 ---------------------------------------------
-segmentRecStmts :: SrcSpan -> HsStmtContext Name
-                -> Stmt GhcRn body
-                -> [Segment (LStmt GhcRn body)] -> FreeVars
-                -> ([LStmt GhcRn body], FreeVars)
+segmentRecStmts :: AnnoBody body
+                => SrcSpan -> HsStmtContext Name
+                -> Stmt GhcRn (LocatedA (body GhcRn))
+                -> [Segment (LStmt GhcRn (LocatedA (body GhcRn)))] -> FreeVars
+                -> ([LStmt GhcRn (LocatedA (body GhcRn))], FreeVars)
 
 segmentRecStmts loc ctxt empty_rec_stmt segs fvs_later
   | null segs
@@ -2022,7 +2032,7 @@ emptyErr (TransStmtCtxt {}) = text "Empty statement group preceding 'group' or '
 emptyErr ctxt               = text "Empty" <+> pprStmtContext ctxt
 
 ----------------------
-checkLastStmt :: Outputable (body GhcPs) => HsStmtContext Name
+checkLastStmt :: AnnoBody body => HsStmtContext Name
               -> LStmt GhcPs (LocatedA (body GhcPs))
               -> RnM (LStmt GhcPs (LocatedA (body GhcPs)))
 checkLastStmt ctxt lstmt@(L loc stmt)

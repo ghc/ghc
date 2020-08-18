@@ -275,8 +275,8 @@ module GHC (
 
         -- * API Annotations
         ApiAnns(..),AnnKeywordId(..),AnnotationComment(..), ApiAnnKey,
-        getAnnotation, getAndRemoveAnnotation,
-        getAnnotationComments, getAndRemoveAnnotationComments,
+        -- getAnnotation, getAndRemoveAnnotation,
+        -- getAnnotationComments, getAndRemoveAnnotationComments,
         unicodeAnn,
 
         -- * Miscellaneous

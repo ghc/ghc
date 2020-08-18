@@ -553,19 +553,19 @@ is_fam_decl decl = Right decl
 
 is_tyfam_inst :: LHsDecl GhcPs -> Either (LTyFamInstDecl GhcPs) (LHsDecl GhcPs)
 is_tyfam_inst (L loc (Hs.InstD _ (TyFamInstD { tfid_inst = d })))
-  = Left (L (locA loc) d)
+  = Left (L loc d)
 is_tyfam_inst decl
   = Right decl
 
 is_datafam_inst :: LHsDecl GhcPs
                 -> Either (LDataFamInstDecl GhcPs) (LHsDecl GhcPs)
 is_datafam_inst (L loc (Hs.InstD  _ (DataFamInstD { dfid_inst = d })))
-  = Left (L (locA loc) d)
+  = Left (L loc d)
 is_datafam_inst decl
   = Right decl
 
 is_sig :: LHsDecl GhcPs -> Either (LSig GhcPs) (LHsDecl GhcPs)
-is_sig (L loc (Hs.SigD _ sig)) = Left (L (locA loc) sig)
+is_sig (L loc (Hs.SigD _ sig)) = Left (L loc sig)
 is_sig decl                    = Right decl
 
 is_bind :: LHsDecl GhcPs -> Either (LHsBind GhcPs) (LHsDecl GhcPs)
