@@ -449,9 +449,9 @@ pprInstr platform instr = case instr of
 
   -- 4. Branch Instructions ----------------------------------------------------
   J t            -> pprInstr platform (B t)
-  B (TBlock bid) -> text "\tb" <+> ppr (mkLocalBlockLabel (getUnique bid))
-  B (TLabel lbl) -> text "\tb" <+> ppr lbl
-  B (TReg r)     -> text "\tbr" <+> pprReg W64 r
+  B (TBlock bid) -> text "\tbl" <+> ppr (mkLocalBlockLabel (getUnique bid))
+  B (TLabel lbl) -> text "\tbl" <+> ppr lbl
+  B (TReg r)     -> text "\tblr" <+> pprReg W64 r
 
   BL (TBlock bid) -> text "\tbl" <+> ppr (mkLocalBlockLabel (getUnique bid))
   BL (TLabel lbl) -> text "\tbl" <+> ppr lbl
@@ -483,22 +483,22 @@ pprInstr platform instr = case instr of
     text "\tstrh" <+> pprOp o1 <> comma <+> pprOp o2
   STR f o1 o2 -> text "\tstr" <+> pprOp o1 <> comma <+> pprOp o2
 
-  -- LDR f o1 (OpImm (ImmIndex lbl off)) ->
-  --   text "\tadrp" <+> pprOp o1 <> comma <+> ppr lbl $$
-  --   text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> text ":lo12:" <> ppr lbl $$
-  --   text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
-  -- always GOT loads
   LDR f o1 (OpImm (ImmIndex lbl off)) ->
-    text "\tadrp" <+> pprOp o1 <> comma <+> text ":got:" <> ppr lbl $$
-    text "\tldr" <+> pprOp o1 <> comma <+> text "[" <> pprOp o1 <> comma <+> text":got_lo12:" <> ppr lbl <> text "]" $$
+    text "\tadrp" <+> pprOp o1 <> comma <+> ppr lbl $$
+    text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> text ":lo12:" <> ppr lbl $$
     text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
+  -- always GOT loads
+  -- LDR f o1 (OpImm (ImmIndex lbl off)) ->
+  --   text "\tadrp" <+> pprOp o1 <> comma <+> text ":got:" <> ppr lbl $$
+  --   text "\tldr" <+> pprOp o1 <> comma <+> text "[" <> pprOp o1 <> comma <+> text":got_lo12:" <> ppr lbl <> text "]" $$
+  --   text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
 
-  -- LDR f o1 (OpImm (ImmCLbl lbl)) ->
-  --   text "\tadrp" <+> pprOp o1 <> comma <+> ppr lbl $$
-  --   text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> text ":lo12:" <> ppr lbl
   LDR f o1 (OpImm (ImmCLbl lbl)) ->
-    text "\tadrp" <+> pprOp o1 <> comma <+> text ":got:" <> ppr lbl $$
-    text "\tldr" <+> pprOp o1 <> comma <+> text "[" <> pprOp o1 <> comma <+> text":got_lo12:" <> ppr lbl <> text "]"
+    text "\tadrp" <+> pprOp o1 <> comma <+> ppr lbl $$
+    text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> text ":lo12:" <> ppr lbl
+  -- LDR f o1 (OpImm (ImmCLbl lbl)) ->
+  --   text "\tadrp" <+> pprOp o1 <> comma <+> text ":got:" <> ppr lbl $$
+  --   text "\tldr" <+> pprOp o1 <> comma <+> text "[" <> pprOp o1 <> comma <+> text":got_lo12:" <> ppr lbl <> text "]"
 
   LDR f o1@(OpReg W8 (RegReal (RealRegSingle i))) o2 | i < 32 ->
     text "\tldrsb" <+> pprOp o1 <> comma <+> pprOp o2
