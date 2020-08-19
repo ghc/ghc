@@ -24,6 +24,7 @@ import GHC.Prelude
 import GHC.Driver.Backpack.Syntax
 
 import GHC.Parser.Annotation
+import GHC.Parser.Errors.Ppr
 import GHC hiding (Failed, Succeeded)
 import GHC.Parser
 import GHC.Parser.Lexer
@@ -85,7 +86,7 @@ doBackpack [src_filename] = do
     buf <- liftIO $ hGetStringBuffer src_filename
     let loc = mkRealSrcLoc (mkFastString src_filename) 1 1 -- TODO: not great
     case unP parseBackpack (initParserState (initParserOpts dflags) buf loc) of
-        PFailed pst -> throwErrors (getErrorMessages pst dflags)
+        PFailed pst -> throwErrors (fmap pprError (getErrorMessages pst))
         POk _ pkgname_bkp -> do
             -- OK, so we have an LHsUnit PackageName, but we want an
             -- LHsUnit HsComponentId.  So let's rename it.
