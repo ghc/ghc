@@ -48,9 +48,9 @@ import GHC.Types.Unique ( hasKey )
 import GHC.Core.Unfold
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity ( ArityType(..), arityTypeArity, isBotArityType
+                          , pushCoTyArg, pushCoValArg
                           , idArityType, etaExpandAT )
-import GHC.Core.SimpleOpt ( pushCoTyArg, pushCoValArg
-                          , joinPointBinding_maybe, joinPointBindings_maybe )
+import GHC.Core.SimpleOpt ( joinPointBinding_maybe, joinPointBindings_maybe )
 import GHC.Core.FVs     ( mkRuleInfo )
 import GHC.Core.Rules   ( lookupRule, getRules, initRuleOpts )
 import GHC.Types.Basic
@@ -315,7 +315,7 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
         ; let rhs_cont = mkRhsStop (substTy body_env (exprType body))
         ; (body_floats0, body0) <- {-#SCC "simplExprF" #-} simplExprF body_env body rhs_cont
 
-              -- Never float join-floats out of a non-join let-binding
+              -- Never float join-floats out of a non-join let-binding (which this is)
               -- So wrap the body in the join-floats right now
               -- Hence: body_floats1 consists only of let-floats
         ; let (body_floats1, body1) = wrapJoinFloatsX body_floats0 body0
@@ -385,7 +385,8 @@ simplNonRecX env bndr new_rhs
 
   | otherwise
   = do  { (env', bndr') <- simplBinder env bndr
-        ; completeNonRecX NotTopLevel env' (isStrictId bndr) bndr bndr' new_rhs }
+        ; -- pprTrace "simplNonRecX" (ppr bndr <+> ppr bndr' $$ ppr (idOccInfo bndr) $$ ppr new_rhs) $
+          completeNonRecX NotTopLevel env' (isStrictId bndr) bndr bndr' new_rhs }
                 -- simplNonRecX is only used for NotTopLevel things
 
 --------------------------
@@ -600,7 +601,8 @@ prepareRhs mode top_lvl occ rhs0
         = do { (is_exp, floats1, fun') <- go (n_val_args+1) fun
              ; case is_exp of
                 False -> return (False, emptyLetFloats, App fun arg)
-                True  -> do { (floats2, arg') <- makeTrivial mode top_lvl topDmd occ arg
+                True  -> do { (floats2, arg') <- -- pprTrace "prepareRhs" (ppr occ <+> ppr rhs0) $
+                                                 makeTrivial mode top_lvl topDmd occ arg
                             ; return (True, floats1 `addLetFlts` floats2, App fun' arg') } }
     go n_val_args (Var fun)
         = return (is_exp, emptyLetFloats, Var fun)
@@ -680,7 +682,8 @@ makeTrivialBinding mode top_lvl occ_fs info expr expr_ty
         ; let final_id = addLetBndrInfo var arity_type unf
               bind     = NonRec final_id expr2
 
-        ; return ( floats `addLetFlts` unitLetFloat bind, final_id ) }
+        ; -- pprTrace "makeTrivial" (ppr bind) $
+          return ( floats `addLetFlts` unitLetFloat bind, final_id ) }
 
 bindingOk :: TopLevelFlag -> CoreExpr -> Type -> Bool
 -- True iff we can have a binding of this expression at this level
@@ -1411,25 +1414,23 @@ simplCast env body co0 cont0
                                         -- type of the hole changes (#16312)
 
         -- (f |> co) e   ===>   (f (e |> co1)) |> co2
-        -- where   co :: (s1->s2) ~ (t1~t2)
+        -- where   co :: (s1->s2) ~ (t1->t2)
         --         co1 :: t1 ~ s1
         --         co2 :: s2 ~ t2
         addCoerce co cont@(ApplyToVal { sc_arg = arg, sc_env = arg_se
                                       , sc_dup = dup, sc_cont = tail })
-          | Just (co1, m_co2) <- pushCoValArg co
-          , let new_ty = coercionRKind co1
-          , not (isTypeLevPoly new_ty)  -- Without this check, we get a lev-poly arg
-                                        -- See Note [Levity polymorphism invariants] in GHC.Core
-                                        -- test: typecheck/should_run/EtaExpandLevPoly
+          | Just (m_co1, m_co2) <- pushCoValArg co
+          , levity_ok m_co1
           = {-#SCC "addCoerce-pushCoValArg" #-}
             do { tail' <- addCoerceM m_co2 tail
-               ; if isReflCo co1
-                 then return (cont { sc_cont = tail'
-                                   , sc_hole_ty = coercionLKind co })
+               ; case m_co1 of {
+                   MRefl -> return (cont { sc_cont = tail'
+                                         , sc_hole_ty = coercionLKind co }) ;
                       -- Avoid simplifying if possible;
                       -- See Note [Avoiding exponential behaviour]
-                 else do
-               { (dup', arg_se', arg') <- simplArg env dup arg_se arg
+
+                   MCo co1 ->
+            do { (dup', arg_se', arg') <- simplArg env dup arg_se arg
                     -- When we build the ApplyTo we can't mix the OutCoercion
                     -- 'co' with the InExpr 'arg', so we simplify
                     -- to make it all consistent.  It's a bit messy.
@@ -1439,13 +1440,20 @@ simplCast env body co0 cont0
                                     , sc_env  = arg_se'
                                     , sc_dup  = dup'
                                     , sc_cont = tail'
-                                    , sc_hole_ty = coercionLKind co }) } }
+                                    , sc_hole_ty = coercionLKind co }) } } }
 
         addCoerce co cont
           | isReflexiveCo co = return cont  -- Having this at the end makes a huge
                                             -- difference in T12227, for some reason
                                             -- See Note [Optimising reflexivity]
           | otherwise        = return (CastIt co cont)
+
+        levity_ok :: MCoercionR -> Bool
+        levity_ok MRefl = True
+        levity_ok (MCo co) = not $ isTypeLevPoly $ coercionRKind co
+          -- Without this check, we get a lev-poly arg
+          -- See Note [Levity polymorphism invariants] in GHC.Core
+          -- test: typecheck/should_run/EtaExpandLevPoly
 
 simplArg :: SimplEnv -> DupFlag -> StaticEnv -> CoreExpr
          -> SimplM (DupFlag, StaticEnv, OutExpr)
@@ -3111,7 +3119,7 @@ knownCon :: SimplEnv
 
 knownCon env scrut dc_floats dc dc_ty_args dc_args bndr bs rhs cont
   = do  { (floats1, env1)  <- bind_args env bs dc_args
-        ; (floats2, env2) <- bind_case_bndr env1
+        ; (floats2, env2)  <- bind_case_bndr env1
         ; (floats3, expr') <- simplExprF env2 rhs cont
         ; case dc_floats of
             [] ->
@@ -3143,8 +3151,9 @@ knownCon env scrut dc_floats dc dc_ty_args dc_args bndr bs rhs cont
              -- it via postInlineUnconditionally.
              -- Nevertheless we must keep it if the case-binder is alive,
              -- because it may be used in the con_app.  See Note [knownCon occ info]
-           ; (floats1, env2) <- simplNonRecX env' b' arg  -- arg satisfies let/app invariant
-           ; (floats2, env3)  <- bind_args env2 bs' args
+           ; (floats1, env2) <- -- pprTrace "knownCon" (vcat [ pprBndr CasePatBind b, pprBndr CasePatBind b', ppr arg ]) $
+                                simplNonRecX env' b' arg  -- arg satisfies let/app invariant
+           ; (floats2, env3) <- bind_args env2 bs' args
            ; return (floats1 `addFloats` floats2, env3) }
 
     bind_args _ _ _ =
@@ -3237,6 +3246,7 @@ altsWouldDup [_] = False
 altsWouldDup (alt:alts)
   | is_bot_alt alt = altsWouldDup alts
   | otherwise      = not (all is_bot_alt alts)
+    -- otherwise case: first alt is non-bot, so all the rest must be bot
   where
     is_bot_alt (_,_,rhs) = exprIsDeadEnd rhs
 
@@ -3824,7 +3834,8 @@ simplStableUnfolding env top_lvl mb_cont id rhs_ty id_arity unf
                                         simplJoinRhs unf_env id expr cont
                            Nothing   -> -- Binder is not a join point
                                         do { expr' <- simplExprC unf_env expr (mkBoringStop rhs_ty)
-                                           ; return (eta_expand expr') }
+                                           ; -- pprTrace "ssu" (ppr expr $$ ppr expr' $$ ppr (eta_expand expr')) $
+                                             return (eta_expand expr') }
               ; case guide of
                   UnfWhen { ug_arity = arity
                           , ug_unsat_ok = sat_ok

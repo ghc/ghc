@@ -161,15 +161,18 @@ pprOptCo co = sdocOption sdocSuppressCoercions $ \case
               True  -> angleBrackets (text "Co:" <> int (coercionSize co))
               False -> parens $ sep [ppr co, dcolon <+> ppr (coercionType co)]
 
+ppr_id_occ :: (SDoc -> SDoc) -> Id -> SDoc
+ppr_id_occ add_par id
+  | isJoinId id = add_par ((text "jump") <+> pp_id)
+  | otherwise   = pp_id
+  where
+    pp_id = pprPrefixOcc id
+
 ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
         -- The function adds parens in context that need
         -- an atomic value (e.g. function args)
 
-ppr_expr add_par (Var name)
- | isJoinId name               = add_par ((text "jump") <+> pp_name)
- | otherwise                   = pp_name
- where
-   pp_name = pprPrefixOcc name
+ppr_expr add_par (Var id)      = ppr_id_occ add_par id
 ppr_expr add_par (Type ty)     = add_par (text "TYPE:" <+> ppr ty)       -- Weird
 ppr_expr add_par (Coercion co) = add_par (text "CO:" <+> ppr co)
 ppr_expr add_par (Lit lit)     = pprLiteral add_par lit
@@ -212,8 +215,7 @@ ppr_expr add_par expr@(App {})
 
                    _ -> parens (hang fun_doc 2 pp_args)
                    where
-                     fun_doc | isJoinId f = text "jump" <+> ppr f
-                             | otherwise  = ppr f
+                     fun_doc = ppr_id_occ noParens f
 
         _ -> parens (hang (pprParendExpr fun) 2 pp_args)
     }
