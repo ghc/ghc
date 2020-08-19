@@ -57,7 +57,7 @@ import GHC.Types.Name.Reader
 import GHC.Driver.Types
 import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.Monad
-import GHC.Parser.PostProcess ( filterCTuple, setRdrNameSpace )
+import GHC.Parser.PostProcess ( setRdrNameSpace )
 import GHC.Builtin.RebindableNames
 import GHC.Builtin.Types
 import GHC.Types.Name

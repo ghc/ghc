@@ -26,6 +26,8 @@ import Control.Monad
 
 import GHC.Driver.Session
 import GHC.Parser.Lexer
+import GHC.Parser.Errors
+import GHC.Types.SrcLoc
 
 newtype PD a = PD { unPD :: DynFlags -> PState -> ParseResult a }
 
@@ -42,7 +44,7 @@ instance Monad PD where
 liftP :: P a -> PD a
 liftP (P f) = PD $ \_ s -> f s
 
-failMsgPD :: String -> PD a
+failMsgPD :: (SrcSpan -> Error) -> PD a
 failMsgPD = liftP . failMsgP
 
 returnPD :: a -> PD a
