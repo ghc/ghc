@@ -47,7 +47,7 @@ module GHC.Utils.Outputable (
         bufLeftRenderSDoc,
         pprCode, mkCodeStyle,
         showSDocOneLine,
-        renderWithStyle,
+        renderWithContext,
 
         pprInfixVar, pprPrefixVar,
         pprHsChar, pprHsString, pprHsBytes,
@@ -71,7 +71,7 @@ module GHC.Utils.Outputable (
         QualifyName(..), queryQual,
         sdocWithDynFlags, sdocOption,
         updSDocContext,
-        SDocContext (..), sdocWithContext,
+        SDocContext (..), sdocWithContext, defaultSDocContext,
         getPprStyle, withPprStyle, setStyleColoured,
         pprDeeper, pprDeeperList, pprSetDepth,
         codeStyle, userStyle, dumpStyle, asmStyle,
@@ -302,7 +302,7 @@ code (either C or assembly), or generating interface files.
 -- | Represents a pretty-printable document.
 --
 -- To display an 'SDoc', use 'printSDoc', 'printSDocLn', 'bufLeftRenderSDoc',
--- or 'renderWithStyle'.  Avoid calling 'runSDoc' directly as it breaks the
+-- or 'renderWithContext'.  Avoid calling 'runSDoc' directly as it breaks the
 -- abstraction layer.
 newtype SDoc = SDoc { runSDoc :: SDocContext -> Doc }
 
@@ -354,6 +354,44 @@ instance IsString SDoc where
 instance Outputable SDoc where
   ppr = id
 
+-- | Default pretty-printing options
+defaultSDocContext :: SDocContext
+defaultSDocContext = SDC
+  { sdocStyle                       = defaultDumpStyle
+  , sdocColScheme                   = Col.defaultScheme
+  , sdocLastColour                  = Col.colReset
+  , sdocShouldUseColor              = False
+  , sdocDefaultDepth                = 5
+  , sdocLineLength                  = 100
+  , sdocCanUseUnicode               = False
+  , sdocHexWordLiterals             = False
+  , sdocPprDebug                    = False
+  , sdocPrintUnicodeSyntax          = False
+  , sdocPrintCaseAsLet              = False
+  , sdocPrintTypecheckerElaboration = False
+  , sdocPrintAxiomIncomps           = False
+  , sdocPrintExplicitKinds          = False
+  , sdocPrintExplicitCoercions      = False
+  , sdocPrintExplicitRuntimeReps    = False
+  , sdocPrintExplicitForalls        = False
+  , sdocPrintPotentialInstances     = False
+  , sdocPrintEqualityRelations      = False
+  , sdocSuppressTicks               = False
+  , sdocSuppressTypeSignatures      = False
+  , sdocSuppressTypeApplications    = False
+  , sdocSuppressIdInfo              = False
+  , sdocSuppressCoercions           = False
+  , sdocSuppressUnfoldings          = False
+  , sdocSuppressVarKinds            = False
+  , sdocSuppressUniques             = False
+  , sdocSuppressModulePrefixes      = False
+  , sdocSuppressStgExts             = False
+  , sdocErrorSpans                  = False
+  , sdocStarIsType                  = False
+  , sdocImpredicativeTypes          = False
+  , sdocLinearTypes                 = False
+  , sdocDynFlags                    = error "defaultSDocContext: DynFlags not available"
+  }
 
 withPprStyle :: PprStyle -> SDoc -> SDoc
 withPprStyle sty d = SDoc $ \ctxt -> runSDoc d ctxt{sdocStyle=sty}
@@ -490,8 +528,8 @@ pprCode cs d = withPprStyle (PprCode cs) d
 mkCodeStyle :: CodeStyle -> PprStyle
 mkCodeStyle = PprCode
 
-renderWithStyle :: SDocContext -> SDoc -> String
-renderWithStyle ctx sdoc
+renderWithContext :: SDocContext -> SDoc -> String
+renderWithContext ctx sdoc
   = let s = Pretty.style{ Pretty.mode       = PageMode,
                           Pretty.lineLength = sdocLineLength ctx }
     in Pretty.renderStyle s $ runSDoc sdoc ctx

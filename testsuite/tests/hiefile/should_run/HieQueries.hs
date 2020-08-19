@@ -14,7 +14,7 @@ import GHC.Iface.Ext.Utils
 import Data.Maybe (fromJust)
 import GHC.Driver.Session
 import GHC.SysTools
-import GHC.Utils.Outputable                 ( Outputable, renderWithStyle, ppr, defaultUserStyle, text)
+import GHC.Utils.Outputable                 ( Outputable, renderWithContext, ppr, defaultUserStyle, text)
 import qualified Data.Map as M
 import Data.Foldable
 
@@ -78,5 +78,5 @@ explainEv df hf refmap point = do
 
     pretty = unlines . (++["└"]) . ("┌":) . map ("│ "++) . lines
 
-    pprint = pretty . renderWithStyle (initSDocContext df sty) . ppr
+    pprint = pretty . renderWithContext (initSDocContext df sty) . ppr
     sty = defaultUserStyle
