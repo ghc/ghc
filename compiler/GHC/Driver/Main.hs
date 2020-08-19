@@ -101,6 +101,8 @@ import GHC.Utils.Panic
 import GHC.Core.ConLike
 
 import GHC.Parser.Annotation
+import GHC.Parser.Errors
+import GHC.Parser.Errors.Ppr
 import GHC.Unit
 import GHC.Unit.State
 import GHC.Types.Name.Reader
@@ -177,7 +179,7 @@ import qualified Data.Set as S
 import Data.Set (Set)
 import Data.Functor
 import Control.DeepSeq (force)
-import Data.Bifunctor (first)
+import Data.Bifunctor (first, bimap)
 
 import GHC.Iface.Ext.Ast    ( mkHieFile )
 import GHC.Iface.Ext.Types  ( getAsts, hie_asts, hie_module )
@@ -237,15 +239,19 @@ handleWarnings = do
 
 -- | log warning in the monad, and if there are errors then
 -- throw a SourceError exception.
-logWarningsReportErrors :: Messages -> Hsc ()
-logWarningsReportErrors (warns,errs) = do
+logWarningsReportErrors :: (Bag Warning, Bag Error) -> Hsc ()
+logWarningsReportErrors (warnings,errors) = do
+    let warns = fmap pprWarning warnings
+        errs  = fmap pprError   errors
     logWarnings warns
     when (not $ isEmptyBag errs) $ throwErrors errs
 
 -- | Log warnings and throw errors, assuming the messages
 -- contain at least one error (e.g. coming from PFailed)
-handleWarningsThrowErrors :: Messages -> Hsc a
-handleWarningsThrowErrors (warns, errs) = do
+handleWarningsThrowErrors :: (Bag Warning, Bag Error) -> Hsc a
+handleWarningsThrowErrors (warnings, errors) = do
+    let warns = fmap pprWarning warnings
+        errs  = fmap pprError   errors
     logWarnings warns
     dflags <- getDynFlags
     (wWarns, wErrs) <- warningsToMessages dflags <$> getWarnings
@@ -356,9 +362,9 @@ hscParse' mod_summary
 
     case unP parseMod (initParserState (initParserOpts dflags) buf loc) of
         PFailed pst ->
-            handleWarningsThrowErrors (getMessages pst dflags)
+            handleWarningsThrowErrors (getMessages pst)
         POk pst rdr_module -> do
-            let (warns, errs) = getMessages pst dflags
+            let (warns, errs) = bimap (fmap pprWarning) (fmap pprError) (getMessages pst)
             logWarnings warns
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser"
                         FormatHaskell (ppr rdr_module)
@@ -1496,7 +1502,11 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
     let dflags   = hsc_dflags hsc_env
         home_unit = mkHomeUnitFromFlags dflags
         platform  = targetPlatform dflags
-    cmm <- ioMsgMaybe $ parseCmmFile dflags filename
+    cmm <- ioMsgMaybe
+               $ do
+                  (warns,errs,cmm) <- withTiming dflags (text "ParseCmm"<+>brackets (text filename)) (\_ -> ())
+                                       $ parseCmmFile dflags filename
+                  return ((fmap pprWarning warns, fmap pprError errs), cmm)
     liftIO $ do
         dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose_by_proc "Parsed Cmm" FormatCMM (pdoc platform cmm)
         let -- Make up a module name to give the NCG. We can't pass bottom here
@@ -1878,10 +1888,10 @@ hscParseThingWithLocation source linenumber parser str
 
     case unP parser (initParserState (initParserOpts dflags) buf loc) of
         PFailed pst -> do
-            handleWarningsThrowErrors (getMessages pst dflags)
+            handleWarningsThrowErrors (getMessages pst)
 
         POk pst thing -> do
-            logWarningsReportErrors (getMessages pst dflags)
+            logWarningsReportErrors (getMessages pst)
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser"
                         FormatHaskell (ppr thing)
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed_ast "Parser AST"

@@ -5101,3 +5101,4 @@ initSDocContext dflags style = SDC
 initDefaultSDocContext :: DynFlags -> SDocContext
 initDefaultSDocContext dflags = initSDocContext dflags defaultUserStyle
 
+
