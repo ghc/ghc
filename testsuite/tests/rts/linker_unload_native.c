@@ -6,8 +6,7 @@
 #include <dlfcn.h>
 
 // poke into linker internals
-extern void *native_objects;
-extern void *unloaded_native_objects;
+extern void *objects;
 
 #define ITERATIONS 1000
 
@@ -97,8 +96,9 @@ int main (int argc, char *argv[])
         printf("%d ", i);
         fflush(stdout);
     }
-    // if we unloaded everything, these should be NULL
-    printf("\n%p %p\n", unloaded_native_objects, native_objects);
+
+    // Verify that Test.so isn't still loaded.
+    int res = getObjectLoadStatus("Test.so") != OBJECT_NOT_LOADED;
     hs_exit();
-    exit(0);
+    exit(res);
 }
