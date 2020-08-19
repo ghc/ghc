@@ -16,13 +16,12 @@ module GHC.Utils.Error (
         Severity(..),
 
         -- * Messages
-        ErrMsg, errMsgDoc, errMsgSeverity, errMsgReason,
-        ErrDoc, errDoc, errDocImportant, errDocContext, errDocSupplementary,
+        ErrMsg(..),
+        ErrDoc(..), errDoc,
         mapErrDoc,
         WarnMsg, MsgDoc,
         Messages, ErrorMessages, WarningMessages,
         unionMessages,
-        errMsgSpan, errMsgContext,
         errorsFound, isEmptyMessages,
         isWarnMsgFatal,
         warningsToMessages,
@@ -193,7 +192,6 @@ data Severity
 
 instance ToJson Severity where
   json s = JSString (show s)
-
 
 instance Show ErrMsg where
     show em = errMsgShortString em

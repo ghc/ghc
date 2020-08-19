@@ -65,7 +65,10 @@ module GHC.Types.Name.Reader (
         importSpecLoc, importSpecModule, isExplicitItem, bestImport,
 
         -- * Utils for StarIsType
-        starInfo
+        starInfo,
+
+        -- * Utils
+        opIsAt,
   ) where
 
 #include "HsVersions.h"
@@ -1402,3 +1405,7 @@ starInfo star_is_type rdr_name =
       = let fs = occNameFS occName
         in fs == fsLit "*" || fs == fsLit "★"
       | otherwise = False
+
+-- | Indicate if the given name is the "@" operator
+opIsAt :: RdrName -> Bool
+opIsAt e = e == mkUnqual varName (fsLit "@")

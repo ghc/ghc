@@ -45,6 +45,7 @@ import GHC.Unit.State
 import GHC.Platform.Ways
 import GHC.Platform.ArchOS
 import GHC.Parser.Header
+import GHC.Parser.Errors.Ppr
 import GHC.Driver.Phases
 import GHC.SysTools
 import GHC.SysTools.ExtraObj
@@ -1117,7 +1118,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
             buf <- hGetStringBuffer input_fn
             eimps <- getImports dflags buf input_fn (basename <.> suff)
             case eimps of
-              Left errs -> throwErrors errs
+              Left errs -> throwErrors (fmap pprError errs)
               Right (src_imps,imps,L _ mod_name) -> return
                   (Just buf, mod_name, imps, src_imps)
 

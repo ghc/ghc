@@ -357,6 +357,7 @@ import GHC.Data.FastString
 import qualified GHC.Parser as Parser
 import GHC.Parser.Lexer
 import GHC.Parser.Annotation
+import GHC.Parser.Errors.Ppr
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Types.Name.Env
 import GHC.Tc.Module
@@ -1430,10 +1431,8 @@ getTokenStream mod = do
   (sourceFile, source, dflags) <- getModuleSourceAndFlags mod
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream (initParserOpts dflags) source startLoc of
-    POk _ ts  -> return ts
-    PFailed pst ->
-        do dflags <- getDynFlags
-           throwErrors (getErrorMessages pst dflags)
+    POk _ ts    -> return ts
+    PFailed pst -> throwErrors (fmap pprError (getErrorMessages pst))
 
 -- | Give even more information on the source than 'getTokenStream'
 -- This function allows reconstructing the source completely with
@@ -1443,10 +1442,8 @@ getRichTokenStream mod = do
   (sourceFile, source, dflags) <- getModuleSourceAndFlags mod
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream (initParserOpts dflags) source startLoc of
-    POk _ ts -> return $ addSourceToTokens startLoc source ts
-    PFailed pst ->
-        do dflags <- getDynFlags
-           throwErrors (getErrorMessages pst dflags)
+    POk _ ts    -> return $ addSourceToTokens startLoc source ts
+    PFailed pst -> throwErrors (fmap pprError (getErrorMessages pst))
 
 -- | Given a source location and a StringBuffer corresponding to this
 -- location, return a rich token stream with the source associated to the
@@ -1620,12 +1617,12 @@ parser str dflags filename =
    case unP Parser.parseModule (initParserState (initParserOpts dflags) buf loc) of
 
      PFailed pst ->
-         let (warns,errs) = getMessages pst dflags in
-         (warns, Left errs)
+         let (warns,errs) = getMessages pst in
+         (fmap pprWarning warns, Left (fmap pprError errs))
 
      POk pst rdr_module ->
-         let (warns,_) = getMessages pst dflags in
-         (warns, Right rdr_module)
+         let (warns,_) = getMessages pst in
+         (fmap pprWarning warns, Right rdr_module)
 
 -- -----------------------------------------------------------------------------
 -- | Find the package environment (if one exists)

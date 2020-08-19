@@ -56,7 +56,6 @@ import GHC.Hs
 
 import GHC.Types.SrcLoc
 import GHC.Driver.Session ( WarningFlag(..) )
-import GHC.Utils.Outputable hiding ( (<>) )
 import GHC.Utils.Panic
 import GHC.Data.Bag
 
@@ -73,6 +72,7 @@ import Data.Coerce
 import qualified Data.Monoid
 
 import GHC.Parser.Lexer
+import GHC.Parser.Errors
 import GHC.Utils.Misc (mergeListsBy, filterOut, mapLastM, (<&&>))
 
 {- Note [Adding Haddock comments to the syntax tree]
@@ -193,12 +193,9 @@ addHaddockToModule lmod = do
 
 reportHdkWarning :: HdkWarn -> P ()
 reportHdkWarning (HdkWarnInvalidComment (L l _)) =
-  addWarning Opt_WarnInvalidHaddock (mkSrcSpanPs l) $
-    text "A Haddock comment cannot appear in this position and will be ignored."
+  addWarning Opt_WarnInvalidHaddock $ WarnHaddockInvalidPos (mkSrcSpanPs l)
 reportHdkWarning (HdkWarnExtraComment (L l _)) =
-  addWarning Opt_WarnInvalidHaddock l $
-    text "Multiple Haddock comments for a single entity are not allowed." $$
-    text "The extraneous comment will be ignored."
+  addWarning Opt_WarnInvalidHaddock $ WarnHaddockIgnoreMulti l
 
 collectHdkWarnings :: HdkSt -> [HdkWarn]
 collectHdkWarnings HdkSt{ hdk_st_pending, hdk_st_warnings } =
