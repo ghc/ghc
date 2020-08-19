@@ -27,6 +27,8 @@ where
 import GHC.Prelude
 
 import GHC.Platform
+import GHC.Parser.Errors.Ppr
+import GHC.Parser.Errors
 import GHC.Driver.Types
 import GHC.Parser           ( parseHeader )
 import GHC.Parser.Lexer
@@ -43,7 +45,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import GHC.Utils.Panic
 import GHC.Data.Maybe
-import GHC.Data.Bag         ( emptyBag, listToBag, unitBag )
+import GHC.Data.Bag         ( Bag, emptyBag, listToBag, unitBag, isEmptyBag )
 import GHC.Utils.Monad
 import GHC.Utils.Exception as Exception
 import GHC.Types.Basic
@@ -66,7 +68,7 @@ getImports :: DynFlags
            -> FilePath     -- ^ The original source filename (used for locations
                            --   in the function result)
            -> IO (Either
-               ErrorMessages
+               (Bag Error)
                ([(Maybe FastString, Located ModuleName)],
                 [(Maybe FastString, Located ModuleName)],
                 Located ModuleName))
@@ -77,15 +79,13 @@ getImports dflags buf filename source_filename = do
   case unP parseHeader (initParserState (initParserOpts dflags) buf loc) of
     PFailed pst ->
         -- assuming we're not logging warnings here as per below
-      return $ Left $ getErrorMessages pst dflags
+      return $ Left $ getErrorMessages pst
     POk pst rdr_module -> fmap Right $ do
-      let _ms@(_warns, errs) = getMessages pst dflags
+      let (_warns, errs) = getMessages pst
       -- don't log warnings: they'll be reported when we parse the file
       -- for real.  See #2500.
-          ms = (emptyBag, errs)
-      -- logWarnings warns
-      if errorsFound dflags ms
-        then throwIO $ mkSrcErr errs
+      if not (isEmptyBag errs)
+        then throwIO $ mkSrcErr (fmap pprError errs)
         else
           let   hsmod = unLoc rdr_module
                 mb_mod = hsmodName hsmod
