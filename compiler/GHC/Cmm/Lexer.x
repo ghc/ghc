@@ -26,6 +26,7 @@ import GHC.Types.Unique.FM
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
 import GHC.Parser.CharClass
+import GHC.Parser.Errors
 import GHC.Utils.Misc
 --import TRACE
 
@@ -325,7 +326,7 @@ lexToken = do
     AlexEOF -> do let span = mkPsSpan loc1 loc1
                   liftP (setLastToken span 0)
                   return (L span CmmT_EOF)
-    AlexError (loc2,_) -> liftP $ failLocMsgP (psRealLoc loc1) (psRealLoc loc2) "lexical error"
+    AlexError (loc2,_) -> liftP $ failLocMsgP (psRealLoc loc1) (psRealLoc loc2) (Error ErrCmmLexer [])
     AlexSkip inp2 _ -> do
         setInput inp2
         lexToken

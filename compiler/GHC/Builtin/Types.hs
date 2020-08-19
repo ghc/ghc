@@ -78,6 +78,7 @@ module GHC.Builtin.Types (
         unboxedUnitTy,
         unboxedUnitTyCon, unboxedUnitDataCon,
         unboxedTupleKind, unboxedSumKind,
+        filterCTuple,
 
         -- ** Constraint tuples
         cTupleTyCon, cTupleTyConName, cTupleTyConNames, isCTupleTyConName,
@@ -2029,3 +2030,11 @@ naturalNSDataCon = pcDataCon naturalNSDataConName [] [wordPrimTy] naturalTyCon
 
 naturalNBDataCon :: DataCon
 naturalNBDataCon = pcDataCon naturalNBDataConName [] [byteArrayPrimTy] naturalTyCon
+
+
+-- | Replaces constraint tuple names with corresponding boxed ones.
+filterCTuple :: RdrName -> RdrName
+filterCTuple (Exact n)
+  | Just arity <- cTupleTyConNameArity_maybe n
+  = Exact $ tupleTyConName BoxedTuple arity
+filterCTuple rdr = rdr
