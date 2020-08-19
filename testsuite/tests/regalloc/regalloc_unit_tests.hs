@@ -33,6 +33,7 @@ import GHC.Cmm.Pipeline
 import GHC.Cmm.Parser
 import GHC.Cmm.Info
 import GHC.Cmm
+import GHC.Parser.Errors.Ppr
 import GHC.Unit.Module
 import GHC.Cmm.DebugBlock
 import GHC
@@ -109,7 +110,9 @@ compileCmmForRegAllocStats dflags' cmmFile ncgImplF us = do
     hscEnv <- newHscEnv dflags
 
     -- parse the cmm file and output any warnings or errors
-    ((warningMsgs, errorMsgs), parsedCmm) <- parseCmmFile dflags cmmFile
+    (warnings, errors, parsedCmm) <- parseCmmFile dflags cmmFile
+    let warningMsgs = fmap pprWarning warnings
+        errorMsgs   = fmap pprError errors
 
     -- print parser errors or warnings
     mapM_ (printBagOfErrors dflags) [warningMsgs, errorMsgs]

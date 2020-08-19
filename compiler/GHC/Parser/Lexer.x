@@ -53,8 +53,6 @@ module GHC.Parser.Lexer (
    ParserOpts(..), mkParserOpts,
    PState (..), initParserState, initPragState,
    P(..), ParseResult(..),
-   appendWarning,
-   appendError,
    allocateComments,
    MonadP(..),
    getRealSrcLoc, getPState, withHomeUnitId,
@@ -70,6 +68,7 @@ module GHC.Parser.Lexer (
    addAnnsAt,
    commentToAnnotation,
    HdkComment(..),
+   warnopt,
   ) where
 
 import GHC.Prelude
@@ -104,8 +103,6 @@ import GHC.Types.Unique.FM
 import GHC.Data.Maybe
 import GHC.Data.OrdList
 import GHC.Utils.Misc ( readRational, readHexRational )
-import GHC.Utils.Error
-import GHC.Driver.Session as DynFlags
 
 import GHC.Types.SrcLoc
 import GHC.Unit
@@ -117,6 +114,8 @@ import GHC.Hs.Doc
 import GHC.Parser.CharClass
 
 import GHC.Parser.Annotation
+import GHC.Driver.Flags
+import GHC.Parser.Errors
 }
 
 -- -----------------------------------------------------------------------------
@@ -357,7 +356,7 @@ $tab          { warnTab }
 }
 
 <0,option_prags> {
-  "{-#"  { warnThen Opt_WarnUnrecognisedPragmas (text "Unrecognised pragma")
+  "{-#"  { warnThen Opt_WarnUnrecognisedPragmas WarnUnrecognisedPragma
                     (nested_comment lexToken) }
 }
 
@@ -1086,7 +1085,7 @@ failLinePrag1 :: Action
 failLinePrag1 span _buf _len = do
   b <- getBit InNestedCommentBit
   if b then return (L span ITcomment_line_prag)
-       else lexError "lexical error in pragma"
+       else lexError LexErrorInPragma
 
 -- See Note [Nested comment line pragmas]
 popLinePrag1 :: Action
@@ -1107,7 +1106,7 @@ hopefully_open_brace span buf len
                  Layout prev_off _ : _ -> prev_off < offset
                  _                     -> True
       if isOK then pop_and open_brace span buf len
-              else addFatalError (mkSrcSpanPs span) (text "Missing block")
+              else addFatalError $ Error ErrMissingBlock [] (mkSrcSpanPs span)
 
 pop_and :: Action -> Action
 pop_and act span buf len = do _ <- popLexState
@@ -1486,7 +1485,7 @@ docCommentEnd input commentAcc docType buf span = do
   commentEnd lexToken input commentAcc finalizeComment buf span
 
 errBrace :: AlexInput -> RealSrcSpan -> P a
-errBrace (AI end _) span = failLocMsgP (realSrcSpanStart span) (psRealLoc end) "unterminated `{-'"
+errBrace (AI end _) span = failLocMsgP (realSrcSpanStart span) (psRealLoc end) (Error (ErrLexer LexUnterminatedComment LexErrKind_EOF) [])
 
 open_brace, close_brace :: Action
 open_brace span _str _len = do
@@ -1545,8 +1544,7 @@ varid span buf len =
           lambdaCase <- getBit LambdaCaseBit
           unless lambdaCase $ do
             pState <- getPState
-            addError (mkSrcSpanPs (last_loc pState)) $ text
-                     "Illegal lambda-case (use LambdaCase)"
+            addError $ Error ErrLambdaCase [] (mkSrcSpanPs (last_loc pState))
           return ITlcase
         _ -> return ITcase
       maybe_layout keyword
@@ -1595,9 +1593,8 @@ varsym_prefix = sym $ \exts s ->
 -- See Note [Whitespace-sensitive operator parsing]
 varsym_suffix :: Action
 varsym_suffix = sym $ \_ s ->
-  if | s == fsLit "@"
-     -> failMsgP "Suffix occurrence of @. For an as-pattern, remove the leading whitespace."
-     | otherwise -> return (ITvarsym s)
+  if | s == fsLit "@" -> failMsgP (Error ErrSuffixAT [])
+     | otherwise      -> return (ITvarsym s)
 
 -- See Note [Whitespace-sensitive operator parsing]
 varsym_tight_infix :: Action
@@ -1649,8 +1646,7 @@ tok_integral itint transint transbuf translen (radix,char_to_int) span buf len =
   let src = lexemeToString buf len
   when ((not numericUnderscores) && ('_' `elem` src)) $ do
     pState <- getPState
-    addError (mkSrcSpanPs (last_loc pState)) $ text
-             "Use NumericUnderscores to allow underscores in integer literals"
+    addError $ Error (ErrNumUnderscores NumUnderscore_Integral) [] (mkSrcSpanPs (last_loc pState))
   return $ L span $ itint (SourceText src)
        $! transint $ parseUnsignedInteger
        (offsetBytes transbuf buf) (subtract translen len) radix char_to_int
@@ -1691,8 +1687,7 @@ tok_frac drop f span buf len = do
   let src = lexemeToString buf (len-drop)
   when ((not numericUnderscores) && ('_' `elem` src)) $ do
     pState <- getPState
-    addError (mkSrcSpanPs (last_loc pState)) $ text
-             "Use NumericUnderscores to allow underscores in floating literals"
+    addError $ Error (ErrNumUnderscores NumUnderscore_Float) [] (mkSrcSpanPs (last_loc pState))
   return (L span $! (f $! src))
 
 tok_float, tok_primfloat, tok_primdouble :: String -> Token
@@ -1862,7 +1857,7 @@ lex_string_prag mkTok span _buf _len
               = case alexGetChar i of
                   Just (c,i') | c == x    -> isString i' xs
                   _other -> False
-          err (AI end _) = failLocMsgP (realSrcSpanStart (psRealSpan span)) (psRealLoc end) "unterminated options pragma"
+          err (AI end _) = failLocMsgP (realSrcSpanStart (psRealSpan span)) (psRealLoc end) (Error (ErrLexer LexUnterminatedOptions LexErrKind_EOF) [])
 
 
 -- -----------------------------------------------------------------------------
@@ -1900,8 +1895,8 @@ lex_string s = do
                 setInput i
                 when (any (> '\xFF') s') $ do
                   pState <- getPState
-                  addError (mkSrcSpanPs (last_loc pState)) $ text
-                     "primitive string literal must contain only characters <= \'\\xFF\'"
+                  let err = Error ErrPrimStringInvalidChar [] (mkSrcSpanPs (last_loc pState))
+                  addError err
                 return (ITprimstring (SourceText s') (unsafeMkByteString s'))
               _other ->
                 return (ITstring (SourceText s') (mkFastString s'))
@@ -2057,7 +2052,7 @@ readNum2 is_digit base conv i = do
             Just (c,input') | is_digit c -> do
                let i' = i*base + conv c
                if i' > 0x10ffff
-                  then setInput input >> lexError "numeric escape sequence out of range"
+                  then setInput input >> lexError LexNumEscapeRange
                   else read i' input'
             _other -> do
               setInput input; return (chr i)
@@ -2106,12 +2101,12 @@ silly_escape_chars = [
 -- a correct location to the user, but also so we can detect UTF-8 decoding
 -- errors if they occur.
 lit_error :: AlexInput -> P a
-lit_error i = do setInput i; lexError "lexical error in string/character literal"
+lit_error i = do setInput i; lexError LexStringCharLit
 
 getCharOrFail :: AlexInput -> P Char
 getCharOrFail i =  do
   case alexGetChar' i of
-        Nothing -> lexError "unexpected end-of-file in string/character literal"
+        Nothing -> lexError LexStringCharLitEOF
         Just (c,i)  -> do setInput i; return c
 
 -- -----------------------------------------------------------------------------
@@ -2162,7 +2157,8 @@ lex_quasiquote start s = do
 quasiquote_error :: RealSrcLoc -> P a
 quasiquote_error start = do
   (AI end buf) <- getInput
-  reportLexError start (psRealLoc end) buf "unterminated quasiquotation"
+  reportLexError start (psRealLoc end) buf
+    (\k -> Error (ErrLexer LexUnterminatedQQ k) [])
 
 -- -----------------------------------------------------------------------------
 -- Warnings
@@ -2172,9 +2168,9 @@ warnTab srcspan _buf _len = do
     addTabWarning (psRealSpan srcspan)
     lexToken
 
-warnThen :: WarningFlag -> SDoc -> Action -> Action
-warnThen option warning action srcspan buf len = do
-    addWarning option (RealSrcSpan (psRealSpan srcspan) Nothing) warning
+warnThen :: WarningFlag -> (SrcSpan -> Warning) -> Action -> Action
+warnThen flag warning action srcspan buf len = do
+    addWarning flag (warning (RealSrcSpan (psRealSpan srcspan) Nothing))
     action srcspan buf len
 
 -- -----------------------------------------------------------------------------
@@ -2234,11 +2230,10 @@ data HdkComment
 data PState = PState {
         buffer     :: StringBuffer,
         options    :: ParserOpts,
-        -- This needs to take DynFlags as an argument until
-        -- we have a fix for #10143
-        messages   :: DynFlags -> Messages,
+        warnings   :: Bag Warning,
+        errors     :: Bag Error,
         tab_first  :: Maybe RealSrcSpan, -- pos of first tab warning in the file
-        tab_count  :: !Int,              -- number of tab warnings in the file
+        tab_count  :: !Word,             -- number of tab warnings in the file
         last_tk    :: Maybe Token,
         last_loc   :: PsSpan,      -- pos of previous token
         last_len   :: !Int,        -- len of previous token
@@ -2316,14 +2311,14 @@ thenP :: P a -> (a -> P b) -> P b
                 POk s1 a         -> (unP (k a)) s1
                 PFailed s1 -> PFailed s1
 
-failMsgP :: String -> P a
-failMsgP msg = do
+failMsgP :: (SrcSpan -> Error) -> P a
+failMsgP f = do
   pState <- getPState
-  addFatalError (mkSrcSpanPs (last_loc pState)) (text msg)
+  addFatalError (f (mkSrcSpanPs (last_loc pState)))
 
-failLocMsgP :: RealSrcLoc -> RealSrcLoc -> String -> P a
-failLocMsgP loc1 loc2 str =
-  addFatalError (RealSrcSpan (mkRealSrcSpan loc1 loc2) Nothing) (text str)
+failLocMsgP :: RealSrcLoc -> RealSrcLoc -> (SrcSpan -> Error) -> P a
+failLocMsgP loc1 loc2 f =
+  addFatalError (f (RealSrcSpan (mkRealSrcSpan loc1 loc2) Nothing))
 
 getPState :: P PState
 getPState = P $ \s -> POk s s
@@ -2370,7 +2365,7 @@ setLastTk tk = P $ \s -> POk s { last_tk = Just tk } ()
 getLastTk :: P (Maybe Token)
 getLastTk = P $ \s@(PState { last_tk = last_tk }) -> POk s last_tk
 
-data AlexInput = AI PsLoc StringBuffer
+data AlexInput = AI !PsLoc !StringBuffer
 
 {-
 Note [Unicode in Alex]
@@ -2732,7 +2727,8 @@ initParserState options buf loc =
   PState {
       buffer        = buf,
       options       = options,
-      messages      = const emptyMessages,
+      errors        = emptyBag,
+      warnings      = emptyBag,
       tab_first     = Nothing,
       tab_count     = 0,
       last_tk       = Nothing,
@@ -2778,59 +2774,40 @@ class Monad m => MonadP m where
   --   to the accumulator and parsing continues. This allows GHC to report
   --   more than one parse error per file.
   --
-  addError :: SrcSpan -> SDoc -> m ()
+  addError :: Error -> m ()
+
   -- | Add a warning to the accumulator.
   --   Use 'getMessages' to get the accumulated warnings.
-  addWarning :: WarningFlag -> SrcSpan -> SDoc -> m ()
+  addWarning :: WarningFlag -> Warning -> m ()
+
   -- | Add a fatal error. This will be the last error reported by the parser, and
   --   the parser will not produce any result, ending in a 'PFailed' state.
-  addFatalError :: SrcSpan -> SDoc -> m a
+  addFatalError :: Error -> m a
+
   -- | Check if a given flag is currently set in the bitmap.
   getBit :: ExtBits -> m Bool
+
   -- | Given a location and a list of AddAnn, apply them all to the location.
   addAnnotation :: SrcSpan          -- SrcSpan of enclosing AST construct
                 -> AnnKeywordId     -- The first two parameters are the key
                 -> SrcSpan          -- The location of the keyword itself
                 -> m ()
 
-appendError
-  :: SrcSpan
-  -> SDoc
-  -> (DynFlags -> Messages)
-  -> (DynFlags -> Messages)
-appendError srcspan msg m =
-  \d ->
-    let (ws, es) = m d
-        errormsg = mkErrMsg d srcspan alwaysQualify msg
-        es' = es `snocBag` errormsg
-    in (ws, es')
-
-appendWarning
-  :: ParserOpts
-  -> WarningFlag
-  -> SrcSpan
-  -> SDoc
-  -> (DynFlags -> Messages)
-  -> (DynFlags -> Messages)
-appendWarning o option srcspan warning m =
-  \d ->
-    let (ws, es) = m d
-        warning' = makeIntoWarning (Reason option) $
-           mkWarnMsg d srcspan alwaysQualify warning
-        ws' = if warnopt option o then ws `snocBag` warning' else ws
-    in (ws', es)
-
 instance MonadP P where
-  addError srcspan msg
-   = P $ \s@PState{messages=m} ->
-             POk s{messages=appendError srcspan msg m} ()
-  addWarning option srcspan warning
-   = P $ \s@PState{messages=m, options=o} ->
-             POk s{messages=appendWarning o option srcspan warning m} ()
-  addFatalError span msg =
-    addError span msg >> P PFailed
+  addError err
+   = P $ \s -> POk s { errors = err `consBag` errors s} ()
+
+  addWarning option w
+   = P $ \s -> if warnopt option (options s)
+                  then POk (s { warnings = w `consBag` warnings s }) ()
+                  else POk s ()
+
+  addFatalError err =
+    addError err >> P PFailed
+
   getBit ext = P $ \s -> let b =  ext `xtest` pExtsBitmap (options s)
                          in b `seq` POk s b
+
   addAnnotation (RealSrcSpan l _) a (RealSrcSpan v _) = do
     addAnnotationOnly l a v
     allocateCommentsP l
@@ -2849,32 +2826,23 @@ addTabWarning srcspan
                 else s
        in POk s' ()
 
-mkTabWarning :: PState -> DynFlags -> Maybe ErrMsg
-mkTabWarning PState{tab_first=tf, tab_count=tc} d =
-  let middle = if tc == 1
-        then text ""
-        else text ", and in" <+> speakNOf (tc - 1) (text "further location")
-      message = text "Tab character found here"
-                <> middle
-                <> text "."
-                $+$ text "Please use spaces instead."
-  in fmap (\s -> makeIntoWarning (Reason Opt_WarnTabs) $
-                 mkWarnMsg d (RealSrcSpan s Nothing) alwaysQualify message) tf
-
 -- | Get a bag of the errors that have been accumulated so far.
 --   Does not take -Werror into account.
-getErrorMessages :: PState -> DynFlags -> ErrorMessages
-getErrorMessages PState{messages=m} d =
-  let (_, es) = m d in es
+getErrorMessages :: PState -> Bag Error
+getErrorMessages p = errors p
 
 -- | Get the warnings and errors accumulated so far.
 --   Does not take -Werror into account.
-getMessages :: PState -> DynFlags -> Messages
-getMessages p@PState{messages=m} d =
-  let (ws, es) = m d
-      tabwarning = mkTabWarning p d
-      ws' = maybe ws (`consBag` ws) tabwarning
-  in (ws', es)
+getMessages :: PState -> (Bag Warning, Bag Error)
+getMessages p =
+  let ws = warnings p
+      -- we add the tabulation warning on the fly because
+      -- we count the number of occurences of tab characters
+      ws' = case tab_first p of
+               Nothing -> ws
+               Just tf -> WarnTab (RealSrcSpan tf Nothing) (tab_count p)
+                           `consBag` ws
+  in (ws', errors p)
 
 getContext :: P [LayoutContext]
 getContext = P $ \s@PState{context=ctx} -> POk s ctx
@@ -2889,7 +2857,7 @@ popContext = P $ \ s@(PState{ buffer = buf, options = o, context = ctx,
         (_:tl) ->
           POk s{ context = tl } ()
         []     ->
-          unP (addFatalError (mkSrcSpanPs last_loc) (srcParseErr o buf len)) s
+          unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s
 
 -- Push a new layout context at the indentation of the last token read.
 pushCurrentContext :: GenSemic -> P ()
@@ -2919,29 +2887,27 @@ srcParseErr
   :: ParserOpts
   -> StringBuffer       -- current buffer (placed just after the last token)
   -> Int                -- length of the previous token
-  -> MsgDoc
-srcParseErr options buf len
-  = if null token
-         then text "parse error (possibly incorrect indentation or mismatched brackets)"
-         else text "parse error on input" <+> quotes (text token)
-              $$ ppWhen (not th_enabled && token == "$") -- #7396
-                        (text "Perhaps you intended to use TemplateHaskell")
-              $$ ppWhen (token == "<-")
-                        (if mdoInLast100
-                           then text "Perhaps you intended to use RecursiveDo"
-                           else text "Perhaps this statement should be within a 'do' block?")
-              $$ ppWhen (token == "=" && doInLast100) -- #15849
-                        (text "Perhaps you need a 'let' in a 'do' block?"
-                         $$ text "e.g. 'let x = 5' instead of 'x = 5'")
-              $$ ppWhen (not ps_enabled && pattern == "pattern ") -- #12429
-                        (text "Perhaps you intended to use PatternSynonyms")
-  where token = lexemeToString (offsetBytes (-len) buf) len
-        pattern = decodePrevNChars 8 buf
-        last100 = decodePrevNChars 100 buf
-        doInLast100 = "do" `isInfixOf` last100
-        mdoInLast100 = "mdo" `isInfixOf` last100
-        th_enabled = ThQuotesBit `xtest` pExtsBitmap options
-        ps_enabled = PatternSynonymsBit `xtest` pExtsBitmap options
+  -> SrcSpan
+  -> Error
+srcParseErr options buf len loc = Error (ErrParse token) suggests loc
+  where
+   token = lexemeToString (offsetBytes (-len) buf) len
+   pattern = decodePrevNChars 8 buf
+   last100 = decodePrevNChars 100 buf
+   doInLast100 = "do" `isInfixOf` last100
+   mdoInLast100 = "mdo" `isInfixOf` last100
+   th_enabled = ThQuotesBit `xtest` pExtsBitmap options
+   ps_enabled = PatternSynonymsBit `xtest` pExtsBitmap options
+
+   sug c s = if c then Just s else Nothing
+   sug_th  = sug (not th_enabled && token == "$")          SuggestTH              -- #7396
+   sug_rdo = sug (token == "<-" && mdoInLast100)           SuggestRecursiveDo
+   sug_do  = sug (token == "<-" && not mdoInLast100)       SuggestDo
+   sug_let = sug (token == "=" && doInLast100)             SuggestLetInDo         -- #15849
+   sug_pat = sug (not ps_enabled && pattern == "pattern ") SuggestPatternSynonyms -- #12429
+   suggests
+         | null token = []
+         | otherwise  = catMaybes [sug_th, sug_rdo, sug_do, sug_let, sug_pat]
 
 -- Report a parse failure, giving the span of the previous token as
 -- the location of the error.  This is the entry point for errors
@@ -2949,15 +2915,16 @@ srcParseErr options buf len
 srcParseFail :: P a
 srcParseFail = P $ \s@PState{ buffer = buf, options = o, last_len = len,
                             last_loc = last_loc } ->
-    unP (addFatalError (mkSrcSpanPs last_loc) (srcParseErr o buf len)) s
+    unP (addFatalError $ srcParseErr o buf len (mkSrcSpanPs last_loc)) s
 
 -- A lexical error is reported at a particular position in the source file,
 -- not over a token range.
-lexError :: String -> P a
-lexError str = do
+lexError :: LexErr -> P a
+lexError e = do
   loc <- getRealSrcLoc
   (AI end buf) <- getInput
-  reportLexError loc (psRealLoc end) buf str
+  reportLexError loc (psRealLoc end) buf
+    (\k -> Error (ErrLexer e k) [])
 
 -- -----------------------------------------------------------------------------
 -- This is the top-level function: called from the parser each time a
@@ -3073,9 +3040,7 @@ alternativeLayoutRuleToken t
              (ITwhere, ALRLayout _ col : ls, _)
               | newLine && thisCol == col && transitional ->
                  do addWarning Opt_WarnAlternativeLayoutRuleTransitional
-                               (mkSrcSpanPs thisLoc)
-                               (transitionalAlternativeLayoutWarning
-                                    "`where' clause at the same depth as implicit layout block")
+                      $ WarnTransitionalLayout (mkSrcSpanPs thisLoc) TransLayout_Where
                     setALRContext ls
                     setNextToken t
                     -- Note that we use lastLoc, as we may need to close
@@ -3085,9 +3050,7 @@ alternativeLayoutRuleToken t
              (ITvbar, ALRLayout _ col : ls, _)
               | newLine && thisCol == col && transitional ->
                  do addWarning Opt_WarnAlternativeLayoutRuleTransitional
-                               (mkSrcSpanPs thisLoc)
-                               (transitionalAlternativeLayoutWarning
-                                    "`|' at the same depth as implicit layout block")
+                      $ WarnTransitionalLayout (mkSrcSpanPs thisLoc) TransLayout_Pipe
                     setALRContext ls
                     setNextToken t
                     -- Note that we use lastLoc, as we may need to close
@@ -3154,11 +3117,6 @@ alternativeLayoutRuleToken t
              -- the other ITwhere case omitted; general case below covers it
              (_, _, _) -> return t
 
-transitionalAlternativeLayoutWarning :: String -> SDoc
-transitionalAlternativeLayoutWarning msg
-    = text "transitional layout will not be accepted in the future:"
-   $$ text msg
-
 isALRopen :: Token -> Bool
 isALRopen ITcase          = True
 isALRopen ITif            = True
@@ -3213,7 +3171,8 @@ lexToken = do
         setLastToken span 0
         return (L span ITeof)
     AlexError (AI loc2 buf) ->
-        reportLexError (psRealLoc loc1) (psRealLoc loc2) buf "lexical error"
+        reportLexError (psRealLoc loc1) (psRealLoc loc2) buf
+          (\k -> Error (ErrLexer LexError k) [])
     AlexSkip inp2 _ -> do
         setInput inp2
         lexToken
@@ -3227,14 +3186,14 @@ lexToken = do
         unless (isComment lt') (setLastTk lt')
         return lt
 
-reportLexError :: RealSrcLoc -> RealSrcLoc -> StringBuffer -> [Char] -> P a
-reportLexError loc1 loc2 buf str
-  | atEnd buf = failLocMsgP loc1 loc2 (str ++ " at end of input")
+reportLexError :: RealSrcLoc -> RealSrcLoc -> StringBuffer -> (LexErrKind -> SrcSpan -> Error) -> P a
+reportLexError loc1 loc2 buf f
+  | atEnd buf = failLocMsgP loc1 loc2 (f LexErrKind_EOF)
   | otherwise =
   let c = fst (nextChar buf)
   in if c == '\0' -- decoding errors are mapped to '\0', see utf8DecodeChar#
-     then failLocMsgP loc2 loc2 (str ++ " (UTF-8 decoding error)")
-     else failLocMsgP loc1 loc2 (str ++ " at character " ++ show c)
+     then failLocMsgP loc2 loc2 (f LexErrKind_UTF8)
+     else failLocMsgP loc1 loc2 (f (LexErrKind_Char c))
 
 lexTokenStream :: ParserOpts -> StringBuffer -> RealSrcLoc -> ParseResult [Located Token]
 lexTokenStream opts buf loc = unP go initState{ options = opts' }
@@ -3309,7 +3268,7 @@ twoWordPrags = Map.fromList [
 dispatch_pragmas :: Map String Action -> Action
 dispatch_pragmas prags span buf len = case Map.lookup (clean_pragma (lexemeToString buf len)) prags of
                                        Just found -> found span buf len
-                                       Nothing -> lexError "unknown pragma"
+                                       Nothing -> lexError LexUnknownPragma
 
 known_pragma :: Map String Action -> AlexAccPred ExtsBitmap
 known_pragma prags _ (AI _ startbuf) _ (AI _ curbuf)

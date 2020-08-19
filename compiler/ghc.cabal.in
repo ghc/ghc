@@ -375,7 +375,6 @@ Library
         GHC.Driver.Make
         GHC.Plugins
         GHC.Prelude
-        GHC.Parser.Header
         GHC.Driver.Main
         GHC.Hs.Stats
         GHC.Driver.Types
@@ -399,13 +398,17 @@ Library
         GHC.Settings.IO
         GHC.SysTools.Elf
         GHC.Iface.Tidy
-        GHC.Parser.CharClass
-        GHC.Parser.Lexer
-        GHC.Core.Coercion.Opt
         GHC.Parser
+        GHC.Parser.Annotation
+        GHC.Parser.CharClass
+        GHC.Parser.Errors
+        GHC.Parser.Errors.Ppr
+        GHC.Parser.Header
+        GHC.Parser.Lexer
         GHC.Parser.PostProcess
         GHC.Parser.PostProcess.Haddock
-        GHC.Parser.Annotation
+        GHC.Parser.Types
+        GHC.Core.Coercion.Opt
         GHC.Types.ForeignCall
         GHC.Builtin.Uniques
         GHC.Builtin.Utils

@@ -45,6 +45,7 @@ import GHC.Utils.Error
 import GHC.Driver.Finder
 import GHC.Driver.Monad
 import GHC.Parser.Header
+import GHC.Parser.Errors.Ppr
 import GHC.Driver.Types
 import GHC.Unit
 import GHC.Unit.State
@@ -94,6 +95,7 @@ import Data.Foldable (toList)
 import Data.Maybe
 import Data.Ord ( comparing )
 import Data.Time
+import Data.Bifunctor (first)
 import System.Directory
 import System.FilePath
 import System.IO        ( fixIO )
@@ -2669,7 +2671,9 @@ getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
       <- ExceptT $ preprocess hsc_env src_fn (fst <$> maybe_buf) mb_phase
   pi_hspp_buf <- liftIO $ hGetStringBuffer pi_hspp_fn
   (pi_srcimps, pi_theimps, L pi_mod_name_loc pi_mod_name)
-      <- ExceptT $ getImports pi_local_dflags pi_hspp_buf pi_hspp_fn src_fn
+      <- ExceptT $ do
+          mimps <- getImports pi_local_dflags pi_hspp_buf pi_hspp_fn src_fn
+          return (first (fmap pprError) mimps)
   return PreprocessedImports {..}
 
 

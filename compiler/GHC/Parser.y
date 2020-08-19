@@ -85,6 +85,7 @@ import GHC.Parser.PostProcess
 import GHC.Parser.PostProcess.Haddock
 import GHC.Parser.Lexer
 import GHC.Parser.Annotation
+import GHC.Parser.Errors
 
 import GHC.Tc.Types.Evidence  ( emptyTcEvBinds )
 
@@ -797,7 +798,7 @@ HYPHEN :: { [AddAnn] }
       | PREFIX_MINUS { [mj AnnMinus $1 ] }
       | VARSYM  {% if (getVARSYM $1 == fsLit "-")
                    then return [mj AnnMinus $1]
-                   else do { addError (getLoc $1) $ text "Expected a hyphen"
+                   else do { addError $ Error ErrExpectedHyphen [] (getLoc $1)
                            ; return [] } }
 
 
@@ -1094,10 +1095,7 @@ maybe_safe :: { ([AddAnn],Bool) }
 maybe_pkg :: { ([AddAnn],Maybe StringLiteral) }
         : STRING  {% do { let { pkgFS = getSTRING $1 }
                         ; unless (looksLikePackageName (unpackFS pkgFS)) $
-                             addError (getLoc $1) $ vcat [
-                             text "Parse error" <> colon <+> quotes (ppr pkgFS),
-                             text "Version number or non-alphanumeric" <+>
-                             text "character in package name"]
+                             addError $ Error (ErrInvalidPackageName pkgFS) [] (getLoc $1)
                         ; return ([mj AnnPackageName $1], Just (StringLiteral (getSTRINGs $1) pkgFS)) } }
         | {- empty -}                           { ([],Nothing) }
 
@@ -1798,7 +1796,7 @@ rule_activation_marker :: { [AddAnn] }
       : PREFIX_TILDE { [mj AnnTilde $1] }
       | VARSYM  {% if (getVARSYM $1 == fsLit "~")
                    then return [mj AnnTilde $1]
-                   else do { addError (getLoc $1) $ text "Invalid rule activation marker"
+                   else do { addError $ Error ErrInvalidRuleActivationMarker [] (getLoc $1)
                            ; return [] } }
 
 rule_explicit_activation :: { ([AddAnn]
@@ -3216,7 +3214,7 @@ pat     :  exp          {% (checkPattern <=< runPV) (unECP $1) }
 
 bindpat :: { LPat GhcPs }
 bindpat :  exp            {% -- See Note [Parser-Validator Hint] in GHC.Parser.PostProcess
-                             checkPattern_msg (text "Possibly caused by a missing 'do'?")
+                             checkPattern_hints [SuggestMissingDo]
                                               (unECP $1) }
 
 apat   :: { LPat GhcPs }
@@ -3840,10 +3838,9 @@ hasE _                             = False
 
 getSCC :: Located Token -> P FastString
 getSCC lt = do let s = getSTRING lt
-                   err = "Spaces are not allowed in SCCs"
                -- We probably actually want to be more restrictive than this
                if ' ' `elem` unpackFS s
-                   then addFatalError (getLoc lt) (text err)
+                   then addFatalError $ Error ErrSpaceInSCC [] (getLoc lt)
                    else return s
 
 -- Utilities for combining source spans
@@ -3928,8 +3925,7 @@ fileSrcSpan = do
 hintLinear :: MonadP m => SrcSpan -> m ()
 hintLinear span = do
   linearEnabled <- getBit LinearTypesBit
-  unless linearEnabled $ addError span $
-    text "Enable LinearTypes to allow linear functions"
+  unless linearEnabled $ addError $ Error ErrLinearFunction [] span
 
 -- Does this look like (a %m)?
 looksLikeMult :: LHsType GhcPs -> Located RdrName -> LHsType GhcPs -> Bool
@@ -3948,22 +3944,14 @@ looksLikeMult ty1 l_op ty2
 hintMultiWayIf :: SrcSpan -> P ()
 hintMultiWayIf span = do
   mwiEnabled <- getBit MultiWayIfBit
-  unless mwiEnabled $ addError span $
-    text "Multi-way if-expressions need MultiWayIf turned on"
+  unless mwiEnabled $ addError $ Error ErrMultiWayIf [] span
 
 -- Hint about explicit-forall
 hintExplicitForall :: Located Token -> P ()
 hintExplicitForall tok = do
     forall   <- getBit ExplicitForallBit
     rulePrag <- getBit InRulePragBit
-    unless (forall || rulePrag) $ addError (getLoc tok) $ vcat
-      [ text "Illegal symbol" <+> quotes forallSymDoc <+> text "in type"
-      , text "Perhaps you intended to use RankNTypes or a similar language"
-      , text "extension to enable explicit-forall syntax:" <+>
-        forallSymDoc <+> text "<tvs>. <type>"
-      ]
-  where
-    forallSymDoc = text (forallSym (isUnicode tok))
+    unless (forall || rulePrag) $ addError $ Error (ErrExplicitForall (isUnicode tok)) [] (getLoc tok)
 
 -- Hint about qualified-do
 hintQualifiedDo :: Located Token -> P ()
@@ -3971,10 +3959,7 @@ hintQualifiedDo tok = do
     qualifiedDo   <- getBit QualifiedDoBit
     case maybeQDoDoc of
       Just qdoDoc | not qualifiedDo ->
-        addError (getLoc tok) $ vcat
-          [ text "Illegal qualified" <+> quotes qdoDoc <+> text "block"
-          , text "Perhaps you intended to use QualifiedDo"
-          ]
+        addError $ Error (ErrIllegalQualifiedDo qdoDoc) [] (getLoc tok)
       _ -> return ()
   where
     maybeQDoDoc = case unLoc tok of
@@ -3988,17 +3973,7 @@ hintQualifiedDo tok = do
 reportEmptyDoubleQuotes :: SrcSpan -> P a
 reportEmptyDoubleQuotes span = do
     thQuotes <- getBit ThQuotesBit
-    if thQuotes
-      then addFatalError span $ vcat
-        [ text "Parser error on `''`"
-        , text "Character literals may not be empty"
-        , text "Or perhaps you intended to use quotation syntax of TemplateHaskell,"
-        , text "but the type variable or constructor is missing"
-        ]
-      else addFatalError span $ vcat
-        [ text "Parser error on `''`"
-        , text "Character literals may not be empty"
-        ]
+    addFatalError $ Error (ErrEmptyDoubleQuotes thQuotes) [] span
 
 {-
 %************************************************************************
