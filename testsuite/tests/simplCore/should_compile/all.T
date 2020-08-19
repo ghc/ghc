@@ -210,7 +210,7 @@ test('T12076lit', normal, compile, ['-O'])
 test('T12076sat', normal, compile, ['-O'])
 test('T12212', normal, compile, ['-O'])
 
-test('noinline01', only_ways(['optasm']), compile, ['-ddump-stg -dsuppress-uniques -dsuppress-ticks -O'])
+test('noinline01', only_ways(['optasm']), compile, ['-ddump-stg-from-core -dsuppress-uniques -dsuppress-ticks -O'])
 test('par01', only_ways(['optasm']), compile, ['-ddump-prep -dsuppress-uniques -dsuppress-ticks -O2'])
 test('T12776', normal, compile, ['-O2'])
 test('T9509',
