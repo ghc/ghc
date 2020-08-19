@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: 6223fe0b5942f4fa35bdec92c74566cf195bfb42
+  DOCKER_REV: b65e1145d7c0a62c3533904a88dac14f56fb371b
 
   # Sequential version number capturing the versions of all tools fetched by
   # .gitlab/ci.sh.
@@ -671,6 +671,35 @@ nightly-x86_64-linux-deb10:
 release-x86_64-linux-deb10:
   <<: *release
   extends: .build-x86_64-linux-deb10
+
+#################################
+# x86_64-linux-ubuntu 20.04
+#################################
+
+.build-x86_64-linux-ubuntu2004:
+  extends: .validate-linux
+  stage: full-build
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-ubuntu2004:$DOCKER_REV"
+  variables:
+    TEST_ENV: "x86_64-linux-ubuntu2004"
+    BIN_DIST_PREP_TAR_COMP: "./ghc-x86_64-ubuntu2004-linux.tar.xz"
+  cache:
+    key: linux-x86_64-ubuntu2004
+
+# Disabled to alleviate CI load
+.validate-x86_64-linux-ubuntu2004:
+  extends: .build-x86_64-linux-ubuntu2004
+  stage: full-build
+
+nightly-x86_64-linux-ubuntu2004:
+  <<: *nightly
+  extends: .build-x86_64-linux-ubuntu2004
+  variables:
+    TEST_TYPE: slowtest
+
+release-x86_64-linux-ubuntu2004:
+  <<: *release
+  extends: .build-x86_64-linux-ubuntu2004
 
 #################################
 # x86_64-linux-deb8
