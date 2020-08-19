@@ -2657,12 +2657,15 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_spec)
   , make_ord_flag defGhcFlag "ddump-prep"
         (setDumpFlag Opt_D_dump_prep)
-  , make_ord_flag defGhcFlag "ddump-stg"
-        (setDumpFlag Opt_D_dump_stg)
+  , make_ord_flag defGhcFlag "ddump-stg-init"
+        (setDumpFlag Opt_D_dump_stg_init)
   , make_ord_flag defGhcFlag "ddump-stg-unarised"
         (setDumpFlag Opt_D_dump_stg_unarised)
   , make_ord_flag defGhcFlag "ddump-stg-final"
         (setDumpFlag Opt_D_dump_stg_final)
+  , make_dep_flag defGhcFlag "ddump-stg"
+        (setDumpFlag Opt_D_dump_stg_init)
+        "Use `-ddump-stg-init` or `-ddump-stg-final` instead"
   , make_ord_flag defGhcFlag "ddump-call-arity"
         (setDumpFlag Opt_D_dump_call_arity)
   , make_ord_flag defGhcFlag "ddump-exitify"
