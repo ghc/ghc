@@ -498,7 +498,7 @@ strCLabel_llvm lbl = do
     dflags <- getDynFlags
     platform <- getPlatform
     let sdoc = pprCLabel_LLVM platform lbl
-        str = Outp.renderWithStyle
+        str = Outp.renderWithContext
                   (initSDocContext dflags (Outp.mkCodeStyle Outp.CStyle))
                   sdoc
     return (fsLit str)

@@ -64,7 +64,7 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
             _ -> pprLabel platform lbl) $$ -- blocks guaranteed not null,
                                            -- so label needed
          vcat (map (pprBasicBlock config top_info) blocks) $$
-         (if ncgDebugLevel config > 0
+         (if ncgDwarfEnabled config
           then ppr (mkAsmTempEndLabel lbl) <> char ':' else empty) $$
          pprSizeDecl platform lbl
 
@@ -131,7 +131,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
   = maybe_infotable $$
     pprLabel platform asmLbl $$
     vcat (map (pprInstr platform) instrs) $$
-    (if  ncgDebugLevel config > 0
+    (if  ncgDwarfEnabled config
       then ppr (mkAsmTempEndLabel asmLbl) <> char ':'
       else empty
     )

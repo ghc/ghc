@@ -539,7 +539,7 @@ msgUnitId pk = do
     dflags <- getDynFlags
     level <- getBkpLevel
     liftIO . backpackProgressMsg level dflags
-        $ "Instantiating " ++ renderWithStyle
+        $ "Instantiating " ++ renderWithContext
                                 (initSDocContext dflags backpackStyle)
                                 (ppr pk)
 
@@ -550,7 +550,7 @@ msgInclude (i,n) uid = do
     level <- getBkpLevel
     liftIO . backpackProgressMsg level dflags
         $ showModuleIndex (i, n) ++ "Including " ++
-          renderWithStyle (initSDocContext dflags backpackStyle)
+          renderWithContext (initSDocContext dflags backpackStyle)
             (ppr uid)
 
 -- ----------------------------------------------------------------------------

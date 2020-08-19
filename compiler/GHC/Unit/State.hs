@@ -980,7 +980,7 @@ packageFlagErr' :: SDocContext
                -> [(UnitInfo, UnusableUnitReason)]
                -> IO a
 packageFlagErr' ctx flag_doc reasons
-  = throwGhcExceptionIO (CmdLineError (renderWithStyle ctx $ err))
+  = throwGhcExceptionIO (CmdLineError (renderWithContext ctx $ err))
   where err = text "cannot satisfy " <> flag_doc <>
                 (if null reasons then Outputable.empty else text ": ") $$
               nest 4 (ppr_reasons $$
@@ -1712,7 +1712,7 @@ mkModuleNameProvidersMap ctx cfg pkg_map closure vis_map =
     rnBinding (orig, new) = (new, setOrigins origEntry fromFlag)
      where origEntry = case lookupUFM esmap orig of
             Just r -> r
-            Nothing -> throwGhcException (CmdLineError (renderWithStyle ctx
+            Nothing -> throwGhcException (CmdLineError (renderWithContext ctx
                         (text "package flag: could not find module name" <+>
                             ppr orig <+> text "in package" <+> ppr pk)))
 
@@ -2058,7 +2058,7 @@ getPreloadUnitsAnd ctx unit_state home_unit ids0 =
 
 throwErr :: SDocContext -> MaybeErr MsgDoc a -> IO a
 throwErr ctx m = case m of
-   Failed e    -> throwGhcExceptionIO (CmdLineError (renderWithStyle ctx e))
+   Failed e    -> throwGhcExceptionIO (CmdLineError (renderWithContext ctx e))
    Succeeded r -> return r
 
 -- | Takes a list of UnitIds (and their "parent" dependency, used for error

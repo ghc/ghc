@@ -36,7 +36,7 @@ import Control.Monad.IO.Class
 
 -- | Show a SDoc as a String with the default user style
 showSDoc :: DynFlags -> SDoc -> String
-showSDoc dflags sdoc = renderWithStyle (initSDocContext dflags defaultUserStyle) sdoc
+showSDoc dflags sdoc = renderWithContext (initSDocContext dflags defaultUserStyle) sdoc
 
 showPpr :: Outputable a => DynFlags -> a -> String
 showPpr dflags thing = showSDoc dflags (ppr thing)
@@ -46,13 +46,13 @@ showPprUnsafe a = showPpr unsafeGlobalDynFlags a
 
 -- | Allows caller to specify the PrintUnqualified to use
 showSDocForUser :: DynFlags -> PrintUnqualified -> SDoc -> String
-showSDocForUser dflags unqual doc = renderWithStyle (initSDocContext dflags (mkUserStyle unqual AllTheWay)) doc
+showSDocForUser dflags unqual doc = renderWithContext (initSDocContext dflags (mkUserStyle unqual AllTheWay)) doc
 
 showSDocDump :: DynFlags -> SDoc -> String
-showSDocDump dflags d = renderWithStyle (initSDocContext dflags defaultDumpStyle) d
+showSDocDump dflags d = renderWithContext (initSDocContext dflags defaultDumpStyle) d
 
 showSDocDebug :: DynFlags -> SDoc -> String
-showSDocDebug dflags d = renderWithStyle ctx d
+showSDocDebug dflags d = renderWithContext ctx d
    where
       ctx = (initSDocContext dflags defaultDumpStyle)
                { sdocPprDebug = True
