@@ -496,21 +496,30 @@ lexFloat :: Int
 -- Either of the integral and fractional parts may be elided but not both
 -- The decimal point does not have to be preceded or followed by any digits
 lexFloat base expChars constructor =
-  do xs    <- lexDigitsUnlessDot base
+  do xs    <- lexDigitsUnlessDot
      mFrac <- lexFrac base
      integralOrFractionalPresent xs mFrac
-     mExp  <- lexExp expChars
+     mExp  <- trailingDotFollowedByExp mFrac <++ lexExp expChars
+              <++ return Nothing
      return (Number (constructor xs mFrac mExp))
   where
-    lexDigitsUnlessDot :: Int -> ReadP Digits
-    -- Lex a sequence of digits in a specified base which may be empty if a dot
-    -- is encountered
-    lexDigitsUnlessDot base_ = lexDigits base_ <++ do ('.':_) <- look
-                                                      return []
+    lexDigitsUnlessDot :: ReadP Digits
+    -- Lex a sequence of digits which may be empty if a dot is encountered
+    lexDigitsUnlessDot = lexDigits base <++ do ('.':_) <- look
+                                               return []
 
-    integralOrFractionalPresent :: Digits -> Maybe Digits -> ReadP ()
+    integralOrFractionalPresent :: Digits ->  Maybe Digits -> ReadP ()
+    -- Either the integral or the fractional digits of a floating point literal
+    -- can be elided but not both
     integralOrFractionalPresent [] Nothing = pfail
     integralOrFractionalPresent _ _ = return ()
+
+    trailingDotFollowedByExp :: Maybe Digits -> ReadP (Maybe Integer)
+    -- A decimal point may be present but should only be consumed if a valid
+    -- exponent expression immediately follows
+    trailingDotFollowedByExp Nothing = do _ <- char '.'
+                                          lexExp expChars
+    trailingDotFollowedByExp _ = pfail
 
 lexHexNumber :: ReadP Lexeme
 lexHexNumber =
@@ -524,25 +533,24 @@ lexDecNumber = lexFloat 10 ['e', 'E'] MkDecimal
 lexFrac :: Int -> ReadP (Maybe Digits)
 -- Lex the fractional part
 -- Returns Nothing if there is no decimal point or the fractional part is elided
--- Consumes the decimal point if the fractional part is elided
+-- without consuming the (optional) decimal point
 lexFrac base = dotAndDigits <++ return Nothing
  where
    dotAndDigits = do _ <- char '.'
-                     (fmap Just (lexDigits base)) <++ return Nothing
+                     fraction <- lexDigits base
+                     return (Just fraction)
 
 lexExp :: [Char] -> ReadP (Maybe Integer)
--- Lex a base indicator character followed by a non-empty sequence of decimal
--- digits
-lexExp expChars = expCharAndDigits <++ return Nothing
+-- Lex a base indicator character followed by an optional sign and a non-empty
+-- sequence of decimal digits
+lexExp expChars = do _ <- choice (map char expChars)
+                     exp <- signedExp +++ lexInteger 10
+                     return (Just exp)
  where
    signedExp
      = do c <- char '-' +++ char '+'
           n <- lexInteger 10
           return (if c == '-' then -n else n)
-
-   expCharAndDigits = do _ <- choice (map char expChars)
-                         exp <- signedExp +++ lexInteger 10
-                         return (Just exp)
 
 lexDigits :: Int -> ReadP Digits
 -- Lex a non-empty sequence of digits in specified base
