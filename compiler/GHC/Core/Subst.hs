@@ -343,6 +343,8 @@ instance Outputable Subst where
 
 substExprSC :: HasDebugCallStack => Subst -> CoreExpr -> CoreExpr
 -- Just like substExpr, but a no-op if the substitution is empty
+-- Note that this does /not/ replace occurrences of free vars with
+-- their canonical representatives in the in-scope set
 substExprSC subst orig_expr
   | isEmptySubst subst = orig_expr
   | otherwise          = -- pprTrace "enter subst-expr" (doc $$ ppr orig_expr) $
