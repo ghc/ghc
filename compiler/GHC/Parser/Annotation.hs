@@ -197,10 +197,9 @@ getAndRemoveAnnotationComments anns span =
 -- various syntactic keywords that are not captured in the existing
 -- AST.
 --
--- The annotations, together with original source comments are made
--- available in the @'pm_annotations'@ field of @'GHC.ParsedModule'@.
--- Comments are only retained if @'Opt_KeepRawTokenStream'@ is set in
--- @'GHC.Driver.Session.DynFlags'@ before parsing.
+-- The annotations, together with original source comments are made available in
+-- the @'pm_annotations'@ field of @'GHC.Driver.Types.HsParsedModule'@.
+-- Comments are only retained if @'Opt_KeepRawTokenStream'@ is set.
 --
 -- The wiki page describing this feature is
 -- https://gitlab.haskell.org/ghc/ghc/wikis/api-annotations
