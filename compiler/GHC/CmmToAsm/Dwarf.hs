@@ -4,9 +4,6 @@ module GHC.CmmToAsm.Dwarf (
 
 import GHC.Prelude
 
-import GHC.Driver.Session
-import GHC.Driver.Ppr
-
 import GHC.Cmm.CLabel
 import GHC.Cmm.Expr        ( GlobalReg(..) )
 import GHC.Settings.Config ( cProjectName, cProjectVersion )
@@ -20,6 +17,7 @@ import GHC.Types.Unique.Supply
 
 import GHC.CmmToAsm.Dwarf.Constants
 import GHC.CmmToAsm.Dwarf.Types
+import GHC.CmmToAsm.Config
 
 import Control.Arrow    ( first )
 import Control.Monad    ( mfilter )
@@ -34,23 +32,22 @@ import qualified GHC.Cmm.Dataflow.Label as H
 import qualified GHC.Cmm.Dataflow.Collections as H
 
 -- | Generate DWARF/debug information
-dwarfGen :: DynFlags -> ModLocation -> UniqSupply -> [DebugBlock]
+dwarfGen :: NCGConfig -> ModLocation -> UniqSupply -> [DebugBlock]
             -> IO (SDoc, UniqSupply)
-dwarfGen _  _      us [] = return (empty, us)
-dwarfGen df modLoc us blocks = do
-  let platform = targetPlatform df
+dwarfGen _      _      us []     = return (empty, us)
+dwarfGen config modLoc us blocks = do
+  let platform = ncgPlatform config
 
   -- Convert debug data structures to DWARF info records
-  -- We strip out block information when running with -g0 or -g1.
   let procs = debugSplitProcs blocks
       stripBlocks dbg
-        | debugLevel df < 2 = dbg { dblBlocks = [] }
-        | otherwise         = dbg
+        | ncgDwarfStripBlockInfo config = dbg { dblBlocks = [] }
+        | otherwise                     = dbg
   compPath <- getCurrentDirectory
   let lowLabel = dblCLabel $ head procs
       highLabel = mkAsmTempEndLabel $ dblCLabel $ last procs
       dwarfUnit = DwarfCompileUnit
-        { dwChildren = map (procToDwarf df) (map stripBlocks procs)
+        { dwChildren = map (procToDwarf config) (map stripBlocks procs)
         , dwName = fromMaybe "" (ml_hs_file modLoc)
         , dwCompDir = addTrailingPathSeparator compPath
         , dwProducer = cProjectName ++ " " ++ cProjectVersion
@@ -91,8 +88,8 @@ dwarfGen df modLoc us blocks = do
                  pprDwarfFrame platform (debugFrame framesU procs)
 
   -- .aranges section: Information about the bounds of compilation units
-  let aranges' | gopt Opt_SplitSections df = map mkDwarfARange procs
-               | otherwise                 = [DwarfARange lowLabel highLabel]
+  let aranges' | ncgSplitSections config = map mkDwarfARange procs
+               | otherwise               = [DwarfARange lowLabel highLabel]
   let aranges = dwarfARangesSection platform $$ pprDwarfARanges platform aranges' unitU
 
   return (infoSct $$ abbrevSct $$ lineSct $$ frameSct $$ aranges, us'')
@@ -177,12 +174,14 @@ parent, B.
 -}
 
 -- | Generate DWARF info for a procedure debug block
-procToDwarf :: DynFlags -> DebugBlock -> DwarfInfo
-procToDwarf df prc
+procToDwarf :: NCGConfig -> DebugBlock -> DwarfInfo
+procToDwarf config prc
   = DwarfSubprogram { dwChildren = map blockToDwarf (dblBlocks prc)
                     , dwName     = case dblSourceTick prc of
                          Just s@SourceNote{} -> sourceName s
-                         _otherwise -> showSDocDump df $ ppr $ dblLabel prc
+                         _otherwise -> renderWithContext defaultSDocContext
+                                          $ withPprStyle defaultDumpStyle
+                                          $ ppr (dblLabel prc)
                     , dwLabel    = dblCLabel prc
                     , dwParent   = fmap mkAsmTempDieLabel
                                    $ mfilter goodParent
@@ -192,9 +191,9 @@ procToDwarf df prc
   goodParent a | a == dblCLabel prc = False
                -- Omit parent if it would be self-referential
   goodParent a | not (externallyVisibleCLabel a)
-               , debugLevel df < 2 = False
-               -- We strip block information when running -g0 or -g1, don't
-               -- refer to blocks in that case. Fixes #14894.
+               , ncgDwarfStripBlockInfo config = False
+               -- If we strip block information, don't refer to blocks.
+               -- Fixes #14894.
   goodParent _ = True
 
 -- | Generate DWARF info for a block
