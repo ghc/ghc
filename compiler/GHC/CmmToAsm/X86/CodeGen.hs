@@ -229,7 +229,7 @@ basicBlockCodeGen block = do
 addSpUnwindings :: Instr -> NatM (OrdList Instr)
 addSpUnwindings instr@(DELTA d) = do
     config <- getConfig
-    if ncgDebugLevel config >= 1
+    if ncgDwarfUnwindings config
         then do lbl <- mkAsmTempLabel <$> getUniqueM
                 let unwind = M.singleton MachSp (Just $ UwReg MachSp $ negate d)
                 return $ toOL [ instr, UNWIND lbl unwind ]
