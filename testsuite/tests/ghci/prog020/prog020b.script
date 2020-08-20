@@ -1,0 +1,13 @@
+:setu unitB -this-unit-id unitB -hide-all-packages -package base -package containers -i -i./b/
+:addunit unitB B D
+:switch unitB
+:m B D
+bar
+Bar
+:m
+:setu unitA -this-unit-id unitA -hide-all-packages -package base -package-id unitB -i -i./a/
+:addunit unitA A C
+:switch unitA
+:m A B C D
+myfoo
+foo

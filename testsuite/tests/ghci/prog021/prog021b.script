@@ -1,0 +1,12 @@
+:setu unitB -this-unit-id unitB -hide-all-packages -package base -i -i./b/
+:addunit unitB B
+:switch unitB
+:m B
+listOf (+2) (IntList [4..5])
+:k Elem IntList
+:k Elem
+:setu unitA -XTypeFamilies -this-unit-id unitA -hide-all-packages -package base -package-id unitB -i -i./a/
+:addunit unitA A
+:switch unitA
+:m A B
+main
