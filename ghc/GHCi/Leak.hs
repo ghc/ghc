@@ -37,7 +37,7 @@ data LeakModIndicators = LeakModIndicators
 getLeakIndicators :: HscEnv -> IO LeakIndicators
 getLeakIndicators hsc_env =
   fmap LeakIndicators $
-    forM (eltsUDFM (hsc_HPT hsc_env)) $ \hmi@HomeModInfo{..} -> do
+    forM (concatMap eltsUDFM (hsc_HPTs hsc_env)) $ \hmi@HomeModInfo{..} -> do
       leakMod <- mkWeakPtr hmi Nothing
       leakIface <- mkWeakPtr hm_iface Nothing
       leakDetails <- mkWeakPtr hm_details Nothing

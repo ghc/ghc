@@ -803,11 +803,11 @@ removeTarget target_id
 --
 --   - otherwise interpret the string as a module name
 --
-guessTarget :: GhcMonad m => String -> Maybe Phase -> m Target
-guessTarget str (Just phase) = do
-   hsc_env <- getSession
-   return (Target (TargetFile str (Just phase)) (hsc_currentUnit hsc_env) True Nothing)
-guessTarget str Nothing
+guessTarget :: GhcMonad m => String -> Maybe UnitId -> Maybe Phase -> m Target
+guessTarget str muid (Just phase) = do
+   uid <- maybe (hsc_currentUnit <$> getSession) pure muid
+   return (Target (TargetFile str (Just phase)) uid True Nothing)
+guessTarget str muid Nothing
    | isHaskellSrcFilename file
    = target $ TargetFile file Nothing
    | otherwise
@@ -835,9 +835,9 @@ guessTarget str Nothing
          hs_file  = file <.> "hs"
          lhs_file = file <.> "lhs"
 
-         target tid = do
-             hsc_env <- getSession
-             return $ Target tid (hsc_currentUnit hsc_env) obj_allowed Nothing
+         target tid =do
+             uid <- maybe (hsc_currentUnit <$> getSession) pure muid
+             return $ Target tid uid obj_allowed Nothing
 
 
 -- | Inform GHC that the working directory has changed.  GHC will flush
@@ -1103,7 +1103,7 @@ compileToCoreSimplified = compileCore True
 compileCore :: GhcMonad m => Bool -> FilePath -> m CoreModule
 compileCore simplify fn = do
    -- First, set the target to the desired filename
-   target <- guessTarget fn Nothing
+   target <- guessTarget fn Nothing Nothing
    addTarget target
    _ <- load LoadAllTargets
    -- Then find dependencies
