@@ -522,7 +522,7 @@ getRegister' config plat expr
           (op, imm_code) <- litToImm' lit
           let rep = cmmLitType plat lit
               format = cmmTypeFormat rep
-          return (Any format (\dst -> imm_code `snocOL` LDR format (OpReg (formatToWidth format) dst) op))
+          return (Any format (\dst -> imm_code `snocOL` (ANN (text $ show expr) $ LDR format (OpReg (formatToWidth format) dst) op)))
 
         CmmLabelOff lbl off | is12bit (fromIntegral off) -> do
           (op, imm_code) <- litToImm' lit
@@ -904,13 +904,19 @@ assignReg_FltCode = assignReg_IntCode
 -- -----------------------------------------------------------------------------
 -- Jumps
 genJump :: CmmExpr{-the branch target-} -> [Reg] -> NatM InstrBlock
-genJump (CmmLit (CmmLabel lbl)) regs
-  = return $ unitOL (J (TLabel lbl))
+genJump expr@(CmmLit (CmmLabel lbl)) regs
+  = return $ unitOL (ANN (text $ show expr) (J (TLabel lbl)))
   -- = return (toOL [ PUSH_STACK_FRAME
   --               , DELTA (-16)
   --               , B (TLabel lbl)
   --               , POP_STACK_FRAME
   --               , DELTA 0] )
+
+-- no reason to load label into register just to
+-- do a register jump.
+genJump expr@(CmmLoad (CmmLit (CmmLabel lbl)) _rep) regs
+  = return $ unitOL (ANN (text $ show expr) (J (TLabel lbl)))
+
 genJump expr regs = do
     (target, _format, code) <- getSomeReg expr
     return (code `appOL` unitOL (ANN (text $ show expr) (J (TReg target)))
