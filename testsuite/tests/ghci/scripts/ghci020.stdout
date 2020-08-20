@@ -1,5 +1,5 @@
 type (->) :: * -> * -> *
-type (->) = (->) :: * -> * -> *
+type (->) = FUN 'Many :: * -> * -> *
   	-- Defined in ‘GHC.Types’
 infixr -1 ->
 instance Applicative ((->) r) -- Defined in ‘GHC.Base’

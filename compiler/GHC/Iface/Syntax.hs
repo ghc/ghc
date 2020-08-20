@@ -45,6 +45,8 @@ module GHC.Iface.Syntax (
 
 import GHC.Prelude
 
+import GHC.Builtin.Names ( unrestrictedFunTyConKey, liftedTypeKindTyConKey )
+import GHC.Types.Unique ( hasKey )
 import GHC.Iface.Type
 import GHC.Iface.Recomp.Binary
 import GHC.Core( IsOrphan, isOrphan )
@@ -945,12 +947,18 @@ pprIfaceDecl ss (IfaceSynonym { ifName    = tc
                               , ifResKind = res_kind})
   = vcat [ pprStandaloneKindSig name_doc (mkIfaceTyConKind binders res_kind)
          , hang (text "type" <+> pprIfaceDeclHead suppress_bndr_sig [] ss tc binders <+> equals)
-           2 (sep [ pprIfaceForAll tvs, pprIfaceContextArr theta, ppr tau
+           2 (sep [ pprIfaceForAll tvs, pprIfaceContextArr theta, ppr_tau
                   , ppUnless (isIfaceLiftedTypeKind res_kind) (dcolon <+> ppr res_kind) ])
          ]
   where
     (tvs, theta, tau) = splitIfaceSigmaTy mono_ty
     name_doc = pprPrefixIfDeclBndr (ss_how_much ss) (occName tc)
+
+    -- See Note [Printing type abbreviations] in GHC.Iface.Type
+    ppr_tau | tc `hasKey` liftedTypeKindTyConKey ||
+              tc `hasKey` unrestrictedFunTyConKey
+            = updSDocContext (\ctx -> ctx { sdocPrintTypeAbbreviations = False }) $ ppr tau
+            | otherwise = ppr tau
 
     -- See Note [Suppressing binder signatures] in GHC.Iface.Type
     suppress_bndr_sig = SuppressBndrSig True
