@@ -122,6 +122,14 @@ cmmMakeDynamicReference config referenceKind lbl
               addImport stub
               return $ CmmLit $ CmmLabel stub
 
+        -- GOT relative loads work differently on AArch64.  We don't
+        -- the got symbol is loaded directly, and not through an additional
+        -- load.
+        AccessViaSymbolPtr | ArchAArch64 <- platformArch platform -> do
+              let symbolPtr = mkDynamicLinkerLabel SymbolPtr lbl
+              addImport symbolPtr
+              return $ cmmMakePicReference config symbolPtr
+
         AccessViaSymbolPtr -> do
               let symbolPtr = mkDynamicLinkerLabel SymbolPtr lbl
               addImport symbolPtr
@@ -134,7 +142,6 @@ cmmMakeDynamicReference config referenceKind lbl
                 -- PC-relative branch and call instructions,
                 -- so just jump there if it's a call or a jump
               _ -> return $ CmmLit $ CmmLabel lbl
-
 
 -- -----------------------------------------------------------------------------
 -- Create a position independent reference to a label.
@@ -250,11 +257,11 @@ howToAccessLabel config _arch OSMinGW32 _kind lbl
 -- is enough for ~64MB of range. Anything else will need to go through a veneer,
 -- which is the job of the linker to build.  We might only want to lookup
 -- Data References through the GOT.
-howToAccessLabel _config ArchAArch64 _os _this_mod kind _lbl
-        = case kind of
-            DataReference -> AccessDirectly -- AccessViaSymbolPtr
-            CallReference -> AccessDirectly
-            JumpReference -> AccessDirectly
+-- howToAccessLabel _config ArchAArch64 _os _this_mod kind _lbl
+--         = case kind of
+--             DataReference -> AccessDirectly -- AccessViaSymbolPtr
+--             CallReference -> AccessDirectly
+--             JumpReference -> AccessDirectly
 
 
 -- Mach-O (Darwin, Mac OS X)
