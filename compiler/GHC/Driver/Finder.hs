@@ -140,7 +140,7 @@ findPluginModule hsc_env dflags mod_name =
 
 findExactModule :: HscEnv -> InstalledModule -> IO InstalledFindResult
 findExactModule hsc_env mod =
-  case hsc_unitDflags_maybe hsc_env (moduleUnit mod) of
+  case hsc_unitDflags_maybe (moduleUnit mod) hsc_env of
     Just dflags -> findInstalledHomeModule hsc_env dflags (moduleName mod)
     Nothing -> findPackageModule hsc_env mod
 
@@ -158,6 +158,7 @@ findAnyHomeModule hsc_env mod_name _mb_pkg =
     --     )
     $ fmap internalUnitEnv_dflags
     $ M.elems
+    $ unitEnv_graph
     $ hsc_internalUnitEnv hsc_env
   where
     notFound = NotFound [] Nothing [] [] [] []
@@ -274,7 +275,7 @@ modLocationCache hsc_env mod do_this = do
 -- This returns a module because it's more convenient for users
 addHomeModuleToFinder :: HscEnv -> ModuleName -> ModLocation -> UnitId -> IO Module
 addHomeModuleToFinder hsc_env mod_name loc package = do
-  let dflags = hsc_unitDflags hsc_env package
+  let dflags = hsc_unitDflags package hsc_env
   let home_unit = mkHomeUnitFromFlags dflags
   let mod = mkHomeInstalledModule home_unit mod_name
   addToFinderCache (hsc_FC hsc_env) mod (InstalledFound loc mod)

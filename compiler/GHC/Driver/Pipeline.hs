@@ -184,7 +184,7 @@ compileOne' m_tc_result mHscMessage
 
    -- Use an HscEnv with DynFlags updated with the plugin info (returned from
    -- hscIncrementalCompile)
-   let hsc_env' = set_hsc_dflags hsc_env plugin_dflags
+   let hsc_env' = set_hsc_dflags plugin_dflags hsc_env
 
    case (status, bcknd) of
         (HscUpToDate iface hmi_details, _) ->
@@ -235,7 +235,7 @@ compileOne' m_tc_result mHscMessage
                      hscs_iface_dflags = iface_dflags }, Interpreter) -> do
             -- In interpreted mode the regular codeGen backend is not run so we
             -- generate a interface without codeGen info.
-            final_iface <- mkFullIface (set_hsc_dflags hsc_env' iface_dflags) partial_iface Nothing
+            final_iface <- mkFullIface (set_hsc_dflags iface_dflags hsc_env') partial_iface Nothing
             liftIO $ hscMaybeWriteIface dflags final_iface mb_old_iface_hash (ms_location summary)
 
             (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env' cgguts mod_location
@@ -321,7 +321,7 @@ compileOne' m_tc_result mHscMessage
                   -- not the one cached in the summary.  This is so
                   -- that we can change the log_action without having
                   -- to re-summarize all the source files.
-       hsc_env     = set_hsc_dflags hsc_env0 dflags
+       hsc_env     = set_hsc_dflags dflags hsc_env0
 
        -- Figure out which backend we're using
        bcknd = backend dflags
@@ -675,7 +675,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
 
              -- Decide where dump files should go based on the pipeline output
              dflags = dflags0 { dumpPrefix = Just (basename ++ ".") }
-             hsc_env = set_hsc_dflags hsc_env0 dflags
+             hsc_env = set_hsc_dflags dflags hsc_env0
 
              (input_basename, suffix) = splitExtension input_fn
              suffix' = drop 1 suffix -- strip off the .
@@ -1238,7 +1238,7 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                     (outputFilename, mStub, foreign_files, cg_infos) <- liftIO $
                       hscGenHardCode hsc_env' cgguts mod_location output_fn
 
-                    final_iface <- liftIO (mkFullIface (set_hsc_dflags hsc_env' iface_dflags) partial_iface (Just cg_infos))
+                    final_iface <- liftIO (mkFullIface (set_hsc_dflags iface_dflags hsc_env') partial_iface (Just cg_infos))
                     let final_mod_details
                            | gopt Opt_OmitInterfacePragmas iface_dflags
                            = mod_details

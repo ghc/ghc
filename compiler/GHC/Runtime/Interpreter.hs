@@ -74,7 +74,6 @@ import GHC.Utils.Outputable(brackets, ppr)
 import GHC.Driver.Ppr (showSDoc)
 import GHC.Types.SrcLoc
 import GHC.Data.Maybe
-import GHC.Unit.Module
 import GHC.ByteCode.Types
 import GHC.Types.Unique
 
@@ -429,7 +428,7 @@ handleSeqHValueStatus hsc_env eval_status = do
     -- Reason: Setting of flags in libraries/ghci/GHCi/Run.hs:evalOptsSeq
     getSeqBpSpan Nothing = mkGeneralSrcSpan (fsLit "<unknown>")
     breaks mod = getModBreaks $ expectJust "getSeqBpSpan" $
-      lookupHpt (hsc_HPT hsc_env) (moduleName mod)
+      lookupHptByModuleInUnitEnv (hsc_internalUnitEnv hsc_env) mod
 
 
 -- -----------------------------------------------------------------------------

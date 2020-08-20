@@ -71,7 +71,7 @@ initializePlugins hsc_env df
             (cachedPlugins df) -- arguments not changed
   = return df -- no need to reload plugins
   | otherwise
-  = do loadedPlugins <- loadPlugins $ set_hsc_dflags hsc_env df
+  = do loadedPlugins <- loadPlugins $ set_hsc_dflags df hsc_env
        let df' = df { cachedPlugins = loadedPlugins }
        df'' <- withPlugins df' runDflagsPlugin df'
        return df''

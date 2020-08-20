@@ -431,7 +431,7 @@ load' how_much mHscMessage mod_graph = do
     -- before we unload anything, make sure we don't leave an old
     -- interactive context around pointing to dead bindings.  Also,
     -- write the pruned HPT to allow the old HPT to be GC'd.
-    setSession $ discardIC $ set_hsc_HPT hsc_env pruned_hpt
+    setSession $ discardIC $ set_hsc_HPT pruned_hpt hsc_env
 
     liftIO $ debugTraceMsg dflags 2 (text "Stable obj:" <+> ppr stable_obj $$
                             text "Stable BCO:" <+> ppr stable_bco)
@@ -614,7 +614,7 @@ load' how_much mHscMessage mod_graph = do
           -- Link everything together
           linkresult <- liftIO $ link (ghcLink dflags) dflags False hpt5
 
-          modifySession $ \hsc_env -> set_hsc_HPT hsc_env hpt5
+          modifySession $ \hsc_env -> set_hsc_HPT hpt5 hsc_env
           loadFinish Failed linkresult
 
 
@@ -694,7 +694,7 @@ guessOutputFile = modifySession $ \env ->
     in
     case outputFile dflags of
         Just _ -> env
-        Nothing -> modify_hsc_dflags env $ \dflags -> dflags { outputFile = name_exe }
+        Nothing -> modify_hsc_dflags (\dflags -> dflags { outputFile = name_exe }) env
 
 -- -----------------------------------------------------------------------------
 --
@@ -1338,7 +1338,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags mHscMessage cleanup 
 
                 -- Update and fetch the global HscEnv.
                 lcl_hsc_env' <- modifyMVar hsc_env_var $ \hsc_env -> do
-                    let hsc_env' = modify_hsc_HPT hsc_env $ \hpt -> addToHpt hpt this_mod mod_info
+                    let hsc_env' = modify_hsc_HPT (\hpt -> addToHpt hpt this_mod mod_info) hsc_env
                     -- We've finished typechecking the module, now we must
                     -- retypecheck the loop AGAIN to ensure unfoldings are
                     -- updated.  This time, however, we include the loop
@@ -1360,7 +1360,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags mHscMessage cleanup 
                  , filesToClean = filesToClean lcl_dflags } }
 
     localize_hsc_env hsc_env
-        = modify_hsc_dflags hsc_env $ \dflags -> dflags
+        =  flip modify_hsc_dflags hsc_env $ \dflags -> dflags
               { log_action = log_action lcl_dflags
               , filesToClean = filesToClean lcl_dflags }
 
@@ -1467,8 +1467,8 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
         type_env_var <- liftIO $ newIORef emptyNameEnv
         let hsc_env1 = hsc_env { hsc_type_env_var =
                                     Just (ms_mod mod, type_env_var) }
-        -- TODO @fendor: is this save? We modify the current package and never reset it.
-        hsc_env1 <- pure $ hsc_env1 { hsc_currentUnit = ms_unit mod }
+
+        hsc_env1 <- pure $ set_hsc_currentUnit (ms_unit mod) hsc_env1
         setSession hsc_env1
 
         -- Lazily reload the HPT modules participating in the loop.
@@ -1499,7 +1499,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
                 let this_mod = ms_mod_name mod
 
                         -- Add new info to hsc_env
-                    hsc_env3 = modify_hsc_HPT (hsc_env2 { hsc_type_env_var = Nothing }) $ \hpt -> addToHpt hpt this_mod mod_info
+                    hsc_env3 = modify_hsc_HPT (\hpt -> addToHpt hpt this_mod mod_info) (hsc_env2 { hsc_type_env_var = Nothing })
 
                         -- Space-saving: delete the old HPT entry
                         -- for mod BUT if mod is a hs-boot
@@ -1910,14 +1910,14 @@ typecheckLoop dflags hsc_env mods = do
      text "Re-typechecking loop: " <> ppr mods
   new_hpt <-
     fixIO $ \new_hpt -> do
-      let new_hsc_env = set_hsc_HPT hsc_env new_hpt
+      let new_hsc_env = set_hsc_HPT new_hpt hsc_env
       mds <- initIfaceCheck (text "typecheckLoop") new_hsc_env $
                 mapM (typecheckIface . hm_iface) hmis
       let new_hpt = addListToHpt old_hpt
                         (zip mods [ hmi{ hm_details = details }
                                   | (hmi,details) <- zip hmis mds ])
       return new_hpt
-  return $ set_hsc_HPT hsc_env new_hpt
+  return $ set_hsc_HPT new_hpt hsc_env
   where
     old_hpt = hsc_HPT hsc_env
     hmis    = map (expectJust "typecheckLoop" . lookupHpt old_hpt) mods
@@ -2141,14 +2141,14 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                 if exists || isJust maybe_buf
                     then summariseFile hsc_env old_summaries file unit mb_phase
                                        obj_allowed maybe_buf
-                    else return $ Left $ unitBag $ mkPlainErrMsg (hsc_unitDflags hsc_env unit) noSrcSpan $
+                    else return $ Left $ unitBag $ mkPlainErrMsg (hsc_unitDflags unit hsc_env) noSrcSpan $
                            text "can't find file:" <+> text file
         getRootSummary (Target (TargetModule modl) unit obj_allowed maybe_buf)
            = do maybe_summary <- summariseModule hsc_env old_summary_map NotBoot
                                            (L rootLoc modl) unit obj_allowed
                                            maybe_buf excl_mods
                 case maybe_summary of
-                   Nothing -> return $ Left $ moduleNotFoundErr (hsc_unitDflags hsc_env unit) modl
+                   Nothing -> return $ Left $ moduleNotFoundErr (hsc_unitDflags unit hsc_env) modl
                    Just s  -> return s
 
         rootLoc = mkGeneralSrcSpan (fsLit "<command line>")
@@ -2180,7 +2180,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
           = if isSingleton summs then
                 loop ss done
             else
-                do { multiRootsErr (hsc_unitDflags hsc_env unit) (rights summs); return Map.empty }
+                do { multiRootsErr (hsc_unitDflags unit hsc_env) (rights summs); return Map.empty }
           | otherwise
           = do mb_s <- summariseModule hsc_env old_summary_map
                                        is_boot wanted_mod unit True
@@ -2359,7 +2359,7 @@ summariseFile
         :: HscEnv
         -> [ModSummary]                 -- old summaries
         -> FilePath                     -- source file name
-        -> UnitId
+        -> UnitId                       -- UnitId to use
         -> Maybe Phase                  -- start phase
         -> Bool                         -- object code allowed?
         -> Maybe (StringBuffer,UTCTime)
@@ -2372,7 +2372,7 @@ summariseFile hsc_env old_summaries src_fn unit mb_phase obj_allowed maybe_buf
    | Just old_summary <- findSummaryBySourceFile old_summaries src_fn
    = do
         let location = ms_location old_summary
-            dflags = hsc_unitDflags hsc_env unit
+            dflags = hsc_unitDflags unit hsc_env
 
         src_timestamp <- get_src_timestamp
                 -- The file exists; we checked in getRootSummary above.
@@ -2397,7 +2397,7 @@ summariseFile hsc_env old_summaries src_fn unit mb_phase obj_allowed maybe_buf
     new_summary src_fn src_timestamp = runExceptT $ do
         -- Temporary modification, so consumers can call 'hsc_dflags' and 'hsc_HPT'
         -- directly, without explicitly passing the UnitId around.
-        hsc_env <- pure hsc_env { hsc_currentUnit = unit }
+        hsc_env <- pure $ set_hsc_currentUnit unit hsc_env
         preimps@PreprocessedImports {..}
             <- getPreprocessedImports hsc_env src_fn mb_phase maybe_buf
 
@@ -2509,7 +2509,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
 
   | otherwise  = find_it
   where
-    dflags = hsc_unitDflags hsc_env unit
+    dflags = hsc_unitDflags unit hsc_env
     home_unit = mkHomeUnitFromFlags dflags
 
     check_timestamp old_summary location src_fn =
@@ -2519,7 +2519,9 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
           old_summary location unit
 
     find_it = do
-        found <- findImportedModule hsc_env wanted_mod Nothing
+        let hsc_env' = set_hsc_currentUnit unit hsc_env
+        -- Only look in the correct home unit, as we know in which unit it is located.
+        found <- findHomeModule hsc_env' (hsc_unitDflags unit hsc_env) wanted_mod
         case found of
              Found location mod
                 | isJust (ml_hs_file location) ->
@@ -2550,7 +2552,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
       = runExceptT $ do
         -- Temporary modification, so consumers can call 'hsc_dflags' and 'hsc_HPT'
         -- directly, without explicitly passing the UnitId around.
-        hsc_env <- pure hsc_env { hsc_currentUnit = unit }
+        hsc_env <- pure $ set_hsc_currentUnit (toUnitId $ moduleUnit mod) hsc_env
         preimps@PreprocessedImports {..}
             <- getPreprocessedImports hsc_env src_fn Nothing maybe_buf
 
@@ -2717,8 +2719,8 @@ withDeferredDiagnostics f = do
             actions <- atomicModifyIORef' ref $ \i -> ([], i)
             sequence_ $ reverse actions
 
-        setLogAction action = modifySession $ \hsc_env ->
-          modify_hsc_dflags hsc_env $ \dflags -> dflags { log_action = action }
+        setLogAction action = modifySession $
+          modify_hsc_dflags (\dflags -> dflags { log_action = action })
 
     MC.bracket
       (setLogAction deferDiagnostics)
