@@ -308,6 +308,13 @@ loadSrcInterface_maybe doc mod want_boot maybe_pkg
   -- interface; it will call the Finder again, but the ModLocation will be
   -- cached from the first search.
   = do { hsc_env <- getTopEnv
+       ; traceIf $ text "loadSrcInterface_maybe unit:" <+> ppr (hsc_currentUnit hsc_env)
+       ; traceIf $ text "loadSrcInterface_maybe:" <+> ppr mod <+> ppr maybe_pkg
+       ; traceIf $ text "loadSrcInterface_maybe env:" <+> pprInternalUnitMap hsc_env
+       ; traceIf $ text "loadSrcInterface_maybe deps:" <+> ppr (explicitUnits $ unitState $ hsc_dflags hsc_env)
+       ; traceIf $ text "loadSrcInterface_maybe import paths:"
+            $$ nest 2 (vcat $ map text $ importPaths $ hsc_dflags hsc_env)
+
        ; res <- liftIO $ findImportedModule hsc_env mod maybe_pkg
        ; case res of
            Found _ mod -> initIfaceTcRn $ loadInterface doc mod (ImportByUser want_boot)
@@ -438,6 +445,8 @@ loadInterface doc_str mod from
         ; dflags <- getDynFlags
         ; hsc_env <- getTopEnv
         ; let home_unit = hsc_home_unit hsc_env
+        ; traceIf (text "lookupIfaceByModule" <+> ppr mod)
+        ; traceIf (text "lookupIfaceByModule eps_PIT" <+> ppr (map (moduleName) . moduleEnvKeys $ eps_PIT eps))
         ; case lookupIfaceByModule unitEnv (eps_PIT eps) mod of {
             Just iface
                 -> return (Succeeded iface) ;   -- Already loaded

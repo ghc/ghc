@@ -393,6 +393,17 @@ rnImportDecl this_mod
             }
         imports = calculateAvails home_unit iface mod_safe' want_boot (ImportedByUser imv)
 
+    traceRn "Compute Avails" $ text "Compute Avails for" <+> ppr this_mod
+    traceRn "Computed Avails" $ text "Compute Avails info"
+            $$ nest 2
+              (vcat
+                [ text "imp_dep_mods" <+> ppr (imp_dep_mods imports)
+                , text "imp_dep_pkgs" <+> ppr (imp_dep_pkgs imports)
+                , text "imp_trust_pkgs" <+> ppr (imp_trust_pkgs imports)
+                , text "imp_orphs" <+> ppr (imp_orphs imports)
+                , text "imp_finsts" <+> ppr (imp_finsts imports)
+                ]
+              )
     -- Complain if we import a deprecated module
     whenWOptM Opt_WarnWarningsDeprecations (
        case (mi_warns iface) of
