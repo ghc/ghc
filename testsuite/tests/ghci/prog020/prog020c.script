@@ -1,0 +1,14 @@
+:setu unitC -this-unit-id unitC -hide-all-packages -package base -package array -i -i./c/
+:setu unitB -this-unit-id unitB -hide-all-packages -package base -package containers -i -i./b/
+:addunit unitB B D
+:addunit unitC X Y
+:switch unitC
+:m X Y
+main
+fibonacci 10
+:m
+:switch unitB
+:m B D
+unused
+Bar
+bar

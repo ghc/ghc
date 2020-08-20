@@ -1,0 +1,8 @@
+:setu unitB -this-unit-id unitB -hide-all-packages -package base -i -i./b/
+:setu unitA -XTypeFamilies -this-unit-id unitA -hide-all-packages -package base -package-id unitB -i -i./a/
+:addunit unitB B
+:addunit unitA A
+:switch unitA
+:m + A B
+main
+:k Elem CharList
