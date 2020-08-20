@@ -1436,6 +1436,10 @@ pprDynamicLinkerAsmLabel platform dllInfo ppLbl =
           SymbolPtr -> text ".LC_" <> ppLbl
           _         -> panic "pprDynamicLinkerAsmLabel"
 
+      | platformArch platform == ArchAArch64
+      = ppr lbl
+
+
       | platformArch platform == ArchX86_64
       = case dllInfo of
           CodeStub        -> ppLbl <> text "@plt"
