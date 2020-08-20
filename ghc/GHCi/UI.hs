@@ -74,6 +74,7 @@ import GHC.Types.SrcLoc as SrcLoc
 import qualified GHC.Parser.Lexer as Lexer
 
 import GHC.Unit
+import GHC.Unit.Home.ModInfo (emptyHomePackageTable)
 import GHC.Unit.State
 import GHC.Unit.Finder as Finder
 import GHC.Unit.Module.ModSummary
@@ -185,6 +186,7 @@ ghciCommands = map mkCmd [
   -- Hugs users are accustomed to :e, so make sure it doesn't overlap
   ("?",         keepGoing help,                 noCompletion),
   ("add",       keepGoingPaths addModule,       completeFilename),
+  ("addunit",   keepGoingPaths addModuleWithUnit, completeFilename),
   ("abandon",   keepGoing abandonCmd,           noCompletion),
   ("break",     keepGoing breakCmd,             completeBreakpoint),
   ("back",      keepGoing backCmd,              noCompletion),
@@ -225,9 +227,11 @@ ghciCommands = map mkCmd [
   ("run",       keepGoing runRun,               completeFilename),
   ("script",    keepGoing' scriptCmd,           completeFilename),
   ("set",       keepGoing setCmd,               completeSetOptions),
+  ("setunit",   keepGoing setUnitCmd,           completeSeti),
   ("seti",      keepGoing setiCmd,              completeSeti),
   ("show",      keepGoing showCmd,              completeShowOptions),
   ("showi",     keepGoing showiCmd,             completeShowiOptions),
+  ("switch",    keepGoing switchCmd,            completeSwitchOptions),
   ("sprint",    keepGoing sprintCmd,            completeExpression),
   ("step",      keepGoing stepCmd,              completeIdentifier),
   ("steplocal", keepGoing stepLocalCmd,         completeIdentifier),
@@ -443,7 +447,7 @@ default_prompt_cont = generatePromptFunctionFromString "| "
 default_args :: [String]
 default_args = []
 
-interactiveUI :: GhciSettings -> [(FilePath, Maybe Phase)] -> Maybe [String]
+interactiveUI :: GhciSettings -> [(FilePath, Maybe UnitId, Maybe Phase)] -> Maybe [String]
               -> Ghc ()
 interactiveUI config srcs maybe_exprs = do
    -- HACK! If we happen to get into an infinite loop (eg the user
@@ -591,7 +595,7 @@ withGhcAppData right left = do
                right dir
         _ -> left
 
-runGHCi :: [(FilePath, Maybe Phase)] -> Maybe [String] -> GHCi ()
+runGHCi :: [(FilePath, Maybe UnitId, Maybe Phase)] -> Maybe [String] -> GHCi ()
 runGHCi paths maybe_exprs = do
   dflags <- getDynFlags
   let
@@ -1829,6 +1833,32 @@ instancesCmd s = do
     printForUser $ vcat $ map ppr res
 
 -----------------------------------------------------------------------------
+-- :switch
+
+switchCmd :: GhciMonad m => String -> m ()
+switchCmd "" =
+  throwGhcException (CmdLineError "syntax: ':switch <unit-id>'")
+switchCmd unit = do
+  let uid = stringToUnitId unit
+  -- clearAllTargets
+  hsc_env <- GHC.getSession
+  if hsc_memberInternalUnitEnv uid hsc_env
+    then do
+      GHC.setSession (set_hsc_currentUnit uid hsc_env)
+      GHC.setSessionDynFlags (hsc_unitDflags uid hsc_env)
+      -- GHC.setInteractiveDynFlags (hsc_unitDflags uid hsc_env)
+      void $ setContext [] []
+    else
+      printForUser
+        $ text "The Unit Id \"" <> text unit <> "\" is unknown."
+        $$ text "Existing Unit Ids:"
+        $$
+          (nest 2
+            $ vcat $ map (\u -> text "-" <+> ppr u)
+            $ S.toList $ hsc_allUnitIds hsc_env
+          )
+
+-----------------------------------------------------------------------------
 -- :load, :add, :reload
 
 -- | Sets '-fdefer-type-errors' if 'defer' is true, executes 'load' and unsets
@@ -1845,24 +1875,24 @@ wrapDeferTypeErrors load =
     (\originalFlags -> void $ GHC.setProgramDynFlags originalFlags)
     (\_ -> load)
 
-loadModule :: GhciMonad m => [(FilePath, Maybe Phase)] -> m SuccessFlag
+loadModule :: GhciMonad m => [(FilePath, Maybe UnitId, Maybe Phase)] -> m SuccessFlag
 loadModule fs = do
   (_, result) <- runAndPrintStats (const Nothing) (loadModule' fs)
   either (liftIO . Exception.throwIO) return result
 
 -- | @:load@ command
 loadModule_ :: GhciMonad m => [FilePath] -> m ()
-loadModule_ fs = void $ loadModule (zip fs (repeat Nothing))
+loadModule_ fs = void $ loadModule (zip3 fs (repeat Nothing) (repeat Nothing))
 
 loadModuleDefer :: GhciMonad m => [FilePath] -> m ()
 loadModuleDefer = wrapDeferTypeErrors . loadModule_
 
-loadModule' :: GhciMonad m => [(FilePath, Maybe Phase)] -> m SuccessFlag
+loadModule' :: GhciMonad m => [(FilePath, Maybe UnitId, Maybe Phase)] -> m SuccessFlag
 loadModule' files = do
-  let (filenames, phases) = unzip files
+  let (filenames, uids, phases) = unzip3 files
   exp_filenames <- mapM expandPath filenames
-  let files' = zip exp_filenames phases
-  targets <- mapM (uncurry GHC.guessTarget) files'
+  let files' = zip3 exp_filenames uids phases
+  targets <- mapM (uncurry3 GHC.guessTarget) files'
 
   -- NOTE: we used to do the dependency anal first, so that if it
   -- fails we didn't throw away the current set of modules.  This would
@@ -1888,18 +1918,35 @@ loadModule' files = do
     liftIO $ checkLeakIndicators dflags leak_indicators
   return success
 
+-- | @:addunit@ command
+addModuleWithUnit :: GhciMonad m => [String] -> m ()
+addModuleWithUnit [] = pure ()
+addModuleWithUnit (unitString:files) = do
+  revertCAFs -- always revert CAFs on load/add.
+  let unitId = stringToUnitId unitString
+  targets <- guessTargets (Just unitId) files
+  -- remove old targets with the same id; e.g. for :add *M
+  mapM_ GHC.removeTarget [ tid | Target { targetId = tid } <- targets ]
+  mapM_ GHC.addTarget targets
+  _ <- doLoadAndCollectInfo False LoadAllTargets
+  return ()
+
 -- | @:add@ command
 addModule :: GhciMonad m => [FilePath] -> m ()
 addModule files = do
   revertCAFs -- always revert CAFs on load/add.
-  files' <- mapM expandPath files
-  targets <- mapM (\m -> GHC.guessTarget m Nothing) files'
-  targets' <- filterM checkTarget targets
+  targets' <- guessTargets Nothing files
   -- remove old targets with the same id; e.g. for :add *M
   mapM_ GHC.removeTarget [ tid | Target { targetId = tid } <- targets' ]
   mapM_ GHC.addTarget targets'
   _ <- doLoadAndCollectInfo False LoadAllTargets
   return ()
+
+guessTargets :: GhciMonad m => Maybe UnitId -> [FilePath] -> m [Target]
+guessTargets muid files = do
+  files' <- mapM expandPath files
+  targets <- mapM (\m -> GHC.guessTarget m muid Nothing) files'
+  filterM checkTarget targets
   where
     checkTarget :: GHC.GhcMonad m => Target -> m Bool
     checkTarget (Target { targetId = TargetModule m }) = checkTargetModule m
@@ -1907,7 +1954,8 @@ addModule files = do
 
     checkTargetModule :: GHC.GhcMonad m => ModuleName -> m Bool
     checkTargetModule m = do
-      hsc_env <- GHC.getSession
+      hsc_env' <- GHC.getSession
+      let hsc_env = maybe hsc_env' (`set_hsc_currentUnit` hsc_env') muid
       result <- liftIO $
         Finder.findImportedModule hsc_env m (Just (fsLit "this"))
       case result of
@@ -1925,7 +1973,7 @@ addModule files = do
 unAddModule :: GhciMonad m => [FilePath] -> m ()
 unAddModule files = do
   files' <- mapM expandPath files
-  targets <- mapM (\m -> GHC.guessTarget m Nothing) files'
+  targets <- mapM (\m -> GHC.guessTarget m Nothing Nothing) files'
   mapM_ GHC.removeTarget [ tid | Target { targetId = tid } <- targets ]
   _ <- doLoadAndCollectInfo False LoadAllTargets
   return ()
@@ -2786,6 +2834,39 @@ setiCmd str  =
     Left err -> liftIO (hPutStrLn stderr err)
     Right wds -> newDynFlags True wds
 
+setUnitCmd :: GhciMonad m => String -> m ()
+setUnitCmd s =
+  case toArgs s of
+    Left err -> liftIO (hPutStrLn stderr err)
+    Right (unit:args) -> setUnitCmd' (stringToUnitId unit) args
+    Right [] -> do
+      hsc_env <- GHC.getSession
+      printForUser $ text "Internal Unit Env:" $$ pprInternalUnitMap hsc_env
+  where
+  setUnitCmd' :: GhciMonad m => UnitId -> [String] -> m ()
+  setUnitCmd' cid args = do
+    hsc_env <- GHC.getSession
+    case hsc_unitDflags_maybe cid hsc_env of
+      Nothing -> do
+        let lopts = map noLoc args
+        dflags0 <- GHC.getInteractiveDynFlags
+        (dflags1, _, _) <- liftIO $ GHC.parseDynamicFlags dflags0 lopts
+        let home_units = hsc_allUnitIds hsc_env
+        dflags2 <- liftIO $ initUnits home_units dflags1
+        let new_hsc_env = insert_hsc_unitEnv hsc_env
+              InternalUnitEnv
+                { internalUnitEnv_dflags = dflags2 { homeUnitId_ = cid }
+                , internalUnitEnv_homePackageTable = emptyHomePackageTable
+                , internalUnitEnv_home_unit = mkHomeUnitFromFlags dflags2 { homeUnitId_ = cid }
+                }
+        GHC.setSession new_hsc_env
+        printForUser $ text "Added new unit:" <+> ppr cid
+
+      Just dflags -> case args of
+        [] -> liftIO $ showDynFlags False dflags
+        ["-a"] -> liftIO $ showDynFlags True dflags
+        args -> printForUser $ text "Set Unit flag of" <+> ppr cid <+> text "to:" <+> text (unwords args)
+
 showOptions :: GhciMonad m => Bool -> m ()
 showOptions show_all
   = do st <- getGHCiState
@@ -2982,9 +3063,9 @@ newDynFlags interactive_only minus_opts = do
             newCLFrameworks = drop fmrk0length (cmdlineFrameworks dflags2)
 
             hsc_env' = set_hsc_dflags
-                         dflags2 { ldInputs = newLdInputs
-                                 , cmdlineFrameworks = newCLFrameworks }
-                         hsc_env
+                          dflags2 { ldInputs = newLdInputs
+                                  , cmdlineFrameworks = newCLFrameworks }
+                          hsc_env
 
         when (not (null newLdInputs && null newCLFrameworks)) $
           liftIO $ linkCmdLineLibs hsc_env'
@@ -3340,7 +3421,7 @@ completeCmd argLine0 = case parseLine argLine0 of
 
 
 completeGhciCommand, completeMacro, completeIdentifier, completeModule,
-    completeSetModule, completeSeti, completeShowiOptions,
+    completeSetModule, completeSeti, completeShowiOptions, completeSwitchOptions,
     completeHomeModule, completeSetOptions, completeShowOptions,
     completeHomeModuleOrFile, completeExpression, completeBreakpoint
     :: GhciMonad m => CompletionFunc m
@@ -3515,6 +3596,10 @@ completeShowOptions = wrapCompleter flagWordBreakChars $ \w -> do
 
 completeShowiOptions = wrapCompleter flagWordBreakChars $ \w -> do
   return (filter (w `isPrefixOf`) ["language"])
+
+completeSwitchOptions = wrapCompleter flagWordBreakChars $ \w -> do
+  hsc_env <- GHC.getSession
+  return (filter (w `isPrefixOf`) (map unitIdString $ S.toList $ hsc_allUnitIds hsc_env))
 
 completeHomeModuleOrFile = completeWord Nothing filenameWordBreakChars
                 $ unionComplete (fmap (map simpleCompletion) . listHomeModules)
@@ -4329,8 +4414,9 @@ wantInterpretedModuleName :: GHC.GhcMonad m => ModuleName -> m Module
 wantInterpretedModuleName modname = do
    modl <- lookupModuleName modname
    let str = moduleNameString modname
-   home_unit <- mkHomeUnitFromFlags <$> getDynFlags
-   unless (isHomeModule home_unit modl) $
+   hsc_env <- GHC.getSession
+   -- TODO: @fendor: this needs to be `isAnyHomeModule`
+   unless (isAnyHomeModule hsc_env modl) $
       throwGhcException (CmdLineError ("module '" ++ str ++ "' is from another package;\nthis command requires an interpreted module"))
    is_interpreted <- GHC.moduleIsInterpreted modl
    when (not is_interpreted) $

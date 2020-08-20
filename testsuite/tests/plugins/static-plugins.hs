@@ -62,7 +62,7 @@ main = do
       GHC.setTargets []
       _ <- GHC.load LoadAllTargets
 
-      target <- guessTarget "static-plugins-module.hs" Nothing
+      target <- guessTarget "static-plugins-module.hs" Nothing Nothing
       setTargets [target]
 
       dflags <- getSessionDynFlags

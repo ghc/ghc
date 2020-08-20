@@ -93,6 +93,7 @@ module GHC.Driver.Env
    , lookupDependentHpts
    , lookupHptByModuleInUnitEnv
    , lookupHpts
+   , isAnyHomeModule
    )
 where
 
@@ -644,8 +645,8 @@ hsc_currentUnit :: HscEnv -> UnitId
 hsc_currentUnit = unitEnv_currentUnit . hsc_internalUnitEnv
 
 -- -- | Test if the module comes from the home unit
--- isAnyHomeModule :: HscEnv -> Module -> Bool
--- isAnyHomeModule hsc_env m = isJust $ hsc_findInternalUnitEnv_maybe (toUnitId $ moduleUnit m) hsc_env
+isAnyHomeModule :: HscEnv -> Module -> Bool
+isAnyHomeModule hsc_env m = isJust $ hsc_findInternalUnitEnv_maybe (toUnitId $ moduleUnit m) hsc_env
 
 
 {-
