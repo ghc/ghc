@@ -976,13 +976,19 @@ mkLongErrAt :: SrcSpan -> MsgDoc -> MsgDoc -> TcRn ErrMsg
 mkLongErrAt loc msg extra
   = do { dflags <- getDynFlags ;
          printer <- getPrintUnqualified dflags ;
-         return $ mkLongErrMsg dflags loc printer msg extra }
+         unit_state <- unitState <$> getDynFlags ;
+         let msg' = pprWithUnitState unit_state msg in
+         return $ mkLongErrMsg dflags loc printer msg' extra }
 
 mkErrDocAt :: SrcSpan -> ErrDoc -> TcRn ErrMsg
 mkErrDocAt loc errDoc
   = do { dflags <- getDynFlags ;
          printer <- getPrintUnqualified dflags ;
-         return $ mkErrDoc dflags loc printer errDoc }
+         unit_state <- unitState <$> getDynFlags ;
+         let f = pprWithUnitState unit_state
+             errDoc' = mapErrDoc f errDoc
+         in
+         return $ mkErrDoc dflags loc printer errDoc' }
 
 addLongErrAt :: SrcSpan -> MsgDoc -> MsgDoc -> TcRn ()
 addLongErrAt loc msg extra = mkLongErrAt loc msg extra >>= reportError
@@ -1395,7 +1401,10 @@ tryTcDiscardingErrs recover thing_inside
 
 addErrTc :: MsgDoc -> TcM ()
 addErrTc err_msg = do { env0 <- tcInitTidyEnv
-                      ; addErrTcM (env0, err_msg) }
+                        -- ensure that error message use the correct UnitState
+                      ; unit_state <- unitState <$> getDynFlags
+                      ; let err_msg' = pprWithUnitState unit_state err_msg
+                      ; addErrTcM (env0, err_msg') }
 
 addErrTcM :: (TidyEnv, MsgDoc) -> TcM ()
 addErrTcM (tidy_env, err_msg)

@@ -420,9 +420,6 @@ type VisibleOrphanModules = ModuleSet
 newtype ClsInstEnv
   = ClsIE [ClsInst]    -- The instances for a particular class, in any order
 
-instance Outputable ClsInstEnv where
-  ppr (ClsIE is) = pprInstances is
-
 -- INVARIANTS:
 --  * The is_tvs are distinct in each ClsInst
 --      of a ClsInstEnv (so we can safely unify them)
