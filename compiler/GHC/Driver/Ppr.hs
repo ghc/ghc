@@ -30,6 +30,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Ppr       ( Mode(..) )
+import {-# SOURCE #-} GHC.Unit.State
 
 import System.IO ( Handle )
 import Control.Monad.IO.Class
@@ -46,7 +47,11 @@ showPprUnsafe a = showPpr unsafeGlobalDynFlags a
 
 -- | Allows caller to specify the PrintUnqualified to use
 showSDocForUser :: DynFlags -> PrintUnqualified -> SDoc -> String
-showSDocForUser dflags unqual doc = renderWithContext (initSDocContext dflags (mkUserStyle unqual AllTheWay)) doc
+showSDocForUser dflags unqual doc = renderWithContext (initSDocContext dflags sty) doc'
+   where
+      sty        = mkUserStyle unqual AllTheWay
+      unit_state = unitState dflags
+      doc'       = pprWithUnitState unit_state doc
 
 showSDocDump :: DynFlags -> SDoc -> String
 showSDocDump dflags d = renderWithContext (initSDocContext dflags defaultDumpStyle) d
