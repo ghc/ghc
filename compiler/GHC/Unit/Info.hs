@@ -68,7 +68,7 @@ mkUnitKeyInfo = mapGenericUnitInfo
      mkPackageName'       = PackageName    . mkFastStringByteString
      mkUnitKey'           = UnitKey        . mkFastStringByteString
      mkModuleName'        = mkModuleNameFS . mkFastStringByteString
-     mkIndefUnitKey' cid  = Indefinite (mkUnitKey' cid) Nothing
+     mkIndefUnitKey' cid  = Indefinite (mkUnitKey' cid)
      mkVirtUnitKey' i = case i of
       DbInstUnitId cid insts -> mkVirtUnit (mkIndefUnitKey' cid) (fmap (bimap mkModuleName' mkModule') insts)
       DbUnitId uid           -> RealUnit (Definite (mkUnitKey' uid))

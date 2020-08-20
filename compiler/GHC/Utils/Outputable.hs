@@ -344,6 +344,9 @@ data SDocContext = SDC
   , sdocStarIsType                  :: !Bool
   , sdocLinearTypes                 :: !Bool
   , sdocImpredicativeTypes          :: !Bool
+  , sdocUnitIdForUser               :: !(FastString -> SDoc)
+      -- ^ Used to map UnitIds to more friendly "package-version:component"
+      -- strings
   , sdocDynFlags                    :: DynFlags -- TODO: remove
   }
 

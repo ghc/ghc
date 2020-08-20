@@ -68,10 +68,9 @@ module GHC.Unit.State (
         pprUnitIdForUser,
         pprUnitInfoForUser,
         pprModuleMap,
+        pprWithUnitState,
 
         -- * Utils
-        mkIndefUnitId,
-        updateIndefUnitId,
         unwireUnit
     )
 where
@@ -2128,15 +2127,6 @@ pprUnitInfoForUser info = ppr (mkUnitPprInfo unitIdFS info)
 lookupUnitPprInfo :: UnitState -> UnitId -> Maybe UnitPprInfo
 lookupUnitPprInfo state uid = fmap (mkUnitPprInfo unitIdFS) (lookupUnitId state uid)
 
--- | Create a IndefUnitId.
-mkIndefUnitId :: UnitState -> UnitId -> IndefUnitId
-mkIndefUnitId state uid = Indefinite uid $! lookupUnitPprInfo state uid
-
--- | Update component ID details from the database
-updateIndefUnitId :: UnitState -> IndefUnitId -> IndefUnitId
-updateIndefUnitId pkgstate uid = mkIndefUnitId pkgstate (indefUnit uid)
-
-
 -- -----------------------------------------------------------------------------
 -- Displaying packages
 
@@ -2270,3 +2260,8 @@ instModuleToModule :: UnitState -> InstantiatedModule -> Module
 instModuleToModule pkgstate (Module iuid mod_name) =
     mkModule (instUnitToUnit pkgstate iuid) mod_name
 
+-- | Print unit-ids with UnitInfo found in the given UnitState
+pprWithUnitState :: UnitState -> SDoc -> SDoc
+pprWithUnitState state = updSDocContext (\ctx -> ctx
+   { sdocUnitIdForUser = \fs -> pprUnitIdForUser state (UnitId fs)
+   })
