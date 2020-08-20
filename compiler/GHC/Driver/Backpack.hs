@@ -77,7 +77,7 @@ doBackpack [src_filename] = do
     let dflags1 = dflags0
     src_opts <- liftIO $ getOptionsFromFile dflags1 src_filename
     (dflags, unhandled_flags, warns) <- liftIO $ parseDynamicFilePragma dflags1 src_opts
-    modifySession $ \hsc_env -> set_hsc_dflags hsc_env dflags
+    modifySession $ set_hsc_dflags dflags
     -- Cribbed from: preprocessFile / GHC.Driver.Pipeline
     liftIO $ checkProcessArgsResult dflags unhandled_flags
     liftIO $ handleFlagWarnings dflags warns

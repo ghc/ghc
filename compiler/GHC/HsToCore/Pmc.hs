@@ -105,7 +105,7 @@ noCheckDs :: DsM a -> DsM a
 noCheckDs k = do
   dflags <- getDynFlags
   let dflags' = foldl' wopt_unset dflags allPmCheckWarnings
-  updEnv (\env -> env{env_top = set_hsc_dflags (env_top env) dflags' }) k
+  updEnv (\env -> env{env_top = set_hsc_dflags dflags' (env_top env) }) k
 
 -- | Check a pattern binding (let, where) for exhaustiveness.
 pmcPatBind :: DsMatchContext -> Id -> Pat GhcTc -> DsM ()

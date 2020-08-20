@@ -649,12 +649,8 @@ setSessionDynFlags dflags = do
   -- This is absolutely necessary to maintain backwards compatibility.
   modifySession $ \h ->
     if hsc_currentUnit h == homeUnitId_ dflags'''
-        then set_hsc_dflags h dflags'''
-        else singleton_hsc_unitEnv h (homeUnitId_ dflags''')
-                InternalUnitEnv
-                  { internalUnitEnv_dflags = dflags'''
-                  , internalUnitEnv_homePackageTable = hsc_HPT h
-                  }
+        then set_hsc_dflags dflags''' h
+        else set_hsc_dflags dflags''' $ rename_hsc_unitId (hsc_currentUnit h) (homeUnitId_ dflags''') h
   invalidateModSummaryCache
 
 -- | Sets the program 'DynFlags'.  Note: this invalidates the internal
@@ -683,7 +679,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
   dflags'' <- if changed
                then liftIO $ initUnits dflags'
                else return dflags'
-  modifySession $ \h -> set_hsc_dflags h dflags''
+  modifySession $ set_hsc_dflags dflags''
   when invalidate_needed $ invalidateModSummaryCache
   return changed
 
@@ -974,7 +970,7 @@ getModSummary mod = do
 parseModule :: GhcMonad m => ModSummary -> m ParsedModule
 parseModule ms = do
    hsc_env <- getSession
-   let hsc_env_tmp = set_hsc_dflags hsc_env $ ms_hspp_opts ms
+   let hsc_env_tmp = set_hsc_dflags (ms_hspp_opts ms) hsc_env
    hpm <- liftIO $ hscParse hsc_env_tmp ms
    return (ParsedModule ms (hpm_module hpm) (hpm_src_files hpm)
                            (hpm_annotations hpm))
@@ -987,7 +983,7 @@ typecheckModule :: GhcMonad m => ParsedModule -> m TypecheckedModule
 typecheckModule pmod = do
  let ms = modSummary pmod
  hsc_env <- getSession
- let hsc_env_tmp = set_hsc_dflags hsc_env $ ms_hspp_opts ms
+ let hsc_env_tmp = set_hsc_dflags (ms_hspp_opts ms) hsc_env
  (tc_gbl_env, rn_info)
        <- liftIO $ hscTypecheckRename hsc_env_tmp ms $
                       HsParsedModule { hpm_module = parsedSource pmod,
@@ -1019,7 +1015,7 @@ desugarModule tcm = do
  let ms = modSummary tcm
  let (tcg, _) = tm_internals tcm
  hsc_env <- getSession
- let hsc_env_tmp = set_hsc_dflags hsc_env $ ms_hspp_opts ms
+ let hsc_env_tmp = set_hsc_dflags (ms_hspp_opts ms) hsc_env
  guts <- liftIO $ hscDesugar hsc_env_tmp ms tcg
  return $
      DesugaredModule {
@@ -1060,7 +1056,7 @@ loadModule tcm = do
                                     hsc_env ms 1 1 Nothing mb_linkable
                                     source_modified
 
-   modifySession $ \e -> modify_hsc_HPT e $ \hpt -> addToHpt hpt mod mod_info
+   modifySession $ modify_hsc_HPT $ \hpt -> addToHpt hpt mod mod_info
    return tcm
 
 
@@ -1241,7 +1237,7 @@ getPackageModuleInfo hsc_env mdl
 
 getHomeModuleInfo :: HscEnv -> Module -> IO (Maybe ModuleInfo)
 getHomeModuleInfo hsc_env mdl =
-  case lookupHpt (hsc_HPT hsc_env) (moduleName mdl) of
+  case lookupHptByModuleInUnitEnv (hsc_internalUnitEnv hsc_env) mdl of
     Nothing  -> return Nothing
     Just hmi -> do
       let details = hm_details hmi
@@ -1296,8 +1292,7 @@ modInfoLookupName minf name = withSession $ \hsc_env -> do
      Just tyThing -> return (Just tyThing)
      Nothing      -> do
        eps <- liftIO $ readIORef (hsc_EPS hsc_env)
-       return $! lookupType (hsc_dflags hsc_env)
-                            (hsc_HPT hsc_env) (eps_PTE eps) name
+       return $! lookupTypeEverywhere (hsc_internalUnitEnv hsc_env) (eps_PTE eps) name
 
 modInfoIface :: ModuleInfo -> Maybe ModIface
 modInfoIface = minf_iface
@@ -1565,7 +1560,11 @@ lookupModule mod_name Nothing = withSession $ \hsc_env -> do
 
 lookupLoadedHomeModule :: GhcMonad m => ModuleName -> m (Maybe Module)
 lookupLoadedHomeModule mod_name = withSession $ \hsc_env ->
-  case lookupHpt (hsc_HPT hsc_env) mod_name of
+  let
+    unitEnv = hsc_internalUnitEnv hsc_env
+    uid = hsc_currentUnit hsc_env
+  in
+  case lookupDependentHpts unitEnv uid mod_name of
     Just mod_info      -> return (Just (mi_module (hm_iface mod_info)))
     _not_a_home_module -> return Nothing
 
