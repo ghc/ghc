@@ -344,6 +344,7 @@ data SDocContext = SDC
   , sdocStarIsType                  :: !Bool
   , sdocLinearTypes                 :: !Bool
   , sdocImpredicativeTypes          :: !Bool
+  , sdocPrintTypeAbbreviations      :: !Bool
   , sdocDynFlags                    :: DynFlags -- TODO: remove
   }
 
@@ -390,6 +391,7 @@ defaultSDocContext = SDC
   , sdocStarIsType                  = False
   , sdocImpredicativeTypes          = False
   , sdocLinearTypes                 = False
+  , sdocPrintTypeAbbreviations      = True
   , sdocDynFlags                    = error "defaultSDocContext: DynFlags not available"
   }
 
