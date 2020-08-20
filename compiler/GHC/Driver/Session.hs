@@ -5146,6 +5146,7 @@ initSDocContext dflags style = SDC
   , sdocStarIsType                  = xopt LangExt.StarIsType dflags
   , sdocImpredicativeTypes          = xopt LangExt.ImpredicativeTypes dflags
   , sdocLinearTypes                 = xopt LangExt.LinearTypes dflags
+  , sdocPrintUsualSynonyms          = True
   , sdocDynFlags                    = dflags
   }
 
