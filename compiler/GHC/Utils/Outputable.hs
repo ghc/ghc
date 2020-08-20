@@ -344,6 +344,7 @@ data SDocContext = SDC
   , sdocStarIsType                  :: !Bool
   , sdocLinearTypes                 :: !Bool
   , sdocImpredicativeTypes          :: !Bool
+  , sdocPrintTypeAbbreviations      :: !Bool
   , sdocDynFlags                    :: DynFlags -- TODO: remove
   }
 
