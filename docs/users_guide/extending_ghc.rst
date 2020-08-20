@@ -137,7 +137,7 @@ when invoked:
           runGhc (Just libdir) $ do
             dflags <- getSessionDynFlags
             setSessionDynFlags dflags
-            target <- guessTarget "test_main.hs" Nothing
+            target <- guessTarget "test_main.hs" Nothing Nothing
             setTargets [target]
             load LoadAllTargets
 

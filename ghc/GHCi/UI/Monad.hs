@@ -514,6 +514,7 @@ runInternal :: GhcMonad m => m a -> m a
 runInternal =
     withTempSession mkTempSession
   where
+    mkTempSession :: HscEnv -> HscEnv
     mkTempSession = modify_hsc_dflags $ \dflags -> dflags
       { -- Running GHCi's internal expression is incompatible with -XSafe.
         -- We temporarily disable any Safe Haskell settings while running

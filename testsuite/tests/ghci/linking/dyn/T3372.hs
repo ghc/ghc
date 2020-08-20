@@ -27,7 +27,7 @@ main = do let test1 = "TestMain1.hs"
           line "2" $ runInServer ghc_2 $ load (test2, "Main")
           line "3" $ runInServer ghc_1 $ eval "test1"
           line "4" $ runInServer ghc_2 $ eval "test2"
-  where line n a = putStr (n ++ ": ") >> a 
+  where line n a = putStr (n ++ ": ") >> a
 
 type ModuleName = String
 type GhcServerHandle = Chan (Ghc ())
@@ -37,7 +37,7 @@ newGhcServer = do (libdir:_) <- getArgs
                   pChan <- newChan
                   let be_a_server = forever $ join (GHC.liftIO $ readChan pChan)
                   forkIO $ ghc be_a_server libdir
-                  return pChan 
+                  return pChan
   where ghc action libdir = GHC.runGhc (Just libdir) (init >> action)
         init = do df <- GHC.getSessionDynFlags
                   GHC.setSessionDynFlags df{GHC.ghcMode    = GHC.CompManager,
@@ -51,7 +51,7 @@ runInServer h action = do me <- newChan
                           readChan me
 
 load :: (FilePath,ModuleName) -> Ghc ()
-load (f,mn) = do target <- GHC.guessTarget f Nothing
+load (f,mn) = do target <- GHC.guessTarget f Nothing Nothing
                  GHC.setTargets [target]
                  res <- GHC.load GHC.LoadAllTargets
                  GHC.liftIO $ putStrLn ("Load " ++ showSuccessFlag res)
