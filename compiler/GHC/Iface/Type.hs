@@ -783,6 +783,22 @@ Here we'd like to omit the kind annotation:
 
    type F :: Symbol -> Type
    type F s = blah
+
+Note [Printing type abbreviations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Normally, we pretty-print `TYPE 'LiftedRep` as `Type` (or `*`) and
+`FUN 'Many` as `(->)`.
+This way, error messages don't refer to levity polymorphism or linearity
+if it is not necessary.
+
+However, when printing the definition of Type or (->) with :info,
+this would give confusing output: `type (->) = (->)` (#18594).
+Solution: detect when we are in :info and disable displaying the synonym
+with the SDoc option sdocPrintTypeAbbreviations.
+
+If there will be a need, in the future we could expose it as a flag
+-fprint-type-abbreviations or even two separate flags controlling
+TYPE 'LiftedRep and FUN 'Many.
 -}
 
 -- | Do we want to suppress kind annotations on binders?
@@ -1364,12 +1380,14 @@ pprIfaceTypeApp prec tc args = pprTyTcApp prec tc args
 pprTyTcApp :: PprPrec -> IfaceTyCon -> IfaceAppArgs -> SDoc
 pprTyTcApp ctxt_prec tc tys =
     sdocOption sdocPrintExplicitKinds $ \print_kinds ->
+    sdocOption sdocPrintTypeAbbreviations $ \print_type_abbreviations ->
     getPprDebug $ \debug ->
-    pprTyTcApp' ctxt_prec tc tys (PrintExplicitKinds print_kinds) debug
+    pprTyTcApp' ctxt_prec tc tys (PrintExplicitKinds print_kinds)
+                print_type_abbreviations debug
 
 pprTyTcApp' :: PprPrec -> IfaceTyCon -> IfaceAppArgs
-            -> PrintExplicitKinds -> Bool -> SDoc
-pprTyTcApp' ctxt_prec tc tys printExplicitKinds debug
+            -> PrintExplicitKinds -> Bool -> Bool -> SDoc
+pprTyTcApp' ctxt_prec tc tys printExplicitKinds printTypeAbbreviations debug
   | ifaceTyConName tc `hasKey` ipClassKey
   , IA_Arg (IfaceLitTy (IfaceStrTyLit n))
            Required (IA_Arg ty Required IA_Nil) <- tys
@@ -1393,11 +1411,13 @@ pprTyTcApp' ctxt_prec tc tys printExplicitKinds debug
   | tc `ifaceTyConHasKey` tYPETyConKey
   , IA_Arg (IfaceTyConApp rep IA_Nil) Required IA_Nil <- tys
   , rep `ifaceTyConHasKey` liftedRepDataConKey
+  , printTypeAbbreviations  -- See Note [Printing type abbreviations]
   = ppr_kind_type ctxt_prec
 
   | tc `ifaceTyConHasKey` funTyConKey
   , IA_Arg (IfaceTyConApp rep IA_Nil) Required args <- tys
   , rep `ifaceTyConHasKey` manyDataConKey
+  , printTypeAbbreviations  -- See Note [Printing type abbreviations]
   = pprIfacePrefixApp ctxt_prec (parens arrow) (map (ppr_ty appPrec) (appArgsIfaceTypes $ stripInvisArgs printExplicitKinds args))
 
   | otherwise
