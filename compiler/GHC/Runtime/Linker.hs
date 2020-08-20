@@ -199,8 +199,6 @@ linkDependencies :: HscEnv -> PersistentLinkerState
                  -> IO (PersistentLinkerState, SuccessFlag)
 linkDependencies hsc_env pls span needed_mods = do
 --   initDynLinker (hsc_dflags hsc_env) dl
-   let hpt = hsc_HPT hsc_env
-       dflags = hsc_dflags hsc_env
    -- The interpreter and dynamic linker can only handle object code built
    -- the "normal" way, i.e. no non-std ways like profiling or ticky-ticky.
    -- So here we check the build tag: if we're building a non-standard way
@@ -208,7 +206,7 @@ linkDependencies hsc_env pls span needed_mods = do
    maybe_normal_osuf <- checkNonStdWay hsc_env span
 
    -- Find what packages and linkables are required
-   (lnks, pkgs) <- getLinkDeps hsc_env dflags hpt pls
+   (lnks, pkgs) <- getLinkDeps hsc_env (hsc_currentUnit hsc_env) pls
                                maybe_normal_osuf span needed_mods
 
    -- Link the packages and modules required
@@ -304,8 +302,9 @@ linkCmdLineLibs hsc_env = do
     linkCmdLineLibs' hsc_env pls
 
 linkCmdLineLibs' :: HscEnv -> PersistentLinkerState -> IO PersistentLinkerState
-linkCmdLineLibs' hsc_env pls =
-  do
+linkCmdLineLibs' hsc_env' pls' =
+  (\f-> foldM f pls' (hsc_allHomeUnits hsc_env')) $ \pls unitId -> do
+      let hsc_env = set_hsc_currentUnit unitId hsc_env'
       let dflags@(DynFlags { ldInputs = cmdline_ld_inputs
                            , libraryPaths = lib_paths_base})
             = hsc_dflags hsc_env
@@ -499,7 +498,7 @@ preloadLib hsc_env lib_paths framework_paths pls lib_spec = do
        = do b <- or <$> mapM doesFileExist names
             if not b then return (False, pls)
                      else if hostIsDynamic
-                             then  do pls1 <- dynLoadObjs hsc_env pls names
+                             then  do pls1 <- dynLoadObjs hsc_env pls [(hsc_currentUnit hsc_env, names)]
                                       return (True, pls1)
                              else  do mapM_ (loadObj hsc_env) names
                                       return (True, pls)
@@ -624,7 +623,7 @@ failNonStd dflags srcspan = dieWith dflags srcspan $
             | hostIsProfiled = text "with -prof"
             | otherwise = text "the normal way"
 
-getLinkDeps :: HscEnv -> DynFlags -> HomePackageTable
+getLinkDeps :: HscEnv -> UnitId
             -> PersistentLinkerState
             -> Maybe FilePath                   -- replace object suffices?
             -> SrcSpan                          -- for error messages
@@ -632,7 +631,7 @@ getLinkDeps :: HscEnv -> DynFlags -> HomePackageTable
             -> IO ([Linkable], [UnitId])     -- ... then link these first
 -- Fails with an IO exception if it can't find enough files
 
-getLinkDeps hsc_env dflags hpt pls replace_osuf span mods
+getLinkDeps hsc_env unitId pls replace_osuf span mods
 -- Find all the packages and linkables that a set of modules depends on
  = do {
         -- 1.  Find the dependent home-pkg-modules/packages from each iface
@@ -657,7 +656,12 @@ getLinkDeps hsc_env dflags hpt pls replace_osuf span mods
 
       ; return (lnks_needed, pkgs_needed) }
   where
-
+    unitEnv = hsc_findInternalUnitEnv unitId hsc_env
+    hpt = internalUnitEnv_homePackageTable unitEnv
+    dflags = internalUnitEnv_dflags unitEnv
+    homeUnits = Set.insert unitId (hsc_homeUnitDependencies hsc_env unitId)
+    unitEnvDeps = hsc_homeUnitDependencies_unitEnv hsc_env unitId
+    hptDeps = hpt : map internalUnitEnv_homePackageTable unitEnvDeps
         -- The ModIface contains the transitive closure of the module dependencies
         -- within the current package, *except* for boot modules: if we encounter
         -- a boot module, we have to find its real interface and discover the
@@ -695,9 +699,9 @@ getLinkDeps hsc_env dflags hpt pls replace_osuf span mods
             acc_mods'  = addListToUniqDSet acc_mods (moduleName mod : mod_deps)
             acc_pkgs'  = addListToUniqDSet acc_pkgs $ map fst pkg_deps
           --
-          if not (isHomeUnit home_unit pkg)
+          if toUnitId pkg `notElem` homeUnits
              then follow_deps mods acc_mods (addOneToUniqDSet acc_pkgs' (toUnitId pkg))
-             else follow_deps (map (mkHomeModule home_unit) boot_deps' ++ mods)
+             else follow_deps (map (mkModule (homeUnitAsUnit home_unit)) boot_deps' ++ mods)
                               acc_mods' acc_pkgs'
         where
             msg = text "need to link module" <+> ppr mod <+>
@@ -720,7 +724,7 @@ getLinkDeps hsc_env dflags hpt pls replace_osuf span mods
         -- This one is a build-system bug
 
     get_linkable osuf mod_name      -- A home-package module
-        | Just mod_info <- lookupHpt hpt mod_name
+        | Just mod_info <- lookupHpts hptDeps mod_name
         = adjust_linkable (Maybes.expectJust "getLinkDeps" (hm_linkable mod_info))
         | otherwise
         = do    -- It's not in the HPT because we are in one shot mode,
@@ -888,13 +892,15 @@ dynLinkObjs hsc_env pls objs = do
         -- Load the object files and link them
         let (objs_loaded', new_objs) = rmDupLinkables (objs_loaded pls) objs
             pls1                     = pls { objs_loaded = objs_loaded' }
-            unlinkeds                = concatMap linkableUnlinked new_objs
-            wanted_objs              = map nameOfObject unlinkeds
+            unitIdOf                 = toUnitId . moduleUnit . linkableModule
+            unlinkeds                = map (\linkable -> (unitIdOf linkable, ) (linkableUnlinked linkable)) new_objs
+            wanted_objs              = map (liftSnd (map nameOfObject)) unlinkeds
 
         if interpreterDynamic (hscInterp hsc_env)
             then do pls2 <- dynLoadObjs hsc_env pls1 wanted_objs
                     return (pls2, Succeeded)
-            else do mapM_ (loadObj hsc_env) wanted_objs
+            else do
+                    mapM_ (loadObj hsc_env) (concatMap snd wanted_objs)
 
                     -- Link them all together
                     ok <- resolveObjs hsc_env
@@ -908,10 +914,12 @@ dynLinkObjs hsc_env pls objs = do
                             return (pls2, Failed)
 
 
-dynLoadObjs :: HscEnv -> PersistentLinkerState -> [FilePath]
+dynLoadObjs :: HscEnv -> PersistentLinkerState -> [(UnitId, [FilePath])]
             -> IO PersistentLinkerState
-dynLoadObjs _       pls                           []   = return pls
-dynLoadObjs hsc_env pls@PersistentLinkerState{..} objs = do
+dynLoadObjs _       pls  []   = return pls
+dynLoadObjs hsc_env' pls' objs_ =
+  (\f-> foldM f pls' objs_) $ \pls@PersistentLinkerState{..} (unit, objs) -> do
+    let hsc_env = set_hsc_currentUnit unit hsc_env'
     let dflags = hsc_dflags hsc_env
     let platform = targetPlatform dflags
     let minus_ls = [ lib | Option ('-':'l':lib) <- ldInputs dflags ]

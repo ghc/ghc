@@ -601,7 +601,8 @@ checkBrokenTablesNextToCode' dflags
 setSessionDynFlags :: GhcMonad m => DynFlags -> m ()
 setSessionDynFlags dflags = do
   dflags' <- checkNewDynFlags dflags
-  dflags''' <- liftIO $ initUnits dflags'
+  home_units <- hsc_allHomeUnits <$> getSession
+  dflags''' <- liftIO $ initUnits home_units dflags'
 
   -- Interpreter
   interp  <- if gopt Opt_ExternalInterpreter dflags
@@ -676,8 +677,9 @@ setProgramDynFlags_ invalidate_needed dflags = do
   dflags' <- checkNewDynFlags dflags
   dflags_prev <- getProgramDynFlags
   let changed = packageFlagsChanged dflags_prev dflags'
+  home_units <- hsc_allHomeUnits <$> getSession
   dflags'' <- if changed
-               then liftIO $ initUnits dflags'
+               then liftIO $ initUnits home_units dflags'
                else return dflags'
   modifySession $ set_hsc_dflags dflags''
   when invalidate_needed $ invalidateModSummaryCache
