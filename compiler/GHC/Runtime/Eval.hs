@@ -153,7 +153,7 @@ getHistoryModule = breakInfo_module . historyBreakInfo
 getHistorySpan :: HscEnv -> History -> SrcSpan
 getHistorySpan hsc_env History{..} =
   let BreakInfo{..} = historyBreakInfo in
-  case lookupHpt (hsc_HPT hsc_env) (moduleName breakInfo_module) of
+  case lookupHptByModuleInUnitEnv (hsc_internalUnitEnv hsc_env) breakInfo_module of
     Just hmi -> modBreaks_locs (getModBreaks hmi) ! breakInfo_number
     _ -> panic "getHistorySpan"
 
@@ -164,7 +164,7 @@ getHistorySpan hsc_env History{..} =
 findEnclosingDecls :: HscEnv -> BreakInfo -> [String]
 findEnclosingDecls hsc_env (BreakInfo modl ix) =
    let hmi = expectJust "findEnclosingDecls" $
-             lookupHpt (hsc_HPT hsc_env) (moduleName modl)
+             lookupHptByModuleInUnitEnv (hsc_internalUnitEnv hsc_env) modl
        mb = getModBreaks hmi
    in modBreaks_decls mb ! ix
 
@@ -829,7 +829,7 @@ moduleIsInterpreted :: GhcMonad m => Module -> m Bool
 moduleIsInterpreted modl = withSession $ \h ->
  if notHomeModule (hsc_home_unit h) modl
         then return False
-        else case lookupHpt (hsc_HPT h) (moduleName modl) of
+        else case lookupHptByModuleInUnitEnv (hsc_internalUnitEnv h) modl of
                 Just details       -> return (isJust (mi_globals (hm_iface details)))
                 _not_a_home_module -> return False
 
@@ -1276,7 +1276,7 @@ showModule mod_summary =
 
 moduleIsBootOrNotObjectLinkable :: GhcMonad m => ModSummary -> m Bool
 moduleIsBootOrNotObjectLinkable mod_summary = withSession $ \hsc_env ->
-  case lookupHpt (hsc_HPT hsc_env) (ms_mod_name mod_summary) of
+  case lookupHptByModuleInUnitEnv (hsc_internalUnitEnv hsc_env) (ms_mod mod_summary) of
         Nothing       -> panic "missing linkable"
         Just mod_info -> return $ case hm_linkable mod_info of
           Nothing       -> True

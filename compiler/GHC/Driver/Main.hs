@@ -239,7 +239,7 @@ newHscEnv dflags = do
     nc_var  <- newIORef (initNameCache us knownKeyNames)
     fc_var  <- newIORef emptyInstalledModuleEnv
     emptyDynLinker <- uninitializedLinker
-    return HscEnv {  hsc_internalUnitEnv = unitEnv_new (homeUnitId_ dflags) $ M.singleton (homeUnitId home_unit) $  InternalUnitEnv
+    return HscEnv {  hsc_internalUnitEnv = unitEnv_singleton (homeUnitId_ dflags) $ InternalUnitEnv
                       { internalUnitEnv_dflags = dflags
                       , internalUnitEnv_homePackageTable = emptyHomePackageTable
                       , internalUnitEnv_home_unit = home_unit
@@ -768,10 +768,10 @@ hscIncrementalCompile :: Bool
 hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
     mHscMessage hsc_env' mod_summary source_modified mb_old_iface mod_index
   = do
-    unitEnvs <- forM (hsc_internalUnitEnv hsc_env') $ \ue -> do
+    homeUnitEnv <- forM (hsc_internalUnitEnv hsc_env') $ \ue -> do
       dflags <- initializePlugins hsc_env' $ internalUnitEnv_dflags ue
       return $ ue { internalUnitEnv_dflags = dflags }
-    let hsc_env'' = hsc_env' { hsc_internalUnitEnv = unitEnvs }
+    let hsc_env'' = set_hsc_internalUnitEnvGraph homeUnitEnv hsc_env'
 
     -- One-shot mode needs a knot-tying mutable variable for interface
     -- files. See GHC.Tc.Utils.TcGblEnv.tcg_type_env_var.
@@ -1251,8 +1251,8 @@ hscCheckSafe' m l = do
         hsc_env <- getHscEnv
         hsc_eps <- liftIO $ hscEPS hsc_env
         let pkgIfaceT = eps_PIT hsc_eps
-            homePkgT  = hsc_HPT hsc_env
-            iface     = lookupIfaceByModule homePkgT pkgIfaceT m
+            unitEnv   = hsc_internalUnitEnv hsc_env
+            iface     = lookupIfaceByModule unitEnv pkgIfaceT m
         -- the 'lookupIfaceByModule' method will always fail when calling from GHCi
         -- as the compiler hasn't filled in the various module tables
         -- so we need to call 'getModuleInterface' to load from disk
@@ -1350,8 +1350,8 @@ hscSimplify hsc_env plugins modguts =
 hscSimplify' :: [String] -> ModGuts -> Hsc ModGuts
 hscSimplify' plugins ds_result = do
     hsc_env <- getHscEnv
-    let hsc_env_with_plugins = modify_hsc_dflags (\dflags ->
-            foldr addPluginModuleName dflags plugins)
+    let hsc_env_with_plugins = modify_hsc_dflags
+            (\dflags -> foldr addPluginModuleName dflags plugins)
             hsc_env
     {-# SCC "Core2Core" #-}
       liftIO $ core2core hsc_env_with_plugins ds_result

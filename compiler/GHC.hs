@@ -679,12 +679,7 @@ setSessionDynFlags dflags0 = do
   modifySession $ \h ->
     if hsc_currentUnit h == homeUnitId_ dflags
         then set_hsc_dflags dflags h
-        else singleton_hsc_unitEnv h (homeUnitId_ dflags)
-                InternalUnitEnv
-                  { internalUnitEnv_dflags = dflags
-                  , internalUnitEnv_homePackageTable = hsc_HPT h
-                  , internalUnitEnv_home_unit = mkHomeUnitFromFlags dflags
-                  }
+        else set_hsc_dflags dflags $ rename_hsc_unitId (hsc_currentUnit h) (homeUnitId_ dflags) h
   invalidateModSummaryCache
 
 -- | Sets the program 'DynFlags'.  Note: this invalidates the internal
@@ -713,7 +708,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
   dflags'' <- if changed
                then liftIO $ initUnits dflags'
                else return dflags'
-  modifySession $ \h -> set_hsc_dflags dflags'' h
+  modifySession $ set_hsc_dflags dflags''
   when invalidate_needed $ invalidateModSummaryCache
   return changed
 
@@ -1353,7 +1348,7 @@ getPackageModuleInfo hsc_env mdl
 
 getHomeModuleInfo :: HscEnv -> Module -> IO (Maybe ModuleInfo)
 getHomeModuleInfo hsc_env mdl =
-  case lookupHpt (hsc_HPT hsc_env) (moduleName mdl) of
+  case lookupHptByModuleInUnitEnv (hsc_internalUnitEnv hsc_env) mdl of
     Nothing  -> return Nothing
     Just hmi -> do
       let details = hm_details hmi
@@ -1670,7 +1665,11 @@ lookupModule mod_name Nothing = withSession $ \hsc_env -> do
 
 lookupLoadedHomeModule :: GhcMonad m => ModuleName -> m (Maybe Module)
 lookupLoadedHomeModule mod_name = withSession $ \hsc_env ->
-  case lookupHpt (hsc_HPT hsc_env) mod_name of
+  let
+    unitEnv = hsc_internalUnitEnv hsc_env
+    uid = hsc_currentUnit hsc_env
+  in
+  case lookupDependentHpts unitEnv uid mod_name of
     Just mod_info      -> return (Just (mi_module (hm_iface mod_info)))
     _not_a_home_module -> return Nothing
 
