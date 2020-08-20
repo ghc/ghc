@@ -1,0 +1,8 @@
+Added new unit: unitB
+Added new unit: unitA
+Added new unit: unitC
+Bar
+fromList [(1,"Hallo"),(2,"World")]
+array (1,5) [(1,0),(2,1),(3,1),(4,2),(5,3)]
+7
+fromList [(1,"Hallo"),(2,"World")]
