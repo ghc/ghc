@@ -92,6 +92,7 @@ module GHC.Driver.Env
    , lookupIfaceByModule
    , lookupDependentHpts
    , lookupHptByModuleInUnitEnv
+   , lookupHpts
    )
 where
 

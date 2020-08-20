@@ -579,8 +579,8 @@ listUnitInfo state = Map.elems (unitInfoMap state)
 -- 'initUnits' can be called again subsequently after updating the
 -- 'packageFlags' field of the 'DynFlags', and it will update the
 -- 'unitState' in 'DynFlags'.
-initUnits :: DynFlags -> IO DynFlags
-initUnits dflags = do
+initUnits :: Set UnitId -> DynFlags -> IO DynFlags
+initUnits homeUnits dflags = do
 
   let forceUnitInfoMap (state, _) = unitInfoMap state `seq` ()
   let ctx     = initSDocContext dflags defaultUserStyle -- SDocContext used to render exception messages
@@ -588,7 +588,7 @@ initUnits dflags = do
 
   (state,dbs) <- withTiming dflags (text "initializing unit database")
                    forceUnitInfoMap
-                   (mkUnitState ctx printer (initUnitConfig dflags))
+                   (mkUnitState ctx printer homeUnits (initUnitConfig dflags))
 
   dumpIfSet_dyn (dflags { pprCols = 200 }) Opt_D_dump_mod_map "Module Map"
     FormatText (pprModuleMap (moduleNameProvidersMap state))
@@ -801,41 +801,14 @@ applyPackageFlag
 
 applyPackageFlag ctx prec_map pkg_map closure unusable no_hide_others pkgs vm flag =
   case flag of
-    ExposePackage _ arg (ModRenaming b rns) ->
+    ExposePackage _ arg modRenaming@(ModRenaming _ rns) ->
        case findPackages prec_map pkg_map closure arg pkgs unusable of
          Left ps         -> packageFlagErr ctx flag ps
          Right (p:_) -> return vm'
           where
            n = fsPackageName p
 
-           -- If a user says @-unit-id p[A=<A>]@, this imposes
-           -- a requirement on us: whatever our signature A is,
-           -- it must fulfill all of p[A=<A>]:A's requirements.
-           -- This method is responsible for computing what our
-           -- inherited requirements are.
-           reqs | UnitIdArg orig_uid <- arg = collectHoles orig_uid
-                | otherwise                 = Map.empty
-
-           collectHoles uid = case uid of
-             HoleUnit       -> Map.empty
-             RealUnit {}    -> Map.empty -- definite units don't have holes
-             VirtUnit indef ->
-                  let local = [ Map.singleton
-                                  (moduleName mod)
-                                  (Set.singleton $ Module indef mod_name)
-                              | (mod_name, mod) <- instUnitInsts indef
-                              , isHoleModule mod ]
-                      recurse = [ collectHoles (moduleUnit mod)
-                                | (_, mod) <- instUnitInsts indef ]
-                  in Map.unionsWith Set.union $ local ++ recurse
-
-           uv = UnitVisibility
-                { uv_expose_all = b
-                , uv_renamings = rns
-                , uv_package_name = First (Just n)
-                , uv_requirements = reqs
-                , uv_explicit = True
-                }
+           uv = mkUnitVisibility n arg modRenaming
            vm' = Map.insertWith mappend (mkUnit p) uv vm_cleared
            -- In the old days, if you said `ghc -package p-0.1 -package p-0.2`
            -- (or if p-0.1 was registered in the pkgdb as exposed: True),
@@ -870,6 +843,38 @@ applyPackageFlag ctx prec_map pkg_map closure unusable no_hide_others pkgs vm fl
          Left ps  -> packageFlagErr ctx flag ps
          Right ps -> return vm'
           where vm' = foldl' (flip Map.delete) vm (map mkUnit ps)
+
+mkUnitVisibility :: FastString -> PackageArg -> ModRenaming -> UnitVisibility
+mkUnitVisibility pkgName arg (ModRenaming b rns) =
+  let
+    -- If a user says @-unit-id p[A=<A>]@, this imposes
+    -- a requirement on us: whatever our signature A is,
+    -- it must fulfill all of p[A=<A>]:A's requirements.
+    -- This method is responsible for computing what our
+    -- inherited requirements are.
+    reqs | UnitIdArg orig_uid <- arg = collectHoles orig_uid
+        | otherwise                 = Map.empty
+
+    collectHoles uid = case uid of
+      HoleUnit       -> Map.empty
+      RealUnit {}    -> Map.empty -- definite units don't have holes
+      VirtUnit indef ->
+          let local = [ Map.singleton
+                          (moduleName mod)
+                          (Set.singleton $ Module indef mod_name)
+                      | (mod_name, mod) <- instUnitInsts indef
+                      , isHoleModule mod ]
+              recurse = [ collectHoles (moduleUnit mod)
+                        | (_, mod) <- instUnitInsts indef ]
+          in Map.unionsWith Set.union $ local ++ recurse
+  in
+    UnitVisibility
+      { uv_expose_all = b
+      , uv_renamings = rns
+      , uv_package_name = First (Just pkgName)
+      , uv_requirements = reqs
+      , uv_explicit = True
+      }
 
 -- | Like 'selectPackages', but doesn't return a list of unmatched
 -- packages.  Furthermore, any packages it returns are *renamed*
@@ -1402,9 +1407,10 @@ validateDatabase cfg pkg_map1 =
 mkUnitState
     :: SDocContext            -- ^ SDocContext used to render exception messages
     -> (Int -> SDoc -> IO ()) -- ^ Trace printer
+    -> Set UnitId             -- ^ Home Units
     -> UnitConfig
     -> IO (UnitState,[UnitDatabase UnitId])
-mkUnitState ctx printer cfg = do
+mkUnitState ctx printer homeUnits cfg = do
 {-
    Plan.
 
@@ -1472,9 +1478,15 @@ mkUnitState ctx printer cfg = do
   -- This, and the other reverse's that you will see, are due to the fact that
   -- packageFlags, pluginPackageFlags, etc. are all specified in *reverse* order
   -- than they are on the command line.
-  let other_flags = reverse (unitConfigFlagsExposed cfg)
+  let other_flags' = reverse (unitConfigFlagsExposed cfg)
+  let isHomeUnitPackageFlag (ExposePackage _ (UnitIdArg unit) _)
+        = toUnitId unit `Set.member` homeUnits
+      isHomeUnitPackageFlag _ = False
+  let (home_unit_flags, other_flags) = partition isHomeUnitPackageFlag other_flags'
   printer 2 $
       text "package flags" <+> ppr other_flags
+  printer 2 $
+      text "home flags" <+> ppr home_unit_flags
 
   -- Merge databases together, without checking validity
   (pkg_map1, prec_map) <- mergeDatabases (printer 2) dbs
@@ -1558,8 +1570,19 @@ mkUnitState ctx printer cfg = do
   (pkgs2, wired_map) <- findWiredInUnits (printer 2) prec_map pkgs1 vis_map2
   let pkg_db = mkUnitInfoMap pkgs2
 
+
+  let home_unit_vis_map = foldr (\pkg_flag vis ->
+          case pkg_flag of
+            ExposePackage _ arg@(UnitIdArg unit) modRenaming ->
+                Map.insert unit (mkUnitVisibility (unitIdFS $ toUnitId unit) arg modRenaming) vis
+            _ -> vis
+        ) Map.empty home_unit_flags
+
   -- Update the visibility map, so we treat wired packages as visible.
   let vis_map = updateVisibilityMap wired_map vis_map2
+
+  printer 2 $ text "Visibility map:" <+> ppr vis_map
+  printer 2 $ text "Visibility home units map:" <+> ppr home_unit_vis_map
 
   let hide_plugin_pkgs = unitConfigHideAllPlugins cfg
   plugin_vis_map <-
@@ -1596,7 +1619,7 @@ mkUnitState ctx printer cfg = do
   -- The requirement context is directly based off of this: we simply
   -- look for nested unit IDs that are directly fed holes: the requirements
   -- of those units are precisely the ones we need to track
-  let explicit_pkgs = Map.keys vis_map
+  let explicit_pkgs = Map.keys (vis_map `Map.union` home_unit_vis_map)
       req_ctx = Map.map (Set.toList)
               $ Map.unionsWith Set.union (map uv_requirements (Map.elems vis_map))
 

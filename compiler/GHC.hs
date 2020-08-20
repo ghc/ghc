@@ -628,9 +628,10 @@ checkBrokenTablesNextToCode' dflags
 -- can ignore the list of packages returned.
 --
 setSessionDynFlags :: GhcMonad m => DynFlags -> m ()
-setSessionDynFlags dflags0 = do
-  dflags1 <- checkNewDynFlags dflags0
-  dflags <- liftIO $ initUnits dflags1
+setSessionDynFlags dflags = do
+  dflags' <- checkNewDynFlags dflags
+  home_units <- hsc_allUnitIds <$> getSession
+  dflags <- liftIO $ initUnits home_units dflags'
 
   -- Interpreter
   interp  <- if gopt Opt_ExternalInterpreter dflags
@@ -705,8 +706,9 @@ setProgramDynFlags_ invalidate_needed dflags = do
   dflags' <- checkNewDynFlags dflags
   dflags_prev <- getProgramDynFlags
   let changed = packageFlagsChanged dflags_prev dflags'
+  home_units <- hsc_allUnitIds <$> getSession
   dflags'' <- if changed
-               then liftIO $ initUnits dflags'
+               then liftIO $ initUnits home_units dflags'
                else return dflags'
   modifySession $ set_hsc_dflags dflags''
   when invalidate_needed $ invalidateModSummaryCache
