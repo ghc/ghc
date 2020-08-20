@@ -1032,6 +1032,12 @@ data PackageDBFlag
   | ClearPackageDBs
   deriving (Eq)
 
+instance Outputable PackageDBFlag where
+  ppr (PackageDB ref) = text "PackageDB" <+> ppr ref
+  ppr NoUserPackageDB = text "NoUserPackageDB"
+  ppr NoGlobalPackageDB = text "NoGlobalPackageDB"
+  ppr ClearPackageDBs = text "ClearPackageDBs"
+
 packageFlagsChanged :: DynFlags -> DynFlags -> Bool
 packageFlagsChanged idflags1 idflags0 =
   packageFlags idflags1 /= packageFlags idflags0 ||
@@ -4391,6 +4397,11 @@ data PkgDbRef
   | UserPkgDb
   | PkgDbPath FilePath
   deriving Eq
+
+instance Outputable PkgDbRef where
+  ppr GlobalPkgDb = text "GlobalPkgDb"
+  ppr UserPkgDb = text "UserPkgDb"
+  ppr (PkgDbPath fp) = text "PkgDbPath" <+> text fp
 
 addPkgDbRef :: PkgDbRef -> DynP ()
 addPkgDbRef p = upd $ \s ->
