@@ -887,25 +887,25 @@ oneShotMsg hsc_env recomp =
     case recomp of
         UpToDate ->
             compilationProgressMsg (hsc_dflags hsc_env) $
-                   "compilation IS NOT required"
+                   text "compilation IS NOT required"
         _ ->
             return ()
 
 batchMsg :: Messager
 batchMsg hsc_env mod_index recomp mod_summary =
     case recomp of
-        MustCompile -> showMsg "Compiling " ""
+        MustCompile -> showMsg (text "Compiling ") empty
         UpToDate
-            | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg "Skipping  " ""
+            | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg (text "Skipping  ") empty
             | otherwise -> return ()
-        RecompBecause reason -> showMsg "Compiling " (" [" ++ reason ++ "]")
+        RecompBecause reason -> showMsg (text "Compiling ") (text " [" <> text reason <> text "]")
     where
         dflags = hsc_dflags hsc_env
         showMsg msg reason =
             compilationProgressMsg dflags $
-            (showModuleIndex mod_index ++
-            msg ++ showModMsg dflags (recompileRequired recomp) mod_summary)
-                ++ reason
+            (showModuleIndex mod_index <>
+            msg <> showModMsg dflags (recompileRequired recomp) mod_summary)
+                <> reason
 
 --------------------------------------------------------------
 -- Safe Haskell
@@ -1174,7 +1174,8 @@ hscCheckSafe' m l = do
                     pkgTrustErr = unitBag $ mkErrMsg dflags l (pkgQual state) $
                         sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
-                            , text "The package (" <> ppr (moduleUnit m)
+                            , text "The package ("
+                                <> (pprWithUnitState state $ ppr (moduleUnit m))
                                 <> text ") the module resides in isn't trusted."
                             ]
                     modTrustErr = unitBag $ mkErrMsg dflags l (pkgQual state) $
@@ -1225,8 +1226,10 @@ checkPkgTrust pkgs = do
             = acc
             | otherwise
             = (:acc) $ mkErrMsg dflags noSrcSpan (pkgQual state)
-                     $ text "The package (" <> ppr pkg <> text ") is required" <>
-                       text " to be trusted but it isn't!"
+                     $ pprWithUnitState state
+                     $ text "The package ("
+                        <> ppr pkg
+                        <> text ") is required to be trusted but it isn't!"
     case errors of
         [] -> return ()
         _  -> (liftIO . throwIO . mkSrcErr . listToBag) errors
@@ -1940,9 +1943,9 @@ dumpIfaceStats hsc_env = do
 %*                                                                      *
 %********************************************************************* -}
 
-showModuleIndex :: (Int, Int) -> String
-showModuleIndex (i,n) = "[" ++ padded ++ " of " ++ n_str ++ "] "
+showModuleIndex :: (Int, Int) -> SDoc
+showModuleIndex (i,n) = text "[" <> pad <> int i <> text " of " <> int n <> text "] "
   where
-    n_str = show n
-    i_str = show i
-    padded = replicate (length n_str - length i_str) ' ' ++ i_str
+    -- compute the length of x > 0 in base 10
+    len x = ceiling (logBase 10 (fromIntegral x+1) :: Float)
+    pad = text (replicate (len n - len i) ' ') -- TODO: use GHC.Utils.Ppr.RStr

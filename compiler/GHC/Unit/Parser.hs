@@ -36,7 +36,7 @@ parseUnitId = do
 parseIndefUnitId :: ReadP IndefUnitId
 parseIndefUnitId = do
    uid <- parseUnitId
-   return (Indefinite uid Nothing)
+   return (Indefinite uid)
 
 parseHoleyModule :: ReadP Module
 parseHoleyModule = parseModuleVar <++ parseModule

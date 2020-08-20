@@ -620,11 +620,12 @@ findObjectLinkable mod obj_fn obj_time = return (LM obj_time mod [DotO obj_fn])
 -- Error messages
 
 cannotFindModule :: DynFlags -> ModuleName -> FindResult -> SDoc
-cannotFindModule flags mod res =
+cannotFindModule dflags mod res = pprWithUnitState unit_state $
   cantFindErr (sLit cannotFindMsg)
               (sLit "Ambiguous module name")
-              flags mod res
+              dflags mod res
   where
+    unit_state = unitState dflags
     cannotFindMsg =
       case res of
         NotFound { fr_mods_hidden = hidden_mods

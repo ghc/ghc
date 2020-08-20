@@ -272,39 +272,58 @@ themselves.  It is a reminiscence of previous terminology (when "instanceOf" was
 TODO: We should probably have `instanceOf :: Maybe IndefUnitId` instead.
 
 
-Pretty-printing UnitId
-----------------------
+Note [Pretty-printing UnitId]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-GHC mostly deals with UnitIds which are some opaque strings. We could display
-them when we pretty-print a module origin, a name, etc. But it wouldn't be
-very friendly to the user because of the hash they usually contain. E.g.
+When we pretty-print a UnitId for the user, we try to map it back to its origin
+package name, version and component to print "package-version:component" instead
+of some hash. How to retrieve these information from a UnitId?
 
-   foo-4.18.1:thelib-XYZsomeUglyHashABC
+Solution 0: ask for a UnitState to be passed each time we want to pretty-print a
+SDoc so that the Outputable instance for UnitId could retrieve the information
+from it. That what we used in the past: a DynFlags was passed and the UnitState
+was retrieved from it. This is wrong for several reasons:
 
-Instead when we want to pretty-print a 'UnitId' we query the database to
-get the 'UnitInfo' and print something nicer to the user:
+    1. The UnitState is accessed when the message is printed, not when it is
+       generated. So we could imagine that the UnitState could have changed
+       in-between. Especially if we want to allow unit unloading.
 
-   foo-4.18.1:thelib
+    2. We want GHC to support several independent sessions at once, hence
+       several UnitState. This approach supposes there is a unique UnitState
+       (the one given at printing-time), moreover a UnitId doesn't indicate
+       which UnitState it comes from (think about statically defined UnitId for
+       wired-in units).
 
-We do the same for wired-in units.
+Solution 1: an obvious approach would be to store the required information in
+the UnitId itself. However it doesn't work because some UnitId are defined
+statically for wired-in units and the same UnitId can map to different units in
+different contexts. This solution would make wired-in units harder to deal with.
 
-Currently (2020-04-06), we don't thread the database into every function that
-pretty-prints a Name/Module/Unit. Instead querying the database is delayed
-until the `SDoc` is transformed into a `Doc` using the database that is
-active at this point in time. This is an issue because we want to be able to
-unload units from the database and we also want to support several
-independent databases loaded at the same time (see #14335). The alternatives
-we have are:
+Solution 2: another approach would be to thread the UnitState to all places
+where a UnitId is pretty-printed and to retrieve the information from the
+UnitState only when needed. It would mean that UnitId couldn't have an
+Outputable instance as it would need an additional UnitState parameter to be
+printed. It means that many other types couldn't have an Outputable instance
+either: Unit, Module, Name, InstEnv, etc. Too many to make this solution
+feasible.
 
-   * threading the database into every function that pretty-prints a UnitId
-   for the user (directly or indirectly).
+Solution 3: the approach we use is a compromise between solutions 0 and 2: the
+appropriate UnitState has to be threaded close enough to the function generating
+the SDoc so that the latter can use `pprWithUnitState` to set the UnitState to
+fetch information from. However the UnitState doesn't have to be threaded
+explicitly all the way down to the point where the UnitId itself is printed:
+instead the Outputable instance of UnitId fetches the "sdocUnitIdForUser"
+field in the SDocContext to pretty-print.
 
-   * storing enough info to correctly display a UnitId into the UnitId
-   datatype itself. This is done in the IndefUnitId wrapper (see
-   'UnitPprInfo' datatype) but not for every 'UnitId'. Statically defined
-   'UnitId' for wired-in units would have empty UnitPprInfo so we need to
-   find some places to update them if we want to display wired-in UnitId
-   correctly. This leads to a solution similar to the first one above.
+   1. We can still have Outputable instances for common types (Module, Unit,
+      Name, etc.)
+
+   2. End-users don't have to pass a UnitState (via a DynFlags) to print a SDoc.
+
+   3. By default "sdocUnitIdForUser" prints the UnitId hash. In case of a bug
+      (i.e. GHC doesn't correctly call `pprWithUnitState` before pretty-printing a
+      UnitId), that's what will be shown to the user so it's no big deal.
+
 
 Note [VirtUnit to RealUnit improvement]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

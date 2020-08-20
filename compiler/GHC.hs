@@ -1682,7 +1682,7 @@ interpretPackageEnv dflags = do
         return dflags
       Just envfile -> do
         content <- readFile envfile
-        compilationProgressMsg dflags ("Loaded package environment from " ++ envfile)
+        compilationProgressMsg dflags (text "Loaded package environment from " <> text envfile)
         let (_, dflags') = runCmdLine (runEwM (setFlagsFromEnvFile envfile content)) dflags
 
         return dflags'

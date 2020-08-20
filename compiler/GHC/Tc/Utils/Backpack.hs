@@ -234,16 +234,15 @@ check_inst sig_inst = do
 -- | Return this list of requirement interfaces that need to be merged
 -- to form @mod_name@, or @[]@ if this is not a requirement.
 requirementMerges :: UnitState -> ModuleName -> [InstantiatedModule]
-requirementMerges pkgstate mod_name =
-    fmap fixupModule $ fromMaybe [] (Map.lookup mod_name (requirementContext pkgstate))
+requirementMerges unit_state mod_name =
+    fmap fixupModule $ fromMaybe [] (Map.lookup mod_name (requirementContext unit_state))
     where
       -- update IndefUnitId ppr info as they may have changed since the
       -- time the IndefUnitId was created
       fixupModule (Module iud name) = Module iud' name
          where
-            iud' = iud { instUnitInstanceOf = cid' }
+            iud' = iud { instUnitInstanceOf = cid }
             cid  = instUnitInstanceOf iud
-            cid' = updateIndefUnitId pkgstate cid
 
 -- | For a module @modname@ of type 'HscSource', determine the list
 -- of extra "imports" of other requirements which should be considered part of
@@ -276,8 +275,8 @@ findExtraSigImports' hsc_env HsigFile modname =
             $ moduleFreeHolesPrecise (text "findExtraSigImports")
                 (mkModule (VirtUnit iuid) mod_name)))
   where
-    pkgstate = unitState (hsc_dflags hsc_env)
-    reqs = requirementMerges pkgstate modname
+    unit_state = unitState (hsc_dflags hsc_env)
+    reqs = requirementMerges unit_state modname
 
 findExtraSigImports' _ _ _ = return emptyUniqDSet
 
@@ -535,17 +534,17 @@ mergeSignatures
        }) $ do
     tcg_env <- getGblEnv
 
-    let outer_mod = tcg_mod tcg_env
-        inner_mod = tcg_semantic_mod tcg_env
-        mod_name = moduleName (tcg_mod tcg_env)
-        pkgstate = unitState dflags
-        home_unit = mkHomeUnitFromFlags dflags
+    let outer_mod  = tcg_mod tcg_env
+        inner_mod  = tcg_semantic_mod tcg_env
+        mod_name   = moduleName (tcg_mod tcg_env)
+        unit_state = unitState dflags
+        home_unit  = mkHomeUnitFromFlags dflags
 
     -- STEP 1: Figure out all of the external signature interfaces
     -- we are going to merge in.
-    let reqs = requirementMerges pkgstate mod_name
+    let reqs = requirementMerges unit_state mod_name
 
-    addErrCtxt (merge_msg mod_name reqs) $ do
+    addErrCtxt (pprWithUnitState unit_state $ merge_msg mod_name reqs) $ do
 
     -- STEP 2: Read in the RAW forms of all of these interfaces
     ireq_ifaces0 <- forM reqs $ \(Module iuid mod_name) ->
@@ -572,7 +571,7 @@ mergeSignatures
             let insts = instUnitInsts iuid
                 isFromSignaturePackage =
                     let inst_uid = instUnitInstanceOf iuid
-                        pkg = unsafeLookupUnitId pkgstate (indefUnit inst_uid)
+                        pkg = unsafeLookupUnitId unit_state (indefUnit inst_uid)
                     in null (unitExposedModules pkg)
             -- 3(a). Rename the exports according to how the dependency
             -- was instantiated.  The resulting export list will be accurate
@@ -900,18 +899,21 @@ tcRnInstantiateSignature hsc_env this_mod real_loc =
 exportOccs :: [AvailInfo] -> [OccName]
 exportOccs = concatMap (map occName . availNames)
 
-impl_msg :: Module -> InstantiatedModule -> SDoc
-impl_msg impl_mod (Module req_uid req_mod_name) =
-  text "while checking that" <+> ppr impl_mod <+>
-  text "implements signature" <+> ppr req_mod_name <+>
-  text "in" <+> ppr req_uid
+impl_msg :: UnitState -> Module -> InstantiatedModule -> SDoc
+impl_msg unit_state impl_mod (Module req_uid req_mod_name)
+   = pprWithUnitState unit_state $
+      text "while checking that" <+> ppr impl_mod <+>
+      text "implements signature" <+> ppr req_mod_name <+>
+      text "in" <+> ppr req_uid
 
 -- | Check if module implements a signature.  (The signature is
 -- always un-hashed, which is why its components are specified
 -- explicitly.)
 checkImplements :: Module -> InstantiatedModule -> TcRn TcGblEnv
-checkImplements impl_mod req_mod@(Module uid mod_name) =
-  addErrCtxt (impl_msg impl_mod req_mod) $ do
+checkImplements impl_mod req_mod@(Module uid mod_name) = do
+  dflags <- getDynFlags
+  let unit_state = unitState dflags
+  addErrCtxt (impl_msg unit_state impl_mod req_mod) $ do
     let insts = instUnitInsts uid
 
     -- STEP 1: Load the implementing interface, and make a RdrEnv
@@ -931,7 +933,6 @@ checkImplements impl_mod req_mod@(Module uid mod_name) =
     loadModuleInterfaces (text "Loading orphan modules (from implementor of hsig)")
                          (dep_orphs (mi_deps impl_iface))
 
-    dflags <- getDynFlags
     let avails = calculateAvails dflags
                     impl_iface False{- safe -} NotBoot ImportedBySystem
         fix_env = mkNameEnv [ (gre_name rdr_elt, FixItem occ f)
@@ -969,9 +970,8 @@ checkImplements impl_mod req_mod@(Module uid mod_name) =
     forM_ (exportOccs (mi_exports isig_iface)) $ \occ ->
         case lookupGlobalRdrEnv impl_gr occ of
             [] -> addErr $ quotes (ppr occ)
-                    <+> text "is exported by the hsig file, but not"
-                    <+> text "exported by the implementing module"
-                    <+> quotes (ppr impl_mod)
+                    <+> text "is exported by the hsig file, but not exported by the implementing module"
+                    <+> quotes (pprWithUnitState unit_state $ ppr impl_mod)
             _ -> return ()
     failIfErrsM
 
@@ -1002,15 +1002,12 @@ instantiateSignature = do
     let outer_mod = tcg_mod tcg_env
         inner_mod = tcg_semantic_mod tcg_env
         home_unit = mkHomeUnitFromFlags dflags
-        unit_state = unitState dflags
     -- TODO: setup the local RdrEnv so the error messages look a little better.
     -- But this information isn't stored anywhere. Should we RETYPECHECK
     -- the local one just to get the information?  Hmm...
     MASSERT( isHomeModule home_unit outer_mod )
     MASSERT( isHomeUnitInstantiating home_unit)
-        -- we need to fetch the most recent ppr infos from the unit
-        -- database because we might have modified it
-    let uid = mkIndefUnitId unit_state (homeUnitInstanceOf home_unit)
+    let uid = Indefinite (homeUnitInstanceOf home_unit)
     inner_mod `checkImplements`
         Module
             (mkInstantiatedUnit uid (homeUnitInstantiations home_unit))

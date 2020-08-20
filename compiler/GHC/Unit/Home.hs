@@ -105,7 +105,7 @@ homeUnitInstanceOfMaybe _                                   = Nothing
 --    produce any code object that rely on the unit id of this virtual unit.
 homeUnitAsUnit :: HomeUnit -> Unit
 homeUnitAsUnit (DefiniteHomeUnit u _)    = RealUnit (Definite u)
-homeUnitAsUnit (IndefiniteHomeUnit u is) = mkVirtUnit (Indefinite u Nothing) is
+homeUnitAsUnit (IndefiniteHomeUnit u is) = mkVirtUnit (Indefinite u) is
 
 -- | Map over the unit identifier for instantiating units
 homeUnitMap :: IsUnitId v => (u -> v) -> GenHomeUnit u -> GenHomeUnit v

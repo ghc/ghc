@@ -2995,8 +2995,8 @@ instance Outputable ModSummary where
              char '}'
             ]
 
-showModMsg :: DynFlags -> Bool -> ModSummary -> String
-showModMsg dflags recomp mod_summary = showSDoc dflags $
+showModMsg :: DynFlags -> Bool -> ModSummary -> SDoc
+showModMsg dflags recomp mod_summary =
    if gopt Opt_HideSourcePaths dflags
       then text mod_str
       else hsep $

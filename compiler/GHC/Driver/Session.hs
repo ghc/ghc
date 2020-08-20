@@ -5080,6 +5080,7 @@ initSDocContext dflags style = SDC
   , sdocImpredicativeTypes          = xopt LangExt.ImpredicativeTypes dflags
   , sdocLinearTypes                 = xopt LangExt.LinearTypes dflags
   , sdocPrintTypeAbbreviations      = True
+  , sdocUnitIdForUser               = ftext
   , sdocDynFlags                    = dflags
   }
 

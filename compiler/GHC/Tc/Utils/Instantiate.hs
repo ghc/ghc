@@ -80,6 +80,7 @@ import GHC.Utils.Panic
 import GHC.Utils.Outputable
 import GHC.Types.Basic ( TypeOrKind(..) )
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Unit.State
 
 import Data.List ( sortBy, mapAccumL )
 import Control.Monad( unless )
@@ -972,9 +973,10 @@ dupInstErr ispec dup_ispec
                     [ispec, dup_ispec]
 
 addClsInstsErr :: SDoc -> [ClsInst] -> TcRn ()
-addClsInstsErr herald ispecs
-  = setSrcSpan (getSrcSpan (head sorted)) $
-    addErr (hang herald 2 (pprInstances sorted))
+addClsInstsErr herald ispecs = do
+   unit_state <- unitState <$> getDynFlags
+   setSrcSpan (getSrcSpan (head sorted)) $
+      addErr $ pprWithUnitState unit_state $ (hang herald 2 (pprInstances sorted))
  where
    sorted = sortBy (SrcLoc.leftmost_smallest `on` getSrcSpan) ispecs
    -- The sortBy just arranges that instances are displayed in order

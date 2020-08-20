@@ -88,7 +88,7 @@ doBackpack [src_filename] = do
             -- OK, so we have an LHsUnit PackageName, but we want an
             -- LHsUnit HsComponentId.  So let's rename it.
             let pkgstate = unitState dflags
-            let bkp = renameHsUnits pkgstate (bkpPackageNameMap pkgstate pkgname_bkp) pkgname_bkp
+            let bkp = renameHsUnits pkgstate (bkpPackageNameMap pkgname_bkp) pkgname_bkp
             initBkpM src_filename bkp $
                 forM_ (zip [1..] bkp) $ \(i, lunit) -> do
                     let comp_name = unLoc (hsunitName (unLoc lunit))
@@ -96,7 +96,7 @@ doBackpack [src_filename] = do
                     innerBkpM $ do
                         let (cid, insts) = computeUnitId lunit
                         if null insts
-                            then if cid == Indefinite (UnitId (fsLit "main")) Nothing
+                            then if cid == Indefinite (UnitId (fsLit "main"))
                                     then compileExe lunit
                                     else compileUnit cid []
                             else typecheckUnit cid insts
@@ -209,7 +209,7 @@ withBkpSession cid insts deps session_type do_this = do
 
 withBkpExeSession :: [(Unit, ModRenaming)] -> BkpM a -> BkpM a
 withBkpExeSession deps do_this = do
-    withBkpSession (Indefinite (UnitId (fsLit "main")) Nothing) [] deps ExeSession do_this
+    withBkpSession (Indefinite (UnitId (fsLit "main"))) [] deps ExeSession do_this
 
 getSource :: IndefUnitId -> BkpM (LHsUnit HsComponentId)
 getSource cid = do
@@ -491,9 +491,10 @@ initBkpM file bkp m = do
 
 -- | Print a compilation progress message, but with indentation according
 -- to @level@ (for nested compilation).
-backpackProgressMsg :: Int -> DynFlags -> String -> IO ()
+backpackProgressMsg :: Int -> DynFlags -> SDoc -> IO ()
 backpackProgressMsg level dflags msg =
-    compilationProgressMsg dflags $ replicate (level * 2) ' ' ++ msg
+    compilationProgressMsg dflags $ text (replicate (level * 2) ' ') -- TODO: use GHC.Utils.Ppr.RStr
+                                      <> msg
 
 -- | Creates a 'Messager' for Backpack compilation; this is basically
 -- a carbon copy of 'batchMsg' but calling 'backpackProgressMsg', which
@@ -503,17 +504,18 @@ mkBackpackMsg = do
     level <- getBkpLevel
     return $ \hsc_env mod_index recomp mod_summary ->
       let dflags = hsc_dflags hsc_env
+          state = unitState dflags
           showMsg msg reason =
-            backpackProgressMsg level dflags $
-                showModuleIndex mod_index ++
-                msg ++ showModMsg dflags (recompileRequired recomp) mod_summary
-                    ++ reason
+            backpackProgressMsg level dflags $ pprWithUnitState state $
+                showModuleIndex mod_index <>
+                msg <> showModMsg dflags (recompileRequired recomp) mod_summary
+                    <> reason
       in case recomp of
-            MustCompile -> showMsg "Compiling " ""
+            MustCompile -> showMsg (text "Compiling ") empty
             UpToDate
-                | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg "Skipping  " ""
+                | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg (text "Skipping  ") empty
                 | otherwise -> return ()
-            RecompBecause reason -> showMsg "Compiling " (" [" ++ reason ++ "]")
+            RecompBecause reason -> showMsg (text "Compiling ") (text " [" <> text reason <> text "]")
 
 -- | 'PprStyle' for Backpack messages; here we usually want the module to
 -- be qualified (so we can tell how it was instantiated.) But we try not
@@ -531,27 +533,29 @@ msgTopPackage (i,n) (HsComponentId (PackageName fs_pn) _) = do
     dflags <- getDynFlags
     level <- getBkpLevel
     liftIO . backpackProgressMsg level dflags
-        $ showModuleIndex (i, n) ++ "Processing " ++ unpackFS fs_pn
+        $ showModuleIndex (i, n) <> text "Processing " <> ftext fs_pn
 
 -- | Message when we instantiate a Backpack unit.
 msgUnitId :: Unit -> BkpM ()
 msgUnitId pk = do
     dflags <- getDynFlags
     level <- getBkpLevel
+    let state = unitState dflags
     liftIO . backpackProgressMsg level dflags
-        $ "Instantiating " ++ renderWithContext
-                                (initSDocContext dflags backpackStyle)
-                                (ppr pk)
+        $ pprWithUnitState state
+        $ text "Instantiating "
+           <> withPprStyle backpackStyle (ppr pk)
 
 -- | Message when we include a Backpack unit.
 msgInclude :: (Int,Int) -> Unit -> BkpM ()
 msgInclude (i,n) uid = do
     dflags <- getDynFlags
     level <- getBkpLevel
+    let state = unitState dflags
     liftIO . backpackProgressMsg level dflags
-        $ showModuleIndex (i, n) ++ "Including " ++
-          renderWithContext (initSDocContext dflags backpackStyle)
-            (ppr uid)
+        $ pprWithUnitState state
+        $ showModuleIndex (i, n) <> text "Including "
+            <> withPprStyle backpackStyle (ppr uid)
 
 -- ----------------------------------------------------------------------------
 -- Conversion from PackageName to HsComponentId
@@ -560,12 +564,12 @@ type PackageNameMap a = Map PackageName a
 
 -- For now, something really simple, since we're not actually going
 -- to use this for anything
-unitDefines :: UnitState -> LHsUnit PackageName -> (PackageName, HsComponentId)
-unitDefines pkgstate (L _ HsUnit{ hsunitName = L _ pn@(PackageName fs) })
-    = (pn, HsComponentId pn (mkIndefUnitId pkgstate (UnitId fs)))
+unitDefines :: LHsUnit PackageName -> (PackageName, HsComponentId)
+unitDefines (L _ HsUnit{ hsunitName = L _ pn@(PackageName fs) })
+    = (pn, HsComponentId pn (Indefinite (UnitId fs)))
 
-bkpPackageNameMap :: UnitState -> [LHsUnit PackageName] -> PackageNameMap HsComponentId
-bkpPackageNameMap pkgstate units = Map.fromList (map (unitDefines pkgstate) units)
+bkpPackageNameMap :: [LHsUnit PackageName] -> PackageNameMap HsComponentId
+bkpPackageNameMap units = Map.fromList (map unitDefines units)
 
 renameHsUnits :: UnitState -> PackageNameMap HsComponentId -> [LHsUnit PackageName] -> [LHsUnit HsComponentId]
 renameHsUnits pkgstate m units = map (fmap renameHsUnit) units

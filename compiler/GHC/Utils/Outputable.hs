@@ -357,6 +357,20 @@ data SDocContext = SDC
   , sdocLinearTypes                 :: !Bool
   , sdocImpredicativeTypes          :: !Bool
   , sdocPrintTypeAbbreviations      :: !Bool
+  , sdocUnitIdForUser               :: !(FastString -> SDoc)
+      -- ^ Used to map UnitIds to more friendly "package-version:component"
+      -- strings while pretty-printing.
+      --
+      -- Use `GHC.Unit.State.pprWithUnitState` to set it. Users should never
+      -- have to set it to pretty-print SDocs emitted by GHC, otherwise it's a
+      -- bug. It's an internal field used to thread the UnitState so that the
+      -- Outputable instance of UnitId can use it.
+      --
+      -- See Note [Pretty-printing UnitId] in "GHC.Unit" for more details.
+      --
+      -- Note that we use `FastString` instead of `UnitId` to avoid boring
+      -- module inter-dependency issues.
+
   , sdocDynFlags                    :: DynFlags -- TODO: remove
   }
 
@@ -404,6 +418,7 @@ defaultSDocContext = SDC
   , sdocImpredicativeTypes          = False
   , sdocLinearTypes                 = False
   , sdocPrintTypeAbbreviations      = True
+  , sdocUnitIdForUser               = ftext
   , sdocDynFlags                    = error "defaultSDocContext: DynFlags not available"
   }
 
