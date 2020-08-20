@@ -370,7 +370,7 @@ load' how_much mHscMessage mod_graph = do
     guessOutputFile
     hsc_env <- getSession
 
-    let hpt1   = hsc_HPT hsc_env
+    -- Only used for printing
     let dflags = hsc_dflags hsc_env
 
     -- The "bad" boot modules are the ones for which we have
@@ -414,23 +414,26 @@ load' how_much mHscMessage mod_graph = do
     -- are definitely unnecessary, then emit a warning.
     warnUnnecessarySourceImports mg2_with_srcimps
 
+    hscEnv <- getSession
     let
+        hpts = hsc_HPTs hscEnv
         -- check the stability property for each module.
         stable_mods@(stable_obj,stable_bco)
-            = checkStability hpt1 mg2_with_srcimps all_home_mods
-
-        -- prune bits of the HPT which are definitely redundant now,
-        -- to save space.
-        pruned_hpt = pruneHomePackageTable hpt1
-                            (flattenSCCs mg2_with_srcimps)
-                            stable_mods
-
-    _ <- liftIO $ evaluate pruned_hpt
+            = checkStability hpts mg2_with_srcimps all_home_mods
 
     -- before we unload anything, make sure we don't leave an old
     -- interactive context around pointing to dead bindings.  Also,
     -- write the pruned HPT to allow the old HPT to be GC'd.
-    setSession $ discardIC $ set_hsc_HPT pruned_hpt hsc_env
+    homeUnitEnv <- forM (hsc_internalUnitEnv hscEnv) $ \env -> do
+      let hpt = internalUnitEnv_homePackageTable env
+      let pruned_hpt = pruneHomePackageTable hpt (flattenSCCs mg2_with_srcimps) stable_mods
+      _ <- liftIO $ evaluate pruned_hpt
+      pure env { internalUnitEnv_homePackageTable = pruned_hpt }
+
+    setSession $ discardIC $ set_hsc_internalUnitEnvGraph homeUnitEnv hscEnv
+    hscEnv <- getSession
+    let pruned_hpts = hsc_HPTs hscEnv
+    let internal_unit_env = unitEnv_graph $ hsc_internalUnitEnv hscEnv
 
     liftIO $ debugTraceMsg dflags 2 (text "Stable obj:" <+> ppr stable_obj $$
                             text "Stable BCO:" <+> ppr stable_bco)
@@ -442,7 +445,7 @@ load' how_much mHscMessage mod_graph = do
                              -- It's OK to use nonDetEltsUniqSet here
                              -- because it only affects linking. Besides
                              -- this list only serves as a poor man's set.
-                             Just hmi <- [lookupHpt pruned_hpt m],
+                             Just hmi <- [lookupHpts pruned_hpts m],
                              Just linkable <- [hm_linkable hmi] ]
     liftIO $ unload hsc_env stable_linkables
 
@@ -515,9 +518,12 @@ load' how_much mHscMessage mod_graph = do
     let upsweep_fn | n_jobs > 1 = parUpsweep n_jobs
                    | otherwise  = upsweep
 
-    setSession hsc_env { hsc_internalUnitEnv = (\ue -> ue { internalUnitEnv_homePackageTable = emptyHomePackageTable }) <$> hsc_internalUnitEnv hsc_env }
+
+    let unitEnvWithEmptiedHPTs = (\ue -> ue { internalUnitEnv_homePackageTable = emptyHomePackageTable }) <$> (hsc_internalUnitEnv hsc_env)
+    setSession $ set_hsc_internalUnitEnvGraph unitEnvWithEmptiedHPTs hsc_env
+
     (upsweep_ok, modsUpswept) <- withDeferredDiagnostics $
-      upsweep_fn mHscMessage pruned_hpt stable_mods cleanup mg
+      upsweep_fn mHscMessage internal_unit_env stable_mods cleanup mg
 
     -- Make modsDone be the summaries for each home module now
     -- available; this should equal the domain of hpt3.
@@ -613,7 +619,7 @@ load' how_much mHscMessage mod_graph = do
           -- Link everything together
           linkresult <- liftIO $ link (ghcLink dflags) dflags False hpt5
 
-          modifySession $ \hsc_env -> set_hsc_HPT hpt5 hsc_env
+          modifySession $ set_hsc_HPT hpt5
           loadFinish Failed linkresult
 
 
@@ -638,7 +644,9 @@ loadFinish all_ok Succeeded
 discardProg :: HscEnv -> HscEnv
 discardProg hsc_env
   = discardIC $ hsc_env { hsc_mod_graph = emptyMG
-                        , hsc_internalUnitEnv = (\ue -> ue { internalUnitEnv_homePackageTable = emptyHomePackageTable }) <$> hsc_internalUnitEnv hsc_env }
+                        , hsc_internalUnitEnv = fmap emptyHPT (hsc_internalUnitEnv hsc_env) }
+  where
+    emptyHPT ue = ue { internalUnitEnv_homePackageTable = emptyHomePackageTable }
 
 -- | Discard the contents of the InteractiveContext, but keep the DynFlags.
 -- It will also keep ic_int_print and ic_monad if their names are from
@@ -822,12 +830,12 @@ type StableModules =
 
 
 checkStability
-        :: HomePackageTable   -- HPT from last compilation
+        :: [HomePackageTable] -- HPTs from last compilation
         -> [SCC ModSummary]   -- current module graph (cyclic)
         -> UniqSet ModuleName -- all home modules
         -> StableModules
 
-checkStability hpt sccs all_home_mods =
+checkStability hpts sccs all_home_mods =
   foldl' checkSCC (emptyUniqSet, emptyUniqSet) sccs
   where
    checkSCC :: StableModules -> SCC ModSummary -> StableModules
@@ -861,7 +869,7 @@ checkStability hpt sccs all_home_mods =
                                          && same_as_prev t
           | otherwise = False
           where
-             same_as_prev t = case lookupHpt hpt (ms_mod_name ms) of
+             same_as_prev t = case lookupHpts hpts (ms_mod_name ms) of
                                 Just hmi  | Just l <- hm_linkable hmi
                                  -> isObjectLinkable l && t == linkableTime l
                                 _other  -> True
@@ -877,7 +885,7 @@ checkStability hpt sccs all_home_mods =
 
         bco_ok ms
           | gopt Opt_ForceRecomp (ms_hspp_opts ms) = False
-          | otherwise = case lookupHpt hpt (ms_mod_name ms) of
+          | otherwise = case lookupHpts hpts (ms_mod_name ms) of
                 Just hmi  | Just l <- hm_linkable hmi ->
                         not (isObjectLinkable l) &&
                         linkableTime l >= ms_hs_date ms
@@ -967,13 +975,13 @@ parUpsweep
     => Int
     -- ^ The number of workers we wish to run in parallel
     -> Maybe Messager
-    -> HomePackageTable
+    -> Map UnitId InternalUnitEnv
     -> StableModules
     -> (HscEnv -> IO ())
     -> [SCC ModSummary]
     -> m (SuccessFlag,
           [ModSummary])
-parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
+parUpsweep n_jobs mHscMessage old_unit_env stable_mods cleanup sccs = do
     hsc_env <- getSession
     let dflags = hsc_dflags hsc_env
 
@@ -988,7 +996,8 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
 
     -- The old HPT is used for recompilation checking in upsweep_mod. When a
     -- module successfully gets compiled, its HMI is pruned from the old HPT.
-    old_hpt_var <- liftIO $ newIORef old_hpt
+    old_unit_env_var <- liftIO $
+      mapM (newIORef . internalUnitEnv_homePackageTable) old_unit_env
 
     -- What we use to limit parallelism with.
     par_sem <- liftIO $ newQSem n_jobs
@@ -1076,7 +1085,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
                 m_res <- MC.try $ unmask $ prettyPrintGhcErrors lcl_dflags $
                         parUpsweep_one mod home_mod_map comp_graph_loops
                                        lcl_dflags mHscMessage cleanup
-                                       par_sem hsc_env_var old_hpt_var
+                                       par_sem hsc_env_var old_unit_env_var
                                        stable_mods mod_idx (length sccs)
 
                 res <- case m_res of
@@ -1185,7 +1194,7 @@ parUpsweep_one
     -- ^ The semaphore for limiting the number of simultaneous compiles
     -> MVar HscEnv
     -- ^ The MVar that synchronizes updates to the global HscEnv
-    -> IORef HomePackageTable
+    -> Map UnitId (IORef HomePackageTable)
     -- ^ The old HPT
     -> StableModules
     -- ^ Sets of stable objects and BCOs
@@ -1196,7 +1205,7 @@ parUpsweep_one
     -> IO SuccessFlag
     -- ^ The result of this compile
 parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags mHscMessage cleanup par_sem
-               hsc_env_var old_hpt_var stable_mods mod_index num_mods = do
+               hsc_env_var old_unit_env_var stable_mods mod_index num_mods = do
 
     let this_build_mod = mkBuildModule mod
 
@@ -1290,8 +1299,11 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags mHscMessage cleanup 
         -- Any hsc_env at this point is OK to use since we only really require
         -- that the HPT contains the HMIs of our dependencies.
         hsc_env <- readMVar hsc_env_var
+        old_hpt_var <- case Map.lookup (ms_unit mod) old_unit_env_var of
+          Nothing -> pprPanic "Can not find old hpt"
+                      $ text "Could not find unit" <+> ppr (ms_unit mod) <+> text "in old unit environment"
+          Just hptRef -> pure hptRef
         old_hpt <- readIORef old_hpt_var
-
         let logger err = printBagOfErrors lcl_dflags (srcErrorMessages err)
 
         -- Limit the number of parallel compiles.
@@ -1374,7 +1386,7 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags mHscMessage cleanup 
 upsweep
     :: GhcMonad m
     => Maybe Messager
-    -> HomePackageTable            -- ^ HPT from last time round (pruned)
+    -> Map UnitId InternalUnitEnv  -- ^ HPT from last time round (pruned)
     -> StableModules               -- ^ stable modules (see checkStability)
     -> (HscEnv -> IO ())           -- ^ How to clean up unwanted tmp files
     -> [SCC ModSummary]            -- ^ Mods to do (the worklist)
@@ -1386,15 +1398,15 @@ upsweep
        --  2. The 'HscEnv' in the monad has an updated HPT
        --  3. A list of modules which succeeded loading.
 
-upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
+upsweep mHscMessage old_unit_env stable_mods cleanup sccs = do
    dflags <- getSessionDynFlags
-   (res, done) <- upsweep' old_hpt emptyMG sccs 1 (length sccs)
+   (res, done) <- upsweep' old_unit_env emptyMG sccs 1 (length sccs)
                            (instantiatedUnitsToCheck dflags) done_holes
    return (res, reverse $ mgModSummaries done)
  where
   done_holes = emptyUniqSet
 
-  keep_going this_mods old_hpt done mods mod_index nmods uids_to_check done_holes = do
+  keep_going this_mods old_unit_env done mods mod_index nmods uids_to_check done_holes = do
     let sum_deps ms (AcyclicSCC mod) =
           if any (flip elem $ unfilteredEdges False mod) ms
             then mkHomeBuildModule mod:ms
@@ -1410,12 +1422,12 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
     when (not $ null dropped_ms) $ do
         dflags <- getSessionDynFlags
         liftIO $ fatalErrorMsg dflags (keepGoingPruneErr $ gwib_mod <$> dropped_ms)
-    (_, done') <- upsweep' old_hpt done mods' (mod_index+1) nmods' uids_to_check done_holes
+    (_, done') <- upsweep' old_unit_env done mods' (mod_index+1) nmods' uids_to_check done_holes
     return (Failed, done')
 
   upsweep'
     :: GhcMonad m
-    => HomePackageTable
+    => Map UnitId InternalUnitEnv
     -> ModuleGraph
     -> [SCC ModSummary]
     -> Int
@@ -1423,24 +1435,25 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
     -> [Unit]
     -> UniqSet ModuleName
     -> m (SuccessFlag, ModuleGraph)
-  upsweep' _old_hpt done
+  upsweep' _old_hpts done
      [] _ _ uids_to_check _
    = do hsc_env <- getSession
         liftIO . runHsc hsc_env $ mapM_ (ioMsgMaybe . tcRnCheckUnit hsc_env) uids_to_check
         return (Succeeded, done)
 
-  upsweep' _old_hpt done
+  upsweep' _old_unit_env done
      (CyclicSCC ms:mods) mod_index nmods uids_to_check done_holes
    = do dflags <- getSessionDynFlags
         liftIO $ fatalErrorMsg dflags (cyclicModuleErr ms)
         if gopt Opt_KeepGoing dflags
-          then keep_going (mkHomeBuildModule <$> ms) old_hpt done mods mod_index nmods
+          then keep_going (mkHomeBuildModule <$> ms) old_unit_env done mods mod_index nmods
                           uids_to_check done_holes
           else return (Failed, done)
 
-  upsweep' old_hpt done
+  upsweep' old_unit_env done
      (AcyclicSCC mod:mods) mod_index nmods uids_to_check done_holes
-   = do -- putStrLn ("UPSWEEP_MOD: hpt = " ++
+   = setActiveUnitTemporarily (ms_unit mod) $ do
+        -- putStrLn ("UPSWEEP_MOD: hpt = " ++
         --           show (map (moduleUserString.moduleName.mi_module.hm_iface)
         --                     (moduleEnvElts (hsc_HPT hsc_env)))
         let logger _mod = defaultWarnErrLogger
@@ -1467,7 +1480,6 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
         let hsc_env1 = hsc_env { hsc_type_env_var =
                                     Just (ms_mod mod, type_env_var) }
 
-        hsc_env1 <- pure $ set_hsc_currentUnit (ms_unit mod) hsc_env1
         setSession hsc_env1
 
         -- Lazily reload the HPT modules participating in the loop.
@@ -1479,6 +1491,10 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
         hsc_env2 <- liftIO $ reTypecheckLoop hsc_env1 mod done
         setSession hsc_env2
 
+        old_hpt <- case Map.lookup (ms_unit mod) old_unit_env of
+          Nothing -> pprPanic "Can not find old hpt"
+                      $ text "Could not find unit" <+> ppr (ms_unit mod) <+> text "in old unit environment"
+          Just env -> pure $ internalUnitEnv_homePackageTable env
         mb_mod_info
             <- handleSourceError
                    (\err -> do logger mod (Just err); return Nothing) $ do
@@ -1491,25 +1507,33 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
           Nothing -> do
                 dflags <- getSessionDynFlags
                 if gopt Opt_KeepGoing dflags
-                  then keep_going [mkHomeBuildModule mod] old_hpt done mods mod_index nmods
+                  then keep_going [mkHomeBuildModule mod] old_unit_env done mods mod_index nmods
                                   uids_to_check done_holes
                   else return (Failed, done)
           Just mod_info -> do
                 let this_mod = ms_mod_name mod
 
                         -- Add new info to hsc_env
-                    hsc_env3 = modify_hsc_HPT (\hpt -> addToHpt hpt this_mod mod_info) (hsc_env2 { hsc_type_env_var = Nothing })
+                    hsc_env3 = modify_hsc_HPT
+                        (\hpt -> addToHpt hpt this_mod mod_info)
+                        (hsc_env2 { hsc_type_env_var = Nothing })
 
-                        -- Space-saving: delete the old HPT entry
-                        -- for mod BUT if mod is a hs-boot
-                        -- node, don't delete it.  For the
-                        -- interface, the HPT entry is probably for the
-                        -- main Haskell source file.  Deleting it
-                        -- would force the real module to be recompiled
-                        -- every time.
-                    old_hpt1 = case isBootSummary mod of
-                      IsBoot -> old_hpt
-                      NotBoot -> delFromHpt old_hpt this_mod
+                    -- old_hpt1 = case isBootSummary mod of
+                    --   IsBoot -> old_hpt
+                    --   NotBoot -> delFromHpt old_hpt this_mod
+
+                    -- Space-saving: delete the old HPT entry
+                    -- for mod BUT if mod is a hs-boot
+                    -- node, don't delete it.  For the
+                    -- interface, the HPT entry is probably for the
+                    -- main Haskell source file.  Deleting it
+                    -- would force the real module to be recompiled
+                    -- every time.
+                    old_unit_env1 = Map.adjust (\env ->
+                      case isBootSummary mod of
+                        IsBoot -> env
+                        NotBoot -> env { internalUnitEnv_homePackageTable = delFromHpt old_hpt this_mod }
+                      ) (ms_unit mod) old_unit_env
 
                     done' = extendMG done mod
 
@@ -1533,7 +1557,17 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
                                  , spt <- spts
                                  ]
 
-                upsweep' old_hpt1 done' mods (mod_index+1) nmods uids_to_check' done_holes'
+                upsweep' old_unit_env1 done' mods (mod_index+1) nmods uids_to_check' done_holes'
+
+setActiveUnitTemporarily :: GhcMonad m => UnitId -> m a -> m a
+setActiveUnitTemporarily unit act = do
+  hsc_env <- getSession
+  let oldUnit = hsc_currentUnit hsc_env
+  setSession $ set_hsc_currentUnit unit hsc_env
+  res <- act
+  hsc_env <- getSession
+  setSession $ set_hsc_currentUnit oldUnit hsc_env
+  pure res
 
 -- | Return a list of instantiated units to type check from the UnitState.
 --
@@ -2518,9 +2552,11 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
           old_summary location unit
 
     find_it = do
+        -- Temporary modification, so consumers can call 'hsc_dflags' and 'hsc_HPT'
+        -- directly, without explicitly passing the UnitId around.
         let hsc_env' = set_hsc_currentUnit unit hsc_env
         -- Only look in the correct home unit, as we know in which unit it is located.
-        found <- findHomeModule hsc_env' (hsc_unitDflags unit hsc_env) wanted_mod
+        found <- findHomeModule hsc_env' (hsc_unitDflags unit hsc_env') wanted_mod
         case found of
              Found location mod
                 | isJust (ml_hs_file location) ->

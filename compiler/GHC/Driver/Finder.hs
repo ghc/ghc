@@ -11,6 +11,7 @@ module GHC.Driver.Finder (
     flushFinderCaches,
     FindResult(..),
     findImportedModule,
+    findAnyImportedModule,
     findPluginModule,
     findExactModule,
     findHomeModule,
@@ -49,7 +50,6 @@ import GHC.Utils.Panic
 import GHC.Data.Maybe    ( expectJust )
 
 import Data.IORef       ( IORef, readIORef, atomicModifyIORef' )
-import qualified Data.Map as M
 import System.Directory
 import System.FilePath
 import Control.Monad
@@ -79,8 +79,8 @@ flushFinderCaches hsc_env =
   atomicModifyIORef' fc_ref $ \fm -> (filterInstalledModuleEnv is_ext fm, ())
  where
         fc_ref       = hsc_FC hsc_env
-        home_unit    = mkHomeUnitFromFlags (hsc_dflags hsc_env)
-        is_ext mod _ = not (isHomeInstalledModule home_unit mod)
+        home_units    = map mkHomeUnitFromFlags (hsc_allDflags hsc_env)
+        is_ext mod _ = all (`notHomeInstalledModule` mod) home_units
 
 addToFinderCache :: IORef FinderCache -> InstalledModule -> InstalledFindResult -> IO ()
 addToFinderCache ref key val =
@@ -106,6 +106,30 @@ lookupFinderCache ref key = do
 
 findImportedModule :: HscEnv -> ModuleName -> Maybe FastString -> IO FindResult
 findImportedModule hsc_env mod_name mb_pkg =
+  case mb_pkg of
+        Nothing                        -> unqual_import
+        Just pkg | pkg == fsLit "this" -> home_import -- "this" is special
+                 | otherwise           -> pkg_import
+  where
+    home_import   = findHomeModule hsc_env (hsc_dflags hsc_env) mod_name
+
+    any_home_import = findHomeModuleInUnit hsc_env mod_name mb_pkg
+
+    pkg_import    = findExposedPackageModule hsc_env mod_name mb_pkg
+
+    unqual_import = any_home_import
+                    `orIfNotFound`
+                    findExposedPackageModule hsc_env mod_name Nothing
+
+
+-- | Locate a module that was imported by the user.  We have the
+-- module's name, and possibly a package name.  Without a package
+-- name, this function will use the search path and the known exposed
+-- packages to find the module, if a package is specified then only
+-- that package is searched for the module.
+
+findAnyImportedModule :: HscEnv -> ModuleName -> Maybe FastString -> IO FindResult
+findAnyImportedModule hsc_env mod_name mb_pkg =
   case mb_pkg of
         Nothing                        -> unqual_import
         Just pkg | pkg == fsLit "this" -> home_import -- "this" is special
@@ -145,20 +169,23 @@ findExactModule hsc_env mod =
 
 
 -- TODO use mb_pkg to narrow search
+findHomeModuleInUnit :: HscEnv -> ModuleName -> Maybe FastString -> IO FindResult
+findHomeModuleInUnit hsc_env mod_name _mb_pkg = do
+  foldl' orIfNotFound (pure notFound)
+    $ fmap (\dflags -> findHomeModule hsc_env dflags mod_name)
+    $ (current_dflags : deps)
+  where
+    currentUnit = hsc_currentUnit hsc_env
+    deps = map internalUnitEnv_dflags $ hsc_homeUnitDependencies_unitEnv hsc_env currentUnit
+    notFound = NotFound [] Nothing [] [] [] []
+    current_dflags = hsc_dflags hsc_env
+
+-- TODO use mb_pkg to narrow search
 findAnyHomeModule :: HscEnv -> ModuleName -> Maybe FastString -> IO FindResult
 findAnyHomeModule hsc_env mod_name _mb_pkg =
-    foldl' orIfNotFound (pure notFound)
+  foldl' orIfNotFound (pure notFound)
     $ fmap (\dflags -> findHomeModule hsc_env dflags mod_name)
-    --  $ filter (\dflags ->
-    --     let
-    --         deps = explicitPackages $ pkgState dflags
-    --     in
-    --         thisPackage dflags `elem` deps
-    --     )
-    $ fmap internalUnitEnv_dflags
-    $ M.elems
-    $ unitEnv_graph
-    $ hsc_internalUnitEnv hsc_env
+    $ hsc_allDflags hsc_env
   where
     notFound = NotFound [] Nothing [] [] [] []
 

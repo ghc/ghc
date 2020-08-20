@@ -72,6 +72,8 @@ import Data.Either      ( partitionEithers, isRight, rights )
 import Data.Map         ( Map )
 import qualified Data.Map as Map
 import Data.Ord         ( comparing )
+import Data.Set         ( Set )
+import qualified Data.Set as Set
 import Data.List        ( partition, (\\), find, sortBy )
 import Data.Function    ( on )
 import qualified Data.Set as S
@@ -365,6 +367,8 @@ rnImportDecl this_mod
                     || (not implicit && safeDirectImpsReq dflags)
                     || (implicit && safeImplicitImpsReq dflags)
 
+    hsc_env <- getTopEnv
+    let home_units_deps = hsc_currentHomeUnitDependencies hsc_env
     let imv = ImportedModsVal
             { imv_name        = qual_mod_name
             , imv_span        = loc
@@ -373,7 +377,7 @@ rnImportDecl this_mod
             , imv_all_exports = potential_gres
             , imv_qualified   = qual_only
             }
-        imports = calculateAvails dflags iface mod_safe' want_boot (ImportedByUser imv)
+        imports = calculateAvails home_units_deps dflags iface mod_safe' want_boot (ImportedByUser imv)
 
     traceRn "Compute Avails" $ text "Compute Avails for" <+> ppr this_mod
     traceRn "Computed Avails" $ text "Compute Avails info"
@@ -407,13 +411,14 @@ rnImportDecl this_mod
 
 -- | Calculate the 'ImportAvails' induced by an import of a particular
 -- interface, but without 'imp_mods'.
-calculateAvails :: DynFlags
+calculateAvails :: Set UnitId -- ^ Set of home units the dynflags depend on
+                -> DynFlags
                 -> ModIface
                 -> IsSafeImport
                 -> IsBootInterface
                 -> ImportedBy
                 -> ImportAvails
-calculateAvails dflags iface mod_safe' want_boot imported_by =
+calculateAvails home_units_deps dflags iface mod_safe' want_boot imported_by =
   let imp_mod    = mi_module iface
       imp_sem_mod= mi_semantic_module iface
       orph_iface = mi_orphan (mi_final_exts iface)
@@ -456,8 +461,8 @@ calculateAvails dflags iface mod_safe' want_boot imported_by =
                             imp_sem_mod : dep_finsts deps
              | otherwise  = dep_finsts deps
 
-      pkg = moduleUnit (mi_module iface)
-      ipkg = toUnitId pkg
+      unit = moduleUnit (mi_module iface)
+      ipkg = toUnitId unit
 
       -- Does this import mean we now require our own pkg
       -- to be trusted? See Note [Trust Own Package]
@@ -466,7 +471,9 @@ calculateAvails dflags iface mod_safe' want_boot imported_by =
       home_unit = mkHomeUnitFromFlags dflags
 
       (dependent_mods, dependent_pkgs, pkg_trust_req)
-         | isHomeUnit home_unit pkg =
+         | unit == homeUnitAsUnit home_unit
+           || toUnitId unit `Set.member` home_units_deps =
+            -- TODO: @fendor: comment is outdated, dont merge before this is resolved
             -- Imported module is from the home package
             -- Take its dependent modules and add imp_mod itself
             -- Take its dependent packages unchanged
@@ -509,7 +516,6 @@ calculateAvails dflags iface mod_safe' want_boot imported_by =
           -- See Note [Trust Own Package]
           imp_trust_own_pkg = pkg_trust_req
      }
-
 
 -- | Issue a warning if the user imports Data.List without either an import
 -- list or `qualified`. This is part of the migration plan for the

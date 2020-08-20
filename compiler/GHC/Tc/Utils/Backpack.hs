@@ -801,6 +801,7 @@ mergeSignatures
               | otherwise
               = return ()
         mapM_ check_export (map availName exports)
+        home_units_deps <- hsc_currentHomeUnitDependencies <$> getTopEnv
 
         -- Note [Signature merging instances]
         -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -845,7 +846,7 @@ mergeSignatures
             -- supposed to include itself in its dep_orphs/dep_finsts.  See #13214
             iface' = iface { mi_final_exts = (mi_final_exts iface){ mi_orphan = False, mi_finsts = False } }
             avails = plusImportAvails (tcg_imports tcg_env) $
-                        calculateAvails dflags iface' False NotBoot ImportedBySystem
+                        calculateAvails home_units_deps dflags iface' False NotBoot ImportedBySystem
         return tcg_env {
             tcg_inst_env = inst_env,
             tcg_insts    = insts,
@@ -933,7 +934,8 @@ checkImplements impl_mod req_mod@(Module uid mod_name) = do
     loadModuleInterfaces (text "Loading orphan modules (from implementor of hsig)")
                          (dep_orphs (mi_deps impl_iface))
 
-    let avails = calculateAvails dflags
+    home_units <- hsc_allHomeUnits <$> getTopEnv
+    let avails = calculateAvails home_units dflags
                     impl_iface False{- safe -} NotBoot ImportedBySystem
         fix_env = mkNameEnv [ (gre_name rdr_elt, FixItem occ f)
                             | (occ, f) <- mi_fixities impl_iface

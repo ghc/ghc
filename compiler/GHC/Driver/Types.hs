@@ -73,7 +73,7 @@ module GHC.Driver.Types (
         HomePackageTable, HomeModInfo(..), emptyHomePackageTable,
         lookupHpt, lookupHpts, lookupDependentHpts, eltsHpt, filterHpt, allHpt, mapHpt, delFromHpt,
         addToHpt, addListToHpt, lookupHptDirectly, listToHpt,
-        hptCompleteSigs, hm_unit,
+        hptCompleteSigs,
         hptInstances, hptRules, pprHPT,
 
         -- * State relating to known packages
@@ -261,6 +261,7 @@ import Control.DeepSeq
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
 import Control.Monad.Catch as MC (MonadCatch, catch)
+import Data.Foldable (Foldable(toList))
 
 -- -----------------------------------------------------------------------------
 -- Compilation state
@@ -1082,15 +1083,25 @@ listToHpt = listToUDFM
 lookupHptByModule :: InternalUnitEnv -> Module -> Maybe HomeModInfo
 -- The HPT is indexed by ModuleName, not Module,
 -- we must check for a hit on the right Module
-lookupHptByModule homeUnit mod =
-  lookupHpt (internalUnitEnv_homePackageTable homeUnit) (moduleName mod)
+lookupHptByModule unitEnv mod =
+  lookupHpt (internalUnitEnv_homePackageTable unitEnv) (moduleName mod)
 
 lookupHptByModuleInUnitEnv :: UnitEnv -> Module -> Maybe HomeModInfo
 -- The HPT is indexed by ModuleName, not Module,
 -- we must check for a hit on the right Module
 lookupHptByModuleInUnitEnv unitEnv mod = do
-  homeUnit <- unitEnv_lookup_maybe (toUnitId $ moduleUnit mod) unitEnv
-  lookupHpt (internalUnitEnv_homePackageTable homeUnit) (moduleName mod)
+  let mod_unit = moduleUnit mod
+  if isHoleUnit mod_unit
+    then do
+      -- this code-path is only for backpack.
+      -- When trying to compile a hole module, we do not have a unit-id.
+      -- Therefore, we can not use it. This is safe, as we expect that backpack
+      -- does not support multiple home units.
+      let allHpts = toList $ fmap internalUnitEnv_homePackageTable unitEnv
+      lookupHpts allHpts (moduleName mod)
+    else do
+      unitEnv <- unitEnv_lookup_maybe (toUnitId mod_unit) unitEnv
+      lookupHptByModule unitEnv mod
 
 -- | Information about modules in the package being compiled
 data HomeModInfo
@@ -1119,9 +1130,6 @@ data HomeModInfo
         -- 'HomeModInfo' by building a new 'ModDetails' from the old
         -- 'ModIface' (only).
     }
-
-hm_unit :: HomeModInfo -> UnitId
-hm_unit = toUnitId . moduleUnit . mi_module . hm_iface
 
 -- | Find the 'ModIface' for a 'Module', searching in both the loaded home
 -- and external package module information
