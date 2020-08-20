@@ -480,7 +480,7 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
         src_filename  = ms_hspp_file mod_summary
         real_loc = realSrcLocSpan $ mkRealSrcLoc (mkFastString src_filename) 1 1
         keep_rn' = gopt Opt_WriteHie dflags || keep_rn
-    MASSERT( isHomeModule home_unit outer_mod )
+    MASSERT( isAnyHomeModule hsc_env outer_mod )
     tc_result <- if hsc_src == HsigFile && not (isHoleModule inner_mod)
         then ioMsgMaybe $ tcRnInstantiateSignature hsc_env outer_mod' real_loc
         else
@@ -1119,12 +1119,11 @@ hscGetSafe hsc_env m l = runHsc hsc_env $ do
 hscCheckSafe' :: Module -> SrcSpan
   -> Hsc (Maybe UnitId, Set UnitId)
 hscCheckSafe' m l = do
-    dflags <- getDynFlags
-    let home_unit = mkHomeUnitFromFlags dflags
+    hsc_env <- getHscEnv
     (tw, pkgs) <- isModSafe m l
     case tw of
-        False                           -> return (Nothing, pkgs)
-        True | isHomeModule home_unit m -> return (Nothing, pkgs)
+        False                            -> return (Nothing, pkgs)
+        True | isAnyHomeModule hsc_env m -> return (Nothing, pkgs)
              -- TODO: do we also have to check the trust of the instantiation?
              -- Not necessary if that is reflected in dependencies
              | otherwise   -> return (Just $ toUnitId (moduleUnit m), pkgs)

@@ -518,7 +518,7 @@ bindLocalsAtBreakpoint hsc_env apStack Nothing = do
 bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
    let
        hmi       = expectJust "bindLocalsAtBreakpoint" $
-                     lookupHpt (hsc_HPT hsc_env) (moduleName breakInfo_module)
+                     lookupHpts (hsc_HPTs hsc_env) (moduleName breakInfo_module)
        breaks    = getModBreaks hmi
        info      = expectJust "bindLocalsAtBreakpoint2" $
                      IntMap.lookup breakInfo_number (modBreaks_breakInfo breaks)
@@ -777,7 +777,7 @@ findGlobalRdrEnv hsc_env imports
     imods :: [ModuleName]
     imods = [m | IIModule m <- imports]
 
-    mkEnv mod = case mkTopLevEnv (hsc_HPT hsc_env) mod of
+    mkEnv mod = case mkTopLevEnv (hsc_HPTs hsc_env) mod of
       Left err -> Left (mod, err)
       Right env -> Right env
 
@@ -792,9 +792,9 @@ availsToGlobalRdrEnv mod_name avails
                          is_qual = False,
                          is_dloc = srcLocSpan interactiveSrcLoc }
 
-mkTopLevEnv :: HomePackageTable -> ModuleName -> Either String GlobalRdrEnv
-mkTopLevEnv hpt modl
-  = case lookupHpt hpt modl of
+mkTopLevEnv :: [HomePackageTable] -> ModuleName -> Either String GlobalRdrEnv
+mkTopLevEnv hpts modl
+  = case lookupHpts hpts modl of
       Nothing -> Left "not a home module"
       Just details ->
          case mi_globals (hm_iface details) of
