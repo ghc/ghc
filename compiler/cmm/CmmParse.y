@@ -203,6 +203,7 @@ necessary to the stack to accommodate it (e.g. 2).
 module CmmParse ( parseCmmFile ) where
 
 import GhcPrelude
+import qualified Prelude -- for happy-generated code
 
 import GHC.StgToCmm.ExtCode
 import CmmCallConv
