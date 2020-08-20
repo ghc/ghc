@@ -1167,7 +1167,7 @@ getModuleGraph = liftM hsc_mod_graph getSession
 -- | Return @True@ \<==> module is loaded.
 isLoaded :: GhcMonad m => ModuleName -> m Bool
 isLoaded m = withSession $ \hsc_env ->
-  return $! isJust (lookupHpt (hsc_HPT hsc_env) m)
+  return $! isJust (lookupHpts (hsc_HPTs hsc_env) m)
 
 -- | Return the bindings for the current interactive session.
 getBindings :: GhcMonad m => m [TyThing]
@@ -1519,8 +1519,9 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
   let dflags = hsc_dflags hsc_env
       home_unit = mkHomeUnitFromFlags dflags
   case maybe_pkg of
+    -- TODO: @fendor this should be a lookup, don't load "this" for unconditionally
     Just pkg | not (isHomeUnit home_unit (fsToUnit pkg)) && pkg /= fsLit "this" -> liftIO $ do
-      res <- findImportedModule hsc_env mod_name maybe_pkg
+      res <- findAnyImportedModule hsc_env mod_name maybe_pkg
       case res of
         Found _ m -> return m
         err       -> throwOneError $ noModError dflags noSrcSpan mod_name err
@@ -1529,7 +1530,7 @@ findModule mod_name maybe_pkg = withSession $ \hsc_env -> do
       case home of
         Just m  -> return m
         Nothing -> liftIO $ do
-           res <- findImportedModule hsc_env mod_name maybe_pkg
+           res <- findAnyImportedModule hsc_env mod_name maybe_pkg
            case res of
              Found loc m | not (isHomeModule home_unit m) -> return m
                          | otherwise -> modNotLoadedError dflags m loc
