@@ -429,7 +429,7 @@ loadInterface doc_str mod from
   | otherwise
   = withTimingSilentD (text "loading interface") (pure ()) $
     do  {       -- Read the state
-          (eps,hpt) <- getEpsAndHpt
+          (eps, unitEnv) <- getEpsAndUnitEnv
         ; gbl_env <- getGblEnv
 
         ; traceIf (text "Considering whether to load" <+> ppr mod <+> ppr from)
@@ -438,7 +438,7 @@ loadInterface doc_str mod from
         ; dflags <- getDynFlags
         ; hsc_env <- getTopEnv
         ; let home_unit = hsc_home_unit hsc_env
-        ; case lookupIfaceByModule hpt (eps_PIT eps) mod of {
+        ; case lookupIfaceByModule unitEnv (eps_PIT eps) mod of {
             Just iface
                 -> return (Succeeded iface) ;   -- Already loaded
                         -- The (src_imp == mi_boot iface) test checks that the already-loaded
@@ -707,14 +707,14 @@ moduleFreeHolesPrecise doc_str mod
         let insts = instUnitInsts (moduleUnit indef)
         traceIf (text "Considering whether to load" <+> ppr mod <+>
                  text "to compute precise free module holes")
-        (eps, hpt) <- getEpsAndHpt
-        case tryEpsAndHpt eps hpt `firstJust` tryDepsCache eps imod insts of
+        (eps, unitEnv) <- getEpsAndUnitEnv
+        case tryEpsAndUnitEnv eps unitEnv `firstJust` tryDepsCache eps imod insts of
             Just r -> return (Succeeded r)
             Nothing -> readAndCache imod insts
     (_, Nothing) -> return (Succeeded emptyUniqDSet)
   where
-    tryEpsAndHpt eps hpt =
-        fmap mi_free_holes (lookupIfaceByModule hpt (eps_PIT eps) mod)
+    tryEpsAndUnitEnv eps unitEnv =
+        fmap mi_free_holes (lookupIfaceByModule unitEnv (eps_PIT eps) mod)
     tryDepsCache eps imod insts =
         case lookupInstalledModuleEnv (eps_free_holes eps) imod of
             Just ifhs  -> Just (renameFreeHoles ifhs insts)

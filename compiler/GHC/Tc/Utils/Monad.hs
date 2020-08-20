@@ -32,7 +32,7 @@ module GHC.Tc.Utils.Monad(
   getEpsVar,
   getEps,
   updateEps, updateEps_,
-  getHpt, getEpsAndHpt,
+  getHpt, getEpsAndHpt, getEpsAndUnitEnv,
 
   -- * Arrow scopes
   newArrowScope, escapeArrowScope,
@@ -582,6 +582,10 @@ getHpt = do { env <- getTopEnv; return (hsc_HPT env) }
 getEpsAndHpt :: TcRnIf gbl lcl (ExternalPackageState, HomePackageTable)
 getEpsAndHpt = do { env <- getTopEnv; eps <- readMutVar (hsc_EPS env)
                   ; return (eps, hsc_HPT env) }
+
+getEpsAndUnitEnv :: TcRnIf gbl lcl (ExternalPackageState, UnitEnv)
+getEpsAndUnitEnv = do { env <- getTopEnv; eps <- readMutVar (hsc_EPS env)
+                  ; return (eps, hsc_internalUnitEnv env) }
 
 -- | A convenient wrapper for taking a @MaybeErr MsgDoc a@ and throwing
 -- an exception if it is an error.

@@ -206,8 +206,9 @@ tcRnModule hsc_env mod_sum save_rn_syntax
 
   where
     hsc_src = ms_hsc_src mod_sum
-    dflags = hsc_dflags hsc_env
-    home_unit = hsc_home_unit hsc_env
+    unitid = ms_unit mod_sum
+    home_unit = hsc_unitHomeUnit unitid hsc_env
+    dflags = hsc_unitDflags unitid hsc_env
     err_msg = mkPlainErrMsg dflags loc $
               text "Module does not have a RealSrcSpan:" <+> ppr this_mod
 

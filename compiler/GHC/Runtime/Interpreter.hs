@@ -82,7 +82,6 @@ import GHC.Utils.Outputable(brackets, ppr)
 import GHC.Utils.Fingerprint
 import GHC.Utils.Misc
 
-import GHC.Unit.Module
 import GHC.Unit.Module.ModIface
 import GHC.Unit.Home.ModInfo
 
@@ -437,7 +436,7 @@ handleSeqHValueStatus hsc_env eval_status = do
     -- Reason: Setting of flags in libraries/ghci/GHCi/Run.hs:evalOptsSeq
     getSeqBpSpan Nothing = mkGeneralSrcSpan (fsLit "<unknown>")
     breaks mod = getModBreaks $ expectJust "getSeqBpSpan" $
-      lookupHpt (hsc_HPT hsc_env) (moduleName mod)
+      lookupHptByModuleInUnitEnv (hsc_internalUnitEnv hsc_env) mod
 
 
 -- -----------------------------------------------------------------------------

@@ -2533,7 +2533,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
   | otherwise  = find_it
   where
     dflags = hsc_unitDflags unit hsc_env
-    home_unit = hsc_home_unit hsc_env
+    home_unit = hsc_unitHomeUnit unit hsc_env
 
     check_timestamp old_summary location src_fn =
         checkSummaryTimestamp
@@ -2542,7 +2542,9 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
           old_summary location unit
 
     find_it = do
-        found <- findImportedModule hsc_env wanted_mod Nothing
+        let hsc_env' = set_hsc_currentUnit unit hsc_env
+        -- Only look in the correct home unit, as we know in which unit it is located.
+        found <- findHomeModule hsc_env' (hsc_unitHomeUnit unit hsc_env) wanted_mod
         case found of
              Found location mod
                 | isJust (ml_hs_file location) ->
@@ -2573,7 +2575,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
       = runExceptT $ do
         -- Temporary modification, so consumers can call 'hsc_dflags' and 'hsc_HPT'
         -- directly, without explicitly passing the UnitId around.
-        hsc_env <- pure $ set_hsc_currentUnit unit hsc_env
+        hsc_env <- pure $ set_hsc_currentUnit (toUnitId $ moduleUnit mod) hsc_env
         preimps@PreprocessedImports {..}
             <- getPreprocessedImports hsc_env src_fn Nothing maybe_buf
 
@@ -2745,7 +2747,7 @@ withDeferredDiagnostics f = do
             sequence_ $ reverse actions
 
         setLogAction action = modifySession $
-          modify_hsc_dflags $ \dflags -> dflags { log_action = action }
+          modify_hsc_dflags (\dflags -> dflags { log_action = action })
 
     MC.bracket
       (setLogAction deferDiagnostics)

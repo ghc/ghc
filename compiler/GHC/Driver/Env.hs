@@ -54,6 +54,7 @@ module GHC.Driver.Env
    , set_hsc_internalUnitEnv
    , set_hsc_internalUnitEnvGraph
    , modify_hsc_internalUnitenv
+   , rename_hsc_unitId
    -- * Dependency functionality for unit environment
    , hsc_currentHomeUnitDependencies
    , hsc_homeUnitDependencies
@@ -89,6 +90,8 @@ module GHC.Driver.Env
    , prepareAnnotations
    , lookupType
    , lookupIfaceByModule
+   , lookupDependentHpts
+   , lookupHptByModuleInUnitEnv
    )
 where
 
@@ -145,6 +148,7 @@ import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import GHC.Unit.State (UnitState(explicitUnits))
+import Data.Foldable (asum)
 
 -- | The Hsc monad: Passing an environment and warning state
 newtype Hsc a = Hsc (HscEnv -> WarningMessages -> IO (a, WarningMessages))
@@ -540,32 +544,32 @@ modify_hsc_internalUnitenv f uid e = assertHscEnvInvariant e
 -- @'rename_hsc_unitId' oldUnit newUnit hscEnv@, it is assumed that the 'oldUnit' exists in the map,
 -- otherwise we panic.
 -- The 'DynFlags' associated with the home unit will have its field 'homeUnitId' set to 'newUnit'.
--- rename_hsc_unitId :: HasCallStack => UnitId -> UnitId -> HscEnv -> HscEnv
--- rename_hsc_unitId oldUnit newUnit hscEnv = case hsc_findInternalUnitEnv_maybe oldUnit hscEnv of
---   Nothing ->
---     pprPanic "Tried to rename unit, but it didn't exist"
---               $ text "Rename old unit \"" <> ppr oldUnit <> text "\" to \""<> ppr newUnit <> text "\""
---               $$ nest 2 (pprInternalUnitMap hscEnv)
---   Just oldEnv ->
---     let
---       activeUnit :: UnitId
---       !activeUnit = if hsc_currentUnit hscEnv == oldUnit
---                 then newUnit
---                 else hsc_currentUnit hscEnv
+rename_hsc_unitId :: HasCallStack => UnitId -> UnitId -> HscEnv -> HscEnv
+rename_hsc_unitId oldUnit newUnit hscEnv = case hsc_findInternalUnitEnv_maybe oldUnit hscEnv of
+  Nothing ->
+    pprPanic "Tried to rename unit, but it didn't exist"
+              $ text "Rename old unit \"" <> ppr oldUnit <> text "\" to \""<> ppr newUnit <> text "\""
+              $$ nest 2 (pprInternalUnitMap hscEnv)
+  Just oldEnv ->
+    let
+      activeUnit :: UnitId
+      !activeUnit = if hsc_currentUnit hscEnv == oldUnit
+                then newUnit
+                else hsc_currentUnit hscEnv
 
---       newInternalUnitEnv = oldEnv
---         { internalUnitEnv_dflags = (internalUnitEnv_dflags oldEnv)
---             { homeUnitId_ = newUnit
---             }
---         }
---     in
---     assertHscEnvInvariant $ hscEnv
---       { hsc_internalUnitEnv =
---           unitEnv_setCurrentUnit activeUnit
---           $ unitEnv_insert newUnit newInternalUnitEnv
---           $ unitEnv_delete oldUnit
---           $ hsc_internalUnitEnv hscEnv
---       }
+      newInternalUnitEnv = oldEnv
+        { internalUnitEnv_dflags = (internalUnitEnv_dflags oldEnv)
+            { homeUnitId_ = newUnit
+            }
+        }
+    in
+    assertHscEnvInvariant $ hscEnv
+      { hsc_internalUnitEnv =
+          unitEnv_setCurrentUnit activeUnit
+          $ unitEnv_insert newUnit newInternalUnitEnv
+          $ unitEnv_delete oldUnit
+          $ hsc_internalUnitEnv hscEnv
+      }
 
 -- -----------------------------------------------------------------------------
 -- Getters
@@ -821,12 +825,12 @@ lookupType hsc_env name = do
 -- | Find the 'ModIface' for a 'Module', searching in both the loaded home
 -- and external package module information
 lookupIfaceByModule
-        :: HomePackageTable
+        :: UnitEnv
         -> PackageIfaceTable
         -> Module
         -> Maybe ModIface
-lookupIfaceByModule hpt pit mod
-  = case lookupHptByModule hpt mod of
+lookupIfaceByModule unitEnv pit mod
+  = case lookupHptByModuleInUnitEnv unitEnv mod of
        Just hm -> Just (hm_iface hm)
        Nothing -> lookupModuleEnv pit mod
    -- If the module does come from the home package, why do we look in the PIT as well?
@@ -836,3 +840,21 @@ lookupIfaceByModule hpt pit mod
    -- We could eliminate (b) if we wanted, by making GHC.Prim belong to a package
    -- of its own, but it doesn't seem worth the bother.
 
+-- | Lookup a 'ModuleName' in the given units home package table,
+-- or any home package table the given unit depends on.
+lookupDependentHpts :: UnitEnv -> UnitId -> ModuleName -> Maybe HomeModInfo
+lookupDependentHpts unitEnv root mod = do
+  let deps = unitEnv_homeUnitDependencies unitEnv root
+  let homeUnits = fmap (`unitEnv_lookup` unitEnv) (root:deps)
+  let hptOf = internalUnitEnv_homePackageTable
+  lookupHpts (map hptOf homeUnits) mod
+
+lookupHpts :: [HomePackageTable] -> ModuleName -> Maybe HomeModInfo
+lookupHpts hpts m = asum $ map (\hpt -> lookupHpt hpt m) hpts
+
+lookupHptByModuleInUnitEnv :: UnitEnv -> Module -> Maybe HomeModInfo
+-- The HPT is indexed by ModuleName, not Module,
+-- we must check for a hit on the right Module
+lookupHptByModuleInUnitEnv unitEnv mod = do
+  homeUnit <- unitEnv_lookup_maybe (toUnitId $ moduleUnit mod) unitEnv
+  lookupHpt (internalUnitEnv_homePackageTable homeUnit) (moduleName mod)

@@ -1077,10 +1077,10 @@ getOrphanHashes :: HscEnv -> [Module] -> IO [Fingerprint]
 getOrphanHashes hsc_env mods = do
   eps <- hscEPS hsc_env
   let
-    hpt        = hsc_HPT hsc_env
+    unitEnv    = hsc_internalUnitEnv hsc_env
     pit        = eps_PIT eps
     get_orph_hash mod =
-          case lookupIfaceByModule hpt pit mod of
+          case lookupIfaceByModule unitEnv pit mod of
             Just iface -> return (mi_orphan_hash (mi_final_exts iface))
             Nothing    -> do -- similar to 'mkHashFun'
                 iface <- initIfaceLoad hsc_env . withException
@@ -1371,13 +1371,13 @@ mkHashFun hsc_env eps name
   = lookup orig_mod
   where
       home_unit = hsc_home_unit hsc_env
-      hpt = hsc_HPT hsc_env
+      unitEnv = hsc_internalUnitEnv hsc_env
       pit = eps_PIT eps
       occ = nameOccName name
       orig_mod = nameModule name
       lookup mod = do
         MASSERT2( isExternalName name, ppr name )
-        iface <- case lookupIfaceByModule hpt pit mod of
+        iface <- case lookupIfaceByModule unitEnv pit mod of
                   Just iface -> return iface
                   Nothing -> do
                       -- This can occur when we're writing out ifaces for
