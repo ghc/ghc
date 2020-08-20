@@ -350,6 +350,9 @@ tcRnImports hsc_env import_decls
                                                             want_instances
               } ;
 
+        ; traceRn "tcRnImports" $ ppr dep_mods
+                  $$  ppr home_insts
+                  $$ ppr home_fam_insts
                 -- Record boot-file info in the EPS, so that it's
                 -- visible to loadHiBootInterface in tcRnSrcDecls,
                 -- and any other incrementally-performed imports
