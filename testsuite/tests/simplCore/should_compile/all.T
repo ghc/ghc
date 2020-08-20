@@ -332,3 +332,4 @@ test('T18328', [ only_ways(['optasm']), grep_errmsg(r'Arity=') ], compile, ['-dd
 test('T18347', normal, compile, ['-dcore-lint -O'])
 test('T18355', [ grep_errmsg(r'OneShot') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('T18399', normal, compile, ['-dcore-lint -O'])
+test('T18589', normal, compile, ['-dcore-lint -O'])
