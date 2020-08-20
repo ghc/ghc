@@ -30,7 +30,7 @@ module GHC.Tc.Utils.Monad(
   getEpsVar,
   getEps,
   updateEps, updateEps_,
-  getHpt, getEpsAndHpt,
+  getHpt, getEpsAndHpt, getEpsAndUnitEnv,
 
   -- * Arrow scopes
   newArrowScope, escapeArrowScope,
@@ -486,19 +486,19 @@ woptM flag = do { dflags <- getDynFlags; return (wopt flag dflags) }
 
 setXOptM :: LangExt.Extension -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 setXOptM flag =
-  updTopEnv (\top -> modify_hsc_dflags top $ \dflags -> xopt_set dflags flag)
+  updTopEnv (modify_hsc_dflags $ \dflags -> xopt_set dflags flag)
 
 unsetXOptM :: LangExt.Extension -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 unsetXOptM flag =
-  updTopEnv (\top -> modify_hsc_dflags top $ \dflags -> xopt_unset dflags flag)
+  updTopEnv (modify_hsc_dflags $ \dflags -> xopt_unset dflags flag)
 
 unsetGOptM :: GeneralFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 unsetGOptM flag =
-  updTopEnv (\top -> modify_hsc_dflags top $ \dflags -> gopt_unset dflags flag)
+  updTopEnv (modify_hsc_dflags $ \dflags -> gopt_unset dflags flag)
 
 unsetWOptM :: WarningFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 unsetWOptM flag =
-  updTopEnv (\top -> modify_hsc_dflags top $ \dflags -> wopt_unset dflags flag)
+  updTopEnv (modify_hsc_dflags $ \dflags -> wopt_unset dflags flag)
 
 -- | Do it flag is true
 whenDOptM :: DumpFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
@@ -532,7 +532,7 @@ getGhcMode = do { env <- getTopEnv; return (ghcMode (hsc_dflags env)) }
 
 withDoDynamicToo :: TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 withDoDynamicToo =
-  updTopEnv (\top -> modify_hsc_dflags top dynamicTooMkDynamicDynFlags)
+  updTopEnv (modify_hsc_dflags dynamicTooMkDynamicDynFlags)
 
 getEpsVar :: TcRnIf gbl lcl (TcRef ExternalPackageState)
 getEpsVar = do { env <- getTopEnv; return (hsc_EPS env) }
@@ -566,6 +566,10 @@ getHpt = do { env <- getTopEnv; return (hsc_HPT env) }
 getEpsAndHpt :: TcRnIf gbl lcl (ExternalPackageState, HomePackageTable)
 getEpsAndHpt = do { env <- getTopEnv; eps <- readMutVar (hsc_EPS env)
                   ; return (eps, hsc_HPT env) }
+
+getEpsAndUnitEnv :: TcRnIf gbl lcl (ExternalPackageState, UnitEnv)
+getEpsAndUnitEnv = do { env <- getTopEnv; eps <- readMutVar (hsc_EPS env)
+                  ; return (eps, hsc_internalUnitEnv env) }
 
 -- | A convenient wrapper for taking a @MaybeErr MsgDoc a@ and throwing
 -- an exception if it is an error.

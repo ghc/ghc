@@ -2967,9 +2967,10 @@ newDynFlags interactive_only minus_opts = do
             newLdInputs     = drop ld0length (ldInputs dflags2)
             newCLFrameworks = drop fmrk0length (cmdlineFrameworks dflags2)
 
-            hsc_env' = set_hsc_dflags hsc_env $
+            hsc_env' = set_hsc_dflags
                          dflags2 { ldInputs = newLdInputs
                                  , cmdlineFrameworks = newCLFrameworks }
+                         hsc_env
 
         when (not (null newLdInputs && null newCLFrameworks)) $
           liftIO $ linkCmdLineLibs hsc_env'

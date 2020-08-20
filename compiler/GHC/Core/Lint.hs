@@ -3302,7 +3302,7 @@ lintAnnots pname pass guts = do
 -- annotations from incoming modules.
 withoutAnnots :: (ModGuts -> CoreM ModGuts) -> ModGuts -> CoreM ModGuts
 withoutAnnots pass guts = do
-  let removeFlag env = modify_hsc_dflags env $ \dflags -> dflags { debugLevel = 0}
+  let removeFlag env = modify_hsc_dflags (\dflags -> dflags { debugLevel = 0}) env
       withoutFlag corem =
           -- TODO: supply tag here as well ?
         liftIO =<< runCoreM <$> fmap removeFlag getHscEnv <*> getRuleBase <*>

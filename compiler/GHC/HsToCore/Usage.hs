@@ -250,7 +250,6 @@ mk_mod_usage_info :: PackageIfaceTable
 mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
   = mapMaybe mkUsage usage_mods
   where
-    hpt = hsc_HPT hsc_env
     dflags = hsc_dflags hsc_env
     home_unit = mkHomeUnitFromFlags dflags
 
@@ -321,7 +320,7 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
                       usg_entities = Map.toList ent_hashs,
                       usg_safe     = imp_safe }
       where
-        maybe_iface  = lookupIfaceByModule hpt pit mod
+        maybe_iface  = lookupIfaceByModule (hsc_internalUnitEnv hsc_env) pit mod
                 -- In one-shot mode, the interfaces for home-package
                 -- modules accumulate in the PIT not HPT.  Sigh.
 
