@@ -143,11 +143,11 @@ primOpRules nm = \case
                                     , inversePrimOp NotIOp ]
    IntNegOp    -> mkPrimOpRule nm 1 [ unaryLit negOp
                                     , inversePrimOp IntNegOp ]
-   ISllOp      -> mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftL)
+   ISllOp      -> mkPrimOpRule nm 2 [ shiftRule LitNumInt (const Bits.shiftL)
                                     , rightIdentityPlatform zeroi ]
-   ISraOp      -> mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftR)
+   ISraOp      -> mkPrimOpRule nm 2 [ shiftRule LitNumInt (const Bits.shiftR)
                                     , rightIdentityPlatform zeroi ]
-   ISrlOp      -> mkPrimOpRule nm 2 [ shiftRule shiftRightLogical
+   ISrlOp      -> mkPrimOpRule nm 2 [ shiftRule LitNumInt shiftRightLogical
                                     , rightIdentityPlatform zeroi ]
 
    -- Word operations
@@ -189,8 +189,8 @@ primOpRules nm = \case
                                     , equalArgs >> retLit zerow ]
    NotOp       -> mkPrimOpRule nm 1 [ unaryLit complementOp
                                     , inversePrimOp NotOp ]
-   SllOp       -> mkPrimOpRule nm 2 [ shiftRule (const Bits.shiftL) ]
-   SrlOp       -> mkPrimOpRule nm 2 [ shiftRule shiftRightLogical ]
+   SllOp       -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const Bits.shiftL) ]
+   SrlOp       -> mkPrimOpRule nm 2 [ shiftRule LitNumWord shiftRightLogical ]
 
    -- coercions
    Word2IntOp     -> mkPrimOpRule nm 1 [ liftLitPlatform word2IntLit
@@ -477,12 +477,14 @@ wordOpC2 op env (LitNumber LitNumWord w1) (LitNumber LitNumWord w2) =
   wordCResult (roPlatform env) (fromInteger w1 `op` fromInteger w2)
 wordOpC2 _ _ _ _ = Nothing
 
-shiftRule :: (Platform -> Integer -> Int -> Integer) -> RuleM CoreExpr
+shiftRule :: LitNumType  -- Type of the result, either LitNumInt or LitNumWord
+          -> (Platform -> Integer -> Int -> Integer)
+          -> RuleM CoreExpr
 -- Shifts take an Int; hence third arg of op is Int
 -- Used for shift primops
---    ISllOp, ISraOp, ISrlOp :: Word# -> Int# -> Word#
+--    ISllOp, ISraOp, ISrlOp :: Int#  -> Int#  -> Int#
 --    SllOp, SrlOp           :: Word# -> Int# -> Word#
-shiftRule shift_op
+shiftRule lit_num_ty shift_op
   = do { platform <- getPlatform
        ; [e1, Lit (LitNumber LitNumInt shift_len)] <- getArgs
        ; case e1 of
@@ -490,7 +492,9 @@ shiftRule shift_op
              -> return e1
              -- See Note [Guarding against silly shifts]
              | shift_len < 0 || shift_len > toInteger (platformWordSizeInBits platform)
-             -> return $ Lit $ mkLitNumberWrap platform LitNumInt 0
+             -> return $ Lit $ mkLitNumberWrap platform lit_num_ty 0
+                -- Be sure to use lit_num_ty here, so we get a correctly typed zero
+                -- of type Int# or Word# resp.  See #18589
 
            -- Do the shift at type Integer, but shift length is Int
            Lit (LitNumber nt x)
