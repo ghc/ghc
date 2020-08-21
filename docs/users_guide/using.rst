@@ -265,6 +265,19 @@ The available mode flags are:
     Interactive mode, which is also available as :program:`ghci`. Interactive
     mode is described in more detail in :ref:`ghci`.
 
+.. ghc-flag:: -unit
+    :shortdesc: Interactive mode for multiple home units - normally used by just running ``ghci``;
+        see :ref:`ghci` for details.
+    :type: mode
+    :category: modes
+
+    .. index::
+       single: multi home unit interactive mode
+       single: GHCi
+
+    Interactive mode, which is also available as :program:`ghci`. Interactive
+    mode is described in more detail in :ref:`ghci`.
+
 .. ghc-flag:: --make
     :shortdesc: Build a multi-module Haskell program, automatically figuring out
         dependencies. Likely to be much easier, and faster, than using
