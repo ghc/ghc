@@ -98,9 +98,11 @@
 ***************************************/
 /*! Modify the local functions below should you wish to use some other memory routines
 *   for malloc(), free() */
-#include <stdlib.h>
-static void* XXH_malloc(size_t s) { return malloc(s); }
-static void  XXH_free  (void* p)  { free(p); }
+#include "Rts.h"
+#include "RtsUtils.h"
+
+static void* XXH_malloc(size_t s) { return stgMallocBytes(s, "XXH_malloc"); }
+static void  XXH_free  (void* p)  { stgFree(p); }
 /*! and for memcpy() */
 #include <string.h>
 static void* XXH_memcpy(void* dest, const void* src, size_t size) { return memcpy(dest,src,size); }
