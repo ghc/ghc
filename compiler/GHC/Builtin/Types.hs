@@ -157,7 +157,7 @@ import {-# SOURCE #-} GHC.Types.Id.Make ( mkDataConWorkId, mkDictSelId )
 -- friends:
 import GHC.Builtin.Names
 import GHC.Builtin.Types.Prim
-import {-# SOURCE #-} GHC.Builtin.Uniques
+import GHC.Builtin.Uniques
 
 -- others:
 import GHC.Core.Coercion.Axiom
@@ -178,7 +178,6 @@ import GHC.Types.Name.Set ( NameSet, mkNameSet, elemNameSet )
 import GHC.Types.Basic
 import GHC.Types.ForeignCall
 import GHC.Types.SrcLoc   ( noSrcSpan )
-import GHC.Types.Unique
 import Data.Array
 import GHC.Data.FastString
 import GHC.Data.BooleanFormula ( mkAnd )

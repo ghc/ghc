@@ -59,7 +59,7 @@ import GHC.Types.Var.Set
 import GHC.Core.Coercion ( ltRole )
 import GHC.Types.Basic
 import GHC.Types.SrcLoc
-import GHC.Types.Unique ( mkBuiltinUnique )
+import GHC.Builtin.Uniques ( mkBuiltinUnique )
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Utils.Misc

@@ -73,8 +73,8 @@ where
 
 import GHC.Prelude
 
-import GHC.Types.Name.Occurrence
-import GHC.Types.Name
+import {-# SOURCE #-} GHC.Types.Name.Occurrence
+import {-# SOURCE #-} GHC.Types.Name
 
 import GHC.Data.FastString
 import GHC.Data.FastString.Env

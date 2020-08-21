@@ -118,6 +118,7 @@ import GHC.Types.Name
 import GHC.Core.TyCon
 import GHC.Types.SrcLoc
 import GHC.Types.Unique
+import GHC.Builtin.Uniques
 import GHC.Builtin.Names
 import GHC.Data.FastString
 import GHC.Utils.Outputable
