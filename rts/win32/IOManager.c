@@ -265,7 +265,7 @@ IOWorkerProc(PVOID param)
                 }
                 // Free the WorkItem
                 DeregisterWorkItem(iom,work);
-                free(work);
+                stgFree(work);
             } else {
                 fprintf(stderr, "unable to fetch work; fatal.\n");
                 fflush(stderr);
@@ -321,7 +321,7 @@ StartIOManager(void)
     wq = NewWorkQueue();
     if ( !wq ) return false;
 
-    ioMan = (IOManagerState*)malloc(sizeof(IOManagerState));
+    ioMan = (IOManagerState*)stgMallocBytes(sizeof(IOManagerState), "StartIOManager");
 
     if (!ioMan) {
         FreeWorkQueue(wq);
@@ -332,7 +332,7 @@ StartIOManager(void)
     hExit = CreateEvent ( NULL, true, false, NULL );
     if ( !hExit ) {
         FreeWorkQueue(wq);
-        free(ioMan);
+        stgFree(ioMan);
         return false;
     }
 
@@ -440,8 +440,7 @@ AddIORequest ( int   fd,
 {
     ASSERT(ioMan);
 
-    WorkItem* wItem    = (WorkItem*)malloc(sizeof(WorkItem));
-    if (!wItem) return 0;
+    WorkItem* wItem    = (WorkItem*)stgMallocBytes(sizeof(WorkItem), "AddIORequest");
 
     unsigned int reqID = ioMan->requestID++;
 
@@ -471,8 +470,7 @@ AddDelayRequest ( HsInt          usecs,
 {
     ASSERT(ioMan);
 
-    WorkItem* wItem = (WorkItem*)malloc(sizeof(WorkItem));
-    if (!wItem) return false;
+    WorkItem* wItem = (WorkItem*)stgMallocBytes(sizeof(WorkItem), "AddDelayRequest");
 
     unsigned int reqID = ioMan->requestID++;
 
@@ -498,7 +496,7 @@ AddProcRequest ( void* proc,
 {
     ASSERT(ioMan);
 
-    WorkItem* wItem = (WorkItem*)malloc(sizeof(WorkItem));
+    WorkItem* wItem = (WorkItem*)stgMallocBytes(sizeof(WorkItem), "AddProcRequest");
     if (!wItem) return false;
 
     unsigned int reqID = ioMan->requestID++;
@@ -542,7 +540,7 @@ void ShutdownIOManager ( bool wait_threads )
             barf("timeEndPeriod failed");
         }
 
-        free(ioMan);
+        stgFree(ioMan);
         ioMan = NULL;
     }
 }
