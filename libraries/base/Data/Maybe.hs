@@ -256,8 +256,26 @@ listToMaybe = foldr (const . Just) Nothing
 -- >>> catMaybes $ [readMaybe x :: Maybe Int | x <- ["1", "Foo", "3"] ]
 -- [1,3]
 --
-catMaybes              :: [Maybe a] -> [a]
-catMaybes ls = [x | Just x <- ls]
+catMaybes :: [Maybe a] -> [a]
+catMaybes []     = []         -- we would like to implement it as `mapMaybe id` (#18574)
+catMaybes (x:xs) =            -- but it makes the simplifier loops because of rules for
+ let rs = catMaybes xs in     -- `mapMaybe` and `id`. So we do it the long way.
+ case x of
+  Nothing -> rs
+  Just r  -> r:rs
+{-# NOINLINE [1] catMaybes #-}
+
+{-# RULES
+"catMaybes"     [~1] forall xs. catMaybes xs
+                    = build (\c n -> foldr (catMaybesFB c) n xs)
+"catMaybesList" [1]  foldr (catMaybesFB (:)) [] = catMaybes
+  #-}
+
+{-# INLINE [0] catMaybesFB #-} -- See Note [Inline FB functions] in GHC.List
+catMaybesFB :: (a -> r -> r) -> Maybe a -> r -> r
+catMaybesFB cons x next = case x of
+  Nothing -> next
+  Just r -> cons r next
 
 -- | The 'mapMaybe' function is a version of 'map' which can throw
 -- out elements.  In particular, the functional argument returns
