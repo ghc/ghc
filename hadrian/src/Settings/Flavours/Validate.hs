@@ -42,5 +42,10 @@ slowValidateFlavour = werror $ validateFlavour
 slowValidateArgs :: Args
 slowValidateArgs =
   mconcat [ validateArgs
-          , notStage0 ? arg "-DDEBUG"
+          , sourceArgs SourceArgs
+            { hsCompiler = notStage0 ? arg "-DDEBUG"
+            , hsDefault  = mempty
+            , hsLibrary  = mempty
+            , hsGhc      = mempty
+            }
           ]
