@@ -1342,6 +1342,9 @@ void stmWriteTVar(Capability *cap,
   if (entry != NULL) {
     if (entry_in == trec) {
       // Entry found in our trec
+      IF_NONMOVING_WRITE_BARRIER_ENABLED {
+        updateRemembSetPushClosure(&cap->upd_rem_set, (StgClosure *) entry->new_value);
+      }
       entry -> new_value = new_value;
     } else {
       // Entry found in another trec
