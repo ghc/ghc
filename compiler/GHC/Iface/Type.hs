@@ -1359,58 +1359,53 @@ pprTyTcApp ctxt_prec tc tys =
     sdocOption sdocPrintExplicitKinds $ \print_kinds ->
     sdocOption sdocPrintTypeAbbreviations $ \print_type_abbreviations ->
     getPprDebug $ \debug ->
-    pprTyTcApp' ctxt_prec tc tys (PrintExplicitKinds print_kinds)
-                print_type_abbreviations debug
 
-pprTyTcApp' :: PprPrec -> IfaceTyCon -> IfaceAppArgs
-            -> PrintExplicitKinds -> Bool -> Bool -> SDoc
-pprTyTcApp' ctxt_prec tc tys printExplicitKinds printTypeAbbreviations debug
-  | ifaceTyConName tc `hasKey` ipClassKey
-  , IA_Arg (IfaceLitTy (IfaceStrTyLit n))
-           Required (IA_Arg ty Required IA_Nil) <- tys
-  = maybeParen ctxt_prec funPrec
-    $ char '?' <> ftext n <> text "::" <> ppr_ty topPrec ty
+    if | ifaceTyConName tc `hasKey` ipClassKey
+       , IA_Arg (IfaceLitTy (IfaceStrTyLit n))
+                Required (IA_Arg ty Required IA_Nil) <- tys
+       -> maybeParen ctxt_prec funPrec
+         $ char '?' <> ftext n <> text "::" <> ppr_ty topPrec ty
 
-  | IfaceTupleTyCon arity sort <- ifaceTyConSort info
-  , not debug
-  , arity == ifaceVisAppArgsLength tys
-  = pprTuple ctxt_prec sort (ifaceTyConIsPromoted info) tys
+       | IfaceTupleTyCon arity sort <- ifaceTyConSort info
+       , not debug
+       , arity == ifaceVisAppArgsLength tys
+       -> pprTuple ctxt_prec sort (ifaceTyConIsPromoted info) tys
 
-  | IfaceSumTyCon arity <- ifaceTyConSort info
-  = pprSum arity (ifaceTyConIsPromoted info) tys
+       | IfaceSumTyCon arity <- ifaceTyConSort info
+       -> pprSum arity (ifaceTyConIsPromoted info) tys
 
-  | tc `ifaceTyConHasKey` consDataConKey
-  , PrintExplicitKinds False <- printExplicitKinds
-  , IA_Arg _ argf (IA_Arg ty1 Required (IA_Arg ty2 Required IA_Nil)) <- tys
-  , isInvisibleArgFlag argf
-  = pprIfaceTyList ctxt_prec ty1 ty2
+       | tc `ifaceTyConHasKey` consDataConKey
+       , False <- print_kinds
+       , IA_Arg _ argf (IA_Arg ty1 Required (IA_Arg ty2 Required IA_Nil)) <- tys
+       , isInvisibleArgFlag argf
+       -> pprIfaceTyList ctxt_prec ty1 ty2
 
-  | tc `ifaceTyConHasKey` tYPETyConKey
-  , IA_Arg (IfaceTyConApp rep IA_Nil) Required IA_Nil <- tys
-  , rep `ifaceTyConHasKey` liftedRepDataConKey
-  , printTypeAbbreviations  -- See Note [Printing type abbreviations]
-  = ppr_kind_type ctxt_prec
+       | tc `ifaceTyConHasKey` tYPETyConKey
+       , IA_Arg (IfaceTyConApp rep IA_Nil) Required IA_Nil <- tys
+       , rep `ifaceTyConHasKey` liftedRepDataConKey
+       , print_type_abbreviations  -- See Note [Printing type abbreviations]
+       -> ppr_kind_type ctxt_prec
 
-  | tc `ifaceTyConHasKey` funTyConKey
-  , IA_Arg (IfaceTyConApp rep IA_Nil) Required args <- tys
-  , rep `ifaceTyConHasKey` manyDataConKey
-  , printTypeAbbreviations  -- See Note [Printing type abbreviations]
-  = pprIfacePrefixApp ctxt_prec (parens arrow) (map (ppr_ty appPrec) (appArgsIfaceTypes $ stripInvisArgs printExplicitKinds args))
+       | tc `ifaceTyConHasKey` funTyConKey
+       , IA_Arg (IfaceTyConApp rep IA_Nil) Required args <- tys
+       , rep `ifaceTyConHasKey` manyDataConKey
+       , print_type_abbreviations  -- See Note [Printing type abbreviations]
+       -> pprIfacePrefixApp ctxt_prec (parens arrow) (map (ppr_ty appPrec) $
+          appArgsIfaceTypes $ stripInvisArgs (PrintExplicitKinds print_kinds) args)
 
-  | otherwise
-  = getPprDebug $ \dbg ->
-    if | not dbg && tc `ifaceTyConHasKey` errorMessageTypeErrorFamKey
+       | tc `ifaceTyConHasKey` errorMessageTypeErrorFamKey
+       , not debug
          -- Suppress detail unless you _really_ want to see
-         -> text "(TypeError ...)"
+       -> text "(TypeError ...)"
 
        | Just doc <- ppr_equality ctxt_prec tc (appArgsIfaceTypes tys)
-         -> doc
+       -> doc
 
        | otherwise
-         -> ppr_iface_tc_app ppr_app_arg ctxt_prec tc tys_wo_kinds
+       -> ppr_iface_tc_app ppr_app_arg ctxt_prec tc $
+          appArgsIfaceTypesArgFlags $ stripInvisArgs (PrintExplicitKinds print_kinds) tys
   where
     info = ifaceTyConInfo tc
-    tys_wo_kinds = appArgsIfaceTypesArgFlags $ stripInvisArgs printExplicitKinds tys
 
 ppr_kind_type :: PprPrec -> SDoc
 ppr_kind_type ctxt_prec = sdocOption sdocStarIsType $ \case
