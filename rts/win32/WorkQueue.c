@@ -41,12 +41,7 @@ newSemaphore(int initCount, int max)
 WorkQueue*
 NewWorkQueue()
 {
-  WorkQueue* wq = (WorkQueue*)malloc(sizeof(WorkQueue));
-
-  if (!wq) {
-    queue_error("NewWorkQueue", "malloc() failed");
-    return wq;
-  }
+  WorkQueue* wq = (WorkQueue*)stgMallocBytes(sizeof(WorkQueue), "NewWorkQueue");
 
   memset(wq, 0, sizeof *wq);
 

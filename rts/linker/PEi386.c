@@ -735,7 +735,7 @@ addDLL_PEi386( pathchar *dll_name, HINSTANCE *loaded )
 error:
     stgFree(buf);
 
-    char* errormsg = malloc(sizeof(char) * 80);
+    char* errormsg = stgMallocBytes(sizeof(char) * 80, "addDLL_PEi386");
     snprintf(errormsg, 80, "addDLL: %" PATH_FMT " or dependencies not loaded. (Win32 error %lu)", dll_name, GetLastError());
     /* LoadLibrary failed; return a ptr to the error msg. */
     return errormsg;
@@ -745,7 +745,7 @@ pathchar* findSystemLibrary_PEi386( pathchar* dll_name )
 {
     const unsigned int init_buf_size = 1024;
     unsigned int bufsize             = init_buf_size;
-    wchar_t* result = malloc(sizeof(wchar_t) * bufsize);
+    wchar_t* result = stgMallocBytes(sizeof(wchar_t) * bufsize, "findSystemLibrary_PEi386");
     DWORD wResult   = SearchPathW(NULL, dll_name, NULL, bufsize, result, NULL);
 
     if (wResult > bufsize) {
@@ -755,7 +755,7 @@ pathchar* findSystemLibrary_PEi386( pathchar* dll_name )
 
 
     if (!wResult) {
-        free(result);
+        stgFree(result);
         return NULL;
     }
 
@@ -773,7 +773,7 @@ HsPtr addLibrarySearchPath_PEi386(pathchar* dll_path)
     int bufsize                      = init_buf_size;
 
     // Make sure the path is an absolute path
-    WCHAR* abs_path = malloc(sizeof(WCHAR) * init_buf_size);
+    WCHAR* abs_path = stgMallocBytes(sizeof(WCHAR) * init_buf_size, "addLibrarySearchPath_PEi386(1)");
     DWORD wResult = GetFullPathNameW(dll_path, bufsize, abs_path, NULL);
     if (!wResult){
         IF_DEBUG(linker, debugBelch("addLibrarySearchPath[GetFullPathNameW]: %" PATH_FMT " (Win32 error %lu)", dll_path, GetLastError()));
@@ -791,7 +791,7 @@ HsPtr addLibrarySearchPath_PEi386(pathchar* dll_path)
     else
     {
         warnMissingKBLibraryPaths();
-        WCHAR* str = malloc(sizeof(WCHAR) * init_buf_size);
+        WCHAR* str = stgMallocBytes(sizeof(WCHAR) * init_buf_size, "addLibrarySearchPath_PEi386(2)");
         wResult = GetEnvironmentVariableW(L"PATH", str, bufsize);
 
         if (wResult > init_buf_size) {
@@ -804,7 +804,7 @@ HsPtr addLibrarySearchPath_PEi386(pathchar* dll_path)
         }
 
         bufsize = wResult + 2 + pathlen(abs_path);
-        wchar_t* newPath = malloc(sizeof(wchar_t) * bufsize);
+        wchar_t* newPath = stgMallocBytes(sizeof(wchar_t) * bufsize, "addLibrarySearchPath_PEi386(3)");
 
         wcscpy(newPath, abs_path);
         wcscat(newPath, L";");
@@ -813,19 +813,19 @@ HsPtr addLibrarySearchPath_PEi386(pathchar* dll_path)
             sysErrorBelch("addLibrarySearchPath[SetEnvironmentVariableW]: %" PATH_FMT " (Win32 error %lu)", abs_path, GetLastError());
         }
 
-        free(newPath);
-        free(abs_path);
+        stgFree(newPath);
+        stgFree(abs_path);
 
         return str;
     }
 
     if (!result) {
         sysErrorBelch("addLibrarySearchPath: %" PATH_FMT " (Win32 error %lu)", abs_path, GetLastError());
-        free(abs_path);
+        stgFree(abs_path);
         return NULL;
     }
 
-    free(abs_path);
+    stgFree(abs_path);
     return result;
 }
 
