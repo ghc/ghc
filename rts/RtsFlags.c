@@ -260,7 +260,6 @@ void initRtsFlagsDefaults(void)
 #else
     RtsFlags.MiscFlags.ioManager               = IO_MNGR_POSIX;
 #endif
-    RtsFlags.MiscFlags.useIoUringBackend       = false;
 #if defined(THREADED_RTS) && defined(mingw32_HOST_OS)
     RtsFlags.MiscFlags.numIoWorkerThreads      = getNumberOfProcessors();
 #else
@@ -500,8 +499,6 @@ usage_text[] = {
 "            The number of worker threads to use in the native I/O manager to",
 "            handle completion events. (defualt: num cores)",
 #endif
-"  --use-io-uring-backend",
-"            Use the io_uring based backend for the I/O event manager on posix",
 "  -e<n>     Maximum number of outstanding local sparks (default: 4096)",
 #endif
 #if defined(x86_64_HOST_ARCH)
@@ -969,11 +966,6 @@ error = true;
                                &rts_argv[arg][2])) {
                       OPTION_UNSAFE;
                       RtsFlags.MiscFlags.ioManager = IO_MNGR_POSIX;
-                  }
-                  else if (strequal("use-io-uring-backend",
-                               &rts_argv[arg][2])) {
-                      OPTION_UNSAFE;
-                      RtsFlags.MiscFlags.useIoUringBackend = true;
                   }
                   else if (strequal("info",
                                &rts_argv[arg][2])) {
