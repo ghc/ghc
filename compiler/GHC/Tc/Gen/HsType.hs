@@ -16,8 +16,8 @@
 module GHC.Tc.Gen.HsType (
         -- Type signatures
         kcClassSigType, tcClassSigType,
-        tcHsSigType, tcLHsSigType, tcHsSigWcType,
-        tcHsPartialSigType,
+        tcHsSigType, tcLHsSigType, tcHsSigWcType, tcLHsSigWcType,
+        tcHsPartialSigType, tcHsPartialSigType',
         tcStandaloneKindSig,
         funsSigCtxt, addSigCtxt, pprSigCtxt,
 
@@ -30,7 +30,7 @@ module GHC.Tc.Gen.HsType (
         bindExplicitTKBndrs_Tv, bindExplicitTKBndrs_Skol,
             bindExplicitTKBndrs_Q_Tv, bindExplicitTKBndrs_Q_Skol,
         bindOuterFamEqnTKBndrs_Q_Skol, bindOuterFamEqnTKBndrs_Q_Tv,
-        bindOuterGadtTKBndrs_Tv, bindOuterGadtTKBndrs_Skol,
+        bindOuterSigTKBndrs_Tv, bindOuterSigTKBndrs_Skol,
         ContextKind(..),
 
         -- Type checking type and class decls, and instances thereof
@@ -291,7 +291,14 @@ tcHsSigWcType :: UserTypeCtxt -> LHsSigWcType GhcRn -> TcM Type
 -- already checked this, so we can simply ignore it.
 tcHsSigWcType ctxt sig_ty = tcHsSigType ctxt (dropWildCards sig_ty)
 
-kcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM ()
+-- TODO RGS: This is the REAL tcHsSigWcType. Delete the one above when ready.
+tcLHsSigWcType :: UserTypeCtxt -> LHsSigWcType' GhcRn -> TcM Type
+-- This one is used when we have a LHsSigWcType, but in
+-- a place where wildcards aren't allowed. The renamer has
+-- already checked this, so we can simply ignore it.
+tcLHsSigWcType ctxt sig_ty = tcLHsSigType ctxt (dropWildCards' sig_ty)
+
+kcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType' GhcRn -> TcM ()
 -- This is a special form of tcClassSigType that is used during the
 -- kind-checking phase to infer the kind of class variables. Cf. tc_hs_sig_type.
 -- Importantly, this does *not* kind-generalize. Consider
@@ -304,22 +311,23 @@ kcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM ()
 -- end up promoting kappa to the top level (because kind-generalization is
 -- normally done right before adding a binding to the context), and then we
 -- can't set kappa := f a, because a is local.
-kcClassSigType skol_info names (HsIB { hsib_ext  = sig_vars
-                                     , hsib_body = hs_ty })
-  = addSigCtxt (funsSigCtxt names) hs_ty $
-    do { (tc_lvl, (wanted, (spec_tkvs, _)))
+kcClassSigType skol_info names
+    sig_ty@(L _ (HsSig { sig_bndrs = outer_bndrs, sig_body = hs_ty }))
+  = addSigCtxt (funsSigCtxt names) sig_ty $
+    do { (tc_lvl, (wanted, (imp_or_exp_tkvs, _)))
            <- pushTcLevelM                           $
               solveLocalEqualitiesX "kcClassSigType" $
-              bindImplicitTKBndrs_Skol sig_vars      $
+              bindOuterSigTKBndrs_Skol outer_bndrs   $
               tcLHsType hs_ty liftedTypeKind
 
+       ; let spec_tkvs = either id binderVars imp_or_exp_tkvs
        ; emitResidualTvConstraint skol_info spec_tkvs tc_lvl wanted }
 
-tcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM Type
+tcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType' GhcRn -> TcM Type
 -- Does not do validity checking
 tcClassSigType skol_info names sig_ty
-  = addSigCtxt (funsSigCtxt names) (hsSigType sig_ty) $
-    do { (implic, ty) <- tc_hs_sig_type skol_info sig_ty (TheKind liftedTypeKind)
+  = addSigCtxt (funsSigCtxt names) sig_ty $
+    do { (implic, ty) <- tc_hs_sig_type' skol_info sig_ty (TheKind liftedTypeKind)
        ; emitImplication implic
        ; return ty }
        -- Do not zonk-to-Type, nor perform a validity check
@@ -445,7 +453,7 @@ tc_hs_sig_type' skol_info (L loc (HsSig { sig_bndrs = outer_bndrs
        -- should be in the global tyvars, and therefore won't be quantified
 
        ; imp_or_exp_tkvs <- bitraverse zonkAndScopedSort pure imp_or_exp_tkvs
-       ; let ty1 = either mkSpecForAllTys mkForAllTys imp_or_exp_tkvs ty
+       ; let ty1 = either mkSpecForAllTys mkInvisForAllTys imp_or_exp_tkvs ty
 
        -- This bit is very much like decideMonoTyVars in GHC.Tc.Solver,
        -- but constraints are so much simpler in kinds, it is much
@@ -562,7 +570,7 @@ tc_top_lhs_sig_type mode (L loc sig_ty@(HsSig { sig_bndrs = outer_bndrs
                     ; tc_lhs_type mode body kind }
 
        ; imp_or_exp_tkvs <- bitraverse zonkAndScopedSort pure imp_or_exp_tkvs
-       ; let ty1 = either mkSpecForAllTys mkForAllTys imp_or_exp_tkvs ty
+       ; let ty1 = either mkSpecForAllTys mkInvisForAllTys imp_or_exp_tkvs ty
        ; kvs <- kindGeneralizeAll ty1  -- "All" because it's a top-level type
        ; final_ty <- zonkTcTypeToType (mkInfForAllTys kvs ty1)
        ; traceTc "tc_top_hs_sig_type }" (vcat [ppr sig_ty, ppr final_ty])
@@ -3070,8 +3078,9 @@ cloneFlexiKindedTyVarTyVar = newFlexiKindedTyVar cloneTyVarTyVar
 
 -- TODO RGS: Which of these do we actually need?
 
+{-
 -- | Skolemise the 'HsTyVarBndr's in an 'HsForAllTelescope'.
--- TODO RGS: Consolidate with bindExplicitTK_Tele_Tv?
+-- TODO RGS: Consolidate with bindExplicitTK_Skol_M?
 bindExplicitTKTele_Skol
     :: HsForAllTelescope GhcRn
     -> TcM a
@@ -3087,27 +3096,8 @@ bindExplicitTKTele_Skol tele thing_inside = case tele of
             -- inv_tv_bndrs :: [VarBndr TyVar Specificity],
             -- but we want [VarBndr TyVar ArgFlag]
           ; return (tyVarSpecToBinders inv_tv_bndrs, thing) }
-
-{-
--- | Clone the 'HsTyVarBndr's in an 'HsForAllTelescope'.
--- TODO RGS: Consolidate with bindExplicitTK_Tele_Skol?
-bindExplicitTKTele_Tv
-    :: HsForAllTelescope GhcRn
-    -> TcM a
-    -> TcM (Either [TcReqTVBinder] [TcInvisTVBinder], a)
-bindExplicitTKTele_Tv tele thing_inside = case tele of
-  HsForAllVis { hsf_vis_bndrs = bndrs } -> do
-    (req_tv_bndrs, thing) <- bindExplicitTKBndrs_Tv bndrs thing_inside
-    pure (Left req_tv_bndrs, thing)
-  HsForAllInvis { hsf_invis_bndrs = bndrs } -> do
-    (inv_tv_bndrs, thing) <- bindExplicitTKBndrs_Tv bndrs thing_inside
-    pure (Right inv_tv_bndrs, thing)
 -}
 
-{-
-TODO RGS: Consider renaming this to bindExplicitTKTele, as the QL patch does,
-if there are no other variants that work over HsForAllTelescopes
--}
 -- | Skolemise the 'HsTyVarBndr's in an 'HsForAllTelescope' with the supplied
 -- 'TcTyMode'.
 bindExplicitTKTele_Skol_M
@@ -3217,52 +3207,38 @@ bindOuterFamEqnTKBndrs_Q_Tv :: ContextKind
                             -> TcM a
                             -> TcM ([TcTyVar], a)
 bindOuterFamEqnTKBndrs_Q_Tv ctxt_kind outer_bndrs thing_inside = case outer_bndrs of
-  HsOuterImplicit{hso_ximplicit = implicit_tkv_nms} -> do
-    bindImplicitTKBndrs_Q_Tv implicit_tkv_nms thing_inside
-  HsOuterExplicit{hso_bndrs = exp_bndrs} -> do
-    bindExplicitTKBndrs_Q_Tv ctxt_kind exp_bndrs thing_inside
-
--- TODO RGS: Docs(?)
--- TODO RGS: Is the return type correct?
--- TODO RGS: Consolidate with bindHsOuter*TKBndrs_Tv?
-bindOuterGadtTKBndrs_Skol :: HsOuterGadtTyVarBndrs GhcRn
-                          -> TcM a
-                          -> TcM (Either [TcTyVar] [TcInvisTVBinder], a)
-bindOuterGadtTKBndrs_Skol outer_bndrs thing_inside = case outer_bndrs of
-  HsOuterImplicit{hso_ximplicit = implicit_tkv_nms} -> do
-    (imp_tvs, thing) <- bindImplicitTKBndrs_Skol implicit_tkv_nms thing_inside
-    pure (Left imp_tvs, thing)
-  HsOuterExplicit{hso_bndrs = exp_bndrs} -> do
-    (exp_bndrs', thing) <- bindExplicitTKBndrs_Skol exp_bndrs thing_inside
-    pure (Right exp_bndrs', thing)
-
--- TODO RGS: Docs(?)
--- TODO RGS: Is the return type correct?
--- TODO RGS: Consolidate with bindHsOuter*TKBndrs_Skol?
-bindOuterGadtTKBndrs_Tv :: HsOuterGadtTyVarBndrs GhcRn
-                        -> TcM a
-                        -> TcM (Either [TcTyVar] [TcInvisTVBinder], a)
-bindOuterGadtTKBndrs_Tv outer_bndrs thing_inside = case outer_bndrs of
-  HsOuterImplicit{hso_ximplicit = implicit_tv_names} -> do
-    (imp_tvs, thing) <- bindImplicitTKBndrs_Tv implicit_tv_names thing_inside
-    pure (Left imp_tvs, thing)
-  HsOuterExplicit{hso_bndrs = exp_bndrs} -> do
-    (exp_bndrs', thing) <- bindExplicitTKBndrs_Tv exp_bndrs thing_inside
-    pure (Right exp_bndrs', thing)
+  HsOuterImplicit{hso_ximplicit = implicit_tkv_nms}
+    -> bindImplicitTKBndrs_Q_Tv implicit_tkv_nms thing_inside
+  HsOuterExplicit{hso_bndrs = exp_bndrs}
+    -> bindExplicitTKBndrs_Q_Tv ctxt_kind exp_bndrs thing_inside
 
 -- TODO RGS: Docs(?)
 -- TODO RGS: Is the return type correct?
 -- TODO RGS: Consolidate?
 bindOuterSigTKBndrs_Skol :: HsOuterSigTyVarBndrs GhcRn
                          -> TcM a
-                         -> TcM (Either [TcTyVar] [TcTyVarBinder], a)
+                         -> TcM (Either [TcTyVar] [TcInvisTVBinder], a)
 bindOuterSigTKBndrs_Skol outer_bndrs thing_inside = case outer_bndrs of
-  HsOuterImplicit{hso_ximplicit = implicit_tkv_nms} -> do
-    (imp_tvs, thing) <- bindImplicitTKBndrs_Skol implicit_tkv_nms thing_inside
-    pure (Left imp_tvs, thing)
-  HsOuterExplicit{hso_bndrs = exp_bndrs} -> do
-    (exp_bndrs', thing) <- bindExplicitTKTele_Skol exp_bndrs thing_inside
-    pure (Right exp_bndrs', thing)
+  HsOuterImplicit{hso_ximplicit = implicit_tkv_nms}
+    -> do { (imp_tvs, thing) <- bindImplicitTKBndrs_Skol implicit_tkv_nms thing_inside
+          ; pure (Left imp_tvs, thing) }
+  HsOuterExplicit{hso_bndrs = exp_bndrs}
+    -> do { (exp_bndrs', thing) <- bindExplicitTKBndrs_Skol exp_bndrs thing_inside
+          ; pure (Right exp_bndrs', thing) }
+
+-- TODO RGS: Docs(?)
+-- TODO RGS: Is the return type correct?
+-- TODO RGS: Consolidate with bindHsOuter*TKBndrs_Skol?
+bindOuterSigTKBndrs_Tv :: HsOuterSigTyVarBndrs GhcRn
+                       -> TcM a
+                       -> TcM (Either [TcTyVar] [TcInvisTVBinder], a)
+bindOuterSigTKBndrs_Tv outer_bndrs thing_inside = case outer_bndrs of
+  HsOuterImplicit{hso_ximplicit = implicit_tv_names}
+    -> do { (imp_tvs, thing) <- bindImplicitTKBndrs_Tv implicit_tv_names thing_inside
+          ; pure (Left imp_tvs, thing) }
+  HsOuterExplicit{hso_bndrs = exp_bndrs}
+    -> do { (exp_bndrs', thing) <- bindExplicitTKBndrs_Tv exp_bndrs thing_inside
+          ; pure (Right exp_bndrs', thing) }
 
 -- TODO RGS: Docs(?)
 -- TODO RGS: Is the return type correct?
@@ -3270,14 +3246,29 @@ bindOuterSigTKBndrs_Skol outer_bndrs thing_inside = case outer_bndrs of
 bindOuterSigTKBndrs_Skol_M :: TcTyMode
                            -> HsOuterSigTyVarBndrs GhcRn
                            -> TcM a
-                           -> TcM (Either [TcTyVar] [TcTyVarBinder], a)
+                           -> TcM (Either [TcTyVar] [TcInvisTVBinder], a)
 bindOuterSigTKBndrs_Skol_M mode outer_bndrs thing_inside = case outer_bndrs of
-  HsOuterImplicit{hso_ximplicit = implicit_tkv_nms} -> do
-    (imp_tvs, thing) <- bindImplicitTKBndrs_Skol implicit_tkv_nms thing_inside
-    pure (Left imp_tvs, thing)
-  HsOuterExplicit{hso_bndrs = exp_bndrs} -> do
-    (exp_bndrs', thing) <- bindExplicitTKTele_Skol_M mode exp_bndrs thing_inside
-    pure (Right exp_bndrs', thing)
+  HsOuterImplicit{hso_ximplicit = implicit_tkv_nms}
+    -> do { (imp_tvs, thing) <- bindImplicitTKBndrs_Skol implicit_tkv_nms thing_inside
+          ; pure (Left imp_tvs, thing) }
+  HsOuterExplicit{hso_bndrs = exp_bndrs}
+    -> do { (exp_bndrs', thing) <- bindExplicitTKBndrs_Skol_M mode exp_bndrs thing_inside
+          ; pure (Right exp_bndrs', thing) }
+
+-- TODO RGS: Docs(?)
+-- TODO RGS: Is the return type correct?
+-- TODO RGS: Consolidate?
+bindOuterSigTKBndrs_Tv_M :: TcTyMode
+                         -> HsOuterSigTyVarBndrs GhcRn
+                         -> TcM a
+                         -> TcM ([TcInvisTVBinder], a)
+bindOuterSigTKBndrs_Tv_M mode outer_bndrs thing_inside = case outer_bndrs of
+  HsOuterImplicit{hso_ximplicit = implicit_tkv_nms}
+    -> do { (imp_tvs, thing) <- bindImplicitTKBndrs_Tv implicit_tkv_nms thing_inside
+          ; pure (mkTyVarBinders SpecifiedSpec imp_tvs, thing) }
+  HsOuterExplicit{hso_bndrs = exp_bndrs}
+    -> do { (exp_bndrs', thing) <- bindExplicitTKBndrs_Tv_M mode exp_bndrs thing_inside
+          ; pure (exp_bndrs', thing) }
 
 -----------------
 tcHsTyVarBndr :: TcTyMode -> (Name -> Kind -> TcM TyVar)
@@ -3732,6 +3723,7 @@ It isn't essential for correctness.
 
 -}
 
+-- TODO RGS: Delete me
 tcHsPartialSigType
   :: UserTypeCtxt
   -> LHsSigWcType GhcRn       -- The type signature
@@ -3791,6 +3783,70 @@ tcHsPartialSigType ctxt sig_ty
          -- Test case: partial-sigs/should_compile/LocalDefinitionBug
        ; let tv_prs = (implicit_hs_tvs                  `zip` implicit_tvbndrs)
                       ++ (hsLTyVarNames explicit_hs_tvs `zip` explicit_tvbndrs)
+
+      -- NB: checkValidType on the final inferred type will be
+      --     done later by checkInferredPolyId.  We can't do it
+      --     here because we don't have a complete type to check
+
+       ; traceTc "tcHsPartialSigType" (ppr tv_prs)
+       ; return (wcs, wcx, tv_prs, theta, tau) }
+
+-- TODO RGS: This is the REAL tcHsPartialSigType. Delete the one above when ready.
+tcHsPartialSigType'
+  :: UserTypeCtxt
+  -> LHsSigWcType' GhcRn       -- The type signature
+  -> TcM ( [(Name, TcTyVar)]  -- Wildcards
+         , Maybe TcType       -- Extra-constraints wildcard
+         , [(Name,InvisTVBinder)] -- Original tyvar names, in correspondence with
+                              --   the implicitly and explicitly bound type variables
+         , TcThetaType        -- Theta part
+         , TcType )           -- Tau part
+-- See Note [Checking partial type signatures]
+tcHsPartialSigType' ctxt sig_ty
+  | HsWC { hswc_ext  = sig_wcs, hswc_body = sig_ty } <- sig_ty
+  , L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body_ty}) <- sig_ty
+  , (L _ hs_ctxt, hs_tau) <- splitLHsQualTy body_ty
+  = addSigCtxt ctxt sig_ty $
+    do { mode <- mkHoleMode TypeLevel HM_Sig
+       ; (imp_or_exp_tvbndrs, (wcs, wcx, theta, tau))
+            <- solveLocalEqualities "tcHsPartialSigType" $
+               -- See Note [Failure in local type signatures]
+               tcNamedWildCardBinders sig_wcs            $ \ wcs ->
+               bindOuterSigTKBndrs_Tv_M mode outer_bndrs $
+               do {   -- Instantiate the type-class context; but if there
+                      -- is an extra-constraints wildcard, just discard it here
+                    (theta, wcx) <- tcPartialContext mode hs_ctxt
+
+                  ; ek <- newOpenTypeKind
+                  ; tau <- addTypeCtxt hs_tau $
+                           tc_lhs_type mode hs_tau ek
+
+                  ; return (wcs, wcx, theta, tau) }
+
+         -- No kind-generalization here:
+       ; kindGeneralizeNone (mkInvisForAllTys imp_or_exp_tvbndrs $
+                             mkPhiTy theta $
+                             tau)
+
+       -- Spit out the wildcards (including the extra-constraints one)
+       -- as "hole" constraints, so that they'll be reported if necessary
+       -- See Note [Extra-constraint holes in partial type signatures]
+       ; mapM_ emitNamedTypeHole wcs
+
+       -- Zonk, so that any nested foralls can "see" their occurrences
+       -- See Note [Checking partial type signatures], and in particular
+       -- Note [Levels for wildcards]
+       ; imp_or_exp_tvbndrs <- mapM zonkInvisTVBinder imp_or_exp_tvbndrs
+       ; theta              <- mapM zonkTcType theta
+       ; tau                <- zonkTcType tau
+
+         -- We return a proper (Name,InvisTVBinder) environment, to be sure that
+         -- we bring the right name into scope in the function body.
+         -- Test case: partial-sigs/should_compile/LocalDefinitionBug
+       ; let imp_or_exp_hs_tvs = case outer_bndrs of
+               HsOuterImplicit{hso_ximplicit = imp_tvs} -> imp_tvs
+               HsOuterExplicit{hso_bndrs = exp_tvs}     -> hsLTyVarNames exp_tvs
+             tv_prs = imp_or_exp_hs_tvs `zip` imp_or_exp_tvbndrs
 
       -- NB: checkValidType on the final inferred type will be
       --     done later by checkInferredPolyId.  We can't do it

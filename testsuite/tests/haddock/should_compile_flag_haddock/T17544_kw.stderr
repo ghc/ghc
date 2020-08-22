@@ -133,15 +133,18 @@
          [({ T17544_kw.hs:24:5-13 }
            (Unqual
             {OccName: clsmethod}))]
-         (HsIB
-          (NoExtField)
-          ({ T17544_kw.hs:24:18 }
-           (HsTyVar
-            (NoExtField)
-            (NotPromoted)
-            ({ T17544_kw.hs:24:18 }
-             (Unqual
-              {OccName: a})))))))]
+         ({ T17544_kw.hs:24:18 }
+          (HsSig
+           (NoExtField)
+           (HsOuterImplicit
+            (NoExtField))
+           ({ T17544_kw.hs:24:18 }
+            (HsTyVar
+             (NoExtField)
+             (NotPromoted)
+             ({ T17544_kw.hs:24:18 }
+              (Unqual
+               {OccName: a}))))))))]
       {Bag(Located (HsBind GhcPs)):
        []}
       []

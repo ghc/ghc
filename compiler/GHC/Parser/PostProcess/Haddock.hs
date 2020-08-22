@@ -925,8 +925,8 @@ instance HasHaddock (Located (HsSigType GhcPs)) where
     -- HasHaddock instance for HsType. Is this right? Need Vlad to check.
     extendHdkA l $ do
       case outer_bndrs of
-        HsOuterImplicit{}                 -> pure ()
-        HsOuterExplicit{hso_bndrs = tele} -> registerLocHdkA (getForAllTeleLoc tele)
+        HsOuterImplicit{}                  -> pure ()
+        HsOuterExplicit{hso_bndrs = bndrs} -> registerLocHdkA (getLHsTyVarBndrsLoc bndrs)
       body' <- addHaddock body
       pure $ L l $ HsSig noExtField outer_bndrs body'
 
@@ -1461,10 +1461,12 @@ mkLHsDocTy t (Just doc) = L (getLoc t) (HsDocTy noExtField t doc)
 
 getForAllTeleLoc :: HsForAllTelescope GhcPs -> SrcSpan
 getForAllTeleLoc tele =
-  foldr combineSrcSpans noSrcSpan $
   case tele of
-    HsForAllVis{ hsf_vis_bndrs } -> map getLoc hsf_vis_bndrs
-    HsForAllInvis { hsf_invis_bndrs } -> map getLoc hsf_invis_bndrs
+    HsForAllVis{ hsf_vis_bndrs } -> getLHsTyVarBndrsLoc hsf_vis_bndrs
+    HsForAllInvis { hsf_invis_bndrs } -> getLHsTyVarBndrsLoc hsf_invis_bndrs
+
+getLHsTyVarBndrsLoc :: [LHsTyVarBndr flag GhcPs] -> SrcSpan
+getLHsTyVarBndrsLoc bndrs = foldr combineSrcSpans noSrcSpan $ map getLoc bndrs
 
 -- | The inverse of 'partitionBindsAndSigs' that merges partitioned items back
 -- into a flat list. Elements are put back into the order in which they

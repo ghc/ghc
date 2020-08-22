@@ -39,32 +39,35 @@
          [({ T17544.hs:6:3-4 }
            (Unqual
             {OccName: f1}))]
-         (HsIB
-          (NoExtField)
-          ({ T17544.hs:6:9-16 }
-           (HsFunTy
-            (NoExtField)
-            (HsUnrestrictedArrow)
-            ({ T17544.hs:6:9 }
-             (HsTyVar
-              (NoExtField)
-              (NotPromoted)
-              ({ T17544.hs:6:9 }
-               (Unqual
-                {OccName: a}))))
-            ({ T17544.hs:6:14-16 }
-             (HsDocTy
-              (NoExtField)
-              ({ T17544.hs:6:14-16 }
-               (HsTyVar
-                (NoExtField)
-                (NotPromoted)
-                ({ T17544.hs:6:14-16 }
-                 (Unqual
-                  {OccName: Int}))))
-              ({ T17544.hs:7:5-23 }
-               (HsDocString
-                " comment on Int")))))))))]
+         ({ T17544.hs:6:9-16 }
+          (HsSig
+           (NoExtField)
+           (HsOuterImplicit
+            (NoExtField))
+           ({ T17544.hs:6:9-16 }
+            (HsFunTy
+             (NoExtField)
+             (HsUnrestrictedArrow)
+             ({ T17544.hs:6:9 }
+              (HsTyVar
+               (NoExtField)
+               (NotPromoted)
+               ({ T17544.hs:6:9 }
+                (Unqual
+                 {OccName: a}))))
+             ({ T17544.hs:6:14-16 }
+              (HsDocTy
+               (NoExtField)
+               ({ T17544.hs:6:14-16 }
+                (HsTyVar
+                 (NoExtField)
+                 (NotPromoted)
+                 ({ T17544.hs:6:14-16 }
+                  (Unqual
+                   {OccName: Int}))))
+               ({ T17544.hs:7:5-23 }
+                (HsDocString
+                 " comment on Int"))))))))))]
       {Bag(Located (HsBind GhcPs)):
        []}
       []
@@ -99,26 +102,29 @@
          [({ T17544.hs:10:3-4 }
            (Unqual
             {OccName: f2}))]
-         (HsIB
-          (NoExtField)
-          ({ T17544.hs:10:9-16 }
-           (HsFunTy
-            (NoExtField)
-            (HsUnrestrictedArrow)
-            ({ T17544.hs:10:9 }
-             (HsTyVar
-              (NoExtField)
-              (NotPromoted)
-              ({ T17544.hs:10:9 }
-               (Unqual
-                {OccName: a}))))
-            ({ T17544.hs:10:14-16 }
-             (HsTyVar
-              (NoExtField)
-              (NotPromoted)
-              ({ T17544.hs:10:14-16 }
-               (Unqual
-                {OccName: Int})))))))))]
+         ({ T17544.hs:10:9-16 }
+          (HsSig
+           (NoExtField)
+           (HsOuterImplicit
+            (NoExtField))
+           ({ T17544.hs:10:9-16 }
+            (HsFunTy
+             (NoExtField)
+             (HsUnrestrictedArrow)
+             ({ T17544.hs:10:9 }
+              (HsTyVar
+               (NoExtField)
+               (NotPromoted)
+               ({ T17544.hs:10:9 }
+                (Unqual
+                 {OccName: a}))))
+             ({ T17544.hs:10:14-16 }
+              (HsTyVar
+               (NoExtField)
+               (NotPromoted)
+               ({ T17544.hs:10:14-16 }
+                (Unqual
+                 {OccName: Int}))))))))))]
       {Bag(Located (HsBind GhcPs)):
        []}
       []
@@ -156,26 +162,29 @@
          [({ T17544.hs:14:3-4 }
            (Unqual
             {OccName: f3}))]
-         (HsIB
-          (NoExtField)
-          ({ T17544.hs:14:9-16 }
-           (HsFunTy
-            (NoExtField)
-            (HsUnrestrictedArrow)
-            ({ T17544.hs:14:9 }
-             (HsTyVar
-              (NoExtField)
-              (NotPromoted)
-              ({ T17544.hs:14:9 }
-               (Unqual
-                {OccName: a}))))
-            ({ T17544.hs:14:14-16 }
-             (HsTyVar
-              (NoExtField)
-              (NotPromoted)
-              ({ T17544.hs:14:14-16 }
-               (Unqual
-                {OccName: Int})))))))))]
+         ({ T17544.hs:14:9-16 }
+          (HsSig
+           (NoExtField)
+           (HsOuterImplicit
+            (NoExtField))
+           ({ T17544.hs:14:9-16 }
+            (HsFunTy
+             (NoExtField)
+             (HsUnrestrictedArrow)
+             ({ T17544.hs:14:9 }
+              (HsTyVar
+               (NoExtField)
+               (NotPromoted)
+               ({ T17544.hs:14:9 }
+                (Unqual
+                 {OccName: a}))))
+             ({ T17544.hs:14:14-16 }
+              (HsTyVar
+               (NoExtField)
+               (NotPromoted)
+               ({ T17544.hs:14:14-16 }
+                (Unqual
+                 {OccName: Int}))))))))))]
       {Bag(Located (HsBind GhcPs)):
        []}
       []
@@ -216,26 +225,29 @@
          [({ T17544.hs:18:3-4 }
            (Unqual
             {OccName: f4}))]
-         (HsIB
-          (NoExtField)
-          ({ T17544.hs:18:9-16 }
-           (HsFunTy
-            (NoExtField)
-            (HsUnrestrictedArrow)
-            ({ T17544.hs:18:9 }
-             (HsTyVar
-              (NoExtField)
-              (NotPromoted)
-              ({ T17544.hs:18:9 }
-               (Unqual
-                {OccName: a}))))
-            ({ T17544.hs:18:14-16 }
-             (HsTyVar
-              (NoExtField)
-              (NotPromoted)
-              ({ T17544.hs:18:14-16 }
-               (Unqual
-                {OccName: Int})))))))))
+         ({ T17544.hs:18:9-16 }
+          (HsSig
+           (NoExtField)
+           (HsOuterImplicit
+            (NoExtField))
+           ({ T17544.hs:18:9-16 }
+            (HsFunTy
+             (NoExtField)
+             (HsUnrestrictedArrow)
+             ({ T17544.hs:18:9 }
+              (HsTyVar
+               (NoExtField)
+               (NotPromoted)
+               ({ T17544.hs:18:9 }
+                (Unqual
+                 {OccName: a}))))
+             ({ T17544.hs:18:14-16 }
+              (HsTyVar
+               (NoExtField)
+               (NotPromoted)
+               ({ T17544.hs:18:14-16 }
+                (Unqual
+                 {OccName: Int}))))))))))
       ,({ T17544.hs:20:3-16 }
         (ClassOpSig
          (NoExtField)
@@ -243,26 +255,29 @@
          [({ T17544.hs:20:3-4 }
            (Unqual
             {OccName: g4}))]
-         (HsIB
-          (NoExtField)
-          ({ T17544.hs:20:9-16 }
-           (HsFunTy
-            (NoExtField)
-            (HsUnrestrictedArrow)
-            ({ T17544.hs:20:9 }
-             (HsTyVar
-              (NoExtField)
-              (NotPromoted)
-              ({ T17544.hs:20:9 }
-               (Unqual
-                {OccName: a}))))
-            ({ T17544.hs:20:14-16 }
-             (HsTyVar
-              (NoExtField)
-              (NotPromoted)
-              ({ T17544.hs:20:14-16 }
-               (Unqual
-                {OccName: Int})))))))))]
+         ({ T17544.hs:20:9-16 }
+          (HsSig
+           (NoExtField)
+           (HsOuterImplicit
+            (NoExtField))
+           ({ T17544.hs:20:9-16 }
+            (HsFunTy
+             (NoExtField)
+             (HsUnrestrictedArrow)
+             ({ T17544.hs:20:9 }
+              (HsTyVar
+               (NoExtField)
+               (NotPromoted)
+               ({ T17544.hs:20:9 }
+                (Unqual
+                 {OccName: a}))))
+             ({ T17544.hs:20:14-16 }
+              (HsTyVar
+               (NoExtField)
+               (NotPromoted)
+               ({ T17544.hs:20:14-16 }
+                (Unqual
+                 {OccName: Int}))))))))))]
       {Bag(Located (HsBind GhcPs)):
        []}
       []

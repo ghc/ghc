@@ -610,7 +610,7 @@ mkScopedTvFn sigs = \n -> lookupNameEnv env n `orElse` []
     get_scoped_tvs :: LSig GhcRn -> Maybe ([Located Name], [Name])
     -- Returns (binders, scoped tvs for those binders)
     get_scoped_tvs (L _ (ClassOpSig _ _ names sig_ty))
-      = Just (names, hsScopedTvs sig_ty)
+      = Just (names, hsScopedTvs' sig_ty)
     get_scoped_tvs (L _ (TypeSig _ names sig_ty))
       = Just (names, hsWcScopedTvs sig_ty)
     get_scoped_tvs (L _ (PatSynSig _ names sig_ty))
@@ -965,7 +965,7 @@ renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
         ; when (is_deflt && not defaultSigs_on) $
           addErr (defaultSigErr sig)
         ; new_v <- mapM (lookupSigOccRn ctxt sig) vs
-        ; (new_ty, fvs) <- rnHsSigType ty_ctxt TypeLevel ty
+        ; (new_ty, fvs) <- rnLHsSigType ty_ctxt TypeLevel ty
         ; return (ClassOpSig noExtField is_deflt new_v new_ty, fvs) }
   where
     (v1:_) = vs

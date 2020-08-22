@@ -1614,7 +1614,7 @@ kcConDecl new_or_data res_kind (ConDeclGADT
     -- for the type constructor T
     addErrCtxt (dataConCtxtName names) $
     discardResult $
-    bindOuterGadtTKBndrs_Tv outer_bndrs $
+    bindOuterSigTKBndrs_Tv outer_bndrs $
         -- Why "_Tv"?  See Note [Kind-checking for GADTs]
     do { _ <- tcHsMbContext cxt
        ; kcConArgTys new_or_data res_kind (hsConDeclArgTys args)
@@ -3268,7 +3268,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
            <- pushTcLevelM_    $  -- We are going to generalise
               solveEqualities  $  -- We won't get another crack, and we don't
                                   -- want an error cascade
-              bindOuterGadtTKBndrs_Skol outer_bndrs $
+              bindOuterSigTKBndrs_Skol outer_bndrs $
               do { ctxt <- tcHsMbContext cxt
                  ; (res_ty, res_kind) <- tcInferLHsTypeKind hs_res_ty
                          -- See Note [GADT return kinds]

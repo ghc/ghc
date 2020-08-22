@@ -30,11 +30,10 @@ module GHC.Hs.Type (
         HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,
         HsForAllTelescope(..), HsTyVarBndr(..), LHsTyVarBndr,
         LHsQTyVars(..),
-        HsOuterTyVarBndrs(..), HsOuterFamEqnTyVarBndrs,
-        HsOuterGadtTyVarBndrs, HsOuterSigTyVarBndrs,
+        HsOuterTyVarBndrs(..), HsOuterFamEqnTyVarBndrs, HsOuterSigTyVarBndrs,
         HsImplicitBndrs(..), HsWildCardBndrs(..),
         HsPatSigType(..), HsPSRn(..),
-        LHsSigType, HsSigType(..), LHsSigType', LHsSigWcType, LHsWcType,
+        LHsSigType, HsSigType(..), LHsSigType', LHsSigWcType, LHsSigWcType', LHsWcType,
         HsTupleSort(..),
         HsContext, LHsContext, noLHsContext,
         HsTyLit(..),
@@ -61,12 +60,13 @@ module GHC.Hs.Type (
 
         mkHsOuterImplicit, mkHsOuterExplicit, mapXHsOuterImplicit,
         mkHsImplicitSigType, mkHsExplicitSigType,
+        hsSigTypeToHsType, hsTypeToHsSigType, hsTypeToHsSigWcType,
         mkHsImplicitBndrs, mkHsWildCardBndrs, mkHsPatSigType, hsImplicitBody,
         mkEmptyImplicitBndrs, mkEmptyWildCardBndrs,
         mkHsForAllVisTele, mkHsForAllInvisTele,
         mkHsQTvs, hsQTvExplicit, emptyLHsQTvs,
         isHsKindedTyVar, hsTvbAllKinded, isLHsForAllTy,
-        hsScopedTvs, hsScopedTvs', hsWcScopedTvs, dropWildCards,
+        hsScopedTvs, hsScopedTvs', hsWcScopedTvs, hsWcScopedTvs', dropWildCards, dropWildCards',
         hsTyVarName, hsAllLTyVarNames, hsLTyVarLocNames,
         hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsExplicitLTyVarNames,
         splitLHsInstDeclTy, getLHsInstDeclHead, getLHsInstDeclHead', getLHsInstDeclClass_maybe,
@@ -75,14 +75,14 @@ module GHC.Hs.Type (
         splitLHsSigmaTyInvis, splitLHsGadtTy,
         splitHsFunType, hsTyGetAppHead_maybe,
         mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
-        ignoreParens, hsSigType, hsSigWcType, hsPatSigType,
+        ignoreParens, hsSigType, hsSigWcType, hsSigWcTypeBody, hsPatSigType,
         hsTyKindSig,
         hsConDetailsArgs,
         setHsTyVarBndrFlag, hsTyVarBndrFlag,
 
         -- Printing
         pprHsType, pprHsForAll,
-        pprHsOuterFamEqnTyVarBndrs, pprHsOuterGadtTyVarBndrs,
+        pprHsOuterFamEqnTyVarBndrs, pprHsOuterSigTyVarBndrs,
         pprLHsContext,
         hsTypeNeedsParens, parenthesizeHsType, parenthesizeHsContext
     ) where
@@ -415,25 +415,20 @@ emptyLHsQTvs = HsQTvs { hsq_ext = [], hsq_explicit = [] }
 --    * Patterns in a type/data family instance (HsTyPats)
 
 -- | TODO RGS: Docs
-data HsOuterTyVarBndrs pass expBndrs
+data HsOuterTyVarBndrs flag pass
   = HsOuterImplicit
     { hso_ximplicit :: XHsOuterImplicit pass
     }
   | HsOuterExplicit
     { hso_xexplicit :: XHsOuterExplicit pass
-    , hso_bndrs     :: expBndrs
+    , hso_bndrs     :: [LHsTyVarBndr flag pass]
     }
   | XHsOuterTyVarBndrs !(XXHsOuterTyVarBndrs pass)
 
 -- | TODO RGS: Docs
-type HsOuterFamEqnTyVarBndrs pass =
-  HsOuterTyVarBndrs pass [LHsTyVarBndr () pass]
+type HsOuterFamEqnTyVarBndrs = HsOuterTyVarBndrs ()
 -- | TODO RGS: Docs
-type HsOuterGadtTyVarBndrs pass =
-  HsOuterTyVarBndrs pass [LHsTyVarBndr Specificity pass]
--- | TODO RGS: Docs
-type HsOuterSigTyVarBndrs pass =
-  HsOuterTyVarBndrs pass (HsForAllTelescope pass)
+type HsOuterSigTyVarBndrs = HsOuterTyVarBndrs Specificity
 
 type instance XHsOuterImplicit GhcPs = NoExtField
 type instance XHsOuterImplicit GhcRn = [Name]
@@ -536,16 +531,26 @@ type LHsWcType    pass = HsWildCardBndrs pass (LHsType pass)    -- Wildcard only
 -- | Located Haskell Signature Wildcard Type
 type LHsSigWcType pass = HsWildCardBndrs pass (LHsSigType pass) -- Both
 
+-- | TODO RGS: This is the REAL LHsSigWcType. Delete the one above when ready.
+type LHsSigWcType' pass = HsWildCardBndrs pass (LHsSigType' pass) -- Both
+
 -- See Note [Representing type signatures]
 
+-- TODO RGS: Delete this
 hsImplicitBody :: HsImplicitBndrs (GhcPass p) thing -> thing
 hsImplicitBody (HsIB { hsib_body = body }) = body
 
+-- TODO RGS: Delete this
 hsSigType :: LHsSigType (GhcPass p) -> LHsType (GhcPass p)
 hsSigType = hsImplicitBody
 
+-- TODO RGS: Delete this?
 hsSigWcType :: LHsSigWcType pass -> LHsType pass
 hsSigWcType sig_ty = hsib_body (hswc_body sig_ty)
+
+-- TODO RGS: This is the REAL hsSigWcType. Delete the one above when ready.
+hsSigWcTypeBody :: LHsSigWcType' pass -> LHsType pass
+hsSigWcTypeBody = sig_body . unLoc . hswc_body
 
 hsPatSigType :: HsPatSigType pass -> LHsType pass
 hsPatSigType = hsps_body
@@ -553,6 +558,11 @@ hsPatSigType = hsps_body
 dropWildCards :: LHsSigWcType pass -> LHsSigType pass
 -- Drop the wildcard part of a LHsSigWcType
 dropWildCards sig_ty = hswc_body sig_ty
+
+-- TODO RGS: This is the REAL dropWildCards. Delete the one above when ready.
+dropWildCards' :: LHsSigWcType' pass -> LHsSigType' pass
+-- Drop the wildcard part of a LHsSigWcType
+dropWildCards' sig_ty = hswc_body sig_ty
 
 {- Note [Representing type signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -639,16 +649,16 @@ variables so that they can be brought into scope during renaming and
 typechecking.
 -}
 
-mkHsOuterImplicit :: HsOuterTyVarBndrs GhcPs expBndrs
+mkHsOuterImplicit :: HsOuterTyVarBndrs flag GhcPs
 mkHsOuterImplicit = HsOuterImplicit { hso_ximplicit = noExtField }
 
-mkHsOuterExplicit :: expBndrs -> HsOuterTyVarBndrs GhcPs expBndrs
+mkHsOuterExplicit :: [LHsTyVarBndr flag GhcPs] -> HsOuterTyVarBndrs flag GhcPs
 mkHsOuterExplicit exp_bndrs = HsOuterExplicit { hso_xexplicit = noExtField
                                               , hso_bndrs     = exp_bndrs }
 
 mapXHsOuterImplicit ::
      (XHsOuterImplicit pass -> XHsOuterImplicit pass)
-  -> HsOuterTyVarBndrs pass expBndrs -> HsOuterTyVarBndrs pass expBndrs
+  -> HsOuterTyVarBndrs flag pass -> HsOuterTyVarBndrs flag pass
 mapXHsOuterImplicit f (HsOuterImplicit { hso_ximplicit = ximplicit }) =
   HsOuterImplicit { hso_ximplicit = f ximplicit }
 mapXHsOuterImplicit _ hso@HsOuterExplicit{}    = hso
@@ -659,11 +669,36 @@ mkHsImplicitSigType body =
   HsSig { sig_ext = noExtField
         , sig_bndrs = mkHsOuterImplicit, sig_body = body }
 
-mkHsExplicitSigType :: HsForAllTelescope GhcPs -> LHsType GhcPs
+mkHsExplicitSigType :: [LHsTyVarBndr Specificity GhcPs] -> LHsType GhcPs
                     -> HsSigType GhcPs
-mkHsExplicitSigType tele body =
+mkHsExplicitSigType bndrs body =
   HsSig { sig_ext = noExtField
-        , sig_bndrs = mkHsOuterExplicit tele, sig_body = body }
+        , sig_bndrs = mkHsOuterExplicit bndrs, sig_body = body }
+
+-- TODO RGS: Delete this crap
+hsSigTypeToHsType :: LHsSigType' GhcPs -> LHsType GhcPs
+hsSigTypeToHsType (L l (HsSig{sig_bndrs = outer_bndrs, sig_body = body})) =
+  case outer_bndrs of
+    HsOuterImplicit{} -> body
+    HsOuterExplicit{hso_bndrs = exp_bndrs} ->
+      L l $ HsForAllTy { hst_xforall = noExtField
+                       , hst_tele = mkHsForAllInvisTele exp_bndrs, hst_body = body }
+
+-- TODO RGS: Docs
+-- TODO RGS: Consider moving this to GHC.Hs.Utils instead, as it is somewhat analogous
+-- to mkLHsSigType
+hsTypeToHsSigType :: LHsType GhcPs -> LHsSigType' GhcPs
+hsTypeToHsSigType lty@(L loc ty) = L loc $ case ty of
+  HsForAllTy { hst_tele = HsForAllInvis { hsf_invis_bndrs = bndrs }
+             , hst_body = body }
+    -> mkHsExplicitSigType bndrs body
+  _ -> mkHsImplicitSigType lty
+
+-- TODO RGS: Docs
+-- TODO RGS: Consider moving this to GHC.Hs.Utils instead, as it is somewhat analogous
+-- to mkLHsSigWcType
+hsTypeToHsSigWcType :: LHsType GhcPs -> LHsSigWcType' GhcPs
+hsTypeToHsSigWcType = mkHsWildCardBndrs . hsTypeToHsSigType
 
 mkHsImplicitBndrs :: thing -> HsImplicitBndrs GhcPs thing
 mkHsImplicitBndrs x = HsIB { hsib_ext  = noExtField
@@ -1241,6 +1276,21 @@ hsWcScopedTvs sig_ty
         vars ++ nwcs ++ hsLTyVarNames tvs
       _                                    -> nwcs
 
+-- TODO RGS: This is the REAL hsWcScopedTvs. Delete the one above when ready.
+hsWcScopedTvs' :: LHsSigWcType' GhcRn -> [Name]
+-- Get the lexically-scoped type variables of a HsSigType
+--  - the explicitly-given forall'd type variables
+--  - the named wildcards; see Note [Scoping of named wildcards]
+-- because they scope in the same way
+hsWcScopedTvs' sig_wc_ty
+  | HsWC { hswc_ext = nwcs, hswc_body = sig_ty }  <- sig_wc_ty
+  , L _ (HsSig{sig_bndrs = outer_bndrs}) <- sig_ty
+  = case outer_bndrs of
+      HsOuterImplicit{} ->
+        nwcs
+      HsOuterExplicit{hso_bndrs = tvs} ->
+        nwcs ++ hsLTyVarNames tvs -- See Note [hsScopedTvs vis_flag]
+
 -- TODO RGS: Delete this
 hsScopedTvs :: LHsSigType GhcRn -> [Name]
 -- Same as hsWcScopedTvs, but for a LHsSigType
@@ -1257,13 +1307,10 @@ hsScopedTvs sig_ty
 hsScopedTvs' :: LHsSigType' GhcRn -> [Name]
 -- Same as hsWcScopedTvs, but for a LHsSigType
 hsScopedTvs' (L _ (HsSig{sig_bndrs = outer_bndrs})) = case outer_bndrs of
-  HsOuterImplicit{hso_ximplicit = vars}
-      -> vars
-  HsOuterExplicit{hso_bndrs = exp_bndrs} -> case exp_bndrs of
-    HsForAllInvis{hsf_invis_bndrs = invis_bndrs}
-      -> hsLTyVarNames invis_bndrs -- See Note [hsScopedTvs vis_flag]
-    HsForAllVis{}
-      -> []
+  HsOuterImplicit{} ->
+    []
+  HsOuterExplicit{hso_bndrs = tvs} ->
+    hsLTyVarNames tvs -- See Note [hsScopedTvs vis_flag]
 
 {- Note [Scoping of named wildcards]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1568,44 +1615,21 @@ splitLHsSigmaTyInvis_KP ty
 -- This function is careful not to look through parentheses.
 -- See @Note [GADT abstract syntax] (Wrinkle: No nested foralls or contexts)@
 -- "GHC.Hs.Decls" for why this is important.
-{-
--- TODO RGS: Delete me?
-
-splitLHsGadtTy ::
-     LHsType (GhcPass pass)
-  -> (Maybe [LHsTyVarBndr Specificity (GhcPass pass)], Maybe (LHsContext (GhcPass pass)), LHsType (GhcPass pass))
-splitLHsGadtTy = splitLHsSigmaTyInvis_KP
--}
 -- TODO RGS: Delete me?
 
 splitLHsGadtTy ::
 -- TODO RGS: Delete me?
 
      LHsSigType' GhcPs
-  -> (HsOuterGadtTyVarBndrs GhcPs, Maybe (LHsContext GhcPs), LHsType GhcPs)
-{-
--- TODO RGS: Delete me?
-
-     LHsSigType' (GhcPass pass)
-  -> (HsOuterGadtTyVarBndrs (GhcPass pass), Maybe (LHsContext (GhcPass pass)), LHsType (GhcPass pass))
--}
-splitLHsGadtTy (L l sig_ty)
+  -> (HsOuterSigTyVarBndrs GhcPs, Maybe (LHsContext GhcPs), LHsType GhcPs)
+splitLHsGadtTy (L _ sig_ty)
   | (outer_bndrs, rho_ty) <- split_bndrs sig_ty
   , (mb_ctxt, tau_ty)     <- splitLHsQualTy_KP rho_ty
   = (outer_bndrs, mb_ctxt, tau_ty)
   where
-    split_bndrs (HsSig { sig_bndrs = outer_bndrs, sig_body = body_ty}) = case outer_bndrs of
-      HsOuterImplicit{} ->
-          (mkHsOuterImplicit, body_ty)
-      HsOuterExplicit{hso_bndrs = tele} -> case tele of
-        HsForAllInvis{hsf_invis_bndrs = bndrs} ->
-          (mkHsOuterExplicit bndrs, body_ty)
-        -- TODO RGS: Say more here. In particular, rather than throwing an
-        -- error here, we let addNoNestedForallsContextsErr catch this later.
-        HsForAllVis{} ->
-          ( mkHsOuterImplicit
-          , L l $ HsForAllTy { hst_xforall = noExtField
-                             , hst_tele = tele, hst_body = body_ty })
+    split_bndrs :: HsSigType GhcPs -> (HsOuterSigTyVarBndrs GhcPs, LHsType GhcPs)
+    split_bndrs (HsSig { sig_bndrs = outer_bndrs, sig_body = body_ty}) =
+      (outer_bndrs, body_ty)
 
 -- | Decompose a type of the form @forall <tvs>. body@ into its constituent
 -- parts. Only splits type variable binders that
@@ -1927,8 +1951,8 @@ instance OutputableBndrId p
        => Outputable (LHsQTyVars (GhcPass p)) where
     ppr (HsQTvs { hsq_explicit = tvs }) = interppSP tvs
 
-instance forall p expBndrs. (OutputableBndrId p, Outputable expBndrs)
-       => Outputable (HsOuterTyVarBndrs (GhcPass p) expBndrs) where
+instance forall flag p. (OutputableBndrFlag flag, OutputableBndrId p)
+       => Outputable (HsOuterTyVarBndrs flag (GhcPass p)) where
     ppr (HsOuterImplicit { hso_ximplicit = implicit_vars }) =
       text "HsOuterImplicit" <> case ghcPass @p of
         GhcPs -> empty
@@ -1973,20 +1997,13 @@ pprHsOuterFamEqnTyVarBndrs (HsOuterExplicit{hso_bndrs = qtvs}) =
   forAllLit <+> interppSP qtvs <> dot
 
 -- | TODO RGS: Docs
-pprHsOuterGadtTyVarBndrs :: OutputableBndrId p
-                         => HsOuterGadtTyVarBndrs (GhcPass p) -> SDoc
-pprHsOuterGadtTyVarBndrs (HsOuterImplicit{}) = empty
-pprHsOuterGadtTyVarBndrs (HsOuterExplicit{hso_bndrs = bndrs}) =
-  pprHsForAll (mkHsForAllInvisTele bndrs) noLHsContext
-  -- TODO RGS: The use of mkHsForAllInvisTele above is a mite bit fishy.
-  -- Consider carefully if this is the best design.
-
--- | TODO RGS: Docs
 pprHsOuterSigTyVarBndrs :: OutputableBndrId p
                         => HsOuterSigTyVarBndrs (GhcPass p) -> SDoc
 pprHsOuterSigTyVarBndrs (HsOuterImplicit{}) = empty
-pprHsOuterSigTyVarBndrs (HsOuterExplicit{hso_bndrs = tele}) =
-  pprHsForAll tele noLHsContext
+pprHsOuterSigTyVarBndrs (HsOuterExplicit{hso_bndrs = bndrs}) =
+  pprHsForAll (mkHsForAllInvisTele bndrs) noLHsContext
+  -- TODO RGS: The use of mkHsForAllInvisTele above is a mite bit fishy.
+  -- Consider carefully if this is the best design.
 
 -- | Prints a forall; When passed an empty list, prints @forall .@/@forall ->@
 -- only when @-dppr-debug@ is enabled.

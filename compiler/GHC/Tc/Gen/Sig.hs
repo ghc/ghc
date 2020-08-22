@@ -266,10 +266,22 @@ isCompleteHsSig :: LHsSigWcType GhcRn -> Bool
 -- ^ If there are no wildcards, return a LHsSigType
 isCompleteHsSig (HsWC { hswc_ext  = wcs
                       , hswc_body = HsIB { hsib_body = hs_ty } })
-   = null wcs && no_anon_wc hs_ty
+   = null wcs && no_anon_wc_ty hs_ty
 
-no_anon_wc :: LHsType GhcRn -> Bool
-no_anon_wc lty = go lty
+-- TODO RGS: This is the REAL isCompleteHsSig. Delete the one above when ready.
+isCompleteHsSig' :: LHsSigWcType' GhcRn -> Bool
+-- ^ If there are no wildcards, return a LHsSigWcType
+isCompleteHsSig' (HsWC { hswc_ext = wcs, hswc_body = hs_sig_ty })
+   = null wcs && no_anon_wc_sig_ty hs_sig_ty
+
+no_anon_wc_sig_ty :: LHsSigType' GhcRn -> Bool
+no_anon_wc_sig_ty (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body})) =
+  case outer_bndrs of
+    HsOuterImplicit{}                 -> no_anon_wc_ty body
+    HsOuterExplicit{hso_bndrs = ltvs} -> all no_anon_wc_tvb ltvs && no_anon_wc_ty body
+
+no_anon_wc_ty :: LHsType GhcRn -> Bool
+no_anon_wc_ty lty = go lty
   where
     go (L _ ty) = case ty of
       HsWildCardTy _                 -> False
@@ -304,11 +316,13 @@ no_anon_wc lty = go lty
 
 no_anon_wc_tele :: HsForAllTelescope GhcRn -> Bool
 no_anon_wc_tele tele = case tele of
-  HsForAllVis   { hsf_vis_bndrs   = ltvs } -> all (go . unLoc) ltvs
-  HsForAllInvis { hsf_invis_bndrs = ltvs } -> all (go . unLoc) ltvs
-  where
-    go (UserTyVar _ _ _)      = True
-    go (KindedTyVar _ _ _ ki) = no_anon_wc ki
+  HsForAllVis   { hsf_vis_bndrs   = ltvs } -> all no_anon_wc_tvb ltvs
+  HsForAllInvis { hsf_invis_bndrs = ltvs } -> all no_anon_wc_tvb ltvs
+
+no_anon_wc_tvb :: LHsTyVarBndr flag GhcRn -> Bool
+no_anon_wc_tvb (L _ tvb) = case tvb of
+  UserTyVar _ _ _      -> True
+  KindedTyVar _ _ _ ki -> no_anon_wc_ty ki
 
 {- Note [Fail eagerly on bad signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

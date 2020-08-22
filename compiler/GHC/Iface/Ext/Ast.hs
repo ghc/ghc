@@ -1128,7 +1128,8 @@ instance HiePass p => ToHie (Located (HsExpr (GhcPass p))) where
         ]
       ExprWithTySig _ expr sig ->
         [ toHie expr
-        , toHie $ TS (ResolvedScopes [mkLScope expr]) sig
+        -- TODO RGS: Figure out how to do this correctly
+        -- , toHie $ TS (ResolvedScopes [mkLScope expr]) sig
         ]
       ArithSeq _ _ info ->
         [ toHie info
@@ -1611,7 +1612,8 @@ instance HiePass p => ToHie (SigContext (Located (Sig (GhcPass p)))) where
       HieRn -> concatM $ makeNode sig sp : case sig of
         TypeSig _ names typ ->
           [ toHie $ map (C TyDecl) names
-          , toHie $ TS (UnresolvedScope (map unLoc names) Nothing) typ
+          -- TODO RGS: Figure out how to do this correctly
+          -- , toHie $ TS (UnresolvedScope (map unLoc names) Nothing) typ
           ]
         PatSynSig _ names typ ->
           [ toHie $ map (C TyDecl) names
@@ -1621,7 +1623,8 @@ instance HiePass p => ToHie (SigContext (Located (Sig (GhcPass p)))) where
           [ case styp of
               ClassSig -> toHie $ map (C $ ClassTyDecl $ getRealSpan sp) names
               _  -> toHie $ map (C $ TyDecl) names
-          , toHie $ TS (UnresolvedScope (map unLoc names) msp) typ
+          -- TODO RGS: Figure out how to do this correctly
+          -- , toHie $ TS (UnresolvedScope (map unLoc names) msp) typ
           ]
         IdSig _ _ -> []
         FixSig _ fsig ->

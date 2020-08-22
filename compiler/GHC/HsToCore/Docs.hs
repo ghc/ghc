@@ -246,7 +246,7 @@ classDecls class_ = filterDecls . collectDocs . sortLocated $ decls
 declTypeDocs :: HsDecl GhcRn -> Map Int (HsDocString)
 declTypeDocs = \case
   SigD  _ (TypeSig _ _ ty)          -> typeDocs (unLoc (hsSigWcType ty))
-  SigD  _ (ClassOpSig _ _ _ ty)     -> typeDocs (unLoc (hsSigType ty))
+  SigD  _ (ClassOpSig _ _ _ ty)     -> sigTypeDocs (unLoc ty)
   SigD  _ (PatSynSig _ _ ty)        -> typeDocs (unLoc (hsSigType ty))
   ForD  _ (ForeignImport _ _ ty _)  -> sigTypeDocs (unLoc ty)
   TyClD _ (SynDecl { tcdRhs = ty }) -> typeDocs (unLoc ty)

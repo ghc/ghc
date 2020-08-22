@@ -724,15 +724,7 @@ rnFamEqn doc atfi rhs_kvars
          -- @
        ; let all_imp_vars = pat_kity_vars_with_dups ++ rhs_kvars
 
-       {-
-       TODO RGS: Delete
-
-       ; rnImplicitBndrs mb_cls all_imp_vars $ \all_imp_var_names' ->
-         bindLHsTyVarBndrs doc WarnUnusedForalls
-                           Nothing (fromMaybe [] mb_bndrs) $ \bndrs' ->
-       -}
-       ; bindHsOuterFamEqnTyVarBndrs doc mb_cls all_imp_vars
-                                     outer_bndrs $ \rn_outer_bndrs ->
+       ; bindHsOuterTyVarBndrs doc mb_cls all_imp_vars outer_bndrs $ \rn_outer_bndrs ->
     do { (pats', pat_fvs) <- rnLHsTypeArgs (FamPatCtx tycon) pats
        ; (payload', rhs_fvs) <- rn_payload doc payload
 
@@ -2231,12 +2223,12 @@ rnConDecl (ConDeclGADT { con_names   = names
               -- variable, and hence the order needed for visible type application
               -- See #14808.
               implicit_bndrs =
-                extractHsOuterGadtTvBndrs outer_bndrs $
+                extractHsOuterTvBndrs outer_bndrs $
                 extractHsTysRdrTyVars (theta ++ map hsScaledThing arg_tys ++ [res_ty])
 
         ; let ctxt = ConDeclCtx new_names
 
-        ; bindHsOuterGadtTyVarBndrs ctxt implicit_bndrs outer_bndrs $ \outer_bndrs' ->
+        ; bindHsOuterTyVarBndrs ctxt Nothing implicit_bndrs outer_bndrs $ \outer_bndrs' ->
     do  { (new_cxt, fvs1)    <- rnMbContext ctxt mcxt
         ; (new_args, fvs2)   <- rnConDeclDetails (unLoc (head new_names)) ctxt args
         ; (new_res_ty, fvs3) <- rnLHsType ctxt res_ty

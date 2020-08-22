@@ -1894,7 +1894,7 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
           --
           --   op :: forall c. a -> [T x] -> c -> Int
           L loc $ ClassOpSig noExtField False [loc_meth_RDR]
-                $ mkLHsSigType $ nlHsCoreTy to_ty
+                $ L loc $ mkHsImplicitSigType $ nlHsCoreTy to_ty
         )
       where
         Pair from_ty to_ty = mkCoerceClassMethEqn cls inst_tvs inst_tys rhs_ty meth_id
@@ -1955,6 +1955,7 @@ nlHsAppType e s = noLoc (HsAppType noExtField e hs_ty)
 nlExprWithTySig :: LHsExpr GhcPs -> LHsType GhcPs -> LHsExpr GhcPs
 nlExprWithTySig e s = noLoc $ ExprWithTySig noExtField (parenthesizeHsExpr sigPrec e) hs_ty
   where
+    -- hs_ty = hsTypeToHsSigWcType s
     hs_ty = mkLHsSigWcType s
 
 nlHsCoreTy :: Type -> LHsType GhcPs
@@ -2002,8 +2003,6 @@ The `tags' here start at zero, hence the @fIRST_TAG@ (currently one)
 fiddling around.
 -}
 
--- | Generate the full code for an auxiliary binding.
--- See @Note [Auxiliary binders] (Wrinkle: Reducing code duplication)@.
 genAuxBindSpecOriginal :: DynFlags -> SrcSpan -> AuxBindSpec
                        -> (LHsBind GhcPs, LSig GhcPs)
 genAuxBindSpecOriginal dflags loc spec
@@ -2081,8 +2080,8 @@ genAuxBindSpecDup loc original_rdr_name dup_spec
   where
     dup_rdr_name = auxBindSpecRdrName dup_spec
 
--- | Generate the type signature of an auxiliary binding.
--- See @Note [Auxiliary binders]@.
+-- | Generate the full code for an auxiliary binding.
+-- See @Note [Auxiliary binders] (Wrinkle: Reducing code duplication)@.
 genAuxBindSpecSig :: SrcSpan -> AuxBindSpec -> LHsSigWcType GhcPs
 genAuxBindSpecSig loc spec = case spec of
   DerivCon2Tag tycon _
@@ -2099,6 +2098,26 @@ genAuxBindSpecSig loc spec = case spec of
     -> mkLHsSigWcType (nlHsTyVar dataType_RDR)
   DerivDataConstr _ _ _
     -> mkLHsSigWcType (nlHsTyVar constr_RDR)
+
+-- TODO RGS: This is the REAL genAuxBindSpecSig. Delete the one above when ready.
+genAuxBindSpecSig' :: SrcSpan -> AuxBindSpec -> LHsSigWcType' GhcPs
+genAuxBindSpecSig' loc spec = case spec of
+  DerivCon2Tag tycon _
+    -> mk_sig $ L loc $ XHsType $ NHsCoreTy $
+       mkSpecSigmaTy (tyConTyVars tycon) (tyConStupidTheta tycon) $
+       mkParentType tycon `mkVisFunTyMany` intPrimTy
+  DerivTag2Con tycon _
+    -> mk_sig $ L loc $
+       XHsType $ NHsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
+       intTy `mkVisFunTyMany` mkParentType tycon
+  DerivMaxTag _ _
+    -> mk_sig (L loc (XHsType (NHsCoreTy intTy)))
+  DerivDataDataType _ _ _
+    -> mk_sig (nlHsTyVar dataType_RDR)
+  DerivDataConstr _ _ _
+    -> mk_sig (nlHsTyVar constr_RDR)
+  where
+    mk_sig = mkHsWildCardBndrs . L loc . mkHsImplicitSigType
 
 type SeparateBagsDerivStuff =
   -- DerivAuxBinds

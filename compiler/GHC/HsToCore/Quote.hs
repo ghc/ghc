@@ -346,7 +346,7 @@ get_scoped_tvs (L _ signature)
   | TypeSig _ _ sig <- signature
   = get_scoped_tvs_from_sig (hswc_body sig)
   | ClassOpSig _ _ _ sig <- signature
-  = get_scoped_tvs_from_sig sig
+  = get_scoped_tvs_from_sig' sig
   | PatSynSig _ _ sig <- signature
   = get_scoped_tvs_from_sig sig
   | otherwise
@@ -366,6 +366,20 @@ get_scoped_tvs_from_sig sig
          , hsib_body = hs_ty } <- sig
   , (explicit_vars, _) <- splitLHsForAllTyInvis hs_ty
   = implicit_vars ++ hsLTyVarNames explicit_vars
+
+-- TODO RGS: This is the REAL get_scoped_tvs_from_sig'. Delete the one above when ready.
+get_scoped_tvs_from_sig' :: LHsSigType' GhcRn -> [Name]
+  -- Collect both implicit and explicit quantified variables, since
+  -- the types in instance heads, as well as `via` types in DerivingVia, can
+  -- bring implicitly quantified type variables into scope, e.g.,
+  --
+  --   instance Foo [a] where
+  --     m = n @a
+  --
+  -- See also Note [Scoped type variables in quotes]
+get_scoped_tvs_from_sig' (L _ (HsSig{sig_bndrs = outer_bndrs})) = case outer_bndrs of
+  HsOuterImplicit{hso_ximplicit = imp_tv_names} -> imp_tv_names
+  HsOuterExplicit{hso_bndrs = exp_tvs}          -> hsLTyVarNames exp_tvs
 
 {- Notes
 
@@ -695,13 +709,6 @@ repTyFamEqn (FamEqn { feqn_tycon = tc_name
                     , feqn_fixity = fixity
                     , feqn_rhs  = rhs })
   = do { tc <- lookupLOcc tc_name     -- See note [Binders and occurrences]
-       {-
-       TODO RGS: Delete me
-
-       ; let hs_tvs = HsQTvs { hsq_ext = var_names
-                             , hsq_explicit = fromMaybe [] mb_bndrs }
-       ; addTyClTyVarBinds hs_tvs $ \ _ ->
-       -}
        ; addHsOuterFamEqnTyVarBinds outer_bndrs $ \mb_exp_bndrs ->
          do { tys1 <- case fixity of
                         Prefix -> repTyArgs (repNamedTyCon tc) tys
@@ -733,13 +740,6 @@ repDataFamInstD (DataFamInstDecl { dfid_eqn =
                                              , feqn_fixity = fixity
                                              , feqn_rhs   = defn }})
   = do { tc <- lookupLOcc tc_name         -- See note [Binders and occurrences]
-       {-
-       TODO RGS: Delete
-
-       ; let hs_tvs = HsQTvs { hsq_ext = var_names
-                             , hsq_explicit = fromMaybe [] mb_bndrs }
-       ; addTyClTyVarBinds hs_tvs $ \ _ ->
-       -}
        ; addHsOuterFamEqnTyVarBinds outer_bndrs $ \mb_exp_bndrs ->
          do { tys1 <- case fixity of
                         Prefix -> repTyArgs (repNamedTyCon tc) tys
@@ -907,26 +907,16 @@ repC (L _ (ConDeclGADT { con_names  = cons
   = repGadtDataCons cons args res_ty
 
   | otherwise
-  = addHsOuterGadtTyVarBinds outer_bndrs $ \ th_outer_bndrs ->
+  = addHsOuterSigTyVarBinds outer_bndrs $ \ outer_bndrs' ->
              -- See Note [Don't quantify implicit type variables in quotes]
-    do { ex_bndrs <- case th_outer_bndrs of
-           Nothing          -> coreListM tyVarBndrSpecTyConName []
-           Just invis_bndrs -> pure invis_bndrs
-       ; c'    <- repGadtDataCons cons args res_ty
+    do { c'    <- repGadtDataCons cons args res_ty
        ; ctxt' <- repMbContext mcxt
        ; if null_outer_exp_tvs && isNothing mcxt
          then return c'
-         else rep2 forallCName ([unC ex_bndrs, unC ctxt', unC c']) }
+         else rep2 forallCName ([unC outer_bndrs', unC ctxt', unC c']) }
   where
-    null_outer_imp_tvs = case outer_bndrs of
-      HsOuterImplicit{hso_ximplicit = imp_bndrs} -> null imp_bndrs
-      HsOuterExplicit{}                          -> True
-        -- Vacuously true, as there is no implicit quantification
-
-    null_outer_exp_tvs = case outer_bndrs of
-      HsOuterExplicit{hso_bndrs = exp_bndrs} -> null exp_bndrs
-      HsOuterImplicit{}                      -> True
-        -- Vacuously true, as there is no outermost explicit quantification
+    null_outer_imp_tvs = nullOuterImplicit outer_bndrs
+    null_outer_exp_tvs = nullOuterExplicit outer_bndrs
 
 repMbContext :: Maybe (LHsContext GhcRn) -> MetaM (Core (M TH.Cxt))
 repMbContext Nothing          = repContext []
@@ -1004,8 +994,8 @@ rep_sig (L loc (TypeSig _ nms ty))
 rep_sig (L loc (PatSynSig _ nms ty))
   = mapM (rep_patsyn_ty_sig loc ty) nms
 rep_sig (L loc (ClassOpSig _ is_deflt nms ty))
-  | is_deflt     = mapM (rep_ty_sig defaultSigDName loc ty) nms
-  | otherwise    = mapM (rep_ty_sig sigDName loc ty) nms
+  | is_deflt     = mapM (rep_ty_sig_ defaultSigDName loc ty) nms
+  | otherwise    = mapM (rep_ty_sig_ sigDName loc ty) nms
 rep_sig d@(L _ (IdSig {}))           = pprPanic "rep_sig IdSig" (ppr d)
 rep_sig (L loc (FixSig _ fix_sig))   = rep_fix_d loc fix_sig
 rep_sig (L loc (InlineSig _ nm ispec))= rep_inline nm ispec loc
@@ -1028,6 +1018,16 @@ rep_ty_sig_tvs explicit_tvs
              explicit_tvs
          -- NB: Don't pass any implicit type variables to repList above
          -- See Note [Don't quantify implicit type variables in quotes]
+
+-- TODO RGS: This is the REAL rep_ty_sig_tvs. Delete the one above when ready.
+rep_ty_sig_tvs' :: HsOuterSigTyVarBndrs GhcRn
+                -> MetaM (Core [M TH.TyVarBndrSpec])
+rep_ty_sig_tvs' (HsOuterImplicit{}) =
+  coreListM tyVarBndrSpecTyConName []
+    -- See Note [Don't quantify implicit type variables in quotes]
+rep_ty_sig_tvs' (HsOuterExplicit{hso_bndrs = explicit_tvs}) =
+  repListM tyVarBndrSpecTyConName repTyVarBndr
+           explicit_tvs
 
 -- Desugar a top-level type signature. Unlike 'repHsSigType', this
 -- deliberately avoids gensymming the type variables.
@@ -1057,6 +1057,27 @@ rep_ty_sig' sig_ty
             then return th_ty
             else repTForall th_explicit_tvs th_ctxt th_ty }
 
+-- TODO RGS: This is the REAL rep_ty_sig. Delete the one above when ready.
+rep_ty_sig_ :: Name -> SrcSpan -> LHsSigType' GhcRn -> Located Name
+           -> MetaM (SrcSpan, Core (M TH.Dec))
+rep_ty_sig_ mk_sig loc sig_ty nm
+  = do { nm1 <- lookupLOcc nm
+       ; ty1 <- rep_ty_sig'_ sig_ty
+       ; sig <- repProto mk_sig nm1 ty1
+       ; return (loc, sig) }
+
+-- TODO RGS: This is the REAL rep_ty_sig'. Delete the one above when ready.
+rep_ty_sig'_ :: LHsSigType' GhcRn
+            -> MetaM (Core (M TH.Type))
+rep_ty_sig'_ (L _ (HsSig{sig_bndrs = outer_bndrs, sig_body = body}))
+  | (ctxt, tau) <- splitLHsQualTy body
+  = do { th_explicit_tvs <- rep_ty_sig_tvs' outer_bndrs
+       ; th_ctxt <- repLContext ctxt
+       ; th_tau  <- repLTy tau
+       ; if nullOuterExplicit outer_bndrs && null (unLoc ctxt)
+            then return th_tau
+            else repTForall th_explicit_tvs th_ctxt th_tau }
+
 rep_patsyn_ty_sig :: SrcSpan -> LHsSigType GhcRn -> Located Name
                   -> MetaM (SrcSpan, Core (M TH.Dec))
 -- represents a pattern synonym type signature;
@@ -1084,6 +1105,12 @@ rep_wc_ty_sig :: Name -> SrcSpan -> LHsSigWcType GhcRn -> Located Name
               -> MetaM (SrcSpan, Core (M TH.Dec))
 rep_wc_ty_sig mk_sig loc sig_ty nm
   = rep_ty_sig mk_sig loc (hswc_body sig_ty) nm
+
+-- TODO RGS: This is the REAL rep_wc_ty_sig. Delete the one above when ready.
+rep_wc_ty_sig' :: Name -> SrcSpan -> LHsSigWcType' GhcRn -> Located Name
+              -> MetaM (SrcSpan, Core (M TH.Dec))
+rep_wc_ty_sig' mk_sig loc sig_ty nm
+  = rep_ty_sig_ mk_sig loc (hswc_body sig_ty) nm
 
 rep_inline :: Located Name
            -> InlinePragma      -- Never defaultInlinePragma
@@ -1192,17 +1219,28 @@ addHsOuterFamEqnTyVarBinds outer_bndrs thing_inside = do
     mk_qtvs imp_tvs exp_tvs = HsQTvs { hsq_ext = imp_tvs
                                      , hsq_explicit = exp_tvs }
 
-addHsOuterGadtTyVarBinds ::
-     HsOuterGadtTyVarBndrs GhcRn
-  -- TODO RGS: Turn that argument into type Core [M TH.TyVarBndrSpec]. It's easier that way,
-  -- and more consistent with what addHsOuterFamEqnTyVarBinds does.
-  -> (Maybe (Core [M TH.TyVarBndrSpec]) -> MetaM (Core (M a)))
+addHsOuterSigTyVarBinds ::
+     HsOuterSigTyVarBndrs GhcRn
+  -> (Core [M TH.TyVarBndrSpec] -> MetaM (Core (M a)))
   -> MetaM (Core (M a))
-addHsOuterGadtTyVarBinds outer_bndrs thing_inside = case outer_bndrs of
-  HsOuterImplicit{hso_ximplicit = imp_tvs} ->
-    addSimpleTyVarBinds imp_tvs $ thing_inside Nothing
+addHsOuterSigTyVarBinds outer_bndrs thing_inside = case outer_bndrs of
+  HsOuterImplicit{hso_ximplicit = imp_tvs} -> do
+    th_nil <- coreListM tyVarBndrSpecTyConName []
+    addSimpleTyVarBinds imp_tvs $ thing_inside th_nil
   HsOuterExplicit{hso_bndrs = exp_bndrs} ->
-    addHsTyVarBinds exp_bndrs $ thing_inside . Just
+    addHsTyVarBinds exp_bndrs thing_inside
+
+-- TODO RGS: Docs
+nullOuterImplicit :: HsOuterSigTyVarBndrs GhcRn -> Bool
+nullOuterImplicit (HsOuterImplicit{hso_ximplicit = imp_bndrs}) = null imp_bndrs
+nullOuterImplicit (HsOuterExplicit{})                          = True
+  -- Vacuously true, as there is no implicit quantification
+
+-- TODO RGS: Docs
+nullOuterExplicit :: HsOuterSigTyVarBndrs GhcRn -> Bool
+nullOuterExplicit (HsOuterExplicit{hso_bndrs = exp_bndrs}) = null exp_bndrs
+nullOuterExplicit (HsOuterImplicit{})                      = True
+  -- Vacuously true, as there is no outermost explicit quantification
 
 addSimpleTyVarBinds :: [Name]             -- the binders to be added
                     -> MetaM (Core (M a)) -- action in the ext env
@@ -1307,25 +1345,14 @@ repLHsSigType lsig_ty = repHsSigType' (unLoc lsig_ty)
 
 -- TODO RGS: This is the REAL repHsSigType. Delete the one above when ready
 repHsSigType' :: HsSigType GhcRn -> MetaM (Core (M TH.Type))
-repHsSigType' (HsSig { sig_bndrs = outer_bndrs, sig_body = body }) =
-  case outer_bndrs of
-    HsOuterImplicit{hso_ximplicit = implicit_tvs} ->
-      addSimpleTyVarBinds implicit_tvs $ repLTy body
-    HsOuterExplicit{hso_bndrs = tele} -> case tele of
-      HsForAllInvis{hsf_invis_bndrs = invis_bndrs} ->
-        addHsTyVarBinds invis_bndrs $ \ th_invis_bndrs ->
-          let (ctxt, tau) = splitLHsQualTy body in
-          if null invis_bndrs && null (unLoc ctxt)
-             then repLTy body
-             else do th_ctxt <- repLContext ctxt
-                     th_tau  <- repLTy tau
-                     repTForall th_invis_bndrs th_ctxt th_tau
-      HsForAllVis{hsf_vis_bndrs = vis_bndrs } ->
-        addHsTyVarBinds vis_bndrs $ \ th_vis_bndrs -> do
-          th_body <- repLTy body
-          if null vis_bndrs
-             then pure th_body
-             else repTForallVis th_vis_bndrs th_body
+repHsSigType' (HsSig { sig_bndrs = outer_bndrs, sig_body = body })
+  | (ctxt, tau) <- splitLHsQualTy body
+  = addHsOuterSigTyVarBinds outer_bndrs $ \ th_outer_bndrs ->
+    do { th_ctxt <- repLContext ctxt
+       ; th_tau  <- repLTy tau
+       ; if nullOuterExplicit outer_bndrs && null (unLoc ctxt)
+         then pure th_tau
+         else repTForall th_outer_bndrs th_ctxt th_tau }
 
 -- yield the representation of a list of types
 repLTys :: [LHsType GhcRn] -> MetaM [Core (M TH.Type)]

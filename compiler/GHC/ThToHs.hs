@@ -392,9 +392,9 @@ cvtDec (TH.StandaloneDerivD ds cxt ty)
 
 cvtDec (TH.DefaultSigD nm typ)
   = do { nm' <- vNameL nm
-       ; ty' <- cvtType typ
+       ; ty' <- cvtSigType typ
        ; returnJustL $ Hs.SigD noExtField
-                     $ ClassOpSig noExtField True [nm'] (mkLHsSigType ty')}
+                     $ ClassOpSig noExtField True [nm'] ty'}
 
 cvtDec (TH.PatSynD nm args dir pat)
   = do { nm'   <- cNameL nm
@@ -1426,10 +1426,7 @@ cvtSigType = cvtSigTypeKind "type"
 cvtSigTypeKind :: String -> TH.Type -> CvtM (LHsSigType' GhcPs)
 cvtSigTypeKind ty_str ty = do
   ty' <- cvtTypeKind ty_str ty
-  pure $ case ty' of
-    L loc (HsForAllTy { hst_tele = tele, hst_body = body })
-            -> L loc $ mkHsExplicitSigType tele body
-    L loc _ -> L loc $ mkHsImplicitSigType ty'
+  pure $ hsTypeToHsSigType ty'
 
 cvtTypeKind :: String -> TH.Type -> CvtM (LHsType GhcPs)
 cvtTypeKind ty_str ty

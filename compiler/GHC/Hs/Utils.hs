@@ -657,6 +657,7 @@ chunkify xs
 mkLHsSigType :: LHsType GhcPs -> LHsSigType GhcPs
 mkLHsSigType ty = mkHsImplicitBndrs ty
 
+-- TODO RGS: DELETE THIS
 mkLHsSigWcType :: LHsType GhcPs -> LHsSigWcType GhcPs
 mkLHsSigWcType ty = mkHsWildCardBndrs (mkHsImplicitBndrs ty)
 
@@ -694,7 +695,7 @@ mkClassOpSigs sigs
   = map fiddle sigs
   where
     fiddle (L loc (TypeSig _ nms ty))
-      = L loc (ClassOpSig noExtField False nms (dropWildCards ty))
+      = L loc (ClassOpSig noExtField False nms (hsTypeToHsSigType (hsSigWcType ty)))
     fiddle sig = sig
 
 {- *********************************************************************

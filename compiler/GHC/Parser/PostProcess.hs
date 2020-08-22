@@ -1599,6 +1599,7 @@ instance DisambECP (HsExpr GhcPs) where
   mkHsLitPV (L l a) = return $ L l (HsLit noExtField a)
   mkHsOverLitPV (L l a) = return $ L l (HsOverLit noExtField a)
   mkHsWildCardPV l = return $ L l hsHoleExpr
+  -- mkHsTySigPV l a sig = return $ L l (ExprWithTySig noExtField a (hsTypeToHsSigWcType sig))
   mkHsTySigPV l a sig = return $ L l (ExprWithTySig noExtField a (mkLHsSigWcType sig))
   mkHsExplicitListPV l xs = return $ L l (ExplicitList noExtField Nothing xs)
   mkHsSplicePV sp = return $ mapLoc (HsSpliceE noExtField) sp
