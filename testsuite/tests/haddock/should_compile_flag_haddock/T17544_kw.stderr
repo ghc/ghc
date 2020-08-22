@@ -30,24 +30,28 @@
        (Nothing)
        (Nothing)
        [({ T17544_kw.hs:16:9-20 }
-         (XConDecl
-          (ConDeclGADTPrefixPs
-           [({ T17544_kw.hs:16:9-13 }
-             (Unqual
-              {OccName: MkFoo}))]
-           (HsIB
+         (ConDeclGADT
+          (NoExtField)
+          [({ T17544_kw.hs:16:9-13 }
+            (Unqual
+             {OccName: MkFoo}))]
+          ({ T17544_kw.hs:16:18-20 }
+           (False))
+          []
+          (Nothing)
+          (PrefixCon
+           [])
+          ({ T17544_kw.hs:16:18-20 }
+           (HsTyVar
             (NoExtField)
+            (NotPromoted)
             ({ T17544_kw.hs:16:18-20 }
-             (HsTyVar
-              (NoExtField)
-              (NotPromoted)
-              ({ T17544_kw.hs:16:18-20 }
-               (Unqual
-                {OccName: Foo})))))
-           (Just
-            ({ T17544_kw.hs:15:10-35 }
-             (HsDocString
-              " Bad comment for MkFoo"))))))]
+             (Unqual
+              {OccName: Foo}))))
+          (Just
+           ({ T17544_kw.hs:15:10-35 }
+            (HsDocString
+             " Bad comment for MkFoo")))))]
        ({ <no location info> }
         [])))))
   ,({ T17544_kw.hs:(18,1)-(19,26) }
@@ -70,33 +74,34 @@
        (Nothing)
        (Nothing)
        [({ T17544_kw.hs:19:9-26 }
-         (XConDecl
-          (ConDeclGADTPrefixPs
-           [({ T17544_kw.hs:19:9-13 }
-             (Unqual
-              {OccName: MkBar}))]
-           (HsIB
+         (ConDeclGADT
+          (NoExtField)
+          [({ T17544_kw.hs:19:9-13 }
+            (Unqual
+             {OccName: MkBar}))]
+          ({ T17544_kw.hs:19:18-26 }
+           (False))
+          []
+          (Nothing)
+          (PrefixCon
+           [(HsScaled
+             (HsLinearArrow)
+             ({ T17544_kw.hs:19:18-19 }
+              (HsTupleTy
+               (NoExtField)
+               (HsBoxedOrConstraintTuple)
+               [])))])
+          ({ T17544_kw.hs:19:24-26 }
+           (HsTyVar
             (NoExtField)
-            ({ T17544_kw.hs:19:18-26 }
-             (HsFunTy
-              (NoExtField)
-              (HsUnrestrictedArrow)
-              ({ T17544_kw.hs:19:18-19 }
-               (HsTupleTy
-                (NoExtField)
-                (HsBoxedOrConstraintTuple)
-                []))
-              ({ T17544_kw.hs:19:24-26 }
-               (HsTyVar
-                (NoExtField)
-                (NotPromoted)
-                ({ T17544_kw.hs:19:24-26 }
-                 (Unqual
-                  {OccName: Bar})))))))
-           (Just
-            ({ T17544_kw.hs:18:13-38 }
-             (HsDocString
-              " Bad comment for MkBar"))))))]
+            (NotPromoted)
+            ({ T17544_kw.hs:19:24-26 }
+             (Unqual
+              {OccName: Bar}))))
+          (Just
+           ({ T17544_kw.hs:18:13-38 }
+            (HsDocString
+             " Bad comment for MkBar")))))]
        ({ <no location info> }
         [])))))
   ,({ T17544_kw.hs:(21,1)-(24,18) }

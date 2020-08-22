@@ -301,7 +301,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                         -- Do this /after/ typeinference, so that when reporting
                         -- a function with no type signature we can give the
                         -- inferred type
-                        reportUnusedNames tcg_env
+                        reportUnusedNames tcg_env hsc_src
                       ; -- add extra source files to tcg_dependent_files
                         addDependentFiles src_files
                       ; tcg_env <- runTypecheckerPlugin mod_sum hsc_env tcg_env
@@ -2973,8 +2973,8 @@ ppr_datacons debug type_env
   = ppr_things "DATA CONSTRUCTORS" ppr_dc wanted_dcs
       -- The filter gets rid of class data constructors
   where
-    ppr_dc dc = sdocWithDynFlags (\dflags ->
-                ppr dc <+> dcolon <+> ppr (dataConDisplayType dflags dc))
+    ppr_dc dc = sdocOption sdocLinearTypes (\show_linear_types ->
+                ppr dc <+> dcolon <+> ppr (dataConDisplayType show_linear_types dc))
     all_dcs    = typeEnvDataCons type_env
     wanted_dcs | debug     = all_dcs
                | otherwise = filterOut is_cls_dc all_dcs
