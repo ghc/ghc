@@ -281,13 +281,13 @@ Runtime system
 ~~~~~~~~~~~~~~
 
 - The runtime system linker now marks loaded code as non-writable (see
-  :ghc-ticket:`14069`) on all tier-1 platforms. This is necesaary for
+  :ghc-ticket:`14069`) on all tier-1 platforms. This is necessary for
   out-of-the-box compatibility with OpenBSD and macOS Catalina (see
   :ghc-ticket:`17353`)
 
 - The RTS API now exposes :ref:`an interface <event_log_output_api>` to
-  configure ``EventLogWriters``, allowing eventlog data to fed to sinks other
-  than ``.eventlog`` files.
+  configure ``EventLogWriters``, allowing eventlog data to be fed to sinks
+  other than ``.eventlog`` files.
 
 - A new ``+RTS`` flag ``--disable-delayed-os-memory-return`` was added to make
   for accurate resident memory usage of the program as shown in memory
@@ -298,9 +298,9 @@ Runtime system
   Using this new flag is expected to make the program slightly slower.
 
   Without this flag, the (Linux) RTS returns unused memory "lazily" to the OS.
-  This has making the memory available to other processes while also allowing
-  the RTS to re-use the memory very efficiently (without zeroing pages) in case
-  it needs it again, but common tools will incorrectly show such memory as
+  This makes the memory available to other processes while also allowing the
+  RTS to re-use the memory very efficiently (without zeroing pages) in case it
+  needs it again, but common tools will incorrectly show such memory as
   occupied by the RTS (because they do not process the ``LazyFree`` field in
   ``/proc/PID/smaps``).
 
