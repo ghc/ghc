@@ -88,10 +88,8 @@ import qualified GHC.Event.Internal as I
 
 #if defined(HAVE_KQUEUE)
 import qualified GHC.Event.KQueue as KQueue
-#elif defined(HAVE_IO_URING) && defined(HAVE_EPOLL)
-import GHC.RTS.Flags
+#elif defined(HAVE_IO_URING)
 import qualified GHC.Event.IoUring as IoUring
-import qualified GHC.Event.EPoll  as EPoll
 #elif defined(HAVE_EPOLL)
 import qualified GHC.Event.EPoll  as EPoll
 #elif defined(HAVE_POLL)
@@ -172,14 +170,8 @@ handleControlEvent mgr fd _evt = do
 newDefaultBackend :: IO Backend
 #if defined(HAVE_KQUEUE)
 newDefaultBackend = KQueue.new
-#elif defined(HAVE_IO_URING) && defined(HAVE_EPOLL)
--- io_uring is Linux-only atm, so we don't need to check
--- combinations with kqueue, which is BSD-only
-newDefaultBackend = do
-  flags <- getRTSFlags
-  case useIOUringBackend . miscFlags $ flags of
-    True -> IoUring.new
-    False -> EPoll.new
+#elif defined(HAVE_IO_URING)
+newDefaultBackend = IoUring.new
 #elif defined(HAVE_EPOLL)
 newDefaultBackend = EPoll.new
 #elif defined(HAVE_POLL)
