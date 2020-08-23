@@ -113,7 +113,7 @@ class  Show a  where
     {-# MINIMAL showsPrec | show #-}
 
     -- | Convert a value to a readable 'String'.
-    -- 
+    --
     -- showsPrec is a parameterized versions of shows. The extra parameter is a precedence level,
     -- used to properly parenthesize expressions containing infix constructors.
     --
