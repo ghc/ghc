@@ -731,7 +731,7 @@ release-x86_64-linux-deb8:
 # x86_64-linux-alpine
 #################################
 
-.build-x86_64-linux-alpine-hadrian:
+build-x86_64-linux-alpine-hadrian:
   extends: .validate-linux-hadrian
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine:$DOCKER_REV"
