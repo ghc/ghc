@@ -79,6 +79,7 @@ import Control.DeepSeq
 import Foreign
 import Data.Array
 import Data.ByteString (ByteString)
+import Data.ByteString.Char8 as Char8
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
 import Data.IORef
@@ -1272,15 +1273,16 @@ instance Binary RuleMatchInfo where
 
 instance Binary InlineSpec where
     put_ bh NoUserInline    = putByte bh 0
-    put_ bh Inline          = putByte bh 1
-    put_ bh Inlinable       = putByte bh 2
-    put_ bh NoInline        = putByte bh 3
+    put_ bh (Inline _)      = putByte bh 1
+    put_ bh (Inlinable _)   = putByte bh 2
+    put_ bh (NoInline _)    = putByte bh 3
 
     get bh = do h <- getByte bh
+                a <- (Char8.unpack $ pack $ getByte) bh
                 case h of
-                  0 -> return NoUserInline
-                  1 -> return Inline
-                  2 -> return Inlinable
+                  0 -> return (NoUserInline (SourceText a))
+                  1 -> return (Inline (SourceText a))
+                  2 -> return (Inlinable (SourceText a))
                   _ -> return NoInline
 
 instance Binary RecFlag where
