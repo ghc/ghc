@@ -1271,17 +1271,25 @@ instance Binary RuleMatchInfo where
                       else return FunLike
 
 instance Binary InlineSpec where
-    put_ bh NoUserInline    = putByte bh 0
-    put_ bh Inline          = putByte bh 1
-    put_ bh Inlinable       = putByte bh 2
-    put_ bh NoInline        = putByte bh 3
+    put_ bh (NoUserInline)               = putByte bh 0
+    put_ bh (Inline (SourceText a))      = putByte bh 1 >> put_ bh a
+    put_ bh (Inlinable (SourceText a))   = putByte bh 2 >> put_ bh a
+    put_ bh (NoInline (SourceText a))    = putByte bh 3 >> put_ bh a
+    put_ bh (Inline (NoSourceText))      = putByte bh 4 >> put_ bh NoSourceText
+    put_ bh (Inlinable (NoSourceText))   = putByte bh 5 >> put_ bh NoSourceText
+    put_ bh (NoInline (NoSourceText))    = putByte bh 6 >> put_ bh NoSourceText
 
     get bh = do h <- getByte bh
+                a <- get bh
                 case h of
-                  0 -> return NoUserInline
-                  1 -> return Inline
-                  2 -> return Inlinable
-                  _ -> return NoInline
+                  0 -> return $ NoUserInline
+                  1 -> return $ (Inline (SourceText a))
+                  2 -> return $ (Inlinable (SourceText a))
+                  3 -> return $ (NoInline (SourceText a))
+                  4 -> return $ (Inline (NoSourceText))
+                  5 -> return $ (Inlinable (NoSourceText))
+                  6 -> return $ (NoInline (NoSourceText))
+                  _ -> panic $ "Unknown Inline Specification:" ++ show h
 
 instance Binary RecFlag where
     put_ bh Recursive = do
