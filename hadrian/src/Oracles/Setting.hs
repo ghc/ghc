@@ -184,6 +184,7 @@ settingList key = fmap words $ lookupValueOrError configFile $ case key of
 
 -- | Look up the value of a 'SettingList' in @cfg/system.config@, tracking the
 -- result.
+-- See Note [tooldir: How GHC finds mingw on Windows]
 settingsFileSetting :: SettingsFileSetting -> Action String
 settingsFileSetting key = lookupValueOrError configFile $ case key of
     SettingsFileSetting_CCompilerCommand -> "settings-c-compiler-command"

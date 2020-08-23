@@ -507,6 +507,7 @@ AC_DEFUN([GET_ARM_ISA],
 # FP_SETTINGS
 # ----------------------------------
 # Set the variables used in the settings file
+# See Note [tooldir: How GHC finds mingw on Windows]
 AC_DEFUN([FP_SETTINGS],
 [
     if test "$windows" = YES -a "$EnableDistroToolchain" = "NO"
