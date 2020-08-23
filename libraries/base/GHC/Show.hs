@@ -114,6 +114,9 @@ class  Show a  where
 
     -- | Convert a value to a readable 'String'.
     --
+    -- showsPrec is a parameterized versions of shows. The extra parameter is a precedence level,
+    -- used to properly parenthesize expressions containing infix constructors.
+    --
     -- 'showsPrec' should satisfy the law
     --
     -- > showsPrec d x r ++ s  ==  showsPrec d x (r ++ s)
