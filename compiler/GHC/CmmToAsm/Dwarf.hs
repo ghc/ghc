@@ -179,9 +179,7 @@ procToDwarf config prc
   = DwarfSubprogram { dwChildren = map blockToDwarf (dblBlocks prc)
                     , dwName     = case dblSourceTick prc of
                          Just s@SourceNote{} -> sourceName s
-                         _otherwise -> renderWithContext defaultSDocContext
-                                          $ withPprStyle defaultDumpStyle
-                                          $ ppr (dblLabel prc)
+                         _otherwise -> show (dblLabel prc)
                     , dwLabel    = dblCLabel prc
                     , dwParent   = fmap mkAsmTempDieLabel
                                    $ mfilter goodParent
