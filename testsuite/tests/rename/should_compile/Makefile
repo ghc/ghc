@@ -60,3 +60,8 @@ T7969:
 T18497:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -fno-code T18497_Foo.hs T18497_Bar.hs -ddump-minimal-imports
 	cat T18497_Bar.imports-boot
+
+T18264:
+	$(RM) T18264.hi T18264.o T18264.imports
+	'$(TEST_HC)' $(TEST_HC_OPTS) -ddump-minimal-imports -c T18264.hs
+	cat T18264.imports
