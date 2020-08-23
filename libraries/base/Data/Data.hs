@@ -85,6 +85,7 @@ module Data.Data (
         Fixity(..),
         -- ** Constructors
         mkConstr,
+        mkConstrTag,
         mkIntegralConstr,
         mkRealConstr,
         mkCharConstr,
@@ -628,10 +629,9 @@ mkDataType str cs = DataType
                         , datarep = AlgRep cs
                         }
 
-
 -- | Constructs a constructor
-mkConstr :: DataType -> String -> [String] -> Fixity -> Constr
-mkConstr dt str fields fix =
+mkConstrTag :: DataType -> String -> Int -> [String] -> Fixity -> Constr
+mkConstrTag dt str idx fields fix =
         Constr
                 { conrep    = AlgConstr idx
                 , constring = str
@@ -639,9 +639,20 @@ mkConstr dt str fields fix =
                 , confixity = fix
                 , datatype  = dt
                 }
+
+-- | Constructs a constructor
+mkConstr :: DataType -> String -> [String] -> Fixity -> Constr
+mkConstr dt str fields fix = mkConstrTag dt str idx fields fix
   where
-    idx = head [ i | (c,i) <- dataTypeConstrs dt `zip` [1..],
-                     showConstr c == str ]
+    idx' = filter (\(_,c) -> showConstr c == str)
+             -- put [1..] as first argument to allow its fusion (#16577)
+           $ zip [1..] (dataTypeConstrs dt)
+    idx = case idx' of
+            [(i,_)] -> i
+            []      -> errorWithoutStackTrace $
+                        "Data.Data.mkConstr: couldn't find constructor " ++ str
+            _       -> errorWithoutStackTrace $
+                        "Data.Data.mkConstr: duplicate constructors for " ++ str
 
 
 -- | Gets the constructors of an algebraic datatype
