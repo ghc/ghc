@@ -114,6 +114,9 @@ class  Show a  where
 
     -- | Convert a value to a readable 'String'.
     --
+    -- showsPrec is a parameterized version of 'shows'. The extra parameter is a precedence level,
+    -- used to properly parenthesize expressions containing infix constructors.
+    --
     -- 'showsPrec' should satisfy the law
     --
     -- > showsPrec d x r ++ s  ==  showsPrec d x (r ++ s)
@@ -125,6 +128,42 @@ class  Show a  where
     --
     -- That is, 'Text.Read.readsPrec' parses the string produced by
     -- 'showsPrec', and delivers the value that 'showsPrec' started with.
+    --
+    -- === __Example__
+    --
+    -- > -- Let us have an ADT that encodes the AST of a small language:
+    -- > data Expr = Lit Integer | Expr :*: Expr | Expr :+: Expr
+    -- > -- We want (:*:) to have a precedence level of 7, and (:+:) to have a precedence level of 6.
+    -- > -- This is expressed both in the infixl declarations below, and in the Show instance.
+    -- >
+    -- > infixl 7 :*:
+    -- > infixl 6 :+:
+    -- >
+    -- > instance Show Expr where
+    -- >     showsPrec contextPrec (Lit i) =
+    -- >         showParen (contextPrec > myPrec)
+    -- >                   (showString "Lit " .
+    -- >                    showsPrec (myPrec + 1) i)
+    -- >       where myPrec = 10
+    -- >     showsPrec contextPrec (e1 :*: e2) =
+    -- >         showParen (contextPrec > myPrec)
+    -- >                   (showsPrec (myPrec + 1) e1 .
+    -- >                    showString " :*: " .
+    -- >                    showsPrec (myPrec + 1) e2)
+    -- >       where myPrec = 7
+    -- >     showsPrec contextPrec (e1 :+: e2) =
+    -- >         showParen (contextPrec > myPrec)
+    -- >                   (showsPrec (myPrec + 1) e1 .
+    -- >                    showString " :+: " .
+    -- >                    showsPrec (myPrec + 1) e2)
+    -- >       where myPrec = 6
+    -- >
+    -- > -- The precedence settings do not ask for a parenthesised expression.
+    -- > example1 = Lit 3 :*: Lit 1 :+: Lit 4 :*: Lit 1
+    -- >
+    -- > -- Whereas they do here.
+    -- > example2 = (Lit (-3) :+: Lit (-1)) :*: (Lit (-4) :+: Lit 1)
+
 
     showsPrec :: Int    -- ^ the operator precedence of the enclosing
                         -- context (a number from @0@ to @11@).
