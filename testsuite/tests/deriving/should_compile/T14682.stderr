@@ -74,7 +74,7 @@ Derived class instances:
   $tFoo :: Data.Data.DataType
   $cFoo :: Data.Data.Constr
   $tFoo = Data.Data.mkDataType "Foo" [$cFoo]
-  $cFoo = Data.Data.mkConstr $tFoo "Foo" [] Data.Data.Prefix
+  $cFoo = Data.Data.mkConstrTag $tFoo "Foo" 1 [] Data.Data.Prefix
 
 Derived type family instances:
 
