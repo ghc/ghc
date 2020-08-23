@@ -4,7 +4,7 @@
 Extracting imported and top-level names in scope
 -}
 
-{-# LANGUAGE CPP, NondecreasingIndentation, MultiWayIf, NamedFieldPuns #-}
+{-# LANGUAGE CPP, NondecreasingIndentation #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -72,7 +72,7 @@ import Data.Either      ( partitionEithers, isRight, rights )
 import Data.Map         ( Map )
 import qualified Data.Map as Map
 import Data.Ord         ( comparing )
-import Data.List        ( partition, (\\), find, sortBy )
+import Data.List        ( partition, (\\), find, sortBy, groupBy, sortOn )
 import Data.Function    ( on )
 import qualified Data.Set as S
 import System.FilePath  ((</>))
@@ -1570,7 +1570,7 @@ decls, and simply trim their import lists.  NB that
 -}
 
 getMinimalImports :: [ImportDeclUsage] -> RnM [LImportDecl GhcRn]
-getMinimalImports = mapM mk_minimal
+getMinimalImports = fmap combine . mapM mk_minimal
   where
     mk_minimal (L l decl, used_gres, unused)
       | null unused
@@ -1623,11 +1623,29 @@ getMinimalImports = mapM mk_minimal
 
           all_non_overloaded = all (not . flIsOverloaded)
 
+    combine :: [LImportDecl GhcRn] -> [LImportDecl GhcRn]
+    combine  =  map merge . groupBy ((==) `on` getKey) . sortOn getKey
+
+    -- getKey :: LImportDecl GhcRn -> (ModuleName, Bool, Maybe ModuleName)
+    getKey decl = (
+        isImportDeclQualified . ideclQualified $ idecl -- is this qualified?
+        , unLoc <$> ideclAs idecl -- what is the qualifier (inside Maybe monad)
+        , unLoc . ideclName $ idecl -- Module Name
+      )
+      where
+        idecl :: ImportDecl GhcRn
+        idecl = unLoc decl
+
+    merge decls@((L l decl):_) = L l (decl { ideclHiding = Just (False, L l lies) })
+      where
+        lies = concatMap (unLoc . snd) $ mapMaybe (ideclHiding . unLoc) decls
+
+
 printMinimalImports :: HscSource -> [ImportDeclUsage] -> RnM ()
 -- See Note [Printing minimal imports]
 printMinimalImports hsc_src imports_w_usage
   = do { imports' <- getMinimalImports imports_w_usage
-       ; this_mod <- getModule
+       ; this_mod <- getModule 
        ; dflags   <- getDynFlags
        ; liftIO $ withFile (mkFilename dflags this_mod) WriteMode $ \h ->
           printForUser dflags h neverQualify AllTheWay (vcat (map ppr imports'))
