@@ -1272,15 +1272,16 @@ instance Binary RuleMatchInfo where
 
 instance Binary InlineSpec where
     put_ bh NoUserInline    = putByte bh 0
-    put_ bh Inline          = putByte bh 1
-    put_ bh Inlinable       = putByte bh 2
-    put_ bh NoInline        = putByte bh 3
+    put_ bh (Inline _)      = putByte bh 1
+    put_ bh (Inlinable _)   = putByte bh 2
+    put_ bh (NoInline _)    = putByte bh 3
 
     get bh = do h <- getByte bh
+                a <- getByte bh
                 case h of
-                  0 -> return NoUserInline
-                  1 -> return Inline
-                  2 -> return Inlinable
+                  0 -> return NoUserInline a
+                  1 -> return Inline a
+                  2 -> return Inlinable a
                   _ -> return NoInline
 
 instance Binary RecFlag where
