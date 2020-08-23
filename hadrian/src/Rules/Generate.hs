@@ -283,6 +283,7 @@ generateGhcPlatformH = do
         , "#endif /* __GHCPLATFORM_H__ */"
         ]
 
+-- See Note [tooldir: How GHC finds mingw on Windows]
 generateSettings :: Expr String
 generateSettings = do
     ctx <- getContext
