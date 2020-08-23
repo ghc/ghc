@@ -207,6 +207,7 @@ $(eval $(call includesHeaderPlatform,1))
 
 # These settings are read by GHC at runtime, so as to not cause spurious
 # rebuilds.
+# See Note [tooldir: How GHC finds mingw on Windows]
 
 includes_SETTINGS = includes/dist/build/settings
 
