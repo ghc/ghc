@@ -128,6 +128,7 @@ data AuxBindSpec
   | DerivDataConstr
       DataCon -- The data constructor to be represented
       RdrName -- The to-be-generated $c binding's RdrName
+      Int     -- Tag of the data constructor (index in the type constructor's datacons list)
       RdrName -- The RdrName of the to-be-generated $t binding for the parent
               -- data type. This is only used on the RHS of the
               -- to-be-generated $c binding.
@@ -139,7 +140,7 @@ auxBindSpecRdrName (DerivCon2Tag      _ con2tag_RDR) = con2tag_RDR
 auxBindSpecRdrName (DerivTag2Con      _ tag2con_RDR) = tag2con_RDR
 auxBindSpecRdrName (DerivMaxTag       _ maxtag_RDR)  = maxtag_RDR
 auxBindSpecRdrName (DerivDataDataType _ dataT_RDR _) = dataT_RDR
-auxBindSpecRdrName (DerivDataConstr   _ dataC_RDR _) = dataC_RDR
+auxBindSpecRdrName (DerivDataConstr   _ dataC_RDR _ _) = dataC_RDR
 
 data DerivStuff     -- Please add this auxiliary stuff
   = DerivAuxBind AuxBindSpec
@@ -1406,9 +1407,10 @@ gen_Data_binds loc rep_tc _
                           -- Auxiliary definitions: the data type and constructors
               , listToBag $ map DerivAuxBind
                   ( DerivDataDataType rep_tc dataT_RDR dataC_RDRs
-                  : zipWith (\data_con dataC_RDR ->
-                               DerivDataConstr data_con dataC_RDR dataT_RDR)
-                            data_cons dataC_RDRs )
+                  : zipWith3 (\data_con dataC_RDR tag ->
+                               DerivDataConstr data_con dataC_RDR tag dataT_RDR)
+                            data_cons dataC_RDRs [1..] -- ConIndex are indexed from 1
+                  )
               ) }
   where
     data_cons  = tyConDataCons rep_tc
@@ -1503,7 +1505,7 @@ kind1, kind2 :: Kind
 kind1 = typeToTypeKind
 kind2 = liftedTypeKind `mkVisFunTyMany` kind1
 
-gfoldl_RDR, gunfold_RDR, toConstr_RDR, dataTypeOf_RDR, mkConstr_RDR,
+gfoldl_RDR, gunfold_RDR, toConstr_RDR, dataTypeOf_RDR, mkConstrTag_RDR,
     mkDataType_RDR, conIndex_RDR, prefix_RDR, infix_RDR,
     dataCast1_RDR, dataCast2_RDR, gcast1_RDR, gcast2_RDR,
     constr_RDR, dataType_RDR,
@@ -1531,7 +1533,7 @@ dataCast1_RDR  = varQual_RDR  gENERICS (fsLit "dataCast1")
 dataCast2_RDR  = varQual_RDR  gENERICS (fsLit "dataCast2")
 gcast1_RDR     = varQual_RDR  tYPEABLE (fsLit "gcast1")
 gcast2_RDR     = varQual_RDR  tYPEABLE (fsLit "gcast2")
-mkConstr_RDR   = varQual_RDR  gENERICS (fsLit "mkConstr")
+mkConstrTag_RDR = varQual_RDR gENERICS (fsLit "mkConstrTag")
 constr_RDR     = tcQual_RDR   gENERICS (fsLit "Constr")
 mkDataType_RDR = varQual_RDR  gENERICS (fsLit "mkDataType")
 dataType_RDR   = tcQual_RDR   gENERICS (fsLit "DataType")
@@ -2166,15 +2168,15 @@ genAuxBindSpecOriginal dflags loc spec
               `nlHsApp` nlHsLit (mkHsString (showSDocOneLine ctx (ppr tycon)))
               `nlHsApp` nlList (map nlHsVar dataC_RDRs)
 
-    gen_bind (DerivDataConstr dc dataC_RDR dataT_RDR)
+    gen_bind (DerivDataConstr dc dataC_RDR tag dataT_RDR)
       = mkHsVarBind loc dataC_RDR rhs
       where
-        rhs = nlHsApps mkConstr_RDR constr_args
+        rhs = nlHsApps mkConstrTag_RDR constr_args
 
         constr_args
-           = [ -- nlHsIntLit (toInteger (dataConTag dc)),   -- Tag
-               nlHsVar dataT_RDR                            -- DataType
-             , nlHsLit (mkHsString (occNameString dc_occ))  -- String name
+           = [ nlHsVar dataT_RDR                            -- DataType
+             , nlHsLit (mkHsString (occNameString dc_occ))  -- Constructor name
+             , nlHsIntLit (toInteger tag)                   -- Constructor tag
              , nlList  labels                               -- Field labels
              , nlHsVar fixity ]                             -- Fixity
 
@@ -2213,7 +2215,7 @@ genAuxBindSpecSig loc spec = case spec of
     -> mk_sig (L loc (XHsType intTy))
   DerivDataDataType _ _ _
     -> mk_sig (nlHsTyVar dataType_RDR)
-  DerivDataConstr _ _ _
+  DerivDataConstr _ _ _ _
     -> mk_sig (nlHsTyVar constr_RDR)
   where
     mk_sig = mkHsWildCardBndrs . L loc . mkHsImplicitSigType
