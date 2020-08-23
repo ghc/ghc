@@ -114,6 +114,9 @@ class  Show a  where
 
     -- | Convert a value to a readable 'String'.
     --
+    -- showsPrec is a parameterized versions of shows. The extra parameter is a precedence level,
+    -- used to properly parenthesize expressions containing infix constructors.
+    --
     -- 'showsPrec' should satisfy the law
     --
     -- > showsPrec d x r ++ s  ==  showsPrec d x (r ++ s)
@@ -125,6 +128,7 @@ class  Show a  where
     --
     -- That is, 'Text.Read.readsPrec' parses the string produced by
     -- 'showsPrec', and delivers the value that 'showsPrec' started with.
+    --
 
     showsPrec :: Int    -- ^ the operator precedence of the enclosing
                         -- context (a number from @0@ to @11@).
