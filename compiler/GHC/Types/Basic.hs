@@ -1360,9 +1360,9 @@ data InlinePragma            -- Note [InlinePragma]
 
 -- | Inline Specification
 data InlineSpec   -- What the user's INLINE pragma looked like
-  = Inline       -- User wrote INLINE
-  | Inlinable    -- User wrote INLINABLE
-  | NoInline     -- User wrote NOINLINE
+  = Inline    SourceText  -- User wrote INLINE
+  | Inlinable SourceText  -- User wrote INLINABLE
+  | NoInline  SourceText  -- User wrote NOINLINE
   | NoUserInline -- User did not write any of INLINE/INLINABLE/NOINLINE
                  -- e.g. in `defaultInlinePragma` or when created by CSE
   deriving( Eq, Data, Show )
@@ -1459,7 +1459,7 @@ defaultInlinePragma = InlinePragma { inl_src = SourceText "{-# INLINE"
                                    , inl_inline = NoUserInline
                                    , inl_sat = Nothing }
 
-alwaysInlinePragma = defaultInlinePragma { inl_inline = Inline }
+alwaysInlinePragma = defaultInlinePragma { inl_inline = (Inline SourceText) }
 neverInlinePragma  = defaultInlinePragma { inl_act    = NeverActive }
 
 inlinePragmaSpec :: InlinePragma -> InlineSpec
@@ -1480,19 +1480,19 @@ isDefaultInlinePragma (InlinePragma { inl_act = activation
 
 isInlinePragma :: InlinePragma -> Bool
 isInlinePragma prag = case inl_inline prag of
-                        Inline -> True
-                        _      -> False
+                        Inline _ -> True
+                        _        -> False
 
 isInlinablePragma :: InlinePragma -> Bool
 isInlinablePragma prag = case inl_inline prag of
-                           Inlinable -> True
-                           _         -> False
+                           Inlinable _  -> True
+                           _            -> False
 
 isAnyInlinePragma :: InlinePragma -> Bool
 -- INLINE or INLINABLE
 isAnyInlinePragma prag = case inl_inline prag of
-                        Inline    -> True
-                        Inlinable -> True
+                        Inline _ -> True
+                        Inlinable _ -> True
                         _         -> False
 
 inlinePragmaSat :: InlinePragma -> Maybe Arity
@@ -1521,9 +1521,9 @@ instance Outputable RuleMatchInfo where
    ppr FunLike = text "FUNLIKE"
 
 instance Outputable InlineSpec where
-   ppr Inline       = text "INLINE"
-   ppr NoInline     = text "NOINLINE"
-   ppr Inlinable    = text "INLINABLE"
+   ppr (Inline _)      = text "INLINE"
+   ppr (NoInline _)    = text "NOINLINE"
+   ppr (Inlinable _)   = text "INLINABLE"
    ppr NoUserInline = text "NOUSERINLINE" -- what is better?
 
 instance Outputable InlinePragma where
@@ -1544,8 +1544,8 @@ pprInline' emptyInline (InlinePragma { inl_inline = inline, inl_act = activation
     where
       pp_inl x = if emptyInline then empty else ppr x
 
-      pp_act Inline   AlwaysActive = empty
-      pp_act NoInline NeverActive  = empty
+      pp_act (Inline _) AlwaysActive = empty
+      pp_act (NoInline SourceText) NeverActive  = empty
       pp_act _        act          = ppr act
 
       pp_sat | Just ar <- mb_arity = parens (text "sat-args=" <> int ar)
