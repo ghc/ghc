@@ -85,6 +85,7 @@ module Data.Data (
         Fixity(..),
         -- ** Constructors
         mkConstr,
+        mkConstrTag,
         mkIntegralConstr,
         mkRealConstr,
         mkCharConstr,
@@ -628,10 +629,9 @@ mkDataType str cs = DataType
                         , datarep = AlgRep cs
                         }
 
-
 -- | Constructs a constructor
-mkConstr :: DataType -> String -> [String] -> Fixity -> Constr
-mkConstr dt str fields fix =
+mkConstrTag :: DataType -> String -> Int -> [String] -> Fixity -> Constr
+mkConstrTag dt str idx fields fix =
         Constr
                 { conrep    = AlgConstr idx
                 , constring = str
@@ -639,6 +639,10 @@ mkConstr dt str fields fix =
                 , confixity = fix
                 , datatype  = dt
                 }
+
+-- | Constructs a constructor
+mkConstr :: DataType -> String -> [String] -> Fixity -> Constr
+mkConstr dt str fields fix = mkConstrTag dt str idx fields fix
   where
     idx = head [ i | (c,i) <- dataTypeConstrs dt `zip` [1..],
                      showConstr c == str ]

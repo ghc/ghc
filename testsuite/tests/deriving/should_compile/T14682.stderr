@@ -76,7 +76,7 @@ Derived class instances:
   $con2tag_Foo :: T14682.Foo -> GHC.Prim.Int#
   $con2tag_Foo (T14682.Foo _ _) = 0#
   $tFoo = Data.Data.mkDataType "Foo" [$cFoo]
-  $cFoo = Data.Data.mkConstr $tFoo "Foo" [] Data.Data.Prefix
+  $cFoo = Data.Data.mkConstrTag $tFoo "Foo" 1 [] Data.Data.Prefix
 
 Derived type family instances:
 
