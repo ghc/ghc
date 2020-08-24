@@ -777,7 +777,7 @@ mkVarBind var rhs = L (getLoc rhs) $
                     VarBind { var_ext = noExtField,
                               var_id = var, var_rhs = rhs }
 
-mkPatSynBind :: Located RdrName -> HsPatSynDetails (Located RdrName)
+mkPatSynBind :: Located RdrName -> HsPatSynDetails GhcPs
              -> LPat GhcPs -> HsPatSynDir GhcPs -> HsBind GhcPs
 mkPatSynBind name details lpat dir = PatSynBind noExtField psb
   where
@@ -990,7 +990,7 @@ collect_bind omitPatSyn (PatSynBind _ (PSB { psb_id = ps })) acc
 collect_bind _ (PatSynBind _ (XPatSynBind _)) acc = acc
 collect_bind _ (XHsBindsLR _) acc = acc
 
-collectMethodBinders :: forall idL idR. UnXRec idL => LHsBindsLR idL idR -> [XRec idL (IdP idL)]
+collectMethodBinders :: forall idL idR. UnXRec idL => LHsBindsLR idL idR -> [LIdP idL]
 -- ^ Used exclusively for the bindings of an instance decl which are all
 -- 'FunBinds'
 collectMethodBinders binds = foldr (get . unXRec @idL) [] binds
@@ -1173,7 +1173,7 @@ hsLTyClDeclBinders (L loc (DataDecl    { tcdLName = (L _ name)
 
 
 -------------------
-hsForeignDeclsBinders :: forall pass. (UnXRec pass, MapXRec pass) => [LForeignDecl pass] -> [XRec pass (IdP pass)]
+hsForeignDeclsBinders :: forall pass. (UnXRec pass, MapXRec pass) => [LForeignDecl pass] -> [LIdP pass]
 -- ^ See Note [SrcSpan for binders]
 hsForeignDeclsBinders foreign_decls
   = [ mapXRec @pass (const $ unXRec @pass n) fi
