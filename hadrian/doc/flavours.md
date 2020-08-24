@@ -168,7 +168,10 @@ See `src/Settings/Flavours/Llvm.hs` for details.
 The `static` flavour does not strictly follow the groupings in the table
 above because it links all the executables statically, not just GHC
 itself, and because it passes `-optc -static` when delegating to a C
-compiler.  It also only adds static flags when building in a non-dynamic _way_.
+compiler.  It also adds the `-dynamic-system-linker` cabal flag to the
+`ghc` package build and only adds static flags when building in a
+non-dynamic _way_.  Some of the considerations for a static build aren't
+a great fit for the flavour system, so it's a little bit hacky.
 
 ## Ways
 
@@ -191,7 +194,7 @@ information. The following table lists ways that are built in different flavours
         <th>stage1+</th>
     </tr>
     <tr>
-    <th>default<br>perf<br>prof<br>devel1<br>devel2<br>perf-llvm<br>prof-llvm<br>static</td>
+    <th>default<br>perf<br>prof<br>devel1<br>devel2<br>perf-llvm<br>prof-llvm</td>
     <td>vanilla</td>
     <td>vanilla<br>profiling<br>dynamic</td>
     <td>logging<br>debug<br>threaded<br>threadedDebug<br>threadedLogging
@@ -203,6 +206,19 @@ information. The following table lists ways that are built in different flavours
         threadedLogging<br>threadedProfiling
         <br>debugDynamic<br>threadedDynamic<br>threadedDebugDynamic
         <br>loggingDynamic<br>threadedLoggingDynamic
+    </td>
+    <td>Only in<br>prof<br>flavour</td>
+    <td>Only in<br>prof<br>flavour</td>
+</tr>
+<tr>
+    <th>static</td>
+    <td>vanilla</td>
+    <td>vanilla<br>profiling</td>
+    <td>logging<br>debug<br>threaded<br>threadedDebug<br>threadedLogging
+    </td>
+    <td>
+        logging<br>debug<br>threaded<br>threadedDebug<br>
+        threadedLogging<br>threadedProfiling
     </td>
     <td>Only in<br>prof<br>flavour</td>
     <td>Only in<br>prof<br>flavour</td>
