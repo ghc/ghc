@@ -55,9 +55,12 @@ heapallocedTest = do
     putStrLn ("HEAP_ALLOCED  = " ++ show same
                  ++ "\t(c_HEAP_ALLOCED ptr == cmm_HEAP_ALLOCED ptr)")
   where
-    addrs =
+    heapStart = 0x4200000000
+    addrs
+      -- Addresses around the start of the heap
+      = [heapStart + offset | offset <- [-1000..1000]]
       -- 2k address probes, appropriate to the address space
-      case sizeOf (nullPtr :: Ptr ()) of
+      ++ case sizeOf (nullPtr :: Ptr ()) of
         4 -> [0, 2^21 .. 2^32-1] -- 0 to 4Gb-1 in 2Mb jumps
         8 -> [0, 2^30 .. 2^41-1] -- 0 to 2Tb-1 in 1Gb jumps
         _ -> error "sizeOf ptr not 4 or 8"
