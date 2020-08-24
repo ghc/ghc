@@ -367,7 +367,13 @@ test('T16190',
       multimod_compile,
       ['T16190.hs', '-v0'])
 
-test('T16473', normal, makefile_test, ['T16473'])
+# Run this program. If specialisation fails, it'll start to allocate much more
+test ('T16473',
+      [ collect_stats('bytes allocated',5)
+      , only_ways(['normal'])
+      ],
+      compile_and_run,
+      ['-O2 -flate-specialise'])
 
 test('T17516',
       [ collect_compiler_stats('bytes allocated', 5),
@@ -411,6 +417,11 @@ test ('T13253',
       compile,
       ['-v0 -O'])
 test ('T13253-spj',
+      [ collect_compiler_stats('bytes allocated',2)
+      ],
+      compile,
+      ['-v0 -O'])
+test ('T18223',
       [ collect_compiler_stats('bytes allocated',2)
       ],
       compile,
