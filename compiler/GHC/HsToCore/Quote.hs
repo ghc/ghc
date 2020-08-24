@@ -1840,7 +1840,7 @@ rep_bind (L loc (PatSynBind _ (PSB { psb_id   = syn
        ; patSynD'' <- wrapGenArgSyms args ss patSynD'
        ; return (loc, patSynD'') }
   where
-    mkGenArgSyms :: HsPatSynDetails (Located Name) -> MetaM [GenSymBind]
+    mkGenArgSyms :: HsPatSynDetails GhcRn -> MetaM [GenSymBind]
     -- for Record Pattern Synonyms we want to conflate the selector
     -- and the pattern-only names in order to provide a nicer TH
     -- API. Whereas inside GHC, record pattern synonym selectors and
@@ -1859,7 +1859,7 @@ rep_bind (L loc (PatSynBind _ (PSB { psb_id   = syn
       = [ (pat, id) | (sel, id) <- genSyms, (sel', pat) <- selsPats
                     , sel == sel' ]
 
-    wrapGenArgSyms :: HsPatSynDetails (Located Name)
+    wrapGenArgSyms :: HsPatSynDetails GhcRn
                    -> [GenSymBind] -> Core (M TH.Dec) -> MetaM (Core (M TH.Dec))
     wrapGenArgSyms (RecCon _) _  dec = return dec
     wrapGenArgSyms _          ss dec = wrapGenSyms ss dec
@@ -1872,7 +1872,7 @@ repPatSynD :: Core TH.Name
 repPatSynD (MkC syn) (MkC args) (MkC dir) (MkC pat)
   = rep2 patSynDName [syn, args, dir, pat]
 
-repPatSynArgs :: HsPatSynDetails (Located Name) -> MetaM (Core (M TH.PatSynArgs))
+repPatSynArgs :: HsPatSynDetails GhcRn -> MetaM (Core (M TH.PatSynArgs))
 repPatSynArgs (PrefixCon args)
   = do { args' <- repList nameTyConName lookupLOcc args
        ; repPrefixPatSynArgs args' }

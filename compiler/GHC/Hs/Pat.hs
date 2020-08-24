@@ -93,7 +93,7 @@ data Pat p
 
        -- AZ:TODO above comment needs to be updated
   | VarPat      (XVarPat p)
-                (XRec p (IdP p))  -- ^ Variable Pattern
+                (LIdP p)     -- ^ Variable Pattern
 
                              -- See Note [Located RdrNames] in GHC.Hs.Expr
   | LazyPat     (XLazyPat p)
@@ -103,7 +103,7 @@ data Pat p
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | AsPat       (XAsPat p)
-                (XRec p (IdP p)) (LPat p)    -- ^ As pattern
+                (LIdP p) (LPat p)    -- ^ As pattern
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnAt'
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
@@ -224,7 +224,7 @@ data Pat p
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | NPlusKPat       (XNPlusKPat p)           -- Type of overall pattern
-                    (XRec p (IdP p))         -- n+k pattern
+                    (LIdP p)                 -- n+k pattern
                     (XRec p (HsOverLit p))   -- It'll always be an HsIntegral
                     (HsOverLit p)            -- See Note [NPlusK patterns] in GHC.Tc.Gen.Pat
                      -- NB: This could be (PostTc ...), but that induced a
@@ -313,7 +313,7 @@ type instance XXPat GhcTc = CoPat
 type family ConLikeP x
 
 type instance ConLikeP GhcPs = RdrName -- IdP GhcPs
-type instance ConLikeP GhcRn = Name -- IdP GhcRn
+type instance ConLikeP GhcRn = Name    -- IdP GhcRn
 type instance ConLikeP GhcTc = ConLike
 
 -- ---------------------------------------------------------------------

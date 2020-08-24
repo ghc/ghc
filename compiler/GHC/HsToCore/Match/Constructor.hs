@@ -126,7 +126,7 @@ matchPatSyn (var :| vars) ty eqns
         PatSynCon psyn -> alt{ alt_pat = psyn }
         _ -> panic "matchPatSyn: not PatSynCon"
 
-type ConArgPats = HsConDetails (LPat GhcTc) (HsRecFields GhcTc (LPat GhcTc))
+type ConArgPats = HsConPatDetails GhcTc
 
 matchOneConLike :: [Id]
                 -> Type
