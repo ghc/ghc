@@ -26,9 +26,6 @@ LT_CYAN="1;36"
 WHITE="1;37"
 LT_GRAY="0;37"
 
-export LANG=C.UTF-8
-export LC_ALL=C.UTF-8
-
 # GitLab Pipelines log section delimiters
 # https://gitlab.com/gitlab-org/gitlab-foss/issues/14664
 start_section() {
@@ -59,6 +56,18 @@ function run() {
 }
 
 TOP="$(pwd)"
+
+function setup_locale() {
+  if locale -a | grep -q C.UTF-8; then
+    export LANG=C.UTF-8
+  elif locale -a | grep -q en_US.UTF-8; then
+    export LANG=en_US.UTF-8
+  else
+    fail "Failed to find usable locale"
+  fi
+  info "Using locale $LANG..."
+  export LC_ALL=$LANG
+}
 
 function mingw_init() {
   case "$MSYSTEM" in
@@ -422,6 +431,8 @@ function shell() {
   fi
   run $cmd
 }
+
+setup_locale
 
 # Determine Cabal data directory
 case "$(uname)" in
