@@ -127,17 +127,17 @@ bignat_sub_word mwa wa b = go b 0#
       !sz = wordArraySize# wa
       go carry i s
          | isTrue# (i >=# sz)
-         = (# s, carry `neWord#` 0## #)
+         = (# s, carry `eqWord#` 0## #)
 
          | 0## <- carry
          = case mwaArrayCopy# mwa i wa i (sz -# i) s of
-            s' -> (# s', 0# #)
+            s' -> (# s', 1# #) -- no overflow
 
          | True
          = case subWordC# (indexWordArray# wa i) carry of
             (# 0##, 0# #)
                | isTrue# (i ==# sz) -> case mwaShrink# mwa 1# s of
-                                          s' -> (# s', 0# #)
+                                          s' -> (# s', 1# #) -- no overflow
 
             (# l  , c  #) -> case mwaWrite# mwa i l s of
                               s1 -> go (int2Word# c) (i +# 1#) s1
