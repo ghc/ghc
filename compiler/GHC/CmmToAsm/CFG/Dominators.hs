@@ -45,7 +45,6 @@ import Data.Bifunctor
 import Data.Tuple (swap)
 
 import Data.Tree
-import Data.List
 import Data.IntMap(IntMap)
 import Data.IntSet(IntSet)
 import qualified Data.IntMap.Strict as IM
