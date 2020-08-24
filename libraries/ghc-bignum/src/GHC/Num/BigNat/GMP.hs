@@ -92,8 +92,8 @@ bignat_sub
 {-# INLINE bignat_sub #-}
 bignat_sub mwa wa wb s =
    case ioWord# (c_mpn_sub mwa wa (wordArraySize# wa) wb (wordArraySize# wb)) s of
-      (# s', 0## #) -> (# s', 0# #)
-      (# s', _   #) -> (# s', 1# #)
+      (# s', 1## #) -> (# s', 0# #) -- overflow
+      (# s', _   #) -> (# s', 1# #) -- no overflow
 
 bignat_sub_word
    :: MutableWordArray# RealWorld
@@ -104,8 +104,8 @@ bignat_sub_word
 {-# INLINE bignat_sub_word #-}
 bignat_sub_word mwa wa b s =
    case ioWord# (c_mpn_sub_1 mwa wa (wordArraySize# wa) b) s of
-      (# s', 0## #) -> (# s', 0# #)
-      (# s', _   #) -> (# s', 1# #)
+      (# s', 1## #) -> (# s', 0# #) -- overflow
+      (# s', _   #) -> (# s', 1# #) -- no overflow
 
 bignat_mul
    :: MutableWordArray# RealWorld
