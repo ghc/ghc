@@ -299,8 +299,8 @@ tidyCoAxBndrsForUser init_env tcvs
 coToMCo :: Coercion -> MCoercion
 -- Convert a coercion to a MCoercion,
 -- checking aggressively for reflexivity
-coToMCo co | isReflexiveCo co = MRefl
-           | otherwise        = MCo co
+coToMCo co | isReflCo co = MRefl
+           | otherwise   = MCo co
 
 -- | Tests if this MCoercion is obviously generalized reflexive
 -- Guaranteed to work very quickly.

@@ -166,7 +166,9 @@ ppr_id_occ add_par id
   | isJoinId id = add_par ((text "jump") <+> pp_id)
   | otherwise   = pp_id
   where
-    pp_id = pprPrefixOcc id
+    pp_id = ppr id  -- We could use pprPrefixOcc to print (+) etc, but this is
+                    -- Core where we don't print things infix anyway, so doing
+                    -- so just adds extra redundant parens
 
 ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
         -- The function adds parens in context that need
