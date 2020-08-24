@@ -711,7 +711,7 @@ loop:
 
       case FUN_STATIC:
           if (info->srt != 0 || info->layout.payload.ptrs != 0) {
-              evacuate_static_object(STATIC_LINK(info,(StgClosure *)q), q);
+              evacuate_static_object(CONSTR_AND_FUN_STATIC_LINK(info,(StgClosure *)q), q);
           }
           return;
 
@@ -727,7 +727,7 @@ loop:
       case CONSTR_1_0:
       case CONSTR_2_0:
       case CONSTR_1_1:
-          evacuate_static_object(STATIC_LINK(info,(StgClosure *)q), q);
+          evacuate_static_object(CONSTR_AND_FUN_STATIC_LINK(info,(StgClosure *)q), q);
           return;
 
       case CONSTR_0_1:
@@ -742,7 +742,7 @@ loop:
       case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN: // todo: do we even need to evac this case?
       case SMALL_MUT_ARR_PTRS_DIRTY:
       case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
-          evacuate_static_object(STATIC_LINK(info,(StgSmallMutArrPtrs*)q), q);
+          evacuate_static_object(SMALL_MUT_ARR_STATIC_LINK((StgSmallMutArrPtrs*)q), q);
           return;
 
       default:

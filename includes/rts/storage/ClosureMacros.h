@@ -166,27 +166,35 @@ INLINE_HEADER StgHalfWord GET_TAG(const StgClosure *con)
 
 /* These are hard-coded. */
 #define THUNK_STATIC_LINK(p) (&(p)->payload[1])
-#define IND_STATIC_LINK(p)   (&(p)->payload[1])
+#define IND_STATIC_LINK(p) (&(p)->payload[1])
+#define SMALL_MUT_ARR_STATIC_LINK(p) (&((StgSmallMutArrPtrs*)p)->payload[((StgSmallMutArrPtrs*)p)->ptrs])
+#define CONSTR_AND_FUN_STATIC_LINK(info,p) (&(p)->payload[info->layout.payload.ptrs + info->layout.payload.nptrs])
 
 INLINE_HEADER StgClosure **
 STATIC_LINK(const StgInfoTable *info, StgClosure *p)
 {
     switch (info->type) {
+    case FUN_STATIC:
+    case CONSTR:
+    case CONSTR_1_0:
+    case CONSTR_2_0:
+    case CONSTR_1_1:
+        return CONSTR_AND_FUN_STATIC_LINK(info,p);
+
     case THUNK_STATIC:
         return THUNK_STATIC_LINK(p);
 
     case IND_STATIC:
         return IND_STATIC_LINK(p);
 
-    case SMALL_MUT_ARR_PTRS_CLEAN:
-    case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+    // case SMALL_MUT_ARR_PTRS_CLEAN: // TODO: do we really need this case?
+    // case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN: // TODO: do we really need this case?
     case SMALL_MUT_ARR_PTRS_DIRTY:
     case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
-        return (StgSmallMutArrPtrs*)p->payload[(StgSmallMutArrPtrs*)p->size];
+        return SMALL_MUT_ARR_STATIC_LINK(p);
 
     default:
-        return &p->payload[info->layout.payload.ptrs +
-                           info->layout.payload.nptrs];
+        barf("STATIC_LINK: strange closure type %d", (int)(info->type));
     }
 }
 
