@@ -307,7 +307,7 @@ type family IdGhcP pass where
   IdGhcP 'Renamed     = Name
   IdGhcP 'Typechecked = Id
 
-type LIdP p = Located (IdP p)
+type LIdP p = XRec p (IdP p)
 
 -- | Marks that a field uses the GhcRn variant even when the pass
 -- parameter is GhcTc. Useful for storing HsTypes in GHC.Hs.Exprs, say, because

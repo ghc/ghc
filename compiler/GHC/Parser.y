@@ -1491,7 +1491,7 @@ pattern_synonym_decl :: { LHsDecl GhcPs }
                        (as ++ ((mj AnnPattern $1:mu AnnLarrow $3:(fst $ unLoc $5))) )
                    }}
 
-pattern_synonym_lhs :: { (Located RdrName, HsPatSynDetails (Located RdrName), [AddAnn]) }
+pattern_synonym_lhs :: { (Located RdrName, HsPatSynDetails GhcPs, [AddAnn]) }
         : con vars0 { ($1, PrefixCon $2, []) }
         | varid conop varid { ($2, InfixCon $1 $3, []) }
         | con '{' cvars1 '}' { ($1, RecCon $3, [moc $2, mcc $4] ) }
