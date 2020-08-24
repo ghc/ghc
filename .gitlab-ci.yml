@@ -6,7 +6,7 @@ variables:
 
   # Sequential version number capturing the versions of all tools fetched by
   # .gitlab/ci.sh.
-  WINDOWS_TOOLCHAIN_VERSION: 1
+  WINDOWS_TOOLCHAIN_VERSION: 2
 
   # Disable shallow clones; they break our linting rules
   GIT_DEPTH: 0
