@@ -52,7 +52,7 @@ stages:
     expire_in: 1 year
   only:
     variables:
-      - $RELEASE == "yes"
+      - $RELEASE_JOB == "yes"
 
 ############################################################
 # Runner Tags
