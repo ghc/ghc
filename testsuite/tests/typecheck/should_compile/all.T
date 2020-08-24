@@ -721,4 +721,5 @@ test('T18118', normal, multimod_compile, ['T18118', '-v0'])
 test('T18412', normal, compile, [''])
 test('T18470', normal, compile, [''])
 test('T18323', normal, compile, [''])
+test('T18585', normal, compile, [''])
 
