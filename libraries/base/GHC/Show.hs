@@ -128,6 +128,42 @@ class  Show a  where
     --
     -- That is, 'Text.Read.readsPrec' parses the string produced by
     -- 'showsPrec', and delivers the value that 'showsPrec' started with.
+    --
+    -- === __Example__ ===
+    --
+    -- > data Expr = Lit Integer | Expr :*: Expr | Expr :+: Expr
+
+    -- -- I want :*: to have precedence level 7, :+: level 6.
+    -- -- This is coded both as the infixl declarations below, and in the Show instance.
+
+    -- > infixl 7 :*:
+    -- > infixl 6 :+:
+    -- >
+    -- > instance Show Expr where
+    -- >     showsPrec contextPrec (Lit i) =
+    -- >         showParen (contextPrec > myPrec)
+    -- >                   (showString "Lit " .
+    -- >                    showsPrec (myPrec + 1) i)
+    -- >       where myPrec = 10
+    -- >     showsPrec contextPrec (e1 :*: e2) =
+    -- >         showParen (contextPrec > myPrec)
+    -- >                   (showsPrec (myPrec + 1) e1 .
+    -- >                    showString " :*: " .
+    -- >                    showsPrec (myPrec + 1) e2)
+    -- >       where myPrec = 7
+    -- >     showsPrec contextPrec (e1 :+: e2) =
+    -- >         showParen (contextPrec > myPrec)
+    -- >                   (showsPrec (myPrec + 1) e1 .
+    -- >                    showString " :+: " .
+    -- >                    showsPrec (myPrec + 1) e2)
+    -- >       where myPrec = 6
+    -- >
+    -- -- Precedence says not parenthesized.
+    -- > example1 = Lit 3 :*: Lit 1 :+: Lit 4 :*: Lit 1
+    --
+    -- -- Precendence says parenthesized.
+    -- > example2 = (Lit (-3) :+: Lit (-1)) :*: (Lit (-4) :+: Lit 1)
+
 
     showsPrec :: Int    -- ^ the operator precedence of the enclosing
                         -- context (a number from @0@ to @11@).
