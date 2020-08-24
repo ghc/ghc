@@ -66,7 +66,7 @@ import qualified GHC.Utils.Error as Err
 import Control.Monad
 import Data.Function
 import Data.List        ( sortBy, mapAccumL )
-import Data.IORef       ( atomicModifyIORef' )
+import Data.IORef       ( atomicModifyIORef', readIORef )
 
 {-
 Constructing the TypeEnv, Instances, Rules from which the
@@ -143,23 +143,16 @@ mkBootModDetailsTc hsc_env
                   tcg_insts            = insts,
                   tcg_fam_insts        = fam_insts,
                   tcg_complete_matches = complete_sigs,
-                  tcg_mod              = this_mod
+                  tcg_mod              = this_mod,
+                  tcg_keep             = keep_ids_ref
                 }
   = -- This timing isn't terribly useful since the result isn't forced, but
     -- the message is useful to locating oneself in the compilation process.
     Err.withTiming dflags
                    (text "CoreTidy"<+>brackets (ppr this_mod))
-                   (const ()) $
-    return (ModDetails { md_types         = type_env'
-                       , md_insts         = insts'
-                       , md_fam_insts     = fam_insts
-                       , md_rules         = []
-                       , md_anns          = []
-                       , md_exports       = exports
-                       , md_complete_sigs = complete_sigs
-                       })
-  where
-    dflags = hsc_dflags hsc_env
+                   (const ()) $ do
+   keep_ids <- readIORef keep_ids_ref
+   let
 
     -- Find the LocalIds in the type env that are exported
     -- Make them into GlobalIds, and tidy their types
@@ -190,9 +183,22 @@ mkBootModDetailsTc hsc_env
                  -- See Note [Drop wired-in things]
                | isExportedId id                 = True
                | id_name `elemNameSet` exp_names = True
+               | id_name `elemNameSet` keep_ids  = True
+                 -- Wee need to keep ids in tcg_keep, because they contain e.g.
+                 -- TH values
                | otherwise                       = False
                where
                  id_name = idName id
+   return (ModDetails { md_types         = type_env'
+                       , md_insts         = insts'
+                       , md_fam_insts     = fam_insts
+                       , md_rules         = []
+                       , md_anns          = []
+                       , md_exports       = exports
+                       , md_complete_sigs = complete_sigs
+                       })
+  where
+    dflags = hsc_dflags hsc_env
 
     exp_names = availsToNameSet exports
 
