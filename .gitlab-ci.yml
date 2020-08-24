@@ -866,9 +866,6 @@ validate-x86_64-windows-hadrian:
   cache:
     key: "x86_64-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
-validate-x86_64-windows:
-  extends: .build-x86_64-windows-make
-
 nightly-x86_64-windows:
   <<: *nightly
   extends: .build-x86_64-windows-make
