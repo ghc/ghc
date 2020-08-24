@@ -1814,6 +1814,20 @@ scavenge_static(void)
         }
         break;
       }
+    case SMALL_MUT_ARR_PTRS_CLEAN:
+    case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+    case SMALL_MUT_ARR_PTRS_DIRTY:
+    case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
+    {
+        StgPtr q, next;
+        StgSmallMutArrPtrs* arr = (StgSmallMutArrPtrs*)p;
+        next = (P_)arr->payload + arr->ptrs;
+        // evacuate the pointers
+        for (q = (P_)arr->payload; q < next; q++) { // todo: does the payload come last, even when profiling?
+            evacuate((StgClosure **)q);
+        }
+        break;
+    }
 
     default:
       barf("scavenge_static: strange closure %d", (int)(info->type));

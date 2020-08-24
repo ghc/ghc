@@ -197,7 +197,7 @@ mkStaticClosureFields profile info_tbl ccs caf_refs payload
     is_caf = isThunkRep (cit_rep info_tbl)
 
     padding
-        | is_caf && null payload = [mkIntCLit platform 0]
+        | is_caf && null payload = [mkIntCLit platform 0] -- TODO empty array case?
         | otherwise = []
 
     static_link_field
@@ -205,7 +205,11 @@ mkStaticClosureFields profile info_tbl ccs caf_refs payload
         = [mkIntCLit platform 0]
         | staticClosureNeedsLink (mayHaveCafRefs caf_refs) info_tbl
         = [static_link_value]
-        | otherwise
+        | SmallArrayPtrsRep 0 <- cit_rep info_tbl -- todo: This is a hack.
+        = [mkIntCLit platform 3]
+        | SmallArrayPtrsRep _ <- cit_rep info_tbl -- todo: This is a hack.
+        = [mkIntCLit platform 0]
+        | otherwise -- CONSTR_0_1, CONSTR_0_2, CONSTR_NOCAF cases in evacuate (rts/sm/Evac.c).
         = []
 
     saved_info_field

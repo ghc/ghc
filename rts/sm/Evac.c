@@ -734,8 +734,15 @@ loop:
       case CONSTR_0_2:
       case CONSTR_NOCAF:
           /* no need to put these on the static linked list, they don't need
-           * to be scavenged.
+           * to be scavenged. See static_link_field in GHC.StgToCmm.Heap
            */
+          return;
+
+      case SMALL_MUT_ARR_PTRS_CLEAN: // todo: do we even need to evac this case?
+      case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN: // todo: do we even need to evac this case?
+      case SMALL_MUT_ARR_PTRS_DIRTY:
+      case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
+          evacuate_static_object(STATIC_LINK(info,(StgSmallMutArrPtrs*)q), q);
           return;
 
       default:
