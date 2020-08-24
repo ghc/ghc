@@ -558,7 +558,7 @@ a pattern synonym.  What about the /building/ side?
   a bad idea.
 -}
 
-collectPatSynArgInfo :: HsPatSynDetails (Located Name)
+collectPatSynArgInfo :: HsPatSynDetails GhcRn
                      -> ([Name], [Name], Bool)
 collectPatSynArgInfo details =
   case details of
