@@ -506,7 +506,7 @@ bigNatSubUnsafe a b
       let szA = wordArraySize# a
       in withNewWordArrayTrimed# szA \mwa s->
             case inline bignat_sub mwa a b s of
-               (# s', 0# #) -> s'
+               (# s', 1# #) -> s'
                (# s', _  #) -> case raiseUnderflow of
                                  !_ -> s'
                                  -- see Note [ghc-bignum exceptions] in
