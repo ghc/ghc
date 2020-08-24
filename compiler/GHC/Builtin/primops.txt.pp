@@ -1410,7 +1410,7 @@ section "Byte Arrays"
 -- It is useful to be able to allocate byte arrays outside of the heap,
 -- i.e. outside of the memory space covered by the HEAP_ALLOCED() test.
 --
--- There are two major use cases:
+-- There are two major use cases (see issue #17747):
 --
 --  1. Having foreign memory appear as a normal GHC byte array. This
 --     are use cases similar to the use of a ForeignPtr, but where it
@@ -1422,10 +1422,13 @@ section "Byte Arrays"
 -- The second is not yet available as it requires additional support
 -- from the code gen.
 --
--- A concrete use-case in the first category is to memory map a file
+-- An example of the first category can be seen in GHC test T17747.
+-- A concrete use-case is to memory map a file
 -- but have it appear as a ByteArray# rather than a ForeignPtr. Doing
--- so of course requires that space is reserved immediatly before the
--- file data for the byte array heap object header.
+-- so of course requires that space is reserved immediately before the
+-- file data for the byte array heap object header. See the
+-- placeByteArray# primop documentation below and the FFI section of
+-- the user guide for more details.
 --
 -- To have the first use-case work requires a few things:
 --
@@ -1433,31 +1436,35 @@ section "Byte Arrays"
 --   the HEAP_ALLOCED space. This is straightforward because the GC
 --   has support for a number of different closure types to appear
 --   outside the heap (primarily for statically allocated values), and
---   byte arrays are easy because they contain no heap pointers.
+--   byte arrays are easy because they contain no heap pointers. See
+--   the reference back to this note in `evacuate(StgClosure **p)` in
+--   `rts/sm/Evac.c`
 --
--- * For other primops to not fail when encountering byte arrays
---   outside of the heap. Specifically isByteArrayPinned# requires
---   special support. This is currently the only primop that needs
---   special support.
+-- * For all other byte array primops (e.g. shrinkMutableByteArray#,
+--   sameMutableByteArray#, isByteArrayPinned#, etc.) to not fail when
+--   encountering byte arrays outside of the heap. Specifically
+--   isByteArrayPinned# requires special support. This is currently the
+--   only primop that needs special support.
+--   See Note [isByteArrayPinned# support for off heap byte arrays].
 --
 -- * A mechanism to set up the heap object header for a byte array at
 --   an address outside of the HEAP_ALLOCED space. This is needed to
 --   make the foreign allocated memory look like a byte array. This is
 --   provided by the placeByteArray# primop.
 --
--- A concrete use case is to memory map a file but have it appear as a
--- ByteArray# rather than a ForeignPtr. Doing so of course requires
--- that space is reserved immediatly before the file data for the byte
--- array heap object header.
---
--- The special support in the isByteArrayPinned# primop is that it
--- needs to be able to test if the byte array is HEAP_ALLOCED or not
--- and if not then it is certainly pinned. This requires CMM support
--- for the HEAP_ALLOCED test, which is otherwise only called from C
+
+-- Note [isByteArrayPinned# support for off heap byte arrays]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- The isByteArrayPinned# primop is implemented by reading block descriptor
+-- flags. Since off heap byte arrays don't have block descriptors,
+-- isByteArrayPinned# must explicitly check if the byte array is HEAP_ALLOCED
+-- or not. If not HEAP_ALLOCED then it is certainly pinned. This requires CMM
+-- support for the HEAP_ALLOCED test, which is otherwise only called from C
 -- code in the RTS. The current design is to provide full CMM
--- implementations of the code to implement HEAP_ALLOCED. This is fast
--- but essentially duplicates what is already a complex implementation.
--- An alternative would be to use a CMM C call to a C function that use
+-- implementations of HEAP_ALLOCED enabled in `rts/sm/HeapAlloc.h` with the
+-- CMINUSMINUS cpp flag. This includes HEAP_ALLOCED_CALLISH which essentially
+-- duplicates what is already a complex C implementation. This is fast
+-- but an alternative would be to use a CMM C call to a C function that use
 -- the existing C implementation of HEAP_ALLOCED.
 
 
@@ -1475,8 +1482,14 @@ primop  NewByteArrayOp_Char "newByteArray#" GenPrimOp
 -- See [Byte arrays outside of the HEAP_ALLOCED space]
 primop  PlaceByteArrayOp_Char "placeByteArray#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, MutableByteArray# s #)
-   {Place a new byte array header for the specified size (in bytes), at the
-    specified address outside of the heap, in the specified state thread.}
+   {Place a new byte array header at the specified address outside of the heap,
+   for the specified payload size (in bytes), in the specified state thread. In
+   C code with `#include "Rts.h"`, use `sizeOf(StgArrBytes)` or
+   `sizeOfW(StgArrBytes)` to get the size of a byte array header in bytes or
+   words respectively. The caller must ensure `sizeof(StgArrBytes) + n` bytes of
+   space is allocated at the give address for the heap object header followed by
+   n bytes of payload. See the FFI section of the user guide for more details
+   on how to use this primop.}
    with out_of_line = True
         has_side_effects = True
 
