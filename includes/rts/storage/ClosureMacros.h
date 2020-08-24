@@ -174,8 +174,16 @@ STATIC_LINK(const StgInfoTable *info, StgClosure *p)
     switch (info->type) {
     case THUNK_STATIC:
         return THUNK_STATIC_LINK(p);
+
     case IND_STATIC:
         return IND_STATIC_LINK(p);
+
+    case SMALL_MUT_ARR_PTRS_CLEAN:
+    case SMALL_MUT_ARR_PTRS_FROZEN_CLEAN:
+    case SMALL_MUT_ARR_PTRS_DIRTY:
+    case SMALL_MUT_ARR_PTRS_FROZEN_DIRTY:
+        return (StgSmallMutArrPtrs*)p->payload[(StgSmallMutArrPtrs*)p->size];
+
     default:
         return &p->payload[info->layout.payload.ptrs +
                            info->layout.payload.nptrs];
