@@ -1,7 +1,7 @@
 {-# LANGUAGE RankNTypes, BangPatterns, FlexibleContexts, Strict #-}
 
 {- |
-  Module      :  Data.Graph.Dom
+  Module      :  GHC.CmmToAsm.CFG.Dominators
   Copyright   :  (c) Matt Morrow 2009
   License     :  BSD3
   Maintainer  :  <klebinger.andreas@gmx.at>
@@ -41,7 +41,6 @@ module GHC.CmmToAsm.CFG.Dominators (
 ) where
 
 import GHC.Prelude
-import Data.Monoid(Monoid(..))
 import Data.Bifunctor
 import Data.Tuple (swap)
 
