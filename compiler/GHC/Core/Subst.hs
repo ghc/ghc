@@ -343,6 +343,8 @@ instance Outputable Subst where
 
 substExprSC :: HasDebugCallStack => Subst -> CoreExpr -> CoreExpr
 -- Just like substExpr, but a no-op if the substitution is empty
+-- Note that this does /not/ replace occurrences of free vars with
+-- their canonical representatives in the in-scope set
 substExprSC subst orig_expr
   | isEmptySubst subst = orig_expr
   | otherwise          = -- pprTrace "enter subst-expr" (doc $$ ppr orig_expr) $
@@ -628,6 +630,9 @@ substIdInfo subst new_id info
 
 ------------------
 -- | Substitutes for the 'Id's within an unfolding
+-- NB: substUnfolding /discards/ any unfolding without
+--     without a Stable source.  This is usually what we want,
+--     but it may be a bit unexpected
 substUnfolding, substUnfoldingSC :: Subst -> Unfolding -> Unfolding
         -- Seq'ing on the returned Unfolding is enough to cause
         -- all the substitutions to happen completely

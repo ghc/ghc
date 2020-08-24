@@ -20,7 +20,7 @@ T18052a.$b:||: = \ (@a) (@b) (x :: a) (y :: b) -> (x, y)
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 (+++) :: forall {a}. [a] -> [a] -> [a]
 [GblId]
-(+++) = (++)
+(+++) = ++
 
 -- RHS size: {terms: 13, types: 20, coercions: 0, joins: 0/0}
 T18052a.$m:||:

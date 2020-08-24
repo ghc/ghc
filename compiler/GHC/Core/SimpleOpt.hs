@@ -18,17 +18,14 @@ module GHC.Core.SimpleOpt (
         -- ** Predicates on expressions
         exprIsConApp_maybe, exprIsLiteral_maybe, exprIsLambda_maybe,
 
-        -- ** Coercions and casts
-        pushCoArg, pushCoValArg, pushCoTyArg, collectBindersPushingCo
     ) where
 
 #include "HsVersions.h"
 
 import GHC.Prelude
 
-import GHC.Core.Opt.Arity( etaExpandToJoinPoint )
-
 import GHC.Core
+import GHC.Core.Opt.Arity
 import GHC.Core.Subst
 import GHC.Core.Utils
 import GHC.Core.FVs
@@ -48,16 +45,12 @@ import GHC.Core.Coercion.Opt ( optCoercion, OptCoercionOpts (..) )
 import GHC.Core.Type hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                             , isInScope, substTyVarBndr, cloneTyVarBndr )
 import GHC.Core.Coercion hiding ( substCo, substCoVarBndr )
-import GHC.Core.TyCon ( tyConArity )
-import GHC.Core.Multiplicity
 import GHC.Builtin.Types
 import GHC.Builtin.Names
 import GHC.Types.Basic
 import GHC.Unit.Module ( Module )
-import GHC.Driver.Ppr
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
-import GHC.Data.Pair
 import GHC.Utils.Misc
 import GHC.Data.Maybe       ( orElse )
 import GHC.Data.FastString
@@ -782,6 +775,28 @@ a good cause. And it won't hurt other RULES and such that it comes across.
 ************************************************************************
 -}
 
+{- Note [Strictness and join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+
+   let f = \x.  if x>200 then e1 else e1
+
+and we know that f is strict in x.  Then if we subsequently
+discover that f is an arity-2 join point, we'll eta-expand it to
+
+   let f = \x y.  if x>200 then e1 else e1
+
+and now it's only strict if applied to two arguments.  So we should
+adjust the strictness info.
+
+A more common case is when
+
+   f = \x. error ".."
+
+and again its arity increases (#15517)
+-}
+
+
 -- | Returns Just (bndr,rhs) if the binding is a join point:
 -- If it's a JoinId, just return it
 -- If it's not yet a JoinId but is always tail-called,
@@ -814,27 +829,6 @@ joinPointBindings_maybe :: [(InBndr, InExpr)] -> Maybe [(InBndr, InExpr)]
 joinPointBindings_maybe bndrs
   = mapM (uncurry joinPointBinding_maybe) bndrs
 
-
-{- Note [Strictness and join points]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have
-
-   let f = \x.  if x>200 then e1 else e1
-
-and we know that f is strict in x.  Then if we subsequently
-discover that f is an arity-2 join point, we'll eta-expand it to
-
-   let f = \x y.  if x>200 then e1 else e1
-
-and now it's only strict if applied to two arguments.  So we should
-adjust the strictness info.
-
-A more common case is when
-
-   f = \x. error ".."
-
-and again its arity increases (#15517)
--}
 
 {- *********************************************************************
 *                                                                      *
@@ -1350,275 +1344,3 @@ exprIsLambda_maybe _ _e
       Nothing
 
 
-{- *********************************************************************
-*                                                                      *
-              The "push rules"
-*                                                                      *
-************************************************************************
-
-Here we implement the "push rules" from FC papers:
-
-* The push-argument rules, where we can move a coercion past an argument.
-  We have
-      (fun |> co) arg
-  and we want to transform it to
-    (fun arg') |> co'
-  for some suitable co' and transformed arg'.
-
-* The PushK rule for data constructors.  We have
-       (K e1 .. en) |> co
-  and we want to transform to
-       (K e1' .. en')
-  by pushing the coercion into the arguments
--}
-
-pushCoArgs :: CoercionR -> [CoreArg] -> Maybe ([CoreArg], MCoercion)
-pushCoArgs co []         = return ([], MCo co)
-pushCoArgs co (arg:args) = do { (arg',  m_co1) <- pushCoArg  co  arg
-                              ; case m_co1 of
-                                  MCo co1 -> do { (args', m_co2) <- pushCoArgs co1 args
-                                                 ; return (arg':args', m_co2) }
-                                  MRefl  -> return (arg':args, MRefl) }
-
-pushCoArg :: CoercionR -> CoreArg -> Maybe (CoreArg, MCoercion)
--- We have (fun |> co) arg, and we want to transform it to
---         (fun arg) |> co
--- This may fail, e.g. if (fun :: N) where N is a newtype
--- C.f. simplCast in GHC.Core.Opt.Simplify
--- 'co' is always Representational
--- If the returned coercion is Nothing, then it would have been reflexive
-pushCoArg co (Type ty) = do { (ty', m_co') <- pushCoTyArg co ty
-                            ; return (Type ty', m_co') }
-pushCoArg co val_arg   = do { (arg_co, m_co') <- pushCoValArg co
-                            ; return (val_arg `mkCast` arg_co, m_co') }
-
-pushCoTyArg :: CoercionR -> Type -> Maybe (Type, MCoercionR)
--- We have (fun |> co) @ty
--- Push the coercion through to return
---         (fun @ty') |> co'
--- 'co' is always Representational
--- If the returned coercion is Nothing, then it would have been reflexive;
--- it's faster not to compute it, though.
-pushCoTyArg co ty
-  -- The following is inefficient - don't do `eqType` here, the coercion
-  -- optimizer will take care of it. See #14737.
-  -- -- | tyL `eqType` tyR
-  -- -- = Just (ty, Nothing)
-
-  | isReflCo co
-  = Just (ty, MRefl)
-
-  | isForAllTy_ty tyL
-  = ASSERT2( isForAllTy_ty tyR, ppr co $$ ppr ty )
-    Just (ty `mkCastTy` co1, MCo co2)
-
-  | otherwise
-  = Nothing
-  where
-    Pair tyL tyR = coercionKind co
-       -- co :: tyL ~ tyR
-       -- tyL = forall (a1 :: k1). ty1
-       -- tyR = forall (a2 :: k2). ty2
-
-    co1 = mkSymCo (mkNthCo Nominal 0 co)
-       -- co1 :: k2 ~N k1
-       -- Note that NthCo can extract a Nominal equality between the
-       -- kinds of the types related by a coercion between forall-types.
-       -- See the NthCo case in GHC.Core.Lint.
-
-    co2 = mkInstCo co (mkGReflLeftCo Nominal ty co1)
-        -- co2 :: ty1[ (ty|>co1)/a1 ] ~ ty2[ ty/a2 ]
-        -- Arg of mkInstCo is always nominal, hence mkNomReflCo
-
-pushCoValArg :: CoercionR -> Maybe (Coercion, MCoercion)
--- We have (fun |> co) arg
--- Push the coercion through to return
---         (fun (arg |> co_arg)) |> co_res
--- 'co' is always Representational
--- If the second returned Coercion is actually Nothing, then no cast is necessary;
--- the returned coercion would have been reflexive.
-pushCoValArg co
-  -- The following is inefficient - don't do `eqType` here, the coercion
-  -- optimizer will take care of it. See #14737.
-  -- -- | tyL `eqType` tyR
-  -- -- = Just (mkRepReflCo arg, Nothing)
-
-  | isReflCo co
-  = Just (mkRepReflCo arg, MRefl)
-
-  | isFunTy tyL
-  , (co_mult, co1, co2) <- decomposeFunCo Representational co
-  , isReflexiveCo co_mult
-    -- We can't push the coercion in the case where co_mult isn't reflexivity:
-    -- it could be an unsafe axiom, and losing this information could yield
-    -- ill-typed terms. For instance (fun x ::(1) Int -> (fun _ -> () |> co) x)
-    -- with co :: (Int -> ()) ~ (Int #-> ()), would reduce to (fun x ::(1) Int
-    -- -> (fun _ ::(Many) Int -> ()) x) which is ill-typed
-
-              -- If   co  :: (tyL1 -> tyL2) ~ (tyR1 -> tyR2)
-              -- then co1 :: tyL1 ~ tyR1
-              --      co2 :: tyL2 ~ tyR2
-  = ASSERT2( isFunTy tyR, ppr co $$ ppr arg )
-    Just (mkSymCo co1, MCo co2)
-
-  | otherwise
-  = Nothing
-  where
-    arg = funArgTy tyR
-    Pair tyL tyR = coercionKind co
-
-pushCoercionIntoLambda
-    :: InScopeSet -> Var -> CoreExpr -> CoercionR -> Maybe (Var, CoreExpr)
--- This implements the Push rule from the paper on coercions
---    (\x. e) |> co
--- ===>
---    (\x'. e |> co')
-pushCoercionIntoLambda in_scope x e co
-    | ASSERT(not (isTyVar x) && not (isCoVar x)) True
-    , Pair s1s2 t1t2 <- coercionKind co
-    , Just (_, _s1,_s2) <- splitFunTy_maybe s1s2
-    , Just (w1, t1,_t2) <- splitFunTy_maybe t1t2
-    , (co_mult, co1, co2) <- decomposeFunCo Representational co
-    , isReflexiveCo co_mult
-      -- We can't push the coercion in the case where co_mult isn't
-      -- reflexivity. See pushCoValArg for more details.
-    = let
-          -- Should we optimize the coercions here?
-          -- Otherwise they might not match too well
-          x' = x `setIdType` t1 `setIdMult` w1
-          in_scope' = in_scope `extendInScopeSet` x'
-          subst = extendIdSubst (mkEmptySubst in_scope')
-                                x
-                                (mkCast (Var x') co1)
-      in Just (x', substExpr subst e `mkCast` co2)
-    | otherwise
-    = pprTrace "exprIsLambda_maybe: Unexpected lambda in case" (ppr (Lam x e))
-      Nothing
-
-pushCoDataCon :: DataCon -> [CoreExpr] -> Coercion
-              -> Maybe (DataCon
-                       , [Type]      -- Universal type args
-                       , [CoreExpr]) -- All other args incl existentials
--- Implement the KPush reduction rule as described in "Down with kinds"
--- The transformation applies iff we have
---      (C e1 ... en) `cast` co
--- where co :: (T t1 .. tn) ~ to_ty
--- The left-hand one must be a T, because exprIsConApp returned True
--- but the right-hand one might not be.  (Though it usually will.)
-pushCoDataCon dc dc_args co
-  | isReflCo co || from_ty `eqType` to_ty  -- try cheap test first
-  , let (univ_ty_args, rest_args) = splitAtList (dataConUnivTyVars dc) dc_args
-  = Just (dc, map exprToType univ_ty_args, rest_args)
-
-  | Just (to_tc, to_tc_arg_tys) <- splitTyConApp_maybe to_ty
-  , to_tc == dataConTyCon dc
-        -- These two tests can fail; we might see
-        --      (C x y) `cast` (g :: T a ~ S [a]),
-        -- where S is a type function.  In fact, exprIsConApp
-        -- will probably not be called in such circumstances,
-        -- but there's nothing wrong with it
-
-  = let
-        tc_arity       = tyConArity to_tc
-        dc_univ_tyvars = dataConUnivTyVars dc
-        dc_ex_tcvars   = dataConExTyCoVars dc
-        arg_tys        = dataConRepArgTys dc
-
-        non_univ_args  = dropList dc_univ_tyvars dc_args
-        (ex_args, val_args) = splitAtList dc_ex_tcvars non_univ_args
-
-        -- Make the "Psi" from the paper
-        omegas = decomposeCo tc_arity co (tyConRolesRepresentational to_tc)
-        (psi_subst, to_ex_arg_tys)
-          = liftCoSubstWithEx Representational
-                              dc_univ_tyvars
-                              omegas
-                              dc_ex_tcvars
-                              (map exprToType ex_args)
-
-          -- Cast the value arguments (which include dictionaries)
-        new_val_args = zipWith cast_arg (map scaledThing arg_tys) val_args
-        cast_arg arg_ty arg = mkCast arg (psi_subst arg_ty)
-
-        to_ex_args = map Type to_ex_arg_tys
-
-        dump_doc = vcat [ppr dc,      ppr dc_univ_tyvars, ppr dc_ex_tcvars,
-                         ppr arg_tys, ppr dc_args,
-                         ppr ex_args, ppr val_args, ppr co, ppr from_ty, ppr to_ty, ppr to_tc
-                         , ppr $ mkTyConApp to_tc (map exprToType $ takeList dc_univ_tyvars dc_args) ]
-    in
-    ASSERT2( eqType from_ty (mkTyConApp to_tc (map exprToType $ takeList dc_univ_tyvars dc_args)), dump_doc )
-    ASSERT2( equalLength val_args arg_tys, dump_doc )
-    Just (dc, to_tc_arg_tys, to_ex_args ++ new_val_args)
-
-  | otherwise
-  = Nothing
-
-  where
-    Pair from_ty to_ty = coercionKind co
-
-collectBindersPushingCo :: CoreExpr -> ([Var], CoreExpr)
--- Collect lambda binders, pushing coercions inside if possible
--- E.g.   (\x.e) |> g         g :: <Int> -> blah
---        = (\x. e |> Nth 1 g)
---
--- That is,
---
--- collectBindersPushingCo ((\x.e) |> g) === ([x], e |> Nth 1 g)
-collectBindersPushingCo e
-  = go [] e
-  where
-    -- Peel off lambdas until we hit a cast.
-    go :: [Var] -> CoreExpr -> ([Var], CoreExpr)
-    -- The accumulator is in reverse order
-    go bs (Lam b e)   = go (b:bs) e
-    go bs (Cast e co) = go_c bs e co
-    go bs e           = (reverse bs, e)
-
-    -- We are in a cast; peel off casts until we hit a lambda.
-    go_c :: [Var] -> CoreExpr -> CoercionR -> ([Var], CoreExpr)
-    -- (go_c bs e c) is same as (go bs e (e |> c))
-    go_c bs (Cast e co1) co2 = go_c bs e (co1 `mkTransCo` co2)
-    go_c bs (Lam b e)    co  = go_lam bs b e co
-    go_c bs e            co  = (reverse bs, mkCast e co)
-
-    -- We are in a lambda under a cast; peel off lambdas and build a
-    -- new coercion for the body.
-    go_lam :: [Var] -> Var -> CoreExpr -> CoercionR -> ([Var], CoreExpr)
-    -- (go_lam bs b e c) is same as (go_c bs (\b.e) c)
-    go_lam bs b e co
-      | isTyVar b
-      , let Pair tyL tyR = coercionKind co
-      , ASSERT( isForAllTy_ty tyL )
-        isForAllTy_ty tyR
-      , isReflCo (mkNthCo Nominal 0 co)  -- See Note [collectBindersPushingCo]
-      = go_c (b:bs) e (mkInstCo co (mkNomReflCo (mkTyVarTy b)))
-
-      | isCoVar b
-      , let Pair tyL tyR = coercionKind co
-      , ASSERT( isForAllTy_co tyL )
-        isForAllTy_co tyR
-      , isReflCo (mkNthCo Nominal 0 co)  -- See Note [collectBindersPushingCo]
-      , let cov = mkCoVarCo b
-      = go_c (b:bs) e (mkInstCo co (mkNomReflCo (mkCoercionTy cov)))
-
-      | isId b
-      , let Pair tyL tyR = coercionKind co
-      , ASSERT( isFunTy tyL) isFunTy tyR
-      , (co_mult, co_arg, co_res) <- decomposeFunCo Representational co
-      , isReflCo co_mult -- See Note [collectBindersPushingCo]
-      , isReflCo co_arg  -- See Note [collectBindersPushingCo]
-      = go_c (b:bs) e co_res
-
-      | otherwise = (reverse bs, mkCast (Lam b e) co)
-
-{-
-
-Note [collectBindersPushingCo]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We just look for coercions of form
-   <type> # w -> blah
-(and similarly for foralls) to keep this function simple.  We could do
-more elaborate stuff, but it'd involve substitution etc.
-
--}

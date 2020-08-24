@@ -31,7 +31,7 @@ module GHC.Core.Coercion (
         mkAxInstRHS, mkUnbranchedAxInstRHS,
         mkAxInstLHS, mkUnbranchedAxInstLHS,
         mkPiCo, mkPiCos, mkCoCast,
-        mkSymCo, mkTransCo, mkTransMCo,
+        mkSymCo, mkTransCo,
         mkNthCo, nthCoRole, mkLRCo,
         mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo, mkFunCo,
         mkForAllCo, mkForAllCos, mkHomoForAllCos,
@@ -65,7 +65,8 @@ module GHC.Core.Coercion (
         pickLR,
 
         isGReflCo, isReflCo, isReflCo_maybe, isGReflCo_maybe, isReflexiveCo, isReflexiveCo_maybe,
-        isReflCoVar_maybe, isGReflMCo, coToMCo,
+        isReflCoVar_maybe, isGReflMCo,
+        coToMCo, mkTransMCo, mkTransMCoL,
 
         -- ** Coercion variables
         mkCoVar, isCoVar, coVarName, setCoVarName, setCoVarUnique,
@@ -287,6 +288,44 @@ tidyCoAxBndrsForUser init_env tcvs
     is_wildcard tv = case occNameString (getOccName tv) of
                        ('_' : rest) -> all isDigit rest
                        _            -> False
+
+
+{- *********************************************************************
+*                                                                      *
+              MCoercion
+*                                                                      *
+********************************************************************* -}
+
+coToMCo :: Coercion -> MCoercion
+-- Convert a coercion to a MCoercion,
+-- It's not clear whether or not isReflexiveCo would be better here
+coToMCo co | isReflCo co = MRefl
+           | otherwise   = MCo co
+
+-- | Tests if this MCoercion is obviously generalized reflexive
+-- Guaranteed to work very quickly.
+isGReflMCo :: MCoercion -> Bool
+isGReflMCo MRefl = True
+isGReflMCo (MCo co) | isGReflCo co = True
+isGReflMCo _ = False
+
+-- | Make a generalized reflexive coercion
+mkGReflCo :: Role -> Type -> MCoercionN -> Coercion
+mkGReflCo r ty mco
+  | isGReflMCo mco = if r == Nominal then Refl ty
+                     else GRefl r ty MRefl
+  | otherwise    = GRefl r ty mco
+
+-- | Compose two MCoercions via transitivity
+mkTransMCo :: MCoercion -> MCoercion -> MCoercion
+mkTransMCo MRefl     co2       = co2
+mkTransMCo co1       MRefl     = co1
+mkTransMCo (MCo co1) (MCo co2) = MCo (mkTransCo co1 co2)
+
+mkTransMCoL :: MCoercion -> Coercion -> MCoercion
+mkTransMCoL MRefl     co2 = MCo co2
+mkTransMCoL (MCo co1) co2 = MCo (mkTransCo co1 co2)
+
 
 {-
 %************************************************************************
@@ -556,13 +595,6 @@ isGReflCo (GRefl{}) = True
 isGReflCo (Refl{})  = True -- Refl ty == GRefl N ty MRefl
 isGReflCo _         = False
 
--- | Tests if this MCoercion is obviously generalized reflexive
--- Guaranteed to work very quickly.
-isGReflMCo :: MCoercion -> Bool
-isGReflMCo MRefl = True
-isGReflMCo (MCo co) | isGReflCo co = True
-isGReflMCo _ = False
-
 -- | Tests if this coercion is obviously reflexive. Guaranteed to work
 -- very quickly. Sometimes a coercion can be reflexive, but not obviously
 -- so. c.f. 'isReflexiveCo'
@@ -603,10 +635,6 @@ isReflexiveCo_maybe co
   = Nothing
   where (Pair ty1 ty2, r) = coercionKindRole co
 
-coToMCo :: Coercion -> MCoercion
-coToMCo c = if isReflCo c
-  then MRefl
-  else MCo c
 
 {-
 %************************************************************************
@@ -668,13 +696,6 @@ appropriate? I (Richard E.) have decided not to do this, because upgrading a
 role is bizarre and a caller should have to ask for this behavior explicitly.
 
 -}
-
--- | Make a generalized reflexive coercion
-mkGReflCo :: Role -> Type -> MCoercionN -> Coercion
-mkGReflCo r ty mco
-  | isGReflMCo mco = if r == Nominal then Refl ty
-                     else GRefl r ty MRefl
-  | otherwise    = GRefl r ty mco
 
 -- | Make a reflexive coercion
 mkReflCo :: Role -> Type -> Coercion
@@ -989,12 +1010,6 @@ mkTransCo co1 co2 | isReflCo co1 = co2
 mkTransCo (GRefl r t1 (MCo co1)) (GRefl _ _ (MCo co2))
   = GRefl r t1 (MCo $ mkTransCo co1 co2)
 mkTransCo co1 co2                 = TransCo co1 co2
-
--- | Compose two MCoercions via transitivity
-mkTransMCo :: MCoercion -> MCoercion -> MCoercion
-mkTransMCo MRefl     co2       = co2
-mkTransMCo co1       MRefl     = co1
-mkTransMCo (MCo co1) (MCo co2) = MCo (mkTransCo co1 co2)
 
 mkNthCo :: HasDebugCallStack
         => Role  -- The role of the coercion you're creating
