@@ -6,7 +6,7 @@ variables:
 
   # Sequential version number capturing the versions of all tools fetched by
   # .gitlab/ci.sh.
-  WINDOWS_TOOLCHAIN_VERSION: 1
+  WINDOWS_TOOLCHAIN_VERSION: 2
 
   # Disable shallow clones; they break our linting rules
   GIT_DEPTH: 0
@@ -896,9 +896,6 @@ validate-x86_64-windows-hadrian:
   cache:
     key: "x86_64-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
-validate-x86_64-windows:
-  extends: .build-x86_64-windows-make
-
 nightly-x86_64-windows:
   <<: *nightly
   extends: .build-x86_64-windows-make
@@ -909,13 +906,13 @@ nightly-x86_64-windows:
 # Normal Windows validate builds are profiled; that won't do for releases.
 release-x86_64-windows:
   <<: *release
-  extends: validate-x86_64-windows
+  extends: .build-x86_64-windows-make
   variables:
     BUILD_FLAVOUR: "perf"
     #
 release-x86_64-windows-integer-simple:
   <<: *release
-  extends: validate-x86_64-windows
+  extends: .build-x86_64-windows-make
   variables:
     BIGNUM_BACKEND: native
     BUILD_FLAVOUR: "perf"
