@@ -788,7 +788,7 @@ Note that the object header size is different for normal and profiling
 builds. When allocating in foreign memory, space must be made available
 for this in the memory layout immediately before the data payload.
 
-In C code, ``#include "rts.h"`` and use ``sizeOf(StgArrBytes)`` or
+In C code, ``#include "Rts.h"`` and use ``sizeOf(StgArrBytes)`` or
 ``sizeOfW(StgArrBytes)`` to get the size of a byte array heap object
 header in bytes or words respectively. This is the space that must be
 reserved at the memory location immediately before the intended payload.
