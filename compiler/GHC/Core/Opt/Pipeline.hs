@@ -315,33 +315,38 @@ getCoreToDo dflags
 
         runWhen do_float_in CoreDoFloatInwards,
 
+        simplify "final",  -- Final tidy-up
+
         maybe_rule_check FinalPhase,
+
+        --------  After this we have -O2 passes -----------------
+        -- None of them run with -O
 
                 -- Case-liberation for -O2.  This should be after
                 -- strictness analysis and the simplification which follows it.
-        runWhen liberate_case (CoreDoPasses [
-            CoreLiberateCase,
-            simplify "post-liberate-case"
-            ]),         -- Run the simplifier after LiberateCase to vastly
-                        -- reduce the possibility of shadowing
-                        -- Reason: see Note [Shadowing] in GHC.Core.Opt.SpecConstr
+        runWhen liberate_case $ CoreDoPasses
+           [ CoreLiberateCase, simplify "post-liberate-case" ],
+           -- Run the simplifier after LiberateCase to vastly
+           -- reduce the possibility of shadowing
+           -- Reason: see Note [Shadowing] in GHC.Core.Opt.SpecConstr
 
-        runWhen spec_constr CoreDoSpecConstr,
+        runWhen spec_constr $ CoreDoPasses
+           [ CoreDoSpecConstr, simplify "post-spec-constr"],
+           -- See Note [Simplify after SpecConstr]
 
         maybe_rule_check FinalPhase,
 
-        runWhen late_specialise
-          (CoreDoPasses [ CoreDoSpecialising
-                        , simplify "post-late-spec"]),
+        runWhen late_specialise $ CoreDoPasses
+           [ CoreDoSpecialising, simplify "post-late-spec"],
 
         -- LiberateCase can yield new CSE opportunities because it peels
         -- off one layer of a recursive function (concretely, I saw this
         -- in wheel-sieve1), and I'm guessing that SpecConstr can too
         -- And CSE is a very cheap pass. So it seems worth doing here.
-        runWhen ((liberate_case || spec_constr) && cse) CoreCSE,
+        runWhen ((liberate_case || spec_constr) && cse) $ CoreDoPasses
+           [ CoreCSE, simplify "post-final-cse" ],
 
-        -- Final clean-up simplification:
-        simplify "final",
+        ---------  End of -O2 passes --------------
 
         runWhen late_dmd_anal $ CoreDoPasses (
             dmd_cpr_ww ++ [simplify "post-late-ww"]
@@ -409,6 +414,27 @@ or with -O0.  Two reasons:
 
 But watch out: list fusion can prevent floating.  So use phase control
 to switch off those rules until after floating.
+
+Note [Simplify after SpecConstr]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We want to run the simplifier after SpecConstr, and before late-Specialise,
+for two reasons, both shown up in test perf/compiler/T16473,
+with -O2 -flate-specialise
+
+1.  I found that running late-Specialise after SpecConstr, with no
+    simplification in between meant that the carefullly constructed
+    SpecConstr rule never got to fire.  (It was something like
+          lvl = f a   -- Arity 1
+          ....g lvl....
+    SpecConstr specialised g for argument lvl; but Specialise then
+    specialised lvl = f a to lvl = $sf, and inlined. Or something like
+    that.)
+
+2.  Specialise relies on unfoldings being available for top-level dictionary
+    bindings; but SpecConstr kills them all!  The Simplifer restores them.
+
+This extra run of the simplifier has a cost, but this is only with -O2.
+
 
 ************************************************************************
 *                                                                      *

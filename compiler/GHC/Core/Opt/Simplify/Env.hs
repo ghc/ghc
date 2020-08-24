@@ -596,7 +596,7 @@ addJoinFlts :: JoinFloats -> JoinFloats -> JoinFloats
 addJoinFlts = appOL
 
 mkRecFloats :: SimplFloats -> SimplFloats
--- Flattens the floats from env2 into a single Rec group,
+-- Flattens the floats into a single Rec group,
 -- They must either all be lifted LetFloats or all JoinFloats
 mkRecFloats floats@(SimplFloats { sfLetFloats  = LetFloats bs ff
                                 , sfJoinFloats = jbs
