@@ -67,7 +67,7 @@ workflow:
     when: always
     expire_in: 1 year
   rules:
-    - if: '$RELEASE == "yes"'
+    - if: '$RELEASE_JOB == "yes"'
 
 ############################################################
 # Runner Tags
