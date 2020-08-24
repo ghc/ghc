@@ -1,14 +1,12 @@
 {-# LANGUAGE RankNTypes, BangPatterns, FlexibleContexts, Strict #-}
 
 {- |
-  Module      :  Dominators
+  Module      :  GHC.CmmToAsm.CFG.Dominators
   Copyright   :  (c) Matt Morrow 2009
   License     :  BSD3
-  Maintainer  :  <morrow@moonpatio.com>
-  Stability   :  experimental
+  Maintainer  :  <klebinger.andreas@gmx.at>
+  Stability   :  stable
   Portability :  portable
-
-  Taken from the dom-lt package.
 
   The Lengauer-Tarjan graph dominators algorithm.
 
@@ -22,7 +20,11 @@
       /Interference Graphs for Procedures in Static Single/
       /Information Form are Interval Graphs/, 2007.
 
-  Originally taken from the dom-lt package.
+ * Strictness
+
+ Unless stated otherwise all exposed functions might fully evaluate their input
+ but are not guaranteed to do so.
+
 -}
 
 module GHC.CmmToAsm.CFG.Dominators (
@@ -39,7 +41,6 @@ module GHC.CmmToAsm.CFG.Dominators (
 ) where
 
 import GHC.Prelude
-
 import Data.Bifunctor
 import Data.Tuple (swap)
 
@@ -53,12 +54,9 @@ import Control.Monad
 import Control.Monad.ST.Strict
 
 import Data.Array.ST
-import Data.Array.Base hiding ((!))
-  -- (unsafeNewArray_
-  -- ,unsafeWrite,unsafeRead
-  -- ,readArray,writeArray)
-
-import GHC.Utils.Misc (debugIsOn)
+import Data.Array.Base
+  (unsafeNewArray_
+  ,unsafeWrite,unsafeRead)
 
 -----------------------------------------------------------------------------
 
@@ -152,9 +150,9 @@ idomM = do
   n <- gets dfsE
   forM_ [n,n-1..1] (\i-> do
     w <- ndfsM i
-    sw <- sdnoM w
     ps <- predsM w
     forM_ ps (\v-> do
+      sw <- sdnoM w
       u <- eval v
       su <- sdnoM u
       when (su < sw)
@@ -291,9 +289,10 @@ dfsDom i = do
 
 initEnv :: Rooted -> ST s (Env s)
 initEnv (r0,g0) = do
+  -- Graph renumbered to indices from 1 to |V|
   let (g,rnmap) = renum 1 g0
-      pred      = predG g
-      r         = rnmap IM.! r0
+      pred      = predG g -- reverse graph
+      root      = rnmap IM.! r0 -- renamed root
       n         = IM.size g
       ns        = [0..n]
       m         = n+1
@@ -315,13 +314,14 @@ initEnv (r0,g0) = do
   ndfs      <- newI m
   dfn       <- newI m
 
+  -- Initialize all arrays
   forM_ [0..n] (doms.=0)
   forM_ [0..n] (sdno.=0)
   forM_ [1..n] (size.=1)
   forM_ [0..n] (ancestor.=0)
   forM_ [0..n] (child.=0)
 
-  (doms.=r) r
+  (doms.=root) root
   (size.=0) 0
   (label.=0) 0
 
@@ -329,7 +329,7 @@ initEnv (r0,g0) = do
     {rnE        = rna
     ,dfsE       = 0
     ,zeroE      = 0
-    ,rootE      = r
+    ,rootE      = root
     ,labelE     = label
     ,parentE    = parent
     ,ancestorE  = ancestor
@@ -400,21 +400,16 @@ type Arr s a = A s Int a
 infixl 9 !:
 infixr 2 .=
 
+-- | arr .= x idx => write x to index
 (.=) :: (MArray (A s) a (ST s))
      => Arr s a -> a -> Int -> ST s ()
-(v .= x) i
-  | debugIsOn = writeArray v i x
-  | otherwise = unsafeWrite v i x
+(v .= x) i = unsafeWrite v i x
 
 (!:) :: (MArray (A s) a (ST s))
      => A s Int a -> Int -> ST s a
-a !: i
-  | debugIsOn = do
-      o <- readArray a i
-      return $! o
-  | otherwise = do
-      o <- unsafeRead a i
-      return $! o
+a !: i = do
+  o <- unsafeRead a i
+  return $! o
 
 new :: (MArray (A s) a (ST s))
     => Int -> ST s (Arr s a)
@@ -423,30 +418,10 @@ new n = unsafeNewArray_ (0,n-1)
 newI :: Int -> ST s (Arr s Int)
 newI = new
 
--- newD :: Int -> ST s (Arr s Double)
--- newD = new
-
--- dump :: (MArray (A s) a (ST s)) => Arr s a -> ST s [a]
--- dump a = do
---   (m,n) <- getBounds a
---   forM [m..n] (\i -> a!:i)
-
 writes :: (MArray (A s) a (ST s))
      => Arr s a -> [(Int,a)] -> ST s ()
 writes a xs = forM_ xs (\(i,x) -> (a.=x) i)
 
--- arr :: (MArray (A s) a (ST s)) => [a] -> ST s (Arr s a)
--- arr xs = do
---   let n = length xs
---   a <- new n
---   go a n 0 xs
---   return a
---   where go _ _ _    [] = return ()
---         go a n i (x:xs)
---           | i <= n = (a.=x) i >> go a n (i+1) xs
---           | otherwise = return ()
-
------------------------------------------------------------------------------
 
 (!) :: Monoid a => IntMap a -> Int -> a
 (!) g n = maybe mempty id (IM.lookup n g)
@@ -466,13 +441,11 @@ toEdges = concatMap (uncurry (fmap . (,))) . toAdj
 predG :: Graph -> Graph
 predG g = IM.unionWith IS.union (go g) g0
   where g0 = fmap (const mempty) g
-        f :: IntMap IntSet -> Int -> IntSet -> IntMap IntSet
-        f m i a = foldl' (\m p -> IM.insertWith mappend p
+        go = flip IM.foldrWithKey mempty (\i a m ->
+                foldl' (\m p -> IM.insertWith mappend p
                                       (IS.singleton i) m)
                         m
-                       (IS.toList a)
-        go :: IntMap IntSet -> IntMap IntSet
-        go = flip IM.foldlWithKey' mempty f
+                       (IS.toList a))
 
 pruneReach :: Rooted -> Rooted
 pruneReach (r,g) = (r,g2)
@@ -522,41 +495,35 @@ collectI (<>) f g
                                   (f a)
                                   (g a) m) mempty
 
--- collect :: (Ord b) => (c -> c -> c)
---         -> (a -> b) -> (a -> c) -> [a] -> Map b c
--- collect (<>) f g
---   = foldl' (\m a -> SM.insertWith (<>)
---                                   (f a)
---                                   (g a) m) mempty
-
+-- | renum n g: Rename all nodes
+--
+-- Gives nodes sequential names starting at n.
+-- Returns the new graph and a mapping.
 -- (renamed, old -> new)
 renum :: Int -> Graph -> (Graph, NodeMap Node)
 renum from = (\(_,m,g)->(g,m))
-  . IM.foldlWithKey'
-      f (from,mempty,mempty)
-  where
-    f :: (Int, NodeMap Node, IntMap IntSet) -> Node -> IntSet
-      -> (Int, NodeMap Node, IntMap IntSet)
-    f (!n,!env,!new) i ss =
-            let (j,n2,env2) = go n env i
-                (n3,env3,ss2) = IS.fold
-                  (\k (!n,!env,!new)->
-                      case go n env k of
-                        (l,n2,env2)-> (n2,env2,l `IS.insert` new))
-                  (n2,env2,mempty) ss
-                new2 = IM.insertWith IS.union j ss2 new
-            in (n3,env3,new2)
-    go :: Int
-        -> NodeMap Node
-        -> Node
-        -> (Node,Int,NodeMap Node)
-    go !n !env i =
-        case IM.lookup i env of
-        Just j -> (j,n,env)
-        Nothing -> (n,n+1,IM.insert i n env)
+  . IM.foldrWithKey
+      (\i ss (!n,!env,!new)->
+          let (j,n2,env2) = go n env i
+              (n3,env3,ss2) = IS.fold
+                (\k (!n,!env,!new)->
+                    case go n env k of
+                      (l,n2,env2)-> (n2,env2,l `IS.insert` new))
+                (n2,env2,mempty) ss
+              new2 = IM.insertWith IS.union j ss2 new
+          in (n3,env3,new2)) (from,mempty,mempty)
+  where go :: Int
+           -> NodeMap Node
+           -> Node
+           -> (Node,Int,NodeMap Node)
+        go !n !env i =
+          case IM.lookup i env of
+            Just j -> (j,n,env)
+            Nothing -> (n,n+1,IM.insert i n env)
 
 -----------------------------------------------------------------------------
 
+-- Nothing better than reinvinting the state monad.
 newtype S z s a = S {unS :: forall o. (a -> s -> ST z o) -> s -> ST z o}
 instance Functor (S z s) where
   fmap f (S g) = S (\k -> g (k . f))
@@ -594,4 +561,3 @@ fetch :: (MArray (A z) a (ST z))
 fetch f i = do
   a <- gets f
   st (a!:i)
-
