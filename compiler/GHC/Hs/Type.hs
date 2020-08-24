@@ -73,7 +73,6 @@ module GHC.Hs.Type (
         mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
         ignoreParens, hsSigType, hsSigWcType, hsPatSigType,
         hsTyKindSig,
-        hsConDetailsArgs,
         setHsTyVarBndrFlag, hsTyVarBndrFlag,
 
         -- Printing
@@ -638,13 +637,13 @@ data HsTyVarBndr flag pass
   = UserTyVar        -- no explicit kinding
          (XUserTyVar pass)
          flag
-         (XRec pass (IdP pass))
+         (LIdP pass)
         -- See Note [Located RdrNames] in GHC.Hs.Expr
 
   | KindedTyVar
          (XKindedTyVar pass)
          flag
-         (XRec pass (IdP pass))
+         (LIdP pass)
          (LHsKind pass)  -- The user-supplied kind signature
         -- ^
         --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnOpen',
@@ -705,7 +704,7 @@ data HsType pass
   | HsTyVar  (XTyVar pass)
               PromotionFlag    -- Whether explicitly promoted,
                                -- for the pretty printer
-             (XRec pass (IdP pass))
+             (LIdP pass)
                   -- Type variable, type constructor, or data constructor
                   -- see Note [Promotions (HsTyVar)]
                   -- See Note [Located RdrNames] in GHC.Hs.Expr
@@ -755,7 +754,7 @@ data HsType pass
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsOpTy              (XOpTy pass)
-                        (LHsType pass) (XRec pass (IdP pass)) (LHsType pass)
+                        (LHsType pass) (LIdP pass) (LHsType pass)
       -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : None
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
@@ -1115,14 +1114,6 @@ instance (Outputable arg, Outputable rec)
   ppr (PrefixCon args) = text "PrefixCon" <+> ppr args
   ppr (RecCon rec)     = text "RecCon:" <+> ppr rec
   ppr (InfixCon l r)   = text "InfixCon:" <+> ppr [l, r]
-
-hsConDetailsArgs ::
-     HsConDetails (LHsType (GhcPass p)) (Located [LConDeclField (GhcPass p)])
-  -> [LHsType (GhcPass p)]
-hsConDetailsArgs details = case details of
-  InfixCon a b -> [a,b]
-  PrefixCon xs -> xs
-  RecCon r -> map (cd_fld_type . unLoc) (unLoc r)
 
 {-
 Note [ConDeclField passs]
