@@ -719,7 +719,7 @@ spec_import top_env callers rb dict_binds cis@(CIS fn _)
   = do { -- debugTraceMsg (text "specImport:no valid calls")
        ; return ([], []) }
 
-  | Just rhs <- maybeUnfoldingTemplate unfolding
+  | Just rhs <- canSpecImport dflags fn
   = do {     -- Get rules from the external package state
              -- We keep doing this in case we "page-fault in"
              -- more rules as we go along
@@ -757,10 +757,32 @@ spec_import top_env callers rb dict_binds cis@(CIS fn _)
 
   where
     dflags = se_dflags top_env
-    unfolding = realIdUnfolding fn   -- We want to see the unfolding even for loop breakers
     good_calls = filterCalls cis dict_binds
        -- SUPER IMPORTANT!  Drop calls that (directly or indirectly) refer to fn
        -- See Note [Avoiding loops in specImports]
+
+canSpecImport :: DynFlags -> Id -> Maybe CoreExpr
+-- See Note [Specialise imported INLINABLE things]
+canSpecImport dflags fn
+  | CoreUnfolding { uf_src = src, uf_tmpl = rhs } <- unf
+  , isStableSource src
+  = Just rhs   -- By default, specialise only imported things that have a stable
+               -- unfolding; that is, have an INLINE or INLINABLE pragma
+               -- Specialise even INLINE things; it hasn't inlined yet,
+               -- so perhaps it never will.  Moreover it may have calls
+               -- inside it that we want to specialise
+
+    -- CoreUnfolding case does /not/ include DFunUnfoldings;
+    -- We only specialise DFunUnfoldings with -fspecialise-aggressively
+    -- See Note [Do not specialise imported DFuns]
+
+  | gopt Opt_SpecialiseAggressively dflags
+  = maybeUnfoldingTemplate unf  -- With -fspecialise-aggressively, specialise anything
+                                -- with an unfolding, stable or not, DFun or not
+
+  | otherwise = Nothing
+  where
+    unf = realIdUnfolding fn   -- We want to see the unfolding even for loop breakers
 
 -- | Returns whether or not to show a missed-spec warning.
 -- If -Wall-missed-specializations is on, show the warning.
@@ -786,8 +808,47 @@ tryWarnMissingSpecs dflags callers fn calls_for_fn
           , whenPprDebug (text "calls:" <+> vcat (map (pprCallInfo fn) calls_for_fn))
           , text "Probable fix: add INLINABLE pragma on" <+> quotes (ppr fn) ])
 
-{- Note [Avoiding loops in specImports]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+{- Note [Do not specialise imported DFuns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Ticket #18223 shows that specialising calls of DFuns is can cause a huge
+and entirely unnecessary blowup in program size.  Consider a call to
+    f @[[[[[[[[T]]]]]]]] d1 x
+where df :: C a => C [a]
+      d1 :: C [[[[[[[[T]]]]]]]] = dfC[] @[[[[[[[T]]]]]]] d1
+      d2 :: C [[[[[[[T]]]]]]]   = dfC[] @[[[[[[T]]]]]] d3
+      ...
+Now we'll specialise f's RHS, which may give rise to calls to 'g',
+also overloaded, which we will specialise, and so on.  However, if
+we specialise the calls to dfC[], we'll generate specialised copies of
+all methods of C, at all types; and the same for C's superclasses.
+
+And many of these specialised functions will never be called.  We are
+going to call the specialised 'f', and the specialised 'g', but DFuns
+group functions into a tuple, many of whose elements may never be used.
+
+With deeply-nested types this can lead to a simply overwhelming number
+of specialisations: see #18223 for a simple example (from the wild).
+I measured the number of specialisations for various numbers of calls
+of `flip evalStateT ()`, and got this
+
+                       Size after one simplification
+  #calls    #SPEC rules    Terms     Types
+      5         56          3100     10600
+      9        108         13660     77206
+
+The real tests case has 60+ calls, which blew GHC out of the water.
+
+Solution: don't specialise DFuns.  The downside is that if we end
+up with (h (dfun d)), /and/ we don't specialise 'h', then we won't
+pass to 'h' a tuple of specialised functions.
+
+However, the flag -fspecialise-aggressively (experimental, off by default)
+allows DFuns to specialise as well.
+
+Note [Avoiding loops in specImports]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We must take great care when specialising instance declarations
 (functions like $fOrdList) lest we accidentally build a recursive
 dictionary. See Note [Avoiding loops].
@@ -2502,69 +2563,16 @@ mkCallUDs' env f args
             ForAllPred {}   -> True
 
 wantCallsFor :: SpecEnv -> Id -> Bool
-wantCallsFor env f
- | isLocalId f    -- Local function; don't look at the unfolding, because
- = True           -- unfoldings for local functions are discarded by cloneBind
-                  -- ToDo: we could keep a candidate set of let-binders to
-                  --       reduce the size of the UsageDetails
+wantCallsFor _env _f = True
+ -- We could be less eager about collecting calls for LocalIds: there's
+ -- no point for ones that are lambda-bound.  But we can't use the
+ -- unfolding, because unfoldings for local functions are discarded by
+ -- cloneBindSM.  We could keep a candidate set of let-binders to
+ -- reduce the size of the UsageDetails
 
- | otherwise      -- Imported function
- = case unf of
-     NoUnfolding      -> False
-     BootUnfolding    -> False
-     OtherCon {}      -> False
-     CoreUnfolding { uf_src = src }
-       | isStableSource src -> True  -- INLINEABLE/INLINE
-               -- See Note [Specialise imported INLINABLE things]
-               -- Specialise even INLINE things; it hasn't inlined yet,
-               -- so perhaps it never will.  Moreover it may have calls
-               -- inside it that we want to specialise
-       | otherwise   -> aggressive_only   -- Imported, no INLINABLE
-     DFunUnfolding {} -> aggressive_only -- See Note [Do not specialise DFuns]
-  where
-    aggressive_only = gopt Opt_SpecialiseAggressively (se_dflags env)
-    unf = realIdUnfolding f
-          -- 'realIdUnfolding' to ignore the loop-breaker flag!
 
-{- Note [Do not specialise DFuns]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Ticket #18223 shows that specialising calls of DFuns is can cause a huge
-and entirely unnecessary blowup in program size.  Consider a call to
-    f @[[[[[[[[T]]]]]]]] d1 x
-where df :: C a => C [a]
-      d1 :: C [[[[[[[[T]]]]]]]] = dfC[] @[[[[[[[T]]]]]]] d1
-      d2 :: C [[[[[[[T]]]]]]]   = dfC[] @[[[[[[T]]]]]] d3
-      ...
-Now we'll specialise f's RHS, which may give rise to calls to 'g',
-also overloaded, which we will specialise, and so on.  However, if
-we specialise the calls to dfC[], we'll generate specialised copies of
-all methods of C, at all types; and the same for C's superclasses.
-
-And many of these specialised functions will never be called.  We are
-going to call the specialised 'f', and the specialised 'g', but DFuns
-group functions into a tuple, many of whose elements may never be used.
-
-With deeply-nested types this can lead to a simply overwhelming number
-of specialisations: see #18223 for a simple example (from the wild).
-I measured the number of specialisations for various numbers of calls
-of `flip evalStateT ()`, and got this
-
-                       Size after one simplification
-  #calls    #SPEC rules    Terms     Types
-      5         56          3100     10600
-      9        108         13660     77206
-
-The real tests case has 60+ calls, which blew GHC out of the water.
-
-Solution: don't specialise DFuns.  The downside is that if we end
-up with (h (dfun d)), /and/ we don't specialise 'h', then we won't
-pass to 'h' a tuple of specialised functions.
-
-However, the flag -fspecialise-aggressively (experimental, off by default)
-allows DFuns to specialise as well.
-
-Note [Type determines value]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Type determines value]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Only specialise on non-IP *class* params, because these are the ones
 whose *type* determines their *value*.  In particular, with implicit
 params, the type args *don't* say what the value of the implicit param
