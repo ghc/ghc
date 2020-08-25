@@ -95,297 +95,396 @@ import GHC.Builtin.Types ( unitTyCon, unitDataCon, tupleTyCon, tupleDataCon, nil
                            manyDataConTyCon)
 }
 
-%expect 232 -- shift/reduce conflicts
+%expect 0 -- shift/reduce conflicts
 
-{- Last updated: 08 June 2020
+{- Note [shift/reduce conflicts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'happy' tool turns this grammar into an efficient parser that follows the
+shift-reduce parsing model. There's a parse stack that contains items parsed so
+far (both terminals and non-terminals). Every next token produced by the lexer
+results in one of two actions:
 
-If you modify this parser and add a conflict, please update this comment.
-You can learn more about the conflicts by passing 'happy' the -i flag:
+  SHIFT:    push the token onto the parse stack
 
-    happy -agc --strict compiler/GHC/Parser.y -idetailed-info
+  REDUCE:   pop a few items off the parse stack and combine them
+            with a function (reduction rule)
 
-How is this section formatted? Look up the state the conflict is
-reported at, and copy the list of applicable rules (at the top, without the
-rule numbers).  Mark *** for the rule that is the conflicting reduction (that
-is, the interpretation which is NOT taken).  NB: Happy doesn't print a rule
-in a state if it is empty, but you should include it in the list (you can
-look these up in the Grammar section of the info file).
+However, sometimes it's unclear which of the two actions to take.
+Consider this code example:
 
-Obviously the state numbers are not stable across modifications to the parser,
-the idea is to reproduce enough information on each conflict so you can figure
-out what happened if the states were renumbered.  Try not to gratuitously move
-productions around in this file.
+    if x then y else f z
 
--------------------------------------------------------------------------------
+There are two ways to parse it:
 
-state 60 contains 1 shift/reduce conflict.
+    (if x then y else f) z
+    if x then y else (f z)
 
-        context -> btype .
-    *** type -> btype .
-        type -> btype . '->' ctype
+How is this determined? At some point, the parser gets to the following state:
 
-    Conflicts: '->'
+  parse stack:  'if' exp 'then' exp 'else' "f"
+  next token:   "z"
 
--------------------------------------------------------------------------------
+Scenario A (simplified):
 
-state 61 contains 46 shift/reduce conflicts.
+  1. REDUCE, parse stack: 'if' exp 'then' exp 'else' exp
+             next token:  "z"
 
-    *** btype -> tyapps .
-        tyapps -> tyapps . tyapp
+  2. REDUCE, parse stack: exp
+             next token:  "z"
 
-    Conflicts: '_' ':' '~' '!' '.' '`' '{' '[' '(' '(#' '`' TYPEAPP
-      SIMPLEQUOTE VARID CONID VARSYM CONSYM QCONID QVARSYM QCONSYM
-      STRING INTEGER TH_ID_SPLICE '$(' TH_QUASIQUOTE TH_QQUASIQUOTE
-      and all the special ids.
+  3. SHIFT,  parse stack: exp "z"
+             next token:  ...
 
-Example ambiguity:
-    'if x then y else z :: F a'
+  4. REDUCE, parse stack: exp
+             next token:  ...
 
-Shift parses as (per longest-parse rule):
-    'if x then y else z :: (F a)'
+  This way we get:  (if x then y else f) z
 
--------------------------------------------------------------------------------
+Scenario B (simplified):
 
-state 143 contains 14 shift/reduce conflicts.
+  1. SHIFT,  parse stack: 'if' exp 'then' exp 'else' "f" "z"
+             next token:  ...
 
-        exp -> infixexp . '::' sigtype
-        exp -> infixexp . '-<' exp
-        exp -> infixexp . '>-' exp
-        exp -> infixexp . '-<<' exp
-        exp -> infixexp . '>>-' exp
-    *** exp -> infixexp .
-        infixexp -> infixexp . qop exp10
+  2. REDUCE, parse stack: 'if' exp 'then' exp 'else' exp
+             next token:  ...
 
-    Conflicts: ':' '::' '-' '!' '-<' '>-' '-<<' '>>-'
-               '.' '`' '*' VARSYM CONSYM QVARSYM QCONSYM
+  3. REDUCE, parse stack: exp
+             next token:  "z"
 
-Examples of ambiguity:
-    'if x then y else z -< e'
-    'if x then y else z :: T'
-    'if x then y else z + 1' (NB: '+' is in VARSYM)
+  This way we get:  if x then y else (f z)
 
-Shift parses as (per longest-parse rule):
-    'if x then y else (z -< T)'
-    'if x then y else (z :: T)'
-    'if x then y else (z + 1)'
+The end result is determined by the chosen action. When Happy detects this, it
+reports a shift/reduce conflict. At the top of the file, we have the following
+directive:
 
--------------------------------------------------------------------------------
+  %expect 0
 
-state 146 contains 66 shift/reduce conflicts.
+It means that we expect no unresolved shift/reduce conflicts in this grammar.
+If you modify the grammar and get shift/reduce conflicts, follow the steps
+below to resolve them.
 
-    *** exp10 -> fexp .
-        fexp -> fexp . aexp
-        fexp -> fexp . TYPEAPP atype
+STEP ONE
+  is to figure out what causes the conflict.
+  That's where the -i flag comes in handy:
 
-    Conflicts: TYPEAPP and all the tokens that can start an aexp
+      happy -agc --strict compiler/GHC/Parser.y -idetailed-info
 
-Examples of ambiguity:
-    'if x then y else f z'
-    'if x then y else f @ z'
+  By analysing the output of this command, you can figure out which reduction
+  rule causes the issue. At the top of the generated report, you will see a
+  line like this:
 
-Shift parses as (per longest-parse rule):
-    'if x then y else (f z)'
-    'if x then y else (f @ z)'
+      state 147 contains 67 shift/reduce conflicts.
 
--------------------------------------------------------------------------------
+  Scroll down to section State 147 (in your case it could be a different
+  state). The start of the section lists the reduction rules that can fire
+  and shows their context:
 
-state 200 contains 27 shift/reduce conflicts.
+        exp10 -> fexp .                 (rule 492)
+        fexp -> fexp . aexp             (rule 498)
+        fexp -> fexp . PREFIX_AT atype  (rule 499)
 
-        aexp2 -> TH_TY_QUOTE . tyvar
-        aexp2 -> TH_TY_QUOTE . gtycon
-    *** aexp2 -> TH_TY_QUOTE .
+  And then, for every token, it tells you the parsing action:
 
-    Conflicts: two single quotes is error syntax with specific error message.
+        ']'            reduce using rule 492
+        '::'           reduce using rule 492
+        '('            shift, and enter state 178
+        QVARID         shift, and enter state 44
+        DO             shift, and enter state 182
+        ...
 
-Example of ambiguity:
-    'x = '''
-    'x = ''a'
-    'x = ''T'
+  But if you look closer, some of these tokens also have another parsing action
+  in parentheses:
 
-Shift parses as (per longest-parse rule):
-    'x = ''a'
-    'x = ''T'
-
--------------------------------------------------------------------------------
-
-state 294 contains 1 shift/reduce conflicts.
-
-        rule -> STRING . rule_activation rule_forall infixexp '=' exp
-
-    Conflict: '[' (empty rule_activation reduces)
-
-We don't know whether the '[' starts the activation or not: it
-might be the start of the declaration with the activation being
-empty.  --SDM 1/4/2002
-
-Example ambiguity:
-    '{-# RULE [0] f = ... #-}'
-
-We parse this as having a [0] rule activation for rewriting 'f', rather
-a rule instructing how to rewrite the expression '[0] f'.
-
--------------------------------------------------------------------------------
-
-state 305 contains 1 shift/reduce conflict.
-
-    *** type -> btype .
-        type -> btype . '->' ctype
-
-    Conflict: '->'
-
-Same as state 61 but without contexts.
-
--------------------------------------------------------------------------------
-
-state 349 contains 1 shift/reduce conflicts.
-
-        tup_exprs -> commas . tup_tail
-        sysdcon_nolist -> '(' commas . ')'
-        commas -> commas . ','
-
-    Conflict: ')' (empty tup_tail reduces)
-
-A tuple section with NO free variables '(,,)' is indistinguishable
-from the Haskell98 data constructor for a tuple.  Shift resolves in
-favor of sysdcon, which is good because a tuple section will get rejected
-if -XTupleSections is not specified.
-
-See also Note [ExplicitTuple] in GHC.Hs.Expr.
-
--------------------------------------------------------------------------------
-
-state 407 contains 1 shift/reduce conflicts.
-
-        tup_exprs -> commas . tup_tail
-        sysdcon_nolist -> '(#' commas . '#)'
-        commas -> commas . ','
-
-    Conflict: '#)' (empty tup_tail reduces)
-
-Same as State 354 for unboxed tuples.
-
--------------------------------------------------------------------------------
-
-state 416 contains 66 shift/reduce conflicts.
-
-    *** exp10 -> '-' fexp .
-        fexp -> fexp . aexp
-        fexp -> fexp . TYPEAPP atype
-
-Same as 146 but with a unary minus.
-
--------------------------------------------------------------------------------
-
-state 472 contains 1 shift/reduce conflict.
-
-        oqtycon -> '(' qtyconsym . ')'
-    *** qtyconop -> qtyconsym .
-
-    Conflict: ')'
-
-Example ambiguity: 'foo :: (:%)'
-
-Shift means '(:%)' gets parsed as a type constructor, rather than than a
-parenthesized infix type expression of length 1.
-
--------------------------------------------------------------------------------
-
-state 665 contains 1 shift/reduce conflicts.
-
-    *** aexp2 -> ipvar .
-        dbind -> ipvar . '=' exp
-
-    Conflict: '='
-
-Example ambiguity: 'let ?x ...'
-
-The parser can't tell whether the ?x is the lhs of a normal binding or
-an implicit binding.  Fortunately, resolving as shift gives it the only
-sensible meaning, namely the lhs of an implicit binding.
-
--------------------------------------------------------------------------------
-
-state 750 contains 1 shift/reduce conflicts.
-
-        rule -> STRING rule_activation . rule_forall infixexp '=' exp
-
-    Conflict: 'forall' (empty rule_forall reduces)
-
-Example ambiguity: '{-# RULES "name" forall = ... #-}'
-
-'forall' is a valid variable name---we don't know whether
-to treat a forall on the input as the beginning of a quantifier
-or the beginning of the rule itself.  Resolving to shift means
-it's always treated as a quantifier, hence the above is disallowed.
-This saves explicitly defining a grammar for the rule lhs that
-doesn't include 'forall'.
-
--------------------------------------------------------------------------------
-
-state 986 contains 1 shift/reduce conflicts.
-
-        transformqual -> 'then' 'group' . 'using' exp
-        transformqual -> 'then' 'group' . 'by' exp 'using' exp
-    *** special_id -> 'group' .
-
-    Conflict: 'by'
-
--------------------------------------------------------------------------------
-
-state 1084 contains 1 shift/reduce conflicts.
-
-        rule_foralls -> 'forall' rule_vars '.' . 'forall' rule_vars '.'
-    *** rule_foralls -> 'forall' rule_vars '.' .
-
-    Conflict: 'forall'
-
-Example ambiguity: '{-# RULES "name" forall a. forall ... #-}'
-
-Here the parser cannot tell whether the second 'forall' is the beginning of
-a term-level quantifier, for example:
-
-'{-# RULES "name" forall a. forall x. id @a x = x #-}'
-
-or a valid variable named 'forall', for example a function @:: Int -> Int@
-
-'{-# RULES "name" forall a. forall 0 = 0 #-}'
-
-Shift means the parser only allows the former. Also see conflict 753 above.
-
--------------------------------------------------------------------------------
-
-state 1285 contains 1 shift/reduce conflict.
-
-        constrs1 -> constrs1 maybe_docnext '|' . maybe_docprev constr
-
-   Conflict: DOCPREV
-
--------------------------------------------------------------------------------
-
-state 1375 contains 1 shift/reduce conflict.
-
-    *** atype -> tyvar .
-        tv_bndr -> '(' tyvar . '::' kind ')'
-
-    Conflict: '::'
-
-Example ambiguity: 'class C a where type D a = ( a :: * ...'
-
-Here the parser cannot tell whether this is specifying a default for the
-associated type like:
-
-'class C a where type D a = ( a :: * ); type D a'
-
-or it is an injectivity signature like:
-
-'class C a where type D a = ( r :: * ) | r -> a'
-
-Shift means the parser only allows the latter.
-
--------------------------------------------------------------------------------
--- API Annotations
---
-
+        QVARID    shift, and enter state 44
+                   (reduce using rule 492)
+
+  That's how you know rule 492 is causing trouble.
+  Scroll back to the top to see what this rule is:
+
+        ----------------------------------
+        Grammar
+        ----------------------------------
+        ...
+        ...
+        exp10 -> fexp                (492)
+        optSemi -> ';'               (493)
+        ...
+        ...
+
+  Hence the shift/reduce conflict is caused by this parser production:
+
+        exp10 :: { ECP }
+                : '-' fexp    { ... }
+                | fexp        { ... }    -- problematic rule
+
+STEP TWO
+  is to mark the problematic rule with the %shift pragma. This signals to
+  'happy' that any shift/reduce conflicts involving this rule must be resolved
+  in favor of a shift.
+
+STEP THREE
+  is to add a dedicated Note for this specific conflict, as is done for all
+  other conflicts below.
+-}
+
+{- Note [%shift: rule_activation -> {- empty -}]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Context:
+    rule -> STRING . rule_activation rule_foralls infixexp '=' exp
+
+Example:
+    {-# RULE [0] f = rhs #-}
+
+Ambiguity:
+    If we reduced, then we'd get an empty activation rule, and [0] would be
+    parsed as part of the left-hand side expression.
+
+    We shift, so [0] is parsed as an activation rule.
+-}
+
+{- Note [%shift: rule_foralls -> 'forall' rule_vars '.']
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Context:
+    rule_foralls -> 'forall' rule_vars '.' . 'forall' rule_vars '.'
+    rule_foralls -> 'forall' rule_vars '.' .
+
+Example:
+    {-# RULES "name" forall a1. forall a2. lhs = rhs #-}
+
+Ambiguity:
+    Same as in Note [%shift: rule_foralls -> {- empty -}]
+    but for the second 'forall'.
+-}
+
+{- Note [%shift: rule_foralls -> {- empty -}]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Context:
+    rule -> STRING rule_activation . rule_foralls infixexp '=' exp
+
+Example:
+    {-# RULES "name" forall a1. lhs = rhs #-}
+
+Ambiguity:
+    If we reduced, then we would get an empty rule_foralls; the 'forall', being
+    a valid term-level identifier, would be parsed as part of the left-hand
+    side expression.
+
+    We shift, so the 'forall' is parsed as part of rule_foralls.
+-}
+
+{- Note [%shift: type -> btype]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Context:
+    context -> btype .
+    type -> btype .
+    type -> btype . '->' ctype
+    type -> btype . '#->' ctype
+
+Example:
+    a :: Maybe Integer -> Bool
+
+Ambiguity:
+    If we reduced, we would get:   (a :: Maybe Integer) -> Bool
+    We shift to get this instead:  a :: (Maybe Integer -> Bool)
+-}
+
+{- Note [%shift: infixtype -> ftype]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Context:
+    infixtype -> ftype .
+    infixtype -> ftype . tyop infixtype
+    ftype -> ftype . tyarg
+    ftype -> ftype . PREFIX_AT tyarg
+
+Example:
+    a :: Maybe Integer
+
+Ambiguity:
+    If we reduced, we would get:    (a :: Maybe) Integer
+    We shift to get this instead:   a :: (Maybe Integer)
+-}
+
+{- Note [%shift: atype -> tyvar]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Context:
+    atype -> tyvar .
+    tv_bndr_no_braces -> '(' tyvar . '::' kind ')'
+
+Example:
+    class C a where type D a = (a :: Type ...
+
+Ambiguity:
+    If we reduced, we could specify a default for an associated type like this:
+
+      class C a where type D a
+                      type D a = (a :: Type)
+
+    But we shift in order to allow injectivity signatures like this:
+
+      class C a where type D a = (r :: Type) | r -> a
+-}
+
+{- Note [%shift: exp -> infixexp]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Context:
+    exp -> infixexp . '::' sigtype
+    exp -> infixexp . '-<' exp
+    exp -> infixexp . '>-' exp
+    exp -> infixexp . '-<<' exp
+    exp -> infixexp . '>>-' exp
+    exp -> infixexp .
+    infixexp -> infixexp . qop exp10p
+
+Examples:
+    1) if x then y else z -< e
+    2) if x then y else z :: T
+    3) if x then y else z + 1   -- (NB: '+' is in VARSYM)
+
+Ambiguity:
+    If we reduced, we would get:
+
+      1) (if x then y else z) -< e
+      2) (if x then y else z) :: T
+      3) (if x then y else z) + 1
+
+    We shift to get this instead:
+
+      1) if x then y else (z -< e)
+      2) if x then y else (z :: T)
+      3) if x then y else (z + 1)
+-}
+
+{- Note [%shift: exp10 -> '-' fexp]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Context:
+    exp10 -> '-' fexp .
+    fexp -> fexp . aexp
+    fexp -> fexp . PREFIX_AT atype
+
+Examples & Ambiguity:
+    Same as in Note [%shift: exp10 -> fexp],
+    but with a '-' in front.
+-}
+
+{- Note [%shift: exp10 -> fexp]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Context:
+    exp10 -> fexp .
+    fexp -> fexp . aexp
+    fexp -> fexp . PREFIX_AT atype
+
+Examples:
+    1) if x then y else f z
+    2) if x then y else f @z
+
+Ambiguity:
+    If we reduced, we would get:
+
+      1) (if x then y else f) z
+      2) (if x then y else f) @z
+
+    We shift to get this instead:
+
+      1) if x then y else (f z)
+      2) if x then y else (f @z)
+-}
+
+{- Note [%shift: aexp2 -> ipvar]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Context:
+    aexp2 -> ipvar .
+    dbind -> ipvar . '=' exp
+
+Example:
+    let ?x = ...
+
+Ambiguity:
+    If we reduced, ?x would be parsed as the LHS of a normal binding,
+    eventually producing an error.
+
+    We shift, so it is parsed as the LHS of an implicit binding.
+-}
+
+{- Note [%shift: aexp2 -> TH_TY_QUOTE]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Context:
+    aexp2 -> TH_TY_QUOTE . tyvar
+    aexp2 -> TH_TY_QUOTE . gtycon
+    aexp2 -> TH_TY_QUOTE .
+
+Examples:
+    1) x = ''
+    2) x = ''a
+    3) x = ''T
+
+Ambiguity:
+    If we reduced, the '' would result in reportEmptyDoubleQuotes even when
+    followed by a type variable or a type constructor. But the only reason
+    this reduction rule exists is to improve error messages.
+
+    Naturally, we shift instead, so that ''a and ''T work as expected.
+-}
+
+{- Note [%shift: tup_tail -> {- empty -}]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Context:
+    tup_exprs -> commas . tup_tail
+    sysdcon_nolist -> '(' commas . ')'
+    sysdcon_nolist -> '(#' commas . '#)'
+    commas -> commas . ','
+
+Example:
+    (,,)
+
+Ambiguity:
+    A tuple section with no components is indistinguishable from the Haskell98
+    data constructor for a tuple.
+
+    If we reduced, (,,) would be parsed as a tuple section.
+    We shift, so (,,) is parsed as a data constructor.
+
+    This is preferable because we want to accept (,,) without -XTupleSections.
+    See also Note [ExplicitTuple] in GHC.Hs.Expr.
+-}
+
+{- Note [%shift: qtyconop -> qtyconsym]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Context:
+    oqtycon -> '(' qtyconsym . ')'
+    qtyconop -> qtyconsym .
+
+Example:
+    foo :: (:%)
+
+Ambiguity:
+    If we reduced, (:%) would be parsed as a parenthehsized infix type
+    expression without arguments, resulting in the 'failOpFewArgs' error.
+
+    We shift, so it is parsed as a type constructor.
+-}
+
+{- Note [%shift: special_id -> 'group']
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Context:
+    transformqual -> 'then' 'group' . 'using' exp
+    transformqual -> 'then' 'group' . 'by' exp 'using' exp
+    special_id -> 'group' .
+
+Example:
+    [ ... | then group by dept using groupWith
+          , then take 5 ]
+
+Ambiguity:
+    If we reduced, 'group' would be parsed as a term-level identifier, just as
+    'take' in the other clause.
+
+    We shift, so it is parsed as part of the 'group by' clause introduced by
+    the -XTransformListComp extension.
+-}
+
+
+{- Note [Parser API Annotations]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A lot of the productions are now cluttered with calls to
 aa,am,ams,amms etc.
 
@@ -405,9 +504,10 @@ If you modify the parser and want to ensure that the API annotations are process
 correctly, see the README in (REPO)/utils/check-api-annotations for details on
 how to set up a test using the check-api-annotations utility, and interpret the
 output it generates.
+-}
 
-Note [Parsing lists]
----------------------
+{- Note [Parsing lists]
+~~~~~~~~~~~~~~~~~~~~~~~
 You might be wondering why we spend so much effort encoding our lists this
 way:
 
@@ -447,9 +547,6 @@ are the most common patterns, rewritten as regular expressions for clarity:
     -- Equivalent to x (',' x)+ (non-empty, no trailing semis)
     xs : x
        | x ',' xs
-
--- -----------------------------------------------------------------------------
-
 -}
 
 %token
@@ -1682,7 +1779,8 @@ rule    :: { LRuleDecl GhcPs }
 
 -- Rules can be specified to be NeverActive, unlike inline/specialize pragmas
 rule_activation :: { ([AddAnn],Maybe Activation) }
-        : {- empty -}                           { ([],Nothing) }
+        -- See Note [%shift: rule_activation -> {- empty -}]
+        : {- empty -} %shift                    { ([],Nothing) }
         | rule_explicit_activation              { (fst $1,Just (snd $1)) }
 
 -- This production is used to parse the tilde syntax in pragmas such as
@@ -1718,9 +1816,12 @@ rule_foralls :: { ([AddAnn], Maybe [LHsTyVarBndr () GhcPs], [LRuleBndr GhcPs]) }
                                                               >> return ([mu AnnForall $1,mj AnnDot $3,
                                                                           mu AnnForall $4,mj AnnDot $6],
                                                                          Just (mkRuleTyVarBndrs $2), mkRuleBndrs $5) }
-        | 'forall' rule_vars '.'                           { ([mu AnnForall $1,mj AnnDot $3],
+
+        -- See Note [%shift: rule_foralls -> 'forall' rule_vars '.']
+        | 'forall' rule_vars '.' %shift                    { ([mu AnnForall $1,mj AnnDot $3],
                                                               Nothing, mkRuleBndrs $2) }
-        | {- empty -}                                      { ([], Nothing, []) }
+        -- See Note [%shift: rule_foralls -> {- empty -}]
+        | {- empty -}            %shift                    { ([], Nothing, []) }
 
 rule_vars :: { [LRuleTyTmVar] }
         : rule_var rule_vars                    { $1 : $2 }
@@ -1954,7 +2055,8 @@ is connected to the first type too.
 -}
 
 type :: { LHsType GhcPs }
-        : btype                        { $1 }
+        -- See Note [%shift: type -> btype]
+        : btype %shift                 { $1 }
         | btype '->' ctype             {% ams $1 [mu AnnRarrow $2] -- See note [GADT decl discards annotations]
                                        >> ams (sLL $1 $> $ HsFunTy noExtField HsUnrestrictedArrow $1 $3)
                                               [mu AnnRarrow $2] }
@@ -1970,7 +2072,8 @@ btype :: { LHsType GhcPs }
         : infixtype                     {% runPV $1 }
 
 infixtype :: { forall b. DisambTD b => PV (Located b) }
-        : ftype                         { $1 }
+        -- See Note [%shift: infixtype -> ftype]
+        : ftype %shift                  { $1 }
         | ftype tyop infixtype          { $1 >>= \ $1 ->
                                           $3 >>= \ $3 ->
                                           mkHsOpTyPV $1 $2 $3 }
@@ -1999,7 +2102,8 @@ tyop :: { Located RdrName }
 
 atype :: { LHsType GhcPs }
         : ntgtycon                       { sL1 $1 (HsTyVar noExtField NotPromoted $1) }      -- Not including unit tuples
-        | tyvar                          { sL1 $1 (HsTyVar noExtField NotPromoted $1) }      -- (See Note [Unit tuples])
+        -- See Note [%shift: atype -> tyvar]
+        | tyvar %shift                   { sL1 $1 (HsTyVar noExtField NotPromoted $1) }      -- (See Note [Unit tuples])
         | '*'                            {% do { warnStarIsType (getLoc $1)
                                                ; return $ sL1 $1 (HsStarTy noExtField (isUnicode $1)) } }
 
@@ -2485,7 +2589,8 @@ exp   :: { ECP }
                                    ams (sLL $1 $> $ HsCmdArrApp noExtField $3 $1
                                                       HsHigherOrderApp False)
                                        [mu AnnRarrowtail $2] }
-        | infixexp              { $1 }
+        -- See Note [%shift: exp -> infixexp]
+        | infixexp %shift       { $1 }
         | exp_prag(exp)         { $1 } -- See Note [Pragmas and operator fixity]
 
 infixexp :: { ECP }
@@ -2513,11 +2618,13 @@ exp_prag(e) :: { ECP }
              (fst $ unLoc $1) }
 
 exp10 :: { ECP }
-        : '-' fexp                      { ECP $
+        -- See Note [%shift: exp10 -> '-' fexp]
+        : '-' fexp %shift               { ECP $
                                            unECP $2 >>= \ $2 ->
                                            amms (mkHsNegAppPV (comb2 $1 $>) $2)
                                                [mj AnnMinus $1] }
-        | fexp                         { $1 }
+        -- See Note [%shift: exp10 -> fexp]
+        | fexp %shift                  { $1 }
 
 optSemi :: { ([Located Token],Bool) }
         : ';'         { ([$1],True) }
@@ -2708,7 +2815,8 @@ aexp1   :: { ECP }
 aexp2   :: { ECP }
         : qvar                          { ECP $ mkHsVarPV $! $1 }
         | qcon                          { ECP $ mkHsVarPV $! $1 }
-        | ipvar                         { ecpFromExp $ sL1 $1 (HsIPVar noExtField $! unLoc $1) }
+        -- See Note [%shift: aexp2 -> ipvar]
+        | ipvar %shift                  { ecpFromExp $ sL1 $1 (HsIPVar noExtField $! unLoc $1) }
         | overloaded_label              { ecpFromExp $ sL1 $1 (HsOverLabel noExtField Nothing $! unLoc $1) }
         | literal                       { ECP $ mkHsLitPV $! $1 }
 -- This will enable overloaded strings permanently.  Normally the renamer turns HsString
@@ -2750,7 +2858,8 @@ aexp2   :: { ECP }
         | SIMPLEQUOTE  qcon     {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket noExtField (VarBr noExtField True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
         | TH_TY_QUOTE tyvar     {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket noExtField (VarBr noExtField False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
         | TH_TY_QUOTE gtycon    {% fmap ecpFromExp $ ams (sLL $1 $> $ HsBracket noExtField (VarBr noExtField False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
-        | TH_TY_QUOTE {- nothing -} {% reportEmptyDoubleQuotes (getLoc $1) }
+        -- See Note [%shift: aexp2 -> TH_TY_QUOTE]
+        | TH_TY_QUOTE %shift    {% reportEmptyDoubleQuotes (getLoc $1) }
         | '[|' exp '|]'       {% runPV (unECP $2) >>= \ $2 ->
                                  fmap ecpFromExp $
                                  ams (sLL $1 $> $ HsBracket noExtField (ExpBr noExtField $2))
@@ -2892,7 +3001,8 @@ tup_tail :: { forall b. DisambECP b => PV [Located (Maybe (Located b))] }
                                    return ((L (gl $1) (Just $1)) : snd $2) }
           | texp                 { unECP $1 >>= \ $1 ->
                                    return [L (gl $1) (Just $1)] }
-          | {- empty -}          { return [noLoc Nothing] }
+          -- See Note [%shift: tup_tail -> {- empty -}]
+          | {- empty -} %shift   { return [noLoc Nothing] }
 
 -----------------------------------------------------------------------------
 -- List expressions
@@ -3403,7 +3513,8 @@ child.
 -}
 
 qtyconop :: { Located RdrName } -- Qualified or unqualified
-        : qtyconsym                     { $1 }
+        -- See Note [%shift: qtyconop -> qtyconsym]
+        : qtyconsym %shift              { $1 }
         | '`' qtycon '`'                {% ams (sLL $1 $> (unLoc $2))
                                                [mj AnnBackquote $1,mj AnnVal $2
                                                ,mj AnnBackquote $3] }
@@ -3570,7 +3681,8 @@ special_id
         | 'capi'                { sL1 $1 (fsLit "capi") }
         | 'prim'                { sL1 $1 (fsLit "prim") }
         | 'javascript'          { sL1 $1 (fsLit "javascript") }
-        | 'group'               { sL1 $1 (fsLit "group") }
+        -- See Note [%shift: special_id -> 'group']
+        | 'group' %shift        { sL1 $1 (fsLit "group") }
         | 'stock'               { sL1 $1 (fsLit "stock") }
         | 'anyclass'            { sL1 $1 (fsLit "anyclass") }
         | 'via'                 { sL1 $1 (fsLit "via") }
