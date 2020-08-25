@@ -132,7 +132,6 @@ class  Show a  where
     -- === __Example__
     --
     -- > data Expr = Lit Integer | Expr :*: Expr | Expr :+: Expr
-
     -- > -- I want :*: to have precedence level 7, :+: level 6.
     -- > -- This is coded both as the infixl declarations below, and in the Show instance.
     -- > infixl 7 :*:
