@@ -316,7 +316,12 @@ instance Monoid UnitVisibility where
 data UnitConfig = UnitConfig
    { unitConfigPlatformArchOS :: !ArchOS        -- ^ Platform arch and OS
    , unitConfigWays           :: !Ways          -- ^ Ways to use
-   , unitConfigHomeUnit       :: !HomeUnit      -- ^ Home unit
+
+   , unitConfigAllowVirtual   :: !Bool          -- ^ Allow virtual units
+      -- ^ Do we allow the use of virtual units instantiated on-the-fly (see Note
+      -- [About units] in GHC.Unit). This should only be true when we are
+      -- type-checking an indefinite unit (not producing any code).
+
    , unitConfigProgramName    :: !String
       -- ^ Name of the compiler (e.g. "GHC", "GHCJS"). Used to fetch environment
       -- variables such as "GHC[JS]_PACKAGE_PATH".
@@ -345,18 +350,28 @@ data UnitConfig = UnitConfig
 
 initUnitConfig :: DynFlags -> UnitConfig
 initUnitConfig dflags =
-   let home_unit = mkHomeUnitFromFlags dflags
+   let !hu_id             = homeUnitId_ dflags
+       !hu_instanceof     = homeUnitInstanceOf_ dflags
+       !hu_instantiations = homeUnitInstantiations_ dflags
+
        autoLink
          | not (gopt Opt_AutoLinkPackages dflags) = []
          -- By default we add base & rts to the preload units (when they are
          -- found in the unit database) except when we are building them
-         | otherwise = filter (not . isHomeUnitId home_unit) [baseUnitId, rtsUnitId]
+         | otherwise = filter (hu_id /=) [baseUnitId, rtsUnitId]
+
+       -- if the home unit is indefinite, it means we are type-checking it only
+       -- (not producing any code). Hence we can use virtual units instantiated
+       -- on-the-fly. See Note [About units] in GHC.Unit
+       allow_virtual_units = case (hu_instanceof, hu_instantiations) of
+            (Just u, is) -> u == hu_id && any (isHoleModule . snd) is
+            _            -> False
 
    in UnitConfig
       { unitConfigPlatformArchOS = platformArchOS (targetPlatform dflags)
       , unitConfigProgramName    = programName dflags
       , unitConfigWays           = ways dflags
-      , unitConfigHomeUnit       = home_unit
+      , unitConfigAllowVirtual   = allow_virtual_units
 
       , unitConfigGlobalDB       = globalPackageDatabasePath dflags
       , unitConfigGHCDir         = topDir dflags
@@ -1625,24 +1640,14 @@ mkUnitState ctx printer cfg = do
          , wireMap                      = wired_map
          , unwireMap                    = Map.fromList [ (v,k) | (k,v) <- Map.toList wired_map ]
          , requirementContext           = req_ctx
-         , allowVirtualUnits            = unitConfigAllowVirtualUnits cfg
+         , allowVirtualUnits            = unitConfigAllowVirtual cfg
          }
 
   return (state, raw_dbs)
 
--- | Do we allow the use of virtual units instantiated on-the-fly (see Note
--- [About units] in GHC.Unit). This should only be true when we are
--- type-checking an indefinite unit (not producing any code).
-unitConfigAllowVirtualUnits :: UnitConfig -> Bool
-unitConfigAllowVirtualUnits cfg =
-   -- when the home unit is indefinite, it means we are type-checking it only
-   -- (not producing any code). Hence we can use virtual units instantiated
-   -- on-the-fly (see Note [About units] in GHC.Unit)
-   isHomeUnitIndefinite (unitConfigHomeUnit cfg)
-
 -- | Given a wired-in 'Unit', "unwire" it into the 'Unit'
 -- that it was recorded as in the package database.
-unwireUnit :: UnitState -> Unit-> Unit
+unwireUnit :: UnitState -> Unit -> Unit
 unwireUnit state uid@(RealUnit (Definite def_uid)) =
     maybe uid (RealUnit . Definite) (Map.lookup def_uid (unwireMap state))
 unwireUnit _ uid = uid
@@ -1734,7 +1739,7 @@ mkModuleNameProvidersMap ctx cfg pkg_map closure vis_map =
     hiddens = [(m, mkModMap pk m ModHidden) | m <- hidden_mods]
 
     pk = mkUnit pkg
-    unit_lookup uid = lookupUnit' (unitConfigAllowVirtualUnits cfg) pkg_map closure uid
+    unit_lookup uid = lookupUnit' (unitConfigAllowVirtual cfg) pkg_map closure uid
                         `orElse` pprPanic "unit_lookup" (ppr uid)
 
     exposed_mods = unitExposedModules pkg
