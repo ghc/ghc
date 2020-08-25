@@ -113,7 +113,7 @@ foreign import ccall unsafe ghc_bignat_mul_word
 -- The potential 0 most-significant Words will be removed by the caller if it is
 -- not already done by the backend.
 --
--- Return True to indicate overflow.
+-- Return False# to indicate underflow.
 bignat_sub
    :: MutableWordArray# RealWorld
    -> WordArray#
@@ -136,7 +136,7 @@ foreign import ccall unsafe ghc_bignat_sub
 -- The potential 0 most-significant Words will be removed by the caller if it is
 -- not already done by the backend.
 --
--- Return True to indicate overflow.
+-- Return False# to indicate underflow.
 bignat_sub_word
    :: MutableWordArray# RealWorld
    -> WordArray#
