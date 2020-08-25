@@ -94,8 +94,6 @@ data Token = TEOF
            | TDefaults
            | TTrue
            | TFalse
-           | TDyadic
-           | TMonadic
            | TCompare
            | TGenPrimOp
            | TThatsAllFolks

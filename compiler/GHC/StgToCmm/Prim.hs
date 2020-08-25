@@ -1,6 +1,5 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MultiWayIf #-}
 
 #if __GLASGOW_HASKELL__ <= 808
 -- GHC 8.10 deprecates this flag, but GHC 8.8 needs it
@@ -1562,19 +1561,17 @@ emitPrimOp dflags primop = case primop of
         -> FCode ())
     -> PrimopCmmEmit
   opIntoRegs f = PrimopCmmEmit_Internal $ \res_ty -> do
-    regs <- if
-      | ReturnsPrim VoidRep <- result_info
-      -> pure []
+    regs <- case result_info of
+      ReturnsPrim VoidRep -> pure []
+      ReturnsPrim rep
+        -> do reg <- newTemp (primRepCmmType platform rep)
+              pure [reg]
 
-      | ReturnsPrim rep <- result_info
-      -> do reg <- newTemp (primRepCmmType platform rep)
-            pure [reg]
+      ReturnsAlg tycon | isUnboxedTupleTyCon tycon
+        -> do (regs, _hints) <- newUnboxedTupleRegs res_ty
+              pure regs
 
-      | ReturnsAlg tycon <- result_info, isUnboxedTupleTyCon tycon
-      -> do (regs, _hints) <- newUnboxedTupleRegs res_ty
-            pure regs
-
-      | otherwise -> panic "cgOpApp"
+      _ -> panic "cgOpApp"
     f regs
     pure $ map (CmmReg . CmmLocal) regs
 
