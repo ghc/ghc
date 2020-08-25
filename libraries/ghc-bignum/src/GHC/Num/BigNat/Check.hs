@@ -129,8 +129,8 @@ mwaCompareOpBool mwa f g s =
       0# -> case unexpectedValue of
                !_ -> (# s, ra #)
                -- see Note [ghc-bignum exceptions] in GHC.Num.Primitives
-      _  -> case (ra ==# 1#) of -- don't compare MWAs if overflow signaled!
-         1# -> (# s, ra #)
+      _  -> case ra of -- don't compare MWAs if underflow signaled!
+         0# -> (# s, ra #) -- underflow
          _  -> case mwaTrimZeroes# mwa s of { s ->
                case mwaTrimZeroes# mwb s of { s ->
                case mwaCompare mwa mwb s of

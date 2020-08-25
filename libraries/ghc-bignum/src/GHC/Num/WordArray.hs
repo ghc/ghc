@@ -318,7 +318,7 @@ mwaAddInplaceWord# mwa i y   s = case readWordArray# mwa i s of
 -- | Sub Word# inplace (at the specified offset) in the mwa with carry
 -- propagation.
 --
--- Return False# on overflow
+-- Return False# on underflow
 mwaSubInplaceWord#
    :: MutableWordArray# d
    -> Int#
@@ -328,9 +328,9 @@ mwaSubInplaceWord#
 mwaSubInplaceWord# mwa ii iw s1 = case mwaSize# mwa s1 of
    (# is, sz #) ->
       let
-         go _ 0## s = (# s, 1# #) -- no overflow
+         go _ 0## s = (# s, 1# #) -- no underflow
          go i y   s
-            | isTrue# (i >=# sz) = (# s, 0# #) -- overflow
+            | isTrue# (i >=# sz) = (# s, 0# #) -- underflow
             | True = case readWordArray# mwa i s of
                (# s1, x #) -> let !(# l,h #) = subWordC# x y
                   in case mwaWrite# mwa i l s1 of
@@ -368,16 +368,16 @@ mwaTrimCompare k mwa wb s1
 --
 -- We don't trim the resulting array!
 --
--- Return False# on overflow.
+-- Return False# on underflow.
 mwaSubInplaceArray :: MutableWordArray# d -> Int# -> WordArray# -> State# d -> (# State# d, Bool# #)
 mwaSubInplaceArray mwa off wb = go (wordArraySize# wb -# 1#)
    where
       go i s
-         | isTrue# (i <# 0#) = (# s, 1# #) -- no overflow
+         | isTrue# (i <# 0#) = (# s, 1# #) -- no underflow
          | True
          = case mwaSubInplaceWord# mwa (off +# i) (indexWordArray# wb i) s of
             (# s2, 1# #) -> go (i -# 1#) s2
-            (# s2, _  #) -> (# s2, 0# #) -- overflow
+            (# s2, _  #) -> (# s2, 0# #) -- underflow
 
 -- | Add array inplace (a the specified offset) in the mwa with carry propagation.
 --
@@ -398,19 +398,19 @@ mwaAddInplaceArray mwa off wb = go 0# 0##
 --
 -- We don't trim the resulting array!
 --
--- Return False# on overflow.
+-- Return False# on underflow.
 mwaSubInplaceMutableArray :: MutableWordArray# d -> Int# -> MutableWordArray# d -> State# d -> (# State# d, Bool# #)
 mwaSubInplaceMutableArray mwa off mwb s0 =
    case mwaSize# mwb s0 of
       (# s1, szB #) -> go (szB -# 1#) s1
    where
       go i s
-         | isTrue# (i <# 0#) = (# s, 1# #) -- no overflow
+         | isTrue# (i <# 0#) = (# s, 1# #) -- no underflow
          | True
          = case readWordArray# mwb i s of
             (# s1, bi #) -> case mwaSubInplaceWord# mwa (off +# i) bi s1 of
                (# s2, 1# #) -> go (i -# 1#) s2
-               (# s2, _  #) -> (# s2, 0# #) -- overflow
+               (# s2, _  #) -> (# s2, 0# #) -- underflow
 
 -- | Sub an array inplace and then trim zeroes
 --
