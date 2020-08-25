@@ -129,7 +129,7 @@ class  Show a  where
     -- That is, 'Text.Read.readsPrec' parses the string produced by
     -- 'showsPrec', and delivers the value that 'showsPrec' started with.
     --
-    -- === __Example__ ===
+    -- === __Example__
     --
     -- > data Expr = Lit Integer | Expr :*: Expr | Expr :+: Expr
 
