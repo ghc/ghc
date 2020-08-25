@@ -158,7 +158,7 @@ class  Show a  where
     -- >
     -- > -- Precedence says not parenthesized.
     -- > example1 = Lit 3 :*: Lit 1 :+: Lit 4 :*: Lit 1
-    --
+    -- >
     -- > -- Precendence says parenthesized.
     -- > example2 = (Lit (-3) :+: Lit (-1)) :*: (Lit (-4) :+: Lit 1)
 
