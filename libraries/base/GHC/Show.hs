@@ -133,9 +133,8 @@ class  Show a  where
     --
     -- > data Expr = Lit Integer | Expr :*: Expr | Expr :+: Expr
 
-    -- -- I want :*: to have precedence level 7, :+: level 6.
-    -- -- This is coded both as the infixl declarations below, and in the Show instance.
-
+    -- > -- I want :*: to have precedence level 7, :+: level 6.
+    -- > -- This is coded both as the infixl declarations below, and in the Show instance.
     -- > infixl 7 :*:
     -- > infixl 6 :+:
     -- >
@@ -158,10 +157,10 @@ class  Show a  where
     -- >                    showsPrec (myPrec + 1) e2)
     -- >       where myPrec = 6
     -- >
-    -- -- Precedence says not parenthesized.
+    -- > -- Precedence says not parenthesized.
     -- > example1 = Lit 3 :*: Lit 1 :+: Lit 4 :*: Lit 1
     --
-    -- -- Precendence says parenthesized.
+    -- > -- Precendence says parenthesized.
     -- > example2 = (Lit (-3) :+: Lit (-1)) :*: (Lit (-4) :+: Lit 1)
 
 
