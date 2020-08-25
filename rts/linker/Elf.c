@@ -878,10 +878,10 @@ ocGetNames_ELF ( ObjectCode* oc )
                    isLocal = false;
                    symbol->addr = stgCallocBytes(1, symbol->elf_sym->st_size,
                                        "ocGetNames_ELF(COMMON)");
-                   /*
-                   debugBelch("COMMON symbol, size %d name %s\n",
-                                   stab[j].st_size, nm);
-                   */
+                   IF_DEBUG(linker,
+                            debugBelch("COMMON symbol, size %d name %s\n",
+                                       stab[j].st_size, nm));
+
                    /* Pointless to do addProddableBlock() for this area,
                       since the linker should never poke around in it. */
                } else if ((ELF_ST_BIND(symbol->elf_sym->st_info) == STB_GLOBAL
