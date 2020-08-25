@@ -38,7 +38,7 @@ import GHC.Types.Name
 import GHC.Builtin.Names ( gHC_PRIMOPWRAPPERS )
 import GHC.Core.TyCon    ( TyCon, isPrimTyCon, PrimRep(..) )
 import GHC.Core.Type
-import GHC.Types.RepType ( typePrimRep1, tyConPrimRep1 )
+import GHC.Types.RepType ( tyConPrimRep1 )
 import GHC.Types.Basic   ( Arity, Fixity(..), FixityDirection(..), Boxity(..),
                            SourceText(..) )
 import GHC.Types.SrcLoc  ( wiredInSrcSpan )
@@ -103,33 +103,17 @@ tagToEnumKey = mkPrimOpIdUnique (primOpTag TagToEnumOp)
 \subsection[PrimOp-info]{The essential info about each @PrimOp@}
 *                                                                      *
 ************************************************************************
-
-The @String@ in the @PrimOpInfos@ is the ``base name'' by which the user may
-refer to the primitive operation.  The conventional \tr{#}-for-
-unboxed ops is added on later.
-
-The reason for the funny characters in the names is so we do not
-interfere with the programmer's Haskell name spaces.
-
-We use @PrimKinds@ for the ``type'' information, because they're
-(slightly) more convenient to use than @TyCons@.
 -}
 
 data PrimOpInfo
-  = Dyadic      OccName         -- string :: T -> T -> T
-                Type
-  | Monadic     OccName         -- string :: T -> T
-                Type
-  | Compare     OccName         -- string :: T -> T -> Int#
+  = Compare     OccName         -- string :: T -> T -> Int#
                 Type
   | GenPrimOp   OccName         -- string :: \/a1..an . T1 -> .. -> Tk -> T
                 [TyVar]
                 [Type]
                 Type
 
-mkDyadic, mkMonadic, mkCompare :: FastString -> Type -> PrimOpInfo
-mkDyadic str  ty = Dyadic  (mkVarOccFS str) ty
-mkMonadic str ty = Monadic (mkVarOccFS str) ty
+mkCompare :: FastString -> Type -> PrimOpInfo
 mkCompare str ty = Compare (mkVarOccFS str) ty
 
 mkGenPrimOp :: FastString -> [TyVar] -> [Type] -> Type -> PrimOpInfo
@@ -575,8 +559,6 @@ primOpCodeSizeForeignCall = 4
 primOpType :: PrimOp -> Type  -- you may want to use primOpSig instead
 primOpType op
   = case primOpInfo op of
-    Dyadic  _occ ty -> dyadic_fun_ty ty
-    Monadic _occ ty -> monadic_fun_ty ty
     Compare _occ ty -> compare_fun_ty ty
 
     GenPrimOp _occ tyvars arg_tys res_ty ->
@@ -585,15 +567,11 @@ primOpType op
 primOpResultType :: PrimOp -> Type
 primOpResultType op
   = case primOpInfo op of
-    Dyadic  _occ ty  -> ty
-    Monadic _occ ty  -> ty
     Compare _occ _ty -> intPrimTy
     GenPrimOp _occ _tyvars _arg_tys res_ty -> res_ty
 
 primOpOcc :: PrimOp -> OccName
 primOpOcc op = case primOpInfo op of
-               Dyadic    occ _     -> occ
-               Monadic   occ _     -> occ
                Compare   occ _     -> occ
                GenPrimOp occ _ _ _ -> occ
 
@@ -692,8 +670,8 @@ primOpWrapperId op = mkVanillaGlobalWithInfo name ty info
 
 isComparisonPrimOp :: PrimOp -> Bool
 isComparisonPrimOp op = case primOpInfo op of
-                          Compare {} -> True
-                          _          -> False
+                          Compare {}   -> True
+                          GenPrimOp {} -> False
 
 -- primOpSig is like primOpType but gives the result split apart:
 -- (type variables, argument types, result type)
@@ -706,8 +684,6 @@ primOpSig op
     arity = length arg_tys
     (tyvars, arg_tys, res_ty)
       = case (primOpInfo op) of
-        Monadic   _occ ty                    -> ([],     [ty],    ty       )
-        Dyadic    _occ ty                    -> ([],     [ty,ty], ty       )
         Compare   _occ ty                    -> ([],     [ty,ty], intPrimTy)
         GenPrimOp _occ tyvars arg_tys res_ty -> (tyvars, arg_tys, res_ty   )
 
@@ -722,8 +698,6 @@ data PrimOpResultInfo
 getPrimOpResultInfo :: PrimOp -> PrimOpResultInfo
 getPrimOpResultInfo op
   = case (primOpInfo op) of
-      Dyadic  _ ty                        -> ReturnsPrim (typePrimRep1 ty)
-      Monadic _ ty                        -> ReturnsPrim (typePrimRep1 ty)
       Compare _ _                         -> ReturnsPrim (tyConPrimRep1 intPrimTyCon)
       GenPrimOp _ _ _ ty | isPrimTyCon tc -> ReturnsPrim (tyConPrimRep1 tc)
                          | otherwise      -> ReturnsAlg tc
@@ -747,9 +721,7 @@ commutableOp :: PrimOp -> Bool
 
 -- Utils:
 
-dyadic_fun_ty, monadic_fun_ty, compare_fun_ty :: Type -> Type
-dyadic_fun_ty  ty = mkVisFunTysMany [ty, ty] ty
-monadic_fun_ty ty = mkVisFunTyMany  ty ty
+compare_fun_ty :: Type -> Type
 compare_fun_ty ty = mkVisFunTysMany [ty, ty] intPrimTy
 
 -- Output stuff:

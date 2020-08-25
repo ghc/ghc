@@ -42,11 +42,9 @@
 -- (eg, out_of_line), whilst avoiding parsing complex expressions
 -- needed for strictness info.
 --
--- type refers to the general category of the primop. Valid settings include,
+-- type refers to the general category of the primop. There are only two:
 --
 --  * Compare:   A comparison operation of the shape a -> a -> Int#
---  * Monadic:   A unary operation of shape a -> a
---  * Dyadic:    A binary operation of shape a -> a -> a
 --  * GenPrimOp: Any other sort of primop
 --
 
@@ -238,23 +236,23 @@ primtype Int8#
 primop Int8Extend "extendInt8#" GenPrimOp Int8# -> Int#
 primop Int8Narrow "narrowInt8#" GenPrimOp Int# -> Int8#
 
-primop Int8NegOp "negateInt8#" Monadic Int8# -> Int8#
+primop Int8NegOp "negateInt8#" GenPrimOp Int8# -> Int8#
 
-primop Int8AddOp "plusInt8#" Dyadic Int8# -> Int8# -> Int8#
+primop Int8AddOp "plusInt8#" GenPrimOp Int8# -> Int8# -> Int8#
   with
     commutable = True
 
-primop Int8SubOp "subInt8#" Dyadic Int8# -> Int8# -> Int8#
+primop Int8SubOp "subInt8#" GenPrimOp Int8# -> Int8# -> Int8#
 
-primop Int8MulOp "timesInt8#" Dyadic Int8# -> Int8# -> Int8#
+primop Int8MulOp "timesInt8#" GenPrimOp Int8# -> Int8# -> Int8#
   with
     commutable = True
 
-primop Int8QuotOp "quotInt8#" Dyadic Int8# -> Int8# -> Int8#
+primop Int8QuotOp "quotInt8#" GenPrimOp Int8# -> Int8# -> Int8#
   with
     can_fail = True
 
-primop Int8RemOp "remInt8#" Dyadic Int8# -> Int8# -> Int8#
+primop Int8RemOp "remInt8#" GenPrimOp Int8# -> Int8# -> Int8#
   with
     can_fail = True
 
@@ -279,23 +277,23 @@ primtype Word8#
 primop Word8Extend "extendWord8#" GenPrimOp Word8# -> Word#
 primop Word8Narrow "narrowWord8#" GenPrimOp Word# -> Word8#
 
-primop Word8NotOp "notWord8#" Monadic Word8# -> Word8#
+primop Word8NotOp "notWord8#" GenPrimOp Word8# -> Word8#
 
-primop Word8AddOp "plusWord8#" Dyadic Word8# -> Word8# -> Word8#
+primop Word8AddOp "plusWord8#" GenPrimOp Word8# -> Word8# -> Word8#
   with
     commutable = True
 
-primop Word8SubOp "subWord8#" Dyadic Word8# -> Word8# -> Word8#
+primop Word8SubOp "subWord8#" GenPrimOp Word8# -> Word8# -> Word8#
 
-primop Word8MulOp "timesWord8#" Dyadic Word8# -> Word8# -> Word8#
+primop Word8MulOp "timesWord8#" GenPrimOp Word8# -> Word8# -> Word8#
   with
     commutable = True
 
-primop Word8QuotOp "quotWord8#" Dyadic Word8# -> Word8# -> Word8#
+primop Word8QuotOp "quotWord8#" GenPrimOp Word8# -> Word8# -> Word8#
   with
     can_fail = True
 
-primop Word8RemOp "remWord8#" Dyadic Word8# -> Word8# -> Word8#
+primop Word8RemOp "remWord8#" GenPrimOp Word8# -> Word8# -> Word8#
   with
     can_fail = True
 
@@ -320,23 +318,23 @@ primtype Int16#
 primop Int16Extend "extendInt16#" GenPrimOp Int16# -> Int#
 primop Int16Narrow "narrowInt16#" GenPrimOp Int# -> Int16#
 
-primop Int16NegOp "negateInt16#" Monadic Int16# -> Int16#
+primop Int16NegOp "negateInt16#" GenPrimOp Int16# -> Int16#
 
-primop Int16AddOp "plusInt16#" Dyadic Int16# -> Int16# -> Int16#
+primop Int16AddOp "plusInt16#" GenPrimOp Int16# -> Int16# -> Int16#
   with
     commutable = True
 
-primop Int16SubOp "subInt16#" Dyadic Int16# -> Int16# -> Int16#
+primop Int16SubOp "subInt16#" GenPrimOp Int16# -> Int16# -> Int16#
 
-primop Int16MulOp "timesInt16#" Dyadic Int16# -> Int16# -> Int16#
+primop Int16MulOp "timesInt16#" GenPrimOp Int16# -> Int16# -> Int16#
   with
     commutable = True
 
-primop Int16QuotOp "quotInt16#" Dyadic Int16# -> Int16# -> Int16#
+primop Int16QuotOp "quotInt16#" GenPrimOp Int16# -> Int16# -> Int16#
   with
     can_fail = True
 
-primop Int16RemOp "remInt16#" Dyadic Int16# -> Int16# -> Int16#
+primop Int16RemOp "remInt16#" GenPrimOp Int16# -> Int16# -> Int16#
   with
     can_fail = True
 
@@ -361,23 +359,23 @@ primtype Word16#
 primop Word16Extend "extendWord16#" GenPrimOp Word16# -> Word#
 primop Word16Narrow "narrowWord16#" GenPrimOp Word# -> Word16#
 
-primop Word16NotOp "notWord16#" Monadic Word16# -> Word16#
+primop Word16NotOp "notWord16#" GenPrimOp Word16# -> Word16#
 
-primop Word16AddOp "plusWord16#" Dyadic Word16# -> Word16# -> Word16#
+primop Word16AddOp "plusWord16#" GenPrimOp Word16# -> Word16# -> Word16#
   with
     commutable = True
 
-primop Word16SubOp "subWord16#" Dyadic Word16# -> Word16# -> Word16#
+primop Word16SubOp "subWord16#" GenPrimOp Word16# -> Word16# -> Word16#
 
-primop Word16MulOp "timesWord16#" Dyadic Word16# -> Word16# -> Word16#
+primop Word16MulOp "timesWord16#" GenPrimOp Word16# -> Word16# -> Word16#
   with
     commutable = True
 
-primop Word16QuotOp "quotWord16#" Dyadic Word16# -> Word16# -> Word16#
+primop Word16QuotOp "quotWord16#" GenPrimOp Word16# -> Word16# -> Word16#
   with
     can_fail = True
 
-primop Word16RemOp "remWord16#" Dyadic Word16# -> Word16# -> Word16#
+primop Word16RemOp "remWord16#" GenPrimOp Word16# -> Word16# -> Word16#
   with
     can_fail = True
 
@@ -420,16 +418,16 @@ section "Int#"
 
 primtype Int#
 
-primop   IntAddOp    "+#"    Dyadic
+primop   IntAddOp    "+#"    GenPrimOp
    Int# -> Int# -> Int#
    with commutable = True
         fixity = infixl 6
 
-primop   IntSubOp    "-#"    Dyadic   Int# -> Int# -> Int#
+primop   IntSubOp    "-#"    GenPrimOp   Int# -> Int# -> Int#
    with fixity = infixl 6
 
 primop   IntMulOp    "*#"
-   Dyadic   Int# -> Int# -> Int#
+   GenPrimOp   Int# -> Int# -> Int#
    {Low word of signed integer multiply.}
    with commutable = True
         fixity = infixl 7
@@ -442,7 +440,7 @@ primop   IntMul2Op    "timesInt2#" GenPrimOp
    0#) or not (isHighNeeded = 1#).}
 
 primop   IntMulMayOfloOp  "mulIntMayOflo#"
-   Dyadic   Int# -> Int# -> Int#
+   GenPrimOp   Int# -> Int# -> Int#
    {Return non-zero if there is any possibility that the upper word of a
     signed integer multiply might contain useful information.  Return
     zero only if you are completely sure that no overflow can occur.
@@ -465,14 +463,14 @@ primop   IntMulMayOfloOp  "mulIntMayOflo#"
    }
    with commutable = True
 
-primop   IntQuotOp    "quotInt#"    Dyadic
+primop   IntQuotOp    "quotInt#"    GenPrimOp
    Int# -> Int# -> Int#
    {Rounds towards zero. The behavior is undefined if the second argument is
     zero.
    }
    with can_fail = True
 
-primop   IntRemOp    "remInt#"    Dyadic
+primop   IntRemOp    "remInt#"    GenPrimOp
    Int# -> Int# -> Int#
    {Satisfies \texttt{(quotInt\# x y) *\# y +\# (remInt\# x y) == x}. The
     behavior is undefined if the second argument is zero.
@@ -484,22 +482,22 @@ primop   IntQuotRemOp "quotRemInt#"    GenPrimOp
    {Rounds towards zero.}
    with can_fail = True
 
-primop   AndIOp   "andI#"   Dyadic    Int# -> Int# -> Int#
+primop   AndIOp   "andI#"   GenPrimOp    Int# -> Int# -> Int#
    {Bitwise "and".}
    with commutable = True
 
-primop   OrIOp   "orI#"     Dyadic    Int# -> Int# -> Int#
+primop   OrIOp   "orI#"     GenPrimOp    Int# -> Int# -> Int#
    {Bitwise "or".}
    with commutable = True
 
-primop   XorIOp   "xorI#"   Dyadic    Int# -> Int# -> Int#
+primop   XorIOp   "xorI#"   GenPrimOp    Int# -> Int# -> Int#
    {Bitwise "xor".}
    with commutable = True
 
-primop   NotIOp   "notI#"   Monadic   Int# -> Int#
+primop   NotIOp   "notI#"   GenPrimOp   Int# -> Int#
    {Bitwise "not", also known as the binary complement.}
 
-primop   IntNegOp    "negateInt#"    Monadic   Int# -> Int#
+primop   IntNegOp    "negateInt#"    GenPrimOp   Int# -> Int#
    {Unary negation.
     Since the negative {\tt Int#} range extends one further than the
     positive range, {\tt negateInt#} of the most negative number is an
@@ -573,7 +571,7 @@ section "Word#"
 
 primtype Word#
 
-primop   WordAddOp   "plusWord#"   Dyadic   Word# -> Word# -> Word#
+primop   WordAddOp   "plusWord#"   GenPrimOp   Word# -> Word# -> Word#
    with commutable = True
 
 primop   WordAddCOp   "addWordC#"   GenPrimOp   Word# -> Word# -> (# Word#, Int# #)
@@ -596,9 +594,9 @@ primop   WordAdd2Op   "plusWord2#"   GenPrimOp   Word# -> Word# -> (# Word#, Wor
    with code_size = 2
         commutable = True
 
-primop   WordSubOp   "minusWord#"   Dyadic   Word# -> Word# -> Word#
+primop   WordSubOp   "minusWord#"   GenPrimOp   Word# -> Word# -> Word#
 
-primop   WordMulOp   "timesWord#"   Dyadic   Word# -> Word# -> Word#
+primop   WordMulOp   "timesWord#"   GenPrimOp   Word# -> Word# -> Word#
    with commutable = True
 
 -- Returns (# high, low #)
@@ -606,10 +604,10 @@ primop   WordMul2Op  "timesWord2#"   GenPrimOp
    Word# -> Word# -> (# Word#, Word# #)
    with commutable = True
 
-primop   WordQuotOp   "quotWord#"   Dyadic   Word# -> Word# -> Word#
+primop   WordQuotOp   "quotWord#"   GenPrimOp   Word# -> Word# -> Word#
    with can_fail = True
 
-primop   WordRemOp   "remWord#"   Dyadic   Word# -> Word# -> Word#
+primop   WordRemOp   "remWord#"   GenPrimOp   Word# -> Word# -> Word#
    with can_fail = True
 
 primop   WordQuotRemOp "quotRemWord#" GenPrimOp
@@ -622,16 +620,16 @@ primop   WordQuotRem2Op "quotRemWord2#" GenPrimOp
            Requires that high word < divisor.}
    with can_fail = True
 
-primop   AndOp   "and#"   Dyadic   Word# -> Word# -> Word#
+primop   AndOp   "and#"   GenPrimOp   Word# -> Word# -> Word#
    with commutable = True
 
-primop   OrOp   "or#"   Dyadic   Word# -> Word# -> Word#
+primop   OrOp   "or#"   GenPrimOp   Word# -> Word# -> Word#
    with commutable = True
 
-primop   XorOp   "xor#"   Dyadic   Word# -> Word# -> Word#
+primop   XorOp   "xor#"   GenPrimOp   Word# -> Word# -> Word#
    with commutable = True
 
-primop   NotOp   "not#"   Monadic   Word# -> Word#
+primop   NotOp   "not#"   GenPrimOp   Word# -> Word#
 
 primop   SllOp   "uncheckedShiftL#"   GenPrimOp   Word# -> Int# -> Word#
          {Shift left logical.   Result undefined if shift amount is not
@@ -650,79 +648,79 @@ primop   WordNeOp   "neWord#"   Compare   Word# -> Word# -> Int#
 primop   WordLtOp   "ltWord#"   Compare   Word# -> Word# -> Int#
 primop   WordLeOp   "leWord#"   Compare   Word# -> Word# -> Int#
 
-primop   PopCnt8Op   "popCnt8#"   Monadic   Word# -> Word#
+primop   PopCnt8Op   "popCnt8#"   GenPrimOp   Word# -> Word#
     {Count the number of set bits in the lower 8 bits of a word.}
-primop   PopCnt16Op   "popCnt16#"   Monadic   Word# -> Word#
+primop   PopCnt16Op   "popCnt16#"   GenPrimOp   Word# -> Word#
     {Count the number of set bits in the lower 16 bits of a word.}
-primop   PopCnt32Op   "popCnt32#"   Monadic   Word# -> Word#
+primop   PopCnt32Op   "popCnt32#"   GenPrimOp   Word# -> Word#
     {Count the number of set bits in the lower 32 bits of a word.}
 primop   PopCnt64Op   "popCnt64#"   GenPrimOp   WORD64 -> Word#
     {Count the number of set bits in a 64-bit word.}
-primop   PopCntOp   "popCnt#"   Monadic   Word# -> Word#
+primop   PopCntOp   "popCnt#"   GenPrimOp   Word# -> Word#
     {Count the number of set bits in a word.}
 
-primop   Pdep8Op   "pdep8#"   Dyadic   Word# -> Word# -> Word#
+primop   Pdep8Op   "pdep8#"   GenPrimOp   Word# -> Word# -> Word#
     {Deposit bits to lower 8 bits of a word at locations specified by a mask.}
-primop   Pdep16Op   "pdep16#"   Dyadic   Word# -> Word# -> Word#
+primop   Pdep16Op   "pdep16#"   GenPrimOp   Word# -> Word# -> Word#
     {Deposit bits to lower 16 bits of a word at locations specified by a mask.}
-primop   Pdep32Op   "pdep32#"   Dyadic   Word# -> Word# -> Word#
+primop   Pdep32Op   "pdep32#"   GenPrimOp   Word# -> Word# -> Word#
     {Deposit bits to lower 32 bits of a word at locations specified by a mask.}
 primop   Pdep64Op   "pdep64#"   GenPrimOp   WORD64 -> WORD64 -> WORD64
     {Deposit bits to a word at locations specified by a mask.}
-primop   PdepOp   "pdep#"   Dyadic   Word# -> Word# -> Word#
+primop   PdepOp   "pdep#"   GenPrimOp   Word# -> Word# -> Word#
     {Deposit bits to a word at locations specified by a mask.}
 
-primop   Pext8Op   "pext8#"   Dyadic   Word# -> Word# -> Word#
+primop   Pext8Op   "pext8#"   GenPrimOp   Word# -> Word# -> Word#
     {Extract bits from lower 8 bits of a word at locations specified by a mask.}
-primop   Pext16Op   "pext16#"   Dyadic   Word# -> Word# -> Word#
+primop   Pext16Op   "pext16#"   GenPrimOp   Word# -> Word# -> Word#
     {Extract bits from lower 16 bits of a word at locations specified by a mask.}
-primop   Pext32Op   "pext32#"   Dyadic   Word# -> Word# -> Word#
+primop   Pext32Op   "pext32#"   GenPrimOp   Word# -> Word# -> Word#
     {Extract bits from lower 32 bits of a word at locations specified by a mask.}
 primop   Pext64Op   "pext64#"   GenPrimOp   WORD64 -> WORD64 -> WORD64
     {Extract bits from a word at locations specified by a mask.}
-primop   PextOp   "pext#"   Dyadic   Word# -> Word# -> Word#
+primop   PextOp   "pext#"   GenPrimOp   Word# -> Word# -> Word#
     {Extract bits from a word at locations specified by a mask.}
 
-primop   Clz8Op   "clz8#" Monadic   Word# -> Word#
+primop   Clz8Op   "clz8#" GenPrimOp   Word# -> Word#
     {Count leading zeros in the lower 8 bits of a word.}
-primop   Clz16Op   "clz16#" Monadic   Word# -> Word#
+primop   Clz16Op   "clz16#" GenPrimOp   Word# -> Word#
     {Count leading zeros in the lower 16 bits of a word.}
-primop   Clz32Op   "clz32#" Monadic   Word# -> Word#
+primop   Clz32Op   "clz32#" GenPrimOp   Word# -> Word#
     {Count leading zeros in the lower 32 bits of a word.}
 primop   Clz64Op   "clz64#" GenPrimOp WORD64 -> Word#
     {Count leading zeros in a 64-bit word.}
-primop   ClzOp     "clz#"   Monadic   Word# -> Word#
+primop   ClzOp     "clz#"   GenPrimOp   Word# -> Word#
     {Count leading zeros in a word.}
 
-primop   Ctz8Op   "ctz8#"  Monadic   Word# -> Word#
+primop   Ctz8Op   "ctz8#"  GenPrimOp   Word# -> Word#
     {Count trailing zeros in the lower 8 bits of a word.}
-primop   Ctz16Op   "ctz16#" Monadic   Word# -> Word#
+primop   Ctz16Op   "ctz16#" GenPrimOp   Word# -> Word#
     {Count trailing zeros in the lower 16 bits of a word.}
-primop   Ctz32Op   "ctz32#" Monadic   Word# -> Word#
+primop   Ctz32Op   "ctz32#" GenPrimOp   Word# -> Word#
     {Count trailing zeros in the lower 32 bits of a word.}
 primop   Ctz64Op   "ctz64#" GenPrimOp WORD64 -> Word#
     {Count trailing zeros in a 64-bit word.}
-primop   CtzOp     "ctz#"   Monadic   Word# -> Word#
+primop   CtzOp     "ctz#"   GenPrimOp   Word# -> Word#
     {Count trailing zeros in a word.}
 
-primop   BSwap16Op   "byteSwap16#"   Monadic   Word# -> Word#
+primop   BSwap16Op   "byteSwap16#"   GenPrimOp   Word# -> Word#
     {Swap bytes in the lower 16 bits of a word. The higher bytes are undefined. }
-primop   BSwap32Op   "byteSwap32#"   Monadic   Word# -> Word#
+primop   BSwap32Op   "byteSwap32#"   GenPrimOp   Word# -> Word#
     {Swap bytes in the lower 32 bits of a word. The higher bytes are undefined. }
-primop   BSwap64Op   "byteSwap64#"   Monadic   WORD64 -> WORD64
+primop   BSwap64Op   "byteSwap64#"   GenPrimOp   WORD64 -> WORD64
     {Swap bytes in a 64 bits of a word.}
-primop   BSwapOp     "byteSwap#"     Monadic   Word# -> Word#
+primop   BSwapOp     "byteSwap#"     GenPrimOp   Word# -> Word#
     {Swap bytes in a word.}
 
-primop   BRev8Op    "bitReverse8#"   Monadic   Word# -> Word#
+primop   BRev8Op    "bitReverse8#"   GenPrimOp   Word# -> Word#
     {Reverse the order of the bits in a 8-bit word.}
-primop   BRev16Op   "bitReverse16#"   Monadic   Word# -> Word#
+primop   BRev16Op   "bitReverse16#"   GenPrimOp   Word# -> Word#
     {Reverse the order of the bits in a 16-bit word.}
-primop   BRev32Op   "bitReverse32#"   Monadic   Word# -> Word#
+primop   BRev32Op   "bitReverse32#"   GenPrimOp   Word# -> Word#
     {Reverse the order of the bits in a 32-bit word.}
-primop   BRev64Op   "bitReverse64#"   Monadic   WORD64 -> WORD64
+primop   BRev64Op   "bitReverse64#"   GenPrimOp   WORD64 -> WORD64
     {Reverse the order of the bits in a 64-bit word.}
-primop   BRevOp     "bitReverse#"     Monadic   Word# -> Word#
+primop   BRevOp     "bitReverse#"     GenPrimOp   Word# -> Word#
     {Reverse the order of the bits in a word.}
 
 ------------------------------------------------------------------------
@@ -730,12 +728,12 @@ section "Narrowings"
         {Explicit narrowing of native-sized ints or words.}
 ------------------------------------------------------------------------
 
-primop   Narrow8IntOp      "narrow8Int#"      Monadic   Int# -> Int#
-primop   Narrow16IntOp     "narrow16Int#"     Monadic   Int# -> Int#
-primop   Narrow32IntOp     "narrow32Int#"     Monadic   Int# -> Int#
-primop   Narrow8WordOp     "narrow8Word#"     Monadic   Word# -> Word#
-primop   Narrow16WordOp    "narrow16Word#"    Monadic   Word# -> Word#
-primop   Narrow32WordOp    "narrow32Word#"    Monadic   Word# -> Word#
+primop   Narrow8IntOp      "narrow8Int#"      GenPrimOp   Int# -> Int#
+primop   Narrow16IntOp     "narrow16Int#"     GenPrimOp   Int# -> Int#
+primop   Narrow32IntOp     "narrow32Int#"     GenPrimOp   Int# -> Int#
+primop   Narrow8WordOp     "narrow8Word#"     GenPrimOp   Word# -> Word#
+primop   Narrow16WordOp    "narrow16Word#"    GenPrimOp   Word# -> Word#
+primop   Narrow32WordOp    "narrow32Word#"    GenPrimOp   Word# -> Word#
 
 ------------------------------------------------------------------------
 section "Double#"
@@ -766,27 +764,27 @@ primop   DoubleLtOp "<##"   Compare   Double# -> Double# -> Int#
 primop   DoubleLeOp "<=##"   Compare   Double# -> Double# -> Int#
    with fixity = infix 4
 
-primop   DoubleAddOp   "+##"   Dyadic
+primop   DoubleAddOp   "+##"   GenPrimOp
    Double# -> Double# -> Double#
    with commutable = True
         fixity = infixl 6
 
-primop   DoubleSubOp   "-##"   Dyadic   Double# -> Double# -> Double#
+primop   DoubleSubOp   "-##"   GenPrimOp   Double# -> Double# -> Double#
    with fixity = infixl 6
 
-primop   DoubleMulOp   "*##"   Dyadic
+primop   DoubleMulOp   "*##"   GenPrimOp
    Double# -> Double# -> Double#
    with commutable = True
         fixity = infixl 7
 
-primop   DoubleDivOp   "/##"   Dyadic
+primop   DoubleDivOp   "/##"   GenPrimOp
    Double# -> Double# -> Double#
    with can_fail = True
         fixity = infixl 7
 
-primop   DoubleNegOp   "negateDouble#"  Monadic   Double# -> Double#
+primop   DoubleNegOp   "negateDouble#"  GenPrimOp   Double# -> Double#
 
-primop   DoubleFabsOp  "fabsDouble#"    Monadic   Double# -> Double#
+primop   DoubleFabsOp  "fabsDouble#"    GenPrimOp   Double# -> Double#
 
 primop   Double2IntOp   "double2Int#"          GenPrimOp  Double# -> Int#
    {Truncates a {\tt Double#} value to the nearest {\tt Int#}.
@@ -795,96 +793,96 @@ primop   Double2IntOp   "double2Int#"          GenPrimOp  Double# -> Int#
 
 primop   Double2FloatOp   "double2Float#" GenPrimOp Double# -> Float#
 
-primop   DoubleExpOp   "expDouble#"      Monadic
+primop   DoubleExpOp   "expDouble#"      GenPrimOp
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   DoubleExpM1Op "expm1Double#"    Monadic
+primop   DoubleExpM1Op "expm1Double#"    GenPrimOp
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   DoubleLogOp   "logDouble#"      Monadic
-   Double# -> Double#
-   with
-   code_size = { primOpCodeSizeForeignCall }
-   can_fail = True
-
-primop   DoubleLog1POp   "log1pDouble#"      Monadic
+primop   DoubleLogOp   "logDouble#"      GenPrimOp
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
    can_fail = True
 
-primop   DoubleSqrtOp   "sqrtDouble#"      Monadic
-   Double# -> Double#
-   with
-   code_size = { primOpCodeSizeForeignCall }
-
-primop   DoubleSinOp   "sinDouble#"      Monadic
-   Double# -> Double#
-   with
-   code_size = { primOpCodeSizeForeignCall }
-
-primop   DoubleCosOp   "cosDouble#"      Monadic
-   Double# -> Double#
-   with
-   code_size = { primOpCodeSizeForeignCall }
-
-primop   DoubleTanOp   "tanDouble#"      Monadic
-   Double# -> Double#
-   with
-   code_size = { primOpCodeSizeForeignCall }
-
-primop   DoubleAsinOp   "asinDouble#"      Monadic
+primop   DoubleLog1POp   "log1pDouble#"      GenPrimOp
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
    can_fail = True
 
-primop   DoubleAcosOp   "acosDouble#"      Monadic
+primop   DoubleSqrtOp   "sqrtDouble#"      GenPrimOp
+   Double# -> Double#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+
+primop   DoubleSinOp   "sinDouble#"      GenPrimOp
+   Double# -> Double#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+
+primop   DoubleCosOp   "cosDouble#"      GenPrimOp
+   Double# -> Double#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+
+primop   DoubleTanOp   "tanDouble#"      GenPrimOp
+   Double# -> Double#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+
+primop   DoubleAsinOp   "asinDouble#"      GenPrimOp
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
    can_fail = True
 
-primop   DoubleAtanOp   "atanDouble#"      Monadic
+primop   DoubleAcosOp   "acosDouble#"      GenPrimOp
+   Double# -> Double#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+   can_fail = True
+
+primop   DoubleAtanOp   "atanDouble#"      GenPrimOp
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   DoubleSinhOp   "sinhDouble#"      Monadic
+primop   DoubleSinhOp   "sinhDouble#"      GenPrimOp
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   DoubleCoshOp   "coshDouble#"      Monadic
+primop   DoubleCoshOp   "coshDouble#"      GenPrimOp
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   DoubleTanhOp   "tanhDouble#"      Monadic
+primop   DoubleTanhOp   "tanhDouble#"      GenPrimOp
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   DoubleAsinhOp   "asinhDouble#"      Monadic
+primop   DoubleAsinhOp   "asinhDouble#"      GenPrimOp
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   DoubleAcoshOp   "acoshDouble#"      Monadic
+primop   DoubleAcoshOp   "acoshDouble#"      GenPrimOp
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   DoubleAtanhOp   "atanhDouble#"      Monadic
+primop   DoubleAtanhOp   "atanhDouble#"      GenPrimOp
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   DoublePowerOp   "**##" Dyadic
+primop   DoublePowerOp   "**##" GenPrimOp
    Double# -> Double# -> Double#
    {Exponentiation.}
    with
@@ -924,119 +922,119 @@ primop   FloatNeOp  "neFloat#"   Compare
 primop   FloatLtOp  "ltFloat#"   Compare   Float# -> Float# -> Int#
 primop   FloatLeOp  "leFloat#"   Compare   Float# -> Float# -> Int#
 
-primop   FloatAddOp   "plusFloat#"      Dyadic
+primop   FloatAddOp   "plusFloat#"      GenPrimOp
    Float# -> Float# -> Float#
    with commutable = True
 
-primop   FloatSubOp   "minusFloat#"      Dyadic      Float# -> Float# -> Float#
+primop   FloatSubOp   "minusFloat#"      GenPrimOp      Float# -> Float# -> Float#
 
-primop   FloatMulOp   "timesFloat#"      Dyadic
+primop   FloatMulOp   "timesFloat#"      GenPrimOp
    Float# -> Float# -> Float#
    with commutable = True
 
-primop   FloatDivOp   "divideFloat#"      Dyadic
+primop   FloatDivOp   "divideFloat#"      GenPrimOp
    Float# -> Float# -> Float#
    with can_fail = True
 
-primop   FloatNegOp   "negateFloat#"      Monadic    Float# -> Float#
+primop   FloatNegOp   "negateFloat#"      GenPrimOp    Float# -> Float#
 
-primop   FloatFabsOp  "fabsFloat#"        Monadic    Float# -> Float#
+primop   FloatFabsOp  "fabsFloat#"        GenPrimOp    Float# -> Float#
 
 primop   Float2IntOp   "float2Int#"      GenPrimOp  Float# -> Int#
    {Truncates a {\tt Float#} value to the nearest {\tt Int#}.
     Results are undefined if the truncation if truncation yields
     a value outside the range of {\tt Int#}.}
 
-primop   FloatExpOp   "expFloat#"      Monadic
+primop   FloatExpOp   "expFloat#"      GenPrimOp
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   FloatExpM1Op   "expm1Float#"      Monadic
+primop   FloatExpM1Op   "expm1Float#"      GenPrimOp
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   FloatLogOp   "logFloat#"      Monadic
-   Float# -> Float#
-   with
-   code_size = { primOpCodeSizeForeignCall }
-   can_fail = True
-
-primop   FloatLog1POp  "log1pFloat#"     Monadic
+primop   FloatLogOp   "logFloat#"      GenPrimOp
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
    can_fail = True
 
-primop   FloatSqrtOp   "sqrtFloat#"      Monadic
-   Float# -> Float#
-   with
-   code_size = { primOpCodeSizeForeignCall }
-
-primop   FloatSinOp   "sinFloat#"      Monadic
-   Float# -> Float#
-   with
-   code_size = { primOpCodeSizeForeignCall }
-
-primop   FloatCosOp   "cosFloat#"      Monadic
-   Float# -> Float#
-   with
-   code_size = { primOpCodeSizeForeignCall }
-
-primop   FloatTanOp   "tanFloat#"      Monadic
-   Float# -> Float#
-   with
-   code_size = { primOpCodeSizeForeignCall }
-
-primop   FloatAsinOp   "asinFloat#"      Monadic
+primop   FloatLog1POp  "log1pFloat#"     GenPrimOp
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
    can_fail = True
 
-primop   FloatAcosOp   "acosFloat#"      Monadic
+primop   FloatSqrtOp   "sqrtFloat#"      GenPrimOp
+   Float# -> Float#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+
+primop   FloatSinOp   "sinFloat#"      GenPrimOp
+   Float# -> Float#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+
+primop   FloatCosOp   "cosFloat#"      GenPrimOp
+   Float# -> Float#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+
+primop   FloatTanOp   "tanFloat#"      GenPrimOp
+   Float# -> Float#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+
+primop   FloatAsinOp   "asinFloat#"      GenPrimOp
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
    can_fail = True
 
-primop   FloatAtanOp   "atanFloat#"      Monadic
+primop   FloatAcosOp   "acosFloat#"      GenPrimOp
+   Float# -> Float#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+   can_fail = True
+
+primop   FloatAtanOp   "atanFloat#"      GenPrimOp
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   FloatSinhOp   "sinhFloat#"      Monadic
+primop   FloatSinhOp   "sinhFloat#"      GenPrimOp
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   FloatCoshOp   "coshFloat#"      Monadic
+primop   FloatCoshOp   "coshFloat#"      GenPrimOp
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   FloatTanhOp   "tanhFloat#"      Monadic
+primop   FloatTanhOp   "tanhFloat#"      GenPrimOp
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   FloatAsinhOp   "asinhFloat#"      Monadic
+primop   FloatAsinhOp   "asinhFloat#"      GenPrimOp
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   FloatAcoshOp   "acoshFloat#"      Monadic
+primop   FloatAcoshOp   "acoshFloat#"      GenPrimOp
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   FloatAtanhOp   "atanhFloat#"      Monadic
+primop   FloatAtanhOp   "atanhFloat#"      GenPrimOp
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   FloatPowerOp   "powerFloat#"      Dyadic
+primop   FloatPowerOp   "powerFloat#"      GenPrimOp
    Float# -> Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
@@ -3575,48 +3573,48 @@ primop VecInsertOp "insert#" GenPrimOp
         llvm_only = True
         vector = ALL_VECTOR_TYPES
 
-primop VecAddOp "plus#" Dyadic
+primop VecAddOp "plus#" GenPrimOp
    VECTOR -> VECTOR -> VECTOR
    { Add two vectors element-wise. }
    with commutable = True
         llvm_only = True
         vector = ALL_VECTOR_TYPES
 
-primop VecSubOp "minus#" Dyadic
+primop VecSubOp "minus#" GenPrimOp
    VECTOR -> VECTOR -> VECTOR
    { Subtract two vectors element-wise. }
    with llvm_only = True
         vector = ALL_VECTOR_TYPES
 
-primop VecMulOp "times#" Dyadic
+primop VecMulOp "times#" GenPrimOp
    VECTOR -> VECTOR -> VECTOR
    { Multiply two vectors element-wise. }
    with commutable = True
         llvm_only = True
         vector = ALL_VECTOR_TYPES
 
-primop VecDivOp "divide#" Dyadic
+primop VecDivOp "divide#" GenPrimOp
    VECTOR -> VECTOR -> VECTOR
    { Divide two vectors element-wise. }
    with can_fail = True
         llvm_only = True
         vector = FLOAT_VECTOR_TYPES
 
-primop VecQuotOp "quot#" Dyadic
+primop VecQuotOp "quot#" GenPrimOp
    VECTOR -> VECTOR -> VECTOR
    { Rounds towards zero element-wise. }
    with can_fail = True
         llvm_only = True
         vector = INT_VECTOR_TYPES
 
-primop VecRemOp "rem#" Dyadic
+primop VecRemOp "rem#" GenPrimOp
    VECTOR -> VECTOR -> VECTOR
    { Satisfies \texttt{(quot\# x y) times\# y plus\# (rem\# x y) == x}. }
    with can_fail = True
         llvm_only = True
         vector = INT_VECTOR_TYPES
 
-primop VecNegOp "negate#" Monadic
+primop VecNegOp "negate#" GenPrimOp
    VECTOR -> VECTOR
    { Negate element-wise. }
    with llvm_only = True

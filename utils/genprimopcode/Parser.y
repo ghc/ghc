@@ -36,8 +36,6 @@ import Syntax
     defaults        { TDefaults }
     true            { TTrue }
     false           { TFalse }
-    dyadic          { TDyadic }
-    monadic         { TMonadic }
     compare         { TCompare }
     genprimop       { TGenPrimOp }
     fixity          { TFixity }
@@ -122,9 +120,7 @@ pWithOptions : with pOptions { $2 }
              | {- empty -}   { [] }
 
 pCategory :: { Category }
-pCategory : dyadic { Dyadic }
-          | monadic { Monadic }
-          | compare { Compare }
+pCategory : compare { Compare }
           | genprimop { GenPrimOp }
 
 pDesc :: { String }
