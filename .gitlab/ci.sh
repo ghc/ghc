@@ -6,7 +6,7 @@
 set -e -o pipefail
 
 # Configuration:
-hackage_index_state="@1579718451"
+hackage_index_state="2020-09-14T19:30:43Z"
 
 # Colors
 BLACK="0;30"
