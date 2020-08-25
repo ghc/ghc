@@ -131,9 +131,10 @@ class  Show a  where
     --
     -- === __Example__
     --
+    -- > -- Let us have a ADT that encodes expressions:
     -- > data Expr = Lit Integer | Expr :*: Expr | Expr :+: Expr
-    -- > -- I want :*: to have precedence level 7, :+: level 6.
-    -- > -- This is coded both as the infixl declarations below, and in the Show instance.
+    -- > -- We want (:*:) to have precedence level 7, and (:+:) have level 6.
+    -- > -- This is expressed both in the infixl declarations below, and in the Show instance.
     -- > infixl 7 :*:
     -- > infixl 6 :+:
     -- >
@@ -156,10 +157,10 @@ class  Show a  where
     -- >                    showsPrec (myPrec + 1) e2)
     -- >       where myPrec = 6
     -- >
-    -- > -- Precedence says not parenthesized.
+    -- > -- The precedence settings do ask for a parenthesized expression.
     -- > example1 = Lit 3 :*: Lit 1 :+: Lit 4 :*: Lit 1
     -- >
-    -- > -- Precendence says parenthesized.
+    -- > -- Whereas they do here.
     -- > example2 = (Lit (-3) :+: Lit (-1)) :*: (Lit (-4) :+: Lit 1)
 
 
