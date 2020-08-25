@@ -29,6 +29,9 @@ for l in linters:
     # Don't lint font files
     l.add_path_filter(lambda path: not path.parent == Path('docs','users_guide',
         'rtd-theme', 'static', 'fonts'))
+    # Don't lint image files
+    l.add_path_filter(lambda path: not path.parent == Path('docs','users_guide',
+        'images'))
     # Don't lint core spec
     l.add_path_filter(lambda path: not path.name == 'core-spec.pdf')
 
