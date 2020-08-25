@@ -836,16 +836,6 @@ mkPOI_RHS_text i
                  TyF t1 (TyF _ _)
                     -> "mkCompare " ++ sl_name i ++ ppType t1
                  _ -> error "Type error in comparison op"
-        Monadic
-           -> case ty i of
-                 TyF t1 _
-                    -> "mkMonadic " ++ sl_name i ++ ppType t1
-                 _ -> error "Type error in monadic op"
-        Dyadic
-           -> case ty i of
-                 TyF t1 (TyF _ _)
-                    -> "mkDyadic " ++ sl_name i ++ ppType t1
-                 _ -> error "Type error in dyadic op"
         GenPrimOp
            -> let (argTys, resTy) = flatTys (ty i)
                   tvs = nub (tvsIn (ty i))

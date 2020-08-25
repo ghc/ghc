@@ -44,8 +44,6 @@ words :-
     <0>         "defaults"          { mkT TDefaults }
     <0>         "True"              { mkT TTrue }
     <0>         "False"             { mkT TFalse }
-    <0>         "Dyadic"            { mkT TDyadic }
-    <0>         "Monadic"           { mkT TMonadic }
     <0>         "Compare"           { mkT TCompare }
     <0>         "GenPrimOp"         { mkT TGenPrimOp }
     <0>         "fixity"            { mkT TFixity }
