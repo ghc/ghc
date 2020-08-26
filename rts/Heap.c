@@ -80,7 +80,7 @@ void heap_view_closure_ptrs_in_pap_payload(StgClosure *ptrs[], StgWord *nptrs
  * Collect the pointers of a closure into the given array. size should be
  * heap_view_closureSize(closure). Returns the number of pointers collected.
  */
-static StgWord collect_pointers(StgClosure *closure, StgWord size, StgClosure *ptrs[size]) {
+StgWord collect_pointers(StgClosure *closure, StgWord size, StgClosure *ptrs[size]) {
     StgClosure **end;
     const StgInfoTable *info = get_itbl(closure);
     StgWord nptrs = 0;
@@ -244,37 +244,6 @@ static StgWord collect_pointers(StgClosure *closure, StgWord size, StgClosure *p
     }
 
     return nptrs;
-}
-
-StgArrBytes *heap_view_closurePtrsAsWords(Capability *cap, StgClosure *closure) {
-    if(!rts_isPaused()){
-        errorBelch("Warning: "
-            "The RTS must be paused (see rts_pause()) to inspect it's heap!");
-
-        return NULL;
-    }
-
-    ASSERT(LOOKS_LIKE_CLOSURE_PTR(closure));
-
-    StgWord size = heap_view_closureSize(closure);
-
-    // First collect all pointers here, with the comfortable memory bound
-    // of the whole closure. Afterwards we know how many pointers are in
-    // the closure and then we can allocate space on the heap and copy them
-    // there
-    StgClosure *ptrs[size];
-    StgWord nptrs = collect_pointers(closure, size, ptrs);
-    StgArrBytes *arr =
-        (StgArrBytes *)allocate(cap, sizeofW(StgArrBytes) + nptrs);
-    TICK_ALLOC_PRIM(sizeofW(StgArrBytes), nptrs, 0);
-    SET_HDR(arr, &stg_ARR_WORDS_info, cap->r.rCCCS);
-    arr->bytes = sizeof(StgWord) * nptrs;
-
-    for (StgWord i = 0; i<nptrs; i++) {
-        arr->payload[i] = (StgWord)ptrs[i];
-    }
-
-    return arr;
 }
 
 StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
