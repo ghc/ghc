@@ -30,5 +30,5 @@ test('T12711', only_ways(['ghci']), ghci_script, ['T12711.script'])
 #       extra_files([ "unboxedsums" + str(i) + ".hs" for i in range(1, 12) ])],
 #      makefile_test, [])
 
-test('UbxSumLevPoly', normal, compile, [''])
+test('UbxSumLevPoly', normal, compile, ['-Wno-overlapping-patterns'])
 test('T14051', normal, multi_compile, ['T14051.hs', [('T14051a.hs', '')], '-O2 -v0'])

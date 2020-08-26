@@ -592,5 +592,8 @@ instance Outputable Deltas where
 instance Semigroup Deltas where
   MkDeltas l <> MkDeltas r = MkDeltas (l `unionBags` r)
 
+instance Monoid Deltas where
+  mempty = MkDeltas emptyBag
+
 liftDeltasM :: Monad m => (Delta -> m (Maybe Delta)) -> Deltas -> m Deltas
 liftDeltasM f (MkDeltas ds) = MkDeltas . catBagMaybes <$> (traverse f ds)

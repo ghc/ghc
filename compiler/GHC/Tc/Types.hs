@@ -323,7 +323,7 @@ data DsLclEnv = DsLclEnv {
         dsl_meta    :: DsMetaEnv,        -- Template Haskell bindings
         dsl_loc     :: RealSrcSpan,      -- To put in pattern-matching error msgs
 
-        -- See Note [Note [Type and Term Equality Propagation] in "GHC.HsToCore.PmCheck"
+        -- See Note [Note [Long-distance information] in "GHC.HsToCore.PmCheck"
         -- The set of reaching values Deltas is augmented as we walk inwards,
         -- refined through each pattern match in turn
         dsl_deltas  :: Deltas
