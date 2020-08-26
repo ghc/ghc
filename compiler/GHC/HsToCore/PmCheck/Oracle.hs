@@ -166,25 +166,6 @@ mkOneConFull arg_tys con = do
 -- * Pattern match oracle
 
 
-{- Note [Recovering from unsatisfiable pattern-matching constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider the following code (see #12957 and #15450):
-
-  f :: Int ~ Bool => ()
-  f = case True of { False -> () }
-
-We want to warn that the pattern-matching in `f` is non-exhaustive. But GHC
-used not to do this; in fact, it would warn that the match was /redundant/!
-This is because the constraint (Int ~ Bool) in `f` is unsatisfiable, and the
-coverage checker deems any matches with unsatisfiable constraint sets to be
-unreachable.
-
-We decide to better than this. When beginning coverage checking, we first
-check if the constraints in scope are unsatisfiable, and if so, we start
-afresh with an empty set of constraints. This way, we'll get the warnings
-that we expect.
--}
-
 -------------------------------------
 -- * Composable satisfiability checks
 
@@ -1265,7 +1246,7 @@ isTyConTriviallyInhabited tc = elementOfUniqSet tc triviallyInhabitedTyCons
 {- Note [Checking EmptyCase Expressions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Empty case expressions are strict on the scrutinee. That is, `case x of {}`
-will force argument `x`. Hence, `covCheckMatchGroup` is not sufficient for checking
+will force argument `x`. Hence, `covCheckMatches` is not sufficient for checking
 empty cases, because it assumes that the match is not strict (which is true
 for all other cases, apart from EmptyCase). This gave rise to #10746. Instead,
 we do the following:

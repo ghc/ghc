@@ -1,24 +1,51 @@
-{-
-Author: George Karachalias <george.karachalias@cs.kuleuven.be>
+{-# LANGUAGE CPP                        #-}
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE TupleSections              #-}
+{-# LANGUAGE ViewPatterns               #-}
+{-# LANGUAGE MultiWayIf                 #-}
+{-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE NamedFieldPuns             #-}
+{-# LANGUAGE FlexibleInstances          #-}
 
-Pattern Matching Coverage Checking.
--}
-
-{-# LANGUAGE CPP            #-}
-{-# LANGUAGE GADTs          #-}
-{-# LANGUAGE TupleSections  #-}
-{-# LANGUAGE ViewPatterns   #-}
-{-# LANGUAGE MultiWayIf     #-}
-{-# LANGUAGE LambdaCase     #-}
-{-# LANGUAGE NamedFieldPuns #-}
-
+-- | This module coverage checks pattern matches. It finds
+--
+--     * Uncovered patterns, certifying non-exhaustivity
+--     * Redundant equations
+--     * Equations with an inaccessible right-hand-side
+--
+-- The algorithm is based on the paper
+-- [Lower Your Guards: A Compositional Pattern-Match Coverage Checker"](https://dl.acm.org/doi/abs/10.1145/3408989)
+--
+-- There is an overview Figure 2 in there that's probably helpful.
+-- Here is an overview of how it's implemented, which follows the structure of
+-- the entry points such as 'covCheckMatches':
+--
+--  1. Desugar source syntax (like 'LMatch') to guard tree variants (like
+--     'GrdMatch'), with one of the desugaring functions (like 'desugarMatch').
+--     Follows Section 3.1 in the paper.
+--  2. Coverage check guard trees (with a function like 'checkMatch') to get a
+--     'CheckResult', containing
+--       a. The set of uncovered values, 'cr_uncov'
+--       b. And an annotated tree variant (like 'AnnMatch') that captures
+--          redundancy and inaccessibility information as 'RedSets' annotations
+--     Basically the UA function from Section 5.1. The Normalised Refinement Types
+--     Nabla are modeled as 'Deltas' and checked in "GHC.HsToCore.PmCheck.Oracle".
+--  3. Collect redundancy information into a 'CIRB' with a function such
+--     as 'cirbsMatch'. Follows the R function from Figure 6 of the paper.
+--  4. Format and report uncovered patterns and redundant equations ('CIRB')
+--     with 'formatReportWarnings'. Basically job of the G function, plus proper
+--     pretty printing of the warnings (Section 5.4 of the paper).
+--  5. Return 'Deltas' reaching syntactic sub-components for
+--     Note [Long-distance information]. Collected by functions such as
+--     'ldiMatch'. See Section 4.1 of the paper.
 module GHC.HsToCore.PmCheck (
         -- Checking and printing
-        covCheckPatBind, covCheckMatchGroup, covCheckGRHSs,
+        covCheckPatBind, covCheckMatches, covCheckGRHSs,
         isMatchContextPmChecked,
 
-        -- See Note [Type and Term Equality Propagation]
-        addTyCsDs, addCoreScrutTmCs, addHsScrutTmCs
+        -- See Note [Long-distance information]
+        addTyCs, addCoreScrutTmCs, addHsScrutTmCs
     ) where
 
 #include "HsVersions.h"
@@ -37,7 +64,6 @@ import GHC.Tc.Utils.Zonk (shortCutLit)
 import GHC.Types.Id
 import GHC.Core.ConLike
 import GHC.Types.Name
-import GHC.Tc.Instance.Family
 import GHC.Builtin.Types
 import GHC.Types.SrcLoc
 import GHC.Utils.Misc
@@ -62,34 +88,147 @@ import GHC.Core.Type
 import GHC.HsToCore.Utils       (isTrueLHsExpr)
 import GHC.Data.Maybe
 import qualified GHC.LanguageExtensions as LangExt
-import GHC.Utils.Monad (concatMapM)
+import GHC.Utils.Monad (concatMapM, mapMaybeM)
 
 import Control.Monad (when, forM_, zipWithM)
 import Data.List (elemIndex)
 import qualified Data.Semigroup as Semi
-import Data.List.NonEmpty (NonEmpty(..))
+import Data.List.NonEmpty ( NonEmpty(..) )
+import qualified Data.List.NonEmpty as NE
+import Data.Coerce
 
-{-
-This module checks pattern matches for:
-\begin{enumerate}
-  \item Equations that are redundant
-  \item Equations with inaccessible right-hand-side
-  \item Exhaustiveness
-\end{enumerate}
+--
+-- * Exported entry points to the checker
+--
 
-The algorithm is based on the paper:
+-- | A non-empty delta that is initialised from the ambient refinement type
+-- capturing long-distance information, or the trivially habitable 'Deltas' if
+-- the former is uninhabited.
+-- See Note [Recovering from unsatisfiable pattern-matching constraints].
+getLdiDeltas :: DsM Deltas
+getLdiDeltas = do
+  deltas <- getPmDeltas
+  isInhabited deltas >>= \case
+    True  -> pure deltas
+    False -> pure initDeltas
 
-  "GADTs Meet Their Match:
-     Pattern-matching Warnings That Account for GADTs, Guards, and Laziness"
+-- | Check a pattern binding (let, where) for exhaustiveness.
+covCheckPatBind :: DsMatchContext -> Id -> Pat GhcTc -> DsM ()
+-- See Note [covCheckPatBind only checks PatBindRhs]
+covCheckPatBind ctxt@(DsMatchContext PatBindRhs loc) var p = do
+  missing   <- getLdiDeltas
+  pat_bind <- desugarPatBind loc var p
+  tracePm "covCheckPatBind {" (vcat [ppr ctxt, ppr var, ppr p, ppr pat_bind, ppr missing])
+  result <- unCA (checkPatBind pat_bind) missing
+  tracePm "}: " (ppr (cr_uncov result))
+  formatReportWarnings cirbsPatBind ctxt [var] result
+covCheckPatBind _ _ _ = pure ()
 
-    https://www.microsoft.com/en-us/research/wp-content/uploads/2016/08/gadtpm-acm.pdf
+-- | Exhaustive for guard matches, is used for guards in pattern bindings and
+-- in @MultiIf@ expressions. Returns the 'Deltas' covered by the RHSs.
+covCheckGRHSs
+  :: HsMatchContext GhcRn         -- ^ Match context, for warning messages
+  -> GRHSs GhcTc (LHsExpr GhcTc)  -- ^ The GRHSs to check
+  -> DsM (NonEmpty Deltas)        -- ^ Covered 'Deltas' for each RHS, for long
+                                  --   distance info
+covCheckGRHSs hs_ctxt guards@(GRHSs _ grhss _) = do
+  let combined_loc = foldl1 combineSrcSpans (map getLoc grhss)
+      ctxt = DsMatchContext hs_ctxt combined_loc
+  matches <- desugarGRHSs combined_loc empty guards
+  missing   <- getLdiDeltas
+  tracePm "covCheckGRHSs" (hang (vcat [ppr ctxt
+                                , text "Guards:"])
+                                2
+                                (pprGRHSs hs_ctxt guards $$ ppr missing))
+  result <- unCA (checkGRHSs matches) missing
+  tracePm "}: " (ppr (cr_uncov result))
+  formatReportWarnings cirbsGRHSs ctxt [] result
+  return (ldiGRHS <$> cr_ret result)
 
-%************************************************************************
-%*                                                                      *
-                     Pattern Match Check Types
-%*                                                                      *
-%************************************************************************
+-- | Check a list of syntactic 'Match'es (part of case, functions, etc.), each
+-- with a 'Pat' and one or more 'GRHSs':
+--
+-- @
+--   f x y | x == y    = 1   -- match on x and y with two guarded RHSs
+--         | otherwise = 2
+--   f _ _             = 3   -- clause with a single, un-guarded RHS
+-- @
+--
+-- Returns one non-empty 'Deltas' for 1.) each pattern of a 'Match' and 2.)
+-- each of a 'Match'es 'GRHS' for Note [Long-distance information].
+--
+-- Special case: When there are /no matches/, then the functionassumes it
+-- checks and @-XEmptyCase@ with only a single match variable.
+-- See Note [Checking EmptyCase].
+covCheckMatches
+  :: DsMatchContext                  -- ^ Match context, for warnings messages
+  -> [Id]                            -- ^ Match variables, i.e. x and y above
+  -> [LMatch GhcTc (LHsExpr GhcTc)]  -- ^ List of matches
+  -> DsM [(Deltas, NonEmpty Deltas)] -- ^ One covered 'Deltas' per Match and
+                                     --   GRHS, for long distance info.
+covCheckMatches ctxt vars matches = do
+  -- We have to force @missing@ before printing out the trace message,
+  -- otherwise we get interleaved output from the solver. This function
+  -- should be strict in @missing@ anyway!
+  !missing   <- getLdiDeltas
+  tracePm "covCheckMatches {" $
+          hang (vcat [ppr ctxt, ppr vars, text "Matches:"])
+               2
+               (vcat (map ppr matches) $$ ppr missing)
+  case NE.nonEmpty matches of
+    Nothing -> do
+      -- This must be an -XEmptyCase. See Note [Checking EmptyCase]
+      let var = only vars
+      empty_case <- desugarEmptyCase var
+      result <- unCA (checkEmptyCase empty_case) missing
+      tracePm "}: " (ppr (cr_uncov result))
+      formatReportWarnings cirbsEmptyCase ctxt vars result
+      return []
+    Just matches -> do
+      matches <- desugarMatches vars matches
+      result <- unCA (checkMatchGroup matches) missing
+      tracePm "}: " (ppr (cr_uncov result))
+      formatReportWarnings cirbsMatchGroup ctxt vars result
+      return (NE.toList (ldiMatchGroup (cr_ret result)))
+
+{- Note [covCheckPatBind only checks PatBindRhs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+@covCheckPatBind@'s sole purpose is to check vanilla pattern bindings, like
+@x :: Int; Just x = e@, which is in a @PatBindRhs@ context.
+But its caller is also called for individual pattern guards in a @StmtCtxt@.
+For example, both pattern guards in @f x y | True <- x, False <- y = ...@ will
+go through this function. It makes no sense to do coverage checking there:
+  * Pattern guards may well fail. Fall-through is not an unrecoverable panic,
+    but rather behavior the programmer expects, so inexhaustivity should not be
+    reported.
+  * Redundancy is already reported for the whole GRHS via one of the other
+    exported coverage checking functions. Also reporting individual redundant
+    guards is... redundant. See #17646.
+Note that we can't just omit checking of @StmtCtxt@ altogether (by adjusting
+'isMatchContextPmChecked'), because that affects the other checking functions,
+too.
+
+Note [Checking EmptyCase]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-XEmptyCase is useful for matching on empty data types like 'Void'. For example,
+the following is a complete match:
+
+    f :: Void -> ()
+    f x = case x of {}
+
+Really, -XEmptyCase is the only way to write a program that at the same time is
+safe (@f _ = error "boom"@ is not because of ⊥), doesn't trigger a warning
+(@f !_ = error "inaccessible" has inaccessible RHS) and doesn't turn an
+exception into divergence (@f x = f x@).
+
+Semantically, unlike every other case expression, -XEmptyCase is strict in its
+match var x, which rules out ⊥ as an inhabitant. So we add x /~ ⊥ to the
+initial Delta and check if there are any values left to match on.
 -}
+
+--
+-- * Guard language
+--
 
 -- | A very simple language for pattern guards. Let bindings, bang patterns,
 -- and matching variables against flat constructor patterns.
@@ -106,9 +245,9 @@ data PmGrd
     }
 
     -- | @PmBang x@ corresponds to a @seq x True@ guard.
-    -- If the extra SrcInfo is present, the bang guard came from a source
-    -- bang pattern, in which case we might want to report it as redundant,
-    -- see Note [Dead bang patterns].
+    -- If the extra 'SrcInfo' is present, the bang guard came from a source
+    -- bang pattern, in which case we might want to report it as redundant.
+    -- See Note [Dead bang patterns].
   | PmBang {
       pm_id          :: !Id,
       pm_loc         :: !(Maybe SrcInfo)
@@ -144,24 +283,115 @@ instance Monoid Precision where
   mempty = Precise
   mappend = (Semi.<>)
 
--- | Means by which we identify source location for later pretty-printing
---  in a warning message. 'SDoc' for the equation to show, 'Located' for
--- the location.
+--
+-- * Guard tree language
+--
+
+-- | Means by which we identify a source construct for later pretty-printing in
+-- a warning message. 'SDoc' for the equation to show, 'Located' for the
+-- location.
 type SrcInfo = Located SDoc
 
--- | A representation of the desugaring to 'PmGrd's of all clauses of a
--- function definition/pattern match/etc.
-data GrdTree
-  = Rhs !SrcInfo
-  | Guard !PmGrd !GrdTree
-  -- ^ @Guard grd t@ will try to match @grd@ and on success continue to match
-  -- @t@. Falls through if either match fails. Models left-to-right semantics
-  -- of pattern matching.
-  | Sequence ![GrdTree]
-  -- ^ @Sequence (t:ts)@ matches against @t@, and then matches all
-  -- fallen-through values against @Sequence ts@. Models top-to-bottom semantics
-  -- of pattern matching.
-  -- @Sequence []@ always fails; it is useful for Note [Checking EmptyCase].
+-- | Redundancy sets, used to determine redundancy of RHSs and bang patterns
+-- (later digested into a 'CIRB').
+data RedSets
+  = RedSets
+  { rs_cov :: !Deltas
+  -- ^ The /Covered/ set; the set of values reaching a particular program
+  -- point.
+  , rs_div :: !Deltas
+  -- ^ The /Diverging/ set; empty if no match can lead to divergence.
+  --   If it wasn't empty, we have to turn redundancy warnings into
+  --   inaccessibility warnings for any subclauses.
+  , rs_bangs :: !(OrdList (Deltas, SrcInfo))
+  -- ^ If any of the 'Deltas' is empty, the corresponding 'SrcInfo' pin-points
+  -- a bang pattern in source that is redundant. See Note [Dead bang patterns].
+  }
+
+-- The following two type synonyms instantiate our tree structures to guard
+-- trees and annotated trees, respectively, by giving the types to attach as
+-- payload.
+
+-- | Used as tree payload pre-checking. The LYG guards to check.
+type Pre = [PmGrd]
+
+-- | Used as tree payload post-checking. The redundancy info we elaborated.
+type Post = RedSets
+
+-- | A guard tree denoting 'MatchGroup'.
+newtype PmMatchGroup p = PmMatchGroup (NonEmpty (PmMatch p))
+
+-- | A guard tree denoting 'Match': A payload describing the pats and a bunch of
+-- GRHS.
+data PmMatch p = PmMatch { pm_pats :: !p, pm_grhss :: !(NonEmpty (PmGRHS p)) }
+
+-- | A guard tree denoting 'GRHS': A payload describing the grds and a 'SrcInfo'
+-- useful for printing out in warnings messages.
+data PmGRHS p = PmGRHS { pg_grds :: !p, pg_rhs :: !SrcInfo }
+
+-- | A guard tree denoting an -XEmptyCase.
+newtype PmEmptyCase = PmEmptyCase { pe_var :: Id }
+
+-- | A guard tree denoting a pattern binding.
+newtype PmPatBind p =
+  -- just reuse GrdGRHS and pretend its @SrcInfo@ is info on the /pattern/,
+  -- rather than on the pattern bindings.
+  PmPatBind (PmGRHS p)
+
+emptyRedSets :: RedSets
+-- Semigroup instance would be misleading!
+emptyRedSets = RedSets mempty mempty mempty
+
+pprSrcInfo :: SrcInfo -> SDoc
+pprSrcInfo (L (RealSrcSpan rss _) _) = ppr (srcSpanStartLine rss)
+pprSrcInfo (L s _)                   = ppr s
+
+-- | Format LYG guards as @| True <- x, let x = 42, !z@
+pprLygGuards :: [PmGrd] -> SDoc
+pprLygGuards []     = empty
+pprLygGuards (g:gs) = fsep (char '|' <+> ppr g : map ((comma <+>) . ppr) gs)
+
+-- | Format a LYG sequence (e.g. 'Match'es of a 'MatchGroup' or 'GRHSs') as
+-- @{ <first alt>; ...; <last alt> }@
+pprLygSequence :: Outputable a => NonEmpty a -> SDoc
+pprLygSequence (NE.toList -> as) =
+  braces (space <> fsep (punctuate semi (map ppr as)) <> space)
+
+instance Outputable (PmMatchGroup Pre) where
+  ppr (PmMatchGroup matches) = pprLygSequence matches
+
+instance Outputable (PmMatch Pre) where
+  ppr (PmMatch { pm_pats = grds, pm_grhss = grhss }) =
+    pprLygGuards grds <+> ppr grhss
+
+instance Outputable (PmGRHS Pre) where
+  ppr (PmGRHS { pg_grds = grds, pg_rhs = rhs }) =
+    pprLygGuards grds <+> text "->" <+> pprSrcInfo rhs
+
+instance Outputable (PmPatBind Pre) where
+  ppr (PmPatBind PmGRHS { pg_grds = grds, pg_rhs = bind }) =
+    ppr bind <+> pprLygGuards grds <+> text "=" <+> text "..."
+
+instance Outputable PmEmptyCase where
+  ppr (PmEmptyCase { pe_var = var }) =
+    text "<empty case on " <> ppr var <> text ">"
+
+pprRedSets :: RedSets -> SDoc
+-- It's useful to change this definition for different verbosity levels in
+-- printf-debugging
+pprRedSets RedSets { rs_cov = _cov, rs_div = _div, rs_bangs = _bangs }
+  = empty
+
+instance Outputable (PmMatchGroup Post) where
+  ppr (PmMatchGroup matches) = pprLygSequence matches
+
+instance Outputable (PmMatch Post) where
+  ppr (PmMatch { pm_pats = red, pm_grhss = grhss }) =
+    pprRedSets red <+> ppr grhss
+
+instance Outputable (PmGRHS Post) where
+  ppr (PmGRHS { pg_grds = red, pg_rhs = rhs }) =
+    pprRedSets red <+> text "->" <+> pprSrcInfo rhs
 
 {- Note [Dead bang patterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -178,7 +408,7 @@ that under no circumstances can force a thunk that wasn't already forced.
 Dead bangs are a form of redundant bangs; see below.
 
 We can detect dead bang patterns by checking whether @x ~ ⊥@ is satisfiable
-where the PmBang appears in 'checkGrdTree'. If not, then clearly the bang is
+where the PmBang appears in 'checkGrd'. If not, then clearly the bang is
 dead. Such a dead bang is then indicated in the annotated pattern-match tree by
 a 'RedundantSrcBang' wrapping. In 'redundantAndInaccessibles', we collect
 all dead bangs to warn about.
@@ -197,236 +427,9 @@ it is redundant with the forcing done by the () match. We currently don't
 detect redundant bangs that aren't dead.
 -}
 
--- | The digest of 'checkGrdTree', representing the annotated pattern-match
--- tree. 'extractRedundancyInfo' can figure out redundant and proper
--- inaccessible RHSs from this, as well as dead bangs.
-data AnnotatedTree
-  = AccessibleRhs !Deltas !SrcInfo
-  -- ^ A RHS deemed accessible. The 'Deltas' is the (non-empty) set of covered
-  -- values.
-  | InaccessibleRhs !SrcInfo
-  -- ^ A RHS deemed inaccessible; it covers no value.
-  | MayDiverge !AnnotatedTree
-  -- ^ Asserts that the tree may force diverging values, so not all of its
-  -- clauses can be redundant.
-  | SequenceAnn !Deltas ![AnnotatedTree]
-  -- ^ @SequenceAnn inc ts@ mirrors @'Sequence' ts@ for preserving the
-  -- skeleton of a 'GrdTree's @ts@. It also carries the set of incoming values
-  -- @inc@.
-  | RedundantSrcBang !SrcInfo !AnnotatedTree
-  -- ^ For tracking redundant bangs. See Note [Dead bang patterns]
-
-pprSrcInfo :: SrcInfo -> SDoc
-pprSrcInfo (L (RealSrcSpan rss _) _) = ppr (srcSpanStartLine rss)
-pprSrcInfo (L s _)                   = ppr s
-
-instance Outputable GrdTree where
-  ppr (Rhs info)      = text "->" <+> pprSrcInfo info
-  -- Format guards as "| True <- x, let x = 42, !z"
-  ppr g@Guard{} = fsep (prefix (map ppr grds)) <+> ppr t
-    where
-      (t, grds)                  = collect_grds g
-      collect_grds (Guard grd t) = (grd :) <$> collect_grds t
-      collect_grds t             = (t, [])
-      prefix []                  = []
-      prefix (s:sdocs)           = char '|' <+> s : map (comma <+>) sdocs
-  ppr (Sequence [])   = text "<empty case>"
-  ppr (Sequence ts)   = braces (space <> fsep (punctuate semi (map ppr ts)) <> space)
-
-instance Outputable AnnotatedTree where
-  ppr (AccessibleRhs _delta info) = parens (ppr _delta) <+> pprSrcInfo info
-  ppr (InaccessibleRhs info) = text "inaccessible" <+> pprSrcInfo info
-  ppr (MayDiverge t)         = text "div" <+> ppr t
-  ppr (SequenceAnn _ [])       = text "<empty case>"
-  ppr (SequenceAnn _ ts)       = braces (space <> fsep (punctuate semi (map ppr ts)) <> space)
-  ppr (RedundantSrcBang l t) = text "redundant bang" <+> pprSrcInfo l <+> ppr t
-
--- | Lift 'addPmCts' over 'Deltas'.
-addPmCtsDeltas :: Deltas -> PmCts -> DsM Deltas
-addPmCtsDeltas deltas cts = liftDeltasM (\d -> addPmCts d cts) deltas
-
--- | 'addPmCtsDeltas' a single 'PmCt'.
-addPmCtDeltas :: Deltas -> PmCt -> DsM Deltas
-addPmCtDeltas deltas ct = addPmCtsDeltas deltas (unitBag ct)
-
--- | Test if any of the 'Delta's is inhabited. Currently this is pure, because
--- we preserve the invariant that there are no uninhabited 'Delta's. But that
--- could change in the future, for example by implementing this function in
--- terms of @notNull <$> provideEvidence 1 ds@.
-isInhabited :: Deltas -> DsM Bool
-isInhabited (MkDeltas ds) = pure (not (null ds))
-
--- | Pattern-match check result
-data CheckResult
-  = CheckResult
-  { cr_clauses :: !AnnotatedTree
-  -- ^ Captures redundancy info for each clause in the original program.
-  --   (for -Woverlapping-patterns)
-  , cr_uncov   :: !Deltas
-  -- ^ The set of uncovered values falling out at the bottom.
-  --   (for -Wincomplete-patterns)
-  , cr_approx  :: !Precision
-  -- ^ A flag saying whether we ran into the 'maxPmCheckModels' limit for the
-  --   purpose of suggesting to crank it up in the warning message
-  }
-
-instance Outputable CheckResult where
-  ppr (CheckResult c unc pc)
-    = text "CheckResult" <+> ppr_precision pc <+> braces (fsep
-        [ field "clauses" c <> comma
-        , field "uncov" unc])
-    where
-      ppr_precision Precise     = empty
-      ppr_precision Approximate = text "(Approximate)"
-      field name value = text name <+> equals <+> ppr value
-
-{-
-%************************************************************************
-%*                                                                      *
-       Entry points to the checker: covCheckPatBind and covCheckMatchGroup
-%*                                                                      *
-%************************************************************************
--}
-
--- | Check a pattern binding (let, where) for exhaustiveness.
-covCheckPatBind :: DynFlags -> DsMatchContext -> Id -> Pat GhcTc -> DsM ()
-covCheckPatBind dflags ctxt@(DsMatchContext _ locn) var p = do
-  -- We only ever need to run this in a context where we need exhaustivity
-  -- warnings (so not in pattern guards or comprehensions, for example, because
-  -- they are perfectly fine to fail).
-  -- Omitting checking this flag emits redundancy warnings twice in obscure
-  -- cases like #17646.
-  -- Given the context in which this function is called, it will only ever do
-  -- something for
-  --   * PatBindRhs, -Wincomplete-uni-patterns: @let True = False@
-  --   * PatBindGuards, -Wincomplete-patterns: @Just x | False = Just 42@
-  missing   <- getPmDeltas
-  tracePm "covCheckPatBind" (vcat [ppr ctxt, ppr var, ppr p, ppr missing])
-  fam_insts <- dsGetFamInstEnvs
-  grd_tree  <- mkGrdTreeRhs (L locn $ ppr p) <$> translatePat fam_insts var p
-  res <- checkGrdTree grd_tree missing
-  dsPmWarn dflags ctxt [var] res
-
--- | Exhaustive for guard matches, is used for guards in pattern bindings and
--- in @MultiIf@ expressions. Returns the 'Deltas' covered by the RHSs.
-covCheckGRHSs
-  :: HsMatchContext GhcRn         -- ^ Match context, for warning messages
-  -> GRHSs GhcTc (LHsExpr GhcTc)  -- ^ The GRHSs to check
-  -> DsM (NonEmpty Deltas)        -- ^ Covered 'Deltas' for each RHS, for long
-                                  --   distance info
-covCheckGRHSs hs_ctx guards@(GRHSs _ grhss _) = do
-    let combinedLoc = foldl1 combineSrcSpans (map getLoc grhss)
-        dsMatchContext = DsMatchContext hs_ctx combinedLoc
-        match = L combinedLoc $
-                  Match { m_ext = noExtField
-                        , m_ctxt = hs_ctx
-                        , m_pats = []
-                        , m_grhss = guards }
-    [(_, deltas)] <- covCheckMatchGroup dsMatchContext [] [match]
-    pure deltas
-
--- | Check a list of syntactic /match/es (part of case, functions, etc.), each
--- with a /pat/ and one or more /grhss/:
 --
--- @
---   f x y | x == y    = 1   -- match on x and y with two guarded RHSs
---         | otherwise = 2
---   f _ _             = 3   -- clause with a single, un-guarded RHS
--- @
+-- * Desugaring source syntax to guard trees
 --
--- Returns one 'Deltas' for each GRHS, representing its covered values, or the
--- incoming uncovered 'Deltas' (from 'getPmDeltas') if the GRHS is inaccessible.
--- Since there is at least one /grhs/ per /match/, the list of 'Deltas' is at
--- least as long as the list of matches.
-covCheckMatchGroup
-  :: DsMatchContext                  -- ^ Match context, for warnings messages
-  -> [Id]                            -- ^ Match variables, i.e. x and y above
-  -> [LMatch GhcTc (LHsExpr GhcTc)]  -- ^ List of matches
-  -> DsM [(Deltas, NonEmpty Deltas)] -- ^ One covered 'Deltas' per RHS, for long
-                                     --   distance info.
-covCheckMatchGroup ctxt vars matches = do
-  tracePm "covCheckMatchGroup" (hang (vcat [ppr ctxt
-                               , ppr vars
-                               , text "Matches:"])
-                               2
-                               (vcat (map ppr matches)))
-
-  init_deltas <- getPmDeltas
-  missing <- case matches of
-    -- This must be an -XEmptyCase. See Note [Checking EmptyCase]
-    [] | [var] <- vars -> addPmCtDeltas init_deltas (PmNotBotCt var)
-    _                  -> pure init_deltas
-  fam_insts <- dsGetFamInstEnvs
-  grd_tree  <- translateMatches fam_insts vars matches
-  res <- checkGrdTree grd_tree missing
-
-  dflags <- getDynFlags
-  dsPmWarn dflags ctxt vars res
-
-  return (extractRhsDeltas (cr_clauses res))
-
--- | Extract the 'Deltas' reaching the RHSs of the 'AnnotatedTree' for a match
--- group.
--- For 'AccessibleRhs's, this is stored in the tree node, whereas
--- 'InaccessibleRhs's fall back to the supplied original 'Deltas'.
--- See @Note [Recovering from unsatisfiable pattern-matching constraints]@.
-extractRhsDeltas :: AnnotatedTree -> [(Deltas, NonEmpty Deltas)]
-extractRhsDeltas = go_matches
-  where
-    go_matches :: AnnotatedTree -> [(Deltas, NonEmpty Deltas)]
-    go_matches (SequenceAnn def ts) = map (go_match def) ts -- -XEmptyCase handled here!
-    go_matches t                    = pprPanic "extractRhsDeltas.go_matches" (text "Matches must start with SequenceAnn. But was" $$ ppr t)
-
-    go_match :: Deltas -> AnnotatedTree -> (Deltas, NonEmpty Deltas)
-    -- There is no -XEmptyCase at this level, only at the Matches level. So @ts@
-    -- is non-empty!
-    go_match def (SequenceAnn pat ts)   = (pat, foldMap1 (text "go_match: empty SequenceAnn") (go_grhss def) ts)
-    go_match def (MayDiverge t)         = go_match def t
-    go_match def (RedundantSrcBang _ t) = go_match def t
-    -- Even if there's only a single GRHS, we wrap it in a SequenceAnn for the
-    -- Deltas covered by the pattern. So the remaining cases are impossible!
-    go_match _   t                    = pprPanic "extractRhsDeltas.go_match" (text "Single GRHS must be wrapped in SequenceAnn. But got " $$ ppr t)
-
-    go_grhss :: Deltas -> AnnotatedTree -> NonEmpty Deltas
-    -- There is no -XEmptyCase at this level, only at the Matches level. So @ts@
-    -- is non-empty!
-    go_grhss def (SequenceAnn _ ts)       = foldMap1 (text "go_grhss: empty SequenceAnn") (go_grhss def) ts
-    go_grhss def (MayDiverge t)           = go_grhss def t
-    go_grhss def (RedundantSrcBang _ t)   = go_grhss def t
-    go_grhss _   (AccessibleRhs deltas _) = deltas :| []
-    go_grhss def (InaccessibleRhs _)      = def    :| []
-
-    foldMap1 msg _ []     = pprPanic "extractRhsDeltas.foldMap1" msg
-    foldMap1 _   f (x:xs) = foldl' (\acc x -> acc Semi.<> f x) (f x) xs
-
-{- Note [Checking EmptyCase]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--XEmptyCase is useful for matching on empty data types like 'Void'. For example,
-the following is a complete match:
-
-    f :: Void -> ()
-    f x = case x of {}
-
-Really, -XEmptyCase is the only way to write a program that at the same time is
-safe (@f _ = error "boom"@ is not because of ⊥), doesn't trigger a warning
-(@f !_ = error "inaccessible" has inaccessible RHS) and doesn't turn an
-exception into divergence (@f x = f x@).
-
-Semantically, unlike every other case expression, -XEmptyCase is strict in its
-match var x, which rules out ⊥ as an inhabitant. So we add x /~ ⊥ to the
-initial Delta and check if there are any values left to match on.
--}
-
-{-
-%************************************************************************
-%*                                                                      *
-              Transform source syntax to *our* syntax
-%*                                                                      *
-%************************************************************************
--}
-
--- -----------------------------------------------------------------------
--- * Utilities
 
 -- | Smart constructor that eliminates trivial lets
 mkPmLetVar :: Id -> Id -> GrdVec
@@ -459,7 +462,7 @@ mkListGrds a ((x, head_grds):xs) = do
 -- | Create a 'GrdVec' refining a match variable to a 'PmLit'.
 mkPmLitGrds :: Id -> PmLit -> DsM GrdVec
 mkPmLitGrds x (PmLit _ (PmLitString s)) = do
-  -- We translate String literals to list literals for better overlap reasoning.
+  -- We desugar String literals to list literals for better overlap reasoning.
   -- It's a little unfortunate we do this here rather than in
   -- 'GHC.HsToCore.PmCheck.Oracle.trySolve' and
   -- 'GHC.HsToCore.PmCheck.Oracle.addRefutableAltCon', but it's so much simpler
@@ -477,37 +480,34 @@ mkPmLitGrds x lit = do
                   , pm_con_args = [] }
   pure [grd]
 
--- -----------------------------------------------------------------------
--- * Transform (Pat Id) into GrdVec
-
--- | @translatePat _ x pat@ transforms @pat@ into a 'GrdVec', where
+-- | @desugarPat _ x pat@ transforms @pat@ into a 'GrdVec', where
 -- the variable representing the match is @x@.
-translatePat :: FamInstEnvs -> Id -> Pat GhcTc -> DsM GrdVec
-translatePat fam_insts x pat = case pat of
+desugarPat :: Id -> Pat GhcTc -> DsM GrdVec
+desugarPat x pat = case pat of
   WildPat  _ty -> pure []
   VarPat _ y   -> pure (mkPmLetVar (unLoc y) x)
-  ParPat _ p   -> translateLPat fam_insts x p
+  ParPat _ p   -> desugarLPat x p
   LazyPat _ _  -> pure [] -- like a wildcard
   BangPat _ p@(L l p') ->
     -- Add the bang in front of the list, because it will happen before any
     -- nested stuff.
-    (PmBang x pm_loc :) <$> translateLPat fam_insts x p
-    where pm_loc = Just (L l (ppr p'))
+    (PmBang x pm_loc :) <$> desugarLPat x p
+      where pm_loc = Just (L l (ppr p'))
 
-  -- (x@pat)   ==>   Translate pat with x as match var and handle impedance
+  -- (x@pat)   ==>   Desugar pat with x as match var and handle impedance
   --                 mismatch with incoming match var
-  AsPat _ (L _ y) p -> (mkPmLetVar y x ++) <$> translateLPat fam_insts y p
+  AsPat _ (L _ y) p -> (mkPmLetVar y x ++) <$> desugarLPat y p
 
-  SigPat _ p _ty -> translateLPat fam_insts x p
+  SigPat _ p _ty -> desugarLPat x p
 
-  -- See Note [Translate CoPats]
+  -- See Note [Desugar CoPats]
   -- Generally the translation is
   -- pat |> co   ===>   let y = x |> co, pat <- y  where y is a match var of pat
   XPat (CoPat wrapper p _ty)
-    | isIdHsWrapper wrapper                   -> translatePat fam_insts x p
-    | WpCast co <-  wrapper, isReflexiveCo co -> translatePat fam_insts x p
+    | isIdHsWrapper wrapper                   -> desugarPat x p
+    | WpCast co <-  wrapper, isReflexiveCo co -> desugarPat x p
     | otherwise -> do
-        (y, grds) <- translatePatV fam_insts p
+        (y, grds) <- desugarPatV p
         wrap_rhs_y <- dsHsWrapper wrapper
         pure (PmLet y (wrap_rhs_y (Var x)) : grds)
 
@@ -522,13 +522,13 @@ translatePat fam_insts x pat = case pat of
 
   -- (fun -> pat)   ===>   let y = fun x, pat <- y where y is a match var of pat
   ViewPat _arg_ty lexpr pat -> do
-    (y, grds) <- translateLPatV fam_insts pat
+    (y, grds) <- desugarLPatV pat
     fun <- dsLExpr lexpr
     pure $ PmLet y (App fun (Var x)) : grds
 
   -- list
   ListPat (ListPatTc _elem_ty Nothing) ps ->
-    translateListPat fam_insts x ps
+    desugarListPat x ps
 
   -- overloaded list
   ListPat (ListPatTc elem_ty (Just (pat_ty, to_list))) pats -> do
@@ -536,11 +536,11 @@ translatePat fam_insts x pat = case pat of
     case splitListTyConApp_maybe pat_ty of
       Just _e_ty
         | not (xopt LangExt.RebindableSyntax dflags)
-        -- Just translate it as a regular ListPat
-        -> translateListPat fam_insts x pats
+        -- Just desugar it as a regular ListPat
+        -> desugarListPat x pats
       _ -> do
         y <- mkPmId (mkListTy elem_ty)
-        grds <- translateListPat fam_insts y pats
+        grds <- desugarListPat y pats
         rhs_y <- dsSyntaxExpr to_list [Var x]
         pure $ PmLet y rhs_y : grds
 
@@ -566,7 +566,7 @@ translatePat fam_insts x pat = case pat of
            , cpt_dicts   = dicts
            }
          } -> do
-    translateConPatOut fam_insts x con arg_tys ex_tvs dicts ps
+    desugarConPatOut x con arg_tys ex_tvs dicts ps
 
   NPat ty (L _ olit) mb_neg _ -> do
     -- See Note [Literal short cut] in "GHC.HsToCore.Match.Literal"
@@ -595,46 +595,44 @@ translatePat fam_insts x pat = case pat of
     mkPmLitGrds x lit
 
   TuplePat _tys pats boxity -> do
-    (vars, grdss) <- mapAndUnzipM (translateLPatV fam_insts) pats
+    (vars, grdss) <- mapAndUnzipM desugarLPatV pats
     let tuple_con = tupleDataCon boxity (length vars)
     pure $ vanillaConGrd x tuple_con vars : concat grdss
 
   SumPat _ty p alt arity -> do
-    (y, grds) <- translateLPatV fam_insts p
+    (y, grds) <- desugarLPatV p
     let sum_con = sumDataCon alt arity
     -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
     pure $ vanillaConGrd x sum_con [y] : grds
 
-  -- --------------------------------------------------------------------------
-  -- Not supposed to happen
-  SplicePat {} -> panic "Check.translatePat: SplicePat"
+  SplicePat {} -> panic "Check.desugarPat: SplicePat"
 
--- | 'translatePat', but also select and return a new match var.
-translatePatV :: FamInstEnvs -> Pat GhcTc -> DsM (Id, GrdVec)
-translatePatV fam_insts pat = do
+-- | 'desugarPat', but also select and return a new match var.
+desugarPatV :: Pat GhcTc -> DsM (Id, GrdVec)
+desugarPatV pat = do
   x <- selectMatchVar Many pat
-  grds <- translatePat fam_insts x pat
+  grds <- desugarPat x pat
   pure (x, grds)
 
-translateLPat :: FamInstEnvs -> Id -> LPat GhcTc -> DsM GrdVec
-translateLPat fam_insts x = translatePat fam_insts x . unLoc
+desugarLPat :: Id -> LPat GhcTc -> DsM GrdVec
+desugarLPat x = desugarPat x . unLoc
 
--- | 'translateLPat', but also select and return a new match var.
-translateLPatV :: FamInstEnvs -> LPat GhcTc -> DsM (Id, GrdVec)
-translateLPatV fam_insts = translatePatV fam_insts . unLoc
+-- | 'desugarLPat', but also select and return a new match var.
+desugarLPatV :: LPat GhcTc -> DsM (Id, GrdVec)
+desugarLPatV = desugarPatV . unLoc
 
--- | @translateListPat _ x [p1, ..., pn]@ is basically
---   @translateConPatOut _ x $(mkListConPatOuts [p1, ..., pn]>@ without ever
+-- | @desugarListPat _ x [p1, ..., pn]@ is basically
+--   @desugarConPatOut _ x $(mkListConPatOuts [p1, ..., pn]>@ without ever
 -- constructing the 'ConPatOut's.
-translateListPat :: FamInstEnvs -> Id -> [LPat GhcTc] -> DsM GrdVec
-translateListPat fam_insts x pats = do
-  vars_and_grdss <- traverse (translateLPatV fam_insts) pats
+desugarListPat :: Id -> [LPat GhcTc] -> DsM GrdVec
+desugarListPat x pats = do
+  vars_and_grdss <- traverse desugarLPatV pats
   mkListGrds x vars_and_grdss
 
--- | Translate a constructor pattern
-translateConPatOut :: FamInstEnvs -> Id -> ConLike -> [Type] -> [TyVar]
+-- | Desugar a constructor pattern
+desugarConPatOut :: Id -> ConLike -> [Type] -> [TyVar]
                    -> [EvVar] -> HsConPatDetails GhcTc -> DsM GrdVec
-translateConPatOut fam_insts x con univ_tys ex_tvs dicts = \case
+desugarConPatOut x con univ_tys ex_tvs dicts = \case
     PrefixCon ps                 -> go_field_pats (zip [0..] ps)
     InfixCon  p1 p2              -> go_field_pats (zip [0..] [p1,p2])
     RecCon    (HsRecFields fs _) -> go_field_pats (rec_field_ps fs)
@@ -648,7 +646,7 @@ translateConPatOut fam_insts x con univ_tys ex_tvs dicts = \case
       where
         tagged_pat f = (lbl_to_index (getName (hsRecFieldId f)), hsRecFieldArg f)
         -- Unfortunately the label info is empty when the DataCon wasn't defined
-        -- with record field labels, hence we translate to field index.
+        -- with record field labels, hence we desugar to field index.
         orig_lbls        = map flSelector $ conLikeFieldLabels con
         lbl_to_index lbl = expectJust "lbl_to_index" $ elemIndex lbl orig_lbls
 
@@ -659,10 +657,10 @@ translateConPatOut fam_insts x con univ_tys ex_tvs dicts = \case
       -- the first field of @tagged_pats@.
       -- See Note [Field match order for RecCon]
 
-      -- Translate the mentioned field patterns. We're doing this first to get
+      -- Desugar the mentioned field patterns. We're doing this first to get
       -- the Ids for pm_con_args.
       let trans_pat (n, pat) = do
-            (var, pvec) <- translateLPatV fam_insts pat
+            (var, pvec) <- desugarLPatV pat
             pure ((n, var), pvec)
       (tagged_vars, arg_grdss) <- mapAndUnzipM trans_pat tagged_pats
 
@@ -688,77 +686,81 @@ translateConPatOut fam_insts x con univ_tys ex_tvs dicts = \case
       --      1.         2.           3.
       pure (con_grd : bang_grds ++ arg_grds)
 
--- | Translate a the 'Match'es of a 'MatchGroup'
-translateMatches :: FamInstEnvs -> [Id] -> [LMatch GhcTc (LHsExpr GhcTc)]
-                 -> DsM GrdTree
-translateMatches fam_insts vars matches =
-  -- It's important that we wrap a 'Sequence' even if it only wraps a singleton.
-  -- 'extractRhsDeltas' needs this to recover 'MatchGroup' structure.
-  Sequence <$> traverse (translateMatch fam_insts vars) matches
+desugarPatBind :: SrcSpan -> Id -> Pat GhcTc -> DsM (PmPatBind Pre)
+-- See 'GrdPatBind' for how this simply repurposes GrdGRHS.
+desugarPatBind loc var pat =
+  PmPatBind . flip PmGRHS (L loc (ppr pat)) <$> desugarPat var pat
 
--- Translate a single match
-translateMatch :: FamInstEnvs -> [Id] -> LMatch GhcTc (LHsExpr GhcTc)
-               -> DsM GrdTree
-translateMatch fam_insts vars (L match_loc (Match { m_pats = pats, m_grhss = grhss })) = do
-  pats'  <- concat <$> zipWithM (translateLPat fam_insts) vars pats
-  grhss' <- translateGRHSs fam_insts match_loc (sep (map ppr pats)) grhss
-  -- tracePm "translateMatch" (vcat [ppr pats, ppr pats', ppr grhss'])
-  return (foldr Guard grhss' pats')
+desugarEmptyCase :: Id -> DsM PmEmptyCase
+desugarEmptyCase var = pure PmEmptyCase { pe_var = var }
 
-mkGrdTreeRhs :: Located SDoc -> GrdVec -> GrdTree
-mkGrdTreeRhs sdoc = foldr Guard (Rhs sdoc)
+-- | Desugar the non-empty 'Match'es of a 'MatchGroup'.
+desugarMatches :: [Id] -> NonEmpty (LMatch GhcTc (LHsExpr GhcTc))
+               -> DsM (PmMatchGroup Pre)
+desugarMatches vars matches =
+  PmMatchGroup <$> traverse (desugarMatch vars) matches
 
-translateGRHSs :: FamInstEnvs -> SrcSpan -> SDoc -> GRHSs GhcTc (LHsExpr GhcTc) -> DsM GrdTree
-translateGRHSs fam_insts match_loc pp_pats grhss =
-  -- It's important that we wrap a 'Sequence' even if it only wraps a singleton.
-  -- 'extractRhsDeltas' needs this to recover 'GRHSs' structure.
-  Sequence <$> traverse (translateLGRHS fam_insts match_loc pp_pats) (grhssGRHSs grhss)
+-- Desugar a single match
+desugarMatch :: [Id] -> LMatch GhcTc (LHsExpr GhcTc) -> DsM (PmMatch Pre)
+desugarMatch vars (L match_loc (Match { m_pats = pats, m_grhss = grhss })) = do
+  pats'  <- concat <$> zipWithM desugarLPat vars pats
+  grhss' <- desugarGRHSs match_loc (sep (map ppr pats)) grhss
+  -- tracePm "desugarMatch" (vcat [ppr pats, ppr pats', ppr grhss'])
+  return PmMatch { pm_pats = pats', pm_grhss = grhss' }
 
--- | Translate a guarded right-hand side to a single 'GrdTree'
-translateLGRHS :: FamInstEnvs -> SrcSpan -> SDoc -> LGRHS GhcTc (LHsExpr GhcTc) -> DsM GrdTree
-translateLGRHS fam_insts match_loc pp_pats (L _loc (GRHS _ gs _)) =
-  -- _loc points to the match separator (ie =, ->) that comes after the guards..
-  mkGrdTreeRhs loc_sdoc <$> concatMapM (translateGuard fam_insts . unLoc) gs
-    where
-      loc_sdoc
-        -- pp_pats is the space-separated pattern of the current Match this
-        -- GRHS belongs to, so the @A B x@ part in @A B x | 0 <- x@.
-        | null gs   = L match_loc pp_pats
-        | otherwise = L grd_loc   (pp_pats <+> vbar <+> interpp'SP gs)
-      L grd_loc _ = head gs
+desugarGRHSs :: SrcSpan -> SDoc -> GRHSs GhcTc (LHsExpr GhcTc) -> DsM (NonEmpty (PmGRHS Pre))
+desugarGRHSs match_loc pp_pats grhss
+  = traverse (desugarLGRHS match_loc pp_pats)
+  . expectJust "desugarGRHSs"
+  . NE.nonEmpty
+  $ grhssGRHSs grhss
 
--- | Translate a guard statement to a 'GrdVec'
-translateGuard :: FamInstEnvs -> GuardStmt GhcTc -> DsM GrdVec
-translateGuard fam_insts guard = case guard of
-  BodyStmt _   e _ _ -> translateBoolGuard e
-  LetStmt  _   binds -> translateLet (unLoc binds)
-  BindStmt _ p e     -> translateBind fam_insts p e
-  LastStmt        {} -> panic "translateGuard LastStmt"
-  ParStmt         {} -> panic "translateGuard ParStmt"
-  TransStmt       {} -> panic "translateGuard TransStmt"
-  RecStmt         {} -> panic "translateGuard RecStmt"
-  ApplicativeStmt {} -> panic "translateGuard ApplicativeLastStmt"
+-- | Desugar a guarded right-hand side to a single 'GrdTree'
+desugarLGRHS :: SrcSpan -> SDoc -> LGRHS GhcTc (LHsExpr GhcTc) -> DsM (PmGRHS Pre)
+desugarLGRHS match_loc pp_pats (L _loc (GRHS _ gs _)) = do
+  -- _loc points to the match separator (ie =, ->) that comes after the guards.
+  -- Hence we have to pass in the match_loc, which we use in case that the RHS
+  -- is unguarded.
+  -- pp_pats is the space-separated pattern of the current Match this
+  -- GRHS belongs to, so the @A B x@ part in @A B x | 0 <- x@.
+  let rhs_info = case gs of
+        []              -> L match_loc pp_pats
+        (L grd_loc _):_ -> L grd_loc   (pp_pats <+> vbar <+> interpp'SP gs)
+  grds <- concatMapM (desugarGuard . unLoc) gs
+  pure PmGRHS { pg_grds = grds, pg_rhs = rhs_info }
 
--- | Translate let-bindings
-translateLet :: HsLocalBinds GhcTc -> DsM GrdVec
-translateLet _binds = return []
+-- | Desugar a guard statement to a 'GrdVec'
+desugarGuard :: GuardStmt GhcTc -> DsM GrdVec
+desugarGuard guard = case guard of
+  BodyStmt _   e _ _ -> desugarBoolGuard e
+  LetStmt  _   binds -> desugarLet (unLoc binds)
+  BindStmt _ p e     -> desugarBind p e
+  LastStmt        {} -> panic "desugarGuard LastStmt"
+  ParStmt         {} -> panic "desugarGuard ParStmt"
+  TransStmt       {} -> panic "desugarGuard TransStmt"
+  RecStmt         {} -> panic "desugarGuard RecStmt"
+  ApplicativeStmt {} -> panic "desugarGuard ApplicativeLastStmt"
 
--- | Translate a pattern guard
+-- | Desugar let-bindings
+desugarLet :: HsLocalBinds GhcTc -> DsM GrdVec
+desugarLet _binds = return []
+
+-- | Desugar a pattern guard
 --   @pat <- e ==>  let x = e;  <guards for pat <- x>@
-translateBind :: FamInstEnvs -> LPat GhcTc -> LHsExpr GhcTc -> DsM GrdVec
-translateBind fam_insts p e = dsLExpr e >>= \case
+desugarBind :: LPat GhcTc -> LHsExpr GhcTc -> DsM GrdVec
+desugarBind p e = dsLExpr e >>= \case
   Var y
     | Nothing <- isDataConId_maybe y
     -- RHS is a variable, so that will allow us to omit the let
-    -> translateLPat fam_insts y p
+    -> desugarLPat y p
   rhs -> do
-    (x, grds) <- translateLPatV fam_insts p
+    (x, grds) <- desugarLPatV p
     pure (PmLet x rhs : grds)
 
--- | Translate a boolean guard
+-- | Desugar a boolean guard
 --   @e ==>  let x = e; True <- x@
-translateBoolGuard :: LHsExpr GhcTc -> DsM GrdVec
-translateBoolGuard e
+desugarBoolGuard :: LHsExpr GhcTc -> DsM GrdVec
+desugarBoolGuard e
   | isJust (isTrueLHsExpr e) = return []
     -- The formal thing to do would be to generate (True <- True)
     -- but it is trivial to solve so instead we give back an empty
@@ -803,7 +805,7 @@ for a pattern match appear matter. Consider a situation similar to T5117:
   f (0:_)  = ()
   f (0:[]) = ()
 
-The latter clause is clearly redundant. Yet if we translate the second clause as
+The latter clause is clearly redundant. Yet if we desugar the second clause as
 
   [x:xs' <- xs, [] <- xs', 0 <- x]
 
@@ -815,8 +817,207 @@ translation would have been
 
 And we have to take in the guards on list cells into @mkListGrds@.
 
-Note [Countering exponential blowup]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Desugar CoPats]
+~~~~~~~~~~~~~~~~~~~~~~~
+The pattern match checker did not know how to handle coerced patterns
+`CoPat` efficiently, which gave rise to #11276. The original approach
+desugared `CoPat`s:
+
+    pat |> co    ===>    x (pat <- (x |> co))
+
+Why did we do this seemingly unnecessary expansion in the first place?
+The reason is that the type of @pat |> co@ (which is the type of the value
+abstraction we match against) might be different than that of @pat@. Data
+instances such as @Sing (a :: Bool)@ are a good example of this: If we would
+just drop the coercion, we'd get a type error when matching @pat@ against its
+value abstraction, with the result being that pmIsSatisfiable decides that every
+possible data constructor fitting @pat@ is rejected as uninhabitated, leading to
+a lot of false warnings.
+
+But we can check whether the coercion is a hole or if it is just refl, in
+which case we can drop it.
+-}
+
+--
+-- * Coverage checking guard trees into annotated trees
+--
+
+-- | Pattern-match coverage check result
+data CheckResult a
+  = CheckResult
+  { cr_ret :: !a
+  -- ^ A hole for redundancy info and covered sets.
+  , cr_uncov   :: !Deltas
+  -- ^ The set of uncovered values falling out at the bottom.
+  --   (for -Wincomplete-patterns, but also important state for the algorithm)
+  , cr_approx  :: !Precision
+  -- ^ A flag saying whether we ran into the 'maxPmCheckModels' limit for the
+  -- purpose of suggesting to crank it up in the warning message. Writer state.
+  } deriving Functor
+
+instance Outputable a => Outputable (CheckResult a) where
+  ppr (CheckResult c unc pc)
+    = text "CheckResult" <+> ppr_precision pc <+> braces (fsep
+        [ field "ret" c <> comma
+        , field "uncov" unc])
+    where
+      ppr_precision Precise     = empty
+      ppr_precision Approximate = text "(Approximate)"
+      field name value = text name <+> equals <+> ppr value
+
+-- | Lift 'addPmCts' over 'Deltas'.
+addPmCtsDeltas :: Deltas -> PmCts -> DsM Deltas
+addPmCtsDeltas deltas cts = liftDeltasM (\d -> addPmCts d cts) deltas
+
+-- | 'addPmCtsDeltas' for a single 'PmCt'.
+addPmCtDeltas :: Deltas -> PmCt -> DsM Deltas
+addPmCtDeltas deltas ct = addPmCtsDeltas deltas (unitBag ct)
+
+-- | Test if any of the 'Delta's is inhabited. Currently this is pure, because
+-- we preserve the invariant that there are no uninhabited 'Delta's. But that
+-- could change in the future, for example by implementing this function in
+-- terms of @notNull <$> provideEvidence 1 ds@.
+isInhabited :: Deltas -> DsM Bool
+isInhabited (MkDeltas ds) = pure (not (null ds))
+
+-- | Coverage checking action. Can be composed 'leftToRight' or 'topToBottom'.
+newtype CheckAction a = CA { unCA :: Deltas -> DsM (CheckResult a) }
+  deriving Functor
+
+-- | Composes 'CheckAction's top-to-bottom:
+-- If a value falls through the resulting action, then it must fall through the
+-- first action and then through the second action.
+-- If a value matches the resulting action, then it either matches the
+-- first action or matches the second action.
+-- Basically the semantics of the LYG branching construct.
+topToBottom :: (top -> bot -> ret)
+            -> CheckAction top
+            -> CheckAction bot
+            -> CheckAction ret
+topToBottom f (CA top) (CA bot) = CA $ \inc -> do
+  t <- top inc
+  b <- bot (cr_uncov t)
+  pure CheckResult { cr_ret = f (cr_ret t) (cr_ret b)
+                   , cr_uncov = cr_uncov b
+                   , cr_approx = cr_approx t Semi.<> cr_approx b }
+
+
+-- | Composes 'CheckAction's left-to-right:
+-- If a value falls through the resulting action, then it either falls through the
+-- first action or through the second action.
+-- If a value matches the resulting action, then it must match the first action
+-- and then match the second action.
+-- Basically the semantics of the LYG guard construct.
+leftToRight :: (RedSets -> right -> ret)
+            -> CheckAction RedSets
+            -> CheckAction right
+            -> CheckAction ret
+leftToRight f (CA left) (CA right) = CA $ \inc -> do
+  l <- left inc
+  r <- right (rs_cov (cr_ret l))
+  limit <- maxPmCheckModels <$> getDynFlags
+  let uncov = cr_uncov l Semi.<> cr_uncov r
+  -- See Note [Countering exponential blowup]
+  let (prec', uncov') = throttle limit inc uncov
+  pure CheckResult { cr_ret = f (cr_ret l) (cr_ret r)
+                   , cr_uncov = uncov'
+                   , cr_approx = prec' Semi.<> cr_approx l Semi.<> cr_approx r }
+
+-- | @throttle limit old new@ returns @old@ if the number of 'Delta's in @new@
+-- is exceeding the given @limit@ and the @old@ number of 'Delta's.
+-- See Note [Countering exponential blowup].
+throttle :: Int -> Deltas -> Deltas -> (Precision, Deltas)
+throttle limit old@(MkDeltas old_ds) new@(MkDeltas new_ds)
+  --- | pprTrace "PmCheck:throttle" (ppr (length old_ds) <+> ppr (length new_ds) <+> ppr limit) False = undefined
+  | length new_ds > max limit (length old_ds) = (Approximate, old)
+  | otherwise                                 = (Precise,     new)
+
+-- | Matching on a newtype doesn't force anything.
+-- See Note [Divergence of Newtype matches] in "GHC.HsToCore.PmCheck.Oracle".
+conMatchForces :: PmAltCon -> Bool
+conMatchForces (PmAltConLike (RealDataCon dc))
+  | isNewTyCon (dataConTyCon dc) = False
+conMatchForces _                 = True
+
+-- First the functions that correspond to checking LYG primitives:
+
+checkSequence :: (grdtree -> CheckAction anntree) -> NonEmpty grdtree -> CheckAction (NonEmpty anntree)
+-- The implementation is pretty similar to
+-- @traverse1 :: Apply f => (a -> f b) -> NonEmpty a -> f (NonEmpty b)@
+checkSequence act (t :| [])       = (:| []) <$> act t
+checkSequence act (t1 :| (t2:ts)) =
+  topToBottom (NE.<|) (act t1) (checkSequence act (t2:|ts))
+
+checkGrd :: PmGrd -> CheckAction RedSets
+checkGrd grd = CA $ \inc -> case grd of
+  -- let x = e: Refine with x ~ e
+  PmLet x e -> do
+    matched <- addPmCtDeltas inc (PmCoreCt x e)
+    pure CheckResult { cr_ret = emptyRedSets { rs_cov = matched }
+                     , cr_uncov = mempty
+                     , cr_approx = Precise }
+  -- Bang x _: Diverge on x ~ ⊥, refine with x /~ ⊥
+  PmBang x mb_info -> do
+    div <- addPmCtDeltas inc (PmBotCt x)
+    matched <- addPmCtDeltas inc (PmNotBotCt x)
+    -- See Note [Dead bang patterns]
+    -- mb_info = Just info <==> PmBang originates from bang pattern in source
+    let bangs | Just info <- mb_info = unitOL (div, info)
+              | otherwise            = NilOL
+    pure CheckResult { cr_ret = RedSets { rs_cov = matched, rs_div = div, rs_bangs = bangs }
+                     , cr_uncov = mempty
+                     , cr_approx = Precise }
+  -- Con: Diverge on x ~ ⊥, fall through on x /~ K and refine with x ~ K ys
+  --      and type info
+  PmCon x con tvs dicts args -> do
+    div <- if conMatchForces con
+      then addPmCtDeltas inc (PmBotCt x)
+      else pure mempty
+    uncov <- addPmCtDeltas inc (PmNotConCt x con)
+    matched <- addPmCtsDeltas inc $
+      listToBag (PmTyCt . evVarPred <$> dicts) `snocBag` PmConCt x con tvs args
+    -- tracePm "checkGrd:Con" (ppr inc $$ ppr x $$ ppr con $$ ppr dicts $$ ppr matched)
+    pure CheckResult { cr_ret = emptyRedSets { rs_cov = matched, rs_div = div }
+                     , cr_uncov = uncov
+                     , cr_approx = Precise }
+
+checkGrds :: [PmGrd] -> CheckAction RedSets
+checkGrds [] = CA $ \inc ->
+  pure CheckResult { cr_ret = emptyRedSets { rs_cov = inc }
+                   , cr_uncov = mempty
+                   , cr_approx = Precise }
+checkGrds (g:grds) = leftToRight merge (checkGrd g) (checkGrds grds)
+  where
+    merge ri_g ri_grds = -- This operation would /not/ form a Semigroup!
+      RedSets { rs_cov   = rs_cov ri_grds
+              , rs_div   = rs_div ri_g   Semi.<> rs_div ri_grds
+              , rs_bangs = rs_bangs ri_g Semi.<> rs_bangs ri_grds }
+
+checkMatchGroup :: PmMatchGroup Pre -> CheckAction (PmMatchGroup Post)
+checkMatchGroup (PmMatchGroup matches) =
+  PmMatchGroup <$> checkSequence checkMatch matches
+
+checkMatch :: PmMatch Pre -> CheckAction (PmMatch Post)
+checkMatch (PmMatch { pm_pats = grds, pm_grhss = grhss }) =
+  leftToRight PmMatch (checkGrds grds) (checkGRHSs grhss)
+
+checkGRHSs :: NonEmpty (PmGRHS Pre) -> CheckAction (NonEmpty (PmGRHS Post))
+checkGRHSs = checkSequence checkGRHS
+
+checkGRHS :: PmGRHS Pre -> CheckAction (PmGRHS Post)
+checkGRHS (PmGRHS { pg_grds = grds, pg_rhs = rhs_info }) =
+  flip PmGRHS rhs_info <$> checkGrds grds
+
+checkEmptyCase :: PmEmptyCase -> CheckAction PmEmptyCase
+checkEmptyCase pe@(PmEmptyCase { pe_var = var }) = CA $ \inc -> do
+  unc <- addPmCtDeltas inc (PmNotBotCt var)
+  pure CheckResult { cr_ret = pe, cr_uncov = unc, cr_approx = mempty }
+
+checkPatBind :: (PmPatBind Pre) -> CheckAction (PmPatBind Post)
+checkPatBind = coerce checkGRHS
+
+{- Note [Countering exponential blowup]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Precise pattern match exhaustiveness checking is necessarily exponential in
 the size of some input programs. We implement a counter-measure in the form of
 the -fmax-pmcheck-models flag, limiting the number of Deltas we check against
@@ -835,10 +1036,10 @@ Also we find the first clause to cover the model {x~True,y~True}.
 But the Uncovered set we get out of the match is too huge! We somehow have to
 ensure not to make things worse as they are already, so we continue checking
 with a singleton Uncovered set of the initial Delta {}. Why is this
-sound (wrt. notion of the GADTs Meet their Match paper)? Well, it basically
-amounts to forgetting that we matched against the first clause. The values
-represented by {} are a superset of those represented by its two refinements
-{x/~True} and {x~True,y/~True}.
+sound (wrt. the notion in GADTs Meet Their Match)? Well, it basically amounts
+to forgetting that we matched against the first clause. The values represented
+by {} are a superset of those represented by its two refinements {x/~True} and
+{x~True,y/~True}.
 
 This forgetfulness becomes very apparent in the example above: By continuing
 with {} we don't detect the second clause as redundant, as it again covers the
@@ -855,376 +1056,109 @@ Guards are an extreme example in this regard, with #11195 being a particularly
 dreadful example: Since their RHS are often pretty much unique, we split on a
 variable (the one representing the RHS) that doesn't occur anywhere else in the
 program, so we don't actually get useful information out of that split!
-
-Note [Translate CoPats]
-~~~~~~~~~~~~~~~~~~~~~~~
-The pattern match checker did not know how to handle coerced patterns `CoPat`
-efficiently, which gave rise to #11276. The original approach translated
-`CoPat`s:
-
-    pat |> co    ===>    x (pat <- (x |> co))
-
-Why did we do this seemingly unnecessary expansion in the first place?
-The reason is that the type of @pat |> co@ (which is the type of the value
-abstraction we match against) might be different than that of @pat@. Data
-instances such as @Sing (a :: Bool)@ are a good example of this: If we would
-just drop the coercion, we'd get a type error when matching @pat@ against its
-value abstraction, with the result being that pmIsSatisfiable decides that every
-possible data constructor fitting @pat@ is rejected as uninhabitated, leading to
-a lot of false warnings.
-
-But we can check whether the coercion is a hole or if it is just refl, in
-which case we can drop it.
-
-%************************************************************************
-%*                                                                      *
-                 Utilities for Pattern Match Checking
-%*                                                                      *
-%************************************************************************
 -}
 
--- ----------------------------------------------------------------------------
--- * Basic utilities
-
-{-
-Note [Extensions to GADTs Meet Their Match]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The GADTs Meet Their Match paper presents the formalism that GHC's coverage
-checker adheres to. Since the paper's publication, there have been some
-additional features added to the coverage checker which are not described in
-the paper. This Note serves as a reference for these new features.
-
-* Value abstractions are severely simplified to the point where they are just
-  variables. The information about the shape of a variable is encoded in
-  the oracle state 'Delta' instead.
-* Handling of uninhabited fields like `!Void`.
-  See Note [Strict argument type constraints] in GHC.HsToCore.PmCheck.Oracle.
-* Efficient handling of literal splitting, large enumerations and accurate
-  redundancy warnings for `COMPLETE` groups through the oracle.
-
-Note [Filtering out non-matching COMPLETE sets]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Currently, conlikes in a COMPLETE set are simply grouped by the
-type constructor heading the return type. This is nice and simple, but it does
-mean that there are scenarios when a COMPLETE set might be incompatible with
-the type of a scrutinee. For instance, consider (from #14135):
-
-  data Foo a = Foo1 a | Foo2 a
-
-  pattern MyFoo2 :: Int -> Foo Int
-  pattern MyFoo2 i = Foo2 i
-
-  {-# COMPLETE Foo1, MyFoo2 #-}
-
-  f :: Foo a -> a
-  f (Foo1 x) = x
-
-`f` has an incomplete pattern-match, so when choosing which constructors to
-report as unmatched in a warning, GHC must choose between the original set of
-data constructors {Foo1, Foo2} and the COMPLETE set {Foo1, MyFoo2}. But observe
-that GHC shouldn't even consider the COMPLETE set as a possibility: the return
-type of MyFoo2, Foo Int, does not match the type of the scrutinee, Foo a, since
-there's no substitution `s` such that s(Foo Int) = Foo a.
-
-To ensure that GHC doesn't pick this COMPLETE set, it checks each pattern
-synonym constructor's return type matches the type of the scrutinee, and if one
-doesn't, then we remove the whole COMPLETE set from consideration.
-
-One might wonder why GHC only checks /pattern synonym/ constructors, and not
-/data/ constructors as well. The reason is because that the type of a
-GADT constructor very well may not match the type of a scrutinee, and that's
-OK. Consider this example (from #14059):
-
-  data SBool (z :: Bool) where
-    SFalse :: SBool False
-    STrue  :: SBool True
-
-  pattern STooGoodToBeTrue :: forall (z :: Bool). ()
-                           => z ~ True
-                           => SBool z
-  pattern STooGoodToBeTrue = STrue
-  {-# COMPLETE SFalse, STooGoodToBeTrue #-}
-
-  wobble :: SBool z -> Bool
-  wobble STooGoodToBeTrue = True
-
-In the incomplete pattern match for `wobble`, we /do/ want to warn that SFalse
-should be matched against, even though its type, SBool False, does not match
-the scrutinee type, SBool z.
-
-SG: Another angle at this is that the implied constraints when we instantiate
-universal type variables in the return type of a GADT will lead to *provided*
-thetas, whereas when we instantiate the return type of a pattern synonym that
-corresponds to a *required* theta. See Note [Pattern synonym result type] in
-PatSyn. Note how isValidCompleteMatches will successfully filter out
-
-    pattern Just42 :: Maybe Int
-    pattern Just42 = Just 42
-
-But fail to filter out the equivalent
-
-    pattern Just'42 :: (a ~ Int) => Maybe a
-    pattern Just'42 = Just 42
-
-Which seems fine as far as tcMatchTy is concerned, but it raises a few eye
-brows.
--}
-
-{-
-%************************************************************************
-%*                                                                      *
-            Heart of the algorithm: checkGrdTree
-%*                                                                      *
-%************************************************************************
--}
-
--- | @throttle limit old new@ returns @old@ if the number of 'Delta's in @new@
--- is exceeding the given @limit@ and the @old@ number of 'Delta's.
--- See Note [Countering exponential blowup].
-throttle :: Int -> Deltas -> Deltas -> (Precision, Deltas)
-throttle limit old@(MkDeltas old_ds) new@(MkDeltas new_ds)
-  --- | pprTrace "PmCheck:throttle" (ppr (length old_ds) <+> ppr (length new_ds) <+> ppr limit) False = undefined
-  | length new_ds > max limit (length old_ds) = (Approximate, old)
-  | otherwise                                 = (Precise,     new)
-
--- | Matching on a newtype doesn't force anything.
--- See Note [Divergence of Newtype matches] in "GHC.HsToCore.PmCheck.Oracle".
-conMatchForces :: PmAltCon -> Bool
-conMatchForces (PmAltConLike (RealDataCon dc))
-  | isNewTyCon (dataConTyCon dc) = False
-conMatchForces _                 = True
-
--- | Makes sure that we only wrap a single 'MayDiverge' around an
--- 'AnnotatedTree', purely for esthetic reasons.
-mayDiverge :: AnnotatedTree -> AnnotatedTree
-mayDiverge a@(MayDiverge _) = a
-mayDiverge a                = MayDiverge a
-
--- | Computes two things:
 --
---   * The set of uncovered values not matched by any of the clauses of the
---     'GrdTree'. Note that 'PmCon' guards are the only way in which values
---     fall through from one 'Many' branch to the next.
---   * An 'AnnotatedTree' that contains divergence and inaccessibility info
---     for all clauses. Will be fed to 'extractRedundancyInfo' for
---     presenting redundant and proper innaccessible RHSs, as well as dead
---     bangs to the user.
-checkGrdTree' :: GrdTree -> Deltas -> DsM CheckResult
--- RHS: Check that it covers something and wrap Inaccessible if not
-checkGrdTree' (Rhs sdoc) deltas = do
-  is_covered <- isInhabited deltas
-  let clauses
-        | is_covered = AccessibleRhs deltas sdoc
-        | otherwise  = InaccessibleRhs sdoc
-  pure CheckResult
-    { cr_clauses = clauses
-    , cr_uncov   = MkDeltas emptyBag
-    , cr_approx  = Precise }
--- let x = e: Refine with x ~ e
-checkGrdTree' (Guard (PmLet x e) tree) deltas = do
-  deltas' <- addPmCtDeltas deltas (PmCoreCt x e)
-  checkGrdTree' tree deltas'
--- Bang x: Diverge on x ~ ⊥, refine with x /~ ⊥
-checkGrdTree' (Guard (PmBang x src_bang_info) tree) deltas = do
-  has_diverged <- addPmCtDeltas deltas (PmBotCt x) >>= isInhabited
-  deltas' <- addPmCtDeltas deltas (PmNotBotCt x)
-  res <- checkGrdTree' tree deltas'
-  let clauses
-        | not has_diverged
-        , Just info <- src_bang_info
-        = RedundantSrcBang info (cr_clauses res)
-        | has_diverged
-        = mayDiverge (cr_clauses res)
-        | otherwise -- won't diverge and it wasn't a source bang
-        = cr_clauses res
+-- * Collecting long-distance information
+--
 
-  pure res{ cr_clauses = clauses }
+ldiMatchGroup :: PmMatchGroup Post -> NonEmpty (Deltas, NonEmpty Deltas)
+ldiMatchGroup (PmMatchGroup matches) = ldiMatch <$> matches
 
--- Con: Diverge on x ~ ⊥, fall through on x /~ K and refine with x ~ K ys
---      and type info
-checkGrdTree' (Guard (PmCon x con tvs dicts args) tree) deltas = do
-  has_diverged <-
-    if conMatchForces con
-      then addPmCtDeltas deltas (PmBotCt x) >>= isInhabited
-      else pure False
-  unc_this <- addPmCtDeltas deltas (PmNotConCt x con)
-  deltas' <- addPmCtsDeltas deltas $
-    listToBag (PmTyCt . evVarPred <$> dicts) `snocBag` PmConCt x con tvs args
-  -- tracePm "checkGrdTree:Con" (ppr deltas $$ ppr x $$ ppr con $$ ppr dicts $$ ppr deltas')
-  CheckResult tree' unc_inner prec <- checkGrdTree' tree deltas'
-  limit <- maxPmCheckModels <$> getDynFlags
-  let (prec', unc') = throttle limit deltas (unc_this Semi.<> unc_inner)
-  pure CheckResult
-    { cr_clauses = applyWhen has_diverged mayDiverge tree'
-    , cr_uncov = unc'
-    , cr_approx = prec Semi.<> prec' }
--- Sequence: Thread residual uncovered sets from equation to equation
-checkGrdTree' (Sequence ts) init_unc = go [] init_unc Precise ts
-  where
-    -- | Accumulates a CheckResult. Its type is more like
-    -- @CheckResult -> [GrdTree] -> CheckResult@, but cr_clauses is a single
-    -- 'AnnotatedTree', not a list thereof. Hence 3 parameters to thread the
-    -- fields.
-    go :: [AnnotatedTree] -> Deltas -> Precision -> [GrdTree] -> DsM CheckResult
-    -- No cases left: Fall through for all values
-    go ts' unc prec [] = pure CheckResult
-                          { cr_clauses = SequenceAnn init_unc (reverse ts')
-                          , cr_uncov = unc
-                          , cr_approx = prec }
-    go ts' unc prec (t:ts) = do
-      CheckResult t' unc_1 prec_t <- checkGrdTree' t unc
-      go (t':ts') unc_1 (prec_t Semi.<> prec) ts
+ldiMatch :: PmMatch Post -> (Deltas, NonEmpty Deltas)
+ldiMatch (PmMatch { pm_pats = red, pm_grhss = grhss }) =
+  (rs_cov red, ldiGRHS <$> grhss)
 
--- | Print diagnostic info and actually call 'checkGrdTree''.
-checkGrdTree :: GrdTree -> Deltas -> DsM CheckResult
-checkGrdTree guards deltas = do
-  tracePm "checkGrdTree {" $ vcat [ ppr guards
-                                  , ppr deltas ]
-  res <- checkGrdTree' guards deltas
-  tracePm "checkGrdTree }:" (ppr res) -- braces are easier to match by tooling
-  return res
+ldiGRHS :: PmGRHS Post -> Deltas
+ldiGRHS (PmGRHS { pg_grds = red }) = rs_cov red
 
--- ----------------------------------------------------------------------------
--- * Propagation of term constraints inwards when checking nested matches
+--
+-- * Collecting redundancy information
+--
 
-{- Note [Type and Term Equality Propagation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When checking a match it would be great to have all type and term information
-available so we can get more precise results. For this reason we have functions
-`addDictsDs' and `addTmVarCsDs' in GHC.HsToCore.Monad that store in the
-environment type and term constraints (respectively) as we go deeper.
-
-The type constraints we propagate inwards are collected by `collectEvVarsPats'
-in GHC.Hs.Pat. This handles bug #4139 ( see example
-  https://gitlab.haskell.org/ghc/ghc/snippets/672 )
-where this is needed.
-
-For term equalities we do less, we just generate equalities for HsCase. For
-example we accurately give 2 redundancy warnings for the marked cases:
-
-f :: [a] -> Bool
-f x = case x of
-
-  []    -> case x of        -- brings (x ~ []) in scope
-             []    -> True
-             (_:_) -> False -- can't happen
-
-  (_:_) -> case x of        -- brings (x ~ (_:_)) in scope
-             (_:_) -> True
-             []    -> False -- can't happen
-
-Functions `add*ScrutTmCs' is responsible for generating
-these constraints.
--}
-
--- | Locally update 'dsl_deltas' with the given action, but defer evaluation
--- with 'unsafeInterleaveM' in order not to do unnecessary work.
-locallyExtendPmDelta :: (Deltas -> DsM Deltas) -> DsM a -> DsM a
-locallyExtendPmDelta ext k = do
-  deltas <- getPmDeltas
-  deltas' <- unsafeInterleaveM $ do
-    deltas' <- ext deltas
-    inh <- isInhabited deltas'
-    -- If adding a constraint would lead to a contradiction, don't add it.
-    -- See @Note [Recovering from unsatisfiable pattern-matching constraints]@
-    -- for why this is done.
-    if inh
-      then pure deltas'
-      else pure deltas
-  updPmDeltas deltas' k
-
--- | Add in-scope type constraints if the coverage checker might run and then
--- run the given action.
-addTyCsDs :: Origin -> Bag EvVar -> DsM a -> DsM a
-addTyCsDs origin ev_vars m = do
-  dflags <- getDynFlags
-  applyWhen (needToRunPmCheck dflags origin)
-            (locallyExtendPmDelta (\deltas -> addPmCtsDeltas deltas (PmTyCt . evVarPred <$> ev_vars)))
-            m
-
--- | Add equalities for the 'CoreExpr' scrutinee to the local 'DsM' environment
--- when checking a case expression:
---     case e of x { matches }
--- When checking matches we record that (x ~ e) where x is the initial
--- uncovered. All matches will have to satisfy this equality.
-addCoreScrutTmCs :: Maybe CoreExpr -> [Id] -> DsM a -> DsM a
-addCoreScrutTmCs Nothing    _   k = k
-addCoreScrutTmCs (Just scr) [x] k =
-  flip locallyExtendPmDelta k $ \deltas ->
-    addPmCtsDeltas deltas (unitBag (PmCoreCt x scr))
-addCoreScrutTmCs _   _   _ = panic "addCoreScrutTmCs: scrutinee, but more than one match id"
-
--- | 'addCoreScrutTmCs', but desugars the 'LHsExpr' first.
-addHsScrutTmCs :: Maybe (LHsExpr GhcTc) -> [Id] -> DsM a -> DsM a
-addHsScrutTmCs Nothing    _    k = k
-addHsScrutTmCs (Just scr) vars k = do
-  scr_e <- dsLExpr scr
-  addCoreScrutTmCs (Just scr_e) vars k
-
-{-
-%************************************************************************
-%*                                                                      *
-      Pretty printing of exhaustiveness/redundancy check warnings
-%*                                                                      *
-%************************************************************************
--}
-
--- | Check whether any part of pattern match checking is enabled for this
--- 'HsMatchContext' (does not matter whether it is the redundancy check or the
--- exhaustiveness check).
-isMatchContextPmChecked :: DynFlags -> Origin -> HsMatchContext id -> Bool
-isMatchContextPmChecked dflags origin kind
-  | isGenerated origin
-  = False
-  | otherwise
-  = overlapping dflags kind || exhaustive dflags kind
-
--- | Return True when any of the pattern match warnings ('allPmCheckWarnings')
--- are enabled, in which case we need to run the pattern match checker.
-needToRunPmCheck :: DynFlags -> Origin -> Bool
-needToRunPmCheck dflags origin
-  | isGenerated origin
-  = False
-  | otherwise
-  = notNull (filter (`wopt` dflags) allPmCheckWarnings)
-
--- | A type for organising information to be used in warnings.
-data RedundancyInfo
-  = RedundancyInfo
-  { redundant_rhss    :: ![SrcInfo]
-  , inaccessible_rhss :: ![SrcInfo]
-  , redundant_bangs   :: ![Located SDoc]
+-- | The result of redundancy checking:
+--    * RHSs classified as /C/overed, /I/naccessible and /R/edundant
+--    * And redundant /B/ang patterns. See Note [Dead bang patterns].
+data CIRB
+  = CIRB
+  { cirb_cov   :: !(OrdList SrcInfo) -- ^ Covered clauses
+  , cirb_inacc :: !(OrdList SrcInfo) -- ^ Inaccessible clauses
+  , cirb_red   :: !(OrdList SrcInfo) -- ^ Redundant clauses
+  , cirb_bangs :: !(OrdList SrcInfo) -- ^ Redundant bang patterns
   }
 
-extractRedundancyInfo :: AnnotatedTree -> RedundancyInfo
-extractRedundancyInfo tree =
-  RedundancyInfo { redundant_rhss    = fromOL ol_red
-                 , inaccessible_rhss = fromOL ol_inacc
-                 , redundant_bangs   = fromOL ol_bangs }
-  where
-    (_ol_acc, ol_inacc, ol_red, ol_bangs) = go tree
-    -- | Collects
-    --    1. accessible RHSs
-    --    2. proper inaccessible RHSs (so we can't delete them)
-    --    3. hypothetically redundant RHSs (so not only inaccessible, but we can
-    --       even safely delete the equation without altering semantics)
-    --    4. 'Dead' bangs from the source, collected to be warned about
-    -- See Note [Determining inaccessible clauses]
-    -- See Note [Dead bang patterns]
-    go :: AnnotatedTree -> (OrdList SrcInfo, OrdList SrcInfo, OrdList SrcInfo, OrdList SrcInfo)
-    go (AccessibleRhs _ info) = (unitOL info, nilOL, nilOL      , nilOL)
-    go (InaccessibleRhs info) = (nilOL,       nilOL, unitOL info, nilOL) -- presumably redundant
-    go (MayDiverge t)         = case go t of
-      -- See Note [Determining inaccessible clauses]
-      (acc, inacc, red, bs)
-        | isNilOL acc && isNilOL inacc -> (nilOL, red, nilOL, bs)
-      res                              -> res
-    go (SequenceAnn _ ts)     = foldMap go ts
-    go (RedundantSrcBang l t) = case go t of
-      -- See Note [Dead bang patterns]
-      res@(acc, inacc, _, _)
-        | isNilOL acc, isNilOL inacc -> res
-        | otherwise                  -> (nilOL, nilOL, nilOL, unitOL l) Semi.<> res
+instance Semigroup CIRB where
+  CIRB a b c d <> CIRB e f g h = CIRB (a <> e) (b <> f) (c <> g) (d <> h)
+    where (<>) = (Semi.<>)
+
+instance Monoid CIRB where
+  mempty = CIRB mempty mempty mempty mempty
+
+markAllRedundant :: CIRB -> CIRB
+markAllRedundant CIRB { cirb_cov = cov, cirb_inacc = inacc, cirb_red = red } =
+  mempty { cirb_red = cov Semi.<> inacc Semi.<> red }
+
+-- See Note [Determining inaccessible clauses]
+ensureOneNotRedundant :: CIRB -> CIRB
+ensureOneNotRedundant ci = case ci of
+  CIRB { cirb_cov = NilOL, cirb_inacc = NilOL, cirb_red = ConsOL r rs }
+    -> ci { cirb_inacc = unitOL r, cirb_red = rs }
+  _ -> ci
+
+-- | Only adds the redundant bangs to the @CIRB@ if there is at least one
+-- non-redundant 'SrcInfo'. There is no point in remembering a redundant bang
+-- if the whole match is redundant!
+addRedundantBangs :: OrdList SrcInfo -> CIRB -> CIRB
+addRedundantBangs _red_bangs cirb@CIRB { cirb_cov = NilOL, cirb_inacc = NilOL } =
+  cirb
+addRedundantBangs red_bangs  cirb =
+  cirb { cirb_bangs = cirb_bangs cirb Semi.<> red_bangs }
+
+-- | Checks the 'Deltas' in a 'RedSets' for inhabitants and returns
+--    1. Whether the Covered set was inhabited
+--    2. Whether the Diverging set was inhabited
+--    3. All source bangs whose 'Deltas' were empty, which means they are
+--       redundant.
+testRedSets :: RedSets -> DsM (Bool, Bool, OrdList SrcInfo)
+testRedSets RedSets { rs_cov = cov, rs_div = div, rs_bangs = bangs } = do
+  is_covered  <- isInhabited cov
+  may_diverge <- isInhabited div
+  red_bangs   <- flip mapMaybeM (fromOL bangs) $ \(deltas, bang) -> do
+    isInhabited deltas >>= \case
+      True  -> pure Nothing
+      False -> pure (Just bang)
+  pure (is_covered, may_diverge, toOL red_bangs)
+
+cirbsMatchGroup :: PmMatchGroup Post -> DsM CIRB
+cirbsMatchGroup (PmMatchGroup matches) =
+  Semi.sconcat <$> traverse cirbsMatch matches
+
+cirbsMatch :: PmMatch Post -> DsM CIRB
+cirbsMatch PmMatch { pm_pats = red, pm_grhss = grhss } = do
+  (is_covered, may_diverge, red_bangs) <- testRedSets red
+  cirb <- cirbsGRHSs grhss
+  pure $ addRedundantBangs red_bangs
+       -- See Note [Determining inaccessible clauses]
+       $ applyWhen may_diverge ensureOneNotRedundant
+       $ applyWhen (not is_covered) markAllRedundant
+       $ cirb
+
+cirbsGRHSs :: NonEmpty (PmGRHS Post) -> DsM CIRB
+cirbsGRHSs grhss = Semi.sconcat <$> traverse cirbsGRHS grhss
+
+cirbsGRHS :: PmGRHS Post -> DsM CIRB
+cirbsGRHS PmGRHS { pg_grds = red, pg_rhs = info } = do
+  (is_covered, may_diverge, red_bangs) <- testRedSets red
+  let cirb | is_covered  = mempty { cirb_cov   = unitOL info }
+           | may_diverge = mempty { cirb_inacc = unitOL info }
+           | otherwise   = mempty { cirb_red   = unitOL info }
+  pure (addRedundantBangs red_bangs cirb)
+
+cirbsEmptyCase :: PmEmptyCase -> DsM CIRB
+cirbsEmptyCase _ = pure mempty
+
+cirbsPatBind :: PmPatBind Post -> DsM CIRB
+cirbsPatBind = coerce cirbsGRHS
 
 {- Note [Determining inaccessible clauses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1239,26 +1173,29 @@ arguments we can ever reach clause 2's RHS, so we say it has inaccessible RHS
 (as opposed to being completely redundant).
 
 We detect an inaccessible RHS simply by pretending it's redundant, until we see
-that it's part of a sub-tree in the pattern match that forces some argument
-(which corresponds to wrapping the 'AnnotatedTree' in 'MayDiverge'). Then we
-turn all supposedly redundant RHSs into inaccessible ones.
-
-But as it turns out (@g@ from #17465) this is too conservative:
-  g () | False = ()
-       | otherwise = ()
-g's first clause has an inaccessible RHS, but it's also safe to delete. So it's
-redundant, really! But by just turning all redundant child clauses into
-inaccessible ones, we report the first clause as inaccessible.
-
-Clearly, it is enough if we say that we only degrade if *not all* of the child
-clauses are redundant. As long as there is at least one clause which we announce
-not to be redundant, the guard prefix responsible for the 'MayDiverge' will
-survive. Hence we check for that in 'extractRedundancyInfo'.
 -}
 
--- | Issue all the warnings (coverage, exhaustiveness, inaccessibility)
-dsPmWarn :: DynFlags -> DsMatchContext -> [Id] -> CheckResult -> DsM ()
-dsPmWarn dflags ctx@(DsMatchContext kind loc) vars result
+--
+-- * Formatting and reporting warnings
+--
+
+-- | Given a function that collects 'CIRB's, this function will emit warnings
+-- for a 'CheckResult'.
+formatReportWarnings :: (ann -> DsM CIRB) -> DsMatchContext -> [Id] -> CheckResult ann -> DsM ()
+formatReportWarnings collect ctx vars cr@CheckResult { cr_ret = ann } = do
+  cov_info <- collect ann
+  dflags <- getDynFlags
+  reportWarnings dflags ctx vars cr{cr_ret=cov_info}
+
+-- | Issue all the warnings
+-- (redundancy, inaccessibility, exhaustiveness, redundant bangs).
+reportWarnings :: DynFlags -> DsMatchContext -> [Id] -> CheckResult CIRB -> DsM ()
+reportWarnings dflags ctx@(DsMatchContext kind loc) vars
+  CheckResult { cr_ret    = CIRB { cirb_inacc = inaccessible_rhss
+                                 , cirb_red   = redundant_rhss
+                                 , cirb_bangs = redundant_bangs }
+              , cr_uncov  = uncovered
+              , cr_approx = precision }
   = when (flag_i || flag_u || flag_b) $ do
       unc_examples <- getNFirstUncovered vars (maxPatterns + 1) uncovered
       let exists_r = flag_i && notNull redundant_rhss
@@ -1284,13 +1221,6 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) vars result
       when exists_u $ putSrcSpanDs loc $ warnDs flag_u_reason $
         pprEqns vars unc_examples
   where
-    CheckResult
-      { cr_clauses = clauses
-      , cr_uncov   = uncovered
-      , cr_approx  = precision } = result
-    RedundancyInfo{redundant_rhss, inaccessible_rhss, redundant_bangs}
-      = extractRedundancyInfo clauses
-
     flag_i = overlapping dflags kind
     flag_u = exhaustive dflags kind
     flag_b = redundant_bang dflags
@@ -1331,43 +1261,29 @@ getNFirstUncovered vars n (MkDeltas deltas) = go n (bagToList deltas)
       back <- go (n - length front) deltas
       pure (front ++ back)
 
-{- Note [Inaccessible warnings for record updates]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider (#12957)
-  data T a where
-    T1 :: { x :: Int } -> T Bool
-    T2 :: { x :: Int } -> T a
-    T3 :: T a
-
-  f :: T Char -> T a
-  f r = r { x = 3 }
-
-The desugarer will (conservatively generate a case for T1 even though
-it's impossible:
-  f r = case r of
-          T1 x -> T1 3   -- Inaccessible branch
-          T2 x -> T2 3
-          _    -> error "Missing"
-
-We don't want to warn about the inaccessible branch because the programmer
-didn't put it there!  So we filter out the warning here.
-
-The same can happen for long distance term constraints instead of type
-constraints (#17783):
-
-  data T = A { x :: Int } | B { x :: Int }
-  f r@A{} = r { x = 3 }
-  f _     = B 0
-
-Here, the long distance info from the FunRhs match (@r ~ A x@) will make the
-clause matching on @B@ of the desugaring to @case@ redundant. It's generated
-code that we don't want to warn about.
--}
-
 dots :: Int -> [a] -> SDoc
 dots maxPatterns qs
     | qs `lengthExceeds` maxPatterns = text "..."
     | otherwise                      = empty
+
+pprContext :: Bool -> DsMatchContext -> SDoc -> ((SDoc -> SDoc) -> SDoc) -> SDoc
+pprContext singular (DsMatchContext kind _loc) msg rest_of_msg_fun
+  = vcat [text txt <+> msg,
+          sep [ text "In" <+> ppr_match <> char ':'
+              , nest 4 (rest_of_msg_fun pref)]]
+  where
+    txt | singular  = "Pattern match"
+        | otherwise = "Pattern match(es)"
+
+    (ppr_match, pref)
+        = case kind of
+             FunRhs { mc_fun = L _ fun }
+                  -> (pprMatchContext kind, \ pp -> ppr fun <+> pp)
+             _    -> (pprMatchContext kind, \ pp -> pp)
+
+--
+-- * Utilities
+--
 
 -- | All warning flags that need to run the pattern match checker.
 allPmCheckWarnings :: [WarningFlag]
@@ -1411,18 +1327,138 @@ exhaustiveWarningFlag ThPatQuote    = Nothing
 -- etc. They are often *supposed* to be incomplete
 exhaustiveWarningFlag (StmtCtxt {}) = Nothing
 
--- True <==> singular
-pprContext :: Bool -> DsMatchContext -> SDoc -> ((SDoc -> SDoc) -> SDoc) -> SDoc
-pprContext singular (DsMatchContext kind _loc) msg rest_of_msg_fun
-  = vcat [text txt <+> msg,
-          sep [ text "In" <+> ppr_match <> char ':'
-              , nest 4 (rest_of_msg_fun pref)]]
-  where
-    txt | singular  = "Pattern match"
-        | otherwise = "Pattern match(es)"
+-- | Check whether any part of pattern match checking is enabled for this
+-- 'HsMatchContext' (does not matter whether it is the redundancy check or the
+-- exhaustiveness check).
+isMatchContextPmChecked :: DynFlags -> Origin -> HsMatchContext id -> Bool
+isMatchContextPmChecked dflags origin kind
+  | isGenerated origin
+  = False
+  | otherwise
+  = overlapping dflags kind || exhaustive dflags kind
 
-    (ppr_match, pref)
-        = case kind of
-             FunRhs { mc_fun = L _ fun }
-                  -> (pprMatchContext kind, \ pp -> ppr fun <+> pp)
-             _    -> (pprMatchContext kind, \ pp -> pp)
+-- | Return True when any of the pattern match warnings ('allPmCheckWarnings')
+-- are enabled, in which case we need to run the pattern match checker.
+needToRunPmCheck :: DynFlags -> Origin -> Bool
+needToRunPmCheck dflags origin
+  | isGenerated origin
+  = False
+  | otherwise
+  = notNull (filter (`wopt` dflags) allPmCheckWarnings)
+
+{- Note [Inaccessible warnings for record updates]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (#12957)
+  data T a where
+    T1 :: { x :: Int } -> T Bool
+    T2 :: { x :: Int } -> T a
+    T3 :: T a
+
+  f :: T Char -> T a
+  f r = r { x = 3 }
+
+The desugarer will conservatively generate a case for T1 even though
+it's impossible:
+  f r = case r of
+          T1 x -> T1 3   -- Inaccessible branch
+          T2 x -> T2 3
+          _    -> error "Missing"
+
+We don't want to warn about the inaccessible branch because the programmer
+didn't put it there!  So we filter out the warning here.
+
+The same can happen for long distance term constraints instead of type
+constraints (#17783):
+
+  data T = A { x :: Int } | B { x :: Int }
+  f r@A{} = r { x = 3 }
+  f _     = B 0
+
+Here, the long distance info from the FunRhs match (@r ~ A x@) will make the
+clause matching on @B@ of the desugaring to @case@ redundant. It's generated
+code that we don't want to warn about.
+-}
+
+--
+-- * Long-distance information
+--
+
+-- | Locally update 'dsl_deltas' with the given action, but defer evaluation
+-- with 'unsafeInterleaveM' in order not to do unnecessary work.
+locallyExtendPmDeltas :: (Deltas -> DsM Deltas) -> DsM a -> DsM a
+locallyExtendPmDeltas ext k = do
+  deltas <- getLdiDeltas
+  deltas' <- unsafeInterleaveM $ ext deltas
+  updPmDeltas deltas' k
+
+-- | Add in-scope type constraints if the coverage checker might run and then
+-- run the given action.
+addTyCs :: Origin -> Bag EvVar -> DsM a -> DsM a
+addTyCs origin ev_vars m = do
+  dflags <- getDynFlags
+  applyWhen (needToRunPmCheck dflags origin)
+            (locallyExtendPmDeltas (\deltas -> addPmCtsDeltas deltas (PmTyCt . evVarPred <$> ev_vars)))
+            m
+
+-- | Add equalities for the 'CoreExpr' scrutinee to the local 'DsM' environment
+-- when checking a case expression:
+--     case e of x { matches }
+-- When checking matches we record that (x ~ e) where x is the initial
+-- uncovered. All matches will have to satisfy this equality.
+addCoreScrutTmCs :: Maybe CoreExpr -> [Id] -> DsM a -> DsM a
+addCoreScrutTmCs Nothing    _   k = k
+addCoreScrutTmCs (Just scr) [x] k =
+  flip locallyExtendPmDeltas k $ \deltas ->
+    addPmCtsDeltas deltas (unitBag (PmCoreCt x scr))
+addCoreScrutTmCs _   _   _ = panic "addCoreScrutTmCs: scrutinee, but more than one match id"
+
+-- | 'addCoreScrutTmCs', but desugars the 'LHsExpr' first.
+addHsScrutTmCs :: Maybe (LHsExpr GhcTc) -> [Id] -> DsM a -> DsM a
+addHsScrutTmCs Nothing    _    k = k
+addHsScrutTmCs (Just scr) vars k = do
+  scr_e <- dsLExpr scr
+  addCoreScrutTmCs (Just scr_e) vars k
+
+{- Note [Long-distance information]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+  data Color = R | G | B
+  f :: Color -> Int
+  f R = …
+  f c = … (case c of
+          G -> True
+          B -> False) …
+
+Humans can make the "long-distance connection" between the outer pattern match
+and the nested case pattern match to see that the inner pattern match is
+exhaustive: @c@ can't be @R@ anymore because it was matched in the first clause
+of @f@.
+
+To achieve similar reasoning in the coverage checker, we keep track of the set
+of values that can reach a particular program point (often loosely referred to
+as "Covered set") in 'GHC.HsToCore.Monad.dsl_deltas'.
+We fill that set with Covered Deltas returned by the exported checking
+functions, which the call sites put into place with
+'GHC.HsToCore.Monad.updPmDeltas'.
+Call sites also extend this set with facts from type-constraint dictionaries,
+case scrutinees, etc. with the exported functions 'addTyCs', 'addCoreScrutTmCs'
+and 'addHsScrutTmCs'.
+
+Note [Recovering from unsatisfiable pattern-matching constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider the following code (see #12957 and #15450):
+
+  f :: Int ~ Bool => ()
+  f = case True of { False -> () }
+
+We want to warn that the pattern-matching in `f` is non-exhaustive. But GHC
+used not to do this; in fact, it would warn that the match was /redundant/!
+This is because the constraint (Int ~ Bool) in `f` is unsatisfiable, and the
+coverage checker deems any matches with unsatisfiable constraint sets to be
+unreachable.
+
+We make sure to always start from an inhabited 'Deltas' by calling
+'getLdiDeltas', which falls back to the trivially inhabited 'Deltas' if the
+long-distance info returned by 'GHC.HsToCore.Monad.getPmDeltas' is empty.
+-}
