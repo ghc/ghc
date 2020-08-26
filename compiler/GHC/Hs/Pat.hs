@@ -857,7 +857,13 @@ patNeedsParens p = go
     go (BangPat {})      = False
     go (ParPat {})       = False
     go (AsPat {})        = False
-    go (TuplePat {})     = False
+    go (TuplePat _ pats bx)
+      -- Special-case unary boxed tuple applications so that they are
+      -- parenthesized as `Identity (Solo x)`, not `Identity Solo x` (#18612)
+      -- See Note [One-tuples] in GHC.Builtin.Types
+      | [_] <- pats
+      , Boxed <- bx      = p >= appPrec
+      | otherwise        = False
     go (SumPat {})       = False
     go (ListPat {})      = False
     go (LitPat _ l)      = hsLitNeedsParens p l

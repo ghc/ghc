@@ -1320,7 +1320,13 @@ hsExprNeedsParens p = go
     go (NegApp{})                     = p > topPrec
     go (SectionL{})                   = True
     go (SectionR{})                   = True
-    go (ExplicitTuple{})              = False
+    go (ExplicitTuple _ exprs boxity)
+      -- Special-case unary boxed tuple applications so that they are
+      -- parenthesized as `Identity (Solo x)`, not `Identity Solo x` (#18612)
+      -- See Note [One-tuples] in GHC.Builtin.Types
+     | [L _ Present{}] <- exprs
+     , Boxed <- boxity                = p >= appPrec
+     | otherwise                      = False
     go (ExplicitSum{})                = False
     go (HsLam{})                      = p > topPrec
     go (HsLamCase{})                  = p > topPrec

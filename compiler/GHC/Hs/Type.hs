@@ -1979,14 +1979,29 @@ hsTypeNeedsParens p = go_hs_ty
     go_hs_ty (HsRecTy{})              = False
     go_hs_ty (HsTyVar{})              = False
     go_hs_ty (HsFunTy{})              = p >= funPrec
-    go_hs_ty (HsTupleTy{})            = False
+    go_hs_ty (HsTupleTy _ con tys)
+      -- Special-case unary boxed tuple applications so that they are
+      -- parenthesized as `Identity (Solo x)`, not `Identity Solo x` (#18612)
+      -- See Note [One-tuples] in GHC.Builtin.Types
+      | [L _ ty] <- tys
+      = case con of
+          HsBoxedTuple               -> p >= appPrec
+          HsBoxedOrConstraintTuple   -> p >= appPrec
+          HsConstraintTuple          -> go_hs_ty ty
+          HsUnboxedTuple             -> False
+      | otherwise                     = False
     go_hs_ty (HsSumTy{})              = False
     go_hs_ty (HsKindSig{})            = p >= sigPrec
     go_hs_ty (HsListTy{})             = False
     go_hs_ty (HsIParamTy{})           = p > topPrec
     go_hs_ty (HsSpliceTy{})           = False
     go_hs_ty (HsExplicitListTy{})     = False
-    go_hs_ty (HsExplicitTupleTy{})    = False
+    go_hs_ty (HsExplicitTupleTy _ tys)
+      -- Special-case unary boxed tuple applications so that they are
+      -- parenthesized as `Proxy ('Solo x)`, not `Proxy 'Solo x` (#18612)
+      -- See Note [One-tuples] in GHC.Builtin.Types
+      | [_] <- tys                    = p >= appPrec
+      | otherwise                     = False
     go_hs_ty (HsTyLit{})              = False
     go_hs_ty (HsWildCardTy{})         = False
     go_hs_ty (HsStarTy{})             = p >= starPrec
