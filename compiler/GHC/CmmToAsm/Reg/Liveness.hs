@@ -559,7 +559,7 @@ stripLiveBlock
         -> LiveBasicBlock instr
         -> NatBasicBlock instr
 
-stripLiveBlock config (BasicBlock i lis)
+stripLiveBlock _config (BasicBlock i lis)
  =      BasicBlock i instrs'
 
  where  (instrs', _)
@@ -568,13 +568,15 @@ stripLiveBlock config (BasicBlock i lis)
         spillNat acc []
          =      return (reverse acc)
 
-        spillNat acc (LiveInstr (SPILL reg slot) _ : instrs)
-         = do   delta   <- get
-                spillNat (mkSpillInstr config reg delta slot : acc) instrs
+        spillNat _acc (LiveInstr (SPILL _reg _slot) _ : _instrs)
+         = error "dead code: spill"
+        --  do   delta   <- get
+        --         spillNat (mkSpillInstr config reg delta slot : acc) instrs
 
-        spillNat acc (LiveInstr (RELOAD slot reg) _ : instrs)
-         = do   delta   <- get
-                spillNat (mkLoadInstr config reg delta slot : acc) instrs
+        spillNat _acc (LiveInstr (RELOAD _slot _reg) _ : _instrs)
+         = error "dead code: reload:"
+        --  do   delta   <- get
+        --         spillNat (mkLoadInstr config reg delta slot : acc) instrs
 
         spillNat acc (LiveInstr (Instr instr) _ : instrs)
          | Just i <- takeDeltaInstr instr
