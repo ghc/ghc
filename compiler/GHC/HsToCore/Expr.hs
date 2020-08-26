@@ -31,7 +31,7 @@ import GHC.HsToCore.ListComp
 import GHC.HsToCore.Utils
 import GHC.HsToCore.Arrows
 import GHC.HsToCore.Monad
-import GHC.HsToCore.PmCheck ( addTyCsDs, covCheckGRHSs )
+import GHC.HsToCore.PmCheck ( addTyCs, covCheckGRHSs )
 import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Core.FamInstEnv( topNormaliseType )
@@ -283,7 +283,7 @@ dsExpr hswrap@(XExpr (WrapExpr (HsWrap co_fn e)))
                  HsConLikeOut _ (RealDataCon dc) -> return $ varToCoreExpr (dataConWrapId dc)
                  XExpr (WrapExpr (HsWrap _ _)) -> pprPanic "dsExpr: HsWrap inside HsWrap" (ppr hswrap)
                  HsPar _ _ -> pprPanic "dsExpr: HsPar inside HsWrap" (ppr hswrap)
-                 _ -> addTyCsDs FromSource (hsWrapDictBinders co_fn) $
+                 _ -> addTyCs FromSource (hsWrapDictBinders co_fn) $
                       dsExpr e
                -- See Note [Detecting forced eta expansion]
        ; wrap' <- dsHsWrapper co_fn

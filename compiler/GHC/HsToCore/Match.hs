@@ -770,8 +770,8 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
         -- Each Match will split off one Deltas for its RHSs from this.
         ; matches_deltas <- if isMatchContextPmChecked dflags origin ctxt
             then addHsScrutTmCs mb_scr new_vars $
-                 -- See Note [Type and Term Equality Propagation]
-                 covCheckMatchGroup (DsMatchContext ctxt locn) new_vars matches
+                 -- See Note [Long-distance information]
+                 covCheckMatches (DsMatchContext ctxt locn) new_vars matches
             else pure (initDeltasMatches matches)
 
         ; eqns_info   <- zipWithM mk_eqn_info matches matches_deltas
@@ -881,7 +881,7 @@ matchSinglePatVar var mb_scrut ctx pat ty match_result
        -- Pattern match check warnings
        ; when (isMatchContextPmChecked dflags FromSource ctx) $
            addCoreScrutTmCs mb_scrut [var] $
-           covCheckPatBind dflags (DsMatchContext ctx locn) var (unLoc pat)
+           covCheckPatBind (DsMatchContext ctx locn) var (unLoc pat)
 
        ; let eqn_info = EqnInfo { eqn_pats = [unLoc (decideBangHood dflags pat)]
                                 , eqn_orig = FromSource
