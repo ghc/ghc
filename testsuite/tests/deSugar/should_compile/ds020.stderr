@@ -18,3 +18,11 @@ ds020.hs:20:1: warning: [-Woverlapping-patterns (in -Wdefault)]
 ds020.hs:23:1: warning: [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
     In an equation for ‘f’: f x@(~[]) = ...
+
+ds020.hs:32:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a pattern binding: (x1 : xs1 : ys1) = ...
+
+ds020.hs:33:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a pattern binding: (~x : ~xs : ~ys) = ...

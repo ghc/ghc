@@ -33,7 +33,7 @@ import {-# SOURCE #-}   GHC.HsToCore.Match ( matchWrapper )
 import GHC.HsToCore.Monad
 import GHC.HsToCore.GuardedRHSs
 import GHC.HsToCore.Utils
-import GHC.HsToCore.PmCheck ( addTyCsDs, covCheckGRHSs )
+import GHC.HsToCore.PmCheck ( addTyCs, covCheckGRHSs )
 
 import GHC.Hs             -- lots of things
 import GHC.Core           -- lots of things
@@ -151,14 +151,14 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
                            , fun_matches = matches
                            , fun_ext = co_fn
                            , fun_tick = tick })
- = do   { (args, body) <- addTyCsDs FromSource (hsWrapDictBinders co_fn) $
+ = do   { (args, body) <- addTyCs FromSource (hsWrapDictBinders co_fn) $
                           -- FromSource might not be accurate (we don't have any
                           -- origin annotations for things in this module), but at
                           -- worst we do superfluous calls to the pattern match
                           -- oracle.
-                          -- addTyCsDs: Add type evidence to the refinement type
+                          -- addTyCs: Add type evidence to the refinement type
                           --            predicate of the coverage checker
-                          -- See Note [Type and Term Equality Propagation] in "GHC.HsToCore.PmCheck"
+                          -- See Note [Long-distance information] in "GHC.HsToCore.PmCheck"
                           matchWrapper
                            (mkPrefixFunRhs (L loc (idName fun)))
                            Nothing matches
@@ -200,11 +200,11 @@ dsHsBind dflags (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                           , abs_exports = exports
                           , abs_ev_binds = ev_binds
                           , abs_binds = binds, abs_sig = has_sig })
-  = do { ds_binds <- addTyCsDs FromSource (listToBag dicts) $
+  = do { ds_binds <- addTyCs FromSource (listToBag dicts) $
                      dsLHsBinds binds
-             -- addTyCsDs: push type constraints deeper
+             -- addTyCs: push type constraints deeper
              --            for inner pattern match check
-             -- See Check, Note [Type and Term Equality Propagation]
+             -- See Check, Note [Long-distance information]
 
        ; ds_ev_binds <- dsTcEvBinds_s ev_binds
 
