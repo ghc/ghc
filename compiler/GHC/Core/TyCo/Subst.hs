@@ -440,7 +440,7 @@ zipTyEnv tyvars tys
   = pprPanic "zipTyEnv" (ppr tyvars <+> ppr tys)
   | otherwise
   = ASSERT( all (not . isCoercionTy) tys )
-    mkVarEnv (zipEqual "zipTyEnv" tyvars tys)
+    zipToUFM tyvars tys
         -- There used to be a special case for when
         --      ty == TyVarTy tv
         -- (a not-uncommon case) in which case the substitution was dropped.

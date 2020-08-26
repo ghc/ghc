@@ -113,6 +113,12 @@ unitUFM k v = UFM (M.singleton (getKey $ getUnique k) v)
 unitDirectlyUFM :: Unique -> elt -> UniqFM key elt
 unitDirectlyUFM u v = UFM (M.singleton (getKey u) v)
 
+zipToUFM :: Uniquable key => [key] -> [elt] -> UniqFM key elt
+zipToUFM = innerZip emptyUFM
+  where
+    innerZip ufm (k:kList) (v:vList) = innerZip (addToUFM ufm k v) kList vList
+    innerZip ufm _ _ = ufm
+
 listToUFM :: Uniquable key => [(key,elt)] -> UniqFM key elt
 listToUFM = foldl' (\m (k, v) -> addToUFM m k v) emptyUFM
 
