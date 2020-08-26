@@ -104,8 +104,8 @@ cmmTopCodeGen
     -> NatM [NatCmmDecl RawCmmStatics Instr]
 
 -- Thus we'll have to deal with either CmmProc ...
-cmmTopCodeGen cmm@(CmmProc info lab live graph) = do
-  config <- getConfig
+cmmTopCodeGen _cmm@(CmmProc info lab live graph) = do
+  -- config <- getConfig
   -- do
   --   traceM $ "-- -------------------------- cmmTopGen (CmmProc) -------------------------- --\n"
   --         ++ showSDocUnsafe (ppr cmm)
@@ -120,15 +120,12 @@ cmmTopCodeGen cmm@(CmmProc info lab live graph) = do
       os   = platformOS platform
 
   case picBaseMb of
-      Just picBase -> do
-          -- XXX: PIC not yet implemented
-          panic "AArch64.cmmTopCodeGen: PIC not implemented"
-          return tops
+      Just _picBase -> panic "AArch64.cmmTopCodeGen: picBase not implemented"
       Nothing -> return tops
 
 -- ... or CmmData. Do we want to align this?
-cmmTopCodeGen cmm@(CmmData sec dat) = do
-  config <- getConfig
+cmmTopCodeGen _cmm@(CmmData sec dat) = do
+  -- config <- getConfig
   -- do
   --   traceM $ "-- -------------------------- cmmTopGen (CmmData) -------------------------- --\n"
   --         ++ showSDocUnsafe (ppr cmm)
@@ -141,7 +138,7 @@ basicBlockCodeGen
                 , [NatCmmDecl RawCmmStatics Instr])
 
 basicBlockCodeGen block = do
-  config <- getConfig
+  -- config <- getConfig
   -- do
   --   traceM $ "-- --------------------------- basicBlockCodeGen --------------------------- --\n"
   --         ++ showSDocUnsafe (ppr block)
@@ -385,7 +382,7 @@ getFloatReg expr = do
     Any II64 code -> do
       tmp <- getNewRegNat FF64
       return (tmp, FF64, code tmp)
-    Any w _code -> pprPanic "can't do getFloatReg on" (ppr expr)
+    Any _w _code -> pprPanic "can't do getFloatReg on" (ppr expr)
     -- can't do much for fixed.
     Fixed rep reg code ->
       return (reg, rep, code)
@@ -481,7 +478,7 @@ getRegister' config plat expr
                                                     , MOVK (OpReg W64 dst) (OpImmShift (ImmInt half2) SLSL 32)
                                                     , MOVK (OpReg W64 dst) (OpImmShift (ImmInt half3) SLSL 48)
                                                     ]))
-        CmmInt i rep -> do
+        CmmInt _i rep -> do
           (op, imm_code) <- litToImm' lit
           return (Any (intFormat rep) (\dst -> imm_code `snocOL` ANN (text $ show expr) (MOV (OpReg rep dst) op)))
 
@@ -490,8 +487,8 @@ getRegister' config plat expr
           (op, imm_code) <- litToImm' lit
           return (Any (floatFormat w) (\dst -> imm_code `snocOL` ANN (text $ show expr) (MOV (OpReg w dst) op)))
 
-        CmmFloat f W8  -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for bytes" (ppr expr)
-        CmmFloat f W16 -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for halfs" (ppr expr)
+        CmmFloat _f W8  -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for bytes" (ppr expr)
+        CmmFloat _f W16 -> pprPanic "getRegister' (CmmLit:CmmFloat), no support for halfs" (ppr expr)
         CmmFloat f W32 -> do
           let word = castFloatToWord32 (fromRational f) :: Word32
               half0 = fromIntegral (fromIntegral word :: Word16)
@@ -516,19 +513,19 @@ getRegister' config plat expr
                                                       , MOVK (OpReg W64 tmp) (OpImmShift (ImmInt half3) SLSL 48)
                                                       , MOV (OpReg W64 dst) (OpReg W64 tmp)
                                                       ]))
-        CmmFloat f w -> pprPanic "getRegister' (CmmLit:CmmFloat), unsupported float lit" (ppr expr)
+        CmmFloat _f w -> pprPanic "getRegister' (CmmLit:CmmFloat), unsupported float lit" (ppr expr)
         CmmVec _ -> pprPanic "getRegister' (CmmLit:CmmVec): " (ppr expr)
-        CmmLabel lbl -> do
+        CmmLabel _lbl -> do
           (op, imm_code) <- litToImm' lit
           let rep = cmmLitType plat lit
               format = cmmTypeFormat rep
           return (Any format (\dst -> imm_code `snocOL` (ANN (text $ show expr) $ LDR format (OpReg (formatToWidth format) dst) op)))
 
-        CmmLabelOff lbl off | is12bit (fromIntegral off) -> do
+        CmmLabelOff _lbl off | is12bit (fromIntegral off) -> do
           (op, imm_code) <- litToImm' lit
           let rep = cmmLitType plat lit
               format = cmmTypeFormat rep
-              width = typeWidth rep
+              -- width = typeWidth rep
           return (Any format (\dst -> imm_code `snocOL` LDR format (OpReg (formatToWidth format) dst) op))
 
         CmmLabelOff lbl off -> do
@@ -586,13 +583,16 @@ getRegister' config plat expr
         MO_FF_Conv from to -> return $ Any (floatFormat to) (\dst -> code `snocOL` FCVT (OpReg to dst) (OpReg from reg))
 
         -- Conversions
-        MO_XX_Conv from to -> swizzleRegisterRep (intFormat to) <$> getRegister e
+        MO_XX_Conv _from to -> swizzleRegisterRep (intFormat to) <$> getRegister e
 
         _ -> pprPanic "getRegister' (monadic CmmMachOp):" (ppr expr)
       where toImm W8 =  (OpImm (ImmInt 7))
             toImm W16 = (OpImm (ImmInt 15))
             toImm W32 = (OpImm (ImmInt 31))
             toImm W64 = (OpImm (ImmInt 63))
+            toImm W128 = (OpImm (ImmInt 127))
+            toImm W256 = (OpImm (ImmInt 255))
+            toImm W512 = (OpImm (ImmInt 511))
     -- Dyadic machops:
     --
     -- The general idea is:
@@ -604,8 +604,8 @@ getRegister' config plat expr
     --      fallthrough to alert us if things go wrong!
     -- OPTIMIZATION WARNING: Dyadic CmmMachOp destructuring
     -- 0. XXX This should not exist! Rewrite: Reg +- 0 -> Reg
-    CmmMachOp (MO_Add _) [expr'@(CmmReg (CmmGlobal r)), CmmLit (CmmInt 0 _)] -> getRegister' config plat expr'
-    CmmMachOp (MO_Sub _) [expr'@(CmmReg (CmmGlobal r)), CmmLit (CmmInt 0 _)] -> getRegister' config plat expr'
+    CmmMachOp (MO_Add _) [expr'@(CmmReg (CmmGlobal _r)), CmmLit (CmmInt 0 _)] -> getRegister' config plat expr'
+    CmmMachOp (MO_Sub _) [expr'@(CmmReg (CmmGlobal _r)), CmmLit (CmmInt 0 _)] -> getRegister' config plat expr'
     -- 1. Compute Reg +/- n directly.
     --    For Add/Sub we can directly encode 12bits, or 12bits lsl #12.
     CmmMachOp (MO_Add w) [(CmmReg reg), CmmLit (CmmInt n _)]
@@ -656,7 +656,7 @@ getRegister' config plat expr
             return $ Any format_x (\dst -> code_x `appOL` code_y `appOL` op (OpReg w dst) (OpReg w reg_x) (OpReg w reg_y))
 
           withTempIntReg w op = OpReg w <$> getNewRegNat (intFormat w) >>= op
-          withTempFloatReg w op = OpReg w <$> getNewRegNat (floatFormat w) >>= op
+          -- withTempFloatReg w op = OpReg w <$> getNewRegNat (floatFormat w) >>= op
 
           intOp w op = do
             -- compute x<m> <- x
@@ -782,7 +782,7 @@ getRegister' config plat expr
         -- XXX
 
         op -> pprPanic "getRegister' (unhandled dyadic CmmMachOp): " $ (pprMachOp op) <+> text "in" <+> (ppr expr)
-    CmmMachOp op xs
+    CmmMachOp _op _xs
       -> pprPanic "getRegister' (variadic CmmMachOp): " (ppr expr)
 
   where

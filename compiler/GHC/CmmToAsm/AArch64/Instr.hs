@@ -35,6 +35,9 @@ import Control.Monad (replicateM)
 import Data.Maybe (fromMaybe)
 
 import Debug.Trace
+import GHC.Stack
+
+import Data.Bits ((.&.), complement)
 
 -- | XXX: verify this!
 stackFrameHeaderSize :: Platform -> Int
@@ -337,55 +340,54 @@ aarch64_patchJumpInstr instr patchF
 
 -- | An instruction to spill a register into a spill slot.
 aarch64_mkSpillInstr
-   :: NCGConfig
+   :: HasCallStack
+   => NCGConfig
    -> Reg       -- register to spill
    -> Int       -- current stack delta
    -> Int       -- spill slot to use
-   -> Instr
--- XXX this is stupid. We essentially do sp <- sp - 4095; str xN, [sp - ...] ; sp <- sp + 4095
-{-
-aarch64_mkSpillInstr config reg delta slot | (spillSlotToOffset config slot) - delta > 4095
-    = let (!d, !isns) = traceShow msg $ aarch64_mkSpillInstr config reg (delta + delta') slot
-      in traceShow "Spill(1) ret" (d, subIsn : isns ++ [addIsn])
-      where delta' = 4095
-            !addIsn = ADD sp sp (OpImm (ImmInt delta'))
-            !subIsn = SUB sp sp (OpImm (ImmInt delta'))
-            msg = "Spill(1): " ++ show (spillSlotToOffset config slot) ++ "; Delta: " ++ show delta ++ " -> " ++ show (delta + delta')
+   -> [Instr]
 
-aarch64_mkSpillInstr config reg delta slot | (spillSlotToOffset config slot) - delta > 255
-    = let (!d, !isns) = traceShow msg $ aarch64_mkSpillInstr config reg (delta + delta') slot
-      in traceShow "Spill(2) ret" (d, subIsn : isns ++ [addIsn])
-      where delta' = (spillSlotToOffset config slot) - delta
-            !addIsn = ADD sp sp (OpImm (ImmInt delta'))
-            !subIsn = SUB sp sp (OpImm (ImmInt delta'))
-            msg = "Spill(2): " ++ show (spillSlotToOffset config slot) ++ "; Delta: " ++ show delta ++ " -> " ++ show (delta + delta')
+-- Alright, so here's the plan.  On aarch64, we can't spill into arbitrary locations,
+-- the range is essentially [-256,255], or [0, 0xFFF]*8 = [0, 32760] for 64bits. For
+-- other ranges we need to adjust SP first; we should strive to keep it 16byte aligned.
+--
+-- To adjust for other range, we can use ADD/SUB, with a positive immediate of [0, 0xFFF],
+-- or [0, 0xFFF] << 12.
 
-aarch64_mkSpillInstr config reg delta slot | (spillSlotToOffset config slot) - delta < -4095
-    = let (!d, !isns) = traceShow msg $ aarch64_mkSpillInstr config reg (delta - delta') slot
-      in traceShow "Spill(3) ret" (d, addIsn : isns ++ [subIsn])
-      where delta' = 4095
-            !addIsn = ADD sp sp (OpImm (ImmInt delta'))
-            !subIsn = SUB sp sp (OpImm (ImmInt delta'))
-            msg = "Spill(3): " ++ show (spillSlotToOffset config slot) ++ "; Delta: " ++ show delta ++ " -> " ++ show (delta + delta')
-
-aarch64_mkSpillInstr config reg delta slot | (spillSlotToOffset config slot) - delta < -256
-    = let (!d, !isns) = traceShow msg $ aarch64_mkSpillInstr config reg (delta + delta') slot
-      in traceShow "Spill(4) ret" (d, subIsn : isns ++ [addIsn])
-      where delta' = (spillSlotToOffset config slot) - delta
-            !addIsn = ADD sp sp (OpImm (ImmInt delta'))
-            !subIsn = SUB sp sp (OpImm (ImmInt delta'))
-            msg = "Spill(4): " ++ show (spillSlotToOffset config slot) ++ "; Delta: " ++ show delta ++ " -> " ++ show (delta + delta')
--}
-aarch64_mkSpillInstr config reg delta slot
-    = --[
-      -- ANN (text "Spill") $
-      -- traceShow ("Spill: " ++ show (off - delta)) $
-      STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt $ off - delta)))
-      --]
+aarch64_mkSpillInstr config reg delta slot =
+  case (spillSlotToOffset config slot) - delta of
+    imm | -256 <= imm && imm <= 255                               -> [ mkStr imm ]
+    imm | imm > 0 && imm .&. 0x7 == 0x0 && imm <= 0xfff           -> [ mkStr imm ]
+    imm | imm > 0xfff && imm <= 0xffffff && imm .&. 0x7 == 0x0    -> [ mkAdd (imm .&~. 0xfff)
+                                                                     , mkStr (imm .&.  0xfff)
+                                                                     , mkSub (imm .&~. 0xfff) ]
+    imm | imm > 0xfff && imm <= 0xffffff                          -> [ mkAdd (imm .&~. 0xfff)
+                                                                     , mkAdd (imm .&.  0xff0)
+                                                                     , mkStr (imm .&.  0x00f)
+                                                                     , mkSub (imm .&.  0xff0)
+                                                                     , mkSub (imm .&~. 0xfff) ]
+    -- if we have a negative offset, well subtract another 0x1000 from it, and then
+    -- use the positive
+    imm | -imm > 0xfff && -imm <= 0xffefff && imm .&. 0x7 == 0x0  -> [ mkSub (-imm .&~. 0xfff + 0x1000)
+                                                                     , mkStr (0x1000 - (-imm .&. 0xfff))
+                                                                     , mkAdd (-imm .&~. 0xfff + 0x1000) ]
+    imm | -imm > 0xfff && -imm <= 0xffffff                        -> [ mkSub (-imm .&~. 0xfff)
+                                                                     , mkSub (-imm .&.  0xff0)
+                                                                     , mkStr (-(-imm .&. 0x00f))
+                                                                     , mkAdd (-imm .&.  0xff0)
+                                                                     , mkAdd (-imm .&~. 0xfff) ]
+    imm -> pprPanic "aarch64_mkSpillInstr" (text "Unable to spill into" <+> int imm)
     where
+        a .&~. b = a .&. (complement b)
+
         fmt = case reg of
             RegReal (RealRegSingle n) | n < 32 -> II64
             _                                  -> FF64
+
+        mkStr imm = ANN (text "Spill@" <> int (off - delta)) $ STR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt imm)))
+        mkAdd imm = ANN (text "Spill Add") $ ADD sp sp (OpImm (ImmInt imm))
+        mkSub imm = ANN (text "Spill Sub") $ SUB sp sp (OpImm (ImmInt imm))
+
         off = spillSlotToOffset config slot
 
 aarch64_mkLoadInstr
@@ -393,44 +395,42 @@ aarch64_mkLoadInstr
    -> Reg       -- register to load
    -> Int       -- current stack delta
    -> Int       -- spill slot to use
-   -> Instr
--- XXX this is stupid. We essentially do sp <- sp - 4095; str xN, [sp - ...] ; sp <- sp + 4095
-{-
-aarch64_mkLoadInstr config reg delta slot | (spillSlotToOffset config slot) - delta > 4095
-    = let (!d, !isns) =  traceShow msg $ aarch64_mkLoadInstr config reg (delta + delta') slot
-      in traceShow "Reload(1) ret" (d, SUB sp sp (OpImm (ImmInt 4095)) : isns ++ [ADD sp sp (OpImm (ImmInt 4095))])
-      where delta' = 4095
-            msg = "Reload(1): " ++ show (spillSlotToOffset config slot) ++ "; Delta: " ++ show delta ++ " -> " ++ show (delta + delta')
+   -> [Instr]
 
-aarch64_mkLoadInstr config reg delta slot | (spillSlotToOffset config slot) - delta > 255
-    = let (!d, !isns) = traceShow msg $ aarch64_mkLoadInstr config reg (delta + delta') slot
-      in traceShow "Reload(2) ret" (d, SUB sp sp (OpImm (ImmInt delta')) : isns ++ [ADD sp sp (OpImm (ImmInt delta'))])
-      where delta' = (spillSlotToOffset config slot) - delta
-            msg = "Reload(2): " ++ show (spillSlotToOffset config slot) ++ "; Delta: " ++ show delta ++ " -> " ++ show (delta + delta')
-
-aarch64_mkLoadInstr config reg delta slot | (spillSlotToOffset config slot) - delta < -4095
-    = let (!d, !isns) =  traceShow msg $ aarch64_mkLoadInstr config reg (delta + delta') slot
-      in traceShow "Reload(3) ret" (d, ADD sp sp (OpImm (ImmInt 4095)) : isns ++ [SUB sp sp (OpImm (ImmInt 4095))])
-      where delta' = -4095
-            msg = "Reload(3): " ++ show (spillSlotToOffset config slot) ++ "; Delta: " ++ show delta ++ " -> " ++ show (delta + delta')
-
-aarch64_mkLoadInstr config reg delta slot | (spillSlotToOffset config slot) - delta < -256
-    = let (!d, !isns) = traceShow msg $ aarch64_mkLoadInstr config reg (delta + delta') slot
-      in traceShow "Reload(4) ret" (d, SUB sp sp (OpImm (ImmInt delta')) : isns ++ [ADD sp sp (OpImm (ImmInt delta'))])
-      where delta' = (spillSlotToOffset config slot) - delta
-            msg = "Reload(4): " ++ show (spillSlotToOffset config slot) ++ "; Delta: " ++ show delta ++ " -> " ++ show (delta + delta')
-
--}
-aarch64_mkLoadInstr config reg delta slot
-    = --[
-      -- ANN (text "Reload") $
-      -- traceShow ("Reload: " ++ show (off - delta)) $
-      LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt $ off - delta)))
-      -- ]
+aarch64_mkLoadInstr config reg delta slot =
+  case (spillSlotToOffset config slot) - delta of
+    imm | -256 <= imm && imm <= 255                               -> [ mkLdr imm ]
+    imm | imm > 0 && imm .&. 0x7 == 0x0 && imm <= 0xfff           -> [ mkLdr imm ]
+    imm | imm > 0xfff && imm <= 0xffffff && imm .&. 0x7 == 0x0    -> [ mkAdd (imm .&~. 0xfff)
+                                                                     , mkLdr (imm .&.  0xfff)
+                                                                     , mkSub (imm .&~. 0xfff) ]
+    imm | imm > 0xfff && imm <= 0xffffff                          -> [ mkAdd (imm .&~. 0xfff)
+                                                                     , mkAdd (imm .&.  0xff0)
+                                                                     , mkLdr (imm .&.  0x00f)
+                                                                     , mkSub (imm .&.  0xff0)
+                                                                     , mkSub (imm .&~. 0xfff) ]
+    -- if we have a negative offset, well subtract another 0x1000 from it, and then
+    -- use the positive
+    imm | -imm > 0xfff && -imm <= 0xffefff && imm .&. 0x7 == 0x0  -> [ mkSub (-imm .&~. 0xfff + 0x1000)
+                                                                     , mkLdr (0x1000 - (-imm .&. 0xfff))
+                                                                     , mkAdd (-imm .&~. 0xfff + 0x1000) ]
+    imm | -imm > 0xfff && -imm <= 0xffffff                        -> [ mkSub (-imm .&~. 0xfff)
+                                                                     , mkSub (-imm .&.  0xff0)
+                                                                     , mkLdr (-(-imm .&. 0x00f))
+                                                                     , mkAdd (-imm .&.  0xff0)
+                                                                     , mkAdd (-imm .&~. 0xfff) ]
+    imm -> pprPanic "aarch64_mkSpillInstr" (text "Unable to spill into" <+> int imm)
     where
+        a .&~. b = a .&. (complement b)
+
         fmt = case reg of
             RegReal (RealRegSingle n) | n < 32 -> II64
             _                                  -> FF64
+
+        mkLdr imm = ANN (text "Reload@" <> int (off - delta)) $ LDR fmt (OpReg W64 reg) (OpAddr (AddrRegImm (regSingle 31) (ImmInt imm)))
+        mkAdd imm = ANN (text "Reload Add") $ ADD sp sp (OpImm (ImmInt imm))
+        mkSub imm = ANN (text "Reload Sub") $ SUB sp sp (OpImm (ImmInt imm))
+
         off = spillSlotToOffset config slot
 
 --------------------------------------------------------------------------------
