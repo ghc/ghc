@@ -346,55 +346,48 @@ getClosureX get_closure_raw x = do
                 , finalizer = pts !! 3
                 , link = pts !! 4
                 }
-        TSO -> do
-            unless (length pts == 6) $
-                fail $ "Expected 6 ptr arguments to TSO, found "
+        TSO | [ u_lnk, u_gbl_lnk, tso_stack, u_trec, u_blk_ex, u_bq] <- pts
+                -> withArray wds (\ptr -> do
+                    fields <- FFIClosures.peekTSOFields peekStgTSOProfInfo ptr
+                    pure $ TSOClosure
+                        { info = itbl
+                        , unsafe_link = u_lnk
+                        , unsafe_global_link = u_gbl_lnk
+                        , tsoStack = tso_stack
+                        , unsafe_trec = u_trec
+                        , unsafe_blocked_exceptions = u_blk_ex
+                        , unsafe_bq = u_bq
+                        , what_next = FFIClosures.tso_what_next fields
+                        , why_blocked = FFIClosures.tso_why_blocked fields
+                        , flags = FFIClosures.tso_flags fields
+                        , threadId = FFIClosures.tso_threadId fields
+                        , saved_errno = FFIClosures.tso_saved_errno fields
+                        , tso_dirty = FFIClosures.tso_dirty fields
+                        , alloc_limit = FFIClosures.tso_alloc_limit fields
+                        , tot_stack_size = FFIClosures.tso_tot_stack_size fields
+                        , prof = FFIClosures.tso_prof fields
+                        })
+            | otherwise
+                -> fail $ "Expected 6 ptr arguments to TSO, found "
                         ++ show (length pts)
+        STACK   | [u_sp] <- pts
+                    -> withArray wds (\ptr -> do
+                            fields <- FFIClosures.peekStackFields ptr
 
-            allocaArray (length wds) (\ptr -> do
-                pokeArray ptr wds
-
-                fields <- FFIClosures.peekTSOFields peekStgTSOProfInfo ptr
-                pure $ TSOClosure
-                    { info = itbl
-                    , unsafe_link = (pts !! 0)
-                    , unsafe_global_link = (pts !! 1)
-                    , tsoStack = (pts !! 2)
-                    , unsafe_trec = (pts !! 3)
-                    , unsafe_blocked_exceptions = (pts !! 4)
-                    , unsafe_bq = (pts !! 5)
-                    , what_next = FFIClosures.tso_what_next fields
-                    , why_blocked = FFIClosures.tso_why_blocked fields
-                    , flags = FFIClosures.tso_flags fields
-                    , threadId = FFIClosures.tso_threadId fields
-                    , saved_errno = FFIClosures.tso_saved_errno fields
-                    , tso_dirty = FFIClosures.tso_dirty fields
-                    , alloc_limit = FFIClosures.tso_alloc_limit fields
-                    , tot_stack_size = FFIClosures.tso_tot_stack_size fields
-                    , prof = FFIClosures.tso_prof fields
-                    }
-                )
-        STACK -> do
-            unless (length pts == 1) $
-                fail $ "Expected 1 ptr argument to STACK, found "
-                        ++ show (length pts)
-
-            allocaArray (length wds) (\ptr -> do
-                pokeArray ptr wds
-
-                fields <- FFIClosures.peekStackFields ptr
-
-                pure $ StackClosure
-                    { info = itbl
-                    , stack_size = FFIClosures.stack_size fields
-                    , stack_dirty = FFIClosures.stack_dirty fields
-                    , unsafeStackPointer = (pts !! 0)
-                    , unsafeStack  = FFIClosures.stack fields
+                            pure $ StackClosure
+                                { info = itbl
+                                , stack_size = FFIClosures.stack_size fields
+                                , stack_dirty = FFIClosures.stack_dirty fields
+                                , unsafeStackPointer = u_sp
+                                , unsafeStack  = FFIClosures.stack fields
 #if __GLASGOW_HASKELL__ >= 811
-                    , stack_marking = FFIClosures.stack_marking fields
+                                , stack_marking = FFIClosures.stack_marking fields
 #endif
-                    }
-                )
+                                })
+                | otherwise
+                    -> fail $ "Expected 1 ptr argument to STACK, found "
+                        ++ show (length pts)
+
         _ ->
             pure $ UnsupportedClosure itbl
 
