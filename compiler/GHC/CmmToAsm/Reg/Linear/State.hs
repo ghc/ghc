@@ -52,6 +52,7 @@ import GHC.Types.Unique
 import GHC.Types.Unique.Supply
 
 import Control.Monad (ap)
+import GHC.Stack
 
 type RA_Result freeRegs a = (# RA_State freeRegs, a #)
 
@@ -114,8 +115,8 @@ makeRAStats state
         , ra_fixupList          = ra_fixups state }
 
 
-spillR :: Instruction instr
-       => Reg -> Unique -> RegM freeRegs (instr, Int)
+spillR :: (HasCallStack, Instruction instr)
+       => Reg -> Unique -> RegM freeRegs ([instr], Int)
 
 spillR reg temp = RegM $ \s ->
   let (stack1,slot) = getStackSlotFor (ra_stack s) temp
@@ -125,7 +126,7 @@ spillR reg temp = RegM $ \s ->
 
 
 loadR :: Instruction instr
-      => Reg -> Int -> RegM freeRegs instr
+      => Reg -> Int -> RegM freeRegs [instr]
 
 loadR reg slot = RegM $ \s ->
   RA_Result s (mkLoadInstr (ra_config s) reg (ra_delta s) slot)

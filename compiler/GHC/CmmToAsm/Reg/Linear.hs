@@ -262,7 +262,7 @@ linearRegAlloc' config initFreeRegs entry_ids block_live sccs
         return  (blocks, stats, getStackUse stack)
 
 
-linearRA_SCCs :: OutputableRegConstraint freeRegs instr
+linearRA_SCCs :: (HasCallStack, OutputableRegConstraint freeRegs instr)
               => [BlockId]
               -> BlockMap RegSet
               -> [NatBasicBlock instr]
@@ -297,7 +297,7 @@ linearRA_SCCs entry_ids block_live blocksAcc (CyclicSCC blocks : sccs)
    more sanity checking to guard against this eventuality.
 -}
 
-process :: forall freeRegs instr. (OutputableRegConstraint freeRegs instr)
+process :: forall freeRegs instr. (HasCallStack, OutputableRegConstraint freeRegs instr)
         => [BlockId]
         -> BlockMap RegSet
         -> [GenBasicBlock (LiveInstr instr)]
@@ -337,7 +337,7 @@ process entry_ids block_live =
 -- | Do register allocation on this basic block
 --
 processBlock
-        :: OutputableRegConstraint freeRegs instr
+        :: (HasCallStack, OutputableRegConstraint freeRegs instr)
         => BlockMap RegSet              -- ^ live regs on entry to each basic block
         -> LiveBasicBlock instr         -- ^ block to do register allocation on
         -> RegM freeRegs [NatBasicBlock instr]   -- ^ block with registers allocated
@@ -384,7 +384,7 @@ initBlock id block_live
 
 -- | Do allocation for a sequence of instructions.
 linearRA
-        :: forall freeRegs instr. (OutputableRegConstraint freeRegs instr)
+        :: forall freeRegs instr. (HasCallStack, OutputableRegConstraint freeRegs instr)
         => BlockMap RegSet                      -- ^ map of what vregs are live on entry to each block.
         -> BlockId                              -- ^ id of the current block, for debugging.
         -> [LiveInstr instr]                    -- ^ liveness annotated instructions in this block.
@@ -409,7 +409,7 @@ linearRA block_live block_id = go [] []
 
 -- | Do allocation for a single instruction.
 raInsn
-        :: OutputableRegConstraint freeRegs instr
+        :: (HasCallStack, OutputableRegConstraint freeRegs instr)
         => BlockMap RegSet                      -- ^ map of what vregs are love on entry to each block.
         -> [instr]                              -- ^ accumulator for instructions already processed.
         -> BlockId                              -- ^ the id of the current block, for debugging
@@ -503,7 +503,7 @@ genRaInsn :: forall freeRegs instr.
           -> RegM freeRegs ([instr], [NatBasicBlock instr])
 
 genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
---   pprTraceM "genRaInsn" $ ppr (block_id, instr)
+--  pprTraceM "genRaInsn" $ ppr (block_id, instr)
   platform <- getPlatform
   case regUsageOfInstr platform instr of { RU read written ->
     do
@@ -715,7 +715,7 @@ saveClobberedTemps clobbered dying
 
                   let new_assign  = addToUFM_Directly assig temp (InBoth reg slot)
 
-                  clobber new_assign (spill : instrs) rest
+                  clobber new_assign (spill ++ instrs) rest
 
 
 
@@ -854,7 +854,7 @@ findPrefRealReg vreg = do
 
 -- reading is redundant with reason, but we keep it around because it's
 -- convenient and it maintains the recursive structure of the allocator. -- EZY
-allocRegsAndSpill_spill :: (FR freeRegs, Instruction instr)
+allocRegsAndSpill_spill :: (FR freeRegs, Instruction instr, Outputable instr)
                         => Bool
                         -> [VirtualReg]
                         -> [instr]
@@ -939,7 +939,7 @@ allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
                                 (spill_insn, slot) <- spillR (RegReal my_reg) temp_to_push_out
                                 let spill_store  = (if reading then id else reverse)
                                                         -- COMMENT (fsLit "spill alloc"):
-                                                           [spill_insn]
+                                                           spill_insn
 
                                 -- record that this temp was spilled
                                 recordSpill (SpillAlloc temp_to_push_out)
@@ -989,7 +989,7 @@ loadTemp vreg (ReadMem slot) hreg spills
  = do
         insn <- loadR (RegReal hreg) slot
         recordSpill (SpillLoad $ getUnique vreg)
-        return  $  {- COMMENT (fsLit "spill load") : -} insn : spills
+        return  $  {- COMMENT (fsLit "spill load") : -} insn ++ spills
 
 loadTemp _ _ _ spills =
    return spills
