@@ -3,10 +3,10 @@
 
 module T18572 where
 
-True = True
+True = True -- no warning
 
 data SBool (b :: Bool) where
   STrue :: SBool True
   SFalse :: SBool False
 
-STrue = SFalse
+STrue = SFalse -- "redundant", not "inaccessible"

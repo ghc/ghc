@@ -556,9 +556,8 @@ isSingleton :: [a] -> Bool
 isSingleton [_] = True
 isSingleton _   = False
 
-notNull :: [a] -> Bool
-notNull [] = False
-notNull _  = True
+notNull :: Foldable f => f a -> Bool
+notNull = not . null
 
 only :: [a] -> a
 #if defined(DEBUG)
