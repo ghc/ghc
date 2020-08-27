@@ -10,16 +10,12 @@ Taken quite directly from the Peyton Jones/Lester paper.
 -- | A module concerned with finding the free variables of an expression.
 module GHC.Core.FVs (
         -- * Free variables of expressions and binding groups
-        exprFreeVars,
+        exprFreeVars,     exprsFreeVars,
         exprFreeVarsDSet,
-        exprFreeVarsList,
-        exprFreeIds,
-        exprFreeIdsDSet,
-        exprFreeIdsList,
-        exprsFreeIdsDSet,
-        exprsFreeIdsList,
-        exprsFreeVars,
-        exprsFreeVarsList,
+        exprFreeVarsList, exprsFreeVarsList,
+        exprFreeIds,      exprsFreeIds,
+        exprFreeIdsDSet,  exprsFreeIdsDSet,
+        exprFreeIdsList,  exprsFreeIdsList,
         bindFreeVars,
 
         -- * Selective free variables of expressions
@@ -125,6 +121,9 @@ exprFreeVarsList = fvVarList . exprFVs
 -- | Find all locally-defined free Ids in an expression
 exprFreeIds :: CoreExpr -> IdSet        -- Find all locally-defined free Ids
 exprFreeIds = exprSomeFreeVars isLocalId
+
+exprsFreeIds :: [CoreExpr] -> IdSet        -- Find all locally-defined free Ids
+exprsFreeIds = exprsSomeFreeVars isLocalId
 
 -- | Find all locally-defined free Ids in an expression
 -- returning a deterministic set.
