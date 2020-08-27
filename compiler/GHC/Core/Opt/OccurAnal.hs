@@ -64,7 +64,7 @@ Here's the externally-callable interface:
 occurAnalysePgm :: Module         -- Used only in debug output
                 -> (Id -> Bool)         -- Active unfoldings
                 -> (Activation -> Bool) -- Active rules
-                -> [CoreRule]
+                -> [CoreRule]           -- Local rules for imported Ids
                 -> CoreProgram -> CoreProgram
 occurAnalysePgm this_mod active_unf active_rule imp_rules binds
   | isEmptyDetails final_usage
@@ -96,20 +96,20 @@ occurAnalysePgm this_mod active_unf active_rule imp_rules binds
     -- The RULES declarations keep things alive!
 
     -- imp_rule_edges maps a top-level local binder 'f' to the
-    -- RHS free vars of any local RULES for an imported function,
+    -- RHS free vars of any active local RULES for an imported function,
     -- where 'f' appears on the LHS
     --   e.g.  RULE foldr f = blah
     --         imp_rule_edges contains f :-> fvs(blah)
     -- See Note [Preventing loops due to imported functions rules]
     imp_rule_edges :: ImpRuleEdges
     imp_rule_edges = foldr (plusVarEnv_C unionVarSet) emptyVarEnv
-                            [ mapVarEnv (const maps_to) $
-                                getUniqSet (exprFreeIds arg `delVarSetList` ru_bndrs imp_rule)
-                            | imp_rule <- imp_rules
-                            , not (isBuiltinRule imp_rule)  -- See Note [Plugin rules]
-                            , let maps_to = exprFreeIds (ru_rhs imp_rule)
-                                             `delVarSetList` ru_bndrs imp_rule
-                            , arg <- ru_args imp_rule ]
+                            [ mapVarEnv (const rhs_fvs) $ getUniqSet $
+                              exprsFreeIds args `delVarSetList` bndrs
+                            | Rule { ru_act = act, ru_bndrs = bndrs
+                                   , ru_args = args, ru_rhs = rhs } <- imp_rules
+                                   -- Not BuiltinRules; see Note [Plugin rules]
+                            , active_rule act -- Only active rules
+                            , let rhs_fvs = exprFreeIds rhs `delVarSetList` bndrs ]
 
     go :: OccEnv -> [CoreBind] -> (UsageDetails, [CoreBind])
     go _ []
@@ -208,7 +208,7 @@ Really, we want 'f' to be a loop breaker, even though it's non-recursive.
 
 When analysing "g = ...", occAnalNonRecBind will produce a usage of 'f'
 see Note [Preventing loops due to imported functions rules]. So we'll
-do glomming 
+do glomming
 
 Note [Dead code]
 ~~~~~~~~~~~~~~~~
@@ -260,13 +260,11 @@ always in scope.
     (because it isn't referenced any more), then the children will die
     too (unless they are already referenced directly).
 
-    To that end, we build a Rec group for each cyclic strongly
-    connected component,
-        *treating f's rules as extra RHSs for 'f'*.
     More concretely, the SCC analysis runs on a graph with an edge
     from f -> g iff g is mentioned in
-        (a) f's rhs
-        (b) f's RULES
+        (a) f's RHS
+        (b) The LHS or RHS of all of f's RULES, active or inactive
+            (i.e. regardless of phase)
     These are rec_edges.
 
     Under (b) we include variables free in *either* LHS *or* RHS of
@@ -274,6 +272,9 @@ always in scope.
     dependency info].  So in Example [eftInt], eftInt and eftIntFB
     will be put in the same Rec, even though their 'main' RHSs are
     both non-recursive.
+
+    We must also include inactive rules, so that their free vars
+    remain in scope.
 
   * Note [Rule dependency info]
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -819,45 +820,45 @@ occAnalNonRecBind env lvl imp_rule_edges bndr rhs body_usage
   = (body_usage, [])
 
   | otherwise                   -- It's mentioned in the body
-  = (body_usage' `andUDs` rhs_usage4, [NonRec final_bndr rhs'])
+  = (body_usage' `andUDs` rhs_usage, [NonRec final_bndr rhs'])
   where
     (body_usage', tagged_bndr) = tagNonRecBinder lvl body_usage bndr
     final_bndr = tagged_bndr `setIdUnfolding` unf'
                              `setIdSpecialisation` mkRuleInfo rules'
-    inl_fvs = inlineFreeVars unf unf_usage rhs_usage1
+    rhs_usage = rhs_uds `andUDs` unf_uds `andUDs` rule_uds
 
     -- Get the join info from the *new* decision
     -- See Note [Join points and unfoldings/rules]
     mb_join_arity = willBeJoinId_maybe tagged_bndr
     is_join_point = isJust mb_join_arity
 
-
+    --------- Right hand side ---------
     env1 | is_join_point    = env  -- See Note [Join point RHSs]
          | certainly_inline = env  -- See Note [Cascading inlines]
          | otherwise        = rhsCtxt env
 
     -- See Note [Sources of one-shot information]
     rhs_env = env1 { occ_one_shots = argOneShots dmd }
+    (rhs_uds, rhs') = occAnalRhs rhs_env NonRecursive mb_join_arity rhs
 
-    (rhs_usage1, rhs') = occAnalRhs rhs_env mb_join_arity rhs
-
-    -- Unfoldings
+    --------- Unfolding ---------
     -- See Note [Unfoldings and join points]
     unf = idUnfolding bndr
-    (unf_usage, unf') = occAnalUnfolding rhs_env mb_join_arity unf
-    rhs_usage2 = rhs_usage1 `andUDs` unf_usage
+    (unf_uds, unf') = occAnalUnfolding rhs_env NonRecursive mb_join_arity unf
 
-    -- Rules
+    --------- Rules ---------
     -- See Note [Rules are extra RHSs] and Note [Rule dependency info]
     rules_w_uds = occAnalRules rhs_env mb_join_arity bndr
-    rule_uds    = map (\(_, l, r) -> l `andUDs` r) rules_w_uds
     rules'      = map fstOf3 rules_w_uds
-    rhs_usage3 = foldr andUDs rhs_usage2 rule_uds
-    rhs_usage4 = case lookupVarEnv imp_rule_edges bndr of
-                   Nothing -> rhs_usage3
-                   Just vs -> addManyOccs rhs_usage3 vs
+    imp_rule_uds = case lookupVarEnv imp_rule_edges bndr of
+                     Nothing -> emptyDetails
+                     Just vs -> addManyOccs emptyDetails vs
        -- See Note [Preventing loops due to imported functions rules]
 
+    rule_uds = foldr add_rule_uds imp_rule_uds rules_w_uds
+    add_rule_uds (_, l, r) uds = l `andUDs` r `andUDs` uds
+
+    ----------
     occ = idOccInfo tagged_bndr
     certainly_inline -- See Note [Cascading inlines]
       = case occ of
@@ -868,16 +869,6 @@ occAnalNonRecBind env lvl imp_rule_edges bndr rhs body_usage
     dmd        = idDemandInfo bndr
     active     = isAlwaysActive (idInlineActivation bndr)
     not_stable = not (isStableUnfolding (idUnfolding bndr))
-
-setNonRecLoopBreaker :: TopLevelFlag -> RuleFvEnv -> VarSet -> Id -> Id
--- See Note [Non-recursive loop breakers]
-setNonRecLoopBreaker lvl rule_fv_env inl_fvs bndr
-  | isTopLevel lvl   -- Only relevant for top-level binders
-                     -- since nested binders are never in rng(rule_fv_env)
-  , rule_loop = mk_loop_breaker bndr
-  | otherwise = bndr
-  where
-    rule_loop = bndr `elemVarSet` extendFvs_ rule_fv_env inl_fvs
 
 -----------------
 occAnalRecBind :: OccEnv -> TopLevelFlag -> ImpRuleEdges -> [(Var,CoreExpr)]
@@ -904,15 +895,13 @@ occAnalRecBind env lvl imp_rule_edges pairs body_usage
 
     rule_fv_env :: RuleFvEnv
         -- Maps a variable f to the variables from this group
-        --      mentioned in RHS of active rules for f
+        --      mentioned in RHS of /active/ rules for f
         -- Domain is *subset* of bound vars (others have no rule fvs)
-    rule_fv_env = transClosureFV (mkVarEnv init_rule_fvs)
-    init_rule_fvs   -- See Note [Finding rule RHS free vars]
-      = [ (b, trimmed_rule_fvs)
-        | (node_payload -> ND { nd_bndr = b
-                              , nd_active_rule_fvs = rule_fvs }) <- nodes
-        , let trimmed_rule_fvs = rule_fvs `intersectVarSet` bndr_set
-        , not (isEmptyVarSet trimmed_rule_fvs) ]
+    rule_fv_env   -- See Note [Finding rule RHS free vars]
+      = mkVarEnv [ (b, rule_fvs)
+                 | (node_payload -> ND { nd_bndr = b
+                                       , nd_active_rule_fvs = rule_fvs }) <- nodes
+                 , not (isEmptyVarSet rule_fvs) ]
 
 
 {-
@@ -944,7 +933,7 @@ occAnalRec _ lvl rule_fv_env
   where
     (body_uds', tagged_bndr) = tagNonRecBinder lvl body_uds bndr
     final_bndr = setNonRecLoopBreaker lvl rule_fv_env inl_fvs tagged_bndr
-    rhs_uds'   = adjustRhsUsage (willBeJoinId_maybe tagged_bndr) NonRecursive
+    rhs_uds'   = adjustRhsUsage NonRecursive (willBeJoinId_maybe tagged_bndr)
                                 rhs_bndrs rhs_uds
 
         -- The Rec case is the interesting one
@@ -992,6 +981,16 @@ occAnalRec env lvl rule_fv_env
 ------------------------------------------------------------------
 --                 Loop breaking
 ------------------------------------------------------------------
+
+setNonRecLoopBreaker :: TopLevelFlag -> RuleFvEnv -> VarSet -> Id -> Id
+-- See Note [Non-recursive loop breakers]
+setNonRecLoopBreaker lvl rule_fv_env inl_fvs bndr
+  | isTopLevel lvl   -- Only relevant for top-level binders
+                     -- since nested binders are never in rng(rule_fv_env)
+  , rule_loop = mk_loop_breaker bndr
+  | otherwise = bndr
+  where
+    rule_loop = bndr `elemVarSet` extendFvs_ rule_fv_env inl_fvs
 
 type Binding = (Id,CoreExpr)
 
@@ -1243,9 +1242,6 @@ type ImpRuleEdges = RuleFvEnv
     -- Mapping from a local Id 'f' to the free vars of the RHS of
     -- local rules for an imported Id that mention 'f' on the LHS
 
-lookupRuleFvEnv :: RuleFvEnv -> Id -> IdSet
-lookupRuleFvEnv env id = lookupVarEnv env id `orElse` emptyVarSet
-
 noImpRuleEdges :: ImpRuleEdges
 noImpRuleEdges = emptyVarEnv
 
@@ -1317,14 +1313,19 @@ makeNode env imp_rule_edges bndr_set (bndr, rhs)
     details = ND { nd_bndr            = bndr'
                  , nd_rhs             = rhs'
                  , nd_rhs_bndrs       = bndrs'
-                 , nd_uds             = rhs_usage3
+                 , nd_uds             = rhs_usage
                  , nd_inl             = inl_fvs
                  , nd_weak            = node_fvs `minusVarSet` inl_fvs
-                 , nd_active_rule_fvs = active_rule_fvs
+                 , nd_active_rule_fvs = active_rule_fvs `intersectVarSet` bndr_set
                  , nd_score           = pprPanic "makeNodeDetails" (ppr bndr) }
 
     bndr' = bndr `setIdUnfolding`      unf'
                  `setIdSpecialisation` mkRuleInfo rules'
+
+    rhs_usage = rhs_uds `andUDs` unf_uds `andUDs` rule_uds
+                   -- Note [Rules are extra RHSs]
+                   -- Note [Rule dependency info]
+    node_fvs   = udFreeVars bndr_set rhs_usage
 
     -- Get join point info from the *current* decision
     -- We don't know what the new decision will be!
@@ -1333,42 +1334,43 @@ makeNode env imp_rule_edges bndr_set (bndr, rhs)
     -- See Note [Join points and unfoldings/rules]
     mb_join_arity = isJoinId_maybe bndr
 
+    --------- Right hand side ---------
     -- Constructing the edges for the main Rec computation
     -- See Note [Forming Rec groups]
-    (bndrs, body) = collectBinders rhs
-    rhs_env       = rhsCtxt env
-    (rhs_usage1, bndrs', body') = occAnalLamOrRhs rhs_env bndrs body
-    rhs'       = mkLams bndrs' body'
-    rhs_usage3 = foldr andUDs rhs_usage1 rule_uds
-                 `andUDs` unf_uds
-                   -- Note [Rules are extra RHSs]
-                   -- Note [Rule dependency info]
-    node_fvs   = udFreeVars bndr_set rhs_usage3
+    -- Do not use occAnalRhs because we don't yet know
+    -- the final answer for mb_join_arity
+    (bndrs, body)            = collectBinders rhs
+    rhs_env                  = rhsCtxt env
+    (rhs_uds, bndrs', body') = occAnalLamOrRhs rhs_env bndrs body
+    rhs'                     = mkLams bndrs' body'
 
-    -- Finding the free variables of the rules
-    is_active = occ_rule_act env :: Activation -> Bool
-
-    rules_w_uds :: [(CoreRule, UsageDetails, UsageDetails)]
-    rules_w_uds = occAnalRules rhs_env mb_join_arity bndr
-
-    rules' = map fstOf3 rules_w_uds
-
-    rules_w_rhs_fvs :: [(Activation, VarSet)]    -- Find the RHS fvs
-    rules_w_rhs_fvs = maybe id (\ids -> ((AlwaysActive, ids):))
-                               (lookupVarEnv imp_rule_edges bndr)
-      -- See Note [Preventing loops due to imported functions rules]
-                      [ (ru_act rule, udFreeVars bndr_set rhs_uds)
-                      | (rule, _, rhs_uds) <- rules_w_uds ]
-    rule_uds = map (\(_, l, r) -> l `andUDs` r) rules_w_uds
-    active_rule_fvs = unionVarSets [fvs | (a,fvs) <- rules_w_rhs_fvs
-                                        , is_active a]
-
-    -- Finding the usage details of the INLINE pragma (if any)
+    --------- Unfolding ---------
+    -- See Note [Unfoldings and join points]
     unf = realIdUnfolding bndr -- realIdUnfolding: Ignore loop-breaker-ness
                                -- here because that is what we are setting!
-    (unf_uds, unf') = occAnalUnfolding rhs_env mb_join_arity unf
+    (unf_uds, unf') = occAnalUnfolding rhs_env Recursive mb_join_arity unf
+    inl_fvs = restrictFreeVars bndr_set (inlineFreeVars unf unf_uds rhs_uds)
 
-    inl_fvs = restrictFreeVars bndr_set (inlineFreeVars unf unf_uds rhs_usage1)
+    --------- Rules ---------
+    rules_w_uds :: [(CoreRule, UsageDetails, UsageDetails)]
+    rules_w_uds = occAnalRules rhs_env mb_join_arity bndr
+    rules'      = map fstOf3 rules_w_uds
+
+    rule_uds = foldr add_rule_uds imp_rule_uds rules_w_uds
+    add_rule_uds (_, l, r) uds = l `andUDs` r `andUDs` uds
+    imp_rule_uds = case lookupVarEnv imp_rule_edges bndr of
+                     Nothing -> emptyDetails
+                     Just vs -> addManyOccs emptyDetails vs
+
+
+    is_active       = occ_rule_act env :: Activation -> Bool
+    imp_rule_fvs    = udFreeVars bndr_set imp_rule_uds
+    active_rule_fvs = foldr add_active_rule imp_rule_fvs rules_w_uds
+    add_active_rule (rule, _, rhs_uds) fvs
+      | is_active (ruleActivation rule)
+      = udFreeVars bndr_set rhs_uds `unionVarSet` fvs
+      | otherwise
+      = fvs
 
 inlineFreeVars :: Unfolding
                -> UsageDetails  -- Of the unfolding
@@ -1632,29 +1634,31 @@ Hence the is_lb field of NodeScore
 ************************************************************************
 -}
 
-occAnalRhs :: OccEnv -> Maybe JoinArity
+occAnalRhs :: OccEnv -> RecFlag -> Maybe JoinArity
            -> CoreExpr   -- RHS
            -> (UsageDetails, CoreExpr)
-occAnalRhs env mb_join_arity rhs
+occAnalRhs env is_rec mb_join_arity rhs
   = case occAnalLamOrRhs env bndrs body of { (body_usage, bndrs', body') ->
-    let rhs' = mkLams (markJoinOneShots mb_join_arity bndrs') body'
+    let final_bndrs | isRec is_rec = bndrs'
+                    | otherwise    = markJoinOneShots mb_join_arity bndrs'
                -- For a /non-recursive/ join point we can mark all
                -- its join-lambda as one-shot; and it's a good idea to do so
 
         -- Final adjustment
-        rhs_usage = adjustRhsUsage mb_join_arity NonRecursive bndrs' body_usage
+        rhs_usage = adjustRhsUsage is_rec mb_join_arity final_bndrs body_usage
 
-    in (rhs_usage, rhs') }
+    in (rhs_usage, mkLams final_bndrs body') }
   where
     (bndrs, body) = collectBinders rhs
 
 occAnalUnfolding :: OccEnv
+                 -> RecFlag
                  -> Maybe JoinArity   -- See Note [Join points and unfoldings/rules]
                  -> Unfolding
                  -> (UsageDetails, Unfolding)
 -- Occurrence-analyse a stable unfolding;
 -- discard a non-stable one altogether.
-occAnalUnfolding env mb_join_arity unf
+occAnalUnfolding env is_rec mb_join_arity unf
   = case unf of
       unf@(CoreUnfolding { uf_tmpl = rhs, uf_src = src })
         | isStableSource src -> (usage,        unf')
@@ -1665,7 +1669,7 @@ occAnalUnfolding env mb_join_arity unf
               -- to guide its decisions.  It's ok to leave un-substituted
               -- expressions in the tree because all the variables that were in
               -- scope remain in scope; there is no cloning etc.
-          (usage, rhs') = occAnalRhs env mb_join_arity rhs
+          (usage, rhs') = occAnalRhs env is_rec mb_join_arity rhs
 
           unf' | noBinderSwaps env = unf -- Note [Unfoldings and rules]
                | otherwise         = unf { uf_tmpl = rhs' }
@@ -1962,7 +1966,7 @@ occAnalApp env (Var fun, args, ticks)
   --     This caused #18296
   | fun `hasKey` runRWKey
   , [t1, t2, arg]  <- args
-  , let (usage, arg') = occAnalRhs env (Just 1) arg
+  , let (usage, arg') = occAnalRhs env NonRecursive (Just 1) arg
   = (usage, mkTicks ticks $ mkApps (Var fun) [t1, t2, arg'])
 
 occAnalApp env (Var fun, args, ticks)
@@ -2298,6 +2302,7 @@ addAppCtxt :: OccEnv -> [Arg CoreBndr] -> OccEnv
 addAppCtxt env@(OccEnv { occ_one_shots = ctxt }) args
   = env { occ_one_shots = replicate (valArgCount args) OneShotLam ++ ctxt }
 
+{-
 transClosureFV :: VarEnv VarSet -> VarEnv VarSet
 -- If (f,g), (g,h) are in the input, then (f,h) is in the output
 --                                   as well as (f,g), (g,h)
@@ -2313,7 +2318,7 @@ transClosureFV env
       | otherwise      = (False,     (b,new_fvs))
       where
         (new_fvs, no_change_here) = extendFvs env fvs
-
+-}
 -------------
 extendFvs_ :: VarEnv VarSet -> VarSet -> VarSet
 extendFvs_ env s = fst (extendFvs env s)   -- Discard the Bool flag
@@ -2780,20 +2785,20 @@ flattenUsageDetails ud
 
 -------------------
 -- See Note [Adjusting right-hand sides]
-adjustRhsUsage :: Maybe JoinArity -> RecFlag
+adjustRhsUsage :: RecFlag -> Maybe JoinArity
                -> [CoreBndr]     -- Outer lambdas, AFTER occ anal
                -> UsageDetails   -- From body of lambda
                -> UsageDetails
-adjustRhsUsage mb_join_arity rec_flag bndrs usage
-  = markAllInsideLamIf     (not one_shot)   $
+adjustRhsUsage is_rec mb_join_arity bndrs usage
+  = markAllInsideLamIf (not one_shot) $
     markAllNonTailIf (not exact_join) $
     usage
   where
     one_shot = case mb_join_arity of
                  Just join_arity
-                   | isRec rec_flag -> False
-                   | otherwise      -> all isOneShotBndr (drop join_arity bndrs)
-                 Nothing            -> all isOneShotBndr bndrs
+                   | isRec is_rec -> False
+                   | otherwise    -> all isOneShotBndr (drop join_arity bndrs)
+                 Nothing          -> all isOneShotBndr bndrs
 
     exact_join = exactJoin mb_join_arity bndrs
 
@@ -2874,7 +2879,7 @@ tagRecBinders lvl body_uds triples
      --    join-point-hood decision
      rhs_udss' = map adjust triples
      adjust (bndr, rhs_uds, rhs_bndrs)
-       = adjustRhsUsage mb_join_arity Recursive rhs_bndrs rhs_uds
+       = adjustRhsUsage Recursive mb_join_arity rhs_bndrs rhs_uds
        where
          -- Can't use willBeJoinId_maybe here because we haven't tagged the
          -- binder yet (the tag depends on these adjustments!)
