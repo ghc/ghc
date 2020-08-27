@@ -22,7 +22,7 @@ import sys
 from collections import namedtuple
 from math import ceil, trunc
 
-from testutil import passed, failBecause, testing_metrics
+from testutil import passed, failBecause, testing_metrics, print_table
 from term_color import Color, colored
 
 from my_typing import *
@@ -44,6 +44,14 @@ def inside_git_repo() -> bool:
 # Check if the worktree is dirty.
 def is_worktree_dirty() -> bool:
     return subprocess.check_output(['git', 'status', '--porcelain']) != b''
+
+# Get length of abbreviated git commit hash
+def get_abbrev_hash_length() -> int:
+    try:
+        return len(subprocess.check_output(['git', 'rev-parse',
+                                            '--short', 'HEAD']).strip())
+    except subprocess.CalledProcessError:
+        return 10
 
 #
 # Some data access functions. At the moment this uses git notes.
@@ -757,22 +765,7 @@ def main() -> None:
         file.close()
         exit(0)
 
-    #
-    # String utilities for pretty-printing
-    #
-
-    #                  T1234                 T1234
-    #              max_bytes             max_bytes
-    #                 normal                normal
-    # commit   x86_64-darwin       i386-linux-deb9
-    # --------------------------------------------
-    # HEAD              9123                  9123
-    # HEAD~1           10023                 10023
-    # HEAD~2           21234                 21234
-    # HEAD~3           20000                 20000
-
-    # Data is already in colum major format, so do that, calculate column widths
-    # then transpose and print each row.
+    # Data is in colum major format, so transpose and pass to print_table.
     def strMetric(x):
         return '{:.2f}'.format(x.value) if x != None else ""
 
@@ -782,17 +775,7 @@ def main() -> None:
                 + [ [strMetric(get_commit_metric(ref, commit, env, name, metric, way)) \
                         for commit in commits ] \
                         for (env, name, metric, way) in testSeries ]
-    colWidths = [max([2+len(cell) for cell in colH + colD]) for (colH,colD) in zip(headerCols, dataCols)]
-    col_fmts = ['{:>' + str(w) + '}' for w in colWidths]
-
-    def printCols(cols):
-        for row in zip(*cols):
-            # print(list(zip(col_fmts, row)))
-            print(''.join([f.format(cell) for (f,cell) in zip(col_fmts, row)]))
-
-    printCols(headerCols)
-    print('-'*(sum(colWidths)+2))
-    printCols(dataCols)
+    print_table(list(zip(*headerCols)), list(zip(*dataCols)))
 
 if __name__ == '__main__':
     main()

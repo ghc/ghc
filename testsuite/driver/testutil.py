@@ -144,3 +144,34 @@ def memoize(f):
 
     cached._cache = None
     return cached
+
+
+
+#
+# String utilities for pretty-printing
+#
+
+#                  T1234                 T1234
+#              max_bytes             max_bytes
+#                 normal                normal
+# commit   x86_64-darwin       i386-linux-deb9
+# --------------------------------------------
+# HEAD              9123                  9123
+# HEAD~1           10023                 10023
+# HEAD~2           21234                 21234
+# HEAD~3           20000                 20000
+
+# Calculate column widths then print each row.
+def print_table(header_rows: List[List[str]], data_rows: List[List[str]]) -> None:
+    colWidths = [2+max([len(cell) for cell in col])
+                 for col in zip(*(header_rows + data_rows))]
+    col_fmts = ['{:>' + str(w) + '}' for w in colWidths]
+
+    def printCols(cols):
+        for row in cols:
+            # print(list(zip(col_fmts, row)))
+            print(''.join([f.format(cell) for (f,cell) in zip(col_fmts, row)]))
+
+    printCols(header_rows)
+    print('-'*(sum(colWidths)+2))
+    printCols(data_rows)
