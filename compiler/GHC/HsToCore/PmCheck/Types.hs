@@ -36,7 +36,7 @@ module GHC.HsToCore.PmCheck.Types (
         setIndirectSDIE, setEntrySDIE, traverseSDIE,
 
         -- * The pattern match oracle
-        VarInfo(..), TmState(..), TyState(..), Delta(..),
+        BotInfo(..), VarInfo(..), TmState(..), TyState(..), Delta(..),
         Deltas(..), initDeltas, liftDeltasM
     ) where
 
@@ -230,10 +230,11 @@ pmAltConType (PmAltConLike con) arg_tys  = conLikeResTy con arg_tys
 -- | Is a match on this constructor forcing the match variable?
 -- True of data constructors, literals and pattern synonyms (#17357), but not of
 -- newtypes.
+-- See Note [Divergence of Newtype matches] in "GHC.HsToCore.PmCheck.Oracle".
 isPmAltConMatchStrict :: PmAltCon -> Bool
 isPmAltConMatchStrict PmAltLit{}                      = True
 isPmAltConMatchStrict (PmAltConLike PatSynCon{})      = True -- #17357
-isPmAltConMatchStrict (PmAltConLike (RealDataCon dc)) = not (isNewTyCon (dataConTyCon dc))
+isPmAltConMatchStrict (PmAltConLike (RealDataCon dc)) = not (isNewDataCon dc)
 
 pmAltConImplBangs :: PmAltCon -> [HsImplBang]
 pmAltConImplBangs PmAltLit{}         = []
@@ -490,6 +491,13 @@ instance Outputable a => Outputable (Shared a) where
 instance Outputable a => Outputable (SharedDIdEnv a) where
   ppr (SDIE env) = ppr env
 
+-- | See 'vi_bot'.
+data BotInfo
+  = IsBot
+  | IsNotBot
+  | MaybeBot
+  deriving Eq
+
 -- | The term oracle state. Stores 'VarInfo' for encountered 'Id's. These
 -- entries are possibly shared when we figure out that two variables must be
 -- equal, thus represent the same set of values.
@@ -544,12 +552,12 @@ data VarInfo
   -- because files like Cabal's `LicenseId` define relatively huge enums
   -- that lead to quadratic or worse behavior.
 
-  , vi_bot :: Maybe Bool
+  , vi_bot :: BotInfo
   -- ^ Can this variable be ⊥? Models (mutually contradicting) @x ~ ⊥@ and
   --   @x ~/ ⊥@ constraints. E.g.
-  --    * 'Nothing': Don't know; Neither @x ~ ⊥@ nor @x /~ ⊥@.
-  --    * 'Just True': @x ~ ⊥@
-  --    * 'Just False': @x /~ ⊥@
+  --    * 'MaybeBot': Don't know; Neither @x ~ ⊥@ nor @x /~ ⊥@.
+  --    * 'IsBot': @x ~ ⊥@
+  --    * 'IsNotBot': @x /~ ⊥@
 
   , vi_cache :: !PossibleMatches
   -- ^ A cache of the associated COMPLETE sets. At any time a superset of
@@ -558,6 +566,11 @@ data VarInfo
   -- to recognise completion of a COMPLETE set efficiently for large enums.
   }
 
+instance Outputable BotInfo where
+  ppr MaybeBot = empty
+  ppr IsBot    = text "~⊥"
+  ppr IsNotBot = text "/~⊥"
+
 -- | Not user-facing.
 instance Outputable TmState where
   ppr (TmSt state reps) = ppr state $$ ppr reps
@@ -565,11 +578,7 @@ instance Outputable TmState where
 -- | Not user-facing.
 instance Outputable VarInfo where
   ppr (VI ty pos neg bot cache)
-    = braces (hcat (punctuate comma [ppr ty, ppr pos, ppr neg, pp_bot bot, ppr cache]))
-    where
-      pp_bot Nothing = empty
-      pp_bot (Just True) = text "~⊥"
-      pp_bot (Just False) = text "/~⊥"
+    = braces (hcat (punctuate comma [ppr ty, ppr pos, ppr neg, ppr bot, ppr cache]))
 
 -- | Initial state of the term oracle.
 initTmState :: TmState

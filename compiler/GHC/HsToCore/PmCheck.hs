@@ -614,8 +614,8 @@ desugarListPat x pats = do
 
 conMatchStrictGrds :: PmAltCon -> Id -> GrdVec
 conMatchStrictGrds con x
-  | conMatchForces con = [PmBang x Nothing]
-  | otherwise          = []
+  | isPmAltConMatchStrict con = [PmBang x Nothing]
+  | otherwise                 = []
 
 -- | Desugar a constructor pattern
 desugarConPatOut :: Id -> ConLike -> [Type] -> [TyVar]
@@ -930,13 +930,6 @@ throttle limit old@(MkDeltas old_ds) new@(MkDeltas new_ds)
   --- | pprTrace "PmCheck:throttle" (ppr (length old_ds) <+> ppr (length new_ds) <+> ppr limit) False = undefined
   | length new_ds > max limit (length old_ds) = (Approximate, old)
   | otherwise                                 = (Precise,     new)
-
--- | Matching on a newtype doesn't force anything.
--- See Note [Divergence of Newtype matches] in "GHC.HsToCore.PmCheck.Oracle".
-conMatchForces :: PmAltCon -> Bool
-conMatchForces (PmAltConLike (RealDataCon dc))
-  | isNewTyCon (dataConTyCon dc) = False
-conMatchForces _                 = True
 
 -- | The 'PmCts' arising from a successful  'PmCon' match @T gammas as ys <- x@.
 -- These include

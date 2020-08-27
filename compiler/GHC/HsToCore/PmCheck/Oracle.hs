@@ -627,7 +627,7 @@ emptyVarInfo :: Id -> VarInfo
 -- After all, there are also strict fields, the unliftedness of which isn't
 -- evident in the type. So treating unlifted types here would never be
 -- sufficient anyway.
-emptyVarInfo x = VI (idType x) [] emptyPmAltConSet Nothing NoPM
+emptyVarInfo x = VI (idType x) [] emptyPmAltConSet MaybeBot NoPM
 
 lookupVarInfo :: TmState -> Id -> VarInfo
 -- (lookupVarInfo tms x) tells what we know about 'x'
@@ -648,8 +648,8 @@ lookupVarInfoNT ts x = case lookupVarInfo ts x of
   where
     as_newtype = listToMaybe . mapMaybe go
     go (PmAltConLike (RealDataCon dc), _, [y])
-      | isNewTyCon (dataConTyCon dc) = Just y
-    go _                             = Nothing
+      | isNewDataCon dc = Just y
+    go _                = Nothing
 
 initPossibleMatches :: TyState -> VarInfo -> DsM VarInfo
 initPossibleMatches ty_st vi@VI{ vi_ty = ty, vi_cache = NoPM } = do
@@ -738,7 +738,7 @@ canDiverge :: Delta -> Id -> Bool
 canDiverge MkDelta{ delta_tm_st = ts } x
   -- See Note [Divergence of Newtype matches]
   | (_, VI _ _ _ bot _) <- lookupVarInfoNT ts x
-  = bot /= Just False
+  = bot /= IsNotBot
 
 {- Note [Divergence of Newtype matches]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -757,13 +757,16 @@ This distinction becomes apparent in #17248:
 
 If we treat Newtypes like we treat regular DataCons, we would mark the third
 clause as redundant, which clearly is unsound. The solution:
-1. When compiling the PmCon guard in 'pmCompileTree', don't add a @DivergeIf@,
-   because the match will never diverge.
+1. When desugaring the constructor pattern in 'desugarConPatOut', don't add a
+   @PmBang@ on the match variable, because the match will never diverge.
 2. Regard @T2 x@ as 'canDiverge' iff @x@ 'canDiverge'. E.g. @T2 x ~ _|_@ <=>
    @x ~ _|_@. This way, the third clause will still be marked as inaccessible
-   RHS instead of redundant.
-3. When testing for inhabitants ('mkOneConFull'), we regard the newtype field as
-   strict, so that the newtype is inhabited iff its field is inhabited.
+   RHS instead of redundant. This is ensured by calling 'lookupVarInfoNT'.
+3. When we find @x ~ T2 y@, transfer all constraints on @x@ (which involve @⊥@)
+   @y@, similar to what 'equate' does.
+4. Immediately reject when we find @x /~ T2@.
+Handling of Newtypes is also described in the Appendix of the Lower Your Guards paper,
+where you can find the solution in a perhaps more digestible format.
 -}
 
 lookupRefuts :: Uniquable k => Delta -> k -> [PmAltCon]
@@ -883,10 +886,10 @@ addBotCt :: Delta -> Id -> MaybeT DsM Delta
 addBotCt delta@MkDelta{ delta_tm_st = TmSt env reps } x = do
   let (y, vi@VI { vi_bot = bot }) = lookupVarInfoNT (delta_tm_st delta) x
   case bot of
-    Just False -> mzero      -- There was x /~ ⊥. Contradiction!
-    Just True  -> pure delta -- There already is x ~ ⊥. Nothing left to do
-    Nothing    -> do         -- We add x ~ ⊥
-      let vi' = vi{ vi_bot = Just True }
+    IsNotBot -> mzero      -- There was x /~ ⊥. Contradiction!
+    IsBot    -> pure delta -- There already is x ~ ⊥. Nothing left to do
+    MaybeBot -> do         -- We add x ~ ⊥
+      let vi' = vi{ vi_bot = IsBot }
       pure delta{ delta_tm_st = TmSt (setEntrySDIE env y vi') reps}
 
 -- | Record a @x ~/ K@ constraint, e.g. that a particular 'Id' @x@ can't
@@ -982,10 +985,10 @@ addNotBotCt :: Delta -> Id -> MaybeT DsM Delta
 addNotBotCt delta@MkDelta{ delta_tm_st = TmSt env reps } x = do
   let (y, vi@VI { vi_bot = bot }) = lookupVarInfoNT (delta_tm_st delta) x
   case bot of
-    Just True  -> mzero      -- There was x ~ ⊥. Contradiction!
-    Just False -> pure delta -- There already is x /~ ⊥. Nothing left to do
-    Nothing -> do            -- We add x /~ ⊥ and test if x is still inhabited
-      vi <- MaybeT $ ensureInhabited delta vi{ vi_bot = Just False }
+    IsBot    -> mzero      -- There was x ~ ⊥. Contradiction!
+    IsNotBot -> pure delta -- There already is x /~ ⊥. Nothing left to do
+    MaybeBot -> do            -- We add x /~ ⊥ and test if x is still inhabited
+      vi <- MaybeT $ ensureInhabited delta vi{ vi_bot = IsNotBot }
       pure delta{ delta_tm_st = TmSt (setEntrySDIE env y vi) reps}
 
 ensureInhabited :: Delta -> VarInfo -> DsM (Maybe VarInfo)
@@ -998,9 +1001,9 @@ ensureInhabited :: Delta -> VarInfo -> DsM (Maybe VarInfo)
    --     remain that do not statisfy it.  This lazy approach just
    --     avoids doing unnecessary work.
 ensureInhabited delta vi = case vi_bot vi of
-  Nothing    -> pure (Just vi) -- The |-Bot rule from the paper
-  Just True  -> pure (Just vi)
-  Just False -> initPossibleMatches (delta_ty_st delta) vi >>= inst_complete_sets
+  MaybeBot -> pure (Just vi) -- The |-Bot rule from the paper
+  IsBot    -> pure (Just vi)
+  IsNotBot -> initPossibleMatches (delta_ty_st delta) vi >>= inst_complete_sets
   where
     -- | This is the |-Inst rule from the paper (section 4.5). Tries to
     -- find an inhabitant in every complete set by instantiating with one their
@@ -1141,11 +1144,11 @@ addConCt delta@MkDelta{ delta_tm_st = ts@(TmSt env reps) } x alt tvs args = do
       -- x /~ ⊥ constraints now apply to the wrapped thing, as 'lookupVarInfoNT'
       -- looks through newtype constructors.
       case (alt, args) of
-        (PmAltConLike (RealDataCon dc), [y]) | isNewTyCon (dataConTyCon dc) ->
+        (PmAltConLike (RealDataCon dc), [y]) | isNewDataCon dc ->
           case bot of
-            Nothing -> pure delta'
-            Just True -> addBotCt delta' y
-            Just False -> addNotBotCt delta' y
+            MaybeBot -> pure delta'
+            IsBot    -> addBotCt delta' y
+            IsNotBot -> addNotBotCt delta' y
         _ -> pure delta'
 
 equateTys :: [Type] -> [Type] -> [PmCt]
@@ -1741,7 +1744,7 @@ addCoreCt delta x e = do
       let (_, ex_tvs) = cloneTyVarBndrs (mkEmptyTCvSubst in_scope) dc_ex_tvs uniq_supply
           ty_cts      = equateTys (map mkTyVarTy ex_tvs) ex_tys
       -- 1. @x /~ ⊥@ if 'K' is not a Newtype constructor (#18341)
-      when (not (isNewTyCon (dataConTyCon dc))) $
+      when (not (isNewDataCon dc)) $
         modifyT $ \delta -> addNotBotCt delta x
       -- 2. @a_1 ~ tau_1, ..., a_n ~ tau_n@ for fresh @a_i@. See also #17703
       modifyT $ \delta -> MaybeT $ addPmCts delta (listToBag ty_cts)
