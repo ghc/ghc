@@ -23,11 +23,11 @@ import traceback
 # So we import it here first, so that the testsuite doesn't appear to fail.
 import subprocess
 
-from testutil import getStdout, Watcher, str_warn, str_info
+from testutil import getStdout, Watcher, str_warn, str_info, print_table
 from testglobals import getConfig, ghc_env, getTestRun, TestConfig, \
                         TestOptions, brokens, PerfMetric
 from my_typing import TestName
-from perf_notes import MetricChange, GitRef, inside_git_repo, is_worktree_dirty, format_perf_stat
+from perf_notes import MetricChange, GitRef, inside_git_repo, is_worktree_dirty, format_perf_stat, get_abbrev_hash_length
 from junit import junit
 import term_color
 from term_color import Color, colored
@@ -341,24 +341,30 @@ def cleanup_and_exit(exitcode):
     exit(exitcode)
 
 def tabulate_metrics(metrics: List[PerfMetric]) -> None:
-    for metric in sorted(metrics, key=lambda m: (m.stat.test, m.stat.way, m.stat.metric)):
-        print("{test:24}  {metric:40}  {value:15.3f}".format(
-            test = "{}({})".format(metric.stat.test, metric.stat.way),
-            metric = metric.stat.metric,
-            value = metric.stat.value
-        ))
-        if metric.baseline is not None:
-            val0 = metric.baseline.perfStat.value
-            val1 = metric.stat.value
-            rel = 100 * (val1 - val0) / val0
-            print("{space:24}  {herald:40}  {value:15.3f}  [{direction}, {rel:2.1f}%]".format(
-                space = "",
-                herald = "(baseline @ {commit})".format(
-                    commit = metric.baseline.commit),
-                value = val0,
-                direction = metric.change,
-                rel = rel
-            ))
+    abbrevLen = get_abbrev_hash_length()
+    headerRows = [
+        ["", "", "", "Baseline", "", "", "", ""],
+        ["Test", "Metric", "Value", "Commit", "Environment", "Value", "Change"]
+    ]
+    def strDiff(x: PerfMetric) -> str:
+        if x.baseline is None:
+            return ""
+        val0 = x.baseline.perfStat.value
+        val1 = x.stat.value
+        return "{}({:+2.1f}%)".format(x.change, 100 * (val1 - val0) / val0)
+    dataRows = [["{}({})".format(x.stat.test, x.stat.way),
+                 x.stat.metric,
+                 "{:15.3f}".format(x.stat.value),
+                 "{}".format(x.baseline.commit[:abbrevLen])
+                     if x.baseline is not None else "",
+                 "{}".format(x.baseline.perfStat.test_env)
+                     if x.baseline is not None else "",
+                 "{:15.3f}".format(x.baseline.perfStat.value)
+                     if x.baseline is not None else "",
+                 strDiff(x)
+                 ] for x in sorted(metrics, key =
+                                   lambda m: (m.stat.test, m.stat.way, m.stat.metric))]
+    print_table(headerRows, dataRows)
 
 # First collect all the tests to be run
 t_files_ok = True
