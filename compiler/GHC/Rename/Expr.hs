@@ -120,9 +120,7 @@ rnUnboundVar v
                 ; return (HsVar noExtField (noLoc n), emptyFVs) } }
 
 rnExpr (HsVar _ (L l v))
-  = do { opt_DuplicateRecordFields <- (\x -> if x then DuplicateRecordFields else NoDuplicateRecordFields) <$> xoptM LangExt.DuplicateRecordFields
-       ; opt_FieldSelectors <- (\x -> if x then FieldSelectors else NoFieldSelectors) <$> xoptM LangExt.FieldSelectors
-       ; mb_name <- lookupOccRn_overloaded opt_DuplicateRecordFields opt_FieldSelectors v
+  = do { mb_name <- lookupGlobalOccRn_overloaded_expr v
        ; dflags <- getDynFlags
        ; case mb_name of {
            Nothing -> rnUnboundVar v ;

@@ -15,7 +15,8 @@ module GHC.Rename.Env (
         lookupLocalOccThLvl_maybe, lookupLocalOccRn,
         lookupTypeOccRn,
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,
-        lookupOccRn_overloaded, lookupGlobalOccRn_overloaded,
+        lookupGlobalOccRn_overloaded_expr,
+        lookupGlobalOccRn_overloaded_pat,
 
         ChildLookupResult(..),
         lookupSubBndrOcc_helper,
@@ -1053,19 +1054,6 @@ lookupOccRnX_maybe globalLookup wrapper rdr_name
 lookupOccRn_maybe :: RdrName -> RnM (Maybe Name)
 lookupOccRn_maybe = lookupOccRnX_maybe lookupGlobalOccRn_maybe id
 
-lookupOccRn_overloaded :: DuplicateRecordFields -> FieldSelectors -> RdrName
-                       -> RnM (Maybe (Either Name [Name]))
-lookupOccRn_overloaded overload_ok has_sel
-  = lookupOccRnX_maybe global_lookup Left
-      where
-        global_lookup :: RdrName -> RnM (Maybe (Either Name [Name]))
-        global_lookup n =
-          runMaybeT . msum . map MaybeT $
-            [ lookupGlobalOccRn_overloaded overload_ok has_sel n
-            , fmap Left . listToMaybe <$> lookupQualifiedNameGHCi n ]
-
-
-
 lookupGlobalOccRn_maybe :: RdrName -> RnM (Maybe Name)
 -- Looks up a RdrName occurrence in the top-level
 -- environment, including using lookupQualifiedNameGHCi
@@ -1126,23 +1114,39 @@ lookupInfoOccRn rdr_name =
 --                        if overload_ok was False, this list will be
 --                        a singleton.
 
-lookupGlobalOccRn_overloaded :: DuplicateRecordFields -> FieldSelectors -> RdrName
+lookupGlobalOccRn_resolve :: RdrName -> GreLookupResult -> RnM (Maybe (Either Name [Name]))
+lookupGlobalOccRn_resolve rdr_name res = case res of
+  GreNotFound  -> return Nothing
+  OneNameMatch gre -> do
+    let wrapper = if isRecFldGRE gre then Right . (:[]) else Left
+    return $ Just (wrapper (gre_name gre))
+  MultipleNames gres | any isRecFldGRE gres ->
+    -- Don't record usage for ambiguous selectors
+    -- until we know which is meant
+    return $ Just (Right (map gre_name gres))
+  MultipleNames gres  -> do
+    addNameClashErrRn rdr_name gres
+    return (Just (Left (gre_name (head gres))))
+
+lookupGlobalOccRn_overloaded_expr :: RdrName
                              -> RnM (Maybe (Either Name [Name]))
-lookupGlobalOccRn_overloaded overload_ok has_sel rdr_name =
+lookupGlobalOccRn_overloaded_expr rdr_name =
+  lookupExactOrOrig_maybe rdr_name (fmap Left) $
+     do  { env <- getGlobalRdrEnv
+         ; res <- case filter (not . isNoFieldSelectorGRE) $ lookupGRE_RdrName rdr_name env of
+            []    -> return GreNotFound
+            [gre] -> do { addUsedGRE True gre
+                        ; return (OneNameMatch gre) }
+            gres  -> return (MultipleNames gres)
+         ; lookupGlobalOccRn_resolve rdr_name res
+         }
+
+lookupGlobalOccRn_overloaded_pat :: RdrName
+                             -> RnM (Maybe (Either Name [Name]))
+lookupGlobalOccRn_overloaded_pat rdr_name =
   lookupExactOrOrig_maybe rdr_name (fmap Left) $
      do  { res <- lookupGreRn_helper rdr_name
-         ; case res of
-                GreNotFound  -> return Nothing
-                OneNameMatch gre -> do
-                  let wrapper = if isRecFldGRE gre then Right . (:[]) else Left
-                  return $ Just (wrapper (gre_name gre))
-                MultipleNames gres | any isRecFldGRE gres ->
-                  -- Don't record usage for ambiguous selectors
-                  -- until we know which is meant
-                  return $ Just (Right (map gre_name gres))
-                MultipleNames gres  -> do
-                  addNameClashErrRn rdr_name gres
-                  return (Just (Left (gre_name (head gres)))) }
+         ; lookupGlobalOccRn_resolve rdr_name res }
 
 
 --------------------------------------------------
