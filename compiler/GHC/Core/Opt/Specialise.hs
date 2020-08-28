@@ -1338,8 +1338,9 @@ type SpecInfo = ( [CoreRule]       -- Specialisation rules
 specCalls mb_mod env existing_rules calls_for_me fn rhs
         -- The first case is the interesting one
   |  notNull calls_for_me               -- And there are some calls to specialise
-  && not (isNeverActive (idInlineActivation fn))
-  && idSpecializablePragma fn == NoUserSpecializable
+  -- FIXME specializable is not propagated:
+  -- && not ( isNeverActive (idInlineActivation fn) &&
+  --          idSpecializablePragma fn == NoUserSpecializable )
         -- Don't specialise NOINLINE things that aren't also SPECIALIZABLE
         -- See Note [Auto-specialisation and RULES]
 
@@ -1364,7 +1365,11 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
     fn_arity  = idArity fn
     fn_unf    = realIdUnfolding fn  -- Ignore loop-breaker-ness here
     inl_prag  = idInlinePragma fn
-    inl_act   = inlinePragmaActivation inl_prag
+    inl_act   = if
+                  -- idSpecializablePragma fn == Specializable -- FIXME why is is not here?
+                  inlinePragmaSpec inl_prag == NoInline -- TEMP this is only a proxy for specializable
+                then AlwaysActive -- TODO when/if we add act to specializable, use that
+                else inlinePragmaActivation inl_prag
     is_local  = isLocalId fn
     is_dfun   = isDFunId fn
     specializable_prag = idSpecializablePragma fn
