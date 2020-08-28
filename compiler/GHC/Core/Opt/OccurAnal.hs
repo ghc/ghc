@@ -208,7 +208,6 @@ Really, we want 'f' to be a loop breaker, even though it's non-recursive.
 
 When analysing "g = ...", occAnalNonRecBind will produce a usage of 'f'
 see Note [Preventing loops due to imported functions rules]. So we'll
-do glomming
 
 Note [Dead code]
 ~~~~~~~~~~~~~~~~
