@@ -219,6 +219,8 @@ emitPrimOp dflags primop = case primop of
       -> opIntoRegs $ \ [res] -> emitCloneArray mkMAP_DIRTY_infoLabel res src src_off (fromInteger n)
     _ -> PrimopCmmEmit_External
 
+ AppendArrays -> const PrimopCmmEmit_External
+
   NewSmallArrayOp -> \case
     [(CmmLit (CmmInt n w)), init]
       | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
@@ -263,6 +265,8 @@ emitPrimOp dflags primop = case primop of
       | wordsToBytes platform (asUnsigned w n) <= fromIntegral (maxInlineAllocSize dflags)
       -> opIntoRegs $ \ [res] -> emitCloneSmallArray mkSMAP_DIRTY_infoLabel res src src_off (fromInteger n)
     _ -> PrimopCmmEmit_External
+
+  AppendSmallArrays -> const PrimopCmmEmit_External
 
 -- First we handle various awkward cases specially.
 
@@ -2791,6 +2795,50 @@ emitCloneSmallArray info_p res_r src src_off n = do
         (wordAlignment platform)
 
     emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
+
+-- -- | Takes an info table label, a register to return the newly
+-- -- allocated array in, a source array, an offset in the source array,
+-- -- and the number of elements to copy. Allocates a new array and
+-- -- initializes it from the source array.
+-- emitInsertSmallArray ::
+--      CLabel    -- ^ Pointer to info table
+--   -> CmmFormal -- ^ Return register
+--   -> CmmExpr   -- ^ Source array
+--   -> CmmExpr   -- ^ Offset
+--   -> CmmExpr   -- ^ Element to Insert
+--   -> WordOff   -- ^ Index
+--   -> FCode ()
+-- emitInsertaSmallArray info_p res_r src src_off element idx = do
+--     dflags <- getDynFlags
+--     platform <- getPlatform
+
+--     let info_ptr = mkLblExpr info_p
+--         rep = smallArrPtrsRep n
+
+--     -- tickyAllocPrim (mkIntExpr platform (smallArrPtrsHdrSize dflags))
+--     --     (mkIntExpr platform (nonHdrSize platform rep))
+--     --     (zeroExpr platform)
+
+--     let hdr_size = fixedHdrSize dflags
+
+--     base <- allocHeapClosure rep info_ptr cccsExpr
+--                      [ (mkIntExpr platform n,
+--                         hdr_size + oFFSET_StgSmallMutArrPtrs_ptrs dflags)
+--                      ]
+
+--     arr <- CmmLocal `fmap` newTemp (bWord platform)
+--     emit $ mkAssign arr base
+
+--     dst_p <- assignTempE $ cmmOffsetB platform (CmmReg arr)
+--              (smallArrPtrsHdrSize dflags)
+--     src_p <- assignTempE $ cmmOffsetExprW platform src
+--              (cmmAddWord platform
+--               (mkIntExpr platform (smallArrPtrsHdrSizeW dflags)) src_off)
+
+--     emitMemcpyCall dst_p src_p (mkIntExpr platform (wordsToBytes platform n))
+--         (wordAlignment platform)
+
+--     emit $ mkAssign (CmmLocal res_r) (CmmReg arr)
 
 -- | Takes and offset in the destination array, the base address of
 -- the card table, and the number of elements affected (*not* the
