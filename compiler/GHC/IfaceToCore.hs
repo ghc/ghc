@@ -1486,7 +1486,6 @@ tcIdInfo ignore_prags toplvl name ty info = do
       -- Always read in compulsory unfoldings
       -- See Note [Always expose compulsory unfoldings] in GHC.Iface.Tidy
     need_prag (HsUnfold _ (IfCompulsory {})) = True
-    need_prag (HsUnfold _ (IfSpecializableNoinline {})) = True -- TMP
     need_prag _                              = False
 
     tcPrag :: IdInfo -> IfaceInfoItem -> IfL IdInfo
@@ -1560,12 +1559,9 @@ tcUnfolding toplvl name _ info (IfCoreUnfold stable if_expr)
 
 tcUnfolding toplvl name _ _ (IfSpecializableNoinline if_expr)
   = do  { mb_expr <- tcPragExpr False toplvl name if_expr
-        ; return $ maybe NoUnfolding mkU mb_expr }
-  -- TODO restore case
-  where mkU e = mkCoreUnfolding InlineStable
-                    True
-                    e
-                    UnfNever
+        ; return $ case mb_expr of
+                     Nothing -> NoUnfolding
+                     Just expr -> mkCoreUnfolding InlineStable True expr UnfNever }
 
 tcUnfolding toplvl name _ _ (IfCompulsory if_expr)
   = do  { mb_expr <- tcPragExpr True toplvl name if_expr
