@@ -1472,6 +1472,10 @@ data InlineSpec   -- What the user's INLINE pragma looked like
 
 data SpecializablePragma
   = Specializable
+  -- Why do we need the NoUserSpecializable constructor?
+  -- While at the syntax level we mark the absence of a SPECIALIZABLE pragma
+  -- by simply not having a 'SpecializableSig' in the list of signatures,
+  -- later on we need to add that information in an 'IdInfo' field.
   | NoUserSpecializable
   deriving( Eq, Data )
 
