@@ -51,7 +51,7 @@ Flag terminfo
 Flag dynamic-system-linker
     Description: The system can load dynamic code. This is not the case for musl.
     Default: True
-    Manual: False
+    Manual: True
 
 Library
     Default-Language: Haskell2010
