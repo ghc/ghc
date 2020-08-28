@@ -598,12 +598,7 @@ lhsBindArity _ env = env        -- PatBind/VarBind
 -- TODO find a better name
 addInlinePrags :: TcId -> [LSig GhcRn] -> TcM TcId
 addInlinePrags poly_id prags_for_me
-  | null inl_prags && null spec_prags
-  = return poly_id
-  | otherwise
-  -- | inl@(L _ prag) : inls <- inl_prags
-  = do { liftIO $ putStrLn $ showSDocUnsafe $ ppr prags_for_me
-       ; poly_id <- case inl_prags of
+  = do { poly_id <- case inl_prags of
                       [] -> return poly_id
                       inl@(L _ prag) : inls -> do
                         unless (null inls) $ warn_multiple_inlines inl inls
@@ -618,7 +613,7 @@ addInlinePrags poly_id prags_for_me
        ; return poly_id }
   where
     inl_prags  = [L loc prag | L loc (InlineSig _ _ prag       ) <- prags_for_me]
-    spec_prags = [L loc Specializable | L loc (SpecializableSig _ _ _) <- prags_for_me]
+    spec_prags = [L loc Specializable | L loc SpecializableSig{} <- prags_for_me]
 
     warn_multiple_inlines _ [] = return ()
 
