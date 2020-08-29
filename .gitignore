@@ -78,6 +78,7 @@ _darcs/
 /libffi/dist-install/
 /libraries/*/dist-boot/
 /libraries/*/dist-install/
+/libraries/*/dist-newstyle/
 /libraries/dist-haddock/
 /rts/dist/
 /utils/*/dist*/
@@ -227,8 +228,14 @@ ghc.nix/
 .gdb_history
 .gdbinit
 
-# Tooling - direnv
+# -----------------------------------------------------------------------------
+# Tooling
+
+# direnv
 .envrc
 
-# Tooling - vscode
+# Visual Studio Code
 .vscode
+
+# clangd
+.clangd
