@@ -753,14 +753,147 @@ instance Enum Int64 where
         | x /= minBound = x - 1
         | otherwise     = predError "Int64"
     toEnum (I# i#)      = I64# (intToInt64# i#)
+#if WORD_SIZE_IN_BITS >= 64
+    fromEnum (I64# x#) = I# (int64ToInt# x#)
+#else
     fromEnum x@(I64# x#)
         | x >= fromIntegral (minBound::Int) && x <= fromIntegral (maxBound::Int)
                         = I# (int64ToInt# x#)
         | otherwise     = fromEnumError "Int64" x
-    enumFrom            = integralEnumFrom
-    enumFromThen        = integralEnumFromThen
-    enumFromTo          = integralEnumFromTo
-    enumFromThenTo      = integralEnumFromThenTo
+#endif
+    -- See Note [Stable Unfolding for list producers]
+    {-# INLINE enumFrom #-}
+    enumFrom (I64# x) = eftInt64 x maxInt64#
+        where !(I64# maxInt64#) = maxBound
+        -- Blarg: technically I guess enumFrom isn't strict!
+
+    -- See Note [Stable Unfolding for list producers]
+    {-# INLINE enumFromTo #-}
+    enumFromTo (I64# x) (I64# y) = eftInt64 x y
+
+    -- See Note [Stable Unfolding for list producers]
+    {-# INLINE enumFromThen #-}
+    enumFromThen (I64# x1) (I64# x2) = efdInt64 x1 x2
+
+    -- See Note [Stable Unfolding for list producers]
+    {-# INLINE enumFromThenTo #-}
+    enumFromThenTo (I64# x1) (I64# x2) (I64# y) = efdtInt64 x1 x2 y
+
+-- Modeled after fusion helpers in GHC.Enum for Int
+-- See Note [How the Enum rules work]
+
+{-# RULES
+"eftInt64"      [~1] forall x y. eftInt64 x y = build (\ c n -> eftInt64FB c n x y)
+"eftInt64List"  [1] eftInt64FB  (:) [] = eftInt64
+  #-}
+
+{-# NOINLINE [1] eftInt64 #-}
+eftInt64 :: Int64# -> Int64# -> [Int64]
+-- [x1..x2]
+eftInt64 x0 y | isTrue# (x0 `gtInt64#` y) = []
+              | otherwise         = go x0
+  where
+    !one = intToInt64# 1#
+    go x = I64# x : if isTrue# (x `eqInt64#` y)
+                    then []
+                    else go (x `plusInt64#` one)
+
+{-# NOINLINE [0] eftInt64FB #-}
+eftInt64FB :: (Int64 -> r -> r) -> r -> Int64# -> Int64# -> r
+eftInt64FB c n x0 y | isTrue# (x0 `gtInt64#` y) = n
+                    | otherwise         = go x0
+  where
+    !one = intToInt64# 1#
+    go x = I64# x `c` if isTrue# (x `eqInt64#` y)
+                      then n
+                      else go (x `plusInt64#` one)
+
+{-# RULES
+"efdtInt64"       [~1] forall x1 x2 y.
+                     efdtInt64 x1 x2 y = build (\ c n -> efdtInt64FB c n x1 x2 y)
+"efdtInt64UpList" [1]  efdtInt64FB (:) [] = efdtInt64
+ #-}
+
+efdInt64 :: Int64# -> Int64# -> [Int64]
+-- [x1,x2..maxInt64]
+efdInt64 x1 x2
+ | isTrue# (x2 `geInt64#` x1) = case maxBound of I64# y -> efdtInt64Up x1 x2 y
+ | otherwise                  = case minBound of I64# y -> efdtInt64Dn x1 x2 y
+
+{-# NOINLINE [1] efdtInt64 #-}
+efdtInt64 :: Int64# -> Int64# -> Int64# -> [Int64]
+-- [x1,x2..y]
+efdtInt64 x1 x2 y
+ | isTrue# (x2 `geInt64#` x1) = efdtInt64Up x1 x2 y
+ | otherwise                  = efdtInt64Dn x1 x2 y
+
+{-# INLINE [0] efdtInt64FB #-} -- See Note [Inline FB functions] in GHC.List
+efdtInt64FB :: (Int64 -> r -> r) -> r -> Int64# -> Int64# -> Int64# -> r
+efdtInt64FB c n x1 x2 y
+ | isTrue# (x2 `geInt64#` x1) = efdtInt64UpFB c n x1 x2 y
+ | otherwise                  = efdtInt64DnFB c n x1 x2 y
+
+-- Requires x2 >= x1
+efdtInt64Up :: Int64# -> Int64# -> Int64# -> [Int64]
+efdtInt64Up x1 x2 y    -- Be careful about overflow!
+ | isTrue# (y `ltInt64#` x2) = if isTrue# (y `ltInt64#` x1) then [] else [I64# x1]
+ | otherwise = -- Common case: x1 <= x2 <= y
+               let !delta = x2 `subInt64#` x1 -- >= 0
+                   !y' = y `subInt64#` delta  -- x1 <= y' <= y; hence y' is representable
+
+                   -- Invariant: x <= y
+                   -- Note that: z <= y' => z + delta won't overflow
+                   -- so we are guaranteed not to overflow if/when we recurse
+                   go_up x | isTrue# (x `gtInt64#` y') = [I64# x]
+                           | otherwise                 = I64# x : go_up (x `plusInt64#` delta)
+               in I64# x1 : go_up x2
+
+-- Requires x2 >= x1
+{-# INLINE [0] efdtInt64UpFB #-} -- See Note [Inline FB functions] in GHC.List
+efdtInt64UpFB :: (Int64 -> r -> r) -> r -> Int64# -> Int64# -> Int64# -> r
+efdtInt64UpFB c n x1 x2 y    -- Be careful about overflow!
+ | isTrue# (y `ltInt64#` x2) = if isTrue# (y `ltInt64#` x1) then n else I64# x1 `c` n
+ | otherwise = -- Common case: x1 <= x2 <= y
+               let !delta = x2 `subInt64#` x1 -- >= 0
+                   !y' = y `subInt64#` delta  -- x1 <= y' <= y; hence y' is representable
+
+                   -- Invariant: x <= y
+                   -- Note that: z <= y' => z + delta won't overflow
+                   -- so we are guaranteed not to overflow if/when we recurse
+                   go_up x | isTrue# (x `gtInt64#` y') = I64# x `c` n
+                           | otherwise                 = I64# x `c` go_up (x `plusInt64#` delta)
+               in I64# x1 `c` go_up x2
+
+-- Requires x2 <= x1
+efdtInt64Dn :: Int64# -> Int64# -> Int64# -> [Int64]
+efdtInt64Dn x1 x2 y    -- Be careful about underflow!
+ | isTrue# (y `gtInt64#` x2) = if isTrue# (y `gtInt64#` x1) then [] else [I64# x1]
+ | otherwise = -- Common case: x1 >= x2 >= y
+               let !delta = x2 `subInt64#` x1 -- <= 0
+                   !y' = y `subInt64#` delta  -- y <= y' <= x1; hence y' is representable
+
+                   -- Invariant: x >= y
+                   -- Note that: z >= y' => z + delta won't underflow
+                   -- so we are guaranteed not to underflow if/when we recurse
+                   go_dn x | isTrue# (x `ltInt64#` y') = [I64# x]
+                           | otherwise                 = I64# x : go_dn (x `plusInt64#` delta)
+   in I64# x1 : go_dn x2
+
+-- Requires x2 <= x1
+{-# INLINE [0] efdtInt64DnFB #-} -- See Note [Inline FB functions] in GHC.List
+efdtInt64DnFB :: (Int64 -> r -> r) -> r -> Int64# -> Int64# -> Int64# -> r
+efdtInt64DnFB c n x1 x2 y    -- Be careful about underflow!
+ | isTrue# (y `gtInt64#` x2) = if isTrue# (y `gtInt64#` x1) then n else I64# x1 `c` n
+ | otherwise = -- Common case: x1 >= x2 >= y
+               let !delta = x2 `subInt64#` x1 -- <= 0
+                   !y' = y `subInt64#` delta  -- y <= y' <= x1; hence y' is representable
+
+                   -- Invariant: x >= y
+                   -- Note that: z >= y' => z + delta won't underflow
+                   -- so we are guaranteed not to underflow if/when we recurse
+                   go_dn x | isTrue# (x `ltInt64#` y') = I64# x `c` n
+                           | otherwise                 = I64# x `c` go_dn (x `plusInt64#` delta)
+               in I64# x1 `c` go_dn x2
 
 -- | @since 2.01
 instance Integral Int64 where
