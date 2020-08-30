@@ -1036,6 +1036,8 @@ if test ! -f compiler/parser/Parser.hs || test ! -f compiler/cmm/CmmParse.hs
 then
     FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-lt],[1.19.10],
       [AC_MSG_ERROR([Happy version 1.19.10 or later is required to compile GHC.])])[]
+    FP_COMPARE_VERSIONS([$fptools_cv_happy_version],[-ge],[1.20.0],
+      [AC_MSG_ERROR([Happy version 1.19 is required to compile GHC.])])[]
 fi
 HappyVersion=$fptools_cv_happy_version;
 AC_SUBST(HappyVersion)
