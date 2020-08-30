@@ -23,11 +23,11 @@ import traceback
 # So we import it here first, so that the testsuite doesn't appear to fail.
 import subprocess
 
-from testutil import getStdout, Watcher, str_warn, str_info
+from testutil import getStdout, Watcher, str_warn, str_info, print_table, shorten_metric_name
 from testglobals import getConfig, ghc_env, getTestRun, TestConfig, \
                         TestOptions, brokens, PerfMetric
 from my_typing import TestName
-from perf_notes import MetricChange, GitRef, inside_git_repo, is_worktree_dirty, format_perf_stat
+from perf_notes import MetricChange, GitRef, inside_git_repo, is_worktree_dirty, format_perf_stat, get_abbrev_hash_length, is_commit_hash
 from junit import junit
 import term_color
 from term_color import Color, colored
@@ -341,23 +341,52 @@ def cleanup_and_exit(exitcode):
     exit(exitcode)
 
 def tabulate_metrics(metrics: List[PerfMetric]) -> None:
-    for metric in sorted(metrics, key=lambda m: (m.stat.test, m.stat.way, m.stat.metric)):
-        print("{test:24}  {metric:40}  {value:15.3f}".format(
-            test = "{}({})".format(metric.stat.test, metric.stat.way),
-            metric = metric.stat.metric,
-            value = metric.stat.value
-        ))
-        if metric.baseline is not None:
-            val0 = metric.baseline.perfStat.value
-            val1 = metric.stat.value
-            rel = 100 * (val1 - val0) / val0
-            print("{space:24}  {herald:40}  {value:15.3f}  [{direction}, {rel:2.1f}%]".format(
-                space = "",
-                herald = "(baseline @ {commit})".format(
-                    commit = metric.baseline.commit),
-                value = val0,
-                direction = metric.change,
-                rel = rel
+    abbrevLen = get_abbrev_hash_length()
+    hasBaseline = any([x.baseline is not None for x in metrics])
+    baselineCommitSet = set([x.baseline.commit for x in metrics if x.baseline is not None])
+    hideBaselineCommit = not hasBaseline or len(baselineCommitSet) == 1
+    hideBaselineEnv = not hasBaseline or all(
+        [x.stat.test_env == x.baseline.perfStat.test_env
+         for x in metrics if x.baseline is not None])
+    def row(cells: Tuple[str, str, str, str, str, str, str]) -> List[str]:
+        return [x for (idx, x) in enumerate(list(cells)) if
+                (idx != 2 or not hideBaselineCommit) and
+                (idx != 3 or not hideBaselineEnv )]
+
+    headerRows = [
+        row(("", "", "Baseline", "Baseline", "Baseline", "", "")),
+        row(("Test", "Metric", "commit", "environment", "value", "New value", "Change"))
+    ]
+    def strDiff(x: PerfMetric) -> str:
+        if x.baseline is None:
+            return ""
+        val0 = x.baseline.perfStat.value
+        val1 = x.stat.value
+        return "{}({:+2.1f}%)".format(x.change.short_name(), 100 * (val1 - val0) / val0)
+    dataRows = [row((
+        "{}({})".format(x.stat.test, x.stat.way),
+        shorten_metric_name(x.stat.metric),
+          "{}".format(x.baseline.commit[:abbrevLen]
+                      if is_commit_hash(x.baseline.commit) else x.baseline.commit)
+          if x.baseline is not None else "",
+        "{}".format(x.baseline.perfStat.test_env)
+          if x.baseline is not None else "",
+        "{:13.1f}".format(x.baseline.perfStat.value)
+          if x.baseline is not None else "",
+        "{:13.1f}".format(x.stat.value),
+        strDiff(x)
+    )) for x in sorted(metrics, key =
+                      lambda m: (m.stat.test, m.stat.way, m.stat.metric))]
+    print_table(headerRows, dataRows, 1)
+    print("")
+    if hasBaseline:
+        if hideBaselineEnv:
+            print("* All baselines were measured in the same environment as this test run")
+        if hideBaselineCommit:
+            commit = next(iter(baselineCommitSet))
+            print("* All baseline commits are {}".format(
+                commit[:abbrevLen]
+                if is_commit_hash(commit) else commit
             ))
 
 # First collect all the tests to be run
