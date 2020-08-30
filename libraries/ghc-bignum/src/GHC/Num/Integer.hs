@@ -1002,6 +1002,7 @@ integerIsPowerOf2# (IP w) = bigNatIsPowerOf2# w
 integerFromInt64# :: Int64# -> Integer
 {-# NOINLINE integerFromInt64# #-}
 integerFromInt64# i
+#if WORD_SIZE_IN_BITS < 64
   | isTrue# ((i `leInt64#` intToInt64#  INT_MAXBOUND#)
       &&# (i `geInt64#` intToInt64# INT_MINBOUND#))
   = IS (int64ToInt# i)
@@ -1011,6 +1012,11 @@ integerFromInt64# i
 
   | True
   = IN (bigNatFromWord64# (int64ToWord64# (negateInt64# i)))
+{-# NOINLINE integerFromInt64# #-}
+#else
+  = IS (int64ToInt# i)
+{-# INLINE integerFromInt64# #-}
+#endif
 
 -- | Convert a Word64# into an Integer
 integerFromWord64# :: Word64# -> Integer
