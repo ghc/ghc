@@ -178,19 +178,25 @@ parseTupleArity _ = Nothing
 -- not converted to 'String' or alike to avoid new allocations. Additionally,
 -- since it is stored mostly in 'Set', fast comparison of 'FastString' is also
 -- quite nice.
-type NameRep = FastString
+newtype NameRep
+   = NameRep FastString
+   deriving (Eq)
+
+instance Ord NameRep where
+   compare (NameRep fs1) (NameRep fs2) = uniqCompareFS fs1 fs2
+
 
 getNameRep :: NamedThing name => name -> NameRep
-getNameRep = getOccFS
+getNameRep = NameRep . getOccFS
 
 nameRepString :: NameRep -> String
-nameRepString = unpackFS
+nameRepString (NameRep fs) = unpackFS fs
 
 stringNameRep :: String -> NameRep
-stringNameRep = mkFastString
+stringNameRep = NameRep . mkFastString
 
 setInternalNameRep :: SetName name => NameRep -> name -> name
-setInternalNameRep = setInternalOccName . mkVarOccFS
+setInternalNameRep (NameRep fs) = setInternalOccName (mkVarOccFS fs)
 
 setInternalOccName :: SetName name => OccName -> name -> name
 setInternalOccName occ name =
