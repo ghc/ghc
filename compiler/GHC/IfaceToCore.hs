@@ -1207,10 +1207,9 @@ tcTupleTyCon :: Bool    -- True <=> typechecking a *type* (vs. an expr)
              -> IfL TyCon
 tcTupleTyCon in_type sort arity
   = case sort of
-      ConstraintTuple -> do { thing <- tcIfaceGlobal (cTupleTyConName arity)
-                            ; return (tyThingTyCon thing) }
-      BoxedTuple   -> return (tupleTyCon Boxed   arity)
-      UnboxedTuple -> return (tupleTyCon Unboxed arity')
+      ConstraintTuple -> return (cTupleTyCon arity)
+      BoxedTuple      -> return (tupleTyCon Boxed   arity)
+      UnboxedTuple    -> return (tupleTyCon Unboxed arity')
         where arity' | in_type   = arity `div` 2
                      | otherwise = arity
                       -- in expressions, we only have term args
