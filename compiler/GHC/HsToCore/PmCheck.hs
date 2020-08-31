@@ -152,10 +152,14 @@ covCheckMatches
   -> DsM [(Nablas, NonEmpty Nablas)] -- ^ One covered 'Nablas' per Match and
                                      --   GRHS, for long distance info.
 covCheckMatches ctxt vars matches = do
-  missing <- getPmNablas
-  tracePm "covCheckMatches {" (hang (vcat [ppr ctxt, ppr vars, text "Matches:"])
-                                    2
-                                    (vcat (map ppr matches) $$ ppr missing))
+  -- We have to force @missing@ before printing out the trace message,
+  -- otherwise we get interleaved output from the solver. This function
+  -- should be strict in @missing@ anyway!
+  !missing <- getPmNablas
+  tracePm "covCheckMatches {" $
+          hang (vcat [ppr ctxt, ppr vars, text "Matches:"])
+               2
+               (vcat (map ppr matches) $$ ppr missing)
   case NE.nonEmpty matches of
     Nothing -> do
       -- This must be an -XEmptyCase. See Note [Checking EmptyCase]
@@ -419,29 +423,27 @@ mkPmLetVar x y | x == y = []
 mkPmLetVar x y          = [PmLet x (Var y)]
 
 -- | ADT constructor pattern => no existentials, no local constraints
-vanillaConGrds :: Id -> DataCon -> [Id] -> GrdVec
-vanillaConGrds scrut con arg_ids =
-  [ PmBang scrut Nothing
-  , PmCon { pm_id = scrut, pm_con_con = PmAltConLike (RealDataCon con)
-         , pm_con_tvs = [], pm_con_dicts = [], pm_con_args = arg_ids }
-  ]
+vanillaConGrd :: Id -> DataCon -> [Id] -> PmGrd
+vanillaConGrd scrut con arg_ids =
+  PmCon { pm_id = scrut, pm_con_con = PmAltConLike (RealDataCon con)
+        , pm_con_tvs = [], pm_con_dicts = [], pm_con_args = arg_ids }
 
 -- | Creates a 'GrdVec' refining a match var of list type to a list,
 -- where list fields are matched against the incoming tagged 'GrdVec's.
 -- For example:
 --   @mkListGrds "a" "[(x, True <- x),(y, !y)]"@
 -- to
---   @"[!a, (x:b) <- a, !x, True <- x, !b, (y:c) <- b, !y, !c, [] <- c]"@
+--   @"[(x:b) <- a, True <- x, (y:c) <- b, !y, [] <- c]"@
 -- where @b@ and @c@ are freshly allocated in @mkListGrds@ and @a@ is the match
 -- variable.
 mkListGrds :: Id -> [(Id, GrdVec)] -> DsM GrdVec
 -- See Note [Order of guards matter] for why we need to intertwine guards
 -- on list elements.
-mkListGrds a []                  = pure (vanillaConGrds a nilDataCon [])
+mkListGrds a []                  = pure [vanillaConGrd a nilDataCon []]
 mkListGrds a ((x, head_grds):xs) = do
   b <- mkPmId (idType a)
   tail_grds <- mkListGrds b xs
-  pure $ vanillaConGrds a consDataCon [x, b] ++ head_grds ++ tail_grds
+  pure $ vanillaConGrd a consDataCon [x, b] : head_grds ++ tail_grds
 
 -- | Create a 'GrdVec' refining a match variable to a 'PmLit'.
 mkPmLitGrds :: Id -> PmLit -> DsM GrdVec
@@ -457,13 +459,12 @@ mkPmLitGrds x (PmLit _ (PmLitString s)) = do
   char_grdss <- zipWithM mk_char_lit vars (unpackFS s)
   mkListGrds x (zip vars char_grdss)
 mkPmLitGrds x lit = do
-  let con = PmAltLit lit
-      grd = PmCon { pm_id = x
+  let grd = PmCon { pm_id = x
                   , pm_con_con = PmAltLit lit
                   , pm_con_tvs = []
                   , pm_con_dicts = []
                   , pm_con_args = [] }
-  pure (conMatchStrictGrds con x ++ [grd])
+  pure [grd]
 
 -- | @desugarPat _ x pat@ transforms @pat@ into a 'GrdVec', where
 -- the variable representing the match is @x@.
@@ -499,11 +500,11 @@ desugarPat x pat = case pat of
   -- (n + k)  ===>   let b = x >= k, True <- b, let n = x-k
   NPlusKPat _pat_ty (L _ n) k1 k2 ge minus -> do
     b <- mkPmId boolTy
-    let grd_b = vanillaConGrds b trueDataCon []
+    let grd_b = vanillaConGrd b trueDataCon []
     [ke1, ke2] <- traverse dsOverLit [unLoc k1, k2]
     rhs_b <- dsSyntaxExpr ge    [Var x, ke1]
     rhs_n <- dsSyntaxExpr minus [Var x, ke2]
-    pure $ PmLet b rhs_b : grd_b ++ [PmLet n rhs_n]
+    pure [PmLet b rhs_b, grd_b, PmLet n rhs_n]
 
   -- (fun -> pat)   ===>   let y = fun x, pat <- y where y is a match var of pat
   ViewPat _arg_ty lexpr pat -> do
@@ -582,13 +583,13 @@ desugarPat x pat = case pat of
   TuplePat _tys pats boxity -> do
     (vars, grdss) <- mapAndUnzipM desugarLPatV pats
     let tuple_con = tupleDataCon boxity (length vars)
-    pure $ vanillaConGrds x tuple_con vars ++ concat grdss
+    pure $ vanillaConGrd x tuple_con vars : concat grdss
 
   SumPat _ty p alt arity -> do
     (y, grds) <- desugarLPatV p
     let sum_con = sumDataCon alt arity
     -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
-    pure $ vanillaConGrds x sum_con [y] ++ grds
+    pure $ vanillaConGrd x sum_con [y] : grds
 
   SplicePat {} -> panic "Check.desugarPat: SplicePat"
 
@@ -614,11 +615,6 @@ desugarListPat x pats = do
   vars_and_grdss <- traverse desugarLPatV pats
   mkListGrds x vars_and_grdss
 
-conMatchStrictGrds :: PmAltCon -> Id -> GrdVec
-conMatchStrictGrds con x
-  | isPmAltConMatchStrict con = [PmBang x Nothing]
-  | otherwise                 = []
-
 -- | Desugar a constructor pattern
 desugarConPatOut :: Id -> ConLike -> [Type] -> [TyVar]
                  -> [EvVar] -> HsConPatDetails GhcTc -> DsM GrdVec
@@ -642,33 +638,31 @@ desugarConPatOut x con univ_tys ex_tvs dicts = \case
 
     go_field_pats tagged_pats = do
       -- The fields that appear might not be in the correct order. So
-      --   1. Add a bang that forces the match var if 'isPmAltConMatchStrict'.
-      --   2. Do the PmCon match
-      --   3. Then pattern match on the fields in the order given by the first
+      --   1. Do the PmCon match
+      --   2. Then pattern match on the fields in the order given by the first
       --      field of @tagged_pats@.
       -- See Note [Field match order for RecCon]
 
       -- Desugar the mentioned field patterns. We're doing this first to get
-      -- the Ids for pm_con_args.
+      -- the Ids for pm_con_args and bring them in order afterwards.
       let trans_pat (n, pat) = do
             (var, pvec) <- desugarLPatV pat
             pure ((n, var), pvec)
       (tagged_vars, arg_grdss) <- mapAndUnzipM trans_pat tagged_pats
 
-      let alt_con         = PmAltConLike con
-          get_pat_id n ty = case lookup n tagged_vars of
+      let get_pat_id n ty = case lookup n tagged_vars of
             Just var -> pure var
             Nothing  -> mkPmId ty
 
-      -- the constructor pattern match itself
+      -- 1. the constructor pattern match itself
       arg_ids <- zipWithM get_pat_id [0..] arg_tys
-      let con_grd = PmCon x alt_con ex_tvs dicts arg_ids
+      let con_grd = PmCon x (PmAltConLike con) ex_tvs dicts arg_ids
 
-      -- guards from field selector patterns
+      -- 2. guards from field selector patterns
       let arg_grds = concat arg_grdss
 
       -- tracePm "ConPatOut" (ppr x $$ ppr con $$ ppr arg_ids)
-      pure (conMatchStrictGrds alt_con x ++ con_grd : arg_grds)
+      pure (con_grd : arg_grds)
 
 desugarPatBind :: SrcSpan -> Id -> Pat GhcTc -> DsM GrdPatBind
 -- See 'GrdPatBind' for how this simply repurposes GrdGRHS.
@@ -753,10 +747,10 @@ desugarBoolGuard e
       Var y
         | Nothing <- isDataConId_maybe y
         -- Omit the let by matching on y
-        -> pure (vanillaConGrds y trueDataCon [])
+        -> pure [vanillaConGrd y trueDataCon []]
       rhs -> do
         x <- mkPmId boolTy
-        pure $ PmLet x rhs : vanillaConGrds x trueDataCon []
+        pure [PmLet x rhs, vanillaConGrd x trueDataCon []]
 
 {- Note [Field match order for RecCon]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -768,13 +762,11 @@ the pattern match. For example:
   f T{ b = 42, a = 'a' } = ()
 
 Then @f (T (error "a") (error "b"))@ errors out with "b" because it is mentioned
-frist in the pattern match.
+first in the pattern match.
 
 This means we can't just desugar the pattern match to
-@[!x, T a b <- x, 'a' <- a, 42 <- b]@. Instead we have to force them in the
-right order: @[!x, T a b <- x, 42 <- b, 'a' <- a]@.
-Note the preceding bang guards on the match var: They are necessary for DataCons
-as PmCon guards match lazily.
+@[T a b <- x, 'a' <- a, 42 <- b]@. Instead we have to force them in the
+right order: @[T a b <- x, 42 <- b, 'a' <- a]@.
 
 Note [Strict fields and fields of unlifted type]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -983,11 +975,14 @@ checkGrd grd = CA $ \inc -> case grd of
                      , cr_approx = Precise }
   -- Con: Fall through on x /~ K and refine with x ~ K ys and type info
   PmCon x con tvs dicts args -> do
+    !div <- if isPmAltConMatchStrict con
+      then addPmCtNablas inc (PmBotCt x)
+      else pure mempty
     let con_cts = pmConCts x con tvs dicts args
-    matched <- addPmCtsNablas inc con_cts
-    uncov   <- addPmCtNablas  inc (PmNotConCt x con)
+    !matched <- addPmCtsNablas inc con_cts
+    !uncov   <- addPmCtNablas  inc (PmNotConCt x con)
     -- tracePm "checkGrd:Con" (ppr inc $$ ppr grd $$ ppr con_cts $$ ppr matched)
-    pure CheckResult { cr_ret = emptyRedSets { rs_cov = matched }
+    pure CheckResult { cr_ret = emptyRedSets { rs_cov = matched, rs_div = div }
                      , cr_uncov = uncov
                      , cr_approx = Precise }
 

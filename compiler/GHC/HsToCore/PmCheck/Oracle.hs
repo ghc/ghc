@@ -903,7 +903,11 @@ addNotConCt :: Nabla -> Id -> PmAltCon -> MaybeT DsM Nabla
 addNotConCt _ _ (PmAltConLike (RealDataCon dc))
   | isNewDataCon dc = mzero -- (4) in Note [Coverage checking Newtype matches]
 addNotConCt nabla@MkNabla{ nabla_tm_st = ts@(TmSt env reps) } x nalt = do
-  let vi@(VI _ pos neg _ pm) = lookupVarInfo ts x
+  -- For good performance, it's important to initPossibleMatches here.
+  -- Otherwise we can't mark nalt as matched later on, incurring unnecessary
+  -- inhabitation tests for nalt.
+  vi@(VI _ pos neg _ pm) <- lift $ initPossibleMatches (nabla_ty_st nabla)
+                                                       (lookupVarInfo ts x)
   -- 1. Bail out quickly when nalt contradicts a solution
   let contradicts nalt (cl, _tvs, _args) = eqPmAltCon cl nalt == Equal
   guard (not (any (contradicts nalt) pos))
@@ -915,11 +919,12 @@ addNotConCt nabla@MkNabla{ nabla_tm_st = ts@(TmSt env reps) } x nalt = do
         -- See Note [Completeness checking with required Thetas]
         | hasRequiredTheta nalt  = neg
         | otherwise              = extendPmAltConSet neg nalt
-  let vi1 = vi{ vi_neg = neg' }
+  MASSERT( isPmAltConMatchStrict nalt )
+  let vi1 = vi{ vi_neg = neg', vi_bot = IsNotBot }
   -- 3. Make sure there's at least one other possible constructor
   vi2 <- case nalt of
     PmAltConLike cl
-      -> MaybeT (ensureInhabited nabla vi1{ vi_cache = markMatched cl pm })
+      -> ensureInhabited nabla vi1{ vi_cache = markMatched cl pm }
     _ -> pure vi1
   pure nabla{ nabla_tm_st = TmSt (setEntrySDIE env x vi2) reps }
 
@@ -993,30 +998,30 @@ addNotBotCt nabla@MkNabla{ nabla_tm_st = TmSt env reps } x = do
     IsBot    -> mzero      -- There was x ~ ⊥. Contradiction!
     IsNotBot -> pure nabla -- There already is x /~ ⊥. Nothing left to do
     MaybeBot -> do         -- We add x /~ ⊥ and test if x is still inhabited
-      vi <- MaybeT $ ensureInhabited nabla vi{ vi_bot = IsNotBot }
+      vi <- ensureInhabited nabla vi{ vi_bot = IsNotBot }
       pure nabla{ nabla_tm_st = TmSt (setEntrySDIE env y vi) reps}
 
-ensureInhabited :: Nabla -> VarInfo -> DsM (Maybe VarInfo)
-   -- Returns (Just vi) if at least one member of each ConLike in the COMPLETE
-   -- set satisfies the oracle
-   --
-   -- Internally uses and updates the ConLikeSets in vi_cache.
-   --
-   -- NB: Does /not/ filter each ConLikeSet with the oracle; members may
-   --     remain that do not statisfy it.  This lazy approach just
-   --     avoids doing unnecessary work.
+-- | Returns (Just vi) if at least one member of each ConLike in the COMPLETE
+-- set satisfies the oracle
+--
+-- Internally uses and updates the ConLikeSets in vi_cache.
+--
+-- NB: Does /not/ filter each ConLikeSet with the oracle; members may
+--     remain that do not statisfy it.  This lazy approach just
+--     avoids doing unnecessary work.
+ensureInhabited :: Nabla -> VarInfo -> MaybeT DsM VarInfo
 ensureInhabited nabla vi = case vi_bot vi of
-  MaybeBot -> pure (Just vi) -- The |-Bot rule from the paper
-  IsBot    -> pure (Just vi)
-  IsNotBot -> initPossibleMatches (nabla_ty_st nabla) vi >>= inst_complete_sets
+  MaybeBot -> pure vi -- The |-Bot rule from the paper
+  IsBot    -> pure vi
+  IsNotBot -> lift (initPossibleMatches (nabla_ty_st nabla) vi) >>= inst_complete_sets
   where
     -- | This is the |-Inst rule from the paper (section 4.5). Tries to
     -- find an inhabitant in every complete set by instantiating with one their
     -- constructors. If there is any complete set where we can't find an
     -- inhabitant, the whole thing is uninhabited.
-    inst_complete_sets :: VarInfo -> DsM (Maybe VarInfo)
-    inst_complete_sets vi@VI{ vi_cache = NoPM }  = pure (Just vi)
-    inst_complete_sets vi@VI{ vi_cache = PM ms } = runMaybeT $ do
+    inst_complete_sets :: VarInfo -> MaybeT DsM VarInfo
+    inst_complete_sets vi@VI{ vi_cache = NoPM }  = pure vi
+    inst_complete_sets vi@VI{ vi_cache = PM ms } = do
       ms <- traverse (\cs -> inst_complete_set vi cs (uniqDSetToList cs)) ms
       pure vi{ vi_cache = PM ms }
 
@@ -1061,8 +1066,7 @@ ensureAllInhabited nabla@MkNabla{ nabla_tm_st = TmSt env reps }
   = runMaybeT (set_tm_cs_env nabla <$> traverseSDIE go env)
   where
     set_tm_cs_env nabla env = nabla{ nabla_tm_st = TmSt env reps }
-    go vi = MaybeT $
-      initPossibleMatches (nabla_ty_st nabla) vi >>= ensureInhabited nabla
+    go vi = ensureInhabited nabla vi
 
 --------------------------------------
 -- * Term oracle unification procedure
@@ -1144,17 +1148,18 @@ addConCt nabla@MkNabla{ nabla_tm_st = ts@(TmSt env reps) } x alt tvs args = do
       MaybeT $ addPmCts nabla (listToBag ty_cts `unionBags` listToBag tm_cts)
     Nothing -> do
       let pos' = (alt, tvs, args):pos
-      let nabla' = nabla{ nabla_tm_st = TmSt (setEntrySDIE env x (VI ty pos' neg bot cache)) reps}
+      let nabla_with bot = nabla{ nabla_tm_st = TmSt (setEntrySDIE env x (VI ty pos' neg bot cache)) reps}
       -- In case of a newtype constructor, we have to make sure that x ~ ⊥ and
       -- x /~ ⊥ constraints now apply to the wrapped thing, as 'lookupVarInfoNT'
       -- looks through newtype constructors.
       case (alt, args) of
         (PmAltConLike (RealDataCon dc), [y]) | isNewDataCon dc ->
           case bot of
-            MaybeBot -> pure nabla'
-            IsBot    -> addBotCt nabla' y
-            IsNotBot -> addNotBotCt nabla' y
-        _ -> pure nabla'
+            MaybeBot -> pure (nabla_with MaybeBot)
+            IsBot    -> addBotCt (nabla_with MaybeBot) y
+            IsNotBot -> addNotBotCt (nabla_with MaybeBot) y
+        _ -> ASSERT( isPmAltConMatchStrict alt )
+             pure (nabla_with IsNotBot) -- strict match ==> not ⊥
 
 equateTys :: [Type] -> [Type] -> [PmCt]
 equateTys ts us =
@@ -1671,7 +1676,7 @@ addCoreCt :: Nabla -> Id -> CoreExpr -> MaybeT DsM Nabla
 addCoreCt nabla x e = do
   dflags <- getDynFlags
   let e' = simpleOptExpr dflags e
-  lift $ tracePm "addCoreCt" (ppr x <+> dcolon <+> ppr (idType x) $$ ppr e $$ ppr e')
+  -- lift $ tracePm "addCoreCt" (ppr x <+> dcolon <+> ppr (idType x) $$ ppr e $$ ppr e')
   execStateT (core_expr x e') nabla
   where
     -- | Takes apart a 'CoreExpr' and tries to extract as much information about
