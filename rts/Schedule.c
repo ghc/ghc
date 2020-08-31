@@ -136,7 +136,6 @@ static Capability *schedule (Capability *initialCapability, Task *task);
 // abstracted only to make the structure and control flow of the
 // scheduler clearer.
 //
-static void schedulePreLoop (void);
 static void scheduleFindWork (Capability **pcap);
 #if defined(THREADED_RTS)
 static void scheduleYield (Capability **pcap, Task *task);
@@ -204,8 +203,6 @@ schedule (Capability *initialCapability, Task *task)
   // NB. on return, we still hold a capability.
 
   debugTrace (DEBUG_sched, "cap %d: schedule()", initialCapability->no);
-
-  schedulePreLoop();
 
   // -----------------------------------------------------------
   // Scheduler loop starts here:
@@ -597,20 +594,6 @@ promoteInRunQueue (Capability *cap, StgTSO *tso)
 {
     removeFromRunQueue(cap, tso);
     pushOnRunQueue(cap, tso);
-}
-
-/* ----------------------------------------------------------------------------
- * Setting up the scheduler loop
- * ------------------------------------------------------------------------- */
-
-static void
-schedulePreLoop(void)
-{
-  // initialisation for scheduler - what cannot go into initScheduler()
-
-#if defined(mingw32_HOST_OS) && !defined(USE_MINIINTERPRETER)
-    win32AllocStack();
-#endif
 }
 
 /* -----------------------------------------------------------------------------
