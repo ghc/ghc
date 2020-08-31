@@ -153,6 +153,7 @@ StgFunPtr StgReturn(void)
  * On windows the stack has to be allocated 4k at a time, otherwise
  * we get a segfault.  This is done by using a helper ___chkstk_ms that is
  * provided by libgcc.  The Haskell side already knows how to handle this
+(see GHC.CmmToAsm.X86.Instr.needs_probe_call)
  * but we need to do the same from STG.  Previously we would drop the stack
  * in StgRun but would only make it valid whenever the scheduler loop ran.
  *
