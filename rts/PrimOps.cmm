@@ -373,15 +373,15 @@ stg_casArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
 
 stg_insertArrayzh( gcptr src, W_ idx, gcptr elemt )
 {
-    return ();
+    ccall barf("stg_insertArrayzh not implemented.");
 }
 stg_updateArrayzh( gcptr src, W_ idx, gcptr elemt )
 {
-    return ();
+    ccall barf("stg_updateArrayzh not implemented.");
 }
 stg_deleteArrayzh( gcptr src, W_ idx )
 {
-    return ();
+    ccall barf("stg_deleteArrayzh not implemented.");
 }
 
 stg_newArrayArrayzh ( W_ n /* words */ )
@@ -590,7 +590,6 @@ stg_insertSmallArrayzh( gcptr src, W_ idx, gcptr elemt )
 
     again: MAYBE_GC(again);
 
-    // ccall barf("argh");
     n = StgSmallMutArrPtrs_ptrs(src) + 1;
 
     words = BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) + n;
