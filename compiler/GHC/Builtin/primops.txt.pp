@@ -1246,6 +1246,14 @@ primop  ThawArrayOp "thawArray#" GenPrimOp
   has_side_effects = True
   can_fail         = True
 
+primop AppendArrays "appendArrays#" GenPrimOp
+  Array# a -> Array# a -> Array# a
+  {Concatenate two arrays by @memcpy@ing them into a new array.}
+  with
+  out_of_line      = True
+  has_side_effects = True
+  can_fail         = True
+
 primop CasArrayOp  "casArray#" GenPrimOp
    MutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, a #)
    {Given an array, an offset, the expected old value, and
@@ -1432,6 +1440,14 @@ primop  ThawSmallArrayOp "thawSmallArray#" GenPrimOp
    of elements to copy, create a new array with the elements from the
    source array. The provided array must fully contain the specified
    range, but this is not checked.}
+  with
+  out_of_line      = True
+  has_side_effects = True
+  can_fail         = True
+
+primop AppendSmallArrays "appendSmallArrays#" GenPrimOp
+  SmallArray# a -> SmallArray# a -> SmallArray# a
+  {Concatenate two arrays by @memcpy@ing them into a new array.}
   with
   out_of_line      = True
   has_side_effects = True
