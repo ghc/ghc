@@ -135,7 +135,7 @@
       SymI_HasProto(rts_InstallConsoleEvent)             \
       SymI_HasProto(rts_ConsoleHandlerDone)              \
       SymI_HasProto(atexit)                              \
-      RTS_WIN32_ONLY(SymI_NeedsProto(__chkstk_ms))       \
+      RTS_WIN32_ONLY(SymI_NeedsProto(___chkstk_ms))      \
       RTS_WIN64_ONLY(SymI_NeedsProto(___chkstk_ms))      \
       RTS_WIN32_ONLY(SymI_HasProto(_imp___environ))      \
       RTS_WIN64_ONLY(SymI_HasProto(__imp__environ))      \

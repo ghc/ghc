@@ -96,25 +96,6 @@ StgFunPtr StgReturn(void)
 }
 
 #else /* !USE_MINIINTERPRETER */
-
-#if defined(mingw32_HOST_OS)
-/*
- * Note [Windows Stack allocations]
- *
- * On windows the stack has to be allocated 4k at a time, otherwise
- * we get a segfault.  The C compiler knows how to do this (it calls
- * _alloca()), so we make sure that we can allocate as much stack as
- * we need.  However since we are doing a local stack allocation and the value
- * isn't valid outside the frame, compilers are free to optimize this allocation
- * and the corresponding stack check away. So to prevent that we request that
- * this function never be optimized (See #14669).  */
-STG_NO_OPTIMIZE StgWord8 *win32AllocStack(void)
-{
-    StgWord8 stack[RESERVED_C_STACK_BYTES + 16 + 12];
-    return stack;
-}
-#endif
-
 /* -----------------------------------------------------------------------------
    x86 architecture
    -------------------------------------------------------------------------- */
@@ -166,7 +147,21 @@ STG_NO_OPTIMIZE StgWord8 *win32AllocStack(void)
  *
  * If you edit the sequence below be sure to update the unwinding information
  * for stg_stop_thread in StgStartup.cmm.
- */
+ *
+ * Note [Windows Stack allocations]
+ *
+ * On windows the stack has to be allocated 4k at a time, otherwise
+ * we get a segfault.  This is done by using a helper ___chkstk_ms that is
+ * provided by libgcc.  The Haskell side already knows how to handle this
+(see GHC.CmmToAsm.X86.Instr.needs_probe_call)
+ * but we need to do the same from STG.  Previously we would drop the stack
+ * in StgRun but would only make it valid whenever the scheduler loop ran.
+ *
+ * This approach was fundamentally broken in that it falls apart when you
+ * take a signal from the OS (See #14669, #18601, #18548 and #18496).
+ * Concretely this means we must always keep the stack valid.
+ * */
+
 
 static void GNUC3_ATTRIBUTE(used)
 StgRunIsImplementedInAssembler(void)
@@ -186,7 +181,13 @@ StgRunIsImplementedInAssembler(void)
          * bytes from here - this is a requirement of the C ABI, so
          * that C code can assign SSE2 registers directly to/from
          * stack locations.
+         *
+         * See Note [Windows Stack allocations]
          */
+#if defined(mingw32_HOST_OS)
+        "movl %0, %%eax\n\t"
+        "call ___chkstk_ms\n\t"
+#endif
         "subl %0, %%esp\n\t"
 
         /*
@@ -383,6 +384,14 @@ StgRunIsImplementedInAssembler(void)
         STG_HIDDEN STG_RUN "\n"
 #endif
         STG_RUN ":\n\t"
+        /*
+         * See Note [Windows Stack allocations]
+         */
+#if defined(mingw32_HOST_OS)
+        "movq %1, %%rax\n\t"
+        "addq %0, %%rax\n\t"
+        "callq ___chkstk_ms\n\t"
+#endif
         "subq %1, %%rsp\n\t"
         "movq %%rsp, %%rax\n\t"
         "subq %0, %%rsp\n\t"
