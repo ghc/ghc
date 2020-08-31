@@ -1264,6 +1264,32 @@ primop CasArrayOp  "casArray#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
+primop InsertArrayOp "insertArray#" GenPrimOp
+  Array# a -> Int# -> a -> Array# a
+  {Given an array @a@, an index @i@ and an element @x@, insert the @x@ into a
+   copy of @a@ at @i@. Assumes @0 <= i <= sizeOf a@.}
+  with
+  out_of_line      = True
+  has_side_effects = True
+  can_fail         = True
+
+primop UpdateArrayOp "updateArray#" GenPrimOp
+  Array# a -> Int# -> a -> Array# a
+  {Given an array @a@, an index @i@ and an element @x@, update the @i@th element
+   to @x@ in a copy of @a@ at @i@. Assumes @0 <= i < sizeOf a@.}
+  with
+  out_of_line      = True
+  has_side_effects = True
+  can_fail         = True
+
+primop DeleteArrayOp "deleteArray#" GenPrimOp
+  Array# a -> Int# -> Array# a
+  {Given an array @a@ and an index @i@ and an element @x@, return a copy of @a@
+   with the @i@th element deleted. Assumes @0 <= i < sizeOf a@.}
+  with
+  out_of_line      = True
+  has_side_effects = True
+  can_fail         = True
 
 ------------------------------------------------------------------------
 section "Small Arrays"
@@ -1444,6 +1470,33 @@ primop CasSmallArrayOp  "casSmallArray#" GenPrimOp
    with
    out_of_line = True
    has_side_effects = True
+
+primop InsertSmallArrayOp "insertSmallArray#" GenPrimOp
+  SmallArray# a -> Int# -> a -> SmallArray# a
+  {Given an array, an index and an element, insert the element into a copy of
+   the array. Assumes 0 <= index <= sizeOf array.}
+  with
+  out_of_line      = True
+  has_side_effects = True
+  can_fail         = True
+
+primop UpdateSmallArrayOp "updateSmallArray#" GenPrimOp
+  SmallArray# a -> Int# -> a -> SmallArray# a
+  {Given an array @a@, an index @i@ and an element @x@, update the @i@th element
+   to @x@ in a copy of @a@ at @i@. Assumes @0 <= i < sizeOf a@.}
+  with
+  out_of_line      = True
+  has_side_effects = True
+  can_fail         = True
+
+primop DeleteSmallArrayOp "deleteSmallArray#" GenPrimOp
+  SmallArray# a -> Int# -> SmallArray# a
+  {Clone the array but without the element at the given index.
+   Assumes 0 <= index < sizeOf array.}
+  with
+  out_of_line      = True
+  has_side_effects = True
+  can_fail         = True
 
 ------------------------------------------------------------------------
 section "Byte Arrays"

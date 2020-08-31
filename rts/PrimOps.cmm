@@ -371,6 +371,19 @@ stg_casArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
     }
 }
 
+stg_insertArrayzh( gcptr src, W_ idx, gcptr elemt )
+{
+    return ();
+}
+stg_updateArrayzh( gcptr src, W_ idx, gcptr elemt )
+{
+    return ();
+}
+stg_deleteArrayzh( gcptr src, W_ idx )
+{
+    return ();
+}
+
 stg_newArrayArrayzh ( W_ n /* words */ )
 {
     W_ words, size, p;
@@ -570,6 +583,81 @@ stg_casSmallArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
     }
 }
 
+stg_insertSmallArrayzh( gcptr src, W_ idx, gcptr elemt )
+{
+    W_ words, n;
+    gcptr dst, dst_p, src_p;
+
+    again: MAYBE_GC(again);
+
+    // ccall barf("argh");
+    n = StgSmallMutArrPtrs_ptrs(src) + 1;
+
+    words = BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) + n;
+    ("ptr" dst) = ccall allocate(MyCapability() "ptr", words);
+    TICK_ALLOC_PRIM(SIZEOF_StgSmallMutArrPtrs, WDS(n), 0);
+
+    SET_HDR(dst, stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info, CCCS);
+    StgSmallMutArrPtrs_ptrs(dst) = n;
+
+    dst_p = dst + SIZEOF_StgSmallMutArrPtrs;
+    src_p = src + SIZEOF_StgSmallMutArrPtrs;
+    prim %memcpy(dst_p, src_p, WDS(idx), SIZEOF_W);
+    REP_StgSmallMutArrPtrs_ptrs[dst_p + WDS(idx)] = elemt;
+    prim %memcpy(dst_p + WDS(idx + 1), src_p + WDS(idx), WDS(n - idx - 1), SIZEOF_W);
+
+    return (dst);
+}
+
+stg_updateSmallArrayzh( gcptr src, W_ idx, gcptr elemt )
+{
+    W_ words, n;
+    gcptr dst, dst_p, src_p;
+
+    again: MAYBE_GC(again);
+
+    n = StgSmallMutArrPtrs_ptrs(src);
+
+    words = BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) + n;
+    ("ptr" dst) = ccall allocate(MyCapability() "ptr", words);
+    TICK_ALLOC_PRIM(SIZEOF_StgSmallMutArrPtrs, WDS(n), 0);
+
+    SET_HDR(dst, stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info, CCCS);
+    StgSmallMutArrPtrs_ptrs(dst) = n;
+
+    dst_p = dst + SIZEOF_StgSmallMutArrPtrs;
+    src_p = src + SIZEOF_StgSmallMutArrPtrs;
+    prim %memcpy(dst_p, src_p, WDS(idx), SIZEOF_W);
+    REP_StgSmallMutArrPtrs_ptrs[dst_p + WDS(idx)] = elemt;
+    prim %memcpy(dst_p + WDS(idx + 1), src_p + WDS(idx + 1), WDS(n - idx - 1), SIZEOF_W);
+
+    return (dst);
+}
+
+stg_deleteSmallArrayzh( gcptr src, W_ idx )
+{
+    W_ words, n;
+    gcptr dst, dst_p, src_p;
+
+    again: MAYBE_GC(again);
+
+    n = StgSmallMutArrPtrs_ptrs(src) - 1;
+
+    words = BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) + n;
+    ("ptr" dst) = ccall allocate(MyCapability() "ptr", words);
+    TICK_ALLOC_PRIM(SIZEOF_StgSmallMutArrPtrs, WDS(n), 0);
+
+    SET_HDR(dst, stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info, CCCS);
+    StgSmallMutArrPtrs_ptrs(dst) = n;
+
+    dst_p = dst + SIZEOF_StgSmallMutArrPtrs;
+    src_p = src + SIZEOF_StgSmallMutArrPtrs;
+
+    prim %memcpy(dst_p, src_p, WDS(idx), SIZEOF_W);
+    prim %memcpy(dst_p + WDS(idx), src_p + WDS(idx + 1), WDS(n - idx), SIZEOF_W);
+
+    return (dst);
+}
 
 /* -----------------------------------------------------------------------------
    MutVar primitives
