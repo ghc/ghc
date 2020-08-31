@@ -1269,8 +1269,8 @@ finish_tuple rn_ty tup_sort tau_tys tau_kinds exp_kind = do
       |  arity > mAX_CTUPLE_SIZE
       -> failWith (bigConstraintTuple arity)
       |  otherwise
-      -> do tycon <- tcLookupTyCon (cTupleTyConName arity)
-            check_expected_kind (mkTyConApp tycon tau_tys) constraintKind
+      -> let tycon = cTupleTyCon arity in
+         check_expected_kind (mkTyConApp tycon tau_tys) constraintKind
     BoxedTuple -> do
       let tycon = tupleTyCon Boxed arity
       checkWiredInTyCon tycon
