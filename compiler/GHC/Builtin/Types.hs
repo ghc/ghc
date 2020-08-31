@@ -80,9 +80,10 @@ module GHC.Builtin.Types (
         unboxedTupleKind, unboxedSumKind,
 
         -- ** Constraint tuples
-        cTupleTyConName, cTupleTyConNames, isCTupleTyConName,
+        cTupleTyCon, cTupleTyConName, cTupleTyConNames, isCTupleTyConName,
         cTupleTyConNameArity_maybe,
-        cTupleDataConName, cTupleDataConNames,
+        cTupleDataCon, cTupleDataConName, cTupleDataConNames,
+        cTupleSelId, cTupleSelIdName,
 
         -- * Any
         anyTyCon, anyTy, anyTypeOfKind,
@@ -174,10 +175,9 @@ import GHC.Core.Class     ( Class, mkClass )
 import GHC.Types.Name.Reader
 import GHC.Types.Name as Name
 import GHC.Types.Name.Env ( NameEnv, mkNameEnv, lookupNameEnv, lookupNameEnv_NF )
-import GHC.Types.Name.Set ( NameSet, mkNameSet, elemNameSet )
 import GHC.Types.Basic
 import GHC.Types.ForeignCall
-import GHC.Types.SrcLoc   ( noSrcSpan )
+import GHC.Types.Unique.Set
 import Data.Array
 import GHC.Data.FastString
 import GHC.Data.BooleanFormula ( mkAnd )
@@ -723,20 +723,23 @@ Note [How tuples work]  See also Note [Known-key names] in GHC.Builtin.Names
       but no actual declaration and no info table
 
 * ConstraintTuples
-    - Are known-key rather than wired-in. Reason: it's awkward to
-      have all the superclass selectors wired-in.
+    - A wired-in type.
     - Declared as classes in GHC.Classes, e.g.
          class (c1,c2) => (c1,c2)
     - Given constraints: the superclasses automatically become available
     - Wanted constraints: there is a built-in instance
          instance (c1,c2) => (c1,c2)
-      See GHC.Tc.Solver.Interact.matchCTuple
+      See GHC.Tc.Instance.Class.matchCTuple
     - Currently just go up to 62; beyond that
       you have to use manual nesting
     - Their OccNames look like (%,,,%), so they can easily be
       distinguished from term tuples.  But (following Haskell) we
       pretty-print saturated constraint tuples with round parens;
       see BasicTypes.tupleParens.
+    - Unlike BoxedTuples and UnboxedTuples, which only wire
+      in type constructors and data constructors, ConstraintTuples also wire in
+      superclass selector functions. For instance, $p1(%,%) and $p2(%,%) are
+      the selectors for the binary constraint tuple.
 
 * In quite a lot of places things are restricted just to
   BoxedTuple/UnboxedTuple, and then we used BasicTypes.Boxity to distinguish
@@ -914,26 +917,26 @@ mkConstraintTupleStr ar = "(%" ++ commas ar ++ "%)"
 commas :: Arity -> String
 commas ar = take (ar-1) (repeat ',')
 
+cTupleTyCon :: Arity -> TyCon
+cTupleTyCon i
+  | i > mAX_CTUPLE_SIZE = fstOf3 (mk_ctuple i) -- Build one specially
+  | otherwise           = fstOf3 (cTupleArr ! i)
+
 cTupleTyConName :: Arity -> Name
-cTupleTyConName arity
-  = mkExternalName (mkCTupleTyConUnique arity) gHC_CLASSES
-                   (mkCTupleOcc tcName arity) noSrcSpan
+cTupleTyConName a = tyConName (cTupleTyCon a)
 
 cTupleTyConNames :: [Name]
 cTupleTyConNames = map cTupleTyConName (0 : [2..mAX_CTUPLE_SIZE])
 
-cTupleTyConNameSet :: NameSet
-cTupleTyConNameSet = mkNameSet cTupleTyConNames
+cTupleTyConKeys :: UniqSet Unique
+cTupleTyConKeys = mkUniqSet $ map getUnique cTupleTyConNames
 
 isCTupleTyConName :: Name -> Bool
--- Use Type.isCTupleClass where possible
 isCTupleTyConName n
  = ASSERT2( isExternalName n, ppr n )
-   nameModule n == gHC_CLASSES
-   && n `elemNameSet` cTupleTyConNameSet
+   getUnique n `elementOfUniqSet` cTupleTyConKeys
 
 -- | If the given name is that of a constraint tuple, return its arity.
--- Note that this is inefficient.
 cTupleTyConNameArity_maybe :: Name -> Maybe Arity
 cTupleTyConNameArity_maybe n
   | not (isCTupleTyConName n) = Nothing
@@ -943,13 +946,45 @@ cTupleTyConNameArity_maybe n
     -- case, we have to adjust accordingly our calculated arity.
     adjustArity a = if a > 0 then a + 1 else a
 
+cTupleDataCon :: Arity -> DataCon
+cTupleDataCon i
+  | i > mAX_CTUPLE_SIZE = sndOf3 (mk_ctuple i) -- Build one specially
+  | otherwise           = sndOf3 (cTupleArr ! i)
+
 cTupleDataConName :: Arity -> Name
-cTupleDataConName arity
-  = mkExternalName (mkCTupleDataConUnique arity) gHC_CLASSES
-                   (mkCTupleOcc dataName arity) noSrcSpan
+cTupleDataConName i = dataConName (cTupleDataCon i)
 
 cTupleDataConNames :: [Name]
 cTupleDataConNames = map cTupleDataConName (0 : [2..mAX_CTUPLE_SIZE])
+
+cTupleSelId :: ConTag -- Superclass position
+            -> Arity  -- Arity
+            -> Id
+cTupleSelId sc_pos arity
+  | sc_pos > arity
+  = panic ("cTupleSelId: index out of bounds: superclass position: "
+           ++ show sc_pos ++ " > arity " ++ show arity)
+
+  | sc_pos <= 0
+  = panic ("cTupleSelId: Superclass positions start from 1. "
+           ++ "(superclass position: " ++ show sc_pos
+           ++ ", arity: " ++ show arity ++ ")")
+
+  | arity < 2
+  = panic ("cTupleSelId: Arity starts from 2. "
+           ++ "(superclass position: " ++ show sc_pos
+           ++ ", arity: " ++ show arity ++ ")")
+
+  | arity > mAX_CTUPLE_SIZE
+  = thdOf3 (mk_ctuple arity) ! (sc_pos - 1)  -- Build one specially
+
+  | otherwise
+  = thdOf3 (cTupleArr ! arity) ! (sc_pos - 1)
+
+cTupleSelIdName :: ConTag -- Superclass position
+                -> Arity  -- Arity
+                -> Name
+cTupleSelIdName sc_pos arity = idName (cTupleSelId sc_pos arity)
 
 tupleTyCon :: Boxity -> Arity -> TyCon
 tupleTyCon sort i | i > mAX_TUPLE_SIZE = fst (mk_tuple sort i)  -- Build one specially
@@ -975,6 +1010,20 @@ tupleDataConName sort i = dataConName (tupleDataCon sort i)
 boxedTupleArr, unboxedTupleArr :: Array Int (TyCon,DataCon)
 boxedTupleArr   = listArray (0,mAX_TUPLE_SIZE) [mk_tuple Boxed   i | i <- [0..mAX_TUPLE_SIZE]]
 unboxedTupleArr = listArray (0,mAX_TUPLE_SIZE) [mk_tuple Unboxed i | i <- [0..mAX_TUPLE_SIZE]]
+
+-- | Cached type constructors, data constructors, and superclass selectors for
+-- constraint tuples. The outer array is indexed by the arity of the constraint
+-- tuple and the inner array is indexed by the superclass position.
+cTupleArr :: Array Int (TyCon, DataCon, Array Int Id)
+cTupleArr = listArray (0,mAX_CTUPLE_SIZE) [mk_ctuple i | i <- [0..mAX_CTUPLE_SIZE]]
+  -- Although GHC does not make use of unary constraint tuples
+  -- (see Note [Ignore unary constraint tuples] in GHC.Tc.Gen.HsType),
+  -- this array creates one anyway. This is primarily motivated by the fact
+  -- that (1) the indices of an Array must be contiguous, and (2) we would like
+  -- the index of a constraint tuple in this Array to correspond to its Arity.
+  -- We could envision skipping over the unary constraint tuple and having index
+  -- 1 correspond to a 2-constraint tuple (and so on), but that's more
+  -- complicated than it's worth.
 
 -- | Given the TupleRep/SumRep tycon and list of RuntimeReps of the unboxed
 -- tuple/sum arguments, produces the return kind of an unboxed tuple/sum type
@@ -1039,6 +1088,45 @@ mk_tuple Unboxed arity = (tycon, tuple_con)
                             (AConLike (RealDataCon tuple_con)) BuiltInSyntax
     tc_uniq = mkTupleTyConUnique   boxity arity
     dc_uniq = mkTupleDataConUnique boxity arity
+
+mk_ctuple :: Arity -> (TyCon, DataCon, Array ConTagZ Id)
+mk_ctuple arity = (tycon, tuple_con, sc_sel_ids_arr)
+  where
+    tycon = mkClassTyCon tc_name binders roles
+                         rhs klass
+                         (mkPrelTyConRepName tc_name)
+
+    klass     = mk_ctuple_class tycon sc_theta sc_sel_ids
+    tuple_con = pcDataConW dc_name tvs (map unrestricted sc_theta) tycon
+
+    binders = mkTemplateAnonTyConBinders (replicate arity constraintKind)
+    roles   = replicate arity Nominal
+    rhs     = TupleTyCon{data_con = tuple_con, tup_sort = ConstraintTuple}
+
+    modu    = gHC_CLASSES
+    tc_name = mkWiredInName modu (mkCTupleOcc tcName arity) tc_uniq
+                         (ATyCon tycon) BuiltInSyntax
+    dc_name = mkWiredInName modu (mkCTupleOcc dataName arity) dc_uniq
+                            (AConLike (RealDataCon tuple_con)) BuiltInSyntax
+    tc_uniq = mkCTupleTyConUnique   arity
+    dc_uniq = mkCTupleDataConUnique arity
+
+    tvs            = binderVars binders
+    sc_theta       = map mkTyVarTy tvs
+    sc_sel_ids     = [mk_sc_sel_id sc_pos | sc_pos <- [0..arity-1]]
+    sc_sel_ids_arr = listArray (0,arity-1) sc_sel_ids
+
+    mk_sc_sel_id sc_pos =
+      let sc_sel_id_uniq = mkCTupleSelIdUnique sc_pos arity
+          sc_sel_id_occ  = mkCTupleOcc tcName arity
+          sc_sel_id_name = mkWiredInIdName
+                             gHC_CLASSES
+                             (occNameFS (mkSuperDictSelOcc sc_pos sc_sel_id_occ))
+                             sc_sel_id_uniq
+                             sc_sel_id
+          sc_sel_id      = mkDictSelId sc_sel_id_name klass
+
+      in sc_sel_id
 
 unitTyCon :: TyCon
 unitTyCon = tupleTyCon Boxed 0
@@ -1248,7 +1336,10 @@ mk_class tycon sc_pred sc_sel_id
   = mkClass (tyConName tycon) (tyConTyVars tycon) [] [sc_pred] [sc_sel_id]
             [] [] (mkAnd []) tycon
 
-
+mk_ctuple_class :: TyCon -> ThetaType -> [Id] -> Class
+mk_ctuple_class tycon sc_theta sc_sel_ids
+  = mkClass (tyConName tycon) (tyConTyVars tycon) [] sc_theta sc_sel_ids
+            [] [] (mkAnd []) tycon
 
 {- *********************************************************************
 *                                                                      *
