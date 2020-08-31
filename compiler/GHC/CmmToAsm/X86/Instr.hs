@@ -838,7 +838,7 @@ needs_probe_call platform amount
   = case platformOS platform of
      OSMinGW32 -> case platformArch platform of
                     ArchX86    -> amount > (4 * 1024)
-                    ArchX86_64 -> amount > (8 * 1024)
+                    ArchX86_64 -> amount > (4 * 1024)
                     _          -> False
      _         -> False
 
@@ -862,7 +862,7 @@ mkStackAllocInstr platform amount
         --
         -- We emit a call because the stack probes are quite involved and
         -- would bloat code size a lot.  GHC doesn't really have an -Os.
-        -- __chkstk is guaranteed to leave all nonvolatile registers and AX
+        -- ___chkstk is guaranteed to leave all nonvolatile registers and AX
         -- untouched.  It's part of the standard prologue code for any Windows
         -- function dropping the stack more than a page.
         -- See Note [Windows stack layout]
