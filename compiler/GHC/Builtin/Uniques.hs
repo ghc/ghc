@@ -22,6 +22,7 @@ module GHC.Builtin.Uniques
       -- *** Constraint
     , mkCTupleTyConUnique
     , mkCTupleDataConUnique
+    , mkCTupleSelIdUnique
 
       -- ** Making built-in uniques
     , mkAlphaTyVarUnique
@@ -79,34 +80,37 @@ knownUniqueName u =
       '5' -> Just $ getTupleTyConName Unboxed n
       '7' -> Just $ getTupleDataConName Boxed n
       '8' -> Just $ getTupleDataConName Unboxed n
+      'j' -> Just $ getCTupleSelIdName n
       'k' -> Just $ getCTupleTyConName n
-      'm' -> Just $ getCTupleDataConUnique n
+      'm' -> Just $ getCTupleDataConName n
       _   -> Nothing
   where
     (tag, n) = unpkUnique u
 
---------------------------------------------------
--- Anonymous sums
---
--- Sum arities start from 2. The encoding is a bit funny: we break up the
--- integral part into bitfields for the arity, an alternative index (which is
--- taken to be 0xff in the case of the TyCon), and, in the case of a datacon, a
--- tag (used to identify the sum's TypeRep binding).
---
--- This layout is chosen to remain compatible with the usual unique allocation
--- for wired-in data constructors described in GHC.Types.Unique
---
--- TyCon for sum of arity k:
---   00000000 kkkkkkkk 11111100
+{-
+Note [Unique layout for unboxed sums]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
--- TypeRep of TyCon for sum of arity k:
---   00000000 kkkkkkkk 11111101
---
--- DataCon for sum of arity k and alternative n (zero-based):
---   00000000 kkkkkkkk nnnnnn00
---
--- TypeRep for sum DataCon of arity k and alternative n (zero-based):
---   00000000 kkkkkkkk nnnnnn10
+Sum arities start from 2. The encoding is a bit funny: we break up the
+integral part into bitfields for the arity, an alternative index (which is
+taken to be 0xfc in the case of the TyCon), and, in the case of a datacon, a
+tag (used to identify the sum's TypeRep binding).
+
+This layout is chosen to remain compatible with the usual unique allocation
+for wired-in data constructors described in GHC.Types.Unique
+
+TyCon for sum of arity k:
+  00000000 kkkkkkkk 11111100
+
+TypeRep of TyCon for sum of arity k:
+  00000000 kkkkkkkk 11111101
+
+DataCon for sum of arity k and alternative n (zero-based):
+  00000000 kkkkkkkk nnnnnn00
+
+TypeRep for sum DataCon of arity k and alternative n (zero-based):
+  00000000 kkkkkkkk nnnnnn10
+-}
 
 mkSumTyConUnique :: Arity -> Unique
 mkSumTyConUnique arity =
@@ -156,14 +160,69 @@ getUnboxedSumName n
 --    * u+1: its worker Id
 --    * u+2: the TyConRepName of the promoted TyCon
 
---------------------------------------------------
--- Constraint tuples
+{-
+Note [Unique layout for constraint tuple selectors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Constraint tuples, like boxed and unboxed tuples, have their type and data
+constructor Uniques wired in (see
+Note [Uniques for tuple type and data constructors]). Constraint tuples are
+somewhat more involved, however. For a boxed or unboxed n-tuple, we need:
+
+* A Unique for the type constructor, and
+* A Unique for the data constructor
+
+With a constraint n-tuple, however, we need:
+
+* A Unique for the type constructor,
+* A Unique for the data constructor, and
+* A Unique for each of the n superclass selectors
+
+To pick a concrete example (n = 2), the binary constraint tuple has a type
+constructor and data constructor (%,%) along with superclass selectors
+$p1(%,%) and $p2(%,%).
+
+Just as we wire in the Uniques for constraint tuple type constructors and data
+constructors, we wish to wire in the Uniques for the superclass selectors as
+well. Not only does this make everything consistent, it also avoids a
+compile-time performance penalty whenever GHC.Classes is loaded from an
+interface file. This is because GHC.Classes defines constraint tuples as class
+definitions, and if these classes weren't wired in, then loading GHC.Classes
+would also load every single constraint tuple type constructor, data
+constructor, and superclass selector. See #18635.
+
+We encode the Uniques for constraint tuple superclass selectors as follows. The
+integral part of the Unique is broken up into bitfields for the arity and the
+position of the superclass. Given a selector for a constraint tuple with
+arity n (zero-based) and position k (where 1 <= k <= n), its Unique will look
+like:
+
+  00000000 nnnnnnnn kkkkkkkk
+
+We can use bit-twiddling tricks to access the arity and position with
+cTupleSelIdArityBits and cTupleSelIdPosBitmask, respectively.
+
+This pattern bears a certain resemblance to the way that the Uniques for
+unboxed sums are encoded. This is because for a unboxed sum of arity n, there
+are n corresponding data constructors, each with an alternative position k.
+Similarly, for a constraint tuple of arity n, there are n corresponding
+superclass selectors. Reading Note [Unique layout for unboxed sums] will
+instill an appreciation for how the encoding for constraint tuple superclass
+selector Uniques takes inspiration from the encoding for unboxed sum Uniques.
+-}
 
 mkCTupleTyConUnique :: Arity -> Unique
 mkCTupleTyConUnique a = mkUnique 'k' (2*a)
 
 mkCTupleDataConUnique :: Arity -> Unique
 mkCTupleDataConUnique a = mkUnique 'm' (3*a)
+
+mkCTupleSelIdUnique :: ConTagZ -> Arity -> Unique
+mkCTupleSelIdUnique sc_pos arity
+  | sc_pos >= arity
+  = panic ("mkCTupleSelIdUnique: " ++ show sc_pos ++ " >= " ++ show arity)
+  | otherwise
+  = mkUnique 'j' (arity `shiftL` cTupleSelIdArityBits + sc_pos)
 
 getCTupleTyConName :: Int -> Name
 getCTupleTyConName n =
@@ -172,13 +231,35 @@ getCTupleTyConName n =
       (arity, 1) -> mkPrelTyConRepName $ cTupleTyConName arity
       _          -> panic "getCTupleTyConName: impossible"
 
-getCTupleDataConUnique :: Int -> Name
-getCTupleDataConUnique n =
+getCTupleDataConName :: Int -> Name
+getCTupleDataConName n =
     case n `divMod` 3 of
       (arity,  0) -> cTupleDataConName arity
-      (_arity, 1) -> panic "getCTupleDataConName: no worker"
+      (arity,  1) -> getName $ dataConWrapId $ cTupleDataCon arity
       (arity,  2) -> mkPrelTyConRepName $ cTupleDataConName arity
       _           -> panic "getCTupleDataConName: impossible"
+
+getCTupleSelIdName :: Int -> Name
+getCTupleSelIdName n = cTupleSelIdName (sc_pos + 1) arity
+  where
+    arity  = n `shiftR` cTupleSelIdArityBits
+    sc_pos = n .&. cTupleSelIdPosBitmask
+
+-- Given the arity of a constraint tuple, this is the number of bits by which
+-- one must shift it to the left in order to encode the arity in the Unique
+-- of a superclass selector for that constraint tuple. Alternatively, given the
+-- Unique for a constraint tuple superclass selector, this is the number of
+-- bits by which one must shift it to the right to retrieve the arity of the
+-- constraint tuple. See Note [Unique layout for constraint tuple selectors].
+cTupleSelIdArityBits :: Int
+cTupleSelIdArityBits = 8
+
+-- Given the Unique for a constraint tuple superclass selector, one can
+-- retrieve the position of the selector by ANDing this mask, which will
+-- clear all but the eight least significant bits.
+-- See Note [Unique layout for constraint tuple selectors].
+cTupleSelIdPosBitmask :: Int
+cTupleSelIdPosBitmask = 0xff
 
 --------------------------------------------------
 -- Normal tuples
@@ -230,6 +311,7 @@ Allocation of unique supply characters:
         d       desugarer
         f       AbsC flattener
         g       SimplStg
+        j       constraint tuple superclass selectors
         k       constraint tuple tycons
         m       constraint tuple datacons
         n       Native codegen

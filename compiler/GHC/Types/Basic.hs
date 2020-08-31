@@ -179,7 +179,7 @@ type JoinArity = Int
 ************************************************************************
 -}
 
--- | Constructor Tag
+-- | A *one-index* constructor tag
 --
 -- Type of the tags associated with each constructor possibility or superclass
 -- selector
