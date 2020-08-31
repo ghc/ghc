@@ -64,8 +64,10 @@ promotedTupleDataCon :: Boxity -> Arity -> TyCon
 tupleDataCon :: Boxity -> Arity -> DataCon
 tupleTyCon   :: Boxity -> Arity -> TyCon
 
+cTupleDataCon :: Arity -> DataCon
 cTupleDataConName :: Arity -> Name
 cTupleTyConName :: Arity -> Name
+cTupleSelIdName :: ConTag -> Arity -> Name
 
 sumDataCon :: ConTag -> Arity -> DataCon
 sumTyCon :: Arity -> TyCon
