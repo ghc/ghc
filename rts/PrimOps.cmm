@@ -343,6 +343,40 @@ stg_thawArrayzh ( gcptr src, W_ offset, W_ n )
     cloneArray(stg_MUT_ARR_PTRS_DIRTY_info, src, offset, n)
 }
 
+stg_appendArrayszh( gcptr src1, gcptr src2 )
+{
+    W_ words, n1, n2, nDest, size1, size2;
+    gcptr dst, dst_p, src1_p, src2_p;
+
+    again: MAYBE_GC(again);
+
+    n1 = StgMutArrPtrs_ptrs(src1);
+    n2 = StgMutArrPtrs_ptrs(src2);
+    nDest = n1 + n2;
+
+    size1 = n1 + mutArrPtrsCardWords(n1);
+    size2 = n2 + mutArrPtrsCardWords(n2);
+    sizeDest = nDest + mutArrPtrsCardWords(nDest);
+
+    words = BYTES_TO_WDS(SIZEOF_StgMutArrPtrs) + sizeDest;
+
+    ("ptr" dst) = ccall allocate(MyCapability() "ptr", words);
+    TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(sizeDest), 0);
+
+    SET_HDR(dst, stg_MUT_ARR_PTRS_FROZEN_CLEAN_info, CCCS);
+    StgMutArrPtrs_ptrs(dst) = nDest;
+    StgMutArrPtrs_size(dst) = sizeDest;
+
+    dst_p = dst + SIZEOF_StgMutArrPtrs;
+    src1_p = src1 + SIZEOF_StgMutArrPtrs;
+    src2_p = src2 + SIZEOF_StgMutArrPtrs;
+
+    prim %memcpy(dst_p, src1_p, WDS(n1), SIZEOF_W);
+    prim %memcpy(dst_p + WDS(n1), src2_p, WDS(n2), SIZEOF_W);
+
+    return (dst);
+}
+
 // RRN: Uses the ticketed approach; see casMutVar
 stg_casArrayzh ( gcptr arr, W_ ind, gcptr old, gcptr new )
 /* MutableArray# s a -> Int# -> a -> a -> State# s -> (# State# s, Int#, Any a #) */
@@ -476,6 +510,34 @@ stg_freezzeSmallArrayzh ( gcptr src, W_ offset, W_ n )
 stg_thawSmallArrayzh ( gcptr src, W_ offset, W_ n )
 {
     cloneSmallArray(stg_SMALL_MUT_ARR_PTRS_DIRTY_info, src, offset, n)
+}
+
+stg_appendSmallArrayszh( gcptr src1, gcptr src2 )
+{
+    W_ words, n1, n2, nDest;
+    gcptr dst, dst_p, src1_p, src2_p;
+
+    again: MAYBE_GC(again);
+
+    n1 = StgSmallMutArrPtrs_ptrs(src1);
+    n2 = StgSmallMutArrPtrs_ptrs(src2);
+    nDest = n1 + n2;
+    words = BYTES_TO_WDS(SIZEOF_StgSmallMutArrPtrs) + nDest;
+
+    ("ptr" dst) = ccall allocate(MyCapability() "ptr", words);
+    TICK_ALLOC_PRIM(SIZEOF_StgSmallMutArrPtrs, WDS(nDest), 0);
+
+    SET_HDR(dst, stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info, CCCS);                                  \
+    StgSmallMutArrPtrs_ptrs(dst) = nDest;
+
+    dst_p = dst + SIZEOF_StgSmallMutArrPtrs;
+    src1_p = src1 + SIZEOF_StgSmallMutArrPtrs;
+    src2_p = src2 + SIZEOF_StgSmallMutArrPtrs;
+
+    prim %memcpy(dst_p, src1_p, WDS(n1), SIZEOF_W);
+    prim %memcpy(dst_p + WDS(n1), src2_p, WDS(n2), SIZEOF_W);
+
+    return (dst);
 }
 
 // Concurrent GC write barrier for pointer array copies
