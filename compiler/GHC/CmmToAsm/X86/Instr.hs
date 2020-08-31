@@ -832,6 +832,7 @@ mkJumpInstr id
 --   In essence each allocation larger than a page size needs to be chunked and
 --   a probe emitted after each page allocation.  You have to hit the guard
 --   page so the kernel can map in the next page, otherwise you'll segfault.
+--   See Note [Windows stack allocations].
 --
 needs_probe_call :: Platform -> Int -> Bool
 needs_probe_call platform amount
