@@ -50,9 +50,20 @@ module GHC.Integer.GMP.Internals
     , zeroBigNat
     , oneBigNat
 
+      -- ** Conversions to/from 'BigNat'
+
+    , wordToBigNat
+    , wordToBigNat2
+    , bigNatToInt
+    , bigNatToWord
+    , indexBigNat#
+
+
       -- ** 'BigNat' arithmetic operations
     , plusBigNat
     , plusBigNatWord
+    , minusBigNat
+    , minusBigNatWord
     , timesBigNat
     , timesBigNatWord
     , sqrBigNat
@@ -112,6 +123,7 @@ import qualified GHC.Num.BigNat as B
 import qualified GHC.Num.Primitives as P
 import GHC.Types
 import GHC.Prim
+import Control.Exception
 
 {-# COMPLETE S#, Jp#, Jn# #-}
 
@@ -198,6 +210,19 @@ plusBigNat (BN# a) (BN# b) = BN# (B.bigNatAdd a b)
 {-# DEPRECATED plusBigNatWord "Use bigNatAddWord# instead" #-}
 plusBigNatWord :: BigNat -> GmpLimb# -> BigNat
 plusBigNatWord (BN# a) w = BN# (B.bigNatAddWord# a w)
+
+{-# DEPRECATED minusBigNat "Use bigNatSub instead" #-}
+minusBigNat :: BigNat -> BigNat -> BigNat
+minusBigNat (BN# a) (BN# b) = case B.bigNatSub a b of
+   (# () | #) -> throw Underflow
+   (# | r #)  -> BN# r
+
+{-# DEPRECATED minusBigNatWord "Use bigNatSubWord# instead" #-}
+minusBigNatWord :: BigNat -> GmpLimb# -> BigNat
+minusBigNatWord (BN# a) b = case B.bigNatSubWord# a b of
+   (# () | #) -> throw Underflow
+   (# | r #)  -> BN# r
+
 
 {-# DEPRECATED timesBigNat "Use bigNatMul instead" #-}
 timesBigNat :: BigNat -> BigNat -> BigNat
@@ -344,3 +369,18 @@ exportBigNatToAddr :: BigNat -> Addr# -> Int# -> IO Word
 exportBigNatToAddr (BN# b) addr endian = IO \s ->
    case B.bigNatToAddr# b addr endian s of
       (# s', w #) -> (# s', W# w #)
+
+wordToBigNat :: Word# -> BigNat
+wordToBigNat w = BN# (B.bigNatFromWord# w)
+
+wordToBigNat2 :: Word# -> Word# -> BigNat
+wordToBigNat2 h l = BN# (B.bigNatFromWord2# h l)
+
+bigNatToInt :: BigNat -> Int#
+bigNatToInt (BN# b) = B.bigNatToInt# b
+
+bigNatToWord :: BigNat -> Word#
+bigNatToWord (BN# b) = B.bigNatToWord# b
+
+indexBigNat# :: BigNat -> GmpSize# -> GmpLimb#
+indexBigNat# (BN# b) i = B.bigNatIndex# b i
