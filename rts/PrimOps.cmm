@@ -343,6 +343,7 @@ stg_thawArrayzh ( gcptr src, W_ offset, W_ n )
     cloneArray(stg_MUT_ARR_PTRS_DIRTY_info, src, offset, n)
 }
 
+// Closely follows the pattern of cloneArray in includes/Cmm.h
 stg_appendArrayszh( gcptr src1, gcptr src2 )
 {
     W_ words, n1, n2, nDest, size1, size2;
@@ -512,6 +513,7 @@ stg_thawSmallArrayzh ( gcptr src, W_ offset, W_ n )
     cloneSmallArray(stg_SMALL_MUT_ARR_PTRS_DIRTY_info, src, offset, n)
 }
 
+// Closely follows the pattern of cloneSmallArray in includes/Cmm.h
 stg_appendSmallArrayszh( gcptr src1, gcptr src2 )
 {
     W_ words, n1, n2, nDest;
