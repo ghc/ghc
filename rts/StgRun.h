@@ -9,7 +9,3 @@
 #pragma once
 
 RTS_PRIVATE StgRegTable * StgRun (StgFunPtr f, StgRegTable *basereg);
-
-#if defined(mingw32_HOST_OS)
-StgWord8 *win32AllocStack(void);
-#endif
