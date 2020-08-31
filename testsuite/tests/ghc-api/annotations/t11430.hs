@@ -70,11 +70,11 @@ testOneFile libdir fileName = do
      doHsExpr (HsPragE _ (HsPragTick _ src (_,_,_) ss) _) = [("tp",[show ss])]
      doHsExpr _ = []
 
-     doInline (InlinePragma _ _ _ _ (ActiveBefore (SourceText ss) _) _)
+     doInline (InlinePragma _ _ _ _ _ (ActiveBefore (SourceText ss) _) _)
          = [("ib",[ss])]
-     doInline (InlinePragma _ _ _ _ (ActiveAfter (SourceText ss) _) _)
+     doInline (InlinePragma _ _ _ _ _ (ActiveAfter (SourceText ss) _) _)
          = [("ia",[ss])]
-     doInline (InlinePragma _ _ _ _ _ _ ) = []
+     doInline (InlinePragma _ _ _ _ _ _ _ ) = []
 
 showAnns anns = "[\n" ++ (intercalate "\n"
    $ map (\((s,k),v)
