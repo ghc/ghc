@@ -22,6 +22,7 @@ module GHC.Builtin.Uniques
       -- *** Constraint
     , mkCTupleTyConUnique
     , mkCTupleDataConUnique
+    , mkCTupleSelIdUnique
 
       -- ** Making built-in uniques
     , mkAlphaTyVarUnique
@@ -79,8 +80,9 @@ knownUniqueName u =
       '5' -> Just $ getTupleTyConName Unboxed n
       '7' -> Just $ getTupleDataConName Boxed n
       '8' -> Just $ getTupleDataConName Unboxed n
+      'j' -> Just $ getCTupleSelIdName n
       'k' -> Just $ getCTupleTyConName n
-      'm' -> Just $ getCTupleDataConUnique n
+      'm' -> Just $ getCTupleDataConName n
       _   -> Nothing
   where
     (tag, n) = unpkUnique u
@@ -158,12 +160,34 @@ getUnboxedSumName n
 
 --------------------------------------------------
 -- Constraint tuples
+--
+-- Constraint tuples, like boxed and unboxed tuples, have their type and data
+-- constructor Uniques wired in
+-- (see Note [Uniques for tuple type and data constructors]). In addition, the
+-- superclass selectors for each constraint tuple have wired-in Uniques. A
+-- constraint tuple of arity n has n different selectors (e.g., the binary
+-- constraint tuple has selectors $p1(%,%) and $p2(%,%)).
+--
+-- The encoding of these selectors' Uniques takes somewhat resembles the
+-- encoding for unboxed sums (see above). The integral part of the Unique
+-- is broken up into bitfields for the arity and the position of the
+-- superclass. Given a selector for a constraint tuple with arity n
+-- (zero-based) and position k (where 1 <= k <= n), its Unique will look like:
+--
+--   00000000 nnnnnnnn kkkkkkkk
 
 mkCTupleTyConUnique :: Arity -> Unique
 mkCTupleTyConUnique a = mkUnique 'k' (2*a)
 
 mkCTupleDataConUnique :: Arity -> Unique
 mkCTupleDataConUnique a = mkUnique 'm' (3*a)
+
+mkCTupleSelIdUnique :: ConTagZ -> Arity -> Unique
+mkCTupleSelIdUnique sc_pos arity
+  | sc_pos >= arity
+  = panic ("mkCTupleSelIdUnique: " ++ show sc_pos ++ " >= " ++ show arity)
+  | otherwise
+  = mkUnique 'j' (arity `shiftL` 8 + sc_pos)
 
 getCTupleTyConName :: Int -> Name
 getCTupleTyConName n =
@@ -172,13 +196,19 @@ getCTupleTyConName n =
       (arity, 1) -> mkPrelTyConRepName $ cTupleTyConName arity
       _          -> panic "getCTupleTyConName: impossible"
 
-getCTupleDataConUnique :: Int -> Name
-getCTupleDataConUnique n =
+getCTupleDataConName :: Int -> Name
+getCTupleDataConName n =
     case n `divMod` 3 of
       (arity,  0) -> cTupleDataConName arity
-      (_arity, 1) -> panic "getCTupleDataConName: no worker"
+      (arity,  1) -> getName $ dataConWrapId $ cTupleDataCon arity
       (arity,  2) -> mkPrelTyConRepName $ cTupleDataConName arity
       _           -> panic "getCTupleDataConName: impossible"
+
+getCTupleSelIdName :: Int -> Name
+getCTupleSelIdName n = cTupleSelIdName (sc_pos + 1) arity
+  where
+    arity  = n `shiftR` 8
+    sc_pos = n .&. 0xff
 
 --------------------------------------------------
 -- Normal tuples
@@ -230,6 +260,7 @@ Allocation of unique supply characters:
         d       desugarer
         f       AbsC flattener
         g       SimplStg
+        j       constraint tuple superclass selectors
         k       constraint tuple tycons
         m       constraint tuple datacons
         n       Native codegen
