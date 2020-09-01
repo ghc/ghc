@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 -- | Ways
 --
 -- The central concept of a "way" is that all objects in a given
@@ -33,12 +35,20 @@ module GHC.Platform.Ways
    , wayTag
    , waysTag
    , waysBuildTag
+   , fullWays
+   , rtsWays
    -- * Host GHC ways
+   , hostWays
    , hostFullWays
    , hostIsProfiled
    , hostIsDynamic
+   , hostIsThreaded
+   , hostIsDebugged
+   , hostIsTracing
    )
 where
+
+#include "HsVersions.h"
 
 import GHC.Prelude
 import GHC.Platform
@@ -47,7 +57,6 @@ import GHC.Driver.Flags
 import qualified Data.Set as Set
 import Data.Set (Set)
 import Data.List (intersperse)
-import System.IO.Unsafe ( unsafeDupablePerformIO )
 
 -- | A way
 --
@@ -58,7 +67,7 @@ data Way
   | WayThreaded      -- ^ (RTS only) Multithreaded runtime system
   | WayDebug         -- ^ Debugging, enable trace messages and extra checks
   | WayProf          -- ^ Profiling, enable cost-centre stacks and profiling reports
-  | WayEventLog      -- ^ (RTS only) enable event logging
+  | WayTracing       -- ^ (RTS only) enable event logging (tracing)
   | WayDyn           -- ^ Dynamic linking
   deriving (Eq, Ord, Show)
 
@@ -96,7 +105,7 @@ wayTag WayThreaded    = "thr"
 wayTag WayDebug       = "debug"
 wayTag WayDyn         = "dyn"
 wayTag WayProf        = "p"
-wayTag WayEventLog    = "l"
+wayTag WayTracing     = "l" -- "l" for "logging"
 
 -- | Return true for ways that only impact the RTS, not the generated code
 wayRTSOnly :: Way -> Bool
@@ -105,7 +114,15 @@ wayRTSOnly WayDyn         = False
 wayRTSOnly WayProf        = False
 wayRTSOnly WayThreaded    = True
 wayRTSOnly WayDebug       = True
-wayRTSOnly WayEventLog    = True
+wayRTSOnly WayTracing     = True
+
+-- | Filter ways that have an impact on compilation
+fullWays :: Ways -> Ways
+fullWays ws = Set.filter (not . wayRTSOnly) ws
+
+-- | Filter RTS-only ways (ways that don't have an impact on compilation)
+rtsWays :: Ways -> Ways
+rtsWays ws = Set.filter wayRTSOnly ws
 
 wayDesc :: Way -> String
 wayDesc (WayCustom xs) = xs
@@ -113,7 +130,7 @@ wayDesc WayThreaded    = "Threaded"
 wayDesc WayDebug       = "Debug"
 wayDesc WayDyn         = "Dynamic"
 wayDesc WayProf        = "Profiling"
-wayDesc WayEventLog    = "RTS Event Logging"
+wayDesc WayTracing     = "Tracing"
 
 -- | Turn these flags on when enabling this way
 wayGeneralFlags :: Platform -> Way -> [GeneralFlag]
@@ -129,7 +146,7 @@ wayGeneralFlags _ WayDyn      = [Opt_PIC, Opt_ExternalDynamicRefs]
     -- PIC objects can be linked into a .so, we have to compile even
     -- modules of the main program with -fPIC when using -dynamic.
 wayGeneralFlags _ WayProf     = []
-wayGeneralFlags _ WayEventLog = []
+wayGeneralFlags _ WayTracing  = []
 
 -- | Turn these flags off when enabling this way
 wayUnsetGeneralFlags :: Platform -> Way -> [GeneralFlag]
@@ -140,7 +157,7 @@ wayUnsetGeneralFlags _ WayDyn      = [Opt_SplitSections]
    -- There's no point splitting when we're going to be dynamically linking.
    -- Plus it breaks compilation on OSX x86.
 wayUnsetGeneralFlags _ WayProf     = []
-wayUnsetGeneralFlags _ WayEventLog = []
+wayUnsetGeneralFlags _ WayTracing  = []
 
 -- | Pass these options to the C compiler when enabling this way
 wayOptc :: Platform -> Way -> [String]
@@ -152,7 +169,7 @@ wayOptc platform WayThreaded = case platformOS platform of
 wayOptc _ WayDebug      = []
 wayOptc _ WayDyn        = []
 wayOptc _ WayProf       = ["-DPROFILING"]
-wayOptc _ WayEventLog   = ["-DTRACING"]
+wayOptc _ WayTracing    = ["-DTRACING"]
 
 -- | Pass these options to linker when enabling this way
 wayOptl :: Platform -> Way -> [String]
@@ -168,7 +185,7 @@ wayOptl platform WayThreaded =
 wayOptl _ WayDebug      = []
 wayOptl _ WayDyn        = []
 wayOptl _ WayProf       = []
-wayOptl _ WayEventLog   = []
+wayOptl _ WayTracing    = []
 
 -- | Pass these options to the preprocessor when enabling this way
 wayOptP :: Platform -> Way -> [String]
@@ -177,29 +194,74 @@ wayOptP _ WayThreaded = []
 wayOptP _ WayDebug    = []
 wayOptP _ WayDyn      = []
 wayOptP _ WayProf     = ["-DPROFILING"]
-wayOptP _ WayEventLog = ["-DTRACING"]
+wayOptP _ WayTracing  = ["-DTRACING"]
 
 
 -- | Consult the RTS to find whether it has been built with profiling enabled.
 hostIsProfiled :: Bool
-hostIsProfiled = unsafeDupablePerformIO rtsIsProfiledIO /= 0
+hostIsProfiled = rtsIsProfiled_ /= 0
 
-foreign import ccall unsafe "rts_isProfiled" rtsIsProfiledIO :: IO Int
+foreign import ccall unsafe "rts_isProfiled" rtsIsProfiled_ :: Int
 
 -- | Consult the RTS to find whether GHC itself has been built with
 -- dynamic linking.  This can't be statically known at compile-time,
 -- because we build both the static and dynamic versions together with
 -- -dynamic-too.
 hostIsDynamic :: Bool
-hostIsDynamic = unsafeDupablePerformIO rtsIsDynamicIO /= 0
+hostIsDynamic = rtsIsDynamic_ /= 0
 
-foreign import ccall unsafe "rts_isDynamic" rtsIsDynamicIO :: IO Int
+foreign import ccall unsafe "rts_isDynamic" rtsIsDynamic_ :: Int
 
--- | Return host "full" ways (i.e. ways that have an impact on the compilation,
--- not RTS only ways). These ways must be used when compiling codes targeting
--- the internal interpreter.
-hostFullWays :: Ways
-hostFullWays = Set.unions
-   [ if hostIsDynamic  then Set.singleton WayDyn  else Set.empty
-   , if hostIsProfiled then Set.singleton WayProf else Set.empty
+-- we need this until the bootstrap GHC is always recent enough
+#if MIN_VERSION_GLASGOW_HASKELL(9,1,0,0)
+
+-- | Consult the RTS to find whether it is threaded.
+hostIsThreaded :: Bool
+hostIsThreaded = rtsIsThreaded_ /= 0
+
+foreign import ccall unsafe "rts_isThreaded" rtsIsThreaded_ :: Int
+
+-- | Consult the RTS to find whether it is debugged.
+hostIsDebugged :: Bool
+hostIsDebugged = rtsIsDebugged_ /= 0
+
+foreign import ccall unsafe "rts_isDebugged" rtsIsDebugged_ :: Int
+
+-- | Consult the RTS to find whether it is tracing.
+hostIsTracing :: Bool
+hostIsTracing = rtsIsTracing_ /= 0
+
+foreign import ccall unsafe "rts_isTracing" rtsIsTracing_ :: Int
+
+
+#else
+
+hostIsThreaded :: Bool
+hostIsThreaded = False
+
+hostIsDebugged :: Bool
+hostIsDebugged = False
+
+hostIsTracing :: Bool
+hostIsTracing = False
+
+#endif
+
+
+-- | Host ways.
+hostWays :: Ways
+hostWays = Set.unions
+   [ if hostIsDynamic  then Set.singleton WayDyn      else Set.empty
+   , if hostIsProfiled then Set.singleton WayProf     else Set.empty
+   , if hostIsThreaded then Set.singleton WayThreaded else Set.empty
+   , if hostIsDebugged then Set.singleton WayDebug    else Set.empty
+   , if hostIsTracing  then Set.singleton WayTracing  else Set.empty
    ]
+
+-- | Host "full" ways (i.e. ways that have an impact on the compilation,
+-- not RTS only ways).
+--
+-- These ways must be used when compiling codes targeting the internal
+-- interpreter.
+hostFullWays :: Ways
+hostFullWays = fullWays hostWays
