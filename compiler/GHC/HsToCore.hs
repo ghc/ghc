@@ -228,7 +228,7 @@ deSugar hsc_env
                 mg_modBreaks    = modBreaks,
                 mg_safe_haskell = safe_mode,
                 mg_trust_pkg    = imp_trust_own_pkg imports,
-                mg_complete_sigs = complete_matches,
+                mg_complete_matches = complete_matches,
                 mg_doc_hdr      = doc_hdr,
                 mg_decl_docs    = decl_docs,
                 mg_arg_docs     = arg_docs

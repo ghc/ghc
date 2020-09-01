@@ -61,7 +61,7 @@ module GHC.Driver.Types (
         lookupIfaceByModule, emptyPartialModIface, emptyFullModIface, lookupHptByModule,
 
         PackageInstEnv, PackageFamInstEnv, PackageRuleBase,
-        PackageCompleteMatchMap,
+        PackageCompleteMatches,
 
         mkSOName, mkHsSOName, soExt,
 
@@ -146,8 +146,7 @@ module GHC.Driver.Types (
         handleFlagWarnings, printOrThrowWarnings,
 
         -- * COMPLETE signature
-        CompleteMatch(..), CompleteMatchMap,
-        mkCompleteMatchMap, extendCompleteMatchMap,
+        ConLikeSet, CompleteMatch, CompleteMatches,
 
         -- * Exstensible Iface fields
         ExtensibleFields(..), FieldName,
@@ -735,7 +734,7 @@ lookupIfaceByModule hpt pit mod
 -- of its own, but it doesn't seem worth the bother.
 
 hptCompleteSigs :: HscEnv -> [CompleteMatch]
-hptCompleteSigs = hptAllThings  (md_complete_sigs . hm_details)
+hptCompleteSigs = hptAllThings  (md_complete_matches . hm_details)
 
 -- | Find all the instance declarations (of classes and families) from
 -- the Home Package Table filtered by the provided predicate function.
@@ -1093,7 +1092,7 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- itself) but imports some trustworthy modules from its own
                 -- package (which does require its own package be trusted).
                 -- See Note [Trust Own Package] in GHC.Rename.Names
-        mi_complete_sigs :: [IfaceCompleteMatch],
+        mi_complete_matches :: [IfaceCompleteMatch],
 
         mi_doc_hdr :: Maybe HsDocString,
                 -- ^ Module header.
@@ -1184,7 +1183,7 @@ instance Binary ModIface where
                  mi_hpc       = hpc_info,
                  mi_trust     = trust,
                  mi_trust_pkg = trust_pkg,
-                 mi_complete_sigs = complete_sigs,
+                 mi_complete_matches = complete_matches,
                  mi_doc_hdr   = doc_hdr,
                  mi_decl_docs = decl_docs,
                  mi_arg_docs  = arg_docs,
@@ -1230,7 +1229,7 @@ instance Binary ModIface where
         put_ bh hpc_info
         put_ bh trust
         put_ bh trust_pkg
-        put_ bh complete_sigs
+        put_ bh complete_matches
         lazyPut bh doc_hdr
         lazyPut bh decl_docs
         lazyPut bh arg_docs
@@ -1263,7 +1262,7 @@ instance Binary ModIface where
         hpc_info    <- get bh
         trust       <- get bh
         trust_pkg   <- get bh
-        complete_sigs <- get bh
+        complete_matches <- get bh
         doc_hdr     <- lazyGet bh
         decl_docs   <- lazyGet bh
         arg_docs    <- lazyGet bh
@@ -1287,7 +1286,7 @@ instance Binary ModIface where
                  mi_trust       = trust,
                  mi_trust_pkg   = trust_pkg,
                         -- And build the cached values
-                 mi_complete_sigs = complete_sigs,
+                 mi_complete_matches = complete_matches,
                  mi_doc_hdr     = doc_hdr,
                  mi_decl_docs   = decl_docs,
                  mi_arg_docs    = arg_docs,
@@ -1332,7 +1331,7 @@ emptyPartialModIface mod
                mi_hpc         = False,
                mi_trust       = noIfaceTrustInfo,
                mi_trust_pkg   = False,
-               mi_complete_sigs = [],
+               mi_complete_matches = [],
                mi_doc_hdr     = Nothing,
                mi_decl_docs   = emptyDeclDocMap,
                mi_arg_docs    = emptyArgDocMap,
@@ -1388,7 +1387,7 @@ data ModDetails
         md_rules     :: ![CoreRule],    -- ^ Domain may include 'Id's from other modules
         md_anns      :: ![Annotation],  -- ^ Annotations present in this module: currently
                                         -- they only annotate things also declared in this module
-        md_complete_sigs :: [CompleteMatch]
+        md_complete_matches :: [CompleteMatch]
           -- ^ Complete match pragmas for this module
      }
 
@@ -1401,7 +1400,7 @@ emptyModDetails
                  md_rules     = [],
                  md_fam_insts = [],
                  md_anns      = [],
-                 md_complete_sigs = [] }
+                 md_complete_matches = [] }
 
 -- | Records the modules directly imported by a module for extracting e.g.
 -- usage information, and also to give better error message
@@ -1464,7 +1463,7 @@ data ModGuts
         -- ^ Files to be compiled with the C compiler
         mg_warns     :: !Warnings,       -- ^ Warnings declared in the module
         mg_anns      :: [Annotation],    -- ^ Annotations declared in this module
-        mg_complete_sigs :: [CompleteMatch], -- ^ Complete Matches
+        mg_complete_matches :: [CompleteMatch], -- ^ Complete Matches
         mg_hpc_info  :: !HpcInfo,        -- ^ Coverage tick boxes in the module
         mg_modBreaks :: !(Maybe ModBreaks), -- ^ Breakpoints for the module
 
@@ -2685,7 +2684,7 @@ type PackageRuleBase         = RuleBase
 type PackageInstEnv          = InstEnv
 type PackageFamInstEnv       = FamInstEnv
 type PackageAnnEnv           = AnnEnv
-type PackageCompleteMatchMap = CompleteMatchMap
+type PackageCompleteMatches = CompleteMatches
 
 -- | Information about other packages that we have slurped in by reading
 -- their interface files
@@ -2747,8 +2746,8 @@ data ExternalPackageState
                                                -- from all the external-package modules
         eps_ann_env      :: !PackageAnnEnv,    -- ^ The total 'AnnEnv' accumulated
                                                -- from all the external-package modules
-        eps_complete_matches :: !PackageCompleteMatchMap,
-                                  -- ^ The total 'CompleteMatchMap' accumulated
+        eps_complete_matches :: !PackageCompleteMatches,
+                                  -- ^ The total 'CompleteMatches' accumulated
                                   -- from all the external-package modules
 
         eps_mod_fam_inst_env :: !(ModuleEnv FamInstEnv), -- ^ The family instances accumulated from external
@@ -3204,83 +3203,14 @@ byteCodeOfObject other       = pprPanic "byteCodeOfObject" (ppr other)
 
 -------------------------------------------
 
+type ConLikeSet = UniqDSet ConLike
+
 -- | A list of conlikes which represents a complete pattern match.
 -- These arise from @COMPLETE@ signatures.
+-- See also Note [Implementation of COMPLETE pragmas].
+type CompleteMatch = ConLikeSet
 
--- See Note [Implementation of COMPLETE signatures]
-data CompleteMatch = CompleteMatch {
-                            completeMatchConLikes :: [Name]
-                            -- ^ The ConLikes that form a covering family
-                            -- (e.g. Nothing, Just)
-                          , completeMatchTyCon :: Name
-                            -- ^ The TyCon that they cover (e.g. Maybe)
-                          }
-
-instance Outputable CompleteMatch where
-  ppr (CompleteMatch cl ty) = text "CompleteMatch:" <+> ppr cl
-                                                    <+> dcolon <+> ppr ty
-
--- | A map keyed by the 'completeMatchTyCon' which has type Name.
-
--- See Note [Implementation of COMPLETE signatures]
-type CompleteMatchMap = UniqFM Name [CompleteMatch]
-
-mkCompleteMatchMap :: [CompleteMatch] -> CompleteMatchMap
-mkCompleteMatchMap = extendCompleteMatchMap emptyUFM
-
-extendCompleteMatchMap :: CompleteMatchMap -> [CompleteMatch]
-                       -> CompleteMatchMap
-extendCompleteMatchMap = foldl' insertMatch
-  where
-    insertMatch :: CompleteMatchMap -> CompleteMatch -> CompleteMatchMap
-    insertMatch ufm c@(CompleteMatch _ t) = addToUFM_C (++) ufm t [c]
-
-{-
-Note [Implementation of COMPLETE signatures]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A COMPLETE signature represents a set of conlikes (i.e., constructors or
-pattern synonyms) such that if they are all pattern-matched against in a
-function, it gives rise to a total function. An example is:
-
-  newtype Boolean = Boolean Int
-  pattern F, T :: Boolean
-  pattern F = Boolean 0
-  pattern T = Boolean 1
-  {-# COMPLETE F, T #-}
-
-  -- This is a total function
-  booleanToInt :: Boolean -> Int
-  booleanToInt F = 0
-  booleanToInt T = 1
-
-COMPLETE sets are represented internally in GHC with the CompleteMatch data
-type. For example, {-# COMPLETE F, T #-} would be represented as:
-
-  CompleteMatch { complateMatchConLikes = [F, T]
-                , completeMatchTyCon    = Boolean }
-
-Note that GHC was able to infer the completeMatchTyCon (Boolean), but for the
-cases in which it's ambiguous, you can also explicitly specify it in the source
-language by writing this:
-
-  {-# COMPLETE F, T :: Boolean #-}
-
-For efficiency purposes, GHC collects all of the CompleteMatches that it knows
-about into a CompleteMatchMap, which is a map that is keyed by the
-completeMatchTyCon. In other words, you could have a multiple COMPLETE sets
-for the same TyCon:
-
-  {-# COMPLETE F, T1 :: Boolean #-}
-  {-# COMPLETE F, T2 :: Boolean #-}
-
-And looking up the values in the CompleteMatchMap associated with Boolean
-would give you [CompleteMatch [F, T1] Boolean, CompleteMatch [F, T2] Boolean].
-dsGetCompleteMatches in GHC.HsToCore.Quote accomplishes this lookup.
-
-Also see Note [Typechecking Complete Matches] in GHC.Tc.Gen.Bind for a more detailed
-explanation for how GHC ensures that all the conlikes in a COMPLETE set are
-consistent.
--}
+type CompleteMatches = [CompleteMatch]
 
 -- | Foreign language of the phase if the phase deals with a foreign code
 phaseForeignLanguage :: Phase -> Maybe ForeignSrcLang
