@@ -108,7 +108,7 @@ module GHC.Cmm.CLabel (
         -- * Conversions
         toClosureLbl, toSlowEntryLbl, toEntryLbl, toInfoLbl, hasHaskellName,
 
-        pprCLabel, pprCLabel_LLVM, pprCLabel_NCG,
+        pprCLabel, pprCLabel_LLVM, pprCLabel_NCG, pprCLabel_ViaC,
         isInfoTableLabel,
         isConInfoTableLabel,
         isIdLabel, isTickyLabel
@@ -1218,10 +1218,14 @@ pprCLabel bcknd platform lbl =
    case bcknd of
       NCG  -> pprCLabel_NCG   platform lbl
       LLVM -> pprCLabel_LLVM  platform lbl
+      ViaC -> pprCLabel_ViaC  platform lbl
       _    -> pprCLabel_other platform lbl
 
 pprCLabel_LLVM :: Platform -> CLabel -> SDoc
 pprCLabel_LLVM = pprCLabel_NCG
+
+pprCLabel_ViaC :: Platform -> CLabel -> SDoc
+pprCLabel_ViaC = pprCLabel_other
 
 pprCLabel_NCG :: Platform -> CLabel -> SDoc
 pprCLabel_NCG platform lbl = getPprStyle $ \sty ->
@@ -1348,7 +1352,13 @@ pprCLabel_common platform = \case
 
    (ForeignLabel str _ _ _) -> ftext str
 
-   (IdLabel name _cafs flavor) -> internalNamePrefix platform name <> ppr name <> ppIdFlavor flavor
+   (IdLabel name _cafs flavor) -> internalNamePrefix <> ppr name <> ppIdFlavor flavor
+                                    where
+                                       isRandomGenerated = not (isExternalName name)
+                                       internalNamePrefix = getPprStyle $ \ sty ->
+                                          if asmStyle sty && isRandomGenerated
+                                             then ptext (asmTempLabelPrefix platform)
+                                             else empty
 
    (CC_Label cc)       -> ppr cc
    (CCS_Label ccs)     -> ppr ccs
@@ -1388,15 +1398,6 @@ instance Outputable ForeignLabelSource where
         ForeignLabelInPackage pkgId     -> parens $ text "package: " <> ppr pkgId
         ForeignLabelInThisPackage       -> parens $ text "this package"
         ForeignLabelInExternalPackage   -> parens $ text "external package"
-
-internalNamePrefix :: Platform -> Name -> SDoc
-internalNamePrefix platform name = getPprStyle $ \ sty ->
-  if asmStyle sty && isRandomGenerated then
-      ptext (asmTempLabelPrefix platform)
-  else
-    empty
-  where
-    isRandomGenerated = not $ isExternalName name
 
 tempLabelPrefixOrUnderscore :: Platform -> SDoc
 tempLabelPrefixOrUnderscore platform =
