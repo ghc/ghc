@@ -44,9 +44,8 @@ import GHC.Tc.Utils.TcMType
 import GHC.Core.Multiplicity
 import GHC.Core.FamInstEnv( normaliseType )
 import GHC.Tc.Instance.Family( tcGetFamInstEnvs )
-import GHC.Core.TyCon
 import GHC.Tc.Utils.TcType
-import GHC.Core.Type (mkStrLitTy, tidyOpenType, splitTyConApp_maybe, mkCastTy)
+import GHC.Core.Type (mkStrLitTy, tidyOpenType, mkCastTy)
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types( mkBoxedTupleTy )
 import GHC.Types.Id
@@ -69,9 +68,9 @@ import GHC.Utils.Panic
 import GHC.Builtin.Names( ipClassName )
 import GHC.Tc.Validity (checkValidType)
 import GHC.Types.Unique.FM
+import GHC.Types.Unique.DSet
 import GHC.Types.Unique.Set
 import qualified GHC.LanguageExtensions as LangExt
-import GHC.Core.ConLike
 
 import Control.Monad
 import Data.Foldable (find)
@@ -197,112 +196,22 @@ tcTopBinds binds sigs
         -- The top level bindings are flattened into a giant
         -- implicitly-mutually-recursive LHsBinds
 
-
--- Note [Typechecking Complete Matches]
--- Much like when a user bundled a pattern synonym, the result types of
--- all the constructors in the match pragma must be consistent.
---
--- If we allowed pragmas with inconsistent types then it would be
--- impossible to ever match every constructor in the list and so
--- the pragma would be useless.
-
-
-
-
-
--- This is only used in `tcCompleteSig`. We fold over all the conlikes,
--- this accumulator keeps track of the first `ConLike` with a concrete
--- return type. After fixing the return type, all other constructors with
--- a fixed return type must agree with this.
---
--- The fields of `Fixed` cache the first conlike and its return type so
--- that we can compare all the other conlikes to it. The conlike is
--- stored for error messages.
---
--- `Nothing` in the case that the type is fixed by a type signature
-data CompleteSigType = AcceptAny | Fixed (Maybe ConLike) TyCon
-
 tcCompleteSigs  :: [LSig GhcRn] -> TcM [CompleteMatch]
 tcCompleteSigs sigs =
   let
-      doOne :: Sig GhcRn -> TcM (Maybe CompleteMatch)
-      doOne c@(CompleteMatchSig _ _ lns mtc)
-        = fmap Just $ do
-           addErrCtxt (text "In" <+> ppr c) $
-            case mtc of
-              Nothing -> infer_complete_match
-              Just tc -> check_complete_match tc
-        where
-
-          checkCLTypes acc = foldM checkCLType (acc, []) (unLoc lns)
-
-          infer_complete_match = do
-            (res, cls) <- checkCLTypes AcceptAny
-            case res of
-              AcceptAny -> failWithTc ambiguousError
-              Fixed _ tc  -> return $ mkMatch cls tc
-
-          check_complete_match tc_name = do
-            ty_con <- tcLookupLocatedTyCon tc_name
-            (_, cls) <- checkCLTypes (Fixed Nothing ty_con)
-            return $ mkMatch cls ty_con
-
-          mkMatch :: [ConLike] -> TyCon -> CompleteMatch
-          mkMatch cls ty_con = CompleteMatch {
-            -- foldM is a left-fold and will have accumulated the ConLikes in
-            -- the reverse order. foldrM would accumulate in the correct order,
-            -- but would type-check the last ConLike first, which might also be
-            -- confusing from the user's perspective. Hence reverse here.
-            completeMatchConLikes = reverse (map conLikeName cls),
-            completeMatchTyCon = tyConName ty_con
-            }
+      doOne :: LSig GhcRn -> TcM (Maybe CompleteMatch)
+      -- We don't need to "type-check" COMPLETE signatures anymore; if their
+      -- combinations are invalid it will be found so at match sites. Hence we
+      -- keep '_mtc' only for backwards compatibility.
+      doOne (L loc c@(CompleteMatchSig _ext _src_txt (L _ ns) _mtc))
+        = fmap Just $ setSrcSpan loc $ addErrCtxt (text "In" <+> ppr c) $
+            mkUniqDSet <$> mapM (addLocM tcLookupConLike) ns
       doOne _ = return Nothing
 
-      ambiguousError :: SDoc
-      ambiguousError =
-        text "A type signature must be provided for a set of polymorphic"
-          <+> text "pattern synonyms."
-
-
-      -- See note [Typechecking Complete Matches]
-      checkCLType :: (CompleteSigType, [ConLike]) -> Located Name
-                  -> TcM (CompleteSigType, [ConLike])
-      checkCLType (cst, cs) n = do
-        cl <- addLocM tcLookupConLike n
-        let   (_,_,_,_,_,_, res_ty) = conLikeFullSig cl
-              res_ty_con = fst <$> splitTyConApp_maybe res_ty
-        case (cst, res_ty_con) of
-          (AcceptAny, Nothing) -> return (AcceptAny, cl:cs)
-          (AcceptAny, Just tc) -> return (Fixed (Just cl) tc, cl:cs)
-          (Fixed mfcl tc, Nothing)  -> return (Fixed mfcl tc, cl:cs)
-          (Fixed mfcl tc, Just tc') ->
-            if tc == tc'
-              then return (Fixed mfcl tc, cl:cs)
-              else case mfcl of
-                     Nothing ->
-                      addErrCtxt (text "In" <+> ppr cl) $
-                        failWithTc typeSigErrMsg
-                     Just cl -> failWithTc (errMsg cl)
-             where
-              typeSigErrMsg :: SDoc
-              typeSigErrMsg =
-                text "Couldn't match expected type"
-                      <+> quotes (ppr tc)
-                      <+> text "with"
-                      <+> quotes (ppr tc')
-
-              errMsg :: ConLike -> SDoc
-              errMsg fcl =
-                text "Cannot form a group of complete patterns from patterns"
-                  <+> quotes (ppr fcl) <+> text "and" <+> quotes (ppr cl)
-                  <+> text "as they match different type constructors"
-                  <+> parens (quotes (ppr tc)
-                               <+> text "resp."
-                               <+> quotes (ppr tc'))
   -- For some reason I haven't investigated further, the signatures come in
   -- backwards wrt. declaration order. So we reverse them here, because it makes
   -- a difference for incomplete match suggestions.
-  in  mapMaybeM (addLocM doOne) (reverse sigs) -- process in declaration order
+  in mapMaybeM doOne $ reverse sigs
 
 tcHsBootSigs :: [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn] -> TcM [Id]
 -- A hs-boot file has only one BindGroup, and it only has type

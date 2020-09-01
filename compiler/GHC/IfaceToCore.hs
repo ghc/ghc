@@ -17,7 +17,7 @@ module GHC.IfaceToCore (
         typecheckIfacesForMerging,
         typecheckIfaceForInstantiate,
         tcIfaceDecl, tcIfaceInst, tcIfaceFamInst, tcIfaceRules,
-        tcIfaceAnnotations, tcIfaceCompleteSigs,
+        tcIfaceAnnotations, tcIfaceCompleteMatches,
         tcIfaceExpr,    -- Desired by HERMIT (#7683)
         tcIfaceGlobal,
         tcIfaceOneShot
@@ -67,6 +67,7 @@ import GHC.Types.Name.Set
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Unit.Module
 import GHC.Types.Unique.FM
+import GHC.Types.Unique.DSet ( mkUniqDSet )
 import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable
 import GHC.Data.Maybe
@@ -180,7 +181,7 @@ typecheckIface iface
         ; exports <- ifaceExportNames (mi_exports iface)
 
                 -- Complete Sigs
-        ; complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
+        ; complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
 
                 -- Finished
         ; traceIf (vcat [text "Finished typechecking interface for" <+> ppr (mi_module iface),
@@ -194,7 +195,7 @@ typecheckIface iface
                               , md_rules     = rules
                               , md_anns      = anns
                               , md_exports   = exports
-                              , md_complete_sigs = complete_sigs
+                              , md_complete_matches = complete_matches
                               }
     }
 
@@ -393,14 +394,14 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
         rules     <- tcIfaceRules ignore_prags (mi_rules iface)
         anns      <- tcIfaceAnnotations (mi_anns iface)
         exports   <- ifaceExportNames (mi_exports iface)
-        complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
+        complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
         return $ ModDetails { md_types     = type_env
                             , md_insts     = insts
                             , md_fam_insts = fam_insts
                             , md_rules     = rules
                             , md_anns      = anns
                             , md_exports   = exports
-                            , md_complete_sigs = complete_sigs
+                            , md_complete_matches = complete_matches
                             }
     return (global_type_env, details)
 
@@ -432,14 +433,14 @@ typecheckIfaceForInstantiate nsubst iface =
     rules     <- tcIfaceRules ignore_prags (mi_rules iface)
     anns      <- tcIfaceAnnotations (mi_anns iface)
     exports   <- ifaceExportNames (mi_exports iface)
-    complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
+    complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
     return $ ModDetails { md_types     = type_env
                         , md_insts     = insts
                         , md_fam_insts = fam_insts
                         , md_rules     = rules
                         , md_anns      = anns
                         , md_exports   = exports
-                        , md_complete_sigs = complete_sigs
+                        , md_complete_matches = complete_matches
                         }
 
 -- Note [Resolving never-exported Names]
@@ -1147,11 +1148,14 @@ tcIfaceAnnTarget (ModuleTarget mod) = do
 ************************************************************************
 -}
 
-tcIfaceCompleteSigs :: [IfaceCompleteMatch] -> IfL [CompleteMatch]
-tcIfaceCompleteSigs = mapM tcIfaceCompleteSig
+tcIfaceCompleteMatches :: [IfaceCompleteMatch] -> IfL [CompleteMatch]
+tcIfaceCompleteMatches = mapM tcIfaceCompleteMatch
 
-tcIfaceCompleteSig :: IfaceCompleteMatch -> IfL CompleteMatch
-tcIfaceCompleteSig (IfaceCompleteMatch ms t) = return (CompleteMatch ms t)
+tcIfaceCompleteMatch :: IfaceCompleteMatch -> IfL CompleteMatch
+tcIfaceCompleteMatch (IfaceCompleteMatch ms) =
+  mkUniqDSet <$> mapM (forkM doc . tcIfaceConLike) ms
+  where
+    doc = text "COMPLETE sig" <+> ppr ms
 
 {-
 ************************************************************************
@@ -1760,7 +1764,13 @@ tcIfaceDataCon :: Name -> IfL DataCon
 tcIfaceDataCon name = do { thing <- tcIfaceGlobal name
                          ; case thing of
                                 AConLike (RealDataCon dc) -> return dc
-                                _       -> pprPanic "tcIfaceExtDC" (ppr name$$ ppr thing) }
+                                _       -> pprPanic "tcIfaceDataCon" (ppr name$$ ppr thing) }
+
+tcIfaceConLike :: Name -> IfL ConLike
+tcIfaceConLike name = do { thing <- tcIfaceGlobal name
+                         ; case thing of
+                                AConLike cl -> return cl
+                                _           -> pprPanic "tcIfaceConLike" (ppr name$$ ppr thing) }
 
 tcIfaceExtId :: Name -> IfL Id
 tcIfaceExtId name = do { thing <- tcIfaceGlobal name

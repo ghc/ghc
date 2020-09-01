@@ -32,6 +32,7 @@ module GHC.Types.Unique.DFM (
         addToUDFM_C_Directly,
         addToUDFM_Directly,
         addListToUDFM,
+        addListToUDFM_C,
         delFromUDFM,
         delListFromUDFM,
         adjustUDFM,
@@ -41,6 +42,7 @@ module GHC.Types.Unique.DFM (
         plusUDFM,
         plusUDFM_C,
         lookupUDFM, lookupUDFM_Directly,
+        lookupWithDefaultUDFM, lookupWithDefaultUDFM_Directly,
         elemUDFM,
         foldUDFM,
         eltsUDFM,
@@ -68,6 +70,7 @@ import GHC.Prelude
 
 import GHC.Types.Unique ( Uniquable(..), Unique, getKey )
 import GHC.Utils.Outputable
+import GHC.Data.Maybe ( orElse )
 
 import qualified Data.IntMap as M
 import Data.Data
@@ -206,6 +209,10 @@ addListToUDFM = foldl' (\m (k, v) -> addToUDFM m k v)
 addListToUDFM_Directly :: UniqDFM key elt -> [(Unique,elt)] -> UniqDFM key elt
 addListToUDFM_Directly = foldl' (\m (k, v) -> addToUDFM_Directly m k v)
 
+addListToUDFM_C
+  :: Uniquable key => (elt -> elt -> elt) -> UniqDFM key elt -> [(key,elt)] -> UniqDFM key elt
+addListToUDFM_C f = foldl' (\m (k, v) -> addToUDFM_C f m k v)
+
 addListToUDFM_Directly_C
   :: (elt -> elt -> elt) -> UniqDFM key elt -> [(Unique,elt)] -> UniqDFM key elt
 addListToUDFM_Directly_C f = foldl' (\m (k, v) -> addToUDFM_C_Directly f m k v)
@@ -273,6 +280,12 @@ lookupUDFM (UDFM m _i) k = taggedFst `fmap` M.lookup (getKey $ getUnique k) m
 
 lookupUDFM_Directly :: UniqDFM key elt -> Unique -> Maybe elt
 lookupUDFM_Directly (UDFM m _i) k = taggedFst `fmap` M.lookup (getKey k) m
+
+lookupWithDefaultUDFM :: Uniquable key => UniqDFM key elt -> elt -> key -> elt
+lookupWithDefaultUDFM m v k = lookupUDFM m k `orElse` v
+
+lookupWithDefaultUDFM_Directly :: UniqDFM key elt -> elt -> Unique -> elt
+lookupWithDefaultUDFM_Directly m v k = lookupUDFM_Directly m k `orElse` v
 
 elemUDFM :: Uniquable key => key -> UniqDFM key elt -> Bool
 elemUDFM k (UDFM m _i) = M.member (getKey $ getUnique k) m
