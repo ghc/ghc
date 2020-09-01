@@ -1,4 +1,11 @@
 
-completesig04.hs:6:1: error:
-    • Cannot form a group of complete patterns from patterns ‘Just’ and ‘L’ as they match different type constructors (‘Maybe’ resp. ‘E’)
-    • In {-# COMPLETE Just, L #-}
+completesig04.hs:10:1: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘f’:
+        Patterns not matched:
+            B
+            C
+
+completesig04.hs:12:1: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘g’: Patterns not matched: Nothing
