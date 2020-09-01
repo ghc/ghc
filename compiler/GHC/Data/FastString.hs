@@ -184,7 +184,6 @@ of this string which is used by the compiler internally.
 -}
 data FastString = FastString {
       uniq    :: {-# UNPACK #-} !Int, -- unique id
-      n_chars :: {-# UNPACK #-} !Int, -- number of chars
       fs_sbs  :: {-# UNPACK #-} !ShortByteString,
       fs_zenc :: FastZString
       -- ^ Lazily computed z-encoding of this string.
@@ -499,8 +498,7 @@ mkNewFastStringShortByteString :: ShortByteString -> Int
                                -> IORef Int -> IO FastString
 mkNewFastStringShortByteString sbs uid n_zencs = do
   let zstr = mkZFastString n_zencs sbs
-  chars <- countUTF8Chars sbs
-  return (FastString uid chars sbs zstr)
+  return (FastString uid sbs zstr)
 
 hashStr  :: ShortByteString -> Int
  -- produce a hash value between 0 & m (inclusive)
@@ -525,7 +523,7 @@ hashStr sbs@(SBS.SBS ba#) = loop 0# 0#
 
 -- | Returns the length of the 'FastString' in characters
 lengthFS :: FastString -> Int
-lengthFS fs = n_chars fs
+lengthFS FastString{fs_sbs=sbs} = countUTF8Chars sbs
 
 -- | Returns @True@ if the 'FastString' is empty
 nullFS :: FastString -> Bool

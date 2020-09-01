@@ -170,13 +170,13 @@ utf8DecodeShortByteString (SBS ba#)
       let len# = sizeofByteArray# ba# in
       utf8DecodeLazy# (return ()) (utf8DecodeCharByteArray# ba#) len#
 
-countUTF8Chars :: ShortByteString -> IO Int
+countUTF8Chars :: ShortByteString -> Int
 countUTF8Chars (SBS ba) = go 0# 0#
   where
     len# = sizeofByteArray# ba
     go i# n#
       | isTrue# (i# >=# len#) =
-          return (I# n#)
+          (I# n#)
       | otherwise = do
           case utf8DecodeCharByteArray# ba i# of
             (# _, nBytes# #) -> go (i# +# nBytes#) (n# +# 1#)
