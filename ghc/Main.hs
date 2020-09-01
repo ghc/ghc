@@ -197,13 +197,13 @@ main' postLoadMode dflags0 args flagWarnings = do
   let dflags4 = case bcknd of
                 Interpreter | not (gopt Opt_ExternalInterpreter dflags3) ->
                     let platform = targetPlatform dflags3
-                        dflags3a = dflags3 { ways = hostFullWays }
+                        dflags3a = dflags3 { ways = hostWays }
                         dflags3b = foldl gopt_set dflags3a
                                  $ concatMap (wayGeneralFlags platform)
-                                             hostFullWays
+                                             hostWays
                         dflags3c = foldl gopt_unset dflags3b
                                  $ concatMap (wayUnsetGeneralFlags platform)
-                                             hostFullWays
+                                             hostWays
                     in dflags3c
                 _ ->
                     dflags3
@@ -348,12 +348,12 @@ checkOptions mode dflags srcs objs = do
    let unknown_opts = [ f | (f@('-':_), _) <- srcs ]
    when (notNull unknown_opts) (unknownFlagsErr unknown_opts)
 
-   when (not (Set.null (Set.filter wayRTSOnly (ways dflags)))
+   when (not (Set.null (rtsWays (ways dflags)))
          && isInterpretiveMode mode) $
         hPutStrLn stderr ("Warning: -debug, -threaded and -ticky are ignored by GHCi")
 
         -- -prof and --interactive are not a good combination
-   when ((Set.filter (not . wayRTSOnly) (ways dflags) /= hostFullWays)
+   when ((fullWays (ways dflags) /= hostFullWays)
          && isInterpretiveMode mode
          && not (gopt Opt_ExternalInterpreter dflags)) $
       do throwGhcException (UsageError
