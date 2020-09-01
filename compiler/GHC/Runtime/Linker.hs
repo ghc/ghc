@@ -596,7 +596,7 @@ checkNonStdWay hsc_env srcspan
 
   | otherwise = return (Just (hostWayTag ++ "o"))
   where
-    targetFullWays = Set.filter (not . wayRTSOnly) (ways (hsc_dflags hsc_env))
+    targetFullWays = fullWays (ways (hsc_dflags hsc_env))
     hostWayTag = case waysTag hostFullWays of
                   "" -> ""
                   tag -> tag ++ "_"

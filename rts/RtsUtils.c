@@ -363,6 +363,39 @@ int rts_isDynamic(void)
 #endif
 }
 
+// Provides a way for Haskell programs to tell whether they're
+// linked with the threaded runtime or not.
+int rts_isThreaded(void)
+{
+#if defined(THREADED_RTS)
+    return 1;
+#else
+    return 0;
+#endif
+}
+
+// Provides a way for Haskell programs to tell whether they're
+// linked with the debug runtime or not.
+int rts_isDebugged(void)
+{
+#if defined(DEBUG)
+    return 1;
+#else
+    return 0;
+#endif
+}
+
+// Provides a way for Haskell programs to tell whether they're
+// linked with the tracing runtime or not.
+int rts_isTracing(void)
+{
+#if defined(TRACING)
+    return 1;
+#else
+    return 0;
+#endif
+}
+
 // Used for detecting a non-empty FPU stack on x86 (see #4914)
 void checkFPUStack(void)
 {

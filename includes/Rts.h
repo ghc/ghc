@@ -263,6 +263,15 @@ int rts_isProfiled(void);
 // Returns non-zero if the RTS is a dynamically-linked version
 int rts_isDynamic(void);
 
+// Returns non-zero if the RTS is a threaded version
+int rts_isThreaded(void);
+
+// Returns non-zero if the RTS is a debugged version
+int rts_isDebugged(void);
+
+// Returns non-zero if the RTS is a tracing version (event log)
+int rts_isTracing(void);
+
 /* -----------------------------------------------------------------------------
    RTS Exit codes
    -------------------------------------------------------------------------- */
