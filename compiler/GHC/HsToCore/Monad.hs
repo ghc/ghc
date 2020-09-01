@@ -88,7 +88,7 @@ import GHC.Driver.Ppr
 import GHC.Utils.Error
 import GHC.Utils.Panic
 import GHC.Data.FastString
-import GHC.Types.Unique.FM ( lookupWithDefaultUFM_Directly )
+import GHC.Types.Unique.DFM ( lookupWithDefaultUDFM )
 import GHC.Types.Literal ( mkLitString )
 import GHC.Types.CostCentre.State
 
@@ -534,14 +534,12 @@ dsGetMetaEnv :: DsM (NameEnv DsMetaVal)
 dsGetMetaEnv = do { env <- getLclEnv; return (dsl_meta env) }
 
 -- | The @COMPLETE@ pragmas provided by the user for a given `TyCon`.
-dsGetCompleteMatches :: TyCon -> DsM [CompleteMatch]
-dsGetCompleteMatches tc = do
+dsGetCompleteMatches :: ConLike -> DsM [CompleteMatch]
+dsGetCompleteMatches cl = do
   eps <- getEps
   env <- getGblEnv
-      -- We index into a UniqFM from Name -> elt, for tyCon it holds that
-      -- getUnique (tyConName tc) == getUnique tc. So we lookup using the
-      -- unique directly instead.
-  let lookup_completes ufm = lookupWithDefaultUFM_Directly ufm [] (getUnique tc)
+  let lookup_completes :: CompleteMatchMap -> [CompleteMatch]
+      lookup_completes udfm = lookupWithDefaultUDFM udfm [] cl
       eps_matches_list = lookup_completes $ eps_complete_matches eps
       env_matches_list = lookup_completes $ ds_complete_matches env
   return $ eps_matches_list ++ env_matches_list

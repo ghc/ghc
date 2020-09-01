@@ -70,6 +70,7 @@ import GHC.Data.Maybe
 import GHC.Utils.Error
 import GHC.Driver.Finder
 import GHC.Types.Unique.FM
+import GHC.Types.Unique.DFM
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable as Outputable
 import GHC.Iface.Binary
@@ -1037,9 +1038,8 @@ initExternalPackageState home_unit
       eps_fam_inst_env     = emptyFamInstEnv,
       eps_rule_base        = mkRuleBase builtinRules',
         -- Initialise the EPS rule pool with the built-in rules
-      eps_mod_fam_inst_env
-                           = emptyModuleEnv,
-      eps_complete_matches = emptyUFM,
+      eps_mod_fam_inst_env = emptyModuleEnv,
+      eps_complete_matches = emptyUDFM,
       eps_ann_env          = emptyAnnEnv,
       eps_stats = EpsStats { n_ifaces_in = 0, n_decls_in = 0, n_decls_out = 0
                            , n_insts_in = 0, n_insts_out = 0

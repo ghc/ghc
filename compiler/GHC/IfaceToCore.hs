@@ -67,6 +67,7 @@ import GHC.Types.Name.Set
 import GHC.Core.Opt.OccurAnal ( occurAnalyseExpr )
 import GHC.Unit.Module
 import GHC.Types.Unique.FM
+import GHC.Types.Unique.DSet ( mkUniqDSet )
 import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable
 import GHC.Data.Maybe
@@ -1151,7 +1152,10 @@ tcIfaceCompleteSigs :: [IfaceCompleteMatch] -> IfL [CompleteMatch]
 tcIfaceCompleteSigs = mapM tcIfaceCompleteSig
 
 tcIfaceCompleteSig :: IfaceCompleteMatch -> IfL CompleteMatch
-tcIfaceCompleteSig (IfaceCompleteMatch ms t) = return (CompleteMatch ms t)
+tcIfaceCompleteSig (IfaceCompleteMatch u ms) =
+  CompleteMatch u . mkUniqDSet <$> mapM (forkM doc . tcIfaceConLike) ms
+  where
+    doc = text "COMPLETE sig" <+> ppr ms
 
 {-
 ************************************************************************
@@ -1760,7 +1764,13 @@ tcIfaceDataCon :: Name -> IfL DataCon
 tcIfaceDataCon name = do { thing <- tcIfaceGlobal name
                          ; case thing of
                                 AConLike (RealDataCon dc) -> return dc
-                                _       -> pprPanic "tcIfaceExtDC" (ppr name$$ ppr thing) }
+                                _       -> pprPanic "tcIfaceDataCon" (ppr name$$ ppr thing) }
+
+tcIfaceConLike :: Name -> IfL ConLike
+tcIfaceConLike name = do { thing <- tcIfaceGlobal name
+                         ; case thing of
+                                AConLike cl -> return cl
+                                _           -> pprPanic "tcIfaceConLike" (ppr name$$ ppr thing) }
 
 tcIfaceExtId :: Name -> IfL Id
 tcIfaceExtId name = do { thing <- tcIfaceGlobal name

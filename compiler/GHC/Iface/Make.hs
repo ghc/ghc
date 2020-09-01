@@ -57,6 +57,7 @@ import GHC.Types.Avail
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
+import GHC.Types.Unique.DSet
 import GHC.Unit
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -323,7 +324,8 @@ mkIface_ hsc_env
 -}
 
 mkIfaceCompleteSig :: CompleteMatch -> IfaceCompleteMatch
-mkIfaceCompleteSig (CompleteMatch cls tc) = IfaceCompleteMatch cls tc
+mkIfaceCompleteSig (CompleteMatch n cls) =
+  IfaceCompleteMatch n (map conLikeName (uniqDSetToList cls))
 
 
 {-

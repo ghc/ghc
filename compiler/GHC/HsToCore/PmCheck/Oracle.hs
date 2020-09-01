@@ -66,7 +66,7 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.Type
 import GHC.Tc.Solver   (tcNormalise, tcCheckSatisfiability)
 import GHC.Core.Unify    (tcMatchTy)
-import GHC.Tc.Types      (completeMatchConLikes)
+import GHC.Tc.Types      (CompleteMatch(..))
 import GHC.Core.Coercion
 import GHC.Utils.Monad hiding (foldlM)
 import GHC.HsToCore.Monad hiding (foldlM)
@@ -80,7 +80,6 @@ import Data.Bifunctor (second)
 import Data.Either   (partitionEithers)
 import Data.Foldable (foldlM, minimumBy, toList)
 import Data.List     (find)
-import qualified Data.List.NonEmpty as NonEmpty
 import Data.Ord      (comparing)
 import qualified Data.Semigroup as Semigroup
 import Data.Tuple    (swap)
@@ -105,11 +104,57 @@ mkPmId ty = getUniqueM >>= \unique ->
 -----------------------------------------------
 -- * Caching possible matches of a COMPLETE set
 
-markMatched :: ConLike -> PossibleMatches -> PossibleMatches
-markMatched _   NoPM    = NoPM
-markMatched con (PM ms) = PM (del_one_con con <$> ms)
-  where
-    del_one_con = flip delOneFromUniqDSet
+-- | A pseudo-'CompleteMatch' for the vanilla complete set of the data defn of
+-- the given 'DataCon'.
+-- Ex.: @vanillaCompleteMatchDC 'Just' ==> ("Maybe", {'Just','Nothing'})@
+vanillaCompleteMatchDC :: DataCon -> CompleteMatch
+vanillaCompleteMatchDC dc =
+  expectJust "vanillaCompleteMatchDC" $ vanillaCompleteMatchTC (dataConTyCon dc)
+
+-- | A pseudo-'CompleteMatch' for the vanilla complete set of the given data
+-- 'TyCon'.
+-- Ex.: @vanillaCompleteMatchTC 'Maybe' ==> Just ("Maybe", {'Just','Nothing'})@
+vanillaCompleteMatchTC :: TyCon -> Maybe CompleteMatch
+vanillaCompleteMatchTC tc =
+  let -- | TYPE acts like an empty data type on the term-level (#14086), but
+      -- it is a PrimTyCon, so tyConDataCons_maybe returns Nothing. Hence a
+      -- special case.
+      mb_dcs | tc == tYPETyCon = Just []
+             | otherwise       = tyConDataCons_maybe tc
+      -- | Using the Name of the TyCon instead of a Name of an actual
+      -- CompleteMatches here is OK, since they're in the same Occ NameSpace
+      -- and thus can't clash.
+      nm     = getName tc
+  in CompleteMatch nm . mkUniqDSet . map RealDataCon <$> mb_dcs
+
+-- | Adds the 'CompleteMatches' that the 'ConLike' is part of to the
+-- 'ResidualCompleteMatches', if not already present. We can identify two
+-- 'CompleteMatches' by their 'Name', which conveniently is the index of
+-- the Map in 'ResidualCompleteMatches'.
+addConLikeMatches :: ConLike -> ResidualCompleteMatches -> DsM ResidualCompleteMatches
+addConLikeMatches cl (RCM cmpls) = do
+  tracePm "get cmpl" empty
+  cs <- dsGetCompleteMatches cl
+  -- Add the vanilla COMPLETE set from the data defn
+  let cs' = case cl of
+        RealDataCon dc -> vanillaCompleteMatchDC dc : cs
+        _              -> cs
+  pure $ RCM $ addListToUDFM_C (\old _new -> old) cmpls
+                               [ (n, c) | CompleteMatch n c <- cs' ]
+
+-- | Adds the /vanilla/ 'CompleteMatches' of the data 'TyCon' to the
+-- 'ResidualCompleteMatches', if not already present.
+-- Like 'addConLikeMatches', but based on the data 'TyCon' and adds
+-- only the vanilla COMPLETE set.
+addTyConMatches :: TyCon -> ResidualCompleteMatches -> ResidualCompleteMatches
+addTyConMatches tc rcm@(RCM cmpls) = case vanillaCompleteMatchTC tc of
+  Nothing                  -> rcm
+  Just (CompleteMatch n c) -> RCM $ addToUDFM_C (\old _new -> old) cmpls n c
+
+markMatched :: ConLike -> ResidualCompleteMatches -> DsM ResidualCompleteMatches
+markMatched cl rcm = do
+  RCM cmpl <- addConLikeMatches cl rcm
+  pure $ RCM (flip delOneFromUniqDSet cl <$> cmpl)
 
 ---------------------------------------------------
 -- * Instantiating constructors, types and evidence
@@ -492,7 +537,7 @@ tyOracle (TySt inert) cts
 -- | A 'SatisfiabilityCheck' based on new type-level constraints.
 -- Returns a new 'Nabla' if the new constraints are compatible with existing
 -- ones. Doesn't bother calling out to the type oracle if the bag of new type
--- constraints was empty. Will only recheck 'PossibleMatches' in the term oracle
+-- constraints was empty. Will only recheck 'ResidualCompleteMatches' in the term oracle
 -- for emptiness if the first argument is 'True'.
 tyIsSatisfiable :: Bool -> Bag PredType -> SatisfiabilityCheck
 tyIsSatisfiable recheck_complete_sets new_ty_cs = SC $ \nabla ->
@@ -624,13 +669,16 @@ tmIsSatisfiable new_tm_cs = SC $ \nabla -> runMaybeT $ foldlM addTmCt nabla new_
 -----------------------
 -- * Looking up VarInfo
 
+emptyRCM :: ResidualCompleteMatches
+emptyRCM = RCM emptyUDFM
+
 emptyVarInfo :: Id -> VarInfo
 -- We could initialise @bot@ to @Just False@ in case of an unlifted type here,
 -- but it's cleaner to let the user of the constraint solver take care of this.
 -- After all, there are also strict fields, the unliftedness of which isn't
 -- evident in the type. So treating unlifted types here would never be
 -- sufficient anyway.
-emptyVarInfo x = VI (idType x) [] emptyPmAltConSet MaybeBot NoPM
+emptyVarInfo x = VI (idType x) [] emptyPmAltConSet MaybeBot emptyRCM
 
 lookupVarInfo :: TmState -> Id -> VarInfo
 -- (lookupVarInfo tms x) tells what we know about 'x'
@@ -655,85 +703,6 @@ lookupVarInfoNT ts x = case lookupVarInfo ts x of
     go (PmAltConLike (RealDataCon dc), _, [y])
       | isNewDataCon dc = Just y
     go _                = Nothing
-
-initPossibleMatches :: TyState -> VarInfo -> DsM VarInfo
-initPossibleMatches ty_st vi@VI{ vi_ty = ty, vi_cache = NoPM } = do
-  -- New evidence might lead to refined info on ty, in turn leading to discovery
-  -- of a COMPLETE set.
-  res <- pmTopNormaliseType ty_st ty
-  let ty' = normalisedSourceType res
-  case splitTyConApp_maybe ty' of
-    Nothing -> pure vi{ vi_ty = ty' }
-    Just (tc, [_])
-      | tc == tYPETyCon
-      -- TYPE acts like an empty data type on the term-level (#14086), but
-      -- it is a PrimTyCon, so tyConDataCons_maybe returns Nothing. Hence a
-      -- special case.
-      -> pure vi{ vi_ty = ty', vi_cache = PM (pure emptyUniqDSet) }
-    Just (tc, tc_args) -> do
-      -- See Note [COMPLETE sets on data families]
-      (tc_rep, tc_fam) <- case tyConFamInst_maybe tc of
-        Just (tc_fam, _) -> pure (tc, tc_fam)
-        Nothing -> do
-          env <- dsGetFamInstEnvs
-          let (tc_rep, _tc_rep_args, _co) = tcLookupDataFamInst env tc tc_args
-          pure (tc_rep, tc)
-      -- Note that the common case here is tc_rep == tc_fam
-      let mb_rdcs = map RealDataCon <$> tyConDataCons_maybe tc_rep
-      let rdcs = maybeToList mb_rdcs
-      -- NB: tc_fam, because COMPLETE sets are associated with the parent data
-      -- family TyCon
-      pragmas <- dsGetCompleteMatches tc_fam
-      let fams = mapM dsLookupConLike . completeMatchConLikes
-      pscs <- mapM fams pragmas
-      -- pprTrace "initPossibleMatches" (ppr ty $$ ppr ty' $$ ppr tc_rep <+> ppr tc_fam <+> ppr tc_args $$ ppr (rdcs ++ pscs)) (return ())
-      case NonEmpty.nonEmpty (rdcs ++ pscs) of
-        Nothing -> pure vi{ vi_ty = ty' } -- Didn't find any COMPLETE sets
-        Just cs -> pure vi{ vi_ty = ty', vi_cache = PM (mkUniqDSet <$> cs) }
-initPossibleMatches _     vi                                   = pure vi
-
-{- Note [COMPLETE sets on data families]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-User-defined COMPLETE sets involving data families are attached to the family
-TyCon, whereas the built-in COMPLETE set is attached to a data family instance's
-representation TyCon. This matters for COMPLETE sets involving both DataCons
-and PatSyns (from #17207):
-
-  data family T a
-  data family instance T () = A | B
-  pattern C = B
-  {-# COMPLETE A, C #-}
-  f :: T () -> ()
-  f A = ()
-  f C = ()
-
-The match on A is actually wrapped in a CoPat, matching impedance between T ()
-and its representation TyCon, which we translate as
-@x | let y = x |> co, A <- y@ in PmCheck.
-
-Which TyCon should we use for looking up the COMPLETE set? The representation
-TyCon from the match on A would only reveal the built-in COMPLETE set, while the
-data family TyCon would only give the user-defined one. But when initialising
-the PossibleMatches for a given Type, we want to do so only once, because
-merging different COMPLETE sets after the fact is very complicated and possibly
-inefficient.
-
-So in fact, we just *drop* the coercion arising from the CoPat when handling
-handling the constraint @y ~ x |> co@ in addCoreCt, just equating @y ~ x@.
-We then handle the fallout in initPossibleMatches, which has to get a hand at
-both the representation TyCon tc_rep and the parent data family TyCon tc_fam.
-It considers three cases after having established that the Type is a TyConApp:
-
-1. The TyCon is a vanilla data type constructor
-2. The TyCon is tc_rep
-3. The TyCon is tc_fam
-
-1. is simple and subsumed by the handling of the other two.
-We check for case 2. by 'tyConFamInst_maybe' and get the tc_fam out.
-Otherwise (3.), we try to lookup the data family instance at that particular
-type to get out the tc_rep. In case 1., this will just return the original
-TyCon, so tc_rep = tc_fam afterwards.
--}
 
 ------------------------------------------------
 -- * Exported utility functions querying 'Nabla'
@@ -897,11 +866,7 @@ addNotConCt :: Nabla -> Id -> PmAltCon -> MaybeT DsM Nabla
 addNotConCt _ _ (PmAltConLike (RealDataCon dc))
   | isNewDataCon dc = mzero -- (3) in Note [Coverage checking Newtype matches]
 addNotConCt nabla@MkNabla{ nabla_tm_st = ts@(TmSt env reps) } x nalt = do
-  -- For good performance, it's important to initPossibleMatches here.
-  -- Otherwise we can't mark nalt as matched later on, incurring unnecessary
-  -- inhabitation tests for nalt.
-  vi@(VI _ pos neg _ pm) <- lift $ initPossibleMatches (nabla_ty_st nabla)
-                                                       (lookupVarInfo ts x)
+  let vi@(VI _ pos neg _ rcm) = lookupVarInfo ts x
   -- 1. Bail out quickly when nalt contradicts a solution
   let contradicts nalt (cl, _tvs, _args) = eqPmAltCon cl nalt == Equal
   guard (not (any (contradicts nalt) pos))
@@ -917,9 +882,11 @@ addNotConCt nabla@MkNabla{ nabla_tm_st = ts@(TmSt env reps) } x nalt = do
   let vi1 = vi{ vi_neg = neg', vi_bot = IsNotBot }
   -- 3. Make sure there's at least one other possible constructor
   vi2 <- case nalt of
-    PmAltConLike cl
-      -> ensureInhabited nabla vi1{ vi_cache = markMatched cl pm }
-    _ -> pure vi1
+    PmAltConLike cl -> do
+      rcm' <- lift (markMatched cl rcm)
+      ensureInhabited nabla vi1{ vi_cache = rcm' }
+    _ ->
+      pure vi1
   pure nabla{ nabla_tm_st = TmSt (setEntrySDIE env x vi2) reps }
 
 hasRequiredTheta :: PmAltCon -> Bool
@@ -1007,17 +974,16 @@ ensureInhabited :: Nabla -> VarInfo -> MaybeT DsM VarInfo
 ensureInhabited nabla vi = case vi_bot vi of
   MaybeBot -> pure vi -- The |-Bot rule from the paper
   IsBot    -> pure vi
-  IsNotBot -> lift (initPossibleMatches (nabla_ty_st nabla) vi) >>= inst_complete_sets
+  IsNotBot -> inst_complete_sets vi
   where
     -- | This is the |-Inst rule from the paper (section 4.5). Tries to
     -- find an inhabitant in every complete set by instantiating with one their
     -- constructors. If there is any complete set where we can't find an
     -- inhabitant, the whole thing is uninhabited.
     inst_complete_sets :: VarInfo -> MaybeT DsM VarInfo
-    inst_complete_sets vi@VI{ vi_cache = NoPM }  = pure vi
-    inst_complete_sets vi@VI{ vi_cache = PM ms } = do
+    inst_complete_sets vi@VI{ vi_cache = RCM ms } = do
       ms <- traverse (\cs -> inst_complete_set vi cs (uniqDSetToList cs)) ms
-      pure vi{ vi_cache = PM ms }
+      pure vi{ vi_cache = RCM ms }
 
     inst_complete_set :: VarInfo -> ConLikeSet -> [ConLike] -> MaybeT DsM ConLikeSet
     -- (inst_complete_set cs cls) iterates over cls, deleting from cs
@@ -1586,8 +1552,12 @@ provideEvidence = go
         Just (y, newty_nabla) -> do
           -- Pick a COMPLETE set and instantiate it (n at max). Take care of ⊥.
           let vi = lookupVarInfo (nabla_tm_st newty_nabla) y
-          vi <- initPossibleMatches (nabla_ty_st newty_nabla) vi
-          mb_cls <- pickMinimalCompleteSet newty_nabla (vi_cache vi)
+          res <- pmTopNormaliseType (nabla_ty_st newty_nabla) (vi_ty vi)
+          let y_ty' = normalisedSourceType res
+          let rcm = case splitTyConApp_maybe y_ty' of
+                Nothing      -> vi_cache vi
+                Just (tc, _) -> addTyConMatches tc (vi_cache vi)
+          mb_cls <- pickMinimalCompleteSet newty_nabla rcm
           case uniqDSetToList <$> mb_cls of
             Just cls@(_:_) -> instantiate_cons y core_ty xs n newty_nabla cls
             Just [] | vi_bot vi == IsNotBot -> pure []
@@ -1631,12 +1601,11 @@ provideEvidence = go
           other_cons_nablas <- instantiate_cons x ty xs (n - length con_nablas) nabla cls
           pure (con_nablas ++ other_cons_nablas)
 
-pickMinimalCompleteSet :: Nabla -> PossibleMatches -> DsM (Maybe ConLikeSet)
-pickMinimalCompleteSet _ NoPM      = pure Nothing
+pickMinimalCompleteSet :: Nabla -> ResidualCompleteMatches -> DsM (Maybe ConLikeSet)
 -- TODO: First prune sets with type info in nabla. But this is good enough for
 -- now and less costly. See #17386.
-pickMinimalCompleteSet _ (PM clss) = do
-  tracePm "pickMinimalCompleteSet" (ppr $ NonEmpty.toList clss)
+pickMinimalCompleteSet _ rcm@(RCM clss) = do
+  tracePm "pickMinimalCompleteSet" (ppr rcm)
   pure (Just (minimumBy (comparing sizeUniqDSet) clss))
 
 -- | Finds a representant of the semantic equality class of the given @e@.
