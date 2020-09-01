@@ -1,6 +1,12 @@
--- Test that a COMPLETE pragma over constructors of different types fails.
+{-# OPTIONS_GHC -Wincomplete-patterns -fforce-recomp #-}
+-- Test that a COMPLETE pragma over constructors of different types is a valid
+-- declaration, but that it's not suggested in any warning.
 module TyMismatch where
 
-data E = L | R
+data T = A | B | C
 
-{-# COMPLETE Just, L #-}
+{-# COMPLETE Just, A #-}
+
+f A = ()        -- should not suggest 'Just'
+
+g (Just _) = () -- should not suggest 'A'
