@@ -64,8 +64,8 @@ module GHC.Tc.Utils.Env(
         topIdLvl, isBrackStage,
 
         -- New Ids
-        newDFunName, newFamInstTyConName,
-        newFamInstAxiomName,
+        newDFunName,
+        newFamInstTyConName, newFamInstAxiomName,
         mkStableIdFromString, mkStableIdFromName,
         mkWrapperName
   ) where

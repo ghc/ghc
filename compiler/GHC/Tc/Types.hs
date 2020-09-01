@@ -45,12 +45,11 @@ module GHC.Tc.Types(
         IdBindingInfo(..), ClosedTypeId, RhsNames,
         IsGroupClosed(..),
         SelfBootInfo(..),
-        pprTcTyThingCategory, pprPECategory, CompleteMatch(..),
+        pprTcTyThingCategory, pprPECategory, CompleteMatch,
 
         -- Desugaring types
         DsM, DsLclEnv(..), DsGblEnv(..),
-        DsMetaEnv, DsMetaVal(..), CompleteMatchMap,
-        mkCompleteMatchMap, extendCompleteMatchMap,
+        DsMetaEnv, DsMetaVal(..), CompleteMatches,
 
         -- Template Haskell
         ThStage(..), SpliceType(..), PendingStuff(..),
@@ -310,7 +309,7 @@ data DsGblEnv
         , ds_msgs    :: IORef Messages          -- Warning messages
         , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global,
                                                 -- possibly-imported things
-        , ds_complete_matches :: CompleteMatchMap
+        , ds_complete_matches :: CompleteMatches
            -- Additional complete pattern matches
         , ds_cc_st   :: IORef CostCentreState
            -- Tracking indices for cost centre annotations
@@ -602,7 +601,7 @@ data TcGblEnv
         tcg_static_wc :: TcRef WantedConstraints,
           -- ^ Wanted constraints of static forms.
         -- See Note [Constraints in static forms].
-        tcg_complete_matches :: [CompleteMatch],
+        tcg_complete_matches :: !CompleteMatches,
 
         -- ^ Tracking indices for cost centre annotations
         tcg_cc_st   :: TcRef CostCentreState

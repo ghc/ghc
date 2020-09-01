@@ -38,7 +38,7 @@ import GHC.Prelude
 
 import {-# SOURCE #-} GHC.IfaceToCore
    ( tcIfaceDecl, tcIfaceRules, tcIfaceInst, tcIfaceFamInst
-   , tcIfaceAnnotations, tcIfaceCompleteSigs )
+   , tcIfaceAnnotations, tcIfaceCompleteMatches )
 
 import GHC.Driver.Session
 import GHC.Driver.Backend
@@ -479,7 +479,7 @@ loadInterface doc_str mod from
         ; new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
         ; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
         ; new_eps_anns      <- tcIfaceAnnotations (mi_anns iface)
-        ; new_eps_complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
+        ; new_eps_complete_matches <- tcIfaceCompleteMatches (mi_complete_matches iface)
 
         ; let { final_iface = iface {
                                 mi_decls     = panic "No mi_decls in PIT",
@@ -509,9 +509,7 @@ loadInterface doc_str mod from
                   eps_rule_base    = extendRuleBaseList (eps_rule_base eps)
                                                         new_eps_rules,
                   eps_complete_matches
-                                   = extendCompleteMatchMap
-                                         (eps_complete_matches eps)
-                                         new_eps_complete_sigs,
+                                   = eps_complete_matches eps ++ new_eps_complete_matches,
                   eps_inst_env     = extendInstEnvList (eps_inst_env eps)
                                                        new_eps_insts,
                   eps_fam_inst_env = extendFamInstEnvList (eps_fam_inst_env eps)
@@ -1037,9 +1035,8 @@ initExternalPackageState home_unit
       eps_fam_inst_env     = emptyFamInstEnv,
       eps_rule_base        = mkRuleBase builtinRules',
         -- Initialise the EPS rule pool with the built-in rules
-      eps_mod_fam_inst_env
-                           = emptyModuleEnv,
-      eps_complete_matches = emptyUFM,
+      eps_mod_fam_inst_env = emptyModuleEnv,
+      eps_complete_matches = [],
       eps_ann_env          = emptyAnnEnv,
       eps_stats = EpsStats { n_ifaces_in = 0, n_decls_in = 0, n_decls_out = 0
                            , n_insts_in = 0, n_insts_out = 0
@@ -1181,7 +1178,7 @@ pprModIface iface@ModIface{ mi_final_exts = exts }
         , ppr (mi_warns iface)
         , pprTrustInfo (mi_trust iface)
         , pprTrustPkg (mi_trust_pkg iface)
-        , vcat (map ppr (mi_complete_sigs iface))
+        , vcat (map ppr (mi_complete_matches iface))
         , text "module header:" $$ nest 2 (ppr (mi_doc_hdr iface))
         , text "declaration docs:" $$ nest 2 (ppr (mi_decl_docs iface))
         , text "arg docs:" $$ nest 2 (ppr (mi_arg_docs iface))

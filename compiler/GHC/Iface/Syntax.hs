@@ -324,11 +324,11 @@ data IfaceAnnotation
 
 type IfaceAnnTarget = AnnTarget OccName
 
-data IfaceCompleteMatch = IfaceCompleteMatch [IfExtName] IfExtName
+newtype IfaceCompleteMatch = IfaceCompleteMatch [IfExtName]
 
 instance Outputable IfaceCompleteMatch where
-  ppr (IfaceCompleteMatch cls ty) = text "COMPLETE" <> colon <+> ppr cls
-                                                    <+> dcolon <+> ppr ty
+  ppr (IfaceCompleteMatch cls) = text "COMPLETE" <> colon <+> ppr cls
+
 
 
 
@@ -2481,8 +2481,8 @@ instance Binary IfaceTyConParent where
                 return $ IfDataInstance ax pr ty
 
 instance Binary IfaceCompleteMatch where
-  put_ bh (IfaceCompleteMatch cs ts) = put_ bh cs >> put_ bh ts
-  get bh = IfaceCompleteMatch <$> get bh <*> get bh
+  put_ bh (IfaceCompleteMatch cs) = put_ bh cs
+  get bh = IfaceCompleteMatch <$> get bh
 
 
 {-
@@ -2638,7 +2638,7 @@ instance NFData IfaceConAlt where
     IfaceLitAlt lit -> lit `seq` ()
 
 instance NFData IfaceCompleteMatch where
-  rnf (IfaceCompleteMatch f1 f2) = rnf f1 `seq` rnf f2
+  rnf (IfaceCompleteMatch f1) = rnf f1
 
 instance NFData IfaceRule where
   rnf (IfaceRule f1 f2 f3 f4 f5 f6 f7 f8) =

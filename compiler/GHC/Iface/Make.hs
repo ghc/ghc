@@ -57,6 +57,7 @@ import GHC.Types.Avail
 import GHC.Types.Name.Reader
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
+import GHC.Types.Unique.DSet
 import GHC.Unit
 import GHC.Utils.Error
 import GHC.Utils.Outputable
@@ -220,7 +221,7 @@ mkIface_ hsc_env
                       md_anns      = anns,
                       md_types     = type_env,
                       md_exports   = exports,
-                      md_complete_sigs = complete_sigs }
+                      md_complete_matches = complete_matches }
 -- NB:  notice that mkIface does not look at the bindings
 --      only at the TypeEnv.  The previous Tidy phase has
 --      put exactly the info into the TypeEnv that we want
@@ -256,7 +257,7 @@ mkIface_ hsc_env
         iface_fam_insts = map famInstToIfaceFamInst fam_insts
         trust_info  = setSafeMode safe_mode
         annotations = map mkIfaceAnnotation anns
-        icomplete_sigs = map mkIfaceCompleteSig complete_sigs
+        icomplete_matches = map mkIfaceCompleteMatch complete_matches
 
     ModIface {
           mi_module      = this_mod,
@@ -285,7 +286,7 @@ mkIface_ hsc_env
           mi_hpc         = isHpcUsed hpc_info,
           mi_trust       = trust_info,
           mi_trust_pkg   = pkg_trust_req,
-          mi_complete_sigs = icomplete_sigs,
+          mi_complete_matches = icomplete_matches,
           mi_doc_hdr     = doc_hdr,
           mi_decl_docs   = decl_docs,
           mi_arg_docs    = arg_docs,
@@ -322,8 +323,9 @@ mkIface_ hsc_env
 ************************************************************************
 -}
 
-mkIfaceCompleteSig :: CompleteMatch -> IfaceCompleteMatch
-mkIfaceCompleteSig (CompleteMatch cls tc) = IfaceCompleteMatch cls tc
+mkIfaceCompleteMatch :: CompleteMatch -> IfaceCompleteMatch
+mkIfaceCompleteMatch cls =
+  IfaceCompleteMatch (map conLikeName (uniqDSetToList cls))
 
 
 {-
