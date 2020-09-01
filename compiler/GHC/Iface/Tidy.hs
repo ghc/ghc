@@ -143,7 +143,7 @@ mkBootModDetailsTc hsc_env
                   tcg_patsyns          = pat_syns,
                   tcg_insts            = insts,
                   tcg_fam_insts        = fam_insts,
-                  tcg_complete_matches = complete_sigs,
+                  tcg_complete_matches = complete_matches,
                   tcg_mod              = this_mod
                 }
   = -- This timing isn't terribly useful since the result isn't forced, but
@@ -151,13 +151,13 @@ mkBootModDetailsTc hsc_env
     Err.withTiming dflags
                    (text "CoreTidy"<+>brackets (ppr this_mod))
                    (const ()) $
-    return (ModDetails { md_types         = type_env'
-                       , md_insts         = insts'
-                       , md_fam_insts     = fam_insts
-                       , md_rules         = []
-                       , md_anns          = []
-                       , md_exports       = exports
-                       , md_complete_sigs = complete_sigs
+    return (ModDetails { md_types            = type_env'
+                       , md_insts            = insts'
+                       , md_fam_insts        = fam_insts
+                       , md_rules            = []
+                       , md_anns             = []
+                       , md_exports          = exports
+                       , md_complete_matches = complete_matches
                        })
   where
     dflags = hsc_dflags hsc_env
@@ -346,22 +346,22 @@ three places this is actioned:
 -}
 
 tidyProgram :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
-tidyProgram hsc_env  (ModGuts { mg_module    = mod
-                              , mg_exports   = exports
-                              , mg_rdr_env   = rdr_env
-                              , mg_tcs       = tcs
-                              , mg_insts     = cls_insts
-                              , mg_fam_insts = fam_insts
-                              , mg_binds     = binds
-                              , mg_patsyns   = patsyns
-                              , mg_rules     = imp_rules
-                              , mg_anns      = anns
-                              , mg_complete_sigs = complete_sigs
-                              , mg_deps      = deps
-                              , mg_foreign   = foreign_stubs
-                              , mg_foreign_files = foreign_files
-                              , mg_hpc_info  = hpc_info
-                              , mg_modBreaks = modBreaks
+tidyProgram hsc_env  (ModGuts { mg_module           = mod
+                              , mg_exports          = exports
+                              , mg_rdr_env          = rdr_env
+                              , mg_tcs              = tcs
+                              , mg_insts            = cls_insts
+                              , mg_fam_insts        = fam_insts
+                              , mg_binds            = binds
+                              , mg_patsyns          = patsyns
+                              , mg_rules            = imp_rules
+                              , mg_anns             = anns
+                              , mg_complete_matches = complete_matches
+                              , mg_deps             = deps
+                              , mg_foreign          = foreign_stubs
+                              , mg_foreign_files    = foreign_files
+                              , mg_hpc_info         = hpc_info
+                              , mg_modBreaks        = modBreaks
                               })
 
   = Err.withTiming dflags
@@ -467,13 +467,13 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                            cg_modBreaks = modBreaks,
                            cg_spt_entries = spt_entries },
 
-                   ModDetails { md_types     = tidy_type_env,
-                                md_rules     = tidy_rules,
-                                md_insts     = tidy_cls_insts,
-                                md_fam_insts = fam_insts,
-                                md_exports   = exports,
-                                md_anns      = anns,      -- are already tidy
-                                md_complete_sigs = complete_sigs
+                   ModDetails { md_types            = tidy_type_env,
+                                md_rules            = tidy_rules,
+                                md_insts            = tidy_cls_insts,
+                                md_fam_insts        = fam_insts,
+                                md_exports          = exports,
+                                md_anns             = anns,      -- are already tidy
+                                md_complete_matches = complete_matches
                               })
         }
   where

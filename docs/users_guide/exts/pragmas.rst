@@ -887,29 +887,6 @@ modules. ``COMPLETE`` pragmas should be thought of as asserting a
 universal truth about a set of patterns and as a result, should not be
 used to silence context specific incomplete match warnings.
 
-When specifying a ``COMPLETE`` pragma, the result types of all patterns must
-be consistent with each other. This is a sanity check as it would be impossible
-to match on all the patterns if the types were inconsistent.
-
-The result type must also be unambiguous. Usually this can be inferred but
-when all the pattern synonyms in a group are polymorphic in the constructor
-the user must provide a type signature. ::
-
-    class LL f where
-      go :: f a -> ()
-
-    instance LL [] where
-      go _ = ()
-
-    pattern T :: LL f => f a
-    pattern T <- (go -> ())
-
-    {-# COMPLETE T :: [] #-}
-
-    -- No warning
-    foo :: [a] -> Int
-    foo T = 5
-
 .. _overlap-pragma:
 
 ``OVERLAPPING``, ``OVERLAPPABLE``, ``OVERLAPS``, and ``INCOHERENT`` pragmas
