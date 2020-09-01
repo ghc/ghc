@@ -10,3 +10,6 @@ pattern P :: C f => f a
 pattern P <- (foo -> ())
 
 {-# COMPLETE P #-}
+
+f :: C f => f a -> ()
+f P = () -- A complete match

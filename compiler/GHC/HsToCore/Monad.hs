@@ -88,7 +88,6 @@ import GHC.Driver.Ppr
 import GHC.Utils.Error
 import GHC.Utils.Panic
 import GHC.Data.FastString
-import GHC.Types.Unique.FM ( lookupWithDefaultUFM_Directly )
 import GHC.Types.Literal ( mkLitString )
 import GHC.Types.CostCentre.State
 
@@ -210,13 +209,15 @@ mkDsEnvsFromTcGbl :: MonadIO m
                   -> m (DsGblEnv, DsLclEnv)
 mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
   = do { cc_st_var   <- liftIO $ newIORef newCostCentreState
+       ; eps <- liftIO $ hscEPS hsc_env
        ; let dflags   = hsc_dflags hsc_env
              this_mod = tcg_mod tcg_env
              type_env = tcg_type_env tcg_env
              rdr_env  = tcg_rdr_env tcg_env
              fam_inst_env = tcg_fam_inst_env tcg_env
-             complete_matches = hptCompleteSigs hsc_env
-                                ++ tcg_complete_matches tcg_env
+             complete_matches = hptCompleteSigs hsc_env         -- from the home package
+                                ++ tcg_complete_matches tcg_env -- from the current module
+                                ++ eps_complete_matches eps     -- from imports
        ; return $ mkDsEnvs dflags this_mod rdr_env type_env fam_inst_env
                            msg_var cc_st_var complete_matches
        }
@@ -239,13 +240,15 @@ initDsWithModGuts :: HscEnv -> ModGuts -> DsM a -> IO (Messages, Maybe a)
 initDsWithModGuts hsc_env guts thing_inside
   = do { cc_st_var   <- newIORef newCostCentreState
        ; msg_var <- newIORef emptyMessages
+       ; eps <- liftIO $ hscEPS hsc_env
        ; let dflags   = hsc_dflags hsc_env
              type_env = typeEnvFromEntities ids (mg_tcs guts) (mg_fam_insts guts)
              rdr_env  = mg_rdr_env guts
              fam_inst_env = mg_fam_inst_env guts
              this_mod = mg_module guts
-             complete_matches = hptCompleteSigs hsc_env
-                                ++ mg_complete_sigs guts
+             complete_matches = hptCompleteSigs hsc_env     -- from the home package
+                                ++ mg_complete_matches guts -- from the current module
+                                ++ eps_complete_matches eps -- from imports
 
              bindsToIds (NonRec v _)   = [v]
              bindsToIds (Rec    binds) = map fst binds
@@ -281,7 +284,7 @@ initTcDsForSolver thing_inside
          thing_inside }
 
 mkDsEnvs :: DynFlags -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
-         -> IORef Messages -> IORef CostCentreState -> [CompleteMatch]
+         -> IORef Messages -> IORef CostCentreState -> CompleteMatches
          -> (DsGblEnv, DsLclEnv)
 mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var cc_st_var
          complete_matches
@@ -290,7 +293,6 @@ mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var cc_st_var
         if_lenv = mkIfLclEnv mod (text "GHC error in desugarer lookup in" <+> ppr mod)
                              NotBoot
         real_span = realSrcLocSpan (mkRealSrcLoc (moduleNameFS (moduleName mod)) 1 1)
-        completeMatchMap = mkCompleteMatchMap complete_matches
         gbl_env = DsGblEnv { ds_mod     = mod
                            , ds_fam_inst_env = fam_inst_env
                            , ds_if_env  = (if_genv, if_lenv)
@@ -299,7 +301,7 @@ mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var cc_st_var
                                              (mkHomeUnitFromFlags dflags)
                                              rdr_env
                            , ds_msgs    = msg_var
-                           , ds_complete_matches = completeMatchMap
+                           , ds_complete_matches = complete_matches
                            , ds_cc_st   = cc_st_var
                            }
         lcl_env = DsLclEnv { dsl_meta    = emptyNameEnv
@@ -533,18 +535,9 @@ dsGetFamInstEnvs
 dsGetMetaEnv :: DsM (NameEnv DsMetaVal)
 dsGetMetaEnv = do { env <- getLclEnv; return (dsl_meta env) }
 
--- | The @COMPLETE@ pragmas provided by the user for a given `TyCon`.
-dsGetCompleteMatches :: TyCon -> DsM [CompleteMatch]
-dsGetCompleteMatches tc = do
-  eps <- getEps
-  env <- getGblEnv
-      -- We index into a UniqFM from Name -> elt, for tyCon it holds that
-      -- getUnique (tyConName tc) == getUnique tc. So we lookup using the
-      -- unique directly instead.
-  let lookup_completes ufm = lookupWithDefaultUFM_Directly ufm [] (getUnique tc)
-      eps_matches_list = lookup_completes $ eps_complete_matches eps
-      env_matches_list = lookup_completes $ ds_complete_matches env
-  return $ eps_matches_list ++ env_matches_list
+-- | The @COMPLETE@ pragmas that are in scope.
+dsGetCompleteMatches :: DsM CompleteMatches
+dsGetCompleteMatches = ds_complete_matches <$> getGblEnv
 
 dsLookupMetaEnv :: Name -> DsM (Maybe DsMetaVal)
 dsLookupMetaEnv name = do { env <- getLclEnv; return (lookupNameEnv (dsl_meta env) name) }

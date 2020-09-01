@@ -24,8 +24,8 @@ module GHC.HsToCore.PmCheck.Types (
         literalToPmLit, negatePmLit, overloadPmLit,
         pmLitAsStringLit, coreExprAsPmLit,
 
-        -- * Caching partially matched COMPLETE sets
-        ConLikeSet, PossibleMatches(..),
+        -- * Caching residual COMPLETE sets
+        ConLikeSet, ResidualCompleteMatches(..), getRcm,
 
         -- * PmAltConSet
         PmAltConSet, emptyPmAltConSet, isEmptyPmAltConSet, elemPmAltConSet,
@@ -69,10 +69,10 @@ import GHC.Builtin.Names
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Tc.Utils.TcType (evVarPred)
+import GHC.Driver.Types (ConLikeSet)
 
 import Numeric (fromRat)
 import Data.Foldable (find)
-import qualified Data.List.NonEmpty as NonEmpty
 import Data.Ratio
 import qualified Data.Semigroup as Semi
 
@@ -415,21 +415,32 @@ instance Outputable PmAltCon where
 instance Outputable PmEquality where
   ppr = text . show
 
-type ConLikeSet = UniqDSet ConLike
+-- | A data type that caches for the 'VarInfo' of @x@ the results of querying
+-- 'dsGetCompleteMatches' and then striking out all occurrences of @K@ for
+-- which we already know @x /~ K@ from these sets.
+--
+-- For motivation, see Section 5.3 in Lower Your Guards.
+-- See also Note [Implementation of COMPLETE pragmas]
+data ResidualCompleteMatches
+  = RCM
+  { rcm_vanilla :: !(Maybe ConLikeSet)
+  -- ^ The residual set for the vanilla COMPLETE set from the data defn.
+  -- Tracked separately from 'rcm_pragmas', because it might only be
+  -- known much later (when we have enough type information to see the 'TyCon'
+  -- of the match), or not at all even. Until that happens, it is 'Nothing'.
+  , rcm_pragmas :: !(Maybe [ConLikeSet])
+  -- ^ The residual sets for /all/ COMPLETE sets from pragmas that are
+  -- visible when compiling this module. Querying that set with
+  -- 'dsGetCompleteMatches' requires 'DsM', so we initialise it with 'Nothing'
+  -- until first needed in a 'DsM' context.
+  }
 
--- | A data type caching the results of 'completeMatchConLikes' with support for
--- deletion of constructors that were already matched on.
-data PossibleMatches
-  = PM (NonEmpty.NonEmpty ConLikeSet)
-  -- ^ Each ConLikeSet is a (subset of) the constructors in a COMPLETE set
-  -- 'NonEmpty' because the empty case would mean that the type has no COMPLETE
-  -- set at all, for which we have 'NoPM'.
-  | NoPM
-  -- ^ No COMPLETE set for this type (yet). Think of overloaded literals.
+getRcm :: ResidualCompleteMatches -> [ConLikeSet]
+getRcm (RCM vanilla pragmas) = maybeToList vanilla ++ fromMaybe [] pragmas
 
-instance Outputable PossibleMatches where
-  ppr (PM cs) = ppr (NonEmpty.toList cs)
-  ppr NoPM = text "<NoPM>"
+instance Outputable ResidualCompleteMatches where
+  -- formats as "[{Nothing,Just},{P,Q}]"
+  ppr rcm = ppr (getRcm rcm)
 
 -- | Either @Indirect x@, meaning the value is represented by that of @x@, or
 -- an @Entry@ containing containing the actual value it represents.
@@ -516,8 +527,8 @@ data TmState
 
 -- | Information about an 'Id'. Stores positive ('vi_pos') facts, like @x ~ Just 42@,
 -- and negative ('vi_neg') facts, like "x is not (:)".
--- Also caches the type ('vi_ty'), the 'PossibleMatches' of a COMPLETE set
--- ('vi_cache').
+-- Also caches the type ('vi_ty'), the 'ResidualCompleteMatches' of a COMPLETE set
+-- ('vi_rcm').
 --
 -- Subject to Note [The Pos/Neg invariant] in "GHC.HsToCore.PmCheck.Oracle".
 data VarInfo
@@ -559,7 +570,7 @@ data VarInfo
   --    * 'IsBot': @x ~ ⊥@
   --    * 'IsNotBot': @x ≁ ⊥@
 
-  , vi_cache :: !PossibleMatches
+  , vi_rcm :: !ResidualCompleteMatches
   -- ^ A cache of the associated COMPLETE sets. At any time a superset of
   -- possible constructors of each COMPLETE set. So, if it's not in here, we
   -- can't possibly match on it. Complementary to 'vi_neg'. We still need it
