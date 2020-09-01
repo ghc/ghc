@@ -1856,11 +1856,11 @@ packageHsLibs dflags p = map (mkDynName . addSuffix) (unitLibraries p)
 
         -- debug and profiled RTSs include support for -eventlog
         ways2 | WayDebug `Set.member` ways1 || WayProf `Set.member` ways1
-              = Set.filter (/= WayEventLog) ways1
+              = Set.filter (/= WayTracing) ways1
               | otherwise
               = ways1
 
-        tag     = waysTag (Set.filter (not . wayRTSOnly) ways2)
+        tag     = waysTag (fullWays ways2)
         rts_tag = waysTag ways2
 
         mkDynName x

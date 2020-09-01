@@ -803,6 +803,9 @@
       SymI_HasProto(rtsSupportsBoundThreads)                            \
       SymI_HasProto(rts_isProfiled)                                     \
       SymI_HasProto(rts_isDynamic)                                      \
+      SymI_HasProto(rts_isThreaded)                                     \
+      SymI_HasProto(rts_isDebugged)                                     \
+      SymI_HasProto(rts_isTracing)                                      \
       SymI_HasProto(rts_setInCallCapability)                            \
       SymI_HasProto(rts_enableThreadAllocationLimit)                    \
       SymI_HasProto(rts_disableThreadAllocationLimit)                   \

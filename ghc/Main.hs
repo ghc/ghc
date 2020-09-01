@@ -348,12 +348,12 @@ checkOptions mode dflags srcs objs = do
    let unknown_opts = [ f | (f@('-':_), _) <- srcs ]
    when (notNull unknown_opts) (unknownFlagsErr unknown_opts)
 
-   when (not (Set.null (Set.filter wayRTSOnly (ways dflags)))
+   when (not (Set.null (rtsWays (ways dflags)))
          && isInterpretiveMode mode) $
         hPutStrLn stderr ("Warning: -debug, -threaded and -ticky are ignored by GHCi")
 
         -- -prof and --interactive are not a good combination
-   when ((Set.filter (not . wayRTSOnly) (ways dflags) /= hostFullWays)
+   when ((fullWays (ways dflags) /= hostFullWays)
          && isInterpretiveMode mode
          && not (gopt Opt_ExternalInterpreter dflags)) $
       do throwGhcException (UsageError
