@@ -1861,7 +1861,7 @@ packageHsLibs dflags p = map (mkDynName . addSuffix) (unitLibraries p)
               | otherwise
               = ways1
 
-        tag     = waysTag (Set.filter (not . wayRTSOnly) ways2)
+        tag     = waysTag (fullWays ways2)
         rts_tag = waysTag ways2
 
         mkDynName x

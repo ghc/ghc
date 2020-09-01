@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 -- | Ways
 --
 -- The central concept of a "way" is that all objects in a given
@@ -33,12 +35,19 @@ module GHC.Platform.Ways
    , wayTag
    , waysTag
    , waysBuildTag
+   , fullWays
+   , rtsWays
    -- * Host GHC ways
+   , hostWays
    , hostFullWays
    , hostIsProfiled
    , hostIsDynamic
+   , hostIsThreaded
+   , hostIsDebugged
    )
 where
+
+#include "HsVersions.h"
 
 import GHC.Prelude
 import GHC.Platform
@@ -47,7 +56,6 @@ import GHC.Driver.Flags
 import qualified Data.Set as Set
 import Data.Set (Set)
 import Data.List (intersperse)
-import System.IO.Unsafe ( unsafeDupablePerformIO )
 
 -- | A way
 --
@@ -106,6 +114,14 @@ wayRTSOnly WayProf        = False
 wayRTSOnly WayThreaded    = True
 wayRTSOnly WayDebug       = True
 wayRTSOnly WayEventLog    = True
+
+-- | Filter ways that have an impact on compilation
+fullWays :: Ways -> Ways
+fullWays ws = Set.filter (not . wayRTSOnly) ws
+
+-- | Filter RTS-only ways (ways that don't have an impact on compilation)
+rtsWays :: Ways -> Ways
+rtsWays ws = Set.filter wayRTSOnly ws
 
 wayDesc :: Way -> String
 wayDesc (WayCustom xs) = xs
@@ -182,24 +198,58 @@ wayOptP _ WayEventLog = ["-DTRACING"]
 
 -- | Consult the RTS to find whether it has been built with profiling enabled.
 hostIsProfiled :: Bool
-hostIsProfiled = unsafeDupablePerformIO rtsIsProfiledIO /= 0
+hostIsProfiled = rtsIsProfiled_ /= 0
 
-foreign import ccall unsafe "rts_isProfiled" rtsIsProfiledIO :: IO Int
+foreign import ccall unsafe "rts_isProfiled" rtsIsProfiled_ :: Int
 
 -- | Consult the RTS to find whether GHC itself has been built with
 -- dynamic linking.  This can't be statically known at compile-time,
 -- because we build both the static and dynamic versions together with
 -- -dynamic-too.
 hostIsDynamic :: Bool
-hostIsDynamic = unsafeDupablePerformIO rtsIsDynamicIO /= 0
+hostIsDynamic = rtsIsDynamic_ /= 0
 
-foreign import ccall unsafe "rts_isDynamic" rtsIsDynamicIO :: IO Int
+foreign import ccall unsafe "rts_isDynamic" rtsIsDynamic_ :: Int
 
--- | Return host "full" ways (i.e. ways that have an impact on the compilation,
--- not RTS only ways). These ways must be used when compiling codes targeting
--- the internal interpreter.
-hostFullWays :: Ways
-hostFullWays = Set.unions
-   [ if hostIsDynamic  then Set.singleton WayDyn  else Set.empty
-   , if hostIsProfiled then Set.singleton WayProf else Set.empty
+-- we need this until the bootstrap GHC is recent enough
+#if GHC_STAGE >= 2
+
+-- | Consult the RTS to find whether it is threaded.
+hostIsThreaded :: Bool
+hostIsThreaded = rtsIsThreaded_ /= 0
+
+foreign import ccall unsafe "rts_isThreaded" rtsIsThreaded_ :: Int
+
+-- | Consult the RTS to find whether it is debugged.
+hostIsDebugged :: Bool
+hostIsDebugged = rtsIsDebugged_ /= 0
+
+foreign import ccall unsafe "rts_isDebugged" rtsIsDebugged_ :: Int
+
+#else
+
+hostIsThreaded :: Bool
+hostIsThreaded = False
+
+hostIsDebugged :: Bool
+hostIsDebugged = False
+
+#endif
+
+
+-- | Host ways.
+hostWays :: Ways
+hostWays = Set.unions
+   [ if hostIsDynamic  then Set.singleton WayDyn      else Set.empty
+   , if hostIsProfiled then Set.singleton WayProf     else Set.empty
+   , if hostIsThreaded then Set.singleton WayThreaded else Set.empty
+   , if hostIsDebugged then Set.singleton WayDebug    else Set.empty
    ]
+
+-- | Host "full" ways (i.e. ways that have an impact on the compilation,
+-- not RTS only ways).
+--
+-- These ways must be used when compiling codes targeting the internal
+-- interpreter.
+hostFullWays :: Ways
+hostFullWays = fullWays hostWays
