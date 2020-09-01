@@ -237,5 +237,8 @@ ghc.nix/
 # Visual Studio Code
 .vscode
 
+# Tooling - ghcide
+*.hiedb
+
 # clangd
 .clangd
