@@ -596,7 +596,7 @@ stg_insertSmallArrayzh( gcptr src, W_ idx, gcptr elemt )
     ("ptr" dst) = ccall allocate(MyCapability() "ptr", words);
     TICK_ALLOC_PRIM(SIZEOF_StgSmallMutArrPtrs, WDS(n), 0);
 
-    SET_HDR(dst, stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info, CCCS);
+    SET_HDR(dst, stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info, CCCS);
     StgSmallMutArrPtrs_ptrs(dst) = n;
 
     dst_p = dst + SIZEOF_StgSmallMutArrPtrs;
@@ -621,7 +621,7 @@ stg_updateSmallArrayzh( gcptr src, W_ idx, gcptr elemt )
     ("ptr" dst) = ccall allocate(MyCapability() "ptr", words);
     TICK_ALLOC_PRIM(SIZEOF_StgSmallMutArrPtrs, WDS(n), 0);
 
-    SET_HDR(dst, stg_SMALL_MUT_ARR_PTRS_FROZEN_CLEAN_info, CCCS);
+    SET_HDR(dst, stg_SMALL_MUT_ARR_PTRS_FROZEN_DIRTY_info, CCCS);
     StgSmallMutArrPtrs_ptrs(dst) = n;
 
     dst_p = dst + SIZEOF_StgSmallMutArrPtrs;
