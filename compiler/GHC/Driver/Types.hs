@@ -146,7 +146,7 @@ module GHC.Driver.Types (
         handleFlagWarnings, printOrThrowWarnings,
 
         -- * COMPLETE signature
-        CompleteMatch(..), CompleteMatchMap,
+        ConLikeSet, CompleteMatch(..), CompleteMatchMap,
         mkCompleteMatchMap, extendCompleteMatchMap,
 
         -- * Exstensible Iface fields
@@ -2746,9 +2746,10 @@ data ExternalPackageState
                                                -- from all the external-package modules
         eps_ann_env      :: !PackageAnnEnv,    -- ^ The total 'AnnEnv' accumulated
                                                -- from all the external-package modules
-        eps_complete_matches :: !PackageCompleteMatchMap,
+        eps_complete_matches :: PackageCompleteMatchMap,
                                   -- ^ The total 'CompleteMatchMap' accumulated
                                   -- from all the external-package modules
+                                  -- may only be forced /after/ type-checking
 
         eps_mod_fam_inst_env :: !(ModuleEnv FamInstEnv), -- ^ The family instances accumulated from external
                                                          -- packages, keyed off the module that declared them
@@ -3203,36 +3204,47 @@ byteCodeOfObject other       = pprPanic "byteCodeOfObject" (ppr other)
 
 -------------------------------------------
 
+type ConLikeSet = UniqDSet ConLike
+
 -- | A list of conlikes which represents a complete pattern match.
 -- These arise from @COMPLETE@ signatures.
-
+--
 -- See Note [Implementation of COMPLETE signatures]
-data CompleteMatch = CompleteMatch {
-                            completeMatchConLikes :: [Name]
-                            -- ^ The ConLikes that form a covering family
-                            -- (e.g. Nothing, Just)
-                          , completeMatchTyCon :: Name
-                            -- ^ The TyCon that they cover (e.g. Maybe)
-                          }
+data CompleteMatch
+  = CompleteMatch
+  { completeMatchName     :: !Name
+  -- ^ A Name for this @COMPLETE@ sig. We only need the 'Unique', but the name
+  -- is needed for serialising to interface files. Thus always a proxy name
+  -- like @$CL_a1bz@.
+  , completeMatchConLikes :: ConLikeSet
+  -- ^ The ConLikes that form a covering family (e.g. Nothing, Just)
+  -- Needs to be lazy, because it's lazily loaded from interface files and only
+  -- type-checked after we already accessed 'completeMatchName'.
+  }
 
 instance Outputable CompleteMatch where
-  ppr (CompleteMatch cl ty) = text "CompleteMatch:" <+> ppr cl
-                                                    <+> dcolon <+> ppr ty
+  ppr (CompleteMatch n cls) = text "CompleteMatch(" <> ppr n <> text "):"
+                              <+> ppr cls
 
--- | A map keyed by the 'completeMatchTyCon' which has type Name.
-
+-- | A map associating 'ConLike's to 'CompleteMatch'es in which they
+-- occur.
+--
 -- See Note [Implementation of COMPLETE signatures]
-type CompleteMatchMap = UniqFM Name [CompleteMatch]
+type CompleteMatchMap = UniqDFM ConLike [CompleteMatch]
 
 mkCompleteMatchMap :: [CompleteMatch] -> CompleteMatchMap
-mkCompleteMatchMap = extendCompleteMatchMap emptyUFM
+mkCompleteMatchMap = extendCompleteMatchMap emptyUDFM
 
 extendCompleteMatchMap :: CompleteMatchMap -> [CompleteMatch]
                        -> CompleteMatchMap
-extendCompleteMatchMap = foldl' insertMatch
+extendCompleteMatchMap = foldl' go_over_cls
   where
-    insertMatch :: CompleteMatchMap -> CompleteMatch -> CompleteMatchMap
-    insertMatch ufm c@(CompleteMatch _ t) = addToUFM_C (++) ufm t [c]
+    go_over_cls :: CompleteMatchMap -> CompleteMatch -> CompleteMatchMap
+    go_over_cls udfm c@(CompleteMatch _ cls) =
+      foldl' (go_over_cl c) udfm (uniqDSetToList cls)
+    go_over_cl  :: CompleteMatch -> CompleteMatchMap -> ConLike -> CompleteMatchMap
+    go_over_cl c udfm cl =
+      addToUDFM_C (\old _new -> c:old) udfm cl [c]
 
 {-
 Note [Implementation of COMPLETE signatures]

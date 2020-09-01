@@ -64,8 +64,8 @@ module GHC.Tc.Utils.Env(
         topIdLvl, isBrackStage,
 
         -- New Ids
-        newDFunName, newFamInstTyConName,
-        newFamInstAxiomName,
+        newDFunName, newCompleteMatchName,
+        newFamInstTyConName, newFamInstAxiomName,
         mkStableIdFromString, mkStableIdFromName,
         mkWrapperName
   ) where
@@ -1011,6 +1011,12 @@ newDFunName clas tys loc
                             concatMap (occNameString.getDFunTyKey) tys
         ; dfun_occ <- chooseUniqueOccTc (mkDFunOcc info_string is_boot)
         ; newGlobalBinder mod dfun_occ loc }
+
+newCompleteMatchName :: Int -> SrcSpan -> TcM Name
+newCompleteMatchName n loc
+  = do  { mod   <- getModule
+        ; let occ = mkCompleteMatchOcc (show n)
+        ; newGlobalBinder mod occ loc }
 
 newFamInstTyConName :: Located Name -> [Type] -> TcM Name
 newFamInstTyConName (L loc name) tys = mk_fam_inst_name id loc name [tys]

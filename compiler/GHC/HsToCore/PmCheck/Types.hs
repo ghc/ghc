@@ -24,8 +24,8 @@ module GHC.HsToCore.PmCheck.Types (
         literalToPmLit, negatePmLit, overloadPmLit,
         pmLitAsStringLit, coreExprAsPmLit,
 
-        -- * Caching partially matched COMPLETE sets
-        ConLikeSet, PossibleMatches(..),
+        -- * Caching residual COMPLETE sets
+        ConLikeSet, ResidualCompleteMatches(..),
 
         -- * PmAltConSet
         PmAltConSet, emptyPmAltConSet, isEmptyPmAltConSet, elemPmAltConSet,
@@ -69,10 +69,10 @@ import GHC.Builtin.Names
 import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Tc.Utils.TcType (evVarPred)
+import GHC.Driver.Types (ConLikeSet)
 
 import Numeric (fromRat)
 import Data.Foldable (find)
-import qualified Data.List.NonEmpty as NonEmpty
 import Data.Ratio
 import qualified Data.Semigroup as Semi
 
@@ -415,21 +415,15 @@ instance Outputable PmAltCon where
 instance Outputable PmEquality where
   ppr = text . show
 
-type ConLikeSet = UniqDSet ConLike
+-- | A data type that caches for the 'VarInfo' of @x@ the results of querying
+-- 'completeMatchConLikes' for all the @K@ for which we know @x /~ K@ and then
+-- striking out all occurrences of those @K@s from these sets.
+-- For motivation, see Section 5.3 in Lower Your Guards.
+newtype ResidualCompleteMatches = RCM (UniqDFM Name ConLikeSet) -- 'Name of the 'CompleteMatch'
 
--- | A data type caching the results of 'completeMatchConLikes' with support for
--- deletion of constructors that were already matched on.
-data PossibleMatches
-  = PM (NonEmpty.NonEmpty ConLikeSet)
-  -- ^ Each ConLikeSet is a (subset of) the constructors in a COMPLETE set
-  -- 'NonEmpty' because the empty case would mean that the type has no COMPLETE
-  -- set at all, for which we have 'NoPM'.
-  | NoPM
-  -- ^ No COMPLETE set for this type (yet). Think of overloaded literals.
-
-instance Outputable PossibleMatches where
-  ppr (PM cs) = ppr (NonEmpty.toList cs)
-  ppr NoPM = text "<NoPM>"
+instance Outputable ResidualCompleteMatches where
+  -- formats as "[{Nothing,Just},{P,Q}]"
+  ppr (RCM cs) = ppr (map snd (udfmToList cs))
 
 -- | Either @Indirect x@, meaning the value is represented by that of @x@, or
 -- an @Entry@ containing containing the actual value it represents.
@@ -516,7 +510,7 @@ data TmState
 
 -- | Information about an 'Id'. Stores positive ('vi_pos') facts, like @x ~ Just 42@,
 -- and negative ('vi_neg') facts, like "x is not (:)".
--- Also caches the type ('vi_ty'), the 'PossibleMatches' of a COMPLETE set
+-- Also caches the type ('vi_ty'), the 'ResidualCompleteMatches' of a COMPLETE set
 -- ('vi_cache').
 --
 -- Subject to Note [The Pos/Neg invariant] in "GHC.HsToCore.PmCheck.Oracle".
@@ -559,7 +553,7 @@ data VarInfo
   --    * 'IsBot': @x ~ ⊥@
   --    * 'IsNotBot': @x ≁ ⊥@
 
-  , vi_cache :: !PossibleMatches
+  , vi_cache :: !ResidualCompleteMatches
   -- ^ A cache of the associated COMPLETE sets. At any time a superset of
   -- possible constructors of each COMPLETE set. So, if it's not in here, we
   -- can't possibly match on it. Complementary to 'vi_neg'. We still need it

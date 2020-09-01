@@ -70,6 +70,7 @@ module GHC.Types.Name.Occurrence (
         mkInstTyCoOcc, mkEqPredCoOcc,
         mkRecFldSelOcc,
         mkTyConRepOcc,
+        mkCompleteMatchOcc,
 
         -- ** Deconstruction
         occNameFS, occNameString, occNameSpace,
@@ -651,6 +652,9 @@ mkGen1R  = mk_simple_deriv tcName "Rep1_"
 -- Overloaded record field selectors
 mkRecFldSelOcc :: String -> OccName
 mkRecFldSelOcc s = mk_deriv varName "$sel" [fsLit s]
+
+mkCompleteMatchOcc :: String -> OccName
+mkCompleteMatchOcc s = mk_deriv tcName "$CM" [fsLit s]
 
 mk_simple_deriv :: NameSpace -> FastString -> OccName -> OccName
 mk_simple_deriv sp px occ = mk_deriv sp px [occNameFS occ]

@@ -324,7 +324,7 @@ data IfaceAnnotation
 
 type IfaceAnnTarget = AnnTarget OccName
 
-data IfaceCompleteMatch = IfaceCompleteMatch [IfExtName] IfExtName
+data IfaceCompleteMatch = IfaceCompleteMatch IfExtName [IfExtName]
 
 instance Outputable IfaceCompleteMatch where
   ppr (IfaceCompleteMatch cls ty) = text "COMPLETE" <> colon <+> ppr cls
