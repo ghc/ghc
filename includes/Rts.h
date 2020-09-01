@@ -260,6 +260,14 @@ int rts_isProfiled(void);
 // Returns non-zero if the RTS is a dynamically-linked version
 int rts_isDynamic(void);
 
+// Provides a way for Haskell programs to tell whether they're
+// linked with the threaded runtime or not.
+int rts_isThreaded(void);
+
+// Provides a way for Haskell programs to tell whether they're
+// linked with the debug runtime or not.
+int rts_isDebugged(void);
+
 /* -----------------------------------------------------------------------------
    RTS Exit codes
    -------------------------------------------------------------------------- */
