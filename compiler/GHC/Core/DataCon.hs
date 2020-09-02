@@ -51,8 +51,9 @@ module GHC.Core.DataCon (
         splitDataProductType_maybe,
 
         -- ** Predicates on DataCons
-        isNullarySrcDataCon, isNullaryRepDataCon, isTupleDataCon, isUnboxedTupleCon,
-        isUnboxedSumCon,
+        isNullarySrcDataCon, isNullaryRepDataCon,
+        isTupleDataCon, isBoxedTupleDataCon, isUnboxedTupleDataCon,
+        isUnboxedSumDataCon,
         isVanillaDataCon, classDataCon, dataConCannotMatch,
         dataConUserTyVarsArePermuted,
         isBanged, isMarkedStrict, eqHsBang, isSrcStrict, isSrcUnpacked,
@@ -1467,11 +1468,14 @@ dataConIdentity dc = LBS.toStrict $ BSB.toLazyByteString $ mconcat
 isTupleDataCon :: DataCon -> Bool
 isTupleDataCon (MkData {dcRepTyCon = tc}) = isTupleTyCon tc
 
-isUnboxedTupleCon :: DataCon -> Bool
-isUnboxedTupleCon (MkData {dcRepTyCon = tc}) = isUnboxedTupleTyCon tc
+isBoxedTupleDataCon :: DataCon -> Bool
+isBoxedTupleDataCon (MkData {dcRepTyCon = tc}) = isBoxedTupleTyCon tc
 
-isUnboxedSumCon :: DataCon -> Bool
-isUnboxedSumCon (MkData {dcRepTyCon = tc}) = isUnboxedSumTyCon tc
+isUnboxedTupleDataCon :: DataCon -> Bool
+isUnboxedTupleDataCon (MkData {dcRepTyCon = tc}) = isUnboxedTupleTyCon tc
+
+isUnboxedSumDataCon :: DataCon -> Bool
+isUnboxedSumDataCon (MkData {dcRepTyCon = tc}) = isUnboxedSumTyCon tc
 
 -- | Vanilla 'DataCon's are those that are nice boring Haskell 98 constructors
 isVanillaDataCon :: DataCon -> Bool

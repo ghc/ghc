@@ -354,7 +354,7 @@ bindConArgs :: AltCon -> LocalReg -> [NonVoid Id] -> FCode [LocalReg]
 -- binders args, assuming that we have just returned from a 'case' which
 -- found a con
 bindConArgs (DataAlt con) base args
-  = ASSERT(not (isUnboxedTupleCon con))
+  = ASSERT(not (isUnboxedTupleDataCon con))
     do profile <- getProfile
        platform <- getPlatform
        let (_, _, args_w_offsets) = mkVirtConstrOffsets profile (addIdReps args)

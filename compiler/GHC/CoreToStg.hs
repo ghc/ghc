@@ -699,7 +699,7 @@ mkTopStgRhs dflags this_mod ccs bndr rhs
   , -- Dynamic StgConApps are updatable
     not (isDllConApp dflags this_mod con args)
   = -- CorePrep does this right, but just to make sure
-    ASSERT2( not (isUnboxedTupleCon con || isUnboxedSumCon con)
+    ASSERT2( not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con)
            , ppr bndr $$ ppr con $$ ppr args)
     ( StgRhsCon dontCareCCS con args, ccs )
 

@@ -34,7 +34,7 @@ import GHC.Core.Coercion.Opt    ( optCoercion )
 import GHC.Core.FamInstEnv      ( topNormaliseType_maybe )
 import GHC.Core.DataCon
    ( DataCon, dataConWorkId, dataConRepStrictness
-   , dataConRepArgTys, isUnboxedTupleCon
+   , dataConRepArgTys, isUnboxedTupleDataCon
    , StrictnessMark (..) )
 import GHC.Core.Opt.Monad ( Tick(..), SimplMode(..) )
 import GHC.Core
@@ -2957,7 +2957,7 @@ addEvals :: Maybe OutExpr -> DataCon -> [Id] -> [Id]
 addEvals scrut con vs
   -- Deal with seq# applications
   | Just scr <- scrut
-  , isUnboxedTupleCon con
+  , isUnboxedTupleDataCon con
   , [s,x] <- vs
     -- Use stripNArgs rather than collectArgsTicks to avoid building
     -- a list of arguments only to throw it away immediately.
