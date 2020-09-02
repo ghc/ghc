@@ -287,7 +287,7 @@ instance H.Builder Builder where
                   cmd' echo [path] "--no-split" [ "-o", output] [input]
 
                 Xelatex   -> unit $ cmd' [Cwd output] [path] buildArgs
-                Makeindex -> unit $ cmd' [Cwd output] [path] buildArgs
+                Makeindex -> unit $ cmd' [Cwd output] [path] (buildArgs ++ [input])
 
                 Tar _ -> cmd' buildOptions echo [path] buildArgs
                 _  -> cmd' echo [path] buildArgs
