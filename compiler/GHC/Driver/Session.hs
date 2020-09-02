@@ -3842,7 +3842,7 @@ default_PIC platform =
 
 
 -- We usually want to use RPath, except on macOS (OSDarwin).  On recent macOS
--- version the number of load commands we can embed in a dynamic library are
+-- versions the number of load commands we can embed in a dynamic library is
 -- restricted.  Hence since b592bd98ff2 we rely on -dead_strip_dylib to only
 -- link the needed dylibs instead of linking the full dependency closure.
 --
