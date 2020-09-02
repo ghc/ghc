@@ -249,12 +249,16 @@ instance Outputable instr
                  | otherwise            = name <>
                      (pprUFM (getUniqSet regs) (hcat . punctuate space . map ppr))
 
-instance Outputable LiveInfo where
-    ppr (LiveInfo mb_static entryIds liveVRegsOnEntry liveSlotsOnEntry)
-        =  (ppr mb_static)
+instance OutputableP instr => OutputableP (LiveInstr instr) where
+   pdoc platform i = ppr (fmap (pdoc platform) i)
+
+instance OutputableP LiveInfo where
+    pdoc platform (LiveInfo mb_static entryIds liveVRegsOnEntry liveSlotsOnEntry)
+        =  (pdoc platform mb_static)
         $$ text "# entryIds         = " <> ppr entryIds
         $$ text "# liveVRegsOnEntry = " <> ppr liveVRegsOnEntry
         $$ text "# liveSlotsOnEntry = " <> text (show liveSlotsOnEntry)
+
 
 
 
@@ -503,7 +507,7 @@ slurpReloadCoalesce live
 
 -- | Strip away liveness information, yielding NatCmmDecl
 stripLive
-        :: (Outputable statics, Instruction instr)
+        :: (OutputableP statics, Instruction instr)
         => NCGConfig
         -> LiveCmmDecl statics instr
         -> NatCmmDecl statics instr
@@ -511,7 +515,7 @@ stripLive
 stripLive config live
         = stripCmm live
 
- where  stripCmm :: (Outputable statics, Instruction instr)
+ where  stripCmm :: (OutputableP statics, Instruction instr)
                  => LiveCmmDecl statics instr -> NatCmmDecl statics instr
         stripCmm (CmmData sec ds)       = CmmData sec ds
         stripCmm (CmmProc (LiveInfo info (first_id:_) _ _) label live sccs)
@@ -532,14 +536,13 @@ stripLive config live
 
 
 -- | Pretty-print a `LiveCmmDecl`
-pprLiveCmmDecl :: (Outputable statics, Instruction instr) => Platform -> LiveCmmDecl statics instr -> SDoc
-pprLiveCmmDecl platform d = ppr (mapLiveCmmDecl (pprInstr platform) d)
+pprLiveCmmDecl :: (OutputableP statics, Instruction instr) => Platform -> LiveCmmDecl statics instr -> SDoc
+pprLiveCmmDecl platform d = pdoc platform (mapLiveCmmDecl (pprInstr platform) d)
 
 
 -- | Map over instruction type in `LiveCmmDecl`
 mapLiveCmmDecl
-   :: Outputable statics
-   => (instr -> b)
+   :: (instr -> b)
    -> LiveCmmDecl statics instr
    -> LiveCmmDecl statics b
 mapLiveCmmDecl f proc = fmap (fmap (fmap (fmap (fmap f)))) proc

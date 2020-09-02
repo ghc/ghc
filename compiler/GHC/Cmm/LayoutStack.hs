@@ -1023,7 +1023,7 @@ setInfoTableStackMap platform stackmaps (CmmProc top_info@TopInfo{..} l v g)
     get_liveness :: BlockId -> Liveness
     get_liveness lbl
       = case mapLookup lbl stackmaps of
-          Nothing -> pprPanic "setInfoTableStackMap" (ppr lbl <+> ppr info_tbls)
+          Nothing -> pprPanic "setInfoTableStackMap" (ppr lbl <+> pdoc platform info_tbls)
           Just sm -> stackMapToLiveness platform sm
 
 setInfoTableStackMap _ _ d = d

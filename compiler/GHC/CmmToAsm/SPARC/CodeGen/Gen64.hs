@@ -209,4 +209,6 @@ iselExpr64 (CmmMachOp (MO_SS_Conv W32 W64) [expr])
 
 
 iselExpr64 expr
-   = pprPanic "iselExpr64(sparc)" (ppr expr)
+   = do
+      platform <- getPlatform
+      pprPanic "iselExpr64(sparc)" (pdoc platform expr)

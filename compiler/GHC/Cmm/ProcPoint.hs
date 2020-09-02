@@ -206,7 +206,7 @@ extendPPSet platform g blocks procPoints =
         newPoint  = listToMaybe newPoints
         ppSuccessor b =
             let nreached id = case mapLookup id env `orElse`
-                                    pprPanic "no ppt" (ppr id <+> ppr b) of
+                                    pprPanic "no ppt" (ppr id <+> pdoc platform b) of
                                 ProcPoint -> 1
                                 ReachedBy ps -> setSize ps
                 block_procpoints = nreached (entryLabel b)

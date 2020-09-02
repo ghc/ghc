@@ -389,7 +389,8 @@ tidyProgram hsc_env  (ModGuts { mg_module           = mod
           -- See Note [Grand plan for static forms] in GHC.Iface.Tidy.StaticPtrTable.
         ; (spt_entries, tidy_binds') <-
              sptCreateStaticBinds hsc_env mod tidy_binds
-        ; let { spt_init_code = sptModuleInitCode mod spt_entries
+        ; let { platform = targetPlatform (hsc_dflags hsc_env)
+              ; spt_init_code = sptModuleInitCode platform mod spt_entries
               ; add_spt_init_code =
                   case backend dflags of
                     -- If we are compiling for the interpreter we will insert
