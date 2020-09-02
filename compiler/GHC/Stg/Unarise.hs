@@ -294,7 +294,7 @@ unariseRhs rho (StgRhsClosure ext ccs update_flag args expr)
        return (StgRhsClosure ext ccs update_flag args1 expr')
 
 unariseRhs rho (StgRhsCon ccs con args)
-  = ASSERT(not (isUnboxedTupleCon con || isUnboxedSumCon con))
+  = ASSERT(not (isUnboxedTupleDataCon con || isUnboxedSumDataCon con))
     return (StgRhsCon ccs con (unariseConArgs rho args))
 
 --------------------------------------------------------------------------------
@@ -372,10 +372,10 @@ unariseExpr rho (StgTick tick e)
 -- Doesn't return void args.
 unariseMulti_maybe :: UnariseEnv -> DataCon -> [InStgArg] -> [Type] -> Maybe [OutStgArg]
 unariseMulti_maybe rho dc args ty_args
-  | isUnboxedTupleCon dc
+  | isUnboxedTupleDataCon dc
   = Just (unariseConArgs rho args)
 
-  | isUnboxedSumCon dc
+  | isUnboxedSumDataCon dc
   , let args1 = ASSERT(isSingleton args) (unariseConArgs rho args)
   = Just (mkUbxSum dc ty_args args1)
 
