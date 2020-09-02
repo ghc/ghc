@@ -97,7 +97,7 @@ cpsTop dflags proc =
           if splitting_proc_points
              then do
                pp <- {-# SCC "minimalProcPointSet" #-} runUniqSM $
-                  minimalProcPointSet (targetPlatform dflags) call_pps g
+                  minimalProcPointSet platform call_pps g
                dumpWith dflags Opt_D_dump_cmm_proc "Proc points"
                      FormatCMM (ppr l $$ ppr pp $$ ppr g)
                return pp
@@ -114,7 +114,7 @@ cpsTop dflags proc =
 
        ----------- Sink and inline assignments  --------------------------------
        g <- {-# SCC "sink" #-} -- See Note [Sinking after stack layout]
-            condPass Opt_CmmSink (cmmSink dflags) g
+            condPass Opt_CmmSink (cmmSink platform) g
                      Opt_D_dump_cmm_sink "Sink assignments"
 
        ------------- CAF analysis ----------------------------------------------
@@ -129,7 +129,7 @@ cpsTop dflags proc =
                dumpWith dflags Opt_D_dump_cmm_procmap "procpoint map"
                   FormatCMM (ppr pp_map)
                g <- {-# SCC "splitAtProcPoints" #-} runUniqSM $
-                    splitAtProcPoints dflags l call_pps proc_points pp_map
+                    splitAtProcPoints platform l call_pps proc_points pp_map
                                       (CmmProc h l v g)
                dumps Opt_D_dump_cmm_split "Post splitting" g
                return g
@@ -355,7 +355,7 @@ dumpGraph dflags flag name g = do
   when (gopt Opt_DoCmmLinting dflags) $ do_lint g
   dumpWith dflags flag name FormatCMM (ppr g)
  where
-  do_lint g = case cmmLintGraph dflags g of
+  do_lint g = case cmmLintGraph (targetPlatform dflags) g of
                  Just err -> do { fatalErrorMsg dflags err
                                 ; ghcExit dflags 1
                                 }
