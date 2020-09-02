@@ -102,7 +102,7 @@ given compilation phase:
 
     Use ⟨cmd⟩ as the program to inspect mach-o dynamic libraries and
     executables to read the dynamic library dependencies.  We will compute
-    the necessary ``runpath``s to bembed for the dependencies based on the
+    the necessary ``runpath``s to embed for the dependencies based on the
     result of the ``otool`` call.
 
 .. ghc-flag:: -pgminstall_name_tool ⟨cmd⟩
