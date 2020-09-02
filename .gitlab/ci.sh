@@ -8,6 +8,8 @@ set -e -o pipefail
 # Configuration:
 hackage_index_state="@1579718451"
 
+MIN_ALEX_VERSION="3.2"
+
 # Colors
 BLACK="0;30"
 GRAY="1;30"
@@ -168,6 +170,7 @@ function set_toolchain_paths() {
       HAPPY="$HOME/.cabal/bin/happy"
       ALEX="$HOME/.cabal/bin/alex"
   fi
+
   export GHC
   export CABAL
   export HAPPY
@@ -286,17 +289,13 @@ function setup_toolchain() {
     *) ;;
   esac
 
-  if [ ! -e "$HAPPY" ]; then
-      info "Building happy..."
-      cabal update
-      $cabal_install happy
-  fi
+  cabal update
 
-  if [ ! -e "$ALEX" ]; then
-      info "Building alex..."
-      cabal update
-      $cabal_install alex
-  fi
+  info "Building happy..."
+  $cabal_install happy --constraint="happy==1.19.*"
+
+  info "Building alex..."
+  $cabal_install alex --constraint="alex>=$MIN_ALEX_VERSION"
 }
 
 function cleanup_submodules() {
