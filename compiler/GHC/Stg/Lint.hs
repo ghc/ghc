@@ -164,7 +164,7 @@ lintStgRhs (StgRhsClosure _ _ _ binders expr)
         lintStgExpr expr
 
 lintStgRhs rhs@(StgRhsCon _ con args) = do
-    when (isUnboxedTupleCon con || isUnboxedSumCon con) $ do
+    when (isUnboxedTupleDataCon con || isUnboxedSumDataCon con) $ do
       opts <- getStgPprOpts
       addErrL (text "StgRhsCon is an unboxed tuple or sum application" $$
                pprStgRhs opts rhs)
@@ -182,7 +182,7 @@ lintStgExpr (StgApp fun args) = do
 lintStgExpr app@(StgConApp con args _arg_tys) = do
     -- unboxed sums should vanish during unarise
     lf <- getLintFlags
-    when (lf_unarised lf && isUnboxedSumCon con) $ do
+    when (lf_unarised lf && isUnboxedSumDataCon con) $ do
       opts <- getStgPprOpts
       addErrL (text "Unboxed sum after unarise:" $$
                pprStgExpr opts app)
