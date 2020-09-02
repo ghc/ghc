@@ -57,9 +57,6 @@ module GHC.Integer.GMP.Internals
     , bigNatToInt
     , bigNatToWord
     , indexBigNat#
-    , importBigNatFromByteArray
-    , exportBigNatToMutableByteArray
-
 
       -- ** 'BigNat' arithmetic operations
     , plusBigNat
@@ -112,9 +109,17 @@ module GHC.Integer.GMP.Internals
 
       -- ** Export
     , exportBigNatToAddr
+    , exportIntegerToAddr
+
+    , exportBigNatToMutableByteArray
+    , exportIntegerToMutableByteArray
 
       -- ** Import
     , importBigNatFromAddr
+    , importIntegerFromAddr
+
+    , importBigNatFromByteArray
+    , importIntegerFromByteArray
     ) where
 
 import GHC.Integer
@@ -373,6 +378,18 @@ exportBigNatToAddr (BN# b) addr endian = IO \s ->
    case B.bigNatToAddr# b addr endian s of
       (# s', w #) -> (# s', W# w #)
 
+{-# DEPRECATED importIntegerFromAddr "Use integerFromAddr# instead" #-}
+importIntegerFromAddr :: Addr# -> Word# -> Int# -> IO Integer
+importIntegerFromAddr addr sz endian = IO \s ->
+   case I.integerFromAddr# sz addr endian s of
+      (# s', i #) -> (# s', i #)
+
+{-# DEPRECATED exportIntegerToAddr "Use integerToAddr# instead" #-}
+exportIntegerToAddr :: Integer -> Addr# -> Int# -> IO Word
+exportIntegerToAddr i addr endian = IO \s ->
+   case I.integerToAddr# i addr endian s of
+      (# s', w #) -> (# s', W# w #)
+
 wordToBigNat :: Word# -> BigNat
 wordToBigNat w = BN# (B.bigNatFromWord# w)
 
@@ -397,4 +414,14 @@ importBigNatFromByteArray ba off sz endian = case runRW# (B.bigNatFromByteArray#
 {-# DEPRECATED exportBigNatToMutableByteArray "Use bigNatToMutableByteArray# instead" #-}
 exportBigNatToMutableByteArray :: BigNat -> MutableByteArray# RealWorld -> Word# -> Int# -> IO Word
 exportBigNatToMutableByteArray (BN# ba) mba off endian = IO (\s -> case B.bigNatToMutableByteArray# ba mba off endian s of
+   (# s', r #) -> (# s', W# r #))
+
+{-# DEPRECATED importIntegerFromByteArray "Use integerFromByteArray# instead" #-}
+importIntegerFromByteArray :: ByteArray# -> Word# -> Word# -> Int# -> Integer
+importIntegerFromByteArray ba off sz endian = case runRW# (I.integerFromByteArray# sz ba off endian) of
+   (# _, r #) -> r
+
+{-# DEPRECATED exportIntegerToMutableByteArray "Use integerToMutableByteArray# instead" #-}
+exportIntegerToMutableByteArray :: Integer -> MutableByteArray# RealWorld -> Word# -> Int# -> IO Word
+exportIntegerToMutableByteArray i mba off endian = IO (\s -> case I.integerToMutableByteArray# i mba off endian s of
    (# s', r #) -> (# s', W# r #))
