@@ -11,7 +11,6 @@ where
 
 import GHC.Prelude hiding (last, unzip, succ, zip)
 
-import GHC.Driver.Session
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm
@@ -238,9 +237,9 @@ extendPPSet platform g blocks procPoints =
 -- Input invariant: A block should only be reachable from a single ProcPoint.
 -- ToDo: use the _ret naming convention that the old code generator
 -- used. -- EZY
-splitAtProcPoints :: DynFlags -> CLabel -> ProcPointSet-> ProcPointSet -> LabelMap Status ->
+splitAtProcPoints :: Platform -> CLabel -> ProcPointSet-> ProcPointSet -> LabelMap Status ->
                      CmmDecl -> UniqSM [CmmDecl]
-splitAtProcPoints dflags entry_label callPPs procPoints procMap
+splitAtProcPoints platform entry_label callPPs procPoints procMap
                   (CmmProc (TopInfo {info_tbls = info_tbls})
                            top_l _ g@(CmmGraph {g_entry=entry})) =
   do -- Build a map from procpoints to the blocks they reach
@@ -262,7 +261,7 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
                where graph  = mapLookup procId graphEnv `orElse` mapEmpty
                      graph' = mapInsert bid b graph
 
-     let liveness = cmmGlobalLiveness dflags g
+     let liveness = cmmGlobalLiveness platform g
      let ppLiveness pp = filter isArgReg $
                          regSetToList $
                          expectJust "ppLiveness" $ mapLookup pp liveness
@@ -316,7 +315,6 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
                   -- when jumping to a PP that has an info table, if
                   -- tablesNextToCode is off we must jump to the entry
                   -- label instead.
-                  platform         = targetPlatform dflags
                   tablesNextToCode = platformTablesNextToCode platform
                   jump_label (Just info_lbl) _
                              | tablesNextToCode = info_lbl

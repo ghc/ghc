@@ -83,7 +83,7 @@ codeOutput dflags this_mod filenm location foreign_stubs foreign_fps pkg_deps
                   dflags
                   (text "CmmLint"<+>brackets (ppr this_mod))
                   (const ()) $ do
-                { case cmmLint dflags cmm of
+                { case cmmLint (targetPlatform dflags) cmm of
                         Just err -> do { log_action dflags
                                                    dflags
                                                    NoReason

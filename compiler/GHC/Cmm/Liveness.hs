@@ -14,7 +14,7 @@ where
 
 import GHC.Prelude
 
-import GHC.Driver.Session
+import GHC.Platform
 import GHC.Cmm.BlockId
 import GHC.Cmm
 import GHC.Cmm.Ppr.Expr () -- For Outputable instances
@@ -52,17 +52,17 @@ type BlockEntryLiveness r = LabelMap (CmmLive r)
 -- | Calculated liveness info for a CmmGraph
 -----------------------------------------------------------------------------
 
-cmmLocalLiveness :: DynFlags -> CmmGraph -> BlockEntryLiveness LocalReg
-cmmLocalLiveness dflags graph =
-    check $ analyzeCmmBwd liveLattice (xferLive dflags) graph mapEmpty
+cmmLocalLiveness :: Platform -> CmmGraph -> BlockEntryLiveness LocalReg
+cmmLocalLiveness platform graph =
+    check $ analyzeCmmBwd liveLattice (xferLive platform) graph mapEmpty
   where
     entry = g_entry graph
     check facts =
         noLiveOnEntry entry (expectJust "check" $ mapLookup entry facts) facts
 
-cmmGlobalLiveness :: DynFlags -> CmmGraph -> BlockEntryLiveness GlobalReg
-cmmGlobalLiveness dflags graph =
-    analyzeCmmBwd liveLattice (xferLive dflags) graph mapEmpty
+cmmGlobalLiveness :: Platform -> CmmGraph -> BlockEntryLiveness GlobalReg
+cmmGlobalLiveness platform graph =
+    analyzeCmmBwd liveLattice (xferLive platform) graph mapEmpty
 
 -- | On entry to the procedure, there had better not be any LocalReg's live-in.
 noLiveOnEntry :: BlockId -> CmmLive LocalReg -> a -> a
@@ -72,10 +72,10 @@ noLiveOnEntry bid in_fact x =
 
 gen_kill
     :: (DefinerOfRegs r n, UserOfRegs r n)
-    => DynFlags -> n -> CmmLive r -> CmmLive r
-gen_kill dflags node set =
-    let !afterKill = foldRegsDefd dflags deleteFromRegSet set node
-    in foldRegsUsed dflags extendRegSet afterKill node
+    => Platform -> n -> CmmLive r -> CmmLive r
+gen_kill platform node set =
+    let !afterKill = foldRegsDefd platform deleteFromRegSet set node
+    in foldRegsUsed platform extendRegSet afterKill node
 {-# INLINE gen_kill #-}
 
 xferLive
@@ -85,10 +85,10 @@ xferLive
        , UserOfRegs r (CmmNode O C)
        , DefinerOfRegs r (CmmNode O C)
        )
-    => DynFlags -> TransferFun (CmmLive r)
-xferLive dflags (BlockCC eNode middle xNode) fBase =
-    let joined = gen_kill dflags xNode $! joinOutFacts liveLattice xNode fBase
-        !result = foldNodesBwdOO (gen_kill dflags) middle joined
+    => Platform -> TransferFun (CmmLive r)
+xferLive platform (BlockCC eNode middle xNode) fBase =
+    let joined = gen_kill platform xNode $! joinOutFacts liveLattice xNode fBase
+        !result = foldNodesBwdOO (gen_kill platform) middle joined
     in mapSingleton (entryLabel eNode) result
-{-# SPECIALIZE xferLive :: DynFlags -> TransferFun (CmmLive LocalReg) #-}
-{-# SPECIALIZE xferLive :: DynFlags -> TransferFun (CmmLive GlobalReg) #-}
+{-# SPECIALIZE xferLive :: Platform -> TransferFun (CmmLive LocalReg) #-}
+{-# SPECIALIZE xferLive :: Platform -> TransferFun (CmmLive GlobalReg) #-}

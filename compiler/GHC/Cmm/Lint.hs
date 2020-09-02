@@ -26,7 +26,6 @@ import GHC.Cmm.Liveness
 import GHC.Cmm.Switch (switchTargetsToList)
 import GHC.Cmm.Ppr () -- For Outputable instances
 import GHC.Utils.Outputable
-import GHC.Driver.Session
 
 import Control.Monad (ap, unless)
 
@@ -39,37 +38,38 @@ import Control.Monad (ap, unless)
 -- Exported entry points:
 
 cmmLint :: (Outputable d, Outputable h)
-        => DynFlags -> GenCmmGroup d h CmmGraph -> Maybe SDoc
-cmmLint dflags tops = runCmmLint dflags (mapM_ (lintCmmDecl dflags)) tops
+        => Platform -> GenCmmGroup d h CmmGraph -> Maybe SDoc
+cmmLint platform tops = runCmmLint platform (mapM_ lintCmmDecl) tops
 
-cmmLintGraph :: DynFlags -> CmmGraph -> Maybe SDoc
-cmmLintGraph dflags g = runCmmLint dflags (lintCmmGraph dflags) g
+cmmLintGraph :: Platform -> CmmGraph -> Maybe SDoc
+cmmLintGraph platform g = runCmmLint platform lintCmmGraph g
 
-runCmmLint :: Outputable a => DynFlags -> (a -> CmmLint b) -> a -> Maybe SDoc
-runCmmLint dflags l p =
-   case unCL (l p) dflags of
+runCmmLint :: Outputable a => Platform -> (a -> CmmLint b) -> a -> Maybe SDoc
+runCmmLint platform l p =
+   case unCL (l p) platform of
      Left err -> Just (vcat [text "Cmm lint error:",
                              nest 2 err,
                              text "Program was:",
                              nest 2 (ppr p)])
      Right _  -> Nothing
 
-lintCmmDecl :: DynFlags -> GenCmmDecl h i CmmGraph -> CmmLint ()
-lintCmmDecl dflags (CmmProc _ lbl _ g)
-  = addLintInfo (text "in proc " <> ppr lbl) $ lintCmmGraph dflags g
-lintCmmDecl _ (CmmData {})
+lintCmmDecl :: GenCmmDecl h i CmmGraph -> CmmLint ()
+lintCmmDecl (CmmProc _ lbl _ g)
+  = addLintInfo (text "in proc " <> ppr lbl) $ lintCmmGraph g
+lintCmmDecl (CmmData {})
   = return ()
 
 
-lintCmmGraph :: DynFlags -> CmmGraph -> CmmLint ()
-lintCmmGraph dflags g =
-    cmmLocalLiveness dflags g `seq` mapM_ (lintCmmBlock labels) blocks
-    -- cmmLiveness throws an error if there are registers
-    -- live on entry to the graph (i.e. undefined
-    -- variables)
-  where
-       blocks = toBlockList g
-       labels = setFromList (map entryLabel blocks)
+lintCmmGraph :: CmmGraph -> CmmLint ()
+lintCmmGraph g = do
+   platform <- getPlatform
+   let
+      blocks = toBlockList g
+      labels = setFromList (map entryLabel blocks)
+   cmmLocalLiveness platform g `seq` mapM_ (lintCmmBlock labels) blocks
+   -- cmmLiveness throws an error if there are registers
+   -- live on entry to the graph (i.e. undefined
+   -- variables)
 
 
 lintCmmBlock :: LabelSet -> CmmBlock -> CmmLint ()
@@ -225,9 +225,9 @@ lintTarget (PrimTarget {})     = return ()
 mayNotMentionCallerSavedRegs :: (UserOfRegs GlobalReg a, Outputable a)
                              => SDoc -> a -> CmmLint ()
 mayNotMentionCallerSavedRegs what thing = do
-    dflags <- getDynFlags
-    let badRegs = filter (callerSaves (targetPlatform dflags))
-                  $ foldRegsUsed dflags (flip (:)) [] thing
+    platform <- getPlatform
+    let badRegs = filter (callerSaves platform)
+                  $ foldRegsUsed platform (flip (:)) [] thing
     unless (null badRegs)
       $ cmmLintErr (what <+> text "mentions caller-saved registers: " <> ppr badRegs $$ ppr thing)
 
@@ -243,7 +243,7 @@ checkCond _ expr
 
 -- just a basic error monad:
 
-newtype CmmLint a = CmmLint { unCL :: DynFlags -> Either SDoc a }
+newtype CmmLint a = CmmLint { unCL :: Platform -> Either SDoc a }
     deriving (Functor)
 
 instance Applicative CmmLint where
@@ -251,23 +251,20 @@ instance Applicative CmmLint where
       (<*>) = ap
 
 instance Monad CmmLint where
-  CmmLint m >>= k = CmmLint $ \dflags ->
-                                case m dflags of
+  CmmLint m >>= k = CmmLint $ \platform ->
+                                case m platform of
                                 Left e -> Left e
-                                Right a -> unCL (k a) dflags
-
-instance HasDynFlags CmmLint where
-    getDynFlags = CmmLint (\dflags -> Right dflags)
+                                Right a -> unCL (k a) platform
 
 getPlatform :: CmmLint Platform
-getPlatform = targetPlatform <$> getDynFlags
+getPlatform = CmmLint $ \platform -> Right platform
 
 cmmLintErr :: SDoc -> CmmLint a
 cmmLintErr msg = CmmLint (\_ -> Left msg)
 
 addLintInfo :: SDoc -> CmmLint a -> CmmLint a
-addLintInfo info thing = CmmLint $ \dflags ->
-   case unCL thing dflags of
+addLintInfo info thing = CmmLint $ \platform ->
+   case unCL thing platform of
         Left err -> Left (hang info 2 err)
         Right a  -> Right a
 

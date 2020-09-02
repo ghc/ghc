@@ -38,7 +38,6 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm.MachOp
 import GHC.Cmm.Type
-import GHC.Driver.Session
 import GHC.Utils.Panic (panic)
 import GHC.Types.Unique
 
@@ -331,17 +330,17 @@ sizeRegSet       = Set.size
 regSetToList     = Set.toList
 
 class Ord r => UserOfRegs r a where
-  foldRegsUsed :: DynFlags -> (b -> r -> b) -> b -> a -> b
+  foldRegsUsed :: Platform -> (b -> r -> b) -> b -> a -> b
 
 foldLocalRegsUsed :: UserOfRegs LocalReg a
-                  => DynFlags -> (b -> LocalReg -> b) -> b -> a -> b
+                  => Platform -> (b -> LocalReg -> b) -> b -> a -> b
 foldLocalRegsUsed = foldRegsUsed
 
 class Ord r => DefinerOfRegs r a where
-  foldRegsDefd :: DynFlags -> (b -> r -> b) -> b -> a -> b
+  foldRegsDefd :: Platform -> (b -> r -> b) -> b -> a -> b
 
 foldLocalRegsDefd :: DefinerOfRegs LocalReg a
-                  => DynFlags -> (b -> LocalReg -> b) -> b -> a -> b
+                  => Platform -> (b -> LocalReg -> b) -> b -> a -> b
 foldLocalRegsDefd = foldRegsDefd
 
 instance UserOfRegs LocalReg CmmReg where
@@ -369,20 +368,20 @@ instance Ord r => DefinerOfRegs r r where
 instance (Ord r, UserOfRegs r CmmReg) => UserOfRegs r CmmExpr where
   -- The (Ord r) in the context is necessary here
   -- See Note [Recursive superclasses] in GHC.Tc.TyCl.Instance
-  foldRegsUsed dflags f !z e = expr z e
+  foldRegsUsed platform f !z e = expr z e
     where expr z (CmmLit _)          = z
-          expr z (CmmLoad addr _)    = foldRegsUsed dflags f z addr
-          expr z (CmmReg r)          = foldRegsUsed dflags f z r
-          expr z (CmmMachOp _ exprs) = foldRegsUsed dflags f z exprs
-          expr z (CmmRegOff r _)     = foldRegsUsed dflags f z r
+          expr z (CmmLoad addr _)    = foldRegsUsed platform f z addr
+          expr z (CmmReg r)          = foldRegsUsed platform f z r
+          expr z (CmmMachOp _ exprs) = foldRegsUsed platform f z exprs
+          expr z (CmmRegOff r _)     = foldRegsUsed platform f z r
           expr z (CmmStackSlot _ _)  = z
 
 instance UserOfRegs r a => UserOfRegs r [a] where
-  foldRegsUsed dflags f set as = foldl' (foldRegsUsed dflags f) set as
+  foldRegsUsed platform f set as = foldl' (foldRegsUsed platform f) set as
   {-# INLINABLE foldRegsUsed #-}
 
 instance DefinerOfRegs r a => DefinerOfRegs r [a] where
-  foldRegsDefd dflags f set as = foldl' (foldRegsDefd dflags f) set as
+  foldRegsDefd platform f set as = foldl' (foldRegsDefd platform f) set as
   {-# INLINABLE foldRegsDefd #-}
 
 -----------------------------------------------------------------------------
