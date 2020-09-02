@@ -234,6 +234,10 @@ alignmentOf x = case x .&. 7 of
 
 instance Outputable Alignment where
   ppr (Alignment m) = ppr m
+
+instance OutputableP Alignment where
+  pdoc _ = ppr
+
 {-
 ************************************************************************
 *                                                                      *

@@ -256,9 +256,9 @@ sptCreateStaticBinds hsc_env this_mod binds
 --
 -- @fps@ is a list associating each binding corresponding to a static entry with
 -- its fingerprint.
-sptModuleInitCode :: Module -> [SptEntry] -> SDoc
-sptModuleInitCode _ [] = Outputable.empty
-sptModuleInitCode this_mod entries = vcat
+sptModuleInitCode :: Platform -> Module -> [SptEntry] -> SDoc
+sptModuleInitCode _        _        [] = Outputable.empty
+sptModuleInitCode platform this_mod entries = vcat
     [ text "static void hs_spt_init_" <> ppr this_mod
            <> text "(void) __attribute__((constructor));"
     , text "static void hs_spt_init_" <> ppr this_mod <> text "(void)"
@@ -266,11 +266,11 @@ sptModuleInitCode this_mod entries = vcat
         [  text "static StgWord64 k" <> int i <> text "[2] = "
            <> pprFingerprint fp <> semi
         $$ text "extern StgPtr "
-           <> (ppr $ mkClosureLabel (idName n) (idCafInfo n)) <> semi
+           <> (pdoc platform $ mkClosureLabel (idName n) (idCafInfo n)) <> semi
         $$ text "hs_spt_insert" <> parens
              (hcat $ punctuate comma
                 [ char 'k' <> int i
-                , char '&' <> ppr (mkClosureLabel (idName n) (idCafInfo n))
+                , char '&' <> pdoc platform (mkClosureLabel (idName n) (idCafInfo n))
                 ]
              )
         <> semi

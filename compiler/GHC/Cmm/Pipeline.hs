@@ -45,12 +45,13 @@ cmmPipeline
 
 cmmPipeline hsc_env srtInfo prog = withTimingSilent dflags (text "Cmm pipeline") forceRes $
   do let dflags = hsc_dflags hsc_env
+         platform = targetPlatform dflags
 
      tops <- {-# SCC "tops" #-} mapM (cpsTop dflags) prog
 
      let (procs, data_) = partitionEithers tops
      (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs dflags srtInfo procs data_
-     dumpWith dflags Opt_D_dump_cmm_cps "Post CPS Cmm" FormatCMM (ppr cmms)
+     dumpWith dflags Opt_D_dump_cmm_cps "Post CPS Cmm" FormatCMM (pdoc platform cmms)
 
      return (srtInfo, cmms)
 
@@ -99,7 +100,7 @@ cpsTop dflags proc =
                pp <- {-# SCC "minimalProcPointSet" #-} runUniqSM $
                   minimalProcPointSet platform call_pps g
                dumpWith dflags Opt_D_dump_cmm_proc "Proc points"
-                     FormatCMM (ppr l $$ ppr pp $$ ppr g)
+                     FormatCMM (pdoc platform l $$ ppr pp $$ pdoc platform g)
                return pp
              else
                return call_pps
@@ -119,7 +120,7 @@ cpsTop dflags proc =
 
        ------------- CAF analysis ----------------------------------------------
        let cafEnv = {-# SCC "cafAnal" #-} cafAnal platform call_pps l g
-       dumpWith dflags Opt_D_dump_cmm_caf "CAFEnv" FormatText (ppr cafEnv)
+       dumpWith dflags Opt_D_dump_cmm_caf "CAFEnv" FormatText (pdoc platform cafEnv)
 
        g <- if splitting_proc_points
             then do
@@ -157,7 +158,7 @@ cpsTop dflags proc =
         dump = dumpGraph dflags
 
         dumps flag name
-           = mapM_ (dumpWith dflags flag name FormatCMM . ppr)
+           = mapM_ (dumpWith dflags flag name FormatCMM . pdoc platform)
 
         condPass flag pass g dumpflag dumpname =
             if gopt flag dflags
@@ -353,9 +354,10 @@ runUniqSM m = do
 dumpGraph :: DynFlags -> DumpFlag -> String -> CmmGraph -> IO ()
 dumpGraph dflags flag name g = do
   when (gopt Opt_DoCmmLinting dflags) $ do_lint g
-  dumpWith dflags flag name FormatCMM (ppr g)
+  dumpWith dflags flag name FormatCMM (pdoc platform g)
  where
-  do_lint g = case cmmLintGraph (targetPlatform dflags) g of
+  platform = targetPlatform dflags
+  do_lint g = case cmmLintGraph platform g of
                  Just err -> do { fatalErrorMsg dflags err
                                 ; ghcExit dflags 1
                                 }
