@@ -248,7 +248,7 @@ figureLlvmVersion dflags = traceToolCommand dflags "llc" $ do
 --
 -- @-dead_strip_dylibs@ does not dead strip @-rpath@ entries, as such passing
 -- @-l@ and @-rpath@ to the linker will result in the unnecesasry libraries not
--- being included int he load commands, however the @-rpath@ entries are all
+-- being included in the load commands, however the @-rpath@ entries are all
 -- forced to be included.  This can lead to 100s of @-rpath@ entries being
 -- included when only a handful of liraries end up being turely linked.
 --
