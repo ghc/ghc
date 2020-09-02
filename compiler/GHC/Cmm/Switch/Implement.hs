@@ -6,6 +6,7 @@ where
 
 import GHC.Prelude
 
+import GHC.Driver.Backend
 import GHC.Platform
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.BlockId
@@ -13,7 +14,6 @@ import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch
 import GHC.Types.Unique.Supply
-import GHC.Driver.Session
 import GHC.Utils.Monad (concatMapM)
 
 --
@@ -32,12 +32,12 @@ import GHC.Utils.Monad (concatMapM)
 
 -- | Traverses the 'CmmGraph', making sure that 'CmmSwitch' are suitable for
 -- code generation.
-cmmImplementSwitchPlans :: DynFlags -> CmmGraph -> UniqSM CmmGraph
-cmmImplementSwitchPlans dflags g
+cmmImplementSwitchPlans :: Backend -> Platform -> CmmGraph -> UniqSM CmmGraph
+cmmImplementSwitchPlans backend platform g
     -- Switch generation done by backend (LLVM/C)
-    | backendSupportsSwitch (backend dflags) = return g
+    | backendSupportsSwitch backend = return g
     | otherwise = do
-    blocks' <- concatMapM (visitSwitches (targetPlatform dflags)) (toBlockList g)
+    blocks' <- concatMapM (visitSwitches platform) (toBlockList g)
     return $ ofBlockList (g_entry g) blocks'
 
 visitSwitches :: Platform -> CmmBlock -> UniqSM [CmmBlock]
