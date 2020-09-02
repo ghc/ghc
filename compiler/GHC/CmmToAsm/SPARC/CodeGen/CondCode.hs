@@ -56,9 +56,13 @@ getCondCode (CmmMachOp mop [x, y])
       MO_U_Lt _   -> condIntCode LU   x y
       MO_U_Le _   -> condIntCode LEU  x y
 
-      _           -> pprPanic "SPARC.CodeGen.CondCode.getCondCode" (ppr (CmmMachOp mop [x,y]))
+      _           -> do
+                     platform <- getPlatform
+                     pprPanic "SPARC.CodeGen.CondCode.getCondCode" (pdoc platform (CmmMachOp mop [x,y]))
 
-getCondCode other = pprPanic "SPARC.CodeGen.CondCode.getCondCode" (ppr other)
+getCondCode other = do
+   platform <- getPlatform
+   pprPanic "SPARC.CodeGen.CondCode.getCondCode" (pdoc platform other)
 
 
 

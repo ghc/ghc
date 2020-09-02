@@ -17,10 +17,10 @@
 -- and works over the 'SDoc' type.
 module GHC.Utils.Outputable (
         -- * Type classes
-        Outputable(..), OutputableBndr(..),
+        Outputable(..), OutputableBndr(..), OutputableP(..),
 
         -- * Pretty printing combinators
-        SDoc, runSDoc,
+        SDoc, runSDoc, PDoc(..),
         docToSDoc,
         interppSP, interpp'SP,
         pprQuotedList, pprWithCommas, quotedListWithOr, quotedListWithNor,
@@ -95,6 +95,7 @@ import {-# SOURCE #-}   GHC.Unit.Types ( Unit, Module, moduleName )
 import {-# SOURCE #-}   GHC.Unit.Module.Name( ModuleName )
 import {-# SOURCE #-}   GHC.Types.Name.Occurrence( OccName )
 
+import GHC.Platform
 import GHC.Utils.BufHandle (BufHandle)
 import GHC.Data.FastString
 import qualified GHC.Utils.Ppr as Pretty
@@ -934,6 +935,7 @@ deriving newtype instance Outputable LexicalFastString
 
 instance (Outputable key, Outputable elt) => Outputable (M.Map key elt) where
     ppr m = ppr (M.toList m)
+
 instance (Outputable elt) => Outputable (IM.IntMap elt) where
     ppr m = ppr (IM.toList m)
 
@@ -949,6 +951,49 @@ instance Outputable Serialized where
 
 instance Outputable Extension where
     ppr = text . show
+
+-- | Outputable class with an additional Platform value
+class OutputableP a where
+   pdoc :: Platform -> a -> SDoc
+   pdocPrec :: Rational -> Platform -> a -> SDoc
+                -- 0 binds least tightly
+                -- We use Rational because there is always a
+                -- Rational between any other two Rationals
+   pdoc       = pdocPrec 0
+   pdocPrec _ = pdoc
+
+-- | Wrapper for types having a Outputable instance when an OutputableP instance
+-- is required.
+newtype PDoc a = PDoc a
+
+instance Outputable a => OutputableP (PDoc a) where
+   pdoc _ (PDoc a) = ppr a
+
+instance OutputableP a => OutputableP [a] where
+   pdoc platform xs = ppr (fmap (pdoc platform) xs)
+
+instance OutputableP a => OutputableP (Maybe a) where
+   pdoc platform xs = ppr (fmap (pdoc platform) xs)
+
+instance (OutputableP a, OutputableP b) => OutputableP (a, b) where
+    pdoc platform (a,b) = ppr (pdoc platform a, pdoc platform b)
+
+instance (OutputableP a, OutputableP b, OutputableP c) => OutputableP (a, b, c) where
+    pdoc platform (a,b,c) = ppr (pdoc platform a, pdoc platform b, pdoc platform c)
+
+
+instance (OutputableP key, OutputableP elt) => OutputableP (M.Map key elt) where
+    pdoc platform m = ppr $ fmap (\(x,y) -> (pdoc platform x, pdoc platform y)) $ M.toList m
+
+instance OutputableP a => OutputableP (SCC a) where
+   pdoc platform scc = ppr (fmap (pdoc platform) scc)
+
+instance OutputableP SDoc where
+   pdoc _ x = x
+
+instance (OutputableP a) => OutputableP (Set a) where
+    pdoc platform s = braces (fsep (punctuate comma (map (pdoc platform) (Set.toList s))))
+
 
 {-
 ************************************************************************

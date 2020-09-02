@@ -90,6 +90,7 @@ basicBlockCodeGen block = do
   let (_, nodes, tail)  = blockSplit block
       id = entryLabel block
       stmts = blockToList nodes
+  platform <- getPlatform
   mid_instrs <- stmtsToInstrs stmts
   tail_instrs <- stmtToInstrs tail
   let instrs = mid_instrs `appOL` tail_instrs
@@ -108,7 +109,7 @@ basicBlockCodeGen block = do
 
         -- do intra-block sanity checking
         blocksChecked
-                = map (checkBlock block)
+                = map (checkBlock platform block)
                 $ BasicBlock id top : other_blocks
 
   return (blocksChecked, statics)

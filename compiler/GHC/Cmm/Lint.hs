@@ -37,25 +37,27 @@ import Control.Monad (ap, unless)
 -- -----------------------------------------------------------------------------
 -- Exported entry points:
 
-cmmLint :: (Outputable d, Outputable h)
+cmmLint :: (OutputableP d, OutputableP h)
         => Platform -> GenCmmGroup d h CmmGraph -> Maybe SDoc
 cmmLint platform tops = runCmmLint platform (mapM_ lintCmmDecl) tops
 
 cmmLintGraph :: Platform -> CmmGraph -> Maybe SDoc
 cmmLintGraph platform g = runCmmLint platform lintCmmGraph g
 
-runCmmLint :: Outputable a => Platform -> (a -> CmmLint b) -> a -> Maybe SDoc
+runCmmLint :: OutputableP a => Platform -> (a -> CmmLint b) -> a -> Maybe SDoc
 runCmmLint platform l p =
    case unCL (l p) platform of
      Left err -> Just (vcat [text "Cmm lint error:",
                              nest 2 err,
                              text "Program was:",
-                             nest 2 (ppr p)])
+                             nest 2 (pdoc platform p)])
      Right _  -> Nothing
 
 lintCmmDecl :: GenCmmDecl h i CmmGraph -> CmmLint ()
 lintCmmDecl (CmmProc _ lbl _ g)
-  = addLintInfo (text "in proc " <> ppr lbl) $ lintCmmGraph g
+  = do
+    platform <- getPlatform
+    addLintInfo (text "in proc " <> pdoc platform lbl) $ lintCmmGraph g
 lintCmmDecl (CmmData {})
   = return ()
 
@@ -188,7 +190,7 @@ lintCmmLast labels node = case node of
             if (erep `cmmEqType_ignoring_ptrhood` bWord platform)
               then return ()
               else cmmLintErr (text "switch scrutinee is not a word: " <>
-                               ppr e <> text " :: " <> ppr erep)
+                               pdoc platform e <> text " :: " <> ppr erep)
 
   CmmCall { cml_target = target, cml_cont = cont } -> do
           _ <- lintCmmExpr target
@@ -222,21 +224,21 @@ lintTarget (PrimTarget {})     = return ()
 -- | As noted in Note [Register parameter passing], the arguments and
 -- 'ForeignTarget' of a foreign call mustn't mention
 -- caller-saved registers.
-mayNotMentionCallerSavedRegs :: (UserOfRegs GlobalReg a, Outputable a)
+mayNotMentionCallerSavedRegs :: (UserOfRegs GlobalReg a, OutputableP a)
                              => SDoc -> a -> CmmLint ()
 mayNotMentionCallerSavedRegs what thing = do
     platform <- getPlatform
     let badRegs = filter (callerSaves platform)
                   $ foldRegsUsed platform (flip (:)) [] thing
     unless (null badRegs)
-      $ cmmLintErr (what <+> text "mentions caller-saved registers: " <> ppr badRegs $$ ppr thing)
+      $ cmmLintErr (what <+> text "mentions caller-saved registers: " <> ppr badRegs $$ pdoc platform thing)
 
 checkCond :: Platform -> CmmExpr -> CmmLint ()
 checkCond _ (CmmMachOp mop _) | isComparisonMachOp mop = return ()
 checkCond platform (CmmLit (CmmInt x t)) | x == 0 || x == 1, t == wordWidth platform = return () -- constant values
-checkCond _ expr
+checkCond platform expr
     = cmmLintErr (hang (text "expression is not a conditional:") 2
-                         (ppr expr))
+                         (pdoc platform expr))
 
 -- -----------------------------------------------------------------------------
 -- CmmLint monad
@@ -270,15 +272,19 @@ addLintInfo info thing = CmmLint $ \platform ->
 
 cmmLintMachOpErr :: CmmExpr -> [CmmType] -> [Width] -> CmmLint a
 cmmLintMachOpErr expr argsRep opExpectsRep
-     = cmmLintErr (text "in MachOp application: " $$
-                   nest 2 (ppr  expr) $$
+     = do
+       platform <- getPlatform
+       cmmLintErr (text "in MachOp application: " $$
+                   nest 2 (pdoc platform expr) $$
                       (text "op is expecting: " <+> ppr opExpectsRep) $$
                       (text "arguments provide: " <+> ppr argsRep))
 
 cmmLintAssignErr :: CmmNode e x -> CmmType -> CmmType -> CmmLint a
 cmmLintAssignErr stmt e_ty r_ty
-  = cmmLintErr (text "in assignment: " $$
-                nest 2 (vcat [ppr stmt,
+  = do
+    platform <- getPlatform
+    cmmLintErr (text "in assignment: " $$
+                nest 2 (vcat [pdoc platform stmt,
                               text "Reg ty:" <+> ppr r_ty,
                               text "Rhs ty:" <+> ppr e_ty]))
 

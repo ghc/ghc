@@ -16,6 +16,7 @@ where
 #include "HsVersions.h"
 
 import GHC.Prelude
+import GHC.Platform
 
 import GHC.CmmToAsm     ( nativeCodeGen )
 import GHC.CmmToLlvm    ( llvmCodeGen )
@@ -260,8 +261,8 @@ outputForeignStubs_help fname doc_str header footer
 -- module;
 
 -- | Generate code to initialise cost centres
-profilingInitCode :: Module -> CollectedCCs -> SDoc
-profilingInitCode this_mod (local_CCs, singleton_CCSs)
+profilingInitCode :: Platform -> Module -> CollectedCCs -> SDoc
+profilingInitCode platform this_mod (local_CCs, singleton_CCSs)
  = vcat
     $  map emit_cc_decl local_CCs
     ++ map emit_ccs_decl singleton_CCSs
@@ -278,22 +279,22 @@ profilingInitCode this_mod (local_CCs, singleton_CCSs)
  where
    emit_cc_decl cc =
        text "extern CostCentre" <+> cc_lbl <> text "[];"
-     where cc_lbl = ppr (mkCCLabel cc)
+     where cc_lbl = pdoc platform (mkCCLabel cc)
    local_cc_list_label = text "local_cc_" <> ppr this_mod
    emit_cc_list ccs =
       text "static CostCentre *" <> local_cc_list_label <> text "[] ="
-      <+> braces (vcat $ [ ppr (mkCCLabel cc) <> comma
+      <+> braces (vcat $ [ pdoc platform (mkCCLabel cc) <> comma
                          | cc <- ccs
                          ] ++ [text "NULL"])
       <> semi
 
    emit_ccs_decl ccs =
        text "extern CostCentreStack" <+> ccs_lbl <> text "[];"
-     where ccs_lbl = ppr (mkCCSLabel ccs)
+     where ccs_lbl = pdoc platform (mkCCSLabel ccs)
    singleton_cc_list_label = text "singleton_cc_" <> ppr this_mod
    emit_ccs_list ccs =
       text "static CostCentreStack *" <> singleton_cc_list_label <> text "[] ="
-      <+> braces (vcat $ [ ppr (mkCCSLabel cc) <> comma
+      <+> braces (vcat $ [ pdoc platform (mkCCSLabel cc) <> comma
                          | cc <- ccs
                          ] ++ [text "NULL"])
       <> semi

@@ -7,6 +7,7 @@ module GHC.CmmToAsm.SPARC.CodeGen.Sanity (
 where
 
 import GHC.Prelude
+import GHC.Platform
 
 import GHC.CmmToAsm.SPARC.Instr
 import GHC.CmmToAsm.SPARC.Ppr        () -- For Outputable instances
@@ -20,11 +21,12 @@ import GHC.Utils.Panic
 
 -- | Enforce intra-block invariants.
 --
-checkBlock :: CmmBlock
+checkBlock :: Platform
+           -> CmmBlock
            -> NatBasicBlock Instr
            -> NatBasicBlock Instr
 
-checkBlock cmm block@(BasicBlock _ instrs)
+checkBlock platform cmm block@(BasicBlock _ instrs)
         | checkBlockInstrs instrs
         = block
 
@@ -32,9 +34,9 @@ checkBlock cmm block@(BasicBlock _ instrs)
         = pprPanic
                 ("SPARC.CodeGen: bad block\n")
                 ( vcat  [ text " -- cmm -----------------\n"
-                        , ppr cmm
+                        , pdoc platform cmm
                         , text " -- native code ---------\n"
-                        , ppr block ])
+                        , pdoc platform block ])
 
 
 checkBlockInstrs :: [Instr] -> Bool

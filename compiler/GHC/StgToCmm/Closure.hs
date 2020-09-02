@@ -1,4 +1,6 @@
-{-# LANGUAGE CPP, RecordWildCards #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE LambdaCase #-}
 
 -----------------------------------------------------------------------------
 --
@@ -114,9 +116,13 @@ data CgLoc
         -- To tail-call it, assign to these locals,
         -- and branch to the block id
 
-instance Outputable CgLoc where
-  ppr (CmmLoc e)    = text "cmm" <+> ppr e
-  ppr (LneLoc b rs) = text "lne" <+> ppr b <+> ppr rs
+instance OutputableP CgLoc where
+   pdoc = pprCgLoc
+
+pprCgLoc :: Platform -> CgLoc -> SDoc
+pprCgLoc platform = \case
+   CmmLoc e    -> text "cmm" <+> pdoc platform e
+   LneLoc b rs -> text "lne" <+> ppr b <+> ppr rs
 
 type SelfLoopInfo = (Id, BlockId, [LocalReg])
 

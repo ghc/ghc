@@ -281,7 +281,7 @@ pprStmt platform stmt =
     CmmCall { cml_target = expr } -> mkJMP_ (pprExpr platform expr) <> semi
     CmmSwitch arg ids             -> pprSwitch platform arg ids
 
-    _other -> pprPanic "PprC.pprStmt" (ppr stmt)
+    _other -> pprPanic "PprC.pprStmt" (pdoc platform stmt)
 
 type Hinted a = (a, ForeignHint)
 

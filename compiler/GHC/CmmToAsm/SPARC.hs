@@ -68,7 +68,7 @@ instance Instruction SPARC.Instr where
    mkRegRegMoveInstr       = SPARC.mkRegRegMoveInstr
    takeRegRegMoveInstr     = SPARC.takeRegRegMoveInstr
    mkJumpInstr             = SPARC.mkJumpInstr
-   pprInstr                = const SPARC.pprInstr
+   pprInstr                = SPARC.pprInstr
    mkStackAllocInstr       = panic "no sparc_mkStackAllocInstr"
    mkStackDeallocInstr     = panic "no sparc_mkStackDeallocInstr"
 

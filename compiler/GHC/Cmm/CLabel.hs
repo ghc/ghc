@@ -1210,8 +1210,8 @@ The info table label and the local block label are both local labels
 and are not externally visible.
 -}
 
-instance Outputable CLabel where
-  ppr lbl = sdocWithDynFlags (\dflags -> pprCLabel (backend dflags) (targetPlatform dflags) lbl)
+instance OutputableP CLabel where
+  pdoc platform lbl = sdocWithDynFlags (\dflags -> pprCLabel (backend dflags) platform lbl)
 
 pprCLabel :: Backend -> Platform -> CLabel -> SDoc
 pprCLabel bcknd platform lbl =

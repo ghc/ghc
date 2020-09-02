@@ -620,7 +620,9 @@ iselExpr64 (CmmMachOp (MO_SS_Conv W32 W64) [expr]) = do
             )
 
 iselExpr64 expr
-   = pprPanic "iselExpr64(i386)" (ppr expr)
+   = do
+      platform <- getPlatform
+      pprPanic "iselExpr64(i386)" (pdoc platform expr)
 
 
 --------------------------------------------------------------------------------
@@ -1178,9 +1180,9 @@ getRegister' platform _ (CmmLit lit)
            code dst = unitOL (MOV format (OpImm imm) (OpReg dst))
        return (Any format code)
 
-getRegister' _ _ other
+getRegister' platform _ other
     | isVecExpr other  = needLlvm
-    | otherwise        = pprPanic "getRegister(x86)" (ppr other)
+    | otherwise        = pprPanic "getRegister(x86)" (pdoc platform other)
 
 
 intLoadCode :: (Operand -> Operand -> Instr) -> CmmExpr
@@ -1576,7 +1578,9 @@ getCondCode (CmmMachOp mop [x, y])
 
       _ -> condIntCode (machOpToCond mop) x y
 
-getCondCode other = pprPanic "getCondCode(2)(x86,x86_64)" (ppr other)
+getCondCode other = do
+   platform <- getPlatform
+   pprPanic "getCondCode(2)(x86,x86_64)" (pdoc platform other)
 
 machOpToCond :: MachOp -> Cond
 machOpToCond mo = case mo of

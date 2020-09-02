@@ -182,9 +182,9 @@ data CgIdInfo
         , cg_loc :: CgLoc                     -- CmmExpr for the *tagged* value
         }
 
-instance Outputable CgIdInfo where
-  ppr (CgIdInfo { cg_id = id, cg_loc = loc })
-    = ppr id <+> text "-->" <+> ppr loc
+instance OutputableP CgIdInfo where
+  pdoc platform (CgIdInfo { cg_id = id, cg_loc = loc })
+    = ppr id <+> text "-->" <+> pdoc platform loc
 
 -- Sequel tells what to do with the result of this expression
 data Sequel

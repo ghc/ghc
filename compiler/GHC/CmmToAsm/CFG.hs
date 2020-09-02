@@ -45,6 +45,7 @@ where
 #include "HsVersions.h"
 
 import GHC.Prelude
+import GHC.Platform
 
 import GHC.Cmm.BlockId
 import GHC.Cmm as Cmm
@@ -583,12 +584,12 @@ addNodesBetween weights m updates =
 
 -}
 -- | Generate weights for a Cmm proc based on some simple heuristics.
-getCfgProc :: Weights -> RawCmmDecl -> CFG
-getCfgProc _       (CmmData {}) = mapEmpty
-getCfgProc weights (CmmProc _info _lab _live graph) = getCfg weights graph
+getCfgProc :: Platform -> Weights -> RawCmmDecl -> CFG
+getCfgProc _        _       (CmmData {}) = mapEmpty
+getCfgProc platform weights (CmmProc _info _lab _live graph) = getCfg platform weights graph
 
-getCfg :: Weights -> CmmGraph -> CFG
-getCfg weights graph =
+getCfg :: Platform -> Weights -> CmmGraph -> CFG
+getCfg platform weights graph =
   foldl' insertEdge edgelessCfg $ concatMap getBlockEdges blocks
   where
     Weights
@@ -647,7 +648,7 @@ getCfg weights graph =
         other ->
             panic "Foo" $
             ASSERT2(False, ppr "Unknown successor cause:" <>
-              (ppr branch <+> text "=>" <> ppr (G.successors other)))
+              (pdoc platform branch <+> text "=>" <> pdoc platform (G.successors other)))
             map (\x -> ((bid,x),mkEdgeInfo 0)) $ G.successors other
       where
         bid = G.entryLabel block

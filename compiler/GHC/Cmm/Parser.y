@@ -442,8 +442,9 @@ cmmproc :: { CmmParse () }
                        getCodeScoped $ loopDecls $ do {
                          (entry_ret_label, info, stk_formals) <- $1;
                          dflags <- getDynFlags;
+                         platform <- getPlatform;
                          formals <- sequence (fromMaybe [] $3);
-                         withName (showSDoc dflags (ppr entry_ret_label))
+                         withName (showSDoc dflags (pdoc platform entry_ret_label))
                            $4;
                          return (entry_ret_label, info, stk_formals, formals) }
                      let do_layout = isJust $3
@@ -996,8 +997,8 @@ machOps = listToUFM $
         ( "i2f64",    flip MO_SF_Conv W64 )
         ]
 
-callishMachOps :: UniqFM FastString ([CmmExpr] -> (CallishMachOp, [CmmExpr]))
-callishMachOps = listToUFM $
+callishMachOps :: Platform -> UniqFM FastString ([CmmExpr] -> (CallishMachOp, [CmmExpr]))
+callishMachOps platform = listToUFM $
         map (\(x, y) -> (mkFastString x, y)) [
         ( "read_barrier", (MO_ReadBarrier,)),
         ( "write_barrier", (MO_WriteBarrier,)),
@@ -1049,7 +1050,7 @@ callishMachOps = listToUFM $
         args' = init args
         align = case last args of
           CmmLit (CmmInt alignInteger _) -> fromInteger alignInteger
-          e -> pgmErrorDoc "Non-constant alignment in memcpy-like function:" (ppr e)
+          e -> pgmErrorDoc "Non-constant alignment in memcpy-like function:" (pdoc platform e)
         -- The alignment of memcpy-ish operations must be a
         -- compile-time constant. We verify this here, passing it around
         -- in the MO_* constructor. In order to do this, however, we
@@ -1166,7 +1167,7 @@ reserveStackFrame psize preg body = do
   let size = case constantFoldExpr platform esize of
                CmmLit (CmmInt n _) -> n
                _other -> pprPanic "CmmParse: not a compile-time integer: "
-                            (ppr esize)
+                            (pdoc platform esize)
   let frame = old_updfr_off + platformWordSizeInBytes platform * fromIntegral size
   emitAssign reg (CmmStackSlot Old frame)
   withUpdFrameOff frame body
@@ -1269,7 +1270,9 @@ primCall
         -> [CmmParse CmmExpr]
         -> PD (CmmParse ())
 primCall results_code name args_code
-  = case lookupUFM callishMachOps name of
+  = do
+    platform <- PD.getPlatform
+    case lookupUFM (callishMachOps platform) name of
         Nothing -> failMsgPD ("unknown primitive " ++ unpackFS name)
         Just f  -> return $ do
                 results <- sequence results_code

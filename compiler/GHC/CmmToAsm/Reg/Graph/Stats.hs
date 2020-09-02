@@ -113,13 +113,13 @@ data RegAllocStats statics instr
         deriving (Functor)
 
 
-instance (Outputable statics, Outputable instr)
+instance (OutputableP statics, OutputableP instr)
        => Outputable (RegAllocStats statics instr) where
 
  ppr (s@RegAllocStatsStart{})
     =      text "#  Start"
         $$ text "#  Native code with liveness information."
-        $$ ppr (raLiveCmm s)
+        $$ pdoc (raPlatform s) (raLiveCmm s)
         $$ text ""
         $$ text "#  Initial register conflict graph."
         $$ Color.dotGraph
@@ -134,7 +134,7 @@ instance (Outputable statics, Outputable instr)
            text "#  Spill"
 
         $$ text "#  Code with liveness information."
-        $$ ppr (raCode s)
+        $$ pdoc (raPlatform s) (raCode s)
         $$ text ""
 
         $$ (if (not $ isNullUFM $ raCoalesced s)
@@ -148,14 +148,14 @@ instance (Outputable statics, Outputable instr)
         $$ text ""
 
         $$ text "#  Code with spills inserted."
-        $$ ppr (raSpilled s)
+        $$ pdoc (raPlatform s) (raSpilled s)
 
 
  ppr (s@RegAllocStatsColored { raSRMs = (spills, reloads, moves) })
     =      text "#  Colored"
 
         $$ text "#  Code with liveness information."
-        $$ ppr (raCode s)
+        $$ pdoc (raPlatform s) (raCode s)
         $$ text ""
 
         $$ text "#  Register conflict graph (colored)."
@@ -174,19 +174,19 @@ instance (Outputable statics, Outputable instr)
                 else empty)
 
         $$ text "#  Native code after coalescings applied."
-        $$ ppr (raCodeCoalesced s)
+        $$ pdoc (raPlatform s) (raCodeCoalesced s)
         $$ text ""
 
         $$ text "#  Native code after register allocation."
-        $$ ppr (raPatched s)
+        $$ pdoc (raPlatform s) (raPatched s)
         $$ text ""
 
         $$ text "#  Clean out unneeded spill/reloads."
-        $$ ppr (raSpillClean s)
+        $$ pdoc (raPlatform s) (raSpillClean s)
         $$ text ""
 
         $$ text "#  Final code, after rewriting spill/rewrite pseudo instrs."
-        $$ ppr (raFinal s)
+        $$ pdoc (raPlatform s) (raFinal s)
         $$ text ""
         $$  text "#  Score:"
         $$ (text "#          spills  inserted: " <> int spills)

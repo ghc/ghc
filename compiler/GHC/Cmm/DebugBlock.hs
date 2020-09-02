@@ -72,19 +72,20 @@ data DebugBlock =
   , dblBlocks     :: ![DebugBlock] -- ^ Nested blocks
   }
 
-instance Outputable DebugBlock where
-  ppr blk = (if | dblProcedure blk == dblLabel blk
+instance OutputableP DebugBlock where
+  pdoc platform blk =
+            (if | dblProcedure blk == dblLabel blk
                 -> text "proc"
                 | dblHasInfoTbl blk
                 -> text "pp-blk"
                 | otherwise
                 -> text "blk") <+>
-            ppr (dblLabel blk) <+> parens (ppr (dblCLabel blk)) <+>
+            ppr (dblLabel blk) <+> parens (pdoc platform (dblCLabel blk)) <+>
             (maybe empty ppr (dblSourceTick blk)) <+>
             (maybe (text "removed") ((text "pos " <>) . ppr)
                    (dblPosition blk)) <+>
-            (ppr (dblUnwind blk)) $+$
-            (if null (dblBlocks blk) then empty else nest 4 (ppr (dblBlocks blk)))
+            (pdoc platform (dblUnwind blk)) $+$
+            (if null (dblBlocks blk) then empty else nest 4 (pdoc platform (dblBlocks blk)))
 
 -- | Intermediate data structure holding debug-relevant context information
 -- about a block.
@@ -489,12 +490,12 @@ LOC this information will end up in is Y.
 -- | A label associated with an 'UnwindTable'
 data UnwindPoint = UnwindPoint !CLabel !UnwindTable
 
-instance Outputable UnwindPoint where
-  ppr (UnwindPoint lbl uws) =
-      braces $ ppr lbl<>colon
+instance OutputableP UnwindPoint where
+  pdoc platform (UnwindPoint lbl uws) =
+      braces $ pdoc platform lbl <> colon
       <+> hsep (punctuate comma $ map pprUw $ Map.toList uws)
     where
-      pprUw (g, expr) = ppr g <> char '=' <> ppr expr
+      pprUw (g, expr) = ppr g <> char '=' <> pdoc platform expr
 
 -- | Maps registers to expressions that yield their "old" values
 -- further up the stack. Most interesting for the stack pointer @Sp@,
@@ -513,19 +514,19 @@ data UnwindExpr = UwConst !Int                  -- ^ literal value
                 | UwTimes UnwindExpr UnwindExpr
                 deriving (Eq)
 
-instance Outputable UnwindExpr where
-  pprPrec _ (UwConst i)     = ppr i
-  pprPrec _ (UwReg g 0)     = ppr g
-  pprPrec p (UwReg g x)     = pprPrec p (UwPlus (UwReg g 0) (UwConst x))
-  pprPrec _ (UwDeref e)     = char '*' <> pprPrec 3 e
-  pprPrec _ (UwLabel l)     = pprPrec 3 l
-  pprPrec p (UwPlus e0 e1)  | p <= 0
-                            = pprPrec 0 e0 <> char '+' <> pprPrec 0 e1
-  pprPrec p (UwMinus e0 e1) | p <= 0
-                            = pprPrec 1 e0 <> char '-' <> pprPrec 1 e1
-  pprPrec p (UwTimes e0 e1) | p <= 1
-                            = pprPrec 2 e0 <> char '*' <> pprPrec 2 e1
-  pprPrec _ other           = parens (pprPrec 0 other)
+instance OutputableP UnwindExpr where
+  pdocPrec _ _        (UwConst i)     = ppr i
+  pdocPrec _ _        (UwReg g 0)     = ppr g
+  pdocPrec p platform (UwReg g x)     = pdocPrec p platform (UwPlus (UwReg g 0) (UwConst x))
+  pdocPrec _ platform (UwDeref e)     = char '*' <> pdocPrec 3 platform e
+  pdocPrec _ platform (UwLabel l)     = pdocPrec 3 platform l
+  pdocPrec p platform (UwPlus e0 e1)  | p <= 0
+                                      = pdocPrec 0 platform e0 <> char '+' <> pdocPrec 0 platform e1
+  pdocPrec p platform (UwMinus e0 e1) | p <= 0
+                                      = pdocPrec 1 platform e0 <> char '-' <> pdocPrec 1 platform e1
+  pdocPrec p platform (UwTimes e0 e1) | p <= 1
+                                      = pdocPrec 2 platform e0 <> char '*' <> pdocPrec 2 platform e1
+  pdocPrec _ platform other           = parens (pdocPrec 0 platform other)
 
 -- | Conversion of Cmm expressions to unwind expressions. We check for
 -- unsupported operator usages and simplify the expression as far as
@@ -549,5 +550,5 @@ toUnwindExpr platform e@(CmmMachOp op [e1, e2])   =
     (MO_Mul{}, u1,        u2       ) -> UwTimes u1 u2
     _otherwise -> pprPanic "Unsupported operator in unwind expression!"
                            (pprExpr platform e)
-toUnwindExpr _ e
-  = pprPanic "Unsupported unwind expression!" (ppr e)
+toUnwindExpr platform e
+  = pprPanic "Unsupported unwind expression!" (pdoc platform e)

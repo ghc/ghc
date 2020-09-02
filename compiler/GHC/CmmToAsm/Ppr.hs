@@ -196,7 +196,7 @@ pprGNUSectionHeader config sep t suffix =
     platform      = ncgPlatform config
     splitSections = ncgSplitSections config
     subsection
-      | splitSections = sep <> ppr suffix
+      | splitSections = sep <> pdoc platform suffix
       | otherwise     = empty
     header = case t of
       Text -> sLit ".text"

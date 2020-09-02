@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 
 -----------------------------------------------------------------------------
 --
@@ -92,14 +93,14 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
         pprLabel platform lbl $$ -- blocks guaranteed not null, so label needed
         vcat (map (pprBasicBlock config top_info) blocks) $$
         (if ncgDwarfEnabled config
-         then ppr (mkAsmTempEndLabel lbl) <> char ':' else empty) $$
+         then pdoc platform (mkAsmTempEndLabel lbl) <> char ':' else empty) $$
         pprSizeDecl platform lbl
 
     Just (CmmStaticsRaw info_lbl _) ->
       pprSectionAlign config (Section Text info_lbl) $$
       pprProcAlignment config $$
       (if platformHasSubsectionsViaSymbols platform
-          then ppr (mkDeadStripPreventer info_lbl) <> char ':'
+          then pdoc platform (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
       vcat (map (pprBasicBlock config top_info) blocks) $$
       -- above: Even the first block gets a label, because with branch-chain
@@ -107,9 +108,9 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
       (if platformHasSubsectionsViaSymbols platform
        then -- See Note [Subsections Via Symbols]
                 text "\t.long "
-            <+> ppr info_lbl
+            <+> pdoc platform info_lbl
             <+> char '-'
-            <+> ppr (mkDeadStripPreventer info_lbl)
+            <+> pdoc platform (mkDeadStripPreventer info_lbl)
        else empty) $$
       pprSizeDecl platform info_lbl
 
@@ -117,7 +118,7 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
 pprSizeDecl :: Platform -> CLabel -> SDoc
 pprSizeDecl platform lbl
  = if osElfTarget (platformOS platform)
-   then text "\t.size" <+> ppr lbl <> ptext (sLit ", .-") <> ppr lbl
+   then text "\t.size" <+> pdoc platform lbl <> ptext (sLit ", .-") <> pdoc platform lbl
    else empty
 
 pprBasicBlock :: NCGConfig -> LabelMap RawCmmStatics -> NatBasicBlock Instr -> SDoc
@@ -126,7 +127,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
     pprLabel platform asmLbl $$
     vcat (map (pprInstr platform) instrs) $$
     (if ncgDwarfEnabled config
-      then ppr (mkAsmTempEndLabel asmLbl) <> char ':'
+      then pdoc (ncgPlatform config) (mkAsmTempEndLabel asmLbl) <> char ':'
       else empty
     )
   where
@@ -141,7 +142,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
            pprLabel platform infoLbl $$
            c $$
            (if ncgDwarfEnabled config
-               then ppr (mkAsmTempEndLabel infoLbl) <> char ':'
+               then pdoc platform (mkAsmTempEndLabel infoLbl) <> char ':'
                else empty
            )
     -- Make sure the info table has the right .loc for the block
@@ -153,15 +154,15 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
 
 pprDatas :: NCGConfig -> (Alignment, RawCmmStatics) -> SDoc
 -- See note [emit-time elimination of static indirections] in "GHC.Cmm.CLabel".
-pprDatas _config (_, CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
+pprDatas config (_, CmmStaticsRaw alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l
         labelInd (CmmLabel l) = Just l
         labelInd _ = Nothing
   , Just ind' <- labelInd ind
   , alias `mayRedirectTo` ind'
-  = pprGloblDecl alias
-    $$ text ".equiv" <+> ppr alias <> comma <> ppr (CmmLabel ind')
+  = pprGloblDecl (ncgPlatform config) alias
+    $$ text ".equiv" <+> pdoc (ncgPlatform config) alias <> comma <> pdoc (ncgPlatform config) (CmmLabel ind')
 
 pprDatas config (align, (CmmStaticsRaw lbl dats))
  = vcat (pprAlign platform align : pprLabel platform lbl : map (pprData config) dats)
@@ -180,10 +181,10 @@ pprData config (CmmUninitialised bytes)
 
 pprData config (CmmStaticLit lit) = pprDataItem config lit
 
-pprGloblDecl :: CLabel -> SDoc
-pprGloblDecl lbl
+pprGloblDecl :: Platform -> CLabel -> SDoc
+pprGloblDecl platform lbl
   | not (externallyVisibleCLabel lbl) = empty
-  | otherwise = text ".globl " <> ppr lbl
+  | otherwise = text ".globl " <> pdoc platform lbl
 
 pprLabelType' :: Platform -> CLabel -> SDoc
 pprLabelType' platform lbl =
@@ -246,14 +247,14 @@ pprLabelType' platform lbl =
 pprTypeDecl :: Platform -> CLabel -> SDoc
 pprTypeDecl platform lbl
     = if osElfTarget (platformOS platform) && externallyVisibleCLabel lbl
-      then text ".type " <> ppr lbl <> ptext (sLit  ", ") <> pprLabelType' platform lbl
+      then text ".type " <> pdoc platform lbl <> ptext (sLit  ", ") <> pprLabelType' platform lbl
       else empty
 
 pprLabel :: Platform -> CLabel -> SDoc
 pprLabel platform lbl =
-   pprGloblDecl lbl
+   pprGloblDecl platform lbl
    $$ pprTypeDecl platform lbl
-   $$ (ppr lbl <> char ':')
+   $$ (pdoc platform lbl <> char ':')
 
 pprAlign :: Platform -> Alignment -> SDoc
 pprAlign platform alignment
@@ -417,24 +418,23 @@ pprCond c
                 ALWAYS  -> sLit "mp"})
 
 
-pprImm :: Imm -> SDoc
-pprImm (ImmInt i)     = int i
-pprImm (ImmInteger i) = integer i
-pprImm (ImmCLbl l)    = ppr l
-pprImm (ImmIndex l i) = ppr l <> char '+' <> int i
-pprImm (ImmLit s)     = s
-pprImm (ImmFloat f)   = float $ fromRational f
-pprImm (ImmDouble d)  = double $ fromRational d
-
-pprImm (ImmConstantSum a b) = pprImm a <> char '+' <> pprImm b
-pprImm (ImmConstantDiff a b) = pprImm a <> char '-'
-                            <> lparen <> pprImm b <> rparen
+pprImm :: Platform -> Imm -> SDoc
+pprImm platform = \case
+   ImmInt i            -> int i
+   ImmInteger i        -> integer i
+   ImmCLbl l           -> pdoc platform l
+   ImmIndex l i        -> pdoc platform l <> char '+' <> int i
+   ImmLit s            -> s
+   ImmFloat f          -> float $ fromRational f
+   ImmDouble d         -> double $ fromRational d
+   ImmConstantSum a b  -> pprImm platform a <> char '+' <> pprImm platform b
+   ImmConstantDiff a b -> pprImm platform a <> char '-' <> lparen <> pprImm platform b <> rparen
 
 
 
 pprAddr :: Platform -> AddrMode -> SDoc
-pprAddr _platform (ImmAddr imm off)
-  = let pp_imm = pprImm imm
+pprAddr platform (ImmAddr imm off)
+  = let pp_imm = pprImm platform imm
     in
     if (off == 0) then
         pp_imm
@@ -460,7 +460,7 @@ pprAddr platform (AddrBaseIndex base index displacement)
 
   where
     ppr_disp (ImmInt 0) = empty
-    ppr_disp imm        = pprImm imm
+    ppr_disp imm        = pprImm platform imm
 
 -- | Print section header and appropriate alignment for that section.
 pprSectionAlign :: NCGConfig -> Section -> SDoc
@@ -509,12 +509,12 @@ pprDataItem config lit
         imm = litToImm lit
 
         -- These seem to be common:
-        ppr_item II8   _ = [text "\t.byte\t" <> pprImm imm]
-        ppr_item II16  _ = [text "\t.word\t" <> pprImm imm]
-        ppr_item II32  _ = [text "\t.long\t" <> pprImm imm]
+        ppr_item II8   _ = [text "\t.byte\t" <> pprImm platform imm]
+        ppr_item II16  _ = [text "\t.word\t" <> pprImm platform imm]
+        ppr_item II32  _ = [text "\t.long\t" <> pprImm platform imm]
 
-        ppr_item FF32 _ = [text "\t.float\t" <> pprImm imm]
-        ppr_item FF64 _ = [text "\t.double\t" <> pprImm imm]
+        ppr_item FF32 _ = [text "\t.float\t" <> pprImm platform imm]
+        ppr_item FF64 _ = [text "\t.double\t" <> pprImm platform imm]
 
         ppr_item II64 _
             = case platformOS platform of
@@ -529,10 +529,10 @@ pprDataItem config lit
                               (fromIntegral (x `shiftR` 32) :: Word32))]
                   _ -> panic "X86.Ppr.ppr_item: no match for II64"
                | otherwise ->
-                  [text "\t.quad\t" <> pprImm imm]
+                  [text "\t.quad\t" <> pprImm platform imm]
               _
                | target32Bit platform ->
-                  [text "\t.quad\t" <> pprImm imm]
+                  [text "\t.quad\t" <> pprImm platform imm]
                | otherwise ->
                   -- x86_64: binutils can't handle the R_X86_64_PC64
                   -- relocation type, which means we can't do
@@ -547,10 +547,10 @@ pprDataItem config lit
                   case lit of
                   -- A relative relocation:
                   CmmLabelDiffOff _ _ _ _ ->
-                      [text "\t.long\t" <> pprImm imm,
+                      [text "\t.long\t" <> pprImm platform imm,
                        text "\t.long\t0"]
                   _ ->
-                      [text "\t.quad\t" <> pprImm imm]
+                      [text "\t.quad\t" <> pprImm platform imm]
 
 
 asmComment :: SDoc -> SDoc
@@ -571,8 +571,8 @@ pprInstr platform i = case i of
       -> panic "pprInstr: NEWBLOCK"
 
    UNWIND lbl d
-      -> asmComment (text "\tunwind = " <> ppr d)
-         $$ ppr lbl <> colon
+      -> asmComment (text "\tunwind = " <> pdoc platform d)
+         $$ pdoc platform lbl <> colon
 
    LDATA _ _
       -> panic "pprInstr: LDATA"
@@ -814,14 +814,14 @@ pprInstr platform i = case i of
       -> pprFormatOpReg (sLit "xchg") format src val
 
    JXX cond blockid
-      -> pprCondInstr (sLit "j") cond (ppr lab)
+      -> pprCondInstr (sLit "j") cond (pdoc platform lab)
          where lab = blockLbl blockid
 
    JXX_GBL cond imm
-      -> pprCondInstr (sLit "j") cond (pprImm imm)
+      -> pprCondInstr (sLit "j") cond (pprImm platform imm)
 
    JMP (OpImm imm) _
-      -> text "\tjmp " <> pprImm imm
+      -> text "\tjmp " <> pprImm platform imm
 
    JMP op _
       -> text "\tjmp *" <> pprOperand platform (archWordFormat (target32Bit platform)) op
@@ -830,7 +830,7 @@ pprInstr platform i = case i of
       -> pprInstr platform (JMP op [])
 
    CALL (Left imm) _
-      -> text "\tcall " <> pprImm imm
+      -> text "\tcall " <> pprImm platform imm
 
    CALL (Right reg) _
       -> text "\tcall *" <> pprReg platform (archWordFormat (target32Bit platform)) reg
@@ -929,7 +929,7 @@ pprInstr platform i = case i of
    pprX87Instr _ = panic "X86.Ppr.pprX87Instr: no match"
 
    pprDollImm :: Imm -> SDoc
-   pprDollImm i = text "$" <> pprImm i
+   pprDollImm i = text "$" <> pprImm platform i
 
 
    pprOperand :: Platform -> Format -> Operand -> SDoc
@@ -954,7 +954,7 @@ pprInstr platform i = case i of
      = hcat [
            pprMnemonic name format,
            char '$',
-           pprImm imm,
+           pprImm platform imm,
            comma,
            pprOperand platform format op1
        ]

@@ -36,7 +36,7 @@
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module GHC.Cmm.Ppr.Decl
-    ( writeCmms, pprCmms, pprCmmGroup, pprSection, pprStatic
+    ( pprCmms, pprCmmGroup, pprSection, pprStatic
     )
 where
 
@@ -46,62 +46,54 @@ import GHC.Platform
 import GHC.Cmm.Ppr.Expr
 import GHC.Cmm
 
-import GHC.Driver.Ppr
-import GHC.Driver.Session
 import GHC.Utils.Outputable
 import GHC.Data.FastString
 
 import Data.List
-import System.IO
 
 import qualified Data.ByteString as BS
 
 
-pprCmms :: (Outputable info, Outputable g)
-        => [GenCmmGroup RawCmmStatics info g] -> SDoc
-pprCmms cmms = pprCode CStyle (vcat (intersperse separator $ map ppr cmms))
+pprCmms :: (OutputableP info, OutputableP g)
+        => Platform -> [GenCmmGroup RawCmmStatics info g] -> SDoc
+pprCmms platform cmms = pprCode CStyle (vcat (intersperse separator $ map (pdoc platform) cmms))
         where
           separator = space $$ text "-------------------" $$ space
 
-writeCmms :: (Outputable info, Outputable g)
-          => DynFlags -> Handle -> [GenCmmGroup RawCmmStatics info g] -> IO ()
-writeCmms dflags handle cmms = printForC dflags handle (pprCmms cmms)
-
 -----------------------------------------------------------------------------
 
-instance (Outputable d, Outputable info, Outputable i)
-      => Outputable (GenCmmDecl d info i) where
-    ppr t = pprTop t
+instance (OutputableP d, OutputableP info, OutputableP i)
+      => OutputableP (GenCmmDecl d info i) where
+    pdoc = pprTop
 
-instance Outputable (GenCmmStatics a) where
-    ppr = pprStatics
+instance OutputableP (GenCmmStatics a) where
+    pdoc = pprStatics
 
-instance Outputable CmmStatic where
-    ppr e = sdocWithDynFlags $ \dflags ->
-            pprStatic (targetPlatform dflags) e
+instance OutputableP CmmStatic where
+    pdoc = pprStatic
 
-instance Outputable CmmInfoTable where
-    ppr = pprInfoTable
+instance OutputableP CmmInfoTable where
+    pdoc = pprInfoTable
 
 
 -----------------------------------------------------------------------------
 
-pprCmmGroup :: (Outputable d, Outputable info, Outputable g)
-            => GenCmmGroup d info g -> SDoc
-pprCmmGroup tops
-    = vcat $ intersperse blankLine $ map pprTop tops
+pprCmmGroup :: (OutputableP d, OutputableP info, OutputableP g)
+            => Platform -> GenCmmGroup d info g -> SDoc
+pprCmmGroup platform tops
+    = vcat $ intersperse blankLine $ map (pprTop platform) tops
 
 -- --------------------------------------------------------------------------
 -- Top level `procedure' blocks.
 --
-pprTop :: (Outputable d, Outputable info, Outputable i)
-       => GenCmmDecl d info i -> SDoc
+pprTop :: (OutputableP d, OutputableP info, OutputableP i)
+       => Platform -> GenCmmDecl d info i -> SDoc
 
-pprTop (CmmProc info lbl live graph)
+pprTop platform (CmmProc info lbl live graph)
 
-  = vcat [ ppr lbl <> lparen <> rparen <+> lbrace <+> text "// " <+> ppr live
-         , nest 8 $ lbrace <+> ppr info $$ rbrace
-         , nest 4 $ ppr graph
+  = vcat [ pdoc platform lbl <> lparen <> rparen <+> lbrace <+> text "// " <+> ppr live
+         , nest 8 $ lbrace <+> pdoc platform info $$ rbrace
+         , nest 4 $ pdoc platform graph
          , rbrace ]
 
 -- --------------------------------------------------------------------------
@@ -109,25 +101,25 @@ pprTop (CmmProc info lbl live graph)
 --
 --      section "data" { ... }
 --
-pprTop (CmmData section ds) =
-    (hang (pprSection section <+> lbrace) 4 (ppr ds))
+pprTop platform (CmmData section ds) =
+    (hang (pprSection platform section <+> lbrace) 4 (pdoc platform ds))
     $$ rbrace
 
 -- --------------------------------------------------------------------------
 -- Info tables.
 
-pprInfoTable :: CmmInfoTable -> SDoc
-pprInfoTable (CmmInfoTable { cit_lbl = lbl, cit_rep = rep
+pprInfoTable :: Platform -> CmmInfoTable -> SDoc
+pprInfoTable platform (CmmInfoTable { cit_lbl = lbl, cit_rep = rep
                            , cit_prof = prof_info
                            , cit_srt = srt })
-  = vcat [ text "label: " <> ppr lbl
+  = vcat [ text "label: " <> pdoc platform lbl
          , text "rep: " <> ppr rep
          , case prof_info of
              NoProfilingInfo -> empty
              ProfilingInfo ct cd ->
                vcat [ text "type: " <> text (show (BS.unpack ct))
                     , text "desc: " <> text (show (BS.unpack cd)) ]
-         , text "srt: " <> ppr srt ]
+         , text "srt: " <> pdoc platform srt ]
 
 instance Outputable ForeignHint where
   ppr NoHint     = empty
@@ -142,10 +134,10 @@ instance Outputable ForeignHint where
 --      following C--
 --
 
-pprStatics :: GenCmmStatics a -> SDoc
-pprStatics (CmmStatics lbl itbl ccs payload) =
-  ppr lbl <> colon <+> ppr itbl <+> ppr ccs <+> ppr payload
-pprStatics (CmmStaticsRaw lbl ds) = vcat ((ppr lbl <> colon) : map ppr ds)
+pprStatics :: Platform -> GenCmmStatics a -> SDoc
+pprStatics platform (CmmStatics lbl itbl ccs payload) =
+  pdoc platform lbl <> colon <+> pdoc platform itbl <+> ppr ccs <+> pdoc platform payload
+pprStatics platform (CmmStaticsRaw lbl ds) = vcat ((pdoc platform lbl <> colon) : map (pprStatic platform) ds)
 
 pprStatic :: Platform -> CmmStatic -> SDoc
 pprStatic platform s = case s of
@@ -157,9 +149,9 @@ pprStatic platform s = case s of
 -- --------------------------------------------------------------------------
 -- data sections
 --
-pprSection :: Section -> SDoc
-pprSection (Section t suffix) =
-  section <+> doubleQuotes (pprSectionType t <+> char '.' <+> ppr suffix)
+pprSection :: Platform -> Section -> SDoc
+pprSection platform (Section t suffix) =
+  section <+> doubleQuotes (pprSectionType t <+> char '.' <+> pdoc platform suffix)
   where
     section = text "section"
 
