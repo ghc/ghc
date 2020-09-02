@@ -416,7 +416,7 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
 -- directories to search for the referenced dependencies.
 --
 -- The system linker can do recursive linking, however using only the
--- direct dependencies conflicts with ghc ability to inline across
+-- direct dependencies conflicts with ghc's ability to inline across
 -- packages, and as such would end up with unresolved symbols.
 --
 -- Thus we will pass the full dependency closure to the linker, and then
