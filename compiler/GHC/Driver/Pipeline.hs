@@ -401,7 +401,7 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
 -- Since macOS Sierra (10.14), the dynamic system linker enforces
 -- a limit on the Load Commands.  Specifically the Load Command Size
 -- Limit is at 32K (32768).  The Load Commands contain the install
--- name, dependencies, runpaths, and a few other commans.  We however
+-- name, dependencies, runpaths, and a few other commands.  We however
 -- only have control over the install name, dependencies and runpaths.
 --
 -- The install name is the name by which this library will be
