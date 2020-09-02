@@ -837,7 +837,7 @@ maybeAltHeapCheck (GcInAlts regs, ReturnedTo lret off) code =
 
 cgConApp :: DataCon -> [StgArg] -> FCode ReturnKind
 cgConApp con stg_args
-  | isUnboxedTupleCon con       -- Unboxed tuple: assign and return
+  | isUnboxedTupleDataCon con       -- Unboxed tuple: assign and return
   = do { arg_exprs <- getNonVoidArgAmodes stg_args
        ; tickyUnboxedTupleReturn (length arg_exprs)
        ; emitReturn arg_exprs }

@@ -556,7 +556,7 @@ hasNoBinding :: Id -> Bool
 hasNoBinding id = case Var.idDetails id of
                         PrimOpId _       -> True    -- See Note [Eta expanding primops] in GHC.Builtin.PrimOps
                         FCallId _        -> True
-                        DataConWorkId dc -> isUnboxedTupleCon dc || isUnboxedSumCon dc
+                        DataConWorkId dc -> isUnboxedTupleDataCon dc || isUnboxedSumDataCon dc
                         _                -> isCompulsoryUnfolding (idUnfolding id)
                                             -- See Note [Levity-polymorphic Ids]
 
