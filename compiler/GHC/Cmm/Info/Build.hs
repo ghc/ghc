@@ -1,6 +1,6 @@
 {-# LANGUAGE GADTs, BangPatterns, RecordWildCards,
     GeneralizedNewtypeDeriving, NondecreasingIndentation, TupleSections,
-    ScopedTypeVariables, OverloadedStrings #-}
+    ScopedTypeVariables, OverloadedStrings, LambdaCase #-}
 
 module GHC.Cmm.Info.Build
   ( CAFSet, CAFEnv, cafAnal, cafAnalData
@@ -455,7 +455,7 @@ non-CAFFY.
 -- map them to SRTEntry later, which ranges over labels that do exist.
 --
 newtype CAFLabel = CAFLabel CLabel
-  deriving (Eq,Ord,Outputable)
+  deriving (Eq,Ord,OutputableP)
 
 type CAFSet = Set CAFLabel
 type CAFEnv = LabelMap CAFSet
@@ -466,7 +466,7 @@ mkCAFLabel platform lbl = CAFLabel (toClosureLbl platform lbl)
 -- This is a label that we can put in an SRT.  It *must* be a closure label,
 -- pointing to either a FUN_STATIC, THUNK_STATIC, or CONSTR.
 newtype SRTEntry = SRTEntry CLabel
-  deriving (Eq, Ord, Outputable)
+  deriving (Eq, Ord, OutputableP)
 
 -- ---------------------------------------------------------------------
 -- CAF analysis
@@ -571,12 +571,12 @@ cafTransfers platform contLbls entry topLbl
             _ ->
               set
     in
-      srtTrace "cafTransfers" (text "block:" <+> ppr block $$
-                                text "contLbls:" <+> ppr contLbls $$
-                                text "entry:" <+> ppr entry $$
-                                text "topLbl:" <+> ppr topLbl $$
-                                text "cafs in exit:" <+> ppr joined $$
-                                text "result:" <+> ppr result) $
+      srtTrace "cafTransfers" (text "block:"         <+> pdoc platform block $$
+                                text "contLbls:"     <+> ppr contLbls $$
+                                text "entry:"        <+> ppr entry $$
+                                text "topLbl:"       <+> pdoc platform topLbl $$
+                                text "cafs in exit:" <+> pdoc platform joined $$
+                                text "result:"       <+> pdoc platform result) $
         mapSingleton (entryLabel eNode) result
 
 
@@ -597,12 +597,12 @@ data ModuleSRTInfo = ModuleSRTInfo
   , moduleSRTMap :: SRTMap
   }
 
-instance Outputable ModuleSRTInfo where
-  ppr ModuleSRTInfo{..} =
+instance OutputableP ModuleSRTInfo where
+  pdoc platform ModuleSRTInfo{..} =
     text "ModuleSRTInfo {" $$
-      (nest 4 $ text "dedupSRTs =" <+> ppr dedupSRTs $$
-                text "flatSRTs =" <+> ppr flatSRTs $$
-                text "moduleSRTMap =" <+> ppr moduleSRTMap) $$ char '}'
+      (nest 4 $ text "dedupSRTs ="    <+> pdoc platform dedupSRTs $$
+                text "flatSRTs ="     <+> pdoc platform flatSRTs $$
+                text "moduleSRTMap =" <+> pdoc platform moduleSRTMap) $$ char '}'
 
 emptySRT :: Module -> ModuleSRTInfo
 emptySRT mod =
@@ -635,9 +635,10 @@ data SomeLabel
   | DeclLabel CLabel
   deriving (Eq, Ord)
 
-instance Outputable SomeLabel where
-  ppr (BlockLabel l) = text "b:" <+> ppr l
-  ppr (DeclLabel l) = text "s:" <+> ppr l
+instance OutputableP SomeLabel where
+   pdoc platform = \case
+      BlockLabel l -> text "b:" <+> pdoc platform l
+      DeclLabel l  -> text "s:" <+> pdoc platform l
 
 getBlockLabel :: SomeLabel -> Maybe Label
 getBlockLabel (BlockLabel l) = Just l
@@ -672,9 +673,9 @@ depAnalSRTs
   -> [CmmDecl]
   -> [SCC (SomeLabel, CAFLabel, Set CAFLabel)]
 depAnalSRTs platform cafEnv cafEnv_static decls =
-  srtTrace "depAnalSRTs" (text "decls:" <+> ppr decls $$
-                           text "nodes:" <+> ppr (map node_payload nodes) $$
-                           text "graph:" <+> ppr graph) graph
+  srtTrace "depAnalSRTs" (text "decls:"  <+> pdoc platform decls $$
+                           text "nodes:" <+> pdoc platform (map node_payload nodes) $$
+                           text "graph:" <+> pdoc platform graph) graph
  where
   labelledBlocks :: [(SomeLabel, CAFLabel)]
   labelledBlocks = concatMap (getLabelledBlocks platform) decls
@@ -749,7 +750,7 @@ srtMapNonCAFs srtMap =
 -- | resolve a CAFLabel to its SRTEntry using the SRTMap
 resolveCAF :: Platform -> SRTMap -> CAFLabel -> Maybe SRTEntry
 resolveCAF platform srtMap lbl@(CAFLabel l) =
-    srtTrace "resolveCAF" ("l:" <+> ppr l <+> "resolved:" <+> ppr ret) ret
+    srtTrace "resolveCAF" ("l:" <+> pdoc platform l <+> "resolved:" <+> pdoc platform ret) ret
   where
     ret = Map.findWithDefault (Just (SRTEntry (toClosureLbl platform l))) lbl srtMap
 
@@ -777,7 +778,7 @@ doSRTs dflags moduleSRTInfo procs data_ = do
         \(set, decl) ->
           case decl of
             CmmProc{} ->
-              pprPanic "doSRTs" (text "Proc in static data list:" <+> ppr decl)
+              pprPanic "doSRTs" (text "Proc in static data list:" <+> pdoc platform decl)
             CmmData _ static ->
               case static of
                 CmmStatics lbl _ _ _ -> (lbl, set)
@@ -806,11 +807,11 @@ doSRTs dflags moduleSRTInfo procs data_ = do
     cafsWithSRTs :: [(Label, CAFLabel, Set CAFLabel)]
     cafsWithSRTs = getCAFs platform cafEnv decls
 
-  srtTraceM "doSRTs" (text "data:" <+> ppr data_ $$
-                      text "procs:" <+> ppr procs $$
-                      text "static_data_env:" <+> ppr static_data_env $$
-                      text "sccs:" <+> ppr sccs $$
-                      text "cafsWithSRTs:" <+> ppr cafsWithSRTs)
+  srtTraceM "doSRTs" (text "data:"            <+> pdoc platform data_ $$
+                      text "procs:"           <+> pdoc platform procs $$
+                      text "static_data_env:" <+> pdoc platform static_data_env $$
+                      text "sccs:"            <+> pdoc platform sccs $$
+                      text "cafsWithSRTs:"    <+> pdoc platform cafsWithSRTs)
 
   -- On each strongly-connected group of decls, construct the SRT
   -- closures and the SRT fields for info tables.
@@ -860,7 +861,7 @@ doSRTs dflags moduleSRTInfo procs data_ = do
                           -- Not an IdLabel, ignore
                           srtMap
                     CmmProc{} ->
-                      pprPanic "doSRTs" (text "Found Proc in static data list:" <+> ppr decl))
+                      pprPanic "doSRTs" (text "Found Proc in static data list:" <+> pdoc platform decl))
                (moduleSRTMap moduleSRTInfo') data_
 
   return (moduleSRTInfo'{ moduleSRTMap = srtMap_w_raws }, srt_decls ++ decls')
@@ -966,18 +967,18 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
     filtered0 = Set.fromList resolved `Set.difference` allBelow
 
   srtTraceM "oneSRT:"
-     (text "srtMap:" <+> ppr srtMap $$
-      text "nonRec:" <+> ppr nonRec $$
-      text "lbls:" <+> ppr lbls $$
-      text "caf_lbls:" <+> ppr caf_lbls $$
-      text "static_data:" <+> ppr static_data $$
-      text "cafs:" <+> ppr cafs $$
-      text "blockids:" <+> ppr blockids $$
-      text "maybeFunClosure:" <+> ppr maybeFunClosure $$
-      text "otherFunLabels:" <+> ppr otherFunLabels $$
-      text "resolved:" <+> ppr resolved $$
-      text "allBelow:" <+> ppr allBelow $$
-      text "filtered0:" <+> ppr filtered0)
+     (text "srtMap:"          <+> pdoc platform srtMap $$
+      text "nonRec:"          <+> pdoc platform nonRec $$
+      text "lbls:"            <+> pdoc platform lbls $$
+      text "caf_lbls:"        <+> pdoc platform caf_lbls $$
+      text "static_data:"     <+> pdoc platform static_data $$
+      text "cafs:"            <+> pdoc platform cafs $$
+      text "blockids:"        <+> ppr blockids $$
+      text "maybeFunClosure:" <+> pdoc platform maybeFunClosure $$
+      text "otherFunLabels:"  <+> pdoc platform otherFunLabels $$
+      text "resolved:"        <+> pdoc platform resolved $$
+      text "allBelow:"        <+> pdoc platform allBelow $$
+      text "filtered0:"       <+> pdoc platform filtered0)
 
   let
     isStaticFun = isJust maybeFunClosure
@@ -989,7 +990,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
     updateSRTMap :: Maybe SRTEntry -> StateT ModuleSRTInfo UniqSM ()
     updateSRTMap srtEntry =
       srtTrace "updateSRTMap"
-        (ppr srtEntry <+> "isCAF:" <+> ppr isCAF <+>
+        (pdoc platform srtEntry <+> "isCAF:" <+> ppr isCAF <+>
          "isStaticFun:" <+> ppr isStaticFun) $
       when (not isCAF && (not isStaticFun || isNothing srtEntry)) $
         modify' $ \state ->
@@ -1012,7 +1013,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
       all (\(CAFLabel clbl) -> Set.member clbl static_data) caf_lbls
 
   if Set.null filtered0 then do
-    srtTraceM "oneSRT: empty" (ppr caf_lbls)
+    srtTraceM "oneSRT: empty" (pdoc platform caf_lbls)
     updateSRTMap Nothing
     return ([], [], [], False)
   else do
@@ -1021,8 +1022,8 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
     let allBelow_funs =
           Set.fromList (map (SRTEntry . toClosureLbl platform) otherFunLabels)
     let filtered = filtered0 `Set.union` allBelow_funs
-    srtTraceM "oneSRT" (text "filtered:" <+> ppr filtered $$
-                        text "allBelow_funs:" <+> ppr allBelow_funs)
+    srtTraceM "oneSRT" (text "filtered:"      <+> pdoc platform filtered $$
+                        text "allBelow_funs:" <+> pdoc platform allBelow_funs)
     case Set.toList filtered of
       [] -> pprPanic "oneSRT" empty -- unreachable
 
@@ -1054,8 +1055,8 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
                   [ (b, if b == staticFunBlock then lbl else staticFunLbl)
                   | b <- blockids ]
             Nothing -> do
-              srtTraceM "oneSRT: one" (text "caf_lbls:" <+> ppr caf_lbls $$
-                                       text "one:" <+> ppr one)
+              srtTraceM "oneSRT: one" (text "caf_lbls:" <+> pdoc platform caf_lbls $$
+                                       text "one:"      <+> pdoc platform one)
               updateSRTMap (Just one)
               return ([], map (,lbl) blockids, [], True)
 
@@ -1067,7 +1068,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
         -- Implements the [Common] optimisation.
         case Map.lookup filtered (dedupSRTs topSRT) of
           Just srtEntry@(SRTEntry srtLbl)  -> do
-            srtTraceM "oneSRT [Common]" (ppr caf_lbls <+> ppr srtLbl)
+            srtTraceM "oneSRT [Common]" (pdoc platform caf_lbls <+> pdoc platform srtLbl)
             updateSRTMap (Just srtEntry)
             return ([], map (,srtLbl) blockids, [], True)
           Nothing -> do
@@ -1087,11 +1088,11 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
                 newDedupSRTs = Map.insert filtered srtEntry (dedupSRTs topSRT)
             modify' (\state -> state{ dedupSRTs = newDedupSRTs,
                                       flatSRTs = newFlatSRTs })
-            srtTraceM "oneSRT: new" (text "caf_lbls:" <+> ppr caf_lbls $$
-                                      text "filtered:" <+> ppr filtered $$
-                                      text "srtEntry:" <+> ppr srtEntry $$
-                                      text "newDedupSRTs:" <+> ppr newDedupSRTs $$
-                                      text "newFlatSRTs:" <+> ppr newFlatSRTs)
+            srtTraceM "oneSRT: new" (text "caf_lbls:"      <+> pdoc platform caf_lbls $$
+                                      text "filtered:"     <+> pdoc platform filtered $$
+                                      text "srtEntry:"     <+> pdoc platform srtEntry $$
+                                      text "newDedupSRTs:" <+> pdoc platform newDedupSRTs $$
+                                      text "newFlatSRTs:"  <+> pdoc platform newFlatSRTs)
             let SRTEntry lbl = srtEntry
             return (decls, map (,lbl) blockids, funSRTs, True)
 
@@ -1179,7 +1180,7 @@ updInfoSRTs profile srt_env funSRTEnv caffy (CmmProc top_info top_l live g)
               -- if we don't add SRT entries to this closure, then we
               -- want to set the srt field in its info table as usual
               (info_tbl { cit_srt = mapLookup (g_entry g) srt_env }, [])
-            Just srtEntries -> srtTrace "maybeStaticFun" (ppr res)
+            Just srtEntries -> srtTrace "maybeStaticFun" (pdoc (profilePlatform profile) res)
               (info_tbl { cit_rep = new_rep }, res)
               where res = [ CmmLabel lbl | SRTEntry lbl <- srtEntries ]
           fields = mkStaticClosureFields profile info_tbl ccs caf_info srtEntries

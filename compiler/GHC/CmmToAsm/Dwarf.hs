@@ -73,7 +73,7 @@ dwarfGen config modLoc us blocks = do
                      , dwarfInfoSection platform
                      , compileUnitHeader platform unitU
                      , pprDwarfInfo platform haveSrc dwarfUnit
-                     , compileUnitFooter unitU
+                     , compileUnitFooter platform unitU
                      ]
 
   -- .debug_line section: Generated mainly by the assembler, but we
@@ -109,9 +109,9 @@ mkDwarfARange proc = DwarfARange start end
 compileUnitHeader :: Platform -> Unique -> SDoc
 compileUnitHeader platform unitU =
   let cuLabel = mkAsmTempLabel unitU  -- sits right before initialLength field
-      length = ppr (mkAsmTempEndLabel cuLabel) <> char '-' <> ppr cuLabel
+      length = pdoc platform (mkAsmTempEndLabel cuLabel) <> char '-' <> pdoc platform cuLabel
                <> text "-4"       -- length of initialLength field
-  in vcat [ ppr cuLabel <> colon
+  in vcat [ pdoc platform cuLabel <> colon
           , text "\t.long " <> length  -- compilation unit size
           , pprHalf 3                          -- DWARF version
           , sectionOffset platform (ptext dwarfAbbrevLabel) (ptext dwarfAbbrevLabel)
@@ -120,10 +120,10 @@ compileUnitHeader platform unitU =
           ]
 
 -- | Compilation unit footer, mainly establishing size of debug sections
-compileUnitFooter :: Unique -> SDoc
-compileUnitFooter unitU =
+compileUnitFooter :: Platform -> Unique -> SDoc
+compileUnitFooter platform unitU =
   let cuEndLabel = mkAsmTempEndLabel $ mkAsmTempLabel unitU
-  in ppr cuEndLabel <> colon
+  in pdoc platform cuEndLabel <> colon
 
 -- | Splits the blocks by procedures. In the result all nested blocks
 -- will come from the same procedure as the top-level block. See

@@ -164,7 +164,7 @@ cmmLlvmGen cmm@CmmProc{} = do
     let fixed_cmm = {-# SCC "llvm_fix_regs" #-} fixStgRegisters platform cmm
 
     dumpIfSetLlvm Opt_D_dump_opt_cmm "Optimised Cmm"
-      FormatCMM (pprCmmGroup [fixed_cmm])
+      FormatCMM (pprCmmGroup platform [fixed_cmm])
 
     -- generate llvm code from cmm
     llvmBC <- withClearVars $ genLlvmProc fixed_cmm

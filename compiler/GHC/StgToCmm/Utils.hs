@@ -364,7 +364,7 @@ emitMultiAssign []    []    = return ()
 emitMultiAssign [reg] [rhs] = emitAssign (CmmLocal reg) rhs
 emitMultiAssign regs rhss   = do
   platform <- getPlatform
-  ASSERT2( equalLength regs rhss, ppr regs $$ ppr rhss )
+  ASSERT2( equalLength regs rhss, ppr regs $$ pdoc platform rhss )
     unscramble platform ([1..] `zip` (regs `zip` rhss))
 
 unscramble :: Platform -> [Vrtx] -> FCode ()
