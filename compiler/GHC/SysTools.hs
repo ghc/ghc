@@ -389,7 +389,7 @@ linkDynLib dflags0 o_files dep_packages
                  ++ map Option pkg_framework_opts
                  -- dead_strip_dylibs, will remove unused dylibs, and thus save
                  -- space in the load commands. The -headerpad is necessary so
-                 -- that we can inject more @rpath's later for the left over
+                 -- that we can inject more @rpath's later for the leftover
                  -- libraries in the runInjectRpaths phase below.
                  --
                  -- See Note [Dynamic linking on macOS]
