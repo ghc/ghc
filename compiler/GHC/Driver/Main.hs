@@ -1416,10 +1416,10 @@ hscGenHardCode hsc_env cgguts location output_filename = do
             <- {-# SCC "CoreToStg" #-}
                myCoreToStg dflags this_mod prepd_binds
 
-        let cost_centre_info =
-              (S.toList local_ccs ++ caf_ccs, caf_cc_stacks)
+        let cost_centre_info = (S.toList local_ccs ++ caf_ccs, caf_cc_stacks)
+            platform = targetPlatform dflags
             prof_init
-               | sccProfilingEnabled dflags = profilingInitCode this_mod cost_centre_info
+               | sccProfilingEnabled dflags = profilingInitCode platform this_mod cost_centre_info
                | otherwise = empty
             foreign_stubs = foreign_stubs0 `appendStubC` prof_init
 
@@ -1445,7 +1445,7 @@ hscGenHardCode hsc_env cgguts location output_filename = do
 
             let dump a = do
                   unless (null a) $
-                    dumpIfSet_dyn dflags Opt_D_dump_cmm_raw "Raw Cmm" FormatCMM (ppr a)
+                    dumpIfSet_dyn dflags Opt_D_dump_cmm_raw "Raw Cmm" FormatCMM (pdoc platform a)
                   return a
                 rawcmms1 = Stream.mapM dump rawcmms0
 
@@ -1493,9 +1493,10 @@ hscCompileCmmFile :: HscEnv -> FilePath -> FilePath -> IO ()
 hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
     let dflags   = hsc_dflags hsc_env
         home_unit = mkHomeUnitFromFlags dflags
+        platform  = targetPlatform dflags
     cmm <- ioMsgMaybe $ parseCmmFile dflags filename
     liftIO $ do
-        dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose_by_proc "Parsed Cmm" FormatCMM (ppr cmm)
+        dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose_by_proc "Parsed Cmm" FormatCMM (pdoc platform cmm)
         let -- Make up a module name to give the NCG. We can't pass bottom here
             -- lest we reproduce #11784.
             mod_name = mkModuleName $ "Cmm$" ++ FilePath.takeFileName filename
@@ -1512,7 +1513,7 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
 
         unless (null cmmgroup) $
           dumpIfSet_dyn dflags Opt_D_dump_cmm "Output Cmm"
-            FormatCMM (ppr cmmgroup)
+            FormatCMM (pdoc platform cmmgroup)
         rawCmms <- lookupHook (\x -> cmmToRawCmmHook x)
                      (\dflgs _ -> cmmToRawCmm dflgs) dflags dflags Nothing (Stream.yield cmmgroup)
         _ <- codeOutput dflags cmm_mod output_filename no_loc NoStubs [] []
@@ -1555,6 +1556,7 @@ doCodeGen   :: HscEnv -> Module -> [TyCon]
 doCodeGen hsc_env this_mod data_tycons
               cost_centre_info stg_binds hpc_info = do
     let dflags = hsc_dflags hsc_env
+        platform = targetPlatform dflags
 
     let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
 
@@ -1574,7 +1576,7 @@ doCodeGen hsc_env this_mod data_tycons
     let dump1 a = do
           unless (null a) $
             dumpIfSet_dyn dflags Opt_D_dump_cmm_from_stg
-              "Cmm produced by codegen" FormatCMM (ppr a)
+              "Cmm produced by codegen" FormatCMM (pdoc platform a)
           return a
 
         ppr_stream1 = Stream.mapM dump1 cmm_stream
@@ -1590,7 +1592,7 @@ doCodeGen hsc_env this_mod data_tycons
 
         dump2 a = do
           unless (null a) $
-            dumpIfSet_dyn dflags Opt_D_dump_cmm "Output Cmm" FormatCMM (ppr a)
+            dumpIfSet_dyn dflags Opt_D_dump_cmm "Output Cmm" FormatCMM (pdoc platform a)
           return a
 
     return (Stream.mapM dump2 pipeline_stream)

@@ -204,7 +204,7 @@ slowCall fun stg_args
            r <- direct_call "slow_call" NativeNodeCall
                  (mkRtsApFastLabel rts_fun) arity ((P,Just fun):argsreps)
            emitComment $ mkFastString ("slow_call for " ++
-                                      showSDoc dflags (ppr fun) ++
+                                      showSDoc dflags (pdoc platform fun) ++
                                       " with pat " ++ unpackFS rts_fun)
            return r
 
@@ -291,10 +291,11 @@ direct_call :: String
 direct_call caller call_conv lbl arity args
   | debugIsOn && args `lengthLessThan` real_arity  -- Too few args
   = do -- Caller should ensure that there enough args!
+       platform <- getPlatform
        pprPanic "direct_call" $
             text caller <+> ppr arity <+>
-            ppr lbl <+> ppr (length args) <+>
-            ppr (map snd args) <+> ppr (map fst args)
+            pdoc platform lbl <+> ppr (length args) <+>
+            pdoc platform (map snd args) <+> ppr (map fst args)
 
   | null rest_args  -- Precisely the right number of arguments
   = emitCall (call_conv, NativeReturn) target (nonVArgs args)
