@@ -547,7 +547,7 @@ load' how_much mHscMessage mod_graph = do
           let ofile = outputFile dflags
           let no_hs_main = gopt Opt_NoHsMain dflags
           let
-            main_mod = mainModIs dflags
+            main_mod = mainModuleIs dflags
             a_root_is_Main = mgElemModule mod_graph main_mod
             do_linking = a_root_is_Main || no_hs_main || ghcLink dflags == LinkDynLib || ghcLink dflags == LinkStaticLib
 
@@ -669,7 +669,7 @@ guessOutputFile = modifySession $ \env ->
         !mod_graph = hsc_mod_graph env
         mainModuleSrcPath :: Maybe String
         mainModuleSrcPath = do
-            ms <- mgLookupModule mod_graph (mainModIs dflags)
+            ms <- mgLookupModule mod_graph (mainModuleIs dflags)
             ml_hs_file (ms_location ms)
         name = fmap dropExtension mainModuleSrcPath
 

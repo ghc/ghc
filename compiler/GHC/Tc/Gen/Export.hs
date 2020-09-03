@@ -172,7 +172,7 @@ tcRnExports explicit_mod exports
        -- thing (especially via 'module Foo' export item)
    do   {
         ; dflags <- getDynFlags
-        ; let is_main_mod = mainModIs dflags == this_mod
+        ; let is_main_mod = mainModuleIs dflags == this_mod
         ; let default_main = case mainFunIs dflags of
                  Just main_fun
                      | is_main_mod -> mkUnqual varName (fsLit main_fun)
