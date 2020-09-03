@@ -15,7 +15,7 @@ module GHC.Tc.Solver.Monad (
     getWorkList, updWorkListTcS, pushLevelNoWorkList,
 
     -- The TcS monad
-    TcS, runTcS, runTcSDeriveds, runTcSWithEvBinds,
+    TcS, runTcS, runTcSDeriveds, runTcSWithEvBinds, runTcSInerts,
     failTcS, warnTcS, addErrTcS,
     runTcSEqualities,
     nestTcS, nestImplicTcS, setEvBindsTcS,
@@ -55,7 +55,7 @@ module GHC.Tc.Solver.Monad (
     tcLookupClass, tcLookupId,
 
     -- Inerts
-    InertSet(..), InertCans(..),
+    InertSet(..), InertCans(..), emptyInert,
     updInertTcS, updInertCans, updInertDicts, updInertIrreds,
     getNoGivenEqs, setInertCans,
     getInertEqs, getInertCans, getInertGivens,
@@ -2785,28 +2785,41 @@ runTcS :: TcS a                -- What to run
        -> TcM (a, EvBindMap)
 runTcS tcs
   = do { ev_binds_var <- TcM.newTcEvBinds
-       ; res <- runTcSWithEvBinds ev_binds_var tcs
+       ; res <- runTcSWithEvBinds ev_binds_var True tcs
        ; ev_binds <- TcM.getTcEvBindsMap ev_binds_var
        ; return (res, ev_binds) }
-
 -- | This variant of 'runTcS' will keep solving, even when only Deriveds
 -- are left around. It also doesn't return any evidence, as callers won't
 -- need it.
 runTcSDeriveds :: TcS a -> TcM a
 runTcSDeriveds tcs
   = do { ev_binds_var <- TcM.newTcEvBinds
-       ; runTcSWithEvBinds ev_binds_var tcs }
+       ; runTcSWithEvBinds ev_binds_var True tcs }
 
 -- | This can deal only with equality constraints.
 runTcSEqualities :: TcS a -> TcM a
 runTcSEqualities thing_inside
   = do { ev_binds_var <- TcM.newNoTcEvBinds
-       ; runTcSWithEvBinds ev_binds_var thing_inside }
+       ; runTcSWithEvBinds ev_binds_var True thing_inside }
+
+-- | A variant of 'runTcS' that takes and returns an 'InertSet' for
+-- later resumption of the 'TcS' session. Crucially, it doesn't
+-- 'unflattenGivens' when done.
+runTcSInerts :: InertSet -> TcS a -> TcM (a, InertSet)
+runTcSInerts inerts tcs = do
+  ev_binds_var <- TcM.newTcEvBinds
+  -- Passing False here to prohibit unflattening
+  runTcSWithEvBinds ev_binds_var False $ do
+    setTcSInerts inerts
+    a <- tcs
+    new_inerts <- getTcSInerts
+    return (a, new_inerts)
 
 runTcSWithEvBinds :: EvBindsVar
+                  -> Bool       -- ^ Unflatten types afterwards? Don't if you want to reuse the InertSet.
                   -> TcS a
                   -> TcM a
-runTcSWithEvBinds ev_binds_var tcs
+runTcSWithEvBinds ev_binds_var unflatten tcs
   = do { unified_var <- TcM.newTcRef 0
        ; step_count <- TcM.newTcRef 0
        ; inert_var <- TcM.newTcRef emptyInert
@@ -2824,7 +2837,7 @@ runTcSWithEvBinds ev_binds_var tcs
        ; when (count > 0) $
          csTraceTcM $ return (text "Constraint solver steps =" <+> int count)
 
-       ; unflattenGivens inert_var
+       ; when unflatten $ unflattenGivens inert_var
 
 #if defined(DEBUG)
        ; ev_binds <- TcM.getTcEvBindsMap ev_binds_var
