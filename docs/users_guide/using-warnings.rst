@@ -14,37 +14,43 @@ of warnings.
 To turn off an individual warning ``-W<wflag>``, use ``-Wno-<wflag>``.
 To reverse ``-Werror``, which makes all warnings into errors, use ``-Wwarn``.
 
-By default, you get a standard set of warnings which are
-generally likely to indicate bugs in your program. These are:
 
-.. hlist::
-    :columns: 3
+.. ghc-flag:: -Wdefault
+    :shortdesc: enable default flags
+    :type: dynamic
+    :category:
 
-    * :ghc-flag:`-Woverlapping-patterns`
-    * :ghc-flag:`-Wwarnings-deprecations`
-    * :ghc-flag:`-Wdeprecations`
-    * :ghc-flag:`-Wdeprecated-flags`
-    * :ghc-flag:`-Wunrecognised-pragmas`
-    * :ghc-flag:`-Wduplicate-exports`
-    * :ghc-flag:`-Wderiving-defaults`
-    * :ghc-flag:`-Woverflowed-literals`
-    * :ghc-flag:`-Wempty-enumerations`
-    * :ghc-flag:`-Wmissing-fields`
-    * :ghc-flag:`-Wmissing-methods`
-    * :ghc-flag:`-Wwrong-do-bind`
-    * :ghc-flag:`-Wsimplifiable-class-constraints`
-    * :ghc-flag:`-Wtyped-holes`
-    * :ghc-flag:`-Wdeferred-type-errors`
-    * :ghc-flag:`-Wpartial-type-signatures`
-    * :ghc-flag:`-Wunsupported-calling-conventions`
-    * :ghc-flag:`-Wdodgy-foreign-imports`
-    * :ghc-flag:`-Winline-rule-shadowing`
-    * :ghc-flag:`-Wunsupported-llvm-version`
-    * :ghc-flag:`-Wmissed-extra-shared-lib`
-    * :ghc-flag:`-Wtabs`
-    * :ghc-flag:`-Wunrecognised-warning-flags`
-    * :ghc-flag:`-Winaccessible-code`
-    * :ghc-flag:`-Wstar-binder`
+    By default, you get a standard set of warnings which are
+    generally likely to indicate bugs in your program. These are:
+
+    .. hlist::
+        :columns: 3
+
+        * :ghc-flag:`-Woverlapping-patterns`
+        * :ghc-flag:`-Wwarnings-deprecations`
+        * :ghc-flag:`-Wdeprecations`
+        * :ghc-flag:`-Wdeprecated-flags`
+        * :ghc-flag:`-Wunrecognised-pragmas`
+        * :ghc-flag:`-Wduplicate-exports`
+        * :ghc-flag:`-Wderiving-defaults`
+        * :ghc-flag:`-Woverflowed-literals`
+        * :ghc-flag:`-Wempty-enumerations`
+        * :ghc-flag:`-Wmissing-fields`
+        * :ghc-flag:`-Wmissing-methods`
+        * :ghc-flag:`-Wwrong-do-bind`
+        * :ghc-flag:`-Wsimplifiable-class-constraints`
+        * :ghc-flag:`-Wtyped-holes`
+        * :ghc-flag:`-Wdeferred-type-errors`
+        * :ghc-flag:`-Wpartial-type-signatures`
+        * :ghc-flag:`-Wunsupported-calling-conventions`
+        * :ghc-flag:`-Wdodgy-foreign-imports`
+        * :ghc-flag:`-Winline-rule-shadowing`
+        * :ghc-flag:`-Wunsupported-llvm-version`
+        * :ghc-flag:`-Wmissed-extra-shared-lib`
+        * :ghc-flag:`-Wtabs`
+        * :ghc-flag:`-Wunrecognised-warning-flags`
+        * :ghc-flag:`-Winaccessible-code`
+        * :ghc-flag:`-Wstar-binder`
 
 The following flags are simple ways to select standard "packages" of warnings:
 
@@ -67,6 +73,13 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wdodgy-exports`
         * :ghc-flag:`-Wdodgy-imports`
         * :ghc-flag:`-Wunbanged-strict-patterns`
+
+.. ghc-flag:: -Wextra
+    :shortdesc: alias for :ghc-flag:`-W`
+    :type: dynamic
+    :reverse: -w
+
+    Alias for :ghc-flag:`-W`
 
 .. ghc-flag:: -Wall
     :shortdesc: enable almost all warnings (details in :ref:`options-sanity`)
@@ -144,6 +157,12 @@ The following flags are simple ways to select standard "packages" of warnings:
 
     Turns off all warnings, including the standard ones and those that
     :ghc-flag:`-Wall` doesn't enable.
+
+.. ghc-flag:: -Wnot
+    :shortdesc: *(deprecated)* Alias for :ghc-flag:`-w`
+    :type: dynamic
+
+    Deprecated alias for :ghc-flag:`-w`
 
 These options control which warnings are considered fatal and cause compilation
 to abort.
@@ -248,6 +267,16 @@ of ``-W(no-)*``.
 
     This warning can be addressed by either adding an explicit import list or
     using a ``qualified`` import.
+
+.. ghc-flag:: -Wprepositive-qualified-module
+    :shortdesc: Report imports with a leading/prepositive "qualified"
+    :type: dynamic
+    :reverse: -Wno-prepositive-qualified-module
+    :category:
+
+    Normally, imports are qualified prepositively: ``import qualified M``.
+    By using :extension:`ImportQualifiedPost`, the qualified keyword can be used after the module name.
+    Like so: ``import M qualified``. This will warn when the first, prepositive syntax is used.
 
 .. ghc-flag:: -Wtyped-holes
     :shortdesc: Report warnings when :ref:`typed hole <typed-holes>` errors are
@@ -400,6 +429,13 @@ of ``-W(no-)*``.
 
     This option is off by default.
 
+.. ghc-flag:: -Wmissed-specializations
+    :shortdesc: alias for :ghc-flag:`-Wmissed-specialisations`
+    :type: dynamic
+    :reverse: -Wno-missed-specializations
+
+    Alias for :ghc-flag:`-Wmissed-specialisations`
+
 .. ghc-flag:: -Wall-missed-specialisations
     :shortdesc: warn when specialisation of any overloaded function fails.
     :type: dynamic
@@ -414,6 +450,13 @@ of ``-W(no-)*``.
     :ghc-flag:`-Werror`.
 
     This option is off by default.
+
+.. ghc-flag:: -Wall-missed-specializations
+    :shortdesc: alias for :ghc-flag:`-Wall-missed-specialisations`
+    :type: dynamic
+    :reverse: -Wno-all-missed-specializations
+
+    Alias for :ghc-flag:`-Wall-missed-specialisations`
 
 .. ghc-flag:: -Wwarnings-deprecations
     :shortdesc: warn about uses of functions & types that have warnings or
@@ -1825,6 +1868,18 @@ of ``-W(no-)*``.
 
     This warning informs you about discarded documentation comments.
     It has no effect when :ghc-flag:`-haddock` is disabled.
+
+.. ghc-flag:: -Wauto-orphans
+    :shortdesc: *(deprecated)* Does nothing
+    :type: dynamic
+
+    Does nothing.
+
+.. ghc-flag:: -Wmissing-space-after-bang
+    :shortdesc: *(deprecated)* Does nothing
+    :type: dynamic
+
+    Does nothing.
 
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's

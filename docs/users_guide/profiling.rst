@@ -427,6 +427,43 @@ for all modules in a program.
     interested in the entry counts (for example, if you only intend to
     do heap profiling).
 
+
+.. ghc-flag:: -auto-all
+    :shortdesc: *(deprecated)* Alias for :ghc-flag:`-fprof-auto`
+    :type: dynamic
+
+    Deprecated alias for :ghc-flag:`-fprof-auto`
+
+.. ghc-flag:: -auto
+    :shortdesc: *(deprecated)* Alias for :ghc-flag:`-fprof-auto-exported`
+    :type: dynamic
+
+    Deprecated alias for :ghc-flag:`-fprof-auto-exported`
+    
+.. ghc-flag:: -caf-all
+    :shortdesc: *(deprecated)* Alias for :ghc-flag:`-fprof-cafs`
+    :type: dynamic
+
+    Deprecated alias for :ghc-flag:`-fprof-cafs`
+
+.. ghc-flag:: -no-auto-all
+    :shortdesc: *(deprecated)* Alias for :ghc-flag:`-fno-prof-auto`
+    :type: dynamic
+
+    Deprecated alias for :ghc-flag:`-fno-prof-auto`
+
+.. ghc-flag:: -no-auto
+    :shortdesc: *(deprecated)* Alias for :ghc-flag:`-fno-prof-auto`
+    :type: dynamic
+
+    Deprecated alias for :ghc-flag:`-fno-prof-auto`
+
+.. ghc-flag:: -no-caf-all
+    :shortdesc: *(deprecated)* Alias for :ghc-flag:`-fno-prof-cafs`
+    :type: dynamic
+
+    Deprecated alias for :ghc-flag:`-fno-prof-cafs`
+
 .. _prof-time-options:
 
 Time and allocation profiling
