@@ -1828,7 +1828,10 @@ of ``-W(no-)*``.
     :reverse: -Wno-deriving-typeable
     :category:
 
-    This flag warns when ``Typeable`` is listed in a deriving clause.
+    :since: 7.10
+
+    This flag warns when ``Typeable`` is listed in a deriving clause
+    or derived with ``StandaloneDeriving``.
 
     Since GHC 7.10, ``Typeable`` is automatically derived for all types.
     Thus, deriving ``Typeable`` yourself is redundant.
