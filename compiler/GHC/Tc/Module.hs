@@ -194,7 +194,7 @@ tcRnModule hsc_env mod_sum save_rn_syntax
       = (mkHomeModule home_unit mod, mod_loc)
 
       | otherwise   -- 'module M where' is omitted
-      = (mAIN, srcLocSpan (srcSpanStart loc))
+      = (mkHomeModule home_unit mAIN_NAME, srcLocSpan (srcSpanStart loc))
 
 
 
