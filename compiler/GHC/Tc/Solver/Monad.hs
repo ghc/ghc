@@ -55,7 +55,7 @@ module GHC.Tc.Solver.Monad (
     tcLookupClass, tcLookupId,
 
     -- Inerts
-    InertSet(..), InertCans(..),
+    InertSet(..), InertCans(..), emptyInertCans,
     updInertTcS, updInertCans, updInertDicts, updInertIrreds,
     getNoGivenEqs, setInertCans,
     getInertEqs, getInertCans, getInertGivens,

@@ -718,20 +718,24 @@ simplifyDefault theta
        ; return () }
 
 ------------------
-tcCheckSatisfiability :: Bag EvVar -> TcM Bool
--- Return True if satisfiable, False if definitely contradictory
-tcCheckSatisfiability given_ids
+tcCheckSatisfiability :: InertCans -> Bag EvVar -> TcM (Maybe InertCans)
+-- Return (Just new_inerts) if satisfiable, Nothing if definitely contradictory
+tcCheckSatisfiability inerts given_ids
   = do { lcl_env <- TcM.getLclEnv
        ; let given_loc = mkGivenLoc topTcLevel UnkSkol lcl_env
        ; (res, _ev_binds) <- runTcS $
-             do { traceTcS "checkSatisfiability {" (ppr given_ids)
+             do { traceTcS "checkSatisfiability {" (ppr inerts <+> ppr given_ids)
+                ; setInertCans inerts
                 ; let given_cts = mkGivens given_loc (bagToList given_ids)
                      -- See Note [Superclasses and satisfiability]
                 ; solveSimpleGivens given_cts
                 ; insols <- getInertInsols
                 ; insols <- try_harder insols
                 ; traceTcS "checkSatisfiability }" (ppr insols)
-                ; return (isEmptyBag insols) }
+                ; new_inerts <- getInertCans
+                ; return $ if isEmptyBag insols
+                              then Just new_inerts
+                              else Nothing }
        ; return res }
  where
     try_harder :: Cts -> TcS Cts
@@ -749,15 +753,12 @@ tcCheckSatisfiability given_ids
 
 -- | Normalise a type as much as possible using the given constraints.
 -- See @Note [tcNormalise]@.
-tcNormalise :: Bag EvVar -> Type -> TcM Type
-tcNormalise given_ids ty
-  = do { lcl_env <- TcM.getLclEnv
-       ; let given_loc = mkGivenLoc topTcLevel UnkSkol lcl_env
-       ; norm_loc <- getCtLocM PatCheckOrigin Nothing
+tcNormalise :: InertCans -> Type -> TcM Type
+tcNormalise inert ty
+  = do { norm_loc <- getCtLocM PatCheckOrigin Nothing
        ; (res, _ev_binds) <- runTcS $
-             do { traceTcS "tcNormalise {" (ppr given_ids)
-                ; let given_cts = mkGivens given_loc (bagToList given_ids)
-                ; solveSimpleGivens given_cts
+             do { traceTcS "tcNormalise {" (ppr inert)
+                ; setInertCans inert
                 ; ty' <- flattenType norm_loc ty
                 ; traceTcS "tcNormalise }" (ppr ty')
                 ; pure ty' }
@@ -788,8 +789,9 @@ Note [tcNormalise]
 tcNormalise is a rather atypical entrypoint to the constraint solver. Whereas
 most invocations of the constraint solver are intended to simplify a set of
 constraints or to decide if a particular set of constraints is satisfiable,
-the purpose of tcNormalise is to take a type, plus some local constraints, and
-normalise the type as much as possible with respect to those constraints.
+the purpose of tcNormalise is to take a type, plus some locally solved
+constraints in the form of an InertCans, and normalise the type as much as
+possible with respect to those constraints.
 
 It does *not* reduce type or data family applications or look through newtypes.
 
@@ -798,9 +800,9 @@ expression, it's possible that the type of the scrutinee will only reduce
 if some local equalities are solved for. See "Wrinkle: Local equalities"
 in Note [Type normalisation] in "GHC.HsToCore.PmCheck".
 
-To accomplish its stated goal, tcNormalise first feeds the local constraints
-into solveSimpleGivens, then uses flattenType to simplify the desired type
-with respect to the givens.
+To accomplish its stated goal, tcNormalise first initialises the solver monad
+with the given InertCans, then uses flattenType to simplify the desired type
+with respect to the Givens in the InertCans.
 
 ***********************************************************************************
 *                                                                                 *
