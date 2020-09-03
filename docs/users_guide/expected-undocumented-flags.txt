@@ -4,7 +4,6 @@
 --show-packages
 -Onot
 -Walternative-layout-rule-transitional
--Wderiving-typeable
 -XAlternativeLayoutRule
 -XAlternativeLayoutRuleTransitional
 -XAutoDeriveTypeable
