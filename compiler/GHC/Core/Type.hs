@@ -77,6 +77,7 @@ module GHC.Core.Type (
         stripCoercionTy,
 
         splitPiTysInvisible, splitPiTysInvisibleN,
+        mkInvisBinders,
         invisibleTyBndrCount,
         filterOutInvisibleTypes, filterOutInferredTypes,
         partitionInvisibleTypes, partitionInvisibles,
@@ -1732,6 +1733,15 @@ splitPiTysInvisible ty = split ty ty []
     split orig_ty ty bs
       | Just ty' <- coreView ty  = split orig_ty ty' bs
     split orig_ty _          bs  = (reverse bs, orig_ty)
+
+mkInvisBinders :: [TyCoBinder] -> Kind -> Kind
+mkInvisBinders bndrs res_kind = foldr mk res_kind bndrs
+  where
+    mk :: TyCoBinder -> Kind -> Kind
+    mk (Named bndr@(Bndr _ af))   k
+      | isInvisibleArgFlag af = ForAllTy bndr k
+    mk (Anon InvisArg ty) k = mkScaledFunTy InvisArg ty k
+    mk other k = pprPanic "mkInvisBinders" (ppr other $$ ppr k)
 
 splitPiTysInvisibleN :: Int -> Type -> ([TyCoBinder], Type)
 -- Same as splitPiTysInvisible, but stop when

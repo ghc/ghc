@@ -87,6 +87,7 @@ import GHC.Tc.Solver
 import GHC.Tc.Utils.Zonk
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
+import GHC.Core.Unify ( tcUnifyTyKi )
 import GHC.Tc.Errors      ( reportAllUnsolved )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Instantiate ( tcInstInvisibleTyBindersN, tcInstInvisibleTyBinder )
@@ -2394,8 +2395,15 @@ kcCheckDeclHeader_sig kisig name flav
                      --
                      -- Here we unify   Maybe k ~ Maybe j
                    ; whenIsJust m_res_ki $ \res_ki ->
-                      discardResult $ -- See Note [discardResult in kcCheckDeclHeader_sig]
-                      unifyKind Nothing r_ki res_ki
+                      discardResult $ do -- See Note [discardResult in kcCheckDeclHeader_sig]
+                       -- See Note [Checking inline kind annotations against SAKS]
+                       let m_subst = tcUnifyTyKi res_ki r_ki
+                           res_ki' = case m_subst of
+                             Nothing -> res_ki
+                             Just subst -> substTy subst res_ki
+                           bound = mkInvisBinders invis_binders res_ki'
+                       traceTc "kcCheckDeclHeader unify pure" (ppr res_ki' $$ ppr bound)
+                       unifyKind Nothing kisig' bound
 
                    ; return (invis_binders, r_ki) }
 
@@ -2662,6 +2670,57 @@ same amount of invisible quantifiers left:
 The resulting arity of G is 3+1=4. (length vis_tcbs = 3,
                                     length invis_tcbs = 1,
                                     length tcbs = 4)
+
+-}
+
+{- Note [Checking inline kind annotations against SAKS]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Consider the program from #18640:
+
+  type F2 :: forall a b. Type -> a
+  type family F2 :: forall b. Type -> Type where
+
+This should be rejected, because on the second line we require that (a ~ Type),
+but 'a' is a skolem. But where is it bound? When going under 'forall b. Type ->
+Type', an implication constraint is created for the forall, but its skolems only
+include 'b'. We can't just add 'a' to the skolems of this implication, because
+then it can't be unified with a TyVarTV. Consider the following variant:
+
+  type F3 :: forall a b. Type -> a
+  type family F3 @x :: forall b. Type -> x where
+
+If 'a' is a skolem at the level of 'b' then (x ~ a) can't be solved as
+'a' would escape its scope.
+
+Instead, when checking the inline signature against the SAKS, we do the following:
+
+1) Use the pure unifier to unify the SAKS with the inline kind signature and apply
+the resulting substitution to the inline signature.
+
+This results in
+
+type family F3 :: forall b. Type -> a
+
+2) Bind the invisible variables of the SAKS in the inline signature:
+
+  k := forall a b. Type -> a
+
+3) Unify the resulting kind with the SAKS:
+
+  (forall a b. Type -> a) ~ (forall a b. Type -> a)
+
+which now happily unify.
+
+In the case of 'F2' Applying Steps 1) and 2) result in the kind
+
+  k' := forall a b. Type -> Type
+
+then unifying this kind with the SAKS correctly signals the error that (a ~ Type) but
+now the binding site for the skolem is clear.
+
+Constructing the new kind in Step 2) is safe, as it's only used for sanity checking
+(see Note [discardResult in kcCheckDeclHeader_sig]).
 
 -}
 

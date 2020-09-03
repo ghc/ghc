@@ -1,0 +1,9 @@
+
+T18640a.hs:11:1: error:
+    • Couldn't match kind ‘a’ with ‘*’
+      Expected: forall {k} a (b :: k). * -> *
+        Actual: forall {k} a (b :: k). * -> a
+      ‘a’ is a rigid type variable bound by
+        the type * -> a
+        at T18640a.hs:11:1-40
+    • In the type family declaration for ‘F2’
