@@ -38,7 +38,7 @@ import GHC.Tc.TyCl.Utils
 import GHC.Tc.TyCl.Class
 import {-# SOURCE #-} GHC.Tc.TyCl.Instance( tcInstDecls1 )
 import GHC.Tc.Deriv (DerivInfo(..))
-import GHC.Tc.Utils.Unify ( checkTvConstraints )
+import GHC.Tc.Utils.Unify ( checkTvConstraints, checkTvConstraintsWith )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Instance.Class( AssocInstInfo(..) )
 import GHC.Tc.Utils.TcMType
@@ -2975,9 +2975,11 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
 
        -- This code is closely related to the code
        -- in GHC.Tc.Gen.HsType.kcCheckDeclHeader_cusk
+       ; let skol_info = FamInstSkol
        ; (imp_tvs, (exp_tvs, (lhs_ty, rhs_ty)))
                <- pushTcLevelM_                                $
                   solveEqualities                              $
+                  checkTvConstraintsWith skol_info fst         $
                   bindImplicitTKBndrs_Q_Skol imp_vars          $
                   bindExplicitTKBndrs_Q_Skol AnyKind exp_bndrs $
                   do { (lhs_ty, rhs_kind) <- tcFamTyPats fam_tc hs_pats
