@@ -2718,11 +2718,15 @@ tcTySynRhs roles_info tc_name hs_ty
        ; traceTc "tc-syn" (ppr tc_name $$ ppr (tcl_env env))
        ; rhs_ty <- pushTcLevelM_   $
                    solveEqualities $
+                   checkTvConstraints skol_info (binderVars binders) $
                    tcCheckLHsType hs_ty (TheKind res_kind)
        ; rhs_ty <- zonkTcTypeToType rhs_ty
        ; let roles = roles_info tc_name
              tycon = buildSynTyCon tc_name binders res_kind roles rhs_ty
        ; return tycon }
+
+  where
+    skol_info = TyConSkol TypeSynonymFlavour tc_name
 
 tcDataDefn :: SDoc -> RolesInfo -> Name
            -> HsDataDefn GhcRn -> TcM (TyCon, [DerivInfo])
