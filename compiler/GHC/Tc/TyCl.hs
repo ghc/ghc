@@ -38,7 +38,7 @@ import GHC.Tc.TyCl.Utils
 import GHC.Tc.TyCl.Class
 import {-# SOURCE #-} GHC.Tc.TyCl.Instance( tcInstDecls1 )
 import GHC.Tc.Deriv (DerivInfo(..))
-import GHC.Tc.Utils.Unify ( checkTvConstraints )
+import GHC.Tc.Utils.Unify ( checkTvConstraints, checkTvConstraintsWith )
 import GHC.Tc.Gen.HsType
 import GHC.Tc.Instance.Class( AssocInstInfo(..) )
 import GHC.Tc.Utils.TcMType
@@ -2716,8 +2716,7 @@ tcTySynRhs roles_info tc_name hs_ty
   = bindTyClTyVars tc_name $ \ _ binders res_kind ->
     do { env <- getLclEnv
        ; traceTc "tc-syn" (ppr tc_name $$ ppr (tcl_env env))
-       ; rhs_ty <- pushTcLevelM_   $
-                   solveEqualities $
+       ; rhs_ty <- solveEqualities $
                    checkTvConstraints skol_info (binderVars binders) $
                    tcCheckLHsType hs_ty (TheKind res_kind)
        ; rhs_ty <- zonkTcTypeToType rhs_ty
@@ -2975,9 +2974,17 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
 
        -- This code is closely related to the code
        -- in GHC.Tc.Gen.HsType.kcCheckDeclHeader_cusk
+       ; let skol_info = FamInstSkol
+             cls_vars = case mb_clsinfo of
+               NotAssociated -> []
+               InClsInst { ai_tyvars = vars
+                         , ai_inferred_tyvars = inf_vars
+                         } -> inf_vars ++ vars
+             skol_fn (imp, (exp, _))
+               = imp ++ exp ++ tyConTyVars fam_tc ++ cls_vars
        ; (imp_tvs, (exp_tvs, (lhs_ty, rhs_ty)))
-               <- pushTcLevelM_                                $
-                  solveEqualities                              $
+               <- solveEqualities                              $
+                  checkTvConstraintsWith skol_info skol_fn     $
                   bindImplicitTKBndrs_Q_Skol imp_vars          $
                   bindExplicitTKBndrs_Q_Skol AnyKind exp_bndrs $
                   do { (lhs_ty, rhs_kind) <- tcFamTyPats fam_tc hs_pats
