@@ -1208,6 +1208,7 @@ for example).
 .. ghc-flag:: -pie
     :shortdesc: Instruct the linker to produce a position-independent executable.
     :type: dynamic
+    :reverse: -no-pie
     :category: linking
 
     :since: 8.2.2
@@ -1228,6 +1229,15 @@ for example).
 
     Also, you may need to use the :ghc-flag:`-rdynamic` flag to ensure that
     that symbols are not dropped from your PIE objects.
+
+.. ghc-flag:: -no-pie
+    :shortdesc: Don't instruct the linker to produce a position-independent executable.
+    :type: dynamic
+    :reverse: -pie
+    :category: linking
+
+    If required, the C compiler will still produce a PIE. Otherwise, this is the default.
+    Refer to -pie for more information about PIEs.
 
 .. ghc-flag:: -fkeep-cafs
     :shortdesc: Do not garbage-collect CAFs (top-level expressions) at runtime
