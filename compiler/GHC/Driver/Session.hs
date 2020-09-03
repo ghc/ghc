@@ -43,7 +43,7 @@ module GHC.Driver.Session (
         dynamicTooMkDynamicDynFlags,
         dynamicOutputFile,
         sccProfilingEnabled,
-        DynFlags(..),
+        DynFlags(..), mainModuleIs,
         FlagSpec(..),
         HasDynFlags(..), ContainsDynFlags(..),
         RtsOptsEnabled(..),
@@ -243,7 +243,7 @@ import GHC.Unit.Module
 import GHC.Driver.Ppr
 import {-# SOURCE #-} GHC.Driver.Plugins
 import {-# SOURCE #-} GHC.Driver.Hooks
-import GHC.Builtin.Names ( mAIN )
+import GHC.Builtin.Names ( mAIN_NAME )
 import {-# SOURCE #-} GHC.Unit.State (UnitState, emptyUnitState, UnitDatabase)
 import GHC.Driver.Phases ( Phase(..), phaseInputExt )
 import GHC.Driver.Flags
@@ -521,7 +521,7 @@ data DynFlags = DynFlags {
   historySize           :: Int,         -- ^ Simplification history size
 
   importPaths           :: [FilePath],
-  mainModIs             :: Module,
+  mainModIs             :: ModuleName,
   mainFunIs             :: Maybe String,
   reductionDepth        :: IntWithInf,   -- ^ Typechecker maximum stack depth
   solverIterations      :: IntWithInf,   -- ^ Number of iterations in the constraints solver
@@ -1196,7 +1196,7 @@ defaultDynFlags mySettings llvmConfig =
         ghcHeapSize             = Nothing,
 
         importPaths             = ["."],
-        mainModIs               = mAIN,
+        mainModIs               = mAIN_NAME,
         mainFunIs               = Nothing,
         reductionDepth          = treatZeroAsInf mAX_REDUCTION_DEPTH,
         solverIterations        = treatZeroAsInf mAX_SOLVER_ITERATIONS,
@@ -1689,6 +1689,9 @@ lang_set dflags lang =
             language = lang,
             extensionFlags = flattenExtensionFlags lang (extensions dflags)
           }
+
+mainModuleIs :: DynFlags -> Module
+mainModuleIs dflags = mkModule (mkHomeUnitFromFlags dflags) (mainModIs dflags)
 
 -- | Set the Haskell language standard to use
 setLanguage :: Language -> DynP ()
@@ -4498,10 +4501,10 @@ setMainIs arg
   | not (null main_fn) && isLower (head main_fn)
      -- The arg looked like "Foo.Bar.baz"
   = upd $ \d -> d { mainFunIs = Just main_fn,
-                   mainModIs = mkModule mainUnit (mkModuleName main_mod) }
+                   mainModIs = mkModuleName main_mod }
 
   | isUpper (head arg)  -- The arg looked like "Foo" or "Foo.Bar"
-  = upd $ \d -> d { mainModIs = mkModule mainUnit (mkModuleName arg) }
+  = upd $ \d -> d { mainModIs = mkModuleName arg }
 
   | otherwise                   -- The arg looked like "baz"
   = upd $ \d -> d { mainFunIs = Just arg }
