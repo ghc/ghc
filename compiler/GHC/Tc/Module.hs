@@ -191,7 +191,7 @@ tcRnModule hsc_env mod_sum save_rn_syntax
       = (mkHomeModule home_unit mod, mod_loc)
 
       | otherwise   -- 'module M where' is omitted
-      = (mAIN, srcLocSpan (srcSpanStart loc))
+      = (mkHomeModule home_unit mAIN_NAME, srcLocSpan (srcSpanStart loc))
 
 
 
@@ -1772,7 +1772,7 @@ check_main dflags tcg_env explicit_mod_hdr export_ies
               return tcg_env
   where
     mod         = tcg_mod tcg_env
-    main_mod    = mainModIs dflags
+    main_mod    = mainModuleIs dflags
     main_mod_nm = moduleName main_mod
     main_fn     = getMainFun dflags
     occ_main_fn = occName main_fn
