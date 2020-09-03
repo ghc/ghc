@@ -584,13 +584,11 @@ nameTyCt pred_ty = do
 tyOracle :: TyState -> Bag PredType -> DsM (Maybe TyState)
 tyOracle (TySt inert) cts
   = do { evs <- traverse nameTyCt cts
-       ; let new_inert = inert `unionBags` evs
        ; tracePm "tyOracle" (ppr cts)
-       ; ((_warns, errs), res) <- initTcDsForSolver $ tcCheckSatisfiability new_inert
+       ; ((_warns, errs), res) <- initTcDsForSolver $ tcCheckSatisfiability inert evs
        ; case res of
-            Just True  -> return (Just (TySt new_inert))
-            Just False -> return Nothing
-            Nothing    -> pprPanic "tyOracle" (vcat $ pprErrMsgBagWithLoc errs) }
+            Just mb_new_inert -> return (TySt <$> mb_new_inert)
+            Nothing           -> pprPanic "tyOracle" (vcat $ pprErrMsgBagWithLoc errs) }
 
 -- | A 'SatisfiabilityCheck' based on new type-level constraints.
 -- Returns a new 'Nabla' if the new constraints are compatible with existing
