@@ -101,8 +101,6 @@
 -fimplicit-params
 -fimplicit-prelude
 -firrefutable-tuples
--fkill-absence
--fkill-one-shot
 -fmax-errors
 -fmax-pmcheck-iterations
 -fmono-pat-binds
