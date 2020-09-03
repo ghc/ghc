@@ -52,6 +52,8 @@ hLock h mode = void $ lockImpl h "hLock" mode True
 
 -- | Non-blocking version of 'hLock'.
 --
+-- Returns 'True' if taking the lock was successful and 'False' otherwise.
+--
 -- @since 4.10.0.0
 hTryLock :: Handle -> LockMode -> IO Bool
 hTryLock h mode = lockImpl h "hTryLock" mode False
