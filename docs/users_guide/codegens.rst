@@ -124,4 +124,5 @@ to build GHC with the appropriate options set. Consult the GHC Building
 Guide for details.
 
 You can check if your GHC is unregisterised by calling
+``ghc --print-unregisterised`` (see :ghc-flag:`--print-unregisterised`) or
 ``ghc --info`` (see :ghc-flag:`--info`).

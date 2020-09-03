@@ -675,6 +675,19 @@ Options affecting code generation
     and ``-dynhisuf`` are the counterparts of ``-o``, ``-osuf``, and
     ``-hisuf`` respectively, but applying to the dynamic compilation.
 
+.. ghc-flag:: -split-objs
+    :shortdesc: Split generated object files into smaller files
+    :type: dynamic
+    :category: codegen
+
+    When using this option, the object file is split into many smaller objects.
+    This feature is used when building libraries, so that a program statically
+    linked against the library will pull in less of the library.
+
+    Since this uses platform specific techniques, it may not be available on
+    all target platforms. See the :ghc-flag:`--print-object-splitting-supported`
+    flag to check whether your GHC supports object splitting.
+
 .. _options-linker:
 
 Options affecting linking
