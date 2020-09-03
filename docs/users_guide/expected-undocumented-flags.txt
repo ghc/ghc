@@ -27,7 +27,6 @@
 -Walternative-layout-rule-transitional
 -Wauto-orphans
 -Wdefault
--Wderiving-typeable
 -Wextra
 -Wmissed-specializations
 -Wmissing-space-after-bang

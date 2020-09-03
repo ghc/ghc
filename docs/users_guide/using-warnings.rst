@@ -1781,6 +1781,20 @@ of ``-W(no-)*``.
     This warning informs you about discarded documentation comments.
     It has no effect when :ghc-flag:`-haddock` is disabled.
 
+.. ghc-flag:: -Wderiving-typeable
+    :shortdesc: warn when Typeable is derived
+    :type: dynamic
+    :reverse: -Wno-deriving-typeable
+    :category:
+
+    :since: 7.10
+
+    This flag warns when ``Typeable`` is listed in a deriving clause
+    or derived with :extension:`StandaloneDeriving`.
+
+    Since GHC 7.10, ``Typeable`` is automatically derived for all types.
+    Thus, deriving ``Typeable`` yourself is redundant.
+
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's
 sanity, not yours.)
