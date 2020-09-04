@@ -2350,10 +2350,16 @@ kcCheckDeclHeader_sig kisig name flav
           -- Convert each ZippedBinder to TyConBinder        for  tyConBinders
           --                       and to [(Name, TcTyVar)]  for  tcTyConScopedTyVars
         ; (vis_tcbs, concat -> explicit_tv_prs) <- mapAndUnzipM zipped_to_tcb zipped_binders
+        ; let skol_info = TyConSkol flav name
+              skol_fn (implicit, (invis, _))
+              -- bind the variables *both* from the type family header and the SAKS
+              -- in the implication, as they all need to be scoped properly.
+              -- This gives them the right skolem info. #18640
+                = implicit ++ binderVars (getNamedBinders invis) ++ binderVars vis_tcbs
 
         ; (implicit_tvs, (invis_binders, r_ki))
-             <- pushTcLevelM_ $
-                solveEqualities $  -- #16687
+             <- solveEqualities $  -- #16687
+                checkTvConstraintsWith skol_info skol_fn $
                 bindImplicitTKBndrs_Tv implicit_nms $
                 tcExtendNameTyVarEnv explicit_tv_prs  $
                 do { -- Check that inline kind annotations on binders are valid.
