@@ -188,7 +188,7 @@ toIfaceTypeX fr (TyConApp tc tys)
   = IfaceTupleTy sort NotPromoted (toIfaceTcArgsX fr tc tys)
 
   | Just dc <- isPromotedDataCon_maybe tc
-  , isTupleDataCon dc
+  , isBoxedTupleDataCon dc
   , n_tys == 2*arity
   = IfaceTupleTy BoxedTuple IsPromoted (toIfaceTcArgsX fr tc (drop arity tys))
 

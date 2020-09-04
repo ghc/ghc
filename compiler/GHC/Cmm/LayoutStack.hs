@@ -246,9 +246,10 @@ cmmLayoutStack dflags procpoints entry_args
   = do
     -- We need liveness info. Dead assignments are removed later
     -- by the sinking pass.
-    let liveness = cmmLocalLiveness dflags graph
+    let liveness = cmmLocalLiveness platform graph
         blocks = revPostorder graph
-        profile = targetProfile dflags
+        profile  = targetProfile dflags
+        platform = profilePlatform profile
 
     (final_stackmaps, _final_high_sp, new_blocks) <-
           mfix $ \ ~(rec_stackmaps, rec_high_sp, _new_blocks) ->
@@ -256,7 +257,7 @@ cmmLayoutStack dflags procpoints entry_args
                    rec_stackmaps rec_high_sp blocks
 
     blocks_with_reloads <-
-        insertReloadsAsNeeded dflags procpoints final_stackmaps entry new_blocks
+        insertReloadsAsNeeded platform procpoints final_stackmaps entry new_blocks
     new_blocks' <- mapM (lowerSafeForeignCall profile) blocks_with_reloads
     return (ofBlockList entry new_blocks', final_stackmaps)
 
@@ -1044,30 +1045,29 @@ stackMapToLiveness platform StackMap{..} =
 -- -----------------------------------------------------------------------------
 
 insertReloadsAsNeeded
-    :: DynFlags
+    :: Platform
     -> ProcPointSet
     -> LabelMap StackMap
     -> BlockId
     -> [CmmBlock]
     -> UniqSM [CmmBlock]
-insertReloadsAsNeeded dflags procpoints final_stackmaps entry blocks = do
+insertReloadsAsNeeded platform procpoints final_stackmaps entry blocks = do
     toBlockList . fst <$>
         rewriteCmmBwd liveLattice rewriteCC (ofBlockList entry blocks) mapEmpty
   where
     rewriteCC :: RewriteFun CmmLocalLive
     rewriteCC (BlockCC e_node middle0 x_node) fact_base0 = do
         let entry_label = entryLabel e_node
-            platform = targetPlatform dflags
             stackmap = case mapLookup entry_label final_stackmaps of
                 Just sm -> sm
                 Nothing -> panic "insertReloadsAsNeeded: rewriteCC: stackmap"
 
             -- Merge the liveness from successor blocks and analyse the last
             -- node.
-            joined = gen_kill dflags x_node $!
+            joined = gen_kill platform x_node $!
                          joinOutFacts liveLattice x_node fact_base0
             -- What is live at the start of middle0.
-            live_at_middle0 = foldNodesBwdOO (gen_kill dflags) middle0 joined
+            live_at_middle0 = foldNodesBwdOO (gen_kill platform) middle0 joined
 
             -- If this is a procpoint we need to add the reloads, but only if
             -- they're actually live. Furthermore, nothing is live at the entry
