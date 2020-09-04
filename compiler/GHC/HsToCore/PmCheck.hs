@@ -221,7 +221,7 @@ safe (@f _ = error "boom"@ is not because of ⊥), doesn't trigger a warning
 exception into divergence (@f x = f x@).
 
 Semantically, unlike every other case expression, -XEmptyCase is strict in its
-match var x, which rules out ⊥ as an inhabitant. So we add x /~ ⊥ to the
+match var x, which rules out ⊥ as an inhabitant. So we add x ≁ ⊥ to the
 initial Nabla and check if there are any values left to match on.
 -}
 
@@ -786,7 +786,7 @@ Note [Strict fields and fields of unlifted type]
 How do strict fields play into Note [Field match order for RecCon]? Answer:
 They don't. Desugaring is entirely unconcerned by strict fields; the forcing
 happens *before* pattern matching. But for each strict (or more generally,
-unlifted) field @s@ we have to add @s /~ ⊥@ constraints when we check the PmCon
+unlifted) field @s@ we have to add @s ≁ ⊥@ constraints when we check the PmCon
 guard in 'checkGrd'. Strict fields are devoid of ⊥ by construction, there's
 nothing that a bang pattern would act on. Example from #18341:
 
@@ -798,7 +798,7 @@ nothing that a bang pattern would act on. Example from #18341:
 
 The second clause desugars to @MkT n <- x, !n@. When coverage checked, the
 'PmCon' @MkT n <- x@ refines the set of values that reach the bang pattern with
-the constraints @x ~ MkT n, n /~ ⊥@ (this list is computed by 'pmConCts').
+the constraints @x ~ MkT n, n ≁ ⊥@ (this list is computed by 'pmConCts').
 Checking the 'PmBang' @!n@ will then try to add the constraint @n ~ ⊥@ to this
 set to get the diverging set, which is found to be empty. Hence the whole
 clause is detected as redundant, as expected.
@@ -942,7 +942,7 @@ throttle limit old@(MkNablas old_ds) new@(MkNablas new_ds)
 -- These include
 --
 --   * @gammas@: Constraints arising from the bound evidence vars
---   * @y /~ ⊥@ constraints for each unlifted field (including strict fields)
+--   * @y ≁ ⊥@ constraints for each unlifted field (including strict fields)
 --     @y@ in @ys@
 --   * The constructor constraint itself: @x ~ T as ys@.
 --
@@ -974,7 +974,7 @@ checkGrd grd = CA $ \inc -> case grd of
     pure CheckResult { cr_ret = emptyRedSets { rs_cov = matched }
                      , cr_uncov = mempty
                      , cr_approx = Precise }
-  -- Bang x _: Diverge on x ~ ⊥, refine with x /~ ⊥
+  -- Bang x _: Diverge on x ~ ⊥, refine with x ≁ ⊥
   PmBang x mb_info -> do
     div <- addPmCtNablas inc (PmBotCt x)
     matched <- addPmCtNablas inc (PmNotBotCt x)
@@ -986,7 +986,7 @@ checkGrd grd = CA $ \inc -> case grd of
     pure CheckResult { cr_ret = RedSets { rs_cov = matched, rs_div = div, rs_bangs = bangs }
                      , cr_uncov = mempty
                      , cr_approx = Precise }
-  -- Con: Fall through on x /~ K and refine with x ~ K ys and type info
+  -- Con: Fall through on x ≁ K and refine with x ~ K ys and type info
   PmCon x con tvs dicts args -> do
     !div <- if isPmAltConMatchStrict con
       then addPmCtNablas inc (PmBotCt x)
@@ -1048,7 +1048,7 @@ How do we do that? Consider
 
 And imagine we set our limit to 1 for the sake of the example. The first clause
 will be checked against the initial Nabla, {}. Doing so will produce an
-Uncovered set of size 2, containing the models {x/~True} and {x~True,y/~True}.
+Uncovered set of size 2, containing the models {x≁True} and {x~True,y≁True}.
 Also we find the first clause to cover the model {x~True,y~True}.
 
 But the Uncovered set we get out of the match is too huge! We somehow have to
@@ -1056,8 +1056,8 @@ ensure not to make things worse as they are already, so we continue checking
 with a singleton Uncovered set of the initial Nabla {}. Why is this
 sound (wrt. the notion in GADTs Meet Their Match)? Well, it basically amounts
 to forgetting that we matched against the first clause. The values represented
-by {} are a superset of those represented by its two refinements {x/~True} and
-{x~True,y/~True}.
+by {} are a superset of those represented by its two refinements {x≁True} and
+{x~True,y≁True}.
 
 This forgetfulness becomes very apparent in the example above: By continuing
 with {} we don't detect the second clause as redundant, as it again covers the
