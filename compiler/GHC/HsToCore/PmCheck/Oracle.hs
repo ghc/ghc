@@ -628,10 +628,10 @@ Invariant applying to each VarInfo: Whenever we have @(C, [y,z])@ in 'vi_pos',
 any entry in 'vi_neg' must be incomparable to C (return Nothing) according to
 'eqPmAltCons'. Those entries that are comparable either lead to a refutation
 or are redundant. Examples:
-* @x ~ Just y@, @x /~ [Just]@. 'eqPmAltCon' returns @Equal@, so refute.
-* @x ~ Nothing@, @x /~ [Just]@. 'eqPmAltCon' returns @Disjoint@, so negative
+* @x ~ Just y@, @x ≁ [Just]@. 'eqPmAltCon' returns @Equal@, so refute.
+* @x ~ Nothing@, @x ≁ [Just]@. 'eqPmAltCon' returns @Disjoint@, so negative
   info is redundant and should be discarded.
-* @x ~ I# y@, @x /~ [4,2]@. 'eqPmAltCon' returns @PossiblyOverlap@, so orthogal.
+* @x ~ I# y@, @x ≁ [4,2]@. 'eqPmAltCon' returns @PossiblyOverlap@, so orthogal.
   We keep this info in order to be able to refute a redundant match on i.e. 4
   later on.
 
@@ -676,19 +676,19 @@ oracle) contradictory. This implies a few invariants:
 Maintaining these invariants in 'addVarCt' (the core of the term oracle) and
 'addNotConCt' is subtle.
 * Merging VarInfos. Example: Add the fact @x ~ y@ (see 'equate').
-  - (COMPLETE) If we had @x /~ True@ and @y /~ False@, then we get
-    @x /~ [True,False]@. This is vacuous by matter of comparing to the built-in
+  - (COMPLETE) If we had @x ≁ True@ and @y ≁ False@, then we get
+    @x ≁ [True,False]@. This is vacuous by matter of comparing to the built-in
     COMPLETE set, so should refute.
-  - (Pos/Neg) If we had @x /~ True@ and @y ~ True@, we have to refute.
+  - (Pos/Neg) If we had @x ≁ True@ and @y ~ True@, we have to refute.
 * Adding positive information. Example: Add the fact @x ~ K ys@ (see 'addConCt')
-  - (Neg) If we had @x /~ K@, refute.
+  - (Neg) If we had @x ≁ K@, refute.
   - (Pos) If we had @x ~ K2@, and that contradicts the new solution according to
     'eqPmAltCon' (ex. K2 is [] and K is (:)), then refute.
-  - (Refine) If we had @x /~ K zs@, unify each y with each z in turn.
-* Adding negative information. Example: Add the fact @x /~ Nothing@ (see 'addNotConCt')
+  - (Refine) If we had @x ≁ K zs@, unify each y with each z in turn.
+* Adding negative information. Example: Add the fact @x ≁ Nothing@ (see 'addNotConCt')
   - (Refut) If we have @x ~ K ys@, refute.
-  - (COMPLETE) If K=Nothing and we had @x /~ Just@, then we get
-    @x /~ [Just,Nothing]@. This is vacuous by matter of comparing to the built-in
+  - (COMPLETE) If K=Nothing and we had @x ≁ Just@, then we get
+    @x ≁ [Just,Nothing]@. This is vacuous by matter of comparing to the built-in
     COMPLETE set, so should refute.
 
 Note that merging VarInfo in equate can be done by calling out to 'addConCt' and
@@ -783,10 +783,10 @@ clause as redundant, which clearly is unsound. The solution:
 1. 'isPmAltConMatchStrict' returns False for newtypes, indicating that a
    newtype match is lazy.
 2. When we find @x ~ T2 y@, transfer all constraints on @x@ (which involve @⊥@)
-   to @y@, similar to what 'equate' does, and don't add a @x /~ ⊥@ constraint.
+   to @y@, similar to what 'equate' does, and don't add a @x ≁ ⊥@ constraint.
    This way, the third clause will still be marked as inaccessible RHS instead
    of redundant. This is ensured by calling 'lookupVarInfoNT'.
-3. Immediately reject when we find @x /~ T2@.
+3. Immediately reject when we find @x ≁ T2@.
 Handling of Newtypes is also described in the Appendix of the Lower Your Guards paper,
 where you can find the solution in a perhaps more digestible format.
 -}
@@ -826,13 +826,13 @@ data TmCt
   -- ^ @TmConCt x K tvs ys@ encodes "x ~ K @tvs ys", equating @x@ with the 'PmAltCon'
   -- application @K @tvs ys@.
   | TmNotConCt  !Id !PmAltCon
-  -- ^ @TmNotConCt x K@ encodes "x /~ K", asserting that @x@ can't be headed
+  -- ^ @TmNotConCt x K@ encodes "x ≁ K", asserting that @x@ can't be headed
   -- by @K@.
   | TmBotCt     !Id
   -- ^ @TmBotCt x@ encodes "x ~ ⊥", equating @x@ to ⊥.
   -- by @K@.
   | TmNotBotCt !Id
-  -- ^ @TmNotBotCt x y@ encodes "x /~ ⊥", asserting that @x@ can't be ⊥.
+  -- ^ @TmNotBotCt x y@ encodes "x ≁ ⊥", asserting that @x@ can't be ⊥.
 
 instance Outputable TmCt where
   ppr (TmVarCt x y)            = ppr x <+> char '~' <+> ppr y
@@ -841,9 +841,9 @@ instance Outputable TmCt where
     where
       pp_tvs  = map ((<> char '@') . ppr) tvs
       pp_args = map ppr args
-  ppr (TmNotConCt x con)       = ppr x <+> text "/~" <+> ppr con
+  ppr (TmNotConCt x con)       = ppr x <+> text "≁" <+> ppr con
   ppr (TmBotCt x)              = ppr x <+> text "~ ⊥"
-  ppr (TmNotBotCt x)           = ppr x <+> text "/~ ⊥"
+  ppr (TmNotBotCt x)           = ppr x <+> text "≁ ⊥"
 
 type TyCt = PredType
 
@@ -908,7 +908,7 @@ addBotCt :: Nabla -> Id -> MaybeT DsM Nabla
 addBotCt nabla@MkNabla{ nabla_tm_st = TmSt env reps } x = do
   let (y, vi@VI { vi_bot = bot }) = lookupVarInfoNT (nabla_tm_st nabla) x
   case bot of
-    IsNotBot -> mzero      -- There was x /~ ⊥. Contradiction!
+    IsNotBot -> mzero      -- There was x ≁ ⊥. Contradiction!
     IsBot    -> pure nabla -- There already is x ~ ⊥. Nothing left to do
     MaybeBot -> do         -- We add x ~ ⊥
       let vi' = vi{ vi_bot = IsBot }
@@ -1015,8 +1015,8 @@ addNotBotCt nabla@MkNabla{ nabla_tm_st = TmSt env reps } x = do
   let (y, vi@VI { vi_bot = bot }) = lookupVarInfoNT (nabla_tm_st nabla) x
   case bot of
     IsBot    -> mzero      -- There was x ~ ⊥. Contradiction!
-    IsNotBot -> pure nabla -- There already is x /~ ⊥. Nothing left to do
-    MaybeBot -> do         -- We add x /~ ⊥ and test if x is still inhabited
+    IsNotBot -> pure nabla -- There already is x ≁ ⊥. Nothing left to do
+    MaybeBot -> do         -- We add x ≁ ⊥ and test if x is still inhabited
       vi <- ensureInhabited nabla vi{ vi_bot = IsNotBot }
       pure nabla{ nabla_tm_st = TmSt (setEntrySDIE env y vi) reps}
 
@@ -1776,7 +1776,7 @@ addCoreCt nabla x e = do
 
     -- | Look at @let x = K taus theta es@ and generate the following
     -- constraints (assuming universals were dropped from @taus@ before):
-    --   1. @x /~ ⊥@ if 'K' is not a Newtype constructor.
+    --   1. @x ≁ ⊥@ if 'K' is not a Newtype constructor.
     --   2. @a_1 ~ tau_1, ..., a_n ~ tau_n@ for fresh @a_i@
     --   3. @y_1 ~ e_1, ..., y_m ~ e_m@ for fresh @y_i@
     --   4. @x ~ K as ys@
@@ -1791,7 +1791,7 @@ addCoreCt nabla x e = do
       uniq_supply <- lift $ lift $ getUniqueSupplyM
       let (_, ex_tvs) = cloneTyVarBndrs (mkEmptyTCvSubst in_scope) dc_ex_tvs uniq_supply
           ty_cts      = equateTys (map mkTyVarTy ex_tvs) ex_tys
-      -- 1. @x /~ ⊥@ if 'K' is not a Newtype constructor (#18341)
+      -- 1. @x ≁ ⊥@ if 'K' is not a Newtype constructor (#18341)
       when (not (isNewDataCon dc)) $
         modifyT $ \nabla -> addNotBotCt nabla x
       -- 2. @a_1 ~ tau_1, ..., a_n ~ tau_n@ for fresh @a_i@. See also #17703
