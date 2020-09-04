@@ -359,7 +359,7 @@ forcesRealWorld fam_envs ty
   = True
   | Just DataConAppContext{ dcac_dc = dc, dcac_arg_tys = field_tys }
       <- deepSplitProductType_maybe fam_envs ty
-  , isUnboxedTupleCon dc
+  , isUnboxedTupleDataCon dc
   = any (\(ty,_) -> scaledThing ty `eqType` realWorldStatePrimTy) field_tys
   | otherwise
   = False

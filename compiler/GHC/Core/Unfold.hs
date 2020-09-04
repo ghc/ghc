@@ -889,7 +889,7 @@ conSize dc n_val_args
   | n_val_args == 0 = SizeIs 0 emptyBag 10    -- Like variables
 
 -- See Note [Unboxed tuple size and result discount]
-  | isUnboxedTupleCon dc = SizeIs 0 emptyBag 10
+  | isUnboxedTupleDataCon dc = SizeIs 0 emptyBag 10
 
 -- See Note [Constructor size and result discount]
   | otherwise = SizeIs 10 emptyBag 10
