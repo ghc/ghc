@@ -15,6 +15,7 @@ import Control.Monad
 import Data.Maybe
 import Development.Shake
 import Distribution.Simple.GHC
+import Distribution.Simple.Program.Builtin
 import Distribution.Simple.Program.Db
 import Distribution.Verbosity
 
@@ -58,8 +59,13 @@ cabalOracle = do
                ++ quote (pkgName pkg) ++ " (" ++ show stage ++ ")..."
         -- Configure the package with the GHC corresponding to the given stage
         hcPath <- builderPath (Ghc CompileHs stage)
+        let progDb = userSpecifyPath "ghc" hcPath
+                     $ addKnownProgram ghcProgram emptyProgramDb
         (compiler, maybePlatform, _pkgdb) <- liftIO $
-            configure silent (Just hcPath) Nothing emptyProgramDb
+            -- N.B. the hcPath parameter of `configure` is broken when given an
+            -- empty ProgramDb. To work around this we manually construct an
+            -- appropriate ProgramDb.
+            configure silent Nothing Nothing progDb
         let platform = fromMaybe (error msg) maybePlatform
             msg      = "PackageConfiguration oracle: cannot detect platform"
         return $ PackageConfiguration (compiler, platform)
