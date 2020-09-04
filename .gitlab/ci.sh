@@ -122,22 +122,26 @@ function show_tool() {
 function set_toolchain_paths() {
   needs_toolchain=1
   case "$(uname)" in
-    Linux) needs_toolchain="" ;;
+    Linux) needs_toolchain="0" ;;
     *) ;;
   esac
 
-  if [[ -n "$needs_toolchain" ]]; then
+  if [[ "$needs_toolchain" = 1 ]]; then
       # These are populated by setup_toolchain
       GHC="$toolchain/bin/ghc$exe"
       CABAL="$toolchain/bin/cabal$exe"
       HAPPY="$toolchain/bin/happy$exe"
       ALEX="$toolchain/bin/alex$exe"
   else
-      GHC="$(which ghc)"
-      CABAL="/usr/local/bin/cabal"
-      HAPPY="$HOME/.cabal/bin/happy"
-      ALEX="$HOME/.cabal/bin/alex"
+      # These are generally set by the Docker image but
+      # we provide these handy fallbacks in case the
+      # script isn't run from within a GHC CI docker image.
+      if [ -z "$GHC" ]; then GHC="$(which ghc)"; fi
+      if [ -z "$CABAL" ]; then GHC="$(which cabal)"; fi
+      if [ -z "$HAPPY" ]; then GHC="$(which happy)"; fi
+      if [ -z "$ALEX" ]; then GHC="$(which alex)"; fi
   fi
+
   export GHC
   export CABAL
   export HAPPY
