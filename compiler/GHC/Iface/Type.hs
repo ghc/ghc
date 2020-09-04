@@ -171,12 +171,6 @@ data IfaceType
   | IfaceCastTy     IfaceType IfaceCoercion
   | IfaceCoercionTy IfaceCoercion
 
-  | IfaceTupleTy                  -- Saturated tuples (unsaturated ones use IfaceTyConApp)
-       TupleSort                  -- What sort of tuple?
-       PromotionFlag                 -- A bit like IfaceTyCon
-       IfaceAppArgs               -- arity = length args
-          -- For promoted data cons, the kind args are omitted
-
 type IfaceMult = IfaceType
 
 type IfacePredType = IfaceType
@@ -498,7 +492,6 @@ ifTypeIsVarFree ty = go ty
     go (IfaceFunTy _ w arg res) = go w && go arg && go res
     go (IfaceForAllTy {})      = False
     go (IfaceTyConApp _ args)  = go_args args
-    go (IfaceTupleTy _ _ args) = go_args args
     go (IfaceLitTy _)          = True
     go (IfaceCastTy {})        = False -- Safe
     go (IfaceCoercionTy {})    = False -- Safe
@@ -533,7 +526,6 @@ substIfaceType env ty
     go (IfaceFunTy af w t1 t2)  = IfaceFunTy af (go w) (go t1) (go t2)
     go ty@(IfaceLitTy {})     = ty
     go (IfaceTyConApp tc tys) = IfaceTyConApp tc (substIfaceAppArgs env tys)
-    go (IfaceTupleTy s i tys) = IfaceTupleTy s i (substIfaceAppArgs env tys)
     go (IfaceForAllTy {})     = pprPanic "substIfaceType" (ppr ty)
     go (IfaceCastTy ty co)    = IfaceCastTy (go ty) (go_co co)
     go (IfaceCoercionTy co)   = IfaceCoercionTy (go_co co)
@@ -898,7 +890,6 @@ ppr_ty ctxt_prec ty@(IfaceFunTy InvisArg _ _ _) = ppr_sigma ctxt_prec ty
 ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reason for IfaceFreeTyVar!
 ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [TcTyVars in IfaceType]
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = pprTyTcApp ctxt_prec tc tys
-ppr_ty ctxt_prec (IfaceTupleTy i p tys) = pprTuple ctxt_prec i p tys
 ppr_ty _         (IfaceLitTy n)         = pprIfaceTyLit n
         -- Function types
 ppr_ty ctxt_prec (IfaceFunTy _ w ty1 ty2)  -- Should be VisArg
@@ -1042,9 +1033,6 @@ defaultNonStandardVars do_runtimereps do_multiplicities ty = go False emptyFsEnv
 
     go ink subs (IfaceTyConApp tc tc_args)
       = IfaceTyConApp tc (go_args ink subs tc_args)
-
-    go ink subs (IfaceTupleTy sort is_prom tc_args)
-      = IfaceTupleTy sort is_prom (go_args ink subs tc_args)
 
     go ink subs (IfaceFunTy af w arg res)
       = IfaceFunTy af (go ink subs w) (go ink subs arg) (go ink subs res)
@@ -1866,10 +1854,8 @@ instance Binary IfaceType where
       = do { putByte bh 6; put_ bh a; put_ bh b }
     put_ bh (IfaceCoercionTy a)
       = do { putByte bh 7; put_ bh a }
-    put_ bh (IfaceTupleTy s i tys)
-      = do { putByte bh 8; put_ bh s; put_ bh i; put_ bh tys }
     put_ bh (IfaceLitTy n)
-      = do { putByte bh 9; put_ bh n }
+      = do { putByte bh 8; put_ bh n }
 
     get bh = do
             h <- getByte bh
@@ -1894,8 +1880,6 @@ instance Binary IfaceType where
               7 -> do { a <- get bh
                       ; return (IfaceCoercionTy a) }
 
-              8 -> do { s <- get bh; i <- get bh; tys <- get bh
-                      ; return (IfaceTupleTy s i tys) }
               _  -> do n <- get bh
                        return (IfaceLitTy n)
 
@@ -2094,7 +2078,6 @@ instance NFData IfaceType where
     IfaceTyConApp f1 f2 -> rnf f1 `seq` rnf f2
     IfaceCastTy f1 f2 -> rnf f1 `seq` rnf f2
     IfaceCoercionTy f1 -> rnf f1
-    IfaceTupleTy f1 f2 f3 -> f1 `seq` f2 `seq` rnf f3
 
 instance NFData IfaceTyLit where
   rnf = \case

@@ -726,8 +726,6 @@ rnIfaceType (IfaceAppTy t1 t2)
 rnIfaceType (IfaceLitTy l)         = return (IfaceLitTy l)
 rnIfaceType (IfaceFunTy af w t1 t2)
     = IfaceFunTy af <$> rnIfaceType w <*> rnIfaceType t1 <*> rnIfaceType t2
-rnIfaceType (IfaceTupleTy s i tks)
-    = IfaceTupleTy s i <$> rnIfaceAppArgs tks
 rnIfaceType (IfaceTyConApp tc tks)
     = IfaceTyConApp <$> rnIfaceTyCon tc <*> rnIfaceAppArgs tks
 rnIfaceType (IfaceForAllTy tv t)

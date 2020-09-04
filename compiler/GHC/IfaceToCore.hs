@@ -1105,7 +1105,6 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
         -- to write them out in coreRuleToIfaceRule
     ifTopFreeName :: IfaceExpr -> Maybe Name
     ifTopFreeName (IfaceType (IfaceTyConApp tc _ )) = Just (ifaceTyConName tc)
-    ifTopFreeName (IfaceType (IfaceTupleTy s _ ts)) = Just (tupleTyConName s (length (appArgsIfaceTypes ts)))
     ifTopFreeName (IfaceApp f _)                    = ifTopFreeName f
     ifTopFreeName (IfaceExt n)                      = Just n
     ifTopFreeName _                                 = Nothing
@@ -1167,7 +1166,6 @@ tcIfaceType = go
     go (IfaceFreeTyVar n)        = pprPanic "tcIfaceType:IfaceFreeTyVar" (ppr n)
     go (IfaceLitTy l)            = LitTy <$> tcIfaceTyLit l
     go (IfaceFunTy flag w t1 t2) = FunTy flag <$> tcIfaceType w <*> go t1 <*> go t2
-    go (IfaceTupleTy s i tks)    = tcIfaceTupleTy s i tks
     go (IfaceAppTy t ts)
       = do { t'  <- go t
            ; ts' <- traverse go (appArgsIfaceTypes ts)
@@ -1181,20 +1179,6 @@ tcIfaceType = go
         ForAllTy (Bndr tv' vis) <$> go t
     go (IfaceCastTy ty co)   = CastTy <$> go ty <*> tcIfaceCo co
     go (IfaceCoercionTy co)  = CoercionTy <$> tcIfaceCo co
-
-tcIfaceTupleTy :: TupleSort -> PromotionFlag -> IfaceAppArgs -> IfL Type
-tcIfaceTupleTy sort is_promoted args
- = do { args' <- tcIfaceAppArgs args
-      ; let arity = length args'
-      ; base_tc <- tcTupleTyCon True sort arity
-      ; case is_promoted of
-          NotPromoted
-            -> return (mkTyConApp base_tc args')
-
-          IsPromoted
-            -> do { let tc        = promoteDataCon (tyConSingleDataCon base_tc)
-                        kind_args = map typeKind args'
-                  ; return (mkTyConApp tc (kind_args ++ args')) } }
 
 -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
 tcTupleTyCon :: Bool    -- True <=> typechecking a *type* (vs. an expr)
