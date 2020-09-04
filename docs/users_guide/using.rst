@@ -463,6 +463,17 @@ The available mode flags are:
     The flag can be set in ``GhcStage1HcOpts`` and/or ``GhcStage2HcOpts``
     and is automatically set for ``devel1`` and ``devel2`` build flavors.
 
+.. ghc-flag:: --print-have-interpreter
+    :shortdesc: display whether GHC was built with interactive support
+    :type: mode
+    :category: modes
+
+    Print ``YES`` if GHC was compiled to include the interpreter, ``NO`` otherwise.
+    If this GHC does not have the interpreter included, running it in interactive
+    mode (see :ghc-flag:`--interactive`) will throw an error.
+    This only pertains the use of GHC interactively, not any separate GHCi binaries
+    (see :ref:`ghci`).
+
 .. ghc-flag:: --print-have-native-code-generator
     :shortdesc: display whether target platform has NCG support
     :type: mode
@@ -511,6 +522,17 @@ The available mode flags are:
     :category: modes
 
     Print linke flags used to compile GHC.
+
+.. ghc-flag:: --print-object-splitting-supported
+    :shortdesc: display whether GHC supports object splitting
+    :type: mode
+    :category: modes
+
+    Print ``YES`` if GHC was compiled with support for splitting generated
+    object files into smaller objects, ``NO`` otherwise.
+    This feature uses platform specific techniques and may not be available on
+    all platforms.
+    See :ghc-flag:`-split-objs` for details.
 
 .. ghc-flag:: --print-project-git-commit-id
     :shortdesc: display Git commit id GHC is built from
