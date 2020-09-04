@@ -52,6 +52,10 @@ comparing p x y = compare (p x) (p y)
 -- @low@ and @high@. If it is, @a@ is returned unchanged. The result
 -- is otherwise @low@ if @a <= low@, or @high@ if @high <= a@.
 --
+-- When clamp is used at Double and Float, it has NaN propagating semantics in
+-- its second argument. That is, @clamp (l,h) NaN = NaN@, but @clamp (NaN, NaN)
+-- x = x@.
+--
 -- >>> clamp (0, 10) 2
 -- 2
 --
