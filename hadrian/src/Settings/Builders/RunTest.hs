@@ -142,7 +142,7 @@ runTestBuilderArgs = builder RunTest ? do
             , case perfBaseline of
                 Just commit | not (null commit) -> arg ("--perf-baseline=" ++ show commit)
                 _ -> mempty
-            , emitWhenSet testEnv $ \env -> arg ("--test-env=" ++ show env)
+            , emitWhenSet testEnv $ \env -> arg ("--test-env=" ++ env)
             , emitWhenSet testMetricsFile $ \file -> arg ("--metrics-file=" ++ file)
             , getTestArgs -- User-provided arguments from command line.
             ]
