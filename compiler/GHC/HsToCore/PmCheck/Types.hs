@@ -416,7 +416,7 @@ instance Outputable PmEquality where
 
 -- | A data type that caches for the 'VarInfo' of @x@ the results of querying
 -- 'dsGetCompleteMatches' and then striking out all occurrences of @K@ for
--- which we already know @x /~ K@ from these sets.
+-- which we already know @x ≁ K@ from these sets.
 --
 -- For motivation, see Section 5.3 in Lower Your Guards.
 -- See also Note [Implementation of COMPLETE pragmas]
@@ -552,7 +552,7 @@ data VarInfo
   --     data T = Leaf Int | Branch T T | Node Int T
   -- @
   --
-  -- then @x /~ [Leaf, Node]@ means that @x@ cannot match a @Leaf@ or @Node@,
+  -- then @x ≁ [Leaf, Node]@ means that @x@ cannot match a @Leaf@ or @Node@,
   -- and hence can only match @Branch@. Is orthogonal to anything from 'vi_pos',
   -- in the sense that 'eqPmAltCon' returns @PossiblyOverlap@ for any pairing
   -- between 'vi_pos' and 'vi_neg'.
