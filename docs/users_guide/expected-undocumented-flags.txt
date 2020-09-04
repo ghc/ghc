@@ -1,9 +1,6 @@
 -#include
 --abi-hash
 --backpack
---print-global-package-db
---print-have-interpreter
---print-object-splitting-supported
 --show-packages
 -Onot
 -Wall-missed-specializations
@@ -146,7 +143,6 @@
 -rtsopts=none
 -rtsopts=some
 -smp
--split-objs
 -syslib
 -this-component-id
 -ticky-LNE
