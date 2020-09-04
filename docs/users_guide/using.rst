@@ -463,6 +463,19 @@ The available mode flags are:
     The flag can be set in ``GhcStage1HcOpts`` and/or ``GhcStage2HcOpts``
     and is automatically set for ``devel1`` and ``devel2`` build flavors.
 
+.. ghc-flag:: --print-global-package-db
+    :shortdesc: display GHC's global package database directory
+    :type: mode
+    :category: modes
+
+    Print the path to GHC's global package database directory.
+    A package database stores details about installed packages as a directory
+    containing a file for each package.
+    This flag prints the path to the global database shipped with GHC, and
+    looks something like ``/usr/lib/ghc/package.conf.d`` on Unix.
+    There may be other package databases, e.g., the user package databse.
+    For more details see :ref:`package-databases`.
+
 .. ghc-flag:: --print-have-interpreter
     :shortdesc: display whether GHC was built with interactive support
     :type: mode

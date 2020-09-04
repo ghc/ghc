@@ -1,7 +1,6 @@
 -#include
 --abi-hash
 --backpack
---print-global-package-db
 --show-packages
 -Onot
 -Wall-missed-specializations
