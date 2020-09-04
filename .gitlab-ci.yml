@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: b65e1145d7c0a62c3533904a88dac14f56fb371b
+  DOCKER_REV: 12687d9ad19568f82cb31a47a7de5c82ca221da8
 
   # Sequential version number capturing the versions of all tools fetched by
   # .gitlab/ci.sh.
@@ -119,7 +119,7 @@ lint-testsuite:
   stage: lint
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   script:
-    - make -Ctestsuite list_broken TEST_HC=ghc
+    - make -Ctestsuite list_broken TEST_HC=$GHC
   dependencies: []
   tags:
     - lint
@@ -259,7 +259,7 @@ hadrian-ghc-in-ghci:
     - x86_64-linux
   script:
     - cabal update
-    - cd hadrian; cabal new-build --project-file=ci.project; cd ..
+    - cd hadrian; cabal new-build --with-compiler=$GHC --project-file=ci.project; cd ..
     - git clean -xdf && git submodule foreach git clean -xdf
     - .gitlab/ci.sh setup
     - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
@@ -734,7 +734,7 @@ release-x86_64-linux-deb8:
 .build-x86_64-linux-alpine-hadrian:
   extends: .validate-linux-hadrian
   stage: full-build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine:$DOCKER_REV"
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-alpine3_12:$DOCKER_REV"
   # There are currently a few failing tests
   allow_failure: true
   variables:
