@@ -130,7 +130,13 @@ MetricOracles = NamedTuple("MetricOracles", [("baseline", MetricBaselineOracle),
 
 def parse_perf_stat(stat_str: str) -> PerfStat:
     field_vals = stat_str.strip('\t').split('\t')
-    return PerfStat(*field_vals) # type: ignore
+    stat = PerfStat(*field_vals) # type: ignore
+    if stat.test_env.startswith('"') and stat.test_env.endswith('"'):
+        # Due to a bug, in historical data sometimes the test_env
+        # contains additional quotation marks (#18656).
+        # Remove them, so that we can refer to past data in a uniform fashion.
+        stat = stat._replace(test_env=TestEnv(stat.test_env[1:-1]))
+    return stat
 
 # Get all recorded (in a git note) metrics for a given commit.
 # Returns an empty array if the note is not found.
@@ -662,6 +668,8 @@ def main() -> None:
         metrics = [test for test in metrics if test.stat.way == args.way]
 
     if args.test_env:
+        if '"' in args.test_env:
+            raise Exception('test_env should not contain quotation marks')
         metrics = [test for test in metrics if test.stat.test_env == args.test_env]
 
     if args.test_name:
