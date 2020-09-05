@@ -47,9 +47,13 @@ AC_CHECK_FUNCS([clock_gettime])
 AC_CHECK_FUNCS([getclock getrusage times])
 AC_CHECK_FUNCS([_chsize ftruncate])
 
-AC_CHECK_FUNCS([epoll_ctl eventfd kevent kevent64 kqueue poll])
-
 # event-related fun
+# The line below already defines HAVE_KQUEUE and HAVE_POLL, so technically some of the
+# subsequent portions that redefine them could be skipped. However, we keep those portions
+# to keep kqueue/poll in line with HAVE_EPOLL and possible other additions in the future. You
+# should be aware of this peculiarity if you try to simulate not having kqueue or poll by
+# moving away header files (see also https://gitlab.haskell.org/ghc/ghc/-/issues/9283)
+AC_CHECK_FUNCS([epoll_ctl eventfd kevent kevent64 kqueue poll])
 
 if test "$ac_cv_header_sys_epoll_h" = yes && test "$ac_cv_func_epoll_ctl" = yes; then
   AC_DEFINE([HAVE_EPOLL], [1], [Define if you have epoll support.])
