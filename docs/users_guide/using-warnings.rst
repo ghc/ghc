@@ -1831,7 +1831,7 @@ of ``-W(no-)*``.
     :since: 7.10
 
     This flag warns when ``Typeable`` is listed in a deriving clause
-    or derived with ``StandaloneDeriving``.
+    or derived with :extension:`StandaloneDeriving`.
 
     Since GHC 7.10, ``Typeable`` is automatically derived for all types.
     Thus, deriving ``Typeable`` yourself is redundant.
