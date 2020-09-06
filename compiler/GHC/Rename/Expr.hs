@@ -64,7 +64,6 @@ import GHC.Data.FastString
 import Control.Monad
 import GHC.Builtin.Types ( nilDataConName )
 import qualified GHC.LanguageExtensions as LangExt
-import GHC.Types.FieldLabel (DuplicateRecordFields(..), FieldSelectors(..))
 
 import Control.Arrow (first)
 import Data.Ord
@@ -120,7 +119,7 @@ rnUnboundVar v
                 ; return (HsVar noExtField (noLoc n), emptyFVs) } }
 
 rnExpr (HsVar _ (L l v))
-  = do { mb_name <- lookupGlobalOccRn_overloaded_expr v
+  = do { mb_name <- lookupOccRn_overloaded_expr v
        ; dflags <- getDynFlags
        ; case mb_name of {
            Nothing -> rnUnboundVar v ;

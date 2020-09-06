@@ -17,6 +17,7 @@ module GHC.Rename.Env (
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,
         lookupGlobalOccRn_overloaded_expr,
         lookupGlobalOccRn_overloaded_pat,
+        lookupOccRn_overloaded_expr,
 
         ChildLookupResult(..),
         lookupSubBndrOcc_helper,
@@ -90,8 +91,6 @@ import Data.List        ( find, sortBy )
 import Control.Arrow    ( first )
 import Data.Function
 import GHC.Types.FieldLabel
-
-import Debug.Trace
 
 {-
 *********************************************************
@@ -1043,6 +1042,16 @@ its namespace to DataName and do a second lookup.
 The final result (after the renamer) will be:
   HsTyVar ("Zero", DataName)
 -}
+
+lookupOccRn_overloaded_expr :: RdrName
+                       -> RnM (Maybe (Either Name [Name]))
+lookupOccRn_overloaded_expr = lookupOccRnX_maybe global_lookup Left
+      where
+        global_lookup :: RdrName -> RnM (Maybe (Either Name [Name]))
+        global_lookup n =
+          runMaybeT . msum . map MaybeT $
+            [ lookupGlobalOccRn_overloaded_expr n
+            , fmap Left . listToMaybe <$> lookupQualifiedNameGHCi n ]
 
 lookupOccRnX_maybe :: (RdrName -> RnM (Maybe r)) -> (Name -> r) -> RdrName
                    -> RnM (Maybe r)
