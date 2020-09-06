@@ -431,6 +431,7 @@ function run_hadrian() {
     --flavour="$FLAVOUR" \
     -j"$cores" \
     --broken-test="$BROKEN_TESTS" \
+    --bignum=$BIGNUM_BACKEND \
     $HADRIAN_ARGS \
     $@
 }
