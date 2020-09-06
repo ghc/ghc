@@ -879,13 +879,13 @@ nightly-x86_64-windows:
 # Normal Windows validate builds are profiled; that won't do for releases.
 release-x86_64-windows:
   <<: *release
-  extends: validate-x86_64-windows
+  extends: validate-x86_64-windows-hadrian
   variables:
     BUILD_FLAVOUR: "perf"
-    #
+
 release-x86_64-windows-integer-simple:
   <<: *release
-  extends: validate-x86_64-windows
+  extends: validate-x86_64-windows-hadrian
   variables:
     BIGNUM_BACKEND: native
     BUILD_FLAVOUR: "perf"
