@@ -427,10 +427,12 @@ function clean() {
 }
 
 function run_hadrian() {
+  if [ -z "$BIGNUM_BACKEND" ]; then BIGNUM_BACKEND="gmp"; fi
   run hadrian/build-cabal \
     --flavour="$FLAVOUR" \
     -j"$cores" \
     --broken-test="$BROKEN_TESTS" \
+    --bignum=$BIGNUM_BACKEND \
     $HADRIAN_ARGS \
     $@
 }
