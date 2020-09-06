@@ -826,13 +826,16 @@ validate-x86_64-linux-fedora27:
       - ghc.tar.xz
       - junit.xml
 
-validate-x86_64-windows-hadrian:
+.build-x86_64-windows-hadrian:
   extends: .build-windows-hadrian
   variables:
     MSYSTEM: MINGW64
-    TEST_ENV: "x86_64-windows-hadrian"
+    TEST_ENV: "x86_64-windows"
   cache:
-    key: "x86_64-windows-hadrian-$WINDOWS_TOOLCHAIN_VERSION"
+    key: "x86_64-windows-$WINDOWS_TOOLCHAIN_VERSION"
+
+validate-x86_64-windows-hadrian:
+  extends: .build-x86_64-windows-hadrian
 
 .build-windows-make:
   extends: .build-windows
@@ -873,13 +876,14 @@ nightly-x86_64-windows:
   variables:
     BUILD_FLAVOUR: "validate"
 
-# Normal Windows validate builds are profiled; that won't do for releases.
+# Normal Windows validate builds lack profiled libraries; that won't do for
+# releases.
 release-x86_64-windows:
   <<: *release
   extends: .build-x86_64-windows-hadrian
   variables:
     BUILD_FLAVOUR: "perf"
-    #
+
 release-x86_64-windows-integer-simple:
   <<: *release
   extends: .build-x86_64-windows-hadrian
