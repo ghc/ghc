@@ -13,22 +13,10 @@ data Bar = Bar { barX :: Int, barY :: String }
 foo = 3 -- should not conflict
 fooX = foo + 1
 
-{-
-NoFieldSelectors.hs:17:32: error:
-    • Variable not in scope: bar
-    • Perhaps you meant one of these:
-        ‘bar’ (line 17), data constructor ‘Bar’ (line 11)
-
-NoFieldSelectors.hs:18:17: error:
-    • Variable not in scope: bar :: String
-    • Perhaps you meant one of these:
-        ‘bar’ (line 20), data constructor ‘Bar’ (line 11)
-
 rwcPatFoo Foo{..} = show (foo, bar)
 rwcConFoo = Foo{..} where
   foo = 42
   bar = "hello"
--}
 
 foo1 = Foo 3 "bar"
 foo2 = Foo { foo = 3, bar = "bar" } -- disambiguate foo
