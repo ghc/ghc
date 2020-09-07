@@ -8,7 +8,6 @@ import GHC.Prelude
 
 import GHC.Core
 import GHC.Core.InstEnv
-import GHC.Driver.Session
 import GHC.Driver.Types
 import GHC.StgToCmm.Types (CgInfos (..))
 import GHC.Types.Id
@@ -28,16 +27,11 @@ import GHC.Utils.Panic
 -- See Note [Conveying CAF-info and LFInfo between modules] in
 -- GHC.StgToCmm.Types.
 updateModDetailsIdInfos
-  :: DynFlags
-  -> CgInfos
+  :: CgInfos
   -> ModDetails -- ^ ModDetails to update
   -> ModDetails
 
-updateModDetailsIdInfos dflags _ mod_details
-  | gopt Opt_OmitInterfacePragmas dflags
-  = mod_details
-
-updateModDetailsIdInfos _ cg_infos mod_details =
+updateModDetailsIdInfos cg_infos mod_details =
   let
     ModDetails{ md_types = type_env -- for unfoldings
               , md_insts = insts
