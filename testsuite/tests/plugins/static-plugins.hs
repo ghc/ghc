@@ -67,7 +67,7 @@ main = do
 
       dflags <- getSessionDynFlags
       setSessionDynFlags dflags { staticPlugins = the_plugins
-                                , outputFile = Nothing }
+                                , outputFile_ = Nothing }
       load LoadAllTargets
 
 

@@ -4,6 +4,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -258,12 +259,12 @@ compileOne' m_tc_result mHscMessage
                      hscs_mod_location = mod_location,
                      hscs_mod_details = hmi_details,
                      hscs_partial_iface = partial_iface,
-                     hscs_old_iface_hash = mb_old_iface_hash,
-                     hscs_iface_dflags = iface_dflags }, Interpreter) -> do
+                     hscs_old_iface_hash = mb_old_iface_hash
+                   }, Interpreter) -> do
             -- In interpreted mode the regular codeGen backend is not run so we
             -- generate a interface without codeGen info.
-            final_iface <- mkFullIface hsc_env'{hsc_dflags=iface_dflags} partial_iface Nothing
-            liftIO $ hscMaybeWriteIface dflags final_iface mb_old_iface_hash (ms_location summary)
+            final_iface <- mkFullIface hsc_env' partial_iface Nothing
+            liftIO $ hscMaybeWriteIface dflags True final_iface mb_old_iface_hash (ms_location summary)
 
             (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env' cgguts mod_location
 
@@ -773,20 +774,41 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
          r <- runPipeline' start_phase hsc_env env input_fn'
                            maybe_loc foreign_os
 
-         -- If we are compiling a Haskell module, and doing
-         -- -dynamic-too, but couldn't do the -dynamic-too fast
-         -- path, then rerun the pipeline for the dyn way
          let dflags = hsc_dflags hsc_env
-         -- NB: Currently disabled on Windows (ref #7134, #8228, and #5987)
-         when (not $ platformOS (targetPlatform dflags) == OSMinGW32) $
-           when isHaskellishFile $ whenCannotGenerateDynamicToo dflags $ do
-               debugTraceMsg dflags 4
-                   (text "Running the pipeline again for -dynamic-too")
-               let dflags' = dynamicTooMkDynamicDynFlags dflags
-               hsc_env' <- newHscEnv dflags'
-               _ <- runPipeline' start_phase hsc_env' env input_fn'
-                                 maybe_loc foreign_os
-               return ()
+         when isHaskellishFile $
+           dynamicTooState dflags >>= \case
+               DT_Dont   -> return ()
+               DT_Dyn    -> return ()
+               DT_OK     -> return ()
+               -- If we are compiling a Haskell module with -dynamic-too, we
+               -- first try the "fast path": that is we compile the non-dynamic
+               -- version and at the same time we check that interfaces depended
+               -- on exist both for the non-dynamic AND the dynamic way. We also
+               -- check that they have the same hash.
+               --    If they don't, dynamicTooState is set to DT_Failed.
+               --       See GHC.Iface.Load.checkBuildDynamicToo
+               --    If they do, in the end we produce both the non-dynamic and
+               --    dynamic outputs.
+               --
+               -- If this "fast path" failed, we execute the whole pipeline
+               -- again, this time for the dynamic way *only*. To do that we
+               -- just set the dynamicNow bit from the start to ensure that the
+               -- dynamic DynFlags fields are used and we disable -dynamic-too
+               -- (its state is already set to DT_Failed so it wouldn't do much
+               -- anyway).
+               DT_Failed
+                   -- NB: Currently disabled on Windows (ref #7134, #8228, and #5987)
+                   | OSMinGW32 <- platformOS (targetPlatform dflags) -> return ()
+                   | otherwise -> do
+                       debugTraceMsg dflags 4
+                           (text "Running the full pipeline again for -dynamic-too")
+                       let dflags' = flip gopt_unset Opt_BuildDynamicToo
+                                      $ setDynamicNow
+                                      $ dflags
+                       hsc_env' <- newHscEnv dflags'
+                       _ <- runPipeline' start_phase hsc_env' env input_fn'
+                                         maybe_loc foreign_os
+                       return ()
          return r
 
 runPipeline'
@@ -850,23 +872,40 @@ pipeLoop phase input_fn = do
    _
      -> do liftIO $ debugTraceMsg dflags 4
                                   (text "Running phase" <+> ppr phase)
-           (next_phase, output_fn) <- runHookedPhase phase input_fn dflags
+
            case phase of
                HscOut {} -> do
-                   -- We don't pass Opt_BuildDynamicToo to the backend
-                   -- in DynFlags.
-                   -- Instead it's run twice with flags accordingly set
-                   -- per run.
-                   let noDynToo = pipeLoop next_phase output_fn
+                   let noDynToo = do
+                        (next_phase, output_fn) <- runHookedPhase phase input_fn dflags
+                        pipeLoop next_phase output_fn
                    let dynToo = do
-                          setDynFlags $ gopt_unset dflags Opt_BuildDynamicToo
-                          r <- pipeLoop next_phase output_fn
-                          setDynFlags $ dynamicTooMkDynamicDynFlags dflags
-                          -- TODO shouldn't ignore result:
-                          _ <- pipeLoop phase input_fn
-                          return r
-                   ifGeneratingDynamicToo dflags dynToo noDynToo
-               _ -> pipeLoop next_phase output_fn
+                          -- if Opt_BuildDynamicToo is set and if the platform
+                          -- supports it, we first run the backend to generate
+                          -- the dynamic objects and then re-run it to generate
+                          -- the non-dynamic ones.
+                          let dflags' = setDynamicNow dflags -- set "dynamicNow"
+                          setDynFlags dflags'
+                          (next_phase, output_fn) <- runHookedPhase phase input_fn dflags'
+                          _ <- pipeLoop next_phase output_fn
+                          -- TODO: we probably shouldn't ignore the result of
+                          -- the dynamic compilation
+                          setDynFlags dflags -- restore flags without "dynamicNow" set
+                          noDynToo
+                   dynamicTooState dflags >>= \case
+                     DT_Dont   -> noDynToo
+                     DT_Failed -> noDynToo
+                     DT_OK     -> dynToo
+                     DT_Dyn    -> noDynToo
+                        -- it shouldn't be possible to be in this last case
+                        -- here. It would mean that we executed the whole
+                        -- pipeline with DynamicNow and Opt_BuildDynamicToo set.
+                        --
+                        -- When we restart the whole pipeline for -dynamic-too
+                        -- we set DynamicNow but we unset Opt_BuildDynamicToo so
+                        -- it's weird.
+               _ -> do
+                  (next_phase, output_fn) <- runHookedPhase phase input_fn dflags
+                  pipeLoop next_phase output_fn
 
 runHookedPhase :: PhasePlus -> FilePath -> DynFlags
                -> CompPipeline (PhasePlus, FilePath)
@@ -1264,8 +1303,8 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                         hscs_mod_location = mod_location,
                         hscs_mod_details = mod_details,
                         hscs_partial_iface = partial_iface,
-                        hscs_old_iface_hash = mb_old_iface_hash,
-                        hscs_iface_dflags = iface_dflags }
+                        hscs_old_iface_hash = mb_old_iface_hash
+                      }
               -> do output_fn <- phaseOutputFilename next_phase
 
                     PipeState{hsc_env=hsc_env'} <- getPipeState
@@ -1273,17 +1312,17 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                     (outputFilename, mStub, foreign_files, cg_infos) <- liftIO $
                       hscGenHardCode hsc_env' cgguts mod_location output_fn
 
-                    final_iface <- liftIO (mkFullIface hsc_env'{hsc_dflags=iface_dflags} partial_iface (Just cg_infos))
+                    let dflags = hsc_dflags hsc_env'
+                    final_iface <- liftIO (mkFullIface hsc_env' partial_iface (Just cg_infos))
                     let final_mod_details
-                           | gopt Opt_OmitInterfacePragmas iface_dflags
+                           | gopt Opt_OmitInterfacePragmas dflags
                            = mod_details
                            | otherwise = {-# SCC updateModDetailsIdInfos #-}
                                          updateModDetailsIdInfos cg_infos mod_details
                     setIface final_iface final_mod_details
 
                     -- See Note [Writing interface files]
-                    let if_dflags = dflags `gopt_unset` Opt_BuildDynamicToo
-                    liftIO $ hscMaybeWriteIface if_dflags final_iface mb_old_iface_hash mod_location
+                    liftIO $ hscMaybeWriteIface dflags False final_iface mb_old_iface_hash mod_location
 
                     stub_o <- liftIO (mapM (compileStub hsc_env') mStub)
                     foreign_os <- liftIO $

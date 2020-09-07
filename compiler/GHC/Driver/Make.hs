@@ -712,9 +712,9 @@ guessOutputFile = modifySession $ \env ->
                  "must specify -o explicitly"
             else Just name'
     in
-    case outputFile dflags of
+    case outputFile_ dflags of
         Just _ -> env
-        Nothing -> env { hsc_dflags = dflags { outputFile = name_exe } }
+        Nothing -> env { hsc_dflags = dflags { outputFile_ = name_exe } }
 
 -- -----------------------------------------------------------------------------
 --
@@ -2300,8 +2300,8 @@ enableCodeGenWhen condition should_modify staticLife dynLife bcknd nodemap =
           -- are written into `-odir` and `-hidir` respectively.  #16670
           if gopt Opt_WriteInterface dflags
             then return (ml_hi_file ms_location, ml_obj_file ms_location)
-            else (,) <$> (new_temp_file (hiSuf dflags) (dynHiSuf dflags))
-                     <*> (new_temp_file (objectSuf dflags) (dynObjectSuf dflags))
+            else (,) <$> (new_temp_file (hiSuf_ dflags) (dynHiSuf_ dflags))
+                     <*> (new_temp_file (objectSuf_ dflags) (dynObjectSuf_ dflags))
         return $
           ms
           { ms_location =

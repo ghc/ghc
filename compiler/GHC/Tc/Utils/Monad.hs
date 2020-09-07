@@ -28,7 +28,7 @@ module GHC.Tc.Utils.Monad(
   whenDOptM, whenGOptM, whenWOptM,
   whenXOptM, unlessXOptM,
   getGhcMode,
-  withDoDynamicToo,
+  withDynamicNow, withoutDynamicNow,
   getEpsVar,
   getEps,
   updateEps, updateEps_,
@@ -546,10 +546,15 @@ unlessXOptM flag thing_inside = do b <- xoptM flag
 getGhcMode :: TcRnIf gbl lcl GhcMode
 getGhcMode = do { env <- getTopEnv; return (ghcMode (hsc_dflags env)) }
 
-withDoDynamicToo :: TcRnIf gbl lcl a -> TcRnIf gbl lcl a
-withDoDynamicToo =
+withDynamicNow :: TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+withDynamicNow =
   updTopEnv (\top@(HscEnv { hsc_dflags = dflags }) ->
-              top { hsc_dflags = dynamicTooMkDynamicDynFlags dflags })
+              top { hsc_dflags = setDynamicNow dflags })
+
+withoutDynamicNow :: TcRnIf gbl lcl a -> TcRnIf gbl lcl a
+withoutDynamicNow =
+  updTopEnv (\top@(HscEnv { hsc_dflags = dflags }) ->
+              top { hsc_dflags = dflags { dynamicNow = False} })
 
 getEpsVar :: TcRnIf gbl lcl (TcRef ExternalPackageState)
 getEpsVar = do { env <- getTopEnv; return (hsc_EPS env) }

@@ -204,8 +204,11 @@ withBkpSession cid insts deps session_type do_this = do
         hiDir       = Just (outdir hiDir),
         stubDir     = Just (outdir stubDir),
         -- Unset output-file for non exe builds
-        outputFile  = if session_type == ExeSession
-                        then outputFile dflags
+        outputFile_  = if session_type == ExeSession
+                        then outputFile_ dflags
+                        else Nothing,
+        dynOutputFile_ = if session_type == ExeSession
+                        then dynOutputFile_ dflags
                         else Nothing,
         -- Clear the import path so we don't accidentally grab anything
         importPaths = [],

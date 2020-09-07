@@ -199,7 +199,7 @@ main' postLoadMode dflags0 args flagWarnings = do
   let dflags4 = case bcknd of
                 Interpreter | not (gopt Opt_ExternalInterpreter dflags3) ->
                     let platform = targetPlatform dflags3
-                        dflags3a = dflags3 { ways = hostFullWays }
+                        dflags3a = dflags3 { targetWays_ = hostFullWays }
                         dflags3b = foldl gopt_set dflags3a
                                  $ concatMap (wayGeneralFlags platform)
                                              hostFullWays

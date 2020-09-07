@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP                      #-}
 {-# LANGUAGE BangPatterns             #-}
 {-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE LambdaCase               #-}
 {-# OPTIONS_GHC -fprof-auto-top #-}
 
 -------------------------------------------------------------------------------
@@ -866,8 +867,8 @@ finish summary tc_result mb_old_hash = do
                              hscs_mod_location = ms_location summary,
                              hscs_mod_details = details,
                              hscs_partial_iface = partial_iface,
-                             hscs_old_iface_hash = mb_old_hash,
-                             hscs_iface_dflags = dflags }
+                             hscs_old_iface_hash = mb_old_hash
+                           }
 
       -- We are not generating code, so we can skip simplification
       -- and generate a simple interface.
@@ -875,7 +876,7 @@ finish summary tc_result mb_old_hash = do
         (iface, mb_old_iface_hash, details) <- liftIO $
           hscSimpleIface hsc_env tc_result mb_old_hash
 
-        liftIO $ hscMaybeWriteIface dflags iface mb_old_iface_hash (ms_location summary)
+        liftIO $ hscMaybeWriteIface dflags True iface mb_old_iface_hash (ms_location summary)
 
         return $ case bcknd of
           NoBackend -> HscNotGeneratingCode iface details
@@ -888,27 +889,110 @@ finish summary tc_result mb_old_hash = do
 Note [Writing interface files]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-We write interface files in GHC.Driver.Main and GHC.Driver.Pipeline using
-hscMaybeWriteIface, but only once per compilation (twice with dynamic-too).
+We write one interface file per module and per compilation, except with
+-dynamic-too where we write two interface files (non-dynamic and dynamic).
 
-* If a compilation does NOT require (re)compilation of the hard code we call
-  hscMaybeWriteIface inside GHC.Driver.Main:finish.
-* If we run in One Shot mode and target bytecode we write it in compileOne'
-* Otherwise we must be compiling to regular hard code and require recompilation.
-  In this case we create the interface file inside RunPhase using the interface
-  generator contained inside the HscRecomp status.
+We can write two kinds of interfaces (see Note [Interface file stages] in
+"GHC.Driver.Types"):
+
+   * simple interface: interface generated after the core pipeline
+
+   * full interface: simple interface completed with information from the
+     backend
+
+Depending on the situation, we write one or the other (using
+`hscMaybeWriteIface`). We must be careful with `-dynamic-too` because only the
+backend is run twice, so if we write a simple interface we need to write both
+the non-dynamic and the dynamic interfaces at the same time (with the same
+contents).
+
+Cases for which we generate simple interfaces:
+
+   * GHC.Driver.Main.finish: when a compilation does NOT require (re)compilation
+   of the hard code
+
+   * GHC.Driver.Pipeline.compileOne': when we run in One Shot mode and target
+   bytecode (if interface writing is forced).
+
+   * GHC.Driver.Backpack uses simple interfaces for indefinite units
+   (units with module holes). It writes them indirectly by forcing the
+   -fwrite-interface flag while setting backend to NoBackend.
+
+Cases for which we generate full interfaces:
+
+   * GHC.Driver.Pipeline.runPhase: when we must be compiling to regular hard
+   code and/or require recompilation.
+
+By default interface file names are derived from module file names by adding
+suffixes. The interface file name can be overloaded with "-ohi", except when
+`-dynamic-too` is used.
+
 -}
-hscMaybeWriteIface :: DynFlags -> ModIface -> Maybe Fingerprint -> ModLocation -> IO ()
-hscMaybeWriteIface dflags iface old_iface location = do
+
+-- | Write interface files
+hscMaybeWriteIface :: DynFlags -> Bool -> ModIface -> Maybe Fingerprint -> ModLocation -> IO ()
+hscMaybeWriteIface dflags is_simple iface old_iface mod_location = do
     let force_write_interface = gopt Opt_WriteInterface dflags
         write_interface = case backend dflags of
                             NoBackend    -> False
                             Interpreter  -> False
                             _            -> True
-        no_change = old_iface == Just (mi_iface_hash (mi_final_exts iface))
 
-    when (write_interface || force_write_interface) $
-          hscWriteIface dflags iface no_change location
+      -- mod_location only contains the base name, so we rebuild the
+      -- correct file extension from the dynflags.
+        baseName = ml_hi_file mod_location
+        buildIfName suffix
+          | Just name <- outputHi dflags
+          = name
+          | otherwise
+          = let with_hi = replaceExtension baseName suffix
+            in  addBootSuffix_maybe (mi_boot iface) with_hi
+
+        write_iface dflags' iface =
+          {-# SCC "writeIface" #-}
+          writeIface dflags' (buildIfName (hiSuf dflags')) iface
+
+    when (write_interface || force_write_interface) $ do
+
+      -- FIXME: with -dynamic-too, "no_change" is only meaningful for the
+      -- non-dynamic interface, not for the dynamic one. We should have another
+      -- flag for the dynamic interface. In the meantime:
+      --
+      --    * when we write a single full interface, we check if we are
+      --    currently writing the dynamic interface due to -dynamic-too, in
+      --    which case we ignore "no_change".
+      --
+      --    * when we write two simple interfaces at once because of
+      --    dynamic-too, we use "no_change" both for the non-dynamic and the
+      --    dynamic interfaces. Hopefully both the dynamic and the non-dynamic
+      --    interfaces stay in sync...
+      --
+      let no_change = old_iface == Just (mi_iface_hash (mi_final_exts iface))
+
+      dt <- dynamicTooState dflags
+
+      when (dopt Opt_D_dump_if_trace dflags) $ putMsg dflags $
+        hang (text "Writing interface(s):") 2 $ vcat
+         [ text "Kind:" <+> if is_simple then text "simple" else text "full"
+         , text "Hash change:" <+> ppr (not no_change)
+         , text "DynamicToo state:" <+> text (show dt)
+         ]
+
+      if is_simple
+         then unless no_change $ do -- FIXME: see no_change' comment above
+            write_iface dflags iface
+            case dt of
+               DT_Dont   -> return ()
+               DT_Failed -> return ()
+               DT_Dyn    -> panic "Unexpected DT_Dyn state when writing simple interface"
+               DT_OK     -> write_iface (setDynamicNow dflags) iface
+         else case dt of
+               DT_Dont | not no_change             -> write_iface dflags iface
+               DT_OK   | not no_change             -> write_iface dflags iface
+               -- FIXME: see no_change' comment above
+               DT_Dyn                              -> write_iface dflags iface
+               DT_Failed | not (dynamicNow dflags) -> write_iface dflags iface
+               _                                   -> return ()
 
 --------------------------------------------------------------
 -- NoRecomp handlers
@@ -1384,51 +1468,6 @@ hscSimpleIface' tc_result mb_old_iface = do
 --------------------------------------------------------------
 -- BackEnd combinators
 --------------------------------------------------------------
-{-
-Note [Interface filename extensions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-ModLocation only contains the base names, however when generating dynamic files
-the actual extension might differ from the default.
-
-So we only load the base name from ModLocation and replace the actual extension
-according to the information in DynFlags.
-
-If we generate a interface file right after running the core pipeline we will
-have set -dynamic-too and potentially generate both interface files at the same
-time.
-
-If we generate a interface file after running the backend then dynamic-too won't
-be set, however then the extension will be contained in the dynflags instead so
-things still work out fine.
--}
-
-hscWriteIface :: DynFlags -> ModIface -> Bool -> ModLocation -> IO ()
-hscWriteIface dflags iface no_change mod_location = do
-    -- mod_location only contains the base name, so we rebuild the
-    -- correct file extension from the dynflags.
-    let ifaceBaseFile = ml_hi_file mod_location
-    unless no_change $
-        let ifaceFile = buildIfName ifaceBaseFile (hiSuf dflags)
-        in  {-# SCC "writeIface" #-}
-            writeIface dflags ifaceFile iface
-    whenGeneratingDynamicToo dflags $ do
-        -- TODO: We should do a no_change check for the dynamic
-        --       interface file too
-        -- When we generate iface files after core
-        let dynDflags = dynamicTooMkDynamicDynFlags dflags
-            -- dynDflags will have set hiSuf correctly.
-            dynIfaceFile = buildIfName ifaceBaseFile (hiSuf dynDflags)
-
-        writeIface dynDflags dynIfaceFile iface
-  where
-    buildIfName :: String -> String -> String
-    buildIfName baseName suffix
-      | Just name <- outputHi dflags
-      = name
-      | otherwise
-      = let with_hi = replaceExtension baseName suffix
-        in  addBootSuffix_maybe (mi_boot iface) with_hi
 
 -- | Compile to hard-code.
 hscGenHardCode :: HscEnv -> CgGuts -> ModLocation -> FilePath
