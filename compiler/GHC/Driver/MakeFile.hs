@@ -67,11 +67,11 @@ doMkDependHS srcs = do
     -- We therefore do the initial dependency generation with an empty
     -- way and .o/.hi extensions, regardless of any flags that might
     -- be specified.
-    let dflags = dflags0 {
-                     ways = Set.empty,
-                     hiSuf = "hi",
-                     objectSuf = "o"
-                 }
+    let dflags = dflags0
+            { targetWays_ = Set.empty
+            , hiSuf_      = "hi"
+            , objectSuf_  = "o"
+            }
     GHC.setSessionDynFlags dflags
 
     when (null (depSuffixes dflags)) $ liftIO $
