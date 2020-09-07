@@ -58,6 +58,12 @@ function run() {
 TOP="$(pwd)"
 
 function setup_locale() {
+  # Musl doesn't provide locale support at all...
+  if ! which locale > /dev/null; then
+    info "No locale executable. Skipping locale setup..."
+    return
+  fi
+
   # BSD grep terminates early with -q, consequently locale -a will get a
   # SIGPIPE and the pipeline will fail with pipefail.
   shopt -o -u pipefail
