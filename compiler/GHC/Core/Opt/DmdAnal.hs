@@ -29,6 +29,7 @@ import GHC.Core.DataCon
 import GHC.Types.ForeignCall ( isSafeForeignCall )
 import GHC.Types.Id
 import GHC.Types.Id.Info
+import GHC.Types.Unique       ( hasKey )
 import GHC.Core.Utils
 import GHC.Core.TyCon
 import GHC.Core.Type
@@ -39,6 +40,7 @@ import GHC.Utils.Panic
 import GHC.Data.Maybe         ( isJust )
 import GHC.Builtin.PrimOps
 import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
+import GHC.Builtin.Names      ( noDivIdKey )
 import GHC.Utils.Error        ( dumpIfSet_dyn, DumpFormat (..) )
 import GHC.Types.Unique.Set
 
@@ -188,6 +190,11 @@ dmdAnal' env dmd (App fun arg)
         (fun_ty, fun')    = dmdAnal env call_dmd fun
         (arg_dmd, res_ty) = splitDmdTy fun_ty
         (arg_ty, arg')    = dmdAnalStar env (dmdTransformThunkDmd arg arg_dmd) arg
+        relaxDiv
+          | Var id <- fun
+          , id `hasKey` noDivIdKey
+                          = zapDivergence
+          | otherwise     = id
     in
 --    pprTrace "dmdAnal:app" (vcat
 --         [ text "dmd =" <+> ppr dmd
@@ -197,7 +204,7 @@ dmdAnal' env dmd (App fun arg)
 --         , text "arg dmd_ty =" <+> ppr arg_ty
 --         , text "res dmd_ty =" <+> ppr res_ty
 --         , text "overall res dmd_ty =" <+> ppr (res_ty `bothDmdType` arg_ty) ])
-    (res_ty `bothDmdType` arg_ty, App fun' arg')
+    (relaxDiv $ res_ty `bothDmdType` arg_ty, App fun' arg')
 
 dmdAnal' env dmd (Lam var body)
   | isTyVar var

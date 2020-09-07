@@ -758,8 +758,8 @@ cpeApp top_env expr
             -> Int
             -> UniqSM (Floats, CpeRhs)
     cpe_app env (Var f) (CpeApp Type{} : CpeApp arg : args) depth
-        | f `hasKey` lazyIdKey          -- Replace (lazy a) with a, and
-       || f `hasKey` noinlineIdKey      -- Replace (noinline a) with a
+        | f `hasKey` lazyIdKey          -- Replace (lazy @ty a) with a, and
+       || f `hasKey` noinlineIdKey      -- Replace (noinline @ty a) with a
         -- Consider the code:
         --
         --      lazy (f x) y
@@ -775,6 +775,12 @@ cpeApp top_env expr
         -- rather than the far superior "f x y".  Test case is par01.
         = let (terminal, args', depth') = collect_args arg
           in cpe_app env terminal (args' ++ args) (depth + depth' - 1)
+
+    cpe_app env (Var f) (CpeApp _runtimeRep@Type{} : CpeApp _type@Type{} : CpeApp arg : args) depth
+       | f `hasKey` noDivIdKey       -- Replace (noDiv @rep @ty a) with a
+        = let (terminal, args', depth') = collect_args arg
+          in cpe_app env terminal (args' ++ args) (depth + depth' - 1)
+
     cpe_app env (Var f) (CpeApp _runtimeRep@Type{} : CpeApp _type@Type{} : CpeApp arg : rest) n
         | f `hasKey` runRWKey
         -- N.B. While it may appear that n == 1 in the case of runRW#

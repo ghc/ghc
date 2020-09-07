@@ -41,7 +41,7 @@ module GHC.Types.Demand (
 
         evalDmd, cleanEvalDmd, cleanEvalProdDmd, isStrictDmd,
         splitDmdTy, splitFVs, deferAfterPreciseException,
-        postProcessUnsat, postProcessDmdType,
+        postProcessUnsat, postProcessDmdType, zapDivergence,
 
         splitProdDmd_maybe, peelCallDmd, peelManyCalls, mkCallDmd, mkCallDmds,
         mkWorkerDemand, dmdTransformSig, dmdTransformDataConSig,
@@ -1332,6 +1332,10 @@ postProcessDivergence :: Str () -> Divergence -> Divergence
 -- converge, hence Dunno.
 postProcessDivergence Lazy _ = Dunno
 postProcessDivergence _    d = d
+
+zapDivergence :: DmdType -> DmdType
+zapDivergence (DmdType a b _)
+  = DmdType a b topDiv
 
 postProcessDmdEnv :: DmdShell -> DmdEnv -> DmdEnv
 postProcessDmdEnv ds@(JD { sd = ss, ud = us }) env

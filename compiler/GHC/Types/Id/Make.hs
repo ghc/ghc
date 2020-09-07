@@ -162,7 +162,7 @@ wiredInIds
   ++ errorIds           -- Defined in GHC.Core.Make
 
 magicIds :: [Id]    -- See Note [magicIds]
-magicIds = [lazyId, oneShotId, noinlineId]
+magicIds = [lazyId, oneShotId, noinlineId, noDivId]
 
 ghcPrimIds :: [Id]  -- See Note [ghcPrimIds (aka pseudoops)]
 ghcPrimIds
@@ -1434,10 +1434,11 @@ coerceName        = mkWiredInIdName gHC_PRIM  (fsLit "coerce")         coerceKey
 proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHashKey       proxyHashId
 
 -- Names listed in magicIds; see Note [magicIds]
-lazyIdName, oneShotName, noinlineIdName :: Name
+lazyIdName, oneShotName, noinlineIdName, noDivIdName :: Name
 lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey          lazyId
 oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
 noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline")       noinlineIdKey      noinlineId
+noDivIdName       = mkWiredInIdName gHC_MAGIC (fsLit "noDiv")          noDivIdKey         noDivId
 
 ------------------------------------------------
 proxyHashId :: Id
@@ -1527,6 +1528,16 @@ magicDictId = pcMiscPrelId magicDictName ty info
   info = noCafIdInfo `setInlinePragInfo` neverInlinePragma
                      `setNeverLevPoly`   ty
   ty   = mkSpecForAllTys [alphaTyVar] alphaTy
+
+--------------------------------------------------------------------------------
+
+-- Wired-in due to levity polymorphic RHS. This is okay as it will be inlined during CorePrep.
+noDivId :: Id
+noDivId = pcMiscPrelId noDivIdName ty info
+  where
+    info = noCafIdInfo `setInlinePragInfo` neverInlinePragma
+    ty = mkSpecForAllTys [ runtimeRep1TyVar, openAlphaTyVar ]
+         $ mkVisFunTyMany openAlphaTy openAlphaTy
 
 --------------------------------------------------------------------------------
 

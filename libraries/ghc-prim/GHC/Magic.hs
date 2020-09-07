@@ -22,7 +22,10 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Magic ( inline, noinline, lazy, oneShot, runRW# ) where
+module GHC.Magic
+  ( inline, noinline, lazy, oneShot, runRW#
+  , noDiv
+  ) where
 
 --------------------------------------------------
 --        See Note [magicIds] in GHC.Types.Id.Make
@@ -116,3 +119,10 @@ runRW# :: forall (r :: RuntimeRep) (o :: TYPE r).
 -- See Note [runRW magic] in GHC.CoreToStg.Prep.
 {-# NOINLINE runRW# #-}  -- runRW# is inlined manually in CorePrep
 runRW# m = m realWorld#
+
+-- | Forget that the argument's evaluation may diverge.
+noDiv :: forall (r :: RuntimeRep) (o :: TYPE r).
+         o -> o
+{-# NOINLINE noDiv #-}  -- noDiv# is inlined manually in CorePrep
+noDiv = let x = x in x
+
