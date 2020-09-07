@@ -186,7 +186,7 @@ mkPluginUsage hsc_env pluginModule
             if useDyn
               then libLocs
               else
-                let dflags'  = addWay' WayDyn dflags
+                let dflags'  = dflags { ways_ = addWay WayDyn (ways_ dflags) }
                     dlibLocs = [ searchPath </> mkHsSOName platform dlibLoc
                                | searchPath <- searchPaths
                                , dlibLoc    <- packageHsLibs dflags' pkg
