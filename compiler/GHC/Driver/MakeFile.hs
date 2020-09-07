@@ -64,9 +64,9 @@ doMkDependHS srcs = do
     -- way and .o/.hi extensions, regardless of any flags that might
     -- be specified.
     let dflags = dflags0 {
-                     ways = Set.empty,
-                     hiSuf = "hi",
-                     objectSuf = "o"
+                     ways_ = Set.empty,
+                     hiSuf_ = "hi",
+                     objectSuf_ = "o"
                  }
     GHC.setSessionDynFlags dflags
 
