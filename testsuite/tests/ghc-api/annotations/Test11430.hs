@@ -21,5 +21,3 @@ x = undefined
 {-# INLINABLE [1] y #-}
 y :: (Num a, Integral b) => a -> b -> a
 y = undefined
-
-c = {-# GENERATED "foob\x61r" 0x1 : 0x2  -  0x3 :   0x4 #-} 0.00

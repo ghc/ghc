@@ -820,11 +820,6 @@ ds_prag_expr (HsPragSCC _ _ cc) expr = do
         Tick (ProfNote (mkUserCC nm mod_name (getLoc expr) flavour) count True)
                <$> dsLExpr expr
       else dsLExpr expr
-ds_prag_expr (HsPragTick _ _ _ _) expr = do
-  dflags <- getDynFlags
-  if gopt Opt_Hpc dflags
-    then panic "dsExpr:HsPragTick"
-    else dsLExpr expr
 
 ------------------------------
 dsSyntaxExpr :: SyntaxExpr GhcTc -> [CoreExpr] -> DsM CoreExpr

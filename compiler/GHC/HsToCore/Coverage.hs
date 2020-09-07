@@ -618,10 +618,6 @@ addTickHsExpr (HsTick x t e) =
 addTickHsExpr (HsBinTick x t0 t1 e) =
         liftM (HsBinTick x t0 t1) (addTickLHsExprNever e)
 
-addTickHsExpr (HsPragE _ HsPragTick{} (L pos e0)) = do
-    e2 <- allocTickBox (ExpBox False) False False pos $
-                addTickHsExpr e0
-    return $ unLoc e2
 addTickHsExpr (HsPragE x p e) =
         liftM (HsPragE x p) (addTickLHsExpr e)
 addTickHsExpr e@(HsBracket     {})   = return e
