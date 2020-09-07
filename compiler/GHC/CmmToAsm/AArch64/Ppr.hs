@@ -453,9 +453,9 @@ pprInstr platform instr = case instr of
   B (TLabel lbl) -> text "\tb" <+> ppr lbl
   B (TReg r)     -> text "\tbr" <+> pprReg W64 r
 
-  BL (TBlock bid) -> text "\tbl" <+> ppr (mkLocalBlockLabel (getUnique bid))
-  BL (TLabel lbl) -> text "\tbl" <+> ppr lbl
-  BL (TReg r)     -> text "\tblr" <+> pprReg W64 r
+  BL (TBlock bid) _ _ -> text "\tbl" <+> ppr (mkLocalBlockLabel (getUnique bid))
+  BL (TLabel lbl) _ _ -> text "\tbl" <+> ppr lbl
+  BL (TReg r)     _ _ -> text "\tblr" <+> pprReg W64 r
 
   BCOND c (TBlock bid) -> text "\t" <> pprBcond c <+> ppr (mkLocalBlockLabel (getUnique bid))
   BCOND c (TLabel lbl) -> text "\t" <> pprBcond c <+> ppr lbl
