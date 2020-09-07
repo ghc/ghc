@@ -39,7 +39,7 @@ import GHC.Core.DataCon
 import GHC.Core.Opt.Monad ( Tick(..), SimplMode(..) )
 import GHC.Core
 import GHC.Builtin.Types.Prim( realWorldStatePrimTy )
-import GHC.Builtin.Names( runRWKey )
+import GHC.Builtin.Names( runRWKey, noDivIdKey )
 import GHC.Types.Demand ( StrictSig(..), Demand, dmdTypeDepth, isStrictDmd
                         , mkClosedStrictSig, topDmd, seqDmd, botDiv )
 import GHC.Types.Cpr    ( mkCprSig, botCpr )
@@ -1970,6 +1970,25 @@ rebuildCall env info (CastIt co cont)
 
 rebuildCall env info (ApplyToTy { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_cont = cont })
   = rebuildCall env (addTyArgTo info arg_ty hole_ty) cont
+
+---------- The runRW# rule. Do this after absorbing all arguments ------
+-- See Note [Simplification of noDiv] in GHC.CoreToSTG.Prep.
+--
+-- noDiv :: forall (r :: RuntimeRep) (o :: TYPE r). o -> o
+-- K[ noDiv rr ty body ]   -->   noDiv rr' ty' K[body]
+rebuildCall env (ArgInfo { ai_fun = fun_id, ai_args = rev_args })
+            (ApplyToVal { sc_arg = arg, sc_env = arg_se
+                        , sc_cont = cont })
+  | fun_id `hasKey` noDivIdKey
+  , not (contIsStop cont)  -- Don't fiddle around if the continuation is boring
+  , [ TyArg {}, TyArg {} ] <- rev_args
+  = do { let env'  = arg_se `setInScopeFromE` env
+             ty'   = contResultType cont
+                     -- cont' applies to s, then K
+       ; arg' <- simplExprC env' arg cont
+       ; let rr'   = getRuntimeRep ty'
+             call' = mkApps (Var fun_id) [mkTyArg rr', mkTyArg ty', arg']
+       ; return (emptyFloats env, call') }
 
 ---------- The runRW# rule. Do this after absorbing all arguments ------
 -- See Note [Simplification of runRW#] in GHC.CoreToSTG.Prep.
