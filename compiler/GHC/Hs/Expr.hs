@@ -838,21 +838,10 @@ data HsPragE p
   --       'GHC.Parser.Annotation.AnnVal',
   --       'GHC.Parser.Annotation.AnnClose' @'\#-}'@
 
-  -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | HsPragTick                        -- A pragma introduced tick
-     (XTickPragma p)
-     SourceText                       -- Note [Pragma source text] in GHC.Types.Basic
-     (StringLiteral,(Int,Int),(Int,Int))
-                                      -- external span for this tick
-     ((SourceText,SourceText),(SourceText,SourceText))
-        -- Source text for the four integers used in the span.
-        -- See note [Pragma source text] in GHC.Types.Basic
-
   | XHsPragE !(XXPragE p)
 
 type instance XSCC           (GhcPass _) = NoExtField
 type instance XCoreAnn       (GhcPass _) = NoExtField
-type instance XTickPragma    (GhcPass _) = NoExtField
 type instance XXPragE        (GhcPass _) = NoExtCon
 
 -- | Located Haskell Tuple Argument
@@ -1402,13 +1391,6 @@ instance Outputable (HsPragE (GhcPass p)) where
      -- no doublequotes if stl empty, for the case where the SCC was written
      -- without quotes.
     <+> pprWithSourceText stl (ftext lbl) <+> text "#-}"
-  ppr (HsPragTick _ st (StringLiteral sta s, (v1,v2), (v3,v4)) ((s1,s2),(s3,s4))) =
-    pprWithSourceText st (text "{-# GENERATED")
-    <+> pprWithSourceText sta (doubleQuotes $ ftext s)
-    <+> pprWithSourceText s1 (ppr v1) <+> char ':' <+> pprWithSourceText s2 (ppr v2)
-    <+> char '-'
-    <+> pprWithSourceText s3 (ppr v3) <+> char ':' <+> pprWithSourceText s4 (ppr v4)
-    <+> text "#-}"
 
 {-
 ************************************************************************

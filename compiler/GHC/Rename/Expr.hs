@@ -243,7 +243,6 @@ rnExpr (HsPragE x prag expr)
   where
     rn_prag :: HsPragE GhcPs -> HsPragE GhcRn
     rn_prag (HsPragSCC x1 src ann) = HsPragSCC x1 src ann
-    rn_prag (HsPragTick x1 src info srcInfo) = HsPragTick x1 src info srcInfo
 
 rnExpr (HsLam x matches)
   = do { (matches', fvMatch) <- rnMatchGroup LambdaExpr rnLExpr matches
