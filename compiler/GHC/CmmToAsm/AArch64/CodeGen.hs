@@ -912,11 +912,6 @@ genJump expr@(CmmLit (CmmLabel lbl)) regs
   --               , POP_STACK_FRAME
   --               , DELTA 0] )
 
--- no reason to load label into register just to
--- do a register jump.
-genJump expr@(CmmLoad (CmmLit (CmmLabel lbl)) _rep) regs
-  = return $ unitOL (ANN (text $ show expr) (J (TLabel lbl)))
-
 genJump expr regs = do
     (target, _format, code) <- getSomeReg expr
     return (code `appOL` unitOL (ANN (text $ show expr) (J (TReg target)))
