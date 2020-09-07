@@ -168,7 +168,7 @@ rn_hs_sig_wc_type scoping ctxt hs_ty thing_inside
        ; let nwc_rdrs = nubL nwc_rdrs'
        ; implicit_bndrs <- case scoping of
            AlwaysBind       -> pure tv_rdrs
-           BindUnlessForall -> forAllOrNothing (isLHsForAllTy hs_ty) tv_rdrs
+           BindUnlessForall -> forAllOrNothing (isLHsInvisForAllTy hs_ty) tv_rdrs
            NeverBind        -> pure []
        ; rnImplicitBndrs Nothing implicit_bndrs $ \ vars ->
     do { (wcs, hs_ty', fvs1) <- rnWcBody ctxt nwc_rdrs hs_ty
@@ -321,7 +321,7 @@ rnHsSigType :: HsDocContext
 rnHsSigType ctx level (HsIB { hsib_body = hs_ty })
   = do { traceRn "rnHsSigType" (ppr hs_ty)
        ; rdr_env <- getLocalRdrEnv
-       ; vars0 <- forAllOrNothing (isLHsForAllTy hs_ty)
+       ; vars0 <- forAllOrNothing (isLHsInvisForAllTy hs_ty)
            $ filterInScope rdr_env
            $ extractHsTyRdrTyVars hs_ty
        ; rnImplicitBndrs Nothing vars0 $ \ vars ->
@@ -335,13 +335,21 @@ rnHsSigType ctx level (HsIB { hsib_body = hs_ty })
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- Free variables in signatures are usually bound in an implicit
 -- 'forall' at the beginning of user-written signatures. However, if the
--- signature has an explicit forall at the beginning, this is disabled.
+-- signature has an explicit, invisible forall at the beginning, this is
+-- disabled.
 --
 -- The idea is nested foralls express something which is only
 -- expressible explicitly, while a top level forall could (usually) be
 -- replaced with an implicit binding. Top-level foralls alone ("forall.") are
 -- therefore an indication that the user is trying to be fastidious, so
 -- we don't implicitly bind any variables.
+--
+-- Note that this rule only applies to outermost /in/visible 'forall's, and
+-- not outermost visible 'forall's, like in this example:
+--
+--   type F :: forall a -> b -> b   -- b is implicitly quantified here
+--
+-- See #18660 for more on this point.
 
 -- | See @Note [forall-or-nothing rule]@. This tiny little function is used
 -- (rather than its small body inlined) to indicate that we are implementing
