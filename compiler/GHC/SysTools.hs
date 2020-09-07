@@ -240,12 +240,13 @@ linkDynLib dflags0 o_files dep_packages
         -- against libHSrts, then both end up getting loaded,
         -- and things go wrong. We therefore link the libraries
         -- with the same RTS flags that we link GHC with.
-        dflags1 = if platformMisc_ghcThreaded $ platformMisc dflags0
-          then addWay' WayThreaded dflags0
-          else                     dflags0
-        dflags = if platformMisc_ghcDebugged $ platformMisc dflags1
-          then addWay' WayDebug dflags1
-          else                  dflags1
+        fake_ways0 = if platformMisc_ghcThreaded $ platformMisc dflags0
+          then addWay WayThreaded (ways_ dflags0)
+          else ways_ dflags0
+        fake_ways1 = if platformMisc_ghcDebugged $ platformMisc dflags0
+          then addWay WayDebug fake_ways0
+          else fake_ways0
+        dflags = dflags0 { ways_ = fake_ways1 }
 
         verbFlags = getVerbFlags dflags
         o_file = outputFile dflags

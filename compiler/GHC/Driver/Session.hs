@@ -42,6 +42,7 @@ module GHC.Driver.Session (
         dynamicOutputFile,
         sccProfilingEnabled,
         DynFlags(..), mainModIs,
+        outputFile, hiSuf, objectSuf, ways,
         FlagSpec(..),
         HasDynFlags(..), ContainsDynFlags(..),
         RtsOptsEnabled(..),
@@ -60,8 +61,9 @@ module GHC.Driver.Session (
         positionIndependent,
         optimisationFlags,
         setFlagsFromEnvFile,
+        pprDynFlagsDiff,
 
-        addWay', targetProfile,
+        targetProfile,
 
         mkHomeUnitFromFlags,
 
@@ -525,7 +527,7 @@ data DynFlags = DynFlags {
   homeUnitInstantiations_ :: [(ModuleName, Module)], -- ^ Module instantiations
 
   -- ways
-  ways                  :: Ways,         -- ^ Way flags from the command line
+  ways_                 :: Ways,         -- ^ Way flags from the command line
 
   -- For object splitting
   splitInfo             :: Maybe (String,Int),
@@ -538,19 +540,24 @@ data DynFlags = DynFlags {
   stubDir               :: Maybe String,
   dumpDir               :: Maybe String,
 
-  objectSuf             :: String,
+  objectSuf_            :: String,
   hcSuf                 :: String,
-  hiSuf                 :: String,
+  hiSuf_                :: String,
   hieSuf                :: String,
 
   canGenerateDynamicToo :: IORef Bool,
-  dynObjectSuf          :: String,
-  dynHiSuf              :: String,
+  dynObjectSuf_         :: String,
+  dynHiSuf_             :: String,
 
-  outputFile            :: Maybe String,
-  dynOutputFile         :: Maybe String,
+  outputFile_           :: Maybe String,
+  dynOutputFile_        :: Maybe String,
   outputHi              :: Maybe String,
   dynLibLoader          :: DynLibLoader,
+
+  dynamicNow            :: !Bool, -- ^ Indicate if we are now generating dynamic output
+                                  -- because of -dynamic-too. This predicate is
+                                  -- used to query the appropriate fields
+                                  -- (outputFile/dynOutputFile, ways, etc.)
 
   -- | This is set by 'GHC.Driver.Pipeline.runPipeline' based on where
   --    its output is going.
@@ -1074,28 +1081,23 @@ ifCannotGenerateDynamicToo dflags f g
 generateDynamicTooConditional :: MonadIO m
                               => DynFlags -> m a -> m a -> m a -> m a
 generateDynamicTooConditional dflags canGen cannotGen notTryingToGen
-    = if gopt Opt_BuildDynamicToo dflags
+    = if gopt Opt_BuildDynamicToo dflags && not (dynamicNow dflags)
       then do let ref = canGenerateDynamicToo dflags
               b <- liftIO $ readIORef ref
               if b then canGen else cannotGen
       else notTryingToGen
 
 dynamicTooMkDynamicDynFlags :: DynFlags -> DynFlags
-dynamicTooMkDynamicDynFlags dflags0
-    = let dflags1 = addWay' WayDyn dflags0
-          dflags2 = dflags1 {
-                        outputFile = dynOutputFile dflags1,
-                        hiSuf = dynHiSuf dflags1,
-                        objectSuf = dynObjectSuf dflags1
-                    }
-          dflags3 = gopt_unset dflags2 Opt_BuildDynamicToo
-      in dflags3
+dynamicTooMkDynamicDynFlags dflags0 =
+   dflags0
+      { dynamicNow = True
+      }
 
 -- | Compute the path of the dynamic object corresponding to an object file.
 dynamicOutputFile :: DynFlags -> FilePath -> FilePath
 dynamicOutputFile dflags outputFile = dynOut outputFile
   where
-    dynOut = flip addExtension (dynObjectSuf dflags) . dropExtension
+    dynOut = flip addExtension (dynObjectSuf_ dflags) . dropExtension
 
 -----------------------------------------------------------------------------
 
@@ -1204,14 +1206,15 @@ defaultDynFlags mySettings llvmConfig =
         stubDir                 = Nothing,
         dumpDir                 = Nothing,
 
-        objectSuf               = phaseInputExt StopLn,
+        objectSuf_              = phaseInputExt StopLn,
         hcSuf                   = phaseInputExt HCc,
-        hiSuf                   = "hi",
+        hiSuf_                  = "hi",
         hieSuf                  = "hie",
 
         canGenerateDynamicToo   = panic "defaultDynFlags: No canGenerateDynamicToo",
-        dynObjectSuf            = "dyn_" ++ phaseInputExt StopLn,
-        dynHiSuf                = "dyn_hi",
+        dynObjectSuf_           = "dyn_" ++ phaseInputExt StopLn,
+        dynHiSuf_               = "dyn_hi",
+        dynamicNow              = False,
 
         pluginModNames          = [],
         pluginModNameOpts       = [],
@@ -1220,8 +1223,8 @@ defaultDynFlags mySettings llvmConfig =
         staticPlugins           = [],
         hooks                   = emptyHooks,
 
-        outputFile              = Nothing,
-        dynOutputFile           = Nothing,
+        outputFile_             = Nothing,
+        dynOutputFile_          = Nothing,
         outputHi                = Nothing,
         dynLibLoader            = SystemDependent,
         dumpPrefix              = Nothing,
@@ -1245,7 +1248,7 @@ defaultDynFlags mySettings llvmConfig =
         packageEnv              = Nothing,
         unitDatabases           = Nothing,
         unitState               = emptyUnitState,
-        ways                    = defaultWays mySettings,
+        ways_                   = defaultWays mySettings,
         splitInfo               = Nothing,
 
         ghcNameVersion = sGhcNameVersion mySettings,
@@ -1591,7 +1594,13 @@ dopt_unset dfs f = dfs{ dumpFlags = EnumSet.delete f (dumpFlags dfs) }
 
 -- | Test whether a 'GeneralFlag' is set
 gopt :: GeneralFlag -> DynFlags -> Bool
-gopt f dflags  = f `EnumSet.member` generalFlags dflags
+gopt Opt_PIC dflags
+   | ways dflags `hasWay` WayDyn = True
+gopt Opt_ExternalDynamicRefs dflags
+   | ways dflags `hasWay` WayDyn = True
+gopt Opt_SplitSections dflags
+   | ways dflags `hasWay` WayDyn = False
+gopt f dflags = f `EnumSet.member` generalFlags dflags
 
 -- | Set a 'GeneralFlag'
 gopt_set :: DynFlags -> GeneralFlag -> DynFlags
@@ -1800,16 +1809,16 @@ setOutputDir  f = setObjectDir f
                 . setDumpDir f
 setDylibInstallName  f d = d { dylibInstallName = Just f}
 
-setObjectSuf    f d = d { objectSuf    = f}
-setDynObjectSuf f d = d { dynObjectSuf = f}
-setHiSuf        f d = d { hiSuf        = f}
-setHieSuf       f d = d { hieSuf       = f}
-setDynHiSuf     f d = d { dynHiSuf     = f}
-setHcSuf        f d = d { hcSuf        = f}
+setObjectSuf    f d = d { objectSuf_    = f}
+setDynObjectSuf f d = d { dynObjectSuf_ = f}
+setHiSuf        f d = d { hiSuf_        = f}
+setHieSuf       f d = d { hieSuf        = f}
+setDynHiSuf     f d = d { dynHiSuf_     = f}
+setHcSuf        f d = d { hcSuf         = f}
 
-setOutputFile f d = d { outputFile = f}
-setDynOutputFile f d = d { dynOutputFile = f}
-setOutputHi   f d = d { outputHi   = f}
+setOutputFile    f d = d { outputFile_    = f}
+setDynOutputFile f d = d { dynOutputFile_ = f}
+setOutputHi      f d = d { outputHi       = f}
 
 setJsonLogAction :: DynFlags -> DynFlags
 setJsonLogAction d = d { log_action = jsonLogAction }
@@ -1999,13 +2008,12 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
                                intercalate "/" (map wayDesc (Set.toAscList theWays))))
 
   let chooseOutput
-        | isJust (outputFile dflags2)          -- Only iff user specified -o ...
-        , not (isJust (dynOutputFile dflags2)) -- but not -dyno
-        = return $ dflags2 { dynOutputFile = Just $ dynamicOutputFile dflags2 outFile }
+        | Just outFile <- outputFile_ dflags2   -- Only iff user specified -o ...
+        , not (isJust (dynOutputFile_ dflags2)) -- but not -dyno
+        = return $ dflags2 { dynOutputFile_ = Just $ dynamicOutputFile dflags2 outFile }
         | otherwise
         = return dflags2
-        where
-          outFile = fromJust $ outputFile dflags2
+
   dflags3 <- ifGeneratingDynamicToo dflags2 chooseOutput (return dflags2)
 
   let (dflags4, consistency_warnings) = makeDynFlagsConsistent dflags3
@@ -2181,20 +2189,20 @@ dynamic_flags_deps = [
                                                d { enableTimeStats = True })))
 
     ------- ways ---------------------------------------------------------------
-  , make_ord_flag defGhcFlag "prof"           (NoArg (addWay WayProf))
-  , make_ord_flag defGhcFlag "eventlog"       (NoArg (addWay WayEventLog))
-  , make_ord_flag defGhcFlag "debug"          (NoArg (addWay WayDebug))
-  , make_ord_flag defGhcFlag "threaded"       (NoArg (addWay WayThreaded))
+  , make_ord_flag defGhcFlag "prof"           (NoArg (addWay' WayProf))
+  , make_ord_flag defGhcFlag "eventlog"       (NoArg (addWay' WayEventLog))
+  , make_ord_flag defGhcFlag "debug"          (NoArg (addWay' WayDebug))
+  , make_ord_flag defGhcFlag "threaded"       (NoArg (addWay' WayThreaded))
 
   , make_ord_flag defGhcFlag "ticky"
-      (NoArg (setGeneralFlag Opt_Ticky >> addWay WayDebug))
+      (NoArg (setGeneralFlag Opt_Ticky >> addWay' WayDebug))
 
     -- -ticky enables ticky-ticky code generation, and also implies -debug which
     -- is required to get the RTS ticky support.
 
         ----- Linker --------------------------------------------------------
   , make_ord_flag defGhcFlag "static"         (NoArg removeWayDyn)
-  , make_ord_flag defGhcFlag "dynamic"        (NoArg (addWay WayDyn))
+  , make_ord_flag defGhcFlag "dynamic"        (NoArg (addWay' WayDyn))
   , make_ord_flag defGhcFlag "rdynamic" $ noArg $
 #if defined(linux_HOST_OS)
                               addOptl "-rdynamic"
@@ -4267,20 +4275,11 @@ setDumpFlag :: DumpFlag -> OptKind (CmdLineP DynFlags)
 setDumpFlag dump_flag = NoArg (setDumpFlag' dump_flag)
 
 --------------------------
-addWay :: Way -> DynP ()
-addWay w = upd (addWay' w)
-
-addWay' :: Way -> DynFlags -> DynFlags
-addWay' w dflags0 = let platform = targetPlatform dflags0
-                        dflags1 = dflags0 { ways = Set.insert w (ways dflags0) }
-                        dflags2 = foldr setGeneralFlag' dflags1
-                                        (wayGeneralFlags platform w)
-                        dflags3 = foldr unSetGeneralFlag' dflags2
-                                        (wayUnsetGeneralFlags platform w)
-                    in dflags3
+addWay' :: Way -> DynP ()
+addWay' w = upd (\dflags -> dflags { ways_ = addWay w (ways_ dflags)})
 
 removeWayDyn :: DynP ()
-removeWayDyn = upd (\dfs -> dfs { ways = Set.filter (WayDyn /=) (ways dfs) })
+removeWayDyn = upd (\dfs -> dfs { ways_ = Set.filter (WayDyn /=) (ways_ dfs) })
 
 --------------------------
 setGeneralFlag, unSetGeneralFlag :: GeneralFlag -> DynP ()
@@ -4875,7 +4874,7 @@ makeDynFlagsConsistent dflags
  , hostIsProfiled
  , backendProducesObject (backend dflags)
  , WayProf `Set.notMember` ways dflags
-    = loop dflags{ways = Set.insert WayProf (ways dflags)}
+    = loop dflags{ways_ = addWay WayProf (ways_ dflags)}
          "Enabling -prof, because -fobject-code is enabled and GHCi is profiled"
 
  | otherwise = (dflags, [])
@@ -5069,3 +5068,43 @@ initSDocContext dflags style = SDC
 initDefaultSDocContext :: DynFlags -> SDocContext
 initDefaultSDocContext dflags = initSDocContext dflags defaultUserStyle
 
+outputFile :: DynFlags -> Maybe String
+outputFile dflags
+   | dynamicNow dflags = dynOutputFile_ dflags
+   | otherwise         = outputFile_    dflags
+
+hiSuf :: DynFlags -> String
+hiSuf dflags
+   | dynamicNow dflags = dynHiSuf_ dflags
+   | otherwise         = hiSuf_    dflags
+
+objectSuf :: DynFlags -> String
+objectSuf dflags
+   | dynamicNow dflags = dynObjectSuf_ dflags
+   | otherwise         = objectSuf_    dflags
+
+ways :: DynFlags -> Ways
+ways dflags
+   | dynamicNow dflags = addWay WayDyn (ways_ dflags)
+   | otherwise         = ways_ dflags
+
+-- | Pretty-print the difference between 2 DynFlags.
+--
+-- For now only their general flags but it could be extended.
+-- Useful mostly for debugging.
+pprDynFlagsDiff :: DynFlags -> DynFlags -> SDoc
+pprDynFlagsDiff d1 d2 =
+   let gf_removed  = EnumSet.difference (generalFlags d1) (generalFlags d2)
+       gf_added    = EnumSet.difference (generalFlags d2) (generalFlags d1)
+       ext_removed = EnumSet.difference (extensionFlags d1) (extensionFlags d2)
+       ext_added   = EnumSet.difference (extensionFlags d2) (extensionFlags d1)
+   in vcat
+      [ text "Added general flags:"
+      , text $ show $ EnumSet.toList $ gf_added
+      , text "Removed general flags:"
+      , text $ show $ EnumSet.toList $ gf_removed
+      , text "Added extension flags:"
+      , text $ show $ EnumSet.toList $ ext_added
+      , text "Removed extension flags:"
+      , text $ show $ EnumSet.toList $ ext_removed
+      ]

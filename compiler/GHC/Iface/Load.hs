@@ -961,6 +961,7 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
                 Failed err -> return (Failed (badIfaceFile file_path err))
                 Succeeded iface -> return (Succeeded (iface, file_path))
                             -- Don't forget to fill in the package name...
+
           checkBuildDynamicToo (Succeeded (iface, filePath)) = do
               dflags <- getDynFlags
               -- Indefinite interfaces are ALWAYS non-dynamic, and
@@ -968,9 +969,10 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
               let is_definite_iface = moduleIsDefinite (mi_module iface)
               when is_definite_iface $
                 whenGeneratingDynamicToo dflags $ withDoDynamicToo $ do
+                  dflags <- getDynFlags
                   let ref = canGenerateDynamicToo dflags
                       dynFilePath = addBootSuffix_maybe hi_boot_file
-                                  $ replaceExtension filePath (dynHiSuf dflags)
+                                  $ replaceExtension filePath (hiSuf dflags)
                   r <- read_file dynFilePath
                   case r of
                       Succeeded (dynIface, _)

@@ -957,13 +957,14 @@ dynLoadObjs hsc_env pls@PersistentLinkerState{..} objs = do
                       -- Even if we're e.g. profiling, we still want
                       -- the vanilla dynamic libraries, so we set the
                       -- ways / build tag to be just WayDyn.
-                      ways = Set.singleton WayDyn,
-                      outputFile = Just soFile
+                      ways_ = Set.singleton WayDyn,
+                      outputFile_ = Just soFile
                   }
+        dflags3 = gopt_unset dflags2 Opt_BuildDynamicToo
     -- link all "loaded packages" so symbols in those can be resolved
     -- Note: We are loading packages with local scope, so to see the
     -- symbols in this link we must link all loaded packages again.
-    linkDynLib dflags2 objs pkgs_loaded
+    linkDynLib dflags3 objs pkgs_loaded
 
     -- if we got this far, extend the lifetime of the library file
     changeTempFilesLifetime dflags TFL_GhcSession [soFile]
