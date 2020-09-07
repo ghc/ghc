@@ -26,9 +26,6 @@ LT_CYAN="1;36"
 WHITE="1;37"
 LT_GRAY="0;37"
 
-export LANG=C.UTF-8
-export LC_ALL=C.UTF-8
-
 # GitLab Pipelines log section delimiters
 # https://gitlab.com/gitlab-org/gitlab-foss/issues/14664
 start_section() {
@@ -59,6 +56,30 @@ function run() {
 }
 
 TOP="$(pwd)"
+
+function setup_locale() {
+  # BSD grep terminates early with -q, consequently locale -a will get a
+  # SIGPIPE and the pipeline will fail with pipefail.
+  shopt -o -u pipefail
+  if locale -a | grep -q C.UTF-8; then
+    # Debian
+    export LANG=C.UTF-8
+  elif locale -a | grep -q C.utf8; then
+    # Fedora calls it this
+    export LANG=C.utf8
+  elif locale -a | grep -q en_US.UTF-8; then
+    # Centos doesn't have C.UTF-8
+    export LANG=en_US.UTF-8
+  else
+    error "Failed to find usable locale"
+    info "Available locales:"
+    locale -a
+    fail "No usable locale, aborting..."
+  fi
+  info "Using locale $LANG..."
+  export LC_ALL=$LANG
+  shopt -o -s pipefail
+}
 
 function mingw_init() {
   case "$MSYSTEM" in
@@ -406,10 +427,12 @@ function clean() {
 }
 
 function run_hadrian() {
+  if [ -z "$BIGNUM_BACKEND" ]; then BIGNUM_BACKEND="gmp"; fi
   run hadrian/build-cabal \
     --flavour="$FLAVOUR" \
     -j"$cores" \
     --broken-test="$BROKEN_TESTS" \
+    --bignum=$BIGNUM_BACKEND \
     $HADRIAN_ARGS \
     $@
 }
@@ -422,6 +445,8 @@ function shell() {
   fi
   run $cmd
 }
+
+setup_locale
 
 # Determine Cabal data directory
 case "$(uname)" in
