@@ -681,7 +681,7 @@ funBindTicks loc fun_id mod sigs
           = getOccFS (Var.varName fun_id)
         cc_name = moduleNameFS (moduleName mod) `appendFS` consFS '.' cc_str
   = do
-      flavour <- DeclCC <$> getCCIndexM cc_name
+      flavour <- DeclCC <$> getCCIndexTcM cc_name
       let cc = mkUserCC cc_name mod loc flavour
       return [ProfNote cc True True]
   | otherwise
