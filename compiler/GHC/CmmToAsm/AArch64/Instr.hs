@@ -132,7 +132,7 @@ aarch64_regUsageOfInstr platform instr = case instr of
   J t                      -> usage (regTarget t, [])
   B t                      -> usage (regTarget t, [])
   BCOND _ t                -> usage (regTarget t, [])
-  BL t                     -> usage (regTarget t, callerSavedRegisters)
+  BL t ps _rs              -> usage (regTarget t ++ ps, callerSavedRegisters)
 
   -- 5. Atomic Instructions ----------------------------------------------------
   -- 6. Conditional Instructions -----------------------------------------------
@@ -257,7 +257,7 @@ aarch64_patchRegsOfInstr instr env = case instr of
     -- 4. Branch Instructions --------------------------------------------------
     J t            -> J (patchTarget t)
     B t            -> B (patchTarget t)
-    BL t           -> BL (patchTarget t)
+    BL t rs ts     -> BL (patchTarget t) rs ts
     BCOND c t      -> BCOND c (patchTarget t)
 
     -- 5. Atomic Instructions --------------------------------------------------
@@ -317,7 +317,7 @@ aarch64_jumpDestsOfInstr (CBZ _ t) = [ id | TBlock id <- [t]]
 aarch64_jumpDestsOfInstr (CBNZ _ t) = [ id | TBlock id <- [t]]
 aarch64_jumpDestsOfInstr (J t) = [id | TBlock id <- [t]]
 aarch64_jumpDestsOfInstr (B t) = [id | TBlock id <- [t]]
-aarch64_jumpDestsOfInstr (BL t) = [ id | TBlock id <- [t]]
+aarch64_jumpDestsOfInstr (BL t _ _) = [ id | TBlock id <- [t]]
 aarch64_jumpDestsOfInstr (BCOND _ t) = [ id | TBlock id <- [t]]
 aarch64_jumpDestsOfInstr _ = []
 
@@ -332,7 +332,7 @@ aarch64_patchJumpInstr instr patchF
         CBNZ r (TBlock bid) -> CBNZ r (TBlock (patchF bid))
         J (TBlock bid) -> J (TBlock (patchF bid))
         B (TBlock bid) -> B (TBlock (patchF bid))
-        BL (TBlock bid) -> BL (TBlock (patchF bid))
+        BL (TBlock bid) ps rs -> BL (TBlock (patchF bid)) ps rs
         BCOND c (TBlock bid) -> BCOND c (TBlock (patchF bid))
         _ -> pprPanic "patchJumpInstr" (text $ show instr)
 
@@ -459,30 +459,12 @@ aarch64_isMetaInstr instr
 -- | Copy the value in a register to another one.
 -- Must work for all register classes.
 aarch64_mkRegRegMoveInstr :: Reg -> Reg -> Instr
-aarch64_mkRegRegMoveInstr src dst = MOV (OpReg W64 dst) (OpReg W64 src)
+aarch64_mkRegRegMoveInstr src dst = ANN (text $ "Reg->Reg Move: " ++ show src ++ " -> " ++ show dst) $ MOV (OpReg W64 dst) (OpReg W64 src)
 
 -- | Take the source and destination from this reg -> reg move instruction
 -- or Nothing if it's not one
 aarch64_takeRegRegMoveInstr :: Instr -> Maybe (Reg,Reg)
--- XXX: *if* we enable this here, we run into the elimination shortcut in
---      Linear.hs:441, which does not ensure that the register is free'd
---      before it's reused.  This seesm to be an issue if we have two function
---      calls in the same block.
---
---      y = f a b
---
---      will generate:
---      mov x0 a
---      mov x1 b
---      bl f
---      mov y x0
---
---      We'll elimitate the last mov y x0 call, and alias x0 = y.
---
---      No we'll need to reuse x0 for the next function, and when we
---      try to allocate it, it's already allocated.
---
---aarch64_takeRegRegMoveInstr (MOV (OpReg dst) (OpReg src)) = Just (src, dst)
+--aarch64_takeRegRegMoveInstr (MOV (OpReg fmt dst) (OpReg fmt' src)) | fmt == fmt' = Just (src, dst)
 aarch64_takeRegRegMoveInstr _ = Nothing
 
 -- | Make an unconditional jump instruction.
@@ -670,7 +652,7 @@ data Instr
     -- Branching.
     | J Target            -- like B, but only generated from genJump. Used to distinguish genJumps from others.
     | B Target            -- unconditional branching b/br. (To a blockid, label or register)
-    | BL Target           -- branch and link (e.g. set x30 to next pc, and branch)
+    | BL Target [Reg] [Reg] -- branch and link (e.g. set x30 to next pc, and branch)
     | BCOND Cond Target   -- branch with condition. b.<cond>
 
     -- 8. Synchronization Instructions -----------------------------------------
