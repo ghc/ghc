@@ -56,30 +56,32 @@ The ``forall``-or-nothing rule
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In certain forms of types, type variables obey what is known as the
-"``forall``-or-nothing" rule: if a type has an outermost, explicit
-``forall``, then all of the type variables in the type must be explicitly
-quantified. These two examples illustrate how the rule works: ::
+"``forall``-or-nothing" rule: if a type has an outermost, explicit,
+invisible ``forall``, then all of the type variables in the type must be
+explicitly quantified. These two examples illustrate how the rule works: ::
 
   f  :: forall a b. a -> b -> b         -- OK, `a` and `b` are explicitly bound
   g  :: forall a. a -> forall b. b -> b -- OK, `a` and `b` are explicitly bound
   h  :: forall a. a -> b -> b           -- Rejected, `b` is not in scope
 
 The type signatures for ``f``, ``g``, and ``h`` all begin with an outermost
-``forall``, so every type variable in these signatures must be explicitly
-bound by a ``forall``. Both ``f`` and ``g`` obey the ``forall``-or-nothing
-rule, since they explicitly quantify ``a`` and ``b``. On the other hand,
-``h`` does not explicitly quantify ``b``, so GHC will reject its type
-signature for being improperly scoped.
+invisible ``forall``, so every type variable in these signatures must be
+explicitly bound by a ``forall``. Both ``f`` and ``g`` obey the
+``forall``-or-nothing rule, since they explicitly quantify ``a`` and ``b``. On
+the other hand, ``h`` does not explicitly quantify ``b``, so GHC will reject
+its type signature for being improperly scoped.
 
 In places where the ``forall``-or-nothing rule takes effect, if a type does
-*not* have an outermost ``forall``, then any type variables that are not
-explicitly bound by a ``forall`` become implicitly quantified. For example: ::
+*not* have an outermost invisible ``forall``, then any type variables that are
+not explicitly bound by a ``forall`` become implicitly quantified. For example: ::
 
   i :: a -> b -> b             -- `a` and `b` are implicitly quantified
   j :: a -> forall b. b -> b   -- `a` is implicitly quantified
   k :: (forall a. a -> b -> b) -- `b` is implicitly quantified
+  type L :: forall a -> b -> b -- `b` is implicitly quantified
 
-GHC will accept ``i``, ``j``, and ``k``'s type signatures. Note that:
+GHC will accept ``i``, ``j``, and ``k``'s type signatures, as well as ``L``'s
+kind signature. Note that:
 
 - ``j``'s signature is accepted despite its mixture of implicit and explicit
   quantification. As long as a ``forall`` is not an outermost one, it is fine
@@ -88,6 +90,9 @@ GHC will accept ``i``, ``j``, and ``k``'s type signatures. Note that:
   the ``forall`` is not an outermost ``forall``. The ``forall``-or-nothing
   rule is one of the few places in GHC where the presence or absence of
   parentheses can be semantically significant!
+- ``L``'s signature begins with an outermost ``forall``, but it is a *visible*
+  ``forall``, not an invisible ``forall``, and therefore does not trigger the
+  ``forall``-or-nothing rule.
 
 The ``forall``-or-nothing rule takes effect in the following places:
 
