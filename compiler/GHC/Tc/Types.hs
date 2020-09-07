@@ -45,11 +45,7 @@ module GHC.Tc.Types(
         IdBindingInfo(..), ClosedTypeId, RhsNames,
         IsGroupClosed(..),
         SelfBootInfo(..),
-        pprTcTyThingCategory, pprPECategory, CompleteMatch,
-
-        -- Desugaring types
-        DsM, DsLclEnv(..), DsGblEnv(..),
-        DsMetaEnv, DsMetaVal(..), CompleteMatches,
+        pprTcTyThingCategory, pprPECategory, CompleteMatch, CompleteMatches,
 
         -- Template Haskell
         ThStage(..), SpliceType(..), PendingStuff(..),
@@ -105,7 +101,6 @@ import GHC.Tc.Types.Origin
 import GHC.Types.Annotations
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
-import {-# SOURCE #-} GHC.HsToCore.PmCheck.Types (Nablas)
 import GHC.Data.IOEnv
 import GHC.Types.Name.Reader
 import GHC.Types.Name
@@ -190,7 +185,6 @@ type TcRn       = TcRnIf TcGblEnv TcLclEnv    -- Type inference
 type IfM lcl    = TcRnIf IfGblEnv lcl         -- Iface stuff
 type IfG        = IfM ()                      --    Top level
 type IfL        = IfM IfLclEnv                --    Nested
-type DsM        = TcRnIf DsGblEnv DsLclEnv    -- Desugaring
 
 -- TcRn is the type-checking and renaming monad: the main monad that
 -- most type-checking takes place in.  The global environment is
@@ -288,58 +282,6 @@ data IfLclEnv
         if_tv_env  :: FastStringEnv TyVar,     -- Nested tyvar bindings
         if_id_env  :: FastStringEnv Id         -- Nested id binding
     }
-
-{-
-************************************************************************
-*                                                                      *
-                Desugarer monad
-*                                                                      *
-************************************************************************
-
-Now the mondo monad magic (yes, @DsM@ is a silly name)---carry around
-a @UniqueSupply@ and some annotations, which
-presumably include source-file location information:
--}
-
-data DsGblEnv
-        = DsGblEnv
-        { ds_mod          :: Module             -- For SCC profiling
-        , ds_fam_inst_env :: FamInstEnv         -- Like tcg_fam_inst_env
-        , ds_unqual  :: PrintUnqualified
-        , ds_msgs    :: IORef Messages          -- Warning messages
-        , ds_if_env  :: (IfGblEnv, IfLclEnv)    -- Used for looking up global,
-                                                -- possibly-imported things
-        , ds_complete_matches :: CompleteMatches
-           -- Additional complete pattern matches
-        , ds_cc_st   :: IORef CostCentreState
-           -- Tracking indices for cost centre annotations
-        }
-
-instance ContainsModule DsGblEnv where
-    extractModule = ds_mod
-
-data DsLclEnv = DsLclEnv {
-        dsl_meta    :: DsMetaEnv,        -- Template Haskell bindings
-        dsl_loc     :: RealSrcSpan,      -- To put in pattern-matching error msgs
-
-        -- See Note [Note [Long-distance information] in "GHC.HsToCore.PmCheck"
-        -- The set of reaching values Nablas is augmented as we walk inwards,
-        -- refined through each pattern match in turn
-        dsl_nablas  :: Nablas
-     }
-
--- Inside [| |] brackets, the desugarer looks
--- up variables in the DsMetaEnv
-type DsMetaEnv = NameEnv DsMetaVal
-
-data DsMetaVal
-   = DsBound Id         -- Bound by a pattern inside the [| |].
-                        -- Will be dynamically alpha renamed.
-                        -- The Id has type THSyntax.Var
-
-   | DsSplice (HsExpr GhcTc) -- These bindings are introduced by
-                             -- the PendingSplices on a HsBracketOut
-
 
 {-
 ************************************************************************

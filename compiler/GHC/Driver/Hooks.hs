@@ -38,6 +38,7 @@ import GHC.Hs.Binds
 import GHC.Hs.Expr
 import GHC.Data.OrdList
 import GHC.Tc.Types
+import GHC.HsToCore.Types
 import GHC.Data.Bag
 import GHC.Types.Name.Reader
 import GHC.Types.Name
