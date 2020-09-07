@@ -1572,7 +1572,6 @@ repE (HsUnboundVar _ uv)   = do
                                repUnboundVar sname
 repE (XExpr (HsExpanded _ b))        = repE b
 repE e@(HsPragE _ HsPragSCC  {} _)   = notHandled "Cost centres" (ppr e)
-repE e@(HsPragE _ HsPragTick {} _)   = notHandled "Tick Pragma" (ppr e)
 repE e                     = notHandled "Expression form" (ppr e)
 
 -----------------------------------------------------------------------------
