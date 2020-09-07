@@ -1186,6 +1186,8 @@ gtVal = Var ordGTDataConId
 
 mkIntVal :: Platform -> Integer -> Expr CoreBndr
 mkIntVal platform i = Lit (mkLitInt platform i)
+mkInt64Val :: Integer -> Expr CoreBndr
+mkInt64Val i = Lit (mkLitInt64 i)
 mkFloatVal :: RuleOpts -> Rational -> Expr CoreBndr
 mkFloatVal env f = Lit (convFloating env (LitFloat  f))
 mkDoubleVal :: RuleOpts -> Rational -> Expr CoreBndr
@@ -1444,28 +1446,37 @@ builtinRules enableBignumRules
 
      mkBasicRule unsafeEqualityProofName 3 unsafeEqualityProofRule,
 
-     mkBasicRule divIntName 2 $ msum
+     mkDivInt divIntName (\n -> mkIntVal <$> getPlatform <*> pure n),
+     mkDivInt divInt64Name (pure . mkInt64Val),
+
+     mkModInt modIntName (\n -> mkIntVal <$> getPlatform <*> pure n),
+     mkModInt modInt64Name (pure . mkInt64Val)
+     ]
+ ++ builtinBignumRules enableBignumRules
+ where
+   mkDivInt funName mkVal =
+     mkBasicRule funName 2 $ msum
         [ nonZeroLit 1 >> binaryLit (intOp2 div)
         , leftZero zeroi
         , do
           [arg, Lit (LitNumber LitNumInt d)] <- getArgs
           Just n <- return $ exactLog2 d
-          platform <- getPlatform
-          return $ Var (mkPrimOpId IntSraOp) `App` arg `App` mkIntVal platform n
-        ],
+          n' <- mkVal n
+          return $ Var (mkPrimOpId IntSraOp) `App` arg `App` n'
+        ]
 
-     mkBasicRule modIntName 2 $ msum
+   mkModInt funName mkVal =
+     mkBasicRule funName 2 $ msum
         [ nonZeroLit 1 >> binaryLit (intOp2 mod)
         , leftZero zeroi
         , do
           [arg, Lit (LitNumber LitNumInt d)] <- getArgs
           Just _ <- return $ exactLog2 d
-          platform <- getPlatform
+          dPred' <- mkVal (d - 1)
           return $ Var (mkPrimOpId IntAndOp)
-            `App` arg `App` mkIntVal platform (d - 1)
+            `App` arg `App` dPred'
         ]
-     ]
- ++ builtinBignumRules enableBignumRules
+
 {-# NOINLINE builtinRules #-}
 -- there is no benefit to inlining these yet, despite this, GHC produces
 -- unfoldings for this regardless since the floated list entries look small.
