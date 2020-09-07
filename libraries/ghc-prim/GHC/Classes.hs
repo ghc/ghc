@@ -50,7 +50,8 @@ module GHC.Classes(
     (&&), (||), not,
 
     -- * Integer arithmetic
-    divInt#, modInt#
+    divInt#, divInt64#,
+    modInt#, modInt64#
  ) where
 
 -- GHC.Magic is used in some derived instances
@@ -532,7 +533,6 @@ not False               =  True
 
 -- These functions have built-in rules.
 {-# NOINLINE [0] divInt# #-}
-{-# NOINLINE [0] modInt# #-}
 divInt# :: Int# -> Int# -> Int#
 x# `divInt#` y#
         -- Be careful NOT to overflow if we do any additional arithmetic
@@ -544,6 +544,18 @@ x# `divInt#` y#
       else if isTrue# (x# <# 0#) && isTrue# (y# ># 0#) then ((x# +# 1#) `quotInt#` y#) -# 1#
       else x# `quotInt#` y#
 
+{-# NOINLINE [0] divInt64# #-}
+divInt64# :: Int64# -> Int64# -> Int64#
+x# `divInt64#` y#
+    | y0x = ((x# `subInt64#` one#) `quotInt64#` y#) `subInt64#` one#
+    | x0y = ((x# `plusInt64#` one#) `quotInt64#` y#) `subInt64#` one#
+    | True = x# `quotInt64#` y#
+  where zero# = intToInt64# 0#
+        one# = intToInt64# 1#
+        y0x = isTrue# (x# `gtInt64#` zero#) && isTrue# (y# `ltInt64#` zero#)
+        x0y = isTrue# (x# `ltInt64#` zero#) && isTrue# (y# `gtInt64#` zero#)
+
+{-# NOINLINE [0] modInt# #-}
 modInt# :: Int# -> Int# -> Int#
 x# `modInt#` y#
     = if isTrue# (x# ># 0#) && isTrue# (y# <# 0#) ||
@@ -552,6 +564,18 @@ x# `modInt#` y#
       else r#
     where
     !r# = x# `remInt#` y#
+
+{-# NOINLINE [0] modInt64# #-}
+modInt64# :: Int64# -> Int64# -> Int64#
+x# `modInt64#` y#
+    = if isTrue# (x# `gtInt64#` zero#) && isTrue# (y# `ltInt64#` zero#) ||
+         isTrue# (x# `ltInt64#` zero#) && isTrue# (y# `gtInt64#` zero#)
+      then if isTrue# (r# `neInt64#` zero#) then r# `plusInt64#` y# else zero#
+      else r#
+    where
+    !r# = x# `remInt64#` y#
+    zero# = intToInt64# 0#
+
 
 
 {- *************************************************************
