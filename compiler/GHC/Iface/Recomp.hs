@@ -1384,7 +1384,12 @@ mkHashFun hsc_env eps name
                       -- so there's no guarantee everything is loaded.
                       -- Kind of a heinous hack.
                       initIfaceLoad hsc_env . withException
-                        $ loadInterface (text "lookupVers2") mod ImportBySystem
+                          $ withoutDynamicNow
+                            -- For some unknown reason, we need to reset the
+                            -- dynamicNow bit, otherwise only dynamic
+                            -- interfaces are looked up and some tests fail
+                            -- (e.g. T16219).
+                          $ loadInterface (text "lookupVers2") mod ImportBySystem
         return $ snd (mi_hash_fn (mi_final_exts iface) occ `orElse`
                   pprPanic "lookupVers1" (ppr mod <+> ppr occ))
 

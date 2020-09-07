@@ -5,8 +5,6 @@ where
 
 import GHC.Prelude
 
-import GHC.Driver.Session
-
 import GHC.Unit
 import GHC.Unit.Module.ModGuts
 import GHC.Unit.Module.ModIface
@@ -38,9 +36,4 @@ data HscStatus
           -- exists. Pass to `hscMaybeWriteIface` when writing the interface to
           -- avoid updating the existing interface when the interface isn't
           -- changed.
-        , hscs_iface_dflags :: !DynFlags
-          -- ^ Generate final iface using this DynFlags.
-          -- FIXME (osa): I don't understand why this is necessary, but I spent
-          -- almost two days trying to figure this out and I couldn't .. perhaps
-          -- someone who understands this code better will remove this later.
         }
