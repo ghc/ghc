@@ -8,6 +8,7 @@ module GHC.Data.EnumSet
     , toList
     , fromList
     , empty
+    , difference
     ) where
 
 import GHC.Prelude
@@ -33,3 +34,6 @@ fromList = EnumSet . IntSet.fromList . map fromEnum
 
 empty :: EnumSet a
 empty = EnumSet IntSet.empty
+
+difference :: EnumSet a -> EnumSet a -> EnumSet a
+difference (EnumSet a) (EnumSet b) = EnumSet (IntSet.difference a b)
