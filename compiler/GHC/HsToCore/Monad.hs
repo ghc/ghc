@@ -30,6 +30,7 @@ module GHC.HsToCore.Monad (
         getGhcModeDs, dsGetFamInstEnvs,
         dsLookupGlobal, dsLookupGlobalId, dsLookupTyCon,
         dsLookupDataCon, dsLookupConLike,
+        getCCIndexDsM,
 
         DsMetaEnv, DsMetaVal(..), dsGetMetaEnv, dsLookupMetaEnv, dsExtendMetaEnv,
 
@@ -73,6 +74,7 @@ import GHC.Types.Basic ( Origin )
 import GHC.Core.DataCon
 import GHC.Core.ConLike
 import GHC.Core.TyCon
+import GHC.HsToCore.Types
 import GHC.HsToCore.PmCheck.Types
 import GHC.Types.Id
 import GHC.Unit.Module
@@ -614,3 +616,7 @@ pprRuntimeTrace str doc expr = do
       message = App (Var unpackCStringId) $
                 Lit $ mkLitString $ showSDoc dflags (hang (text str) 4 doc)
   return $ mkApps (Var traceId) [Type (exprType expr), message, expr]
+
+-- | See 'getCCIndexM'.
+getCCIndexDsM :: FastString -> DsM CostCentreIndex
+getCCIndexDsM = getCCIndexM ds_cc_st

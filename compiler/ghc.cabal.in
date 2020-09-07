@@ -314,6 +314,7 @@ Library
         GHC.HsToCore.PmCheck
         GHC.HsToCore.Coverage
         GHC.HsToCore
+        GHC.HsToCore.Types
         GHC.HsToCore.Arrows
         GHC.HsToCore.Binds
         GHC.HsToCore.Foreign.Call
