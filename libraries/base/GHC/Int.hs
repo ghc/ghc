@@ -934,29 +934,6 @@ instance Integral Int64 where
     toInteger (I64# x)               = integerFromInt64# x
 
 
-divInt64#, modInt64# :: Int64# -> Int64# -> Int64#
-
--- Define div in terms of quot, being careful to avoid overflow (#7233)
-x# `divInt64#` y#
-    | isTrue# (x# `gtInt64#` zero) && isTrue# (y# `ltInt64#` zero)
-        = ((x# `subInt64#` one) `quotInt64#` y#) `subInt64#` one
-    | isTrue# (x# `ltInt64#` zero) && isTrue# (y# `gtInt64#` zero)
-        = ((x# `plusInt64#` one)  `quotInt64#` y#) `subInt64#` one
-    | otherwise
-        = x# `quotInt64#` y#
-    where
-    !zero = intToInt64# 0#
-    !one  = intToInt64# 1#
-
-x# `modInt64#` y#
-    | isTrue# (x# `gtInt64#` zero) && isTrue# (y# `ltInt64#` zero) ||
-      isTrue# (x# `ltInt64#` zero) && isTrue# (y# `gtInt64#` zero)
-        = if isTrue# (r# `neInt64#` zero) then r# `plusInt64#` y# else zero
-    | otherwise = r#
-    where
-    !zero = intToInt64# 0#
-    !r# = x# `remInt64#` y#
-
 -- | @since 2.01
 instance Read Int64 where
     readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]
