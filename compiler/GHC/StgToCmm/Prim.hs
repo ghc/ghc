@@ -840,9 +840,9 @@ emitPrimOp dflags primop = case primop of
     emitCtzCall res w (wordWidth platform)
 
 -- Unsigned int to floating point conversions
-  Word2FloatOp -> \[w] -> opIntoRegs $ \[res] -> do
+  WordToFloatOp -> \[w] -> opIntoRegs $ \[res] -> do
     emitPrimCall [res] (MO_UF_Conv W32) [w]
-  Word2DoubleOp -> \[w] -> opIntoRegs $ \[res] -> do
+  WordToDoubleOp -> \[w] -> opIntoRegs $ \[res] -> do
     emitPrimCall [res] (MO_UF_Conv W64) [w]
 
 -- Atomic operations
@@ -1056,10 +1056,10 @@ emitPrimOp dflags primop = case primop of
 
 -- The rest just translate straightforwardly
 
-  Int2WordOp      -> \args -> opNop args
-  Word2IntOp      -> \args -> opNop args
-  Int2AddrOp      -> \args -> opNop args
-  Addr2IntOp      -> \args -> opNop args
+  IntToWordOp     -> \args -> opNop args
+  WordToIntOp     -> \args -> opNop args
+  IntToAddrOp     -> \args -> opNop args
+  AddrToIntOp     -> \args -> opNop args
   ChrOp           -> \args -> opNop args  -- Int# and Char# are rep'd the same
   OrdOp           -> \args -> opNop args
 
@@ -1309,14 +1309,14 @@ emitPrimOp dflags primop = case primop of
 
 -- Conversions
 
-  Int2DoubleOp   -> \args -> opTranslate args (MO_SF_Conv (wordWidth platform) W64)
-  Double2IntOp   -> \args -> opTranslate args (MO_FS_Conv W64 (wordWidth platform))
+  IntToDoubleOp   -> \args -> opTranslate args (MO_SF_Conv (wordWidth platform) W64)
+  DoubleToIntOp   -> \args -> opTranslate args (MO_FS_Conv W64 (wordWidth platform))
 
-  Int2FloatOp    -> \args -> opTranslate args (MO_SF_Conv (wordWidth platform) W32)
-  Float2IntOp    -> \args -> opTranslate args (MO_FS_Conv W32 (wordWidth platform))
+  IntToFloatOp    -> \args -> opTranslate args (MO_SF_Conv (wordWidth platform) W32)
+  FloatToIntOp    -> \args -> opTranslate args (MO_FS_Conv W32 (wordWidth platform))
 
-  Float2DoubleOp -> \args -> opTranslate args (MO_FF_Conv W32 W64)
-  Double2FloatOp -> \args -> opTranslate args (MO_FF_Conv W64 W32)
+  FloatToDoubleOp -> \args -> opTranslate args (MO_FF_Conv W32 W64)
+  DoubleToFloatOp -> \args -> opTranslate args (MO_FF_Conv W64 W32)
 
 -- Word comparisons masquerading as more exotic things.
 
