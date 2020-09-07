@@ -40,7 +40,7 @@ linkDynLib dflags0 o_files dep_packages
         -- with the same RTS flags that we link GHC with.
         dflags | OSMinGW32 <- os
                , hostWays `hasWay` WayDyn
-               = dflags0 { ways = hostWays }
+               = dflags0 { targetWays_ = hostWays }
                | otherwise
                = dflags0
 
