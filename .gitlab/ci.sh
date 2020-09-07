@@ -70,6 +70,9 @@ function setup_locale() {
   elif locale -a | grep -q en_US.UTF-8; then
     # Centos doesn't have C.UTF-8
     export LANG=en_US.UTF-8
+  elif locale -a | grep -q en_US.utf8; then
+    # Centos doesn't have C.UTF-8
+    export LANG=en_US.utf8
   else
     error "Failed to find usable locale"
     info "Available locales:"
