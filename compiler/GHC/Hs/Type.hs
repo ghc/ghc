@@ -61,7 +61,7 @@ module GHC.Hs.Type (
         mkEmptyImplicitBndrs, mkEmptyWildCardBndrs,
         mkHsForAllVisTele, mkHsForAllInvisTele,
         mkHsQTvs, hsQTvExplicit, emptyLHsQTvs,
-        isHsKindedTyVar, hsTvbAllKinded, isLHsForAllTy,
+        isHsKindedTyVar, hsTvbAllKinded, isLHsInvisForAllTy,
         hsScopedTvs, hsWcScopedTvs, dropWildCards,
         hsTyVarName, hsAllLTyVarNames, hsLTyVarLocNames,
         hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsExplicitLTyVarNames,
@@ -1278,9 +1278,12 @@ ignoreParens :: LHsType (GhcPass p) -> LHsType (GhcPass p)
 ignoreParens (L _ (HsParTy _ ty)) = ignoreParens ty
 ignoreParens ty                   = ty
 
-isLHsForAllTy :: LHsType (GhcPass p) -> Bool
-isLHsForAllTy (L _ (HsForAllTy {})) = True
-isLHsForAllTy _                     = False
+-- | Is this type headed by an invisible @forall@? This is used to determine
+-- if the type variables in a type should be implicitly quantified.
+-- See @Note [forall-or-nothing rule]@ in "GHC.Rename.HsType".
+isLHsInvisForAllTy :: LHsType (GhcPass p) -> Bool
+isLHsInvisForAllTy (L _ (HsForAllTy{hst_tele = HsForAllInvis{}})) = True
+isLHsInvisForAllTy _                                              = False
 
 {-
 ************************************************************************
