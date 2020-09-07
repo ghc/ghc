@@ -361,21 +361,21 @@ aarch64_mkSpillInstr config reg delta slot =
     imm | imm > 0xfff && imm <= 0xffffff && imm .&. 0x7 == 0x0    -> [ mkAdd (imm .&~. 0xfff)
                                                                      , mkStr (imm .&.  0xfff)
                                                                      , mkSub (imm .&~. 0xfff) ]
-    imm | imm > 0xfff && imm <= 0xffffff                          -> [ mkAdd (imm .&~. 0xfff)
-                                                                     , mkAdd (imm .&.  0xff0)
-                                                                     , mkStr (imm .&.  0x00f)
-                                                                     , mkSub (imm .&.  0xff0)
-                                                                     , mkSub (imm .&~. 0xfff) ]
+    -- imm | imm > 0xfff && imm <= 0xffffff                          -> [ mkAdd (imm .&~. 0xfff)
+    --                                                                  , mkAdd (imm .&.  0xff0)
+    --                                                                  , mkStr (imm .&.  0x00f)
+    --                                                                  , mkSub (imm .&.  0xff0)
+    --                                                                  , mkSub (imm .&~. 0xfff) ]
     -- if we have a negative offset, well subtract another 0x1000 from it, and then
     -- use the positive
-    imm | -imm > 0xfff && -imm <= 0xffefff && imm .&. 0x7 == 0x0  -> [ mkSub (-imm .&~. 0xfff + 0x1000)
-                                                                     , mkStr (0x1000 - (-imm .&. 0xfff))
-                                                                     , mkAdd (-imm .&~. 0xfff + 0x1000) ]
-    imm | -imm > 0xfff && -imm <= 0xffffff                        -> [ mkSub (-imm .&~. 0xfff)
-                                                                     , mkSub (-imm .&.  0xff0)
-                                                                     , mkStr (-(-imm .&. 0x00f))
-                                                                     , mkAdd (-imm .&.  0xff0)
-                                                                     , mkAdd (-imm .&~. 0xfff) ]
+    -- imm | -imm > 0xfff && -imm <= 0xffefff && imm .&. 0x7 == 0x0  -> [ mkSub (-imm .&~. 0xfff + 0x1000)
+    --                                                                  , mkStr (0x1000 - (-imm .&. 0xfff))
+    --                                                                  , mkAdd (-imm .&~. 0xfff + 0x1000) ]
+    -- imm | -imm > 0xfff && -imm <= 0xffffff                        -> [ mkSub (-imm .&~. 0xfff)
+    --                                                                  , mkSub (-imm .&.  0xff0)
+    --                                                                  , mkStr (-(-imm .&. 0x00f))
+    --                                                                  , mkAdd (-imm .&.  0xff0)
+    --                                                                  , mkAdd (-imm .&~. 0xfff) ]
     imm -> pprPanic "aarch64_mkSpillInstr" (text "Unable to spill into" <+> int imm)
     where
         a .&~. b = a .&. (complement b)
@@ -390,6 +390,7 @@ aarch64_mkSpillInstr config reg delta slot =
 
         off = spillSlotToOffset config slot
 
+-- fails in compiler/stage2/build/GHC/Driver/Pipeline.o
 aarch64_mkLoadInstr
    :: NCGConfig
    -> Reg       -- register to load
@@ -404,21 +405,21 @@ aarch64_mkLoadInstr config reg delta slot =
     imm | imm > 0xfff && imm <= 0xffffff && imm .&. 0x7 == 0x0    -> [ mkAdd (imm .&~. 0xfff)
                                                                      , mkLdr (imm .&.  0xfff)
                                                                      , mkSub (imm .&~. 0xfff) ]
-    imm | imm > 0xfff && imm <= 0xffffff                          -> [ mkAdd (imm .&~. 0xfff)
-                                                                     , mkAdd (imm .&.  0xff0)
-                                                                     , mkLdr (imm .&.  0x00f)
-                                                                     , mkSub (imm .&.  0xff0)
-                                                                     , mkSub (imm .&~. 0xfff) ]
+    -- imm | imm > 0xfff && imm <= 0xffffff                          -> [ mkAdd (imm .&~. 0xfff)
+    --                                                                  , mkAdd (imm .&.  0xff0)
+    --                                                                  , mkLdr (imm .&.  0x00f)
+    --                                                                  , mkSub (imm .&.  0xff0)
+    --                                                                  , mkSub (imm .&~. 0xfff) ]
     -- if we have a negative offset, well subtract another 0x1000 from it, and then
     -- use the positive
-    imm | -imm > 0xfff && -imm <= 0xffefff && imm .&. 0x7 == 0x0  -> [ mkSub (-imm .&~. 0xfff + 0x1000)
-                                                                     , mkLdr (0x1000 - (-imm .&. 0xfff))
-                                                                     , mkAdd (-imm .&~. 0xfff + 0x1000) ]
-    imm | -imm > 0xfff && -imm <= 0xffffff                        -> [ mkSub (-imm .&~. 0xfff)
-                                                                     , mkSub (-imm .&.  0xff0)
-                                                                     , mkLdr (-(-imm .&. 0x00f))
-                                                                     , mkAdd (-imm .&.  0xff0)
-                                                                     , mkAdd (-imm .&~. 0xfff) ]
+    -- imm | -imm > 0xfff && -imm <= 0xffefff && imm .&. 0x7 == 0x0  -> [ mkSub (-imm .&~. 0xfff + 0x1000)
+    --                                                                  , mkLdr (0x1000 - (-imm .&. 0xfff))
+    --                                                                  , mkAdd (-imm .&~. 0xfff + 0x1000) ]
+    -- imm | -imm > 0xfff && -imm <= 0xffffff                        -> [ mkSub (-imm .&~. 0xfff)
+    --                                                                  , mkSub (-imm .&.  0xff0)
+    --                                                                  , mkLdr (-(-imm .&. 0x00f))
+    --                                                                  , mkAdd (-imm .&.  0xff0)
+    --                                                                  , mkAdd (-imm .&~. 0xfff) ]
     imm -> pprPanic "aarch64_mkSpillInstr" (text "Unable to spill into" <+> int imm)
     where
         a .&~. b = a .&. (complement b)
