@@ -474,15 +474,15 @@ aarch64_mkJumpInstr id = [B (TBlock id)]
 aarch64_mkStackAllocInstr :: Platform -> Int -> [Instr]
 aarch64_mkStackAllocInstr platform n
     | n == 0 = []
-    | n > 0 && n < 4096 = [ SUB sp sp (OpImm (ImmInt n)) ]
-    | n > 0 = SUB sp sp (OpImm (ImmInt 4095)) : aarch64_mkStackAllocInstr platform (n - 4095)
+    | n > 0 && n < 4096 = [ ANN (text "Alloc More Stack") $ SUB sp sp (OpImm (ImmInt n)) ]
+    | n > 0 =  ANN (text "Alloc More Stack") (SUB sp sp (OpImm (ImmInt 4095))) : aarch64_mkStackAllocInstr platform (n - 4095)
 aarch64_mkStackAllocInstr platform n = pprPanic "aarch64_mkStackAllocInstr" (int n)
 
 aarch64_mkStackDeallocInstr :: Platform -> Int -> [Instr]
 aarch64_mkStackDeallocInstr platform n
     | n == 0 = []
-    | n > 0 && n < 4096 = [ ADD sp sp (OpImm (ImmInt n)) ]
-    | n > 0 = ADD sp sp (OpImm (ImmInt 4095)) : aarch64_mkStackDeallocInstr platform (n + 4095)
+    | n > 0 && n < 4096 = [ ANN (text "Dealloc More Stack") $ ADD sp sp (OpImm (ImmInt n)) ]
+    | n > 0 =  ANN (text "Dealloc More Stack") (ADD sp sp (OpImm (ImmInt 4095))) : aarch64_mkStackDeallocInstr platform (n - 4095)
 aarch64_mkStackDeallocInstr platform n = pprPanic "aarch64_mkStackDeallocInstr" (int n)
 
 --
