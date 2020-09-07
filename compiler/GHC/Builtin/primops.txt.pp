@@ -603,14 +603,14 @@ primop   IntLeOp  "<=#"   Compare   Int# -> Int# -> Int#
 primop   ChrOp   "chr#"   GenPrimOp   Int# -> Char#
    with code_size = 0
 
-primop   Int2WordOp "int2Word#" GenPrimOp Int# -> Word#
+primop   IntToWordOp "int2Word#" GenPrimOp Int# -> Word#
    with code_size = 0
 
-primop   Int2FloatOp   "int2Float#"      GenPrimOp  Int# -> Float#
-primop   Int2DoubleOp   "int2Double#"          GenPrimOp  Int# -> Double#
+primop   IntToFloatOp   "int2Float#"      GenPrimOp  Int# -> Float#
+primop   IntToDoubleOp   "int2Double#"          GenPrimOp  Int# -> Double#
 
-primop   Word2FloatOp   "word2Float#"      GenPrimOp  Word# -> Float#
-primop   Word2DoubleOp   "word2Double#"          GenPrimOp  Word# -> Double#
+primop   WordToFloatOp   "word2Float#"      GenPrimOp  Word# -> Float#
+primop   WordToDoubleOp   "word2Double#"          GenPrimOp  Word# -> Double#
 
 primop   ISllOp   "uncheckedIShiftL#" GenPrimOp  Int# -> Int# -> Int#
          {Shift left.  Result undefined if shift amount is not
@@ -696,7 +696,7 @@ primop   SrlOp   "uncheckedShiftRL#"   GenPrimOp   Word# -> Int# -> Word#
          {Shift right logical.   Result undefined if shift  amount is not
           in the range 0 to word size - 1 inclusive.}
 
-primop   Word2IntOp   "word2Int#"   GenPrimOp   Word# -> Int#
+primop   WordToIntOp   "word2Int#"   GenPrimOp   Word# -> Int#
    with code_size = 0
 
 primop   WordGtOp   "gtWord#"   Compare   Word# -> Word# -> Int#
@@ -844,12 +844,12 @@ primop   DoubleNegOp   "negateDouble#"  GenPrimOp   Double# -> Double#
 
 primop   DoubleFabsOp  "fabsDouble#"    GenPrimOp   Double# -> Double#
 
-primop   Double2IntOp   "double2Int#"          GenPrimOp  Double# -> Int#
+primop   DoubleToIntOp   "double2Int#"          GenPrimOp  Double# -> Int#
    {Truncates a {\tt Double#} value to the nearest {\tt Int#}.
     Results are undefined if the truncation if truncation yields
     a value outside the range of {\tt Int#}.}
 
-primop   Double2FloatOp   "double2Float#" GenPrimOp Double# -> Float#
+primop   DoubleToFloatOp   "double2Float#" GenPrimOp Double# -> Float#
 
 primop   DoubleExpOp   "expDouble#"      GenPrimOp
    Double# -> Double#
@@ -998,7 +998,7 @@ primop   FloatNegOp   "negateFloat#"      GenPrimOp    Float# -> Float#
 
 primop   FloatFabsOp  "fabsFloat#"        GenPrimOp    Float# -> Float#
 
-primop   Float2IntOp   "float2Int#"      GenPrimOp  Float# -> Int#
+primop   FloatToIntOp   "float2Int#"      GenPrimOp  Float# -> Int#
    {Truncates a {\tt Float#} value to the nearest {\tt Int#}.
     Results are undefined if the truncation if truncation yields
     a value outside the range of {\tt Int#}.}
@@ -1097,7 +1097,7 @@ primop   FloatPowerOp   "powerFloat#"      GenPrimOp
    with
    code_size = { primOpCodeSizeForeignCall }
 
-primop   Float2DoubleOp   "float2Double#" GenPrimOp  Float# -> Double#
+primop   FloatToDoubleOp   "float2Double#" GenPrimOp  Float# -> Double#
 
 primop   FloatDecode_IntOp   "decodeFloat_Int#" GenPrimOp
    Float# -> (# Int#, Int# #)
@@ -2283,11 +2283,11 @@ primop   AddrSubOp "minusAddr#" GenPrimOp Addr# -> Addr# -> Int#
 primop   AddrRemOp "remAddr#" GenPrimOp Addr# -> Int# -> Int#
          {Return the remainder when the {\tt Addr\#} arg, treated like an {\tt Int\#},
           is divided by the {\tt Int\#} arg.}
-primop   Addr2IntOp  "addr2Int#"     GenPrimOp   Addr# -> Int#
+primop   AddrToIntOp  "addr2Int#"     GenPrimOp   Addr# -> Int#
         {Coerce directly from address to int.}
    with code_size = 0
         deprecated_msg = { This operation is strongly deprecated. }
-primop   Int2AddrOp   "int2Addr#"    GenPrimOp  Int# -> Addr#
+primop   IntToAddrOp   "int2Addr#"    GenPrimOp  Int# -> Addr#
         {Coerce directly from int to address.}
    with code_size = 0
         deprecated_msg = { This operation is strongly deprecated. }

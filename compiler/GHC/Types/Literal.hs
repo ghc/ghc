@@ -39,13 +39,13 @@ module GHC.Types.Literal
         , litValue, isLitValue, isLitValue_maybe, mapLitValue
 
         -- ** Coercions
-        , word2IntLit, int2WordLit
+        , wordToIntLit, intToWordLit
         , narrowLit
         , narrow8IntLit, narrow16IntLit, narrow32IntLit
         , narrow8WordLit, narrow16WordLit, narrow32WordLit
-        , char2IntLit, int2CharLit
-        , float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit
-        , nullAddrLit, rubbishLit, float2DoubleLit, double2FloatLit
+        , charToIntLit, intToCharLit
+        , floatToIntLit, intToFloatLit, doubleToIntLit, intToDoubleLit
+        , nullAddrLit, rubbishLit, floatToDoubleLit, doubleToFloatLit
         ) where
 
 #include "HsVersions.h"
@@ -474,27 +474,27 @@ isLitValue = isJust . isLitValue_maybe
 
 narrow8IntLit, narrow16IntLit, narrow32IntLit,
   narrow8WordLit, narrow16WordLit, narrow32WordLit,
-  char2IntLit, int2CharLit,
-  float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit,
-  float2DoubleLit, double2FloatLit
+  charToIntLit, intToCharLit,
+  floatToIntLit, intToFloatLit, doubleToIntLit, intToDoubleLit,
+  floatToDoubleLit, doubleToFloatLit
   :: Literal -> Literal
 
-word2IntLit, int2WordLit :: Platform -> Literal -> Literal
-word2IntLit platform (LitNumber LitNumWord w)
+wordToIntLit, intToWordLit :: Platform -> Literal -> Literal
+wordToIntLit platform (LitNumber LitNumWord w)
   -- Map Word range [max_int+1, max_word]
   -- to Int range   [min_int  , -1]
   -- Range [0,max_int] has the same representation with both Int and Word
   | w > platformMaxInt platform = mkLitInt platform (w - platformMaxWord platform - 1)
   | otherwise                   = mkLitInt platform w
-word2IntLit _ l = pprPanic "word2IntLit" (ppr l)
+wordToIntLit _ l = pprPanic "wordToIntLit" (ppr l)
 
-int2WordLit platform (LitNumber LitNumInt i)
+intToWordLit platform (LitNumber LitNumInt i)
   -- Map Int range [min_int  , -1]
   -- to Word range [max_int+1, max_word]
   -- Range [0,max_int] has the same representation with both Int and Word
   | i < 0     = mkLitWord platform (1 + platformMaxWord platform + i)
   | otherwise = mkLitWord platform i
-int2WordLit _ l = pprPanic "int2WordLit" (ppr l)
+intToWordLit _ l = pprPanic "intToWordLit" (ppr l)
 
 -- | Narrow a literal number (unchecked result range)
 narrowLit :: forall a. Integral a => Proxy a -> Literal -> Literal
@@ -508,25 +508,25 @@ narrow8WordLit  = narrowLit (Proxy :: Proxy Word8)
 narrow16WordLit = narrowLit (Proxy :: Proxy Word16)
 narrow32WordLit = narrowLit (Proxy :: Proxy Word32)
 
-char2IntLit (LitChar c)       = mkLitIntUnchecked (toInteger (ord c))
-char2IntLit l                 = pprPanic "char2IntLit" (ppr l)
-int2CharLit (LitNumber _ i)   = LitChar (chr (fromInteger i))
-int2CharLit l                 = pprPanic "int2CharLit" (ppr l)
+charToIntLit (LitChar c)       = mkLitIntUnchecked (toInteger (ord c))
+charToIntLit l                 = pprPanic "charToIntLit" (ppr l)
+intToCharLit (LitNumber _ i)   = LitChar (chr (fromInteger i))
+intToCharLit l                 = pprPanic "intToCharLit" (ppr l)
 
-float2IntLit (LitFloat f)      = mkLitIntUnchecked (truncate f)
-float2IntLit l                 = pprPanic "float2IntLit" (ppr l)
-int2FloatLit (LitNumber _ i)   = LitFloat (fromInteger i)
-int2FloatLit l                 = pprPanic "int2FloatLit" (ppr l)
+floatToIntLit (LitFloat f)      = mkLitIntUnchecked (truncate f)
+floatToIntLit l                 = pprPanic "floatToIntLit" (ppr l)
+intToFloatLit (LitNumber _ i)   = LitFloat (fromInteger i)
+intToFloatLit l                 = pprPanic "intToFloatLit" (ppr l)
 
-double2IntLit (LitDouble f)     = mkLitIntUnchecked (truncate f)
-double2IntLit l                 = pprPanic "double2IntLit" (ppr l)
-int2DoubleLit (LitNumber _ i)   = LitDouble (fromInteger i)
-int2DoubleLit l                 = pprPanic "int2DoubleLit" (ppr l)
+doubleToIntLit (LitDouble f)     = mkLitIntUnchecked (truncate f)
+doubleToIntLit l                 = pprPanic "doubleToIntLit" (ppr l)
+intToDoubleLit (LitNumber _ i)   = LitDouble (fromInteger i)
+intToDoubleLit l                 = pprPanic "intToDoubleLit" (ppr l)
 
-float2DoubleLit (LitFloat  f) = LitDouble f
-float2DoubleLit l             = pprPanic "float2DoubleLit" (ppr l)
-double2FloatLit (LitDouble d) = LitFloat  d
-double2FloatLit l             = pprPanic "double2FloatLit" (ppr l)
+floatToDoubleLit (LitFloat  f) = LitDouble f
+floatToDoubleLit l             = pprPanic "floatToDoubleLit" (ppr l)
+doubleToFloatLit (LitDouble d) = LitFloat  d
+doubleToFloatLit l             = pprPanic "doubleToFloatLit" (ppr l)
 
 nullAddrLit :: Literal
 nullAddrLit = LitNullAddr

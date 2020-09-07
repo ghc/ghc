@@ -193,10 +193,10 @@ primOpRules nm = \case
    SrlOp       -> mkPrimOpRule nm 2 [ shiftRule LitNumWord shiftRightLogical ]
 
    -- coercions
-   Word2IntOp     -> mkPrimOpRule nm 1 [ liftLitPlatform word2IntLit
-                                       , inversePrimOp Int2WordOp ]
-   Int2WordOp     -> mkPrimOpRule nm 1 [ liftLitPlatform int2WordLit
-                                       , inversePrimOp Word2IntOp ]
+   WordToIntOp    -> mkPrimOpRule nm 1 [ liftLitPlatform wordToIntLit
+                                       , inversePrimOp IntToWordOp ]
+   IntToWordOp    -> mkPrimOpRule nm 1 [ liftLitPlatform intToWordLit
+                                       , inversePrimOp WordToIntOp ]
    Narrow8IntOp   -> mkPrimOpRule nm 1 [ liftLit narrow8IntLit
                                        , subsumedByPrimOp Narrow8IntOp
                                        , Narrow8IntOp `subsumesPrimOp` Narrow16IntOp
@@ -229,19 +229,19 @@ primOpRules nm = \case
                                        , subsumedByPrimOp Narrow32WordOp
                                        , removeOp32
                                        , narrowSubsumesAnd AndOp Narrow32WordOp 32 ]
-   OrdOp          -> mkPrimOpRule nm 1 [ liftLit char2IntLit
+   OrdOp          -> mkPrimOpRule nm 1 [ liftLit charToIntLit
                                        , inversePrimOp ChrOp ]
    ChrOp          -> mkPrimOpRule nm 1 [ do [Lit lit] <- getArgs
                                             guard (litFitsInChar lit)
-                                            liftLit int2CharLit
+                                            liftLit intToCharLit
                                        , inversePrimOp OrdOp ]
-   Float2IntOp    -> mkPrimOpRule nm 1 [ liftLit float2IntLit ]
-   Int2FloatOp    -> mkPrimOpRule nm 1 [ liftLit int2FloatLit ]
-   Double2IntOp   -> mkPrimOpRule nm 1 [ liftLit double2IntLit ]
-   Int2DoubleOp   -> mkPrimOpRule nm 1 [ liftLit int2DoubleLit ]
+   FloatToIntOp    -> mkPrimOpRule nm 1 [ liftLit floatToIntLit ]
+   IntToFloatOp    -> mkPrimOpRule nm 1 [ liftLit intToFloatLit ]
+   DoubleToIntOp   -> mkPrimOpRule nm 1 [ liftLit doubleToIntLit ]
+   IntToDoubleOp   -> mkPrimOpRule nm 1 [ liftLit intToDoubleLit ]
    -- SUP: Not sure what the standard says about precision in the following 2 cases
-   Float2DoubleOp -> mkPrimOpRule nm 1 [ liftLit float2DoubleLit ]
-   Double2FloatOp -> mkPrimOpRule nm 1 [ liftLit double2FloatLit ]
+   FloatToDoubleOp -> mkPrimOpRule nm 1 [ liftLit floatToDoubleLit ]
+   DoubleToFloatOp -> mkPrimOpRule nm 1 [ liftLit doubleToFloatLit ]
 
    -- Float
    FloatAddOp   -> mkPrimOpRule nm 2 [ binaryLit (floatOp2 (+))
@@ -1364,9 +1364,9 @@ builtinBignumRules _ =
       , rule_passthrough      "Word# -> Integer -> Word#"       integerToWordName   integerFromWordName
       , rule_passthrough      "Int64# -> Integer -> Int64#"     integerToInt64Name  integerFromInt64Name
       , rule_passthrough      "Word64# -> Integer -> Word64#"   integerToWord64Name integerFromWord64Name
-      , rule_smallIntegerTo   "IS -> Word#"                     integerToWordName   Int2WordOp
-      , rule_smallIntegerTo   "IS -> Float"                     integerToFloatName  Int2FloatOp
-      , rule_smallIntegerTo   "IS -> Double"                    integerToDoubleName Int2DoubleOp
+      , rule_smallIntegerTo   "IS -> Word#"                     integerToWordName   IntToWordOp
+      , rule_smallIntegerTo   "IS -> Float"                     integerToFloatName  IntToFloatOp
+      , rule_smallIntegerTo   "IS -> Double"                    integerToDoubleName IntToDoubleOp
       , rule_passthrough      "Word# -> Natural -> Word#"       naturalToWordName   naturalNSDataConName
 
       , rule_IntegerToNaturalClamp "Integer -> Natural (clamp)" integerToNaturalClampName
