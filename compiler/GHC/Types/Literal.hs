@@ -60,8 +60,12 @@ module GHC.Types.Literal
         , narrowWord8Lit, narrowWord16Lit, narrowWord32Lit, narrowWord64Lit
         , convertToIntLit, convertToWordLit
         , charToIntLit, intToCharLit
-        , floatToIntLit, intToFloatLit, doubleToIntLit, intToDoubleLit
-        , nullAddrLit, floatToDoubleLit, doubleToFloatLit
+        , floatToIntLit, intToFloatLit
+        , floatToInt64Lit, int64ToFloatLit
+        , doubleToIntLit, intToDoubleLit
+        , doubleToInt64Lit, int64ToDoubleLit
+        , floatToDoubleLit, doubleToFloatLit
+        , nullAddrLit
         ) where
 
 import GHC.Prelude
@@ -676,7 +680,9 @@ mapLitValue _        _ l                  = pprPanic "mapLitValue" (ppr l)
 
 charToIntLit, intToCharLit,
   floatToIntLit, intToFloatLit,
+  floatToInt64Lit, int64ToFloatLit,
   doubleToIntLit, intToDoubleLit,
+  doubleToInt64Lit, int64ToDoubleLit,
   floatToDoubleLit, doubleToFloatLit
   :: Literal -> Literal
 
@@ -715,10 +721,20 @@ floatToIntLit l                 = pprPanic "floatToIntLit" (ppr l)
 intToFloatLit (LitNumber _ i)   = LitFloat (fromInteger i)
 intToFloatLit l                 = pprPanic "intToFloatLit" (ppr l)
 
+floatToInt64Lit (LitFloat f)      = mkLitInt64Unchecked (truncate f)
+floatToInt64Lit l                 = pprPanic "floatToInt64Lit" (ppr l)
+int64ToFloatLit (LitNumber _ i)   = LitFloat (fromInteger i)
+int64ToFloatLit l                 = pprPanic "int64ToFloatLit" (ppr l)
+
 doubleToIntLit (LitDouble f)     = mkLitIntUnchecked (truncate f)
 doubleToIntLit l                 = pprPanic "doubleToIntLit" (ppr l)
 intToDoubleLit (LitNumber _ i)   = LitDouble (fromInteger i)
 intToDoubleLit l                 = pprPanic "intToDoubleLit" (ppr l)
+
+doubleToInt64Lit (LitDouble f)     = mkLitInt64Unchecked (truncate f)
+doubleToInt64Lit l                 = pprPanic "doubleToInt64Lit" (ppr l)
+int64ToDoubleLit (LitNumber _ i)   = LitDouble (fromInteger i)
+int64ToDoubleLit l                 = pprPanic "int64ToDoubleLit" (ppr l)
 
 floatToDoubleLit (LitFloat  f) = LitDouble f
 floatToDoubleLit l             = pprPanic "floatToDoubleLit" (ppr l)

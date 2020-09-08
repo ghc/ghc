@@ -2070,7 +2070,7 @@ genCCall' config gcp target dest_regs args
                     MO_W64_Le    -> (fsLit "hs_leWord64", False)
                     MO_W64_Lt    -> (fsLit "hs_ltWord64", False)
 
-                    MO_UF_Conv w -> (word2FloatLabel w, False)
+                    MO_UF_Conv wFrom wTo -> (word2FloatLabel wFrom wTo, False)
 
                     MO_Memcpy _  -> (fsLit "memcpy", False)
                     MO_Memset _  -> (fsLit "memset", False)

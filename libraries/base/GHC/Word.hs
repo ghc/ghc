@@ -43,7 +43,11 @@ module GHC.Word (
     eqWord8, neWord8, gtWord8, geWord8, ltWord8, leWord8,
     eqWord16, neWord16, gtWord16, geWord16, ltWord16, leWord16,
     eqWord32, neWord32, gtWord32, geWord32, ltWord32, leWord32,
-    eqWord64, neWord64, gtWord64, geWord64, ltWord64, leWord64
+    eqWord64, neWord64, gtWord64, geWord64, ltWord64, leWord64,
+
+    -- * Floating point converions
+    word64ToDouble,
+    word64ToFloat
     ) where
 
 import Data.Maybe

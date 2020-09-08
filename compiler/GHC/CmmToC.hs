@@ -948,7 +948,7 @@ pprCallishMachOp_for_C mop
         MO_Xchg w           -> ftext (xchgLabel w)
         MO_AtomicRead w     -> ftext (atomicReadLabel w)
         MO_AtomicWrite w    -> ftext (atomicWriteLabel w)
-        MO_UF_Conv w        -> ftext (word2FloatLabel w)
+        MO_UF_Conv wFrom wTo -> ftext (word2FloatLabel wFrom wTo)
 
         MO_S_Mul2     {} -> unsupported
         MO_S_QuotRem  {} -> unsupported

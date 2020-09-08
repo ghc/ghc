@@ -840,6 +840,8 @@ primop   IntToDoubleOp   "int2Double#"          GenPrimOp  Int# -> Double#
    {Convert an {\tt Int#} to the corresponding {\tt Double#} with the same
     integral value (up to truncation due to floating-point precision). e.g.
     {\tt int2Double# 1# == 1.0##}}
+primop   Int64ToFloatOp   "int64ToFloat#"      GenPrimOp  Int64# -> Float#
+primop   Int64ToDoubleOp  "int64ToDouble#"     GenPrimOp  Int64# -> Double#
 
 primop   WordToFloatOp   "word2Float#"      GenPrimOp  Word# -> Float#
    {Convert an {\tt Word#} to the corresponding {\tt Float#} with the same
@@ -849,6 +851,8 @@ primop   WordToDoubleOp   "word2Double#"          GenPrimOp  Word# -> Double#
    {Convert an {\tt Word#} to the corresponding {\tt Double#} with the same
     integral value (up to truncation due to floating-point precision). e.g.
     {\tt word2Double# 1## == 1.0##}}
+primop   Word64ToFloatOp  "word64ToFloat#"      GenPrimOp  Word64# -> Float#
+primop   Word64ToDoubleOp "word64ToDouble#"     GenPrimOp  Word64# -> Double#
 
 primop   IntSllOp   "uncheckedIShiftL#" GenPrimOp  Int# -> Int# -> Int#
          {Shift left.  Result undefined if shift amount is not
@@ -1086,6 +1090,7 @@ primop   DoubleToIntOp   "double2Int#"          GenPrimOp  Double# -> Int#
    {Truncates a {\tt Double#} value to the nearest {\tt Int#}.
     Results are undefined if the truncation if truncation yields
     a value outside the range of {\tt Int#}.}
+primop   DoubleToInt64Op "doubleToInt64#"        GenPrimOp  Double# -> Int64#
 
 primop   DoubleToFloatOp   "double2Float#" GenPrimOp Double# -> Float#
 
@@ -1240,6 +1245,7 @@ primop   FloatToIntOp   "float2Int#"      GenPrimOp  Float# -> Int#
    {Truncates a {\tt Float#} value to the nearest {\tt Int#}.
     Results are undefined if the truncation if truncation yields
     a value outside the range of {\tt Int#}.}
+primop   FloatToInt64Op "floatToInt64#"    GenPrimOp  Float# -> Int64#
 
 primop   FloatExpOp   "expFloat#"      GenPrimOp
    Float# -> Float#

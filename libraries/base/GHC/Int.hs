@@ -35,8 +35,10 @@ module GHC.Int (
         eqInt8, neInt8, gtInt8, geInt8, ltInt8, leInt8,
         eqInt16, neInt16, gtInt16, geInt16, ltInt16, leInt16,
         eqInt32, neInt32, gtInt32, geInt32, ltInt32, leInt32,
-        eqInt64, neInt64, gtInt64, geInt64, ltInt64, leInt64
-
+        eqInt64, neInt64, gtInt64, geInt64, ltInt64, leInt64,
+        -- * Floating point converions
+        doubleToInt64, int64ToDouble,
+        floatToInt64, int64ToFloat
     ) where
 
 import Data.Bits

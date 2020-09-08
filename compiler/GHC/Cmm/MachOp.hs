@@ -124,6 +124,7 @@ data MachOp
                                 -- is equivalent to just x.
   | MO_FF_Conv Width Width      -- Float -> Float
 
+
   -- Vector element insertion and extraction operations
   | MO_V_Insert  Length Width   -- Insert scalar into vector
   | MO_V_Extract Length Width   -- Extract scalar from vector
@@ -623,7 +624,7 @@ data CallishMachOp
   | MO_W64_Le
   | MO_W64_Lt
 
-  | MO_UF_Conv Width
+  | MO_UF_Conv Width Width      -- unsigned int -> Float
 
   | MO_S_Mul2    Width
   | MO_S_QuotRem Width
