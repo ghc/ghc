@@ -941,10 +941,7 @@ allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
                         | (temp_to_push_out, (my_reg :: RealReg)) : _
                                         <- candidates_inReg
                         = do
-                                (spill_insn, slot) <- spillR (RegReal my_reg) temp_to_push_out
-                                let spill_store  = (if reading then id else reverse)
-                                                        -- COMMENT (fsLit "spill alloc"):
-                                                           spill_insn
+                                (spill_store, slot) <- spillR (RegReal my_reg) temp_to_push_out
 
                                 -- record that this temp was spilled
                                 recordSpill (SpillAlloc temp_to_push_out)
