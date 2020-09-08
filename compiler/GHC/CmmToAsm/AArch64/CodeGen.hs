@@ -513,7 +513,7 @@ getRegister' config plat expr
                                                       , MOVK (OpReg W64 tmp) (OpImmShift (ImmInt half3) SLSL 48)
                                                       , MOV (OpReg W64 dst) (OpReg W64 tmp)
                                                       ]))
-        CmmFloat _f w -> pprPanic "getRegister' (CmmLit:CmmFloat), unsupported float lit" (ppr expr)
+        CmmFloat _f _w -> pprPanic "getRegister' (CmmLit:CmmFloat), unsupported float lit" (ppr expr)
         CmmVec _ -> pprPanic "getRegister' (CmmLit:CmmVec): " (ppr expr)
         CmmLabel _lbl -> do
           (op, imm_code) <- litToImm' lit
@@ -841,18 +841,18 @@ getAmode platform (CmmRegOff reg off)
 -- CmmStore (CmmMachOp (MO_Add w) [CmmLoad expr, CmmLit (CmmInt n w')]) (expr2)
 -- E.g. a CmmStoreOff really. This can be translated to `str $expr2, [$expr, #n ]
 -- for `n` in range.
-getAmode platform (CmmMachOp (MO_Add _w) [expr, CmmLit (CmmInt off _w')])
+getAmode _platform (CmmMachOp (MO_Add _w) [expr, CmmLit (CmmInt off _w')])
   | -256 <= off, off <= 255
   = do (reg, _format, code) <- getSomeReg expr
        return $ Amode (AddrRegImm reg (ImmInteger off)) code
 
-getAmode platform (CmmMachOp (MO_Sub _w) [expr, CmmLit (CmmInt off _w')])
+getAmode _platform (CmmMachOp (MO_Sub _w) [expr, CmmLit (CmmInt off _w')])
   | -256 <= -off, -off <= 255
   = do (reg, _format, code) <- getSomeReg expr
        return $ Amode (AddrRegImm reg (ImmInteger (-off))) code
 
 -- Generic case
-getAmode _plat expr
+getAmode _platform expr
   = do (reg, _format, code) <- getSomeReg expr
        return $ Amode (AddrReg reg) code
 
@@ -904,7 +904,7 @@ assignReg_FltCode = assignReg_IntCode
 -- -----------------------------------------------------------------------------
 -- Jumps
 genJump :: CmmExpr{-the branch target-} -> [Reg] -> NatM InstrBlock
-genJump expr@(CmmLit (CmmLabel lbl)) regs
+genJump expr@(CmmLit (CmmLabel lbl)) _regs
   = return $ unitOL (ANN (text $ show expr) (J (TLabel lbl)))
   -- = return (toOL [ PUSH_STACK_FRAME
   --               , DELTA (-16)
@@ -912,7 +912,7 @@ genJump expr@(CmmLit (CmmLabel lbl)) regs
   --               , POP_STACK_FRAME
   --               , DELTA 0] )
 
-genJump expr regs = do
+genJump expr _regs = do
     (target, _format, code) <- getSomeReg expr
     return (code `appOL` unitOL (ANN (text $ show expr) (J (TReg target)))
                         --  toOL [ PUSH_STACK_FRAME
