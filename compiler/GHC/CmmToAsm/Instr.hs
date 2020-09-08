@@ -16,6 +16,8 @@ import GHC.Cmm.BlockId
 
 import GHC.CmmToAsm.Config
 
+import GHC.Utils.Outputable (SDoc)
+
 import GHC.Stack
 
 -- | Holds a list of source and destination registers used by a
@@ -162,3 +164,6 @@ class Instruction instr where
 
         -- | Pretty-print an instruction
         pprInstr :: Platform -> instr -> SDoc
+
+        -- Create a comment instruction
+        mkComment :: SDoc -> [instr]

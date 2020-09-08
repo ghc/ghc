@@ -81,6 +81,7 @@ instance Instruction Instr where
         mkJumpInstr             = aarch64_mkJumpInstr
         mkStackAllocInstr       = aarch64_mkStackAllocInstr
         mkStackDeallocInstr     = aarch64_mkStackDeallocInstr
+        mkComment               = pure . COMMENT
 
 -- | Get the registers that are being used by this instruction.
 -- regUsage doesn't need to do any trickery for jumps and such.
