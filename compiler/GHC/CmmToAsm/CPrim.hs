@@ -78,11 +78,14 @@ ctzLabel = \case
   W64 -> fsLit "hs_ctz64"
   w   -> pprPanic "ctzLabel: Unsupported word width " (ppr w)
 
-word2FloatLabel :: Width -> FastString
-word2FloatLabel = \case
-  W32 -> fsLit "hs_word2float32"
-  W64 -> fsLit "hs_word2float64"
-  w   -> pprPanic "word2FloatLabel: Unsupported word width " (ppr w)
+word2FloatLabel :: Width -> Width -> FastString
+word2FloatLabel = curry $ \case
+  (W32, W32) -> fsLit "hs_word2float32"
+  (W32, W64) -> fsLit "hs_word2float64"
+  (W64, W32) -> fsLit "hs_word2float32"
+  (W64, W64) -> fsLit "hs_word2float64"
+  (w,   _)   -> pprPanic "word2FloatLabel: Unsupported word width " (ppr w)
+  (_,   w)   -> pprPanic "word2FloatLabel: Unsupported float width " (ppr w)
 
 atomicRMWLabel :: Width -> AtomicMachOp -> FastString
 atomicRMWLabel w amop = case amop of
