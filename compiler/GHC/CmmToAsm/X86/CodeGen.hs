@@ -2511,7 +2511,7 @@ genCCall' config is32Bit (PrimTarget (MO_Clz width)) dest_regs@[dst] args@[src] 
     bw = widthInBits width
     lbl = mkCmmCodeLabel primUnitId (fsLit (clzLabel width))
 
-genCCall' config is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args bid = do
+genCCall' config is32Bit (PrimTarget (MO_UF_Conv wFrom wTo)) dest_regs args bid = do
     targetExpr <- cmmMakeDynamicReference config
                   CallReference lbl
     let target = ForeignTarget targetExpr (ForeignConvention CCallConv
@@ -2519,7 +2519,7 @@ genCCall' config is32Bit (PrimTarget (MO_UF_Conv width)) dest_regs args bid = do
                                            CmmMayReturn)
     genCCall' config is32Bit target dest_regs args bid
   where
-    lbl = mkCmmCodeLabel primUnitId (fsLit (word2FloatLabel width))
+    lbl = mkCmmCodeLabel primUnitId $ fsLit $ word2FloatLabel wFrom wTo
 
 genCCall' _ _ (PrimTarget (MO_AtomicRead width)) [dst] [addr] _ = do
   load_code <- intLoadCode (MOV (intFormat width)) addr
@@ -3347,7 +3347,7 @@ outOfLineCmmOp bid mop res args
               MO_Cmpxchg _     -> fsLit "cmpxchg"
               MO_Xchg _        -> should_be_inline
 
-              MO_UF_Conv _ -> unsupported
+              MO_UF_Conv _ _ -> unsupported
 
               MO_S_Mul2    {}  -> unsupported
               MO_S_QuotRem {}  -> unsupported

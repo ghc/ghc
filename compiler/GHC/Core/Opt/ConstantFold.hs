@@ -314,6 +314,10 @@ primOpRules nm = \case
    IntToFloatOp    -> mkPrimOpRule nm 1 [ liftLit intToFloatLit ]
    DoubleToIntOp   -> mkPrimOpRule nm 1 [ liftLit doubleToIntLit ]
    IntToDoubleOp   -> mkPrimOpRule nm 1 [ liftLit intToDoubleLit ]
+   FloatToInt64Op  -> mkPrimOpRule nm 1 [ liftLit floatToInt64Lit ]
+   Int64ToFloatOp  -> mkPrimOpRule nm 1 [ liftLit int64ToFloatLit ]
+   DoubleToInt64Op -> mkPrimOpRule nm 1 [ liftLit doubleToInt64Lit ]
+   Int64ToDoubleOp -> mkPrimOpRule nm 1 [ liftLit int64ToDoubleLit ]
    -- SUP: Not sure what the standard says about precision in the following 2 cases
    FloatToDoubleOp -> mkPrimOpRule nm 1 [ liftLit floatToDoubleLit ]
    DoubleToFloatOp -> mkPrimOpRule nm 1 [ liftLit doubleToFloatLit ]

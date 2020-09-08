@@ -774,11 +774,15 @@ primop   ChrOp   "chr#"   GenPrimOp   Int# -> Char#
 primop   IntToWordOp "int2Word#" GenPrimOp Int# -> Word#
    with code_size = 0
 
-primop   IntToFloatOp   "int2Float#"      GenPrimOp  Int# -> Float#
-primop   IntToDoubleOp   "int2Double#"          GenPrimOp  Int# -> Double#
+primop   IntToFloatOp     "int2Float#"      GenPrimOp  Int# -> Float#
+primop   IntToDoubleOp    "int2Double#"     GenPrimOp  Int# -> Double#
+primop   Int64ToFloatOp   "int64ToFloat#"      GenPrimOp  Int64# -> Float#
+primop   Int64ToDoubleOp  "int64ToDouble#"     GenPrimOp  Int64# -> Double#
 
-primop   WordToFloatOp   "word2Float#"      GenPrimOp  Word# -> Float#
-primop   WordToDoubleOp   "word2Double#"          GenPrimOp  Word# -> Double#
+primop   WordToFloatOp    "word2Float#"      GenPrimOp  Word# -> Float#
+primop   WordToDoubleOp   "word2Double#"     GenPrimOp  Word# -> Double#
+primop   Word64ToFloatOp  "word64ToFloat#"      GenPrimOp  Word64# -> Float#
+primop   Word64ToDoubleOp "word64ToDouble#"     GenPrimOp  Word64# -> Double#
 
 primop   IntSllOp   "uncheckedIShiftL#" GenPrimOp  Int# -> Int# -> Int#
          {Shift left.  Result undefined if shift amount is not
@@ -1016,6 +1020,7 @@ primop   DoubleToIntOp   "double2Int#"          GenPrimOp  Double# -> Int#
    {Truncates a {\tt Double#} value to the nearest {\tt Int#}.
     Results are undefined if the truncation if truncation yields
     a value outside the range of {\tt Int#}.}
+primop   DoubleToInt64Op "doubleToInt64#"        GenPrimOp  Double# -> Int64#
 
 primop   DoubleToFloatOp   "double2Float#" GenPrimOp Double# -> Float#
 
@@ -1170,6 +1175,7 @@ primop   FloatToIntOp   "float2Int#"      GenPrimOp  Float# -> Int#
    {Truncates a {\tt Float#} value to the nearest {\tt Int#}.
     Results are undefined if the truncation if truncation yields
     a value outside the range of {\tt Int#}.}
+primop   FloatToInt64Op "floatToInt64#"    GenPrimOp  Float# -> Int64#
 
 primop   FloatExpOp   "expFloat#"      GenPrimOp
    Float# -> Float#

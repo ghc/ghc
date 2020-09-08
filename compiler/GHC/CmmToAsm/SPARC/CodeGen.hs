@@ -662,7 +662,7 @@ outOfLineMachOp_table mop
         MO_F64_Acosh  -> fsLit "acosh"
         MO_F64_Atanh  -> fsLit "atanh"
 
-        MO_UF_Conv w -> fsLit $ word2FloatLabel w
+        MO_UF_Conv wFrom wTo -> fsLit $ word2FloatLabel wFrom wTo
 
         MO_Memcpy _  -> fsLit "memcpy"
         MO_Memset _  -> fsLit "memset"

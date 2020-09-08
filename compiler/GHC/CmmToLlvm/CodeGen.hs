@@ -201,7 +201,7 @@ genCall (PrimTarget MO_WriteBarrier) _ _ = do
 genCall (PrimTarget MO_Touch) _ _
  = return (nilOL, [])
 
-genCall (PrimTarget (MO_UF_Conv w)) [dst] [e] = runStmtsDecls $ do
+genCall (PrimTarget (MO_UF_Conv _ w)) [dst] [e] = runStmtsDecls $ do
     dstV <- getCmmRegW (CmmLocal dst)
     let ty = cmmToLlvmType $ localRegType dst
         width = widthToLlvmFloat w
@@ -210,7 +210,7 @@ genCall (PrimTarget (MO_UF_Conv w)) [dst] [e] = runStmtsDecls $ do
     statement $ Assignment castV $ Cast LM_Uitofp ve width
     statement $ Store castV dstV
 
-genCall (PrimTarget (MO_UF_Conv _)) [_] args =
+genCall (PrimTarget (MO_UF_Conv _ _)) [_] args =
     panic $ "genCall: Too many arguments to MO_UF_Conv. " ++
     "Can only handle 1, given" ++ show (length args) ++ "."
 
@@ -897,7 +897,7 @@ cmmPrimOpFunctions mop = do
     MO_ReadBarrier   -> unsupported
     MO_WriteBarrier  -> unsupported
     MO_Touch         -> unsupported
-    MO_UF_Conv _     -> unsupported
+    MO_UF_Conv _ _   -> unsupported
 
     MO_AtomicRead _  -> unsupported
     MO_AtomicRMW _ _ -> unsupported

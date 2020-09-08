@@ -841,9 +841,14 @@ emitPrimOp dflags primop = case primop of
 
 -- Unsigned int to floating point conversions
   WordToFloatOp -> \[w] -> opIntoRegs $ \[res] -> do
-    emitPrimCall [res] (MO_UF_Conv W32) [w]
+    emitPrimCall [res] (MO_UF_Conv (wordWidth platform) W32) [w]
+  Word64ToFloatOp -> \[w] -> opIntoRegs $ \[res] -> do
+    emitPrimCall [res] (MO_UF_Conv W64 W32) [w]
+
   WordToDoubleOp -> \[w] -> opIntoRegs $ \[res] -> do
-    emitPrimCall [res] (MO_UF_Conv W64) [w]
+    emitPrimCall [res] (MO_UF_Conv (wordWidth platform) W64) [w]
+  Word64ToDoubleOp -> \[w] -> opIntoRegs $ \[res] -> do
+    emitPrimCall [res] (MO_UF_Conv W64 W64) [w]
 
 -- Atomic operations
   InterlockedExchange_Addr -> \[src, value] -> opIntoRegs $ \[res] ->
@@ -1412,8 +1417,14 @@ emitPrimOp dflags primop = case primop of
   IntToDoubleOp   -> \args -> opTranslate args (MO_SF_Conv (wordWidth platform) W64)
   DoubleToIntOp   -> \args -> opTranslate args (MO_FS_Conv W64 (wordWidth platform))
 
+  Int64ToDoubleOp -> \args -> opTranslate args (MO_SF_Conv W64 W64)
+  DoubleToInt64Op -> \args -> opTranslate args (MO_FS_Conv W64 W64)
+
   IntToFloatOp    -> \args -> opTranslate args (MO_SF_Conv (wordWidth platform) W32)
   FloatToIntOp    -> \args -> opTranslate args (MO_FS_Conv W32 (wordWidth platform))
+
+  Int64ToFloatOp  -> \args -> opTranslate args (MO_SF_Conv W64 W32)
+  FloatToInt64Op  -> \args -> opTranslate args (MO_FS_Conv W32 W64)
 
   FloatToDoubleOp -> \args -> opTranslate args (MO_FF_Conv W32 W64)
   DoubleToFloatOp -> \args -> opTranslate args (MO_FF_Conv W64 W32)
