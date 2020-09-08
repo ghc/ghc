@@ -71,6 +71,7 @@ instance Instruction Instr where
         mkJumpInstr             = x86_mkJumpInstr
         mkStackAllocInstr       = x86_mkStackAllocInstr
         mkStackDeallocInstr     = x86_mkStackDeallocInstr
+        mkComment               = const []
 
 
 -- -----------------------------------------------------------------------------

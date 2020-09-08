@@ -76,6 +76,7 @@ instance Instruction Instr where
         mkJumpInstr             = ppc_mkJumpInstr
         mkStackAllocInstr       = ppc_mkStackAllocInstr
         mkStackDeallocInstr     = ppc_mkStackDeallocInstr
+        mkComment               = const []
 
 
 ppc_mkStackAllocInstr :: Platform -> Int -> [Instr]

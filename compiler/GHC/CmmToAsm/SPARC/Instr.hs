@@ -104,6 +104,7 @@ instance Instruction Instr where
         mkJumpInstr             = sparc_mkJumpInstr
         mkStackAllocInstr       = panic "no sparc_mkStackAllocInstr"
         mkStackDeallocInstr     = panic "no sparc_mkStackDeallocInstr"
+        mkComment               = const []
 
 
 -- | SPARC instruction set.
