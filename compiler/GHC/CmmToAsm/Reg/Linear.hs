@@ -603,16 +603,24 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
                                  | src == dst   -> []
                                 _               -> [patched_instr]
 
+    -- On the use of @reverse@ below.
+    -- Since we can now have spills and reloads produce multiple instructions
+    -- we need to ensure they are emitted in the correct order.  Previously
+    -- we did not, as mkSpill/mkReload/mkRegRegMove produced single instructions
+    -- only and as such order didn't matter. Now it does.  And reversing the
+    -- spills (clobber will also spill), will ensure they are emitted in the
+    -- right order.
+
     -- u <- getUniqueR
     let code = -- mkComment (text "<genRaInsn(" <> ppr u <> text ")>")
                -- ++ mkComment (text "<genRaInsn(" <> ppr u <> text "):squashed>")] ++
                squashed_instr
         --     ++ mkComment (text "<genRaInsn(" <> ppr u <> text "):w_spills>")
-            ++ w_spills
+            ++ reverse w_spills
         --     ++ mkComment (text "<genRaInsn(" <> ppr u <> text "):r_spills>")
             ++ reverse r_spills
         --     ++ mkComment (text "<genRaInsn(" <> ppr u <> text "):clobber_saves>")
-            ++ clobber_saves
+            ++ reverse clobber_saves
         --     ++ mkComment (text "<genRaInsn(" <> ppr u <> text "):new_instrs>")
             ++ new_instrs
         --     ++ mkComment (text "</genRaInsn(" <> ppr u <> text ")>")
