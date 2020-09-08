@@ -598,8 +598,19 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
                                  | src == dst   -> []
                                 _               -> [patched_instr]
 
-    let code = squashed_instr ++ w_spills ++ reverse r_spills
-                ++ clobber_saves ++ new_instrs
+    -- u <- getUniqueR
+    let code = -- mkComment (text "<genRaInsn(" <> ppr u <> text ")>")
+               -- ++ mkComment (text "<genRaInsn(" <> ppr u <> text "):squashed>")] ++
+               squashed_instr
+        --     ++ mkComment (text "<genRaInsn(" <> ppr u <> text "):w_spills>")
+            ++ w_spills
+        --     ++ mkComment (text "<genRaInsn(" <> ppr u <> text "):r_spills>")
+            ++ reverse r_spills
+        --     ++ mkComment (text "<genRaInsn(" <> ppr u <> text "):clobber_saves>")
+            ++ clobber_saves
+        --     ++ mkComment (text "<genRaInsn(" <> ppr u <> text "):new_instrs>")
+            ++ new_instrs
+        --     ++ mkComment (text "</genRaInsn(" <> ppr u <> text ")>")
 
 --    pprTrace "patched-code" ((vcat $ map (docToSDoc . pprInstr) code)) $ do
 --    pprTrace "pached-fixup" ((ppr fixup_blocks)) $ do
@@ -677,8 +688,9 @@ saveClobberedTemps clobbered dying
 
         (instrs,assig') <- clobber assig [] to_spill
         setAssigR assig'
-        return instrs
-
+        return $ -- mkComment (text "<saveClobberedTemps>") ++
+                 instrs
+--              ++ mkComment (text "</saveClobberedTemps>")
    where
      -- See Note [UniqFM and the register allocator]
      clobber :: RegMap Loc -> [instr] -> [(Unique,RealReg)] -> RegM freeRegs ([instr], RegMap Loc)
@@ -986,7 +998,7 @@ loadTemp vreg (ReadMem slot) hreg spills
  = do
         insn <- loadR (RegReal hreg) slot
         recordSpill (SpillLoad $ getUnique vreg)
-        return  $  {- COMMENT (fsLit "spill load") : -} insn ++ spills
+        return  $  {- mkComment (text "spill load") : -} insn ++ spills
 
 loadTemp _ _ _ spills =
    return spills
