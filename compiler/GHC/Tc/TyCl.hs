@@ -52,7 +52,7 @@ import GHC.Core.Coercion
 import GHC.Tc.Types.Origin
 import GHC.Core.Type
 import GHC.Core.TyCo.Rep   -- for checkValidRoles
-import GHC.Core.TyCo.Ppr( pprTyVars, pprWithExplicitKindsWhen )
+import GHC.Core.TyCo.Ppr( pprTyVars )
 import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCon
@@ -79,11 +79,9 @@ import GHC.Types.Basic
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
-import Data.Foldable
 import Data.Function ( on )
 import Data.Functor.Identity
 import Data.List
-import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.Set as Set
 import Data.Tuple( swap )
@@ -2393,9 +2391,9 @@ tcClassATs class_name cls ats at_defs
 
 -------------------------
 tcDefaultAssocDecl ::
-     TyCon                                -- ^ Family TyCon (not knot-tied)
-  -> [LTyFamDefltDecl GhcRn]              -- ^ Defaults
-  -> TcM (Maybe (KnotTied Type, SrcSpan)) -- ^ Type checked RHS
+     TyCon                                       -- ^ Family TyCon (not knot-tied)
+  -> [LTyFamDefltDecl GhcRn]                     -- ^ Defaults
+  -> TcM (Maybe (KnotTied Type, ATValidityInfo)) -- ^ Type checked RHS
 tcDefaultAssocDecl _ []
   = return Nothing  -- No default declaration
 
@@ -2436,73 +2434,27 @@ tcDefaultAssocDecl fam_tc
                                                     imp_vars (mb_expl_bndrs `orElse` [])
                                                     hs_pats hs_rhs_ty
 
-       ; let fam_tvs  = tyConTyVars fam_tc
-             ppr_eqn  = ppr_default_eqn pats rhs_ty
-             pats_vis = tyConArgFlags fam_tc pats
+       ; let fam_tvs = tyConTyVars fam_tc
        ; traceTc "tcDefaultAssocDecl 2" (vcat
-           [ text "fam_tvs" <+> ppr fam_tvs
+           [ text "hs_pats"   <+> ppr hs_pats
+           , text "hs_rhs_ty" <+> ppr hs_rhs_ty
+           , text "fam_tvs" <+> ppr fam_tvs
            , text "qtvs"    <+> ppr qtvs
-           , text "pats"    <+> ppr pats
-           , text "rhs_ty"  <+> ppr rhs_ty
+             -- NB: Do *not* print `pats` or rhs_ty here, as they can mention
+             -- knot-tied TyCons. See #18648.
            ])
-       ; cpt_tvs <- zipWithM (extract_tv ppr_eqn) pats pats_vis
-       ; check_all_distinct_tvs ppr_eqn $ zip cpt_tvs pats_vis
-       ; let subst = zipTvSubst cpt_tvs (mkTyVarTys fam_tvs)
-       ; pure $ Just (substTyUnchecked subst rhs_ty, loc)
-           -- We also perform other checks for well-formedness and validity
-           -- later, in checkValidClass
+       ; let subst = case traverse getTyVar_maybe pats of
+                       Just cpt_tvs -> zipTvSubst cpt_tvs (mkTyVarTys fam_tvs)
+                       Nothing      -> emptyTCvSubst
+                       -- The Nothing case can only be reached in invalid
+                       -- associated type family defaults. In such cases, we
+                       -- simply create an empty substitution and let GHC fall
+                       -- over later, in GHC.Tc.Validity.checkValidAssocTyFamDeflt.
+                       -- See Note [Type-checking default assoc decls].
+       ; pure $ Just (substTyUnchecked subst rhs_ty, ATVI loc pats)
+           -- We perform checks for well-formedness and validity later, in
+           -- GHC.Tc.Validity.checkValidAssocTyFamDeflt.
      }
-  where
-    -- Checks that a pattern on the LHS of a default is a type
-    -- variable. If so, return the underlying type variable, and if
-    -- not, throw an error.
-    -- See Note [Type-checking default assoc decls]
-    extract_tv :: SDoc    -- The pretty-printed default equation
-                          -- (only used for error message purposes)
-               -> Type    -- The particular type pattern from which to extract
-                          -- its underlying type variable
-               -> ArgFlag -- The visibility of the type pattern
-                          -- (only used for error message purposes)
-               -> TcM TyVar
-    extract_tv ppr_eqn pat pat_vis =
-      case getTyVar_maybe pat of
-        Just tv -> pure tv
-        Nothing -> failWithTc $
-          pprWithExplicitKindsWhen (isInvisibleArgFlag pat_vis) $
-          hang (text "Illegal argument" <+> quotes (ppr pat) <+> text "in:")
-             2 (vcat [ppr_eqn, suggestion])
-
-
-    -- Checks that no type variables in an associated default declaration are
-    -- duplicated. If that is the case, throw an error.
-    -- See Note [Type-checking default assoc decls]
-    check_all_distinct_tvs ::
-         SDoc               -- The pretty-printed default equation (only used
-                            -- for error message purposes)
-      -> [(TyVar, ArgFlag)] -- The type variable arguments in the associated
-                            -- default declaration, along with their respective
-                            -- visibilities (the latter are only used for error
-                            -- message purposes)
-      -> TcM ()
-    check_all_distinct_tvs ppr_eqn cpt_tvs_vis =
-      let dups = findDupsEq ((==) `on` fst) cpt_tvs_vis in
-      traverse_
-        (\d -> let (pat_tv, pat_vis) = NE.head d in failWithTc $
-               pprWithExplicitKindsWhen (isInvisibleArgFlag pat_vis) $
-               hang (text "Illegal duplicate variable"
-                       <+> quotes (ppr pat_tv) <+> text "in:")
-                  2 (vcat [ppr_eqn, suggestion]))
-        dups
-
-    ppr_default_eqn :: [Type] -> Type -> SDoc
-    ppr_default_eqn pats rhs_ty =
-      quotes (text "type" <+> ppr (mkTyConApp fam_tc pats)
-                <+> equals <+> ppr rhs_ty)
-
-    suggestion :: SDoc
-    suggestion = text "The arguments to" <+> quotes (ppr fam_tc)
-             <+> text "must all be distinct type variables"
-
 
 {- Note [Type-checking default assoc decls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2513,24 +2465,29 @@ Consider this default declaration for an associated type
       type F (x :: j) y = Proxy x -> y
 
 Note that the class variable 'a' doesn't scope over the default assoc
-decl (rather oddly I think), and (less oddly) neither does the second
-argument 'b' of the associated type 'F', or the kind variable 'k'.
-Instead, the default decl is treated more like a top-level type
-instance.
-
-However we store the default rhs (Proxy x -> y) in F's TyCon, using
-F's own type variables, so we need to convert it to (Proxy a -> b).
-We do this by creating a substitution [j |-> k, x |-> a, b |-> y] and
-applying this substitution to the RHS.
+decl, nor do the type variables `k` and `b`. Instead, the default decl is
+treated more like a top-level type instance. However, we store the default rhs
+(Proxy x -> y) in F's TyCon, using F's own type variables, so we need to
+convert it to (Proxy a -> b). We do this in the tcDefaultAssocDecl function by
+creating a substitution [j |-> k, x |-> a, b |-> y] and applying this
+substitution to the RHS.
 
 In order to create this substitution, we must first ensure that all of
 the arguments in the default instance consist of distinct type variables.
-One might think that this is a simple task that could be implemented earlier
-in the compiler, perhaps in the parser or the renamer. However, there are some
-tricky corner cases that really do require the full power of typechecking to
-weed out, as the examples below should illustrate.
+Checking for this property proves surprisingly tricky. Three potential places
+where GHC could check for this property include:
 
-First, we must check that all arguments are type variables. As a motivating
+1. Before typechecking (in the parser or renamer)
+2. During typechecking (in tcDefaultAssocDecl)
+3. After typechecking (using GHC.Tc.Validity)
+
+Currently, GHC picks option (3) and implements this check using
+GHC.Tc.Validity.checkValidAssocTyFamDeflt. GHC previously used options (1) and
+(2), but neither option quite worked out for reasons that we will explain
+shortly.
+
+The first thing that checkValidAssocTyFamDeflt does is check that all arguments
+in an associated type family default are type variables. As a motivating
 example, consider this erroneous program (inspired by #11361):
 
    class C a where
@@ -2538,10 +2495,13 @@ example, consider this erroneous program (inspired by #11361):
       type F x        b = x
 
 If you squint, you'll notice that the kind of `x` is actually Type. However,
-we cannot substitute from [Type |-> k], so we reject this default.
+we cannot substitute from [Type |-> k], so we reject this default. This also
+explains why GHC no longer implements option (1) above, since figuring out that
+`x`'s kind is Type would be much more difficult without the knowledge that the
+typechecker provides.
 
-Next, we must check that all arguments are distinct. Here is another offending
-example, this time taken from #13971:
+Next, checkValidAssocTyFamDeflt checks that all arguments are distinct. Here is
+another offending example, this time taken from #13971:
 
    class C2 (a :: j) where
       type F2 (a :: j) (b :: k)
@@ -2555,10 +2515,37 @@ if we had written `type F2 @z @z x y = SameKind @z x y`, which makes it clear
 that we have duplicated a use of `z` on the LHS. Therefore, `F2`'s default is
 also rejected.
 
-Since the LHS of an associated type family default is always just variables,
-it won't contain any tycons. Accordingly, the patterns used in the substitution
-won't actually be knot-tied, even though we're in the knot. This is too
-delicate for my taste, but it works.
+There is one more design consideration in play here: what error message should
+checkValidAssocTyFamDeflt produce if one of its checks fails? Ideally, it would
+be something like this:
+
+  Illegal duplicate variable ‘z’ in:
+    ‘type F2 @z @z x y = ...’
+    The arguments to ‘F2’ must all be distinct type variables
+
+This requires printing out the arguments to the associated type family. This
+can be dangerous, however. Consider this example, adapted from #18648:
+
+  class C3 a where
+     type F3 a
+     type F3 (F3 a) = a
+
+F3's default is illegal, since its argument is not a bare type variable. But
+note that when we typecheck F3's default, the F3 type constructor is knot-tied.
+Therefore, if we print the type `F3 a` in an error message, GHC will diverge!
+This is the reason why GHC no longer implements option (2) above and instead
+waits until /after/ typechecking has finished, at which point the typechecker
+knot has been worked out.
+
+As one final point, one might worry that the typechecker knot could cause the
+substitution that tcDefaultAssocDecl creates to diverge, but this is not the
+case. Since the LHS of a valid associated type family default is always just
+variables, it won't contain any tycons. Accordingly, the patterns used in the
+substitution won't actually be knot-tied, even though we're in the knot. (This
+is too delicate for my taste, but it works.) If we're dealing with /invalid/
+default, such as F3's above, then we simply create an empty substitution and
+rely on checkValidAssocTyFamDeflt throwing an error message afterwards before
+any damage is done.
 -}
 
 {- *********************************************************************
@@ -4293,10 +4280,14 @@ checkValidClass cls
                         -- since there is no possible ambiguity (#10020)
 
              -- Check that any default declarations for associated types are valid
-           ; whenIsJust m_dflt_rhs $ \ (rhs, loc) ->
-             setSrcSpan loc $
-             tcAddFamInstCtxt (text "default type instance") (getName fam_tc) $
-             checkValidTyFamEqn fam_tc fam_tvs (mkTyVarTys fam_tvs) rhs }
+           ; whenIsJust m_dflt_rhs $ \ (rhs, at_validity_info) ->
+             case at_validity_info of
+               NoATVI -> pure ()
+               ATVI loc pats ->
+                 setSrcSpan loc $
+                 tcAddFamInstCtxt (text "default type instance") (getName fam_tc) $
+                 do { checkValidAssocTyFamDeflt fam_tc pats
+                    ; checkValidTyFamEqn fam_tc fam_tvs (mkTyVarTys fam_tvs) rhs }}
         where
           fam_tvs = tyConTyVars fam_tc
 
