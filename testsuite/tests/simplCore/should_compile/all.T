@@ -333,3 +333,7 @@ test('T18347', normal, compile, ['-dcore-lint -O'])
 test('T18355', [ grep_errmsg(r'OneShot') ], compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('T18399', normal, compile, ['-dcore-lint -O'])
 test('T18589', normal, compile, ['-dcore-lint -O'])
+
+# T18649 should /not/ generate a specialisation rule
+test('T18649', normal, compile, ['-O -ddump-rules -Wno-simplifiable-class-constraints'])
+
