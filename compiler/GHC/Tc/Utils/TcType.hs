@@ -79,7 +79,7 @@ module GHC.Tc.Utils.TcType (
   isFloatingTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isNaturalTy,
   isBoolTy, isUnitTy, isCharTy, isCallStackTy, isCallStackPred,
-  hasIPPred, isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
+  isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
   isPredTy, isTyVarClassPred, isTyVarHead, isInsolubleOccursCheck,
   checkValidClsArgs, hasTyVarHead,
   isRigidTy, isAlmostFunctionFree,
@@ -141,7 +141,7 @@ module GHC.Tc.Utils.TcType (
   mkTyConTy, mkTyVarTy, mkTyVarTys,
   mkTyCoVarTy, mkTyCoVarTys,
 
-  isClassPred, isEqPrimPred, isIPPred, isEqPred, isEqPredClass,
+  isClassPred, isEqPrimPred, isIPLikePred, isEqPred, isEqPredClass,
   mkClassPred,
   tcSplitDFunTy, tcSplitDFunHead, tcSplitMethodTy,
   isRuntimeRepVar, isKindLevPoly,
@@ -1747,7 +1747,7 @@ pickCapturedPreds
 pickCapturedPreds qtvs theta
   = filter captured theta
   where
-    captured pred = isIPPred pred || (tyCoVarsOfType pred `intersectsVarSet` qtvs)
+    captured pred = isIPLikePred pred || (tyCoVarsOfType pred `intersectsVarSet` qtvs)
 
 
 -- Superclasses

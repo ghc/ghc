@@ -388,10 +388,9 @@ makeLitDict clas ty et
     | Just (_, co_dict) <- tcInstNewTyCon_maybe (classTyCon clas) [ty]
           -- co_dict :: KnownNat n ~ SNat n
     , [ meth ]   <- classMethods clas
-    , Just tcRep <- tyConAppTyCon_maybe -- SNat
-                      $ funResultTy         -- SNat n
-                      $ dropForAlls         -- KnownNat n => SNat n
-                      $ idType meth         -- forall n. KnownNat n => SNat n
+    , Just tcRep <- tyConAppTyCon_maybe (classMethodTy meth)
+                    -- If the method type is forall n. KnownNat n => SNat n
+                    -- then tcRep is SNat
     , Just (_, co_rep) <- tcInstNewTyCon_maybe tcRep [ty]
           -- SNat n ~ Integer
     , let ev_tm = mkEvCast et (mkTcSymCo (mkTcTransCo co_dict co_rep))

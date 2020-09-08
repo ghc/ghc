@@ -566,10 +566,10 @@ solveOneFromTheOther ev_i ev_w
      ev_id_w = ctEvEvId ev_w
 
      different_level_strategy  -- Both Given
-       | isIPPred pred = if lvl_w > lvl_i then KeepWork  else KeepInert
-       | otherwise     = if lvl_w > lvl_i then KeepInert else KeepWork
+       | isIPLikePred pred = if lvl_w > lvl_i then KeepWork  else KeepInert
+       | otherwise         = if lvl_w > lvl_i then KeepInert else KeepWork
        -- See Note [Replacement vs keeping] (the different-level bullet)
-       -- For the isIPPred case see Note [Shadowing of Implicit Parameters]
+       -- For the isIPLikePred case see Note [Shadowing of Implicit Parameters]
 
      same_level_strategy binds -- Both Given
        | GivenOrigin (InstSC s_i) <- ctLocOrigin loc_i
@@ -1071,6 +1071,8 @@ shortCutSolver dflags ev_w ev_i
  -- programs should typecheck regardless of whether we take this step or
  -- not. See Note [Shortcut solving]
 
+ && not (isIPLikePred (ctEvPred ev_w))   -- Not for implicit parameters (#18627)
+
  && not (xopt LangExt.IncoherentInstances dflags)
  -- If IncoherentInstances is on then we cannot rely on coherence of proofs
  -- in order to justify this optimization: The proof provided by the
@@ -1079,6 +1081,7 @@ shortCutSolver dflags ev_w ev_i
 
  && gopt Opt_SolveConstantDicts dflags
  -- Enabled by the -fsolve-constant-dicts flag
+
   = do { ev_binds_var <- getTcEvBindsVar
        ; ev_binds <- ASSERT2( not (isCoEvBindsVar ev_binds_var ), ppr ev_w )
                      getTcEvBindsMap ev_binds_var
