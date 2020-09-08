@@ -26,6 +26,8 @@ import GHC.Cmm hiding (topInfoTable)
 
 import GHC.CmmToAsm.Config
 
+import GHC.Utils.Outputable (SDoc)
+
 import GHC.Stack
 
 -- | Holds a list of source and destination registers used by a
@@ -209,3 +211,6 @@ class   Instruction instr where
                 :: Platform
                 -> Int
                 -> [instr]
+
+        -- Create a comment instruction
+        mkComment :: SDoc -> [instr]
