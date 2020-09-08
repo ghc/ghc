@@ -125,6 +125,14 @@ simpleOptExpr :: HasDebugCallStack => SimpleOpts -> CoreExpr -> CoreExpr
 -- The result is NOT guaranteed occurrence-analysed, because
 -- in  (let x = y in ....) we substitute for x; so y's occ-info
 -- may change radically
+--
+-- Note that simpleOptExpr is a pure function that we want to be able to call
+-- from lots of places, including ones that don't have DynFlags (e.g to optimise
+-- unfoldings of statically defined Ids via mkCompulsoryUnfolding). It used to
+-- fetch its options directly from the DynFlags, however, so some callers had to
+-- resort to using unsafeGlobalDynFlags (a global mutable variable containing
+-- the DynFlags). It has been modified to take its own SimpleOpts that may be
+-- created from DynFlags, but not necessarily.
 
 simpleOptExpr opts expr
   = -- pprTrace "simpleOptExpr" (ppr init_subst $$ ppr expr)
