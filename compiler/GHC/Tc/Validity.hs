@@ -14,7 +14,7 @@ module GHC.Tc.Validity (
   checkValidInstance, checkValidInstHead, validDerivPred,
   checkTySynRhs,
   checkValidCoAxiom, checkValidCoAxBranch,
-  checkValidTyFamEqn, checkConsistentFamInst,
+  checkValidTyFamEqn, checkValidAssocTyFamDeflt, checkConsistentFamInst,
   badATErr, arityErr,
   checkTyConTelescope,
   allDistinctTyVars
@@ -72,6 +72,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Data.Foldable
+import Data.Function
 import Data.List        ( (\\), nub )
 import qualified Data.List.NonEmpty as NE
 
@@ -2115,6 +2116,68 @@ checkValidTyFamEqn fam_tc qvs typats rhs
        ; traceTc "checkVTFE" (ppr fam_tc $$ ppr rhs $$ ppr (tcTyFamInsts rhs))
        ; unless undecidable_ok $
          mapM_ addErrTc (checkFamInstRhs fam_tc typats (tcTyFamInsts rhs)) }
+
+-- | Checks that an associated type family default:
+--
+-- 1. Only consists of arguments that are bare type variables, and
+--
+-- 2. Has a distinct type variable in each argument.
+--
+-- See @Note [Type-checking default assoc decls]@ in "GHC.Tc.TyCl".
+checkValidAssocTyFamDeflt :: TyCon  -- ^ of the type family
+                          -> [Type] -- ^ Type patterns
+                          -> TcM ()
+checkValidAssocTyFamDeflt fam_tc pats =
+  do { cpt_tvs <- zipWithM extract_tv pats pats_vis
+     ; check_all_distinct_tvs $ zip cpt_tvs pats_vis }
+  where
+    pats_vis :: [ArgFlag]
+    pats_vis = tyConArgFlags fam_tc pats
+
+    -- Checks that a pattern on the LHS of a default is a type
+    -- variable. If so, return the underlying type variable, and if
+    -- not, throw an error.
+    -- See Note [Type-checking default assoc decls]
+    extract_tv :: Type    -- The particular type pattern from which to extract
+                          -- its underlying type variable
+               -> ArgFlag -- The visibility of the type pattern
+                          -- (only used for error message purposes)
+               -> TcM TyVar
+    extract_tv pat pat_vis =
+      case getTyVar_maybe pat of
+        Just tv -> pure tv
+        Nothing -> failWithTc $
+          pprWithExplicitKindsWhen (isInvisibleArgFlag pat_vis) $
+          hang (text "Illegal argument" <+> quotes (ppr pat) <+> text "in:")
+             2 (vcat [ppr_eqn, suggestion])
+
+    -- Checks that no type variables in an associated default declaration are
+    -- duplicated. If that is the case, throw an error.
+    -- See Note [Type-checking default assoc decls]
+    check_all_distinct_tvs ::
+         [(TyVar, ArgFlag)] -- The type variable arguments in the associated
+                            -- default declaration, along with their respective
+                            -- visibilities (the latter are only used for error
+                            -- message purposes)
+      -> TcM ()
+    check_all_distinct_tvs cpt_tvs_vis =
+      let dups = findDupsEq ((==) `on` fst) cpt_tvs_vis in
+      traverse_
+        (\d -> let (pat_tv, pat_vis) = NE.head d in failWithTc $
+               pprWithExplicitKindsWhen (isInvisibleArgFlag pat_vis) $
+               hang (text "Illegal duplicate variable"
+                       <+> quotes (ppr pat_tv) <+> text "in:")
+                  2 (vcat [ppr_eqn, suggestion]))
+        dups
+
+    ppr_eqn :: SDoc
+    ppr_eqn =
+      quotes (text "type" <+> ppr (mkTyConApp fam_tc pats)
+                <+> equals <+> text "...")
+
+    suggestion :: SDoc
+    suggestion = text "The arguments to" <+> quotes (ppr fam_tc)
+             <+> text "must all be distinct type variables"
 
 -- Make sure that each type family application is
 --   (1) strictly smaller than the lhs,
