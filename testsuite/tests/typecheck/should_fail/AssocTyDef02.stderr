@@ -1,7 +1,7 @@
 
 AssocTyDef02.hs:6:5: error:
     • Illegal argument ‘[b]’ in:
-        ‘type Typ [b] = Int’
+        ‘type Typ [b] = ...’
         The arguments to ‘Typ’ must all be distinct type variables
     • In the default type instance declaration for ‘Typ’
       In the class declaration for ‘Cls’
