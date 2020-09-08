@@ -542,7 +542,7 @@ mk_strict_superclasses rec_clss (CtGiven { ctev_evar = evar, ctev_loc = loc })
                          mk_given_desc sel_id sc_pred
            ; mk_superclasses rec_clss given_ev tvs theta sc_pred }
       where
-        sc_pred  = funResultTy (piResultTys (idType sel_id) tys)
+        sc_pred = classMethodInstTy sel_id tys
 
       -- See Note [Nested quantified constraint superclasses]
     mk_given_desc :: Id -> PredType -> (PredType, EvTerm)

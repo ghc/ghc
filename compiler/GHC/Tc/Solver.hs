@@ -1377,7 +1377,7 @@ growThetaTyVars theta tcvs
   | otherwise  = transCloVarSet mk_next seed_tcvs
   where
     seed_tcvs = tcvs `unionVarSet` tyCoVarsOfTypes ips
-    (ips, non_ips) = partition isIPPred theta
+    (ips, non_ips) = partition isIPLikePred theta
                          -- See Note [Inheriting implicit parameters] in GHC.Tc.Utils.TcType
 
     mk_next :: VarSet -> VarSet -- Maps current set to newly-grown ones
