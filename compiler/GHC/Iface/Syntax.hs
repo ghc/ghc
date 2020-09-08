@@ -215,7 +215,7 @@ data IfaceClassOp
                  -- and the default method, are *not* quantified
                  -- over the class variables
 
-data IfaceAT = IfaceAT  -- See Class.ClassATItem
+data IfaceAT = IfaceAT  -- See GHC.Core.Class.ClassATItem
                   IfaceDecl          -- The associated type declaration
                   (Maybe IfaceType)  -- Default associated type instance, if any
 
