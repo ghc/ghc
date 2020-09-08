@@ -84,8 +84,8 @@ ctzLabel w = "hs_ctz" ++ pprWidth w
     pprWidth W64 = "64"
     pprWidth w   = pprPanic "ctzLabel: Unsupported word width " (ppr w)
 
-word2FloatLabel :: Width -> String
-word2FloatLabel w = "hs_word2float" ++ pprWidth w
+word2FloatLabel :: Width -> Width -> String
+word2FloatLabel wFrom wTo = "hs_word" ++ pprWidth wFrom ++ "_to_float" ++ pprWidth wTo
   where
     pprWidth W32 = "32"
     pprWidth W64 = "64"

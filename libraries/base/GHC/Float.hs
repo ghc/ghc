@@ -1296,8 +1296,11 @@ word2Float (W# w) = F# (word2Float# w)
 "realToFrac/Float->Double"  realToFrac   = float2Double
 "realToFrac/Double->Float"  realToFrac   = double2Float
 "realToFrac/Double->Double" realToFrac   = id :: Double -> Double
-"realToFrac/Int->Double"    realToFrac   = int2Double   -- See Note [realToFrac int-to-float]
-"realToFrac/Int->Float"     realToFrac   = int2Float    --      ..ditto
+-- See Note [realToFrac int-to-float] on the below
+"realToFrac/Int->Double"    realToFrac   = int2Double
+"realToFrac/Int->Float"     realToFrac   = int2Float
+"realToFrac/Word->Double"   realToFrac   = word2Double
+"realToFrac/Word->Float"    realToFrac   = word2Float
     #-}
 
 {-

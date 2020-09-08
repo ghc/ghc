@@ -43,7 +43,11 @@ module GHC.Word (
     eqWord8, neWord8, gtWord8, geWord8, ltWord8, leWord8,
     eqWord16, neWord16, gtWord16, geWord16, ltWord16, leWord16,
     eqWord32, neWord32, gtWord32, geWord32, ltWord32, leWord32,
-    eqWord64, neWord64, gtWord64, geWord64, ltWord64, leWord64
+    eqWord64, neWord64, gtWord64, geWord64, ltWord64, leWord64,
+
+    -- * Floating point converions
+    word64ToDouble,
+    word64ToFloat
     ) where
 
 import Data.Bits
@@ -940,12 +944,23 @@ a `shiftL64#` b  | isTrue# (b >=# 64#) = wordToWord64# 0##
 a `shiftRL64#` b | isTrue# (b >=# 64#) = wordToWord64# 0##
                  | otherwise           = a `uncheckedShiftRL64#` b
 
+word64ToDouble :: Word64 -> Double
+word64ToDouble (W64# w) = D# (word64ToDouble# w)
+
+word64ToFloat :: Word64 -> Float
+word64ToFloat (W64# w) = F# (word64ToFloat# w)
+
 {-# RULES
 "fromIntegral/Int->Word64"    fromIntegral = \(I#   x#) -> W64# (int64ToWord64# (intToInt64# x#))
 "fromIntegral/Word->Word64"   fromIntegral = \(W#   x#) -> W64# (wordToWord64# x#)
 "fromIntegral/Word64->Int"    fromIntegral = \(W64# x#) -> I#   (word2Int# (word64ToWord# x#))
 "fromIntegral/Word64->Word"   fromIntegral = \(W64# x#) -> W#   (word64ToWord# x#)
 "fromIntegral/Word64->Word64" fromIntegral = id :: Word64 -> Word64
+-- See Note [realToFrac int-to-float] about below
+"fromIntegral/Word64->Float"  fromIntegral = word64ToFloat
+"fromIntegral/Word64->Double" fromIntegral = word64ToDouble
+"realToFrac/Word64->Double"   realToFrac   = word64ToDouble
+"realToFrac/Word64->Float"    realToFrac   = word64ToFloat
   #-}
 
 #if WORD_SIZE_IN_BITS == 64
