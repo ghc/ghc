@@ -477,38 +477,38 @@ pprInstr platform instr = case instr of
   -- NOTE: GHC may do whacky things where it only load the lower part of an
   --       address. Not observing the correct size when loading will lead
   --       inevitably to crashes.
-  STR f o1@(OpReg W8 (RegReal (RealRegSingle i))) o2 | i < 32 ->
+  STR _f o1@(OpReg W8 (RegReal (RealRegSingle i))) o2 | i < 32 ->
     text "\tstrb" <+> pprOp o1 <> comma <+> pprOp o2
-  STR f o1@(OpReg W16 (RegReal (RealRegSingle i))) o2 | i < 32 ->
+  STR _f o1@(OpReg W16 (RegReal (RealRegSingle i))) o2 | i < 32 ->
     text "\tstrh" <+> pprOp o1 <> comma <+> pprOp o2
-  STR f o1 o2 -> text "\tstr" <+> pprOp o1 <> comma <+> pprOp o2
+  STR _f o1 o2 -> text "\tstr" <+> pprOp o1 <> comma <+> pprOp o2
 
-  LDR f o1 (OpImm (ImmIndex lbl' off)) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
+  LDR _f o1 (OpImm (ImmIndex lbl' off)) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
     text "\tadrp" <+> pprOp o1 <> comma <+> text ":got:" <> ppr lbl $$
     text "\tldr" <+> pprOp o1 <> comma <+> text "[" <> pprOp o1 <> comma <+> text ":got_lo12:" <> ppr lbl <> text "]" $$
     text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
 
-  LDR f o1 (OpImm (ImmIndex lbl off)) ->
+  LDR _f o1 (OpImm (ImmIndex lbl off)) ->
     text "\tadrp" <+> pprOp o1 <> comma <+> ppr lbl $$
     text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> text ":lo12:" <> ppr lbl $$
     text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> char '#' <> int off -- XXX: check that off is in 12bits.
 
-  LDR f o1 (OpImm (ImmCLbl lbl')) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
+  LDR _f o1 (OpImm (ImmCLbl lbl')) | Just (_info, lbl) <- dynamicLinkerLabelInfo lbl' ->
     text "\tadrp" <+> pprOp o1 <> comma <+> text ":got:" <> ppr lbl $$
     text "\tldr" <+> pprOp o1 <> comma <+> text "[" <> pprOp o1 <> comma <+> text ":got_lo12:" <> ppr lbl <> text "]"
 
-  LDR f o1 (OpImm (ImmCLbl lbl)) ->
+  LDR _f o1 (OpImm (ImmCLbl lbl)) ->
     text "\tadrp" <+> pprOp o1 <> comma <+> ppr lbl $$
     text "\tadd" <+> pprOp o1 <> comma <+> pprOp o1 <> comma <+> text ":lo12:" <> ppr lbl
 
-  LDR f o1@(OpReg W8 (RegReal (RealRegSingle i))) o2 | i < 32 ->
+  LDR _f o1@(OpReg W8 (RegReal (RealRegSingle i))) o2 | i < 32 ->
     text "\tldrsb" <+> pprOp o1 <> comma <+> pprOp o2
-  LDR f o1@(OpReg W16 (RegReal (RealRegSingle i))) o2 | i < 32 ->
+  LDR _f o1@(OpReg W16 (RegReal (RealRegSingle i))) o2 | i < 32 ->
     text "\tldrsh" <+> pprOp o1 <> comma <+> pprOp o2
-  LDR f o1 o2 -> text "\tldr" <+> pprOp o1 <> comma <+> pprOp o2
+  LDR _f o1 o2 -> text "\tldr" <+> pprOp o1 <> comma <+> pprOp o2
 
-  STP f o1 o2 o3 -> text "\tstp" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
-  LDP f o1 o2 o3 -> text "\tldp" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
+  STP _f o1 o2 o3 -> text "\tstp" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
+  LDP _f o1 o2 o3 -> text "\tldp" <+> pprOp o1 <> comma <+> pprOp o2 <> comma <+> pprOp o3
 
   -- 8. Synchronization Instructions -------------------------------------------
   DMBSY -> text "\tdmb sy"
