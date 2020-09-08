@@ -2009,7 +2009,7 @@ genCCall' config gcp target dest_regs args
                     MO_F64_Acosh -> (fsLit "acosh", False)
                     MO_F64_Atanh -> (fsLit "atanh", False)
 
-                    MO_UF_Conv w -> (fsLit $ word2FloatLabel w, False)
+                    MO_UF_Conv wFrom wTo -> (fsLit $ word2FloatLabel wFrom wTo, False)
 
                     MO_Memcpy _  -> (fsLit "memcpy", False)
                     MO_Memset _  -> (fsLit "memset", False)
