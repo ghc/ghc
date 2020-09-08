@@ -518,10 +518,10 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
     -- we don't need to do anything with real registers that are
     -- only read by this instr.  (the list is typically ~2 elements,
     -- so using nub isn't a problem).
-    let real_read       = nub [ rr      | (RegReal rr) <- read]
     let virt_read       = nub [ vr      | (RegVirtual vr) <- read ] :: [VirtualReg]
 
 --     do
+--         let real_read       = nub [ rr      | (RegReal rr) <- read]
 --         freeregs <- getFreeRegsR
 --         assig    <- getAssigR
 
@@ -754,8 +754,6 @@ clobberRegs []
 clobberRegs clobbered
  = do   platform <- getPlatform
         freeregs <- getFreeRegsR
-
-        config <- getConfig
 
         let gpRegs  = frGetFreeRegs platform RcInteger freeregs :: [RealReg]
             fltRegs = frGetFreeRegs platform RcFloat   freeregs :: [RealReg]
