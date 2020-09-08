@@ -144,3 +144,29 @@ def memoize(f):
 
     cached._cache = None
     return cached
+
+# Print the matrix data in a tabular format.
+def print_table(header_rows: List[List[str]], data_rows: List[List[str]], padding=2) -> None:
+    # Calculate column widths then print each row.
+    colWidths = [(0 if idx == 0 else padding) + max([len(cell) for cell in col])
+                 for (idx, col) in enumerate(zip(*(header_rows + data_rows)))]
+    col_fmts = ['{:>' + str(w) + '}' for w in colWidths]
+
+    def printCols(cols):
+        for row in cols:
+            print(''.join([f.format(cell) for (f,cell) in zip(col_fmts, row)]))
+
+    printCols(header_rows)
+    print('-' * sum(colWidths))
+    printCols(data_rows)
+
+def shorten_metric_name(name: str) -> str:
+    dic = {
+        "runtime/bytes allocated": "run/alloc",
+        "runtime/peak_megabytes_allocated": "run/peak",
+        "runtime/max_bytes_used": "run/max",
+        "compile_time/bytes allocated": "ghc/alloc",
+        "compile_time/peak_megabytes_allocated": "ghc/peak",
+        "compile_time/max_bytes_used": "ghc/max",
+    }
+    return dic.get(name, name)

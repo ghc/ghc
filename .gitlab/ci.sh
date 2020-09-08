@@ -58,6 +58,12 @@ function run() {
 TOP="$(pwd)"
 
 function setup_locale() {
+  # Musl doesn't provide locale support at all...
+  if ! which locale > /dev/null; then
+    info "No locale executable. Skipping locale setup..."
+    return
+  fi
+
   # BSD grep terminates early with -q, consequently locale -a will get a
   # SIGPIPE and the pipeline will fail with pipefail.
   shopt -o -u pipefail
@@ -70,6 +76,9 @@ function setup_locale() {
   elif locale -a | grep -q en_US.UTF-8; then
     # Centos doesn't have C.UTF-8
     export LANG=en_US.UTF-8
+  elif locale -a | grep -q en_US.utf8; then
+    # Centos doesn't have C.UTF-8
+    export LANG=en_US.utf8
   else
     error "Failed to find usable locale"
     info "Available locales:"
