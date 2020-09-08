@@ -821,7 +821,7 @@ pprCallishMachOp_for_C mop
         (MO_Xchg w)     -> ptext (sLit $ xchgLabel w)
         (MO_AtomicRead w)  -> ptext (sLit $ atomicReadLabel w)
         (MO_AtomicWrite w) -> ptext (sLit $ atomicWriteLabel w)
-        (MO_UF_Conv w)  -> ptext (sLit $ word2FloatLabel w)
+        (MO_UF_Conv wFrom wTo)  -> ptext (sLit $ word2FloatLabel wFrom wTo)
 
         MO_S_Mul2     {} -> unsupported
         MO_S_QuotRem  {} -> unsupported

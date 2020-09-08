@@ -33,7 +33,10 @@ module GHC.Int (
         eqInt8, neInt8, gtInt8, geInt8, ltInt8, leInt8,
         eqInt16, neInt16, gtInt16, geInt16, ltInt16, leInt16,
         eqInt32, neInt32, gtInt32, geInt32, ltInt32, leInt32,
-        eqInt64, neInt64, gtInt64, geInt64, ltInt64, leInt64
+        eqInt64, neInt64, gtInt64, geInt64, ltInt64, leInt64,
+        -- * Floating point converions
+        doubleToInt64, int64ToDouble,
+        floatToInt6m, int64ToFloat
     ) where
 
 import Data.Bits
@@ -223,6 +226,15 @@ instance FiniteBits Int8 where
 "fromIntegral/Int8->Int8" fromIntegral = id :: Int8 -> Int8
 "fromIntegral/a->Int8"    fromIntegral = \x -> case fromIntegral x of I# x# -> I8# (narrow8Int# x#)
 "fromIntegral/Int8->a"    fromIntegral = \(I8# x#) -> fromIntegral (I# x#)
+-- See Note [realToFrac int-to-float] about below
+"fromIntegral/Int64->Float"   fromIntegral = int64ToFloat
+"fromIntegral/Int64->Double"  fromIntegral = int64ToDouble
+"fromIntegral/Word64->Float"  fromIntegral = word64ToFloat
+"fromIntegral/Word64->Double" fromIntegral = word64ToDouble
+"realToFrac/Int64->Double"    realToFrac   = int64ToDouble
+"realToFrac/Int64->Float"     realToFrac   = int64ToFloat
+"realToFrac/Word64->Double"    realToFrac   = int64ToDouble
+"realToFrac/Word64->Float"     realToFrac   = int64ToFloat
   #-}
 
 {-# RULES
@@ -991,6 +1003,18 @@ a `iShiftRA64#` b | isTrue# (b >=# 64#) = if isTrue# (a `ltInt64#` (intToInt64# 
                                           then intToInt64# (-1#)
                                           else intToInt64# 0#
                   | otherwise = a `uncheckedIShiftRA64#` b
+
+doubleToInt64 :: Double -> Int64
+doubleToInt64 (D# x) = I64# (doubleToInt64# x)
+
+int64ToDouble :: Int64 -> Double
+int64ToDouble (I64# i) = D# (int64ToDouble# i)
+
+floatToInt64 :: Float -> Int64
+floatToInt64 (F# x) = I64# (floatToInt64# x)
+
+int64ToFloat :: Int64 -> Float
+int64ToFloat (I64# i) = F# (int64ToFloat# i)
 
 {-# RULES
 "fromIntegral/Int->Int64"    fromIntegral = \(I#   x#) -> I64# (intToInt64# x#)
