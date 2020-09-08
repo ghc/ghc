@@ -2526,8 +2526,7 @@ emptyDictMap = emptyTcAppMap
 
 findDict :: DictMap a -> CtLoc -> Class -> [Type] -> Maybe a
 findDict m loc cls tys
-  | isCTupleClass cls
-  , any hasIPPred tys   -- See Note [Tuples hiding implicit parameters]
+  | hasIPSuperClasses cls tys -- See Note [Tuples hiding implicit parameters]
   = Nothing
 
   | Just {} <- isCallStackPred cls tys

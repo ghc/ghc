@@ -2508,9 +2508,12 @@ mkCallUDs' env f args
     -- we decide on a case by case basis if we want to specialise
     -- on this argument; if so, SpecDict, if not UnspecArg
     mk_spec_arg arg (Anon InvisArg pred)
-      | type_determines_value (scaledThing pred)
-      , interestingDict env arg -- Note [Interesting dictionary arguments]
+      | not (isIPLikePred (scaledThing pred))
+              -- See Note [Type determines value]
+      , interestingDict env arg
+              -- See Note [Interesting dictionary arguments]
       = SpecDict arg
+
       | otherwise = UnspecArg
 
     mk_spec_arg _ (Anon VisArg _)
@@ -2523,40 +2526,17 @@ mkCallUDs' env f args
          -- in specImports
          -- Use 'realIdUnfolding' to ignore the loop-breaker flag!
 
-    type_determines_value pred    -- See Note [Type determines value]
-        = case classifyPredType pred of
-            ClassPred cls _ -> not (isIPClass cls)  -- Superclasses can't be IPs
-            EqPred {}       -> True
-            IrredPred {}    -> True   -- Things like (D []) where D is a
-                                      -- Constraint-ranged family; #7785
-            ForAllPred {}   -> True
-
-{-
-Note [Type determines value]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Only specialise on non-IP *class* params, because these are the ones
-whose *type* determines their *value*.  In particular, with implicit
-params, the type args *don't* say what the value of the implicit param
-is!  See #7101.
+{- Note [Type determines value]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Only specialise on non-impicit-parameter predicates, because these
+are the ones whose *type* determines their *value*.  In particular,
+with implicit params, the type args *don't* say what the value of the
+implicit param is!  See #7101.
 
 So we treat implicit params just like ordinary arguments for the
 purposes of specialisation.  Note that we still want to specialise
 functions with implicit params if they have *other* dicts which are
 class params; see #17930.
-
-One apparent additional complexity involves type families. For
-example, consider
-         type family D (v::*->*) :: Constraint
-         type instance D [] = ()
-         f :: D v => v Char -> Int
-If we see a call (f "foo"), we'll pass a "dictionary"
-  () |> (g :: () ~ D [])
-and it's good to specialise f at this dictionary.
-
-So the question is: can an implicit parameter "hide inside" a
-type-family constraint like (D a).  Well, no.  We don't allow
-        type instance D Maybe = ?x:Int
-Hence the IrredPred case in type_determines_value.  See #7785.
 
 Note [Interesting dictionary arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
