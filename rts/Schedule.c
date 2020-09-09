@@ -424,7 +424,7 @@ run_thread:
     RELAXED_STORE(&cap->interrupt, false);
 
     cap->in_haskell = true;
-    cap->idle = 0;
+    RELAXED_STORE(&cap->idle, false);
 
     dirty_TSO(cap,t);
     dirty_STACK(cap,t->stackobj);
@@ -1788,7 +1788,7 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
         debugTrace(DEBUG_sched, "%d idle caps", n_idle_caps);
 
         for (i=0; i < n_capabilities; i++) {
-            capabilities[i]->idle++;
+            NONATOMIC_ADD(&capabilities[i]->idle, 1);
         }
 
         // For all capabilities participating in this GC, wait until
