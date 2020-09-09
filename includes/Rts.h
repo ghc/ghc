@@ -212,6 +212,9 @@ void _assertFail(const char *filename, unsigned int linenum)
 #include "rts/storage/GC.h"
 #include "rts/NonMoving.h"
 
+/* Foreign exports */
+#include "rts/ForeignExports.h"
+
 /* Other RTS external APIs */
 #include "rts/Parallel.h"
 #include "rts/Signals.h"
