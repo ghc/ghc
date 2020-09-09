@@ -52,6 +52,11 @@ test('divbyzero',
       # behavior on division-by-zero (#10332).
       omit_ways(llvm_ways),
       when(not(have_ncg()), skip),
+      # Aarch64 does not have div-by-zero exceptions for sdiv/udiv.
+      # The only option would be to implement this in assembly with checks for
+      # each devision. Neither gcc, nor llvm do this as of right now.  Microsoft
+      # apparently does so though?
+      when(arch('aarch64'), skip),
       # Apparently the output can be different on different
       # Linux setups, so just ignore it. As long as we get
       # the right exit code we're OK.
