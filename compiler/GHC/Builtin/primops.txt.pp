@@ -2983,6 +2983,20 @@ primop NumSparks "numSparks#" GenPrimOp
    has_side_effects = True
    out_of_line = True
 
+
+------------------------------------------------------------------------
+section "Controlling object lifetime"
+        {Ensuring that objects don't die a premature death.}
+------------------------------------------------------------------------
+
+-- See Note [keepAlive# magic] in GHC.CoreToStg.Prep.
+primop KeepAliveOp "keepAlive#" GenPrimOp
+   o -> State# RealWorld -> (State# RealWorld -> p) -> p
+   { TODO. }
+   with
+   strictness = { \ _arity -> mkClosedStrictSig [topDmd, topDmd, strictOnceApply1Dmd] topDiv }
+
+
 ------------------------------------------------------------------------
 section "Tag to enum stuff"
         {Convert back and forth between values of enumerated types
