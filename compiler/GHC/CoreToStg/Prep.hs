@@ -1098,10 +1098,26 @@ Breaking our desired invariant. Ultimately we decided to simply accept that
 the continuation may not be a manifest lambda.
 
 
+Note [Simplification of keepAlive#]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The keepAlive# primop benefits from a similar optimisation to that described in
+Note [Simplification of runRW#] above. Specifically, we transform:
+
+    K[keepAlive# @a_rep @a @r_rep @r x s k]
+            ~>
+    keepAlive# @a_rep @a @r_rep @r x s K[k]
+
+The reasons are similar to those described in Note [Simplification of runRW#].
+
+-}
+
+
 -- ---------------------------------------------------------------------------
 --      CpeArg: produces a result satisfying CpeArg
 -- ---------------------------------------------------------------------------
 
+{-
 Note [ANF-ising literal string arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
