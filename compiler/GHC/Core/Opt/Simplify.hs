@@ -65,7 +65,7 @@ import GHC.Utils.Misc
 import GHC.Utils.Error
 import GHC.Unit.Module ( moduleName, pprModuleName )
 import GHC.Core.Multiplicity
-import GHC.Builtin.PrimOps ( PrimOp (SeqOp) )
+import GHC.Builtin.PrimOps ( PrimOp (SeqOp, KeepAliveOp) )
 
 
 {-
@@ -2017,13 +2017,16 @@ rebuildContOpCall :: SimplEnv -> ArgInfo -> SimplCont -> Maybe (SimplM (SimplFlo
 --
 -- runRW# :: forall (r :: RuntimeRep) (o :: TYPE r). (State# RealWorld -> o) -> o
 -- K[ runRW# rr ty body ]   -->   runRW rr' ty' (\s. K[ body s ])
+rebuildContOpCall _env _arg_info cont
+  | not (contIsStop cont)  -- Don't fiddle around if the continuation is boring
+  = Nothing
+
 rebuildContOpCall
     env
     (ArgInfo { ai_fun = fun_id, ai_args = rev_args })
     (ApplyToVal { sc_arg = arg, sc_env = arg_se
                 , sc_cont = cont, sc_hole_ty = fun_ty })
   | fun_id `hasKey` runRWKey
-  , not (contIsStop cont)  -- Don't fiddle around if the continuation is boring
   , [ TyArg {}, TyArg {} ] <- rev_args
   = Just $
     do { s <- newId (fsLit "s") Many realWorldStatePrimTy
@@ -2038,6 +2041,40 @@ rebuildContOpCall
        ; let arg'  = Lam s body'
              rr'   = getRuntimeRep ty'
              call' = mkApps (Var fun_id) [mkTyArg rr', mkTyArg ty', arg']
+       ; return (emptyFloats env, call') }
+
+rebuildContOpCall
+    env
+    (ArgInfo { ai_fun = fun_id, ai_args = rev_args })
+    (ApplyToVal { sc_arg = k, sc_env = k_se
+                , sc_cont = cont, sc_hole_ty = fun_ty })
+  | Just KeepAliveOp <- isPrimOpId_maybe fun_id
+  , [ ValArg {as_arg=s0}
+    , ValArg {as_arg=x}
+    , TyArg {} -- res_ty
+    , TyArg {} -- res_rep
+    , TyArg {as_arg_ty=arg_ty}
+    , TyArg {as_arg_ty=arg_rep}
+    ] <- rev_args
+  = Just $
+    do { s <- newId (fsLit "s") One realWorldStatePrimTy
+       ; let k_env = (k_se `setInScopeFromE` env) `addNewInScopeIds` [s]
+             k_cont = ApplyToVal { sc_dup = Simplified, sc_arg = Var s
+                                 , sc_env = k_env, sc_cont = cont, sc_hole_ty = undefined }
+       ; k' <- simplExprC k_env k k_cont
+       ; let env' = zapSubstEnv env
+       ; s0' <- simplExpr env' s0
+       ; x' <- simplExpr env' x
+       ; arg_rep' <- simplType env' arg_rep
+       ; arg_ty' <- simplType env' arg_ty
+       ; let ty' = contResultType cont
+             call' = mkApps (Var fun_id)
+               [ mkTyArg arg_rep', mkTyArg arg_ty'
+               , mkTyArg (getRuntimeRep ty'), mkTyArg ty'
+               , x'
+               , s0'
+               , Lam s k'
+               ]
        ; return (emptyFloats env, call') }
 
 rebuildContOpCall _ _ _ = Nothing
