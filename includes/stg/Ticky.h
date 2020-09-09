@@ -19,7 +19,7 @@
 
 /* Here are all the counter declarations: */
 /* If you change this list, make the corresponding change
-   in RTS_TICKY_SYMBOLS in rts/Linker.c  */
+   in RTS_TICKY_SYMBOLS in rts/RtsSymbols.c  */
 
 /* These two are explicitly declared in rts/Ticky.c, and
    hence should not be extern'd except when using this header
