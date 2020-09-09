@@ -852,17 +852,6 @@ extern void DEBUG_LoadSymbols( const char *name STG_UNUSED )
 
 #endif /* USING_LIBBFD */
 
-// findPtrCb takes a callback of type FindPtrCb, so external tools (such as
-// ghc-debug) can invoke it and intercept the intermediate results.
-// When findPtrCb successfully finds a closure containing an address then the
-// callback is called on the address of that closure.
-// The `StgClosure` argument is an untagged closure pointer.
-// `user` points to any data provided by the caller. It's not used internally.
-typedef void (*FindPtrCb)(void *user, StgClosure *);
-
-void findPtr(P_ p, int);                /* keep gcc -Wall happy */
-void findPtrCb(FindPtrCb cb, void *, P_ p);  /* keep gcc -Wall happy */
-
 static void
 findPtr_default_callback(void *user STG_UNUSED, StgClosure * closure){
   debugBelch("%p = ", closure);
