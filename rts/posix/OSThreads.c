@@ -240,8 +240,6 @@ forkOS_createThread ( HsStablePtr entry )
 
 void freeThreadingResources (void) { /* nothing */ }
 
-// Get the number of logical CPU cores available to us. Note that this is
-// different from the number of physical cores (see #14781).
 static uint32_t nproc_cache = 0;
 
 uint32_t

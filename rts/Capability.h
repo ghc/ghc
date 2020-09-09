@@ -182,10 +182,10 @@ struct Capability_ {
 #endif
 
 // These properties should be true when a Task is holding a Capability
-#define ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task)                     \
-  ASSERT(cap->running_task != NULL && cap->running_task == task);       \
-  ASSERT(task->cap == cap);                                             \
-  ASSERT_PARTIAL_CAPABILITY_INVARIANTS(cap,task)
+#define ASSERT_FULL_CAPABILITY_INVARIANTS(_cap,_task)                   \
+  ASSERT(_cap->running_task != NULL && _cap->running_task == _task);    \
+  ASSERT(_task->cap == _cap);                                           \
+  ASSERT_PARTIAL_CAPABILITY_INVARIANTS(_cap,_task)
 
 // This assert requires cap->lock to be held, so it can't be part of
 // ASSERT_PARTIAL_CAPABILITY_INVARIANTS()
@@ -460,29 +460,34 @@ stopCapability (Capability *cap)
     // It may not work - the thread might be updating HpLim itself
     // at the same time - so we also have the context_switch/interrupted
     // flags as a sticky way to tell the thread to stop.
-    cap->r.rHpLim = NULL;
+    TSAN_ANNOTATE_BENIGN_RACE(&cap->r.rHpLim, "stopCapability");
+    SEQ_CST_STORE(&cap->r.rHpLim, NULL);
 }
 
 INLINE_HEADER void
 interruptCapability (Capability *cap)
 {
     stopCapability(cap);
-    cap->interrupt = 1;
+    SEQ_CST_STORE(&cap->interrupt, true);
 }
 
 INLINE_HEADER void
 contextSwitchCapability (Capability *cap)
 {
     stopCapability(cap);
-    cap->context_switch = 1;
+    SEQ_CST_STORE(&cap->context_switch, true);
 }
 
 #if defined(THREADED_RTS)
 
 INLINE_HEADER bool emptyInbox(Capability *cap)
 {
-    return (cap->inbox == (Message*)END_TSO_QUEUE &&
-            cap->putMVars == NULL);
+    // This may race with writes to putMVars and inbox but this harmless for the
+    // intended uses of this function.
+    TSAN_ANNOTATE_BENIGN_RACE(&cap->putMVars, "emptyInbox(cap->putMVars)");
+    TSAN_ANNOTATE_BENIGN_RACE(&cap->inbox, "emptyInbox(cap->inbox)");
+    return (RELAXED_LOAD(&cap->inbox) == (Message*)END_TSO_QUEUE &&
+            RELAXED_LOAD(&cap->putMVars) == NULL);
 }
 
 #endif

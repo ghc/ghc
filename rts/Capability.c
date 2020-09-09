@@ -84,8 +84,8 @@ Capability * rts_unsafeGetMyCapability (void)
 STATIC_INLINE bool
 globalWorkToDo (void)
 {
-    return sched_state >= SCHED_INTERRUPTING
-        || recent_activity == ACTIVITY_INACTIVE; // need to check for deadlock
+    return RELAXED_LOAD(&sched_state) >= SCHED_INTERRUPTING
+      || RELAXED_LOAD(&recent_activity) == ACTIVITY_INACTIVE; // need to check for deadlock
 }
 #endif
 
@@ -505,6 +505,9 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
  * The current Task (cap->task) releases the Capability.  The Capability is
  * marked free, and if there is any work to do, an appropriate Task is woken up.
  *
+ * The caller must hold cap->lock and will still hold it after
+ * releaseCapability returns.
+ *
  * N.B. May need to take all_tasks_mutex.
  *
  * ------------------------------------------------------------------------- */
@@ -520,8 +523,9 @@ releaseCapability_ (Capability* cap,
 
     ASSERT_PARTIAL_CAPABILITY_INVARIANTS(cap,task);
     ASSERT_RETURNING_TASKS(cap,task);
+    ASSERT_LOCK_HELD(&cap->lock);
 
-    cap->running_task = NULL;
+    RELAXED_STORE(&cap->running_task, NULL);
 
     // Check to see whether a worker thread can be given
     // the go-ahead to return the result of an external call..
@@ -540,7 +544,7 @@ releaseCapability_ (Capability* cap,
     // be currently in waitForCapability() waiting for this
     // capability, in which case simply setting it as free would not
     // wake up the waiting task.
-    PendingSync *sync = pending_sync;
+    PendingSync *sync = SEQ_CST_LOAD(&pending_sync);
     if (sync && (sync->type != SYNC_GC_PAR || sync->idle[cap->no])) {
         debugTrace(DEBUG_sched, "sync pending, freeing capability %d", cap->no);
         return;
@@ -564,7 +568,7 @@ releaseCapability_ (Capability* cap,
         // is interrupted, we only create a worker task if there
         // are threads that need to be completed.  If the system is
         // shutting down, we never create a new worker.
-        if (sched_state < SCHED_SHUTTING_DOWN || !emptyRunQueue(cap)) {
+        if (RELAXED_LOAD(&sched_state) < SCHED_SHUTTING_DOWN || !emptyRunQueue(cap)) {
             debugTrace(DEBUG_sched,
                        "starting new worker on capability %d", cap->no);
             startWorkerTask(cap);
@@ -587,7 +591,7 @@ releaseCapability_ (Capability* cap,
 #if defined(PROFILING)
     cap->r.rCCCS = CCS_IDLE;
 #endif
-    last_free_capability[cap->node] = cap;
+    RELAXED_STORE(&last_free_capability[cap->node], cap);
     debugTrace(DEBUG_sched, "freeing capability %d", cap->no);
 }
 
@@ -656,6 +660,9 @@ static Capability * waitForWorkerCapability (Task *task)
         ACQUIRE_LOCK(&task->lock);
         // task->lock held, cap->lock not held
         if (!task->wakeup) waitCondition(&task->cond, &task->lock);
+        // The happens-after matches the happens-before in
+        // schedulePushWork, which does owns 'task' when it sets 'task->cap'.
+        TSAN_ANNOTATE_HAPPENS_AFTER(&task->cap);
         cap = task->cap;
         task->wakeup = false;
         RELEASE_LOCK(&task->lock);
@@ -692,7 +699,7 @@ static Capability * waitForWorkerCapability (Task *task)
             cap->n_spare_workers--;
         }
 
-        cap->running_task = task;
+        RELAXED_STORE(&cap->running_task, task);
         RELEASE_LOCK(&cap->lock);
         break;
     }
@@ -733,7 +740,7 @@ static Capability * waitForReturnCapability (Task *task)
                 RELEASE_LOCK(&cap->lock);
                 continue;
             }
-            cap->running_task = task;
+            RELAXED_STORE(&cap->running_task, task);
             popReturningTask(cap);
             RELEASE_LOCK(&cap->lock);
             break;
@@ -744,6 +751,65 @@ static Capability * waitForReturnCapability (Task *task)
     return cap;
 }
 
+#endif /* THREADED_RTS */
+
+#if defined(THREADED_RTS)
+
+/* ----------------------------------------------------------------------------
+ * capability_is_busy (Capability *cap)
+ *
+ * A predicate for determining whether the given Capability is currently running
+ * a Task. This can be safely called without holding the Capability's lock
+ * although the result may be inaccurate if it races with the scheduler.
+ * Consequently there is a TSAN suppression for it.
+ *
+ * ------------------------------------------------------------------------- */
+static bool capability_is_busy(const Capability * cap)
+{
+    return RELAXED_LOAD(&cap->running_task) != NULL;
+}
+
+
+/* ----------------------------------------------------------------------------
+ * find_capability_for_task
+ *
+ * Given a Task, identify a reasonable Capability to run it on. We try to
+ * find an idle capability if possible.
+ *
+ * ------------------------------------------------------------------------- */
+
+static Capability * find_capability_for_task(const Task * task)
+{
+    if (task->preferred_capability != -1) {
+        // Does the task have a preferred capability? If so, use it
+        return capabilities[task->preferred_capability %
+                            enabled_capabilities];
+    } else {
+        // Try last_free_capability first
+        Capability *cap = RELAXED_LOAD(&last_free_capability[task->node]);
+
+        // N.B. There is a data race here since we are loking at
+        // cap->running_task without taking cap->lock. However, this is
+        // benign since the result is merely guiding our search heuristic.
+        if (!capability_is_busy(cap)) {
+            return cap;
+        } else {
+            // The last_free_capability is already busy, search for a free
+            // capability on this node.
+            for (uint32_t i = task->node; i < enabled_capabilities;
+                  i += n_numa_nodes) {
+                // visits all the capabilities on this node, because
+                // cap[i]->node == i % n_numa_nodes
+                if (!RELAXED_LOAD(&capabilities[i]->running_task)) {
+                    return capabilities[i];
+                }
+            }
+
+            // Can't find a free one, use last_free_capability.
+            return RELAXED_LOAD(&last_free_capability[task->node]);
+        }
+    }
+}
 #endif /* THREADED_RTS */
 
 /* ----------------------------------------------------------------------------
@@ -768,38 +834,13 @@ void waitForCapability (Capability **pCap, Task *task)
     *pCap = &MainCapability;
 
 #else
-    uint32_t i;
     Capability *cap = *pCap;
 
     if (cap == NULL) {
-        if (task->preferred_capability != -1) {
-            cap = capabilities[task->preferred_capability %
-                               enabled_capabilities];
-        } else {
-            // Try last_free_capability first
-            cap = last_free_capability[task->node];
-            if (cap->running_task) {
-                // Otherwise, search for a free capability on this node.
-                cap = NULL;
-                for (i = task->node; i < enabled_capabilities;
-                     i += n_numa_nodes) {
-                    // visits all the capabilities on this node, because
-                    // cap[i]->node == i % n_numa_nodes
-                    if (!capabilities[i]->running_task) {
-                        cap = capabilities[i];
-                        break;
-                    }
-                }
-                if (cap == NULL) {
-                    // Can't find a free one, use last_free_capability.
-                    cap = last_free_capability[task->node];
-                }
-            }
-        }
+        cap = find_capability_for_task(task);
 
         // record the Capability as the one this Task is now associated with.
         task->cap = cap;
-
     } else {
         ASSERT(task->cap == cap);
     }
@@ -809,7 +850,7 @@ void waitForCapability (Capability **pCap, Task *task)
     ACQUIRE_LOCK(&cap->lock);
     if (!cap->running_task) {
         // It's free; just grab it
-        cap->running_task = task;
+        RELAXED_STORE(&cap->running_task, task);
         RELEASE_LOCK(&cap->lock);
     } else {
         newReturningTask(cap,task);
@@ -865,7 +906,7 @@ yieldCapability (Capability** pCap, Task *task, bool gcAllowed)
 
     if (gcAllowed)
     {
-        PendingSync *sync = pending_sync;
+        PendingSync *sync = SEQ_CST_LOAD(&pending_sync);
 
         if (sync) {
             switch (sync->type) {
@@ -999,7 +1040,10 @@ bool
 tryGrabCapability (Capability *cap, Task *task)
 {
     int r;
-    if (cap->running_task != NULL) return false;
+    // N.B. This is benign as we will check again after taking the lock.
+    TSAN_ANNOTATE_BENIGN_RACE(&cap->running_task, "tryGrabCapability (cap->running_task)");
+    if (RELAXED_LOAD(&cap->running_task) != NULL) return false;
+
     r = TRY_ACQUIRE_LOCK(&cap->lock);
     if (r != 0) return false;
     if (cap->running_task != NULL) {
@@ -1007,7 +1051,7 @@ tryGrabCapability (Capability *cap, Task *task)
         return false;
     }
     task->cap = cap;
-    cap->running_task = task;
+    RELAXED_STORE(&cap->running_task, task);
     RELEASE_LOCK(&cap->lock);
     return true;
 }
