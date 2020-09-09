@@ -20,6 +20,7 @@
 #include "STM.h"        /* initSTM */
 #include "RtsSignals.h"
 #include "Weak.h"
+#include "ForeignExports.h"     /* processForeignExports */
 #include "Ticky.h"
 #include "StgRun.h"
 #include "Prelude.h"            /* fixupRTStoPreludeRefs */
@@ -346,7 +347,13 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     getStablePtr((StgPtr)processRemoteCompletion_closure);
 #endif
 
-    // Initialize the top-level handler system
+    /*
+     * process any foreign exports which were registered while loading the
+     * image
+     * */
+    processForeignExports();
+
+    /* initialize the top-level handler system */
     initTopHandler();
 
     /* initialise the shared Typeable store */
