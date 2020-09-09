@@ -32,7 +32,10 @@ import GHC.Tc.Utils.Env
 import GHC.Unit
 
 import GHC.Builtin.Names
+import GHC.Builtin.PrimOps
 import GHC.Builtin.Types
+import GHC.Builtin.Types.Prim ( realWorldStatePrimTy )
+import GHC.Types.Id.Make ( realWorldPrimId, mkPrimOpId )
 
 import GHC.Core.Utils
 import GHC.Core.Opt.Arity
@@ -46,6 +49,7 @@ import GHC.Core.Coercion
 import GHC.Core.TyCon
 import GHC.Core.DataCon
 import GHC.Core.Opt.OccurAnal
+
 
 import GHC.Data.Maybe
 import GHC.Data.OrdList
@@ -63,7 +67,6 @@ import GHC.Types.Var.Set
 import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Id.Info
-import GHC.Types.Id.Make ( realWorldPrimId )
 import GHC.Types.Basic
 import GHC.Types.Name   ( NamedThing(..), nameSrcSpan, isInternalName )
 import GHC.Types.SrcLoc ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
@@ -784,6 +787,38 @@ cpeApp top_env expr
         -- rather than the far superior "f x y".  Test case is par01.
         = let (terminal, args', depth') = collect_args arg
           in cpe_app env terminal (args' ++ args) (depth + depth' - 1)
+
+    cpe_app env
+            (Var f)
+            args
+            n
+        | Just KeepAliveOp <- isPrimOpId_maybe f
+        , CpeApp (Type arg_rep)
+          : CpeApp (Type arg_ty)
+          : CpeApp (Type _result_rep)
+          : CpeApp (Type result_ty)
+          : CpeApp arg
+          : CpeApp s0
+          : CpeApp k
+          : rest <- pprTrace "cpe_app keepAlive#" (ppr args) args
+        = do { pprTraceM "cpe_app(keepAlive#)" (ppr n)
+             ; y <- newVar result_ty
+             ; s2 <- newVar realWorldStatePrimTy
+             ; -- beta reduce if possible
+             ; (floats, k') <- case k of
+                  Lam s body -> cpe_app (extendCorePrepEnvExpr env s s0) body rest (n-2)
+                  _          -> cpe_app env k (CpeApp s0 : rest) (n-1)
+             ; let touchId = mkPrimOpId TouchOp
+                   expr = Case k' y result_ty [(DEFAULT, [], rhs)]
+                   rhs = let scrut = mkApps (Var touchId) [Type arg_rep, Type arg_ty, arg, Var realWorldPrimId]
+                         in Case scrut s2 result_ty [(DEFAULT, [], Var y)]
+             ; pprTraceM "cpe_app(keepAlive)" (ppr expr)
+             ; (floats', expr') <- cpeBody env expr
+             ; return (floats `appendFloats` floats', expr')
+             }
+        | Just KeepAliveOp <- isPrimOpId_maybe f
+        = panic "invalid keepAlive# application"
+
     cpe_app env (Var f) (CpeApp _runtimeRep@Type{} : CpeApp _type@Type{} : CpeApp arg : rest) n
         | f `hasKey` runRWKey
         -- N.B. While it may appear that n == 1 in the case of runRW#
