@@ -26,6 +26,7 @@
 #include "RtsSymbols.h"
 #include "RtsSymbolInfo.h"
 #include "Profiling.h"
+#include "ForeignExports.h"
 #include "sm/OSMem.h"
 #include "linker/M32Alloc.h"
 #include "linker/CacheFlush.h"
@@ -909,37 +910,6 @@ SymbolAddr* lookupSymbol( SymbolName* lbl )
 }
 
 /* -----------------------------------------------------------------------------
-   Create a StablePtr for a foreign export.  This is normally called by
-   a C function with __attribute__((constructor)), which is generated
-   by GHC and linked into the module.
-
-   If the object code is being loaded dynamically, then we remember
-   which StablePtrs were allocated by the constructors and free them
-   again in unloadObj().
-   -------------------------------------------------------------------------- */
-
-static ObjectCode *loading_obj = NULL;
-
-StgStablePtr foreignExportStablePtr (StgPtr p)
-{
-    ForeignExportStablePtr *fe_sptr;
-    StgStablePtr *sptr;
-
-    sptr = getStablePtr(p);
-
-    if (loading_obj != NULL) {
-        fe_sptr = stgMallocBytes(sizeof(ForeignExportStablePtr),
-                                 "foreignExportStablePtr");
-        fe_sptr->stable_ptr = sptr;
-        fe_sptr->next = loading_obj->stable_ptrs;
-        loading_obj->stable_ptrs = fe_sptr;
-    }
-
-    return sptr;
-}
-
-
-/* -----------------------------------------------------------------------------
  * Debugging aid: look in GHCi's object symbol tables for symbols
  * within DELTA bytes of the specified address, and show their names.
  */
@@ -1616,7 +1586,10 @@ int ocTryLoad (ObjectCode* oc) {
 
     // run init/init_array/ctors/mod_init_func
 
-    loading_obj = oc; // tells foreignExportStablePtr what to do
+    IF_DEBUG(linker, debugBelch("ocTryLoad: ocRunInit start\n"));
+
+    // See Note [Tracking foreign exports] in ForeignExports.c
+    foreignExportsLoadingObject(oc);
 #if defined(OBJFORMAT_ELF)
     r = ocRunInit_ELF ( oc );
 #elif defined(OBJFORMAT_PEi386)
@@ -1626,7 +1599,7 @@ int ocTryLoad (ObjectCode* oc) {
 #else
     barf("ocTryLoad: initializers not implemented on this platform");
 #endif
-    loading_obj = NULL;
+    foreignExportsFinishedLoadingObject();
 
     if (!r) { return r; }
 

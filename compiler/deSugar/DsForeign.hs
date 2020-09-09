@@ -87,15 +87,16 @@ dsForeigns' :: [LForeignDecl GhcTc]
 dsForeigns' []
   = return (NoStubs, nilOL)
 dsForeigns' fos = do
+    mod <- getModule
     fives <- mapM do_ldecl fos
     let
         (hs, cs, idss, bindss) = unzip4 fives
         fe_ids = concat idss
-        fe_init_code = map foreignExportInitialiser fe_ids
+        fe_init_code = foreignExportsInitialiser mod fe_ids
     --
     return (ForeignStubs
              (vcat hs)
-             (vcat cs $$ vcat fe_init_code),
+             (vcat cs $$ fe_init_code),
             foldr (appOL . toOL) nilOL bindss)
   where
    do_ldecl (dL->L loc decl) = putSrcSpanDs loc (do_decl decl)
@@ -668,8 +669,8 @@ mkFExportCBits dflags c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
      ]
 
 
-foreignExportInitialiser :: Id -> SDoc
-foreignExportInitialiser hs_fn =
+foreignExportsInitialiser :: Module -> [Id] -> SDoc
+foreignExportsInitialiser mod hs_fns =
    -- Initialise foreign exports by registering a stable pointer from an
    -- __attribute__((constructor)) function.
    -- The alternative is to do this from stginit functions generated in
@@ -678,14 +679,24 @@ foreignExportInitialiser hs_fn =
    -- all modules that are imported directly or indirectly are actually used by
    -- the program.
    -- (this is bad for big umbrella modules like Graphics.Rendering.OpenGL)
+   --
+   -- See Note [Tracking foreign exports] in rts/ForeignExports.c
    vcat
-    [ text "static void stginit_export_" <> ppr hs_fn
-         <> text "() __attribute__((constructor));"
-    , text "static void stginit_export_" <> ppr hs_fn <> text "()"
-    , braces (text "foreignExportStablePtr"
-       <> parens (text "(StgPtr) &" <> ppr hs_fn <> text "_closure")
-       <> semi)
+    [ text "static struct ForeignExportsList" <+> list_symbol <+> equals
+         <+> braces (text ".exports = " <+> export_list) <> semi
+    , text "static void " <> ctor_symbol <> text "(void)"
+         <+> text " __attribute__((constructor));"
+    , text "static void " <> ctor_symbol <> text "()"
+    , braces (text "registerForeignExports" <> parens (char '&' <> list_symbol) <> semi)
     ]
+  where
+    mod_str = pprModuleName (moduleName mod)
+    ctor_symbol = text "stginit_export_" <> mod_str
+    list_symbol = text "stg_exports_" <> mod_str
+    export_list = braces $ pprWithCommas closure_ptr hs_fns
+
+    closure_ptr :: Id -> SDoc
+    closure_ptr fn = text "(StgPtr) &" <> ppr fn <> text "_closure"
 
 
 mkHObj :: Type -> SDoc

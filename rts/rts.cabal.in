@@ -130,6 +130,7 @@ library
                       rts/EventLogWriter.h
                       rts/FileLock.h
                       rts/Flags.h
+                      rts/ForeignExports.h
                       rts/GetTime.h
                       rts/Globals.h
                       rts/Hpc.h
@@ -381,6 +382,7 @@ library
                ClosureFlags.c
                Disassembler.c
                FileLock.c
+               ForeignExports.c
                Globals.c
                Hash.c
                Heap.c
