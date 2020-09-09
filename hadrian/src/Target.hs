@@ -21,11 +21,12 @@ type Target = H.Target Context Builder
 trackArgument :: Target -> String -> Bool
 trackArgument target arg = case builder target of
     Make _    -> not $ threadArg arg
-    Ghc _ _   -> not $ verbosityArg arg
+    Ghc _ _   -> not $ verbosityArg arg || diagnosticsColorArg arg
     Cabal _ _ -> not $ verbosityArg arg || cabal_configure_ignore arg
     _         -> True
   where
     threadArg s = dropWhileEnd isDigit s `elem` ["-j", "MAKEFLAGS=-j", "THREADS="]
     verbosityArg s = dropWhileEnd isDigit s == "-v"
+    diagnosticsColorArg s = "-fdiagnostics-color=" `isPrefixOf` s -- N.B. #18672
     cabal_configure_ignore s =
       s `elem` [ "--configure-option=--quiet", "--configure-option=--disable-option-checking" ]
