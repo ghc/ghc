@@ -1919,7 +1919,7 @@ AC_MSG_CHECKING(for path to top of build tree)
 # GHC_CONVERT_CPU(cpu, target_var)
 # --------------------------------
 # Converts cpu from gnu to ghc naming, and assigns the result to $target_var.
-# Should you modify this list, you are invited to reflect the changes in 
+# Should you modify this list, you are invited to reflect the changes in
 # `libraries/base/System/Info.hs`'s documentation.
 AC_DEFUN([GHC_CONVERT_CPU],[
 case "$1" in
