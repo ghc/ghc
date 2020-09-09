@@ -4,6 +4,7 @@
  * (c) sof, 2002-2003.
  */
 #include "Rts.h"
+#include "RtsUtils.h"
 #include "WorkQueue.h"
 #include <stdbool.h>
 #include <stdio.h>
