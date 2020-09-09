@@ -1541,6 +1541,8 @@ emitPrimOp dflags primop = case primop of
   TraceMarkerOp -> alwaysExternal
   SetThreadAllocationCounter -> alwaysExternal
 
+  KeepAliveOp -> panic "keepAlive# should have been eliminated in CorePrep"
+
  where
   profile = targetProfile dflags
   platform = profilePlatform profile
