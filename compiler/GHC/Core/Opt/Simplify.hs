@@ -1975,29 +1975,9 @@ rebuildCall env info (ApplyToTy { sc_arg_ty = arg_ty, sc_hole_ty = hole_ty, sc_c
   = rebuildCall env (addTyArgTo info arg_ty hole_ty) cont
 
 ---------- The runRW# rule. Do this after absorbing all arguments ------
--- See Note [Simplification of runRW#] in GHC.CoreToSTG.Prep.
---
--- runRW# :: forall (r :: RuntimeRep) (o :: TYPE r). (State# RealWorld -> o) -> o
--- K[ runRW# rr ty body ]   -->   runRW rr' ty' (\s. K[ body s ])
-rebuildCall env (ArgInfo { ai_fun = fun_id, ai_args = rev_args })
-            (ApplyToVal { sc_arg = arg, sc_env = arg_se
-                        , sc_cont = cont, sc_hole_ty = fun_ty })
-  | fun_id `hasKey` runRWKey
-  , not (contIsStop cont)  -- Don't fiddle around if the continuation is boring
-  , [ TyArg {}, TyArg {} ] <- rev_args
-  = do { s <- newId (fsLit "s") Many realWorldStatePrimTy
-       ; let (m,_,_) = splitFunTy fun_ty
-             env'  = (arg_se `setInScopeFromE` env) `addNewInScopeIds` [s]
-             ty'   = contResultType cont
-             cont' = ApplyToVal { sc_dup = Simplified, sc_arg = Var s
-                                , sc_env = env', sc_cont = cont
-                                , sc_hole_ty = mkVisFunTy m realWorldStatePrimTy ty' }
-                     -- cont' applies to s, then K
-       ; body' <- simplExprC env' arg cont'
-       ; let arg'  = Lam s body'
-             rr'   = getRuntimeRep ty'
-             call' = mkApps (Var fun_id) [mkTyArg rr', mkTyArg ty', arg']
-       ; return (emptyFloats env, call') }
+rebuildCall env arg_info cont
+  | Just do_it <- rebuildContOpCall env arg_info cont
+  = do_it
 
 rebuildCall env fun_info
             (ApplyToVal { sc_arg = arg, sc_env = arg_se
@@ -2033,6 +2013,37 @@ rebuildCall env fun_info
 ---------- No further useful info, revert to generic rebuild ------------
 rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
   = rebuild env (argInfoExpr fun rev_args) cont
+
+rebuildContOpCall :: SimplEnv -> ArgInfo -> SimplCont -> Maybe (SimplM (SimplFloats, OutExpr))
+---------- The runRW# rule. Do this after absorbing all arguments ------
+-- See Note [Simplification of runRW#] in GHC.CoreToSTG.Prep.
+--
+-- runRW# :: forall (r :: RuntimeRep) (o :: TYPE r). (State# RealWorld -> o) -> o
+-- K[ runRW# rr ty body ]   -->   runRW rr' ty' (\s. K[ body s ])
+rebuildContOpCall
+    env
+    (ArgInfo { ai_fun = fun_id, ai_args = rev_args })
+    (ApplyToVal { sc_arg = arg, sc_env = arg_se
+                , sc_cont = cont, sc_hole_ty = fun_ty })
+  | fun_id `hasKey` runRWKey
+  , not (contIsStop cont)  -- Don't fiddle around if the continuation is boring
+  , [ TyArg {}, TyArg {} ] <- rev_args
+  = Just $
+    do { s <- newId (fsLit "s") Many realWorldStatePrimTy
+       ; let (m,_,_) = splitFunTy fun_ty
+             env'  = (arg_se `setInScopeFromE` env) `addNewInScopeIds` [s]
+             ty'   = contResultType cont
+             cont' = ApplyToVal { sc_dup = Simplified, sc_arg = Var s
+                                , sc_env = env', sc_cont = cont
+                                , sc_hole_ty = mkVisFunTy m realWorldStatePrimTy ty' }
+                     -- cont' applies to s, then K
+       ; body' <- simplExprC env' arg cont'
+       ; let arg'  = Lam s body'
+             rr'   = getRuntimeRep ty'
+             call' = mkApps (Var fun_id) [mkTyArg rr', mkTyArg ty', arg']
+       ; return (emptyFloats env, call') }
+
+rebuildContOpCall _ _ _ = Nothing
 
 {- Note [Trying rewrite rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
