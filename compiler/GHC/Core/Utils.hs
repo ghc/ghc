@@ -1641,6 +1641,8 @@ app_ok primop_ok fun args
         -> False       --     for the special cases for SeqOp and DataToTagOp
         | DataToTagOp <- op
         -> False
+        | KeepAliveOp <- op
+        -> False
 
         | otherwise
         -> primop_ok op  -- Check the primop itself

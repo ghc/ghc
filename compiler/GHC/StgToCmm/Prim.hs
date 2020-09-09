@@ -1521,6 +1521,8 @@ emitPrimOp dflags primop = case primop of
   TraceMarkerOp -> alwaysExternal
   SetThreadAllocationCounter -> alwaysExternal
 
+  KeepAliveOp -> panic "keepAlive# should have been eliminated in CorePrep"
+
  where
   platform = targetPlatform dflags
   result_info = getPrimOpResultInfo primop
