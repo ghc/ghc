@@ -17,7 +17,7 @@ module GHC.Tc.Utils.Unify (
   tcSkolemise, tcSkolemiseScoped, tcSkolemiseET,
   tcSubType, tcSubTypeSigma, tcSubTypePat,
   tcSubMult,
-  checkConstraints, checkTvConstraints,
+  checkConstraints, checkTvConstraints, checkTvConstraintsWith,
   buildImplicationFor, buildTvImplication, emitResidualTvConstraint,
 
   -- Various unifications
@@ -916,9 +916,17 @@ checkTvConstraints :: SkolemInfo
                    -> TcM result
                    -> TcM result
 
-checkTvConstraints skol_info skol_tvs thing_inside
+checkTvConstraints skol_info skol_tvs
+  = checkTvConstraintsWith skol_info (const skol_tvs)
+
+checkTvConstraintsWith :: SkolemInfo
+                        -> (result -> [TcTyVar])          -- Skolem tyvars
+                        -> TcM result
+                        -> TcM result
+
+checkTvConstraintsWith skol_info skol_fn thing_inside
   = do { (tclvl, wanted, result) <- pushLevelAndCaptureConstraints thing_inside
-       ; emitResidualTvConstraint skol_info skol_tvs tclvl wanted
+       ; emitResidualTvConstraint skol_info (skol_fn result) tclvl wanted
        ; return result }
 
 emitResidualTvConstraint :: SkolemInfo -> [TcTyVar]

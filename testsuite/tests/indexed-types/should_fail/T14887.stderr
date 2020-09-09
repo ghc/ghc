@@ -7,10 +7,16 @@ T14887.hs:13:1: error:
     • In the type family declaration for ‘Foo2’
 
 T14887.hs:14:11: error:
-    • Couldn't match kind ‘k1’ with ‘k’
+    • Couldn't match kind ‘k2’ with ‘k3’
       When matching kinds
-        a0 :: k
-        a :: k1
-      Expected kind ‘a0 :~: a0’, but ‘e :: a :~: a’ has kind ‘a :~: a’
+        a0 :: k1
+        a1 :: k2
+      Expected kind ‘a0 :~: a0’, but ‘e :: a :~: a’ has kind ‘a1 :~: a1’
+      ‘k2’ is a rigid type variable bound by
+        a family instance declaration
+        at T14887.hs:14:8-23
+      ‘k3’ is a rigid type variable bound by
+        a family instance declaration
+        at T14887.hs:13:19
     • In the second argument of ‘Foo2’, namely ‘(e :: a :~: a)’
       In the type family declaration for ‘Foo2’

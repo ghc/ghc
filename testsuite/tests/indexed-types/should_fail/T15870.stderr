@@ -1,7 +1,10 @@
 
 T15870.hs:32:34: error:
-    • Couldn't match kind ‘k’ with ‘*’
-      Expected kind ‘Optic a’, but ‘g2’ has kind ‘Optic b’
+    • Couldn't match kind ‘k2’ with ‘*’
+      Expected kind ‘Optic a2’, but ‘g2’ has kind ‘Optic b1’
+      ‘k2’ is a rigid type variable bound by
+        a family instance declaration
+        at T15870.hs:(27,1)-(32,35)
     • In the second argument of ‘Get’, namely ‘g2’
       In the type ‘Get a g2’
       In the type instance declaration for ‘Get’

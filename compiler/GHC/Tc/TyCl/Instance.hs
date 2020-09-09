@@ -493,7 +493,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
               tv_skol_env = mkVarEnv $ map swap tv_skol_prs
               n_inferred = countWhile ((== Inferred) . binderArgFlag) $
                            fst $ splitForAllVarBndrs dfun_ty
-              visible_skol_tvs = drop n_inferred skol_tvs
+              (inferred_skol_tvs, visible_skol_tvs) = splitAt n_inferred skol_tvs
 
         ; traceTc "tcLocalInstDecl 1" (ppr dfun_ty $$ ppr (invisibleTyBndrCount dfun_ty) $$ ppr skol_tvs)
 
@@ -504,6 +504,7 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = hs_ty, cid_binds = binds
                           mini_subst = mkTvSubst (mkInScopeSet (mkVarSet skol_tvs)) mini_env
                           mb_info    = InClsInst { ai_class = clas
                                                  , ai_tyvars = visible_skol_tvs
+                                                 , ai_inferred_tyvars = inferred_skol_tvs
                                                  , ai_inst_env = mini_env }
                     ; df_stuff  <- mapAndRecoverM (tcDataFamInstDecl mb_info tv_skol_env) adts
                     ; tf_insts1 <- mapAndRecoverM (tcTyFamInstDecl mb_info)   ats

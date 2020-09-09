@@ -59,6 +59,8 @@ module GHC.Core.TyCo.Rep (
         isInvisibleArgFlag, isVisibleArgFlag,
         isInvisibleBinder, isVisibleBinder,
         isTyBinder, isNamedBinder,
+        getNamedBinder_maybe, getNamedBinders,
+
 
         -- * Functions over coercions
         pickLR,
@@ -104,6 +106,7 @@ import GHC.Utils.Panic
 -- libraries
 import qualified Data.Data as Data hiding ( TyCon )
 import Data.IORef ( IORef )   -- for CoercionHole
+import Data.Maybe (isJust, mapMaybe)
 
 {-
 %************************************************************************
@@ -724,13 +727,19 @@ isInvisibleBinder (Named (Bndr _ vis)) = isInvisibleArgFlag vis
 isInvisibleBinder (Anon InvisArg _)    = True
 isInvisibleBinder (Anon VisArg   _)    = False
 
+getNamedBinder_maybe :: TyCoBinder -> Maybe TyCoVarBinder
+getNamedBinder_maybe (Anon {}) = Nothing
+getNamedBinder_maybe (Named tv) = Just tv
+
+getNamedBinders :: [TyCoBinder] -> [TyCoVarBinder]
+getNamedBinders = mapMaybe getNamedBinder_maybe
+
 -- | Does this binder bind a visible argument?
 isVisibleBinder :: TyCoBinder -> Bool
 isVisibleBinder = not . isInvisibleBinder
 
 isNamedBinder :: TyCoBinder -> Bool
-isNamedBinder (Named {}) = True
-isNamedBinder (Anon {})  = False
+isNamedBinder = isJust . getNamedBinder_maybe
 
 -- | If its a named binder, is the binder a tyvar?
 -- Returns True for nondependent binder.
