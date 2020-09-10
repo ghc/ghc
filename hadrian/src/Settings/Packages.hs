@@ -279,7 +279,8 @@ rtsPackageArgs = package rts ? do
           , arg $ "-DFS_NAMESPACE=rts"
           , arg $ "-DCOMPILING_RTS"
           , notM targetSupportsSMP           ? arg "-DNOSMP"
-          , way `elem` [debug, debugDynamic] ? arg "-DTICKY_TICKY"
+          , way `elem` [debug, debugDynamic] ? pure [ "-DTICKY_TICKY"
+                                                    , "-optc-DTICKY_TICKY"]
           , Profiling `wayUnit` way          ? arg "-DPROFILING"
           , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
           , notM targetSupportsSMP           ? pure [ "-DNOSMP"
