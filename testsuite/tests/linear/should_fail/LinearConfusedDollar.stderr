@@ -2,7 +2,7 @@
 LinearConfusedDollar.hs:12:7: error:
     • Couldn't match type ‘'One’ with ‘'Many’
       Expected: a -> a
-        Actual: a #-> a
+        Actual: a %1 -> a
     • In the first argument of ‘($)’, namely ‘f’
       In the expression: f $ x
       In an equation for ‘g’: g x = f $ x

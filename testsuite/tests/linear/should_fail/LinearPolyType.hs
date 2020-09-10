@@ -11,6 +11,6 @@ type family If b t f where
   If True t _ = t
   If False _ f = f
 
-dep :: SBool b -> Int # If b One Many -> Int
+dep :: SBool b -> Int %(If b One Many) -> Int
 dep STrue x = x
 dep SFalse _ = 0
