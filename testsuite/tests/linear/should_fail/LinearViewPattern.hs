@@ -7,5 +7,5 @@ module LinearViewPattern where
 -- incorrect Core being emitted by the desugarer. When we understand linear view
 -- pattern better, we will probably want to remove this test.
 
-f :: Bool #-> Bool
+f :: Bool %1 -> Bool
 f (not -> True) = True
