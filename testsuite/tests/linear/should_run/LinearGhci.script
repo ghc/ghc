@@ -3,7 +3,7 @@ data T a = MkT a
 :set -XLinearTypes
 :type MkT
 :set -XGADTs
-data T a where MkT :: a #-> a -> T a
+data T a where MkT :: a %1 -> a -> T a
 :info T
 data T a b m n r = MkT a b m n r
 :set -fprint-explicit-foralls

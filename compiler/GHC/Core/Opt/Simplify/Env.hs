@@ -953,7 +953,7 @@ adjustJoinPointType mult new_res_ty join_id
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider a join point which is linear in its variable, in some context E:
 
-E[join j :: a #-> a
+E[join j :: a %1 -> a
        j x = x
   in case v of
        A -> j 'x'
@@ -961,7 +961,7 @@ E[join j :: a #-> a
 
 The simplifier changes to:
 
-join j :: a #-> a
+join j :: a %1 -> a
      j x = E[x]
 in case v of
      A -> j 'x'

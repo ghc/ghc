@@ -4,5 +4,5 @@ module LinearRecordUpdate where
 
 data R = R { x :: Int, y :: Bool }
 
-shouldFail :: R #-> R
+shouldFail :: R %1 -> R
 shouldFail r = r { y = False }

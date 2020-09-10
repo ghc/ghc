@@ -2,5 +2,5 @@
 
 module LinearAsPat where
 
-shouldFail :: Bool #-> Bool
+shouldFail :: Bool %1 -> Bool
 shouldFail x@True = x

@@ -7,8 +7,8 @@ module LinearPatSyn where
 -- seems to require changes to the desugarer. So currently pattern synonyms are
 -- disallowed in linear patterns.
 
-pattern P :: b #-> a #-> (a, b)
+pattern P :: b %1 -> a %1 -> (a, b)
 pattern P y x = (x, y)
 
-s :: (a, b) #-> (b, a)
+s :: (a, b) %1 -> (b, a)
 s (P y x) = (y, x)

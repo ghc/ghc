@@ -595,12 +595,27 @@ rnHsTyKi env (HsTyVar _ ip (L loc rdr_name))
 
 rnHsTyKi env ty@(HsOpTy _ ty1 l_op ty2)
   = setSrcSpan (getLoc l_op) $
-    do  { (l_op', fvs1) <- rnHsTyOp env ty l_op
+    do  { unlessXOptM LangExt.LinearTypes $
+          when looks_like_mult $ -- Steals the (a %b) syntax from TypeOperators
+          addErr (text "Enable LinearTypes to allow linear functions")
+        ; (l_op', fvs1) <- rnHsTyOp env ty l_op
         ; fix   <- lookupTyFixityRn l_op'
         ; (ty1', fvs2) <- rnLHsTyKi env ty1
         ; (ty2', fvs3) <- rnLHsTyKi env ty2
         ; res_ty <- mkHsOpTyRn l_op' fix ty1' ty2'
         ; return (res_ty, plusFVs [fvs1, fvs2, fvs3]) }
+  where
+    -- Does this look like (a %m)?
+    looks_like_mult
+      | Unqual op_name <- unLoc l_op
+      , occNameFS op_name == fsLit "%"
+      , Just ty1_pos <- getBufSpan (getLoc ty1)
+      , Just pct_pos <- getBufSpan (getLoc l_op)
+      , Just ty2_pos <- getBufSpan (getLoc ty2)
+      , bufSpanEnd ty1_pos /= bufSpanStart pct_pos
+      , bufSpanEnd pct_pos == bufSpanStart ty2_pos
+      = True
+      | otherwise = False
 
 rnHsTyKi env (HsParTy _ ty)
   = do { (ty', fvs) <- rnLHsTyKi env ty

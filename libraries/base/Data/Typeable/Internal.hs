@@ -311,7 +311,7 @@ instance Ord (TypeRep a) where
 
 -- | A non-indexed type representation.
 data SomeTypeRep where
-    SomeTypeRep :: forall k (a :: k). !(TypeRep a) #-> SomeTypeRep
+    SomeTypeRep :: forall k (a :: k). !(TypeRep a) %1 -> SomeTypeRep
 
 instance Eq SomeTypeRep where
   SomeTypeRep a == SomeTypeRep b =
@@ -461,9 +461,9 @@ pattern App f x <- (splitApp -> IsApp f x)
 
 data AppOrCon (a :: k) where
     IsApp :: forall k k' (f :: k' -> k) (x :: k'). ()
-          => TypeRep f #-> TypeRep x #-> AppOrCon (f x)
+          => TypeRep f %1 -> TypeRep x %1 -> AppOrCon (f x)
     -- See Note [Con evidence]
-    IsCon :: IsApplication a ~ "" => TyCon #-> [SomeTypeRep] #-> AppOrCon a
+    IsCon :: IsApplication a ~ "" => TyCon %1 -> [SomeTypeRep] %1 -> AppOrCon a
 
 type family IsApplication (x :: k) :: Symbol where
   IsApplication (_ _) = "An error message about this unifying with \"\" "
@@ -640,7 +640,7 @@ unkindedTypeRep (SomeKindedTypeRep x) = SomeTypeRep x
 
 data SomeKindedTypeRep k where
     SomeKindedTypeRep :: forall k (a :: k). TypeRep a
-                      #-> SomeKindedTypeRep k
+                      %1 -> SomeKindedTypeRep k
 
 kApp :: SomeKindedTypeRep (k -> k')
      -> SomeKindedTypeRep k
@@ -730,7 +730,7 @@ bareArrow (TrFun _ m a b) =
 bareArrow _ = error "Data.Typeable.Internal.bareArrow: impossible"
 
 data IsTYPE (a :: Type) where
-    IsTYPE :: forall (r :: RuntimeRep). TypeRep r #-> IsTYPE (TYPE r)
+    IsTYPE :: forall (r :: RuntimeRep). TypeRep r %1 -> IsTYPE (TYPE r)
 
 -- | Is a type of the form @TYPE rep@?
 isTYPE :: TypeRep (a :: Type) -> Maybe (IsTYPE a)

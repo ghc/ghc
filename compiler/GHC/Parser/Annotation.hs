@@ -259,8 +259,7 @@ data AnnKeywordId
     | AnnLarrow     -- ^ '<-'
     | AnnLarrowU    -- ^ '<-', unicode variant
     | AnnLet
-    | AnnLolly  -- ^ '#->'
-    | AnnLollyU -- ^ '#->', unicode variant
+    | AnnLollyU     -- ^ The '⊸' unicode arrow
     | AnnMdo
     | AnnMinus -- ^ '-'
     | AnnModule
@@ -364,7 +363,6 @@ unicodeAnn AnnOpenB      = AnnOpenBU
 unicodeAnn AnnCloseB     = AnnCloseBU
 unicodeAnn AnnOpenEQ     = AnnOpenEQU
 unicodeAnn AnnCloseQ     = AnnCloseQU
-unicodeAnn AnnLolly      = AnnLollyU
 unicodeAnn ann           = ann
 
 
