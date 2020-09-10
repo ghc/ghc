@@ -80,7 +80,7 @@ import Unsafe.Coerce    ( unsafeCoerce, unsafeCoerceUnlifted )
 -- type argument of 'ForeignPtr' should normally be an instance of
 -- class 'Storable'.
 --
-data ForeignPtr a = ForeignPtr Addr# ForeignPtrContents
+data ForeignPtr a = ForeignPtr Addr# !ForeignPtrContents
         -- The Addr# in the ForeignPtr object is intentionally stored
         -- separately from the finalizer. The primary aim of the
         -- representation is to make withForeignPtr efficient; in fact,
