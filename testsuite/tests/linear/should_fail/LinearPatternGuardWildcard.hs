@@ -3,5 +3,5 @@ module LinearPatternGuardWildcard where
 
 -- See #18439
 
-unsafeConsume :: a #-> ()
+unsafeConsume :: a %1 -> ()
 unsafeConsume x | _ <- x = ()

@@ -768,14 +768,15 @@ data Token
   | ITvbar
   | ITlarrow            IsUnicodeSyntax
   | ITrarrow            IsUnicodeSyntax
-  | ITlolly             IsUnicodeSyntax
   | ITdarrow            IsUnicodeSyntax
+  | ITlolly       -- The (⊸) arrow (for LinearTypes)
   | ITminus       -- See Note [Minus tokens]
   | ITprefixminus -- See Note [Minus tokens]
   | ITbang     -- Prefix (!) only, e.g. f !x = rhs
   | ITtilde    -- Prefix (~) only, e.g. f ~x = rhs
   | ITat       -- Tight infix (@) only, e.g. f x@pat = rhs
   | ITtypeApp  -- Prefix (@) only, e.g. f @t
+  | ITpercent  -- Prefix (%) only, e.g. a %1 -> b
   | ITstar              IsUnicodeSyntax
   | ITdot
 
@@ -1024,8 +1025,7 @@ reservedSymsFM = listToUFM $
        ,("→",   ITrarrow UnicodeSyntax,     UnicodeSyntax, 0 )
        ,("←",   ITlarrow UnicodeSyntax,     UnicodeSyntax, 0 )
 
-       ,("#->", ITlolly NormalSyntax, NormalSyntax, 0)
-       ,("⊸",   ITlolly UnicodeSyntax, UnicodeSyntax, 0)
+       ,("⊸",   ITlolly, UnicodeSyntax, 0)
 
        ,("⤙",   ITlarrowtail UnicodeSyntax, UnicodeSyntax, xbit ArrowsBit)
        ,("⤚",   ITrarrowtail UnicodeSyntax, UnicodeSyntax, xbit ArrowsBit)
@@ -1577,6 +1577,8 @@ varsym_prefix :: Action
 varsym_prefix = sym $ \exts s ->
   if | s == fsLit "@"  -- regardless of TypeApplications for better error messages
      -> return ITtypeApp
+     | LinearTypesBit `xtest` exts, s == fsLit "%"
+     -> return ITpercent
      | ThQuotesBit `xtest` exts, s == fsLit "$"
      -> return ITdollar
      | ThQuotesBit `xtest` exts, s == fsLit "$$"

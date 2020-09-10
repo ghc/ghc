@@ -5,7 +5,7 @@ module Linear13 where
 incorrectLet :: a ⊸ ()
 incorrectLet a = let x = a in ()
 
-incorrectLetWithSignature :: (Bool->Bool) #-> ()
+incorrectLetWithSignature :: (Bool->Bool) %1 -> ()
 incorrectLetWithSignature x = let y :: Bool->Bool; y = x in ()
 
 incorrectLazyMatch :: (a,b) ⊸ b

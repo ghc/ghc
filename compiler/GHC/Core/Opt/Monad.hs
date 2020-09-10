@@ -412,7 +412,7 @@ EtaExpansion:
     fail = \void. (\s. (e |> g) s) |> sym g      where g :: IO () ~ S -> (S,())
   --> Next iteration of simplify
     fail1 = \void. \s. (e |> g) s
-    fail = fail1 |> Void#->sym g
+    fail = fail1 |> Void# -> sym g
   And now inline 'fail'
 
 CaseMerge:

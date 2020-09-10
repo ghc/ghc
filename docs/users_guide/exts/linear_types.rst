@@ -6,8 +6,8 @@ Linear types
 
     :since: 9.0.1
 
-    Enable the linear arrow ``a #-> b`` and the multiplicity-polymorphic arrow
-    ``a # m -> b``.
+    Enable the linear arrow ``a %1 -> b`` and the multiplicity-polymorphic arrow
+    ``a %m -> b``.
 
 **This extension is currently considered experimental, expect bugs,
 warts, and bad error messages; everything down to the syntax is
@@ -29,30 +29,28 @@ means that in every branch of the definition of ``f``, its argument
 * Calling it as a function and using the result exactly once in the same
   fashion.
 
-With ``-XLinearTypes``, you can write ``f :: a #-> b`` to mean that
+With ``-XLinearTypes``, you can write ``f :: a %1 -> b`` to mean that
 ``f`` is a linear function from ``a`` to ``b``.  If
-:extension:`UnicodeSyntax` is enabled, the ``#->`` arrow can be
+:extension:`UnicodeSyntax` is enabled, the ``%1 ->`` arrow can be
 written as ``⊸``.
 
-To allow uniform handling of linear ``a #-> b`` and unrestricted ``a
--> b`` functions, there is a new function type ``a # m -> b``. This
-syntax is, however, not implemented yet, see
-:ref:`linear-types-limitations`. Here, ``m`` is a type of new kind
-``Multiplicity``. We have:
+To allow uniform handling of linear ``a %1 -> b`` and unrestricted ``a
+-> b`` functions, there is a new function type ``a %m -> b``.
+Here, ``m`` is a type of new kind ``Multiplicity``. We have:
 
 ::
 
     data Multiplicity = One | Many  -- Defined in GHC.Types
 
-    type a #-> b = a # 'One  -> b
-    type a  -> b = a # 'Many -> b
+    type a %1 -> b = a %One  -> b
+    type a  -> b = a %Many -> b
 
 (See :ref:`promotion`).
 
 We say that a variable whose multiplicity constraint is ``Many`` is
 *unrestricted*.
 
-The multiplicity-polymorphic arrow ``a # m -> b`` is available in a prefix
+The multiplicity-polymorphic arrow ``a %m -> b`` is available in a prefix
 version as ``GHC.Exts.FUN m a b``, which can be applied
 partially. See, however :ref:`linear-types-limitations`.
 
@@ -74,14 +72,14 @@ the value ``MkT1 x`` can be constructed and deconstructed in a linear context:
 
 ::
 
-    construct :: a #-> MkT1 a
+    construct :: a %1 -> MkT1 a
     construct x = MkT1 x
 
-    deconstruct :: MkT1 a #-> a
+    deconstruct :: MkT1 a %1 -> a
     deconstruct (MkT1 x) = x  -- must consume `x` exactly once
 
 When used as a value, ``MkT1`` is given a multiplicity-polymorphic
-type: ``MkT1 :: forall {m} a. a # m -> T1 a``. This makes it possible
+type: ``MkT1 :: forall {m} a. a %m -> T1 a``. This makes it possible
 to use ``MkT1`` in higher order functions. The additional multiplicity
 argument ``m`` is marked as inferred (see
 :ref:`inferred-vs-specified`), so that there is no conflict with
@@ -103,7 +101,7 @@ Whether a data constructor field is linear or not can be customized using the GA
 ::
 
     data T2 a b c where
-        MkT2 :: a -> b #-> c #-> T2 a b  -- Note unrestricted arrow in the first argument
+        MkT2 :: a -> b %1 -> c %1 -> T2 a b  -- Note unrestricted arrow in the first argument
 
 the value ``MkT2 x y z`` can be constructed only if ``x`` is
 unrestricted. On the other hand, a linear function which is matching
@@ -124,7 +122,7 @@ Printing multiplicity-polymorphic types
 If :extension:`LinearTypes` is disabled, multiplicity variables in types are defaulted
 to ``Many`` when printing, in the same manner as described in :ref:`printing-levity-polymorphic-types`.
 In other words, without :extension:`LinearTypes`, multiplicity-polymorphic functions
-``a # m -> b`` are printed as normal Haskell2010 functions ``a -> b``. This allows
+``a %m -> b`` are printed as normal Haskell2010 functions ``a -> b``. This allows
 existing libraries to be generalized to linear types in a backwards-compatible
 manner; the general types are visible only if the user has enabled
 :extension:`LinearTypes`.
@@ -141,22 +139,20 @@ limitations. If you have read the full design in the proposal (see
 :ref:`linear-types-references` below), here is a run down of the
 missing pieces.
 
-- The syntax ``a # p -> b`` is not yet implemented. You can use ``GHC.Exts.FUN
-  p a b`` instead. However, be aware of the next point.
 - Multiplicity polymorphism is incomplete and experimental. You may
   have success using it, or you may not. Expect it to be really unreliable.
 - There is currently no support for multiplicity annotations such as
-  ``x :: a # p``, ``\(x :: a # p) -> ...``.
+  ``x :: a %p``, ``\(x :: a %p) -> ...``.
 - All ``case``, ``let`` and ``where`` statements consume their
   right-hand side, or scrutiny, ``Many`` times. That is, the following
   will not type check:
 
   ::
 
-      g :: A #-> (A, B)
-      h :: A #-> B #-> C
+      g :: A %1 -> (A, B)
+      h :: A %1 -> B %1 -> C
 
-      f :: A #-> C
+      f :: A %1 -> C
       f x =
         case g x of
           (y, z) -> h y z
@@ -166,13 +162,13 @@ missing pieces.
 
   ::
 
-      g :: A #-> (A, B)
-      h :: A #-> B #-> C
+      g :: A %1 -> (A, B)
+      h :: A %1 -> B %1 -> C
 
-      f :: A #-> C
+      f :: A %1 -> C
       f x = f' (g x)
         where
-          f' :: (A, B) #-> C
+          f' :: (A, B) %1 -> C
           f' (y, z) = h y z
 - There is no support for linear pattern synonyms.
 - ``@``-patterns and view patterns are not linear.
