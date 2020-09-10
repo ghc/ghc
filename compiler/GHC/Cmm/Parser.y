@@ -249,6 +249,7 @@ import GHC.Types.Unique.FM
 import GHC.Types.SrcLoc
 import GHC.Driver.Session
 import GHC.Driver.Ppr
+import GHC.Driver.Config
 import GHC.Utils.Error
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
@@ -1432,7 +1433,8 @@ parseCmmFile dflags filename = withTiming dflags (text "ParseCmm"<+>brackets (te
   buf <- hGetStringBuffer filename
   let
         init_loc = mkRealSrcLoc (mkFastString filename) 1 1
-        init_state = (mkPState dflags buf init_loc) { lex_state = [0] }
+        opts       = initParserOpts dflags
+        init_state = (initParserState opts buf init_loc) { lex_state = [0] }
                 -- reset the lex_state: the Lexer monad leaves some stuff
                 -- in there we don't want.
   case unPD cmmParse dflags init_state of
