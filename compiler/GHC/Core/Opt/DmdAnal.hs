@@ -552,7 +552,18 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
             -- See Note [Demand signatures are computed for a threshold demand based on idArity]
             = mkRhsDmd env rhs_arity rhs
 
-    (DmdType rhs_fv rhs_dmds rhs_div, rhs') = dmdAnal env rhs_dmd rhs
+    (rhs_dmd_ty, rhs') = dmdAnal env rhs_dmd rhs
+
+    -- See Note [Absence analysis for stable unfoldings]
+    unf = realIdUnfolding id
+    full_dmd_ty | isStableUnfolding unf
+                , Just unf_body <- maybeUnfoldingTemplate unf
+                , (unf_dmd_ty, _unf_body') <- dmdAnal env rhs_dmd unf_body
+                = rhs_dmd_ty `bothDmdType` toBothDmdArg unf_dmd_ty
+                | otherwise
+                = rhs_dmd_ty
+
+    DmdType rhs_fv rhs_dmds rhs_div = full_dmd_ty
     sig = mkStrictSigForArity rhs_arity (DmdType sig_fv rhs_dmds rhs_div)
 
     -- See Note [Aggregated demand for cardinality]
@@ -799,6 +810,41 @@ Fortunately, GHC.Core.Opt.Arity gives 'foo' arity 2, which is enough for LetDown
 forward plusInt's demand signature, and all is well (see Note [Newtype arity] in
 GHC.Core.Opt.Arity)! A small example is the test case NewtypeArity.
 
+Note [Absence analysis for stable unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Ticket #18638 shows that it's really important to do absence analysis
+for stable unfoldings. Consider
+
+   g = blah
+
+   f = \x.  ...no use of g....
+   {- f's stable unfolding is f = \x. ...g... -}
+
+If f is ever inlined we use 'g'. But f's current RHS makes no use
+of 'g', so if we don't look at the unfolding we'll mark g as Absent,
+and transform to
+
+   g = error "Entered absent value"
+   f = \x. ...
+   {- f's stable unfolding is f = \x. ...g... -}
+
+Now if f is subsequently inlined, we'll use 'g' and ... disaster.
+
+SOLUTION: if f has a stable unfolding, do demand analysis on its
+body.  (We dicard the resulting term, using only the DmdType,
+specifically the DmdEnv which captures uses of the free variables.
+
+PS: You may wonder how it can be that f's optimised RHS has somehow
+discarded 'g', but when f is inlined we /don't/ discard g in the same
+way. I think a simple example is
+   g = (a,b)
+   f = \x.  fst g
+   {-# INLNE f #-}
+
+Now f's optimised RHS will be \x.a, but if we change g to (error "..")
+(since it is apparently Absent) and then inline (\x. fst g) we get
+disaster.  But regardless, #18638 was a more complicated version of
+this, that actually happened in practice.
 
 Historical Note [Product demands for function body]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
