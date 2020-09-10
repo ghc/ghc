@@ -1,0 +1,10 @@
+
+T17977.hs:31:1: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘f’:
+        Patterns not matched:
+            SZ SZ SZ _
+            SZ SZ (SS _) _
+            SZ (SS _) SZ _
+            SZ (SS _) (SS _) _
+            ...
