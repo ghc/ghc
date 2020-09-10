@@ -50,6 +50,7 @@ import GHC.Driver.Ppr hiding (printForUser)
 import GHC.Utils.Error hiding (traceCmd)
 import GHC.Driver.Finder as Finder
 import GHC.Driver.Monad ( modifySession )
+import GHC.Driver.Config
 import qualified GHC
 import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
              TyThing(..), Phase, BreakIndex, Resume, SingleStep, Ghc,
@@ -1133,7 +1134,7 @@ checkInputForLayout stmt getStmt = do
    st0 <- getGHCiState
    let buf'   =  stringToStringBuffer stmt
        loc    = mkRealSrcLoc (fsLit (progname st0)) (line_number st0) 1
-       pstate = Lexer.mkPState dflags buf' loc
+       pstate = Lexer.initParserState (initParserOpts dflags) buf' loc
    case Lexer.unP goToEnd pstate of
      (Lexer.POk _ False) -> return $ Just stmt
      _other              -> do
@@ -1175,7 +1176,7 @@ enqueueCommands cmds = do
 -- The return value True indicates success, as in `runOneCommand`.
 runStmt :: GhciMonad m => String -> SingleStep -> m (Maybe GHC.ExecResult)
 runStmt input step = do
-  pflags <- Lexer.mkParserFlags <$> GHC.getInteractiveDynFlags
+  pflags <- initParserOpts <$> GHC.getInteractiveDynFlags
   -- In GHCi, we disable `-fdefer-type-errors`, as well as `-fdefer-type-holes`
   -- and `-fdefer-out-of-scope-variables` for **naked expressions**. The
   -- declarations and statements are not affected.
