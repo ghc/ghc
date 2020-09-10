@@ -70,6 +70,7 @@ module GHC.Parser.PostProcess (
         addFatalError, hintBangPat,
         mkBangTy,
         UnpackednessPragma(..),
+        mkMultTy,
 
         -- Help with processing exports
         ImpExpSubSpec(..),
@@ -661,7 +662,7 @@ mkConDeclH98 name mb_forall mb_cxt args
 --
 -- * If -XLinearTypes is not enabled, the function arrows in a prefix GADT
 --   constructor are always interpreted as linear. If -XLinearTypes is enabled,
---   we faithfully record whether -> or #-> was used.
+--   we faithfully record whether -> or %1 -> was used.
 mkGadtDecl :: [Located RdrName]
            -> LHsType GhcPs
            -> P (ConDecl GhcPs)
@@ -2874,6 +2875,10 @@ mkLHsOpTy :: LHsType GhcPs -> Located RdrName -> LHsType GhcPs -> LHsType GhcPs
 mkLHsOpTy x op y =
   let loc = getLoc x `combineSrcSpans` getLoc op `combineSrcSpans` getLoc y
   in L loc (mkHsOpTy x op y)
+
+mkMultTy :: LHsType GhcPs -> HsArrow GhcPs
+mkMultTy (L _ (HsTyLit _ (HsNumTy _ 1))) = HsLinearArrow
+mkMultTy t = HsExplicitMult t
 
 -----------------------------------------------------------------------------
 -- Token symbols
