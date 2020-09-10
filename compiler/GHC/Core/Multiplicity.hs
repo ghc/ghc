@@ -216,7 +216,7 @@ That is, in
 
 We have
 
-    Just :: a #-> Just a
+    Just :: a %1 -> Just a
 
 The goal is to maximise reuse of types between linear code and traditional
 code. This is argued at length in the proposal and the article (links in Note
@@ -232,7 +232,7 @@ backwards compatibility. Consider
 We have
 
     map :: (a -> b) -> f a -> f b
-    Just :: a #-> Just a
+    Just :: a %1 -> Just a
 
 Types don't match, we should get a type error. But this is legal Haskell 98
 code! Bad! Bad! Bad!
@@ -242,7 +242,7 @@ polymorphism.
 
 Instead, we generalise the type of Just, when used as term:
 
-   Just :: forall {p}. a #p-> Just a
+   Just :: forall {p}. a %p-> Just a
 
 This is solely a concern for higher-order code like this: when called fully
 applied linear constructors are more general than constructors with unrestricted

@@ -1321,7 +1321,7 @@ dataConStupidTheta dc = dcStupidTheta dc
 Note [Displaying linear fields]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A constructor with a linear field can be written either as
-MkT :: a #-> T a (with -XLinearTypes)
+MkT :: a %1 -> T a (with -XLinearTypes)
 or
 MkT :: a  -> T a (with -XNoLinearTypes)
 
@@ -1330,7 +1330,7 @@ They differ in how linear fields are handled.
 
 1. dataConWrapperType:
 The type of the wrapper in Core.
-For example, dataConWrapperType for Maybe is a #-> Just a.
+For example, dataConWrapperType for Maybe is a %1 -> Just a.
 
 2. dataConNonlinearType:
 The type of the constructor, with linear arrows replaced by unrestricted ones.

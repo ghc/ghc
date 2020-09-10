@@ -3,18 +3,18 @@ LinearFFI.hs:6:1: error:
     • Unacceptable argument type in foreign declaration:
         Linear types are not supported in FFI declarations, see #18472
     • When checking declaration:
-        foreign import ccall safe "exp" c_exp :: Double #-> Double
+        foreign import ccall safe "exp" c_exp :: Double %1 -> Double
 
 LinearFFI.hs:7:1: error:
     • Unacceptable argument type in foreign declaration:
         Linear types are not supported in FFI declarations, see #18472
     • When checking declaration:
         foreign import stdcall safe "dynamic" d8
-          :: FunPtr (IO Int) #-> IO Int
+          :: FunPtr (IO Int) %1 -> IO Int
 
 LinearFFI.hs:8:1: error:
     • Unacceptable argument type in foreign declaration:
         Linear types are not supported in FFI declarations, see #18472
     • When checking declaration:
         foreign import ccall safe "wrapper" mkF
-          :: IO () #-> IO (FunPtr (IO ()))
+          :: IO () %1 -> IO (FunPtr (IO ()))
