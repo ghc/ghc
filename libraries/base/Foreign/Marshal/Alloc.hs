@@ -68,7 +68,6 @@ import GHC.IO.Exception
 import GHC.Real
 import GHC.Ptr
 import GHC.Base
-import GHC.Prim                 ( keepAlive# )
 
 -- exported functions
 -- ------------------
