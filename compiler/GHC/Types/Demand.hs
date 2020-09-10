@@ -25,7 +25,7 @@ module GHC.Types.Demand (
         BothDmdArg, mkBothDmdArg, toBothDmdArg,
         nopDmdType, botDmdType, addDemand,
 
-        DmdEnv, emptyDmdEnv,
+        DmdEnv, emptyDmdEnv, keepAliveDmdEnv,
         peelFV, findIdDemand,
 
         Divergence(..), lubDivergence, isDeadEndDiv,
@@ -59,8 +59,9 @@ module GHC.Types.Demand (
 
 import GHC.Prelude
 
-import GHC.Types.Var ( Var )
+import GHC.Types.Var ( Var, Id )
 import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import GHC.Types.Unique.FM
 import GHC.Types.Basic
 import GHC.Data.Maybe   ( orElse )
@@ -809,10 +810,22 @@ splitFVs is_thunk rhs_fvs
                     :*:
                     addToUFM_Directly sig_fv  uniq (JD { sd = s,    ud = Abs })
 
-data StrictPair a b = !a :*: !b
+keepAliveDmdEnv :: DmdEnv -> IdSet -> DmdEnv
+-- (keepAliveDmdType dt vs) makes sure that the Ids in vs have
+-- /some/ usage in the returned demand types -- they are not Absent
+-- See Note [Absence analysis for stable unfoldings and RULES]
+--     in GHC.Core.Opt.DmdAnal
+keepAliveDmdEnv env vs
+  = nonDetStrictFoldVarSet add env vs
+  where
+    add :: Id -> DmdEnv -> DmdEnv
+    add v env = extendVarEnv_C add_dmd env v topDmd
 
-strictPairToTuple :: StrictPair a b -> (a, b)
-strictPairToTuple (x :*: y) = (x, y)
+    add_dmd :: Demand -> Demand -> Demand
+    -- If the existing usage is Absent, make it used
+    -- Otherwise leave it alone
+    add_dmd dmd _ | isAbsDmd dmd = topDmd
+                  | otherwise    = dmd
 
 splitProdDmd_maybe :: Demand -> Maybe [Demand]
 -- Split a product into its components, iff there is any
@@ -826,6 +839,11 @@ splitProdDmd_maybe (JD { sd = s, ud = u })
                                 -> Just (mkJointDmds sx ux)
       (Lazy,  Use _ (UProd ux)) -> Just (mkJointDmds (replicate (length ux) Lazy) ux)
       _ -> Nothing
+
+data StrictPair a b = !a :*: !b
+
+strictPairToTuple :: StrictPair a b -> (a, b)
+strictPairToTuple (x :*: y) = (x, y)
 
 {- *********************************************************************
 *                                                                      *
@@ -1541,9 +1559,9 @@ There are several wrinkles:
   can be evaluated in a short finite time -- and that rules out nasty
   cases like the one above.  (I'm not quite sure why this was a
   problem in an earlier version of GHC, but it isn't now.)
+-}
 
-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
                      Demand signatures
 *                                                                      *
