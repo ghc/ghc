@@ -61,7 +61,6 @@ import GHC.Base
 import GHC.IORef
 import GHC.STRef        ( STRef(..) )
 import GHC.Ptr          ( Ptr(..), FunPtr(..) )
-import GHC.Prim         ( keepAlive# )
 
 import Unsafe.Coerce    ( unsafeCoerce, unsafeCoerceUnlifted )
 
