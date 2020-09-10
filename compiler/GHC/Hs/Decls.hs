@@ -1538,7 +1538,7 @@ types of a GADT constructor, since there are some non-obvious details involved.
 While splitting the argument types of a record GADT constructor is easy (they
 are stored in an HsRecTy), splitting the arguments of a prefix GADT constructor
 is trickier. The basic idea is that we must split along the outermost function
-arrows ((->) and (#->)) in the type, which GHC.Hs.Type.splitHsFunType
+arrows ((->) and (%1 ->)) in the type, which GHC.Hs.Type.splitHsFunType
 accomplishes. But what about type operators? Consider:
 
   C :: a :*: b -> a :*: b -> a :+: b

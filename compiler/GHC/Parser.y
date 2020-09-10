@@ -537,7 +537,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '|'            { L _ ITvbar }
  '<-'           { L _ (ITlarrow _) }
  '->'           { L _ (ITrarrow _) }
- '#->'          { L _ (ITlolly _) }
+ '->.'          { L _ (ITlolly _) }
  TIGHT_INFIX_AT { L _ ITat }
  '=>'           { L _ (ITdarrow _) }
  '-'            { L _ ITminus }
@@ -551,6 +551,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '>>-'          { L _ (ITRarrowtail _) }            -- for arrow notation
  '.'            { L _ ITdot }
  PREFIX_AT      { L _ ITtypeApp }
+ PREFIX_PERCENT { L _ ITpercent }                   -- for linear types
 
  '{'            { L _ ITocurly }                        -- special symbols
  '}'            { L _ ITccurly }
@@ -1958,12 +1959,17 @@ type :: { LHsType GhcPs }
                                        >> ams (sLL $1 $> $ HsFunTy noExtField HsUnrestrictedArrow $1 $3)
                                               [mu AnnRarrow $2] }
 
-        | btype '#->' ctype             {% hintLinear (getLoc $2) >>
-                                         ams (sLL $1 $> $ HsFunTy noExtField HsLinearArrow $1 $3)
-                                             [mu AnnLolly $2] }
+        | btype mult '->' ctype
+                                       {% hintLinear (getLoc $2) >>
+                                          ams (sLL $1 $> $ HsFunTy noExtField (unLoc $2) $1 $4)
+                                              [mu AnnRarrow $3] }
 
-mult :: { LHsType GhcPs }
-        : btype                  { $1 }
+        | btype '->.' ctype            {% hintLinear (getLoc $2) >>
+                                          ams (sLL $1 $> $ HsFunTy noExtField HsLinearArrow $1 $3)
+                                              [mu AnnLolly $2] }
+
+mult :: { Located (HsArrow GhcPs) }
+        : PREFIX_PERCENT atype          { sLL $1 $> (mkMultTy $2) }
 
 btype :: { LHsType GhcPs }
         : infixtype                     {% runPV $1 }

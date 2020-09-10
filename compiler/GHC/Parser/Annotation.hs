@@ -259,8 +259,8 @@ data AnnKeywordId
     | AnnLarrow     -- ^ '<-'
     | AnnLarrowU    -- ^ '<-', unicode variant
     | AnnLet
-    | AnnLolly  -- ^ '#->'
-    | AnnLollyU -- ^ '#->', unicode variant
+    | AnnLolly  -- ^ '%1 ->'
+    | AnnLollyU -- ^ '%1 ->', unicode variant
     | AnnMdo
     | AnnMinus -- ^ '-'
     | AnnModule

@@ -1,3 +1,4 @@
+{-# LANGUAGE UnicodeSyntax #-}
 module LinearNoExt where
 
-type T = a #-> a
+type T = a ⊸ a

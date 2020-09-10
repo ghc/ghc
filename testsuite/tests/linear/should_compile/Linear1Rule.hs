@@ -2,7 +2,7 @@
 module Linear1Rule where
 
 -- Test the 1 <= p rule
-f :: a #-> b
+f :: a %1 -> b
 f = f
 
 g :: a # p -> b
