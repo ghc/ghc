@@ -3,7 +3,7 @@
 -- NB: this module is SOURCE-imported by DynFlags, and should primarily
 --     refer to *types*, rather than *code*
 
-{-# LANGUAGE CPP, RankNTypes #-}
+{-# LANGUAGE CPP, RankNTypes, TypeFamilies #-}
 
 module GHC.Driver.Hooks
    ( Hooks
@@ -11,6 +11,7 @@ module GHC.Driver.Hooks
    , lookupHook
    , getHooked
      -- the hooks:
+   , DsForeignsHook
    , dsForeignsHook
    , tcForeignImportsHook
    , tcForeignExportsHook
@@ -36,9 +37,7 @@ import GHC.Driver.Types
 import GHC.Hs.Decls
 import GHC.Hs.Binds
 import GHC.Hs.Expr
-import GHC.Data.OrdList
 import GHC.Tc.Types
-import GHC.HsToCore.Types
 import GHC.Data.Bag
 import GHC.Types.Name.Reader
 import GHC.Types.Name
@@ -59,6 +58,7 @@ import GHC.Hs.Extension
 import GHC.StgToCmm.Types (ModuleLFInfos)
 
 import Data.Maybe
+import qualified Data.Kind
 
 {-
 ************************************************************************
@@ -90,9 +90,32 @@ emptyHooks = Hooks
   , cmmToRawCmmHook        = Nothing
   }
 
+{- Note [The Decoupling Abstract Data Hack]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The "Abstract Data" idea is due to Richard Eisenberg in
+https://gitlab.haskell.org/ghc/ghc/-/merge_requests/1957, where the pattern is
+described in more detail.
+
+Here we use it as a temporary measure to break the dependency from the Parser on
+the Desugarer until the parser is free of DynFlags. We introduced a nullary type
+family @DsForeignsook@, whose single definition is in GHC.HsToCore.Types, where
+we instantiate it to
+
+   [LForeignDecl GhcTc] -> DsM (ForeignStubs, OrdList (Id, CoreExpr))
+
+In doing so, the Hooks module (which is an hs-boot dependency of DynFlags) can
+be decoupled from its use of the DsM definition in GHC.HsToCore.Types. Since
+both DsM and the definition of @ForeignsHook@ live in the same module, there is
+virtually no difference for plugin authors that want to write a foreign hook.
+-}
+
+-- See Note [The Decoupling Abstract Data Hack]
+type family DsForeignsHook :: Data.Kind.Type
+
 data Hooks = Hooks
-  { dsForeignsHook         :: Maybe ([LForeignDecl GhcTc]
-                           -> DsM (ForeignStubs, OrdList (Id, CoreExpr)))
+  { dsForeignsHook         :: Maybe DsForeignsHook
+  -- ^ Actual type:
+  -- @Maybe ([LForeignDecl GhcTc] -> DsM (ForeignStubs, OrdList (Id, CoreExpr)))@
   , tcForeignImportsHook   :: Maybe ([LForeignDecl GhcRn]
                           -> TcM ([Id], [LForeignDecl GhcTc], Bag GlobalRdrElt))
   , tcForeignExportsHook   :: Maybe ([LForeignDecl GhcRn]
