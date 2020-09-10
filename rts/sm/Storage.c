@@ -1565,7 +1565,7 @@ calcNeeded (bool force_major, memcount *blocks_needed)
 
         // This can race with allocate() and compactAllocateBlockInternal()
         // but only needs to be approximate
-        TSAN_ANNOTATE_BENIGN_RACE(&gen->n_large_blocks);
+        TSAN_ANNOTATE_BENIGN_RACE(&gen->n_large_blocks, "calcNeeded");
         blocks += RELAXED_LOAD(&gen->n_large_blocks)
                 + RELAXED_LOAD(&gen->n_compact_blocks);
 
