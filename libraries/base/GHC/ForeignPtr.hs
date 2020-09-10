@@ -3,6 +3,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE Unsafe #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE KindSignatures #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
 
@@ -56,6 +58,7 @@ module GHC.ForeignPtr
 import Foreign.Storable
 import Data.Foldable    ( sequence_ )
 
+import GHC.Types
 import GHC.Show
 import GHC.Base
 import GHC.IORef
@@ -125,7 +128,7 @@ data ForeignPtrContents
     -- ^ The pointer refers to unmanaged memory that should not be freed when
     -- the 'ForeignPtr' becomes unreachable. Functions that add finalizers
     -- to a 'ForeignPtr' throw exceptions when the 'ForeignPtr' is backed by
-    -- 'PlainPtr'Most commonly, this is used with @Addr#@ literals.
+    -- 'PlainPtr'. Most commonly, this is used with @Addr#@ literals.
     -- See Note [Why FinalPtr].
     --
     -- @since 4.15
@@ -163,6 +166,7 @@ data ForeignPtrContents
     -- The invariants that apply to 'MallocPtr' apply to 'PlainPtr' as well.
 
 -- Note [Why FinalPtr]
+-- ~~~~~~~~~~~~~~~~~~~
 --
 -- FinalPtr exists as an optimization for foreign pointers created
 -- from Addr# literals. Most commonly, this happens in the bytestring
@@ -429,7 +433,7 @@ addForeignPtrConcFinalizer_ f@(MallocPtr fo r) finalizer = do
      else return ()
   where
     finalizer' :: State# RealWorld -> (# State# RealWorld, () #)
-    finalizer' = unIO (foreignPtrFinalizer r >> touch f)
+    finalizer' = unIO (foreignPtrFinalizer r >> touchForeignPtrContents f)
 
 addForeignPtrConcFinalizer_ _ _ =
   errorWithoutStackTrace "GHC.ForeignPtr: attempt to add a finalizer to plain pointer or a final pointer"
@@ -526,7 +530,12 @@ withForeignPtr :: ForeignPtr a -> (Ptr a -> IO b) -> IO b
 -- 'Storable' class.
 withForeignPtr fo@(ForeignPtr _ r) f = IO $ \s ->
   case f (unsafeForeignPtrToPtr fo) of
-    IO action# -> keepAlive# r s action#
+    IO action# ->
+      case r of
+        PlainForeignPtr ref -> keepAlive# ref s action#
+        FinalPtr -> action# s
+        MallocPtr mba _ -> keepAlive# mba s action#
+        PlainPtr mba -> keepAlive# mba s action#
 
 
 touchForeignPtr :: ForeignPtr a -> IO ()
@@ -554,10 +563,19 @@ touchForeignPtr :: ForeignPtr a -> IO ()
 -- result in artificial deadlock.  Another alternative is to use
 -- explicit reference counting.
 --
-touchForeignPtr (ForeignPtr _ r) = touch r
+touchForeignPtr (ForeignPtr _ r) = touchForeignPtrContents r
 
-touch :: ForeignPtrContents -> IO ()
-touch r = IO $ \s -> case touch# r s of s' -> (# s', () #)
+touchForeignPtrContents :: ForeignPtrContents -> IO ()
+touchForeignPtrContents (PlainForeignPtr ref) = touchLifted  ref
+touchForeignPtrContents FinalPtr = return ()
+touchForeignPtrContents (MallocPtr mba _) = touchUnlifted mba
+touchForeignPtrContents (PlainPtr mba) = touchUnlifted mba
+
+touchLifted :: a -> IO ()
+touchLifted r = IO $ \s -> case touch# r s of s' -> (# s', () #)
+
+touchUnlifted :: forall (a :: TYPE 'UnliftedRep). a -> IO ()
+touchUnlifted r = IO $ \s -> case touch# r s of s' -> (# s', () #)
 
 unsafeForeignPtrToPtr :: ForeignPtr a -> Ptr a
 -- ^This function extracts the pointer component of a foreign
