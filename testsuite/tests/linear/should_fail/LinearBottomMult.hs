@@ -6,8 +6,8 @@ module LinearBottomMult where
 data Void
 data U a where U :: a -> U a
 
-elim :: U a #-> ()
+elim :: U a %1 -> ()
 elim (U _) = ()
 
-f :: a #-> ()
+f :: a %1 -> ()
 f x = elim (U (\(a :: Void) -> case a of {}))
