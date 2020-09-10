@@ -3,7 +3,7 @@ module Main where
 import GHC
 import GHC.Driver.Session
 import GHC.Driver.Monad
-import GHC.Parser.Lexer (mkParserFlags)
+import GHC.Driver.Config
 import System.Environment
 
 testStrings = [
@@ -53,7 +53,7 @@ main = do
   where
     testWithParser parser = do
       dflags <- getSessionDynFlags
-      let pflags = mkParserFlags dflags
+      let pflags = initParserOpts dflags
       liftIO . putStrLn . unlines $ map (testExpr (parser pflags)) testStrings
 
     testExpr parser expr = do

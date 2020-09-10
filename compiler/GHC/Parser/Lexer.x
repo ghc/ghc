@@ -49,8 +49,10 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module GHC.Parser.Lexer (
-   Token(..), lexer, lexerDbg, pragState, mkPState, mkPStatePure, PState(..),
-   P(..), ParseResult(..), mkParserFlags, mkParserFlags', ParserFlags(..),
+   Token(..), lexer, lexerDbg,
+   ParserOpts(..), mkParserOpts,
+   PState (..), initParserState, initPragState,
+   P(..), ParseResult(..),
    appendWarning,
    appendError,
    allocateComments,
@@ -62,7 +64,7 @@ module GHC.Parser.Lexer (
    activeContext, nextIsEOF,
    getLexState, popLexState, pushLexState,
    ExtBits(..),
-   xtest,
+   xtest, xunset, xset,
    lexTokenStream,
    AddAnn(..),mkParensApiAnn,
    addAnnsAt,
@@ -2207,12 +2209,13 @@ data ParseResult a
              --   a non-empty bag of errors.
 
 -- | Test whether a 'WarningFlag' is set
-warnopt :: WarningFlag -> ParserFlags -> Bool
+warnopt :: WarningFlag -> ParserOpts -> Bool
 warnopt f options = f `EnumSet.member` pWarningFlags options
 
--- | The subset of the 'DynFlags' used by the parser.
--- See 'mkParserFlags' or 'mkParserFlags'' for ways to construct this.
-data ParserFlags = ParserFlags {
+-- | Parser options.
+--
+-- See 'mkParserOpts' to construct this.
+data ParserOpts = ParserOpts {
     pWarningFlags   :: EnumSet WarningFlag
   , pHomeUnitId     :: UnitId      -- ^ id of the unit currently being compiled
                                    -- (only used in Cmm parser)
@@ -2230,7 +2233,7 @@ data HdkComment
 
 data PState = PState {
         buffer     :: StringBuffer,
-        options    :: ParserFlags,
+        options    :: ParserOpts,
         -- This needs to take DynFlags as an argument until
         -- we have a fix for #10143
         messages   :: DynFlags -> Messages,
@@ -2570,6 +2573,12 @@ xbit = bit . fromEnum
 xtest :: ExtBits -> ExtsBitmap -> Bool
 xtest ext xmap = testBit xmap (fromEnum ext)
 
+xset :: ExtBits -> ExtsBitmap -> ExtsBitmap
+xset ext xmap = setBit xmap (fromEnum ext)
+
+xunset :: ExtBits -> ExtsBitmap -> ExtsBitmap
+xunset ext xmap = clearBit xmap (fromEnum ext)
+
 -- | Various boolean flags, mostly language extensions, that impact lexing and
 -- parsing. Note that a handful of these can change during lexing/parsing.
 data ExtBits
@@ -2630,19 +2639,8 @@ data ExtBits
     -- tokens of their own.
   deriving Enum
 
-
-
-
-
--- PState for parsing options pragmas
---
-pragState :: DynFlags -> StringBuffer -> RealSrcLoc -> PState
-pragState dynflags buf loc = (mkPState dynflags buf loc) {
-                                 lex_state = [bol, option_prags, 0]
-                             }
-
-{-# INLINE mkParserFlags' #-}
-mkParserFlags'
+{-# INLINE mkParserOpts #-}
+mkParserOpts
   :: EnumSet WarningFlag        -- ^ warnings flags enabled
   -> EnumSet LangExt.Extension  -- ^ permitted language extensions enabled
   -> UnitId                     -- ^ id of the unit currently being compiled
@@ -2656,11 +2654,11 @@ mkParserFlags'
   -- the internal position kept by the parser. Otherwise, those pragmas are
   -- lexed as 'ITline_prag' and 'ITcolumn_prag' tokens.
 
-  -> ParserFlags
--- ^ Given exactly the information needed, set up the 'ParserFlags'
-mkParserFlags' warningFlags extensionFlags homeUnitId
+  -> ParserOpts
+-- ^ Given exactly the information needed, set up the 'ParserOpts'
+mkParserOpts warningFlags extensionFlags homeUnitId
   safeImports isHaddock rawTokStream usePosPrags =
-    ParserFlags {
+    ParserOpts {
       pWarningFlags = warningFlags
     , pHomeUnitId   = homeUnitId
     , pExtsBitmap   = safeHaskellBit .|. langExtBits .|. optBits
@@ -2722,25 +2720,15 @@ mkParserFlags' warningFlags extensionFlags homeUnitId
     b `setBitIf` cond | cond      = xbit b
                       | otherwise = 0
 
--- | Extracts the flag information needed for parsing
-mkParserFlags :: DynFlags -> ParserFlags
-mkParserFlags =
-  mkParserFlags'
-    <$> DynFlags.warningFlags
-    <*> DynFlags.extensionFlags
-    <*> DynFlags.homeUnitId_
-    <*> safeImportsOn
-    <*> gopt Opt_Haddock
-    <*> gopt Opt_KeepRawTokenStream
-    <*> const True
+-- | Set parser options for parsing OPTIONS pragmas
+initPragState :: ParserOpts -> StringBuffer -> RealSrcLoc -> PState
+initPragState options buf loc = (initParserState options buf loc)
+   { lex_state = [bol, option_prags, 0]
+   }
 
--- | Creates a parse state from a 'DynFlags' value
-mkPState :: DynFlags -> StringBuffer -> RealSrcLoc -> PState
-mkPState flags = mkPStatePure (mkParserFlags flags)
-
--- | Creates a parse state from a 'ParserFlags' value
-mkPStatePure :: ParserFlags -> StringBuffer -> RealSrcLoc -> PState
-mkPStatePure options buf loc =
+-- | Creates a parse state from a 'ParserOpts' value
+initParserState :: ParserOpts -> StringBuffer -> RealSrcLoc -> PState
+initParserState options buf loc =
   PState {
       buffer        = buf,
       options       = options,
@@ -2818,7 +2806,7 @@ appendError srcspan msg m =
     in (ws, es')
 
 appendWarning
-  :: ParserFlags
+  :: ParserOpts
   -> WarningFlag
   -> SrcSpan
   -> SDoc
@@ -2928,7 +2916,7 @@ getOffside = P $ \s@PState{last_loc=loc, context=stk} ->
 -- Construct a parse error
 
 srcParseErr
-  :: ParserFlags
+  :: ParserOpts
   -> StringBuffer       -- current buffer (placed just after the last token)
   -> Int                -- length of the previous token
   -> MsgDoc
@@ -3248,16 +3236,20 @@ reportLexError loc1 loc2 buf str
      then failLocMsgP loc2 loc2 (str ++ " (UTF-8 decoding error)")
      else failLocMsgP loc1 loc2 (str ++ " at character " ++ show c)
 
-lexTokenStream :: StringBuffer -> RealSrcLoc -> DynFlags -> ParseResult [Located Token]
-lexTokenStream buf loc dflags = unP go initState{ options = opts' }
-    where dflags' = gopt_set (gopt_unset dflags Opt_Haddock) Opt_KeepRawTokenStream
-          initState@PState{ options = opts } = mkPState dflags' buf loc
-          opts' = opts{ pExtsBitmap = complement (xbit UsePosPragsBit) .&. pExtsBitmap opts }
-          go = do
-            ltok <- lexer False return
-            case ltok of
-              L _ ITeof -> return []
-              _ -> liftM (ltok:) go
+lexTokenStream :: ParserOpts -> StringBuffer -> RealSrcLoc -> ParseResult [Located Token]
+lexTokenStream opts buf loc = unP go initState{ options = opts' }
+    where
+    new_exts  = xunset HaddockBit        -- disable Haddock
+                $ xunset UsePosPragsBit  -- parse LINE/COLUMN pragmas as tokens
+                $ xset RawTokenStreamBit -- include comments
+                $ pExtsBitmap opts
+    opts'     = opts { pExtsBitmap = new_exts }
+    initState = initParserState opts' buf loc
+    go = do
+      ltok <- lexer False return
+      case ltok of
+        L _ ITeof -> return []
+        _ -> liftM (ltok:) go
 
 linePrags = Map.singleton "line" linePrag
 
