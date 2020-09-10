@@ -199,18 +199,23 @@ EXTERN StgInt RET_UNBOXED_TUP_hst[TICKY_BIN_COUNT] INIT({0});
    TICKY_TICKY is defined or not. */
 
 #if !defined(CMINUSMINUS)
+#if defined(TICKY_TICKY)
 #define TICK_BUMP_BY(ctr,n) ctr = (StgInt) ctr + n
+#else
+#define TICK_BUMP_BY(ctr,n) /* nothing */
+#endif
+
 #define TICK_BUMP(ctr)      TICK_BUMP_BY(ctr,1)
 
-#define TICK_ALLOC_PRIM(x,y,z)
-#define TICK_UPD_OLD_IND()
-#define TICK_UPD_NEW_IND()
-#define TICK_UPD_SQUEEZED()
-#define TICK_ALLOC_HEAP_NOCTR(bytes)
-#define TICK_GC_FAILED_PROMOTION()
-#define TICK_ALLOC_TSO()
-#define TICK_ALLOC_STACK(g)
-#define TICK_ALLOC_UP_THK(g,s)
-#define TICK_ALLOC_SE_THK(g,s)
+#define TICK_ALLOC_PRIM(x,y,z)        // FIXME: update counter
+#define TICK_UPD_OLD_IND()            TICK_BUMP(UPD_OLD_IND_ctr)
+#define TICK_UPD_NEW_IND()            TICK_BUMP(UPD_NEW_IND_ctr)
+#define TICK_UPD_SQUEEZED()           TICK_BUMP(UPD_SQUEEZED_ctr)
+#define TICK_ALLOC_HEAP_NOCTR(bytes)  // FIXME: update counter
+#define TICK_GC_FAILED_PROMOTION()    // FIXME: update counter
+#define TICK_ALLOC_TSO()              // FIXME: update counter
+#define TICK_ALLOC_STACK(g)           // FIXME: update counter
+#define TICK_ALLOC_UP_THK(g,s)        // FIXME: update counter
+#define TICK_ALLOC_SE_THK(g,s)        // FIXME: update counter
 
 #endif
