@@ -1,3 +1,10 @@
 
-LinearNoExt.hs:3:12: error:
-    Enable LinearTypes to allow linear functions
+LinearNoExt.hs:3:14: error:
+    Not in scope: type constructor or class ‘%’
+
+LinearNoExt.hs:3:14: error:
+    Illegal operator ‘%’ in type ‘a % 1’
+      Use TypeOperators to allow operators in types
+
+LinearNoExt.hs:3:15: error:
+    Illegal type: ‘1’ Perhaps you intended to use DataKinds
