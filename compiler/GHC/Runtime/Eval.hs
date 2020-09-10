@@ -97,8 +97,8 @@ import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Data.Bag
 import GHC.Utils.Misc
-import qualified GHC.Parser.Lexer as Lexer (P (..), ParseResult(..), unP, mkPStatePure)
-import GHC.Parser.Lexer (ParserFlags)
+import qualified GHC.Parser.Lexer as Lexer (P (..), ParseResult(..), unP, initParserState)
+import GHC.Parser.Lexer (ParserOpts)
 import qualified GHC.Parser       as Parser (parseStmt, parseModule, parseDeclaration, parseImport)
 
 import System.Directory
@@ -878,14 +878,14 @@ parseName str = withSession $ \hsc_env -> liftIO $
       ; hscTcRnLookupRdrName hsc_env lrdr_name }
 
 -- | Returns @True@ if passed string is a statement.
-isStmt :: ParserFlags -> String -> Bool
+isStmt :: ParserOpts -> String -> Bool
 isStmt pflags stmt =
   case parseThing Parser.parseStmt pflags stmt of
     Lexer.POk _ _ -> True
     Lexer.PFailed _ -> False
 
 -- | Returns @True@ if passed string has an import declaration.
-hasImport :: ParserFlags -> String -> Bool
+hasImport :: ParserOpts -> String -> Bool
 hasImport pflags stmt =
   case parseThing Parser.parseModule pflags stmt of
     Lexer.POk _ thing -> hasImports thing
@@ -894,14 +894,14 @@ hasImport pflags stmt =
     hasImports = not . null . hsmodImports . unLoc
 
 -- | Returns @True@ if passed string is an import declaration.
-isImport :: ParserFlags -> String -> Bool
+isImport :: ParserOpts -> String -> Bool
 isImport pflags stmt =
   case parseThing Parser.parseImport pflags stmt of
     Lexer.POk _ _ -> True
     Lexer.PFailed _ -> False
 
 -- | Returns @True@ if passed string is a declaration but __/not a splice/__.
-isDecl :: ParserFlags -> String -> Bool
+isDecl :: ParserOpts -> String -> Bool
 isDecl pflags stmt = do
   case parseThing Parser.parseDeclaration pflags stmt of
     Lexer.POk _ thing ->
@@ -910,12 +910,12 @@ isDecl pflags stmt = do
         _ -> True
     Lexer.PFailed _ -> False
 
-parseThing :: Lexer.P thing -> ParserFlags -> String -> Lexer.ParseResult thing
-parseThing parser pflags stmt = do
+parseThing :: Lexer.P thing -> ParserOpts -> String -> Lexer.ParseResult thing
+parseThing parser opts stmt = do
   let buf = stringToStringBuffer stmt
       loc = mkRealSrcLoc (fsLit "<interactive>") 1 1
 
-  Lexer.unP parser (Lexer.mkPStatePure pflags buf loc)
+  Lexer.unP parser (Lexer.initParserState opts buf loc)
 
 getDocs :: GhcMonad m
         => Name
