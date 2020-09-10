@@ -1342,5 +1342,3 @@ exprIsLambda_maybe (in_scope_set, id_unf) e
 exprIsLambda_maybe _ _e
     = -- pprTrace "exprIsLambda_maybe:Fail" (vcat [ppr _e])
       Nothing
-
-

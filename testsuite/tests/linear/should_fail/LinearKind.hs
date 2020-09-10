@@ -1,4 +1,4 @@
 {-# LANGUAGE LinearTypes, KindSignatures #-}
 module LinearKind where
 
-data A :: * #-> *
+data A :: * %1 -> *
