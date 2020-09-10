@@ -629,9 +629,75 @@ set_sigtstp_action (bool handle)
 }
 
 /* Used by ItimerTimerCreate and ItimerSetitimer implementations */
+
+/* Note [Signal Handler and Stacks]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * We need to ensure that we use a separate stack for signal handling.  Our
+ * signal can interrupt the current execution at any point in time, which also
+ * means at any possible instruction.  If we are stopped at an sp displacement
+ * and have the signal handler share the stack, we can corrupt the current
+ * stack with the signal handler.  This is only safe if we never increment
+ * sp without the assumption that anything below the stack is invalidated.
+ *
+ * If we share the stack, at the time of the signal interruption, our stack
+ * will look like this:
+ *
+ *  |---------------| <- sp + x
+ *  | Program Stack |
+ *  |---------------| <- sp
+ *  | Signal Stack  |
+ *  |---------------| <- sp - x
+ *
+ * The Signal is free to write anywhere between sp and sp - x (for a downards
+ * growing stack).
+ *
+ * This is usually safe if we assume that we ever only increment sp to sp' when
+ * the data in below the new sp' is never accessed again.
+ *
+ * However we violate this in at least the aarch64 native code gen.  AArch64
+ * only has limited relative load and store addressing modes.  GHC reserves
+ * RESERVED_C_STACK_BYTES (16k) of C stack space.  Thus to allow arbitrary far
+ * loads and store off of the sp.  To effective translate
+ *
+ *      [sp + (n*4k + m)] <- x
+ *
+ * we tranlsate this into a sequence of instructions
+ *
+ *      sp <- sp + (n * 4k)                (1)
+ *      [sp + m] <- x                      (2)
+ *      sp <- sp - (n * 4k)                (3)
+ *
+ * and thus if we receive the signal wile in (2), the signal handler is free to
+ * wreak havoc on our "live" stack.
+ *
+ * This is most notably not an issue on architectures with arbitrary far (or
+ * at least within the RESERVED_C_STACK_BYTES range) addressing modes.  It is
+ * however conceivable that we might produce assembly that has temorary stack
+ * pointer adjustments without the guarantee that anything below the sp is
+ * dead.
+ *
+ * To address this, we will ensure that the signal has its own stack and thus
+ * can never interfere with any of the stack of the running process (during
+ * signal handling).
+ */
 void
 install_vtalrm_handler(int sig, TickProc handle_tick)
 {
+    stack_t stack;
+
+    stack.ss_sp = malloc(SIGSTKSZ);
+    if (stack.ss_sp == NULL) {
+        sysErrorBelch("malloc(signalstack)");
+        stg_exit(EXIT_FAILURE);
+    }
+
+    stack.ss_size = SIGSTKSZ;
+    stack.ss_flags = 0;
+    if (sigaltstack(&stack, NULL) == -1) {
+        sysErrorBelch("sigaltstack");
+        stg_exit(EXIT_FAILURE);
+    }
+
     struct sigaction action = {};
 
     action.sa_handler = handle_tick;
@@ -645,9 +711,9 @@ install_vtalrm_handler(int sig, TickProc handle_tick)
     // readline installs its own SIGALRM signal handler (see
     // readline's signals.c), and this somehow causes readline to go
     // wrong when the input exceeds a single line (try it).
-    action.sa_flags = SA_RESTART;
+    action.sa_flags = SA_ONSTACK | SA_RESTART;
 #else
-    action.sa_flags = 0;
+    action.sa_flags = SA_ONSTACK;
 #endif
 
     if (sigaction(sig, &action, NULL) == -1) {
