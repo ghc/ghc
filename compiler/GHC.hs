@@ -303,6 +303,7 @@ import GHCi.RemoteTypes
 
 import GHC.Core.Ppr.TyThing  ( pprFamInst )
 import GHC.Driver.Backend
+import GHC.Driver.Config
 import GHC.Driver.Main
 import GHC.Driver.Make
 import GHC.Driver.Hooks
@@ -1426,9 +1427,9 @@ getModuleSourceAndFlags mod = do
 -- Throws a 'GHC.Driver.Types.SourceError' on parse error.
 getTokenStream :: GhcMonad m => Module -> m [Located Token]
 getTokenStream mod = do
-  (sourceFile, source, flags) <- getModuleSourceAndFlags mod
+  (sourceFile, source, dflags) <- getModuleSourceAndFlags mod
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
-  case lexTokenStream source startLoc flags of
+  case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts  -> return ts
     PFailed pst ->
         do dflags <- getDynFlags
@@ -1439,9 +1440,9 @@ getTokenStream mod = do
 -- 'showRichTokenStream'.
 getRichTokenStream :: GhcMonad m => Module -> m [(Located Token, String)]
 getRichTokenStream mod = do
-  (sourceFile, source, flags) <- getModuleSourceAndFlags mod
+  (sourceFile, source, dflags) <- getModuleSourceAndFlags mod
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
-  case lexTokenStream source startLoc flags of
+  case lexTokenStream (initParserOpts dflags) source startLoc of
     POk _ ts -> return $ addSourceToTokens startLoc source ts
     PFailed pst ->
         do dflags <- getDynFlags
@@ -1616,7 +1617,7 @@ parser str dflags filename =
        loc  = mkRealSrcLoc (mkFastString filename) 1 1
        buf  = stringToStringBuffer str
    in
-   case unP Parser.parseModule (mkPState dflags buf loc) of
+   case unP Parser.parseModule (initParserState (initParserOpts dflags) buf loc) of
 
      PFailed pst ->
          let (warns,errs) = getMessages pst dflags in

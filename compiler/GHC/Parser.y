@@ -21,13 +21,13 @@
 -- and then parse that string:
 --
 -- @
---     runParser :: DynFlags -> String -> P a -> ParseResult a
---     runParser flags str parser = unP parser parseState
+--     runParser :: ParserOpts -> String -> P a -> ParseResult a
+--     runParser opts str parser = unP parser parseState
 --     where
 --       filename = "\<interactive\>"
 --       location = mkRealSrcLoc (mkFastString filename) 1 1
 --       buffer = stringToStringBuffer str
---       parseState = mkPState flags buffer location
+--       parseState = initParserState opts buffer location
 -- @
 module GHC.Parser
    ( parseModule, parseSignature, parseImport, parseStatement, parseBackpack

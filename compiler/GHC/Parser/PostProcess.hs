@@ -2660,7 +2660,7 @@ failOpFewArgs (L loc op) =
 
 data PV_Context =
   PV_Context
-    { pv_options :: ParserFlags
+    { pv_options :: ParserOpts
     , pv_hint :: SDoc  -- See Note [Parser-Validator Hint]
     }
 

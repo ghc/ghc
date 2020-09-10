@@ -138,6 +138,7 @@ import GHC.Cmm.Info.Build
 import GHC.Cmm.Pipeline
 import GHC.Cmm.Info
 import GHC.Driver.CodeOutput
+import GHC.Driver.Config
 import GHC.Core.InstEnv
 import GHC.Core.FamInstEnv
 import GHC.Utils.Fingerprint ( Fingerprint )
@@ -353,7 +354,7 @@ hscParse' mod_summary
                  = parseSignature
                  | otherwise = parseModule
 
-    case unP parseMod (mkPState dflags buf loc) of
+    case unP parseMod (initParserState (initParserOpts dflags) buf loc) of
         PFailed pst ->
             handleWarningsThrowErrors (getMessages pst dflags)
         POk pst rdr_module -> do
@@ -1875,7 +1876,7 @@ hscParseThingWithLocation source linenumber parser str
     let buf = stringToStringBuffer str
         loc = mkRealSrcLoc (fsLit source) linenumber 1
 
-    case unP parser (mkPState dflags buf loc) of
+    case unP parser (initParserState (initParserOpts dflags) buf loc) of
         PFailed pst -> do
             handleWarningsThrowErrors (getMessages pst dflags)
 

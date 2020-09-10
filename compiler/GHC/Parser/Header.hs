@@ -37,6 +37,7 @@ import GHC.Builtin.Names
 import GHC.Data.StringBuffer
 import GHC.Types.SrcLoc
 import GHC.Driver.Session
+import GHC.Driver.Config
 import GHC.Utils.Error
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
@@ -73,7 +74,7 @@ getImports :: DynFlags
               -- names from -XPackageImports), and the module name.
 getImports dflags buf filename source_filename = do
   let loc  = mkRealSrcLoc (mkFastString filename) 1 1
-  case unP parseHeader (mkPState dflags buf loc) of
+  case unP parseHeader (initParserState (initParserOpts dflags) buf loc) of
     PFailed pst ->
         -- assuming we're not logging warnings here as per below
       return $ Left $ getErrorMessages pst dflags
@@ -178,7 +179,8 @@ blockSize = 1024
 lazyGetToks :: DynFlags -> FilePath -> Handle -> IO [Located Token]
 lazyGetToks dflags filename handle = do
   buf <- hGetStringBufferBlock handle blockSize
-  unsafeInterleaveIO $ lazyLexBuf handle (pragState dflags buf loc) False blockSize
+  let prag_state = initPragState (initParserOpts dflags) buf loc
+  unsafeInterleaveIO $ lazyLexBuf handle prag_state False blockSize
  where
   loc  = mkRealSrcLoc (mkFastString filename) 1 1
 
@@ -214,8 +216,9 @@ lazyGetToks dflags filename handle = do
 
 
 getToks :: DynFlags -> FilePath -> StringBuffer -> [Located Token]
-getToks dflags filename buf = lexAll (pragState dflags buf loc)
+getToks dflags filename buf = lexAll pstate
  where
+  pstate = initPragState (initParserOpts dflags) buf loc
   loc  = mkRealSrcLoc (mkFastString filename) 1 1
 
   lexAll state = case unP (lexer False return) state of
