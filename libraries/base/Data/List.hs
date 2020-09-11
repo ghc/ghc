@@ -25,6 +25,7 @@ module Data.List
    , tail
    , init
    , uncons
+   , singleton
    , null
    , length
 
