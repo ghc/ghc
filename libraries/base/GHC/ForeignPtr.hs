@@ -2,6 +2,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE Unsafe #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
@@ -24,7 +25,7 @@ module GHC.ForeignPtr
   (
         -- * Types
         ForeignPtr(..),
-        ForeignPtrContents(..),
+        ForeignPtrContents(PlainForeignPtr, FinalPtr, MallocPtr, PlainPtr),
         Finalizers(..),
         FinalizerPtr,
         FinalizerEnvPtr,
@@ -117,11 +118,11 @@ data Finalizers
 -- >              Prohibited  | PlainPtr   | FinalPtr        |
 -- >                          +------------+-----------------+
 data ForeignPtrContents
-  = PlainForeignPtr !(IORef Finalizers)
+  = PlainForeignPtr_ !(IORef Finalizers)
     -- ^ The pointer refers to unmanaged memory that was allocated by
     -- a foreign function (typically using @malloc@). The finalizer
     -- frequently calls the C function @free@ or some variant of it.
-  | FinalPtr
+  | FinalPtr_
     -- ^ The pointer refers to unmanaged memory that should not be freed when
     -- the 'ForeignPtr' becomes unreachable. Functions that add finalizers
     -- to a 'ForeignPtr' throw exceptions when the 'ForeignPtr' is backed by
@@ -129,7 +130,7 @@ data ForeignPtrContents
     -- See Note [Why FinalPtr].
     --
     -- @since 4.15
-  | MallocPtr (MutableByteArray# RealWorld) !(IORef Finalizers)
+  | MallocPtr_ (MutableByteArray# RealWorld) !(IORef Finalizers)
     -- ^ The pointer refers to a byte array.
     -- The 'MutableByteArray#' field means that the 'MutableByteArray#' is
     -- reachable (by GC) whenever the 'ForeignPtr' is reachable. When the
@@ -154,13 +155,38 @@ data ForeignPtrContents
     --    > incrBad (ForeignPtr p (MallocPtr m _)) = do
     --    >   f <- newIORef NoFinalizers
     --    >   pure (ForeignPtr p (MallocPtr m f))
-  | PlainPtr (MutableByteArray# RealWorld)
+  | PlainPtr_ (MutableByteArray# RealWorld)
     -- ^ The pointer refers to a byte array. Finalization is not
     -- supported. This optimizes @MallocPtr@ by avoiding the allocation
     -- of a @MutVar#@ when it is known that no one will add finalizers to
     -- the @ForeignPtr@. Functions that add finalizers to a 'ForeignPtr'
     -- throw exceptions when the 'ForeignPtr' is backed by 'PlainPtr'.
     -- The invariants that apply to 'MallocPtr' apply to 'PlainPtr' as well.
+
+plainPtr :: MutableByteArray# RealWorld -> ForeignPtrContents
+plainPtr = PlainPtr_
+{-# INLINE [1] plainPtr #-}
+
+mallocPtr :: MutableByteArray# RealWorld -> IORef Finalizers -> ForeignPtrContents
+mallocPtr = MallocPtr_
+{-# INLINE [1] mallocPtr #-}
+
+finalPtr :: ForeignPtrContents
+finalPtr = FinalPtr_
+{-# INLINE [1] finalPtr #-}
+
+plainForeignPtr :: IORef Finalizers -> ForeignPtrContents
+plainForeignPtr = PlainForeignPtr_
+{-# INLINE [1] plainForeignPtr #-}
+
+pattern PlainPtr mba <- PlainPtr_ mba where
+  PlainPtr mba = plainPtr mba
+pattern MallocPtr mba fin <- MallocPtr_ mba fin where
+  MallocPtr mba bin = mallocPtr mba bin
+pattern FinalPtr <- FinalPtr_ where
+  FinalPtr = finalPtr
+pattern PlainForeignPtr fin <- PlainForeignPtr_ fin where
+  PlainForeignPtr fin = plainForeignPtr fin
 
 -- Note [Why FinalPtr]
 --
@@ -528,6 +554,14 @@ withForeignPtr fo@(ForeignPtr _ r) f = IO $ \s ->
   case f (unsafeForeignPtrToPtr fo) of
     IO action# -> keepAlive# r s action#
 
+{-# RULES "keepAlive#/PlainForeignPtr" forall s k ref .
+        keepAlive# (plainForeignPtr ref) s k = keepAlive# ref s k #-}
+{-# RULES "keepAlive#/FinalPtr" forall s k .
+        keepAlive# finalPtr s k = k s #-}
+{-# RULES "keepAlive#/MallocPtr" forall s k mba x .
+        keepAlive# (mallocPtr mba x) s k = keepAlive# mba s k #-}
+{-# RULES "keepAlive#/PlainPtr" forall s k mba .
+        keepAlive# (plainPtr mba) s k = keepAlive# mba s k #-} 
 
 touchForeignPtr :: ForeignPtr a -> IO ()
 -- ^This function ensures that the foreign object in
