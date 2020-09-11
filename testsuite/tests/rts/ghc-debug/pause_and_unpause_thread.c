@@ -23,6 +23,11 @@ void* pauseAndUnpause_thread(void* unused){
 
     rts_unpause(r_paused);
 
+    if(rts_isPaused()) {
+        errorBelch("Expected the RTS to be unpaused.");
+        exit(1);
+    }
+
     return NULL;
 }
 
