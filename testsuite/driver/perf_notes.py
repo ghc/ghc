@@ -311,7 +311,7 @@ def append_perf_stat(stats: List[PerfStat],
                      max_tries: int=5
                      ) -> bool:
     # Append to git note
-    print('Appending ' + str(len(stats)) + ' stats to git notes.')
+    print('Appending %d stats to git note namespace %s.' % (len(stats), namespace))
     stats_str = format_perf_stat(stats)
     def try_append():
             try:

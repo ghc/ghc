@@ -511,11 +511,7 @@ else:
 
     # Write perf stats if any exist or if a metrics file is specified.
     stats_metrics = [stat for (_, stat, __) in t.metrics] # type: List[PerfStat]
-    if hasMetricsFile:
-        print('Appending ' + str(len(stats_metrics)) + ' stats to file: ' + config.metrics_file)
-        with open(config.metrics_file, 'a') as f:
-            f.write("\n" + Perf.format_perf_stat(stats_metrics))
-    elif inside_git_repo() and any(stats_metrics):
+    if inside_git_repo() and any(stats_metrics):
         if is_worktree_dirty():
             print()
             print(str_warn('Performance Metrics NOT Saved') + \
@@ -523,6 +519,11 @@ else:
                 '--metrics-file to save metrics to a file.')
         else:
             Perf.append_perf_stat(stats_metrics)
+
+    if hasMetricsFile:
+        print('Appending %d stats to file: %s' % (len(stats_metrics), config.metrics_file))
+        with open(config.metrics_file, 'a') as f:
+            f.write("\n" + Perf.format_perf_stat(stats_metrics))
 
     # Write summary
     if config.summary_file:
