@@ -18,30 +18,25 @@ import GHC.Prelude hiding (EQ)
 import GHC.Platform.Regs
 import GHC.CmmToAsm.AArch64.Instr
 import GHC.CmmToAsm.AArch64.Regs
-import GHC.CmmToAsm.AArch64.RegInfo
 import GHC.CmmToAsm.AArch64.Cond
-import GHC.CmmToAsm.AArch64.Ppr
 
 import GHC.CmmToAsm.CPrim
 import GHC.Cmm.DebugBlock
 import GHC.CmmToAsm.Monad
-   ( NatM, getNewRegNat, getNewLabelNat
-   , getBlockIdNat, getPicBaseNat, getNewRegPairNat
+   ( NatM, getNewRegNat
    , getPicBaseMaybeNat, getPlatform, getConfig
    , getDebugBlock, getFileId
    )
-import GHC.CmmToAsm.Instr
+-- import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.PIC
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Config
-import GHC.Platform.Reg.Class
+import GHC.CmmToAsm.Types
 import GHC.Platform.Reg
-import GHC.CmmToAsm.Reg.Target
 import GHC.Platform
 
 -- Our intermediate code:
 import GHC.Cmm.BlockId
-import GHC.Cmm.Ppr           ( pprExpr )
 import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch
@@ -59,15 +54,13 @@ import Control.Monad    ( mapAndUnzipM, when, foldM )
 import Data.Bits
 import Data.Word
 import Data.Maybe
-import Data.Int
 import GHC.Float
 
 import GHC.Types.Basic
 import GHC.Types.ForeignCall
 import GHC.Data.FastString
 import GHC.Utils.Misc
-
-import Debug.Trace
+import GHC.Utils.Panic
 
 -- @cmmTopCodeGen@ will be our main entry point to code gen.  Here we'll get
 -- @RawCmmDecl@; see GHC.Cmm
@@ -113,11 +106,9 @@ cmmTopCodeGen _cmm@(CmmProc info lab live graph) = do
   let blocks = toBlockListEntryFirst graph
   (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
   picBaseMb <- getPicBaseMaybeNat
-  platform <- getPlatform
 
   let proc = CmmProc info lab live (ListGraph $ concat nat_blocks)
       tops = proc : concat statics
-      os   = platformOS platform
 
   case picBaseMb of
       Just _picBase -> panic "AArch64.cmmTopCodeGen: picBase not implemented"
@@ -332,10 +323,11 @@ getRegisterReg platform (CmmGlobal mid)
         -- platform.  Hence ...
 
 -- | Convert a BlockId to some CmmStatic data
-jumpTableEntry :: NCGConfig -> Maybe BlockId -> CmmStatic
-jumpTableEntry config Nothing   = CmmStaticLit (CmmInt 0 (ncgWordWidth config))
-jumpTableEntry _ (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
-    where blockLabel = blockLbl blockid
+-- XXX: Add JumpTable Logic
+-- jumpTableEntry :: NCGConfig -> Maybe BlockId -> CmmStatic
+-- jumpTableEntry config Nothing   = CmmStaticLit (CmmInt 0 (ncgWordWidth config))
+-- jumpTableEntry _ (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
+--     where blockLabel = blockLbl blockid
 
 -- -----------------------------------------------------------------------------
 -- Utility
@@ -345,15 +337,15 @@ isIntFormat = not . isFloatFormat
 -- -----------------------------------------------------------------------------
 -- General things for putting together code sequences
 
--- Expand CmmRegOff.  ToDo: should we do it this way around, or convert
--- CmmExprs into CmmRegOff?
-mangleIndexTree :: Platform -> CmmExpr -> CmmExpr
-mangleIndexTree platform (CmmRegOff reg off)
-  = CmmMachOp (MO_Add width) [CmmReg reg, CmmLit (CmmInt (fromIntegral off) width)]
-  where width = typeWidth (cmmRegType platform reg)
+-- -- Expand CmmRegOff.  ToDo: should we do it this way around, or convert
+-- -- CmmExprs into CmmRegOff?
+-- mangleIndexTree :: Platform -> CmmExpr -> CmmExpr
+-- mangleIndexTree platform (CmmRegOff reg off)
+--   = CmmMachOp (MO_Add width) [CmmReg reg, CmmLit (CmmInt (fromIntegral off) width)]
+--   where width = typeWidth (cmmRegType platform reg)
 
-mangleIndexTree _ _
-        = panic "AArch64.CodeGen.mangleIndexTree: no match"
+-- mangleIndexTree _ _
+--         = panic "AArch64.CodeGen.mangleIndexTree: no match"
 
 -- | The dual to getAnyReg: compute an expression into a register, but
 --      we don't mind which one it is.
@@ -879,7 +871,6 @@ assignMem_IntCode rep addrE srcE
     (src_reg, _format, code) <- getSomeReg srcE
     platform <- getPlatform
     Amode addr addr_code <- getAmode platform addrE
-    let AddrReg r1 = addr
     return $ COMMENT (text "CmmStore" <+> parens (text (show addrE)) <+> parens (text (show srcE)))
             `consOL` (code
             `appOL` addr_code
@@ -889,8 +880,6 @@ assignReg_IntCode _ reg src
   = do
     platform <- getPlatform
     let dst = getRegisterReg platform reg
-        p :: Outputable a => a -> String
-        p = showSDocUnsafe . ppr
     r <- getRegister src
     return $ case r of
       Any _ code              -> COMMENT (text "CmmAssign" <+> parens (text (show reg)) <+> parens (text (show src))) `consOL` code dst
@@ -980,7 +969,8 @@ genCondJump bid expr = do
           MO_U_Ge w -> bcond w UGE
           MO_U_Lt w -> bcond w ULT
           MO_U_Le w -> bcond w ULE
-      _ -> pprPanic "AArch64.genCondJump: " (ppr expr)
+          _ -> pprPanic "AArch64.genCondJump:case mop: " (text $ show expr)
+      _ -> pprPanic "AArch64.genCondJump: " (text $ show expr)
 
 
 genCondBranch
@@ -1233,8 +1223,6 @@ genCCall target dest_regs arg_regs bid = do
         -- -- Sequential consistent.
         -- XXX: this should be implemented properly!
         MO_Xchg w           -> mkCCall (xchgLabel w)
-
-        _ -> pprPanic "genCCall:PrimTarget" (ppr target)
 
   where
     unsupported :: Show a => a -> b
