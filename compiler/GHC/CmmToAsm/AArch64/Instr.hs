@@ -13,9 +13,9 @@ import GHC.CmmToAsm.AArch64.Regs
 
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Format
-import GHC.CmmToAsm.Reg.Target
+-- import GHC.CmmToAsm.Reg.Target
 import GHC.CmmToAsm.Config
-import GHC.Platform.Reg.Class
+-- import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
 
 import GHC.Platform.Regs
@@ -23,18 +23,18 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm
-import GHC.Cmm.Info
-import GHC.Data.FastString
+-- import GHC.Cmm.Info
+-- import GHC.Data.FastString
 import GHC.Cmm.CLabel
 import GHC.Utils.Outputable
 import GHC.Platform
-import GHC.Types.Unique.FM (listToUFM, lookupUFM)
+-- import GHC.Types.Unique.FM (listToUFM, lookupUFM)
 import GHC.Types.Unique.Supply
 
 import Control.Monad (replicateM)
 import Data.Maybe (fromMaybe)
 
-import Debug.Trace
+-- import Debug.Trace
 import GHC.Stack
 
 import Data.Bits ((.&.), complement)
@@ -115,7 +115,6 @@ aarch64_regUsageOfInstr platform instr = case instr of
 
   -- 3. Logical and Move Instructions ------------------------------------------
   AND dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  ADDS dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
   ASR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   BIC dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   BICS dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -183,7 +182,7 @@ aarch64_regUsageOfInstr platform instr = case instr of
         -- Is this register interesting for the register allocator?
         interesting :: Platform -> Reg -> Bool
         interesting _        (RegVirtual _)                 = True
-        interesting platform (RegReal (RealRegSingle (-1))) = False
+        interesting _        (RegReal (RealRegSingle (-1))) = False
         interesting platform (RegReal (RealRegSingle i))    = freeReg platform i
         interesting _        (RegReal (RealRegPair{}))
             = panic "AArch64.Instr.interesting: no reg pairs on this arch"
@@ -280,6 +279,7 @@ aarch64_patchRegsOfInstr instr env = case instr of
     SCVTF o1 o2    -> SCVTF (patchOp o1) (patchOp o2)
     FCVTZS o1 o2   -> FCVTZS (patchOp o1) (patchOp o2)
 
+    _ -> pprPanic "aarch64_patchRegsOfInstr" (text $ show instr)
     where
         patchOp :: Operand -> Operand
         patchOp (OpReg w r) = OpReg w (env r)
@@ -452,14 +452,14 @@ aarch64_mkStackAllocInstr platform n
     | n == 0 = []
     | n > 0 && n < 4096 = [ ANN (text "Alloc More Stack") $ SUB sp sp (OpImm (ImmInt n)) ]
     | n > 0 =  ANN (text "Alloc More Stack") (SUB sp sp (OpImm (ImmInt 4095))) : aarch64_mkStackAllocInstr platform (n - 4095)
-aarch64_mkStackAllocInstr platform n = pprPanic "aarch64_mkStackAllocInstr" (int n)
+aarch64_mkStackAllocInstr _platform n = pprPanic "aarch64_mkStackAllocInstr" (int n)
 
 aarch64_mkStackDeallocInstr :: Platform -> Int -> [Instr]
 aarch64_mkStackDeallocInstr platform n
     | n == 0 = []
     | n > 0 && n < 4096 = [ ANN (text "Dealloc More Stack") $ ADD sp sp (OpImm (ImmInt n)) ]
     | n > 0 =  ANN (text "Dealloc More Stack") (ADD sp sp (OpImm (ImmInt 4095))) : aarch64_mkStackDeallocInstr platform (n - 4095)
-aarch64_mkStackDeallocInstr platform n = pprPanic "aarch64_mkStackDeallocInstr" (int n)
+aarch64_mkStackDeallocInstr _platform n = pprPanic "aarch64_mkStackDeallocInstr" (int n)
 
 --
 -- See note [extra spill slots] in X86/Instr.hs
@@ -643,7 +643,7 @@ data Instr
     | FCVTZS Operand Operand
 
 instance Show Instr where
-    show (LDR f o1 o2) = "LDR " ++ show o1 ++ ", " ++ show o2
+    show (LDR _f o1 o2) = "LDR " ++ show o1 ++ ", " ++ show o2
     show (MOV o1 o2) = "MOV " ++ show o1 ++ ", " ++ show o2
     show _ = "missing"
 
@@ -684,7 +684,7 @@ data Operand
 opReg :: Width -> Reg -> Operand
 opReg = OpReg
 
-xzr, wzr, sp :: Operand
+xzr, wzr, sp, ip0 :: Operand
 xzr = OpReg W64 (RegReal (RealRegSingle (-1)))
 wzr = OpReg W32 (RegReal (RealRegSingle (-1)))
 sp  = OpReg W64 (RegReal (RealRegSingle 31))
@@ -773,9 +773,11 @@ opRegUExt W64 r = OpRegExt W64 r EUXTX 0
 opRegUExt W32 r = OpRegExt W32 r EUXTW 0
 opRegUExt W16 r = OpRegExt W16 r EUXTH 0
 opRegUExt W8  r = OpRegExt W8  r EUXTB 0
+opRegUExt w  _r = pprPanic "opRegUExt" (text $ show w)
 
 opRegSExt :: Width -> Reg -> Operand
 opRegSExt W64 r = OpRegExt W64 r ESXTX 0
 opRegSExt W32 r = OpRegExt W32 r ESXTW 0
 opRegSExt W16 r = OpRegExt W16 r ESXTH 0
 opRegSExt W8  r = OpRegExt W8  r ESXTB 0
+opRegSExt w  _r = pprPanic "opRegSExt" (text $ show w)

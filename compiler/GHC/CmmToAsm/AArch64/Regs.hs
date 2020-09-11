@@ -9,7 +9,7 @@ import GHC.Prelude
 import GHC.Platform.Reg
 import GHC.Platform.Reg.Class
 import GHC.CmmToAsm.Format
-import GHC.CmmToAsm.Config
+-- import GHC.CmmToAsm.Config
 
 import GHC.Cmm
 import GHC.Cmm.CLabel           ( CLabel )
@@ -19,8 +19,8 @@ import GHC.Platform.Regs
 import GHC.Utils.Outputable
 import GHC.Platform
 
-import Data.Word        ( Word8, Word16, Word32, Word64 )
-import Data.Int         ( Int8, Int16, Int32, Int64 )
+-- import Data.Word        ( Word8, Word16, Word32, Word64 )
+-- import Data.Int         ( Int8, Int16, Int32, Int64 )
 
 allMachRegNos   :: [RegNo]
 allMachRegNos   = [0..31] ++ [32..63]

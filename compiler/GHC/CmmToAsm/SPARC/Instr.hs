@@ -376,7 +376,7 @@ sparc_mkSpillInstr
     -> Int      -- ^ spill slot to use
     -> [Instr]
 
-sparc_mkSpillInstr config reg delta slot
+sparc_mkSpillInstr config reg _delta slot
  = let  platform = ncgPlatform config
         off      = spillSlotToOffset config slot
         off_w    = 1 + (off `div` 4)
@@ -396,7 +396,7 @@ sparc_mkLoadInstr
     -> Int      -- ^ spill slot to use
     -> [Instr]
 
-sparc_mkLoadInstr config reg delta slot
+sparc_mkLoadInstr config reg _delta slot
   = let platform = ncgPlatform config
         off      = spillSlotToOffset config slot
         off_w    = 1 + (off `div` 4)
