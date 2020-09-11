@@ -33,6 +33,7 @@ import GHC.Core.Opt.Monad
 import GHC.Data.Bag
 import GHC.Types.Literal
 import GHC.Core.DataCon
+import GHC.Builtin.PrimOps ( PrimOp(KeepAliveOp) )
 import GHC.Builtin.Types.Prim
 import GHC.Builtin.Types ( multiplicityTy )
 import GHC.Tc.Utils.TcType ( isFloatingTy, isTyFamFree )
@@ -910,17 +911,33 @@ lintCoreExpr e@(Let (Rec pairs) body)
     bndrs = map fst pairs
 
 lintCoreExpr e@(App _ _)
-  | Var fun <- fun
-  , fun `hasKey` runRWKey
+    -- Special linting for keepAlive#
+  | Var fun_id <- fun
+  , Just KeepAliveOp <- isPrimOpId_maybe fun_id
+  , arg_rep : arg_ty : k_rep : k_ty : arg : s : k : rest <- args
+  = do { (fun_ty1, ue1) <- lintCoreArgs (idType fun_id, zeroUE) [arg_rep, arg_ty, k_rep, k_ty, arg, s]
+         -- See Note [Linting of runRW#]
+       ; let lintRunRWCont :: CoreArg -> LintM (LintedType, UsageEnv)
+             lintRunRWCont expr@(Lam _ _) = do
+                lintJoinLams 1 (Just fun_id) expr
+             lintRunRWCont other = markAllJoinsBad $ lintCoreExpr other
+             -- TODO: Look through ticks?
+       ; (arg2_ty, ue2) <- lintRunRWCont k
+       ; app_ty <- lintValApp k fun_ty1 arg2_ty ue1 ue2
+       ; lintCoreArgs app_ty rest }
+
+    -- Special linting for runRW#
+  | Var fun_id <- fun
+  , fun_id `hasKey` runRWKey
     -- N.B. we may have an over-saturated application of the form:
     --   runRW (\s -> \x -> ...) y
   , arg_ty1 : arg_ty2 : arg3 : rest <- args
-  = do { fun_pair1 <- lintCoreArg (idType fun, zeroUE) arg_ty1
+  = do { fun_pair1 <- lintCoreArg (idType fun_id, zeroUE) arg_ty1
        ; (fun_ty2, ue2) <- lintCoreArg fun_pair1      arg_ty2
          -- See Note [Linting of runRW#]
        ; let lintRunRWCont :: CoreArg -> LintM (LintedType, UsageEnv)
              lintRunRWCont expr@(Lam _ _) = do
-                lintJoinLams 1 (Just fun) expr
+                lintJoinLams 1 (Just fun_id) expr
              lintRunRWCont other = markAllJoinsBad $ lintCoreExpr other
              -- TODO: Look through ticks?
        ; (arg3_ty, ue3) <- lintRunRWCont arg3
