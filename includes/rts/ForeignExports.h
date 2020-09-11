@@ -29,6 +29,8 @@ struct ForeignExportsList {
       /* if the RTS linker loaded the module,
        * this points to an array of length ->n_entries
        * recording the StablePtr for each export. */
+    StgStablePtr **stable_ptrs;
+      /* the exported closures. of length ->exports. */
     StgPtr exports[];
 };
 

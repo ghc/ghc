@@ -135,17 +135,6 @@ typedef struct _Segment {
     int n_sections;
 } Segment;
 
-/*
- * We must keep track of the StablePtrs that are created for foreign
- * exports by constructor functions when the module is loaded, so that
- * we can free them again when the module is unloaded.  If we don't do
- * this, then the StablePtr will keep the module alive indefinitely.
- */
-typedef struct ForeignExportStablePtr_ {
-    StgStablePtr stable_ptr;
-    struct ForeignExportStablePtr_ *next;
-} ForeignExportStablePtr;
-
 #if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
 #define NEED_SYMBOL_EXTRAS 1
 #endif
@@ -240,7 +229,8 @@ typedef struct _ObjectCode {
     char* bssBegin;
     char* bssEnd;
 
-    ForeignExportStablePtr *stable_ptrs;
+    /* a list of all ForeignExportsLists owned by this object */
+    struct ForeignExportsList *foreign_exports;
 
     /* Holds the list of symbols in the .o file which
        require extra information.*/
