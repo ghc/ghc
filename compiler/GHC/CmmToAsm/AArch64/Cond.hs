@@ -2,8 +2,6 @@ module GHC.CmmToAsm.AArch64.Cond  where
 
 import GHC.Prelude
 
-import GHC.Utils.Panic
-
 -- https://developer.arm.com/documentation/den0024/a/the-a64-instruction-set/data-processing-instructions/conditional-instructions
 
 -- XXX: This appears to go a bit overboard? Maybe we should stick with what LLVM

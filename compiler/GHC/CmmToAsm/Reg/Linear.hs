@@ -139,7 +139,6 @@ import GHC.Types.Unique.Supply
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Platform
-import GHC.Stack
 
 import Data.Maybe
 import Data.List (partition, nub)
@@ -151,7 +150,7 @@ import Control.Applicative
 
 -- Allocate registers
 regAlloc
-        :: Instruction instr
+        :: (Instruction instr)
         => NCGConfig
         -> LiveCmmDecl statics instr
         -> UniqSM ( NatCmmDecl statics instr
@@ -208,7 +207,7 @@ regAlloc _ (CmmProc _ _ _ _)
 --   an entry in the block map or it is the first block.
 --
 linearRegAlloc
-        :: forall instr. Instruction instr
+        :: forall instr. (Instruction instr)
         => NCGConfig
         -> [BlockId] -- ^ entry points
         -> BlockMap RegSet
@@ -262,7 +261,7 @@ linearRegAlloc' config initFreeRegs entry_ids block_live sccs
         return  (blocks, stats, getStackUse stack)
 
 
-linearRA_SCCs :: (HasCallStack, OutputableRegConstraint freeRegs instr)
+linearRA_SCCs :: (OutputableRegConstraint freeRegs instr)
               => [BlockId]
               -> BlockMap RegSet
               -> [NatBasicBlock instr]
@@ -297,7 +296,7 @@ linearRA_SCCs entry_ids block_live blocksAcc (CyclicSCC blocks : sccs)
    more sanity checking to guard against this eventuality.
 -}
 
-process :: forall freeRegs instr. (HasCallStack, OutputableRegConstraint freeRegs instr)
+process :: forall freeRegs instr. (OutputableRegConstraint freeRegs instr)
         => [BlockId]
         -> BlockMap RegSet
         -> [GenBasicBlock (LiveInstr instr)]
@@ -337,7 +336,7 @@ process entry_ids block_live =
 -- | Do register allocation on this basic block
 --
 processBlock
-        :: (HasCallStack, OutputableRegConstraint freeRegs instr)
+        :: (OutputableRegConstraint freeRegs instr)
         => BlockMap RegSet              -- ^ live regs on entry to each basic block
         -> LiveBasicBlock instr         -- ^ block to do register allocation on
         -> RegM freeRegs [NatBasicBlock instr]   -- ^ block with registers allocated
@@ -384,7 +383,7 @@ initBlock id block_live
 
 -- | Do allocation for a sequence of instructions.
 linearRA
-        :: forall freeRegs instr. (HasCallStack, OutputableRegConstraint freeRegs instr)
+        :: forall freeRegs instr. (OutputableRegConstraint freeRegs instr)
         => BlockMap RegSet                      -- ^ map of what vregs are live on entry to each block.
         -> BlockId                              -- ^ id of the current block, for debugging.
         -> [LiveInstr instr]                    -- ^ liveness annotated instructions in this block.
@@ -409,7 +408,7 @@ linearRA block_live block_id = go [] []
 
 -- | Do allocation for a single instruction.
 raInsn
-        :: (HasCallStack, OutputableRegConstraint freeRegs instr)
+        :: (OutputableRegConstraint freeRegs instr)
         => BlockMap RegSet                      -- ^ map of what vregs are love on entry to each block.
         -> [instr]                              -- ^ accumulator for instructions already processed.
         -> BlockId                              -- ^ the id of the current block, for debugging
@@ -493,7 +492,7 @@ isInReg src assig | Just (InReg _) <- lookupUFM assig src = True
 
 
 genRaInsn :: forall freeRegs instr.
-             OutputableRegConstraint freeRegs instr
+             (OutputableRegConstraint freeRegs instr)
           => BlockMap RegSet
           -> [instr]
           -> BlockId
@@ -872,7 +871,7 @@ findPrefRealReg vreg = do
 
 -- reading is redundant with reason, but we keep it around because it's
 -- convenient and it maintains the recursive structure of the allocator. -- EZY
-allocRegsAndSpill_spill :: (FR freeRegs, Instruction instr, Outputable instr)
+allocRegsAndSpill_spill :: (FR freeRegs, Instruction instr)
                         => Bool
                         -> [VirtualReg]
                         -> [instr]

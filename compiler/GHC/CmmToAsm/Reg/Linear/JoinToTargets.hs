@@ -26,7 +26,6 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
 import GHC.Data.Graph.Directed
 import GHC.Utils.Panic
-import GHC.Utils.Outputable
 import GHC.Utils.Monad (concatMapM)
 import GHC.Types.Unique
 import GHC.Types.Unique.FM

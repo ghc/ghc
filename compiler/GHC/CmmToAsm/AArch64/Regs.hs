@@ -1,4 +1,5 @@
 {-# language CPP #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module GHC.CmmToAsm.AArch64.Regs where
 
 
@@ -9,7 +10,7 @@ import GHC.Prelude
 import GHC.Platform.Reg
 import GHC.Platform.Reg.Class
 import GHC.CmmToAsm.Format
-import GHC.CmmToAsm.Config
+-- import GHC.CmmToAsm.Config
 
 import GHC.Cmm
 import GHC.Cmm.CLabel           ( CLabel )
@@ -17,10 +18,13 @@ import GHC.Types.Unique
 
 import GHC.Platform.Regs
 import GHC.Utils.Outputable
+import GHC.Utils.Panic
 import GHC.Platform
 
-import Data.Word        ( Word8, Word16, Word32, Word64 )
-import Data.Int         ( Int8, Int16, Int32, Int64 )
+import GHC.Driver.Ppr
+
+-- import Data.Word        ( Word8, Word16, Word32, Word64 )
+-- import Data.Int         ( Int8, Int16, Int32, Int64 )
 
 allMachRegNos   :: [RegNo]
 allMachRegNos   = [0..31] ++ [32..63]
@@ -74,7 +78,7 @@ data Imm
   deriving (Eq, Show)
 
 instance Show SDoc where
-  show = showSDocUnsafe
+  show = showPprUnsafe . ppr
 
 instance Eq SDoc where
   lhs == rhs = show lhs == show rhs
@@ -154,7 +158,7 @@ mkVirtualReg u format
    = case format of
         FF32    -> VirtualRegD u
         FF64    -> VirtualRegD u
-        _    -> panic "AArch64.mkVirtualReg"
+        _       -> panic "AArch64.mkVirtualReg"
 
 {-# INLINE classOfRealReg      #-}
 classOfRealReg :: RealReg -> RegClass
