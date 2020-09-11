@@ -42,14 +42,10 @@ main = do
     assertEqual miscRootsCount $ length heapClosures
     -- Regarding the type system, this always has to be True, but we want to
     -- force evaluation / de-serialization with a simple check.
-    mapM assertIsClosureType $ map (tipe . info) heapClosures
+    mapM forceClosureType $ map (tipe . info) heapClosures
 
     return ()
 
-assertIsClosureType :: ClosureType -> IO ()
-assertIsClosureType t
-    | t `elem` enumerate = return ()
-    | otherwise = error (show t ++ " not in  " ++ show enumerate)
-    where
-        enumerate :: [ClosureType]
-        enumerate = [minBound..maxBound]
+forceClosureType t
+    | t == t    = return ()
+    | otherwise = error ("Impossible! " ++ show t ++ " not equal to itself.")
