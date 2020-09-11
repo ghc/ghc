@@ -29,14 +29,14 @@
 --       a. The set of uncovered values, 'cr_uncov'
 --       b. And an annotated tree variant (like 'AnnMatch') that captures
 --          redundancy and inaccessibility information as 'RedSets' annotations
---     Basically the UA function from Section 5.1. The Normalised Refinement Types
---     Nabla are modeled as 'Deltas' and checked in "GHC.HsToCore.PmCheck.Oracle".
+--     Basically the UA function from Section 5.1. The Normalised Refinement
+--     Types 'Nablas' are maintained in "GHC.HsToCore.PmCheck.Oracle".
 --  3. Collect redundancy information into a 'CIRB' with a function such
 --     as 'cirbsMatch'. Follows the R function from Figure 6 of the paper.
 --  4. Format and report uncovered patterns and redundant equations ('CIRB')
 --     with 'formatReportWarnings'. Basically job of the G function, plus proper
 --     pretty printing of the warnings (Section 5.4 of the paper).
---  5. Return 'Deltas' reaching syntactic sub-components for
+--  5. Return 'Nablas' reaching syntactic sub-components for
 --     Note [Long-distance information]. Collected by functions such as
 --     'ldiMatch'. See Section 4.1 of the paper.
 module GHC.HsToCore.PmCheck (
@@ -70,7 +70,6 @@ import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Utils.Panic
 import GHC.Core.DataCon
-import GHC.Core.TyCon
 import GHC.Types.Var (EvVar)
 import GHC.Core.Coercion
 import GHC.Tc.Types.Evidence (HsWrapper(..), isIdHsWrapper)
@@ -102,21 +101,21 @@ import Data.Coerce
 --
 
 -- | A non-empty delta that is initialised from the ambient refinement type
--- capturing long-distance information, or the trivially habitable 'Deltas' if
+-- capturing long-distance information, or the trivially habitable 'Nablas' if
 -- the former is uninhabited.
 -- See Note [Recovering from unsatisfiable pattern-matching constraints].
-getLdiDeltas :: DsM Deltas
-getLdiDeltas = do
-  deltas <- getPmDeltas
-  isInhabited deltas >>= \case
-    True  -> pure deltas
-    False -> pure initDeltas
+getLdiNablas :: DsM Nablas
+getLdiNablas = do
+  nablas <- getPmNablas
+  isInhabited nablas >>= \case
+    True  -> pure nablas
+    False -> pure initNablas
 
 -- | Check a pattern binding (let, where) for exhaustiveness.
 covCheckPatBind :: DsMatchContext -> Id -> Pat GhcTc -> DsM ()
 -- See Note [covCheckPatBind only checks PatBindRhs]
 covCheckPatBind ctxt@(DsMatchContext PatBindRhs loc) var p = do
-  missing   <- getLdiDeltas
+  missing   <- getLdiNablas
   pat_bind <- desugarPatBind loc var p
   tracePm "covCheckPatBind {" (vcat [ppr ctxt, ppr var, ppr p, ppr pat_bind, ppr missing])
   result <- unCA (checkPatBind pat_bind) missing
@@ -125,17 +124,17 @@ covCheckPatBind ctxt@(DsMatchContext PatBindRhs loc) var p = do
 covCheckPatBind _ _ _ = pure ()
 
 -- | Exhaustive for guard matches, is used for guards in pattern bindings and
--- in @MultiIf@ expressions. Returns the 'Deltas' covered by the RHSs.
+-- in @MultiIf@ expressions. Returns the 'Nablas' covered by the RHSs.
 covCheckGRHSs
   :: HsMatchContext GhcRn         -- ^ Match context, for warning messages
   -> GRHSs GhcTc (LHsExpr GhcTc)  -- ^ The GRHSs to check
-  -> DsM (NonEmpty Deltas)        -- ^ Covered 'Deltas' for each RHS, for long
+  -> DsM (NonEmpty Nablas)        -- ^ Covered 'Nablas' for each RHS, for long
                                   --   distance info
 covCheckGRHSs hs_ctxt guards@(GRHSs _ grhss _) = do
   let combined_loc = foldl1 combineSrcSpans (map getLoc grhss)
       ctxt = DsMatchContext hs_ctxt combined_loc
   matches <- desugarGRHSs combined_loc empty guards
-  missing   <- getLdiDeltas
+  missing   <- getLdiNablas
   tracePm "covCheckGRHSs" (hang (vcat [ppr ctxt
                                 , text "Guards:"])
                                 2
@@ -154,7 +153,7 @@ covCheckGRHSs hs_ctxt guards@(GRHSs _ grhss _) = do
 --   f _ _             = 3   -- clause with a single, un-guarded RHS
 -- @
 --
--- Returns one non-empty 'Deltas' for 1.) each pattern of a 'Match' and 2.)
+-- Returns one non-empty 'Nablas' for 1.) each pattern of a 'Match' and 2.)
 -- each of a 'Match'es 'GRHS' for Note [Long-distance information].
 --
 -- Special case: When there are /no matches/, then the functionassumes it
@@ -164,13 +163,13 @@ covCheckMatches
   :: DsMatchContext                  -- ^ Match context, for warnings messages
   -> [Id]                            -- ^ Match variables, i.e. x and y above
   -> [LMatch GhcTc (LHsExpr GhcTc)]  -- ^ List of matches
-  -> DsM [(Deltas, NonEmpty Deltas)] -- ^ One covered 'Deltas' per Match and
+  -> DsM [(Nablas, NonEmpty Nablas)] -- ^ One covered 'Nablas' per Match and
                                      --   GRHS, for long distance info.
 covCheckMatches ctxt vars matches = do
   -- We have to force @missing@ before printing out the trace message,
   -- otherwise we get interleaved output from the solver. This function
   -- should be strict in @missing@ anyway!
-  !missing   <- getLdiDeltas
+  !missing   <- getLdiNablas
   tracePm "covCheckMatches {" $
           hang (vcat [ppr ctxt, ppr vars, text "Matches:"])
                2
@@ -223,7 +222,7 @@ exception into divergence (@f x = f x@).
 
 Semantically, unlike every other case expression, -XEmptyCase is strict in its
 match var x, which rules out ⊥ as an inhabitant. So we add x /~ ⊥ to the
-initial Delta and check if there are any values left to match on.
+initial Nabla and check if there are any values left to match on.
 -}
 
 --
@@ -249,8 +248,8 @@ data PmGrd
     -- bang pattern, in which case we might want to report it as redundant.
     -- See Note [Dead bang patterns].
   | PmBang {
-      pm_id          :: !Id,
-      pm_loc         :: !(Maybe SrcInfo)
+      pm_id   :: !Id,
+      _pm_loc :: !(Maybe SrcInfo)
     }
 
     -- | @PmLet x expr@ corresponds to a @let x = expr@ guard. This actually
@@ -296,15 +295,15 @@ type SrcInfo = Located SDoc
 -- (later digested into a 'CIRB').
 data RedSets
   = RedSets
-  { rs_cov :: !Deltas
+  { rs_cov :: !Nablas
   -- ^ The /Covered/ set; the set of values reaching a particular program
   -- point.
-  , rs_div :: !Deltas
+  , rs_div :: !Nablas
   -- ^ The /Diverging/ set; empty if no match can lead to divergence.
   --   If it wasn't empty, we have to turn redundancy warnings into
   --   inaccessibility warnings for any subclauses.
-  , rs_bangs :: !(OrdList (Deltas, SrcInfo))
-  -- ^ If any of the 'Deltas' is empty, the corresponding 'SrcInfo' pin-points
+  , rs_bangs :: !(OrdList (Nablas, SrcInfo))
+  -- ^ If any of the 'Nablas' is empty, the corresponding 'SrcInfo' pin-points
   -- a bang pattern in source that is redundant. See Note [Dead bang patterns].
   }
 
@@ -447,7 +446,7 @@ vanillaConGrd scrut con arg_ids =
 -- For example:
 --   @mkListGrds "a" "[(x, True <- x),(y, !y)]"@
 -- to
---   @"[(x:b) <- a, True <- x, (y:c) <- b, seq y True, [] <- c]"@
+--   @"[(x:b) <- a, True <- x, (y:c) <- b, !y, [] <- c]"@
 -- where @b@ and @c@ are freshly allocated in @mkListGrds@ and @a@ is the match
 -- variable.
 mkListGrds :: Id -> [(Id, GrdVec)] -> DsM GrdVec
@@ -631,7 +630,7 @@ desugarListPat x pats = do
 
 -- | Desugar a constructor pattern
 desugarConPatOut :: Id -> ConLike -> [Type] -> [TyVar]
-                   -> [EvVar] -> HsConPatDetails GhcTc -> DsM GrdVec
+                 -> [EvVar] -> HsConPatDetails GhcTc -> DsM GrdVec
 desugarConPatOut x con univ_tys ex_tvs dicts = \case
     PrefixCon ps                 -> go_field_pats (zip [0..] ps)
     InfixCon  p1 p2              -> go_field_pats (zip [0..] [p1,p2])
@@ -651,14 +650,14 @@ desugarConPatOut x con univ_tys ex_tvs dicts = \case
         lbl_to_index lbl = expectJust "lbl_to_index" $ elemIndex lbl orig_lbls
 
     go_field_pats tagged_pats = do
-      -- The fields that appear might not be in the correct order. So first
-      -- do a PmCon match, then force according to field strictness and then
-      -- force evaluation of the field patterns in the order given by
-      -- the first field of @tagged_pats@.
+      -- The fields that appear might not be in the correct order. So
+      --   1. Do the PmCon match
+      --   2. Then pattern match on the fields in the order given by the first
+      --      field of @tagged_pats@.
       -- See Note [Field match order for RecCon]
 
       -- Desugar the mentioned field patterns. We're doing this first to get
-      -- the Ids for pm_con_args.
+      -- the Ids for pm_con_args and bring them in order afterwards.
       let trans_pat (n, pat) = do
             (var, pvec) <- desugarLPatV pat
             pure ((n, var), pvec)
@@ -672,19 +671,11 @@ desugarConPatOut x con univ_tys ex_tvs dicts = \case
       arg_ids <- zipWithM get_pat_id [0..] arg_tys
       let con_grd = PmCon x (PmAltConLike con) ex_tvs dicts arg_ids
 
-      -- 2. bang strict fields
-      let arg_is_banged = map isBanged $ conLikeImplBangs con
-          noSrcPmBang i = PmBang {pm_id = i, pm_loc = Nothing}
-          bang_grds     = map noSrcPmBang (filterByList arg_is_banged arg_ids)
-
-      -- 3. guards from field selector patterns
+      -- 2. guards from field selector patterns
       let arg_grds = concat arg_grdss
 
       -- tracePm "ConPatOut" (ppr x $$ ppr con $$ ppr arg_ids)
-      --
-      -- Store the guards in exactly that order
-      --      1.         2.           3.
-      pure (con_grd : bang_grds ++ arg_grds)
+      pure (con_grd : arg_grds)
 
 desugarPatBind :: SrcSpan -> Id -> Pat GhcTc -> DsM (PmPatBind Pre)
 -- See 'GrdPatBind' for how this simply repurposes GrdGRHS.
@@ -772,30 +763,45 @@ desugarBoolGuard e
         -> pure [vanillaConGrd y trueDataCon []]
       rhs -> do
         x <- mkPmId boolTy
-        pure $ [PmLet x rhs, vanillaConGrd x trueDataCon []]
+        pure [PmLet x rhs, vanillaConGrd x trueDataCon []]
 
 {- Note [Field match order for RecCon]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The order for RecCon field patterns actually determines evaluation order of
 the pattern match. For example:
 
-  data T = T { a :: !Bool, b :: Char, c :: Int }
+  data T = T { a :: Char, b :: Int }
   f :: T -> ()
-  f T{ c = 42, b = 'b' } = ()
+  f T{ b = 42, a = 'a' } = ()
 
-Then
-  * @f (T (error "a") (error "b") (error "c"))@ errors out with "a" because of
-    the strict field.
-  * @f (T True        (error "b") (error "c"))@ errors out with "c" because it
-    is mentioned frist in the pattern match.
+Then @f (T (error "a") (error "b"))@ errors out with "b" because it is mentioned
+first in the pattern match.
 
-This means we can't just desugar the pattern match to the PatVec
-@[T !_ 'b' 42]@. Instead we have to generate variable matches that have
-strictness according to the field declarations and afterwards force them in the
-right order. As a result, we get the PatVec @[T !_ b c, 42 <- c, 'b' <- b]@.
+This means we can't just desugar the pattern match to
+@[T a b <- x, 'a' <- a, 42 <- b]@. Instead we have to force them in the
+right order: @[T a b <- x, 42 <- b, 'a' <- a]@.
 
-Of course, when the labels occur in the order they are defined, we can just use
-the simpler desugaring.
+Note [Strict fields and fields of unlifted type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+How do strict fields play into Note [Field match order for RecCon]? Answer:
+They don't. Desugaring is entirely unconcerned by strict fields; the forcing
+happens *before* pattern matching. But for each strict (or more generally,
+unlifted) field @s@ we have to add @s /~ ⊥@ constraints when we check the PmCon
+guard in 'checkGrd'. Strict fields are devoid of ⊥ by construction, there's
+nothing that a bang pattern would act on. Example from #18341:
+
+  data T = MkT !Int
+  f :: T -> ()
+  f (MkT  _) | False = () -- inaccessible
+  f (MkT !_) | False = () -- redundant, not only inaccessible!
+  f _                = ()
+
+The second clause desugars to @MkT n <- x, !n@. When coverage checked, the
+'PmCon' @MkT n <- x@ refines the set of values that reach the bang pattern with
+the constraints @x ~ MkT n, n /~ ⊥@ (this list is computed by 'pmConCts').
+Checking the 'PmBang' @!n@ will then try to add the constraint @n ~ ⊥@ to this
+set to get the diverging set, which is found to be empty. Hence the whole
+clause is detected as redundant, as expected.
 
 Note [Order of guards matters]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -847,7 +853,7 @@ data CheckResult a
   = CheckResult
   { cr_ret :: !a
   -- ^ A hole for redundancy info and covered sets.
-  , cr_uncov   :: !Deltas
+  , cr_uncov   :: !Nablas
   -- ^ The set of uncovered values falling out at the bottom.
   --   (for -Wincomplete-patterns, but also important state for the algorithm)
   , cr_approx  :: !Precision
@@ -865,23 +871,23 @@ instance Outputable a => Outputable (CheckResult a) where
       ppr_precision Approximate = text "(Approximate)"
       field name value = text name <+> equals <+> ppr value
 
--- | Lift 'addPmCts' over 'Deltas'.
-addPmCtsDeltas :: Deltas -> PmCts -> DsM Deltas
-addPmCtsDeltas deltas cts = liftDeltasM (\d -> addPmCts d cts) deltas
+-- | Lift 'addPmCts' over 'Nablas'.
+addPmCtsNablas :: Nablas -> PmCts -> DsM Nablas
+addPmCtsNablas nablas cts = liftNablasM (\d -> addPmCts d cts) nablas
 
--- | 'addPmCtsDeltas' for a single 'PmCt'.
-addPmCtDeltas :: Deltas -> PmCt -> DsM Deltas
-addPmCtDeltas deltas ct = addPmCtsDeltas deltas (unitBag ct)
+-- | 'addPmCtsNablas' for a single 'PmCt'.
+addPmCtNablas :: Nablas -> PmCt -> DsM Nablas
+addPmCtNablas nablas ct = addPmCtsNablas nablas (unitBag ct)
 
--- | Test if any of the 'Delta's is inhabited. Currently this is pure, because
--- we preserve the invariant that there are no uninhabited 'Delta's. But that
+-- | Test if any of the 'Nabla's is inhabited. Currently this is pure, because
+-- we preserve the invariant that there are no uninhabited 'Nabla's. But that
 -- could change in the future, for example by implementing this function in
 -- terms of @notNull <$> provideEvidence 1 ds@.
-isInhabited :: Deltas -> DsM Bool
-isInhabited (MkDeltas ds) = pure (not (null ds))
+isInhabited :: Nablas -> DsM Bool
+isInhabited (MkNablas ds) = pure (not (null ds))
 
 -- | Coverage checking action. Can be composed 'leftToRight' or 'topToBottom'.
-newtype CheckAction a = CA { unCA :: Deltas -> DsM (CheckResult a) }
+newtype CheckAction a = CA { unCA :: Nablas -> DsM (CheckResult a) }
   deriving Functor
 
 -- | Composes 'CheckAction's top-to-bottom:
@@ -923,23 +929,34 @@ leftToRight f (CA left) (CA right) = CA $ \inc -> do
                    , cr_uncov = uncov'
                    , cr_approx = prec' Semi.<> cr_approx l Semi.<> cr_approx r }
 
--- | @throttle limit old new@ returns @old@ if the number of 'Delta's in @new@
--- is exceeding the given @limit@ and the @old@ number of 'Delta's.
+-- | @throttle limit old new@ returns @old@ if the number of 'Nabla's in @new@
+-- is exceeding the given @limit@ and the @old@ number of 'Nabla's.
 -- See Note [Countering exponential blowup].
-throttle :: Int -> Deltas -> Deltas -> (Precision, Deltas)
-throttle limit old@(MkDeltas old_ds) new@(MkDeltas new_ds)
+throttle :: Int -> Nablas -> Nablas -> (Precision, Nablas)
+throttle limit old@(MkNablas old_ds) new@(MkNablas new_ds)
   --- | pprTrace "PmCheck:throttle" (ppr (length old_ds) <+> ppr (length new_ds) <+> ppr limit) False = undefined
   | length new_ds > max limit (length old_ds) = (Approximate, old)
   | otherwise                                 = (Precise,     new)
 
--- | Matching on a newtype doesn't force anything.
--- See Note [Divergence of Newtype matches] in "GHC.HsToCore.PmCheck.Oracle".
-conMatchForces :: PmAltCon -> Bool
-conMatchForces (PmAltConLike (RealDataCon dc))
-  | isNewTyCon (dataConTyCon dc) = False
-conMatchForces _                 = True
-
--- First the functions that correspond to checking LYG primitives:
+-- | The 'PmCts' arising from a successful  'PmCon' match @T gammas as ys <- x@.
+-- These include
+--
+--   * @gammas@: Constraints arising from the bound evidence vars
+--   * @y /~ ⊥@ constraints for each unlifted field (including strict fields)
+--     @y@ in @ys@
+--   * The constructor constraint itself: @x ~ T as ys@.
+--
+-- See Note [Strict fields and fields of unlifted type].
+pmConCts :: Id -> PmAltCon -> [TyVar] -> [EvVar] -> [Id] -> PmCts
+pmConCts x con tvs dicts args = gammas `unionBags` unlifted `snocBag` con_ct
+  where
+    gammas   = listToBag $ map (PmTyCt . evVarPred) dicts
+    con_ct   = PmConCt x con tvs args
+    unlifted = listToBag [ PmNotBotCt arg
+                         | (arg, bang) <-
+                             zipEqual "pmConCts" args (pmAltConImplBangs con)
+                         , isBanged bang || isUnliftedType (idType arg)
+                         ]
 
 checkSequence :: (grdtree -> CheckAction anntree) -> NonEmpty grdtree -> CheckAction (NonEmpty anntree)
 -- The implementation is pretty similar to
@@ -952,31 +969,32 @@ checkGrd :: PmGrd -> CheckAction RedSets
 checkGrd grd = CA $ \inc -> case grd of
   -- let x = e: Refine with x ~ e
   PmLet x e -> do
-    matched <- addPmCtDeltas inc (PmCoreCt x e)
+    matched <- addPmCtNablas inc (PmCoreCt x e)
+    -- tracePm "check:Let" (ppr x <+> char '=' <+> ppr e)
     pure CheckResult { cr_ret = emptyRedSets { rs_cov = matched }
                      , cr_uncov = mempty
                      , cr_approx = Precise }
   -- Bang x _: Diverge on x ~ ⊥, refine with x /~ ⊥
   PmBang x mb_info -> do
-    div <- addPmCtDeltas inc (PmBotCt x)
-    matched <- addPmCtDeltas inc (PmNotBotCt x)
+    div <- addPmCtNablas inc (PmBotCt x)
+    matched <- addPmCtNablas inc (PmNotBotCt x)
     -- See Note [Dead bang patterns]
     -- mb_info = Just info <==> PmBang originates from bang pattern in source
     let bangs | Just info <- mb_info = unitOL (div, info)
               | otherwise            = NilOL
+    -- tracePm "check:Bang" (ppr x <+> ppr div)
     pure CheckResult { cr_ret = RedSets { rs_cov = matched, rs_div = div, rs_bangs = bangs }
                      , cr_uncov = mempty
                      , cr_approx = Precise }
-  -- Con: Diverge on x ~ ⊥, fall through on x /~ K and refine with x ~ K ys
-  --      and type info
+  -- Con: Fall through on x /~ K and refine with x ~ K ys and type info
   PmCon x con tvs dicts args -> do
-    div <- if conMatchForces con
-      then addPmCtDeltas inc (PmBotCt x)
+    !div <- if isPmAltConMatchStrict con
+      then addPmCtNablas inc (PmBotCt x)
       else pure mempty
-    uncov <- addPmCtDeltas inc (PmNotConCt x con)
-    matched <- addPmCtsDeltas inc $
-      listToBag (PmTyCt . evVarPred <$> dicts) `snocBag` PmConCt x con tvs args
-    -- tracePm "checkGrd:Con" (ppr inc $$ ppr x $$ ppr con $$ ppr dicts $$ ppr matched)
+    let con_cts = pmConCts x con tvs dicts args
+    !matched <- addPmCtsNablas inc con_cts
+    !uncov   <- addPmCtNablas  inc (PmNotConCt x con)
+    -- tracePm "checkGrd:Con" (ppr inc $$ ppr grd $$ ppr con_cts $$ ppr matched)
     pure CheckResult { cr_ret = emptyRedSets { rs_cov = matched, rs_div = div }
                      , cr_uncov = uncov
                      , cr_approx = Precise }
@@ -1010,7 +1028,7 @@ checkGRHS (PmGRHS { pg_grds = grds, pg_rhs = rhs_info }) =
 
 checkEmptyCase :: PmEmptyCase -> CheckAction PmEmptyCase
 checkEmptyCase pe@(PmEmptyCase { pe_var = var }) = CA $ \inc -> do
-  unc <- addPmCtDeltas inc (PmNotBotCt var)
+  unc <- addPmCtNablas inc (PmNotBotCt var)
   pure CheckResult { cr_ret = pe, cr_uncov = unc, cr_approx = mempty }
 
 checkPatBind :: (PmPatBind Pre) -> CheckAction (PmPatBind Post)
@@ -1020,7 +1038,7 @@ checkPatBind = coerce checkGRHS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Precise pattern match exhaustiveness checking is necessarily exponential in
 the size of some input programs. We implement a counter-measure in the form of
-the -fmax-pmcheck-models flag, limiting the number of Deltas we check against
+the -fmax-pmcheck-models flag, limiting the number of Nablas we check against
 each pattern by a constant.
 
 How do we do that? Consider
@@ -1029,13 +1047,13 @@ How do we do that? Consider
   f True True = ()
 
 And imagine we set our limit to 1 for the sake of the example. The first clause
-will be checked against the initial Delta, {}. Doing so will produce an
+will be checked against the initial Nabla, {}. Doing so will produce an
 Uncovered set of size 2, containing the models {x/~True} and {x~True,y/~True}.
 Also we find the first clause to cover the model {x~True,y~True}.
 
 But the Uncovered set we get out of the match is too huge! We somehow have to
 ensure not to make things worse as they are already, so we continue checking
-with a singleton Uncovered set of the initial Delta {}. Why is this
+with a singleton Uncovered set of the initial Nabla {}. Why is this
 sound (wrt. the notion in GADTs Meet Their Match)? Well, it basically amounts
 to forgetting that we matched against the first clause. The values represented
 by {} are a superset of those represented by its two refinements {x/~True} and
@@ -1062,14 +1080,14 @@ program, so we don't actually get useful information out of that split!
 -- * Collecting long-distance information
 --
 
-ldiMatchGroup :: PmMatchGroup Post -> NonEmpty (Deltas, NonEmpty Deltas)
+ldiMatchGroup :: PmMatchGroup Post -> NonEmpty (Nablas, NonEmpty Nablas)
 ldiMatchGroup (PmMatchGroup matches) = ldiMatch <$> matches
 
-ldiMatch :: PmMatch Post -> (Deltas, NonEmpty Deltas)
+ldiMatch :: PmMatch Post -> (Nablas, NonEmpty Nablas)
 ldiMatch (PmMatch { pm_pats = red, pm_grhss = grhss }) =
   (rs_cov red, ldiGRHS <$> grhss)
 
-ldiGRHS :: PmGRHS Post -> Deltas
+ldiGRHS :: PmGRHS Post -> Nablas
 ldiGRHS (PmGRHS { pg_grds = red }) = rs_cov red
 
 --
@@ -1114,17 +1132,17 @@ addRedundantBangs _red_bangs cirb@CIRB { cirb_cov = NilOL, cirb_inacc = NilOL } 
 addRedundantBangs red_bangs  cirb =
   cirb { cirb_bangs = cirb_bangs cirb Semi.<> red_bangs }
 
--- | Checks the 'Deltas' in a 'RedSets' for inhabitants and returns
+-- | Checks the 'Nablas' in a 'RedSets' for inhabitants and returns
 --    1. Whether the Covered set was inhabited
 --    2. Whether the Diverging set was inhabited
---    3. All source bangs whose 'Deltas' were empty, which means they are
+--    3. All source bangs whose 'Nablas' were empty, which means they are
 --       redundant.
 testRedSets :: RedSets -> DsM (Bool, Bool, OrdList SrcInfo)
 testRedSets RedSets { rs_cov = cov, rs_div = div, rs_bangs = bangs } = do
   is_covered  <- isInhabited cov
   may_diverge <- isInhabited div
-  red_bangs   <- flip mapMaybeM (fromOL bangs) $ \(deltas, bang) -> do
-    isInhabited deltas >>= \case
+  red_bangs   <- flip mapMaybeM (fromOL bangs) $ \(nablas, bang) -> do
+    isInhabited nablas >>= \case
       True  -> pure Nothing
       False -> pure (Just bang)
   pure (is_covered, may_diverge, toOL red_bangs)
@@ -1233,10 +1251,10 @@ reportWarnings dflags ctx@(DsMatchContext kind loc) vars
       f (q <+> matchSeparator kind <+> text "...")
 
     -- Print several clauses (for uncovered clauses)
-    pprEqns vars deltas = pprContext False ctx (text "are non-exhaustive") $ \_ ->
+    pprEqns vars nablas = pprContext False ctx (text "are non-exhaustive") $ \_ ->
       case vars of -- See #11245
            [] -> text "Guards do not cover entire pattern space"
-           _  -> let us = map (\delta -> pprUncovered delta vars) deltas
+           _  -> let us = map (\nabla -> pprUncovered nabla vars) nablas
                  in  hang (text "Patterns not matched:") 4
                        (vcat (take maxPatterns us) $$ dots maxPatterns us)
 
@@ -1251,14 +1269,14 @@ reportWarnings dflags ctx@(DsMatchContext kind loc) vars
           $$ bullet <+> text "Patterns reported as unmatched might actually be matched")
       , text "Increase the limit or resolve the warnings to suppress this message." ]
 
-getNFirstUncovered :: [Id] -> Int -> Deltas -> DsM [Delta]
-getNFirstUncovered vars n (MkDeltas deltas) = go n (bagToList deltas)
+getNFirstUncovered :: [Id] -> Int -> Nablas -> DsM [Nabla]
+getNFirstUncovered vars n (MkNablas nablas) = go n (bagToList nablas)
   where
     go 0 _              = pure []
     go _ []             = pure []
-    go n (delta:deltas) = do
-      front <- provideEvidence vars n delta
-      back <- go (n - length front) deltas
+    go n (nabla:nablas) = do
+      front <- provideEvidence vars n nabla
+      back <- go (n - length front) nablas
       pure (front ++ back)
 
 dots :: Int -> [a] -> SDoc
@@ -1383,13 +1401,13 @@ code that we don't want to warn about.
 -- * Long-distance information
 --
 
--- | Locally update 'dsl_deltas' with the given action, but defer evaluation
+-- | Locally update 'dsl_nablas' with the given action, but defer evaluation
 -- with 'unsafeInterleaveM' in order not to do unnecessary work.
-locallyExtendPmDeltas :: (Deltas -> DsM Deltas) -> DsM a -> DsM a
-locallyExtendPmDeltas ext k = do
-  deltas <- getLdiDeltas
-  deltas' <- unsafeInterleaveM $ ext deltas
-  updPmDeltas deltas' k
+locallyExtendPmNablas :: (Nablas -> DsM Nablas) -> DsM a -> DsM a
+locallyExtendPmNablas ext k = do
+  nablas <- getLdiNablas
+  nablas' <- unsafeInterleaveM $ ext nablas
+  updPmNablas nablas' k
 
 -- | Add in-scope type constraints if the coverage checker might run and then
 -- run the given action.
@@ -1397,7 +1415,7 @@ addTyCs :: Origin -> Bag EvVar -> DsM a -> DsM a
 addTyCs origin ev_vars m = do
   dflags <- getDynFlags
   applyWhen (needToRunPmCheck dflags origin)
-            (locallyExtendPmDeltas (\deltas -> addPmCtsDeltas deltas (PmTyCt . evVarPred <$> ev_vars)))
+            (locallyExtendPmNablas (\nablas -> addPmCtsNablas nablas (PmTyCt . evVarPred <$> ev_vars)))
             m
 
 -- | Add equalities for the 'CoreExpr' scrutinee to the local 'DsM' environment
@@ -1408,8 +1426,8 @@ addTyCs origin ev_vars m = do
 addCoreScrutTmCs :: Maybe CoreExpr -> [Id] -> DsM a -> DsM a
 addCoreScrutTmCs Nothing    _   k = k
 addCoreScrutTmCs (Just scr) [x] k =
-  flip locallyExtendPmDeltas k $ \deltas ->
-    addPmCtsDeltas deltas (unitBag (PmCoreCt x scr))
+  flip locallyExtendPmNablas k $ \nablas ->
+    addPmCtsNablas nablas (unitBag (PmCoreCt x scr))
 addCoreScrutTmCs _   _   _ = panic "addCoreScrutTmCs: scrutinee, but more than one match id"
 
 -- | 'addCoreScrutTmCs', but desugars the 'LHsExpr' first.
@@ -1437,10 +1455,10 @@ of @f@.
 
 To achieve similar reasoning in the coverage checker, we keep track of the set
 of values that can reach a particular program point (often loosely referred to
-as "Covered set") in 'GHC.HsToCore.Monad.dsl_deltas'.
-We fill that set with Covered Deltas returned by the exported checking
+as "Covered set") in 'GHC.HsToCore.Monad.dsl_nablas'.
+We fill that set with Covered Nablas returned by the exported checking
 functions, which the call sites put into place with
-'GHC.HsToCore.Monad.updPmDeltas'.
+'GHC.HsToCore.Monad.updPmNablas'.
 Call sites also extend this set with facts from type-constraint dictionaries,
 case scrutinees, etc. with the exported functions 'addTyCs', 'addCoreScrutTmCs'
 and 'addHsScrutTmCs'.
@@ -1458,7 +1476,7 @@ This is because the constraint (Int ~ Bool) in `f` is unsatisfiable, and the
 coverage checker deems any matches with unsatisfiable constraint sets to be
 unreachable.
 
-We make sure to always start from an inhabited 'Deltas' by calling
-'getLdiDeltas', which falls back to the trivially inhabited 'Deltas' if the
-long-distance info returned by 'GHC.HsToCore.Monad.getPmDeltas' is empty.
+We make sure to always start from an inhabited 'Nablas' by calling
+'getLdiNablas', which falls back to the trivially inhabited 'Nablas' if the
+long-distance info returned by 'GHC.HsToCore.Monad.getPmNablas' is empty.
 -}

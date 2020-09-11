@@ -660,7 +660,11 @@
 #define TICK_BUMP(ctr)      TICK_BUMP_BY(ctr,1)
 
 #define TICK_ENT_DYN_IND()              TICK_BUMP(ENT_DYN_IND_ctr)
-#define TICK_ENT_DYN_THK()              TICK_BUMP(ENT_DYN_THK_ctr)
+// ENT_DYN_THK_ctr doesn't exist anymore. Could be ENT_DYN_THK_SINGLE_ctr or
+// ENT_DYN_THK_MANY_ctr
+// #define TICK_ENT_DYN_THK()              TICK_BUMP(ENT_DYN_THK_ctr)
+#define TICK_ENT_DYN_THK()
+
 #define TICK_ENT_VIA_NODE()             TICK_BUMP(ENT_VIA_NODE_ctr)
 #define TICK_ENT_STATIC_IND()           TICK_BUMP(ENT_STATIC_IND_ctr)
 #define TICK_ENT_PERM_IND()             TICK_BUMP(ENT_PERM_IND_ctr)

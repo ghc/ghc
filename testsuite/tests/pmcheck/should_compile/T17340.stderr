@@ -7,6 +7,10 @@ T17340.hs:19:4: warning: [-Wredundant-bang-patterns]
     Pattern match has redundant bang
     In an equation for ‘g’: g x = ...
 
+T17340.hs:23:9: warning: [-Wredundant-bang-patterns]
+    Pattern match has redundant bang
+    In an equation for ‘h’: h x = ...
+
 T17340.hs:27:4: warning: [-Wredundant-bang-patterns]
     Pattern match has redundant bang
     In an equation for ‘k’: k _ = ...
