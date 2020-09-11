@@ -1083,18 +1083,22 @@ static void removeOcSymbols (ObjectCode *oc)
  * Release StablePtrs and free oc->stable_ptrs.
  * This operation is idempotent.
  */
-static void freeFEStablePtrs (ForeignExportStablePtr **code_stable_ptrs)
+static void freeOcStablePtrs (ObjectCode *oc)
 {
     // Release any StablePtrs that were created when this
     // object module was initialized.
-    ForeignExportStablePtr *fe_ptr, *next;
+    struct ForeignExportsList *exports, *next;
 
-    for (fe_ptr = *code_stable_ptrs; fe_ptr != NULL; fe_ptr = next) {
-        next = fe_ptr->next;
-        freeStablePtr(fe_ptr->stable_ptr);
-        stgFree(fe_ptr);
+    for (exports = oc->foreign_exports; exports != NULL; exports = next) {
+        next = exports->next;
+        for (int i = 0; i < exports->n_entries; i++) {
+            freeStablePtr(exports->stable_ptrs[i]);
+        }
+        stgFree(exports->stable_ptrs);
+        exports->stable_ptrs = NULL;
+        exports->next = NULL;
     }
-    *code_stable_ptrs = NULL;
+    oc->foreign_exports = NULL;
 }
 
 static void
@@ -1257,7 +1261,7 @@ mkOc( pathchar *path, char *image, int imageSize,
    oc->n_sections        = 0;
    oc->sections          = NULL;
    oc->proddables        = NULL;
-   oc->stable_ptrs       = NULL;
+   oc->foreign_exports   = NULL;
 #if defined(NEED_SYMBOL_EXTRAS)
    oc->symbol_extras     = NULL;
 #endif
