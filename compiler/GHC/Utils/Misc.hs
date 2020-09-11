@@ -43,7 +43,7 @@ module GHC.Utils.Misc (
         listLengthCmp, atLength,
         equalLength, compareLength, leLength, ltLength,
 
-        isSingleton, only, singleton,
+        isSingleton, only,
         notNull, snocView,
 
         isIn, isn'tIn,
@@ -549,9 +549,6 @@ ltLength xs ys = case compareLength xs ys of
                    GT -> False
 
 ----------------------------
-singleton :: a -> [a]
-singleton x = [x]
-
 isSingleton :: [a] -> Bool
 isSingleton [_] = True
 isSingleton _   = False
