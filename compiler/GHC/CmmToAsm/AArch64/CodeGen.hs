@@ -18,15 +18,12 @@ import GHC.Prelude hiding (EQ)
 import GHC.Platform.Regs
 import GHC.CmmToAsm.AArch64.Instr
 import GHC.CmmToAsm.AArch64.Regs
-import GHC.CmmToAsm.AArch64.RegInfo
 import GHC.CmmToAsm.AArch64.Cond
-import GHC.CmmToAsm.AArch64.Ppr
 
 import GHC.CmmToAsm.CPrim
 import GHC.Cmm.DebugBlock
 import GHC.CmmToAsm.Monad
-   ( NatM, getNewRegNat, getNewLabelNat
-   , getBlockIdNat, getPicBaseNat, getNewRegPairNat
+   ( NatM, getNewRegNat
    , getPicBaseMaybeNat, getPlatform, getConfig
    , getDebugBlock, getFileId
    )
@@ -34,14 +31,11 @@ import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.PIC
 import GHC.CmmToAsm.Format
 import GHC.CmmToAsm.Config
--- import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
--- import GHC.CmmToAsm.Reg.Target
 import GHC.Platform
 
 -- Our intermediate code:
 import GHC.Cmm.BlockId
--- import GHC.Cmm.Ppr           ( pprExpr )
 import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch
@@ -59,15 +53,12 @@ import Control.Monad    ( mapAndUnzipM, when, foldM )
 import Data.Bits
 import Data.Word
 import Data.Maybe
--- import Data.Int
 import GHC.Float
 
 import GHC.Types.Basic
 import GHC.Types.ForeignCall
 import GHC.Data.FastString
 import GHC.Utils.Misc
-
--- import Debug.Trace
 
 -- @cmmTopCodeGen@ will be our main entry point to code gen.  Here we'll get
 -- @RawCmmDecl@; see GHC.Cmm

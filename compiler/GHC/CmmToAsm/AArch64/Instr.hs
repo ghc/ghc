@@ -99,7 +99,6 @@ aarch64_regUsageOfInstr platform instr = case instr of
   ANN _ i                  -> aarch64_regUsageOfInstr platform i
   -- 1. Arithmetic Instructions ------------------------------------------------
   ADD dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  ADDS dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
   CMN l r                  -> usage (regOp l ++ regOp r, [])
   CMP l r                  -> usage (regOp l ++ regOp r, [])
   MSUB dst src1 src2 src3  -> usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
@@ -223,7 +222,6 @@ aarch64_patchRegsOfInstr instr env = case instr of
     ANN d i        -> ANN d (aarch64_patchRegsOfInstr i env)
     -- 1. Arithmetic Instructions ----------------------------------------------
     ADD o1 o2 o3   -> ADD (patchOp o1) (patchOp o2) (patchOp o3)
-    ADDS o1 o2 o3  -> ADDS (patchOp o1) (patchOp o2) (patchOp o3)
     CMN o1 o2      -> CMN (patchOp o1) (patchOp o2)
     CMP o1 o2      -> CMP (patchOp o1) (patchOp o2)
     MSUB o1 o2 o3 o4 -> MSUB (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
@@ -555,7 +553,7 @@ data Instr
     -- | ADC Operand Operand Operang -- rd = rn + rm + C
     -- | ADCS ...
     | ADD Operand Operand Operand -- rd = rn + rm
-    | ADDS Operand Operand Operand -- rd = rn + rm
+    -- | ADDS Operand Operand Operand -- rd = rn + rm
     -- | ADR ...
     -- | ADRP ...
     | CMN Operand Operand -- rd + op2

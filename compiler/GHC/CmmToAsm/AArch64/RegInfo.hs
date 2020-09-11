@@ -5,17 +5,10 @@ module GHC.CmmToAsm.AArch64.RegInfo where
 
 import GHC.Prelude
 
-import GHC.Platform.Reg
-import GHC.Platform.Reg.Class
-import GHC.CmmToAsm.Format
-
 import GHC.CmmToAsm.AArch64.Instr
-
 import GHC.Cmm.BlockId
 import GHC.Cmm
-import GHC.Cmm.CLabel
 
-import GHC.Types.Unique
 import GHC.Utils.Outputable
 
 data JumpDest = DestBlockId BlockId

@@ -2,8 +2,6 @@ module GHC.CmmToAsm.AArch64.Ppr (pprNatCmmDecl) where
 
 import GHC.Prelude hiding (EQ)
 
-import Data.List (findIndex, all)
-
 import GHC.CmmToAsm.AArch64.Instr
 import GHC.CmmToAsm.AArch64.Regs
 import GHC.CmmToAsm.AArch64.Cond
@@ -11,8 +9,6 @@ import GHC.CmmToAsm.Ppr
 import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Format
 import GHC.Platform.Reg
-import GHC.Platform.Reg.Class
-import GHC.CmmToAsm.Reg.Target
 import GHC.CmmToAsm.Config
 
 import GHC.Cmm hiding (topInfoTable)
@@ -72,8 +68,6 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
        else empty) $$
       pprSizeDecl platform info_lbl
 
-pprNatCmmDecl _ _ = undefined
-
 pprLabel :: Platform -> CLabel -> SDoc
 pprLabel platform lbl =
    pprGloblDecl lbl
@@ -81,7 +75,7 @@ pprLabel platform lbl =
    $$ (ppr lbl <> char ':')
 
 pprAlign :: Platform -> Alignment -> SDoc
-pprAlign platform alignment
+pprAlign _platform alignment
         = text "\t.balign " <> int (alignmentBytes alignment)
 
 -- | Print appropriate alignment for the given section type.
@@ -141,6 +135,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
     -- See https://gitlab.haskell.org/ghc/ghc/-/issues/367
     -- This only intends to catch the very trivial case, not the more
     -- compilicated cases.
+    {-
     detectTrivialDeadlock :: [Instr] -> [Instr]
     detectTrivialDeadlock instrs = case (findIndex isSelfBranch instrs) of
       Just n | all (not . aarch64_isJumpishInstr) (take n instrs) ->
@@ -157,6 +152,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
 
       where isSelfBranch (B (TBlock blockid')) = blockid' == blockid
             isSelfBranch _ = False
+    -}
 
     asmLbl = blockLbl blockid
     platform = ncgPlatform config
@@ -254,6 +250,8 @@ pprDataItem config lit
            = let bs = doubleToBytes (fromRational r)
              in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
 
+        ppr_item _ _ = pprPanic "pprDataItem:ppr_item" (text $ show lit)
+
 pprImm :: Imm -> SDoc
 
 pprImm (ImmInt i)     = int i
@@ -339,7 +337,6 @@ pprOp op = case op of
   OpAddr (AddrRegReg r1 r2) -> char '[' <+> pprReg W64 r1 <> comma <+> pprReg W64 r2 <+> char ']'
   OpAddr (AddrRegImm r1 im) -> char '[' <+> pprReg W64 r1 <> comma <+> pprImm im <+> char ']'
   OpAddr (AddrReg r1)       -> char '[' <+> pprReg W64 r1 <+> char ']'
-  OpAddr _          -> panic "AArch64.pprOp: no amode"
 
 pprReg :: Width -> Reg -> SDoc
 pprReg w r = case r of
@@ -349,6 +346,7 @@ pprReg w r = case r of
   RegVirtual (VirtualRegI u)   -> text "%vI_" <> pprUniqueAlways u
   RegVirtual (VirtualRegF u)   -> text "%vF_" <> pprUniqueAlways u
   RegVirtual (VirtualRegD u)   -> text "%vD_" <> pprUniqueAlways u
+  _                            -> pprPanic "AArch64.pprReg" (text $ show r)
 
   where
     ppr_reg_no :: Width -> Int -> SDoc
@@ -459,7 +457,7 @@ pprInstr platform instr = case instr of
 
   BCOND c (TBlock bid) -> text "\t" <> pprBcond c <+> ppr (mkLocalBlockLabel (getUnique bid))
   BCOND c (TLabel lbl) -> text "\t" <> pprBcond c <+> ppr lbl
-  BCOND c (TReg r)     -> panic "AArch64.ppr: No conditional branching to registers!"
+  BCOND _ (TReg _)     -> panic "AArch64.ppr: No conditional branching to registers!"
 
   -- 5. Atomic Instructions ----------------------------------------------------
   -- 6. Conditional Instructions -----------------------------------------------
@@ -467,11 +465,11 @@ pprInstr platform instr = case instr of
 
   CBZ o (TBlock bid) -> text "\tcbz" <+> pprOp o <> comma <+> ppr (mkLocalBlockLabel (getUnique bid))
   CBZ o (TLabel lbl) -> text "\tcbz" <+> pprOp o <> comma <+> ppr lbl
-  CBZ c (TReg r)     -> panic "AArch64.ppr: No conditional (cbz) branching to registers!"
+  CBZ _ (TReg _)     -> panic "AArch64.ppr: No conditional (cbz) branching to registers!"
 
   CBNZ o (TBlock bid) -> text "\tcbnz" <+> pprOp o <> comma <+> ppr (mkLocalBlockLabel (getUnique bid))
   CBNZ o (TLabel lbl) -> text "\tcbnz" <+> pprOp o <> comma <+> ppr lbl
-  CBNZ c (TReg r)     -> panic "AArch64.ppr: No conditional (cbnz) branching to registers!"
+  CBNZ _ (TReg _)     -> panic "AArch64.ppr: No conditional (cbnz) branching to registers!"
 
   -- 7. Load and Store Instructions --------------------------------------------
   -- NOTE: GHC may do whacky things where it only load the lower part of an
@@ -545,3 +543,9 @@ pprCond c = case c of
   OLE    -> text "ls"
   OGE    -> text "ge"
   OGT    -> text "gt"
+
+  -- Unordered
+  UOLT   -> text "lt"
+  UOLE   -> text "le"
+  UOGE   -> text "pl"
+  UOGT   -> text "hi"

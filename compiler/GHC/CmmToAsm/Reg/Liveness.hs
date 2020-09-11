@@ -154,6 +154,8 @@ instance Instruction instr => Instruction (InstrSR instr) where
         mkStackDeallocInstr platform amount =
              Instr <$> mkStackDeallocInstr platform amount
 
+        mkComment               = fmap Instr . mkComment
+
 
 -- | An instruction with liveness information.
 data LiveInstr instr
