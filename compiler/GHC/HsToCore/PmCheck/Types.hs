@@ -25,7 +25,7 @@ module GHC.HsToCore.PmCheck.Types (
         pmLitAsStringLit, coreExprAsPmLit,
 
         -- * Caching residual COMPLETE sets
-        ConLikeSet, ResidualCompleteMatches(..), getRcm,
+        ConLikeSet, ResidualCompleteMatches(..), getRcm, isRcmInitialised,
 
         -- * PmAltConSet
         PmAltConSet, emptyPmAltConSet, isEmptyPmAltConSet, elemPmAltConSet,
@@ -33,11 +33,11 @@ module GHC.HsToCore.PmCheck.Types (
 
         -- * A 'DIdEnv' where entries may be shared
         Shared(..), SharedDIdEnv(..), emptySDIE, lookupSDIE, sameRepresentativeSDIE,
-        setIndirectSDIE, setEntrySDIE, traverseSDIE,
+        setIndirectSDIE, setEntrySDIE, traverseSDIE, entriesSDIE,
 
         -- * The pattern match oracle
-        BotInfo(..), VarInfo(..), TmState(..), TyState(..), Nabla(..),
-        Nablas(..), initNablas, liftNablasM
+        BotInfo(..), PmAltConApp(..), VarInfo(..), TmState(..), TyState(..),
+        Nabla(..), Nablas(..), initNablas, liftNablasM
     ) where
 
 #include "HsVersions.h"
@@ -49,6 +49,7 @@ import GHC.Data.Bag
 import GHC.Data.FastString
 import GHC.Types.Id
 import GHC.Types.Var.Env
+import GHC.Types.Var.Set
 import GHC.Types.Unique.DSet
 import GHC.Types.Unique.DFM
 import GHC.Types.Name
@@ -437,6 +438,9 @@ data ResidualCompleteMatches
 getRcm :: ResidualCompleteMatches -> [ConLikeSet]
 getRcm (RCM vanilla pragmas) = maybeToList vanilla ++ fromMaybe [] pragmas
 
+isRcmInitialised :: ResidualCompleteMatches -> Bool
+isRcmInitialised (RCM vanilla pragmas) = isJust vanilla && isJust pragmas
+
 instance Outputable ResidualCompleteMatches where
   -- formats as "[{Nothing,Just},{P,Q}]"
   ppr rcm = ppr (getRcm rcm)
@@ -485,6 +489,12 @@ setEntrySDIE :: SharedDIdEnv a -> Id -> a -> SharedDIdEnv a
 setEntrySDIE sdie@(SDIE env) x a =
   SDIE $ extendDVarEnv env (fst (lookupReprAndEntrySDIE sdie x)) (Entry a)
 
+entriesSDIE :: SharedDIdEnv a -> [a]
+entriesSDIE (SDIE env) = mapMaybe preview_entry (eltsUDFM env)
+  where
+    preview_entry (Entry e) = Just e
+    preview_entry _         = Nothing
+
 traverseSDIE :: forall a b f. Applicative f => (a -> f b) -> SharedDIdEnv a -> f (SharedDIdEnv b)
 traverseSDIE f = fmap (SDIE . listToUDFM_Directly) . traverse g . udfmToList . unSDIE
   where
@@ -501,13 +511,6 @@ instance Outputable a => Outputable (Shared a) where
 instance Outputable a => Outputable (SharedDIdEnv a) where
   ppr (SDIE env) = ppr env
 
--- | See 'vi_bot'.
-data BotInfo
-  = IsBot
-  | IsNotBot
-  | MaybeBot
-  deriving Eq
-
 -- | The term oracle state. Stores 'VarInfo' for encountered 'Id's. These
 -- entries are possibly shared when we figure out that two variables must be
 -- equal, thus represent the same set of values.
@@ -522,6 +525,9 @@ data TmState
   -- ^ An environment for looking up whether we already encountered semantically
   -- equivalent expressions that we want to represent by the same 'Id'
   -- representative.
+  , ts_dirty :: !DIdSet
+  -- ^ Which 'VarInfo' needs to be checked for inhabitants because of new
+  -- negative constraints (e.g. @x ≁ ⊥@ or @x ≁ K@).
   }
 
 -- | Information about an 'Id'. Stores positive ('vi_pos') facts, like @x ~ Just 42@,
@@ -532,11 +538,11 @@ data TmState
 -- Subject to Note [The Pos/Neg invariant] in "GHC.HsToCore.PmCheck.Oracle".
 data VarInfo
   = VI
-  { vi_ty  :: !Type
-  -- ^ The type of the variable. Important for rejecting possible GADT
-  -- constructors or incompatible pattern synonyms (@Just42 :: Maybe Int@).
+  { vi_id  :: !Id
+  -- ^ The 'Id' in question. Important for adding new constraints relative to
+  -- this 'VarInfo' when we don't easily have the 'Id' available.
 
-  , vi_pos :: ![(PmAltCon, [TyVar], [Id])]
+  , vi_pos :: ![PmAltConApp]
   -- ^ Positive info: 'PmAltCon' apps it is (i.e. @x ~ [Just y, PatSyn z]@), all
   -- at the same time (i.e. conjunctive).  We need a list because of nested
   -- pattern matches involving pattern synonym
@@ -576,40 +582,76 @@ data VarInfo
   -- to recognise completion of a COMPLETE set efficiently for large enums.
   }
 
+data PmAltConApp
+  = PACA
+  { paca_con :: !PmAltCon
+  , paca_tvs :: ![TyVar]
+  , paca_ids :: ![Id]
+  }
+
+-- | See 'vi_bot'.
+data BotInfo
+  = IsBot
+  | IsNotBot
+  | MaybeBot
+  deriving Eq
+
+instance Outputable PmAltConApp where
+  ppr PACA{paca_con = con, paca_tvs = tvs, paca_ids = ids} =
+    hsep (ppr con : map ((char '@' <>) . ppr) tvs ++ map ppr ids)
+
 instance Outputable BotInfo where
-  ppr MaybeBot = empty
+  ppr MaybeBot = underscore
   ppr IsBot    = text "~⊥"
   ppr IsNotBot = text "≁⊥"
 
 -- | Not user-facing.
 instance Outputable TmState where
-  ppr (TmSt state reps) = ppr state $$ ppr reps
+  ppr (TmSt state reps dirty) = ppr state $$ ppr reps $$ ppr dirty
 
 -- | Not user-facing.
 instance Outputable VarInfo where
-  ppr (VI ty pos neg bot cache)
-    = braces (hcat (punctuate comma [ppr ty, ppr pos, ppr neg, ppr bot, ppr cache]))
+  ppr (VI x pos neg bot cache)
+    = braces (hcat (punctuate comma [pp_x, pp_pos, pp_neg, ppr bot, pp_cache]))
+    where
+      pp_x = ppr x <> dcolon <> ppr (idType x)
+      pp_pos
+        | [] <- pos  = underscore
+        | [p] <- pos = char '~' <> ppr p -- suppress outer [_] if singleton
+        | otherwise  = char '~' <> ppr pos
+      pp_neg
+        | isEmptyPmAltConSet neg = underscore
+        | otherwise              = char '≁' <> ppr neg
+      pp_cache
+        | RCM Nothing Nothing <- cache = underscore
+        | otherwise                    = ppr cache
 
 -- | Initial state of the term oracle.
 initTmState :: TmState
-initTmState = TmSt emptySDIE emptyCoreMap
+initTmState = TmSt emptySDIE emptyCoreMap emptyDVarSet
 
--- | The type oracle state. A poor man's 'GHC.Tc.Solver.Monad.InsertSet': The invariant is
--- that all constraints in there are mutually compatible.
-newtype TyState = TySt InertSet
+-- | The type oracle state. An 'GHC.Tc.Solver.Monad.InsertSet' that we
+-- incrementally add local type constraints to, together with a sequence
+-- number that counts the number of times we extended it with new facts.
+data TyState = TySt { ty_st_n :: !Int, ty_st_inert :: !InertSet }
 
 -- | Not user-facing.
 instance Outputable TyState where
-  ppr (TySt inert) = ppr inert
+  ppr (TySt n inert) = ppr n <+> ppr inert
 
 initTyState :: TyState
-initTyState = TySt emptyInert
+initTyState = TySt 0 emptyInert
 
 -- | A normalised refinement type ∇ (\"nabla\"), comprised of an inert set of
 -- canonical (i.e. mutually compatible) term and type constraints that form the
 -- refinement type's predicate.
-data Nabla = MkNabla { nabla_ty_st :: TyState    -- Type oracle; things like a~Int
-                     , nabla_tm_st :: TmState }  -- Term oracle; things like x~Nothing
+data Nabla
+  = MkNabla
+  { nabla_ty_st :: !TyState
+  -- ^ Type oracle; things like a~Int
+  , nabla_tm_st :: !TmState
+  -- ^ Term oracle; things like x~Nothing
+  }
 
 -- | An initial nabla that is always satisfiable
 initNabla :: Nabla

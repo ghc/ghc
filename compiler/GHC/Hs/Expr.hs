@@ -1347,8 +1347,10 @@ hsExprNeedsParens p = go
           ExpansionExpr (HsExpanded a _) -> hsExprNeedsParens p a
       | GhcRn <- ghcPass @p
       = case x of HsExpanded a _ -> hsExprNeedsParens p a
+#if __GLASGOW_HASKELL__ <= 900
       | otherwise
       = True
+#endif
 
 
 -- | @'parenthesizeHsExpr' p e@ checks if @'hsExprNeedsParens' p e@ is true,

@@ -146,8 +146,8 @@ pprPmVar :: PprPrec -> Id -> PmPprM SDoc
 pprPmVar prec x = do
   nabla <- ask
   case lookupSolution nabla x of
-    Just (alt, _tvs, args) -> pprPmAltCon prec alt args
-    Nothing          -> fromMaybe typed_wildcard <$> checkRefuts x
+    Just (PACA alt _tvs args) -> pprPmAltCon prec alt args
+    Nothing                   -> fromMaybe typed_wildcard <$> checkRefuts x
       where
         -- if we have no info about the parameter and would just print a
         -- wildcard, also show its type.
@@ -206,7 +206,7 @@ pmExprAsList :: Nabla -> PmAltCon -> [Id] -> Maybe PmExprList
 pmExprAsList nabla = go_con []
   where
     go_var rev_pref x
-      | Just (alt, _tvs, args) <- lookupSolution nabla x
+      | Just (PACA alt _tvs args) <- lookupSolution nabla x
       = go_con rev_pref alt args
     go_var rev_pref x
       | Just pref <- nonEmpty (reverse rev_pref)
