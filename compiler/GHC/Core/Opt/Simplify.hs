@@ -2060,7 +2060,7 @@ rebuildContOpCall
     env
     (ArgInfo { ai_fun = fun_id, ai_args = rev_args })
     (ApplyToVal { sc_arg = k, sc_env = k_se
-                , sc_cont = cont, sc_hole_ty = fun_ty })
+                , sc_cont = cont })
   | Just KeepAliveOp <- isPrimOpId_maybe fun_id
   , [ ValArg {as_arg=s0}
     , ValArg {as_arg=x}
