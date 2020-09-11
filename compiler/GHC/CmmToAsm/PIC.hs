@@ -262,7 +262,7 @@ howToAccessLabel config _ OSMinGW32 this_mod _ lbl
 -- is enough for ~64MB of range. Anything else will need to go through a veneer,
 -- which is the job of the linker to build.  We might only want to lookup
 -- Data References through the GOT.
-howToAccessLabel config ArchAArch64 _os this_mod kind lbl
+howToAccessLabel config ArchAArch64 _os this_mod _kind lbl
         | not (ncgExternalDynamicRefs config)
         = AccessDirectly
 
