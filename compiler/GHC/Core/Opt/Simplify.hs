@@ -2069,7 +2069,6 @@ rebuildContOpCall
     , TyArg {as_arg_ty=arg_ty}
     , TyArg {as_arg_ty=arg_rep}
     ] <- rev_args
-  , False
   = Just $
     do { --let (m,_,_) = splitFunTy fun_ty
          let m = Many
