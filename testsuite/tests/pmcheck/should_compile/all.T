@@ -134,6 +134,8 @@ test('T17977b', collect_compiler_stats('bytes allocated',10), compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T18049', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T18249', normal, compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns -Wredundant-bang-patterns'])
 test('T18273', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T18341', normal, compile,
