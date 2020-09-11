@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# language CPP, BangPatterns #-}
 
 module GHC.CmmToAsm.AArch64.Instr
@@ -11,11 +12,13 @@ import GHC.Prelude
 import GHC.CmmToAsm.AArch64.Cond
 import GHC.CmmToAsm.AArch64.Regs
 
-import GHC.CmmToAsm.Instr
+import GHC.CmmToAsm.Instr (RegUsage(..))
 import GHC.CmmToAsm.Format
-import GHC.CmmToAsm.Reg.Target
+import GHC.CmmToAsm.Types
+import GHC.CmmToAsm.Utils
+-- import GHC.CmmToAsm.Reg.Target
 import GHC.CmmToAsm.Config
-import GHC.Platform.Reg.Class
+-- import GHC.Platform.Reg.Class
 import GHC.Platform.Reg
 
 import GHC.Platform.Regs
@@ -23,18 +26,20 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 import GHC.Cmm
-import GHC.Cmm.Info
-import GHC.Data.FastString
+-- import GHC.Cmm.Info
+-- import GHC.Data.FastString
 import GHC.Cmm.CLabel
 import GHC.Utils.Outputable
 import GHC.Platform
-import GHC.Types.Unique.FM (listToUFM, lookupUFM)
+-- import GHC.Types.Unique.FM (listToUFM, lookupUFM)
 import GHC.Types.Unique.Supply
+
+import GHC.Utils.Panic
 
 import Control.Monad (replicateM)
 import Data.Maybe (fromMaybe)
 
-import Debug.Trace
+-- import Debug.Trace
 import GHC.Stack
 
 import Data.Bits ((.&.), complement)
@@ -65,24 +70,6 @@ spillSlotToOffset :: NCGConfig -> Int -> Int
 spillSlotToOffset config slot
    = stackFrameHeaderSize (ncgPlatform config) + spillSlotSize * slot
 
--- | Instruction instance for powerpc
-instance Instruction Instr where
-        regUsageOfInstr         = aarch64_regUsageOfInstr
-        patchRegsOfInstr        = aarch64_patchRegsOfInstr
-        isJumpishInstr          = aarch64_isJumpishInstr
-        jumpDestsOfInstr        = aarch64_jumpDestsOfInstr
-        patchJumpInstr          = aarch64_patchJumpInstr
-        mkSpillInstr            = aarch64_mkSpillInstr
-        mkLoadInstr             = aarch64_mkLoadInstr
-        takeDeltaInstr          = aarch64_takeDeltaInstr
-        isMetaInstr             = aarch64_isMetaInstr
-        mkRegRegMoveInstr _     = aarch64_mkRegRegMoveInstr
-        takeRegRegMoveInstr     = aarch64_takeRegRegMoveInstr
-        mkJumpInstr             = aarch64_mkJumpInstr
-        mkStackAllocInstr       = aarch64_mkStackAllocInstr
-        mkStackDeallocInstr     = aarch64_mkStackDeallocInstr
-        mkComment               = pure . COMMENT
-
 -- | Get the registers that are being used by this instruction.
 -- regUsage doesn't need to do any trickery for jumps and such.
 -- Just state precisely the regs read and written by that insn.
@@ -94,12 +81,11 @@ instance Instruction Instr where
 instance Outputable RegUsage where
     ppr (RU reads writes) = text "RegUsage(reads:" <+> ppr reads <> comma <+> text "writes:" <+> ppr writes <> char ')'
 
-aarch64_regUsageOfInstr :: Platform -> Instr -> RegUsage
-aarch64_regUsageOfInstr platform instr = case instr of
-  ANN _ i                  -> aarch64_regUsageOfInstr platform i
+regUsageOfInstr :: Platform -> Instr -> RegUsage
+regUsageOfInstr platform instr = case instr of
+  ANN _ i                  -> regUsageOfInstr platform i
   -- 1. Arithmetic Instructions ------------------------------------------------
   ADD dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  ADDS dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
   CMN l r                  -> usage (regOp l ++ regOp r, [])
   CMP l r                  -> usage (regOp l ++ regOp r, [])
   MSUB dst src1 src2 src3  -> usage (regOp src1 ++ regOp src2 ++ regOp src3, regOp dst)
@@ -115,7 +101,6 @@ aarch64_regUsageOfInstr platform instr = case instr of
 
   -- 3. Logical and Move Instructions ------------------------------------------
   AND dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
-  ADDS dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
   ASR dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   BIC dst src1 src2        -> usage (regOp src1 ++ regOp src2, regOp dst)
   BICS dst src1 src2       -> usage (regOp src1 ++ regOp src2, regOp dst)
@@ -183,7 +168,7 @@ aarch64_regUsageOfInstr platform instr = case instr of
         -- Is this register interesting for the register allocator?
         interesting :: Platform -> Reg -> Bool
         interesting _        (RegVirtual _)                 = True
-        interesting platform (RegReal (RealRegSingle (-1))) = False
+        interesting _        (RegReal (RealRegSingle (-1))) = False
         interesting platform (RegReal (RealRegSingle i))    = freeReg platform i
         interesting _        (RegReal (RealRegPair{}))
             = panic "AArch64.Instr.interesting: no reg pairs on this arch"
@@ -218,13 +203,12 @@ callerSavedRegisters
 
 -- | Apply a given mapping to all the register references in this
 -- instruction.
-aarch64_patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
-aarch64_patchRegsOfInstr instr env = case instr of
+patchRegsOfInstr :: Instr -> (Reg -> Reg) -> Instr
+patchRegsOfInstr instr env = case instr of
     -- 0. Meta Instructions
-    ANN d i        -> ANN d (aarch64_patchRegsOfInstr i env)
+    ANN d i        -> ANN d (patchRegsOfInstr i env)
     -- 1. Arithmetic Instructions ----------------------------------------------
     ADD o1 o2 o3   -> ADD (patchOp o1) (patchOp o2) (patchOp o3)
-    ADDS o1 o2 o3  -> ADDS (patchOp o1) (patchOp o2) (patchOp o3)
     CMN o1 o2      -> CMN (patchOp o1) (patchOp o2)
     CMP o1 o2      -> CMP (patchOp o1) (patchOp o2)
     MSUB o1 o2 o3 o4 -> MSUB (patchOp o1) (patchOp o2) (patchOp o3) (patchOp o4)
@@ -280,6 +264,7 @@ aarch64_patchRegsOfInstr instr env = case instr of
     SCVTF o1 o2    -> SCVTF (patchOp o1) (patchOp o2)
     FCVTZS o1 o2   -> FCVTZS (patchOp o1) (patchOp o2)
 
+    _ -> pprPanic "patchRegsOfInstr" (text $ show instr)
     where
         patchOp :: Operand -> Operand
         patchOp (OpReg w r) = OpReg w (env r)
@@ -298,9 +283,9 @@ aarch64_patchRegsOfInstr instr env = case instr of
 -- | Checks whether this instruction is a jump/branch instruction.
 -- One that can change the flow of control in a way that the
 -- register allocator needs to worry about.
-aarch64_isJumpishInstr :: Instr -> Bool
-aarch64_isJumpishInstr instr = case instr of
-    ANN _ i -> aarch64_isJumpishInstr i
+isJumpishInstr :: Instr -> Bool
+isJumpishInstr instr = case instr of
+    ANN _ i -> isJumpishInstr i
     CBZ{} -> True
     CBNZ{} -> True
     J{} -> True
@@ -312,23 +297,23 @@ aarch64_isJumpishInstr instr = case instr of
 -- | Checks whether this instruction is a jump/branch instruction.
 -- One that can change the flow of control in a way that the
 -- register allocator needs to worry about.
-aarch64_jumpDestsOfInstr :: Instr -> [BlockId]
-aarch64_jumpDestsOfInstr (ANN _ i) = aarch64_jumpDestsOfInstr i
-aarch64_jumpDestsOfInstr (CBZ _ t) = [ id | TBlock id <- [t]]
-aarch64_jumpDestsOfInstr (CBNZ _ t) = [ id | TBlock id <- [t]]
-aarch64_jumpDestsOfInstr (J t) = [id | TBlock id <- [t]]
-aarch64_jumpDestsOfInstr (B t) = [id | TBlock id <- [t]]
-aarch64_jumpDestsOfInstr (BL t _ _) = [ id | TBlock id <- [t]]
-aarch64_jumpDestsOfInstr (BCOND _ t) = [ id | TBlock id <- [t]]
-aarch64_jumpDestsOfInstr _ = []
+jumpDestsOfInstr :: Instr -> [BlockId]
+jumpDestsOfInstr (ANN _ i) = jumpDestsOfInstr i
+jumpDestsOfInstr (CBZ _ t) = [ id | TBlock id <- [t]]
+jumpDestsOfInstr (CBNZ _ t) = [ id | TBlock id <- [t]]
+jumpDestsOfInstr (J t) = [id | TBlock id <- [t]]
+jumpDestsOfInstr (B t) = [id | TBlock id <- [t]]
+jumpDestsOfInstr (BL t _ _) = [ id | TBlock id <- [t]]
+jumpDestsOfInstr (BCOND _ t) = [ id | TBlock id <- [t]]
+jumpDestsOfInstr _ = []
 
 -- | Change the destination of this jump instruction.
 -- Used in the linear allocator when adding fixup blocks for join
 -- points.
-aarch64_patchJumpInstr :: Instr -> (BlockId -> BlockId) -> Instr
-aarch64_patchJumpInstr instr patchF
+patchJumpInstr :: Instr -> (BlockId -> BlockId) -> Instr
+patchJumpInstr instr patchF
     = case instr of
-        ANN d i -> ANN d (aarch64_patchJumpInstr i patchF)
+        ANN d i -> ANN d (patchJumpInstr i patchF)
         CBZ r (TBlock bid) -> CBZ r (TBlock (patchF bid))
         CBNZ r (TBlock bid) -> CBNZ r (TBlock (patchF bid))
         J (TBlock bid) -> J (TBlock (patchF bid))
@@ -354,7 +339,7 @@ aarch64_patchJumpInstr instr patchF
 -- always poitns to the top of the stack, and we can't use it for computation.
 --
 -- | An instruction to spill a register into a spill slot.
-aarch64_mkSpillInstr
+mkSpillInstr
    :: HasCallStack
    => NCGConfig
    -> Reg       -- register to spill
@@ -362,14 +347,14 @@ aarch64_mkSpillInstr
    -> Int       -- spill slot to use
    -> [Instr]
 
-aarch64_mkSpillInstr config reg delta slot =
+mkSpillInstr config reg delta slot =
   case (spillSlotToOffset config slot) - delta of
     imm | -256 <= imm && imm <= 255                               -> [ mkStrSp imm ]
     imm | imm > 0 && imm .&. 0x7 == 0x0 && imm <= 0xfff           -> [ mkStrSp imm ]
     imm | imm > 0xfff && imm <= 0xffffff && imm .&. 0x7 == 0x0    -> [ mkIp0SpillAddr (imm .&~. 0xfff)
                                                                      , mkStrIp0 (imm .&.  0xfff)
                                                                      ]
-    imm -> pprPanic "aarch64_mkSpillInstr" (text "Unable to spill into" <+> int imm)
+    imm -> pprPanic "mkSpillInstr" (text "Unable to spill into" <+> int imm)
     where
         a .&~. b = a .&. (complement b)
 
@@ -382,21 +367,21 @@ aarch64_mkSpillInstr config reg delta slot =
 
         off = spillSlotToOffset config slot
 
-aarch64_mkLoadInstr
+mkLoadInstr
    :: NCGConfig
    -> Reg       -- register to load
    -> Int       -- current stack delta
    -> Int       -- spill slot to use
    -> [Instr]
 
-aarch64_mkLoadInstr config reg delta slot =
+mkLoadInstr config reg delta slot =
   case (spillSlotToOffset config slot) - delta of
     imm | -256 <= imm && imm <= 255                               -> [ mkLdrSp imm ]
     imm | imm > 0 && imm .&. 0x7 == 0x0 && imm <= 0xfff           -> [ mkLdrSp imm ]
     imm | imm > 0xfff && imm <= 0xffffff && imm .&. 0x7 == 0x0    -> [ mkIp0SpillAddr (imm .&~. 0xfff)
                                                                      , mkLdrIp0 (imm .&.  0xfff)
                                                                      ]
-    imm -> pprPanic "aarch64_mkSpillInstr" (text "Unable to spill into" <+> int imm)
+    imm -> pprPanic "mkSpillInstr" (text "Unable to spill into" <+> int imm)
     where
         a .&~. b = a .&. (complement b)
 
@@ -412,16 +397,16 @@ aarch64_mkLoadInstr config reg delta slot =
 
 --------------------------------------------------------------------------------
 -- | See if this instruction is telling us the current C stack delta
-aarch64_takeDeltaInstr :: Instr -> Maybe Int
-aarch64_takeDeltaInstr (ANN _ i) = aarch64_takeDeltaInstr i
-aarch64_takeDeltaInstr (DELTA i) = Just i
-aarch64_takeDeltaInstr _         = Nothing
+takeDeltaInstr :: Instr -> Maybe Int
+takeDeltaInstr (ANN _ i) = takeDeltaInstr i
+takeDeltaInstr (DELTA i) = Just i
+takeDeltaInstr _         = Nothing
 
 -- Not real instructions.  Just meta data
-aarch64_isMetaInstr :: Instr -> Bool
-aarch64_isMetaInstr instr
+isMetaInstr :: Instr -> Bool
+isMetaInstr instr
  = case instr of
-    ANN _ i     -> aarch64_isMetaInstr i
+    ANN _ i     -> isMetaInstr i
     COMMENT{}   -> True
     MULTILINE_COMMENT{} -> True
     LOCATION{}  -> True
@@ -434,32 +419,32 @@ aarch64_isMetaInstr instr
 
 -- | Copy the value in a register to another one.
 -- Must work for all register classes.
-aarch64_mkRegRegMoveInstr :: Reg -> Reg -> Instr
-aarch64_mkRegRegMoveInstr src dst = ANN (text $ "Reg->Reg Move: " ++ show src ++ " -> " ++ show dst) $ MOV (OpReg W64 dst) (OpReg W64 src)
+mkRegRegMoveInstr :: Reg -> Reg -> Instr
+mkRegRegMoveInstr src dst = ANN (text $ "Reg->Reg Move: " ++ show src ++ " -> " ++ show dst) $ MOV (OpReg W64 dst) (OpReg W64 src)
 
 -- | Take the source and destination from this reg -> reg move instruction
 -- or Nothing if it's not one
-aarch64_takeRegRegMoveInstr :: Instr -> Maybe (Reg,Reg)
---aarch64_takeRegRegMoveInstr (MOV (OpReg fmt dst) (OpReg fmt' src)) | fmt == fmt' = Just (src, dst)
-aarch64_takeRegRegMoveInstr _ = Nothing
+takeRegRegMoveInstr :: Instr -> Maybe (Reg,Reg)
+--takeRegRegMoveInstr (MOV (OpReg fmt dst) (OpReg fmt' src)) | fmt == fmt' = Just (src, dst)
+takeRegRegMoveInstr _ = Nothing
 
 -- | Make an unconditional jump instruction.
-aarch64_mkJumpInstr :: BlockId -> [Instr]
-aarch64_mkJumpInstr id = [B (TBlock id)]
+mkJumpInstr :: BlockId -> [Instr]
+mkJumpInstr id = [B (TBlock id)]
 
-aarch64_mkStackAllocInstr :: Platform -> Int -> [Instr]
-aarch64_mkStackAllocInstr platform n
+mkStackAllocInstr :: Platform -> Int -> [Instr]
+mkStackAllocInstr platform n
     | n == 0 = []
     | n > 0 && n < 4096 = [ ANN (text "Alloc More Stack") $ SUB sp sp (OpImm (ImmInt n)) ]
-    | n > 0 =  ANN (text "Alloc More Stack") (SUB sp sp (OpImm (ImmInt 4095))) : aarch64_mkStackAllocInstr platform (n - 4095)
-aarch64_mkStackAllocInstr platform n = pprPanic "aarch64_mkStackAllocInstr" (int n)
+    | n > 0 =  ANN (text "Alloc More Stack") (SUB sp sp (OpImm (ImmInt 4095))) : mkStackAllocInstr platform (n - 4095)
+mkStackAllocInstr _platform n = pprPanic "mkStackAllocInstr" (int n)
 
-aarch64_mkStackDeallocInstr :: Platform -> Int -> [Instr]
-aarch64_mkStackDeallocInstr platform n
+mkStackDeallocInstr :: Platform -> Int -> [Instr]
+mkStackDeallocInstr platform n
     | n == 0 = []
     | n > 0 && n < 4096 = [ ANN (text "Dealloc More Stack") $ ADD sp sp (OpImm (ImmInt n)) ]
-    | n > 0 =  ANN (text "Dealloc More Stack") (ADD sp sp (OpImm (ImmInt 4095))) : aarch64_mkStackDeallocInstr platform (n - 4095)
-aarch64_mkStackDeallocInstr platform n = pprPanic "aarch64_mkStackDeallocInstr" (int n)
+    | n > 0 =  ANN (text "Dealloc More Stack") (ADD sp sp (OpImm (ImmInt 4095))) : mkStackDeallocInstr platform (n - 4095)
+mkStackDeallocInstr _platform n = pprPanic "mkStackDeallocInstr" (int n)
 
 --
 -- See note [extra spill slots] in X86/Instr.hs
@@ -500,8 +485,8 @@ allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
       insert_dealloc insn r = case insn of
         J _ -> dealloc ++ (insn : r)
         ANN _ (J _) -> dealloc ++ (insn : r)
-        _other | aarch64_jumpDestsOfInstr insn /= []
-            -> aarch64_patchJumpInstr insn retarget : r
+        _other | jumpDestsOfInstr insn /= []
+            -> patchJumpInstr insn retarget : r
         _other -> insn : r
 
         where retarget b = fromMaybe b (mapLookup b new_blockmap)
@@ -555,7 +540,7 @@ data Instr
     -- | ADC Operand Operand Operang -- rd = rn + rm + C
     -- | ADCS ...
     | ADD Operand Operand Operand -- rd = rn + rm
-    | ADDS Operand Operand Operand -- rd = rn + rm
+    -- | ADDS Operand Operand Operand -- rd = rn + rm
     -- | ADR ...
     -- | ADRP ...
     | CMN Operand Operand -- rd + op2
@@ -643,7 +628,7 @@ data Instr
     | FCVTZS Operand Operand
 
 instance Show Instr where
-    show (LDR f o1 o2) = "LDR " ++ show o1 ++ ", " ++ show o2
+    show (LDR _f o1 o2) = "LDR " ++ show o1 ++ ", " ++ show o2
     show (MOV o1 o2) = "MOV " ++ show o1 ++ ", " ++ show o2
     show _ = "missing"
 
@@ -684,7 +669,7 @@ data Operand
 opReg :: Width -> Reg -> Operand
 opReg = OpReg
 
-xzr, wzr, sp :: Operand
+xzr, wzr, sp, ip0 :: Operand
 xzr = OpReg W64 (RegReal (RealRegSingle (-1)))
 wzr = OpReg W32 (RegReal (RealRegSingle (-1)))
 sp  = OpReg W64 (RegReal (RealRegSingle 31))
@@ -773,9 +758,11 @@ opRegUExt W64 r = OpRegExt W64 r EUXTX 0
 opRegUExt W32 r = OpRegExt W32 r EUXTW 0
 opRegUExt W16 r = OpRegExt W16 r EUXTH 0
 opRegUExt W8  r = OpRegExt W8  r EUXTB 0
+opRegUExt w  _r = pprPanic "opRegUExt" (text $ show w)
 
 opRegSExt :: Width -> Reg -> Operand
 opRegSExt W64 r = OpRegExt W64 r ESXTX 0
 opRegSExt W32 r = OpRegExt W32 r ESXTW 0
 opRegSExt W16 r = OpRegExt W16 r ESXTH 0
 opRegSExt W8  r = OpRegExt W8  r ESXTB 0
+opRegSExt w  _r = pprPanic "opRegSExt" (text $ show w)
