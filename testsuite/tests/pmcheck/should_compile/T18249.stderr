@@ -1,0 +1,35 @@
+
+T18249.hs:14:8: warning: [-Woverlapping-patterns]
+    Pattern match is redundant
+    In an equation for ‘f’: f !_ | False = ...
+   |
+14 | f !_ | False = 1
+   |        ^^^^^
+
+T18249.hs:25:4: warning: [-Wredundant-bang-patterns]
+    Pattern match has redundant bang
+    In an equation for ‘g’: g _ = ...
+   |
+25 | g !_ = 1
+   |    ^
+
+T18249.hs:29:16: warning: [-Woverlapping-patterns]
+    Pattern match is redundant
+    In an equation for ‘h’: h (# _, _ #) | False = ...
+   |
+29 | h (# _, _ #) | False = 1
+   |                ^^^^^
+
+T18249.hs:33:13: warning: [-Woverlapping-patterns]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘i’: i !_ | False = ...
+   |
+33 | i !_      | False = 1
+   |             ^^^^^
+
+T18249.hs:34:13: warning: [-Woverlapping-patterns]
+    Pattern match is redundant
+    In an equation for ‘i’: i (I# !_) | False = ...
+   |
+34 | i (I# !_) | False = 2
+   |             ^^^^^
