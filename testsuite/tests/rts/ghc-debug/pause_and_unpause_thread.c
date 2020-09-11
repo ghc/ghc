@@ -22,7 +22,11 @@ void* pauseAndUnpause_thread(void* unused){
     timestamps.end = time(NULL);
 
     rts_unpause(r_paused);
-
+    
+    if(rts_isPaused()) {
+        errorBelch("Expected the RTS to be unpaused.");
+        exit(1);
+    }
     return NULL;
 }
 
