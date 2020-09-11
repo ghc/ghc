@@ -14,7 +14,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.Var
 import GHC.Hs (LForeignDecl, HsExpr, GhcTc)
 import GHC.Tc.Types (TcRnIf, IfGblEnv, IfLclEnv, CompleteMatches)
-import {-# SOURCE #-} GHC.HsToCore.PmCheck.Types (Nablas)
+import GHC.HsToCore.PmCheck.Types (Nablas)
 import GHC.Core (CoreExpr)
 import GHC.Core.FamInstEnv
 import GHC.Utils.Error
