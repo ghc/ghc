@@ -1239,12 +1239,16 @@ static void freeOcStablePtrs (ObjectCode *oc)
 {
     // Release any StablePtrs that were created when this
     // object module was initialized.
-    ForeignExportStablePtr *fe_ptr, *next;
+    struct ForeignExportsList *exports, *next;
 
-    for (fe_ptr = oc->stable_ptrs; fe_ptr != NULL; fe_ptr = next) {
-        next = fe_ptr->next;
-        freeStablePtr(fe_ptr->stable_ptr);
-        stgFree(fe_ptr);
+    for (exports = oc->foreign_exports; exports != NULL; exports = next) {
+        next = exports->next;
+        for (int i = 0; i < exports->n_entries) {
+            freeStablePtr(exports->stable_ptrs[i]);
+        }
+        stgFree(exports->stable_ptrs);
+        exports->stable_ptrs = NULL;
+        exports->next = NULL;
     }
     oc->stable_ptrs = NULL;
 }
