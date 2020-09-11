@@ -48,12 +48,14 @@ static ObjectCode *loading_obj = NULL;
  * For instance, doing exactly this resulted in #18548.
  *
  * Another consideration here is that the linker needs to know which
- * `StablePtr`s belong to each `ObjectCode` it loads for the sake of unloading.
- * For this reason, the linker informs us when it is loading an object by calling
- * `foreignExportsLoadingObject` and `foreignExportsFinishedLoadingObject`. We
- * take note of the `ObjectCode*` we are loading in `loading_obj` such that we
- * can associate the `StablePtr` with the `ObjectCode` in
- * `processForeignExports`.
+ * `StablePtr`s belong to each `ObjectCode` so it can free them when the module is
+ * unloaded.  For this reason, the linker informs us when it is loading an
+ * object by calling `foreignExportsLoadingObject` and
+ * `foreignExportsFinishedLoadingObject`. We take note of the `ObjectCode*` we
+ * are loading in `loading_obj` such that we can associate the `ForeignExportsList` with
+ * the `ObjectCode` in `processForeignExports`. We then record each of the
+ * StablePtrs we create in the ->stable_ptrs array of ForeignExportsList so
+ * they can be enumerated during unloading.
  *
  */
 
@@ -94,20 +96,35 @@ void foreignExportsFinishedLoadingObject()
 void processForeignExports()
 {
     while (pending) {
-        for (int i=0; i < pending->n_entries; i++) {
-            StgPtr p = pending->exports[i];
-            StgStablePtr *sptr = getStablePtr(p);
+        struct ForeignExportsList *cur = pending;
+        pending = cur->next;
 
-            if (loading_obj != NULL) {
-                ForeignExportStablePtr *fe_sptr = (ForeignExportStablePtr *)
-                  stgMallocBytes(sizeof(ForeignExportStablePtr),
-                                 "foreignExportStablePtr");
-                fe_sptr->stable_ptr = sptr;
-                fe_sptr->next = loading_obj->stable_ptrs;
-                pending->oc->stable_ptrs = fe_sptr;
+        /* sanity check */
+        ASSERT(cur->stable_ptrs == NULL);
+
+        /* N.B. We only need to populate the ->stable_ptrs
+         * array if the object might later be unloaded.
+         */
+        if (cur->oc != NULL) {
+            cur->stable_ptrs =
+              stgMallocBytes(sizeof(StgStablePtr*) * cur->n_entries,
+                             "foreignExportStablePtr");
+
+            for (int i=0; i < cur->n_entries; i++) {
+                StgStablePtr *sptr = getStablePtr(cur->exports[i]);
+
+                if (cur->oc != NULL) {
+                    cur->stable_ptrs[i] = sptr;
+                }
+            }
+            cur->next = cur->oc->foreign_exports;
+            cur->oc->foreign_exports = cur;
+        } else {
+            /* can't be unloaded, don't bother populating
+             * ->stable_ptrs array. */
+            for (int i=0; i < cur->n_entries; i++) {
+                getStablePtr(cur->exports[i]);
             }
         }
-
-        pending = pending->next;
     }
 }
