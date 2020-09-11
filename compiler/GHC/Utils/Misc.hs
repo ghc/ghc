@@ -145,7 +145,7 @@ import GHC.Utils.Panic.Plain
 import Data.Data
 import Data.IORef       ( IORef, newIORef, atomicModifyIORef' )
 import System.IO.Unsafe ( unsafePerformIO )
-import Data.List        hiding (group)
+import Data.List        hiding (group, singleton)
 import Data.List.NonEmpty  ( NonEmpty(..) )
 
 import GHC.Exts
