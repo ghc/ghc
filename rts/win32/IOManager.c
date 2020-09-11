@@ -11,6 +11,7 @@
 #if !defined(THREADED_RTS)
 
 #include "Rts.h"
+#include "RtsUtils.h"
 #include "IOManager.h"
 #include "WorkQueue.h"
 #include "ConsoleHandler.h"
@@ -440,7 +441,7 @@ AddIORequest ( int   fd,
 {
     ASSERT(ioMan);
 
-    WorkItem* wItem    = (WorkItem*)stgMallocBytse(sizeof(WorkItem), "AddIORequest");
+    WorkItem* wItem    = (WorkItem*)stgMallocBytes(sizeof(WorkItem), "AddIORequest");
 
     unsigned int reqID = ioMan->requestID++;
 
