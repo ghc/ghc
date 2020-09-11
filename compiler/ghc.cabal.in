@@ -600,6 +600,7 @@ Library
             GHC.CmmToAsm.X86.Cond
             GHC.CmmToAsm.X86.Ppr
             GHC.CmmToAsm.X86.CodeGen
+            GHC.CmmToAsm.AArch64
             GHC.CmmToAsm.AArch64.Regs
             GHC.CmmToAsm.AArch64.RegInfo
             GHC.CmmToAsm.AArch64.Instr

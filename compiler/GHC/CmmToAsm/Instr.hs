@@ -16,8 +16,6 @@ import GHC.Cmm.BlockId
 
 import GHC.CmmToAsm.Config
 
-import GHC.Utils.Outputable (SDoc)
-
 import GHC.Stack
 
 -- | Holds a list of source and destination registers used by a

@@ -699,9 +699,9 @@ mkLoadInstr config reg delta slot
   = let off     = spillSlotToOffset platform slot - delta
     in
         case targetClassOfReg platform reg of
-              RcInteger -> (delta, [MOV (archWordFormat is32Bit)
-                                    (OpAddr (spRel platform off)) (OpReg reg)])
-              RcDouble  -> (delta, [MOV FF64 (OpAddr (spRel platform off)) (OpReg reg)])
+              RcInteger -> ([MOV (archWordFormat is32Bit)
+                                 (OpAddr (spRel platform off)) (OpReg reg)])
+              RcDouble  -> ([MOV FF64 (OpAddr (spRel platform off)) (OpReg reg)])
               _         -> panic "X86.mkLoadInstr"
     where platform = ncgPlatform config
           is32Bit = target32Bit platform

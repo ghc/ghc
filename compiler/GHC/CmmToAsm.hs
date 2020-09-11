@@ -83,12 +83,7 @@ import GHC.Prelude
 import qualified GHC.CmmToAsm.X86   as X86
 import qualified GHC.CmmToAsm.PPC   as PPC
 import qualified GHC.CmmToAsm.SPARC as SPARC
-
-import qualified GHC.CmmToAsm.AArch64.CodeGen as AArch64.CodeGen
-import qualified GHC.CmmToAsm.AArch64.Regs    as AArch64.Regs
-import qualified GHC.CmmToAsm.AArch64.RegInfo as AArch64.RegInfo
-import qualified GHC.CmmToAsm.AArch64.Instr   as AArch64.Instr
-import qualified GHC.CmmToAsm.AArch64.Ppr     as AArch64.Ppr
+import qualified GHC.CmmToAsm.AArch64 as AArch64
 
 import GHC.CmmToAsm.Reg.Liveness
 import qualified GHC.CmmToAsm.Reg.Linear                as Linear
@@ -168,49 +163,12 @@ nativeCodeGen dflags this_mod modLoc h us cmms
       ArchSPARC64   -> panic "nativeCodeGen: No NCG for SPARC64"
       ArchS390X     -> panic "nativeCodeGen: No NCG for S390X"
       ArchARM {}    -> panic "nativeCodeGen: No NCG for ARM"
-      ArchAArch64   -> nCG' (aarch64NcgImpl config)
+      ArchAArch64   -> nCG' (AArch64.ncgAArch64 config)
       ArchAlpha     -> panic "nativeCodeGen: No NCG for Alpha"
       ArchMipseb    -> panic "nativeCodeGen: No NCG for mipseb"
       ArchMipsel    -> panic "nativeCodeGen: No NCG for mipsel"
       ArchUnknown   -> panic "nativeCodeGen: No NCG for unknown arch"
       ArchJavaScript-> panic "nativeCodeGen: No NCG for JavaScript"
-
-aarch64NcgImpl :: NCGConfig -> NcgImpl RawCmmStatics AArch64.Instr.Instr AArch64.RegInfo.JumpDest
-aarch64NcgImpl config
- = NcgImpl {
-        ncgConfig                 = config
-       ,cmmTopCodeGen             = AArch64.CodeGen.cmmTopCodeGen
-       ,generateJumpTableForInstr = AArch64.CodeGen.generateJumpTableForInstr config
-       ,getJumpDestBlockId        = AArch64.RegInfo.getJumpDestBlockId
-       ,canShortcut               = AArch64.RegInfo.canShortcut
-       ,shortcutStatics           = AArch64.RegInfo.shortcutStatics
-       ,shortcutJump              = AArch64.RegInfo.shortcutJump
-       ,pprNatCmmDecl             = AArch64.Ppr.pprNatCmmDecl config
-       ,maxSpillSlots             = AArch64.Instr.maxSpillSlots config
-       ,allocatableRegs           = AArch64.Regs.allocatableRegs platform
-       ,ncgAllocMoreStack         = AArch64.Instr.allocMoreStack platform
-       ,ncgExpandTop              = id
-       ,ncgMakeFarBranches        = const id
-       ,extractUnwindPoints       = const []
-       ,invertCondBranches        = \_ _ -> id
-  }
-    where
-      platform = ncgPlatform config
---
--- Allocating more stack space for spilling is currently only
--- supported for the linear register allocator on x86/x86_64, the rest
--- default to the panic below.  To support allocating extra stack on
--- more platforms provide a definition of ncgAllocMoreStack.
---
-noAllocMoreStack :: Int -> NatCmmDecl statics instr
-                 -> UniqSM (NatCmmDecl statics instr, [(BlockId,BlockId)])
-noAllocMoreStack amount _
-  = panic $   "Register allocator: out of stack slots (need " ++ show amount ++ ")\n"
-        ++  "   If you are trying to compile SHA1.hs from the crypto library then this\n"
-        ++  "   is a known limitation in the linear allocator.\n"
-        ++  "\n"
-        ++  "   Try enabling the graph colouring allocator with -fregs-graph instead."
-        ++  "   You can still file a bug report if you like.\n"
 
 -- | Data accumulated during code generation. Mostly about statistics,
 -- but also collects debug data for DWARF generation.

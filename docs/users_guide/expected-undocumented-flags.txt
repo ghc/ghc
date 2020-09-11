@@ -146,3 +146,8 @@
 -ticky-LNE
 -ticky-allocd
 -ticky-dyn-thunk
+-fasm-immload
+-fasm-jumptables
+-fasm-negoffset
+-fasm-regoffsets
+-fasm-usezeroreg

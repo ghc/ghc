@@ -131,6 +131,7 @@ import GHC.Utils.Panic
 import GHC.Data.FastString
 import GHC.Driver.Session
 import GHC.Driver.Backend
+import GHC.Driver.Ppr
 import GHC.Platform
 import GHC.Types.Unique.Set
 import GHC.Utils.Misc
@@ -271,7 +272,7 @@ data CLabel
   deriving Eq
 
 instance Show CLabel where
-  show = showSDocUnsafe . ppr
+  show = showPprUnsafe . ppr
 
 isIdLabel :: CLabel -> Bool
 isIdLabel IdLabel{} = True
