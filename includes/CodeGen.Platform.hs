@@ -957,7 +957,8 @@ freeReg 31 = False
 freeReg 30 = False
 -- frame pointer
 freeReg 29 = False
-
+-- ip0 -- used for spill offset computations
+freeReg 16 = False
 
 # if defined(REG_Base)
 freeReg REG_Base  = False
