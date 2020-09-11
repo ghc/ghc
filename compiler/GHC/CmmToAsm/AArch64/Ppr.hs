@@ -1,19 +1,23 @@
-module GHC.CmmToAsm.AArch64.Ppr (pprNatCmmDecl) where
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
+module GHC.CmmToAsm.AArch64.Ppr (pprNatCmmDecl, pprInstr) where
 
 import GHC.Prelude hiding (EQ)
 
-import Data.List (findIndex, all)
+import Data.Word
+import qualified Data.Array.Unsafe as U ( castSTUArray )
+import Data.Array.ST
+import Control.Monad.ST
 
 import GHC.CmmToAsm.AArch64.Instr
 import GHC.CmmToAsm.AArch64.Regs
 import GHC.CmmToAsm.AArch64.Cond
 import GHC.CmmToAsm.Ppr
-import GHC.CmmToAsm.Instr
 import GHC.CmmToAsm.Format
 import GHC.Platform.Reg
-import GHC.Platform.Reg.Class
-import GHC.CmmToAsm.Reg.Target
 import GHC.CmmToAsm.Config
+import GHC.CmmToAsm.Types
+import GHC.CmmToAsm.Utils
 
 import GHC.Cmm hiding (topInfoTable)
 import GHC.Cmm.Dataflow.Collections
@@ -29,6 +33,8 @@ import GHC.Platform
 import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Driver.Session (targetPlatform)
+
+import GHC.Utils.Panic
 
 pprProcAlignment :: NCGConfig -> SDoc
 pprProcAlignment config = maybe empty (pprAlign platform . mkAlignment) (ncgProcAlignment config)
@@ -50,7 +56,7 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
         -- pprProcAlignment config $$
         pprLabel platform lbl $$ -- blocks guaranteed not null, so label needed
         vcat (map (pprBasicBlock config top_info) blocks) $$
-        (if ncgDebugLevel config > 0
+        (if ncgDwarfEnabled config
          then ppr (mkAsmTempEndLabel lbl) <> char ':' else empty) $$
         pprSizeDecl platform lbl
 
@@ -72,8 +78,6 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
        else empty) $$
       pprSizeDecl platform info_lbl
 
-pprNatCmmDecl _ _ = undefined
-
 pprLabel :: Platform -> CLabel -> SDoc
 pprLabel platform lbl =
    pprGloblDecl lbl
@@ -81,7 +85,7 @@ pprLabel platform lbl =
    $$ (ppr lbl <> char ':')
 
 pprAlign :: Platform -> Alignment -> SDoc
-pprAlign platform alignment
+pprAlign _platform alignment
         = text "\t.balign " <> int (alignmentBytes alignment)
 
 -- | Print appropriate alignment for the given section type.
@@ -121,7 +125,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
   = maybe_infotable $
     pprLabel platform asmLbl $$
     vcat (map (pprInstr platform) (id {-detectTrivialDeadlock-} optInstrs)) $$
-    (if  ncgDebugLevel config > 0
+    (if  ncgDwarfEnabled config
       then ppr (mkAsmTempEndLabel asmLbl) <> char ':'
       else empty
     )
@@ -141,6 +145,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
     -- See https://gitlab.haskell.org/ghc/ghc/-/issues/367
     -- This only intends to catch the very trivial case, not the more
     -- compilicated cases.
+    {-
     detectTrivialDeadlock :: [Instr] -> [Instr]
     detectTrivialDeadlock instrs = case (findIndex isSelfBranch instrs) of
       Just n | all (not . aarch64_isJumpishInstr) (take n instrs) ->
@@ -157,6 +162,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
 
       where isSelfBranch (B (TBlock blockid')) = blockid' == blockid
             isSelfBranch _ = False
+    -}
 
     asmLbl = blockLbl blockid
     platform = ncgPlatform config
@@ -168,7 +174,7 @@ pprBasicBlock config info_env (BasicBlock blockid instrs)
            vcat (map (pprData config) info) $$
            pprLabel platform info_lbl $$
            c $$
-           (if ncgDebugLevel config > 0
+           (if ncgDwarfEnabled config
              then ppr (mkAsmTempEndLabel info_lbl) <> char ':'
              else empty)
     -- Make sure the info table has the right .loc for the block
@@ -254,8 +260,25 @@ pprDataItem config lit
            = let bs = doubleToBytes (fromRational r)
              in  map (\b -> text "\t.byte\t" <> pprImm (ImmInt b)) bs
 
-pprImm :: Imm -> SDoc
+        ppr_item _ _ = pprPanic "pprDataItem:ppr_item" (text $ show lit)
 
+floatToBytes :: Float -> [Int]
+floatToBytes f
+   = runST (do
+        arr <- newArray_ ((0::Int),3)
+        writeArray arr 0 f
+        arr <- castFloatToWord8Array arr
+        i0 <- readArray arr 0
+        i1 <- readArray arr 1
+        i2 <- readArray arr 2
+        i3 <- readArray arr 3
+        return (map fromIntegral [i0,i1,i2,i3])
+     )
+
+castFloatToWord8Array :: STUArray s Int Float -> ST s (STUArray s Int Word8)
+castFloatToWord8Array = U.castSTUArray
+
+pprImm :: Imm -> SDoc
 pprImm (ImmInt i)     = int i
 pprImm (ImmInteger i) = integer i
 pprImm (ImmCLbl l)    = ppr l
@@ -339,7 +362,6 @@ pprOp op = case op of
   OpAddr (AddrRegReg r1 r2) -> char '[' <+> pprReg W64 r1 <> comma <+> pprReg W64 r2 <+> char ']'
   OpAddr (AddrRegImm r1 im) -> char '[' <+> pprReg W64 r1 <> comma <+> pprImm im <+> char ']'
   OpAddr (AddrReg r1)       -> char '[' <+> pprReg W64 r1 <+> char ']'
-  OpAddr _          -> panic "AArch64.pprOp: no amode"
 
 pprReg :: Width -> Reg -> SDoc
 pprReg w r = case r of
@@ -349,6 +371,7 @@ pprReg w r = case r of
   RegVirtual (VirtualRegI u)   -> text "%vI_" <> pprUniqueAlways u
   RegVirtual (VirtualRegF u)   -> text "%vF_" <> pprUniqueAlways u
   RegVirtual (VirtualRegD u)   -> text "%vD_" <> pprUniqueAlways u
+  _                            -> pprPanic "AArch64.pprReg" (text $ show r)
 
   where
     ppr_reg_no :: Width -> Int -> SDoc
@@ -459,7 +482,7 @@ pprInstr platform instr = case instr of
 
   BCOND c (TBlock bid) -> text "\t" <> pprBcond c <+> ppr (mkLocalBlockLabel (getUnique bid))
   BCOND c (TLabel lbl) -> text "\t" <> pprBcond c <+> ppr lbl
-  BCOND c (TReg r)     -> panic "AArch64.ppr: No conditional branching to registers!"
+  BCOND _ (TReg _)     -> panic "AArch64.ppr: No conditional branching to registers!"
 
   -- 5. Atomic Instructions ----------------------------------------------------
   -- 6. Conditional Instructions -----------------------------------------------
@@ -467,11 +490,11 @@ pprInstr platform instr = case instr of
 
   CBZ o (TBlock bid) -> text "\tcbz" <+> pprOp o <> comma <+> ppr (mkLocalBlockLabel (getUnique bid))
   CBZ o (TLabel lbl) -> text "\tcbz" <+> pprOp o <> comma <+> ppr lbl
-  CBZ c (TReg r)     -> panic "AArch64.ppr: No conditional (cbz) branching to registers!"
+  CBZ _ (TReg _)     -> panic "AArch64.ppr: No conditional (cbz) branching to registers!"
 
   CBNZ o (TBlock bid) -> text "\tcbnz" <+> pprOp o <> comma <+> ppr (mkLocalBlockLabel (getUnique bid))
   CBNZ o (TLabel lbl) -> text "\tcbnz" <+> pprOp o <> comma <+> ppr lbl
-  CBNZ c (TReg r)     -> panic "AArch64.ppr: No conditional (cbnz) branching to registers!"
+  CBNZ _ (TReg _)     -> panic "AArch64.ppr: No conditional (cbnz) branching to registers!"
 
   -- 7. Load and Store Instructions --------------------------------------------
   -- NOTE: GHC may do whacky things where it only load the lower part of an
@@ -545,3 +568,9 @@ pprCond c = case c of
   OLE    -> text "ls"
   OGE    -> text "ge"
   OGT    -> text "gt"
+
+  -- Unordered
+  UOLT   -> text "lt"
+  UOLE   -> text "le"
+  UOGE   -> text "pl"
+  UOGT   -> text "hi"
