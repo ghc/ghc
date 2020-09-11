@@ -161,6 +161,7 @@ import GHC.Types.Basic
 import GHC.Types.ForeignCall
 import GHC.Types.Name
 import GHC.Types.Name.Env
+import GHC.Types.Unique.FuelTank
 import GHC.Core.Coercion.Axiom
 import GHC.Builtin.Names
 import GHC.Data.Maybe
@@ -2747,13 +2748,11 @@ good to be able to unwrap multiple layers.
 The function that manages all this is checkRecTc.
 -}
 
-data RecTcChecker = RC !Int (NameEnv Int)
-  -- The upper bound, and the number of times
-  -- we have encountered each TyCon
+newtype RecTcChecker = RC (FuelTank TyCon)
 
 -- | Initialise a 'RecTcChecker' with 'defaultRecTcMaxBound'.
 initRecTc :: RecTcChecker
-initRecTc = RC defaultRecTcMaxBound emptyNameEnv
+initRecTc = RC (initFuelTank defaultRecTcMaxBound)
 
 -- | The default upper bound (100) for the number of times a 'RecTcChecker' is
 -- allowed to encounter each 'TyCon'.
@@ -2764,18 +2763,14 @@ defaultRecTcMaxBound = 100
 -- | Change the upper bound for the number of times a 'RecTcChecker' is allowed
 -- to encounter each 'TyCon'.
 setRecTcMaxBound :: Int -> RecTcChecker -> RecTcChecker
-setRecTcMaxBound new_bound (RC _old_bound rec_nts) = RC new_bound rec_nts
+setRecTcMaxBound new_bound (RC tank) = RC (setFuel new_bound tank)
 
 checkRecTc :: RecTcChecker -> TyCon -> Maybe RecTcChecker
 -- Nothing      => Recursion detected
 -- Just rec_tcs => Keep going
-checkRecTc (RC bound rec_nts) tc
-  = case lookupNameEnv rec_nts tc_name of
-      Just n | n >= bound -> Nothing
-             | otherwise  -> Just (RC bound (extendNameEnv rec_nts tc_name (n+1)))
-      Nothing             -> Just (RC bound (extendNameEnv rec_nts tc_name 1))
-  where
-    tc_name = tyConName tc
+checkRecTc (RC tank) tc = case burnFuel tank tc of
+  OutOfFuel      -> Nothing
+  FuelLeft tank' -> Just (RC tank')
 
 -- | Returns whether or not this 'TyCon' is definite, or a hole
 -- that may be filled in at some later point.  See Note [Skolem abstract data]
