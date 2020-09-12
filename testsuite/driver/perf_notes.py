@@ -108,12 +108,12 @@ class MetricChange(Enum):
         }
         return strings[self]
 
-    def short_name(self):
+    def hint(self):
         strings = {
-            MetricChange.NewMetric: "new",
-            MetricChange.NoChange:  "unch",
-            MetricChange.Increase:  "incr",
-            MetricChange.Decrease:  "decr"
+            MetricChange.NewMetric: colored(Color.BLUE,"NEW"),
+            MetricChange.NoChange:  "",
+            MetricChange.Increase:  colored(Color.RED, "BAD"),
+            MetricChange.Decrease:  colored(Color.GREEN,"GOOD")
         }
         return strings[self]
 
