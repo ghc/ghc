@@ -1,0 +1,4 @@
+'(#,,,#) Int Char Bool Maybe :: (# *, *, *, * -> * #)
+= '(# Int, Char, Bool, Maybe #)
+'(,,,) Int Char Bool Maybe :: (*, *, *, * -> *)
+= '(Int, Char, Bool, Maybe)

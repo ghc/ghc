@@ -1573,7 +1573,18 @@ pprTuple ctxt_prec sort promoted args =
   case promoted of
     IsPromoted
       -> let tys = appArgsIfaceTypes args
-             args' = drop (length tys `div` 2) tys
+             -- For promoted boxed tuples, drop half of the type arguments:
+             -- display '(,) @Type @(Type -> Type) Int Maybe
+             -- as      '(Int, Maybe)
+             -- For promoted unboxed tuples, additionally drop RuntimeRep vars;
+             -- display '(#,#) @LiftedRep @LiftedRep @Type @(Type -> Type) Int Maybe
+             -- as      '(# Int, Maybe #)
+             -- See Note [Unboxed tuple RuntimeRep vars] in GHC.Core.TyCon
+             -- and ticket #18653
+             toDrop = case sort of
+                        UnboxedTuple -> 2 * length tys `div` 3
+                        _            ->     length tys `div` 2
+             args' = drop toDrop tys
              spaceIfPromoted = case args' of
                arg0:_ -> pprSpaceIfPromotedTyCon arg0
                _ -> id
