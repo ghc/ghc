@@ -189,7 +189,7 @@ toIfaceTypeX fr (TyConApp tc tys)
 
   | Just dc <- isPromotedDataCon_maybe tc
   , isBoxedTupleDataCon dc
-  , n_tys == 2*arity
+  , n_tys == arity
   = IfaceTupleTy BoxedTuple IsPromoted (toIfaceTcArgsX fr tc (drop arity tys))
 
   | tc `elem` [ eqPrimTyCon, eqReprPrimTyCon, heqTyCon ]

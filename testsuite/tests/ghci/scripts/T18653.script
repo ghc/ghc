@@ -1,0 +1,3 @@
+:set -XDataKinds -XUnboxedTuples
+:kind! '(#,,,#) Int Char Bool Maybe
+:kind! '(,,,) Int Char Bool Maybe
