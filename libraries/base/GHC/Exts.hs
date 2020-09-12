@@ -34,7 +34,6 @@ module GHC.Exts
         maxTupleSize,
 
         -- * Primitive operations
-        FUN, -- See https://gitlab.haskell.org/ghc/ghc/issues/18302
         module GHC.Prim,
         module GHC.Prim.Ext,
         shiftL#, shiftRL#, iShiftL#, iShiftRA#, iShiftRL#,
@@ -91,7 +90,7 @@ module GHC.Exts
         type (~~),
 
         -- * Representation polymorphism
-        GHC.Prim.TYPE, RuntimeRep(..), VecCount(..), VecElem(..),
+        RuntimeRep(..), VecCount(..), VecElem(..),
 
         -- * Transform comprehensions
         Down(..), groupWith, sortWith, the,
