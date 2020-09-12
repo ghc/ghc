@@ -37,7 +37,7 @@ import GHC.Data.Graph.Directed
 import GHC.Types.SrcLoc
 import GHC.Utils.Outputable as Outputable
 import GHC.Types.Unique
-import GHC.Utils.Misc hiding ( eqListBy )
+import GHC.Utils.Misc as Utils hiding ( eqListBy )
 import GHC.Data.Maybe
 import GHC.Data.FastString
 import GHC.Utils.Binary
@@ -1339,7 +1339,7 @@ mkOrphMap get_key decls
   where
     go (non_orphs, orphs) d
         | NotOrphan occ <- get_key d
-        = (extendOccEnv_Acc (:) singleton non_orphs occ d, orphs)
+        = (extendOccEnv_Acc (:) Utils.singleton non_orphs occ d, orphs)
         | otherwise = (non_orphs, d:orphs)
 
 -- -----------------------------------------------------------------------------

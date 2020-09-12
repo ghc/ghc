@@ -43,7 +43,7 @@ module GHC.Utils.Misc (
         listLengthCmp, atLength,
         equalLength, compareLength, leLength, ltLength,
 
-        isSingleton, only, singleton,
+        isSingleton, only, GHC.Utils.Misc.singleton,
         notNull, snocView,
 
         isIn, isn'tIn,
