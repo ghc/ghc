@@ -110,10 +110,10 @@ class MetricChange(Enum):
 
     def short_name(self):
         strings = {
-            MetricChange.NewMetric: "new",
-            MetricChange.NoChange:  "unch",
-            MetricChange.Increase:  "incr",
-            MetricChange.Decrease:  "decr"
+            MetricChange.NewMetric: "NEW",
+            MetricChange.NoChange:  "",
+            MetricChange.Increase:  "BAD",
+            MetricChange.Decrease:  "GOOD"
         }
         return strings[self]
 
