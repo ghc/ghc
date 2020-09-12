@@ -65,7 +65,7 @@ import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Data.Maybe
 import GHC.Data.Bag
-import GHC.Utils.Misc
+import GHC.Utils.Misc as Utils
 import Data.List
 import Data.Ord
 import Control.Monad    ( guard )
@@ -356,7 +356,7 @@ unionRuleBase rb1 rb2 = plusNameEnv_C (++) rb1 rb2
 
 extendRuleBase :: RuleBase -> CoreRule -> RuleBase
 extendRuleBase rule_base rule
-  = extendNameEnv_Acc (:) singleton rule_base (ruleIdName rule) rule
+  = extendNameEnv_Acc (:) Utils.singleton rule_base (ruleIdName rule) rule
 
 pprRuleBase :: RuleBase -> SDoc
 pprRuleBase rules = pprUFM rules $ \rss ->

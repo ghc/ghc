@@ -71,7 +71,7 @@ import GHC.Driver.Types
 import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Types.Unique.FM
-import GHC.Utils.Misc
+import GHC.Utils.Misc as Utils
 import GHC.Builtin.Types.Literals ( typeNatTyCons )
 import GHC.Hs.Doc
 
@@ -179,7 +179,7 @@ knownKeyNamesOkay all_names
   | otherwise
   = Just badNamesStr
   where
-    namesEnv      = foldl' (\m n -> extendNameEnv_Acc (:) singleton m n n)
+    namesEnv      = foldl' (\m n -> extendNameEnv_Acc (:) Utils.singleton m n n)
                            emptyUFM all_names
     badNamesEnv   = filterNameEnv (\ns -> ns `lengthExceeds` 1) namesEnv
     badNamesPairs = nonDetUFMToList badNamesEnv
