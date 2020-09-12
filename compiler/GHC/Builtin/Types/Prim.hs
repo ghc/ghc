@@ -11,8 +11,6 @@ Wired-in knowledge about primitive types
 -- | This module defines TyCons that can't be expressed in Haskell.
 --   They are all, therefore, wired-in TyCons.  C.f module "GHC.Builtin.Types"
 module GHC.Builtin.Types.Prim(
-        mkPrimTyConName, -- For implicit parameters in GHC.Builtin.Types only
-
         mkTemplateKindVars, mkTemplateTyVars, mkTemplateTyVarsFrom,
         mkTemplateKiTyVars, mkTemplateKiTyVar,
 
@@ -402,7 +400,7 @@ multiplicityTyVar = mkTemplateTyVars (repeat multiplicityTy) !! 13  -- selects '
 -}
 
 funTyConName :: Name
-funTyConName = mkPrimTyConName (fsLit "FUN") funTyConKey funTyCon
+funTyConName = mkPrimTcName UserSyntax (fsLit "FUN") funTyConKey funTyCon
 
 -- | The @FUN@ type constructor.
 --
@@ -536,12 +534,7 @@ tYPETyCon = mkKindTyCon tYPETyConName
 
 -- If you edit these, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
-tYPETyConName             = mkPrimTyConName (fsLit "TYPE") tYPETyConKey tYPETyCon
-
-mkPrimTyConName :: FastString -> Unique -> TyCon -> Name
-mkPrimTyConName = mkPrimTcName BuiltInSyntax
-  -- All of the super kinds and kinds are defined in Prim,
-  -- and use BuiltInSyntax, because they are never in scope in the source
+tYPETyConName             = mkPrimTcName UserSyntax (fsLit "TYPE") tYPETyConKey tYPETyCon
 
 mkPrimTcName :: BuiltInSyntax -> FastString -> Unique -> TyCon -> Name
 mkPrimTcName built_in_syntax occ key tycon
