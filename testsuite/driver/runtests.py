@@ -348,21 +348,21 @@ def tabulate_metrics(metrics: List[PerfMetric]) -> None:
     hideBaselineEnv = not hasBaseline or all(
         [x.stat.test_env == x.baseline.perfStat.test_env
          for x in metrics if x.baseline is not None])
-    def row(cells: Tuple[str, str, str, str, str, str, str]) -> List[str]:
+    def row(cells: Tuple[str, str, str, str, str, str, str, str]) -> List[str]:
         return [x for (idx, x) in enumerate(list(cells)) if
                 (idx != 2 or not hideBaselineCommit) and
                 (idx != 3 or not hideBaselineEnv )]
 
     headerRows = [
-        row(("", "", "Baseline", "Baseline", "Baseline", "", "")),
-        row(("Test", "Metric", "commit", "environment", "value", "New value", "Change"))
+        row(("", "", "Baseline", "Baseline", "Baseline", "", "", "")),
+        row(("Test", "Metric", "commit", "environment", "value", "New value", "Change", ""))
     ]
     def strDiff(x: PerfMetric) -> str:
         if x.baseline is None:
             return ""
         val0 = x.baseline.perfStat.value
         val1 = x.stat.value
-        return "{}({:+2.1f}%)".format(x.change.short_name(), 100 * (val1 - val0) / val0)
+        return "{:+2.1f}%".format(100 * (val1 - val0) / val0)
     dataRows = [row((
         "{}({})".format(x.stat.test, x.stat.way),
         shorten_metric_name(x.stat.metric),
@@ -374,7 +374,8 @@ def tabulate_metrics(metrics: List[PerfMetric]) -> None:
         "{:13.1f}".format(x.baseline.perfStat.value)
           if x.baseline is not None else "",
         "{:13.1f}".format(x.stat.value),
-        strDiff(x)
+        strDiff(x),
+        "{}".format(x.change.hint())
     )) for x in sorted(metrics, key =
                       lambda m: (m.stat.test, m.stat.way, m.stat.metric))]
     print_table(headerRows, dataRows, 1)
