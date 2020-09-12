@@ -84,7 +84,7 @@ import GHC.Utils.Outputable
 import GHC.Types.Unique
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Set
-import GHC.Utils.Misc
+import GHC.Utils.Misc as Utils
 import GHC.Utils.Panic
 import GHC.Types.Name.Env
 
@@ -970,7 +970,7 @@ mkGlobalRdrEnv :: [GlobalRdrElt] -> GlobalRdrEnv
 mkGlobalRdrEnv gres
   = foldr add emptyGlobalRdrEnv gres
   where
-    add gre env = extendOccEnv_Acc insertGRE singleton env
+    add gre env = extendOccEnv_Acc insertGRE Utils.singleton env
                                    (greOccName gre)
                                    gre
 
@@ -1004,7 +1004,7 @@ transformGREs trans_gre occs rdr_env
 
 extendGlobalRdrEnv :: GlobalRdrEnv -> GlobalRdrElt -> GlobalRdrEnv
 extendGlobalRdrEnv env gre
-  = extendOccEnv_Acc insertGRE singleton env
+  = extendOccEnv_Acc insertGRE Utils.singleton env
                      (greOccName gre) gre
 
 shadowNames :: GlobalRdrEnv -> [Name] -> GlobalRdrEnv
