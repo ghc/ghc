@@ -447,6 +447,12 @@ type family XCHsDerivingClause      x
 type family XXHsDerivingClause      x
 
 -- -------------------------------------
+-- DerivClauseTys type families
+type family XDctSingle       x
+type family XDctMulti        x
+type family XXDerivClauseTys x
+
+-- -------------------------------------
 -- ConDecl type families
 type family XConDeclGADT   x
 type family XConDeclH98    x

@@ -193,13 +193,19 @@ subordinates instMap decl = case decl of
                   , (L _ (ConDeclField _ ns _ doc)) <- (unLoc flds)
                   , (L _ n) <- ns ]
         derivs  = [ (instName, [unLoc doc], M.empty)
-                  | (l, doc) <- mapMaybe (extract_deriv_ty . hsib_body) $
-                                concatMap (unLoc . deriv_clause_tys . unLoc) $
+                  | (l, doc) <- concatMap (extract_deriv_clause_tys .
+                                           deriv_clause_tys . unLoc) $
                                 unLoc $ dd_derivs dd
                   , Just instName <- [lookupSrcSpan l instMap] ]
 
-        extract_deriv_ty :: LHsType GhcRn -> Maybe (SrcSpan, LHsDocString)
-        extract_deriv_ty (L l ty) =
+        extract_deriv_clause_tys :: LDerivClauseTys GhcRn -> [(SrcSpan, LHsDocString)]
+        extract_deriv_clause_tys (L _ dct) =
+          case dct of
+            DctSingle _ ty -> maybeToList $ extract_deriv_ty ty
+            DctMulti _ tys -> mapMaybe extract_deriv_ty tys
+
+        extract_deriv_ty :: LHsSigType GhcRn -> Maybe (SrcSpan, LHsDocString)
+        extract_deriv_ty (HsIB{hsib_body =  L l ty}) =
           case ty of
             -- deriving (forall a. C a {- ^ Doc comment -})
             HsForAllTy{ hst_tele = HsForAllInvis{}

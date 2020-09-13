@@ -1507,11 +1507,15 @@ instance ToHie (Located [Located (HsDerivingClause GhcRn)]) where
 
 instance ToHie (Located (HsDerivingClause GhcRn)) where
   toHie (L span cl) = concatM $ makeNode cl span : case cl of
-      HsDerivingClause _ strat (L ispan tys) ->
+      HsDerivingClause _ strat dct ->
         [ toHie strat
-        , locOnly ispan
-        , toHie $ map (TS (ResolvedScopes [])) tys
+        , toHie dct
         ]
+
+instance ToHie (Located (DerivClauseTys GhcRn)) where
+  toHie (L span dct) = concatM $ makeNode dct span : case dct of
+      DctSingle _ ty -> [ toHie $ TS (ResolvedScopes[]) ty ]
+      DctMulti _ tys -> [ toHie $ map (TS (ResolvedScopes [])) tys ]
 
 instance ToHie (Located (DerivStrategy GhcRn)) where
   toHie (L span strat) = concatM $ makeNode strat span : case strat of
