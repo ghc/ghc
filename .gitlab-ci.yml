@@ -229,6 +229,7 @@ lint-release-changelogs:
     - git checkout .gitmodules
     - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
   after_script:
+    - cp -Rf $HOME/.cabal cabal-cache
     - .gitlab/ci.sh clean
   tags:
     - x86_64-linux
@@ -258,15 +259,16 @@ hadrian-ghc-in-ghci:
   tags:
     - x86_64-linux
   script:
-    - cabal update
-    - cd hadrian; cabal new-build --with-compiler=$GHC --project-file=ci.project; cd ..
     - git clean -xdf && git submodule foreach git clean -xdf
     - .gitlab/ci.sh setup
-    - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
+    - time cabal update
     - ./boot
     - ./configure $CONFIGURE_ARGS
+    - cd hadrian; time cabal new-build -j --with-compiler=$GHC --project-file=ci.project; cd ..
     # Load ghc-in-ghci then immediately exit and check the modules loaded
     - echo ":q" | hadrian/ghci -j`mk/detect-cpu-count.sh`| tail -n2 | grep "Ok,"
+  after_script:
+    - cp -Rf $HOME/.cabal cabal-cache
   cache:
     key: hadrian-ghci
     paths:
