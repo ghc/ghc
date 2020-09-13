@@ -263,7 +263,6 @@ hadrian-ghc-in-ghci:
     - cabal update
     - cd hadrian; time cabal new-build -j --with-compiler=$GHC --project-file=ci.project; cd ..
     - git clean -xdf && git submodule foreach git clean -xdf
-    - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
     - ./boot
     - ./configure $CONFIGURE_ARGS
     # Load ghc-in-ghci then immediately exit and check the modules loaded
