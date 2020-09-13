@@ -19,7 +19,7 @@ Main functions for .hie file generation
 {-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
-module GHC.Iface.Ext.Ast ( mkHieFile, mkHieFileWithSource, getCompressedAsts) where
+module GHC.Iface.Ext.Ast ( mkHieFile, mkHieFileWithSource, getCompressedAsts, enrichHie) where
 
 import GHC.Utils.Outputable(ppr)
 
