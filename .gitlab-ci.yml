@@ -267,6 +267,8 @@ hadrian-ghc-in-ghci:
     - ./configure $CONFIGURE_ARGS
     # Load ghc-in-ghci then immediately exit and check the modules loaded
     - echo ":q" | hadrian/ghci -j`mk/detect-cpu-count.sh`| tail -n2 | grep "Ok,"
+  after_script:
+    - cp -Rf $HOME/.cabal cabal-cache
   cache:
     key: hadrian-ghci
     paths:
