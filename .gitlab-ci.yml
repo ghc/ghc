@@ -260,7 +260,7 @@ hadrian-ghc-in-ghci:
   script:
     - .gitlab/ci.sh setup
     - cabal update
-    - cd hadrian; cabal new-build --with-compiler=$GHC --project-file=ci.project; cd ..
+    - cd hadrian; cabal new-build -j`../mk/detect-cpu-count.sh` --with-compiler=$GHC --project-file=ci.project; cd ..
     - git clean -xdf && git submodule foreach git clean -xdf
     - ./boot
     - ./configure $CONFIGURE_ARGS
