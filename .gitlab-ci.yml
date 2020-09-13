@@ -260,8 +260,8 @@ hadrian-ghc-in-ghci:
     - x86_64-linux
   script:
     - .gitlab/ci.sh setup
+    - if [[ -d ./hadrian-cache ]]; then cp -Rf hadrian-cache hadrian/dist-newstyle; fi # unlike cabal cache, not covered by si.sh setup
     - cabal update
-    - cp -Rf hadrian-cache hadrian/dist-newstyle # unlike cabal cache, not covered by si.sh setup
     - cd hadrian; cabal new-build --with-compiler=$GHC --project-file=ci.project; cd ..
     - git clean -xdf && git submodule foreach git clean -xdf
     - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
