@@ -163,6 +163,11 @@ deriving instance Data (HsDerivingClause GhcPs)
 deriving instance Data (HsDerivingClause GhcRn)
 deriving instance Data (HsDerivingClause GhcTc)
 
+-- deriving instance DataIdLR p p => Data (DerivClauseTys p)
+deriving instance Data (DerivClauseTys GhcPs)
+deriving instance Data (DerivClauseTys GhcRn)
+deriving instance Data (DerivClauseTys GhcTc)
+
 -- deriving instance (DataIdLR p p) => Data (ConDecl p)
 deriving instance Data (ConDecl GhcPs)
 deriving instance Data (ConDecl GhcRn)

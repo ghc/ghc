@@ -2276,15 +2276,13 @@ deriving :: { LHsDerivingClause GhcPs }
                  in ams (L full_loc $ HsDerivingClause noExtField (Just $3) $2)
                         [mj AnnDeriving $1] }
 
-deriv_clause_types :: { Located [LHsSigType GhcPs] }
+deriv_clause_types :: { LDerivClauseTys GhcPs }
         : qtycon              { let { tc = sL1 $1 (HsTyVar noExtField NotPromoted $1) } in
-                                sL1 $1 [mkLHsSigType tc] }
-        | '(' ')'             {% ams (sLL $1 $> [])
+                                sL1 $1 (DctSingle noExtField (mkLHsSigType tc)) }
+        | '(' ')'             {% ams (sLL $1 $> (DctMulti noExtField []))
                                      [mop $1,mcp $2] }
-        | '(' deriv_types ')' {% ams (sLL $1 $> $2)
+        | '(' deriv_types ')' {% ams (sLL $1 $> (DctMulti noExtField $2))
                                      [mop $1,mcp $3] }
-             -- Glasgow extension: allow partial
-             -- applications in derivings
 
 -----------------------------------------------------------------------------
 -- Value definitions
