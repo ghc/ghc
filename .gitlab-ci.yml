@@ -273,7 +273,7 @@ hadrian-ghc-in-ghci:
     key: hadrian-ghci
     paths:
       - cabal-cache
-      - hadrian/dist-newstyle
+      - hadrian
 
 ############################################################
 # Validation via Pipelines (make)
