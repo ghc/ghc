@@ -1393,12 +1393,25 @@ cvtContext p tys = do { preds' <- mapM cvtPred tys
 cvtPred :: TH.Pred -> CvtM (LHsType GhcPs)
 cvtPred = cvtType
 
+cvtDerivClauseTys :: TH.Cxt -> CvtM (LDerivClauseTys GhcPs)
+cvtDerivClauseTys tys
+  = do { tys' <- mapM cvtType tys
+         -- Since TH.Cxt doesn't indicate the presence or absence of
+         -- parentheses in a deriving clause, we have to choose between
+         -- DctSingle and DctMulti somewhat arbitrarily. We opt to use DctMulti
+         -- unless the TH.Cxt is a singleton list whose type is a bare type
+         -- constructor with no arguments.
+       ; case tys' of
+           [ty'@(L l (HsTyVar _ NotPromoted _))]
+                 -> return $ L l $ DctSingle noExtField $ mkLHsSigType ty'
+           _     -> returnL $ DctMulti noExtField (map mkLHsSigType tys') }
+
 cvtDerivClause :: TH.DerivClause
                -> CvtM (LHsDerivingClause GhcPs)
-cvtDerivClause (TH.DerivClause ds ctxt)
-  = do { ctxt' <- fmap (map mkLHsSigType) <$> cvtContext appPrec ctxt
-       ; ds'   <- traverse cvtDerivStrategy ds
-       ; returnL $ HsDerivingClause noExtField ds' ctxt' }
+cvtDerivClause (TH.DerivClause ds tys)
+  = do { tys' <- cvtDerivClauseTys tys
+       ; ds'  <- traverse cvtDerivStrategy ds
+       ; returnL $ HsDerivingClause noExtField ds' tys' }
 
 cvtDerivStrategy :: TH.DerivStrategy -> CvtM (Hs.LDerivStrategy GhcPs)
 cvtDerivStrategy TH.StockStrategy    = returnL Hs.StockStrategy

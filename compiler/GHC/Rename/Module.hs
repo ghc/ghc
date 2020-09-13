@@ -1895,15 +1895,25 @@ rnLHsDerivingClause doc
                 (L loc (HsDerivingClause
                               { deriv_clause_ext = noExtField
                               , deriv_clause_strategy = dcs
-                              , deriv_clause_tys = L loc' dct }))
+                              , deriv_clause_tys = dct }))
   = do { (dcs', dct', fvs)
-           <- rnLDerivStrategy doc dcs $ mapFvRn rn_clause_pred dct
+           <- rnLDerivStrategy doc dcs $ rn_deriv_clause_tys dct
        ; warnNoDerivStrat dcs' loc
        ; pure ( L loc (HsDerivingClause { deriv_clause_ext = noExtField
                                         , deriv_clause_strategy = dcs'
-                                        , deriv_clause_tys = L loc' dct' })
+                                        , deriv_clause_tys = dct' })
               , fvs ) }
   where
+    rn_deriv_clause_tys :: LDerivClauseTys GhcPs
+                        -> RnM (LDerivClauseTys GhcRn, FreeVars)
+    rn_deriv_clause_tys (L l dct) = case dct of
+      DctSingle x ty -> do
+        (ty', fvs) <- rn_clause_pred ty
+        pure (L l (DctSingle x ty'), fvs)
+      DctMulti x tys -> do
+        (tys', fvs) <- mapFvRn rn_clause_pred tys
+        pure (L l (DctMulti x tys'), fvs)
+
     rn_clause_pred :: LHsSigType GhcPs -> RnM (LHsSigType GhcRn, FreeVars)
     rn_clause_pred pred_ty = do
       let inf_err = Just (text "Inferred type variables are not allowed")

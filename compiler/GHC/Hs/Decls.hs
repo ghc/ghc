@@ -25,7 +25,8 @@
 module GHC.Hs.Decls (
   -- * Toplevel declarations
   HsDecl(..), LHsDecl, HsDataDefn(..), HsDeriving, LHsFunDep,
-  HsDerivingClause(..), LHsDerivingClause, NewOrData(..), newOrDataToFlavour,
+  HsDerivingClause(..), LHsDerivingClause, DerivClauseTys(..), LDerivClauseTys,
+  NewOrData(..), newOrDataToFlavour,
   StandaloneKindSig(..), LStandaloneKindSig, standaloneKindSigName,
 
   -- ** Class or type declarations
@@ -1321,15 +1322,8 @@ data HsDerivingClause pass
     , deriv_clause_strategy :: Maybe (LDerivStrategy pass)
       -- ^ The user-specified strategy (if any) to use when deriving
       -- 'deriv_clause_tys'.
-    , deriv_clause_tys :: XRec pass [LHsSigType pass]
+    , deriv_clause_tys :: LDerivClauseTys pass
       -- ^ The types to derive.
-      --
-      -- It uses 'LHsSigType's because, with @-XGeneralizedNewtypeDeriving@,
-      -- we can mention type variables that aren't bound by the datatype, e.g.
-      --
-      -- > data T b = ... deriving (C [a])
-      --
-      -- should produce a derived instance for @C [a] (T b)@.
     }
   | XHsDerivingClause !(XXHsDerivingClause pass)
 
@@ -1342,22 +1336,52 @@ instance OutputableBndrId p
                         , deriv_clause_tys      = L _ dct })
     = hsep [ text "deriving"
            , pp_strat_before
-           , pp_dct dct
+           , ppr dct
            , pp_strat_after ]
       where
-        -- This complexity is to distinguish between
-        --    deriving Show
-        --    deriving (Show)
-        pp_dct [HsIB { hsib_body = ty }]
-                 = ppr (parenthesizeHsType appPrec ty)
-        pp_dct _ = parens (interpp'SP dct)
-
         -- @via@ is unique in that in comes /after/ the class being derived,
         -- so we must special-case it.
         (pp_strat_before, pp_strat_after) =
           case dcs of
             Just (L _ via@ViaStrategy{}) -> (empty, ppr via)
             _                            -> (ppDerivStrategy dcs, empty)
+
+type LDerivClauseTys pass = XRec pass (DerivClauseTys pass)
+
+-- | The types mentioned in a single @deriving@ clause. This can come in two
+-- forms, 'DctSingle' or 'DctMulti', depending on whether the types are
+-- surrounded by enclosing parentheses or not. These parentheses are
+-- semantically differnt than 'HsParTy'. For example, @deriving ()@ means
+-- \"derive zero classes\" rather than \"derive an instance of the 0-tuple\".
+--
+-- 'DerivClauseTys' use 'LHsSigType' because @deriving@ clauses can mention
+-- type variables that aren't bound by the datatype, e.g.
+--
+-- > data T b = ... deriving (C [a])
+--
+-- should produce a derived instance for @C [a] (T b)@.
+data DerivClauseTys pass
+  = -- | A @deriving@ clause with a single type. Moreover, that type can only
+    -- be a type constructor without any arguments.
+    --
+    -- Example: @deriving Eq@
+    DctSingle (XDctSingle pass) (LHsSigType pass)
+
+    -- | A @deriving@ clause with a comma-separated list of types, surrounded
+    -- by enclosing parentheses.
+    --
+    -- Example: @deriving (Eq, C a)@
+  | DctMulti (XDctMulti pass) [LHsSigType pass]
+
+  | XDerivClauseTys !(XXDerivClauseTys pass)
+
+type instance XDctSingle (GhcPass _) = NoExtField
+type instance XDctMulti  (GhcPass _) = NoExtField
+type instance XXDerivClauseTys (GhcPass _) = NoExtCon
+
+instance OutputableBndrId p => Outputable (DerivClauseTys (GhcPass p)) where
+  ppr (DctSingle _ ty) = ppr ty
+  ppr (DctMulti _ tys) = parens (interpp'SP tys)
 
 -- | Located Standalone Kind Signature
 type LStandaloneKindSig pass = XRec pass (StandaloneKindSig pass)

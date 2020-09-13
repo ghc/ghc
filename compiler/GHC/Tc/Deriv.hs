@@ -437,17 +437,22 @@ makeDerivSpecs :: [DerivInfo]
                -> TcM [EarlyDerivSpec]
 makeDerivSpecs deriv_infos deriv_decls
   = do  { eqns1 <- sequenceA
-                     [ deriveClause rep_tc scoped_tvs dcs preds err_ctxt
+                     [ deriveClause rep_tc scoped_tvs dcs (deriv_clause_preds dct) err_ctxt
                      | DerivInfo { di_rep_tc = rep_tc
                                  , di_scoped_tvs = scoped_tvs
                                  , di_clauses = clauses
                                  , di_ctxt = err_ctxt } <- deriv_infos
                      , L _ (HsDerivingClause { deriv_clause_strategy = dcs
-                                             , deriv_clause_tys = L _ preds })
+                                             , deriv_clause_tys = dct })
                          <- clauses
                      ]
         ; eqns2 <- mapM (recoverM (pure Nothing) . deriveStandalone) deriv_decls
         ; return $ concat eqns1 ++ catMaybes eqns2 }
+  where
+    deriv_clause_preds :: LDerivClauseTys GhcRn -> [LHsSigType GhcRn]
+    deriv_clause_preds (L _ dct) = case dct of
+      DctSingle _ ty -> [ty]
+      DctMulti _ tys -> tys
 
 ------------------------------------------------------------------
 -- | Process the derived classes in a single @deriving@ clause.
