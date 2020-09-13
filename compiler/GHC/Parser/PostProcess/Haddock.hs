@@ -628,14 +628,33 @@ instance HasHaddock (Located (HsDerivingClause GhcPs)) where
               Just (L l (ViaStrategy _)) -> (pure (), registerLocHdkA l)
               Just (L l _) -> (registerLocHdkA l, pure ())
         register_strategy_before
-        deriv_clause_tys' <-
-          extendHdkA (getLoc deriv_clause_tys) $
-          traverse @Located addHaddock deriv_clause_tys
+        deriv_clause_tys' <- addHaddock deriv_clause_tys
         register_strategy_after
         pure HsDerivingClause
           { deriv_clause_ext = noExtField,
             deriv_clause_strategy,
             deriv_clause_tys = deriv_clause_tys' }
+
+-- Process the types in a single deriving clause, which may come in one of the
+-- following forms:
+--
+--    1. A singular type constructor:
+--          deriving Eq -- ^ Comment on Eq
+--
+--    2. A list of comma-separated types surrounded by enclosing parentheses:
+--          deriving ( Eq  -- ^ Comment on Eq
+--                   , C a -- ^ Comment on C a
+--                   )
+instance HasHaddock (Located (DerivClauseTys GhcPs)) where
+  addHaddock (L l_dct dct) =
+    extendHdkA l_dct $
+    case dct of
+      DctSingle x ty -> do
+        ty' <- addHaddock ty
+        pure $ L l_dct $ DctSingle x ty'
+      DctMulti x tys -> do
+        tys' <- addHaddock tys
+        pure $ L l_dct $ DctMulti x tys'
 
 -- Process a single data constructor declaration, which may come in one of the
 -- following forms:
