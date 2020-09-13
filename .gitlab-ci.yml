@@ -229,6 +229,7 @@ lint-release-changelogs:
     - git checkout .gitmodules
     - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
   after_script:
+    - cp -Rf $HOME/.cabal cabal-cache
     - .gitlab/ci.sh clean
   tags:
     - x86_64-linux
