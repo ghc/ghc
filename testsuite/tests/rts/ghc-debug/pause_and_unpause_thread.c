@@ -9,7 +9,7 @@
 
 struct PauseTimestamps timestamps = {0, 0};
 
-void* pauseAndUnpause_thread(void* unused){
+void pauseAndUnpause(void){
     RtsPaused r_paused = rts_pause();
 
     if(!rts_isPaused()) {
@@ -29,12 +29,6 @@ void* pauseAndUnpause_thread(void* unused){
     }
 
     return NULL;
-}
-
-void pauseAndUnpause(void){
-    pthread_t threadId;
-    pthread_create(&threadId, NULL, &pauseAndUnpause_thread, NULL);
-    pthread_detach(threadId);
 }
 
 time_t getPauseBegin(void) {

@@ -669,7 +669,7 @@ void rts_unpause (RtsPaused paused)
 {
     rts_paused = false;
     releaseAllCapabilities(n_capabilities, paused.capabilities, paused.pausing_task);
-    freeTask(paused.pausing_task);
+    exitMyTask();
 }
 
 // Tells the current state of the RTS regarding rts_pause() and rts_unpause().
