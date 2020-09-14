@@ -33,6 +33,7 @@ import GHC.Core.TyCon
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr
 import GHC.Core.TyCo.Subst (substTyWithInScope)
+import GHC.Core.TyCo.FVs( shallowTyCoVarsOfType )
 import GHC.Core.Type
 import GHC.Tc.Types.Evidence
 import GHC.Types.Var.Set
@@ -852,30 +853,68 @@ qlUnify delta ty1 ty2
                                   ; go_flexi bvs kappa ty2 } }
 
     ----------------
-    -- ToDo: what about other magic in Unify.metaTyVarUpdateOK?
     go_flexi (_,bvs2) kappa ty2  -- ty2 is zonked
-      | ty2_tvs `intersectsVarSet` bvs2   -- We really only need shallow here
-      = return ()   -- Can't instantiate a delta-var
-                    -- to a forall-bound variable
-
-      | kappa `elemVarSet` ty2_tvs
-      = return ()   -- Occurs-check
-
-      | otherwise
-      = do { -- Unify the kinds
-             -- c.f. Note [Equalities with incompatible kinds] in Solver.Canonical
-           ; co <- unifyKind (Just (ppr ty2)) ty2_kind kappa_kind
+      | -- See Note [Actual unification in qlUnify]
+        let ty2_tvs = shallowTyCoVarsOfType ty2
+      , not (ty2_tvs `intersectsVarSet` bvs2)
+          -- Can't instantiate a delta-varto a forall-bound variable
+      , Just ty2' <- occCheckExpand [kappa] ty2
+          -- Passes the occurs check
+      = do { co <- unifyKind (Just (ppr ty2)) ty2_kind kappa_kind
+                   -- unifyKind: see Note [Actual unification in qlUnify]
 
            ; traceTc "qlUnify:update" $
              vcat [ hang (ppr kappa <+> dcolon <+> ppr kappa_kind)
                        2 (text ":=" <+> ppr ty2 <+> dcolon <+> ppr ty2_kind)
                  , text "co:" <+> ppr co ]
            ; writeMetaTyVar kappa (mkCastTy ty2 co) }
+
+      | otherwise
+      = return ()   -- Occurs-check or forall-bound varialbe
       where
-        ty2_tvs    = tyCoVarsOfType ty2
         ty2_kind   = typeKind ty2
         kappa_kind = tyVarKind kappa
 
+
+{- Note [Actual unification in qlUnify]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In qlUnify, if we find (kappa ~ ty), we are going to update kappa := ty.
+That is the entire point of qlUnify!   Wrinkles
+
+* We must not unify with anything bound by an enclosing forall; e.g.
+    (forall a. kappa -> Int) ~ forall a. a -> Int)
+  That's tracked by the 'bvs' arg of 'go'.
+
+* We must not make an occurs-check; we use occCheckExpand for that.
+
+* metaTyVarUpdateOK also checks for various other things, including
+  - foralls, and predicate types, which we want to allow here
+  - blocking coercion holes
+  - type families
+  But after some thought we believe that none of these are relevant
+  here.
+
+* What if kappa and ty have different kinds?  We solve that problem by
+  calling unifyKind, producing a coercion perhaps emitting some deferred
+  equality constraints.  That is /different/ from the approach we use in
+  the main constraint solver for herterogeneous equalities; see Note
+  [Equalities with incompatible kinds] in Solver.Canonical
+
+  Why different? Because:
+  - We can't use qlUnify to solve the kind constraint because qlUnify
+    won't unify ordinary (non-instantiation) unification variables.
+    (It would have to worry about lots of things like untouchability
+    if it did.)
+  - qlUnify can't give up if the kinds look un-equal because that would
+    mean that it might succeed some times (when the eager unifier
+    has already unified those kinds) but not others -- order
+    dependence.
+  - We can't use the ordinary unifier/constraint solver instead,
+    because it doesn't unify polykinds, and has all kinds of other
+    magic.  qlUnify is very focused.
+
+  TL;DR Calling unifyKind seems like the lesser evil.
+  -}
 
 {- *********************************************************************
 *                                                                      *

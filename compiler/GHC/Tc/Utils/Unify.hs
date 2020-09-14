@@ -14,7 +14,7 @@
 module GHC.Tc.Utils.Unify (
   -- Full-blown subsumption
   tcWrapResult, tcWrapResultO, tcWrapResultMono,
-  tcSkolemise, tcSkolemiseScoped, tcSkolemiseAlways, tcSkolemiseET,
+  tcSkolemise, tcSkolemiseScoped, tcSkolemiseET,
   tcSubType, tcSubTypeSigma, tcSubTypePat,
   tcSubMult,
   checkConstraints, checkTvConstraints,
@@ -93,6 +93,9 @@ matchActualFunTySigma
                                    -- Both are used only for error messages)
   -> TcRhoType                     -- Type to analyse: a TcRhoType
   -> TcM (HsWrapper, Scaled TcSigmaType, TcSigmaType)
+-- The /argument/ is a RhoType
+-- The /result/   is an (uninstantiated) SigmaType
+--
 -- See Note [matchActualFunTy error handling] for the first three arguments
 
 -- If   (wrap, arg_ty, res_ty) = matchActualFunTySigma ... fun_ty
@@ -826,10 +829,11 @@ to checkConstraints.
 
 tcSkolemiseScoped is very similar, but differs in two ways:
 
-* It deals specially with just the outer forall, bringing those
-  type variables into lexical scope.  To my surprise, I found that
-  doing this regardless (in tcSkolemise) caused a non-trivial (1%-ish)
-  perf hit on the compiler.
+* It deals specially with just the outer forall, bringing those type
+  variables into lexical scope.  To my surprise, I found that doing
+  this unconditionally in tcSkolemise (i.e. doing it even if we don't
+  need to bring the variables into lexical scope, which is harmless)
+  caused a non-trivial (1%-ish) perf hit on the compiler.
 
 * It always calls checkConstraints, even if there are no skolem
   variables at all.  Reason: there might be nested deferred errors
@@ -837,11 +841,13 @@ tcSkolemiseScoped is very similar, but differs in two ways:
   See Note [When to build an implication] below.
 -}
 
-tcSkolemise, tcSkolemiseScoped, tcSkolemiseAlways
+tcSkolemise, tcSkolemiseScoped
     :: UserTypeCtxt -> TcSigmaType
     -> (TcType -> TcM result)
     -> TcM (HsWrapper, result)
         -- ^ The wrapper has type: spec_ty ~> expected_ty
+-- See Note [Skolemisation] for the differences between
+-- tcSkolemiseScoped and tcSkolemise
 
 tcSkolemiseScoped ctxt expected_ty thing_inside
   = do { (wrap, tv_prs, given, rho_ty) <- topSkolemise expected_ty
@@ -860,9 +866,6 @@ tcSkolemise ctxt expected_ty thing_inside
   = do { res <- thing_inside expected_ty
        ; return (idHsWrapper, res) }
   | otherwise
-  = tcSkolemiseAlways ctxt expected_ty thing_inside
-
-tcSkolemiseAlways ctxt expected_ty thing_inside
   = do  { (wrap, tv_prs, given, rho_ty) <- topSkolemise expected_ty
 
         ; let skol_tvs  = map snd tv_prs
@@ -1946,7 +1949,7 @@ occCheckForErrors :: DynFlags -> TcTyVar -> Type -> MetaTyVarUpdateResult ()
 --   a) the given variable occurs in the given type.
 --   b) there is a forall in the type (unless we have -XImpredicativeTypes)
 occCheckForErrors dflags tv ty
-  = case preCheck dflags True tv ty of
+  = case mtvu_check dflags True tv ty of
       MTVU_OK _        -> MTVU_OK ()
       MTVU_Bad         -> MTVU_Bad
       MTVU_HoleBlocker -> MTVU_HoleBlocker
@@ -1960,13 +1963,20 @@ metaTyVarUpdateOK :: DynFlags
                   -> TcType              -- ty :: k2
                   -> MetaTyVarUpdateResult TcType        -- possibly-expanded ty
 -- (metaTyVarUpdateOK tv ty)
--- We are about to update the meta-tyvar tv with ty
--- Check (a) that tv doesn't occur in ty (occurs check)
+-- Checks that the equality tv~ty is OK to be used to rewrite
+-- other equalities.  Equivalently, checks the conditions for CTyEqCan
+--       (a) that tv doesn't occur in ty (occurs check)
 --       (b) that ty does not have any foralls
 --           (in the impredicative case), or type functions
 --       (c) that ty does not have any blocking coercion holes
 --           See Note [Equalities with incompatible kinds] in "GHC.Tc.Solver.Canonical"
 --
+-- Used in two places:
+--   - In the eager unifier: uUnfilledVar2
+--   - In the canonicaliser: GHC.Tc.Solver.Canonical.canEqTyVar2
+-- Note that in the latter case tv is not necessarily a meta-tyvar,
+-- despite the name of this function.
+
 -- We have two possible outcomes:
 -- (1) Return the type to update the type variable with,
 --        [we know the update is ok]
@@ -1985,7 +1995,7 @@ metaTyVarUpdateOK :: DynFlags
 -- See Note [Refactoring hazard: checkTauTvUpdate]
 
 metaTyVarUpdateOK dflags tv ty
-  = case preCheck dflags False tv ty of
+  = case mtvu_check dflags False tv ty of
          -- False <=> type families not ok
          -- See Note [Prevent unification with type families]
       MTVU_OK _        -> MTVU_OK ty
@@ -1995,8 +2005,8 @@ metaTyVarUpdateOK dflags tv ty
                             Just expanded_ty -> MTVU_OK expanded_ty
                             Nothing          -> MTVU_Occurs
 
-preCheck :: DynFlags -> Bool -> TcTyVar -> TcType -> MetaTyVarUpdateResult ()
--- A quick check for
+mtvu_check :: DynFlags -> Bool -> TcTyVar -> TcType -> MetaTyVarUpdateResult ()
+-- Checks the invariants for CTyEqCan.   In particular:
 --   (a) a forall type (forall a. blah)
 --   (b) a predicate type (c => ty)
 --   (c) a type family; see Note [Prevent unification with type families]
@@ -2007,7 +2017,7 @@ preCheck :: DynFlags -> Bool -> TcTyVar -> TcType -> MetaTyVarUpdateResult ()
 -- inside the kinds of variables it mentions.  For (d) we look deeply
 -- in coercions, and for (e) we do look in the kinds of course.
 
-preCheck dflags ty_fam_ok tv ty
+mtvu_check dflags ty_fam_ok tv ty
   = fast_check ty
   where
     ok :: MetaTyVarUpdateResult ()

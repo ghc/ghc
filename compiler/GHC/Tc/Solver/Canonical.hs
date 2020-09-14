@@ -2144,7 +2144,7 @@ k2 and use this to cast. To wit, from
 
   [X] (tv :: k1) ~ (rhs :: k2)
 
-we go to
+(where [X] is [G], [W], or [D]), we go to
 
   [noDerived X] co :: k2 ~ k1
   [X]           (tv :: k1) ~ ((rhs |> co) :: k1)
@@ -2153,6 +2153,9 @@ where
 
   noDerived G = G
   noDerived _ = W
+
+For Wanted/Derived, the [X] constraint is "blocked" (not CTyEqCan, is CIrred)
+until the k1~k2 constraint solved: Wrinkle (2).
 
 Wrinkles:
 
@@ -2166,7 +2169,7 @@ Wrinkles:
        [W] (tv :: k1) ~ ((rhs |> co) :: k1)
      as canonical in the inert set. In particular, we must not unify tv.
      If we did, the Wanted becomes a Given (effectively), and then can
-     rewrite other Wanteds. But that's bad: See Note [Wanteds to not rewrite Wanteds]
+     rewrite other Wanteds. But that's bad: See Note [Wanteds do not rewrite Wanteds]
      in GHC.Tc.Types.Constraint. The problem is about poor error messages. See #11198 for
      tales of destruction.
 
