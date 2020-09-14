@@ -58,7 +58,6 @@ import GHC.Core.Class
 import GHC.Core.Coercion.Axiom
 import GHC.Core.TyCon
 import GHC.Core.DataCon
-import GHC.Hs.Decls( newOrDataToFlavour )
 import GHC.Types.Id
 import GHC.Types.Var
 import GHC.Types.Var.Env
@@ -2318,7 +2317,7 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
                   ; return (ctxt, fds, sig_stuff, at_stuff) }
 
 
-       -- The pushLevelAndSolveEqualities will report errors for any
+       -- The reportUnsolvedEqualities will report errors for any
        -- unsolved equalities, so these zonks should not encounter
        -- any unfilled coercion variables unless there is such an error
        -- The zonk also squeeze out the TcTyCons, and converts
@@ -2796,7 +2795,8 @@ tcDataDefn err_ctxt roles_info tc_name
        ; return (tycon, [deriv_info]) }
   where
     skol_info = TyConSkol flav tc_name
-    flav = newOrDataToFlavour new_or_data
+    flav = case new_or_data of { NewType  -> NewtypeFlavour
+                               ; DataType -> DataTypeFlavour }
 
     -- Abstract data types in hsig files can have arbitrary kinds,
     -- because they may be implemented by type synonyms
@@ -3305,12 +3305,12 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
        ; let skol_tvs = imp_tvs ++ binderVars exp_tvbndrs
        ; reportUnsolvedEqualities skol_info skol_tvs tclvl wanted
 
-       ; let con_ty = mkSpecForAllTys imp_tvs      $
-                      mkInvisForAllTys exp_tvbndrs $
-                      mkPhiTy ctxt                 $
-                      mkVisFunTys arg_tys          $
-                      res_ty
-       ; tkvs <- kindGeneralizeAll con_ty
+       ; let fake_ty = mkSpecForAllTys imp_tvs      $
+                       mkInvisForAllTys exp_tvbndrs $
+                       mkPhiTy ctxt                 $
+                       mkVisFunTys arg_tys          $
+                       res_ty
+       ; tkvs <- kindGeneralizeAll fake_ty
 
        ; let tvbndrs =  mkTyVarBinders InferredSpec  tkvs
                      ++ mkTyVarBinders SpecifiedSpec imp_tvs

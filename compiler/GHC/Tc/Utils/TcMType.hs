@@ -468,7 +468,7 @@ readExpType exp_ty
 -- | Returns the expected type when in checking mode.
 checkingExpType_maybe :: ExpType -> Maybe TcType
 checkingExpType_maybe (Check ty) = Just ty
-checkingExpType_maybe (Infer {}) = Nothing
+checkingExpType_maybe _          = Nothing
 
 -- | Returns the expected type when in checking mode. Panics if in inference
 -- mode.
@@ -1646,11 +1646,11 @@ alpha[1] and beta[2]? Their levels. beta[2] has the right TcLevel for
 generalisation, and so we generalise it. alpha[1] does not, and so
 we leave it alone.
 
-Note that not *every* variable with a higher level will get
-generalised, either due to the monomorphism restriction or other
-quirks. See, for example, the code in GHC.Tc.Solver.decideMonoTyVars
-and in GHC.Tc.Gen.HsType.kindGeneralizeSome, both of which exclude
-certain otherwise-eligible variables from being generalised.
+Note that not *every* variable with a higher level will get generalised,
+either due to the monomorphism restriction or other quirks. See, for
+example, the code in GHC.Tc.Solver.decideMonoTyVars and in
+GHC.Tc.Gen.HsType.kindGeneralize, both of which exclude certain otherwise-eligible
+variables from being generalised.
 
 Using level numbers for quantification is implemented in the candidateQTyVars...
 functions, by adding only those variables with a level strictly higher than
@@ -1690,7 +1690,7 @@ quantifyTyVars dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
   | otherwise
   = do { traceTc "quantifyTyVars {" (ppr dvs)
 
-       ; let (dep_kvs, nondep_tvs) = candidateKiTyVars dvs
+       ; let !(dep_kvs, nondep_tvs) = candidateKiTyVars dvs
 
              -- In the non-PolyKinds case, default the kind variables
              -- to *, and zonk the tyvars as usual.  Notice that this
