@@ -39,6 +39,7 @@
 #if defined(HAVE_SYS_RESOURCE_H) && defined(HAVE_SYS_TIME_H)
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <pthread.h>
 #endif
 
 #include <errno.h>
@@ -545,13 +546,57 @@ void *osReserveHeapMemory(void *startAddressPtr, W_ *len)
     }
 
 #if defined(HAVE_SYS_RESOURCE_H) && defined(HAVE_SYS_TIME_H)
-    struct rlimit limit;
+    struct rlimit asLimit;
     /* rlim_t is signed on some platforms, including FreeBSD;
      * explicitly cast to avoid sign compare error */
-    if (!getrlimit(RLIMIT_AS, &limit)
-        && limit.rlim_cur > 0
-        && *len > (W_) limit.rlim_cur) {
-        *len = (W_) limit.rlim_cur;
+    if (!getrlimit(RLIMIT_AS, &asLimit)
+        && asLimit.rlim_cur > 0
+        && *len > (W_) asLimit.rlim_cur) {
+
+        /* In case address space/virtual memory was limited by rlimit (ulimit),
+           we try to reserver 2/3 of that limit. If we take all, there'll be
+           nothing left for spawning system threads etc. and we'll crash
+           (See #18623)
+        */
+
+        pthread_attr_t threadAttr;
+        if (pthread_attr_init(&threadAttr)) {
+            // Never fails on Linux
+            sysErrorBelch("failed to initialize thread attributes");
+            stg_exit(EXIT_FAILURE);
+        }
+
+        size_t stacksz = 0;
+        if (pthread_attr_getstacksize(&threadAttr, &stacksz)) {
+            // Should never fail
+            sysErrorBelch("failed to read default thread stack size");
+            stg_exit(EXIT_FAILURE);
+        }
+
+        // Cleanup
+        if (pthread_attr_destroy(&threadAttr)) {
+            // Should never fail
+            sysErrorBelch("failed to destroy thread attributes");
+            stg_exit(EXIT_FAILURE);
+        }
+
+        size_t pageSize = getPageSize();
+        // 2/3rds of limit, round down to multiple of PAGE_SIZE
+        *len = (W_) (asLimit.rlim_cur * 0.666) & ~(pageSize - 1);
+
+        // debugBelch("New len: %zu, pageSize: %zu\n", *len, pageSize);
+
+        /* Make sure we leave enough vmem for at least three threads.
+           This number was found through trial and error. We're at least launching
+           that many threads (e.g., itimer). We can't know for sure how much we need,
+           but at least we can fail early and give a useful error message in this case. */
+        if (((W_) (asLimit.rlim_cur - *len )) < ((W_) (stacksz * 3))) {
+            // Three stacks is 1/3 of needed, then convert to Megabyte
+            size_t needed = (stacksz * 3 * 3) / (1024 * 1024);
+            errorBelch("the current resource limit for virtual memory ('ulimit -v' or RLIMIT_AS) is too low.\n"
+                "Please make sure that at least %zuMiB of virtual memory are available.", needed);
+            stg_exit(EXIT_FAILURE);
+        }
     }
 #endif
 
@@ -577,9 +622,11 @@ void *osReserveHeapMemory(void *startAddressPtr, W_ *len)
             // of memory will be wasted (e.g. imagine a machine with 512GB of
             // physical memory but a 511GB ulimit). See #14492.
             *len -= *len / 8;
+            // debugBelch("Limit hit, reduced len: %zu\n", *len);
         } else if ((W_)at >= minimumAddress) {
             // Success! We were given a block of memory starting above the 8 GB
             // mark, which is what we were looking for.
+
             break;
         } else {
             // We got addressing space but it wasn't above the 8GB mark.
