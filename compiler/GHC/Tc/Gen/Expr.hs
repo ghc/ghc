@@ -76,12 +76,11 @@ import GHC.Utils.Panic
 import GHC.Data.FastString
 import Control.Monad
 import GHC.Core.Class(classTyCon)
-import GHC.Types.Unique.Set ( nonDetEltsUniqSet )
+import GHC.Types.Unique.Set ( UniqSet, mkUniqSet, elementOfUniqSet, nonDetEltsUniqSet )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Function
 import Data.List (partition, sortBy, groupBy, intersect)
-import qualified Data.Set as Set
 
 {-
 ************************************************************************
@@ -1566,11 +1565,11 @@ badFieldsUpd rbinds data_cons
     -- For each field, which constructors contain the field?
     membership :: [(FieldLabelString, [Bool])]
     membership = sortMembership $
-        map (\fld -> (fld, map (Set.member fld) fieldLabelSets)) $
+        map (\fld -> (fld, map (fld `elementOfUniqSet`) fieldLabelSets)) $
           map (occNameFS . rdrNameOcc . rdrNameAmbiguousFieldOcc . unLoc . hsRecFieldLbl . unLoc) rbinds
 
-    fieldLabelSets :: [Set.Set FieldLabelString]
-    fieldLabelSets = map (Set.fromList . map flLabel . conLikeFieldLabels) data_cons
+    fieldLabelSets :: [UniqSet FieldLabelString]
+    fieldLabelSets = map (mkUniqSet . map flLabel . conLikeFieldLabels) data_cons
 
     -- Sort in order of increasing number of True, so that a smaller
     -- conflicting set can be found.
