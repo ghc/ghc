@@ -969,6 +969,8 @@ addHoles wc holes
 dropMisleading :: WantedConstraints -> WantedConstraints
 -- Drop misleading constraints; really just class constraints
 -- See Note [Constraints and errors] in GHC.Tc.Utils.Monad
+--   for why this function is so strange, treating the 'simples'
+--   and the implications differently.  Sigh.
 dropMisleading (WC { wc_simple = simples, wc_impl = implics, wc_holes = holes })
   = WC { wc_simple = filterBag insolubleCt simples
        , wc_impl   = mapBag drop_implic implics

@@ -267,11 +267,10 @@ kind-generalisation, is done by
     kindGeneraliseSome
     kindGeneraliseNone
 
-perform kind generalisation.  Here, we have to deal with the fact that
-metatyvars generated in the type will have a bumped TcLevel, because
-explicit foralls raise the TcLevel. To avoid these variables from ever
-being visible in the surrounding context, we must obey the following
-dictum:
+Here, we have to deal with the fact that metatyvars generated in the
+type will have a bumped TcLevel, because explicit foralls raise the
+TcLevel. To avoid these variables from ever being visible in the
+surrounding context, we must obey the following dictum:
 
   Every metavariable in a type must either be
     (A) generalized, or
@@ -1057,7 +1056,7 @@ tc_hs_type mode forall@(HsForAllTy { hst_tele = tele, hst_body = ty }) exp_kind
   = do { (tclvl, wanted, (tv_bndrs, ty'))
             <- pushLevelAndCaptureConstraints $
                  -- No need to solve equalities here; we will do that later
-               bindExplicitTKTele mode tele   $
+               bindExplicitTKTele_Skol_M mode tele   $
                  -- The _M variant passes on the mode from the type, to
                  -- any wildards in kind signatures on the forall'd variables
                  -- e.g.      f :: _ -> Int -> forall (a :: _). blah
@@ -3024,12 +3023,12 @@ cloneFlexiKindedTyVarTyVar = newFlexiKindedTyVar cloneTyVarTyVar
 --------------------------------------
 
 -- | Skolemise the 'HsTyVarBndr's in an 'LHsForAllTelescope.
-bindExplicitTKTele
+bindExplicitTKTele_Skol_M
     :: TcTyMode
     -> HsForAllTelescope GhcRn
     -> TcM a
     -> TcM ([TcTyVarBinder], a)
-bindExplicitTKTele mode tele thing_inside = case tele of
+bindExplicitTKTele_Skol_M mode tele thing_inside = case tele of
   HsForAllVis { hsf_vis_bndrs = bndrs }
     -> do { (req_tv_bndrs, thing) <- bindExplicitTKBndrs_Skol_M mode bndrs thing_inside
             -- req_tv_bndrs :: [VarBndr TyVar ()],
