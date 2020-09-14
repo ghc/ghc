@@ -37,14 +37,14 @@ import Control.Monad (ap, unless)
 -- -----------------------------------------------------------------------------
 -- Exported entry points:
 
-cmmLint :: (OutputableP d, OutputableP h)
+cmmLint :: (OutputableP Platform d, OutputableP Platform h)
         => Platform -> GenCmmGroup d h CmmGraph -> Maybe SDoc
 cmmLint platform tops = runCmmLint platform (mapM_ lintCmmDecl) tops
 
 cmmLintGraph :: Platform -> CmmGraph -> Maybe SDoc
 cmmLintGraph platform g = runCmmLint platform lintCmmGraph g
 
-runCmmLint :: OutputableP a => Platform -> (a -> CmmLint b) -> a -> Maybe SDoc
+runCmmLint :: OutputableP Platform a => Platform -> (a -> CmmLint b) -> a -> Maybe SDoc
 runCmmLint platform l p =
    case unCL (l p) platform of
      Left err -> Just (vcat [text "Cmm lint error:",
@@ -224,7 +224,7 @@ lintTarget (PrimTarget {})     = return ()
 -- | As noted in Note [Register parameter passing], the arguments and
 -- 'ForeignTarget' of a foreign call mustn't mention
 -- caller-saved registers.
-mayNotMentionCallerSavedRegs :: (UserOfRegs GlobalReg a, OutputableP a)
+mayNotMentionCallerSavedRegs :: (UserOfRegs GlobalReg a, OutputableP Platform a)
                              => SDoc -> a -> CmmLint ()
 mayNotMentionCallerSavedRegs what thing = do
     platform <- getPlatform

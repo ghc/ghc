@@ -1,4 +1,8 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+
 
 ----------------------------------------------------------------------------
 --
@@ -54,7 +58,7 @@ import Data.List
 import qualified Data.ByteString as BS
 
 
-pprCmms :: (OutputableP info, OutputableP g)
+pprCmms :: (OutputableP Platform info, OutputableP Platform g)
         => Platform -> [GenCmmGroup RawCmmStatics info g] -> SDoc
 pprCmms platform cmms = pprCode CStyle (vcat (intersperse separator $ map (pdoc platform) cmms))
         where
@@ -62,23 +66,23 @@ pprCmms platform cmms = pprCode CStyle (vcat (intersperse separator $ map (pdoc 
 
 -----------------------------------------------------------------------------
 
-instance (OutputableP d, OutputableP info, OutputableP i)
-      => OutputableP (GenCmmDecl d info i) where
+instance (OutputableP Platform d, OutputableP Platform info, OutputableP Platform i)
+      => OutputableP Platform (GenCmmDecl d info i) where
     pdoc = pprTop
 
-instance OutputableP (GenCmmStatics a) where
+instance OutputableP Platform (GenCmmStatics a) where
     pdoc = pprStatics
 
-instance OutputableP CmmStatic where
+instance OutputableP Platform CmmStatic where
     pdoc = pprStatic
 
-instance OutputableP CmmInfoTable where
+instance OutputableP Platform CmmInfoTable where
     pdoc = pprInfoTable
 
 
 -----------------------------------------------------------------------------
 
-pprCmmGroup :: (OutputableP d, OutputableP info, OutputableP g)
+pprCmmGroup :: (OutputableP Platform d, OutputableP Platform info, OutputableP Platform g)
             => Platform -> GenCmmGroup d info g -> SDoc
 pprCmmGroup platform tops
     = vcat $ intersperse blankLine $ map (pprTop platform) tops
@@ -86,7 +90,7 @@ pprCmmGroup platform tops
 -- --------------------------------------------------------------------------
 -- Top level `procedure' blocks.
 --
-pprTop :: (OutputableP d, OutputableP info, OutputableP i)
+pprTop :: (OutputableP Platform d, OutputableP Platform info, OutputableP Platform i)
        => Platform -> GenCmmDecl d info i -> SDoc
 
 pprTop platform (CmmProc info lbl live graph)

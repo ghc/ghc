@@ -7,6 +7,10 @@
 
 {-# LANGUAGE BangPatterns, CPP, GADTs, ScopedTypeVariables, PatternSynonyms,
     DeriveFunctor #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+
 
 #if !defined(GHC_LOADED_INTO_GHCI)
 {-# LANGUAGE UnboxedTuples #-}
@@ -150,7 +154,7 @@ nativeCodeGen :: forall a . DynFlags -> Module -> ModLocation -> Handle -> UniqS
 nativeCodeGen dflags this_mod modLoc h us cmms
  = let config   = initNCGConfig dflags
        platform = ncgPlatform config
-       nCG' :: ( OutputableP statics, Outputable jumpDest, Instruction instr)
+       nCG' :: ( OutputableP Platform statics, Outputable jumpDest, Instruction instr)
             => NcgImpl statics instr jumpDest -> IO a
        nCG' ncgImpl = nativeCodeGen' dflags config this_mod modLoc ncgImpl h us cmms
    in case platformArch platform of
@@ -214,7 +218,7 @@ unwinding table).
 See also Note [What is this unwinding business?] in "GHC.Cmm.DebugBlock".
 -}
 
-nativeCodeGen' :: (OutputableP statics, Outputable jumpDest, Instruction instr)
+nativeCodeGen' :: (OutputableP Platform statics, Outputable jumpDest, Instruction instr)
                => DynFlags
                -> NCGConfig
                -> Module -> ModLocation
@@ -293,7 +297,7 @@ finishNativeGen dflags config modLoc bufh@(BufHandle _ _ h) us ngs
                    (dumpOptionsFromFlag Opt_D_dump_asm_stats) "NCG stats"
                    FormatText
 
-cmmNativeGenStream :: (OutputableP statics, Outputable jumpDest, Instruction instr)
+cmmNativeGenStream :: (OutputableP Platform statics, Outputable jumpDest, Instruction instr)
               => DynFlags
               -> NCGConfig
               -> Module -> ModLocation
@@ -349,7 +353,7 @@ cmmNativeGenStream dflags config this_mod modLoc ncgImpl h us cmm_stream ngs
 -- | Do native code generation on all these cmms.
 --
 cmmNativeGens :: forall statics instr jumpDest.
-                 (OutputableP statics, Outputable jumpDest, Instruction instr)
+                 (OutputableP Platform statics, Outputable jumpDest, Instruction instr)
               => DynFlags
               -> NCGConfig
               -> Module -> ModLocation
@@ -427,7 +431,7 @@ emitNativeCode dflags config h sdoc = do
 --      Dumping the output of each stage along the way.
 --      Global conflict graph and NGC stats
 cmmNativeGen
-    :: forall statics instr jumpDest. (Instruction instr, OutputableP statics, Outputable jumpDest)
+    :: forall statics instr jumpDest. (Instruction instr, OutputableP Platform statics, Outputable jumpDest)
     => DynFlags
     -> Module -> ModLocation
     -> NcgImpl statics instr jumpDest

@@ -1,6 +1,13 @@
 {-# LANGUAGE GADTs, BangPatterns, RecordWildCards,
     GeneralizedNewtypeDeriving, NondecreasingIndentation, TupleSections,
     ScopedTypeVariables, OverloadedStrings, LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 
 module GHC.Cmm.Info.Build
   ( CAFSet, CAFEnv, cafAnal, cafAnalData
@@ -455,7 +462,9 @@ non-CAFFY.
 -- map them to SRTEntry later, which ranges over labels that do exist.
 --
 newtype CAFLabel = CAFLabel CLabel
-  deriving (Eq,Ord,OutputableP)
+  deriving (Eq,Ord)
+
+deriving newtype instance OutputableP env CLabel => OutputableP env CAFLabel
 
 type CAFSet = Set CAFLabel
 type CAFEnv = LabelMap CAFSet
@@ -466,7 +475,10 @@ mkCAFLabel platform lbl = CAFLabel (toClosureLbl platform lbl)
 -- This is a label that we can put in an SRT.  It *must* be a closure label,
 -- pointing to either a FUN_STATIC, THUNK_STATIC, or CONSTR.
 newtype SRTEntry = SRTEntry CLabel
-  deriving (Eq, Ord, OutputableP)
+  deriving (Eq, Ord)
+
+deriving newtype instance OutputableP env CLabel => OutputableP env SRTEntry
+
 
 -- ---------------------------------------------------------------------
 -- CAF analysis
@@ -597,12 +609,12 @@ data ModuleSRTInfo = ModuleSRTInfo
   , moduleSRTMap :: SRTMap
   }
 
-instance OutputableP ModuleSRTInfo where
-  pdoc platform ModuleSRTInfo{..} =
+instance OutputableP env CLabel => OutputableP env ModuleSRTInfo where
+  pdoc env ModuleSRTInfo{..} =
     text "ModuleSRTInfo {" $$
-      (nest 4 $ text "dedupSRTs ="    <+> pdoc platform dedupSRTs $$
-                text "flatSRTs ="     <+> pdoc platform flatSRTs $$
-                text "moduleSRTMap =" <+> pdoc platform moduleSRTMap) $$ char '}'
+      (nest 4 $ text "dedupSRTs ="    <+> pdoc env dedupSRTs $$
+                text "flatSRTs ="     <+> pdoc env flatSRTs $$
+                text "moduleSRTMap =" <+> pdoc env moduleSRTMap) $$ char '}'
 
 emptySRT :: Module -> ModuleSRTInfo
 emptySRT mod =
@@ -635,10 +647,10 @@ data SomeLabel
   | DeclLabel CLabel
   deriving (Eq, Ord)
 
-instance OutputableP SomeLabel where
-   pdoc platform = \case
-      BlockLabel l -> text "b:" <+> pdoc platform l
-      DeclLabel l  -> text "s:" <+> pdoc platform l
+instance OutputableP env CLabel => OutputableP env SomeLabel where
+   pdoc env = \case
+      BlockLabel l -> text "b:" <+> pdoc env l
+      DeclLabel l  -> text "s:" <+> pdoc env l
 
 getBlockLabel :: SomeLabel -> Maybe Label
 getBlockLabel (BlockLabel l) = Just l

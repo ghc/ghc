@@ -3,6 +3,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -249,12 +252,12 @@ instance Outputable instr
                  | otherwise            = name <>
                      (pprUFM (getUniqSet regs) (hcat . punctuate space . map ppr))
 
-instance OutputableP instr => OutputableP (LiveInstr instr) where
-   pdoc platform i = ppr (fmap (pdoc platform) i)
+instance OutputableP env instr => OutputableP env (LiveInstr instr) where
+   pdoc env i = ppr (fmap (pdoc env) i)
 
-instance OutputableP LiveInfo where
-    pdoc platform (LiveInfo mb_static entryIds liveVRegsOnEntry liveSlotsOnEntry)
-        =  (pdoc platform mb_static)
+instance OutputableP Platform LiveInfo where
+    pdoc env (LiveInfo mb_static entryIds liveVRegsOnEntry liveSlotsOnEntry)
+        =  (pdoc env mb_static)
         $$ text "# entryIds         = " <> ppr entryIds
         $$ text "# liveVRegsOnEntry = " <> ppr liveVRegsOnEntry
         $$ text "# liveSlotsOnEntry = " <> text (show liveSlotsOnEntry)
@@ -507,7 +510,7 @@ slurpReloadCoalesce live
 
 -- | Strip away liveness information, yielding NatCmmDecl
 stripLive
-        :: (OutputableP statics, Instruction instr)
+        :: (OutputableP Platform statics, Instruction instr)
         => NCGConfig
         -> LiveCmmDecl statics instr
         -> NatCmmDecl statics instr
@@ -515,7 +518,7 @@ stripLive
 stripLive config live
         = stripCmm live
 
- where  stripCmm :: (OutputableP statics, Instruction instr)
+ where  stripCmm :: (OutputableP Platform statics, Instruction instr)
                  => LiveCmmDecl statics instr -> NatCmmDecl statics instr
         stripCmm (CmmData sec ds)       = CmmData sec ds
         stripCmm (CmmProc (LiveInfo info (first_id:_) _ _) label live sccs)
@@ -536,7 +539,7 @@ stripLive config live
 
 
 -- | Pretty-print a `LiveCmmDecl`
-pprLiveCmmDecl :: (OutputableP statics, Instruction instr) => Platform -> LiveCmmDecl statics instr -> SDoc
+pprLiveCmmDecl :: (OutputableP Platform statics, Instruction instr) => Platform -> LiveCmmDecl statics instr -> SDoc
 pprLiveCmmDecl platform d = pdoc platform (mapLiveCmmDecl (pprInstr platform) d)
 
 

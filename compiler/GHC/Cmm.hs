@@ -4,6 +4,9 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ExplicitNamespaces #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 
 module GHC.Cmm (
      -- * Cmm top-level datatypes
@@ -266,15 +269,15 @@ newtype ListGraph i
 instance Outputable instr => Outputable (ListGraph instr) where
     ppr (ListGraph blocks) = vcat (map ppr blocks)
 
-instance OutputableP instr => OutputableP (ListGraph instr) where
-    pdoc platform g = ppr (fmap (pdoc platform) g)
+instance OutputableP env instr => OutputableP env (ListGraph instr) where
+    pdoc env g = ppr (fmap (pdoc env) g)
 
 
 instance Outputable instr => Outputable (GenBasicBlock instr) where
     ppr = pprBBlock
 
-instance OutputableP instr => OutputableP (GenBasicBlock instr) where
-    pdoc platform block = ppr (fmap (pdoc platform) block)
+instance OutputableP env instr => OutputableP env (GenBasicBlock instr) where
+    pdoc env block = ppr (fmap (pdoc env) block)
 
 pprBBlock :: Outputable stmt => GenBasicBlock stmt -> SDoc
 pprBBlock (BasicBlock ident stmts) =

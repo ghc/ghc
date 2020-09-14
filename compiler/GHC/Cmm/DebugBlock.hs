@@ -1,6 +1,11 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -72,20 +77,20 @@ data DebugBlock =
   , dblBlocks     :: ![DebugBlock] -- ^ Nested blocks
   }
 
-instance OutputableP DebugBlock where
-  pdoc platform blk =
+instance OutputableP env CLabel => OutputableP env DebugBlock where
+  pdoc env blk =
             (if | dblProcedure blk == dblLabel blk
                 -> text "proc"
                 | dblHasInfoTbl blk
                 -> text "pp-blk"
                 | otherwise
                 -> text "blk") <+>
-            ppr (dblLabel blk) <+> parens (pdoc platform (dblCLabel blk)) <+>
+            ppr (dblLabel blk) <+> parens (pdoc env (dblCLabel blk)) <+>
             (maybe empty ppr (dblSourceTick blk)) <+>
             (maybe (text "removed") ((text "pos " <>) . ppr)
                    (dblPosition blk)) <+>
-            (pdoc platform (dblUnwind blk)) $+$
-            (if null (dblBlocks blk) then empty else nest 4 (pdoc platform (dblBlocks blk)))
+            (pdoc env (dblUnwind blk)) $+$
+            (if null (dblBlocks blk) then empty else nest 4 (pdoc env (dblBlocks blk)))
 
 -- | Intermediate data structure holding debug-relevant context information
 -- about a block.
@@ -490,12 +495,12 @@ LOC this information will end up in is Y.
 -- | A label associated with an 'UnwindTable'
 data UnwindPoint = UnwindPoint !CLabel !UnwindTable
 
-instance OutputableP UnwindPoint where
-  pdoc platform (UnwindPoint lbl uws) =
-      braces $ pdoc platform lbl <> colon
+instance OutputableP env CLabel => OutputableP env UnwindPoint where
+  pdoc env (UnwindPoint lbl uws) =
+      braces $ pdoc env lbl <> colon
       <+> hsep (punctuate comma $ map pprUw $ Map.toList uws)
     where
-      pprUw (g, expr) = ppr g <> char '=' <> pdoc platform expr
+      pprUw (g, expr) = ppr g <> char '=' <> pdoc env expr
 
 -- | Maps registers to expressions that yield their "old" values
 -- further up the stack. Most interesting for the stack pointer @Sp@,
@@ -514,19 +519,19 @@ data UnwindExpr = UwConst !Int                  -- ^ literal value
                 | UwTimes UnwindExpr UnwindExpr
                 deriving (Eq)
 
-instance OutputableP UnwindExpr where
-  pdocPrec _ _        (UwConst i)     = ppr i
-  pdocPrec _ _        (UwReg g 0)     = ppr g
-  pdocPrec p platform (UwReg g x)     = pdocPrec p platform (UwPlus (UwReg g 0) (UwConst x))
-  pdocPrec _ platform (UwDeref e)     = char '*' <> pdocPrec 3 platform e
-  pdocPrec _ platform (UwLabel l)     = pdocPrec 3 platform l
-  pdocPrec p platform (UwPlus e0 e1)  | p <= 0
-                                      = pdocPrec 0 platform e0 <> char '+' <> pdocPrec 0 platform e1
-  pdocPrec p platform (UwMinus e0 e1) | p <= 0
-                                      = pdocPrec 1 platform e0 <> char '-' <> pdocPrec 1 platform e1
-  pdocPrec p platform (UwTimes e0 e1) | p <= 1
-                                      = pdocPrec 2 platform e0 <> char '*' <> pdocPrec 2 platform e1
-  pdocPrec _ platform other           = parens (pdocPrec 0 platform other)
+instance OutputableP env CLabel => OutputableP env UnwindExpr where
+  pdocPrec _ _   (UwConst i)     = ppr i
+  pdocPrec _ _   (UwReg g 0)     = ppr g
+  pdocPrec p env (UwReg g x)     = pdocPrec p env (UwPlus (UwReg g 0) (UwConst x))
+  pdocPrec _ env (UwDeref e)     = char '*' <> pdocPrec 3 env e
+  pdocPrec _ env (UwLabel l)     = pdocPrec 3 env l
+  pdocPrec p env (UwPlus e0 e1)  | p <= 0
+                                      = pdocPrec 0 env e0 <> char '+' <> pdocPrec 0 env e1
+  pdocPrec p env (UwMinus e0 e1) | p <= 0
+                                      = pdocPrec 1 env e0 <> char '-' <> pdocPrec 1 env e1
+  pdocPrec p env (UwTimes e0 e1) | p <= 1
+                                      = pdocPrec 2 env e0 <> char '*' <> pdocPrec 2 env e1
+  pdocPrec _ env other           = parens (pdocPrec 0 env other)
 
 -- | Conversion of Cmm expressions to unwind expressions. We check for
 -- unsupported operator usages and simplify the expression as far as

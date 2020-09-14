@@ -32,6 +32,9 @@
 -- A useful example pass over Cmm is in nativeGen/MachCodeGen.hs
 --
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module GHC.Cmm.Ppr.Expr
@@ -53,13 +56,13 @@ import Numeric ( fromRat )
 
 -----------------------------------------------------------------------------
 
-instance OutputableP CmmExpr where
+instance OutputableP Platform CmmExpr where
     pdoc = pprExpr
 
 instance Outputable CmmReg where
     ppr e = pprReg e
 
-instance OutputableP CmmLit where
+instance OutputableP Platform CmmLit where
     pdoc = pprLit
 
 instance Outputable LocalReg where
@@ -71,7 +74,7 @@ instance Outputable Area where
 instance Outputable GlobalReg where
     ppr e = pprGlobalReg e
 
-instance OutputableP GlobalReg where
+instance OutputableP env GlobalReg where
     pdoc _ = ppr
 
 -- --------------------------------------------------------------------------

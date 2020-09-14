@@ -1,5 +1,10 @@
-{-# LANGUAGE GADTs, TypeFamilies, FlexibleContexts, FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
+
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 ----------------------------------------------------------------------------
@@ -63,11 +68,11 @@ import GHC.Cmm.Dataflow.Graph
 instance Outputable CmmStackInfo where
     ppr = pprStackInfo
 
-instance OutputableP CmmTopInfo where
+instance OutputableP Platform CmmTopInfo where
     pdoc = pprTopInfo
 
 
-instance OutputableP (CmmNode e x) where
+instance OutputableP Platform (CmmNode e x) where
     pdoc = pprNode
 
 instance Outputable Convention where
@@ -76,25 +81,25 @@ instance Outputable Convention where
 instance Outputable ForeignConvention where
     ppr = pprForeignConvention
 
-instance OutputableP ForeignTarget where
+instance OutputableP Platform ForeignTarget where
     pdoc = pprForeignTarget
 
 instance Outputable CmmReturnInfo where
     ppr = pprReturnInfo
 
-instance OutputableP (Block CmmNode C C) where
+instance OutputableP Platform (Block CmmNode C C) where
     pdoc = pprBlock
-instance OutputableP (Block CmmNode C O) where
+instance OutputableP Platform (Block CmmNode C O) where
     pdoc = pprBlock
-instance OutputableP (Block CmmNode O C) where
+instance OutputableP Platform (Block CmmNode O C) where
     pdoc = pprBlock
-instance OutputableP (Block CmmNode O O) where
+instance OutputableP Platform (Block CmmNode O O) where
     pdoc = pprBlock
 
-instance OutputableP (Graph CmmNode e x) where
+instance OutputableP Platform (Graph CmmNode e x) where
     pdoc = pprGraph
 
-instance OutputableP CmmGraph where
+instance OutputableP Platform CmmGraph where
     pdoc = pprCmmGraph
 
 ----------------------------------------------------------
@@ -130,7 +135,7 @@ pprGraph platform = \case
          text "{"
       $$ nest 2 (pprMaybeO entry $$ (vcat $ map (pdoc platform) $ bodyToBlockList body) $$ pprMaybeO exit)
       $$ text "}"
-      where pprMaybeO :: OutputableP (Block CmmNode e x)
+      where pprMaybeO :: OutputableP Platform (Block CmmNode e x)
                       => MaybeO ex (Block CmmNode e x) -> SDoc
             pprMaybeO NothingO = empty
             pprMaybeO (JustO block) = pdoc platform block

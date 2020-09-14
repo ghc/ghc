@@ -1,3 +1,8 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 module GHC.CmmToAsm.Dwarf.Types
   ( -- * Dwarf information
     DwarfInfo(..)
@@ -286,8 +291,8 @@ data DwarfFrameBlock
       -- in the block
     }
 
-instance OutputableP DwarfFrameBlock where
-  pdoc platform (DwarfFrameBlock hasInfo unwinds) = braces $ ppr hasInfo <+> pdoc platform unwinds
+instance OutputableP env CLabel => OutputableP env DwarfFrameBlock where
+  pdoc env (DwarfFrameBlock hasInfo unwinds) = braces $ ppr hasInfo <+> pdoc env unwinds
 
 -- | Header for the @.debug_frame@ section. Here we emit the "Common
 -- Information Entry" record that establishes general call frame

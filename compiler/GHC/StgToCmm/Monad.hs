@@ -1,5 +1,8 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 
 -----------------------------------------------------------------------------
 --
@@ -182,9 +185,9 @@ data CgIdInfo
         , cg_loc :: CgLoc                     -- CmmExpr for the *tagged* value
         }
 
-instance OutputableP CgIdInfo where
-  pdoc platform (CgIdInfo { cg_id = id, cg_loc = loc })
-    = ppr id <+> text "-->" <+> pdoc platform loc
+instance OutputableP Platform CgIdInfo where
+  pdoc env (CgIdInfo { cg_id = id, cg_loc = loc })
+    = ppr id <+> text "-->" <+> pdoc env loc
 
 -- Sequel tells what to do with the result of this expression
 data Sequel
